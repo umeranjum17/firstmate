@@ -1,0 +1,21 @@
+LIVE_SCENARIO captain-hold-while-pr-poll-is-armed
+STEP register-real-github-pr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair a missing or failed watcher cycle with the Pi tool fm_watch_arm_pi, or restart Pi with -e /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M2HFV5HFZ54TJ006Z5RKWV0C/.pi/extensions/fm-primary-turnend-guard.ts -e /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M2HFV5HFZ54TJ006Z5RKWV0C/.pi/extensions/fm-primary-pi-watch.ts if the extensions are not loaded.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+armed: state/livepr.check.sh
+OBSERVED initial_authenticated_poll=true
+STEP record-captain-hold-and-complete
+livepr
+complete: livepr captain-call inventory reviewed (livepr)
+OBSERVED post_completion_authenticated_poll=true
+OBSERVED metadata_tail:
+mode=no-mistakes
+pr=https://github.com/kunchenguid/firstmate/pull/4499
+pr_head=8580d21c1cabe4f620d9f8cb3ceaad747e43e409
+decisions_reviewed=1
+decision_keys=livepr

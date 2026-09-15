@@ -1,0 +1,18 @@
+LIVE_SCENARIO watcher-supervises-registered-pr-after-captain-completion
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair a missing or failed watcher cycle with the Pi tool fm_watch_arm_pi, or restart Pi with -e /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M2HFV5HFZ54TJ006Z5RKWV0C/.pi/extensions/fm-primary-turnend-guard.ts -e /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M2HFV5HFZ54TJ006Z5RKWV0C/.pi/extensions/fm-primary-pi-watch.ts if the extensions are not loaded.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+armed: state/livewatch.check.sh
+livewatch
+complete: livewatch captain-call inventory reviewed (livewatch)
+OBSERVED poll_authenticated_before_watcher=true
+STEP run-real-watcher-one-cycle
+OBSERVED watcher_exit=124
+Terminated                 sleep "$POLL"
+OBSERVED watcher_beat=true
+OBSERVED check_cycle_completed=true
+OBSERVED rejected_unauthenticated_state_check=false
