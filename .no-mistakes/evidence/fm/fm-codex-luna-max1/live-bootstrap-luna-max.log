@@ -1,0 +1,5 @@
+scenario: bootstrap dispatch validation
+model=gpt-5.6-luna status=0
+CREW_DISPATCH: accepted (no diagnostic)
+model=gpt-5.6-sol status=0
+CREW_DISPATCH: invalid config/crew-dispatch.json - invalid effort: codex:max

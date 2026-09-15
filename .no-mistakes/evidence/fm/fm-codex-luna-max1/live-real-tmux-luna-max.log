@@ -1,0 +1,71 @@
+model=gpt-5.6-luna
+spawn_status=0
+spawn_output:
+warning: /tmp/fm-real-tmux-luna-max.f38MdG/gpt-5.6-luna/home/data/live-gpt-5-6-luna-max/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+spawned live-gpt-5-6-luna-max harness=codex kind=ship mode=no-mistakes yolo=off window=firstmate:fm-live-gpt-5-6-luna-max worktree=/tmp/fm-real-tmux-luna-max.f38MdG/gpt-5.6-luna/worktree
+codex_argv:
+--model
+gpt-5.6-luna
+-c
+model_reasoning_effort="max"
+--dangerously-bypass-approvals-and-sandbox
+-c
+notify=["bash","-c","touch '/tmp/fm-real-tmux-luna-max.f38MdG/gpt-5.6-luna/home/state/live-gpt-5-6-luna-max.turn-ended'"]
+⁣FIRSTMATE_OP: v1 launch-brief: # Task
+## Captain's intent
+brief for live-gpt-5-6-luna-max
+
+## Firstmate spec
+Exercise the spawn behavior under test.
+
+# Current worker role contract
+When this task works on Firstmate itself, this section supersedes every earlier brief instruction about your role and identity.
+When this task works on Firstmate itself, the repository root `AGENTS.md` (also imported by `CLAUDE.md`) is the primary/secondmate supervisor's contract: follow this brief instead of that supervisor contract.
+For that Firstmate task, do the assigned work yourself and report to firstmate; do not adopt the supervisor identity, delegate the task, run fleet supervision, or address the captain.
+This exception preserves this brief's safety and authority boundaries and applicable contributor guidance, including `CONTRIBUTING.md` and `firstmate-coding-guidelines` for Firstmate changes.
+Other projects retain their own instructions unchanged.
+
+# Current no-mistakes intent contract
+This section supersedes every earlier brief instruction about constructing `--intent`, but not later clarifications actually supplied by the captain.
+Use everything under `## Captain intent authorized for --intent` through the end of this brief, including any nested subheadings but excluding that heading, plus any later words the captain actually supplied as `--intent`; never include Firstmate specification or other mixed Task content.
+Preserve those words without adding speaker labels or direct address.
+Firstmate-authored constraints, acceptance criteria, implementation details, decisions, and tradeoffs are specification, not captain intent.
+The Definition of done's rule that `--intent` must be self-sufficient still governs the string you pass: resolve any report, decision, or PR the intent below refers to into its substance rather than passing the pointer.
+
+## Captain intent authorized for --intent
+brief for live-gpt-5-6-luna-max
+model=gpt-5.6-sol
+spawn_status=0
+spawn_output:
+warning: /tmp/fm-real-tmux-luna-max.f38MdG/gpt-5.6-sol/home/data/live-gpt-5-6-sol-max/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+spawned live-gpt-5-6-sol-max harness=codex kind=ship mode=no-mistakes yolo=off window=firstmate:fm-live-gpt-5-6-sol-max worktree=/tmp/fm-real-tmux-luna-max.f38MdG/gpt-5.6-sol/worktree
+codex_argv:
+--model
+gpt-5.6-sol
+--dangerously-bypass-approvals-and-sandbox
+-c
+notify=["bash","-c","touch '/tmp/fm-real-tmux-luna-max.f38MdG/gpt-5.6-sol/home/state/live-gpt-5-6-sol-max.turn-ended'"]
+⁣FIRSTMATE_OP: v1 launch-brief: # Task
+## Captain's intent
+brief for live-gpt-5-6-sol-max
+
+## Firstmate spec
+Exercise the spawn behavior under test.
+
+# Current worker role contract
+When this task works on Firstmate itself, this section supersedes every earlier brief instruction about your role and identity.
+When this task works on Firstmate itself, the repository root `AGENTS.md` (also imported by `CLAUDE.md`) is the primary/secondmate supervisor's contract: follow this brief instead of that supervisor contract.
+For that Firstmate task, do the assigned work yourself and report to firstmate; do not adopt the supervisor identity, delegate the task, run fleet supervision, or address the captain.
+This exception preserves this brief's safety and authority boundaries and applicable contributor guidance, including `CONTRIBUTING.md` and `firstmate-coding-guidelines` for Firstmate changes.
+Other projects retain their own instructions unchanged.
+
+# Current no-mistakes intent contract
+This section supersedes every earlier brief instruction about constructing `--intent`, but not later clarifications actually supplied by the captain.
+Use everything under `## Captain intent authorized for --intent` through the end of this brief, including any nested subheadings but excluding that heading, plus any later words the captain actually supplied as `--intent`; never include Firstmate specification or other mixed Task content.
+Preserve those words without adding speaker labels or direct address.
+Firstmate-authored constraints, acceptance criteria, implementation details, decisions, and tradeoffs are specification, not captain intent.
+The Definition of done's rule that `--intent` must be self-sufficient still governs the string you pass: resolve any report, decision, or PR the intent below refers to into its substance rather than passing the pointer.
+
+## Captain intent authorized for --intent
+brief for live-gpt-5-6-sol-max
+done
