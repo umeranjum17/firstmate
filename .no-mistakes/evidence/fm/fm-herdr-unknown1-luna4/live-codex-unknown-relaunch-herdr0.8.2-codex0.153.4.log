@@ -1,0 +1,13 @@
+FM_TEST_BEGIN 2026-09-15T06:22:49Z tests/fm-herdr-codex-unknown-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability
+running_registration={"type":"agent_info","agent":"codex","agent_status":"idle","pane_id":"w1:p1","agent_session":{"agent":"codex","kind":"id","source":"herdr:codex","value":"01a0a3bb-9385-72a1-8300-ea0963606af1"}}
+running_foreground=[{"name":"node-MainThread","argv0":null,"argv":["/home/umer/.local/share/mise/installs/node/26.1.0/bin/node","/home/umer/.local/share/mise/installs/node/26.1.0/lib/node_modules/@openai/codex/bin/codex.js","Reply with only the word ready."],"cmdline":"/home/umer/.local/share/mise/installs/node/26.1.0/bin/node /home/umer/.local/share/mise/installs/node/26.1.0/lib/node_modules/@openai/codex/bin/codex.js Reply with only the word ready."},{"name":"codex","argv0":null,"argv":["/home/umer/.local/share/mise/installs/node/26.1.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/bin/codex","Reply with only the word ready."],"cmdline":"/home/umer/.local/share/mise/installs/node/26.1.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/bin/codex Reply with only the word ready."}]
+shell_only_foreground=[{"name":"bash","argv0":null,"argv":["bash"],"cmdline":"bash"}]
+stale_registration={"type":"agent_info","agent":null,"agent_status":"unknown","pane_id":"w1:p1","agent_session":{"agent":"codex","kind":"id","source":"herdr:codex","value":"01a0a3bb-9385-72a1-8300-ea0963606af1"}}
+pane_state=stale-agent recovery_state=dead husk=no
+control_rc=0
+candidate_head_before=0f7f80fa0a6ecaae4c151f18dc57f56316d49e4f candidate_head_after=0f7f80fa0a6ecaae4c151f18dc57f56316d49e4f endpoint=fm-lab-fm-herdr-unknown-3144600-7934:w1:p1
+ok - herdr 0.8.2 + codex-cli 0.153.4: an unlabeled unknown registration over a shell-only pane relaunches Codex in the same pane and committed worktree
+FM_TEST_END 2026-09-15T06:23:37Z tests/fm-herdr-codex-unknown-live-e2e.test.sh exit=0 duration_ms=48296 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=48322
+FM_TEST_SUMMARY_FAMILY family=live-harness-optin count=1 duration_ms=48296 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-herdr-codex-unknown-live-e2e.test.sh duration_ms=48296
