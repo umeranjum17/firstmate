@@ -1,0 +1,54 @@
+byte-identical dead display proof (real tmux captures, last 40 lines, successor relaunch between watcher runs)
+display 1 (death already reported):
+bash-5.3$
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+display 2 (successor husk after in-pane agent swap):
+bash-5.3$
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+cmp: files are byte-identical

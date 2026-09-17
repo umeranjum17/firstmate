@@ -1,0 +1,10 @@
+captain-visible dead-record wake payloads, queued by the real bin/fm-watch.sh against a real tmux lane (from the live-drive transcript; tab-separated queue rows: epoch, seq, kind, window, payload):
+
+stale: fmdeadrec:lane1 (idle 2s, agent dead - the endpoint is still there with no agent running in it, so this is not a wedge; reported once and not re-escalated while it stays that way - reconcile this record, and check for unlanded work before any cleanup)
+
+stale: fmdeadrec:lane1 (idle 2s, possible wedge, escalation 1)   <- a LIVE replacement agent in the same window still escalates as a wedge
+
+once-marker file state/.dead-reported-fmdeadrec_lane1 through the drive:
+  dead 0d34c66df78da3883725b52f25e65c4a      <- first death, no incarnation token readable: pane-hash fallback
+  dead g1789684927.13687.1209                <- successor death re-keyed to the new busy incarnation (real fm-busy-event.sh arm)
+  dead g1789684948.31560.21259               <- replacement's death report under its own incarnation; marker dropped when the endpoint read live again

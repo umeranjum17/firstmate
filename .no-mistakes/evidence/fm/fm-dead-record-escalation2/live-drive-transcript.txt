@@ -1,0 +1,93 @@
+=== P0: real tmux fleet + records (the failed-lane shape from the intent) ===
+  PASS: real tmux server up on isolated socket
+  lane1 fg cmd: bash
+
+=== S1: dead-endpoint lane (bare-shell husk) reports once, then stays quiet ===
+  [s1-a-signal] signal: /tmp/fm-deadrec-live/home/state/wedge.status
+  -> EXIT:0:1.4s
+  [s1-b-surface] stale: fmdeadrec:lane1
+  -> EXIT:0:2.6s
+  PASS: lane1 tally after first-sight stale surface (1)
+  [s1-c-dead] stale: fmdeadrec:lane1 (idle 2s, agent dead - the endpoint is still there with no agent running in it, so this is not a wedge; reported once and not re-escalated while it stays that way - reconcile this record, and check for unlanded work before any cleanup)
+  -> EXIT:0:2.7s
+  PASS: report names the verdict (agent dead)
+  PASS: report carries the once-only reconciliation reason
+  PASS: dead lane NOT reported as a possible wedge
+  PASS: lane1 tally after the dead record (1 surface + 1 dead report) (2)
+  PASS: once-marker written: 'dead 0d34c66df78da3883725b52f25e65c4a'
+  PASS: no wedge escalation count for dead lane
+  -> s1-d-quiet: ABSORBED:8s
+  -> s1-e-quiet: ABSORBED:8s
+  -> s1-f-quiet: ABSORBED:8s
+  PASS: lane1 tally still 2 after 3 quiet rounds (hash-fallback absorb; task has no trusted busy source) (2)
+  absorbed-once triage lines: 10
+  triage: [2026-09-18T02:42:06+0400] absorbed non-terminal stale (agent dead, already reported once, idle 2s): fmdeadrec:lane1
+
+=== S5: successor dies into a byte-identical display; incarnation keying reports it ===
+  PASS: successor's busy incarnation armed via real fm-busy-event.sh
+  gen after arm: g1789684927.13687.1209
+  PASS: successor's dead display is byte-identical to the reported one
+  lane1 fg cmd: bash
+  [s5-a-successor-death] stale: fmdeadrec:lane1 (idle 4s, agent dead - the endpoint is still there with no agent running in it, so this is not a wedge; reported once and not re-escalated while it stays that way - reconcile this record, and check for unlanded work before any cleanup)
+  -> EXIT:0:0.4s
+  PASS: successor's identical-looking death reported (new incarnation under the marker)
+  PASS: lane1 tally: +1 for the successor death (3)
+  PASS: marker now keyed to the new incarnation (g1789684927.13687.1209)
+  -> s5-b-same-gen-quiet: ABSORBED:8s
+  -> s5-c-same-gen-quiet: ABSORBED:8s
+  PASS: lane1 tally still 3 under the unchanged incarnation (3)
+
+=== S2: replacement agent occupies the lane; its wedge escalates, its later death reports in full ===
+  gen after relaunch arm: g1789684948.31560.21259
+  lane1 fg cmd now: grok
+  [s2-a-relaunch-surface] stale: fmdeadrec:lane1
+  -> EXIT:0:2.6s
+  [s2-b-replacement-wedge] stale: fmdeadrec:lane1 (idle 2s, possible wedge, escalation 1)
+  -> EXIT:0:2.6s
+  PASS: replacement live agent escalated as a real wedge
+  PASS: replacement wedge count = 1 (1)
+  PASS: once-marker dropped when the endpoint read live again
+  lane1 fg cmd after agent death: bash
+  [s2-c-death-surface] stale: fmdeadrec:lane1
+  -> EXIT:0:2.6s
+  [s2-d-second-death] stale: fmdeadrec:lane1 (idle 2s, agent dead - the endpoint is still there with no agent running in it, so this is not a wedge; reported once and not re-escalated while it stays that way - reconcile this record, and check for unlanded work before any cleanup)
+  -> EXIT:0:2.7s
+  PASS: lane1 running stale-wake tally gains the second death report (4)
+  PASS: replacement's own later death reported in full
+  PASS: marker re-keyed to the replacement's incarnation after its death report (g1789684948.31560.21259)
+  -> s2-e-quiet: ABSORBED:8s
+
+=== S4: ambiguous endpoint (unattributable foreground) still escalates unchanged ===
+  lane2 fg cmd: bash
+  [s4-a-signal] signal: /tmp/fm-deadrec-live/home/state/amb.status
+  -> EXIT:0:1.4s
+  [s4-b-surface] stale: fmdeadrec:lane2
+  -> EXIT:0:2.7s
+  [s4-c-escalate] stale: fmdeadrec:lane2 (idle 2s, possible wedge, escalation 1)
+  -> EXIT:0:2.8s
+  PASS: ambiguous endpoint escalates (1)
+  [s4-d-escalate-again] stale: fmdeadrec:lane2 (idle 2s, possible wedge, escalation 2)
+  -> EXIT:0:2.8s
+  PASS: ambiguous endpoint keeps climbing the ladder (2)
+  PASS: ambiguous escalation count = 2 (2)
+
+=== S3: genuinely live agent keeps the unchanged escalation ladder ===
+  [s3-a-husk-surface] stale: fmdeadrec:lane2
+  -> EXIT:0:2.7s
+  lane2 fg cmd now: grok
+  [s3-b-alive-surface] stale: fmdeadrec:lane2
+  -> EXIT:0:2.7s
+  [s3-c-alive-escalate] stale: fmdeadrec:lane2 (idle 3s, possible wedge, escalation 1)
+  -> EXIT:0:2.7s
+  PASS: live agent escalates after the churn (count restarts at 1 - pre-existing new-hash reset, unchanged)
+  [s3-d-alive-escalate] stale: fmdeadrec:lane2 (idle 2s, possible wedge, escalation 2)
+  -> EXIT:0:1.5s
+  PASS: live agent keeps counting (2)
+  PASS: live escalation count = 2 and climbing (2)
+  PASS: live agent never absorbed by the dead-record bound
+
+=== final state ===
+--- wake queue rows still pending (all earlier rows were acked) ---
+  tmux server: still up (window churn never required tearing it down)
+
+RESULT: pass=28 fail=0

@@ -1,0 +1,7 @@
+--- running the five dead-record regression tests ---
+ok - a record whose endpoint is dead or missing reports itself once and is never re-escalated
+ok - a live wedged agent, an unattributable one, and an unreadable endpoint escalate unchanged
+ok - the once-only gone report re-arms when the endpoint comes back, and reports a later death again
+ok - a second death after a same-window relaunch reports in full without a live probe, and an unchanged dead pane stays silent
+ok - a successor's byte-identical dead display reports in full, and the same incarnation still absorbs
+--- all five regression tests completed without failure ---

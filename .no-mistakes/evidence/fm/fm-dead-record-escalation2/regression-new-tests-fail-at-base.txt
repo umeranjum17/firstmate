@@ -1,0 +1,2 @@
+--- running the five dead-record regression tests ---
+not ok - the dead report did not name the endpoint verdict: stale: test:fm-wedge (idle 1s, possible wedge, escalation 1)
