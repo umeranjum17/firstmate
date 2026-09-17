@@ -1,0 +1,41 @@
+
+=== S1 deep chain (Codex SessionStart depth): harness verdict ===
+chain: codex -> 7 bash hook stages -> fm-harness.sh
+fixed bin/fm-harness.sh -> codex
+base  bin/fm-harness.sh -> unknown   (the reported defect)
+
+=== S2 session start renderer at the same depth, retained CLAUDECODE=1 ===
+--- fixed renderer ---
+================================================================================
+SUPERVISION OPERATING INSTRUCTIONS - primary harness: codex
+================================================================================
+Current state:
+- Lock: held by this session; this session owns normal supervision unless away mode says otherwise.
+- Away/quiet mode: inactive.
+- X mode: inactive; use the default watcher cadence.
+- Ordinary wake: take the next foreground bin/fm-watch-checkpoint.sh checkpoint as directed below.
+
+Mode: Codex foreground checkpoint.
+
+When this session owns supervision and away mode is not active:
+--- base renderer (the reported defect surface) ---
+================================================================================
+SUPERVISION OPERATING INSTRUCTIONS - primary harness: claude
+================================================================================
+
+=== S2b same depth, no retained marker (harness verdict) ===
+fixed harness with retained CLAUDECODE=1 -> codex (must stay codex)
+
+=== S3 adversarial: codex one past the bound (17 ancestors), bounded walk ===
+codex 16 stages up -> unknown (terminates in 74ms, no unbounded walk)
+ancestry-descent from that depth -> [no verdict] in 116ms (also bounded)
+
+=== S4 regression guard: shallow chain (codex directly above probe) ===
+codex 1 stage up -> codex (nearest-match-wins unchanged)
+ancestry subcommand from this shell -> [comm pi] (no codex above, silent is correct)
+
+=== S5 omp marker arm at depth 9 ===
+FM_OMP_HARNESS=omp with real omp 8 parents up -> omp (16-parent omp walk)
+FM_OMP_HARNESS=omp with NO omp ancestor -> [pi] (marker did not win; real ancestry answered)
+
+=== DONE ===
