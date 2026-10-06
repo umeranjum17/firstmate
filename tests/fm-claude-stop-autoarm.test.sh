@@ -106,6 +106,11 @@ if [ -n "${FM_WATCH_PREDECESSOR_ARM_PID:-}" ]; then
     printf 'watcher: FAILED - no live watcher with a fresh beacon\n'
     exit 1
   fi
+  if [ -e "$FM_HOME/state/successor-fail-once" ] && [ ! -e "$FM_HOME/state/successor-retried" ]; then
+    : > "$FM_HOME/state/successor-retried"
+    printf 'watcher: FAILED - no live watcher with a fresh beacon\n'
+    exit 1
+  fi
   printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
   while [ -e "$FM_HOME/state/successor-park" ]; do sleep 0.05; done
   exit 0
@@ -552,8 +557,23 @@ test_unconfirmed_handling_successor_still_rewakes() {
   assert_contains "$out" "signal: task.status done: fixture peer cycle ended" "rewake must still carry the delivered reason"
   assert_contains "$out" "did not confirm a live watcher" "the rewake must say this turn runs uncovered"
   assert_contains "$out" "watcher: FAILED - no live watcher with a fresh beacon" "the rewake must carry the successor's own failure line"
-  [ "$(wc -l < "$dir/state/successor-ran" | tr -d ' ')" -eq 1 ] || fail "the failed successor must not be retried inside the rewake path"
-  pass "auto-arm: an unconfirmed handling successor is reported in the rewake instead of blocking it"
+  [ "$(wc -l < "$dir/state/successor-ran" | tr -d ' ')" -eq 2 ] || fail "an unconfirmed successor must be relaunched boundedly before the rewake reports it: $(cat "$dir/state/successor-ran")"
+  pass "auto-arm: an unconfirmed handling successor is relaunched boundedly and still reported in the rewake instead of blocking it"
+}
+
+test_transient_successor_failure_confirms_on_relaunch() {
+  local dir out status
+  dir=$(make_primary_dir "$TMP_ROOT/successor-transient")
+  : > "$dir/state/task.meta"
+  write_arm_fixture "$dir" attached-delivered
+  : > "$dir/state/successor-fail-once"
+  out=$(run_autoarm "$dir" 2>/dev/null); status=$?
+  expect_code 2 "$status" "a recovered successor must never withhold the delivered wake"
+  assert_contains "$out" "signal: task.status done: fixture peer cycle ended" "rewake must still carry the delivered reason"
+  assert_not_contains "$out" "did not confirm a live watcher" "a successor confirmed on relaunch adds nothing to the rewake"
+  [ "$(wc -l < "$dir/state/successor-ran" | tr -d ' ')" -eq 2 ] || fail "a transient successor failure must relaunch exactly once: $(cat "$dir/state/successor-ran")"
+  [ "$(epoch_outcome "$dir")" = rewake ] || fail "epoch must record outcome=rewake, got: $(epoch_outcome "$dir")"
+  pass "auto-arm: a transient handling-successor failure relaunches once and confirms without touching the wake"
 }
 
 test_failed_close_rewakes_with_failure_banner() {
@@ -1759,6 +1779,7 @@ test_actionable_close_rewakes_with_reason
 test_actionable_close_with_live_successor_rewakes_once
 test_attached_cycle_end_starts_handling_successor
 test_unconfirmed_handling_successor_still_rewakes
+test_transient_successor_failure_confirms_on_relaunch
 test_failed_close_rewakes_with_failure_banner
 test_failed_cycles_notify_once_and_keep_retrying
 test_failure_notice_marker_write_refuses_delivery_and_retries
