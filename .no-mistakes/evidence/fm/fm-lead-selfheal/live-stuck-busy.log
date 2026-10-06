@@ -1,0 +1,9 @@
+--- real tail ---
+line1
+line2
+• Working (6s • esc to interrupt)
+
+01M493DC8A6C4WX7SHWXRMC53R HEAD ? ❯
+---
+composer: unknown
+PASS(live-stuck-safe): stale record under live busy chrome still reads working

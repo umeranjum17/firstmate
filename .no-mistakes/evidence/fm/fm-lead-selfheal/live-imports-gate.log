@@ -1,0 +1,43 @@
+--- imports: viewport before ---
+cat '/tmp/tmp.uLuEkdVELw/imports.txt'
+
+01M493DC8A6C4WX7SHWXRMC53R HEAD ❯ cat '/tmp/tmp.uLuEkdVELw/imports.txt'
+Allow external CLAUDE.md file imports?
+This project's CLAUDE.md imports files outside the current working directory.
+> No, disable external imports
+  Yes, allow external imports
+
+01M493DC8A6C4WX7SHWXRMC53R HEAD ❯
+
+
+
+--- imports: rc=0 enters=1 ---
+
+01M493DC8A6C4WX7SHWXRMC53R HEAD ❯
+
+
+
+
+PASS(imports)
+--- trust: viewport before ---
+cat '/tmp/tmp.uLuEkdVELw/trust.txt'
+
+01M493DC8A6C4WX7SHWXRMC53R HEAD ❯ cat '/tmp/tmp.uLuEkdVELw/trust.txt'
+Accessing workspace: /tmp/wt-a
+Quick safety check: Is this a project you created or one you trust?
+Claude Code'll be able to read, edit, and execute files here.
+> No, exit
+  Yes, I trust this folder
+Enter to confirm . Esc to cancel
+
+01M493DC8A6C4WX7SHWXRMC53R HEAD ❯
+
+--- trust: rc=0 enters=0 ---
+cat '/tmp/tmp.uLuEkdVELw/trust.txt'
+
+01M493DC8A6C4WX7SHWXRMC53R HEAD ❯ cat '/tmp/tmp.uLuEkdVELw/trust.txt'
+Accessing workspace: /tmp/wt-a
+Quick safety check: Is this a project you created or one you trust?
+Claude Code'll be able to read, edit, and execute files here.
+PASS(trust)
+ALL LIVE IMPORTS CASES PASSED
