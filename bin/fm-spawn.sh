@@ -1399,7 +1399,11 @@ spawn_herdr_presentation_order_lock_acquire() {
   lock_path=$(fm_backend_herdr_presentation_session_lock_path "$session") || return 1
   HERDR_PRESENTATION_ORDER_LOCK="$lock_path"
   attempt=0
-  while [ "$attempt" -lt 50 ]; do
+  # The wait must fit a full serialized reclaim plus launch: a
+  # same-identity reclaim holds the lock for several seconds (each proven
+  # shell-only classification reads agent state plus the process table), so
+  # a shorter wait refuses a legitimate queued resume on slow runners.
+  while [ "$attempt" -lt 150 ]; do
     if fm_lock_try_acquire "$HERDR_PRESENTATION_ORDER_LOCK"; then
       HERDR_PRESENTATION_ORDER_LOCK_HELD=1
       return 0
