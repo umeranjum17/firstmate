@@ -1,0 +1,4 @@
+ok - absent gate passes the spawn through to the missing-brief check
+ok - refusing gate blocks the scout with its text and creates nothing
+ok - allowing gate passes the spawn through to the missing-brief check
+ok - secondmate spawn ignores the refusing gate
