@@ -916,6 +916,13 @@ A malformed value is reported once in the watcher's triage log and then treated 
 
 The floor is a floor, not a cap: it never asks a home to stop working above its target.
 
+## Spawn gate (config/spawn-gate)
+
+The optional local, gitignored `config/spawn-gate` is an executable that hard-blocks a fresh ship or scout spawn before it creates anything.
+When the file exists and is executable, `bin/fm-spawn.sh` runs `config/spawn-gate <task-id>` with `FM_HOME` set; a nonzero exit refuses the spawn and prints the gate's output.
+Secondmate spawns and relaunches never run it, and an absent file leaves spawn behavior unchanged.
+The gate's own content is home-local policy (for example a per-home lane limit); [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the invocation mechanics.
+
 ## Home brief include (config/brief-include.md)
 
 The optional gitignored `config/brief-include-shared.md` and home-local `config/brief-include.md` add standing worker instructions to every ship and scout brief.
