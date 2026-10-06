@@ -1,0 +1,10 @@
+=== fm-busy-state (target commit) EXIT 0: all passed ===
+ok - record parsing never clobbers the caller's positional parameters, glob setting, or fields
+ok - the boolean view reports busy only on an exact busy verdict
+all fm-busy-state tests passed
+=== fm-supervisor-work-pretool-check (target) EXIT 0 ===
+ok - Claude and the pi/omp supervisor extensions all invoke the guard
+ok - the Claude, Grok, and Pi transports of the same policy all refuse the incident command
+ok - a malformed payload or missing runtime never denies a supervisor command
+=== fm-fleet-snapshot-view ok-count ===
+19
