@@ -4238,14 +4238,14 @@ claude_visible_capture() {
 # at the dialog.
 claude_wait_for_imports_answer() {
   local pane i=0 max=${FM_CLAUDE_IMPORTS_POLLS:-60} interval=${FM_CLAUDE_IMPORTS_POLL_INTERVAL:-0.5}
-  local answered=0 clean=0
+  local answered=0 clear_streak=0
   while [ "$i" -lt "$max" ]; do
     pane=$(claude_visible_capture)
     if [ -n "$pane" ] && printf '%s' "$pane" | fm_busy_claude_trust_dialog_tail; then
       # Trust is pre-registered, never answered: leave it for the stale path.
       return 0
     elif [ -n "$pane" ] && printf '%s' "$pane" | fm_busy_claude_imports_dialog_tail; then
-      clean=0
+      clear_streak=0
       if [ "$answered" -eq 0 ]; then
         spawn_send_key "$T" Enter || return 1
         answered=1
@@ -4253,11 +4253,11 @@ claude_wait_for_imports_answer() {
     elif [ -z "$pane" ]; then
       :
     elif [ "$answered" -eq 1 ]; then
-      clean=$((clean + 1))
-      [ "$clean" -lt 3 ] || return 0
+      clear_streak=$((clear_streak + 1))
+      [ "$clear_streak" -lt 3 ] || return 0
     else
-      clean=$((clean + 1))
-      [ "$clean" -lt 10 ] || return 0
+      clear_streak=$((clear_streak + 1))
+      [ "$clear_streak" -lt 10 ] || return 0
     fi
     i=$((i + 1))
     [ "$i" -ge "$max" ] || sleep "$interval"
