@@ -1,0 +1,28 @@
+=== fm-control.test.sh (48 ok, 0 not ok) ===
+ok - submitted Claude exit types once and refuses the confirming Enter without generic retries
+ok - fm-control Devin exit: a busy record whose turn already ended never opens the revert picker
+ok - fm-control Devin interrupt: a revert picker a press opened is closed with Escape, never Enter
+ok - fm-control Devin: an open revert picker refuses every typed command
+ok - fm-control-lib: only muse needs a post-interrupt composer clear key
+ok - fm-control exit: an already-open background-task picker is not typed into
+ok - fm-control exit: the Enter that opens the background-task picker is not followed by a confirming Enter
+ok - fm-control exit: a picker that renders after the submit returned is named when the stop wait times out
+
+=== fm-control-relaunch.test.sh (76 ok, 0 not ok) ===
+ok - fm-control relaunch: pending composer text refuses before the exit command is typed
+ok - fm-control relaunch: the pending refusal names the harness clear key alongside the submit recovery
+ok - fm-control relaunch: an unreadable composer fails safe before the exit command is typed
+ok - fm-spawn --relaunch: pending closes refuse before replacement begins
+
+=== fm-send-inbox.test.sh (16 ok, 0 not ok) ===
+ok - fm-send inbox: a visibly pending composer skips the ring, and the steer stays durably sent
+
+=== fm-composer-lib.test.sh (50 ok, 0 not ok) ===
+ok - fm_composer_classify_content: a bare shell prompt glyph (>/$/%/#) reads unknown, never empty
+ok - fm_composer_classify_content: stripped unbordered content is unknown except verified agent glyphs
+ok - fm_composer_classify_content: a bare shell prompt carrying a command is not empty
+ok - fm_composer_classify_content: a bare prompt glyph inside a bordered composer box reads empty (claude's own idle composer)
+ok - fm_composer_classify_content: agent prompt glyphs (❯ claude, › codex, ⟩ muse) read empty bordered or bare
+ok - fm_composer_classify_content: an empty composer reads empty
+ok - fm_composer_classify_content: idle matching is limited to proven placeholder positions
+ok - fm_composer_classify_content: idle matching preserves the caller's case mode
