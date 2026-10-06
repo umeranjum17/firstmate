@@ -4227,8 +4227,11 @@ claude_wait_for_imports_answer() {
         spawn_send_key "$T" Enter || return 1
         answered=1
       fi
+    elif [ -z "$pane" ]; then
+      :
     elif [ "$answered" -eq 1 ]; then
-      return 0
+      clean=$((clean + 1))
+      [ "$clean" -lt 3 ] || return 0
     else
       clean=$((clean + 1))
       [ "$clean" -lt 10 ] || return 0
