@@ -236,6 +236,8 @@ WATCH_HOME_EXISTED=0
 . "$SCRIPT_DIR/fm-pending-reply-lib.sh"
 # shellcheck source=bin/fm-busy-lib.sh
 . "$SCRIPT_DIR/fm-busy-lib.sh"
+# shellcheck source=bin/fm-composer-lib.sh
+. "$SCRIPT_DIR/fm-composer-lib.sh"
 # Steering-inbox loss detection: bin/fm-task-inbox-lib.sh owns the record,
 # doorbell, re-ring ladder, and unavailable-endpoint contracts; this watcher
 # supplies their live endpoint and busy checks plus wake emission
@@ -459,6 +461,39 @@ hash_pane() {
 # into the contract's harness-scoped rendered-text checks: the Grok/Rovo/AGY
 # busy fallbacks and the launch-prompt backstop that keeps a launch pinned at
 # its fm-spawn seed from reading as provably working.
+# window_stuck_busy: 0 when a busy verdict must be DISTRUSTED because the
+# turn behind it has visibly stopped. A hook that never fires (a Claude turn
+# parked at an empty prompt with a full context, no Stop event) leaves a busy
+# record nothing ever clears, and the stale backbone would trust it for the
+# whole BUSY_TURN_MAX_SECS bound. All three must hold at once: the record's
+# own last-event age already passed STALE_ESCALATE_SECS, the pane shows none
+# of its harness's registered busy chrome, and the composer is proven empty.
+# Any live chrome, any unproven composer, any fresh record, and any harness
+# with no registered spinner signature keep the busy verdict: a stale video
+# frame still carries its Working line, a mid-redraw pane never proves empty,
+# and absence of a signature the repo never recorded proves nothing either.
+# The safe direction is to surface: a false positive becomes one stale alert
+# for inspection, never an automatic interrupt, signal, or restart.
+window_stuck_busy() {  # <window> <task> <tail40>
+  local w=$1 task=$2 tail40=$3 rec ts age harness backend label cstate
+  [ -n "$task" ] || return 1
+  rec="$STATE/$task.busy-state"
+  ts=$(sed -n 's/^v1 .* state=busy .* ts=\([0-9][0-9]*\)$/\1/p' "$rec" 2>/dev/null | head -n 1) || return 1
+  case "$ts" in ''|*[!0-9]*) return 1 ;; esac
+  age=$(( $(date +%s) - ts ))
+  [ "$age" -ge "$STALE_ESCALATE_SECS" ] || return 1
+  harness=$(window_harness "$w")
+  if printf '%s' "$tail40" | fm_busy_lines_match "$harness"; then
+    return 1
+  fi
+  fm_busy_harness_has_signature "$harness" || return 1
+  backend=$(window_backend "$w")
+  label=$(window_label "$w")
+  cstate=$(fm_backend_composer_state "$backend" "$w" "$label" 2>/dev/null || true)
+  [ "$cstate" = empty ] || return 1
+  return 0
+}
+
 window_is_busy() {  # <window> <tail40>
   local w=$1 tail40=$2 task meta verdict
   task=$(window_to_task "$w" "$STATE")
@@ -469,7 +504,9 @@ window_is_busy() {  # <window> <tail40>
     verdict=$(fm_busy_classify "$(window_backend "$w")" "$w" "$(window_harness "$w")" \
       "${task:-unknown}" "$STATE" "$tail40")
   fi
-  [ "${verdict%% *}" = busy ]
+  [ "${verdict%% *}" = busy ] || return 1
+  window_stuck_busy "$w" "$task" "$tail40" && return 1
+  return 0
 }
 
 window_kind() {

@@ -313,6 +313,40 @@ This project'"'"'s CLAUDE.md imports files outside the current working directory
   pass "a Claude launch parked on its trust or external-imports dialog classifies unknown launch-prompt"
 }
 
+# The spawn gate may answer the imports dialog with Enter (cursor rests on
+# the fail-closed decline) but must never touch the trust dialog (Enter
+# selects "No, exit"). The split matchers it decides on must therefore
+# discriminate the two dialogs in both directions and ignore bare question
+# prose that a worker could render on its own.
+test_claude_dialog_matchers_split_trust_from_imports() {
+  local imports trust
+  imports='Allow external CLAUDE.md file imports?
+This project'"'"'s CLAUDE.md imports files outside the current working directory.
+> No, disable external imports
+  Yes, allow external imports'
+  trust='Accessing workspace: /tmp/wt-a
+Quick safety check: Is this a project you created or one you trust?
+Claude Code'"'"'ll be able to read, edit, and execute files here.
+> No, exit
+  Yes, I trust this folder
+Enter to confirm . Esc to cancel'
+  printf '%s' "$imports" | fm_busy_claude_imports_dialog_tail \
+    || fail "imports dialog text must match the imports matcher"
+  printf '%s' "$imports" | fm_busy_claude_trust_dialog_tail \
+    && fail "imports dialog text must never match the trust matcher"
+  printf '%s' "$trust" | fm_busy_claude_trust_dialog_tail \
+    || fail "trust dialog text must match the trust matcher"
+  printf '%s' "$trust" | fm_busy_claude_imports_dialog_tail \
+    && fail "trust dialog text must never match the imports matcher: Enter there selects No, exit"
+  printf '%s' 'the Allow external CLAUDE.md file imports? dialog is what the gate answers' \
+    | fm_busy_claude_imports_dialog_tail \
+    && fail "bare imports question prose must not match the imports matcher"
+  printf '%s' 'Quick safety check: Is this a project you created or one you trust? is quoted in a header' \
+    | fm_busy_claude_trust_dialog_tail \
+    && fail "bare trust question prose must not match the trust matcher"
+  pass "the Claude dialog matchers split trust from imports and ignore bare question prose"
+}
+
 test_launch_prompt_pi_trust_dialog() {
   local state out h
   for h in pi pi-signed omp; do
@@ -640,6 +674,7 @@ test_record_without_sidecar_unknown
 test_source_mismatch_cross_adapter
 test_converted_adapters_ignore_footer_text
 test_launch_prompt_claude_trust_dialog
+test_claude_dialog_matchers_split_trust_from_imports
 test_launch_prompt_pi_trust_dialog
 test_launch_prompt_pi_requires_both_markers
 test_launch_prompt_gemini_dialogs
