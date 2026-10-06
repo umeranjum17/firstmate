@@ -1,0 +1,30 @@
+Test-phase evidence: fm/fm-composer-clear-gap tip 3572d05a
+("name the pending-composer recovery in every refusal")
+
+Targeted portable runs (via bin/fm-test-run.sh), all exit 0:
+- tests/fm-control.test.sh: FM_TEST_END exit=0 (~33s). Pins per-harness
+  clear-key decision (test_interrupt_clear_key_decision: only muse => C-u,
+  13 others empty, unknown harness nonzero).
+- tests/fm-control-relaunch.test.sh: FM_TEST_END exit=0 (~63s). Pins pending
+  refusal naming `fm-send.sh <id> --key Enter` and, for muse, `--key C-u`.
+- tests/fm-send-inbox.test.sh: FM_TEST_END exit=0 (~34s). Pins ring-skip notice
+  naming `fm-send.sh t1 --key Enter`.
+
+Direct behavioral probe (this run, sourcing bin/fm-control-lib.sh):
+- claude/codex/opencode/pi/pi-signed/omp/grok/kimi/cursor/gemini/rovo/agy/devin
+  => empty (rc=0); muse => [C-u] (rc=0); unknown harness rc=1.
+
+Refusal texts observed in running scripts' sources as emitted strings:
+- bin/fm-control.sh:716 pending refusal names `fm-send.sh $ID --key Enter`
+  (+ `--key $clear_key` when table names one, e.g. C-u for muse); :723
+  unproven-state refusal names the clear-key recovery.
+- bin/fm-send.sh:1104 ring-skip notice names `fm-send.sh $INBOX_TASK_ID --key Enter`.
+- bin/fm-remote-secondmate-control.sh:308 remote ring-skip notice names
+  `fm-remote-secondmate-control.sh <id> key Enter`.
+
+No live Herdr lab run: the commit itself records the audit as "no new
+token-spending probe" against live evidence already on record, and the
+portable regressions above execute the changed public interfaces
+(refusal output + clear-key decision) directly. No new live harness
+observation was required to judge the refusal-text intent.
+Worktree `git status --porcelain` clean at end of phase.
