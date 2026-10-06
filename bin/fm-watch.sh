@@ -29,7 +29,10 @@
 #                          external-wait pause or verified captain-held transfer is
 #                          absorbed instead with its own long re-surface cadence,
 #                          never as a wedge, and that recheck reason names which
-#                          human the wait is on. Only when neither absorb class
+#                          human the wait is on. An idle `paused:` lane whose
+#                          authoritative run is parked at a gate nobody was told
+#                          about wakes once per run state, naming that state
+#                          (declared_wait_contradiction). Only when neither absorb class
 #                          applies does the log's latest recognized status event decide:
 #                          terminal (captain-relevant) or non-terminal (no verb),
 #                          both surfaced at once. A provably-working stale past the
@@ -511,7 +514,7 @@ window_label() {
 # The ONE derivation of a window's per-window marker key: `:`, `/` and `.` become
 # `_` so a window name is usable as a filename suffix. Every per-window file the
 # watcher keeps is named by it (.hash-, .count-, .stale-, .stale-since-,
-# .wedge-escalations-, .paused-*, .writing-*, .waiting-*, .tracked-), and live homes
+# .wedge-escalations-, .paused-*, .writing-*, .waiting-*, .truth-*, .tracked-), and live homes
 # hold those markers on disk under the current format, so the format lives here alone: a second copy is
 # how a future change to it silently orphans a window's markers instead of clearing
 # them. The helpers below take the derived key rather than re-deriving it, so one
@@ -1801,7 +1804,7 @@ phantom_pane_prune() {
     # the next cycle retries the whole prune, while a removed sidecar with
     # markers left behind would strand the orphans unfindable.
     rm -f "$STATE/.hash-$key" "$STATE/.count-$key" "$STATE/.churn-since-$key" \
-      "$STATE/.dead-reported-$key" || continue
+      "$STATE/.dead-reported-$key" "$STATE/.truth-read-$key" "$STATE/.truth-raised-$key" || continue
     rm -f "$tracked" || continue
     reason="stale: $w (pane vanished, state pruned: no task record owns it and the backend confirms it is gone)"
     fm_wake_append stale "$w" "$reason" || exit 1
@@ -2047,6 +2050,46 @@ surface_nonterminal_stale() {  # <window> <hash>
     return 0
   fi
   wake "stale: $win"
+}
+
+# A worker's `paused:` line is its own claim about its silence, and authoritative
+# crew state outranks it. A no-mistakes run parked at a gate holds
+# no pending drive call - the call returns at the gate - so an idle pane under
+# such a claim is a lane nothing will resume: either firstmate owes an ask-user
+# decision or the worker owes its own gate answer, and its drive process may be
+# gone. Without this check the claim buys the declared-wait cadence (hours) after
+# one bare stale that names nothing, so the supervisor learns the truth only when
+# a human notices. A `working:` claim needs no such check: it never buys that
+# cadence, so the existing first-sight surface and wedge ladder already reach it. A gate the worker escalated as an open run-bound decision is
+# not contradicted: firstmate already holds it. Wakes ONCE per (status signature, crew-state line), naming the
+# task and the real state; a new status append or a new gate state may wake
+# again. The fm-crew-state.sh read is costly, so it is taken at most once per
+# STALE_ESCALATE_SECS per window unless the status log changed. A claim with no
+# contradicting run state keeps every existing path, including the 4 h recheck.
+declared_wait_contradiction() {  # <window> <task> <window-key>
+  local win=$1 task=$2 key=$3 statusf sig read_marker raised state reason
+  statusf="$STATE/$task.status"
+  status_is_paused "$(status_declared_wait_line "$statusf")" || return 0
+  sig=$(fm_wake_signal_sig "$statusf" || true)
+  read_marker="$STATE/.truth-read-$key"
+  if [ "$(cat "$read_marker" 2>/dev/null || true)" = "$sig" ] \
+    && [ "$(age_of "$read_marker")" -lt "$STALE_ESCALATE_SECS" ]; then
+    return 0
+  fi
+  printf '%s' "$sig" > "$read_marker"
+  state=$("$FM_CREW_STATE_BIN" "$task" 2>/dev/null) || true
+  case "$state" in "state: parked · source: run-step · "?*) ;; *) return 0 ;; esac
+  # A gate the worker already escalated under its run-bound key is one firstmate
+  # was told about; wedge_wait_evidence owns that verified wait.
+  case "$state" in
+    *" · run: "?*) status_has_open_needs_decision "$statusf" "${state##* · run: }" && return 0 ;;
+  esac
+  raised="$STATE/.truth-raised-$key"
+  [ "$(cat "$raised" 2>/dev/null || true)" != "$sig $state" ] || return 0
+  reason="stale: $win (task $task says paused, but its run is ${state#state: parked · source: run-step · } - a parked gate holds no pending drive call, so nothing resumes this lane until firstmate decides or steers)"
+  fm_wake_append stale "$win" "$reason" || exit 1
+  printf '%s' "$sig $state" > "$raised"
+  wake "$reason"
 }
 
 # Check and heartbeat cadence must survive actionable exits and restarts: the
@@ -3218,6 +3261,9 @@ EOF
     # content cannot suppress stale detection. Read once per window per poll and
     # reused below so a busy verdict is consistent within one cycle.
     if window_is_busy "$w" "$tail40"; then busy_now=0; else busy_now=1; fi
+    if [ "$busy_now" -ne 0 ] && [ "$kind" != secondmate ] && [ -n "$task" ]; then
+      declared_wait_contradiction "$w" "$task" "$key"
+    fi
     if [ "$h" = "$prev" ]; then
       n=$(( $(cat "$cf" 2>/dev/null || echo 0) + 1 ))
       echo "$n" > "$cf"

@@ -2806,6 +2806,73 @@ parked_watch_round() {  # <state> <fakebin> <out> <capture> <window> <exit|absor
   return 0
 }
 
+# --- a declared wait contradicted by authoritative run state ---------------
+# The live 2026-10-06 case: a worker wrote `paused: no-mistakes drive call
+# running in background` while its run was parked at a review gate awaiting an
+# ask-user decision and its drive process was gone. The declaration's first
+# bare alert had already fired, so the declared-wait throttle hid the parked
+# gate for its whole 4 h cadence. Authoritative state must outrank the claim:
+# one wake naming the task and the real state, not re-raised for the same state,
+# while a declared wait that nothing contradicts stays quiet exactly as before.
+test_declared_wait_contradicted_by_parked_run_wakes_once() {
+  local dir state fakebin out capture_file statusf window key pid parked waiting reads wakes
+  parked='state: parked · source: run-step · parked at review: 3 finding(s) · ask-user: authority decision · run: 01RUN'
+  waiting='state: paused · source: status-log · no-mistakes drive call running in background'
+  window="test:fm-truth"; key=$(printf '%s' "$window" | tr ':/.' '___')
+  truth_case() {  # <name>
+    dir=$(make_case "$1"); state="$dir/state"; fakebin="$dir/fakebin"
+    out="$dir/watch.out"; capture_file="$dir/pane.txt"; statusf="$state/truth.status"
+    printf 'idle worker after its drive call died\n' > "$capture_file"
+    printf 'window=%s\nkind=ship\nharness=grok\nbackend=tmux\n' "$window" > "$state/truth.meta"
+    printf 'paused: no-mistakes drive call running in background\n' > "$statusf"
+    printf '%s' "$(seen_sig "$statusf")" > "$state/.seen-truth_status"
+    printf '%s' "$(hash_text "$(cat "$capture_file")")" > "$state/.hash-$key"
+    printf '1\n' > "$state/.count-$key"
+    # The declaration's first bare alert already fired before the run parked.
+    printf 'declared:%s' "$(bash -c '. "$1"; fm_wake_signal_sig "$2"' _ "$ROOT/bin/fm-wake-lib.sh" "$statusf")" \
+      > "$state/.paused-resurfaced-$key"
+  }
+  truth_watch() {  # <crew-state> <out>
+    PATH="$fakebin:$PATH" FM_FAKE_TMUX_WINDOW="$window" FM_FAKE_TMUX_CAPTURE="$capture_file" \
+      FM_FAKE_TMUX_CURRENT_COMMAND=grok FM_FAKE_CREW_STATE="$1" FM_FAKE_CREW_STATE_LOG="$dir/reads" \
+      watch_bg "$state" "$fakebin" "$2" env FM_PAUSE_RESURFACE_SECS=14400 FM_STALE_ESCALATE_SECS=240
+    pid=$!
+  }
+
+  truth_case truth-parked
+  truth_watch "$parked" "$out"
+  wait_for_exit "$pid" 100 || { reap "$pid"; fail "a paused claim over a parked ask-user gate raised no wake"; }
+  grep -F "stale: $window (task truth says paused, but its run is parked at review: 3 finding(s) · ask-user: authority decision · run: 01RUN" "$out" >/dev/null \
+    || fail "the contradiction wake did not name the task and the real state: $(cat "$out")"
+  grep -F "but its run is parked at review" "$state/.wake-queue" >/dev/null \
+    || fail "the contradiction wake was not queued durably"
+
+  # Same run state twice: one wake. The read cadence is aged out so the second
+  # watcher really re-reads the crew state rather than passing vacuously.
+  ack_stopped_cycle "$state" || fail "could not acknowledge the first contradiction wake"
+  set_mtime "$(( $(date +%s) - 500 ))" "$state/.truth-read-$key"
+  : > "$dir/reads"
+  truth_watch "$parked" "$dir/again.out"
+  wait_poll_cycle "$state" "$pid" || { reap "$pid"; fail "the same parked state was raised twice: $(cat "$dir/again.out")"; }
+  reap "$pid"
+  reads=$(wc -l < "$dir/reads")
+  [ "$reads" -ge 1 ] || fail "the repeat watcher never re-read the crew state, so the one-wake bound is unproven"
+  wakes=$(grep -cF "but its run is parked" "$state/.wake-queue" 2>/dev/null || true)
+  [ "${wakes:-0}" -eq 0 ] || fail "the same parked state queued $wakes more contradiction wakes"
+  [ ! -s "$dir/again.out" ] || fail "the same parked state printed a second wake: $(cat "$dir/again.out")"
+
+  # Disconfirming control: a declared wait with no run behind it keeps today's
+  # quiet declared-wait cadence.
+  truth_case truth-no-run
+  truth_watch "$waiting" "$out"
+  wait_poll_cycle "$state" "$pid" || { reap "$pid"; fail "a plain declared wait raised a wake: $(cat "$out")"; }
+  reap "$pid"
+  [ -s "$dir/reads" ] || fail "the declared-wait control never read the crew state, so its quiet is unproven"
+  [ ! -s "$out" ] || fail "a plain declared wait printed a wake: $(cat "$out")"
+  [ ! -s "$state/.wake-queue" ] || fail "a plain declared wait queued a wake: $(cat "$state/.wake-queue")"
+  pass "a paused claim over a parked gate wakes once naming the real state; an uncontradicted wait stays quiet"
+}
+
 # --- a live worker parked on a declared wait: pane churn must not re-alarm ----
 # The 2026-08/09 alarm loop, in both observed forms - a worker parked on the
 # CAPTAIN (captain-held, five consecutive alarms) and one parked on the PIPELINE
@@ -7057,6 +7124,7 @@ test_nonterminal_stale_paused_absorbed_then_resurfaced
 test_exited_declared_pause_is_bounded_but_live_gate_surfaces
 test_own_work_wait_keeps_first_alert_then_long_cadence
 test_absorbed_replacement_wait_does_not_inherit_the_old_throttle
+test_declared_wait_contradicted_by_parked_run_wakes_once
 test_live_declared_wait_churn_honors_the_resurface_throttle
 test_live_paused_until_controls_recheck_time
 test_wedge_threshold_defers_to_a_declared_wait_under_a_working_verdict
