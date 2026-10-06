@@ -43,7 +43,7 @@ run_spawn_home() {
 test_gate_absent_passes() {
   local home=$TMP_ROOT/absent out status
   make_home "$home"
-  out=$(run_spawn_home "$home" nope-gate-absent-z1 projects/none --mode no-mistakes --yolo off)
+  out=$(run_spawn_home "$home" nope-gate-absent-z1 projects/none --mode no-mistakes --yolo off --harness 'true worker')
   status=$?
   [ "$status" -ne 0 ] || fail "ship spawn with missing brief should exit non-zero"
   printf '%s\n' "$out" | grep -F 'has no brief' >/dev/null \
