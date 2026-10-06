@@ -1,0 +1,22 @@
+== clear-key decisions (live: sourcing bin/fm-control-lib.sh) ==
+muse -> 'C-u'
+cursor -> '<none>'
+gemini -> '<none>'
+agy -> '<none>'
+omp -> '<none>'
+devin -> '<none>'
+rovo -> '<none>'
+claude -> '<none>'
+codex -> '<none>'
+opencode -> '<none>'
+pi -> '<none>'
+grok -> '<none>'
+kimi -> '<none>'
+
+== unknown harness ==
+someagent -> nonzero (refused, as required)
+
+== refusal texts (live test output excerpts) ==
+ok - fm-control relaunch: pending composer text refuses before the exit command is typed
+ok - fm-control relaunch: the pending refusal names the harness clear key alongside the submit recovery
+ok - fm-send inbox: a visibly pending composer skips the ring, and the steer stays durably sent
