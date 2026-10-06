@@ -554,16 +554,19 @@ test_codex_herdr_native_busy_during_tool_wait() {
   GPT-6.1-Sol medium · /worktree · Run bounded lab sleep
   ← for agents · ? for shortcuts'
   out=$(
+    # shellcheck disable=SC2329 # invoked indirectly through fm_busy_classify
     fm_backend_busy_state() { printf busy; }
     fm_busy_classify herdr lab:w1:p1 codex t1 "$state" "$screen"
   )
   [ "$out" = 'busy herdr-native' ] || fail "a live Codex tool wait with native busy must report busy, got '$out'"
   out=$(
+    # shellcheck disable=SC2329 # invoked indirectly through fm_busy_classify
     fm_backend_busy_state() { printf idle; }
     fm_busy_classify herdr lab:w1:p1 codex t1 "$state" "$screen"
   )
   [ "$out" = 'unknown codex-unverified' ] || fail "native idle must not prove Codex turn end, got '$out'"
   out=$(
+    # shellcheck disable=SC2329 # invoked indirectly through fm_busy_classify
     fm_backend_busy_state() { printf busy; }
     fm_busy_classify tmux lab codex t1 "$state" "$screen"
   )
