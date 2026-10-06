@@ -59,14 +59,14 @@ gate_setup() {  # <name> <frame...> (each "name:content" via parallel arrays is
 
 gate_frame() {  # <text>  (appends one replay frame)
   local n
-  n=$(ls "$GATE_DIR"/frame-* 2>/dev/null | wc -l | tr -d ' ')
+  n=$(find "$GATE_DIR" -maxdepth 1 -name 'frame-*' 2>/dev/null | wc -l | tr -d ' ')
   printf '%s' "$1" >"$GATE_DIR/frame-$n"
 }
 
 claude_visible_capture() {
   local idx n
   idx=$(cat "$GATE_DIR/idx")
-  n=$(ls "$GATE_DIR"/frame-* 2>/dev/null | wc -l | tr -d ' ')
+  n=$(find "$GATE_DIR" -maxdepth 1 -name 'frame-*' 2>/dev/null | wc -l | tr -d ' ')
   [ "$idx" -ge "$n" ] && idx=$((n - 1))
   printf 'call\n' >>"$GATE_DIR/calls"
   printf '%s' "$((idx + 1))" >"$GATE_DIR/idx"
