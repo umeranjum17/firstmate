@@ -3449,13 +3449,14 @@ herdr_projection_existing_meta_allows_flat() { # <meta>
     }
     old_state=$(fm_backend_herdr_pane_agent_state "$old_session" "$old_pane")
     case "$old_state" in
-    # A stale registration over a shell-only pane is agent-free for RECOVERY
-    # (--relaunch reuses the pane, issue #4115), but the duplicate-launch
-    # corridor keeps refusing it like every other non-husk state, so a fresh
-    # spawn is refused here consistently with the reclaim and presentation
-    # gates downstream.
-    dead | no-agent) return 0 ;;
-    live | stale-agent | unknown)
+    # A stale registration over a shell-only pane is proven agent-free: the
+    # process view shows no running agent, only Herdr's leftover record (on
+    # 0.7.4 even a bare restored shell carries a label-less unknown record).
+    # The duplicate-launch corridor lets it through consistently with the
+    # reclaim and presentation gates downstream, which replace exactly that
+    # husk or fall back flat; live and unknown still refuse.
+    dead | no-agent | stale-agent) return 0 ;;
+    live | unknown)
       echo "error: existing herdr endpoint for $ID is $old_state; refusing duplicate launch" >&2
       return 1
       ;;

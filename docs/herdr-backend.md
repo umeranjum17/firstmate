@@ -366,7 +366,7 @@ An existing journal suppresses another projected create.
 Before any recovery mutation, Firstmate holds both the task spawn lock and the named-session presentation lock.
 
 A same-identity version 2 binding may replace one exact agent-free restart husk in place.
-A husk is a restored same-labeled tab with a missing pane or no registered agent, as [Restart and liveness behavior](#restart-and-liveness-behavior) describes.
+A husk is a restored same-labeled tab with a missing pane, no registered agent, or a registration the process view proves shell-only, as [Restart and liveness behavior](#restart-and-liveness-behavior) describes.
 The replacement is allowed only when all of these agree:
 
 - The physical home.
@@ -663,8 +663,8 @@ No Herdr-specific copy of that protocol exists.
 ### Husks after a server restart
 
 Stopping and restarting a named Herdr server preserves workspace, tab, pane, and label ids.
-The underlying harness processes and live agent registrations do not survive.
-A restored same-labeled tab with a missing pane or no registered agent is a husk.
+The underlying harness processes do not survive, and no live agent registration does: newer releases report agent_not_found on the revived pane, while 0.7.4 restores a label-less unknown record over the bare shell.
+A restored same-labeled tab with a missing pane, no registered agent, or only such a proven shell-only leftover record is a husk.
 
 Create replaces only a confidently dead or no-agent husk, creates the replacement before closing the old tab, and refuses live or unknown states.
 This prevents closing the workspace's last tab before a replacement exists.
