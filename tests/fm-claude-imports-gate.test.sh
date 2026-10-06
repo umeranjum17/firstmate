@@ -54,6 +54,7 @@ gate_setup() {  # <name> <frame...> (each "name:content" via parallel arrays is
   : >"$GATE_DIR/calls"
   # The gate's only free inputs, as a real spawn provides them: T is the
   # window the Enter goes to, W rides along for backend calls.
+  # shellcheck disable=SC2034 # read by the eval'd spawn gate at call time
   T=test-window W=test-pane
 } 
 
