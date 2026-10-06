@@ -4218,6 +4218,53 @@ agy_pane_is_working() {  # <plain-pane-capture>
   return 1
 }
 
+claude_visible_capture() {
+  fm_backend_visible_capture "$BACKEND" "$T" "$W" 2>/dev/null || true
+}
+
+# Post-launch answer for Claude's external-CLAUDE.md-imports dialog
+# (bin/fm-busy-lib.sh owns both dialog signatures). Pre-registration
+# (bin/fm-claude-trust.sh) covers workspace trust and carries
+# already-approved imports consent, but a project entry with no standing
+# approval still opens this dialog, and no launch flag suppresses it. Its
+# cursor rests on the fail-closed "No, disable external imports" decline,
+# so one Enter dismisses it without manufacturing consent - the worker
+# proceeds without the global memory chain rather than sitting at the dialog
+# until a stale wake fires. The trust dialog is never touched: Enter there
+# selects "No, exit" and kills the worker, so a trust wedge stays a
+# stale-wake matter exactly as before. Exits 0 when no imports dialog needed
+# answering, or once an answered one clears; exits 1 when an answered dialog
+# never clears, failing the spawn loudly rather than leaving a worker parked
+# at the dialog.
+claude_wait_for_imports_answer() {
+  local pane i=0 max=${FM_CLAUDE_IMPORTS_POLLS:-60} interval=${FM_CLAUDE_IMPORTS_POLL_INTERVAL:-0.5}
+  local answered=0 clean=0
+  while [ "$i" -lt "$max" ]; do
+    pane=$(claude_visible_capture)
+    if [ -n "$pane" ] && printf '%s' "$pane" | fm_busy_claude_trust_dialog_tail; then
+      # Trust is pre-registered, never answered: leave it for the stale path.
+      return 0
+    elif [ -n "$pane" ] && printf '%s' "$pane" | fm_busy_claude_imports_dialog_tail; then
+      clean=0
+      if [ "$answered" -eq 0 ]; then
+        spawn_send_key "$T" Enter || return 1
+        answered=1
+      fi
+    elif [ "$answered" -eq 1 ]; then
+      return 0
+    else
+      clean=$((clean + 1))
+      [ "$clean" -lt 10 ] || return 0
+    fi
+    i=$((i + 1))
+    [ "$i" -ge "$max" ] || sleep "$interval"
+  done
+  if [ "$answered" -eq 0 ]; then
+    return 0
+  fi
+  return 1
+}
+
 agy_wait_for_working() {
   local pane i=0 max=${FM_AGY_READY_POLLS:-60} interval=${FM_AGY_POLL_INTERVAL:-0.5}
   while [ "$i" -lt "$max" ]; do
@@ -5479,6 +5526,15 @@ if [ "$HARNESS" = agy ]; then
     exit 1
   fi
 fi
+case "$HARNESS" in
+claude*)
+  if ! claude_wait_for_imports_answer; then
+    printf '%s\n' "$(status_stamp_line "failed: claude external-imports dialog did not clear after the safe decline in window $T")" >>"$STATE/$ID.status"
+    echo "error: claude external-imports dialog did not clear after the safe decline in window $T; refusing to leave a worker parked at the dialog; inspect window $T" >&2
+    exit 1
+  fi
+  ;;
+esac
 
 if [ "$KIND" = secondmate ] && [ "${FM_SKIP_SECONDMATE_INHERIT:-0}" != 1 ]; then
   if ! fm_config_reread_discard_pending "$PROJ_ABS" "$ID" "$FM_HOME"; then

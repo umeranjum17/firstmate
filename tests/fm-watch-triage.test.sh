@@ -7025,6 +7025,60 @@ test_record_owned_pane_still_escalates_normally() {
   pass "a pane a task record still references keeps its full wedge escalation ladder"
 }
 
+# A busy record whose last hook event is older than the stale window, on a
+# pane that reads idle (proven empty composer, none of the harness's busy
+# chrome), must stop reading as provably working: the turn behind it visibly
+# stopped (a Claude turn parked at an empty prompt with a full context fires
+# no Stop hook), so the stale backbone surfaces it instead of trusting the
+# record for the whole BUSY_TURN_MAX_SECS bound. Any live chrome, any
+# unproven composer, and any fresh record keep the busy verdict.
+test_stuck_busy_record_with_idle_pane_is_not_working() (
+  local state gen old now
+  state="$TMP_ROOT/stuck-busy/state"
+  mkdir -p "$state" "$TMP_ROOT/stuck-busy-home/state"
+  printf 'window=fake\nbackend=tmux\nharness=claude\nkind=scout\n' > "$state/task.meta"
+  gen=$("$ROOT/bin/fm-busy-event.sh" arm "$state" task) || fail "arm failed"
+  "$ROOT/bin/fm-busy-event.sh" apply "$state" task busy --gen "$gen" --source claude-hook --event user-prompt-submit >/dev/null \
+    || fail "apply failed"
+  now=$(date +%s)
+  old=$(( now - 3600 ))
+  sed -i "s/ ts=[0-9][0-9]*\$/ ts=$old/" "$state/task.busy-state" \
+    || fail "could not backdate the busy record"
+  FM_HOME="$TMP_ROOT/stuck-busy-home"
+  FM_STATE_OVERRIDE="$state"
+  FM_STALE_ESCALATE_SECS=50
+  export FM_HOME FM_STATE_OVERRIDE FM_STALE_ESCALATE_SECS
+  # shellcheck source=/dev/null
+  . "$ROOT/bin/fm-watch.sh"
+  # shellcheck disable=SC2329 # Runtime override called by the sourced watcher.
+  fm_backend_composer_state() {
+    [ "$1" = tmux ] && [ "$2" = fake ] || { printf 'unexpected composer_state args: %s\n' "$*" >&2; return 1; }
+    printf '%s' "${FM_STUCK_COMPOSER:-empty}"
+  }
+  idle_tail=$(printf '❯\n? for shortcuts\n')
+  busy_tail=$(printf '• Working (6s • esc to interrupt)\n')
+  if [ "$(fm_busy_classify_meta "$state/task.meta" task "$state" "$idle_tail")" != "busy claude-hook" ]; then
+    fail "fixture must classify busy before the stuck override is consulted"
+  fi
+  if window_is_busy fake "$idle_tail"; then
+    fail "an hour-old busy record on an idle pane must not read as provably working"
+  fi
+  if ! window_is_busy fake "$busy_tail"; then
+    fail "an hour-old busy record under live busy chrome must stay provably working"
+  fi
+  FM_STUCK_COMPOSER=pending
+  if ! window_is_busy fake "$idle_tail"; then
+    fail "an hour-old busy record with an unproven composer must stay provably working"
+  fi
+  FM_STUCK_COMPOSER=empty
+  "$ROOT/bin/fm-busy-event.sh" apply "$state" task busy --gen "$gen" --source claude-hook --event user-prompt-submit >/dev/null \
+    || fail "re-apply failed"
+  if ! window_is_busy fake "$idle_tail"; then
+    fail "a fresh busy record on an idle pane must stay provably working until the stale window passes"
+  fi
+  pass "a stale busy record on an idle pane stops proving work, while live chrome, unproven composer, and fresh records still do"
+)
+
 test_uncertain_read_keeps_phantom_state() {
   local dir state fakebin out window key pid
   window="test:fm-uncertain"; key=$(printf '%s' "$window" | tr ':/.' '___')
@@ -7207,4 +7261,5 @@ test_paused_until_that_passed_is_rechecked_before_the_cadence
 test_phantom_pane_state_pruned_once_vanished
 test_record_owned_pane_state_never_pruned
 test_record_owned_pane_still_escalates_normally
+test_stuck_busy_record_with_idle_pane_is_not_working
 test_uncertain_read_keeps_phantom_state

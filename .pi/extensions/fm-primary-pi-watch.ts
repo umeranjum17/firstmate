@@ -15,6 +15,8 @@
 //
 // Delivery versus consumption (stated once here):
 // A main follow-up is delivered once Pi accepts it (sendUserMessage resolves).
+// A branch-accepted wake is owned by the branch only until the bounded
+// settlement wait above elapses; past it the wake is re-ringed to main.
 // The successor pipeline never waits for the model to read it: a follow-up
 // queued while main is streaming joins the running run without ever raising
 // before_agent_start, so waiting on that event stalls every later close.
@@ -155,6 +157,13 @@ const extensionVersion = `sha256:${createHash("sha256").update(readFileSync(exte
 const retryBaseMs = positiveInteger("FM_WATCH_REARM_RETRY_BASE_MS", 250);
 const retryMaxMs = positiveInteger("FM_WATCH_REARM_RETRY_MAX_MS", 4000);
 const retryLimit = positiveInteger("FM_WATCH_REARM_RETRY_LIMIT", 5);
+// Bound for one accepted branch settlement: a branch that takes a wake but
+// never settles it (a wedged provider call) must not park the delivery
+// pipeline behind it forever, or every later wake waits while main stays
+// idle. Past this bound the wake is re-ringed to main, whose queue-lock
+// claim wins over a late branch drain (that settlement then rejects back
+// harmlessly as already-claimed-by-main).
+const branchSettlementTimeoutMs = positiveInteger("FM_BRANCH_SETTLEMENT_TIMEOUT_MS", 600000);
 // 35s on Windows so the budget stays above arm's MSYS confirm default (30s in
 // bin/fm-watch-arm.sh): a slow but successful Git Bash cold start must not be
 // SIGTERMed mid-confirmation. Conditioned on win32 so other platforms keep 12s.
@@ -722,6 +731,33 @@ export default function (pi: ExtensionAPI) {
     return offer.accepted ? offer.settlement : null;
   }
 
+  // Bounded wait on one accepted branch settlement: "settled" keeps wake
+  // ownership with the branch, "timed-out" sends the caller back to main
+  // with a re-ring note. A branch refusal rejects, preserving the existing
+  // silent fallthrough to main. Handlers stay attached to the settlement
+  // either way, so a late outcome after a timeout never surfaces as an
+  // unhandled rejection.
+  async function awaitBranchSettlement(branchDelivery: Promise<void>): Promise<"settled" | "timed-out"> {
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+    try {
+      return await Promise.race([
+        branchDelivery.then(
+          (): "settled" | "refused" => "settled",
+          (): "settled" | "refused" => "refused",
+        ).then((verdict): "settled" | "timed-out" => {
+          if (verdict === "refused") throw new Error("supervision branch refused the accepted wake");
+          return verdict;
+        }),
+        new Promise<"timed-out">((resolveTimeout) => {
+          timeout = setTimeout(() => resolveTimeout("timed-out"), branchSettlementTimeoutMs);
+          timeout.unref();
+        }),
+      ]);
+    } finally {
+      if (timeout) clearTimeout(timeout);
+    }
+  }
+
   async function deliverActionableWake(
     owner: SessionGeneration,
     message: string,
@@ -758,9 +794,17 @@ export default function (pi: ExtensionAPI) {
       const branchDelivery = offerWakeToBranch(message);
       if (branchDelivery) {
         try {
-          await branchDelivery;
-          return true;
-        } catch {}
+          const verdict = await awaitBranchSettlement(branchDelivery);
+          if (verdict === "settled") return true;
+          return await sendWake(
+            owner,
+            `${message}\n\nwatcher: FAILED - supervision branch accepted the wake but did not settle within ${branchSettlementTimeoutMs}ms; re-ringed to main`,
+            pending,
+          );
+        } catch {
+          // A branch refusal (lost lock, rows already claimed by main) falls
+          // back to main exactly as before, with the wake unchanged.
+        }
       }
     }
     return await sendWake(owner, message, pending);
