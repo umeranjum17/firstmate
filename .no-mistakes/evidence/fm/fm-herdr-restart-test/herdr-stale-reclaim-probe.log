@@ -1,0 +1,11 @@
+ok - anchor primary workspace live as the projection parent
+ok - fresh projected spawn published an exact restart binding
+ok - session restart left a bare-shell husk with no registration (0.9.1 shape)
+test-agent/idle
+ok - classifier proves the 0.7.4-shape leftover record shell-only (stale-agent)
+ok - same-identity reclaim replaced the stale-agent husk in place
+warning: 2 exact herdr presentation token matches for dup1 are quarantined; inspecting only for duplicate-agent risk
+error: quarantined herdr presentation for dup1 has a stale-agent pane; refusing duplicate launch
+ok - duplicate-token match with a registered pane still refuses fallback
+ok - teardown after stale-agent reclaim retired the task
+ok - stale-agent reclaim probe completed with the default-session tripwire intact

@@ -1,0 +1,4 @@
+# pi mise ~/.config/mise/config.toml tools: pi@1.0.0 under herdr 0.9.1: registered idle, foreground [{"name":"pi","argv0":null}]
+ok - real herdr 0.9.1 + pi mise ~/.config/mise/config.toml tools: pi@1.0.0: a running registered pi classifies alive at process level
+# herdr 0.9.1 released the pi registration after /quit under a nested shell; the stale-registration branch was not exercised by this release, the agent-free verdict still held through agent_not_found
+ok - real herdr 0.9.1 + pi mise ~/.config/mise/config.toml tools: pi@1.0.0: a quit pi under a nested shell recovers as dead
