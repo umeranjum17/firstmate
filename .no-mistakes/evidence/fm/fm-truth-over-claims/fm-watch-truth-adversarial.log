@@ -1,0 +1,1 @@
+RESULT-PASS: an already-escalated run-bound gate stays quiet under a paused claim
