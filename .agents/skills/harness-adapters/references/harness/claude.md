@@ -29,13 +29,14 @@ When the project entry instead already carries an explicit decline (`hasClaudeMd
 Both flags `false` is Claude Code's default entry for a project never asked, not a decline, and is treated like an absent flag: trust registers and the import dialog still renders.
 The why-two-entries mechanism and the consent-gating logic live in the script's own header comment, which is the one owner for that contract; the fact worth repeating here is that `../../../bin/fm-spawn.sh` refuses the spawn when the trust flag fails to land, rather than launching a worker that would wedge on that dialog.
 
-Never try to answer either dialog with a key.
-Firstmate's key plane carries only Enter, Escape, and C-c with no arrow navigation, so it cannot move a dialog's selection at all, and both dialogs render with the cursor on their declining option, which means a sent Enter ends the session instead of accepting.
+Never try to answer the trust dialog with a key.
+Firstmate's key plane carries only Enter, Escape, and C-c with no arrow navigation, so it cannot move a dialog's selection at all, and the trust dialog renders with the cursor on its declining option, which means a sent Enter ends the session instead of accepting.
+The external-imports dialog is the one exception: `bin/fm-spawn.sh` answers exactly that dialog post-launch with one Enter, which lands on the fail-closed "No, disable external imports" decline, and fails the spawn loudly when the dialog never clears.
 A visible trust dialog means pre-registration did not take effect (or the project entry already carries an explicit decline) - inspect the store and the spawn's error output rather than sending keys.
-A visible external-imports dialog is expected, not a failure signal, whenever the project entry has no prior explicit approval on record - the common first-spawn case.
+A still-visible external-imports dialog after spawn means that gate failed and the spawn already failed rather than leaving a worker parked at the dialog.
 `fm-control.sh <id> interrupt` delivers Escape, which is the safe way to clear a wedged workspace-trust dialog for inspection without answering it.
 Escape on the external-imports dialog is different: it records a permanent decline (`hasClaudeMdExternalIncludesApproved: false`, `hasClaudeMdExternalIncludesWarningShown: true`) that `../../../bin/fm-claude-trust.sh` then correctly refuses to override on every later spawn for that project.
-Leave a pane showing the external-imports dialog alone and have a person answer it interactively instead of interrupting it.
+Outside a spawn, leave a pane showing the external-imports dialog for a person to answer interactively instead of interrupting it.
 To recover from an already-recorded decline, remove both flags from the project's entry in `~/.claude.json` and approve the imports dialog once by hand.
 
 The once-per-machine bypass-permissions confirmation is a third, separate dialog, scoped to the machine rather than the path, and pre-registration does not address it.
