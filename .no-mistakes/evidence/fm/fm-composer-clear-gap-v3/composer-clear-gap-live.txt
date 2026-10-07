@@ -1,0 +1,25 @@
+=== 1. per-harness clear-key decision (bin/fm-control-lib.sh) ===
+muse     -> [C-u]
+cursor   -> []
+gemini   -> []
+agy      -> []
+omp      -> []
+devin    -> []
+rovo     -> []
+claude   -> []
+codex    -> []
+opencode -> []
+pi       -> []
+grok     -> []
+kimi     -> []
+unverified harness:
+someagent -> nonzero (no guessed key) rc=1
+
+=== 2. exit refusal text with pending composer (muse: names C-u) ===
+716:        die "task $ID's composer visibly holds pending text; refusing to type the $cmd exit command because it would concatenate onto that text. Submit it with 'fm-send.sh $ID --key Enter', or clear it with 'fm-send.sh $ID --key $clear_key', then retry '$VERB'."
+718:        die "task $ID's composer visibly holds pending text; refusing to type the $cmd exit command because it would concatenate onto that text. Submit it with 'fm-send.sh $ID --key Enter', or clear the composer, then retry '$VERB'."
+723:        die "task $ID's composer state is '$composer_state', not proven empty; refusing to type the $cmd exit command because it could concatenate onto existing text. Clear the composer with 'fm-send.sh $ID --key $clear_key', then retry '$VERB'."
+
+=== 3. steer ring-skip notice names Enter recovery ===
+bin/fm-send.sh:1104:    1) echo "fm-send: doorbell skipped (composer visibly holds pending text); the steer is durably recorded at $INBOX_RECORD and $ring_retry. To ring now, submit the pending text with 'fm-send.sh $INBOX_TASK_ID --key Enter' (or clear the composer); the next ring then lands." >&2 ;;
+bin/fm-remote-secondmate-control.sh:308:    1) printf "notice: doorbell skipped (composer visibly holds pending text); the steer is durably recorded at %s. To ring now, submit the pending text with '%s key %s Enter' (or clear the composer); the next ring then lands.\n" "$rec" "fm-remote-secondmate-control.sh" "$id" >&2 ;;
