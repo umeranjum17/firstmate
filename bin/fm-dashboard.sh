@@ -19,8 +19,8 @@
 #                                   are skipped, with a note; absent/empty means zero
 #   FM_BEARINGS_SECONDMATES=500 FM_BEARINGS_UNHEALTHY=500 FM_SNAPSHOT_SECONDMATES=500
 #                                   bin/fm-bearings-snapshot.sh --json: lead state and unhealthy
-#                                   endpoints (the FM_SNAPSHOT_* bound lifts the fleet snapshot's
-#                                   own registry cap, which otherwise omits mates past 20 upstream)
+#                                   endpoints (the FM_SNAPSHOT_* bound raises the fleet snapshot's
+#                                   own registry cap from 20 to 500, which otherwise omits mates past 20 upstream)
 #   data/secondmates.md             registered homes: "- <name> - ... (home: <dir>; ...)"
 #   config/parked-homes             home ids the captain parked, one per line (# comments)
 #   <home>/state/*.meta + *.status  lanes: every ship/scout record, in one state by its last
