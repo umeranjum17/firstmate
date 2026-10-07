@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
-# fm-flow.sh - read-only durable flow data; no endpoint, network or cache writes.
-# Usage: FM_HOME=<home> fm-flow.sh --json [--now <unix-seconds>]
+# fm-flow.sh - read-only flow data, no endpoint or cache writes.
+# Usage: FM_HOME=<home> fm-flow.sh --json [--now <unix-seconds>] [--checks]
+# --checks reads durable GitHub check-run records through gh-axi (5 s per call).
+# These live observations carry their own timestamp, independent of --now.
+# It reports queued/running counts on the recorded PR head, never infers green
+# from an empty check list; missing, stale or incomplete results stay unknown.
+# Why-lines classify explicitly named waits only, not arbitrary prose mentions.
+# Stage clocks read the installed config/fm-flow-check.sh policy expression;
+# an unrecognized/missing policy yields unknown, not a copied default.
+# config/lane-caps supplies recorded-active lane caps; no free worker is inferred.
 # Reads this home and recursively registered local homes, state/*.meta/status,
 # state/fleet-ledger.jsonl (docs/fleet-ledger.md), and data/backlog.md.
 # Output fm-flow.v1: homes, lanes, queue, bottlenecks, executed_24h/7d,
@@ -12,24 +20,26 @@
 # Bottlenecks sum CURRENT recorded wait ages, not historical or causal losses.
 # Keyed waits close only on matching resolved/captain-held, not working/done.
 # Historical results cover retained records only, not a complete forge history.
-# Coverage: queue holds/dependencies and recorded waits/lifecycle. Capacity,
-# dispatch-admission reasons and stage-clock/liveness probes are not collected.
+# Capacity and worker-liveness probes are not collected.
 set -eu
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-[ "${1:-}" = --json ] || { echo 'usage: fm-flow.sh --json [--now <unix-seconds>]' >&2; exit 2; }
+[ "${1:-}" = --json ] || { echo 'usage: fm-flow.sh --json [--now <unix-seconds>] [--checks]' >&2; exit 2; }
 shift
-now=$(date +%s)
-if [ "$#" -gt 0 ]; then
-  [ "$#" -eq 2 ] && [ "$1" = --now ] || exit 2
-  now=$2
-fi
+now=$(date +%s) checks=0
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --now) [ "$#" -ge 2 ] || exit 2; now=$2; shift 2 ;;
+    --checks) checks=1; shift ;;
+    *) exit 2 ;;
+  esac
+done
 case "$now" in ''|*[!0-9]*) echo 'fm-flow: --now requires Unix seconds' >&2; exit 2 ;; esac
-exec python3 - "${FM_HOME:-$SCRIPT_DIR/..}" "$now" <<'PY'
-import base64, json, math, re, statistics, sys
+exec python3 - "${FM_HOME:-$SCRIPT_DIR/..}" "$now" "$checks" <<'PY'
+import base64, json, math, re, statistics, subprocess, sys, time
 from datetime import datetime, timezone
 from pathlib import Path
 ROOT, NOW = Path(sys.argv[1]).resolve(), int(sys.argv[2])
-notes, homes, lanes, queue = [], {}, [], []
+notes, homes, lanes, queue, metadata = [], {}, [], [], {}
 def read(path, optional=False):
     try:
         return path.read_text(errors='replace').splitlines()
@@ -55,6 +65,36 @@ def events(path):
         out.append({'state': v[1], 'ts': stamp(int(ats[0])) if len(ats) == 1 else None,
                     'key': keys[0] if len(keys) == 1 else 'default', 'text': text.strip()})
     return out
+
+def cause(key, event):
+    if key.startswith('captain-hold'):
+        return 'captain'
+    text = event.get('text') or ''
+    if re.search(r'^(?:fm-mem-gate: waiting|waiting (?:for|on) (?:the )?memory gate)\b', text, re.I):
+        return 'memory_gate'
+    if re.search(r'^(?:waiting (?:for|on)|missing|expired|invalid|needs?) .*\b(?:credentials?|login|authentication)\b', text, re.I):
+        return 'credential_external'
+    if re.search(r'^waiting (?:for|on) (?:an? |the )?(?:external|SSH|network|MacBook)\b', text, re.I):
+        return 'credential_external'
+    if re.search(r'^(?:waiting (?:for|on)|awaiting) (?:the )?CI queue\b', text, re.I):
+        return 'ci_queue'
+    if re.search(r'^(?:waiting (?:for|on)|awaiting) (?:the )?(?:review|merge)\b', text, re.I):
+        return 'review_merge'
+    return 'lead' if event.get('state') == 'needs-decision' else 'unknown'
+
+clock_source = ROOT / 'config/fm-flow-check.sh'
+policy = '\n'.join(read(clock_source, True) or [])
+clock = re.search(r"^\s*clock = (\d+) if L\['verb'\] == 'needs-decision' else (\d+)\s*$", policy, re.M)
+clocks = {'needs-decision': int(clock[1]), 'blocked': int(clock[2]), 'paused': int(clock[2])} if clock else {}
+if not clock:
+    notes.append({'source': str(clock_source), 'reason': 'stage clock policy unknown'})
+caps = {}
+for line in read(ROOT / 'config/lane-caps', True) or []:
+    fields = line.split()
+    if len(fields) == 2 and fields[1].isdigit():
+        caps[fields[0]] = int(fields[1])
+    elif line.strip() and not line.lstrip().startswith('#'):
+        notes.append({'source': 'config/lane-caps', 'reason': 'malformed cap row'})
 
 pending = [('main', ROOT, None)]
 seen = set()
@@ -114,6 +154,7 @@ for name, home in sorted(homes.items()):
         meta = dict(l.split('=', 1) for l in content if '=' in l)
         if meta.get('kind') in ('ship', 'scout'):
             live[path.stem] = meta
+            metadata[(name, path.stem)] = meta
             records.setdefault(path.stem, [])
     for task, es in sorted(records.items()):
         if any(e.get('kind') == 'secondmate' for e in es):
@@ -151,13 +192,16 @@ for name, home in sorted(homes.items()):
                'seconds_in_stage': age(start), 'reason': last.get('text') or 'unknown: no status reason',
                'timestamp_basis': basis, 'open_waits': [dict(key=k, since=e['ts'],
                    seconds=age(e['ts']), reason=e.get('text') or '',
-                   cause='captain' if k.startswith('captain-hold') else
-                         'lead' if e.get('state') == 'needs-decision' else 'unknown')
+                   cause=cause(k, e))
                    for k, e in sorted(waits.items())],
                'times': dict(times, working=working, first_commit=None, pr_opened=None, checks_green=None),
                'durations': {'pickup_to_working': age(times['dispatched'], working),
                    'time_to_merge': age(times['dispatched'], times['merged']),
                    'merge_to_cleanup': age(times['merged'], times['cleaned_up'])}}
+        seconds = clocks.get(state)
+        row['stage_clock'] = {'seconds': seconds, 'source': str(clock_source) if seconds is not None else None,
+                              'overdue': row['seconds_in_stage'] >= seconds
+                              if seconds is not None and row['seconds_in_stage'] is not None else None}
         lanes.append(row)
     backlog = read(home / 'data/backlog.md')
     section, rows = '', []
@@ -185,22 +229,76 @@ for name, home in sorted(homes.items()):
         queue.append({'home': name, 'task': task,
                       'why': ' '.join(reason.split()) if reason else 'unknown: dispatch admission not recorded'})
 
+active = {h: sum(l['open'] and l['home'] == h and l['stage'] in ('working', 'resolved') and
+                 not any(w['cause'] == 'captain' for w in l['open_waits']) for l in lanes) for h in homes}
+for q in queue:
+    if q['why'].startswith('unknown:') and q['home'] in caps and active[q['home']] >= caps[q['home']]:
+        q['why'] = f"lane cap: {active[q['home']]} recorded active lanes, cap {caps[q['home']]}"
+
+def api(path, projection):
+    result = subprocess.run(['gh-axi', 'api', path, '--jq', projection, '--full'],
+                            capture_output=True, text=True, timeout=5)
+    if result.returncode:
+        raise ValueError('gh-axi query failed: ' + (result.stderr.strip() or result.stdout.strip())[-300:])
+    return result.stdout
+
+def check_runs(meta):
+    url = meta.get('pr', '')
+    m = re.fullmatch(r'https://github.com/([\w.-]+/[\w.-]+)/pull/(\d+)', url)
+    if not m:
+        raise ValueError('canonical GitHub PR URL not recorded')
+    pull = api(f'/repos/{m[1]}/pulls/{m[2]}', '{head: .head.sha}|tojson')
+    head = re.search(r'^head: "?([0-9a-f]{40})"?$', pull, re.M)
+    if not head or not meta.get('pr_head') or meta['pr_head'] != head[1]:
+        raise ValueError('PR head is missing or differs from the recorded head')
+    counts = api(f'/repos/{m[1]}/commits/{head[1]}/check-runs?per_page=100',
+                 '{total: .total_count, returned: (.check_runs|length), '
+                 'queued: ([.check_runs[]|select(.status=="queued")]|length), '
+                 'running: ([.check_runs[]|select(.status=="in_progress")]|length), '
+                 'completed: ([.check_runs[]|select(.status=="completed")]|length)}|tojson')
+    values = {}
+    for field in ('total', 'returned', 'queued', 'running', 'completed'):
+        found = re.search(r'^' + field + r': (\d+)$', counts, re.M)
+        if not found:
+            raise ValueError('invalid check-run counts from gh-axi')
+        values[field] = int(found[1])
+    if values['total'] != values['returned'] or values['returned'] != sum(values[k] for k in ('queued', 'running', 'completed')):
+        raise ValueError('check-run coverage incomplete; counts unknown')
+    return dict(values, head=head[1], observed_at=int(time.time()), source=url,
+                phase='unreported' if not values['total'] else 'mixed' if values['queued'] and values['running']
+                else 'queued' if values['queued'] else 'running' if values['running'] else 'reported_complete')
+
+for lane in lanes:
+    if not lane['open']:
+        continue
+    lane['ci'] = None
+    meta = metadata[(lane['home'], lane['task'])]
+    if sys.argv[3] != '1' or not meta.get('pr'):
+        continue
+    try:
+        lane['ci'] = check_runs(meta)
+        if lane['ci']['queued'] and lane['stage'] in ('paused', 'blocked', 'needs-decision', 'done'):
+            lane['open_waits'].append({'key': None, 'since': None, 'seconds': None, 'cause': 'ci_queue',
+                                      'source': 'forge', 'reason': f"{lane['ci']['queued']} reported checks queued; wait start unknown"})
+    except (OSError, ValueError, subprocess.TimeoutExpired) as err:
+        notes.append({'source': lane['home'] + '/' + lane['task'] + '/checks', 'reason': str(err)})
+
 bottlenecks = []
-for cause in ('captain', 'lead', 'unknown'):
+for cause_name in ('captain', 'lead', 'ci_queue', 'memory_gate', 'credential_external', 'review_merge', 'unknown'):
     items = []
     for lane in lanes:
         if not lane['open']:
             continue
         classes = {w['cause'] for w in lane['open_waits']}
         lane_cause = next(iter(classes)) if len(classes) == 1 else 'unknown'
-        matching = lane['open_waits'] if lane_cause == cause else []
+        matching = lane['open_waits'] if lane_cause == cause_name else []
         if matching:
             durations = [w['seconds'] for w in matching]
             items.append({'home': lane['home'], 'task': lane['task'], 'waits': matching,
                           'seconds': max(durations) if all(d is not None for d in durations) else None})
     if items:
         known = [i['seconds'] for i in items if i['seconds'] is not None]
-        bottlenecks.append({'cause': cause, 'items': items, 'known_lane_hours': sum(known) / 3600,
+        bottlenecks.append({'cause': cause_name, 'items': items, 'known_lane_hours': sum(known) / 3600,
                             'unknown_items': len(items) - len(known)})
 bottlenecks.sort(key=lambda b: (-b['known_lane_hours'], b['cause']))
 def executed(seconds):
@@ -221,6 +319,7 @@ print(json.dumps({'schema': 'fm-flow.v1', 'at': NOW, 'homes': sorted(homes), 'la
                   'time_to_merge_by_home': {h: summary([l for l in executed(7 * 86400) if l['home'] == h]) for h in sorted(homes)},
                   'trend_7d': trend, 'limitations': notes + [{'source': 'coverage', 'reason':
                   'Retained records only; missing pickup/PR/check/cleanup times stay unknown. '
-                  'Wait ages are recorded waits, not proof of idle workers. Capacity, clocks and admission probes not collected.'}]},
+                  'Wait ages are recorded waits, not proof of idle workers. Capacity and free-worker availability not collected. '
+                  'CI counts cover reported check runs only, not all required contexts or a green verdict.'}]},
                  sort_keys=True, allow_nan=False))
 PY
