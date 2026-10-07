@@ -1664,6 +1664,9 @@ async function assertStockHtmlRendering(command, submitData) {
   terminalInputHandler(submitData);
   const htmlRenderer = createToolHtmlRenderer({
     getToolDefinition: (name) => tools.find((tool) => tool.name === name),
+    // Pi 1.0.4 renamed this dependency to getToolRenderers; pass both so the
+    // lookup works on old and new Pi (each version reads the key it knows).
+    getToolRenderers: (name) => tools.find((tool) => tool.name === name),
     theme,
     cwd: process.cwd(),
   });
@@ -1695,6 +1698,9 @@ editorText = "/export remapped.html";
 terminalInputHandler("\r");
 const unmatchedRenderer = createToolHtmlRenderer({
   getToolDefinition: (name) => tools.find((tool) => tool.name === name),
+  // Pi 1.0.4 renamed this dependency to getToolRenderers; pass both so the
+  // lookup works on old and new Pi (each version reads the key it knows).
+  getToolRenderers: (name) => tools.find((tool) => tool.name === name),
   theme,
   cwd: process.cwd(),
 });

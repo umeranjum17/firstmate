@@ -1204,11 +1204,20 @@ for RESTART_ID in fm-hibit-resume-r1 wheelhouse-healing-r1; do
   # Stopping the whole Herdr session also ends the anchor's agent. Its restored
   # shell remains useful as the durable layout anchor, but its task record no
   # longer represents a live slot owner and must not poison later slot reuse.
+  # Newer Herdr releases report agent_not_found on the revived pane while
+  # 0.7.4 restores a label-less unknown record; either shape is agent-free,
+  # so the guard pins that no live registration survived, and the reclaim
+  # below proves the slot reuse itself.
   rm -f "$ANCHOR_META"
   lab pane get "$OLD_RESTART_PANE" >/dev/null 2>&1 \
     || fail "$RESTART_ID restart did not preserve the projected pane structurally"
-  if lab agent get "$OLD_RESTART_PANE" >/dev/null 2>&1; then
-    fail "$RESTART_ID restart fixture unexpectedly retained a registered agent"
+  if RESTART_AGENT_JSON=$(lab agent get "$OLD_RESTART_PANE" 2>/dev/null); then
+    printf '%s' "$RESTART_AGENT_JSON" | jq -e '
+      (.result.agent.agent // "") == ""
+      and ((.result.agent.agent_status // "") == "unknown"
+        or (.result.agent.agent_status // "") == "stale")
+    ' >/dev/null 2>&1 \
+      || fail "$RESTART_ID restart fixture retained a live agent registration"
   fi
   RECLAIM_FOCUS=$(focus_snapshot)
   spawn_task "$RESTART_ID" "$HOME_DIR" "$RECOVERY_PROJECT_DIR" > "$TMP_ROOT/$RESTART_ID-reclaim.out" 2> "$TMP_ROOT/$RESTART_ID-reclaim.err" \

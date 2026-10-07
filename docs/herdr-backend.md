@@ -366,7 +366,7 @@ An existing journal suppresses another projected create.
 Before any recovery mutation, Firstmate holds both the task spawn lock and the named-session presentation lock.
 
 A same-identity version 2 binding may replace one exact agent-free restart husk in place.
-A husk is a restored same-labeled tab with a missing pane or no registered agent, as [Restart and liveness behavior](#restart-and-liveness-behavior) describes.
+A husk is a restored same-labeled tab with a missing pane, no registered agent, or a registration the process view proves shell-only, as [Restart and liveness behavior](#restart-and-liveness-behavior) describes.
 The replacement is allowed only when all of these agree:
 
 - The physical home.
@@ -393,7 +393,7 @@ These cases fall back flat without mutating the old projection when duplicate-ag
 - Active target tabs.
 - Ambiguous identity or focus.
 
-A live or unknown recorded or token-matched endpoint refuses duplicate launch.
+A live or unknown recorded or token-matched endpoint refuses duplicate launch, as does any registered pane under a duplicate token match; only a single unambiguous token match may fall back flat over a proven shell-only leftover record.
 
 ### Startup cleanup of restored projections
 
@@ -663,8 +663,8 @@ No Herdr-specific copy of that protocol exists.
 ### Husks after a server restart
 
 Stopping and restarting a named Herdr server preserves workspace, tab, pane, and label ids.
-The underlying harness processes and live agent registrations do not survive.
-A restored same-labeled tab with a missing pane or no registered agent is a husk.
+The underlying harness processes do not survive, and no live agent registration does: newer releases report agent_not_found on the revived pane, while 0.7.4 restores a label-less unknown record over the bare shell.
+A restored same-labeled tab with a missing pane, no registered agent, or only such a proven shell-only leftover record is a husk.
 
 Create replaces only a confidently dead or no-agent husk, creates the replacement before closing the old tab, and refuses live or unknown states.
 This prevents closing the workspace's last tab before a replacement exists.
@@ -711,9 +711,8 @@ The generic Herdr agent-liveness probe reuses that pane classifier, then applies
 | A registered agent with a live process | `alive` |
 | Every other unexpected read | `unreadable` |
 
-Neither the stopped-server exception nor the stale-registration verdict widens husk detection or any close authority.
-Those paths still refuse an unreadable pane.
-A `stale-agent` pane is reused by recovery, never closed as a husk, because the shell it holds may be a nested worktree shell.
+Neither the stopped-server exception nor the stale-registration verdict widens the generic husk classifier (`fm_backend_herdr_tab_is_husk`), the session-startup sweep, or any unreadable-pane refusal.
+Outside the exact same-identity restart reclaim, a `stale-agent` pane is reused by recovery, never closed as a husk, because the shell it holds may be a nested worktree shell; only that reclaim path may replace a proven shell-only leftover record in place, as [Restart recovery](#restart-recovery) describes.
 
 Native registration still identifies Pi by name where tmux would see a generic interpreter.
 The process-level proof only decides whether that registration is backed by a running process.
