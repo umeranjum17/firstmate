@@ -427,6 +427,18 @@ fm_control_harness_turnend_auth_path() {  # <harness> <token>
   esac
 }
 
+# Claude's startup gates (2.1.292): the folder-trust and external-import
+# dialogs a session resumed outside its recorded copy can render before any
+# composer exists. Escape declines either one and never approves anything.
+# Input is a plain full viewport. Output: gate|none.
+fm_control_startup_gate() {  # <harness> <viewport>
+  [ "${1-}" = claude ] || { printf 'none'; return 0; }
+  printf '%s\n' "${2-}" | awk '
+    /Allow external CLAUDE\.md file imports\?|Is this a project you created or one you trust\?/ { gate = 1 }
+    /Enter to confirm · Esc to cancel/ { prompt = 1 }
+    END { printf "%s", (gate && prompt) ? "gate" : "none" }'
+}
+
 # Claude's supported background-work exit dialog (2.1.286). Match the current
 # modal, never an option mentioned in transcript prose. Only the stop option
 # already selected is supported; other selections or changed dialogs refuse.

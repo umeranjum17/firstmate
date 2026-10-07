@@ -89,6 +89,7 @@ case "${1:-}" in
     else
       printf '%s\n' "$payload" >> "$D/keys"
       case "$payload" in
+        Escape) rm -f "$D/screen" ;;
         'export GOTMPDIR='*)
           if [ -n "${FM_FAKE_TRACE_PREPARE:-}" ]; then
             : > "$FM_FAKE_TRACE_PREPARE"
@@ -117,7 +118,9 @@ case "${1:-}" in
     printf 'fakepane\n'; exit 0 ;;
   capture-pane)
     [ -z "${FM_FAKE_COMPOSER_READ_FAIL:-}" ] || exit 1
-    if [ -s "$D/composer" ]; then
+    if [ -s "$D/screen" ]; then
+      cat "$D/screen"
+    elif [ -s "$D/composer" ]; then
       printf '╭────╮\n│ %s  │\n╰────╯\n' "$(cat "$D/composer")"
     else
       printf '╭────╮\n│    │\n╰────╯\n'
@@ -632,6 +635,29 @@ test_relaunch_appends_the_progress_note_to_the_instructions() {
   assert_grep 'do not reject it as another home' "$launch_brief" \
     "the Firstmate-worktree relaunch did not distinguish its inbox from cross-home state"
   pass "fm-control relaunch: progress and the Firstmate-worktree worker identity reach the replacement"
+}
+
+test_relaunch_declines_a_claude_startup_gate_before_exit() {
+  local dir out rc
+  dir=$(new_case startupgate rl52)
+  add_ship_task "$dir" rl52 claude
+  cat > "$dir/fake/screen" <<'EOF'
+  Allow external CLAUDE.md file imports?
+  This project's CLAUDE.md or .claude/rules imports files outside the current working directory. Never allow this for
+  third-party repositories.
+  External imports:
+    /home/lab/AGENTS.md
+  ❯ No, disable external imports
+    Yes, allow external imports
+  Enter to confirm · Esc to cancel
+EOF
+  out=$(run_control "$dir" rl52 relaunch --note "resumed outside its copy"); rc=$?
+  expect_code 0 "$rc" "a resumed agent at a startup gate should relaunch"$'\n'"$out"
+  [ "$(head -n 1 "$dir/fake/keys")" = Escape ] || fail "the startup gate must be declined with Escape before anything else"
+  ! grep -qx Enter "$dir/fake/keys" || [ "$(grep -n -m1 -x Escape "$dir/fake/keys" | cut -d: -f1)" -lt "$(grep -n -m1 -x Enter "$dir/fake/keys" | cut -d: -f1)" ] \
+    || fail "Enter must never reach the startup gate"
+  assert_grep "/exit" "$dir/fake/literal" "the exit command should follow the declined gate"
+  pass "fm-control relaunch: declines a Claude startup gate with Escape, then exits and relaunches"
 }
 
 test_relaunch_refuses_a_copy_another_task_records() {
@@ -2493,6 +2519,7 @@ test_disabled_relaunch_clears_prior_trace_context
 test_relaunch_appends_the_progress_note_to_the_instructions
 test_relaunch_requires_a_note_for_a_ship_task
 test_relaunch_refuses_a_copy_another_task_records
+test_relaunch_declines_a_claude_startup_gate_before_exit
 test_harness_switch_moves_the_record_and_clears_prior_wiring
 test_harness_switch_does_not_carry_the_old_profile_axes
 test_harness_switch_resolves_a_prefixed_recorded_harness

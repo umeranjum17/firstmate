@@ -36,7 +36,9 @@
 #              every uncommitted change. Interrupts first when the task reads
 #              busy, then submits the harness's exit command. An exact Claude
 #              background-work dialog with Exit and stop tasks selected is
-#              confirmed; detach and unknown dialogs are refused. Postcondition:
+#              confirmed; detach and unknown dialogs are refused. A Claude
+#              startup gate (folder trust or external imports) is declined
+#              with Escape before the exit command. Postcondition:
 #              the backend's recovery-grade classifier reports the agent gone.
 #              Already-stopped is success (idempotent). An endpoint that reads
 #              `missing` is put through the control plane's per-backend absence
@@ -680,6 +682,22 @@ do_exit() {
     1) ;;
     *) die "task $ID exit confirmation could not be delivered safely" ;;
   esac
+  # A resumed Claude can wait at a startup gate with no composer yet; decline it.
+  local gate_screen
+  gate_screen=$(fm_backend_visible_capture "$BACKEND" "$T" "$LABEL" 2>/dev/null) || gate_screen=
+  if [ "$(fm_control_startup_gate "$HARNESS" "$gate_screen")" = gate ]; then
+    fm_backend_send_key "$BACKEND" "$T" Escape "$LABEL" \
+      || die "task $ID shows a Claude startup dialog that could not be declined"
+    sleep 2
+    if [ "$(agent_state)" = dead ]; then
+      retire_busy_incarnation
+      printf 'stopped'
+      return 0
+    fi
+    gate_screen=$(fm_backend_visible_capture "$BACKEND" "$T" "$LABEL" 2>/dev/null) || gate_screen=
+    [ "$(fm_control_startup_gate "$HARNESS" "$gate_screen")" = none ] \
+      || die "task $ID still shows a Claude startup dialog after Escape; refusing to type into it"
+  fi
   # A busy agent is interrupted first before the exit command is submitted.
   case "$(busy_verdict)" in
     busy*)
