@@ -108,6 +108,7 @@ for task, reason in [('memory', 'fm-mem-gate: waiting (free 1 GB)'), ('credentia
 (child / 'state/mixed.meta').write_text('kind=ship\n')
 (child / 'state/mixed.status').write_text('blocked [at=10] [key=a]: fm-mem-gate: waiting (free 1 GB)\n'
     'blocked [at=30] [key=a2]: fm-mem-gate: waiting (free 1 GB)\n'
+    'blocked [key=a0]: fm-mem-gate: waiting (free 1 GB)\n'
     'needs-decision [at=20] [key=b]: waiting for merge\n')
 z = json.loads(run())
 new = {l['task']: l for l in z['lanes'] if l['open']}
@@ -120,8 +121,12 @@ mem_bucket = next(b for b in z['bottlenecks'] if b['cause'] == 'memory_gate')
 merge_bucket = next(b for b in z['bottlenecks'] if b['cause'] == 'review_merge')
 mem_item = next(i for i in mem_bucket['items'] if i['task'] == 'mixed')
 merge_item = next(i for i in merge_bucket['items'] if i['task'] == 'mixed')
-assert mem_item['seconds'] == 90 and len(mem_item['waits']) == 2, 'within-cause maximum, not sum'
-assert merge_item['seconds'] == 80
+assert mem_item['seconds'] is None, 'unstamped same-cause wait keeps full total unknown'
+assert mem_item['known_seconds'] == 90 and len(mem_item['waits']) == 3, 'within-cause maximum, not sum'
+assert mem_item['unknown_waits'] == 1
+assert merge_item['seconds'] == 80 and merge_item['known_seconds'] == 80
+assert mem_bucket['known_lower_bound_lane_hours'] == (90 + 90) / 3600
+assert mem_bucket['unknown_items'] == 1 and mem_bucket['unknown_waits'] == 1
 assert mem_item['overlap'] is True and merge_item['overlap'] is True
 assert mem_bucket['additive'] is False and merge_bucket['additive'] is False
 assert next(i for i in mem_bucket['items'] if i['task'] == 'memory')['overlap'] is False
