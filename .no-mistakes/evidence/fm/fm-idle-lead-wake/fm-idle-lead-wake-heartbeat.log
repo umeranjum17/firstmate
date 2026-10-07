@@ -1,0 +1,3 @@
+ok - an idle lead with ready work is woken once per ready set, and never while a worker is working
+ok - a home under its lane floor wakes with free lane slots, stays quiet at the floor, and re-raises while held
+ok - a home with every lane slot open but no worker working is woken
