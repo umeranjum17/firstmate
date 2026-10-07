@@ -1407,7 +1407,7 @@ def pr_row(p):
             {'failing': 'checks failing', 'green': 'checks green', 'running': 'checks running'}.get(p['checks'] or '', st[0].lower() + st[1:]))
     seen = f' · checks read {when(parse_ts(p["checked"]).timestamp())}' if p['checked'] and parse_ts(p['checked']) else ''
     pr = f' · {link("pull request", p["url"])}' if p['url'] else ''
-    return grow(esc(titles.get((l['home'], l['task'])) or l['task']), esc(f'{hname(l["home"])} · {what} · {dur(NOW_TS - l["since"])}') + pr + esc(seen))
+    return grow(esc(titles.get((l['home'], l['task'])) or l['task']), esc(f'{hname(l["home"])} · {what} · last status {dur(NOW_TS - l["since"])} ago') + pr + esc(seen))
 def pr_section(group):
     if group == 'home':
         hs = sorted({p['lane']['home'] for p in PRS}, key=lambda h: (h != 'main', h))
@@ -1418,7 +1418,7 @@ def pr_section(group):
     body = glist(gs, 'Pull requests and validations open') if PRS else '<p class="note">No lane has a pull request or a validation run.</p>'
     if nm_err: body += f'<p class="note">Validation run {unknown(f"{len(nm_err)} of {len(PR_LANES)} lanes: {nm_err[0]}")}</p>'
     ci = max(ci_waits, key=lambda p: p['wait']) if ci_waits else None
-    body += (f'<p class="note">Longest CI wait now: {dur(ci["wait"])} ({esc(ci["lane"]["task"])}, {esc(hname(ci["lane"]["home"]))}), from no-mistakes. '
+    body += (f'<p class="note">Longest CI wait now: {dur(ci["wait"])} ({esc(titles.get((ci["lane"]["home"], ci["lane"]["task"])) or ci["lane"]["task"])}, {esc(hname(ci["lane"]["home"]))}), from no-mistakes. '
              if ci else '<p class="note">No pull request is waiting on CI now. ') + 'Checks come from each lane\'s own pull request record, not a new GitHub call.</p>'
     h2 = f'{plural(len(PRS), "pull request or validation", "pull requests or validations")}; {len(failing)} failing.'
     return f'<section id="prs">\n{sh(f"Pull requests and validation · no-mistakes and lane records, now {BUILT}")}\n<h2>{h2}</h2>\n{body}\n</section>'
