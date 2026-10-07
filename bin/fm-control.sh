@@ -697,6 +697,18 @@ do_exit() {
     gate_screen=$(fm_backend_visible_capture "$BACKEND" "$T" "$LABEL" 2>/dev/null) || gate_screen=
     [ "$(fm_control_startup_gate "$HARNESS" "$gate_screen")" = none ] \
       || die "task $ID still shows a Claude startup dialog after Escape; refusing to type into it"
+    # The session is still loading behind the dialog; typed input is lost until
+    # its composer reads empty on two reads in a row.
+    local settled=0 waited=0
+    while [ "$settled" -lt 2 ] && [ "$waited" -lt 30 ]; do
+      sleep 1
+      waited=$((waited + 1))
+      if [ "$(fm_backend_composer_state "$BACKEND" "$T" "$LABEL" 2>/dev/null)" = empty ]; then
+        settled=$((settled + 1))
+      else
+        settled=0
+      fi
+    done
   fi
   # A busy agent is interrupted first before the exit command is submitted.
   case "$(busy_verdict)" in

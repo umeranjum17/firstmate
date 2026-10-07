@@ -327,7 +327,6 @@ pass "lab primary, lead, and worker are live with both watchers armed and every 
 fm "$MAIN" "$MAIN/bin/fm-sentinel.sh" tick >/dev/null
 [ -s "$MAIN/state/.sentinel-herdr-identity" ] || fail "sentinel recorded no Herdr identity"
 
-pgrep -f "$MAIN/bin/fm-watch.sh" >/dev/null || fail "no primary watcher process before the restart"
 # The incident: the server dies and its supervisor restarts it.
 lab_env "$HERDR_LAB_HELPER" stop "$HERDR_LAB_SESSION" >/dev/null || fail "could not stop the lab server"
 # oomd kills the whole Herdr unit, but a lab stop leaves detached watchers alive.
