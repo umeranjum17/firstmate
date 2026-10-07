@@ -1050,11 +1050,11 @@ machine_rows = ''.join([
 ])
 def devices_list(group):
     if group == 'home':
-        key = lambda r: r[4] or 'No holder'
-        order = sorted({key(r) for r in dev_rows}, key=lambda k: (k == 'No holder', k))
+        key = lambda r: 'Unknown' if r[3] == '' else r[4] or 'No holder'
+        order = sorted({key(r) for r in dev_rows}, key=lambda k: (k in ('No holder', 'Unknown'), k))
     else:
-        key = lambda r: 'Problem' if r[3] == 'bad' else 'In use' if r[4] else 'Free'
-        order = [k for k in ('Problem', 'In use', 'Free') if any(key(r) == k for r in dev_rows)]
+        key = lambda r: 'Problem' if r[3] == 'bad' else 'Unknown' if r[3] == '' else 'In use' if r[4] else 'Free'
+        order = [k for k in ('Problem', 'In use', 'Free', 'Unknown') if any(key(r) == k for r in dev_rows)]
     groups = [(k, sum(key(r) == k for r in dev_rows), ''.join(grow(esc(r[0]), esc(f'{r[2]} · {r[1]}')) for r in dev_rows if key(r) == k), '', None, True) for k in order]
     body = glist(groups, 'Devices') if dev_rows else ('<p class="note">No device connected and no emulator running.</p>' if dev_count is not None else '')
     return body + ''.join(f'<p class="note">unknown - {esc(p)}</p>' for p in dev_problems)
@@ -1356,7 +1356,7 @@ def flow_body():
 </section>
 <section>
 {sh(f"Today by hour · landings {LANDED_SRC if landings is not None else 'unknown'}")}
-<h2>{h_landed} landed since 00:00{"" if f_exact else f"; filing times from {from_h:02d}:00"}.</h2>
+<h2>{"Landings unknown." if landings is None else f"{h_landed} landed since 00:00{'' if f_exact else f'; filing times from {from_h:02d}:00'}."}</h2>
 {inout_chart() if landings is not None else unknown(why_of("GitHub landings"))}
 </section>
 <section>
