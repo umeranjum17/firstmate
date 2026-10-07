@@ -2281,7 +2281,7 @@ case "$ARG3" in
   # kinds: a harness with no template aborts the spawn.
   if [ "$KIND" = secondmate ]; then
     HARNESS=$("$FM_ROOT/bin/fm-harness.sh" secondmate "$ID") || exit 1
-    harness_src='secondmate profile resolved by fm-harness.sh'
+    harness_src='config/secondmates/$ID/harness or config/secondmate-harness (falling back to config/crew-harness)'
   else
     if [ -f "$CONFIG/crew-dispatch.json" ]; then
       echo "error: config/crew-dispatch.json is active - pass an explicit harness resolved from the dispatch rules (the consultation backstop, so the rules are never silently skipped)." >&2
