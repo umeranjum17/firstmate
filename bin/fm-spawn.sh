@@ -4250,8 +4250,6 @@ claude_wait_for_imports_answer() {
         spawn_send_key "$T" Enter || return 1
         answered=1
       fi
-    elif [ -z "$pane" ]; then
-      :
     elif [ "$answered" -eq 1 ]; then
       clear_streak=$((clear_streak + 1))
       [ "$clear_streak" -lt 3 ] || return 0

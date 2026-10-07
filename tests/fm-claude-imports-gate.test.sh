@@ -13,7 +13,9 @@
 # (Enter there selects "No, exit"); a single non-dialog frame right after the
 # answer - including an empty capture from a failed backend read - must not
 # report success (post-answer clear streak); a dialog that never clears fails
-# the spawn loudly instead of parking a worker at the dialog.
+# the spawn loudly instead of parking a worker at the dialog. Sustained
+# empty reads count toward the clear streak, so a pane that never renders
+# exits without burning the full poll budget.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -130,7 +132,7 @@ test_empty_capture_after_answer_is_not_success() {
   local rc calls
   gate_setup empty-frame
   gate_frame "$IMPORTS_FRAME"
-  gate_frame "$EMPTY_FRAME"    # failed backend read: must not count as clear
+  gate_frame "$EMPTY_FRAME"    # failed backend read: counts toward the streak but one alone must not succeed
   gate_frame "$IMPORTS_FRAME"
   gate_frame "$IDLE_FRAME"; gate_frame "$IDLE_FRAME"; gate_frame "$IDLE_FRAME"
   gate_frame "$IDLE_FRAME"; gate_frame "$IDLE_FRAME"
@@ -162,6 +164,19 @@ test_dialog_that_never_clears_fails_loudly() {
   pass "an imports dialog that never clears fails the spawn instead of parking a worker"
 }
 
+test_sustained_empty_exits_without_burning_full_budget() {
+  local rc calls
+  gate_setup sustained-empty
+  local i
+  for ((i = 0; i < 60; i++)); do gate_frame "$EMPTY_FRAME"; done
+  gate_run 60; rc=$?
+  calls=$(gate_calls)
+  [ "$rc" -eq 0 ] || fail "sustained empty must exit 0, got $rc"
+  [ "$(gate_enters)" -eq 0 ] || fail "must press nothing when no dialog was seen"
+  [ "$calls" -eq 10 ] || fail "sustained empty must exit on the clear streak (10 polls), not burn the full budget (used $calls polls)"
+  pass "a pane that never renders exits on the clear streak instead of hanging the full budget"
+}
+
 test_no_dialog_seen_at_all_exits_clean() {
   local rc i
   gate_setup all-empty
@@ -178,4 +193,5 @@ test_single_transient_frame_after_answer_is_not_success
 test_empty_capture_after_answer_is_not_success
 test_trust_dialog_is_never_touched
 test_dialog_that_never_clears_fails_loudly
+test_sustained_empty_exits_without_burning_full_budget
 test_no_dialog_seen_at_all_exits_clean
