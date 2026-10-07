@@ -313,8 +313,34 @@ PY
   pass "serve answers the three pages at once, remembers ?group in a cookie, rebuilds an old page itself, and 404s every other path"
 }
 
+test_fleet_past_twenty_mates_keeps_every_lead_row() {
+  local home d i mdir
+  home=$(make_home many)
+  d="$home/state/dashboard"
+  # Mate homes must live outside the active home; empty ones read as
+  # "Records need tidy-up", one row each, when the snapshot reads them.
+  for i in $(seq -w 1 25); do
+    mdir="$TMP_ROOT/mate$i"
+    mkdir -p "$mdir/state" "$mdir/data"
+    printf -- '- mate%s - domain %s (home: %s; scope: work; projects: alpha; added 2026-07-11)\n' \
+      "$i" "$i" "$mdir" >> "$home/data/secondmates.md"
+  done
+  build "$home"
+  has "$d/index.html" "mate25"
+  python3 - "$d/index.html" <<'PY' || fail "the 25th mate lost its lead state"
+import html, re, sys
+text = re.sub(r'\s+', ' ', html.unescape(re.sub(r'<[^>]+>', ' ', open(sys.argv[1]).read())))
+for mate in ('mate01', 'mate25'):
+    i = text.find(mate)
+    assert i >= 0, mate
+    assert 'Records need tidy-up' in text[i:i + 200], mate
+PY
+  pass "a fleet past twenty mates keeps every lead row"
+}
+
 test_overview_answers_the_four_questions_with_sums_that_add_up
 test_backlog_and_method_pages_show_their_numbers
+test_fleet_past_twenty_mates_keeps_every_lead_row
 test_each_failed_source_shows_unknown_and_why
 test_devices_and_machine_come_from_read_only_probes
 test_serve_answers_each_page_and_remembers_the_grouping
