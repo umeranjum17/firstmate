@@ -69,6 +69,7 @@ test_supervisor_may_not_drive_a_workers_no_mistakes_run() {
   pass "a supervisor may read a worker's run record but may never drive that run"
 }
 
+# shellcheck disable=SC2016 # single-quoted commands are intentional fixtures the guard receives literally.
 test_supervisor_may_not_sleep_or_poll_inside_a_turn() {
   expect_deny "sleep over 60s" "$PRIMARY" "$STATE" 'sleep 110' supervisor-poll-in-turn
   expect_deny "compound duration over 60s" "$PRIMARY" "$STATE" 'sleep 1m30s' supervisor-poll-in-turn
@@ -114,6 +115,7 @@ test_only_a_secondmate_lead_may_not_type_into_a_pane() {
   pass "pane typing is refused only in a secondmate lead, which must steer with fm-send instead"
 }
 
+# shellcheck disable=SC2016 # single-quoted commands are intentional fixtures the guard receives literally.
 test_a_worker_worktree_is_never_refused() {
   local child="$TMP_ROOT/child" plain="$TMP_ROOT/plain" command
   git -C "$PRIMARY" worktree add -q -b fixture-child "$child"
