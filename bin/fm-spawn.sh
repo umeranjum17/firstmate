@@ -4411,6 +4411,22 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
   # Written under the Treehouse project lock held from before slot allocation
   # through metadata publication, so no other spawn or return sees a half-claim.
   if fm_treehouse_pool_slot "$PROJ_ABS" "$WT"; then
+    # Treehouse frees a slot once its process lease lapses, which a killed
+    # worker's slot does while that task's record still names it (a Herdr
+    # restart resumes the agent outside the lease). Any record in any local home
+    # naming this slot is a task this spawn would overwrite, so refuse it.
+    slot_rc=0
+    fm_slot_record_owner "$WT" "$STATE" "$STATE/$ID.meta" || slot_rc=$?
+    case "$slot_rc" in
+      0)
+        echo "error: Treehouse handed out pool slot $WT, but task $FM_SLOT_RECORD_OWNER_ID still records it as its $FM_SLOT_RECORD_OWNER_FIELD; refusing to overwrite a live task's copy. Retry the spawn for a different slot, and reconcile $FM_SLOT_RECORD_OWNER_ID (bin/fm-crew-state.sh $FM_SLOT_RECORD_OWNER_ID); inspect window $T" >&2
+        exit 1
+        ;;
+      2)
+        echo "error: cannot prove Treehouse pool slot $WT is free of other task records: $FM_LOCAL_STATE_DIRS_ERROR; inspect window $T" >&2
+        exit 1
+        ;;
+    esac
     if ! fm_treehouse_slot_owner_claim "$WT" "$ID" "$FM_HOME"; then
       echo "error: could not claim Treehouse pool slot $WT for task $ID; refusing to launch a worker whose slot cannot later be proved to be its own; inspect window $T" >&2
       exit 1

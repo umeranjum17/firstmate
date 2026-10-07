@@ -663,7 +663,10 @@ No Herdr-specific copy of that protocol exists.
 ### Husks after a server restart
 
 Stopping and restarting a named Herdr server preserves workspace, tab, pane, and label ids.
-The underlying harness processes do not survive, and no live agent registration does: newer releases report agent_not_found on the revived pane, while 0.7.4 restores a label-less unknown record over the bare shell.
+Every process in the server dies with it, including the harness processes, watchers, Stop-hook arms, and the away daemon, and no live agent registration survives: newer releases report agent_not_found on the revived pane, while 0.7.4 restores a label-less unknown record over the bare shell.
+With its default `resume_agents_on_restore`, Herdr 0.9.1 then resumes each recorded agent session (`claude --resume <id>`, `pi --session <path>`) without its original launch flags, in the pane's creation folder.
+`bin/fm-spawn.sh` creates a new worker's pane at the project's primary checkout before it enters the worktree, so a resumed worker can land in the primary checkout.
+`bin/fm-sentinel.sh` runs outside Herdr and owns recovery from a restart ([watcher continuity](watcher-continuity.md#agent-runtime-restart)).
 A restored same-labeled tab with a missing pane, no registered agent, or only such a proven shell-only leftover record is a husk.
 
 Create replaces only a confidently dead or no-agent husk, creates the replacement before closing the old tab, and refuses live or unknown states.

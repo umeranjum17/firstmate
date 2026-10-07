@@ -743,8 +743,32 @@ test_pool_slot_claim_follows_the_spawn_outcome() {
   pass "a Treehouse slot claim names the launched task, refuses when unclaimable, and is dropped by a locked abort"
 }
 
+# Treehouse frees a slot when its process lease lapses, which a killed worker's
+# slot does while that task's record still names it (a Herdr restart resumes
+# the agent outside the lease). A spawn handed such a slot must refuse it.
+test_pool_slot_still_recorded_by_another_task_refuses() {
+  local rec id out status before
+
+  id='pool-slot-recorded-r1'
+  rec=$(make_case slot-recorded "$id")
+  read_case_record "$rec"
+  lay_out_as_pool_slot
+  printf 'kind=ship\nbackend=herdr\nworktree=%s\n' "$POOL_DIR" > "$HOME_DIR/state/live-owner.meta"
+  before=$(git -C "$POOL_DIR" rev-parse HEAD)
+  out=$(run_spawn "$id" --scout)
+  status=$?
+  [ "$status" -ne 0 ] || fail "spawn launched on a slot another task record still names"
+  assert_contains "$out" "task live-owner still records it as its worktree" \
+    "spawn did not name the task whose record owns the slot"
+  [ ! -e "$HOME_DIR/state/$id.meta" ] || fail "spawn published a record for a slot another task owns"
+  [ ! -e "$SLOT_CLAIM" ] || fail "spawn claimed a slot another task owns: $(cat "$SLOT_CLAIM")"
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$before" ] || fail "spawn moved the owned slot's HEAD"
+  pass "a spawn refuses a Treehouse slot that another task's record still names"
+}
+
 test_remote_seeded_home_spawns_from_treehouse_pool
 test_pool_slot_claim_follows_the_spawn_outcome
+test_pool_slot_still_recorded_by_another_task_refuses
 test_linked_spawning_home_rejects_primary_before_refresh
 test_stale_pool_base_refreshes_before_branching
 test_non_main_default_branch_refreshes_before_branching
