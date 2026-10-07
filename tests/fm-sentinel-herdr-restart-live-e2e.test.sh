@@ -62,14 +62,14 @@ HERDR_LAB_SESSION=$("$HERDR_LAB_HELPER" name fm-oom-guard)
 export HERDR_LAB_HELPER HERDR_LAB_SESSION REAL_HERDR HERDR_ORIGINAL_PATH
 LAB_READY=0
 
-forget_claude_entries() {  # drop every Claude project entry under LABROOT
-  node - "$LABHOME/.claude.json" "$LABROOT" <<'NODE'
+forget_claude_entries() {  # drop every Claude project entry under LABROOT or LABHOME
+  node - "$LABHOME/.claude.json" "$LABROOT" "$LABHOME" <<'NODE'
 const fs = require("node:fs");
-const [link, root] = process.argv.slice(2);
+const [link, ...roots] = process.argv.slice(2);
 const store = fs.realpathSync(link);
 const data = JSON.parse(fs.readFileSync(store, "utf8"));
 const projects = data.projects || {};
-const drop = Object.keys(projects).filter((k) => k === root || k.startsWith(`${root}/`));
+const drop = Object.keys(projects).filter((k) => roots.some((r) => k === r || k.startsWith(`${r}/`)));
 if (drop.length === 0) process.exit(0);
 for (const k of drop) delete projects[k];
 const tmp = `${store}.fm-sentinel-e2e.${process.pid}`;
