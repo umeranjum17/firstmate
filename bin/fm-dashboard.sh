@@ -17,8 +17,10 @@
 #                                   text is an ask (a bad time or duplicate id shows as a record
 #                                   needing correction); blank rows and rows without an id or text
 #                                   are skipped, with a note; absent/empty means zero
-#   FM_BEARINGS_SECONDMATES=500 FM_BEARINGS_UNHEALTHY=500 bin/fm-bearings-snapshot.sh --json
-#                                   lead state and unhealthy endpoints
+#   FM_BEARINGS_SECONDMATES=500 FM_BEARINGS_UNHEALTHY=500 FM_SNAPSHOT_SECONDMATES=500
+#                                   bin/fm-bearings-snapshot.sh --json: lead state and unhealthy
+#                                   endpoints (the FM_SNAPSHOT_* bound lifts the fleet snapshot's
+#                                   own registry cap, which otherwise omits mates past 20 upstream)
 #   data/secondmates.md             registered homes: "- <name> - ... (home: <dir>; ...)"
 #   config/parked-homes             home ids the captain parked, one per line (# comments)
 #   <home>/state/*.meta + *.status  lanes: every ship/scout record, in one state by its last
@@ -181,7 +183,7 @@ snap_err="$out_dir/.snapshot.$$.err"
 tmp="$out_dir/.build.$$"
 trap 'rm -rf "$snap" "$snap_err" "$tmp"' EXIT
 mkdir -p "$tmp" || { echo "fm-dashboard: cannot create $tmp" >&2; exit 1; }
-FM_HOME="$FM_HOME" FM_BEARINGS_SECONDMATES=500 FM_BEARINGS_UNHEALTHY=500 "$SCRIPT_DIR/fm-bearings-snapshot.sh" --json > "$snap" 2> "$snap_err" \
+FM_HOME="$FM_HOME" FM_BEARINGS_SECONDMATES=500 FM_BEARINGS_UNHEALTHY=500 FM_SNAPSHOT_SECONDMATES=500 "$SCRIPT_DIR/fm-bearings-snapshot.sh" --json > "$snap" 2> "$snap_err" \
   || { rc=$?; : > "$snap"; printf 'fleet snapshot exited %s: %s\n' "$rc" "$(tail -n 1 "$snap_err")" >> "$snap_err"; }
 
 python3 - "$FM_HOME" "$snap" "$snap_err" "$tmp" "$SCRIPT_DIR" "$MAX_AGE" <<'PY' || { echo "fm-dashboard: page build failed" >&2; exit 1; }
