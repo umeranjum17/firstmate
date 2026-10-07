@@ -382,6 +382,35 @@ SH
   pass "a compound raw launch-command still starts its agent with the compact-adviser switch on"
 }
 
+# Execute a compound worker launch with hostile inherited editor settings.
+# Both the ordinary and cleared launch environment must override them.
+test_worker_git_editors() {
+  local setting rec out status seen launch probe_dir
+  for setting in absent enabled; do
+    rec=$(make_case "git-editors-$setting" codex "git-editors-$setting-a1")
+    read_case "$rec"
+    [ "$setting" = absent ] || : > "$HOME_DIR/config/launch-env-allowlist"
+    probe_dir="$CASE_DIR/agent-cwd"
+    mkdir -p "$probe_dir"
+    cat > "$probe_dir/probe" <<'SH'
+#!/bin/sh
+printf '%s\n' "${GIT_EDITOR-unset}|${GIT_SEQUENCE_EDITOR-unset}"
+SH
+    chmod +x "$probe_dir/probe"
+    out=$(run_case_spawn "git-editors-$setting-a1" "$PROJ_DIR" --mode no-mistakes --yolo off \
+      "cd $probe_dir && ./probe")
+    status=$?
+    expect_code 0 "$status" "editor probe spawn with allowlist=$setting should succeed: $out"
+    launch=$(cat "$LAUNCH_LOG")
+    seen=$(env -i HOME="$TMP_ROOT/pane-home" PATH="$FAKEBIN_DIR:$PATH" TERM=xterm \
+      GIT_EDITOR=nvim GIT_SEQUENCE_EDITOR=nvim /bin/sh -c "$launch") \
+      || fail "allowlist=$setting: worker editor probe failed to run"
+    assert_equals 'true|true' "$seen" "allowlist=$setting: workers must never open a git editor"
+  done
+  pass "worker launches disable both git editors in ordinary and cleared environments"
+}
+
+test_worker_git_editors
 test_ship_allowlist_absent
 test_ship_allowlist_enabled
 test_launch_command_carries_the_switch_without_the_pane_export

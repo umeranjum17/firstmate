@@ -5343,6 +5343,10 @@ fi
 # launch and the launch-env-allowlist `env -i` wrapper.
 LAUNCH="export FM_TASK_INBOX=$(shell_quote "$STATE_REAL/$ID.inbox"); $LAUNCH"
 LAUNCH="export COMPACT_ADVISER_DISABLE=1; $LAUNCH"
+# Git must never open an interactive editor in a worker pane. Export inside
+# the launch so both compound commands and the cleared-env wrapper inherit it;
+# fm-control.sh relaunch rebuilds this same command through --relaunch.
+LAUNCH="export GIT_EDITOR=true GIT_SEQUENCE_EDITOR=true; $LAUNCH"
 # When the live-harness gate has exported DISABLE_AUTOUPDATER into this spawn's
 # own environment, carry it into the launch command text so Claude Code's
 # auto-updater cannot rewrite the shared binary during a live run. Embedding the
