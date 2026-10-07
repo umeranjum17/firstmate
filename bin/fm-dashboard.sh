@@ -728,16 +728,20 @@ QWIN = [YDAY, TODAY]
 def window_metrics(home=None):
     ps = [p for d in QWIN for p in merged_on.get(d, []) if home is None or p['home'] == home]
     n = len(ps)
-    def dw(col): return sum(dsum(col, d, home) or 0 for d in QWIN) if daily is not None else None
+    def dw(col):
+        if daily is None: return None
+        vals = [dsum(col, d, home) for d in QWIN]
+        return None if any(v is None for v in vals) else sum(vals)
     hrs = sorted(v for v in (num(p.get('hours_to_merge')) for p in ps) if v is not None)
     per = lambda v: round(v / n, 2) if n and v is not None else None
     steers, dec, blk = dw('steers'), dw('decisions'), dw('blocks')
+    esc = [num(p.get('escaped')) for p in ps] if prs is not None else None
     return {
         'first_pass': (100 * sum(p['first_pass'] == '1' for p in ps) // n if n else None) if prs is not None else None,
-        'escaped': sum((num(p.get('escaped')) or 0) > 0 for p in ps) if prs is not None else None,
+        'escaped': None if esc is None or any(v is None for v in esc) else sum(v > 0 for v in esc),
         'p90_hours': hrs[int(0.9 * (len(hrs) - 1))] if hrs else None,
         'corrections_per_merge': per(dw('s_correct')),
-        'interventions_per_merge': per(None if steers is None else steers + (dec or 0) + (blk or 0)),
+        'interventions_per_merge': per(None if None in (steers, dec, blk) else steers + dec + blk),
         'captain_per_merge': per(dw('captain_msgs')),
         'stall_alarms': dw('stall_alarms'),
     }, n
