@@ -1094,28 +1094,6 @@ def io_bars(legend=True):  # today vs yesterday, filed (outlined) beside landed 
                 f'<span class="nums">{"" if fx else "≥"}{f} in · {"–" if l is None else l} out</span></div>')
     return (f'<div class="iol">{r("Today", f_today, l_today, f_exact)}{r("Yesterday", f_yday, l_yday, fy_exact)}</div>'
             + ('<div class="legend"><span><i class="sw o"></i>Filed</span><span><i class="sw f"></i>Landed</span></div>' if legend else ''))
-def hour_chart():
-    n = NOW.hour + 1
-    lh = [0] * n
-    for t, *_ in landings or []:
-        if t.date() == TODAY: lh[t.hour] += 1
-    fh = [0] * n
-    for s, *_ in filed_today: fh[datetime.fromtimestamp(s).astimezone().hour] += 1
-    from_h = datetime.fromtimestamp(log_since).astimezone().hour if not f_exact else 0
-    mx = max(lh + fh + [1])
-    w = 900 / n
-    bars = ''
-    for i in range(n):
-        x = i * w
-        if i >= from_h and fh[i]:
-            hf = fh[i] / mx * 128
-            bars += f'<rect x="{x + w * .14:.1f}" y="{140 - hf:.1f}" width="{w * .34:.1f}" height="{hf:.1f}" fill="none" stroke="var(--text2)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>'
-        if lh[i]:
-            hl = lh[i] / mx * 128
-            bars += f'<rect x="{x + w * .52:.1f}" y="{140 - hl:.1f}" width="{w * .34:.1f}" height="{hl:.1f}" fill="var(--bar)"/>'
-    cols = ''.join(f'<span><i>{i:02d}</i></span>' if i % 3 == 0 else '<span></span>' for i in range(n))
-    return (f'<div class="chart"><svg viewBox="0 0 900 140" preserveAspectRatio="none" role="img" aria-label="Filed and landed per hour today">{bars}</svg>'
-            f'<div class="cols" style="grid-template-columns:repeat({n},1fr)">{cols}</div></div>', sum(lh), from_h)
 
 # --- charts: inline SVG drawn here, no script ---------------------------
 def nice_top(v):  # a round axis top at or above v
@@ -1329,8 +1307,8 @@ def index_body(group):
 
 # --- flow ----------------------------------------------------------------
 def flow_body():
-    if landings is None: chart, h_landed, from_h = '', 0, 0
-    else: chart, h_landed, from_h = hour_chart()
+    h_landed = sum(1 for t, *_ in landings if t.date() == TODAY) if landings is not None else 0
+    from_h = 0 if f_exact else datetime.fromtimestamp(log_since).astimezone().hour
     ph = sorted(ACTIVE, key=lambda h: (-(landed(TODAY, h) or 0), -filed(TODAY, h)[0], h))
     phrows = ''.join(f'<tr><td>{esc(hname(h))}</td><td>{filed_txt(TODAY, h)}</td><td>{"–" if landed(TODAY, h) is None else landed(TODAY, h)}</td></tr>' for h in ph)
     drows = ''.join(f'<tr><td>{d:%a %d %b}{" <span class=mut>so far</span>" if d == TODAY else ""}</td><td>{filed_txt(d)}</td><td>{"–" if o is None else o}</td></tr>'
