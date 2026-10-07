@@ -964,6 +964,16 @@ test_secondmate_relaunch_picks_up_the_configured_harness_pin() {
   [ "$(journal_field "$dir" sm3 to_effort)" = high ] \
     || fail "the configured effort token should come with the pin"
   assert_not_contains "$out" "not a verified harness" "codex is a verified harness"
+  printf 'omp some-model high\n' > "$home/config/secondmates/sm3/harness"
+  out=$(FM_HOME="$home" "$ROOT/bin/fm-harness.sh" secondmate sm3 2>&1); rc=$?
+  expect_code 0 "$rc" "an omp per-mate pin should resolve"$'\n'"$out"
+  [ "$out" = omp ] \
+    || fail "an omp per-mate pin should resolve to omp, got '$out'"
+  [ "$(FM_HOME="$home" "$ROOT/bin/fm-harness.sh" secondmate-model sm3)" = some-model ] \
+    || fail "the configured model token should come with the omp pin"
+  [ "$(FM_HOME="$home" "$ROOT/bin/fm-harness.sh" secondmate-effort sm3)" = high ] \
+    || fail "the configured effort token should come with the omp pin"
+  assert_not_contains "$out" "unverified secondmate harness" "omp is a verified secondmate harness"
   pass "fm-control relaunch: a secondmate relaunch re-resolves its durable configured harness pin"
 }
 

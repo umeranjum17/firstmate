@@ -485,7 +485,7 @@ secondmate_line() {
         return 1
       fi
       case "${fields[0]}" in
-        claude|codex|opencode|pi|pi-signed|grok|kimi|cursor) ;;
+        claude|codex|opencode|pi|pi-signed|grok|kimi|cursor|omp) ;;
         *) echo "error: malformed secondmate pin $file: unverified secondmate harness '${fields[0]}'" >&2; return 1 ;;
       esac
       case "${fields[1]}" in
