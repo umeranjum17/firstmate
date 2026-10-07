@@ -196,7 +196,7 @@ fm_control_interrupt_hazard_signal() {  # <harness>
 # cursor was checked for exactly that behaviour and does NOT repollute: after a single Escape its composer shows only the `Add a follow-up` placeholder, so it needs no clear key.
 # gemini was checked the same way and also does not repollute: after a single Escape it prints `Request cancelled.` and its composer shows only the `Type your message or @path/to/file` placeholder.
 # agy prints its Interrupted row with an idle composer and no repollution, omp leaves its composer empty after its single Escape, devin's cancelled turn is followed by a control-plane exit that reads the composer empty, and rovo accepts a raw /exit after its `Agent cancelled` row with nothing restored; none of the six needs a clear key.
-# claude, codex, opencode, pi, pi-signed, grok, and kimi have no post-interrupt composer observation on record, so they keep none: the next submit re-checks the composer before typing (this plane's exit check, the steer plane's ring pre-check), so restored text surfaces as a refusal naming its recovery rather than a garbled send.
+# claude, codex, opencode, pi, and pi-signed were observed on 2026-10-07 with an empty composer after interrupt (see docs/verification/runtime-backends.md), and grok and kimi stay unobserved, so they keep none: the next submit re-checks the composer before typing (this plane's exit check, the steer plane's ring pre-check), so restored text surfaces as a refusal naming its recovery rather than a garbled send.
 # Prints the key or nothing;
 # a harness with no verified mechanics returns nonzero, matching the tables
 # above.
