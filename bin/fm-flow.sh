@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 # fm-flow.sh - read-only flow data, no endpoint or cache writes.
-# Usage: FM_HOME=<home> fm-flow.sh --json [--now <unix-seconds>] [--checks]
+# Usage: FM_HOME=<home> fm-flow.sh --json [--now <unix-seconds>] [--checks] [--capacity]
+# --capacity reads Linux procfs, installed memory-gate defaults, the heavy slice,
+# and /tmp filesystem usage (du limited to 3 s). Partial du exposes readable
+# lower bounds, not complete directory sizes/ranks. RSS is per process, not additive
+# host memory. Ownership is a recorded worktree/cwd match, otherwise unknown.
+# FM_MAC_HOST=user@host opts into one read-only SSH probe, limited to 6 s,
+# with existing host keys only. No device boot/claim/stop, files or slot changes.
+# Missing/unavailable probes yield null, never a fabricated zero or free slot.
+# Live capacity observations carry their own timestamp, independent of --now.
 # --checks reads durable GitHub check-run records through gh-axi (5 s per call).
 # These live observations carry their own timestamp, independent of --now.
 # It reports queued/running counts on the recorded PR head, never infers green
@@ -24,22 +32,23 @@
 # known_lane_hours alongside known_lower_bound_lane_hours, and ranking uses the lower bound.
 # Keyed waits close only on matching resolved/captain-held, not working/done.
 # Historical results cover retained records only, not a complete forge history.
-# Capacity and worker-liveness probes are not collected.
+# Worker-liveness and task-specific admission probes are not collected.
 set -eu
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-[ "${1:-}" = --json ] || { echo 'usage: fm-flow.sh --json [--now <unix-seconds>] [--checks]' >&2; exit 2; }
+[ "${1:-}" = --json ] || { echo 'usage: fm-flow.sh --json [--now <unix-seconds>] [--checks] [--capacity]' >&2; exit 2; }
 shift
-now=$(date +%s) checks=0
+now=$(date +%s) checks=0 capacity=0
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --now) [ "$#" -ge 2 ] || exit 2; now=$2; shift 2 ;;
     --checks) checks=1; shift ;;
+    --capacity) capacity=1; shift ;;
     *) exit 2 ;;
   esac
 done
 case "$now" in ''|*[!0-9]*) echo 'fm-flow: --now requires Unix seconds' >&2; exit 2 ;; esac
-exec python3 - "${FM_HOME:-$SCRIPT_DIR/..}" "$now" "$checks" <<'PY'
-import base64, json, math, re, statistics, subprocess, sys, time
+exec python3 - "${FM_HOME:-$SCRIPT_DIR/..}" "$now" "$checks" "$capacity" <<'PY'
+import base64, json, math, os, re, statistics, subprocess, sys, time
 from datetime import datetime, timezone
 from pathlib import Path
 ROOT, NOW = Path(sys.argv[1]).resolve(), int(sys.argv[2])
@@ -287,6 +296,173 @@ for lane in lanes:
     except (OSError, ValueError, subprocess.TimeoutExpired) as err:
         notes.append({'source': lane['home'] + '/' + lane['task'] + '/checks', 'reason': str(err)})
 
+def probe(args, timeout=3, source=None, partial=False):
+    try:
+        result = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
+        if result.returncode:
+            reason = (result.stderr.strip() or result.stdout.strip())[-300:] or f'exit {result.returncode}'
+            if partial and result.stdout:
+                notes.append({'source': source or args[0], 'reason': reason})
+            else:
+                raise ValueError(reason)
+        return result.stdout
+    except (OSError, ValueError, subprocess.TimeoutExpired) as err:
+        notes.append({'source': source or args[0], 'reason': str(err)})
+        return None
+
+def machine_capacity():
+    mem = '\n'.join(read(Path('/proc/meminfo')) or [])
+    memory = {k: int(m[1]) * 1024 if (m := re.search(r'^' + k + r':\s+(\d+) kB$', mem, re.M)) else None
+              for k in ('MemTotal', 'MemAvailable', 'SwapTotal', 'SwapFree')}
+    pressure = '\n'.join(read(Path('/proc/pressure/memory')) or [])
+    psi = re.search(r'^some avg10=(\d+(?:\.\d+)?)\b', pressure, re.M)
+    psi = float(psi[1]) if psi else None
+    jobs, complete = [], True
+    try:
+        processes = sorted(p for p in Path('/proc').iterdir() if p.name.isdigit())
+    except OSError as err:
+        processes, complete = [], False
+        notes.append({'source': '/proc', 'reason': str(err)})
+    roots = []
+    for (h, t), m in metadata.items():
+        if m.get('worktree') and Path(m['worktree']).is_absolute():
+            try:
+                roots.append((Path(m['worktree']).resolve(), h, t))
+            except (OSError, ValueError, RuntimeError) as err:
+                notes.append({'source': h + '/' + t + '/worktree', 'reason': str(err)})
+    for p in processes:
+        try:
+            comm = (p / 'comm').read_text().strip()
+            argv = (p / 'cmdline').read_bytes().decode(errors='replace')
+        except FileNotFoundError:
+            continue  # exited during this read-only census
+        except OSError as err:
+            complete = False
+            notes.append({'source': str(p), 'reason': str(err)})
+            continue
+        kind = 'emulator' if comm.startswith('qemu-system') else 'gradle_gate_match' if 'appname=gradlew' in argv else \
+               'gradle_daemon' if 'org.gradle.launcher.daemon.bootstrap.GradleDaemon' in argv else \
+               'gradle_client' if 'org.gradle.launcher.GradleMain' in argv else None
+        if kind is None:
+            continue
+        status = '\n'.join(read(p / 'status') or [])
+        rss = re.search(r'^VmRSS:\s+(\d+) kB$', status, re.M)
+        state = re.search(r'^State:\s+(\w)', status, re.M)
+        owner = None
+        try:
+            cwd = Path(os.readlink(p / 'cwd'))
+            matches = [(r, h, t) for r, h, t in roots if cwd == r or r in cwd.parents]
+            if matches:
+                longest = max(len(str(r)) for r, _, _ in matches)
+                matches = [(h, t) for r, h, t in matches if len(str(r)) == longest]
+                if len(matches) == 1:
+                    owner = dict(home=matches[0][0], task=matches[0][1], basis='recorded_worktree_cwd')
+        except OSError:
+            pass  # ownership is unknown; never inspect another process's environment
+        jobs.append(dict(pid=int(p.name), kind=kind, rss_bytes=int(rss[1]) * 1024 if rss else None,
+                         process_state=state[1] if state else None, owner=owner))
+    policy_source = ROOT / 'config/fm-mem-gate.sh'
+    gate = '\n'.join(read(policy_source) or [])
+    limits = {}
+    for key in ('FM_MEM_MIN_GB', 'FM_EMU_MAX', 'FM_GRADLE_MAX', 'FM_MEM_JOB_GB'):
+        defaults = set(re.findall(r'\$\{' + key + r':-(\d+)\}', gate))
+        value = os.environ.get(key) or (next(iter(defaults)) if len(defaults) == 1 else '')
+        limits[key] = int(value) if len(defaults) == 1 and value.isdigit() else None
+    threshold = re.search(r'\[ "\$psi" -lt (\d+) \]', gate)
+    limits['psi_max'] = int(threshold[1]) if threshold else None
+    counts = {k: sum(j['kind'] == k for j in jobs) if complete else None for k in ('emulator', 'gradle_gate_match')}
+    free = {k: max(limits[c] - counts[k], 0) if limits[c] is not None and counts[k] is not None else None
+            for k, c in [('emulator', 'FM_EMU_MAX'), ('gradle_gate_match', 'FM_GRADLE_MAX')]}
+    heavy = probe(['systemctl', '--user', 'show', 'fm-heavy.slice', '-p', 'LoadState', '-p', 'MemoryCurrent', '-p', 'MemoryMax'])
+    heavy_values = dict(l.split('=', 1) for l in (heavy or '').splitlines() if '=' in l)
+    loaded = heavy_values.get('LoadState') == 'loaded'
+    slice_data = {k: int(heavy_values[k]) if loaded and heavy_values.get(k, '').isdigit() else None
+                  for k in ('MemoryCurrent', 'MemoryMax')}
+    slice_data['unlimited'] = heavy_values.get('MemoryMax') == 'infinity' if loaded else None
+    tmp = {'ram_backed': None, 'filesystem_total_bytes': None, 'filesystem_available_bytes': None,
+           'filesystem_used_bytes': None, 'directory_bytes': None, 'known_directory_bytes': None,
+           'top_folders': None, 'top_folders_complete': None}
+    try:
+        fs = os.statvfs('/tmp')
+        tmp.update(filesystem_total_bytes=fs.f_blocks * fs.f_frsize, filesystem_available_bytes=fs.f_bavail * fs.f_frsize,
+                   filesystem_used_bytes=(fs.f_blocks - fs.f_bfree) * fs.f_frsize)
+        mounts = []
+        for line in read(Path('/proc/self/mountinfo')) or []:
+            left, sep, right = line.partition(' - ')
+            fields = left.split()
+            if sep and len(fields) >= 5:
+                mount = Path(fields[4].replace('\\040', ' '))
+                if mount == Path('/tmp').resolve() or mount in Path('/tmp').resolve().parents:
+                    mounts.append((len(str(mount)), right.split()[0]))
+        if mounts:
+            tmp['ram_backed'] = max(mounts)[1] in ('tmpfs', 'ramfs')
+    except OSError as err:
+        notes.append({'source': '/tmp', 'reason': str(err)})
+    previous_notes = len(notes)
+    folders = probe(['du', '-x', '-k', '-d', '1', '-0', '/tmp'], source='/tmp/top_folders', partial=True)
+    full = len(notes) == previous_notes
+    if folders is not None:
+        values = [l.partition('\t') for l in folders.split('\0') if l]
+        totals = [int(n) * 1024 for n, sep, p in values if sep and n.isdigit() and p == '/tmp']
+        if len(totals) == 1 and all(sep and n.isdigit() for n, sep, _ in values):
+            tmp['directory_bytes'] = totals[0] if full else None
+            tmp['known_directory_bytes'] = totals[0]
+            tmp['top_folders_complete'] = full
+            tmp['top_folders'] = sorted([dict(path=p, bytes=int(n) * 1024 if full else None,
+                                             known_bytes=int(n) * 1024) for n, _, p in values
+                                         if p != '/tmp'], key=lambda f: (-f['known_bytes'], f['path']))[:10]
+        else:
+            notes.append({'source': '/tmp/top_folders', 'reason': 'du output incomplete or invalid'})
+    mac = {'reachable': None, 'available_bytes': None, 'free_disk_bytes': None, 'simulators': None,
+           'android_pids': None, 'source': 'FM_MAC_HOST'}
+    host = os.environ.get('FM_MAC_HOST', '')
+    if re.fullmatch(r'\w[\w.-]*@\w[\w.-]*', host):
+        # Fixed read-only commands; no command text, environment or private files are returned.
+        code = """import subprocess,json,re,os,time
+out={'reachable':True,'observed_at':int(time.time()),'available_bytes':None,'free_disk_bytes':None,'simulators':None,'android_pids':None,'errors':[]}
+def run(args):
+    try: return subprocess.check_output(args,text=True,stderr=subprocess.PIPE,timeout=2)
+    except (OSError,subprocess.SubprocessError) as e: out['errors'].append(str(getattr(e,'stderr',None) or e)[-300:]); return None
+vm=run(['vm_stat'])
+if vm:
+    page=re.search(r'page size of (\\d+) bytes',vm)
+    vals=[re.search(r'^Pages '+key+r':\\s+(\\d+)',vm,re.M) for key in ['free','inactive','speculative']]
+    if page and all(vals): out['available_bytes']=sum(int(v[1]) for v in vals)*int(page[1])
+disk=run(['df','-k','/'])
+if disk:
+    rows=disk.splitlines()
+    if len(rows)==2 and len(rows[1].split())>=4 and rows[1].split()[3].isdigit(): out['free_disk_bytes']=int(rows[1].split()[3])*1024
+dev=run(['xcrun','simctl','list','devices','--json'])
+if dev:
+    try: out['simulators']=[dict(d,runtime=r) for r,ds in json.loads(dev)['devices'].items() for d in ds if d['state']!='Shutdown']
+    except (ValueError,KeyError,TypeError) as e: out['errors'].append(str(e))
+ps=run(['ps','-axo','pid,comm'])
+if ps:
+    out['android_pids']=[]
+    for line in ps.splitlines()[1:]:
+        f=line.strip().split(None,1)
+        if len(f)==2 and f[0].isdigit() and (os.path.basename(f[1]).startswith('qemu-system-') or os.path.basename(f[1])=='emulator'): out['android_pids'].append(int(f[0]))
+print(json.dumps(out))"""
+        # stdin avoids expanding any caller value in the remote command.
+        try:
+            response = subprocess.run(['ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=3', '-o',
+                                       'StrictHostKeyChecking=yes', host, 'python3 -'], input=code,
+                                      capture_output=True, text=True, timeout=6)
+            if response.returncode:
+                raise ValueError(response.stderr.strip()[-300:] or f'SSH exit {response.returncode}')
+            snapshot = json.loads(response.stdout)
+            if not isinstance(snapshot, dict) or snapshot.get('reachable') is not True:
+                raise ValueError('invalid Mac snapshot')
+            mac.update(snapshot)
+        except (OSError, ValueError, subprocess.TimeoutExpired) as err:
+            notes.append({'source': 'Mac SSH probe', 'reason': str(err)})
+    else:
+        notes.append({'source': 'FM_MAC_HOST', 'reason': 'Mac probe not configured or target invalid'})
+    return dict(observed_at=int(time.time()), memory_bytes=memory, memory_some_avg10_percent=psi,
+                jobs=jobs, census_complete=complete, gate_source=str(policy_source), gate_scope='observer environment and installed defaults',
+                limits=limits, gate_counts=counts, slots_under_caps=free, heavy_slice=slice_data, tmp=tmp, mac=mac)
+
+capacity = machine_capacity() if sys.argv[4] == '1' else None
 bottlenecks = []
 for cause_name in ('captain', 'lead', 'ci_queue', 'memory_gate', 'credential_external', 'review_merge', 'unknown'):
     items = []
@@ -326,7 +502,7 @@ for day in range(today - 6, today + 1):
     rows = [l for l in executed(7 * 86400) if l['times']['merged'] // 86400 == day]
     trend.append(dict(day=datetime.fromtimestamp(day * 86400, timezone.utc).strftime('%Y-%m-%d'), **summary(rows)))
 print(json.dumps({'schema': 'fm-flow.v1', 'at': NOW, 'homes': sorted(homes), 'lanes': lanes,
-                  'queue': queue, 'bottlenecks': bottlenecks, 'executed_24h': executed(86400),
+                  'queue': queue, 'bottlenecks': bottlenecks, 'capacity': capacity, 'executed_24h': executed(86400),
                   'executed_7d': executed(7 * 86400), 'time_to_merge': summary(executed(7 * 86400)),
                   'time_to_merge_by_home': {h: summary([l for l in executed(7 * 86400) if l['home'] == h]) for h in sorted(homes)},
                   'trend_7d': trend, 'limitations': notes + [{'source': 'coverage', 'reason':
@@ -334,7 +510,9 @@ print(json.dumps({'schema': 'fm-flow.v1', 'at': NOW, 'homes': sorted(homes), 'la
                   'Wait ages are recorded waits, not proof of idle workers. Bottleneck items report the maximum '
                   'recorded wait age per (lane, cause); a lane in several cause buckets overlaps in time, so cause '
                   'sums are non-additive and never causal lane-hours lost. Items keep full seconds null when any '
-                  'same-cause wait is unstamped and report the known lower bound separately. Capacity and free-worker availability not collected. '
+                  'same-cause wait is unstamped and report the known lower bound separately. Free-worker availability not collected. '
+                  'Capacity is an observed census, not a job-admission promise; per-job gate overrides are not inspected. '
+                  'Mac available bytes use free+inactive+speculative pages, matching the installed slot helper, not Linux MemAvailable. '
                   'CI counts cover reported check runs only, not all required contexts or a green verdict.'}]},
                  sort_keys=True, allow_nan=False))
 PY

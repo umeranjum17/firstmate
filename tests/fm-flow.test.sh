@@ -143,6 +143,28 @@ assert {q['task']: q['why'] for q in z['queue']}['ready'] == 'lane cap: 0 record
 assert new['unknown']['stage_clock']['overdue'] is None, 'unstamped stage never guessed overdue'
 (main / 'config/fm-flow-check.sh').write_text('unrecognized clock policy\n')
 assert next(l for l in json.loads(run())['lanes'] if l['task'] == 'memory')['stage_clock']['seconds'] is None
+(main / 'config/fm-mem-gate.sh').write_text('min=${FM_MEM_MIN_GB:-12}\n'
+    '[ "$psi" -lt 40 ] && [ "$running" -lt "${FM_EMU_MAX:-3}" ] && [ "$builds" -lt "${FM_GRADLE_MAX:-2}" ]\n'
+    'echo "${FM_MEM_JOB_GB:-10}G"\n')
+clean_env = dict(os.environ, FM_HOME=str(main))
+for key in ('FM_MAC_HOST', 'FM_MEM_MIN_GB', 'FM_EMU_MAX', 'FM_GRADLE_MAX', 'FM_MEM_JOB_GB'):
+    clean_env.pop(key, None)
+before = files()
+c = json.loads(subprocess.check_output(['bash', script, '--json', '--capacity'], env=clean_env))['capacity']
+assert files() == before, 'native read-only census never writes the isolated home'
+assert c['limits']['FM_EMU_MAX'] == 3 and c['limits']['FM_GRADLE_MAX'] == 2
+assert c['mac']['reachable'] is None and c['mac']['available_bytes'] is None and c['mac']['simulators'] is None
+if Path('/proc/meminfo').exists():
+    assert c['memory_bytes']['MemTotal'] > 0 and 0 <= c['memory_bytes']['MemAvailable'] <= c['memory_bytes']['MemTotal']
+for kind, limit in [('emulator', 3), ('gradle_gate_match', 2)]:
+    if c['gate_counts'][kind] is not None:
+        assert c['gate_counts'][kind] == sum(j['kind'] == kind for j in c['jobs'])
+        assert c['slots_under_caps'][kind] == max(limit - c['gate_counts'][kind], 0)
+assert all(j['rss_bytes'] is None or j['rss_bytes'] % 1024 == 0 for j in c['jobs'])
+assert c['tmp']['filesystem_available_bytes'] <= c['tmp']['filesystem_total_bytes']
+if c['tmp']['top_folders_complete'] is False:
+    assert c['tmp']['directory_bytes'] is None and c['tmp']['known_directory_bytes'] >= 0
+    assert all(f['bytes'] is None and f['known_bytes'] >= 0 for f in c['tmp']['top_folders'])
 bad = subprocess.run(['bash', script, '--json', '--now', 'bad'], capture_output=True)
 assert bad.returncode == 2
 print('PASS: real flow CLI, two homes, queue, keyed waits, retained lifecycle, unknowns, read-only determinism')
