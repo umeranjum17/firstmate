@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Behavior tests for bin/fm-dashboard.sh: build the page from a tiny fixture
-# home through the real script (and the real fleet snapshot), then read the
-# page's visible text the way a person would, and over `serve`.
+# Behavior tests for bin/fm-dashboard.sh: build the pages from a small fixture
+# fleet through the real script, the real fleet snapshot and the real tasks-axi,
+# with stub herdr, quota-axi and gh on PATH, then read each page's visible text
+# the way a person would, and over `serve`.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -13,8 +14,9 @@ TMP_ROOT=$(fm_test_tmproot fm-dashboard)
 
 command -v python3 >/dev/null 2>&1 || { echo "skip: python3 not found"; exit 0; }
 command -v jq >/dev/null 2>&1 || { echo "skip: jq not found"; exit 0; }
+command -v tasks-axi >/dev/null 2>&1 || { echo "skip: tasks-axi not found"; exit 0; }
 
-# The page's visible text, one space between words.
+# A page's visible text, one space between words.
 page_text() {  # <page>
   python3 - "$1" <<'PY'
 import html, re, sys
@@ -24,200 +26,280 @@ print(re.sub(r'\s+', ' ', html.unescape(re.sub(r'<[^>]+>', ' ', s))))
 PY
 }
 
-when() {  # <hours ago> -> UTC ISO time and the local day it falls on
-  python3 -c 'import sys; from datetime import datetime, timedelta, timezone as z
-t = datetime.now(z.utc) - timedelta(hours=float(sys.argv[1]))
-print(t.strftime("%Y-%m-%dT%H:%M:%SZ"), t.astimezone().date())' "$1"
+has() {  # <page> <want>...: every phrase is in the page's visible text
+  local page=$1 text want
+  shift
+  text=$(page_text "$page")
+  for want in "$@"; do
+    case "$text" in *"$want"*) ;; *) fail "$(basename "$page") lacks '$want': $text" ;; esac
+  done
 }
 
+lacks() {  # <page> <phrase>...
+  local page=$1 text bad
+  shift
+  text=$(page_text "$page")
+  for bad in "$@"; do
+    case "$text" in *"$bad"*) fail "$(basename "$page") shows '$bad': $text" ;; esac
+  done
+}
+
+iso() {  # <hours ago> -> UTC ISO time
+  python3 -c 'import sys; from datetime import datetime, timedelta, timezone as z
+print((datetime.now(z.utc) - timedelta(hours=float(sys.argv[1]))).strftime("%Y-%m-%dT%H:%M:%SZ"))' "$1"
+}
+
+lane() {  # <home> <task> <kind> <status line>...: a lane record whose last status line sets its state
+  local home=$1 task=$2 kind=$3
+  shift 3
+  fm_write_meta "$home/state/$task.meta" "kind=$kind" "project=alpha" "harness=claude" "model=model-a" "herdr_pane_id=pane-$task"
+  printf '%s\n' "$@" > "$home/state/$task.status"
+}
+
+# A fleet of Main, one active lead (zephyrine) and one parked lead (beta).
+# Lanes: Main has 2 building, 1 validating, 1 blocked, 1 on a decision, 1 finished,
+# 1 waiting; zephyrine has 1 building; parked beta has 1 building that no total counts.
+# Plan: Main 6 from config/lane-caps, every other home 3 from config/lane-target.
 make_home() {  # <name>
-  local home="$TMP_ROOT/$1" now_ts today y_ts tab
-  tab=$(printf '\t')
-  read -r now_ts today < <(when 0)
-  read -r y_ts _ < <(when 24)
-  mkdir -p "$home/data/metrics" "$home/state" "$home/config" "$home/projects/wt"
-  cat > "$home/data/backlog.md" <<'EOF'
+  local home="$TMP_ROOT/$1" now today z b stubs
+  now=$(date +%s) today=$(date +%F)
+  z="$home/mates/zephyrine" b="$home/mates/beta" stubs="$home/stubs"
+  mkdir -p "$home/data/metrics" "$home/state" "$home/config" "$z/data" "$z/state" "$b/data" "$b/state" "$stubs"
+  printf -- '- zephyrine - made-up domain (home: %s; scope: made-up work; projects: alpha; added 2026-07-11)\n- beta - parked domain (home: %s; scope: parked; projects: alpha; added 2026-07-11)\n' \
+    "$z" "$b" > "$home/data/secondmates.md"
+  printf 'beta  # parked by the captain\n' > "$home/config/parked-homes"
+  printf '3\n' > "$home/config/lane-target"
+  printf 'main 6\n' > "$home/config/lane-caps"
+  cat > "$home/data/backlog.md" <<EOF
 ## In flight
-- [ ] alpha-fix - Fix the alpha thing (repo: alpha) (kind: ship) (since 2026-07-11)
+- [ ] m-build - Build the main thing (repo: alpha) (kind: ship) (since $today)
 
 ## Queued
-- [ ] beta-next - Start the beta thing (repo: alpha) (kind: ship)
+- [ ] m-ready - Start the ready thing (repo: alpha) (kind: ship) (since $today)
+- [ ] m-held - Wait for the captain's call (repo: alpha) (kind: ship) (since 2026-10-01) (hold: needs his call) (hold-kind: captain)
+- [ ] m-after - After the ready thing blocked-by: m-ready (repo: alpha) (kind: ship) (since $today)
 
 ## Done
-- [x] gamma-done - Landed gamma https://example.invalid/pull/7 (repo: alpha) (kind: ship) (merged 2026-07-10)
+- [x] m-old - Landed long ago (repo: alpha) (kind: ship) (merged 2026-07-10)
 EOF
-  fm_write_meta "$home/state/alpha-fix.meta" "window=firstmate:fm-alpha-fix" "worktree=$home/projects/wt" \
-    "project=alpha" "harness=claude" "kind=ship" "mode=no-mistakes"
-  printf 'working: building\n' > "$home/state/alpha-fix.status"
-  sed "s/|/$tab/g" > "$home/data/metrics/prs.tsv" <<EOF
-home|pr|created|merged|hours_to_merge|first_pass|escaped
-alpha|1|$now_ts|$now_ts|1.0|1|0
-alpha|2|$now_ts|$now_ts|2.0|1|0
-alpha|3|$now_ts|$now_ts|3.0|0|0
-beta|4|$y_ts|$y_ts|4.0|0|0
+  cat > "$z/data/backlog.md" <<EOF
+## Queued
+- [ ] z-ready - Start the zephyrine thing (repo: alpha) (kind: ship) (since $today)
 EOF
-  sed "s/|/$tab/g" > "$home/data/metrics/daily.tsv" <<EOF
-day|home|steers|s_correct|stall_alarms|self_rings|relaunches|skill_reads
-$today|alpha|4|1|2|0|1|7
-$today|beta|0|0|0|0|0|5
+  cat > "$b/data/backlog.md" <<EOF
+## In flight
+- [ ] b-stale - A parked home's stale lane (repo: alpha) (kind: ship) (since 2026-10-01)
 EOF
-  sed "s/|/$tab/g" > "$home/data/metrics/skills.tsv" <<EOF
-day|home|skill|reads
-$today|alpha|verify-alpha|7
-$today|beta|pre-review-check|5
+  lane "$home" m-build ship "working [at=$((now - 600))]: building"
+  lane "$home" m-resume ship "blocked [at=$((now - 900))]: tests fail" "resolved [at=$((now - 300))]: back on it"
+  lane "$home" m-ci ship "paused [at=$((now - 1200))]: waiting for CI checks https://github.com/acme/alpha/pull/9"
+  lane "$home" m-stuck ship "blocked [at=$((now - 7200))]: cannot reach the build server"
+  lane "$home" m-ask ship "needs-decision [at=$((now - 3600))] [key=scope]: which layout"
+  lane "$home" m-done ship "done [at=$((now - 1800))]: PR https://github.com/acme/alpha/pull/8 checks green"
+  lane "$home" m-wait scout "paused [at=$((now - 2400))]: waiting for the vendor's reply"
+  lane "$z" z-build ship "working [at=$((now - 60))]: building"
+  lane "$b" b-stale ship "working [at=$((now - 60))]: building"
+  fm_write_meta "$home/state/zephyrine.meta" "kind=secondmate" "harness=claude" "model=lead-model" "herdr_pane_id=pane-lead"
+  # Agents: a busy lead, a busy Main, one busy and one idle worker, one busy unknown agent, and a parked-home worker.
+  cat > "$home/herdr.json" <<EOF
+{"result":{"agents":[
+ {"agent":"claude","agent_status":"working","cwd":"$z","pane_id":"pane-lead","name":"lead"},
+ {"agent":"claude","agent_status":"working","cwd":"$home","pane_id":"pane-main","name":"main"},
+ {"agent":"claude","agent_status":"working","cwd":"/wt/1","pane_id":"pane-m-build","name":"w1"},
+ {"agent":"claude","agent_status":"idle","cwd":"/wt/2","pane_id":"pane-m-ask","name":"w2"},
+ {"agent":"codex","agent_status":"working","cwd":"/elsewhere/odd-job","pane_id":"pane-x","name":"odd-job"},
+ {"agent":"claude","agent_status":"working","cwd":"/wt/3","pane_id":"pane-b-stale","name":"w3"}]}}
 EOF
-  # A pulse file whose header predates its later columns, as long-lived ones do.
-  sed "s/|/$tab/g" > "$home/data/fleet-pulse.tsv" <<EOF
-time|home|merged2h|working|paused|blocked
-${today}T01:00|alpha|0|1|0|0|5|3|2|1.5|10|0|900
-${today}T01:00|beta|0|1|0|0|2|1|1|0.4|5|0|900
-EOF
-  sed "s/|/$tab/g" > "$home/config/metrics-targets.tsv" <<'EOF'
-# metric|op|target|owner|rule
-first_pass|>=|70|each home|prove before PR
-stall_alarms|<=|0|each home|watcher wakes idle leads
-EOF
-  # A registered home with no metrics rows at all, under a made-up name.
-  mkdir -p "$home/mates/zephyrine/data" "$home/mates/zephyrine/state"
-  cat > "$home/config/fm-flow-check.sh" <<'EOF'
+  cat > "$stubs/herdr" <<EOF
 #!/bin/sh
-printf 'home\t1\t1\t0\t0\t0\t-1\n'
+[ -e "$home/herdr.fail" ] && { echo 'herdr: server not running' >&2; exit 1; }
+cat "$home/herdr.json"
 EOF
-  chmod +x "$home/config/fm-flow-check.sh"
-  printf -- '- quillwork [direct-PR] - made-up project (added 2026-07-11)\n' > "$home/mates/zephyrine/data/projects.md"
-  printf -- '- zephyrine - made-up domain (home: %s; scope: made-up work; projects: other; added 2026-07-11)\n' \
-    "$home/mates/zephyrine" > "$home/data/secondmates.md"
-  printf -- '- alpha [no-mistakes] - fixture project (added 2026-07-11)\n' > "$home/data/projects.md"
-  printf '%s\n' "$home"
-}
-
-test_the_page_answers_the_questions_with_the_fixture_numbers() {
-  local home page text out want
-  home=$(make_home full)
-  out=$(FM_HOME="$home" "$DASH" build) || fail "build failed: $out"
-  page="$home/state/dashboard/index.html"
-  [ "$out" = "$page" ] || fail "build did not print the page path: $out"
-  ! grep -Eq '<script|https?://[^"]*\.(css|js)' "$page" || fail "page is not self-contained"
-  text=$(page_text "$page")
-  for want in "Running now 1" "Finished, not landed 3" "Merged today 3 yesterday 1" "Queued and ready 4" \
-    "Not automatic yet: 2 lead stalls reached Main" "12 skill reads today" "verify-alpha 7" \
-    "First-pass merges 50%" "Fix the alpha thing" "Start the beta thing" "Landed gamma" \
-    "Projects by home 2 projects Main alpha zephyrine quillwork"; do
-    case "$text" in *"$want"*) ;; *) fail "page text lacks '$want': $text" ;; esac
-  done
-  ! grep -q '<details open' "$page" || fail "a work list starts open"
-  grep -q '<b>zephyrine</b>' "$page" || fail "a registered home with no metrics rows has no row"
-  grep -q 'class="q bad"><span>First-pass merges' "$page" || fail "a missed first-pass target is not marked as a miss"
-  pass "the page answers the questions with the fixture's numbers"
-}
-
-green_pr() {  # <home> <task> <url>: a fresh observed open PR with green checks the captain could merge
-  mkdir -p "$1/data/$2"
-  jq -n --arg task "$2" --arg url "$3" --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '
-    {schema:"fm-contributions.v1",task:$task,records:[{
-      url:$url,kind:"pr",checked_at:$at,error:null,pending:[],seen:[],verdict:null,
-      observation:{head:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",state:"open",draft:false,mergeable:"mergeable",
-        review_decision:"",can_merge:true,
-        checks:[{name:"test",id:1,status:"completed",conclusion:"success",started_at:$at}],
-        reviews:[],events:[]}}]}' > "$1/data/$2/contributions.json"
-}
-
-test_totals_count_only_work_that_waits() {
-  local home page text out want
-  home=$(make_home live)
-  # alpha-fix's own record names its project, so its PR resolves to alpha whatever the repo is called.
-  printf -- '- alpha [no-mistakes +yolo] - fixture project (added 2026-07-11)\n- delta [direct-PR] - fixture project (added 2026-07-11)\n' \
-    > "$home/data/projects.md"
-  green_pr "$home" alpha-fix https://github.com/o/alpha-repo/pull/11
-  green_pr "$home" delta-pr https://github.com/o/delta/pull/12
-  green_pr "$home" ghost-pr https://github.com/o/ghost/pull/13
-  printf '# parked by the captain\nbeta\n' > "$home/config/parked-homes"
-  mkdir -p "$home/mates/alpha/data" "$home/mates/alpha/state"
-  printf -- '- alpha - fixture domain (home: %s; scope: fixture; projects: alpha; added 2026-07-11)\n' \
-    "$home/mates/alpha" >> "$home/data/secondmates.md"
-  # The home's flow check reports two finished lanes for every home it is asked about.
-  cat > "$home/config/fm-flow-check.sh" <<'EOF'
+  # One account that runs out in 5 hours, before its week resets in 3 days; one that cannot be read.
+  python3 - "$home/quota.json" <<'PY'
+import json, sys
+from datetime import datetime, timedelta, timezone as z
+t = lambda h: (datetime.now(z.utc) + timedelta(hours=h)).strftime('%Y-%m-%dT%H:%M:%SZ')
+json.dump({'schemaVersion': 5, 'providers': [
+  {'provider': 'claude', 'plan': 'max', 'state': {'status': 'fresh'},
+   'windows': [{'id': 'week', 'label': 'week', 'resetsAt': t(72), 'percentRemaining': 30, 'pace': {'reservePercentPoints': -40}}],
+   'quotaSemantics': {'effectiveAvailability': [{'scope': 'all_models', 'runway': {
+     'status': 'projected_exhaustion', 'projectedExhaustedAt': t(5), 'limitingWindowId': 'week', 'projectionConfidence': 'established'}}]}},
+  {'provider': 'cursor', 'plan': 'Free', 'state': {'status': 'error', 'stale': True, 'error': 'sign_in_required'}, 'windows': []}]},
+  open(sys.argv[1], 'w'))
+PY
+  cat > "$stubs/quota-axi" <<EOF
 #!/bin/sh
-[ -d "$1/data" ] || exit 1
-printf 'x\t3\t1\t0\t2\t0\t-1\n'
+[ -e "$home/quota.fail" ] && { echo 'quota-axi: no network' >&2; exit 1; }
+cat "$home/quota.json"
 EOF
-  chmod +x "$home/config/fm-flow-check.sh"
-  out=$(FM_HOME="$home" "$DASH" build) || fail "build failed: $out"
-  page="$home/state/dashboard/index.html"
-  text=$(page_text "$page")
-  for want in "Waiting on you 0 Nothing needs you right now." \
-    "Finished, not landed 6 Merged today" "Merged today 3 yesterday 0" \
-    "Queued and ready 0 can start when a lane frees" "Running now 1 working, not waiting" "beta Parked"; do
-    case "$text" in *"$want"*) ;; *) fail "page text lacks '$want': $text" ;; esac
-  done
-  ! grep -q 'pull/11' "$page" || fail "a green PR in a +yolo project waits on the captain: $text"
-  grep -Eq '<tr class="parked"><th>.*<b>beta</b><span class="chip ">Parked</span></span></th><td colspan="[0-9]+"></td></tr>' "$page" \
-    || fail "the parked home row shows numbers"
-  pass "totals leave out parked homes and self-merged PRs, and count finished lanes now"
-}
-
-test_merged_days_use_the_same_bounded_github_source() {
-  local home page text out want r clone
-  home=$(make_home ghlive)
-  # zephyrine clones two repos and a parked home a third; the search also returns a repo no home clones.
-  printf -- '- parkedmate - fixture domain (home: %s; scope: fixture; projects: held; added 2026-07-11)\n' \
-    "$home/mates/parkedmate" >> "$home/data/secondmates.md"
-  printf 'parkedmate\n' > "$home/config/parked-homes"
-  for r in zephyrine/quillwork=https://github.com/acme/quillwork.git zephyrine/shared=git@github.com:acme/shared.git \
-    parkedmate/held=https://github.com/acme/held; do
-    clone="$home/mates/${r%%/*}/projects/$(basename "${r%%=*}")"
-    git init -q "$clone" && git -C "$clone" remote add origin "${r#*=}"
-  done
-  mkdir -p "$home/bin" "$home/mates/parkedmate/state"
-  cat > "$home/bin/gh" <<EOF
+  # GitHub answers each bounded day search from a fixed list of merges: two today, one yesterday.
+  git init -q "$home/projects/alpha" && git -C "$home/projects/alpha" remote add origin https://github.com/acme/alpha.git
+  printf '%s\tLand the first fix\n%s\tLand the second fix\n%s\tYesterday fix\n' "$(iso 0)" "$(iso 0)" "$(iso 24)" > "$home/merges.tsv"
+  cat > "$stubs/gh" <<EOF
 #!/bin/sh
 printf '%s\n' "\$*" >> "$home/gh.calls"
 [ -e "$home/gh.fail" ] && { echo 'HTTP 403: API rate limit exceeded' >&2; exit 1; }
-case "\$*" in *"merged:>="*|*"merged:<"*) echo 'expected one merged:start..end range' >&2; exit 1 ;; esac
-printf '%s\n' '[{"total_count":5,"incomplete_results":false,"items":[{"id":1,"repository_url":"https://api.github.com/repos/acme/quillwork"},{"id":2,"repository_url":"https://api.github.com/repos/acme/quillwork"},{"id":3,"repository_url":"https://api.github.com/repos/acme/shared"},{"id":4,"repository_url":"https://api.github.com/repos/acme/held"},{"id":5,"repository_url":"https://api.github.com/repos/acme/other"}]}]'
+exec python3 - "$home/merges.tsv" "\$*" <<'PY'
+import json, re, sys
+a, b = re.search(r'merged:(\S+)\.\.(\S+)', sys.argv[2]).groups()
+items = [dict(id=n, number=n, title=t, html_url=f'https://github.com/acme/alpha/pull/{n}',
+              repository_url='https://api.github.com/repos/acme/alpha', pull_request={'merged_at': at})
+         for n, (at, t) in enumerate((l.rstrip('\n').split('\t') for l in open(sys.argv[1])), 1) if a <= at <= b]
+print(json.dumps([{'total_count': len(items), 'incomplete_results': False, 'items': items}]))
+PY
 EOF
-  chmod +x "$home/bin/gh"
-  page="$home/state/dashboard/index.html"
-  out=$(PATH="$home/bin:$PATH" FM_HOME="$home" "$DASH" build) || fail "build failed: $out"
-  text=$(page_text "$page")
-  for want in "Merged today 3 yesterday 3 · GitHub as of" "zephyrine Records need tidy-up – – 0 – 0 – 3 "; do
-    case "$text" in *"$want"*) ;; *) fail "page text lacks '$want': $text" ;; esac
+  # No device or emulator unless a test adds one, and no heavy-job slice to ask.
+  printf '#!/bin/sh\nprintf "List of devices attached\\n\\n"\n' > "$stubs/adb"
+  printf '#!/bin/sh\nexit 1\n' > "$stubs/pgrep"
+  printf '#!/bin/sh\necho "no user bus" >&2\nexit 1\n' > "$stubs/systemctl"
+  mkdir -p "$home/locks"
+  chmod +x "$stubs/herdr" "$stubs/quota-axi" "$stubs/gh" "$stubs/adb" "$stubs/pgrep" "$stubs/systemctl"
+  printf '%s\n' "$home"
+}
+
+build() {  # <home> [env...]: build with the fixture's stubs first on PATH
+  local home=$1 out
+  shift
+  out=$(env PATH="$home/stubs:$PATH" FM_HOME="$home" FM_DEVICE_LOCK_DIR="$home/locks" "$@" "$DASH" build 2>&1) || fail "build failed: $out"
+  [ "$out" = "$home/state/dashboard/index.html" ] || fail "build did not print the page path: $out"
+}
+
+test_overview_answers_the_four_questions_with_sums_that_add_up() {
+  local home d now
+  home=$(make_home overview)
+  d="$home/state/dashboard"
+  build "$home"
+  for p in index index.home flow quota backlog backlog.home measure; do
+    [ -s "$d/$p.html" ] || fail "no $p page"
+    ! grep -Eq '<script|https?://[^"]*\.(css|js)"' "$d/$p.html" || fail "$p is not self-contained"
   done
-  [ "$(wc -l < "$home/gh.calls")" -eq 2 ] || fail "not two bounded day searches: $(cat "$home/gh.calls")"
-  grep -q 'q=owner:acme is:pr is:merged merged:20[0-9-]*T[0-9:]*Z\.\.20[0-9-]*T[0-9:]*Z' "$home/gh.calls" || fail "unexpected search: $(cat "$home/gh.calls")"
-  # A rebuild inside 5 minutes reuses the count and does not search, even when GitHub would fail.
-  touch "$home/gh.fail"
-  PATH="$home/bin:$PATH" FM_HOME="$home" "$DASH" build >/dev/null || fail "cached build failed"
-  [ "$(wc -l < "$home/gh.calls")" -eq 2 ] || fail "a rebuild inside 5 minutes searched again"
-  case "$(page_text "$page")" in *"Merged today 3 yesterday 3 · GitHub as of"*) ;; *) fail "the cached count was not shown" ;; esac
-  # After 5 minutes a failed search falls back to prs.tsv, says how old that count is, and shows why.
-  python3 -c 'import json,sys; p=sys.argv[1]; c=json.load(open(p)); c["at"]-=301; json.dump(c,open(p,"w"))' \
-    "$home/state/dashboard/.merged-today.json"
-  touch -d "$(date +%F) 00:01" "$home/data/metrics/prs.tsv"
-  PATH="$home/bin:$PATH" FM_HOME="$home" "$DASH" build >/dev/null || fail "fallback build failed"
-  text=$(page_text "$page")
-  for want in "Merged today 3 yesterday 1 · as of 00:01" "GitHub merged-today search : HTTP 403: API rate limit exceeded"; do
-    case "$text" in *"$want"*) ;; *) fail "page text lacks '$want': $text" ;; esac
-  done
-  grep -q 'merged:[^ ]*\.\.[^ ]*:59Z' "$home/gh.calls" || fail "day range has no inclusive last-second boundary"
-  rm -f "$home/gh.fail"
-  python3 -c 'import json,sys; json.dump({"scope":json.load(open(sys.argv[1]))["scope"],"day":json.load(open(sys.argv[1]))["day"],"at":"yesterday","yesterday":[1,2]},open(sys.argv[1],"w"))' \
-    "$home/state/dashboard/.merged-today.json"
-  PATH="$home/bin:$PATH" FM_HOME="$home" "$DASH" build >/dev/null || fail "corrupt cache build failed"
-  [ "$(wc -l < "$home/gh.calls")" -gt 4 ] || fail "a corrupt cache was trusted instead of searched again"
-  case "$(page_text "$page")" in *"Merged today 3 yesterday 3 · GitHub as of"*) ;; *) fail "corrupt cache was not recomputed" ;; esac
-  python3 -c 'import json,sys; p=sys.argv[1]; c=json.load(open(p)); c["scope"]=c["scope"][1:]; c["homes"]={"zephyrine":777}; json.dump(c,open(p,"w"))' \
-    "$home/state/dashboard/.merged-today.json"
-  PATH="$home/bin:$PATH" FM_HOME="$home" "$DASH" build >/dev/null || fail "old-query cache build failed"
-  case "$(page_text "$page")" in *"Merged today 3 yesterday 3 · GitHub as of"*) ;; *) fail "old two-qualifier cache was reused" ;; esac
-  pass "both merge days use one bounded range, reject old-query caches, and fall back together with an explicit time"
+  has "$d/index.html" "Waiting on you · Main's ask list, now Nothing needs you." \
+    "Landed so far 2 yesterday 1" "Lanes building 3 of 8 open" \
+    "Busy agents 1 lead + 1 Main + 1 worker + 1 other 4 of 5 agents" \
+    "8 lanes open of a plan of 9; 2 blocked or waiting." "moving 4 stopped 4 free 1 of plan 9" \
+    "Blocked or waiting on a decision 1 blocked · 1 on a decision 2" "Finished, not landed" \
+    "Producing 3 building · 1 validating 4" "Open lanes 2 + 1 + 4 + 1 = 8" \
+    "beta is parked by the captain and left out of every total." \
+    "1 item held for the captain in home records · oldest" "Main must triage" \
+    "Claude quota runs out" "2 lanes blocked or waiting on a decision · oldest 2 h"
+  # Grouped by home, the same lanes sum to the same total.
+  has "$d/index.home.html" "Open lanes 7 + 1 = 8" "Main 1 blocked · 1 on a decision 7 Blocked, needs help 1" "zephyrine 1 building 1"
+  lacks "$d/index.html" "A parked home's stale lane" "w3"
+  # Main's ask list is the only thing in the hero; held items are a slow spot, never "Waiting on you".
+  now=$(date +%s)
+  printf 'first\t%s\tApprove the release\thttps://example.invalid/release\nsecond\t%s\tChoose a date\t\n' \
+    "$((now - 7200))" "$((now - 3600))" > "$home/data/captain-asks.tsv"
+  build "$home"
+  has "$d/index.html" "2 things need you. Approve the release 2 h Choose a date 1 h"
+  grep -q 'href="https://example.invalid/release"' "$d/index.html" || fail "ask URL not linked"
+  printf 'bad row\n' >> "$home/data/captain-asks.tsv"
+  build "$home"
+  has "$d/index.html" "3 things need you." "Ask record needs correction"
+  has "$d/measure.html" "data/captain-asks.tsv malformed row 3"
+  pass "the overview answers each question, and lanes, agents and groups sum to their totals"
+}
+
+test_sub_pages_show_flow_quota_backlog_and_method() {
+  local home d
+  home=$(make_home pages)
+  d="$home/state/dashboard"
+  build "$home"
+  has "$d/flow.html" "2 landed so far today" "Yesterday's full day: 1 landed" \
+    "Latest landings · GitHub" "Land the first fix" "Land the second fix" "Fleet ≥ 4 2"
+  has "$d/quota.html" "Claude runs out first" "Claude · 1 lead, 8 workers" "week 70% used" \
+    "1 account cannot be read or is empty." "Cursor sign in required" "even pace 30%"
+  has "$d/backlog.html" "Queued 4 = Ready 2 + Held 1 + Waiting on another item 1" \
+    "1 item held; oldest" "Wait for the captain's call" "needs his call" \
+    "Open lanes 2 + 1 + 4 + 1 = 8" "Busy now 1 + 1 + 1 + 1 = 4" "4 busy: 1 lead + 1 Main + 1 worker + 1 other." \
+    "Lane settings plan 9 lanes; 8 are open." "Fleet 8 9 2" "Main 6" \
+    "Oldest validation or CI wait: 20 min (m-ci, Main)"
+  has "$d/backlog.home.html" "Queued" "Main 3" "zephyrine 1" "Open lanes 7 + 1 = 8"
+  has "$d/measure.html" "The pages rebuild every 60 s" "3 lanes per home from config/lane-target; config/lane-caps overrides (9 in all)" \
+    "Parked homes left out of every total: beta" "beta is parked but has 1 item marked in flight" \
+    "Fleet retro no schedule in any record this page reads"
+  pass "Flow, Quota, Backlog and Method pages show their numbers with windows and sums"
+}
+
+test_each_failed_source_shows_unknown_and_why() {
+  local home d
+  home=$(make_home failing)
+  d="$home/state/dashboard"
+  build "$home"
+  touch "$home/herdr.fail" "$home/quota.fail" "$home/gh.fail"
+  # The quota reading is too old to reuse as current, but young enough to show with its time.
+  python3 -c 'import json,sys; p=sys.argv[1]; c=json.load(open(p)); c["at"]-=200; json.dump(c,open(p,"w"))' "$d/.quota.json"
+  # GitHub's cache for today is past its 5 minutes, so the failed search falls back to the merge record.
+  python3 -c 'import json,sys; p=sys.argv[1]; c=json.load(open(p)); [e.__setitem__("at", e["at"]-400) for e in c["days"].values()]; json.dump(c,open(p,"w"))' "$d/.merged.json"
+  printf 'home\tmerged\tfirst_pass\nmain\t%s\t1\n' "$(iso 0)" > "$home/data/metrics/prs.tsv"
+  build "$home"
+  has "$d/index.html" "Busy agents unknown: herdr: server not running" "landings merge record as of" "Landed so far 1"
+  has "$d/quota.html" "Claude runs out first"
+  has "$d/measure.html" "herdr agent list herdr: server not running" "quota-axi quota-axi: no network; showing the reading from" \
+    "GitHub landings HTTP 403: API rate limit exceeded"
+  lacks "$d/index.html" "Busy agents 0"
+  # With no reading to reuse and no merge record, the numbers say unknown, never zero.
+  rm "$d/.quota.json" "$home/data/metrics/prs.tsv"
+  build "$home"
+  has "$d/quota.html" "Quota unknown. unknown: quota-axi: no network"
+  has "$d/index.html" "Landed so far unknown: HTTP 403: API rate limit exceeded"
+  lacks "$d/index.html" "Landed so far 0"
+  # A home whose backlog cannot be read makes the queue unknown, and names the home.
+  printf '#!/bin/sh\necho "tasks-axi: backlog unreadable" >&2\nexit 1\n' > "$home/stubs/tasks-axi"
+  chmod +x "$home/stubs/tasks-axi"
+  build "$home"
+  has "$d/backlog.html" "Queued work unknown." "main: tasks-axi: backlog unreadable" "At least 0 items held; the backlog of Main, zephyrine is unknown." "Agents unknown."
+  has "$d/measure.html" "backlog main: tasks-axi: backlog unreadable"
+  lacks "$d/backlog.html" "Queued 0" "No item is held" "0 busy"
+  pass "each failed source shows unknown and why, reuses a dated reading where one exists, and never guesses zero"
+}
+
+test_github_searches_each_day_once_and_today_again_after_five_minutes() {
+  local home d
+  home=$(make_home github)
+  d="$home/state/dashboard"
+  build "$home"
+  [ "$(wc -l < "$home/gh.calls")" -eq 7 ] || fail "not one search per day of 7: $(cat "$home/gh.calls")"
+  grep -q 'q=owner:acme is:pr is:merged merged:20[0-9-]*T[0-9:]*Z\.\.20[0-9-]*T[0-9:]*59Z' "$home/gh.calls" \
+    || fail "unexpected search: $(cat "$home/gh.calls")"
+  build "$home"
+  [ "$(wc -l < "$home/gh.calls")" -eq 7 ] || fail "a rebuild inside 5 minutes searched again"
+  python3 -c 'import json,sys; p=sys.argv[1]; c=json.load(open(p)); [e.__setitem__("at", e["at"]-400) for e in c["days"].values()]; json.dump(c,open(p,"w"))' "$d/.merged.json"
+  build "$home"
+  [ "$(wc -l < "$home/gh.calls")" -eq 8 ] || fail "after 5 minutes not only today was searched again: $(cat "$home/gh.calls")"
+  has "$d/index.html" "Landed so far 2 yesterday 1"
+  pass "GitHub is searched once per finished day and today again after 5 minutes"
+}
+
+test_the_filing_log_counts_new_items_exactly() {
+  local home d today
+  home=$(make_home filing)
+  d="$home/state/dashboard"
+  today=$(date +%F)
+  build "$home"
+  # Items already queued when the log starts have only their filing day: a floor.
+  has "$d/index.html" "Filed, at least ≥ 4"
+  has "$d/flow.html" "0 items first seen today."
+  printf -- '- [ ] m-new - A brand new thing (repo: alpha) (kind: ship) (since %s)\n' "$today" >> "$home/mates/zephyrine/data/backlog.md"
+  build "$home"
+  has "$d/flow.html" "1 item first seen today." "A brand new thing zephyrine"
+  # Once the log covers the whole day, today's count is exact.
+  python3 -c 'import sys,time
+p=sys.argv[1]; rows=open(p).read().split("\n",1); t=int(time.mktime(time.strptime(time.strftime("%Y-%m-%d"),"%Y-%m-%d")))
+open(p,"w").write(f"# since {t} last {int(time.time())}\thome\tid\tfirst_seen\ttitle\n"+rows[1])' "$d/filed.tsv"
+  build "$home"
+  has "$d/index.html" "Filed 5"
+  lacks "$d/index.html" "Filed, at least ≥"
+  pass "the filing log records first-seen times, and filed counts are floors until the log covers the day"
 }
 
 test_devices_and_machine_come_from_read_only_probes() {
-  local home page text want proc locks bin key at
+  local home d proc locks bin key at
   home=$(make_home probes)
+  d="$home/state/dashboard"
   proc="$home/proc" locks="$home/locks" bin="$home/stubs"
-  mkdir -p "$proc/pressure" "$proc/900" "$proc/800" "$locks" "$bin"
+  mkdir -p "$proc/pressure" "$proc/900" "$proc/800" "$locks" "$home/projects/wt"
+  fm_write_meta "$home/state/m-build.meta" "kind=ship" "worktree=$home/projects/wt" "herdr_pane_id=pane-m-build"
   printf 'MemTotal:       67108864 kB\nMemAvailable:   10485760 kB\n' > "$proc/meminfo"
   printf 'some avg10=3.50 avg60=1.00 avg300=0.50 total=1\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n' > "$proc/pressure/memory"
   printf 'Name:\tqemu-system-x86\nVmRSS:\t 4194304 kB\n' > "$proc/900/status"
@@ -228,8 +310,8 @@ test_devices_and_machine_come_from_read_only_probes() {
   # The kernel lists a held flock by device and inode; only the emulator lock is held.
   key=$(python3 -c 'import os,sys; s=os.stat(sys.argv[1]); print(f"{os.major(s.st_dev):02x}:{os.minor(s.st_dev):02x}:{s.st_ino}")' "$locks/fm-phone-muxr-emu.lock")
   printf '1: FLOCK  ADVISORY  WRITE 800 %s 0 EOF\n' "$key" > "$proc/locks"
-  at=$(python3 -c 'from datetime import datetime,timedelta,timezone as z; print((datetime.now(z.utc)-timedelta(minutes=10)).strftime("%Y-%m-%dT%H:%M:%SZ"))')
-  printf '%s PHONE1 acquired pid=700 waited=0s cwd=/tmp/fm-alpha-fix\n%s PHONE1 released pid=700 rc=0\n%s muxr-emu acquired pid=800 waited=0s cwd=%s\n' \
+  at=$(iso 0.17)
+  printf '%s PHONE1 acquired pid=700 waited=0s cwd=/tmp/fm-m-build\n%s PHONE1 released pid=700 rc=0\n%s muxr-emu acquired pid=800 waited=0s cwd=%s\n' \
     "$at" "$at" "$at" "$home/projects/wt/app" > "$locks/fm-device-lock.log"
   cat > "$bin/adb" <<EOF
 #!/bin/sh
@@ -251,38 +333,32 @@ EOF
 printf 'MemoryCurrent=8589934592\nMemoryHigh=34359738368\nMemoryMax=40802189312\n'
 EOF
   chmod +x "$bin/adb" "$bin/pgrep" "$bin/systemctl"
-  page="$home/state/dashboard/index.html"
-  PATH="$bin:$PATH" FM_HOME="$home" FM_DASHBOARD_PROC="$proc" FM_DEVICE_LOCK_DIR="$locks" "$DASH" build >/dev/null || fail "probe build failed"
-  text=$(page_text "$page")
-  for want in "Problem: Leads, Alerts, Machine" "Machine 10 GB free · pressure 4% · heavy jobs wait" "Devices 2 connected · 1 in use" \
-    "Phone Pixel 9 PHONE1 · USB Free · last used by Main 10 min ago" \
-    "Emulator test-avd emulator-5554 · 4.0 GB in use In use by Main · 10 min" \
+  build "$home" FM_DASHBOARD_PROC="$proc" FM_DEVICE_LOCK_DIR="$locks"
+  has "$d/index.html" "2 devices connected; 1 in use." "In use 1" "Free 1" "Devices 1 + 1 = 2" \
+    "Phone Pixel 9 Free · last used by Main 10 min ago · PHONE1 · USB" \
+    "Emulator test-avd In use by Main · 10 min · emulator-5554 · 4.0 GB in use" \
     "Free memory 10.0 GB of 64 GB" "Memory pressure 4%" "Heavy jobs 8.0 GB of 32 GB" "hard limit 38 GB" \
-    "Gradle builds 2 of 2" "Emulators 1 of 2"; do
-    case "$text" in *"$want"*) ;; *) fail "page text lacks '$want': $text" ;; esac
-  done
+    "Gradle builds 2 of 2" "Emulators 1 of 2" "Heavy jobs wait for memory · as of"
+  has "$d/index.home.html" "Main 1 Emulator test-avd" "No holder 1 Phone Pixel 9" "Devices 1 + 1 = 2"
   [ "$(sort -u "$home/adb.calls")" = "devices -l" ] || fail "adb was asked more than the device list: $(cat "$home/adb.calls")"
   # Each failed probe says unknown and why; nothing is guessed as zero.
   touch "$home/adb.fail" "$home/systemctl.fail"
   rm "$proc/meminfo" "$proc/locks"
-  PATH="$bin:$PATH" FM_HOME="$home" FM_DASHBOARD_PROC="$proc" FM_DEVICE_LOCK_DIR="$locks" "$DASH" build >/dev/null || fail "failed-probe build failed"
-  text=$(page_text "$page")
-  for want in "Machine pressure 4%" "Devices unknown: adb: error: daemon not running" \
+  build "$home" FM_DASHBOARD_PROC="$proc" FM_DEVICE_LOCK_DIR="$locks"
+  has "$d/index.html" "Devices unknown." "unknown - adb: error: daemon not running" \
     "Free memory unknown: $proc/meminfo: No such file or directory" "Heavy jobs unknown: Failed to connect to bus" \
-    "unknown - device locks: $proc/locks: No such file or directory" "Emulator test-avd not listed by adb · 4.0 GB in use unknown:"; do
-    case "$text" in *"$want"*) ;; *) fail "page text lacks '$want': $text" ;; esac
-  done
-  case "$text" in *"0 connected"*|*"Free memory 0"*) fail "a failed probe was shown as zero: $text" ;; esac
+    "unknown - device locks: $proc/locks: No such file or directory"
+  lacks "$d/index.html" "0 devices connected" "Free memory 0"
   pass "devices and machine come from read-only probes, name each holder's home, and say unknown with the reason"
 }
 
 SERVE_PID=
 trap '[ -z "$SERVE_PID" ] || kill "$SERVE_PID" 2>/dev/null; fm_test_cleanup' EXIT
 
-test_serve_answers_the_page_and_nothing_else() {
+test_serve_answers_each_page_and_remembers_the_grouping() {
   local home url got
   home=$(make_home served)
-  FM_HOME="$home" "$DASH" serve --port 0 > "$home/serve.out" 2> "$home/serve.err" &
+  PATH="$home/stubs:$PATH" FM_HOME="$home" FM_DEVICE_LOCK_DIR="$home/locks" "$DASH" serve --port 0 > "$home/serve.out" 2> "$home/serve.err" &
   SERVE_PID=$!
   for _ in $(seq 1 100); do
     url=$(sed -n 's/^serving //p' "$home/serve.out")
@@ -294,137 +370,42 @@ test_serve_answers_the_page_and_nothing_else() {
   case "$url" in http://127.0.0.1:*/) ;; *) fail "serve did not default to loopback: $url" ;; esac
   got=$(python3 - "$url" <<'PY'
 import sys, urllib.request, urllib.error
-def get(u):
+def get(u, cookie=None):
+    rq = urllib.request.Request(u, headers={'Cookie': cookie} if cookie else {})
     try:
-        with urllib.request.urlopen(u, timeout=60) as r: return r.status, r.read().decode()
-    except urllib.error.HTTPError as e: return e.code, ''
-code, body = get(sys.argv[1])
-print(code, 'Merged today' in body and 'Fleet dashboard' in body)
-for path in ('state/', 'index.html/..', '../data/metrics/prs.tsv', 'data/metrics/prs.tsv'):
-    print(get(sys.argv[1] + path)[0])
+        with urllib.request.urlopen(rq, timeout=120) as r: return r.status, r.read().decode(), r.headers.get('Set-Cookie') or ''
+    except urllib.error.HTTPError as e: return e.code, '', ''
+base = sys.argv[1]
+for path, want in (('', 'Nothing needs you.'), ('flow', 'Latest landings'), ('quota', 'runs out first'),
+                   ('backlog', 'Held for the captain'), ('measure', 'How each number is measured.')):
+    code, body, _ = get(base + path)
+    print(path or '/', code, want in body)
+code, body, cookie = get(base + 'backlog?group=home')
+print('group', code, 'fm_group=home' in cookie, '7 + 1 = <b>8</b>' in body)
+code, body, _ = get(base, 'fm_group=home')
+print('cookie', code, '7 + 1 = <b>8</b>' in body)
+for path in ('state/', 'index.home.html', '../data/backlog.md', 'data/backlog.md'):
+    print(path, get(base + path)[0])
 PY
 )
-  [ "$got" = "$(printf '200 True\n404\n404\n404\n404')" ] || fail "serve answers were not page-then-404s: $got"
+  [ "$got" = "$(printf '%s\n' '/ 200 True' 'flow 200 True' 'quota 200 True' 'backlog 200 True' 'measure 200 True' \
+    'group 200 True True' 'cookie 200 True' 'state/ 404' 'index.home.html 404' '../data/backlog.md 404' 'data/backlog.md 404')" ] \
+    || fail "serve answers were not the five pages, the remembered grouping, then 404s: $got"
   # An old page is answered at once, as it is, while a rebuild runs behind it.
   printf '<p>old page<!--age--></p>\n' > "$home/state/dashboard/index.html"
   touch -d '-5 minutes' "$home/state/dashboard/index.html"
   got=$(python3 -c 'import sys, urllib.request; print(urllib.request.urlopen(sys.argv[1], timeout=5).read().decode())' "$url")
   case "$got" in *"old page · updated 3"[0-9][0-9]" s ago"*) ;; *) fail "an old page was not answered at once: $got" ;; esac
-  for _ in $(seq 1 600); do grep -q 'old page' "$home/state/dashboard/index.html" || break; sleep 0.1; done
-  grep -q 'Fleet dashboard' "$home/state/dashboard/index.html" || fail "the background rebuild did not replace the old page"
+  for _ in $(seq 1 1200); do grep -q 'old page' "$home/state/dashboard/index.html" || break; sleep 0.1; done
+  grep -q 'Nothing needs you' "$home/state/dashboard/index.html" || fail "the background rebuild did not replace the old page"
   kill "$SERVE_PID" 2>/dev/null; SERVE_PID=
-  pass "serve returns the page with 200 at once, rebuilds an old one by itself, and 404s every other path"
+  pass "serve answers the five pages at once, remembers ?group in a cookie, rebuilds an old page itself, and 404s every other path"
 }
 
-test_missing_or_malformed_sources_hide_only_their_part() {
-  local home page text out
-  home=$(make_home partial)
-  rm "$home/data/metrics/skills.tsv" "$home/data/fleet-pulse.tsv"
-  printf 'nonsense\n1\n' > "$home/data/metrics/daily.tsv"
-  printf 'alpha\n' >> "$home/data/metrics/prs.tsv"  # a cut-off appended line
-  # A broken snapshot bound makes the fleet snapshot itself exit non-zero.
-  out=$(FM_HOME="$home" FM_BEARINGS_LANDED=0 "$DASH" build 2>&1) || fail "a missing source failed the build: $out"
-  page="$home/state/dashboard/index.html"
-  text=$(page_text "$page")
-  for want in "data/metrics/skills.tsv : not found" "data/fleet-pulse.tsv : not found" \
-    "data/metrics/daily.tsv : malformed" "data/metrics/prs.tsv : 1 short row(s) skipped" "fleet snapshot exited 2: fm-bearings-snapshot: FM_BEARINGS_LANDED must be a positive integer" "Merged today 3 yesterday 1"; do
-    case "$text" in *"$want"*) ;; *) fail "page text lacks '$want': $text" ;; esac
-  done
-  case "$text" in *"Waiting on you 0"*"Running now 1"*) ;; *) fail "independent tiles disappeared with the snapshot: $text" ;; esac
-  pass "missing or malformed sources hide only their own part and never fail the build"
-}
-
-test_who_does_the_work_groups_lanes_by_harness_and_model() {
-  local home page text out want tab now_ts old_ts
-  tab=$(printf '\t')
-  home=$(make_home who)
-  read -r now_ts _ < <(when 0)
-  read -r old_ts _ < <(when 240)
-  printf 'beta\n' > "$home/config/parked-homes"
-  # alpha-fix runs in main (its record exists); zephyrine's lanes ended, two of their PRs merged this week.
-  sed "s/|/$tab/g" > "$home/data/metrics/prs.tsv" <<EOF
-home|repo|pr|merged|first_pass
-zephyrine|acme/quillwork|5|$now_ts|1
-zephyrine|acme/quillwork|6|$now_ts|0
-zephyrine|acme/quillwork|7|$old_ts|1
-EOF
-  sed "s/|/$tab/g" > "$home/data/metrics/lanes.tsv" <<EOF
-first_seen|home|task|kind|project|harness|model|effort|mode|pr
-2026-10-06T09:35|main|zephyrine|secondmate|-|pi|lead-model-z|medium|secondmate|
-2026-10-06T09:35|main|beta|secondmate|-|pi|parked-lead|medium|secondmate|
-2026-10-06T09:35|main|alpha-fix|ship|alpha|claude|model-a|medium|no-mistakes|
-2026-10-06T09:35|zephyrine|qw-1|ship|quillwork|pi|model-b|medium|direct-PR|https://github.com/acme/quillwork/pull/5
-2026-10-06T09:35|zephyrine|qw-2|ship|quillwork|pi|model-b|medium|direct-PR|https://github.com/acme/quillwork/pull/6
-2026-10-06T09:35|zephyrine|qw-3|ship|quillwork|pi|model-b|medium|direct-PR|https://github.com/acme/quillwork/pull/7
-2026-10-06T09:35|beta|b-1|ship|b|codex|parked-model|medium|direct-PR|
-EOF
-  out=$(FM_HOME="$home" "$DASH" build) || fail "build failed: $out"
-  page="$home/state/dashboard/index.html"
-  text=$(page_text "$page")
-  for want in "Who does the work 2 worker models Worker model Running Merged, 7 days First pass" \
-    "claude · model-a 1 0 –" "pi · model-b 0 2 50%" "zephyrine Records need tidy-up lead-model-z" "Recorded since 2026-10-06"; do
-    case "$text" in *"$want"*) ;; *) fail "page text lacks '$want': $text" ;; esac
-  done
-  case "$text" in *parked-model*|*parked-lead*) fail "a parked home shows in Who does the work: $text" ;; esac
-  # No lane record yet: the section says so and Missing data names the file.
-  : > "$home/data/metrics/lanes.tsv"
-  FM_HOME="$home" "$DASH" build >/dev/null || fail "build with an empty lane record failed"
-  text=$(page_text "$page")
-  for want in "Who does the work no record yet No record yet." "data/metrics/lanes.tsv : empty"; do
-    case "$text" in *"$want"*) ;; *) fail "page text lacks '$want': $text" ;; esac
-  done
-  pass "Who does the work groups lanes by harness and model, joins merges by PR URL, and leaves out parked homes"
-}
-
-test_main_asks_and_lane_verbs_are_authoritative() {
-  local home page text now task today yesterday
-  home=$(make_home exact)
-  read -r _ today < <(when 0)
-  read -r _ yesterday < <(when 24)
-  printf '%s\talpha\t6\t0\t5\t99\t3\t0\n' "$yesterday" >> "$home/data/metrics/daily.tsv"
-  printf 'day\thome\n%s\talpha\n%s\talpha\n%s\tbeta\n' "$today" "$yesterday" "$yesterday" > "$home/data/metrics/rings.tsv"
-  page="$home/state/dashboard/index.html"
-  now=$(date +%s)
-  : > "$home/data/captain-asks.tsv"
-  FM_HOME="$home" "$DASH" build >/dev/null || fail "empty ask build failed"
-  grep -q '<section class="asks ok" id="asks"><div class="ah"><h2>Waiting on you</h2><b class="an">0</b>' "$page" || fail "empty asks not zero and ok"
-  printf 'first\t%s\tApprove Umer release\thttps://example.invalid/release\nsecond\t%s\tChoose launch date\t\n' \
-    "$((now - 7200))" "$((now - 3600))" > "$home/data/captain-asks.tsv"
-  # A resolved lane is working, but a still-open captain hold is not, even after working resumes.
-  for task in resolved held; do
-    fm_write_meta "$home/state/$task.meta" 'kind=ship'
-  done
-  printf 'resolved [at=%s]: ready to continue\n' "$now" > "$home/state/resolved.status"
-  printf 'blocked [at=%s] [key=captain-hold-x]: decision\nworking [at=%s]: resumed\n' "$now" "$now" > "$home/state/held.status"
-  FM_HOME="$home" "$DASH" build >/dev/null || fail "two ask build failed"
-  text=$(page_text "$page")
-  for task in 'Running now 2' 'Waiting on you 2' 'Approve Umer release 2 h' 'Choose launch date 1 h' \
-    '2 stalls reached Main yesterday 5' '1 leads woken automatically yesterday 2' \
-    '1 stopped leads restarted yesterday 3' '4 Main messages to leads yesterday 6'; do
-    case "$text" in *"$task"*) ;; *) fail "missing $task: $text" ;; esac
-  done
-  grep -q 'href="https://example.invalid/release"' "$page" || fail "ask URL not linked"
-  printf 'bad row\n' >> "$home/data/captain-asks.tsv"
-  FM_HOME="$home" "$DASH" build >/dev/null || fail "malformed ask build failed"
-  text=$(page_text "$page")
-  case "$text" in *'Waiting on you 3'*'Ask record needs correction'*'malformed row 3'*) ;; *) fail "malformed row guessed or dropped: $text" ;; esac
-  python3 -c 'print("huge\t" + "9"*5000 + "\tOverlong epoch\t")' >> "$home/data/captain-asks.tsv"
-  FM_HOME="$home" "$DASH" build >/dev/null || fail "overlong epoch build failed"
-  text=$(page_text "$page")
-  case "$text" in *'Waiting on you 4'*'Ask record needs correction'*'malformed row 4'*) ;; *) fail "overlong epoch crashed or was dropped: $text" ;; esac
-  # UTC yesterday 21:00 is today 01:00 in the captain's +04 local day.
-  yesterday=$(TZ=Etc/GMT-4 python3 -c 'from datetime import datetime,timedelta; print((datetime.now().date()-timedelta(days=1)).isoformat())')
-  printf 'home\tmerged\tfirst_pass\nalpha\t%sT21:00:00Z\t1\n' "$yesterday" > "$home/data/metrics/prs.tsv"
-  TZ=Etc/GMT-4 FM_HOME="$home" "$DASH" build >/dev/null || fail "local-day build failed"
-  case "$(page_text "$page")" in *'Merged today 1 yesterday 0'*) ;; *) fail "UTC date used instead of local day" ;; esac
-  pass "Main asks, lane verbs, alert counts and +04 local merge days are exact from their records"
-}
-
-test_the_page_answers_the_questions_with_the_fixture_numbers
-test_main_asks_and_lane_verbs_are_authoritative
-test_totals_count_only_work_that_waits
-test_missing_or_malformed_sources_hide_only_their_part
-test_who_does_the_work_groups_lanes_by_harness_and_model
-test_merged_days_use_the_same_bounded_github_source
-test_serve_answers_the_page_and_nothing_else
+test_overview_answers_the_four_questions_with_sums_that_add_up
+test_sub_pages_show_flow_quota_backlog_and_method
+test_each_failed_source_shows_unknown_and_why
+test_github_searches_each_day_once_and_today_again_after_five_minutes
+test_the_filing_log_counts_new_items_exactly
 test_devices_and_machine_come_from_read_only_probes
+test_serve_answers_each_page_and_remembers_the_grouping
