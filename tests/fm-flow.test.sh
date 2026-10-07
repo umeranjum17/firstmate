@@ -110,6 +110,11 @@ for task, reason in [('memory', 'fm-mem-gate: waiting (free 1 GB)'), ('credentia
     'blocked [at=30] [key=a2]: fm-mem-gate: waiting (free 1 GB)\n'
     'blocked [key=a0]: fm-mem-gate: waiting (free 1 GB)\n'
     'needs-decision [at=20] [key=b]: waiting for merge\n')
+(child / 'state/partknown.meta').write_text('kind=ship\n')
+(child / 'state/partknown.status').write_text('blocked [at=10] [key=a]: fm-mem-gate: waiting (free 1 GB)\n'
+    'blocked [key=b]: fm-mem-gate: waiting (free 1 GB)\n')
+(child / 'state/smallmerge.meta').write_text('kind=ship\n')
+(child / 'state/smallmerge.status').write_text('blocked [at=90] [key=wait]: waiting for merge\n')
 z = json.loads(run())
 new = {l['task']: l for l in z['lanes'] if l['open']}
 for task, expected in [('memory', 'memory_gate'), ('credential', 'credential_external'),
@@ -125,8 +130,11 @@ assert mem_item['seconds'] is None, 'unstamped same-cause wait keeps full total 
 assert mem_item['known_seconds'] == 90 and len(mem_item['waits']) == 3, 'within-cause maximum, not sum'
 assert mem_item['unknown_waits'] == 1
 assert merge_item['seconds'] == 80 and merge_item['known_seconds'] == 80
-assert mem_bucket['known_lower_bound_lane_hours'] == (90 + 90) / 3600
-assert mem_bucket['unknown_items'] == 1 and mem_bucket['unknown_waits'] == 1
+assert mem_bucket['known_lower_bound_lane_hours'] == (90 + 90 + 90) / 3600
+assert mem_bucket['unknown_items'] == 2 and mem_bucket['unknown_waits'] == 2
+part = next(i for i in mem_bucket['items'] if i['task'] == 'partknown')
+assert part['seconds'] is None and part['known_seconds'] == 90 and part['unknown_waits'] == 1
+assert [b['cause'] for b in z['bottlenecks']].index('memory_gate') < [b['cause'] for b in z['bottlenecks']].index('review_merge'), 'known lower bound ranks first'
 assert mem_item['overlap'] is True and merge_item['overlap'] is True
 assert mem_bucket['additive'] is False and merge_bucket['additive'] is False
 assert next(i for i in mem_bucket['items'] if i['task'] == 'memory')['overlap'] is False
