@@ -883,11 +883,17 @@ bin/fm-test-run.sh tests/fm-control.test.sh
 | omp | composer reads `empty` after a single Escape; no clear key | [Oh My Pi (omp)](#oh-my-pi-omp) interrupt row: control-plane interrupt left the composer `empty` |
 | devin | cancelled turn leaves the composer empty; no clear key | `tests/fm-devin-signals-live-e2e.test.sh`: double Escape cancels, then control-plane exit succeeds through the composer check |
 | rovo | nothing restored; a raw `/exit` after `Agent cancelled` exits cleanly; no clear key | `tests/fm-rovo-signals-live-e2e.test.sh` mid-tool-call Escape |
-| claude, codex, opencode, pi, pi-signed, grok, kimi | no post-interrupt composer observation on record; table keeps none | n/a - unverified |
+| claude | empty composer after one Escape; no clear key | Live observation 2026-10-07: claude 2.1.292 left `❯` empty after interrupting a mid-turn story prompt |
+| codex | placeholder-only composer after one Escape; no clear key | Live observation 2026-10-07: codex-cli 0.159.2 left only `› Ask Codex to do anything` after interrupting a mid-turn story prompt |
+| opencode | empty composer after double Escape; no clear key | Live observation 2026-10-07: opencode 1.18.25 left the composer box empty after two Escapes ~0.7 s apart mid-turn |
+| pi | empty composer after one Escape; no clear key | Live observation 2026-10-07: pi 1.0.0 showed `Operation aborted` with blank composer input after interrupting a mid-turn story prompt |
+| pi-signed | shares pi's composer; covered by the pi observation above | No `pi-signed` binary installed; the pi empty-composer result covers it unless later evidence shows otherwise |
+| grok, kimi | no post-interrupt composer observation on record; table keeps none | n/a - unverified: grok 1.0.0 stopped at browser OAuth device-code approval, kimi 2.1.1 refused its stored token, so no turn ever ran on either |
 
 For the unverified remainder the next submit still re-checks the composer before typing (the control plane's exit check, the steer plane's ring pre-check), so restored text surfaces as a refusal naming its recovery (`fm-send.sh <id> --key Enter`, plus the harness clear key where the table names one) rather than a garbled send.
 The default stays none rather than a guessed clear key because the two errors are not symmetric: a missing clear degrades to a refusal that names its recovery, while a spurious clear would silently discard the worker's pending text.
 The per-harness signals guards above are the refresh commands after a harness upgrade; a harness observed to restore takes a clear key in the table plus a dated line here.
+Observed 2026-10-07: claude 2.1.292, codex-cli 0.159.2, opencode 1.18.25, and pi 1.0.0 each left an empty or placeholder-only composer after one interrupt, so none takes a clear key and `fm_control_interrupt_clear_key` stays none for all of them.
 
 ## Waiting-worker command ceilings
 
