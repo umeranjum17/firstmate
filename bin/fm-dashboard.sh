@@ -284,7 +284,8 @@ def merged_today_live():
     if not repo_home: return None
     scope = [sorted(repo_home.items()), sorted(parked), str(NOW.tzinfo)]
     scope = json.loads(json.dumps(scope))
-    if c.get('scope') == scope and c.get('day') == TODAY.isoformat() and c.get('yesterday') is not None and 0 <= NOW.timestamp() - c.get('at', 0) < 300:
+    at, yh, th = c.get('at'), c.get('yesterday'), c.get('homes')
+    if c.get('scope') == scope and c.get('day') == TODAY.isoformat() and isinstance(yh, dict) and isinstance(th, dict) and isinstance(at, (int, float)) and math.isfinite(at) and 0 <= NOW.timestamp() - at < 300:
         return c
     counts = {}
     for day in (TODAY, YDAY):
@@ -385,11 +386,13 @@ asks, asks_known, ask_ids = [], True, set()
 try:
     for n, line in enumerate(open(os.path.join(HOME, 'data/captain-asks.tsv'), encoding='utf-8', errors='replace'), 1):
         fields = line.rstrip('\r\n').split('\t')
-        valid = len(fields) == 4 and fields[0].strip() and fields[2].strip() and re.fullmatch(r'[0-9]+', fields[1]) and fields[0] not in ask_ids
+        valid = len(fields) == 4 and fields[0].strip() and fields[2].strip() and re.fullmatch(r'[0-9]{1,10}', fields[1]) and fields[0] not in ask_ids
         if valid: ask_ids.add(fields[0])
-        try: age = max(0, int(NOW.timestamp()) - int(fields[1])) if valid else None
-        except (ValueError, OverflowError): age = None
-        if valid and int(fields[1]) > int(NOW.timestamp()): age = None
+        try: epoch = int(fields[1]) if valid else None
+        except (ValueError, OverflowError): epoch = None
+        if epoch is None: age = None
+        elif epoch > int(NOW.timestamp()): age = None
+        else: age = max(0, int(NOW.timestamp()) - epoch)
         asks.append((fields, age))
         if age is None: notes.append(('data/captain-asks.tsv', f'malformed row {n}'))
 except FileNotFoundError: pass

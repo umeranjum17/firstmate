@@ -198,6 +198,12 @@ EOF
     case "$text" in *"$want"*) ;; *) fail "page text lacks '$want': $text" ;; esac
   done
   grep -q 'merged:<' "$home/gh.calls" || fail "day query has no upper boundary"
+  rm -f "$home/gh.fail"
+  python3 -c 'import json,sys; json.dump({"scope":json.load(open(sys.argv[1]))["scope"],"day":json.load(open(sys.argv[1]))["day"],"at":"yesterday","yesterday":[1,2]},open(sys.argv[1],"w"))' \
+    "$home/state/dashboard/.merged-today.json"
+  PATH="$home/bin:$PATH" FM_HOME="$home" "$DASH" build >/dev/null || fail "corrupt cache build failed"
+  [ "$(wc -l < "$home/gh.calls")" -gt 4 ] || fail "a corrupt cache was trusted instead of searched again"
+  case "$(page_text "$page")" in *"Merged today 3 yesterday 3 · GitHub as of"*) ;; *) fail "corrupt cache was not recomputed" ;; esac
   pass "both merge days use bounded GitHub counts, cached and explicitly dated, or the same ledger fallback"
 }
 
@@ -333,6 +339,10 @@ test_main_asks_and_lane_verbs_are_authoritative() {
   FM_HOME="$home" "$DASH" build >/dev/null || fail "malformed ask build failed"
   text=$(page_text "$page")
   case "$text" in *'Waiting on you 3 recorded by Main'*'Ask record needs correction'*'malformed row 3'*) ;; *) fail "malformed row guessed or dropped: $text" ;; esac
+  python3 -c 'print("huge\t" + "9"*5000 + "\tOverlong epoch\t")' >> "$home/data/captain-asks.tsv"
+  FM_HOME="$home" "$DASH" build >/dev/null || fail "overlong epoch build failed"
+  text=$(page_text "$page")
+  case "$text" in *'Waiting on you 4 recorded by Main'*'Ask record needs correction'*'malformed row 4'*) ;; *) fail "overlong epoch crashed or was dropped: $text" ;; esac
   # UTC yesterday 21:00 is today 01:00 in the captain's +04 local day.
   yesterday=$(TZ=Etc/GMT-4 python3 -c 'from datetime import datetime,timedelta; print((datetime.now().date()-timedelta(days=1)).isoformat())')
   printf 'home\tmerged\tfirst_pass\nalpha\t%sT21:00:00Z\t1\n' "$yesterday" > "$home/data/metrics/prs.tsv"
