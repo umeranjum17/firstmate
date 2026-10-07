@@ -1,0 +1,12 @@
+=== focused live evidence: corrupt cache + overlong epoch ===
+--- dashboard test file (existing integration journey, real executable) ---
+ok - the page answers the questions with the fixture's numbers
+ok - Main asks, lane verbs, alert counts and +04 local merge days are exact from their records
+ok - totals leave out parked homes and self-merged PRs, and count finished lanes now
+ok - missing or malformed sources hide only their own part and never fail the build
+ok - Who does the work groups lanes by harness and model, joins merges by PR URL, and leaves out parked homes
+ok - both merge days use bounded GitHub counts, cached and explicitly dated, or the same ledger fallback
+ok - serve returns the page with 200 at once, rebuilds an old one by itself, and 404s every other path
+--- git: fix commit under test ---
+fce26eb6 no-mistakes(review): Fixed cache validation and epoch parsing crashes
+d120d2b2 fix dashboard ask authority and count provenance
