@@ -496,7 +496,10 @@ for h, d in sorted(home_dir.items()):
     out, err = probe(['bash', os.path.join(BIN, 'fm-tasks-axi.sh'), 'list', '--limit', '10000',
                       '--fields', 'held,hold_kind,hold_reason,blocked,created,closed'],
                      timeout=20, env=dict(os.environ, FM_HOME=d))
-    rows = toon_rows(out) if out is not None else None
+    try:
+        rows = toon_rows(out) if out is not None else None
+    except ValueError as e:
+        backlog[h] = None; notes.append(('backlog', f'{h}: unparseable task row ({e})')); continue
     if rows is None:
         backlog[h] = None; notes.append(('backlog', f'{h}: {err or "no task table in its output"}')); continue
     for r in rows:
