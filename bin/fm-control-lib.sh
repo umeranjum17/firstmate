@@ -429,7 +429,8 @@ fm_control_harness_turnend_auth_path() {  # <harness> <token>
 
 # Claude's startup gates (2.1.292): the folder-trust and external-import
 # dialogs a session resumed outside its recorded copy can render before any
-# composer exists. Escape declines either one and never approves anything.
+# composer exists. No key may answer either one (Escape at the imports gate
+# records a permanent decline); fm-control closes the endpoint instead.
 # Input is a plain full viewport. Output: gate|none.
 fm_control_startup_gate() {  # <harness> <viewport>
   [ "${1-}" = claude ] || { printf 'none'; return 0; }

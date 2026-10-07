@@ -37,6 +37,7 @@ A still-visible external-imports dialog after spawn means that gate failed and t
 `fm-control.sh <id> interrupt` delivers Escape, which is the safe way to clear a wedged workspace-trust dialog for inspection without answering it.
 Escape on the external-imports dialog is different: it records a permanent decline (`hasClaudeMdExternalIncludesApproved: false`, `hasClaudeMdExternalIncludesWarningShown: true`) that `../../../bin/fm-claude-trust.sh` then correctly refuses to override on every later spawn for that project.
 Outside a spawn, leave a pane showing the external-imports dialog for a person to answer interactively instead of interrupting it.
+A session resumed at either dialog, before it loaded anything, has its endpoint closed unanswered by `../../../bin/fm-control.sh` exit or relaunch, whose header owns that path.
 To recover from an already-recorded decline, remove both flags from the project's entry in `~/.claude.json` and approve the imports dialog once by hand.
 
 The once-per-machine bypass-permissions confirmation is a third, separate dialog, scoped to the machine rather than the path, and pre-registration does not address it.

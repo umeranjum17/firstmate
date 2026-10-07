@@ -89,7 +89,6 @@ case "${1:-}" in
     else
       printf '%s\n' "$payload" >> "$D/keys"
       case "$payload" in
-        Escape) rm -f "$D/screen" ;;
         'export GOTMPDIR='*)
           if [ -n "${FM_FAKE_TRACE_PREPARE:-}" ]; then
             : > "$FM_FAKE_TRACE_PREPARE"
@@ -143,6 +142,12 @@ case "${1:-}" in
       exit 1
     fi
     [ -f "$D/windows" ] && cat "$D/windows"; exit 0 ;;
+  kill-window)
+    printf 'kill-window\n' >> "$D/keys"
+    rm -f "$D/screen"
+    grep -vx "fm-${FM_FAKE_KILL_ID:-}" "$D/windows" > "$D/windows.next" || true
+    mv "$D/windows.next" "$D/windows"
+    exit 0 ;;
   new-session)
     # Nothing in the relaunch path may ever create a session; recording the
     # call is how a refusal test proves that.
@@ -637,7 +642,7 @@ test_relaunch_appends_the_progress_note_to_the_instructions() {
   pass "fm-control relaunch: progress and the Firstmate-worktree worker identity reach the replacement"
 }
 
-test_relaunch_declines_a_claude_startup_gate_before_exit() {
+test_relaunch_closes_a_claude_startup_gate_unanswered() {
   local dir out rc
   dir=$(new_case startupgate rl52)
   add_ship_task "$dir" rl52 claude
@@ -651,13 +656,18 @@ test_relaunch_declines_a_claude_startup_gate_before_exit() {
     Yes, allow external imports
   Enter to confirm · Esc to cancel
 EOF
-  out=$(run_control "$dir" rl52 relaunch --note "resumed outside its copy"); rc=$?
-  expect_code 0 "$rc" "a resumed agent at a startup gate should relaunch"$'\n'"$out"
-  [ "$(head -n 1 "$dir/fake/keys")" = Escape ] || fail "the startup gate must be declined with Escape before anything else"
-  ! grep -qx Enter "$dir/fake/keys" || [ "$(grep -n -m1 -x Escape "$dir/fake/keys" | cut -d: -f1)" -lt "$(grep -n -m1 -x Enter "$dir/fake/keys" | cut -d: -f1)" ] \
-    || fail "Enter must never reach the startup gate"
-  assert_grep "/exit" "$dir/fake/literal" "the exit command should follow the declined gate"
-  pass "fm-control relaunch: declines a Claude startup gate with Escape, then exits and relaunches"
+  out=$(FM_FAKE_KILL_ID=rl52 run_control "$dir" rl52 relaunch --note "resumed outside its copy"); rc=$?
+  # tmux cannot prove a closed window absent, so the relaunch stops there;
+  # Herdr proves it and re-creates the endpoint (live e2e in
+  # tests/fm-sentinel-herdr-restart-live-e2e.test.sh).
+  expect_code 1 "$rc" "tmux cannot prove the closed endpoint absent"$'\n'"$out"
+  assert_contains "$out" "tmux absence cannot be proven" "the refusal should name the unprovable absence"
+  [ "$(head -n 1 "$dir/fake/keys")" = kill-window ] || fail "the startup gate's endpoint must be closed before anything else"$'\n'"$(cat "$dir/fake/keys")"
+  ! grep -qxE 'Escape|Enter|C-c' "$dir/fake/keys" || fail "no key may answer a startup gate"
+  [ -z "$(cat "$dir/fake/literal")" ] || fail "nothing may be typed into a startup gate"
+  [ ! -e "$dir/fake/created-windows" ] || fail "an unproven endpoint must not be re-created"
+  [ -d "$dir/wt" ] || fail "the task's copy must be kept"
+  pass "fm-control relaunch: closes a Claude startup gate's endpoint unanswered and keeps the work"
 }
 
 test_relaunch_refuses_a_copy_another_task_records() {
@@ -2519,7 +2529,7 @@ test_disabled_relaunch_clears_prior_trace_context
 test_relaunch_appends_the_progress_note_to_the_instructions
 test_relaunch_requires_a_note_for_a_ship_task
 test_relaunch_refuses_a_copy_another_task_records
-test_relaunch_declines_a_claude_startup_gate_before_exit
+test_relaunch_closes_a_claude_startup_gate_unanswered
 test_harness_switch_moves_the_record_and_clears_prior_wiring
 test_harness_switch_does_not_carry_the_old_profile_axes
 test_harness_switch_resolves_a_prefixed_recorded_harness

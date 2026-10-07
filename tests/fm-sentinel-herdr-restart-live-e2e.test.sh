@@ -99,6 +99,10 @@ cleanup() {
       for pane in $(jq -r '.result.panes[]?.pane_id' "$EVID/fail-panes.json" 2>/dev/null); do
         capture "fail-${pane//:/-}" "$pane"
       done
+      if [ -n "${WORKER_WT:-}" ]; then
+        { fm "$LEAD" bash -x "$LEAD/bin/fm-claude-trust.sh" "$WORKER_WT" "$NOTES"; echo "rc=$?"; } \
+          > "$EVID/fail-worker-trust.txt" 2>&1 || true
+      fi
     fi
   fi
   if [ "$LAB_READY" -eq 1 ]; then
