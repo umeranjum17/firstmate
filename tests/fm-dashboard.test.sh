@@ -355,6 +355,53 @@ EOF
 SERVE_PID=
 trap '[ -z "$SERVE_PID" ] || kill "$SERVE_PID" 2>/dev/null; fm_test_cleanup' EXIT
 
+test_pull_requests_show_validation_runs_and_checks_from_local_records() {
+  local home d now
+  home=$(make_home prs)
+  d="$home/state/dashboard" now=$(date +%s)
+  mkdir -p "$home/wt/ci" "$home/wt/done" "$home/wt/green" "$home/data/m-done" "$home/data/m-green"
+  fm_write_meta "$home/state/m-ci.meta" "kind=ship" "worktree=$home/wt/ci" "herdr_pane_id=pane-m-ci"
+  fm_write_meta "$home/state/m-done.meta" "kind=ship" "worktree=$home/wt/done" "herdr_pane_id=pane-m-done"
+  lane "$home" m-green ship "done [at=$((now - 600))]: PR https://github.com/acme/alpha/pull/10 ready"
+  fm_write_meta "$home/state/m-green.meta" "kind=ship" "worktree=$home/wt/green" "herdr_pane_id=pane-m-green"
+  # no-mistakes answers per copy: m-ci waits on CI, the others have no run on their branch.
+  cat > "$home/stubs/no-mistakes" <<'EOF'
+#!/bin/sh
+[ "$*" = "axi status" ] || { echo "unexpected: $*" >&2; exit 2; }
+[ -e "$FM_NM_FAIL" ] && { echo "error: daemon not reachable" >&2; exit 1; }
+case "$PWD" in
+*/ci) printf 'run:\n  id: "r1"\n  status: running\n  pr: "https://github.com/acme/alpha/pull/9"\n  active_steps[1]{step,status,active_for,round_active_for,last_activity,agent_pid,round}:\n    ci,running,2h18m,2h18m,"quiet","",starting\nbranch_sync:\n  pipeline:\n    status: running\n' ;;
+*) printf 'current_branch: x\nruns_on_current_branch: 0\n' ;;
+esac
+EOF
+  chmod +x "$home/stubs/no-mistakes"
+  printf '{"records":[{"url":"https://github.com/acme/alpha/pull/8","checked_at":"%s","observation":{"checks":[{"name":"lint","status":"completed","conclusion":"success"},{"name":"test","status":"completed","conclusion":"failure"}]}}]}\n' \
+    "$(iso 1)" > "$home/data/m-done/contributions.json"
+  printf '{"records":[{"url":"https://github.com/acme/alpha/pull/10","checked_at":"%s","observation":{"checks":[{"name":"test","status":"completed","conclusion":"success"}]}}]}\n' \
+    "$(iso 0)" > "$home/data/m-green/contributions.json"
+  build "$home" FM_NM_FAIL="$home/nm.fail"
+  has "$d/backlog.html" "3 pull requests or validations; 1 failing." \
+    "Checks or validation failing 1" "m-done Main · checks failing" \
+    "Validating or waiting on CI 1" "m-ci Main · waiting on CI for 2 h 18 min" \
+    "Green, waiting to land 1" "m-green Main · checks green" \
+    "Pull requests and validations open 1 + 1 + 1 = 3" "Longest CI wait now: 2 h 18 min (m-ci, Main), from no-mistakes."
+  grep -q 'href="https://github.com/acme/alpha/pull/9"' "$d/backlog.html" || fail "validation run's PR not linked"
+  has "$d/backlog.home.html" "Pull requests and validations open 3"
+  has "$d/index.html" "1 pull request with failing checks or validation" "1 pull request waiting on CI over 1 h · longest 2 h 18 min"
+  # A validation status that cannot be read says unknown and why, and the checks still come from the records;
+  # a finished lane whose checks are still running is not green yet.
+  touch "$home/nm.fail"
+  printf '{"records":[{"url":"https://github.com/acme/alpha/pull/10","checked_at":"%s","observation":{"checks":[{"name":"test","status":"in_progress","conclusion":null}]}}]}\n' \
+    "$(iso 0)" > "$home/data/m-green/contributions.json"
+  build "$home" FM_NM_FAIL="$home/nm.fail"
+  has "$d/backlog.html" "Validation run unknown: 3 of 3 lanes: error: daemon not reachable" "No pull request is waiting on CI now." "m-done Main · checks failing" \
+    "m-green Main · checks running" "Pull requests and validations open 1 + 2 = 3"
+  lacks "$d/backlog.html" "Green, waiting to land"
+  has "$d/measure.html" "no-mistakes axi status 3 of 3 lanes: error: daemon not reachable" "a CI wait over 1 h is a slow spot"
+  lacks "$d/index.html" "waiting on CI over"
+  pass "pull requests group by checks and validation, with CI wait from no-mistakes, and an unreadable run shows unknown"
+}
+
 test_serve_answers_each_page_and_remembers_the_grouping() {
   local home url got
   home=$(make_home served)
@@ -408,4 +455,5 @@ test_each_failed_source_shows_unknown_and_why
 test_github_searches_each_day_once_and_today_again_after_five_minutes
 test_the_filing_log_counts_new_items_exactly
 test_devices_and_machine_come_from_read_only_probes
+test_pull_requests_show_validation_runs_and_checks_from_local_records
 test_serve_answers_each_page_and_remembers_the_grouping

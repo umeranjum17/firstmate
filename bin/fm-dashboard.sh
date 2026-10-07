@@ -7,7 +7,8 @@
 #            devices and machine, and one row per home
 #   flow     work filed vs landed: today vs yesterday, by hour, by home, 7 days, latest feeds
 #   quota    every readable provider account: runout time, windows against even pace, who it carries
-#   backlog  queued, ready and held work per home, held-for-captain items, every lane, agents
+#   backlog  queued, ready and held work per home, held-for-captain items, every lane,
+#            pull requests with checks and validation runs, agents
 #   measure  how each number is measured: cycles, windows, targets, records that disagree, unknowns
 # Every number names its window and the time its source was read. Every list is
 # grouped, by default by what to act on first; index and backlog also build a
@@ -42,6 +43,10 @@
 #   quota-axi --json --no-credential-refresh --max-age 5m   quota, cached 2 minutes in
 #                                   state/dashboard/.quota.json; a failed read reuses a reading
 #                                   under an hour old, named with its time
+#   no-mistakes axi status          per lane with a PR or validation, run in its worktree=: run
+#                                   status, PR and active step with its age (CI wait)
+#   <home>/data/<task>/contributions.json   the lane's PR record: check conclusions, so checks
+#                                   come from local records, never a new GitHub call
 #   data/fleet-pulse.tsv            oldest finished-work wait and pulse cadence
 #   data/metrics/{prs,daily,lanes}.tsv, config/metrics-targets.tsv   quality targets for today
 #                                   and yesterday; who does the work (model per lane)
@@ -182,7 +187,7 @@ try: srv.serve_forever()
 except KeyboardInterrupt: pass
 PY
     ;;
-  -h|--help) sed -n '2,76p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+  -h|--help) sed -n '2,81p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
   *) usage ;;
 esac
 
@@ -265,9 +270,9 @@ def tsv(rel, need, extra=()):
     if len(good) < len(rows): notes.append((rel, f'{len(rows) - len(good)} short row(s) skipped'))
     return good
 
-def probe(cmd, ok=(0,), timeout=5, env=None):
+def probe(cmd, ok=(0,), timeout=5, env=None, cwd=None):
     """(stdout, None) from a read-only command, or (None, reason)."""
-    try: r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env)
+    try: r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env, cwd=cwd)
     except FileNotFoundError: return None, f'{cmd[0]} not found'
     except subprocess.TimeoutExpired: return None, f'{os.path.basename(cmd[0])} gave no answer in {timeout} s'
     except OSError as e: return None, f'{cmd[0]}: {e.strerror}'
@@ -398,6 +403,51 @@ def split(ls): return {s: sum(l['state'] == s for l in ls) for s in STATES}
 SPLIT = split(live)
 OPEN = len(live)
 by_home = {h: [l for l in live if l['home'] == h] for h in ACTIVE}
+
+# --- pull requests and validation runs: local records, read-only ---------
+def secs(s):  # a no-mistakes duration such as 2h18m or 45s
+    parts = re.findall(r'(\d+)([hms])', s or '')
+    return sum(int(n) * {'h': 3600, 'm': 60, 's': 1}[u] for n, u in parts) if parts else None
+def nm_run(l):
+    """The lane's validation run from `no-mistakes axi status` in its own copy: {status, pr, step, for} or {err}."""
+    wt = l['meta'].get('worktree')
+    if not wt or not os.path.isdir(wt): return None
+    out, err = probe(['no-mistakes', 'axi', 'status'], timeout=10, cwd=wt)
+    if out is None: return {'err': err}
+    st = re.search(r'^  status: (\S+)', out, re.M)
+    pr = re.search(r'^  pr: "?(https://[^"\s]+)', out, re.M)
+    act = re.search(r'^  active_steps\[\d+\]\{[^}]*\}:\n    ([\w-]+),[\w-]+,(\w+)', out, re.M)
+    return {'status': st and st.group(1), 'pr': pr and pr.group(1), 'step': act and act.group(1), 'for': act and secs(act.group(2))}
+def checks_of(l, url):
+    """('failing'|'running'|'green', checked_at) from the lane's local PR record, or (None, None)."""
+    c = load_json(os.path.join(home_dir[l['home']], 'data', l['task'], 'contributions.json'))
+    for r in c.get('records') or [] if isinstance(c.get('records'), list) else []:
+        if not isinstance(r, dict) or r.get('url') != url: continue
+        o = r.get('observation') or {}
+        cs = [x for x in o.get('checks') or [] if isinstance(x, dict)]
+        if any(x.get('conclusion') in ('failure', 'cancelled', 'timed_out', 'action_required') for x in cs): v = 'failing'
+        elif any(x.get('status') != 'completed' for x in cs): v = 'running'
+        elif cs: v = 'green'
+        else: v = None
+        return v, r.get('checked_at')
+    return None, None
+PR_LANES = [l for l in live if l['pr'] or l['state'] in ('validating', 'finished')]
+from concurrent.futures import ThreadPoolExecutor
+with ThreadPoolExecutor(8) as ex: RUNS = list(ex.map(nm_run, PR_LANES))  # ponytail: one status call per lane, 8 at a time
+nm_err = [r['err'] for r in RUNS if r and r.get('err')]
+if nm_err: notes.append(('no-mistakes axi status', f'{len(nm_err)} of {len(PR_LANES)} lanes: {nm_err[0]}'))
+PRS = []  # dict(lane, url, group, step, wait, checks, checked)
+for l, run in zip(PR_LANES, RUNS):
+    run = run if run and not run.get('err') else {}
+    url = run.get('pr') or l['pr']
+    ck, at = checks_of(l, url) if url else (None, None)
+    if ck == 'failing' or run.get('status') == 'failed': g = 'failing'
+    elif run.get('status') == 'running' or ck == 'running' or l['state'] == 'validating': g = 'validating'
+    elif ck == 'green': g = 'green'
+    else: g = 'none'
+    PRS.append(dict(lane=l, url=url, group=g, step=run.get('step'), wait=run.get('for'), checks=ck, checked=at))
+ci_waits = [p for p in PRS if p['step'] == 'ci' and p['wait'] is not None]
+CI_SLOW = 3600  # a CI wait over this is a slow spot
 
 # --- backlog per home: tasks-axi ----------------------------------------
 def toon_fields(s):
@@ -937,6 +987,16 @@ fin = [l for l in live if l['state'] == 'finished']
 if fin:
     spots.append(('warn', f'{plural(len(fin), "lane")} finished, not landed · oldest {dur(NOW_TS - min(l["since"] for l in fin))}',
                   hname(fin[0]['home']) if len({l['home'] for l in fin}) == 1 else f'{len({l["home"] for l in fin})} homes', esc(where(fin)), 'backlog#lanes'))
+failing = [p for p in PRS if p['group'] == 'failing']
+if failing:
+    spots.append(('bad', f'{plural(len(failing), "pull request")} with failing checks or validation · oldest {dur(NOW_TS - min(p["lane"]["since"] for p in failing))}',
+                  hname(failing[0]['lane']['home']) if len({p['lane']['home'] for p in failing}) == 1 else f'{len({p["lane"]["home"] for p in failing})} homes',
+                  esc(where([p['lane'] for p in failing])), 'backlog#prs'))
+long_ci = [p for p in ci_waits if p['wait'] >= CI_SLOW]
+if long_ci:
+    spots.append(('warn', f'{plural(len(long_ci), "pull request")} waiting on CI over {dur(CI_SLOW)} · longest {dur(max(p["wait"] for p in long_ci))}',
+                  hname(long_ci[0]['lane']['home']) if len({p['lane']['home'] for p in long_ci}) == 1 else f'{len({p["lane"]["home"] for p in long_ci})} homes',
+                  esc(where([p['lane'] for p in long_ci])), 'backlog#prs'))
 if held_cap:
     c = {}
     for h, _ in held_cap: c[h] = c.get(h, 0) + 1
@@ -1338,6 +1398,29 @@ def who_section():
             f'<tbody>{rows}</tbody></table></section>')
 
 # --- backlog -------------------------------------------------------------
+PR_GROUPS = (('failing', 'Checks or validation failing', 'wb'), ('validating', 'Validating or waiting on CI', ''),
+             ('green', 'Green, waiting to land', 'l2'), ('none', 'No check record yet', 'ol'))
+def pr_row(p):
+    l = p['lane']
+    st = STATES[l['state']]
+    what = ((f'waiting on CI for {dur(p["wait"])}' if p['step'] == 'ci' else f'{p["step"]} step for {dur(p["wait"])}') if p['step'] and p['wait'] is not None else
+            {'failing': 'checks failing', 'green': 'checks green', 'running': 'checks running'}.get(p['checks'] or '', st[0].lower() + st[1:]))
+    seen = f' · checks read {when(parse_ts(p["checked"]).timestamp())}' if p['checked'] and parse_ts(p['checked']) else ''
+    return grow(link(l['task'], p['url']) if p['url'] else esc(l['task']), esc(f'{hname(l["home"])} · {what} · status {dur(NOW_TS - l["since"])} old') + esc(seen))
+def pr_section(group):
+    if group == 'home':
+        hs = sorted({p['lane']['home'] for p in PRS}, key=lambda h: (h != 'main', h))
+        gs = [(hname(h), sum(p['lane']['home'] == h for p in PRS), ''.join(pr_row(p) for p in PRS if p['lane']['home'] == h), '', None, True) for h in hs]
+    else:
+        gs = [(n, sum(p['group'] == g for p in PRS), ''.join(pr_row(p) for p in PRS if p['group'] == g), '', sw, g != 'none')
+              for g, n, sw in PR_GROUPS if any(p['group'] == g for p in PRS)]
+    body = glist(gs, 'Pull requests and validations open') if PRS else '<p class="note">No lane has a pull request or a validation run.</p>'
+    if nm_err: body += f'<p class="note">Validation run {unknown(f"{len(nm_err)} of {len(PR_LANES)} lanes: {nm_err[0]}")}</p>'
+    ci = max(ci_waits, key=lambda p: p['wait']) if ci_waits else None
+    body += (f'<p class="note">Longest CI wait now: {dur(ci["wait"])} ({esc(ci["lane"]["task"])}, {esc(hname(ci["lane"]["home"]))}), from no-mistakes. '
+             if ci else '<p class="note">No pull request is waiting on CI now. ') + 'Checks come from each lane\'s own pull request record, not a new GitHub call.</p>'
+    h2 = f'{plural(len(PRS), "pull request or validation", "pull requests or validations")}; {len(failing)} failing.'
+    return f'<section id="prs">\n{sh(f"Pull requests and validation · no-mistakes and lane records, now {BUILT}")}\n<h2>{h2}</h2>\n{body}\n</section>'
 def backlog_body(group):
     if QUEUE is None:
         eq = f'<p class="lede">{unknown("; ".join(r for s, r in notes if s == "backlog"))}</p>'
@@ -1420,6 +1503,7 @@ def backlog_body(group):
 {lanes_list(group, names=True)}
 <p class="note">Oldest validation or CI wait: {f"{dur(NOW_TS - oldest_val['since'])} ({esc(oldest_val['task'])}, {esc(hname(oldest_val['home']))})" if oldest_val else "none running"}.</p>
 </section>
+{pr_section(group)}
 <section id="targets">
 {sh("Lane plan · lane settings")}
 <h2>Lane settings plan {PLAN} lanes; {OPEN} are open.</h2>
@@ -1442,6 +1526,7 @@ def measure_body():
         ('Lanes, backlog, agents, devices, machine', 'read at every build', BUILT),
         ('Landings', f'GitHub search per local day; today again after {GH_TTL // 60} min, finished days kept',
          hm(gh_days[TODAY.isoformat()]['at']) if gh_days else 'unknown'),
+        ('Validation runs and pull request checks', f'no-mistakes status in each lane copy at every build; checks as each lane last recorded them; a CI wait over {dur(CI_SLOW)} is a slow spot', BUILT),
         ('Filing times', 'first seen by this page, at every build', f'exact since {when(log_since)}'),
         ('Quota', f'quota-axi, read again after {QUOTA_TTL // 60} min, reusing provider readings up to {QUOTA_REUSE[:-1]} min', hm(q_at) if q_at else 'unknown'),
         ('Fleet pulse', pulse_every, pulse_at(max(latest.values(), key=lambda r: r['time'])['time']) if latest else 'unknown'),
