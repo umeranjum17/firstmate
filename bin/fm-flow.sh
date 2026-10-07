@@ -511,7 +511,7 @@ if disk:
     if len(rows)==2 and len(rows[1].split())>=4 and rows[1].split()[3].isdigit(): out['free_disk_bytes']=int(rows[1].split()[3])*1024
 dev=run(['xcrun','simctl','list','devices','--json'])
 if dev:
-    try: out['simulators']=[dict(d,runtime=r) for r,ds in json.loads(dev)['devices'].items() for d in ds if d['state']!='Shutdown']
+    try: out['simulators']=[dict(name=d.get('name'),udid=d.get('udid'),state=d['state'],runtime=r) for r,ds in json.loads(dev)['devices'].items() for d in ds if d['state']!='Shutdown']
     except (ValueError,KeyError,TypeError) as e: out['errors'].append(str(e))
 ps=run(['ps','-axo','pid,comm'])
 if ps:
