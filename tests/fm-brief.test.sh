@@ -1413,6 +1413,8 @@ test_crewmate_scaffolds_forbid_pool_administration() {
     FM_HOME="$home" "$ROOT/bin/fm-brief.sh" "$id" alpha --mode "$mode" >/dev/null 2>&1 \
       || fail "fm-brief.sh --mode $mode exited non-zero"
     brief="$home/data/$id/brief.md"
+    assert_grep "Never use git stash: all worktrees of a repo share one stash; commit work in progress on your own branch instead." "$brief" \
+      "$mode ship brief did not forbid the shared stash and name the safe alternative"
     assert_grep "worktree pool" "$brief" \
       "$mode ship brief did not name the shared worktree pool"
     assert_grep "create, remove, return, prune, move, or reassign" "$brief" \
@@ -1434,6 +1436,8 @@ test_crewmate_scaffolds_forbid_pool_administration() {
   FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-pool-scout alpha --scout >/dev/null 2>&1 \
     || fail "fm-brief.sh --scout exited non-zero"
   brief="$home/data/brief-pool-scout/brief.md"
+  assert_grep "Never use git stash: all worktrees of a repo share one stash; commit work in progress on your own branch instead." "$brief" \
+    "scout brief did not forbid the shared stash and name the safe alternative"
   assert_grep "worktree pool" "$brief" "scout brief did not name the shared worktree pool"
   # shellcheck disable=SC2016 # Literal backticks and braces must remain unexpanded.
   assert_grep 'blocked [at=<epoch>]: {what you need}' "$brief" "scout brief gave the prohibition no exit"
