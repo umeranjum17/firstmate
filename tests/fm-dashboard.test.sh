@@ -241,9 +241,10 @@ test_each_failed_source_shows_unknown_and_why() {
   python3 -c 'import json,sys; p=sys.argv[1]; c=json.load(open(p)); c["at"]-=200; json.dump(c,open(p,"w"))' "$d/.quota.json"
   # GitHub's cache for today is past its 5 minutes, so the failed search falls back to the merge record.
   python3 -c 'import json,sys; p=sys.argv[1]; c=json.load(open(p)); [e.__setitem__("at", e["at"]-400) for e in c["days"].values()]; json.dump(c,open(p,"w"))' "$d/.merged.json"
-  printf 'home\tmerged\tfirst_pass\nmain\t%s\t1\n' "$(iso 0)" > "$home/data/metrics/prs.tsv"
+  printf 'home\tmerged\tfirst_pass\tbuild_hours\nmain\t%s\t1\t2\n' "$(iso 0)" > "$home/data/metrics/prs.tsv"
   build "$home"
   has "$d/index.html" "Agents busy unknown: herdr: server not running" "landings merge record as of" "Landed today 1"
+  has "$d/flow.html" "P50 2 h" "P85 2 h"
   has "$d/quota.html" "Claude runs out first"
   has "$d/measure.html" "herdr agent list herdr: server not running" "quota-axi quota-axi: no network; showing the reading from" \
     "GitHub landings HTTP 403: API rate limit exceeded"

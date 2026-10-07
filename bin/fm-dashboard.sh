@@ -39,8 +39,8 @@
 #   gh api search/issues            landings: one bounded search per local day of the last 7, over
 #                                   registered project clones (including Main); a finished day is
 #                                   kept, today is searched again after 5 minutes, all cached in
-#                                   state/dashboard/.merged.json; on failure data/metrics/prs.tsv,
-#                                   marked "merge record as of"
+#                                   state/dashboard/.merged.json; on failure data/metrics/prs.tsv
+#                                   (build_hours: first commit to merge), marked "merge record as of"
 #   herdr agent list                agents busy now (agent_status working), the state the muxr
 #                                   app reads; role by pane id against the records: lead, worker,
 #                                   Main (the folder holding this home's data), else other
@@ -924,20 +924,6 @@ def dot(tone=''): return f'<span class="dot {tone}"></span>'
 def unknown(why): return f'<span class="unkv">unknown: {esc(why)}</span>'
 def why_of(source): return next((r for s, r in notes if s == source or s.startswith(source)), 'not read')
 
-def spark(vals):  # 6 full days joined, today's partial value as a hollow point, unjoined
-    if any(v is None for v in vals): return '<span></span>'
-    mx = max(vals) or 1
-    xs = [2.5 + i * 9.83 for i in range(7)]
-    y = lambda v: 17.5 - v / mx * 15
-    pts = ' '.join(f'{xs[i]:.1f},{y(v):.1f}' for i, v in enumerate(vals[:6]))
-    return (f'<svg class="spark" viewBox="0 0 64 20" aria-hidden="true"><polyline points="{pts}" fill="none" stroke="currentColor" '
-            f'stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round"/><circle cx="{xs[6]:.1f}" cy="{y(vals[6]):.1f}" r="2.1" '
-            f'fill="var(--bg)" stroke="var(--text2)" stroke-width="1.3"/></svg>')
-def kv(k, v, d='', sp='<span></span>', href=None, sub=''):
-    k = f'<a href="{esc(href)}">{esc(k)}</a>' if href else esc(k)
-    wide = sp == '<span></span>'  # no chart: the label takes the chart's column too
-    return (f'<div class="kv"><span class="k{" wide" if wide else ""}">{k}{f"<span class=ks>{sub}</span>" if sub else ""}</span>{"" if wide else sp}'
-            f'<span class="v">{v}</span><span class="d">{d}</span></div>')
 def item(tone, t, h='', w='', tm=None, href=None):
     t = f'<a href="{esc(href)}">{t}</a>' if href else t
     return (f'<div class="item{" feed" if tm is not None else ""}">' + (f'<span class="tm">{esc(tm)}</span>' if tm is not None else dot(tone))
@@ -1113,22 +1099,6 @@ def io_bars(legend=True):  # today vs yesterday, filed (outlined) beside landed 
                 f'<span class="nums">{"" if fx else "≥"}{f} in · {"–" if l is None else l} out</span></div>')
     return (f'<div class="iol">{r("Today", f_today, l_today, f_exact)}{r("Yesterday", f_yday, l_yday, fy_exact)}</div>'
             + ('<div class="legend"><span><i class="sw o"></i>Filed</span><span><i class="sw f"></i>Landed</span></div>' if legend else ''))
-def week_chart():  # filed vs landed, last 7 days - graft from B
-    vals = [v for v in week_f + week_l if v is not None]
-    mx = max(vals + [1])
-    bars = ''
-    for i, (f, o) in enumerate(zip(week_f, week_l)):
-        x, op = i * 100 + 18, ' opacity=".55"' if i == 6 else ''
-        hi = f / mx * 130
-        bars += (f'<rect x="{x + .75}" y="{140 - hi + .75:.1f}" width="28.5" height="{max(hi - .75, 0):.1f}" fill="none" stroke="var(--text2)" '
-                 f'stroke-width="1.5" vector-effect="non-scaling-stroke"{op}><title>{WEEK[i]:%a}: filed {"" if exact(WEEK[i]) else "at least "}{f}</title></rect>')
-        if o is not None:
-            ho = o / mx * 130
-            bars += f'<rect x="{x + 34}" y="{140 - ho:.1f}" width="30" height="{ho:.1f}" fill="var(--bar)"{op}><title>{WEEK[i]:%a}: landed {o}</title></rect>'
-    cols = ''.join(f'<span><b>{"–" if o is None else o}</b><i>{d:%a}{" so far" if d == TODAY else ""}</i></span>' for d, o in zip(WEEK, week_l))
-    return (f'<div class="legend"><span><i class="sw o"></i>Filed{"" if all(exact(d) for d in WEEK) else ", at least"}</span><span><i class="sw f"></i>Landed</span></div>'
-            f'<div class="chart"><svg viewBox="0 0 700 140" preserveAspectRatio="none" role="img" aria-label="Filed and landed per day">{bars}</svg>'
-            f'<div class="cols" style="grid-template-columns:repeat(7,1fr)">{cols}</div></div>')
 def hour_chart():
     n = NOW.hour + 1
     lh = [0] * n
@@ -1321,6 +1291,7 @@ def delta(now_v, then_v, then_txt, floor=False):
     tone, sign = ('up', '▲') if d > 0 else ('down', '▼') if d < 0 else ('mut', '=')
     return f'<span class="dl {tone}">{sign}{abs(d) if d else ""}</span>{vs}'
 def psi_spark():  # 5-minute pressure samples of up to the last hour, with the gate's 40% line
+    if psi5 is None: return ''
     smp = [(s, v) for s, v in psi_log if NOW_TS - s <= 3600]
     if len(smp) < 2: return ''
     t0 = smp[0][0]
@@ -1497,7 +1468,7 @@ def flow_body():
 <div class="stack">
 <section>
 {sh("Today vs yesterday · since 00:00 and the full day before")}
-<h2>{"More landed than filed today." if (l_today or 0) > f_today else "More filed than landed today." if f_today > (l_today or 0) else "As much filed as landed today."}</h2>
+<h2>{"Landings unknown." if l_today is None else "More landed than filed today." if l_today > f_today else "More filed than landed today." if f_today > l_today else "As much filed as landed today."}</h2>
 {io_bars()}
 </section>
 <section>
@@ -1663,7 +1634,7 @@ def backlog_body(group):
               f'<p class="note">In flight: {sum(len(bl(h, state="in_flight")) for h in ACTIVE)} items, counted apart from the queue. Held for the captain: {len(held_cap)}.</p>')
         CL = (('ready', 'Ready to start'), ('held', 'Held'), ('waiting', 'Waiting on another item'))
         if group == 'home':
-            gs = [(hname(h), len(bl(h, 'queued') if False else [r for r in backlog[h] if r['class']]),
+            gs = [(hname(h), len([r for r in backlog[h] if r['class']]),
                    ''.join(grow(esc(n), '', len(bl(h, c))) for c, n in CL if bl(h, c)), '', None, False)
                   for h in sorted(ACTIVE, key=lambda h: (-len([r for r in backlog[h] if r['class']]), h)) if any(r['class'] for r in backlog[h])]
         else:
