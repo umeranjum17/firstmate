@@ -307,7 +307,7 @@ open(p,"w").write(f"# since {t} last {int(time.time())}\thome\tid\tfirst_seen\tt
 }
 
 test_devices_and_machine_come_from_read_only_probes() {
-  local home d proc locks bin key at
+  local home d proc locks bin key at nopath
   home=$(make_home probes)
   d="$home/state/dashboard"
   proc="$home/proc" locks="$home/locks" bin="$home/stubs"
@@ -366,6 +366,19 @@ EOF
     "Free memory unknown: $proc/meminfo: No such file or directory" "Heavy jobs unknown: Failed to connect to bus" \
     "unknown - device locks: $proc/locks: No such file or directory"
   lacks "$d/index.html" "0 devices connected" "Free memory 0"
+  # A server whose PATH lacks adb still finds it in the Android SDK, and says not found only when neither has it.
+  rm "$home/adb.fail"
+  mkdir -p "$home/sdk/platform-tools"
+  mv "$bin/adb" "$home/sdk/platform-tools/adb"
+  # PATH keeps every tool but adb: a directory holding adb is replaced by links to its other files.
+  mkdir -p "$home/noadb"
+  nopath=$bin$(printf '%s' "$PATH" | tr ':' '\n' | while IFS= read -r p; do
+    if [ -x "$p/adb" ]; then find "$p" -maxdepth 1 ! -name adb ! -type d -exec ln -s {} "$home/noadb/" \; 2>/dev/null; printf ':%s' "$home/noadb"
+    else printf ':%s' "$p"; fi; done)
+  build "$home" PATH="$nopath" ANDROID_HOME="$home/sdk" FM_DASHBOARD_PROC="$proc" FM_DEVICE_LOCK_DIR="$locks"
+  has "$d/index.html" "Phone Pixel 9"
+  build "$home" PATH="$nopath" HOME="$home" ANDROID_HOME= ANDROID_SDK_ROOT= FM_DASHBOARD_PROC="$proc" FM_DEVICE_LOCK_DIR="$locks"
+  has "$d/index.html" "unknown - adb: adb not found"
   pass "devices and machine come from read-only probes, name each holder's home, and say unknown with the reason"
 }
 
@@ -467,8 +480,32 @@ PY
   pass "serve answers the five pages at once, remembers ?group in a cookie, rebuilds an old page itself, and 404s every other path"
 }
 
+test_fleet_past_twenty_mates_keeps_every_lead_row() {
+  local home d i mdir
+  home=$(make_home many)
+  d="$home/state/dashboard"
+  # Mate homes must live outside the active home; empty ones read as
+  # "Records need tidy-up", one row each, when the snapshot reads them.
+  for i in $(seq -w 1 25); do
+    mdir="$TMP_ROOT/mate$i"
+    mkdir -p "$mdir/state" "$mdir/data"
+    printf -- '- mate%s - domain %s (home: %s; scope: work; projects: alpha; added 2026-07-11)\n' \
+      "$i" "$i" "$mdir" >> "$home/data/secondmates.md"
+  done
+  build "$home"
+  has "$d/index.html" "mate25"
+  python3 - "$d/index.html" <<'PY' || fail "the 25th mate lost its lead state"
+import html, re, sys
+text = re.sub(r'\s+', ' ', html.unescape(re.sub(r'<[^>]+>', ' ', open(sys.argv[1]).read())))
+for mate in ('mate01', 'mate25'):  # the lanes chart names each home first; its table row carries the lead state
+    assert any('Records need tidy-up' in text[m.start():m.start() + 200] for m in re.finditer(mate, text)), mate
+PY
+  pass "a fleet past twenty mates keeps every lead row"
+}
+
 test_overview_answers_the_four_questions_with_sums_that_add_up
 test_sub_pages_show_flow_quota_backlog_and_method
+test_fleet_past_twenty_mates_keeps_every_lead_row
 test_each_failed_source_shows_unknown_and_why
 test_github_searches_each_day_once_and_today_again_after_five_minutes
 test_the_filing_log_counts_new_items_exactly

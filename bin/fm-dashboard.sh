@@ -20,7 +20,10 @@
 #                                   text is an ask (a bad time or duplicate id shows as a record
 #                                   needing correction); blank rows and rows without an id or text
 #                                   are skipped, with a note; absent/empty means zero
-#   bin/fm-bearings-snapshot.sh --json   lead state and unhealthy endpoints
+#   FM_BEARINGS_SECONDMATES=500 FM_BEARINGS_UNHEALTHY=500 FM_SNAPSHOT_SECONDMATES=500
+#                                   bin/fm-bearings-snapshot.sh --json: lead state and unhealthy
+#                                   endpoints (the FM_SNAPSHOT_* bound raises the fleet snapshot's
+#                                   own registry cap from 20 to 500, which otherwise omits mates past 20 upstream)
 #   data/secondmates.md             registered homes: "- <name> - ... (home: <dir>; ...)"
 #   config/parked-homes             home ids the captain parked, one per line (# comments)
 #   <home>/state/*.meta + *.status  lanes: every ship/scout record, in one state by its last
@@ -55,7 +58,9 @@
 #   data/metrics/{prs,daily,lanes}.tsv, config/metrics-targets.tsv   quality targets for today
 #                                   and yesterday; who does the work (model per lane)
 # Machine and devices, each probe read-only with a 5 s timeout:
-#   adb devices -l                  connected phones and emulators (nothing else is asked of adb)
+#   adb devices -l                  connected phones and emulators (nothing else is asked of adb);
+#                                   adb from PATH, else platform-tools under $ANDROID_HOME,
+#                                   $ANDROID_SDK_ROOT, ~/Android/Sdk or ~/Library/Android/sdk
 #   pgrep -a '^qemu-system'         running emulators (-avd, -port; VmRSS from <proc>/<pid>/status)
 #   pgrep -cf 'appname=gradle[w]'   Gradle builds, counted as config/fm-mem-gate.sh counts them
 #   systemctl --user show fm-heavy.slice   MemoryCurrent, MemoryHigh, MemoryMax
@@ -192,7 +197,7 @@ try: srv.serve_forever()
 except KeyboardInterrupt: pass
 PY
     ;;
-  -h|--help) sed -n '2,83p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+  -h|--help) sed -n '2,91p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
   *) usage ;;
 esac
 
@@ -203,11 +208,11 @@ snap_err="$out_dir/.snapshot.$$.err"
 tmp="$out_dir/.build.$$"
 trap 'rm -rf "$snap" "$snap_err" "$tmp"' EXIT
 mkdir -p "$tmp" || { echo "fm-dashboard: cannot create $tmp" >&2; exit 1; }
-FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-bearings-snapshot.sh" --json > "$snap" 2> "$snap_err" \
+FM_HOME="$FM_HOME" FM_BEARINGS_SECONDMATES=500 FM_BEARINGS_UNHEALTHY=500 FM_SNAPSHOT_SECONDMATES=500 "$SCRIPT_DIR/fm-bearings-snapshot.sh" --json > "$snap" 2> "$snap_err" \
   || { rc=$?; : > "$snap"; printf 'fleet snapshot exited %s: %s\n' "$rc" "$(tail -n 1 "$snap_err")" >> "$snap_err"; }
 
 python3 - "$FM_HOME" "$snap" "$snap_err" "$tmp" "$SCRIPT_DIR" "$MAX_AGE" <<'PY' || { echo "fm-dashboard: page build failed" >&2; exit 1; }
-import html, json, math, os, re, subprocess, sys
+import html, json, math, os, re, shutil, subprocess, sys
 from datetime import date, datetime, timedelta, timezone
 
 HOME, SNAP, SNAP_ERR, OUT, BIN, MAX_AGE = sys.argv[1:7]
@@ -274,6 +279,10 @@ def tsv(rel, need, extra=()):
     good = [r for r in rows if all(r.get(c) for c in need)]
     if len(good) < len(rows): notes.append((rel, f'{len(rows) - len(good)} short row(s) skipped'))
     return good
+
+def adb_path():  # a server started outside a login shell often lacks the SDK on PATH
+    sdks = [os.environ.get('ANDROID_HOME'), os.environ.get('ANDROID_SDK_ROOT'), '~/Android/Sdk', '~/Library/Android/sdk']
+    return shutil.which('adb') or next((p for d in sdks if d and os.access(p := os.path.join(os.path.expanduser(d), 'platform-tools', 'adb'), os.X_OK)), 'adb')
 
 def probe(cmd, ok=(0,), timeout=5, env=None, cwd=None):
     """(stdout, None) from a read-only command, or (None, reason)."""
@@ -478,7 +487,12 @@ def toon_rows(text, name='tasks'):
             cols = m.group(2).split(',')
             body = lines[i + 1:i + 1 + int(m.group(1))]
             if len(body) < int(m.group(1)): return None
-            return [dict(zip(cols, toon_fields(r.strip()))) for r in body]
+            rows = []
+            for r in body:
+                f = toon_fields(r.strip())
+                if len(f) != len(cols): raise ValueError(f'row has {len(f)} fields, want {len(cols)}')
+                rows.append(dict(zip(cols, f)))
+            return rows
         if re.match(rf'^{name}: 0 ', l): return []
     return None
 def clean(t):
@@ -489,7 +503,10 @@ for h, d in sorted(home_dir.items()):
     out, err = probe(['bash', os.path.join(BIN, 'fm-tasks-axi.sh'), 'list', '--limit', '10000',
                       '--fields', 'held,hold_kind,hold_reason,blocked,created,closed'],
                      timeout=20, env=dict(os.environ, FM_HOME=d))
-    rows = toon_rows(out) if out is not None else None
+    try:
+        rows = toon_rows(out) if out is not None else None
+    except ValueError as e:
+        backlog[h] = None; notes.append(('backlog', f'{h}: unparseable task row ({e})')); continue
     if rows is None:
         backlog[h] = None; notes.append(('backlog', f'{h}: {err or "no task table in its output"}')); continue
     for r in rows:
@@ -713,16 +730,20 @@ QWIN = [YDAY, TODAY]
 def window_metrics(home=None):
     ps = [p for d in QWIN for p in merged_on.get(d, []) if home is None or p['home'] == home]
     n = len(ps)
-    def dw(col): return sum(dsum(col, d, home) or 0 for d in QWIN) if daily is not None else None
+    def dw(col):
+        if daily is None: return None
+        vals = [dsum(col, d, home) for d in QWIN]
+        return None if any(v is None for v in vals) else sum(vals)
     hrs = sorted(v for v in (num(p.get('hours_to_merge')) for p in ps) if v is not None)
     per = lambda v: round(v / n, 2) if n and v is not None else None
     steers, dec, blk = dw('steers'), dw('decisions'), dw('blocks')
+    esc = [num(p.get('escaped')) for p in ps] if prs is not None else None
     return {
         'first_pass': (100 * sum(p['first_pass'] == '1' for p in ps) // n if n else None) if prs is not None else None,
-        'escaped': sum((num(p.get('escaped')) or 0) > 0 for p in ps) if prs is not None else None,
+        'escaped': None if esc is None or any(v is None for v in esc) else sum(v > 0 for v in esc),
         'p90_hours': hrs[int(0.9 * (len(hrs) - 1))] if hrs else None,
         'corrections_per_merge': per(dw('s_correct')),
-        'interventions_per_merge': per(None if steers is None else steers + (dec or 0) + (blk or 0)),
+        'interventions_per_merge': per(None if None in (steers, dec, blk) else steers + dec + blk),
         'captain_per_merge': per(dw('captain_msgs')),
         'stall_alarms': dw('stall_alarms'),
     }, n
@@ -844,7 +865,7 @@ def ancestors(pid):
 
 def devices():
     """(rows, summary) for every adb device, every running emulator and every held device lock."""
-    out, adb_err = probe(['adb', 'devices', '-l'])
+    out, adb_err = probe([adb_path(), 'devices', '-l'])
     emus, emu_err = emulators()
     locks, lock_err = lock_holders()
     homes_by_path = worktree_homes()
@@ -951,8 +972,6 @@ PARKED_LINE = (f'<p class="note">{esc(" and ".join(PARKED))} {"is" if len(PARKED
                if PARKED else '')
 
 # --- lanes: the strip (graft from B) and the grouped list ----------------
-MOVING = SPLIT['building'] + SPLIT['validating']
-STOPPED = OPEN - MOVING
 FREE = max(0, PLAN - OPEN)
 def lane_strip(): return stack(lane_parts(SPLIT), max(PLAN, OPEN), 'sb big') + lane_legend(SPLIT, FREE)
 def lanes_list(group, names=False, strip=True):
@@ -1051,15 +1070,14 @@ machine_rows = ''.join([
 ])
 def devices_list(group):
     if group == 'home':
-        key = lambda r: r[4] or 'No holder'
-        order = sorted({key(r) for r in dev_rows}, key=lambda k: (k == 'No holder', k))
+        key = lambda r: 'Unknown' if r[3] == '' else r[4] or 'No holder'
+        order = sorted({key(r) for r in dev_rows}, key=lambda k: (k in ('No holder', 'Unknown'), k))
     else:
-        key = lambda r: 'Problem' if r[3] == 'bad' else 'In use' if r[4] else 'Free'
-        order = [k for k in ('Problem', 'In use', 'Free') if any(key(r) == k for r in dev_rows)]
+        key = lambda r: 'Problem' if r[3] == 'bad' else 'Unknown' if r[3] == '' else 'In use' if r[4] else 'Free'
+        order = [k for k in ('Problem', 'In use', 'Free', 'Unknown') if any(key(r) == k for r in dev_rows)]
     groups = [(k, sum(key(r) == k for r in dev_rows), ''.join(grow(esc(r[0]), esc(f'{r[2]} · {r[1]}')) for r in dev_rows if key(r) == k), '', None, True) for k in order]
     body = glist(groups, 'Devices') if dev_rows else ('<p class="note">No device connected and no emulator running.</p>' if dev_count is not None else '')
     return body + ''.join(f'<p class="note">unknown - {esc(p)}</p>' for p in dev_problems)
-in_use = sum(1 for r in dev_rows if r[4])
 
 # --- homes ---------------------------------------------------------------
 def home_row(h):
@@ -1077,9 +1095,6 @@ def home_row(h):
 homes_table = ('<div class="homes"><div class="home head" aria-hidden="true"><span class="n"></span><span class="s">.</span>'
                '<span class="f fa">Lanes open / plan</span><span class="f fb">Ready</span><span class="f fc">Landed today</span></div>'
                + ''.join(home_row(h) for h in ACTIVE) + '</div>' + PARKED_LINE)
-live_leads = [h for h in leads]
-homes_h2 = (f'{len(live_leads) - len(down)} of {plural(len(live_leads), "lead")} running; '
-            f'{plural(sum(1 for h in ACTIVE if split(by_home[h])["blocked"] + split(by_home[h])["decision"]), "home")} with blocked lanes.') if snap is not None else 'Lead state unknown: fleet snapshot unavailable.'
 
 # --- flow numbers --------------------------------------------------------
 def filed_txt(d, home=None):
@@ -1099,28 +1114,6 @@ def io_bars(legend=True):  # today vs yesterday, filed (outlined) beside landed 
                 f'<span class="nums">{"" if fx else "≥"}{f} in · {"–" if l is None else l} out</span></div>')
     return (f'<div class="iol">{r("Today", f_today, l_today, f_exact)}{r("Yesterday", f_yday, l_yday, fy_exact)}</div>'
             + ('<div class="legend"><span><i class="sw o"></i>Filed</span><span><i class="sw f"></i>Landed</span></div>' if legend else ''))
-def hour_chart():
-    n = NOW.hour + 1
-    lh = [0] * n
-    for t, *_ in landings or []:
-        if t.date() == TODAY: lh[t.hour] += 1
-    fh = [0] * n
-    for s, *_ in filed_today: fh[datetime.fromtimestamp(s).astimezone().hour] += 1
-    from_h = datetime.fromtimestamp(log_since).astimezone().hour if not f_exact else 0
-    mx = max(lh + fh + [1])
-    w = 900 / n
-    bars = ''
-    for i in range(n):
-        x = i * w
-        if i >= from_h and fh[i]:
-            hf = fh[i] / mx * 128
-            bars += f'<rect x="{x + w * .14:.1f}" y="{140 - hf:.1f}" width="{w * .34:.1f}" height="{hf:.1f}" fill="none" stroke="var(--text2)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>'
-        if lh[i]:
-            hl = lh[i] / mx * 128
-            bars += f'<rect x="{x + w * .52:.1f}" y="{140 - hl:.1f}" width="{w * .34:.1f}" height="{hl:.1f}" fill="var(--bar)"/>'
-    cols = ''.join(f'<span><i>{i:02d}</i></span>' if i % 3 == 0 else '<span></span>' for i in range(n))
-    return (f'<div class="chart"><svg viewBox="0 0 900 140" preserveAspectRatio="none" role="img" aria-label="Filed and landed per hour today">{bars}</svg>'
-            f'<div class="cols" style="grid-template-columns:repeat({n},1fr)">{cols}</div></div>', sum(lh), from_h)
 
 # --- charts: inline SVG drawn here, no script ---------------------------
 def nice_top(v):  # a round axis top at or above v
@@ -1446,8 +1439,8 @@ def index_body(group):
 
 # --- flow ----------------------------------------------------------------
 def flow_body():
-    if landings is None: chart, h_landed, from_h = '', 0, 0
-    else: chart, h_landed, from_h = hour_chart()
+    h_landed = sum(1 for t, *_ in landings if t.date() == TODAY) if landings is not None else 0
+    from_h = 0 if f_exact else datetime.fromtimestamp(log_since).astimezone().hour
     ph = sorted(ACTIVE, key=lambda h: (-(landed(TODAY, h) or 0), -filed(TODAY, h)[0], h))
     phrows = ''.join(f'<tr><td>{esc(hname(h))}</td><td>{filed_txt(TODAY, h)}</td><td>{"–" if landed(TODAY, h) is None else landed(TODAY, h)}</td></tr>' for h in ph)
     drows = ''.join(f'<tr><td>{d:%a %d %b}{" <span class=mut>so far</span>" if d == TODAY else ""}</td><td>{filed_txt(d)}</td><td>{"–" if o is None else o}</td></tr>'
@@ -1473,7 +1466,7 @@ def flow_body():
 </section>
 <section>
 {sh(f"Today by hour · landings {LANDED_SRC if landings is not None else 'unknown'}")}
-<h2>{h_landed} landed since 00:00{"" if f_exact else f"; filing times from {from_h:02d}:00"}.</h2>
+<h2>{"Landings unknown." if landings is None else f"{h_landed} landed since 00:00{'' if f_exact else f'; filing times from {from_h:02d}:00'}."}</h2>
 {inout_chart() if landings is not None else unknown(why_of("GitHub landings"))}
 </section>
 <section>

@@ -174,6 +174,7 @@ An explicit queue inside the extension is what keeps them serialized (see "Off-t
 
 Every accepted path that cannot reach a working branch rejects its settlement to the watcher.
 The watcher retains delivery ownership and routes the wake to main as a follow-up, which counts as delivered once Pi accepts it.
+A settlement still open past the watcher's bounded settlement wait is re-ringed to main the same way, so a wedged branch cannot park later wakes behind it (`.pi/extensions/fm-primary-pi-watch.ts` owns the bound).
 A broken branch declines later offers, so they take that path directly.
 
 After wake rows are claimed, a branch prompt counts as handled only when `fm_branch_report` appends a durable outcome before that prompt settles.

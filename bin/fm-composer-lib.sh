@@ -424,31 +424,46 @@ FM_DELIVERY_CURSOR_BUSY_REGEX_DEFAULT='ctrl\+c to stop'
 FM_DELIVERY_AGY_BUSY_REGEX_DEFAULT='esc[[:space:]]+to[[:space:]]+cancel'
 FM_DELIVERY_KIMI_BUSY_REGEX_DEFAULT='^[[:space:]]*(🌑|🌒|🌓|🌔|🌕|🌖|🌗|🌘)[[:space:]]+·[[:space:]]+'
 
+# The busy-chrome signature selected for [harness]: prints the regex
+# fm_busy_lines_match tests, or nothing when no signature is registered.
+# The table lives here once; both readers below consult it.
+fm_busy_signature_for_harness() {  # [harness]
+  local harness=${1:-}
+  if [ -n "${FM_BUSY_REGEX:-}" ]; then
+    printf '%s' "$FM_BUSY_REGEX"
+    return 0
+  fi
+  case "$harness" in
+    claude) printf '%s' "$FM_DELIVERY_CLAUDE_BUSY_REGEX_DEFAULT" ;;
+    devin) printf '%s' "$FM_DELIVERY_DEVIN_BUSY_REGEX_DEFAULT" ;;
+    codex) printf '%s' "$FM_DELIVERY_CODEX_BUSY_REGEX_DEFAULT" ;;
+    opencode) printf '%s' "$FM_DELIVERY_OPENCODE_BUSY_REGEX_DEFAULT" ;;
+    pi|pi-signed) printf '%s' "$FM_DELIVERY_PI_BUSY_REGEX_DEFAULT" ;;
+    omp) printf '%s' "$FM_DELIVERY_OMP_BUSY_REGEX_DEFAULT" ;;
+    grok) printf '%s' "$FM_DELIVERY_GROK_BUSY_REGEX_DEFAULT" ;;
+    agy) printf '%s' "$FM_DELIVERY_AGY_BUSY_REGEX_DEFAULT" ;;
+    kimi) printf '%s' "$FM_DELIVERY_KIMI_BUSY_REGEX_DEFAULT" ;;
+    cursor) printf '%s' "$FM_DELIVERY_CURSOR_BUSY_REGEX_DEFAULT" ;;
+    '') printf '%s' "$FM_DELIVERY_BUSY_REGEX_DEFAULT" ;;
+    *)
+      # A supplied harness must never borrow another harness's signature.
+      # Register its verified signature explicitly before classifying it busy.
+      return 1
+      ;;
+  esac
+}
+
+# 0 iff fm_busy_lines_match would test <harness> against a real signature
+# rather than an empty regex: without a registered signature, absence of a
+# match proves nothing about the pane, so callers must not read it as idle.
+fm_busy_harness_has_signature() {  # [harness]
+  [ -n "$(fm_busy_signature_for_harness "${1:-}")" ]
+}
+
 fm_busy_lines_match() {  # [harness]
   local harness=${1:-} lines regex
   IFS= read -r -d '' lines || true
-  if [ -n "${FM_BUSY_REGEX:-}" ]; then
-    regex=$FM_BUSY_REGEX
-  else
-    case "$harness" in
-      claude) regex=$FM_DELIVERY_CLAUDE_BUSY_REGEX_DEFAULT ;;
-      devin) regex=$FM_DELIVERY_DEVIN_BUSY_REGEX_DEFAULT ;;
-      codex) regex=$FM_DELIVERY_CODEX_BUSY_REGEX_DEFAULT ;;
-      opencode) regex=$FM_DELIVERY_OPENCODE_BUSY_REGEX_DEFAULT ;;
-      pi|pi-signed) regex=$FM_DELIVERY_PI_BUSY_REGEX_DEFAULT ;;
-      omp) regex=$FM_DELIVERY_OMP_BUSY_REGEX_DEFAULT ;;
-      grok) regex=$FM_DELIVERY_GROK_BUSY_REGEX_DEFAULT ;;
-      agy) regex=$FM_DELIVERY_AGY_BUSY_REGEX_DEFAULT ;;
-      kimi) regex=$FM_DELIVERY_KIMI_BUSY_REGEX_DEFAULT ;;
-      cursor) regex=$FM_DELIVERY_CURSOR_BUSY_REGEX_DEFAULT ;;
-      '') regex=$FM_DELIVERY_BUSY_REGEX_DEFAULT ;;
-      *)
-        # A supplied harness must never borrow another harness's signature.
-        # Register its verified signature explicitly before classifying it busy.
-        regex=
-        ;;
-    esac
-  fi
+  regex=$(fm_busy_signature_for_harness "$harness") || return 1
   [ -n "$regex" ] && printf '%s' "$lines" | grep -qiE "$regex"
 }
 
