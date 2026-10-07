@@ -19,7 +19,9 @@
 # Ledger status timestamps are capture times; live logs use their own [at=].
 # Bottlenecks attribute each open (lane, cause) separately at its maximum recorded wait age;
 # cross-cause ages on one lane overlap in time: reported sums are non-additive recorded waits,
-# never allocated causal or lane-hours-lost durations.
+# never allocated causal or lane-hours-lost durations. Full seconds stay null when any
+# same-cause wait is unstamped; known_seconds carries the max known age, cause totals carry
+# known_lane_hours alongside known_lower_bound_lane_hours, and ranking uses the lower bound.
 # Keyed waits close only on matching resolved/captain-held, not working/done.
 # Historical results cover retained records only, not a complete forge history.
 # Capacity and worker-liveness probes are not collected.
