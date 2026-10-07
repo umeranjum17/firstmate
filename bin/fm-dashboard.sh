@@ -35,7 +35,9 @@
 #                                   app reads; role by pane id against the records: lead, worker,
 #                                   Main (the folder holding this home's data), else other
 # Machine and devices, each probe read-only with a 5 s timeout:
-#   adb devices -l                  connected phones and emulators (nothing else is asked of adb)
+#   adb devices -l                  connected phones and emulators (nothing else is asked of adb);
+#                                   adb from PATH, else platform-tools under $ANDROID_HOME,
+#                                   $ANDROID_SDK_ROOT, ~/Android/Sdk or ~/Library/Android/sdk
 #   pgrep -a '^qemu-system'         running emulators (-avd, -port; VmRSS from <proc>/<pid>/status)
 #   pgrep -cf 'appname=gradle[w]'   Gradle builds, counted as config/fm-mem-gate.sh counts them
 #   systemctl --user show fm-heavy.slice   MemoryCurrent, MemoryHigh, MemoryMax
@@ -187,7 +189,7 @@ FM_HOME="$FM_HOME" FM_BEARINGS_SECONDMATES=500 FM_BEARINGS_UNHEALTHY=500 FM_SNAP
   || { rc=$?; : > "$snap"; printf 'fleet snapshot exited %s: %s\n' "$rc" "$(tail -n 1 "$snap_err")" >> "$snap_err"; }
 
 python3 - "$FM_HOME" "$snap" "$snap_err" "$tmp" "$SCRIPT_DIR" "$MAX_AGE" <<'PY' || { echo "fm-dashboard: page build failed" >&2; exit 1; }
-import html, json, os, re, subprocess, sys
+import html, json, os, re, shutil, subprocess, sys
 from datetime import date, datetime
 
 HOME, SNAP, SNAP_ERR, OUT, BIN, MAX_AGE = sys.argv[1:7]
@@ -210,6 +212,10 @@ def dur(s):
 def days_old(d): return 'today' if d == TODAY else f'{(TODAY - d).days}\u00a0d'
 def plural(n, word, many=None): return f'{n} {word if n == 1 else many or word + "s"}'
 def hname(h): return 'Main' if h == 'main' else h
+
+def adb_path():  # a server started outside a login shell often lacks the SDK on PATH
+    sdks = [os.environ.get('ANDROID_HOME'), os.environ.get('ANDROID_SDK_ROOT'), '~/Android/Sdk', '~/Library/Android/sdk']
+    return shutil.which('adb') or next((p for d in sdks if d and os.access(p := os.path.join(os.path.expanduser(d), 'platform-tools', 'adb'), os.X_OK)), 'adb')
 
 def probe(cmd, ok=(0,), timeout=5, env=None, cwd=None):
     """(stdout, None) from a read-only command, or (None, reason)."""
@@ -520,7 +526,7 @@ def ancestors(pid):
 
 def devices():
     """(rows, summary) for every adb device, every running emulator and every held device lock."""
-    out, adb_err = probe(['adb', 'devices', '-l'])
+    out, adb_err = probe([adb_path(), 'devices', '-l'])
     emus, emu_err = emulators()
     locks, lock_err = lock_holders()
     homes_by_path = worktree_homes()

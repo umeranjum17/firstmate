@@ -206,7 +206,7 @@ test_each_failed_source_shows_unknown_and_why() {
 }
 
 test_devices_and_machine_come_from_read_only_probes() {
-  local home d proc locks bin key at
+  local home d proc locks bin key at nopath
   home=$(make_home probes)
   d="$home/state/dashboard"
   proc="$home/proc" locks="$home/locks" bin="$home/stubs"
@@ -261,6 +261,19 @@ EOF
     "Free memory unknown: $proc/meminfo: No such file or directory" "Heavy jobs unknown: Failed to connect to bus" \
     "unknown - device locks: $proc/locks: No such file or directory"
   lacks "$d/index.html" "0 devices connected" "Free memory 0"
+  # A server whose PATH lacks adb still finds it in the Android SDK, and says not found only when neither has it.
+  rm "$home/adb.fail"
+  mkdir -p "$home/sdk/platform-tools"
+  mv "$bin/adb" "$home/sdk/platform-tools/adb"
+  # PATH keeps every tool but adb: a directory holding adb is replaced by links to its other files.
+  mkdir -p "$home/noadb"
+  nopath=$bin$(printf '%s' "$PATH" | tr ':' '\n' | while IFS= read -r p; do
+    if [ -x "$p/adb" ]; then find "$p" -maxdepth 1 ! -name adb ! -type d -exec ln -s {} "$home/noadb/" \; 2>/dev/null; printf ':%s' "$home/noadb"
+    else printf ':%s' "$p"; fi; done)
+  build "$home" PATH="$nopath" ANDROID_HOME="$home/sdk" FM_DASHBOARD_PROC="$proc" FM_DEVICE_LOCK_DIR="$locks"
+  has "$d/index.html" "Phone Pixel 9"
+  build "$home" PATH="$nopath" HOME="$home" ANDROID_HOME= ANDROID_SDK_ROOT= FM_DASHBOARD_PROC="$proc" FM_DEVICE_LOCK_DIR="$locks"
+  has "$d/index.html" "unknown - adb: adb not found"
   pass "devices and machine come from read-only probes, name each holder's home, and say unknown with the reason"
 }
 
