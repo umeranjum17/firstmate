@@ -779,8 +779,15 @@ The first non-empty, non-comment line is parsed as `<harness> [<model>] [<effort
 A bare `<harness>` preserves the previous behavior: harness only, with no model or effort launch flag.
 When the harness token is absent or `default`, secondmate launch falls back through `config/crew-harness` and then the primary's own harness, and no model or effort is read from that file.
 
-`fm-harness.sh secondmate-model` and `fm-harness.sh secondmate-effort` expose only the optional tokens from `config/secondmate-harness`; `config/crew-harness` remains a bare adapter-name file.
-Changing this pin affects the next secondmate spawn or control-plane relaunch; the relaunch profile rules are owned by [`docs/agent-control.md`](agent-control.md#transactional-relaunch).
+For an individual registered secondmate, the primary may keep a complete pin in `config/secondmates/<id>/harness`, beside the global file and never inside the secondmate's home.
+Its first non-empty, non-comment line must contain exactly `<harness> <model> <effort>`, with a verified secondmate harness, a concrete model, and a supported effort (`low`, `medium`, `high`, `xhigh`, `max`, or native `ultra`).
+An empty, unreadable, or malformed per-mate pin is an error naming that file, never permission to use the global default.
+For example, `config/secondmates/design/harness` containing `claude claude-opus-5-5 high` keeps that lead's profile independent of the global setting.
+
+`fm-harness.sh secondmate <id>`, `secondmate-model <id>`, and `secondmate-effort <id>` are the single resolver: per-mate pin, then the unchanged global file, then the existing static harness fallback.
+Without an id these commands retain their global behavior; `config/crew-harness` remains a bare adapter-name file.
+Launch, update restart, and automatic recovery use the mate's id, including remote routes whose profile is resolved on the parent before transmission.
+Changing a pin affects the next spawn or control-plane relaunch; the relaunch profile rules are owned by [`docs/agent-control.md`](agent-control.md#transactional-relaunch).
 
 ### Per-launch overrides and inherited defaults
 

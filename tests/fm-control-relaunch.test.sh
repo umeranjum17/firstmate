@@ -924,8 +924,9 @@ test_secondmate_relaunch_picks_up_the_configured_harness_pin() {
   local dir home out rc
   dir=$(new_case smpin sm3)
   home="$dir/home"
-  mkdir -p "$home/config"
-  printf 'codex some-model high\n' > "$home/config/secondmate-harness"
+  mkdir -p "$home/config/secondmates/sm3"
+  printf 'pi global-model medium\n' > "$home/config/secondmate-harness"
+  printf 'codex some-model high\n' > "$home/config/secondmates/sm3/harness"
   mkdir -p "$home/data/sm3"
   printf '# secondmate brief\n' > "$home/data/sm3/brief.md"
   fm_git_worktree "$dir/proj" "$dir/smhome" sm-branch
@@ -948,6 +949,12 @@ test_secondmate_relaunch_picks_up_the_configured_harness_pin() {
   printf '%s\n' "fm-sm3" > "$dir/fake/windows"
   printf '%s' "$dir/smhome" > "$dir/fake/cwd"
   printf 'codex' > "$dir/fake/becomes"
+  printf 'codex some-model impossible\n' > "$home/config/secondmates/sm3/harness"
+  out=$(run_control "$dir" sm3 relaunch); rc=$?
+  [ "$rc" -ne 0 ] || fail "a malformed per-mate pin must refuse relaunch"
+  assert_contains "$out" "$home/config/secondmates/sm3/harness" "malformed pin must name its file"
+  assert_not_contains "$(cat "$dir/fake/literal")" '/exit' "invalid pin must refuse before stopping the agent"
+  printf 'codex some-model high\n' > "$home/config/secondmates/sm3/harness"
   out=$(run_control "$dir" sm3 relaunch); rc=$?
   expect_code 0 "$rc" "a configured secondmate harness should relaunch"$'\n'"$out"
   [ "$(journal_field "$dir" sm3 to_harness)" = codex ] \
