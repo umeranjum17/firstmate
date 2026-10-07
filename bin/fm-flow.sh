@@ -56,20 +56,22 @@ def events(path):
                     'key': keys[0] if len(keys) == 1 else 'default', 'text': text.strip()})
     return out
 
-pending = [('main', ROOT)]
+pending = [('main', ROOT, None)]
 seen = set()
+registering = {}
 while pending:
-    name, home = pending.pop(0)
+    name, home, parent = pending.pop(0)
     if home in seen:
         continue
     seen.add(home)
     homes[name] = home
+    registering[name] = parent
     for line in read(home / 'data/secondmates.md', True) or []:
         m = re.match(r'^- ([\w.-]+) - .*\(home: ([^;]+);', line)
         if m:
             path = Path(m[2].strip())
             if path.is_absolute():
-                pending.append((m[1], path.resolve()))
+                pending.append((m[1], path.resolve(), home))
             else:
                 notes.append({'source': name, 'reason': 'remote home unavailable to local reader'})
 
@@ -92,7 +94,8 @@ for name, home in sorted(homes.items()):
         except (ValueError, TypeError) as err:
             notes.append({'source': str(home / 'state/fleet-ledger.jsonl'), 'line': n, 'reason': str(err)})
     # Parent return-channel merge records survive child cleanup; no endpoint reads.
-    for e in events(ROOT / 'state' / (name + '.status')) if name != 'main' else []:
+    reg = registering.get(name)
+    for e in events(reg / 'state' / (name + '.status')) if reg is not None else []:
         if e['state'] == 'done' and e['key'].startswith('merged-') and e['ts'] is not None:
             task = e['key'][7:]
             records.setdefault(task, []).append(dict(e, event='task.merged'))
@@ -131,9 +134,9 @@ for name, home in sorted(homes.items()):
             elif e.get('state') in ('resolved', 'captain-held'):
                 waits.pop(key, None)
         last = status[-1] if status else {}
-        state = last.get('state', 'unknown')
+        state = last.get('state') or 'unknown'
         if sum(e['event'] == 'task.dispatched' for e in es) > 1:
-            times = dict(times, dispatched=None, pr_ready=None, cleaned_up=None)
+            times = dict(times, dispatched=None, pr_ready=None, merged=None, cleaned_up=None)
             working = None
             notes.append({'source': name + '/' + task, 'reason': 'reused task id: lifecycle attribution unknown'})
         # Stage entry is the first event in the trailing run, not the preceding event.
