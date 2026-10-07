@@ -37,7 +37,12 @@
 #   selected branch does not match the project's registered prefix, the spawn
 #   prints a one-line deviation notice and continues, because the registered
 #   prefix is the captain's standing preference and the brief agreement above
-#   already guarantees the worker's instructions match the branch.
+#   already guarantees the worker's instructions match the branch. When
+#   config/spawn-gate exists and is executable, a fresh ship or scout spawn
+#   runs it as `config/spawn-gate <task-id>` with FM_HOME set before creating
+#   anything; a nonzero exit refuses the spawn and prints the gate's output.
+#   Secondmate spawns and relaunches never run it, and an absent file changes
+#   nothing.
 #   Ship/scout launches always put fm-dod-lib.sh's current worker role scope
 #   first in the private launch-brief overlay, including the exact task-owned
 #   steering inbox. This never rewrites a project's instruction files or a
@@ -1513,6 +1518,19 @@ if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" = ship ]; then
   if ! git check-ref-format --branch "$BRANCH" >/dev/null 2>&1; then
     echo "error: --branch-prefix and task id must form a valid git branch (got '$BRANCH')" >&2
     exit 1
+  fi
+fi
+# Optional pre-spawn gate (header above): a fresh ship or scout spawn runs
+# config/spawn-gate before creating anything, so a home can hard-block lanes
+# past its limit. Secondmate spawns and relaunches never run it.
+if [ "$RELAUNCH" -eq 0 ] && { [ "$KIND" = ship ] || [ "$KIND" = scout ]; }; then
+  if [ -f "$CONFIG/spawn-gate" ] && [ -x "$CONFIG/spawn-gate" ]; then
+    SPAWN_GATE_OUT=$(FM_HOME="$FM_HOME" "$CONFIG/spawn-gate" "$ID" 2>&1) || {
+      SPAWN_GATE_RC=$?
+      [ -n "$SPAWN_GATE_OUT" ] && printf '%s\n' "$SPAWN_GATE_OUT" >&2
+      echo "error: spawn refused by config/spawn-gate (exit $SPAWN_GATE_RC)" >&2
+      exit 1
+    }
   fi
 fi
 if [ -e "$STATE" ] || [ -L "$STATE" ]; then
