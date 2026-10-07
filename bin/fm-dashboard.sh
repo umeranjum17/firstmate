@@ -174,7 +174,7 @@ try: srv.serve_forever()
 except KeyboardInterrupt: pass
 PY
     ;;
-  -h|--help) sed -n '2,63p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+  -h|--help) sed -n '2,68p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
   *) usage ;;
 esac
 
