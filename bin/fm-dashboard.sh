@@ -38,7 +38,7 @@
 #                                   marked "merge record as of"
 #   herdr agent list                agents busy now (agent_status working), the state the muxr
 #                                   app reads; role by pane id against the records: lead, worker,
-#                                   Main (the home's own folder), else other
+#                                   Main (the folder holding this home's data), else other
 #   quota-axi --json --no-credential-refresh --max-age 5m   quota, cached 2 minutes in
 #                                   state/dashboard/.quota.json; a failed read reuses a reading
 #                                   under an hour old, named with its time
@@ -563,7 +563,7 @@ agent_rows = []  # (role, home, name, status)
 for a in agents or []:
     role = pane_role.get(a.get('pane_id'))
     if role: r, h, n = role
-    elif os.path.realpath(a.get('cwd') or '/') == os.path.realpath(HOME): r, h, n = 'main', 'main', 'Main'
+    elif os.path.realpath(os.path.join(a.get('cwd') or '/', 'data')) == os.path.realpath(os.path.join(HOME, 'data')): r, h, n = 'main', 'main', 'Main'  # the folder holding this home's records
     else: r, h, n = 'other', None, a.get('name') or os.path.basename((a.get('cwd') or '').rstrip('/')) or 'unnamed'
     if h in parked: continue
     agent_rows.append((r, h, n, a.get('agent_status') or 'unknown'))
@@ -954,7 +954,7 @@ if bl_known:
 for a in running_out[:2]:
     if (a['runout'] - NOW).total_seconds() < 48 * 3600:
         spots.append(('warn', f'{esc(a["name"])} quota runs out {when(a["runout"].timestamp())} · in {dur((a["runout"] - NOW).total_seconds())}',
-                      'Quota', f'Carries {carries_words(a["p"])} · before its {esc(a["limit"]["label"] if a["limit"] else "window")} resets', 'quota'))
+                      'Quota', f'Carries {carries_words(a["p"])} · before its {esc(a["limit"]["label"] + " window" if a["limit"] else "window")} resets', 'quota'))
 for a in accounts:
     if a['empty'] and carries.get(a['p']):
         spots.append(('bad', f'{esc(a["name"])} quota is used up · as of {hm(q_at)}', 'Quota', f'Carries {carries_words(a["p"])}', 'quota'))
