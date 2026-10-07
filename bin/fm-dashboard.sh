@@ -1461,7 +1461,7 @@ def flow_body():
 <div class="stack">
 <section>
 {sh("Today vs yesterday · since 00:00 and the full day before")}
-<h2>{"Landings unknown." if l_today is None else "More landed than filed today." if l_today > f_today else "More filed than landed today." if f_today > l_today else "As much filed as landed today."}</h2>
+<h2>{"Landings unknown." if l_today is None else "More filed than landed today." if f_today > l_today else "Filings partial; comparison unknown." if not f_exact else "More landed than filed today." if l_today > f_today else "As much filed as landed today."}</h2>
 {io_bars()}
 </section>
 <section>
