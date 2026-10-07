@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # fm-dashboard.sh - build the read-only fleet dashboard pages for this home.
 #
-# Builds three self-contained HTML pages (inline CSS and SVG, no script, no network
+# Builds three self-contained HTML pages (inline CSS, no script, no network
 # reference), phone first, each answering one question set:
 #   index    Overview: Main's ask list only, then slow spots, lanes,
 #            devices and machine, and one row per home
@@ -610,8 +610,6 @@ PARKED_LINE = (f'<p class="note">{esc(" and ".join(PARKED))} {"is" if len(PARKED
                if PARKED else '')
 
 # --- lanes: the strip (graft from B) and the grouped list ----------------
-MOVING = SPLIT['building'] + SPLIT['validating']
-STOPPED = OPEN - MOVING
 FREE = max(0, PLAN - OPEN)
 def lane_strip(): return stack(lane_parts(SPLIT), max(PLAN, OPEN), 'sb big') + lane_legend(SPLIT, FREE)
 def lanes_list(group, names=False, strip=True):
@@ -705,7 +703,6 @@ def devices_list(group):
     groups = [(k, sum(key(r) == k for r in dev_rows), ''.join(grow(esc(r[0]), esc(f'{r[2]} · {r[1]}')) for r in dev_rows if key(r) == k), '', None, True) for k in order]
     body = glist(groups, 'Devices') if dev_rows else ('<p class="note">No device connected and no emulator running.</p>' if dev_count is not None else '')
     return body + ''.join(f'<p class="note">unknown - {esc(p)}</p>' for p in dev_problems)
-in_use = sum(1 for r in dev_rows if r[4])
 
 # --- homes ---------------------------------------------------------------
 def home_row(h):
@@ -722,11 +719,8 @@ def home_row(h):
 homes_table = ('<div class="homes nl"><div class="home head" aria-hidden="true"><span class="n"></span><span class="s">.</span>'
                '<span class="f fb">Lanes open / plan</span><span class="f fc">Ready</span></div>'
                + ''.join(home_row(h) for h in ACTIVE) + '</div>' + PARKED_LINE)
-live_leads = [h for h in leads]
-homes_h2 = (f'{len(live_leads) - len(down)} of {plural(len(live_leads), "lead")} running; '
-            f'{plural(sum(1 for h in ACTIVE if split(by_home[h])["blocked"] + split(by_home[h])["decision"]), "home")} with blocked lanes.') if snap is not None else 'Lead state unknown: fleet snapshot unavailable.'
 
-# --- charts: inline SVG drawn here, no script ---------------------------
+# --- charts: inline CSS bars drawn here, no script ----------------------
 def legend(*items):  # (class, text)
     return '<div class="lg">' + ''.join(f'<span><i class="{c}"></i>{t}</span>' for c, t in items) + '</div>'
 # Lane states in one order and one colour each, the same everywhere.
