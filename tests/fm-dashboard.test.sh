@@ -172,6 +172,7 @@ test_merged_days_use_the_same_bounded_github_source() {
 #!/bin/sh
 printf '%s\n' "\$*" >> "$home/gh.calls"
 [ -e "$home/gh.fail" ] && { echo 'HTTP 403: API rate limit exceeded' >&2; exit 1; }
+case "\$*" in *"merged:>="*|*"merged:<"*) echo 'expected one merged:start..end range' >&2; exit 1 ;; esac
 printf '%s\n' '[{"total_count":5,"incomplete_results":false,"items":[{"id":1,"repository_url":"https://api.github.com/repos/acme/quillwork"},{"id":2,"repository_url":"https://api.github.com/repos/acme/quillwork"},{"id":3,"repository_url":"https://api.github.com/repos/acme/shared"},{"id":4,"repository_url":"https://api.github.com/repos/acme/held"},{"id":5,"repository_url":"https://api.github.com/repos/acme/other"}]}]'
 EOF
   chmod +x "$home/bin/gh"
@@ -182,7 +183,7 @@ EOF
     case "$text" in *"$want"*) ;; *) fail "page text lacks '$want': $text" ;; esac
   done
   [ "$(wc -l < "$home/gh.calls")" -eq 2 ] || fail "not two bounded day searches: $(cat "$home/gh.calls")"
-  grep -q 'q=owner:acme is:pr is:merged merged:>=20[0-9-]*T[0-9:]*Z' "$home/gh.calls" || fail "unexpected search: $(cat "$home/gh.calls")"
+  grep -q 'q=owner:acme is:pr is:merged merged:20[0-9-]*T[0-9:]*Z\.\.20[0-9-]*T[0-9:]*Z' "$home/gh.calls" || fail "unexpected search: $(cat "$home/gh.calls")"
   # A rebuild inside 5 minutes reuses the count and does not search, even when GitHub would fail.
   touch "$home/gh.fail"
   PATH="$home/bin:$PATH" FM_HOME="$home" "$DASH" build >/dev/null || fail "cached build failed"
@@ -197,14 +198,18 @@ EOF
   for want in "Merged today 3 yesterday 1 · as of 00:01" "GitHub merged-today search : HTTP 403: API rate limit exceeded"; do
     case "$text" in *"$want"*) ;; *) fail "page text lacks '$want': $text" ;; esac
   done
-  grep -q 'merged:<' "$home/gh.calls" || fail "day query has no upper boundary"
+  grep -q 'merged:[^ ]*\.\.[^ ]*:59Z' "$home/gh.calls" || fail "day range has no inclusive last-second boundary"
   rm -f "$home/gh.fail"
   python3 -c 'import json,sys; json.dump({"scope":json.load(open(sys.argv[1]))["scope"],"day":json.load(open(sys.argv[1]))["day"],"at":"yesterday","yesterday":[1,2]},open(sys.argv[1],"w"))' \
     "$home/state/dashboard/.merged-today.json"
   PATH="$home/bin:$PATH" FM_HOME="$home" "$DASH" build >/dev/null || fail "corrupt cache build failed"
   [ "$(wc -l < "$home/gh.calls")" -gt 4 ] || fail "a corrupt cache was trusted instead of searched again"
   case "$(page_text "$page")" in *"Merged today 3 yesterday 3 · GitHub as of"*) ;; *) fail "corrupt cache was not recomputed" ;; esac
-  pass "both merge days use bounded GitHub counts, cached and explicitly dated, or the same ledger fallback"
+  python3 -c 'import json,sys; p=sys.argv[1]; c=json.load(open(p)); c["scope"]=c["scope"][1:]; c["homes"]={"zephyrine":777}; json.dump(c,open(p,"w"))' \
+    "$home/state/dashboard/.merged-today.json"
+  PATH="$home/bin:$PATH" FM_HOME="$home" "$DASH" build >/dev/null || fail "old-query cache build failed"
+  case "$(page_text "$page")" in *"Merged today 3 yesterday 3 · GitHub as of"*) ;; *) fail "old two-qualifier cache was reused" ;; esac
+  pass "both merge days use one bounded range, reject old-query caches, and fall back together with an explicit time"
 }
 
 SERVE_PID=

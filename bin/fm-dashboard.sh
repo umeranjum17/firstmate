@@ -282,7 +282,7 @@ def merged_today_live():
             r = re.sub(r'\.git$', '', re.sub(r'^.*github\.com[:/]', '', u))
             if '/' in r and (r not in repo_home or r.split('/')[1] == h): repo_home[r] = h
     if not repo_home: return None
-    scope = [sorted(repo_home.items()), sorted(parked), str(NOW.tzinfo)]
+    scope = ['merged-range-v1', sorted(repo_home.items()), sorted(parked), str(NOW.tzinfo)]
     scope = json.loads(json.dumps(scope))
     at, yh, th = c.get('at'), c.get('yesterday'), c.get('homes')
     if c.get('scope') == scope and c.get('day') == TODAY.isoformat() and isinstance(yh, dict) and isinstance(th, dict) and isinstance(at, (int, float)) and math.isfinite(at) and 0 <= NOW.timestamp() - at < 300:
@@ -290,9 +290,9 @@ def merged_today_live():
     counts = {}
     for day in (TODAY, YDAY):
         since = datetime.combine(day, datetime.min.time()).astimezone().astimezone(timezone.utc)
-        end = datetime.combine(day + timedelta(days=1), datetime.min.time()).astimezone().astimezone(timezone.utc)
+        end = datetime.combine(day + timedelta(days=1), datetime.min.time()).astimezone().astimezone(timezone.utc) - timedelta(seconds=1)
         q = ' '.join(f'owner:{o}' for o in sorted({r.split('/')[0] for r in repo_home})) + \
-            f' is:pr is:merged merged:>={since:%Y-%m-%dT%H:%M:%SZ} merged:<{end:%Y-%m-%dT%H:%M:%SZ}'
+            f' is:pr is:merged merged:{since:%Y-%m-%dT%H:%M:%SZ}..{end:%Y-%m-%dT%H:%M:%SZ}'
         try:
             r = subprocess.run(['gh', 'api', '-X', 'GET', 'search/issues', '--paginate', '--slurp', '-f', f'q={q}', '-f', 'per_page=100'],
                                capture_output=True, text=True, timeout=30)
