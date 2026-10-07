@@ -297,13 +297,19 @@ for cause_name in ('captain', 'lead', 'ci_queue', 'memory_gate', 'credential_ext
         matching = grouped.get(cause_name, [])
         if matching:
             durations = [w['seconds'] for w in matching]
+            known = [d for d in durations if d is not None]
             items.append({'home': lane['home'], 'task': lane['task'], 'waits': matching,
                           'seconds': max(durations) if all(d is not None for d in durations) else None,
+                          'known_seconds': max(known) if known else None,
+                          'unknown_waits': len(durations) - len(known),
                           'overlap': len(grouped) > 1})
     if items:
-        known = [i['seconds'] for i in items if i['seconds'] is not None]
-        bottlenecks.append({'cause': cause_name, 'items': items, 'known_lane_hours': sum(known) / 3600,
-                            'unknown_items': len(items) - len(known), 'additive': False})
+        full = [i['seconds'] for i in items if i['seconds'] is not None]
+        lower = [i['known_seconds'] for i in items if i['known_seconds'] is not None]
+        bottlenecks.append({'cause': cause_name, 'items': items, 'known_lane_hours': sum(full) / 3600,
+                            'known_lower_bound_lane_hours': sum(lower) / 3600,
+                            'unknown_items': len(items) - len(full),
+                            'unknown_waits': sum(i['unknown_waits'] for i in items), 'additive': False})
 bottlenecks.sort(key=lambda b: (-b['known_lane_hours'], b['cause']))
 def executed(seconds):
     return [l for l in lanes if l['times']['merged'] is not None and NOW - seconds <= l['times']['merged'] <= NOW]
@@ -325,7 +331,8 @@ print(json.dumps({'schema': 'fm-flow.v1', 'at': NOW, 'homes': sorted(homes), 'la
                   'Retained records only; missing pickup/PR/check/cleanup times stay unknown. '
                   'Wait ages are recorded waits, not proof of idle workers. Bottleneck items report the maximum '
                   'recorded wait age per (lane, cause); a lane in several cause buckets overlaps in time, so cause '
-                  'sums are non-additive and never causal lane-hours lost. Capacity and free-worker availability not collected. '
+                  'sums are non-additive and never causal lane-hours lost. Items keep full seconds null when any '
+                  'same-cause wait is unstamped and report the known lower bound separately. Capacity and free-worker availability not collected. '
                   'CI counts cover reported check runs only, not all required contexts or a green verdict.'}]},
                  sort_keys=True, allow_nan=False))
 PY
