@@ -970,6 +970,11 @@ safe_checkpoint() {
   wt_top_real=$(cd "$wt_top" 2>/dev/null && pwd -P) || wt_top_real=$wt_top
   [ "$wt_real" = "$wt_top_real" ] \
     || die "task $ID's recorded worktree $WT is not a worktree root (root is $wt_top); refusing to relaunch against an ambiguous checkout"
+  if fm_slot_record_owner "$WT" "$STATE" "$META"; then
+    die "task $ID's recorded worktree $WT is also recorded by task $FM_SLOT_RECORD_OWNER_ID as its $FM_SLOT_RECORD_OWNER_FIELD; refusing to relaunch two agents into one copy. Reconcile which record is stale (bin/fm-crew-state.sh $ID $FM_SLOT_RECORD_OWNER_ID)"
+  elif [ $? -eq 2 ]; then
+    die "cannot prove task $ID's worktree $WT is free of other task records: $FM_LOCAL_STATE_DIRS_ERROR; refusing to relaunch"
+  fi
   if head=$(git -C "$WT" rev-parse --verify HEAD 2>/dev/null); then
     :
   elif head_ref=$(git -C "$WT" symbolic-ref -q HEAD 2>/dev/null); then

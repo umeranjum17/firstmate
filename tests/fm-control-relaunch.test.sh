@@ -634,6 +634,21 @@ test_relaunch_appends_the_progress_note_to_the_instructions() {
   pass "fm-control relaunch: progress and the Firstmate-worktree worker identity reach the replacement"
 }
 
+test_relaunch_refuses_a_copy_another_task_records() {
+  local dir out rc before
+  dir=$(new_case sharedcopy rl50)
+  add_ship_task "$dir" rl50 claude
+  printf 'window=fmses:fm-rl51\nkind=ship\nworktree=%s\n' "$dir/wt" > "$dir/home/state/rl51.meta"
+  before=$(cat "$dir/home/state/rl50.meta")
+  out=$(run_control "$dir" rl50 relaunch --note "stale record after a restart"); rc=$?
+  expect_code 1 "$rc" "a relaunch into a copy another task records should refuse"
+  assert_contains "$out" "also recorded by task rl51 as its worktree" "the refusal should name the other task"
+  [ "$(cat "$dir/home/state/rl50.meta")" = "$before" ] || fail "a refused relaunch must leave the task record untouched"
+  [ -z "$(cat "$dir/fake/literal")" ] || fail "a refused relaunch must send nothing"
+  [ "$(cat "$dir/fake/command")" = claude ] || fail "a refused relaunch must not stop the agent"
+  pass "fm-control relaunch: refuses and reports when another task records the same copy"
+}
+
 test_relaunch_requires_a_note_for_a_ship_task() {
   local dir out rc before
   dir=$(new_case nonote rl3)
@@ -2477,6 +2492,7 @@ test_relaunch_serializes_concurrent_durable_metadata_publication
 test_disabled_relaunch_clears_prior_trace_context
 test_relaunch_appends_the_progress_note_to_the_instructions
 test_relaunch_requires_a_note_for_a_ship_task
+test_relaunch_refuses_a_copy_another_task_records
 test_harness_switch_moves_the_record_and_clears_prior_wiring
 test_harness_switch_does_not_carry_the_old_profile_axes
 test_harness_switch_resolves_a_prefixed_recorded_harness

@@ -42,13 +42,15 @@ pass() { printf 'ok - %s\n' "$1"; }
 # take turns.
 if [ -f "$CRED_HOME/../run.lock" ] && command -v flock >/dev/null 2>&1; then
   exec 9<"$CRED_HOME/../run.lock"
-  flock -w 1800 9 || fail "the test credential stayed busy for 30 minutes"
+  flock -w "${FM_SENTINEL_E2E_LOCK_WAIT:-1800}" 9 || fail "the test credential stayed busy past the lock wait"
 fi
 
 REAL_HERDR=$(command -v herdr)
 HERDR_ORIGINAL_PATH=$PATH
 LABROOT=$(mktemp -d "$(cd "${TMPDIR:-/tmp}" && pwd -P)/fm-sentinel-e2e.XXXXXX")
-LABHOME="$LABROOT/userhome"
+# A unix socket path is capped near 108 bytes and Herdr keeps its session
+# sockets under $HOME/.config, so the lab HOME gets its own short path.
+LABHOME=$(mktemp -d /tmp/fmsn.XXXXXX)
 FAKEBIN="$LABROOT/fakebin"
 MAIN="$LABROOT/main"
 LEAD_ID=lab-lead
@@ -92,13 +94,14 @@ cleanup() {
     lab_env "$HERDR_LAB_HELPER" teardown "$HERDR_LAB_SESSION" >/dev/null || status=1
   fi
   [ ! -e "$LABHOME/.claude.json" ] || forget_claude_entries || status=1
-  rm -rf "/tmp/fm-$LEAD_ID" "/tmp/fm-$WORKER_ID" "/tmp/fm-$SPARE_ID" "$LABROOT"
+  chmod -R u+w "$LABROOT" 2>/dev/null
+  rm -rf "$LABROOT" "$LABHOME" "/tmp/fm-$LEAD_ID"* "/tmp/fm-$WORKER_ID"* "/tmp/fm-$SPARE_ID"*
   exit "$status"
 }
 trap cleanup EXIT
 
 # A throwaway HOME whose Claude state is the test credential's, by symlink.
-mkdir -p "$LABHOME" "$FAKEBIN" "$LABROOT/treehouse"
+mkdir -p "$FAKEBIN" "$LABROOT/treehouse"
 [ -z "$EVID" ] || mkdir -p "$EVID"
 ln -s "$CRED_HOME/.claude" "$LABHOME/.claude"
 ln -s "$CRED_HOME/.claude.json" "$LABHOME/.claude.json"
@@ -167,8 +170,8 @@ agent_field() {  # <pane> <jq-field>
 }
 pane_of_meta() { sed -n 's/^herdr_pane_id=//p' "$1" | tail -n 1; }
 
-lab_env "$HERDR_LAB_HELPER" provision "$HERDR_LAB_SESSION" >/dev/null || fail "could not provision the Herdr lab"
 LAB_READY=1
+lab_env "$HERDR_LAB_HELPER" provision "$HERDR_LAB_SESSION" >/dev/null || fail "could not provision the Herdr lab"
 
 # Settings every lab Claude session needs, as Herdr's Claude integration and
 # the operator's defaults give them on a real host: a SessionStart report of the
@@ -192,7 +195,7 @@ lab_settings() {  # <dir>
   mkdir -p "$1/.claude"
   cat > "$1/.claude/settings.local.json" <<EOF
 {
-  "permissions": { "defaultMode": "bypassPermissions" },
+  "permissions": { "allow": ["Bash", "Read", "Edit", "Write"] },
   "hooks": {
     "SessionStart": [
       { "matcher": "^(startup|resume|clear|compact|fork)\$",
@@ -210,11 +213,15 @@ git -C "$MAIN" fetch -q "$ROOT" HEAD
 git -C "$MAIN" checkout -q -f -B main FETCH_HEAD
 cp -R "$ROOT/bin/." "$MAIN/bin/"
 git -C "$MAIN" add -A bin
-git -C "$MAIN" -c user.name=Umer -c user.email=umer@example.invalid commit -q -m "lab: working tree" || true
+git -C "$MAIN" -c user.name=Umer -c user.email=umer@example.invalid commit -q -m "lab: working tree" >/dev/null || true
 mkdir -p "$MAIN/state" "$MAIN/data" "$MAIN/config" "$MAIN/projects"
 printf 'herdr\n' > "$MAIN/config/backend"
 printf 'claude\n' > "$MAIN/config/crew-harness"
 printf 'claude %s low\n' "$MODEL" > "$MAIN/config/secondmate-harness"
+# Claude ignores a bypass default from project settings and Herdr resumes a
+# session without its launch flags, so lab settings (below) allow tools outright,
+# as the captain's user-level bypass default does; launches use auto mode.
+printf 'auto\n' > "$MAIN/config/claude-permission-mode"
 lab_settings "$MAIN"
 
 # The lead: a real seeded second mate home with its own project and worker.
@@ -222,7 +229,7 @@ fm "$MAIN" env FM_SECONDMATE_CHARTER='Lab second mate for a Herdr restart test. 
   FM_SECONDMATE_SCOPE='lab restart recovery test' \
   "$MAIN/bin/fm-home-seed.sh" "$LEAD_ID" "$LEAD" --no-projects >"$LABROOT/seed.out" 2>&1 \
   || fail "cannot seed the lead home: $(tail -5 "$LABROOT/seed.out")"
-cp "$MAIN/config/backend" "$MAIN/config/crew-harness" "$LEAD/config/"
+cp "$MAIN/config/backend" "$MAIN/config/crew-harness" "$MAIN/config/claude-permission-mode" "$LEAD/config/"
 lab_settings "$LEAD"
 git init -q -b main "$LABROOT/notes-seed"
 printf '# notes\n' > "$LABROOT/notes-seed/README.md"
@@ -269,7 +276,23 @@ lab pane run "$MAIN_PANE" "claude --model $MODEL --effort low 'This is a disposa
   || fail "cannot launch the lab primary"
 
 START=$(date +%s)
-wait_for 600 "the primary's first turn to end with its watcher armed" beacon_newer "$MAIN" "$START"
+# A fresh test credential shows Claude's one-time renderer tip after the first
+# reply; dismiss it so the composer reads empty, as on a long-used install.
+dismiss_tips() {
+  local pane
+  for pane in "$MAIN_PANE" "$LEAD_PANE" "$WORKER_PANE"; do
+    lab pane read "$pane" --source visible 2>/dev/null | grep -q 'Try the new fullscreen renderer' \
+      && lab pane send-keys "$pane" Escape >/dev/null 2>&1
+  done
+  return 0
+}
+primary_armed() {
+  ! lab pane read "$MAIN_PANE" --source visible 2>/dev/null | grep -q 'Please run /login' \
+    || fail "the test Claude credential is signed out; sign it in again and rerun"
+  dismiss_tips
+  beacon_newer "$MAIN" "$START"
+}
+wait_for 600 "the primary's first turn to end with its watcher armed" primary_armed
 wait_for 600 "the lead's turn to end with its watcher armed" beacon_newer "$LEAD" "$START"
 wait_for 600 "the worker to settle on its brief" test -s "$LEAD/state/$WORKER_ID.status"
 MAIN_SID=$(head -n 1 "$MAIN/state/.lock-session")

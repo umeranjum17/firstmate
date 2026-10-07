@@ -18,8 +18,8 @@
 #   FM_HOME=<home> fm-sentinel.sh unit       print a systemd user service running `loop`
 #
 # tick, under the home's state/.sentinel.lock:
-#   1. Reads the Herdr server identity for FM_SENTINEL_HERDR_SESSION (default
-#      `default`) as the inode and bind time of its API socket, which the server
+#   1. Reads the Herdr server identity for FM_SENTINEL_HERDR_SESSION (default the
+#      backend's own HERDR_SESSION, else `default`) as the inode and bind time of its API socket, which the server
 #      recreates on every start. A stopped server is left alone: its supervisor
 #      restarts it, and this script never starts one.
 #   2. On the first identity it records it in state/.sentinel-herdr-identity.
@@ -54,7 +54,7 @@
 #   order passes on), so a repeat delivers nothing new.
 #   One line per task goes to stdout and state/.sentinel.log.
 #
-# Knobs: FM_SENTINEL_HERDR_SESSION (default), FM_SENTINEL_INTERVAL (60),
+# Knobs: FM_SENTINEL_HERDR_SESSION (HERDR_SESSION, else default), FM_SENTINEL_INTERVAL (60),
 # FM_SENTINEL_REWAKE_SECS (1800), FM_GUARD_GRACE (300).
 # Exit: 0 after a pass (including deferred work), 1 when the pass hit an error
 # it logged, 2 for usage or a missing FM_HOME.
@@ -75,7 +75,7 @@ esac
 FM_HOME=$(cd "$FM_HOME" 2>/dev/null && pwd -P) || { echo "fm-sentinel: FM_HOME is not a directory" >&2; exit 2; }
 export FM_HOME
 STATE="$FM_HOME/state"
-SESSION=${FM_SENTINEL_HERDR_SESSION:-default}
+SESSION=${FM_SENTINEL_HERDR_SESSION:-${HERDR_SESSION:-default}}
 INTERVAL=${FM_SENTINEL_INTERVAL:-60}
 REWAKE=${FM_SENTINEL_REWAKE_SECS:-1800}
 GRACE=${FM_GUARD_GRACE:-300}
@@ -258,7 +258,7 @@ locked() {
   fm_lock_try_acquire "$lock" || return 0
   "$@" || rc=$?
   fm_lock_release "$lock"
-  if [ "$(wc -l <"$LOG" 2>/dev/null || echo 0)" -gt 1000 ]; then
+  if [ -f "$LOG" ] && [ "$(wc -l <"$LOG")" -gt 1000 ]; then
     tail -n 500 "$LOG" >"$LOG.tmp" && mv -f "$LOG.tmp" "$LOG"
   fi
   return "$rc"

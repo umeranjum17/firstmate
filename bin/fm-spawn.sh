@@ -1835,6 +1835,20 @@ if [ "$RELAUNCH" -eq 1 ]; then
     echo "error: task $ID's recorded worktree '${RELAUNCH_WT:-none}' is missing; refusing to relaunch without the local copy its work lives in" >&2
     exit 1
   }
+  # A stale record can name a copy another task now holds; launching into it
+  # would put two agents on one checkout, so report the clash instead.
+  slot_rc=0
+  fm_slot_record_owner "$RELAUNCH_WT" "$STATE" "$RELAUNCH_META" || slot_rc=$?
+  case "$slot_rc" in
+    0)
+      echo "error: task $ID's recorded worktree $RELAUNCH_WT is also recorded by task $FM_SLOT_RECORD_OWNER_ID as its $FM_SLOT_RECORD_OWNER_FIELD; refusing to relaunch two agents into one copy. Reconcile which record is stale (bin/fm-crew-state.sh $ID $FM_SLOT_RECORD_OWNER_ID)" >&2
+      exit 1
+      ;;
+    2)
+      echo "error: cannot prove task $ID's worktree $RELAUNCH_WT is free of other task records: $FM_LOCAL_STATE_DIRS_ERROR; refusing to relaunch" >&2
+      exit 1
+      ;;
+  esac
   if [ "$KIND" = secondmate ]; then
     FIRSTMATE_HOME=$(fm_meta_get "$RELAUNCH_META" home)
     [ -n "$FIRSTMATE_HOME" ] || FIRSTMATE_HOME=$RELAUNCH_WT
