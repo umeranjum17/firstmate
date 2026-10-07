@@ -886,6 +886,7 @@ bin/fm-test-run.sh tests/fm-control.test.sh
 | claude, codex, opencode, pi, pi-signed, grok, kimi | no post-interrupt composer observation on record; table keeps none | n/a - unverified |
 
 For the unverified remainder the next submit still re-checks the composer before typing (the control plane's exit check, the steer plane's ring pre-check), so restored text surfaces as a refusal naming its recovery (`fm-send.sh <id> --key Enter`, plus the harness clear key where the table names one) rather than a garbled send.
+The default stays none rather than a guessed clear key because the two errors are not symmetric: a missing clear degrades to a refusal that names its recovery, while a spurious clear would silently discard the worker's pending text.
 The per-harness signals guards above are the refresh commands after a harness upgrade; a harness observed to restore takes a clear key in the table plus a dated line here.
 
 ## Waiting-worker command ceilings
