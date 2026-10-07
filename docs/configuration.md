@@ -911,7 +911,7 @@ It is primary-authoritative inherited configuration, so one value in the main ho
 An open lane is a `state/<task>.meta` whose `kind` is `ship` or `scout`; a secondmate endpoint's own meta is not a lane of that home.
 
 In a secondmate home, a heartbeat whose home sits below the floor with `fm-tasks-axi.sh ready` work raises one check wake naming the open and target counts and the first ready ids, re-raised while the condition holds every `FM_READY_WORK_RESURFACE_SECS` (1800 by default).
-Without the file, a home keeps the older rule and wakes only when no worker is provably working.
+At or above the floor, or without the file, a home wakes when no worker is provably working, so open lanes that only wait never hide an idle home.
 A malformed value is reported once in the watcher's triage log and then treated as absent, never as a number; `bin/fm-watch.sh`'s header owns the exact reason lines.
 
 The floor is a floor, not a cap: it never asks a home to stop working above its target.

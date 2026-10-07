@@ -127,8 +127,9 @@
 #                          queued work (fm-tasks-axi.sh ready) while the home sits
 #                          below its lane floor: with config/lane-target naming a
 #                          positive integer, fewer open lanes than that target;
-#                          with no usable target, none of its workers is provably
-#                          working. Re-raised while the condition holds, once per
+#                          otherwise (no usable target, or at least that many
+#                          open lanes), none of its workers is provably working.
+#                          Re-raised while the condition holds, once per
 #                          new ready set and then every READY_WORK_RESURFACE_SECS
 #   check: inactive-outcome bounded poll-loop reconciliation found a suspicious
 #                          inactive terminal outcome that still lacks its durable
@@ -2458,9 +2459,11 @@ warn_invalid_lane_target_once() {
 # dispatchable queued work, and the home sits below its lane floor. With
 # config/lane-target naming a positive integer N, the floor is fewer than N open
 # lanes, and a home with working workers but free slots is exactly the 5 Oct
-# stall that the no-worker-working rule missed. With no usable target the rule is
-# the older one: no worker is provably working. A condition that still holds
-# re-raises on READY_WORK_RESURFACE_SECS; a new ready set fires at once. Sets
+# stall that the no-worker-working rule missed. Otherwise (no usable target, or
+# open lanes at or above it) the rule is the older one: no worker is provably
+# working, so open lanes that only wait never hide an idle home. A condition
+# that still holds re-raises on READY_WORK_RESURFACE_SECS; a new ready set
+# fires at once. Sets
 # READY_WORK_IDS and READY_WORK_REASON. An empty ready set forgets the last one so
 # the same work surfaces again if it returns. A lead below its floor with ready
 # work otherwise has no trigger: an absorbed heartbeat never reads the backlog.
@@ -2480,9 +2483,7 @@ ready_work_waits_idle() {
   if [ -z "$target" ] && [ -f "$FM_HOME/config/lane-target" ]; then
     warn_invalid_lane_target_once
   fi
-  if [ -n "$target" ]; then
-    open=$(open_lane_count)
-    [ "$open" -lt "$target" ] || return 1
+  if [ -n "$target" ] && open=$(open_lane_count) && [ "$open" -lt "$target" ]; then
     READY_WORK_REASON="check: ready work waiting with free lane slots ($open/$target open): $READY_WORK_IDS - start the top ready item now, or record why it waits"
   else
     for meta in "$STATE"/*.meta; do
