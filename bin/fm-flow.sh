@@ -17,7 +17,9 @@
 # Pickup and cleanup use ledger events, NOT file birth/mtime or spawn_gen
 # (relaunch changes spawn_gen). pr_ready is NOT pr_opened or checks_green.
 # Ledger status timestamps are capture times; live logs use their own [at=].
-# Bottlenecks sum CURRENT recorded wait ages, not historical or causal losses.
+# Bottlenecks attribute each open (lane, cause) separately at its maximum recorded wait age;
+# cross-cause ages on one lane overlap in time: reported sums are non-additive recorded waits,
+# never allocated causal or lane-hours-lost durations.
 # Keyed waits close only on matching resolved/captain-held, not working/done.
 # Historical results cover retained records only, not a complete forge history.
 # Capacity and worker-liveness probes are not collected.
@@ -289,17 +291,19 @@ for cause_name in ('captain', 'lead', 'ci_queue', 'memory_gate', 'credential_ext
     for lane in lanes:
         if not lane['open']:
             continue
-        classes = {w['cause'] for w in lane['open_waits']}
-        lane_cause = next(iter(classes)) if len(classes) == 1 else 'unknown'
-        matching = lane['open_waits'] if lane_cause == cause_name else []
+        grouped = {}
+        for w in lane['open_waits']:
+            grouped.setdefault(w['cause'], []).append(w)
+        matching = grouped.get(cause_name, [])
         if matching:
             durations = [w['seconds'] for w in matching]
             items.append({'home': lane['home'], 'task': lane['task'], 'waits': matching,
-                          'seconds': max(durations) if all(d is not None for d in durations) else None})
+                          'seconds': max(durations) if all(d is not None for d in durations) else None,
+                          'overlap': len(grouped) > 1})
     if items:
         known = [i['seconds'] for i in items if i['seconds'] is not None]
         bottlenecks.append({'cause': cause_name, 'items': items, 'known_lane_hours': sum(known) / 3600,
-                            'unknown_items': len(items) - len(known)})
+                            'unknown_items': len(items) - len(known), 'additive': False})
 bottlenecks.sort(key=lambda b: (-b['known_lane_hours'], b['cause']))
 def executed(seconds):
     return [l for l in lanes if l['times']['merged'] is not None and NOW - seconds <= l['times']['merged'] <= NOW]
@@ -319,7 +323,9 @@ print(json.dumps({'schema': 'fm-flow.v1', 'at': NOW, 'homes': sorted(homes), 'la
                   'time_to_merge_by_home': {h: summary([l for l in executed(7 * 86400) if l['home'] == h]) for h in sorted(homes)},
                   'trend_7d': trend, 'limitations': notes + [{'source': 'coverage', 'reason':
                   'Retained records only; missing pickup/PR/check/cleanup times stay unknown. '
-                  'Wait ages are recorded waits, not proof of idle workers. Capacity and free-worker availability not collected. '
+                  'Wait ages are recorded waits, not proof of idle workers. Bottleneck items report the maximum '
+                  'recorded wait age per (lane, cause); a lane in several cause buckets overlaps in time, so cause '
+                  'sums are non-additive and never causal lane-hours lost. Capacity and free-worker availability not collected. '
                   'CI counts cover reported check runs only, not all required contexts or a green verdict.'}]},
                  sort_keys=True, allow_nan=False))
 PY

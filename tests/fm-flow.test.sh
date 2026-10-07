@@ -105,6 +105,10 @@ for task, reason in [('memory', 'fm-mem-gate: waiting (free 1 GB)'), ('credentia
                      ('mention', 'memory gate code fixed; waiting for new instructions')]:
     (child / 'state' / (task + '.meta')).write_text('kind=ship\n')
     (child / 'state' / (task + '.status')).write_text(f'blocked [at=10] [key=wait]: {reason}\n')
+(child / 'state/mixed.meta').write_text('kind=ship\n')
+(child / 'state/mixed.status').write_text('blocked [at=10] [key=a]: fm-mem-gate: waiting (free 1 GB)\n'
+    'blocked [at=30] [key=a2]: fm-mem-gate: waiting (free 1 GB)\n'
+    'needs-decision [at=20] [key=b]: waiting for merge\n')
 z = json.loads(run())
 new = {l['task']: l for l in z['lanes'] if l['open']}
 for task, expected in [('memory', 'memory_gate'), ('credential', 'credential_external'),
@@ -112,6 +116,16 @@ for task, expected in [('memory', 'memory_gate'), ('credential', 'credential_ext
     assert new[task]['open_waits'][0]['cause'] == expected
     assert new[task]['stage_clock']['seconds'] == 50 and new[task]['stage_clock']['overdue'] is True
     assert new[task]['ci'] is None, 'no reported CI is not a zero or green'
+mem_bucket = next(b for b in z['bottlenecks'] if b['cause'] == 'memory_gate')
+merge_bucket = next(b for b in z['bottlenecks'] if b['cause'] == 'review_merge')
+mem_item = next(i for i in mem_bucket['items'] if i['task'] == 'mixed')
+merge_item = next(i for i in merge_bucket['items'] if i['task'] == 'mixed')
+assert mem_item['seconds'] == 90 and len(mem_item['waits']) == 2, 'within-cause maximum, not sum'
+assert merge_item['seconds'] == 80
+assert mem_item['overlap'] is True and merge_item['overlap'] is True
+assert mem_bucket['additive'] is False and merge_bucket['additive'] is False
+assert next(i for i in mem_bucket['items'] if i['task'] == 'memory')['overlap'] is False
+assert 'mixed' not in {i['task'] for i in next(b for b in z['bottlenecks'] if b['cause'] == 'unknown')['items']}
 assert {q['task']: q['why'] for q in z['queue']}['ready'] == 'lane cap: 0 recorded active lanes, cap 0'
 assert new['unknown']['stage_clock']['overdue'] is None, 'unstamped stage never guessed overdue'
 (main / 'config/fm-flow-check.sh').write_text('unrecognized clock policy\n')
