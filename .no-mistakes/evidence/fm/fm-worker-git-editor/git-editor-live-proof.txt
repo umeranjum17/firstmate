@@ -1,0 +1,4 @@
+PROOF-DONE
+=== no-block proof ===
+GIT_EDITOR=true + GIT_SEQUENCE_EDITOR=true: bare 'git commit' aborts immediately on empty message, never opens an editor (fast exit, no hang).
+Conflicting 'git rebase --continue' with env-only editors returns within timeout, never invokes nvim.
