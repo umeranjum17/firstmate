@@ -607,10 +607,12 @@ def devices():
         return 'Free', 'ok'
     emu_by_port = {e['port']: e for e in emus or [] if e['port']}
     serials = []
+    connected = 0
     for l in (out or '').splitlines()[1:]:
         f = l.split()
         if len(f) < 2: continue
         serials.append(f[0])
+        if f[1] == 'device': connected += 1
         kv = dict(x.split(':', 1) for x in f[2:] if ':' in x)
         e = emu_by_port.pop(f[0][9:], None) if f[0].startswith('emulator-') else None
         if e:
@@ -631,7 +633,7 @@ def devices():
     problems = [f'adb: {adb_err}'] if out is None else []
     if emus is None: problems.append(f'emulators: {emu_err}')
     if lock_err: problems.append(f'device locks: {lock_err}')
-    return rows, len(serials) if out is not None else None, len(emus) if emus is not None else None, problems
+    return rows, connected if out is not None else None, len(emus) if emus is not None else None, problems
 
 mach = machine()
 dev_rows, dev_count, emu_count, dev_problems = devices()
