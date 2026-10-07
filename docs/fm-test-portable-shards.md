@@ -21,8 +21,12 @@ A failed script's duration is excluded even when its lane uploaded an artifact.
 In particular, run 36664663190's serial 5 finished in 22m15s with an assertion failure, not a timeout; treating that as a healthy whole-lane sample would hide the failure.
 Collect successful per-script measurements for every member before calculating a split.
 
-`tests/fm-supervision-host.test.sh` uses 789123 ms from run 36669175457, after the merged [host runtime fix](https://github.com/kunchenguid/firstmate/pull/6179), rather than its pre-fix maximum of 1065298 ms.
-That post-fix value has only one sample in this baseline, so further green runs must establish its variance.
+Serial hints retain that baseline's maxima and were raised where successful script records in the timing aggregate of fork run [37608647552](https://github.com/umeranjum17/firstmate/actions/runs/37608647552) measured slower durations.
+That aggregate includes records from more than one attempt; failed records and missing scripts are not successful measurements.
+The host suite's former 789123 ms hint substantially understated its successful 1602476 ms execution in serial job 112793307797 of that run, which finished all assertions but was cancelled at the job limit.
+Its unchanged cases and fixtures now live in `tests/fm-supervision-host-helpers.sh`, called by three disjoint executable parts: `fm-supervision-host.test.sh`, `fm-supervision-host-away.test.sh`, and `fm-supervision-host-recovery.test.sh`.
+Their initial weights are estimates from the intervals between that job's successful case markers, with the entire original setup/cleanup remainder charged to each part conservatively.
+Those intervals include work between cases and are not independent case benchmarks; the split jobs' own timing artifacts must establish their actual durations and variance.
 The native-Windows-only `tests/fm-pi-windows-shell-invocation.test.sh` retains its separate 5121 ms measurement from 2026-09-06T21:02Z instead of a portable capability skip.
 The session-start hint retains its pre-optimization maximum until CI measures the shorter fixture-only home-summary bound; do not discount a local speedup from CI packing weights.
 
@@ -113,7 +117,7 @@ No fast mode, path skips, or paid runner provisioning is part of this layout.
 
 The longer-term performance objective remains a complete green run under fifteen minutes including start delay, but the current watch-triage floor alone exceeds that objective.
 The immediate packing target is the runner's modeled script budget, not a claim that more shards alone can make an indivisible script faster.
-The layout uses fourteen long-lived Linux jobs (nine serial, two parallel, Herdr, two lint), plus short checks and macOS; insufficient shared account capacity can erase the packing gain.
+The layout uses fifteen long-lived Linux jobs (ten serial, two parallel, Herdr, two lint), plus short checks and macOS; insufficient shared account capacity can erase the packing gain.
 Compare complete before/after runs, preserve cancelled and partial-run evidence, and measure a representative normal-run sample before claiming a P95 improvement.
 The workflow retains per-PR supersession without cancelling main pushes or changing the compliance workflow's event semantics.
 
