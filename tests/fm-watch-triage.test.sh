@@ -6418,6 +6418,32 @@ test_heartbeat_lane_floor_wakes_with_free_lane_slots() {
   pass "a home under its lane floor wakes with free lane slots, stays quiet at the floor, and re-raises while held"
 }
 
+# Every lane slot open but none working still leaves an idle home: at or above
+# config/lane-target the heartbeat falls back to the no-worker-working rule
+# (the 6 Oct TakeOne stall: four parked lanes, nine ready items, no wake 3 h).
+test_heartbeat_full_lanes_with_no_worker_working_wake() {
+  local dir state fakebin out pid tasks i
+  if ! command -v tasks-axi >/dev/null 2>&1; then
+    pass "full-but-idle heartbeat # skip: tasks-axi not found"
+    return 0
+  fi
+  dir=$(make_case heartbeat-full-idle); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
+  tasks="$ROOT/bin/fm-tasks-axi.sh"
+  printf 'sm-full-idle\n' > "$dir/.fm-secondmate-home"
+  mkdir -p "$dir/data" "$dir/config"
+  FM_HOME="$dir" "$tasks" add alpha-one "first ready item" >/dev/null || fail "fixture: could not queue alpha-one"
+  printf '4\n' > "$dir/config/lane-target"
+  for i in 1 2 3 4; do printf 'kind=ship\n' > "$state/lane$i.meta"; done
+  watch_bg "$state" "$fakebin" "$out" env FM_HOME="$dir" FM_HEARTBEAT=1 \
+    FM_FAKE_CREW_STATE='state: blocked · source: status-log · parked on a sibling lane'
+  pid=$!
+  wait_for_exit "$pid" 100 || { reap "$pid"; fail "a home whose four open lanes all wait was not woken: $(cat "$out")"; }
+  grep -Fx "check: ready work waiting with no worker working: alpha-one - start each or record why it waits" "$out" >/dev/null \
+    || fail "the full-but-idle wake did not use the no-worker-working reason: $(cat "$out")"
+  ack_stopped_cycle "$state" >/dev/null 2>&1 || fail "could not acknowledge the full-but-idle wake"
+  pass "a home with every lane slot open but no worker working is woken"
+}
+
 test_heartbeat_backstop_surfaces_a_masked_status() {
   local dir state fakebin out sig pid
   dir=$(make_case heartbeat-masked); state="$dir/state"; fakebin="$dir/fakebin"
@@ -7165,6 +7191,7 @@ test_heartbeat_backstop_surfaces_unsurfaced_status
 test_heartbeat_backstop_surfaces_a_masked_status
 test_heartbeat_wakes_an_idle_lead_with_ready_work
 test_heartbeat_lane_floor_wakes_with_free_lane_slots
+test_heartbeat_full_lanes_with_no_worker_working_wake
 test_beacon_stays_fresh_while_absorbing
 test_afk_signal_records_heartbeat_endpoint
 test_afk_present_reverts_watcher_to_one_shot
