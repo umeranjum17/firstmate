@@ -168,7 +168,7 @@ Claude's Stop hook also starts one handling successor before notification.
 After an actionable foreground close, including an attached peer cycle that ended, the hook:
 
 1. Launches `bin/fm-watch-arm.sh` with the closed arm's pid as `FM_WATCH_PREDECESSOR_ARM_PID`.
-2. Waits for that arm's one status line.
+2. Waits for that arm's one status line, relaunching it boundedly while it stays unconfirmed.
 3. Only then exits 2 with the wake.
 
 A child of the hook cannot outlive its exit-2 rewake.
@@ -181,7 +181,7 @@ So that successor is the one deliberate detached launch in the continuity path:
 This is the shape `bin/fm-startup-network.sh` uses, and [`verification/supervision.md`](verification/supervision.md#detached-session-open-workers-survive-the-hook) verified that it survives the hook.
 
 The next Stop's foreground arm attaches to that live cycle.
-A successor that confirms no live watcher adds one line to the rewake banner and never withholds the wake.
+A successor that confirms no live watcher on any bounded attempt adds one line to the rewake banner and never withholds the wake.
 The next Stop then re-arms as before.
 
 ### Durable queue and turn-end backstop

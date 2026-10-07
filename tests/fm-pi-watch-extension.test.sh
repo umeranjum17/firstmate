@@ -621,6 +621,107 @@ EOF
   pass "Pi dispatcher branch offer owns accepted wakes and falls back to main"
 }
 
+# A branch that accepts a wake but never settles it must not park the whole
+# delivery pipeline: past the bounded settlement wait the wake is re-ringed
+# to main, and later closes keep flowing behind it.
+test_pi_hung_branch_settlement_rerings_to_main() {
+  local repo home plugin log stop out status
+  repo="$TMP_ROOT/pi-hung-branch-root"
+  home="$TMP_ROOT/pi-hung-branch-home"
+  log="$TMP_ROOT/pi-hung-branch.log"
+  stop="$TMP_ROOT/pi-hung-branch.stop"
+  mkdir -p "$repo/bin" "$home/state" "$home/config"
+  install_pi_watch_extension_fixture "$repo"
+  plugin="$repo/.pi/extensions/fm-primary-pi-watch.ts"
+  cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = --handling-delivered ]; then
+  printf 'confirmed generation=%s watcher=%s\n' "$2" "$4" >> "${FM_ARM_LOG:?}"
+  exit 0
+fi
+printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
+count=$(grep -c '^arm=' "$FM_ARM_LOG")
+if [ "$count" -eq 1 ]; then
+  printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
+  printf 'signal: hung-branch synthetic wake\n'
+  exit 0
+fi
+printf 'watcher: started pid=%s (beacon fresh) recovery-generation=fixture-generation\n' "$$"
+trap 'exit 0' TERM INT
+while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.02; done
+SH
+  chmod +x "$repo/bin/fm-watch-arm.sh"
+  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_STOP_FILE="$stop" \
+    FM_BRANCH_SETTLEMENT_TIMEOUT_MS=200 node --input-type=module 2>&1 <<'EOF'
+import { writeFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
+
+const startedAt = Date.now();
+const offers = [];
+let mainPrompt = "";
+let tool = null;
+const handlers = new Map();
+const bus = {
+  on(channel, handler) {
+    handlers.set(channel, [...(handlers.get(channel) ?? []), handler]);
+    return () => {};
+  },
+  emit(channel, data) {
+    for (const handler of handlers.get(channel) ?? []) handler(data);
+  },
+};
+bus.on("fm-branch-supervision:dispatch", (offer) => {
+  offers.push({ message: offer.message, eligible: offer.eligible });
+  // The hung branch: accepts ownership, then never settles.
+  offer.accept(new Promise(() => {}));
+});
+const pi = {
+  on() {},
+  events: bus,
+  registerCommand() {},
+  registerTool(candidate) {
+    if (candidate.name === "fm_watch_arm_pi") tool = candidate;
+  },
+  sendUserMessage: async (message) => {
+    mainPrompt = message;
+  },
+};
+writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.FM_HOME}/state/hung-branch.meta`, "project=/projects/approved\nwindow=fm-hung-branch\n");
+writeFileSync(`${process.env.FM_HOME}/state/.wake-queue`, "1\t1\tsignal\thung-branch.status\tsignal: hung-branch synthetic wake\n");
+const mod = await import(pathToFileURL(process.env.PLUGIN).href);
+mod.default(pi);
+await tool.execute("tool-call-hung-branch", {}, undefined, undefined, {});
+for (let i = 0; i < 500 && !mainPrompt; i += 1) {
+  await new Promise((resolve) => setTimeout(resolve, 10));
+}
+if (offers.length !== 1) throw new Error(`expected the branch to take the wake, got ${offers.length} offers`);
+if (offers[0].eligible !== true) throw new Error(`hung-branch offer was not branch-eligible: ${JSON.stringify(offers[0])}`);
+if (!offers[0].message.includes("signal: hung-branch synthetic wake")) {
+  throw new Error(`offer missed the wake reason: ${offers[0].message}`);
+}
+if (!mainPrompt.includes("FIRSTMATE WATCHER WAKE")) {
+  throw new Error("a branch-accepted wake with no settlement never reached main");
+}
+if (!mainPrompt.includes("signal: hung-branch synthetic wake")) {
+  throw new Error(`re-ringed wake lost the reason line: ${mainPrompt}`);
+}
+if (!mainPrompt.includes("re-ringed to main")) {
+  throw new Error(`re-ringed wake did not say it was re-ringed: ${mainPrompt}`);
+}
+if (Date.now() - startedAt > 15000) {
+  throw new Error("branch-settlement fallback did not stay bounded");
+}
+writeFileSync(process.env.FM_STOP_FILE, "stop\n");
+process.exit(0);
+EOF
+  )
+  status=$?
+  expect_code 0 "$status" "a hung branch settlement must re-ring the wake to main within the bound: $out"
+  [ -z "$out" ] || fail "Pi hung-branch test printed output: $out"
+  pass "a hung branch settlement re-rings the wake to main within the bound"
+}
+
 test_pi_branch_offer_flags_heartbeat() {
   local repo home plugin log stop out status
   repo="$TMP_ROOT/pi-branch-heartbeat-root"
@@ -5188,6 +5289,7 @@ test_pi_scheduled_retry_call_is_owned_noop
 test_pi_actionable_close_starts_single_successor_before_delivery
 test_pi_actionable_output_waits_for_predecessor_close
 test_pi_branch_offer_owns_actionable_wake
+test_pi_hung_branch_settlement_rerings_to_main
 test_pi_branch_offer_flags_heartbeat
 test_pi_heartbeat_is_not_ridden_into_main_by_a_co_present_check
 test_pi_main_only_check_classes_stay_on_main

@@ -937,15 +937,38 @@ fm_busy_agy_tail_busy() {
 # plausible self-referential prose a firstmate-repo worker could easily render
 # on its own (fm-claude-trust.sh's header literally quotes both questions),
 # but the option/footer pairing only ever renders inside the real dialog.
+# fm_busy_claude_trust_dialog_tail: Claude's workspace-trust dialog alone
+# (question plus its own option/footer lines, both required). The spawn gate
+# owns the reason this is separate from the imports dialog below: Enter on
+# the trust dialog selects "No, exit" and kills the worker, so the gate
+# must never press there, while Enter on the imports dialog selects the safe
+# "No, disable external imports" decline and lets the worker proceed.
+fm_busy_claude_trust_dialog_tail() {
+  local buf
+  buf=$(cat)
+  printf '%s' "$buf" | grep -qiE "${FM_BUSY_CLAUDE_TRUST_PROMPT_REGEX:-Quick safety check: Is this a project you created or one you trust\\?}" \
+    && printf '%s' "$buf" | grep -qiE 'No, exit|Enter to confirm'
+}
+
+# fm_busy_claude_imports_dialog_tail: Claude's separate external-CLAUDE.md-
+# imports dialog alone (question plus its own option lines, both required).
+# The only dialog fm-spawn.sh may answer post-launch: its cursor rests on the
+# fail-closed decline, so one Enter dismisses it without manufacturing the
+# consent fm-claude-trust.sh refuses to grant.
+fm_busy_claude_imports_dialog_tail() {
+  local buf
+  buf=$(cat)
+  printf '%s' "$buf" | grep -qiE "${FM_BUSY_CLAUDE_IMPORTS_PROMPT_REGEX:-Allow external CLAUDE\\.md file imports\\?}" \
+    && printf '%s' "$buf" | grep -qiE 'No, disable external imports|Yes, allow external imports'
+}
+
 fm_busy_claude_launch_prompt_tail() {
   local buf
   buf=$(cat)
-  if printf '%s' "$buf" | grep -qiE "${FM_BUSY_CLAUDE_TRUST_PROMPT_REGEX:-Quick safety check: Is this a project you created or one you trust\\?}" \
-    && printf '%s' "$buf" | grep -qiE 'No, exit|Enter to confirm'; then
+  if printf '%s' "$buf" | fm_busy_claude_trust_dialog_tail; then
     return 0
   fi
-  printf '%s' "$buf" | grep -qiE "${FM_BUSY_CLAUDE_IMPORTS_PROMPT_REGEX:-Allow external CLAUDE\\.md file imports\\?}" \
-    && printf '%s' "$buf" | grep -qiE 'No, disable external imports|Yes, allow external imports'
+  printf '%s' "$buf" | fm_busy_claude_imports_dialog_tail
 }
 
 # fm_busy_pi_launch_prompt_tail: Pi's project-trust dialog. Live-verified on
