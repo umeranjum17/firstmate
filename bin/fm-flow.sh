@@ -128,9 +128,8 @@ for name, home in sorted(homes.items()):
         if sum(e['event'] == 'task.dispatched' for e in es) > 1:
             times = dict(times, dispatched=None, pr_ready=None, merged=None, cleaned_up=None)
             notes.append({'source': name + '/' + task, 'reason': 'reused task id: lifecycle attribution unknown'})
-            if basis == 'captured':
-                latest = max(e['ts'] for e in es if e['event'] == 'task.dispatched')
-                status = [e for e in status if e.get('ts') is not None and e['ts'] >= latest]
+            latest = max(e['ts'] for e in es if e['event'] == 'task.dispatched')
+            status = [e for e in status if e.get('ts') is not None and e['ts'] >= latest]
         working = next((e['ts'] for e in status if e.get('state') == 'working'), None)
         waits = {}
         for e in status:
