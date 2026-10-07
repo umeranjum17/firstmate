@@ -967,6 +967,47 @@ test_secondmate_relaunch_picks_up_the_configured_harness_pin() {
   pass "fm-control relaunch: a secondmate relaunch re-resolves its durable configured harness pin"
 }
 
+test_secondmate_relaunch_keeps_a_dotted_mate_pin_through_relaunch() {
+  local dir home out rc id=sm.dotted
+  dir=$(new_case smdotted "$id")
+  home="$dir/home"
+  mkdir -p "$home/config/secondmates/$id"
+  printf 'pi global-model medium\n' > "$home/config/secondmate-harness"
+  printf 'codex some-model high\n' > "$home/config/secondmates/$id/harness"
+  mkdir -p "$home/data/$id"
+  printf '# secondmate brief\n' > "$home/data/$id/brief.md"
+  fm_git_worktree "$dir/proj" "$dir/smhome" sm-branch
+  mkdir -p "$dir/smhome/state" "$dir/smhome/data" "$dir/smhome/bin"
+  printf '%s\n' "$id" > "$dir/smhome/.fm-secondmate-home"
+  printf '# agents\n' > "$dir/smhome/AGENTS.md"
+  {
+    echo "window=fmses:fm-$id"
+    echo "endpoint_task_id=$id"
+    echo "worktree=$dir/smhome"
+    echo "project=$dir/smhome"
+    echo "harness=claude"
+    echo "kind=secondmate"
+    echo "mode=secondmate"
+    echo "yolo=off"
+    echo "model=default"
+    echo "effort=default"
+    echo "home=$dir/smhome"
+  } > "$home/state/$id.meta"
+  printf '%s\n' "fm-$id" > "$dir/fake/windows"
+  printf '%s' "$dir/smhome" > "$dir/fake/cwd"
+  printf 'codex' > "$dir/fake/becomes"
+  out=$(run_control "$dir" "$id" relaunch); rc=$?
+  expect_code 0 "$rc" "a dotted secondmate id should relaunch"$'\n'"$out"
+  [ "$(journal_field "$dir" "$id" to_harness)" = codex ] \
+    || fail "a dotted mate relaunch should pick up the configured harness pin, got '$(journal_field "$dir" "$id" to_harness)'"
+  [ "$(journal_field "$dir" "$id" to_model)" = some-model ] \
+    || fail "the configured model token should come with the dotted pin"
+  [ "$(journal_field "$dir" "$id" to_effort)" = high ] \
+    || fail "the configured effort token should come with the dotted pin"
+  assert_not_contains "$out" "invalid secondmate id" "a legal dotted mate id must not be refused"
+  pass "fm-control relaunch: a dotted mate id keeps its configured profile through relaunch"
+}
+
 test_secondmate_relaunch_ignores_invalid_configured_effort_before_stop() {
   local dir home out rc
   dir=$(new_case invalid-effort sm6)
@@ -2440,6 +2481,7 @@ test_prior_harness_turnend_registry_entry_is_cleared
 test_wiring_removal_failure_refuses_before_replacement_arm
 test_turnend_auth_paths_are_owned_by_the_control_adapter
 test_secondmate_relaunch_picks_up_the_configured_harness_pin
+test_secondmate_relaunch_keeps_a_dotted_mate_pin_through_relaunch
 test_secondmate_relaunch_ignores_invalid_configured_effort_before_stop
 test_secondmate_relaunch_onto_a_crewmate_only_adapter_refuses_before_stop
 test_explicit_secondmate_harness_ignores_configured_profile_axes

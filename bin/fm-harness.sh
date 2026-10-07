@@ -459,7 +459,7 @@ secondmate_line() {
   local line file="$CONFIG/secondmate-harness" pinned=0
   if [ -n "$SECONDMATE_ID" ]; then
     case "$SECONDMATE_ID" in
-      *[!a-zA-Z0-9_-]*|.|..) echo "error: invalid secondmate id '$SECONDMATE_ID'" >&2; return 1 ;;
+      ''|.*|*[!a-zA-Z0-9._-]*) echo "error: invalid secondmate id '$SECONDMATE_ID'" >&2; return 1 ;;
     esac
     file="$CONFIG/secondmates/$SECONDMATE_ID/harness"
     if [ -e "$file" ] || [ -L "$file" ]; then
