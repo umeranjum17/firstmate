@@ -176,13 +176,19 @@ test_overview_answers_the_four_questions_with_sums_that_add_up() {
   done
   has "$d/index.html" "Waiting on you · Main's ask list, now Nothing needs you." \
     "Landed so far 2 yesterday 1" "Lanes building 3 of 8 open" \
-    "Busy agents 1 lead + 1 Main + 1 worker + 1 other 4 of 5 agents" \
+    "Busy agents 1 lead + 1 Main + 1 worker + 1 other 4 of 5 running agents" \
     "8 lanes open of a plan of 9; 2 blocked or waiting." "moving 4 stopped 4 free 1 of plan 9" \
     "Blocked or waiting on a decision 1 blocked · 1 on a decision 2" "Finished, not landed" \
     "Producing 3 building · 1 validating 4" "Open lanes 2 + 1 + 4 + 1 = 8" \
     "beta is parked by the captain and left out of every total." \
     "1 item held for the captain in home records · oldest" "Main must triage" \
     "Claude quota runs out" "2 lanes blocked or waiting on a decision · oldest 2 h"
+  # The busy parts sum to the busy total, and the denominator is every running Herdr agent
+  # outside parked homes (6 listed, 1 in parked beta), not the lane plan of 9.
+  running=$(jq '[.result.agents[] | select(.pane_id != "pane-b-stale")] | length' "$home/herdr.json")
+  [ "$running" = 5 ] || fail "fixture should list 5 running agents outside parked homes, has $running"
+  has "$d/index.html" "4 of $running running agents"
+  has "$d/backlog.html" "Busy now 1 + 1 + 1 + 1 = 4" "the groups list all $running running agents"
   # Grouped by home, the same lanes sum to the same total.
   has "$d/index.home.html" "Open lanes 7 + 1 = 8" "Main 1 blocked · 1 on a decision 7 Blocked, needs help 1" "zephyrine 1 building 1"
   lacks "$d/index.html" "A parked home's stale lane" "w3"
