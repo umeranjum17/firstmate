@@ -54,6 +54,29 @@ assert {q['task']: q['why'] for q in x['queue']} == {'next': 'dependency: prior'
 assert next(b for b in x['bottlenecks'] if b['cause'] == 'unknown')['unknown_items'] == 1
 assert any(n.get('line') == 7 for n in x['limitations']), 'malformed durable record disclosed'
 assert len(x['trend_7d']) == 7
+grand = tmp / 'grand'
+(grand / 'state').mkdir(parents=True)
+(grand / 'data').mkdir()
+(grand / 'data/backlog.md').write_text('## Queued\n')
+(grand / 'data/secondmates.md').write_text(f'- main - Parent (home: {main}; scope: fleet; projects: app)\n')
+with open(child / 'data/secondmates.md', 'a') as f:
+    f.write(f'- grand - Worker (home: {grand}; scope: app; projects: app)\n')
+(child / 'state/grand.status').write_text('done [at=70] [key=merged-gtask]: merged\n')
+with open(child / 'state/fleet-ledger.jsonl', 'a') as f:
+    f.write(json.dumps(dict(v=1, task='reused', ts=10, event='task.dispatched')) + '\n')
+    f.write(json.dumps(dict(v=1, task='reused', ts=70, event='task.merged')) + '\n')
+    f.write(json.dumps(dict(v=1, task='reused', ts=90, event='task.dispatched')) + '\n')
+    f.write(json.dumps(dict(v=1, task='nullstage', ts=10, event='task.dispatched')) + '\n')
+    f.write(json.dumps(dict(v=1, task='nullstage', ts=20, event='task.status', state=None, key='k', text='t')) + '\n')
+y = json.loads(run())
+assert y['homes'] == ['child', 'grand', 'main'], 'nested home discovered'
+bytask = {(l['home'], l['task']): l for l in y['lanes']}
+assert bytask[('grand', 'gtask')]['times']['merged'] == 70, 'nested return-channel merge found'
+assert bytask[('grand', 'gtask')]['durations']['time_to_merge'] is None, 'no guessed pickup'
+assert 'gtask' in {l['task'] for l in y['executed_24h']}
+assert bytask[('child', 'reused')]['times']['merged'] is None, 'reused id keeps no merge'
+assert 'reused' not in {l['task'] for l in y['executed_24h']}
+assert bytask[('child', 'nullstage')]['stage'] == 'unknown', 'null ledger state stays unknown'
 bad = subprocess.run(['bash', script, '--json', '--now', 'bad'], capture_output=True)
 assert bad.returncode == 2
 print('PASS: real flow CLI, two homes, queue, keyed waits, retained lifecycle, unknowns, read-only determinism')
