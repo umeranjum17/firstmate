@@ -1,0 +1,19 @@
+## fresh ship refused by gate
+lane cap reached: 2 of 2 open
+error: spawn refused by config/spawn-gate (exit 1)
+exit=1
+--- gate-seen.log:
+FM_HOME=/tmp/fm-gate-evid.eGriIU/home id=ship-evid-z1
+
+## relaunch ignores refusing gate
+error: --relaunch needs an existing task record; no /tmp/fm-gate-evid.eGriIU/home/state/ship-evid-z1.meta
+exit=1
+gate-seen.log exists: NO
+
+## non-executable gate ignored
+error: task nonexec-evid-z1 has no brief at inaccessible data path /tmp/fm-gate-evid.eGriIU/home/data/nonexec-evid-z1/brief.md
+exit=1
+ok - absent gate passes the spawn through to the missing-brief check
+ok - refusing gate blocks the scout with its text and creates nothing
+ok - allowing gate passes the spawn through to the missing-brief check
+ok - secondmate spawn ignores the refusing gate
