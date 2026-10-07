@@ -470,7 +470,9 @@ test_sweep_respawns_authoritatively_missing_pi_secondmate() {
 test_sweep_respawns_authoritatively_missing_pi_signed_secondmate() {
   local w fb tmuxfb log out
   w=$(new_world sweep-missing-pi-signed)
-  printf '%s\n' pi-signed > "$w/home/config/secondmate-harness"
+  printf 'pi global-model medium\n' > "$w/home/config/secondmate-harness"
+  mkdir -p "$w/home/config/secondmates/sm1"
+  printf 'pi-signed some-model high\n' > "$w/home/config/secondmates/sm1/harness"
   add_sm_home "$w" sm1 firstmate:fm-sm1 pi-signed
   fb=$(make_toolchain "$w"); tmuxfb=$(make_liveness_tmux "$w")
   log="$w/calls.log"; : > "$log"
@@ -483,7 +485,9 @@ test_sweep_respawns_authoritatively_missing_pi_signed_secondmate() {
     "an authoritatively missing pi-signed secondmate should be relaunched"
   assert_not_contains "$(cat "$log")" "kill-window" \
     "an absent pi-signed window should not need a destructive pre-kill"
-  pass "sweep: an authoritatively missing pi-signed secondmate window is relaunched"
+  assert_contains "$(cat "$w/home/state/sm1.meta")" "model=some-model" "recovery must preserve the per-mate model"
+  assert_contains "$(cat "$w/home/state/sm1.meta")" "effort=high" "recovery must preserve the per-mate effort"
+  pass "sweep: an authoritatively missing pi-signed secondmate window is relaunched on its own pin"
 }
 
 test_sweep_never_acts_on_ambiguous_existing_process() {

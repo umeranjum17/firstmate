@@ -779,13 +779,20 @@ The first non-empty, non-comment line is parsed as `<harness> [<model>] [<effort
 A bare `<harness>` preserves the previous behavior: harness only, with no model or effort launch flag.
 When the harness token is absent or `default`, secondmate launch falls back through `config/crew-harness` and then the primary's own harness, and no model or effort is read from that file.
 
-`fm-harness.sh secondmate-model` and `fm-harness.sh secondmate-effort` expose only the optional tokens from `config/secondmate-harness`; `config/crew-harness` remains a bare adapter-name file.
-Changing this pin affects the next secondmate spawn or control-plane relaunch; the relaunch profile rules are owned by [`docs/agent-control.md`](agent-control.md#transactional-relaunch).
+For an individual registered secondmate, the primary may keep a complete pin in `config/secondmates/<id>/harness`, beside the global file and never inside the secondmate's home.
+Its first non-empty, non-comment line must contain exactly `<harness> <model> <effort>`, with a verified secondmate harness, a concrete model, and a supported effort (`low`, `medium`, `high`, `xhigh`, `max`, or native `ultra`).
+An empty, unreadable, or malformed per-mate pin is an error naming that file, never permission to use the global default.
+For example, `config/secondmates/design/harness` containing `claude claude-opus-5-5 high` keeps that lead's profile independent of the global setting.
+
+`fm-harness.sh secondmate <id>`, `secondmate-model <id>`, and `secondmate-effort <id>` are the single resolver: per-mate pin, then the unchanged global file, then the existing static harness fallback.
+Without an id these commands retain their global behavior; `config/crew-harness` remains a bare adapter-name file.
+Launch, update restart, and automatic recovery use the mate's id, including remote routes whose profile is resolved on the parent before transmission.
+Changing a pin affects the next spawn or control-plane relaunch; the relaunch profile rules are owned by [`docs/agent-control.md`](agent-control.md#transactional-relaunch).
 
 ### Per-launch overrides and inherited defaults
 
-An explicit harness argument to `fm-spawn.sh` still overrides either config file for that spawn only.
-An explicit `--model` or `--effort` overrides the matching token from `config/secondmate-harness`; for a local route, an explicit harness or raw launch command starts with clean model and effort defaults unless those flags are also passed.
+An explicit harness argument to `fm-spawn.sh` still overrides the resolved harness profile for that spawn only.
+An explicit `--model` or `--effort` overrides the matching token from the resolved secondmate profile (per-mate pin or global file); for a local route, an explicit harness or raw launch command starts with clean model and effort defaults unless those flags are also passed.
 
 Remote secondmate routes accept verified harness adapters only and reject raw launch commands.
 When `config/crew-dispatch.json` exists, crewmate and scout spawns require an explicit resolved harness instead of automatically falling back to `config/crew-harness`.
@@ -793,7 +800,7 @@ When `config/crew-dispatch.json` exists, crewmate and scout spawns require an ex
 The inherited-local-material contract is owned by [`secondmate-provisioning`](../.agents/skills/secondmate-provisioning/SKILL.md); its harness-relevant consequence is that a secondmate's own crewmates use the primary's dispatch profiles and static harness value.
 Those inherited values are defaults and rules only; `fm-spawn` still permits a consciously chosen explicit runtime outside the config.
 
-`config/secondmate-harness` is not inherited because secondmates do not launch secondmates.
+`config/secondmate-harness` and `config/secondmates/<id>/harness` pins are not inherited because secondmates do not launch secondmates.
 
 ### Installed hooks and launch details
 
@@ -1029,7 +1036,7 @@ Firstmate resolves the rule's profile object or array under `AGENTS.md` section 
 
 - When the file exists, `fm-spawn.sh` enforces that contract by refusing crewmate and scout spawns that lack an explicit harness (`--harness`, a positional adapter, or a raw launch command).
 - Batch spawns satisfy the same requirement with a shared `--harness`.
-- Secondmate spawns are exempt and still resolve through `config/secondmate-harness` and its optional model and effort tokens.
+- Secondmate spawns are exempt and still resolve through the per-mate pin or the global `config/secondmate-harness`, including the resolved model and effort tokens.
 
 **Contract owners**
 

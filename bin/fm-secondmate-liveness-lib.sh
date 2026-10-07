@@ -267,6 +267,12 @@ fm_secondmate_liveness_probe() {  # <meta> <id> <full|poll>
 fm_secondmate_liveness_relaunch() {  # <meta> <id> [timeout-secs]
   local meta=$1 id=$2 timeout=${3:-}
   FM_SM_LIVE_OUT='' FM_SM_LIVE_RC=0
+  # Reject a malformed durable pin before removing even a dead endpoint.
+  if ! FM_SM_LIVE_OUT=$("$FM_SM_LIVE_LIB_DIR/fm-harness.sh" secondmate "$id" 2>&1); then
+    FM_SM_LIVE_RC=1
+    return 1
+  fi
+  FM_SM_LIVE_OUT=''
   if ! fm_secondmate_liveness_recent_attempts "$id" 0 >/dev/null; then
     FM_SM_LIVE_STATUS=skipped
     FM_SM_LIVE_REASON="relaunch ledger $STATE/.secondmate-relaunch-$id is unreadable; endpoint left $FM_SM_LIVE_STATE"

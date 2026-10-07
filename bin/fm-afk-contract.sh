@@ -523,8 +523,11 @@ fm_afk_contract_cmd_enter() {
     fm_afk_contract_render_readback "$record"
     return
   fi
-  now=$(fm_afk_contract_now_iso)
+  # One clock read: entered/confirmed ISO and epoch are two representations of
+  # the same instant, so the ISO is derived from the epoch. Two separate date
+  # calls can straddle a second boundary and disagree by 1s (flaky return brief).
   now_epoch=$(date +%s)
+  now=$(date -u -r "$now_epoch" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d "@$now_epoch" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || fm_afk_contract_now_iso)
   session_entered=$now
   session_entered_epoch=$now_epoch
   # A replacement carries the session entry forward; quiet mode becoming the
