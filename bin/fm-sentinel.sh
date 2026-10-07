@@ -172,6 +172,18 @@ reconcile() {  # <episode>
     if [ "$agent" = alive ]; then
       cwd=$(fm_canonical_existing_dir "$(fm_backend_herdr_current_path "$target")")
     fi
+    if [ -z "$wt" ]; then
+      case "$agent:$current" in
+        alive:done|alive:failed)
+          act "$id" "$current, was live in ${cwd:-an unreadable folder}; exited" "$SCRIPT_DIR/fm-control.sh" "$id" exit
+          ;;
+        *)
+          say "$id: worktree missing; skipped"
+          RECONCILE_RC=1
+          ;;
+      esac
+      continue
+    fi
     case "$agent:$current" in
       alive:done|alive:failed)
         case "$cwd/" in
@@ -215,13 +227,16 @@ primary_target() {
 }
 
 wake_primary() {  # <body>
-  local target doorbell verdict
+  local target doorbell verdict rec
   target=$(primary_target) || { say "primary: no single Herdr pane runs session $(head -n 1 "$STATE/.lock-session" 2>/dev/null); wake deferred"; return 1; }
   [ "$(fm_backend_busy_state herdr "$target")" != busy ] || { say "primary: $target mid-turn; wake deferred"; return 1; }
   [ "$(fm_backend_composer_state herdr "$target")" = empty ] || { say "primary: $target composer not empty; wake deferred"; return 1; }
   fm_operational_record_write "$STATE" watcher "$1" doorbell || { say "primary: could not write the wake record"; return 1; }
   verdict=$(fm_backend_send_text_submit herdr "$target" "$doorbell" 3 0.5 0.5 2>/dev/null)
-  [ "$verdict" = empty ] || { say "primary: wake typed into $target but not confirmed ($verdict)"; return 1; }
+  if [ "$verdict" != empty ]; then
+    if fm_operational_doorbell_path "$doorbell" rec 2>/dev/null; then rm -f "$rec"; fi
+    say "primary: wake typed into $target but not confirmed ($verdict)"; return 1;
+  fi
   say "primary: woke $target"
 }
 
@@ -231,12 +246,14 @@ tick() {
   [ -n "$id" ] || return 0
   prev=$(cat "$STATE/.sentinel-herdr-identity" 2>/dev/null)
   if [ "$prev" != "$id" ]; then
-    printf '%s\n' "$id" >"$STATE/.sentinel-herdr-identity"
     if [ -n "$prev" ]; then
       say "herdr session $SESSION restarted (socket $prev -> $id)"
       reconcile "$id" || rc=1
       printf '%s\n' "The Herdr server restarted at $(date -u +%Y-%m-%dT%H:%M:%SZ), which stopped every agent and watcher in it. The sentinel already reconciled this home's direct reports; its lines are in $LOG. Run bin/fm-session-start.sh if this session was resumed, reconcile what remains, then end the turn so supervision re-arms." \
         >"$STATE/.sentinel-wake-pending"
+      printf '%s\n' "$id" >"$STATE/.sentinel-herdr-identity"
+    else
+      printf '%s\n' "$id" >"$STATE/.sentinel-herdr-identity"
     fi
   fi
   if [ -f "$STATE/.sentinel-wake-pending" ]; then
