@@ -97,6 +97,25 @@ assert relive['open'] and relive['timestamp_basis'] == 'emitted'
 assert relive['stage'] == 'unknown' and relive['open_waits'] == [], 'live reuse drops pre-dispatch status'
 assert relive['seconds_in_stage'] is None and relive['times']['working'] is None
 assert relive['reason'] == 'unknown: no status reason'
+(main / 'config').mkdir()
+(main / 'config/fm-flow-check.sh').write_text("clock = 30 if L['verb'] == 'needs-decision' else 50\n")
+(main / 'config/lane-caps').write_text('main 0\n')
+for task, reason in [('memory', 'fm-mem-gate: waiting (free 1 GB)'), ('credential', 'waiting for login'),
+                     ('ci', 'waiting for CI queue'), ('merge', 'waiting for merge'),
+                     ('mention', 'memory gate code fixed; waiting for new instructions')]:
+    (child / 'state' / (task + '.meta')).write_text('kind=ship\n')
+    (child / 'state' / (task + '.status')).write_text(f'blocked [at=10] [key=wait]: {reason}\n')
+z = json.loads(run())
+new = {l['task']: l for l in z['lanes'] if l['open']}
+for task, expected in [('memory', 'memory_gate'), ('credential', 'credential_external'),
+                       ('ci', 'ci_queue'), ('merge', 'review_merge'), ('mention', 'unknown')]:
+    assert new[task]['open_waits'][0]['cause'] == expected
+    assert new[task]['stage_clock']['seconds'] == 50 and new[task]['stage_clock']['overdue'] is True
+    assert new[task]['ci'] is None, 'no reported CI is not a zero or green'
+assert {q['task']: q['why'] for q in z['queue']}['ready'] == 'lane cap: 0 recorded active lanes, cap 0'
+assert new['unknown']['stage_clock']['overdue'] is None, 'unstamped stage never guessed overdue'
+(main / 'config/fm-flow-check.sh').write_text('unrecognized clock policy\n')
+assert next(l for l in json.loads(run())['lanes'] if l['task'] == 'memory')['stage_clock']['seconds'] is None
 bad = subprocess.run(['bash', script, '--json', '--now', 'bad'], capture_output=True)
 assert bad.returncode == 2
 print('PASS: real flow CLI, two homes, queue, keyed waits, retained lifecycle, unknowns, read-only determinism')
