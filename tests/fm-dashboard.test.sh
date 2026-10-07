@@ -78,7 +78,12 @@ first_pass|>=|70|each home|prove before PR
 stall_alarms|<=|0|each home|watcher wakes idle leads
 EOF
   # A registered home with no metrics rows at all, under a made-up name.
-  mkdir -p "$home/mates/zephyrine/data"
+  mkdir -p "$home/mates/zephyrine/data" "$home/mates/zephyrine/state"
+  cat > "$home/config/fm-flow-check.sh" <<'EOF'
+#!/bin/sh
+printf 'home\t1\t1\t0\t0\t0\t-1\n'
+EOF
+  chmod +x "$home/config/fm-flow-check.sh"
   printf -- '- quillwork [direct-PR] - made-up project (added 2026-07-11)\n' > "$home/mates/zephyrine/data/projects.md"
   printf -- '- zephyrine - made-up domain (home: %s; scope: made-up work; projects: other; added 2026-07-11)\n' \
     "$home/mates/zephyrine" > "$home/data/secondmates.md"
@@ -127,7 +132,7 @@ test_totals_count_only_work_that_waits() {
   green_pr "$home" delta-pr https://github.com/o/delta/pull/12
   green_pr "$home" ghost-pr https://github.com/o/ghost/pull/13
   printf '# parked by the captain\nbeta\n' > "$home/config/parked-homes"
-  mkdir -p "$home/mates/alpha/data"
+  mkdir -p "$home/mates/alpha/data" "$home/mates/alpha/state"
   printf -- '- alpha - fixture domain (home: %s; scope: fixture; projects: alpha; added 2026-07-11)\n' \
     "$home/mates/alpha" >> "$home/data/secondmates.md"
   # The home's flow check reports two finished lanes for every home it is asked about.
@@ -140,9 +145,9 @@ EOF
   out=$(FM_HOME="$home" "$DASH" build) || fail "build failed: $out"
   page="$home/state/dashboard/index.html"
   text=$(page_text "$page")
-  for want in "Waiting on you 2 2 merge approvals, 0 decisions" "delta-pr main Merge approval ghost-pr main Merge approval" \
+  for want in "Waiting on you 0 recorded by Main" \
     "Finished, not landed 6 waiting to merge Merged today" "Merged today 3 yesterday 0" \
-    "Queued and ready 3" "of 6 open lanes" "beta Parked"; do
+    "Queued and ready 0" "Running now 1 actively working, not waiting" "beta Parked"; do
     case "$text" in *"$want"*) ;; *) fail "page text lacks '$want': $text" ;; esac
   done
   ! grep -q 'pull/11' "$page" || fail "a green PR in a +yolo project waits on the captain: $text"
@@ -150,7 +155,7 @@ EOF
   pass "totals leave out parked homes and self-merged PRs, and count finished lanes now"
 }
 
-test_merged_today_is_live_from_one_github_search() {
+test_merged_days_use_the_same_bounded_github_source() {
   local home page text out want r clone
   home=$(make_home ghlive)
   # zephyrine clones two repos and a parked home a third; the search also returns a repo no home clones.
@@ -162,27 +167,27 @@ test_merged_today_is_live_from_one_github_search() {
     clone="$home/mates/${r%%/*}/projects/$(basename "${r%%=*}")"
     git init -q "$clone" && git -C "$clone" remote add origin "${r#*=}"
   done
-  mkdir -p "$home/bin"
+  mkdir -p "$home/bin" "$home/mates/parkedmate/state"
   cat > "$home/bin/gh" <<EOF
 #!/bin/sh
 printf '%s\n' "\$*" >> "$home/gh.calls"
 [ -e "$home/gh.fail" ] && { echo 'HTTP 403: API rate limit exceeded' >&2; exit 1; }
-for r in quillwork quillwork shared held other; do echo "https://api.github.com/repos/acme/\$r"; done
+printf '%s\n' '[{"total_count":5,"incomplete_results":false,"items":[{"id":1,"repository_url":"https://api.github.com/repos/acme/quillwork"},{"id":2,"repository_url":"https://api.github.com/repos/acme/quillwork"},{"id":3,"repository_url":"https://api.github.com/repos/acme/shared"},{"id":4,"repository_url":"https://api.github.com/repos/acme/held"},{"id":5,"repository_url":"https://api.github.com/repos/acme/other"}]}]'
 EOF
   chmod +x "$home/bin/gh"
   page="$home/state/dashboard/index.html"
   out=$(PATH="$home/bin:$PATH" FM_HOME="$home" "$DASH" build) || fail "build failed: $out"
   text=$(page_text "$page")
-  for want in "Merged today 3 yesterday 1 · live from GitHub" "zephyrine Records need tidy-up Working now 0 Merged today 3 "; do
+  for want in "Merged today 3 yesterday 3 · GitHub as of" "zephyrine Records need tidy-up Working now 0 Finished, not landed 0 Merged today 3 "; do
     case "$text" in *"$want"*) ;; *) fail "page text lacks '$want': $text" ;; esac
   done
-  [ "$(wc -l < "$home/gh.calls")" -eq 1 ] || fail "not one search call: $(cat "$home/gh.calls")"
+  [ "$(wc -l < "$home/gh.calls")" -eq 2 ] || fail "not two bounded day searches: $(cat "$home/gh.calls")"
   grep -q 'q=owner:acme is:pr is:merged merged:>=20[0-9-]*T[0-9:]*Z' "$home/gh.calls" || fail "unexpected search: $(cat "$home/gh.calls")"
   # A rebuild inside 5 minutes reuses the count and does not search, even when GitHub would fail.
   touch "$home/gh.fail"
   PATH="$home/bin:$PATH" FM_HOME="$home" "$DASH" build >/dev/null || fail "cached build failed"
-  [ "$(wc -l < "$home/gh.calls")" -eq 1 ] || fail "a rebuild inside 5 minutes searched again"
-  case "$(page_text "$page")" in *"Merged today 3 yesterday 1 · live from GitHub"*) ;; *) fail "the cached count was not shown" ;; esac
+  [ "$(wc -l < "$home/gh.calls")" -eq 2 ] || fail "a rebuild inside 5 minutes searched again"
+  case "$(page_text "$page")" in *"Merged today 3 yesterday 3 · GitHub as of"*) ;; *) fail "the cached count was not shown" ;; esac
   # After 5 minutes a failed search falls back to prs.tsv, says how old that count is, and shows why.
   python3 -c 'import json,sys; p=sys.argv[1]; c=json.load(open(p)); c["at"]-=301; json.dump(c,open(p,"w"))' \
     "$home/state/dashboard/.merged-today.json"
@@ -192,7 +197,8 @@ EOF
   for want in "Merged today 3 yesterday 1 · as of 00:01" "GitHub merged-today search : HTTP 403: API rate limit exceeded"; do
     case "$text" in *"$want"*) ;; *) fail "page text lacks '$want': $text" ;; esac
   done
-  pass "Merged today counts live from one cached GitHub search and falls back to prs.tsv as of its time"
+  grep -q 'merged:<' "$home/gh.calls" || fail "day query has no upper boundary"
+  pass "both merge days use bounded GitHub counts, cached and explicitly dated, or the same ledger fallback"
 }
 
 SERVE_PID=
@@ -249,7 +255,7 @@ test_missing_or_malformed_sources_hide_only_their_part() {
     "data/metrics/daily.tsv : malformed" "data/metrics/prs.tsv : 1 short row(s) skipped" "fleet snapshot exited 2: fm-bearings-snapshot: FM_BEARINGS_LANDED must be a positive integer" "Merged today 3 yesterday 1"; do
     case "$text" in *"$want"*) ;; *) fail "page text lacks '$want': $text" ;; esac
   done
-  case "$text" in *"Running now"*) fail "snapshot tile shown without a snapshot: $text" ;; esac
+  case "$text" in *"Running now 1"*"Waiting on you 0 recorded by Main"*) ;; *) fail "independent tiles disappeared with the snapshot: $text" ;; esac
   pass "missing or malformed sources hide only their own part and never fail the build"
 }
 
@@ -295,9 +301,50 @@ EOF
   pass "Who does the work groups lanes by harness and model, joins merges by PR URL, and leaves out parked homes"
 }
 
+test_main_asks_and_lane_verbs_are_authoritative() {
+  local home page text now task today yesterday
+  home=$(make_home exact)
+  read -r _ today < <(when 0)
+  read -r _ yesterday < <(when 24)
+  printf '%s\talpha\t6\t0\t5\t99\t3\t0\n' "$yesterday" >> "$home/data/metrics/daily.tsv"
+  printf 'day\thome\n%s\talpha\n%s\talpha\n%s\tbeta\n' "$today" "$yesterday" "$yesterday" > "$home/data/metrics/rings.tsv"
+  page="$home/state/dashboard/index.html"
+  now=$(date +%s)
+  : > "$home/data/captain-asks.tsv"
+  FM_HOME="$home" "$DASH" build >/dev/null || fail "empty ask build failed"
+  grep -q 'class="tile ok"><div class="tl">Waiting on you</div><div class="tv">0' "$page" || fail "empty asks not zero and ok"
+  printf 'first\t%s\tApprove Umer release\thttps://example.invalid/release\nsecond\t%s\tChoose launch date\t\n' \
+    "$((now - 7200))" "$((now - 3600))" > "$home/data/captain-asks.tsv"
+  # A resolved lane is working, but a still-open captain hold is not, even after working resumes.
+  for task in resolved held; do
+    fm_write_meta "$home/state/$task.meta" 'kind=ship'
+  done
+  printf 'resolved [at=%s]: ready to continue\n' "$now" > "$home/state/resolved.status"
+  printf 'blocked [at=%s] [key=captain-hold-x]: decision\nworking [at=%s]: resumed\n' "$now" "$now" > "$home/state/held.status"
+  FM_HOME="$home" "$DASH" build >/dev/null || fail "two ask build failed"
+  text=$(page_text "$page")
+  for task in 'Running now 2' 'Waiting on you 2 recorded by Main' 'Approve Umer release 2 h' 'Choose launch date 1 h' \
+    '2 stalls reached Main yesterday 5' '1 leads woken automatically yesterday 2' \
+    '1 stopped leads restarted yesterday 3' '4 Main messages to leads yesterday 6'; do
+    case "$text" in *"$task"*) ;; *) fail "missing $task: $text" ;; esac
+  done
+  grep -q 'href="https://example.invalid/release"' "$page" || fail "ask URL not linked"
+  printf 'bad row\n' >> "$home/data/captain-asks.tsv"
+  FM_HOME="$home" "$DASH" build >/dev/null || fail "malformed ask build failed"
+  text=$(page_text "$page")
+  case "$text" in *'Waiting on you 3 recorded by Main'*'Ask record needs correction'*'malformed row 3'*) ;; *) fail "malformed row guessed or dropped: $text" ;; esac
+  # UTC yesterday 21:00 is today 01:00 in the captain's +04 local day.
+  yesterday=$(TZ=Etc/GMT-4 python3 -c 'from datetime import datetime,timedelta; print((datetime.now().date()-timedelta(days=1)).isoformat())')
+  printf 'home\tmerged\tfirst_pass\nalpha\t%sT21:00:00Z\t1\n' "$yesterday" > "$home/data/metrics/prs.tsv"
+  TZ=Etc/GMT-4 FM_HOME="$home" "$DASH" build >/dev/null || fail "local-day build failed"
+  case "$(page_text "$page")" in *'Merged today 1 yesterday 0'*) ;; *) fail "UTC date used instead of local day" ;; esac
+  pass "Main asks, lane verbs, alert counts and +04 local merge days are exact from their records"
+}
+
 test_the_page_answers_the_questions_with_the_fixture_numbers
+test_main_asks_and_lane_verbs_are_authoritative
 test_totals_count_only_work_that_waits
 test_missing_or_malformed_sources_hide_only_their_part
 test_who_does_the_work_groups_lanes_by_harness_and_model
-test_merged_today_is_live_from_one_github_search
+test_merged_days_use_the_same_bounded_github_source
 test_serve_answers_the_page_and_nothing_else

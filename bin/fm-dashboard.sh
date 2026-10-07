@@ -12,10 +12,13 @@
 #   bin/fm-bearings-snapshot.sh --json --all-in-flight --all-decisions
 #       --all-queued --all-landed   in flight, decisions, queued, landed
 #   data/metrics/prs.tsv            merged PRs (merged, first_pass, escaped, hours_to_merge)
-#   gh api search/issues            Merged today, live: one search over the owners of the
-#                                   second mate homes' project clones, cached 5 minutes in
-#                                   state/dashboard/.merged-today.json; on failure the
-#                                   prs.tsv count, marked "as of" its last write
+#   data/captain-asks.tsv           Waiting on you: Main's fleet-wide headerless
+#                                   id<TAB>since-epoch<TAB>text<TAB>url; physical row count,
+#                                   malformed rows become notes, absent/empty means zero
+#   gh api search/issues            Merged today AND yesterday: bounded local-day searches
+#                                   over registered project clones (including Main), cached
+#                                   5 minutes in state/dashboard/.merged-today.json;
+#                                   on failure both figures use prs.tsv, marked "as of"
 #   data/metrics/daily.tsv          per day and home counters (steers, stall_alarms, ...)
 #   data/metrics/skills.tsv         per day, home and skill read counts
 #   data/metrics/rings.tsv          leads the watcher woke itself
@@ -25,17 +28,22 @@
 #   config/metrics-targets.tsv      metric, op (>= or <=), target
 #   config/lane-target              open-lane target per home (default 4)
 #   config/parked-homes             home ids the captain parked, one per line (# comments);
-#                                   a parked home is left out of every At a glance total
-#                                   and the Waiting on you list, and its card says Parked
-#   config/fm-flow-check.sh         `<home> --summary` per live home, for a fresh
-#                                   finished-not-landed count (else the pulse row's)
+#                                   a parked home is left out of operational totals;
+#                                   Main's ask list is fleet-wide, including parked homes
+#   state/*.meta + *.status         Running now: ship/scout lanes, last verb working or
+#                                   resolved, excluding open captain-hold keys; live homes
+#   config/fm-flow-check.sh         `<home> --summary` per live home: Finished not landed
+#                                   (column 5), Queued and ready (column 4); unavailable
+#                                   homes use pulse rows, explicitly dated, never partial
+#   data/metrics/daily.tsv          Alert counts: stall_alarms, relaunches, steers per local
+#                                   calendar day; automatic wakes use rings.tsv row count
+#                                   (daily.tsv self_rings only when rings.tsv unavailable)
 #   data/defects.md                 "- " defect lines under "## <date>" headings
 #   data/secondmates.md             registered homes (every one gets a card)
 #   data/projects.md                this home's projects, and each registered
-#                                   home's own data/projects.md; a green PR in a
-#                                   +yolo project is merged by its home, so it is
-#                                   not a merge approval waiting on the captain
-# TSV files are read by header name. A source that is absent or malformed hides
+#                                   home's own data/projects.md, for home card labels
+# All day comparisons use the host timezone, including UTC timestamp conversion.
+# Except captain-asks.tsv, TSV files are read by header name. A source that is absent or malformed hides
 # its section behind a one-line note; it never fails the build. The snapshot's
 # own parent-side ledger cache refresh is the only state it may touch besides
 # the page.
@@ -181,7 +189,7 @@ def num(v):
     return v if math.isfinite(v) else None
 def count(v):  # a pulse count; producers write -1 or ? when they could not measure
     v = num(v)
-    return v if v is not None and v >= 0 else None
+    return int(v) if v is not None and v >= 0 and v.is_integer() else None
 def fmt(v, digits=1):
     if v is None: return '–'
     return str(int(v)) if float(v).is_integer() else f'{v:.{digits}f}'
@@ -260,46 +268,57 @@ try:
 except OSError: pass  # no parked homes
 
 def merged_today_live():
-    """{home: PRs merged since local midnight} for every live second mate home, from ONE GitHub search,
-    cached for 5 minutes; None when the fleet has no GitHub clones or the search failed (with a note)."""
+    """Two bounded local-day counts from GitHub, with the same fleet scope for both."""
     cache = os.path.join(HOME, 'state/dashboard/.merged-today.json')
     try:
         c = json.load(open(cache))
-        if c['day'] == TODAY.isoformat() and 0 <= NOW.timestamp() - c['at'] < 300: return c['homes']
-    except (OSError, ValueError, KeyError, TypeError): pass
+        if not isinstance(c, dict): c = {}
+    except (OSError, ValueError, KeyError, TypeError): c = {}
     repo_home = {}  # owner/name -> home: the home named like the repo, else the first home that clones it
-    for h, d in home_dir.items():
-        if h == 'main': continue
+    for h, d in sorted(home_dir.items()):
         for pj in sorted(os.listdir(os.path.join(d, 'projects')) if os.path.isdir(os.path.join(d, 'projects')) else []):
             u = subprocess.run(['git', '-C', os.path.join(d, 'projects', pj), 'remote', 'get-url', 'origin'],
                                capture_output=True, text=True).stdout.strip()
             r = re.sub(r'\.git$', '', re.sub(r'^.*github\.com[:/]', '', u))
             if '/' in r and (r not in repo_home or r.split('/')[1] == h): repo_home[r] = h
     if not repo_home: return None
-    since = datetime.combine(TODAY, datetime.min.time()).astimezone().astimezone(timezone.utc)
-    q = ' '.join(f'owner:{o}' for o in sorted({r.split('/')[0] for r in repo_home})) + \
-        f' is:pr is:merged merged:>={since:%Y-%m-%dT%H:%M:%SZ}'
+    scope = [sorted(repo_home.items()), sorted(parked), str(NOW.tzinfo)]
+    scope = json.loads(json.dumps(scope))
+    if c.get('scope') == scope and c.get('day') == TODAY.isoformat() and c.get('yesterday') is not None and 0 <= NOW.timestamp() - c.get('at', 0) < 300:
+        return c
+    counts = {}
+    for day in (TODAY, YDAY):
+        since = datetime.combine(day, datetime.min.time()).astimezone().astimezone(timezone.utc)
+        end = datetime.combine(day + timedelta(days=1), datetime.min.time()).astimezone().astimezone(timezone.utc)
+        q = ' '.join(f'owner:{o}' for o in sorted({r.split('/')[0] for r in repo_home})) + \
+            f' is:pr is:merged merged:>={since:%Y-%m-%dT%H:%M:%SZ} merged:<{end:%Y-%m-%dT%H:%M:%SZ}'
+        try:
+            r = subprocess.run(['gh', 'api', '-X', 'GET', 'search/issues', '--paginate', '--slurp', '-f', f'q={q}', '-f', 'per_page=100'],
+                               capture_output=True, text=True, timeout=30)
+            if r.returncode: raise ValueError((r.stderr.strip().splitlines() or [f'exit {r.returncode}'])[-1])
+            pages = json.loads(r.stdout)
+            if not pages or any(p.get('incomplete_results') or p.get('total_count', 0) > 1000 for p in pages):
+                raise ValueError('search incomplete or exceeds GitHub search limit')
+            items = {i['id']: i for p in pages for i in p['items']}
+            if len(items) != pages[0]['total_count']: raise ValueError('search returned a partial count')
+            homes = {h: 0 for h in set(repo_home.values()) - parked}
+            for i in items.values():
+                h = repo_home.get('/'.join(i['repository_url'].rstrip('/').split('/')[-2:]))
+                if h in homes: homes[h] += 1
+            counts['homes' if day == TODAY else 'yesterday'] = homes
+        except (OSError, subprocess.TimeoutExpired, ValueError, KeyError, TypeError) as e:
+            notes.append(('GitHub merged-today search', str(e))); return None
+    counts.update(day=TODAY.isoformat(), at=NOW.timestamp(), scope=scope)
     try:
-        r = subprocess.run(['gh', 'api', '-X', 'GET', 'search/issues', '--paginate', '-f', f'q={q}', '-f', 'per_page=100',
-                            '--jq', '.items[].repository_url'], capture_output=True, text=True, timeout=30)
-        err = (r.stderr.strip().splitlines() or [f'exit {r.returncode}'])[-1] if r.returncode else ''
-    except (OSError, subprocess.TimeoutExpired) as e:
-        err = str(e)
-    if err:
-        notes.append(('GitHub merged-today search', err)); return None
-    homes = {h: 0 for h in set(repo_home.values()) - parked}
-    for u in r.stdout.split():
-        h = repo_home.get('/'.join(u.rstrip('/').split('/')[-2:]))
-        if h in homes: homes[h] += 1
-    try:
-        with open(cache + '.tmp', 'w') as f: json.dump(dict(day=TODAY.isoformat(), at=NOW.timestamp(), homes=homes), f)
+        with open(cache + '.tmp', 'w') as f: json.dump(counts, f)
         os.replace(cache + '.tmp', cache)
     except OSError: pass  # no cache only means the next build searches again
-    return homes
-live_merged = merged_today_live()
+    return counts
+live_counts = merged_today_live()
+live_merged = live_counts['homes'] if live_counts is not None else None
 
 # Finished, not landed: counted now from each live home's records by the check the pulse runs.
-fresh_done = {}
+fresh_done, fresh_ready = {}, {}
 flow = os.path.join(HOME, 'config/fm-flow-check.sh')
 if os.access(flow, os.X_OK):
     for h, d in home_dir.items():
@@ -309,6 +328,8 @@ if os.access(flow, os.X_OK):
             v = count((r.stdout.split('\t') + [''] * 5)[4]) if r.returncode == 0 else None
             if v is None: notes.append(('config/fm-flow-check.sh', f'{h}: ' + ((r.stderr.strip().splitlines() or [f'exit {r.returncode}'])[-1] if r.returncode else 'no count in its summary')))
             else: fresh_done[h] = v
+            ready = count((r.stdout.split('\t') + [''] * 4)[3]) if r.returncode == 0 else None
+            if ready is not None: fresh_ready[h] = ready
         except (OSError, subprocess.TimeoutExpired) as e:
             notes.append(('config/fm-flow-check.sh', f'{h}: {e}'))
 
@@ -328,7 +349,12 @@ else:
 # --- derived numbers -----------------------------------------------------
 def dsum(col, day, home=None):
     if daily is None: return None
-    return sum(int(num(r.get(col)) or 0) for r in daily if iso_day(r['day']) == day and (home is None or r['home'] == home))
+    vals = [count(r.get(col)) for r in daily if iso_day(r['day']) == day and (home is None or r['home'] == home)]
+    if any(v is None for v in vals):
+        problem = ('data/metrics/daily.tsv', f'invalid {col} count for {day}')
+        if problem not in notes: notes.append(problem)
+        return None
+    return sum(vals)
 
 merged_on = {}
 for p in prs or []:
@@ -346,10 +372,6 @@ latest = {}  # home -> latest measured pulse row
 for r in pulse or []:
     if count(r.get('donewait')) is not None or count(r.get('open')) is not None:
         latest[r['home']] = r
-def pulse_sum(col):  # live homes only
-    vals = [count(r.get(col)) for h, r in latest.items() if h not in parked]
-    vals = [v for v in vals if v is not None]
-    return sum(vals) if vals else None
 def pulse_day(col, day):  # each home's last row of that day, summed
     rows = {}
     for r in pulse or []:
@@ -358,20 +380,48 @@ def pulse_day(col, day):  # each home's last row of that day, summed
 
 def home_of_task(tid): return tid.split('/', 1)[0] if '/' in tid else 'main'
 def owner_home(o): return 'main' if o in ('(main)', None, '') else o
-def standing_merge(m):  # the PR's project, from its task record or else its repo name, is +yolo in the owning home
-    h = owner_home(m.get('owner'))
-    pj = os.path.basename(m.get('url', '').split('/pull/')[0])
-    try:
-        for l in open(os.path.join(home_dir.get(h, ''), 'state', f"{m.get('task')}.meta"), encoding='utf-8', errors='replace'):
-            if l.startswith('project='): pj = os.path.basename(l[8:].strip().rstrip('/'))
-    except OSError: pass
-    return (projects.get(h) or {}).get(pj, False)  # unresolved still counts
-
 in_flight = (snap or {}).get('in_flight') or []
-# A parked home's asks and green PRs a home merges itself under +yolo wait on nobody.
-decisions = [d for d in (snap or {}).get('decisions_open') or [] if owner_home(d.get('owner')) not in parked]
-merge_asks = [m for m in ((snap or {}).get('contributions') or {}).get('captain') or []
-              if owner_home(m.get('owner')) not in parked and not standing_merge(m)]
+asks, asks_known, ask_ids = [], True, set()
+try:
+    for n, line in enumerate(open(os.path.join(HOME, 'data/captain-asks.tsv'), encoding='utf-8', errors='replace'), 1):
+        fields = line.rstrip('\r\n').split('\t')
+        valid = len(fields) == 4 and fields[0].strip() and fields[2].strip() and re.fullmatch(r'[0-9]+', fields[1]) and fields[0] not in ask_ids
+        if valid: ask_ids.add(fields[0])
+        try: age = max(0, int(NOW.timestamp()) - int(fields[1])) if valid else None
+        except (ValueError, OverflowError): age = None
+        if valid and int(fields[1]) > int(NOW.timestamp()): age = None
+        asks.append((fields, age))
+        if age is None: notes.append(('data/captain-asks.tsv', f'malformed row {n}'))
+except FileNotFoundError: pass
+except OSError as e:
+    asks_known = False
+    notes.append(('data/captain-asks.tsv', f'unreadable: {e.strerror}'))
+
+running = {}
+for h, d in sorted(home_dir.items()):
+    if h in parked: continue
+    running[h] = 0
+    try:
+        for filename in sorted(os.listdir(os.path.join(d, 'state'))):
+            if not filename.endswith('.meta'): continue
+            meta = dict(l.strip().split('=', 1) for l in open(os.path.join(d, 'state', filename), errors='replace') if '=' in l)
+            if meta.get('kind') not in ('ship', 'scout'): continue
+            try: ls = [l.strip() for l in open(os.path.join(d, 'state', filename[:-5] + '.status'), errors='replace') if l.strip()]
+            except FileNotFoundError: ls = []
+            keys = set()
+            verb = 'working'
+            for l in ls:
+                v = re.match(r'^(?:\d{9,11}\s+)?([a-z][a-z-]*)', l)
+                verb = v.group(1) if v else 'unknown'
+                k = re.search(r'\[key=([^\]]+)\]', l)
+                key = k.group(1) if k else 'default'
+                if verb in ('done', 'failed'): keys.clear()
+                elif verb in ('blocked', 'needs-decision'): keys.add(key)
+                elif verb in ('resolved', 'captain-held'): keys.discard(key)
+            running[h] += verb in ('working', 'resolved') and not any(k.startswith('captain-hold') for k in keys)
+    except OSError as e:
+        running[h] = None
+        notes.append(('lane records', f'{h}: {e.strerror}'))
 gates = (snap or {}).get('gates') or []
 landed = (snap or {}).get('landed') or []
 leads = {s.get('id'): s for s in (snap or {}).get('secondmates') or []}
@@ -456,32 +506,29 @@ S = []  # sections
 
 # 1. At a glance
 t = []
-if snap is not None:
-    lanes_open = pulse_sum('open')
-    sub = 'work items actively working'
-    if lanes_open is not None:  # the snapshot lists second mate lanes only while they work; the pulse counts every open lane
-        lanes_open += len([i for i in in_flight if home_of_task(i.get('id', '')) == 'main'])
-        sub = f'actively working, of {fmt(lanes_open)} open lanes'
-    t.append(tile('Running now', len([i for i in in_flight if home_of_task(i.get('id', '')) not in parked]), sub))
+if running and all(v is not None for v in running.values()):
+    t.append(tile('Running now', sum(running.values()), 'actively working, not waiting'))
 def done_waiting(h):  # (count, pulse time when it is not fresh)
     if h in fresh_done: return fresh_done[h], None
     r = latest.get(h, {})
     return (count(r['donewait']), r['time']) if count(r.get('donewait')) is not None else (None, None)
 dws = [done_waiting(h) for h in (set(home_dir) | set(latest)) - parked]
 if any(v is not None for v, _ in dws):
-    nl = sum(v for v, _ in dws if v is not None)
+    nl = sum(v for v, _ in dws) if all(v is not None for v, _ in dws) else None
     old = min((at for _, at in dws if at), default=None)  # the oldest pulse row still in the total
-    t.append(tile('Finished, not landed', fmt(nl), 'waiting to merge' + (f' · as of {esc(old[11:16])}' if old else ''), 'warn' if nl else ''))
+    t.append(tile('Finished, not landed', fmt(nl), 'waiting to merge' + (f' · as of {esc(old)}' if old else ''), 'warn' if nl else ''))
 if live_merged is not None:
-    t.append(tile('Merged today', sum(live_merged.values()), f'yesterday {fmt(merged_live(YDAY))} · live from GitHub'))
+    t.append(tile('Merged today', sum(live_merged.values()), f'yesterday {sum(live_counts["yesterday"].values())} · GitHub as of {datetime.fromtimestamp(live_counts["at"]).strftime("%H:%M")}'))
 elif prs is not None:
     asof = datetime.fromtimestamp(os.path.getmtime(os.path.join(HOME, 'data/metrics/prs.tsv'))).strftime('%H:%M')
     t.append(tile('Merged today', merged_live(TODAY), f'yesterday {merged_live(YDAY)} · as of {asof}'))
-if latest:
-    t.append(tile('Queued and ready', fmt(pulse_sum('ready')), 'can start when a lane frees'))
-if snap is not None:
-    wait = len(decisions) + len(merge_asks)
-    t.append(tile('Waiting on you', wait, f'{len(merge_asks)} merge approval{"s" if len(merge_asks) != 1 else ""}, {len(decisions)} decision{"s" if len(decisions) != 1 else ""}', 'warn' if wait else 'ok'))
+ready_rows = [(fresh_ready[h], None) if h in fresh_ready else (count(latest.get(h, {}).get('ready')), latest.get(h, {}).get('time'))
+              for h in sorted((set(home_dir) | set(latest)) - parked)]
+if ready_rows:
+    ready = sum(v for v, _ in ready_rows) if all(v is not None for v, _ in ready_rows) else None
+    old = min((at for _, at in ready_rows if at), default=None)
+    t.append(tile('Queued and ready', fmt(ready), 'can start when a lane frees' + (f' · as of {esc(old)}' if old else '')))
+t.append(tile('Waiting on you', len(asks) if asks_known else '–', 'recorded by Main', ('warn' if asks else 'ok') if asks_known else ''))
 S.append(f'<section><h2>At a glance</h2><div class="tiles">{"".join(t)}</div></section>')
 
 # 2. Questions: alerts, skills, quality, firstmate changes
@@ -492,7 +539,9 @@ if daily is not None:
         return len([r for r in rings if iso_day(r['day']) == day])
     st_t, sr_t, rl_t = dsum('stall_alarms', TODAY), rung(TODAY), dsum('relaunches', TODAY)
     st_y, sr_y, rl_y = dsum('stall_alarms', YDAY), rung(YDAY), dsum('relaunches', YDAY)
-    if st_t and not sr_t:
+    if st_t is None or sr_t is None:
+        verdict, tone = 'Alert counts unavailable: records need correction.', ''
+    elif st_t and not sr_t:
         verdict, tone = f'Not automatic yet: {st_t} lead stall{"s" if st_t != 1 else ""} reached Main and the watcher woke no lead itself.', 'bad'
     elif st_t:
         verdict, tone = f'Partly automatic: the watcher woke {sr_t} lead{"s" if sr_t != 1 else ""} itself, but {st_t} stall{"s" if st_t != 1 else ""} still reached Main.', 'warn'
@@ -586,7 +635,6 @@ for h in sorted(homes, key=lambda x: (x != 'main', x)):
     fp = window_metrics(h)[0]['first_pass'] if h in measured and prs is not None else None
     fp_t = next(((tr['op'], num(tr['target'])) for tr in targets or [] if tr['metric'] == 'first_pass'), None)
     mine = len([i for i in in_flight if home_of_task(i.get('id', '')) == h])
-    asks = len([d for d in decisions if owner_home(d.get('owner')) == h]) + len([m for m in merge_asks if owner_home(m.get('owner')) == h])
     def kv(k, v, tone_=''): return f'<div class="kv {tone_}"><span>{esc(k)}</span><b>{v}</b></div>'
     body = ''.join([
         kv('Open lanes', f'{fmt(o)} <small>/ {lane_target}</small>') if o is not None else '',
@@ -598,7 +646,6 @@ for h in sorted(homes, key=lambda x: (x != 'main', x)):
         kv('Merged today', merged(TODAY, h)) if prs is not None and h in measured else '',
         kv('First-pass merges, 2 days', f'{fp}%', 'bad' if fp_t and misses(fp, *fp_t) else '') if fp is not None else '',
         kv('Stalls reached Main', stalls, 'bad' if stalls else '') if stalls is not None else '',
-        kv('Waiting on you', asks, 'warn' if asks else '') if snap is not None else '',
     ])
     pj = projects.get(h)
     pj = f'<p class="small muted">Projects: {esc(", ".join(pj))}</p>' if pj else ''
@@ -674,11 +721,6 @@ if snap is not None:
         rs.append(row(f'{esc(i.get("name") or i.get("id"))}{why}', esc('Main' if h == 'main' else h), chip(sw, stone) + extra))
     rs.insert(0, '<p class="empty">Second mate work shows here while it is working; paused or blocked lanes count only in the open lanes on each home card.</p>')
     L.append(details('Working now', len(in_flight), ''.join(rs)))
-    rs = [row(link(m.get('task') or m.get('url'), m.get('url')), esc(owner_home(m.get('owner'))), chip('Merge approval', 'warn')) for m in merge_asks]
-    rs += [row(esc(d.get('summary') or d.get('id')), esc('Main' if owner_home(d.get('owner')) == 'main' else d.get('owner')), chip('Decision', 'warn')) for d in decisions]
-    # The snapshot carries no ask time; record order lists the oldest first.
-    more = f'<details class="more"><summary>show all {len(rs)}</summary>{"".join(rs[5:])}</details>' if len(rs) > 5 else ''
-    L.append(details('Waiting on you', len(rs), ''.join(rs[:5]) + more))
     rs = []
     real = lambda v: v not in (None, '', '-')
     for g in gates:
@@ -694,6 +736,9 @@ if snap is not None:
     L.append(details('Recently landed', len(landed), ''.join(rs)))
 else:
     L.append(note('fleet snapshot', next((r for s, r in notes if s == 'fleet snapshot'), 'not available')))
+rs = [row(link(fields[2], fields[3]), '', chip(f'{age // 3600} h {age % 3600 // 60} min old', 'warn'))
+      if age is not None else row('Ask record needs correction', '', chip('Malformed row', 'warn')) for fields, age in asks]
+L.insert(0, details('Waiting on you', len(asks) if asks_known else '–', ''.join(rs) if asks_known else note('ask list', 'unreadable')))
 if defects is not None:
     open_n = sum(d['status'] == 'OPEN' for d in defects)
     rs = [row(esc(d['text']), esc(d['day']), chip(d['status'].capitalize(), 'bad' if d['status'] == 'OPEN' else 'ok') if d['status'] else '')
