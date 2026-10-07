@@ -1,0 +1,5 @@
+session: fm-lab-fm-oom-guard-782472-12918
+old identity line: socket 329210518:1791359785 -> 329210717:1791359794)
+identity file now: 329210717:1791359794
+wake-pending present: yes
+restart reports in log: 1

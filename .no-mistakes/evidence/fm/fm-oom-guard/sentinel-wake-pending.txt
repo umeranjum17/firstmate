@@ -1,0 +1,1 @@
+The Herdr server restarted at 2026-10-07T07:56:34Z, which stopped every agent and watcher in it. The sentinel already reconciled this home's direct reports; its lines are in /tmp/fm-lab.WZtncE/state/.sentinel.log. Run bin/fm-session-start.sh if this session was resumed, reconcile what remains, then end the turn so supervision re-arms.

@@ -1,0 +1,2 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.WZtncE
+primary: no single Herdr pane runs session ; wake deferred
