@@ -83,16 +83,28 @@ capture() {  # <name> <pane>: keep a pane's recent output as evidence
   lab pane read "$2" --source recent --lines 80 > "$EVID/$1.txt" 2>&1 || true
 }
 
+kill_lab_processes() {
+  local pids
+  mapfile -t pids < <(pgrep -f "$LABROOT/|$LABHOME/" | grep -vx "$$")
+  [ "${#pids[@]}" -eq 0 ] || kill -KILL "${pids[@]}" 2>/dev/null || true
+}
 cleanup() {
-  local status=$?
+  local status=$? pane
   if [ -n "$EVID" ]; then
     cp "$MAIN/state/.sentinel.log" "$EVID/main-sentinel.log" 2>/dev/null || true
     cp "$LEAD/state/.sentinel.log" "$EVID/lead-sentinel.log" 2>/dev/null || true
     cp "$LABROOT/spare-spawn.err" "$EVID/spare-spawn.err" 2>/dev/null || true
+    if [ "$status" -ne 0 ] && [ "$LAB_READY" -eq 1 ]; then
+      lab pane list > "$EVID/fail-panes.json" 2>&1 || true
+      for pane in $(jq -r '.result.panes[]?.pane_id' "$EVID/fail-panes.json" 2>/dev/null); do
+        capture "fail-${pane//:/-}" "$pane"
+      done
+    fi
   fi
   if [ "$LAB_READY" -eq 1 ]; then
     lab_env "$HERDR_LAB_HELPER" teardown "$HERDR_LAB_SESSION" >/dev/null || status=1
   fi
+  kill_lab_processes
   [ ! -e "$LABHOME/.claude.json" ] || forget_claude_entries || status=1
   chmod -R u+w "$LABROOT" 2>/dev/null
   rm -rf "$LABROOT" "$LABHOME" "/tmp/fm-$LEAD_ID"* "/tmp/fm-$WORKER_ID"* "/tmp/fm-$SPARE_ID"*
@@ -129,6 +141,18 @@ fi
 exec env PATH="$HERDR_ORIGINAL_PATH" "$HERDR_LAB_HELPER" run "$HERDR_LAB_SESSION" "$@"
 SH
 chmod +x "$FAKEBIN/herdr"
+# Herdr resumes `claude --resume <id>` without launch flags. The captain's install
+# keeps a user-level bypass default, which the shared test credential's settings
+# must not change, so this shim gives a resumed lab session the auto mode it was
+# launched with; project settings cannot grant it without a trust dialog.
+cat > "$FAKEBIN/claude" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" --resume "*) case " \$* " in *" --permission-mode "*) ;; *) set -- --permission-mode auto "\$@" ;; esac ;;
+esac
+exec '$(command -v claude)' "\$@"
+SH
+chmod +x "$FAKEBIN/claude"
 cat > "$LABHOME/.bashrc" <<EOF
 export PATH='$FAKEBIN':"\$PATH"
 export HERDR_SESSION='$HERDR_LAB_SESSION' HERDR_LAB_SESSION='$HERDR_LAB_SESSION'
@@ -195,7 +219,6 @@ lab_settings() {  # <dir>
   mkdir -p "$1/.claude"
   cat > "$1/.claude/settings.local.json" <<EOF
 {
-  "permissions": { "allow": ["Bash", "Read", "Edit", "Write"] },
   "hooks": {
     "SessionStart": [
       { "matcher": "^(startup|resume|clear|compact|fork)\$",
@@ -218,9 +241,7 @@ mkdir -p "$MAIN/state" "$MAIN/data" "$MAIN/config" "$MAIN/projects"
 printf 'herdr\n' > "$MAIN/config/backend"
 printf 'claude\n' > "$MAIN/config/crew-harness"
 printf 'claude %s low\n' "$MODEL" > "$MAIN/config/secondmate-harness"
-# Claude ignores a bypass default from project settings and Herdr resumes a
-# session without its launch flags, so lab settings (below) allow tools outright,
-# as the captain's user-level bypass default does; launches use auto mode.
+# Lab launches use auto mode, so no lab agent stops at the bypass acceptance prompt.
 printf 'auto\n' > "$MAIN/config/claude-permission-mode"
 lab_settings "$MAIN"
 
@@ -255,26 +276,10 @@ PY
   fm "$LEAD" bash -c 'cd "$FM_HOME" && bin/fm-tasks-axi.sh add "$1" "lab worker" --kind ship --repo notes' _ "$1" >/dev/null \
     || fail "cannot file backlog item $1"
 }
-write_brief "$WORKER_ID"
-fm "$LEAD" "$LEAD/bin/fm-spawn.sh" "$WORKER_ID" "$NOTES" --mode local-only --yolo on \
-  --harness claude --model "$MODEL" --effort low >"$LABROOT/worker-spawn.out" 2>&1 \
-  || fail "worker spawn failed: $(tail -5 "$LABROOT/worker-spawn.out")"
-WORKER_META="$LEAD/state/$WORKER_ID.meta"
-WORKER_WT=$(sed -n 's/^worktree=//p' "$WORKER_META" | tail -n 1)
-WORKER_PANE=$(pane_of_meta "$WORKER_META")
-[ -d "$WORKER_WT" ] && [ -n "$WORKER_PANE" ] || fail "worker record lacks a worktree or pane"
-
-fm "$MAIN" "$MAIN/bin/fm-spawn.sh" "$LEAD_ID" --secondmate >"$LABROOT/lead-spawn.out" 2>&1 \
-  || fail "lead spawn failed: $(tail -5 "$LABROOT/lead-spawn.out")"
-LEAD_PANE=$(pane_of_meta "$MAIN/state/$LEAD_ID.meta")
-
-# The lab primary, launched the way an operator starts Firstmate.
-fm "$MAIN" "$MAIN/bin/fm-claude-trust.sh" --lab-home "$MAIN" >/dev/null || fail "cannot register trust for the lab primary"
-MAIN_WS=$(lab workspace create --cwd "$MAIN" --label lab-main --no-focus) || fail "cannot create the primary workspace"
-MAIN_PANE=$(printf '%s' "$MAIN_WS" | jq -r '.result.root_pane.pane_id')
-lab pane run "$MAIN_PANE" "claude --model $MODEL --effort low 'This is a disposable Firstmate lab. Run no command for this message: reply with only MAIN-READY and end your turn. For each later message, handle the Firstmate operational input it names with as few commands as possible, never spawn, steer, merge, or edit project files, and end your turn as soon as it is handled.'" >/dev/null \
-  || fail "cannot launch the lab primary"
-
+# Claude sessions sharing one .claude.json can lose each other's writes, such as
+# a trust entry fm-spawn records, so the lab starts one agent at a time: the
+# worker first, so the lead has work under way and arms its watcher.
+MAIN_PANE='' LEAD_PANE='' WORKER_PANE=''
 START=$(date +%s)
 # A fresh test credential shows Claude's one-time renderer tip after the first
 # reply; dismiss it so the composer reads empty, as on a long-used install.
@@ -292,9 +297,27 @@ primary_armed() {
   dismiss_tips
   beacon_newer "$MAIN" "$START"
 }
-wait_for 600 "the primary's first turn to end with its watcher armed" primary_armed
-wait_for 600 "the lead's turn to end with its watcher armed" beacon_newer "$LEAD" "$START"
+write_brief "$WORKER_ID"
+fm "$LEAD" "$LEAD/bin/fm-spawn.sh" "$WORKER_ID" "$NOTES" --mode local-only --yolo on \
+  --harness claude --model "$MODEL" --effort low >"$LABROOT/worker-spawn.out" 2>&1 \
+  || fail "worker spawn failed: $(tail -5 "$LABROOT/worker-spawn.out")"
+WORKER_META="$LEAD/state/$WORKER_ID.meta"
+WORKER_WT=$(sed -n 's/^worktree=//p' "$WORKER_META" | tail -n 1)
+WORKER_PANE=$(pane_of_meta "$WORKER_META")
+[ -d "$WORKER_WT" ] && [ -n "$WORKER_PANE" ] || fail "worker record lacks a worktree or pane"
 wait_for 600 "the worker to settle on its brief" test -s "$LEAD/state/$WORKER_ID.status"
+fm "$MAIN" "$MAIN/bin/fm-spawn.sh" "$LEAD_ID" --secondmate >"$LABROOT/lead-spawn.out" 2>&1 \
+  || fail "lead spawn failed: $(tail -5 "$LABROOT/lead-spawn.out")"
+LEAD_PANE=$(pane_of_meta "$MAIN/state/$LEAD_ID.meta")
+wait_for 600 "the lead's turn to end with its watcher armed" beacon_newer "$LEAD" "$START"
+
+# The lab primary, launched the way an operator starts Firstmate.
+fm "$MAIN" "$MAIN/bin/fm-claude-trust.sh" --lab-home "$MAIN" >/dev/null || fail "cannot register trust for the lab primary"
+MAIN_WS=$(lab workspace create --cwd "$MAIN" --label lab-main --no-focus) || fail "cannot create the primary workspace"
+MAIN_PANE=$(printf '%s' "$MAIN_WS" | jq -r '.result.root_pane.pane_id')
+lab pane run "$MAIN_PANE" "claude --model $MODEL --effort low 'This is a disposable Firstmate lab. Run no command for this message: reply with only MAIN-READY and end your turn. For each later message, handle the Firstmate operational input it names with as few commands as possible, never spawn, steer, merge, or edit project files, and end your turn as soon as it is handled.'" >/dev/null \
+  || fail "cannot launch the lab primary"
+wait_for 600 "the primary's first turn to end with its watcher armed" primary_armed
 MAIN_SID=$(head -n 1 "$MAIN/state/.lock-session")
 main_session_reported() { [ "$(agent_field "$MAIN_PANE" '.agent_session.value')" = "$MAIN_SID" ]; }
 wait_for 120 "Herdr to record the primary's Claude session" main_session_reported
@@ -304,8 +327,11 @@ pass "lab primary, lead, and worker are live with both watchers armed and every 
 fm "$MAIN" "$MAIN/bin/fm-sentinel.sh" tick >/dev/null
 [ -s "$MAIN/state/.sentinel-herdr-identity" ] || fail "sentinel recorded no Herdr identity"
 
+pgrep -f "$MAIN/bin/fm-watch.sh" >/dev/null || fail "no primary watcher process before the restart"
 # The incident: the server dies and its supervisor restarts it.
 lab_env "$HERDR_LAB_HELPER" stop "$HERDR_LAB_SESSION" >/dev/null || fail "could not stop the lab server"
+# oomd kills the whole Herdr unit, but a lab stop leaves detached watchers alive.
+kill_lab_processes
 RESTART=$(date +%s)
 lab_env "$HERDR_LAB_HELPER" provision "$HERDR_LAB_SESSION" >/dev/null || fail "could not restart the lab server"
 worker_resumed() { [ -n "$(agent_field "$WORKER_PANE" '.pane_id')" ]; }
@@ -317,7 +343,6 @@ case "$WORKER_CWD_AFTER/" in
   "$WORKER_WT"/*) fail "Herdr resumed the worker inside its worktree; the misplacement did not reproduce" ;;
 esac
 pass "Herdr resumed the worker in $WORKER_CWD_AFTER, outside its worktree $WORKER_WT"
-! beacon_newer "$MAIN" "$((RESTART + 5))" || fail "a primary watcher survived the restart"
 
 # Treehouse now reports the worker's slot free; a new spawn must not take it.
 write_brief "$SPARE_ID"
