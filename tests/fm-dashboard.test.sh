@@ -199,10 +199,13 @@ test_overview_answers_the_four_questions_with_sums_that_add_up() {
   build "$home"
   has "$d/index.html" "2 things need you. Approve the release 2 h Choose a date 1 h"
   grep -q 'href="https://example.invalid/release"' "$d/index.html" || fail "ask URL not linked"
-  printf 'bad row\n' >> "$home/data/captain-asks.tsv"
+  # A blank row, or one without an id or text, is not an ask; a real ask with a bad time still counts.
+  printf '\nbad row\n\t%s\tNo id\t\nfourth\t%s\t\t\nfifth\tsoon\tFix the time\t\n' "$now" "$now" >> "$home/data/captain-asks.tsv"
   build "$home"
-  has "$d/index.html" "3 things need you." "Ask record needs correction"
-  has "$d/measure.html" "data/captain-asks.tsv malformed row 3"
+  has "$d/index.html" "3 things need you." "Approve the release" "Choose a date" "Ask record needs correction"
+  lacks "$d/index.html" "No id" "4 things need you." "5 things need you."
+  has "$d/measure.html" "data/captain-asks.tsv row 4 skipped: no id or text" "row 5 skipped: no id or text" \
+    "row 6 skipped: no id or text" "data/captain-asks.tsv malformed row 7"
   pass "the overview answers each question, and lanes, agents and groups sum to their totals"
 }
 

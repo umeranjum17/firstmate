@@ -16,8 +16,10 @@
 #
 # Sources, all read-only and all optional (a failed source shows "unknown" and why):
 #   data/captain-asks.tsv           Waiting on you: Main's fleet-wide headerless
-#                                   id<TAB>since-epoch<TAB>text<TAB>url; physical row count,
-#                                   malformed rows become notes, absent/empty means zero
+#                                   id<TAB>since-epoch<TAB>text<TAB>url; each row with an id and
+#                                   text is an ask (a bad time or duplicate id shows as a record
+#                                   needing correction); blank rows and rows without an id or text
+#                                   are skipped, with a note; absent/empty means zero
 #   bin/fm-bearings-snapshot.sh --json   lead state and unhealthy endpoints
 #   data/secondmates.md             registered homes: "- <name> - ... (home: <dir>; ...)"
 #   config/parked-homes             home ids the captain parked, one per line (# comments)
@@ -187,7 +189,7 @@ try: srv.serve_forever()
 except KeyboardInterrupt: pass
 PY
     ;;
-  -h|--help) sed -n '2,81p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+  -h|--help) sed -n '2,83p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
   *) usage ;;
 esac
 
@@ -345,6 +347,9 @@ asks, asks_known, ask_ids = [], True, set()
 try:
     for n, line in enumerate(open(os.path.join(HOME, 'data/captain-asks.tsv'), encoding='utf-8', errors='replace'), 1):
         fields = line.rstrip('\r\n').split('\t')
+        if not line.strip(): continue
+        if len(fields) < 3 or not fields[0].strip() or not fields[2].strip():  # no id or no text: not an ask
+            notes.append(('data/captain-asks.tsv', f'row {n} skipped: no id or text')); continue
         valid = len(fields) == 4 and fields[0].strip() and fields[2].strip() and re.fullmatch(r'[0-9]{1,10}', fields[1]) and fields[0] not in ask_ids
         if valid: ask_ids.add(fields[0])
         epoch = int(fields[1]) if valid else None
