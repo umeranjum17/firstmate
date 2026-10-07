@@ -248,10 +248,13 @@ tick() {
   if [ "$prev" != "$id" ]; then
     if [ -n "$prev" ]; then
       say "herdr session $SESSION restarted (socket $prev -> $id)"
-      reconcile "$id" || rc=1
-      printf '%s\n' "The Herdr server restarted at $(date -u +%Y-%m-%dT%H:%M:%SZ), which stopped every agent and watcher in it. The sentinel already reconciled this home's direct reports; its lines are in $LOG. Run bin/fm-session-start.sh if this session was resumed, reconcile what remains, then end the turn so supervision re-arms." \
-        >"$STATE/.sentinel-wake-pending"
-      printf '%s\n' "$id" >"$STATE/.sentinel-herdr-identity"
+      if reconcile "$id"; then
+        printf '%s\n' "The Herdr server restarted at $(date -u +%Y-%m-%dT%H:%M:%SZ), which stopped every agent and watcher in it. The sentinel already reconciled this home's direct reports; its lines are in $LOG. Run bin/fm-session-start.sh if this session was resumed, reconcile what remains, then end the turn so supervision re-arms." \
+          >"$STATE/.sentinel-wake-pending"
+        printf '%s\n' "$id" >"$STATE/.sentinel-herdr-identity"
+      else
+        rc=1
+      fi
     else
       printf '%s\n' "$id" >"$STATE/.sentinel-herdr-identity"
     fi
