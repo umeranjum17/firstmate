@@ -2277,13 +2277,16 @@ EOF
 #                 and its tab from `pane get`/`tab list`).
 #   no-agent    - `pane get` succeeds (the pane structurally exists) but `agent
 #                 get` responds with error code agent_not_found: nothing is
-#                 registered in it - exactly what a herdr session-layout restore
-#                 produces (verified empirically: `session stop` + fresh `herdr
-#                 server` restart leaves the pane alive, agent_status "unknown",
-#                 agent get -> agent_not_found - docs/herdr-backend.md "ID
-#                 stability across a server restart"), and what a future
-#                 `resume_agents_on_restore = false` restore would produce too
-#                 (a plain shell, never an agent).
+#                 registered in it - what a herdr session-layout restore
+#                 produces on newer releases (verified empirically on 0.9.x:
+#                 `session stop` + fresh `herdr server` restart leaves the pane
+#                 alive, agent_status "unknown", agent get -> agent_not_found
+#                 - docs/herdr-backend.md "ID stability across a server
+#                 restart"). A future `resume_agents_on_restore = false`
+#                 restore would produce a plain shell with never an agent.
+#                 On 0.7.4 the restore instead keeps a label-less
+#                 unknown record, which the shell-only process proof below
+#                 reads as stale-agent - equally agent-free, never liveness.
 #   stale-agent - `agent get` reports a registered agent_status (working, idle,
 #                 done, blocked, or unknown/stale - Codex-labeled or
 #                 label-less) but fm_backend_herdr_pane_process_state
@@ -2929,6 +2932,11 @@ fm_backend_herdr_projection_reclaim_rollback() {  # <session> <new-pane>
 
 # fm_backend_herdr_projection_reclaim_task: replace one exact agent-free
 # restored projection husk inside its original workspace.
+# Agent-free here is the classifier's proven verdict, not just an absent
+# record: `no-agent` (Herdr reports nothing registered) or `stale-agent` (a
+# registration lingers but the process view proves the pane is shell-only -
+# on 0.7.4 a bare restored shell carries a label-less unknown record, while
+# newer releases report agent_not_found for the same shape).
 # The caller holds the session presentation lock and has already established
 # that flat fallback is safe across every token match.
 # Return 0 means exact reclaim, 2 means non-mutating or exactly rolled-back
@@ -2936,7 +2944,7 @@ fm_backend_herdr_projection_reclaim_rollback() {  # <session> <new-pane>
 # post-mutation uncertainty that must refuse the launch.
 fm_backend_herdr_projection_reclaim_task() {  # <session> <journal> <task-id> <home> <meta-workspace> <meta-tab> <meta-pane> <parent-label> <task-label> <cwd>
   local session=$1 journal=$2 id=$3 home=$4 meta_workspace=$5 meta_tab=$6 meta_pane=$7
-  local parent_label=$8 task_label=$9 cwd=${10} canonical_home state focus_before active_tab out new_tab new_pane info close_status
+  local parent_label=$8 task_label=$9 cwd=${10} canonical_home state focus_before active_tab out new_tab new_pane info close_status husk_state
   FM_BACKEND_HERDR_PROJECTION_TAB_ID=""
   FM_BACKEND_HERDR_PROJECTION_PANE_ID=""
   fm_backend_herdr_projection_journal_snapshot "$journal" "$id" || return 1
@@ -2968,12 +2976,12 @@ fm_backend_herdr_projection_reclaim_task() {  # <session> <journal> <task-id> <h
   fi
   state=$(fm_backend_herdr_pane_agent_state "$session" "$meta_pane")
   case "$state" in
-    no-agent) ;;
+    no-agent|stale-agent) husk_state=$state ;;
     dead)
       echo "warning: exact herdr presentation pane for $id is gone; spawning flat" >&2
       return 2
       ;;
-    live|stale-agent|unknown)
+    live|unknown)
       echo "error: exact herdr presentation pane for $id is $state; refusing duplicate launch" >&2
       return 1
       ;;
@@ -3021,8 +3029,8 @@ fm_backend_herdr_projection_reclaim_task() {  # <session> <journal> <task-id> <h
   fi
   state=$(fm_backend_herdr_pane_agent_state "$session" "$meta_pane")
   case "$state" in
-    no-agent) ;;
-    live|stale-agent|unknown)
+    no-agent|stale-agent) husk_state=$state ;;
+    live|unknown)
       fm_backend_herdr_projection_reclaim_rollback "$session" "$new_pane" || return 1
       echo "error: herdr presentation pane for $id became $state during reclaim; refusing duplicate launch" >&2
       return 1
@@ -3033,7 +3041,7 @@ fm_backend_herdr_projection_reclaim_task() {  # <session> <journal> <task-id> <h
       return 2
       ;;
   esac
-  if fm_backend_herdr_projection_close_pane_focus_preserving "$session" "$meta_pane" no-agent; then
+  if fm_backend_herdr_projection_close_pane_focus_preserving "$session" "$meta_pane" "$husk_state"; then
     close_status=0
   else
     close_status=$?
@@ -3044,12 +3052,10 @@ fm_backend_herdr_projection_reclaim_task() {  # <session> <journal> <task-id> <h
     fi
     state=$FM_BACKEND_HERDR_PROJECTION_CLOSE_AGENT_STATE
     fm_backend_herdr_projection_reclaim_rollback "$session" "$new_pane" || return 1
-    case "$state" in
-      live|stale-agent|unknown)
-        echo "error: herdr presentation pane for $id became $state at the close boundary; refusing duplicate launch" >&2
-        return 1
-        ;;
-    esac
+    if [ -n "$state" ] && [ "$state" != "$husk_state" ] && [ "$state" != dead ]; then
+      echo "error: herdr presentation pane for $id became $state at the close boundary; refusing duplicate launch" >&2
+      return 1
+    fi
     echo "warning: herdr presentation reclaim for $id could not close the exact old husk; spawning flat" >&2
     return 2
   fi
@@ -3081,8 +3087,11 @@ fm_backend_herdr_projection_reclaim_task() {  # <session> <journal> <task-id> <h
 # journal's exact token matches without adopting, reusing, renaming, closing,
 # or deleting anything.
 # Missing matches safely degrade to the normal flat workspace.
-# One or more matches allow flat fallback only when every pane is positively
-# dead or agent-free; a live or unknown pane refuses a duplicate launch.
+# A single unambiguous match allows flat fallback when every pane is
+# positively dead or agent-free - including a proven shell-only leftover
+# registration, which a session-layout restore can leave behind. Duplicate
+# matches keep refusing any registered pane, since ownership is unclear
+# there; only a live or unknown pane refuses a single match.
 fm_backend_herdr_projection_recovery_allows_flat() {  # <session> <journal> <task-id>
   local session=$1 journal=$2 id=$3 token list wsids count wsid panes pane_ids pane state
   token=$(fm_backend_herdr_projection_journal_token "$journal" "$id") || {
@@ -3127,7 +3136,13 @@ fm_backend_herdr_projection_recovery_allows_flat() {  # <session> <journal> <tas
       state=$(fm_backend_herdr_pane_agent_state "$session" "$pane")
       case "$state" in
         dead|no-agent) : ;;
-        live|stale-agent|unknown)
+        stale-agent)
+          [ "$count" -eq 1 ] || {
+            echo "error: quarantined herdr presentation for $id has a $state pane; refusing duplicate launch" >&2
+            return 1
+          }
+          ;;
+        live|unknown)
           echo "error: quarantined herdr presentation for $id has a $state pane; refusing duplicate launch" >&2
           return 1
           ;;

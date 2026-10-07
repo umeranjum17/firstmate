@@ -1404,7 +1404,11 @@ spawn_herdr_presentation_order_lock_acquire() {
   lock_path=$(fm_backend_herdr_presentation_session_lock_path "$session") || return 1
   HERDR_PRESENTATION_ORDER_LOCK="$lock_path"
   attempt=0
-  while [ "$attempt" -lt 50 ]; do
+  # The wait must fit a full serialized reclaim plus launch: a
+  # same-identity reclaim holds the lock for several seconds (each proven
+  # shell-only classification reads agent state plus the process table), so
+  # a shorter wait refuses a legitimate queued resume on slow runners.
+  while [ "$attempt" -lt 150 ]; do
     if fm_lock_try_acquire "$HERDR_PRESENTATION_ORDER_LOCK"; then
       HERDR_PRESENTATION_ORDER_LOCK_HELD=1
       return 0
@@ -3467,13 +3471,14 @@ herdr_projection_existing_meta_allows_flat() { # <meta>
     }
     old_state=$(fm_backend_herdr_pane_agent_state "$old_session" "$old_pane")
     case "$old_state" in
-    # A stale registration over a shell-only pane is agent-free for RECOVERY
-    # (--relaunch reuses the pane, issue #4115), but the duplicate-launch
-    # corridor keeps refusing it like every other non-husk state, so a fresh
-    # spawn is refused here consistently with the reclaim and presentation
-    # gates downstream.
-    dead | no-agent) return 0 ;;
-    live | stale-agent | unknown)
+    # A stale registration over a shell-only pane is proven agent-free: the
+    # process view shows no running agent, only Herdr's leftover record (on
+    # 0.7.4 even a bare restored shell carries a label-less unknown record).
+    # The duplicate-launch corridor lets it through consistently with the
+    # reclaim and presentation gates downstream, which replace exactly that
+    # husk or fall back flat; live and unknown still refuse.
+    dead | no-agent | stale-agent) return 0 ;;
+    live | unknown)
       echo "error: existing herdr endpoint for $ID is $old_state; refusing duplicate launch" >&2
       return 1
       ;;

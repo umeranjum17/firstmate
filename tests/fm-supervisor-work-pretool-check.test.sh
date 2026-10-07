@@ -72,13 +72,16 @@ test_supervisor_may_not_drive_a_workers_no_mistakes_run() {
 test_supervisor_may_not_sleep_or_poll_inside_a_turn() {
   expect_deny "sleep over 60s" "$PRIMARY" "$STATE" 'sleep 110' supervisor-poll-in-turn
   expect_deny "compound duration over 60s" "$PRIMARY" "$STATE" 'sleep 1m30s' supervisor-poll-in-turn
+  # shellcheck disable=SC2016 # the single-quoted words are the checker's literal input, expanded by nothing here.
   expect_deny "unreadable duration" "$PRIMARY" "$STATE" 'sleep "$WAIT"' supervisor-poll-in-turn
+  # shellcheck disable=SC2016 # the single-quoted words are the checker's literal input, expanded by nothing here.
   expect_deny "for loop with sleep" "$PRIMARY" "$STATE" 'for i in $(seq 10); do sleep 5; no-mistakes axi status; done' supervisor-poll-in-turn
   expect_deny "while loop with sleep" "$PRIMARY" "$STATE" 'while :; do sleep 5; done' supervisor-poll-in-turn
   expect_deny "until loop with sleep" "$PRIMARY" "$STATE" 'until [ -f done ]; do sleep 30; done' supervisor-poll-in-turn
   expect_allow "short sleep" "$PRIMARY" "$STATE" 'sleep 5'
   expect_allow "60s sleep" "$PRIMARY" "$STATE" 'sleep 60'
   expect_allow "one minute sleep" "$PRIMARY" "$STATE" 'sleep 1m'
+  # shellcheck disable=SC2016 # the single-quoted words are the checker's literal input, expanded by nothing here.
   expect_allow "a loop with no sleep" "$PRIMARY" "$STATE" 'for f in *.log; do wc -l "$f"; done'
   # The words must be a command, not data: a supervisor edits its own docs.
   expect_allow "sleep as quoted data" "$PRIMARY" "$STATE" "git commit -m 'never sleep 90 in a turn'"
@@ -116,6 +119,7 @@ test_a_worker_worktree_is_never_refused() {
   git -C "$PRIMARY" worktree add -q -b fixture-child "$child"
   mkdir -p "$child/bin" "$child/state"
   printf '# fixture\n' > "$child/AGENTS.md"
+  # shellcheck disable=SC2016 # literal command words for the worker fixture, expanded by nothing here.
   for command in "$INCIDENT_RESPOND" "$INCIDENT_POLL" 'sleep 110' \
                   'herdr pane send-text "yes"' 'herdr pane send-keys Enter' \
                   'for i in $(seq 10); do sleep 5; done'; do
