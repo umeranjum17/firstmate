@@ -1406,7 +1406,8 @@ def pr_row(p):
     what = ((f'waiting on CI for {dur(p["wait"])}' if p['step'] == 'ci' else f'{p["step"]} step for {dur(p["wait"])}') if p['step'] and p['wait'] is not None else
             {'failing': 'checks failing', 'green': 'checks green', 'running': 'checks running'}.get(p['checks'] or '', st[0].lower() + st[1:]))
     seen = f' · checks read {when(parse_ts(p["checked"]).timestamp())}' if p['checked'] and parse_ts(p['checked']) else ''
-    return grow(link(l['task'], p['url']) if p['url'] else esc(l['task']), esc(f'{hname(l["home"])} · {what} · status {dur(NOW_TS - l["since"])} old') + esc(seen))
+    pr = f' · {link("pull request", p["url"])}' if p['url'] else ''
+    return grow(esc(titles.get((l['home'], l['task'])) or l['task']), esc(f'{hname(l["home"])} · {what} · {dur(NOW_TS - l["since"])}') + pr + esc(seen))
 def pr_section(group):
     if group == 'home':
         hs = sorted({p['lane']['home'] for p in PRS}, key=lambda h: (h != 'main', h))
