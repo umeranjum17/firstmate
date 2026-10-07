@@ -1,0 +1,7 @@
+ok - no imports dialog exits 0 without pressing Enter
+ok - imports dialog is answered once with Enter and success follows the clear
+ok - one transient non-dialog frame after answering does not report success
+ok - an empty capture after answering does not report success
+ok - trust dialog is never answered and stays a stale-wake matter
+ok - an imports dialog that never clears fails the spawn instead of parking a worker
+ok - empty captures with no dialog exit 0 without pressing

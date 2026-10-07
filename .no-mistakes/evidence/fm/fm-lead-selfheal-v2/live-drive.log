@@ -1,0 +1,12 @@
+=== 1. split dialog matchers (real bin/fm-busy-lib.sh) ===
+imports->imports-matcher: MATCH (expected)
+imports->trust-matcher: no match (expected)
+trust->trust-matcher: MATCH (expected)
+trust->imports-matcher: no match (expected)
+=== 2. busy signature table (real bin/fm-composer-lib.sh) ===
+claude has signature (expected)
+bogus harness: no signature (expected)
+=== 3. successor retry bound present (real bin/fm-claude-stop-autoarm.sh) ===
+2
+=== 4. branch settlement bound present (real .pi/extensions/fm-primary-pi-watch.ts) ===
+3
