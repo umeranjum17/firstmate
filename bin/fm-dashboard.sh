@@ -2,11 +2,12 @@
 # fm-dashboard.sh - build the read-only fleet dashboard page for this home.
 #
 # Builds ONE self-contained HTML page (inline CSS and SVG, no script, no network
-# reference) that answers the common fleet questions at a glance: what is
-# running, what finished but has not landed, what merged, whether lead alerts
-# are automatic, how skill use and quality track their targets, and what waits
-# on the captain. Below that it shows one card per home, seven-day trends, and
-# the full task lists in collapsible sections.
+# reference), phone first. The top answers the common fleet questions at a
+# glance: what waits on the captain, a strip of four numbers (running, finished
+# but not landed, merged, queued) that each link to their list, and one health
+# line each for leads, alerts, the machine and test devices. Below that: one row
+# per home, devices and machine detail, the work lists (first rows shown, the
+# rest one tap away), quality, seven-day trends, and missing data.
 #
 # Sources, all read-only and all optional:
 #   bin/fm-bearings-snapshot.sh --json --all-in-flight --all-decisions
@@ -39,9 +40,22 @@
 #                                   calendar day; automatic wakes use rings.tsv row count
 #                                   (daily.tsv self_rings only when rings.tsv unavailable)
 #   data/defects.md                 "- " defect lines under "## <date>" headings
-#   data/secondmates.md             registered homes (every one gets a card)
+#   data/secondmates.md             registered homes (every one gets a row)
 #   data/projects.md                this home's projects, and each registered
-#                                   home's own data/projects.md, for home card labels
+#                                   home's own data/projects.md, for home row labels
+# Machine and devices, each probe read-only with a 5 s timeout; a failed probe shows
+# "unknown" and its reason, never a guess or a zero:
+#   adb devices -l                  connected phones and emulators (nothing else is asked of adb)
+#   pgrep -a '^qemu-system'         running emulators (-avd, -port; VmRSS from <proc>/<pid>/status)
+#   pgrep -cf 'appname=gradle[w]'   Gradle builds, counted as config/fm-mem-gate.sh counts them
+#   systemctl --user show fm-heavy.slice   MemoryCurrent, MemoryHigh, MemoryMax
+#   <proc>/meminfo, <proc>/pressure/memory   MemAvailable; "some avg10"
+#   <locks>/fm-phone-<name>.lock + <proc>/locks   who holds a device now (flock by inode);
+#   <locks>/fm-device-lock.log      the holder's pid, time and cwd, mapped to its home by
+#                                   each home's state/*.meta worktree=, tasktmp= or task id;
+#                                   an emulator matches a held lock its process ancestry took
+#   <proc> is FM_DASHBOARD_PROC (default /proc), <locks> FM_DEVICE_LOCK_DIR (default /tmp);
+#   FM_EMU_MAX, FM_GRADLE_MAX, FM_MEM_MIN_GB (defaults 2, 2, 12) mirror the memory gate's caps
 # All day comparisons use the host timezone, including UTC timestamp conversion.
 # Except captain-asks.tsv, TSV files are read by header name. A source that is absent or malformed hides
 # its section behind a one-line note; it never fails the build. The snapshot's
@@ -455,19 +469,192 @@ QLABEL = {'first_pass': ('First-pass merges', '%'), 'escaped': ('Bugs that escap
           'stall_alarms': ('Lead stalls that reached Main', '')}
 def misses(v, op, t): return v is not None and (v < t if op == '>=' else v > t)
 
+# --- machine and devices: read-only probes, each with a short timeout ------
+# A probe that fails says "unknown" and why; it never guesses a value or a zero.
+PROC = os.environ.get('FM_DASHBOARD_PROC', '/proc')
+LOCK_DIR = os.environ.get('FM_DEVICE_LOCK_DIR', '/tmp')
+def env_int(name, default):
+    try: return int(os.environ.get(name, default))
+    except ValueError: return default
+EMU_MAX, GRADLE_MAX, MEM_MIN_GB = env_int('FM_EMU_MAX', 2), env_int('FM_GRADLE_MAX', 2), env_int('FM_MEM_MIN_GB', 12)
+
+def probe(cmd, ok=(0,)):
+    """(stdout, None) from a read-only command, or (None, reason)."""
+    try: r = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+    except FileNotFoundError: return None, f'{cmd[0]} not found'
+    except subprocess.TimeoutExpired: return None, f'{cmd[0]} gave no answer in 5 s'
+    except OSError as e: return None, f'{cmd[0]}: {e.strerror}'
+    if r.returncode not in ok: return None, (r.stderr.strip().splitlines() or [f'{cmd[0]} exit {r.returncode}'])[-1]
+    return r.stdout, None
+def read(rel):
+    try: return open(os.path.join(PROC, rel), errors='replace').read(), None
+    except OSError as e: return None, f'{PROC}/{rel}: {e.strerror}'
+def gb(kib): return kib / 1048576
+
+def machine():
+    m = {}
+    t, err = read('meminfo')
+    kv = dict(re.findall(r'^(\w+):\s+(\d+)', t or '', re.M))
+    m['free'] = (gb(int(kv['MemAvailable'])), gb(int(kv['MemTotal']))) if 'MemAvailable' in kv and 'MemTotal' in kv else None
+    m['free_why'] = err or 'no MemAvailable in meminfo'
+    t, err = read('pressure/memory')
+    p = re.search(r'^some avg10=([0-9.]+)', t or '', re.M)
+    m['pressure'], m['pressure_why'] = (float(p.group(1)) if p else None), err or 'no "some avg10" line'
+    out, err = probe(['systemctl', '--user', 'show', 'fm-heavy.slice', '-p', 'MemoryCurrent', '-p', 'MemoryHigh', '-p', 'MemoryMax'])
+    kv = dict(l.split('=', 1) for l in (out or '').splitlines() if '=' in l)
+    def size(v): return int(v) / 2**30 if (v or '').isdigit() else None
+    m['heavy'] = (size(kv.get('MemoryCurrent')), size(kv.get('MemoryHigh')), size(kv.get('MemoryMax')))
+    m['heavy_why'] = err or f"MemoryCurrent is {kv.get('MemoryCurrent', 'missing')}"
+    out, err = probe(['pgrep', '-cf', 'appname=gradle[w]'], ok=(0, 1))  # the memory gate's own count
+    m['gradle'], m['gradle_why'] = (int(out.split()[0]) if out and out.split()[0].isdigit() else None), err or 'no count'
+    return m
+
+def emulators():
+    """[{pid, avd, port, rss}] from the running qemu processes, or (None, reason)."""
+    out, err = probe(['pgrep', '-a', '^qemu-system'], ok=(0, 1))
+    if out is None: return None, err
+    emus = []
+    for l in out.splitlines():
+        pid, _, args = l.partition(' ')
+        a = args.split()
+        opt = lambda k: a[a.index(k) + 1] if k in a[:-1] else None
+        st, _ = read(f'{pid}/status')
+        rss = re.search(r'^VmRSS:\s+(\d+)', st or '', re.M)
+        emus.append(dict(pid=pid, avd=opt('-avd') or '?', port=opt('-port'), rss=gb(int(rss.group(1))) if rss else None))
+    return emus, None
+
+def lock_holders():
+    """{lock name: {held, pid, cwd, at, last, verb}} from the device locks, /proc/locks and the lock log."""
+    t, err = read('locks')
+    held = set(re.findall(r'^\d+:\s+FLOCK\s+\S+\s+\S+\s+\d+\s+(\S+)', t or '', re.M))
+    locks = {}
+    try: names = sorted(f for f in os.listdir(LOCK_DIR) if f.startswith('fm-phone-') and f.endswith('.lock'))
+    except OSError: names = []
+    for f in names:
+        try: s = os.stat(os.path.join(LOCK_DIR, f))
+        except OSError: continue
+        key = f'{os.major(s.st_dev):02x}:{os.minor(s.st_dev):02x}:{s.st_ino}'
+        locks[f[9:-5]] = dict(held=None if t is None else key in held)
+    try:
+        for l in open(os.path.join(LOCK_DIR, 'fm-device-lock.log'), errors='replace'):
+            f = l.split()
+            if len(f) < 3: continue
+            at = datetime.fromisoformat(f[0].replace('Z', '+00:00')) if re.match(r'\d{4}-\d\d-\d\dT', f[0]) else None
+            d = locks.setdefault(f[1], dict(held=None if t is None else False))
+            d.update(last=at, verb=f[2])
+            if f[2] == 'acquired':
+                kv = dict(x.split('=', 1) for x in f[3:] if '=' in x)
+                d.update(pid=kv.get('pid'), at=at, cwd=l.split(' cwd=', 1)[1].strip() if ' cwd=' in l else None)
+    except OSError: pass
+    return locks, err
+
+def worktree_homes():  # every task's worktree and id, and each home itself, mapped to its home
+    m = {}
+    for h, d in home_dir.items():
+        m[os.path.realpath(d)] = h
+        try:
+            for f in os.listdir(os.path.join(d, 'state')):
+                if not f.endswith('.meta'): continue
+                m[f[:-5]] = h  # a worker's own scratch dir is often named after its task id
+                for l in open(os.path.join(d, 'state', f), errors='replace'):
+                    k, _, v = l.strip().partition('=')
+                    if k in ('worktree', 'tasktmp') and v: m[os.path.realpath(v)] = h
+        except OSError: pass
+    return m
+def who(cwd, homes_by_path):
+    if not cwd: return 'an unknown worker'
+    p = os.path.realpath(cwd)
+    while p not in homes_by_path and os.path.dirname(p) != p: p = os.path.dirname(p)
+    h = homes_by_path.get(p)
+    base = os.path.basename(cwd.rstrip('/'))
+    h = h or homes_by_path.get(base) or homes_by_path.get(base.removeprefix('fm-'))
+    return ('Main' if h == 'main' else h) if h else base
+def ago(at):
+    if at is None: return ''
+    s = max(0, int(NOW.timestamp() - at.timestamp()))
+    return 'under a minute' if s < 60 else f'{s // 60} min' if s < 3600 else f'{s // 3600} h {s % 3600 // 60} min' if s < 86400 else f'{s // 86400} d'
+def ancestors(pid):
+    seen = []
+    for _ in range(40):
+        t, _ = read(f'{pid}/stat')
+        m = re.match(r'\d+ \(.*\) \S (\d+)', t or '', re.S)
+        if not m or m.group(1) in ('0', '1'): break
+        pid = m.group(1); seen.append(pid)
+    return seen
+
+def devices():
+    """(rows, summary) for every adb device, every running emulator and every held device lock."""
+    out, adb_err = probe(['adb', 'devices', '-l'])
+    emus, emu_err = emulators()
+    locks, lock_err = lock_holders()
+    homes_by_path = worktree_homes()
+    held_by_pid = {d['pid']: n for n, d in locks.items() if d.get('held') and d.get('pid')}
+    rows, seen_locks = [], set()
+    def holder(names, pids=()):
+        """(text, tone) for the first held lock among names, else via a held lock an ancestor process took."""
+        for n in names:
+            d = locks.get(n)
+            if d and d.get('held'):
+                seen_locks.add(n); return f'In use by {who(d.get("cwd"), homes_by_path)} · {ago(d.get("at"))}', 'warn'
+        for p in pids:
+            if p in held_by_pid:
+                d = locks[held_by_pid[p]]; seen_locks.add(held_by_pid[p])
+                return f'In use by {who(d.get("cwd"), homes_by_path)} · {ago(d.get("at"))}', 'warn'
+        if lock_err: return f'unknown: {lock_err}', ''  # no lock state, so free is a guess
+        d = next((locks[n] for n in names if n in locks), None)
+        if d and d.get('at'):
+            return f'Free · last used by {who(d.get("cwd"), homes_by_path)} {ago(d.get("last"))} ago', 'ok'
+        return 'Free', 'ok'
+    emu_by_port = {e['port']: e for e in emus or [] if e['port']}
+    serials = []
+    for l in (out or '').splitlines()[1:]:
+        f = l.split()
+        if len(f) < 2: continue
+        serials.append(f[0])
+        kv = dict(x.split(':', 1) for x in f[2:] if ':' in x)
+        e = emu_by_port.pop(f[0][9:], None) if f[0].startswith('emulator-') else None
+        if e:
+            name, sub = f'Emulator {e["avd"]}', f'{f[0]}' + (f' · {e["rss"]:.1f} GB in use' if e['rss'] is not None else '')
+            text, tone = holder([f[0], e['avd']], ancestors(e['pid']))
+        else:
+            name, sub = (kv.get('model') or 'Device').replace('_', ' '), f'{f[0]}' + (' · USB' if 'usb' in kv else '')
+            name = ('Emulator ' if f[0].startswith('emulator-') else 'Phone ') + name
+            text, tone = holder([f[0]])
+        if f[1] != 'device': text, tone = f'{f[1].capitalize()} · {text}', 'bad'
+        rows.append((name, sub, text, tone))
+    for e in emu_by_port.values() if emus is not None else []:  # running, but adb does not list it
+        text, tone = holder([f'emulator-{e["port"]}', e['avd']], ancestors(e['pid']))
+        rows.append((f'Emulator {e["avd"]}', 'not listed by adb' + (f' · {e["rss"]:.1f} GB in use' if e['rss'] is not None else ''), text, tone))
+    for n, d in sorted(locks.items()):  # a held lock no device above accounts for
+        if d.get('held') and n not in seen_locks and n not in serials:
+            rows.append((f'Lock {n}', 'no matching device', f'Held by {who(d.get("cwd"), homes_by_path)} · {ago(d.get("at"))}', 'warn'))
+    problems = [f'adb: {adb_err}'] if out is None else []
+    if emus is None: problems.append(f'emulators: {emu_err}')
+    if lock_err: problems.append(f'device locks: {lock_err}')
+    return rows, len(serials) if out is not None else None, len(emus) if emus is not None else None, problems
+
+mach = machine()
+dev_rows, dev_count, emu_count, dev_problems = devices()
+
 # --- html pieces ---------------------------------------------------------
-def tile(label, value, sub, tone=''):
-    return (f'<div class="tile {tone}"><div class="tl">{esc(label)}</div>'
-            f'<div class="tv">{value}</div><div class="ts">{sub}</div></div>')
 def note(section, reason): return f'<p class="note">{esc(section)}: {esc(reason)}. This part is hidden.</p>'
 def chip(text, tone=''): return f'<span class="chip {tone}">{esc(text)}</span>'
+def dot(tone=''): return f'<i class="dot {tone}"></i>'
 def link(text, url):
     return f'<a href="{esc(url)}" rel="noreferrer">{esc(text)}</a>' if re.match(r'https?://', url or '') else esc(text)
+ANCHOR = {'Running now': 'running', 'Finished, not landed': 'homes', 'Merged today': 'landed', 'Queued and ready': 'queued'}
+def tile(label, value, sub, tone=''):  # one cell of the work strip, linked to the list behind it
+    return (f'<a class="m {tone}" href="#{ANCHOR.get(label, "work")}"><span class="ml">{esc(label)}</span>'
+            f'<b class="mv">{value}</b><small>{sub}</small></a>')
+def hrow(label, value, tone, href):
+    return f'<a class="hr" href="#{href}">{dot(tone)}<span>{esc(label)}</span><b>{value}</b></a>'
+def panel(title, body, id_='', extra=''):
+    return f'<div class="panel"{f" id={id_}" if id_ else ""}><div class="ph"><h3>{esc(title)}</h3>{extra}</div>{body}</div>'
 
-def bars(values, tone=''):
+def bars(values):
     vals = [v for v in values if v is not None]
     top = max(vals) if vals and max(vals) > 0 else 1
-    w, gap, h = 16, 4, 40
+    w, gap, h = 16, 5, 32
     parts = []
     for i, (d, v) in enumerate(zip(WEEK, values)):
         x = i * (w + gap)
@@ -475,42 +662,41 @@ def bars(values, tone=''):
             parts.append(f'<rect x="{x}" y="{h-2}" width="{w}" height="2" class="b0"><title>{d:%a %d %b}: no data</title></rect>')
             continue
         bh = max(2, round(h * v / top))
-        cls = 'bt' if d == TODAY else 'b'
-        parts.append(f'<rect x="{x}" y="{h-bh}" width="{w}" height="{bh}" rx="2" class="{cls}"><title>{d:%a %d %b}: {fmt(v)}</title></rect>')
-    return f'<svg viewBox="0 0 {7*w+6*gap} {h}" class="spark {tone}" role="img" aria-label="last 7 days">{"".join(parts)}</svg>'
+        parts.append(f'<rect x="{x}" y="{h-bh}" width="{w}" height="{bh}" rx="2" class="{"bt" if d == TODAY else "b"}"><title>{d:%a %d %b}: {fmt(v)}</title></rect>')
+    return f'<svg viewBox="0 0 {7*w+6*gap} {h}" class="spark" role="img" aria-label="last 7 days">{"".join(parts)}</svg>'
 
 def trend(label, values, kind='count', week=None):
-    """kind: count (footer sums the week), level (footer shows the peak), pct (footer shows `week`)."""
-    v = values[-1]
+    """The header sums the week (count), shows its peak (level) or the week's rate (pct); never today alone, which the strip owns."""
     vals = [x for x in values if x is not None]
-    if not vals: total = 'no data'
-    elif kind == 'count': total = f'7 days {fmt(sum(vals))}'
-    elif kind == 'level': total = f'peak {fmt(max(vals))}'
-    else: total = f'7 days {fmt(week)}%'
-    unit = '%' if kind == 'pct' else ''
-    return (f'<div class="trend"><div class="trh"><span>{esc(label)}</span><b>{fmt(v)}{unit if v is not None else ""}</b></div>'
-            f'{bars(values)}<div class="trf"><span>{WEEK[0]:%a}</span><span>{total}</span><span>today</span></div></div>')
+    if not vals: total = '<small>no data</small>'
+    elif kind == 'count': total = f'{fmt(sum(vals))} <small>in 7 days</small>'
+    elif kind == 'level': total = f'<small>peak</small> {fmt(max(vals))}'
+    else: total = f'{fmt(week)}% <small>in 7 days</small>' if week is not None else '<small>no data</small>'
+    return (f'<div class="trend"><div class="trh"><span>{esc(label)}</span><b>{total}</b></div>'
+            f'{bars(values)}<div class="trf"><span>{WEEK[0]:%a}</span><span>today</span></div></div>')
 
-def details(title, count, body, open_=False):
-    return (f'<details{" open" if open_ else ""}><summary><span>{esc(title)}</span><span class="cnt">{count}</span></summary>'
-            f'<div class="list">{body or "<p class=empty>Nothing here.</p>"}</div></details>')
+def rows_more(rs, n=6, what='all'):  # the first rows, the rest one tap away
+    return ''.join(rs[:n]) + (f'<details class="more"><summary>Show {what} {len(rs)}</summary>{"".join(rs[n:])}</details>' if len(rs) > n else '')
 def row(main, meta='', right=''):
-    return f'<div class="row"><div class="rm">{main}</div><div class="rx">{meta}</div><div class="rr">{right}</div></div>'
+    return f'<div class="row"><div class="rm">{main}</div><div class="rx">{meta}{right}</div></div>'
 
 STATE_WORDS = {'working': ('Working', 'ok'), 'paused': ('Waiting', 'warn'), 'blocked': ('Blocked', 'bad'),
                'needs-decision': ('Needs a decision', 'bad'), 'done': ('Finished', 'ok'), 'failed': ('Failed', 'bad'),
                'unknown': ('Status unclear', 'warn')}
-LEAD_WORDS = {'captain_decision': ('Waiting on you', 'warn'), 'externally_held': ('Waiting on someone else', 'warn'),
+# A lead's open decision is its own until Main puts it on the ask list, so it never reads "Waiting on you" here.
+LEAD_WORDS = {'captain_decision': ('Holding a decision', 'warn'), 'externally_held': ('Waiting on someone else', 'warn'),
               'unknown': ('Records need tidy-up', 'bad'), 'working': ('Working', 'ok'), 'idle': ('Idle', ''),
+              'active_child_work': ('Working', 'ok'), 'no_active_work': ('Idle', ''),
               'stale': ('Not responding', 'bad'), 'dead': ('Stopped', 'bad')}
 
 # --- page ----------------------------------------------------------------
-S = []  # sections
 
-# 1. At a glance
+# 1. Work strip
 t = []
 if running and all(v is not None for v in running.values()):
-    t.append(tile('Running now', sum(running.values()), 'actively working, not waiting'))
+    t.append(tile('Running now', sum(running.values()), ''))
+def pulse_at(at):  # a pulse row's time as a reader says it: 14:05 today, else 06 Oct 14:05
+    return at[11:16] if at[:10] == TODAY.isoformat() else f'{at[8:10]} {datetime.strptime(at[5:7], "%m"):%b} {at[11:16]}' if len(at) >= 16 else at
 def done_waiting(h):  # (count, pulse time when it is not fresh)
     if h in fresh_done: return fresh_done[h], None
     r = latest.get(h, {})
@@ -519,7 +705,7 @@ dws = [done_waiting(h) for h in (set(home_dir) | set(latest)) - parked]
 if any(v is not None for v, _ in dws):
     nl = sum(v for v, _ in dws) if all(v is not None for v, _ in dws) else None
     old = min((at for _, at in dws if at), default=None)  # the oldest pulse row still in the total
-    t.append(tile('Finished, not landed', fmt(nl), 'waiting to merge' + (f' · as of {esc(old)}' if old else ''), 'warn' if nl else ''))
+    t.append(tile('Finished, not landed', fmt(nl), f'as of {esc(pulse_at(old))}' if old else '', 'warn' if nl else ''))
 if live_merged is not None:
     t.append(tile('Merged today', sum(live_merged.values()), f'yesterday {sum(live_counts["yesterday"].values())} · GitHub as of {datetime.fromtimestamp(live_counts["at"]).strftime("%H:%M")}'))
 elif prs is not None:
@@ -530,12 +716,35 @@ ready_rows = [(fresh_ready[h], None) if h in fresh_ready else (count(latest.get(
 if ready_rows:
     ready = sum(v for v, _ in ready_rows) if all(v is not None for v, _ in ready_rows) else None
     old = min((at for _, at in ready_rows if at), default=None)
-    t.append(tile('Queued and ready', fmt(ready), 'can start when a lane frees' + (f' · as of {esc(old)}' if old else '')))
-t.append(tile('Waiting on you', len(asks) if asks_known else '–', 'recorded by Main', ('warn' if asks else 'ok') if asks_known else ''))
-S.append(f'<section><h2>At a glance</h2><div class="tiles">{"".join(t)}</div></section>')
+    t.append(tile('Queued and ready', fmt(ready), f'as of {esc(pulse_at(old))}' if old else ''))
 
-# 2. Questions: alerts, skills, quality, firstmate changes
-cards = []
+# 2. Waiting on you: Main's ask list, every ask a link with its age
+def age_words(s): return f'{s // 60} min' if s < 3600 else f'{s // 3600} h {s % 3600 // 60} min' if s < 86400 else f'{s // 86400} d {s % 86400 // 3600} h'
+ask_rows = []
+for fields, age in asks:
+    if age is None:
+        ask_rows.append(f'<div class="ask">{dot("bad")}<span>Ask record needs correction</span>{chip("Malformed row", "bad")}</div>')
+    elif re.match(r'https?://', fields[3]):
+        ask_rows.append(f'<a class="ask" href="{esc(fields[3])}" rel="noreferrer">{dot("warn")}<span>{esc(fields[2])}</span><time>{age_words(age)}</time></a>')
+    else:
+        ask_rows.append(f'<div class="ask">{dot("warn")}<span>{esc(fields[2])}</span><time>{age_words(age)}</time></div>')
+if not asks_known: ask_body = note('ask list', 'unreadable')
+elif not asks: ask_body = '<p class="calm">Nothing needs you right now.</p>'
+else: ask_body = rows_more(ask_rows, 5)
+asks_card = (f'<section class="asks {("warn" if asks else "ok") if asks_known else ""}" id="asks"><div class="ah"><h2>Waiting on you</h2>'
+             f'<b class="an">{len(asks) if asks_known else "–"}</b></div>{ask_body}</section>')
+
+# 3. Health: leads, alerts, machine, devices - one line each
+health = []
+live_leads = {h: s for h, s in leads.items() if h and h not in parked and not str(h).startswith('(')}
+down = {e.get('id') for e in (snap or {}).get('unhealthy_endpoints') or []} & set(live_leads)
+if snap is None: health.append(('Leads', 'unknown: fleet snapshot unavailable', '', 'homes'))
+else:
+    tidy = [h for h, s in live_leads.items() if h not in down and LEAD_WORDS.get(s.get('state'), ('', ''))[1] == 'bad']
+    v = f'{len(live_leads) - len(down)} of {len(live_leads)} running' + (f' · {len(tidy)} need{"s" if len(tidy) == 1 else ""} tidy-up' if tidy else '')
+    health.append(('Leads', v + (f' · not running: {", ".join(sorted(down))}' if down else ''), 'bad' if down else 'warn' if tidy else 'ok', 'homes'))
+
+panels_q = []
 if daily is not None:
     def rung(day):  # the ring log is appended every pass; the daily roll-up only every 2 h
         if rings is None: return dsum('self_rings', day)
@@ -550,6 +759,9 @@ if daily is not None:
         verdict, tone = f'Partly automatic: the watcher woke {sr_t} lead{"s" if sr_t != 1 else ""} itself, but {st_t} stall{"s" if st_t != 1 else ""} still reached Main.', 'warn'
     else:
         verdict, tone = 'Working: no lead stall reached Main today.', 'ok'
+    health.append(('Alerts', 'unknown: records need correction' if st_t is None or sr_t is None else
+                   f'{st_t} stall{"s" if st_t != 1 else ""} reached Main today · {sr_t} woken automatically' if st_t else
+                   'No stall reached Main today', tone, 'alerts'))
     woke = ''
     if rings is not None:
         names = {}
@@ -560,11 +772,152 @@ if daily is not None:
         woke = '<p class="small muted">Per-lead wake record not found yet.</p>'
     def stat(label, a, b, tone_=''):
         return f'<div class="stat {tone_}"><b>{fmt(a)}</b><span>{esc(label)}</span><i>yesterday {fmt(b)}</i></div>'
-    cards.append(f'''<div class="card"><h3>Are the alerts working?</h3><p class="verdict {tone}">{esc(verdict)}</p>
-<div class="stats">{stat("stalls reached Main", st_t, st_y, "bad" if st_t and not sr_t else ("warn" if st_t else ""))}{stat("leads woken automatically", sr_t, sr_y)}{stat("stopped leads restarted", rl_t, rl_y)}{stat("Main messages to leads", dsum("steers", TODAY), dsum("steers", YDAY))}</div>{woke}</div>''')
+    panels_q.append(panel('Are the alerts working?', f'''<p class="verdict {tone}">{esc(verdict)}</p>
+<div class="stats">{stat("stalls reached Main", st_t, st_y, "bad" if st_t and not sr_t else ("warn" if st_t else ""))}{stat("leads woken automatically", sr_t, sr_y)}{stat("stopped leads restarted", rl_t, rl_y)}{stat("Main messages to leads", dsum("steers", TODAY), dsum("steers", YDAY))}</div>{woke}''', 'alerts'))
 else:
-    cards.append(f'<div class="card"><h3>Are the alerts working?</h3>{note("data/metrics/daily.tsv", "not available")}</div>')
+    health.append(('Alerts', 'unknown: data/metrics/daily.tsv not available', '', 'alerts'))
+    panels_q.append(panel('Are the alerts working?', note('data/metrics/daily.tsv', 'not available'), 'alerts'))
 
+free, psi, (hc_, hh_, hm_) = mach['free'], mach['pressure'], mach['heavy']
+gate_wait = (free is not None and free[0] < MEM_MIN_GB) or (psi is not None and psi >= 40)
+at_cap = ' and '.join(x for x, full in (('emulators', (emu_count or 0) >= EMU_MAX), ('builds', (mach['gradle'] or 0) >= GRADLE_MAX)) if full)
+mv = ' · '.join(x for x in (f'{free[0]:.0f} GB free' if free else '', f'pressure {psi:.0f}%' if psi is not None else '') if x)
+health.append(('Machine', (mv + (' · heavy jobs wait' if gate_wait else f' · {at_cap} at cap' if at_cap else '')) if mv else f'unknown: {mach["free_why"]}',
+               'bad' if gate_wait else 'warn' if at_cap else 'ok' if mv else '', 'machine'))
+in_use = sum(1 for r in dev_rows if r[2].startswith(('In use', 'Held')))
+if dev_count is None: health.append(('Devices', f'unknown: {dev_problems[0]}', '', 'devices'))
+else:
+    health.append(('Devices', f'{dev_count} connected · {in_use} in use',
+                   'bad' if any(r[3] == 'bad' for r in dev_rows) else 'ok', 'devices'))
+issues = [h for h in health if h[2] in ('bad', 'warn')]
+bad_n = sum(h[2] == 'bad' for h in issues)
+pill = (chip(f'{bad_n} problem{"s" if bad_n != 1 else ""}', 'bad') if bad_n else
+        chip(f'{len(issues)} to watch', 'warn') if issues else chip('Healthy', 'ok'))
+health_card = (f'<section class="health" id="health"><h2>Fleet health</h2>'
+               + ''.join(hrow(*h) for h in health) + '</section>')
+
+# 4. Homes: one row per home, lead state, model and lane numbers
+lrel = 'data/metrics/lanes.tsv'
+lp = os.path.join(HOME, lrel)
+lanes_rec = None
+if os.path.isfile(lp) and os.path.getsize(lp) == 0: notes.append((lrel, 'empty'))
+else: lanes_rec = tsv(lrel, ('home', 'task', 'kind', 'harness', 'model'))
+if lanes_rec == []: notes.append((lrel, 'no rows yet')); lanes_rec = None
+lead_model = {r['task']: r['model'] for r in lanes_rec or [] if r['kind'] == 'secondmate'}
+homes = set(latest) | {r['home'] for r in daily or [] if iso_day(r['day']) in (TODAY, YDAY) and r['home'] != 'main'}
+homes |= {home_of_task(i.get('id', '')) for i in in_flight} | {h for h in leads if h} | registered | {'main'}
+hc, parked_rows = [], []
+COLS = ('Open lanes', 'Working', 'Ready', 'To land', 'Oldest wait', 'Merged today', 'First pass', 'Stalls today')
+for h in sorted(homes, key=lambda x: (x != 'main', x)):
+    pj = projects.get(h)
+    pj = f'<small>{esc(", ".join(pj))}</small>' if pj else ''
+    if h in parked:
+        parked_rows.append(f'<tr class="parked"><th><span class="hn">{dot()}<b>{esc(h)}</b>{chip("Parked")}</span>{pj}</th><td colspan="{len(COLS) + 1}"></td></tr>')
+        continue
+    r = latest.get(h, {})
+    o, rd = (count(r.get(k)) for k in ('open', 'ready'))
+    dw = done_waiting(h)[0]
+    ow = num(r.get('oldestwait_h'))  # -1 means nothing is waiting
+    lead = leads.get(h)
+    lw = LEAD_WORDS.get((lead or {}).get('state'), (str((lead or {}).get('state', '')).replace('_', ' ').capitalize(), ''))
+    if h in down: lw = ('Not running', 'bad')
+    lanes = ''
+    if o is not None:
+        lanes = '<span class="lanes" aria-hidden="true">' + ''.join(
+            f'<i class="{"on" if k < o else ""}{" over" if k >= lane_target else ""}"></i>' for k in range(max(lane_target, int(o)))) + '</span>'
+    flag = ''
+    if o is not None and o > lane_target: flag = chip('over target', 'warn')
+    elif o is not None and o < lane_target and (rd or 0) > 0: flag = chip('free lanes, ready work', 'warn')
+    stalls = dsum('stall_alarms', TODAY, h) if h in measured else None
+    fp = window_metrics(h)[0]['first_pass'] if h in measured and prs is not None else None
+    fp_t = next(((tr['op'], num(tr['target'])) for tr in targets or [] if tr['metric'] == 'first_pass'), None)
+    mine = len([i for i in in_flight if home_of_task(i.get('id', '')) == h])
+    model = lead_model.get(h, '').split('/')[-1]
+    mt = live_merged[h] if live_merged is not None and h in live_merged else merged(TODAY, h) if prs is not None and h in measured else None
+    def td(label, v, tone_=''):
+        return f'<td class="{tone_}{" na" if v is None else ""}" data-l="{esc(label.lower())}">{"–" if v is None else v}</td>'
+    old = f' · lanes as of {esc(r["time"][11:16])}' if r and r['time'] != max(x['time'] for x in latest.values()) else ''
+    hc.append(f'<tr><th><span class="hn">{dot(lw[1]) if lead or h in down else dot()}<b>{esc("Main" if h == "main" else h)}</b>'
+              f'<span class="hs {lw[1]}">{esc(lw[0]) if lead or h in down else ""}</span></span>{pj}</th>'
+              f'<td class="model{"" if model else " na"}" data-l="lead">{esc(model) or "–"}</td>'
+              + td(COLS[0], f'{lanes}<span>{fmt(o)}<small>/{lane_target}</small></span>{flag}' if o is not None else None, 'ol ')
+              + td(COLS[1], mine if snap is not None else None)
+              + td(COLS[2], fmt(rd) if rd is not None else None)
+              + td(COLS[3], fmt(dw) if dw is not None else None, 'warn' if dw else '')
+              + td(COLS[4], (f'{fmt(ow)} h' if ow >= 0 else 'none') if ow is not None else None, 'warn' if (ow or 0) >= 2 else '')
+              + td(COLS[5], mt)
+              + td(COLS[6], f'{fp}%' if fp is not None else None, 'bad' if fp is not None and fp_t and misses(fp, *fp_t) else '')
+              + td(COLS[7], stalls, 'bad' if stalls else '') + f'</tr>{f"<tr class=sub><td colspan={len(COLS) + 2}>{old[3:]}</td></tr>" if old else ""}')
+homes_sec = (f'<section id="homes"><h2>Homes</h2><div class="panel flush"><table class="homes"><thead><tr><th>Home</th><th>Lead</th>'
+             + ''.join(f'<th>{c}</th>' for c in COLS) + f'</tr></thead><tbody>{"".join(hc + parked_rows)}</tbody></table></div>'
+             f'<p class="small muted">Lane boxes show open lanes against the target of {lane_target}. First pass covers merges of the last 2 days.</p></section>')
+
+# 5. Devices and machine
+def drow(name, sub, text, tone):
+    return f'<div class="dev">{dot(tone)}<div class="dn"><b>{esc(name)}</b><small>{esc(sub)}</small></div><span class="dw {tone}">{esc(text)}</span></div>'
+dev_body = ''.join(drow(*r) for r in dev_rows) or ('<p class="empty">No device connected and no emulator running.</p>' if dev_count is not None else '')
+dev_body += ''.join(f'<p class="note">unknown - {esc(p)}</p>' for p in dev_problems)
+def meter(label, value, frac, tone, hint=''):
+    bar = f'<span class="bar"><i class="{tone}" style="--w:{max(2, min(100, round(100 * frac)))}%"></i></span>' if frac is not None else ''
+    return f'<div class="meter"><span>{esc(label)}</span><b class="{tone}">{value}</b>{bar}{f"<small>{esc(hint)}</small>" if hint else ""}</div>'
+def unknown(why): return f'<span class="unk">unknown: {esc(why)}</span>'
+ms = [
+    meter('Free memory', f'{free[0]:.1f} GB <small>of {free[1]:.0f} GB</small>', free[0] / free[1] if free[1] else None,
+          'bad' if free[0] < MEM_MIN_GB else 'ok', f'heavy jobs wait below {MEM_MIN_GB} GB')
+    if free else meter('Free memory', unknown(mach['free_why']), None, ''),
+    meter('Memory pressure', f'{psi:.0f}%', psi / 100, 'bad' if psi >= 40 else 'warn' if psi >= 20 else 'ok', 'share of the last 10 s some job waited on memory; heavy jobs wait at 40%')
+    if psi is not None else meter('Memory pressure', unknown(mach['pressure_why']), None, ''),
+    meter('Heavy jobs', f'{hc_:.1f} GB <small>of {hh_:.0f} GB</small>' if hh_ else f'{hc_:.1f} GB', hc_ / hh_ if hh_ else None,
+          'warn' if hh_ and hc_ >= 0.9 * hh_ else 'ok', f'shared group for builds and emulators' + (f'; hard limit {hm_:.0f} GB' if hm_ else ''))
+    if hc_ is not None else meter('Heavy jobs', unknown(mach['heavy_why']), None, ''),
+    meter('Gradle builds', f'{mach["gradle"]} <small>of {GRADLE_MAX}</small>', mach['gradle'] / GRADLE_MAX if GRADLE_MAX else None,
+          'warn' if mach['gradle'] >= GRADLE_MAX else 'ok', 'a new build waits at the cap')
+    if mach['gradle'] is not None else meter('Gradle builds', unknown(mach['gradle_why']), None, ''),
+    meter('Emulators', f'{emu_count} <small>of {EMU_MAX}</small>', emu_count / EMU_MAX if EMU_MAX else None,
+          'warn' if emu_count >= EMU_MAX else 'ok', 'a new emulator waits at the cap')
+    if emu_count is not None else meter('Emulators', unknown(next((p for p in dev_problems if p.startswith('emulators')), 'no answer')), None, ''),
+]
+ops_sec = (f'<section id="machine"><h2>Devices and machine</h2><div class="grid2">'
+           + panel('Devices', dev_body, 'devices') + panel('Machine', ''.join(ms)) + '</div></section>')
+
+# 6. Work lists
+W = []
+if snap is not None:
+    rs = []
+    for i in sorted(in_flight, key=lambda i: i.get('id', '')):
+        sw, stone = STATE_WORDS.get(i.get('state'), (str(i.get('state') or 'unknown').capitalize(), ''))
+        doing = i.get('doing') or ''
+        extra = chip('Checks running', 'ok') if doing.startswith('validating') else ''
+        why = f'<div class="why">{esc(doing)}</div>' if doing and i.get('state') in ('paused', 'blocked', 'needs-decision', 'failed') else ''
+        h = home_of_task(i.get('id', ''))
+        rs.append(row(f'{esc(i.get("name") or i.get("id"))}{why}', esc('Main' if h == 'main' else h), chip(sw, stone) + extra))
+    W.append(panel('Open work', (rows_more(rs) or '<p class="empty">Nothing is open.</p>')
+                   + '<p class="foot-note">Second mate work shows while it is working; paused or blocked work counts in each home\'s open lanes.</p>',
+                   'running', f'<span class="cnt">{len(in_flight)}</span>'))
+    rs = []
+    real = lambda v: v not in (None, '', '-')
+    for g in gates:
+        if str(g.get('id', '')).startswith('('):  # a synthetic row about the records themselves, not queued work
+            notes.append(('Main records', g.get('title') or g.get('id'))); continue
+        why = f'<div class="why">{esc(g["reason"])}</div>' if real(g.get('reason')) else ''
+        state = chip(f'after {g["blocked_by"]}') if real(g.get('blocked_by')) else (chip('Waiting', 'warn') if why else chip('Ready', 'ok'))
+        rs.append(row(esc(g.get('title') or g.get('id')) + why,
+                      esc({'main': 'Main'}.get(owner_home(g.get('owner')), owner_home(g.get('owner')))) + (f' · filed {esc(g["filed"])}' if real(g.get('filed')) else ''), state))
+    W.append(panel('Queued', (rows_more(rs) or '<p class="empty">Nothing queued.</p>')
+                   + '<p class="foot-note">Second mate homes may send only their first queued items; the Queued and ready number counts all ready work.</p>',
+                   'queued', f'<span class="cnt">{len(rs)}</span>'))
+    rs = [row(link(l.get('what') or l.get('id'), l.get('artifact')), esc('Main' if owner_home(l.get('owner')) == 'main' else l.get('owner')), '') for l in landed]
+    W.append(panel('Recently landed', rows_more(rs) or '<p class="empty">Nothing landed recently.</p>', 'landed', f'<span class="cnt">{len(landed)}</span>'))
+else:
+    W.append(note('fleet snapshot', next((r for s, r in notes if s == 'fleet snapshot'), 'not available')))
+if defects is not None:
+    open_n = sum(d['status'] == 'OPEN' for d in defects)
+    rs = [row(esc(d['text']), esc(d['day']), chip(d['status'].capitalize(), 'bad' if d['status'] == 'OPEN' else 'ok') if d['status'] else '')
+          for d in reversed(defects[-15:])]
+    W.append(panel('Defects log', rows_more(rs, 4, 'newest'), 'defects', f'<span class="cnt">{open_n} open of {len(defects)}</span>'))
+work_sec = f'<section id="work"><h2>Work</h2><div class="grid2">{"".join(W)}</div></section>'
+
+# 7. Quality and trends
 if skills is not None or daily is not None:
     sk_t, sk_y = dsum('skill_reads', TODAY), dsum('skill_reads', YDAY)
     top = {}
@@ -574,8 +927,8 @@ if skills is not None or daily is not None:
     peak = top[0][1] if top else 1
     rows_ = ''.join(f'<div class="hbar"><span>{esc(k)}</span><i style="--w:{max(4, round(100*v/peak))}%"></i><b>{v}</b></div>' for k, v in top)
     delta = '' if sk_t is None or sk_y is None else (f'{"up" if sk_t >= sk_y else "down"} from {sk_y} yesterday')
-    cards.append(f'''<div class="card"><h3>Are skills being used?</h3><div class="big"><b>{fmt(sk_t)}</b><span>skill reads today · {esc(delta)}</span></div>
-{rows_ or '<p class="small muted">No skill reads recorded today.</p>'}{'' if skills is not None else note('data/metrics/skills.tsv', 'not available')}</div>''')
+    panels_q.append(panel('Are skills being used?', f'''<div class="big"><b>{fmt(sk_t)}</b><span>skill reads today · {esc(delta)}</span></div>
+{rows_ or '<p class="small muted">No skill reads recorded today.</p>'}{'' if skills is not None else note('data/metrics/skills.tsv', 'not available')}'''))
 
 if targets is not None and (prs is not None or daily is not None):
     vals, n = window_metrics()
@@ -591,81 +944,19 @@ if targets is not None and (prs is not None or daily is not None):
         rows_.append(f'<div class="q {tone_}"><span>{esc(label)}</span><b>{fmt(v, 2)}{unit if v is not None else ""}</b>'
                      f'<i>target {"at least" if op == ">=" else "at most"} {fmt(tv)}{unit}'
                      f'{" · missed in " + esc(", ".join(homes_missed)) if homes_missed else ""}</i></div>')
-    cards.append(f'''<div class="card"><h3>Is quality on target?</h3><p class="small muted">Today and yesterday, {n} merge{"s" if n != 1 else ""}, whole fleet. Red means the fleet or a home missed the target.</p>
-<div class="qs">{"".join(rows_) or '<p class="small muted">No known metrics in the targets file.</p>'}</div></div>''')
-elif targets is None:
-    cards.append(f'<div class="card"><h3>Is quality on target?</h3>{note("config/metrics-targets.tsv", "not available")}</div>')
-
-if snap is not None:
-    fm_now = [i for i in in_flight if home_of_task(i.get('id', '')) == 'main']
-    fm_landed = [l for l in landed if owner_home(l.get('owner')) == 'main']
     words = [count(r.get('rulewords')) for r in (pulse or []) if count(r.get('rulewords')) is not None]
     rw = ''
     if len(words) >= 2:
         d = words[-1] - words[0]
-        rw = f'<p class="small">Written rules: {fmt(words[-1])} words ({"+" if d > 0 else ""}{fmt(d)} since the first pulse).</p>'
-    items = ''.join(f'<li>{esc(i.get("name") or i.get("id"))}</li>' for i in fm_now[:5])
-    cards.append(f'''<div class="card"><h3>How are Firstmate changes going?</h3><div class="stats">
-<div class="stat"><b>{len(fm_now)}</b><span>in progress in Main</span></div><div class="stat"><b>{len(fm_landed)}</b><span>landed recently</span></div></div>
-{f'<ul class="mini">{items}</ul>' if items else ''}{rw}</div>''')
-S.append(f'<section><h2>Your questions</h2><div class="cards">{"".join(cards)}</div></section>')
+        rw = f'<p class="small muted">Written rules: {fmt(words[-1])} words ({"+" if d > 0 else ""}{fmt(d)} since the first pulse).</p>'
+    panels_q.append(panel('Is quality on target?', f'''<p class="small muted">Today and yesterday, {n} merge{"s" if n != 1 else ""}, whole fleet. Red means the fleet or a home missed the target.</p>
+<div class="qs">{"".join(rows_) or '<p class="small muted">No known metrics in the targets file.</p>'}</div>{rw}'''))
+elif targets is None:
+    panels_q.append(panel('Is quality on target?', note('config/metrics-targets.tsv', 'not available')))
 
-# 3. Homes
-homes = set(latest) | {r['home'] for r in daily or [] if iso_day(r['day']) in (TODAY, YDAY) and r['home'] != 'main'}
-homes |= {home_of_task(i.get('id', '')) for i in in_flight} | {h for h in leads if h} | registered | {'main'}
-hc = []
-for h in sorted(homes, key=lambda x: (x != 'main', x)):
-    if h in parked:
-        pj = projects.get(h)
-        hc.append(f'<div class="home"><div class="hh"><h3>{esc(h)}</h3>{chip("Parked")}</div>'
-                  + (f'<p class="small muted">Projects: {esc(", ".join(pj))}</p>' if pj else '') + '</div>')
-        continue
-    r = latest.get(h, {})
-    o, rd = (count(r.get(k)) for k in ('open', 'ready'))
-    dw = done_waiting(h)[0]
-    ow = num(r.get('oldestwait_h'))  # -1 means nothing is waiting
-    lead = leads.get(h)
-    lw = LEAD_WORDS.get((lead or {}).get('state'), (str((lead or {}).get('state', '')).replace('_', ' ').capitalize(), ''))
-    lanes = ''
-    if o is not None:
-        slots = max(lane_target, int(o))
-        lanes = '<div class="lanes" aria-label="open lanes">' + ''.join(
-            f'<i class="{"on" if k < o else ""}{" over" if k >= lane_target else ""}"></i>' for k in range(slots)) + '</div>'
-    flag = ''
-    if o is not None and o > lane_target: flag = chip('over lane target', 'warn')
-    elif o is not None and o < lane_target and (rd or 0) > 0: flag = chip('free lanes with ready work', 'warn')
-    stalls = dsum('stall_alarms', TODAY, h) if h in measured else None
-    fp = window_metrics(h)[0]['first_pass'] if h in measured and prs is not None else None
-    fp_t = next(((tr['op'], num(tr['target'])) for tr in targets or [] if tr['metric'] == 'first_pass'), None)
-    mine = len([i for i in in_flight if home_of_task(i.get('id', '')) == h])
-    def kv(k, v, tone_=''): return f'<div class="kv {tone_}"><span>{esc(k)}</span><b>{v}</b></div>'
-    body = ''.join([
-        kv('Open lanes', f'{fmt(o)} <small>/ {lane_target}</small>') if o is not None else '',
-        kv('Working now', mine) if snap is not None else '',
-        kv('Ready to start', fmt(rd)) if rd is not None else '',
-        kv('Finished, not landed', fmt(dw), 'warn' if dw else '') if dw is not None else '',
-        kv('Oldest wait', f'{fmt(ow)} h' if ow is not None and ow >= 0 else 'none', 'warn' if (ow or 0) >= 2 else '') if ow is not None else '',
-        kv('Merged today', live_merged[h]) if live_merged is not None and h in live_merged else
-        kv('Merged today', merged(TODAY, h)) if prs is not None and h in measured else '',
-        kv('First-pass merges, 2 days', f'{fp}%', 'bad' if fp_t and misses(fp, *fp_t) else '') if fp is not None else '',
-        kv('Stalls reached Main', stalls, 'bad' if stalls else '') if stalls is not None else '',
-    ])
-    pj = projects.get(h)
-    pj = f'<p class="small muted">Projects: {esc(", ".join(pj))}</p>' if pj else ''
-    old = f'<p class="small muted">Lane numbers as of {esc(r["time"][11:16])}</p>' if r and r['time'] != max(x['time'] for x in latest.values()) else ''
-    hc.append(f'<div class="home"><div class="hh"><h3>{esc("Main" if h == "main" else h)}</h3>{chip(*lw) if lead else ""}</div>{lanes}{flag}<div class="kvs">{body}</div>{pj}{old}</div>')
-if hc:
-    S.append(f'<section><h2>Homes</h2><p class="small muted">Lane boxes show open lanes against the target of {lane_target}.</p><div class="homes">{"".join(hc)}</div></section>')
-
-# 3b. Who does the work: harness and model per lane, from the lane record
-lrel = 'data/metrics/lanes.tsv'
-lp = os.path.join(HOME, lrel)
-lanes_rec = None
-if os.path.isfile(lp) and os.path.getsize(lp) == 0: notes.append((lrel, 'empty'))
-else: lanes_rec = tsv(lrel, ('home', 'task', 'kind', 'harness', 'model'))
-if lanes_rec == []: notes.append((lrel, 'no rows yet')); lanes_rec = None
+# Who does the work: model per lane, from the lane record
 if lanes_rec is None:
-    S.append('<section><h2>Who does the work</h2><div class="card"><p class="small muted">No record yet.</p></div></section>')
+    panels_q.append(panel('Who does the work', '<p class="small muted">No record yet.</p>'))
 else:
     last = {}  # (home, task) -> its latest row; a row per model change or PR
     for r in lanes_rec:
@@ -684,144 +975,127 @@ else:
     def wrow(label, a, b, c, cls='wr'): return f'<div class="{cls}"><span>{label}</span><b>{a}</b><b>{b}</b><b>{c}</b></div>'
     rs = [wrow(esc(k), g['run'], g['merged'], f"{100 * g['fp'] // g['merged']}%" if g['merged'] else '–')
           for k, g in sorted(groups.items(), key=lambda kv: (-kv[1]['run'], -kv[1]['merged'], kv[0]))]
-    more = f'<details class="more"><summary>show all {len(rs)}</summary>{"".join(rs[5:])}</details>' if len(rs) > 5 else ''
-    leads_ = {}
-    for r in lanes_rec:
-        if r['kind'] == 'secondmate' and r['task'] not in parked: leads_[r['task']] = r
-    ll = ''.join(f'<li>{esc(h)}: {esc(r["harness"])} · {esc(r["model"])}</li>' for h, r in sorted(leads_.items()))
-    ll = f'<details class="more"><summary>Lead models, {len(leads_)} home{"s" if len(leads_) != 1 else ""}</summary><ul class="mini">{ll}</ul></details>' if ll else ''
-    since = min(r.get('first_seen', '') or '9' for r in lanes_rec)[:10]
-    S.append(f'''<section><h2>Who does the work</h2><div class="card">{wrow("Harness · model", "Running", "Merged, 7 days", "First pass", "wr wh")}
-{"".join(rs[:5]) or '<p class="small muted">No worker lanes recorded.</p>'}{more}{ll}<p class="small muted">Recorded since {esc(since)}; older work has no record.</p></div></section>''')
+    first = min(r.get('first_seen', '') or '9' for r in lanes_rec)[:10]
+    panels_q.append(panel('Who does the work', f'''{wrow("Worker model", "Running", "Merged, 7 days", "First pass", "wr wh")}
+{rows_more(rs, 5) or '<p class="small muted">No worker lanes recorded.</p>'}<p class="small muted">Recorded since {esc(first)}; older work has no record.</p>'''))
 
-# 4. Trends
 tr = []
 if prs is not None:
     tr.append(trend('Merged', [merged(d) for d in WEEK]))
     tr.append(trend('First-pass merges', [first_pass_pct([d]) for d in WEEK], 'pct', first_pass_pct(WEEK)))
 if pulse is not None:
     tr.append(trend('Finished, not landed', [pulse_day('donewait', d) for d in WEEK], 'level'))
-    tr.append(trend('Open lanes', [pulse_day('open', d) for d in WEEK], 'level'))
 if daily is not None:
     tr.append(trend('Stalls reached Main', [dsum('stall_alarms', d) for d in WEEK]))
-    tr.append(trend('Leads woken automatically', [dsum('self_rings', d) for d in WEEK]))
-    tr.append(trend('Skill reads', [dsum('skill_reads', d) for d in WEEK]))
-    tr.append(trend('Main messages to leads', [dsum('steers', d) for d in WEEK]))
-    tr.append(trend('Defects logged', [dsum('defects', d) for d in WEEK]))
-if tr:
-    S.append(f'<section><h2>Last 7 days</h2><div class="trends">{"".join(tr)}</div></section>')
-
-# 5. Lists
-L = []
-if snap is not None:
-    rs = []
-    for i in sorted(in_flight, key=lambda i: i.get('id', '')):
-        sw, stone = STATE_WORDS.get(i.get('state'), (str(i.get('state') or 'unknown').capitalize(), ''))
-        doing = i.get('doing') or ''
-        extra = chip('Checks running', 'ok') if doing.startswith('validating') else ''
-        why = f'<div class="why">{esc(doing)}</div>' if doing and i.get('state') in ('paused', 'blocked', 'needs-decision', 'failed') else ''
-        h = home_of_task(i.get('id', ''))
-        rs.append(row(f'{esc(i.get("name") or i.get("id"))}{why}', esc('Main' if h == 'main' else h), chip(sw, stone) + extra))
-    rs.insert(0, '<p class="empty">Second mate work shows here while it is working; paused or blocked lanes count only in the open lanes on each home card.</p>')
-    L.append(details('Working now', len(in_flight), ''.join(rs)))
-    rs = []
-    real = lambda v: v not in (None, '', '-')
-    for g in gates:
-        if str(g.get('id', '')).startswith('('):  # a synthetic row about the records themselves, not queued work
-            notes.append(('Main records', g.get('title') or g.get('id'))); continue
-        why = f'<div class="why">{esc(g["reason"])}</div>' if real(g.get('reason')) else ''
-        state = chip(f'after {g["blocked_by"]}') if real(g.get('blocked_by')) else (chip('Waiting', 'warn') if why else chip('Ready', 'ok'))
-        rs.append(row(esc(g.get('title') or g.get('id')) + why,
-                      esc(owner_home(g.get('owner'))) + (f' · filed {esc(g["filed"])}' if real(g.get('filed')) else ''), state))
-    cap = '<p class="empty">Second mate homes may send only their first queued items, so this list can be short. The Queued and ready tile counts all ready work.</p>'
-    L.append(details('Queued', len(rs), cap + ''.join(rs)))
-    rs = [row(link(l.get('what') or l.get('id'), l.get('artifact')), esc('Main' if owner_home(l.get('owner')) == 'main' else l.get('owner')), '') for l in landed]
-    L.append(details('Recently landed', len(landed), ''.join(rs)))
-else:
-    L.append(note('fleet snapshot', next((r for s, r in notes if s == 'fleet snapshot'), 'not available')))
-rs = [row(link(fields[2], fields[3]), '', chip(f'{age // 3600} h {age % 3600 // 60} min old', 'warn'))
-      if age is not None else row('Ask record needs correction', '', chip('Malformed row', 'warn')) for fields, age in asks]
-L.insert(0, details('Waiting on you', len(asks) if asks_known else '–', ''.join(rs) if asks_known else note('ask list', 'unreadable')))
-if defects is not None:
-    open_n = sum(d['status'] == 'OPEN' for d in defects)
-    rs = [row(esc(d['text']), esc(d['day']), chip(d['status'].capitalize(), 'bad' if d['status'] == 'OPEN' else 'ok') if d['status'] else '')
-          for d in reversed(defects[-15:])]
-    L.append(details(f'Defects log · {open_n} open of {len(defects)}', '15 newest' if len(defects) > 15 else len(defects), ''.join(rs)))
-S.append(f'<section><h2>All work</h2>{"".join(L)}</section>')
+if tr: panels_q.append(panel('Last 7 days', f'<div class="trends">{"".join(tr)}</div>'))
+quality_sec = f'<section id="quality"><h2>Quality and trends</h2><div class="grid2">{"".join(panels_q)}</div></section>'
 
 missing = ''.join(f'<li><code>{esc(s)}</code>: {esc(r)}</li>' for s, r in notes)
-if missing: S.append(f'<section class="foot"><h2>Missing data</h2><ul class="mini">{missing}</ul><p class="small muted">Each missing source only hides its own part.</p></section>')
+missing_sec = (f'<section class="foot"><details><summary>Missing data <span class="cnt">{len(notes)}</span></summary><ul class="mini">{missing}</ul>'
+               f'<p class="small muted">Each missing source only hides its own part.</p></details></section>') if missing else ''
 
 CSS = '''
-:root{--bg:#f6f5f1;--card:#ffffff;--ink:#1d1d1b;--soft:#5f5e58;--faint:#8c8a82;--line:#e4e2da;--ok:#2f7d4f;--ok-bg:#e6f2ea;--warn:#9a5b00;--warn-bg:#fbf0dc;--bad:#b3261e;--bad-bg:#fbe5e3;--bar:#c9c6bb;--bar-now:#1d1d1b;color-scheme:light dark}
-@media (prefers-color-scheme:dark){:root{--bg:#141413;--card:#1d1d1b;--ink:#ecebe6;--soft:#b2b0a7;--faint:#86847c;--line:#2f2e2b;--ok:#7fcf9c;--ok-bg:#1d3326;--warn:#f0b65a;--warn-bg:#3a2c12;--bad:#ff8a80;--bad-bg:#3d1c1a;--bar:#4a4944;--bar-now:#ecebe6}}
+:root{--bg:#f6f6f7;--panel:#fff;--sunk:#f1f1f3;--line:#e5e5e9;--ink:#141417;--soft:#55555e;--faint:#8b8b94;
+--ok:#15803d;--ok-bg:#e8f6ed;--warn:#b45309;--warn-bg:#fdf3e2;--bad:#c62828;--bad-bg:#fdeceb;--bar:#d4d4da;--bar-now:#141417;color-scheme:light dark}
+@media (prefers-color-scheme:dark){:root{--bg:#0b0b0d;--panel:#141417;--sunk:#1b1b1f;--line:#26262c;--ink:#ececef;--soft:#a3a3ad;--faint:#6e6e78;
+--ok:#4ade80;--ok-bg:#12301f;--warn:#fbbf24;--warn-bg:#33270c;--bad:#f87171;--bad-bg:#3a1616;--bar:#34343c;--bar-now:#ececef}}
 *{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,"Helvetica Neue",sans-serif;font-feature-settings:"tnum" 1}
-main{max-width:1120px;margin:0 auto;padding:28px 20px 56px}
-header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 16px;margin-bottom:22px}
-h1{font-size:26px;letter-spacing:-.02em;margin:0}h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--soft);margin:34px 0 12px;font-weight:600}
-h3{font-size:16px;margin:0 0 10px;letter-spacing:-.01em}section:first-of-type h2{margin-top:0}
-.muted{color:var(--faint)}.small{font-size:13px;margin:8px 0 0}
-.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
-.tile{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;min-width:0}
-.tl{font-size:13px;color:var(--soft)}.tv{font-size:44px;font-weight:650;letter-spacing:-.03em;line-height:1.1;margin:4px 0}.ts{font-size:13px;color:var(--faint)}
-.tile.warn .tv{color:var(--warn)}.tile.bad .tv{color:var(--bad)}.tile.ok .tv{color:var(--ok)}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,400px),1fr));gap:12px}
-.card,.home{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;min-width:0}
-.verdict{margin:0 0 12px;padding:8px 12px;border-radius:10px;font-size:14px;font-weight:550}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;font-variant-numeric:tabular-nums}
+main{max-width:1180px;margin:0 auto;padding:18px 16px 48px}
+a{color:inherit;text-decoration:none}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+h1{font-size:18px;font-weight:650;letter-spacing:-.01em;margin:0}.stamp{display:block;font-size:12px;color:var(--faint)}
+h2{font-size:13px;font-weight:600;margin:0 0 10px;color:var(--soft)}
+h3{font-size:14px;font-weight:600;margin:0}
+section{margin-top:28px}.top section{margin-top:0}
+.top{display:grid;gap:12px}
+.panel,.asks,.health{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;min-width:0}
+.ph{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.dot{display:inline-block;flex:none;width:8px;height:8px;border-radius:50%;background:var(--faint)}
+.dot.ok{background:var(--ok)}.dot.warn{background:var(--warn)}.dot.bad{background:var(--bad)}
+.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+.asks .ah{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:6px}.asks h2{margin:0;color:var(--ink);font-size:15px}
+.an{font-size:22px;font-weight:650;line-height:1}.asks.warn{border-color:color-mix(in srgb,var(--warn) 45%,var(--line))}.asks.warn .an{color:var(--warn)}.asks.ok .an{color:var(--ok)}
+.ask{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line)}
+.ask span{flex:1;min-width:0;overflow-wrap:anywhere}a.ask span{text-decoration:underline;text-decoration-color:var(--bar);text-underline-offset:3px}
+.ask time{flex:none;font-size:12px;color:var(--faint)}
+.calm{margin:0;color:var(--soft)}.calm::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok);margin-right:8px}
+.strip{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.m{display:flex;flex-direction:column;background:var(--panel);padding:11px 14px;min-width:0}
+.m:hover,.hr:hover{background:var(--sunk)}
+.ml{font-size:12px;color:var(--soft)}.mv{font-size:24px;font-weight:650;letter-spacing:-.02em;line-height:1.2}
+.m small{font-size:11.5px;color:var(--faint);line-height:1.3}.m.warn .mv{color:var(--warn)}.m.ok .mv{color:var(--ok)}
+.health{padding:6px 0}.health h2{padding:8px 16px 2px;margin:0}
+.hr{display:grid;grid-template-columns:auto 4.6em minmax(0,1fr) auto;align-items:center;gap:10px;padding:9px 16px;border-top:1px solid var(--line)}
+.health h2+.hr{border-top:0}.hr span{color:var(--soft)}.hr b{font-weight:500;overflow-wrap:anywhere}.hr::after{content:"›";color:var(--faint)}
+.chip{display:inline-block;font-size:11.5px;font-weight:550;padding:1px 7px;border-radius:6px;background:var(--sunk);color:var(--soft);white-space:nowrap;margin:2px 0 2px 4px}
+.chip.ok{background:var(--ok-bg);color:var(--ok)}.chip.warn{background:var(--warn-bg);color:var(--warn)}.chip.bad{background:var(--bad-bg);color:var(--bad)}
+.cnt{font-size:12px;color:var(--faint);font-weight:500}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr));gap:12px;align-items:start}
+.flush{padding:0;overflow-x:auto}
+table.homes{width:100%;border-collapse:collapse}
+.homes th,.homes td{padding:9px 10px;border-top:1px solid var(--line);text-align:right;font-weight:400;white-space:nowrap;vertical-align:middle}
+.homes thead th{border-top:0;font-size:11.5px;color:var(--faint);font-weight:500;vertical-align:bottom}
+.homes th:first-child,.homes th:nth-child(2),.homes td.model{text-align:left}.homes thead th:first-child{padding-left:16px}.homes tbody th{padding-left:16px}
+.hn{display:flex;align-items:center;gap:8px}.hn b{font-weight:600}.hs{font-size:12px}
+.homes tbody th small{display:block;max-width:240px;overflow:hidden;text-overflow:ellipsis;font-size:11.5px;color:var(--faint);padding-left:16px}
+.homes td.ol .chip{display:block;width:max-content;margin:3px 0 0 auto}.homes td.model{font-size:12px;color:var(--soft)}.homes td small{color:var(--faint)}.homes td.na{color:var(--faint)}
+.homes tr.sub td{border-top:0;padding-top:0;text-align:left;font-size:11.5px;color:var(--faint);padding-left:32px}
+.lanes{display:inline-flex;gap:3px;margin-right:8px;vertical-align:middle}.lanes i{width:9px;height:9px;border-radius:2px;border:1px solid var(--bar)}
+.lanes i.on{background:var(--ink);border-color:var(--ink)}.lanes i.on.over{background:var(--warn);border-color:var(--warn)}
+.dev{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:4px 10px;padding:9px 0;border-top:1px solid var(--line)}
+.ph+.dev{border-top:0}.dn b{display:block;font-weight:550;overflow-wrap:anywhere}.dn small{font-size:11.5px;color:var(--faint)}.dw{font-size:13px;text-align:right}.dw.ok{color:var(--soft)}
+@media (max-width:599px){.dev{grid-template-columns:auto minmax(0,1fr)}.dw{grid-column:2;text-align:left}}
+.meter{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;padding:9px 0;border-top:1px solid var(--line)}.ph+.meter{border-top:0}
+.meter>span:first-child{color:var(--soft)}.meter b{font-weight:600}.meter b small{color:var(--faint);font-weight:400}
+.bar{grid-column:1/-1;height:6px;border-radius:3px;background:var(--sunk);overflow:hidden}.bar i{display:block;height:100%;width:var(--w);background:var(--ok);border-radius:3px}
+.bar i.warn{background:var(--warn)}.bar i.bad{background:var(--bad)}.meter>small{grid-column:1/-1;font-size:11.5px;color:var(--faint)}.unk{color:var(--faint);font-weight:400}
+.row{padding:8px 0;border-top:1px solid var(--line)}#defects .rm{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.ph+.row{border-top:0}.rm{overflow-wrap:anywhere}.rm a{text-decoration:underline;text-decoration-color:var(--bar);text-underline-offset:3px}
+.rx{display:flex;flex-wrap:wrap;align-items:center;gap:2px 8px;margin-top:2px;color:var(--faint);font-size:12px}.rx .chip{margin:0}
+.why{font-size:12px;color:var(--faint);margin-top:2px}
+.more{border-top:1px solid var(--line)}.more summary{cursor:pointer;list-style:none;padding:9px 0 2px;font-size:12.5px;color:var(--soft)}
+.more summary::-webkit-details-marker{display:none}.more summary::after{content:" ›"}.more[open] summary{display:none}
+.foot-note{font-size:11.5px;color:var(--faint);margin:8px 0 0}
+.verdict{margin:0 0 10px;padding:7px 10px;border-radius:8px;font-size:13px;font-weight:550;background:var(--sunk)}
 .verdict.ok{background:var(--ok-bg);color:var(--ok)}.verdict.warn{background:var(--warn-bg);color:var(--warn)}.verdict.bad{background:var(--bad-bg);color:var(--bad)}
 .stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-.stat{display:flex;flex-direction:column;min-width:0}.stat b{font-size:28px;font-weight:650;letter-spacing:-.02em;line-height:1.15}
-.stat span{font-size:13px;color:var(--soft)}.stat i{font-style:normal;font-size:12px;color:var(--faint)}
-.stat.bad b{color:var(--bad)}.stat.warn b{color:var(--warn)}
-.big{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:10px}.big b{font-size:36px;font-weight:650;letter-spacing:-.03em}.big span{font-size:13px;color:var(--soft)}
-.hbar{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) 2.2em;align-items:center;gap:8px;font-size:13px;margin:5px 0}
-.hbar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.hbar i{display:block;height:8px;border-radius:4px;background:var(--bar);width:var(--w)}.hbar b{text-align:right;font-weight:600}
-.qs{display:grid;gap:6px;margin-top:10px}
-.q{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0 10px;padding:7px 10px;border-radius:10px;background:var(--bg)}
-.q span{font-size:14px}.q b{font-size:16px;text-align:right}.q i{grid-column:1/-1;font-style:normal;font-size:12px;color:var(--faint)}
+.stat{display:flex;flex-direction:column;min-width:0}.stat b{font-size:20px;font-weight:650;line-height:1.2}
+.stat span{font-size:12.5px;color:var(--soft)}.stat i{font-style:normal;font-size:11.5px;color:var(--faint)}.stat.bad b{color:var(--bad)}.stat.warn b{color:var(--warn)}
+.big{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:8px}.big b{font-size:24px;font-weight:650}.big span{font-size:12.5px;color:var(--soft)}
+.hbar{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) 2.4em;align-items:center;gap:8px;font-size:12.5px;margin:4px 0}
+.hbar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.hbar i{display:block;height:6px;border-radius:3px;background:var(--bar);width:var(--w)}.hbar b{text-align:right;font-weight:600}
+.qs{display:grid;gap:5px;margin-top:8px}
+.q{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0 10px;padding:6px 10px;border-radius:8px;background:var(--sunk)}
+.q span{font-size:13px}.q b{text-align:right}.q i{grid-column:1/-1;font-style:normal;font-size:11.5px;color:var(--faint)}
 .q.bad{background:var(--bad-bg)}.q.bad b,.q.bad span{color:var(--bad)}.q.ok b{color:var(--ok)}
-.mini{margin:10px 0 0;padding-left:18px;font-size:13px;color:var(--soft)}.mini li{margin:2px 0;overflow-wrap:anywhere}
-.homes{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:12px}
-.hh{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}.hh h3{margin:0;text-transform:capitalize}
-.lanes{display:flex;gap:4px;margin:2px 0 8px}.lanes i{width:22px;height:10px;border-radius:3px;border:1px solid var(--bar)}
-.lanes i.on{background:var(--ink);border-color:var(--ink)}.lanes i.on.over{background:var(--warn);border-color:var(--warn)}
-.kvs{display:grid;gap:2px;margin-top:6px}.kv{display:flex;justify-content:space-between;gap:10px;font-size:14px;padding:3px 0;border-bottom:1px solid var(--line)}
-.kv:last-child{border-bottom:0}.kv span{color:var(--soft)}.kv b{font-weight:600}.kv small{color:var(--faint);font-weight:400}
-.kv.warn b{color:var(--warn)}.kv.bad b{color:var(--bad)}
-.chip{display:inline-block;font-size:12px;font-weight:550;padding:2px 9px;border-radius:999px;background:var(--bg);color:var(--soft);white-space:nowrap;margin:2px 0 2px 4px}
-.chip.ok{background:var(--ok-bg);color:var(--ok)}.chip.warn{background:var(--warn-bg);color:var(--warn)}.chip.bad{background:var(--bad-bg);color:var(--bad)}
-.home>.chip{margin:0 0 6px}
-.trends{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));gap:12px}
-.trend{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;min-width:0}
-.trh{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;color:var(--soft)}.trh b{font-size:22px;color:var(--ink);font-weight:650}
-.spark{display:block;width:100%;height:44px;margin:8px 0 4px}.spark .b{fill:var(--bar)}.spark .bt{fill:var(--bar-now)}.spark .b0{fill:var(--line)}
-.trf{display:flex;justify-content:space-between;font-size:11px;color:var(--faint)}
-details{background:var(--card);border:1px solid var(--line);border-radius:14px;margin-bottom:10px;overflow:hidden}
-summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 18px;font-weight:600}
-summary::-webkit-details-marker{display:none}summary::before{content:"›";display:inline-block;margin-right:10px;color:var(--faint);transition:transform .15s}
-details[open] summary::before{transform:rotate(90deg)}summary span:first-child{flex:1}
-.more{border:0;border-radius:0;margin:0;background:none}.more summary{font-weight:500;color:var(--faint);padding:10px 18px}
-.card .more summary{padding:8px 0;justify-content:flex-start}
-.wr{display:grid;grid-template-columns:minmax(0,1fr) repeat(3,4.6em);gap:10px;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px}
-.wr span{overflow-wrap:anywhere}.wr b{text-align:right;font-weight:600}.wh{font-size:12px;color:var(--faint)}.wh b{font-weight:500}
-.cnt{font-size:13px;font-weight:600;color:var(--soft);background:var(--bg);border-radius:999px;padding:1px 10px}
-.list{border-top:1px solid var(--line)}
-.row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,9em) auto;gap:4px 14px;align-items:center;padding:10px 18px;border-bottom:1px solid var(--line);font-size:14px}
-.row:last-child{border-bottom:0}.rm{min-width:0;overflow-wrap:anywhere}.rx{color:var(--faint);font-size:13px;overflow-wrap:anywhere;text-transform:capitalize}.rr{text-align:right}
-.why{font-size:12px;color:var(--faint);margin-top:2px}
-a{color:inherit;text-decoration-color:var(--bar);text-underline-offset:3px}a:hover{text-decoration-color:currentColor}
-.note{font-size:13px;color:var(--faint);margin:6px 0 0}.empty{padding:12px 18px;margin:0;color:var(--faint);font-size:14px}
+.wr{display:grid;grid-template-columns:minmax(0,1fr) repeat(3,4.4em);gap:8px;align-items:baseline;padding:6px 0;border-top:1px solid var(--line);font-size:13px}
+.wr span{overflow-wrap:anywhere}.wr b{text-align:right;font-weight:600}.wh{font-size:11.5px;color:var(--faint);border-top:0}.wh b{font-weight:500}
+.trends{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 18px}
+.trh{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px;font-size:12.5px;color:var(--soft)}.trh b{font-size:16px;color:var(--ink);font-weight:650;white-space:nowrap}.trh b small{font-size:11px;color:var(--faint);font-weight:400}
+.spark{display:block;width:100%;height:34px;margin:6px 0 2px}.spark .b{fill:var(--bar)}.spark .bt{fill:var(--bar-now)}.spark .b0{fill:var(--line)}
+.trf{display:flex;justify-content:space-between;font-size:10.5px;color:var(--faint)}
+.mini{margin:8px 0 0;padding-left:18px;font-size:12.5px;color:var(--soft)}.mini li{margin:2px 0;overflow-wrap:anywhere}
+.small{font-size:12.5px;margin:8px 0 0}.muted{color:var(--faint)}
+.note{font-size:12.5px;color:var(--faint);margin:6px 0 0}.empty{margin:4px 0;color:var(--faint)}
+.foot details summary{cursor:pointer;color:var(--faint);font-size:12.5px}
 code{font:12px ui-monospace,SFMono-Regular,Menlo,monospace}
-@media (max-width:620px){main{padding:18px 14px 40px}.tv{font-size:36px}.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.tile:last-child:nth-child(odd){grid-column:1/-1}
-.row{grid-template-columns:minmax(0,1fr);padding:10px 14px}.rr{text-align:left}.rr .chip{margin:2px 4px 2px 0}.rr:empty{display:none}
-.wr{grid-template-columns:minmax(0,1fr) repeat(3,3.4em);gap:8px}}
+@media (min-width:600px){.strip{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media (min-width:960px){main{padding:28px 32px 56px}.top{grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);align-items:start}
+.top>.asks{grid-column:1}.top>.strip{grid-column:1}.top>.health{grid-column:2;grid-row:1/span 2}}
+@media (max-width:759px){.homes thead{display:none}.homes,.homes tbody{display:block}
+.homes tr{display:flex;flex-wrap:wrap;gap:3px 14px;padding:10px 14px;border-top:1px solid var(--line)}.homes tbody tr:first-child{border-top:0}
+.homes th,.homes td{padding:0;border:0;text-align:left;font-size:13px}.homes tbody th{flex:1 0 100%;padding:0 0 2px}
+.homes td.na,.homes tr.parked td{display:none}.homes td::after{content:" " attr(data-l);color:var(--faint);font-size:12px}
+.homes td.ol:not(.na){display:inline-flex;align-items:center;gap:0 4px;flex-wrap:wrap}.homes td.ol::after{order:1}.homes td.ol .chip{order:2;margin:0 0 0 4px}.homes td.model::after{content:none}.homes td.model::before{content:"lead ";color:var(--faint)}.homes td.model{flex:1 0 100%}
+.homes tbody th{min-width:0;overflow:hidden}.homes tbody th small{padding-left:16px;max-width:none;white-space:nowrap}.homes tr.sub{padding-top:0;border-top:0}.homes tr.sub td::after{content:none}}
 '''
-stamp = NOW.strftime('%a %d %b %Y, %H:%M')
+stamp = NOW.strftime('%a %d %b, %H:%M')
 doc = f'''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="60">
 <title>Fleet dashboard</title><style>{CSS}</style></head><body><main>
-<header><h1>Fleet dashboard</h1><span class="muted small">Built {esc(stamp)}<!--age--></span></header>
-{"".join(S)}</main></body></html>
+<header><div><h1>Fleet</h1><span class="stamp">Built {esc(stamp)}<!--age--></span></div><a href="#health">{pill}</a></header>
+<div class="top">{asks_card}<nav class="strip" aria-label="Work">{"".join(t)}</nav>{health_card}</div>
+{homes_sec}{ops_sec}{work_sec}{quality_sec}{missing_sec}</main></body></html>
 '''
 with open(OUT, 'w', encoding='utf-8') as f: f.write(doc)
 PY

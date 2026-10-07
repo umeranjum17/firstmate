@@ -102,11 +102,11 @@ test_the_page_answers_the_questions_with_the_fixture_numbers() {
   for want in "Running now 1" "Finished, not landed 3" "Merged today 3 yesterday 1" "Queued and ready 4" \
     "Not automatic yet: 2 lead stalls reached Main" "12 skill reads today" "verify-alpha 7" \
     "First-pass merges 50%" "Fix the alpha thing" "Start the beta thing" "Landed gamma" \
-    "Projects: quillwork" "Main" "Projects: alpha"; do
+    "zephyrine Records need tidy-up quillwork" "Main alpha"; do
     case "$text" in *"$want"*) ;; *) fail "page text lacks '$want': $text" ;; esac
   done
   ! grep -q '<details open' "$page" || fail "a work list starts open"
-  grep -q '<h3>zephyrine</h3>' "$page" || fail "a registered home with no metrics rows has no card"
+  grep -q '<b>zephyrine</b>' "$page" || fail "a registered home with no metrics rows has no row"
   grep -q 'class="q bad"><span>First-pass merges' "$page" || fail "a missed first-pass target is not marked as a miss"
   pass "the page answers the questions with the fixture's numbers"
 }
@@ -145,13 +145,14 @@ EOF
   out=$(FM_HOME="$home" "$DASH" build) || fail "build failed: $out"
   page="$home/state/dashboard/index.html"
   text=$(page_text "$page")
-  for want in "Waiting on you 0 recorded by Main" \
-    "Finished, not landed 6 waiting to merge Merged today" "Merged today 3 yesterday 0" \
-    "Queued and ready 0" "Running now 1 actively working, not waiting" "beta Parked"; do
+  for want in "Waiting on you 0 Nothing needs you right now." \
+    "Finished, not landed 6 Merged today" "Merged today 3 yesterday 0" \
+    "Queued and ready 0" "Running now 1 Finished" "beta Parked"; do
     case "$text" in *"$want"*) ;; *) fail "page text lacks '$want': $text" ;; esac
   done
   ! grep -q 'pull/11' "$page" || fail "a green PR in a +yolo project waits on the captain: $text"
-  grep -q '<h3>beta</h3><span class="chip ">Parked</span></div></div>' "$page" || fail "the parked home card shows numbers"
+  grep -Eq '<tr class="parked"><th>.*<b>beta</b><span class="chip ">Parked</span></span>(<small>[^<]*</small>)?</th><td colspan="[0-9]+"></td></tr>' "$page" \
+    || fail "the parked home row shows numbers"
   pass "totals leave out parked homes and self-merged PRs, and count finished lanes now"
 }
 
@@ -179,7 +180,7 @@ EOF
   page="$home/state/dashboard/index.html"
   out=$(PATH="$home/bin:$PATH" FM_HOME="$home" "$DASH" build) || fail "build failed: $out"
   text=$(page_text "$page")
-  for want in "Merged today 3 yesterday 3 · GitHub as of" "zephyrine Records need tidy-up Working now 0 Finished, not landed 0 Merged today 3 "; do
+  for want in "Merged today 3 yesterday 3 · GitHub as of" "zephyrine Records need tidy-up quillwork – – 0 – 0 – 3 "; do
     case "$text" in *"$want"*) ;; *) fail "page text lacks '$want': $text" ;; esac
   done
   [ "$(wc -l < "$home/gh.calls")" -eq 2 ] || fail "not two bounded day searches: $(cat "$home/gh.calls")"
@@ -210,6 +211,69 @@ EOF
   PATH="$home/bin:$PATH" FM_HOME="$home" "$DASH" build >/dev/null || fail "old-query cache build failed"
   case "$(page_text "$page")" in *"Merged today 3 yesterday 3 · GitHub as of"*) ;; *) fail "old two-qualifier cache was reused" ;; esac
   pass "both merge days use one bounded range, reject old-query caches, and fall back together with an explicit time"
+}
+
+test_devices_and_machine_come_from_read_only_probes() {
+  local home page text want proc locks bin key at
+  home=$(make_home probes)
+  proc="$home/proc" locks="$home/locks" bin="$home/stubs"
+  mkdir -p "$proc/pressure" "$proc/900" "$proc/800" "$locks" "$bin"
+  printf 'MemTotal:       67108864 kB\nMemAvailable:   10485760 kB\n' > "$proc/meminfo"
+  printf 'some avg10=3.50 avg60=1.00 avg300=0.50 total=1\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n' > "$proc/pressure/memory"
+  printf 'Name:\tqemu-system-x86\nVmRSS:\t 4194304 kB\n' > "$proc/900/status"
+  printf '900 (qemu-system-x86) S 800 900 1\n' > "$proc/900/stat"
+  printf '800 (flock) S 1 800 1\n' > "$proc/800/stat"
+  : > "$locks/fm-phone-PHONE1.lock"
+  : > "$locks/fm-phone-muxr-emu.lock"
+  # The kernel lists a held flock by device and inode; only the emulator lock is held.
+  key=$(python3 -c 'import os,sys; s=os.stat(sys.argv[1]); print(f"{os.major(s.st_dev):02x}:{os.minor(s.st_dev):02x}:{s.st_ino}")' "$locks/fm-phone-muxr-emu.lock")
+  printf '1: FLOCK  ADVISORY  WRITE 800 %s 0 EOF\n' "$key" > "$proc/locks"
+  at=$(python3 -c 'from datetime import datetime,timedelta,timezone as z; print((datetime.now(z.utc)-timedelta(minutes=10)).strftime("%Y-%m-%dT%H:%M:%SZ"))')
+  printf '%s PHONE1 acquired pid=700 waited=0s cwd=/tmp/fm-alpha-fix\n%s PHONE1 released pid=700 rc=0\n%s muxr-emu acquired pid=800 waited=0s cwd=%s\n' \
+    "$at" "$at" "$at" "$home/projects/wt/app" > "$locks/fm-device-lock.log"
+  cat > "$bin/adb" <<EOF
+#!/bin/sh
+printf '%s\n' "\$*" >> "$home/adb.calls"
+[ -e "$home/adb.fail" ] && { echo 'error: daemon not running' >&2; exit 1; }
+printf 'List of devices attached\nPHONE1 device usb:1-1 product:p model:Pixel_9 device:d transport_id:1\nemulator-5554 device product:sdk model:sdk transport_id:2\n\n'
+EOF
+  cat > "$bin/pgrep" <<'EOF'
+#!/bin/sh
+case "$*" in
+  "-a ^qemu-system") echo '900 /opt/emulator/qemu-system-x86_64 -netdelay none -avd test-avd -port 5554' ;;
+  "-cf appname=gradle[w]") echo 2 ;;
+  *) exit 1 ;;
+esac
+EOF
+  cat > "$bin/systemctl" <<EOF
+#!/bin/sh
+[ -e "$home/systemctl.fail" ] && { echo 'Failed to connect to bus' >&2; exit 1; }
+printf 'MemoryCurrent=8589934592\nMemoryHigh=34359738368\nMemoryMax=40802189312\n'
+EOF
+  chmod +x "$bin/adb" "$bin/pgrep" "$bin/systemctl"
+  page="$home/state/dashboard/index.html"
+  PATH="$bin:$PATH" FM_HOME="$home" FM_DASHBOARD_PROC="$proc" FM_DEVICE_LOCK_DIR="$locks" "$DASH" build >/dev/null || fail "probe build failed"
+  text=$(page_text "$page")
+  for want in "Machine 10 GB free · pressure 4% · heavy jobs wait" "Devices 2 connected · 1 in use" \
+    "Phone Pixel 9 PHONE1 · USB Free · last used by Main 10 min ago" \
+    "Emulator test-avd emulator-5554 · 4.0 GB in use In use by Main · 10 min" \
+    "Free memory 10.0 GB of 64 GB" "Memory pressure 4%" "Heavy jobs 8.0 GB of 32 GB" "hard limit 38 GB" \
+    "Gradle builds 2 of 2" "Emulators 1 of 2"; do
+    case "$text" in *"$want"*) ;; *) fail "page text lacks '$want': $text" ;; esac
+  done
+  [ "$(sort -u "$home/adb.calls")" = "devices -l" ] || fail "adb was asked more than the device list: $(cat "$home/adb.calls")"
+  # Each failed probe says unknown and why; nothing is guessed as zero.
+  touch "$home/adb.fail" "$home/systemctl.fail"
+  rm "$proc/meminfo" "$proc/locks"
+  PATH="$bin:$PATH" FM_HOME="$home" FM_DASHBOARD_PROC="$proc" FM_DEVICE_LOCK_DIR="$locks" "$DASH" build >/dev/null || fail "failed-probe build failed"
+  text=$(page_text "$page")
+  for want in "Machine pressure 4%" "Devices unknown: adb: error: daemon not running" \
+    "Free memory unknown: $proc/meminfo: No such file or directory" "Heavy jobs unknown: Failed to connect to bus" \
+    "unknown - device locks: $proc/locks: No such file or directory" "Emulator test-avd not listed by adb · 4.0 GB in use unknown:"; do
+    case "$text" in *"$want"*) ;; *) fail "page text lacks '$want': $text" ;; esac
+  done
+  case "$text" in *"0 connected"*|*"Free memory 0"*) fail "a failed probe was shown as zero: $text" ;; esac
+  pass "devices and machine come from read-only probes, name each holder's home, and say unknown with the reason"
 }
 
 SERVE_PID=
@@ -266,7 +330,7 @@ test_missing_or_malformed_sources_hide_only_their_part() {
     "data/metrics/daily.tsv : malformed" "data/metrics/prs.tsv : 1 short row(s) skipped" "fleet snapshot exited 2: fm-bearings-snapshot: FM_BEARINGS_LANDED must be a positive integer" "Merged today 3 yesterday 1"; do
     case "$text" in *"$want"*) ;; *) fail "page text lacks '$want': $text" ;; esac
   done
-  case "$text" in *"Running now 1"*"Waiting on you 0 recorded by Main"*) ;; *) fail "independent tiles disappeared with the snapshot: $text" ;; esac
+  case "$text" in *"Waiting on you 0"*"Running now 1"*) ;; *) fail "independent tiles disappeared with the snapshot: $text" ;; esac
   pass "missing or malformed sources hide only their own part and never fail the build"
 }
 
@@ -297,8 +361,8 @@ EOF
   out=$(FM_HOME="$home" "$DASH" build) || fail "build failed: $out"
   page="$home/state/dashboard/index.html"
   text=$(page_text "$page")
-  for want in "Who does the work Harness · model Running Merged, 7 days First pass" \
-    "claude · model-a 1 0 –" "pi · model-b 0 2 50%" "zephyrine: pi · lead-model-z" "Recorded since 2026-10-06"; do
+  for want in "Who does the work Worker model Running Merged, 7 days First pass" \
+    "claude · model-a 1 0 –" "pi · model-b 0 2 50%" "zephyrine Records need tidy-up quillwork lead-model-z" "Recorded since 2026-10-06"; do
     case "$text" in *"$want"*) ;; *) fail "page text lacks '$want': $text" ;; esac
   done
   case "$text" in *parked-model*|*parked-lead*) fail "a parked home shows in Who does the work: $text" ;; esac
@@ -323,7 +387,7 @@ test_main_asks_and_lane_verbs_are_authoritative() {
   now=$(date +%s)
   : > "$home/data/captain-asks.tsv"
   FM_HOME="$home" "$DASH" build >/dev/null || fail "empty ask build failed"
-  grep -q 'class="tile ok"><div class="tl">Waiting on you</div><div class="tv">0' "$page" || fail "empty asks not zero and ok"
+  grep -q '<section class="asks ok" id="asks"><div class="ah"><h2>Waiting on you</h2><b class="an">0</b>' "$page" || fail "empty asks not zero and ok"
   printf 'first\t%s\tApprove Umer release\thttps://example.invalid/release\nsecond\t%s\tChoose launch date\t\n' \
     "$((now - 7200))" "$((now - 3600))" > "$home/data/captain-asks.tsv"
   # A resolved lane is working, but a still-open captain hold is not, even after working resumes.
@@ -334,7 +398,7 @@ test_main_asks_and_lane_verbs_are_authoritative() {
   printf 'blocked [at=%s] [key=captain-hold-x]: decision\nworking [at=%s]: resumed\n' "$now" "$now" > "$home/state/held.status"
   FM_HOME="$home" "$DASH" build >/dev/null || fail "two ask build failed"
   text=$(page_text "$page")
-  for task in 'Running now 2' 'Waiting on you 2 recorded by Main' 'Approve Umer release 2 h' 'Choose launch date 1 h' \
+  for task in 'Running now 2' 'Waiting on you 2' 'Approve Umer release 2 h' 'Choose launch date 1 h' \
     '2 stalls reached Main yesterday 5' '1 leads woken automatically yesterday 2' \
     '1 stopped leads restarted yesterday 3' '4 Main messages to leads yesterday 6'; do
     case "$text" in *"$task"*) ;; *) fail "missing $task: $text" ;; esac
@@ -343,11 +407,11 @@ test_main_asks_and_lane_verbs_are_authoritative() {
   printf 'bad row\n' >> "$home/data/captain-asks.tsv"
   FM_HOME="$home" "$DASH" build >/dev/null || fail "malformed ask build failed"
   text=$(page_text "$page")
-  case "$text" in *'Waiting on you 3 recorded by Main'*'Ask record needs correction'*'malformed row 3'*) ;; *) fail "malformed row guessed or dropped: $text" ;; esac
+  case "$text" in *'Waiting on you 3'*'Ask record needs correction'*'malformed row 3'*) ;; *) fail "malformed row guessed or dropped: $text" ;; esac
   python3 -c 'print("huge\t" + "9"*5000 + "\tOverlong epoch\t")' >> "$home/data/captain-asks.tsv"
   FM_HOME="$home" "$DASH" build >/dev/null || fail "overlong epoch build failed"
   text=$(page_text "$page")
-  case "$text" in *'Waiting on you 4 recorded by Main'*'Ask record needs correction'*'malformed row 4'*) ;; *) fail "overlong epoch crashed or was dropped: $text" ;; esac
+  case "$text" in *'Waiting on you 4'*'Ask record needs correction'*'malformed row 4'*) ;; *) fail "overlong epoch crashed or was dropped: $text" ;; esac
   # UTC yesterday 21:00 is today 01:00 in the captain's +04 local day.
   yesterday=$(TZ=Etc/GMT-4 python3 -c 'from datetime import datetime,timedelta; print((datetime.now().date()-timedelta(days=1)).isoformat())')
   printf 'home\tmerged\tfirst_pass\nalpha\t%sT21:00:00Z\t1\n' "$yesterday" > "$home/data/metrics/prs.tsv"
@@ -363,3 +427,4 @@ test_missing_or_malformed_sources_hide_only_their_part
 test_who_does_the_work_groups_lanes_by_harness_and_model
 test_merged_days_use_the_same_bounded_github_source
 test_serve_answers_the_page_and_nothing_else
+test_devices_and_machine_come_from_read_only_probes
