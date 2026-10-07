@@ -73,6 +73,10 @@ with open(child / 'state/fleet-ledger.jsonl', 'a') as f:
     f.write(json.dumps(dict(v=1, task='restale', ts=90, event='task.dispatched')) + '\n')
     f.write(json.dumps(dict(v=1, task='nullwait', ts=10, event='task.dispatched')) + '\n')
     f.write(json.dumps(dict(v=1, task='nullwait', ts=20, event='task.status', state='blocked', key='k', text=None)) + '\n')
+    f.write(json.dumps(dict(v=1, task='relive', ts=10, event='task.dispatched')) + '\n')
+    f.write(json.dumps(dict(v=1, task='relive', ts=90, event='task.dispatched')) + '\n')
+(child / 'state/relive.meta').write_text('kind=ship\n')
+(child / 'state/relive.status').write_text('working [at=20]: building\nblocked [at=25] [key=stale-key]: waiting\n')
 y = json.loads(run())
 assert y['homes'] == ['child', 'grand', 'main'], 'nested home discovered'
 bytask = {(l['home'], l['task']): l for l in y['lanes']}
@@ -88,6 +92,11 @@ assert restale['seconds_in_stage'] is None and restale['times']['working'] is No
 assert restale['reason'] == 'unknown: no status reason'
 assert 'restale' not in {l['task'] for l in y['executed_24h']}
 assert bytask[('child', 'nullwait')]['open_waits'][0]['reason'] == '', 'null wait text coerced'
+relive = bytask[('child', 'relive')]
+assert relive['open'] and relive['timestamp_basis'] == 'emitted'
+assert relive['stage'] == 'unknown' and relive['open_waits'] == [], 'live reuse drops pre-dispatch status'
+assert relive['seconds_in_stage'] is None and relive['times']['working'] is None
+assert relive['reason'] == 'unknown: no status reason'
 bad = subprocess.run(['bash', script, '--json', '--now', 'bad'], capture_output=True)
 assert bad.returncode == 2
 print('PASS: real flow CLI, two homes, queue, keyed waits, retained lifecycle, unknowns, read-only determinism')
