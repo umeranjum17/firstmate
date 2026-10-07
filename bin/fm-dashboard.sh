@@ -485,7 +485,12 @@ def toon_rows(text, name='tasks'):
             cols = m.group(2).split(',')
             body = lines[i + 1:i + 1 + int(m.group(1))]
             if len(body) < int(m.group(1)): return None
-            return [dict(zip(cols, toon_fields(r.strip()))) for r in body]
+            rows = []
+            for r in body:
+                f = toon_fields(r.strip())
+                if len(f) != len(cols): raise ValueError(f'row has {len(f)} fields, want {len(cols)}')
+                rows.append(dict(zip(cols, f)))
+            return rows
         if re.match(rf'^{name}: 0 ', l): return []
     return None
 def clean(t):
