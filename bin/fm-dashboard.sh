@@ -3,7 +3,7 @@
 #
 # Builds five self-contained HTML pages (inline CSS and SVG, no script, no network
 # reference), phone first, each answering one question set:
-#   index    Overview: Main's ask list only, then slow spots, pull request checks, lanes,
+#   index    Overview: Main's ask list only, then output today, lanes, slow spots,
 #            devices and machine, and one row per home
 #   flow     work filed vs landed: today vs yesterday, by hour, by home, 7 days, latest feeds
 #   quota    every readable provider account: runout time, windows against even pace, who it carries
@@ -37,6 +37,8 @@
 #   state/dashboard/filed.tsv       filing log this page keeps: home, id, first-seen epoch, title;
 #                                   a day counts exactly once the log covers all of it, before
 #                                   that it is a floor ("at least") from each item's filing day
+#   state/dashboard/pressure.tsv    memory pressure samples this page keeps: epoch, some avg300;
+#                                   the last 2 hours, one per build
 #   gh api search/issues            landings: one bounded search per local day of the last 7, over
 #                                   registered project clones (including Main); a finished day is
 #                                   kept, today is searched again after 5 minutes, all cached in
@@ -195,7 +197,7 @@ try: srv.serve_forever()
 except KeyboardInterrupt: pass
 PY
     ;;
-  -h|--help) sed -n '2,89p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+  -h|--help) sed -n '2,91p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
   *) usage ;;
 esac
 
@@ -916,6 +918,20 @@ def devices():
     return rows, connected if out is not None else None, len(emus) if emus is not None else None, problems
 
 mach = machine()
+# --- pressure samples: one per build, the last 2 hours ---------------------
+PSI_LOG = os.path.join(STATE_DIR, 'pressure.tsv')
+psi_log = []
+try:
+    for l in open(PSI_LOG, encoding='utf-8', errors='replace'):
+        f = l.split('\t')
+        if len(f) == 2 and f[0].isdigit() and NOW_TS - int(f[0]) <= 7200: psi_log.append((int(f[0]), float(f[1])))
+except (OSError, ValueError): psi_log = []
+if mach['pressure5'] is not None:
+    psi_log.append((int(NOW_TS), mach['pressure5']))
+    try:
+        with open(PSI_LOG + '.tmp', 'w', encoding='utf-8') as f: f.write(''.join(f'{s}\t{v}\n' for s, v in psi_log))
+        os.replace(PSI_LOG + '.tmp', PSI_LOG)
+    except OSError as e: notes.append(('pressure log', e.strerror))
 dev_rows, dev_count, emu_count, dev_problems = devices()
 
 # --- html pieces ---------------------------------------------------------
@@ -1202,6 +1218,15 @@ def stack(parts, total, cls='sb'):  # parts: (class, n, title); total sets the s
 def lane_parts(sp): return [(f's-{s}', sp[s], f'{sp[s]} {n}') for s, n in LANE_ORDER]
 def lane_legend(sp, free=None):
     return legend(*[(f'k s-{s}', f'{sp[s]} {n}') for s, n in LANE_ORDER if sp[s]], *([('k free', f'{free} free of plan {PLAN}')] if free else []))
+def home_bars():  # small multiples: each home's lanes against its plan
+    out = ''
+    for h in sorted(ACTIVE, key=lambda h: (-len(by_home[h]), h)):
+        sp = split(by_home[h])
+        out += (f'<a class="hb" href="backlog?group=home#lanes" title="{esc(hname(h))}: {esc(split_txt(sp, list(STATES)) or "no open lanes")}; plan {plan(h)}">'
+                f'<span class="hn">{esc(hname(h))}</span><span class="hv">{len(by_home[h])}<small>/{plan(h)}</small></span>'
+                + stack(lane_parts(sp), max(plan(h), len(by_home[h]))) + '</a>')
+    return f'<div class="hbs">{out}</div>'
+
 PR_TONE = {'failing': 'bad', 'validating': 'in', 'green': 'ok', 'none': 'mut'}
 def pr_bar():
     short = {'failing': 'failing', 'validating': 'validating or on CI', 'green': 'green, to land', 'none': 'no check record'}
@@ -1223,6 +1248,103 @@ def quota_bars():  # every readable account: its tightest window, soonest runout
                  f'<span class="qn">{esc(a["name"])}</span><span class="qt"><i class="c-{tone}" style="width:{0 if used is None else max(2, min(100, round(used)))}%"></i>{tick}</span>'
                  f'<span class="qr {tone if tone != "ok" else "mut"}">{right}</span></div>')
     return rows or '<p class="note">No account reported a window.</p>'
+
+def donut(parts, total, center, sub):  # parts: (class, n, title)
+    off, segs = 25, ''
+    for c, n, t in parts:
+        if not n or not total: continue
+        f = n / total * 100
+        segs += f'<circle class="{c}" r="15.915" cx="18" cy="18" stroke-dasharray="{f:.2f} {100 - f:.2f}" stroke-dashoffset="{off:.2f}"><title>{esc(t)}</title></circle>'
+        off -= f
+    return (f'<svg class="donut" viewBox="0 0 36 36" aria-hidden="true"><circle class="tr" r="15.915" cx="18" cy="18"/>{segs}'
+            f'<text x="18" y="18.5" class="dc">{center}</text><text x="18" y="24.5" class="ds">{sub}</text></svg>')
+def gauge(frac, tone, center, sub):  # a half ring, frac 0..1
+    f = max(0, min(1, frac)) * 50
+    return (f'<svg class="gauge" viewBox="0 0 36 21" aria-hidden="true"><path class="tr" d="M3,18 A15,15 0 0 1 33,18" pathLength="50"/>'
+            f'<path class="c-{tone}" d="M3,18 A15,15 0 0 1 33,18" pathLength="50" stroke-dasharray="{f:.2f} 60"/>'
+            f'<text x="18" y="15" class="dc">{center}</text><text x="18" y="20.5" class="ds">{sub}</text></svg>')
+def tile_spark(vals, cls):
+    if any(v is None for v in vals): return ''
+    top = max(vals) or 1
+    pts = [(i / 6, v) for i, v in enumerate(vals)]
+    d = path(pts, top)
+    hits = ''.join(f'<rect class="hit" x="{(i - .5) * 1000 / 6:.0f}" y="0" width="{1000 / 6:.0f}" height="200"><title>{WEEK[i]:%a}: {v}</title></rect>' for i, v in enumerate(vals))
+    return (f'<svg class="tsp {cls}" viewBox="0 0 1000 200" preserveAspectRatio="none" aria-hidden="true">'
+            f'<path class="ar" d="{d} L1000,200 L0,200 Z"/><path class="ln" d="{d}" vector-effect="non-scaling-stroke"/>{hits}</svg>')
+
+def by_now(times):  # how many of yesterday's happened before this time of day
+    return sum(1 for t in times if t.date() == YDAY and t.time() <= NOW.time())
+def delta(now_v, then_v, then_txt, floor=False):
+    """Today against yesterday at the same clock time; a floor gets no arrow, only the number."""
+    if now_v is None or then_v is None: return ''
+    vs = f'<span class="tc" title="{esc(then_txt)}">vs {"≥" if floor else ""}{then_v} by {BUILT} yday</span>'
+    if floor:  # a floor of what the log never watched says nothing
+        return vs if log_since <= day_start(YDAY).timestamp() + (NOW_TS - day_start(TODAY).timestamp()) else f'<span class="tc">yday by {BUILT} not logged</span>'
+    d = now_v - then_v
+    tone, sign = ('up', '▲') if d > 0 else ('down', '▼') if d < 0 else ('mut', '=')
+    return f'<span class="dl {tone}">{sign}{abs(d) if d else ""}</span>{vs}'
+def psi_spark():  # 5-minute pressure samples of up to the last hour, with the gate's 40% line
+    if psi5 is None: return ''
+    smp = [(s, v) for s, v in psi_log if NOW_TS - s <= 3600]
+    if len(smp) < 2: return ''
+    t0 = smp[0][0]
+    pts = [((s - t0) / max(1, NOW_TS - t0), v) for s, v in smp]
+    top = max(50, nice_top(max(v for _, v in pts)))
+    d = path(pts, top)
+    return (f'<svg class="tsp {psi_tone(psi5)}" viewBox="0 0 1000 200" preserveAspectRatio="none" aria-hidden="true">'
+            f'<title>Memory pressure, 5-minute average, since {hm(t0)}: {min(v for _, v in pts):.0f}% to {max(v for _, v in pts):.0f}%; heavy jobs wait at 40%</title>'
+            f'<line class="gl" x1="0" x2="1000" y1="{200 - 40 / top * 198:.1f}" y2="{200 - 40 / top * 198:.1f}" vector-effect="non-scaling-stroke"/>'
+            f'<path class="ar" d="{d} L{pts[-1][0] * 1000:.1f},200 L{pts[0][0] * 1000:.1f},200 Z"/><path class="ln" d="{d}" vector-effect="non-scaling-stroke"/></svg>')
+def tile(href, label, big, extra, viz, asof, tone=''):
+    return (f'<a class="tile{" t-" + tone if tone else ""}" href="{href}"><span class="tl">{label}</span><span class="tv">{big}{extra}</span>'
+            f'{viz}<span class="ta">{asof}</span></a>')
+def tiles():
+    ly_now = by_now([t for t, *_ in landings]) if landings is not None else None
+    # items the log saw without a time count only toward the full day, so before the log covers yesterday this is a floor
+    fy_now = by_now([datetime.fromtimestamp(s).astimezone() for (h, i), (s, t) in log.items() if s and h not in parked])
+    t1 = tile('flow', 'Landed today', unknown(why_of('GitHub landings')) if l_today is None else l_today,
+              delta(l_today, ly_now, f'yesterday {ly_now} by {BUILT}, {l_yday} in the whole day'), tile_spark(week_l, 'out'),
+              f'since 00:00 · {LANDED_SRC if landings is not None else "unknown"}')
+    t2 = tile('flow', 'Filed today', filed_txt(TODAY),
+              delta(f_today, fy_now, f'yesterday {"" if exact(YDAY) else "at least "}{fy_now} by {BUILT}, {"" if exact(YDAY) else "at least "}{f_yday} in the whole day',
+                    floor=not (f_exact and exact(YDAY))),
+              tile_spark(week_f, 'in'), f'since 00:00 · {BUILT}')
+    if agents is not None:
+        busy_total = sum(BUSY.values())
+        cls = {'lead': 'c-in', 'main': 'c-vio', 'worker': 'c-out', 'other': 'c-mut'}
+        parts = [(cls[r], BUSY[r], f'{BUSY[r]} {n} busy') for r, n in ROLES]
+        lg = '<span class="mini">' + ''.join(f'<span><i class="{cls[r]}"></i>{plural(BUSY[r], n[:-1]) if r in ("lead", "worker") else f"{BUSY[r]} {n}"}</span>'
+                                             for r, n in ROLES if BUSY[r] or r != 'other') + '</span>'
+        t3 = tile('backlog#agents', 'Agents busy', donut(parts, len(agent_rows), busy_total, f'of {len(agent_rows)}'), '', lg,
+                  f'of {len(agent_rows)} running agents · {BUILT}')
+    else: t3 = tile('backlog#agents', 'Agents busy', unknown(why_of('herdr')), '', '', BUILT)
+    short = {'building': 'building', 'validating': 'in CI', 'finished': 'to land', 'waiting': 'waiting', 'decision': 'decision', 'blocked': 'blocked'}
+    lmini = '<span class="mini">' + ''.join(f'<span><i class="s-{s}"></i>{SPLIT[s]} {short[s]}</span>' for s, _ in LANE_ORDER if SPLIT[s]) + (f'<span><i class="free"></i>{FREE} free</span>' if FREE else '') + '</span>'
+    t4 = tile('backlog#lanes', 'Lanes open', f'{OPEN}<small>/{PLAN} plan</small>', '', stack(lane_parts(SPLIT), max(PLAN, OPEN), 'sb big') + lmini,
+              f'now {BUILT}', 'warn' if SPLIT['blocked'] + SPLIT['decision'] else '')
+    if qdata is None: t5 = tile('quota', 'Quota', unknown(why_of('quota-axi')), '', '', '')
+    else:
+        a = running_out[0] if running_out else None
+        if a:  # the ring is what is left of the window that runs out first
+            w = tight_window(a)
+            left = None if w is None else max(0, 100 - w['used'])
+            day = 'today' if a['runout'].date() == TODAY else a['runout'].strftime('%a')
+            ring = donut([('c-warn', left or 0, f'{a["name"]} {w["label"] if w else "window"}: {fmt(left, 0)}% left')], 100,
+                         f'{fmt(left, 0)}%' if left is not None else '?', 'left')
+            t5 = tile('quota', 'Quota', ring, '', f'<span class="mini"><span><b>runs out {a["runout"]:%H:%M} {day}</b></span>'
+                      f'<span>{esc(a["name"])} · in {dur((a["runout"] - NOW).total_seconds())}</span></span>',
+                      f'current pace · {hm(q_at)}', 'warn' if (a['runout'] - NOW).total_seconds() < 24 * 3600 else '')
+        else:
+            t5 = tile('quota', 'Quota', '<span class="okv">lasts</span>', '', '<span class="mini"><span>no account runs out before reset</span></span>', f'current pace · {hm(q_at)}')
+    if free:
+        ptone = psi_tone(psi5) if psi5 is not None else 'ok'
+        tone = 'bad' if free[0] < MEM_MIN_GB or ptone == 'bad' else 'warn' if free[0] < 2 * MEM_MIN_GB or ptone == 'warn' else 'ok'
+        g = gauge(1 - free[0] / free[1] if free[1] else 0, 'bad' if free[0] < MEM_MIN_GB else 'warn' if free[0] < 2 * MEM_MIN_GB else 'ok', f'{free[0]:.0f}', 'GB free')
+        sub = (f'<span><i class="c-{ptone}"></i>pressure {psi5:.0f}% · 5 min</span>' if psi5 is not None else f'<span>pressure {unknown(mach["pressure_why"])}</span>')
+        sub += f'<span><i class="c-mut"></i>emulators {emu_count}/{EMU_MAX}</span>' if emu_count is not None else ''
+        t6 = tile('#devices', 'Memory', g, '', f'<span class="mini">{sub}</span>{psi_spark()}', f'of {free[1]:.0f} GB · {BUILT}', tone if tone != 'ok' else '')
+    else: t6 = tile('#devices', 'Memory', unknown(mach['free_why']), '', '', BUILT)
+    return f'<div class="tiles">{t1}{t2}{t3}{t4}{t5}{t6}</div>'
 
 def spot_table():
     if not spots: return '<p class="note okn">No slow spots now.</p>'
@@ -1300,8 +1422,14 @@ def index_body(group):
 <h1><span class="hd c-{tone}"></span>{h1}</h1>
 {ask_rows()}
 </div>
+{tiles()}
 <div class="cards">
 {card("Slow spots", f"now {BUILT}" + (f" · quota {hm(q_at)}" if q_at else ""), spot_table(), "wide-m")}
+{card("In vs out by hour", f"today vs yesterday, running total · landings {ld}, filings {BUILT}", inout_chart() if landings is not None else unknown(why_of("GitHub landings")), more=("flow", "Flow"))}
+{card("Filed vs landed, 7 days", f"local days · landings {ld}", week_bars(), more=("flow", "Flow"))}
+{card("Cycle time", f"first commit to merge, P50 and P85 per day · last {CYCLE_DAYS} days · merge record", cycle_chart() if cycle is not None else unknown(why_of("data/metrics/prs.tsv")))}
+{card("Lanes per home", f"open against plan · now {BUILT}", home_bars() + lane_legend(SPLIT, FREE) + PARKED_LINE, more=("backlog#lanes", "Every lane"))}
+{card("Quota by account", f"tightest window, soonest runout first · {hm(q_at) if q_at else 'unknown'}", quota_bars() if qdata is not None else unknown(why_of("quota-axi")), more=("quota", "Quota"))}
 {card("Pull request checks", f"lane records and no-mistakes · now {BUILT}", pr_bar() + (f'<p class="note">Longest CI wait {dur(max(p["wait"] for p in ci_waits))}.</p>' if ci_waits else ""), cls="wide-l", more=("backlog#prs", "Backlog"))}
 {card("Lanes by what to do", f"every open lane · now {BUILT}",  switch(group) + lanes_list(group, strip=False), "wide", ("backlog#lanes", "Every lane"))}
 <section class="card wide" id="devices"><div class="ch"><h3>Devices and machine</h3></div><p class="cw">now {BUILT}</p><div class="devm"><div>{devices_list(group)}</div><div class="mach">{machine_rows}</div></div></section>
@@ -1333,7 +1461,7 @@ def flow_body():
 <div class="stack">
 <section>
 {sh("Today vs yesterday · since 00:00 and the full day before")}
-<h2>{"Landings unknown." if l_today is None else "More landed than filed today." if l_today > f_today else "More filed than landed today." if f_today > l_today else "As much filed as landed today."}</h2>
+<h2>{"Landings unknown." if l_today is None else "More filed than landed today." if f_today > l_today else "Filings partial; comparison unknown." if not f_exact else "More landed than filed today." if l_today > f_today else "As much filed as landed today."}</h2>
 {io_bars()}
 </section>
 <section>

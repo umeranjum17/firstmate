@@ -174,8 +174,12 @@ test_overview_answers_the_four_questions_with_sums_that_add_up() {
     [ -s "$d/$p.html" ] || fail "no $p page"
     ! grep -Eq '<script|https?://[^"]*\.(css|js)"' "$d/$p.html" || fail "$p is not self-contained"
   done
-  # Lanes group by what to do and sum to the open total; slow spots name a number and an age.
-  has "$d/index.html" "Nothing needs you. Slow spots" "1 waiting 7 /6 1 2 zephyrine" "1 building 1 /3 1 0" \
+  # The tiles: the lane parts and the free lanes sum to the plan of 9; the busy roles sum to 4.
+  # Today compares with yesterday at the same clock time, never with all of yesterday.
+  has "$d/index.html" "Nothing needs you. Landed today 2 ▲1 vs 1 by" "left runs out" "Claude · in 4 h" \
+    "Lanes open 8 /9 plan 3 building 1 in CI 1 to land 1 waiting 1 decision 1 blocked 1 free" \
+    "Agents busy 4 of 5 1 lead 1 Main 1 worker 1 other of 5 running agents" \
+    "Main 7 /6 zephyrine 1 /3" "Landed 2 yesterday 1" \
     "Blocked or waiting on a decision 1 blocked · 1 on a decision 2" "Finished, not landed" \
     "Producing 3 building · 1 validating 4" "Open lanes 2 + 1 + 4 + 1 = 8" \
     "beta is parked by the captain and left out of every total." \
@@ -184,6 +188,7 @@ test_overview_answers_the_four_questions_with_sums_that_add_up() {
   # outside parked homes (6 listed, 1 in parked beta), not the lane plan of 9.
   running=$(jq '[.result.agents[] | select(.pane_id != "pane-b-stale")] | length' "$home/herdr.json")
   [ "$running" = 5 ] || fail "fixture should list 5 running agents outside parked homes, has $running"
+  has "$d/index.html" "4 of $running" "of $running running agents"
   has "$d/backlog.html" "Busy now 1 + 1 + 1 + 1 = 4" "the groups list all $running running agents"
   # Grouped by home, the same lanes sum to the same total.
   has "$d/index.home.html" "Open lanes 7 + 1 = 8" "Main 1 blocked · 1 on a decision 7 Blocked, needs help 1" "zephyrine 1 building 1"
@@ -238,17 +243,18 @@ test_each_failed_source_shows_unknown_and_why() {
   python3 -c 'import json,sys; p=sys.argv[1]; c=json.load(open(p)); [e.__setitem__("at", e["at"]-400) for e in c["days"].values()]; json.dump(c,open(p,"w"))' "$d/.merged.json"
   printf 'home\tmerged\tfirst_pass\tbuild_hours\nmain\t%s\t1\t2\n' "$(iso 0)" > "$home/data/metrics/prs.tsv"
   build "$home"
-  has "$d/flow.html" "landings merge record as of" "1 landed so far today"
+  has "$d/index.html" "Agents busy unknown: herdr: server not running" "landings merge record as of" "Landed today 1"
   has "$d/flow.html" "P50 2 h" "P85 2 h"
   has "$d/quota.html" "Claude runs out first"
   has "$d/measure.html" "herdr agent list herdr: server not running" "quota-axi quota-axi: no network; showing the reading from" \
     "GitHub landings HTTP 403: API rate limit exceeded"
+  lacks "$d/index.html" "Agents busy 0"
   # With no reading to reuse and no merge record, the numbers say unknown, never zero.
   rm "$d/.quota.json" "$home/data/metrics/prs.tsv"
   build "$home"
   has "$d/quota.html" "Quota unknown. unknown: quota-axi: no network"
-  has "$d/flow.html" "– landed so far today" "Landings unknown."
-  lacks "$d/flow.html" "0 landed so far today"
+  has "$d/index.html" "Landed today unknown: HTTP 403: API rate limit exceeded"
+  lacks "$d/index.html" "Landed today 0"
   # A home whose backlog cannot be read makes the queue unknown, and names the home.
   printf '#!/bin/sh\necho "tasks-axi: backlog unreadable" >&2\nexit 1\n' > "$home/stubs/tasks-axi"
   chmod +x "$home/stubs/tasks-axi"
@@ -272,7 +278,7 @@ test_github_searches_each_day_once_and_today_again_after_five_minutes() {
   python3 -c 'import json,sys; p=sys.argv[1]; c=json.load(open(p)); [e.__setitem__("at", e["at"]-400) for e in c["days"].values()]; json.dump(c,open(p,"w"))' "$d/.merged.json"
   build "$home"
   [ "$(wc -l < "$home/gh.calls")" -eq 8 ] || fail "after 5 minutes not only today was searched again: $(cat "$home/gh.calls")"
-  has "$d/flow.html" "2 landed so far today"
+  has "$d/index.html" "Landed today 2"
   pass "GitHub is searched once per finished day and today again after 5 minutes"
 }
 
@@ -283,17 +289,20 @@ test_the_filing_log_counts_new_items_exactly() {
   today=$(date +%F)
   build "$home"
   # Items already queued when the log starts have only their filing day: a floor.
-  has "$d/flow.html" "4 filed, at least." "0 items first seen today."
+  # The log never watched yesterday, so there is no comparison and no arrow.
+  has "$d/index.html" "Filed today ≥ 4 yday by" "not logged"
+  lacks "$d/index.html" "Filed today ≥ 4 ▲"
+  has "$d/flow.html" "0 items first seen today."
   printf -- '- [ ] m-new - A brand new thing (repo: alpha) (kind: ship) (since %s)\n' "$today" >> "$home/mates/zephyrine/data/backlog.md"
   build "$home"
   has "$d/flow.html" "1 item first seen today." "A brand new thing zephyrine"
-  # Once the log covers today, today's count is exact.
+  # Once the log covers today and yesterday, today's count is exact and compares with yesterday by this time.
   python3 -c 'import sys,time
 p=sys.argv[1]; rows=open(p).read().split("\n",1); t=int(time.mktime(time.strptime(time.strftime("%Y-%m-%d"),"%Y-%m-%d"))) - 86400
 open(p,"w").write(f"# since {t} last {int(time.time())}\thome\tid\tfirst_seen\ttitle\n"+rows[1])' "$d/filed.tsv"
   build "$home"
-  has "$d/flow.html" "5 filed."
-  lacks "$d/flow.html" "filed, at least"
+  has "$d/index.html" "Filed today 5 ▲5 vs 0 by"
+  lacks "$d/index.html" "Filed today ≥"
   pass "the filing log records first-seen times, and filed counts are floors until the log covers the day"
 }
 
@@ -342,14 +351,18 @@ EOF
     "Phone Pixel 9 Free · last used by Main 10 min ago · PHONE1 · USB" \
     "Emulator test-avd In use by Main · 10 min · emulator-5554 · 4.0 GB in use" \
     "Free memory 10.0 GB of 64 GB" "Memory pressure 12%" "the 10 s share is 40% or more (now 4%)" "Heavy jobs 8.0 GB of 32 GB" "hard limit 38 GB" \
-    "Gradle builds 2 of 2" "Emulators 1 of 2" "Memory heavy jobs wait"
+    "Gradle builds 2 of 2" "Emulators 1 of 2" "Memory 10 GB free pressure 12% · 5 min emulators 1/2 of 64 GB" "Memory heavy jobs wait"
   has "$d/index.home.html" "Main 1 Emulator test-avd" "No holder 1 Phone Pixel 9" "Devices 1 + 1 = 2"
+  # Each build keeps one 5-minute pressure sample; two in the last hour draw the tile's sparkline.
+  [ "$(cut -f2 "$d/pressure.tsv")" = 12.0 ] || fail "pressure sample not kept: $(cat "$d/pressure.tsv")"
+  build "$home" FM_DASHBOARD_PROC="$proc" FM_DEVICE_LOCK_DIR="$locks"
+  grep -q '% to 12%; heavy jobs wait at 40%' "$d/index.html" || fail "no pressure sparkline after two samples"
   [ "$(sort -u "$home/adb.calls")" = "devices -l" ] || fail "adb was asked more than the device list: $(cat "$home/adb.calls")"
   # Each failed probe says unknown and why; nothing is guessed as zero.
   touch "$home/adb.fail" "$home/systemctl.fail"
   rm "$proc/meminfo" "$proc/locks"
   build "$home" FM_DASHBOARD_PROC="$proc" FM_DEVICE_LOCK_DIR="$locks"
-  has "$d/index.html" "unknown - adb: error: daemon not running" \
+  has "$d/index.html" "Memory unknown: $proc/meminfo" "unknown - adb: error: daemon not running" \
     "Free memory unknown: $proc/meminfo: No such file or directory" "Heavy jobs unknown: Failed to connect to bus" \
     "unknown - device locks: $proc/locks: No such file or directory"
   lacks "$d/index.html" "0 devices connected" "Free memory 0"
@@ -484,10 +497,8 @@ test_fleet_past_twenty_mates_keeps_every_lead_row() {
   python3 - "$d/index.html" <<'PY' || fail "the 25th mate lost its lead state"
 import html, re, sys
 text = re.sub(r'\s+', ' ', html.unescape(re.sub(r'<[^>]+>', ' ', open(sys.argv[1]).read())))
-for mate in ('mate01', 'mate25'):
-    i = text.find(mate)
-    assert i >= 0, mate
-    assert 'Records need tidy-up' in text[i:i + 200], mate
+for mate in ('mate01', 'mate25'):  # the lanes chart names each home first; its table row carries the lead state
+    assert any('Records need tidy-up' in text[m.start():m.start() + 200] for m in re.finditer(mate, text)), mate
 PY
   pass "a fleet past twenty mates keeps every lead row"
 }
