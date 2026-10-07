@@ -174,20 +174,20 @@ test_overview_answers_the_four_questions_with_sums_that_add_up() {
     [ -s "$d/$p.html" ] || fail "no $p page"
     ! grep -Eq '<script|https?://[^"]*\.(css|js)"' "$d/$p.html" || fail "$p is not self-contained"
   done
-  has "$d/index.html" "Waiting on you · Main's ask list, now Nothing needs you." \
-    "Landed so far 2 yesterday 1" "Lanes building 3 of 8 open" \
-    "Busy agents 1 lead + 1 Main + 1 worker + 1 other 4 of 5 running agents" \
-    "8 lanes open of a plan of 9; 2 blocked or waiting." "moving 4 stopped 4 free 1 of plan 9" \
+  # The tiles: the lane parts and the free lanes sum to the plan of 9; the busy roles sum to 4.
+  has "$d/index.html" "Nothing needs you. Landed today 2" \
+    "Lanes open 8 /9 plan 3 building 1 in CI 1 to land 1 waiting 1 decision 1 blocked 1 free" \
+    "Agents busy 4 of 5 1 lead 1 Main 1 worker 1 other of 5 running agents" \
+    "Main 7 /6 zephyrine 1 /3" "Landed 2 yesterday 1" \
     "Blocked or waiting on a decision 1 blocked · 1 on a decision 2" "Finished, not landed" \
     "Producing 3 building · 1 validating 4" "Open lanes 2 + 1 + 4 + 1 = 8" \
     "beta is parked by the captain and left out of every total." \
-    "1 item held for the captain in home records · oldest" "Main must triage" \
-    "Claude quota runs out" "2 lanes blocked or waiting on a decision · oldest 2 h"
+    "Stuck blocked or on a decision 2 2 h" "Held held - Main must triage 1" "Quota Claude runs out 1 in"
   # The busy parts sum to the busy total, and the denominator is every running Herdr agent
   # outside parked homes (6 listed, 1 in parked beta), not the lane plan of 9.
   running=$(jq '[.result.agents[] | select(.pane_id != "pane-b-stale")] | length' "$home/herdr.json")
   [ "$running" = 5 ] || fail "fixture should list 5 running agents outside parked homes, has $running"
-  has "$d/index.html" "4 of $running running agents"
+  has "$d/index.html" "4 of $running" "of $running running agents"
   has "$d/backlog.html" "Busy now 1 + 1 + 1 + 1 = 4" "the groups list all $running running agents"
   # Grouped by home, the same lanes sum to the same total.
   has "$d/index.home.html" "Open lanes 7 + 1 = 8" "Main 1 blocked · 1 on a decision 7 Blocked, needs help 1" "zephyrine 1 building 1"
@@ -242,17 +242,17 @@ test_each_failed_source_shows_unknown_and_why() {
   python3 -c 'import json,sys; p=sys.argv[1]; c=json.load(open(p)); [e.__setitem__("at", e["at"]-400) for e in c["days"].values()]; json.dump(c,open(p,"w"))' "$d/.merged.json"
   printf 'home\tmerged\tfirst_pass\nmain\t%s\t1\n' "$(iso 0)" > "$home/data/metrics/prs.tsv"
   build "$home"
-  has "$d/index.html" "Busy agents unknown: herdr: server not running" "landings merge record as of" "Landed so far 1"
+  has "$d/index.html" "Agents busy unknown: herdr: server not running" "landings merge record as of" "Landed today 1"
   has "$d/quota.html" "Claude runs out first"
   has "$d/measure.html" "herdr agent list herdr: server not running" "quota-axi quota-axi: no network; showing the reading from" \
     "GitHub landings HTTP 403: API rate limit exceeded"
-  lacks "$d/index.html" "Busy agents 0"
+  lacks "$d/index.html" "Agents busy 0"
   # With no reading to reuse and no merge record, the numbers say unknown, never zero.
   rm "$d/.quota.json" "$home/data/metrics/prs.tsv"
   build "$home"
   has "$d/quota.html" "Quota unknown. unknown: quota-axi: no network"
-  has "$d/index.html" "Landed so far unknown: HTTP 403: API rate limit exceeded"
-  lacks "$d/index.html" "Landed so far 0"
+  has "$d/index.html" "Landed today unknown: HTTP 403: API rate limit exceeded"
+  lacks "$d/index.html" "Landed today 0"
   # A home whose backlog cannot be read makes the queue unknown, and names the home.
   printf '#!/bin/sh\necho "tasks-axi: backlog unreadable" >&2\nexit 1\n' > "$home/stubs/tasks-axi"
   chmod +x "$home/stubs/tasks-axi"
@@ -276,7 +276,7 @@ test_github_searches_each_day_once_and_today_again_after_five_minutes() {
   python3 -c 'import json,sys; p=sys.argv[1]; c=json.load(open(p)); [e.__setitem__("at", e["at"]-400) for e in c["days"].values()]; json.dump(c,open(p,"w"))' "$d/.merged.json"
   build "$home"
   [ "$(wc -l < "$home/gh.calls")" -eq 8 ] || fail "after 5 minutes not only today was searched again: $(cat "$home/gh.calls")"
-  has "$d/index.html" "Landed so far 2 yesterday 1"
+  has "$d/index.html" "Landed today 2"
   pass "GitHub is searched once per finished day and today again after 5 minutes"
 }
 
@@ -287,7 +287,7 @@ test_the_filing_log_counts_new_items_exactly() {
   today=$(date +%F)
   build "$home"
   # Items already queued when the log starts have only their filing day: a floor.
-  has "$d/index.html" "Filed, at least ≥ 4"
+  has "$d/index.html" "Filed today ≥ 4"
   has "$d/flow.html" "0 items first seen today."
   printf -- '- [ ] m-new - A brand new thing (repo: alpha) (kind: ship) (since %s)\n' "$today" >> "$home/mates/zephyrine/data/backlog.md"
   build "$home"
@@ -297,8 +297,8 @@ test_the_filing_log_counts_new_items_exactly() {
 p=sys.argv[1]; rows=open(p).read().split("\n",1); t=int(time.mktime(time.strptime(time.strftime("%Y-%m-%d"),"%Y-%m-%d")))
 open(p,"w").write(f"# since {t} last {int(time.time())}\thome\tid\tfirst_seen\ttitle\n"+rows[1])' "$d/filed.tsv"
   build "$home"
-  has "$d/index.html" "Filed 5"
-  lacks "$d/index.html" "Filed, at least ≥"
+  has "$d/index.html" "Filed today 5"
+  lacks "$d/index.html" "Filed today ≥"
   pass "the filing log records first-seen times, and filed counts are floors until the log covers the day"
 }
 
@@ -343,18 +343,18 @@ printf 'MemoryCurrent=8589934592\nMemoryHigh=34359738368\nMemoryMax=40802189312\
 EOF
   chmod +x "$bin/adb" "$bin/pgrep" "$bin/systemctl"
   build "$home" FM_DASHBOARD_PROC="$proc" FM_DEVICE_LOCK_DIR="$locks"
-  has "$d/index.html" "2 devices connected; 1 in use." "In use 1" "Free 1" "Devices 1 + 1 = 2" \
+  has "$d/index.html" "In use 1" "Free 1" "Devices 1 + 1 = 2" \
     "Phone Pixel 9 Free · last used by Main 10 min ago · PHONE1 · USB" \
     "Emulator test-avd In use by Main · 10 min · emulator-5554 · 4.0 GB in use" \
     "Free memory 10.0 GB of 64 GB" "Memory pressure 4%" "Heavy jobs 8.0 GB of 32 GB" "hard limit 38 GB" \
-    "Gradle builds 2 of 2" "Emulators 1 of 2" "Heavy jobs wait for memory · as of"
+    "Gradle builds 2 of 2" "Emulators 1 of 2" "Memory 10 GB free pressure 4% emulators 1/2 of 64 GB" "Memory heavy jobs wait"
   has "$d/index.home.html" "Main 1 Emulator test-avd" "No holder 1 Phone Pixel 9" "Devices 1 + 1 = 2"
   [ "$(sort -u "$home/adb.calls")" = "devices -l" ] || fail "adb was asked more than the device list: $(cat "$home/adb.calls")"
   # Each failed probe says unknown and why; nothing is guessed as zero.
   touch "$home/adb.fail" "$home/systemctl.fail"
   rm "$proc/meminfo" "$proc/locks"
   build "$home" FM_DASHBOARD_PROC="$proc" FM_DEVICE_LOCK_DIR="$locks"
-  has "$d/index.html" "Devices unknown." "unknown - adb: error: daemon not running" \
+  has "$d/index.html" "Memory unknown: $proc/meminfo" "unknown - adb: error: daemon not running" \
     "Free memory unknown: $proc/meminfo: No such file or directory" "Heavy jobs unknown: Failed to connect to bus" \
     "unknown - device locks: $proc/locks: No such file or directory"
   lacks "$d/index.html" "0 devices connected" "Free memory 0"
@@ -396,7 +396,8 @@ EOF
     "Pull requests and validations open 1 + 1 + 1 = 3" "Longest CI wait now: 2 h 18 min (m-ci, Main), from no-mistakes."
   grep -q 'href="https://github.com/acme/alpha/pull/9"' "$d/backlog.html" || fail "validation run's PR not linked"
   has "$d/backlog.home.html" "Pull requests and validations open 3"
-  has "$d/index.html" "1 pull request with failing checks or validation" "1 pull request waiting on CI over 1 h · longest 2 h 18 min"
+  has "$d/index.html" "Failing PRs with failing checks 1" "CI wait PRs on CI over 1 h 1 2 h 18 min" \
+    "1 failing 1 validating or on CI 1 green, to land"
   # A validation status that cannot be read says unknown and why, and the checks still come from the records;
   # a finished lane whose checks are still running is not green yet.
   touch "$home/nm.fail"
@@ -407,7 +408,7 @@ EOF
     "m-green Main · checks running" "Pull requests and validations open 1 + 2 = 3"
   lacks "$d/backlog.html" "Green, waiting to land"
   has "$d/measure.html" "no-mistakes axi status 3 of 3 lanes: error: daemon not reachable" "a CI wait over 1 h is a slow spot"
-  lacks "$d/index.html" "waiting on CI over"
+  lacks "$d/index.html" "PRs on CI over"
   pass "pull requests group by checks and validation, with CI wait from no-mistakes, and an unreadable run shows unknown"
 }
 

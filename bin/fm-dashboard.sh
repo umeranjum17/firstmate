@@ -950,11 +950,8 @@ PARKED_LINE = (f'<p class="note">{esc(" and ".join(PARKED))} {"is" if len(PARKED
 MOVING = SPLIT['building'] + SPLIT['validating']
 STOPPED = OPEN - MOVING
 FREE = max(0, PLAN - OPEN)
-def lane_strip():
-    cells = ''.join(f'<i class="{c}"></i>' for c, n in (('mv', MOVING), ('st', STOPPED), ('fr', FREE)) for _ in range(n))
-    return (f'<div class="strip" aria-hidden="true">{cells}</div><div class="legend"><span><i class="sw mv"></i>moving {MOVING}</span>'
-            f'<span><i class="sw st"></i>stopped {STOPPED}</span><span><i class="sw fr"></i>free {FREE} of plan {PLAN}</span></div>')
-def lanes_list(group, names=False):
+def lane_strip(): return stack(lane_parts(SPLIT), max(PLAN, OPEN), 'sb big') + lane_legend(SPLIT, FREE)
+def lanes_list(group, names=False, strip=True):
     """Every open lane in exactly one group; with names, each lane is a row, else one row per home with its count."""
     def lane_row(l):
         t = esc(titles.get((l['home'], l['task'])) or l['task'])
@@ -977,66 +974,56 @@ def lanes_list(group, names=False):
                 per = sorted(((h, [l for l in ls if l['home'] == h]) for h in ACTIVE), key=lambda x: (-len(x[1]), x[0]))
                 rows = ''.join(grow(esc(hname(h)), esc(split_txt(split(hl), states)) if len(states) > 1 else '', len(hl)) for h, hl in per if hl)
             groups.append((name, len(ls), rows, esc(split_txt(SPLIT, states)) if len(states) > 1 else '', sw, True))
-    return lane_strip() + glist(groups, 'Open lanes', OPEN)
+    return (lane_strip() if strip else '') + glist(groups, 'Open lanes', OPEN)
 
-# --- slow spots: each row a number and an age ----------------------------
-spots = []
+# --- slow spots: each row a state, a number and an age ------------------
+spots = []  # dict(tone, chip, what, n, age, href, title)
 def where(ls):
     c = {}
     for l in ls: c[l['home']] = c.get(l['home'], 0) + 1
-    return ', '.join(f'{hname(h)} {n}' for h, n in sorted(c.items(), key=lambda x: (-x[1], x[0]))) if len(c) > 1 else ''  # one home is already named
+    return ', '.join(f'{hname(h)} {n}' for h, n in sorted(c.items(), key=lambda x: (-x[1], x[0])))
+def spot(tone, chip, what, n, age, href, title=''):
+    spots.append(dict(tone=tone, chip=chip, what=what, n=n, age=age, href=href, title=f'{n} {what}' + (f' · {title}' if title else '')))
 stuck = [l for l in live if l['state'] in ('blocked', 'decision')]
-if stuck:
-    spots.append(('warn', f'{plural(len(stuck), "lane")} blocked or waiting on a decision · oldest {dur(NOW_TS - min(l["since"] for l in stuck))}',
-                  f'{len({l["home"] for l in stuck})} homes' if len({l['home'] for l in stuck}) > 1 else hname(stuck[0]['home']),
-                  esc(where(stuck)), 'backlog#lanes'))
+if stuck: spot('warn', 'Stuck', 'blocked or on a decision', len(stuck), dur(NOW_TS - min(l['since'] for l in stuck)), 'backlog#lanes', where(stuck))
 fin = [l for l in live if l['state'] == 'finished']
-if fin:
-    spots.append(('warn', f'{plural(len(fin), "lane")} finished, not landed · oldest {dur(NOW_TS - min(l["since"] for l in fin))}',
-                  hname(fin[0]['home']) if len({l['home'] for l in fin}) == 1 else f'{len({l["home"] for l in fin})} homes', esc(where(fin)), 'backlog#lanes'))
+if fin: spot('warn', 'To land', 'finished, not landed', len(fin), dur(NOW_TS - min(l['since'] for l in fin)), 'backlog#lanes', where(fin))
 failing = [p for p in PRS if p['group'] == 'failing']
-if failing:
-    spots.append(('bad', f'{plural(len(failing), "pull request")} with failing checks or validation · oldest {dur(NOW_TS - min(p["lane"]["since"] for p in failing))}',
-                  hname(failing[0]['lane']['home']) if len({p['lane']['home'] for p in failing}) == 1 else f'{len({p["lane"]["home"] for p in failing})} homes',
-                  esc(where([p['lane'] for p in failing])), 'backlog#prs'))
+if failing: spot('bad', 'Failing', 'PRs with failing checks', len(failing), dur(NOW_TS - min(p['lane']['since'] for p in failing)), 'backlog#prs',
+                 where([p['lane'] for p in failing]))
 long_ci = [p for p in ci_waits if p['wait'] >= CI_SLOW]
-if long_ci:
-    spots.append(('warn', f'{plural(len(long_ci), "pull request")} waiting on CI over {dur(CI_SLOW)} · longest {dur(max(p["wait"] for p in long_ci))}',
-                  hname(long_ci[0]['lane']['home']) if len({p['lane']['home'] for p in long_ci}) == 1 else f'{len({p["lane"]["home"] for p in long_ci})} homes',
-                  esc(where([p['lane'] for p in long_ci])), 'backlog#prs'))
+if long_ci: spot('warn', 'CI wait', f'PRs on CI over {dur(CI_SLOW)}', len(long_ci), dur(max(p['wait'] for p in long_ci)), 'backlog#prs',
+                 where([p['lane'] for p in long_ci]))
 if held_cap:
     c = {}
     for h, _ in held_cap: c[h] = c.get(h, 0) + 1
     oldest = held_cap[0][1]['day']
-    spots.append(('warn', f'{"" if bl_known else "At least "}{plural(len(held_cap), "item")} held for the captain in home records · oldest {days_old(oldest) if oldest else "unknown"} - Main must triage',
-                  f'{len(c)} homes' if len(c) > 1 else hname(next(iter(c))),
-                  esc(', '.join(f'{hname(h)} {n}' for h, n in sorted(c.items(), key=lambda x: (-x[1], x[0]))) if len(c) > 1 else ''), 'backlog?group=home#held'))
+    spot('warn', 'Held', 'held - Main must triage', f'{"" if bl_known else "≥"}{len(held_cap)}', days_old(oldest) if oldest else 'unknown',
+         'backlog?group=home#held', ', '.join(f'{hname(h)} {n}' for h, n in sorted(c.items(), key=lambda x: (-x[1], x[0]))))
 if bl_known:
     could = {h: min(max(0, plan(h) - len(by_home[h])), len(bl(h, 'ready'))) for h in ACTIVE}
     if sum(could.values()):
         old = min((r['day'] for h in ACTIVE if could[h] for r in bl(h, 'ready') if r['day']), default=None)
-        spots.append(('warn', f'{plural(sum(could.values()), "lane")} could start now: free of plan, with ready work'
-                      + (f' · oldest ready {days_old(old)}' if old else ''), ', '.join(hname(h) for h in ACTIVE if could[h]),
-                      esc(', '.join(f'{hname(h)} {len(bl(h, "ready"))} ready, {len(by_home[h])} of {plan(h)} open' for h in ACTIVE if could[h])), 'backlog#targets'))
+        spot('warn', 'Idle', 'free lanes, ready work', sum(could.values()), days_old(old) if old else 'unknown', 'backlog#targets',
+             ', '.join(f'{hname(h)} {len(bl(h, "ready"))} ready, {len(by_home[h])} of {plan(h)} open' for h in ACTIVE if could[h]))
 for a in running_out[:2]:
     if (a['runout'] - NOW).total_seconds() < 48 * 3600:
-        spots.append(('warn', f'{esc(a["name"])} quota runs out {when(a["runout"].timestamp())} · in {dur((a["runout"] - NOW).total_seconds())}',
-                      'Quota', f'Carries {carries_words(a["p"])} · before its {esc(a["limit"]["label"] + " window" if a["limit"] else "window")} resets', 'quota'))
+        spot('warn', 'Quota', f'{a["name"]} runs out', 1, f'in {dur((a["runout"] - NOW).total_seconds())}', 'quota',
+             f'carries {carries_words(a["p"])}; before its {a["limit"]["label"] + " window" if a["limit"] else "window"} resets')
 for a in accounts:
     if a['empty'] and carries.get(a['p']):
-        spots.append(('bad', f'{esc(a["name"])} quota is used up · as of {hm(q_at)}', 'Quota', f'Carries {carries_words(a["p"])}', 'quota'))
-if down: spots.append(('bad', f'{plural(len(down), "lead")} not running · as of {BUILT}', esc(', '.join(sorted(down))), '', '#homes'))
+        spot('bad', 'Quota', f'{a["name"]} quota used up', 1, f'as of {hm(q_at)}', 'quota', f'carries {carries_words(a["p"])}')
+if down: spot('bad', 'Down', 'leads not running', len(down), 'now', '#homes', ', '.join(sorted(down)))
 tidy = sorted(h for h in leads if h not in down and lead_word(h)[1] == 'bad')
-if tidy: spots.append(('warn', f'{plural(len(tidy), "home")} with records that need tidy-up · as of {BUILT}', esc(', '.join(tidy)), '', '#homes'))
+if tidy: spot('warn', 'Tidy', 'homes to tidy up', len(tidy), 'now', '#homes', ', '.join(tidy))
 
 # --- machine and devices -------------------------------------------------
 free, psi, (hc_, hh_, hm_) = mach['free'], mach['pressure'], mach['heavy']
 gate_wait = (free is not None and free[0] < MEM_MIN_GB) or (psi is not None and psi >= 40)
 at_cap = [x for x, full in (('emulators', (emu_count or 0) >= EMU_MAX), ('Gradle builds', (mach['gradle'] or 0) >= GRADLE_MAX)) if full]
-if gate_wait or at_cap:
-    spots.append(('bad' if gate_wait else 'warn', ('Heavy jobs wait for memory' if gate_wait else
-                  ' and '.join(f'{x} {emu_count if x == "emulators" else mach["gradle"]} of {EMU_MAX if x == "emulators" else GRADLE_MAX}' for x in at_cap).capitalize() + ' in use')
-                  + f' · as of {BUILT}', 'Machine', 'the next heavy job queues', '#devices'))
+if gate_wait: spot('bad', 'Memory', 'heavy jobs wait', f'{free[0]:.0f} GB' if free else '?', 'now', '#devices', 'the next heavy job queues')
+for x, n, cap in (('emulators', emu_count, EMU_MAX), ('Gradle builds', mach['gradle'], GRADLE_MAX)):
+    if x in at_cap: spot('warn', 'At cap', f'{x} at the cap', f'{n}/{cap}', 'now', '#devices', 'the next one queues')
 def meter(label, value, frac, tone, hint=''):
     bar = f'<span class="bar"><i class="{tone}" style="width:{max(2, min(100, round(100 * frac)))}%"></i></span>' if frac is not None else ''
     return f'<div class="mm"><span>{esc(label)}</span><b class="{tone}">{value}</b>{bar}{f"<small>{esc(hint)}</small>" if hint else ""}</div>'
@@ -1145,6 +1132,222 @@ def hour_chart():
     return (f'<div class="chart"><svg viewBox="0 0 900 140" preserveAspectRatio="none" role="img" aria-label="Filed and landed per hour today">{bars}</svg>'
             f'<div class="cols" style="grid-template-columns:repeat({n},1fr)">{cols}</div></div>', sum(lh), from_h)
 
+# --- charts: inline SVG drawn here, no script ---------------------------
+def nice_top(v):  # a round axis top at or above v
+    if not v or v <= 0: return 1
+    m = 10 ** math.floor(math.log10(v))
+    return next(s * m for s in (1, 2, 2.5, 5, 10) if s * m >= v)
+def axis_n(v): return f'{v:g}' if v < 10 else f'{v:.0f}'
+def frame(svg, top, xlabels, unit='', h=150, xpos=None):
+    """A chart: y labels (top, half, 0) beside a stretched SVG with gridlines, x labels below."""
+    ys = ''.join(f'<span>{axis_n(v)}{unit}</span>' for v in (top, top / 2, 0))
+    xs = ''.join(f'<span style="left:{p * 100:.2f}%">{x}</span>' for p, x in zip(xpos, xlabels)) if xpos else ''.join(f'<span>{x}</span>' for x in xlabels)
+    grid = ''.join(f'<line class="gl" x1="0" x2="1000" y1="{y}" y2="{y}" vector-effect="non-scaling-stroke"/>' for y in (1, 100, 199))
+    return (f'<div class="cf" style="--ch:{h}px"><div class="ya">{ys}</div><div class="pl">'
+            f'<svg viewBox="0 0 1000 200" preserveAspectRatio="none" role="img">{grid}{svg}</svg>'
+            + (f'<div class="xa xp">{xs}</div>' if xpos else f'<div class="xa" style="grid-template-columns:repeat({len(xlabels)},1fr)">{xs}</div>') + '</div></div>')
+def legend(*items):  # (class, text)
+    return '<div class="lg">' + ''.join(f'<span><i class="{c}"></i>{t}</span>' for c, t in items) + '</div>'
+def path(pts, top):  # pts: (x 0..1, value) -> SVG path in the 1000x200 box
+    return ' '.join(f'{"M" if i == 0 else "L"}{x * 1000:.1f},{200 - v / top * 198:.1f}' for i, (x, v) in enumerate(pts))
+
+def cum_hours(times, upto):  # cumulative count at the end of each hour 0..upto-1
+    c = [0] * 24
+    for t in times: c[t.hour] += 1
+    out, s = [], 0
+    for h in range(upto): s += c[h]; out.append(s)
+    return out
+def inout_chart():
+    """Cumulative filed (in) and landed (out) by hour: today solid, yesterday dashed."""
+    now_x = (NOW.hour + NOW.minute / 60) / 24
+    lt = [t for t, *_ in landings or [] if t.date() == TODAY]
+    ly = [t for t, *_ in landings or [] if t.date() == YDAY]
+    ft = [datetime.fromtimestamp(s).astimezone() for s, *_ in filed_today]
+    fy = [datetime.fromtimestamp(s).astimezone() for (h, i), (s, t) in log.items() if s and h not in parked and datetime.fromtimestamp(s).astimezone().date() == YDAY]
+    series = []  # (class, points, title)
+    if landings is not None:
+        series.append(('out y', [(0, 0)] + [((h + 1) / 24, v) for h, v in enumerate(cum_hours(ly, 24))], f'Landed yesterday: {len(ly)}'))
+    if exact(YDAY): series.append(('in y', [(0, 0)] + [((h + 1) / 24, v) for h, v in enumerate(cum_hours(fy, 24))], f'Filed yesterday: {len(fy)}'))
+    f0 = 0 if f_exact else (datetime.fromtimestamp(log_since).astimezone().hour + datetime.fromtimestamp(log_since).astimezone().minute / 60) / 24
+    fc = cum_hours(ft, NOW.hour + 1)
+    series.append(('in', [(f0, 0)] + [((h + 1) / 24, v) for h, v in enumerate(fc[:-1]) if (h + 1) / 24 > f0] + [(now_x, fc[-1] if fc else 0)],
+                   f'Filed today{"" if f_exact else " since " + hm(log_since)}: {len(ft)}'))
+    if landings is not None:
+        lc = cum_hours(lt, NOW.hour + 1)
+        series.append(('out', [(0, 0)] + [((h + 1) / 24, v) for h, v in enumerate(lc[:-1])] + [(now_x, lc[-1] if lc else 0)], f'Landed today: {len(lt)}'))
+    top = nice_top(max([v for _, p, _ in series for _, v in p] + [1]))
+    svg = ''.join(f'<path class="ln {c}" d="{path(p, top)}" vector-effect="non-scaling-stroke"><title>{esc(t)}</title></path>' for c, p, t in series)
+    svg += f'<line class="now" x1="{now_x * 1000:.1f}" x2="{now_x * 1000:.1f}" y1="0" y2="200" vector-effect="non-scaling-stroke"/>'
+    lg = legend(('k out', f'Landed {len(lt) if landings is not None else "?"}'), ('k out y', f'yesterday {len(ly) if landings is not None else "?"}'),
+                ('k in', f'Filed {len(ft)}' + ('' if f_exact else f' since {hm(log_since)}')),
+                ('k in y', f'yesterday {len(fy)}') if exact(YDAY) else ('k in y', 'yesterday not logged'))
+    return lg + frame(svg, top, ['00', '06', '12', '18', '24'], xpos=[0, .25, .5, .75, 1])
+
+def week_bars():
+    """Filed (in) beside landed (out) per local day, last 7 days."""
+    top = nice_top(max([v for v in week_f + week_l if v is not None] + [1]))
+    svg = ''
+    for i, (d, f, o) in enumerate(zip(WEEK, week_f, week_l)):
+        x = i * 1000 / 7
+        hf = f / top * 198
+        svg += (f'<rect class="b in{"" if exact(d) else " fl"}" x="{x + 22:.1f}" y="{200 - hf:.1f}" width="50" height="{hf:.1f}">'
+                f'<title>{d:%a %d %b}: filed {"" if exact(d) else "at least "}{f}</title></rect>')
+        if o is not None:
+            ho = o / top * 198
+            svg += f'<rect class="b out" x="{x + 76:.1f}" y="{200 - ho:.1f}" width="50" height="{ho:.1f}"><title>{d:%a %d %b}: landed {o}</title></rect>'
+    return (legend(('k in', 'Filed' + ('' if all(exact(d) for d in WEEK) else ', at least')), ('k out', 'Landed'))
+            + frame(svg, top, [f'{d:%a}' for d in WEEK]))
+
+# Cycle time: first commit to merge (build_hours in the merge record), P50 and P85 per merge day.
+CYCLE_DAYS = 14
+def pct(vals, p):
+    s = sorted(vals)
+    return s[min(len(s) - 1, max(0, math.ceil(p * len(s)) - 1))] if s else None
+cycle = None
+if prs is not None:
+    cycle = []
+    for i in range(CYCLE_DAYS - 1, -1, -1):
+        d = TODAY - timedelta(days=i)
+        hs = [num(p.get('build_hours')) for p in prs if p['home'] not in parked and local_day(p['merged']) == d]
+        hs = [v for v in hs if v is not None]
+        cycle.append((d, pct(hs, .5), pct(hs, .85), len(hs)))
+def cycle_chart():
+    pts = [(i, c) for i, c in enumerate(cycle) if c[3]]
+    if not pts: return '<p class="note">No merges in the merge record over the last 14 days.</p>'
+    top = nice_top(max(c[2] for _, c in pts))
+    x = lambda i: (i + .5) / CYCLE_DAYS
+    svg = (f'<path class="ln p85" d="{path([(x(i), c[2]) for i, c in pts], top)}" vector-effect="non-scaling-stroke"/>'
+           f'<path class="ln p50" d="{path([(x(i), c[1]) for i, c in pts], top)}" vector-effect="non-scaling-stroke"/>')
+    svg += ''.join(f'<rect class="hit" x="{i * 1000 / CYCLE_DAYS:.1f}" y="0" width="{1000 / CYCLE_DAYS:.1f}" height="200">'
+                   f'<title>{c[0]:%a %d %b}: P50 {fmt(c[1])} h, P85 {fmt(c[2])} h, {plural(c[3], "merge")}</title></rect>' for i, c in pts)
+    last = pts[-1][1]
+    return (legend(('k p50', f'P50 {fmt(last[1])} h'), ('k p85', f'P85 {fmt(last[2])} h'))
+            + frame(svg, top, [f'{c[0]:%d}' if i % 2 == 0 else '' for i, c in enumerate(cycle)], ' h'))
+
+# Lane states in one order and one colour each, the same everywhere.
+LANE_ORDER = [('building', 'building'), ('validating', 'validating or CI'), ('finished', 'finished, not landed'),
+              ('waiting', 'waiting on something'), ('decision', 'on a decision'), ('blocked', 'blocked')]
+def stack(parts, total, cls='sb'):  # parts: (class, n, title); total sets the scale, the rest is free
+    used = sum(n for _, n, _ in parts)
+    segs = ''.join(f'<i class="{c}" style="flex:{n}" title="{esc(t)}"></i>' for c, n, t in parts if n)
+    free = total - used
+    return f'<div class="{cls}">{segs}' + (f'<i class="free" style="flex:{free}" title="{free} free"></i>' if free > 0 else '') + '</div>'
+def lane_parts(sp): return [(f's-{s}', sp[s], f'{sp[s]} {n}') for s, n in LANE_ORDER]
+def lane_legend(sp, free=None):
+    return legend(*[(f'k s-{s}', f'{sp[s]} {n}') for s, n in LANE_ORDER if sp[s]], *([('k free', f'{free} free of plan {PLAN}')] if free else []))
+def home_bars():  # small multiples: each home's lanes against its plan
+    out = ''
+    for h in sorted(ACTIVE, key=lambda h: (-len(by_home[h]), h)):
+        sp = split(by_home[h])
+        out += (f'<a class="hb" href="backlog?group=home#lanes" title="{esc(hname(h))}: {esc(split_txt(sp, list(STATES)) or "no open lanes")}; plan {plan(h)}">'
+                f'<span class="hn">{esc(hname(h))}</span><span class="hv">{len(by_home[h])}<small>/{plan(h)}</small></span>'
+                + stack(lane_parts(sp), max(plan(h), len(by_home[h]))) + '</a>')
+    return f'<div class="hbs">{out}</div>'
+
+PR_TONE = {'failing': 'bad', 'validating': 'in', 'green': 'ok', 'none': 'mut'}
+def pr_bar():
+    short = {'failing': 'failing', 'validating': 'validating or on CI', 'green': 'green, to land', 'none': 'no check record'}
+    parts = [(f'c-{PR_TONE[g]}', sum(p['group'] == g for p in PRS), f'{sum(p["group"] == g for p in PRS)} {short[g]}') for g, n, _ in PR_GROUPS]
+    return (stack(parts, len(PRS), 'sb big') + legend(*[(f'k {c}', t) for c, n, t in parts if n])) if PRS else '<p class="note">No pull request or validation open.</p>'
+
+def quota_bars():  # every readable account: its tightest window, soonest runout first
+    rows = ''
+    for a in sorted((a for a in accounts if a['windows']), key=lambda a: (not runs_out(a), a['runout'] or NOW, a['name'])):
+        w = a['limit'] if a['limit'] and a['limit']['used'] is not None else max((w for w in a['windows'] if w['used'] is not None), key=lambda w: w['used'], default=None)
+        used = w['used'] if w else None
+        tone = 'bad' if a['empty'] else 'warn' if runs_out(a) else 'ok'
+        right = ('used up' if a['empty'] else f'out {when(a["runout"].timestamp())}' if runs_out(a) else
+                 f'resets {when(w["reset"].timestamp())}' if w and w['reset'] else 'lasts')
+        tick = f'<b style="left:{w["pace"]:.0f}%" title="even pace {fmt(w["pace"], 0)}%"></b>' if w and w['pace'] is not None else ''
+        rows += (f'<div class="qb" title="{esc(a["name"])}: {esc(w["label"]) if w else "window"} {fmt(used, 0) if used is not None else "?"}% used; carries {esc(carries_words(a["p"]))}">'
+                 f'<span class="qn">{esc(a["name"])}</span><span class="qt"><i class="c-{tone}" style="width:{0 if used is None else max(2, min(100, round(used)))}%"></i>{tick}</span>'
+                 f'<span class="qr {tone if tone != "ok" else "mut"}">{right}</span></div>')
+    return rows or '<p class="note">No account reported a window.</p>'
+
+def donut(parts, total, center, sub):  # parts: (class, n, title)
+    off, segs = 25, ''
+    for c, n, t in parts:
+        if not n or not total: continue
+        f = n / total * 100
+        segs += f'<circle class="{c}" r="15.915" cx="18" cy="18" stroke-dasharray="{f:.2f} {100 - f:.2f}" stroke-dashoffset="{off:.2f}"><title>{esc(t)}</title></circle>'
+        off -= f
+    return (f'<svg class="donut" viewBox="0 0 36 36" aria-hidden="true"><circle class="tr" r="15.915" cx="18" cy="18"/>{segs}'
+            f'<text x="18" y="18.5" class="dc">{center}</text><text x="18" y="24.5" class="ds">{sub}</text></svg>')
+def gauge(frac, tone, center, sub):  # a half ring, frac 0..1
+    f = max(0, min(1, frac)) * 50
+    return (f'<svg class="gauge" viewBox="0 0 36 21" aria-hidden="true"><path class="tr" d="M3,18 A15,15 0 0 1 33,18" pathLength="50"/>'
+            f'<path class="c-{tone}" d="M3,18 A15,15 0 0 1 33,18" pathLength="50" stroke-dasharray="{f:.2f} 60"/>'
+            f'<text x="18" y="15" class="dc">{center}</text><text x="18" y="20.5" class="ds">{sub}</text></svg>')
+def tile_spark(vals, cls):
+    if any(v is None for v in vals): return ''
+    top = max(vals) or 1
+    pts = [(i / 6, v) for i, v in enumerate(vals)]
+    d = path(pts, top)
+    hits = ''.join(f'<rect class="hit" x="{(i - .5) * 1000 / 6:.0f}" y="0" width="{1000 / 6:.0f}" height="200"><title>{WEEK[i]:%a}: {v}</title></rect>' for i, v in enumerate(vals))
+    return (f'<svg class="tsp {cls}" viewBox="0 0 1000 200" preserveAspectRatio="none" aria-hidden="true">'
+            f'<path class="ar" d="{d} L1000,200 L0,200 Z"/><path class="ln" d="{d}" vector-effect="non-scaling-stroke"/>{hits}</svg>')
+
+def by_now(times):  # how many of yesterday's happened before this time of day
+    return sum(1 for t in times if t.date() == YDAY and t.time() <= NOW.time())
+def delta(now_v, then_v, then_txt):
+    if now_v is None or then_v is None: return '<span class="dl mut">–</span>'
+    d = now_v - then_v
+    tone, sign = ('up', '▲') if d > 0 else ('down', '▼') if d < 0 else ('mut', '=')
+    return f'<span class="dl {tone}" title="{esc(then_txt)}">{sign}{abs(d) if d else ""} vs yday</span>'
+def tile(href, label, big, extra, viz, asof, tone=''):
+    return (f'<a class="tile{" t-" + tone if tone else ""}" href="{href}"><span class="tl">{label}</span><span class="tv">{big}{extra}</span>'
+            f'{viz}<span class="ta">{asof}</span></a>')
+def tiles():
+    ly_now = by_now([t for t, *_ in landings]) if landings is not None else None
+    fy_now = by_now([datetime.fromtimestamp(s).astimezone() for (h, i), (s, t) in log.items() if s and h not in parked]) if exact(YDAY) else None
+    t1 = tile('flow', 'Landed today', unknown(why_of('GitHub landings')) if l_today is None else l_today,
+              delta(l_today, ly_now, f'yesterday by {BUILT}: {ly_now}; full day {l_yday}'), tile_spark(week_l, 'out'),
+              f'since 00:00 · {LANDED_SRC if landings is not None else "unknown"}')
+    t2 = tile('flow', 'Filed today', filed_txt(TODAY),
+              delta(f_today, fy_now, f'yesterday by {BUILT}: {fy_now}') if f_exact and fy_now is not None else f'<span class="dl mut">yday {filed_txt(YDAY)}</span>',
+              tile_spark(week_f, 'in'), f'since 00:00 · {BUILT}')
+    if agents is not None:
+        busy_total = sum(BUSY.values())
+        cls = {'lead': 'c-in', 'main': 'c-vio', 'worker': 'c-out', 'other': 'c-mut'}
+        parts = [(cls[r], BUSY[r], f'{BUSY[r]} {n} busy') for r, n in ROLES]
+        lg = '<span class="mini">' + ''.join(f'<span><i class="{cls[r]}"></i>{plural(BUSY[r], n[:-1]) if r in ("lead", "worker") else f"{BUSY[r]} {n}"}</span>'
+                                             for r, n in ROLES if BUSY[r] or r != 'other') + '</span>'
+        t3 = tile('backlog#agents', 'Agents busy', donut(parts, len(agent_rows), busy_total, f'of {len(agent_rows)}'), '', lg,
+                  f'of {len(agent_rows)} running agents · {BUILT}')
+    else: t3 = tile('backlog#agents', 'Agents busy', unknown(why_of('herdr')), '', '', BUILT)
+    short = {'building': 'building', 'validating': 'in CI', 'finished': 'to land', 'waiting': 'waiting', 'decision': 'decision', 'blocked': 'blocked'}
+    lmini = '<span class="mini">' + ''.join(f'<span><i class="s-{s}"></i>{SPLIT[s]} {short[s]}</span>' for s, _ in LANE_ORDER if SPLIT[s]) + (f'<span><i class="free"></i>{FREE} free</span>' if FREE else '') + '</span>'
+    t4 = tile('backlog#lanes', 'Lanes open', f'{OPEN}<small>/{PLAN} plan</small>', '', stack(lane_parts(SPLIT), max(PLAN, OPEN), 'sb big') + lmini,
+              f'now {BUILT}', 'warn' if SPLIT['blocked'] + SPLIT['decision'] else '')
+    if qdata is None: t5 = tile('quota', 'Quota', unknown(why_of('quota-axi')), '', '', '')
+    else:
+        a = running_out[0] if running_out else None
+        if a:
+            used = a['limit']['used'] if a['limit'] else None
+            ring = donut([('c-warn', used or 0, f'{a["limit"]["label"] if a["limit"] else "window"} {fmt(used, 0)}% used')], 100,
+                         a['runout'].strftime('%H:%M'), a['runout'].strftime('%a') if a['runout'].date() != TODAY else 'today')
+            t5 = tile('quota', 'Quota runs out', ring, '', f'<span class="mini"><span>{esc(a["name"])} · in {dur((a["runout"] - NOW).total_seconds())}</span></span>',
+                      f'current pace · {hm(q_at)}', 'warn' if (a['runout'] - NOW).total_seconds() < 24 * 3600 else '')
+        else:
+            t5 = tile('quota', 'Quota', '<span class="okv">lasts</span>', '', '<span class="mini"><span>no account runs out before reset</span></span>', f'current pace · {hm(q_at)}')
+    if free:
+        tone = 'bad' if gate_wait else 'warn' if free[0] < 2 * MEM_MIN_GB or (psi or 0) >= 20 else 'ok'
+        g = gauge(1 - free[0] / free[1] if free[1] else 0, tone, f'{free[0]:.0f}', 'GB free')
+        sub = ''.join(f'<span>{x}</span>' for x in (f'pressure {psi:.0f}%' if psi is not None else '', f'emulators {emu_count}/{EMU_MAX}' if emu_count is not None else '') if x)
+        t6 = tile('#devices', 'Memory', g, '', f'<span class="mini">{sub}</span>', f'of {free[1]:.0f} GB · {BUILT}', tone if tone != 'ok' else '')
+    else: t6 = tile('#devices', 'Memory', unknown(mach['free_why']), '', '', BUILT)
+    return f'<div class="tiles">{t1}{t2}{t3}{t4}{t5}{t6}</div>'
+
+def spot_table():
+    if not spots: return '<p class="note okn">No slow spots now.</p>'
+    rows = ''.join(f'<a class="sp" href="{esc(s["href"])}" title="{esc(s["title"])}"><span class="chip c-{s["tone"]}">{esc(s["chip"])}</span>'
+                   f'<span class="spw">{esc(s["what"])}</span><b class="sn">{s["n"]}</b><span class="sa">{esc(s["age"])}</span></a>' for s in spots)
+    return f'<div class="sps"><div class="sp sph"><span>State</span><span>What</span><span>N</span><span>Oldest</span></div>{rows}</div>'
+
+def card(title, window, body, cls='', more=None):
+    m = f'<a class="cm" href="{esc(more[0])}">{esc(more[1])} →</a>' if more else ''
+    return f'<section class="card {cls}"><div class="ch"><h3>{title}</h3>{m}</div><p class="cw">{window}</p>{body}</section>'
+
 # --- page shell ----------------------------------------------------------
 NAV = [('./', 'index', 'Overview'), ('flow', 'flow', 'Flow'), ('quota', 'quota', 'Quota'), ('backlog', 'backlog', 'Backlog'), ('measure', 'measure', 'Method')]
 records = []  # (title, detail): two records that give different answers
@@ -1169,7 +1372,7 @@ def trust():
     parts = [f'<a class="warn" href="measure#records">{plural(len(records), "record")} disagree</a>'] if records else []
     parts += [f'<a class="warn" href="measure#unknown">{plural(len(notes), "source")} unknown</a>'] if notes else []
     return ' · '.join(parts) or 'All sources read'
-CSS = ':root{color-scheme:light dark;--bg:#fbfbfa;--text:#141518;--text2:#46494f;--text3:#676a72;--line:rgba(20,22,26,.09);--line2:rgba(20,22,26,.18);--bar:#3d4047;--track:rgba(20,22,26,.08);--tick:#141518;--ok:#1d8048;--warn:#9a5a00;--warnbar:#c27c0e;--bad:#c92a2a}@media (prefers-color-scheme:dark){:root{--bg:#0b0b0c;--text:#ececee;--text2:#b3b5bb;--text3:#8a8d95;--line:rgba(255,255,255,.08);--line2:rgba(255,255,255,.16);--bar:#c9cbd0;--track:rgba(255,255,255,.08);--tick:#ececee;--ok:#43c97b;--warn:#efaa3c;--warnbar:#e09a2c;--bad:#ff6359}}*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}a{color:inherit;text-decoration:none}a:hover{text-decoration:underline;text-decoration-color:var(--line2);text-underline-offset:3px}.shell{max-width:780px;margin:0 auto;padding:0 16px 40px}/* nav */.brand{display:none}.brand b{font-size:16px;font-weight:600;letter-spacing:-.01em}.stamp{display:block;font-size:12px;color:var(--text3);margin-top:2px}.nav{display:flex;gap:16px;align-items:center;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}.nav a{font-size:14px;color:var(--text2);padding:12px 0 11px;border-bottom:1.5px solid transparent;margin-bottom:-1px;white-space:nowrap}.nav a:hover{text-decoration:none;color:var(--text)}.nav a[aria-current]{color:var(--text);border-bottom-color:var(--text);font-weight:500}.side-foot{display:none}main{padding-top:14px}/* type: 12 meta, 14 small, 16 body, 20 answers, 28/36 verdicts */.label{font-size:12px;color:var(--text3);margin:0;font-weight:500}.sh{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin:0 0 4px}.sh a{font-size:12px;color:var(--text2);white-space:nowrap}h1{text-wrap:balance;font-size:28px;line-height:1.15;letter-spacing:-.022em;font-weight:650;margin:0;max-width:24ch}.lede{text-wrap:pretty;font-size:16px;color:var(--text2);margin:8px 0 0;max-width:56ch}.lede a,.inl{color:var(--text);text-decoration:underline;text-decoration-color:var(--line2);text-underline-offset:3px}h2{font-size:20px;line-height:1.3;letter-spacing:-.014em;font-weight:600;margin:0 0 10px;text-wrap:balance}.meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;margin-bottom:8px;font-size:12px;color:var(--text3)}.state{display:inline-flex;align-items:center;gap:7px;font-size:14px;font-weight:500}.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}.mut{color:var(--text3)}.sub{color:var(--text2)}a.warn{text-decoration:underline;text-decoration-color:currentColor;text-underline-offset:3px;text-decoration-thickness:1px}.dot{width:7px;height:7px;border-radius:50%;background:currentColor;flex:none;display:inline-block}.dot.idle{background:none;box-shadow:inset 0 0 0 1.5px var(--text3)}.dot.warn{background:var(--warnbar)}.dot.ok{background:var(--ok)}.sections{display:grid;gap:26px;margin-top:20px}.stack{display:grid;gap:28px;align-content:start;min-width:0}section{min-width:0}.more{display:inline-block;margin-top:10px;font-size:14px;color:var(--text2)}/* key-value rows */.rows{border-top:1px solid var(--line)}.kv{display:grid;grid-template-columns:minmax(0,1fr) 48px 2.6em 6.6em;align-items:center;column-gap:10px;min-height:40px;border-bottom:1px solid var(--line)}.kv .k{color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.kv .v{text-align:right;font-weight:600;white-space:nowrap;letter-spacing:-.01em}.kv .d{font-size:12px;color:var(--text3);white-space:nowrap}.kv .d.warn{color:var(--warn)}.ge{font-weight:400;color:var(--text3);margin-right:1px}.spark{display:block;width:48px;height:18px;color:var(--text3)}.wo,.wonly{display:none}.nw{white-space:nowrap}/* items: what / where / why */.item{display:grid;grid-template-columns:14px minmax(0,1fr) auto;column-gap:8px;padding:8px 0;border-bottom:1px solid var(--line);align-items:baseline}.item .dot{transform:translateY(-1px)}.item .t{font-weight:500}.item .w{grid-column:2/4;font-size:14px;color:var(--text3);margin-top:1px}.item .h{font-size:14px;color:var(--text2);white-space:nowrap}.cline{display:grid;grid-template-columns:14px minmax(0,1fr);column-gap:8px;align-items:baseline;font-size:14px;color:var(--text2);padding:10px 0 0}.cline .dot{transform:translateY(-1px)}/* homes */.home{display:grid;grid-template-columns:minmax(0,1fr) repeat(3,3.4em);grid-template-areas:"n a b c" "s s s s";column-gap:6px;padding:10px 0;border-bottom:1px solid var(--line);align-items:baseline}.home.head{padding:0 0 6px;font-size:12px;color:var(--text3);line-height:1.25;align-items:end}.home .n{grid-area:n;display:flex;align-items:center;gap:9px;font-weight:550}.home .s{grid-area:s;font-size:14px;color:var(--text2);padding-left:16px;margin-top:1px}.home .f{text-align:right}.home .fa{grid-area:a}.home .fb{grid-area:b}.home .fc{grid-area:c}.home.head .s{display:none}.z{color:var(--text3)}/* lane split */.split{display:flex;height:10px;gap:2px;margin:2px 0 12px}.split i{display:block;height:100%;background:var(--bar)}.split i.l2{opacity:.6}.split i.l3{opacity:.35}.split i.wb{background:var(--warnbar)}.lane{display:grid;grid-template-columns:12px minmax(0,1fr) 2.4em;column-gap:8px;padding:8px 0;border-bottom:1px solid var(--line);align-items:baseline}.lane .sw2{width:9px;height:9px;border-radius:2px;background:var(--bar);transform:translateY(0)}.lane .sw2.l2{opacity:.6}.lane .sw2.l3{opacity:.35}.lane .sw2.wb{background:var(--warnbar)}.lane .c{text-align:right;font-weight:600}.lane .w{grid-column:2/4;font-size:14px;color:var(--text3)}.lane.tot{border-bottom:0;border-top:1px solid var(--line2);margin-top:-1px}.lane.tot .k{font-weight:600}.split i.ol,.sw2.ol{background:none;box-shadow:inset 0 0 0 1.5px var(--text3)}/* grouped lists: switch, collapsible groups, visible sum */.gsw{display:flex;align-items:center;gap:10px;margin:18px 0 0;font-size:12px;color:var(--text3)}.seg{display:inline-flex;gap:2px;padding:2px;border:1px solid var(--line2);border-radius:8px}.seg a{padding:4px 11px;border-radius:6px;color:var(--text2);white-space:nowrap;line-height:1.4}.seg a:hover{text-decoration:none;color:var(--text)}.seg a[aria-current]{background:var(--track);color:var(--text);font-weight:600}.gl{border-top:1px solid var(--line)}details.g{border-bottom:1px solid var(--line)}details.g>summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:16px minmax(0,1fr) auto;grid-template-areas:"cv gn gc" ". gs gs";column-gap:8px;align-items:baseline;padding:10px 0}details.g>summary::-webkit-details-marker{display:none}.cv{grid-area:cv;align-self:start;height:24px;display:flex;align-items:center}.cv::before{content:"";width:6px;height:6px;border-right:1.5px solid var(--text3);border-bottom:1.5px solid var(--text3);transform:translate(2px,-2px) rotate(45deg)}details.g:not([open]) .cv::before{transform:translate(0,0) rotate(-45deg)}details.g[open] .gs.cl{display:none}.gn{grid-area:gn;font-weight:600}.gn .sw2{display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--bar);margin-right:9px;vertical-align:0}.gn .sw2.l3{opacity:.35}.gn .sw2.wb{background:var(--warnbar)}.gn .sw2.ol{background:none}.gn .sw2.no{visibility:hidden}.gc{grid-area:gc;font-weight:600;text-align:right}.gs{grid-area:gs;font-size:14px;color:var(--text3)}.gb{padding:0 0 10px 24px;font-size:14px}.gr{display:grid;grid-template-columns:6.5em minmax(0,1fr) 2.4em;column-gap:12px;align-items:baseline;padding:3px 0}.gr .n{color:var(--text)}.gr .w{color:var(--text3)}.gr .c{grid-column:3;text-align:right;color:var(--text2)}.gr.st .n{grid-column:1/3}.gr .sw2{display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--bar);margin-right:9px}.gr .sw2.l3{opacity:.35}.gr .sw2.wb{background:var(--warnbar)}.gr .sw2.ol{background:none}.gr.dv{grid-template-columns:minmax(0,1fr)}.homes.nl .home{grid-template-columns:minmax(0,1fr) repeat(2,3.4em);grid-template-areas:"n b c" "s s s"}.gtot{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:10px 0 0;border-top:1px solid var(--line2);margin-top:-1px}.gtot .k{font-weight:600}.gtot .sum{font-size:14px;color:var(--text3);white-space:nowrap}.gtot .sum b{font-size:16px;color:var(--text);font-weight:600;margin-left:3px}.ks{display:block;font-size:12px;color:var(--text3);line-height:1.3}.kv .k.span{grid-column:1/3;padding:4px 0}/* tables */table{width:100%;border-collapse:collapse}th{font-size:12px;font-weight:500;color:var(--text3);text-align:right;padding:0 0 6px 8px;vertical-align:bottom;line-height:1.25}th:first-child,td:first-child{text-align:left;padding-left:0}td{text-align:right;padding:9px 0 9px 8px;border-top:1px solid var(--line)}tbody tr:last-child td{border-bottom:1px solid var(--line)}tfoot td{font-weight:600;border-top:1px solid var(--line2);border-bottom:0}td.l,th.l{text-align:left}td .bf,th.bfc,td.bfc{display:none}.tt td{vertical-align:top}.tt td:first-child{color:var(--text)}.tt td.l{color:var(--text2);font-size:14px}.tt th.l{width:46%}/* totals equation */.eq{display:flex;flex-wrap:wrap;align-items:flex-end;gap:6px 14px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:12px 0}.eq div span{display:block;font-size:12px;color:var(--text3)}.eq div b{display:block;font-size:20px;font-weight:600;letter-spacing:-.015em;line-height:1.3}.eq .op{font-size:20px;color:var(--text3);line-height:1.3}.eq small{font-size:14px;font-weight:400;color:var(--text2)}/* charts */.chart svg{display:block;width:100%;height:120px}.cols{display:grid;text-align:center;font-size:12px;color:var(--text3);border-top:1px solid var(--line2);padding-top:6px}.cols b{display:block;font-size:14px;font-weight:600;color:var(--text)}.cols i{font-style:normal}.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:14px;color:var(--text2);margin:0 0 10px}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}.sw.f{background:var(--bar)}.sw.o{box-shadow:inset 0 0 0 1.5px var(--text2)}.note{font-size:14px;color:var(--text3);margin:10px 0 0;max-width:62ch}.unk{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);color:var(--text2)}.unk b{font-weight:500;color:var(--text3)}/* feed */.feed .item{grid-template-columns:3.4em minmax(0,1fr) auto}.feed.nt .item{grid-template-columns:minmax(0,1fr) auto}.feed.nt .item .w{grid-column:1/3}.feed .tm{font-size:14px;color:var(--text3)}/* quota */.acct{padding:14px 0 16px;border-bottom:1px solid var(--line)}.acct:first-child{border-top:1px solid var(--line)}.acct-h{display:flex;justify-content:space-between;align-items:baseline;gap:4px 12px;flex-wrap:wrap}.acct-h b{font-weight:600}.acct-h .r{font-size:14px;font-weight:500}.acct-meta{font-size:14px;color:var(--text3);margin-top:1px}.win{display:grid;grid-template-columns:minmax(0,1fr) 3.2em;grid-template-areas:"l p" "b b" "x x";column-gap:10px;margin-top:12px}.win .l{grid-area:l;font-size:14px;color:var(--text2)}.win .p{grid-area:p;text-align:right;font-weight:600}.win svg{grid-area:b;display:block;width:100%;height:12px;margin:4px 0 2px;overflow:visible}.win .x{grid-area:x;font-size:12px;color:var(--text3)}.meter .tr{fill:var(--track)}.meter .fi{fill:var(--bar)}.meter .fi.w{fill:var(--warnbar)}.meter .fi.m{fill:var(--text3);opacity:.55}.meter .tk{stroke:var(--tick);stroke-width:1.5}.users{font-size:14px;color:var(--text3);margin-top:12px}.users b{font-weight:500;color:var(--text2)}.two table{margin-top:22px}.grp{font-size:12px;color:var(--text3);font-weight:500;margin:16px 0 4px}.grp:first-of-type{margin-top:0}footer{margin-top:40px;padding-top:14px;border-top:1px solid var(--line);font-size:14px;color:var(--text3);line-height:1.6}footer p{margin:0 0 4px}footer a{color:var(--text2);text-decoration:underline;text-decoration-color:var(--line2);text-underline-offset:3px}@media (min-width:600px){ .shell{padding:0 32px 48px} .nav{gap:22px} main{padding-top:24px} h1{font-size:36px} .sections{gap:36px;margin-top:28px} .stack{gap:36px} .kv{grid-template-columns:minmax(0,1fr) 72px 2.8em 13em;column-gap:16px;min-height:44px} .spark{width:72px;height:22px} .wo{display:inline}.wonly{display:block} .item .w{grid-column:2/3} .feed.nt .item .w{grid-column:1/2} .home{grid-template-columns:9em minmax(0,1fr) repeat(3,4.6em);grid-template-areas:"n s a b c";column-gap:12px} .home .s{padding-left:0;margin-top:0} .home.head .s{display:block;visibility:hidden} td .bf{display:block;margin:0 auto} th.bfc,td.bfc{display:table-cell;width:42%} th.bfc{text-align:center} .chart svg{height:140px} details.g>summary{grid-template-columns:16px auto minmax(0,1fr) auto;grid-template-areas:"cv gn gs gc";column-gap:10px} .homes.nl .home{grid-template-columns:9em minmax(0,1fr) repeat(2,4.6em);grid-template-areas:"n s b c"}}@media (max-width:1099px){ .ov>.stack{display:contents} .a-out{order:1}.a-slow{order:2}.a-lanes{order:3}.a-homes{order:4}.a-dev{order:5}}@media (min-width:1100px){ .shell{max-width:1360px;display:grid;grid-template-columns:184px minmax(0,1fr);column-gap:72px;padding:0 56px 64px} .side{position:sticky;top:0;align-self:start;padding-top:40px;height:100vh} .brand{display:block} .nav{flex-direction:column;align-items:flex-start;gap:2px;border:0;margin-top:28px;overflow:visible} .nav a{padding:6px 10px;margin:0 0 0 -10px;border:0;border-radius:6px} .nav a[aria-current]{background:var(--track);border:0} .side-foot{display:block;position:absolute;bottom:40px;font-size:12px;color:var(--text3);line-height:1.6;max-width:184px} .side-foot a{color:var(--text2);text-decoration:underline;text-decoration-color:var(--line2);text-underline-offset:3px} main{padding-top:40px;max-width:1100px} .hero .meta{display:none} .sections{grid-template-columns:repeat(2,minmax(0,1fr));gap:52px 72px;margin-top:44px} .sections .wide{grid-column:1/-1} .stack{gap:52px} .accts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:72px} .acct:nth-child(2){border-top:1px solid var(--line)} .two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:72px;align-items:start} .two table{margin-top:0!important} .kv{grid-template-columns:minmax(0,1fr) 64px 2.8em 10.5em} .home{grid-template-columns:9em minmax(0,30em) repeat(3,minmax(4.6em,1fr))} .homes.nl .home{grid-template-columns:9em minmax(0,30em) repeat(2,minmax(4.6em,1fr))}}/* phase 2: grafts and live-only pieces */.unkv{color:var(--text3);font-weight:400;font-size:14px}.trust{margin-top:0}.trust a{color:var(--text2)}.trust a.warn{color:var(--warn)}.strip{display:flex;height:12px;gap:2px;margin:2px 0 8px}.strip i{flex:1;border-radius:2px;background:var(--bar)}.strip i.st{background:var(--warnbar)}.strip i.fr{background:none;box-shadow:inset 0 0 0 1.5px var(--line2)}.sw.mv{background:var(--bar)}.sw.st{background:var(--warnbar)}.sw.fr{box-shadow:inset 0 0 0 1.5px var(--line2)}.gr .n{min-width:0;overflow:hidden;text-overflow:ellipsis}.gb .gr{grid-template-columns:minmax(0,1fr) auto 2.4em}.gb .gr .w{font-size:13px;text-align:right}@media (max-width:599px){.gb .gr{grid-template-columns:minmax(0,1fr) 2.4em}.gb .gr .w{grid-column:1/-1;grid-row:2;text-align:left}}.iol{border-top:1px solid var(--line)}.iob{display:grid;grid-template-columns:6em minmax(0,1fr);grid-template-areas:"lab bars" ". nums";column-gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}.iob .lab{grid-area:lab;color:var(--text2)}.iob .bars{grid-area:bars;display:grid;gap:4px;align-content:center}.iob .nums{grid-area:nums;font-size:13px;color:var(--text3)}.io{display:block;height:9px;border-radius:2px;min-width:0}.io.out{background:var(--bar)}.io.in{box-shadow:inset 0 0 0 1.5px var(--text2)}.iol+.legend{margin-top:10px}.ro{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:12px;padding:10px 0;border-bottom:1px solid var(--line);align-items:baseline}.ro>b{font-size:20px;font-weight:600;letter-spacing:-.015em}.ro .rn{font-size:14px;color:var(--text2)}.ro .rn b{color:var(--text)}.ro .bar,.mm .bar{grid-column:1/-1;display:block;height:6px;background:var(--track);border-radius:3px;margin:6px 0 3px;overflow:hidden}.ro .bar i,.mm .bar i{display:block;height:100%;background:var(--bar)}.ro .bar i.w,.mm .bar i.warn{background:var(--warnbar)}.mm .bar i.bad{background:var(--bad)}.ro small,.mm small{grid-column:1/-1;font-size:12px;color:var(--text3)}.mach{margin-top:18px}.mm{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:12px;padding:8px 0;border-bottom:1px solid var(--line);align-items:baseline}.mm:first-child{border-top:1px solid var(--line)}.mm>span{color:var(--text2)}.mm>b{font-weight:600}.mm>b small{font-size:12px;font-weight:400;color:var(--text3);grid-column:auto}.xl{display:none}.sm{font-size:13px}@media (min-width:1100px){.xl{display:block}.trust{margin-top:6px}}.gb .gr.st{display:block;padding:5px 0}.gb .gr.st .n{display:block;white-space:normal}.gb .gr.st .w{display:block;text-align:left;grid-column:auto}.kv .ks{white-space:normal}.kv .k.wide{grid-column:1/3}.kv .dw{display:block;white-space:normal;line-height:1.3}.item.feed{grid-template-columns:4.2em minmax(0,1fr) auto}.item.feed .tm{white-space:nowrap}.item.feed .w{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.item.feed .tm{font-size:14px;color:var(--text3)}'
+CSS = ':root{color-scheme:light dark;--bg:#fbf6ef;--card:#ffffff;--text:#231b14;--text2:#5d5045;--text3:#857768;--line:rgba(90,55,20,.11);--line2:rgba(90,55,20,.22);--bar:#4a3f36;--track:rgba(90,55,20,.09);--tick:#231b14;--acc:#ec5a24;--in:#1c8c9c;--vio:#7a5ae6;--ok:#22924e;--okbar:#2fae62;--warn:#a76800;--warnbar:#eba51c;--bad:#d42f5a}@media (prefers-color-scheme:dark){:root{--bg:#16120e;--card:#211b16;--text:#f5eee6;--text2:#d2c6b8;--text3:#a09385;--line:rgba(255,230,200,.09);--line2:rgba(255,230,200,.18);--bar:#d8ccbf;--track:rgba(255,230,200,.09);--tick:#f5eee6;--acc:#ff8352;--in:#4fc3d2;--vio:#a88dff;--ok:#4fd18b;--okbar:#43c47e;--warn:#f7bc45;--warnbar:#f0ab2a;--bad:#ff6b8f}}*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}a{color:inherit;text-decoration:none}a:hover{text-decoration:underline;text-decoration-color:var(--line2);text-underline-offset:3px}.shell{max-width:780px;margin:0 auto;padding:0 16px 40px}/* nav */.brand{display:none}.brand b{font-size:16px;font-weight:600;letter-spacing:-.01em}.stamp{display:block;font-size:12px;color:var(--text3);margin-top:2px}.nav{display:flex;gap:16px;align-items:center;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}.nav a{font-size:14px;color:var(--text2);padding:12px 0 11px;border-bottom:1.5px solid transparent;margin-bottom:-1px;white-space:nowrap}.nav a:hover{text-decoration:none;color:var(--text)}.nav a[aria-current]{color:var(--text);border-bottom-color:var(--text);font-weight:500}.side-foot{display:none}main{padding-top:14px}/* type: 12 meta, 14 small, 16 body, 20 answers, 28/36 verdicts */.label{font-size:12px;color:var(--text3);margin:0;font-weight:500}.sh{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin:0 0 4px}.sh a{font-size:12px;color:var(--text2);white-space:nowrap}h1{text-wrap:balance;font-size:28px;line-height:1.15;letter-spacing:-.022em;font-weight:650;margin:0;max-width:24ch}.lede{text-wrap:pretty;font-size:16px;color:var(--text2);margin:8px 0 0;max-width:56ch}.lede a,.inl{color:var(--text);text-decoration:underline;text-decoration-color:var(--line2);text-underline-offset:3px}h2{font-size:20px;line-height:1.3;letter-spacing:-.014em;font-weight:600;margin:0 0 10px;text-wrap:balance}.meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;margin-bottom:8px;font-size:12px;color:var(--text3)}.state{display:inline-flex;align-items:center;gap:7px;font-size:14px;font-weight:500}.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}.mut{color:var(--text3)}.sub{color:var(--text2)}a.warn{text-decoration:underline;text-decoration-color:currentColor;text-underline-offset:3px;text-decoration-thickness:1px}.dot{width:7px;height:7px;border-radius:50%;background:currentColor;flex:none;display:inline-block}.dot.idle{background:none;box-shadow:inset 0 0 0 1.5px var(--text3)}.dot.warn{background:var(--warnbar)}.dot.ok{background:var(--ok)}.sections{display:grid;gap:26px;margin-top:20px}.stack{display:grid;gap:28px;align-content:start;min-width:0}section{min-width:0}.more{display:inline-block;margin-top:10px;font-size:14px;color:var(--text2)}/* key-value rows */.rows{border-top:1px solid var(--line)}.kv{display:grid;grid-template-columns:minmax(0,1fr) 48px 2.6em 6.6em;align-items:center;column-gap:10px;min-height:40px;border-bottom:1px solid var(--line)}.kv .k{color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.kv .v{text-align:right;font-weight:600;white-space:nowrap;letter-spacing:-.01em}.kv .d{font-size:12px;color:var(--text3);white-space:nowrap}.kv .d.warn{color:var(--warn)}.ge{font-weight:400;color:var(--text3);margin-right:1px}.spark{display:block;width:48px;height:18px;color:var(--text3)}.wo,.wonly{display:none}.nw{white-space:nowrap}/* items: what / where / why */.item{display:grid;grid-template-columns:14px minmax(0,1fr) auto;column-gap:8px;padding:8px 0;border-bottom:1px solid var(--line);align-items:baseline}.item .dot{transform:translateY(-1px)}.item .t{font-weight:500}.item .w{grid-column:2/4;font-size:14px;color:var(--text3);margin-top:1px}.item .h{font-size:14px;color:var(--text2);white-space:nowrap}.cline{display:grid;grid-template-columns:14px minmax(0,1fr);column-gap:8px;align-items:baseline;font-size:14px;color:var(--text2);padding:10px 0 0}.cline .dot{transform:translateY(-1px)}/* homes */.home{display:grid;grid-template-columns:minmax(0,1fr) repeat(3,3.4em);grid-template-areas:"n a b c" "s s s s";column-gap:6px;padding:10px 0;border-bottom:1px solid var(--line);align-items:baseline}.home.head{padding:0 0 6px;font-size:12px;color:var(--text3);line-height:1.25;align-items:end}.home .n{grid-area:n;display:flex;align-items:center;gap:9px;font-weight:550}.home .s{grid-area:s;font-size:14px;color:var(--text2);padding-left:16px;margin-top:1px}.home .f{text-align:right}.home .fa{grid-area:a}.home .fb{grid-area:b}.home .fc{grid-area:c}.home.head .s{display:none}.z{color:var(--text3)}/* lane split */.split{display:flex;height:10px;gap:2px;margin:2px 0 12px}.split i{display:block;height:100%;background:var(--bar)}.split i.l2{opacity:.6}.split i.l3{opacity:.35}.split i.wb{background:var(--warnbar)}.lane{display:grid;grid-template-columns:12px minmax(0,1fr) 2.4em;column-gap:8px;padding:8px 0;border-bottom:1px solid var(--line);align-items:baseline}.lane .sw2{width:9px;height:9px;border-radius:2px;background:var(--bar);transform:translateY(0)}.lane .sw2.l2{opacity:.6}.lane .sw2.l3{opacity:.35}.lane .sw2.wb{background:var(--warnbar)}.lane .c{text-align:right;font-weight:600}.lane .w{grid-column:2/4;font-size:14px;color:var(--text3)}.lane.tot{border-bottom:0;border-top:1px solid var(--line2);margin-top:-1px}.lane.tot .k{font-weight:600}.split i.ol,.sw2.ol{background:none;box-shadow:inset 0 0 0 1.5px var(--text3)}/* grouped lists: switch, collapsible groups, visible sum */.gsw{display:flex;align-items:center;gap:10px;margin:18px 0 0;font-size:12px;color:var(--text3)}.seg{display:inline-flex;gap:2px;padding:2px;border:1px solid var(--line2);border-radius:8px}.seg a{padding:4px 11px;border-radius:6px;color:var(--text2);white-space:nowrap;line-height:1.4}.seg a:hover{text-decoration:none;color:var(--text)}.seg a[aria-current]{background:var(--track);color:var(--text);font-weight:600}.gl{border-top:1px solid var(--line)}details.g{border-bottom:1px solid var(--line)}details.g>summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:16px minmax(0,1fr) auto;grid-template-areas:"cv gn gc" ". gs gs";column-gap:8px;align-items:baseline;padding:10px 0}details.g>summary::-webkit-details-marker{display:none}.cv{grid-area:cv;align-self:start;height:24px;display:flex;align-items:center}.cv::before{content:"";width:6px;height:6px;border-right:1.5px solid var(--text3);border-bottom:1.5px solid var(--text3);transform:translate(2px,-2px) rotate(45deg)}details.g:not([open]) .cv::before{transform:translate(0,0) rotate(-45deg)}details.g[open] .gs.cl{display:none}.gn{grid-area:gn;font-weight:600}.gn .sw2{display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--bar);margin-right:9px;vertical-align:0}.gn .sw2.l3{opacity:.35}.gn .sw2.wb{background:var(--warnbar)}.gn .sw2.ol{background:none}.gn .sw2.no{visibility:hidden}.gc{grid-area:gc;font-weight:600;text-align:right}.gs{grid-area:gs;font-size:14px;color:var(--text3)}.gb{padding:0 0 10px 24px;font-size:14px}.gr{display:grid;grid-template-columns:6.5em minmax(0,1fr) 2.4em;column-gap:12px;align-items:baseline;padding:3px 0}.gr .n{color:var(--text)}.gr .w{color:var(--text3)}.gr .c{grid-column:3;text-align:right;color:var(--text2)}.gr.st .n{grid-column:1/3}.gr .sw2{display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--bar);margin-right:9px}.gr .sw2.l3{opacity:.35}.gr .sw2.wb{background:var(--warnbar)}.gr .sw2.ol{background:none}.gr.dv{grid-template-columns:minmax(0,1fr)}.homes.nl .home{grid-template-columns:minmax(0,1fr) repeat(2,3.4em);grid-template-areas:"n b c" "s s s"}.gtot{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:10px 0 0;border-top:1px solid var(--line2);margin-top:-1px}.gtot .k{font-weight:600}.gtot .sum{font-size:14px;color:var(--text3);white-space:nowrap}.gtot .sum b{font-size:16px;color:var(--text);font-weight:600;margin-left:3px}.ks{display:block;font-size:12px;color:var(--text3);line-height:1.3}.kv .k.span{grid-column:1/3;padding:4px 0}/* tables */table{width:100%;border-collapse:collapse}th{font-size:12px;font-weight:500;color:var(--text3);text-align:right;padding:0 0 6px 8px;vertical-align:bottom;line-height:1.25}th:first-child,td:first-child{text-align:left;padding-left:0}td{text-align:right;padding:9px 0 9px 8px;border-top:1px solid var(--line)}tbody tr:last-child td{border-bottom:1px solid var(--line)}tfoot td{font-weight:600;border-top:1px solid var(--line2);border-bottom:0}td.l,th.l{text-align:left}td .bf,th.bfc,td.bfc{display:none}.tt td{vertical-align:top}.tt td:first-child{color:var(--text)}.tt td.l{color:var(--text2);font-size:14px}.tt th.l{width:46%}/* totals equation */.eq{display:flex;flex-wrap:wrap;align-items:flex-end;gap:6px 14px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:12px 0}.eq div span{display:block;font-size:12px;color:var(--text3)}.eq div b{display:block;font-size:20px;font-weight:600;letter-spacing:-.015em;line-height:1.3}.eq .op{font-size:20px;color:var(--text3);line-height:1.3}.eq small{font-size:14px;font-weight:400;color:var(--text2)}/* charts */.chart svg{display:block;width:100%;height:120px}.cols{display:grid;text-align:center;font-size:12px;color:var(--text3);border-top:1px solid var(--line2);padding-top:6px}.cols b{display:block;font-size:14px;font-weight:600;color:var(--text)}.cols i{font-style:normal}.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:14px;color:var(--text2);margin:0 0 10px}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}.sw.f{background:var(--bar)}.sw.o{box-shadow:inset 0 0 0 1.5px var(--text2)}.note{font-size:14px;color:var(--text3);margin:10px 0 0;max-width:62ch}.unk{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);color:var(--text2)}.unk b{font-weight:500;color:var(--text3)}/* feed */.feed .item{grid-template-columns:3.4em minmax(0,1fr) auto}.feed.nt .item{grid-template-columns:minmax(0,1fr) auto}.feed.nt .item .w{grid-column:1/3}.feed .tm{font-size:14px;color:var(--text3)}/* quota */.acct{padding:14px 0 16px;border-bottom:1px solid var(--line)}.acct:first-child{border-top:1px solid var(--line)}.acct-h{display:flex;justify-content:space-between;align-items:baseline;gap:4px 12px;flex-wrap:wrap}.acct-h b{font-weight:600}.acct-h .r{font-size:14px;font-weight:500}.acct-meta{font-size:14px;color:var(--text3);margin-top:1px}.win{display:grid;grid-template-columns:minmax(0,1fr) 3.2em;grid-template-areas:"l p" "b b" "x x";column-gap:10px;margin-top:12px}.win .l{grid-area:l;font-size:14px;color:var(--text2)}.win .p{grid-area:p;text-align:right;font-weight:600}.win svg{grid-area:b;display:block;width:100%;height:12px;margin:4px 0 2px;overflow:visible}.win .x{grid-area:x;font-size:12px;color:var(--text3)}.meter .tr{fill:var(--track)}.meter .fi{fill:var(--bar)}.meter .fi.w{fill:var(--warnbar)}.meter .fi.m{fill:var(--text3);opacity:.55}.meter .tk{stroke:var(--tick);stroke-width:1.5}.users{font-size:14px;color:var(--text3);margin-top:12px}.users b{font-weight:500;color:var(--text2)}.two table{margin-top:22px}.grp{font-size:12px;color:var(--text3);font-weight:500;margin:16px 0 4px}.grp:first-of-type{margin-top:0}footer{margin-top:40px;padding-top:14px;border-top:1px solid var(--line);font-size:14px;color:var(--text3);line-height:1.6}footer p{margin:0 0 4px}footer a{color:var(--text2);text-decoration:underline;text-decoration-color:var(--line2);text-underline-offset:3px}@media (min-width:600px){ .shell{padding:0 32px 48px} .nav{gap:22px} main{padding-top:24px} h1{font-size:36px} .sections{gap:36px;margin-top:28px} .stack{gap:36px} .kv{grid-template-columns:minmax(0,1fr) 72px 2.8em 13em;column-gap:16px;min-height:44px} .spark{width:72px;height:22px} .wo{display:inline}.wonly{display:block} .item .w{grid-column:2/3} .feed.nt .item .w{grid-column:1/2} .home{grid-template-columns:9em minmax(0,1fr) repeat(3,4.6em);grid-template-areas:"n s a b c";column-gap:12px} .home .s{padding-left:0;margin-top:0} .home.head .s{display:block;visibility:hidden} td .bf{display:block;margin:0 auto} th.bfc,td.bfc{display:table-cell;width:42%} th.bfc{text-align:center} .chart svg{height:140px} details.g>summary{grid-template-columns:16px auto minmax(0,1fr) auto;grid-template-areas:"cv gn gs gc";column-gap:10px} .homes.nl .home{grid-template-columns:9em minmax(0,1fr) repeat(2,4.6em);grid-template-areas:"n s b c"}}@media (max-width:1099px){ .ov>.stack{display:contents} .a-out{order:1}.a-slow{order:2}.a-lanes{order:3}.a-homes{order:4}.a-dev{order:5}}@media (min-width:1100px){ .shell{max-width:1360px;display:grid;grid-template-columns:184px minmax(0,1fr);column-gap:72px;padding:0 56px 64px} .side{position:sticky;top:0;align-self:start;padding-top:40px;height:100vh} .brand{display:block} .nav{flex-direction:column;align-items:flex-start;gap:2px;border:0;margin-top:28px;overflow:visible} .nav a{padding:6px 10px;margin:0 0 0 -10px;border:0;border-radius:6px} .nav a[aria-current]{background:var(--track);border:0} .side-foot{display:block;position:absolute;bottom:40px;font-size:12px;color:var(--text3);line-height:1.6;max-width:184px} .side-foot a{color:var(--text2);text-decoration:underline;text-decoration-color:var(--line2);text-underline-offset:3px} main{padding-top:40px;max-width:1100px} .hero .meta{display:none} .sections{grid-template-columns:repeat(2,minmax(0,1fr));gap:52px 72px;margin-top:44px} .sections .wide{grid-column:1/-1} .stack{gap:52px} .accts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:72px} .acct:nth-child(2){border-top:1px solid var(--line)} .two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:72px;align-items:start} .two table{margin-top:0!important} .kv{grid-template-columns:minmax(0,1fr) 64px 2.8em 10.5em} .home{grid-template-columns:9em minmax(0,30em) repeat(3,minmax(4.6em,1fr))} .homes.nl .home{grid-template-columns:9em minmax(0,30em) repeat(2,minmax(4.6em,1fr))}}/* phase 2: grafts and live-only pieces */.unkv{color:var(--text3);font-weight:400;font-size:14px}.trust{margin-top:0}.trust a{color:var(--text2)}.trust a.warn{color:var(--warn)}.strip{display:flex;height:12px;gap:2px;margin:2px 0 8px}.strip i{flex:1;border-radius:2px;background:var(--bar)}.strip i.st{background:var(--warnbar)}.strip i.fr{background:none;box-shadow:inset 0 0 0 1.5px var(--line2)}.sw.mv{background:var(--bar)}.sw.st{background:var(--warnbar)}.sw.fr{box-shadow:inset 0 0 0 1.5px var(--line2)}.gr .n{min-width:0;overflow:hidden;text-overflow:ellipsis}.gb .gr{grid-template-columns:minmax(0,1fr) auto 2.4em}.gb .gr .w{font-size:13px;text-align:right}@media (max-width:599px){.gb .gr{grid-template-columns:minmax(0,1fr) 2.4em}.gb .gr .w{grid-column:1/-1;grid-row:2;text-align:left}}.iol{border-top:1px solid var(--line)}.iob{display:grid;grid-template-columns:6em minmax(0,1fr);grid-template-areas:"lab bars" ". nums";column-gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}.iob .lab{grid-area:lab;color:var(--text2)}.iob .bars{grid-area:bars;display:grid;gap:4px;align-content:center}.iob .nums{grid-area:nums;font-size:13px;color:var(--text3)}.io{display:block;height:9px;border-radius:2px;min-width:0}.io.out{background:var(--bar)}.io.in{box-shadow:inset 0 0 0 1.5px var(--text2)}.iol+.legend{margin-top:10px}.ro{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:12px;padding:10px 0;border-bottom:1px solid var(--line);align-items:baseline}.ro>b{font-size:20px;font-weight:600;letter-spacing:-.015em}.ro .rn{font-size:14px;color:var(--text2)}.ro .rn b{color:var(--text)}.ro .bar,.mm .bar{grid-column:1/-1;display:block;height:6px;background:var(--track);border-radius:3px;margin:6px 0 3px;overflow:hidden}.ro .bar i,.mm .bar i{display:block;height:100%;background:var(--bar)}.ro .bar i.w,.mm .bar i.warn{background:var(--warnbar)}.mm .bar i.bad{background:var(--bad)}.ro small,.mm small{grid-column:1/-1;font-size:12px;color:var(--text3)}.mach{margin-top:18px}.mm{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:12px;padding:8px 0;border-bottom:1px solid var(--line);align-items:baseline}.mm:first-child{border-top:1px solid var(--line)}.mm>span{color:var(--text2)}.mm>b{font-weight:600}.mm>b small{font-size:12px;font-weight:400;color:var(--text3);grid-column:auto}.xl{display:none}.sm{font-size:13px}@media (min-width:1100px){.xl{display:block}.trust{margin-top:6px}}.gb .gr.st{display:block;padding:5px 0}.gb .gr.st .n{display:block;white-space:normal}.gb .gr.st .w{display:block;text-align:left;grid-column:auto}.kv .ks{white-space:normal}.kv .k.wide{grid-column:1/3}.kv .dw{display:block;white-space:normal;line-height:1.3}.item.feed{grid-template-columns:4.2em minmax(0,1fr) auto}.item.feed .tm{white-space:nowrap}.item.feed .w{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.item.feed .tm{font-size:14px;color:var(--text3)}/* visual-first: cards, tiles and charts */.c-ok{--c:var(--okbar)}.c-warn{--c:var(--warnbar)}.c-bad{--c:var(--bad)}.c-in{--c:var(--in)}.c-out{--c:var(--acc)}.c-vio{--c:var(--vio)}.c-mut{--c:var(--text3)}.hero.ov h1{display:flex;align-items:center;gap:12px;max-width:none}.hd{width:14px;height:14px;border-radius:50%;background:var(--c);flex:none;box-shadow:0 0 0 5px color-mix(in srgb,var(--c) 22%,transparent)}.tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:18px}.tile{display:flex;flex-direction:column;min-width:0;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 12px 10px;color:inherit;position:relative;overflow:hidden}.tile:hover{text-decoration:none;border-color:var(--line2)}.tile.t-warn{box-shadow:inset 0 3px 0 var(--warnbar)}.tile.t-bad{box-shadow:inset 0 3px 0 var(--bad)}.tl{font-size:12px;font-weight:600;color:var(--text2);letter-spacing:.01em}.tv{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 8px;font-size:30px;font-weight:700;letter-spacing:-.03em;line-height:1.15;margin:2px 0 4px}.tv small{font-size:14px;font-weight:500;color:var(--text3);letter-spacing:0}.tv .unkv{font-size:13px;letter-spacing:0}.okv{color:var(--ok)}.dl{font-size:12px;font-weight:600;letter-spacing:0;padding:1px 7px;border-radius:999px;background:var(--track);color:var(--text2);white-space:nowrap}.dl.up{color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,transparent)}.dl.down{color:var(--warn);background:color-mix(in srgb,var(--warnbar) 16%,transparent)}.ta{font-size:11px;color:var(--text3);margin-top:auto;padding-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tsp{display:block;width:100%;height:34px}.tsp .ln{fill:none;stroke-width:2;stroke-linejoin:round}.tsp .ar{stroke:none;opacity:.16}.tsp.out .ln{stroke:var(--acc)}.tsp.out .ar{fill:var(--acc)}.tsp.in .ln{stroke:var(--in)}.tsp.in .ar{fill:var(--in)}.hit{fill:transparent}.donut{width:84px;height:84px;display:block;margin:2px 0}.donut,.gauge{letter-spacing:0}.donut circle{fill:none;stroke-width:4.2;stroke:var(--c)}.donut .tr{stroke:var(--track)}.donut .dc,.gauge .dc{font-size:9px;font-weight:700;fill:var(--text);text-anchor:middle;letter-spacing:-.3px}.donut .ds,.gauge .ds{font-size:4.2px;font-weight:500;letter-spacing:0;fill:var(--text3);text-anchor:middle}.tv:has(.donut),.tv:has(.gauge){margin:0}.gauge{width:110px;height:64px;display:block}.gauge path{fill:none;stroke-width:4.6;stroke-linecap:round;stroke:var(--c)}.gauge .tr{stroke:var(--track)}.gauge .dc{font-size:10px}.mini{display:flex;flex-wrap:wrap;gap:2px 10px;font-size:12px;color:var(--text2)}.mini span{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}.mini i.free{background:none;box-shadow:inset 0 0 0 1.5px var(--line2)}.mini i,.lg i{width:8px;height:8px;border-radius:2px;background:var(--c);display:inline-block;flex:none}.sb{display:flex;gap:2px;height:10px;border-radius:5px;overflow:hidden;margin:4px 0}.sb.big{height:14px;margin:8px 0 6px}.sb i{display:block;min-width:3px;background:var(--c)}.sb i.free,.lg i.free{background:none;box-shadow:inset 0 0 0 1.5px var(--line2)}.s-building{--c:var(--okbar)}.s-validating{--c:var(--in)}.s-finished{--c:var(--acc)}.s-waiting{--c:var(--text3)}.s-decision{--c:var(--warnbar)}.s-blocked{--c:var(--bad)}.k.out{--c:var(--acc)}.k.in{--c:var(--in)}.k.y{opacity:.55}.k.p50{--c:var(--acc)}.k.p85{--c:var(--vio)}.k.ok{--c:var(--okbar)}.k.bad{--c:var(--bad)}.k.mut{--c:var(--text3)}.lg{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--text2);margin:2px 0 8px}.lg span{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}.lg .k.y{opacity:1}.lg .k.y i,.lg i.k.y{opacity:.5}.cards{display:grid;gap:12px;margin-top:12px}.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 14px 12px;min-width:0}.ch{display:flex;justify-content:space-between;align-items:baseline;gap:10px}.ch h3{font-size:16px;font-weight:650;letter-spacing:-.01em;margin:0}.cm{font-size:12px;color:var(--text2);white-space:nowrap}.cw{font-size:11px;color:var(--text3);margin:0 0 10px}.cf{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:6px}.ya{display:flex;flex-direction:column;justify-content:space-between;height:var(--ch);font-size:11px;color:var(--text3);text-align:right;line-height:1;margin-top:-1px}.pl svg{display:block;width:100%;height:var(--ch);overflow:visible}.xa{display:grid;font-size:11px;color:var(--text3);margin-top:4px}.xa span{text-align:center;white-space:nowrap}.gl{stroke:var(--line);stroke-width:1}.ln{fill:none;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.ln.out{stroke:var(--acc)}.ln.in{stroke:var(--in)}.ln.y{stroke-width:1.6;stroke-dasharray:5 4;opacity:.7}.ln.p50{stroke:var(--acc)}.ln.p85{stroke:var(--vio);stroke-dasharray:6 4}.now{stroke:var(--text3);stroke-width:1;stroke-dasharray:2 3}.b.out{fill:var(--acc)}.b.in{fill:var(--in);opacity:.85}.b.in.fl{fill:none;stroke:var(--in);stroke-width:3}.hbs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 16px}.hb{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;color:inherit;padding:4px 0}.hb:hover{text-decoration:none}.hb .hn{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hb .hv{font-size:14px;font-weight:700}.hb .hv small{font-size:11px;color:var(--text3);font-weight:500}.hb .sb{grid-column:1/-1;height:8px;margin:3px 0 0}.qb{display:grid;grid-template-columns:6.5em minmax(0,1fr) auto;align-items:center;gap:10px;padding:5px 0}.qn{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.qt{position:relative;height:10px;border-radius:5px;background:var(--track)}.qt i{position:absolute;inset:0 auto 0 0;border-radius:5px;background:var(--c)}.qt b{position:absolute;top:-3px;bottom:-3px;width:2px;margin-left:-1px;background:var(--tick);opacity:.55;border-radius:1px}.qr{font-size:12px;white-space:nowrap;text-align:right;min-width:6.5em}.qr.warn{font-weight:600}.sps{display:grid}.sp{display:grid;grid-template-columns:4.8em minmax(0,1fr) 3.4em 4.6em;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--line);color:inherit}.sp:hover{text-decoration:none;background:var(--track)}.sp.sph{font-size:11px;color:var(--text3);border-top:0;padding-top:0}.sp.sph span:nth-child(n+3){text-align:right}.chip{font-size:11px;font-weight:700;text-align:center;padding:2px 0;border-radius:999px;color:var(--c);background:color-mix(in srgb,var(--c) 17%,transparent);white-space:nowrap}.sp .spw{font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sp .sn{font-size:15px;text-align:right}.sp .sa{font-size:12px;color:var(--text3);text-align:right;white-space:nowrap}.okn{color:var(--ok)}.card .gl,.card table{margin-top:4px}@media (min-width:600px){ .tiles{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px} .cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px} .cards .wide,.cards .wide-m{grid-column:1/-1} .hbs{grid-template-columns:repeat(3,minmax(0,1fr))}}@media (min-width:1100px){ .tiles{grid-template-columns:repeat(6,minmax(0,1fr))} .cards .wide-m{grid-column:auto} .cards .wide-l{grid-column:1/-1} .hbs{grid-template-columns:repeat(4,minmax(0,1fr))}}.xa.xp{position:relative;display:block;height:1.3em}.xa.xp span{position:absolute;transform:translateX(-50%)}.xa.xp span:first-child{transform:none}.xa.xp span:last-child{transform:translateX(-100%)}.mm .bar i.ok{background:var(--okbar)}@media (min-width:600px){.devm{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:28px;align-items:start}.devm .mach{margin-top:0}}.sections section{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 14px 12px}.sections .stack{gap:12px}.sections{gap:12px}.io.out{background:var(--acc)}.io.in{box-shadow:inset 0 0 0 1.5px var(--in)}.legend .sw.f{background:var(--acc)}.legend .sw.o{box-shadow:inset 0 0 0 1.5px var(--in);background:none}@media (min-width:600px){.sections,.sections .stack{gap:14px}}@media (min-width:1100px){.sections{gap:16px}.sections .stack{gap:16px}}'
 def page(name, title, body, foot=''):
     nav = ''.join(f'<a href="{u}"{" aria-current=page" if n == name else ""}>{t}</a>' for u, n, t in NAV)
     return f'''<!doctype html>
@@ -1204,58 +1407,25 @@ def busy_split():  # leads + Main + workers (+ other), always summing to the bus
 def index_body(group):
     n_asks = len(asks)
     h1 = 'Nothing needs you.' if asks_known and not asks else f'{plural(n_asks, "thing")} {"needs" if n_asks == 1 else "need"} you.' if asks_known else 'Ask list unknown.'
-    stuck_n = SPLIT['blocked'] + SPLIT['decision']
-    busy_total = sum(BUSY.values())
-    busy_sub = busy_split()
-    out_h2 = (f'{"–" if l_today is None else l_today} landed today; {f_today} {FILED_WORD}.')
-    spot_rows = ''.join(item(t, a, b, c, href=h) for t, a, b, c, h in spots) or '<p class="lede">No slow spots now.</p>'
-    flow_xl = (f'<section class="xl">{sh(f"Flow · today since 00:00 and last 7 days · landings {LANDED_SRC}", ("flow", "Flow"))}'
-               f'<h2>Filed vs landed</h2>{io_bars(False)}{week_chart()}</section>') if landings is not None else ''
+    tone = 'ok' if asks_known and not asks else 'warn' if asks_known else 'mut'
+    ld = LANDED_SRC if landings is not None else 'unknown'
     return f'''
-<div class="hero">
-{sh("Waiting on you · Main's ask list, now")}
-<h1>{h1}</h1>
+<div class="hero ov">
+<h1><span class="hd c-{tone}"></span>{h1}</h1>
 {ask_rows()}
-{switch(group)}
 </div>
-<div class="sections ov">
-<div class="stack">
-<section class="a-out">
-{sh(f"Output · today since 00:00 · landings {LANDED_SRC if landings is not None else 'unknown'}, filings and agents {BUILT}", ("flow", "Flow"))}
-<h2>{out_h2}</h2>
-<div class="rows">
-{kv("Landed so far", "–" if l_today is None else l_today, f"yesterday {'–' if l_yday is None else l_yday}", spark(week_l)) if landings is not None else kv("Landed so far", unknown(why_of("GitHub landings")))}
-{kv("Filed" if f_exact else "Filed, at least", filed_txt(TODAY), f"yesterday {filed_txt(YDAY)}", spark(week_f))}
-{kv("Busy agents", busy_total, '<span class="dw">of ' + str(len(agent_rows)) + ' running agents</span>', href="backlog#agents", sub=esc(busy_sub)) if agents is not None else kv("Busy agents", unknown(why_of("herdr")))}
-{kv("Lanes building", SPLIT["building"], f"of {OPEN} open", href="#lanes")}
-</div>
-</section>
-<section id="lanes" class="a-lanes">
-{sh(f"Lanes · now {BUILT} · plan from lane settings", ("backlog#lanes", "Every lane"))}
-<h2>{plural(OPEN, "lane")} open of a plan of {PLAN}; {stuck_n} blocked or waiting.</h2>
-{lanes_list(group)}
-{PARKED_LINE}
-</section>
-</div>
-<div class="stack">
-<section class="a-slow">
-{sh(f"Slow spots · now {BUILT}" + (f", quota {hm(q_at)}" if q_at else ""), ("quota", "Quota"))}
-<h2>{plural(len(spots), "slow spot")}.</h2>
-<div class="rows">{spot_rows}</div>
-</section>
-{flow_xl}
-<section id="devices" class="a-dev">
-{sh(f"Devices and machine · now {BUILT}")}
-<h2>{"Devices unknown." if dev_count is None else f"{plural(dev_count, 'device')} connected; {in_use} in use."}</h2>
-{devices_list(group)}
-<div class="mach">{machine_rows}</div>
-</section>
-</div>
-<section id="homes" class="a-homes wide">
-{sh(f"Homes · lanes and backlog now {BUILT}, landings {LANDED_SRC if landings is not None else 'unknown'}", ("backlog", "Backlog"))}
-<h2>{homes_h2}</h2>
-{homes_table}
-</section>
+{tiles()}
+<div class="cards">
+{card("Slow spots", f"now {BUILT}" + (f" · quota {hm(q_at)}" if q_at else ""), spot_table(), "wide-m")}
+{card("In vs out by hour", f"today vs yesterday, running total · landings {ld}, filings {BUILT}", inout_chart() if landings is not None else unknown(why_of("GitHub landings")), more=("flow", "Flow"))}
+{card("Filed vs landed, 7 days", f"local days · landings {ld}", week_bars(), more=("flow", "Flow"))}
+{card("Cycle time", f"first commit to merge, P50 and P85 per day · last {CYCLE_DAYS} days · merge record", cycle_chart() if cycle is not None else unknown(why_of("data/metrics/prs.tsv")))}
+{card("Lanes per home", f"open against plan · now {BUILT}", home_bars() + lane_legend(SPLIT, FREE) + PARKED_LINE, more=("backlog#lanes", "Every lane"))}
+{card("Quota by account", f"tightest window, soonest runout first · {hm(q_at) if q_at else 'unknown'}", quota_bars() if qdata is not None else unknown(why_of("quota-axi")), more=("quota", "Quota"))}
+{card("Pull request checks", f"lane records and no-mistakes · now {BUILT}", pr_bar() + (f'<p class="note">Longest CI wait {dur(max(p["wait"] for p in ci_waits))}.</p>' if ci_waits else ""), cls="wide-l", more=("backlog#prs", "Backlog"))}
+{card("Lanes by what to do", f"every open lane · now {BUILT}",  switch(group) + lanes_list(group, strip=False), "wide", ("backlog#lanes", "Every lane"))}
+<section class="card wide" id="devices"><div class="ch"><h3>Devices and machine</h3></div><p class="cw">now {BUILT}</p><div class="devm"><div>{devices_list(group)}</div><div class="mach">{machine_rows}</div></div></section>
+<section class="card wide" id="homes"><div class="ch"><h3>Homes</h3><a class="cm" href="backlog">Backlog →</a></div><p class="cw">lanes and backlog now {BUILT}, landings {ld}</p>{homes_table}</section>
 </div>
 '''
 
@@ -1289,8 +1459,7 @@ def flow_body():
 <section>
 {sh(f"Today by hour · landings {LANDED_SRC if landings is not None else 'unknown'}")}
 <h2>{h_landed} landed since 00:00{"" if f_exact else f"; filing times from {from_h:02d}:00"}.</h2>
-<div class="legend"><span><i class="sw o"></i>Filed</span><span><i class="sw f"></i>Landed</span></div>
-{chart or unknown(why_of("GitHub landings"))}
+{inout_chart() if landings is not None else unknown(why_of("GitHub landings"))}
 </section>
 <section>
 {sh("By home · today since 00:00")}
@@ -1303,11 +1472,16 @@ def flow_body():
 <section>
 {sh("Last 7 days · local days")}
 <h2>{"–" if None in week_l else sum(week_l)} landed in 7 days; {"" if all(exact(d) for d in WEEK) else "at least "}{sum(week_f)} filed.</h2>
-{week_chart()}
+{week_bars()}
 <table style="margin-top:18px"><thead><tr><th>Day</th><th>Filed</th><th>Landed</th></tr></thead><tbody>{drows}</tbody>
 <tfoot><tr><td>7 days</td><td>{"" if all(exact(d) for d in WEEK) else '<span class="ge">≥</span>'}{sum(week_f)}</td><td>{"–" if None in week_l else sum(week_l)}</td></tr></tfoot></table>
 </section>
 </div>
+<section>
+{sh(f"Cycle time · first commit to merge, P50 and P85 per day · last {CYCLE_DAYS} days · merge record")}
+<h2>{f"Half of yesterday's merges took under {fmt(cycle[-2][1])} h." if cycle and cycle[-2][3] else "Cycle time per merge day."}</h2>
+{cycle_chart() if cycle is not None else unknown(why_of("data/metrics/prs.tsv"))}
+</section>
 <section>
 {sh(f"Latest filings · first seen by this page, today")}
 <h2>{plural(len(filed_today), "item")} first seen today.</h2>
@@ -1363,6 +1537,11 @@ def quota_body():
 <p class="lede">{"; ".join(f"{esc(a['name'])} at {when(a['runout'].timestamp())}, carrying {esc(carries_words(a['p']))}" for a in running_out) or "Every readable account lasts until its window resets at the current pace."}.</p>
 </div>
 <div class="sections">
+<section class="wide">
+{sh(f"Tightest window per account · bar = share used, tick = even pace · read {hm(q_at)}")}
+<h2>{plural(len(running_out), "account")} out before reset; {sum(1 for a in accounts if a['empty'])} used up.</h2>
+{quota_bars()}
+</section>
 <section>
 {sh("Runs out before it resets · soonest first")}
 <h2>{plural(len(running_out), "account")} run{"s" if len(running_out) == 1 else ""} out before {"its" if len(running_out) == 1 else "their"} window resets.</h2>
@@ -1422,7 +1601,7 @@ def pr_section(group):
     else:
         gs = [(n, sum(p['group'] == g for p in PRS), ''.join(pr_row(p) for p in PRS if p['group'] == g), '', sw, g != 'none')
               for g, n, sw in PR_GROUPS if any(p['group'] == g for p in PRS)]
-    body = glist(gs, 'Pull requests and validations open') if PRS else '<p class="note">No lane has a pull request or a validation run.</p>'
+    body = pr_bar() + glist(gs, 'Pull requests and validations open') if PRS else '<p class="note">No lane has a pull request or a validation run.</p>'
     if nm_err: body += f'<p class="note">Validation run {unknown(f"{len(nm_err)} of {len(PR_LANES)} lanes: {nm_err[0]}")}</p>'
     ci = max(ci_waits, key=lambda p: p['wait']) if ci_waits else None
     body += (f'<p class="note">Longest CI wait now: {dur(ci["wait"])} ({esc(titles.get((ci["lane"]["home"], ci["lane"]["task"])) or ci["lane"]["task"])}, {esc(hname(ci["lane"]["home"]))}), from no-mistakes. '
