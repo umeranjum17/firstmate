@@ -102,7 +102,7 @@ test_the_page_answers_the_questions_with_the_fixture_numbers() {
   for want in "Running now 1" "Finished, not landed 3" "Merged today 3 yesterday 1" "Queued and ready 4" \
     "Not automatic yet: 2 lead stalls reached Main" "12 skill reads today" "verify-alpha 7" \
     "First-pass merges 50%" "Fix the alpha thing" "Start the beta thing" "Landed gamma" \
-    "zephyrine Records need tidy-up quillwork" "Main alpha"; do
+    "Projects by home 2 projects Main alpha zephyrine quillwork"; do
     case "$text" in *"$want"*) ;; *) fail "page text lacks '$want': $text" ;; esac
   done
   ! grep -q '<details open' "$page" || fail "a work list starts open"
@@ -147,11 +147,11 @@ EOF
   text=$(page_text "$page")
   for want in "Waiting on you 0 Nothing needs you right now." \
     "Finished, not landed 6 Merged today" "Merged today 3 yesterday 0" \
-    "Queued and ready 0" "Running now 1 Finished" "beta Parked"; do
+    "Queued and ready 0 can start when a lane frees" "Running now 1 working, not waiting" "beta Parked"; do
     case "$text" in *"$want"*) ;; *) fail "page text lacks '$want': $text" ;; esac
   done
   ! grep -q 'pull/11' "$page" || fail "a green PR in a +yolo project waits on the captain: $text"
-  grep -Eq '<tr class="parked"><th>.*<b>beta</b><span class="chip ">Parked</span></span>(<small>[^<]*</small>)?</th><td colspan="[0-9]+"></td></tr>' "$page" \
+  grep -Eq '<tr class="parked"><th>.*<b>beta</b><span class="chip ">Parked</span></span></th><td colspan="[0-9]+"></td></tr>' "$page" \
     || fail "the parked home row shows numbers"
   pass "totals leave out parked homes and self-merged PRs, and count finished lanes now"
 }
@@ -180,7 +180,7 @@ EOF
   page="$home/state/dashboard/index.html"
   out=$(PATH="$home/bin:$PATH" FM_HOME="$home" "$DASH" build) || fail "build failed: $out"
   text=$(page_text "$page")
-  for want in "Merged today 3 yesterday 3 · GitHub as of" "zephyrine Records need tidy-up quillwork – – 0 – 0 – 3 "; do
+  for want in "Merged today 3 yesterday 3 · GitHub as of" "zephyrine Records need tidy-up – – 0 – 0 – 3 "; do
     case "$text" in *"$want"*) ;; *) fail "page text lacks '$want': $text" ;; esac
   done
   [ "$(wc -l < "$home/gh.calls")" -eq 2 ] || fail "not two bounded day searches: $(cat "$home/gh.calls")"
@@ -254,7 +254,7 @@ EOF
   page="$home/state/dashboard/index.html"
   PATH="$bin:$PATH" FM_HOME="$home" FM_DASHBOARD_PROC="$proc" FM_DEVICE_LOCK_DIR="$locks" "$DASH" build >/dev/null || fail "probe build failed"
   text=$(page_text "$page")
-  for want in "Machine 10 GB free · pressure 4% · heavy jobs wait" "Devices 2 connected · 1 in use" \
+  for want in "Problem: Leads, Alerts, Machine" "Machine 10 GB free · pressure 4% · heavy jobs wait" "Devices 2 connected · 1 in use" \
     "Phone Pixel 9 PHONE1 · USB Free · last used by Main 10 min ago" \
     "Emulator test-avd emulator-5554 · 4.0 GB in use In use by Main · 10 min" \
     "Free memory 10.0 GB of 64 GB" "Memory pressure 4%" "Heavy jobs 8.0 GB of 32 GB" "hard limit 38 GB" \
@@ -361,8 +361,8 @@ EOF
   out=$(FM_HOME="$home" "$DASH" build) || fail "build failed: $out"
   page="$home/state/dashboard/index.html"
   text=$(page_text "$page")
-  for want in "Who does the work Worker model Running Merged, 7 days First pass" \
-    "claude · model-a 1 0 –" "pi · model-b 0 2 50%" "zephyrine Records need tidy-up quillwork lead-model-z" "Recorded since 2026-10-06"; do
+  for want in "Who does the work 2 worker models Worker model Running Merged, 7 days First pass" \
+    "claude · model-a 1 0 –" "pi · model-b 0 2 50%" "zephyrine Records need tidy-up lead-model-z" "Recorded since 2026-10-06"; do
     case "$text" in *"$want"*) ;; *) fail "page text lacks '$want': $text" ;; esac
   done
   case "$text" in *parked-model*|*parked-lead*) fail "a parked home shows in Who does the work: $text" ;; esac
@@ -370,7 +370,7 @@ EOF
   : > "$home/data/metrics/lanes.tsv"
   FM_HOME="$home" "$DASH" build >/dev/null || fail "build with an empty lane record failed"
   text=$(page_text "$page")
-  for want in "Who does the work No record yet." "data/metrics/lanes.tsv : empty"; do
+  for want in "Who does the work no record yet No record yet." "data/metrics/lanes.tsv : empty"; do
     case "$text" in *"$want"*) ;; *) fail "page text lacks '$want': $text" ;; esac
   done
   pass "Who does the work groups lanes by harness and model, joins merges by PR URL, and leaves out parked homes"
