@@ -125,6 +125,12 @@ for name, home in sorted(homes.items()):
         basis = 'emitted' if status else 'captured'
         if not status:
             status = [e for e in es if e['event'] == 'task.status']
+        if sum(e['event'] == 'task.dispatched' for e in es) > 1:
+            times = dict(times, dispatched=None, pr_ready=None, merged=None, cleaned_up=None)
+            notes.append({'source': name + '/' + task, 'reason': 'reused task id: lifecycle attribution unknown'})
+            if basis == 'captured':
+                latest = max(e['ts'] for e in es if e['event'] == 'task.dispatched')
+                status = [e for e in status if e.get('ts') is not None and e['ts'] >= latest]
         working = next((e['ts'] for e in status if e.get('state') == 'working'), None)
         waits = {}
         for e in status:
@@ -135,10 +141,6 @@ for name, home in sorted(homes.items()):
                 waits.pop(key, None)
         last = status[-1] if status else {}
         state = last.get('state') or 'unknown'
-        if sum(e['event'] == 'task.dispatched' for e in es) > 1:
-            times = dict(times, dispatched=None, pr_ready=None, merged=None, cleaned_up=None)
-            working = None
-            notes.append({'source': name + '/' + task, 'reason': 'reused task id: lifecycle attribution unknown'})
         # Stage entry is the first event in the trailing run, not the preceding event.
         trailing = []
         for e in reversed(status):
@@ -149,7 +151,7 @@ for name, home in sorted(homes.items()):
         row = {'home': name, 'task': task, 'open': task in live, 'stage': state,
                'seconds_in_stage': age(start), 'reason': last.get('text') or 'unknown: no status reason',
                'timestamp_basis': basis, 'open_waits': [dict(key=k, since=e['ts'],
-                   seconds=age(e['ts']), reason=e.get('text', ''),
+                   seconds=age(e['ts']), reason=e.get('text') or '',
                    cause='captain' if k.startswith('captain-hold') else
                          'lead' if e.get('state') == 'needs-decision' else 'unknown')
                    for k, e in sorted(waits.items())],

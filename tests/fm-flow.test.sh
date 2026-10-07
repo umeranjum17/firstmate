@@ -68,6 +68,11 @@ with open(child / 'state/fleet-ledger.jsonl', 'a') as f:
     f.write(json.dumps(dict(v=1, task='reused', ts=90, event='task.dispatched')) + '\n')
     f.write(json.dumps(dict(v=1, task='nullstage', ts=10, event='task.dispatched')) + '\n')
     f.write(json.dumps(dict(v=1, task='nullstage', ts=20, event='task.status', state=None, key='k', text='t')) + '\n')
+    f.write(json.dumps(dict(v=1, task='restale', ts=10, event='task.dispatched')) + '\n')
+    f.write(json.dumps(dict(v=1, task='restale', ts=20, event='task.status', state='blocked', key='k', text='stale')) + '\n')
+    f.write(json.dumps(dict(v=1, task='restale', ts=90, event='task.dispatched')) + '\n')
+    f.write(json.dumps(dict(v=1, task='nullwait', ts=10, event='task.dispatched')) + '\n')
+    f.write(json.dumps(dict(v=1, task='nullwait', ts=20, event='task.status', state='blocked', key='k', text=None)) + '\n')
 y = json.loads(run())
 assert y['homes'] == ['child', 'grand', 'main'], 'nested home discovered'
 bytask = {(l['home'], l['task']): l for l in y['lanes']}
@@ -77,6 +82,12 @@ assert 'gtask' in {l['task'] for l in y['executed_24h']}
 assert bytask[('child', 'reused')]['times']['merged'] is None, 'reused id keeps no merge'
 assert 'reused' not in {l['task'] for l in y['executed_24h']}
 assert bytask[('child', 'nullstage')]['stage'] == 'unknown', 'null ledger state stays unknown'
+restale = bytask[('child', 'restale')]
+assert restale['stage'] == 'unknown' and restale['open_waits'] == [], 'reuse drops pre-dispatch status'
+assert restale['seconds_in_stage'] is None and restale['times']['working'] is None
+assert restale['reason'] == 'unknown: no status reason'
+assert 'restale' not in {l['task'] for l in y['executed_24h']}
+assert bytask[('child', 'nullwait')]['open_waits'][0]['reason'] == '', 'null wait text coerced'
 bad = subprocess.run(['bash', script, '--json', '--now', 'bad'], capture_output=True)
 assert bad.returncode == 2
 print('PASS: real flow CLI, two homes, queue, keyed waits, retained lifecycle, unknowns, read-only determinism')
