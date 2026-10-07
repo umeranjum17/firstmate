@@ -1,0 +1,13 @@
+=== S1 tick 1: first identity recorded, RC=0
+identity: 333918137:1791409463
+
+=== S2 tick 2 after server stop+provision restart:
+herdr session fm-lab-sentinel-live-180347-6520 restarted (socket 333918137:1791409463 -> 333920415:1791409532)
+badtask: worktree missing; skipped
+RC=1, identity unchanged (333918137:1791409463), no .sentinel-wake-pending
+
+=== S3 tick 3 after removing bad meta:
+restart re-detected, reconcile clean, RC=0
+identity: 333920415:1791409532, .sentinel-wake-pending written with restart body
+
+=== S4 tick 4: no restart, identity stable, RC=0, no duplicate restart handling
