@@ -310,7 +310,7 @@ for cause_name in ('captain', 'lead', 'ci_queue', 'memory_gate', 'credential_ext
                             'known_lower_bound_lane_hours': sum(lower) / 3600,
                             'unknown_items': len(items) - len(full),
                             'unknown_waits': sum(i['unknown_waits'] for i in items), 'additive': False})
-bottlenecks.sort(key=lambda b: (-b['known_lane_hours'], b['cause']))
+bottlenecks.sort(key=lambda b: (-b['known_lower_bound_lane_hours'], -b['known_lane_hours'], b['cause']))
 def executed(seconds):
     return [l for l in lanes if l['times']['merged'] is not None and NOW - seconds <= l['times']['merged'] <= NOW]
 def summary(rows):
