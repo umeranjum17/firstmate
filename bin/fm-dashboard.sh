@@ -9,8 +9,15 @@
 # (the ask list); Ship (ship/: the selected home's ship at night with each lane a worker at its
 # stage's deck station, dressed by model, and a sheet with fleet-wide key numbers and stuck or
 # parked work); a command palette and keys (?).
+# In Ship, tap a worker or its tag to open its card's detail; a station or its plate opens
+# a worker in that stage, prioritizing stuck work and then recorded age, oldest first (empty stations do nothing).
+# Stuck and parked sheet rows also open their cards, by click or focused Enter/Space.
+# Select a home tab or swipe left/right on the sea for the next/previous home, without wrapping.
+# Home changes sail the outgoing ship ahead and bring the selected ship in from astern;
+# scene tags and picking pause during the transition, while the panels remain interactive.
 # Ship needs WebGL2; otherwise a static illustration replaces the scene while its panels stay live.
-# The system's reduced-motion preference stops continuous scene animation and tag pulsing.
+# The system's reduced-motion preference stops continuous scene animation and tag pulsing
+# and immediately settles any home transition, restoring tags and picking.
 # On a phone the board is a list grouped by stage, with a dock.
 # Each build writes the app's one data file, state/dashboard/board.json: homes with their
 # lane plans, one card per open lane, ready backlog item and pull request landed today,
