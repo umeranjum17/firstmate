@@ -1,0 +1,12 @@
+$ bin/fm-jev-mem-guard.sh --record /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D5G9JMQRZ6ECQ22RKCM0EG/.test-tmp/manual/Fleet Home/state/host-memory.tsv
+OK	pressure 2% (10 s average), 40.0 GB available, 4.0 GB swap used; cgroup pressure unreadable; host-only classification
+EXIT=0
+$ bin/fm-spawn.sh labqueued projects/absent --mode no-mistakes --yolo off --harness claude
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D5G9JMQRZ6ECQ22RKCM0EG/.test-tmp/manual/Fleet Home
+host memory under pressure: pressure at or above 20% (pressure 25% (10 s average), 40.0 GB available, 4.0 GB swap used; cgroup pressure unreadable; host-only classification)
+error: spawn refused - task labqueued stays queued until host memory eases; retry then
+EXIT=1
+$ bin/fm-spawn.sh labqueued projects/absent --mode no-mistakes --yolo off --harness claude --scout
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D5G9JMQRZ6ECQ22RKCM0EG/.test-tmp/manual/Fleet Home
+error: --mode applies only to ship spawns; a scout delivers a report and a secondmate records its own fixed posture
+EXIT=1

@@ -1,0 +1,26 @@
+{
+  "lifecycle": {
+    "effectiveLaunch": {
+      "browserLaunched": true,
+      "engine": "chrome",
+      "launchHash": 12825947863403514000
+    },
+    "launched": false,
+    "relaunchedBrowser": false,
+    "restartedBackground": false,
+    "restoreStatus": "missing",
+    "reused": true,
+    "saveStatus": "saved"
+  },
+  "origin": "file:///home/umer/.no-mistakes/evidence/01M4D5G9JMQRZ6ECQ22RKCM0EG/dashboard-index.html",
+  "result": {
+    "memory": [
+      "Memory pressure\n42%\nshare of the last 10 s some job waited on memory; heavy jobs wait at 40% or more",
+      "Pressure peak, last hour\n42%\nhighest 10 s share the watcher recorded; config/host-memory sets when new agents wait and when an alert goes out",
+      "Swap used\n4.0 GB\nmemory the kernel pushed to disk"
+    ],
+    "refusal": [
+      "✕\nlabqueued\nnew agents wait (Main)\nunder a minute"
+    ]
+  }
+}

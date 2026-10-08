@@ -1,0 +1,56 @@
+$ bin/fm-jev-mem-guard.sh --record /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D5G9JMQRZ6ECQ22RKCM0EG/.test-tmp/manual/Fleet Home/state/host-memory.tsv
+OK	pressure 2% (10 s average), 40.0 GB available, 4.0 GB swap used; cgroup pressure unreadable; host-only classification
+EXIT=0
+$ bin/fm-spawn.sh labqueued projects/absent --harness claude --mode no-mistakes --yolo off
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D5G9JMQRZ6ECQ22RKCM0EG/.test-tmp/manual/Fleet Home
+host memory under pressure: pressure at or above 20% (pressure 25% (10 s average), 40.0 GB available, 4.0 GB swap used; cgroup pressure unreadable; host-only classification)
+error: spawn refused - task labqueued stays queued until host memory eases; retry then
+EXIT=1
+$ bin/fm-spawn.sh labqueued projects/absent --harness claude --scout
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D5G9JMQRZ6ECQ22RKCM0EG/.test-tmp/manual/Fleet Home
+host memory under pressure: pressure at or above 20% (pressure 25% (10 s average), 40.0 GB available, 4.0 GB swap used; cgroup pressure unreadable; host-only classification)
+error: spawn refused - task labqueued stays queued until host memory eases; retry then
+EXIT=1
+No task endpoint record created; refusal=1791443841	labqueued	host memory under pressure: pressure at or above 20% (pressure 25% (10 s average), 40.0 GB available, 4.0 GB swap used; cgroup pressure unreadable; host-only classification)
+$ bin/fm-spawn.sh lablead / --secondmate --harness claude
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D5G9JMQRZ6ECQ22RKCM0EG/.test-tmp/manual/Fleet Home
+host memory under pressure: pressure at or above 20% (pressure 25% (10 s average), 40.0 GB available, 4.0 GB swap used; cgroup pressure unreadable; host-only classification)
+error: spawn refused - task lablead stays queued until host memory eases; retry then
+EXIT=1
+$ bin/fm-jev-mem-guard.sh --admit labqueued --state /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D5G9JMQRZ6ECQ22RKCM0EG/.test-tmp/manual/Fleet Home/state
+EXIT=0
+$ bin/fm-jev-mem-guard.sh --admit labqueued --state /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D5G9JMQRZ6ECQ22RKCM0EG/.test-tmp/manual/Fleet Home/state
+host memory under pressure: pressure at or above 35% (pressure 43% (10 s average), 40.0 GB available, 4.0 GB swap used; host 2%, cgroup 43% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service))
+EXIT=1
+$ bin/fm-jev-mem-guard.sh --config /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D5G9JMQRZ6ECQ22RKCM0EG/.test-tmp/manual/Fleet Home/config/host-memory --admit labqueued --state /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D5G9JMQRZ6ECQ22RKCM0EG/.test-tmp/manual/Fleet Home/state
+fm-jev-mem-guard: invalid /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D5G9JMQRZ6ECQ22RKCM0EG/.test-tmp/manual/Fleet Home/config/host-memory line 1: 'wait_pressure=nan' (expected KEY=number, keys: wait_pressure, wait_available_gb, alert_pressure, alert_available_gb)
+EXIT=2
+Watcher restarted sampler: 987226 -> 988995
+Durable queue:
+1791443844	1	check	host-memory	check: host memory ALERT: pressure 42% (10 s average), 40.0 GB available, 4.0 GB swap used; cgroup pressure unreadable; host-only classification; pressure at or above 35%; automatic interrupt skipped: top consumer is not a task this home owns
+Interrupt ownership decision:
+1791443844		check: host memory ALERT: pressure 42% (10 s average), 40.0 GB available, 4.0 GB swap used; cgroup pressure unreadable; host-only classification; pressure at or above 35%; automatic interrupt skipped: top consumer is not a task this home owns
+Sampler records:
+1791443840	41943040	4194304	2.00	OK
+1791443841	41943040	4194304	2.00	OK
+1791443843	41943040	4194304	2.00	OK
+1791443843	41943040	4194304	2.00	OK
+1791443843	41943040	4194304	2.00	OK
+1791443844	41943040	4194304	42.00	ALERT
+$ bin/fm-sentinel.sh unit
+[Unit]
+Description=Firstmate sentinel for /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D5G9JMQRZ6ECQ22RKCM0EG/.test-tmp/manual/Fleet Home (recovers supervision after an agent-runtime restart)
+
+[Service]
+Environment="FM_HOME=/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D5G9JMQRZ6ECQ22RKCM0EG/.test-tmp/manual/Fleet Home"
+Environment="PATH=/home/umer/.pi/agent/bin:/home/umer/.local/bin:/home/umer/.flashlight/bin:/home/umer/Android/Sdk/platform-tools:/home/umer/Android/Sdk/emulator:/home/umer/.kimi-code/bin:/home/umer/go/bin:/home/umer/.cargo/bin:/home/umer/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/local/sbin:/usr/bin:/bin:/usr/sbin:/sbin:/home/umer/.local/share/mise/installs/pi/latest/pi:/home/umer/.local/share/mise/installs/gh/latest/gh_2.97.0_linux_amd64/bin:/home/umer/.local/share/mise/installs/opencode/latest:/home/umer/.local/share/mise/shims:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl"
+ExecStart="/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D5G9JMQRZ6ECQ22RKCM0EG/bin/fm-sentinel.sh" loop
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target
+EXIT=0
+$ isolated PATH bin/fm-dashboard.sh build
+/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D5G9JMQRZ6ECQ22RKCM0EG/.test-tmp/manual/Fleet Home/state/dashboard/index.html
+Dashboard generated from the actual sampler history and admission record; unrelated probes unavailable intentionally.

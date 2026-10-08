@@ -1,0 +1,7 @@
+# all fm-secondmate-liveness tests passed
+ok - memory deferrals preserve the endpoint and liveness retry budget
+SECONDMATE_LIVENESS: secondmate sm1: respawn failed after confirmed agent absence on existing endpoint: error: secondmate home cannot be inside the firstmate repo: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D5G9JMQRZ6ECQ22RKCM0EG/.test-tmp/fm-secondmate-liveness.YYO2xg/sweep-dead/sm1
+SECONDMATE_SYNC: secondmate sm1: skipped: primary default-branch commit cannot be resolved
+not ok - a confirmed-dead secondmate should actually be relaunched (missing: 'new-window')
+--- output ---
+kill-window -t =firstmate:=fm-sm1

@@ -1,10 +1,10 @@
 [Unit]
-Description=Firstmate sentinel for /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.validation/fm-lab.M3mPGT/Fleet Home (recovers supervision after an agent-runtime restart)
+Description=Firstmate sentinel for /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D5G9JMQRZ6ECQ22RKCM0EG/.test-tmp/manual/Fleet Home (recovers supervision after an agent-runtime restart)
 
 [Service]
-Environment="FM_HOME=/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.validation/fm-lab.M3mPGT/Fleet Home"
+Environment="FM_HOME=/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D5G9JMQRZ6ECQ22RKCM0EG/.test-tmp/manual/Fleet Home"
 Environment="PATH=/home/umer/.pi/agent/bin:/home/umer/.local/bin:/home/umer/.flashlight/bin:/home/umer/Android/Sdk/platform-tools:/home/umer/Android/Sdk/emulator:/home/umer/.kimi-code/bin:/home/umer/go/bin:/home/umer/.cargo/bin:/home/umer/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/local/sbin:/usr/bin:/bin:/usr/sbin:/sbin:/home/umer/.local/share/mise/installs/pi/latest/pi:/home/umer/.local/share/mise/installs/gh/latest/gh_2.97.0_linux_amd64/bin:/home/umer/.local/share/mise/installs/opencode/latest:/home/umer/.local/share/mise/shims:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl"
-ExecStart="/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/bin/fm-sentinel.sh" loop
+ExecStart="/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D5G9JMQRZ6ECQ22RKCM0EG/bin/fm-sentinel.sh" loop
 Restart=always
 RestartSec=10
 
