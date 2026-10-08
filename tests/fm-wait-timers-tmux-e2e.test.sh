@@ -75,3 +75,51 @@ for round in 1 2 3; do cycle; done
 [ ! -e "$world/state/.waiting-timers/held-lane" ] || exit 1
 ! grep -q 'waiting-timer-overdue' "$world/parent/state/lead.status" || exit 1
 echo 'PASS: real tmux watcher honours pause deadline, owner-only pause and active captain hold'
+
+# Restart an unheld lane after its observation window has elapsed, but before
+# its owner has received a wake. The real watcher must leave a response interval
+# before publishing to Main, including for a future-until decision declaration.
+tmux new-window -d -t firstmate -n fm-ladder 'sleep 300'
+printf 'window=firstmate:fm-ladder\nkind=ship\nharness=pi\nbackend=tmux\nworktree=%s\n' "$world" > "$world/state/ladder.meta"
+for verb in blocked needs-decision; do
+  : > "$world/events"
+  : > "$world/parent/state/lead.status"
+  printf '%s [key=dependency]: fixture dependency until 2099-01-01T00:00Z\n' "$verb" > "$world/state/ladder.status"
+  FM_POLL=1 FM_SIGNAL_GRACE=1 FM_WAIT_ALERT_SECS=300 FM_WAIT_ESCALATE_SECS=900 \
+    bash "$ROOT/bin/fm-watch.sh" > "$world/out" 2> "$world/err" &
+  watch_pid=$!
+  for unused in $(seq 1 40); do
+    [ ! -f "$world/state/.waiting-timers/ladder" ] || break
+    kill -0 "$watch_pid" || { cat "$world/err"; exit 1; }
+    sleep 0.1
+  done
+  [ -f "$world/state/.waiting-timers/ladder" ] || { echo 'observation not recorded'; exit 1; }
+  kill "$watch_pid"
+  wait "$watch_pid" || :
+  watch_pid=''
+  IFS=$'\t' read -r sig since owner parent key < "$world/state/.waiting-timers/ladder"
+  [ "$owner" = 0 ] || { echo 'priming woke owner'; exit 1; }
+  printf '%s\t%s\t0\t0\t%s\n' "$sig" "$((since - 900))" "$key" > "$world/state/.waiting-timers/ladder"
+  cycle
+  grep -q "waiting-state ladder ($verb" "$world/events" || exit 1
+  [ ! -s "$world/parent/state/lead.status" ] || { echo 'Main alerted before owner response interval'; exit 1; }
+  IFS=$'\t' read -r sig since owner parent key < "$world/state/.waiting-timers/ladder"
+  [ "$owner" -gt 1 ] || { echo 'owner delivery not recorded'; exit 1; }
+  # A queued status-change wake may close the next watcher before its poll.
+  # Drain that real event, then require the timer on a subsequent bounded run.
+  for unused in 1 2 3; do
+    cycle
+    [ ! -s "$world/parent/state/lead.status" ] || break
+  done
+  grep -q 'waiting-timer-overdue: ladder' "$world/parent/state/lead.status" || exit 1
+  cycle
+  [ "$(grep -c 'waiting-state ladder' "$world/events")" -eq 1 ] || { echo 'duplicate owner wake'; exit 1; }
+  [ "$(grep -c '^blocked ' "$world/parent/state/lead.status")" -eq 1 ] || { echo 'duplicate Main escalation'; exit 1; }
+  printf 'resolved [key=dependency]: fixture cleared\nworking: resumed\n' >> "$world/state/ladder.status"
+  cycle
+  grep -q 'waiting-timer-cleared: ladder' "$world/parent/state/lead.status" || exit 1
+  [ ! -e "$world/state/.waiting-timers/ladder" ] || exit 1
+  grep 'waiting-state ladder' "$world/events"
+  cat "$world/parent/state/lead.status"
+  echo "PASS: real tmux $verb restart preserves owner-first interval, deduplicates and resolves Main report"
+done

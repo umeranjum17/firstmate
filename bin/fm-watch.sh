@@ -2005,28 +2005,11 @@ pause_state_class() {  # <window> <task>
   printf '%s' "$class"
 }
 
-# The two records of one ordinary crew wait, and why its stale alarm reads both.
-#
-# status_is_paused_or_captain_held reads the status LINE a worker wrote, which is
-# the only record when the worker itself is waiting. It is not the only record
-# there is: once firstmate hands work to the captain, the wait is written into the
-# BACKLOG by bin/fm-captain-hold.sh, and the worker's last line stays whatever it
-# was - routinely `done` after a PR delivery, which no line predicate can
-# read as a wait. An alarm bounded only by the line therefore re-fires for the
-# captain's whole thinking time, on exactly the work they already have in hand.
-#
-# `open` is that record's own read-only predicate and owns its semantics: exit 0
-# still an open captain call, 1 not, 2 could not be established. Only a 0 bounds
-# an alarm here, so an unreadable backlog, an incompatible or absent tasks-axi,
-# and a row this home does not carry all keep alarming exactly as they do today -
-# a wait this watcher cannot prove is not a wait.
-#
-# The read costs one subprocess and runs only where the watcher is about to
-# alarm, so at most once per distinct stale hash per window, beside the crew-state
-# read the same paths already pay. The secondmate stale gate deliberately runs
-# before this bound and admits only status-declared waits: a backlog-only hold
-# whose mate still says `working:` or `done:` does not reach this read. Reaching
-# it would put backlog reads into windows deliberately skipped on ordinary polls.
+# Active backlog holds are checked before stale classification, including for
+# secondmates; docs/configuration.md "Waiting-state escalation" owns the policy.
+# fm-captain-hold.sh open owns the read-only hold verdict. Only exit 0 proves a
+# hold, so unreadable or absent records cannot silently suppress an alarm.
+# The remaining declared-wait paths preserve status-only transfer semantics.
 STALE_WAIT_DECLARATION=
 
 # The identity a re-surface throttle is bound to: the task's whole status-log
