@@ -2523,6 +2523,12 @@ It verifies native `ultra` on initial and operational turns and after restart, s
 Its native App Server peer and watcher-close process are deterministic fixtures; it does not claim a real backend or a live model was tested by that command.
 `tests/fm-busy-state.test.sh`, `tests/fm-busy-adapter-wiring.test.sh`, and `tests/fm-watch-triage.test.sh` cover separate progress notification, unchanged semantic busy state, rejection of a superseded worker's events, and progress refreshing the busy-age bound without fabricating a completed turn.
 
+The watcher consumer was checked again on 2026-10-08 with GNU Bash 5.3.15 and tmux 3.7b.
+`bash bin/fm-test-run.sh tests/fm-watch-triage.test.sh` passed 154 cases, including generation-bound activity, frozen-pane progress, active validation, expired progress, and repeated genuine-wedge escalation.
+The added progress cases drive the real watcher entrypoint against isolated state and controlled backend responses, not a live model.
+A separate private tmux server with an unchanged terminal stayed quiet after the real `fm-busy-event.sh progress` command and emitted a durable stale alert after that progress expired.
+This establishes consumer behavior, not automatic model dispatch, token/context footer parsing, or revised wait-timer policy.
+
 ## Oh My Pi (omp)
 
 omp runs crewmate, scout, secondmate, and primary work; [`supervision.md`](supervision.md#omp-oh-my-pi-native-delivery-2026-09-05) owns the primary evidence.
