@@ -455,7 +455,7 @@ export function world(canvas, tagLayer) {
       f.f.rotation.y = 0.15
       f.c = c; f.pose = poseOf(c)
     })
-    const landed = d.landed_by_home?.[id]?.at(-1) || 0
+    const landed = d.cards.filter(c => c.stage === 'landed' && c.home === id).length
     crates.clear()
     for (const [i, [y, z]] of STACK.slice(0, landed).entries()) { const c = mesh(geos().crate, tc(i % 2 ? '#b07a40' : '#c99555'), 0.03); c.position.set(0, y * 0.5, z); crates.add(c) }
     if (still.matches) frame()
