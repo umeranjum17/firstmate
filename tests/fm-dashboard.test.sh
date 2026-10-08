@@ -140,6 +140,7 @@ EOF
 cat "$home/herdr.json"
 EOF
   printf '#!/bin/sh\nprintf "List of devices attached\\n\\n"\n' > "$stubs/adb"
+  # shellcheck disable=SC2016 # the single-quoted stub expands when it runs
   printf '#!/bin/sh\n[ "$1" = "-cf" ] && { echo 0; exit 0; }\nexit 1\n' > "$stubs/pgrep"
   printf '#!/bin/sh\nprintf "MemoryCurrent=0\\nMemoryHigh=34359738368\\nMemoryMax=40802189312\\n"\n' > "$stubs/systemctl"
   mkdir -p "$home/proc/pressure"
@@ -296,6 +297,7 @@ EOF
   jq -e '.metrics.devices.value == 2 and .metrics.connected_devices.value == 2 and .metrics.device_groups.value.action == {"In use":1,"Free":1} and .metrics.device_groups.value.home == {"Main":1,"No holder":1}' "$d/data.json" >/dev/null || fail "device groups differ from the page"
   printf 'List of devices attached\nPHONE1 device model:Pixel_9\nOFFLINE offline model:Pixel_8\n' > "$home/adb-output"
   printf '#!/bin/sh\ncat "%s/adb-output"\n' "$home" > "$bin/adb"
+  # shellcheck disable=SC2016 # the single-quoted stub expands when it runs
   printf '#!/bin/sh\n[ "$1" = "-cf" ] && { echo 0; exit 0; }\nexit 1\n' > "$bin/pgrep"
   build "$home" FM_DASHBOARD_PROC="$proc"
   has "$d/index.html" "Problem 1" "In use 1" "Free 1" "Devices 1 + 1 + 1 = 3" "Lock muxr-emu"
@@ -568,7 +570,7 @@ test_new_lane_and_unwritten_archive_stay_exact() {
     fail "a lane with no status line or an archive not yet written made a number unknown: $(jq -c '.metrics.lanes, .metrics.closed | del(.daily)' "$d/data.json")"
   has "$d/index.html" "Closed 7 d 2"
   mkfifo "$home/state/m-vanishing.meta"
-  (printf 'kind=ship\nproject=alpha\n'; rm "$home/state/m-vanishing.meta") > "$home/state/m-vanishing.meta" &
+  (printf 'kind=ship\nproject=alpha\n' > "$home/state/m-vanishing.meta"; rm "$home/state/m-vanishing.meta") &
   local writer=$!
   build "$home"
   wait "$writer" || fail "vanishing metadata fixture failed"
@@ -618,6 +620,7 @@ test_unavailable_readings_and_concurrent_caches() {
   home=$(make_home concurrent)
   : > "$home/data/secondmates.md"
   FM_HOME="$home" bash "$ROOT/bin/fm-tasks-axi.sh" list --limit 10000 --fields held,hold_kind,hold_reason,blocked,created,closed > "$home/table"
+  # shellcheck disable=SC2016 # the single-quoted stub expands when it runs
   printf '#!/bin/sh\ncat "$TEST_TABLE"\ntouch "$TEST_TABLE.read"\n' > "$home/stubs/tasks-axi"
   chmod +x "$home/stubs/tasks-axi"
   python3 - "$home" "$DASH" <<'PY' || fail "concurrent cache updates lost observations or escaped the lock"
