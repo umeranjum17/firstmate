@@ -38,7 +38,7 @@
 #                                   a day counts exactly once the log covers all of it, before
 #                                   that it is a floor ("at least") from each item's filing day
 #   gh api search/issues            landings: one bounded search per local day of the last 7, over
-#                                   registered project clones (including Main); a finished day is
+#                                   GitHub repositories in registered project clones; a finished day is
 #                                   kept, today is searched again after 5 minutes, all cached in
 #                                   state/dashboard/.merged.json; on failure data/metrics/prs.tsv
 #                                   (build_hours: first commit to merge), marked "merge record as of"
@@ -47,12 +47,12 @@
 #                                   Main (the folder holding this home's data), else other
 #   quota-axi --json --no-credential-refresh --max-age 5m   quota, cached 2 minutes in
 #                                   state/dashboard/.quota.json; a failed read reuses a reading
-#                                   under an hour old, named with its time
-#   no-mistakes axi status          per lane with a PR or validation, run in its worktree=: run
-#                                   status, PR and active step with its age (CI wait)
+#                                   under an hour old, dated, with its runway treated as unknown
+#   no-mistakes axi                 select the lane's run in its worktree, then axi status --run ID:
+#                                   verified status, PR and active step age; unreadable runs stay unknown
 #   <home>/data/<task>/contributions.json   the lane's PR record: check conclusions, so checks
 #                                   come from local records, never a new GitHub call
-#   data/fleet-pulse.tsv            oldest finished-work wait and pulse cadence
+#   data/fleet-pulse.tsv            observed pulse cadence and open-lane record disagreements
 #   data/metrics/{prs,daily,lanes}.tsv, config/metrics-targets.tsv   quality targets for today
 #                                   and yesterday; who does the work (model per lane)
 # Machine and devices, each probe read-only with a 5 s timeout:
@@ -1269,7 +1269,7 @@ def week_bars():
     return (legend(('k in', 'Filed' + ('' if all(exact(d) for d in WEEK) else ', at least')), ('k out', 'Landed'))
             + frame(svg, top, [f'{d:%a}' for d in WEEK]))
 
-# Cycle time: first commit to merge (build_hours in the merge record), P50 and P85 per merge day.
+# Cycle-time source and window are described in the Flow section; incomplete days cannot establish percentiles.
 CYCLE_DAYS = 14
 def pct(vals, p):
     if any(v is None for v in vals): return None
