@@ -863,7 +863,8 @@ esac
 exit 0
 SH
   chmod +x "$fb/tmux"
-  fm_fake_exit0 "$fb" treehouse
+  printf '#!/usr/bin/env bash\nprintf "%%s\\n" %q\n' "$wt" > "$fb/treehouse"
+  chmod +x "$fb/treehouse"
   printf '%s\n' "$fb"
 }
 
@@ -935,7 +936,8 @@ esac
 exit 0
 SH
   chmod +x "$fb/tmux"
-  fm_fake_exit0 "$fb" treehouse
+  printf '#!/usr/bin/env bash\nprintf "%%s\\n" %q\n' "$wt" > "$fb/treehouse"
+  chmod +x "$fb/treehouse"
   printf '%s\n' "$fb"
 }
 

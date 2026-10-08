@@ -1430,14 +1430,14 @@ The per-backend delta is required only for the backend resolved from `FM_BACKEND
 
 | Resolved backend | Additional tools |
 | --- | --- |
-| `tmux` | `tmux`, `treehouse` |
-| `herdr` | `herdr`, `jq`, `treehouse` |
-| `zellij` | `zellij`, `jq`, `treehouse` |
+| `tmux` | `tmux`, `treehouse`, `python3` |
+| `herdr` | `herdr`, `jq`, `treehouse`, `python3` |
+| `zellij` | `zellij`, `jq`, `treehouse`, `python3` |
 | `orca` | `orca` |
-| `cmux` | `cmux`, `jq`, `treehouse` |
+| `cmux` | `cmux`, `jq`, `treehouse`, `python3` |
 
 The JSON-emitting adapters (`herdr`, `zellij`, `cmux`) need `jq` because their spawn and liveness paths parse backend JSON.
-Every session-provider-only backend (`tmux`, `herdr`, `zellij`, `cmux`) uses `treehouse` for worktrees.
+Every session-provider-only backend (`tmux`, `herdr`, `zellij`, `cmux`) uses `treehouse` for worktrees and `python3` for the recorded-copy protection described by `bin/fm-treehouse-protect.py`.
 
 Backend tool availability uses the adapter's own executable resolver, so bootstrap and spawn agree on supported non-`PATH` locations such as cmux's bundled CLI.
 An unknown resolved backend emits `BACKEND_INVALID` and blocks dispatch instead of silently dropping its dependency delta or falling back to tmux.

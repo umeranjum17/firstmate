@@ -446,6 +446,10 @@ fm_fake_exit0() {
   for tool in "$@"; do
     cat > "$fakebin/$tool" <<'SH'
 #!/usr/bin/env bash
+# Durable acquisition returns its path; other exit-0 tools stay silent.
+case "${0##*/}:$*" in
+  treehouse:get\ --lease*) printf '%s\n' "${FM_FAKE_PANE_PATH:-}" ;;
+esac
 exit 0
 SH
     chmod +x "$fakebin/$tool"
