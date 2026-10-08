@@ -2330,6 +2330,7 @@ test_stale_terminal_status_overridden_by_active_run() {
   reap "$pid"
   ack_stopped_cycle "$state" || fail "could not acknowledge the intentional phase-A watcher stop"
 
+  export FM_FAKE_CREW_STATE='state: working · source: run-step · execution active · validating (running)'
   # Phase B: an old pane timer does not override an active validation step.
   echo $(( $(date +%s) - 500 )) > "$state/.stale-since-$key"
   : > "$out"
@@ -2344,7 +2345,7 @@ test_stale_terminal_status_overridden_by_active_run() {
   reap "$pid"
   ack_stopped_cycle "$state" || fail "could not acknowledge the phase-B watcher stop"
   # Phase C: once validation stops, the same old timer must still alert.
-  export FM_FAKE_CREW_STATE='state: unknown · source: none · validation stopped'
+  export FM_FAKE_CREW_STATE='state: working · source: run-step · validating (running)'
   echo $(( $(date +%s) - 500 )) > "$state/.stale-since-$key"
   PATH="$fakebin:$PATH" FM_FAKE_TMUX_WINDOW="$window" FM_FAKE_TMUX_CAPTURE="$capture_file" \
     watch_bg "$state" "$fakebin" "$out" env FM_STALE_ESCALATE_SECS=240
@@ -2352,7 +2353,7 @@ test_stale_terminal_status_overridden_by_active_run() {
   wait_for_exit "$pid" 100 || { reap "$pid"; fail "stopped validation did not alert"; }
   grep -F "possible wedge" "$out" >/dev/null || fail "stopped validation's alert was missing"
   unset FM_FAKE_CREW_STATE
-  pass "active validation protects a frozen terminal, but stopped validation still alerts"
+  pass "recent validation protects a frozen terminal, but a running record alone still alerts"
 }
 
 # --- non-terminal stale, crew provably working: absorbed, then wedge-escalated ---
@@ -4999,6 +5000,43 @@ test_busy_pane_turn_end_touch_resets_age() {
   pass "touching a busy worker's completed-turn marker resets the age and prevents an old-age escalation"
 }
 
+test_progress_observation_keeps_concurrent_writes() (
+  . "$ROOT/bin/fm-busy-lib.sh"
+  . "$ROOT/bin/fm-watch-progress-lib.sh"
+  local source dir identity observed injected
+  for source in status turn-ended busy-state progress; do
+    dir=$(make_case "observation-race-$source")
+    STATE="$dir/state"
+    observed="$STATE/.activity-observed-race"
+    identity="race:$(fm_busy_current_gen "$STATE" race 2>/dev/null || true)"
+    printf '%s' "$identity" > "$observed"
+    printf 'working: earlier\n' > "$STATE/race.$source"
+    touch -t 200001010000 "$STATE/race.$source"
+    injected=0
+    inject_append() {
+      [ "$injected" -eq 0 ] || return 0
+      injected=1
+      sleep 0.02
+      printf 'working: concurrent write\n' >> "$STATE/race.$source"
+    }
+    mv() {
+      [ "${*: -1}" != "$observed" ] || inject_append
+      command mv "$@"
+    }
+    touch() {
+      [ "${*: -1}" != "$observed" ] || inject_append
+      command touch "$@"
+    }
+    observe_window_progress race race 'working: earlier' || true
+    [ ! -e "$STATE/.activity-race" ] || fail "$source was credited before it was scanned"
+    [ "$injected" -eq 1 ] || fail "$source concurrent writer did not run"
+    observe_window_progress race race 'working: concurrent write' || true
+    [ -e "$STATE/.activity-race" ] || fail "$source concurrent write was permanently skipped"
+    unset -f mv touch inject_append
+  done
+  pass "every activity source written after its scan remains eligible at the next poll"
+)
+
 test_worker_progress_sources_reset_old_wedge() {
   local source dir state fakebin out capture window key pid text
   for source in status turn event; do
@@ -7356,6 +7394,7 @@ test_busy_pane_below_turn_age_bound_is_absorbed
 test_busy_pane_stable_hash_escalates_past_turn_age_bound
 test_busy_pane_changing_hash_escalates_past_turn_age_bound
 test_busy_pane_turn_end_touch_resets_age
+test_progress_observation_keeps_concurrent_writes
 test_worker_progress_sources_reset_old_wedge
 test_idle_pane_native_progress_defers_stale
 test_busy_pane_native_progress_resets_age

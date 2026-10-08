@@ -1251,6 +1251,9 @@ if [ "$HAVE_RUN" = 1 ]; then
   esac
 
   [ -z "$SELECTED_RUN_ID" ] || RUN_DETAIL="$RUN_DETAIL${SEP}run: $SELECTED_RUN_ID"
+  if [ "$RUN_STATE" = working ] && [ "$RUN_SOURCE" = full ] && nm_run_activity_is_recent; then
+    RUN_DETAIL="execution active${SEP}$RUN_DETAIL"
+  fi
   emit "$RUN_STATE" run-step "$RUN_DETAIL"
 fi
 

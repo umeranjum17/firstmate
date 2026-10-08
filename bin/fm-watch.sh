@@ -1932,7 +1932,7 @@ phantom_pane_prune() {
     # markers left behind would strand the orphans unfindable.
     rm -f "$STATE/.hash-$key" "$STATE/.count-$key" "$STATE/.churn-since-$key" \
       "$STATE/.dead-reported-$key" "$STATE/.truth-read-$key" "$STATE/.truth-raised-$key" \
-      "$STATE/.activity-$key" "$STATE/.activity-observed-$key" || continue
+      "$STATE/.activity-$key" "$STATE/.activity-observed-$key" "$STATE/.activity-observed-$key.next" || continue
     rm -f "$tracked" || continue
     reason="stale: $w (pane vanished, state pruned: no task record owns it and the backend confirms it is gone)"
     fm_wake_append stale "$w" "$reason" || exit 1
