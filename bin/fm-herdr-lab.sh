@@ -138,10 +138,10 @@ fm_herdr_lab_ensure_isolated_xdg() { # <session>
   fi
   base=$(fm_herdr_lab_xdg_base "$1") || return 1
   for sub in home config data state cache; do
-    [ ! -L "$base/$sub" ] && { [ ! -e "$base/$sub" ] || fm_herdr_lab_private_dir "$base/$sub"; } || {
+    if [ -L "$base/$sub" ] || { [ -e "$base/$sub" ] && ! fm_herdr_lab_private_dir "$base/$sub"; }; then
       fm_herdr_lab_error "unsafe disposable directory: $base/$sub"
       return 1
-    }
+    fi
   done
   (umask 077; mkdir -p "$base/home" "$base/config" "$base/data" "$base/state" "$base/cache") || {
     fm_herdr_lab_error "cannot create isolated XDG directories under $base"
