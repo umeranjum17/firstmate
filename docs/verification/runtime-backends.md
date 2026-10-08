@@ -1186,6 +1186,24 @@ The CLI matrix was checked directly:
 All destructive verification used `bin/fm-herdr-lab.sh` with a non-default `fm-lab-` name and a byte-identical default-session tripwire.
 No ambient `herdr server stop` command is a supported test operation.
 
+### Waiting-state native list probe
+
+Verified 2026-10-08 on Linux with Herdr 0.9.1, using the task's own pane only:
+
+```sh
+herdr agent list | jq -c --arg pane "$HERDR_PANE_ID" '{resultKeys:(.result|keys),status:[.result.agents[] | select(.pane_id == $pane) | .agent_status]}'
+herdr --version
+```
+
+```text
+{"resultKeys":["agents","type"],"status":["working"]}
+herdr 0.9.1
+```
+
+This proves the native list envelope and pane/status field path, not a live permission popup or a blocked-to-working transition.
+`bin/fm-test-run.sh tests/fm-wait-timers.test.sh` exercises the real watcher, queue drain and local/remote parent-channel publication with a terminal API fixture, including blocked overriding a working log, declaration timers, deduplication and re-arming.
+The declaration path is backend- and harness-independent; only native Herdr state adds a backend-specific read, without lifecycle actions or changes to busy classification.
+
 ### Disposable Herdr lab HOME
 
 Verified 2026-10-08 on Linux with Herdr 0.9.1 (protocol 22): a real pane created through the guarded lab helper reported disposable HOME and config/data/state/cache XDG paths, wrote a tool marker only into its disposable `$HOME/.local/bin`, and retained no inherited credential directories.
