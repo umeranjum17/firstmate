@@ -1143,6 +1143,7 @@ EOF
 # budget. The per-mate liveness lock serializes this tick against a concurrent
 # session-start sweep, so neither side can kill or re-probe an endpoint the
 # other is mid-relaunch on.
+# shellcheck source=bin/fm-host-memory-sampler.sh
 . "$SCRIPT_DIR/fm-host-memory-sampler.sh"
 
 host_memory_surface_queued() {

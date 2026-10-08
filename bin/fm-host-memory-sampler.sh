@@ -9,7 +9,7 @@ MEMORY_SAMPLER_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/fm-host-memor
 
 fm_memory_sampler_matches() {
   local pid identity current suffix
-  IFS=$'\t' read -r pid identity < "$STATE/.host-memory-sampler.pid" 2>/dev/null || return 1
+  IFS=$'\t' read -r pid identity 2>/dev/null < "$STATE/.host-memory-sampler.pid" || return 1
   case "$pid" in ''|*[!0-9]*|0|1) return 1 ;; esac
   [ -n "$identity" ] || return 1
   current=$(fm_pid_identity "$pid") || return 1
@@ -107,7 +107,7 @@ fm_memory_sampler_tick() {
 
 fm_memory_sampler_cleanup() {
   local pid identity
-  IFS=$'\t' read -r pid identity < "$STATE/.host-memory-sampler.pid" 2>/dev/null || pid=
+  IFS=$'\t' read -r pid identity 2>/dev/null < "$STATE/.host-memory-sampler.pid" || pid=
   [ "$pid" != "$$" ] || rm -f "$STATE/.host-memory-sampler.pid"
   fm_lock_release "$STATE/.host-memory-sampler.lock"
 }
@@ -118,7 +118,9 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
   FM_HOME=$2 STATE=$3 CONFIG=$4
   [ -d "$STATE" ] || exit 1
   SAMPLER_DIR=${MEMORY_SAMPLER_PATH%/*}
+  # shellcheck source=bin/fm-wake-lib.sh
   . "$SAMPLER_DIR/fm-wake-lib.sh"
+  # shellcheck source=bin/fm-backend.sh
   . "$SAMPLER_DIR/fm-backend.sh"
   fm_lock_try_acquire "$STATE/.host-memory-sampler.lock" || exit 0
   trap fm_memory_sampler_cleanup EXIT
