@@ -27,9 +27,9 @@ Usage (bin/fm-jev-mem-guard.sh runs this with python3):
 Verdicts: OK; WAIT (new agents wait); ALERT (watcher attempts one owned-task interrupt);
 UNKNOWN (not measurable, for example no pressure file: admits and records nothing).
 Thresholds come from config/host-memory (docs/configuration.md "Host memory guard").
-Consumers are summed RSS plus swap per owner: the task whose FM_TASK_ID the process
-carries, else the task or lead whose recorded worktree, task temp, or home holds its
-working directory (task records in each --state-dir), else the process itself.
+Consumers are summed RSS plus swap per owner: recorded worktree, task temp, or
+home paths qualify the process's working directory; FM_TASK_ID disambiguates tasks
+within that home (task records in each --state-dir), else the process is unowned.
 The proc root is FM_HOST_MEMORY_PROC (default /proc). Exit 2: usage or an invalid
 config file, with the reason on stderr.
 """
@@ -38,6 +38,7 @@ import argparse
 import math
 import os
 import sys
+import tempfile
 import time
 
 PROC = os.environ.get("FM_HOST_MEMORY_PROC") or "/proc"
@@ -209,19 +210,17 @@ def consumers(state_dirs, top=3):
             tid = next((e[11:].decode(errors="replace") for e in open(f"{base}/environ", "rb").read().split(b"\0")
                         if e.startswith(b"FM_TASK_ID=")), "")
             matches = tasks.get(tid, [])
-            owner = matches[0] if len(matches) == 1 else None
         except OSError:
             pass
-        if owner is None:
-            try:
-                cwd = os.path.realpath(os.readlink(f"{base}/cwd"))
-                owner = next((o for p, o in paths if cwd == p or cwd.startswith(p + "/")), None)
-                if len(matches) > 1 and owner not in matches:
-                    homes = [o for o in matches if cwd == os.path.dirname(o[0]) or
-                             cwd.startswith(os.path.dirname(o[0]) + "/")]
-                    owner = max(homes, key=lambda o: len(o[0])) if homes else None
-            except OSError:
-                pass
+        try:
+            cwd = os.path.realpath(os.readlink(f"{base}/cwd"))
+            owner = next((o for p, o in paths if cwd == p or cwd.startswith(p + "/")), None)
+            if matches and owner not in matches:
+                homes = [o for o in matches if cwd == os.path.dirname(o[0]) or
+                         cwd.startswith(os.path.dirname(o[0]) + "/")]
+                owner = max(homes, key=lambda o: len(o[0])) if homes else None
+        except OSError:
+            pass
         owner = owner or ("", "", f"{status.get('Name', '?').strip()} pid {pid}")
         group = groups.setdefault(owner, [0, 0])
         group[0] += kb
@@ -238,28 +237,39 @@ def line(s, v, why, cons):
     return f"{v}\t{text}" + (f"; largest: {', '.join(cons)}" if cons else "")
 
 
+def replace_text(path, text):
+    fd, tmp = tempfile.mkstemp(prefix=f".{os.path.basename(path)}.", dir=os.path.dirname(path) or ".")
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write(text)
+        os.replace(tmp, path)
+    finally:
+        try:
+            os.unlink(tmp)
+        except FileNotFoundError:
+            pass
+
+
 def record(path, s, v):
     with open(path, "a") as f:
         f.write(f"{int(time.time())}\t{s['available_kb']}\t{s['swap_used_kb']}\t{s['pressure']:.2f}\t{v}\n")
     with open(path) as f:
         rows = f.readlines()
     if len(rows) > KEEP_ROWS + 120:
-        with open(path + ".tmp", "w") as f:
-            f.writelines(rows[-KEEP_ROWS:])
-        os.replace(path + ".tmp", path)
+        replace_text(path, "".join(rows[-KEEP_ROWS:]))
 
 
 def admit(task, state, s, v, why):
     rec = os.path.join(state, "admission-refused")
     if v in ("OK", "UNKNOWN"):
-        if os.path.exists(rec):
+        try:
             os.remove(rec)
+        except FileNotFoundError:
+            pass
         return 0
     reason = f"host memory under pressure: {'; '.join(why)} ({summary(s)})"
     os.makedirs(state, exist_ok=True)
-    with open(rec + ".tmp", "w") as f:
-        f.write(f"{int(time.time())}\t{task}\t{reason}\n")
-    os.replace(rec + ".tmp", rec)
+    replace_text(rec, f"{int(time.time())}\t{task}\t{reason}\n")
     print(reason)
     return 1
 
