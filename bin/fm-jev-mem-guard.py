@@ -2,34 +2,35 @@
 """
 fm-jev-mem-guard.py - host memory guard: measure, admit, and alert before an oomd kill.
 
-Every fleet agent runs inside one agent-runtime service, and systemd-oomd kills
+On Herdr, fleet agents share one agent-runtime service, and systemd-oomd kills
 that service as a unit when its slice's memory pressure stays above the oomd
 limit (on the reference host: "some" avg10 above 50% for 20 s). Read host
 and runtime cgroup pressure independently and classify the worse reading.
 Admission refusal and watcher interrupts cannot guarantee avoidance of an oomd kill.
 
 Usage (bin/fm-jev-mem-guard.sh runs this with python3):
-  fm-jev-mem-guard.sh [--config FILE] [--state-dir HOME DIR ...]
+  fm-jev-mem-guard.sh [--config FILE] [--state-dir HOME DIR]...
       Print "<verdict>\t<summary>" for the host, naming the largest consumers.
   fm-jev-mem-guard.sh [--config FILE] --admit TASK --state DIR
       Admission for one agent launch (bin/fm-spawn.sh, bin/fm-control.sh relaunch).
       Exit 0 admits and removes DIR/admission-refused. Exit 1 refuses: prints the
       reason and writes DIR/admission-refused as "<epoch>\t<task>\t<reason>".
-  fm-jev-mem-guard.sh [--config FILE] --record FILE [--state-dir HOME DIR ...]
+  fm-jev-mem-guard.sh [--config FILE] --record FILE [--state-dir HOME DIR]...
       One independent sampler sample (bin/fm-host-memory-sampler.sh): appends
       "<epoch>\t<MemAvailable kB>\t<swap used kB>\t<pressure some avg10>\t<verdict>"
-      to FILE, keeping the newest 8640 rows (a day at the 10 s cadence), and prints
+      to FILE, trimming to the newest 8640 rows once it exceeds 8760, and prints
       "<verdict>\t<summary>"; an ALERT summary names the largest consumers.
 
   --owned-top-task DIR appends a tab and the top consumer's task ID only when
       that consumer is a task recorded in DIR (for the watcher's interrupt).
 
-Verdicts: OK; WAIT (new agents wait); ALERT (watcher attempts one owned-task interrupt);
+Verdicts: OK; WAIT (new agents wait); ALERT (sampler attempts one owned-task interrupt);
 UNKNOWN (not measurable, for example no pressure file: admits and records nothing).
 Thresholds come from config/host-memory (docs/configuration.md "Host memory guard").
 Consumers are summed RSS plus swap per owner: recorded worktree or explicit
 home paths qualify the process's working directory; FM_TASK_ID disambiguates tasks
 within that home (task records in each --state-dir), else the process is unowned.
+Remote records (remote_host set) never contribute local task or home owners.
 The proc root is FM_HOST_MEMORY_PROC (default /proc). Exit 2: usage or an invalid
 config file, with the reason on stderr.
 """
