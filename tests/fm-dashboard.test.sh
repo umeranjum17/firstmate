@@ -827,7 +827,35 @@ assert states['blocked'] == 2, states
 assert states['validating'] == 1, states
 PY
   has "$d/index.html" 'Stuck 3' '2 blocked'
-  pass "blocked and failed CI lanes stay stuck while paused CI remains validating"
+  lane "$home" m-held-ci ship "paused [at=$now]: waiting for CI checks" \
+    "needs-decision [at=$now] [key=captain-hold-ci]: captain parked CI"
+  build "$home"
+  python3 - "$d" <<'PY' || fail "captain-held lane disagrees between board and metrics"
+import json, pathlib, sys
+out = pathlib.Path(sys.argv[1])
+metrics = json.loads((out / 'data.json').read_text())['metrics']
+board = json.loads((out / 'board.json').read_text())
+held = next(c for c in board['cards'] if c.get('task') == 'm-held-ci')
+assert held['wait'] == 'parked', held
+assert metrics['stuck']['value'] == 3, metrics['stuck']
+assert metrics['stuck']['value'] == sum(c.get('wait') in ('blocked', 'decision') for c in board['cards'])
+assert metrics['lanes']['value'] == sum(metrics['lane_states']['value'].values()) == 9
+PY
+  has "$d/index.html" 'Stuck 3' '2 blocked'
+  printf 'resolved [at=%s] [key=captain-hold-ci]: captain released CI\nfailed [at=%s]: CI checks failed\n' "$now" "$now" >> "$home/state/m-held-ci.status"
+  build "$home"
+  python3 - "$d" <<'PY' || fail "released CI failure was not counted as stuck"
+import json, pathlib, sys
+out = pathlib.Path(sys.argv[1])
+metrics = json.loads((out / 'data.json').read_text())['metrics']
+board = json.loads((out / 'board.json').read_text())
+released = next(c for c in board['cards'] if c.get('task') == 'm-held-ci')
+assert released['wait'] == 'blocked', released
+assert metrics['stuck']['value'] == 4, metrics['stuck']
+assert metrics['stuck']['value'] == sum(c.get('wait') in ('blocked', 'decision') for c in board['cards'])
+PY
+  has "$d/index.html" 'Stuck 4' '3 blocked'
+  pass "CI failures stay stuck unless captain-held, and releasing the hold restores the count"
 }
 
 if [ "${1:-}" = ci-stuck ]; then test_ci_failures_remain_stuck_in_metrics; exit; fi

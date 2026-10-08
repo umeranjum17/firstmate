@@ -452,7 +452,7 @@ for h, d in sorted(home_dir.items()):
             elif verb in ('resolved', 'captain-held'): keys.discard(key)
             text = l.split(':', 1)[1].strip() if ':' in l else ''
             pr = (re.findall(r'https://github\.com/[\w.-]+/[\w.-]+/pull/\d+', l) or [pr])[-1]
-        if any(k.startswith('captain-hold') for k in keys): state = 'decision'
+        if any(k.startswith('captain-hold') for k in keys): state = 'waiting'
         elif verb in ('working', 'resolved'): state = 'building'
         elif verb == 'needs-decision': state = 'decision'
         elif verb == 'done': state = 'finished'
