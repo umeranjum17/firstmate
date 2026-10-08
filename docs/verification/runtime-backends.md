@@ -1193,8 +1193,10 @@ herdr 0.9.1
 ```
 
 This proves the native list envelope and pane/status field path, not a live permission popup or a blocked-to-working transition.
-`bin/fm-test-run.sh tests/fm-wait-timers.test.sh` exercises the real watcher, queue drain and local/remote parent-channel publication with a terminal API fixture, including blocked overriding a working log, declaration timers, deduplication and re-arming.
-The declaration path is backend- and harness-independent; only native Herdr state adds a backend-specific read, without lifecycle actions or changes to busy classification.
+The behavior contract is [Waiting-state escalation](../configuration.md#waiting-state-escalation).
+`bin/fm-test-run.sh tests/fm-wait-timers.test.sh` exercises the real watcher, queue drain and local/remote parent-channel publication with a terminal API fixture, including blocked overriding a working log, owner-first restart timing, declaration timers, deduplication, re-arming, Cursor exclusion and a bounded agent-list failure.
+`bin/fm-test-run.sh tests/fm-wait-timers-tmux-e2e.test.sh` exercises real tmux watcher/drain journeys for pause deadlines, owner-only pause rechecks, active captain holds and the blocked/needs-decision restart ladder.
+Neither regression proves live Cursor status behavior or a stalled native Herdr service.
 
 ### Disposable Herdr lab HOME
 
