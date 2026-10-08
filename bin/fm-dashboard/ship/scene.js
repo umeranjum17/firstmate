@@ -1,5 +1,5 @@
 // The Ship view's 3D world in the ship-or-die art direction: a night sea in hard colour bands with the moon's glints,
-// rendered at half resolution with crisp pixels and ink outlines. One home's flagship carries its workers at a deck
+// rendered with crisp pixels and ink outlines. One home's flagship carries its workers at a deck
 // station per stage, each worker a chibi in its model's colour, and the lead stands at the wheel.
 import * as THREE from '../vendor/three-0.186.1.min.js'
 import { render } from '../vendor/preact-htm-3.1.1.js'
