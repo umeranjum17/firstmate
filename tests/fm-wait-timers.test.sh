@@ -145,6 +145,7 @@ cat > "$dir/fakebin/herdr" <<'SH'
 if [ "$1 $2" = 'agent list' ]; then sleep 30; else exit 1; fi
 SH
 for tool in timeout gtimeout; do
+  # shellcheck disable=SC2016 # The generated script expands FM_HOME at runtime.
   printf '#!/usr/bin/env bash\nprintf "coreutils-called\\n" >> "$FM_HOME/coreutils-calls"\nexit 125\n' > "$dir/fakebin/$tool"
   chmod +x "$dir/fakebin/$tool"
 done
