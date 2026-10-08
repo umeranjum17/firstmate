@@ -65,7 +65,7 @@ export CLAUDE_CONFIG_DIR="$HOME_DIR/owner-claude" PI_CODING_AGENT_DIR="$HOME_DIR
 export CODEX_HOME="$HOME_DIR/owner-codex" OPENAI_API_KEY=lab-synthetic-openai
 export ANTHROPIC_API_KEY=lab-synthetic-key ANTHROPIC_AUTH_TOKEN=lab-synthetic-token
 export CLAUDE_CODE_OAUTH_TOKEN=lab-synthetic-oauth CLAUDE_CODE_USE_BEDROCK=1
-export FM_HERDR_LAB_FLEET_HOME="$CALLER_HOME" FM_HERDR_LAB_FLEET_QUERY=1
+export FM_HERDR_LAB_FLEET_HOME="$CALLER_HOME"
 (
   . "$ROOT/tests/herdr-test-safety.sh"
   PREPARED_SESSION=$(fm_herdr_lab_name prepare-proof)
