@@ -491,6 +491,7 @@ test_incomplete_lanes_and_moved_filings() {
   FM_HOME="$home" bash "$ROOT/bin/fm-tasks-axi.sh" list --limit 10000 --fields held,hold_kind,hold_reason,blocked,created,closed > "$home/backend.toon" || fail "backlog fixture failed"
   printf 'backend = "beads"\n' > "$home/.tasks.toml"
   real_tasks=$(command -v tasks-axi)
+  # shellcheck disable=SC2016 # the single-quoted stub expands when it runs
   printf '#!/bin/sh\n[ "$PWD" = "%s" ] || exec "%s" "$@"\n[ -z "${TASKS_AXI_FILE:-}" ] || exit 1\necho called > "%s/backend.called"\ncat "%s/backend.toon"\n' "$home" "$real_tasks" "$home" "$home" > "$home/stubs/tasks-axi"
   chmod +x "$home/stubs/tasks-axi"
   build "$home"
@@ -521,6 +522,22 @@ test_incomplete_lanes_and_moved_filings() {
   pass "moved filings count once and unavailable lanes retain unknown capacity across HTML and JSON"
 }
 
+test_new_lane_and_unwritten_archive_stay_exact() {
+  local home d before
+  home=$(make_home fresh)
+  d="$home/state/dashboard"
+  printf 'backend = "markdown"\n[markdown]\narchive = "data/custom-done.md"\n' > "$home/.tasks.toml"
+  build "$home"
+  before=$(jq '.metrics.lanes.value' "$d/data.json")
+  fm_write_meta "$home/state/m-new.meta" "kind=ship" "project=alpha" "herdr_pane_id=pane-m-new"
+  build "$home"
+  jq -e --argjson n "$((before + 1))" '.metrics.lanes.value == $n and .metrics.lanes.status == "exact" and .metrics.closed.status == "exact" and .metrics.closed.value > 0' "$d/data.json" >/dev/null ||
+    fail "a lane with no status line or an archive not yet written made a number unknown: $(jq -c '.metrics.lanes, .metrics.closed | del(.daily)' "$d/data.json")"
+  has "$d/index.html" "Closed 7 d 2"
+  pass "a lane with no status line yet and an archive not yet written keep their numbers exact"
+}
+
+test_new_lane_and_unwritten_archive_stay_exact
 test_incomplete_lanes_and_moved_filings
 test_review_evidence_boundaries
 test_overview_answers_the_four_questions_with_sums_that_add_up

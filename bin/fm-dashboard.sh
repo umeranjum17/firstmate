@@ -365,6 +365,8 @@ for h, d in sorted(home_dir.items()):
         try:
             ls = [l.strip() for l in open(os.path.join(sd, f[:-5] + '.status'), errors='replace') if l.strip()]
             mt = os.path.getmtime(os.path.join(sd, f[:-5] + '.status'))
+        except FileNotFoundError:  # a lane just started: no status line yet, building since its record
+            ls, mt = [], os.path.getmtime(os.path.join(sd, f))
         except OSError as e:
             lane_err.add(h); notes.append(('lane records', f'{h}: {e.strerror}')); continue
         keys, verb, at, text, pr = set(), 'working', None, '', ''
@@ -527,8 +529,8 @@ for h in ACTIVE:
         for f in (source, os.path.join(root, archive)):
             try: fh = open(f, encoding='utf-8', errors='replace')
             except FileNotFoundError:
-                if f == source or 'archive' in (settings.get('markdown') or {}): raise
-                continue
+                if f == source: raise
+                continue  # tasks-axi writes the archive with its first archived item: none yet
             with fh:
                 for l in fh:
                     m, ds = CLOSED.match(l), CDATE.findall(l)
