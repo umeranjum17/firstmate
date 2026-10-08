@@ -666,11 +666,12 @@ The helper's header owns exact parsing, publication, and report output mechanics
 ## Host memory guard (config/host-memory)
 
 The agent runtime runs every agent of every home in one service, so a host out of memory loses the whole fleet at once.
-The host memory guard reads the host's available memory, swap, and memory pressure (the share of time some process waited on memory over 10 seconds) and acts before the system's out-of-memory killer does:
+The host memory guard reads available memory, swap, and host and runtime-cgroup pressure (the share of time some process waited on memory over 10 seconds), classifying the worse pressure reading. It reads the `herdr-server.service` cgroup and its parent user slice when available; unreadable cgroup pressure is reported as host-only classification. These controls reduce risk but cannot guarantee avoidance of an out-of-memory kill:
 
-- Each watcher records a sample in `state/host-memory.tsv`, and the dashboard shows the last hour's peak pressure and current swap.
+- Each watcher samples every 10 seconds by default (`FM_HOST_MEMORY_SECS`) into `state/host-memory.tsv`, and the dashboard shows the last hour's peak measured pressure and current swap.
 - At the wait level, `bin/fm-spawn.sh` and `bin/fm-control.sh relaunch` refuse to start a new agent, leave the task queued, and record the reason in `state/admission-refused`, which the dashboard raises for 15 minutes.
-- At the alert level, the watcher raises one `check: host memory ALERT` wake per episode naming the largest memory consumers by task, lead, or process; an OK sample ends the episode.
+- At the alert level, the watcher attempts one automatic `fm-control.sh <task-id> interrupt` per episode if the top consumer is a task this home owns; it never exits, kills, or discards that task. It records the task, reason, and result in `state/host-memory-interrupts.tsv` and raises a `check: host memory ALERT` wake naming the consumer and interrupt result (or the ownership skip). An OK sample ends the episode.
+- Local secondmate liveness recovery checks admission before consuming its retry budget or removing a dead endpoint, so memory deferral leaves recovery eligible when pressure eases.
 
 `config/host-memory` is optional; each line is `key=number`, `#` starts a comment, and a missing key keeps its default:
 
@@ -681,7 +682,8 @@ The host memory guard reads the host's available memory, swap, and memory pressu
 | `alert_pressure` | `35` | the watcher alerts while pressure is at or above this percentage |
 | `alert_available_gb` | `6` | the watcher alerts while available memory is below this many GB |
 
-An invalid line is refused with its line number, so a typo never silently loosens the guard.
+Thresholds must be finite, nonnegative numbers. An invalid line is refused with its line number, so a typo never silently loosens the guard.
+For fixture testing, `FM_HOST_MEMORY_PROC` selects the proc root and `FM_HOST_MEMORY_CGROUP_ROOT` selects the cgroup root; production defaults are `/proc` and `/sys/fs/cgroup`.
 A host without pressure readings or without `python3` reads unknown and admits work, because the guard cannot measure it.
 The guard's header owns the sample format and exact output.
 
@@ -2338,7 +2340,7 @@ FM_STARTUP_NETWORK_TIMEOUT=120   # seconds bounding the deferred inactive-outcom
 FM_TASKS_AXI_COMPATIBLE=   # internal one-hop handoff of an already-computed tasks-axi compatibility verdict (0 or 1); consumed when bin/fm-tasks-axi-lib.sh is sourced
 FM_GUARD_READ_ONLY=0    # internal/read-only guard mode: keep alarms but suppress drain, supervision repair, and checkout repair commands
 FM_GUARD_CONTINUE_LINE='This is a supervision warning only; the guarded operation WILL still run.'   # banner continuation line; fm-send.sh overrides it to name the requested message specifically
-FM_POLL=15              # seconds between watcher poll cycles
+FM_POLL=10              # seconds between watcher poll cycles
 FM_HOME_SUMMARY_INTERVAL=300   # seconds before a live watcher refreshes this home's state/home-summary.json even without a status signal; invalid or zero values use 300
 FM_HOME_SUMMARY_TIMEOUT=60     # seconds bounding the complete best-effort home-summary refresh, including lock acquisition, validation, atomic publication, and worker-side failure logging; invalid or zero values use 60
 FM_HOME_SUMMARY_ERROR_LOG_MAX_BYTES=65536   # approximate size cap for state/.home-summary-refresh.log before it is trimmed to the newest 200 lines; invalid or zero values use 65536
@@ -2426,7 +2428,7 @@ FM_STALE_ESCALATE_SECS=240         # idle seconds before a provably-working stal
 FM_BUSY_TURN_MAX_SECS=3600         # maximum age without a completed turn or explicit native-harness progress (bin/fm-watch.sh owns marker selection), before the same wedge escalation used for a provably-working non-busy stale takes over; inspection-only, never an automatic interrupt or restart; a declared external wait, an attended verified captain-held transfer, or - where config/wedge-defer-parked-gate arms it - a validation gate of the crew's own awaiting the supervisor's still-unanswered decision takes the FM_PAUSE_RESURFACE_SECS recheck below instead
 FM_PAUSE_RESURFACE_SECS=14400      # four hours between bounded rechecks of a declared external wait or verified captain-held transfer, and between repeated new-hash stale alarms for an ordinary crew task with an open backlog captain call; a structured until time can make an external-wait recheck occur sooner but cannot extend this bound; this includes a live idle pane after its first inconclusive stale wake, a provably-working pane whose own unelapsed declared wait or, where config/wedge-defer-parked-gate arms it, unanswered supervisor-owed validation gate defers its FM_STALE_ESCALATE_SECS escalation, and a live busy pane past FM_BUSY_TURN_MAX_SECS, while the away-mode daemon uses the same setting and ages its window against the crew's own latest status line rather than pane busy state; a captain-held transfer is never rechecked while the away-posture record exists, while an armed validation gate awaiting the supervisor's decision keeps this recheck in either posture; an idle `paused:` claim contradicted by a parked run the worker never escalated wakes once per run state instead of taking this cadence (docs/architecture.md owns the contract)
 FM_SECONDMATE_WAKE_STALL_SECS=180  # minimum interval with no change of the oldest actionable foreign wake-queue row (it advances as the mate drains, and a queue reprovisioned under the same task id starts a fresh interval at whatever sequence it restarts) before an endpoint-recorded local secondmate produces one durable parent wake-loop-stall notification for that no-progress episode; a mate that is provably inside an active turn (an exact busy verdict, or that row held by its supervision branch's live grant) does not escalate until that same no-progress interval reaches FM_BUSY_TURN_MAX_SECS above; a mate whose busy class is exactly idle, whose agent is alive, and whose composer is not pending is rung once, naming that row, to drain it and run the acknowledgement the drain prints, and the parent notification is withheld until that same row stays frozen for another stall interval; unknown or ring-unsafe panes keep the parent alarm; declared external-wait pause rows are excluded, and zero or invalid values use 180
-FM_HOST_MEMORY_SECS=30          # seconds between watcher samples of host memory (config/host-memory)
+FM_HOST_MEMORY_SECS=10          # seconds between watcher memory samples (config/host-memory)
 FM_HOST_MEMORY_PROC=             # alternate /proc root for the host memory guard only, mainly for tests; bin/fm-test-run.sh points it at a missing path so suites never read the host
 FM_SECONDMATE_LIVENESS_SECS=60   # seconds between watcher probes of each registered secondmate's recorded endpoint through bin/fm-secondmate-liveness-lib.sh, which relaunches only a positively `dead` or `missing` endpoint through the ordinary guarded fm-spawn.sh --secondmate path and emits exactly one check wake per relaunch; zero or invalid values use 60
 FM_SECONDMATE_LIVENESS_TIMEOUT=120   # seconds bounding one watcher-driven relaunch, so a wedged spawn cannot stall the poll; zero or invalid values use 120

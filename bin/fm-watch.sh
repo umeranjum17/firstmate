@@ -170,10 +170,10 @@
 #                          FM_SECONDMATE_LIVENESS_WINDOW_SECS)
 #   check: host memory ALERT: <summary>; largest: <owner> <size>, ...
 #                          the host memory tick (every FM_HOST_MEMORY_SECS,
-#                          default 30) sampled ALERT from bin/fm-jev-mem-guard.sh,
+#                          default 10) sampled ALERT from bin/fm-jev-mem-guard.sh,
 #                          which also appends every sample to
-#                          state/host-memory.tsv; pause or stop the largest
-#                          consumer before oomd kills the whole agent runtime.
+#                          state/host-memory.tsv and attempts one interrupt of
+#                          the top consumer only if this home owns that task.
 #                          One wake per episode: state/.host-memory-alerted
 #                          latches it until a sample reads OK again
 # For normal supervision, resume the session-start primary-harness protocol
@@ -294,7 +294,7 @@ fi
 # markers, while bin/fm-wake-lib.sh owns their wake-facing routing, the legacy
 # turn-ended signature, annotation staleness checks, and guarded bookkeeping writes.
 
-POLL=${FM_POLL:-15}                   # seconds between cycles
+POLL=${FM_POLL:-10}                   # seconds between cycles
 # The liveness beacon is touched once per cycle, immediately before the
 # terminal wait below (event_wait_or_sleep) as well as at the top of the next
 # one, so a healthy cycle's beacon can legitimately age up to POLL seconds
@@ -390,7 +390,7 @@ case "$SECONDMATE_LIVENESS_SECS" in ''|*[!0-9]*|0) SECONDMATE_LIVENESS_SECS=60 ;
 # Host memory sampling cadence (host_memory_tick). oomd acts on 20 s of high
 # pressure, so the sample runs well inside the slower check sweep.
 HOST_MEMORY_SECS=${FM_HOST_MEMORY_SECS:-}
-case "$HOST_MEMORY_SECS" in ''|*[!0-9]*|0) HOST_MEMORY_SECS=30 ;; esac
+case "$HOST_MEMORY_SECS" in ''|*[!0-9]*|0) HOST_MEMORY_SECS=10 ;; esac
 # Per-relaunch wall-clock bound, so a wedged spawn cannot stall the poll.
 SECONDMATE_LIVENESS_TIMEOUT=${FM_SECONDMATE_LIVENESS_TIMEOUT:-}
 case "$SECONDMATE_LIVENESS_TIMEOUT" in ''|*[!0-9]*|0) SECONDMATE_LIVENESS_TIMEOUT=120 ;; esac
@@ -1153,13 +1153,13 @@ EOF
 # WAIT and ALERT is not re-announced. A guard that cannot run is logged, never
 # woken on: spawn admission reports a broken config loudly at the next launch.
 host_memory_tick() {
-  local marker="$STATE/.host-memory-tick" latch="$STATE/.host-memory-alerted" out reason d
+  local marker="$STATE/.host-memory-tick" latch="$STATE/.host-memory-alerted" out reason d task action result
   local -a dirs=()
   [ "$(age_of "$marker")" -ge "$HOST_MEMORY_SECS" ] || return 0
   touch "$marker" || return 0
   fm_local_firstmate_state_dirs "$STATE" 2>/dev/null || FM_LOCAL_STATE_DIRS=("$STATE")
   for d in "${FM_LOCAL_STATE_DIRS[@]}"; do dirs+=(--state-dir "$d"); done
-  out=$("$SCRIPT_DIR/fm-jev-mem-guard.sh" --config "$CONFIG/host-memory" --record "$STATE/host-memory.tsv" "${dirs[@]}" 2>&1) || {
+  out=$("$SCRIPT_DIR/fm-jev-mem-guard.sh" --config "$CONFIG/host-memory" --record "$STATE/host-memory.tsv" --owned-top-task "$STATE" "${dirs[@]}" 2>&1) || {
     triage_log "host memory guard failed: $out"
     return 0
   }
@@ -1169,10 +1169,30 @@ host_memory_tick() {
     *) return 0 ;;
   esac
   [ ! -e "$latch" ] || return 0
-  reason="check: host memory ALERT: ${out#*$'\t'}; pause or stop the largest consumer before oomd kills the whole agent runtime"
+  task=${out##*$'\t'}
+  out=${out%$'\t'*}
+  reason="check: host memory ALERT: ${out#*$'\t'}"
+  action="automatic interrupt skipped: top consumer is not a task this home owns"
+  case "$task" in
+    ''|*[!A-Za-z0-9._-]*) ;;
+    *) action="automatic interrupt attempted: task $task" ;;
+  esac
+  printf '%s\t%s\t%s\n' "$(date +%s)" "$task" "$reason; $action" >> "$STATE/host-memory-interrupts.tsv" || return 0
+  printf '%s\n' "$reason; $action" > "$latch" || return 0
+  case "$task" in
+    ''|*[!A-Za-z0-9._-]*) ;;
+    *)
+      if result=$("$SCRIPT_DIR/fm-control.sh" "$task" interrupt 2>&1); then
+        action="automatically interrupted task $task: $result"
+      else
+        action="automatic interrupt failed for task $task: $result"
+      fi
+      printf '%s\t%s\t%s\n' "$(date +%s)" "$task" "$action" >> "$STATE/host-memory-interrupts.tsv"
+      ;;
+  esac
+  reason="$reason; $action"
   if fm_wake_queued_keys check | grep -Fx host-memory >/dev/null 2>&1 \
     || fm_wake_append check host-memory "$reason"; then
-    : >"$latch"
     wake "$reason"
   fi
 }

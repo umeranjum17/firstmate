@@ -12,6 +12,7 @@ GUARD="$ROOT/bin/fm-jev-mem-guard.sh"
 WATCH="$ROOT/bin/fm-watch.sh"
 DRAIN="$ROOT/bin/fm-wake-drain.sh"
 TMP_ROOT=$(fm_test_tmproot fm-mem-guard)
+export FM_HOST_MEMORY_CGROUP_ROOT="$TMP_ROOT/no-cgroup"
 
 # fake_host <proc> <available-gb> <pressure-avg10> [swap-used-gb]
 fake_host() {
@@ -52,14 +53,14 @@ test_verdicts_samples_and_owners() {
   make_fleet "$case"
   fake_host "$case/proc" 40 2.5 1
   out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --record "$tsv" --state-dir "$case/state")
-  assert_equals $'OK\tpressure 2% (10 s average), 40.0 GB available, 1.0 GB swap used' "$out" "calm host"
+  assert_equals $'OK\tpressure 2% (10 s average), 40.0 GB available, 1.0 GB swap used; cgroup pressure unreadable; host-only classification' "$out" "calm host"
   fake_host "$case/proc" 30 24 3
   out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --record "$tsv" --state-dir "$case/state")
-  assert_equals $'WAIT\tpressure 24% (10 s average), 30.0 GB available, 3.0 GB swap used; pressure at or above 20%' "$out" \
+  assert_equals $'WAIT\tpressure 24% (10 s average), 30.0 GB available, 3.0 GB swap used; cgroup pressure unreadable; host-only classification; pressure at or above 20%' "$out" \
     "pressure past the wait threshold makes new agents wait"
   fake_host "$case/proc" 5 41.2 16
   out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --record "$tsv" --state-dir "$case/state")
-  assert_equals $'ALERT\tpressure 41% (10 s average), 5.0 GB available, 16.0 GB swap used; pressure at or above 35%; available memory below 6 GB; largest: task big-build (main) 14.0 GB in 2 processes, llama pid 104 6.0 GB, lead sm1 2.0 GB' "$out" \
+  assert_equals $'ALERT\tpressure 41% (10 s average), 5.0 GB available, 16.0 GB swap used; cgroup pressure unreadable; host-only classification; pressure at or above 35%; available memory below 6 GB; largest: task big-build (main) 14.0 GB in 2 processes, llama pid 104 6.0 GB, lead sm1 2.0 GB' "$out" \
     "an alert names the largest consumers by task, lead, or process"
   [ "$(wc -l < "$tsv" | tr -d ' ')" -eq 3 ] || fail "three samples should be recorded: $(cat "$tsv")"
   assert_equals $'5242880\t16777216\t41.20\tALERT' "$(tail -n 1 "$tsv" | cut -f2-)" "the sample row carries available kB, swap kB, pressure, verdict"
@@ -82,8 +83,8 @@ test_verdicts_samples_and_owners() {
 watch_leg() {
   local case=$1 tag=$2
   env PATH="$case/fakebin:$PATH" FM_HOME="$case" FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$case/state" \
-    FM_CREW_STATE_BIN="$case/fakebin/fm-crew-state.sh" TMUX='' FM_BACKEND=tmux \
-    FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_SECS=1 FM_SECONDMATE_LIVENESS_SECS=99999999 \
+    FM_CREW_STATE_BIN="$case/fakebin/fm-crew-state.sh" FM_FAKE_CREW_STATE='state: working · source: run-step · fixture build' TMUX='' FM_BACKEND=tmux \
+    FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_SECS="${3:-1}" FM_SECONDMATE_LIVENESS_SECS=99999999 \
     FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
     "$WATCH" > "$case/watch-$tag.out" 2> "$case/watch-$tag.err" &
   LEG_PID=$!
@@ -110,14 +111,32 @@ test_watcher_wakes_once_per_alert_episode() {
   case=$(make_case alert)
   make_fleet "$case"
   fake_host "$case/proc" 5 41.2 16
-  watch_leg "$case" alert
-  wait_for_exit "$LEG_PID" 300 || fail "the watcher did not wake on a memory alert: $(cat "$case/watch-alert.err")"
+  fm_write_meta "$case/state/big-build.meta" kind=ship harness=pi window=firstmate:fm-big-build "worktree=$case/wt" "project=$case/wt"
+  cat > "$case/fakebin/tmux" <<'SH'
+#!/usr/bin/env bash
+case "$1" in
+  list-windows) printf '%s\n' fm-big-build ;;
+  display-message)
+    case "$*" in *pane_current_command*) printf 'pi\n' ;; *) printf '%%1\n' ;; esac ;;
+  capture-pane) printf 'idle\n' ;;
+  send-keys) printf '%s\n' "$*" >> "$FM_HOME/keys" ;;
+  *) exit 1 ;;
+esac
+SH
+  chmod +x "$case/fakebin/tmux"
+  touch -d '11 seconds ago' "$case/state/.host-memory-tick"
+  watch_leg "$case" alert default
+  wait_for_exit "$LEG_PID" 50 || fail "the watcher did not wake on a memory alert: $(cat "$case/watch-alert.err")"
   out=$(cat "$case/watch-alert.out")
   assert_contains "$out" "check: host memory ALERT: pressure 41% (10 s average)" "the alert wake names the pressure"
   assert_contains "$out" "largest: task big-build (main) 14.0 GB in 2 processes" "the alert wake names the largest task"
   [ "$(grep -c $'\tcheck\thost-memory\t' "$case/state/.wake-queue")" -eq 1 ] \
     || fail "the alert was not queued durably exactly once: $(cat "$case/state/.wake-queue")"
   [ -s "$case/state/host-memory.tsv" ] || fail "the watcher did not record the sample"
+  assert_contains "$(cat "$case/keys")" 'send-keys -t firstmate:fm-big-build Escape' "the watcher uses the public control plane to interrupt"
+  [ "$(wc -l < "$case/keys")" -eq 1 ] || fail "one interrupt key expected"
+  assert_contains "$(cat "$case/state/host-memory-interrupts.tsv")" 'automatically interrupted task big-build' "the interrupt outcome is durable"
+  assert_contains "$out" 'automatically interrupted task big-build' "Main receives the interrupt outcome"
 
   # Still under alert: the episode is latched, so the next watcher stays quiet.
   drain_and_ack "$case"
@@ -125,6 +144,7 @@ test_watcher_wakes_once_per_alert_episode() {
   wait_rows "$case/state/host-memory.tsv" 3
   is_live_non_zombie "$LEG_PID" || fail "a latched alert woke again: $(cat "$case/watch-latched.out")"
   kill -TERM "$LEG_PID" 2>/dev/null; wait_for_exit "$LEG_PID" 50 >/dev/null || true
+  [ "$(wc -l < "$case/keys")" -eq 1 ] || fail "the latched episode interrupted again"
 
   # An OK sample ends the episode; the next alert wakes again.
   fake_host "$case/proc" 40 2
@@ -138,8 +158,82 @@ test_watcher_wakes_once_per_alert_episode() {
   watch_leg "$case" again
   wait_for_exit "$LEG_PID" 300 || fail "a new alert episode did not wake"
   assert_contains "$(cat "$case/watch-again.out")" "check: host memory ALERT" "the second episode wakes"
-  pass "the watcher samples memory and wakes once per alert episode, naming the largest task"
+  [ "$(wc -l < "$case/keys")" -eq 2 ] || fail "the new episode did not interrupt once"
+  fake_host "$case/proc" 40 2
+  drain_and_ack "$case"
+  watch_leg "$case" calm-foreign
+  wait_rows "$case/state/host-memory.tsv" "$(( $(wc -l < "$case/state/host-memory.tsv") + 1 ))"
+  kill -TERM "$LEG_PID" 2>/dev/null; wait_for_exit "$LEG_PID" 50 >/dev/null || true
+  fake_pid "$case/proc" 105 foreign 25 /
+  fake_host "$case/proc" 5 41
+  drain_and_ack "$case"
+  watch_leg "$case" foreign
+  wait_for_exit "$LEG_PID" 300 || fail "a foreign top consumer did not wake Main"
+  assert_contains "$(cat "$case/watch-foreign.out")" 'foreign pid 105 25.0 GB' "the skipped top consumer is named"
+  assert_contains "$(cat "$case/watch-foreign.out")" 'automatic interrupt skipped' "foreign ownership is reported"
+  [ "$(wc -l < "$case/keys")" -eq 2 ] || fail "a foreign top consumer caused an interrupt"
+  pass "the watcher samples memory and interrupts once per alert episode, naming the largest task"
+}
+
+test_cgroup_pressure() {
+  local case=$TMP_ROOT/cgroup out rc group=user.slice/user-123.slice/user@123.service/app.slice/herdr-server.service
+  fake_host "$case/proc" 40 2
+  mkdir -p "$case/proc/self" "$case/cgroup/$group" "$case/state"
+  printf '0::/%s/child\n' "$group" > "$case/proc/self/cgroup"
+  printf 'some avg10=58.88 avg60=0 avg300=0 total=1\n' > "$case/cgroup/$group/memory.pressure"
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --record "$case/state/sample")
+  assert_contains "$out" $'ALERT\tpressure 59%' "cgroup pressure dominates a calm host"
+  assert_contains "$out" 'host 2%, cgroup 59%' "the independent measurements are visible"
+  assert_equals '58.88' "$(cut -f4 "$case/state/sample")" "the recorded pressure is the worse signal"
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build --state "$case/state"); rc=$?
+  [ "$rc" -eq 1 ] || fail "critical cgroup pressure admitted work: $out"
+  rm "$case/cgroup/$group/memory.pressure"
+  mkdir -p "$case/cgroup/user.slice/user-123.slice"
+  printf 'some avg10=24 avg60=0 avg300=0 total=1\n' > "$case/cgroup/user.slice/user-123.slice/memory.pressure"
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD")
+  assert_contains "$out" $'WAIT\tpressure 24%' "the parent user slice is measured when the unit is unreadable"
+  rm "$case/cgroup/user.slice/user-123.slice/memory.pressure"
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD")
+  assert_contains "$out" 'host-only classification' "unreadable cgroup pressure is explicit"
+  pass "cgroup pressure participates in classification and admission"
+}
+
+test_home_qualified_owners() {
+  local case=$TMP_ROOT/owners out
+  make_fleet "$case"
+  fake_host "$case/proc" 5 41
+  fm_write_meta "$case/mate/state/big-build.meta" kind=ship "worktree=$case/mate/wt"
+  mkdir -p "$case/mate/wt"
+  fake_pid "$case/proc" 105 java 20 "$case/mate/wt" big-build
+  fake_pid "$case/proc" 106 node 10 "$case/mate" big-build
+  rm "$case/proc/102/cwd"
+  ln -s "$case/wt" "$case/proc/102/cwd"
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --state-dir "$case/state" --state-dir "$case/mate/state" --owned-top-task "$case/state")
+  assert_contains "$out" 'task big-build (sm1) 30.0 GB in 2 processes, task big-build (main) 14.0 GB in 2 processes' "equal task IDs remain separate owners"
+  assert_equals '' "${out##*$'\t'}" "a foreign top task cannot be interrupted by this home"
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --state-dir "$case/state" --state-dir "$case/mate/state" --owned-top-task "$case/mate/state")
+  assert_equals big-build "${out##*$'\t'}" "the owning home receives its exact task ID"
+  printf 'Name:\tpi\nVmRSS:\t41943040 kB\nVmSwap:\t0 kB\n' > "$case/proc/103/status"
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --state-dir "$case/state" --state-dir "$case/mate/state" --owned-top-task "$case/state")
+  assert_equals sm1 "${out##*$'\t'}" "a lead is controlled only through its parent-owned task record"
+  pass "task ownership stays home-qualified through grouping and control selection"
+}
+
+test_finite_thresholds() {
+  local case=$TMP_ROOT/thresholds key value out rc
+  fake_host "$case/proc" 30 25
+  for key in wait_pressure alert_pressure wait_available_gb alert_available_gb; do
+    for value in nan inf -inf; do
+      printf '%s=%s\n' "$key" "$value" > "$case/config"
+      out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --config "$case/config" 2>&1); rc=$?
+      [ "$rc" -eq 2 ] || fail "$key=$value should be invalid, got $rc: $out"
+    done
+  done
+  pass "all thresholds reject non-finite numbers"
 }
 
 test_verdicts_samples_and_owners
+test_cgroup_pressure
+test_home_qualified_owners
+test_finite_thresholds
 test_watcher_wakes_once_per_alert_episode
