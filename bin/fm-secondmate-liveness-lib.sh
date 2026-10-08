@@ -91,7 +91,7 @@ fm_sm_live_first_line() {
 # file is the durable per-mate relaunch record the captain can count to see
 # frequency. Fails when the row cannot be appended.
 fm_secondmate_liveness_ledger_add() {  # <id> <attempt|relaunched|failed|rearmed>
-  printf '%s\t%s\n' "$(date +%s)" "$2" >> "$STATE/.secondmate-relaunch-$1" 2>/dev/null
+  printf '%s\t%s\n' "$(date +%s)" "$2" 2>/dev/null >> "$STATE/.secondmate-relaunch-$1"
 }
 
 # Count of attempt rows no older than <window-secs> that follow the last
