@@ -432,7 +432,7 @@ fm_herdr_lab_viewer_start() { # <session>
     trap 'trap - INT TERM; [ -z "${launcher_pid:-}" ] || fm_herdr_lab_cancel_viewer_launcher "$launcher_pid"; exit 130' INT
     trap 'trap - INT TERM; [ -z "${launcher_pid:-}" ] || fm_herdr_lab_cancel_viewer_launcher "$launcher_pid"; exit 143' TERM
   fi
-  fm_herdr_lab_env "$name" nohup python3 "$launcher" "$name" "$record" >"$log" 2>&1 &
+  (fm_herdr_lab_runtime_env "$name" && exec nohup python3 "$launcher" "$name" "$record") >"$log" 2>&1 &
   launcher_pid=$!
 
   waited=0
@@ -565,7 +565,7 @@ fm_herdr_lab_provision() { # <session>
   else
     fm_herdr_lab_prepare "$name" || return 1
   fi
-  fm_herdr_lab_raw "$name" server >/dev/null 2>&1 &
+  (fm_herdr_lab_runtime_env "$name" && exec herdr server --session "$name") >/dev/null 2>&1 &
   server_pid=$!
   attempt=0
   max_attempts=300
@@ -685,7 +685,6 @@ fm_herdr_lab_usage() {
 fm_herdr_lab_main() {
   local command=${1:-}
   if [ "$command" = --isolated-xdg ]; then
-    FM_HERDR_LAB_ISOLATED_XDG=1
     shift
     command=${1:-}
   fi
