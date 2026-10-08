@@ -2913,6 +2913,9 @@ resurface_after_downtime() {
     fi
     [ "$FM_RECOVERY_MARKER_ACTION" = recover ] || return 0
   fi
+  # The independent sampler can publish after the earlier queue scan, while
+  # arm-check is deciding recovery. Preserve that queued alert's richer reason.
+  host_memory_surface_queued
   wake "check: rearm-resurface"
 }
 

@@ -307,7 +307,7 @@ test_finite_thresholds() {
 }
 
 test_benign_liveness_outcomes() {
-  local case pid
+  local case pid real_ln
   case=$(make_case deferred)
   make_fleet "$case"
   prepare_control_task "$case"
@@ -315,13 +315,31 @@ test_benign_liveness_outcomes() {
   printf 'pi\n' > "$case/config/secondmate-harness"
   fm_write_meta "$case/state/sm1.meta" kind=secondmate harness=pi window=firstmate:fm-sm1 "home=$case/mate"
   fake_host "$case/proc" 30 25
+  # Publish the alert after the watcher's queue scan but before its recovery
+  # check acquires the queue lock: a late memory row must keep its own reason.
+  real_ln=$(command -v ln)
+  cat > "$case/fakebin/ln" <<SH
+#!/usr/bin/env bash
+if [ "\${3:-}" = "\$FM_HOME/state/.wake-queue.lock" ] \\
+  && [ "\$PPID" = "\$(cat "\$FM_HOME/state/.watch.lock/pid" 2>/dev/null)" ] \\
+  && [ -e "\$FM_HOME/publish-alert" ]; then
+  rm "\$FM_HOME/publish-alert"
+  printf 'some avg10=41 avg60=1.00 avg300=1.00 total=1\\n' > "\$FM_HOME/proc/pressure/memory"
+  for ((i=0; i<100; i++)); do
+    grep -q \$'\\tcheck\\thost-memory\\t' "\$FM_HOME/state/.wake-queue" 2>/dev/null && break
+    sleep 0.1
+  done
+fi
+exec "$real_ln" "\$@"
+SH
+  chmod +x "$case/fakebin/ln"
   watch_leg "$case" wait 1 1
   pid=$LEG_PID
   wait_rows "$case/state/host-memory.tsv" 3
   is_live_non_zombie "$pid" || fail "memory deferral exited the watcher: $(cat "$case/watch-wait.err")"
   [ ! -e "$case/state/.secondmate-relaunch-sm1" ] || fail "a memory deferral consumed the retry budget"
-  fake_host "$case/proc" 30 41
-  wait_for_exit "$pid" 100 || fail "ALERT did not wake while recovery was deferred"
+  : > "$case/publish-alert"
+  wait_for_exit "$pid" 150 || fail "ALERT did not wake while recovery was deferred"
   wait_interrupt "$case/state"
   assert_contains "$(cat "$case/watch-wait.out")" 'automatic interrupt attempted: task big-build' "deferred recovery does not suppress critical action"
 
