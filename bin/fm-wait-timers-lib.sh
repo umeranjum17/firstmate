@@ -16,7 +16,9 @@
 _FM_WAIT_TIMER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=bin/fm-parent-channel-lib.sh
 . "$_FM_WAIT_TIMER_DIR/fm-parent-channel-lib.sh"
+# shellcheck source=bin/fm-wait-native-lib.sh
 . "$_FM_WAIT_TIMER_DIR/fm-wait-native-lib.sh"
+# shellcheck source=bin/fm-timeout-lib.sh
 . "$_FM_WAIT_TIMER_DIR/fm-timeout-lib.sh"
 
 fm_wait_timer_save() {  # <record> <signature> <since> <owner> <parent> <key>
@@ -165,6 +167,7 @@ EOF
       FM_WAIT_OWNER_SIGNATURE=$signature
       FM_WAIT_OWNER_SINCE=$since
       FM_WAIT_OWNER_KEY=$key
+      # shellcheck disable=SC2034 # Consumed by wake() in fm-push-transition-lib.sh.
       FM_WAKE_POST_OUTPUT_ACTION=fm_wait_timer_owner_delivered
       wake "$reason"
     fi

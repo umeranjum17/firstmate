@@ -3997,33 +3997,10 @@ test_identical_dead_display_of_a_successor_still_reports() {
 }
 
 
-# --- work the captain is already holding: pane churn must not re-alarm -------
-# The other record of a legitimate wait. The declared-wait bound above reads the
-# status LINE, and a delivered task's line stays `done: PR ...` while the wait
-# itself lives in the BACKLOG, written there by bin/fm-captain-hold.sh. No line
-# predicate can see that record, so both stale alarms - the captain-relevant one
-# and the inconclusive one - re-fired on every new pane hash for as long as the
-# captain was deciding, which is the 2026-09 loop observed on delivered work
-# awaiting their merge word.
-# Pinned here, in both directions: while the call stands the first sight still
-# alarms, further sights of the SAME call and status-log state are absorbed, and
-# a new pane hash after the window's end alarms once more; and the identical
-# fixture WITHOUT the hold keeps alarming on every hash, because a bound that
-# swallowed an unheld delivery or blocker would be worse than the churn it removes.
-#
-# The backlog is real rather than a fixture file: bin/fm-captain-hold.sh is the
-# only writer of a hold and tasks-axi the only reader, so a hand-written row
-# would pin this test's idea of a hold instead of the one the watcher consults.
-#
-# Cost: every case below drives churn through ONE watcher process rather than
-# relaunching per pane change. Watcher startup dominates a round here, and an
-# absorbing watcher stays in its poll loop across churn in production anyway, so
-# the cheaper shape is also the more faithful one.
-
-# The window key every hold fixture uses, derived the way fm-watch.sh derives it.
-hold_key() {
-  printf '%s' test:fm-held-merge | tr ':/.' '___'
-}
+# --- active backlog holds suppress stale alerts until released --------------
+# Use the real hold writer and tasks-axi reader, independent of status wording.
+# Held deliveries and working lines stay quiet even after the ordinary cadence;
+# their unheld counterparts and released tasks retain normal stale delivery.
 
 # bin/fm-captain-hold.sh against a hold fixture's own home.
 run_hold() {  # <dir> <args...>
@@ -4111,10 +4088,10 @@ hold_stale_wakes() {  # <state>
 # the captain-relevant stale branch, and a worker line that routes through the
 # inconclusive one. The hold is invisible to the status line in both, so both
 # branches had the same blindness and both are covered.
-test_open_captain_call_bounds_stale_churn() {
-  local spec name line dir state out capture throttle wakes
+test_active_captain_call_suppresses_stale_churn() {
+  local spec name line dir state out capture
   command -v tasks-axi >/dev/null 2>&1 \
-    || { echo "skip: tasks-axi not found (captain-hold stale bound)"; return 0; }
+    || { echo "skip: tasks-axi not found (captain-hold suppression)"; return 0; }
   for spec in \
     'held-delivery|done: PR https://example.invalid/pull/1 checks green' \
     'held-worker-line|working: still tidying the branch'
@@ -4123,35 +4100,24 @@ test_open_captain_call_bounds_stale_churn() {
     dir=$(make_hold_home "$name" "$line" hold) \
       || fail "[$name] could not build a captain-held backlog fixture"
     state="$dir/state"; out="$dir/watch.out"; capture="$dir/pane.txt"
-    throttle="$state/.paused-resurfaced-$(hold_key)"
 
-    # First sight still alarms: the call bounds repetition, never the first look.
-    hold_watch_surface "$dir" "$out" "$capture" 'idle, elapsed 1s' \
-      || fail "[$name] first sight of held work did not surface"
-    wakes=$(hold_stale_wakes "$state")
-    [ "$wakes" -eq 1 ] || fail "[$name] first sight produced $wakes wakes instead of one"
-    ack_stopped_cycle "$state" || fail "[$name] could not acknowledge the first surface"
+    # A short stale cadence must not turn an active hold into a recheck.
+    FM_HOLD_PAUSE_RESURFACE_SECS=1 hold_watch_churn "$dir" "$out" "$capture" 'idle, tick' 2 \
+      || fail "[$name] active hold raised an alert on first sight or later churn"
+    [ "$(hold_stale_wakes "$state")" -eq 0 ] \
+      || fail "[$name] active hold queued a stale wake"
+    [ ! -s "$out" ] || fail "[$name] active hold printed an alert"
 
-    # The pane churns while the SAME call stands. Every one of these alarmed.
-    hold_watch_churn "$dir" "$out" "$capture" 'idle, tick' 2 \
-      || fail "[$name] watcher exited during pane churn instead of supervising through it"
-    wakes=$(hold_stale_wakes "$state")
-    [ "$wakes" -eq 0 ] \
-      || fail "[$name] pane churn re-alarmed held work $wakes time(s) inside the re-surface window"
-
-    # After the window ends, the next new pane hash re-surfaces held work exactly
-    # once, so a forgotten call on a churning pane cannot hide behind the bound.
-    [ -e "$throttle" ] || fail "[$name] the absorbed churn recorded no re-surface cadence to elapse"
-    set_mtime "$(( $(date +%s) - 5000 ))" "$throttle"
-    hold_watch_surface "$dir" "$out" "$capture" 'idle, elapsed 9s' \
-      || fail "[$name] held work did not re-surface once its re-surface window elapsed"
-    wakes=$(hold_stale_wakes "$state")
-    [ "$wakes" -eq 1 ] \
-      || fail "[$name] elapsed re-surface window produced $wakes wakes instead of one"
+    printf 'go ahead\n' > "$dir/decision.txt"
+    run_hold "$dir" answer held-merge --decision-file "$dir/decision.txt" --release \
+      || fail "[$name] could not release the hold"
+    hold_watch_surface "$dir" "$out" "$capture" 'idle, released' \
+      || fail "[$name] release did not restore stale alerts"
+    [ "$(hold_stale_wakes "$state")" -eq 1 ] \
+      || fail "[$name] released work did not queue one stale wake"
   done
-  pass "work under an open captain call surfaces once, absorbs pane churn, then re-surfaces when the window elapses"
+  pass "active holds suppress first-sight and elapsed churn alerts; release restores stale delivery"
 }
-
 
 
 # The other half of the same bound, and the one that decides whether widening the
@@ -4185,17 +4151,13 @@ test_stale_churn_without_a_captain_call_still_alarms() {
 }
 
 
-# The cadence marker may never outlive the wake it claims to record. Recording it
-# before publishing the durable wake turned a delayed alarm into a lost one: the
-# append fails, the watcher exits with nothing queued, and the next sighting
-# reads that fresh marker and absorbs the retry. An unwritable queue is the real
-# failure, so it is the one this drives.
-test_failed_wake_append_does_not_arm_the_captain_hold_throttle() {
+# A failed durable append must leave unheld stale work replayable.
+test_failed_unheld_wake_append_is_replayable() {
   local dir state out capture wakes rc
   command -v tasks-axi >/dev/null 2>&1 \
     || { echo "skip: tasks-axi not found (failed wake append)"; return 0; }
-  dir=$(make_hold_home append-failure 'done: PR https://example.invalid/pull/1 checks green' hold) \
-    || fail "could not build a captain-held backlog fixture"
+  dir=$(make_hold_home append-failure 'done: PR https://example.invalid/pull/1 checks green' nohold) \
+    || fail "could not build an unheld backlog fixture"
   state="$dir/state"; out="$dir/watch.out"; capture="$dir/pane.txt"
 
   # A directory where the queue file belongs: every append fails, whatever the
@@ -4211,8 +4173,6 @@ test_failed_wake_append_does_not_arm_the_captain_hold_throttle() {
   rmdir "$state/.wake-queue"
   [ "$rc" -ne 124 ] || fail "the watcher did not exit when its durable queue could not be written"
   [ "$rc" -ne 0 ] || fail "the watcher reported success despite an unwritable durable queue"
-  [ -e "$state/.paused-resurfaced-$(hold_key)" ] \
-    && fail "a wake that never reached the durable queue still armed the re-surface throttle"
 
   # The retry must alarm: nothing was ever delivered, so nothing may be absorbed.
   hold_watch_surface "$dir" "$out" "$capture" 'idle, elapsed 2s' \
@@ -4220,47 +4180,31 @@ test_failed_wake_append_does_not_arm_the_captain_hold_throttle() {
   wakes=$(hold_stale_wakes "$state")
   [ "$wakes" -eq 1 ] \
     || fail "the retry after a failed wake append produced $wakes wakes instead of one"
-  pass "a wake that never reached the durable queue arms no re-surface throttle"
+  pass "an unheld stale wake retries after a failed durable append"
 }
 
-# The task id is not the captain call. A task can be answered with `--release`
-# and held again as a genuinely different call with NO status append, and binding
-# the throttle to the status-log signature alone let the second call inherit the
-# first one's silence and absorbed its first sight. That is the one alarm this
-# bound must never swallow: a delivery announced twice is noise, but a decision
-# waiting on the captain that is never surfaced is invisible.
-# Measured at base c499f84 this fixture alarms on every sighting, so the
-# suppression was introduced by the bound itself rather than pre-existing.
-test_reheld_captain_call_starts_its_own_resurface_window() {
-  local dir state out capture wakes
+# Re-holding without a status append must keep the new active hold quiet.
+test_reheld_captain_call_stays_quiet() {
+  local dir state out capture
   command -v tasks-axi >/dev/null 2>&1 \
     || { echo "skip: tasks-axi not found (re-held captain call)"; return 0; }
   dir=$(make_hold_home reheld-call 'done: PR https://example.invalid/pull/1 checks green' hold) \
     || fail "could not build a captain-held backlog fixture"
   state="$dir/state"; out="$dir/watch.out"; capture="$dir/pane.txt"
+  hold_watch_churn "$dir" "$out" "$capture" 'first hold' 1 \
+    || fail "the first active hold raised an alert"
 
-  hold_watch_surface "$dir" "$out" "$capture" 'idle, elapsed 1s' \
-    || fail "first sight of the first captain call did not surface"
-  ack_stopped_cycle "$state" || fail "could not acknowledge the first call's surface"
-  hold_watch_churn "$dir" "$out" "$capture" 'idle, tick' 1 \
-    || fail "the first call's churn was not absorbed"
-  [ "$(hold_stale_wakes "$state")" -eq 0 ] \
-    || fail "the first call's churn re-alarmed inside its own window"
-
-  # Answer and release, then re-hold: a second, distinct captain call on the same
-  # task id, with no status append, so the status signature cannot tell them apart.
   printf 'go ahead\n' > "$dir/decision.txt"
   run_hold "$dir" answer held-merge --decision-file "$dir/decision.txt" --release \
     || fail "could not record the captain's answer"
   run_hold "$dir" hold held-merge --reason 'awaiting the captain a second time' \
-    || fail "could not re-hold the task as a second captain call"
+    || fail "could not re-hold the task"
 
-  hold_watch_surface "$dir" "$out" "$capture" 'idle, elapsed 3s' \
-    || fail "the second captain call inherited the first call's silence"
-  wakes=$(hold_stale_wakes "$state")
-  [ "$wakes" -eq 1 ] \
-    || fail "the second captain call produced $wakes first wakes instead of one"
-  pass "a released-then-re-held task is a distinct captain call whose first sight still alarms"
+  hold_watch_churn "$dir" "$out" "$capture" 'second hold' 1 \
+    || fail "the second active hold raised an alert"
+  [ "$(hold_stale_wakes "$state")" -eq 0 ] && [ ! -s "$out" ] \
+    || fail "re-held work emitted a stale alert"
+  pass "a released-then-re-held task stays quiet while the new hold is active"
 }
 
 
@@ -6773,9 +6717,7 @@ test_backlog_hold_never_rechecked_while_away_record_exists() {
     || fail "could not build the backlog-hold fixture"
   out="$dir/watch.out"; capture="$dir/pane.txt"
   write_away_record "$dir/state"
-  # Without the record the FIRST sight of a held delivery alarms
-  # (test_stale_churn_without_a_captain_call_still_alarms and its siblings). With
-  # it, even the first sight and every later hash are absorbed.
+  # Active backlog holds stay quiet in away posture too, on every sight.
   hold_watch_churn "$dir" "$out" "$capture" 'held delivery, pane tick' 3 \
     || fail "watcher exited while churning a backlog-held delivery under the away-posture record: $(cat "$out")"
   wakes=$(hold_stale_wakes "$dir/state")
@@ -7281,10 +7223,10 @@ test_wedge_threshold_defers_to_a_parked_gate_awaiting_a_human
 test_wedge_threshold_parked_gate_needs_an_unanswered_decision
 test_wedge_threshold_parked_gate_is_off_until_armed
 test_wedge_defer_refuses_a_half_filled_wait_record
-test_open_captain_call_bounds_stale_churn
+test_active_captain_call_suppresses_stale_churn
 test_stale_churn_without_a_captain_call_still_alarms
-test_failed_wake_append_does_not_arm_the_captain_hold_throttle
-test_reheld_captain_call_starts_its_own_resurface_window
+test_failed_unheld_wake_append_is_replayable
+test_reheld_captain_call_stays_quiet
 test_secondmate_paused_resurfaces_in_normal_mode
 test_secondmate_captain_held_resurfaces_in_normal_mode
 test_secondmate_nonpaused_stale_remains_suppressed
