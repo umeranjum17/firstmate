@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Behavior tests for bin/fm-dashboard.sh: build the pages from a small fixture
-# fleet through the real script, the real fleet snapshot and the real tasks-axi,
-# with a stub herdr on PATH, then read each page's visible text
+# fleet through the real script and the real tasks-axi, with stub herdr,
+# quota-axi and device probes on PATH, then read each page's visible text
 # the way a person would, and over `serve`.
 set -u
 
@@ -56,10 +56,15 @@ lane() {  # <home> <task> <kind> <status line>...: a lane record whose last stat
   printf '%s\n' "$@" > "$home/state/$task.status"
 }
 
+summary() {  # <home> <state> <epoch> [json fields]: the summary a home publishes about itself
+  printf '{"schema":"fm-secondmate-home-summary.v1","home":"%s","state":"%s","generated_epoch":%s%s}\n' "$1" "$2" "$3" "${4:+,$4}" > "$1/state/home-summary.json"
+}
+
 # A fleet of Main, one active lead (zephyrine) and one parked lead (beta).
 # Lanes: Main has 2 building, 1 validating, 1 blocked, 1 on a decision, 1 finished,
 # 1 waiting; zephyrine has 1 building; parked beta has 1 building that no total counts.
 # Plan: Main 6 from config/lane-caps, every other home 3 from config/lane-target.
+# Landed and closed today: one item each in Main and zephyrine; a day ago, 4 lanes were stuck.
 make_home() {  # <name>
   local home="$TMP_ROOT/$1" now today z b stubs
   now=$(date +%s) today=$(date +%F)
@@ -80,11 +85,17 @@ make_home() {  # <name>
 - [ ] m-after - After the ready thing blocked-by: m-ready (repo: alpha) (kind: ship) (since $today)
 
 ## Done
+- [x] m-shipped - Ship the main thing (repo: alpha) (kind: ship) (merged $today)
 - [x] m-old - Landed long ago (repo: alpha) (kind: ship) (merged 2026-07-10)
 EOF
+  # The archive repeats an item still in the backlog; it counts once.
+  printf -- '- [x] m-shipped - Ship the main thing (repo: alpha) (kind: ship) (merged %s)\n' "$today" > "$home/data/done-archive.md"
   cat > "$z/data/backlog.md" <<EOF
 ## Queued
 - [ ] z-ready - Start the zephyrine thing (repo: alpha) (kind: ship) (since $today)
+
+## Done
+- [x] z-shipped - Ship the zephyrine thing (repo: alpha) (kind: ship) (merged $today)
 EOF
   cat > "$b/data/backlog.md" <<EOF
 ## In flight
@@ -100,6 +111,18 @@ EOF
   lane "$z" z-build ship "working [at=$((now - 60))]: building"
   lane "$b" b-stale ship "working [at=$((now - 60))]: building"
   fm_write_meta "$home/state/zephyrine.meta" "kind=secondmate" "harness=claude" "model=lead-model" "herdr_pane_id=pane-lead"
+  summary "$home" no_active_work "$now" '"endpoints":[{"id":"zephyrine","endpoint":{"exists":true,"agent_alive":"alive"}}]'
+  summary "$z" active_child_work "$now"
+  # Merges: zephyrine's on Main's channel for it, Main's own in its fleet ledger, which starts 2 days ago.
+  printf 'done [key=merged-z-shipped] [at=%s]: merged z-shipped https://github.com/acme/alpha/pull/5\n' "$((now - 120))" > "$home/state/zephyrine.status"
+  printf '{"ts":%s,"event":"ledger.started"}\n{"ts":%s,"event":"task.merged","task":"m-shipped","pr":"https://github.com/acme/alpha/pull/4"}\n' \
+    "$((now - 172800))" "$((now - 60))" > "$home/state/fleet-ledger.jsonl"
+  mkdir -p "$home/state/dashboard"
+  printf '%s\t5\t4\t0\n' "$((now - 86400))" > "$home/state/dashboard/history.tsv"
+  # Quota: Codex runs out in 2 h, before its 5-hour window resets in 4 h; Claude has room.
+  printf '{"schemaVersion":6,"providers":[{"provider":"codex","state":{"status":"fresh"},"windows":[{"id":"5h","label":"5 hours","percentRemaining":20,"resetsAt":"%s"}],"quotaSemantics":{"effectiveAvailability":[{"scope":"all_models","runway":{"status":"projected_exhaustion","projectedExhaustedAt":"%s","limitingWindowId":"5h"}}]}},{"provider":"claude","state":{"status":"fresh"},"windows":[{"id":"7d","label":"7 days","percentRemaining":90,"resetsAt":"%s"}]}]}\n' \
+    "$(iso -4)" "$(iso -2.05)" "$(iso -72)" > "$home/quota.json"
+  printf '#!/bin/sh\n[ -e "%s/quota.fail" ] && { echo "no account set up" >&2; exit 1; }\ncat "%s/quota.json"\n' "$home" "$home" > "$stubs/quota-axi"
   # Agents: a busy lead, a busy Main, one busy and one idle worker, one busy unknown agent, and a parked-home worker.
   cat > "$home/herdr.json" <<EOF
 {"result":{"agents":[
@@ -120,7 +143,7 @@ EOF
   printf '#!/bin/sh\nexit 1\n' > "$stubs/pgrep"
   printf '#!/bin/sh\necho "no user bus" >&2\nexit 1\n' > "$stubs/systemctl"
   mkdir -p "$home/locks"
-  chmod +x "$stubs/herdr" "$stubs/adb" "$stubs/pgrep" "$stubs/systemctl"
+  chmod +x "$stubs/herdr" "$stubs/adb" "$stubs/pgrep" "$stubs/systemctl" "$stubs/quota-axi"
   printf '%s\n' "$home"
 }
 
@@ -136,23 +159,24 @@ test_overview_answers_the_four_questions_with_sums_that_add_up() {
   home=$(make_home overview)
   d="$home/state/dashboard"
   build "$home"
-  for p in index index.home backlog backlog.home measure; do
+  for p in index backlog backlog.home measure; do
     [ -s "$d/$p.html" ] || fail "no $p page"
     ! grep -Eq '<script|https?://[^"]*\.(css|js)"' "$d/$p.html" || fail "$p is not self-contained"
   done
-  # Lanes group by what to do and sum to the open total; slow spots name a number and an age.
-  has "$d/index.html" "Nothing needs you. Slow spots" "1 waiting 7 /6 1 zephyrine" "1 building 1 /3 1" \
-    "Blocked or waiting on a decision 1 blocked · 1 on a decision 2" "Finished, not landed" \
-    "Producing 3 building · 1 validating 4" "Open lanes 2 + 1 + 4 + 1 = 8" \
-    "beta is parked by the captain and left out of every total." \
-    "Stuck blocked or on a decision 2 2 h" "Held held - Main must triage 1"
+  # Chips name each spot with a number and an age; tiles compare with yesterday and the sample a day ago.
+  has "$d/index.html" "Nothing needs you. ✕ 2 stuck 2 h ▲ 1 to land 30 min ▲ 1 held for triage 7 d ▲ 1 idle with ready work today" \
+    "Landed today 2 +2" "Closed 7 d 2 +2" "Lanes open 8 of 9 +3 3 building · 1 free" "Stuck 2 -2 1 blocked · oldest 2 h" \
+    "Quota runs out 2 h" "Codex before its reset" "Codex out" "Claude resets"
+  # Each lane is in one state and each queued item has one reason, summing to their totals.
+  has "$d/index.html" "Blocked 1 2 h" "On a decision 1 1 h" "Finished, not landed 1 30 min" "Validating or CI 1 20 min" \
+    "Waiting on other 1 40 min" "Building 3 10 min" "Queued 1 + 1 + 1 + 0 + 1 = 4" \
+    "Ship the main thing Main" "Ship the zephyrine thing zephyrine" "Main 7 of 6 1 1 1 zephyrine 1 of 3 1 1 1" \
+    "beta is parked by the captain and left out of every total."
   # The busy parts sum to the busy total, and the denominator is every running Herdr agent
   # outside parked homes (6 listed, 1 in parked beta), not the lane plan of 9.
   running=$(jq '[.result.agents[] | select(.pane_id != "pane-b-stale")] | length' "$home/herdr.json")
   [ "$running" = 5 ] || fail "fixture should list 5 running agents outside parked homes, has $running"
   has "$d/backlog.html" "Busy now 1 + 1 + 1 + 1 = 4" "the groups list all $running running agents"
-  # Grouped by home, the same lanes sum to the same total.
-  has "$d/index.home.html" "Open lanes 7 + 1 = 8" "Main 1 blocked · 1 on a decision 7 Blocked, needs help 1" "zephyrine 1 building 1"
   lacks "$d/index.html" "A parked home's stale lane" "w3"
   # Main's ask list is the only thing in the hero; held items are a slow spot, never "Waiting on you".
   now=$(date +%s)
@@ -182,9 +206,9 @@ test_backlog_and_method_pages_show_their_numbers() {
     "Lane settings plan 9 lanes; 8 are open." "Fleet 8 9 2" "Main 6" \
     "Oldest validation or CI wait: 20 min (m-ci, Main)"
   has "$d/backlog.home.html" "Queued" "Main 3" "zephyrine 1" "Open lanes 7 + 1 = 8"
-  has "$d/measure.html" "The pages rebuild every 60 s" "3 lanes per home from config/lane-target; config/lane-caps overrides (9 in all)" \
-    "Parked homes left out of every total: beta" "beta is parked but has 1 item marked in flight" \
-    "Fleet retro no schedule in any record this page reads"
+  has "$d/backlog.html" "Plan per home from the lane settings (Main 6); every other home 3."
+  has "$d/measure.html" "every 60 s" "Parked homes are left out (beta)." "beta is parked but has 1 item marked in flight" \
+    "Landed Counts pull requests the fleet recorded as merged, each once" "Every source was read."
   pass "Backlog and Method pages show their numbers with windows and sums"
 }
 
@@ -202,6 +226,17 @@ test_each_failed_source_shows_unknown_and_why() {
   has "$d/backlog.html" "Queued work unknown." "main: tasks-axi: backlog unreadable" "At least 0 items held; the backlog of Main, zephyrine is unknown." "Agents unknown."
   has "$d/measure.html" "backlog main: tasks-axi: backlog unreadable"
   lacks "$d/backlog.html" "Queued 0" "No item is held" "0 busy"
+  # A failed quota read shows the last reading under an hour old, and says when it was taken; with none, unknown.
+  touch "$home/quota.fail"
+  jq '.at -= 600' "$d/.quota.json" > "$home/q.json" && mv "$home/q.json" "$d/.quota.json"
+  build "$home"
+  has "$d/index.html" "Quota runs out 2 h" "Codex before its reset"
+  has "$d/measure.html" "quota-axi no account set up; showing the reading from"
+  rm "$d/.quota.json" "$home/mates/zephyrine/state/home-summary.json"
+  build "$home"
+  has "$d/index.html" "Quota runs out unknown" "▲ 1 lead to check" "zephyrine State unknown"
+  has "$d/measure.html" "home summary zephyrine: No such file or directory"
+  lacks "$d/index.html" "Codex"
   pass "each failed source shows unknown and why, and never guesses zero"
 }
 
@@ -250,8 +285,7 @@ EOF
     "Phone Pixel 9 Free · last used by Main 10 min ago · PHONE1 · USB" \
     "Emulator test-avd In use by Main · 10 min · emulator-5554 · 4.0 GB in use" \
     "Free memory 10.0 GB of 64 GB" "Memory pressure 12%" "the 10 s share is 40% or more (now 4%)" "Heavy jobs 8.0 GB of 32 GB" "hard limit 38 GB" \
-    "Gradle builds 2 of 2" "Emulators 1 of 2" "Memory heavy jobs wait"
-  has "$d/index.home.html" "Main 1 Emulator test-avd" "No holder 1 Phone Pixel 9" "Devices 1 + 1 = 2"
+    "Gradle builds 2 of 2" "Emulators 1 of 2" "✕ 10 GB free, heavy jobs wait" "▲ 2/2 Gradle builds at cap"
   [ "$(sort -u "$home/adb.calls")" = "devices -l" ] || fail "adb was asked more than the device list: $(cat "$home/adb.calls")"
   # Each failed probe says unknown and why; nothing is guessed as zero.
   touch "$home/adb.fail" "$home/systemctl.fail"
@@ -294,7 +328,7 @@ test_serve_answers_each_page_and_remembers_the_grouping() {
   [ -n "$url" ] || fail "serve never reported its address: $(cat "$home/serve.err")"
   case "$url" in http://127.0.0.1:*/) ;; *) fail "serve did not default to loopback: $url" ;; esac
   got=$(python3 - "$url" <<'PY'
-import sys, urllib.request, urllib.error
+import re, sys, urllib.request, urllib.error
 def get(u, cookie=None):
     rq = urllib.request.Request(u, headers={'Cookie': cookie} if cookie else {})
     try:
@@ -306,44 +340,49 @@ for path, want in (('', 'Nothing needs you.'), ('backlog', 'Held for the captain
     print(path or '/', code, want in body)
 code, body, cookie = get(base + 'backlog?group=home')
 print('group', code, 'fm_group=home' in cookie, '7 + 1 = <b>8</b>' in body)
-code, body, _ = get(base, 'fm_group=home')
+code, body, _ = get(base + 'backlog', 'fm_group=home')
 print('cookie', code, '7 + 1 = <b>8</b>' in body)
+code, body, _ = get(base + 'measure')
+print('ages', '<!--' not in body, re.search(r'last read \d+\u00a0s ago', body) is not None)
 for path in ('flow', 'state/', 'index.home.html', '../data/backlog.md', 'data/backlog.md'):
     print(path, get(base + path)[0])
 PY
 )
   [ "$got" = "$(printf '%s\n' '/ 200 True' 'backlog 200 True' 'measure 200 True' \
-    'group 200 True True' 'cookie 200 True' 'flow 404' 'state/ 404' 'index.home.html 404' '../data/backlog.md 404' 'data/backlog.md 404')" ] \
+    'group 200 True True' 'cookie 200 True' 'ages True True' 'flow 404' 'state/ 404' 'index.home.html 404' '../data/backlog.md 404' 'data/backlog.md 404')" ] \
     || fail "serve answers were not the three pages, the remembered grouping, then 404s: $got"
   # An old page is answered at once, as it is, while a rebuild runs behind it.
   printf '<p>old page<!--age--></p>\n' > "$home/state/dashboard/index.html"
   touch -d '-5 minutes' "$home/state/dashboard/index.html"
   got=$(python3 -c 'import sys, urllib.request; print(urllib.request.urlopen(sys.argv[1], timeout=5).read().decode())' "$url")
-  case "$got" in *"old page · updated 3"[0-9][0-9]" s ago"*) ;; *) fail "an old page was not answered at once: $got" ;; esac
+  case "$got" in *'<span class="age bad">updated 5'*'min ago'*) ;; *) fail "an old page was not answered at once, marked old: $got" ;; esac
   for _ in $(seq 1 1200); do grep -q 'old page' "$home/state/dashboard/index.html" || break; sleep 0.1; done
   grep -q 'Nothing needs you' "$home/state/dashboard/index.html" || fail "the background rebuild did not replace the old page"
   kill "$SERVE_PID" 2>/dev/null; SERVE_PID=
-  pass "serve answers the three pages at once, remembers ?group in a cookie, rebuilds an old page itself, and 404s every other path"
+  pass "serve answers the three pages at once with their ages, remembers ?group in a cookie, rebuilds an old page itself, and 404s every other path"
 }
 
 test_fleet_past_twenty_mates_keeps_every_lead_row() {
   local home d i mdir
   home=$(make_home many)
   d="$home/state/dashboard"
-  # Mate homes must live outside the active home; empty ones read as
-  # "Records need tidy-up", one row each, when the snapshot reads them.
+  # Mate homes live outside the active home; each reads its own summary, one row each:
+  # mate24's is an hour old and Main's view says mate25 is not running.
+  now=$(date +%s)
   for i in $(seq -w 1 25); do
     mdir="$TMP_ROOT/mate$i"
     mkdir -p "$mdir/state" "$mdir/data"
     printf -- '- mate%s - domain %s (home: %s; scope: work; projects: alpha; added 2026-07-11)\n' \
       "$i" "$i" "$mdir" >> "$home/data/secondmates.md"
+    summary "$mdir" unknown "$([ "$i" = 24 ] && echo $((now - 3600)) || echo "$now")"
   done
+  summary "$home" no_active_work "$now" '"endpoints":[{"id":"mate25","endpoint":{"exists":false}}]'
   build "$home"
-  has "$d/index.html" "mate25"
-  python3 - "$d/index.html" <<'PY' || fail "the 25th mate lost its lead state"
+  has "$d/index.html" "✕ 1 lead down" "mate24 Silent 1 h" "mate25 Not running"
+  python3 - "$d/index.html" <<'PY' || fail "a mate past the twentieth lost its lead state"
 import html, re, sys
 text = re.sub(r'\s+', ' ', html.unescape(re.sub(r'<[^>]+>', ' ', open(sys.argv[1]).read())))
-for mate in ('mate01', 'mate25'):
+for mate in ('mate01', 'mate23'):
     i = text.find(mate)
     assert i >= 0, mate
     assert 'Records need tidy-up' in text[i:i + 200], mate

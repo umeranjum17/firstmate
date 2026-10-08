@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
 # fm-dashboard.sh - build the read-only fleet dashboard pages for this home.
 #
-# Builds three self-contained HTML pages (inline CSS, no script, no network
+# Builds three self-contained HTML pages (inline CSS and SVG, no script, no network
 # reference), phone first, each answering one question set:
-#   index    Overview: Main's ask list only, then slow spots, lanes,
-#            devices and machine, and one row per home
+#   index    Overview: Main's ask list only, then attention chips, six number tiles with
+#            their trends, and charts: where lanes wait and why, in versus out over 14 days,
+#            homes, quota runway, devices and machine
 #   backlog  queued, ready and held work per home, held-for-captain items, every lane, agents
-#   measure  how each number is measured: cycles, windows, records that disagree, unknowns
-# Every number names its window and the time its source was read. Every list is
-# grouped, by default by what to act on first; index and backlog also build a
-# by-home variant. Parked homes are left out of every total, with one line saying so.
+#   measure  every number's one definition (what it counts, source, window and cutoff, how
+#            often it is read), records that disagree, sources not read
+# Every number names its window and the time its source was read. Backlog lists are
+# grouped, by default by what to act on first, with a by-home variant. Parked homes
+# are left out of every total, with one line saying so.
 #
 # Sources, all read-only and all optional (a failed source shows "unknown" and why):
 #   data/captain-asks.tsv           Waiting on you: Main's fleet-wide headerless
@@ -17,10 +19,9 @@
 #                                   text is an ask (a bad time or duplicate id shows as a record
 #                                   needing correction); blank rows and rows without an id or text
 #                                   are skipped, with a note; absent/empty means zero
-#   FM_BEARINGS_SECONDMATES=500 FM_BEARINGS_UNHEALTHY=500 FM_SNAPSHOT_SECONDMATES=500
-#                                   bin/fm-bearings-snapshot.sh --json: lead state and unhealthy
-#                                   endpoints (the FM_SNAPSHOT_* bound raises the fleet snapshot's
-#                                   own registry cap from 20 to 500, which otherwise omits mates past 20 upstream)
+#   <home>/state/home-summary.json  lead state, as each home publishes it itself
+#                                   (bin/fm-home-summary-refresh.sh); Main's copy also says which
+#                                   leads are not running (an endpoint missing or its agent dead)
 #   data/secondmates.md             registered homes: "- <name> - ... (home: <dir>; ...)"
 #   config/parked-homes             home ids the captain parked, one per line (# comments)
 #   <home>/state/*.meta + *.status  lanes: every ship/scout record, in one state by its last
@@ -34,6 +35,11 @@
 #   herdr agent list                agents busy now (agent_status working), the state the muxr
 #                                   app reads; role by pane id against the records: lead, worker,
 #                                   Main (the folder holding this home's data), else other
+#   state/<lead>.status, state/fleet-ledger.jsonl   Landed: each pull request the fleet
+#                                   recorded as merged, once (bin/fm-merge-outcome-lib.sh writes a
+#                                   lead's merges to Main's channel for it, Main's own to its ledger)
+#   <home>/data/backlog.md, data/done-archive.md    Out: items closed per local day (none if absent)
+#   quota-axi --json --no-credential-refresh --max-age 5m   quota runway, read again after 2 min
 # Machine and devices, each probe read-only with a 5 s timeout:
 #   adb devices -l                  connected phones and emulators (nothing else is asked of adb);
 #                                   adb from PATH, else platform-tools under $ANDROID_HOME,
@@ -49,8 +55,10 @@
 #                                   an emulator matches a held lock its process ancestry took
 #   <proc> is FM_DASHBOARD_PROC (default /proc), <locks> FM_DEVICE_LOCK_DIR (default /tmp);
 #   FM_EMU_MAX, FM_GRADLE_MAX, FM_MEM_MIN_GB (defaults 2, 2, 12) mirror the memory gate's caps
-# All day comparisons use the host timezone. Besides the pages, a build writes only
-# its pages under state/dashboard, and the snapshot's own ledger cache.
+# All day comparisons use the host timezone. A build writes only under state/dashboard:
+# its pages, .quota.json (the last quota reading), filed.json (each open item's filing
+# day, kept 15 days, so an item filed and closed later still counts as filed) and
+# history.tsv (the tiles' numbers, sampled every 10 minutes and kept 8 days).
 #
 # Usage:
 #   fm-dashboard.sh [build]
@@ -59,11 +67,13 @@
 # serve runs a small read-only web server (python3 stdlib, IPv4) that answers GET or
 # HEAD for /, /index.html, /backlog and /measure only; every other path
 # is 404. ?group=home or ?group=action picks how lists are grouped and is remembered in
-# a cookie. It answers at once with the last built pages, marked "updated N s ago", and
-# keeps them fresh itself: a side thread starts each rebuild early enough, by the last
-# build's length, for the new pages to land as the old ones turn 60 seconds old, and
-# the pages reload themselves every 60 seconds; only the very first load waits for a
-# build. It prints `serving http://ADDR:PORT/` once listening. ADDR defaults to
+# a cookie. It answers at once with the last built pages, marked "updated N s ago" (and
+# each source's own age, filled in as each request is answered), and keeps them fresh
+# itself: a side thread starts each rebuild early enough, by the last build's length,
+# for the new pages to land as the old ones turn 60 seconds old, and the pages reload
+# themselves every 60 seconds; only the very first load waits for a build. Requests are
+# answered on their own threads, so an idle connection never holds another one up.
+# It prints `serving http://ADDR:PORT/` once listening. ADDR defaults to
 # 127.0.0.1 and PORT to 8787; port 0 picks a free port. There is no authentication:
 # reach is whatever the bind address exposes.
 set -u
@@ -92,14 +102,14 @@ case "$cmd" in
     done
     case "$port" in ''|*[!0-9]*) usage ;; esac
     exec python3 - "$0" "$FM_HOME" "$out_dir" "$bind" "$port" "$MAX_AGE" <<'PY'
-import http.server, os, subprocess, sys, threading, time, urllib.parse
+import http.server, os, re, subprocess, sys, threading, time, urllib.parse
 SCRIPT, HOME, DIR, BIND, PORT, MAX_AGE = sys.argv[1:7]
 MAX_AGE = int(MAX_AGE)
 PAGE = os.path.join(DIR, 'index.html')
 ROUTES = {'/': 'index', '/index.html': 'index', '/backlog': 'backlog', '/measure': 'measure'}
 building = threading.Lock()
 last_error = b''
-last_took = 30.0  # seconds the last build took; a fleet snapshot alone can take 45 s under load
+last_took = 5.0  # seconds the last build took; a fresh quota reading alone can take 2 s
 
 def build():  # call holding `building`; the build replaces each page in one rename
     global last_error, last_took
@@ -115,9 +125,13 @@ def build():  # call holding `building`; the build replaces each page in one ren
 def age():
     try: return time.time() - os.path.getmtime(PAGE)
     except OSError: return None
+AT = re.compile(rb'<!--at:(\d+)-->')
+def ago(s):
+    s = max(0, int(s))
+    return f'{s}\u00a0s' if s < 120 else f'{s // 60}\u00a0min' if s < 7200 else f'{s // 3600}\u00a0h'
 
 class Handler(http.server.BaseHTTPRequestHandler):
-    timeout = 10  # an idle preconnect must not hold the one-at-a-time server
+    timeout = 10  # an idle preconnect is closed after 10 s
 
     def send(self, code, body, ctype, cookie=None):
         self.send_response(code)
@@ -141,58 +155,56 @@ class Handler(http.server.BaseHTTPRequestHandler):
         group = asked or jar.get('fm_group')
         a = age()
         if a is None:  # the first load ever waits for the first pages
-            with building: pass  # a build already under way finishes first
-            if age() is None:
-                building.acquire(); build()
+            building.acquire()  # a build already under way finishes first
+            if age() is None: build()
+            else: building.release()
             a = age()
             if a is None:
                 return self.send(500, b'dashboard build failed: ' + last_error, 'text/plain; charset=utf-8')
-        note = f' · updated {int(a)} s ago' + (' · refreshing' if building.locked() else '')
-        if last_error: note += ' · last refresh failed, showing the last good page'
-        f = os.path.join(DIR, f'{name}.home.html' if group == 'home' else f'{name}.html')
+        tone = 'bad' if last_error or a >= 3 * MAX_AGE else 'warn' if a >= 1.5 * MAX_AGE else 'ok'
+        note = (f'<span class="age {tone}">updated {ago(a)} ago' + (' · refreshing' if building.locked() else '')
+                + (' · last refresh failed, showing the last good page' if last_error else '') + '</span>')
+        f = os.path.join(DIR, f'{name}.home.html' if group == 'home' and name == 'backlog' else f'{name}.html')
         if not os.path.isfile(f): f = os.path.join(DIR, f'{name}.html')
         try:
             with open(f, 'rb') as fh: body = fh.read().replace(b'<!--age-->', note.encode(), 1)
+            body = AT.sub(lambda m: ago(time.time() - int(m.group(1))).encode(), body)  # each source's own age, as of this answer
         except OSError:
             return self.send(404, b'not built yet\n', 'text/plain; charset=utf-8')
         self.send(200, body, 'text/html; charset=utf-8', asked)
     do_HEAD = do_GET
 
-# ponytail: one request at a time; rebuilds run on a side thread, one at a time.
+# Each request on its own thread; rebuilds run on a side thread, one at a time.
 def refresh():  # rebuild on age, not on requests, so an idle phone never opens a minutes-old page
     while True:
         a = age()  # start early by the last build's length, so the new page lands as this one turns MAX_AGE
         if (a is None or a + last_took >= MAX_AGE) and building.acquire(blocking=False):
             build()
             if last_error: time.sleep(MAX_AGE)  # a failing build retries once a minute
-        time.sleep(5)
+        time.sleep(1)  # one stat a second; a page is replaced within a second of turning MAX_AGE
 
 threading.Thread(target=refresh, daemon=True).start()
-srv = http.server.HTTPServer((BIND, int(PORT)), Handler)
+srv = http.server.ThreadingHTTPServer((BIND, int(PORT)), Handler)
 print(f'serving http://{BIND}:{srv.server_address[1]}/', flush=True)
 try: srv.serve_forever()
 except KeyboardInterrupt: pass
 PY
     ;;
-  -h|--help) sed -n '2,68p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+  -h|--help) sed -n '2,78p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
   *) usage ;;
 esac
 
 mkdir -p "$out_dir" || { echo "fm-dashboard: cannot create $out_dir" >&2; exit 1; }
 # Per-run scratch names, so a manual build and a served rebuild never share files.
-snap="$out_dir/.snapshot.$$.json"
-snap_err="$out_dir/.snapshot.$$.err"
 tmp="$out_dir/.build.$$"
-trap 'rm -rf "$snap" "$snap_err" "$tmp"' EXIT
+trap 'rm -rf "$tmp"' EXIT
 mkdir -p "$tmp" || { echo "fm-dashboard: cannot create $tmp" >&2; exit 1; }
-FM_HOME="$FM_HOME" FM_BEARINGS_SECONDMATES=500 FM_BEARINGS_UNHEALTHY=500 FM_SNAPSHOT_SECONDMATES=500 "$SCRIPT_DIR/fm-bearings-snapshot.sh" --json > "$snap" 2> "$snap_err" \
-  || { rc=$?; : > "$snap"; printf 'fleet snapshot exited %s: %s\n' "$rc" "$(tail -n 1 "$snap_err")" >> "$snap_err"; }
 
-python3 - "$FM_HOME" "$snap" "$snap_err" "$tmp" "$SCRIPT_DIR" "$MAX_AGE" <<'PY' || { echo "fm-dashboard: page build failed" >&2; exit 1; }
-import html, json, os, re, shutil, subprocess, sys
-from datetime import date, datetime
+python3 - "$FM_HOME" "$out_dir" "$tmp" "$SCRIPT_DIR" "$MAX_AGE" <<'PY' || { echo "fm-dashboard: page build failed" >&2; exit 1; }
+import html, json, math, os, re, shutil, subprocess, sys
+from datetime import date, datetime, timedelta
 
-HOME, SNAP, SNAP_ERR, OUT, BIN, MAX_AGE = sys.argv[1:7]
+HOME, STATE_DIR, OUT, BIN, MAX_AGE = sys.argv[1:6]
 MAX_AGE = int(MAX_AGE)
 NOW = datetime.now().astimezone()
 NOW_TS = NOW.timestamp()
@@ -255,26 +267,33 @@ MAIN_ALIAS = os.path.basename(os.path.dirname(os.path.realpath(HOME)))
 def plan(h): return caps.get(h, caps.get(MAIN_ALIAS, lane_default) if h == 'main' else lane_default)
 PLAN = sum(plan(h) for h in ACTIVE)
 
-# --- fleet snapshot: lead state -----------------------------------------
-snap = None
-try:
-    snap = json.load(open(SNAP))
-    if not isinstance(snap, dict) or snap.get('schema') != 'fm-bearings.v1': raise ValueError('unexpected schema')
-except (OSError, ValueError) as e:
-    err = ''
-    try: err = open(SNAP_ERR, errors='replace').read().strip().splitlines()[-1]
-    except (OSError, IndexError): pass
-    notes.append(('fleet snapshot', err or str(e) or 'no output')); snap = None
-leads = {s.get('id'): s for s in (snap or {}).get('secondmates') or [] if s.get('id') in home_dir and s.get('id') not in parked}
-down = {e.get('id') for e in (snap or {}).get('unhealthy_endpoints') or []} & set(leads)
+# --- lead state: the summary each home publishes about itself ----------
+SUMMARY_MAX_AGE = 900  # a home republishes at least every 5 minutes
+def summary(h):
+    p = os.path.join(home_dir[h], 'state/home-summary.json')
+    try:
+        if os.path.getsize(p) > 262144: raise ValueError('summary larger than 256 KB')
+        s = json.load(open(p, encoding='utf-8'))
+        if not isinstance(s, dict) or s.get('schema') != 'fm-secondmate-home-summary.v1': raise ValueError('unexpected summary schema')
+        if os.path.realpath(str(s.get('home'))) != os.path.realpath(home_dir[h]): raise ValueError('summary names another home')
+        if not isinstance(s.get('generated_epoch'), int): raise ValueError('summary has no time')
+        return s
+    except OSError as e: notes.append(('home summary', f'{h}: {e.strerror}'))
+    except ValueError as e: notes.append(('home summary', f'{h}: {str(e)[:80]}'))
+    return None
+sums = {h: summary(h) for h in ACTIVE}
+leads = {h: sums[h] for h in ACTIVE if h != 'main'}
+down = {e.get('id') for e in (sums.get('main') or {}).get('endpoints') or []
+        if (e.get('endpoint') or {}).get('exists') is False or (e.get('endpoint') or {}).get('agent_alive') == 'dead'} & set(leads)
 LEAD_WORDS = {'captain_decision': ('Holding a decision', 'warn'), 'externally_held': ('Waiting on someone else', 'warn'),
-              'unknown': ('Records need tidy-up', 'bad'), 'working': ('Working', 'ok'), 'idle': ('Idle', ''),
-              'active_child_work': ('Working', 'ok'), 'no_active_work': ('Idle', ''),
-              'stale': ('Not responding', 'bad'), 'dead': ('Stopped', 'bad')}
+              'unknown': ('Records need tidy-up', 'bad'), 'active_child_work': ('Working', 'ok'), 'no_active_work': ('Idle', '')}
 def lead_word(h):
+    if h not in leads: return ('', '')
     if h in down: return ('Not running', 'bad')
-    s = (leads.get(h) or {}).get('state')
-    return LEAD_WORDS.get(s, (str(s or '').replace('_', ' ').capitalize(), '')) if h in leads else ('', '')
+    if leads[h] is None: return ('State unknown', 'bad')
+    if NOW_TS - leads[h]['generated_epoch'] > SUMMARY_MAX_AGE: return (f'Silent {dur(NOW_TS - leads[h]["generated_epoch"])}', 'bad')
+    s = leads[h].get('state')
+    return LEAD_WORDS.get(s, (str(s or '').replace('_', ' ').capitalize(), ''))
 
 # --- Waiting on you: Main's ask list ------------------------------------
 asks, asks_known, ask_ids = [], True, set()
@@ -368,8 +387,10 @@ def toon_rows(text, name='tasks'):
         if re.match(rf'^{name}: 0 ', l): return []
     return None
 def clean(t):
-    t = str(t or '')
+    t = re.split(r' (?:https?://|/|data/)\S', str(t or ''), maxsplit=1)[0]
     return t.split('\n', 1)[0].rstrip() + '…' if '\n' in t else t
+def prose(t):  # record text without the links and paths that mean nothing on a phone
+    return re.sub(r'(?<!\S)(?:https?://|~?/|(?:data|config|state|projects|bin)/)\S+', '…', str(t or ''))
 backlog = {}
 for h, d in sorted(home_dir.items()):
     out, err = probe(['bash', os.path.join(BIN, 'fm-tasks-axi.sh'), 'list', '--limit', '10000',
@@ -391,6 +412,159 @@ held_cap = sorted(((h, r) for h in ACTIVE for r in backlog.get(h) or []
                    if r.get('hold_kind') == 'captain' and r.get('state') != 'done'),
                   key=lambda x: (x[1]['day'] or TODAY, x[0]))
 titles = {(h, r['id']): r['title'] for h in home_dir for r in backlog.get(h) or []}
+
+# --- flow over local days: landed, closed, filed ------------------------
+def load_json(p):
+    try:
+        v = json.load(open(p))
+        return v if isinstance(v, dict) else {}
+    except (OSError, ValueError): return {}
+def save_json(p, v):
+    try:
+        with open(p + '.tmp', 'w') as f: json.dump(v, f)
+        os.replace(p + '.tmp', p)
+    except OSError: pass  # no cache only means the next build reads again
+def midnight(d): return datetime.combine(d, datetime.min.time()).astimezone().timestamp()
+def hm(ts): return datetime.fromtimestamp(ts).astimezone().strftime('%H:%M')
+def when(ts):  # 14:05 today, Thu 08:05 this week, else 07 Oct 14:05
+    t = datetime.fromtimestamp(ts).astimezone()
+    if t.date() == TODAY: return t.strftime('%H:%M')
+    return t.strftime('%a %H:%M') if abs((t.date() - TODAY).days) < 6 else t.strftime('%d %b %H:%M')
+DAYS = [TODAY - timedelta(days=i) for i in range(13, -1, -1)]  # 14 local days, today last
+
+# Landed: each pull request the fleet recorded as merged, once, by the home that merged it.
+MERGED = re.compile(r'^done \[key=merged-([^\]]+)\] \[at=(\d+)\]: merged \1 (https://\S+/pull/\d+)')
+merges = {}  # PR URL -> (epoch, home, task)
+def merged(url, at, h, task):
+    if url not in merges or at < merges[url][0]: merges[url] = (at, h, task)
+for h in leads:
+    try:
+        with open(os.path.join(HOME, 'state', f'{h}.status'), encoding='utf-8', errors='replace') as fh:
+            for l in fh:
+                m = MERGED.match(l)
+                if m: merged(m.group(3), int(m.group(2)), h, m.group(1))
+    except FileNotFoundError: pass  # a lead with no channel yet has merged nothing
+    except OSError as e: notes.append(('merge records', f'{h}: {e.strerror}'))
+ledger_from = None  # Main's own merges are on record only since its fleet ledger's first line
+try:
+    with open(os.path.join(HOME, 'state/fleet-ledger.jsonl'), encoding='utf-8', errors='replace') as fh:
+        for n, l in enumerate(fh):
+            if n and '"task.merged"' not in l: continue
+            try: e = json.loads(l)
+            except ValueError: continue
+            if not isinstance(e, dict) or not isinstance(e.get('ts'), int): continue
+            if n == 0: ledger_from = e['ts']
+            if e.get('event') == 'task.merged' and re.fullmatch(r'https://\S+/pull/\d+', str(e.get('pr'))): merged(e['pr'], e['ts'], 'main', str(e.get('task')))
+except OSError as e: notes.append(('merge records', f"Main: {e.strerror}, so Main's own merges are not counted"))
+def landed_exact(d): return ledger_from is not None and ledger_from <= midnight(d)
+def landed_on(d, h=None, until=math.inf):
+    lo, hi = midnight(d), min(midnight(d + timedelta(days=1)), until)
+    return sum(lo <= at < hi and h in (None, hh) for at, hh, _ in merges.values())
+LANDED = [landed_on(d) for d in DAYS]
+LANDED_EXACT = [landed_exact(d) for d in DAYS]
+
+# Closed: backlog items marked done, by the local day they closed (the backlog and its archive).
+CLOSED = re.compile(r'^- \[x\] (\S+) (?:- )?(.*?)(?= https?://| /\S| data/\S| blocked-by:| \((?:repo|kind|priority|merged|reported|done|closed)\b|$)')
+CDATE = re.compile(r'\((?:merged|reported|done|closed) (\d{4}-\d\d-\d\d)\)')
+closed, done_title = {}, {}  # home -> {day: n}; (home, id) -> title
+for h in ACTIVE:
+    seen, c = set(), {}
+    try:
+        for f in ('backlog.md', 'done-archive.md'):
+            try: fh = open(os.path.join(home_dir[h], 'data', f), encoding='utf-8', errors='replace')
+            except FileNotFoundError: continue  # no backlog or archive yet: nothing closed, as tasks-axi reads it
+            with fh:
+                for l in fh:
+                    m, ds = CLOSED.match(l), CDATE.findall(l)
+                    d = iso_day(ds[-1]) if m and ds else None
+                    if d is None or (m.group(1), d) in seen: continue
+                    seen.add((m.group(1), d)); c[d] = c.get(d, 0) + 1
+                    done_title.setdefault((h, m.group(1)), m.group(2).strip())
+        closed[h] = c
+    except OSError as e: closed[h] = None; notes.append(('closed items', f'{h}: {e.strerror}'))
+CLOSED_KNOWN = all(closed[h] is not None for h in ACTIVE)
+def closed_on(d, h=None): return sum((closed[x] or {}).get(d, 0) for x in ([h] if h else ACTIVE))
+CLOSED_N = [closed_on(d) for d in DAYS]
+
+# Filed: a closed item loses its filing day, so a log keeps each open item's day once seen.
+FILED = os.path.join(STATE_DIR, 'filed.json')
+flog = load_json(FILED)
+items = flog.get('items') if isinstance(flog.get('items'), dict) else {}
+gap = not all(isinstance(flog.get(k), (int, float)) for k in ('since', 'last')) or NOW_TS - flog['last'] > 3600
+filed_since = NOW_TS if gap else flog['since']  # a gap in the log restarts what it can vouch for
+for h in ACTIVE:
+    for r in backlog.get(h) or []:
+        if r['day'] and r.get('state') != 'done': items.setdefault(f'{h}\t{r["id"]}', r['day'].isoformat())
+items = {k: v for k, v in items.items() if isinstance(v, str) and v >= (DAYS[0] - timedelta(days=1)).isoformat()}
+save_json(FILED, dict(since=filed_since, last=NOW_TS, items=items))
+FILED_N = [sum(v == d.isoformat() and k.split('\t')[0] in ACTIVE for k, v in items.items()) for d in DAYS]
+FILED_EXACT = [filed_since <= midnight(d) for d in DAYS]
+
+# Trends: the tiles' numbers now, sampled every 10 minutes and kept 8 days (-1 is unknown).
+HIST = os.path.join(STATE_DIR, 'history.tsv')
+STUCK = SPLIT['blocked'] + SPLIT['decision']
+hist = []
+try:
+    for l in open(HIST):
+        f = l.split()
+        if len(f) == 4 and all(re.fullmatch(r'-?\d+', x) for x in f): hist.append([int(x) for x in f])
+except OSError: pass
+if not hist or NOW_TS - hist[-1][0] >= 600:
+    lanes_ok = not lane_err & set(ACTIVE)
+    hist = [r for r in hist if NOW_TS - r[0] < 8 * 86400] + [[int(NOW_TS), OPEN if lanes_ok else -1, STUCK if lanes_ok else -1, QUEUE['ready'] if QUEUE else -1]]
+    try:
+        with open(HIST + '.tmp', 'w') as f: f.write(''.join('\t'.join(map(str, r)) + '\n' for r in hist))
+        os.replace(HIST + '.tmp', HIST)
+    except OSError: pass  # the trend only misses this sample
+def day_ago(col): return next((r[col] for r in hist if abs(r[0] - (NOW_TS - 86400)) <= 1800 and r[col] >= 0), None)
+
+# --- quota: quota-axi, read again after 2 minutes -------------------------
+QUOTA_TTL = 120
+def num(v): return v if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+def parse_ts(ts):
+    try: return datetime.fromisoformat(ts.replace('Z', '+00:00')).astimezone()
+    except (AttributeError, ValueError): return None
+def quota():
+    cache_p = os.path.join(STATE_DIR, '.quota.json')
+    c = load_json(cache_p)
+    at = c.get('at') if isinstance(c.get('at'), (int, float)) else None
+    if at is not None and 0 <= NOW_TS - at < QUOTA_TTL and isinstance(c.get('data'), dict): return c['data'], at
+    out, err = probe(['quota-axi', '--json', '--no-credential-refresh', '--max-age', '5m'], timeout=20)
+    try:
+        if out is None: raise ValueError(err)
+        data = json.loads(out)
+        if data.get('schemaVersion') not in (5, 6): raise ValueError(f"unsupported quota-axi schema version: {data.get('schemaVersion')}")
+        if not isinstance(data.get('providers'), list): raise ValueError('no providers')
+        save_json(cache_p, {'at': NOW_TS, 'data': data})
+        return data, NOW_TS
+    except (ValueError, AttributeError) as e:
+        if at is not None and 0 <= NOW_TS - at < 3600 and isinstance(c.get('data'), dict):
+            notes.append(('quota-axi', f'{e}; showing the reading from {hm(at)}')); return c['data'], at
+        notes.append(('quota-axi', str(e) or 'unreadable')); return None, None
+qdata, q_at = quota()
+QNAME = {'claude': 'Claude', 'codex': 'Codex', 'opencode-go': 'OpenCode Go', 'zai': 'Z.ai', 'cursor': 'Cursor', 'copilot': 'Copilot',
+         'kimi': 'Kimi', 'deepseek': 'DeepSeek', 'grok': 'Grok', 'openrouter': 'OpenRouter', 'minimax': 'MiniMax', 'agy': 'Antigravity'}
+accounts = []  # dict(name, runout, status, limit, windows, problem, empty)
+for p in (qdata or {}).get('providers') or []:
+    if not isinstance(p, dict) or p.get('notSetUp'): continue
+    st = p.get('state') or {}
+    av = next((a for a in ((p.get('quotaSemantics') or {}).get('effectiveAvailability') or []) if a.get('scope') == 'all_models'), {})
+    run = av.get('runway') or {}
+    wins = []
+    for w in p.get('windows') or []:
+        rem, reserve = num(w.get('percentRemaining')), num((w.get('pace') or {}).get('reservePercentPoints'))
+        used = None if rem is None else 100 - rem
+        wins.append(dict(id=w.get('id'), label=str(w.get('label') or w.get('id')), used=used,
+                         pace=None if used is None or reserve is None else max(0, min(100, used + reserve)),
+                         reset=parse_ts(w.get('resetsAt')) if w.get('resetsAt') else None))
+    credits = p.get('credits') or {}
+    accounts.append(dict(name=QNAME.get(p.get('provider'), str(p.get('provider')).title()), status=run.get('status'),
+                         runout=parse_ts(run.get('projectedExhaustedAt')) if run.get('projectedExhaustedAt') else None,
+                         limit=next((w for w in wins if w['id'] == run.get('limitingWindowId')), None), windows=wins,
+                         problem=str(st.get('error') or st.get('status')).replace('_', ' ') if st.get('stale') or st.get('status') not in ('fresh', None) else None,
+                         empty=run.get('status') == 'exhausted_now' or (credits.get('remaining') == 0 and not credits.get('unlimited') and not wins)))
+def runs_out(a): return a['status'] == 'projected_exhaustion' and a['runout'] and not a['problem'] and (not a['limit'] or not a['limit']['reset'] or a['runout'] < a['limit']['reset'])
+running_out = sorted((a for a in accounts if runs_out(a)), key=lambda a: a['runout'])
 
 # --- agents: the Herdr state the muxr app reads -------------------------
 agents = None
@@ -655,33 +829,34 @@ def where(ls):
 def spot(tone, chip, what, n, age, href, title=''):
     spots.append(dict(tone=tone, chip=chip, what=what, n=n, age=age, href=href, title=f'{n} {what}' + (f' · {title}' if title else '')))
 stuck = [l for l in live if l['state'] in ('blocked', 'decision')]
-if stuck: spot('warn', 'Stuck', 'blocked or on a decision', len(stuck), dur(NOW_TS - min(l['since'] for l in stuck)), 'backlog#lanes', where(stuck))
+if stuck: spot('bad' if SPLIT['blocked'] else 'warn', 'Stuck', 'stuck', len(stuck), dur(NOW_TS - min(l['since'] for l in stuck)), 'backlog#lanes', where(stuck))
 fin = [l for l in live if l['state'] == 'finished']
-if fin: spot('warn', 'To land', 'finished, not landed', len(fin), dur(NOW_TS - min(l['since'] for l in fin)), 'backlog#lanes', where(fin))
+if fin: spot('warn', 'To land', 'to land', len(fin), dur(NOW_TS - min(l['since'] for l in fin)), 'backlog#lanes', where(fin))
 if held_cap:
     c = {}
     for h, _ in held_cap: c[h] = c.get(h, 0) + 1
     oldest = held_cap[0][1]['day']
-    spot('warn', 'Held', 'held - Main must triage', f'{"" if bl_known else "≥"}{len(held_cap)}', days_old(oldest) if oldest else 'unknown',
+    spot('warn', 'Held', 'held for triage', f'{"" if bl_known else "≥"}{len(held_cap)}', days_old(oldest) if oldest else 'unknown',
          'backlog?group=home#held', ', '.join(f'{hname(h)} {n}' for h, n in sorted(c.items(), key=lambda x: (-x[1], x[0]))))
 if bl_known:
     could = {h: min(max(0, plan(h) - len(by_home[h])), len(bl(h, 'ready'))) for h in ACTIVE}
     if sum(could.values()):
         old = min((r['day'] for h in ACTIVE if could[h] for r in bl(h, 'ready') if r['day']), default=None)
-        spot('warn', 'Idle', 'free lanes, ready work', sum(could.values()), days_old(old) if old else 'unknown', 'backlog#targets',
+        spot('warn', 'Idle', 'idle with ready work', sum(could.values()), days_old(old) if old else 'unknown', 'backlog#targets',
              ', '.join(f'{hname(h)} {len(bl(h, "ready"))} ready, {len(by_home[h])} of {plan(h)} open' for h in ACTIVE if could[h]))
-if down: spot('bad', 'Down', 'leads not running', len(down), 'now', '#homes', ', '.join(sorted(down)))
+if down: spot('bad', 'Down', 'lead down' if len(down) == 1 else 'leads down', len(down), 'now', '#homes', ', '.join(sorted(down)))
 tidy = sorted(h for h in leads if h not in down and lead_word(h)[1] == 'bad')
-if tidy: spot('warn', 'Tidy', 'homes to tidy up', len(tidy), 'now', '#homes', ', '.join(tidy))
+if tidy: spot('warn', 'Check', 'lead to check' if len(tidy) == 1 else 'leads to check', len(tidy), 'now', '#homes', ', '.join(f'{h}: {lead_word(h)[0]}' for h in tidy))
 
 # --- machine and devices -------------------------------------------------
 free, psi, psi5, (hc_, hh_, hm_) = mach['free'], mach['pressure'], mach['pressure5'], mach['heavy']
 def psi_tone(v): return 'bad' if v >= 40 else 'warn' if v >= 20 else 'ok'
 gate_wait = (free is not None and free[0] < MEM_MIN_GB) or (psi is not None and psi >= 40)
 at_cap = [x for x, full in (('emulators', (emu_count or 0) >= EMU_MAX), ('Gradle builds', (mach['gradle'] or 0) >= GRADLE_MAX)) if full]
-if gate_wait: spot('bad', 'Memory', 'heavy jobs wait', f'{free[0]:.0f} GB' if free else '?', 'now', '#devices', 'the next heavy job queues')
+low = free is not None and free[0] < MEM_MIN_GB
+if gate_wait: spot('bad', 'Memory', 'free, heavy jobs wait' if low else 'memory pressure, heavy jobs wait', f'{free[0]:.0f} GB' if low else f'{psi:.0f}%', 'now', '#devices', 'the next heavy job queues')
 for x, n, cap in (('emulators', emu_count, EMU_MAX), ('Gradle builds', mach['gradle'], GRADLE_MAX)):
-    if x in at_cap: spot('warn', 'At cap', f'{x} at the cap', f'{n}/{cap}', 'now', '#devices', 'the next one queues')
+    if x in at_cap: spot('warn', 'At cap', f'{x} at cap', f'{n}/{cap}', 'now', '#devices', 'the next one queues')
 def meter(label, value, frac, tone, hint=''):
     bar = f'<span class="bar"><i class="{tone}" style="width:{max(2, min(100, round(100 * frac)))}%"></i></span>' if frac is not None else ''
     return f'<div class="mm"><span>{esc(label)}</span><b class="{tone}">{value}</b>{bar}{f"<small>{esc(hint)}</small>" if hint else ""}</div>'
@@ -713,21 +888,22 @@ def devices_list(group):
     body = glist(groups, 'Devices') if dev_rows else ('<p class="note">No device connected and no emulator running.</p>' if dev_count is not None else '')
     return body + ''.join(f'<p class="note">unknown - {esc(p)}</p>' for p in dev_problems)
 
-# --- homes ---------------------------------------------------------------
-def home_row(h):
-    sp, lw = split(by_home[h]), lead_word(h)
-    parts = [lw[0]] if lw[1] in ('bad', 'warn') else []
-    parts += [split_txt(sp, list(STATES))] if by_home[h] else ['No open lanes']
-    if h in lane_err: parts = ['Lane records unreadable']
-    need = sp['blocked'] + sp['decision']
-    tone = 'bad' if lw[1] == 'bad' else 'warn' if need or lw[1] == 'warn' else 'ok' if by_home[h] else 'idle'
-    rd = len(bl(h, 'ready')) if backlog.get(h) is not None else None
-    z = lambda v, c, s=None: f'<span class="f {c}{" z" if not v else ""}">{"–" if v is None else s or v}</span>'
-    return (f'<div class="home"><span class="n">{dot(tone)}{esc(hname(h))}</span><span class="s">{esc(" · ".join(p for p in parts if p))}</span>'
-            + z(len(by_home[h]), 'fb', f'{len(by_home[h])}<small>/{plan(h)}</small>') + z(rd, 'fc') + '</div>')
-homes_table = ('<div class="homes nl"><div class="home head" aria-hidden="true"><span class="n"></span><span class="s">.</span>'
-               '<span class="f fb">Lanes open / plan</span><span class="f fc">Ready</span></div>'
-               + ''.join(home_row(h) for h in ACTIVE) + '</div>' + PARKED_LINE)
+# --- homes: one row each, every lane stack on one shared scale -----------
+def home_rows():
+    top = max([plan(h) for h in ACTIVE] + [len(by_home[h]) for h in ACTIVE] + [1])
+    def cell(v): return f'<span class="hn{" z" if not v else ""}">{"–" if v is None else v}</span>'
+    rows = ''
+    for h in ACTIVE:
+        lw, sp, n = lead_word(h), split(by_home[h]), len(by_home[h])
+        tone = 'bad' if lw[1] == 'bad' or h in lane_err else 'warn' if lw[1] == 'warn' or sp['blocked'] + sp['decision'] else 'ok' if n else 'idle'
+        sub = 'Lane records unreadable' if h in lane_err else lw[0] if lw[1] in ('bad', 'warn') else ''
+        free = max(0, plan(h) - n)
+        rows += (f'<div class="hr"><span class="hname">{dot(tone)}<b>{esc(hname(h))}</b>{f"<small>{esc(sub)}</small>" if sub else ""}</span>'
+                 f'<span class="hst"><span class="hsc"><span style="width:{100 * (n + free) / top:.1f}%">{stack(lane_parts(sp), n + free)}</span></span><small>{n} of {plan(h)}</small></span>'
+                 + cell(len(bl(h, 'ready')) if backlog.get(h) is not None else None) + cell(landed_on(TODAY, h))
+                 + cell(sum((closed[h] or {}).get(d, 0) for d in DAYS[7:]) if closed[h] is not None else None) + '</div>')
+    return ('<div class="hrs"><div class="hr hh"><span>Home</span><span>Lanes open of plan</span><span class="hn">Ready</span>'
+            '<span class="hn">Landed today</span><span class="hn">Closed 7\u00a0d</span></div>' + rows + '</div>' + PARKED_LINE)
 
 # --- charts: inline CSS bars drawn here, no script ----------------------
 def legend(*items):  # (class, text)
@@ -743,15 +919,9 @@ def stack(parts, total, cls='sb'):  # parts: (class, n, title); total sets the s
 def lane_parts(sp): return [(f's-{s}', sp[s], f'{sp[s]} {n}') for s, n in LANE_ORDER]
 def lane_legend(sp, free=None):
     return legend(*[(f'k s-{s}', f'{sp[s]} {n}') for s, n in LANE_ORDER if sp[s]], *([('k free', f'{free} free of plan {PLAN}')] if free else []))
-def spot_table():
-    if not spots: return '<p class="note okn">No slow spots now.</p>'
-    rows = ''.join(f'<a class="sp" href="{esc(s["href"])}" title="{esc(s["title"])}"><span class="chip c-{s["tone"]}">{esc(s["chip"])}</span>'
-                   f'<span class="spw">{esc(s["what"])}</span><b class="sn">{s["n"]}</b><span class="sa">{esc(s["age"])}</span></a>' for s in spots)
-    return f'<div class="sps"><div class="sp sph"><span>State</span><span>What</span><span>N</span><span>Oldest</span></div>{rows}</div>'
-
-def card(title, window, body, cls='', more=None):
+def card(title, window, body, cls='', more=None, cid=''):
     m = f'<a class="cm" href="{esc(more[0])}">{esc(more[1])} →</a>' if more else ''
-    return f'<section class="card {cls}"><div class="ch"><h3>{title}</h3>{m}</div><p class="cw">{window}</p>{body}</section>'
+    return f'<section class="card {cls}"{f" id={cid}" if cid else ""}><div class="ch"><h3>{title}</h3>{m}</div><p class="cw">{window}</p>{body}</section>'
 
 # --- page shell ----------------------------------------------------------
 NAV = [('./', 'index', 'Overview'), ('backlog', 'backlog', 'Backlog'), ('measure', 'measure', 'Method')]
@@ -765,24 +935,19 @@ for h in sorted(home_dir):
         if orphan: records.append((f'{hname(h)}: {plural(len(orphan), "item")} marked in flight with no live lane',
                                    ', '.join(r['id'] for r in orphan[:6]) + (' and more' if len(orphan) > 6 else '')))
 def trust():
-    parts = [f'<a class="warn" href="measure#records">{plural(len(records), "record")} disagree</a>'] if records else []
+    parts = [f'<a class="warn" href="measure#records">{plural(len(records), "record mismatch", "record mismatches")}</a>'] if records else []
     parts += [f'<a class="warn" href="measure#unknown">{plural(len(notes), "source")} unknown</a>'] if notes else []
     return ' · '.join(parts) or 'All sources read'
-CSS = ':root{color-scheme:light dark;--bg:#fbf6ef;--card:#ffffff;--text:#231b14;--text2:#5d5045;--text3:#857768;--line:rgba(90,55,20,.11);--line2:rgba(90,55,20,.22);--bar:#4a3f36;--track:rgba(90,55,20,.09);--tick:#231b14;--acc:#ec5a24;--in:#1c8c9c;--vio:#7a5ae6;--ok:#22924e;--okbar:#2fae62;--warn:#a76800;--warnbar:#eba51c;--bad:#d42f5a}@media (prefers-color-scheme:dark){:root{--bg:#16120e;--card:#211b16;--text:#f5eee6;--text2:#d2c6b8;--text3:#a09385;--line:rgba(255,230,200,.09);--line2:rgba(255,230,200,.18);--bar:#d8ccbf;--track:rgba(255,230,200,.09);--tick:#f5eee6;--acc:#ff8352;--in:#4fc3d2;--vio:#a88dff;--ok:#4fd18b;--okbar:#43c47e;--warn:#f7bc45;--warnbar:#f0ab2a;--bad:#ff6b8f}}*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}a{color:inherit;text-decoration:none}a:hover{text-decoration:underline;text-decoration-color:var(--line2);text-underline-offset:3px}.shell{max-width:780px;margin:0 auto;padding:0 16px 40px}/* nav */.brand{display:none}.brand b{font-size:16px;font-weight:600;letter-spacing:-.01em}.stamp{display:block;font-size:12px;color:var(--text3);margin-top:2px}.nav{display:flex;gap:16px;align-items:center;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}.nav a{font-size:14px;color:var(--text2);padding:12px 0 11px;border-bottom:1.5px solid transparent;margin-bottom:-1px;white-space:nowrap}.nav a:hover{text-decoration:none;color:var(--text)}.nav a[aria-current]{color:var(--text);border-bottom-color:var(--text);font-weight:500}.side-foot{display:none}main{padding-top:14px}/* type: 12 meta, 14 small, 16 body, 20 answers, 28/36 verdicts */.label{font-size:12px;color:var(--text3);margin:0;font-weight:500}.sh{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin:0 0 4px}.sh a{font-size:12px;color:var(--text2);white-space:nowrap}h1{text-wrap:balance;font-size:28px;line-height:1.15;letter-spacing:-.022em;font-weight:650;margin:0;max-width:24ch}.lede{text-wrap:pretty;font-size:16px;color:var(--text2);margin:8px 0 0;max-width:56ch}.lede a,.inl{color:var(--text);text-decoration:underline;text-decoration-color:var(--line2);text-underline-offset:3px}h2{font-size:20px;line-height:1.3;letter-spacing:-.014em;font-weight:600;margin:0 0 10px;text-wrap:balance}.meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;margin-bottom:8px;font-size:12px;color:var(--text3)}.state{display:inline-flex;align-items:center;gap:7px;font-size:14px;font-weight:500}.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}.mut{color:var(--text3)}.sub{color:var(--text2)}a.warn{text-decoration:underline;text-decoration-color:currentColor;text-underline-offset:3px;text-decoration-thickness:1px}.dot{width:7px;height:7px;border-radius:50%;background:currentColor;flex:none;display:inline-block}.dot.idle{background:none;box-shadow:inset 0 0 0 1.5px var(--text3)}.dot.warn{background:var(--warnbar)}.dot.ok{background:var(--ok)}.sections{display:grid;gap:26px;margin-top:20px}.stack{display:grid;gap:28px;align-content:start;min-width:0}section{min-width:0}.more{display:inline-block;margin-top:10px;font-size:14px;color:var(--text2)}/* key-value rows */.rows{border-top:1px solid var(--line)}.kv{display:grid;grid-template-columns:minmax(0,1fr) 48px 2.6em 6.6em;align-items:center;column-gap:10px;min-height:40px;border-bottom:1px solid var(--line)}.kv .k{color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.kv .v{text-align:right;font-weight:600;white-space:nowrap;letter-spacing:-.01em}.kv .d{font-size:12px;color:var(--text3);white-space:nowrap}.kv .d.warn{color:var(--warn)}.ge{font-weight:400;color:var(--text3);margin-right:1px}.spark{display:block;width:48px;height:18px;color:var(--text3)}.wo,.wonly{display:none}.nw{white-space:nowrap}/* items: what / where / why */.item{display:grid;grid-template-columns:14px minmax(0,1fr) auto;column-gap:8px;padding:8px 0;border-bottom:1px solid var(--line);align-items:baseline}.item .dot{transform:translateY(-1px)}.item .t{font-weight:500}.item .w{grid-column:2/4;font-size:14px;color:var(--text3);margin-top:1px}.item .h{font-size:14px;color:var(--text2);white-space:nowrap}.cline{display:grid;grid-template-columns:14px minmax(0,1fr);column-gap:8px;align-items:baseline;font-size:14px;color:var(--text2);padding:10px 0 0}.cline .dot{transform:translateY(-1px)}/* homes */.home{display:grid;grid-template-columns:minmax(0,1fr) repeat(3,3.4em);grid-template-areas:"n a b c" "s s s s";column-gap:6px;padding:10px 0;border-bottom:1px solid var(--line);align-items:baseline}.home.head{padding:0 0 6px;font-size:12px;color:var(--text3);line-height:1.25;align-items:end}.home .n{grid-area:n;display:flex;align-items:center;gap:9px;font-weight:550}.home .s{grid-area:s;font-size:14px;color:var(--text2);padding-left:16px;margin-top:1px}.home .f{text-align:right}.home .fa{grid-area:a}.home .fb{grid-area:b}.home .fc{grid-area:c}.home.head .s{display:none}.z{color:var(--text3)}/* lane split */.split{display:flex;height:10px;gap:2px;margin:2px 0 12px}.split i{display:block;height:100%;background:var(--bar)}.split i.l2{opacity:.6}.split i.l3{opacity:.35}.split i.wb{background:var(--warnbar)}.lane{display:grid;grid-template-columns:12px minmax(0,1fr) 2.4em;column-gap:8px;padding:8px 0;border-bottom:1px solid var(--line);align-items:baseline}.lane .sw2{width:9px;height:9px;border-radius:2px;background:var(--bar);transform:translateY(0)}.lane .sw2.l2{opacity:.6}.lane .sw2.l3{opacity:.35}.lane .sw2.wb{background:var(--warnbar)}.lane .c{text-align:right;font-weight:600}.lane .w{grid-column:2/4;font-size:14px;color:var(--text3)}.lane.tot{border-bottom:0;border-top:1px solid var(--line2);margin-top:-1px}.lane.tot .k{font-weight:600}.split i.ol,.sw2.ol{background:none;box-shadow:inset 0 0 0 1.5px var(--text3)}/* grouped lists: switch, collapsible groups, visible sum */.gsw{display:flex;align-items:center;gap:10px;margin:18px 0 0;font-size:12px;color:var(--text3)}.seg{display:inline-flex;gap:2px;padding:2px;border:1px solid var(--line2);border-radius:8px}.seg a{padding:4px 11px;border-radius:6px;color:var(--text2);white-space:nowrap;line-height:1.4}.seg a:hover{text-decoration:none;color:var(--text)}.seg a[aria-current]{background:var(--track);color:var(--text);font-weight:600}.gl{border-top:1px solid var(--line)}details.g{border-bottom:1px solid var(--line)}details.g>summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:16px minmax(0,1fr) auto;grid-template-areas:"cv gn gc" ". gs gs";column-gap:8px;align-items:baseline;padding:10px 0}details.g>summary::-webkit-details-marker{display:none}.cv{grid-area:cv;align-self:start;height:24px;display:flex;align-items:center}.cv::before{content:"";width:6px;height:6px;border-right:1.5px solid var(--text3);border-bottom:1.5px solid var(--text3);transform:translate(2px,-2px) rotate(45deg)}details.g:not([open]) .cv::before{transform:translate(0,0) rotate(-45deg)}details.g[open] .gs.cl{display:none}.gn{grid-area:gn;font-weight:600}.gn .sw2{display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--bar);margin-right:9px;vertical-align:0}.gn .sw2.l3{opacity:.35}.gn .sw2.wb{background:var(--warnbar)}.gn .sw2.ol{background:none}.gn .sw2.no{visibility:hidden}.gc{grid-area:gc;font-weight:600;text-align:right}.gs{grid-area:gs;font-size:14px;color:var(--text3)}.gb{padding:0 0 10px 24px;font-size:14px}.gr{display:grid;grid-template-columns:6.5em minmax(0,1fr) 2.4em;column-gap:12px;align-items:baseline;padding:3px 0}.gr .n{color:var(--text)}.gr .w{color:var(--text3)}.gr .c{grid-column:3;text-align:right;color:var(--text2)}.gr.st .n{grid-column:1/3}.gr .sw2{display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--bar);margin-right:9px}.gr .sw2.l3{opacity:.35}.gr .sw2.wb{background:var(--warnbar)}.gr .sw2.ol{background:none}.gr.dv{grid-template-columns:minmax(0,1fr)}.homes.nl .home{grid-template-columns:minmax(0,1fr) repeat(2,3.4em);grid-template-areas:"n b c" "s s s"}.gtot{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:10px 0 0;border-top:1px solid var(--line2);margin-top:-1px}.gtot .k{font-weight:600}.gtot .sum{font-size:14px;color:var(--text3);white-space:nowrap}.gtot .sum b{font-size:16px;color:var(--text);font-weight:600;margin-left:3px}.ks{display:block;font-size:12px;color:var(--text3);line-height:1.3}.kv .k.span{grid-column:1/3;padding:4px 0}/* tables */table{width:100%;border-collapse:collapse}th{font-size:12px;font-weight:500;color:var(--text3);text-align:right;padding:0 0 6px 8px;vertical-align:bottom;line-height:1.25}th:first-child,td:first-child{text-align:left;padding-left:0}td{text-align:right;padding:9px 0 9px 8px;border-top:1px solid var(--line)}tbody tr:last-child td{border-bottom:1px solid var(--line)}tfoot td{font-weight:600;border-top:1px solid var(--line2);border-bottom:0}td.l,th.l{text-align:left}td .bf,th.bfc,td.bfc{display:none}.tt td{vertical-align:top}.tt td:first-child{color:var(--text)}.tt td.l{color:var(--text2);font-size:14px}.tt th.l{width:46%}/* totals equation */.eq{display:flex;flex-wrap:wrap;align-items:flex-end;gap:6px 14px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:12px 0}.eq div span{display:block;font-size:12px;color:var(--text3)}.eq div b{display:block;font-size:20px;font-weight:600;letter-spacing:-.015em;line-height:1.3}.eq .op{font-size:20px;color:var(--text3);line-height:1.3}.eq small{font-size:14px;font-weight:400;color:var(--text2)}/* charts */.chart svg{display:block;width:100%;height:120px}.cols{display:grid;text-align:center;font-size:12px;color:var(--text3);border-top:1px solid var(--line2);padding-top:6px}.cols b{display:block;font-size:14px;font-weight:600;color:var(--text)}.cols i{font-style:normal}.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:14px;color:var(--text2);margin:0 0 10px}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}.sw.f{background:var(--bar)}.sw.o{box-shadow:inset 0 0 0 1.5px var(--text2)}.note{font-size:14px;color:var(--text3);margin:10px 0 0;max-width:62ch}.unk{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);color:var(--text2)}.unk b{font-weight:500;color:var(--text3)}/* feed */.feed .item{grid-template-columns:3.4em minmax(0,1fr) auto}.feed.nt .item{grid-template-columns:minmax(0,1fr) auto}.feed.nt .item .w{grid-column:1/3}.feed .tm{font-size:14px;color:var(--text3)}/* quota */.acct{padding:14px 0 16px;border-bottom:1px solid var(--line)}.acct:first-child{border-top:1px solid var(--line)}.acct-h{display:flex;justify-content:space-between;align-items:baseline;gap:4px 12px;flex-wrap:wrap}.acct-h b{font-weight:600}.acct-h .r{font-size:14px;font-weight:500}.acct-meta{font-size:14px;color:var(--text3);margin-top:1px}.win{display:grid;grid-template-columns:minmax(0,1fr) 3.2em;grid-template-areas:"l p" "b b" "x x";column-gap:10px;margin-top:12px}.win .l{grid-area:l;font-size:14px;color:var(--text2)}.win .p{grid-area:p;text-align:right;font-weight:600}.win svg{grid-area:b;display:block;width:100%;height:12px;margin:4px 0 2px;overflow:visible}.win .x{grid-area:x;font-size:12px;color:var(--text3)}.meter .tr{fill:var(--track)}.meter .fi{fill:var(--bar)}.meter .fi.w{fill:var(--warnbar)}.meter .fi.m{fill:var(--text3);opacity:.55}.meter .tk{stroke:var(--tick);stroke-width:1.5}.users{font-size:14px;color:var(--text3);margin-top:12px}.users b{font-weight:500;color:var(--text2)}.two table{margin-top:22px}.grp{font-size:12px;color:var(--text3);font-weight:500;margin:16px 0 4px}.grp:first-of-type{margin-top:0}footer{margin-top:40px;padding-top:14px;border-top:1px solid var(--line);font-size:14px;color:var(--text3);line-height:1.6}footer p{margin:0 0 4px}footer a{color:var(--text2);text-decoration:underline;text-decoration-color:var(--line2);text-underline-offset:3px}@media (min-width:600px){ .shell{padding:0 32px 48px} .nav{gap:22px} main{padding-top:24px} h1{font-size:36px} .sections{gap:36px;margin-top:28px} .stack{gap:36px} .kv{grid-template-columns:minmax(0,1fr) 72px 2.8em 13em;column-gap:16px;min-height:44px} .spark{width:72px;height:22px} .wo{display:inline}.wonly{display:block} .item .w{grid-column:2/3} .feed.nt .item .w{grid-column:1/2} .home{grid-template-columns:9em minmax(0,1fr) repeat(3,4.6em);grid-template-areas:"n s a b c";column-gap:12px} .home .s{padding-left:0;margin-top:0} .home.head .s{display:block;visibility:hidden} td .bf{display:block;margin:0 auto} th.bfc,td.bfc{display:table-cell;width:42%} th.bfc{text-align:center} .chart svg{height:140px} details.g>summary{grid-template-columns:16px auto minmax(0,1fr) auto;grid-template-areas:"cv gn gs gc";column-gap:10px} .homes.nl .home{grid-template-columns:9em minmax(0,1fr) repeat(2,4.6em);grid-template-areas:"n s b c"}}@media (max-width:1099px){ .ov>.stack{display:contents} .a-out{order:1}.a-slow{order:2}.a-lanes{order:3}.a-homes{order:4}.a-dev{order:5}}@media (min-width:1100px){ .shell{max-width:1360px;display:grid;grid-template-columns:184px minmax(0,1fr);column-gap:72px;padding:0 56px 64px} .side{position:sticky;top:0;align-self:start;padding-top:40px;height:100vh} .brand{display:block} .nav{flex-direction:column;align-items:flex-start;gap:2px;border:0;margin-top:28px;overflow:visible} .nav a{padding:6px 10px;margin:0 0 0 -10px;border:0;border-radius:6px} .nav a[aria-current]{background:var(--track);border:0} .side-foot{display:block;position:absolute;bottom:40px;font-size:12px;color:var(--text3);line-height:1.6;max-width:184px} .side-foot a{color:var(--text2);text-decoration:underline;text-decoration-color:var(--line2);text-underline-offset:3px} main{padding-top:40px;max-width:1100px} .hero .meta{display:none} .sections{grid-template-columns:repeat(2,minmax(0,1fr));gap:52px 72px;margin-top:44px} .sections .wide{grid-column:1/-1} .stack{gap:52px} .accts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:72px} .acct:nth-child(2){border-top:1px solid var(--line)} .two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:72px;align-items:start} .two table{margin-top:0!important} .kv{grid-template-columns:minmax(0,1fr) 64px 2.8em 10.5em} .home{grid-template-columns:9em minmax(0,30em) repeat(3,minmax(4.6em,1fr))} .homes.nl .home{grid-template-columns:9em minmax(0,30em) repeat(2,minmax(4.6em,1fr))}}/* phase 2: grafts and live-only pieces */.unkv{color:var(--text3);font-weight:400;font-size:14px}.trust{margin-top:0}.trust a{color:var(--text2)}.trust a.warn{color:var(--warn)}.strip{display:flex;height:12px;gap:2px;margin:2px 0 8px}.strip i{flex:1;border-radius:2px;background:var(--bar)}.strip i.st{background:var(--warnbar)}.strip i.fr{background:none;box-shadow:inset 0 0 0 1.5px var(--line2)}.sw.mv{background:var(--bar)}.sw.st{background:var(--warnbar)}.sw.fr{box-shadow:inset 0 0 0 1.5px var(--line2)}.gr .n{min-width:0;overflow:hidden;text-overflow:ellipsis}.gb .gr{grid-template-columns:minmax(0,1fr) auto 2.4em}.gb .gr .w{font-size:13px;text-align:right}@media (max-width:599px){.gb .gr{grid-template-columns:minmax(0,1fr) 2.4em}.gb .gr .w{grid-column:1/-1;grid-row:2;text-align:left}}.iol{border-top:1px solid var(--line)}.iob{display:grid;grid-template-columns:6em minmax(0,1fr);grid-template-areas:"lab bars" ". nums";column-gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}.iob .lab{grid-area:lab;color:var(--text2)}.iob .bars{grid-area:bars;display:grid;gap:4px;align-content:center}.iob .nums{grid-area:nums;font-size:13px;color:var(--text3)}.io{display:block;height:9px;border-radius:2px;min-width:0}.io.out{background:var(--bar)}.io.in{box-shadow:inset 0 0 0 1.5px var(--text2)}.iol+.legend{margin-top:10px}.ro{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:12px;padding:10px 0;border-bottom:1px solid var(--line);align-items:baseline}.ro>b{font-size:20px;font-weight:600;letter-spacing:-.015em}.ro .rn{font-size:14px;color:var(--text2)}.ro .rn b{color:var(--text)}.ro .bar,.mm .bar{grid-column:1/-1;display:block;height:6px;background:var(--track);border-radius:3px;margin:6px 0 3px;overflow:hidden}.ro .bar i,.mm .bar i{display:block;height:100%;background:var(--bar)}.ro .bar i.w,.mm .bar i.warn{background:var(--warnbar)}.mm .bar i.bad{background:var(--bad)}.ro small,.mm small{grid-column:1/-1;font-size:12px;color:var(--text3)}.mach{margin-top:18px}.mm{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:12px;padding:8px 0;border-bottom:1px solid var(--line);align-items:baseline}.mm:first-child{border-top:1px solid var(--line)}.mm>span{color:var(--text2)}.mm>b{font-weight:600}.mm>b small{font-size:12px;font-weight:400;color:var(--text3);grid-column:auto}.xl{display:none}.sm{font-size:13px}@media (min-width:1100px){.xl{display:block}.trust{margin-top:6px}}.gb .gr.st{display:block;padding:5px 0}.gb .gr.st .n{display:block;white-space:normal}.gb .gr.st .w{display:block;text-align:left;grid-column:auto}.kv .ks{white-space:normal}.kv .k.wide{grid-column:1/3}.kv .dw{display:block;white-space:normal;line-height:1.3}.item.feed{grid-template-columns:4.2em minmax(0,1fr) auto}.item.feed .tm{white-space:nowrap}.item.feed .w{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.item.feed .tm{font-size:14px;color:var(--text3)}/* visual-first: cards, tiles and charts */.c-ok{--c:var(--okbar)}.c-warn{--c:var(--warnbar)}.c-bad{--c:var(--bad)}.c-in{--c:var(--in)}.c-out{--c:var(--acc)}.c-vio{--c:var(--vio)}.c-mut{--c:var(--text3)}.hero.ov h1{display:flex;align-items:center;gap:12px;max-width:none}.hd{width:14px;height:14px;border-radius:50%;background:var(--c);flex:none;box-shadow:0 0 0 5px color-mix(in srgb,var(--c) 22%,transparent)}.tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:18px}.tile{display:flex;flex-direction:column;min-width:0;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 12px 10px;color:inherit;position:relative;overflow:hidden}.tile:hover{text-decoration:none;border-color:var(--line2)}.tile.t-warn{box-shadow:inset 0 3px 0 var(--warnbar)}.tile.t-bad{box-shadow:inset 0 3px 0 var(--bad)}.tl{font-size:12px;font-weight:600;color:var(--text2);letter-spacing:.01em}.tv{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 8px;font-size:30px;font-weight:700;letter-spacing:-.03em;line-height:1.15;margin:2px 0 4px}.tv small{font-size:14px;font-weight:500;color:var(--text3);letter-spacing:0}.tv .unkv{font-size:13px;letter-spacing:0}.okv{color:var(--ok)}.dl{font-size:12px;font-weight:600;letter-spacing:0;padding:1px 7px;border-radius:999px;background:var(--track);color:var(--text2);white-space:nowrap}.dl.up{color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,transparent)}.dl.down{color:var(--warn);background:color-mix(in srgb,var(--warnbar) 16%,transparent)}.ta{font-size:11px;line-height:1.35;color:var(--text3);margin-top:auto;padding-top:6px}.tc{flex-basis:100%;font-size:12px;font-weight:500;letter-spacing:0;color:var(--text3)}.mini b{font-weight:600;color:var(--text)}.tsp.ok .ln{stroke:var(--okbar)}.tsp.ok .ar{fill:var(--okbar)}.tsp.warn .ln{stroke:var(--warnbar)}.tsp.warn .ar{fill:var(--warnbar)}.tsp.bad .ln{stroke:var(--bad)}.tsp.bad .ar{fill:var(--bad)}.gauge+.mini,.tv:has(.gauge)+.mini{margin-top:6px}.mini+.tsp{margin-top:6px}.tsp{display:block;width:100%;height:34px}.tsp .ln{fill:none;stroke-width:2;stroke-linejoin:round}.tsp .ar{stroke:none;opacity:.16}.tsp.out .ln{stroke:var(--acc)}.tsp.out .ar{fill:var(--acc)}.tsp.in .ln{stroke:var(--in)}.tsp.in .ar{fill:var(--in)}.hit{fill:transparent}.donut{width:84px;height:84px;display:block;margin:2px 0}.donut,.gauge{letter-spacing:0}.donut circle{fill:none;stroke-width:4.2;stroke:var(--c)}.donut .tr{stroke:var(--track)}.donut .dc,.gauge .dc{font-size:9px;font-weight:700;fill:var(--text);text-anchor:middle;letter-spacing:-.3px}.donut .ds,.gauge .ds{font-size:4.2px;font-weight:500;letter-spacing:0;fill:var(--text3);text-anchor:middle}.tv:has(.donut),.tv:has(.gauge){margin:0}.gauge{width:110px;height:64px;display:block}.gauge path{fill:none;stroke-width:4.6;stroke-linecap:round;stroke:var(--c)}.gauge .tr{stroke:var(--track)}.gauge .dc{font-size:10px}.mini{display:flex;flex-wrap:wrap;gap:2px 10px;font-size:12px;color:var(--text2)}.mini span{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}.mini i.free{background:none;box-shadow:inset 0 0 0 1.5px var(--line2)}.mini i,.lg i{width:8px;height:8px;border-radius:2px;background:var(--c);display:inline-block;flex:none}.sb{display:flex;gap:2px;height:10px;border-radius:5px;overflow:hidden;margin:4px 0}.sb.big{height:14px;margin:8px 0 6px}.sb i{display:block;min-width:3px;background:var(--c)}.sb i.free,.lg i.free{background:none;box-shadow:inset 0 0 0 1.5px var(--line2)}.s-building{--c:var(--okbar)}.s-validating{--c:var(--in)}.s-finished{--c:var(--acc)}.s-waiting{--c:var(--text3)}.s-decision{--c:var(--warnbar)}.s-blocked{--c:var(--bad)}.k.out{--c:var(--acc)}.k.in{--c:var(--in)}.k.y{opacity:.55}.k.p50{--c:var(--acc)}.k.p85{--c:var(--vio)}.k.ok{--c:var(--okbar)}.k.bad{--c:var(--bad)}.k.mut{--c:var(--text3)}.lg{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--text2);margin:2px 0 8px}.lg span{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}.lg .k.y{opacity:1}.lg .k.y i,.lg i.k.y{opacity:.5}.cards{display:grid;gap:12px;margin-top:12px}.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 14px 12px;min-width:0}.ch{display:flex;justify-content:space-between;align-items:baseline;gap:10px}.ch h3{font-size:16px;font-weight:650;letter-spacing:-.01em;margin:0}.cm{font-size:12px;color:var(--text2);white-space:nowrap}.cw{font-size:11px;color:var(--text3);margin:0 0 10px}.cf{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:6px}.ya{display:flex;flex-direction:column;justify-content:space-between;height:var(--ch);font-size:11px;color:var(--text3);text-align:right;line-height:1;margin-top:-1px}.pl svg{display:block;width:100%;height:var(--ch);overflow:visible}.xa{display:grid;font-size:11px;color:var(--text3);margin-top:4px}.xa span{text-align:center;white-space:nowrap}.gl{stroke:var(--line);stroke-width:1}.ln{fill:none;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.ln.out{stroke:var(--acc)}.ln.in{stroke:var(--in)}.ln.y{stroke-width:1.6;stroke-dasharray:5 4;opacity:.7}.ln.p50{stroke:var(--acc)}.ln.p85{stroke:var(--vio);stroke-dasharray:6 4}.now{stroke:var(--text3);stroke-width:1;stroke-dasharray:2 3}.b.out{fill:var(--acc)}.b.in{fill:var(--in);opacity:.85}.b.in.fl{fill:none;stroke:var(--in);stroke-width:3}.hbs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 16px}.hb{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;color:inherit;padding:4px 0}.hb:hover{text-decoration:none}.hb .hn{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hb .hv{font-size:14px;font-weight:700}.hb .hv small{font-size:11px;color:var(--text3);font-weight:500}.hb .sb{grid-column:1/-1;height:8px;margin:3px 0 0}.qb{display:grid;grid-template-columns:6.5em minmax(0,1fr) auto;align-items:center;gap:10px;padding:5px 0}.qn{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.qt{position:relative;height:10px;border-radius:5px;background:var(--track)}.qt i{position:absolute;inset:0 auto 0 0;border-radius:5px;background:var(--c)}.qt b{position:absolute;top:-3px;bottom:-3px;width:2px;margin-left:-1px;background:var(--tick);opacity:.55;border-radius:1px}.qr{font-size:12px;white-space:nowrap;text-align:right;min-width:6.5em}.qr.warn{font-weight:600}.sps{display:grid}.sp{display:grid;grid-template-columns:4.8em minmax(0,1fr) 3.4em 4.6em;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--line);color:inherit}.sp:hover{text-decoration:none;background:var(--track)}.sp.sph{font-size:11px;color:var(--text3);border-top:0;padding-top:0}.sp.sph span:nth-child(n+3){text-align:right}.chip{font-size:11px;font-weight:700;text-align:center;padding:2px 0;border-radius:999px;color:var(--c);background:color-mix(in srgb,var(--c) 17%,transparent);white-space:nowrap}.sp .spw{font-size:13.5px;line-height:1.3;min-width:0}.sp .sn{font-size:15px;text-align:right}.sp .sa{font-size:12px;color:var(--text3);text-align:right;white-space:nowrap}.okn{color:var(--ok)}.card .gl,.card table{margin-top:4px}@media (min-width:600px){ .tiles{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px} .cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px} .cards .wide,.cards .wide-m{grid-column:1/-1} .hbs{grid-template-columns:repeat(3,minmax(0,1fr))}}@media (min-width:1100px){ .tiles{grid-template-columns:repeat(6,minmax(0,1fr))} .cards .wide-m{grid-column:auto} .cards .wide-l{grid-column:1/-1} .hbs{grid-template-columns:repeat(4,minmax(0,1fr))}}.xa.xp{position:relative;display:block;height:1.3em}.xa.xp span{position:absolute;transform:translateX(-50%)}.xa.xp span:first-child{transform:none}.xa.xp span:last-child{transform:translateX(-100%)}.mm .bar i.ok{background:var(--okbar)}@media (min-width:600px){.devm{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:28px;align-items:start}.devm .mach{margin-top:0}}.sections section{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 14px 12px}.sections .stack{gap:12px}.sections{gap:12px}.io.out{background:var(--acc)}.io.in{box-shadow:inset 0 0 0 1.5px var(--in)}.legend .sw.f{background:var(--acc)}.legend .sw.o{box-shadow:inset 0 0 0 1.5px var(--in);background:none}@media (min-width:600px){.sections,.sections .stack{gap:14px}}@media (min-width:1100px){.sections{gap:16px}.sections .stack{gap:16px}}'
+CSS = ':root{color-scheme:light dark;--bg:#faf5ee;--card:#ffffff;--text:#231b14;--text2:#5a4d41;--text3:#736456;--line:rgba(90,55,20,.11);--line2:rgba(90,55,20,.22);--bar:#4a3f36;--track:rgba(90,55,20,.09);--tick:#231b14;--acc:#c84f00;--in:#007ea6;--vio:#a07cdb;--ok:#1a7a3c;--okbar:#218a45;--warn:#8f5600;--warnbar:#bb7400;--bad:#c72c4c}@media (prefers-color-scheme:dark){:root{--bg:#15110d;--card:#201a15;--text:#f6efe7;--text2:#d4c8ba;--text3:#a89a8a;--line:rgba(255,230,200,.09);--line2:rgba(255,230,200,.18);--bar:#d8ccbf;--track:rgba(255,230,200,.09);--tick:#f5eee6;--acc:#df6c32;--in:#10a8b0;--vio:#9a7de3;--ok:#5fd394;--okbar:#3eab5e;--warn:#f5ae39;--warnbar:#f5ae39;--bad:#f0546e}}*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}a{color:inherit;text-decoration:none}a:hover{text-decoration:underline;text-decoration-color:var(--line2);text-underline-offset:3px}.shell{max-width:780px;margin:0 auto;padding:0 16px 40px}/* nav */.brand{display:none}.brand b{font-size:16px;font-weight:600;letter-spacing:-.01em}.stamp{display:block;font-size:12px;color:var(--text3);margin-top:2px}.nav{display:flex;gap:16px;align-items:center;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}.nav a{font-size:14px;color:var(--text2);padding:12px 0 11px;border-bottom:1.5px solid transparent;margin-bottom:-1px;white-space:nowrap}.nav a:hover{text-decoration:none;color:var(--text)}.nav a[aria-current]{color:var(--text);border-bottom-color:var(--text);font-weight:500}.side-foot{display:none}main{padding-top:14px}/* type: 12 meta, 14 small, 16 body, 20 answers, 28/36 verdicts */.label{font-size:12px;color:var(--text3);margin:0;font-weight:500}.sh{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin:0 0 4px}.sh a{font-size:12px;color:var(--text2);white-space:nowrap}h1{text-wrap:balance;font-size:28px;line-height:1.15;letter-spacing:-.022em;font-weight:650;margin:0;max-width:24ch}.lede{text-wrap:pretty;font-size:16px;color:var(--text2);margin:8px 0 0;max-width:56ch}.lede a,.inl{color:var(--text);text-decoration:underline;text-decoration-color:var(--line2);text-underline-offset:3px}h2{font-size:20px;line-height:1.3;letter-spacing:-.014em;font-weight:600;margin:0 0 10px;text-wrap:balance}.meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;margin-bottom:8px;font-size:12px;color:var(--text3)}.state{display:inline-flex;align-items:center;gap:7px;font-size:14px;font-weight:500}.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}.mut{color:var(--text3)}.sub{color:var(--text2)}a.warn{text-decoration:underline;text-decoration-color:currentColor;text-underline-offset:3px;text-decoration-thickness:1px}.dot{width:7px;height:7px;border-radius:50%;background:currentColor;flex:none;display:inline-block}.dot.idle{background:none;box-shadow:inset 0 0 0 1.5px var(--text3)}.dot.warn{background:var(--warnbar)}.dot.ok{background:var(--ok)}.sections{display:grid;gap:26px;margin-top:20px}.stack{display:grid;gap:28px;align-content:start;min-width:0}section{min-width:0}.more{display:inline-block;margin-top:10px;font-size:14px;color:var(--text2)}/* key-value rows */.rows{border-top:1px solid var(--line)}.kv{display:grid;grid-template-columns:minmax(0,1fr) 48px 2.6em 6.6em;align-items:center;column-gap:10px;min-height:40px;border-bottom:1px solid var(--line)}.kv .k{color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.kv .v{text-align:right;font-weight:600;white-space:nowrap;letter-spacing:-.01em}.kv .d{font-size:12px;color:var(--text3);white-space:nowrap}.kv .d.warn{color:var(--warn)}.ge{font-weight:400;color:var(--text3);margin-right:1px}.spark{display:block;width:48px;height:18px;color:var(--text3)}.wo,.wonly{display:none}.nw{white-space:nowrap}/* items: what / where / why */.item{display:grid;grid-template-columns:14px minmax(0,1fr) auto;column-gap:8px;padding:8px 0;border-bottom:1px solid var(--line);align-items:baseline}.item .dot{transform:translateY(-1px)}.item .t{font-weight:500}.item .w{grid-column:2/4;font-size:14px;color:var(--text3);margin-top:1px}.item .h{font-size:14px;color:var(--text2);white-space:nowrap}.cline{display:grid;grid-template-columns:14px minmax(0,1fr);column-gap:8px;align-items:baseline;font-size:14px;color:var(--text2);padding:10px 0 0}.cline .dot{transform:translateY(-1px)}/* homes */.home{display:grid;grid-template-columns:minmax(0,1fr) repeat(3,3.4em);grid-template-areas:"n a b c" "s s s s";column-gap:6px;padding:10px 0;border-bottom:1px solid var(--line);align-items:baseline}.home.head{padding:0 0 6px;font-size:12px;color:var(--text3);line-height:1.25;align-items:end}.home .n{grid-area:n;display:flex;align-items:center;gap:9px;font-weight:550}.home .s{grid-area:s;font-size:14px;color:var(--text2);padding-left:16px;margin-top:1px}.home .f{text-align:right}.home .fa{grid-area:a}.home .fb{grid-area:b}.home .fc{grid-area:c}.home.head .s{display:none}.z{color:var(--text3)}/* lane split */.split{display:flex;height:10px;gap:2px;margin:2px 0 12px}.split i{display:block;height:100%;background:var(--bar)}.split i.l2{opacity:.6}.split i.l3{opacity:.35}.split i.wb{background:var(--warnbar)}.lane{display:grid;grid-template-columns:12px minmax(0,1fr) 2.4em;column-gap:8px;padding:8px 0;border-bottom:1px solid var(--line);align-items:baseline}.lane .sw2{width:9px;height:9px;border-radius:2px;background:var(--bar);transform:translateY(0)}.lane .sw2.l2{opacity:.6}.lane .sw2.l3{opacity:.35}.lane .sw2.wb{background:var(--warnbar)}.lane .c{text-align:right;font-weight:600}.lane .w{grid-column:2/4;font-size:14px;color:var(--text3)}.lane.tot{border-bottom:0;border-top:1px solid var(--line2);margin-top:-1px}.lane.tot .k{font-weight:600}.split i.ol,.sw2.ol{background:none;box-shadow:inset 0 0 0 1.5px var(--text3)}/* grouped lists: switch, collapsible groups, visible sum */.gsw{display:flex;align-items:center;gap:10px;margin:18px 0 0;font-size:12px;color:var(--text3)}.seg{display:inline-flex;gap:2px;padding:2px;border:1px solid var(--line2);border-radius:8px}.seg a{padding:4px 11px;border-radius:6px;color:var(--text2);white-space:nowrap;line-height:1.4}.seg a:hover{text-decoration:none;color:var(--text)}.seg a[aria-current]{background:var(--track);color:var(--text);font-weight:600}.gl{border-top:1px solid var(--line)}details.g{border-bottom:1px solid var(--line)}details.g>summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:16px minmax(0,1fr) auto;grid-template-areas:"cv gn gc" ". gs gs";column-gap:8px;align-items:baseline;padding:10px 0}details.g>summary::-webkit-details-marker{display:none}.cv{grid-area:cv;align-self:start;height:24px;display:flex;align-items:center}.cv::before{content:"";width:6px;height:6px;border-right:1.5px solid var(--text3);border-bottom:1.5px solid var(--text3);transform:translate(2px,-2px) rotate(45deg)}details.g:not([open]) .cv::before{transform:translate(0,0) rotate(-45deg)}details.g[open] .gs.cl{display:none}.gn{grid-area:gn;font-weight:600}.gn .sw2{display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--bar);margin-right:9px;vertical-align:0}.gn .sw2.l3{opacity:.35}.gn .sw2.wb{background:var(--warnbar)}.gn .sw2.ol{background:none}.gn .sw2.no{visibility:hidden}.gc{grid-area:gc;font-weight:600;text-align:right}.gs{grid-area:gs;font-size:14px;color:var(--text3)}.gb{padding:0 0 10px 24px;font-size:14px}.gr{display:grid;grid-template-columns:6.5em minmax(0,1fr) 2.4em;column-gap:12px;align-items:baseline;padding:3px 0}.gr .n{color:var(--text)}.gr .w{color:var(--text3)}.gr .c{grid-column:3;text-align:right;color:var(--text2)}.gr.st .n{grid-column:1/3}.gr .sw2{display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--bar);margin-right:9px}.gr .sw2.l3{opacity:.35}.gr .sw2.wb{background:var(--warnbar)}.gr .sw2.ol{background:none}.gr.dv{grid-template-columns:minmax(0,1fr)}.homes.nl .home{grid-template-columns:minmax(0,1fr) repeat(2,3.4em);grid-template-areas:"n b c" "s s s"}.gtot{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:10px 0 0;border-top:1px solid var(--line2);margin-top:-1px}.gtot .k{font-weight:600}.gtot .sum{font-size:14px;color:var(--text3);white-space:nowrap}.gtot .sum b{font-size:16px;color:var(--text);font-weight:600;margin-left:3px}.ks{display:block;font-size:12px;color:var(--text3);line-height:1.3}.kv .k.span{grid-column:1/3;padding:4px 0}/* tables */table{width:100%;border-collapse:collapse}th{font-size:12px;font-weight:500;color:var(--text3);text-align:right;padding:0 0 6px 8px;vertical-align:bottom;line-height:1.25}th:first-child,td:first-child{text-align:left;padding-left:0}td{text-align:right;padding:9px 0 9px 8px;border-top:1px solid var(--line)}tbody tr:last-child td{border-bottom:1px solid var(--line)}tfoot td{font-weight:600;border-top:1px solid var(--line2);border-bottom:0}td.l,th.l{text-align:left}td .bf,th.bfc,td.bfc{display:none}.tt td{vertical-align:top}.tt td:first-child{color:var(--text)}.tt td.l{color:var(--text2);font-size:14px}.tt th.l{width:46%}/* totals equation */.eq{display:flex;flex-wrap:wrap;align-items:flex-end;gap:6px 14px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:12px 0}.eq div span{display:block;font-size:12px;color:var(--text3)}.eq div b{display:block;font-size:20px;font-weight:600;letter-spacing:-.015em;line-height:1.3}.eq .op{font-size:20px;color:var(--text3);line-height:1.3}.eq small{font-size:14px;font-weight:400;color:var(--text2)}/* charts */.chart svg{display:block;width:100%;height:120px}.cols{display:grid;text-align:center;font-size:12px;color:var(--text3);border-top:1px solid var(--line2);padding-top:6px}.cols b{display:block;font-size:14px;font-weight:600;color:var(--text)}.cols i{font-style:normal}.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:14px;color:var(--text2);margin:0 0 10px}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}.sw.f{background:var(--bar)}.sw.o{box-shadow:inset 0 0 0 1.5px var(--text2)}.note{font-size:14px;color:var(--text3);margin:10px 0 0;max-width:62ch}.unk{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);color:var(--text2)}.unk b{font-weight:500;color:var(--text3)}/* feed */.feed .item{grid-template-columns:3.4em minmax(0,1fr) auto}.feed.nt .item{grid-template-columns:minmax(0,1fr) auto}.feed.nt .item .w{grid-column:1/3}.feed .tm{font-size:14px;color:var(--text3)}/* quota */.acct{padding:14px 0 16px;border-bottom:1px solid var(--line)}.acct:first-child{border-top:1px solid var(--line)}.acct-h{display:flex;justify-content:space-between;align-items:baseline;gap:4px 12px;flex-wrap:wrap}.acct-h b{font-weight:600}.acct-h .r{font-size:14px;font-weight:500}.acct-meta{font-size:14px;color:var(--text3);margin-top:1px}.win{display:grid;grid-template-columns:minmax(0,1fr) 3.2em;grid-template-areas:"l p" "b b" "x x";column-gap:10px;margin-top:12px}.win .l{grid-area:l;font-size:14px;color:var(--text2)}.win .p{grid-area:p;text-align:right;font-weight:600}.win svg{grid-area:b;display:block;width:100%;height:12px;margin:4px 0 2px;overflow:visible}.win .x{grid-area:x;font-size:12px;color:var(--text3)}.meter .tr{fill:var(--track)}.meter .fi{fill:var(--bar)}.meter .fi.w{fill:var(--warnbar)}.meter .fi.m{fill:var(--text3);opacity:.55}.meter .tk{stroke:var(--tick);stroke-width:1.5}.users{font-size:14px;color:var(--text3);margin-top:12px}.users b{font-weight:500;color:var(--text2)}.two table{margin-top:22px}.grp{font-size:12px;color:var(--text3);font-weight:500;margin:16px 0 4px}.grp:first-of-type{margin-top:0}footer{margin-top:40px;padding-top:14px;border-top:1px solid var(--line);font-size:14px;color:var(--text3);line-height:1.6}footer p{margin:0 0 4px}footer a{color:var(--text2);text-decoration:underline;text-decoration-color:var(--line2);text-underline-offset:3px}@media (min-width:600px){ main{padding-top:24px} h1{font-size:36px} .sections{gap:36px;margin-top:28px} .stack{gap:36px} .kv{grid-template-columns:minmax(0,1fr) 72px 2.8em 13em;column-gap:16px;min-height:44px} .spark{width:72px;height:22px} .wo{display:inline}.wonly{display:block} .item .w{grid-column:2/3} .feed.nt .item .w{grid-column:1/2} .home{grid-template-columns:9em minmax(0,1fr) repeat(3,4.6em);grid-template-areas:"n s a b c";column-gap:12px} .home .s{padding-left:0;margin-top:0} .home.head .s{display:block;visibility:hidden} td .bf{display:block;margin:0 auto} th.bfc,td.bfc{display:table-cell;width:42%} th.bfc{text-align:center} .chart svg{height:140px} details.g>summary{grid-template-columns:16px auto minmax(0,1fr) auto;grid-template-areas:"cv gn gs gc";column-gap:10px} .homes.nl .home{grid-template-columns:9em minmax(0,1fr) repeat(2,4.6em);grid-template-areas:"n s b c"}}@media (max-width:1099px){ .ov>.stack{display:contents} .a-out{order:1}.a-slow{order:2}.a-lanes{order:3}.a-homes{order:4}.a-dev{order:5}}@media (min-width:1100px){ .shell{max-width:1312px;padding:0 48px 64px} main{padding-top:28px} .hero .meta{display:none} .sections{grid-template-columns:repeat(2,minmax(0,1fr));gap:52px 72px;margin-top:44px} .sections .wide{grid-column:1/-1} .stack{gap:52px} .accts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:72px} .acct:nth-child(2){border-top:1px solid var(--line)} .two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:72px;align-items:start} .two table{margin-top:0!important} .kv{grid-template-columns:minmax(0,1fr) 64px 2.8em 10.5em} .home{grid-template-columns:9em minmax(0,30em) repeat(3,minmax(4.6em,1fr))} .homes.nl .home{grid-template-columns:9em minmax(0,30em) repeat(2,minmax(4.6em,1fr))}}/* phase 2: grafts and live-only pieces */.unkv{color:var(--text3);font-weight:400;font-size:14px}.trust{margin-top:0}.trust a{color:var(--text2)}.trust a.warn{color:var(--warn)}.strip{display:flex;height:12px;gap:2px;margin:2px 0 8px}.strip i{flex:1;border-radius:2px;background:var(--bar)}.strip i.st{background:var(--warnbar)}.strip i.fr{background:none;box-shadow:inset 0 0 0 1.5px var(--line2)}.sw.mv{background:var(--bar)}.sw.st{background:var(--warnbar)}.sw.fr{box-shadow:inset 0 0 0 1.5px var(--line2)}.gr .n{min-width:0;overflow:hidden;text-overflow:ellipsis}.gb .gr{grid-template-columns:minmax(0,1fr) auto 2.4em}.gb .gr .w{font-size:13px;text-align:right}@media (max-width:599px){.gb .gr{grid-template-columns:minmax(0,1fr) 2.4em}.gb .gr .w{grid-column:1/-1;grid-row:2;text-align:left}}.iol{border-top:1px solid var(--line)}.iob{display:grid;grid-template-columns:6em minmax(0,1fr);grid-template-areas:"lab bars" ". nums";column-gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}.iob .lab{grid-area:lab;color:var(--text2)}.iob .bars{grid-area:bars;display:grid;gap:4px;align-content:center}.iob .nums{grid-area:nums;font-size:13px;color:var(--text3)}.io{display:block;height:9px;border-radius:2px;min-width:0}.io.out{background:var(--bar)}.io.in{box-shadow:inset 0 0 0 1.5px var(--text2)}.iol+.legend{margin-top:10px}.ro{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:12px;padding:10px 0;border-bottom:1px solid var(--line);align-items:baseline}.ro>b{font-size:20px;font-weight:600;letter-spacing:-.015em}.ro .rn{font-size:14px;color:var(--text2)}.ro .rn b{color:var(--text)}.ro .bar,.mm .bar{grid-column:1/-1;display:block;height:6px;background:var(--track);border-radius:3px;margin:6px 0 3px;overflow:hidden}.ro .bar i,.mm .bar i{display:block;height:100%;background:var(--bar)}.ro .bar i.w,.mm .bar i.warn{background:var(--warnbar)}.mm .bar i.bad{background:var(--bad)}.ro small,.mm small{grid-column:1/-1;font-size:12px;color:var(--text3)}.mach{margin-top:18px}.mm{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:12px;padding:8px 0;border-bottom:1px solid var(--line);align-items:baseline}.mm:first-child{border-top:1px solid var(--line)}.mm>span{color:var(--text2)}.mm>b{font-weight:600}.mm>b small{font-size:12px;font-weight:400;color:var(--text3);grid-column:auto}.xl{display:none}.sm{font-size:13px}@media (min-width:1100px){.xl{display:block}.trust{margin-top:6px}}.gb .gr.st{display:block;padding:5px 0}.gb .gr.st .n{display:block;white-space:normal}.gb .gr.st .w{display:block;text-align:left;grid-column:auto}.kv .ks{white-space:normal}.kv .k.wide{grid-column:1/3}.kv .dw{display:block;white-space:normal;line-height:1.3}.item.feed{grid-template-columns:4.2em minmax(0,1fr) auto}.item.feed .tm{white-space:nowrap}.item.feed .w{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.item.feed .tm{font-size:14px;color:var(--text3)}/* visual-first: cards, tiles and charts */.c-ok{--c:var(--okbar)}.c-warn{--c:var(--warnbar)}.c-bad{--c:var(--bad)}.c-in{--c:var(--in)}.c-out{--c:var(--acc)}.c-vio{--c:var(--vio)}.c-mut{--c:var(--text3)}.hero.ov h1{display:flex;align-items:center;gap:12px;max-width:none}.hd{width:14px;height:14px;border-radius:50%;background:var(--c);flex:none;box-shadow:0 0 0 5px color-mix(in srgb,var(--c) 22%,transparent)}.tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:18px}.tile{display:flex;flex-direction:column;min-width:0;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 12px 10px;color:inherit;position:relative;overflow:hidden}.tile:hover{text-decoration:none;border-color:var(--line2)}.tile.t-warn{box-shadow:inset 0 3px 0 var(--warnbar)}.tile.t-bad{box-shadow:inset 0 3px 0 var(--bad)}.tl{font-size:12px;font-weight:600;color:var(--text2);letter-spacing:.01em}.tv{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 8px;font-size:30px;font-weight:700;letter-spacing:-.03em;line-height:1.15;margin:2px 0 4px}.tv small{font-size:14px;font-weight:500;color:var(--text3);letter-spacing:0}.tv .unkv{font-size:13px;letter-spacing:0}.okv{color:var(--ok)}.dl{font-size:12px;font-weight:600;letter-spacing:0;padding:1px 7px;border-radius:999px;background:var(--track);color:var(--text2);white-space:nowrap}.dl.up{color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,transparent)}.dl.down{color:var(--warn);background:color-mix(in srgb,var(--warnbar) 16%,transparent)}.ta{font-size:11px;line-height:1.35;color:var(--text3);margin-top:auto;padding-top:6px}.tc{flex-basis:100%;font-size:12px;font-weight:500;letter-spacing:0;color:var(--text3)}.mini b{font-weight:600;color:var(--text)}.tsp.ok .ln{stroke:var(--okbar)}.tsp.ok .ar{fill:var(--okbar)}.tsp.warn .ln{stroke:var(--warnbar)}.tsp.warn .ar{fill:var(--warnbar)}.tsp.bad .ln{stroke:var(--bad)}.tsp.bad .ar{fill:var(--bad)}.gauge+.mini,.tv:has(.gauge)+.mini{margin-top:6px}.mini+.tsp{margin-top:6px}.tsp{display:block;width:100%;height:34px}.tsp .ln{fill:none;stroke-width:2;stroke-linejoin:round}.tsp .ar{stroke:none;opacity:.16}.tsp.out .ln{stroke:var(--acc)}.tsp.out .ar{fill:var(--acc)}.tsp.in .ln{stroke:var(--in)}.tsp.in .ar{fill:var(--in)}.hit{fill:transparent}.donut{width:84px;height:84px;display:block;margin:2px 0}.donut,.gauge{letter-spacing:0}.donut circle{fill:none;stroke-width:4.2;stroke:var(--c)}.donut .tr{stroke:var(--track)}.donut .dc,.gauge .dc{font-size:9px;font-weight:700;fill:var(--text);text-anchor:middle;letter-spacing:-.3px}.donut .ds,.gauge .ds{font-size:4.2px;font-weight:500;letter-spacing:0;fill:var(--text3);text-anchor:middle}.tv:has(.donut),.tv:has(.gauge){margin:0}.gauge{width:110px;height:64px;display:block}.gauge path{fill:none;stroke-width:4.6;stroke-linecap:round;stroke:var(--c)}.gauge .tr{stroke:var(--track)}.gauge .dc{font-size:10px}.mini{display:flex;flex-wrap:wrap;gap:2px 10px;font-size:12px;color:var(--text2)}.mini span{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}.mini i.free{background:none;box-shadow:inset 0 0 0 1.5px var(--line2)}.mini i,.lg i{width:8px;height:8px;border-radius:2px;background:var(--c);display:inline-block;flex:none}.sb{display:flex;gap:2px;height:10px;border-radius:5px;overflow:hidden;margin:4px 0}.sb.big{height:14px;margin:8px 0 6px}.sb i{display:block;min-width:3px;background:var(--c)}.sb i.free,.lg i.free{background:none;box-shadow:inset 0 0 0 1.5px var(--line2)}.s-building{--c:var(--acc)}.s-validating{--c:var(--in)}.s-finished{--c:var(--vio)}.s-waiting{--c:var(--text3)}.s-decision{--c:var(--warnbar)}.s-blocked{--c:var(--bad)}.k.out{--c:var(--acc)}.k.in{--c:var(--in)}.k.y{opacity:.55}.k.p50{--c:var(--acc)}.k.p85{--c:var(--vio)}.k.ok{--c:var(--okbar)}.k.bad{--c:var(--bad)}.k.mut{--c:var(--text3)}.lg{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--text2);margin:2px 0 8px}.lg span{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}.lg .k.y{opacity:1}.lg .k.y i,.lg i.k.y{opacity:.5}.cards{display:grid;gap:12px;margin-top:12px}.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 14px 12px;min-width:0}.ch{display:flex;justify-content:space-between;align-items:baseline;gap:10px}.ch h3{font-size:16px;font-weight:650;letter-spacing:-.01em;margin:0}.cm{font-size:12px;color:var(--text2);white-space:nowrap}.cw{font-size:11px;color:var(--text3);margin:0 0 10px}.cf{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:6px}.ya{display:flex;flex-direction:column;justify-content:space-between;height:var(--ch);font-size:11px;color:var(--text3);text-align:right;line-height:1;margin-top:-1px}.pl svg{display:block;width:100%;height:var(--ch);overflow:visible}.xa{display:grid;font-size:11px;color:var(--text3);margin-top:4px}.xa span{text-align:center;white-space:nowrap}.gl{stroke:var(--line);stroke-width:1}.ln{fill:none;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.ln.out{stroke:var(--acc)}.ln.in{stroke:var(--in)}.ln.y{stroke-width:1.6;stroke-dasharray:5 4;opacity:.7}.ln.p50{stroke:var(--acc)}.ln.p85{stroke:var(--vio);stroke-dasharray:6 4}.now{stroke:var(--text3);stroke-width:1;stroke-dasharray:2 3}.b.out{fill:var(--acc)}.b.in{fill:var(--in);opacity:.85}.hbs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 16px}.hb{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;color:inherit;padding:4px 0}.hb:hover{text-decoration:none}.hb .hn{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hb .hv{font-size:14px;font-weight:700}.hb .hv small{font-size:11px;color:var(--text3);font-weight:500}.hb .sb{grid-column:1/-1;height:8px;margin:3px 0 0}.qb{display:grid;grid-template-columns:6.5em minmax(0,1fr) auto;align-items:center;gap:10px;padding:5px 0}.qn{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.qt{position:relative;height:10px;border-radius:5px;background:var(--track)}.qt i{position:absolute;inset:0 auto 0 0;border-radius:5px;background:var(--c)}.qt b{position:absolute;top:-3px;bottom:-3px;width:2px;margin-left:-1px;background:var(--tick);opacity:.55;border-radius:1px}.qr{font-size:12px;white-space:nowrap;text-align:right;min-width:6.5em}.qr.warn{font-weight:600}.sps{display:grid}.sp{display:grid;grid-template-columns:4.8em minmax(0,1fr) 3.4em 4.6em;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--line);color:inherit}.sp:hover{text-decoration:none;background:var(--track)}.sp.sph{font-size:11px;color:var(--text3);border-top:0;padding-top:0}.sp.sph span:nth-child(n+3){text-align:right}.chip{font-size:11px;font-weight:700;text-align:center;padding:2px 0;border-radius:999px;color:var(--c);background:color-mix(in srgb,var(--c) 17%,transparent);white-space:nowrap}.sp .spw{font-size:13.5px;line-height:1.3;min-width:0}.sp .sn{font-size:15px;text-align:right}.sp .sa{font-size:12px;color:var(--text3);text-align:right;white-space:nowrap}.okn{color:var(--ok)}.card .gl,.card table{margin-top:4px}@media (min-width:600px){ .tiles{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}}@media (min-width:900px){ .cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px} .cards .wide{grid-column:1/-1}}@media (min-width:1100px){ .tiles{grid-template-columns:repeat(6,minmax(0,1fr))}}.xa.xp{position:relative;display:block;height:1.3em}.xa.xp span{position:absolute;transform:translateX(-50%)}.xa.xp span:first-child{transform:none}.xa.xp span:last-child{transform:translateX(-100%)}.mm .bar i.ok{background:var(--okbar)}@media (min-width:600px){.devm{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:28px;align-items:start}.devm .mach{margin-top:0}}.sections section{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 14px 12px}.sections .stack{gap:12px}.sections{gap:12px}.io.out{background:var(--acc)}.io.in{box-shadow:inset 0 0 0 1.5px var(--in)}.legend .sw.f{background:var(--acc)}.legend .sw.o{box-shadow:inset 0 0 0 1.5px var(--in);background:none}@media (min-width:600px){.sections,.sections .stack{gap:14px}}@media (min-width:1100px){.sections{gap:16px}.sections .stack{gap:16px}}/* v4: top tabs, chips, bars on one scale, homes, definitions */.top{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}.topi{max-width:780px;margin:0 auto;padding:0 16px;display:flex;align-items:center;gap:6px 14px;min-height:52px;flex-wrap:wrap}.brand{display:block;font-size:17px;font-weight:750;letter-spacing:-.02em}.top .nav{border:0;gap:2px;flex:1}.top .nav a{padding:7px 11px;margin:0;border:0;border-radius:9px}.top .nav a[aria-current]{background:var(--track);color:var(--text);font-weight:600}.stamp{margin:0}.age{font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px;background:var(--track);white-space:nowrap}.age::before{content:"● "}.age.ok{color:var(--ok)}.age.warn{color:var(--warn)}.age.bad{color:var(--bad)}.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}.chip2{display:inline-flex;align-items:baseline;gap:6px;padding:6px 13px;border-radius:999px;font-size:14px;background:color-mix(in srgb,var(--c) 16%,var(--card));border:1px solid color-mix(in srgb,var(--c) 30%,transparent);color:var(--text);white-space:nowrap}.chip2:hover{text-decoration:none;background:color-mix(in srgb,var(--c) 26%,var(--card))}.chip2 i{font-style:normal;font-size:11px;color:var(--c)}.chip2 b{font-weight:700}.chip2 small{font-size:12px;color:var(--text2)}.tsp .ln{stroke:var(--text2)}.t-bad .tsp .ln{stroke:var(--bad)}.t-warn .tsp .ln{stroke:var(--warnbar)}.tile .sb.big{margin:8px 0 4px}.tv .dl{align-self:center}.b.out{fill:var(--okbar)}.b.in{fill:var(--text3);opacity:.75}.b.in.fl,.b.out.fl{opacity:.35}.k.out{--c:var(--okbar)}.k.in{--c:var(--text3)}.hbr{border-top:1px solid var(--line)}.hbr>summary,div.hbr{list-style:none;display:grid;grid-template-columns:12.5rem minmax(0,1fr) 7.2em;align-items:center;gap:12px;padding:9px 0}.hbr>summary{cursor:pointer}.hbr>summary::-webkit-details-marker{display:none}.hbl{font-size:14px;display:flex;align-items:center;gap:8px;white-space:nowrap}.hbl .sw2{width:10px;height:10px;border-radius:3px;background:var(--c);flex:none}.hbt{height:12px;border-radius:6px;background:var(--track);overflow:hidden}.hbt i{display:block;height:100%;background:var(--c);border-radius:6px}.hbv{text-align:right;font-size:13px;white-space:nowrap}.hbv b{font-size:16px;font-weight:700}.hbv small{color:var(--text3);font-size:12px;margin-left:2px}.hbv.z b{color:var(--text3);font-weight:500}details.hbr[open]>summary .hbl{font-weight:600}.hbr .gb{padding:0 0 10px 18px}i.s-waiting,.hbl .sw2.s-waiting{background:none;box-shadow:inset 0 0 0 1.5px var(--text3)}.hbr+.gtot{margin-top:0}.hrs{display:grid}.hr{display:grid;grid-template-columns:minmax(0,10.5em) minmax(0,1fr) repeat(3,4.4em);gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line)}.hr.hh{font-size:11px;line-height:1.25;color:var(--text3);border-top:0;padding-top:0;align-items:end}.hname{display:flex;align-items:center;flex-wrap:wrap;gap:0 8px;min-width:0}.hname b{font-weight:600}.hname small{flex-basis:100%;padding-left:15px;font-size:12px;color:var(--warn)}.hst{display:grid;grid-template-columns:minmax(0,1fr) 3.6em;gap:8px;align-items:center}.hsc>span{display:block}.hst .sb{margin:0}.hst small{font-size:12px;color:var(--text3);white-space:nowrap}.hn{text-align:right;font-weight:600}.hr.hh .hn{font-weight:500}.qn{white-space:nowrap}.tile .qt{display:block;margin:12px 0 6px}.qt.unk{background:none;outline:1.5px dashed var(--line2);outline-offset:-1.5px}.qr.ok,.qr.mut{color:var(--text3)}.qr.bad{color:var(--bad)}.qr.warn{color:var(--warn)}.defs{display:grid;gap:4px 32px}.def{scroll-margin-top:72px;border-top:1px solid var(--line);padding:12px 0 8px}.def:first-child{border-top:0}.def:target{outline:2px solid var(--acc);outline-offset:4px;border-radius:6px}.def h3{margin:0 0 6px;font-size:16px}.def dl{display:grid;grid-template-columns:4.6em minmax(0,1fr);gap:3px 12px;margin:0;font-size:14px}.def dt{color:var(--text3)}.def dd{margin:0;color:var(--text2)}footer .trust a{color:var(--warn)}@media (max-width:519px){.hbr>summary,div.hbr{grid-template-columns:minmax(0,1fr) auto}.hbt{grid-column:1/-1;grid-row:2}.hr{grid-template-columns:minmax(0,1fr) repeat(3,3.6em)}.hst{grid-column:1/-1;grid-row:2}.hr.hh>span:nth-child(2){display:none}}@media (min-width:900px){.defs{grid-template-columns:repeat(2,minmax(0,1fr))}.def:nth-child(2){border-top:0}}@media (min-width:1100px){.topi{max-width:1312px;padding:0 48px}}'
 def page(name, title, body, foot=''):
     nav = ''.join(f'<a href="{u}"{" aria-current=page" if n == name else ""}>{t}</a>' for u, n, t in NAV)
     return f'''<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark"><meta http-equiv="refresh" content="{MAX_AGE}">
 <title>{esc(title)}</title><style>{CSS}</style></head>
-<body><div class="shell">
-<header class="side"><div class="brand"><b>Fleet</b></div>
-<span class="stamp">Built {NOW:%a %d %b}, {BUILT}<!--age--></span><span class="stamp trust">{trust()}</span>
-<nav class="nav" aria-label="Pages">{nav}</nav>
-<div class="side-foot">Read-only. Each section names what it counts, its window and when its source was read. <a href="measure">How each number is measured</a></div>
-</header>
-<main>{body}
-<footer>{foot}{"" if name == "measure" else '<p><a href="measure">How each number is measured</a></p>'}</footer>
+<body><header class="top"><div class="topi"><b class="brand">Fleet</b><nav class="nav" aria-label="Pages">{nav}</nav><span class="stamp"><!--age--></span></div></header>
+<div class="shell"><main>{body}
+<footer><p>Built {NOW:%a %d %b}, {BUILT} · <span class="trust">{trust()}</span></p>{foot}{"" if name == "measure" else '<p><a href="measure">How each number is measured</a></p>'}</footer>
 </main></div></body></html>
 '''
 def unknown_foot(*sources):
@@ -800,20 +965,151 @@ def ask_rows():
     return f'<div class="rows asks">{"".join(rs)}</div>'
 def busy_split():  # leads + Main + workers (+ other), always summing to the busy total
     return ' + '.join(f'{BUSY[r]} Main' if r == 'main' else plural(BUSY[r], r) for r, n in ROLES if BUSY[r] or r != 'other')
+GLYPH = {'bad': '✕', 'warn': '▲', 'ok': '●', 'mut': '?'}
+def chips():  # the fleet's state at a glance: each spot one chip, linking to where it is listed
+    cs = [(s['tone'], s['n'], s['what'], s['age'], s['href'], s['title']) for s in spots]
+    if records: cs.append(('mut', len(records), 'record mismatch' if len(records) == 1 else 'record mismatches', '', 'measure#records', ''))
+    if notes: cs.append(('mut', len(notes), 'source unknown' if len(notes) == 1 else 'sources unknown', '', 'measure#unknown', '; '.join(f'{s}: {r}' for s, r in notes)))
+    if not spots: cs.insert(0, ('ok', '', 'All flowing', '', '#wait', 'nothing stuck, waiting to land or idle'))
+    return '<div class="chips">' + ''.join(f'<a class="chip2 c-{t}" href="{esc(h)}" title="{esc(ti)}"><i>{GLYPH[t]}</i><b>{n}</b> {esc(w)}'
+                                           + (f' <small>{esc(a)}</small>' if a and a != 'now' else '') + '</a>' for t, n, w, a, h, ti in cs) + '</div>'
+
+def delta(now, then, good_up=True):  # change against a named earlier value: absolute under 20, else percent
+    if now is None or then is None: return '<span class="dl">–</span>'
+    d = now - then
+    txt = f'{d:+d}' if then < 20 else f'{round(100 * d / then):+d}%'
+    return f'<span class="dl{"" if not d or good_up is None else " up" if (d > 0) == good_up else " down"}">{txt}</span>'  # up: the good way
+def day_cols(vals, exact):  # one column per local day from 0; a day the records cannot vouch for is faded (at least)
+    top, w = max(vals + [1]), 1000 / len(vals)
+    return ('<svg class="tsp" viewBox="0 0 1000 40" preserveAspectRatio="none" aria-hidden="true">' + ''.join(
+        f'<rect class="b out{"" if ok else " fl"}" x="{i * w + w * .14:.0f}" y="{40 - v / top * 38:.1f}" width="{w * .72:.0f}" height="{v / top * 38:.1f}" vector-effect="non-scaling-stroke"/>'
+        for i, (v, ok) in enumerate(zip(vals, exact))) + '</svg>')
+def trend(col):  # one point per hour over 7 days from the sampled history, broken at gaps
+    t0, pts = NOW_TS - 7 * 86400, {}
+    for r in hist:
+        if r[0] >= t0: pts[int((r[0] - t0) // 3600)] = r[col]
+    top, d, prev = max(list(pts.values()) + [1]), '', None
+    for k in sorted(pts):
+        if pts[k] < 0: prev = None; continue
+        d += f'{"L" if prev is not None and k - prev <= 2 else "M"}{k / 168 * 1000:.0f},{38 - pts[k] / top * 36:.1f}'; prev = k
+    return f'<svg class="tsp" viewBox="0 0 1000 40" preserveAspectRatio="none" aria-hidden="true"><path class="ln" d="{d}" vector-effect="non-scaling-stroke"/></svg>' if 'L' in d else ''
+def tile(mid, label, value, foot, art='', tone=''):  # a tap opens the number's definition
+    return (f'<a class="tile{" t-" + tone if tone else ""}" href="measure#m-{mid}"><span class="tl">{label}</span>'
+            f'<span class="tv">{value}</span>{art}<span class="ta">{foot}</span></a>')
+def tiles():
+    ly = landed_on(DAYS[-2], until=NOW_TS - 86400) if LANDED_EXACT[-2] else None
+    c7, f7 = sum(CLOSED_N[7:]), sum(FILED_N[7:])
+    old = dur(NOW_TS - min(l['since'] for l in stuck)) if stuck else ''
+    if qdata is None: q = tile('quota', 'Quota runs out', unknown(why_of('quota-axi')), '')
+    elif running_out:
+        a = running_out[0]
+        w = tight_window(a)
+        bar = (f'<span class="qt"><i class="c-warn" style="width:{max(2, min(100, round(w["used"])))}%"></i>'
+               + (f'<b style="left:{w["pace"]:.0f}%"></b>' if w['pace'] is not None else '') + '</span>') if w else ''
+        q = tile('quota', 'Quota runs out', f'{dur(a["runout"].timestamp() - NOW_TS)}', f'{esc(a["name"])} before its reset'
+                 + (f' · {len(running_out) - 1} more' if len(running_out) > 1 else ''), bar, 'warn')
+    else: q = tile('quota', 'Quota runs out', '<span class="okv">none</span>', f'{sum(a["empty"] for a in accounts)} used up · {len(accounts)} read')
+    return '<div class="tiles">' + ''.join([
+        tile('landed', 'Landed today', f'{"" if LANDED_EXACT[-1] else "≥"}{LANDED[-1]}{delta(LANDED[-1], ly)}', 'vs yesterday by now · 14 d', day_cols(LANDED, LANDED_EXACT)),
+        tile('closed', 'Closed 7 d', f'{c7}{delta(c7, sum(CLOSED_N[:7]))}' if CLOSED_KNOWN else unknown(why_of('closed')),
+             f'filed {"" if all(FILED_EXACT[7:]) else "≥"}{f7} · vs prior 7 d', day_cols(CLOSED_N, [CLOSED_KNOWN] * len(DAYS))),
+        tile('lanes', 'Lanes open', f'{OPEN}<small>of {PLAN}</small>{delta(OPEN, day_ago(1), None)}', f'{SPLIT["building"]} building · {FREE} free', stack(lane_parts(SPLIT), max(PLAN, OPEN), 'sb big')),
+        tile('stuck', 'Stuck', f'{STUCK}{delta(STUCK, day_ago(2), False)}', (f'{SPLIT["blocked"]} blocked · oldest {old}' if stuck else 'vs 24 h ago'),
+             stack([('s-blocked', SPLIT['blocked'], 'blocked'), ('s-decision', SPLIT['decision'], 'on a decision')], STUCK, 'sb big') + trend(2),
+             'bad' if SPLIT['blocked'] else 'warn' if STUCK else ''),
+        tile('ready', 'Ready', f'{QUEUE["ready"]}{delta(QUEUE["ready"], day_ago(3), None)}' if QUEUE else unknown(why_of('backlog')),
+             f'{QUEUE["held"]} held · {QUEUE["waiting"]} waiting' if QUEUE else '',
+             (stack([(cls, sum(v.values()), n) for n, v, cls in QREASONS], sum(QUEUE.values()), 'sb big') if QUEUE else '') + trend(3)),
+        q]) + '</div>'
+
+def hbar(label, n, cls, right='', body='', top=1):  # one bar on a shared scale; with a body it opens to the items
+    head = (f'<span class="hbl"><i class="sw2 {cls}"></i>{label}</span><span class="hbt"><i class="{cls}" style="width:{100 * n / max(top, 1):.1f}%"></i></span>'
+            f'<span class="hbv{"" if n else " z"}"><b>{n}</b>{f" <small>{right}</small>" if right else ""}</span>')
+    return f'<details class="hbr"><summary>{head}</summary><div class="gb">{body}</div></details>' if body else f'<div class="hbr">{head}</div>'
+WAIT = [('blocked', 'Blocked'), ('decision', 'On a decision'), ('finished', 'Finished, not landed'),
+        ('validating', 'Validating or CI'), ('waiting', 'Waiting on other'), ('building', 'Building')]
+def wait_bars():  # every open lane in exactly one state; why it waits, in its own last words
+    def row(l):
+        t = esc(titles.get((l['home'], l['task'])) or l['task'])
+        why = f' · {esc(prose(l["text"])[:140])}' if l['state'] in ('blocked', 'decision', 'waiting') and l['text'] else ''
+        return grow(t, f'{esc(hname(l["home"]))} · {dur(NOW_TS - l["since"])}' + (f' · {link("PR", l["pr"])}' if l['pr'] else '') + why)
+    top = max(SPLIT.values())
+    return ''.join(hbar(name, len(ls), f's-{s}', dur(NOW_TS - min(l['since'] for l in ls)) if ls else '',
+                        ''.join(row(l) for l in sorted(ls, key=lambda l: l['since'])), top)
+                   for s, name in WAIT for ls in [[l for l in live if l['state'] == s]])
+could = {h: min(max(0, plan(h) - len(by_home[h])), len(bl(h, 'ready'))) for h in ACTIVE}
+capt = {h: sum(r.get('hold_kind') == 'captain' for r in bl(h, 'held')) for h in ACTIVE}
+QREASONS = [('Ready, a lane is free', could, 'c-warn'), ('Ready, lanes full', {h: len(bl(h, 'ready')) - could[h] for h in ACTIVE}, 's-building'),
+            ('Held for the captain', capt, 's-decision'), ('Held, other reason', {h: len(bl(h, 'held')) - capt[h] for h in ACTIVE}, 'c-mut'),
+            ('Waiting on another item', {h: len(bl(h, 'waiting')) for h in ACTIVE}, 's-waiting')]  # why queued work waits; sums to the queue
+def queue_bars():
+    if QUEUE is None: return f'<p class="lede">{unknown(why_of("backlog"))}</p>'
+    rows = QREASONS
+    top = max(sum(v.values()) for _, v, _ in rows)
+    return (''.join(hbar(n, sum(v.values()), cls, '', ''.join(grow(esc(hname(h)), '', c) for h, c in sorted(v.items(), key=lambda x: (-x[1], x[0])) if c), top)
+                    for n, v, cls in rows)
+            + f'<div class="gtot"><span class="k">Queued</span><span class="sum">{" + ".join(str(sum(v.values())) for _, v, _ in rows)} = <b>{sum(QUEUE.values())}</b></span></div>')
+
+def nice_top(v):  # a round axis top at or above v
+    m = 10 ** math.floor(math.log10(max(v, 1)))
+    return next(s * m for s in (1, 2, 2.5, 5, 10) if s * m >= v)
+def frame(svg, top, xlabels, h=150):
+    """A chart: y labels (top, half, 0) beside a stretched SVG with gridlines, x labels below."""
+    ys = ''.join(f'<span>{v:g}</span>' for v in (top, top / 2, 0))
+    grid = ''.join(f'<line class="gl" x1="0" x2="1000" y1="{y}" y2="{y}" vector-effect="non-scaling-stroke"/>' for y in (1, 100, 199))
+    return (f'<div class="cf" style="--ch:{h}px"><div class="ya">{ys}</div><div class="pl">'
+            f'<svg viewBox="0 0 1000 200" preserveAspectRatio="none" role="img">{grid}{svg}</svg>'
+            f'<div class="xa" style="grid-template-columns:repeat({len(xlabels)},1fr)">{"".join(f"<span>{x}</span>" for x in xlabels)}</div></div></div>')
+def inout_chart():  # filed (in) beside closed (out) per local day
+    top, w = nice_top(max(FILED_N + CLOSED_N + [1])), 1000 / len(DAYS)
+    svg = ''.join(f'<rect class="b in{"" if FILED_EXACT[i] else " fl"}" x="{i * w + w * .1:.1f}" y="{200 - f / top * 198:.1f}" width="{w * .38:.1f}" height="{f / top * 198:.1f}" vector-effect="non-scaling-stroke"/>'
+                  f'<rect class="b out" x="{i * w + w * .52:.1f}" y="{200 - c / top * 198:.1f}" width="{w * .38:.1f}" height="{c / top * 198:.1f}"/>'
+                  for i, (f, c) in enumerate(zip(FILED_N, CLOSED_N)))
+    exact = all(FILED_EXACT)
+    lg = legend(('k in', f'In: filed{"" if exact else ", faded where at least"}'), ('k out', 'Out: closed' + ('' if CLOSED_KNOWN else ', some homes unknown')))
+    return lg + frame(svg, top, [('today' if d == TODAY else f'{d:%d}') if i % 2 else '' for i, d in enumerate(DAYS)])
+def recent():  # the latest merges, newest first
+    rows = ''.join(item('', link(done_title.get((h, task)) or titles.get((h, task)) or task, url), esc(hname(h)), tm=when(at))
+                   for url, (at, h, task) in sorted(merges.items(), key=lambda x: -x[1][0])[:6])
+    return f'<div class="rows">{rows}</div>' if rows else '<p class="note">No merge on record.</p>'
+
+def tight_window(a):  # the limiting window, else the most used one
+    return a['limit'] if a['limit'] and a['limit']['used'] is not None else max((w for w in a['windows'] if w['used'] is not None), key=lambda w: w['used'], default=None)
+def quota_bars():  # every account read: its tightest window, soonest runout first
+    rows = ''
+    for a in sorted(accounts, key=lambda a: (not runs_out(a), not a['empty'], a['problem'] is not None, a['runout'] or NOW, a['name'])):
+        w = tight_window(a)
+        used = w['used'] if w else None
+        used = None if a['problem'] else used
+        tone = 'bad' if a['empty'] else 'warn' if runs_out(a) else 'mut' if used is None else 'ok'
+        right = ('used up' if a['empty'] else f'out {when(a["runout"].timestamp())}' if runs_out(a) else 'not read' if a['problem'] else
+                 f'resets {when(w["reset"].timestamp())}' if w and w['reset'] else 'lasts')
+        tick = f'<b style="left:{w["pace"]:.0f}%"></b>' if w and w['pace'] is not None and not a['empty'] else ''
+        rows += (f'<div class="qb"><span class="qn">{esc(a["name"])}</span><span class="qt{" unk" if used is None and not a["empty"] else ""}">'
+                 f'<i class="c-{tone}" style="width:{100 if a["empty"] and used is None else 0 if used is None else max(2, min(100, round(used)))}%"></i>{tick}</span>'
+                 f'<span class="qr {tone}">{esc(right)}</span></div>')
+    return rows or '<p class="note">No account reported a window.</p>'
+
 def index_body(group):
     n_asks = len(asks)
     h1 = 'Nothing needs you.' if asks_known and not asks else f'{plural(n_asks, "thing")} {"needs" if n_asks == 1 else "need"} you.' if asks_known else 'Ask list unknown.'
     tone = 'ok' if asks_known and not asks else 'warn' if asks_known else 'mut'
+    q_age = f'read <!--at:{int(q_at)}--> ago' if q_at else 'not read'
     return f'''
 <div class="hero ov">
 <h1><span class="hd c-{tone}"></span>{h1}</h1>
 {ask_rows()}
+{chips()}
 </div>
+{tiles()}
 <div class="cards">
-{card("Slow spots", f"now {BUILT}", spot_table(), "wide-m")}
-{card("Lanes by what to do", f"every open lane · now {BUILT}",  switch(group) + lanes_list(group, strip=False), "wide", ("backlog#lanes", "Every lane"))}
-<section class="card wide" id="devices"><div class="ch"><h3>Devices and machine</h3></div><p class="cw">now {BUILT}</p><div class="devm"><div>{devices_list(group)}</div><div class="mach">{machine_rows}</div></div></section>
-<section class="card wide" id="homes"><div class="ch"><h3>Homes</h3><a class="cm" href="backlog">Backlog →</a></div><p class="cw">lanes and backlog now {BUILT}</p>{homes_table}</section>
+{card("Where lanes wait", f"{OPEN} open lanes by state · oldest wait · tap for each lane", wait_bars(), cid="wait", more=("backlog#lanes", "Lanes"))}
+{card("Why work is queued", "queued items by reason · tap for each home", queue_bars(), more=("backlog", "Backlog"))}
+{card("In vs out", "backlog items per local day, 14 days", inout_chart(), "wide")}
+{card("Landed recently", "pull requests merged, newest first", recent())}
+{card("Quota runway", f"tightest window per account · even-pace mark · {q_age}", quota_bars() if qdata is not None else f'<p class="lede">{unknown(why_of("quota-axi"))}</p>')}
+{card("Homes", "lanes now · landed today · closed 7 days", home_rows(), "wide", ("backlog", "Backlog"), "homes")}
+<section class="card wide" id="devices"><div class="ch"><h3>Devices and machine</h3></div><p class="cw">now</p><div class="devm"><div>{devices_list(group)}</div><div class="mach">{machine_rows}</div></div></section>
 </div>
 '''
 
@@ -826,7 +1122,7 @@ def backlog_body(group):
         total = sum(QUEUE.values())
         eq = (f'<div class="eq"><div><span>Queued</span><b>{total}</b></div><span class="op">=</span><div><span>Ready</span><b>{QUEUE["ready"]}</b></div>'
               f'<span class="op">+</span><div><span>Held</span><b>{QUEUE["held"]}</b></div><span class="op">+</span><div><span>Waiting on another item</span><b>{QUEUE["waiting"]}</b></div></div>'
-              f'<p class="note">In flight: {sum(len(bl(h, state="in_flight")) for h in ACTIVE)} items, counted apart from the queue. Held for the captain: {len(held_cap)}.</p>')
+              f'<p class="note">In flight: {plural(sum(len(bl(h, state="in_flight")) for h in ACTIVE), "item")}, counted apart from the queue. Held for the captain: {len(held_cap)}.</p>')
         CL = (('ready', 'Ready to start'), ('held', 'Held'), ('waiting', 'Waiting on another item'))
         if group == 'home':
             gs = [(hname(h), len([r for r in backlog[h] if r['class']]),
@@ -837,7 +1133,7 @@ def backlog_body(group):
                   for c, n in CL]
         queued = glist(gs, 'Queued', total)
     def held_row(h, r):
-        return item('', esc(r['title']), esc(hname(h)), esc(r.get('hold_reason') if r.get('hold_reason') not in (None, '-') else 'no reason recorded'),
+        return item('', esc(r['title']), esc(hname(h)), esc(prose(r['hold_reason']) if r.get('hold_reason') not in (None, '-') else 'no reason recorded'),
                     tm=days_old(r['day']) if r['day'] else '?')
     if group == 'home':
         hs = sorted({h for h, _ in held_cap}, key=lambda h: (-sum(x == h for x, _ in held_cap), h))
@@ -898,68 +1194,71 @@ def backlog_body(group):
 {sh(f"Every lane · now {BUILT} · age since its last status")}
 <h2>{plural(OPEN, "lane")} open; {SPLIT["blocked"] + SPLIT["decision"]} blocked or waiting.</h2>
 {lanes_list(group, names=True)}
-<p class="note">Oldest validation or CI wait: {f"{dur(NOW_TS - oldest_val['since'])} ({esc(oldest_val['task'])}, {esc(hname(oldest_val['home']))})" if oldest_val else "none running"}.</p>
+<p class="note">Oldest validation or CI wait: {f"{dur(NOW_TS - oldest_val['since'])} ({esc(titles.get((oldest_val['home'], oldest_val['task'])) or oldest_val['task'])}, {esc(hname(oldest_val['home']))})" if oldest_val else "none running"}.</p>
 </section>
 <section id="targets">
 {sh("Lane plan · lane settings")}
 <h2>Lane settings plan {PLAN} lanes; {OPEN} are open.</h2>
 <table><thead><tr><th>Home</th><th>Open</th><th>Plan</th><th>Ready</th></tr></thead><tbody>{ltrows}</tbody>
 <tfoot><tr><td>Fleet</td><td>{OPEN}</td><td>{PLAN}</td><td>{QUEUE["ready"] if QUEUE else "–"}</td></tr></tfoot></table>
-<p class="note">Plan per home from config/lane-caps{f" ({esc(raised)})" if raised else ""}; every other home {lane_default}, from config/lane-target.</p>
+<p class="note">Plan per home from the lane settings{f" ({esc(raised)})" if raised else ""}; every other home {lane_default}.</p>
 </section>
 </div>
 </div>
 '''
 
 # --- method --------------------------------------------------------------
+OFF = NOW.strftime('%z')
+METRICS = [  # each number's one definition: id, name, what it counts, source, window and cutoff, how often it is read
+    ('asks', 'Waiting on you', "each row of Main's ask list, and nothing else", "Main's ask list", 'now', 'every build'),
+    ('landed', 'Landed', 'pull requests the fleet recorded as merged, each once, on the day of its first merge record',
+     "each lead's merge lines in Main's records; Main's own merges from its fleet ledger",
+     f"local days from midnight (UTC{OFF[:3]}:{OFF[3:]}); today so far against yesterday up to the same time. Main's merges are on record only since "
+     + (when(ledger_from) if ledger_from else 'its fleet ledger starts') + ', so earlier days read at least', 'every build'),
+    ('closed', 'Closed', 'backlog items marked done, merged or reported, on the day they closed', "each home's backlog and its done archive",
+     'the last 7 local days, today so far, against the 7 days before', 'every build'),
+    ('filed', 'Filed', 'backlog items on the day they were filed', "each home's open items, plus a log that keeps each filing day after the item closes",
+     f'local days; a day the log did not watch from its midnight reads at least (watching since {when(filed_since)})', 'every build'),
+    ('lanes', 'Lanes open', 'ship and scout lanes, each in one state by its last status line', "each home's lane records",
+     'now, against the lane plan; compared with the sample nearest 24 hours ago', 'every build; sampled every 10 minutes, kept 8 days'),
+    ('stuck', 'Stuck', 'lanes blocked or waiting on a decision; age from the oldest one\'s last status', "each home's lane records",
+     'now; compared with the sample nearest 24 hours ago', 'every build; sampled every 10 minutes, kept 8 days'),
+    ('ready', 'Ready', 'queued items neither held nor waiting on another item', "each home's backlog",
+     'now; compared with the sample nearest 24 hours ago', 'every build; sampled every 10 minutes, kept 8 days'),
+    ('quota', 'Quota runs out', "the soonest account projected to run out before its window resets; each bar is that account's tightest window, the mark is even pace",
+     'quota-axi, never refreshing a login', 'now', f'every {QUOTA_TTL // 60} minutes' + (f'; last read <!--at:{int(q_at)}--> ago' if q_at else '')),
+    ('leads', 'Lead state', 'what each lead home last published about itself; silent after 15 minutes without a new one',
+     "each home's own summary, and Main's view of which leads are not running", 'now', 'every build'),
+    ('machine', 'Machine and devices', 'free memory, memory pressure, heavy jobs, Gradle builds, emulators and who holds each device', 'this host and adb, read-only', 'now', 'every build'),
+]
 def measure_body():
-    cycles = [
-        ('Every page', f'rebuilt every {MAX_AGE} s by the page server', BUILT),
-        ('Lanes, backlog, agents, devices, machine', 'read at every build', BUILT),
-        ('Fleet retro', 'no schedule in any record this page reads', '–'),
-    ]
-    crow = ''.join(f'<tr><td>{esc(n)}<div class="mut sm">{esc(how)}</div></td><td class="nw">{esc(last)}</td></tr>' for n, how, last in cycles)
-    off = NOW.strftime('%z')
-    windows = [('Today', f'since local midnight (UTC{off[:3]}:{off[3:]})'), ('Yesterday', 'the full local day before'),
-               ('Lane plan', f'{lane_default} lanes per home from config/lane-target; config/lane-caps overrides ({PLAN} in all)'),
-               ('Ages', "a lane's last status time; a held item's filing day"),
-               ('Parked homes', 'left out of every total' + (f': {", ".join(PARKED)}' if PARKED else ''))]
-    wrow = ''.join(f'<tr><td>{esc(n)}</td><td class="l">{esc(w)}</td></tr>' for n, w in windows)
-    rrow = ''.join(item('warn', esc(t), '', esc(w)) for t, w in records) or '<p class="note">No two records disagree.</p>'
-    urow = ''.join(item('warn', esc(s), '', esc(r)) for s, r in notes) or '<p class="note">Every source was read.</p>'
+    defs = ''.join(f'<div class="def" id="m-{i}"><h3>{esc(n)}</h3><dl><dt>Counts</dt><dd>{esc(c)}</dd><dt>Source</dt><dd>{esc(src)}</dd>'
+                   f'<dt>Window</dt><dd>{esc(w)}</dd><dt>Read</dt><dd>{r}</dd></dl></div>' for i, n, c, src, w, r in METRICS)
+    rrow = ''.join(item('warn', esc(t), '', esc(w)) for t, w in records)
+    urow = ''.join(item('warn', esc(s), '', esc(r)) for s, r in notes)
     return f'''
 <div class="hero">
-{sh(f"Method · read from the code and config at {BUILT}")}
+{sh(f"Method · built {BUILT}, every {MAX_AGE} s")}
 <h1>How each number is measured.</h1>
-<p class="lede">Each source runs on its own cycle, so every section names its own time. A source that cannot be read shows unknown and why, never a guess or a zero.</p>
+<p class="lede">One definition per number. A source that cannot be read shows unknown and why, never a guess or a zero. Parked homes are left out{f" ({esc(', '.join(PARKED))})" if PARKED else ""}.</p>
 </div>
 <div class="sections">
-<section>
-{sh("Cycles")}
-<h2>The pages rebuild every {MAX_AGE} s.</h2>
-<table class="tt"><thead><tr><th>Number · how often</th><th>Last</th></tr></thead><tbody>{crow}</tbody></table>
-</section>
-<section>
-{sh("Windows")}
-<h2>Today starts at local midnight.</h2>
-<table class="tt"><thead><tr><th>Number</th><th class="l">Window</th></tr></thead><tbody>{wrow}</tbody></table>
-</section>
+<section class="wide defs">{defs}</section>
 <section id="records" class="wide">
 {sh("Records that disagree")}
-<h2>{plural(len(records), "place")} where two records give different answers.</h2>
+<h2>{f'{plural(len(records), "place")} where two records give different answers.' if records else 'No two records disagree.'}</h2>
 <div class="rows">{rrow}</div>
 </section>
 <section id="unknown" class="wide">
 {sh("Sources not read")}
-<h2>{plural(len(notes), "source")} could not be read.</h2>
+<h2>{f'{plural(len(notes), "source")} could not be read.' if notes else 'Every source was read.'}</h2>
 <div class="rows">{urow}</div>
 </section>
 </div>
 '''
 
 # The pages, rendered after every source so each shell shows the full trust line.
-pages = {'index.html': page('index', 'Fleet', index_body('action'), unknown_foot('backlog', 'herdr')),
-         'index.home.html': page('index', 'Fleet', index_body('home'), unknown_foot('backlog', 'herdr')),
+pages = {'index.html': page('index', 'Fleet', index_body('action'), unknown_foot('backlog', 'herdr', 'quota', 'merge', 'closed', 'home summary')),
          'backlog.html': page('backlog', 'Fleet backlog', backlog_body('action'), unknown_foot('backlog', 'herdr', 'lane')),
          'backlog.home.html': page('backlog', 'Fleet backlog', backlog_body('home'), unknown_foot('backlog', 'herdr', 'lane')),
          'measure.html': page('measure', 'Fleet method', measure_body())}
