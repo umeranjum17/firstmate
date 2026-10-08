@@ -87,7 +87,7 @@ fm_sm_live_first_line() {
 
 # One line per relaunch attempt and one per outcome, keyed by epoch, plus a
 # `rearmed` row when a live probe lifts a parked mate. The watcher bound counts
-# `attempt` rows inside its window and after the last `rearmed` row; the whole
+# `attempt` rows and failures before admission inside its window and after the last `rearmed` row; the whole
 # file is the durable per-mate relaunch record the captain can count to see
 # frequency. Fails when the row cannot be appended.
 fm_secondmate_liveness_ledger_add() {  # <id> <attempt|relaunched|failed|rearmed>
@@ -107,7 +107,9 @@ fm_secondmate_liveness_recent_attempts() {  # <id> <window-secs>
   now=$(date +%s)
   cutoff=$((now - window))
   awk -F '\t' -v cutoff="$cutoff" \
-    '$2 == "rearmed" { n = 0; next } $1 ~ /^[0-9]+$/ && $1 >= cutoff && $2 == "attempt" { n++ } END { print n + 0 }' \
+    '$2 == "rearmed" { n = 0; prior = ""; next }
+     $1 ~ /^[0-9]+$/ && $1 >= cutoff && ($2 == "attempt" || ($2 == "failed" && prior != "attempt")) { n++ }
+     { prior = $2 } END { print n + 0 }' \
     "$ledger" 2>/dev/null
 }
 
@@ -255,24 +257,18 @@ fm_secondmate_liveness_probe() {  # <meta> <id> <full|poll>
 
 # fm_secondmate_liveness_relaunch <meta> <id> [timeout-secs]
 #
-# Acts on a `relaunchable` probe verdict for <id>: kills a confirmed-dead local
-# endpoint first (FM_SM_LIVE_KILL), records the attempt and its outcome in the
-# per-mate ledger, then runs the guarded secondmate spawn. A positive timeout
+# Acts on a `relaunchable` probe verdict for <id>. Local spawn calls
+# fm_secondmate_liveness_begin after memory admission to ledger the attempt
+# and remove a confirmed-dead endpoint; remote recovery begins here.
+# The caller records the spawn outcome in the per-mate ledger. A positive timeout
 # wraps the spawn in fm_run_timed so a watcher poll stays bounded; 124/137 mean
 # the bound fired. Returns the spawn exit status; combined spawn output is in
 # FM_SM_LIVE_OUT and the status in FM_SM_LIVE_RC. When the ledger cannot be
 # read or the attempt row cannot be appended, nothing is killed or spawned: the verdict becomes
-# FM_SM_LIVE_STATUS=skipped with FM_SM_LIVE_REASON set and this returns 1.
+# FM_SM_LIVE_STATUS=skipped with FM_SM_LIVE_REASON set and this returns nonzero.
 # Caller holds the liveness lock and owns reporting.
-fm_secondmate_liveness_relaunch() {  # <meta> <id> [timeout-secs]
-  local meta=$1 id=$2 timeout=${3:-}
-  FM_SM_LIVE_OUT='' FM_SM_LIVE_RC=0
-  # Reject a malformed durable pin before removing even a dead endpoint.
-  if ! FM_SM_LIVE_OUT=$("$FM_SM_LIVE_LIB_DIR/fm-harness.sh" secondmate "$id" 2>&1); then
-    FM_SM_LIVE_RC=1
-    return 1
-  fi
-  FM_SM_LIVE_OUT=''
+fm_secondmate_liveness_begin() {
+  local meta=$1 id=$2
   if ! fm_secondmate_liveness_recent_attempts "$id" 0 >/dev/null; then
     FM_SM_LIVE_STATUS=skipped
     FM_SM_LIVE_REASON="relaunch ledger $STATE/.secondmate-relaunch-$id is unreadable; endpoint left $FM_SM_LIVE_STATE"
@@ -295,13 +291,36 @@ fm_secondmate_liveness_relaunch() {  # <meta> <id> [timeout-secs]
     fi
     [ -z "$target" ] || fm_backend_kill "$backend" "$target" 2>/dev/null || true
   fi
+}
+
+fm_secondmate_liveness_relaunch() {  # <meta> <id> [timeout-secs]
+  local meta=$1 id=$2 timeout=${3:-} recovery=1
+  FM_SM_LIVE_OUT='' FM_SM_LIVE_RC=0
+  if ! FM_SM_LIVE_OUT=$("$FM_SM_LIVE_LIB_DIR/fm-harness.sh" secondmate "$id" 2>&1); then
+    FM_SM_LIVE_RC=1
+    return 1
+  fi
+  if [ -n "$(fm_meta_get "$meta" remote_host)" ]; then
+    fm_secondmate_liveness_begin "$meta" "$id" || return 1
+    recovery=0
+  fi
   local rc=0
   if [ -n "$timeout" ]; then
-    FM_SM_LIVE_OUT=$(FM_SPAWN_NO_GUARD=1 fm_run_timed "$timeout" "$FM_ROOT/bin/fm-spawn.sh" "$id" --secondmate 2>&1) || rc=$?
+    FM_SM_LIVE_OUT=$(FM_SPAWN_NO_GUARD=1 FM_SECONDMATE_LIVENESS_RECOVERY=$recovery fm_run_timed "$timeout" "$FM_ROOT/bin/fm-spawn.sh" "$id" --secondmate 2>&1) || rc=$?
   else
-    FM_SM_LIVE_OUT=$(FM_SPAWN_NO_GUARD=1 "$FM_ROOT/bin/fm-spawn.sh" "$id" --secondmate 2>&1) || rc=$?
+    FM_SM_LIVE_OUT=$(FM_SPAWN_NO_GUARD=1 FM_SECONDMATE_LIVENESS_RECOVERY=$recovery "$FM_ROOT/bin/fm-spawn.sh" "$id" --secondmate 2>&1) || rc=$?
   fi
   FM_SM_LIVE_RC=$rc
+  case "$rc" in
+    75)
+      FM_SM_LIVE_STATUS=skipped
+      FM_SM_LIVE_REASON="memory admission deferred: $FM_SM_LIVE_OUT"
+      return "$rc" ;;
+    73)
+      FM_SM_LIVE_STATUS=skipped
+      FM_SM_LIVE_REASON=$(fm_sm_live_first_line "$FM_SM_LIVE_OUT")
+      return "$rc" ;;
+  esac
   if [ "$rc" -eq 0 ]; then
     fm_secondmate_liveness_ledger_add "$id" relaunched || true
   else

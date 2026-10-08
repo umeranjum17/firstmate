@@ -1683,14 +1683,30 @@ if [ "$KIND" = secondmate ]; then
   [ "$remote_spawn_rc" -eq 3 ] || exit "$remote_spawn_rc"
 fi
 # Host memory admission: every local agent launch - fresh, relaunch, or
-# secondmate - waits while the host is under memory pressure, so new work never
-# pushes the agent runtime into an oomd kill. bin/fm-jev-mem-guard.py owns the
+# secondmate - is refused while measured memory is under pressure.
+# bin/fm-jev-mem-guard.py owns the
 # verdict and the state/admission-refused record the queue views read.
 HOST_MEMORY_OUT=$("$SCRIPT_DIR/fm-jev-mem-guard.sh" --config "$CONFIG/host-memory" --admit "$ID" --state "$STATE" 2>&1) || {
+  HOST_MEMORY_RC=$?
   printf '%s\n' "$HOST_MEMORY_OUT" >&2
   echo "error: spawn refused - task $ID stays queued until host memory eases; retry then" >&2
+  if [ "$HOST_MEMORY_RC" -eq 1 ] && [ "$KIND" = secondmate ] && [ "${FM_SECONDMATE_LIVENESS_RECOVERY:-0}" = 1 ]; then
+    exit 75
+  fi
   exit 1
 }
+if [ "$KIND" = secondmate ] && [ "${FM_SECONDMATE_LIVENESS_RECOVERY:-0}" = 1 ]; then
+  . "$SCRIPT_DIR/fm-secondmate-liveness-lib.sh"
+  fm_secondmate_liveness_probe "$STATE/$ID.meta" "$ID" poll
+  if [ "$FM_SM_LIVE_STATUS" != relaunchable ]; then
+    printf '%s\n' "endpoint no longer relaunchable: $FM_SM_LIVE_STATE" >&2
+    exit 73
+  fi
+  if ! fm_secondmate_liveness_begin "$STATE/$ID.meta" "$ID"; then
+    printf '%s\n' "$FM_SM_LIVE_REASON" >&2
+    exit 73
+  fi
+fi
 # Backend selection (data/fm-backend-design-d7): explicit --backend, else
 # FM_BACKEND env, else config/backend, else runtime auto-detection, else
 # default tmux (fm_backend_name). fm_backend_validate_spawn refuses unknown or
