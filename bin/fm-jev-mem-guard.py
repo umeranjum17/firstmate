@@ -1,259 +1,312 @@
 #!/usr/bin/env python3
 """
-fm-jev-mem-guard.py - Jev Multi-Agent Memory RSS & Swap Thrashing Guard (Pattern 46)
+fm-jev-mem-guard.py - host memory guard: measure, admit, and alert before an oomd kill.
 
-Audits host memory availability (/proc/meminfo) and swap utilization to detect memory
-starvation, swap thrashing, and out-of-control worker RSS expansion across multi-agent seats.
-Prevents catastrophic OOM killer invocations against persistent agent supervisors and tmux sessions.
+On Herdr, fleet agents share one agent-runtime service, and systemd-oomd kills
+that service as a unit under the host's configured oomd pressure policy.
+Read host and runtime cgroup pressure independently and classify the worse reading.
+Admission refusal and watcher interrupts cannot guarantee avoidance of an oomd kill.
 
-Thresholds (each named for the CLI flag that carries its operational default; run --help for current values):
-  - --warn-mem-pct: memory utilization warning, percent of MemTotal not available.
-  - --crit-mem-pct: memory utilization critical, percent of MemTotal not available.
-  - --warn-swap-pct: swap utilization warning, percent of SwapTotal in use.
-  - --crit-swap-pct: swap utilization critical, percent of SwapTotal in use.
+Usage (bin/fm-jev-mem-guard.sh runs this with python3):
+  fm-jev-mem-guard.sh [--config FILE] [--state-dir HOME DIR]...
+      Print "<verdict>\t<summary>" for the host, naming the largest consumers.
+  fm-jev-mem-guard.sh [--config FILE] --admit TASK --state DIR
+      Admission for one agent launch (bin/fm-spawn.sh, bin/fm-control.sh relaunch).
+      Exit 0 admits and removes DIR/admission-refused. Exit 1 refuses: prints the
+      reason and writes DIR/admission-refused as "<epoch>\t<task>\t<reason>".
+  fm-jev-mem-guard.sh [--config FILE] --record FILE [--state-dir HOME DIR]...
+      One independent sampler sample (bin/fm-host-memory-sampler.sh): appends
+      "<epoch>\t<MemAvailable kB>\t<swap used kB>\t<pressure some avg10>\t<verdict>"
+      to FILE, trimming to the newest 8640 rows once it exceeds 8760, and prints
+      "<verdict>\t<summary>"; an ALERT summary names the largest consumers.
 
-Invariants:
-  - Read-only diagnostics.
-  - Fail-open: an unreadable or incomplete /proc/meminfo degrades to a graceful status
-    UNKNOWN with a machine-readable reason and a 0 --check exit, never a crash and never
-    a false alarm; an unassessed host reports null measured percentages (JSON null,
-    "unavailable" in human output) instead of fabricated numbers.
-  - Swap with SwapTotal > 0 but no SwapFree line is reported as unknown and never
-    classifies the verdict; a failed top-process listing degrades to an empty list.
-  - Bounded sub-second execution (< 500ms).
-  - Status is OK, WARNING, CRITICAL, or UNKNOWN; recommendation is diagnostic text
-    for the operator, never a command.
+  --owned-top-task DIR appends a tab and the top consumer's task ID only when
+      that consumer is a task recorded in DIR (for the watcher's interrupt).
+
+Verdicts: OK; WAIT (new agents wait); ALERT (sampler attempts one owned-task interrupt);
+UNKNOWN (not measurable, for example no pressure file: admits and records nothing).
+Thresholds come from config/host-memory (docs/configuration.md "Host memory guard").
+Consumers are summed RSS plus swap per owner, using the longest matching recorded
+worktree or explicit home path for the process's working directory.
+A matching FM_TASK_ID must also qualify against that task's recorded worktree or
+explicit home; an ID alone never establishes ownership, and unmatched processes
+are named by command and PID rather than interrupted.
+Home identity comes from each --state-dir HOME DIR pair, never DIR's parent.
+RSS includes shared pages per process, so these totals rank consumers rather than
+accounting for unique physical memory.
+Remote records (remote_host set) never contribute local task or home owners.
+The proc root is FM_HOST_MEMORY_PROC (default /proc). Exit 2: usage or an invalid
+config file, with the reason on stderr.
 """
 
 import argparse
-import json
+import math
 import os
 import sys
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+import tempfile
+import time
+
+PROC = os.environ.get("FM_HOST_MEMORY_PROC") or "/proc"
+DEFAULTS = {"wait_pressure": 20.0, "wait_available_gb": 12.0, "alert_pressure": 35.0, "alert_available_gb": 6.0}
+KEEP_ROWS = 8640
+CGROUP_ROOT = os.environ.get("FM_HOST_MEMORY_CGROUP_ROOT") or "/sys/fs/cgroup"
+GIB_KB = 1048576
 
 
-def read_meminfo() -> Dict[str, int]:
-    """Reads and parses /proc/meminfo in kB."""
-    info: Dict[str, int] = {}
+def die(msg):
+    print(f"fm-jev-mem-guard: {msg}", file=sys.stderr)
+    sys.exit(2)
+
+
+def load_config(path):
+    cfg = dict(DEFAULTS)
+    if not path or not os.path.exists(path):
+        return cfg
     try:
-        with open("/proc/meminfo", "r") as f:
-            for line in f:
-                parts = line.split(":")
-                if len(parts) == 2:
-                    key = parts[0].strip()
-                    val_parts = parts[1].strip().split()
-                    if val_parts and val_parts[0].isdigit():
-                        info[key] = int(val_parts[0])
-    except Exception:
-        pass
-    return info
-
-
-def get_top_rss_processes(top_n: int = 10) -> List[Dict[str, Any]]:
-    """Inspects /proc to find top memory-consuming processes by RSS; a listing failure degrades to []."""
-    procs: List[Dict[str, Any]] = []
-    try:
-        page_size_kb = os.sysconf("SC_PAGE_SIZE") // 1024
-    except Exception:
-        return []
-
-    try:
-        entries = os.listdir("/proc")
-    except Exception:
-        return []
-
-    for entry in entries:
-        if not entry.isdigit():
+        lines = open(path).read().splitlines()
+    except OSError as e:
+        die(f"cannot read {path}: {e.strerror}")
+    for n, raw in enumerate(lines, 1):
+        line = raw.strip()
+        if not line or line.startswith("#"):
             continue
-        pid = int(entry)
+        key, sep, val = (p.strip() for p in line.partition("="))
         try:
-            with open(f"/proc/{pid}/statm", "r") as f:
-                parts = f.read().strip().split()
-            if len(parts) < 2 or not parts[1].isdigit():
-                continue
-            rss_kb = int(parts[1]) * page_size_kb
-            if rss_kb < 10240:  # Skip procs using < 10MB
-                continue
+            if not sep or key not in DEFAULTS or not math.isfinite(float(val)) or float(val) < 0:
+                raise ValueError
+            cfg[key] = float(val)
+        except ValueError:
+            die(f"invalid {path} line {n}: {raw!r} (expected KEY=number, keys: {', '.join(DEFAULTS)})")
+    return cfg
 
-            comm = f"pid_{pid}"
-            try:
-                with open(f"/proc/{pid}/comm", "r", errors="replace") as f:
-                    comm = f.read().strip()
-            except Exception:
-                pass
 
-            procs.append({
-                "pid": pid,
-                "comm": comm,
-                "rss_mb": round(rss_kb / 1024.0, 1),
-            })
-        except Exception:
+def pressure_at(path):
+    some = next(l for l in open(path) if l.startswith("some "))
+    value = float(dict(f.split("=", 1) for f in some.split()[1:])["avg10"])
+    if not math.isfinite(value) or value < 0:
+        raise ValueError
+    return value
+
+
+def cgroup_pressure():
+    uid = os.getuid()
+    user = f"user.slice/user-{uid}.slice"
+    paths = {user, f"{user}/user@{uid}.service/app.slice/herdr-server.service"}
+    try:
+        for line in open(f"{PROC}/self/cgroup"):
+            if not line.startswith("0::"):
+                continue
+            group = line.strip()[3:].lstrip("/")
+            parts = group.split("/")
+            if "herdr-server.service" in parts:
+                paths.add("/".join(parts[:parts.index("herdr-server.service") + 1]))
+            paths.update("/".join(parts[:i + 1]) for i, part in enumerate(parts)
+                         if part.startswith("user-") and part.endswith(".slice"))
+    except OSError:
+        pass
+    readings = []
+    root = os.path.realpath(CGROUP_ROOT)
+    for group in paths:
+        path = os.path.realpath(os.path.join(root, group, "memory.pressure"))
+        if not path.startswith(root + os.sep):
             continue
+        try:
+            readings.append((pressure_at(path), group))
+        except (OSError, StopIteration, KeyError, ValueError):
+            pass
+    return max(readings) if readings else (None, None)
 
-    procs.sort(key=lambda p: p["rss_mb"], reverse=True)
-    return procs[:top_n]
+
+def sample():
+    """{available_kb, swap_used_kb, pressure}, or None when not measurable."""
+    try:
+        mem = {}
+        for line in open(f"{PROC}/meminfo"):
+            key, _, val = line.partition(":")
+            if val.split() and val.split()[0].isdigit():
+                mem[key.strip()] = int(val.split()[0])
+        host = pressure_at(f"{PROC}/pressure/memory")
+        cgroup, group = cgroup_pressure()
+        return {"available_kb": mem["MemAvailable"],
+                "swap_used_kb": max(0, mem.get("SwapTotal", 0) - mem.get("SwapFree", 0)),
+                "pressure": max(host, cgroup) if cgroup is not None else host,
+                "host_pressure": host, "cgroup_pressure": cgroup, "cgroup": group}
+    except (OSError, StopIteration, KeyError, ValueError):
+        return None
 
 
-def audit_memory(
-    warn_mem_pct: float,
-    crit_mem_pct: float,
-    warn_swap_pct: float,
-    crit_swap_pct: float,
-) -> Dict[str, Any]:
-    """Audits system memory and swap usage, failing open to status UNKNOWN when unmeasurable."""
-    mem = read_meminfo()
-    mem_total_kb = mem.get("MemTotal")
-    mem_avail_kb = mem.get("MemAvailable")
-    swap_total_kb = mem.get("SwapTotal")
-    swap_free_kb = mem.get("SwapFree")
+def verdict(s, cfg):
+    if s is None:
+        return "UNKNOWN", []
+    gb = s["available_kb"] / GIB_KB
+    for level in ("alert", "wait"):
+        why = []
+        if s["pressure"] >= cfg[f"{level}_pressure"]:
+            why.append(f"pressure at or above {cfg[f'{level}_pressure']:g}%")
+        if gb < cfg[f"{level}_available_gb"]:
+            why.append(f"available memory below {cfg[f'{level}_available_gb']:g} GB")
+        if why:
+            return level.upper(), why
+    return "OK", []
 
-    reason: Optional[str] = None
-    mem_total_gb: Optional[float] = None
-    mem_available_gb: Optional[float] = None
-    mem_used_pct: Optional[float] = None
-    swap_total_gb: Optional[float] = None
-    swap_used_gb: Optional[float] = None
-    swap_used_pct: Optional[float] = None
 
-    if mem_total_kb is None or mem_total_kb <= 0 or mem_avail_kb is None:
-        status = "UNKNOWN"
-        reason = "meminfo-unavailable"
-        recommendation = (
-            "/proc/meminfo is unreadable or incomplete on this host; "
-            "the verdict is withheld rather than fabricated."
-        )
-    else:
-        mem_used_kb = max(0, mem_total_kb - mem_avail_kb)
-        mem_total_gb = round(mem_total_kb / (1024.0 * 1024.0), 2)
-        mem_available_gb = round(mem_avail_kb / (1024.0 * 1024.0), 2)
-        mem_used_pct = round((mem_used_kb / mem_total_kb) * 100.0, 1)
+def summary(s):
+    return (f"pressure {s['pressure']:.0f}% (10 s average), {s['available_kb'] / GIB_KB:.1f} GB available, "
+            f"{s['swap_used_kb'] / GIB_KB:.1f} GB swap used; " +
+            (f"host {s['host_pressure']:.0f}%, cgroup {s['cgroup_pressure']:.0f}% ({s['cgroup']})"
+             if s['cgroup_pressure'] is not None else "cgroup pressure unreadable; host-only classification"))
 
-        if swap_total_kb is not None:
-            swap_total_gb = round(swap_total_kb / (1024.0 * 1024.0), 2)
-            if swap_total_kb == 0:
-                swap_used_gb = 0.0
-                swap_used_pct = 0.0
-            elif swap_free_kb is not None:
-                swap_used_kb = max(0, swap_total_kb - swap_free_kb)
-                swap_used_gb = round(swap_used_kb / (1024.0 * 1024.0), 2)
-                swap_used_pct = round((swap_used_kb / swap_total_kb) * 100.0, 1)
 
-        crit = mem_used_pct >= crit_mem_pct or (
-            swap_used_pct is not None and swap_used_pct >= crit_swap_pct
-        )
-        warn = mem_used_pct >= warn_mem_pct or (
-            swap_used_pct is not None and swap_used_pct >= warn_swap_pct
-        )
-        if crit:
-            status = "CRITICAL"
-            recommendation = (
-                "Memory or swap utilization is at or above a critical threshold; "
-                "this host condition can explain worker silence while it holds."
-            )
-        elif warn:
-            status = "WARNING"
-            recommendation = (
-                "Memory or swap utilization is above a warning threshold but below a "
-                "critical one; degraded but explained, see the top RSS processes."
-            )
-        else:
-            status = "OK"
-            recommendation = (
-                "Memory and swap utilization are within thresholds; "
-                "the caller should continue unchanged."
-            )
+def read_meta(path):
+    meta = {}
+    try:
+        for line in open(path, errors="replace"):
+            key, sep, val = line.rstrip("\n").partition("=")
+            if sep:
+                meta[key] = val
+    except OSError:
+        pass
+    return meta
 
-    top_procs = get_top_rss_processes()
 
-    return {
-        "name": "fm-jev-mem-guard",
-        "checked_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "status": status,
-        "recommendation": recommendation,
-        "reason": reason,
-        "summary": {
-            "mem_total_gb": mem_total_gb,
-            "mem_available_gb": mem_available_gb,
-            "mem_used_pct": mem_used_pct,
-            "swap_total_gb": swap_total_gb,
-            "swap_used_gb": swap_used_gb,
-            "swap_used_pct": swap_used_pct,
-        },
-        "top_processes": top_procs,
-    }
+def owners(state_dirs):
+    """Home-qualified owners, indexed by recorded paths and task IDs."""
+    homes = {os.path.realpath(d): os.path.realpath(home) for home, d in state_dirs}
+    metas = [(d, f[:-5], read_meta(os.path.join(d, f)))
+             for _, d in state_dirs if os.path.isdir(d) for f in sorted(os.listdir(d)) if f.endswith(".meta")]
+    metas = [(d, tid, m) for d, tid, m in metas if not m.get("remote_host")]
+    lead_of = {os.path.realpath(m["home"]): tid for _, tid, m in metas if m.get("kind") == "secondmate" and m.get("home")}
+    paths, tasks = [], {}
+    for d, tid, m in metas:
+        if m.get("kind") == "secondmate":
+            if m.get("home"):
+                owner = (os.path.realpath(d), tid, f"lead {tid}")
+                tasks.setdefault(tid, []).append(owner)
+                paths.append((os.path.realpath(m["home"]), owner))
+            continue
+        home = lead_of.get(homes[os.path.realpath(d)], "main")
+        owner = (os.path.realpath(d), tid, f"task {tid} ({home})")
+        tasks.setdefault(tid, []).append(owner)
+        if m.get("worktree"):
+            paths.append((os.path.realpath(m["worktree"]), owner))
+        paths.append((homes[os.path.realpath(d)], (os.path.realpath(d), "", f"lead {home}")))
+    paths.sort(key=lambda p: -len(p[0]))
+    return paths, tasks, homes
+
+
+def consumers(state_dirs, top=3):
+    # ponytail: summed RSS counts shared pages once per process; fine for ranking owners, not for accounting.
+    paths, tasks, homes = owners(state_dirs)
+    groups = {}
+    try:
+        pids = [p for p in os.listdir(PROC) if p.isdigit()]
+    except OSError:
+        return []
+    for pid in pids:
+        base = f"{PROC}/{pid}"
+        try:
+            status = dict(l.split(":", 1) for l in open(f"{base}/status", errors="replace") if ":" in l)
+            kb = sum(int(status[k].split()[0]) for k in ("VmRSS", "VmSwap") if k in status)
+        except (OSError, ValueError, IndexError):
+            continue
+        if kb < 10240:
+            continue
+        owner = None
+        tid = ""
+        matches = []
+        try:
+            tid = next((e[11:].decode(errors="replace") for e in open(f"{base}/environ", "rb").read().split(b"\0")
+                        if e.startswith(b"FM_TASK_ID=")), "")
+            matches = tasks.get(tid, [])
+        except OSError:
+            pass
+        try:
+            cwd = os.path.realpath(os.readlink(f"{base}/cwd"))
+            owner = next((o for p, o in paths if cwd == p or cwd.startswith(p + "/")), None)
+            if matches and owner not in matches:
+                qualified = [o for o in matches if cwd == homes[o[0]] or
+                             cwd.startswith(homes[o[0]] + "/")]
+                owner = max(qualified, key=lambda o: len(homes[o[0]])) if qualified else None
+        except OSError:
+            pass
+        owner = owner or ("", "", f"{status.get('Name', '?').strip()} pid {pid}")
+        group = groups.setdefault(owner, [0, 0])
+        group[0] += kb
+        group[1] += 1
+    ranked = sorted(groups.items(), key=lambda g: -g[1][0])[:top]
+    return [(owner, f"{owner[2]} {kb / GIB_KB:.1f} GB" + (f" in {n} processes" if n > 1 else ""))
+            for owner, (kb, n) in ranked]
+
+
+def line(s, v, why, cons):
+    if v == "UNKNOWN":
+        return f"UNKNOWN\thost memory is not measurable here (no readable {PROC}/meminfo and {PROC}/pressure/memory)"
+    text = summary(s) + "".join(f"; {w}" for w in why)
+    return f"{v}\t{text}" + (f"; largest: {', '.join(cons)}" if cons else "")
+
+
+def replace_text(path, text):
+    fd, tmp = tempfile.mkstemp(prefix=f".{os.path.basename(path)}.", dir=os.path.dirname(path) or ".")
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write(text)
+        os.replace(tmp, path)
+    finally:
+        try:
+            os.unlink(tmp)
+        except FileNotFoundError:
+            pass
+
+
+def record(path, s, v):
+    with open(path, "a") as f:
+        f.write(f"{int(time.time())}\t{s['available_kb']}\t{s['swap_used_kb']}\t{s['pressure']:.2f}\t{v}\n")
+    with open(path) as f:
+        rows = f.readlines()
+    if len(rows) > KEEP_ROWS + 120:
+        replace_text(path, "".join(rows[-KEEP_ROWS:]))
+
+
+def admit(task, state, s, v, why):
+    rec = os.path.join(state, "admission-refused")
+    if v in ("OK", "UNKNOWN"):
+        try:
+            os.remove(rec)
+        except FileNotFoundError:
+            pass
+        return 0
+    reason = f"host memory under pressure: {'; '.join(why)} ({summary(s)})"
+    os.makedirs(state, exist_ok=True)
+    replace_text(rec, f"{int(time.time())}\t{task}\t{reason}\n")
+    print(reason)
+    return 1
 
 
 def main():
-    sys.stdout.reconfigure(errors="replace")
-    parser = argparse.ArgumentParser(
-        description="Jev Multi-Agent Memory RSS & Swap Thrashing Guard (Pattern 46)"
-    )
-    parser.add_argument(
-        "--warn-mem-pct",
-        type=float,
-        default=90.0,
-        help="Warning threshold for memory utilization %% (default: %(default)s)",
-    )
-    parser.add_argument(
-        "--crit-mem-pct",
-        type=float,
-        default=95.0,
-        help="Critical threshold for memory utilization %% (default: %(default)s)",
-    )
-    parser.add_argument(
-        "--warn-swap-pct",
-        type=float,
-        default=85.0,
-        help="Warning threshold for swap utilization %% (default: %(default)s)",
-    )
-    parser.add_argument(
-        "--crit-swap-pct",
-        type=float,
-        default=95.0,
-        help="Critical threshold for swap utilization %% (default: %(default)s)",
-    )
-    parser.add_argument(
-        "--json",
-        action="store_true",
-        help="Emit structured JSON telemetry to stdout",
-    )
-    parser.add_argument(
-        "--check",
-        action="store_true",
-        help="Exit 0 for OK or unknown (fail-open), exit 1 for WARNING or CRITICAL",
-    )
-
+    parser = argparse.ArgumentParser(description="Host memory guard: measure, admit, and alert before an oomd kill.")
+    parser.add_argument("--config", help="thresholds file (config/host-memory); absent means the defaults")
+    parser.add_argument("--admit", metavar="TASK", help="admission for one agent launch; needs --state")
+    parser.add_argument("--state", metavar="DIR", help="the launching home's state directory")
+    parser.add_argument("--record", metavar="FILE", help="append one sample to FILE")
+    parser.add_argument("--owned-top-task", metavar="DIR", help="append the top task ID if owned by DIR")
+    parser.add_argument("--state-dir", nargs=2, metavar=("HOME", "DIR"), action="append", default=[],
+                        help="explicit home and its state directory whose task records map consumers")
     args = parser.parse_args()
-    report = audit_memory(
-        warn_mem_pct=args.warn_mem_pct,
-        crit_mem_pct=args.crit_mem_pct,
-        warn_swap_pct=args.warn_swap_pct,
-        crit_swap_pct=args.crit_swap_pct,
-    )
-
-    if args.json:
-        print(json.dumps(report, indent=2))
-    else:
-        s = report["summary"]
-        print(f"{report['name']} — {report['checked_at']}")
-        if s["mem_used_pct"] is None:
-            print("  • RAM: unavailable")
-        else:
-            print(f"  • RAM: {s['mem_used_pct']}% used ({s['mem_available_gb']} GB available / {s['mem_total_gb']} GB total)")
-        if s["swap_used_pct"] is None:
-            print("  • Swap: unknown (not measurable)")
-        else:
-            print(f"  • Swap: {s['swap_used_pct']}% used ({s['swap_used_gb']} GB used / {s['swap_total_gb']} GB total)")
-        print(f"  • Status: {report['status']}")
-        print(f"  • Recommendation: {report['recommendation']}")
-        if report["top_processes"]:
-            print(f"\n  Top {len(report['top_processes'])} RSS Processes:")
-            for p in report["top_processes"]:
-                print(f"    - PID {p['pid']} ({p['comm']}): {p['rss_mb']} MB")
-
-    if args.check and report["status"] in ("WARNING", "CRITICAL"):
-        sys.exit(1)
+    if args.admit and not args.state:
+        die("--admit needs --state")
+    cfg = load_config(args.config)
+    s = sample()
+    v, why = verdict(s, cfg)
+    if args.admit:
+        sys.exit(admit(args.admit, args.state, s, v, why))
+    if args.record and s is not None:
+        record(args.record, s, v)
+    cons = consumers(args.state_dir) if v == "ALERT" or (not args.record and v != "UNKNOWN") else []
+    output = line(s, v, why, [text for _, text in cons])
+    if args.owned_top_task:
+        task = cons[0][0][1] if cons and cons[0][0][0] == os.path.realpath(args.owned_top_task) else ""
+        output += "\t" + task
+    print(output)
 
 
 if __name__ == "__main__":
