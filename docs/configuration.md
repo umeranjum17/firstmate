@@ -669,8 +669,11 @@ On Herdr, agents across homes share the server's service cgroup, so an out-of-me
 The host memory guard reads available memory, swap, and host and runtime-cgroup pressure (the share of time some process waited on memory over 10 seconds), classifying the worse pressure reading.
 It reads the `herdr-server.service` cgroup and its parent user slice when available; unreadable cgroup pressure is reported as host-only classification.
 It classifies the host as `OK`, `WAIT` (new agents should wait), or `ALERT`, and names the largest consumers by owning task.
+The helper currently requires explicit invocation; fleet spawn/relaunch admission, periodic sampling, and watcher supervision are not wired into the runtime.
+It cannot guarantee avoidance of an out-of-memory kill.
 
-`config/host-memory` is optional; each setting is `key=number`, blank lines and lines beginning with `#` are ignored, and a missing key keeps its default:
+`config/host-memory` is optional and read only when passed with `--config`; otherwise the helper uses its defaults.
+Each setting is `key=number`, blank lines and lines beginning with `#` are ignored, and a missing file or key keeps its default:
 
 | Key | Default | Meaning |
 | --- | --- | --- |

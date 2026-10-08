@@ -2466,9 +2466,8 @@ run_script_bounded() {  # <script> <out> <stream> <id>
   local GIT_CONFIG_GLOBAL GIT_CONFIG_NOSYSTEM
   # shellcheck source=tests/git-config-helpers.sh
   . "$ROOT/tests/git-config-helpers.sh" || return
-  # The host memory guard admits every spawn and stays quiet when it cannot
-  # measure, so suites never read the runner's real memory pressure; the guard's
-  # own tests point this at a fixture proc tree.
+  # Keep guard invocations from reading the runner's real memory pressure by
+  # default; guard tests supply fixture roots, and callers may opt into others.
   local FM_HOST_MEMORY_PROC=${FM_HOST_MEMORY_PROC:-/nonexistent/fm-test-host-memory}
   local FM_HOST_MEMORY_CGROUP_ROOT=${FM_HOST_MEMORY_CGROUP_ROOT:-/nonexistent/fm-test-host-cgroup}
   export FM_HOST_MEMORY_PROC FM_HOST_MEMORY_CGROUP_ROOT

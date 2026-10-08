@@ -4,7 +4,7 @@ A Jev guard is a bounded, read-only host diagnostic that turns one class of reso
 Guards exist so a supervision loop can distinguish a genuinely wedged worker from a host condition that merely looks like one, without granting any guard the power to change the system it measures.
 This document owns the diagnostic framework contract; each diagnostic family's own script header owns its measured signals and thresholds.
 Despite its retained filename, `fm-jev-mem-guard` is now the [host memory admission guard](configuration.md#host-memory-guard-confighost-memory), not a diagnostic family governed by the contract below.
-Its script header owns its CLI and record formats; the former diagnostic flags and JSON output are no longer supported.
+Its [script header](../bin/fm-jev-mem-guard.py) owns its CLI, compatibility limits, and record formats.
 
 ## Shape
 

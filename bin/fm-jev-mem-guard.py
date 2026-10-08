@@ -5,33 +5,39 @@ fm-jev-mem-guard.py - host memory guard: measure, admit, and alert before an oom
 On Herdr, fleet agents share one agent-runtime service, and systemd-oomd kills
 that service as a unit under the host's configured oomd pressure policy.
 Read host and runtime cgroup pressure independently and classify the worse reading.
-Admission refusal and watcher interrupts cannot guarantee avoidance of an oomd kill.
+This helper measures or publishes a refusal only when explicitly invoked; it does
+not launch a sampler, interrupt tasks, or enforce fleet launch/relaunch admission.
+Admission refusal cannot guarantee avoidance of an oomd kill.
 
 Usage (bin/fm-jev-mem-guard.sh runs this with python3):
   fm-jev-mem-guard.sh [--config FILE] [--state-dir HOME DIR]...
       Print "<verdict>\t<summary>" for the host, naming the largest consumers.
   fm-jev-mem-guard.sh [--config FILE] --admit TASK --state DIR
-      Admission for one agent launch (bin/fm-spawn.sh, bin/fm-control.sh relaunch).
+      Admission decision for one proposed agent launch.
       Exit 0 admits and removes DIR/admission-refused. Exit 1 refuses: prints the
       reason and writes DIR/admission-refused as "<epoch>\t<task>\t<reason>".
   fm-jev-mem-guard.sh [--config FILE] --record FILE [--state-dir HOME DIR]...
-      One independent sampler sample (bin/fm-host-memory-sampler.sh): appends
+      Record one sample: appends
       "<epoch>\t<MemAvailable kB>\t<swap used kB>\t<pressure some avg10>\t<verdict>"
       to FILE, trimming to the newest 8640 rows once it exceeds 8760, and prints
       "<verdict>\t<summary>"; an ALERT summary names the largest consumers.
 
   --owned-top-task DIR appends a tab and the top consumer's task ID only when
-      that consumer is a task recorded in DIR (for the watcher's interrupt).
+      that consumer is a task recorded in DIR; this does not interrupt it.
 
-Verdicts: OK; WAIT (new agents wait); ALERT (sampler attempts one owned-task interrupt);
-UNKNOWN (not measurable, for example no pressure file: admits and records nothing).
-Thresholds come from config/host-memory (docs/configuration.md "Host memory guard").
+Verdicts: OK; WAIT; ALERT; UNKNOWN (not measurable, for example no pressure file).
+--admit refuses WAIT and ALERT and admits OK and UNKNOWN; UNKNOWN records no sample.
+Pass --config FILE to read thresholds; without it the defaults apply.
+Settings are owned by docs/configuration.md "Host memory guard".
+The former diagnostic --check, --json, and percentage-threshold flags are unsupported.
 Consumers are summed RSS plus swap per owner, using the longest matching recorded
 worktree or explicit home path for the process's working directory.
 A matching FM_TASK_ID must also qualify against that task's recorded worktree or
 explicit home; an ID alone never establishes ownership, and unmatched processes
 are named by command and PID rather than interrupted.
 Home identity comes from each --state-dir HOME DIR pair, never DIR's parent.
+Explicit homes aggregate lead processes even without ordinary task records; a
+local secondmate's home remains owned by its parent-recorded secondmate task.
 RSS includes shared pages per process, so these totals rank consumers rather than
 accounting for unique physical memory.
 Remote records (remote_host set) never contribute local task or home owners.
