@@ -139,10 +139,13 @@ EOF
 [ -e "$home/herdr.fail" ] && { echo 'herdr: server not running' >&2; exit 1; }
 cat "$home/herdr.json"
 EOF
-  # No device or emulator unless a test adds one, and no heavy-job slice to ask.
   printf '#!/bin/sh\nprintf "List of devices attached\\n\\n"\n' > "$stubs/adb"
-  printf '#!/bin/sh\nexit 1\n' > "$stubs/pgrep"
-  printf '#!/bin/sh\necho "no user bus" >&2\nexit 1\n' > "$stubs/systemctl"
+  printf '#!/bin/sh\n[ "$1" = "-cf" ] && { echo 0; exit 0; }\nexit 1\n' > "$stubs/pgrep"
+  printf '#!/bin/sh\nprintf "MemoryCurrent=0\\nMemoryHigh=34359738368\\nMemoryMax=40802189312\\n"\n' > "$stubs/systemctl"
+  mkdir -p "$home/proc/pressure"
+  printf 'MemTotal: 67108864 kB\nMemAvailable: 33554432 kB\n' > "$home/proc/meminfo"
+  printf 'some avg10=0.00\n' > "$home/proc/pressure/memory"
+  : > "$home/proc/locks"
   mkdir -p "$home/locks"
   chmod +x "$stubs/herdr" "$stubs/adb" "$stubs/pgrep" "$stubs/systemctl" "$stubs/quota-axi"
   printf '%s\n' "$home"
@@ -151,7 +154,7 @@ EOF
 build() {  # <home> [env...]: build with the fixture's stubs first on PATH
   local home=$1 out
   shift
-  out=$(env PATH="$home/stubs:$PATH" FM_HOME="$home" FM_DEVICE_LOCK_DIR="$home/locks" "$@" "$DASH" build 2>&1) || fail "build failed: $out"
+  out=$(env PATH="$home/stubs:$PATH" FM_HOME="$home" FM_DEVICE_LOCK_DIR="$home/locks" FM_DASHBOARD_PROC="$home/proc" "$@" "$DASH" build 2>&1) || fail "build failed: $out"
   [ "$out" = "$home/state/dashboard/index.html" ] || fail "build did not print the page path: $out"
 }
 
@@ -288,6 +291,14 @@ EOF
     "Free memory 10.0 GB of 64 GB" "Memory pressure 4% share of the last 10 s" "Heavy jobs 8.0 GB of 32 GB" "hard limit 38 GB" \
     "Gradle builds 2 of 2" "Emulators 1 of 2" "✕ 10 GB free, heavy jobs wait" "▲ 2/2 Gradle builds at cap"
   [ "$(sort -u "$home/adb.calls")" = "devices -l" ] || fail "adb was asked more than the device list: $(cat "$home/adb.calls")"
+  jq -e '.metrics.devices.value == 2 and .metrics.connected_devices.value == 2 and .metrics.device_groups.value.action == {"In use":1,"Free":1} and .metrics.device_groups.value.home == {"Main":1,"No holder":1}' "$d/data.json" >/dev/null || fail "device groups differ from the page"
+  printf 'List of devices attached\nPHONE1 device model:Pixel_9\nOFFLINE offline model:Pixel_8\n' > "$home/adb-output"
+  printf '#!/bin/sh\ncat "%s/adb-output"\n' "$home" > "$bin/adb"
+  printf '#!/bin/sh\n[ "$1" = "-cf" ] && { echo 0; exit 0; }\nexit 1\n' > "$bin/pgrep"
+  build "$home" FM_DASHBOARD_PROC="$proc"
+  has "$d/index.html" "Problem 1" "In use 1" "Free 1" "Devices 1 + 1 + 1 = 3" "Lock muxr-emu"
+  jq -e '.metrics.devices.value == 3 and .metrics.connected_devices.value == 1 and .metrics.device_groups.value.action == {"Problem":1,"In use":1,"Free":1} and (.devices | length) == 3' "$d/data.json" >/dev/null || fail "offline devices or unmatched locks disappeared from JSON"
+  printf '#!/bin/sh\n[ -e "%s/adb.fail" ] && { echo "error: daemon not running" >&2; exit 1; }\ncat "%s/adb-output"\n' "$home" "$home" > "$bin/adb"
   # Memory pressure is one number, the gate's 10 s share, in the chip and the card alike.
   printf 'MemTotal:       67108864 kB\nMemAvailable:   20971520 kB\n' > "$proc/meminfo"
   printf 'some avg10=45.00 avg60=8.00 avg300=12.00 total=1\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n' > "$proc/pressure/memory"
@@ -506,6 +517,7 @@ test_incomplete_lanes_and_moved_filings() {
   has "$d/index.html" "Lanes open at least 8" "Stuck at least 2" "free unknown" "Ready, capacity unknown 1" "unknown of 3"
   lacks "$d/index.html" "All flowing" "missing 0 of 3"
   has "$d/backlog.html" "at least 8 lanes open" "Fleet at least 8" "missing unknown 3"
+  for p in backlog backlog.home; do has "$d/$p.html" "Oldest validation or CI wait: at least"; done
   has "$d/backlog.home.html" "missing unknown"
   jq -e '.metrics.lanes.status == "lower_bound" and .metrics.stuck.status == "lower_bound" and .metrics.free_lanes.status == "unknown" and ([.homes[] | select(.home == "missing")][0].lanes.value == null)' "$d/data.json" >/dev/null || fail "missing lane coverage looks exact"
   printf -- '- zephyrine - remote (host: distant; root: /srv; home: %s; scope: work; projects: alpha; added 2026-07-11)\n' "$z" > "$home/data/secondmates.md"
@@ -519,6 +531,10 @@ test_incomplete_lanes_and_moved_filings() {
   build "$home"
   has "$d/index.html" "Lanes open at least 0" "free unknown"
   lacks "$d/index.html" "All flowing" "Ready, a lane is free 1"
+  for p in backlog backlog.home; do
+    has "$d/$p.html" "Oldest validation or CI wait: unknown"
+    lacks "$d/$p.html" "none running"
+  done
   pass "moved filings count once and unavailable lanes retain unknown capacity across HTML and JSON"
 }
 
@@ -537,6 +553,75 @@ test_new_lane_and_unwritten_archive_stay_exact() {
   pass "a lane with no status line yet and an archive not yet written keep their numbers exact"
 }
 
+test_unavailable_readings_and_concurrent_caches() {
+  local home d
+  home=$(make_home sources)
+  d="$home/state/dashboard"
+  : > "$home/data/secondmates.md"
+  printf '## Queued\n' > "$home/data/backlog.md"
+  rm "$home/state"/m-*.meta "$home/state"/m-*.status
+  printf '{"result":{"agents":[]}}\n' > "$home/herdr.json"
+  build "$home"
+  has "$d/index.html" "All flowing"
+  has "$d/measure.html" "Every source was read."
+  jq '.data.providers = [{provider:"cursor",state:{status:"fresh"},quotaSemantics:{status:"unknown"}}]' "$d/.quota.json" > "$home/q.json"
+  mv "$home/q.json" "$d/.quota.json"
+  build "$home"
+  lacks "$d/index.html" "All flowing"
+  lacks "$d/measure.html" "Every source was read."
+  jq -e 'any(.sources_unknown[]; .source == "quota-axi account" and (.reason | contains("Cursor: runway unknown")))' "$d/data.json" >/dev/null || fail "missing account runway source"
+  jq --argjson at "$(date +%s)" '{at:$at,data:.}' "$home/quota.json" > "$d/.quota.json"
+  rm "$home/proc/meminfo" "$home/proc/pressure/memory" "$home/proc/locks"
+  printf '#!/bin/sh\necho unavailable >&2\nexit 2\n' | tee "$home/stubs/adb" "$home/stubs/pgrep" > "$home/stubs/systemctl"
+  build "$home"
+  lacks "$d/index.html" "All flowing"
+  lacks "$d/measure.html" "Every source was read."
+  jq -e '[.sources_unknown[].source] | contains(["machine free memory","machine memory pressure","machine Gradle builds","machine heavy jobs","machine heavy high limit","machine heavy max limit","devices"])' "$d/data.json" >/dev/null || fail "unavailable readings missing from source list"
+  home=$(make_home concurrent)
+  : > "$home/data/secondmates.md"
+  FM_HOME="$home" bash "$ROOT/bin/fm-tasks-axi.sh" list --limit 10000 --fields held,hold_kind,hold_reason,blocked,created,closed > "$home/table"
+  printf '#!/bin/sh\ncat "$TEST_TABLE"\ntouch "$TEST_TABLE.read"\n' > "$home/stubs/tasks-axi"
+  chmod +x "$home/stubs/tasks-axi"
+  python3 - "$home" "$DASH" <<'PY' || fail "concurrent cache updates lost observations or escaped the lock"
+import fcntl, json, os, pathlib, subprocess, sys, time
+home, dash = pathlib.Path(sys.argv[1]), sys.argv[2]
+state = home / 'state/dashboard'
+original = (state / 'history.tsv').read_text()
+env = dict(os.environ, PATH=str(home / 'stubs') + ':' + os.environ['PATH'], FM_HOME=str(home), FM_DEVICE_LOCK_DIR=str(home / 'locks'), FM_DASHBOARD_PROC=str(home / 'proc'))
+processes = []
+with (state / '.cache.lock').open('a') as lock:
+    fcntl.flock(lock, fcntl.LOCK_EX)
+    try:
+        for name in ('a-ready', 'b-ready'):
+            table = home / name
+            table.write_text((home / 'table').read_text().replace('m-ready', name))
+            processes.append(subprocess.Popen([dash, 'build'], env=dict(env, TEST_TABLE=str(table)), stdout=subprocess.PIPE, stderr=subprocess.PIPE))
+        deadline = time.monotonic() + 30
+        while not all((home / (n + '.read')).exists() for n in ('a-ready', 'b-ready')):
+            assert time.monotonic() < deadline, 'backlog reads stalled'
+            time.sleep(.05)
+        for p in processes:
+            try: p.wait(timeout=.3)
+            except subprocess.TimeoutExpired: pass
+            else: raise AssertionError('build did not wait for cache lock')
+        assert not (state / 'filed.json').exists()
+        assert (state / 'history.tsv').read_text() == original
+    finally:
+        fcntl.flock(lock, fcntl.LOCK_UN)
+        for p in processes:
+            out, err = p.communicate(timeout=30)
+            assert p.returncode == 0, err.decode()
+items = json.loads((state / 'filed.json').read_text())['items']
+assert {'main\ta-ready', 'main\tb-ready'} <= items.keys(), items
+history = [list(map(int, l.split())) for l in (state / 'history.tsv').read_text().splitlines()]
+assert len(history) == 2 and all(len(r) == 4 for r in history), history
+assert not list(state.glob('*.tmp.*'))
+assert json.loads((state / 'data.json').read_text())['metrics']['lanes']['value'] == 7
+PY
+  pass "unavailable displayed readings suppress reassurance and concurrent cache updates preserve both builds"
+}
+
+test_unavailable_readings_and_concurrent_caches
 test_new_lane_and_unwritten_archive_stay_exact
 test_incomplete_lanes_and_moved_filings
 test_review_evidence_boundaries

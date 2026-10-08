@@ -206,7 +206,7 @@ trap 'rm -rf "$tmp"' EXIT
 mkdir -p "$tmp" || { echo "fm-dashboard: cannot create $tmp" >&2; exit 1; }
 
 python3 - "$FM_HOME" "$out_dir" "$tmp" "$SCRIPT_DIR" "$MAX_AGE" <<'PY' || { echo "fm-dashboard: page build failed" >&2; exit 1; }
-import hashlib, html, json, math, os, re, shutil, subprocess, sys, time
+import fcntl, hashlib, html, json, math, os, re, shutil, subprocess, sys, time
 BUILD_STARTED = time.monotonic()
 from urllib.parse import urlsplit
 from datetime import date, datetime, timedelta
@@ -474,8 +474,8 @@ def load_json(p):
     except (OSError, ValueError): return {}
 def save_json(p, v):
     try:
-        with open(p + '.tmp', 'w') as f: json.dump(v, f)
-        os.replace(p + '.tmp', p)
+        with open(p + f'.tmp.{os.getpid()}', 'w') as f: json.dump(v, f)
+        os.replace(p + f'.tmp.{os.getpid()}', p)
     except OSError: pass  # no cache only means the next build reads again
 def midnight(d): return datetime.combine(d, datetime.min.time()).astimezone().timestamp()
 def when(ts):  # 14:05 today, Thu 08:05 this week, else 07 Oct 14:05
@@ -547,32 +547,34 @@ CLOSED_N = [closed_on(d) for d in DAYS]
 
 # Filed: a closed item loses its filing day, so a log keeps each open item's day once seen.
 FILED = os.path.join(STATE_DIR, 'filed.json')
-flog = load_json(FILED)
-items = flog.get('items') if isinstance(flog.get('items'), dict) else {}
-gap = not bl_known or not all(isinstance(flog.get(k), (int, float)) for k in ('since', 'last')) or NOW_TS - flog['last'] > 3600
-filed_since = NOW_TS if gap else flog['since']  # a gap in the log restarts what it can vouch for
-for h in ACTIVE:
-    for r in backlog.get(h) or []:
-        if r['day'] and r.get('state') != 'done': items.setdefault(f'{h}\t{r["id"]}', r['day'].isoformat())
-items = {k: v for k, v in items.items() if isinstance(v, str) and v >= (DAYS[0] - timedelta(days=1)).isoformat()}
-save_json(FILED, dict(since=filed_since if bl_known else None, last=NOW_TS if bl_known else None, items=items))
-FILED_N = [len({k.split('\t', 1)[1] for k, v in items.items() if '\t' in k and v == d.isoformat() and k.split('\t', 1)[0] in ACTIVE}) for d in DAYS]
+with open(os.path.join(STATE_DIR, '.cache.lock'), 'a') as cache_lock:
+    fcntl.flock(cache_lock, fcntl.LOCK_EX)
+    flog = load_json(FILED)
+    items = flog.get('items') if isinstance(flog.get('items'), dict) else {}
+    gap = not bl_known or not all(isinstance(flog.get(k), (int, float)) for k in ('since', 'last')) or NOW_TS - flog['last'] > 3600
+    filed_since = NOW_TS if gap else flog['since']  # a gap in the log restarts what it can vouch for
+    for h in ACTIVE:
+        for r in backlog.get(h) or []:
+            if r['day'] and r.get('state') != 'done': items.setdefault(f'{h}\t{r["id"]}', r['day'].isoformat())
+    items = {k: v for k, v in items.items() if isinstance(v, str) and v >= (DAYS[0] - timedelta(days=1)).isoformat()}
+    save_json(FILED, dict(since=filed_since if bl_known else None, last=NOW_TS if bl_known else None, items=items))
+    FILED_N = [len({k.split('\t', 1)[1] for k, v in items.items() if '\t' in k and v == d.isoformat() and k.split('\t', 1)[0] in ACTIVE}) for d in DAYS]
 
-# Trends: the tiles' numbers now, sampled every 10 minutes and kept 8 days (-1 is unknown).
-HIST = os.path.join(STATE_DIR, 'history.tsv')
-STUCK = SPLIT['blocked'] + SPLIT['decision']
-hist = []
-try:
-    for l in open(HIST):
-        f = l.split()
-        if len(f) == 4 and all(re.fullmatch(r'-?\d+', x) for x in f): hist.append([int(x) for x in f])
-except OSError: pass
-if not hist or NOW_TS - hist[-1][0] >= 600:
-    hist = [r for r in hist if NOW_TS - r[0] < 8 * 86400] + [[int(NOW_TS), OPEN if LANES_KNOWN else -1, STUCK if LANES_KNOWN else -1, QUEUE['ready'] if QUEUE else -1]]
+    # Trends: the tiles' numbers now, sampled every 10 minutes and kept 8 days (-1 is unknown).
+    HIST = os.path.join(STATE_DIR, 'history.tsv')
+    STUCK = SPLIT['blocked'] + SPLIT['decision']
+    hist = []
     try:
-        with open(HIST + '.tmp', 'w') as f: f.write(''.join('\t'.join(map(str, r)) + '\n' for r in hist))
-        os.replace(HIST + '.tmp', HIST)
-    except OSError: pass  # the trend only misses this sample
+        for l in open(HIST):
+            f = l.split()
+            if len(f) == 4 and all(re.fullmatch(r'-?\d+', x) for x in f): hist.append([int(x) for x in f])
+    except OSError: pass
+    if not hist or NOW_TS - hist[-1][0] >= 600:
+        hist = [r for r in hist if NOW_TS - r[0] < 8 * 86400] + [[int(NOW_TS), OPEN if LANES_KNOWN else -1, STUCK if LANES_KNOWN else -1, QUEUE['ready'] if QUEUE else -1]]
+        try:
+            with open(HIST + f'.tmp.{os.getpid()}', 'w') as f: f.write(''.join('\t'.join(map(str, r)) + '\n' for r in hist))
+            os.replace(HIST + f'.tmp.{os.getpid()}', HIST)
+        except OSError: pass  # the trend only misses this sample
 def day_ago(col): return next((r[col] for r in hist if abs(r[0] - (NOW_TS - 86400)) <= 1800 and r[col] >= 0), None)
 
 # --- quota -------------------------------------------------------------
@@ -812,6 +814,18 @@ def devices():
 mach = machine()
 dev_rows, dev_count, emu_count, dev_problems = devices()
 machine_read_at = time.time()
+for a in accounts:
+    if a['problem']: notes.append(('quota-axi account', f'{a["name"]}: {a["problem"]}'))
+if qdata is not None and not accounts: notes.append(('quota-axi', 'no account runway readings'))
+for key, label in (('free', 'free memory'), ('pressure', 'memory pressure'), ('gradle', 'Gradle builds')):
+    if mach[key] is None: notes.append(('machine ' + label, mach[key + '_why']))
+for label, value in zip(('heavy jobs', 'heavy high limit', 'heavy max limit'), mach['heavy']):
+    if value is None: notes.append(('machine ' + label, mach['heavy_why']))
+notes.extend(('devices', p) for p in dev_problems)
+def device_group(r, group):
+    return (r[4] or 'No holder') if group == 'home' else 'Problem' if r[3] == 'bad' else 'In use' if r[4] else 'Free'
+device_groups = {g: {k: sum(device_group(r, g) == k for r in dev_rows)
+                    for k in sorted({device_group(r, g) for r in dev_rows})} for g in ('action', 'home')}
 
 # --- html pieces ---------------------------------------------------------
 BUILT = NOW.strftime('%H:%M')
@@ -937,10 +951,10 @@ machine_rows = ''.join([
 ])
 def devices_list(group):
     if group == 'home':
-        key = lambda r: r[4] or 'No holder'
+        key = lambda r: device_group(r, group)
         order = sorted({key(r) for r in dev_rows}, key=lambda k: (k == 'No holder', k))
     else:
-        key = lambda r: 'Problem' if r[3] == 'bad' else 'In use' if r[4] else 'Free'
+        key = lambda r: device_group(r, group)
         order = [k for k in ('Problem', 'In use', 'Free') if any(key(r) == k for r in dev_rows)]
     groups = [(k, sum(key(r) == k for r in dev_rows), ''.join(grow(esc(r[0]), esc(f'{r[2]} · {r[1]}')) for r in dev_rows if key(r) == k), '', None, True) for k in order]
     body = glist(groups, 'Devices') if dev_rows else ('<p class="note">No device connected and no emulator running.</p>' if dev_count is not None else '')
@@ -1255,7 +1269,7 @@ def backlog_body(group):
 {sh(f"Every lane · now {BUILT} · age since its last status")}
 <h2>{lane_value(OPEN)} lanes open; {lane_value(STUCK)} blocked or waiting.</h2>
 {lanes_list(group, names=True)}
-<p class="note">Oldest validation or CI wait: {f"{dur(NOW_TS - oldest_val['since'])} ({esc(titles.get((oldest_val['home'], oldest_val['task'])) or oldest_val['task'])}, {esc(hname(oldest_val['home']))})" if oldest_val else "none running"}.</p>
+<p class="note">Oldest validation or CI wait: {f'{"" if LANES_KNOWN else "at least "}{dur(NOW_TS - oldest_val["since"])} ({esc(titles.get((oldest_val["home"], oldest_val["task"])) or oldest_val["task"])}, {esc(hname(oldest_val["home"]))})' if oldest_val else "none running" if LANES_KNOWN else "unknown"}.</p>
 </section>
 <section id="targets">
 {sh("Lane plan · lane settings")}
@@ -1362,7 +1376,9 @@ metrics = {
     'memory_pressure': reading(psi, 'machine', psi is not None, reason=mach['pressure_why'], read_at=machine_read_at),
     'gradle_builds': reading(mach['gradle'], 'machine', mach['gradle'] is not None, reason=mach['gradle_why'], read_at=machine_read_at),
     'emulators': reading(emu_count, 'machine', emu_count is not None, reason='emulator inventory unavailable', read_at=machine_read_at),
-    'devices': reading(dev_count, 'machine', dev_count is not None, reason='device inventory unavailable', read_at=machine_read_at),
+    'devices': reading(len(dev_rows), 'machine', lower=bool(dev_problems), read_at=machine_read_at),
+    'device_groups': reading(device_groups, 'machine', lower=bool(dev_problems), read_at=machine_read_at),
+    'connected_devices': reading(dev_count, 'machine', dev_count is not None, reason='adb inventory unavailable', read_at=machine_read_at),
 }
 for key, value in zip(('heavy_jobs_gb', 'heavy_high_gb', 'heavy_max_gb'), mach['heavy']):
     metrics[key] = reading(value, 'machine', value is not None, reason=mach['heavy_why'], read_at=machine_read_at)
