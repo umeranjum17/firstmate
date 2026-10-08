@@ -1835,6 +1835,20 @@ if [ "$RELAUNCH" -eq 1 ]; then
     echo "error: task $ID's recorded worktree '${RELAUNCH_WT:-none}' is missing; refusing to relaunch without the local copy its work lives in" >&2
     exit 1
   }
+  # A stale record can name a copy another task now holds; launching into it
+  # would put two agents on one checkout, so report the clash instead.
+  slot_rc=0
+  fm_slot_record_owner "$RELAUNCH_WT" "$STATE" "$RELAUNCH_META" || slot_rc=$?
+  case "$slot_rc" in
+    0)
+      echo "error: task $ID's recorded worktree $RELAUNCH_WT is also recorded by task $FM_SLOT_RECORD_OWNER_ID as its $FM_SLOT_RECORD_OWNER_FIELD; refusing to relaunch two agents into one copy. Reconcile which record is stale (bin/fm-crew-state.sh $ID $FM_SLOT_RECORD_OWNER_ID)" >&2
+      exit 1
+      ;;
+    2)
+      echo "error: cannot prove task $ID's worktree $RELAUNCH_WT is free of other task records: $FM_LOCAL_STATE_DIRS_ERROR; refusing to relaunch" >&2
+      exit 1
+      ;;
+  esac
   if [ "$KIND" = secondmate ]; then
     FIRSTMATE_HOME=$(fm_meta_get "$RELAUNCH_META" home)
     [ -n "$FIRSTMATE_HOME" ] || FIRSTMATE_HOME=$RELAUNCH_WT
@@ -3677,10 +3691,10 @@ else
     # it stands up a DIFFERENT home's own workspace by design - so it asks for
     # the per-home container instead of inheriting this launcher's.
     HERDR_LABEL_HOME=$FM_HOME
-    HERDR_LAUNCHER_RELATIONSHIP=launcher-home
+    HERDR_LAUNCHER_RELATIONSHIP="launcher-home"
     if [ "$KIND" = secondmate ]; then
       HERDR_LABEL_HOME=$PROJ_ABS
-      HERDR_LAUNCHER_RELATIONSHIP=other-home
+      HERDR_LAUNCHER_RELATIONSHIP="other-home"
     fi
     HERDR_PRESENTATION_JOURNAL=$(fm_backend_herdr_projection_journal_path "$STATE" "$ID")
     HERDR_PROJECTED=0
@@ -4411,6 +4425,22 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
   # Written under the Treehouse project lock held from before slot allocation
   # through metadata publication, so no other spawn or return sees a half-claim.
   if fm_treehouse_pool_slot "$PROJ_ABS" "$WT"; then
+    # Treehouse frees a slot once its process lease lapses, which a killed
+    # worker's slot does while that task's record still names it (a Herdr
+    # restart resumes the agent outside the lease). Any record in any local home
+    # naming this slot is a task this spawn would overwrite, so refuse it.
+    slot_rc=0
+    fm_slot_record_owner "$WT" "$STATE" "$STATE/$ID.meta" || slot_rc=$?
+    case "$slot_rc" in
+      0)
+        echo "error: Treehouse handed out pool slot $WT, but task $FM_SLOT_RECORD_OWNER_ID still records it as its $FM_SLOT_RECORD_OWNER_FIELD; refusing to overwrite a live task's copy. Retry the spawn for a different slot, and reconcile $FM_SLOT_RECORD_OWNER_ID (bin/fm-crew-state.sh $FM_SLOT_RECORD_OWNER_ID); inspect window $T" >&2
+        exit 1
+        ;;
+      2)
+        echo "error: cannot prove Treehouse pool slot $WT is free of other task records: $FM_LOCAL_STATE_DIRS_ERROR; inspect window $T" >&2
+        exit 1
+        ;;
+    esac
     if ! fm_treehouse_slot_owner_claim "$WT" "$ID" "$FM_HOME"; then
       echo "error: could not claim Treehouse pool slot $WT for task $ID; refusing to launch a worker whose slot cannot later be proved to be its own; inspect window $T" >&2
       exit 1

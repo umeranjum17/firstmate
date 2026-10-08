@@ -1295,6 +1295,25 @@ FM_HERDR_SUBMIT_CONFIRM_LIVE=1 tests/fm-herdr-submit-confirm-live-e2e.test.sh
 ok - live Herdr submit confirm: Claude Code (2.1.283 (Claude Code)) on herdr 0.9.0 proves and submits a typed /exit behind its command popup
 ```
 
+Measured 2026-10-07 against Herdr 0.9.1 and Claude Code 2.1.292 in an isolated `fm-lab-` session with no viewer attached, signed in with the test credential.
+Claude 2.1.292 draws a three-row popup directly under the composer's closing rule and marks its selected row with the same `❯` agent glyph as the composer.
+The bottom-most bare glyph row was that menu row, so the payload proof read `/exit Exit the CLI /context ... /usage-credits ...`, refused, and never pressed Enter.
+Exact output of the plain composer read before the fix:
+
+```text
+rc=0 content=[/exit Exit the CLI /context Visualize current context usage as a colored grid /usage-credits Configure usage credits or request them from your admin when you hit a limit]
+payload proof: FAIL
+```
+
+The cursorless selector now keeps the glyph row inside the last rule pair when a lower glyph row sits below that pair's closing rule.
+Portable regression:
+
+```text
+ok - fm_backend_herdr_send_text_submit: a typed /exit above Claude 2.1.292's glyph-marked popup is proven and submitted
+```
+
+The live proof is `FM_SENTINEL_LIVE_E2E=1 tests/fm-sentinel-herdr-restart-live-e2e.test.sh`, whose worker relaunch exits a resumed Claude through this path.
+
 ### Claude background-work exit confirmation
 
 Verified 2026-10-01 with Herdr 0.9.1 and Claude Code 2.1.286 in a named private lab.
