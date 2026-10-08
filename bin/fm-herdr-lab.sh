@@ -12,17 +12,17 @@
 #   fm-herdr-lab.sh stop <session>
 #   fm-herdr-lab.sh teardown <session>
 #
-# Pass --isolated-xdg before the command to give the lab its own
-# XDG_CONFIG_HOME, XDG_DATA_HOME, and XDG_STATE_HOME under the lab state
-# directory, so plugin install/link inside the lab never reads or writes the
-# live user's Herdr plugin registry. The fleet-state tripwire still reads
-# with the caller's XDG environment so it observes the live default session.
-# For a private runtime HOME, set FM_HERDR_LAB_FLEET_HOME to the existing
-# absolute signed-in home for read-only fleet queries using its default XDG
-# paths. Named runtime calls retain the caller's HOME and lab XDG paths.
-# Without the flag every Herdr call
-# inherits the caller's XDG environment unchanged. Use the flag on every
-# command for one lab session (FM_HERDR_LAB_ISOLATED_XDG=1 is equivalent).
+# Named runtime calls always use disposable HOME and XDG_CONFIG_HOME,
+# XDG_DATA_HOME, XDG_STATE_HOME, and XDG_CACHE_HOME in a short private /tmp/fhl.*
+# directory recorded by <session>.xdg-root in the lab state directory.
+# Teardown removes both the directory and pointer without copying credentials.
+# --isolated-xdg and FM_HERDR_LAB_ISOLATED_XDG=1 remain accepted for compatibility.
+# The fleet-state tripwire reads with the caller's HOME and XDG environment.
+# Existing signed-in tests may explicitly supply their own scratch runtime HOME
+# and set FM_HERDR_LAB_FLEET_HOME to the existing absolute fleet home for
+# read-only fleet queries using its default XDG paths.
+# That opt-in retains the caller's scratch HOME, never the fleet HOME, while
+# XDG paths still belong to the lab.
 # Session names must begin with "fm-lab-" and can never be "default".
 # The name command sanitizes the label, caps it at 16 characters, and appends
 # process/random suffixes to keep generated socket paths short.
@@ -72,32 +72,64 @@ fm_herdr_lab_tripwire_path() { # <session>
 }
 
 fm_herdr_lab_xdg_base() { # <session>
-  printf '%s/%s.xdg' "$(fm_herdr_lab_state_dir)" "$1"
+  local pointer
+  pointer="$(fm_herdr_lab_state_dir)/$1.xdg-root"
+  if [ -f "$pointer" ]; then
+    cat "$pointer"
+  else
+    printf '%s/%s.xdg' "$(fm_herdr_lab_state_dir)" "$1"
+  fi
 }
 
-# Prints the session's isolated XDG base after creating its config, data,
-# and state directories.
+# Prints the session's isolated base after creating its disposable directories.
 fm_herdr_lab_ensure_isolated_xdg() { # <session>
-  local base
+  local base pointer
+  pointer="$(fm_herdr_lab_state_dir)/$1.xdg-root"
   base=$(fm_herdr_lab_xdg_base "$1")
-  mkdir -p "$base/config" "$base/data" "$base/state" || {
+  if [ ! -f "$pointer" ] && [ ! -d "$base" ]; then
+    mkdir -p "$(fm_herdr_lab_state_dir)" || return 1
+    # Herdr repeats the session name in its Unix socket path (108-byte limit).
+    base=$(mktemp -d /tmp/fhl.XXXXXX) || return 1
+    if ! (set -o noclobber; printf '%s\n' "$base" > "$pointer") 2>/dev/null; then
+      rmdir "$base"
+      base=$(fm_herdr_lab_xdg_base "$1")
+    fi
+  fi
+  mkdir -p "$base/home" "$base/config" "$base/data" "$base/state" "$base/cache" || {
     fm_herdr_lab_error "cannot create isolated XDG directories under $base"
     return 1
   }
   printf '%s' "$base"
 }
 
+fm_herdr_lab_env() { # <session> <command...>
+  local name=$1
+  shift
+  if [ "${FM_HERDR_LAB_FLEET_QUERY:-0}" = 1 ]; then
+    HERDR_SESSION="$name" "$@"
+    return
+  fi
+  local base runtime_home
+  base=$(fm_herdr_lab_ensure_isolated_xdg "$name") || return 1
+  runtime_home="$base/home"
+  if [ "${FM_HERDR_LAB_FLEET_HOME+x}" = x ]; then
+    runtime_home=$(cd "$HOME" && pwd -P) || return 1
+    local fleet_home
+    fleet_home=$(cd "$FM_HERDR_LAB_FLEET_HOME" && pwd -P) || return 1
+    [ "$runtime_home" != "$fleet_home" ] || {
+      fm_herdr_lab_error "explicit runtime HOME must differ from fleet HOME"
+      return 1
+    }
+  fi
+  HOME="$runtime_home" XDG_CONFIG_HOME="$base/config" XDG_DATA_HOME="$base/data" \
+    XDG_STATE_HOME="$base/state" XDG_CACHE_HOME="$base/cache" \
+    HERDR_SESSION="$name" "$@"
+}
+
 fm_herdr_lab_exec() { # <session> <herdr arguments...>
   local name=$1
   shift
-  if [ "${FM_HERDR_LAB_ISOLATED_XDG:-0}" = 1 ]; then
-    local base
-    base=$(fm_herdr_lab_ensure_isolated_xdg "$name") || return 1
-    XDG_CONFIG_HOME="$base/config" XDG_DATA_HOME="$base/data" \
-      XDG_STATE_HOME="$base/state" HERDR_SESSION="$name" herdr "$@"
-  else
-    HERDR_SESSION="$name" herdr "$@"
-  fi
+  fm_herdr_lab_env "$name" herdr "$@"
 }
 
 fm_herdr_lab_raw() { # <session> <herdr arguments...>
@@ -120,7 +152,7 @@ fm_herdr_lab_session_list() { # <session>
 fm_herdr_lab_fleet_session_list() ( # <session>
   # This override intentionally ends with the fleet-observation subshell.
   # shellcheck disable=SC2030
-  local FM_HERDR_LAB_ISOLATED_XDG=0
+  local FM_HERDR_LAB_FLEET_QUERY=1
   if [ "${FM_HERDR_LAB_FLEET_HOME+x}" = x ]; then
     case "$FM_HERDR_LAB_FLEET_HOME" in
       /*) ;;
@@ -131,7 +163,7 @@ fm_herdr_lab_fleet_session_list() ( # <session>
       return 1
     }
     export HOME="$FM_HERDR_LAB_FLEET_HOME"
-    unset XDG_CONFIG_HOME XDG_DATA_HOME XDG_STATE_HOME
+    unset XDG_CONFIG_HOME XDG_DATA_HOME XDG_STATE_HOME XDG_CACHE_HOME
   fi
   fm_herdr_lab_session_list "$1"
 )
@@ -333,7 +365,7 @@ fm_herdr_lab_viewer_session_stopped_or_absent() { # <session>
 }
 
 fm_herdr_lab_viewer_start() { # <session>
-  local name=$1 record log launcher launcher_pid waited attempt reason pid interrupt_traps=0 timeout=$fm_herdr_lab_viewer_timeout_seconds base
+  local name=$1 record log launcher launcher_pid waited attempt reason pid interrupt_traps=0 timeout=$fm_herdr_lab_viewer_timeout_seconds
   fm_herdr_lab_validate_name "$name" || return 1
   command -v herdr >/dev/null 2>&1 || { fm_herdr_lab_error "herdr is required"; return 1; }
   command -v jq >/dev/null 2>&1 || { fm_herdr_lab_error "jq is required"; return 1; }
@@ -362,15 +394,7 @@ fm_herdr_lab_viewer_start() { # <session>
     trap 'trap - INT TERM; [ -z "${launcher_pid:-}" ] || fm_herdr_lab_cancel_viewer_launcher "$launcher_pid"; exit 130' INT
     trap 'trap - INT TERM; [ -z "${launcher_pid:-}" ] || fm_herdr_lab_cancel_viewer_launcher "$launcher_pid"; exit 143' TERM
   fi
-  # Fleet observation's subshell override cannot change the caller's setting.
-  # shellcheck disable=SC2031
-  if [ "${FM_HERDR_LAB_ISOLATED_XDG:-0}" = 1 ]; then
-    base=$(fm_herdr_lab_ensure_isolated_xdg "$name") || return 1
-    XDG_CONFIG_HOME="$base/config" XDG_DATA_HOME="$base/data" \
-      XDG_STATE_HOME="$base/state" nohup python3 "$launcher" "$name" "$record" >"$log" 2>&1 &
-  else
-    nohup python3 "$launcher" "$name" "$record" >"$log" 2>&1 &
-  fi
+  fm_herdr_lab_env "$name" exec nohup python3 "$launcher" "$name" "$record" >"$log" 2>&1 &
   launcher_pid=$!
 
   waited=0
@@ -579,6 +603,7 @@ fm_herdr_lab_teardown() { # <session>
   if ! printf '%s' "$sessions" | jq -e --arg name "$name" '.sessions[]? | select(.name == $name)' >/dev/null 2>&1; then
     fm_herdr_lab_verify_tripwire "$name" || return 1
     rm -rf "$(fm_herdr_lab_xdg_base "$name")"
+    rm -f "$(fm_herdr_lab_state_dir)/$name.xdg-root"
     return
   fi
   fm_herdr_lab_stop "$name" >/dev/null 2>&1 || true
@@ -599,6 +624,7 @@ fm_herdr_lab_teardown() { # <session>
   fi
   fm_herdr_lab_verify_tripwire "$name" || return 1
   rm -rf "$(fm_herdr_lab_xdg_base "$name")"
+  rm -f "$(fm_herdr_lab_state_dir)/$name.xdg-root"
 }
 
 fm_herdr_lab_name() { # <label>

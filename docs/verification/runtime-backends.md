@@ -1178,6 +1178,20 @@ The CLI matrix was checked directly:
 All destructive verification used `bin/fm-herdr-lab.sh` with a non-default `fm-lab-` name and a byte-identical default-session tripwire.
 No ambient `herdr server stop` command is a supported test operation.
 
+### Disposable Herdr lab HOME
+
+Verified 2026-10-08 on Linux with Herdr 0.9.1 (protocol 22): a real pane created through the guarded lab helper reported disposable HOME and config/data/state/cache XDG paths, wrote a tool marker only into its disposable `$HOME/.local/bin`, and retained no inherited credential directories.
+The existing restored-shell journey also passed, and teardown removed the disposable root with the default-session tripwire unchanged.
+The short root kept the observed named-session socket at 86 bytes with a maximum-length generated label, and a real foreground viewer started and stopped successfully in the same disposable environment.
+This is environment isolation, not an operating-system filesystem sandbox; the existing explicit signed-in-test opt-in remains separate.
+Refresh the evidence with:
+
+```sh
+bash bin/fm-test-run.sh tests/fm-herdr-session-cleanup-e2e.test.sh
+# ok - real lab pane has disposable HOME and XDG paths; HOME-local tool writes do not touch caller HOME
+# evidence: herdr=0.9.1 protocol=22 default-session-tripwire=armed
+```
+
 ### fm-remote server birth and login-keychain access
 
 Measured 2026-09-09 on macOS 26 (Darwin 25.6.0) aarch64 with Claude Code 2.1.266 and Herdr 0.9.0, the guarantee behind `bin/fm-remote-herdr-guard.sh` and the doctor's `herdr-server` check: login-keychain access follows the audit session a process was born into, never the launch shape or the shell.

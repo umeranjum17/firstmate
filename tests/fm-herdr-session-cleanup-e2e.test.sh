@@ -21,6 +21,8 @@ TMP_ROOT=$(mktemp -d "$(cd "${TMPDIR:-/tmp}" && pwd -P)/fm-herdr-session-cleanup
 FAKEBIN="$TMP_ROOT/fakebin"
 HOME_DIR="$TMP_ROOT/home"
 mkdir -p "$FAKEBIN" "$HOME_DIR/state" "$HOME_DIR/config"
+export FM_HERDR_LAB_STATE_DIR="$TMP_ROOT/lab-state"
+CALLER_HOME=$HOME
 touch "$HOME_DIR/config/herdr-presentation-spaces"
 printf '%s\n' herdr > "$HOME_DIR/config/backend"
 
@@ -29,6 +31,9 @@ export HERDR_LAB_HELPER HERDR_LAB_SESSION REAL_HERDR HERDR_ORIGINAL_PATH
 cleanup() {
   local status=$?
   env PATH="$HERDR_ORIGINAL_PATH" "$HERDR_LAB_HELPER" teardown "$HERDR_LAB_SESSION" || status=1
+  if [ -n "${LAB_BASE:-}" ]; then
+    [ ! -e "$LAB_BASE" ] || { printf 'not ok - disposable HOME survived teardown\n' >&2; status=1; }
+  fi
   rm -rf "$TMP_ROOT"
   exit "$status"
 }
@@ -79,6 +84,39 @@ focus_snapshot() {
 
 ANCHOR=$(lab workspace create --cwd "$ROOT" --label captain-anchor --focus) || fail 'could not create focus anchor'
 ANCHOR_TAB=$(printf '%s' "$ANCHOR" | jq -r '.result.tab.tab_id')
+ANCHOR_PANE=$(printf '%s' "$ANCHOR" | jq -r '.result.root_pane.pane_id')
+HOME_PROOF="$TMP_ROOT/pane-home.txt"
+lab pane run "$ANCHOR_PANE" "printf '%s\\n' \"\$HOME\" \"\$XDG_CONFIG_HOME\" \"\$XDG_DATA_HOME\" \"\$XDG_STATE_HOME\" \"\$XDG_CACHE_HOME\" > '$HOME_PROOF'" >/dev/null \
+  || fail 'could not request lab pane HOME evidence'
+attempt=0
+while [ ! -s "$HOME_PROOF" ] && [ "$attempt" -lt 100 ]; do
+  sleep 0.1
+  attempt=$((attempt + 1))
+done
+[ -s "$HOME_PROOF" ] || fail 'lab pane did not write HOME evidence'
+LAB_BASE=$(<"$FM_HERDR_LAB_STATE_DIR/$HERDR_LAB_SESSION.xdg-root")
+SOCKET_PATH=$(lab session list --json | jq -r --arg name "$HERDR_LAB_SESSION" '.sessions[] | select(.name == $name) | .socket_path')
+printf 'evidence: socket_path=%s bytes=%s\n' "$SOCKET_PATH" "${#SOCKET_PATH}"
+[ "${#SOCKET_PATH}" -lt 100 ] || fail 'lab socket path is not safely below Unix socket capacity'
+[ "$(head -n 1 "$HOME_PROOF")" = "$LAB_BASE/home" ] || fail 'lab pane HOME is not its disposable home'
+[ "$(head -n 1 "$HOME_PROOF")" != "$CALLER_HOME" ] || fail 'lab pane inherited caller HOME'
+printf '%s\n' "$LAB_BASE/home" "$LAB_BASE/config" "$LAB_BASE/data" "$LAB_BASE/state" "$LAB_BASE/cache" > "$TMP_ROOT/expected-home.txt"
+cmp -s "$HOME_PROOF" "$TMP_ROOT/expected-home.txt" || fail 'lab pane HOME and XDG paths are inconsistent'
+HOME_MARKER="fm-lab-home-proof-$HERDR_LAB_SESSION"
+[ ! -e "$CALLER_HOME/.local/bin/$HOME_MARKER" ] || fail 'caller marker already exists'
+lab pane run "$ANCHOR_PANE" "mkdir -p \"\$HOME/.local/bin\" && printf scratch > \"\$HOME/.local/bin/$HOME_MARKER\"" >/dev/null \
+  || fail 'could not request scratch HOME write'
+attempt=0
+while [ ! -s "$LAB_BASE/home/.local/bin/$HOME_MARKER" ] && [ "$attempt" -lt 100 ]; do
+  sleep 0.1
+  attempt=$((attempt + 1))
+done
+[ "$(<"$LAB_BASE/home/.local/bin/$HOME_MARKER")" = scratch ] || fail 'scratch HOME write did not finish'
+[ ! -e "$CALLER_HOME/.local/bin/$HOME_MARKER" ] || fail 'lab HOME write touched caller HOME'
+for credentials in .claude .codex .pi .config; do
+  [ ! -e "$LAB_BASE/home/$credentials" ] || fail 'lab HOME contains inherited configuration or credentials'
+done
+pass 'real lab pane has disposable HOME and XDG paths; HOME-local tool writes do not touch caller HOME'
 TOKEN=AbCdEfGhIjKlMnOpQrStUv
 ID=restored-idle-shell
 TITLE="└ $ID · p:$TOKEN"
