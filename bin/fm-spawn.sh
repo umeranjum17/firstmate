@@ -281,6 +281,9 @@
 #   python3 bin/fm-treehouse-protect.py protects recorded pre-lease copies
 #   before Treehouse can reset one. Teardown alone returns a leased copy;
 #   failed launches retain a cleanup_recovery=treehouse task record.
+#   Relaunch reuses that copy and clears the recovery marker on publication;
+#   teardown treats the recovery record as an aborted allocation, not a launched
+#   backlog worker. Existing endpoint and landed-work safety checks still apply.
 #   The pane must settle at that exact leased path. The isolation test screens
 #   every read: a pane still showing the project
 #   or the repository primary while the pane enters its leased slot is waited
@@ -3481,14 +3484,10 @@ real_path_or_raw() { # <path>
 # left holding the worktree root the check read, and SPAWN_WT_REASON a short
 # phrase naming why a rejected path failed, both for the refusal messages.
 #
-# The worktree-discovery poll below reads this same predicate, so it can never
-# adopt a path the guard would then refuse. That matters because a pane's cwd
-# read is a snapshot of whatever process is in the foreground: while `treehouse
-# get` is still fetching and checking a slot out, it reports the REPOSITORY's
-# primary checkout as its own cwd. That path differs from a linked spawning
-# project, so a poll comparing only against the project accepted it, and the
-# guard then refused a launch whose slot treehouse went on to create normally.
-# A read like that is a transient, not a destination: the poll keeps waiting.
+# The worktree-discovery poll below uses this same predicate and requires the
+# exact leased path, so it can never adopt a path the guard would then refuse.
+# A pane may still report the project or primary checkout before its shell cd
+# settles; those reads are transients, not destinations.
 SPAWN_WT_TOP=
 SPAWN_WT_REASON=
 spawn_worktree_isolated() { # <path>
@@ -3890,7 +3889,7 @@ else
     # #134 robustness (tmux): fm_backend_tmux_create_task captures a stable window
     # id and pins the window name (automatic-rename/allow-rename off) so a captain's
     # non-default tmux config cannot rename the window away from fm-<id> once
-    # treehouse cd's into the worktree. WT_TARGET carries that stable id for the
+    # the shell cd's into the worktree. WT_TARGET carries that stable id for the
     # rename-critical worktree-detection steps below; the persisted window= handle
     # stays $T (the name form), which is safe now that rename is disabled.
     WID=$(fm_backend_tmux_create_task "$SES" "$W" "$PROJ_ABS") || exit 1
@@ -4136,7 +4135,7 @@ fi
 # #134 robustness: only tmux needs a worktree-detection target distinct from $T -
 # its rename-safe stable window id, set as WT_TARGET=$WID in the tmux branch above.
 # Every other backend addresses its pane/surface by the id already in $T, so default
-# WT_TARGET to $T for them (and for any future backend) - the shared treehouse-get +
+# WT_TARGET to $T for them (and for any future backend) - the shared handoff +
 # worktree-detection steps below must never reference an unbound WT_TARGET under set -u.
 : "${WT_TARGET:=$T}"
 spawn_send_text_line() { # <target> <text>
@@ -4177,8 +4176,8 @@ spawn_send_key() { # <target> <key>
 
 # Enter the exact copy recorded for this task immediately before trust setup and
 # launch. Herdr restores a pane's shell cwd from its durable tab layout, so a
-# treehouse subshell's foreground cwd is not enough to keep a later pane restart
-# out of the primary checkout. The same explicit cd gives every backend one
+# foreground cwd alone is not enough to keep a later pane restart out of the
+# primary checkout. The same explicit cd gives every backend one
 # launch boundary and makes a dropped or ignored cwd change a refusal.
 spawn_enter_recorded_worktree() {
   [ "$KIND" = secondmate ] && return 0
@@ -4616,14 +4615,10 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
   # A single read that already looks isolated is not proof the pane settled
   # there: on some tmux/WSL setups a brand-new window's pane_current_path
   # transiently reports an unrelated stale path (seen live as another real git
-  # checkout entirely) before the shell catches up with treehouse get's cd. That
-  # stale path passes spawn_worktree_isolated too (it resolves to a real,
-  # distinct worktree top-level), so accepting it on one read alone silently
-  # records the wrong worktree= in state/<id>.meta. Require two consecutive
-  # reads to agree on the same isolated path before accepting it; a mismatch
-  # just becomes the new candidate rather than resetting the wait, so a pane
-  # that is already settled by the first real read only costs the one existing
-  # inter-poll sleep as confirmation, not a whole extra cycle on top.
+  # checkout entirely) before the shell catches up with the explicit cd. That
+  # stale path may pass spawn_worktree_isolated too, so require the exact leased
+  # path and two consecutive agreeing reads. A mismatch clears the candidate;
+  # a pane settled by the first read costs only one inter-poll confirmation.
   #
   # Every candidate is screened with the isolation guard's own predicate, so a
   # read of the project itself or of the repository primary checkout is treated
@@ -4669,10 +4664,8 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
   # Written under the Treehouse project lock held from before slot allocation
   # through metadata publication, so no other spawn or return sees a half-claim.
   if fm_treehouse_pool_slot "$PROJ_ABS" "$WT"; then
-    # Treehouse frees a slot once its process lease lapses, which a killed
-    # worker's slot does while that task's record still names it (a Herdr
-    # restart resumes the agent outside the lease). Any record in any local home
-    # naming this slot is a task this spawn would overwrite, so refuse it.
+    # Defense in depth after legacy-copy protection: a conflicting record
+    # still forbids adopting the allocated slot, even if Treehouse leased it.
     slot_rc=0
     fm_slot_record_owner "$WT" "$STATE" "$STATE/$ID.meta" || slot_rc=$?
     case "$slot_rc" in

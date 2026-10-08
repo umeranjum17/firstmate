@@ -2,9 +2,9 @@
 """Protect recorded task copies before Treehouse allocation (no Git mutations).
 
 Usage: python3 fm-treehouse-protect.py <project> <state-dir>...
-Called by fm-spawn under its shared project lock. Only entries already in a
-Treehouse pool for this Git repository are leased; copies are never moved,
-reset or returned. Existing leases are preserved. JSON replacement holds
+Called by fm-spawn and fm-home-seed under their shared project lock.
+Only entries already in a Treehouse pool for this Git repository are leased;
+copies are never moved, reset or returned. Existing leases are preserved. JSON replacement holds
 Treehouse's own native state lock (flock on POSIX, LockFileEx on Windows).
 Unreadable state or conflicting records refuse allocation.
 """

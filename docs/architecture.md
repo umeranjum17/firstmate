@@ -291,7 +291,7 @@ Codex App support is recorded in `docs/codex-app-backend.md`; it is not selectab
 ## Worktrees, not branches in your checkout
 
 Crewmates never intentionally touch your project clone; [treehouse](https://github.com/kunchenguid/treehouse) pools clean worktrees for tmux, herdr, zellij, and cmux tasks, while Orca creates its own worktrees for `backend=orca`.
-The [`fm-spawn.sh` header](../bin/fm-spawn.sh) owns ship/scout worktree isolation and fresh-base refusal rules, including spawns from linked homes.
+The [`fm-spawn.sh` header](../bin/fm-spawn.sh) owns ship/scout durable allocation, failed-launch recovery, worktree isolation, and fresh-base refusal rules, including spawns from linked homes.
 Portable regressions live in [`tests/fm-spawn-pool-base-freshen.test.sh`](../tests/fm-spawn-pool-base-freshen.test.sh) for spawn isolation and base freshness, and [`tests/fm-control-relaunch.test.sh`](../tests/fm-control-relaunch.test.sh) for preserving the recorded copy on relaunch.
 
 The firstmate repo has one extra exposure because it can dispatch crewmates to work on itself.
@@ -419,7 +419,7 @@ A later merged poll consumes only that matching persisted value; with no match i
 [`bin/fm-merge-authority-lib.sh`](../bin/fm-merge-authority-lib.sh)'s header owns resolution, private atomic persistence, identity-checked consumption, and retirement, while only the merge path gates on the answer.
 Teardown is fail-closed for ship worktrees: dirty worktrees refuse, and committed work must be landed before the worktree is returned.
 A pool worktree is only returned after teardown passes the slot-ownership proof: a contradictory task record or a supported live endpoint refuses without touching either task, and no discard authority relaxes that.
-A slot's own owner claim, written by the spawn that takes it under the allocation lock and owned by [`bin/fm-wake-lib.sh`](../bin/fm-wake-lib.sh), covers a slot reassigned to another task, including one that left no record the scan could reach: a claim naming a different task releases nothing, even alongside that task's contradictory record - teardown warns, names the claimant, and finishes only the task's own cleanup - because Treehouse's own live process lease cannot answer ownership once the worker's exit releases it.
+[`bin/fm-wake-lib.sh`](../bin/fm-wake-lib.sh)'s slot-owner claim comment owns the legacy-slot collision protection that remains alongside durable leases.
 Allocation and return serialize on one project lock per machine-local Firstmate tree: every home reachable through local parent links shares that lock, and a home seeded from another machine anchors its own, because a lock taken on this filesystem is neither held nor observable across that boundary.
 Before the worktree is returned, teardown concludes the task's own no-mistakes run when it is parked at a gate, including a run whose head the task copy cannot resolve - the shared runs-ledger continuation proof is the only recognition for that case, so cleanup never orphans a parked run the pipeline advanced past the submitted head.
 [`bin/fm-teardown.sh`](../bin/fm-teardown.sh)'s header owns the landed-work proofs, slot-ownership proof, endpoint-close refusal, PR-discovery fallback, pre-teardown run conclusion, and stale-lock recovery procedure; [`tests/fm-teardown-endpoint-safety.test.sh`](../tests/fm-teardown-endpoint-safety.test.sh) and [`tests/fm-secondmate-safety.test.sh`](../tests/fm-secondmate-safety.test.sh) pin the slot-collision boundary.
