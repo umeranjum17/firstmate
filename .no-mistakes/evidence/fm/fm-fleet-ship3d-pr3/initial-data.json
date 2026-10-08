@@ -1,0 +1,153 @@
+{
+  "lifecycle": {
+    "effectiveLaunch": {
+      "browserLaunched": true,
+      "engine": "chrome",
+      "launchHash": 12825947863403514000
+    },
+    "launched": false,
+    "relaunchedBrowser": false,
+    "restartedBackground": false,
+    "restoreStatus": "missing",
+    "reused": true,
+    "saveStatus": "saved"
+  },
+  "origin": "http://127.0.0.1:4397/#ship",
+  "result": {
+    "canvas": true,
+    "cards": {
+      "asks": [],
+      "cards": [
+        {
+          "effort": null,
+          "history": [
+            {
+              "at": 1791458734,
+              "stage": "building",
+              "text": "building",
+              "tone": "",
+              "v": "working",
+              "verb": "Working"
+            }
+          ],
+          "home": "main",
+          "id": "main/walker",
+          "kind": "ship",
+          "model": "opus",
+          "model_name": "Opus",
+          "pr": null,
+          "reached": {},
+          "since": 1791458734,
+          "stage": "building",
+          "started": 1791458734,
+          "state": "building",
+          "task": "walker",
+          "title": "walker lane",
+          "tool": "claude",
+          "wait": null,
+          "wait_since": null,
+          "why": "building"
+        },
+        {
+          "effort": null,
+          "history": [
+            {
+              "at": 1791458734,
+              "stage": "building",
+              "text": "building",
+              "tone": "",
+              "v": "working",
+              "verb": "Working"
+            }
+          ],
+          "home": "relay",
+          "id": "relay/relay-worker",
+          "kind": "ship",
+          "model": "qwen",
+          "model_name": "Qwen",
+          "pr": null,
+          "reached": {},
+          "since": 1791458734,
+          "stage": "building",
+          "started": 1791458734,
+          "state": "building",
+          "task": "relay-worker",
+          "title": "relay-worker lane",
+          "tool": "claude",
+          "wait": null,
+          "wait_since": null,
+          "why": "building"
+        }
+      ],
+      "cycle_p50": null,
+      "generated": 1791458735,
+      "homes": [
+        {
+          "id": "main",
+          "known": true,
+          "name": "Main",
+          "open": 1,
+          "plan": 4,
+          "ready": 0
+        },
+        {
+          "id": "relay",
+          "known": true,
+          "name": "relay",
+          "open": 1,
+          "plan": 4,
+          "ready": 0
+        }
+      ],
+      "landed": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "parked": [],
+      "schema": "fm-dashboard-board.v1",
+      "stages": [
+        {
+          "id": "queued",
+          "name": "Queued"
+        },
+        {
+          "id": "building",
+          "name": "Building"
+        },
+        {
+          "id": "review",
+          "name": "Review"
+        },
+        {
+          "id": "test",
+          "name": "Test"
+        },
+        {
+          "id": "ci",
+          "name": "PR + CI"
+        },
+        {
+          "id": "merge",
+          "name": "Waiting to merge"
+        },
+        {
+          "id": "landed",
+          "name": "Landed today"
+        }
+      ]
+    },
+    "reduced": false
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "lifecycle": {
+    "effectiveLaunch": {
+      "browserLaunched": true,
+      "engine": "chrome",
+      "launchHash": 12825947863403514000
+    },
+    "launched": false,
+    "relaunchedBrowser": false,
+    "restartedBackground": false,
+    "restoreStatus": "missing",
+    "reused": true,
+    "saveStatus": "saved"
+  },
+  "origin": "http://127.0.0.1:4397/#ship",
+  "result": {
+    "boxes": [
+      {
+        "stage": "building",
+        "x": 173,
+        "y": 541.296875
+      },
+      {
+        "stage": "review",
+        "x": 273,
+        "y": 564.296875
+      },
+      {
+        "stage": "test",
+        "x": 368,
+        "y": 583.296875
+      },
+      {
+        "stage": "ci",
+        "x": 477,
+        "y": 592.296875
+      },
+      {
+        "stage": "merge",
+        "x": 577,
+        "y": 578.296875
+      }
+    ],
+    "cratesWithRopes": 0,
+    "legsReset": true,
+    "reduced": true,
+    "workerAtTest": true
+  }
+}

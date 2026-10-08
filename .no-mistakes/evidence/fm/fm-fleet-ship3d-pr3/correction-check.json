@@ -1,0 +1,34 @@
+{
+  "lifecycle": {
+    "effectiveLaunch": {
+      "browserLaunched": true,
+      "engine": "chrome",
+      "launchHash": 12825947863403514000
+    },
+    "launched": false,
+    "relaunchedBrowser": false,
+    "restartedBackground": false,
+    "restoreStatus": "missing",
+    "reused": true,
+    "saveStatus": "saved"
+  },
+  "origin": "http://127.0.0.1:4397/#/ship",
+  "result": {
+    "cargoCorrection": [
+      {
+        "id": 418,
+        "rope": false,
+        "y": 0
+      }
+    ],
+    "reduced": false,
+    "strides": [
+      "0,0",
+      "-0.55,0.55",
+      "0.55,-0.55"
+    ],
+    "walkingFramesObserved": 108,
+    "walkingLaptopHidden": true,
+    "workerAtTest": true
+  }
+}

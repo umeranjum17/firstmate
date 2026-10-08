@@ -1,0 +1,22 @@
+{
+  "lifecycle": {
+    "effectiveLaunch": {
+      "browserLaunched": true,
+      "engine": "chrome",
+      "launchHash": 12825947863403514000
+    },
+    "launched": false,
+    "relaunchedBrowser": false,
+    "restartedBackground": false,
+    "restoreStatus": "missing",
+    "reused": true,
+    "saveStatus": "saved"
+  },
+  "origin": "http://127.0.0.1:4397/#/ship",
+  "result": {
+    "crates": 6,
+    "home": "Main1",
+    "ropeCount": 0,
+    "workerX": 0.9
+  }
+}

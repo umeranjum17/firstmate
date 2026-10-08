@@ -1,0 +1,147 @@
+{
+  "lifecycle": {
+    "effectiveLaunch": {
+      "browserLaunched": true,
+      "engine": "chrome",
+      "launchHash": 12825947863403514000
+    },
+    "launched": false,
+    "relaunchedBrowser": false,
+    "restartedBackground": false,
+    "restoreStatus": "missing",
+    "reused": true,
+    "saveStatus": "saved"
+  },
+  "origin": "http://127.0.0.1:4397/#ship",
+  "result": {
+    "crates": [
+      {
+        "id": 126,
+        "last": {
+          "id": 126,
+          "p": [
+            0,
+            0,
+            -0.52
+          ],
+          "rope": false
+        },
+        "ropeSeen": false,
+        "y": [
+          0,
+          0
+        ]
+      },
+      {
+        "id": 127,
+        "last": {
+          "id": 127,
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "rope": false
+        },
+        "ropeSeen": false,
+        "y": [
+          0,
+          0
+        ]
+      },
+      {
+        "id": 129,
+        "last": {
+          "id": 129,
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "rope": false
+        },
+        "ropeSeen": true,
+        "y": [
+          0,
+          2.7122149866266163
+        ]
+      },
+      {
+        "id": 130,
+        "last": {
+          "id": 130,
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "rope": false
+        },
+        "ropeSeen": false,
+        "y": [
+          0,
+          0
+        ]
+      }
+    ],
+    "crew": [
+      {
+        "id": 75,
+        "last": {
+          "arms": [
+            -1.3,
+            -1.3
+          ],
+          "id": 75,
+          "legs": [
+            0,
+            0
+          ],
+          "p": [
+            0,
+            0,
+            0
+          ]
+        },
+        "legs": [
+          "0,0"
+        ],
+        "walkingLaptopHidden": true,
+        "x": [
+          0,
+          0
+        ]
+      },
+      {
+        "id": 94,
+        "last": {
+          "arms": [
+            -1.15,
+            -0.97
+          ],
+          "id": 94,
+          "lap": true,
+          "legs": [
+            0,
+            0
+          ],
+          "p": [
+            -1.6,
+            2.25,
+            0.8
+          ]
+        },
+        "legs": [
+          "0,0",
+          "-0.55,0.55",
+          "0.55,-0.55"
+        ],
+        "walkingLaptopHidden": true,
+        "x": [
+          -1.6,
+          3.6
+        ]
+      }
+    ]
+  }
+}
