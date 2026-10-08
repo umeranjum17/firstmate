@@ -66,8 +66,8 @@ summary() {  # <home> <state> <epoch> [json fields]: the summary a home publishe
 # Plan: Main 6 from config/lane-caps, every other home 3 from config/lane-target.
 # Landed and closed today: one item each in Main and zephyrine; a day ago, 4 lanes were stuck.
 make_home() {  # <name>
-  local home="$TMP_ROOT/$1" now today z b stubs
-  now=$(date +%s) today=$(date +%F)
+  local home="$TMP_ROOT/$1" now today held_day z b stubs
+  now=$(date +%s) today=$(date +%F) held_day=$(date -d '7 days ago' +%F)
   z="$home/mates/zephyrine" b="$home/mates/beta" stubs="$home/stubs"
   mkdir -p "$home/data/metrics" "$home/state" "$home/config" "$z/data" "$z/state" "$b/data" "$b/state" "$stubs"
   printf -- '- zephyrine - made-up domain (home: %s; scope: made-up work; projects: alpha; added 2026-07-11)\n- beta - parked domain (home: %s; scope: parked; projects: alpha; added 2026-07-11)\n' \
@@ -81,7 +81,7 @@ make_home() {  # <name>
 
 ## Queued
 - [ ] m-ready - Start the ready thing (repo: alpha) (kind: ship) (since $today)
-- [ ] m-held - Wait for the captain's call (repo: alpha) (kind: ship) (since 2026-10-01) (hold: needs his call) (hold-kind: captain)
+- [ ] m-held - Wait for the captain's call (repo: alpha) (kind: ship) (since $held_day) (hold: needs his call) (hold-kind: captain)
 - [ ] m-after - After the ready thing blocked-by: m-ready (repo: alpha) (kind: ship) (since $today)
 
 ## Done
@@ -305,9 +305,14 @@ EOF
   build "$home" FM_DASHBOARD_PROC="$proc" FM_DEVICE_LOCK_DIR="$locks"
   has "$d/index.html" "✕ 45% memory pressure, heavy jobs wait" "Memory pressure 45%"
   lacks "$d/index.html" "12%"
+  rm "$proc/locks"
+  build "$home" FM_DASHBOARD_PROC="$proc"
+  has "$d/index.html" "Unknown 2"
+  lacks "$d/index.html" "Free 1"
+  jq -e '.metrics.device_groups.status == "unknown" and .metrics.device_groups.value == null and all(.devices[]; .holder == null)' "$d/data.json" >/dev/null || fail "unknown ownership exported as free capacity"
   # Each failed probe says unknown and why; nothing is guessed as zero.
   touch "$home/adb.fail" "$home/systemctl.fail"
-  rm "$proc/meminfo" "$proc/locks"
+  rm "$proc/meminfo"
   build "$home" FM_DASHBOARD_PROC="$proc" FM_DEVICE_LOCK_DIR="$locks"
   has "$d/index.html" "unknown - adb: error: daemon not running" \
     "Free memory unknown: $proc/meminfo: No such file or directory" "Heavy jobs unknown: Failed to connect to bus" \
@@ -550,6 +555,17 @@ test_new_lane_and_unwritten_archive_stay_exact() {
   jq -e --argjson n "$((before + 1))" '.metrics.lanes.value == $n and .metrics.lanes.status == "exact" and .metrics.closed.status == "exact" and .metrics.closed.value > 0' "$d/data.json" >/dev/null ||
     fail "a lane with no status line or an archive not yet written made a number unknown: $(jq -c '.metrics.lanes, .metrics.closed | del(.daily)' "$d/data.json")"
   has "$d/index.html" "Closed 7 d 2"
+  mkfifo "$home/state/m-vanishing.meta"
+  python3 - "$home/state/m-vanishing.meta" <<'PY' &
+import os, sys
+with open(sys.argv[1], 'w') as f:
+    f.write('kind=ship\nproject=alpha\n')
+    os.unlink(sys.argv[1])
+PY
+  local writer=$!
+  build "$home"
+  wait "$writer" || fail "vanishing metadata fixture failed"
+  jq -e --argjson n "$((before + 1))" '.metrics.lanes.value == $n and .metrics.lanes.status == "exact"' "$d/data.json" >/dev/null || fail "vanished lane aborted or polluted the build"
   pass "a lane with no status line yet and an archive not yet written keep their numbers exact"
 }
 
@@ -577,6 +593,21 @@ test_unavailable_readings_and_concurrent_caches() {
   lacks "$d/index.html" "All flowing"
   lacks "$d/measure.html" "Every source was read."
   jq -e '[.sources_unknown[].source] | contains(["machine free memory","machine memory pressure","machine Gradle builds","machine heavy jobs","machine heavy high limit","machine heavy max limit","devices"])' "$d/data.json" >/dev/null || fail "unavailable readings missing from source list"
+  home=$(make_home leads)
+  d="$home/state/dashboard"
+  for scenario in invalid future runtime missing; do
+    summary "$home/mates/zephyrine" active_child_work "$(date +%s)"
+    summary "$home" no_active_work "$(date +%s)" '"endpoints":[{"id":"zephyrine","endpoint":{"exists":true,"agent_alive":"alive"}}]'
+    case "$scenario" in
+      invalid) summary "$home/mates/zephyrine" active_child_work "$(date +%s)" '"valid":false' ;;
+      future) summary "$home/mates/zephyrine" active_child_work "$(( $(date +%s) + 3600 ))" ;;
+      runtime) summary "$home" no_active_work "$(date +%s)" '"endpoints":[]'; printf '{"result":{"agents":[]}}\n' > "$home/herdr.json" ;;
+      missing) rm "$home/mates/zephyrine/state/home-summary.json" ;;
+    esac
+    build "$home"
+    lacks "$d/measure.html" "Every source was read."
+    jq -e 'any(.sources_unknown[]; .source == "lead state" and (.reason | startswith("zephyrine:")))' "$d/data.json" >/dev/null || fail "lead uncertainty absent: $scenario"
+  done
   home=$(make_home concurrent)
   : > "$home/data/secondmates.md"
   FM_HOME="$home" bash "$ROOT/bin/fm-tasks-axi.sh" list --limit 10000 --fields held,hold_kind,hold_reason,blocked,created,closed > "$home/table"

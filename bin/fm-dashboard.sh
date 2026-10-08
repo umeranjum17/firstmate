@@ -357,16 +357,22 @@ for h, d in sorted(home_dir.items()):
     except OSError as e:
         lane_err.add(h); notes.append(('lane records', f'{h}: {e.strerror}')); continue
     for f in files:
-        try: meta = dict(l.rstrip('\n').split('=', 1) for l in open(os.path.join(sd, f), errors='replace') if '=' in l)
+        try:
+            with open(os.path.join(sd, f), errors='replace') as fh:
+                meta_mt = os.fstat(fh.fileno()).st_mtime
+                meta = dict(l.rstrip('\n').split('=', 1) for l in fh if '=' in l)
+        except FileNotFoundError: continue
         except OSError as e:
             lane_err.add(h); notes.append(('lane records', f'{h}: {e.strerror}')); continue
         metas.setdefault(h, []).append((f[:-5], meta))
         if meta.get('kind') not in ('ship', 'scout'): continue
         try:
-            ls = [l.strip() for l in open(os.path.join(sd, f[:-5] + '.status'), errors='replace') if l.strip()]
-            mt = os.path.getmtime(os.path.join(sd, f[:-5] + '.status'))
-        except FileNotFoundError:  # a lane just started: no status line yet, building since its record
-            ls, mt = [], os.path.getmtime(os.path.join(sd, f))
+            with open(os.path.join(sd, f[:-5] + '.status'), errors='replace') as fh:
+                mt = os.fstat(fh.fileno()).st_mtime
+                ls = [l.strip() for l in fh if l.strip()]
+        except FileNotFoundError:
+            if not os.path.exists(os.path.join(sd, f)): continue
+            ls, mt = [], meta_mt
         except OSError as e:
             lane_err.add(h); notes.append(('lane records', f'{h}: {e.strerror}')); continue
         keys, verb, at, text, pr = set(), 'working', None, '', ''
@@ -822,7 +828,16 @@ for key, label in (('free', 'free memory'), ('pressure', 'memory pressure'), ('g
 for label, value in zip(('heavy jobs', 'heavy high limit', 'heavy max limit'), mach['heavy']):
     if value is None: notes.append(('machine ' + label, mach['heavy_why']))
 notes.extend(('devices', p) for p in dev_problems)
+for h, s in leads.items():
+    reason = ('summary unavailable' if s is None else
+              'summary time is in the future' if s['generated_epoch'] > NOW_TS else
+              'summary stale' if NOW_TS - s['generated_epoch'] > SUMMARY_MAX_AGE else
+              'child state unavailable' if s.get('valid') is False else
+              'runtime evidence unavailable' if lead_word(h)[0] == 'Runtime unknown' else
+              'child state unknown' if s.get('state') == 'unknown' or s.get('state') not in LEAD_WORDS else None)
+    if reason: notes.append(('lead state', f'{h}: {reason}'))
 def device_group(r, group):
+    if not r[4] and 'unknown:' in r[2]: return 'Unknown'
     return (r[4] or 'No holder') if group == 'home' else 'Problem' if r[3] == 'bad' else 'In use' if r[4] else 'Free'
 device_groups = {g: {k: sum(device_group(r, g) == k for r in dev_rows)
                     for k in sorted({device_group(r, g) for r in dev_rows})} for g in ('action', 'home')}
@@ -950,12 +965,11 @@ machine_rows = ''.join([
     if emu_count is not None else meter('Emulators', unknown(next((p for p in dev_problems if p.startswith('emulators')), 'no answer')), None, ''),
 ])
 def devices_list(group):
+    key = lambda r: device_group(r, group)
     if group == 'home':
-        key = lambda r: device_group(r, group)
-        order = sorted({key(r) for r in dev_rows}, key=lambda k: (k == 'No holder', k))
+        order = sorted(device_groups[group], key=lambda k: (k == 'No holder', k))
     else:
-        key = lambda r: device_group(r, group)
-        order = [k for k in ('Problem', 'In use', 'Free') if any(key(r) == k for r in dev_rows)]
+        order = [k for k in ('Problem', 'In use', 'Free', 'Unknown') if k in device_groups[group]]
     groups = [(k, sum(key(r) == k for r in dev_rows), ''.join(grow(esc(r[0]), esc(f'{r[2]} · {r[1]}')) for r in dev_rows if key(r) == k), '', None, True) for k in order]
     body = glist(groups, 'Devices') if dev_rows else ('<p class="note">No device connected and no emulator running.</p>' if dev_count is not None else '')
     return body + ''.join(f'<p class="note">unknown - {esc(p)}</p>' for p in dev_problems)
@@ -1377,7 +1391,7 @@ metrics = {
     'gradle_builds': reading(mach['gradle'], 'machine', mach['gradle'] is not None, reason=mach['gradle_why'], read_at=machine_read_at),
     'emulators': reading(emu_count, 'machine', emu_count is not None, reason='emulator inventory unavailable', read_at=machine_read_at),
     'devices': reading(len(dev_rows), 'machine', lower=bool(dev_problems), read_at=machine_read_at),
-    'device_groups': reading(device_groups, 'machine', lower=bool(dev_problems), read_at=machine_read_at),
+    'device_groups': reading(device_groups, 'machine', not dev_problems, reason='device availability or inventory unavailable', read_at=machine_read_at),
     'connected_devices': reading(dev_count, 'machine', dev_count is not None, reason='adb inventory unavailable', read_at=machine_read_at),
 }
 for key, value in zip(('heavy_jobs_gb', 'heavy_high_gb', 'heavy_max_gb'), mach['heavy']):
