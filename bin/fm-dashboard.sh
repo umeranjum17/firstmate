@@ -18,10 +18,10 @@
 # Ship needs WebGL2; otherwise a static illustration replaces the scene while its panels stay live.
 # The system's reduced-motion preference stops continuous scene animation and tag pulsing
 # and immediately settles any home transition, restoring tags and picking.
-# On tablet-sized viewports the header figures use their own row and the sidebar narrows
-# to a compact rail with four-character home labels (or the whole name if shorter).
-# Home buttons expose the full name through their accessible label and tooltip.
-# On a phone the board is a list grouped by stage, with a dock.
+# At viewport widths of 760-1279 CSS pixels the header figures use their own row.
+# At 760-1023 CSS pixels the sidebar becomes a compact rail with four-character home
+# labels (or the whole name if shorter); home buttons retain the full accessible name and tooltip.
+# Below 760 CSS pixels the board is a list grouped by stage, with a dock.
 # Each build writes the app's one data file, state/dashboard/board.json: homes with their
 # lane plans, one card per open lane, ready backlog item and pull request landed today,
 # and parked home ids. Cards carry the current stage inferred from status lines (which
