@@ -500,14 +500,15 @@ printf '%s\\n' "$out"
     return {'status': fields.get('status'), 'outcome': fields.get('outcome'), 'pr': fields.get('pr'),
             'step': act.get('step'), 'for': secs(act.get('active_for'))}
 def checks_of(l, url):
-    """('failing'|'running'|'green', checked_at) from the lane's local PR record, or (None, None)."""
+    """Check verdict, observation time and publication state from the lane's PR record."""
     c = load_json(os.path.join(home_dir[l['home']], 'data', l['task'], 'contributions.json'))
     for r in c.get('records') or [] if isinstance(c.get('records'), list) else []:
         if not isinstance(r, dict) or r.get('url') != url: continue
         if r.get('error'):
             notes.append(('pull request checks', f'{hname(l["home"])}/{l["task"]}: {r["error"]}'))
-            return None, None
+            return None, None, None
         o = r.get('observation') or {}
+        if o.get('state') in ('merged', 'closed'): return None, r.get('checked_at'), o['state']
         latest_checks = {}
         for x in sorted((x for x in o.get('checks') or [] if isinstance(x, dict)),
                         key=lambda x: (x.get('started_at') or '', x.get('id') or 0)):
@@ -518,8 +519,8 @@ def checks_of(l, url):
         elif any(not x.get('conclusion') for x in cs) or o.get('absent_checks'): v = None
         elif cs: v = 'green'
         else: v = None
-        return v, r.get('checked_at')
-    return None, None
+        return v, r.get('checked_at'), o.get('state')
+    return None, None, None
 PR_LANES = [l for l in live if l['pr'] or l['state'] in ('validating', 'finished')]
 from concurrent.futures import ThreadPoolExecutor
 with ThreadPoolExecutor(8) as ex: RUNS = list(ex.map(nm_run, PR_LANES))  # ponytail: one status call per lane, 8 at a time
@@ -527,15 +528,25 @@ nm_err = [r['err'] for r in RUNS if r and r.get('err')]
 if nm_err: notes.append(('no-mistakes axi status', f'{len(nm_err)} of {len(PR_LANES)} lanes: {nm_err[0]}'))
 PRS = []  # dict(lane, url, group, step, wait, checks, checked)
 for l, run in zip(PR_LANES, RUNS):
-    run = run if run and not run.get('err') else {}
+    run_error = bool(run and run.get('err'))
+    run = run if run and not run_error else {}
     url = run.get('pr') or l['pr']
-    ck, at = checks_of(l, url) if url else (None, None)
-    if ck == 'failing' or run.get('status') == 'failed' or run.get('outcome') == 'failed': g = 'failing'
-    elif run.get('status') in ('pending', 'running', 'fixing', 'ci', 'awaiting_approval', 'fix_review') or ck == 'running' or l['state'] == 'validating': g = 'validating'
+    ck, at, publication = checks_of(l, url) if url else (None, None, None)
+    active_run = not run.get('outcome') and run.get('status') in ('pending', 'running', 'fixing', 'ci', 'awaiting_approval', 'fix_review')
+    if publication in ('merged', 'closed'):
+        if not active_run and not (run_error and l['state'] == 'validating'): continue
+        url, ck, at = '', None, None
+    failures = []
+    if ck == 'failing': failures.append('checks failing')
+    if run.get('status') == 'failed' or run.get('outcome') == 'failed': failures.append('validation failed')
+    if failures: g = 'failing'
+    elif active_run or ck == 'running' or l['state'] == 'validating': g = 'validating'
     elif ck == 'green': g = 'green'
     else: g = 'none'
-    PRS.append(dict(lane=l, url=url, group=g, step=run.get('step'), wait=run.get('for'), checks=ck, checked=at))
+    PRS.append(dict(lane=l, url=url, group=g, step=run.get('step'), wait=run.get('for'), checks=ck, checked=at,
+                    failures=failures, run_error=run_error))
 ci_waits = [p for p in PRS if p['step'] == 'ci' and p['wait'] is not None]
+ci_unknown = any(p['run_error'] for p in PRS)
 CI_SLOW = 3600  # a CI wait over this is a slow spot
 
 # --- backlog per home: tasks-axi ----------------------------------------
@@ -1083,8 +1094,10 @@ if stuck: spot('warn', 'Stuck', 'blocked or on a decision', len(stuck), dur(NOW_
 fin = [l for l in live if l['state'] == 'finished']
 if fin: spot('warn', 'To land', 'finished, not landed', len(fin), dur(NOW_TS - min(l['since'] for l in fin)), 'backlog#lanes', where(fin))
 failing = [p for p in PRS if p['group'] == 'failing']
-if failing: spot('bad', 'Failing', 'PRs with failing checks', len(failing), dur(NOW_TS - min(p['lane']['since'] for p in failing)), 'backlog#prs',
-                 where([p['lane'] for p in failing]))
+for reason, label in (('checks failing', 'PRs with failing checks'), ('validation failed', 'failed validations')):
+    affected = [p for p in failing if reason in p['failures']]
+    if affected: spot('bad', 'Failing', label, len(affected), dur(NOW_TS - min(p['lane']['since'] for p in affected)), 'backlog#prs',
+                      where([p['lane'] for p in affected]))
 long_ci = [p for p in ci_waits if p['wait'] >= CI_SLOW]
 if long_ci: spot('warn', 'CI wait', f'PRs on CI over {dur(CI_SLOW)}', len(long_ci), dur(max(p['wait'] for p in long_ci)), 'backlog#prs',
                  where([p['lane'] for p in long_ci]))
@@ -1293,7 +1306,9 @@ PR_TONE = {'failing': 'bad', 'validating': 'in', 'green': 'ok', 'none': 'mut'}
 def pr_bar():
     short = {'failing': 'failing', 'validating': 'validating or on CI', 'green': 'green, to land', 'none': 'no check record'}
     parts = [(f'c-{PR_TONE[g]}', sum(p['group'] == g for p in PRS), f'{sum(p["group"] == g for p in PRS)} {short[g]}') for g, n, _ in PR_GROUPS]
-    return (stack(parts, len(PRS), 'sb big') + legend(*[(f'k {c}', t) for c, n, t in parts if n])) if PRS else '<p class="note">No pull request or validation open.</p>'
+    reasons = ', '.join(f'{sum(reason in p["failures"] for p in PRS)} {reason}' for reason in ('checks failing', 'validation failed') if any(reason in p['failures'] for p in PRS))
+    return (stack(parts, len(PRS), 'sb big') + legend(*[(f'k {c}', t) for c, n, t in parts if n]) +
+            (f'<p class="note">{reasons}.</p>' if reasons else '')) if PRS else '<p class="note">No pull request or validation open.</p>'
 
 def tight_window(a):  # the limiting window, else the most used one
     return a['limit'] if a['limit'] and a['limit']['used'] is not None else max((w for w in a['windows'] if w['used'] is not None), key=lambda w: w['used'], default=None)
@@ -1389,7 +1404,7 @@ def index_body(group):
 </div>
 <div class="cards">
 {card("Slow spots", f"now {BUILT}" + (f" · quota {hm(q_at)}" if q_at else ""), spot_table(), "wide-m")}
-{card("Pull request checks", f"lane records and no-mistakes · now {BUILT}", pr_bar() + (f'<p class="note">Longest CI wait {dur(max(p["wait"] for p in ci_waits))}.</p>' if ci_waits else ""), cls="wide-l", more=("backlog#prs", "Backlog"))}
+{card("Pull request checks", f"lane records and no-mistakes · now {BUILT}", pr_bar() + (f'<p class="note">Longest observed CI wait {dur(max(p["wait"] for p in ci_waits))}.</p>' if ci_waits else "") + ('<p class="note">CI waits unknown for unreadable validation runs.</p>' if ci_unknown else ""), cls="wide-l", more=("backlog#prs", "Backlog"))}
 {card("Lanes by what to do", f"every open lane · now {BUILT}",  switch(group) + lanes_list(group, strip=False), "wide", ("backlog#lanes", "Every lane"))}
 <section class="card wide" id="devices"><div class="ch"><h3>Devices and machine</h3></div><p class="cw">now {BUILT}</p><div class="devm"><div>{devices_list(group)}</div><div class="mach">{machine_rows}</div></div></section>
 <section class="card wide" id="homes"><div class="ch"><h3>Homes</h3><a class="cm" href="backlog">Backlog →</a></div><p class="cw">lanes and backlog now {BUILT}, landings {ld}</p>{homes_table}</section>
@@ -1561,8 +1576,8 @@ PR_GROUPS = (('failing', 'Checks or validation failing', 'wb'), ('validating', '
 def pr_row(p):
     l = p['lane']
     st = STATES[l['state']]
-    what = ((f'waiting on CI for {dur(p["wait"])}' if p['step'] == 'ci' else f'{p["step"]} step for {dur(p["wait"])}') if p['step'] and p['wait'] is not None else
-            {'failing': 'checks failing', 'green': 'checks green', 'running': 'checks running'}.get(p['checks'] or '', st[0].lower() + st[1:]))
+    what = '; '.join(p['failures']) if p['failures'] else ((f'waiting on CI for {dur(p["wait"])}' if p['step'] == 'ci' else f'{p["step"]} step for {dur(p["wait"])}') if p['step'] and p['wait'] is not None else
+            {'green': 'checks green', 'running': 'checks running'}.get(p['checks'] or '', 'validation unknown' if p['run_error'] else 'validation running' if p['group'] == 'validating' else st[0].lower() + st[1:]))
     seen = f' · checks read {when(parse_ts(p["checked"]).timestamp())}' if p['checked'] and parse_ts(p['checked']) else ''
     pr = f' · {link("pull request", p["url"])}' if p['url'] else ''
     return grow(esc(titles.get((l['home'], l['task'])) or l['task']), esc(f'{hname(l["home"])} · {what} · last status {dur(NOW_TS - l["since"])} ago') + pr + esc(seen))
@@ -1576,8 +1591,8 @@ def pr_section(group):
     body = pr_bar() + glist(gs, 'Pull requests and validations open') if PRS else '<p class="note">No lane has a pull request or a validation run.</p>'
     if nm_err: body += f'<p class="note">Validation run {unknown(f"{len(nm_err)} of {len(PR_LANES)} lanes: {nm_err[0]}")}</p>'
     ci = max(ci_waits, key=lambda p: p['wait']) if ci_waits else None
-    body += (f'<p class="note">Longest CI wait now: {dur(ci["wait"])} ({esc(titles.get((ci["lane"]["home"], ci["lane"]["task"])) or ci["lane"]["task"])}, {esc(hname(ci["lane"]["home"]))}), from no-mistakes. '
-             if ci else '<p class="note">No pull request is waiting on CI now. ') + 'Checks come from each lane\'s own pull request record, not a new GitHub call.</p>'
+    body += (f'<p class="note">Longest {"observed " if ci_unknown else ""}CI wait now: {dur(ci["wait"])} ({esc(titles.get((ci["lane"]["home"], ci["lane"]["task"])) or ci["lane"]["task"])}, {esc(hname(ci["lane"]["home"]))}), from no-mistakes. '
+             if ci else '<p class="note">') + ('CI waits unknown for unreadable validation runs. ' if ci_unknown else '' if ci else 'No pull request is waiting on CI now. ') + 'Checks come from each lane\'s own pull request record, not a new GitHub call.</p>'
     h2 = f'{plural(len(PRS), "pull request or validation", "pull requests or validations")}; {len(failing)} failing.'
     return f'<section id="prs">\n{sh(f"Pull requests and validation · no-mistakes and lane records, now {BUILT}")}\n<h2>{h2}</h2>\n{body}\n</section>'
 def backlog_body(group):

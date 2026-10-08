@@ -440,8 +440,11 @@ EOF
   printf 'done [at=%s]: PR https://github.com/acme/alpha/pull/9 ready\n' "$now" > "$home/state/m-ci.status"
   printf '{"records":[{"url":"https://github.com/acme/alpha/pull/8","observation":{"checks":[{"name":"test","status":"completed","conclusion":null}]}}]}\n' > "$home/data/m-done/contributions.json"
   build "$home" FM_NM_FAIL="$home/nm.fail"
-  has "$d/backlog.html" "Checks or validation failing 1"
-  lacks "$d/backlog.html" "m-done Main · checks green" "waiting on CI for 2 h 18 min"
+  has "$d/backlog.html" "Checks or validation failing 1" "m-ci Main · validation failed"
+  has "$d/backlog.home.html" "m-ci Main · validation failed"
+  has "$d/index.html" "Failing failed validations 1" "1 validation failed"
+  lacks "$d/index.html" "PRs with failing checks"
+  lacks "$d/backlog.html" "m-done Main · checks green" "m-ci Main · checks green" "waiting on CI for 2 h 18 min"
   printf '{"records":[{"url":"https://github.com/acme/alpha/pull/10","checked_at":"%s","error":"forge observation unavailable or changed during read","observation":{"checks":[{"name":"test","status":"completed","conclusion":"success"}]}}]}\n' \
     "$(iso 0)" > "$home/data/m-green/contributions.json"
   build "$home" FM_NM_FAIL="$home/nm.fail"
@@ -452,20 +455,41 @@ EOF
   touch "$home/wt/ci/foreign"
   printf '{"records":[{"url":"https://github.com/acme/alpha/pull/8","observation":{"checks":[{"name":"test","status":"completed","conclusion":"error"}]}}]}\n' > "$home/data/m-done/contributions.json"
   build "$home" FM_NM_FAIL="$home/nm.fail"
-  has "$d/backlog.html" "m-done Main · checks failing" "No pull request is waiting on CI now."
+  has "$d/backlog.html" "m-done Main · checks failing" "CI waits unknown for unreadable validation runs."
+  lacks "$d/backlog.html" "No pull request is waiting on CI now."
   lacks "$d/backlog.html" "other/repo" "waiting on CI for 2 h 18 min"
   rm "$home/wt/ci/foreign"
+  printf '{"records":[{"url":"https://github.com/acme/alpha/pull/8","observation":{"state":"merged","checks":[{"name":"test","status":"completed","conclusion":"success"}]}}]}\n' > "$home/data/m-done/contributions.json"
+  printf '{"records":[{"url":"https://github.com/acme/alpha/pull/10","observation":{"state":"closed","checks":[{"name":"test","status":"completed","conclusion":"success"}]}}]}\n' > "$home/data/m-green/contributions.json"
+  printf '{"records":[{"url":"https://github.com/acme/alpha/pull/9","observation":{"state":"merged","checks":[{"name":"test","status":"completed","conclusion":"success"}]}}]}\n' > "$home/data/m-ci/contributions.json"
+  build "$home" FM_NM_FAIL="$home/nm.fail"
+  has "$d/backlog.html" "1 pull request or validation; 0 failing." "m-ci Main · waiting on CI for 2 h 18 min" "Pull requests and validations open 1"
+  lacks "$d/backlog.html" "Green, waiting to land" "m-done Main · checks green" "m-green Main · checks green"
+  python3 - "$d/backlog.html" <<'PY'
+import re, sys
+section = re.search(r'<section id="prs">(.*?)</section>', open(sys.argv[1]).read(), re.S).group(1)
+assert not re.search(r'href="https://github.com/acme/alpha/pull/(8|9|10)"', section)
+PY
+  has "$d/index.html" "1 validating or on CI"
+  touch "$home/wt/ci/terminal"
+  build "$home" FM_NM_FAIL="$home/nm.fail"
+  has "$d/backlog.html" "0 pull requests or validations; 0 failing." "No pull request is waiting on CI now."
+  lacks "$d/backlog.html" "Green, waiting to land" "Checks or validation failing" "waiting on CI for"
+  rm "$home/wt/ci/terminal" "$home/data/m-ci/contributions.json"
+  printf '{"records":[{"url":"https://github.com/acme/alpha/pull/8","observation":{"state":"open","checks":[{"name":"test","status":"completed","conclusion":"failure"}]}}]}\n' > "$home/data/m-done/contributions.json"
   # A validation status that cannot be read says unknown and why, and the checks still come from the records;
   # a finished lane whose checks are still running is not green yet.
   touch "$home/nm.fail"
   printf '{"records":[{"url":"https://github.com/acme/alpha/pull/10","checked_at":"%s","observation":{"checks":[{"name":"test","status":"in_progress","conclusion":null}]}}]}\n' \
     "$(iso 0)" > "$home/data/m-green/contributions.json"
   build "$home" FM_NM_FAIL="$home/nm.fail"
-  has "$d/backlog.html" "Validation run unknown: 3 of 3 lanes: error: daemon not reachable" "No pull request is waiting on CI now." "m-done Main · checks failing" \
+  has "$d/backlog.html" "Validation run unknown: 3 of 3 lanes: error: daemon not reachable" "CI waits unknown for unreadable validation runs." "m-done Main · checks failing" \
     "m-green Main · checks running" "Pull requests and validations open 1 + 2 = 3"
   lacks "$d/backlog.html" "Green, waiting to land"
   has "$d/measure.html" "no-mistakes axi status 3 of 3 lanes: error: daemon not reachable" "a CI wait over 1 h is a slow spot"
   lacks "$d/index.html" "PRs on CI over"
+  has "$d/index.html" "CI waits unknown for unreadable validation runs."
+  lacks "$d/backlog.html" "No pull request is waiting on CI now."
   pass "pull requests group by checks and validation, with CI wait from no-mistakes, and an unreadable run shows unknown"
 }
 
