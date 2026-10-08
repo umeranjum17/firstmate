@@ -1,0 +1,36 @@
+session=fm-lab-auth-write-proof-604266-8532
+pane=w1:p1
+HOME=/tmp/fhl.DUMeZ7/home
+XDG_CONFIG_HOME=/tmp/fhl.DUMeZ7/config
+XDG_DATA_HOME=/tmp/fhl.DUMeZ7/data
+XDG_STATE_HOME=/tmp/fhl.DUMeZ7/state
+XDG_CACHE_HOME=/tmp/fhl.DUMeZ7/cache
+CLAUDE_CONFIG_DIR=/tmp/fhl.DUMeZ7/home/.claude
+PI_CODING_AGENT_DIR=/tmp/fhl.DUMeZ7/home/.pi/agent
+CODEX_HOME=/tmp/fhl.DUMeZ7/home/.codex
+OPENAI_API_KEY=unset
+ANTHROPIC_API_KEY=unset
+ANTHROPIC_AUTH_TOKEN=unset
+CLAUDE_CODE_OAUTH_TOKEN=unset
+{
+  "loggedIn": false,
+  "authMethod": "none",
+  "apiProvider": "firstParty",
+  "analyticsDisabled": false,
+  "projectsDirectory": "/tmp/fhl.DUMeZ7/home/.claude/projects",
+  "configDirectory": "/tmp/fhl.DUMeZ7/home/.claude"
+}
+scratch-link=/tmp/fhl.DUMeZ7/data/claude/versions/fm-proof
+scratch-content=scratch-only
+caller Claude link unchanged; no caller fm-proof file
+[umer@extreme 01M4CH7QAEH5CAM35DB5TT0GSA]$ printf 'HOME=%s\nXDG_CONFIG_HOME=%s\nXDG_DATA_HOME=%s\nXDG_STATE_HOME=%s\nXD
+G_CACHE_HOME=%s\nCLAUDE_CONFIG_DIR=%s\nPI_CODING_AGENT_DIR=%s\nCODEX_HOME=%s\nOPENAI_API_KEY=%s\nANTHROPIC_API_KEY=%s\n
+ANTHROPIC_AUTH_TOKEN=%s\nCLAUDE_CODE_OAUTH_TOKEN=%s\n' "$HOME" "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME" "$
+XDG_CACHE_HOME" "$CLAUDE_CONFIG_DIR" "$PI_CODING_AGENT_DIR" "$CODEX_HOME" "${OPENAI_API_KEY-unset}" "${ANTHROPIC_API_KE
+Y-unset}" "${ANTHROPIC_AUTH_TOKEN-unset}" "${CLAUDE_CODE_OAUTH_TOKEN-unset}" > '/home/umer/.no-mistakes/evidence/01M4CH
+7QAEH5CAM35DB5TT0GSA/herdr-pane-environment.txt'; claude auth status > '/home/umer/.no-mistakes/evidence/01M4CH7QAEH5CA
+M35DB5TT0GSA/claude-scratch-auth.json' 2>&1; mkdir -p "$HOME/.local/bin" "$XDG_DATA_HOME/claude/versions"; printf 'scra
+tch-only' > "$XDG_DATA_HOME/claude/versions/fm-proof"; ln -s "$XDG_DATA_HOME/claude/versions/fm-proof" "$HOME/.local/bi
+n/fm-proof"; printf '%s\n' done > '/tmp/fhl.DUMeZ7/finished'
+[umer@extreme 01M4CH7QAEH5CAM35DB5TT0GSA]$
+disposable root removed; fleet tripwire verified by teardown

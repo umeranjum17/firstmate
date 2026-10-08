@@ -1,0 +1,9 @@
+ok - real prepare-based adapter startup and restart use disposable HOME and shed authentication
+ok - real helper rejects public state, state symlinks, legacy roots and redirected disposable roots
+evidence: socket_path=/tmp/fhl.TgLKiY/config/herdr/sessions/fm-lab-fm-herdr-session-371043-9891/herdr.sock bytes=84
+ok - real lab pane has disposable HOME, XDG and credential roots without inherited authentication
+viewer attached to fm-lab-fm-herdr-session-371043-9891 (pid 375144)
+ok - real named lab reproduced the exact restored one-tab one-pane childless no-agent shell shape
+ok - real named lab cleanup closes only the exact stale pane and preserves exact focus
+ok - real named lab cleanup is idempotent and leaves the default fleet session to the teardown tripwire
+evidence: herdr=0.9.1 protocol=22 default-session-tripwire=armed

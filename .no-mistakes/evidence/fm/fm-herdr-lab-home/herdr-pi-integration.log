@@ -1,0 +1,5 @@
+installed pi integration to /tmp/fhl.RTC3kf/home/.pi/agent/extensions/herdr-agent-state.ts
+# pi mise ~/.config/mise/config.toml tools: pi@1.0.0 under herdr 0.9.1: registered idle, foreground [{"name":"pi","argv0":null}]
+ok - real herdr 0.9.1 + pi mise ~/.config/mise/config.toml tools: pi@1.0.0: a running registered pi classifies alive at process level
+# herdr 0.9.1 kept the pi registration (idle) after /quit under a nested shell: the stale-registration branch is exercised
+ok - real herdr 0.9.1 + pi mise ~/.config/mise/config.toml tools: pi@1.0.0: the registration left behind by a quit pi reads stale-agent and recovers as dead

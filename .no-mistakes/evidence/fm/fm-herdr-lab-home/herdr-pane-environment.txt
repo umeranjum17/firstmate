@@ -1,0 +1,12 @@
+HOME=/tmp/fhl.DUMeZ7/home
+XDG_CONFIG_HOME=/tmp/fhl.DUMeZ7/config
+XDG_DATA_HOME=/tmp/fhl.DUMeZ7/data
+XDG_STATE_HOME=/tmp/fhl.DUMeZ7/state
+XDG_CACHE_HOME=/tmp/fhl.DUMeZ7/cache
+CLAUDE_CONFIG_DIR=/tmp/fhl.DUMeZ7/home/.claude
+PI_CODING_AGENT_DIR=/tmp/fhl.DUMeZ7/home/.pi/agent
+CODEX_HOME=/tmp/fhl.DUMeZ7/home/.codex
+OPENAI_API_KEY=unset
+ANTHROPIC_API_KEY=unset
+ANTHROPIC_AUTH_TOKEN=unset
+CLAUDE_CODE_OAUTH_TOKEN=unset
