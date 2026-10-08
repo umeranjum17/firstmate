@@ -668,20 +668,21 @@ The helper's header owns exact parsing, publication, and report output mechanics
 On Herdr, agents across homes share the server's service cgroup, so an out-of-memory kill of that unit stops the whole fleet.
 The host memory guard reads available memory, swap, and host and runtime-cgroup pressure (the share of time some process waited on memory over 10 seconds), classifying the worse pressure reading.
 It reads the `herdr-server.service` cgroup and its parent user slice when available; unreadable cgroup pressure is reported as host-only classification.
-It classifies the host as `OK`, `WAIT` (new agents should wait), or `ALERT`, and names the largest consumers by owning task.
+It classifies measurable memory as `OK`, `WAIT` (new agents should wait), or `ALERT`, and names the largest consumers by owning task; unavailable measurements read `UNKNOWN`.
 These controls reduce risk but cannot guarantee avoidance of an out-of-memory kill:
 
 - Each watcher starts and supervises one independent `bin/fm-host-memory-sampler.sh` per home.
   It samples every 10 seconds by default (`FM_HOST_MEMORY_SECS`) into `state/host-memory.tsv`, even during slow recovery or custom checks.
   The dashboard shows the last hour's peak measured pressure and current swap.
   The home-scoped `state/.host-memory-sampler.pid` records PID and process identity; the watcher restarts a dead sampler and stops only the exact recorded PID after verifying its identity, script, home, and state.
-- At the wait or alert level, local `bin/fm-spawn.sh` launches and `bin/fm-control.sh relaunch` refuse to start a new agent and record the reason in `state/admission-refused`, which the dashboard raises for 15 minutes.
+- At the wait or alert level, local `bin/fm-spawn.sh` launches and `bin/fm-control.sh relaunch` refuse to start a new agent and record the reason in `state/admission-refused`, which the dashboard raises for 15 minutes for local homes only.
   A refused fresh spawn leaves the task queued; a relaunch refused by its initial admission check leaves the existing agent and task record untouched.
   The replacement launch checks admission again after the old agent stops, so pressure rising between those checks can still prevent replacement; this is not a memory reservation.
   Retry once pressure eases; admission does not automatically retry a queued spawn.
 - At the alert level, the sampler attempts one automatic `fm-control.sh <task-id> interrupt` per episode if the top consumer is a task this home owns, passing the resolved home and selected state explicitly; it never exits, kills, or discards that task.
-  Interrupt delivery runs independently of subsequent samples.
-  It records the task, reason, and result in `state/host-memory-interrupts.tsv` and queues a durable `check: host memory ALERT` wake naming the consumer and interrupt attempt (or the ownership skip); the completion result is in the interrupt log.
+  Before latching the episode or dispatching an interrupt, it queues a durable `check: host memory ALERT` wake naming the consumer and planned interrupt attempt (or the ownership skip), then records the attempt in `state/host-memory-interrupts.tsv`.
+  Failed wake publication leaves the next sample eligible, including after a sampler restart; an older episode's queued wake does not suppress a new episode's wake.
+  Interrupt delivery runs independently of subsequent samples and appends its completion result to the interrupt log.
   An OK sample ends the episode.
 - Local secondmate liveness recovery checks admission before consuming its retry budget or removing a dead endpoint, so memory deferral leaves recovery eligible when pressure eases.
   Memory deferral and a no-longer-relaunchable endpoint keep the watcher polling rather than failing supervision.

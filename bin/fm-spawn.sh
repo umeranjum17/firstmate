@@ -43,10 +43,9 @@
 #   anything; a nonzero exit refuses the spawn and prints the gate's output.
 #   Secondmate spawns and relaunches never run it, and an absent file changes
 #   nothing.
-#   Every local launch, relaunches and secondmates included, is then refused
-#   while bin/fm-jev-mem-guard.sh --admit reads the host as under memory
-#   pressure (thresholds: config/host-memory); the refusal prints the reason
-#   and records it in state/admission-refused, and the task stays queued.
+#   Every local launch, relaunches and secondmates included, also checks host
+#   memory admission; docs/configuration.md "Host memory guard" owns refusal
+#   behavior, retry guidance, and thresholds.
 #   Ship/scout launches always put fm-dod-lib.sh's current worker role scope
 #   first in the private launch-brief overlay, including the exact task-owned
 #   steering inbox. This never rewrites a project's instruction files or a
