@@ -3061,6 +3061,14 @@ test_herdr_projection_teardown_retires_journal_only_after_confirmed_close() {
   write_meta "$case_dir" local-only ship
   configure_herdr_projection_teardown_case "$case_dir"
   log="$case_dir/herdr.log"; closed="$case_dir/closed"; restored="$case_dir/restored"; : > "$log"
+  # A leased cd puts the top-level shell in the copy. Returning it can end
+  # that pane before the adapter gets a chance to preserve the original focus.
+  cat > "$case_dir/fakebin/treehouse" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" != return ] || : > "${FM_FAKE_HERDR_CLOSED:?}"
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/treehouse"
 
   FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_CLOSED="$closed" FM_FAKE_HERDR_RESTORED="$restored" \
     run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" \
