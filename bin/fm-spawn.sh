@@ -1443,7 +1443,18 @@ spawn_abort_cleanup() {
     [ ! -e "$STATE/$ID.meta" ] && [ ! -L "$STATE/$ID.meta" ]; then
     SPAWN_META_TMP="$STATE/.$ID.meta.treehouse-recovery.${BASHPID:-$$}"
     {
-      printf 'window=%s\nendpoint_task_id=%s\ncleanup_recovery=treehouse\n' "${W:-}" "$ID"
+      printf 'window=%s\nendpoint_task_id=%s\ncleanup_recovery=treehouse\n' "${T:-}" "$ID"
+      printf 'spawn_gen=%s\n' "${SPAWN_GEN:-s$(date +%s).${BASHPID:-$$}.$RANDOM}"
+      case "$BACKEND" in
+        herdr)
+          printf 'herdr_session=%s\nherdr_workspace_id=%s\nherdr_tab_id=%s\nherdr_pane_id=%s\n' \
+            "$HERDR_SES" "$HERDR_WORKSPACE_ID" "$HERDR_TAB_ID" "$HERDR_PANE_ID" ;;
+        zellij)
+          printf 'zellij_session=%s\nzellij_tab_id=%s\nzellij_pane_id=%s\n' \
+            "$ZELLIJ_SES" "$ZELLIJ_TAB_ID" "$ZELLIJ_PANE_ID" ;;
+        cmux)
+          printf 'cmux_workspace_id=%s\ncmux_surface_id=%s\n' "$CMUX_WORKSPACE_ID" "$CMUX_SURFACE_ID" ;;
+      esac
       printf 'worktree=%s\nproject=%s\nharness=%s\nkind=%s\nbackend=%s\n' \
         "$SPAWN_TREEHOUSE_LEASE" "$PROJ_ABS" "$HARNESS" "$KIND" "$BACKEND"
       printf 'mode=%s\nyolo=%s\nbranch=%s\ntasktmp=%s\n' "${MODE:-}" "${YOLO:-}" "${BRANCH:-}" "${TASK_TMP:-}"
@@ -5284,7 +5295,11 @@ SPAWN_META_PATH=$SPAWN_META_TMP
 preserve_relaunch_meta() {
   awk -F= '
     BEGIN {
+<<<<<<< HEAD
       split("window endpoint_task_id worktree project harness kind mode yolo branch receipt_required tasktmp base_branch model effort account account_provider busy_gen spawn_gen traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx", keys, " ")
+=======
+      split("window endpoint_task_id cleanup_recovery worktree project harness kind mode yolo branch receipt_required tasktmp model effort account account_provider busy_gen spawn_gen traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx", keys, " ")
+>>>>>>> 10d63db5 (no-mistakes(review): Fix retained allocation recovery and protect home-seed slots)
       for (i in keys) owned[keys[i]] = 1
     }
     !($1 in owned)

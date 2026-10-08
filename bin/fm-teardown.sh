@@ -573,7 +573,7 @@ case "$TEARDOWN_WINDOW_COUNT:$(fm_meta_get "$META" window)" in
     esac
     ;;
 esac
-if [ "$TEARDOWN_CLEANUP_RECOVERY" != orca ]; then
+if [ "$TEARDOWN_CLEANUP_RECOVERY" != orca ] && [ "$TEARDOWN_CLEANUP_RECOVERY" != treehouse ]; then
   if fm_backlog_transition_applies "$CONFIG" "$DATA" "$TEARDOWN_META_KIND"; then
     TEARDOWN_BACKLOG_APPLIES=1
   else
@@ -1640,7 +1640,7 @@ backlog_done_args() {
 backlog_refresh_reminder() {
   local backlog_display root backend=markdown
   [ "$KIND" = secondmate ] && return 0
-  [ "$CLEANUP_RECOVERY" = orca ] && return 0
+  { [ "$CLEANUP_RECOVERY" = orca ] || [ "$CLEANUP_RECOVERY" = treehouse ]; } && return 0
   if root=$(fm_backlog_root "$DATA"); then
     backend=$(fm_tasks_axi_backend "$root") || return 2
   fi
@@ -3507,8 +3507,8 @@ teardown_legacy_stamp_rollback() {
     exit 1
   fi
 else
-  if [ "$CLEANUP_RECOVERY" = orca ]; then
-    BACKLOG_SKIP_REASON="Orca cleanup recovery is not a launched backlog worker"
+  if [ "$CLEANUP_RECOVERY" = orca ] || [ "$CLEANUP_RECOVERY" = treehouse ]; then
+    BACKLOG_SKIP_REASON="$CLEANUP_RECOVERY cleanup recovery is not a launched backlog worker"
   else
     BACKLOG_SKIP_REASON=$TEARDOWN_BACKLOG_SKIP_REASON
   fi

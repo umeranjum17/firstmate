@@ -387,8 +387,19 @@ seeded_origin_url() {
   normalize_origin_url "$dst" "$url"
 }
 
-acquire_treehouse_home() {
-  local id=$1 home
+acquire_treehouse_home() (
+  local id=$1 home project_lock
+  project_lock=$(fm_treehouse_project_lock_path "$FM_ROOT") || return 1
+  fm_lock_try_acquire "$project_lock" || {
+    echo "error: another Treehouse slot allocation or return is in progress for $FM_ROOT; refusing to race it" >&2
+    return 1
+  }
+  trap 'fm_lock_release "$project_lock"' EXIT
+  fm_local_firstmate_state_dirs "$STATE" || {
+    echo "error: cannot enumerate recorded Treehouse copies: $FM_LOCAL_STATE_DIRS_ERROR" >&2
+    return 1
+  }
+  python3 "$SCRIPT_DIR/fm-treehouse-protect.py" "$FM_ROOT" "${FM_LOCAL_STATE_DIRS[@]}" || return 1
   # Durably lease a firstmate worktree from the pool. The lease persists with no
   # live process and is skipped by later get/prune, so the home survives restarts
   # until teardown or rollback returns it. treehouse prints only the worktree path
@@ -399,7 +410,7 @@ acquire_treehouse_home() {
   }
   [ -n "$home" ] || { echo "error: treehouse get --lease did not report a firstmate home" >&2; return 1; }
   printf '%s\n' "$home"
-}
+)
 
 ensure_home() {
   local id=$1 requested=$2 home
