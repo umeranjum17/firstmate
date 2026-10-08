@@ -240,9 +240,10 @@
 # removal so the operator can see what happened.
 #
 # Pre-teardown cleanup sequence (runs once every landed/discard-work safety
-# refusal above has already passed, and BEFORE any worktree return, branch
-# delete, or backend kill below - a still-active run or a leaked process may
-# own live work in that worktree):
+# refusal above has already passed, and BEFORE any worktree return or branch
+# delete below - a still-active run or a leaked process may own live work in
+# that worktree). Run conclusion precedes endpoint close; process reaping
+# follows Herdr's focus-preserving close so it cannot kill the pane first:
 #   Fix 1 - conclude the task's own no-mistakes run. A ship task's worktree can
 #     be torn down while its no-mistakes pipeline run is still PARKED at a gate
 #     (awaiting_approval/fix_review/any awaiting_agent field), with no worker
@@ -3514,17 +3515,11 @@ else
 fi
 
 # Every landed/discard-work refusal above has now passed (or --force skipped
-# them). Fix 1 and Fix 2 (see script header) run here, unconditionally on
-# --force, and before ANY destructive step below - a still-parked run or a
-# leaked process can own live work in this exact worktree. Not for
-# kind=secondmate: a secondmate home's own runtime lifecycle is owned by the
-# dedicated process-event and firstmate-home removal machinery further below,
-# not by task-worktree cleanup.
+# them). Fix 1 (see script header) concludes a parked run before any endpoint
+# close. A secondmate home's lifecycle belongs to the dedicated removal
+# machinery below, not to task-worktree cleanup.
 if [ "$KIND" != secondmate ] && teardown_owns_worktree; then
   conclude_task_no_mistakes_run "$WT"
-  reap_task_worktree_processes worktree "$WT" "$TASK_TMP"
-elif [ "$KIND" != secondmate ]; then
-  reap_task_worktree_processes tasktmp "$TASK_TMP"
 fi
 if [ "$KIND" = ship ] && teardown_owns_worktree && [ -e "$CONFIG/pipeline-spend" ]; then
   FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" FM_CONFIG_OVERRIDE="$CONFIG" \
@@ -3532,13 +3527,8 @@ if [ "$KIND" = ship ] && teardown_owns_worktree && [ -e "$CONFIG/pipeline-spend"
     || echo "warning: could not record $ID's no-mistakes pipeline spend; cleanup continues" >&2
 fi
 
-# Fix 3 (see script header): sweep remote job workers abandoned by an already
-# pruned code root. Best effort - a sweep failure never blocks this teardown.
-"$SCRIPT_DIR/fm-remote-job-reap-orphans.sh" >&2 || true
-
-# Best-effort: drop the local task branch so the shared repo does not accumulate refs.
-# Returning a leased copy can kill the pane's top-level shell. Close Herdr's
-# endpoint under its held focus lock first, as forced descendant cleanup does.
+# Both process reaping and Treehouse return can kill a leased pane's top-level
+# shell. Close Herdr's endpoint under its held focus lock before either runs.
 HERDR_PRESENTATION_JOURNAL="$STATE/$ID.herdr-presentation"
 # teardown_herdr_journal_orphaned: true when the task's own journal names
 # nothing the session-start sweep could still close - a version 1 attempt whose
@@ -3628,6 +3618,20 @@ if [ "$BACKEND" = herdr ]; then
   fi
 fi
 
+# Fix 2 (see script header): reap descendants only after Herdr's exact pane
+# close is confirmed, before any branch deletion or copy return. Otherwise
+# killing the pane shell steals focus before the close can snapshot it.
+if [ "$KIND" != secondmate ] && teardown_owns_worktree; then
+  reap_task_worktree_processes worktree "$WT" "$TASK_TMP"
+elif [ "$KIND" != secondmate ]; then
+  reap_task_worktree_processes tasktmp "$TASK_TMP"
+fi
+
+# Fix 3 (see script header): sweep remote job workers abandoned by an already
+# pruned code root. Best effort - a sweep failure never blocks this teardown.
+"$SCRIPT_DIR/fm-remote-job-reap-orphans.sh" >&2 || true
+
+# Best-effort: drop the local task branch so the shared repo does not accumulate refs.
 if [ "$BACKEND" = orca ] && [ "$KIND" != secondmate ]; then
   if [ "$ORCA_PATH_MATCH_VERIFIED" != 1 ]; then
     require_orca_worktree_path_match_if_present "$ORCA_WORKTREE_ID" "$WT" || exit 1
