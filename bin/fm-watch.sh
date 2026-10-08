@@ -123,14 +123,17 @@
 #                          status, unless afk is active
 #   check: ready work waiting with free lane slots: (<open>/<target> open): <ids> - start the top ready item now, or record why it waits
 #   check: ready work waiting with no worker working: <ids> - start each or record why it waits
-#                          a secondmate home's heartbeat found dispatchable
+#                          a secondmate home's base-cadence scan found dispatchable
 #                          queued work (fm-tasks-axi.sh ready) while the home sits
 #                          below its lane floor: with config/lane-target naming a
 #                          positive integer, fewer open lanes than that target;
 #                          otherwise (no usable target, or at least that many
 #                          open lanes), none of its workers is provably working.
 #                          Re-raised while the condition holds, once per
-#                          new ready set and then every READY_WORK_RESURFACE_SECS
+#                          new ready set and then every READY_WORK_RESURFACE_SECS;
+#                          intake uses HEARTBEAT's base interval, never its backoff
+# Local queue reminder semantics, including decision-signal normalization:
+# docs/watcher-continuity.md, "Durable queue and turn-end backstop".
 #   check: inactive-outcome bounded poll-loop reconciliation found a suspicious
 #                          inactive terminal outcome that still lacks its durable
 #                          upstream receipt
@@ -1141,13 +1144,66 @@ EOF
 # shellcheck source=bin/fm-host-memory-sampler.sh
 . "$SCRIPT_DIR/fm-host-memory-sampler.sh"
 
+# Publication and acknowledgement remain the sampler and drain's jobs. A
+# delivered row must not immediately close the successor before it can prove
+# continuity; the own-queue backstop below re-rings an unhandled row later.
+host_memory_surface_after_output() {
+  local status=$1
+  if [ "$status" -eq 0 ]; then
+    printf '%s\n' "$HOST_MEMORY_SURFACED" > "$STATE/.host-memory-surfaced" || status=1
+  fi
+  fm_lock_release "$FM_WAKE_QUEUE_LOCK" || status=1
+  return "$status"
+}
+
 host_memory_surface_queued() {
-  local reason
+  local row reason
   [ -s "$FM_WAKE_QUEUE" ] || return 0
   fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || return 1
-  reason=$(awk -F '\t' '$3 == "check" && $4 == "host-memory" { reason=$5 } END { if (reason != "") print reason }' "$FM_WAKE_QUEUE")
-  fm_lock_release "$FM_WAKE_QUEUE_LOCK"
-  [ -z "$reason" ] || wake "$reason"
+  row=$(awk -F '\t' '$3 == "check" && $4 == "host-memory" { row=$0 } END { if (row != "") print row }' "$FM_WAKE_QUEUE")
+  HOST_MEMORY_SURFACED=$(printf '%s\n' "$row" | cut -f1,2)
+  if [ -z "$row" ] || [ "$HOST_MEMORY_SURFACED" = "$(cat "$STATE/.host-memory-surfaced" 2>/dev/null)" ]; then
+    fm_lock_release "$FM_WAKE_QUEUE_LOCK"
+    return 0
+  fi
+  reason=$(printf '%s\n' "$row" | cut -f5-)
+  # shellcheck disable=SC2034 # Consumed by wake() in the separately linted transition owner.
+  FM_WAKE_POST_OUTPUT_ACTION=host_memory_surface_after_output
+  wake "$reason"
+}
+
+# Re-deliver the oldest unhandled local wake on a bounded cadence, without
+# adding a duplicate queue row or consuming it. This survives watcher cycles,
+# excludes declared external waits, and defers rows a live branch is handling.
+# The ordinary arm owner delivers the reason, never a synthetic keyboard ring.
+own_queue_resurface() {
+  local row epoch seq kind key reason now previous observed_at observed_key row_key idle
+  row=$(secondmate_oldest_queue_row "$FM_WAKE_QUEUE")
+  if [ -z "$row" ]; then
+    rm -f "$STATE/.own-wake-progress"
+    return 0
+  fi
+  IFS=$'\t' read -r epoch seq kind key reason <<EOF
+$row
+EOF
+  row_key="$epoch-$seq"
+  fm_epoch_seconds_to now
+  previous=$(cat "$STATE/.own-wake-progress" 2>/dev/null) || previous=
+  observed_at=${previous%%$'\t'*}
+  observed_key=${previous#*$'\t'}
+  case "$observed_at" in ''|*[!0-9]*) observed_at=$now; observed_key= ;; esac
+  if [ "$observed_key" != "$row_key" ] || [ "$now" -lt "$observed_at" ]; then
+    printf '%s\t%s\n' "$now" "$row_key" > "$STATE/.own-wake-progress" || return 1
+    return 0
+  fi
+  idle=$((now - observed_at))
+  [ "$idle" -ge "$SECONDMATE_WAKE_STALL_SECS" ] || return 0
+  secondmate_in_active_turn '' "$idle" "$FM_HOME" "$seq" && return 0
+  printf '%s\t%s\n' "$now" "$row_key" > "$STATE/.own-wake-progress" || return 1
+  case "$kind:$reason" in
+    signal:needs-decision:*) reason="signal:${reason#needs-decision:}" ;;
+  esac
+  wake "$reason"
 }
 
 secondmate_liveness_tick() {
@@ -2510,7 +2566,7 @@ warn_invalid_lane_target_once() {
   triage_log "lane-target is not a positive integer; using the no-worker-working rule instead"
 }
 
-# Heartbeat idle-lead check: 0 when this is a secondmate home, its backlog has
+# Base-cadence idle-lead check: 0 when this is a secondmate home, its backlog has
 # dispatchable queued work, and the home sits below its lane floor. With
 # config/lane-target naming a positive integer N, the floor is fewer than N open
 # lanes, and a home with working workers but free slots is exactly the 5 Oct
@@ -2520,8 +2576,8 @@ warn_invalid_lane_target_once() {
 # that still holds re-raises on READY_WORK_RESURFACE_SECS; a new ready set
 # fires at once. Sets
 # READY_WORK_IDS and READY_WORK_REASON. An empty ready set forgets the last one so
-# the same work surfaces again if it returns. A lead below its floor with ready
-# work otherwise has no trigger: an absorbed heartbeat never reads the backlog.
+# the same work surfaces again if it returns. Intake is independent of the
+# heartbeat's idle backoff and runs before an away heartbeat can exit.
 ready_work_waits_idle() {
   local meta task target open now surfaced surfaced_at surfaced_ids
   READY_WORK_IDS=
@@ -2951,6 +3007,7 @@ while :; do
 
   fm_memory_sampler_ensure || triage_log "host memory sampler failed to restart"
   host_memory_surface_queued
+  own_queue_resurface || { echo "watcher: own wake-queue observation failed" >&2; exit 1; }
 
   # Liveness beacon for fm-guard.sh: a fresh mtime here means a watcher is
   # alive. Supervision scripts warn when this goes stale with tasks in flight.
@@ -3521,6 +3578,18 @@ EOF
   # classification escalates forever.
   phantom_pane_prune
 
+  # Ready intake must not inherit idle heartbeat backoff (up to two hours),
+  # nor be starved by away-mode heartbeats. Keep its base cadence independent.
+  if [ "$(age_of "$STATE/.last-ready-work-check")" -ge "$HEARTBEAT" ]; then
+    touch "$STATE/.last-ready-work-check"
+    if ready_work_waits_idle; then
+      reason=$READY_WORK_REASON
+      fm_wake_append check ready-work "$reason" || exit 1
+      record_ready_work_surfaced
+      wake "$reason"
+    fi
+  fi
+
   # Heartbeat: the watcher runs a cheap fleet-scan at a regular cadence no matter
   # what. Time-based via .last-heartbeat mtime; interval doubles per consecutive
   # no-change heartbeat (idle fleet) up to HEARTBEAT_MAX, and resets on any
@@ -3548,12 +3617,6 @@ EOF
       touch "$STATE/.last-heartbeat"
       mark_all_captain_relevant_surfaced || true
       wake "heartbeat"
-    elif ready_work_waits_idle; then
-      reason=$READY_WORK_REASON
-      fm_wake_append check ready-work "$reason" || exit 1
-      touch "$STATE/.last-heartbeat"
-      record_ready_work_surfaced
-      wake "$reason"
     else
       if ! mark_all_captain_relevant_surfaced; then
         fm_wake_append heartbeat heartbeat heartbeat || exit 1

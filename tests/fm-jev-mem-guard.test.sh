@@ -153,6 +153,14 @@ test_watcher_wakes_once_per_alert_episode() {
   assert_contains "$(cat "$case/state/host-memory-interrupts.tsv")" 'automatically interrupted task big-build' "the interrupt outcome is durable"
   assert_contains "$out" 'automatic interrupt attempted: task big-build' "Main receives the interrupt reason and task"
 
+  # A handling successor starts BEFORE acknowledgement. The same queued alert
+  # must not close it before its owner can establish continuity and drain it.
+  FM_WATCH_HANDLING_SUCCESSOR=1 watch_leg "$case" successor
+  wait_rows "$case/state/host-memory.tsv" 2
+  is_live_non_zombie "$LEG_PID" || fail "unacknowledged alert killed the handling successor: $(cat "$case/watch-successor.out")"
+  [ ! -s "$case/watch-successor.out" ] || fail "the handling successor re-delivered the queued alert"
+  kill -TERM "$LEG_PID" 2>/dev/null; wait_for_exit "$LEG_PID" 50 >/dev/null || true
+
   # Still under alert: the episode is latched, so the next watcher stays quiet.
   drain_and_ack "$case"
   watch_leg "$case" latched

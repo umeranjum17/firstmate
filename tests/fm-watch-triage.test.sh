@@ -6303,6 +6303,14 @@ test_heartbeat_wakes_an_idle_lead_with_ready_work() {
   FM_HOME="$dir" "$tasks" add gamma "blocked item" --blocked-by alpha-one >/dev/null || fail "fixture: could not queue gamma"
   expected="check: ready work waiting with no worker working: alpha-one beta-two - start each or record why it waits"
 
+  # An idle heartbeat has backed off for hours, but ready work must still use
+  # the base cadence. Held and future-dated work is not dispatchable.
+  FM_HOME="$dir" "$tasks" add held-one "held item" >/dev/null || fail "could not add held item"
+  FM_HOME="$dir" "$tasks" hold held-one --reason "waiting for approval" >/dev/null || fail "could not hold item"
+  FM_HOME="$dir" "$tasks" add future-one "future item" >/dev/null || fail "could not add future item"
+  FM_HOME="$dir" "$tasks" hold future-one --reason "scheduled later" --until 2099-01-01 --kind future >/dev/null || fail "could not date item"
+  echo 12 > "$state/.heartbeat-streak"
+  touch "$state/.last-heartbeat"
   watch_bg "$state" "$fakebin" "$out" env FM_HOME="$dir" FM_HEARTBEAT=1
   pid=$!
   wait_for_exit "$pid" 100 || { reap "$pid"; fail "an idle lead with ready work was not woken"; }
@@ -7105,6 +7113,65 @@ test_uncertain_read_keeps_phantom_state() {
   pass "an uncertain backend read never prunes a vanished pane's state"
 }
 
+test_own_queue_redelivers_without_churning_successors() {
+  local dir state fakebin out pid now original status_file decision_original drain_out
+  dir=$(make_case own-queue); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
+  now=$(date +%s)
+  original=$(printf '%s\t1\tcheck\tlocal-alert\tcheck: local alert needs handling' "$now")
+  printf '%s\n' "$original" > "$state/.wake-queue"
+  FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-wake-grant.sh" activate "$$" own-queue >/dev/null || fail "could not activate branch grant"
+  FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-wake-grant.sh" publish own-queue 1 >/dev/null || fail "could not publish branch grant"
+  printf '%s\t%s-1\n' "$((now - 10))" "$now" > "$state/.own-wake-progress"
+  watch_bg "$state" "$fakebin" "$out" env FM_HOME="$dir" FM_WATCH_HANDLING_SUCCESSOR=1 FM_SECONDMATE_WAKE_STALL_SECS=1
+  pid=$!
+  wait_poll_cycle "$state" "$pid" || { reap "$pid"; fail "a live branch grant was re-delivered to main"; }
+  reap "$pid"
+  FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-wake-grant.sh" deactivate "$$" own-queue >/dev/null || fail "could not release branch grant"
+  rm -f "$state/.own-wake-progress"
+  # A handling successor must first establish continuity, then re-deliver a
+  # still-unacknowledged row after a bounded interval, without duplicating it.
+  watch_bg "$state" "$fakebin" "$out" env FM_HOME="$dir" FM_WATCH_HANDLING_SUCCESSOR=1 FM_SECONDMATE_WAKE_STALL_SECS=3
+  pid=$!
+  wait_poll_cycle "$state" "$pid" || { reap "$pid"; fail "a pending local wake churned the handling successor"; }
+  wait_for_exit "$pid" 150 || { reap "$pid"; fail "an unhandled local wake never re-surfaced"; }
+  grep -Fx 'check: local alert needs handling' "$out" >/dev/null || fail "the local wake lost its original reason"
+  [ "$(cat "$state/.wake-queue")" = "$original" ] || fail "re-delivery mutated or duplicated the pending row"
+  # The persisted progress timer gives another successor room to run even
+  # though the same queue row has not yet been acknowledged.
+  watch_bg "$state" "$fakebin" "$out" env FM_HOME="$dir" FM_WATCH_HANDLING_SUCCESSOR=1 FM_SECONDMATE_WAKE_STALL_SECS=30
+  pid=$!
+  wait_poll_cycle "$state" "$pid" || { reap "$pid"; fail "re-delivery immediately closed the next successor"; }
+  reap "$pid"
+  ack_stopped_cycle "$state" >/dev/null 2>&1 || fail "could not acknowledge the local wake"
+  watch_bg "$state" "$fakebin" "$out" env FM_HOME="$dir" FM_WATCH_HANDLING_SUCCESSOR=1 FM_SECONDMATE_WAKE_STALL_SECS=1
+  pid=$!
+  wait_poll_cycle "$state" "$pid" || { reap "$pid"; fail "an acknowledged wake was re-delivered"; }
+  [ ! -s "$out" ] || fail "the empty local queue produced a wake"
+  reap "$pid"
+  status_file="$state/task.status"; drain_out="$dir/decision.drain.out"
+  printf 'needs-decision: choose the release target\n' > "$status_file"
+  watch_bg "$state" "$fakebin" "$out" env FM_HOME="$dir" FM_WATCH_HANDLING_SUCCESSOR=1
+  pid=$!
+  wait_for_exit "$pid" 100 || { reap "$pid"; fail "the decision signal did not wake main"; }
+  decision_original=$(cat "$state/.wake-queue")
+  grep -F "$(printf 'signal\ttask.status\tneeds-decision:')" "$state/.wake-queue" >/dev/null \
+    || fail "the decision signal lost its durable branch-exclusion marker"
+  rm -f "$state/.own-wake-progress"
+  watch_bg "$state" "$fakebin" "$out" env FM_HOME="$dir" FM_WATCH_HANDLING_SUCCESSOR=1 FM_SECONDMATE_WAKE_STALL_SECS=3
+  pid=$!
+  wait_poll_cycle "$state" "$pid" || { reap "$pid"; fail "the decision immediately churned its handling successor"; }
+  wait_for_exit "$pid" 150 || { reap "$pid"; fail "the unhandled decision never re-surfaced"; }
+  grep -Fx "signal: $status_file" "$out" >/dev/null || fail "the decision reminder was not a supported signal wake"
+  [ "$(cat "$state/.wake-queue")" = "$decision_original" ] || fail "the decision reminder changed the durable row"
+  FM_STATE_OVERRIDE="$state" "$DRAIN" > "$drain_out" 2>/dev/null || fail "the decision reminder could not be drained"
+  grep -F "$(printf 'signal\ttask.status\tneeds-decision:')" "$drain_out" >/dev/null \
+    || fail "the drain lost the decision marker"
+  [ "$(cat "$state/.wake-queue")" = "$decision_original" ] || fail "draining consumed the unacknowledged decision"
+  ack_stopped_cycle "$state" >/dev/null 2>&1 || fail "could not acknowledge the decision reminder"
+  [ ! -s "$state/.wake-queue" ] || fail "the acknowledged decision remained queued"
+  pass "local queue reminders preserve decision markers and end on acknowledgement"
+}
+
 # CI's stock macOS Bash lane sets FM_TEST_ONLY to run just the bash-3.2
 # churn-deferral regression. The rest of this file is not a 3.2 snapshot suite.
 if [ -n "${FM_TEST_ONLY:-}" ]; then
@@ -7240,6 +7307,7 @@ test_procevent_launch_failed_episodes_are_each_delivered
 test_procevent_surface_serializes_with_drain
 test_procevent_surface_crash_boundaries
 test_procevent_marker_failure_exits_and_replays
+test_own_queue_redelivers_without_churning_successors
 test_heartbeat_no_change_absorbed
 test_heartbeat_backstop_surfaces_unsurfaced_status
 test_heartbeat_backstop_surfaces_a_masked_status
