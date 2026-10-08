@@ -16,10 +16,13 @@ TRIPWIRES="$TMP_ROOT/tripwires"
 mkdir -p "$FAKE_STATE" "$FAKE_HOME"
 : > "$FAKE_LOG"
 cleanup() {
-  local pointer
+  local pointer base name
   for pointer in "$TRIPWIRES"/*.xdg-root; do
     [ -f "$pointer" ] || continue
-    rm -rf "$(<"$pointer")"
+    name=${pointer##*/}
+    name=${name%.xdg-root}
+    base=$(FM_HERDR_LAB_STATE_DIR="$TRIPWIRES" bash -c '. "$1"; fm_herdr_lab_xdg_base "$2"' _ "$ROOT/bin/fm-herdr-lab.sh" "$name") || continue
+    rm -rf "$base"
   done
   fm_test_cleanup
 }
@@ -214,7 +217,7 @@ test_explicit_fleet_home_preserves_private_runtime() {
   XDG_CONFIG_HOME="$TMP_ROOT/wrong-config" lab_cli --isolated-xdg provision "$name" \
     || fail "explicit fleet HOME did not observe actual default"
   lab_cli --isolated-xdg run "$name" plugin link "$plugin" >/dev/null || fail "private runtime failed"
-  assert_contains "$(cat "$FAKE_LOG")" "HOME=$FAKE_HOME" "runtime adopted fleet HOME"
+  assert_contains "$(cat "$FAKE_LOG")" "HOME=$(<"$TRIPWIRES/$name.xdg-root")/home" "runtime inherited caller HOME"
   assert_present "$(<"$TRIPWIRES/$name.xdg-root")/config/herdr/plugins/home-plugin.link" "runtime adopted fleet XDG"
   assert_absent "$fleet/.config/herdr/plugins/home-plugin.link" "runtime wrote fleet plugin registry"
   lab_cli --isolated-xdg stop "$name" || fail "guarded stop failed"
@@ -238,7 +241,7 @@ test_invalid_fleet_home_refuses() {
     if out=$(FM_HERDR_LAB_FLEET_HOME="$value" lab_cli --isolated-xdg provision "$name" 2>&1); then
       fail "invalid fleet HOME provision succeeded"
     fi
-    assert_contains "$out" "cannot list Herdr sessions" "invalid context did not refuse before provisioning"
+    assert_contains "$out" "cannot read Herdr sessions for the fleet-state tripwire" "invalid fleet context did not refuse before provisioning"
     if rg -q '^server |^session stop |^session delete ' "$FAKE_LOG"; then
       fail "invalid fleet HOME reached lifecycle mutation"
     fi

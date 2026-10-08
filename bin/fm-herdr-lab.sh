@@ -18,11 +18,8 @@
 # Teardown removes both the directory and pointer without copying credentials.
 # --isolated-xdg and FM_HERDR_LAB_ISOLATED_XDG=1 remain accepted for compatibility.
 # The fleet-state tripwire reads with the caller's HOME and XDG environment.
-# Existing signed-in tests may explicitly supply their own scratch runtime HOME
-# and set FM_HERDR_LAB_FLEET_HOME to the existing absolute fleet home for
+# FM_HERDR_LAB_FLEET_HOME selects only the existing absolute fleet home for
 # read-only fleet queries using its default XDG paths.
-# That opt-in retains the caller's scratch HOME, never the fleet HOME, while
-# XDG paths still belong to the lab.
 # Session names must begin with "fm-lab-" and can never be "default".
 # The name command sanitizes the label, caps it at 16 characters, and appends
 # process/random suffixes to keep generated socket paths short.
@@ -71,60 +68,92 @@ fm_herdr_lab_tripwire_path() { # <session>
   printf '%s/%s.fleet-state.json' "$(fm_herdr_lab_state_dir)" "$1"
 }
 
-fm_herdr_lab_xdg_base() { # <session>
-  local pointer
-  pointer="$(fm_herdr_lab_state_dir)/$1.xdg-root"
-  if [ -f "$pointer" ]; then
-    cat "$pointer"
-  else
-    printf '%s/%s.xdg' "$(fm_herdr_lab_state_dir)" "$1"
+fm_herdr_lab_private_dir() {
+  local mode
+  [ -d "$1" ] && [ ! -L "$1" ] && [ -O "$1" ] || return 1
+  case "$(uname -s)" in
+    Darwin) mode=$(stat -f '%Lp' "$1") || return 1 ;;
+    *) mode=$(stat -c '%a' "$1") || return 1 ;;
+  esac
+  [ "$mode" = 700 ]
+}
+
+fm_herdr_lab_ensure_state() {
+  local dir
+  dir=$(fm_herdr_lab_state_dir)
+  if [ ! -e "$dir" ] && [ ! -L "$dir" ]; then
+    (umask 077; mkdir -p "$dir") || return 1
   fi
+  fm_herdr_lab_private_dir "$dir" || {
+    fm_herdr_lab_error "lab state must be an owned, non-symlink directory with mode 700: $dir"
+    return 1
+  }
+}
+
+fm_herdr_lab_xdg_base() { # <session>
+  local pointer base
+  fm_herdr_lab_validate_name "$1" || return 1
+  fm_herdr_lab_ensure_state || return 1
+  pointer="$(fm_herdr_lab_state_dir)/$1.xdg-root"
+  [ -f "$pointer" ] && [ ! -L "$pointer" ] && [ -O "$pointer" ] || {
+    fm_herdr_lab_error "missing or unsafe disposable root for '$1'; fresh provisioning required"
+    return 1
+  }
+  base=$(cat "$pointer") || return 1
+  [[ "$base" =~ ^/tmp/fhl\.[a-zA-Z0-9]{6}$ ]] && fm_herdr_lab_private_dir "$base" \
+    && [ -f "$base/.lab-session" ] && [ ! -L "$base/.lab-session" ] \
+    && [ "$(cat "$base/.lab-session")" = "$1" ] || {
+    fm_herdr_lab_error "invalid disposable root identity for '$1'"
+    return 1
+  }
+  printf '%s' "$base"
 }
 
 # Prints the session's isolated base after creating its disposable directories.
 fm_herdr_lab_ensure_isolated_xdg() { # <session>
-  local base pointer
+  local base pointer sub
+  fm_herdr_lab_validate_name "$1" || return 1
+  fm_herdr_lab_ensure_state || return 1
   pointer="$(fm_herdr_lab_state_dir)/$1.xdg-root"
-  base=$(fm_herdr_lab_xdg_base "$1")
-  if [ ! -f "$pointer" ] && [ ! -d "$base" ]; then
-    mkdir -p "$(fm_herdr_lab_state_dir)" || return 1
-    # Herdr repeats the session name in its Unix socket path (108-byte limit).
+  if [ ! -e "$pointer" ] && [ ! -L "$pointer" ]; then
+    [ ! -e "$(fm_herdr_lab_state_dir)/$1.xdg" ] && [ ! -L "$(fm_herdr_lab_state_dir)/$1.xdg" ] || {
+      fm_herdr_lab_error "legacy XDG root for '$1'; guarded cleanup and fresh provisioning required"
+      return 1
+    }
     base=$(mktemp -d /tmp/fhl.XXXXXX) || return 1
-    if ! (set -o noclobber; printf '%s\n' "$base" > "$pointer") 2>/dev/null; then
+    printf '%s\n' "$1" > "$base/.lab-session" || return 1
+    if ! (umask 077; set -o noclobber; printf '%s\n' "$base" > "$pointer") 2>/dev/null; then
+      rm -f "$base/.lab-session"
       rmdir "$base"
-      base=$(fm_herdr_lab_xdg_base "$1")
     fi
   fi
-  mkdir -p "$base/home" "$base/config" "$base/data" "$base/state" "$base/cache" || {
+  base=$(fm_herdr_lab_xdg_base "$1") || return 1
+  for sub in home config data state cache; do
+    [ ! -L "$base/$sub" ] && { [ ! -e "$base/$sub" ] || fm_herdr_lab_private_dir "$base/$sub"; } || {
+      fm_herdr_lab_error "unsafe disposable directory: $base/$sub"
+      return 1
+    }
+  done
+  (umask 077; mkdir -p "$base/home" "$base/config" "$base/data" "$base/state" "$base/cache") || {
     fm_herdr_lab_error "cannot create isolated XDG directories under $base"
     return 1
   }
   printf '%s' "$base"
 }
 
-fm_herdr_lab_env() { # <session> <command...>
-  local name=$1
+fm_herdr_lab_env() ( # <session> <command...>
+  local name=$1 base key
   shift
-  if [ "${FM_HERDR_LAB_FLEET_QUERY:-0}" = 1 ]; then
-    HERDR_SESSION="$name" "$@"
-    return
-  fi
-  local base runtime_home
   base=$(fm_herdr_lab_ensure_isolated_xdg "$name") || return 1
-  runtime_home="$base/home"
-  if [ "${FM_HERDR_LAB_FLEET_HOME+x}" = x ]; then
-    runtime_home=$(cd "$HOME" && pwd -P) || return 1
-    local fleet_home
-    fleet_home=$(cd "$FM_HERDR_LAB_FLEET_HOME" && pwd -P) || return 1
-    [ "$runtime_home" != "$fleet_home" ] || {
-      fm_herdr_lab_error "explicit runtime HOME must differ from fleet HOME"
-      return 1
-    }
-  fi
-  HOME="$runtime_home" XDG_CONFIG_HOME="$base/config" XDG_DATA_HOME="$base/data" \
+  for key in $(compgen -e); do
+    case "$key" in CLAUDE_*|ANTHROPIC_*|PI_CODING_AGENT_DIR) unset "$key" || return 1 ;; esac
+  done
+  export HOME="$base/home" XDG_CONFIG_HOME="$base/config" XDG_DATA_HOME="$base/data" \
     XDG_STATE_HOME="$base/state" XDG_CACHE_HOME="$base/cache" \
-    HERDR_SESSION="$name" "$@"
-}
+    CLAUDE_CONFIG_DIR="$base/home/.claude" PI_CODING_AGENT_DIR="$base/home/.pi/agent" \
+    HERDR_SESSION="$name"
+  exec "$@"
+)
 
 fm_herdr_lab_exec() { # <session> <herdr arguments...>
   local name=$1
@@ -150,9 +179,6 @@ fm_herdr_lab_session_list() { # <session>
 
 # Fleet observation never changes the named runtime's HOME or XDG context.
 fm_herdr_lab_fleet_session_list() ( # <session>
-  # This override intentionally ends with the fleet-observation subshell.
-  # shellcheck disable=SC2030
-  local FM_HERDR_LAB_FLEET_QUERY=1
   if [ "${FM_HERDR_LAB_FLEET_HOME+x}" = x ]; then
     case "$FM_HERDR_LAB_FLEET_HOME" in
       /*) ;;
@@ -165,7 +191,7 @@ fm_herdr_lab_fleet_session_list() ( # <session>
     export HOME="$FM_HERDR_LAB_FLEET_HOME"
     unset XDG_CONFIG_HOME XDG_DATA_HOME XDG_STATE_HOME XDG_CACHE_HOME
   fi
-  fm_herdr_lab_session_list "$1"
+  HERDR_SESSION="$1" herdr session list --json --session "$1"
 )
 
 fm_herdr_lab_fleet_state() { # <session>
@@ -189,7 +215,7 @@ fm_herdr_lab_fleet_state() { # <session>
 }
 
 fm_herdr_lab_prepare() { # <session>
-  local name=$1 sessions state_dir tripwire
+  local name=$1 sessions tripwire
   fm_herdr_lab_validate_name "$name" || return 1
   command -v herdr >/dev/null 2>&1 || { fm_herdr_lab_error "herdr is required"; return 1; }
   command -v jq >/dev/null 2>&1 || { fm_herdr_lab_error "jq is required"; return 1; }
@@ -203,9 +229,8 @@ fm_herdr_lab_prepare() { # <session>
     return 1
   fi
 
-  state_dir=$(fm_herdr_lab_state_dir)
   tripwire=$(fm_herdr_lab_tripwire_path "$name")
-  mkdir -p "$state_dir" || return 1
+  fm_herdr_lab_ensure_state || return 1
   [ ! -e "$tripwire" ] || {
     fm_herdr_lab_error "tripwire already exists for '$name'; refusing ambiguous ownership"
     return 1
@@ -394,7 +419,7 @@ fm_herdr_lab_viewer_start() { # <session>
     trap 'trap - INT TERM; [ -z "${launcher_pid:-}" ] || fm_herdr_lab_cancel_viewer_launcher "$launcher_pid"; exit 130' INT
     trap 'trap - INT TERM; [ -z "${launcher_pid:-}" ] || fm_herdr_lab_cancel_viewer_launcher "$launcher_pid"; exit 143' TERM
   fi
-  fm_herdr_lab_env "$name" exec nohup python3 "$launcher" "$name" "$record" >"$log" 2>&1 &
+  fm_herdr_lab_env "$name" nohup python3 "$launcher" "$name" "$record" >"$log" 2>&1 &
   launcher_pid=$!
 
   waited=0
@@ -424,6 +449,7 @@ fm_herdr_lab_viewer_start() { # <session>
 fm_herdr_lab_viewer_stop() { # <session>
   local name=$1 record log role waited attempt reason timeout=$fm_herdr_lab_viewer_timeout_seconds
   fm_herdr_lab_validate_name "$name" || return 1
+  fm_herdr_lab_xdg_base "$name" >/dev/null || return 1
   record=$(fm_herdr_lab_viewer_record_path "$name")
   log=$(fm_herdr_lab_viewer_log_path "$name")
   # An absent record means this lab owns no viewer. Any client attached in that
@@ -550,6 +576,7 @@ fm_herdr_lab_provision() { # <session>
 
 fm_herdr_lab_check_tripwire() { # <session>
   local name=$1 tripwire before after
+  fm_herdr_lab_ensure_state || return 1
   tripwire=$(fm_herdr_lab_tripwire_path "$name")
   [ -f "$tripwire" ] || {
     fm_herdr_lab_error "missing fleet-state tripwire for '$name'; refusing unverified teardown"
@@ -585,8 +612,9 @@ fm_herdr_lab_stop() { # <session>
 }
 
 fm_herdr_lab_teardown() { # <session>
-  local name=$1 tripwire sessions delete_status=0
+  local name=$1 tripwire sessions base delete_status=0
   fm_herdr_lab_validate_name "$name" || return 1
+  base=$(fm_herdr_lab_xdg_base "$name") || return 1
   tripwire=$(fm_herdr_lab_tripwire_path "$name")
   [ -f "$tripwire" ] || {
     fm_herdr_lab_error "missing fleet-state tripwire for '$name'; refusing destructive calls"
@@ -602,7 +630,7 @@ fm_herdr_lab_teardown() { # <session>
   }
   if ! printf '%s' "$sessions" | jq -e --arg name "$name" '.sessions[]? | select(.name == $name)' >/dev/null 2>&1; then
     fm_herdr_lab_verify_tripwire "$name" || return 1
-    rm -rf "$(fm_herdr_lab_xdg_base "$name")"
+    rm -rf "$base"
     rm -f "$(fm_herdr_lab_state_dir)/$name.xdg-root"
     return
   fi
@@ -623,7 +651,7 @@ fm_herdr_lab_teardown() { # <session>
     return 1
   fi
   fm_herdr_lab_verify_tripwire "$name" || return 1
-  rm -rf "$(fm_herdr_lab_xdg_base "$name")"
+  rm -rf "$base"
   rm -f "$(fm_herdr_lab_state_dir)/$name.xdg-root"
 }
 

@@ -1183,12 +1183,12 @@ No ambient `herdr server stop` command is a supported test operation.
 Verified 2026-10-08 on Linux with Herdr 0.9.1 (protocol 22): a real pane created through the guarded lab helper reported disposable HOME and config/data/state/cache XDG paths, wrote a tool marker only into its disposable `$HOME/.local/bin`, and retained no inherited credential directories.
 The existing restored-shell journey also passed, and teardown removed the disposable root with the default-session tripwire unchanged.
 The short root kept the observed named-session socket at 86 bytes with a maximum-length generated label, and a real foreground viewer started and stopped successfully in the same disposable environment.
-This is environment isolation, not an operating-system filesystem sandbox; the existing explicit signed-in-test opt-in remains separate.
+This is environment isolation, not an operating-system filesystem sandbox. Runtime HOME always belongs to the lab, including when FM_HERDR_LAB_FLEET_HOME selects a different home for read-only fleet observation. Claude and Pi credential roots belong to scratch HOME; inherited Claude/Anthropic environment overrides are removed. State must be owned, non-symlink, and mode 700; persisted roots must be private /tmp/fhl.* directories carrying the matching session identity. Legacy .xdg roots and roots without that identity are refused pending guarded cleanup and fresh provisioning; no signed-in runtime opt-in is supported.
 Refresh the evidence with:
 
 ```sh
 bash bin/fm-test-run.sh tests/fm-herdr-session-cleanup-e2e.test.sh
-# ok - real lab pane has disposable HOME and XDG paths; HOME-local tool writes do not touch caller HOME
+# ok - real lab pane has disposable HOME, XDG and credential roots without inherited authentication
 # evidence: herdr=0.9.1 protocol=22 default-session-tripwire=armed
 ```
 

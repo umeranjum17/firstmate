@@ -38,7 +38,53 @@ cleanup() {
   exit "$status"
 }
 trap cleanup EXIT
-"$HERDR_LAB_HELPER" provision "$HERDR_LAB_SESSION"
+reject_lab() {
+  if "$HERDR_LAB_HELPER" "$@" > "$TMP_ROOT/refusal.txt" 2>&1; then
+    fail "unsafe lab operation succeeded: $*"
+  fi
+}
+mkdir -m 755 "$FM_HERDR_LAB_STATE_DIR"
+reject_lab provision "$HERDR_LAB_SESSION"
+chmod 700 "$FM_HERDR_LAB_STATE_DIR"
+mv "$FM_HERDR_LAB_STATE_DIR" "$TMP_ROOT/private-state"
+ln -s "$TMP_ROOT/private-state" "$FM_HERDR_LAB_STATE_DIR"
+reject_lab provision "$HERDR_LAB_SESSION"
+rm "$FM_HERDR_LAB_STATE_DIR"
+mv "$TMP_ROOT/private-state" "$FM_HERDR_LAB_STATE_DIR"
+mkdir "$FM_HERDR_LAB_STATE_DIR/$HERDR_LAB_SESSION.xdg"
+for action in prepare provision 'run status --json' 'viewer start' 'viewer stop' stop teardown; do
+  case "$action" in
+    'run status --json') reject_lab run "$HERDR_LAB_SESSION" status --json ;;
+    'viewer start') reject_lab viewer start "$HERDR_LAB_SESSION" ;;
+    'viewer stop') reject_lab viewer stop "$HERDR_LAB_SESSION" ;;
+    *) reject_lab "$action" "$HERDR_LAB_SESSION" ;;
+  esac
+done
+rmdir "$FM_HERDR_LAB_STATE_DIR/$HERDR_LAB_SESSION.xdg"
+export CLAUDE_CONFIG_DIR="$HOME_DIR/owner-claude" PI_CODING_AGENT_DIR="$HOME_DIR/owner-pi"
+export ANTHROPIC_API_KEY=lab-synthetic-key ANTHROPIC_AUTH_TOKEN=lab-synthetic-token
+export CLAUDE_CODE_OAUTH_TOKEN=lab-synthetic-oauth CLAUDE_CODE_USE_BEDROCK=1
+export FM_HERDR_LAB_FLEET_HOME="$CALLER_HOME" FM_HERDR_LAB_FLEET_QUERY=1
+"$HERDR_LAB_HELPER" provision "$HERDR_LAB_SESSION" || fail 'could not provision isolated lab'
+LAB_BASE=$(<"$FM_HERDR_LAB_STATE_DIR/$HERDR_LAB_SESSION.xdg-root")
+printf '%s\n' "$HOME_DIR" > "$FM_HERDR_LAB_STATE_DIR/$HERDR_LAB_SESSION.xdg-root"
+for action in prepare provision run stop teardown; do
+  if [ "$action" = run ]; then
+    reject_lab run "$HERDR_LAB_SESSION" status --json
+  else
+    reject_lab "$action" "$HERDR_LAB_SESSION"
+  fi
+done
+reject_lab viewer start "$HERDR_LAB_SESSION"
+reject_lab viewer stop "$HERDR_LAB_SESSION"
+[ -f "$HOME_DIR/config/backend" ] || fail 'invalid pointer deleted unrelated home'
+printf '%s\n' "$LAB_BASE" > "$FM_HERDR_LAB_STATE_DIR/$HERDR_LAB_SESSION.xdg-root"
+mv "$LAB_BASE/config" "$LAB_BASE/saved-config"
+ln -s "$HOME_DIR" "$LAB_BASE/config"
+reject_lab run "$HERDR_LAB_SESSION" status --json
+rm "$LAB_BASE/config"
+mv "$LAB_BASE/saved-config" "$LAB_BASE/config"
+pass 'real helper rejects public state, state symlinks, legacy roots and redirected disposable roots'
 
 # Keep the lab helper as the only CLI transport. Production adapter calls have
 # already appended the exact session; this shim strips that pair, refuses every
@@ -86,7 +132,7 @@ ANCHOR=$(lab workspace create --cwd "$ROOT" --label captain-anchor --focus) || f
 ANCHOR_TAB=$(printf '%s' "$ANCHOR" | jq -r '.result.tab.tab_id')
 ANCHOR_PANE=$(printf '%s' "$ANCHOR" | jq -r '.result.root_pane.pane_id')
 HOME_PROOF="$TMP_ROOT/pane-home.txt"
-lab pane run "$ANCHOR_PANE" "printf '%s\\n' \"\$HOME\" \"\$XDG_CONFIG_HOME\" \"\$XDG_DATA_HOME\" \"\$XDG_STATE_HOME\" \"\$XDG_CACHE_HOME\" > '$HOME_PROOF'" >/dev/null \
+lab pane run "$ANCHOR_PANE" "printf '%s\\n' \"\$HOME\" \"\$XDG_CONFIG_HOME\" \"\$XDG_DATA_HOME\" \"\$XDG_STATE_HOME\" \"\$XDG_CACHE_HOME\" \"\$CLAUDE_CONFIG_DIR\" \"\$PI_CODING_AGENT_DIR\" \"\${ANTHROPIC_API_KEY-unset}\" \"\${ANTHROPIC_AUTH_TOKEN-unset}\" \"\${CLAUDE_CODE_OAUTH_TOKEN-unset}\" \"\${CLAUDE_CODE_USE_BEDROCK-unset}\" > '$HOME_PROOF'" >/dev/null \
   || fail 'could not request lab pane HOME evidence'
 attempt=0
 while [ ! -s "$HOME_PROOF" ] && [ "$attempt" -lt 100 ]; do
@@ -100,7 +146,8 @@ printf 'evidence: socket_path=%s bytes=%s\n' "$SOCKET_PATH" "${#SOCKET_PATH}"
 [ "${#SOCKET_PATH}" -lt 100 ] || fail 'lab socket path is not safely below Unix socket capacity'
 [ "$(head -n 1 "$HOME_PROOF")" = "$LAB_BASE/home" ] || fail 'lab pane HOME is not its disposable home'
 [ "$(head -n 1 "$HOME_PROOF")" != "$CALLER_HOME" ] || fail 'lab pane inherited caller HOME'
-printf '%s\n' "$LAB_BASE/home" "$LAB_BASE/config" "$LAB_BASE/data" "$LAB_BASE/state" "$LAB_BASE/cache" > "$TMP_ROOT/expected-home.txt"
+printf '%s\n' "$LAB_BASE/home" "$LAB_BASE/config" "$LAB_BASE/data" "$LAB_BASE/state" "$LAB_BASE/cache" \
+  "$LAB_BASE/home/.claude" "$LAB_BASE/home/.pi/agent" unset unset unset unset > "$TMP_ROOT/expected-home.txt"
 cmp -s "$HOME_PROOF" "$TMP_ROOT/expected-home.txt" || fail 'lab pane HOME and XDG paths are inconsistent'
 HOME_MARKER="fm-lab-home-proof-$HERDR_LAB_SESSION"
 [ ! -e "$CALLER_HOME/.local/bin/$HOME_MARKER" ] || fail 'caller marker already exists'
@@ -116,7 +163,9 @@ done
 for credentials in .claude .codex .pi .config; do
   [ ! -e "$LAB_BASE/home/$credentials" ] || fail 'lab HOME contains inherited configuration or credentials'
 done
-pass 'real lab pane has disposable HOME and XDG paths; HOME-local tool writes do not touch caller HOME'
+pass 'real lab pane has disposable HOME, XDG and credential roots without inherited authentication'
+"$HERDR_LAB_HELPER" viewer start "$HERDR_LAB_SESSION" || fail 'isolated viewer start failed'
+"$HERDR_LAB_HELPER" viewer stop "$HERDR_LAB_SESSION" || fail 'isolated viewer stop failed'
 TOKEN=AbCdEfGhIjKlMnOpQrStUv
 ID=restored-idle-shell
 TITLE="└ $ID · p:$TOKEN"

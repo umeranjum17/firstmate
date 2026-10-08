@@ -15,10 +15,13 @@ mkdir -p "$FAKE_STATE"
 printf '%s\n' '/home/test/.config/herdr/herdr.sock' > "$FAKE_STATE/default-socket"
 : > "$FAKE_LOG"
 cleanup() {
-  local pointer
+  local pointer base name
   for pointer in "$TRIPWIRES"/*.xdg-root; do
     [ -f "$pointer" ] || continue
-    rm -rf "$(<"$pointer")"
+    name=${pointer##*/}
+    name=${name%.xdg-root}
+    base=$(FM_HERDR_LAB_STATE_DIR="$TRIPWIRES" bash -c '. "$1"; fm_herdr_lab_xdg_base "$2"' _ "$ROOT/bin/fm-herdr-lab.sh" "$name") || continue
+    rm -rf "$base"
   done
   fm_test_cleanup
 }
