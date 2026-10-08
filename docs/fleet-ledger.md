@@ -74,6 +74,12 @@ Example:
   To truncate it, stop reading, then empty it with `: > state/fleet-ledger.jsonl`; later records append to the empty file.
 - The ledger copies status text verbatim from the home's `state/` directory and adds no scrubbing, so give its readers exactly the trust you give `state/`.
 
+## Reading lifecycle metrics
+
+[`fm-flow.sh`](../bin/fm-flow.sh) reads retained fleet records into lifecycle, queue-reason, and bottleneck metrics; its header owns usage, output interpretation, timestamp provenance, and uncertainty limits.
+It is a standalone JSON reader, not an addition to the pages served by `fm-dashboard.sh`.
+The real CLI regression journey is [`tests/fm-flow.test.sh`](../tests/fm-flow.test.sh).
+
 ## Not included
 
 These are possible follow-ups, deliberately left out of this version:
