@@ -553,7 +553,7 @@ test_failed_alert_publication() {
       wait
     " _ "$ROOT")
   mkdir "$case/state/.wake-queue.seq"
-  for attempt in 1 2; do
+  for ((attempt=1; attempt<=2; attempt++)); do
     "${tick[@]}" 2> "$case/tick.err" || fail "failed publication stopped sampling"
     [ ! -e "$case/state/.host-memory-alerted" ] || fail "failed wake publication latched the episode"
     [ ! -e "$case/keys" ] || fail "failed wake publication dispatched an interrupt"
