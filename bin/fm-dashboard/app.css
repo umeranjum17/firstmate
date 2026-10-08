@@ -51,6 +51,7 @@ kbd{font:500 11px Inter,sans-serif;color:var(--ink-3);border:1px solid var(--lin
 .nav[aria-current=page]{background:var(--sel);color:var(--ink)}
 .nav svg{color:var(--ink-3);flex:none}
 .nav .n{margin-left:auto;font-size:12px}
+.home-short{display:none}
 .nav .dot{width:6px;height:6px;border-radius:50%;background:var(--red);margin-left:auto}
 .nav .dot+.n{margin-left:6px}
 .badge{margin-left:auto;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--accent);color:#fff;font-size:11px;font-weight:600;display:grid;place-items:center}
@@ -219,6 +220,9 @@ a.pill:hover{background:var(--hover)}
   .side .ws{flex-direction:column;height:auto;padding:0;gap:6px;margin-bottom:8px}
   .side .ws b,.side .ws .sp,.side .nav .n{display:none}
   .side .nav{font-size:0;gap:0;width:36px;height:32px;padding:0;justify-content:center;position:relative;flex:none}
+  .side .home-nav{flex-direction:column;gap:2px}
+  .side .home-name{display:none}
+  .side .home-short{display:block;font-size:10px;line-height:12px}
   .side .nav .dot,.side .nav .badge{position:absolute;top:3px;right:3px;margin:0}
   .side .sec{font-size:0;height:1px;width:24px;padding:0;margin:10px 0;background:var(--line-2)}
   .side .foot{flex-direction:column;height:auto;padding:0;gap:6px}
