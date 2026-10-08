@@ -66,6 +66,7 @@ fm_wait_timers_tick() {
     bound=$FM_BACKEND_HERDR_READ_TIMEOUT
     case "$bound" in ''|0*|*[!0-9]*) echo "waiting timers: native read timeout must be positive decimal seconds" >&2; return 1 ;; esac
     [ "${#bound}" -le 9 ] || return 1
+    # shellcheck disable=SC2016 # The child shell expands its positional parameters.
     if native=$(fm_run_timed "$bound" bash -c '
       . "$1"
       fm_backend_source herdr || exit 1
