@@ -655,12 +655,12 @@ test_incomplete_lanes_and_moved_filings() {
   printf '## Queued\n- [ ] missing-ready - Missing home ready (since %s)\n' "$(date +%F)" > "$home/mates/missing/data/backlog.md"
   printf -- '- missing - domain (home: %s; scope: work; projects: alpha; added 2026-07-11)\n' "$home/mates/missing" >> "$home/data/secondmates.md"
   build "$home"
-  has "$d/index.html" "Lanes open at least 8" "Stuck at least 2" "free unknown" "Ready, capacity unknown 1" "unknown of 3"
+  has "$d/index.html" "Lanes open at least 8" "Stuck at least 3" "free unknown" "Ready, capacity unknown 1" "unknown of 3"
   lacks "$d/index.html" "All flowing" "missing 0 of 3"
   has "$d/backlog.html" "at least 8 lanes open" "Fleet at least 8" "missing unknown 3"
-  for p in backlog backlog.home; do has "$d/$p.html" "Oldest validation or CI wait: at least"; done
+  for p in backlog backlog.home; do has "$d/$p.html" "Oldest validation or CI wait: unknown"; done
   has "$d/backlog.home.html" "missing unknown"
-  jq -e '.metrics.lanes.status == "lower_bound" and .metrics.stuck.status == "lower_bound" and .metrics.free_lanes.status == "unknown" and ([.homes[] | select(.home == "missing")][0].lanes.value == null)' "$d/data.json" >/dev/null || fail "missing lane coverage looks exact"
+  jq -e '.metrics.lanes.status == "lower_bound" and .metrics.stuck.status == "lower_bound" and .metrics.stuck.value == 3 and .metrics.free_lanes.status == "unknown" and ([.homes[] | select(.home == "missing")][0].lanes.value == null)' "$d/data.json" >/dev/null || fail "missing lane coverage looks exact"
   printf -- '- zephyrine - remote (host: distant; root: /srv; home: %s; scope: work; projects: alpha; added 2026-07-11)\n' "$z" > "$home/data/secondmates.md"
   build "$home"
   has "$d/index.html" "Lanes open at least 7" "unknown of 3"
