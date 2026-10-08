@@ -1,0 +1,12 @@
+ok - bootstrap reports treehouse lease + tasks-axi/quota-axi bootstrap contracts
+ok - bootstrap enforces no-mistakes minimum version
+ok - bootstrap enforces gh-axi minimum version
+ok - bootstrap preserves legacy Lavish boards while recommending synchronous reply support
+ok - bootstrap enforces tasks-axi minimum version
+ok - bootstrap enforces quota-axi minimum version
+ok - bootstrap requires git with an install instruction
+ok - bootstrap: backend=orca gates the Orca CLI without requiring it on the default backend
+ok - bootstrap: session-provider backends require their own CLI + jq + treehouse, never tmux
+not ok - backend=herdr must fail closed on its own missing session CLI (missing: 'MISSING_MANUAL: herdr (instructions: https://herdr.dev)')
+--- output ---
+

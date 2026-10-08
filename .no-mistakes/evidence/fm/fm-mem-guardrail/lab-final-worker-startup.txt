@@ -1,0 +1,24 @@
+[umer@extreme wt]$ export HOME=/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMB
+N7DDRKETEBP/.lab-final.FqdZbq/home CLAUDE_CONFIG_DIR=/home/umer/.no-mistakes/worktrees/bde6b4
+035eae/01M4CT545F00ZMBN7DDRKETEBP/.lab-final.FqdZbq/claude FM_HOME=/home/umer/.no-mistakes/wo
+rktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.lab-final.FqdZbq/fleet DISABLE_AUTOUPDATER=1
+; printf "lab private config ready\n"
+lab private config ready
+[umer@extreme wt]$ claude
+
+─────────────────────────────────────────────────────────────────────────────────────────────
+  Allow external CLAUDE.md file imports?
+
+  This project's CLAUDE.md or .claude/rules imports files outside the current working
+  directory. Never allow this for third-party repositories.
+
+  External imports:
+    /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/AGENTS.md
+
+  Important: Only use Claude Code with files you trust. Accessing untrusted files may pose
+  security risks https://code.claude.com/docs/en/security
+
+  ❯ No, disable external imports
+    Yes, allow external imports
+
+  Enter to confirm · Esc to cancel

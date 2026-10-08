@@ -1,0 +1,23 @@
+Candidate: 8e87d9f30af77e44c7d68a6946b2ef80143646fb
+/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.lab.LLnT3p/fleet
+viewer attached to fm-lab-m2 (pid 3061618)
+{"id":"cli:pane:wait-output","result":{"matched_line":"[umer@extreme wt]$ export HOME=/home/umer FM_HOME=/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.lab.LLnT3p/fleet; printf \"lab worker ready\\n\"","pane_id":"w1:p2","read":{"format":"text","pane_id":"w1:p2","revision":0,"source":"recent_unwrapped","tab_id":"w1:t2","text":"[umer@extreme wt]$ export HOME=/home/umer FM_HOME=/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.lab.LLnT3p/fleet; printf \"lab worker ready\\n\"\nlab worker ready\n[umer@extreme wt]$","truncated":false,"workspace_id":"w1"},"revision":0,"type":"output_matched"}}
+{"error":{"code":"agent_not_ready","message":"agent memory-worker is blocked during startup and is not ready for prompts"},"id":"cli:agent:start"}
+
+=== Relaunch under synthetic WAIT pressure ===
+relaunch exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.lab.LLnT3p/fleet
+host memory under pressure: pressure at or above 20% (pressure 25% (10 s average), 30.0 GB available, 0.0 GB swap used; cgroup pressure unreadable; host-only classification)
+error: relaunch of build refused before its agent was touched: host memory is under pressure; retry once it eases
+The same recognized Claude agent remains in the same state after refusal.
+
+=== Dead secondmate recovery under WAIT ===
+[2026-10-08T08:59:08+0400] secondmate mate liveness deferred: memory admission deferred: fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.lab.LLnT3p/fleet
+host memory under pressure: pressure at or above 20% (pressure 25% (10 s average), 30.0 GB available, 0.0 GB swap used; cgroup pressure unreadable; host-only classification)
+error: spawn refused - task mate stays queued until host memory eases; retry then
+{"id":"cli:pane:get","result":{"pane":{"agent_status":"unknown","cwd":"/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.lab.LLnT3p/fleet","focused":false,"foreground_cwd":"/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.lab.LLnT3p/fleet","pane_id":"w1:p3","revision":1,"scroll":{"max_offset_from_bottom":0,"offset_from_bottom":0,"viewport_rows":39},"tab_id":"w1:t3","terminal_id":"term_65d4d1774ebc83","terminal_title":"umer@extreme:/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.lab.LLnT3p/fleet","terminal_title_stripped":"umer@extreme:/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.lab.LLnT3p/fleet","workspace_id":"w1"},"type":"pane_info"}}
+Secondmate shell endpoint survived; no recovery attempt ledger was created.
+
+=== Remaining proofs ===
+not proven: interrupt of an actively working Claude agent; startup requires trust approval that writes user-level configuration outside the worktree.
+not proven: restored primary/lead supervision after a Herdr restart; the permitted primary never advanced past that trust prompt.

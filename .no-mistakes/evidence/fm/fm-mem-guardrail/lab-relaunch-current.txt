@@ -1,0 +1,3 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.lab.LLnT3p/fleet
+host memory under pressure: pressure at or above 20% (pressure 25% (10 s average), 30.0 GB available, 0.0 GB swap used; cgroup pressure unreadable; host-only classification)
+error: relaunch of build refused before its agent was touched: host memory is under pressure; retry once it eases

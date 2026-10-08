@@ -1,0 +1,8 @@
+=== Independent sampler while public custom check remains blocked ===
+watcher is still alive; check-release does not exist
+1791436107	40400432	46908812	4.19	OK
+1791436108	40201880	47014784	4.19	OK
+1791436118	44049948	45304040	2.60	ALERT
+1791436118		check: host memory ALERT: pressure 3% (10 s average), 42.0 GB available, 43.2 GB swap used; host 3%, cgroup 1% (user.slice/user-1000.slice); pressure at or above 0%; largest: java pid 3419211 5.5 GB, qemu-system-x86 pid 35693 4.1 GB, qemu-system-x86 pid 1425996 4.1 GB; automatic interrupt skipped: top consumer is not a task this home owns
+1791436118	1	check	host-memory	check: host memory ALERT: pressure 3% (10 s average), 42.0 GB available, 43.2 GB swap used; host 3%, cgroup 1% (user.slice/user-1000.slice); pressure at or above 0%; largest: java pid 3419211 5.5 GB, qemu-system-x86 pid 35693 4.1 GB, qemu-system-x86 pid 1425996 4.1 GB; automatic interrupt skipped: top consumer is not a task this home owns
+watcher exited after delivering memory alert; owned sampler pid record removed

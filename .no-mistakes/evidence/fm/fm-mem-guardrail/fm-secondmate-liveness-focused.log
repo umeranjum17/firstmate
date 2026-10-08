@@ -1,0 +1,2 @@
+# all fm-secondmate-liveness tests passed
+ok - memory deferrals preserve the endpoint and liveness retry budget

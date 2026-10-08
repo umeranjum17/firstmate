@@ -1,0 +1,14 @@
+{
+  "candidate": "8e87d9f30af77e44c7d68a6946b2ef80143646fb",
+  "lab_setup": "Repository-relative XDG_CONFIG_HOME, XDG_DATA_HOME and XDG_STATE_HOME allow the real guarded named Herdr lab to start without the prior sockaddr_un path-length error. All runtime directories remained inside the gate worktree; the normal HOME was used only for read-only fleet tripwire observation and the explicitly permitted normal Claude login.",
+  "relaunch_attempts": [
+    "Attempt 1 did not reach admission: hand-seeded lab metadata lacked endpoint_task_id. No endpoint was changed; guarded teardown succeeded.",
+    "Attempt 2 used exact endpoint_task_id and an fm-build tab. The real control plane refused pressure before touching the recognized Claude agent, preserving metadata and agent identity/state. The real watcher deferred a dead secondmate's recovery and created no attempt ledger. Guarded teardown succeeded."
+  ],
+  "proof_limits": [
+    "not proven: interrupt of an actively working Claude agent once per alert episode, with foreign/remote exclusion. Claude reached a startup trust prompt; approving it would persist user-level configuration outside the authorized worktree. Targeted behavior checks passed but use mocked terminal control and are not live evidence for this journey.",
+    "not proven: primary and lead supervision re-arm after a lab Herdr restart. The real CLI did not advance past the same trust boundary; no restart was attempted without a qualified primary. Provide a pre-trusted disposable signed-in Claude home with authorized local configuration and rerun the guarded scenario."
+  ],
+  "cleanup": "Every named lab was torn down in its evidence turn using fm-herdr-lab.sh. Transient lab and test directories were removed. git status --short was empty. No source files, production credentials, host services, default Herdr session or fleet endpoints were changed.",
+  "verdict": "inconclusive"
+}

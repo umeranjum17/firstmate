@@ -1,0 +1,41 @@
+{
+  "tested_head_sha": "a2ff69a2e4861fbd063c58af88f38643e1603b02",
+  "verdict": "inconclusive",
+  "attempts": [
+    {
+      "number": 1,
+      "interface": "bin/fm-herdr-lab.sh --isolated-xdg provision fm-lab-t",
+      "isolation": "Private HOME and lab state directory inside the current worktree; original HOME used only for fleet-state observation",
+      "result": "provision exited 1 after its 60-second readiness deadline",
+      "diagnostic_interface": "bin/fm-herdr-lab.sh --isolated-xdg run fm-lab-t status --json",
+      "diagnostic": "Error: Custom { kind: InvalidInput, error: local socket name length exceeds capacity of sun_path of sockaddr_un }",
+      "cleanup": "Guarded teardown completed successfully",
+      "log": "lab-retry-1.log"
+    },
+    {
+      "number": 2,
+      "interface": "bin/fm-herdr-lab.sh provision fm-lab-t",
+      "isolation": "Shorter worktree-local private HOME and explicit XDG_CONFIG_HOME, XDG_DATA_HOME, XDG_STATE_HOME; original HOME used only for fleet-state observation",
+      "result": "provision exited 1 after its 60-second readiness deadline",
+      "diagnostic_interface": "bin/fm-herdr-lab.sh run fm-lab-t status --json",
+      "diagnostic": "Error: Custom { kind: InvalidInput, error: local socket name length exceeds capacity of sun_path of sockaddr_un }",
+      "cleanup": "Guarded teardown completed successfully",
+      "log": "lab-retry-2.log"
+    }
+  ],
+  "scenarios": [
+    {
+      "name": "Relaunch under fake pressure preserves worker and recovery attempts",
+      "result": "not proven: both shared lab provisioning attempts failed with Unix socket path length errors before a disposable worker could be established"
+    },
+    {
+      "name": "Sampler interrupts largest owned worker once without foreign-home or remote-record attribution",
+      "result": "not proven: both shared lab provisioning attempts failed with Unix socket path length errors before a disposable worker could be established"
+    },
+    {
+      "name": "Sentinel reconcile restores supervision after lab Herdr restart",
+      "result": "not proven: both shared lab provisioning attempts failed with Unix socket path length errors before a disposable runtime could be established"
+    }
+  ],
+  "limits": "No pressure was induced, no live runtime was stopped or restarted, no service was installed, no credentials were changed, and no repository suite, linter or static analysis was run. No source changes were made in this iteration; the pre-existing liveness diagnostic repair remains untouched. A shorter authorized lab storage location or a runtime supporting these worktree-local socket paths is needed to establish the lab."
+}

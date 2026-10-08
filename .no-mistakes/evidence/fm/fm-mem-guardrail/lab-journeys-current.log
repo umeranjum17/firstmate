@@ -1,0 +1,10 @@
+Candidate: 8e87d9f30af77e44c7d68a6946b2ef80143646fb
+/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.lab.UQWnLi/fleet
+viewer attached to fm-lab-m2 (pid 2971279)
+{"id":"cli:pane:wait-output","result":{"matched_line":"[umer@extreme wt]$ export HOME=/home/umer FM_HOME=/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.lab.UQWnLi/fleet; printf \"lab worker ready\\n\"","pane_id":"w1:p1","read":{"format":"text","pane_id":"w1:p1","revision":0,"source":"recent_unwrapped","tab_id":"w1:t1","text":"[umer@extreme wt]$ export HOME=/home/umer FM_HOME=/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.lab.UQWnLi/fleet; printf \"lab worker ready\\n\"\nlab worker ready\n[umer@extreme wt]$","truncated":false,"workspace_id":"w1"},"revision":0,"type":"output_matched"}}
+{"error":{"code":"agent_not_ready","message":"agent memory-worker is blocked during startup and is not ready for prompts"},"id":"cli:agent:start"}
+
+=== Relaunch under synthetic WAIT pressure ===
+relaunch exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.lab.UQWnLi/fleet
+REFUSED: legacy Herdr endpoint metadata for task build lacks an exact task binding; preserving task state.

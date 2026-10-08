@@ -1,0 +1,11 @@
+{
+  "candidate": "8e87d9f30af77e44c7d68a6946b2ef80143646fb",
+  "new_commands": ["TMPDIR=$PWD/.gate-test-tmp bash tests/fm-jev-mem-guard.test.sh", "TMPDIR=$PWD/.gate-test-tmp bash live-driver.sh (absolute evidence path)", "TMPDIR=$PWD/.gate-test-tmp bash live-guardrails.sh (absolute evidence path)", "agent_browser open dashboard.html; snapshot -i; screenshot dashboard-final-recheck.png --full"],
+  "new_results": "All targeted assertions and safe CLI drivers exited 0. Real host readings were classified and recorded; forced thresholds refused ship/scout/secondmate launches without endpoints; relaxed thresholds cleared refusals. Independent sampler persisted an alert after 10 seconds while a custom check blocked, identified unowned real consumers and skipped interruption. Watcher surfaced the durable wake on check release. Generated space-home unit passed systemd-analyze verify without installation. Dashboard rendered memory peak, swap and queued refusal; screenshot verified on disk.",
+  "baseline": "Earlier phase evidence retained for bootstrap, control/relaunch, liveness and dashboard behavior. Not rerun wholesale. Behavioral memory tests use fixture proc trees and mocked terminal control: these are not live working-agent interruption evidence.",
+  "authorized_final_lab_attempt": "Already recorded at this candidate in lab-final-results.json, lab-final-attempt.log and lab-final-worker-startup.txt. Private workspace trust succeeded, but Claude stopped at external CLAUDE.md import consent with agent_not_ready. No working turn or armed primary/lead baseline was established. Guarded teardown succeeded. No third attempt performed.",
+  "interruption": "not proven: external-import consent blocked the real Claude startup in the final authorized private-config lab attempt",
+  "restart": "not proven: no armed primary/lead supervision baseline could be established before a guarded runtime restart",
+  "cleanup": "All newly created disposable homes and temporary directories removed. git status --short empty. No source changes, host services, real memory pressure, credential mutation, live-fleet restart, full suite, linter or static analysis.",
+  "verdict": "inconclusive"
+}

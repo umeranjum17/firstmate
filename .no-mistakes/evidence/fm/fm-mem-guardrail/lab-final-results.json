@@ -1,0 +1,17 @@
+{
+  "tested_head_sha": "8e87d9f30af77e44c7d68a6946b2ef80143646fb",
+  "verdict": "inconclusive",
+  "attempt_budget": "Second and final authorized attempt; no additional lab runs",
+  "interruption": "not proven: Claude reported agent_not_ready and rendered external CLAUDE.md import consent before any working model turn",
+  "restart": "not proven: the same blocked Claude startup prevented establishing armed primary and lead supervision; no unqualified restart was performed",
+  "root_cause": "Workspace trust in the disposable Claude configuration succeeded, but the nested lab inherited the candidate CLAUDE.md importing the worktree's AGENTS.md outside the lab working directory; external-import consent is separate from workspace trust",
+  "evidence": [
+    "lab-final-attempt.log",
+    "lab-final-worker-startup.txt",
+    "lab-final-agent.json"
+  ],
+  "test_driver_error": "After blocked startup, the driver attempted unsupported pane send-keys text; Herdr rejected it with invalid_key. No prompt was delivered and this is not a product failure.",
+  "cleanup": "Guarded fm-herdr-lab teardown exited successfully; private HOME, credentials, Claude config, fixture data and lab state removed; git status clean",
+  "scope": "No real memory pressure, live-fleet restart, host service installation, user configuration changes, full suite, linter or static analysis",
+  "source_changes": "None; no product failure reproduced"
+}

@@ -1,0 +1,1 @@
+check: host memory ALERT: pressure 41% (10 s average), 30.0 GB available, 0.0 GB swap used; cgroup pressure unreadable; host-only classification; pressure at or above 35%; largest: task big-build (main) 14.0 GB in 2 processes, llama pid 104 6.0 GB, lead sm1 2.0 GB; automatic interrupt attempted: task big-build

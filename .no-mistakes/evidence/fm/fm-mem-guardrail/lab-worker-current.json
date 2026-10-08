@@ -1,0 +1,23 @@
+[umer@extreme wt]$ export HOME=/home/umer FM_HOME=/home/umer/.no-mistakes/worktrees/bde6b4035
+eae/01M4CT545F00ZMBN7DDRKETEBP/.lab.P3OKvV/fleet; printf "lab worker environment ready\n"
+lab worker environment ready
+[umer@extreme wt]$ claude
+
+─────────────────────────────────────────────────────────────────────────────────────────────
+ Accessing workspace:
+
+ /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.lab.P3OKvV/fleet
+ /wt
+
+ Quick safety check: Is this a project you created or one you trust? (Like your own code, a
+ well-known open source project, or work from your team). If not, take a moment to review
+ what's in this folder first.
+
+ Claude Code'll be able to read, edit, and execute files here.
+
+ Security guide
+
+ ❯ No, exit
+   Yes, I trust this folder
+
+ Enter to confirm · Esc to cancel

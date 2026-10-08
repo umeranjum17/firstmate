@@ -1,0 +1,10 @@
+=== Real host measurement and persisted sample ===
+OK	pressure 4% (10 s average), 38.5 GB available, 44.7 GB swap used; host 4%, cgroup 2% (user.slice/user-1000.slice)
+=== Fresh scout admission refuses before an endpoint exists ===
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/live.H9xOVa
+host memory under pressure: pressure at or above 0% (pressure 4% (10 s average), 37.9 GB available, 44.7 GB swap used; host 4%, cgroup 2% (user.slice/user-1000.slice))
+error: spawn refused - task live-admission stays queued until host memory eases; retry then
+spawn exit=1
+refusal record: 1791436107	live-admission	host memory under pressure: pressure at or above 0% (pressure 4% (10 s average), 37.9 GB available, 44.7 GB swap used; host 4%, cgroup 2% (user.slice/user-1000.slice))
+=== Raising thresholds admits the same task and clears refusal ===
+admission exit=0; refusal record removed

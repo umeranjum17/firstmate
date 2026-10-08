@@ -1,0 +1,19 @@
+/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/admission.U7wmSV
+
+=== ship admission exit=1 ===
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/admission.U7wmSV
+host memory under pressure: pressure at or above 0% (pressure 1% (10 s average), 36.9 GB available, 35.6 GB swap used; host 1%, cgroup 0% (user.slice/user-1000.slice))
+error: spawn refused - task build stays queued until host memory eases; retry then
+1791435643	build	host memory under pressure: pressure at or above 0% (pressure 1% (10 s average), 36.9 GB available, 35.6 GB swap used; host 1%, cgroup 0% (user.slice/user-1000.slice))
+
+=== scout admission exit=1 ===
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/admission.U7wmSV
+host memory under pressure: pressure at or above 0% (pressure 1% (10 s average), 36.9 GB available, 35.6 GB swap used; host 1%, cgroup 0% (user.slice/user-1000.slice))
+error: spawn refused - task scout stays queued until host memory eases; retry then
+1791435644	scout	host memory under pressure: pressure at or above 0% (pressure 1% (10 s average), 36.9 GB available, 35.6 GB swap used; host 1%, cgroup 0% (user.slice/user-1000.slice))
+
+=== secondmate admission exit=1 ===
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/admission.U7wmSV
+host memory under pressure: pressure at or above 0% (pressure 1% (10 s average), 36.8 GB available, 35.6 GB swap used; host 1%, cgroup 0% (user.slice/user-1000.slice))
+error: spawn refused - task mate stays queued until host memory eases; retry then
+1791435644	mate	host memory under pressure: pressure at or above 0% (pressure 1% (10 s average), 36.8 GB available, 35.6 GB swap used; host 1%, cgroup 0% (user.slice/user-1000.slice))

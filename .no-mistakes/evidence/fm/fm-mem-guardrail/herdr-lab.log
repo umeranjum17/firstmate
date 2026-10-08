@@ -1,0 +1,8 @@
+session=fm-lab-memory-298260-19886
+fm-herdr-lab: tripwire already exists for 'fm-lab-memory-298260-19886'; refusing ambiguous ownership
+provision exit=1
+
+provision owns prepare; retry fresh session=fm-lab-memory-313760-25474
+fm-herdr-lab: lab session 'fm-lab-memory-313760-25474' did not report running within 60 seconds
+provision exit=1
+teardown exit=0

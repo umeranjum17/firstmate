@@ -1,0 +1,50 @@
+ok - verdicts, recorded samples, and owner mapping follow the host
+ok - cgroup pressure participates in classification and admission
+ok - task ownership stays home-qualified through grouping and control selection
+ok - remote records never own local processes or label local homes
+ok - overridden state paths never widen home ownership
+ok - all thresholds reject non-finite numbers
+ok - the watcher samples memory and interrupts once per alert episode, naming the largest task
+tests/fm-jev-mem-guard.test.sh: line 105: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.x7UPHK/deferred/state/host-memory.tsv: No such file or directory
+tests/fm-jev-mem-guard.test.sh: line 105: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.x7UPHK/deferred/state/host-memory.tsv: No such file or directory
+tests/fm-jev-mem-guard.test.sh: line 105: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.x7UPHK/deferred/state/host-memory.tsv: No such file or directory
+tests/fm-jev-mem-guard.test.sh: line 105: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.x7UPHK/deferred/state/host-memory.tsv: No such file or directory
+tests/fm-jev-mem-guard.test.sh: line 105: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.x7UPHK/deferred/state/host-memory.tsv: No such file or directory
+tests/fm-jev-mem-guard.test.sh: line 105: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.x7UPHK/deferred/state/host-memory.tsv: No such file or directory
+tests/fm-jev-mem-guard.test.sh: line 105: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.x7UPHK/deferred/state/host-memory.tsv: No such file or directory
+tests/fm-jev-mem-guard.test.sh: line 105: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.x7UPHK/deferred/state/host-memory.tsv: No such file or directory
+tests/fm-jev-mem-guard.test.sh: line 105: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.x7UPHK/deferred/state/host-memory.tsv: No such file or directory
+tests/fm-jev-mem-guard.test.sh: line 105: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.x7UPHK/endpoint-changed/state/host-memory.tsv: No such file or directory
+tests/fm-jev-mem-guard.test.sh: line 105: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.x7UPHK/endpoint-changed/state/host-memory.tsv: No such file or directory
+tests/fm-jev-mem-guard.test.sh: line 105: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.x7UPHK/endpoint-changed/state/host-memory.tsv: No such file or directory
+tests/fm-jev-mem-guard.test.sh: line 105: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.x7UPHK/endpoint-changed/state/host-memory.tsv: No such file or directory
+tests/fm-jev-mem-guard.test.sh: line 105: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.x7UPHK/endpoint-changed/state/host-memory.tsv: No such file or directory
+tests/fm-jev-mem-guard.test.sh: line 105: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.x7UPHK/endpoint-changed/state/host-memory.tsv: No such file or directory
+tests/fm-jev-mem-guard.test.sh: line 105: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.x7UPHK/endpoint-changed/state/host-memory.tsv: No such file or directory
+tests/fm-jev-mem-guard.test.sh: line 105: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.x7UPHK/endpoint-changed/state/host-memory.tsv: No such file or directory
+ok - memory deferral and endpoint changes keep supervision polling
+ok - default-home automatic interrupts preserve the selected state
+tests/fm-jev-mem-guard.test.sh: line 105: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.x7UPHK/sampler-restart/state/host-memory.tsv: No such file or directory
+tests/fm-jev-mem-guard.test.sh: line 105: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.x7UPHK/sampler-restart/state/host-memory.tsv: No such file or directory
+tests/fm-jev-mem-guard.test.sh: line 105: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.x7UPHK/sampler-restart/state/host-memory.tsv: No such file or directory
+tests/fm-jev-mem-guard.test.sh: line 105: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.x7UPHK/sampler-restart/state/host-memory.tsv: No such file or directory
+tests/fm-jev-mem-guard.test.sh: line 105: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.x7UPHK/sampler-restart/state/host-memory.tsv: No such file or directory
+tests/fm-jev-mem-guard.test.sh: line 105: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.x7UPHK/sampler-restart/state/host-memory.tsv: No such file or directory
+tests/fm-jev-mem-guard.test.sh: line 105: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.x7UPHK/sampler-restart/state/host-memory.tsv: No such file or directory
+tests/fm-jev-mem-guard.test.sh: line 105: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.x7UPHK/sampler-restart/state/host-memory.tsv: No such file or directory
+tests/fm-jev-mem-guard.test.sh: line 431: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.x7UPHK/sampler-restart/state/.host-memory-sampler.pid: No such file or directory
+tests/fm-jev-mem-guard.test.sh: line 431: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.x7UPHK/sampler-restart/state/.host-memory-sampler.pid: No such file or directory
+tests/fm-jev-mem-guard.test.sh: line 431: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.x7UPHK/sampler-restart/state/.host-memory-sampler.pid: No such file or directory
+tests/fm-jev-mem-guard.test.sh: line 431: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.x7UPHK/sampler-restart/state/.host-memory-sampler.pid: No such file or directory
+tests/fm-jev-mem-guard.test.sh: line 431: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.x7UPHK/sampler-restart/state/.host-memory-sampler.pid: No such file or directory
+tests/fm-jev-mem-guard.test.sh: line 105: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.x7UPHK/other-home/state/host-memory.tsv: No such file or directory
+tests/fm-jev-mem-guard.test.sh: line 105: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.x7UPHK/other-home/state/host-memory.tsv: No such file or directory
+tests/fm-jev-mem-guard.test.sh: line 105: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.x7UPHK/other-home/state/host-memory.tsv: No such file or directory
+tests/fm-jev-mem-guard.test.sh: line 105: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.x7UPHK/other-home/state/host-memory.tsv: No such file or directory
+tests/fm-jev-mem-guard.test.sh: line 105: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.x7UPHK/other-home/state/host-memory.tsv: No such file or directory
+tests/fm-jev-mem-guard.test.sh: line 105: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.x7UPHK/other-home/state/host-memory.tsv: No such file or directory
+tests/fm-jev-mem-guard.test.sh: line 105: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.x7UPHK/other-home/state/host-memory.tsv: No such file or directory
+ok - independent sampling survives slow checks, restarts, and respects PID ownership
+ok - parallel admission publications and clearing are independent
+ok - termination cannot commit an alert without dispatching its interrupt
+ok - general supervision retains its independent 15-second default

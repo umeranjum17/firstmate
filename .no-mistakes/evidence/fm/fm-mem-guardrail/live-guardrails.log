@@ -1,0 +1,53 @@
+/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.validation/fm-lab.nAQf3e
+
+=== real host admission: ship rc=1 ===
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.validation/fm-lab.nAQf3e
+host memory under pressure: pressure at or above 0% (pressure 1% (10 s average), 43.8 GB available, 38.4 GB swap used; host 1%, cgroup 0% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service))
+error: spawn refused - task guard-ship stays queued until host memory eases; retry then
+1791434498	guard-ship	host memory under pressure: pressure at or above 0% (pressure 1% (10 s average), 43.8 GB available, 38.4 GB swap used; host 1%, cgroup 0% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service))
+
+=== real host admission: scout rc=1 ===
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.validation/fm-lab.nAQf3e
+host memory under pressure: pressure at or above 0% (pressure 0% (10 s average), 43.7 GB available, 38.4 GB swap used; host 0%, cgroup 0% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service))
+error: spawn refused - task guard-scout stays queued until host memory eases; retry then
+1791434498	guard-scout	host memory under pressure: pressure at or above 0% (pressure 0% (10 s average), 43.7 GB available, 38.4 GB swap used; host 0%, cgroup 0% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service))
+
+=== real host admission: secondmate rc=1 ===
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.validation/fm-lab.nAQf3e
+host memory under pressure: pressure at or above 0% (pressure 0% (10 s average), 43.7 GB available, 38.4 GB swap used; host 0%, cgroup 0% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service))
+error: spawn refused - task guard-mate stays queued until host memory eases; retry then
+1791434498	guard-mate	host memory under pressure: pressure at or above 0% (pressure 0% (10 s average), 43.7 GB available, 38.4 GB swap used; host 0%, cgroup 0% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service))
+
+=== healthy admission clears refusal ===
+OK	pressure 0% (10 s average), 43.7 GB available, 38.4 GB swap used; host 0%, cgroup 0% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service)
+registered: state/slow.check.sh
+
+=== real host sampler ALERT while supervision check blocks ===
+1791434499	45770704	40257452	0.46	OK
+1791434509	46344740	40164956	0.46	ALERT
+1791434509		check: host memory ALERT: pressure 0% (10 s average), 44.2 GB available, 38.3 GB swap used; host 0%, cgroup 0% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service); pressure at or above 0%; largest: java pid 3419211 5.5 GB, qemu-system-x86 pid 35693 3.9 GB, qemu-system-x86 pid 1425996 3.9 GB; automatic interrupt skipped: top consumer is not a task this home owns
+1791434509	1	check	host-memory	check: host memory ALERT: pressure 0% (10 s average), 44.2 GB available, 38.3 GB swap used; host 0%, cgroup 0% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service); pressure at or above 0%; largest: java pid 3419211 5.5 GB, qemu-system-x86 pid 35693 3.9 GB, qemu-system-x86 pid 1425996 3.9 GB; automatic interrupt skipped: top consumer is not a task this home owns
+check: host memory ALERT: pressure 0% (10 s average), 44.2 GB available, 38.3 GB swap used; host 0%, cgroup 0% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service); pressure at or above 0%; largest: java pid 3419211 5.5 GB, qemu-system-x86 pid 35693 3.9 GB, qemu-system-x86 pid 1425996 3.9 GB; automatic interrupt skipped: top consumer is not a task this home owns
+/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/bin/fm-host-memory-sampler.sh: line 12: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.validation/fm-lab.nAQf3e/state/.host-memory-sampler.pid: No such file or directory
+/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/bin/fm-host-memory-sampler.sh: line 12: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.validation/fm-lab.nAQf3e/state/.host-memory-sampler.pid: No such file or directory
+/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/bin/fm-host-memory-sampler.sh: line 12: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.validation/fm-lab.nAQf3e/state/.host-memory-sampler.pid: No such file or directory
+
+=== real systemd unit output: home with spaces ===
+[Unit]
+Description=Firstmate sentinel for /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.validation/fm-lab.nAQf3e/Fleet Home (recovers supervision after an agent-runtime restart)
+
+[Service]
+Environment="FM_HOME=/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.validation/fm-lab.nAQf3e/Fleet Home"
+Environment="PATH=/home/umer/.pi/agent/bin:/home/umer/.local/bin:/home/umer/.flashlight/bin:/home/umer/Android/Sdk/platform-tools:/home/umer/Android/Sdk/emulator:/home/umer/.kimi-code/bin:/home/umer/go/bin:/home/umer/.cargo/bin:/home/umer/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/local/sbin:/usr/bin:/bin:/usr/sbin:/sbin:/home/umer/.local/share/mise/installs/pi/latest/pi:/home/umer/.local/share/mise/installs/gh/latest/gh_2.97.0_linux_amd64/bin:/home/umer/.local/share/mise/installs/opencode/latest:/home/umer/.local/share/mise/shims:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl"
+ExecStart="/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/bin/fm-sentinel.sh" loop
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target
+
+=== dashboard generated from real host and sampler state ===
+host memory under pressure: pressure at or above 0% (pressure 0% (10 s average), 44.2 GB available, 38.3 GB swap used; host 0%, cgroup 0% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service))
+/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.validation/fm-lab.nAQf3e/state/dashboard/index.html
+
+Live driver completed; disposable home removed by trap.

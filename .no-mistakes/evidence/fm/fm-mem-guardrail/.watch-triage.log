@@ -1,0 +1,4 @@
+[2026-10-08T08:25:57+0400] secondmate sm1 liveness deferred: memory admission deferred: host memory under pressure: pressure at or above 20% (pressure 25% (10 s average), 30.0 GB available, 0.0 GB swap used; cgroup pressure unreadable; host-only classification)
+error: spawn refused - task sm1 stays queued until host memory eases; retry then
+[2026-10-08T08:25:59+0400] secondmate sm1 liveness deferred: memory admission deferred: host memory under pressure: pressure at or above 20% (pressure 25% (10 s average), 30.0 GB available, 0.0 GB swap used; cgroup pressure unreadable; host-only classification)
+error: spawn refused - task sm1 stays queued until host memory eases; retry then

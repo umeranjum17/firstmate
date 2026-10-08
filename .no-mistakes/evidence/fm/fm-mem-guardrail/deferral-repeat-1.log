@@ -1,0 +1,9 @@
+tests/.gate-memory-probe.sh: line 105: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.gvAExf/deferred/state/host-memory.tsv: No such file or directory
+tests/.gate-memory-probe.sh: line 105: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.gvAExf/deferred/state/host-memory.tsv: No such file or directory
+tests/.gate-memory-probe.sh: line 105: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.gvAExf/deferred/state/host-memory.tsv: No such file or directory
+tests/.gate-memory-probe.sh: line 105: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.gvAExf/deferred/state/host-memory.tsv: No such file or directory
+tests/.gate-memory-probe.sh: line 105: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.gvAExf/deferred/state/host-memory.tsv: No such file or directory
+tests/.gate-memory-probe.sh: line 105: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.gvAExf/endpoint-changed/state/host-memory.tsv: No such file or directory
+tests/.gate-memory-probe.sh: line 105: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.gvAExf/endpoint-changed/state/host-memory.tsv: No such file or directory
+tests/.gate-memory-probe.sh: line 105: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CT545F00ZMBN7DDRKETEBP/.gate-test-tmp/fm-mem-guard.gvAExf/endpoint-changed/state/host-memory.tsv: No such file or directory
+ok - memory deferral and endpoint changes keep supervision polling
