@@ -1,0 +1,25 @@
++ printf 'worker cwd=%s\nGIT_EDITOR=%s\nGIT_SEQUENCE_EDITOR=%s\n' /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CND652NW53MP2VDN56N9SD/.lv/p/.treehouse/p-14c484/1/p true true
+worker cwd=/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CND652NW53MP2VDN56N9SD/.lv/p/.treehouse/p-14c484/1/p
+GIT_EDITOR=true
+GIT_SEQUENCE_EDITOR=true
++ git config user.name Lab
++ git config user.email lab@example.invalid
++ git config core.editor /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CND652NW53MP2VDN56N9SD/.lv/user/../poison
++ git config sequence.editor /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CND652NW53MP2VDN56N9SD/.lv/user/../poison
++ printf 'base\n'
++ git add conflict.txt
++ git diff --cached --quiet
+++ git rev-parse HEAD
++ base=6a2caeafcd19f61fd56ba38b0f6554080988df23
+++ git branch --show-current
++ branch=
++ printf 'topic\n'
++ git commit -qam topic
+++ date +%s%N
++ git checkout -qb upstream-1791426799426308990 6a2caeafcd19f61fd56ba38b0f6554080988df23
++ printf 'upstream\n'
++ git commit -qam upstream
+++ git rev-parse HEAD
++ upstream=94e45a30d4f87ce6b901a6471d7626b07e511b62
++ git checkout -q ''
+fatal: empty string is not a valid pathspec. please use . instead if you meant to match all paths

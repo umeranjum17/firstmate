@@ -1,0 +1,20 @@
+Rebasing (1/1)error: could not apply 2e2c584... topic
+hint: Resolve all conflicts manually, mark them as resolved with
+hint: "git add/rm <conflicted_files>", then run "git rebase --continue".
+hint: You can instead skip this commit: run "git rebase --skip".
+hint: To abort and get back to the state before "git rebase", run "git rebase --abort".
+hint: Disable this message with "git config set advice.mergeConflict false"
+Could not apply 2e2c584... # topic
+Successfully rebased and updated refs/heads/topic.
+Successfully rebased and updated refs/heads/topic.
+Rebasing (1/1)error: could not apply 48a67f5... topic
+hint: Resolve all conflicts manually, mark them as resolved with
+hint: "git add/rm <conflicted_files>", then run "git rebase --continue".
+hint: You can instead skip this commit: run "git rebase --skip".
+hint: To abort and get back to the state before "git rebase", run "git rebase --abort".
+hint: Disable this message with "git config set advice.mergeConflict false"
+Could not apply 48a67f5... # topic
+Successfully rebased and updated refs/heads/topic.
+Successfully rebased and updated refs/heads/topic.
+ok - worker launches disable both git editors in ordinary and cleared environments
+ok - relaunch rebuilds the compact-adviser switch for the replacement agent in both allowlist postures

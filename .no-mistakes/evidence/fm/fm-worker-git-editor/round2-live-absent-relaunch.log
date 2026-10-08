@@ -1,0 +1,61 @@
++ printf 'worker cwd=%s\nGIT_EDITOR=%s\nGIT_SEQUENCE_EDITOR=%s\n' /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CND652NW53MP2VDN56N9SD/.lv/p/.treehouse/p-14c484/1/p true true
+worker cwd=/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CND652NW53MP2VDN56N9SD/.lv/p/.treehouse/p-14c484/1/p
+GIT_EDITOR=true
+GIT_SEQUENCE_EDITOR=true
++ git config user.name Lab
++ git config user.email lab@example.invalid
++ git config core.editor /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CND652NW53MP2VDN56N9SD/.lv/user/../poison
++ git config sequence.editor /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CND652NW53MP2VDN56N9SD/.lv/user/../poison
++ printf 'base\n'
++ git add conflict.txt
++ git diff --cached --quiet
++ git commit -qm base
+++ git rev-parse HEAD
++ base=c0a05546e6bbb0379c8a1b52c30ac1ac5713970b
+++ date +%s%N
++ branch=journey-1791427433895567380
++ git checkout -qb journey-1791427433895567380
++ printf 'topic\n'
++ git commit -qam topic
+++ date +%s%N
++ git checkout -qb upstream-1791427433914538873 c0a05546e6bbb0379c8a1b52c30ac1ac5713970b
++ printf 'upstream\n'
++ git commit -qam upstream
+++ git rev-parse HEAD
++ upstream=4e552c5c93c9ae08da4b4c1e0a44546aeb51d3b7
++ git checkout -q journey-1791427433895567380
++ git rebase 4e552c5c93c9ae08da4b4c1e0a44546aeb51d3b7
+Rebasing (1/1)Auto-merging conflict.txt
+CONFLICT (content): Merge conflict in conflict.txt
+error: could not apply d02c1dc... topic
+hint: Resolve all conflicts manually, mark them as resolved with
+hint: "git add/rm <conflicted_files>", then run "git rebase --continue".
+hint: You can instead skip this commit: run "git rebase --skip".
+hint: To abort and get back to the state before "git rebase", run "git rebase --abort".
+hint: Disable this message with "git config set advice.mergeConflict false"
+Could not apply d02c1dc... # topic
++ printf 'resolved\n'
++ git add conflict.txt
++ printf '\nRUN git rebase --continue (stdin=/dev/null)\n'
+
+RUN git rebase --continue (stdin=/dev/null)
++ timeout 15 git rebase --continue
+[detached HEAD 84b5529] topic
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+Successfully rebased and updated refs/heads/journey-1791427433895567380.
++ printf '\nRUN git rebase -i HEAD~1 (stdin=/dev/null)\n'
+
+RUN git rebase -i HEAD~1 (stdin=/dev/null)
++ timeout 15 git rebase -i HEAD~1
+Successfully rebased and updated refs/heads/journey-1791427433895567380.
+++ git branch --show-current
+++ cat conflict.txt
++ printf 'branch=%s content=%s\n' journey-1791427433895567380 resolved
+branch=journey-1791427433895567380 content=resolved
+++ cat conflict.txt
++ test resolved = resolved
+++ git rev-parse --git-path rebase-merge
++ test '!' -d /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CND652NW53MP2VDN56N9SD/.lv/p/.git/worktrees/p/rebase-merge
++ printf '\nWORKER_GIT_COMPLETED\n'
+
+WORKER_GIT_COMPLETED

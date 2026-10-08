@@ -1,0 +1,4 @@
+worker cwd=/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CND652NW53MP2VDN56N9SD/.lv/p/.treehouse/p-14c484/1/p
+GIT_EDITOR=true
+GIT_SEQUENCE_EDITOR=true
+fatal: empty string is not a valid pathspec. please use . instead if you meant to match all paths

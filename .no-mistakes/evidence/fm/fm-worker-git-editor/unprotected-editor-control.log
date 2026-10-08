@@ -1,0 +1,11 @@
+Rebasing (1/1)Auto-merging conflict.txt
+CONFLICT (content): Merge conflict in conflict.txt
+error: could not apply 29518d4... topic
+hint: Resolve all conflicts manually, mark them as resolved with
+hint: "git add/rm <conflicted_files>", then run "git rebase --continue".
+hint: You can instead skip this commit: run "git rebase --skip".
+hint: To abort and get back to the state before "git rebase", run "git rebase --abort".
+hint: Disable this message with "git config set advice.mergeConflict false"
+Could not apply 29518d4... # topic
+EDITOR_ENTERED_NO_STDIN
+unprotected continuation exit=124 (124 means editor timeout)

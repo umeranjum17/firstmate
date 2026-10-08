@@ -1,0 +1,5 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CND652NW53MP2VDN56N9SD/.lv/home
+warning: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CND652NW53MP2VDN56N9SD/.lv/home/data/editor-absent/launch-brief.md records no ship branch; defaulting to legacy branch fm/editor-absent
+warning: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CND652NW53MP2VDN56N9SD/.lv/home/data/editor-absent/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: editor-absent ships mode=local-only while the standing posture for p is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+spawned editor-absent harness=bash kind=ship mode=local-only yolo=off window=firstmate:fm-editor-absent worktree=/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CND652NW53MP2VDN56N9SD/.lv/p/.treehouse/p-14c484/1/p

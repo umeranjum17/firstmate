@@ -1,0 +1,40 @@
+treehouse get
+bash-5.3$ treehouse get
+🌳 Setting up worktree...
+🌳 Entered worktree at /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CND652NW53MP2VDN56N9SD/.lv/p/.treehouse/p-14c4
+84/2/p. Type 'exit' to return.
+[umer@extreme p]$ cd -- '/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CND652NW53MP2VDN56N9SD/.lv/p/.treehouse/p-14
+c484/2/p'
+[umer@extreme p]$ export GOTMPDIR=/tmp/fm-editor-enabled/gotmp
+[umer@extreme p]$ export COMPACT_ADVISER_DISABLE=1
+[umer@extreme p]$ export FM_TASK_ID=editor-enabled
+[umer@extreme p]$ . '/tmp/fm-editor-enabled+be4f43da0bdffef8373ed6dccd476f55a5be14023a9477c80ddc8b84ac46f82a/launch.s179
+1427436.3087023.18802.sh'
++ log=/home/umer/.no-mistakes/evidence/01M4CND652NW53MP2VDN56N9SD/round2-live-enabled.log
++ exec
+[umer@extreme p]$
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

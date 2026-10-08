@@ -1,0 +1,23 @@
+Rebasing (1/1)error: could not apply 04aec3e... topic
+hint: Resolve all conflicts manually, mark them as resolved with
+hint: "git add/rm <conflicted_files>", then run "git rebase --continue".
+hint: You can instead skip this commit: run "git rebase --skip".
+hint: To abort and get back to the state before "git rebase", run "git rebase --abort".
+hint: Disable this message with "git config set advice.mergeConflict false"
+Could not apply 04aec3e... # topic
+Successfully rebased and updated refs/heads/topic.
+Successfully rebased and updated refs/heads/topic.
+Rebasing (1/1)error: could not apply 0f256b1... topic
+hint: Resolve all conflicts manually, mark them as resolved with
+hint: "git add/rm <conflicted_files>", then run "git rebase --continue".
+hint: You can instead skip this commit: run "git rebase --skip".
+hint: To abort and get back to the state before "git rebase", run "git rebase --abort".
+hint: Disable this message with "git config set advice.mergeConflict false"
+Could not apply 0f256b1... # topic
+Successfully rebased and updated refs/heads/topic.
+Successfully rebased and updated refs/heads/topic.
+ok - worker launches disable both git editors in ordinary and cleared environments
+ok - ship launch with no allowlist starts its agent with the compact-adviser switch on
+ok - ship launch under an enabled allowlist keeps the compact-adviser switch through the cleared environment
+ok - the launch command sets the switch on its own, whichever allowlist posture is in force
+not ok - secondmate spawn with allowlist=absent should succeed: error: secondmate home cannot be inside the firstmate repo: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CND652NW53MP2VDN56N9SD/.lv-tmp/fm-spawn-compact-adviser.Xb632K/secondmate-absent/secondmate-home: expected exit 0, got 1
