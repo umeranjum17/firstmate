@@ -246,6 +246,24 @@ test_home_qualified_owners() {
   pass "task ownership stays home-qualified through grouping and control selection"
 }
 
+test_remote_records_do_not_own_local_processes() {
+  local case=$TMP_ROOT/remote-owners home wt out
+  home=$case/main wt=$case/pool/build
+  mkdir -p "$home/state" "$wt/sub"
+  fm_write_meta "$home/state/big-build.meta" kind=ship "worktree=$wt"
+  fm_write_meta "$home/state/a-remote.meta" kind=secondmate remote_host=other "home=$wt"
+  fm_write_meta "$home/state/b-remote.meta" kind=ship remote_host=other "worktree=$wt"
+  fm_write_meta "$home/state/c-remote.meta" kind=secondmate remote_host=other "home=$home"
+  fake_host "$case/proc" 5 41
+  fake_pid "$case/proc" 101 node 9 "$wt/sub"
+  fake_pid "$case/proc" 102 java 5 "$wt" big-build
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --state-dir "$home" "$home/state" --owned-top-task "$home/state")
+  assert_contains "$out" 'largest: task big-build (main) 14.0 GB in 2 processes' \
+    "remote task paths and lead homes cannot steal tagged or untagged local processes"
+  assert_equals big-build "${out##*$'\t'}" "the local task remains the interrupt target"
+  pass "remote records never own local processes or label local homes"
+}
+
 test_overridden_state_ownership() {
   local case state out
   case=$(make_case override/A)
@@ -540,6 +558,7 @@ SH
 test_verdicts_samples_and_owners
 test_cgroup_pressure
 test_home_qualified_owners
+test_remote_records_do_not_own_local_processes
 test_overridden_state_ownership
 test_finite_thresholds
 test_watcher_wakes_once_per_alert_episode
