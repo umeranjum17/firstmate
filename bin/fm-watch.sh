@@ -132,10 +132,8 @@
 #                          Re-raised while the condition holds, once per
 #                          new ready set and then every READY_WORK_RESURFACE_SECS;
 #                          intake uses HEARTBEAT's base interval, never its backoff
-# Unacknowledged local queue rows retain their original reason and re-surface
-# after SECONDMATE_WAKE_STALL_SECS without progress, across watcher cycles.
-# Live branch grants defer that reminder up to BUSY_TURN_MAX_SECS; declared
-# external-wait stale rows remain on their existing pause cadence.
+# Local queue reminder semantics, including decision-signal normalization:
+# docs/watcher-continuity.md, "Durable queue and turn-end backstop".
 #   check: inactive-outcome bounded poll-loop reconciliation found a suspicious
 #                          inactive terminal outcome that still lacks its durable
 #                          upstream receipt
