@@ -31,10 +31,15 @@ fm_wait_timer_report() {  # <status-line>
   }
 }
 
+fm_wait_timer_owner_delivered() {
+  [ "$1" -eq 0 ] || return 0
+  fm_wait_timer_save "$FM_WAIT_OWNER_RECORD" "$FM_WAIT_OWNER_SIGNATURE" "$FM_WAIT_OWNER_SINCE" "$(date +%s)" 0 "$FM_WAIT_OWNER_KEY"
+}
+
 fm_wait_timers_tick() {
   local alert=${FM_WAIT_ALERT_SECS:-300} escalate=${FM_WAIT_ESCALATE_SECS:-900}
   local meta task backend window session native sessions='|' blocked='|' rows actor=Main
-  local dir="$STATE/.waiting-timers" now record declaration verb signature old since owner parent key age reason first=''
+  local dir="$STATE/.waiting-timers" now record declaration verb signature old since owner parent key age reason until harness
   for native in "$alert" "$escalate"; do
     case "$native" in ''|*[!0-9]*|0* ) echo "waiting timers: thresholds must be positive decimal seconds" >&2; return 1 ;; esac
     [ "${#native}" -le 9 ] || { echo "waiting timers: threshold exceeds nine digits" >&2; return 1; }
@@ -55,7 +60,7 @@ fm_wait_timers_tick() {
     session=$FM_BACKEND_HERDR_SESSION
     case "$sessions" in *"|$session|"*) continue ;; esac
     sessions="$sessions$session|"
-    native=$(fm_backend_herdr_cli "$session" agent list) || return 1
+    native=$(FM_BACKEND_HERDR_TIMEOUT=$FM_BACKEND_HERDR_READ_TIMEOUT fm_backend_herdr_cli "$session" agent list) || return 1
     rows=$(printf '%s' "$native" | jq -er '
       if (.result.agents | type) != "array" then error("agent.list missing agents array")
       else [.result.agents[] | select(.agent_status == "blocked") |
@@ -85,9 +90,12 @@ EOF
     _fm_parent_channel_id_valid "$task" || { echo "waiting timers: invalid task id in $meta" >&2; return 1; }
     window=$(fm_backend_target_of_meta "$meta")
     declaration=''
-    case "$blocked" in
-      *"|$window|"*) [ -z "$window" ] || declaration=herdr-blocked ;;
-    esac
+    harness=$(fm_meta_get "$meta" harness)
+    if [ "$harness" != cursor ]; then
+      case "$blocked" in
+        *"|$window|"*) [ -z "$window" ] || declaration=herdr-blocked ;;
+      esac
+    fi
     if [ -z "$declaration" ]; then
       rows=$(status_own_open_decisions "$STATE/$task.status")
       while IFS=$'\t' read -r old verb native; do
@@ -97,6 +105,11 @@ $rows
 EOF
       [ -n "$declaration" ] || declaration=$(status_declared_wait_line "$STATE/$task.status")
       status_is_paused "$declaration" || case "$declaration" in blocked*|needs-decision*) ;; *) declaration='' ;; esac
+    fi
+    if task_captain_call_open "$task"; then
+      declaration=''
+    elif status_is_paused "$declaration" && until=$(status_paused_until "$declaration") && [ "$now" -lt "$until" ]; then
+      declaration=''
     fi
     record="$dir/$task"
     old=''; since=$now; owner=0; parent=0; key="waiting-timer-$task-$now-$$-$RANDOM"
@@ -108,7 +121,10 @@ EOF
       esac
       case "$since" in ''|*[!0-9]*) echo "waiting timers: invalid episode time $record" >&2; return 1 ;; esac
       [ "${#since}" -le 12 ] && [ -n "$key" ] || { echo "waiting timers: corrupt episode identity $record" >&2; return 1; }
-      case "$owner:$parent" in 0:0|1:0|1:1) ;; *) echo "waiting timers: invalid episode levels $record" >&2; return 1 ;; esac
+      case "$owner" in ''|*[!0-9]*) echo "waiting timers: invalid owner time $record" >&2; return 1 ;; esac
+      [ "${#owner}" -le 12 ] || return 1
+      case "$parent" in 0|1) ;; *) echo "waiting timers: invalid episode levels $record" >&2; return 1 ;; esac
+      if [ "$owner" -eq 1 ]; then owner=0; fi
     fi
     signature=$(printf '%s' "$window|$declaration" | hash_pane)
     if [ -z "$declaration" ] || [ "$old" != "$signature" ]; then
@@ -129,11 +145,14 @@ EOF
       if ! fm_wake_queued_keys check | grep -Fx "$key-owner" >/dev/null; then
         fm_wake_append check "$key-owner" "$reason" || return 1
       fi
-      owner=1
-      fm_wait_timer_save "$record" "$signature" "$since" "$owner" "$parent" "$key" || return 1
-      [ -n "$first" ] || first=$reason
+      FM_WAIT_OWNER_RECORD=$record
+      FM_WAIT_OWNER_SIGNATURE=$signature
+      FM_WAIT_OWNER_SINCE=$since
+      FM_WAIT_OWNER_KEY=$key
+      FM_WAKE_POST_OUTPUT_ACTION=fm_wait_timer_owner_delivered
+      wake "$reason"
     fi
-    if [ "$age" -ge "$escalate" ] && [ "$parent" -eq 0 ]; then
+    if ! status_is_paused "$declaration" && [ "$owner" -gt 1 ] && [ "$((now - owner))" -ge "$((escalate - alert))" ] && [ "$parent" -eq 0 ]; then
       if [ -e "$FM_HOME/.fm-secondmate-home" ] || [ -L "$FM_HOME/.fm-secondmate-home" ]; then
         fm_wait_timer_report "blocked [key=$key]: waiting-timer-overdue: $task ($verb, observed ${age}s); owning lead has not cleared the wait; Main must unblock or steer the lead" || return 1
       fi
@@ -141,5 +160,5 @@ EOF
       fm_wait_timer_save "$record" "$signature" "$since" "$owner" "$parent" "$key" || return 1
     fi
   done
-  [ -z "$first" ] || wake "$first"
+  return 0
 }
