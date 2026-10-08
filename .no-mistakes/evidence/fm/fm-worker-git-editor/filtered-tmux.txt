@@ -1,0 +1,40 @@
+treehouse get
+[umer@extreme project]$ treehouse get
+🌳 Setting up worktree...
+🌳 Entered worktree at ~/.treehouse/project-49fcbe/2/project. Type 'exit' to return.
+[umer@extreme project]$ cd -- '/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CGFX7T2337R85W85XNDB65/.editor-validat
+ion/user/.treehouse/project-49fcbe/2/project'
+[umer@extreme project]$ export GOTMPDIR=/tmp/fm-editor-filtered/gotmp
+[umer@extreme project]$ export COMPACT_ADVISER_DISABLE=1
+[umer@extreme project]$ export FM_TASK_ID=editor-filtered
+[umer@extreme project]$ . '/tmp/fm-editor-filtered+305a48d59a68ba5a145a53b51308be160e537348505c50156f2843515f33827e/laun
+ch.s1791422379.1557997.30199.sh'
+[umer@extreme project]$
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

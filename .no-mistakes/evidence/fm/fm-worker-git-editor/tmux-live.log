@@ -1,0 +1,14 @@
+/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CGFX7T2337R85W85XNDB65/.editor-validation/home
+scaffolded: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CGFX7T2337R85W85XNDB65/.editor-validation/home/data/editor-ordinary/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CGFX7T2337R85W85XNDB65/.editor-validation/home
+spawned editor-ordinary harness=cd kind=scout window=lab-control:fm-editor-ordinary worktree=/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CGFX7T2337R85W85XNDB65/.editor-validation/user/.treehouse/project-49fcbe/1/project
+ordinary git journey exit=0
+scaffolded: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CGFX7T2337R85W85XNDB65/.editor-validation/home/data/editor-filtered/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CGFX7T2337R85W85XNDB65/.editor-validation/home
+spawned editor-filtered harness=cd kind=scout window=lab-control:fm-editor-filtered worktree=/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CGFX7T2337R85W85XNDB65/.editor-validation/user/.treehouse/project-49fcbe/2/project
+filtered git journey exit=0
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CGFX7T2337R85W85XNDB65/.editor-validation/home
+spawned editor-ordinary harness=pi kind=scout window=lab-control:fm-editor-ordinary worktree=/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CGFX7T2337R85W85XNDB65/.editor-validation/user/.treehouse/project-49fcbe/1/project
+Traceback (most recent call last):
+  File "<stdin>", line 16, in <module>
+AssertionError: no real Pi process observed after relaunch

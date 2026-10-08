@@ -1,0 +1,16 @@
+editors=true|true stdin-tty=no
+Rebasing (1/1)Auto-merging conflict.txt
+CONFLICT (content): Merge conflict in conflict.txt
+error: could not apply 266799c... topic
+hint: Resolve all conflicts manually, mark them as resolved with
+hint: "git add/rm <conflicted_files>", then run "git rebase --continue".
+hint: You can instead skip this commit: run "git rebase --skip".
+hint: To abort and get back to the state before "git rebase", run "git rebase --abort".
+hint: Disable this message with "git config set advice.mergeConflict false"
+Could not apply 266799c... # topic
+[detached HEAD 3ee7d60] topic
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+Successfully rebased and updated refs/heads/topic-1557093.
+REBASE_CONTINUE_COMPLETED=topic
+Successfully rebased and updated refs/heads/topic-1557093.
+INTERACTIVE_REBASE_COMPLETED=sequence
