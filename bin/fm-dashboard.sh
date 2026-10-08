@@ -33,7 +33,8 @@
 # (dispatch to merge across recorded merges, shown only with at least five samples).
 # Dispatch history is local-only; each merge uses its latest preceding dispatch.
 # Quota and history samples remain on Overview, not in board.json.
-# A lane the captain holds is parked, not stuck.
+# A lane the captain holds is parked on the board, remains open, and counts as
+# waiting on other in metric lane-state totals, not as stuck or waiting on a decision.
 # Each build also atomically replaces data.json (every metric with its status and source;
 # GET/HEAD /data.json serves it as application/json) and writes three self-contained HTML
 # pages (inline CSS and SVG, no script, no network reference), phone first:
