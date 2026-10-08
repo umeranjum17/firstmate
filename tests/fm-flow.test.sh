@@ -6,7 +6,7 @@ TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 mkdir -p "$TMP/home" "$TMP/xdg" "$TMP/tmp"
 HOME="$TMP/home" XDG_CONFIG_HOME="$TMP/xdg" TMPDIR="$TMP/tmp" python3 - "$ROOT/bin/fm-flow.sh" "$TMP" <<'PY'
-import hashlib, json, os, subprocess, sys
+import hashlib, json, os, shlex, shutil, socket, subprocess, sys, threading
 from pathlib import Path
 script, tmp = sys.argv[1], Path(sys.argv[2])
 main, child = tmp / 'main', tmp / 'child'
@@ -271,6 +271,40 @@ assert c['tmp']['filesystem_available_bytes'] <= c['tmp']['filesystem_total_byte
 if c['tmp']['top_folders_complete'] is False:
     assert c['tmp']['directory_bytes'] is None and c['tmp']['known_directory_bytes'] >= 0
     assert all(f['bytes'] is None and f['known_bytes'] >= 0 for f in c['tmp']['top_folders'])
+# Real SSH stalls on a task-owned loopback banner exchange. A private port route
+# extends SSH's own timeout so the flow CLI's six-second outer bound must win.
+ssh = shutil.which('ssh')
+assert ssh, 'native SSH client required for timeout integration'
+with socket.socket() as listener:
+    listener.bind(('127.0.0.1', 0))
+    listener.listen(1)
+    listener.settimeout(30)
+    banner = []
+    def stalled_banner():
+        with listener.accept()[0] as connection:
+            connection.settimeout(30)
+            while data := connection.recv(4096):
+                banner.append(data)
+    thread = threading.Thread(target=stalled_banner, daemon=True)
+    thread.start()
+    route = tmp / 'ssh-route'
+    route.mkdir()
+    wrapper = route / 'ssh'
+    wrapper.write_text('#!/bin/sh\nexec ' + shlex.quote(ssh) +
+        f' -F /dev/null -p {listener.getsockname()[1]} -o ConnectTimeout=30 "$@"\n')
+    wrapper.chmod(0o700)
+    before = files()
+    stalled = json.loads(subprocess.check_output(['bash', script, '--json', '--capacity'],
+        env=dict(clean_env, FM_MAC_HOST='nobody@127.0.0.1', PATH=str(route) + os.pathsep + os.environ['PATH']),
+        timeout=45))
+    thread.join(2)
+    assert banner and banner[0].startswith(b'SSH-'), 'actual SSH client reached private native transport'
+    assert not thread.is_alive(), 'timed-out SSH connection closed'
+    assert files() == before, 'timeout path also leaves fleet records untouched'
+    assert any(n['source'] == 'Mac SSH probe' and 'timed out after 6 seconds' in n['reason']
+               for n in stalled['limitations']), 'outer Mac deadline enforced with native SSH'
+    mac = stalled['capacity']['mac']
+    assert mac['reachable'] is None and mac['available_bytes'] is None and mac['simulators'] is None
 bad = subprocess.run(['bash', script, '--json', '--now', 'bad'], capture_output=True)
 assert bad.returncode == 2
 print('PASS: real flow CLI, two homes, queue, keyed waits, retained lifecycle, unknowns, read-only determinism')
