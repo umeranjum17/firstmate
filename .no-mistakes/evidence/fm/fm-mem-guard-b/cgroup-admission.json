@@ -1,0 +1,50 @@
+[
+  {
+    "command": [
+      "bin/fm-jev-mem-guard.sh",
+      "--admit",
+      "bounded-build",
+      "--state",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D9TDDSH7WEDXV3YZH1FMZD/.validation-memory-guard/admission-state"
+    ],
+    "host_pressure": 2,
+    "cgroup_pressure": 58.88,
+    "available_gb": 40,
+    "exit": 1,
+    "stdout": "host memory under pressure: pressure at or above 35% (pressure 59% (10 s average), 40.0 GB available, 0.0 GB swap used; host 2%, cgroup 59% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service))\n",
+    "stderr": "",
+    "persisted_admission_refused": "1791450416\tbounded-build\thost memory under pressure: pressure at or above 35% (pressure 59% (10 s average), 40.0 GB available, 0.0 GB swap used; host 2%, cgroup 59% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service))\n"
+  },
+  {
+    "command": [
+      "bin/fm-jev-mem-guard.sh",
+      "--admit",
+      "bounded-build",
+      "--state",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D9TDDSH7WEDXV3YZH1FMZD/.validation-memory-guard/admission-state"
+    ],
+    "host_pressure": 2,
+    "cgroup_pressure": 24,
+    "available_gb": 40,
+    "exit": 1,
+    "stdout": "host memory under pressure: pressure at or above 20% (pressure 24% (10 s average), 40.0 GB available, 0.0 GB swap used; host 2%, cgroup 24% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service))\n",
+    "stderr": "",
+    "persisted_admission_refused": "1791450416\tbounded-build\thost memory under pressure: pressure at or above 20% (pressure 24% (10 s average), 40.0 GB available, 0.0 GB swap used; host 2%, cgroup 24% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service))\n"
+  },
+  {
+    "command": [
+      "bin/fm-jev-mem-guard.sh",
+      "--admit",
+      "bounded-build",
+      "--state",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D9TDDSH7WEDXV3YZH1FMZD/.validation-memory-guard/admission-state"
+    ],
+    "host_pressure": 2,
+    "cgroup_pressure": 2,
+    "available_gb": 40,
+    "exit": 0,
+    "stdout": "",
+    "stderr": "",
+    "persisted_admission_refused": null
+  }
+]

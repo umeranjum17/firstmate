@@ -1,0 +1,60 @@
+[
+  {
+    "registration": "- zephyrine - local (home: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D9TDDSH7WEDXV3YZH1FMZD/.validation-memory-guard/dashboard-home/mates/zephyrine; scope: work; projects: alpha; added 2026-07-11)\n",
+    "exit": 0,
+    "stdout": "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D9TDDSH7WEDXV3YZH1FMZD/.validation-memory-guard/dashboard-home/state/dashboard/index.html\n",
+    "stderr": "",
+    "pages": {
+      "index": {
+        "remote_refusal_shown": true,
+        "local_task_shown": true,
+        "main_refusal_shown": true
+      },
+      "backlog": {
+        "remote_refusal_shown": false,
+        "local_task_shown": false,
+        "main_refusal_shown": false
+      },
+      "backlog.home": {
+        "remote_refusal_shown": false,
+        "local_task_shown": false,
+        "main_refusal_shown": false
+      },
+      "measure": {
+        "remote_refusal_shown": false,
+        "local_task_shown": false,
+        "main_refusal_shown": false
+      }
+    },
+    "probe_isolation": "Restricted PATH omits Herdr, adb, systemctl, pgrep and tasks-axi; unrelated metrics unknown. HOME, proc and lock directory are worktree-local."
+  },
+  {
+    "registration": "- zephyrine - remote (host: distant; root: /srv; home: /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D9TDDSH7WEDXV3YZH1FMZD/.validation-memory-guard/dashboard-home/mates/zephyrine; scope: work; projects: alpha; added 2026-07-11)\n",
+    "exit": 0,
+    "stdout": "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D9TDDSH7WEDXV3YZH1FMZD/.validation-memory-guard/dashboard-home/state/dashboard/index.html\n",
+    "stderr": "",
+    "pages": {
+      "index": {
+        "remote_refusal_shown": false,
+        "local_task_shown": false,
+        "main_refusal_shown": true
+      },
+      "backlog": {
+        "remote_refusal_shown": false,
+        "local_task_shown": false,
+        "main_refusal_shown": false
+      },
+      "backlog.home": {
+        "remote_refusal_shown": false,
+        "local_task_shown": false,
+        "main_refusal_shown": false
+      },
+      "measure": {
+        "remote_refusal_shown": false,
+        "local_task_shown": false,
+        "main_refusal_shown": false
+      }
+    },
+    "probe_isolation": "Restricted PATH omits Herdr, adb, systemctl, pgrep and tasks-axi; unrelated metrics unknown. HOME, proc and lock directory are worktree-local."
+  }
+]

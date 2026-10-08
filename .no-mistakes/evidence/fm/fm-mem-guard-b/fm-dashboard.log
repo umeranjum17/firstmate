@@ -1,0 +1,10 @@
+ok - unavailable displayed readings suppress reassurance and concurrent cache updates preserve both builds
+ok - a lane with no status line yet and an archive not yet written keep their numbers exact
+ok - moved filings count once and unavailable lanes retain unknown capacity across HTML and JSON
+ok - dashboard preserves lower bounds, route ownership, configured archives, runway uncertainty and wait reasons
+ok - the overview answers each question, and lanes, agents and groups sum to their totals
+ok - Backlog and Method pages show their numbers with windows and sums
+ok - a fleet past twenty mates keeps every lead row
+ok - each failed source shows unknown and why, and never guesses zero
+ok - devices and machine come from read-only probes, name each holder's home, and say unknown with the reason
+ok - serve retains source timestamps, fills page age, remembers ?group in a cookie, rebuilds old pages, and 404s every other path

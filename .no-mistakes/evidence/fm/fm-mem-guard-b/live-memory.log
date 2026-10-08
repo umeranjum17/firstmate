@@ -1,0 +1,82 @@
+/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D9TDDSH7WEDXV3YZH1FMZD/l.v799
+=== Measured real host, refuse new local agents using configured WAIT threshold ===
+WAIT	pressure 1% (10 s average), 51.0 GB available, 42.5 GB swap used; host 1%, cgroup 0% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service); pressure at or above 0%
+ship exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D9TDDSH7WEDXV3YZH1FMZD/l.v799
+host memory under pressure: pressure at or above 0% (pressure 1% (10 s average), 51.0 GB available, 42.5 GB swap used; host 1%, cgroup 0% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service))
+error: spawn refused - task memory-ship stays queued until host memory eases; retry then
+1791449813	memory-ship	host memory under pressure: pressure at or above 0% (pressure 1% (10 s average), 51.0 GB available, 42.5 GB swap used; host 1%, cgroup 0% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service))
+scout exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D9TDDSH7WEDXV3YZH1FMZD/l.v799
+host memory under pressure: pressure at or above 0% (pressure 1% (10 s average), 50.9 GB available, 42.5 GB swap used; host 1%, cgroup 0% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service))
+error: spawn refused - task memory-scout stays queued until host memory eases; retry then
+1791449813	memory-scout	host memory under pressure: pressure at or above 0% (pressure 1% (10 s average), 50.9 GB available, 42.5 GB swap used; host 1%, cgroup 0% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service))
+secondmate exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D9TDDSH7WEDXV3YZH1FMZD/l.v799
+host memory under pressure: pressure at or above 0% (pressure 1% (10 s average), 50.9 GB available, 42.5 GB swap used; host 1%, cgroup 0% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service))
+error: spawn refused - task memory-secondmate stays queued until host memory eases; retry then
+1791449813	memory-secondmate	host memory under pressure: pressure at or above 0% (pressure 1% (10 s average), 50.9 GB available, 42.5 GB swap used; host 1%, cgroup 0% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service))
+=== Start actual Claude in private 120x40 tmux primary; refuse relaunch before touching it ===
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Accessing workspace:
+
+ /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D9TDDSH7WEDXV3YZH1FMZD
+
+ Quick safety check: Is this a project you created or one you trust? (Like your own code, a well-known open source
+ project, or work from your team). If not, take a moment to review what's in this folder first.
+
+ Claude Code'll be able to read, edit, and execute files here.
+
+ Security guide
+
+ ❯ No, exit
+   Yes, I trust this folder
+
+ Enter to confirm · Esc to cancel
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+relaunch exit=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D9TDDSH7WEDXV3YZH1FMZD/l.v799
+host memory under pressure: pressure at or above 0% (pressure 1% (10 s average), 51.3 GB available, 42.7 GB swap used; host 1%, cgroup 0% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service))
+error: relaunch of live-primary refused before its agent was touched: host memory is under pressure; retry once it eases
+same live pane before/after: 754576 0
+=== Admission clears refusal after relaxing thresholds against same actual host ===
+admission exit=0, durable refusal removed
+=== Independent real sampler retries failed durable wake publication ===
+publication unavailable: actual ALERT sample, no committed alert latch
+1791449813	53476268	44512428	1.01	WAIT
+1791449822	53798420	44779920	1.36	ALERT
+1791449822	1	check	host-memory	check: host memory ALERT: pressure 1% (10 s average), 51.3 GB available, 42.7 GB swap used; host 1%, cgroup 0% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service); pressure at or above 0%; largest: qemu-system-x86 pid 3383109 9.1 GB, java pid 1484583 3.0 GB, node-MainThread pid 3349941 2.6 GB; automatic interrupt skipped: top consumer is not a task this home owns
+1791449822		check: host memory ALERT: pressure 1% (10 s average), 51.3 GB available, 42.7 GB swap used; host 1%, cgroup 0% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service); pressure at or above 0%; largest: qemu-system-x86 pid 3383109 9.1 GB, java pid 1484583 3.0 GB, node-MainThread pid 3349941 2.6 GB; automatic interrupt skipped: top consumer is not a task this home owns
+check: host memory ALERT: pressure 1% (10 s average), 51.3 GB available, 42.7 GB swap used; host 1%, cgroup 0% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service); pressure at or above 0%; largest: qemu-system-x86 pid 3383109 9.1 GB, java pid 1484583 3.0 GB, node-MainThread pid 3349941 2.6 GB; automatic interrupt skipped: top consumer is not a task this home owns
+successful retry: durable ALERT wake surfaced by real watcher; foreign top consumer not interrupted
+=== New real ALERT episode retains its own wake while prior episode remains queued ===
+1791449822	1	check	host-memory	check: host memory ALERT: pressure 1% (10 s average), 51.3 GB available, 42.7 GB swap used; host 1%, cgroup 0% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service); pressure at or above 0%; largest: qemu-system-x86 pid 3383109 9.1 GB, java pid 1484583 3.0 GB, node-MainThread pid 3349941 2.6 GB; automatic interrupt skipped: top consumer is not a task this home owns
+1791449823	2	check	host-memory	check: host memory ALERT: pressure 1% (10 s average), 52.0 GB available, 42.8 GB swap used; host 1%, cgroup 0% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service); pressure at or above 0%; largest: qemu-system-x86 pid 3383109 9.1 GB, java pid 1484583 3.0 GB, node-MainThread pid 3349941 2.6 GB; automatic interrupt skipped: top consumer is not a task this home owns
+two retained durable wakes for two episodes; old episode did not suppress new publication
+=== Build end-user memory dashboard from recorded actual samples and actual admission refusal ===
+host memory under pressure: pressure at or above 0% (pressure 1% (10 s average), 52.1 GB available, 42.8 GB swap used; host 1%, cgroup 0% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service))
+/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D9TDDSH7WEDXV3YZH1FMZD/l.v799/state/dashboard/index.html
+all isolated checks passed; cleanup removes primary, sampler and lab home
