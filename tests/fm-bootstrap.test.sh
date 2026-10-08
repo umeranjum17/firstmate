@@ -45,6 +45,14 @@ make_fake_toolchain() {
   local dir=$1 fakebin
   fakebin=$(fm_fakebin "$dir")
   fm_fake_exit0 "$fakebin" tmux node chrome-devtools-axi
+  # A user bus whose fm-sentinel service is running, so no case reads the host's own.
+  cat > "$fakebin/systemctl" <<'SH'
+#!/usr/bin/env bash
+[ -z "${FM_FAKE_NO_USER_BUS:-}" ] || exit 1
+[ "$*" != "--user is-active --quiet fm-sentinel" ] || [ -z "${FM_FAKE_SENTINEL_DOWN:-}" ] || exit 3
+exit 0
+SH
+  chmod +x "$fakebin/systemctl"
   fm_fake_version_tool "$fakebin" lavish-axi FM_FAKE_LAVISH_AXI_VERSION 0.1.80
   cat > "$fakebin/gh-axi" <<'SH'
 #!/usr/bin/env bash
@@ -617,6 +625,28 @@ zellij^zellij
 cmux^cmux
 ROWS
   pass "bootstrap: a session-provider backend gates its own CLI, never a false tmux requirement"
+}
+
+test_herdr_primary_without_restart_recovery_says_how_to_install_it() {
+  local case_dir fakebin out
+  case_dir="$TMP_ROOT/herdr-no-sentinel"
+  mkdir -p "$case_dir/home/config"
+  printf '%s\n' manual > "$case_dir/home/config/backlog-backend"
+  printf '%s\n' herdr > "$case_dir/home/config/backend"
+  fakebin=$(make_fake_toolchain_no_tmux "$case_dir" herdr)
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
+    FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_FAKE_SENTINEL_DOWN=1 "$ROOT/bin/fm-bootstrap.sh")
+  assert_contains "$out" "SENTINEL: fm-sentinel is not running" "a Herdr primary without restart recovery should say so"
+  assert_contains "$out" "install: FM_HOME=$case_dir/home $case_dir/home/bin/fm-sentinel.sh unit > ~/.config/systemd/user/fm-sentinel.service && systemctl --user enable --now fm-sentinel" \
+    "the notice carries the exact install command"
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
+    FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_FAKE_SENTINEL_DOWN=1 FM_FAKE_NO_USER_BUS=1 "$ROOT/bin/fm-bootstrap.sh")
+  [ -z "$out" ] || fail "a host without a systemd user bus has nothing to install, got: $out"
+  : > "$case_dir/home/.fm-secondmate-home"
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
+    FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_FAKE_SENTINEL_DOWN=1 "$ROOT/bin/fm-bootstrap.sh")
+  assert_not_contains "$out" "SENTINEL:" "a secondmate home is recovered by its primary's sentinel"
+  pass "bootstrap: a Herdr primary without the restart-recovery service gets the install command"
 }
 
 test_herdr_install_requires_manual_action() {
@@ -1254,6 +1284,7 @@ test_git_is_required_with_supported_install_instruction
 test_orca_backend_gates_orca_tool_only_when_selected
 test_session_provider_backends_do_not_require_tmux
 test_session_provider_backends_gate_own_cli_not_tmux
+test_herdr_primary_without_restart_recovery_says_how_to_install_it
 test_herdr_install_requires_manual_action
 test_cmux_bundled_cli_satisfies_dependency
 test_unknown_backend_reports_invalid_configuration
