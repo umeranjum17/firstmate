@@ -453,6 +453,9 @@ test_board_json_feeds_the_app() {
   printf '%s\n' "working [at=$((now - 3000))]: building" "working [at=$((now - 900))] [key=nm-run-review]: no-mistakes review" "working [at=$((now - 600))] [key=nm-run-ci]: CI checks" "needs-decision [at=$((now - 300))] [key=nm-newrun-review]: waiting for vendor credentials" > "$home/state/m-opus.status"
   lane "$home" m-ci ship "blocked [at=$((now - 1200))]: CI failed: approve config/release.json https://github.com/acme/alpha/pull/9"
   lane "$home" m-paused ship "paused [at=$((now - 200))] [key=nm-run-test]: waiting for vendor credentials"
+  lane "$home" m-gitlab ship "working [at=$((now - 900))] [key=nm-run-ci]: checks running" "done [at=$((now - 300))]: PR https://gitlab.example/team/nested/app/-/merge_requests/27 checks green"
+  fm_write_meta "$home/state/m-canonical.meta" "kind=ship" "project=alpha" "pr=https://gitlab.example/team/app/-/merge_requests/28"
+  printf 'working [at=%s] [key=nm-run-ci]: checks running\n' "$now" > "$home/state/m-canonical.status"
   printf '{"ts":%s,"event":"task.dispatched","task":"m-opus","harness":"claude"}\n{"ts":%s,"event":"task.dispatched","task":"m-fix","model":"gpt-5.5","harness":"codex"}\n{"ts":%s,"event":"task.merged","task":"m-fix","pr":"https://github.com/acme/alpha/pull/12"}\n' \
     "$((now - 3600))" "$((now - 10800))" "$((now - 60))" >> "$home/state/fleet-ledger.jsonl"
   printf -- '- [x] m-fix - Fix the login PR https://github.com/acme/alpha/pull/12 (repo: alpha) (kind: ship) (merged %s)\n' "$today" >> "$home/data/done-archive.md"
@@ -470,6 +473,8 @@ test_board_json_feeds_the_app() {
     and (c("main/m-done") | .stage == "merge" and .why == "PR 8 checks green" and .pr == "https://github.com/acme/alpha/pull/8" and .history[0].v == "done" and .history[0].stage == "merge")
     and (c("main/m-ci") | .stage == "ci" and .wait == "blocked" and .wait_since == $now - 1200)
     and (c("main/m-paused") | .stage == "test" and .wait == "waiting")
+    and (c("main/m-gitlab") | .stage == "merge" and .since == $now - 300 and .pr == "https://gitlab.example/team/nested/app/-/merge_requests/27")
+    and (c("main/m-canonical") | .pr == "https://gitlab.example/team/app/-/merge_requests/28")
     and (c("main/m-fix@https://github.com/acme/alpha/pull/12") | .stage == "landed" and .title == "Fix the login" and .pr == "https://github.com/acme/alpha/pull/12")
     and ([.cards[] | select(.stage == "queued") | .id] == ["main/m-ready","zephyrine/z-ready"])
     and .parked == ["beta"] and ([.cards[] | select(.home == "beta")] == [])
@@ -494,6 +499,7 @@ const root = process.argv[2], ui = await import(`${root}/ui.js`), board = await 
 const d = { homes: [{ id: 'main', known: true, ready: 0 }, { id: 'remote', known: false, ready: null }], cards: [] }
 assert.equal(ui.total(d, 0), '≥0'); assert.equal(ui.total(d, 0, 'queued'), '≥0'); assert.equal(ui.total(d, 0, 'landed'), '≥0')
 assert.equal(ui.total(d, 2, 'active', 'main'), 2)
+assert.equal(ui.prNum('https://gitlab.example/team/nested/app/-/merge_requests/27'), '27'); assert.equal(ui.prNum('https://github.com/team/app/pull/28'), '28')
 const note = text => ({ verb: 'Waiting', stage: 'review', text, at: 1 })
 const prefix = 'Waiting for approval of the production deployment configuration in '
 assert.equal(board.squash([note(prefix + 'production'), note(prefix + 'staging')]).length, 2)

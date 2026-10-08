@@ -128,7 +128,6 @@ function Palette({ d, go, close, toggleTheme }) {
     if (e.key === 'ArrowDown') { e.preventDefault(); setI(Math.min(i + 1, flat.length - 1)) }
     else if (e.key === 'ArrowUp') { e.preventDefault(); setI(Math.max(i - 1, 0)) }
     else if (e.key === 'Enter' && flat[i]) { flat[i].run(); close() }
-    else if (e.key === 'Escape') close()
   }
   useEffect(() => document.querySelector('.pal [aria-selected=true]')?.scrollIntoView({ block: 'nearest' }), [i])
   let k = -1
@@ -140,8 +139,11 @@ function Palette({ d, go, close, toggleTheme }) {
 }
 const KEYS = [['⌘K or /', 'Search and jump'], ['G then B, N, S', 'Board, Needs you, Ship'], ['H J K L or arrows', 'Move between cards'], ['Enter', 'Open the card'],
   ['J K in a card', 'Next and previous lane'], ['Esc', 'Close'], ['⇧G', 'Rows by home on or off'], ['T', 'Light or dark theme'], ['?', 'This list']]
-const Shortcuts = ({ close }) => html`<div class="scrim dim" onClick=${close}></div><div class="pal" role="dialog" aria-label="Keyboard shortcuts">
+function Shortcuts({ close }) {
+  const ref = useRef(); useEffect(() => ref.current?.focus(), [])
+  return html`<div class="scrim dim" onClick=${close}></div><div class="pal" role="dialog" aria-label="Keyboard shortcuts" tabindex="-1" ref=${ref}>
   <div class="pop-h" style="padding:14px 16px 8px">Keyboard shortcuts</div><dl class="keys">${KEYS.map(([k, v]) => html`<dt><kbd>${k}</kbd></dt><dd>${v}</dd>`)}</dl></div>`
+}
 // Board keys move on a grid: up and down inside a column, left and right across columns.
 function moveFocus(dx, dy) {
   const cols = [...document.querySelectorAll('.col')].map(p => [...p.querySelectorAll('[data-card]')]).filter(p => p.length)
@@ -151,11 +153,14 @@ function moveFocus(dx, dy) {
   if (dx) { ci = Math.max(0, Math.min(cols.length - 1, ci + dx)); ri = Math.min(ri, cols[ci].length - 1) } else ri = Math.max(0, Math.min(cols[ci].length - 1, ri + dy))
   cols[ci][ri].focus(); cols[ci][ri].scrollIntoView({ block: 'nearest', inline: 'nearest' })
 }
-function useKeys(r, go, setPal, setKeys, toggleTheme) {
+function useKeys(r, go, setPal, setKeys, toggleTheme, pal, keys) {
+  const overlay = useRef(); overlay.current = [pal, keys]
   useEffect(() => {
     let g = false
     const f = e => {
-      if (e.target.closest?.('input, [role=dialog]') || e.altKey) return
+      const [pal, keys] = overlay.current
+      if (pal || keys) { if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); keys ? setKeys(false) : setPal(false) } return }
+      if (e.target.closest?.('input') || e.altKey) return
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); return setPal(true) }
       if (e.metaKey || e.ctrlKey) return
       if (e.key === '/') { e.preventDefault(); return setPal(true) }
@@ -168,8 +173,8 @@ function useKeys(r, go, setPal, setKeys, toggleTheme) {
       const m = { j: [0, 1], ArrowDown: [0, 1], k: [0, -1], ArrowUp: [0, -1], h: [-1, 0], ArrowLeft: [-1, 0], l: [1, 0], ArrowRight: [1, 0] }[e.key]
       if (m) { e.preventDefault(); moveFocus(...m) }
     }
-    addEventListener('keydown', f)
-    return () => removeEventListener('keydown', f)
+    addEventListener('keydown', f, true)
+    return () => removeEventListener('keydown', f, true)
   }, [r])
 }
 
@@ -179,7 +184,7 @@ function App() {
   // the button shows the theme a click turns on
   const themeIcon = () => root.dataset.theme === 'dark' ? IC.sun : IC.theme
   const toggleTheme = () => { const t = root.dataset.theme === 'dark' ? 'light' : 'dark'; root.dataset.theme = t; setTheme(t); try { localStorage.setItem('fm-theme', t) } catch {} }
-  useKeys(r, go, setPal, setKeys, toggleTheme)
+  useKeys(r, go, setPal, setKeys, toggleTheme, pal, keys)
   const d = st.data
   useEffect(() => { document.title = d?.asks?.length ? `(${d.asks.length}) Fleet` : 'Fleet' }, [d])
   if (!d) return html`<div class="none" style="height:100vh">${st.err ? `Cannot load the fleet: ${st.err}` : ''}</div>`

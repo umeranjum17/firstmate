@@ -82,8 +82,8 @@ export function Detail({ d, id, go, list }) {
   const step = k => { const n = list[at + k]; if (n) go({ card: n.id }) }
   const close = () => { go({ card: null }); document.querySelector(`[data-card="${CSS.escape(id)}"]`)?.focus() }
   useEffect(() => {
-    ref.current?.focus()
-    const f = e => { if (e.target.closest?.('input')) return
+    if (!document.querySelector('.pal')) ref.current?.focus()
+    const f = e => { if (document.querySelector('.pal') || e.target.closest?.('input')) return
       if (e.key === 'Escape') close(); else if (e.key === 'j' || e.key === 'ArrowDown') step(1); else if (e.key === 'k' || e.key === 'ArrowUp') step(-1) }
     addEventListener('keydown', f)
     return () => removeEventListener('keydown', f)
@@ -107,7 +107,7 @@ export function Detail({ d, id, go, list }) {
         ${c.since && !done && P(c.stage === 'queued' ? 'Ready for' : 'In stage', html`<span class="num">${dur(now() - c.since)}</span><small>since ${hm(c.since)}</small>`)}
         ${done && P('Landed', hm(c.since))}
         ${c.started && P('Started', html`<span class="num">${dur(now() - c.started)} ago</span><small>${hm(c.started)}</small>`)}
-        ${n && P('Pull request', html`<a class="pill pr" href=${c.pr} target="_blank" rel="noreferrer">${I(IC.pr, 12)}${c.pr.split('/')[4]} #${n}</a>`)}
+        ${n && P('Pull request', html`<a class="pill pr" href=${c.pr} target="_blank" rel="noreferrer">${I(IC.pr, 12)}#${n}</a>`)}
       </dl>
       ${c.stage !== 'queued' ? html`<div class="h4">Stages</div><div class="steps">${ACTIVE.map((s, i) => html`<div class=${'step' + (i === cur && !done ? ' cur' : done || enter[s] ? ' done' : '')} style=${{ '--st': `var(--st-${s})` }}>
         <i></i><span>${SNAME[s]}</span><small class="num">${spent[i] != null ? dur(spent[i]) : ''}</small></div>`)}</div>` : ''}

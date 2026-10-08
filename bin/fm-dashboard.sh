@@ -1473,7 +1473,7 @@ STAGES = [('queued', 'Queued'), ('building', 'Building'), ('review', 'Review'), 
 RANK = {s: i for i, (s, _) in enumerate(STAGES)}
 STEP = {'intent': 'review', 'rebase': 'review', 'review': 'review', 'test': 'test', 'document': 'test',
         'lint': 'test', 'push': 'ci', 'pr': 'ci', 'ci': 'ci'}
-PR_URL = re.compile(r'https://github\.com/[\w.-]+/[\w.-]+/pull/\d+')
+PR_URL = re.compile(r'https://(?:github\.com/[\w.-]+/[\w.-]+/pull|[\w.-]+/[\w./-]+/-/merge_requests)/[1-9]\d*')
 def line_stage(verb, key, text):
     s = re.search(r'^nm-.*?-(' + '|'.join(STEP) + r')(?:-fix\d+)?$', key or '')
     if s: return STEP[s.group(1)]
@@ -1517,7 +1517,7 @@ for l in live:
     if l['pr'] in merges and merges[l['pr']][1:] == (h, task): continue
     try: ls = [x.strip() for x in open(os.path.join(home_dir[h], 'state', task + '.status'), errors='replace') if x.strip()]
     except OSError: ls = []
-    stage, entered, rows, at, reached, verbs = 'building', None, [], None, {}, []
+    stage, entered, rows, at, reached, verbs, pr = 'building', None, [], None, {}, [], None
     for x in ls:
         v = re.match(r'^(?:\d{9,11}\s+)?([a-z][a-z-]*)', x)
         verb = v.group(1) if v else ''
@@ -1525,6 +1525,7 @@ for l in live:
         at = int(a.group(1)) if a else at
         k = re.search(r'\[key=([^\]]+)\]', x)
         text = x.split(':', 1)[1].strip() if ':' in x else ''
+        pr = PR_URL.search(text) or pr
         s = line_stage(verb, k.group(1) if k else None, text)
         if meta.get('kind') == 'scout' and s and RANK[s] > RANK['review']: s = 'review'
         if s and s != stage: stage, entered = s, at
@@ -1538,10 +1539,11 @@ for l in live:
         if verb not in WAIT_VERBS.get(wait, ()): break
         wait_since = a or wait_since
     d = disp.get((h, task)) or {}
+    pr = PR_URL.fullmatch(meta.get('pr', '')) or pr
     started = d.get('ts') or (rows[0]['at'] if rows else None) or l['since']
     cards.append(card(h, task, meta.get('kind'), titles.get((h, task)) or task.replace('-', ' '), stage, model=meta.get('model'), tool=meta.get('harness') or d.get('harness'),
                       wait=wait, wait_since=(wait_since or l['since']) if wait else None, reached=reached, state=l['state'], since=entered or started,
-                      started=started, pr=l['pr'] or None, why=prose(l['text'])[:240], effort=meta.get('effort'), history=rows[-40:]))
+                      started=started, pr=pr.group() if pr else None, why=prose(l['text'])[:240], effort=meta.get('effort'), history=rows[-40:]))
 # a merge line's title ends in its PR number, which the card shows as its own link
 def landed_title(h, task): return re.sub(r'\s+PR \d+$', '', done_title.get((h, task)) or titles.get((h, task)) or task.replace('-', ' '))
 for url, (at, h, task) in merges.items():

@@ -16,7 +16,7 @@ export const hm = t => {
   const d = new Date(t * 1000), tm = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
   return d.toDateString() === new Date().toDateString() ? tm : `${d.toLocaleDateString([], { weekday: 'short' })} ${tm}`
 }
-export const prNum = u => (u || '').match(/\/pull\/(\d+)/)?.[1]
+export const prNum = u => (u || '').match(/\/(?:pull|merge_requests)\/(\d+)(?:[/?#]|$)/)?.[1]
 
 export const STAGES = ['queued', 'building', 'review', 'test', 'ci', 'merge', 'landed']
 export const ACTIVE = STAGES.slice(1, 6)
