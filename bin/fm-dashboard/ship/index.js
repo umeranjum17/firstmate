@@ -18,26 +18,26 @@ function Spark({ vals, w = 72, h = 14 }) {
 
 // Home tabs, then the home's lifecycle stage by stage, its crew by model and what it landed today (the sheet below is the whole fleet).
 function Top({ d, home, pick }) {
-  const o = open(d), mine = o.filter(c => c.home === home), n = s => mine.filter(c => c.stage === s).length
+  const o = open(d), mine = o.filter(c => c.home === home), n = s => mine.filter(c => c.stage === s).length, known = d.homes.find(h => h.id === home)?.known
   const by = {}; for (const c of mine) by[c.model || ''] = (by[c.model || ''] || 0) + 1
-  const landed = total(d, d.cards.filter(c => c.stage === 'landed' && c.home === home).length, 'landed')
+  const landed = total(d, d.cards.filter(c => c.stage === 'landed' && c.home === home).length, 'landed', home)
   return html`<div class="sv-hd">
     <div class="sv-homes"><div class="seg" role="tablist">${d.homes.map(h => { const cs = o.filter(c => c.home === h.id), t = tone(cs)
-      return html`<button role="tab" aria-pressed=${h.id === home} aria-selected=${h.id === home} onClick=${() => pick(h.id)}>${h.name}<small class="num">${h.known ? cs.length : '?'}</small>${t ? html`<i class=${t}></i>` : ''}</button>` })}</div></div>
-    <div class="sv-flow">${ACTIVE.map(s => html`<div class=${n(s) ? '' : 'sv-z'}><span class="sv-c"><${StageIcon} s=${s} size=${13}/><b class="num">${n(s)}</b></span><span class="sv-n">${SNAME[s]}</span></div>`)}</div>
-    <div class="sv-crew">${Object.entries(by).sort((a, b) => b[1] - a[1]).map(([m, k]) => html`<span class="sv-chip"><${Av} m=${m || null} size=${18}/>${mname(m || null, d)} <b class="num">${k}</b></span>`)}
-      ${!mine.length ? html`<span class="sv-chip">Nobody on deck</span>` : ''}<span class="sp"></span>
+      return html`<button role="tab" aria-pressed=${h.id === home} aria-selected=${h.id === home} onClick=${() => pick(h.id)}>${h.name}<small class="num">${total(d, cs.length, 'active', h.id)}</small>${t ? html`<i class=${t}></i>` : ''}</button>` })}</div></div>
+    <div class="sv-flow">${ACTIVE.map(s => html`<div class=${known && !n(s) ? 'sv-z' : ''}><span class="sv-c"><${StageIcon} s=${s} size=${13}/><b class="num">${total(d, n(s), s, home)}</b></span><span class="sv-n">${SNAME[s]}</span></div>`)}</div>
+    <div class="sv-crew">${Object.entries(by).sort((a, b) => b[1] - a[1]).map(([m, k]) => html`<span class="sv-chip"><${Av} m=${m || null} size=${18}/>${mname(m || null, d)} <b class="num">${total(d, k, 'active', home)}</b></span>`)}
+      ${!known ? html`<span class="sv-chip">Crew unknown</span>` : !mine.length ? html`<span class="sv-chip">Nobody on deck</span>` : ''}<span class="sp"></span>
       <span class="sv-chip" aria-label=${`${hname(d, home)} landed ${landed} today`}><${StageIcon} s="landed" size=${16}/><b class="num">${landed}</b> landed today</span></div>
   </div>`
 }
 
 function Kpis({ d }) {
-  const o = open(d), plan = d.homes.reduce((s, h) => s + (h.plan || 0), 0), stk = o.filter(stuck), old = oldest(stk)[0]
+  const o = open(d), plan = d.homes.reduce((s, h) => s + (h.plan || 0), 0), stk = o.filter(stuck), known = d.homes.every(h => h.known), a = stk.length && stk.every(c => age(c) != null) ? age(oldest(stk)[0]) : null
   return html`<div class="sv-kpis">
     <div><span class="sv-l">Landed today</span><span class="sv-v num">${d.landed.length ? total(d, d.landed.at(-1), 'landed') : '–'}</span><${Spark} vals=${d.landed}/></div>
     <div><span class="sv-l">In flight</span><span class="sv-v num">${total(d, o.length)}<small>/${plan}</small></span><span class="sv-l">${d.homes.every(h => h.known) ? `${Math.max(0, plan - o.length)} free` : 'unknown'}</span></div>
     <div><span class="sv-l">Cycle p50</span><span class="sv-v num">${d.cycle_p50 == null ? '–' : dur(d.cycle_p50)}</span></div>
-    <div><span class="sv-l">Stuck</span><span class=${'sv-v num' + (stk.length ? ' sv-bad' : '')}>${total(d, stk.length)}</span><span class="sv-l">${old ? `oldest ${dur(age(old) ?? 0)}` : 'none'}</span></div></div>`
+    <div><span class="sv-l">Stuck</span><span class=${'sv-v num' + (stk.length ? ' sv-bad' : '')}>${total(d, stk.length)}</span><span class="sv-l">${stk.length ? a == null ? 'oldest unknown' : `${known ? 'oldest' : 'oldest recorded'} ${dur(a)}` : known ? 'none' : 'unknown'}</span></div></div>`
 }
 // The app's phone rows: model, title, age, then the state word in its colour, the home and the reason.
 function Row({ d, c, parked }) {
@@ -50,15 +50,15 @@ function Row({ d, c, parked }) {
 // Folded, it keeps the oldest stuck row in view (on a short screen only the counts) and leaves the rest of the screen to the ship.
 function Sheet({ d, folded, fold, short }) {
   const o = open(d), stk = oldest(o.filter(stuck)), park = oldest(o.filter(c => c.wait === 'parked')), k = short ? 0 : 1
-  const keep = folded ? k : Infinity, more = stk.length + park.length > k
+  const keep = folded ? k : Infinity, more = stk.length + park.length > k, known = d.homes.every(h => h.known)
   return html`<section class=${'sv-sheet' + (folded ? ' sv-folded' : '')}>
     <button class="sv-grab" aria-expanded=${!folded} aria-label=${folded ? 'Show all stuck work' : 'Show less'} onClick=${fold}><span>Whole fleet</span><i></i></button>
     <${Kpis} d=${d}/>
     <div class="sv-list">
-      <button class="gh" aria-expanded=${!folded} onClick=${fold}>Stuck <span class="n num">${stk.length}</span>${park.length ? html`<span class="n">· Parked by captain</span><span class="n num">${park.length}</span>` : ''}
+      <button class="gh" aria-expanded=${!folded} onClick=${fold}>Stuck <span class="n num">${total(d, stk.length)}</span>${park.length || !known ? html`<span class="n">· Parked by captain</span><span class="n num">${total(d, park.length)}</span>` : ''}
         <span class="sp"></span>${more ? html`<span class="n">${folded ? 'Show all' : 'Show less'}</span>` : ''}</button>
-      ${stk.length ? stk.slice(0, keep).map(c => html`<${Row} key=${c.id} d=${d} c=${c}/>`) : html`<p class="sv-calm">Nothing is stuck.</p>`}
-      ${park.length && !folded ? html`<div class="gh">Parked by captain <span class="n num">${park.length}</span></div>${park.map(c => html`<${Row} key=${c.id} d=${d} c=${c} parked/>`)}` : ''}
+      ${stk.length ? stk.slice(0, keep).map(c => html`<${Row} key=${c.id} d=${d} c=${c}/>`) : html`<p class="sv-calm">${known ? 'Nothing is stuck.' : 'Stuck work unknown.'}</p>`}
+      ${!folded && (park.length || !known) ? html`<div class="gh">Parked by captain <span class="n num">${total(d, park.length)}</span></div>${park.map(c => html`<${Row} key=${c.id} d=${d} c=${c} parked/>`)}${!known ? html`<p class="sv-calm">Parked work unknown.</p>` : ''}` : ''}
     </div></section>`
 }
 const Still = () => html`<div class="sv-still"><svg width="120" height="80" viewBox="0 0 120 80" aria-hidden="true"><path d="M58 8v52M60 12l26 30H60zM56 18L34 44h22z" fill="currentColor" opacity=".5"/>

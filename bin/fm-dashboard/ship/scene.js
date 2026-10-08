@@ -3,7 +3,7 @@
 // station per stage, each worker a chibi in its model's colour, and the lead stands at the wheel.
 import * as THREE from '../vendor/three-0.186.1.min.js'
 import { render } from '../vendor/preact-htm-3.1.1.js'
-import { html, dur, state, stuck, age, ACTIVE, StageIcon } from '../ui.js'
+import { html, dur, state, stuck, age, ACTIVE, StageIcon, MODELS } from '../ui.js'
 
 const P = {
   horizon: '#18233a', cream: '#f3e6c9',
@@ -14,15 +14,9 @@ const P = {
 }
 // Model and stage colours come from the app's tokens, so the deck and the panels agree.
 const tok = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim() || '#8a8f98'
-const MODEL = ['opus', 'sol', 'muse', 'qwen']
-const modelCol = m => tok(`--m-${MODEL.includes(m) ? m : 'other'}`)
-const GLYPH = {
-  opus: 'M8 2.5v11M2.5 8h11M4.1 4.1l7.8 7.8M11.9 4.1l-7.8 7.8',
-  sol: 'M8 5.6a2.4 2.4 0 1 1 0 4.8a2.4 2.4 0 1 1 0-4.8M8 2v1.3M8 12.7V14M2 8h1.3M12.7 8H14M3.8 3.8l.9.9M11.3 11.3l.9.9M12.2 3.8l-.9.9M4.7 11.3l-.9.9',
-  muse: 'M8 2.2C8.4 5.9 10.1 7.6 13.8 8C10.1 8.4 8.4 10.1 8 13.8C7.6 10.1 5.9 8.4 2.2 8C5.9 7.6 7.6 5.9 8 2.2Z',
-  qwen: 'M8 2.4l4.8 2.8v5.6L8 13.6l-4.8-2.8V5.2zM8 5.8v4.4',
-}
+const modelCol = m => tok(`--m-${Object.hasOwn(MODELS, m) ? m : 'other'}`)
 
+export function world(canvas, tagLayer) {
 // ---- toon materials and ink outlines
 const grad = new THREE.DataTexture(new Uint8Array([150, 215, 255]), 3, 1, THREE.RedFormat)
 grad.minFilter = grad.magFilter = THREE.NearestFilter; grad.needsUpdate = true
@@ -274,7 +268,7 @@ function badge(m) {
   if (!badges.has(m)) badges.set(m, new THREE.MeshBasicMaterial({ map: canvasTex(64, g => {
     g.fillStyle = modelCol(m); g.beginPath(); g.arc(32, 32, 30, 0, 7); g.fill(); g.lineWidth = 3; g.strokeStyle = '#fff'; g.stroke()
     g.translate(9, 9); g.scale(46 / 16, 46 / 16); g.lineWidth = 1.8; g.lineCap = g.lineJoin = 'round'; g.strokeStyle = g.fillStyle = '#fff'
-    if (GLYPH[m]) { const p = new Path2D(GLYPH[m]); m === 'muse' ? g.fill(p) : g.stroke(p) } else { g.font = '700 9px Inter, sans-serif'; g.textAlign = 'center'; g.fillText((m || '?')[0].toUpperCase(), 8, 11) }
+    if (Object.hasOwn(MODELS, m)) { const p = new Path2D(MODELS[m][1]); m === 'muse' ? g.fill(p) : g.stroke(p) } else { g.font = '700 9px Inter, sans-serif'; g.textAlign = 'center'; g.fillText((m || '?')[0].toUpperCase(), 8, 11) }
   }) }))
   return badges.get(m)
 }
@@ -310,7 +304,7 @@ function headgear(k, head, o, d) {
   return 1.8
 }
 function crew(m, role = 'crew') {
-  const g = geos(), worker = role === 'crew', k = worker ? (MODEL.includes(m) ? m : 'crew') : role, c = worker ? modelCol(m) : P.coat
+  const g = geos(), worker = role === 'crew', k = worker ? (Object.hasOwn(MODELS, m) ? m : 'crew') : role, c = worker ? modelCol(m) : P.coat
   const root = new THREE.Group(), body = new THREE.Group(), head = new THREE.Group(); root.add(body)
   const outfit = tc(c, 0.28), dark = tc('#' + new THREE.Color(c).multiplyScalar(0.55).getHexString())
   const torso = mesh(k === 'muse' ? g.robe : g.body, outfit, 0.03); body.add(torso, head)
@@ -363,7 +357,28 @@ const SX = { building: -4.3, review: -1.6, test: 0.9, ci: 3.6, merge: 5.9 }
 // up to six crates stacked three, two, one
 const STACK = [[0, -0.52], [0, 0], [0, 0.52], [1, -0.26], [1, 0.26], [2, 0]]
 const PARK = 'Parked by captain', DIR = new THREE.Vector3(0.12, 0.84, 1).normalize()
-export function world(canvas, tagLayer) {
+  const resources = (root, cached = false) => {
+    const assets = new Set(), material = m => {
+      assets.add(m)
+      for (const v of Object.values(m)) if (v?.isTexture) assets.add(v)
+      for (const u of Object.values(m.uniforms || {})) if (u.value?.isTexture) assets.add(u.value)
+    }
+    root?.traverse(o => {
+      if (o.geometry && !o.isSprite) assets.add(o.geometry)
+      if (o.material) for (const m of [o.material].flat()) material(m)
+    })
+    if (cached) {
+      for (const g of Object.values(G)) assets.add(g)
+      for (const m of [...mats.values(), ...badges.values()]) material(m)
+      assets.add(grad); if (haloTex) assets.add(haloTex)
+    }
+    return assets
+  }
+  const retire = root => {
+    root.removeFromParent()
+    const shared = resources(null, true)
+    for (const a of resources(root)) if (!shared.has(a)) a.dispose()
+  }
   const r = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' })
   r.setPixelRatio(0.5); r.toneMapping = THREE.NoToneMapping
   r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFShadowMap
@@ -410,6 +425,9 @@ export function world(canvas, tagLayer) {
     if (t.words !== words) { t.words = words; render(view, t.el); t.w = t.el.offsetWidth; t.h = t.el.offsetHeight }
     return t
   }
+  function removeTag(key, t) {
+    sized.unobserve(t.el); render(null, t.el); t.el.remove(); tags.delete(key)
+  }
   // Tags never touch: trouble goes first, each over its own worker; one whose spot is taken slides sideways as far as its stem
   // still meets it, else steps up over what is in the way. A station plate shows only where it fits.
   function placeTags() {
@@ -440,14 +458,14 @@ export function world(canvas, tagLayer) {
       home = id; const i = d.homes.findIndex(h => h.id === id), h = d.homes[i]
       const col = tok(`--h-${(i % 8 + 8) % 8 + 1}`); mark.draw((h?.name || id)[0].toUpperCase(), col)
       for (const sl of S.userData.sails) if (sl.flag) sl.m.material.color.set(col)
-      if (lead) S.remove(lead)
+      if (lead) retire(lead)
       lead = crew(null, id === 'main' ? 'main' : 'lead'); lead.scale.setScalar(SCALE * 1.1); lead.rotation.y = Math.PI / 2; helm.add(lead)
     }
     const mine = d.cards.filter(c => c.home === id && ACTIVE.includes(c.stage))
-    for (const [k, f] of figs) if (!mine.some(c => c.id === k)) { S.remove(f.f); figs.delete(k) }
+    for (const [k, f] of figs) if (!mine.some(c => c.id === k)) { retire(f.f); figs.delete(k) }
     for (const s of ACTIVE) mine.filter(c => c.stage === s).forEach((c, i, all) => {
       let f = figs.get(c.id)
-      if (!f || f.m !== c.model) { if (f) S.remove(f.f); f = { f: crew(c.model), m: c.model }; f.f.scale.setScalar(SCALE); S.add(f.f); figs.set(c.id, f) }
+      if (!f || f.m !== c.model) { if (f) retire(f.f); f = { f: crew(c.model), m: c.model }; f.f.scale.setScalar(SCALE); S.add(f.f); figs.set(c.id, f) }
       // pairs stand on a diagonal, one a step behind and aside, rows from the near rail inward, so every face shows
       const n = all.length, rows = Math.ceil(n / 2), row = Math.floor(i / 2), pair = n - row * 2 > 1, back = pair && i % 2
       const x = SX[s] + (pair ? (back ? 0.65 : -0.65) : 0), w = S.userData.half((x + LEN / 2) / LEN) * 0.75
@@ -509,7 +527,7 @@ export function world(canvas, tagLayer) {
       const [x, y] = toScreen(V), tg = tag('st' + k, 'sv-ico', 2, k, html`<${StageIcon} s=${k}/>`)
       tg.x = x; tg.y = y; tg.pin = true
     }
-    for (const [k, g] of tags) if (!g.on) { g.el.remove(); tags.delete(k) }
+    for (const [k, g] of tags) if (!g.on) removeTag(k, g)
     placeTags()
   }
   // 30 frames a second: the motion is stepped by design, and a tab left open all day stays cool
@@ -519,6 +537,13 @@ export function world(canvas, tagLayer) {
   still.addEventListener('change', motion)
   return {
     show, fit, start: motion,
-    destroy() { alive = false; cancelAnimationFrame(raf); sized.disconnect(); still.removeEventListener('change', motion); r.dispose(); tagLayer.textContent = '' },
+    destroy() {
+      alive = false; cancelAnimationFrame(raf); still.removeEventListener('change', motion)
+      for (const [k, t] of tags) removeTag(k, t)
+      sized.disconnect()
+      for (const a of resources(scene, true)) a.dispose()
+      scene.traverse(o => o.shadow?.dispose())
+      r.dispose()
+    },
   }
 }
