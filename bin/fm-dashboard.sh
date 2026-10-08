@@ -420,51 +420,6 @@ OPEN = len(live)
 by_home = {h: [l for l in live if l['home'] == h] for h in ACTIVE}
 
 # --- pull requests and validation runs: local records, read-only ---------
-def secs(s):  # a no-mistakes duration such as 2h18m or 45s
-    parts = re.findall(r'(\d+)([hms])', s or '')
-    return sum(int(n) * {'h': 3600, 'm': 60, 's': 1}[u] for n, u in parts) if parts else None
-def nm_run(l):
-    """The lane's validation run from `no-mistakes axi status` in its own copy: {status, pr, step, for} or {err}."""
-    wt = l['meta'].get('worktree')
-    if not wt or not os.path.isdir(wt): return None
-    out, err = probe(['no-mistakes', 'axi', 'status'], timeout=10, cwd=wt)
-    if out is None: return {'err': err}
-    st = re.search(r'^  status: (\S+)', out, re.M)
-    pr = re.search(r'^  pr: "?(https://[^"\s]+)', out, re.M)
-    act = re.search(r'^  active_steps\[\d+\]\{[^}]*\}:\n    ([\w-]+),[\w-]+,(\w+)', out, re.M)
-    return {'status': st and st.group(1), 'pr': pr and pr.group(1), 'step': act and act.group(1), 'for': act and secs(act.group(2))}
-def checks_of(l, url):
-    """('failing'|'running'|'green', checked_at) from the lane's local PR record, or (None, None)."""
-    c = load_json(os.path.join(home_dir[l['home']], 'data', l['task'], 'contributions.json'))
-    for r in c.get('records') or [] if isinstance(c.get('records'), list) else []:
-        if not isinstance(r, dict) or r.get('url') != url: continue
-        o = r.get('observation') or {}
-        cs = [x for x in o.get('checks') or [] if isinstance(x, dict)]
-        if any(x.get('conclusion') in ('failure', 'cancelled', 'timed_out', 'action_required') for x in cs): v = 'failing'
-        elif any(x.get('status') != 'completed' for x in cs): v = 'running'
-        elif cs: v = 'green'
-        else: v = None
-        return v, r.get('checked_at')
-    return None, None
-PR_LANES = [l for l in live if l['pr'] or l['state'] in ('validating', 'finished')]
-from concurrent.futures import ThreadPoolExecutor
-with ThreadPoolExecutor(8) as ex: RUNS = list(ex.map(nm_run, PR_LANES))  # ponytail: one status call per lane, 8 at a time
-nm_err = [r['err'] for r in RUNS if r and r.get('err')]
-if nm_err: notes.append(('no-mistakes axi status', f'{len(nm_err)} of {len(PR_LANES)} lanes: {nm_err[0]}'))
-PRS = []  # dict(lane, url, group, step, wait, checks, checked)
-for l, run in zip(PR_LANES, RUNS):
-    run = run if run and not run.get('err') else {}
-    url = run.get('pr') or l['pr']
-    ck, at = checks_of(l, url) if url else (None, None)
-    if ck == 'failing' or run.get('status') == 'failed': g = 'failing'
-    elif run.get('status') == 'running' or ck == 'running' or l['state'] == 'validating': g = 'validating'
-    elif ck == 'green': g = 'green'
-    else: g = 'none'
-    PRS.append(dict(lane=l, url=url, group=g, step=run.get('step'), wait=run.get('for'), checks=ck, checked=at))
-ci_waits = [p for p in PRS if p['step'] == 'ci' and p['wait'] is not None]
-CI_SLOW = 3600  # a CI wait over this is a slow spot
-
-# --- backlog per home: tasks-axi ----------------------------------------
 def toon_fields(s):
     out, i = [], 0
     while i <= len(s):
@@ -493,6 +448,92 @@ def toon_rows(text, name='tasks'):
             return rows
         if re.match(rf'^{name}: 0 ', l): return []
     return None
+def secs(s):  # a no-mistakes duration such as 2h18m or 45s
+    parts = re.findall(r'(\d+)([hms])', s or '')
+    return sum(int(n) * {'h': 3600, 'm': 60, 's': 1}[u] for n, u in parts) if parts else None
+def nm_run(l):
+    """The lane's verified validation run, or an attribution error."""
+    wt = l['meta'].get('worktree')
+    if not wt or not os.path.isdir(wt): return None
+    out, err = probe(['bash', '-c', '''
+. "$1/fm-nm-run-lib.sh"
+wt=$2
+branch=$(git -C "$wt" symbolic-ref --short HEAD 2>/dev/null) || exit 0
+overview=$(fm_nm_run_bounded "$wt" 10 axi) || exit $?
+choice=$(fm_nm_select_run "$branch" "$overview" "$wt" 10)
+case "$choice" in
+  absent) exit 0 ;;
+  selected'|'*) IFS='|' read -r _ id status candidates <<< "$choice" ;;
+  *) echo "run attribution unknown: $choice" >&2; exit 1 ;;
+esac
+out=$(fm_nm_run_bounded "$wt" 10 axi status --run "$id") || exit $?
+field() { fm_nm_strip_quotes "$(fm_nm_field "$out" "$1")"; }
+[ "$(field id)" = "$id" ] && [ "$(field branch)" = "$branch" ] || exit 1
+case "$(field status)" in
+  pending|running|fixing|ci|awaiting_approval|fix_review|completed|failed|cancelled) ;;
+  *) exit 1 ;;
+esac
+if fm_nm_run_is_active "$out"; then class=live; else class=terminal; fi
+[ "$(fm_nm_run_status_class "$status")" = "$class" ] || exit 1
+if ! fm_nm_head_matches_worktree "$wt" "$(field head)" && ! fm_nm_run_is_pipeline_owned_active "$out"; then
+  fm_nm_run_is_executing "$out" || exit 1
+  rc=0
+  fm_nm_run_bounded "$wt" 10 daemon status >/dev/null || rc=$?
+  [ "$rc" = 0 ] || [ "$rc" = 124 ] || exit 1
+fi
+printf '%s\\n' "$out"
+''', 'dashboard', BIN, wt], timeout=45, cwd=wt)
+    if out is None: return {'err': err}
+    if not out.strip(): return None
+    block = re.search(r'^run:\n((?:[ \t].*\n|\n)*)', out + '\n', re.M)
+    if not block: return {'err': 'no verified run block'}
+    text = '\n'.join(l[2:] for l in block.group(1).splitlines())
+    fields = dict(re.findall(r'^(\w+): (.*)$', text, re.M))
+    try:
+        fields = {k: json.loads(v) if v.startswith('"') else v for k, v in fields.items()}
+        active = toon_rows(text, 'active_steps') or []
+    except ValueError as e: return {'err': f'unparseable run: {e}'}
+    if fields.get('outcome') or fields.get('status') in ('completed', 'failed', 'cancelled'): active = []
+    act = next((a for a in active if a.get('step') == 'ci'), active[0] if active else {})
+    return {'status': fields.get('status'), 'outcome': fields.get('outcome'), 'pr': fields.get('pr'),
+            'step': act.get('step'), 'for': secs(act.get('active_for'))}
+def checks_of(l, url):
+    """('failing'|'running'|'green', checked_at) from the lane's local PR record, or (None, None)."""
+    c = load_json(os.path.join(home_dir[l['home']], 'data', l['task'], 'contributions.json'))
+    for r in c.get('records') or [] if isinstance(c.get('records'), list) else []:
+        if not isinstance(r, dict) or r.get('url') != url: continue
+        o = r.get('observation') or {}
+        latest_checks = {}
+        for x in sorted((x for x in o.get('checks') or [] if isinstance(x, dict)),
+                        key=lambda x: (x.get('started_at') or '', x.get('id') or 0)):
+            latest_checks[x.get('name')] = x
+        cs = list(latest_checks.values())
+        if any(x.get('status') == 'completed' and x.get('conclusion') and x['conclusion'] not in ('success', 'skipped', 'neutral') for x in cs): v = 'failing'
+        elif any(x.get('status') != 'completed' for x in cs): v = 'running'
+        elif any(not x.get('conclusion') for x in cs) or o.get('absent_checks'): v = None
+        elif cs: v = 'green'
+        else: v = None
+        return v, r.get('checked_at')
+    return None, None
+PR_LANES = [l for l in live if l['pr'] or l['state'] in ('validating', 'finished')]
+from concurrent.futures import ThreadPoolExecutor
+with ThreadPoolExecutor(8) as ex: RUNS = list(ex.map(nm_run, PR_LANES))  # ponytail: one status call per lane, 8 at a time
+nm_err = [r['err'] for r in RUNS if r and r.get('err')]
+if nm_err: notes.append(('no-mistakes axi status', f'{len(nm_err)} of {len(PR_LANES)} lanes: {nm_err[0]}'))
+PRS = []  # dict(lane, url, group, step, wait, checks, checked)
+for l, run in zip(PR_LANES, RUNS):
+    run = run if run and not run.get('err') else {}
+    url = run.get('pr') or l['pr']
+    ck, at = checks_of(l, url) if url else (None, None)
+    if ck == 'failing' or run.get('status') == 'failed' or run.get('outcome') == 'failed': g = 'failing'
+    elif run.get('status') in ('pending', 'running', 'fixing', 'ci', 'awaiting_approval', 'fix_review') or ck == 'running' or l['state'] == 'validating': g = 'validating'
+    elif ck == 'green': g = 'green'
+    else: g = 'none'
+    PRS.append(dict(lane=l, url=url, group=g, step=run.get('step'), wait=run.get('for'), checks=ck, checked=at))
+ci_waits = [p for p in PRS if p['step'] == 'ci' and p['wait'] is not None]
+CI_SLOW = 3600  # a CI wait over this is a slow spot
+
+# --- backlog per home: tasks-axi ----------------------------------------
 def clean(t):
     t = str(t or '')
     return t.split('\n', 1)[0].rstrip() + '…' if '\n' in t else t
@@ -533,18 +574,19 @@ try:
 except (OSError, ValueError, IndexError): log, log_since = {}, None
 first_log = log_since is None
 # A gap of more than 10 minutes between builds means filings in it have no exact time: start over from now.
-if first_log or not log_last or NOW_TS - log_last > 600: log_since = int(NOW_TS)
+log_gap = first_log or not log_last or NOW_TS - log_last > 600 or not bl_known
+if log_gap: log_since = int(NOW_TS)
 changed = True
 for h in home_dir:
     for r in backlog.get(h) or []:
         if (h, r['id']) not in log:  # items already filed when the log starts have no known time (0)
             # an item from an earlier day the log never saw (first run, outage, new home) keeps only its filing day
-            seen = int(NOW_TS) if not first_log and r['day'] in (None, TODAY) else 0
+            seen = int(NOW_TS) if not log_gap and r['day'] in (None, TODAY) else 0
             log[(h, r['id'])] = [seen, re.sub(r'[\t\n]', ' ', r['title'])]
 if changed:
     try:
         with open(FILED + '.tmp', 'w', encoding='utf-8') as f:
-            f.write(f'# since {log_since} last {int(NOW_TS)}\thome\tid\tfirst_seen\ttitle\n')
+            f.write(f'# since {log_since} last {int(NOW_TS) if bl_known else 0}\thome\tid\tfirst_seen\ttitle\n')
             for (h, i), (s, t) in sorted(log.items(), key=lambda kv: (kv[1][0], kv[0])): f.write(f'{h}\t{i}\t{s}\t{t}\n')
         os.replace(FILED + '.tmp', FILED)
     except OSError as e: notes.append(('filing log', e.strerror))
@@ -552,7 +594,7 @@ created = {(h, r['id']): r['day'] for h in home_dir for r in backlog.get(h) or [
 def filed_day(key):
     s = log.get(key, [0])[0]
     return datetime.fromtimestamp(s).astimezone().date() if s else created.get(key)
-def exact(d): return log_since <= day_start(d).timestamp()
+def exact(d): return bl_known and log_since <= day_start(d).timestamp()
 def filed(d, home=None):
     """(count, exact) of non-parked items filed on local day d; before the log covers d, a floor."""
     keys = [k for k in log if k[0] not in parked and (home is None or k[0] == home) and filed_day(k) == d]
@@ -563,18 +605,18 @@ filed_today = sorted(((s, h, t) for (h, i), (s, t) in log.items() if s and h not
 def github_days():
     cache_p = os.path.join(STATE_DIR, '.merged.json')
     c = load_json(cache_p)
-    repo_home = {}  # owner/name -> home: the home named like the repo, else the first home that clones it
+    repos = set()
     for h, d in sorted(home_dir.items()):
         pd = os.path.join(d, 'projects')
         for pj in sorted(os.listdir(pd)) if os.path.isdir(pd) else []:
             u = subprocess.run(['git', '-C', os.path.join(pd, pj), 'remote', 'get-url', 'origin'], capture_output=True, text=True).stdout.strip()
             r = re.sub(r'\.git$', '', re.sub(r'^.*github\.com[:/]', '', u))
-            if '/' in r and (r not in repo_home or r.split('/')[1] == h): repo_home[r] = h
-    if not repo_home: notes.append(('GitHub landings', 'no registered project clone has a GitHub remote')); return None, {}
-    scope = json.loads(json.dumps(['merged-days-v2', sorted(repo_home.items()), str(NOW.tzinfo)]))
+            if '/' in r: repos.add(r)
+    if not repos: notes.append(('GitHub landings', 'no registered project clone has a GitHub remote')); return None, set()
+    scope = json.loads(json.dumps(['merged-days-v3', sorted(repos), str(NOW.tzinfo)]))
     days = c.get('days') if c.get('scope') == scope and isinstance(c.get('days'), dict) else {}
     out = {}
-    owners = ' '.join(f'owner:{o}' for o in sorted({r.split('/')[0] for r in repo_home}))
+    owners = ' '.join(f'owner:{o}' for o in sorted({r.split('/')[0] for r in repos}))
     for d in WEEK:
         e = days.get(d.isoformat())
         end = day_start(d + timedelta(days=1)) - timedelta(seconds=1)
@@ -599,16 +641,39 @@ def github_days():
                 notes.append(('GitHub landings', str(ex))); return None, {}
         out[d.isoformat()] = e
     save_json(cache_p, {'scope': scope, 'days': out})
-    return out, repo_home
-gh_days, repo_home = github_days()
+    return out, repos
+gh_days, repos = github_days()
 prs = tsv('data/metrics/prs.tsv', ('home', 'merged', 'first_pass'))
+pr_homes = {}
+for p in prs or []:
+    if p.get('repo') and p.get('pr') and p['home'] in home_dir:
+        pr_homes.setdefault(f"https://github.com/{p['repo']}/pull/{p['pr']}", set()).add(p['home'])
+for h, d in home_dir.items():
+    data_dir = os.path.join(d, 'data')
+    try: tasks = os.listdir(data_dir)
+    except OSError: tasks = []
+    for task in tasks:
+        c = load_json(os.path.join(data_dir, task, 'contributions.json'))
+        for r in c.get('records') or [] if isinstance(c.get('records'), list) else []:
+            if isinstance(r, dict) and r.get('url'): pr_homes.setdefault(r['url'], set()).add(h)
+    if h == 'main': continue
+    try:
+        with open(os.path.join(data_dir, 'metrics/prs.tsv')) as f:
+            cols = f.readline().lstrip('# ').rstrip('\n').split('\t')
+            for line in f:
+                p = dict(zip(cols, line.rstrip('\n').split('\t')))
+                if p.get('repo') and p.get('pr') and p.get('home') in home_dir:
+                    pr_homes.setdefault(f"https://github.com/{p['repo']}/pull/{p['pr']}", set()).add(p['home'])
+    except OSError: pass
 landings = None  # [(local datetime, home, title, url, repo#n)] for non-parked homes, last 7 days
 if gh_days is not None:
     landings = []
     for d, e in gh_days.items():
         for i in e['items']:
-            h, t = repo_home.get(i.get('repo')), parse_ts(i.get('at'))
-            if h and h not in parked and t: landings.append((t, h, i.get('title', ''), i.get('url', ''), f"{i.get('repo')}#{i.get('n')}"))
+            owners = pr_homes.get(i.get('url'), set())
+            h = next(iter(owners)) if len(owners) == 1 else 'unattributed'
+            t = parse_ts(i.get('at'))
+            if i.get('repo') in repos and h not in parked and t: landings.append((t, h, i.get('title', ''), i.get('url', ''), f"{i.get('repo')}#{i.get('n')}"))
     LANDED_SRC = f"GitHub {hm(gh_days[TODAY.isoformat()]['at'])}"
 elif prs is not None:
     landings = [(parse_ts(p['merged']), p['home'], p.get('title') or f"{p.get('repo', p['home'])} pull request {p.get('pr', '')}", '', '')
@@ -653,7 +718,7 @@ def quota():
     try:
         if out is None: raise ValueError(err)
         data = json.loads(out)
-        if data.get('schemaVersion') != 5: raise ValueError(f"unsupported quota-axi schema version: {data.get('schemaVersion')}")
+        if data.get('schemaVersion') not in (5, 6): raise ValueError(f"unsupported quota-axi schema version: {data.get('schemaVersion')}")
         if not isinstance(data.get('providers'), list): raise ValueError('no providers')
         save_json(cache_p, {'at': NOW_TS, 'data': data})
         return data, NOW_TS
@@ -666,7 +731,7 @@ QNAME = {'claude': 'Claude', 'codex': 'Codex', 'opencode-go': 'OpenCode Go', 'za
          'kimi': 'Kimi', 'deepseek': 'DeepSeek', 'grok': 'Grok', 'openrouter': 'OpenRouter', 'minimax': 'MiniMax', 'agy': 'Antigravity'}
 def provider_of(m):  # the account a lane spends, from its model's provider prefix, else its harness
     model, harness = m.get('model') or '', m.get('harness') or ''
-    if '/' in model: p = model.split('/')[0]; return {'openai-codex': 'codex', 'claude-bridge': 'claude'}.get(p, p)
+    if '/' in model: p = model.split('/')[0]; return {'openai-codex': 'codex', 'codex-native': 'codex', 'claude-bridge': 'claude'}.get(p, p)
     return {'claude': 'claude', 'codex': 'codex', 'opencode': 'codex', 'grok': 'grok', 'kimi': 'kimi', 'cursor': 'cursor'}.get(harness)
 carries = {}  # provider -> {'leads': n, 'workers': n}
 for h, ms in metas.items():
@@ -674,7 +739,17 @@ for h, ms in metas.items():
         if m.get('kind') not in ('ship', 'scout', 'secondmate'): continue
         if (task if m.get('kind') == 'secondmate' else h) in parked: continue
         p = provider_of(m)
-        if p: carries.setdefault(p, {'leads': 0, 'workers': 0})['leads' if m.get('kind') == 'secondmate' else 'workers'] += 1
+        model, harness = m.get('model') or '', m.get('harness') or ''
+        lane = m.get('account_provider') or ('codex-home' if harness == 'codex' else model.split('/')[0] if harness in ('pi', 'pi-signed') and '/' in model else '')
+        if lane == 'codex-native': lane = 'codex-home'
+        rows = [r for r in (qdata or {}).get('providers') or [] if r.get('provider') == p]
+        if (qdata or {}).get('schemaVersion') == 6:
+            matches = [r for r in (qdata or {}).get('providers') or [] if lane and r.get('accountKey') == lane and lane != 'default']
+            row = matches[0] if len(matches) == 1 else next((r for r in rows if r.get('accountKey') == lane), None) or next((r for r in rows if r.get('accountKey') == 'default'), None)
+        else: row = next(iter(rows), None)
+        if row:
+            key = (row.get('provider'), row.get('accountKey'))
+            carries.setdefault(key, {'leads': 0, 'workers': 0})['leads' if m.get('kind') == 'secondmate' else 'workers'] += 1
 def carries_words(p):
     c = carries.get(p) or {}
     w = ', '.join(x for x in (plural(c['leads'], 'lead') if c.get('leads') else '', plural(c['workers'], 'worker') if c.get('workers') else '') if x)
@@ -695,13 +770,20 @@ for p in (qdata or {}).get('providers') or []:
                          reset=parse_ts(w.get('resetsAt')) if w.get('resetsAt') else None))
     limit = next((w for w in wins if w['id'] == run.get('limitingWindowId')), None)
     credits = p.get('credits') or {}
-    problem = str(st.get('error')).replace('_', ' ') if st.get('stale') or st.get('status') not in ('fresh', None) else None
+    problem = (str(st.get('error') or 'reading not current').replace('_', ' ')
+               if st.get('stale') or st.get('status') not in ('fresh', None) or NOW_TS - q_at >= QUOTA_TTL else None)
+    runway = run.get('status') if not problem and av.get('status') in ('known', None) else 'unknown'
     out_at = parse_ts(run.get('projectedExhaustedAt')) if run.get('projectedExhaustedAt') else None
-    accounts.append(dict(p=p.get('provider'), name=QNAME.get(p.get('provider'), str(p.get('provider')).title()), plan=p.get('plan') or '',
-                         status=run.get('status'), runout=out_at, conf=run.get('projectionConfidence') or '', limit=limit, windows=wins,
-                         problem=problem, empty=run.get('status') == 'exhausted_now' or (credits.get('remaining') == 0 and not credits.get('unlimited') and not wins)))
+    name = QNAME.get(p.get('provider'), str(p.get('provider')).title())
+    if p.get('accountKey'): name += ' · ' + p['accountKey']
+    accounts.append(dict(p=(p.get('provider'), p.get('accountKey')), name=name, plan=p.get('plan') or '',
+                         status=runway, runout=out_at, conf=run.get('projectionConfidence') or '', limit=limit, windows=wins,
+                         problem=problem, empty=not problem and (runway == 'exhausted_now' or (credits.get('remaining') == 0 and not credits.get('unlimited') and not wins))))
 def runs_out(a): return a['status'] == 'projected_exhaustion' and a['runout'] and not a['problem'] and (not a['limit'] or not a['limit']['reset'] or a['runout'] < a['limit']['reset'])
+def lasts_to_reset(a):
+    return not a['problem'] and (a['status'] == 'through_reset' or (a['status'] == 'projected_exhaustion' and a['runout'] and a['limit'] and a['limit']['reset'] and a['runout'] >= a['limit']['reset']))
 running_out = sorted((a for a in accounts if runs_out(a)), key=lambda a: a['runout'])
+quota_unknown = [a for a in accounts if not runs_out(a) and not lasts_to_reset(a) and not a['empty']]
 
 # --- pulse, metrics ------------------------------------------------------
 PULSE = ('time', 'home', 'merged2h', 'working', 'paused', 'blocked', 'open', 'ready', 'donewait',
@@ -714,7 +796,7 @@ daily = tsv('data/metrics/daily.tsv', ('day', 'home'))
 targets = tsv('config/metrics-targets.tsv', ('metric', 'op', 'target'))
 def dsum(col, day, home=None):
     if daily is None: return None
-    vals = [count(r.get(col)) for r in daily if iso_day(r['day']) == day and (home is None or r['home'] == home)]
+    vals = [count(r.get(col)) for r in daily if r['home'] not in parked and iso_day(r['day']) == day and (home is None or r['home'] == home)]
     if any(v is None for v in vals):
         problem = ('data/metrics/daily.tsv', f'invalid {col} count for {day}')
         if problem not in notes: notes.append(problem)
@@ -726,7 +808,7 @@ for p in prs or []:
     if d: merged_on.setdefault(d, []).append(p)
 QWIN = [YDAY, TODAY]
 def window_metrics(home=None):
-    ps = [p for d in QWIN for p in merged_on.get(d, []) if home is None or p['home'] == home]
+    ps = [p for d in QWIN for p in merged_on.get(d, []) if p['home'] not in parked and (home is None or p['home'] == home)]
     n = len(ps)
     def dw(col):
         if daily is None: return None
@@ -739,7 +821,7 @@ def window_metrics(home=None):
     return {
         'first_pass': (100 * sum(p['first_pass'] == '1' for p in ps) // n if n else None) if prs is not None else None,
         'escaped': None if esc is None or any(v is None for v in esc) else sum(v > 0 for v in esc),
-        'p90_hours': hrs[int(0.9 * (len(hrs) - 1))] if hrs else None,
+        'p90_hours': pct(hrs, .9),
         'corrections_per_merge': per(dw('s_correct')),
         'interventions_per_merge': per(None if None in (steers, dec, blk) else steers + dec + blk),
         'captain_per_merge': per(dw('captain_msgs')),
@@ -1129,7 +1211,7 @@ def inout_chart():
     now_x = (NOW.hour + NOW.minute / 60) / 24
     lt = [t for t, *_ in landings or [] if t.date() == TODAY]
     ly = [t for t, *_ in landings or [] if t.date() == YDAY]
-    ft = [datetime.fromtimestamp(s).astimezone() for s, *_ in filed_today]
+    ft = [datetime.fromtimestamp(s).astimezone() for s, *_ in filed_today if s >= log_since]
     fy = [datetime.fromtimestamp(s).astimezone() for (h, i), (s, t) in log.items() if s and h not in parked and datetime.fromtimestamp(s).astimezone().date() == YDAY]
     series = []  # (class, points, title)
     if landings is not None:
@@ -1215,9 +1297,9 @@ def quota_bars():  # every readable account: its tightest window, soonest runout
     for a in sorted((a for a in accounts if a['windows']), key=lambda a: (not runs_out(a), a['runout'] or NOW, a['name'])):
         w = tight_window(a)
         used = w['used'] if w else None
-        tone = 'bad' if a['empty'] else 'warn' if runs_out(a) else 'ok'
+        tone = 'bad' if a['empty'] else 'warn' if runs_out(a) else 'ok' if lasts_to_reset(a) else 'mut'
         right = ('used up' if a['empty'] else f'out {when(a["runout"].timestamp())}' if runs_out(a) else
-                 f'resets {when(w["reset"].timestamp())}' if w and w['reset'] else 'lasts')
+                 'runway unknown' if not lasts_to_reset(a) else f'resets {when(w["reset"].timestamp())}' if w and w['reset'] else 'lasts to reset')
         tick = f'<b style="left:{w["pace"]:.0f}%" title="even pace {fmt(w["pace"], 0)}%"></b>' if w and w['pace'] is not None else ''
         rows += (f'<div class="qb" title="{esc(a["name"])}: {esc(w["label"]) if w else "window"} {fmt(used, 0) if used is not None else "?"}% used; carries {esc(carries_words(a["p"]))}">'
                  f'<span class="qn">{esc(a["name"])}</span><span class="qt"><i class="c-{tone}" style="width:{0 if used is None else max(2, min(100, round(used)))}%"></i>{tick}</span>'
@@ -1315,6 +1397,8 @@ def flow_body():
     from_h = 0 if f_exact else datetime.fromtimestamp(log_since).astimezone().hour
     ph = sorted(ACTIVE, key=lambda h: (-(landed(TODAY, h) or 0), -filed(TODAY, h)[0], h))
     phrows = ''.join(f'<tr><td>{esc(hname(h))}</td><td>{filed_txt(TODAY, h)}</td><td>{"–" if landed(TODAY, h) is None else landed(TODAY, h)}</td></tr>' for h in ph)
+    if landings is not None:
+        phrows += f'<tr><td>Unattributed</td><td>–</td><td>{landed(TODAY, "unattributed")}</td></tr>'
     drows = ''.join(f'<tr><td>{d:%a %d %b}{" <span class=mut>so far</span>" if d == TODAY else ""}</td><td>{filed_txt(d)}</td><td>{"–" if o is None else o}</td></tr>'
                     for d, o in zip(WEEK, week_l))
     lin = ''.join(item('', esc(t), esc(hname(h)), tm=hm(s)) for s, h, t in filed_today[:10]) or '<p class="note">Nothing filed yet today that this page saw.</p>'
@@ -1333,7 +1417,7 @@ def flow_body():
 <div class="stack">
 <section>
 {sh("Today vs yesterday · since 00:00 and the full day before")}
-<h2>{"Landings unknown." if l_today is None else "More landed than filed today." if l_today > f_today else "More filed than landed today." if f_today > l_today else "As much filed as landed today."}</h2>
+<h2>{"Landings unknown." if l_today is None else "Filing count is a lower bound; comparison unknown." if not f_exact and f_today <= l_today else "More landed than filed today." if l_today > f_today else "More filed than landed today." if f_today > l_today else "As much filed as landed today."}</h2>
 {io_bars()}
 </section>
 <section>
@@ -1398,14 +1482,17 @@ def quota_body():
     if qdata is None:
         return (f'<div class="hero">{sh("Quota")}<h1>Quota unknown.</h1><p class="lede">{unknown(why_of("quota-axi"))}</p></div>')
     first = running_out[0] if running_out else None
-    h1 = (f'{esc(first["name"])} runs out first: {when(first["runout"].timestamp())}.' if first else 'No account runs out before it resets.')
+    h1 = (f'{esc(first["name"])} runs out first among known runways: {when(first["runout"].timestamp())}.' if first and quota_unknown else
+          f'{esc(first["name"])} runs out first: {when(first["runout"].timestamp())}.' if first else
+          'Account runway unknown.' if quota_unknown else 'An account is used up.' if any(a['empty'] for a in accounts) else
+          'No account runs out before it resets.' if accounts else 'No set-up account reported.')
     attn = [a for a in accounts if a['problem'] or a['empty']]
     accts = ''
     order = sorted(accounts, key=lambda a: (not runs_out(a), a['runout'] or NOW, bool(a['problem']), a['name']))
     for a in order:
         if not a['windows']: continue
         state = (f'<span class="r warn">Runs out {when(a["runout"].timestamp())}</span>' if runs_out(a) else
-                 '<span class="r mut">Used up</span>' if a['empty'] else '<span class="r ok">Lasts to reset</span>' if a['status'] == 'projected_exhaustion' or a['status'] == 'sufficient' else '<span class="r mut">Runway unknown</span>')
+                 '<span class="r mut">Used up</span>' if a['empty'] else '<span class="r ok">Lasts to reset</span>' if lasts_to_reset(a) else '<span class="r mut">Runway unknown</span>')
         wins = ''.join(window_meter(w, runs_out(a) and a['limit'] and w['id'] == a['limit']['id']) for w in a['windows'])
         accts += (f'<div class="acct"><div class="acct-h"><b>{esc(a["name"])} {"<span class=mut>" + esc(a["plan"]) + "</span>" if a["plan"].lower() != a["name"].lower() else ""}</b>{state}</div>'
                   f'<div class="acct-meta">Carries {esc(carries_words(a["p"]))}{(" · " + esc(a["problem"])) if a["problem"] else ""}</div>{wins}</div>')
@@ -1414,7 +1501,7 @@ def quota_body():
 <div class="hero">
 {sh(f"Quota · read {hm(q_at)} · runout projects the current pace")}
 <h1>{h1}</h1>
-<p class="lede">{"; ".join(f"{esc(a['name'])} at {when(a['runout'].timestamp())}, carrying {esc(carries_words(a['p']))}" for a in running_out) or "Every readable account lasts until its window resets at the current pace."}.</p>
+<p class="lede">{"; ".join(f"{esc(a['name'])} at {when(a['runout'].timestamp())}, carrying {esc(carries_words(a['p']))}" for a in running_out) or ("Some account runways are unknown." if quota_unknown else "Some accounts are used up." if any(a['empty'] for a in accounts) else "Every readable account lasts until its window resets at the current pace." if accounts else "No account runway was reported.")}.</p>
 </div>
 <div class="sections">
 <section class="wide">
@@ -1585,7 +1672,8 @@ def backlog_body(group):
 # --- method --------------------------------------------------------------
 def measure_body():
     pts = sorted({datetime.fromisoformat(r['time']).timestamp() for r in pulse or [] if re.match(r'\d{4}-\d\d-\d\dT\d\d:\d\d', r['time'])})
-    gaps = sorted(b - a for a, b in zip(pts[-13:], pts[-12:]))
+    pts = pts[-13:]
+    gaps = sorted(b - a for a, b in zip(pts, pts[1:]))
     pulse_every = f'about every {dur(gaps[len(gaps) // 2])}' if gaps else 'unknown'
     mt = lambda rel: when(os.path.getmtime(os.path.join(HOME, rel))) if os.path.exists(os.path.join(HOME, rel)) else 'unknown'
     cycles = [

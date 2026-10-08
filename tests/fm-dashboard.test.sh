@@ -97,6 +97,9 @@ EOF
   lane "$home" m-ask ship "needs-decision [at=$((now - 3600))] [key=scope]: which layout"
   lane "$home" m-done ship "done [at=$((now - 1800))]: PR https://github.com/acme/alpha/pull/8 checks green"
   lane "$home" m-wait scout "paused [at=$((now - 2400))]: waiting for the vendor's reply"
+  mkdir -p "$home/data/m-build" "$home/data/m-resume"
+  printf '{"records":[{"url":"https://github.com/acme/alpha/pull/1"}]}\n' > "$home/data/m-build/contributions.json"
+  printf '{"records":[{"url":"https://github.com/acme/alpha/pull/2"}]}\n' > "$home/data/m-resume/contributions.json"
   lane "$z" z-build ship "working [at=$((now - 60))]: building"
   lane "$b" b-stale ship "working [at=$((now - 60))]: building"
   fm_write_meta "$home/state/zephyrine.meta" "kind=secondmate" "harness=claude" "model=lead-model" "herdr_pane_id=pane-lead"
@@ -212,7 +215,7 @@ test_sub_pages_show_flow_quota_backlog_and_method() {
   build "$home"
   has "$d/flow.html" "2 landed so far today" "Yesterday's full day: 1 landed" \
     "Latest landings · GitHub" "Land the first fix" "Land the second fix" "Fleet ≥ 4 2"
-  has "$d/quota.html" "Claude runs out first" "Claude · 1 lead, 8 workers" "week 70% used" \
+  has "$d/quota.html" "Claude runs out first among known runways" "Claude · 1 lead, 8 workers" "week 70% used" \
     "1 account cannot be read or is empty." "Cursor sign in required" "even pace 30%"
   has "$d/backlog.html" "Queued 4 = Ready 2 + Held 1 + Waiting on another item 1" \
     "1 item held; oldest" "Wait for the captain's call" "needs his call" \
@@ -240,7 +243,8 @@ test_each_failed_source_shows_unknown_and_why() {
   build "$home"
   has "$d/flow.html" "landings merge record as of" "1 landed so far today"
   has "$d/flow.html" "P50 2 h" "P85 2 h"
-  has "$d/quota.html" "Claude runs out first"
+  has "$d/quota.html" "Account runway unknown." "Runway unknown"
+  lacks "$d/quota.html" "Lasts to reset" "runs out first"
   has "$d/measure.html" "herdr agent list herdr: server not running" "quota-axi quota-axi: no network; showing the reading from" \
     "GitHub landings HTTP 403: API rate limit exceeded"
   # With no reading to reuse and no merge record, the numbers say unknown, never zero.
@@ -377,6 +381,10 @@ test_pull_requests_show_validation_runs_and_checks_from_local_records() {
   home=$(make_home prs)
   d="$home/state/dashboard" now=$(date +%s)
   mkdir -p "$home/wt/ci" "$home/wt/done" "$home/wt/green" "$home/data/m-done" "$home/data/m-green"
+  for wt in ci done green; do
+    git init -q -b "dash-$wt" "$home/wt/$wt"
+    git -C "$home/wt/$wt" -c user.name=Test -c user.email=test@example.invalid commit -qm fixture --allow-empty
+  done
   fm_write_meta "$home/state/m-ci.meta" "kind=ship" "worktree=$home/wt/ci" "herdr_pane_id=pane-m-ci"
   fm_write_meta "$home/state/m-done.meta" "kind=ship" "worktree=$home/wt/done" "herdr_pane_id=pane-m-done"
   lane "$home" m-green ship "done [at=$((now - 600))]: PR https://github.com/acme/alpha/pull/10 ready"
@@ -384,11 +392,25 @@ test_pull_requests_show_validation_runs_and_checks_from_local_records() {
   # no-mistakes answers per copy: m-ci waits on CI, the others have no run on their branch.
   cat > "$home/stubs/no-mistakes" <<'EOF'
 #!/bin/sh
-[ "$*" = "axi status" ] || { echo "unexpected: $*" >&2; exit 2; }
 [ -e "$FM_NM_FAIL" ] && { echo "error: daemon not reachable" >&2; exit 1; }
-case "$PWD" in
-*/ci) printf 'run:\n  id: "r1"\n  status: running\n  pr: "https://github.com/acme/alpha/pull/9"\n  active_steps[1]{step,status,active_for,round_active_for,last_activity,agent_pid,round}:\n    ci,running,2h18m,2h18m,"quiet","",starting\nbranch_sync:\n  pipeline:\n    status: running\n' ;;
-*) printf 'current_branch: x\nruns_on_current_branch: 0\n' ;;
+printf '%s\n' "$*" >> "$PWD/nm.calls"
+head=$(git rev-parse HEAD)
+case "$*" in
+axi)
+  if [ "${PWD##*/}" = ci ]; then
+    status=running
+    [ -e "$PWD/terminal" ] && status=completed
+    printf 'count: 1 of 1 total\nruns[1]{id,branch,status,head,pr}:\n  r1,dash-ci,%s,%s,""\n' "$status" "$head"
+  else printf 'count: 0 of 0 total\nruns[0]{id,branch,status,head,pr}:\n'; fi ;;
+'axi status --run r1')
+  [ -e "$PWD/foreign" ] && { printf 'run:\n  id: r1\n  branch: unrelated\n  status: running\n'; exit; }
+  status=ci outcome=
+  [ -e "$PWD/fixing" ] && status=fixing
+  [ -e "$PWD/terminal" ] && { status=completed; outcome=failed; }
+  printf 'run:\n  id: "r1"\n  branch: dash-ci\n  head: %s\n  status: %s\n  outcome: %s\n  pr: "https://github.com/acme/alpha/pull/9"\n  active_steps[1]{step,active_for,last_activity,agent_pid,round}:\n    ci,2h18m,"quiet, awaiting provider",123,starting\n' "$head" "$status" "$outcome" ;;
+'axi status') printf 'run:\n  id: other\n  branch: unrelated\n  status: failed\n  pr: "https://github.com/other/repo/pull/99"\n' ;;
+'daemon status') exit 0 ;;
+*) echo "unexpected: $*" >&2; exit 2 ;;
 esac
 EOF
   chmod +x "$home/stubs/no-mistakes"
@@ -406,6 +428,24 @@ EOF
   has "$d/backlog.home.html" "Pull requests and validations open 3"
   has "$d/index.html" "Failing PRs with failing checks 1" "CI wait PRs on CI over 1 h 1 2 h 18 min" \
     "1 failing 1 validating or on CI 1 green, to land"
+  touch "$home/wt/ci/fixing"
+  printf '{"records":[{"url":"https://github.com/acme/alpha/pull/8","observation":{"checks":[{"name":"test","id":1,"started_at":"2026-01-01","status":"completed","conclusion":"failure"},{"name":"test","id":2,"started_at":"2026-01-02","status":"completed","conclusion":"success"}]}}]}\n' > "$home/data/m-done/contributions.json"
+  build "$home" FM_NM_FAIL="$home/nm.fail"
+  has "$d/backlog.html" "m-done Main · checks green" "m-ci Main · waiting on CI for 2 h 18 min"
+  lacks "$d/backlog.html" "other/repo" "m-done Main · checks failing"
+  grep -qx 'axi status --run r1' "$home/wt/ci/nm.calls" || fail 'did not read the selected run by ID'
+  touch "$home/wt/ci/terminal"
+  printf '{"records":[{"url":"https://github.com/acme/alpha/pull/8","observation":{"checks":[{"name":"test","status":"completed","conclusion":null}]}}]}\n' > "$home/data/m-done/contributions.json"
+  build "$home" FM_NM_FAIL="$home/nm.fail"
+  has "$d/backlog.html" "Checks or validation failing 1"
+  lacks "$d/backlog.html" "m-done Main · checks green"
+  rm "$home/wt/ci/terminal"
+  touch "$home/wt/ci/foreign"
+  printf '{"records":[{"url":"https://github.com/acme/alpha/pull/8","observation":{"checks":[{"name":"test","status":"completed","conclusion":"error"}]}}]}\n' > "$home/data/m-done/contributions.json"
+  build "$home" FM_NM_FAIL="$home/nm.fail"
+  has "$d/backlog.html" "m-done Main · checks failing" "No pull request is waiting on CI now."
+  lacks "$d/backlog.html" "other/repo" "waiting on CI for 2 h 18 min"
+  rm "$home/wt/ci/foreign"
   # A validation status that cannot be read says unknown and why, and the checks still come from the records;
   # a finished lane whose checks are still running is not green yet.
   touch "$home/nm.fail"
@@ -418,6 +458,84 @@ EOF
   has "$d/measure.html" "no-mistakes axi status 3 of 3 lanes: error: daemon not reachable" "a CI wait over 1 h is a slow spot"
   lacks "$d/index.html" "PRs on CI over"
   pass "pull requests group by checks and validation, with CI wait from no-mistakes, and an unreadable run shows unknown"
+}
+
+test_quota_quality_filing_and_landing_boundaries() {
+  local home d today
+  home=$(make_home boundaries)
+  d="$home/state/dashboard" today=$(date +%F)
+  rm "$home/data/m-resume/contributions.json"
+  mv "$home/data/m-build" "$home/mates/zephyrine/data/archived-task"
+  git init -q "$home/mates/beta/projects/alpha"
+  git -C "$home/mates/beta/projects/alpha" remote add origin https://github.com/acme/alpha.git
+  printf 'home\trepo\tpr\tmerged\tfirst_pass\thours_to_merge\tescaped\nmain\tacme/alpha\t80\t%s\t1\t1\t0\nmain\tacme/alpha\t81\t%s\t1\t100\t0\nbeta\tacme/alpha\t90\t%s\t0\t1000\t1\n' \
+    "$(iso 0)" "$(iso 0)" "$(iso 0)" > "$home/data/metrics/prs.tsv"
+  printf 'day\thome\tsteers\tdecisions\tblocks\ts_correct\tcaptain_msgs\tstall_alarms\n%s\tmain\t2\t0\t0\t2\t2\t2\n%s\tbeta\t?\t?\t?\t?\t?\t?\n' \
+    "$today" "$today" > "$home/data/metrics/daily.tsv"
+  printf 'metric\top\ttarget\nfirst_pass\t>=\t100\np90_hours\t<=\t50\nescaped\t<=\t0\ncorrections_per_merge\t<=\t1\ninterventions_per_merge\t<=\t1\ncaptain_per_merge\t<=\t1\nstall_alarms\t<=\t2\n' > "$home/config/metrics-targets.tsv"
+  printf 'time\thome\n%s\tmain\n%s\tmain\n' "$(iso 2)" "$(iso 0)" > "$home/data/fleet-pulse.tsv"
+  fm_write_meta "$home/state/m-build.meta" "kind=ship" "harness=codex" "model=default"
+  fm_write_meta "$home/state/m-resume.meta" "kind=ship" "harness=pi-signed" "model=openai-codex-work/gpt" "account_provider=openai-codex-work"
+  python3 - "$home/quota.json" <<'PY'
+import json, sys
+p = sys.argv[1]
+c = json.load(open(p))
+a = c['providers'][0]
+a['accountKey'] = 'default'
+a['quotaSemantics']['effectiveAvailability'][0]['runway']['status'] = 'through_reset'
+def row(key, status, stale=False):
+    r = json.loads(json.dumps(a))
+    r.update(provider='codex', accountKey=key)
+    r['quotaSemantics']['effectiveAvailability'][0]['runway']['status'] = status
+    if stale: r['state'].update(stale=True, error='stale_snapshot')
+    return r
+c.update(schemaVersion=6, providers=[a, row('codex-home', 'through_reset'),
+    row('openai-codex-work', 'unknown'), row('stale', 'projected_exhaustion', True)])
+json.dump(c, open(p, 'w'))
+PY
+  build "$home"
+  has "$d/flow.html" "zephyrine ≥ 1 1" "Main ≥ 3 0" "Unattributed – 1" "Land the first fix zephyrine" "Land the second fix unattributed"
+  has "$d/quota.html" "Account runway unknown." "Codex · codex-home" "Codex · openai-codex-work" "Runway unknown" "Lasts to reset" "Carries 1 worker"
+  lacks "$d/quota.html" "Every readable account lasts" "No account runs out before" "Carries 2 workers"
+  has "$d/measure.html" "First-pass merges at least 100% 100% met" "Slowest merges (p90) at most 50 h 100 h missed" \
+    "Bugs that escaped at most 0 0 met" "Corrections per merge at most 1 1 met" "Main nudges per merge at most 1 1 met" \
+    "Captain messages per merge at most 1 1 met" "Lead stalls that reached Main at most 2 2 met" "fleet pulse runs about every 2 h"
+  python3 - "$home/merges.tsv" "$d/.merged.json" <<'PY'
+import os, sys
+p = sys.argv[1]
+rows = open(p).readlines()
+with open(p, 'a') as f:
+    for i in range(3): f.write(rows[0])
+os.remove(sys.argv[2])
+PY
+  build "$home"
+  has "$d/flow.html" "Filing count is a lower bound; comparison unknown."
+  lacks "$d/flow.html" "More landed than filed today." "As much filed as landed today."
+  python3 - "$d/filed.tsv" <<'PY'
+import sys, time
+p = sys.argv[1]
+rows = open(p).read().split('\n', 1)
+start = int(time.mktime(time.strptime(time.strftime('%Y-%m-%d'), '%Y-%m-%d'))) - 86400
+open(p, 'w').write(f'# since {start} last {int(time.time())}\thome\tid\tfirst_seen\ttitle\n' + rows[1])
+PY
+  printf '#!/bin/sh\necho "tasks-axi: backlog unreadable" >&2\nexit 1\n' > "$home/stubs/tasks-axi"
+  chmod +x "$home/stubs/tasks-axi"
+  build "$home"
+  has "$d/flow.html" "filed, at least." "Filing count is a lower bound; comparison unknown."
+  python3 - "$d/filed.tsv" <<'PY'
+import sys
+assert open(sys.argv[1]).readline().split()[4] == '0'
+PY
+  rm "$home/stubs/tasks-axi"
+  printf -- '- [ ] missed - Filed during outage (repo: alpha) (kind: ship) (since %s)\n' "$today" >> "$home/mates/zephyrine/data/backlog.md"
+  build "$home"
+  has "$d/flow.html" "5 filed, at least." "0 items first seen today."
+  python3 - "$d/filed.tsv" <<'PY'
+import sys
+rows = [r.split('\t') for r in open(sys.argv[1]).read().splitlines()[1:]]
+assert next(r for r in rows if r[1] == 'missed')[2] == '0'
+PY
+  pass "quota identity, runway uncertainty, quality samples, cadence, filing gaps and producing homes stay faithful"
 }
 
 test_serve_answers_each_page_and_remembers_the_grouping() {
@@ -500,4 +618,5 @@ test_github_searches_each_day_once_and_today_again_after_five_minutes
 test_the_filing_log_counts_new_items_exactly
 test_devices_and_machine_come_from_read_only_probes
 test_pull_requests_show_validation_runs_and_checks_from_local_records
+test_quota_quality_filing_and_landing_boundaries
 test_serve_answers_each_page_and_remembers_the_grouping
