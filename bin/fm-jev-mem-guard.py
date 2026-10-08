@@ -1,259 +1,231 @@
 #!/usr/bin/env python3
 """
-fm-jev-mem-guard.py - Jev Multi-Agent Memory RSS & Swap Thrashing Guard (Pattern 46)
+fm-jev-mem-guard.py - host memory guard: measure, admit, and alert before an oomd kill.
 
-Audits host memory availability (/proc/meminfo) and swap utilization to detect memory
-starvation, swap thrashing, and out-of-control worker RSS expansion across multi-agent seats.
-Prevents catastrophic OOM killer invocations against persistent agent supervisors and tmux sessions.
+Every fleet agent runs inside one agent-runtime service, and systemd-oomd kills
+that service as a unit when its slice's memory pressure stays above the oomd
+limit (on the reference host: "some" avg10 above 50% for 20 s). Host-wide
+pressure is never below a slice's own, so classifying the host's
+/proc/pressure/memory is a conservative early reading of the same signal.
 
-Thresholds (each named for the CLI flag that carries its operational default; run --help for current values):
-  - --warn-mem-pct: memory utilization warning, percent of MemTotal not available.
-  - --crit-mem-pct: memory utilization critical, percent of MemTotal not available.
-  - --warn-swap-pct: swap utilization warning, percent of SwapTotal in use.
-  - --crit-swap-pct: swap utilization critical, percent of SwapTotal in use.
+Usage (bin/fm-jev-mem-guard.sh runs this with python3):
+  fm-jev-mem-guard.sh [--config FILE] [--state-dir DIR ...]
+      Print "<verdict>\t<summary>" for the host, naming the largest consumers.
+  fm-jev-mem-guard.sh [--config FILE] --admit TASK --state DIR
+      Admission for one agent launch (bin/fm-spawn.sh, bin/fm-control.sh relaunch).
+      Exit 0 admits and removes DIR/admission-refused. Exit 1 refuses: prints the
+      reason and writes DIR/admission-refused as "<epoch>\t<task>\t<reason>".
+  fm-jev-mem-guard.sh [--config FILE] --record FILE [--state-dir DIR ...]
+      One watcher sample (bin/fm-watch.sh host_memory_tick): appends
+      "<epoch>\t<MemAvailable kB>\t<swap used kB>\t<pressure some avg10>\t<verdict>"
+      to FILE, keeping the newest 2880 rows (a day at the 30 s cadence), and prints
+      "<verdict>\t<summary>"; an ALERT summary names the largest consumers.
 
-Invariants:
-  - Read-only diagnostics.
-  - Fail-open: an unreadable or incomplete /proc/meminfo degrades to a graceful status
-    UNKNOWN with a machine-readable reason and a 0 --check exit, never a crash and never
-    a false alarm; an unassessed host reports null measured percentages (JSON null,
-    "unavailable" in human output) instead of fabricated numbers.
-  - Swap with SwapTotal > 0 but no SwapFree line is reported as unknown and never
-    classifies the verdict; a failed top-process listing degrades to an empty list.
-  - Bounded sub-second execution (< 500ms).
-  - Status is OK, WARNING, CRITICAL, or UNKNOWN; recommendation is diagnostic text
-    for the operator, never a command.
+Verdicts: OK; WAIT (new agents wait); ALERT (pause or stop the largest consumer);
+UNKNOWN (not measurable, for example no pressure file: admits and records nothing).
+Thresholds come from config/host-memory (docs/configuration.md "Host memory guard").
+Consumers are summed RSS plus swap per owner: the task whose FM_TASK_ID the process
+carries, else the task or lead whose recorded worktree, task temp, or home holds its
+working directory (task records in each --state-dir), else the process itself.
+The proc root is FM_HOST_MEMORY_PROC (default /proc). Exit 2: usage or an invalid
+config file, with the reason on stderr.
 """
 
 import argparse
-import json
 import os
 import sys
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+import time
+
+PROC = os.environ.get("FM_HOST_MEMORY_PROC") or "/proc"
+DEFAULTS = {"wait_pressure": 20.0, "wait_available_gb": 12.0, "alert_pressure": 35.0, "alert_available_gb": 6.0}
+KEEP_ROWS = 2880
+GIB_KB = 1048576
 
 
-def read_meminfo() -> Dict[str, int]:
-    """Reads and parses /proc/meminfo in kB."""
-    info: Dict[str, int] = {}
+def die(msg):
+    print(f"fm-jev-mem-guard: {msg}", file=sys.stderr)
+    sys.exit(2)
+
+
+def load_config(path):
+    cfg = dict(DEFAULTS)
+    if not path or not os.path.exists(path):
+        return cfg
     try:
-        with open("/proc/meminfo", "r") as f:
-            for line in f:
-                parts = line.split(":")
-                if len(parts) == 2:
-                    key = parts[0].strip()
-                    val_parts = parts[1].strip().split()
-                    if val_parts and val_parts[0].isdigit():
-                        info[key] = int(val_parts[0])
-    except Exception:
-        pass
-    return info
-
-
-def get_top_rss_processes(top_n: int = 10) -> List[Dict[str, Any]]:
-    """Inspects /proc to find top memory-consuming processes by RSS; a listing failure degrades to []."""
-    procs: List[Dict[str, Any]] = []
-    try:
-        page_size_kb = os.sysconf("SC_PAGE_SIZE") // 1024
-    except Exception:
-        return []
-
-    try:
-        entries = os.listdir("/proc")
-    except Exception:
-        return []
-
-    for entry in entries:
-        if not entry.isdigit():
+        lines = open(path).read().splitlines()
+    except OSError as e:
+        die(f"cannot read {path}: {e.strerror}")
+    for n, raw in enumerate(lines, 1):
+        line = raw.strip()
+        if not line or line.startswith("#"):
             continue
-        pid = int(entry)
+        key, sep, val = (p.strip() for p in line.partition("="))
         try:
-            with open(f"/proc/{pid}/statm", "r") as f:
-                parts = f.read().strip().split()
-            if len(parts) < 2 or not parts[1].isdigit():
-                continue
-            rss_kb = int(parts[1]) * page_size_kb
-            if rss_kb < 10240:  # Skip procs using < 10MB
-                continue
+            if not sep or key not in DEFAULTS or float(val) < 0:
+                raise ValueError
+            cfg[key] = float(val)
+        except ValueError:
+            die(f"invalid {path} line {n}: {raw!r} (expected KEY=number, keys: {', '.join(DEFAULTS)})")
+    return cfg
 
-            comm = f"pid_{pid}"
-            try:
-                with open(f"/proc/{pid}/comm", "r", errors="replace") as f:
-                    comm = f.read().strip()
-            except Exception:
-                pass
 
-            procs.append({
-                "pid": pid,
-                "comm": comm,
-                "rss_mb": round(rss_kb / 1024.0, 1),
-            })
-        except Exception:
+def sample():
+    """{available_kb, swap_used_kb, pressure}, or None when not measurable."""
+    try:
+        mem = {}
+        for line in open(f"{PROC}/meminfo"):
+            key, _, val = line.partition(":")
+            if val.split() and val.split()[0].isdigit():
+                mem[key.strip()] = int(val.split()[0])
+        some = next(l for l in open(f"{PROC}/pressure/memory") if l.startswith("some "))
+        pressure = float(dict(f.split("=", 1) for f in some.split()[1:])["avg10"])
+        return {"available_kb": mem["MemAvailable"],
+                "swap_used_kb": max(0, mem.get("SwapTotal", 0) - mem.get("SwapFree", 0)),
+                "pressure": pressure}
+    except (OSError, StopIteration, KeyError, ValueError):
+        return None
+
+
+def verdict(s, cfg):
+    if s is None:
+        return "UNKNOWN", []
+    gb = s["available_kb"] / GIB_KB
+    for level in ("alert", "wait"):
+        why = []
+        if s["pressure"] >= cfg[f"{level}_pressure"]:
+            why.append(f"pressure at or above {cfg[f'{level}_pressure']:g}%")
+        if gb < cfg[f"{level}_available_gb"]:
+            why.append(f"available memory below {cfg[f'{level}_available_gb']:g} GB")
+        if why:
+            return level.upper(), why
+    return "OK", []
+
+
+def summary(s):
+    return (f"pressure {s['pressure']:.0f}% (10 s average), {s['available_kb'] / GIB_KB:.1f} GB available, "
+            f"{s['swap_used_kb'] / GIB_KB:.1f} GB swap used")
+
+
+def read_meta(path):
+    meta = {}
+    try:
+        for line in open(path, errors="replace"):
+            key, sep, val = line.rstrip("\n").partition("=")
+            if sep:
+                meta[key] = val
+    except OSError:
+        pass
+    return meta
+
+
+def owners(state_dirs):
+    """([(path, label)] longest path first, {task id: label}) from the task records."""
+    metas = [(d, f[:-5], read_meta(os.path.join(d, f)))
+             for d in state_dirs if os.path.isdir(d) for f in sorted(os.listdir(d)) if f.endswith(".meta")]
+    lead_of = {os.path.realpath(m["home"]): tid for _, tid, m in metas if m.get("kind") == "secondmate" and m.get("home")}
+    paths, tasks = [], {}
+    for d, tid, m in metas:
+        if m.get("kind") == "secondmate":
+            if m.get("home"):
+                paths.append((os.path.realpath(m["home"]), f"lead {tid}"))
             continue
+        home = lead_of.get(os.path.realpath(os.path.dirname(os.path.abspath(d))), "main")
+        tasks[tid] = f"task {tid} ({home})"
+        paths += [(os.path.realpath(m[k]), tasks[tid]) for k in ("worktree", "tasktmp") if m.get(k)]
+    paths.sort(key=lambda p: -len(p[0]))
+    return paths, tasks
 
-    procs.sort(key=lambda p: p["rss_mb"], reverse=True)
-    return procs[:top_n]
+
+def consumers(state_dirs, top=3):
+    # ponytail: summed RSS counts shared pages once per process; fine for ranking owners, not for accounting.
+    paths, tasks = owners(state_dirs)
+    groups = {}
+    try:
+        pids = [p for p in os.listdir(PROC) if p.isdigit()]
+    except OSError:
+        return []
+    for pid in pids:
+        base = f"{PROC}/{pid}"
+        try:
+            status = dict(l.split(":", 1) for l in open(f"{base}/status", errors="replace") if ":" in l)
+            kb = sum(int(status[k].split()[0]) for k in ("VmRSS", "VmSwap") if k in status)
+        except (OSError, ValueError, IndexError):
+            continue
+        if kb < 10240:
+            continue
+        label = None
+        try:
+            tid = next((e[11:].decode(errors="replace") for e in open(f"{base}/environ", "rb").read().split(b"\0")
+                        if e.startswith(b"FM_TASK_ID=")), "")
+            label = tasks.get(tid, f"task {tid}") if tid else None
+        except OSError:
+            pass
+        if label is None:
+            try:
+                cwd = os.path.realpath(os.readlink(f"{base}/cwd"))
+                label = next((l for p, l in paths if cwd == p or cwd.startswith(p + "/")), None)
+            except OSError:
+                pass
+        label = label or f"{status.get('Name', '?').strip()} pid {pid}"
+        group = groups.setdefault(label, [0, 0])
+        group[0] += kb
+        group[1] += 1
+    ranked = sorted(groups.items(), key=lambda g: -g[1][0])[:top]
+    return [f"{label} {kb / GIB_KB:.1f} GB" + (f" in {n} processes" if n > 1 else "") for label, (kb, n) in ranked]
 
 
-def audit_memory(
-    warn_mem_pct: float,
-    crit_mem_pct: float,
-    warn_swap_pct: float,
-    crit_swap_pct: float,
-) -> Dict[str, Any]:
-    """Audits system memory and swap usage, failing open to status UNKNOWN when unmeasurable."""
-    mem = read_meminfo()
-    mem_total_kb = mem.get("MemTotal")
-    mem_avail_kb = mem.get("MemAvailable")
-    swap_total_kb = mem.get("SwapTotal")
-    swap_free_kb = mem.get("SwapFree")
+def line(s, v, why, cons):
+    if v == "UNKNOWN":
+        return f"UNKNOWN\thost memory is not measurable here (no readable {PROC}/meminfo and {PROC}/pressure/memory)"
+    text = summary(s) + "".join(f"; {w}" for w in why)
+    return f"{v}\t{text}" + (f"; largest: {', '.join(cons)}" if cons else "")
 
-    reason: Optional[str] = None
-    mem_total_gb: Optional[float] = None
-    mem_available_gb: Optional[float] = None
-    mem_used_pct: Optional[float] = None
-    swap_total_gb: Optional[float] = None
-    swap_used_gb: Optional[float] = None
-    swap_used_pct: Optional[float] = None
 
-    if mem_total_kb is None or mem_total_kb <= 0 or mem_avail_kb is None:
-        status = "UNKNOWN"
-        reason = "meminfo-unavailable"
-        recommendation = (
-            "/proc/meminfo is unreadable or incomplete on this host; "
-            "the verdict is withheld rather than fabricated."
-        )
-    else:
-        mem_used_kb = max(0, mem_total_kb - mem_avail_kb)
-        mem_total_gb = round(mem_total_kb / (1024.0 * 1024.0), 2)
-        mem_available_gb = round(mem_avail_kb / (1024.0 * 1024.0), 2)
-        mem_used_pct = round((mem_used_kb / mem_total_kb) * 100.0, 1)
+def record(path, s, v):
+    with open(path, "a") as f:
+        f.write(f"{int(time.time())}\t{s['available_kb']}\t{s['swap_used_kb']}\t{s['pressure']:.2f}\t{v}\n")
+    with open(path) as f:
+        rows = f.readlines()
+    if len(rows) > KEEP_ROWS + 120:
+        with open(path + ".tmp", "w") as f:
+            f.writelines(rows[-KEEP_ROWS:])
+        os.replace(path + ".tmp", path)
 
-        if swap_total_kb is not None:
-            swap_total_gb = round(swap_total_kb / (1024.0 * 1024.0), 2)
-            if swap_total_kb == 0:
-                swap_used_gb = 0.0
-                swap_used_pct = 0.0
-            elif swap_free_kb is not None:
-                swap_used_kb = max(0, swap_total_kb - swap_free_kb)
-                swap_used_gb = round(swap_used_kb / (1024.0 * 1024.0), 2)
-                swap_used_pct = round((swap_used_kb / swap_total_kb) * 100.0, 1)
 
-        crit = mem_used_pct >= crit_mem_pct or (
-            swap_used_pct is not None and swap_used_pct >= crit_swap_pct
-        )
-        warn = mem_used_pct >= warn_mem_pct or (
-            swap_used_pct is not None and swap_used_pct >= warn_swap_pct
-        )
-        if crit:
-            status = "CRITICAL"
-            recommendation = (
-                "Memory or swap utilization is at or above a critical threshold; "
-                "this host condition can explain worker silence while it holds."
-            )
-        elif warn:
-            status = "WARNING"
-            recommendation = (
-                "Memory or swap utilization is above a warning threshold but below a "
-                "critical one; degraded but explained, see the top RSS processes."
-            )
-        else:
-            status = "OK"
-            recommendation = (
-                "Memory and swap utilization are within thresholds; "
-                "the caller should continue unchanged."
-            )
-
-    top_procs = get_top_rss_processes()
-
-    return {
-        "name": "fm-jev-mem-guard",
-        "checked_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "status": status,
-        "recommendation": recommendation,
-        "reason": reason,
-        "summary": {
-            "mem_total_gb": mem_total_gb,
-            "mem_available_gb": mem_available_gb,
-            "mem_used_pct": mem_used_pct,
-            "swap_total_gb": swap_total_gb,
-            "swap_used_gb": swap_used_gb,
-            "swap_used_pct": swap_used_pct,
-        },
-        "top_processes": top_procs,
-    }
+def admit(task, state, s, v, why):
+    rec = os.path.join(state, "admission-refused")
+    if v in ("OK", "UNKNOWN"):
+        if os.path.exists(rec):
+            os.remove(rec)
+        return 0
+    reason = f"host memory under pressure: {'; '.join(why)} ({summary(s)})"
+    os.makedirs(state, exist_ok=True)
+    with open(rec + ".tmp", "w") as f:
+        f.write(f"{int(time.time())}\t{task}\t{reason}\n")
+    os.replace(rec + ".tmp", rec)
+    print(reason)
+    return 1
 
 
 def main():
-    sys.stdout.reconfigure(errors="replace")
-    parser = argparse.ArgumentParser(
-        description="Jev Multi-Agent Memory RSS & Swap Thrashing Guard (Pattern 46)"
-    )
-    parser.add_argument(
-        "--warn-mem-pct",
-        type=float,
-        default=90.0,
-        help="Warning threshold for memory utilization %% (default: %(default)s)",
-    )
-    parser.add_argument(
-        "--crit-mem-pct",
-        type=float,
-        default=95.0,
-        help="Critical threshold for memory utilization %% (default: %(default)s)",
-    )
-    parser.add_argument(
-        "--warn-swap-pct",
-        type=float,
-        default=85.0,
-        help="Warning threshold for swap utilization %% (default: %(default)s)",
-    )
-    parser.add_argument(
-        "--crit-swap-pct",
-        type=float,
-        default=95.0,
-        help="Critical threshold for swap utilization %% (default: %(default)s)",
-    )
-    parser.add_argument(
-        "--json",
-        action="store_true",
-        help="Emit structured JSON telemetry to stdout",
-    )
-    parser.add_argument(
-        "--check",
-        action="store_true",
-        help="Exit 0 for OK or unknown (fail-open), exit 1 for WARNING or CRITICAL",
-    )
-
+    parser = argparse.ArgumentParser(description="Host memory guard: measure, admit, and alert before an oomd kill.")
+    parser.add_argument("--config", help="thresholds file (config/host-memory); absent means the defaults")
+    parser.add_argument("--admit", metavar="TASK", help="admission for one agent launch; needs --state")
+    parser.add_argument("--state", metavar="DIR", help="the launching home's state directory")
+    parser.add_argument("--record", metavar="FILE", help="append one sample to FILE")
+    parser.add_argument("--state-dir", action="append", default=[], help="state directory whose task records map consumers")
     args = parser.parse_args()
-    report = audit_memory(
-        warn_mem_pct=args.warn_mem_pct,
-        crit_mem_pct=args.crit_mem_pct,
-        warn_swap_pct=args.warn_swap_pct,
-        crit_swap_pct=args.crit_swap_pct,
-    )
-
-    if args.json:
-        print(json.dumps(report, indent=2))
-    else:
-        s = report["summary"]
-        print(f"{report['name']} — {report['checked_at']}")
-        if s["mem_used_pct"] is None:
-            print("  • RAM: unavailable")
-        else:
-            print(f"  • RAM: {s['mem_used_pct']}% used ({s['mem_available_gb']} GB available / {s['mem_total_gb']} GB total)")
-        if s["swap_used_pct"] is None:
-            print("  • Swap: unknown (not measurable)")
-        else:
-            print(f"  • Swap: {s['swap_used_pct']}% used ({s['swap_used_gb']} GB used / {s['swap_total_gb']} GB total)")
-        print(f"  • Status: {report['status']}")
-        print(f"  • Recommendation: {report['recommendation']}")
-        if report["top_processes"]:
-            print(f"\n  Top {len(report['top_processes'])} RSS Processes:")
-            for p in report["top_processes"]:
-                print(f"    - PID {p['pid']} ({p['comm']}): {p['rss_mb']} MB")
-
-    if args.check and report["status"] in ("WARNING", "CRITICAL"):
-        sys.exit(1)
+    if args.admit and not args.state:
+        die("--admit needs --state")
+    cfg = load_config(args.config)
+    s = sample()
+    v, why = verdict(s, cfg)
+    if args.admit:
+        sys.exit(admit(args.admit, args.state, s, v, why))
+    if args.record and s is not None:
+        record(args.record, s, v)
+    cons = consumers(args.state_dir) if v == "ALERT" or (not args.record and v != "UNKNOWN") else []
+    print(line(s, v, why, cons))
 
 
 if __name__ == "__main__":

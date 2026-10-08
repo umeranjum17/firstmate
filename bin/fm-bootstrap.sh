@@ -10,6 +10,7 @@
 #                 "MISSING_MANUAL: <tool> (instructions: <url>)", "NEEDS_GH_AUTH",
 #                 "BACKEND_INVALID: <name> (known: <names>)",
 #                 "STARTUP_MEMORY_BUDGET: invalid config/startup-memory-budget - <reason>",
+#                 "SENTINEL: fm-sentinel is not running ... (install: <command>)",
 #                 "CREW_DISPATCH: invalid config/crew-dispatch.json - <reason>",
 #                 "FLEET_SYNC: <repo>: skipped|recovered|STUCK: <detail>",
 #                 "HOME_SUMMARY: <ledger never published|not republished since
@@ -1473,6 +1474,19 @@ detect_local_config() {
   fi
   detect_code_root_backlog_fork
   detect_home_summary_publication
+  detect_sentinel_service
+}
+
+# Restart recovery (bin/fm-sentinel.sh) must run outside the Herdr server it
+# recovers from, as a systemd user service someone installs once. Without it a
+# killed server leaves supervision and every worker down until noticed, so a
+# primary Herdr home on a systemd host says so on every start until installed.
+detect_sentinel_service() {
+  [ "$BACKEND" = herdr ] || return 0
+  [ -e "$FM_HOME/.fm-secondmate-home" ] || [ -L "$FM_HOME/.fm-secondmate-home" ] && return 0
+  command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1 || return 0
+  systemctl --user is-active --quiet fm-sentinel && return 0
+  echo "SENTINEL: fm-sentinel is not running, so a killed Herdr server leaves supervision and workers down until someone notices (install: FM_HOME=$FM_HOME $FM_ROOT/bin/fm-sentinel.sh unit > ~/.config/systemd/user/fm-sentinel.service && systemctl --user enable --now fm-sentinel)"
 }
 
 # Shadow-backlog check. When this home's data directory is not the code root's,

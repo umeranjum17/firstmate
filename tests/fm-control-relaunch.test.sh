@@ -685,6 +685,25 @@ test_relaunch_refuses_a_copy_another_task_records() {
   pass "fm-control relaunch: refuses and reports when another task records the same copy"
 }
 
+test_relaunch_under_memory_pressure_refuses_before_stop() {
+  local dir out rc before
+  dir=$(new_case mempressure rl52)
+  add_ship_task "$dir" rl52 claude
+  mkdir -p "$dir/proc/pressure"
+  printf 'MemTotal: 67108864 kB\nMemAvailable: 31457280 kB\n' > "$dir/proc/meminfo"
+  printf 'some avg10=27.00 avg60=20.00 avg300=9.00 total=1\n' > "$dir/proc/pressure/memory"
+  before=$(cat "$dir/home/state/rl52.meta")
+  out=$(FM_HOST_MEMORY_PROC="$dir/proc" run_control "$dir" rl52 relaunch --note "stopped by a restart"); rc=$?
+  expect_code 1 "$rc" "a relaunch under memory pressure should refuse"
+  assert_contains "$out" "host memory under pressure: pressure at or above 20%" "the refusal should name the pressure"
+  assert_contains "$out" "refused before its agent was touched" "the refusal should say the agent is untouched"
+  [ "$(cat "$dir/home/state/rl52.meta")" = "$before" ] || fail "a refused relaunch must leave the task record untouched"
+  [ "$(cat "$dir/fake/command")" = claude ] || fail "a refused relaunch must not stop the agent"
+  [ -z "$(cat "$dir/fake/literal")" ] || fail "a refused relaunch must send nothing"
+  [ -s "$dir/home/state/admission-refused" ] || fail "the refusal was not recorded for the queue views"
+  pass "fm-control relaunch: host memory pressure refuses before the running agent is stopped"
+}
+
 test_relaunch_requires_a_note_for_a_ship_task() {
   local dir out rc before
   dir=$(new_case nonote rl3)
@@ -2529,6 +2548,7 @@ test_disabled_relaunch_clears_prior_trace_context
 test_relaunch_appends_the_progress_note_to_the_instructions
 test_relaunch_requires_a_note_for_a_ship_task
 test_relaunch_refuses_a_copy_another_task_records
+test_relaunch_under_memory_pressure_refuses_before_stop
 test_relaunch_closes_a_claude_startup_gate_unanswered
 test_harness_switch_moves_the_record_and_clears_prior_wiring
 test_harness_switch_does_not_carry_the_old_profile_axes

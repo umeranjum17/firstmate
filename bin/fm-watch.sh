@@ -168,6 +168,14 @@
 #                          budget and is parked until a probe reads it live
 #                          again (FM_SECONDMATE_LIVENESS_MAX_ATTEMPTS and
 #                          FM_SECONDMATE_LIVENESS_WINDOW_SECS)
+#   check: host memory ALERT: <summary>; largest: <owner> <size>, ...
+#                          the host memory tick (every FM_HOST_MEMORY_SECS,
+#                          default 30) sampled ALERT from bin/fm-jev-mem-guard.sh,
+#                          which also appends every sample to
+#                          state/host-memory.tsv; pause or stop the largest
+#                          consumer before oomd kills the whole agent runtime.
+#                          One wake per episode: state/.host-memory-alerted
+#                          latches it until a sample reads OK again
 # For normal supervision, resume the session-start primary-harness protocol
 # after each printed reason. Direct duplicate invocations of this script still
 # no-op through the watcher singleton lock. A live holder whose beacon is stale
@@ -379,6 +387,10 @@ case "$SECONDMATE_WAKE_STALL_SECS" in ''|*[!0-9]*|0) SECONDMATE_WAKE_STALL_SECS=
 # relaunch wake cannot restart the probe into a tight loop.
 SECONDMATE_LIVENESS_SECS=${FM_SECONDMATE_LIVENESS_SECS:-}
 case "$SECONDMATE_LIVENESS_SECS" in ''|*[!0-9]*|0) SECONDMATE_LIVENESS_SECS=60 ;; esac
+# Host memory sampling cadence (host_memory_tick). oomd acts on 20 s of high
+# pressure, so the sample runs well inside the slower check sweep.
+HOST_MEMORY_SECS=${FM_HOST_MEMORY_SECS:-}
+case "$HOST_MEMORY_SECS" in ''|*[!0-9]*|0) HOST_MEMORY_SECS=30 ;; esac
 # Per-relaunch wall-clock bound, so a wedged spawn cannot stall the poll.
 SECONDMATE_LIVENESS_TIMEOUT=${FM_SECONDMATE_LIVENESS_TIMEOUT:-}
 case "$SECONDMATE_LIVENESS_TIMEOUT" in ''|*[!0-9]*|0) SECONDMATE_LIVENESS_TIMEOUT=120 ;; esac
@@ -1134,6 +1146,37 @@ EOF
 # budget. The per-mate liveness lock serializes this tick against a concurrent
 # session-start sweep, so neither side can kill or re-probe an endpoint the
 # other is mid-relaunch on.
+# Samples host memory into state/host-memory.tsv and raises one wake per ALERT
+# episode naming the largest consumers by task (bin/fm-jev-mem-guard.py owns the
+# verdict, the sample row, and the owner mapping across every local home's task
+# records). The latch clears only on an OK sample, so a host hovering between
+# WAIT and ALERT is not re-announced. A guard that cannot run is logged, never
+# woken on: spawn admission reports a broken config loudly at the next launch.
+host_memory_tick() {
+  local marker="$STATE/.host-memory-tick" latch="$STATE/.host-memory-alerted" out reason d
+  local -a dirs=()
+  [ "$(age_of "$marker")" -ge "$HOST_MEMORY_SECS" ] || return 0
+  touch "$marker" || return 0
+  fm_local_firstmate_state_dirs "$STATE" 2>/dev/null || FM_LOCAL_STATE_DIRS=("$STATE")
+  for d in "${FM_LOCAL_STATE_DIRS[@]}"; do dirs+=(--state-dir "$d"); done
+  out=$("$SCRIPT_DIR/fm-jev-mem-guard.sh" --config "$CONFIG/host-memory" --record "$STATE/host-memory.tsv" "${dirs[@]}" 2>&1) || {
+    triage_log "host memory guard failed: $out"
+    return 0
+  }
+  case "${out%%$'\t'*}" in
+    ALERT) ;;
+    OK) rm -f "$latch"; return 0 ;;
+    *) return 0 ;;
+  esac
+  [ ! -e "$latch" ] || return 0
+  reason="check: host memory ALERT: ${out#*$'\t'}; pause or stop the largest consumer before oomd kills the whole agent runtime"
+  if fm_wake_queued_keys check | grep -Fx host-memory >/dev/null 2>&1 \
+    || fm_wake_append check host-memory "$reason"; then
+    : >"$latch"
+    wake "$reason"
+  fi
+}
+
 secondmate_liveness_tick() {
   local tick_marker="$STATE/.secondmate-liveness-tick"
   [ "$(age_of "$tick_marker")" -ge "$SECONDMATE_LIVENESS_SECS" ] || return 0
@@ -2968,6 +3011,10 @@ while :; do
     echo "watcher: secondmate wake-loop observation failed" >&2
     exit 1
   }
+
+  # Host memory runs before the signal scan for the same reason as the check
+  # sweep below: a chatty crewmate's signals must not starve an oomd warning.
+  host_memory_tick
 
   # Process-to-event liveness repair. This never discovers a result by polling:
   # each registered source has its own child blocking on that source, and this

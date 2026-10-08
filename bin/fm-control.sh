@@ -1108,6 +1108,11 @@ do_relaunch() {
   else
     note_line="note=none"
   fi
+  # fm-spawn admits the launch on host memory too, but only after the agent is
+  # stopped; asking first leaves the running agent untouched on a refusal.
+  "$SCRIPT_DIR/fm-jev-mem-guard.sh" --config "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}/host-memory" \
+    --admit "$ID" --state "$STATE" >&2 \
+    || die "relaunch of $ID refused before its agent was touched: host memory is under pressure; retry once it eases"
   safe_checkpoint
   cp -p "$META" "$META_PRIOR" || die "could not preserve task $ID's durable record before relaunching"
   RELAUNCH_ACTIVE=1

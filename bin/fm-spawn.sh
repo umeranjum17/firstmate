@@ -43,6 +43,10 @@
 #   anything; a nonzero exit refuses the spawn and prints the gate's output.
 #   Secondmate spawns and relaunches never run it, and an absent file changes
 #   nothing.
+#   Every local launch, relaunches and secondmates included, is then refused
+#   while bin/fm-jev-mem-guard.sh --admit reads the host as under memory
+#   pressure (thresholds: config/host-memory); the refusal prints the reason
+#   and records it in state/admission-refused, and the task stays queued.
 #   Ship/scout launches always put fm-dod-lib.sh's current worker role scope
 #   first in the private launch-brief overlay, including the exact task-owned
 #   steering inbox. This never rewrites a project's instruction files or a
@@ -1678,6 +1682,15 @@ if [ "$KIND" = secondmate ]; then
   fi
   [ "$remote_spawn_rc" -eq 3 ] || exit "$remote_spawn_rc"
 fi
+# Host memory admission: every local agent launch - fresh, relaunch, or
+# secondmate - waits while the host is under memory pressure, so new work never
+# pushes the agent runtime into an oomd kill. bin/fm-jev-mem-guard.py owns the
+# verdict and the state/admission-refused record the queue views read.
+HOST_MEMORY_OUT=$("$SCRIPT_DIR/fm-jev-mem-guard.sh" --config "$CONFIG/host-memory" --admit "$ID" --state "$STATE" 2>&1) || {
+  printf '%s\n' "$HOST_MEMORY_OUT" >&2
+  echo "error: spawn refused - task $ID stays queued until host memory eases; retry then" >&2
+  exit 1
+}
 # Backend selection (data/fm-backend-design-d7): explicit --backend, else
 # FM_BACKEND env, else config/backend, else runtime auto-detection, else
 # default tmux (fm_backend_name). fm_backend_validate_spawn refuses unknown or
