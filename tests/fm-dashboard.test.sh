@@ -608,6 +608,51 @@ PY
   pass "quota identity, runway uncertainty, quality samples, cadence, filing gaps and producing homes stay faithful"
 }
 
+test_duration_percentiles_require_complete_samples() {
+  local home d
+  home=$(make_home durations)
+  d="$home/state/dashboard"
+  printf 'metric\top\ttarget\np90_hours\t<=\t50\n' > "$home/config/metrics-targets.tsv"
+  python3 - "$home/data/metrics/prs.tsv" <<'PY'
+import sys
+from datetime import datetime, timedelta
+start = datetime.now().astimezone().replace(hour=0, minute=0, second=0, microsecond=0)
+with open(sys.argv[1], 'w') as f:
+    f.write('home\tmerged\tfirst_pass\tbuild_hours\n')
+    for day in (start - timedelta(days=1), start):
+        for hours in (1, 100): f.write(f'main\t{day.isoformat()}\t1\t{hours}\n')
+PY
+  build "$home"
+  has "$d/flow.html" "Yesterday's cycle-time P50: 1 h." "P50 1 h" "P85 100 h"
+  lacks "$d/flow.html" "took under" "omitted:"
+  has "$d/measure.html" "Slowest merges (p90) at most 50 h 100 h missed"
+  python3 - "$home/data/metrics/prs.tsv" <<'PY'
+import sys
+p = sys.argv[1]
+rows = open(p).read().splitlines()
+a = rows[2].split('\t'); a[-1] = ''; rows[2] = '\t'.join(a)
+a = rows[4].split('\t'); a[-1] = '?'; rows[4] = '\t'.join(a)
+open(p, 'w').write('\n'.join(rows) + '\n')
+PY
+  build "$home"
+  has "$d/flow.html" "Yesterday's cycle time unknown." "Cycle time unknown: missing or invalid merge durations."
+  lacks "$d/flow.html" "P50 1 h" "P85 1 h"
+  has "$d/measure.html" "Slowest merges (p90) at most 50 h – unknown"
+  python3 - "$home/data/metrics/prs.tsv" <<'PY'
+import sys
+p = sys.argv[1]
+rows = open(p).read().splitlines()
+a = rows[2].split('\t'); a[-1] = '100'; rows[2] = '\t'.join(a)
+a = rows[4].split('\t'); a[-1] = '-1'; rows[4] = '\t'.join(a)
+open(p, 'w').write('\n'.join(rows) + '\n')
+PY
+  build "$home"
+  has "$d/flow.html" "Yesterday's cycle-time P50: 1 h." "P85 100 h" \
+    "1 day omitted: missing or invalid durations. Every merge in each plotted day was measured."
+  has "$d/measure.html" "Slowest merges (p90) at most 50 h – unknown"
+  pass "population percentiles require complete durations, and P50 makes no strict timing claim"
+}
+
 test_serve_answers_each_page_and_remembers_the_grouping() {
   local home url got
   home=$(make_home served)
@@ -689,4 +734,5 @@ test_the_filing_log_counts_new_items_exactly
 test_devices_and_machine_come_from_read_only_probes
 test_pull_requests_show_validation_runs_and_checks_from_local_records
 test_quota_quality_filing_and_landing_boundaries
+test_duration_percentiles_require_complete_samples
 test_serve_answers_each_page_and_remembers_the_grouping

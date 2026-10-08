@@ -824,6 +824,9 @@ for p in prs or []:
     d = local_day(p['merged'])
     if d: merged_on.setdefault(d, []).append(p)
 QWIN = [YDAY, TODAY]
+def merge_hours(p):
+    v = num(p.get('build_hours'))
+    return v if v is not None and v >= 0 else None
 def window_metrics(home=None):
     ps = [p for d in QWIN for p in merged_on.get(d, []) if p['home'] not in parked and (home is None or p['home'] == home)]
     n = len(ps)
@@ -831,7 +834,7 @@ def window_metrics(home=None):
         if daily is None: return None
         vals = [dsum(col, d, home) for d in QWIN]
         return None if any(v is None for v in vals) else sum(vals)
-    hrs = sorted(v for v in (num(p.get('build_hours')) for p in ps) if v is not None)
+    hrs = [merge_hours(p) for p in ps]
     per = lambda v: round(v / n, 2) if n and v is not None else None
     steers, dec, blk = dw('steers'), dw('decisions'), dw('blocks')
     esc = [num(p.get('escaped')) for p in ps] if prs is not None else None
@@ -1269,6 +1272,7 @@ def week_bars():
 # Cycle time: first commit to merge (build_hours in the merge record), P50 and P85 per merge day.
 CYCLE_DAYS = 14
 def pct(vals, p):
+    if any(v is None for v in vals): return None
     s = sorted(vals)
     return s[min(len(s) - 1, max(0, math.ceil(p * len(s)) - 1))] if s else None
 cycle = None
@@ -1276,12 +1280,12 @@ if prs is not None:
     cycle = []
     for i in range(CYCLE_DAYS - 1, -1, -1):
         d = TODAY - timedelta(days=i)
-        hs = [num(p.get('build_hours')) for p in prs if p['home'] not in parked and local_day(p['merged']) == d]
-        hs = [v for v in hs if v is not None]
+        hs = [merge_hours(p) for p in prs if p['home'] not in parked and local_day(p['merged']) == d]
         cycle.append((d, pct(hs, .5), pct(hs, .85), len(hs)))
 def cycle_chart():
-    pts = [(i, c) for i, c in enumerate(cycle) if c[3]]
-    if not pts: return '<p class="note">No merges in the merge record over the last 14 days.</p>'
+    pts = [(i, c) for i, c in enumerate(cycle) if c[1] is not None]
+    incomplete = sum(c[3] > 0 and c[1] is None for c in cycle)
+    if not pts: return '<p class="note">Cycle time unknown: missing or invalid merge durations.</p>' if incomplete else '<p class="note">No merges in the merge record over the last 14 days.</p>'
     top = nice_top(max(c[2] for _, c in pts))
     x = lambda i: (i + .5) / CYCLE_DAYS
     svg = (f'<path class="ln p85" d="{path([(x(i), c[2]) for i, c in pts], top)}" vector-effect="non-scaling-stroke"/>'
@@ -1290,7 +1294,8 @@ def cycle_chart():
                    f'<title>{c[0]:%a %d %b}: P50 {fmt(c[1])} h, P85 {fmt(c[2])} h, {plural(c[3], "merge")}</title></rect>' for i, c in pts)
     last = pts[-1][1]
     return (legend(('k p50', f'P50 {fmt(last[1])} h'), ('k p85', f'P85 {fmt(last[2])} h'))
-            + frame(svg, top, [f'{c[0]:%d}' if i % 2 == 0 else '' for i, c in enumerate(cycle)], ' h'))
+            + frame(svg, top, [f'{c[0]:%d}' if i % 2 == 0 else '' for i, c in enumerate(cycle)], ' h')
+            + (f'<p class="note">{plural(incomplete, "day")} omitted: missing or invalid durations. Every merge in each plotted day was measured.</p>' if incomplete else ''))
 
 # Lane states in one order and one colour each, the same everywhere.
 LANE_ORDER = [('building', 'building'), ('validating', 'validating or CI'), ('finished', 'finished, not landed'),
@@ -1464,7 +1469,7 @@ def flow_body():
 </div>
 <section>
 {sh(f"Cycle time · first commit to merge, P50 and P85 per day · last {CYCLE_DAYS} days · merge record")}
-<h2>{f"Half of yesterday's merges took under {fmt(cycle[-2][1])} h." if cycle and cycle[-2][3] else "Cycle time per merge day."}</h2>
+<h2>{f"Yesterday's cycle-time P50: {fmt(cycle[-2][1])} h." if cycle and cycle[-2][1] is not None else "Yesterday's cycle time unknown." if cycle and cycle[-2][3] else "Cycle time per merge day."}</h2>
 {cycle_chart() if cycle is not None else unknown(why_of("data/metrics/prs.tsv"))}
 </section>
 <section>
