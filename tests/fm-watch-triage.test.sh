@@ -7114,7 +7114,7 @@ test_uncertain_read_keeps_phantom_state() {
 }
 
 test_own_queue_redelivers_without_churning_successors() {
-  local dir state fakebin out pid now original
+  local dir state fakebin out pid now original status_file decision_original drain_out
   dir=$(make_case own-queue); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
   now=$(date +%s)
   original=$(printf '%s\t1\tcheck\tlocal-alert\tcheck: local alert needs handling' "$now")
@@ -7148,7 +7148,28 @@ test_own_queue_redelivers_without_churning_successors() {
   wait_poll_cycle "$state" "$pid" || { reap "$pid"; fail "an acknowledged wake was re-delivered"; }
   [ ! -s "$out" ] || fail "the empty local queue produced a wake"
   reap "$pid"
-  pass "local queue re-delivery is bounded across cycles and ends on acknowledgement"
+  status_file="$state/task.status"; drain_out="$dir/decision.drain.out"
+  printf 'needs-decision: choose the release target\n' > "$status_file"
+  watch_bg "$state" "$fakebin" "$out" env FM_HOME="$dir" FM_WATCH_HANDLING_SUCCESSOR=1
+  pid=$!
+  wait_for_exit "$pid" 100 || { reap "$pid"; fail "the decision signal did not wake main"; }
+  decision_original=$(cat "$state/.wake-queue")
+  grep -F "$(printf 'signal\ttask.status\tneeds-decision:')" "$state/.wake-queue" >/dev/null \
+    || fail "the decision signal lost its durable branch-exclusion marker"
+  rm -f "$state/.own-wake-progress"
+  watch_bg "$state" "$fakebin" "$out" env FM_HOME="$dir" FM_WATCH_HANDLING_SUCCESSOR=1 FM_SECONDMATE_WAKE_STALL_SECS=3
+  pid=$!
+  wait_poll_cycle "$state" "$pid" || { reap "$pid"; fail "the decision immediately churned its handling successor"; }
+  wait_for_exit "$pid" 150 || { reap "$pid"; fail "the unhandled decision never re-surfaced"; }
+  grep -Fx "signal: $status_file" "$out" >/dev/null || fail "the decision reminder was not a supported signal wake"
+  [ "$(cat "$state/.wake-queue")" = "$decision_original" ] || fail "the decision reminder changed the durable row"
+  FM_STATE_OVERRIDE="$state" "$DRAIN" > "$drain_out" 2>/dev/null || fail "the decision reminder could not be drained"
+  grep -F "$(printf 'signal\ttask.status\tneeds-decision:')" "$drain_out" >/dev/null \
+    || fail "the drain lost the decision marker"
+  [ "$(cat "$state/.wake-queue")" = "$decision_original" ] || fail "draining consumed the unacknowledged decision"
+  ack_stopped_cycle "$state" >/dev/null 2>&1 || fail "could not acknowledge the decision reminder"
+  [ ! -s "$state/.wake-queue" ] || fail "the acknowledged decision remained queued"
+  pass "local queue reminders preserve decision markers and end on acknowledgement"
 }
 
 # CI's stock macOS Bash lane sets FM_TEST_ONLY to run just the bash-3.2

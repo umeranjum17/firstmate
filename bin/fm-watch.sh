@@ -1202,6 +1202,9 @@ EOF
   [ "$idle" -ge "$SECONDMATE_WAKE_STALL_SECS" ] || return 0
   secondmate_in_active_turn '' "$idle" "$FM_HOME" "$seq" && return 0
   printf '%s\t%s\n' "$now" "$row_key" > "$STATE/.own-wake-progress" || return 1
+  case "$kind:$reason" in
+    signal:needs-decision:*) reason="signal:${reason#needs-decision:}" ;;
+  esac
   wake "$reason"
 }
 
