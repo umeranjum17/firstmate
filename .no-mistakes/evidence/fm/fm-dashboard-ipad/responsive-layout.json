@@ -1,0 +1,1922 @@
+[
+  {
+    "command": [
+      "get",
+      "url"
+    ],
+    "error": null,
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "url": "http://127.0.0.1:35911/#/board"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "set",
+      "viewport",
+      "760",
+      "900"
+    ],
+    "error": null,
+    "result": {
+      "deviceScaleFactor": 1,
+      "height": 900,
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "mobile": false,
+      "width": 760
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "wait",
+      "--fn",
+      "!!document.querySelector('.app')"
+    ],
+    "error": null,
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "result": true
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "eval",
+      "(()=>{const rect=e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,right:r.right}};const hd=document.querySelector('.hd'),k=document.querySelector('.kpi'),s=document.querySelector('.side');const controls=[...document.querySelectorAll('.hd>button,.hd>.anchor,.hd>h1')];const data={width:innerWidth,documentWidth:document.documentElement.scrollWidth,rail:s?rect(s):null,header:hd?rect(hd):null,kpi:k?rect(k):null,controls:controls.map(e=>({text:e.textContent,...rect(e)})),phone:!!document.querySelector('.phone')};if(data.documentWidth>innerWidth)throw Error('document overflows');if(innerWidth>=760){if(!hd||!k)throw Error('tablet shell absent');if(controls.some(e=>rect(e).right>innerWidth))throw Error('header control clipped');if(innerWidth<1280&&rect(k).y<=Math.max(...controls.map(e=>rect(e).y)))throw Error('metric row not separate');if(innerWidth<1024&&rect(s).w!==52)throw Error('rail not compact');}else if(!data.phone)throw Error('phone absent');return data})()"
+    ],
+    "error": null,
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "origin": "http://127.0.0.1:35911/#/board",
+      "result": {
+        "controls": [
+          {
+            "h": 18.84375,
+            "right": 104.71875,
+            "text": "Board",
+            "w": 36.71875,
+            "x": 68,
+            "y": 20.578125
+          },
+          {
+            "h": 24,
+            "right": 188.671875,
+            "text": "Active2",
+            "w": 69.953125,
+            "x": 118.71875,
+            "y": 18
+          },
+          {
+            "h": 24,
+            "right": 273.640625,
+            "text": "Queued1",
+            "w": 78.96875,
+            "x": 194.671875,
+            "y": 18
+          },
+          {
+            "h": 24,
+            "right": 398.09375,
+            "text": "Landed today≥0",
+            "w": 118.453125,
+            "x": 279.640625,
+            "y": 18
+          },
+          {
+            "h": 24,
+            "right": 438.65625,
+            "text": "All",
+            "w": 34.5625,
+            "x": 404.09375,
+            "y": 18
+          },
+          {
+            "h": 28,
+            "right": 649.875,
+            "text": "Filter",
+            "w": 70.953125,
+            "x": 578.921875,
+            "y": 16
+          },
+          {
+            "h": 28,
+            "right": 740,
+            "text": "Display",
+            "w": 84.125,
+            "x": 655.875,
+            "y": 16
+          }
+        ],
+        "documentWidth": 760,
+        "header": {
+          "h": 81,
+          "right": 752,
+          "w": 700,
+          "x": 52,
+          "y": 8
+        },
+        "kpi": {
+          "h": 28,
+          "right": 740,
+          "w": 672,
+          "x": 68,
+          "y": 52
+        },
+        "phone": false,
+        "rail": {
+          "h": 900,
+          "right": 52,
+          "w": 52,
+          "x": 0,
+          "y": 0
+        },
+        "width": 760
+      }
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "get",
+      "url"
+    ],
+    "error": null,
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "url": "http://127.0.0.1:35911/#/board"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "set",
+      "viewport",
+      "768",
+      "900"
+    ],
+    "error": null,
+    "result": {
+      "deviceScaleFactor": 1,
+      "height": 900,
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "mobile": false,
+      "width": 768
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "wait",
+      "--fn",
+      "!!document.querySelector('.app')"
+    ],
+    "error": null,
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "result": true
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "eval",
+      "(()=>{const rect=e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,right:r.right}};const hd=document.querySelector('.hd'),k=document.querySelector('.kpi'),s=document.querySelector('.side');const controls=[...document.querySelectorAll('.hd>button,.hd>.anchor,.hd>h1')];const data={width:innerWidth,documentWidth:document.documentElement.scrollWidth,rail:s?rect(s):null,header:hd?rect(hd):null,kpi:k?rect(k):null,controls:controls.map(e=>({text:e.textContent,...rect(e)})),phone:!!document.querySelector('.phone')};if(data.documentWidth>innerWidth)throw Error('document overflows');if(innerWidth>=760){if(!hd||!k)throw Error('tablet shell absent');if(controls.some(e=>rect(e).right>innerWidth))throw Error('header control clipped');if(innerWidth<1280&&rect(k).y<=Math.max(...controls.map(e=>rect(e).y)))throw Error('metric row not separate');if(innerWidth<1024&&rect(s).w!==52)throw Error('rail not compact');}else if(!data.phone)throw Error('phone absent');return data})()"
+    ],
+    "error": null,
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "origin": "http://127.0.0.1:35911/#/board",
+      "result": {
+        "controls": [
+          {
+            "h": 18.84375,
+            "right": 104.71875,
+            "text": "Board",
+            "w": 36.71875,
+            "x": 68,
+            "y": 20.578125
+          },
+          {
+            "h": 24,
+            "right": 188.671875,
+            "text": "Active2",
+            "w": 69.953125,
+            "x": 118.71875,
+            "y": 18
+          },
+          {
+            "h": 24,
+            "right": 273.640625,
+            "text": "Queued1",
+            "w": 78.96875,
+            "x": 194.671875,
+            "y": 18
+          },
+          {
+            "h": 24,
+            "right": 398.09375,
+            "text": "Landed today≥0",
+            "w": 118.453125,
+            "x": 279.640625,
+            "y": 18
+          },
+          {
+            "h": 24,
+            "right": 438.65625,
+            "text": "All",
+            "w": 34.5625,
+            "x": 404.09375,
+            "y": 18
+          },
+          {
+            "h": 28,
+            "right": 657.875,
+            "text": "Filter",
+            "w": 70.953125,
+            "x": 586.921875,
+            "y": 16
+          },
+          {
+            "h": 28,
+            "right": 748,
+            "text": "Display",
+            "w": 84.125,
+            "x": 663.875,
+            "y": 16
+          }
+        ],
+        "documentWidth": 768,
+        "header": {
+          "h": 81,
+          "right": 760,
+          "w": 708,
+          "x": 52,
+          "y": 8
+        },
+        "kpi": {
+          "h": 28,
+          "right": 748,
+          "w": 680,
+          "x": 68,
+          "y": 52
+        },
+        "phone": false,
+        "rail": {
+          "h": 900,
+          "right": 52,
+          "w": 52,
+          "x": 0,
+          "y": 0
+        },
+        "width": 768
+      }
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "get",
+      "url"
+    ],
+    "error": null,
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "url": "http://127.0.0.1:35911/#/board"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "set",
+      "viewport",
+      "820",
+      "900"
+    ],
+    "error": null,
+    "result": {
+      "deviceScaleFactor": 1,
+      "height": 900,
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "mobile": false,
+      "width": 820
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "wait",
+      "--fn",
+      "!!document.querySelector('.app')"
+    ],
+    "error": null,
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "result": true
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "eval",
+      "(()=>{const rect=e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,right:r.right}};const hd=document.querySelector('.hd'),k=document.querySelector('.kpi'),s=document.querySelector('.side');const controls=[...document.querySelectorAll('.hd>button,.hd>.anchor,.hd>h1')];const data={width:innerWidth,documentWidth:document.documentElement.scrollWidth,rail:s?rect(s):null,header:hd?rect(hd):null,kpi:k?rect(k):null,controls:controls.map(e=>({text:e.textContent,...rect(e)})),phone:!!document.querySelector('.phone')};if(data.documentWidth>innerWidth)throw Error('document overflows');if(innerWidth>=760){if(!hd||!k)throw Error('tablet shell absent');if(controls.some(e=>rect(e).right>innerWidth))throw Error('header control clipped');if(innerWidth<1280&&rect(k).y<=Math.max(...controls.map(e=>rect(e).y)))throw Error('metric row not separate');if(innerWidth<1024&&rect(s).w!==52)throw Error('rail not compact');}else if(!data.phone)throw Error('phone absent');return data})()"
+    ],
+    "error": null,
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "origin": "http://127.0.0.1:35911/#/board",
+      "result": {
+        "controls": [
+          {
+            "h": 18.84375,
+            "right": 104.71875,
+            "text": "Board",
+            "w": 36.71875,
+            "x": 68,
+            "y": 20.578125
+          },
+          {
+            "h": 24,
+            "right": 188.671875,
+            "text": "Active2",
+            "w": 69.953125,
+            "x": 118.71875,
+            "y": 18
+          },
+          {
+            "h": 24,
+            "right": 273.640625,
+            "text": "Queued1",
+            "w": 78.96875,
+            "x": 194.671875,
+            "y": 18
+          },
+          {
+            "h": 24,
+            "right": 398.09375,
+            "text": "Landed today≥0",
+            "w": 118.453125,
+            "x": 279.640625,
+            "y": 18
+          },
+          {
+            "h": 24,
+            "right": 438.65625,
+            "text": "All",
+            "w": 34.5625,
+            "x": 404.09375,
+            "y": 18
+          },
+          {
+            "h": 28,
+            "right": 709.875,
+            "text": "Filter",
+            "w": 70.953125,
+            "x": 638.921875,
+            "y": 16
+          },
+          {
+            "h": 28,
+            "right": 800,
+            "text": "Display",
+            "w": 84.125,
+            "x": 715.875,
+            "y": 16
+          }
+        ],
+        "documentWidth": 820,
+        "header": {
+          "h": 81,
+          "right": 812,
+          "w": 760,
+          "x": 52,
+          "y": 8
+        },
+        "kpi": {
+          "h": 28,
+          "right": 800,
+          "w": 732,
+          "x": 68,
+          "y": 52
+        },
+        "phone": false,
+        "rail": {
+          "h": 900,
+          "right": 52,
+          "w": 52,
+          "x": 0,
+          "y": 0
+        },
+        "width": 820
+      }
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "get",
+      "url"
+    ],
+    "error": null,
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "url": "http://127.0.0.1:35911/#/board"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "set",
+      "viewport",
+      "1023",
+      "900"
+    ],
+    "error": null,
+    "result": {
+      "deviceScaleFactor": 1,
+      "height": 900,
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "mobile": false,
+      "width": 1023
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "wait",
+      "--fn",
+      "!!document.querySelector('.app')"
+    ],
+    "error": null,
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "result": true
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "eval",
+      "(()=>{const rect=e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,right:r.right}};const hd=document.querySelector('.hd'),k=document.querySelector('.kpi'),s=document.querySelector('.side');const controls=[...document.querySelectorAll('.hd>button,.hd>.anchor,.hd>h1')];const data={width:innerWidth,documentWidth:document.documentElement.scrollWidth,rail:s?rect(s):null,header:hd?rect(hd):null,kpi:k?rect(k):null,controls:controls.map(e=>({text:e.textContent,...rect(e)})),phone:!!document.querySelector('.phone')};if(data.documentWidth>innerWidth)throw Error('document overflows');if(innerWidth>=760){if(!hd||!k)throw Error('tablet shell absent');if(controls.some(e=>rect(e).right>innerWidth))throw Error('header control clipped');if(innerWidth<1280&&rect(k).y<=Math.max(...controls.map(e=>rect(e).y)))throw Error('metric row not separate');if(innerWidth<1024&&rect(s).w!==52)throw Error('rail not compact');}else if(!data.phone)throw Error('phone absent');return data})()"
+    ],
+    "error": null,
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "origin": "http://127.0.0.1:35911/#/board",
+      "result": {
+        "controls": [
+          {
+            "h": 18.84375,
+            "right": 104.71875,
+            "text": "Board",
+            "w": 36.71875,
+            "x": 68,
+            "y": 20.578125
+          },
+          {
+            "h": 24,
+            "right": 188.671875,
+            "text": "Active2",
+            "w": 69.953125,
+            "x": 118.71875,
+            "y": 18
+          },
+          {
+            "h": 24,
+            "right": 273.640625,
+            "text": "Queued1",
+            "w": 78.96875,
+            "x": 194.671875,
+            "y": 18
+          },
+          {
+            "h": 24,
+            "right": 398.09375,
+            "text": "Landed today≥0",
+            "w": 118.453125,
+            "x": 279.640625,
+            "y": 18
+          },
+          {
+            "h": 24,
+            "right": 438.65625,
+            "text": "All",
+            "w": 34.5625,
+            "x": 404.09375,
+            "y": 18
+          },
+          {
+            "h": 28,
+            "right": 912.875,
+            "text": "Filter",
+            "w": 70.953125,
+            "x": 841.921875,
+            "y": 16
+          },
+          {
+            "h": 28,
+            "right": 1003,
+            "text": "Display",
+            "w": 84.125,
+            "x": 918.875,
+            "y": 16
+          }
+        ],
+        "documentWidth": 1023,
+        "header": {
+          "h": 81,
+          "right": 1015,
+          "w": 963,
+          "x": 52,
+          "y": 8
+        },
+        "kpi": {
+          "h": 28,
+          "right": 1003,
+          "w": 935,
+          "x": 68,
+          "y": 52
+        },
+        "phone": false,
+        "rail": {
+          "h": 900,
+          "right": 52,
+          "w": 52,
+          "x": 0,
+          "y": 0
+        },
+        "width": 1023
+      }
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "get",
+      "url"
+    ],
+    "error": null,
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "url": "http://127.0.0.1:35911/#/board"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "set",
+      "viewport",
+      "1024",
+      "900"
+    ],
+    "error": null,
+    "result": {
+      "deviceScaleFactor": 1,
+      "height": 900,
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "mobile": false,
+      "width": 1024
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "wait",
+      "--fn",
+      "!!document.querySelector('.app')"
+    ],
+    "error": null,
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "result": true
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "eval",
+      "(()=>{const rect=e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,right:r.right}};const hd=document.querySelector('.hd'),k=document.querySelector('.kpi'),s=document.querySelector('.side');const controls=[...document.querySelectorAll('.hd>button,.hd>.anchor,.hd>h1')];const data={width:innerWidth,documentWidth:document.documentElement.scrollWidth,rail:s?rect(s):null,header:hd?rect(hd):null,kpi:k?rect(k):null,controls:controls.map(e=>({text:e.textContent,...rect(e)})),phone:!!document.querySelector('.phone')};if(data.documentWidth>innerWidth)throw Error('document overflows');if(innerWidth>=760){if(!hd||!k)throw Error('tablet shell absent');if(controls.some(e=>rect(e).right>innerWidth))throw Error('header control clipped');if(innerWidth<1280&&rect(k).y<=Math.max(...controls.map(e=>rect(e).y)))throw Error('metric row not separate');if(innerWidth<1024&&rect(s).w!==52)throw Error('rail not compact');}else if(!data.phone)throw Error('phone absent');return data})()"
+    ],
+    "error": null,
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "origin": "http://127.0.0.1:35911/#/board",
+      "result": {
+        "controls": [
+          {
+            "h": 18.84375,
+            "right": 272.71875,
+            "text": "Board",
+            "w": 36.71875,
+            "x": 236,
+            "y": 20.578125
+          },
+          {
+            "h": 24,
+            "right": 356.671875,
+            "text": "Active2",
+            "w": 69.953125,
+            "x": 286.71875,
+            "y": 18
+          },
+          {
+            "h": 24,
+            "right": 441.640625,
+            "text": "Queued1",
+            "w": 78.96875,
+            "x": 362.671875,
+            "y": 18
+          },
+          {
+            "h": 24,
+            "right": 566.09375,
+            "text": "Landed today≥0",
+            "w": 118.453125,
+            "x": 447.640625,
+            "y": 18
+          },
+          {
+            "h": 24,
+            "right": 606.65625,
+            "text": "All",
+            "w": 34.5625,
+            "x": 572.09375,
+            "y": 18
+          },
+          {
+            "h": 28,
+            "right": 913.875,
+            "text": "Filter",
+            "w": 70.953125,
+            "x": 842.921875,
+            "y": 16
+          },
+          {
+            "h": 28,
+            "right": 1004,
+            "text": "Display",
+            "w": 84.125,
+            "x": 919.875,
+            "y": 16
+          }
+        ],
+        "documentWidth": 1024,
+        "header": {
+          "h": 81,
+          "right": 1016,
+          "w": 796,
+          "x": 220,
+          "y": 8
+        },
+        "kpi": {
+          "h": 28,
+          "right": 1004,
+          "w": 768,
+          "x": 236,
+          "y": 52
+        },
+        "phone": false,
+        "rail": {
+          "h": 900,
+          "right": 220,
+          "w": 220,
+          "x": 0,
+          "y": 0
+        },
+        "width": 1024
+      }
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "get",
+      "url"
+    ],
+    "error": null,
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "url": "http://127.0.0.1:35911/#/board"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "set",
+      "viewport",
+      "1180",
+      "900"
+    ],
+    "error": null,
+    "result": {
+      "deviceScaleFactor": 1,
+      "height": 900,
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "mobile": false,
+      "width": 1180
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "wait",
+      "--fn",
+      "!!document.querySelector('.app')"
+    ],
+    "error": null,
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "result": true
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "eval",
+      "(()=>{const rect=e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,right:r.right}};const hd=document.querySelector('.hd'),k=document.querySelector('.kpi'),s=document.querySelector('.side');const controls=[...document.querySelectorAll('.hd>button,.hd>.anchor,.hd>h1')];const data={width:innerWidth,documentWidth:document.documentElement.scrollWidth,rail:s?rect(s):null,header:hd?rect(hd):null,kpi:k?rect(k):null,controls:controls.map(e=>({text:e.textContent,...rect(e)})),phone:!!document.querySelector('.phone')};if(data.documentWidth>innerWidth)throw Error('document overflows');if(innerWidth>=760){if(!hd||!k)throw Error('tablet shell absent');if(controls.some(e=>rect(e).right>innerWidth))throw Error('header control clipped');if(innerWidth<1280&&rect(k).y<=Math.max(...controls.map(e=>rect(e).y)))throw Error('metric row not separate');if(innerWidth<1024&&rect(s).w!==52)throw Error('rail not compact');}else if(!data.phone)throw Error('phone absent');return data})()"
+    ],
+    "error": null,
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "origin": "http://127.0.0.1:35911/#/board",
+      "result": {
+        "controls": [
+          {
+            "h": 18.84375,
+            "right": 272.71875,
+            "text": "Board",
+            "w": 36.71875,
+            "x": 236,
+            "y": 20.578125
+          },
+          {
+            "h": 24,
+            "right": 356.671875,
+            "text": "Active2",
+            "w": 69.953125,
+            "x": 286.71875,
+            "y": 18
+          },
+          {
+            "h": 24,
+            "right": 441.640625,
+            "text": "Queued1",
+            "w": 78.96875,
+            "x": 362.671875,
+            "y": 18
+          },
+          {
+            "h": 24,
+            "right": 566.09375,
+            "text": "Landed today≥0",
+            "w": 118.453125,
+            "x": 447.640625,
+            "y": 18
+          },
+          {
+            "h": 24,
+            "right": 606.65625,
+            "text": "All",
+            "w": 34.5625,
+            "x": 572.09375,
+            "y": 18
+          },
+          {
+            "h": 28,
+            "right": 1069.875,
+            "text": "Filter",
+            "w": 70.953125,
+            "x": 998.921875,
+            "y": 16
+          },
+          {
+            "h": 28,
+            "right": 1160,
+            "text": "Display",
+            "w": 84.125,
+            "x": 1075.875,
+            "y": 16
+          }
+        ],
+        "documentWidth": 1180,
+        "header": {
+          "h": 81,
+          "right": 1172,
+          "w": 952,
+          "x": 220,
+          "y": 8
+        },
+        "kpi": {
+          "h": 28,
+          "right": 1160,
+          "w": 924,
+          "x": 236,
+          "y": 52
+        },
+        "phone": false,
+        "rail": {
+          "h": 900,
+          "right": 220,
+          "w": 220,
+          "x": 0,
+          "y": 0
+        },
+        "width": 1180
+      }
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "get",
+      "url"
+    ],
+    "error": null,
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "url": "http://127.0.0.1:35911/#/board"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "set",
+      "viewport",
+      "1279",
+      "900"
+    ],
+    "error": null,
+    "result": {
+      "deviceScaleFactor": 1,
+      "height": 900,
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "mobile": false,
+      "width": 1279
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "wait",
+      "--fn",
+      "!!document.querySelector('.app')"
+    ],
+    "error": null,
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "result": true
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "eval",
+      "(()=>{const rect=e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,right:r.right}};const hd=document.querySelector('.hd'),k=document.querySelector('.kpi'),s=document.querySelector('.side');const controls=[...document.querySelectorAll('.hd>button,.hd>.anchor,.hd>h1')];const data={width:innerWidth,documentWidth:document.documentElement.scrollWidth,rail:s?rect(s):null,header:hd?rect(hd):null,kpi:k?rect(k):null,controls:controls.map(e=>({text:e.textContent,...rect(e)})),phone:!!document.querySelector('.phone')};if(data.documentWidth>innerWidth)throw Error('document overflows');if(innerWidth>=760){if(!hd||!k)throw Error('tablet shell absent');if(controls.some(e=>rect(e).right>innerWidth))throw Error('header control clipped');if(innerWidth<1280&&rect(k).y<=Math.max(...controls.map(e=>rect(e).y)))throw Error('metric row not separate');if(innerWidth<1024&&rect(s).w!==52)throw Error('rail not compact');}else if(!data.phone)throw Error('phone absent');return data})()"
+    ],
+    "error": null,
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "origin": "http://127.0.0.1:35911/#/board",
+      "result": {
+        "controls": [
+          {
+            "h": 18.84375,
+            "right": 272.71875,
+            "text": "Board",
+            "w": 36.71875,
+            "x": 236,
+            "y": 20.578125
+          },
+          {
+            "h": 24,
+            "right": 356.671875,
+            "text": "Active2",
+            "w": 69.953125,
+            "x": 286.71875,
+            "y": 18
+          },
+          {
+            "h": 24,
+            "right": 441.640625,
+            "text": "Queued1",
+            "w": 78.96875,
+            "x": 362.671875,
+            "y": 18
+          },
+          {
+            "h": 24,
+            "right": 566.09375,
+            "text": "Landed today≥0",
+            "w": 118.453125,
+            "x": 447.640625,
+            "y": 18
+          },
+          {
+            "h": 24,
+            "right": 606.65625,
+            "text": "All",
+            "w": 34.5625,
+            "x": 572.09375,
+            "y": 18
+          },
+          {
+            "h": 28,
+            "right": 1168.875,
+            "text": "Filter",
+            "w": 70.953125,
+            "x": 1097.921875,
+            "y": 16
+          },
+          {
+            "h": 28,
+            "right": 1259,
+            "text": "Display",
+            "w": 84.125,
+            "x": 1174.875,
+            "y": 16
+          }
+        ],
+        "documentWidth": 1279,
+        "header": {
+          "h": 81,
+          "right": 1271,
+          "w": 1051,
+          "x": 220,
+          "y": 8
+        },
+        "kpi": {
+          "h": 28,
+          "right": 1259,
+          "w": 1023,
+          "x": 236,
+          "y": 52
+        },
+        "phone": false,
+        "rail": {
+          "h": 900,
+          "right": 220,
+          "w": 220,
+          "x": 0,
+          "y": 0
+        },
+        "width": 1279
+      }
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "get",
+      "url"
+    ],
+    "error": null,
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "url": "http://127.0.0.1:35911/#/board"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "set",
+      "viewport",
+      "1280",
+      "900"
+    ],
+    "error": null,
+    "result": {
+      "deviceScaleFactor": 1,
+      "height": 900,
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "mobile": false,
+      "width": 1280
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "wait",
+      "--fn",
+      "!!document.querySelector('.app')"
+    ],
+    "error": null,
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "result": true
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "eval",
+      "(()=>{const rect=e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,right:r.right}};const hd=document.querySelector('.hd'),k=document.querySelector('.kpi'),s=document.querySelector('.side');const controls=[...document.querySelectorAll('.hd>button,.hd>.anchor,.hd>h1')];const data={width:innerWidth,documentWidth:document.documentElement.scrollWidth,rail:s?rect(s):null,header:hd?rect(hd):null,kpi:k?rect(k):null,controls:controls.map(e=>({text:e.textContent,...rect(e)})),phone:!!document.querySelector('.phone')};if(data.documentWidth>innerWidth)throw Error('document overflows');if(innerWidth>=760){if(!hd||!k)throw Error('tablet shell absent');if(controls.some(e=>rect(e).right>innerWidth))throw Error('header control clipped');if(innerWidth<1280&&rect(k).y<=Math.max(...controls.map(e=>rect(e).y)))throw Error('metric row not separate');if(innerWidth<1024&&rect(s).w!==52)throw Error('rail not compact');}else if(!data.phone)throw Error('phone absent');return data})()"
+    ],
+    "error": null,
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "origin": "http://127.0.0.1:35911/#/board",
+      "result": {
+        "controls": [
+          {
+            "h": 18.84375,
+            "right": 272.71875,
+            "text": "Board",
+            "w": 36.71875,
+            "x": 236,
+            "y": 20.078125
+          },
+          {
+            "h": 24,
+            "right": 356.671875,
+            "text": "Active2",
+            "w": 69.953125,
+            "x": 286.71875,
+            "y": 17.5
+          },
+          {
+            "h": 24,
+            "right": 441.640625,
+            "text": "Queued1",
+            "w": 78.96875,
+            "x": 362.671875,
+            "y": 17.5
+          },
+          {
+            "h": 24,
+            "right": 566.09375,
+            "text": "Landed today≥0",
+            "w": 118.453125,
+            "x": 447.640625,
+            "y": 17.5
+          },
+          {
+            "h": 24,
+            "right": 606.65625,
+            "text": "All",
+            "w": 34.5625,
+            "x": 572.09375,
+            "y": 17.5
+          },
+          {
+            "h": 28,
+            "right": 1169.875,
+            "text": "Filter",
+            "w": 70.953125,
+            "x": 1098.921875,
+            "y": 15.5
+          },
+          {
+            "h": 28,
+            "right": 1260,
+            "text": "Display",
+            "w": 84.125,
+            "x": 1175.875,
+            "y": 15.5
+          }
+        ],
+        "documentWidth": 1280,
+        "header": {
+          "h": 44,
+          "right": 1272,
+          "w": 1052,
+          "x": 220,
+          "y": 8
+        },
+        "kpi": {
+          "h": 28,
+          "right": 1086.921875,
+          "w": 376.21875,
+          "x": 710.703125,
+          "y": 15.5
+        },
+        "phone": false,
+        "rail": {
+          "h": 900,
+          "right": 220,
+          "w": 220,
+          "x": 0,
+          "y": 0
+        },
+        "width": 1280
+      }
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "get",
+      "url"
+    ],
+    "error": null,
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "url": "http://127.0.0.1:35911/#/board"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "set",
+      "viewport",
+      "1440",
+      "900"
+    ],
+    "error": null,
+    "result": {
+      "deviceScaleFactor": 1,
+      "height": 900,
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "mobile": false,
+      "width": 1440
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "wait",
+      "--fn",
+      "!!document.querySelector('.app')"
+    ],
+    "error": null,
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "result": true
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "eval",
+      "(()=>{const rect=e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,right:r.right}};const hd=document.querySelector('.hd'),k=document.querySelector('.kpi'),s=document.querySelector('.side');const controls=[...document.querySelectorAll('.hd>button,.hd>.anchor,.hd>h1')];const data={width:innerWidth,documentWidth:document.documentElement.scrollWidth,rail:s?rect(s):null,header:hd?rect(hd):null,kpi:k?rect(k):null,controls:controls.map(e=>({text:e.textContent,...rect(e)})),phone:!!document.querySelector('.phone')};if(data.documentWidth>innerWidth)throw Error('document overflows');if(innerWidth>=760){if(!hd||!k)throw Error('tablet shell absent');if(controls.some(e=>rect(e).right>innerWidth))throw Error('header control clipped');if(innerWidth<1280&&rect(k).y<=Math.max(...controls.map(e=>rect(e).y)))throw Error('metric row not separate');if(innerWidth<1024&&rect(s).w!==52)throw Error('rail not compact');}else if(!data.phone)throw Error('phone absent');return data})()"
+    ],
+    "error": null,
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "origin": "http://127.0.0.1:35911/#/board",
+      "result": {
+        "controls": [
+          {
+            "h": 18.84375,
+            "right": 272.71875,
+            "text": "Board",
+            "w": 36.71875,
+            "x": 236,
+            "y": 20.078125
+          },
+          {
+            "h": 24,
+            "right": 356.671875,
+            "text": "Active2",
+            "w": 69.953125,
+            "x": 286.71875,
+            "y": 17.5
+          },
+          {
+            "h": 24,
+            "right": 441.640625,
+            "text": "Queued1",
+            "w": 78.96875,
+            "x": 362.671875,
+            "y": 17.5
+          },
+          {
+            "h": 24,
+            "right": 566.09375,
+            "text": "Landed today≥0",
+            "w": 118.453125,
+            "x": 447.640625,
+            "y": 17.5
+          },
+          {
+            "h": 24,
+            "right": 606.65625,
+            "text": "All",
+            "w": 34.5625,
+            "x": 572.09375,
+            "y": 17.5
+          },
+          {
+            "h": 28,
+            "right": 1329.875,
+            "text": "Filter",
+            "w": 70.953125,
+            "x": 1258.921875,
+            "y": 15.5
+          },
+          {
+            "h": 28,
+            "right": 1420,
+            "text": "Display",
+            "w": 84.125,
+            "x": 1335.875,
+            "y": 15.5
+          }
+        ],
+        "documentWidth": 1440,
+        "header": {
+          "h": 44,
+          "right": 1432,
+          "w": 1212,
+          "x": 220,
+          "y": 8
+        },
+        "kpi": {
+          "h": 28,
+          "right": 1246.921875,
+          "w": 376.21875,
+          "x": 870.703125,
+          "y": 15.5
+        },
+        "phone": false,
+        "rail": {
+          "h": 900,
+          "right": 220,
+          "w": 220,
+          "x": 0,
+          "y": 0
+        },
+        "width": 1440
+      }
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "get",
+      "url"
+    ],
+    "error": null,
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "url": "http://127.0.0.1:35911/#/board"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "set",
+      "viewport",
+      "759",
+      "900"
+    ],
+    "error": null,
+    "result": {
+      "deviceScaleFactor": 1,
+      "height": 900,
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "mobile": false,
+      "width": 759
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "wait",
+      "--fn",
+      "!!document.querySelector('.phone')"
+    ],
+    "error": null,
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "result": true
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "eval",
+      "(()=>{const rect=e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,right:r.right}};const hd=document.querySelector('.hd'),k=document.querySelector('.kpi'),s=document.querySelector('.side');const controls=[...document.querySelectorAll('.hd>button,.hd>.anchor,.hd>h1')];const data={width:innerWidth,documentWidth:document.documentElement.scrollWidth,rail:s?rect(s):null,header:hd?rect(hd):null,kpi:k?rect(k):null,controls:controls.map(e=>({text:e.textContent,...rect(e)})),phone:!!document.querySelector('.phone')};if(data.documentWidth>innerWidth)throw Error('document overflows');if(innerWidth>=760){if(!hd||!k)throw Error('tablet shell absent');if(controls.some(e=>rect(e).right>innerWidth))throw Error('header control clipped');if(innerWidth<1280&&rect(k).y<=Math.max(...controls.map(e=>rect(e).y)))throw Error('metric row not separate');if(innerWidth<1024&&rect(s).w!==52)throw Error('rail not compact');}else if(!data.phone)throw Error('phone absent');return data})()"
+    ],
+    "error": null,
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "origin": "http://127.0.0.1:35911/#/board",
+      "result": {
+        "controls": [],
+        "documentWidth": 759,
+        "header": null,
+        "kpi": null,
+        "phone": true,
+        "rail": null,
+        "width": 759
+      }
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "get",
+      "url"
+    ],
+    "error": null,
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "url": "http://127.0.0.1:35911/#/board"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "set",
+      "viewport",
+      "390",
+      "900"
+    ],
+    "error": null,
+    "result": {
+      "deviceScaleFactor": 1,
+      "height": 900,
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "mobile": false,
+      "width": 390
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "wait",
+      "--fn",
+      "!!document.querySelector('.phone')"
+    ],
+    "error": null,
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "result": true
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "eval",
+      "(()=>{const rect=e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,right:r.right}};const hd=document.querySelector('.hd'),k=document.querySelector('.kpi'),s=document.querySelector('.side');const controls=[...document.querySelectorAll('.hd>button,.hd>.anchor,.hd>h1')];const data={width:innerWidth,documentWidth:document.documentElement.scrollWidth,rail:s?rect(s):null,header:hd?rect(hd):null,kpi:k?rect(k):null,controls:controls.map(e=>({text:e.textContent,...rect(e)})),phone:!!document.querySelector('.phone')};if(data.documentWidth>innerWidth)throw Error('document overflows');if(innerWidth>=760){if(!hd||!k)throw Error('tablet shell absent');if(controls.some(e=>rect(e).right>innerWidth))throw Error('header control clipped');if(innerWidth<1280&&rect(k).y<=Math.max(...controls.map(e=>rect(e).y)))throw Error('metric row not separate');if(innerWidth<1024&&rect(s).w!==52)throw Error('rail not compact');}else if(!data.phone)throw Error('phone absent');return data})()"
+    ],
+    "error": null,
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "origin": "http://127.0.0.1:35911/#/board",
+      "result": {
+        "controls": [],
+        "documentWidth": 390,
+        "header": null,
+        "kpi": null,
+        "phone": true,
+        "rail": null,
+        "width": 390
+      }
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "get",
+      "url"
+    ],
+    "error": null,
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "url": "http://127.0.0.1:35911/#/board"
+    },
+    "success": true
+  }
+]

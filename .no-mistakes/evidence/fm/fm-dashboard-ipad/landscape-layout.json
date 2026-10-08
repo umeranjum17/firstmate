@@ -1,0 +1,26 @@
+{
+  "lifecycle": {
+    "effectiveLaunch": {
+      "browserLaunched": true,
+      "engine": "chrome",
+      "launchHash": 12825947863403514000
+    },
+    "launched": false,
+    "relaunchedBrowser": false,
+    "restartedBackground": false,
+    "restoreStatus": "missing",
+    "reused": true,
+    "saveStatus": "saved"
+  },
+  "origin": "http://127.0.0.1:39429/#/board?tab=queued",
+  "result": {
+    "cards": [
+      "queuedAdd home-level trends"
+    ],
+    "headerHeight": 81,
+    "kpi": "Needs you 1Stuck 2Landed today ≥1Cycle p50 –",
+    "selected": "Queued1",
+    "sidebarWidth": 220,
+    "width": 1180
+  }
+}

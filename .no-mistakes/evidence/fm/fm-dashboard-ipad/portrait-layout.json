@@ -1,0 +1,63 @@
+{
+  "lifecycle": {
+    "effectiveLaunch": {
+      "browserLaunched": true,
+      "engine": "chrome",
+      "launchHash": 12825947863403514000
+    },
+    "launched": false,
+    "relaunchedBrowser": false,
+    "restartedBackground": false,
+    "restoreStatus": "missing",
+    "reused": true,
+    "saveStatus": "saved"
+  },
+  "origin": "http://127.0.0.1:39429/",
+  "result": {
+    "documentOverflow": false,
+    "kpi": {
+      "h": 28,
+      "text": "Needs you 1Stuck 2Landed today ≥1Cycle p50 –",
+      "w": 732,
+      "x": 68,
+      "y": 52
+    },
+    "sidebar": {
+      "h": 1180,
+      "w": 52,
+      "x": 0,
+      "y": 0
+    },
+    "tabs": [
+      {
+        "h": 24,
+        "text": "Active6",
+        "w": 69.953125,
+        "x": 118.71875,
+        "y": 18
+      },
+      {
+        "h": 24,
+        "text": "Queued1",
+        "w": 78.96875,
+        "x": 194.671875,
+        "y": 18
+      },
+      {
+        "h": 24,
+        "text": "Landed today≥1",
+        "w": 118.453125,
+        "x": 279.640625,
+        "y": 18
+      },
+      {
+        "h": 24,
+        "text": "All",
+        "w": 34.5625,
+        "x": 404.09375,
+        "y": 18
+      }
+    ],
+    "viewport": 820
+  }
+}

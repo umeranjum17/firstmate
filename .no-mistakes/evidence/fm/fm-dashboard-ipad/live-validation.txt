@@ -1,0 +1,14 @@
+Candidate: a65c4f09bfbd2d1b273261a45eb6d88442bee439 (includes the CI/stuck regression repair); working tree unchanged.
+Product: bin/fm-dashboard.sh serve --port 0, bound to http://127.0.0.1:39429/.
+FM_HOME and HOME: <worktree>/.test-tmp/dashboard-home; seeded local fleet records, no mock HTTP server or replaced dashboard modules.
+Startup: HOME="$PWD/.test-tmp/dashboard-home" FM_HOME="$PWD/.test-tmp/dashboard-home" FM_DEVICE_LOCK_DIR="$PWD/.test-tmp/dashboard-home/locks" ANDROID_HOME="$PWD/.test-tmp/dashboard-home/sdk" ANDROID_SDK_ROOT="$PWD/.test-tmp/dashboard-home/sdk" PATH="/usr/bin:/bin:/home/umer/.local/bin" bin/fm-dashboard.sh serve --port 0
+Seeded lanes: 3 working, blocked CI needs credentials, failed no-mistakes checks, paused waiting for CI checks. One queued item, one recorded merge, one captain ask.
+Targeted baseline: TMPDIR="$PWD/.test-tmp" bash tests/fm-dashboard.test.sh ci-stuck exited 0.
+Browser: actual dashboard in Chromium, not physical iPad/Safari. 820x1180 portrait; 1180x820 landscape; 1440x900 desktop. Dark and light screenshots saved.
+Portrait: 52px icon rail; all tab labels and Filter/Display visible; KPI on its own row. Stuck click filtered to exactly blocked and failed lanes. Nested board scrolling exposed CI column; clicking blocked card opened reason, state, PR and activity detail.
+Landscape: 220px sidebar, separate KPI row. Queued tab selected and displayed Add home-level trends as its only card.
+Boundary probes: 760,768,1023,1024,1279,1280,1440px: no document overflow or clipped header controls. Header 81px below 1280, 44px from 1280. Sidebar 52px below 1024, 220px from 1024.
+Navigation: portrait Needs you displayed Approve the release scope; Ship displayed its documented module mount placeholder (3D module is a separate task).
+Metrics navigation: /overview showed Stuck 2, Blocked 2 and Validating or CI 1. Actual HTTP board.json/data.json agreed; paused CI was not stuck. Saved API response excerpt and full overview screenshot.
+Unavailable lab sources were explicitly displayed as unknown (quota cache, home summary, Herdr inventory, adb); no credentials or fleet lifecycle were changed.
+No complete test suite, lint, formatters, push, PR, CI or pipeline-control command was run.

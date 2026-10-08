@@ -1,0 +1,50 @@
+{
+  "url": "http://127.0.0.1:39429/",
+  "board_cards": [
+    {
+      "task": "blocked",
+      "stage": "ci",
+      "wait": "blocked",
+      "why": "CI needs credentials PR 22"
+    },
+    {
+      "task": "failed",
+      "stage": "ci",
+      "wait": "blocked",
+      "why": "no-mistakes checks failed PR 23"
+    },
+    {
+      "task": "paused",
+      "stage": "ci",
+      "wait": "waiting",
+      "why": "Waiting for CI checks PR 24"
+    }
+  ],
+  "metrics": {
+    "stuck": {
+      "value": 2,
+      "status": "exact",
+      "reason": null,
+      "source": "each home's lane records",
+      "window": "now; compared with the sample nearest 24 hours ago",
+      "cutoff": 1791447885.869908,
+      "read_at": 1791447885.870554
+    },
+    "lane_states": {
+      "value": {
+        "blocked": 2,
+        "decision": 0,
+        "finished": 0,
+        "building": 3,
+        "validating": 1,
+        "waiting": 0
+      },
+      "status": "exact",
+      "reason": null,
+      "source": "each home's lane records",
+      "window": "now; unreadable homes are unknown, fleet counts are at least and free capacity is unknown; compared with the sample nearest 24 hours ago",
+      "cutoff": 1791447885.869908,
+      "read_at": 1791447885.870554
+    }
+  }
+}

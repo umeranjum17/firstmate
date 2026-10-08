@@ -1,0 +1,36 @@
+{
+  "board_generated": 1791447435,
+  "board_blocked_cards": [
+    {
+      "id": "main/tablet-blocked",
+      "state": "validating",
+      "wait": "blocked",
+      "why": "CI cannot reach the build server"
+    }
+  ],
+  "metrics_stuck": {
+    "value": 0,
+    "status": "exact",
+    "reason": null,
+    "source": "each home's lane records",
+    "window": "now; compared with the sample nearest 24 hours ago",
+    "cutoff": 1791447435.250128,
+    "read_at": 1791447435.2505755
+  },
+  "metrics_lane_states": {
+    "value": {
+      "blocked": 0,
+      "decision": 0,
+      "finished": 0,
+      "building": 1,
+      "validating": 1,
+      "waiting": 0
+    },
+    "status": "exact",
+    "reason": null,
+    "source": "each home's lane records",
+    "window": "now; unreadable homes are unknown, fleet counts are at least and free capacity is unknown; compared with the sample nearest 24 hours ago",
+    "cutoff": 1791447435.250128,
+    "read_at": 1791447435.2505755
+  }
+}

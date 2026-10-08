@@ -1,0 +1,93 @@
+[
+  {
+    "success": true,
+    "data": {
+      "origin": "http://127.0.0.1:39429/",
+      "result": {
+        "headerHeight": 81,
+        "problems": [],
+        "sidebarWidth": 52,
+        "width": 760
+      }
+    },
+    "error": null
+  },
+  {
+    "success": true,
+    "data": {
+      "origin": "http://127.0.0.1:39429/",
+      "result": {
+        "headerHeight": 81,
+        "problems": [],
+        "sidebarWidth": 52,
+        "width": 768
+      }
+    },
+    "error": null
+  },
+  {
+    "success": true,
+    "data": {
+      "origin": "http://127.0.0.1:39429/",
+      "result": {
+        "headerHeight": 81,
+        "problems": [],
+        "sidebarWidth": 52,
+        "width": 1023
+      }
+    },
+    "error": null
+  },
+  {
+    "success": true,
+    "data": {
+      "origin": "http://127.0.0.1:39429/",
+      "result": {
+        "headerHeight": 81,
+        "problems": [],
+        "sidebarWidth": 220,
+        "width": 1024
+      }
+    },
+    "error": null
+  },
+  {
+    "success": true,
+    "data": {
+      "origin": "http://127.0.0.1:39429/",
+      "result": {
+        "headerHeight": 81,
+        "problems": [],
+        "sidebarWidth": 220,
+        "width": 1279
+      }
+    },
+    "error": null
+  },
+  {
+    "success": true,
+    "data": {
+      "origin": "http://127.0.0.1:39429/",
+      "result": {
+        "headerHeight": 44,
+        "problems": [],
+        "sidebarWidth": 220,
+        "width": 1280
+      }
+    },
+    "error": null
+  },
+  {
+    "success": true,
+    "data": {
+      "origin": "http://127.0.0.1:39429/",
+      "result": {
+        "headerHeight": 44,
+        "problems": [],
+        "sidebarWidth": 220,
+        "width": 1440
+      }
+    },
+    "error": null
+  }
+]
