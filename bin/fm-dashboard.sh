@@ -9,13 +9,17 @@
 # list); a mount point for the ship view (ship/index.js); a command palette and keys (?).
 # On a phone the board is a list grouped by stage, with a dock.
 # Each build writes the app's one data file, state/dashboard/board.json: homes with their
-# lane plans, one card per open lane, ready backlog item and pull request landed today
-# (stage from its status lines, wait, model from the fleet ledger's dispatch, and those lines
-# with each one's verb and the stage it had reached, which the app words plainly), the
-# ask list (the only source of "needs you": a lane's own decision is its home's, Main's or
-# its lead's), landed per day, cycle times (dispatch to merge, with each lane's title and
-# pull request), quota and the history.tsv samples. A lane the captain holds is parked,
-# not stuck.
+# lane plans, one card per open lane, ready backlog item and pull request landed today,
+# and parked home ids. Cards carry the current stage inferred from status lines (which
+# can move backwards), wait, metadata model or ledger dispatch model, and up to 40 recent
+# activity lines. Recorded merges replace matching live cards using the canonical request
+# URL; supported requests are GitHub PRs, GitLab merge requests and Gerrit changes.
+# The payload includes the ask list (the only source of "needs you": a lane's own decision
+# is its home's, Main's or its lead's), 14 local days of landed counts and cycle p50
+# (dispatch to merge across recorded merges, shown only with at least five samples).
+# Dispatch history is local-only; each merge uses its latest preceding dispatch.
+# Quota and history samples remain on Overview, not in board.json.
+# A lane the captain holds is parked, not stuck. Ship is a mount point, not a bundled 3D view.
 # Each build also atomically replaces data.json (every metric with its status and source;
 # GET/HEAD /data.json serves it as application/json) and writes three self-contained HTML
 # pages (inline CSS and SVG, no script, no network reference), phone first:
@@ -80,16 +84,22 @@
 #   fm-dashboard.sh serve [--bind ADDR] [--port N]
 # build (the default) writes $FM_HOME/state/dashboard/ and prints the index page path.
 # serve runs a small read-only web server (python3 stdlib, IPv4) that answers GET or
-# HEAD for / (the app, its files under bin/fm-dashboard/ and /board.json), /overview (the
-# index page), /backlog, /measure and /data.json; every other path is 404. The app's
+# HEAD for / and /index.html (the JavaScript app), its files under bin/fm-dashboard/,
+# /board.json, /overview (the generated index page), /backlog, /measure and /data.json;
+# every other path is 404. Metrics in the app opens /overview. The app's
 # files and both JSON files carry an ETag, answer 304 while unchanged and are gzipped
 # for a client that accepts it (the font is not); the app's CSP allows its own origin
-# only. ?group=home or ?group=action picks how lists are grouped and is remembered in
-# a cookie. It answers at once with the last built pages, marked "updated N s ago",
+# only. The app keeps its view, tabs, filters and open card in the URL hash and its theme
+# in localStorage; ? opens its shortcut list. It polls board.json every 10 seconds,
+# retains the last good data on refresh failure, and marks data older than 15 minutes stale.
+# Both JSON endpoints return 503 after a failed rebuild rather than reporting a healthy
+# refresh. On the generated Backlog page, ?group=home or ?group=action selects grouping
+# and is remembered in a cookie. It answers at once with the last built pages, marked "updated N s ago",
 # retaining source timestamps from the build, and keeps them fresh itself: a side
 # thread starts each rebuild early enough, by the last build's length,
 # for the new pages to land as the old ones turn 60 seconds old, and the pages reload
-# themselves every 60 seconds; only the very first load waits for a build. Requests are
+# themselves every 60 seconds; only the first generated-page or JSON load waits for a
+# build, while the app shell is served immediately. Requests are
 # answered on their own threads, so an idle connection never holds another one up.
 # It prints `serving http://ADDR:PORT/` once listening. ADDR defaults to
 # 127.0.0.1 and PORT to 8787; port 0 picks a free port. There is no authentication:
