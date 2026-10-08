@@ -43,6 +43,9 @@
 #   anything; a nonzero exit refuses the spawn and prints the gate's output.
 #   Secondmate spawns and relaunches never run it, and an absent file changes
 #   nothing.
+#   Every local launch, relaunches and secondmates included, also checks host
+#   memory admission; docs/configuration.md "Host memory guard" owns refusal
+#   behavior, retry guidance, and thresholds.
 #   Ship/scout launches always put fm-dod-lib.sh's current worker role scope
 #   first in the private launch-brief overlay, including the exact task-owned
 #   steering inbox. This never rewrites a project's instruction files or a
@@ -1677,6 +1680,32 @@ if [ "$KIND" = secondmate ]; then
     remote_spawn_rc=$?
   fi
   [ "$remote_spawn_rc" -eq 3 ] || exit "$remote_spawn_rc"
+fi
+# Host memory admission: every local agent launch - fresh, relaunch, or
+# secondmate - is refused while measured memory is under pressure.
+# bin/fm-jev-mem-guard.py owns the
+# verdict and the state/admission-refused record the queue views read.
+HOST_MEMORY_OUT=$("$SCRIPT_DIR/fm-jev-mem-guard.sh" --config "$CONFIG/host-memory" --admit "$ID" --state "$STATE" 2>&1) || {
+  HOST_MEMORY_RC=$?
+  printf '%s\n' "$HOST_MEMORY_OUT" >&2
+  echo "error: spawn refused - task $ID stays queued until host memory eases; retry then" >&2
+  if [ "$HOST_MEMORY_RC" -eq 1 ] && [ "$KIND" = secondmate ] && [ "${FM_SECONDMATE_LIVENESS_RECOVERY:-0}" = 1 ]; then
+    exit 75
+  fi
+  exit 1
+}
+if [ "$KIND" = secondmate ] && [ "${FM_SECONDMATE_LIVENESS_RECOVERY:-0}" = 1 ]; then
+  # shellcheck source=bin/fm-secondmate-liveness-lib.sh
+  . "$SCRIPT_DIR/fm-secondmate-liveness-lib.sh"
+  fm_secondmate_liveness_probe "$STATE/$ID.meta" "$ID" poll
+  if [ "$FM_SM_LIVE_STATUS" != relaunchable ]; then
+    printf '%s\n' "endpoint no longer relaunchable: $FM_SM_LIVE_STATE" >&2
+    exit 73
+  fi
+  if ! fm_secondmate_liveness_begin "$STATE/$ID.meta" "$ID"; then
+    printf '%s\n' "$FM_SM_LIVE_REASON" >&2
+    exit 74
+  fi
 fi
 # Backend selection (data/fm-backend-design-d7): explicit --backend, else
 # FM_BACKEND env, else config/backend, else runtime auto-detection, else

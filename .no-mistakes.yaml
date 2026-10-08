@@ -33,8 +33,8 @@ document:
 commands:
   lint: 'bin/fm-lint.sh'
 
-# Publish each run's test evidence to the orphan no-mistakes/evidence branch linked from the PR.
-# The evidence is not committed to the feature or default branch.
+# Keep evidence local: do not publish the evidence branch or attach media.
+# Text artifacts are still inlined into the PR body of this public repository.
 test:
   instructions: |
     Run live Herdr scenarios only through bin/fm-herdr-lab.sh with a named non-default fm-lab-* session, following that helper's prepare, provision, run, and teardown contract exactly.
@@ -45,5 +45,7 @@ test:
     Do not mutate the operator primary checkout, real fleet FM_HOME state, or production credentials (never sign in, sign out, re-login, or edit credential stores), and keep git changes otherwise inside the run worktree. A captain-opted-in live check may use the machine's normal Claude login; Claude's own session and transcript files under the home directory are expected and are not credential mutations. An empty isolated CLAUDE_CONFIG_DIR is not evidence that the normal login is unavailable.
     Read docs/herdr-backend.md and the bin/fm-herdr-lab.sh header as the owners of Herdr lab mechanics rather than reproducing that manual here.
     Ship or scout briefs that will drive Herdr lifecycle still require --herdr-lab at scaffold time; these Test-agent instructions are not a substitute for that brief flag.
+    Every text artifact the Test step references is published in the PR body; it must contain only counts, pass/fail, and fixture or lab data. Text artifacts, other evidence, and anything inlined into the PR body must never contain real fleet records (real FM_HOME data/state/config contents, task notes, hold reasons), network addresses, host or user names, e-mail addresses, or credentials.
   evidence:
-    store_in_repo: true
+    store_in_repo: false
+    attach_media: false

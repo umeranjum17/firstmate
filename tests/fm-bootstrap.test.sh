@@ -45,6 +45,14 @@ make_fake_toolchain() {
   local dir=$1 fakebin
   fakebin=$(fm_fakebin "$dir")
   fm_fake_exit0 "$fakebin" tmux node chrome-devtools-axi
+  # A user bus whose fm-sentinel service is running, so no case reads the host's own.
+  cat > "$fakebin/systemctl" <<'SH'
+#!/usr/bin/env bash
+[ -z "${FM_FAKE_NO_USER_BUS:-}" ] || exit 1
+[ "$*" != "--user is-active --quiet fm-sentinel" ] || [ -z "${FM_FAKE_SENTINEL_DOWN:-}" ] || exit 3
+exit 0
+SH
+  chmod +x "$fakebin/systemctl"
   fm_fake_version_tool "$fakebin" lavish-axi FM_FAKE_LAVISH_AXI_VERSION 0.1.80
   cat > "$fakebin/gh-axi" <<'SH'
 #!/usr/bin/env bash
@@ -617,6 +625,74 @@ zellij^zellij
 cmux^cmux
 ROWS
   pass "bootstrap: a session-provider backend gates its own CLI, never a false tmux requirement"
+}
+
+test_herdr_primary_without_restart_recovery_says_how_to_install_it() {
+  local case_dir fakebin out command notice unit special_home escaped_home
+  case_dir="$TMP_ROOT/herdr no sentinel"
+  mkdir -p "$case_dir/home/config"
+  printf '%s\n' manual > "$case_dir/home/config/backlog-backend"
+  printf '%s\n' herdr > "$case_dir/home/config/backend"
+  fakebin=$(make_fake_toolchain_no_tmux "$case_dir" herdr)
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
+    FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_FAKE_SENTINEL_DOWN=1 "$ROOT/bin/fm-bootstrap.sh")
+  assert_contains "$out" "SENTINEL: fm-sentinel is not running" "a Herdr primary without restart recovery should say so"
+  notice=$(printf '%s\n' "$out" | grep '^SENTINEL:')
+  command=${notice#*'(install: '}
+  command=${command%')'}
+  mkdir -p "$case_dir/home/bin"
+  cp "$ROOT/bin/fm-sentinel.sh" "$case_dir/home/bin/fm-sentinel.sh"
+  cat > "$fakebin/systemctl" <<'SH'
+#!/usr/bin/env bash
+[ -z "${FM_FAKE_NO_USER_BUS:-}" ] || exit 1
+[ "$*" != "--user is-active --quiet fm-sentinel" ] || [ -z "${FM_FAKE_SENTINEL_DOWN:-}" ] || exit 3
+if [ "$*" = "--user enable --now fm-sentinel" ]; then
+  printf 'systemctl\t%s\n' "$*" >> "$FM_TEST_SENTINEL_RECEIPT"
+fi
+SH
+  chmod +x "$case_dir/home/bin/fm-sentinel.sh" "$fakebin/systemctl"
+  [ ! -e "$case_dir/shell home/.config/systemd/user" ] \
+    || fail "the first-install fixture must not precreate the service directory"
+  HOME="$case_dir/shell home" PATH="$fakebin:$BASE_PATH" FM_TEST_SENTINEL_RECEIPT="$case_dir/receipt" \
+    bash -c "$command" || fail "the emitted install command is not safely executable"
+  assert_equals $'systemctl\t--user enable --now fm-sentinel' \
+    "$(cat "$case_dir/receipt")" "the emitted command enables the selected service"
+  unit="$case_dir/shell home/.config/systemd/user/fm-sentinel.service"
+  grep -Fx "Environment=\"FM_HOME=$case_dir/home\"" "$unit" >/dev/null \
+    || fail "the generated unit must preserve the space-containing home"
+  grep -Fx "Environment=\"PATH=$fakebin:$BASE_PATH\"" "$unit" >/dev/null \
+    || fail "the generated unit must preserve the space-containing PATH"
+  grep -Fx "ExecStart=\"$case_dir/home/bin/fm-sentinel.sh\" loop" "$unit" >/dev/null \
+    || fail "the generated unit must preserve the space-containing executable path"
+  if command -v systemd-analyze >/dev/null 2>&1; then
+    systemd-analyze verify "$unit" || fail "systemd rejected the generated unit"
+  fi
+  special_home="$TMP_ROOT/"'sentinel % " \ home'
+  escaped_home="$TMP_ROOT/"'sentinel %% \" \\ home'
+  mkdir -p "$special_home/bin" "$case_dir/code % root/bin"
+  cp "$ROOT/bin/fm-sentinel.sh" "$case_dir/code % root/bin/fm-sentinel.sh"
+  unit="$case_dir/escaped.service"
+  FM_HOME="$special_home" PATH="$special_home/bin:$BASE_PATH" \
+    "$case_dir/code % root/bin/fm-sentinel.sh" unit > "$unit" || fail "unit generation failed"
+  grep -Fx "Description=Firstmate sentinel for ${special_home//%/%%} (recovers supervision after an agent-runtime restart)" "$unit" >/dev/null \
+    || fail "the generated description must preserve literal percent signs"
+  grep -Fx "Environment=\"FM_HOME=$escaped_home\"" "$unit" >/dev/null \
+    || fail "the generated home assignment must escape systemd metacharacters"
+  grep -Fx "Environment=\"PATH=$escaped_home/bin:$BASE_PATH\"" "$unit" >/dev/null \
+    || fail "the generated PATH assignment must escape systemd metacharacters"
+  grep -Fx "ExecStart=\"$case_dir/code %% root/bin/fm-sentinel.sh\" loop" "$unit" >/dev/null \
+    || fail "the generated executable path must escape systemd metacharacters"
+  if command -v systemd-analyze >/dev/null 2>&1; then
+    systemd-analyze verify "$unit" || fail "systemd rejected the escaped unit"
+  fi
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
+    FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_FAKE_SENTINEL_DOWN=1 FM_FAKE_NO_USER_BUS=1 "$ROOT/bin/fm-bootstrap.sh")
+  [ -z "$out" ] || fail "a host without a systemd user bus has nothing to install, got: $out"
+  : > "$case_dir/home/.fm-secondmate-home"
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
+    FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_FAKE_SENTINEL_DOWN=1 "$ROOT/bin/fm-bootstrap.sh")
+  assert_not_contains "$out" "SENTINEL:" "a secondmate home is recovered by its primary's sentinel"
+  pass "bootstrap: a Herdr primary without the restart-recovery service gets the install command"
 }
 
 test_herdr_install_requires_manual_action() {
@@ -1244,6 +1320,11 @@ ROWS
   pass "bootstrap gates resolver fields and additive harnesses on the typed key"
 }
 
+if [ "${1:-}" = sentinel ]; then
+  test_herdr_primary_without_restart_recovery_says_how_to_install_it
+  exit 0
+fi
+
 test_bootstrap_reporting
 test_no_mistakes_min_version
 test_gh_axi_min_version
@@ -1254,6 +1335,7 @@ test_git_is_required_with_supported_install_instruction
 test_orca_backend_gates_orca_tool_only_when_selected
 test_session_provider_backends_do_not_require_tmux
 test_session_provider_backends_gate_own_cli_not_tmux
+test_herdr_primary_without_restart_recovery_says_how_to_install_it
 test_herdr_install_requires_manual_action
 test_cmux_bundled_cli_satisfies_dependency
 test_unknown_backend_reports_invalid_configuration

@@ -168,6 +168,10 @@
 #                          budget and is parked until a probe reads it live
 #                          again (FM_SECONDMATE_LIVENESS_MAX_ATTEMPTS and
 #                          FM_SECONDMATE_LIVENESS_WINDOW_SECS)
+#   check: host memory ALERT: <summary>; largest: <owner> <size>, ...; <action>
+#                          durable sampler wake; docs/configuration.md "Host
+#                          memory guard" owns admission and alert behavior;
+#                          bin/fm-host-memory-sampler.sh owns sampler lifecycle
 # For normal supervision, resume the session-start primary-harness protocol
 # after each printed reason. Direct duplicate invocations of this script still
 # no-op through the watcher singleton lock. A live holder whose beacon is stale
@@ -1134,6 +1138,18 @@ EOF
 # budget. The per-mate liveness lock serializes this tick against a concurrent
 # session-start sweep, so neither side can kill or re-probe an endpoint the
 # other is mid-relaunch on.
+# shellcheck source=bin/fm-host-memory-sampler.sh
+. "$SCRIPT_DIR/fm-host-memory-sampler.sh"
+
+host_memory_surface_queued() {
+  local reason
+  [ -s "$FM_WAKE_QUEUE" ] || return 0
+  fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || return 1
+  reason=$(awk -F '\t' '$3 == "check" && $4 == "host-memory" { reason=$5 } END { if (reason != "") print reason }' "$FM_WAKE_QUEUE")
+  fm_lock_release "$FM_WAKE_QUEUE_LOCK"
+  [ -z "$reason" ] || wake "$reason"
+}
+
 secondmate_liveness_tick() {
   local tick_marker="$STATE/.secondmate-liveness-tick"
   [ "$(age_of "$tick_marker")" -ge "$SECONDMATE_LIVENESS_SECS" ] || return 0
@@ -1167,6 +1183,8 @@ secondmate_liveness_tick() {
         elif fm_secondmate_liveness_relaunch "$meta" "$id" "$SECONDMATE_LIVENESS_TIMEOUT"; then
           reason="check: secondmate $id auto-relaunched after $FM_SM_LIVE_CAUSE ($FM_SM_LIVE_WHERE)"
           notify_key="secondmate-relaunch-$id-$now"
+        elif [ "$FM_SM_LIVE_STATUS" = deferred ]; then
+          triage_log "secondmate $id liveness deferred: $FM_SM_LIVE_REASON"
         elif [ "$FM_SM_LIVE_STATUS" = skipped ]; then
           err=$FM_SM_LIVE_REASON
         else
@@ -2804,6 +2822,7 @@ watcher_cleanup() {
       transition=release-lock-existing
     fi
   fi
+  [ "$owns_lock" -ne 1 ] || fm_memory_sampler_stop
   fm_active_check_stop || cleanup_status=1
   fm_check_output_cleanup
   fm_custom_check_snapshot_cleanup
@@ -2827,6 +2846,7 @@ printf '%s\n' "$WATCH_PATH" > "$WATCH_LOCK/watcher-path" || true
 FM_WATCH_DELIVERY_PID=$WATCHER_PID
 FM_WATCH_DELIVERY_IDENTITY=$(fm_pid_identity "$WATCHER_PID" 2>/dev/null || true)
 printf '%s\n' "$FM_WATCH_DELIVERY_IDENTITY" > "$WATCH_LOCK/pid-identity" 2>/dev/null || true
+fm_memory_sampler_ensure || triage_log "host memory sampler failed to start"
 
 [ -e "$STATE/.last-heartbeat" ] || touch "$STATE/.last-heartbeat"
 
@@ -2889,6 +2909,9 @@ resurface_after_downtime() {
     fi
     [ "$FM_RECOVERY_MARKER_ACTION" = recover ] || return 0
   fi
+  # The independent sampler can publish after the earlier queue scan, while
+  # arm-check is deciding recovery. Preserve that queued alert's richer reason.
+  host_memory_surface_queued
   wake "check: rearm-resurface"
 }
 
@@ -2925,6 +2948,9 @@ while :; do
   if [ "$(cat "$WATCH_LOCK/pid" 2>/dev/null || true)" != "$WATCHER_PID" ]; then
     exit 0
   fi
+
+  fm_memory_sampler_ensure || triage_log "host memory sampler failed to restart"
+  host_memory_surface_queued
 
   # Liveness beacon for fm-guard.sh: a fresh mtime here means a watcher is
   # alive. Supervision scripts warn when this goes stale with tasks in flight.
@@ -2968,6 +2994,8 @@ while :; do
     echo "watcher: secondmate wake-loop observation failed" >&2
     exit 1
   }
+
+  host_memory_surface_queued
 
   # Process-to-event liveness repair. This never discovers a result by polling:
   # each registered source has its own child blocking on that source, and this
