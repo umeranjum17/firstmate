@@ -6,7 +6,13 @@
 # lower bounds, not complete directory sizes/ranks. RSS is per process, not additive
 # host memory. Ownership is a recorded worktree/cwd match, otherwise unknown.
 # FM_MAC_HOST=user@host opts into one read-only SSH probe, limited to 6 s,
-# with existing host keys only. No device boot/claim/stop, files or slot changes.
+# with existing host keys only and host-key updates disabled (UpdateHostKeys=no).
+# The Mac needs python3; observations cover memory, root free disk, non-Shutdown
+# simulators and Android emulator PIDs. Mac available_bytes counts free+inactive+
+# speculative pages, not Linux MemAvailable; individual failures stay unknown.
+# No device boot/claim/stop, files, slot changes or workload routing are performed.
+# slots_under_caps is cap-minus-census arithmetic, not admission or free workers;
+# limits use the observer environment and installed defaults, not per-job overrides.
 # Missing/unavailable probes yield null, never a fabricated zero or free slot.
 # Live capacity observations carry their own timestamp, independent of --now.
 # --checks reads durable GitHub check-run records through gh-axi (5 s per call).
@@ -22,9 +28,10 @@
 # home-addressed fm-tasks-axi.sh consumer (including archived dependency completions).
 # Missing/unavailable backlog backends are unknown, never a stale Markdown fallback.
 # Registered remote homes remain listed, with unavailable lanes/backlog/lifecycle
-# disclosed in limitations; remote paths are not read locally and no SSH is used.
-# Output fm-flow.v1: homes, lanes, queue, bottlenecks, executed_24h/7d,
+# disclosed in limitations; remote paths are not read locally or probed over SSH.
+# Output fm-flow.v1: homes, lanes, queue, bottlenecks, capacity, executed_24h/7d,
 # time_to_merge (median, nearest-rank P85, UTC seven-day trend), and limitations.
+# capacity is null unless --capacity is requested; FM_MAC_HOST alone runs no probe.
 # Times are seconds. null means unknown, including unstamped status lines.
 # Pickup and cleanup use ledger events, NOT file birth/mtime or spawn_gen
 # (relaunch changes spawn_gen). pr_ready is NOT pr_opened or checks_green.
