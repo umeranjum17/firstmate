@@ -1,28 +1,27 @@
 #!/usr/bin/env bash
 # fm-dashboard.sh - build the read-only fleet dashboard pages for this home.
 #
-# Each build also writes state/dashboard/data.json; GET/HEAD /data.json serves it.
+# Each build atomically replaces state/dashboard/data.json; GET/HEAD /data.json serves it as application/json.
 # Builds three self-contained HTML pages (inline CSS and SVG, no script, no network
 # reference), phone first, each answering one question set:
-#   index    Overview: Main's ask list only, then attention chips, six number tiles with
-#            their trends, and charts: where lanes wait and why, in versus out over 14 days,
-#            homes, quota runway, devices and machine
+#   index    Overview: Main's ask list, attention chips, six tiles and trends, lane waits,
+#            14-day in/out chart, homes, quota runway, devices and machine
 #   backlog  queued, ready and held work per home, held-for-captain items, every lane, agents
 #   measure  every number's one definition (what it counts, source, window and cutoff, how
 #            often it is read), records that disagree, sources not read
-# Every number names its window and the time its source was read. Backlog lists are
-# grouped, by default by what to act on first, with a by-home variant. Parked homes
-# are left out of every total, with one line saying so.
-#
-# Sources, all read-only and all optional (a failed source shows "unknown" and why):
+# Method owns the metric definitions shared with data.json's coverage and source metadata.
+# Backlog lists default to action grouping, with a by-home variant.
+# Parked homes are left out of every total, with one line saying so.
+# Sources are local records, existing caches and read-only probes; no GitHub or SSH collection runs during builds.
+# Remote lane/backlog records are unavailable, not read from same-named local paths.
 #   data/captain-asks.tsv           Waiting on you: Main's fleet-wide headerless
 #                                   id<TAB>since-epoch<TAB>text<TAB>url; each row with an id and
 #                                   text is an ask (a bad time or duplicate id shows as a record
 #                                   needing correction); blank rows and rows without an id or text
 #                                   are skipped, with a note; absent/empty means zero
-#   <home>/state/home-summary.json  lead state, as each home publishes it itself
-#                                   (bin/fm-home-summary-refresh.sh); Main's copy also says which
-#                                   leads are not running (an endpoint missing or its agent dead)
+#   <home>/state/home-summary.json  local lead state; summaries older than 15 minutes are silent
+#                                   (bin/fm-home-summary-refresh.sh); Main's fresh endpoint view
+#                                   and Herdr inventory inform local liveness; remote leads use the existing route-keyed FM_SNAPSHOT_CACHE_DIR cache
 #   data/secondmates.md             registered homes: "- <name> - ... (home: <dir>; ...)"
 #   config/parked-homes             home ids the captain parked, one per line (# comments)
 #   <home>/state/*.meta + *.status  lanes: every ship/scout record, in one state by its last
@@ -39,7 +38,8 @@
 #   state/<lead>.status, state/fleet-ledger.jsonl   Landed: each pull request the fleet
 #                                   recorded as merged, once (bin/fm-merge-outcome-lib.sh writes a
 #                                   lead's merges to Main's channel for it, Main's own to its ledger)
-#   <home>/data/backlog.md, data/done-archive.md    Out: items closed per local day (none if absent)
+#   resolved markdown backlog + configured archive    Out: closed per local day; missing backlog or unsupported backend is unknown, absent archive is empty
+#   ~/.cache/quota-axi/quotas.json  schema-3 quota cache, read-only; no collector runs during builds
 # Machine and devices, each probe read-only with a 5 s timeout:
 #   adb devices -l                  connected phones and emulators (nothing else is asked of adb);
 #                                   adb from PATH, else platform-tools under $ANDROID_HOME,
@@ -56,9 +56,9 @@
 #   <proc> is FM_DASHBOARD_PROC (default /proc), <locks> FM_DEVICE_LOCK_DIR (default /tmp);
 #   FM_EMU_MAX, FM_GRADLE_MAX, FM_MEM_MIN_GB (defaults 2, 2, 12) mirror the memory gate's caps
 # All day comparisons use the host timezone. A build writes only under state/dashboard:
-# its pages and filed.json (each open item's filing
-# day, kept 15 days, so an item filed and closed later still counts as filed) and
-# history.tsv (the tiles' numbers, sampled every 10 minutes and kept 8 days).
+# HTML, data.json, filed.json (observed open-item filing days, kept 15 days), and
+# history.tsv (lane, stuck and ready counts sampled every 10 minutes, kept 8 days).
+# .cache.lock serializes cache updates across builds.
 #
 # Usage:
 #   fm-dashboard.sh [build]
