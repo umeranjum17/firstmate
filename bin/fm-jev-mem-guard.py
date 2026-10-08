@@ -16,7 +16,7 @@ Usage (bin/fm-jev-mem-guard.sh runs this with python3):
       Exit 0 admits and removes DIR/admission-refused. Exit 1 refuses: prints the
       reason and writes DIR/admission-refused as "<epoch>\t<task>\t<reason>".
   fm-jev-mem-guard.sh [--config FILE] --record FILE [--state-dir DIR ...]
-      One watcher sample (bin/fm-watch.sh host_memory_tick): appends
+      One independent sampler sample (bin/fm-host-memory-sampler.sh): appends
       "<epoch>\t<MemAvailable kB>\t<swap used kB>\t<pressure some avg10>\t<verdict>"
       to FILE, keeping the newest 8640 rows (a day at the 10 s cadence), and prints
       "<verdict>\t<summary>"; an ALERT summary names the largest consumers.
