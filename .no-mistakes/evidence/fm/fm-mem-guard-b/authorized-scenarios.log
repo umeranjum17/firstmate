@@ -1,0 +1,43 @@
+INPUT: calm host avg10=2.00%, available=40 GiB; runtime cgroup avg10=58.88%
+$ bin/fm-jev-mem-guard.sh --admit bounded-build --state /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4DDDY5SCXR7JQ20C0EH78VZ/.memory-validation-pfeedec2/admission-state
+exit=1
+host memory under pressure: pressure at or above 35% (pressure 59% (10 s average), 40.0 GB available, 1.0 GB swap used; host 2%, cgroup 59% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service))
+
+PERSISTED admission-refused:
+1791452023	bounded-build	host memory under pressure: pressure at or above 35% (pressure 59% (10 s average), 40.0 GB available, 1.0 GB swap used; host 2%, cgroup 59% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service))
+
+CONTROL INPUT: only runtime cgroup pressure changed to 2.00%
+$ bin/fm-jev-mem-guard.sh --admit bounded-build --state /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4DDDY5SCXR7JQ20C0EH78VZ/.memory-validation-pfeedec2/admission-state
+exit=0
+
+OBSERVED: admission allowed and refusal record removed after cgroup pressure eases.
+CONTROL: registered local home containing local-pressure-task refusal.
+$ bin/fm-dashboard.sh build
+exit=1
+bin/fm-dashboard.sh: line 1602: basename: command not found
+bin/fm-dashboard.sh: line 1602: basename: command not found
+bin/fm-dashboard.sh: line 1602: basename: command not found
+bin/fm-dashboard.sh: line 1602: basename: command not found
+bin/fm-dashboard.sh: line 1602: basename: command not found
+bin/fm-dashboard.sh: line 1602: basename: command not found
+mv: cannot stat '/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4DDDY5SCXR7JQ20C0EH78VZ/.memory-validation-pfeedec2/home/state/dashboard/.build.1466115/index.html': No such file or directory
+fm-dashboard: cannot write /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4DDDY5SCXR7JQ20C0EH78VZ/.memory-validation-pfeedec2/home/state/dashboard/index.html
+
+CLEANUP: removed all worktree fixture files.
+
+Setup repair: added missing basename executable to isolated PATH; retry dashboard only.
+INPUT: calm host avg10=2.00%, available=40 GiB; runtime cgroup avg10=58.88%
+CONTROL: registered local home containing local-pressure-task refusal.
+$ bin/fm-dashboard.sh build
+exit=0
+/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4DDDY5SCXR7JQ20C0EH78VZ/.memory-validation-g7llzlf8/home/state/dashboard/index.html
+
+OBSERVED local control: new agents wait (remote-lead); local-pressure-task.
+ADVERSARIAL: same home path now registered remote; coincident local refusal remains untouched.
+$ bin/fm-dashboard.sh build
+exit=0
+/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4DDDY5SCXR7JQ20C0EH78VZ/.memory-validation-g7llzlf8/home/state/dashboard/index.html
+
+OBSERVED remote result: Main refusal still visible; remote lead not credited with local refusal on any of the four generated pages.
+PASS: both authorized scenarios, each with one adversarial reading and one control; no lifecycle or credential actions.
+CLEANUP: removed all worktree fixture files.
