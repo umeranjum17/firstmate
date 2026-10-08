@@ -42,7 +42,7 @@ function Kpis({ d }) {
 // The app's phone rows: model, title, age, then the state word in its colour, the home and the reason; each opens its card.
 function Row({ d, c, parked, detail }) {
   const st = state(c), a = age(c)
-  return html`<article class="li" tabindex="0" data-card=${c.id} onClick=${() => detail(c.id)} onKeyDown=${e => e.key === 'Enter' && detail(c.id)}><${Av} m=${c.model} size=${20}/><div class="tx"><div class="t"><h3>${c.title}</h3>${a != null ? html`<span class="age num">${dur(a)}</span>` : ''}</div>
+  return html`<article class="li" role="button" tabindex="0" data-card=${c.id} onClick=${() => detail(c.id)} onKeyDown=${e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); detail(c.id) } }}><${Av} m=${c.model} size=${20}/><div class="tx"><div class="t"><h3>${c.title}</h3>${a != null ? html`<span class="age num">${dur(a)}</span>` : ''}</div>
     <p>${parked ? '' : html`<i style=${{ '--c': st[1] }}></i><b>${st[0]}</b> · `}${hname(d, c.home)} · ${reason(c)}</p></div></article>`
 }
 // Fleet-wide, and labelled so beside the home's own numbers: the key numbers, what is stuck oldest first, and what the

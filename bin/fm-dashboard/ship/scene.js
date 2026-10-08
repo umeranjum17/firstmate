@@ -490,6 +490,7 @@ export function world(canvas, tagLayer) {
   // How far along its own length the ship stands from its place, and its heel, while it sails out or in.
   function sailing(t) {
     if (!sail) return [0, 0]
+    if (still.matches) { dress(...want); sail = null; return [0, 0] }
     let k = t - sail.t0
     if (sail.out && k >= OUT) { sail.out = false; sail.t0 += OUT; k -= OUT; dress(...want) }
     if (!sail.out && k >= IN) { sail = null; return [0, 0] }
