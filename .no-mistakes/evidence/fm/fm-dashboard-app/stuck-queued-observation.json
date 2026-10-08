@@ -1,0 +1,152 @@
+[
+  {
+    "command": [
+      "snapshot",
+      "-i"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "origin": "http://127.0.0.1:34059/#/board?state=blocked,decision",
+      "refs": {
+        "e1": {
+          "name": "Search",
+          "role": "button"
+        },
+        "e10": {
+          "name": "Remove Blocked",
+          "role": "button"
+        },
+        "e11": {
+          "name": "Remove Main or lead decides",
+          "role": "button"
+        },
+        "e12": {
+          "name": "Board",
+          "role": "heading"
+        },
+        "e13": {
+          "name": "Active 5",
+          "role": "button"
+        },
+        "e14": {
+          "name": "Queued 2",
+          "role": "button"
+        },
+        "e15": {
+          "name": "Landed today ≥4",
+          "role": "button"
+        },
+        "e16": {
+          "name": "All",
+          "role": "button"
+        },
+        "e17": {
+          "name": "Needs you 1",
+          "role": "link"
+        },
+        "e18": {
+          "name": "Stuck 2",
+          "role": "button"
+        },
+        "e19": {
+          "name": "Landed today ≥4",
+          "role": "button"
+        },
+        "e2": {
+          "name": "Needs you 1",
+          "role": "link"
+        },
+        "e20": {
+          "name": "Filter 2",
+          "role": "button"
+        },
+        "e21": {
+          "name": "Display",
+          "role": "button"
+        },
+        "e22": {
+          "name": "review 12m gpt Review the security boundary choose the permission boundary Main decides Main",
+          "role": "button"
+        },
+        "e23": {
+          "name": "ci 9m gpt Check the release pipeline CI failed: missing release credentials Blocked Main",
+          "role": "button"
+        },
+        "e24": {
+          "name": "Review the security boundary",
+          "role": "heading"
+        },
+        "e25": {
+          "name": "Check the release pipeline",
+          "role": "heading"
+        },
+        "e3": {
+          "name": "Board 5",
+          "role": "link"
+        },
+        "e4": {
+          "name": "Ship",
+          "role": "link"
+        },
+        "e5": {
+          "name": "Metrics",
+          "role": "link"
+        },
+        "e6": {
+          "name": "Main 5",
+          "role": "button"
+        },
+        "e7": {
+          "name": "guide 0",
+          "role": "button"
+        },
+        "e8": {
+          "name": "Live",
+          "role": "button"
+        },
+        "e9": {
+          "name": "Light or dark theme",
+          "role": "button"
+        }
+      },
+      "snapshot": "- button \"Search\" [ref=e1]\n- link \"Needs you 1\" [ref=e2]\n- link \"Board 5\" [ref=e3]\n- link \"Ship\" [ref=e4]\n- link \"Metrics\" [ref=e5]\n- button \"Main 5\" [ref=e6]\n- button \"guide 0\" [ref=e7]\n- button \"Live\" [ref=e8]\n- button \"Light or dark theme\" [ref=e9]\n- heading \"Board\" [level=1, ref=e12]\n- button \"Active 5\" [ref=e13]\n- button \"Queued 2\" [ref=e14]\n- button \"Landed today ≥4\" [ref=e15]\n- button \"All\" [ref=e16]\n- link \"Needs you 1\" [ref=e17]\n- button \"Stuck 2\" [ref=e18]\n- button \"Landed today ≥4\" [ref=e19]\n- button \"Filter 2\" [expanded=false, ref=e20]\n- button \"Display\" [expanded=false, ref=e21]\n- button \"Remove Blocked\" [ref=e10]\n- button \"Remove Main or lead decides\" [ref=e11]\n- button \"review 12m gpt Review the security boundary choose the permission boundary Main decides Main\" [ref=e22]\n  - heading \"Review the security boundary\" [level=3, ref=e24]\n- button \"ci 9m gpt Check the release pipeline CI failed: missing release credentials Blocked Main\" [ref=e23]\n  - heading \"Check the release pipeline\" [level=3, ref=e25]"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "eval",
+      "--stdin"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "origin": "http://127.0.0.1:34059/#/board?state=blocked,decision",
+      "result": null
+    },
+    "success": true
+  }
+]

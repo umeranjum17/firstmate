@@ -1,0 +1,12 @@
+{
+  "board.json": {
+    "status": 503,
+    "cache": "no-store",
+    "body": "dashboard refresh failed\n"
+  },
+  "data.json": {
+    "status": 503,
+    "cache": "no-store",
+    "body": "dashboard refresh failed\n"
+  }
+}

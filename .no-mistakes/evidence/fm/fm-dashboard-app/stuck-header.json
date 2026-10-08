@@ -1,0 +1,25 @@
+{
+  "lifecycle": {
+    "effectiveLaunch": {
+      "browserLaunched": true,
+      "engine": "chrome",
+      "launchHash": 12825947863403514000
+    },
+    "launched": false,
+    "relaunchedBrowser": false,
+    "restartedBackground": false,
+    "restoreStatus": "missing",
+    "reused": true,
+    "saveStatus": "saved"
+  },
+  "origin": "http://127.0.0.1:34059/#/board?state=blocked,decision",
+  "result": {
+    "cards": [
+      "main/review",
+      "main/ci"
+    ],
+    "result": "pass",
+    "scenario": "Header Stuck from Queued",
+    "url": "http://127.0.0.1:34059/#/board?state=blocked,decision"
+  }
+}

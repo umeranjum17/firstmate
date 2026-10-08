@@ -1,0 +1,43 @@
+{
+  "lifecycle": {
+    "effectiveLaunch": {
+      "browserLaunched": true,
+      "engine": "chrome",
+      "launchHash": 12825947863403514000
+    },
+    "launched": false,
+    "relaunchedBrowser": false,
+    "restartedBackground": false,
+    "restoreStatus": "missing",
+    "reused": true,
+    "saveStatus": "saved"
+  },
+  "origin": "http://127.0.0.1:34059/#/board?tab=landed",
+  "result": {
+    "cards": [
+      "main/gitlab@https://gitlab.example/team/app/-/merge_requests/27",
+      "main/gerrit@https://review.example/c/team/app/+/28",
+      "guide/guide-lab@https://gitlab.example/team/app/-/merge_requests/50",
+      "guide/guide-review@https://review.example/c/team/app/+/51"
+    ],
+    "links": [
+      {
+        "href": "https://gitlab.example/team/app/-/merge_requests/27",
+        "text": "27"
+      },
+      {
+        "href": "https://review.example/c/team/app/+/28",
+        "text": "28"
+      },
+      {
+        "href": "https://gitlab.example/team/app/-/merge_requests/50",
+        "text": "50"
+      },
+      {
+        "href": "https://review.example/c/team/app/+/51",
+        "text": "51"
+      }
+    ],
+    "scenario": "Recorded GitLab/Gerrit merges from both readers"
+  }
+}

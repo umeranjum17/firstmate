@@ -1,0 +1,20 @@
+{
+  "lifecycle": {
+    "effectiveLaunch": {
+      "browserLaunched": true,
+      "engine": "chrome",
+      "launchHash": 12825947863403514000
+    },
+    "launched": false,
+    "relaunchedBrowser": false,
+    "restartedBackground": false,
+    "restoreStatus": "missing",
+    "reused": true,
+    "saveStatus": "saved"
+  },
+  "origin": "http://127.0.0.1:34059/#/board",
+  "result": {
+    "column": "Test2test15mRun device acceptancewaiting for device accessWaitingMainbuild1mBuild the navigationMain",
+    "scenario": "background rebuild and polling moves lane to Test"
+  }
+}

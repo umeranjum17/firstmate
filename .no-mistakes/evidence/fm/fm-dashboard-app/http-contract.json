@@ -1,0 +1,30 @@
+{
+  "landed_after_cleanup": [
+    [
+      "guide/guide-lab@https://gitlab.example/team/app/-/merge_requests/50",
+      "https://gitlab.example/team/app/-/merge_requests/50"
+    ],
+    [
+      "guide/guide-review@https://review.example/c/team/app/+/51",
+      "https://review.example/c/team/app/+/51"
+    ],
+    [
+      "main/gitlab@https://gitlab.example/team/app/-/merge_requests/27",
+      "https://gitlab.example/team/app/-/merge_requests/27"
+    ],
+    [
+      "main/gerrit@https://review.example/c/team/app/+/28",
+      "https://review.example/c/team/app/+/28"
+    ]
+  ],
+  "malformed_merge_identities": "rejected",
+  "landed_today": 4,
+  "etag": "304",
+  "gzip": "equivalent payload",
+  "private_paths": {
+    "../data/backlog.md": 404,
+    "state/ci.meta": 404,
+    "vendor/../app.js": 404,
+    "missing.js": 404
+  }
+}
