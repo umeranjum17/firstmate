@@ -407,7 +407,7 @@ axi)
   status=ci outcome=
   [ -e "$PWD/fixing" ] && status=fixing
   [ -e "$PWD/terminal" ] && { status=completed; outcome=failed; }
-  printf 'run:\n  id: "r1"\n  branch: dash-ci\n  head: %s\n  status: %s\n  outcome: %s\n  pr: "https://github.com/acme/alpha/pull/9"\n  active_steps[1]{step,active_for,last_activity,agent_pid,round}:\n    ci,2h18m,"quiet, awaiting provider",123,starting\n' "$head" "$status" "$outcome" ;;
+  printf 'run:\n  id: "r1"\n  branch: dash-ci\n  head: %s\n  status: %s\n  pr: "https://github.com/acme/alpha/pull/9"\n  active_steps[1]{step,active_for,last_activity,agent_pid,round}:\n    ci,2h18m,"quiet, awaiting provider",123,starting\noutcome: %s\n' "$head" "$status" "$outcome" ;;
 'axi status') printf 'run:\n  id: other\n  branch: unrelated\n  status: failed\n  pr: "https://github.com/other/repo/pull/99"\n' ;;
 'daemon status') exit 0 ;;
 *) echo "unexpected: $*" >&2; exit 2 ;;
@@ -435,11 +435,20 @@ EOF
   lacks "$d/backlog.html" "other/repo" "m-done Main · checks failing"
   grep -qx 'axi status --run r1' "$home/wt/ci/nm.calls" || fail 'did not read the selected run by ID'
   touch "$home/wt/ci/terminal"
+  mkdir -p "$home/data/m-ci"
+  printf '{"records":[{"url":"https://github.com/acme/alpha/pull/9","observation":{"checks":[{"name":"test","status":"completed","conclusion":"success"}]}}]}\n' > "$home/data/m-ci/contributions.json"
+  printf 'done [at=%s]: PR https://github.com/acme/alpha/pull/9 ready\n' "$now" > "$home/state/m-ci.status"
   printf '{"records":[{"url":"https://github.com/acme/alpha/pull/8","observation":{"checks":[{"name":"test","status":"completed","conclusion":null}]}}]}\n' > "$home/data/m-done/contributions.json"
   build "$home" FM_NM_FAIL="$home/nm.fail"
   has "$d/backlog.html" "Checks or validation failing 1"
-  lacks "$d/backlog.html" "m-done Main · checks green"
-  rm "$home/wt/ci/terminal"
+  lacks "$d/backlog.html" "m-done Main · checks green" "waiting on CI for 2 h 18 min"
+  printf '{"records":[{"url":"https://github.com/acme/alpha/pull/10","checked_at":"%s","error":"forge observation unavailable or changed during read","observation":{"checks":[{"name":"test","status":"completed","conclusion":"success"}]}}]}\n' \
+    "$(iso 0)" > "$home/data/m-green/contributions.json"
+  build "$home" FM_NM_FAIL="$home/nm.fail"
+  lacks "$d/backlog.html" "Green, waiting to land" "m-green Main · checks green" "checks read"
+  has "$d/measure.html" "pull request checks Main/m-green: forge observation unavailable or changed during read"
+  rm "$home/wt/ci/terminal" "$home/data/m-ci/contributions.json"
+  printf 'paused [at=%s]: waiting for CI checks https://github.com/acme/alpha/pull/9\n' "$((now - 1200))" > "$home/state/m-ci.status"
   touch "$home/wt/ci/foreign"
   printf '{"records":[{"url":"https://github.com/acme/alpha/pull/8","observation":{"checks":[{"name":"test","status":"completed","conclusion":"error"}]}}]}\n' > "$home/data/m-done/contributions.json"
   build "$home" FM_NM_FAIL="$home/nm.fail"
@@ -491,12 +500,16 @@ def row(key, status, stale=False):
     return r
 c.update(schemaVersion=6, providers=[a, row('codex-home', 'through_reset'),
     row('openai-codex-work', 'unknown'), row('stale', 'projected_exhaustion', True)])
+empty = row('exhausted', 'exhausted_now')
+empty['quotaSemantics']['effectiveAvailability'][0]['status'] = 'unknown'
+c['providers'].append(empty)
 json.dump(c, open(p, 'w'))
 PY
   build "$home"
   has "$d/flow.html" "zephyrine ≥ 1 1" "Main ≥ 3 0" "Unattributed – 1" "Land the first fix zephyrine" "Land the second fix unattributed"
   has "$d/quota.html" "Account runway unknown." "Codex · codex-home" "Codex · openai-codex-work" "Runway unknown" "Lasts to reset" "Carries 1 worker"
   lacks "$d/quota.html" "Every readable account lasts" "No account runs out before" "Carries 2 workers"
+  has "$d/quota.html" "Codex · exhausted max Used up" "1 used up." "2 accounts cannot be read or are empty."
   has "$d/measure.html" "First-pass merges at least 100% 100% met" "Slowest merges (p90) at most 50 h 100 h missed" \
     "Bugs that escaped at most 0 0 met" "Corrections per merge at most 1 1 met" "Main nudges per merge at most 1 1 met" \
     "Captain messages per merge at most 1 1 met" "Lead stalls that reached Main at most 2 2 met" "fleet pulse runs about every 2 h"

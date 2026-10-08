@@ -489,6 +489,8 @@ printf '%s\\n' "$out"
     if not block: return {'err': 'no verified run block'}
     text = '\n'.join(l[2:] for l in block.group(1).splitlines())
     fields = dict(re.findall(r'^(\w+): (.*)$', text, re.M))
+    outcome = re.search(r'^outcome: (.*)$', out, re.M)
+    fields['outcome'] = outcome.group(1) if outcome else ''
     try:
         fields = {k: json.loads(v) if v.startswith('"') else v for k, v in fields.items()}
         active = toon_rows(text, 'active_steps') or []
@@ -502,6 +504,9 @@ def checks_of(l, url):
     c = load_json(os.path.join(home_dir[l['home']], 'data', l['task'], 'contributions.json'))
     for r in c.get('records') or [] if isinstance(c.get('records'), list) else []:
         if not isinstance(r, dict) or r.get('url') != url: continue
+        if r.get('error'):
+            notes.append(('pull request checks', f'{hname(l["home"])}/{l["task"]}: {r["error"]}'))
+            return None, None
         o = r.get('observation') or {}
         latest_checks = {}
         for x in sorted((x for x in o.get('checks') or [] if isinstance(x, dict)),
@@ -772,7 +777,7 @@ for p in (qdata or {}).get('providers') or []:
     credits = p.get('credits') or {}
     problem = (str(st.get('error') or 'reading not current').replace('_', ' ')
                if st.get('stale') or st.get('status') not in ('fresh', None) or NOW_TS - q_at >= QUOTA_TTL else None)
-    runway = run.get('status') if not problem and av.get('status') in ('known', None) else 'unknown'
+    runway = run.get('status') if not problem and (av.get('status') in ('known', None) or run.get('status') == 'exhausted_now') else 'unknown'
     out_at = parse_ts(run.get('projectedExhaustedAt')) if run.get('projectedExhaustedAt') else None
     name = QNAME.get(p.get('provider'), str(p.get('provider')).title())
     if p.get('accountKey'): name += ' · ' + p['accountKey']
