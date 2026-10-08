@@ -25,7 +25,7 @@ cycle() {
   [ -z "$seq" ] || FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" "$DRAIN" --ack-through "$seq" --recovery-generation "$gen" >/dev/null
 }
 
-for verb in blocked needs-decision paused; do
+for verb in blocked needs-decision; do
   dir=$(make_case "$verb")
   mkdir -p "$dir/home/config" "$dir/tmp" "$dir/config" "$dir/parent/state"
   printf 'lead\n' > "$dir/.fm-secondmate-home"
@@ -38,7 +38,16 @@ for verb in blocked needs-decision paused; do
   printf 'kind=ship\nbackend=tmux\nwindow=fake:1\n' > "$dir/state/lane.meta"
   printf '%s [at=%s] [key=wait]: external condition until 2099-01-01T00:00Z\n' "$verb" "$(date +%s)" > "$dir/state/lane.status"
   cycle
+  if [ "$verb" = blocked ]; then
+    IFS=$'\t' read -r sig since owner parent key < "$dir/state/.waiting-timers/lane"
+    printf '%s\t%s\t0\t0\t%s\n' "$sig" "$((since - 900))" "$key" > "$dir/state/.waiting-timers/lane"
+  fi
   cycle
+  if [ "$verb" = blocked ]; then
+    [ ! -s "$channel" ] || fail 'restart escalated before owner response interval'
+    IFS=$'\t' read -r sig since owner parent key < "$dir/state/.waiting-timers/lane"
+    [ "$owner" -gt 1 ] || fail 'owner delivery timestamp missing'
+  fi
   grep -q 'check: waiting-state lane .*level=owner' "$dir/events" || fail "$verb did not alert its owner"
   cycle
   grep -q 'blocked .*waiting-timer-overdue: lane' "$channel" || fail "$verb did not escalate to parent"
@@ -64,7 +73,7 @@ done
 # Native blocked wins over a working log and survives unrelated status churn.
 dir=$(make_case herdr)
 mkdir -p "$dir/home/config" "$dir/tmp" "$dir/config"
-printf 'kind=secondmate\nbackend=herdr\nwindow=fixture:w1:p1\n' > "$dir/state/lane.meta"
+printf 'kind=secondmate\nharness=opencode\nbackend=herdr\nwindow=fixture:w1:p1\n' > "$dir/state/lane.meta"
 printf 'working: running\n' > "$dir/state/lane.status"
 printf 'blocked\n' > "$dir/native"
 cat > "$dir/fakebin/herdr" <<'SH'
@@ -95,3 +104,30 @@ cycle
 cycle
 [ "$(grep -c 'level=owner' "$dir/events")" -eq 2 ] || fail 'child report was mistaken for the lead waiting'
 pass 'lead native blocked overrides log, ignores foreign panes, re-arms, and excludes child reports'
+
+printf 'kind=secondmate\nharness=cursor\nbackend=herdr\nwindow=fixture:w1:p1\n' > "$dir/state/lane.meta"
+printf 'blocked\n' > "$dir/native"
+printf 'working: healthy Cursor\n' > "$dir/state/lane.status"
+cycle
+[ ! -e "$dir/state/.waiting-timers/lane" ] || fail 'Cursor native blocked admitted'
+printf 'blocked [key=cursor-wait]: real dependency\n' >> "$dir/state/lane.status"
+cycle
+cycle
+grep -q 'waiting-state lane (blocked' "$dir/events" || fail 'Cursor declaration not monitored'
+pass 'Cursor ignores native blocked but retains declaration monitoring'
+
+cat > "$dir/fakebin/herdr" <<'SH'
+#!/usr/bin/env bash
+if [ "$1 $2" = 'agent list' ]; then sleep 30; else exit 1; fi
+SH
+start=$(date +%s)
+FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_CONFIG_OVERRIDE="$dir/config" \
+  PATH="$dir/fakebin:$PATH" FM_BACKEND_HERDR_READ_TIMEOUT=1 \
+  "$WATCH" > "$dir/timeout-out" 2> "$dir/timeout-err" &
+pid=$!
+rc=0
+wait_for_exit "$pid" 80 || rc=$?
+[ "$rc" -ne 0 ] && [ "$rc" -ne 124 ] || fail 'stalled native lookup did not fail within bound'
+[ "$(( $(date +%s) - start ))" -lt 8 ] || fail 'native timeout exceeded bound'
+grep -q 'waiting-state timer check failed' "$dir/timeout-err" || fail 'native failure diagnostic missing'
+pass 'native agent-list lookup is bounded'
