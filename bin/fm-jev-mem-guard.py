@@ -3,9 +3,8 @@
 fm-jev-mem-guard.py - host memory guard: measure, admit, and alert before an oomd kill.
 
 On Herdr, fleet agents share one agent-runtime service, and systemd-oomd kills
-that service as a unit when its slice's memory pressure stays above the oomd
-limit (on the reference host: "some" avg10 above 50% for 20 s). Read host
-and runtime cgroup pressure independently and classify the worse reading.
+that service as a unit under the host's configured oomd pressure policy.
+Read host and runtime cgroup pressure independently and classify the worse reading.
 Admission refusal and watcher interrupts cannot guarantee avoidance of an oomd kill.
 
 Usage (bin/fm-jev-mem-guard.sh runs this with python3):
@@ -27,9 +26,14 @@ Usage (bin/fm-jev-mem-guard.sh runs this with python3):
 Verdicts: OK; WAIT (new agents wait); ALERT (sampler attempts one owned-task interrupt);
 UNKNOWN (not measurable, for example no pressure file: admits and records nothing).
 Thresholds come from config/host-memory (docs/configuration.md "Host memory guard").
-Consumers are summed RSS plus swap per owner: recorded worktree or explicit
-home paths qualify the process's working directory; FM_TASK_ID disambiguates tasks
-within that home (task records in each --state-dir), else the process is unowned.
+Consumers are summed RSS plus swap per owner, using the longest matching recorded
+worktree or explicit home path for the process's working directory.
+A matching FM_TASK_ID must also qualify against that task's recorded worktree or
+explicit home; an ID alone never establishes ownership, and unmatched processes
+are named by command and PID rather than interrupted.
+Home identity comes from each --state-dir HOME DIR pair, never DIR's parent.
+RSS includes shared pages per process, so these totals rank consumers rather than
+accounting for unique physical memory.
 Remote records (remote_host set) never contribute local task or home owners.
 The proc root is FM_HOST_MEMORY_PROC (default /proc). Exit 2: usage or an invalid
 config file, with the reason on stderr.

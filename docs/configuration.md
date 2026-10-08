@@ -675,7 +675,8 @@ These controls reduce risk but cannot guarantee avoidance of an out-of-memory ki
   The dashboard shows the last hour's peak measured pressure and current swap.
   The home-scoped `state/.host-memory-sampler.pid` records PID and process identity; the watcher restarts a dead sampler and stops only the exact recorded PID after verifying its identity, script, home, and state.
 - At the wait or alert level, local `bin/fm-spawn.sh` launches and `bin/fm-control.sh relaunch` refuse to start a new agent and record the reason in `state/admission-refused`, which the dashboard raises for 15 minutes.
-  A refused spawn leaves the task queued; a refused relaunch leaves the existing agent and task record untouched.
+  A refused fresh spawn leaves the task queued; a relaunch refused by its initial admission check leaves the existing agent and task record untouched.
+  The replacement launch checks admission again after the old agent stops, so pressure rising between those checks can still prevent replacement; this is not a memory reservation.
   Retry once pressure eases; admission does not automatically retry a queued spawn.
 - At the alert level, the sampler attempts one automatic `fm-control.sh <task-id> interrupt` per episode if the top consumer is a task this home owns, passing the resolved home and selected state explicitly; it never exits, kills, or discards that task.
   Interrupt delivery runs independently of subsequent samples.
@@ -696,8 +697,9 @@ These controls reduce risk but cannot guarantee avoidance of an out-of-memory ki
 Thresholds must be finite, nonnegative numbers.
 An invalid line is refused with its line number, so a typo never silently loosens the guard.
 For fixture testing, `FM_HOST_MEMORY_PROC` selects the proc root and `FM_HOST_MEMORY_CGROUP_ROOT` selects the cgroup root; production defaults are `/proc` and `/sys/fs/cgroup`.
-A host without pressure readings or without `python3` reads unknown and admits work, because the guard cannot measure it.
-The guard's header owns the sample format and exact output.
+Without readable host pressure and available memory, or without `python3`, the guard reads unknown and admits work without recording a sample, because it cannot measure the host.
+The guard's header owns consumer attribution, sample format, and exact output.
+`tests/fm-jev-mem-guard.test.sh` pins sampling, home-qualified ownership, remote-record exclusion, and once-per-episode dispatch; `tests/fm-control-relaunch.test.sh` and `tests/fm-secondmate-liveness.test.sh` pin admission before agent stop and recovery-budget consumption.
 
 ## Stow pass horizon (config/stow-pass-horizon)
 
