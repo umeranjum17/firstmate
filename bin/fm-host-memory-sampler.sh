@@ -26,7 +26,7 @@ fm_memory_sampler_matches() {
 fm_memory_sampler_ensure() {
   local i=0
   fm_memory_sampler_matches && return 0
-  FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_CONFIG_OVERRIDE="$CONFIG" \
+  env FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_CONFIG_OVERRIDE="$CONFIG" \
     "$MEMORY_SAMPLER_PATH" run "$FM_HOME" "$STATE" "$CONFIG" \
     </dev/null >> "$STATE/.host-memory-sampler.log" 2>&1 &
   while [ "$i" -lt 30 ]; do
@@ -129,7 +129,9 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
   case "$secs" in ''|*[!0-9]*|0) secs=10 ;; esac
   while [ -d "$FM_HOME" ] && [ -d "$STATE" ] && [ -d "$SAMPLER_DIR" ]; do
     watcher=$(cat "$STATE/.watch.lock/pid" 2>/dev/null || true)
-    fm_pid_alive "$watcher" && fm_watcher_lock_matches_pid "$STATE" "$SAMPLER_DIR/fm-watch.sh" "$watcher" "$FM_HOME" || break
+    if ! fm_pid_alive "$watcher" || ! fm_watcher_lock_matches_pid "$STATE" "$SAMPLER_DIR/fm-watch.sh" "$watcher" "$FM_HOME"; then
+      break
+    fi
     start=$(date +%s)
     fm_memory_sampler_tick
     if [ "$registered" -eq 0 ]; then
