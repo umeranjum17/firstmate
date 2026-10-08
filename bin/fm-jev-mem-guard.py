@@ -169,6 +169,7 @@ def owners(state_dirs):
     homes = {os.path.realpath(d): os.path.realpath(home) for home, d in state_dirs}
     metas = [(d, f[:-5], read_meta(os.path.join(d, f)))
              for _, d in state_dirs if os.path.isdir(d) for f in sorted(os.listdir(d)) if f.endswith(".meta")]
+    metas = [(d, tid, m) for d, tid, m in metas if not m.get("remote_host")]
     lead_of = {os.path.realpath(m["home"]): tid for _, tid, m in metas if m.get("kind") == "secondmate" and m.get("home")}
     paths, tasks = [], {}
     for d, tid, m in metas:
