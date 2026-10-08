@@ -492,11 +492,14 @@ PY
   has "$d/index.html" "Closed 7 d unknown" "Out: unknown"
   [ ! -e "$home/quota.called" ] || fail "page build collected quota"
   rm "$home/.tasks.toml"
-  : > "$home/data/secondmates.md"
+  printf -- '- zephyrine - domain (home: %s; scope: work; projects: alpha; added 2026-07-11)\n' "$z" > "$home/data/secondmates.md"
+  printf '\n## Queued\n- [ ] m-held - Lead release call (hold: choose lead release) (hold-kind: captain)\n' >> "$z/data/backlog.md"
   printf '\n## In flight\n- [ ] flight-call - Flight call (hold: choose flight scope) (hold-kind: captain)\n\n## Queued\n- [ ] expired-call - Expired call (hold: choose deferred scope) (hold-kind: captain) (hold-until: %s)\n- [ ] vendor - Vendor access (since %s) (hold: waiting for vendor credentials) (hold-kind: external)\n' "$(date -d yesterday +%F)" "$today" >> "$home/data/backlog.md"
   build "$home"
-  for p in index backlog backlog.home; do has "$d/$p.html" "waiting for vendor credentials" "choose flight scope" "choose deferred scope"; done
-  jq -e '(.held_items | length) == 4 and ([.held_items[].title] | unique | length) == 4 and any(.held_items[]; .reason == "waiting for vendor credentials")' "$d/data.json" >/dev/null || fail "hold union lost calls or double-counted items"
+  has "$d/index.html" "4 held for triage" "Captain calls and queued holds 5"
+  for p in backlog backlog.home; do has "$d/$p.html" "5 items held" "Held for the captain: 4"; done
+  for p in index backlog backlog.home; do has "$d/$p.html" "waiting for vendor credentials" "choose flight scope" "choose deferred scope" "Wait for the captain's call" "Approve release.json instead of staging.json" "Lead release call" "choose lead release"; done
+  jq -e '(.held_items | length) == 5 and .metrics.held_for_captain.value == 4 and .metrics.queue.value.held == 3 and ([.held_items[] | [.home, .title]] | unique | length) == 5 and any(.held_items[]; .home == "main" and .title == "Wait for the captain\u0027s call") and any(.held_items[]; .home == "zephyrine" and .title == "Lead release call")' "$d/data.json" >/dev/null || fail "home-scoped hold union lost calls or double-counted items"
   pass "dashboard preserves lower bounds, route ownership, configured archives, runway uncertainty and wait reasons"
 }
 

@@ -464,10 +464,10 @@ def bl(h, cls=None, state=None):
 bl_known = all(backlog.get(h) is not None for h in ACTIVE)
 backlog_read_at = time.time()
 QUEUE = {c: sum(len(bl(h, c)) for h in ACTIVE) for c in ('ready', 'held', 'waiting')} if bl_known else None
-held_all = {r['id']: (h, r) for h in ACTIVE for r in bl(h, 'held') if r.get('hold_kind') != 'captain'}
-held_all.update({r['id']: (h, r) for h in ACTIVE for r in backlog.get(h) or [] if r.get('hold_kind') == 'captain' and r.get('state') != 'done'})
-held_all = sorted(held_all.values(), key=lambda x: (x[1]['day'] or TODAY, x[0]))
-held_cap = [(h, r) for h, r in held_all if r.get('hold_kind') == 'captain']
+held_cap = sorted(((h, r) for h in ACTIVE for r in backlog.get(h) or []
+                   if r.get('hold_kind') == 'captain' and r.get('state') != 'done'), key=lambda x: (x[1]['day'] or TODAY, x[0]))
+held_all = sorted(held_cap + [(h, r) for h in ACTIVE for r in bl(h, 'held') if r.get('hold_kind') != 'captain'],
+                  key=lambda x: (x[1]['day'] or TODAY, x[0]))
 titles = {(h, r['id']): r['title'] for h in home_dir for r in backlog.get(h) or []}
 could = {h: min(max(0, plan(h) - len(by_home[h])), len(bl(h, 'ready'))) if h not in lane_err else 0 for h in ACTIVE}
 
