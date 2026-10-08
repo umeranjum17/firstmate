@@ -78,8 +78,16 @@ printf 'working: running\n' > "$dir/state/lane.status"
 printf 'blocked\n' > "$dir/native"
 cat > "$dir/fakebin/herdr" <<'SH'
 #!/usr/bin/env bash
+printf '%s\n' "$*" >> "$FM_HOME/native-calls"
 if [ "$1 $2" = 'agent list' ]; then
   printf '{"result":{"agents":[{"pane_id":"w1:p1","agent_status":"%s"},{"pane_id":"foreign:pane","agent_status":"blocked"}]}}\n' "$(cat "$FM_HOME/native")"
+elif [ "$1" = status ]; then
+  printf '{"server":{"running":true}}\n'
+elif [ "$1 $2" = 'session list' ]; then
+  printf '{"sessions":[{"name":"fixture","socket_path":"fixture-socket"}]}\n'
+elif [ "$1 $2" = 'agent get' ]; then
+  printf 'agent-get\n' >> "$FM_HOME/native-reads"
+  printf '{"result":{"agent":{"agent_status":"%s"}}}\n' "$(cat "$FM_HOME/native")"
 else
   exit 1
 fi
@@ -105,24 +113,44 @@ cycle
 [ "$(grep -c 'level=owner' "$dir/events")" -eq 2 ] || fail 'child report was mistaken for the lead waiting'
 pass 'lead native blocked overrides log, ignores foreign panes, re-arms, and excludes child reports'
 
-printf 'kind=secondmate\nharness=cursor\nbackend=herdr\nwindow=fixture:w1:p1\n' > "$dir/state/lane.meta"
+printf 'kind=ship\nharness=cursor\nbackend=herdr\nwindow=fixture:w1:p1\n' > "$dir/state/lane.meta"
+cat > "$dir/fakebin/reader" <<'SH'
+#!/usr/bin/env bash
+printf '@subscribed\n'
+sleep "$2"
+SH
+chmod +x "$dir/fakebin/reader"
+export FM_BACKEND_HERDR_EVENTS_FORCE=1 FM_BACKEND_HERDR_EVENT_READER="$dir/fakebin/reader"
+: > "$dir/events"
+: > "$dir/native-reads"
 printf 'blocked\n' > "$dir/native"
 printf 'working: healthy Cursor\n' > "$dir/state/lane.status"
+prime_status_seen "$dir/state" "$dir/state/lane.status"
+: > "$dir/native-calls"
 cycle
 [ ! -e "$dir/state/.waiting-timers/lane" ] || fail 'Cursor native blocked admitted'
+[ -s "$dir/native-reads" ] || fail "Cursor ship did not reach native push reconciliation: $(cat "$dir/out" "$dir/err" "$dir/native-calls")"
+[ -e "$dir/state/.herdr-escalated-fixture_w1_p1" ] || fail 'Cursor push was not consumed'
+[ ! -s "$dir/events" ] || fail 'healthy Cursor ship emitted an alert'
 printf 'blocked [key=cursor-wait]: real dependency\n' >> "$dir/state/lane.status"
 cycle
 cycle
 grep -q 'waiting-state lane (blocked' "$dir/events" || fail 'Cursor declaration not monitored'
-pass 'Cursor ignores native blocked but retains declaration monitoring'
+pass 'Cursor ship ignores native polling and push blockers but retains declaration monitoring'
+unset FM_BACKEND_HERDR_EVENTS_FORCE FM_BACKEND_HERDR_EVENT_READER
+printf 'kind=secondmate\nharness=cursor\nbackend=herdr\nwindow=fixture:w1:p1\n' > "$dir/state/lane.meta"
 
 cat > "$dir/fakebin/herdr" <<'SH'
 #!/usr/bin/env bash
 if [ "$1 $2" = 'agent list' ]; then sleep 30; else exit 1; fi
 SH
+for tool in timeout gtimeout; do
+  printf '#!/usr/bin/env bash\nprintf "coreutils-called\\n" >> "$FM_HOME/coreutils-calls"\nexit 125\n' > "$dir/fakebin/$tool"
+  chmod +x "$dir/fakebin/$tool"
+done
 start=$(date +%s)
 FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_CONFIG_OVERRIDE="$dir/config" \
-  PATH="$dir/fakebin:$PATH" FM_BACKEND_HERDR_READ_TIMEOUT=1 \
+  PATH="$dir/fakebin:$PATH" FM_BACKEND_HERDR_READ_TIMEOUT=1 FM_TIMEOUT_MECHANISM_OVERRIDE=bash \
   "$WATCH" > "$dir/timeout-out" 2> "$dir/timeout-err" &
 pid=$!
 rc=0
@@ -130,4 +158,6 @@ wait_for_exit "$pid" 80 || rc=$?
 [ "$rc" -ne 0 ] && [ "$rc" -ne 124 ] || fail 'stalled native lookup did not fail within bound'
 [ "$(( $(date +%s) - start ))" -lt 8 ] || fail 'native timeout exceeded bound'
 grep -q 'waiting-state timer check failed' "$dir/timeout-err" || fail 'native failure diagnostic missing'
-pass 'native agent-list lookup is bounded'
+grep -q 'agent list for fixture failed (code 124, deadline 1s)' "$dir/timeout-err" || fail 'portable deadline diagnostic missing'
+[ ! -e "$dir/coreutils-calls" ] || fail 'portable lookup invoked optional coreutils'
+pass 'native agent-list lookup is bounded without optional coreutils'
