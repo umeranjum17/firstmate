@@ -4,8 +4,9 @@
 # docs/configuration.md "Waiting-state escalation".
 # Each recorded task owns one durable episode under state/.waiting-timers/.
 # The effective declaration is an own open blocker/decision, else a declared
-# pause. Herdr agent.list blocked overrides it immediately, scoped to recorded
-# panes only. Time starts at first observation and survives watcher restarts.
+# pause. Admitted Herdr agent.list blocked overrides it immediately, scoped to
+# recorded panes only (admission policy: configuration reference above).
+# Time starts at first observation and survives watcher restarts.
 # Changing state/declaration/endpoint clears and re-arms the episode. Parent
 # reports use the existing local/remote parent channel, never a captain alert.
 # A waiting-timer-* key belongs to this library; it resolves that report when
