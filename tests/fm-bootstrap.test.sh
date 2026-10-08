@@ -628,7 +628,7 @@ ROWS
 }
 
 test_herdr_primary_without_restart_recovery_says_how_to_install_it() {
-  local case_dir fakebin out command notice
+  local case_dir fakebin out command notice unit special_home escaped_home
   case_dir="$TMP_ROOT/herdr no sentinel"
   mkdir -p "$case_dir/home/config"
   printf '%s\n' manual > "$case_dir/home/config/backlog-backend"
@@ -641,11 +641,7 @@ test_herdr_primary_without_restart_recovery_says_how_to_install_it() {
   command=${notice#*'(install: '}
   command=${command%')'}
   mkdir -p "$case_dir/home/bin" "$case_dir/shell home/.config/systemd/user"
-  cat > "$case_dir/home/bin/fm-sentinel.sh" <<'SH'
-#!/usr/bin/env bash
-printf '%s\t%s\n' "$FM_HOME" "$*" > "$FM_TEST_SENTINEL_RECEIPT"
-printf 'fixture unit\n'
-SH
+  cp "$ROOT/bin/fm-sentinel.sh" "$case_dir/home/bin/fm-sentinel.sh"
   cat > "$fakebin/systemctl" <<'SH'
 #!/usr/bin/env bash
 [ -z "${FM_FAKE_NO_USER_BUS:-}" ] || exit 1
@@ -657,10 +653,36 @@ SH
   chmod +x "$case_dir/home/bin/fm-sentinel.sh" "$fakebin/systemctl"
   HOME="$case_dir/shell home" PATH="$fakebin:$BASE_PATH" FM_TEST_SENTINEL_RECEIPT="$case_dir/receipt" \
     bash -c "$command" || fail "the emitted install command is not safely executable"
-  assert_equals "$case_dir/home"$'\tunit\nsystemctl\t--user enable --now fm-sentinel' \
-    "$(cat "$case_dir/receipt")" "the emitted command preserves its home, script path, and actions"
-  assert_equals 'fixture unit' "$(cat "$case_dir/shell home/.config/systemd/user/fm-sentinel.service")" \
-    "the emitted unit is redirected to the selected user's service file"
+  assert_equals $'systemctl\t--user enable --now fm-sentinel' \
+    "$(cat "$case_dir/receipt")" "the emitted command enables the selected service"
+  unit="$case_dir/shell home/.config/systemd/user/fm-sentinel.service"
+  grep -Fx "Environment=\"FM_HOME=$case_dir/home\"" "$unit" >/dev/null \
+    || fail "the generated unit must preserve the space-containing home"
+  grep -Fx "Environment=\"PATH=$fakebin:$BASE_PATH\"" "$unit" >/dev/null \
+    || fail "the generated unit must preserve the space-containing PATH"
+  grep -Fx "ExecStart=\"$case_dir/home/bin/fm-sentinel.sh\" loop" "$unit" >/dev/null \
+    || fail "the generated unit must preserve the space-containing executable path"
+  if command -v systemd-analyze >/dev/null 2>&1; then
+    systemd-analyze verify "$unit" || fail "systemd rejected the generated unit"
+  fi
+  special_home="$TMP_ROOT/"'sentinel % " \ home'
+  escaped_home="$TMP_ROOT/"'sentinel %% \" \\ home'
+  mkdir -p "$special_home/bin" "$case_dir/code % root/bin"
+  cp "$ROOT/bin/fm-sentinel.sh" "$case_dir/code % root/bin/fm-sentinel.sh"
+  unit="$case_dir/escaped.service"
+  FM_HOME="$special_home" PATH="$special_home/bin:$BASE_PATH" \
+    "$case_dir/code % root/bin/fm-sentinel.sh" unit > "$unit" || fail "unit generation failed"
+  grep -Fx "Description=Firstmate sentinel for ${special_home//%/%%} (recovers supervision after an agent-runtime restart)" "$unit" >/dev/null \
+    || fail "the generated description must preserve literal percent signs"
+  grep -Fx "Environment=\"FM_HOME=$escaped_home\"" "$unit" >/dev/null \
+    || fail "the generated home assignment must escape systemd metacharacters"
+  grep -Fx "Environment=\"PATH=$escaped_home/bin:$BASE_PATH\"" "$unit" >/dev/null \
+    || fail "the generated PATH assignment must escape systemd metacharacters"
+  grep -Fx "ExecStart=\"$case_dir/code %% root/bin/fm-sentinel.sh\" loop" "$unit" >/dev/null \
+    || fail "the generated executable path must escape systemd metacharacters"
+  if command -v systemd-analyze >/dev/null 2>&1; then
+    systemd-analyze verify "$unit" || fail "systemd rejected the escaped unit"
+  fi
   out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
     FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_FAKE_SENTINEL_DOWN=1 FM_FAKE_NO_USER_BUS=1 "$ROOT/bin/fm-bootstrap.sh")
   [ -z "$out" ] || fail "a host without a systemd user bus has nothing to install, got: $out"
