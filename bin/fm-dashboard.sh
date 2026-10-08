@@ -19,7 +19,9 @@
 # The system's reduced-motion preference stops continuous scene animation and tag pulsing
 # and immediately settles any home transition, restoring tags and picking.
 # On tablet-sized viewports the header figures use their own row and the sidebar narrows
-# to an icon rail; on a phone the board is a list grouped by stage, with a dock.
+# to a compact rail with four-character home labels (or the whole name if shorter).
+# Home buttons expose the full name through their accessible label and tooltip.
+# On a phone the board is a list grouped by stage, with a dock.
 # Each build writes the app's one data file, state/dashboard/board.json: homes with their
 # lane plans, one card per open lane, ready backlog item and pull request landed today,
 # and parked home ids. Cards carry the current stage inferred from status lines (which
@@ -58,10 +60,10 @@
 #   <home>/state/*.meta + *.status  lanes: every ship/scout record, in one state by its last
 #                                   status verb and [at=] time (building, validating or waiting on
 #                                   CI, waiting on a decision, blocked, waiting on something
-#                                   else, finished not landed); a secondmate record is a lead
-#                                   without a captain hold, blocked/failed stay blocked even when
-#                                   their text names CI; only paused validation/CI/checks/pipeline
-#                                   waits are validating (tests/fm-dashboard.test.sh ci-stuck)
+#                                   else, finished not landed); a secondmate record is a lead.
+#                                   Without a captain hold, blocked/failed stay blocked even when
+#                                   their text names CI; only paused validation/no-mistakes/CI/checks/
+#                                   pipeline waits are validating (tests/fm-dashboard.test.sh ci-stuck)
 #   config/lane-caps                "<home> <cap>" lane plan per home (Main is "main" or the name
 #                                   of its home's parent folder); config/lane-target is the default (4)
 #   bin/fm-tasks-axi.sh list        each home's backlog (FM_HOME=<home>): queued = ready + held +
