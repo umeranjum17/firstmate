@@ -39,7 +39,6 @@
 #                                   recorded as merged, once (bin/fm-merge-outcome-lib.sh writes a
 #                                   lead's merges to Main's channel for it, Main's own to its ledger)
 #   <home>/data/backlog.md, data/done-archive.md    Out: items closed per local day (none if absent)
-#   quota-axi --json --no-credential-refresh --max-age 5m   quota runway, read again after 2 min
 # Machine and devices, each probe read-only with a 5 s timeout:
 #   adb devices -l                  connected phones and emulators (nothing else is asked of adb);
 #                                   adb from PATH, else platform-tools under $ANDROID_HOME,
@@ -109,7 +108,7 @@ PAGE = os.path.join(DIR, 'index.html')
 ROUTES = {'/': 'index', '/index.html': 'index', '/backlog': 'backlog', '/measure': 'measure'}
 building = threading.Lock()
 last_error = b''
-last_took = 5.0  # seconds the last build took; a fresh quota reading alone can take 2 s
+last_took = 5.0
 
 def build():  # call holding `building`; the build replaces each page in one rename
     global last_error, last_took
@@ -201,7 +200,8 @@ trap 'rm -rf "$tmp"' EXIT
 mkdir -p "$tmp" || { echo "fm-dashboard: cannot create $tmp" >&2; exit 1; }
 
 python3 - "$FM_HOME" "$out_dir" "$tmp" "$SCRIPT_DIR" "$MAX_AGE" <<'PY' || { echo "fm-dashboard: page build failed" >&2; exit 1; }
-import html, json, math, os, re, shutil, subprocess, sys
+import hashlib, html, json, math, os, re, shutil, subprocess, sys
+from urllib.parse import urlsplit
 from datetime import date, datetime, timedelta
 
 HOME, STATE_DIR, OUT, BIN, MAX_AGE = sys.argv[1:6]
@@ -240,11 +240,15 @@ def probe(cmd, ok=(0,), timeout=5, env=None, cwd=None):
 
 # --- homes ---------------------------------------------------------------
 home_dir = {'main': HOME}
+remote_hosts = {}
 try:
     for l in open(os.path.join(HOME, 'data/secondmates.md'), encoding='utf-8', errors='replace'):
         m = re.match(r'- (\S+) - ', l)
-        f = re.match(r'.*\(home: ([^;]*);', l)  # the routing fields close the line; greedy .* lands on the last "(home:"
-        if m and f: home_dir[m.group(1)] = f.group(1).strip()
+        f = re.match(r'.*\((?:host:[^;]*;\s*root:[^;]*;\s*)?home: ([^;]*);', l)
+        if m and f:
+            home_dir[m.group(1)] = f.group(1).strip()
+            host = re.search(r'\(host:\s*([^;]+);\s*root:', l)
+            if host: remote_hosts[m.group(1)] = host.group(1).strip()
 except OSError: pass  # no registered homes
 parked = set()
 try:
@@ -270,12 +274,16 @@ PLAN = sum(plan(h) for h in ACTIVE)
 # --- lead state: the summary each home publishes about itself ----------
 SUMMARY_MAX_AGE = 900  # a home republishes at least every 5 minutes
 def summary(h):
-    p = os.path.join(home_dir[h], 'state/home-summary.json')
+    if h in remote_hosts:
+        key = hashlib.sha256(f'{h}\n{remote_hosts[h]}\n{home_dir[h]}\n'.encode()).hexdigest()
+        p = os.path.join(os.environ.get('FM_SNAPSHOT_CACHE_DIR', os.path.join(HOME, 'state/secondmate-summary-cache')), key + '.json')
+    else: p = os.path.join(home_dir[h], 'state/home-summary.json')
     try:
         if os.path.getsize(p) > 262144: raise ValueError('summary larger than 256 KB')
         s = json.load(open(p, encoding='utf-8'))
         if not isinstance(s, dict) or s.get('schema') != 'fm-secondmate-home-summary.v1': raise ValueError('unexpected summary schema')
-        if os.path.realpath(str(s.get('home'))) != os.path.realpath(home_dir[h]): raise ValueError('summary names another home')
+        if (str(s.get('home')) != home_dir[h] if h in remote_hosts else os.path.realpath(str(s.get('home'))) != os.path.realpath(home_dir[h])): raise ValueError('summary names another home')
+        if h in remote_hosts and s.get('hold_classifier_schema') != 'fm-captain-hold-buckets.v1': raise ValueError('unexpected summary classifier')
         if not isinstance(s.get('generated_epoch'), int): raise ValueError('summary has no time')
         return s
     except OSError as e: notes.append(('home summary', f'{h}: {e.strerror}'))
@@ -283,15 +291,25 @@ def summary(h):
     return None
 sums = {h: summary(h) for h in ACTIVE}
 leads = {h: sums[h] for h in ACTIVE if h != 'main'}
-down = {e.get('id') for e in (sums.get('main') or {}).get('endpoints') or []
-        if (e.get('endpoint') or {}).get('exists') is False or (e.get('endpoint') or {}).get('agent_alive') == 'dead'} & set(leads)
+main_summary = sums.get('main') or {}
+endpoints = {e.get('id'): e.get('endpoint') or {} for e in main_summary.get('endpoints') or []} if 0 <= NOW_TS - main_summary.get('generated_epoch', 0) <= SUMMARY_MAX_AGE else {}
+down = set()
 LEAD_WORDS = {'captain_decision': ('Holding a decision', 'warn'), 'externally_held': ('Waiting on someone else', 'warn'),
               'unknown': ('Records need tidy-up', 'bad'), 'active_child_work': ('Working', 'ok'), 'no_active_work': ('Idle', '')}
 def lead_word(h):
     if h not in leads: return ('', '')
-    if h in down: return ('Not running', 'bad')
     if leads[h] is None: return ('State unknown', 'bad')
-    if NOW_TS - leads[h]['generated_epoch'] > SUMMARY_MAX_AGE: return (f'Silent {dur(NOW_TS - leads[h]["generated_epoch"])}', 'bad')
+    age = NOW_TS - leads[h]['generated_epoch']
+    if age < 0: return ('State unknown', 'bad')
+    if age > SUMMARY_MAX_AGE: return (f'Silent {dur(age)}', 'bad')
+    if h not in remote_hosts:
+        pane = next((m.get('herdr_pane_id') for task, m in metas.get('main', []) if task == h and m.get('kind') == 'secondmate'), None)
+        current = agents is not None and pane and any(a.get('pane_id') == pane for a in agents)
+        endpoint = endpoints.get(h, {})
+        if not current:
+            if endpoint.get('exists') is False or endpoint.get('agent_alive') == 'dead': return ('Not running', 'bad')
+            if endpoint.get('exists') is not True or endpoint.get('agent_alive') != 'alive': return ('Runtime unknown', 'bad')
+    if leads[h].get('valid') is False: return ('State unknown', 'bad')
     s = leads[h].get('state')
     return LEAD_WORDS.get(s, (str(s or '').replace('_', ' ').capitalize(), ''))
 
@@ -322,6 +340,8 @@ ACT = [('Blocked or waiting on a decision', ('blocked', 'decision'), 'wb'), ('Fi
        ('Producing', ('building', 'validating'), ''), ('Waiting on something else', ('waiting',), 'ol')]
 metas, lanes, lane_err = {}, [], set()
 for h, d in sorted(home_dir.items()):
+    if h in remote_hosts:
+        lane_err.add(h); notes.append(('lane records', f'{h}: remote records not cached')); continue
     sd = os.path.join(d, 'state')
     try: files = sorted(f for f in os.listdir(sd) if f.endswith('.meta'))
     except OSError as e:
@@ -386,13 +406,27 @@ def toon_rows(text, name='tasks'):
             return [dict(zip(cols, toon_fields(r.strip()))) for r in body]
         if re.match(rf'^{name}: 0 ', l): return []
     return None
+def prose(t):
+    def resource(m):
+        token = m.group().rstrip('.,;:)`')
+        suffix = m.group()[len(token):]
+        path = urlsplit(token).path if '://' in token else token.split('?', 1)[0].split('#', 1)[0]
+        pr = re.search(r'/pull/(\d+)$', path)
+        return (f'PR {pr.group(1)}' if pr else os.path.basename(path.rstrip('/')) or 'link') + suffix
+    text = re.sub(r'\[(?:key|at)=[^\]]*\]', '', str(t or ''))
+    return re.sub(r'(?<![\w/])(?:https?://|~?/|(?:[\w.-]+/)+)\S+', resource, text)
 def clean(t):
-    t = re.split(r' (?:https?://|/|data/)\S', str(t or ''), maxsplit=1)[0]
+    t = prose(t)
     return t.split('\n', 1)[0].rstrip() + '…' if '\n' in t else t
-def prose(t):  # record text without the links and paths that mean nothing on a phone
-    return re.sub(r'(?<!\S)(?:https?://|~?/|(?:data|config|state|projects|bin)/)\S+', '…', str(t or ''))
-backlog = {}
+backlog, backlog_sources = {}, {}
 for h, d in sorted(home_dir.items()):
+    if h in remote_hosts:
+        backlog[h] = None; notes.append(('backlog', f'{h}: remote records not cached')); continue
+    address, err = probe(['bash', '-c', '. "$1/fm-tasks-axi-lib.sh"; . "$1/fm-backlog-transition-lib.sh"; fm_backlog_tasks_axi_addressing "${FM_DATA_OVERRIDE:-$FM_HOME/data}" || exit 1; printf "%s\\n%s\\n" "$FM_BACKLOG_AXI_ROOT" "$FM_BACKLOG_AXI_FILE"', 'dashboard', BIN], env=dict(os.environ, FM_HOME=d))
+    fields = address.splitlines() if address is not None else []
+    if len(fields) != 2 or not fields[1]:
+        backlog[h] = None; notes.append(('backlog', f'{h}: {err or "unsupported backlog source"}')); continue
+    backlog_sources[h] = fields
     out, err = probe(['bash', os.path.join(BIN, 'fm-tasks-axi.sh'), 'list', '--limit', '10000',
                       '--fields', 'held,hold_kind,hold_reason,blocked,created,closed'],
                      timeout=20, env=dict(os.environ, FM_HOME=d))
@@ -425,7 +459,6 @@ def save_json(p, v):
         os.replace(p + '.tmp', p)
     except OSError: pass  # no cache only means the next build reads again
 def midnight(d): return datetime.combine(d, datetime.min.time()).astimezone().timestamp()
-def hm(ts): return datetime.fromtimestamp(ts).astimezone().strftime('%H:%M')
 def when(ts):  # 14:05 today, Thu 08:05 this week, else 07 Oct 14:05
     t = datetime.fromtimestamp(ts).astimezone()
     if t.date() == TODAY: return t.strftime('%H:%M')
@@ -443,9 +476,8 @@ for h in leads:
             for l in fh:
                 m = MERGED.match(l)
                 if m: merged(m.group(3), int(m.group(2)), h, m.group(1))
-    except FileNotFoundError: pass  # a lead with no channel yet has merged nothing
+    except FileNotFoundError: pass
     except OSError as e: notes.append(('merge records', f'{h}: {e.strerror}'))
-ledger_from = None  # Main's own merges are on record only since its fleet ledger's first line
 try:
     with open(os.path.join(HOME, 'state/fleet-ledger.jsonl'), encoding='utf-8', errors='replace') as fh:
         for n, l in enumerate(fh):
@@ -453,35 +485,41 @@ try:
             try: e = json.loads(l)
             except ValueError: continue
             if not isinstance(e, dict) or not isinstance(e.get('ts'), int): continue
-            if n == 0: ledger_from = e['ts']
             if e.get('event') == 'task.merged' and re.fullmatch(r'https://\S+/pull/\d+', str(e.get('pr'))): merged(e['pr'], e['ts'], 'main', str(e.get('task')))
 except OSError as e: notes.append(('merge records', f"Main: {e.strerror}, so Main's own merges are not counted"))
-def landed_exact(d): return ledger_from is not None and ledger_from <= midnight(d)
-def landed_on(d, h=None, until=math.inf):
-    lo, hi = midnight(d), min(midnight(d + timedelta(days=1)), until)
+def landed_on(d, h=None):
+    lo, hi = midnight(d), midnight(d + timedelta(days=1))
     return sum(lo <= at < hi and h in (None, hh) for at, hh, _ in merges.values())
 LANDED = [landed_on(d) for d in DAYS]
-LANDED_EXACT = [landed_exact(d) for d in DAYS]
 
 # Closed: backlog items marked done, by the local day they closed (the backlog and its archive).
-CLOSED = re.compile(r'^- \[x\] (\S+) (?:- )?(.*?)(?= https?://| /\S| data/\S| blocked-by:| \((?:repo|kind|priority|merged|reported|done|closed)\b|$)')
+CLOSED = re.compile(r'^- \[x\] (\S+) (?:- )?(.*?)(?= blocked-by:| \((?:repo|kind|priority|merged|reported|done|closed)\b|$)')
 CDATE = re.compile(r'\((?:merged|reported|done|closed) (\d{4}-\d\d-\d\d)\)')
 closed, done_title = {}, {}  # home -> {day: n}; (home, id) -> title
 for h in ACTIVE:
     seen, c = set(), {}
     try:
-        for f in ('backlog.md', 'done-archive.md'):
-            try: fh = open(os.path.join(home_dir[h], 'data', f), encoding='utf-8', errors='replace')
-            except FileNotFoundError: continue  # no backlog or archive yet: nothing closed, as tasks-axi reads it
+        if h not in backlog_sources: raise ValueError('unsupported backlog source')
+        root, source = backlog_sources[h]
+        import tomllib
+        config = next((p for p in (os.path.join(root, '.tasks.toml'), os.path.expanduser('~/.tasks-axi/config.toml')) if os.path.lexists(p)), None)
+        settings = tomllib.load(open(config, 'rb')) if config else {}
+        archive = (settings.get('markdown') or {}).get('archive', os.path.join(os.path.dirname(source), 'done-archive.md'))
+        if not isinstance(archive, str) or not archive: raise ValueError('archive unavailable')
+        for f in (source, os.path.join(root, archive)):
+            try: fh = open(f, encoding='utf-8', errors='replace')
+            except FileNotFoundError:
+                if f == source or 'archive' in (settings.get('markdown') or {}): raise
+                continue
             with fh:
                 for l in fh:
                     m, ds = CLOSED.match(l), CDATE.findall(l)
                     d = iso_day(ds[-1]) if m and ds else None
                     if d is None or (m.group(1), d) in seen: continue
                     seen.add((m.group(1), d)); c[d] = c.get(d, 0) + 1
-                    done_title.setdefault((h, m.group(1)), m.group(2).strip())
+                    done_title.setdefault((h, m.group(1)), clean(m.group(2).strip()))
         closed[h] = c
-    except OSError as e: closed[h] = None; notes.append(('closed items', f'{h}: {e.strerror}'))
+    except (OSError, ValueError, ImportError) as e: closed[h] = None; notes.append(('closed items', f'{h}: {e.strerror if isinstance(e, OSError) else str(e)}'))
 CLOSED_KNOWN = all(closed[h] is not None for h in ACTIVE)
 def closed_on(d, h=None): return sum((closed[x] or {}).get(d, 0) for x in ([h] if h else ACTIVE))
 CLOSED_N = [closed_on(d) for d in DAYS]
@@ -490,15 +528,14 @@ CLOSED_N = [closed_on(d) for d in DAYS]
 FILED = os.path.join(STATE_DIR, 'filed.json')
 flog = load_json(FILED)
 items = flog.get('items') if isinstance(flog.get('items'), dict) else {}
-gap = not all(isinstance(flog.get(k), (int, float)) for k in ('since', 'last')) or NOW_TS - flog['last'] > 3600
+gap = not bl_known or not all(isinstance(flog.get(k), (int, float)) for k in ('since', 'last')) or NOW_TS - flog['last'] > 3600
 filed_since = NOW_TS if gap else flog['since']  # a gap in the log restarts what it can vouch for
 for h in ACTIVE:
     for r in backlog.get(h) or []:
         if r['day'] and r.get('state') != 'done': items.setdefault(f'{h}\t{r["id"]}', r['day'].isoformat())
 items = {k: v for k, v in items.items() if isinstance(v, str) and v >= (DAYS[0] - timedelta(days=1)).isoformat()}
-save_json(FILED, dict(since=filed_since, last=NOW_TS, items=items))
+save_json(FILED, dict(since=filed_since if bl_known else None, last=NOW_TS if bl_known else None, items=items))
 FILED_N = [sum(v == d.isoformat() and k.split('\t')[0] in ACTIVE for k, v in items.items()) for d in DAYS]
-FILED_EXACT = [filed_since <= midnight(d) for d in DAYS]
 
 # Trends: the tiles' numbers now, sampled every 10 minutes and kept 8 days (-1 is unknown).
 HIST = os.path.join(STATE_DIR, 'history.tsv')
@@ -518,8 +555,7 @@ if not hist or NOW_TS - hist[-1][0] >= 600:
     except OSError: pass  # the trend only misses this sample
 def day_ago(col): return next((r[col] for r in hist if abs(r[0] - (NOW_TS - 86400)) <= 1800 and r[col] >= 0), None)
 
-# --- quota: quota-axi, read again after 2 minutes -------------------------
-QUOTA_TTL = 120
+# --- quota -------------------------------------------------------------
 def num(v): return v if isinstance(v, (int, float)) and not isinstance(v, bool) else None
 def parse_ts(ts):
     try: return datetime.fromisoformat(ts.replace('Z', '+00:00')).astimezone()
@@ -528,23 +564,20 @@ def quota():
     cache_p = os.path.join(STATE_DIR, '.quota.json')
     c = load_json(cache_p)
     at = c.get('at') if isinstance(c.get('at'), (int, float)) else None
-    if at is not None and 0 <= NOW_TS - at < QUOTA_TTL and isinstance(c.get('data'), dict): return c['data'], at
-    out, err = probe(['quota-axi', '--json', '--no-credential-refresh', '--max-age', '5m'], timeout=20)
     try:
-        if out is None: raise ValueError(err)
-        data = json.loads(out)
+        if at is None or not 0 <= NOW_TS - at <= 300: raise ValueError('no recent local quota reading')
+        data = c.get('data')
+        if not isinstance(data, dict): raise ValueError('no local quota reading')
         if data.get('schemaVersion') not in (5, 6): raise ValueError(f"unsupported quota-axi schema version: {data.get('schemaVersion')}")
         if not isinstance(data.get('providers'), list): raise ValueError('no providers')
-        save_json(cache_p, {'at': NOW_TS, 'data': data})
-        return data, NOW_TS
+        return data, at
     except (ValueError, AttributeError) as e:
-        if at is not None and 0 <= NOW_TS - at < 3600 and isinstance(c.get('data'), dict):
-            notes.append(('quota-axi', f'{e}; showing the reading from {hm(at)}')); return c['data'], at
         notes.append(('quota-axi', str(e) or 'unreadable')); return None, None
 qdata, q_at = quota()
 QNAME = {'claude': 'Claude', 'codex': 'Codex', 'opencode-go': 'OpenCode Go', 'zai': 'Z.ai', 'cursor': 'Cursor', 'copilot': 'Copilot',
          'kimi': 'Kimi', 'deepseek': 'DeepSeek', 'grok': 'Grok', 'openrouter': 'OpenRouter', 'minimax': 'MiniMax', 'agy': 'Antigravity'}
 accounts = []  # dict(name, runout, status, limit, windows, problem, empty)
+providers = (qdata or {}).get('providers') or []
 for p in (qdata or {}).get('providers') or []:
     if not isinstance(p, dict) or p.get('notSetUp'): continue
     st = p.get('state') or {}
@@ -557,12 +590,15 @@ for p in (qdata or {}).get('providers') or []:
         wins.append(dict(id=w.get('id'), label=str(w.get('label') or w.get('id')), used=used,
                          pace=None if used is None or reserve is None else max(0, min(100, used + reserve)),
                          reset=parse_ts(w.get('resetsAt')) if w.get('resetsAt') else None))
-    credits = p.get('credits') or {}
-    accounts.append(dict(name=QNAME.get(p.get('provider'), str(p.get('provider')).title()), status=run.get('status'),
+    name = QNAME.get(p.get('provider'), str(p.get('provider')).title())
+    if sum(isinstance(x, dict) and not x.get('notSetUp') and x.get('provider') == p.get('provider') for x in providers) > 1:
+        name += ' · ' + clean(p.get('accountKey') or 'account unknown')
+    problem = str(st.get('error') or st.get('status')).replace('_', ' ') if st.get('stale') or st.get('status') != 'fresh' else None
+    if run.get('status') not in ('through_reset', 'projected_exhaustion', 'exhausted_now') or (run.get('status') == 'projected_exhaustion' and parse_ts(run.get('projectedExhaustedAt')) is None): problem = problem or 'runway unknown'
+    accounts.append(dict(name=name, status=run.get('status'),
                          runout=parse_ts(run.get('projectedExhaustedAt')) if run.get('projectedExhaustedAt') else None,
                          limit=next((w for w in wins if w['id'] == run.get('limitingWindowId')), None), windows=wins,
-                         problem=str(st.get('error') or st.get('status')).replace('_', ' ') if st.get('stale') or st.get('status') not in ('fresh', None) else None,
-                         empty=run.get('status') == 'exhausted_now' or (credits.get('remaining') == 0 and not credits.get('unlimited') and not wins)))
+                         problem=problem, empty=not problem and run.get('status') == 'exhausted_now'))
 def runs_out(a): return a['status'] == 'projected_exhaustion' and a['runout'] and not a['problem'] and (not a['limit'] or not a['limit']['reset'] or a['runout'] < a['limit']['reset'])
 running_out = sorted((a for a in accounts if runs_out(a)), key=lambda a: a['runout'])
 
@@ -666,6 +702,7 @@ def lock_holders():
 def worktree_homes():  # every task's worktree and id, and each home itself, mapped to its home
     m = {}
     for h, d in home_dir.items():
+        if h in remote_hosts: continue
         m[os.path.realpath(d)] = h
         try:
             for f in os.listdir(os.path.join(d, 'state')):
@@ -800,7 +837,8 @@ def lanes_list(group, names=False, strip=True):
         t = esc(titles.get((l['home'], l['task'])) or l['task'])
         what = STATES[l['state']] if group == 'home' else hname(l['home'])
         pr = f' · {link("pull request", l["pr"])}' if l['pr'] else ''
-        return grow(t, f'{esc(what)} · {dur(NOW_TS - l["since"])}{pr}')
+        why = f' · {esc(prose(l["text"])[:140])}' if l['state'] in ('blocked', 'decision', 'waiting', 'validating') and l['text'] else ''
+        return grow(t, f'{esc(what)} · {dur(NOW_TS - l["since"])}{pr}{why}')
     groups = []
     if group == 'home':
         for h in sorted(ACTIVE, key=lambda h: (-sum(l['state'] in ('blocked', 'decision') for l in by_home[h]), -len(by_home[h]), h)):
@@ -843,6 +881,7 @@ if bl_known:
         old = min((r['day'] for h in ACTIVE if could[h] for r in bl(h, 'ready') if r['day']), default=None)
         spot('warn', 'Idle', 'idle with ready work', sum(could.values()), days_old(old) if old else 'unknown', 'backlog#targets',
              ', '.join(f'{hname(h)} {len(bl(h, "ready"))} ready, {len(by_home[h])} of {plan(h)} open' for h in ACTIVE if could[h]))
+down = {h for h in leads if lead_word(h)[0] == 'Not running'}
 if down: spot('bad', 'Down', 'lead down' if len(down) == 1 else 'leads down', len(down), 'now', '#homes', ', '.join(sorted(down)))
 tidy = sorted(h for h in leads if h not in down and lead_word(h)[1] == 'bad')
 if tidy: spot('warn', 'Check', 'lead to check' if len(tidy) == 1 else 'leads to check', len(tidy), 'now', '#homes', ', '.join(f'{h}: {lead_word(h)[0]}' for h in tidy))
@@ -894,11 +933,11 @@ def home_rows():
     for h in ACTIVE:
         lw, sp, n = lead_word(h), split(by_home[h]), len(by_home[h])
         tone = 'bad' if lw[1] == 'bad' or h in lane_err else 'warn' if lw[1] == 'warn' or sp['blocked'] + sp['decision'] else 'ok' if n else 'idle'
-        sub = 'Lane records unreadable' if h in lane_err else lw[0] if lw[1] in ('bad', 'warn') else ''
+        sub = ((lw[0] + ' · ' if h in remote_hosts else '') + 'Lane records unreadable') if h in lane_err else lw[0] if lw[1] in ('bad', 'warn') else ''
         free = max(0, plan(h) - n)
         rows += (f'<div class="hr"><span class="hname">{dot(tone)}<b>{esc(hname(h))}</b>{f"<small>{esc(sub)}</small>" if sub else ""}</span>'
                  f'<span class="hst"><span class="hsc"><span style="width:{100 * (n + free) / top:.1f}%">{stack(lane_parts(sp), n + free)}</span></span><small>{n} of {plan(h)}</small></span>'
-                 + cell(len(bl(h, 'ready')) if backlog.get(h) is not None else None) + cell(landed_on(TODAY, h))
+                 + cell(len(bl(h, 'ready')) if backlog.get(h) is not None else None) + cell(f'at least {landed_on(TODAY, h)}')
                  + cell(sum((closed[h] or {}).get(d, 0) for d in DAYS[7:]) if closed[h] is not None else None) + '</div>')
     return ('<div class="hrs"><div class="hr hh"><span>Home</span><span>Lanes open of plan</span><span class="hn">Ready</span>'
             '<span class="hn">Landed today</span><span class="hn">Closed 7\u00a0d</span></div>' + rows + '</div>' + PARKED_LINE)
@@ -995,22 +1034,26 @@ def tile(mid, label, value, foot, art='', tone=''):  # a tap opens the number's 
     return (f'<a class="tile{" t-" + tone if tone else ""}" href="measure#m-{mid}"><span class="tl">{label}</span>'
             f'<span class="tv">{value}</span>{art}<span class="ta">{foot}</span></a>')
 def tiles():
-    ly = landed_on(DAYS[-2], until=NOW_TS - 86400) if LANDED_EXACT[-2] else None
     c7, f7 = sum(CLOSED_N[7:]), sum(FILED_N[7:])
     old = dur(NOW_TS - min(l['since'] for l in stuck)) if stuck else ''
     if qdata is None: q = tile('quota', 'Quota runs out', unknown(why_of('quota-axi')), '')
+    elif any(a['empty'] for a in accounts):
+        a = next(a for a in accounts if a['empty'])
+        q = tile('quota', 'Quota runs out', 'used up', esc(a['name']), tone='bad')
     elif running_out:
         a = running_out[0]
         w = tight_window(a)
         bar = (f'<span class="qt"><i class="c-warn" style="width:{max(2, min(100, round(w["used"])))}%"></i>'
                + (f'<b style="left:{w["pace"]:.0f}%"></b>' if w['pace'] is not None else '') + '</span>') if w else ''
         q = tile('quota', 'Quota runs out', f'{dur(a["runout"].timestamp() - NOW_TS)}', f'{esc(a["name"])} before its reset'
-                 + (f' · {len(running_out) - 1} more' if len(running_out) > 1 else ''), bar, 'warn')
+                 + (f' · {len(running_out) - 1} more' if len(running_out) > 1 else '')
+                 + (' · others unknown' if any(a['problem'] for a in accounts) else ''), bar, 'warn')
+    elif not accounts or any(a['problem'] for a in accounts): q = tile('quota', 'Quota runs out', unknown('runway unavailable for some accounts'), '')
     else: q = tile('quota', 'Quota runs out', '<span class="okv">none</span>', f'{sum(a["empty"] for a in accounts)} used up · {len(accounts)} read')
     return '<div class="tiles">' + ''.join([
-        tile('landed', 'Landed today', f'{"" if LANDED_EXACT[-1] else "≥"}{LANDED[-1]}{delta(LANDED[-1], ly)}', 'vs yesterday by now · 14 d', day_cols(LANDED, LANDED_EXACT)),
+        tile('landed', 'Landed today', f'at least {LANDED[-1]}', 'recorded merges · 14 d', day_cols(LANDED, [False] * len(DAYS))),
         tile('closed', 'Closed 7 d', f'{c7}{delta(c7, sum(CLOSED_N[:7]))}' if CLOSED_KNOWN else unknown(why_of('closed')),
-             f'filed {"" if all(FILED_EXACT[7:]) else "≥"}{f7} · vs prior 7 d', day_cols(CLOSED_N, [CLOSED_KNOWN] * len(DAYS))),
+             f'filed at least {f7} · vs prior 7 d', day_cols(CLOSED_N, [True] * len(DAYS)) if CLOSED_KNOWN else ''),
         tile('lanes', 'Lanes open', f'{OPEN}<small>of {PLAN}</small>{delta(OPEN, day_ago(1), None)}', f'{SPLIT["building"]} building · {FREE} free', stack(lane_parts(SPLIT), max(PLAN, OPEN), 'sb big')),
         tile('stuck', 'Stuck', f'{STUCK}{delta(STUCK, day_ago(2), False)}', (f'{SPLIT["blocked"]} blocked · oldest {old}' if stuck else 'vs 24 h ago'),
              stack([('s-blocked', SPLIT['blocked'], 'blocked'), ('s-decision', SPLIT['decision'], 'on a decision')], STUCK, 'sb big') + trend(2),
@@ -1029,7 +1072,7 @@ WAIT = [('blocked', 'Blocked'), ('decision', 'On a decision'), ('finished', 'Fin
 def wait_bars():  # every open lane in exactly one state; why it waits, in its own last words
     def row(l):
         t = esc(titles.get((l['home'], l['task'])) or l['task'])
-        why = f' · {esc(prose(l["text"])[:140])}' if l['state'] in ('blocked', 'decision', 'waiting') and l['text'] else ''
+        why = f' · {esc(prose(l["text"])[:140])}' if l['state'] in ('blocked', 'decision', 'waiting', 'validating') and l['text'] else ''
         return grow(t, f'{esc(hname(l["home"]))} · {dur(NOW_TS - l["since"])}' + (f' · {link("PR", l["pr"])}' if l['pr'] else '') + why)
     top = max(SPLIT.values())
     return ''.join(hbar(name, len(ls), f's-{s}', dur(NOW_TS - min(l['since'] for l in ls)) if ls else '',
@@ -1060,16 +1103,15 @@ def frame(svg, top, xlabels, h=150):
             f'<div class="xa" style="grid-template-columns:repeat({len(xlabels)},1fr)">{"".join(f"<span>{x}</span>" for x in xlabels)}</div></div></div>')
 def inout_chart():  # filed (in) beside closed (out) per local day
     top, w = nice_top(max(FILED_N + CLOSED_N + [1])), 1000 / len(DAYS)
-    svg = ''.join(f'<rect class="b in{"" if FILED_EXACT[i] else " fl"}" x="{i * w + w * .1:.1f}" y="{200 - f / top * 198:.1f}" width="{w * .38:.1f}" height="{f / top * 198:.1f}" vector-effect="non-scaling-stroke"/>'
-                  f'<rect class="b out" x="{i * w + w * .52:.1f}" y="{200 - c / top * 198:.1f}" width="{w * .38:.1f}" height="{c / top * 198:.1f}"/>'
+    svg = ''.join(f'<rect class="b in fl" x="{i * w + w * .1:.1f}" y="{200 - f / top * 198:.1f}" width="{w * .38:.1f}" height="{f / top * 198:.1f}" vector-effect="non-scaling-stroke"/>'
+                  + (f'<rect class="b out" x="{i * w + w * .52:.1f}" y="{200 - c / top * 198:.1f}" width="{w * .38:.1f}" height="{c / top * 198:.1f}"/>' if CLOSED_KNOWN else '')
                   for i, (f, c) in enumerate(zip(FILED_N, CLOSED_N)))
-    exact = all(FILED_EXACT)
-    lg = legend(('k in', f'In: filed{"" if exact else ", faded where at least"}'), ('k out', 'Out: closed' + ('' if CLOSED_KNOWN else ', some homes unknown')))
+    lg = legend(('k in', 'In: filed, always at least'), ('k out', 'Out: closed' if CLOSED_KNOWN else 'Out: unknown'))
     return lg + frame(svg, top, [('today' if d == TODAY else f'{d:%d}') if i % 2 else '' for i, d in enumerate(DAYS)])
 def recent():  # the latest merges, newest first
     rows = ''.join(item('', link(done_title.get((h, task)) or titles.get((h, task)) or task, url), esc(hname(h)), tm=when(at))
                    for url, (at, h, task) in sorted(merges.items(), key=lambda x: -x[1][0])[:6])
-    return f'<div class="rows">{rows}</div>' if rows else '<p class="note">No merge on record.</p>'
+    return '<p class="note">Recorded merges only; some may be missing.</p>' + (f'<div class="rows">{rows}</div>' if rows else '<p class="note">No merge on record.</p>')
 
 def tight_window(a):  # the limiting window, else the most used one
     return a['limit'] if a['limit'] and a['limit']['used'] is not None else max((w for w in a['windows'] if w['used'] is not None), key=lambda w: w['used'], default=None)
@@ -1080,7 +1122,7 @@ def quota_bars():  # every account read: its tightest window, soonest runout fir
         used = w['used'] if w else None
         used = None if a['problem'] else used
         tone = 'bad' if a['empty'] else 'warn' if runs_out(a) else 'mut' if used is None else 'ok'
-        right = ('used up' if a['empty'] else f'out {when(a["runout"].timestamp())}' if runs_out(a) else 'not read' if a['problem'] else
+        right = ('used up' if a['empty'] else f'out {when(a["runout"].timestamp())}' if runs_out(a) else 'unknown' if a['problem'] else
                  f'resets {when(w["reset"].timestamp())}' if w and w['reset'] else 'lasts')
         tick = f'<b style="left:{w["pace"]:.0f}%"></b>' if w and w['pace'] is not None and not a['empty'] else ''
         rows += (f'<div class="qb"><span class="qn">{esc(a["name"])}</span><span class="qt{" unk" if used is None and not a["empty"] else ""}">'
@@ -1211,12 +1253,11 @@ METRICS = [  # each number's one definition: id, name, what it counts, source, w
     ('asks', 'Waiting on you', "each row of Main's ask list, and nothing else", "Main's ask list", 'now', 'every build'),
     ('landed', 'Landed', 'pull requests the fleet recorded as merged, each once, on the day of its first merge record',
      "each lead's merge lines in Main's records; Main's own merges from its fleet ledger",
-     f"local days from midnight (UTC{OFF[:3]}:{OFF[3:]}); today so far against yesterday up to the same time. Main's merges are on record only since "
-     + (when(ledger_from) if ledger_from else 'its fleet ledger starts') + ', so earlier days read at least', 'every build'),
+     f"local days from midnight (UTC{OFF[:3]}:{OFF[3:]}); always at least: recording can be disabled or records unreadable", 'every build'),
     ('closed', 'Closed', 'backlog items marked done, merged or reported, on the day they closed', "each home's backlog and its done archive",
      'the last 7 local days, today so far, against the 7 days before', 'every build'),
     ('filed', 'Filed', 'backlog items on the day they were filed', "each home's open items, plus a log that keeps each filing day after the item closes",
-     f'local days; a day the log did not watch from its midnight reads at least (watching since {when(filed_since)})', 'every build'),
+     'local days; always at least: items filed and closed between readings can be missed; a failed backlog read breaks coverage', 'every build'),
     ('lanes', 'Lanes open', 'ship and scout lanes, each in one state by its last status line', "each home's lane records",
      'now, against the lane plan; compared with the sample nearest 24 hours ago', 'every build; sampled every 10 minutes, kept 8 days'),
     ('stuck', 'Stuck', 'lanes blocked or waiting on a decision; age from the oldest one\'s last status', "each home's lane records",
@@ -1224,7 +1265,7 @@ METRICS = [  # each number's one definition: id, name, what it counts, source, w
     ('ready', 'Ready', 'queued items neither held nor waiting on another item', "each home's backlog",
      'now; compared with the sample nearest 24 hours ago', 'every build; sampled every 10 minutes, kept 8 days'),
     ('quota', 'Quota runs out', "the soonest account projected to run out before its window resets; each bar is that account's tightest window, the mark is even pace",
-     'quota-axi, never refreshing a login', 'now', f'every {QUOTA_TTL // 60} minutes' + (f'; last read <!--at:{int(q_at)}--> ago' if q_at else '')),
+     'local quota cache only; unavailable runway is unknown', 'reading no older than 5 minutes', 'every build' + (f'; last read <!--at:{int(q_at)}--> ago' if q_at else '')),
     ('leads', 'Lead state', 'what each lead home last published about itself; silent after 15 minutes without a new one',
      "each home's own summary, and Main's view of which leads are not running", 'now', 'every build'),
     ('machine', 'Machine and devices', 'free memory, memory pressure, heavy jobs, Gradle builds, emulators and who holds each device', 'this host and adb, read-only',
@@ -1257,6 +1298,7 @@ def measure_body():
 '''
 
 # The pages, rendered after every source so each shell shows the full trust line.
+notes = [(s, prose(r)) for s, r in notes]
 pages = {'index.html': page('index', 'Fleet', index_body('action'), unknown_foot('backlog', 'herdr', 'quota', 'merge', 'closed', 'home summary')),
          'backlog.html': page('backlog', 'Fleet backlog', backlog_body('action'), unknown_foot('backlog', 'herdr', 'lane')),
          'backlog.home.html': page('backlog', 'Fleet backlog', backlog_body('home'), unknown_foot('backlog', 'herdr', 'lane')),

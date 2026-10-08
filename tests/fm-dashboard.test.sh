@@ -120,9 +120,10 @@ EOF
   mkdir -p "$home/state/dashboard"
   printf '%s\t5\t4\t0\n' "$((now - 86400))" > "$home/state/dashboard/history.tsv"
   # Quota: Codex runs out in 2 h, before its 5-hour window resets in 4 h; Claude has room.
-  printf '{"schemaVersion":6,"providers":[{"provider":"codex","state":{"status":"fresh"},"windows":[{"id":"5h","label":"5 hours","percentRemaining":20,"resetsAt":"%s"}],"quotaSemantics":{"effectiveAvailability":[{"scope":"all_models","runway":{"status":"projected_exhaustion","projectedExhaustedAt":"%s","limitingWindowId":"5h"}}]}},{"provider":"claude","state":{"status":"fresh"},"windows":[{"id":"7d","label":"7 days","percentRemaining":90,"resetsAt":"%s"}]}]}\n' \
+  printf '{"schemaVersion":6,"providers":[{"provider":"codex","state":{"status":"fresh"},"windows":[{"id":"5h","label":"5 hours","percentRemaining":20,"resetsAt":"%s"}],"quotaSemantics":{"effectiveAvailability":[{"scope":"all_models","runway":{"status":"projected_exhaustion","projectedExhaustedAt":"%s","limitingWindowId":"5h"}}]}},{"provider":"claude","state":{"status":"fresh"},"windows":[{"id":"7d","label":"7 days","percentRemaining":90,"resetsAt":"%s"}],"quotaSemantics":{"effectiveAvailability":[{"scope":"all_models","runway":{"status":"through_reset"}}]}}]}\n' \
     "$(iso -4)" "$(iso -2.05)" "$(iso -72)" > "$home/quota.json"
-  printf '#!/bin/sh\n[ -e "%s/quota.fail" ] && { echo "no account set up" >&2; exit 1; }\ncat "%s/quota.json"\n' "$home" "$home" > "$stubs/quota-axi"
+  jq --argjson at "$now" '{at:$at,data:.}' "$home/quota.json" > "$home/state/dashboard/.quota.json"
+  printf '#!/bin/sh\necho called > "%s/quota.called"\nexit 1\n' "$home" > "$stubs/quota-axi"
   # Agents: a busy lead, a busy Main, one busy and one idle worker, one busy unknown agent, and a parked-home worker.
   cat > "$home/herdr.json" <<EOF
 {"result":{"agents":[
@@ -165,12 +166,12 @@ test_overview_answers_the_four_questions_with_sums_that_add_up() {
   done
   # Chips name each spot with a number and an age; tiles compare with yesterday and the sample a day ago.
   has "$d/index.html" "Nothing needs you. ✕ 2 stuck 2 h ▲ 1 to land 30 min ▲ 1 held for triage 7 d ▲ 1 idle with ready work today" \
-    "Landed today 2 +2" "Closed 7 d 2 +2" "Lanes open 8 of 9 +3 3 building · 1 free" "Stuck 2 -2 1 blocked · oldest 2 h" \
+    "Landed today at least 2" "Closed 7 d 2 +2" "Lanes open 8 of 9 +3 3 building · 1 free" "Stuck 2 -2 1 blocked · oldest 2 h" \
     "Quota runs out 2 h" "Codex before its reset" "Codex out" "Claude resets"
   # Each lane is in one state and each queued item has one reason, summing to their totals.
   has "$d/index.html" "Blocked 1 2 h" "On a decision 1 1 h" "Finished, not landed 1 30 min" "Validating or CI 1 20 min" \
     "Waiting on other 1 40 min" "Building 3 10 min" "Queued 1 + 1 + 1 + 0 + 1 = 4" \
-    "Ship the main thing Main" "Ship the zephyrine thing zephyrine" "Main 7 of 6 1 1 1 zephyrine 1 of 3 1 1 1" \
+    "Ship the main thing Main" "Ship the zephyrine thing zephyrine" "Main 7 of 6 1 at least 1 1 zephyrine 1 of 3 1 at least 1 1" \
     "beta is parked by the captain and left out of every total."
   # The busy parts sum to the busy total, and the denominator is every running Herdr agent
   # outside parked homes (6 listed, 1 in parked beta), not the lane plan of 9.
@@ -226,12 +227,12 @@ test_each_failed_source_shows_unknown_and_why() {
   has "$d/backlog.html" "Queued work unknown." "main: tasks-axi: backlog unreadable" "At least 0 items held; the backlog of Main, zephyrine is unknown." "Agents unknown."
   has "$d/measure.html" "backlog main: tasks-axi: backlog unreadable"
   lacks "$d/backlog.html" "Queued 0" "No item is held" "0 busy"
-  # A failed quota read shows the last reading under an hour old, and says when it was taken; with none, unknown.
-  touch "$home/quota.fail"
   jq '.at -= 600' "$d/.quota.json" > "$home/q.json" && mv "$home/q.json" "$d/.quota.json"
   build "$home"
-  has "$d/index.html" "Quota runs out 2 h" "Codex before its reset"
-  has "$d/measure.html" "quota-axi no account set up; showing the reading from"
+  has "$d/index.html" "Quota runs out unknown"
+  has "$d/measure.html" "quota-axi no recent local quota reading"
+  [ ! -e "$home/quota.called" ] || fail "page build collected quota"
+  jq -e '.since == null and .last == null' "$d/filed.json" >/dev/null || fail "failed backlog read advanced filing coverage"
   rm "$d/.quota.json" "$home/mates/zephyrine/state/home-summary.json"
   build "$home"
   has "$d/index.html" "Quota runs out unknown" "▲ 1 lead to check" "zephyrine State unknown"
@@ -387,15 +388,76 @@ test_fleet_past_twenty_mates_keeps_every_lead_row() {
   has "$d/index.html" "✕ 1 lead down" "mate24 Silent 1 h" "mate25 Not running"
   python3 - "$d/index.html" <<'PY' || fail "a mate past the twentieth lost its lead state"
 import html, re, sys
-text = re.sub(r'\s+', ' ', html.unescape(re.sub(r'<[^>]+>', ' ', open(sys.argv[1]).read())))
+homes = open(sys.argv[1]).read().split('<div class="hrs">', 1)[1]
+text = re.sub(r'\s+', ' ', html.unescape(re.sub(r'<[^>]+>', ' ', homes)))
 for mate in ('mate01', 'mate23'):
     i = text.find(mate)
     assert i >= 0, mate
-    assert 'Records need tidy-up' in text[i:i + 200], mate
+    assert 'Runtime unknown' in text[i:i + 200], text[i:i + 200]
 PY
   pass "a fleet past twenty mates keeps every lead row"
 }
 
+test_review_evidence_boundaries() {
+  local home d z now today key
+  home=$(make_home review)
+  d="$home/state/dashboard" z="$home/mates/zephyrine"
+  now=$(date +%s) today=$(date +%F)
+  printf 'backend = "markdown"\n[markdown]\narchive = "data/custom-done.md"\n' > "$home/.tasks.toml"
+  printf -- '- [x] archived - Archived completion (done %s)\n' "$today" > "$home/data/custom-done.md"
+  lane "$home" m-ci ship "blocked [at=$now] [key=checks]: CI failed: approve config/release.json instead of config/staging.json https://github.com/acme/alpha/pull/22"
+  python3 - "$home/data/backlog.md" <<'PY'
+import pathlib, sys
+p = pathlib.Path(sys.argv[1])
+p.write_text(p.read_text().replace('needs his call', 'Approve config/release.json instead of config/staging.json'))
+PY
+  summary "$home" no_active_work "$((now - 3600))" '"endpoints":[{"id":"zephyrine","endpoint":{"exists":false}}]'
+  rm "$home/state/zephyrine.status"
+  mkdir "$home/state/zephyrine.status"
+  build "$home"
+  has "$d/index.html" "Closed 7 d 3" "Landed today at least 1" "Recorded merges only; some may be missing." "In: filed, always at least" \
+    "CI failed: approve release.json instead of staging.json PR 22"
+  lacks "$d/index.html" "Not running" "lead down" "config/release.json" "https://github.com/acme/alpha/pull/22" "Landed today 1"
+  for p in backlog backlog.home; do
+    has "$d/$p.html" "CI failed: approve release.json instead of staging.json PR 22" "Approve release.json instead of staging.json"
+    lacks "$d/$p.html" "config/release.json" "[key=checks]"
+  done
+  has "$d/measure.html" "always at least: recording can be disabled" "always at least: items filed and closed between readings"
+  jq '.providers = [{provider:"cursor",state:{status:"fresh"},quotaSemantics:{status:"unknown"}},{provider:"copilot",state:{status:"auth_required"}}]' "$home/quota.json" |
+    jq --argjson at "$now" '{at:$at,data:.}' > "$d/.quota.json"
+  build "$home"
+  has "$d/index.html" "Quota runs out unknown" "Cursor unknown" "Copilot unknown"
+  lacks "$d/index.html" "Quota runs out none" "lasts"
+  jq '.providers = [.providers[0] + {accountKey:"work"}, .providers[0] + {accountKey:"personal",quotaSemantics:{effectiveAvailability:[{scope:"all_models",runway:{status:"through_reset"}}]}}]' "$home/quota.json" |
+    jq --argjson at "$now" '{at:$at,data:.}' > "$d/.quota.json"
+  build "$home"
+  has "$d/index.html" "Codex · work before its reset" "Codex · work out" "Codex · personal resets"
+  summary "$home" no_active_work "$now" '"endpoints":[]'
+  printf '{"result":{"agents":[]}}\n' > "$home/herdr.json"
+  build "$home"
+  has "$d/index.html" "zephyrine Runtime unknown"
+  lacks "$d/index.html" "lead down"
+  summary "$home" no_active_work "$now" '"endpoints":[{"id":"zephyrine","endpoint":{"exists":false}}]'
+  build "$home"
+  has "$d/index.html" "zephyrine Not running" "lead down"
+  printf -- '- zephyrine - remote (host: distant; root: /srv; home: %s; scope: work; projects: alpha; added 2026-07-11)\n' "$z" > "$home/data/secondmates.md"
+  key=$(printf 'zephyrine\ndistant\n%s\n' "$z" | sha256sum | cut -d' ' -f1)
+  mkdir "$home/state/secondmate-summary-cache"
+  jq '.state="externally_held" | .hold_classifier_schema="fm-captain-hold-buckets.v1"' "$z/state/home-summary.json" > "$home/state/secondmate-summary-cache/$key.json"
+  build "$home"
+  has "$d/index.html" "zephyrine Waiting on someone else" "Closed 7 d unknown" "Out: unknown"
+  lacks "$d/index.html" "Not running" "Start the zephyrine thing" "Ship the zephyrine thing"
+  rm "$home/state/secondmate-summary-cache/$key.json"
+  build "$home"
+  has "$d/index.html" "zephyrine State unknown"
+  printf 'backend = "beads"\n' > "$home/.tasks.toml"
+  build "$home"
+  has "$d/index.html" "Closed 7 d unknown" "Out: unknown"
+  [ ! -e "$home/quota.called" ] || fail "page build collected quota"
+  pass "dashboard preserves lower bounds, route ownership, configured archives, runway uncertainty and wait reasons"
+}
+
+test_review_evidence_boundaries
 test_overview_answers_the_four_questions_with_sums_that_add_up
 test_backlog_and_method_pages_show_their_numbers
 test_fleet_past_twenty_mates_keeps_every_lead_row
