@@ -614,10 +614,12 @@ The flag is a home-local supervision-noise preference and is not inherited by se
 
 ## Gate defaults (.no-mistakes.yaml)
 
-The tracked `.no-mistakes.yaml` sets `test.evidence.store_in_repo: true` and pins `commands.lint` to `bin/fm-lint.sh`, the same owner CI invokes.
-Storing evidence in the repo publishes each run's test artifacts to the orphan `no-mistakes/evidence` branch and links them from the PR body, instead of keeping them on local disk under the no-mistakes home.
+The tracked `.no-mistakes.yaml` sets `test.evidence.store_in_repo: false` and `test.evidence.attach_media: false`, and pins `commands.lint` to `bin/fm-lint.sh`, the same owner CI invokes.
+These evidence settings disable publication to the orphan `no-mistakes/evidence` branch and media attachments, but referenced text artifacts are still inlined into this public repository's PR bodies.
+The [Test instructions in `.no-mistakes.yaml`](../.no-mistakes.yaml) own the permitted evidence content and privacy restrictions; local artifact storage does not make referenced text private.
+Changing these settings does not delete previously published evidence.
 
-That branch shares no history with code branches, so evidence never enters a pushed feature branch or the default branch; the worktree's `.no-mistakes/` stays local and CI rejects tracked entries under that path.
+The worktree's `.no-mistakes/` stays local and CI rejects tracked entries under that path.
 The [`firstmate-coding-guidelines` skill](../.agents/skills/firstmate-coding-guidelines/SKILL.md#no-mistakes-test-configuration) owns why `commands.test` stays absent and targeted validation belongs to the evidence path.
 
 `commands.test` executes code, so no-mistakes honors it only from the default-branch copy of `.no-mistakes.yaml`; a pushed branch cannot change what the gate runs.
