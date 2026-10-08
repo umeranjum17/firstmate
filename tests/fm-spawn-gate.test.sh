@@ -124,6 +124,8 @@ EOF
 # spawn through and clears the record.
 test_host_memory_pressure_refuses_launches() {
   local home=$TMP_ROOT/memory proc out status
+  local FM_HOST_MEMORY_CGROUP_ROOT=$home/missing-cgroup
+  export FM_HOST_MEMORY_CGROUP_ROOT
   make_home "$home"
   proc=$home/proc
   mkdir -p "$proc/pressure"
