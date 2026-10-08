@@ -16,6 +16,15 @@
 # XDG_DATA_HOME, XDG_STATE_HOME, and XDG_CACHE_HOME in a short private /tmp/fhl.*
 # directory recorded by <session>.xdg-root in the lab state directory.
 # Teardown removes both the directory and pointer without copying credentials.
+# Runtime clears exported CLAUDE_*, ANTHROPIC_*, OPENAI_API_KEY,
+# PI_CODING_AGENT_DIR, and CODEX_HOME, then sets CLAUDE_CONFIG_DIR,
+# PI_CODING_AGENT_DIR, and CODEX_HOME to home/.claude, home/.pi/agent,
+# and home/.codex under that root.
+# State and disposable directories must be owned, non-symlink, and mode 700;
+# the owned, non-symlink .xdg-root pointer must name /tmp/fhl.<six alphanumerics>
+# with a non-symlink .lab-session file matching the session name.
+# Legacy <session>.xdg roots are refused pending guarded cleanup and fresh provisioning.
+# docs/herdr-backend.md#destructive-lab-safety owns the isolation boundary.
 # --isolated-xdg and FM_HERDR_LAB_ISOLATED_XDG=1 remain accepted for compatibility.
 # The fleet-state tripwire reads with the caller's HOME and XDG environment.
 # FM_HERDR_LAB_FLEET_HOME selects only the existing absolute fleet home for

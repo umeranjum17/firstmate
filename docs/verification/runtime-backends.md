@@ -1183,7 +1183,7 @@ No ambient `herdr server stop` command is a supported test operation.
 Verified 2026-10-08 on Linux with Herdr 0.9.1 (protocol 22): a real pane created through the guarded lab helper reported disposable HOME and config/data/state/cache XDG paths, wrote a tool marker only into its disposable `$HOME/.local/bin`, and retained no inherited credential directories.
 The existing restored-shell journey also passed, and teardown removed the disposable root with the default-session tripwire unchanged.
 The short root kept the observed named-session socket at 86 bytes with a maximum-length generated label, and a real foreground viewer started and stopped successfully in the same disposable environment.
-This is environment isolation, not an operating-system filesystem sandbox. Runtime HOME always belongs to the lab, including when FM_HERDR_LAB_FLEET_HOME selects a different home for read-only fleet observation. Claude, Pi, and Codex credential roots belong to scratch HOME; inherited Claude/Anthropic environment overrides and OPENAI_API_KEY are removed. Prepare-based adapter tests enter the same runtime environment before startup and subsequent operations, including restarts; cleanup restores the original HOME/XDG context only for the fleet tripwire. State must be owned, non-symlink, and mode 700; persisted roots must be private /tmp/fhl.* directories carrying the matching session identity. Legacy .xdg roots and roots without that identity are refused pending guarded cleanup and fresh provisioning; no signed-in runtime opt-in is supported.
+The isolation boundary is owned by [Destructive lab safety](../herdr-backend.md#destructive-lab-safety); the helper's header and `--help` own exact runtime variables and private-root checks.
 Refresh the evidence with:
 
 ```sh
@@ -1879,7 +1879,8 @@ process-info  Show pane process information
 
 This proves subcommand presence in the client only, not the server response shape, which is measured only on 0.9.0 above.
 
-The live guard that refreshes this record runs by default wherever Herdr and Pi are installed, spends no model token, and fails naming both versions:
+The live guard that refreshes this record runs by default wherever Herdr and Pi are installed, spends no model token, and fails naming both versions.
+It installs the non-credential Herdr Pi integration into the disposable Pi resource root before launching Pi, without depending on the owner's extensions or configuration:
 
 ```sh
 tests/fm-herdr-pi-stale-registration-live-e2e.test.sh
