@@ -435,10 +435,10 @@ PY
 }
 
 test_review_evidence_boundaries() {
-  local home d z now today key
+  local home d z now today key old
   home=$(make_home review)
   d="$home/state/dashboard" z="$home/mates/zephyrine"
-  now=$(date +%s) today=$(date +%F)
+  now=$(date +%s) today=$(date +%F) old=$(iso 1)
   printf 'backend = "markdown"\n[markdown]\narchive = "data/custom-done.md"\n' > "$home/.tasks.toml"
   printf -- '- [x] archived - Archived completion (done %s)\n' "$today" > "$home/data/custom-done.md"
   lane "$home" m-ci ship "blocked [at=$now] [key=checks]: CI failed: approve config/release.json instead of config/staging.json https://github.com/acme/alpha/pull/22"
@@ -463,9 +463,12 @@ PY
   build "$home"
   has "$d/index.html" "Quota runs out unknown" "Cursor unknown" "Copilot unknown"
   lacks "$d/index.html" "Quota runs out none" "lasts"
-  jq '.providers = [.providers[0] + {label:"Codex · work"}, (.providers[0] + {label:"Codex · personal"} | .windows[0].percentUsed=10)]' "$home/quota.json" > "$home/.cache/quota-axi/quotas.json"
+  jq --arg old "$old" --arg reset "$(iso -10)" '.providers = [(.providers[0] + {label:"Codex · work"} | .state.refreshedAt=$old), (.providers[0] + {label:"Codex · personal"} | .windows=[(.windows[0] + {percentUsed:0}),(.windows[0] + {percentUsed:80,windowSeconds:360000,resetsAt:$reset})])]' "$home/quota.json" > "$home/.cache/quota-axi/quotas.json"
   build "$home"
-  has "$d/index.html" "Codex · work before its reset" "Codex · work out" "Codex · personal resets"
+  has "$d/index.html" "Codex · work before its reset" "Codex · work out" "Codex · personal resets" "across accounts"
+  jq -e --arg old "$old" '.metrics.quota.read_at == ($old | fromdateiso8601) and .metrics.quota.read_at_latest > .metrics.quota.read_at and .quota_accounts[1].limit == null and .quota_accounts[1].status == "through_reset"' "$d/data.json" >/dev/null || fail "quota limits or aggregate source times are wrong"
+  grep -q 'Codex · personal</span>.*width:80%' "$d/index.html" || fail "quota bar hid the most-used non-exhausting window"
+  grep -q "Codex · work before its reset · as of .*$(date -d "$old" '+%H:%M')" "$d/index.html" || fail "headline used the cache time instead of the limiting account time"
   summary "$home" no_active_work "$now" '"endpoints":[]'
   printf '{"result":{"agents":[]}}\n' > "$home/herdr.json"
   build "$home"
@@ -490,10 +493,10 @@ PY
   [ ! -e "$home/quota.called" ] || fail "page build collected quota"
   rm "$home/.tasks.toml"
   : > "$home/data/secondmates.md"
-  printf '\n## Queued\n- [ ] vendor - Vendor access (since %s) (hold: waiting for vendor credentials) (hold-kind: external)\n' "$today" >> "$home/data/backlog.md"
+  printf '\n## In flight\n- [ ] flight-call - Flight call (hold: choose flight scope) (hold-kind: captain)\n\n## Queued\n- [ ] expired-call - Expired call (hold: choose deferred scope) (hold-kind: captain) (hold-until: %s)\n- [ ] vendor - Vendor access (since %s) (hold: waiting for vendor credentials) (hold-kind: external)\n' "$(date -d yesterday +%F)" "$today" >> "$home/data/backlog.md"
   build "$home"
-  for p in index backlog backlog.home; do has "$d/$p.html" "waiting for vendor credentials"; done
-  jq -e 'any(.held_items[]; .reason == "waiting for vendor credentials")' "$d/data.json" >/dev/null || fail "external hold reason absent from export"
+  for p in index backlog backlog.home; do has "$d/$p.html" "waiting for vendor credentials" "choose flight scope" "choose deferred scope"; done
+  jq -e '(.held_items | length) == 4 and ([.held_items[].title] | unique | length) == 4 and any(.held_items[]; .reason == "waiting for vendor credentials")' "$d/data.json" >/dev/null || fail "hold union lost calls or double-counted items"
   pass "dashboard preserves lower bounds, route ownership, configured archives, runway uncertainty and wait reasons"
 }
 
@@ -562,12 +565,7 @@ test_new_lane_and_unwritten_archive_stay_exact() {
     fail "a lane with no status line or an archive not yet written made a number unknown: $(jq -c '.metrics.lanes, .metrics.closed | del(.daily)' "$d/data.json")"
   has "$d/index.html" "Closed 7 d 2"
   mkfifo "$home/state/m-vanishing.meta"
-  python3 - "$home/state/m-vanishing.meta" <<'PY' &
-import os, sys
-with open(sys.argv[1], 'w') as f:
-    f.write('kind=ship\nproject=alpha\n')
-    os.unlink(sys.argv[1])
-PY
+  (printf 'kind=ship\nproject=alpha\n'; rm "$home/state/m-vanishing.meta") > "$home/state/m-vanishing.meta" &
   local writer=$!
   build "$home"
   wait "$writer" || fail "vanishing metadata fixture failed"

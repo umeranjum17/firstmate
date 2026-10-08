@@ -466,10 +466,10 @@ def bl(h, cls=None, state=None):
 bl_known = all(backlog.get(h) is not None for h in ACTIVE)
 backlog_read_at = time.time()
 QUEUE = {c: sum(len(bl(h, c)) for h in ACTIVE) for c in ('ready', 'held', 'waiting')} if bl_known else None
-held_cap = sorted(((h, r) for h in ACTIVE for r in backlog.get(h) or []
-                   if r.get('hold_kind') == 'captain' and r.get('state') != 'done'),
-                  key=lambda x: (x[1]['day'] or TODAY, x[0]))
-held_all = sorted(((h, r) for h in ACTIVE for r in bl(h, 'held')), key=lambda x: (x[1]['day'] or TODAY, x[0]))
+held_all = {r['id']: (h, r) for h in ACTIVE for r in bl(h, 'held') if r.get('hold_kind') != 'captain'}
+held_all.update({r['id']: (h, r) for h in ACTIVE for r in backlog.get(h) or [] if r.get('hold_kind') == 'captain' and r.get('state') != 'done'})
+held_all = sorted(held_all.values(), key=lambda x: (x[1]['day'] or TODAY, x[0]))
+held_cap = [(h, r) for h, r in held_all if r.get('hold_kind') == 'captain']
 titles = {(h, r['id']): r['title'] for h in home_dir for r in backlog.get(h) or []}
 could = {h: min(max(0, plan(h) - len(by_home[h])), len(bl(h, 'ready'))) if h not in lane_err else 0 for h in ACTIVE}
 
@@ -618,14 +618,16 @@ for p in (qdata or {}).get('providers') or []:
         status = 'unknown' if not valid else 'exhausted_now' if used == 100 else 'projected_exhaustion' if out and out < reset else 'through_reset'
         wins.append(dict(id=w.get('id'), label=str(w.get('label') or w.get('id')), used=used,
                          pace=100 * elapsed / span if valid else None, reset=reset, runout=out, status=status))
-    limit = min(wins, key=lambda w: (w['status'] != 'exhausted_now', w['status'] != 'projected_exhaustion', w['runout'] or at), default=None)
+    limit = min((w for w in wins if w['status'] in ('exhausted_now', 'projected_exhaustion')), key=lambda w: (w['status'] != 'exhausted_now', w['runout']), default=None)
     problem = str(st.get('status') or 'state unknown').replace('_', ' ') if st.get('status') not in ('fresh', 'stale') else None
     if not wins or any(w['status'] == 'unknown' for w in wins): problem = problem or 'runway unknown'
-    accounts.append(dict(name=clean(p.get('label') or str(p.get('provider')).title()), status=limit['status'] if limit else 'unknown',
+    accounts.append(dict(name=clean(p.get('label') or str(p.get('provider')).title()), status=limit['status'] if limit else 'unknown' if problem else 'through_reset',
                          runout=limit['runout'] if limit else None, limit=limit, windows=wins, read_at=at.timestamp(),
-                         problem=problem, empty=not problem and limit['status'] == 'exhausted_now'))
+                         problem=problem, empty=not problem and limit is not None and limit['status'] == 'exhausted_now'))
 def runs_out(a): return a['status'] == 'projected_exhaustion' and not a['problem']
 running_out = sorted((a for a in accounts if runs_out(a)), key=lambda a: a['runout'])
+quota_times = sorted({a['read_at'] for a in accounts})
+quota_stamp = f'as of {esc(when(quota_times[0]))}' + (f' through {esc(when(quota_times[-1]))} across accounts' if len(quota_times) > 1 else '') if quota_times else 'not read'
 
 # --- agents: the Herdr state the muxr app reads -------------------------
 agents = None
@@ -1076,8 +1078,8 @@ def trend(col):  # one point per hour over 7 days from the sampled history, brok
         if pts[k] < 0: prev = None; continue
         d += f'{"L" if prev is not None and k - prev <= 2 else "M"}{k / 168 * 1000:.0f},{38 - pts[k] / top * 36:.1f}'; prev = k
     return f'<svg class="tsp" viewBox="0 0 1000 40" preserveAspectRatio="none" aria-hidden="true"><path class="ln" d="{d}" vector-effect="non-scaling-stroke"/></svg>' if 'L' in d else ''
-def tile(mid, label, value, foot, art='', tone=''):  # a tap opens the number's definition
-    if mid == 'quota' and q_at: foot += f' · as of {esc(when(q_at))}'
+def tile(mid, label, value, foot, art='', tone='', at=None):  # a tap opens the number's definition
+    if mid == 'quota': foot += f' · {quota_stamp if at is None else "as of " + esc(when(at))}'
     return (f'<a class="tile{" t-" + tone if tone else ""}" href="measure#m-{mid}"><span class="tl">{label}</span>'
             f'<span class="tv">{value}</span>{art}<span class="ta">{foot}</span></a>')
 def tiles():
@@ -1086,7 +1088,7 @@ def tiles():
     if qdata is None: q = tile('quota', 'Quota runs out', unknown(why_of('quota-axi')), '')
     elif any(a['empty'] for a in accounts):
         a = next(a for a in accounts if a['empty'])
-        q = tile('quota', 'Quota runs out', 'used up', esc(a['name']), tone='bad')
+        q = tile('quota', 'Quota runs out', 'used up', esc(a['name']), tone='bad', at=a['read_at'])
     elif running_out:
         a = running_out[0]
         w = tight_window(a)
@@ -1094,7 +1096,7 @@ def tiles():
                + (f'<b style="left:{w["pace"]:.0f}%"></b>' if w['pace'] is not None else '') + '</span>') if w else ''
         q = tile('quota', 'Quota runs out', f'{dur(a["runout"].timestamp() - NOW_TS)}', f'{esc(a["name"])} before its reset'
                  + (f' · {len(running_out) - 1} more' if len(running_out) > 1 else '')
-                 + (' · others unknown' if any(a['problem'] for a in accounts) else ''), bar, 'warn')
+                 + (' · others unknown' if any(a['problem'] for a in accounts) else ''), bar, 'warn', at=a['read_at'])
     elif not accounts or any(a['problem'] for a in accounts): q = tile('quota', 'Quota runs out', unknown('runway unavailable for some accounts'), '')
     else: q = tile('quota', 'Quota runs out', '<span class="okv">none</span>', f'{sum(a["empty"] for a in accounts)} used up · {len(accounts)} read')
     return '<div class="tiles">' + ''.join([
@@ -1133,11 +1135,11 @@ if not LANES_KNOWN: QREASONS.append(('Ready, capacity unknown', {h: len(bl(h, 'r
 def held_reasons(rows): return ''.join(grow(esc(r['title']), esc(hname(h) + ': ' + prose(r.get('hold_reason') or 'no reason recorded'))) for h, r in rows)
 def queue_bars():
     if QUEUE is None: return f'<p class="lede">{unknown(why_of("backlog"))}</p>' + held_reasons(held_all)
-    top = max(sum(v.values()) for _, v, _ in QREASONS)
-    return (''.join(hbar(n, sum(v.values()), cls, '', ''.join(grow(esc(hname(h)), '', c) for h, c in sorted(v.items(), key=lambda x: (-x[1], x[0])) if c)
-                        + (held_reasons((h, r) for h, r in held_all if (r.get('hold_kind') == 'captain') == (n == 'Held for the captain')) if n.startswith('Held') else ''), top)
+    top = max([sum(v.values()) for _, v, _ in QREASONS] + [len(held_all)])
+    return (''.join(hbar(n, sum(v.values()), cls, '', ''.join(grow(esc(hname(h)), '', c) for h, c in sorted(v.items(), key=lambda x: (-x[1], x[0])) if c), top)
                     for n, v, cls in QREASONS)
-            + f'<div class="gtot"><span class="k">Queued</span><span class="sum">{" + ".join(str(sum(v.values())) for _, v, _ in QREASONS)} = <b>{sum(QUEUE.values())}</b></span></div>')
+            + f'<div class="gtot"><span class="k">Queued</span><span class="sum">{" + ".join(str(sum(v.values())) for _, v, _ in QREASONS)} = <b>{sum(QUEUE.values())}</b></span></div>'
+            + hbar('Captain calls and queued holds', len(held_all), 's-decision', '', held_reasons(held_all), top))
 
 def nice_top(v):  # a round axis top at or above v
     m = 10 ** math.floor(math.log10(max(v, 1)))
@@ -1182,7 +1184,6 @@ def index_body(group):
     n_asks = len(asks)
     h1 = 'Nothing needs you.' if asks_known and not asks else f'{plural(n_asks, "thing")} {"needs" if n_asks == 1 else "need"} you.' if asks_known else 'Ask list unknown.'
     tone = 'ok' if asks_known and not asks else 'warn' if asks_known else 'mut'
-    q_age = f'as of {esc(when(q_at))}' if q_at else 'not read'
     return f'''
 <div class="hero ov">
 <h1><span class="hd c-{tone}"></span>{h1}</h1>
@@ -1195,7 +1196,7 @@ def index_body(group):
 {card("Why work is queued", "queued items by reason · tap for each home", queue_bars(), more=("backlog", "Backlog"))}
 {card("In vs out", "backlog items per local day, 14 days", inout_chart(), "wide")}
 {card("Landed recently", "pull requests merged, newest first", recent())}
-{card("Quota runway", f"tightest window per account · even-pace mark · {q_age}", quota_bars() if qdata is not None else f'<p class="lede">{unknown(why_of("quota-axi"))}</p>')}
+{card("Quota runway", f"tightest window per account · even-pace mark · {quota_stamp}", quota_bars() if qdata is not None else f'<p class="lede">{unknown(why_of("quota-axi"))}</p>')}
 {card("Homes", "lanes now · landed today · closed 7 days", home_rows(), "wide", ("backlog", "Backlog"), "homes")}
 <section class="card wide" id="devices"><div class="ch"><h3>Devices and machine</h3></div><p class="cw">now</p><div class="devm"><div>{devices_list(group)}</div><div class="mach">{machine_rows}</div></div></section>
 </div>
@@ -1230,7 +1231,7 @@ def backlog_body(group):
         band = lambda r: 'Over 3 days' if r['day'] and (TODAY - r['day']).days > 3 else '1 to 3 days' if r['day'] and (TODAY - r['day']).days >= 1 else 'Today or unknown'
         hgroups = [(b, sum(band(r) == b for _, r in held_all), ''.join(held_row(h, r) for h, r in held_all if band(r) == b), '', None, True)
                    for b in ('Over 3 days', '1 to 3 days', 'Today or unknown') if any(band(r) == b for _, r in held_all)]
-    held = (glist(hgroups, 'Held queued items') if held_all else '<p class="note">No queued item is held in any home record.</p>' if bl_known else '')
+    held = (glist(hgroups, 'Unresolved captain calls and queued holds') if held_all else '<p class="note">No unresolved captain call or queued hold in any home record.</p>' if bl_known else '')
     unread = [hname(h) for h in ACTIVE if backlog.get(h) is None]
     held_h2 = (f'{plural(len(held_all), "item")} held' + (f'; oldest {days_old(held_all[0][1]["day"])}' if held_all and held_all[0][1]['day'] else '') + '.'
                if bl_known else f'At least {plural(len(held_all), "item")} held; the backlog of {", ".join(unread)} is unknown.')
@@ -1262,7 +1263,7 @@ def backlog_body(group):
 </section>
 <div class="stack">
 <section id="held">
-{sh("Held queued items · in home records, oldest first")}
+{sh("Captain calls and queued holds · in home records, oldest first")}
 <h2>{held_h2}</h2>
 {held}
 </section>
@@ -1313,7 +1314,7 @@ METRICS = [  # each number's one definition: id, name, what it counts, source, w
     ('ready', 'Ready', 'queued items neither held nor waiting on another item', "each home's backlog",
      'now; compared with the sample nearest 24 hours ago', 'every build; sampled every 10 minutes, kept 8 days'),
     ('quota', 'Quota runs out', "even pace per window: elapsed = windowSeconds minus time until resetsAt at the reading; exhaustion = reading time plus (100 − percentUsed) × elapsed / percentUsed. All three fields must be present, with positive elapsed time inside the window; otherwise runway is unknown. Zero use lasts through reset. Each mark is elapsed share of the window; projections are estimates",
-     'quota-axi cache ~/.cache/quota-axi/quotas.json, read-only; unavailable runway is unknown', 'as of each provider reading, retained when old', 'every build' + (f'; as of {when(q_at)}' if q_at else '')),
+     'quota-axi cache ~/.cache/quota-axi/quotas.json, read-only; unavailable runway is unknown', 'as of each provider reading, retained when old', 'every build; ' + quota_stamp),
     ('leads', 'Lead state', 'what each lead home last published about itself; silent after 15 minutes without a new one',
      "each home's own summary, and Main's view of which leads are not running", 'now', 'every build'),
     ('machine', 'Machine and devices', 'free memory, memory pressure, heavy jobs, Gradle builds, emulators and who holds each device', 'this host and adb, read-only',
@@ -1383,7 +1384,7 @@ metrics = {
     'busy_agents': reading(sum(BUSY.values()), 'lanes', agents is not None, reason=why_of('herdr'), read_at=agents_read_at),
     'agent_roles': reading(BUSY, 'lanes', agents is not None, reason=why_of('herdr'), read_at=agents_read_at),
     'running_agents': reading(len(agent_rows), 'lanes', agents is not None, reason=why_of('herdr'), read_at=agents_read_at),
-    'quota': reading(quota_value, 'quota', quota_known, reason='runway unavailable for some accounts', read_at=q_at),
+    'quota': reading(quota_value, 'quota', quota_known, reason='runway unavailable for some accounts', read_at=quota_times[0] if quota_times else None),
     'free_memory_gb': reading(free[0] if free else None, 'machine', free is not None, reason=mach['free_why'], read_at=machine_read_at),
     'total_memory_gb': reading(free[1] if free else None, 'machine', free is not None, reason=mach['free_why'], read_at=machine_read_at),
     'memory_pressure': reading(psi, 'machine', psi is not None, reason=mach['pressure_why'], read_at=machine_read_at),
@@ -1393,6 +1394,7 @@ metrics = {
     'device_groups': reading(device_groups, 'machine', not dev_problems, reason='device availability or inventory unavailable', read_at=machine_read_at),
     'connected_devices': reading(dev_count, 'machine', dev_count is not None, reason='adb inventory unavailable', read_at=machine_read_at),
 }
+metrics['quota'].update(read_at_latest=quota_times[-1] if quota_times else None, read_at_policy='oldest contributing account reading')
 for key, value in zip(('heavy_jobs_gb', 'heavy_high_gb', 'heavy_max_gb'), mach['heavy']):
     metrics[key] = reading(value, 'machine', value is not None, reason=mach['heavy_why'], read_at=machine_read_at)
 for key, values in (('landed', LANDED), ('closed', CLOSED_N), ('filed', FILED_N)):
