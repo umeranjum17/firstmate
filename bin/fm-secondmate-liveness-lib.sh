@@ -86,17 +86,18 @@ fm_sm_live_first_line() {
 }
 
 # One line per relaunch attempt and one per outcome, keyed by epoch, plus a
-# `rearmed` row when a live probe lifts a parked mate. The watcher bound counts
-# `attempt` rows and failures before admission inside its window and after the last `rearmed` row; the whole
-# file is the durable per-mate relaunch record the captain can count to see
-# frequency. Fails when the row cannot be appended.
+# `rearmed` row when a live probe lifts a parked mate. The whole file is the
+# durable per-mate relaunch record; recent_attempts below owns bound counting.
+# Fails when the row cannot be appended.
 fm_secondmate_liveness_ledger_add() {  # <id> <attempt|relaunched|failed|rearmed>
   printf '%s\t%s\n' "$(date +%s)" "$2" 2>/dev/null >> "$STATE/.secondmate-relaunch-$1"
 }
 
-# Count of attempt rows no older than <window-secs> that follow the last
-# `rearmed` row. An absent ledger counts
-# zero; an existing ledger that cannot be read fails rather than counting zero.
+# Count `attempt` rows and `failed` rows not immediately preceded by an
+# `attempt`, no older than <window-secs> and after the last `rearmed` row.
+# This charges failures before admission without double-counting a failed
+# admitted launch; memory deferrals append neither row and consume no budget.
+# An absent ledger counts zero; an unreadable ledger fails rather than counting zero.
 fm_secondmate_liveness_recent_attempts() {  # <id> <window-secs>
   local id=$1 window=$2 now cutoff ledger
   ledger="$STATE/.secondmate-relaunch-$id"
@@ -255,18 +256,11 @@ fm_secondmate_liveness_probe() {  # <meta> <id> <full|poll>
   return 0
 }
 
-# fm_secondmate_liveness_relaunch <meta> <id> [timeout-secs]
-#
-# Acts on a `relaunchable` probe verdict for <id>. Local spawn calls
-# fm_secondmate_liveness_begin after memory admission to ledger the attempt
-# and remove a confirmed-dead endpoint; remote recovery begins here.
-# The caller records the spawn outcome in the per-mate ledger. A positive timeout
-# wraps the spawn in fm_run_timed so a watcher poll stays bounded; 124/137 mean
-# the bound fired. Returns the spawn exit status; combined spawn output is in
-# FM_SM_LIVE_OUT and the status in FM_SM_LIVE_RC. When the ledger cannot be
-# read or the attempt row cannot be appended, nothing is killed or spawned: the verdict becomes
-# FM_SM_LIVE_STATUS=skipped with FM_SM_LIVE_REASON set and this returns nonzero.
-# Caller holds the liveness lock and owns reporting.
+# fm_secondmate_liveness_begin <meta> <id>
+# Commit an authorized recovery attempt before removing a confirmed-dead
+# endpoint. An unreadable or unwritable ledger leaves the endpoint untouched
+# and sets FM_SM_LIVE_STATUS=skipped with FM_SM_LIVE_REASON.
+# Caller holds the liveness lock.
 fm_secondmate_liveness_begin() {
   local meta=$1 id=$2
   if ! fm_secondmate_liveness_recent_attempts "$id" 0 >/dev/null; then
@@ -293,6 +287,15 @@ fm_secondmate_liveness_begin() {
   fi
 }
 
+# Acts on a `relaunchable` probe verdict under the caller's liveness lock.
+# Local spawn calls begin only after memory admission and a fresh probe;
+# remote recovery calls begin here before spawning on the recorded host.
+# This function records the spawn outcome. Memory refusal (75) and a changed
+# endpoint (73) set FM_SM_LIVE_STATUS=deferred without charging an attempt;
+# ledger refusal (74) sets skipped. FM_SM_LIVE_REASON explains either verdict.
+# A positive timeout bounds spawn via fm_run_timed (124/137 on timeout).
+# Returns the spawn status in FM_SM_LIVE_RC and combined output in FM_SM_LIVE_OUT;
+# the caller owns reporting.
 fm_secondmate_liveness_relaunch() {  # <meta> <id> [timeout-secs]
   local meta=$1 id=$2 timeout=${3:-} recovery=1
   FM_SM_LIVE_OUT='' FM_SM_LIVE_RC=0

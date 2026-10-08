@@ -678,7 +678,7 @@ def machine():
     p = re.search(r'^some avg10=([0-9.]+)', t or '', re.M)
     m['pressure'], m['pressure_why'] = (float(p.group(1)) if p else None), err or 'no "some avg10" line'
     m['swap'] = gb(int(kv['SwapTotal']) - int(kv['SwapFree'])) if 'SwapTotal' in kv and 'SwapFree' in kv else None
-    # The watcher's host memory guard (bin/fm-jev-mem-guard.py) records one sample per tick; keep the last hour's peak.
+    # Use the independent sampler's history (bin/fm-host-memory-sampler.sh), not the dashboard's refresh cadence.
     try:
         rows = [l.split('\t') for l in open(os.path.join(HOME, 'state/host-memory.tsv'), errors='replace')]
         m['peak'] = max((float(r[3]) for r in rows if len(r) >= 5 and float(r[0]) >= NOW_TS - 3600), default=None)
