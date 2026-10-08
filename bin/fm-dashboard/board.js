@@ -62,8 +62,8 @@ export function List({ d, cards, r, open }) {
 
 // --- card detail -----------------------------------------------------------
 // Repeated status lines with the same words read as one entry with a count.
-const squash = h => h.reduce((a, x) => { const p = a.at(-1), k = y => y.verb + (y.text || '').slice(0, 60)
-  if (p && k(p) === k(x)) { p.n++; p.first = p.first ?? p.at; p.at = x.at } else a.push({ ...x, n: 1 }); return a }, [])
+export const squash = h => h.reduce((a, x) => { const p = a.at(-1)
+  if (p && p.verb === x.verb && p.stage === x.stage && p.text === x.text) { p.n++; p.first = p.first ?? p.at; p.at = x.at } else a.push({ ...x, n: 1 }); return a }, [])
 // Commit hashes, branch names and file names stay, set apart from the words around them; a long local path reads as its last part.
 const CODE = /(\b[0-9a-f]{7,40}\b|\b(?:fm|nm|no-mistakes)\/[\w./-]+|\b[\w-]+\.(?:txt|md|json|sh|js|py)\b|\b\w+_\w+\b)/g
 const words = t => (t || '').replace(/(?:~|\/home)\/[\w.@-]+(?:\/[\w.@-]+)*\/([\w.@-]+)/g, '…/$1').split(CODE).map((p, i) => i % 2 ? html`<code>${p}</code>` : p)
@@ -74,6 +74,9 @@ function Entry({ x }) {
     <p>${plain(x.text) || x.verb}${x.text ? html`<button class="rawb" aria-expanded=${raw} onClick=${() => setRaw(!raw)}>Raw</button>` : ''}</p>
     ${raw && html`<p class="raw">${words(x.text)}</p>`}</div></li>`
 }
+export const stageTimes = (enter, cur, done) => ACTIVE.map((s, i) => { const a = enter[s]; if (!a) return null
+  const b = ACTIVE.slice(i + 1).map(x => enter[x]).find(Boolean) || (done ? enter.landed : i === cur ? now() : null)
+  return b != null && b >= a ? b - a : null })
 export function Detail({ d, id, go, list }) {
   const c = d.cards.find(x => x.id === id), at = list.findIndex(x => x.id === id), ref = useRef()
   const step = k => { const n = list[at + k]; if (n) go({ card: n.id }) }
@@ -87,11 +90,7 @@ export function Detail({ d, id, go, list }) {
   }, [id, list])
   if (!c) return null
   const st = state(c), why = reason(c), n = prNum(c.pr), cur = ACTIVE.indexOf(c.stage), done = c.stage === 'landed'
-  // time spent in each stage: from when it was reached to when the next one was
-  const enter = { building: c.started, ...c.reached }
-  const spent = ACTIVE.map((s, i) => { const a = enter[s]; if (!a) return null
-    const b = ACTIVE.slice(i + 1).map(x => enter[x]).find(Boolean) || (done ? enter.landed : i === cur ? now() : null)
-    return b ? b - a : null })
+  const enter = { building: c.started, ...c.reached }, spent = stageTimes(enter, cur, done)
   const P = (k, v) => v ? html`<dt>${k}</dt><dd>${v}</dd>` : ''
   return html`<div class="scrim dim" onClick=${close}></div>
   <aside class="peek" role="dialog" aria-label=${c.title} tabindex="-1" ref=${ref}>

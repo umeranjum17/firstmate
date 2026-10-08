@@ -141,7 +141,7 @@ def build():  # call holding `building`; the build replaces each page in one ren
     try:
         r = subprocess.run(['bash', SCRIPT, 'build'], env=dict(os.environ, FM_HOME=HOME),
                            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-        last_error = r.stderr if r.returncode else b''
+        last_error = (r.stderr or b'build exited unsuccessfully') if r.returncode else b''
         last_took = time.time() - start
     finally:
         building.release()
@@ -201,7 +201,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
             a = age()
             if a is None:
                 return self.send(500, b'dashboard build failed: ' + last_error, 'text/plain; charset=utf-8')
-        if name in ('data', 'board'): return self.file(os.path.join(DIR, f'{name}.json'), 'json')
+        if name in ('data', 'board'):
+            if last_error: return self.send(503, b'dashboard refresh failed\n', 'text/plain; charset=utf-8')
+            return self.file(os.path.join(DIR, f'{name}.json'), 'json')
         tone = 'bad' if last_error or a >= 3 * MAX_AGE else 'warn' if a >= 1.5 * MAX_AGE else 'ok'
         note = (f'<span class="age {tone}">updated {ago(a)} ago' + (' · refreshing' if building.locked() else '')
                 + (' · last refresh failed, showing the last good page' if last_error else '') + '</span>')
@@ -1486,17 +1488,16 @@ def family(model, harness):  # the model family a lane runs on, else its tool
                            ('gemini', 'gemini', 'Gemini'), ('kimi', 'kimi', 'Kimi'), ('deepseek', 'deepseek', 'DeepSeek'), ('gpt', 'gpt', 'GPT')):
         if pat in m: return fid, name
     return 'tool-' + (harness or 'unknown'), (harness or 'Unknown').capitalize()
-disp, ledger_from = {}, {}  # (home, task) -> its dispatch event; home -> its ledger's first time
+disp = {}
 for h in ACTIVE:
     if h in remote_hosts: continue
     try:
         with open(os.path.join(home_dir[h], 'state/fleet-ledger.jsonl'), encoding='utf-8', errors='replace') as fh:
             for l in fh:
-                if '"task.dispatched"' not in l and h in ledger_from: continue
+                if '"task.dispatched"' not in l: continue
                 try: e = json.loads(l)
                 except ValueError: continue
                 if not isinstance(e, dict) or not isinstance(e.get('ts'), int): continue
-                ledger_from.setdefault(h, e['ts'])
                 if e.get('event') == 'task.dispatched' and isinstance(e.get('task'), str): disp.setdefault((h, e['task']), e)
     except OSError: pass  # a home without the ledger has no dispatch history
 VERBS = {'working': 'Working', 'resolved': 'Cleared', 'paused': 'Waiting', 'blocked': 'Blocked', 'needs-decision': 'Needs a decision',
@@ -1513,6 +1514,7 @@ def card(h, task, kind, title, stage, **kw):
 cards = []
 for l in live:
     h, task, meta = l['home'], l['task'], l['meta']
+    if l['pr'] in merges and merges[l['pr']][1:] == (h, task): continue
     try: ls = [x.strip() for x in open(os.path.join(home_dir[h], 'state', task + '.status'), errors='replace') if x.strip()]
     except OSError: ls = []
     stage, entered, rows, at, reached, verbs = 'building', None, [], None, {}, []
@@ -1529,7 +1531,7 @@ for l in live:
         if s and at: reached.setdefault(s, at)
         verbs.append((verb, at))
         rows.append(dict(at=at, v=verb, stage=stage, verb=VERBS.get(verb, verb.replace('-', ' ').capitalize() or 'Note'),
-                         tone={'blocked': 'bad', 'failed': 'bad', 'needs-decision': 'warn', 'done': 'ok'}.get(verb, ''), text=prose(text)[:240]))
+                         tone={'blocked': 'bad', 'failed': 'bad', 'needs-decision': 'warn', 'done': 'ok'}.get(verb, ''), text=prose(text)))
     # a captain hold parks the lane on purpose: it is not stuck and asks nothing of anyone
     wait, wait_since = 'parked' if l['held'] else {'blocked': 'blocked', 'failed': 'blocked', 'paused': 'waiting', 'needs-decision': 'decision'}.get(verbs[-1][0] if verbs else '', WAIT_OF.get(l['state'])), None
     for verb, a in reversed(verbs):  # the current wait began with the trailing run of lines that say it
@@ -1544,28 +1546,20 @@ for l in live:
 def landed_title(h, task): return re.sub(r'\s+PR \d+$', '', done_title.get((h, task)) or titles.get((h, task)) or task.replace('-', ' '))
 for url, (at, h, task) in merges.items():
     if at >= midnight(TODAY) and h in ACTIVE:
-        cards.append(card(h, task, 'ship', landed_title(h, task), 'landed', since=at, pr=url))
+        cards.append(card(h, task, 'ship', landed_title(h, task), 'landed', id=f'{h}/{task}@{url}', since=at, pr=url))
 for h in ACTIVE:
     for r in bl(h, 'ready'):
+        if any(c['home'] == h and c['task'] == r['id'] and c['stage'] != 'landed' for c in cards): continue
         cards.append(card(h, r['id'], r.get('kind') or 'ship', r['title'], 'queued', since=midnight(r['day']) if r['day'] else None))
 # Cycle time: dispatch to merge, for each merged task whose dispatch is in a ledger.
-done_tasks = sorted((dict(id=f'{h}/{task}', home=h, at=at, cycle=at - disp[(h, task)]['ts'], model=family(disp[(h, task)].get('model'), disp[(h, task)].get('harness'))[0],
-                          title=landed_title(h, task), pr=url)
-                     for url, (at, h, task) in merges.items() if (h, task) in disp and at >= disp[(h, task)]['ts']), key=lambda t: t['at'])
-def pct(xs, p):
-    xs = sorted(xs)
-    return xs[min(len(xs) - 1, int(math.ceil(p / 100 * len(xs))) - 1)] if len(xs) >= 5 else None  # fewer than 5 is noise
+cycles = sorted(at - disp[(h, task)]['ts'] for at, h, task in merges.values() if (h, task) in disp and at >= disp[(h, task)]['ts'])
 board = dict(
     schema='fm-dashboard-board.v1', generated=int(NOW_TS), stages=[dict(id=s, name=n) for s, n in STAGES],
-    homes=[dict(id=h, name=hname(h), plan=plan(h), open=len(by_home[h]), ready=len(bl(h, 'ready')) if backlog.get(h) is not None else None,
+    homes=[dict(id=h, name=hname(h), plan=plan(h), open=sum(c['home'] == h and c['stage'] not in ('queued', 'landed') for c in cards), ready=len(bl(h, 'ready')) if backlog.get(h) is not None else None,
                 known=h not in lane_err) for h in ACTIVE],
     parked=PARKED, cards=cards,
     asks=[dict(id=f[0], text=f[2], url=f[3] if len(f) > 3 else '', age=a) for f, a in asks] if asks_known else None,
-    days=[d.isoformat() for d in DAYS], landed=LANDED, landed_by_home={h: [landed_on(d, h) for d in DAYS] for h in ACTIVE},
-    done=done_tasks, cycle_p50=pct([t['cycle'] for t in done_tasks], 50), cycle_p85=pct([t['cycle'] for t in done_tasks], 85),
-    quota=[dict(name=a['name'], used=None if a['problem'] or not tight_window(a) else tight_window(a)['used'], runout=a['runout'].timestamp() if a['runout'] else None,
-                runs_out=bool(runs_out(a)), empty=bool(a['empty']) or (tight_window(a) or {}).get('used') == 100, problem=a['problem']) for a in accounts],
-    quota_at=q_at, ledger_from=ledger_from, history=[[x if x >= 0 else None for x in r] for r in hist], notes=[dict(source=s, why=r) for s, r in notes])
+    landed=LANDED, cycle_p50=cycles[(len(cycles) - 1) // 2] if len(cycles) >= 5 else None)
 with open(os.path.join(OUT, 'board.json'), 'w', encoding='utf-8') as fh:
     json.dump(board, fh, ensure_ascii=False, allow_nan=False, separators=(',', ':'))
 PY

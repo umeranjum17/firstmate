@@ -422,6 +422,23 @@ PY
   case "$got" in *'<span class="age bad">updated 5'*'min ago'*) ;; *) fail "an old page was not answered at once, marked old: $got" ;; esac
   for _ in $(seq 1 1200); do grep -q 'old page' "$home/state/dashboard/index.html" || break; sleep 0.1; done
   grep -q 'Nothing needs you' "$home/state/dashboard/index.html" || fail "the background rebuild did not replace the old page"
+  python3 - "$url" "$home" <<'PY' || fail "failed rebuild reported a healthy JSON refresh"
+import os, time, sys, urllib.request, urllib.error
+base, home = sys.argv[1:]
+with urllib.request.urlopen(base + 'board.json') as r: tag = r.headers['ETag']
+os.unlink(home + '/state/dashboard/backlog.html')
+os.mkdir(home + '/state/dashboard/backlog.html')
+os.utime(home + '/state/dashboard/index.html', (time.time() - 300,) * 2)
+deadline = time.monotonic() + 15
+while 'last refresh failed' not in urllib.request.urlopen(base + 'overview').read().decode():
+    assert time.monotonic() < deadline, 'rebuild never failed'
+    time.sleep(.1)
+for path in ('board.json', 'data.json'):
+    for headers in ({}, {'If-None-Match': tag}):
+        try: urllib.request.urlopen(urllib.request.Request(base + path, headers=headers))
+        except urllib.error.HTTPError as e: assert e.code == 503 and e.headers['Cache-Control'] == 'no-store'
+        else: raise AssertionError('failed refresh answered successfully')
+PY
   kill "$SERVE_PID" 2>/dev/null; SERVE_PID=
   pass "serve answers the app and its files by version, the three pages at once retaining source timestamps, remembers ?group in a cookie, rebuilds an old page itself, and 404s every other path"
 }
@@ -440,6 +457,7 @@ test_board_json_feeds_the_app() {
     "$((now - 3600))" "$((now - 10800))" "$((now - 60))" >> "$home/state/fleet-ledger.jsonl"
   printf -- '- [x] m-fix - Fix the login PR https://github.com/acme/alpha/pull/12 (repo: alpha) (kind: ship) (merged %s)\n' "$today" >> "$home/data/done-archive.md"
   printf 'first\t%s\tApprove the release\thttps://example.invalid/release\n' "$((now - 7200))" > "$home/data/captain-asks.tsv"
+  lane "$home" m-fix ship "done [at=$((now - 90))]: PR https://github.com/acme/alpha/pull/12 checks green"
   build "$home"
   jq -e --argjson now "$now" '
     def c($id): .cards[] | select(.id == $id);
@@ -452,17 +470,22 @@ test_board_json_feeds_the_app() {
     and (c("main/m-done") | .stage == "merge" and .why == "PR 8 checks green" and .pr == "https://github.com/acme/alpha/pull/8" and .history[0].v == "done" and .history[0].stage == "merge")
     and (c("main/m-ci") | .stage == "ci" and .wait == "blocked" and .wait_since == $now - 1200)
     and (c("main/m-paused") | .stage == "test" and .wait == "waiting")
-    and (c("main/m-fix") | .stage == "landed" and .title == "Fix the login" and .pr == "https://github.com/acme/alpha/pull/12")
+    and (c("main/m-fix@https://github.com/acme/alpha/pull/12") | .stage == "landed" and .title == "Fix the login" and .pr == "https://github.com/acme/alpha/pull/12")
     and ([.cards[] | select(.stage == "queued") | .id] == ["main/m-ready","zephyrine/z-ready"])
     and .parked == ["beta"] and ([.cards[] | select(.home == "beta")] == [])
-    and ([.done[] | [.id, .title, .pr, .cycle, .model]] == [["main/m-fix","Fix the login","https://github.com/acme/alpha/pull/12",10740,"gpt"]])
+    and all(.cards[]; .id != "main/m-fix") and .cycle_p50 == null
     and ([.asks[] | [.id, .text, .url]] == [["first","Approve the release","https://example.invalid/release"]])
-    and .history[0][1:] == [5,4,0] and .landed[-1] == 3 and .landed_by_home.main[-1] == 2' "$d/board.json" >/dev/null ||
-    fail "board.json does not carry each lane's stage, wait, model, reason and the day's landings: $(jq -c '{cards: [.cards[] | {id, stage, wait, why, model, title}], done, asks, history, landed}' "$d/board.json")"
+    and .landed[-1] == 3' "$d/board.json" >/dev/null ||
+    fail "board.json does not carry each lane's stage, wait, model, reason and the day's landings: $(jq -c '{cards: [.cards[] | {id, stage, wait, why, model, title}], asks, landed, cycle_p50}' "$d/board.json")"
   printf -- '- zephyrine - remote (host: distant; root: /srv; home: %s; scope: work; projects: alpha; added 2026-07-11)\n' "$home/mates/zephyrine" > "$home/data/secondmates.md"
   printf '{"ts":%s,"event":"task.dispatched","task":"z-shipped","model":"gpt-5.5"}\n' "$((now - 5000))" >> "$home/mates/zephyrine/state/fleet-ledger.jsonl"
+  for i in 1 2 3 4; do
+    printf '{"ts":%s,"event":"task.dispatched","task":"m-cycle%s","model":"gpt-5.5"}\n{"ts":%s,"event":"task.merged","task":"m-cycle%s","pr":"https://github.com/acme/alpha/pull/%s"}\n' "$((now - 60 - i * 1000))" "$i" "$((now - 60))" "$i" "$((20 + i))" >> "$home/state/fleet-ledger.jsonl"
+  done
+  printf '{"ts":%s,"event":"task.merged","task":"m-fix","pr":"https://github.com/acme/alpha/pull/13"}\n' "$((now - 30))" >> "$home/state/fleet-ledger.jsonl"
+  lane "$home" m-fix ship "working [at=$now] [key=nm-renew-review]: PR https://github.com/acme/alpha/pull/99"
   build "$home"
-  jq -e '(.ledger_from | has("zephyrine") | not) and all(.done[]; .home != "zephyrine") and any(.homes[]; .id == "zephyrine" and .known == false and .ready == null)' "$d/board.json" >/dev/null || fail "remote records borrowed local dispatch or implied complete coverage"
+  jq -e '.cycle_p50 == 3000 and any(.homes[]; .id == "zephyrine" and .known == false and .ready == null) and any(.cards[]; .home == "zephyrine" and .stage == "landed" and .model == null and .started == null) and ([.cards[].id] | length == (unique | length)) and ([.cards[] | select(.task == "m-fix" and .stage == "landed")] | length == 2) and any(.cards[]; .id == "main/m-fix" and .stage == "review")' "$d/board.json" >/dev/null || fail "remote dispatch or renewed card identity was misrepresented"
   cp -R "$ROOT/bin/fm-dashboard" "$home/ui"
   printf '{"type":"module"}\n' > "$home/ui/package.json"
   node --input-type=module - "$home/ui" <<'JS' || fail "dashboard UI behavior regressed"
@@ -471,6 +494,13 @@ const root = process.argv[2], ui = await import(`${root}/ui.js`), board = await 
 const d = { homes: [{ id: 'main', known: true, ready: 0 }, { id: 'remote', known: false, ready: null }], cards: [] }
 assert.equal(ui.total(d, 0), '≥0'); assert.equal(ui.total(d, 0, 'queued'), '≥0'); assert.equal(ui.total(d, 0, 'landed'), '≥0')
 assert.equal(ui.total(d, 2, 'active', 'main'), 2)
+const note = text => ({ verb: 'Waiting', stage: 'review', text, at: 1 })
+const prefix = 'Waiting for approval of the production deployment configuration in '
+assert.equal(board.squash([note(prefix + 'production'), note(prefix + 'staging')]).length, 2)
+assert.equal(board.squash([note(prefix), { ...note(prefix), stage: 'ci' }]).length, 2)
+assert.equal(board.squash([note(prefix), { ...note(prefix), at: 2 }])[0].n, 2)
+assert.equal(board.stageTimes({ ci: 100, test: 200 }, 2, false)[2], null)
+assert.equal(board.stageTimes({ building: 100, review: 200, test: 300 }, 2, false)[1], 100)
 const c = { id: 'main/m-test', home: 'main', task: 'm-test', title: 'Test', stage: 'review', wait: 'waiting', why: 'm-login is complete; waiting for vendor credentials', history: [] }
 assert.equal(ui.reason(c), c.why); assert.equal(ui.stuck({ ...c, wait: 'blocked' }), true)
 let opened = null
@@ -746,6 +776,7 @@ PY
 }
 
 if [ "${1:-}" = board ]; then test_board_json_feeds_the_app; exit; fi
+if [ "${1:-}" = review ]; then test_board_json_feeds_the_app; test_serve_answers_each_page_and_remembers_the_grouping; exit; fi
 
 test_unavailable_readings_and_concurrent_caches
 test_new_lane_and_unwritten_archive_stay_exact
