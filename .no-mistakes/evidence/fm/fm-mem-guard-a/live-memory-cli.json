@@ -1,0 +1,317 @@
+[
+  {
+    "argv": [
+      "bin/fm-jev-mem-guard.sh",
+      "--record",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/state/host-memory.tsv"
+    ],
+    "environment": {},
+    "exit": 0,
+    "stdout": "OK\tpressure 0% (10 s average), 43.2 GB available, 38.6 GB swap used; host 0%, cgroup 0% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service)",
+    "stderr": ""
+  },
+  {
+    "persisted_sample": [
+      "1791447246",
+      "45305136",
+      "40513496",
+      "0.00",
+      "OK"
+    ]
+  },
+  {
+    "argv": [
+      "bin/fm-jev-mem-guard.sh",
+      "--config",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/wait.conf",
+      "--record",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/state/host-memory.tsv"
+    ],
+    "environment": {},
+    "exit": 0,
+    "stdout": "WAIT\tpressure 0% (10 s average), 43.2 GB available, 38.6 GB swap used; host 0%, cgroup 0% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service); pressure at or above 0%",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "bin/fm-jev-mem-guard.sh",
+      "--config",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/wait.conf",
+      "--admit",
+      "private-build",
+      "--state",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/state"
+    ],
+    "environment": {},
+    "exit": 1,
+    "stdout": "host memory under pressure: pressure at or above 0% (pressure 0% (10 s average), 43.2 GB available, 38.6 GB swap used; host 0%, cgroup 0% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service))",
+    "stderr": ""
+  },
+  {
+    "persisted_refusal": [
+      "1791447246",
+      "private-build",
+      "host memory under pressure: pressure at or above 0% (pressure 0% (10 s average), 43.2 GB available, 38.6 GB swap used; host 0%, cgroup 0% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service))"
+    ]
+  },
+  {
+    "argv": [
+      "bin/fm-jev-mem-guard.sh",
+      "--config",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/alert.conf",
+      "--record",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/state/host-memory.tsv"
+    ],
+    "environment": {},
+    "exit": 0,
+    "stdout": "ALERT\tpressure 0% (10 s average), 43.2 GB available, 38.6 GB swap used; host 0%, cgroup 0% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service); pressure at or above 0%; largest: qemu-system-x86 pid 2360470 5.5 GB, qemu-system-x86 pid 3196590 5.0 GB, java pid 1484583 3.0 GB",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "bin/fm-jev-mem-guard.sh",
+      "--config",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/alert.conf",
+      "--admit",
+      "private-build",
+      "--state",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/state"
+    ],
+    "environment": {},
+    "exit": 1,
+    "stdout": "host memory under pressure: pressure at or above 0% (pressure 0% (10 s average), 43.2 GB available, 38.6 GB swap used; host 0%, cgroup 0% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service))",
+    "stderr": ""
+  },
+  {
+    "persisted_refusal": [
+      "1791447246",
+      "private-build",
+      "host memory under pressure: pressure at or above 0% (pressure 0% (10 s average), 43.2 GB available, 38.6 GB swap used; host 0%, cgroup 0% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service))"
+    ]
+  },
+  {
+    "parallel_admission_exit": 1,
+    "stdout": "host memory under pressure: pressure at or above 0% (pressure 0% (10 s average), 43.1 GB available, 38.6 GB swap used; host 0%, cgroup 0% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service))",
+    "stderr": ""
+  },
+  {
+    "parallel_admission_exit": 1,
+    "stdout": "host memory under pressure: pressure at or above 0% (pressure 0% (10 s average), 43.1 GB available, 38.6 GB swap used; host 0%, cgroup 0% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service))",
+    "stderr": ""
+  },
+  {
+    "parallel_persisted_refusal": [
+      "1791447246",
+      "parallel-a",
+      "host memory under pressure: pressure at or above 0% (pressure 0% (10 s average), 43.1 GB available, 38.6 GB swap used; host 0%, cgroup 0% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service))"
+    ]
+  },
+  {
+    "argv": [
+      "bin/fm-jev-mem-guard.sh",
+      "--config",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/healthy.conf",
+      "--admit",
+      "private-build",
+      "--state",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/state"
+    ],
+    "environment": {},
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "healthy_admission_cleared_refusal": true
+  },
+  {
+    "argv": [
+      "bin/fm-jev-mem-guard.sh",
+      "--record",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/state/unknown.tsv"
+    ],
+    "environment": {
+      "FM_HOST_MEMORY_PROC": "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/absent-proc"
+    },
+    "exit": 0,
+    "stdout": "UNKNOWN\thost memory is not measurable here (no readable /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/absent-proc/meminfo and /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/absent-proc/pressure/memory)",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "bin/fm-jev-mem-guard.sh",
+      "--admit",
+      "unknown-build",
+      "--state",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/state"
+    ],
+    "environment": {
+      "FM_HOST_MEMORY_PROC": "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/absent-proc"
+    },
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "unmeasurable_host_admitted_without_recording": true
+  },
+  {
+    "argv": [
+      "bin/fm-jev-mem-guard.sh",
+      "--config",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/bad.conf"
+    ],
+    "environment": {},
+    "exit": 2,
+    "stdout": "",
+    "stderr": "fm-jev-mem-guard: invalid /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/bad.conf line 1: 'alert_pressure=nan' (expected KEY=number, keys: wait_pressure, wait_available_gb, alert_pressure, alert_available_gb)"
+  },
+  {
+    "argv": [
+      "bin/fm-jev-mem-guard.sh",
+      "--config",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/bad.conf"
+    ],
+    "environment": {},
+    "exit": 2,
+    "stdout": "",
+    "stderr": "fm-jev-mem-guard: invalid /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/bad.conf line 1: 'alert_pressure=inf' (expected KEY=number, keys: wait_pressure, wait_available_gb, alert_pressure, alert_available_gb)"
+  },
+  {
+    "argv": [
+      "bin/fm-jev-mem-guard.sh",
+      "--config",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/bad.conf"
+    ],
+    "environment": {},
+    "exit": 2,
+    "stdout": "",
+    "stderr": "fm-jev-mem-guard: invalid /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/bad.conf line 1: 'alert_pressure=-inf' (expected KEY=number, keys: wait_pressure, wait_available_gb, alert_pressure, alert_available_gb)"
+  },
+  {
+    "argv": [
+      "bin/fm-jev-mem-guard.sh",
+      "--config",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/bad.conf"
+    ],
+    "environment": {},
+    "exit": 2,
+    "stdout": "",
+    "stderr": "fm-jev-mem-guard: invalid /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/bad.conf line 1: 'alert_pressure=typo' (expected KEY=number, keys: wait_pressure, wait_available_gb, alert_pressure, alert_available_gb)"
+  },
+  {
+    "argv": [
+      "bin/fm-jev-mem-guard.sh",
+      "--config",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/alert.conf",
+      "--state-dir",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/state",
+      "--state-dir",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/mate",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/mate/state",
+      "--owned-top-task",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/state"
+    ],
+    "environment": {
+      "FM_HOST_MEMORY_PROC": "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/selected-proc"
+    },
+    "exit": 0,
+    "stdout": "ALERT\tpressure 0% (10 s average), 42.9 GB available, 38.6 GB swap used; host 0%, cgroup 0% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service); pressure at or above 0%; largest: lead main 0.1 GB in 2 processes, lead main 0.1 GB in 2 processes\t",
+    "stderr": ""
+  },
+  {
+    "empty_home_aggregated_real_processes": true
+  },
+  {
+    "argv": [
+      "bin/fm-jev-mem-guard.sh",
+      "--config",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/alert.conf",
+      "--state-dir",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/state",
+      "--state-dir",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/mate",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/mate/state",
+      "--owned-top-task",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/state"
+    ],
+    "environment": {
+      "FM_HOST_MEMORY_PROC": "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/selected-proc"
+    },
+    "exit": 0,
+    "stdout": "ALERT\tpressure 0% (10 s average), 42.9 GB available, 38.6 GB swap used; host 0%, cgroup 0% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service); pressure at or above 0%; largest: lead sm1 0.1 GB in 2 processes, lead main 0.1 GB in 2 processes\tsm1",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "bin/fm-jev-mem-guard.sh",
+      "--config",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/alert.conf",
+      "--state-dir",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/mate",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/mate/state",
+      "--state-dir",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/state",
+      "--owned-top-task",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/state"
+    ],
+    "environment": {
+      "FM_HOST_MEMORY_PROC": "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/selected-proc"
+    },
+    "exit": 0,
+    "stdout": "ALERT\tpressure 0% (10 s average), 42.9 GB available, 38.6 GB swap used; host 0%, cgroup 0% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service); pressure at or above 0%; largest: lead sm1 0.1 GB in 2 processes, lead main 0.1 GB in 2 processes\tsm1",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "bin/fm-jev-mem-guard.sh",
+      "--config",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/alert.conf",
+      "--state-dir",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/mate",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/mate/state",
+      "--state-dir",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/state",
+      "--owned-top-task",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/mate/state"
+    ],
+    "environment": {
+      "FM_HOST_MEMORY_PROC": "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/selected-proc"
+    },
+    "exit": 0,
+    "stdout": "ALERT\tpressure 0% (10 s average), 42.9 GB available, 38.6 GB swap used; host 0%, cgroup 0% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service); pressure at or above 0%; largest: lead sm1 0.1 GB in 2 processes, lead main 0.1 GB in 2 processes\t",
+    "stderr": ""
+  },
+  {
+    "parent_owned_lead_preserved_both_argument_orders": true,
+    "child_control_not_authorized": true
+  },
+  {
+    "argv": [
+      "bin/fm-jev-mem-guard.sh",
+      "--config",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/alert.conf",
+      "--state-dir",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/state",
+      "--state-dir",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/mate",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/mate/state",
+      "--owned-top-task",
+      "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/state"
+    ],
+    "environment": {
+      "FM_HOST_MEMORY_PROC": "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D8J6Y6KAAA7DQBH50JCH1S/.test-memory-tmp/live-memory-lnbu1vcj/selected-proc"
+    },
+    "exit": 0,
+    "stdout": "ALERT\tpressure 0% (10 s average), 42.8 GB available, 38.6 GB swap used; host 0%, cgroup 0% (user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service); pressure at or above 0%; largest: lead main 0.1 GB in 2 processes, lead main 0.1 GB in 2 processes\t",
+    "stderr": ""
+  },
+  {
+    "remote_record_did_not_authorize_local_control": true
+  }
+]
