@@ -12,7 +12,7 @@
 # lanes by stage against its plan); Needs you
 # (the ask list); Ship (ship/: the selected home's ship at night with each lane a worker at its
 # stage's deck station, dressed by model, and a sheet with fleet-wide key numbers and stuck or
-# parked work); a command palette and keys (?).
+# parked work); Insights (the shipped fm-flow.sh reader's lifecycle, waits, queue, retained merge outcomes and optional read-only capacity observations); a command palette and keys (?).
 # In Ship, tap a worker or its tag to open its card's detail; a station or its plate opens
 # a worker in that stage, prioritizing stuck work and then recorded age, oldest first (empty stations do nothing).
 # Stuck and parked sheet rows also open their cards, by click or focused Enter/Space.
@@ -56,8 +56,11 @@
 #            often it is read), records that disagree, sources not read
 # Method owns the metric definitions shared with data.json's coverage and source metadata.
 # Backlog lists default to action grouping, with a by-home variant.
-# Parked homes are left out of every total, with one line saying so.
-# Sources are local records, existing caches and read-only probes; no GitHub or SSH collection runs during builds.
+# Board and Overview leave parked homes out of totals; Insights labels its all-registered-home scope.
+# Sources are local records, existing caches and read-only probes; no GitHub collection runs during builds.
+# Insights invokes fm-flow.sh --json --capacity at the build cutoff (180 s overall deadline).
+# FM_MAC_HOST opts into that reader's bounded read-only Mac SSH probe; unset means unknown.
+# The reader's live capacity timestamps remain separate from the durable-record cutoff.
 # Remote lane/backlog records are unavailable, not read from same-named local paths.
 #   data/captain-asks.tsv           Waiting on you: Main's fleet-wide headerless
 #                                   id<TAB>since-epoch<TAB>text<TAB>url; each row with an id and
@@ -1618,11 +1621,39 @@ for h in ACTIVE:
         cards.append(card(h, r['id'], r.get('kind') or 'ship', r['title'], 'queued', since=midnight(r['day']) if r['day'] else None))
 # Cycle time: dispatch to merge, for each merged task whose dispatch is in a ledger.
 cycles = sorted(at - d['ts'] for at, h, task in merges.values() if (d := dispatch(h, task, at)))
+flow_text, flow_error = probe(['bash', os.path.join(BIN, 'fm-flow.sh'), '--json', '--now', str(int(NOW_TS)), '--capacity'],
+                              timeout=180, env=dict(os.environ, FM_HOME=HOME))
+flow = None
+if flow_text is not None:
+    try:
+        flow = json.loads(flow_text)
+        if not isinstance(flow, dict) or flow.get('schema') != 'fm-flow.v1':
+            raise ValueError('unsupported flow observation format')
+        for row in flow['lanes'] + flow['queue'] + flow['executed_24h'] + flow['executed_7d']:
+            h, task = row['home'], row['task']
+            row['display_title'] = titles.get((h, task)) or re.sub(r'\s+PR \d+$', '', done_title.get((h, task), '')) or 'Task name not recorded'
+            row['display_reason'] = prose(row.get('reason', ''))
+            why = row.get('why', '')
+            if why.startswith('dependency:'):
+                row['display_why'] = 'Waiting for: ' + ', '.join(titles.get((h, t.strip()), 'earlier work (name unavailable)') for t in why[11:].split(','))
+            else:
+                row['display_why'] = prose(why).replace('recorded active lanes', 'recorded active tasks').replace('lane cap:', 'Count limit:')
+            for wait in row.get('open_waits', []):
+                wait['display_reason'] = prose(wait['reason'])
+            row['pr'] = next((url for url, (at, mh, mt) in merges.items()
+                              if (mh, mt) == (h, task) and at == row.get('times', {}).get('merged')), None)
+        for job in (flow.get('capacity') or {}).get('jobs', []):
+            if job['owner']:
+                job['owner']['display_title'] = titles.get((job['owner']['home'], job['owner']['task'])) or 'Task name not recorded'
+        for folder in (flow.get('capacity') or {}).get('tmp', {}).get('top_folders') or []:
+            folder['display_name'] = os.path.basename(folder['path'])
+    except (ValueError, KeyError, TypeError) as err:
+        flow, flow_error = None, 'Cannot read flow observations: ' + str(err)
 board = dict(
     schema='fm-dashboard-board.v1', generated=int(NOW_TS), stages=[dict(id=s, name=n) for s, n in STAGES],
     homes=[dict(id=h, name=hname(h), plan=plan(h), open=sum(c['home'] == h and c['stage'] not in ('queued', 'landed') for c in cards), ready=len(bl(h, 'ready')) if backlog.get(h) is not None else None,
                 known=h not in lane_err) for h in ACTIVE],
-    parked=PARKED, cards=cards,
+    parked=PARKED, cards=cards, flow=flow, flow_error=flow_error,
     asks=[dict(id=f[0], text=f[2], url=f[3] if len(f) > 3 else '', age=a) for f, a in asks] if asks_known else None,
     landed=LANDED, cycle_p50=cycles[(len(cycles) - 1) // 2] if len(cycles) >= 5 else None)
 with open(os.path.join(OUT, 'board.json'), 'w', encoding='utf-8') as fh:
