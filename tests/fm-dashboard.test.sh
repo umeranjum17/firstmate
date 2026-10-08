@@ -145,10 +145,14 @@ printf '%s\n' "\$*" >> "$home/gh.calls"
 [ -e "$home/gh.fail" ] && { echo 'HTTP 403: API rate limit exceeded' >&2; exit 1; }
 exec python3 - "$home/merges.tsv" "\$*" <<'PY'
 import json, re, sys
-a, b = re.search(r'merged:(\S+)\.\.(\S+)', sys.argv[2]).groups()
+query = sys.argv[2]
+repos = re.findall(r'\brepo:([A-Za-z0-9-]+/[A-Za-z0-9._-]+)', query)
+if not repos or 'owner:' in query:
+    raise SystemExit('search must name registered repositories')
+a, b = re.search(r'merged:(\S+)\.\.(\S+)', query).groups()
 items = [dict(id=n, number=n, title=t, html_url=f'https://github.com/acme/alpha/pull/{n}',
               repository_url='https://api.github.com/repos/acme/alpha', pull_request={'merged_at': at})
-         for n, (at, t) in enumerate((l.rstrip('\n').split('\t') for l in open(sys.argv[1])), 1) if a <= at <= b]
+         for n, (at, t) in enumerate((l.rstrip('\n').split('\t') for l in open(sys.argv[1])), 1) if a <= at <= b and 'acme/alpha' in repos]
 print(json.dumps([{'total_count': len(items), 'incomplete_results': False, 'items': items}]))
 PY
 EOF
@@ -267,17 +271,45 @@ test_github_searches_each_day_once_and_today_again_after_five_minutes() {
   local home d
   home=$(make_home github)
   d="$home/state/dashboard"
+  for spec in 'gitlab https://gitlab.com/team/beta.git' 'local /tmp/example/clone.git' \
+    'spoof https://example.invalid/github.com/acme/secret.git' 'ssh git@github.com:acme/alpha.git' \
+    'protocol ssh://git@github.com/acme/beta.git'; do
+    read -r name origin <<< "$spec"
+    git init -q "$home/projects/$name"
+    git -C "$home/projects/$name" remote add origin "$origin"
+  done
   build "$home"
   [ "$(wc -l < "$home/gh.calls")" -eq 7 ] || fail "not one search per day of 7: $(cat "$home/gh.calls")"
-  grep -q 'q=owner:acme is:pr is:merged merged:20[0-9-]*T[0-9:]*Z\.\.20[0-9-]*T[0-9:]*59Z' "$home/gh.calls" \
-    || fail "unexpected search: $(cat "$home/gh.calls")"
+  python3 - "$home/gh.calls" "$d/.merged.json" <<'PY'
+import json, re, sys
+for request in open(sys.argv[1]):
+    qualifiers = re.findall(r'(?:repo|owner):\S+', request)
+    assert qualifiers == ['repo:acme/alpha', 'repo:acme/beta'], request
+cache = json.load(open(sys.argv[2]))
+assert cache['scope'][1] == ['acme/alpha', 'acme/beta']
+assert all(i['repo'] in cache['scope'][1] for day in cache['days'].values() for i in day['items'])
+PY
   build "$home"
   [ "$(wc -l < "$home/gh.calls")" -eq 7 ] || fail "a rebuild inside 5 minutes searched again"
   python3 -c 'import json,sys; p=sys.argv[1]; c=json.load(open(p)); [e.__setitem__("at", e["at"]-400) for e in c["days"].values()]; json.dump(c,open(p,"w"))' "$d/.merged.json"
   build "$home"
   [ "$(wc -l < "$home/gh.calls")" -eq 8 ] || fail "after 5 minutes not only today was searched again: $(cat "$home/gh.calls")"
   has "$d/flow.html" "2 landed so far today"
-  pass "GitHub is searched once per finished day and today again after 5 minutes"
+  python3 - "$d/.merged.json" <<'PY'
+import json, sys
+json.dump({'scope': ['merged-days-v3', [['acme/secret', 'main']], 'UTC'],
+           'days': {'old': {'at': 0, 'items': [{'repo': 'acme/secret', 'title': 'Unrelated private title'}]}}}, open(sys.argv[1], 'w'))
+PY
+  touch "$home/gh.fail"
+  build "$home"
+  python3 - "$d/.merged.json" <<'PY'
+import json, sys
+cache = json.load(open(sys.argv[1]))
+assert cache['scope'][1] == ['acme/alpha', 'acme/beta']
+assert cache['days'] == {}
+PY
+  has "$d/flow.html" "Landings unknown."
+  pass "GitHub searches and caches only registered GitHub repositories, with bounded daily refreshes"
 }
 
 test_the_filing_log_counts_new_items_exactly() {
@@ -501,7 +533,7 @@ test_quota_quality_filing_and_landing_boundaries() {
   mv "$home/data/m-build" "$home/mates/zephyrine/data/archived-task"
   git init -q "$home/mates/beta/projects/alpha"
   git -C "$home/mates/beta/projects/alpha" remote add origin https://github.com/acme/alpha.git
-  printf 'home\trepo\tpr\tmerged\tfirst_pass\thours_to_merge\tescaped\nmain\tacme/alpha\t80\t%s\t1\t1\t0\nmain\tacme/alpha\t81\t%s\t1\t100\t0\nbeta\tacme/alpha\t90\t%s\t0\t1000\t1\n' \
+  printf 'home\trepo\tpr\tmerged\tfirst_pass\tbuild_hours\tescaped\nmain\tacme/alpha\t80\t%s\t1\t1\t0\nmain\tacme/alpha\t81\t%s\t1\t100\t0\nbeta\tacme/alpha\t90\t%s\t0\t1000\t1\n' \
     "$(iso 0)" "$(iso 0)" "$(iso 0)" > "$home/data/metrics/prs.tsv"
   printf 'day\thome\tsteers\tdecisions\tblocks\ts_correct\tcaptain_msgs\tstall_alarms\n%s\tmain\t2\t0\t0\t2\t2\t2\n%s\tbeta\t?\t?\t?\t?\t?\t?\n' \
     "$today" "$today" > "$home/data/metrics/daily.tsv"
@@ -534,6 +566,7 @@ PY
   has "$d/quota.html" "Account runway unknown." "Codex · codex-home" "Codex · openai-codex-work" "Runway unknown" "Lasts to reset" "Carries 1 worker"
   lacks "$d/quota.html" "Every readable account lasts" "No account runs out before" "Carries 2 workers"
   has "$d/quota.html" "Codex · exhausted max Used up" "1 used up." "2 accounts cannot be read or are empty."
+  has "$d/flow.html" "P50 1 h" "P85 100 h"
   has "$d/measure.html" "First-pass merges at least 100% 100% met" "Slowest merges (p90) at most 50 h 100 h missed" \
     "Bugs that escaped at most 0 0 met" "Corrections per merge at most 1 1 met" "Main nudges per merge at most 1 1 met" \
     "Captain messages per merge at most 1 1 met" "Lead stalls that reached Main at most 2 2 met" "fleet pulse runs about every 2 h"

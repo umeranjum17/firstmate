@@ -626,20 +626,21 @@ def github_days():
         pd = os.path.join(d, 'projects')
         for pj in sorted(os.listdir(pd)) if os.path.isdir(pd) else []:
             u = subprocess.run(['git', '-C', os.path.join(pd, pj), 'remote', 'get-url', 'origin'], capture_output=True, text=True).stdout.strip()
-            r = re.sub(r'\.git$', '', re.sub(r'^.*github\.com[:/]', '', u))
-            if '/' in r: repos.add(r)
+            m = re.fullmatch(r'(?:(?:https?|ssh|git)://(?:[^/@\s]+@)?github\.com(?::[0-9]+)?/|(?:[^/@:\s]+@)?github\.com:)([A-Za-z0-9-]+/[A-Za-z0-9._-]+?)(?:\.git)?/?', u, re.I)
+            if m: repos.add(m.group(1).lower())
+    scope = json.loads(json.dumps(['merged-days-v4', sorted(repos), str(NOW.tzinfo)]))
+    if c.get('scope') != scope: save_json(cache_p, {'scope': scope, 'days': {}})
     if not repos: notes.append(('GitHub landings', 'no registered project clone has a GitHub remote')); return None, set()
-    scope = json.loads(json.dumps(['merged-days-v3', sorted(repos), str(NOW.tzinfo)]))
     days = c.get('days') if c.get('scope') == scope and isinstance(c.get('days'), dict) else {}
     out = {}
-    owners = ' '.join(f'owner:{o}' for o in sorted({r.split('/')[0] for r in repos}))
+    repositories = ' '.join(f'repo:{r}' for r in sorted(repos))
     for d in WEEK:
         e = days.get(d.isoformat())
         end = day_start(d + timedelta(days=1)) - timedelta(seconds=1)
         good = isinstance(e, dict) and isinstance(e.get('at'), (int, float)) and math.isfinite(e['at']) and isinstance(e.get('items'), list)
         if not (good and (e['at'] > end.timestamp() or 0 <= NOW_TS - e['at'] < GH_TTL)):
             since = day_start(d).astimezone(timezone.utc)
-            q = f'{owners} is:pr is:merged merged:{since:%Y-%m-%dT%H:%M:%SZ}..{end.astimezone(timezone.utc):%Y-%m-%dT%H:%M:%SZ}'
+            q = f'{repositories} is:pr is:merged merged:{since:%Y-%m-%dT%H:%M:%SZ}..{end.astimezone(timezone.utc):%Y-%m-%dT%H:%M:%SZ}'
             try:
                 r = subprocess.run(['gh', 'api', '-X', 'GET', 'search/issues', '--paginate', '--slurp', '-f', f'q={q}', '-f', 'per_page=100'],
                                    capture_output=True, text=True, timeout=30)
@@ -649,10 +650,10 @@ def github_days():
                     raise ValueError('search incomplete or exceeds GitHub search limit')
                 items = {i['id']: i for p in pages for i in p['items']}
                 if len(items) != pages[0]['total_count']: raise ValueError('search returned a partial count')
-                e = {'at': NOW_TS, 'items': [dict(repo='/'.join(i['repository_url'].rstrip('/').split('/')[-2:]), n=i.get('number'),
+                e = {'at': NOW_TS, 'items': [dict(repo='/'.join(i['repository_url'].rstrip('/').split('/')[-2:]).lower(), n=i.get('number'),
                                                   title=i.get('title') or '', url=i.get('html_url') or '',
                                                   at=(i.get('pull_request') or {}).get('merged_at') or i.get('closed_at') or '')
-                                             for i in items.values()]}
+                                             for i in items.values() if '/'.join(i['repository_url'].rstrip('/').split('/')[-2:]).lower() in repos]}
             except (OSError, subprocess.TimeoutExpired, ValueError, KeyError, TypeError, AttributeError) as ex:
                 notes.append(('GitHub landings', str(ex))); return None, {}
         out[d.isoformat()] = e
@@ -830,7 +831,7 @@ def window_metrics(home=None):
         if daily is None: return None
         vals = [dsum(col, d, home) for d in QWIN]
         return None if any(v is None for v in vals) else sum(vals)
-    hrs = sorted(v for v in (num(p.get('hours_to_merge')) for p in ps) if v is not None)
+    hrs = sorted(v for v in (num(p.get('build_hours')) for p in ps) if v is not None)
     per = lambda v: round(v / n, 2) if n and v is not None else None
     steers, dec, blk = dw('steers'), dw('decisions'), dw('blocks')
     esc = [num(p.get('escaped')) for p in ps] if prs is not None else None
