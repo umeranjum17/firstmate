@@ -284,9 +284,15 @@ EOF
   has "$d/index.html" "In use 1" "Free 1" "Devices 1 + 1 = 2" \
     "Phone Pixel 9 Free · last used by Main 10 min ago · PHONE1 · USB" \
     "Emulator test-avd In use by Main · 10 min · emulator-5554 · 4.0 GB in use" \
-    "Free memory 10.0 GB of 64 GB" "Memory pressure 12%" "the 10 s share is 40% or more (now 4%)" "Heavy jobs 8.0 GB of 32 GB" "hard limit 38 GB" \
+    "Free memory 10.0 GB of 64 GB" "Memory pressure 4% share of the last 10 s" "Heavy jobs 8.0 GB of 32 GB" "hard limit 38 GB" \
     "Gradle builds 2 of 2" "Emulators 1 of 2" "✕ 10 GB free, heavy jobs wait" "▲ 2/2 Gradle builds at cap"
   [ "$(sort -u "$home/adb.calls")" = "devices -l" ] || fail "adb was asked more than the device list: $(cat "$home/adb.calls")"
+  # Memory pressure is one number, the gate's 10 s share, in the chip and the card alike.
+  printf 'MemTotal:       67108864 kB\nMemAvailable:   20971520 kB\n' > "$proc/meminfo"
+  printf 'some avg10=45.00 avg60=8.00 avg300=12.00 total=1\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n' > "$proc/pressure/memory"
+  build "$home" FM_DASHBOARD_PROC="$proc" FM_DEVICE_LOCK_DIR="$locks"
+  has "$d/index.html" "✕ 45% memory pressure, heavy jobs wait" "Memory pressure 45%"
+  lacks "$d/index.html" "12%"
   # Each failed probe says unknown and why; nothing is guessed as zero.
   touch "$home/adb.fail" "$home/systemctl.fail"
   rm "$proc/meminfo" "$proc/locks"

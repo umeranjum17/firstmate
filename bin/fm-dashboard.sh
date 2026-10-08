@@ -47,8 +47,8 @@
 #   pgrep -a '^qemu-system'         running emulators (-avd, -port; VmRSS from <proc>/<pid>/status)
 #   pgrep -cf 'appname=gradle[w]'   Gradle builds, counted as config/fm-mem-gate.sh counts them
 #   systemctl --user show fm-heavy.slice   MemoryCurrent, MemoryHigh, MemoryMax
-#   <proc>/meminfo, <proc>/pressure/memory   MemAvailable; "some avg10" (the gate's rule) and
-#                                   "some avg300" (the 5-minute average the page shows)
+#   <proc>/meminfo, <proc>/pressure/memory   MemAvailable; "some avg10", the memory gate's own
+#                                   pressure, the one pressure number on every page
 #   <locks>/fm-phone-<name>.lock + <proc>/locks   who holds a device now (flock by inode);
 #   <locks>/fm-device-lock.log      the holder's pid, time and cwd, mapped to its home by
 #                                   each home's state/*.meta worktree=, tasktmp= or task id;
@@ -613,9 +613,8 @@ def machine():
     m['free'] = (gb(int(kv['MemAvailable'])), gb(int(kv['MemTotal']))) if 'MemAvailable' in kv and 'MemTotal' in kv else None
     m['free_why'] = err or 'no MemAvailable in meminfo'
     t, err = read('pressure/memory')
-    p = re.search(r'^some avg10=([0-9.]+) .*avg300=([0-9.]+)', t or '', re.M)
-    m['pressure'], m['pressure_why'] = (float(p.group(1)) if p else None), err or 'no "some avg10 ... avg300" line'
-    m['pressure5'] = float(p.group(2)) if p else None  # avg10 swings within a minute; the page shows the 5-minute average
+    p = re.search(r'^some avg10=([0-9.]+)', t or '', re.M)
+    m['pressure'], m['pressure_why'] = (float(p.group(1)) if p else None), err or 'no "some avg10" line'
     out, err = probe(['systemctl', '--user', 'show', 'fm-heavy.slice', '-p', 'MemoryCurrent', '-p', 'MemoryHigh', '-p', 'MemoryMax'])
     kv = dict(l.split('=', 1) for l in (out or '').splitlines() if '=' in l)
     def size(v): return int(v) / 2**30 if (v or '').isdigit() else None
@@ -849,7 +848,7 @@ tidy = sorted(h for h in leads if h not in down and lead_word(h)[1] == 'bad')
 if tidy: spot('warn', 'Check', 'lead to check' if len(tidy) == 1 else 'leads to check', len(tidy), 'now', '#homes', ', '.join(f'{h}: {lead_word(h)[0]}' for h in tidy))
 
 # --- machine and devices -------------------------------------------------
-free, psi, psi5, (hc_, hh_, hm_) = mach['free'], mach['pressure'], mach['pressure5'], mach['heavy']
+free, psi, (hc_, hh_, hm_) = mach['free'], mach['pressure'], mach['heavy']
 def psi_tone(v): return 'bad' if v >= 40 else 'warn' if v >= 20 else 'ok'
 gate_wait = (free is not None and free[0] < MEM_MIN_GB) or (psi is not None and psi >= 40)
 at_cap = [x for x, full in (('emulators', (emu_count or 0) >= EMU_MAX), ('Gradle builds', (mach['gradle'] or 0) >= GRADLE_MAX)) if full]
@@ -864,9 +863,8 @@ machine_rows = ''.join([
     meter('Free memory', f'{free[0]:.1f} GB <small>of {free[1]:.0f} GB</small>', free[0] / free[1] if free[1] else None,
           'bad' if free[0] < MEM_MIN_GB else 'ok', f'heavy jobs wait below {MEM_MIN_GB} GB')
     if free else meter('Free memory', unknown(mach['free_why']), None, ''),
-    meter('Memory pressure', f'{psi5:.0f}%', psi5 / 100, psi_tone(psi5),
-          f'5-minute average share of time some job waited on memory; heavy jobs wait while the 10 s share is 40% or more (now {psi:.0f}%)')
-    if psi5 is not None else meter('Memory pressure', unknown(mach['pressure_why']), None, ''),
+    meter('Memory pressure', f'{psi:.0f}%', psi / 100, psi_tone(psi), 'share of the last 10 s some job waited on memory; heavy jobs wait at 40% or more')
+    if psi is not None else meter('Memory pressure', unknown(mach['pressure_why']), None, ''),
     meter('Heavy jobs', f'{hc_:.1f} GB <small>of {hh_:.0f} GB</small>' if hh_ else f'{hc_:.1f} GB', hc_ / hh_ if hh_ else None,
           'warn' if hh_ and hc_ >= 0.9 * hh_ else 'ok', 'shared group for builds and emulators' + (f'; hard limit {hm_:.0f} GB' if hm_ else ''))
     if hc_ is not None else meter('Heavy jobs', unknown(mach['heavy_why']), None, ''),
@@ -1229,7 +1227,8 @@ METRICS = [  # each number's one definition: id, name, what it counts, source, w
      'quota-axi, never refreshing a login', 'now', f'every {QUOTA_TTL // 60} minutes' + (f'; last read <!--at:{int(q_at)}--> ago' if q_at else '')),
     ('leads', 'Lead state', 'what each lead home last published about itself; silent after 15 minutes without a new one',
      "each home's own summary, and Main's view of which leads are not running", 'now', 'every build'),
-    ('machine', 'Machine and devices', 'free memory, memory pressure, heavy jobs, Gradle builds, emulators and who holds each device', 'this host and adb, read-only', 'now', 'every build'),
+    ('machine', 'Machine and devices', 'free memory, memory pressure, heavy jobs, Gradle builds, emulators and who holds each device', 'this host and adb, read-only',
+     'now; memory pressure is the share of the last 10 seconds some job waited on memory, the memory gate\'s own rule', 'every build'),
 ]
 def measure_body():
     defs = ''.join(f'<div class="def" id="m-{i}"><h3>{esc(n)}</h3><dl><dt>Counts</dt><dd>{esc(c)}</dd><dt>Source</dt><dd>{esc(src)}</dd>'
