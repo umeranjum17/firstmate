@@ -38,7 +38,7 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 case "$now" in ''|*[!0-9]*) echo 'fm-flow: --now requires Unix seconds' >&2; exit 2 ;; esac
-exec python3 - "${FM_HOME:-$SCRIPT_DIR/..}" "$now" "$checks" <<'PY'
+exec python3 - "${FM_HOME:-$SCRIPT_DIR/..}" "$now" "$checks" "$SCRIPT_DIR/fm-classify-lib.sh" <<'PY'
 import base64, json, math, re, statistics, subprocess, sys, time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -58,17 +58,39 @@ def stamp(value):
 def age(start, end=NOW):
     return end - start if start is not None and end is not None and end >= start else None
 
+def parse_status(lines):
+    if not lines:
+        return []
+    parsed = subprocess.check_output(['bash', '-c', '''
+source "$1"
+while IFS= read -r -d '' line; do
+    verb=$(status_line_verb "$line")
+    key=$(_fm_decision_key "$line") || key=''
+    epoch=$(status_line_at_epoch "$line") || epoch=''
+    note=$(status_line_note "$line")
+    printf '%s\\0%s\\0%s\\0%s\\0' "$verb" "$key" "$epoch" "$note"
+done
+''', 'fm-flow', sys.argv[4]], input=''.join(line + '\0' for line in lines).encode())
+    fields = parsed.decode().split('\0')[:-1]
+    return [dict(state=v, key=k or None, ts=stamp(int(t)) if t else None, text=n)
+            for v, k, t, n in zip(*[iter(fields)] * 4)]
+
 def events(path):
-    out = []
-    for line in read(path, True) or []:
-        head, sep, text = line.partition(':')
-        v = re.match(r'^(?:\d{9,11}\s+)?([a-z-]+)\b', head)
-        if not sep or not v:
-            continue
-        ats, keys = re.findall(r'\[at=(\d+)\]', head), re.findall(r'\[key=([^\]]+)\]', head)
-        out.append({'state': v[1], 'ts': stamp(int(ats[0])) if len(ats) == 1 else None,
-                    'key': keys[0] if len(keys) == 1 else 'default', 'text': text.strip()})
-    return out
+    lines = [line for line in read(path, True) or [] if ':' in line]
+    return [e for e in parse_status(lines) if re.fullmatch(r'[a-z-]+', e['state'])]
+
+def captured_status(records):
+    lines = []
+    for e in records:
+        text = e.get('text') or ''
+        lines.append(f"{e.get('state') or ''}: {text}")
+    parsed = parse_status(lines)
+    for e, p in zip(records, parsed):
+        key = e.get('key')
+        if key and p['key'] != key:
+            p['key'], p['text'] = key, (e.get('text') or '').lstrip()
+        p['ts'] = e['ts']
+    return parsed
 
 def cause(key, event):
     if key.startswith('captain-hold'):
@@ -169,7 +191,7 @@ for name, home in sorted(homes.items()):
         status = events(home / 'state' / (task + '.status')) if task in live else []
         basis = 'emitted' if status else 'captured'
         if not status:
-            status = [e for e in es if e['event'] == 'task.status']
+            status = captured_status([e for e in es if e['event'] == 'task.status'])
         if sum(e['event'] == 'task.dispatched' for e in es) > 1:
             times = dict(times, dispatched=None, pr_ready=None, merged=None, cleaned_up=None)
             notes.append({'source': name + '/' + task, 'reason': 'reused task id: lifecycle attribution unknown'})
@@ -178,9 +200,11 @@ for name, home in sorted(homes.items()):
         working = next((e['ts'] for e in status if e.get('state') == 'working'), None)
         waits = {}
         for e in status:
-            key = e.get('key') or 'default'
+            key = e.get('key')
+            if key is None:
+                continue
             if e.get('state') in ('blocked', 'needs-decision'):
-                waits.setdefault(key, e)
+                waits[key] = e
             elif e.get('state') in ('resolved', 'captain-held'):
                 waits.pop(key, None)
         last = status[-1] if status else {}
@@ -202,6 +226,9 @@ for name, home in sorted(homes.items()):
                'durations': {'pickup_to_working': age(times['dispatched'], working),
                    'time_to_merge': age(times['dispatched'], times['merged']),
                    'merge_to_cleanup': age(times['merged'], times['cleaned_up'])}}
+        if state == 'paused':
+            row['open_waits'].append(dict(key=None, since=last['ts'], seconds=age(last['ts']),
+                                          reason=last.get('text') or '', cause=cause(last.get('key') or '', last)))
         seconds = clocks.get(state)
         row['stage_clock'] = {'seconds': seconds, 'source': str(clock_source) if seconds is not None else None,
                               'overdue': row['seconds_in_stage'] >= seconds
