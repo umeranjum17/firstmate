@@ -213,7 +213,7 @@ In its `--claude` mode it cooperates with the auto-arm.
 
 Every owner above runs inside the agent runtime, so a killed Herdr server takes all of them down at once, and a Claude primary whose turn had already ended has no Stop event left to re-arm.
 `bin/fm-sentinel.sh` is the one piece that must run outside the runtime, as a systemd user service:
-`FM_HOME=<home> bin/fm-sentinel.sh unit > ~/.config/systemd/user/fm-sentinel.service && systemctl --user enable --now fm-sentinel`.
+`mkdir -p ~/.config/systemd/user && FM_HOME=<home> bin/fm-sentinel.sh unit > ~/.config/systemd/user/fm-sentinel.service && systemctl --user enable --now fm-sentinel`.
 Until it is installed, session start on a primary Herdr home with a systemd user bus prints a `SENTINEL:` line carrying that command.
 On a server restart it reconciles the home's direct reports, orders each live secondmate to do the same in its own home, and types an operational-input doorbell into the primary, so that turn's end re-arms through the primary's own owner.
 It also wakes the primary when supervision is needed and the beacon has been stale beyond the guard grace with no turn running.
