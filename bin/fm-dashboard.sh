@@ -1,12 +1,23 @@
 #!/usr/bin/env bash
 # fm-dashboard.sh - build and serve the read-only fleet dashboard for this home.
 #
-# The dashboard is the app in bin/fm-dashboard/ (vendored Preact, htm and Inter; no network
-# reference; light and dark): Board, a kanban of Building, Review, Test, PR + CI and To merge
-# with tabs for Queued, Landed today and All and rows by home on request, whose cards carry
-# the lane's model, age, pull request and, when it waits, why in plain words; filters by
-# home, model and state; a card's detail with its stages and activity; Needs you (the ask
-# list); a mount point for the ship view (ship/index.js); a command palette and keys (?).
+# The dashboard is the app in bin/fm-dashboard/ (vendored Preact, htm, Inter and, for the Ship tab
+# only, three.js; no network reference; light and dark): Board, a kanban of Building, Review,
+# Test, PR + CI and To merge with tabs for Queued, Landed today and All and rows by home on
+# request, whose cards carry the lane's model, age, pull request and, when it waits, why in plain
+# words; filters by home, model and state; a card's detail with its stages and activity; Needs you
+# (the ask list); Ship (ship/: the selected home's ship at night with each lane a worker at its
+# stage's deck station, dressed by model, and a sheet with fleet-wide key numbers and stuck or
+# parked work); a command palette and keys (?).
+# In Ship, tap a worker or its tag to open its card's detail; a station or its plate opens
+# a worker in that stage, prioritizing stuck work and then recorded age, oldest first (empty stations do nothing).
+# Stuck and parked sheet rows also open their cards, by click or focused Enter/Space.
+# Select a home tab or swipe left/right on the sea for the next/previous home, without wrapping.
+# Home changes sail the outgoing ship ahead and bring the selected ship in from astern;
+# scene tags and picking pause during the transition, while the panels remain interactive.
+# Ship needs WebGL2; otherwise a static illustration replaces the scene while its panels stay live.
+# The system's reduced-motion preference stops continuous scene animation and tag pulsing
+# and immediately settles any home transition, restoring tags and picking.
 # On tablet-sized viewports the header figures use their own row and the sidebar narrows
 # to an icon rail; on a phone the board is a list grouped by stage, with a dock.
 # Each build writes the app's one data file, state/dashboard/board.json: homes with their
@@ -20,7 +31,7 @@
 # (dispatch to merge across recorded merges, shown only with at least five samples).
 # Dispatch history is local-only; each merge uses its latest preceding dispatch.
 # Quota and history samples remain on Overview, not in board.json.
-# A lane the captain holds is parked, not stuck. Ship is a mount point, not a bundled 3D view.
+# A lane the captain holds is parked, not stuck.
 # Each build also atomically replaces data.json (every metric with its status and source;
 # GET/HEAD /data.json serves it as application/json) and writes three self-contained HTML
 # pages (inline CSS and SVG, no script, no network reference), phone first:

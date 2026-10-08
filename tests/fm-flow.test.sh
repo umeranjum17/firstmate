@@ -6,7 +6,7 @@ TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 mkdir -p "$TMP/home" "$TMP/xdg" "$TMP/tmp"
 HOME="$TMP/home" XDG_CONFIG_HOME="$TMP/xdg" TMPDIR="$TMP/tmp" python3 - "$ROOT/bin/fm-flow.sh" "$TMP" <<'PY'
-import hashlib, json, os, subprocess, sys
+import hashlib, json, os, shlex, shutil, socket, subprocess, sys, threading
 from pathlib import Path
 script, tmp = sys.argv[1], Path(sys.argv[2])
 main, child = tmp / 'main', tmp / 'child'
@@ -249,6 +249,72 @@ assert any(n['source'] == 'child/backlog' and n['reason'].startswith('unknown:')
            for n in unavailable['limitations']), 'unavailable alternate backend disclosed'
 (main / 'config/fm-flow-check.sh').write_text('unrecognized clock policy\n')
 assert next(l for l in json.loads(run())['lanes'] if l['task'] == 'memory')['stage_clock']['seconds'] is None
+(main / 'config/fm-mem-gate.sh').write_text('min=${FM_MEM_MIN_GB:-12}\n'
+    '[ "$psi" -lt 40 ] && [ "$running" -lt "${FM_EMU_MAX:-3}" ] && [ "$builds" -lt "${FM_GRADLE_MAX:-2}" ]\n'
+    'echo "${FM_MEM_JOB_GB:-10}G"\n')
+clean_env = dict(os.environ, FM_HOME=str(main))
+for key in ('FM_MAC_HOST', 'FM_MEM_MIN_GB', 'FM_EMU_MAX', 'FM_GRADLE_MAX', 'FM_MEM_JOB_GB'):
+    clean_env.pop(key, None)
+before = files()
+c = json.loads(subprocess.check_output(['bash', script, '--json', '--capacity'], env=clean_env))['capacity']
+assert files() == before, 'native read-only census never writes the isolated home'
+assert c['limits']['FM_EMU_MAX'] == 3 and c['limits']['FM_GRADLE_MAX'] == 2
+assert c['mac']['reachable'] is None and c['mac']['available_bytes'] is None and c['mac']['simulators'] is None
+if Path('/proc/meminfo').exists():
+    assert c['memory_bytes']['MemTotal'] > 0 and 0 <= c['memory_bytes']['MemAvailable'] <= c['memory_bytes']['MemTotal']
+for kind, limit in [('emulator', 3), ('gradle_gate_match', 2)]:
+    if c['gate_counts'][kind] is not None:
+        assert c['gate_counts'][kind] == sum(j['kind'] == kind for j in c['jobs'])
+        assert c['slots_under_caps'][kind] == max(limit - c['gate_counts'][kind], 0)
+assert all(j['rss_bytes'] is None or j['rss_bytes'] % 1024 == 0 for j in c['jobs'])
+assert c['tmp']['filesystem_available_bytes'] <= c['tmp']['filesystem_total_bytes']
+if c['tmp']['top_folders_complete'] is False:
+    assert c['tmp']['directory_bytes'] is None and c['tmp']['known_directory_bytes'] >= 0
+    assert all(f['bytes'] is None and f['known_bytes'] >= 0 for f in c['tmp']['top_folders'])
+# Real SSH stalls on a task-owned loopback banner exchange. A private port route
+# extends SSH's own timeout so the flow CLI's six-second outer bound must win.
+ssh = shutil.which('ssh')
+assert ssh, 'native SSH client required for timeout integration'
+with socket.socket() as listener:
+    listener.bind(('127.0.0.1', 0))
+    listener.listen(1)
+    listener.settimeout(30)
+    banner = []
+    def stalled_banner():
+        with listener.accept()[0] as connection:
+            connection.settimeout(30)
+            while data := connection.recv(4096):
+                banner.append(data)
+    thread = threading.Thread(target=stalled_banner, daemon=True)
+    thread.start()
+    route = tmp / 'ssh-route'
+    route.mkdir()
+    config = route / 'config'
+    config.write_text('Host *\n    UpdateHostKeys yes\n')
+    effective = route / 'effective-options'
+    native = shlex.quote(ssh) + ' -F ' + shlex.quote(str(config)) + \
+        f' -p {listener.getsockname()[1]} -o ConnectTimeout=30'
+    control = dict(line.split(None, 1) for line in subprocess.check_output(
+        [ssh, '-G', '-F', str(config), 'nobody@127.0.0.1'], text=True).splitlines())
+    assert control['updatehostkeys'] == 'true', 'private configuration enables host-key updates'
+    wrapper = route / 'ssh'
+    wrapper.write_text('#!/bin/sh\n' + native + ' -G "$@" > ' + shlex.quote(str(effective)) +
+        ' || exit $?\nexec ' + native + ' "$@"\n')
+    wrapper.chmod(0o700)
+    before = files()
+    stalled = json.loads(subprocess.check_output(['bash', script, '--json', '--capacity'],
+        env=dict(clean_env, FM_MAC_HOST='nobody@127.0.0.1', PATH=str(route) + os.pathsep + os.environ['PATH']),
+        timeout=45))
+    thread.join(2)
+    options = dict(line.split(None, 1) for line in effective.read_text().splitlines())
+    assert options['updatehostkeys'] == 'false', 'flow CLI disables host-key updates in native SSH'
+    assert banner and banner[0].startswith(b'SSH-'), 'actual SSH client reached private native transport'
+    assert not thread.is_alive(), 'timed-out SSH connection closed'
+    assert files() == before, 'timeout path also leaves fleet records untouched'
+    assert any(n['source'] == 'Mac SSH probe' and 'timed out after 6 seconds' in n['reason']
+               for n in stalled['limitations']), 'outer Mac deadline enforced with native SSH'
+    mac = stalled['capacity']['mac']
+    assert mac['reachable'] is None and mac['available_bytes'] is None and mac['simulators'] is None
 bad = subprocess.run(['bash', script, '--json', '--now', 'bad'], capture_output=True)
 assert bad.returncode == 2
 print('PASS: real flow CLI, two homes, queue, keyed waits, retained lifecycle, unknowns, read-only determinism')
