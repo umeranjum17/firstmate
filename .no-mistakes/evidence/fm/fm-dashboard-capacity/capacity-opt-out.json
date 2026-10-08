@@ -1,0 +1,88 @@
+{
+  "at": 100,
+  "bottlenecks": [],
+  "capacity": null,
+  "executed_24h": [],
+  "executed_7d": [],
+  "homes": [
+    "main"
+  ],
+  "lanes": [],
+  "limitations": [
+    {
+      "reason": "stage clock policy unknown",
+      "source": "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D9A4JCF0254Q8RTZJ622ZC/.capacity-validation-tmp/drive-7bi5h65s/fleet/config/fm-flow-check.sh"
+    },
+    {
+      "reason": "Retained records only; missing pickup/PR/check/cleanup times stay unknown. Wait ages are recorded waits, not proof of idle workers. Bottleneck items report the maximum recorded wait age per (lane, cause); a lane in several cause buckets overlaps in time, so cause sums are non-additive and never causal lane-hours lost. Items keep full seconds null when any same-cause wait is unstamped and report the known lower bound separately. Free-worker availability not collected. Capacity is an observed census, not a job-admission promise; per-job gate overrides are not inspected. Mac available bytes use free+inactive+speculative pages, matching the installed slot helper, not Linux MemAvailable. CI counts cover reported check runs only, not all required contexts or a green verdict.",
+      "source": "coverage"
+    }
+  ],
+  "queue": [],
+  "schema": "fm-flow.v1",
+  "time_to_merge": {
+    "known": 0,
+    "median_seconds": null,
+    "p85_seconds": null,
+    "unknown": 0
+  },
+  "time_to_merge_by_home": {
+    "main": {
+      "known": 0,
+      "median_seconds": null,
+      "p85_seconds": null,
+      "unknown": 0
+    }
+  },
+  "trend_7d": [
+    {
+      "day": "1969-12-26",
+      "known": 0,
+      "median_seconds": null,
+      "p85_seconds": null,
+      "unknown": 0
+    },
+    {
+      "day": "1969-12-27",
+      "known": 0,
+      "median_seconds": null,
+      "p85_seconds": null,
+      "unknown": 0
+    },
+    {
+      "day": "1969-12-28",
+      "known": 0,
+      "median_seconds": null,
+      "p85_seconds": null,
+      "unknown": 0
+    },
+    {
+      "day": "1969-12-29",
+      "known": 0,
+      "median_seconds": null,
+      "p85_seconds": null,
+      "unknown": 0
+    },
+    {
+      "day": "1969-12-30",
+      "known": 0,
+      "median_seconds": null,
+      "p85_seconds": null,
+      "unknown": 0
+    },
+    {
+      "day": "1969-12-31",
+      "known": 0,
+      "median_seconds": null,
+      "p85_seconds": null,
+      "unknown": 0
+    },
+    {
+      "day": "1970-01-01",
+      "known": 0,
+      "median_seconds": null,
+      "p85_seconds": null,
+      "unknown": 0
+    }
+  ]
+}

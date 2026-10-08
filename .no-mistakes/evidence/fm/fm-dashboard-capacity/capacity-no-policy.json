@@ -1,0 +1,224 @@
+{
+  "at": 100,
+  "bottlenecks": [],
+  "capacity": {
+    "census_complete": true,
+    "gate_counts": {
+      "emulator": 2,
+      "gradle_gate_match": 0
+    },
+    "gate_scope": "observer environment and installed defaults",
+    "gate_source": "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D9A4JCF0254Q8RTZJ622ZC/.capacity-validation-tmp/drive-7bi5h65s/fleet/config/fm-mem-gate.sh",
+    "heavy_slice": {
+      "MemoryCurrent": 17714429952,
+      "MemoryMax": 40802189312,
+      "unlimited": false
+    },
+    "jobs": [
+      {
+        "kind": "gradle_daemon",
+        "owner": null,
+        "pid": 1470479,
+        "process_state": "S",
+        "rss_bytes": 65970176
+      },
+      {
+        "kind": "emulator",
+        "owner": null,
+        "pid": 622385,
+        "process_state": "S",
+        "rss_bytes": 3641479168
+      },
+      {
+        "kind": "emulator",
+        "owner": null,
+        "pid": 74094,
+        "process_state": "S",
+        "rss_bytes": 7444336640
+      }
+    ],
+    "limits": {
+      "FM_EMU_MAX": null,
+      "FM_GRADLE_MAX": null,
+      "FM_MEM_JOB_GB": null,
+      "FM_MEM_MIN_GB": null,
+      "psi_max": null
+    },
+    "mac": {
+      "android_pids": null,
+      "available_bytes": null,
+      "free_disk_bytes": null,
+      "reachable": null,
+      "simulators": null,
+      "source": "FM_MAC_HOST"
+    },
+    "memory_bytes": {
+      "MemAvailable": 46859517952,
+      "MemTotal": 98755674112,
+      "SwapFree": 225174462464,
+      "SwapTotal": 266232573952
+    },
+    "memory_some_avg10_percent": 0.01,
+    "observed_at": 1791448351,
+    "slots_under_caps": {
+      "emulator": null,
+      "gradle_gate_match": null
+    },
+    "tmp": {
+      "directory_bytes": null,
+      "filesystem_available_bytes": 37075644416,
+      "filesystem_total_bytes": 49377837056,
+      "filesystem_used_bytes": 12302192640,
+      "known_directory_bytes": 12129816576,
+      "ram_backed": true,
+      "top_folders": [
+        {
+          "bytes": null,
+          "known_bytes": 1778917376,
+          "path": "/tmp/claude-1000"
+        },
+        {
+          "bytes": null,
+          "known_bytes": 888152064,
+          "path": "/tmp/node-compile-cache"
+        },
+        {
+          "bytes": null,
+          "known_bytes": 587653120,
+          "path": "/tmp/clippy-p1e-target"
+        },
+        {
+          "bytes": null,
+          "known_bytes": 540385280,
+          "path": "/tmp/jest_rs"
+        },
+        {
+          "bytes": null,
+          "known_bytes": 504500224,
+          "path": "/tmp/fm-mx-ios-sim-harden4"
+        },
+        {
+          "bytes": null,
+          "known_bytes": 301707264,
+          "path": "/tmp/dl-rn-flow-g5b8gZ"
+        },
+        {
+          "bytes": null,
+          "known_bytes": 247193600,
+          "path": "/tmp/byk-pr303-agent-signin"
+        },
+        {
+          "bytes": null,
+          "known_bytes": 231419904,
+          "path": "/tmp/fm-pins-base"
+        },
+        {
+          "bytes": null,
+          "known_bytes": 192937984,
+          "path": "/tmp/crewhouse-migrate-Ln3Z6L"
+        },
+        {
+          "bytes": null,
+          "known_bytes": 186331136,
+          "path": "/tmp/newcomer-first-app"
+        }
+      ],
+      "top_folders_complete": false
+    }
+  },
+  "executed_24h": [],
+  "executed_7d": [],
+  "homes": [
+    "main"
+  ],
+  "lanes": [],
+  "limitations": [
+    {
+      "reason": "stage clock policy unknown",
+      "source": "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D9A4JCF0254Q8RTZJ622ZC/.capacity-validation-tmp/drive-7bi5h65s/fleet/config/fm-flow-check.sh"
+    },
+    {
+      "reason": "[Errno 2] No such file or directory: '/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D9A4JCF0254Q8RTZJ622ZC/.capacity-validation-tmp/drive-7bi5h65s/fleet/config/fm-mem-gate.sh'",
+      "source": "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4D9A4JCF0254Q8RTZJ622ZC/.capacity-validation-tmp/drive-7bi5h65s/fleet/config/fm-mem-gate.sh"
+    },
+    {
+      "reason": "d-logind.service-ko7KEE': Permission denied\ndu: cannot read directory '/tmp/systemd-private-ae78c80a86e34e0cb50730cf4be1882f-bluetooth.service-kJvXc0': Permission denied\ndu: cannot read directory '/tmp/systemd-private-ae78c80a86e34e0cb50730cf4be1882f-NetworkManager.service-3lHxKo': Permission denied",
+      "source": "/tmp/top_folders"
+    },
+    {
+      "reason": "Mac probe not configured or target invalid",
+      "source": "FM_MAC_HOST"
+    },
+    {
+      "reason": "Retained records only; missing pickup/PR/check/cleanup times stay unknown. Wait ages are recorded waits, not proof of idle workers. Bottleneck items report the maximum recorded wait age per (lane, cause); a lane in several cause buckets overlaps in time, so cause sums are non-additive and never causal lane-hours lost. Items keep full seconds null when any same-cause wait is unstamped and report the known lower bound separately. Free-worker availability not collected. Capacity is an observed census, not a job-admission promise; per-job gate overrides are not inspected. Mac available bytes use free+inactive+speculative pages, matching the installed slot helper, not Linux MemAvailable. CI counts cover reported check runs only, not all required contexts or a green verdict.",
+      "source": "coverage"
+    }
+  ],
+  "queue": [],
+  "schema": "fm-flow.v1",
+  "time_to_merge": {
+    "known": 0,
+    "median_seconds": null,
+    "p85_seconds": null,
+    "unknown": 0
+  },
+  "time_to_merge_by_home": {
+    "main": {
+      "known": 0,
+      "median_seconds": null,
+      "p85_seconds": null,
+      "unknown": 0
+    }
+  },
+  "trend_7d": [
+    {
+      "day": "1969-12-26",
+      "known": 0,
+      "median_seconds": null,
+      "p85_seconds": null,
+      "unknown": 0
+    },
+    {
+      "day": "1969-12-27",
+      "known": 0,
+      "median_seconds": null,
+      "p85_seconds": null,
+      "unknown": 0
+    },
+    {
+      "day": "1969-12-28",
+      "known": 0,
+      "median_seconds": null,
+      "p85_seconds": null,
+      "unknown": 0
+    },
+    {
+      "day": "1969-12-29",
+      "known": 0,
+      "median_seconds": null,
+      "p85_seconds": null,
+      "unknown": 0
+    },
+    {
+      "day": "1969-12-30",
+      "known": 0,
+      "median_seconds": null,
+      "p85_seconds": null,
+      "unknown": 0
+    },
+    {
+      "day": "1969-12-31",
+      "known": 0,
+      "median_seconds": null,
+      "p85_seconds": null,
+      "unknown": 0
+    },
+    {
+      "day": "1970-01-01",
+      "known": 0,
+      "median_seconds": null,
+      "p85_seconds": null,
+      "unknown": 0
+    }
+  ]
+}

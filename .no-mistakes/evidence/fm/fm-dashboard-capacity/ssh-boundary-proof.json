@@ -1,0 +1,15 @@
+{
+  "native_census_elapsed_seconds": 0.608,
+  "timeout_cli_elapsed_seconds": 6.632,
+  "control_updatehostkeys": "true",
+  "flow_native_ssh_options": {
+    "updatehostkeys": "false",
+    "stricthostkeychecking": "true",
+    "batchmode": "yes",
+    "connecttimeout": "30"
+  },
+  "native_ssh_banner": "SSH-2.0-OpenSSH_10.5",
+  "native_connection_closed": true,
+  "isolated_fleet_and_private_user_files_unchanged": true,
+  "note": "Private -F config and loopback route; no shared SSH files or production credentials touched. No successful Mac host configured."
+}

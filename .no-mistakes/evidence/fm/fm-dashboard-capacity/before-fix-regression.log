@@ -1,0 +1,4 @@
+Pseudo-terminal will not be allocated because stdin is not a terminal.
+Traceback (most recent call last):
+  File "<stdin>", line 302, in <module>
+AssertionError: flow CLI disables host-key updates in native SSH

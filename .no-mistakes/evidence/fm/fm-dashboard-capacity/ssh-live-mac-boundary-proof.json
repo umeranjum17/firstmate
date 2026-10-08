@@ -1,0 +1,13 @@
+{
+  "candidate": "da34db291c872a5bbbca4a5ae7ff052738cf4263",
+  "control_updatehostkeys": "true",
+  "boundary_options": {
+    "updatehostkeys": "false",
+    "stricthostkeychecking": "true",
+    "batchmode": "yes",
+    "connecttimeout": "3",
+    "hostname": "100.97.31.92",
+    "user": "umerfaroq"
+  },
+  "started_at": 1791448936
+}

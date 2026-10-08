@@ -1,0 +1,13 @@
+{
+  "before": {
+    "state/fleet-ledger.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "data/backlog.md": "895f7201b3db3f0a30d2d9bab2c695af2fee91f7a8546998a4b36519139f2a17",
+    "config/fm-mem-gate.sh": "bf0861b0a28573e1fb3b75c953648f104520ed678f4a7fd07b0a55450a8489a6"
+  },
+  "after": {
+    "state/fleet-ledger.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "data/backlog.md": "895f7201b3db3f0a30d2d9bab2c695af2fee91f7a8546998a4b36519139f2a17",
+    "config/fm-mem-gate.sh": "bf0861b0a28573e1fb3b75c953648f104520ed678f4a7fd07b0a55450a8489a6"
+  },
+  "unchanged": true
+}
