@@ -570,7 +570,13 @@ test_new_lane_and_unwritten_archive_stay_exact() {
     fail "a lane with no status line or an archive not yet written made a number unknown: $(jq -c '.metrics.lanes, .metrics.closed | del(.daily)' "$d/data.json")"
   has "$d/index.html" "Closed 7 d 2"
   mkfifo "$home/state/m-vanishing.meta"
-  (printf 'kind=ship\nproject=alpha\n' > "$home/state/m-vanishing.meta"; rm "$home/state/m-vanishing.meta") &
+  # Unlink while the writer is open, so the reader cannot reach EOF before removal.
+  python3 - "$home/state/m-vanishing.meta" <<'PY' &
+import os, sys
+with open(sys.argv[1], 'w') as fh:
+    os.unlink(sys.argv[1])
+    fh.write('kind=ship\nproject=alpha\n')
+PY
   local writer=$!
   build "$home"
   wait "$writer" || fail "vanishing metadata fixture failed"
