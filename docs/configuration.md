@@ -598,6 +598,26 @@ The bound is required rather than cosmetic because churn and pane staleness read
 The flag is a home-local supervision-noise preference and is not inherited by secondmate homes, which run their own crew mix.
 [`architecture.md`](architecture.md) owns the triage contract and `bin/fm-watch.sh`'s `signal_turnend_panes_churned` owns the exact evidence and fail-closed boundaries.
 
+## Waiting-state escalation
+
+Every watch poll checks recorded workers and leads for open `blocked` or `needs-decision` declarations and declared `paused` waits, independently of pane activity and the existing stale/wedge heuristics.
+Herdr's `agent list` `agent_status=blocked` takes precedence for each recorded pane, even while its status log says working.
+A native API failure stops the check with its diagnostic rather than treating the pane as unblocked.
+
+| Environment setting | Default | Meaning |
+| --- | --- | --- |
+| `FM_WAIT_ALERT_SECS` | `300` | Observed waiting seconds before one alert wakes the owning lead, or Main for its own workers and leads. |
+| `FM_WAIT_ESCALATE_SECS` | `900` | Total observed waiting seconds before a still-waiting lead-owned lane reports one escalation through its parent channel. |
+
+Both values must be positive decimal seconds of at most nine digits, with escalation later than the owner alert; invalid settings stop the check.
+The durable episode starts at first observation, survives watcher restarts, and re-arms when the effective declaration or endpoint changes or clears.
+Pane output and unrelated status events cannot reset an open blocker or decision; a future `until` time does not suspend a pause timer.
+Each alert names the item, observed wait duration, and the supervisor who must act.
+Local and remote secondmate routes use the existing parent channel; the escalation is automatically resolved when the episode ends.
+Main has no automatic captain escalation: it seeks a human only when it cannot unblock the item itself.
+The existing steering-inbox retry and secondmate wake-loop recovery paths still attempt safe delivery before raising their own escalation; the owner timer itself queues and delivers an actionable wake before parent escalation becomes due.
+Timer mechanics are owned by [`bin/fm-wait-timers-lib.sh`](../bin/fm-wait-timers-lib.sh), with the real watcher/drain/parent-channel regression in `tests/fm-wait-timers.test.sh`.
+
 ## Parked-gate wait deferral (config/wedge-defer-parked-gate)
 
 The optional local, gitignored `config/wedge-defer-parked-gate` presence flag opts this home into a default-off second form of wait evidence in the watcher's wedge timer.
