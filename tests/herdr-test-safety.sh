@@ -36,10 +36,23 @@ herdr_forget_inherited_pane() {
   unset HERDR_ENV HERDR_PANE_ID HERDR_TAB_ID HERDR_WORKSPACE_ID HERDR_SOCKET_PATH HERDR_SESSION
 }
 
+HERDR_TEST_FLEET_ENV=(-u XDG_CONFIG_HOME -u XDG_DATA_HOME -u XDG_STATE_HOME -u XDG_CACHE_HOME "HOME=$HOME")
+for herdr_test_key in XDG_CONFIG_HOME XDG_DATA_HOME XDG_STATE_HOME XDG_CACHE_HOME; do
+  if [ "${!herdr_test_key+x}" = x ]; then
+    HERDR_TEST_FLEET_ENV+=("$herdr_test_key=${!herdr_test_key}")
+  fi
+done
+unset herdr_test_key
+
+herdr_prepare_runtime() {
+  fm_herdr_lab_prepare "$1" || return 1
+  fm_herdr_lab_runtime_env "$1"
+}
+
 herdr_refuse_if_default() { # <session>
   fm_herdr_lab_refuse_if_default "$1"
 }
 
 herdr_safe_stop_and_delete() { # <session>
-  fm_herdr_lab_teardown "$1"
+  env "${HERDR_TEST_FLEET_ENV[@]}" bash "$HERDR_TEST_SAFETY_DIR/bin/fm-herdr-lab.sh" teardown "$1"
 }

@@ -141,17 +141,21 @@ fm_herdr_lab_ensure_isolated_xdg() { # <session>
   printf '%s' "$base"
 }
 
-fm_herdr_lab_env() ( # <session> <command...>
+fm_herdr_lab_runtime_env() {
   local name=$1 base key
-  shift
   base=$(fm_herdr_lab_ensure_isolated_xdg "$name") || return 1
   for key in $(compgen -e); do
-    case "$key" in CLAUDE_*|ANTHROPIC_*|PI_CODING_AGENT_DIR) unset "$key" || return 1 ;; esac
+    case "$key" in CLAUDE_*|ANTHROPIC_*|OPENAI_API_KEY|PI_CODING_AGENT_DIR|CODEX_HOME) unset "$key" || return 1 ;; esac
   done
   export HOME="$base/home" XDG_CONFIG_HOME="$base/config" XDG_DATA_HOME="$base/data" \
     XDG_STATE_HOME="$base/state" XDG_CACHE_HOME="$base/cache" \
     CLAUDE_CONFIG_DIR="$base/home/.claude" PI_CODING_AGENT_DIR="$base/home/.pi/agent" \
-    HERDR_SESSION="$name"
+    CODEX_HOME="$base/home/.codex" HERDR_SESSION="$name"
+}
+
+fm_herdr_lab_env() ( # <session> <command...>
+  fm_herdr_lab_runtime_env "$1" || return 1
+  shift
   exec "$@"
 )
 

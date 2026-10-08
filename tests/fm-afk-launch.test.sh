@@ -1624,7 +1624,7 @@ unit_flag_write_failure_aborts() {
 # ---------------------------------------------------------------------------
 # E2E herdr: topology invariant.
 # ---------------------------------------------------------------------------
-e2e_herdr() {
+e2e_herdr() (
   command -v herdr >/dev/null 2>&1 || { echo "skip: herdr not found (herdr e2e)"; return 0; }
   command -v jq >/dev/null 2>&1 || { echo "skip: jq not found (herdr e2e)"; return 0; }
   # shellcheck source=tests/herdr-test-safety.sh
@@ -1644,15 +1644,15 @@ e2e_herdr() {
     herdr_safe_stop_and_delete "$SESSION" >/dev/null 2>&1 || true
     rm -rf "$home_tmp" 2>/dev/null || true
   }
-  fm_herdr_lab_prepare "$SESSION" || { fail "herdr e2e: could not prepare isolated lab session"; return 0; }
-  fm_backend_source herdr || { E2E_HERDR_CLEANUP; fail "herdr e2e: fm_backend_source herdr failed"; return 0; }
-  fm_backend_herdr_server_ensure "$SESSION" || { E2E_HERDR_CLEANUP; fail "herdr e2e: lab server did not start"; return 0; }
+  herdr_prepare_runtime "$SESSION" || { E2E_HERDR_CLEANUP; fail "herdr e2e: could not prepare isolated lab session"; return 1; }
+  fm_backend_source herdr || { E2E_HERDR_CLEANUP; fail "herdr e2e: fm_backend_source herdr failed"; return 1; }
+  fm_backend_herdr_server_ensure "$SESSION" || { E2E_HERDR_CLEANUP; fail "herdr e2e: lab server did not start"; return 1; }
 
   out=$(fm_backend_herdr_cli "$SESSION" workspace create --cwd "$ROOT" --label captain --no-focus 2>/dev/null)
   cap_ws=$(printf '%s' "$out" | jq -r '.result.workspace.workspace_id // empty')
   cap_tab=$(printf '%s' "$out" | jq -r '.result.tab.tab_id // empty')
   cap_pane=$(printf '%s' "$out" | jq -r '.result.root_pane.pane_id // empty')
-  if [ -z "$cap_ws" ] || [ -z "$cap_pane" ]; then E2E_HERDR_CLEANUP; fail "herdr e2e: could not create captain workspace"; return 0; fi
+  if [ -z "$cap_ws" ] || [ -z "$cap_pane" ]; then E2E_HERDR_CLEANUP; fail "herdr e2e: could not create captain workspace"; return 1; fi
   target="$SESSION:$cap_pane"
   enter_posture "$home_tmp" || fail "herdr e2e: could not enter fixture posture"
   before=$(fm_backend_herdr_cli "$SESSION" pane list --workspace "$cap_ws" 2>/dev/null | jq --arg t "$cap_tab" '[.result.panes[]?|select(.tab_id==$t)]|length')
@@ -1682,7 +1682,8 @@ e2e_herdr() {
   if [ ! -e "$home_tmp/state/.afk-daemon-terminal" ] && [ ! -e "$home_tmp/state/.afk" ]; then pass "herdr e2e: record + .afk cleared on stop"; else fail "herdr e2e: record or .afk not cleared"; fi
 
   E2E_HERDR_CLEANUP
-}
+  exit "$FAILED"
+)
 
 # ---------------------------------------------------------------------------
 # E2E tmux: topology invariant (captain window untouched; daemon in a separate
@@ -1774,7 +1775,7 @@ unit_clear_failure_aborts_entry
 unit_confirmed_absence_succeeds
 unit_incomplete_restore_retains_backup
 unit_flag_write_failure_aborts
-e2e_herdr
+e2e_herdr || FAILED=1
 e2e_tmux
 
 [ "$FAILED" -eq 0 ] || exit 1

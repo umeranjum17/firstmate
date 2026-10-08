@@ -60,7 +60,7 @@ cleanup_all() {
   exit "$status"
 }
 trap cleanup_all EXIT
-fm_herdr_lab_prepare "$SESSION" || fail "could not prepare isolated Herdr lab session"
+herdr_prepare_runtime "$SESSION" || fail "could not prepare isolated Herdr lab session"
 
 SCRATCH=$(mktemp -d "${TMPDIR:-/tmp}/fm-pi-stale.XXXXXX")
 SCRATCH=$(cd "$SCRATCH" && pwd)
@@ -72,8 +72,7 @@ fm_backend_source herdr || fail "fm_backend_source herdr failed"
 
 lab() { fm_herdr_lab_cli "$SESSION" "$@"; }
 
-# prepare only records the tripwire; the adapter's own server-ensure starts
-# the lab session's server exactly as a spawn would.
+# The adapter's own server-ensure starts the lab session's server.
 fm_backend_herdr_server_ensure "$SESSION" || fail "could not start the isolated Herdr lab server"
 WS=$(lab workspace create --label fm-pi-stale --cwd "$SCRATCH/cwd" 2>&1) \
   || fail "could not create the lab workspace: $WS"
