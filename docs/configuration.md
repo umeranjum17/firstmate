@@ -10,7 +10,7 @@ Start with the directory layout, then use the setting reference for the behavior
 | Firstmate's code, private files, or project location | [FM_HOME](#fm_home) and [operational home layout](#operational-home-layout-and-state) |
 | Task windows and worker tools | [Runtime backend](#runtime-backend-configbackend--fm_backend) and [harness support](#harness-support) |
 | Worker permissions, accounts, or environment | [Claude permission mode](#claude-permission-mode-configclaude-permission-mode), [worker account pin](#worker-account-pin-configclaude-account-configpi-account), and [worker launch environment](#worker-launch-environment-configlaunch-env-allowlist) |
-| Backlog, preferences, and memory | [Backlog backend](#backlog-backend-taskstoml--configbacklog-backend), [captain preferences](#captain-preferences-datacaptainmd--datacaptain-sharedmd), and [startup memory budget](#startup-memory-budget-configstartup-memory-budget) |
+| Backlog, preferences, and memory | [Backlog backend](#backlog-backend-taskstoml--configbacklog-backend), [captain preferences](#captain-preferences-datacaptainmd--datacaptain-sharedmd), [startup memory budget](#startup-memory-budget-configstartup-memory-budget), and [host memory guard](#host-memory-guard-confighost-memory) |
 | Supervision and presentation | [Pi supervision branch](#pi-supervision-branch), [supervision host](#supervision-host-configsupervision-host), and [Calm preference](#calm-preference-configcalm) |
 | Persistent secondmates | [Secondmate routes](#secondmate-routes-datasecondmatesmd) |
 | Per-run overrides and tuning | [Environment variables](#environment-variables) |
@@ -92,6 +92,7 @@ Each effective `FM_HOME` contains private operational directories.
 - Private secondmate config-reread generations with their retry and quarantine state.
 - Per-task steering-inbox records under `state/<id>.inbox/` (`bin/fm-task-inbox-lib.sh`).
 - Parent-owned secondmate pending-reply records under `state/pending-replies/` (`bin/fm-pending-reply-lib.sh`).
+- [Host memory guard records](#host-memory-guard-confighost-memory).
 
 `config/` holds local gitignored operating choices, including explicit extension bindings under `config/extensions.d/`.
 
@@ -661,6 +662,32 @@ An inherited `data/captain-shared.md` counts in a secondmate's total but remains
 The internal [`/stow` skill](../.agents/skills/stow/SKILL.md) owns curation and its automatic secondmate cascade, which accounts every home against this same per-home allowance separately rather than against a fleet total.
 
 The helper's header owns exact parsing, publication, and report output mechanics.
+
+## Host memory guard (config/host-memory)
+
+On Herdr, agents across homes share the server's service cgroup, so an out-of-memory kill of that unit stops the whole fleet.
+The host memory guard reads available memory, swap, and host and runtime-cgroup pressure (the share of time some process waited on memory over 10 seconds), classifying the worse pressure reading.
+It reads the `herdr-server.service` cgroup and its parent user slice when available; unreadable cgroup pressure is reported as host-only classification.
+It classifies the host as `OK`, `WAIT` (new agents should wait), or `ALERT`, and names the largest consumers by owning task.
+The helper currently requires explicit invocation; fleet spawn/relaunch admission, periodic sampling, and watcher supervision are not wired into the runtime.
+It cannot guarantee avoidance of an out-of-memory kill.
+
+`config/host-memory` is optional and read only when passed with `--config`; otherwise the helper uses its defaults.
+Each setting is `key=number`, blank lines and lines beginning with `#` are ignored, and a missing file or key keeps its default:
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `wait_pressure` | `20` | the guard reads `WAIT` while pressure is at or above this percentage |
+| `wait_available_gb` | `12` | the guard reads `WAIT` while available memory is below this many GB |
+| `alert_pressure` | `35` | the guard reads `ALERT` while pressure is at or above this percentage |
+| `alert_available_gb` | `6` | the guard reads `ALERT` while available memory is below this many GB |
+
+Thresholds must be finite, nonnegative numbers.
+An invalid line is refused with its line number, so a typo never silently loosens the guard.
+For fixture testing, `FM_HOST_MEMORY_PROC` selects the proc root and `FM_HOST_MEMORY_CGROUP_ROOT` selects the cgroup root; production defaults are `/proc` and `/sys/fs/cgroup`.
+Without readable host pressure and available memory, or without `python3`, the guard reads unknown and admits work without recording a sample, because it cannot measure the host.
+The guard's header owns consumer attribution, sample format, and exact output.
+`tests/fm-jev-mem-guard.test.sh` pins verdicts, recorded samples, cgroup classification, home-qualified ownership, remote-record exclusion, finite thresholds, and admission publication.
 
 ## Stow pass horizon (config/stow-pass-horizon)
 
@@ -2403,6 +2430,8 @@ FM_STALE_ESCALATE_SECS=240         # idle seconds before a provably-working stal
 FM_BUSY_TURN_MAX_SECS=3600         # maximum age without a completed turn or explicit native-harness progress (bin/fm-watch.sh owns marker selection), before the same wedge escalation used for a provably-working non-busy stale takes over; inspection-only, never an automatic interrupt or restart; a declared external wait, an attended verified captain-held transfer, or - where config/wedge-defer-parked-gate arms it - a validation gate of the crew's own awaiting the supervisor's still-unanswered decision takes the FM_PAUSE_RESURFACE_SECS recheck below instead
 FM_PAUSE_RESURFACE_SECS=14400      # four hours between bounded rechecks of a declared external wait or verified captain-held transfer, and between repeated new-hash stale alarms for an ordinary crew task with an open backlog captain call; a structured until time can make an external-wait recheck occur sooner but cannot extend this bound; this includes a live idle pane after its first inconclusive stale wake, a provably-working pane whose own unelapsed declared wait or, where config/wedge-defer-parked-gate arms it, unanswered supervisor-owed validation gate defers its FM_STALE_ESCALATE_SECS escalation, and a live busy pane past FM_BUSY_TURN_MAX_SECS, while the away-mode daemon uses the same setting and ages its window against the crew's own latest status line rather than pane busy state; a captain-held transfer is never rechecked while the away-posture record exists, while an armed validation gate awaiting the supervisor's decision keeps this recheck in either posture; an idle `paused:` claim contradicted by a parked run the worker never escalated wakes once per run state instead of taking this cadence (docs/architecture.md owns the contract)
 FM_SECONDMATE_WAKE_STALL_SECS=180  # minimum interval with no change of the oldest actionable foreign wake-queue row (it advances as the mate drains, and a queue reprovisioned under the same task id starts a fresh interval at whatever sequence it restarts) before an endpoint-recorded local secondmate produces one durable parent wake-loop-stall notification for that no-progress episode; a mate that is provably inside an active turn (an exact busy verdict, or that row held by its supervision branch's live grant) does not escalate until that same no-progress interval reaches FM_BUSY_TURN_MAX_SECS above; a mate whose busy class is exactly idle, whose agent is alive, and whose composer is not pending is rung once, naming that row, to drain it and run the acknowledgement the drain prints, and the parent notification is withheld until that same row stays frozen for another stall interval; unknown or ring-unsafe panes keep the parent alarm; declared external-wait pause rows are excluded, and zero or invalid values use 180
+FM_HOST_MEMORY_PROC=             # fixture proc root; see Host memory guard above
+FM_HOST_MEMORY_CGROUP_ROOT=      # fixture cgroup root; see Host memory guard above
 FM_SECONDMATE_LIVENESS_SECS=60   # seconds between watcher probes of each registered secondmate's recorded endpoint through bin/fm-secondmate-liveness-lib.sh, which relaunches only a positively `dead` or `missing` endpoint through the ordinary guarded fm-spawn.sh --secondmate path and emits exactly one check wake per relaunch; zero or invalid values use 60
 FM_SECONDMATE_LIVENESS_TIMEOUT=120   # seconds bounding one watcher-driven relaunch, so a wedged spawn cannot stall the poll; zero or invalid values use 120
 FM_SECONDMATE_LIVENESS_MAX_ATTEMPTS=3   # automatic relaunch attempts allowed per mate inside the window before the watcher parks auto-relaunch behind state/.secondmate-relaunch-bound-<id> and escalates once; a later live probe clears the marker and restores the full attempt budget (the ledger keeps its history behind a `rearmed` row); zero or invalid values use 3

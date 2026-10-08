@@ -771,7 +771,7 @@ tests/fm-host-mirror-live-e2e.test.sh 79
 tests/fm-host-mirror.test.sh 11587
 tests/fm-inactive-reconcile.test.sh 60823
 tests/fm-inbox.test.sh 6062
-tests/fm-jev-mem-guard.test.sh 340
+tests/fm-jev-mem-guard.test.sh 6000
 tests/fm-kimi-harness.test.sh 58917
 tests/fm-launch-prompt-signals-live-e2e.test.sh 51
 tests/fm-lint-workflows.test.sh 872
@@ -2466,6 +2466,11 @@ run_script_bounded() {  # <script> <out> <stream> <id>
   local GIT_CONFIG_GLOBAL GIT_CONFIG_NOSYSTEM
   # shellcheck source=tests/git-config-helpers.sh
   . "$ROOT/tests/git-config-helpers.sh" || return
+  # Keep guard invocations from reading the runner's real memory pressure by
+  # default; guard tests supply fixture roots, and callers may opt into others.
+  local FM_HOST_MEMORY_PROC=${FM_HOST_MEMORY_PROC:-/nonexistent/fm-test-host-memory}
+  local FM_HOST_MEMORY_CGROUP_ROOT=${FM_HOST_MEMORY_CGROUP_ROOT:-/nonexistent/fm-test-host-cgroup}
+  export FM_HOST_MEMORY_PROC FM_HOST_MEMORY_CGROUP_ROOT
   local rc
   : "$id"
   set +e
