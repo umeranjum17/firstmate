@@ -1,0 +1,51 @@
+{
+  "url": "http://127.0.0.1:34581",
+  "candidate": "f2636ffaa160d488f5eab41d39d84ce3b712ebc2",
+  "board_stuck": 2,
+  "overview_stuck": 3,
+  "cards": {
+    "blocked-ci": {
+      "state": "blocked",
+      "wait": "blocked",
+      "why": "CI needs credentials PR 9",
+      "stage": "ci"
+    },
+    "failed-checks": {
+      "state": "blocked",
+      "wait": "blocked",
+      "why": "no-mistakes checks failed",
+      "stage": "review"
+    },
+    "paused-ci": {
+      "state": "validating",
+      "wait": "waiting",
+      "why": "waiting for CI checks PR 10",
+      "stage": "ci"
+    },
+    "held-ci": {
+      "state": "decision",
+      "wait": "parked",
+      "why": "CI change held by captain",
+      "stage": "building"
+    }
+  },
+  "lane_states": {
+    "blocked": 2,
+    "decision": 1,
+    "finished": 1,
+    "building": 9,
+    "validating": 3,
+    "waiting": 0
+  },
+  "baseline": {
+    "commit": "07db5066c959c78a983cc015bafcb6f76fad422b",
+    "overview_stuck": 1,
+    "board_stuck": 2,
+    "held_card": {
+      "state": "decision",
+      "wait": "parked",
+      "why": "CI change held by captain"
+    }
+  },
+  "conclusion": "CI failure classification is fixed. Captain-held lane still adds one to Overview stuck but is parked in Board and Ship; held classification is unchanged from base."
+}

@@ -12,52 +12,214 @@
     "reused": true,
     "saveStatus": "saved"
   },
-  "origin": "http://127.0.0.1:39429/",
+  "origin": "http://127.0.0.1:36575/",
   "result": {
-    "documentOverflow": false,
+    "header": {
+      "h": 81,
+      "w": 760,
+      "x": 52,
+      "y": 8
+    },
+    "homes": [
+      {
+        "name": "Main",
+        "rect": {
+          "h": 32,
+          "w": 36,
+          "x": 8,
+          "y": 233
+        },
+        "short": "Main",
+        "shown": "block",
+        "title": "Main"
+      },
+      {
+        "name": "atlas",
+        "rect": {
+          "h": 32,
+          "w": 36,
+          "x": 8,
+          "y": 267
+        },
+        "short": "atla",
+        "shown": "block",
+        "title": "atlas"
+      },
+      {
+        "name": "borealis",
+        "rect": {
+          "h": 32,
+          "w": 36,
+          "x": 8,
+          "y": 301
+        },
+        "short": "bore",
+        "shown": "block",
+        "title": "borealis"
+      },
+      {
+        "name": "cirrus",
+        "rect": {
+          "h": 32,
+          "w": 36,
+          "x": 8,
+          "y": 335
+        },
+        "short": "cirr",
+        "shown": "block",
+        "title": "cirrus"
+      },
+      {
+        "name": "delta",
+        "rect": {
+          "h": 32,
+          "w": 36,
+          "x": 8,
+          "y": 369
+        },
+        "short": "delt",
+        "shown": "block",
+        "title": "delta"
+      },
+      {
+        "name": "ember",
+        "rect": {
+          "h": 32,
+          "w": 36,
+          "x": 8,
+          "y": 403
+        },
+        "short": "embe",
+        "shown": "block",
+        "title": "ember"
+      },
+      {
+        "name": "fjord",
+        "rect": {
+          "h": 32,
+          "w": 36,
+          "x": 8,
+          "y": 437
+        },
+        "short": "fjor",
+        "shown": "block",
+        "title": "fjord"
+      },
+      {
+        "name": "gaia",
+        "rect": {
+          "h": 32,
+          "w": 36,
+          "x": 8,
+          "y": 471
+        },
+        "short": "gaia",
+        "shown": "block",
+        "title": "gaia"
+      },
+      {
+        "name": "helix",
+        "rect": {
+          "h": 32,
+          "w": 36,
+          "x": 8,
+          "y": 505
+        },
+        "short": "heli",
+        "shown": "block",
+        "title": "helix"
+      },
+      {
+        "name": "io",
+        "rect": {
+          "h": 32,
+          "w": 36,
+          "x": 8,
+          "y": 539
+        },
+        "short": "io",
+        "shown": "block",
+        "title": "io"
+      },
+      {
+        "name": "😀orbit",
+        "rect": {
+          "h": 32,
+          "w": 36,
+          "x": 8,
+          "y": 573
+        },
+        "short": "😀orb",
+        "shown": "block",
+        "title": "😀orbit"
+      }
+    ],
     "kpi": {
       "h": 28,
-      "text": "Needs you 1Stuck 2Landed today ≥1Cycle p50 –",
       "w": 732,
       "x": 68,
       "y": 52
     },
-    "sidebar": {
-      "h": 1180,
-      "w": 52,
-      "x": 0,
-      "y": 0
-    },
+    "pageOverflow": false,
     "tabs": [
       {
-        "h": 24,
-        "text": "Active6",
-        "w": 69.953125,
-        "x": 118.71875,
-        "y": 18
+        "rect": {
+          "h": 24,
+          "w": 77.734375,
+          "x": 118.71875,
+          "y": 18
+        },
+        "text": "Active\n19"
       },
       {
-        "h": 24,
-        "text": "Queued1",
-        "w": 78.96875,
-        "x": 194.671875,
-        "y": 18
+        "rect": {
+          "h": 24,
+          "w": 86.75,
+          "x": 202.453125,
+          "y": 18
+        },
+        "text": "Queued\n11"
       },
       {
-        "h": 24,
-        "text": "Landed today≥1",
-        "w": 118.453125,
-        "x": 279.640625,
-        "y": 18
+        "rect": {
+          "h": 24,
+          "w": 118.453125,
+          "x": 295.203125,
+          "y": 18
+        },
+        "text": "Landed today\n≥0"
       },
       {
-        "h": 24,
-        "text": "All",
-        "w": 34.5625,
-        "x": 404.09375,
-        "y": 18
+        "rect": {
+          "h": 24,
+          "w": 34.5625,
+          "x": 419.65625,
+          "y": 18
+        },
+        "text": "All"
+      },
+      {
+        "rect": {
+          "h": 28,
+          "w": 70.953125,
+          "x": 638.921875,
+          "y": 16
+        },
+        "text": "Filter"
+      },
+      {
+        "rect": {
+          "h": 28,
+          "w": 84.125,
+          "x": 715.875,
+          "y": 16
+        },
+        "text": "Display"
       }
     ],
-    "viewport": 820
+    "viewport": [
+      820,
+      1180
+    ]
   }
 }

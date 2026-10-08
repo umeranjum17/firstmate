@@ -1,0 +1,361 @@
+{
+  "runtime": "Unmodified bin/fm-dashboard.sh serve --port 0, on loopback, with task-private FM_HOME containing native persisted lane/backlog records. Real tasks-axi consumed those records. Herdr and adb omitted from a real-tool-only PATH to avoid operator fleet/device access; no mocked browser/API responses.",
+  "targeted_check": "TMPDIR=\"$PWD/.test-dashboard/tmp\" bash tests/fm-dashboard.test.sh ci-stuck: passed (stubbed probes; not counted as live).",
+  "home_nav": "11 homes; full aria-label/title; visible four-codepoint labels, including io and 😀orbit. Clicked helix, whose color repeats Main, and observed only Helix Build.",
+  "layouts": [
+    {
+      "controls": [
+        {
+          "h": 18.84375,
+          "text": "Board",
+          "w": 36.71875,
+          "x": 236,
+          "y": 20.578125
+        },
+        {
+          "h": 24,
+          "text": "Active\n19",
+          "w": 77.734375,
+          "x": 286.71875,
+          "y": 18
+        },
+        {
+          "h": 24,
+          "text": "Queued\n11",
+          "w": 86.75,
+          "x": 370.453125,
+          "y": 18
+        },
+        {
+          "h": 24,
+          "text": "Landed today\n≥0",
+          "w": 118.453125,
+          "x": 463.203125,
+          "y": 18
+        },
+        {
+          "h": 24,
+          "text": "All",
+          "w": 34.5625,
+          "x": 587.65625,
+          "y": 18
+        },
+        {
+          "h": 28,
+          "text": "Needs you\n0\nStuck\n3\nLanded today\n≥0\nCycle p50\n–",
+          "w": 768,
+          "x": 236,
+          "y": 52
+        },
+        {
+          "h": 28,
+          "text": "Filter",
+          "w": 70.953125,
+          "x": 842.921875,
+          "y": 16
+        },
+        {
+          "h": 28,
+          "text": "Display",
+          "w": 84.125,
+          "x": 919.875,
+          "y": 16
+        }
+      ],
+      "dock": false,
+      "overflow": false,
+      "overlaps": [],
+      "side": true,
+      "viewport": [
+        1024,
+        768
+      ]
+    },
+    {
+      "controls": [
+        {
+          "h": 18.84375,
+          "text": "Board",
+          "w": 36.71875,
+          "x": 236,
+          "y": 20.578125
+        },
+        {
+          "h": 24,
+          "text": "Active\n19",
+          "w": 77.734375,
+          "x": 286.71875,
+          "y": 18
+        },
+        {
+          "h": 24,
+          "text": "Queued\n11",
+          "w": 86.75,
+          "x": 370.453125,
+          "y": 18
+        },
+        {
+          "h": 24,
+          "text": "Landed today\n≥0",
+          "w": 118.453125,
+          "x": 463.203125,
+          "y": 18
+        },
+        {
+          "h": 24,
+          "text": "All",
+          "w": 34.5625,
+          "x": 587.65625,
+          "y": 18
+        },
+        {
+          "h": 28,
+          "text": "Needs you\n0\nStuck\n3\nLanded today\n≥0\nCycle p50\n–",
+          "w": 1023,
+          "x": 236,
+          "y": 52
+        },
+        {
+          "h": 28,
+          "text": "Filter",
+          "w": 70.953125,
+          "x": 1097.921875,
+          "y": 16
+        },
+        {
+          "h": 28,
+          "text": "Display",
+          "w": 84.125,
+          "x": 1174.875,
+          "y": 16
+        }
+      ],
+      "dock": false,
+      "overflow": false,
+      "overlaps": [],
+      "side": true,
+      "viewport": [
+        1279,
+        800
+      ]
+    },
+    {
+      "controls": [
+        {
+          "h": 18.84375,
+          "text": "Board",
+          "w": 36.71875,
+          "x": 236,
+          "y": 20.078125
+        },
+        {
+          "h": 24,
+          "text": "Active\n19",
+          "w": 77.734375,
+          "x": 286.71875,
+          "y": 17.5
+        },
+        {
+          "h": 24,
+          "text": "Queued\n11",
+          "w": 86.75,
+          "x": 370.453125,
+          "y": 17.5
+        },
+        {
+          "h": 24,
+          "text": "Landed today\n≥0",
+          "w": 118.453125,
+          "x": 463.203125,
+          "y": 17.5
+        },
+        {
+          "h": 24,
+          "text": "All",
+          "w": 34.5625,
+          "x": 587.65625,
+          "y": 17.5
+        },
+        {
+          "h": 28,
+          "text": "Needs you\n0\nStuck\n3\nLanded today\n≥0\nCycle p50\n–",
+          "w": 376.21875,
+          "x": 710.703125,
+          "y": 15.5
+        },
+        {
+          "h": 28,
+          "text": "Filter",
+          "w": 70.953125,
+          "x": 1098.921875,
+          "y": 15.5
+        },
+        {
+          "h": 28,
+          "text": "Display",
+          "w": 84.125,
+          "x": 1175.875,
+          "y": 15.5
+        }
+      ],
+      "dock": false,
+      "overflow": false,
+      "overlaps": [],
+      "side": true,
+      "viewport": [
+        1280,
+        800
+      ]
+    },
+    {
+      "controls": [
+        {
+          "h": 18.84375,
+          "text": "Board",
+          "w": 36.71875,
+          "x": 236,
+          "y": 20.078125
+        },
+        {
+          "h": 24,
+          "text": "Active\n19",
+          "w": 77.734375,
+          "x": 286.71875,
+          "y": 17.5
+        },
+        {
+          "h": 24,
+          "text": "Queued\n11",
+          "w": 86.75,
+          "x": 370.453125,
+          "y": 17.5
+        },
+        {
+          "h": 24,
+          "text": "Landed today\n≥0",
+          "w": 118.453125,
+          "x": 463.203125,
+          "y": 17.5
+        },
+        {
+          "h": 24,
+          "text": "All",
+          "w": 34.5625,
+          "x": 587.65625,
+          "y": 17.5
+        },
+        {
+          "h": 28,
+          "text": "Needs you\n0\nStuck\n3\nLanded today\n≥0\nCycle p50\n–",
+          "w": 376.21875,
+          "x": 870.703125,
+          "y": 15.5
+        },
+        {
+          "h": 28,
+          "text": "Filter",
+          "w": 70.953125,
+          "x": 1258.921875,
+          "y": 15.5
+        },
+        {
+          "h": 28,
+          "text": "Display",
+          "w": 84.125,
+          "x": 1335.875,
+          "y": 15.5
+        }
+      ],
+      "dock": false,
+      "overflow": false,
+      "overlaps": [],
+      "side": true,
+      "viewport": [
+        1440,
+        900
+      ]
+    },
+    {
+      "controls": [],
+      "dock": true,
+      "overflow": false,
+      "overlaps": [],
+      "side": false,
+      "viewport": [
+        390,
+        844
+      ]
+    },
+    {
+      "controls": [
+        {
+          "h": 18.84375,
+          "text": "Board",
+          "w": 36.71875,
+          "x": 68,
+          "y": 20.578125
+        },
+        {
+          "h": 24,
+          "text": "Active\n19",
+          "w": 77.734375,
+          "x": 118.71875,
+          "y": 18
+        },
+        {
+          "h": 24,
+          "text": "Queued\n11",
+          "w": 86.75,
+          "x": 202.453125,
+          "y": 18
+        },
+        {
+          "h": 24,
+          "text": "Landed today\n≥0",
+          "w": 118.453125,
+          "x": 295.203125,
+          "y": 18
+        },
+        {
+          "h": 24,
+          "text": "All",
+          "w": 34.5625,
+          "x": 419.65625,
+          "y": 18
+        },
+        {
+          "h": 28,
+          "text": "Needs you\n0\nStuck\n3\nLanded today\n≥0\nCycle p50\n–",
+          "w": 680,
+          "x": 68,
+          "y": 52
+        },
+        {
+          "h": 28,
+          "text": "Filter",
+          "w": 70.953125,
+          "x": 586.921875,
+          "y": 16
+        },
+        {
+          "h": 28,
+          "text": "Display",
+          "w": 84.125,
+          "x": 663.875,
+          "y": 16
+        }
+      ],
+      "dock": false,
+      "overflow": false,
+      "overlaps": [],
+      "side": true,
+      "viewport": [
+        768,
+        1024
+      ]
+    }
+  ],
+  "hold_transition": 3,
+  "released_stuck": 4,
+  "tooling_notes": "Added PATH links to existing perl and node after initial isolated setup lacked their dependencies. A native wait --text \"Stuck 4\" timed out on split rendered text; fresh snapshot showed the Stuck 4 control and CI checks failed on Captain Held, confirmed in screenshot/API. Browser-code unavailable in this unpublished conversation; native commands used instead."
+}

@@ -1,0 +1,84 @@
+{
+  "lifecycle": {
+    "effectiveLaunch": {
+      "browserLaunched": true,
+      "engine": "chrome",
+      "launchHash": 12825947863403514000
+    },
+    "launched": false,
+    "relaunchedBrowser": false,
+    "restartedBackground": false,
+    "restoreStatus": "missing",
+    "reused": true,
+    "saveStatus": "saved"
+  },
+  "origin": "http://127.0.0.1:36575/#/board",
+  "result": {
+    "controls": [
+      {
+        "h": 18.84375,
+        "text": "Board",
+        "w": 36.71875,
+        "x": 236,
+        "y": 20.578125
+      },
+      {
+        "h": 24,
+        "text": "Active\n19",
+        "w": 77.734375,
+        "x": 286.71875,
+        "y": 18
+      },
+      {
+        "h": 24,
+        "text": "Queued\n11",
+        "w": 86.75,
+        "x": 370.453125,
+        "y": 18
+      },
+      {
+        "h": 24,
+        "text": "Landed today\n≥0",
+        "w": 118.453125,
+        "x": 463.203125,
+        "y": 18
+      },
+      {
+        "h": 24,
+        "text": "All",
+        "w": 34.5625,
+        "x": 587.65625,
+        "y": 18
+      },
+      {
+        "h": 28,
+        "text": "Needs you\n0\nStuck\n3\nLanded today\n≥0\nCycle p50\n–",
+        "w": 1023,
+        "x": 236,
+        "y": 52
+      },
+      {
+        "h": 28,
+        "text": "Filter",
+        "w": 70.953125,
+        "x": 1097.921875,
+        "y": 16
+      },
+      {
+        "h": 28,
+        "text": "Display",
+        "w": 84.125,
+        "x": 1174.875,
+        "y": 16
+      }
+    ],
+    "dock": false,
+    "overflow": false,
+    "overlaps": [],
+    "side": true,
+    "viewport": [
+      1279,
+      800
+    ]
+  }
+}

@@ -1,0 +1,196 @@
+{
+  "lifecycle": {
+    "effectiveLaunch": {
+      "browserLaunched": true,
+      "engine": "chrome",
+      "launchHash": 12825947863403514000
+    },
+    "launched": false,
+    "relaunchedBrowser": false,
+    "restartedBackground": false,
+    "restoreStatus": "missing",
+    "reused": true,
+    "saveStatus": "saved"
+  },
+  "origin": "http://127.0.0.1:34581/",
+  "result": {
+    "docWidth": 820,
+    "header": {
+      "b": 89,
+      "h": 81,
+      "w": 760,
+      "x": 52,
+      "y": 8
+    },
+    "homes": [
+      {
+        "b": 265,
+        "fullDisplay": "none",
+        "h": 32,
+        "label": "Main",
+        "short": "Main",
+        "shortDisplay": "block",
+        "text": "Main",
+        "title": "Main",
+        "w": 36,
+        "x": 8,
+        "y": 233
+      },
+      {
+        "b": 299,
+        "fullDisplay": "none",
+        "h": 32,
+        "label": "atlas",
+        "short": "atla",
+        "shortDisplay": "block",
+        "text": "atla",
+        "title": "atlas",
+        "w": 36,
+        "x": 8,
+        "y": 267
+      },
+      {
+        "b": 333,
+        "fullDisplay": "none",
+        "h": 32,
+        "label": "borealis",
+        "short": "bore",
+        "shortDisplay": "block",
+        "text": "bore",
+        "title": "borealis",
+        "w": 36,
+        "x": 8,
+        "y": 301
+      },
+      {
+        "b": 367,
+        "fullDisplay": "none",
+        "h": 32,
+        "label": "cygnus",
+        "short": "cygn",
+        "shortDisplay": "block",
+        "text": "cygn",
+        "title": "cygnus",
+        "w": 36,
+        "x": 8,
+        "y": 335
+      },
+      {
+        "b": 401,
+        "fullDisplay": "none",
+        "h": 32,
+        "label": "delta",
+        "short": "delt",
+        "shortDisplay": "block",
+        "text": "delt",
+        "title": "delta",
+        "w": 36,
+        "x": 8,
+        "y": 369
+      },
+      {
+        "b": 435,
+        "fullDisplay": "none",
+        "h": 32,
+        "label": "echo",
+        "short": "echo",
+        "shortDisplay": "block",
+        "text": "echo",
+        "title": "echo",
+        "w": 36,
+        "x": 8,
+        "y": 403
+      },
+      {
+        "b": 469,
+        "fullDisplay": "none",
+        "h": 32,
+        "label": "foxtrot",
+        "short": "foxt",
+        "shortDisplay": "block",
+        "text": "foxt",
+        "title": "foxtrot",
+        "w": 36,
+        "x": 8,
+        "y": 437
+      },
+      {
+        "b": 503,
+        "fullDisplay": "none",
+        "h": 32,
+        "label": "ganymede",
+        "short": "gany",
+        "shortDisplay": "block",
+        "text": "gany",
+        "title": "ganymede",
+        "w": 36,
+        "x": 8,
+        "y": 471
+      },
+      {
+        "b": 537,
+        "fullDisplay": "none",
+        "h": 32,
+        "label": "helios",
+        "short": "heli",
+        "shortDisplay": "block",
+        "text": "heli",
+        "title": "helios",
+        "w": 36,
+        "x": 8,
+        "y": 505
+      },
+      {
+        "b": 571,
+        "fullDisplay": "none",
+        "h": 32,
+        "label": "io",
+        "short": "io",
+        "shortDisplay": "block",
+        "text": "io",
+        "title": "io",
+        "w": 36,
+        "x": 8,
+        "y": 539
+      }
+    ],
+    "kpi": {
+      "b": 80,
+      "h": 28,
+      "w": 732,
+      "x": 68,
+      "y": 52
+    },
+    "tabs": [
+      {
+        "b": 42,
+        "h": 24,
+        "w": 77.734375,
+        "x": 118.71875,
+        "y": 18
+      },
+      {
+        "b": 42,
+        "h": 24,
+        "w": 86.75,
+        "x": 202.453125,
+        "y": 18
+      },
+      {
+        "b": 42,
+        "h": 24,
+        "w": 118.453125,
+        "x": 295.203125,
+        "y": 18
+      },
+      {
+        "b": 42,
+        "h": 24,
+        "w": 34.5625,
+        "x": 419.65625,
+        "y": 18
+      }
+    ],
+    "width": 820
+  }
+}

@@ -1,0 +1,962 @@
+{
+  "schema": "fm-dashboard-board.v1",
+  "generated": 1791459573,
+  "stages": [
+    {
+      "id": "queued",
+      "name": "Queued"
+    },
+    {
+      "id": "building",
+      "name": "Building"
+    },
+    {
+      "id": "review",
+      "name": "Review"
+    },
+    {
+      "id": "test",
+      "name": "Test"
+    },
+    {
+      "id": "ci",
+      "name": "PR + CI"
+    },
+    {
+      "id": "merge",
+      "name": "Waiting to merge"
+    },
+    {
+      "id": "landed",
+      "name": "Landed today"
+    }
+  ],
+  "homes": [
+    {
+      "id": "main",
+      "name": "Main",
+      "plan": 4,
+      "open": 9,
+      "ready": 1,
+      "known": true
+    },
+    {
+      "id": "atlas",
+      "name": "atlas",
+      "plan": 4,
+      "open": 1,
+      "ready": 1,
+      "known": true
+    },
+    {
+      "id": "borealis",
+      "name": "borealis",
+      "plan": 4,
+      "open": 1,
+      "ready": 1,
+      "known": true
+    },
+    {
+      "id": "cirrus",
+      "name": "cirrus",
+      "plan": 4,
+      "open": 1,
+      "ready": 1,
+      "known": true
+    },
+    {
+      "id": "delta",
+      "name": "delta",
+      "plan": 4,
+      "open": 1,
+      "ready": 1,
+      "known": true
+    },
+    {
+      "id": "ember",
+      "name": "ember",
+      "plan": 4,
+      "open": 1,
+      "ready": 1,
+      "known": true
+    },
+    {
+      "id": "fjord",
+      "name": "fjord",
+      "plan": 4,
+      "open": 1,
+      "ready": 1,
+      "known": true
+    },
+    {
+      "id": "gaia",
+      "name": "gaia",
+      "plan": 4,
+      "open": 1,
+      "ready": 1,
+      "known": true
+    },
+    {
+      "id": "helix",
+      "name": "helix",
+      "plan": 4,
+      "open": 1,
+      "ready": 1,
+      "known": true
+    },
+    {
+      "id": "io",
+      "name": "io",
+      "plan": 4,
+      "open": 1,
+      "ready": 1,
+      "known": true
+    },
+    {
+      "id": "😀orbit",
+      "name": "😀orbit",
+      "plan": 4,
+      "open": 1,
+      "ready": 1,
+      "known": true
+    }
+  ],
+  "parked": [],
+  "cards": [
+    {
+      "id": "atlas/atlas-build",
+      "home": "atlas",
+      "task": "atlas-build",
+      "kind": "ship",
+      "title": "Atlas Build",
+      "stage": "building",
+      "wait": null,
+      "wait_since": null,
+      "reached": {},
+      "state": "building",
+      "since": 1791457617,
+      "started": 1791457617,
+      "pr": null,
+      "why": "building atlas",
+      "model": "opus",
+      "model_name": "Opus",
+      "tool": "claude",
+      "effort": null,
+      "history": [
+        {
+          "at": 1791457617,
+          "v": "working",
+          "stage": "building",
+          "verb": "Working",
+          "tone": "",
+          "text": "building atlas"
+        }
+      ]
+    },
+    {
+      "id": "borealis/borealis-build",
+      "home": "borealis",
+      "task": "borealis-build",
+      "kind": "ship",
+      "title": "Borealis Build",
+      "stage": "building",
+      "wait": null,
+      "wait_since": null,
+      "reached": {},
+      "state": "building",
+      "since": 1791457617,
+      "started": 1791457617,
+      "pr": null,
+      "why": "building borealis",
+      "model": "opus",
+      "model_name": "Opus",
+      "tool": "claude",
+      "effort": null,
+      "history": [
+        {
+          "at": 1791457617,
+          "v": "working",
+          "stage": "building",
+          "verb": "Working",
+          "tone": "",
+          "text": "building borealis"
+        }
+      ]
+    },
+    {
+      "id": "cirrus/cirrus-build",
+      "home": "cirrus",
+      "task": "cirrus-build",
+      "kind": "ship",
+      "title": "Cirrus Build",
+      "stage": "building",
+      "wait": null,
+      "wait_since": null,
+      "reached": {},
+      "state": "building",
+      "since": 1791457617,
+      "started": 1791457617,
+      "pr": null,
+      "why": "building cirrus",
+      "model": "opus",
+      "model_name": "Opus",
+      "tool": "claude",
+      "effort": null,
+      "history": [
+        {
+          "at": 1791457617,
+          "v": "working",
+          "stage": "building",
+          "verb": "Working",
+          "tone": "",
+          "text": "building cirrus"
+        }
+      ]
+    },
+    {
+      "id": "delta/delta-build",
+      "home": "delta",
+      "task": "delta-build",
+      "kind": "ship",
+      "title": "Delta Build",
+      "stage": "building",
+      "wait": null,
+      "wait_since": null,
+      "reached": {},
+      "state": "building",
+      "since": 1791457617,
+      "started": 1791457617,
+      "pr": null,
+      "why": "building delta",
+      "model": "opus",
+      "model_name": "Opus",
+      "tool": "claude",
+      "effort": null,
+      "history": [
+        {
+          "at": 1791457617,
+          "v": "working",
+          "stage": "building",
+          "verb": "Working",
+          "tone": "",
+          "text": "building delta"
+        }
+      ]
+    },
+    {
+      "id": "ember/ember-build",
+      "home": "ember",
+      "task": "ember-build",
+      "kind": "ship",
+      "title": "Ember Build",
+      "stage": "building",
+      "wait": null,
+      "wait_since": null,
+      "reached": {},
+      "state": "building",
+      "since": 1791457617,
+      "started": 1791457617,
+      "pr": null,
+      "why": "building ember",
+      "model": "opus",
+      "model_name": "Opus",
+      "tool": "claude",
+      "effort": null,
+      "history": [
+        {
+          "at": 1791457617,
+          "v": "working",
+          "stage": "building",
+          "verb": "Working",
+          "tone": "",
+          "text": "building ember"
+        }
+      ]
+    },
+    {
+      "id": "fjord/fjord-build",
+      "home": "fjord",
+      "task": "fjord-build",
+      "kind": "ship",
+      "title": "Fjord Build",
+      "stage": "building",
+      "wait": null,
+      "wait_since": null,
+      "reached": {},
+      "state": "building",
+      "since": 1791457617,
+      "started": 1791457617,
+      "pr": null,
+      "why": "building fjord",
+      "model": "opus",
+      "model_name": "Opus",
+      "tool": "claude",
+      "effort": null,
+      "history": [
+        {
+          "at": 1791457617,
+          "v": "working",
+          "stage": "building",
+          "verb": "Working",
+          "tone": "",
+          "text": "building fjord"
+        }
+      ]
+    },
+    {
+      "id": "gaia/gaia-build",
+      "home": "gaia",
+      "task": "gaia-build",
+      "kind": "ship",
+      "title": "Gaia Build",
+      "stage": "building",
+      "wait": null,
+      "wait_since": null,
+      "reached": {},
+      "state": "building",
+      "since": 1791457617,
+      "started": 1791457617,
+      "pr": null,
+      "why": "building gaia",
+      "model": "opus",
+      "model_name": "Opus",
+      "tool": "claude",
+      "effort": null,
+      "history": [
+        {
+          "at": 1791457617,
+          "v": "working",
+          "stage": "building",
+          "verb": "Working",
+          "tone": "",
+          "text": "building gaia"
+        }
+      ]
+    },
+    {
+      "id": "helix/helix-build",
+      "home": "helix",
+      "task": "helix-build",
+      "kind": "ship",
+      "title": "Helix Build",
+      "stage": "building",
+      "wait": null,
+      "wait_since": null,
+      "reached": {},
+      "state": "building",
+      "since": 1791457617,
+      "started": 1791457617,
+      "pr": null,
+      "why": "building helix",
+      "model": "opus",
+      "model_name": "Opus",
+      "tool": "claude",
+      "effort": null,
+      "history": [
+        {
+          "at": 1791457617,
+          "v": "working",
+          "stage": "building",
+          "verb": "Working",
+          "tone": "",
+          "text": "building helix"
+        }
+      ]
+    },
+    {
+      "id": "io/io-build",
+      "home": "io",
+      "task": "io-build",
+      "kind": "ship",
+      "title": "Io Build",
+      "stage": "building",
+      "wait": null,
+      "wait_since": null,
+      "reached": {},
+      "state": "building",
+      "since": 1791457617,
+      "started": 1791457617,
+      "pr": null,
+      "why": "building io",
+      "model": "opus",
+      "model_name": "Opus",
+      "tool": "claude",
+      "effort": null,
+      "history": [
+        {
+          "at": 1791457617,
+          "v": "working",
+          "stage": "building",
+          "verb": "Working",
+          "tone": "",
+          "text": "building io"
+        }
+      ]
+    },
+    {
+      "id": "main/build",
+      "home": "main",
+      "task": "build",
+      "kind": "ship",
+      "title": "Build",
+      "stage": "building",
+      "wait": null,
+      "wait_since": null,
+      "reached": {},
+      "state": "building",
+      "since": 1791457617,
+      "started": 1791457617,
+      "pr": null,
+      "why": "building",
+      "model": "opus",
+      "model_name": "Opus",
+      "tool": "claude",
+      "effort": null,
+      "history": [
+        {
+          "at": 1791457617,
+          "v": "working",
+          "stage": "building",
+          "verb": "Working",
+          "tone": "",
+          "text": "building"
+        }
+      ]
+    },
+    {
+      "id": "main/captain-held",
+      "home": "main",
+      "task": "captain-held",
+      "kind": "ship",
+      "title": "Captain Held",
+      "stage": "building",
+      "wait": "parked",
+      "wait_since": 1791457617,
+      "reached": {},
+      "state": "waiting",
+      "since": 1791457617,
+      "started": 1791457617,
+      "pr": null,
+      "why": "captain parked CI",
+      "model": "opus",
+      "model_name": "Opus",
+      "tool": "claude",
+      "effort": null,
+      "history": [
+        {
+          "at": 1791457617,
+          "v": "paused",
+          "stage": "building",
+          "verb": "Waiting",
+          "tone": "",
+          "text": "waiting for CI checks"
+        },
+        {
+          "at": 1791459417,
+          "v": "needs-decision",
+          "stage": "building",
+          "verb": "Needs a decision",
+          "tone": "warn",
+          "text": "captain parked CI"
+        }
+      ]
+    },
+    {
+      "id": "main/ci-blocked",
+      "home": "main",
+      "task": "ci-blocked",
+      "kind": "ship",
+      "title": "Ci Blocked",
+      "stage": "building",
+      "wait": "blocked",
+      "wait_since": 1791457617,
+      "reached": {},
+      "state": "blocked",
+      "since": 1791457617,
+      "started": 1791457617,
+      "pr": null,
+      "why": "CI needs credentials",
+      "model": "opus",
+      "model_name": "Opus",
+      "tool": "claude",
+      "effort": null,
+      "history": [
+        {
+          "at": 1791457617,
+          "v": "blocked",
+          "stage": "building",
+          "verb": "Blocked",
+          "tone": "bad",
+          "text": "CI needs credentials"
+        }
+      ]
+    },
+    {
+      "id": "main/ci-wait",
+      "home": "main",
+      "task": "ci-wait",
+      "kind": "ship",
+      "title": "Ci Wait",
+      "stage": "building",
+      "wait": "waiting",
+      "wait_since": 1791457617,
+      "reached": {},
+      "state": "validating",
+      "since": 1791457617,
+      "started": 1791457617,
+      "pr": null,
+      "why": "waiting for CI checks",
+      "model": "opus",
+      "model_name": "Opus",
+      "tool": "claude",
+      "effort": null,
+      "history": [
+        {
+          "at": 1791457617,
+          "v": "paused",
+          "stage": "building",
+          "verb": "Waiting",
+          "tone": "",
+          "text": "waiting for CI checks"
+        }
+      ]
+    },
+    {
+      "id": "main/decision",
+      "home": "main",
+      "task": "decision",
+      "kind": "ship",
+      "title": "Decision",
+      "stage": "building",
+      "wait": "decision",
+      "wait_since": 1791457617,
+      "reached": {},
+      "state": "decision",
+      "since": 1791457617,
+      "started": 1791457617,
+      "pr": null,
+      "why": "choose scope",
+      "model": "opus",
+      "model_name": "Opus",
+      "tool": "claude",
+      "effort": null,
+      "history": [
+        {
+          "at": 1791457617,
+          "v": "needs-decision",
+          "stage": "building",
+          "verb": "Needs a decision",
+          "tone": "warn",
+          "text": "choose scope"
+        }
+      ]
+    },
+    {
+      "id": "main/merge",
+      "home": "main",
+      "task": "merge",
+      "kind": "ship",
+      "title": "Merge",
+      "stage": "merge",
+      "wait": null,
+      "wait_since": null,
+      "reached": {
+        "merge": 1791457617
+      },
+      "state": "finished",
+      "since": 1791457617,
+      "started": 1791457617,
+      "pr": "https://github.com/acme/demo/pull/14",
+      "why": "PR 14 checks green",
+      "model": "opus",
+      "model_name": "Opus",
+      "tool": "claude",
+      "effort": null,
+      "history": [
+        {
+          "at": 1791457617,
+          "v": "done",
+          "stage": "merge",
+          "verb": "Finished",
+          "tone": "ok",
+          "text": "PR 14 checks green"
+        }
+      ]
+    },
+    {
+      "id": "main/pipeline-failed",
+      "home": "main",
+      "task": "pipeline-failed",
+      "kind": "ship",
+      "title": "Pipeline Failed",
+      "stage": "review",
+      "wait": "blocked",
+      "wait_since": 1791457617,
+      "reached": {
+        "review": 1791457617
+      },
+      "state": "blocked",
+      "since": 1791457617,
+      "started": 1791457617,
+      "pr": null,
+      "why": "no-mistakes checks failed",
+      "model": "opus",
+      "model_name": "Opus",
+      "tool": "claude",
+      "effort": null,
+      "history": [
+        {
+          "at": 1791457617,
+          "v": "failed",
+          "stage": "review",
+          "verb": "Failed",
+          "tone": "bad",
+          "text": "no-mistakes checks failed"
+        }
+      ]
+    },
+    {
+      "id": "main/review",
+      "home": "main",
+      "task": "review",
+      "kind": "ship",
+      "title": "Review",
+      "stage": "review",
+      "wait": "waiting",
+      "wait_since": 1791457617,
+      "reached": {
+        "review": 1791457617
+      },
+      "state": "validating",
+      "since": 1791457617,
+      "started": 1791457617,
+      "pr": null,
+      "why": "no-mistakes review gate",
+      "model": "opus",
+      "model_name": "Opus",
+      "tool": "claude",
+      "effort": null,
+      "history": [
+        {
+          "at": 1791457617,
+          "v": "paused",
+          "stage": "review",
+          "verb": "Waiting",
+          "tone": "",
+          "text": "no-mistakes review gate"
+        }
+      ]
+    },
+    {
+      "id": "main/test",
+      "home": "main",
+      "task": "test",
+      "kind": "ship",
+      "title": "Test",
+      "stage": "test",
+      "wait": "waiting",
+      "wait_since": 1791457617,
+      "reached": {
+        "test": 1791457617
+      },
+      "state": "validating",
+      "since": 1791457617,
+      "started": 1791457617,
+      "pr": null,
+      "why": "no-mistakes test gate",
+      "model": "opus",
+      "model_name": "Opus",
+      "tool": "claude",
+      "effort": null,
+      "history": [
+        {
+          "at": 1791457617,
+          "v": "paused",
+          "stage": "test",
+          "verb": "Waiting",
+          "tone": "",
+          "text": "no-mistakes test gate"
+        }
+      ]
+    },
+    {
+      "id": "😀orbit/😀orbit-build",
+      "home": "😀orbit",
+      "task": "😀orbit-build",
+      "kind": "ship",
+      "title": "😀orbit build",
+      "stage": "building",
+      "wait": null,
+      "wait_since": null,
+      "reached": {},
+      "state": "building",
+      "since": 1791457617,
+      "started": 1791457617,
+      "pr": null,
+      "why": "building 😀orbit",
+      "model": "opus",
+      "model_name": "Opus",
+      "tool": "claude",
+      "effort": null,
+      "history": [
+        {
+          "at": 1791457617,
+          "v": "working",
+          "stage": "building",
+          "verb": "Working",
+          "tone": "",
+          "text": "building 😀orbit"
+        }
+      ]
+    },
+    {
+      "id": "main/ready-item",
+      "home": "main",
+      "task": "ready-item",
+      "kind": "ship",
+      "title": "Ready next task",
+      "stage": "queued",
+      "wait": null,
+      "wait_since": null,
+      "reached": {},
+      "state": "queued",
+      "since": null,
+      "started": null,
+      "pr": null,
+      "why": "",
+      "model": null,
+      "model_name": "Unknown",
+      "tool": null,
+      "effort": null,
+      "history": []
+    },
+    {
+      "id": "atlas/ready-item",
+      "home": "atlas",
+      "task": "ready-item",
+      "kind": "ship",
+      "title": "Ready next task",
+      "stage": "queued",
+      "wait": null,
+      "wait_since": null,
+      "reached": {},
+      "state": "queued",
+      "since": null,
+      "started": null,
+      "pr": null,
+      "why": "",
+      "model": null,
+      "model_name": "Unknown",
+      "tool": null,
+      "effort": null,
+      "history": []
+    },
+    {
+      "id": "borealis/ready-item",
+      "home": "borealis",
+      "task": "ready-item",
+      "kind": "ship",
+      "title": "Ready next task",
+      "stage": "queued",
+      "wait": null,
+      "wait_since": null,
+      "reached": {},
+      "state": "queued",
+      "since": null,
+      "started": null,
+      "pr": null,
+      "why": "",
+      "model": null,
+      "model_name": "Unknown",
+      "tool": null,
+      "effort": null,
+      "history": []
+    },
+    {
+      "id": "cirrus/ready-item",
+      "home": "cirrus",
+      "task": "ready-item",
+      "kind": "ship",
+      "title": "Ready next task",
+      "stage": "queued",
+      "wait": null,
+      "wait_since": null,
+      "reached": {},
+      "state": "queued",
+      "since": null,
+      "started": null,
+      "pr": null,
+      "why": "",
+      "model": null,
+      "model_name": "Unknown",
+      "tool": null,
+      "effort": null,
+      "history": []
+    },
+    {
+      "id": "delta/ready-item",
+      "home": "delta",
+      "task": "ready-item",
+      "kind": "ship",
+      "title": "Ready next task",
+      "stage": "queued",
+      "wait": null,
+      "wait_since": null,
+      "reached": {},
+      "state": "queued",
+      "since": null,
+      "started": null,
+      "pr": null,
+      "why": "",
+      "model": null,
+      "model_name": "Unknown",
+      "tool": null,
+      "effort": null,
+      "history": []
+    },
+    {
+      "id": "ember/ready-item",
+      "home": "ember",
+      "task": "ready-item",
+      "kind": "ship",
+      "title": "Ready next task",
+      "stage": "queued",
+      "wait": null,
+      "wait_since": null,
+      "reached": {},
+      "state": "queued",
+      "since": null,
+      "started": null,
+      "pr": null,
+      "why": "",
+      "model": null,
+      "model_name": "Unknown",
+      "tool": null,
+      "effort": null,
+      "history": []
+    },
+    {
+      "id": "fjord/ready-item",
+      "home": "fjord",
+      "task": "ready-item",
+      "kind": "ship",
+      "title": "Ready next task",
+      "stage": "queued",
+      "wait": null,
+      "wait_since": null,
+      "reached": {},
+      "state": "queued",
+      "since": null,
+      "started": null,
+      "pr": null,
+      "why": "",
+      "model": null,
+      "model_name": "Unknown",
+      "tool": null,
+      "effort": null,
+      "history": []
+    },
+    {
+      "id": "gaia/ready-item",
+      "home": "gaia",
+      "task": "ready-item",
+      "kind": "ship",
+      "title": "Ready next task",
+      "stage": "queued",
+      "wait": null,
+      "wait_since": null,
+      "reached": {},
+      "state": "queued",
+      "since": null,
+      "started": null,
+      "pr": null,
+      "why": "",
+      "model": null,
+      "model_name": "Unknown",
+      "tool": null,
+      "effort": null,
+      "history": []
+    },
+    {
+      "id": "helix/ready-item",
+      "home": "helix",
+      "task": "ready-item",
+      "kind": "ship",
+      "title": "Ready next task",
+      "stage": "queued",
+      "wait": null,
+      "wait_since": null,
+      "reached": {},
+      "state": "queued",
+      "since": null,
+      "started": null,
+      "pr": null,
+      "why": "",
+      "model": null,
+      "model_name": "Unknown",
+      "tool": null,
+      "effort": null,
+      "history": []
+    },
+    {
+      "id": "io/ready-item",
+      "home": "io",
+      "task": "ready-item",
+      "kind": "ship",
+      "title": "Ready next task",
+      "stage": "queued",
+      "wait": null,
+      "wait_since": null,
+      "reached": {},
+      "state": "queued",
+      "since": null,
+      "started": null,
+      "pr": null,
+      "why": "",
+      "model": null,
+      "model_name": "Unknown",
+      "tool": null,
+      "effort": null,
+      "history": []
+    },
+    {
+      "id": "😀orbit/ready-item",
+      "home": "😀orbit",
+      "task": "ready-item",
+      "kind": "ship",
+      "title": "Ready next task",
+      "stage": "queued",
+      "wait": null,
+      "wait_since": null,
+      "reached": {},
+      "state": "queued",
+      "since": null,
+      "started": null,
+      "pr": null,
+      "why": "",
+      "model": null,
+      "model_name": "Unknown",
+      "tool": null,
+      "effort": null,
+      "history": []
+    }
+  ],
+  "asks": [],
+  "landed": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "cycle_p50": null
+}

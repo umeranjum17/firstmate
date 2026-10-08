@@ -1,0 +1,26 @@
+{
+  "lifecycle": {
+    "effectiveLaunch": {
+      "browserLaunched": true,
+      "engine": "chrome",
+      "launchHash": 12825947863403514000
+    },
+    "launched": false,
+    "relaunchedBrowser": false,
+    "restartedBackground": false,
+    "restoreStatus": "missing",
+    "reused": true,
+    "saveStatus": "saved"
+  },
+  "origin": "http://127.0.0.1:36575/#/board?state=blocked,decision",
+  "result": {
+    "hash": "#/board?state=blocked,decision",
+    "homesIdentifiable": true,
+    "visibleStuckCards": [
+      "main/captain-held",
+      "main/ci-blocked",
+      "main/decision",
+      "main/pipeline-failed"
+    ]
+  }
+}

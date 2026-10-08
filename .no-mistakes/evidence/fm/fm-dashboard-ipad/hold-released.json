@@ -1,0 +1,14 @@
+{
+  "url": "http://127.0.0.1:34581",
+  "action": "Resolve captain-hold-layout by its key; retain blocked CI, failed checks and paused CI",
+  "board_stuck": 2,
+  "overview_stuck": 2,
+  "lane_states": {
+    "blocked": 2,
+    "decision": 0,
+    "finished": 1,
+    "building": 10,
+    "validating": 3,
+    "waiting": 0
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "phase": "held",
+  "overview_stuck": 3,
+  "board_stuck": 3,
+  "lanes": 19,
+  "validating": 3,
+  "blocked": 2,
+  "captain_lane_wait": "parked",
+  "failed_lane_wait": "blocked"
+}
+{
+  "phase": "released",
+  "overview_stuck": 4,
+  "board_stuck": 4,
+  "lanes": 19,
+  "validating": 3,
+  "blocked": 3,
+  "captain_lane_wait": "blocked",
+  "failed_lane_wait": "blocked"
+}

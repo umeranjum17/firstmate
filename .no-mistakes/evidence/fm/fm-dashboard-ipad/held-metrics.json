@@ -1,0 +1,1358 @@
+{
+  "build_time": "2026-10-08T15:39:33.177692+04:00",
+  "cutoff": 1791459573.177692,
+  "metrics": {
+    "asks": {
+      "value": 0,
+      "status": "exact",
+      "reason": null,
+      "source": "Main's ask list",
+      "window": "now",
+      "cutoff": 1791459573.177692,
+      "read_at": 1791459573.1784763
+    },
+    "landed": {
+      "value": 0,
+      "status": "lower_bound",
+      "reason": null,
+      "source": "each lead's merge lines in Main's records; Main's own merges from its fleet ledger",
+      "window": "local days from midnight (UTC+04:00); always at least: recording can be disabled or records unreadable",
+      "cutoff": 1791459573.177692,
+      "read_at": 1791459574.1749432,
+      "daily": [
+        {
+          "day": "2026-09-25",
+          "value": 0
+        },
+        {
+          "day": "2026-09-26",
+          "value": 0
+        },
+        {
+          "day": "2026-09-27",
+          "value": 0
+        },
+        {
+          "day": "2026-09-28",
+          "value": 0
+        },
+        {
+          "day": "2026-09-29",
+          "value": 0
+        },
+        {
+          "day": "2026-09-30",
+          "value": 0
+        },
+        {
+          "day": "2026-10-01",
+          "value": 0
+        },
+        {
+          "day": "2026-10-02",
+          "value": 0
+        },
+        {
+          "day": "2026-10-03",
+          "value": 0
+        },
+        {
+          "day": "2026-10-04",
+          "value": 0
+        },
+        {
+          "day": "2026-10-05",
+          "value": 0
+        },
+        {
+          "day": "2026-10-06",
+          "value": 0
+        },
+        {
+          "day": "2026-10-07",
+          "value": 0
+        },
+        {
+          "day": "2026-10-08",
+          "value": 0
+        }
+      ]
+    },
+    "closed": {
+      "value": 0,
+      "status": "exact",
+      "reason": null,
+      "source": "each home's backlog and its done archive",
+      "window": "the last 7 local days, today so far, against the 7 days before",
+      "cutoff": 1791459573.177692,
+      "read_at": 1791459574.1765072,
+      "daily": [
+        {
+          "day": "2026-09-25",
+          "value": 0
+        },
+        {
+          "day": "2026-09-26",
+          "value": 0
+        },
+        {
+          "day": "2026-09-27",
+          "value": 0
+        },
+        {
+          "day": "2026-09-28",
+          "value": 0
+        },
+        {
+          "day": "2026-09-29",
+          "value": 0
+        },
+        {
+          "day": "2026-09-30",
+          "value": 0
+        },
+        {
+          "day": "2026-10-01",
+          "value": 0
+        },
+        {
+          "day": "2026-10-02",
+          "value": 0
+        },
+        {
+          "day": "2026-10-03",
+          "value": 0
+        },
+        {
+          "day": "2026-10-04",
+          "value": 0
+        },
+        {
+          "day": "2026-10-05",
+          "value": 0
+        },
+        {
+          "day": "2026-10-06",
+          "value": 0
+        },
+        {
+          "day": "2026-10-07",
+          "value": 0
+        },
+        {
+          "day": "2026-10-08",
+          "value": 0
+        }
+      ]
+    },
+    "filed": {
+      "value": 18,
+      "status": "lower_bound",
+      "reason": null,
+      "source": "each home's open items, plus a log that keeps each filing day after the item closes",
+      "window": "local days; always at least: items filed and closed between readings can be missed; matching task IDs and filing dates count once across homes; a failed backlog read breaks coverage",
+      "cutoff": 1791459573.177692,
+      "read_at": 1791459574.1744242,
+      "daily": [
+        {
+          "day": "2026-09-25",
+          "value": 0
+        },
+        {
+          "day": "2026-09-26",
+          "value": 0
+        },
+        {
+          "day": "2026-09-27",
+          "value": 0
+        },
+        {
+          "day": "2026-09-28",
+          "value": 0
+        },
+        {
+          "day": "2026-09-29",
+          "value": 0
+        },
+        {
+          "day": "2026-09-30",
+          "value": 0
+        },
+        {
+          "day": "2026-10-01",
+          "value": 0
+        },
+        {
+          "day": "2026-10-02",
+          "value": 0
+        },
+        {
+          "day": "2026-10-03",
+          "value": 0
+        },
+        {
+          "day": "2026-10-04",
+          "value": 0
+        },
+        {
+          "day": "2026-10-05",
+          "value": 0
+        },
+        {
+          "day": "2026-10-06",
+          "value": 0
+        },
+        {
+          "day": "2026-10-07",
+          "value": 0
+        },
+        {
+          "day": "2026-10-08",
+          "value": 18
+        }
+      ]
+    },
+    "lanes": {
+      "value": 19,
+      "status": "exact",
+      "reason": null,
+      "source": "each home's lane records",
+      "window": "now; unreadable homes are unknown, fleet counts are at least and free capacity is unknown; compared with the sample nearest 24 hours ago",
+      "cutoff": 1791459573.177692,
+      "read_at": 1791459573.1792314
+    },
+    "lane_states": {
+      "value": {
+        "blocked": 2,
+        "decision": 1,
+        "finished": 1,
+        "building": 11,
+        "validating": 3,
+        "waiting": 1
+      },
+      "status": "exact",
+      "reason": null,
+      "source": "each home's lane records",
+      "window": "now; unreadable homes are unknown, fleet counts are at least and free capacity is unknown; compared with the sample nearest 24 hours ago",
+      "cutoff": 1791459573.177692,
+      "read_at": 1791459573.1792314
+    },
+    "oldest_lane_seconds": {
+      "value": {
+        "blocked": 1956.177691936493,
+        "decision": 1956.177691936493,
+        "finished": 1956.177691936493,
+        "building": 1956.177691936493,
+        "validating": 1956.177691936493,
+        "waiting": 156.17769193649292
+      },
+      "status": "exact",
+      "reason": null,
+      "source": "each home's lane records",
+      "window": "now; unreadable homes are unknown, fleet counts are at least and free capacity is unknown; compared with the sample nearest 24 hours ago",
+      "cutoff": 1791459573.177692,
+      "read_at": 1791459573.1792314
+    },
+    "lane_plan": {
+      "value": 44,
+      "status": "exact",
+      "reason": null,
+      "source": "lane settings",
+      "window": "configured plan",
+      "cutoff": 1791459573.177692,
+      "read_at": 1791459573.177692
+    },
+    "free_lanes": {
+      "value": 25,
+      "status": "exact",
+      "reason": null,
+      "source": "each home's lane records",
+      "window": "now; unreadable homes are unknown, fleet counts are at least and free capacity is unknown; compared with the sample nearest 24 hours ago",
+      "cutoff": 1791459573.177692,
+      "read_at": 1791459573.1792314
+    },
+    "stuck": {
+      "value": 3,
+      "status": "exact",
+      "reason": null,
+      "source": "each home's lane records",
+      "window": "now; compared with the sample nearest 24 hours ago",
+      "cutoff": 1791459573.177692,
+      "read_at": 1791459573.1792314
+    },
+    "ready": {
+      "value": 11,
+      "status": "exact",
+      "reason": null,
+      "source": "each home's backlog",
+      "window": "now; compared with the sample nearest 24 hours ago",
+      "cutoff": 1791459573.177692,
+      "read_at": 1791459574.1744242
+    },
+    "queue": {
+      "value": {
+        "ready": 11,
+        "held": 0,
+        "waiting": 0
+      },
+      "status": "exact",
+      "reason": null,
+      "source": "each home's backlog",
+      "window": "now",
+      "cutoff": 1791459573.177692,
+      "read_at": 1791459574.1744242
+    },
+    "held_for_captain": {
+      "value": 0,
+      "status": "exact",
+      "reason": null,
+      "source": "each home's backlog",
+      "window": "now",
+      "cutoff": 1791459573.177692,
+      "read_at": 1791459574.1744242
+    },
+    "busy_agents": {
+      "value": null,
+      "status": "unknown",
+      "reason": "herdr not found",
+      "source": "Herdr agent inventory",
+      "window": "now",
+      "cutoff": 1791459573.177692,
+      "read_at": 1791459574.17726
+    },
+    "agent_roles": {
+      "value": null,
+      "status": "unknown",
+      "reason": "herdr not found",
+      "source": "Herdr agent inventory",
+      "window": "now",
+      "cutoff": 1791459573.177692,
+      "read_at": 1791459574.17726
+    },
+    "running_agents": {
+      "value": null,
+      "status": "unknown",
+      "reason": "herdr not found",
+      "source": "Herdr agent inventory",
+      "window": "now",
+      "cutoff": 1791459573.177692,
+      "read_at": 1791459574.17726
+    },
+    "quota": {
+      "value": null,
+      "status": "unknown",
+      "reason": "runway unavailable for some accounts",
+      "source": "quota-axi cache ~/.cache/quota-axi/quotas.json, read-only; unavailable runway is unknown",
+      "window": "as of each provider reading, retained when old",
+      "cutoff": 1791459573.177692,
+      "read_at": null,
+      "read_at_latest": null,
+      "read_at_policy": "oldest contributing account reading"
+    },
+    "free_memory_gb": {
+      "value": 49.493167877197266,
+      "status": "exact",
+      "reason": null,
+      "source": "this host and adb, read-only",
+      "window": "now; memory pressure is the share of the last 10 seconds some job waited on memory, the memory gate's own rule",
+      "cutoff": 1791459573.177692,
+      "read_at": 1791459574.270449
+    },
+    "total_memory_gb": {
+      "value": 91.973388671875,
+      "status": "exact",
+      "reason": null,
+      "source": "this host and adb, read-only",
+      "window": "now; memory pressure is the share of the last 10 seconds some job waited on memory, the memory gate's own rule",
+      "cutoff": 1791459573.177692,
+      "read_at": 1791459574.270449
+    },
+    "memory_pressure": {
+      "value": 0.09,
+      "status": "exact",
+      "reason": null,
+      "source": "this host and adb, read-only",
+      "window": "now; memory pressure is the share of the last 10 seconds some job waited on memory, the memory gate's own rule",
+      "cutoff": 1791459573.177692,
+      "read_at": 1791459574.270449
+    },
+    "gradle_builds": {
+      "value": 0,
+      "status": "exact",
+      "reason": null,
+      "source": "this host and adb, read-only",
+      "window": "now; memory pressure is the share of the last 10 seconds some job waited on memory, the memory gate's own rule",
+      "cutoff": 1791459573.177692,
+      "read_at": 1791459574.270449
+    },
+    "emulators": {
+      "value": 1,
+      "status": "exact",
+      "reason": null,
+      "source": "this host and adb, read-only",
+      "window": "now; memory pressure is the share of the last 10 seconds some job waited on memory, the memory gate's own rule",
+      "cutoff": 1791459573.177692,
+      "read_at": 1791459574.270449
+    },
+    "devices": {
+      "value": 2,
+      "status": "exact",
+      "reason": null,
+      "source": "this host and adb, read-only",
+      "window": "now; memory pressure is the share of the last 10 seconds some job waited on memory, the memory gate's own rule",
+      "cutoff": 1791459573.177692,
+      "read_at": 1791459574.270449
+    },
+    "device_groups": {
+      "value": {
+        "action": {
+          "Free": 2
+        },
+        "home": {
+          "No holder": 2
+        }
+      },
+      "status": "exact",
+      "reason": null,
+      "source": "this host and adb, read-only",
+      "window": "now; memory pressure is the share of the last 10 seconds some job waited on memory, the memory gate's own rule",
+      "cutoff": 1791459573.177692,
+      "read_at": 1791459574.270449
+    },
+    "connected_devices": {
+      "value": 2,
+      "status": "exact",
+      "reason": null,
+      "source": "this host and adb, read-only",
+      "window": "now; memory pressure is the share of the last 10 seconds some job waited on memory, the memory gate's own rule",
+      "cutoff": 1791459573.177692,
+      "read_at": 1791459574.270449
+    },
+    "heavy_jobs_gb": {
+      "value": 8.731674194335938,
+      "status": "exact",
+      "reason": null,
+      "source": "this host and adb, read-only",
+      "window": "now; memory pressure is the share of the last 10 seconds some job waited on memory, the memory gate's own rule",
+      "cutoff": 1791459573.177692,
+      "read_at": 1791459574.270449
+    },
+    "heavy_high_gb": {
+      "value": 32.0,
+      "status": "exact",
+      "reason": null,
+      "source": "this host and adb, read-only",
+      "window": "now; memory pressure is the share of the last 10 seconds some job waited on memory, the memory gate's own rule",
+      "cutoff": 1791459573.177692,
+      "read_at": 1791459574.270449
+    },
+    "heavy_max_gb": {
+      "value": 38.0,
+      "status": "exact",
+      "reason": null,
+      "source": "this host and adb, read-only",
+      "window": "now; memory pressure is the share of the last 10 seconds some job waited on memory, the memory gate's own rule",
+      "cutoff": 1791459573.177692,
+      "read_at": 1791459574.270449
+    }
+  },
+  "lanes": [
+    {
+      "state": "building",
+      "home": "atlas",
+      "title": "Atlas Build",
+      "age_seconds": 1956.177691936493,
+      "reason": "building atlas"
+    },
+    {
+      "state": "building",
+      "home": "borealis",
+      "title": "Borealis Build",
+      "age_seconds": 1956.177691936493,
+      "reason": "building borealis"
+    },
+    {
+      "state": "building",
+      "home": "cirrus",
+      "title": "Cirrus Build",
+      "age_seconds": 1956.177691936493,
+      "reason": "building cirrus"
+    },
+    {
+      "state": "building",
+      "home": "delta",
+      "title": "Delta Build",
+      "age_seconds": 1956.177691936493,
+      "reason": "building delta"
+    },
+    {
+      "state": "building",
+      "home": "ember",
+      "title": "Ember Build",
+      "age_seconds": 1956.177691936493,
+      "reason": "building ember"
+    },
+    {
+      "state": "building",
+      "home": "fjord",
+      "title": "Fjord Build",
+      "age_seconds": 1956.177691936493,
+      "reason": "building fjord"
+    },
+    {
+      "state": "building",
+      "home": "gaia",
+      "title": "Gaia Build",
+      "age_seconds": 1956.177691936493,
+      "reason": "building gaia"
+    },
+    {
+      "state": "building",
+      "home": "helix",
+      "title": "Helix Build",
+      "age_seconds": 1956.177691936493,
+      "reason": "building helix"
+    },
+    {
+      "state": "building",
+      "home": "io",
+      "title": "Io Build",
+      "age_seconds": 1956.177691936493,
+      "reason": "building io"
+    },
+    {
+      "state": "building",
+      "home": "main",
+      "title": "Build",
+      "age_seconds": 1956.177691936493,
+      "reason": "building"
+    },
+    {
+      "state": "waiting",
+      "home": "main",
+      "title": "Captain Held",
+      "age_seconds": 156.17769193649292,
+      "reason": "captain parked CI"
+    },
+    {
+      "state": "blocked",
+      "home": "main",
+      "title": "Ci Blocked",
+      "age_seconds": 1956.177691936493,
+      "reason": "CI needs credentials"
+    },
+    {
+      "state": "validating",
+      "home": "main",
+      "title": "Ci Wait",
+      "age_seconds": 1956.177691936493,
+      "reason": "waiting for CI checks"
+    },
+    {
+      "state": "decision",
+      "home": "main",
+      "title": "Decision",
+      "age_seconds": 1956.177691936493,
+      "reason": "choose scope"
+    },
+    {
+      "state": "finished",
+      "home": "main",
+      "title": "Merge",
+      "age_seconds": 1956.177691936493,
+      "reason": "PR 14 checks green"
+    },
+    {
+      "state": "blocked",
+      "home": "main",
+      "title": "Pipeline Failed",
+      "age_seconds": 1956.177691936493,
+      "reason": "no-mistakes checks failed"
+    },
+    {
+      "state": "validating",
+      "home": "main",
+      "title": "Review",
+      "age_seconds": 1956.177691936493,
+      "reason": "no-mistakes review gate"
+    },
+    {
+      "state": "validating",
+      "home": "main",
+      "title": "Test",
+      "age_seconds": 1956.177691936493,
+      "reason": "no-mistakes test gate"
+    },
+    {
+      "state": "building",
+      "home": "😀orbit",
+      "title": "😀orbit-build",
+      "age_seconds": 1956.177691936493,
+      "reason": "building 😀orbit"
+    }
+  ],
+  "queue_reasons": [
+    {
+      "reason": "Ready, a lane is free",
+      "by_home": {
+        "main": 0,
+        "atlas": 1,
+        "borealis": 1,
+        "cirrus": 1,
+        "delta": 1,
+        "ember": 1,
+        "fjord": 1,
+        "gaia": 1,
+        "helix": 1,
+        "io": 1,
+        "😀orbit": 1
+      }
+    },
+    {
+      "reason": "Ready, lanes full",
+      "by_home": {
+        "main": 1,
+        "atlas": 0,
+        "borealis": 0,
+        "cirrus": 0,
+        "delta": 0,
+        "ember": 0,
+        "fjord": 0,
+        "gaia": 0,
+        "helix": 0,
+        "io": 0,
+        "😀orbit": 0
+      }
+    },
+    {
+      "reason": "Held for the captain",
+      "by_home": {
+        "main": 0,
+        "atlas": 0,
+        "borealis": 0,
+        "cirrus": 0,
+        "delta": 0,
+        "ember": 0,
+        "fjord": 0,
+        "gaia": 0,
+        "helix": 0,
+        "io": 0,
+        "😀orbit": 0
+      }
+    },
+    {
+      "reason": "Held, other reason",
+      "by_home": {
+        "main": 0,
+        "atlas": 0,
+        "borealis": 0,
+        "cirrus": 0,
+        "delta": 0,
+        "ember": 0,
+        "fjord": 0,
+        "gaia": 0,
+        "helix": 0,
+        "io": 0,
+        "😀orbit": 0
+      }
+    },
+    {
+      "reason": "Waiting on another item",
+      "by_home": {
+        "main": 0,
+        "atlas": 0,
+        "borealis": 0,
+        "cirrus": 0,
+        "delta": 0,
+        "ember": 0,
+        "fjord": 0,
+        "gaia": 0,
+        "helix": 0,
+        "io": 0,
+        "😀orbit": 0
+      }
+    }
+  ],
+  "homes": [
+    {
+      "home": "main",
+      "lead_state": "",
+      "summary_read_at": 1791459573.1784582,
+      "summary_generated_epoch": 1791459417,
+      "lanes": {
+        "value": 9,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's lane records",
+        "window": "now; unreadable homes are unknown, fleet counts are at least and free capacity is unknown; compared with the sample nearest 24 hours ago",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459573.1792314
+      },
+      "plan": 4,
+      "free_lanes": {
+        "value": 0,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's lane records",
+        "window": "now; unreadable homes are unknown, fleet counts are at least and free capacity is unknown; compared with the sample nearest 24 hours ago",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459573.1792314
+      },
+      "ready": {
+        "value": 1,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's backlog",
+        "window": "now; compared with the sample nearest 24 hours ago",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459574.1744242
+      },
+      "landed": {
+        "value": 0,
+        "status": "lower_bound",
+        "reason": null,
+        "source": "each lead's merge lines in Main's records; Main's own merges from its fleet ledger",
+        "window": "local days from midnight (UTC+04:00); always at least: recording can be disabled or records unreadable",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459574.1749432
+      },
+      "closed": {
+        "value": 0,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's backlog and its done archive",
+        "window": "the last 7 local days, today so far, against the 7 days before",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459574.1765072
+      }
+    },
+    {
+      "home": "atlas",
+      "lead_state": "Runtime unknown",
+      "summary_read_at": 1791459573.1784582,
+      "summary_generated_epoch": 1791459417,
+      "lanes": {
+        "value": 1,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's lane records",
+        "window": "now; unreadable homes are unknown, fleet counts are at least and free capacity is unknown; compared with the sample nearest 24 hours ago",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459573.1792314
+      },
+      "plan": 4,
+      "free_lanes": {
+        "value": 3,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's lane records",
+        "window": "now; unreadable homes are unknown, fleet counts are at least and free capacity is unknown; compared with the sample nearest 24 hours ago",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459573.1792314
+      },
+      "ready": {
+        "value": 1,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's backlog",
+        "window": "now; compared with the sample nearest 24 hours ago",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459574.1744242
+      },
+      "landed": {
+        "value": 0,
+        "status": "lower_bound",
+        "reason": null,
+        "source": "each lead's merge lines in Main's records; Main's own merges from its fleet ledger",
+        "window": "local days from midnight (UTC+04:00); always at least: recording can be disabled or records unreadable",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459574.1749432
+      },
+      "closed": {
+        "value": 0,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's backlog and its done archive",
+        "window": "the last 7 local days, today so far, against the 7 days before",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459574.1765072
+      }
+    },
+    {
+      "home": "borealis",
+      "lead_state": "Runtime unknown",
+      "summary_read_at": 1791459573.1784582,
+      "summary_generated_epoch": 1791459417,
+      "lanes": {
+        "value": 1,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's lane records",
+        "window": "now; unreadable homes are unknown, fleet counts are at least and free capacity is unknown; compared with the sample nearest 24 hours ago",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459573.1792314
+      },
+      "plan": 4,
+      "free_lanes": {
+        "value": 3,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's lane records",
+        "window": "now; unreadable homes are unknown, fleet counts are at least and free capacity is unknown; compared with the sample nearest 24 hours ago",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459573.1792314
+      },
+      "ready": {
+        "value": 1,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's backlog",
+        "window": "now; compared with the sample nearest 24 hours ago",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459574.1744242
+      },
+      "landed": {
+        "value": 0,
+        "status": "lower_bound",
+        "reason": null,
+        "source": "each lead's merge lines in Main's records; Main's own merges from its fleet ledger",
+        "window": "local days from midnight (UTC+04:00); always at least: recording can be disabled or records unreadable",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459574.1749432
+      },
+      "closed": {
+        "value": 0,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's backlog and its done archive",
+        "window": "the last 7 local days, today so far, against the 7 days before",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459574.1765072
+      }
+    },
+    {
+      "home": "cirrus",
+      "lead_state": "Runtime unknown",
+      "summary_read_at": 1791459573.1784582,
+      "summary_generated_epoch": 1791459417,
+      "lanes": {
+        "value": 1,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's lane records",
+        "window": "now; unreadable homes are unknown, fleet counts are at least and free capacity is unknown; compared with the sample nearest 24 hours ago",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459573.1792314
+      },
+      "plan": 4,
+      "free_lanes": {
+        "value": 3,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's lane records",
+        "window": "now; unreadable homes are unknown, fleet counts are at least and free capacity is unknown; compared with the sample nearest 24 hours ago",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459573.1792314
+      },
+      "ready": {
+        "value": 1,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's backlog",
+        "window": "now; compared with the sample nearest 24 hours ago",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459574.1744242
+      },
+      "landed": {
+        "value": 0,
+        "status": "lower_bound",
+        "reason": null,
+        "source": "each lead's merge lines in Main's records; Main's own merges from its fleet ledger",
+        "window": "local days from midnight (UTC+04:00); always at least: recording can be disabled or records unreadable",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459574.1749432
+      },
+      "closed": {
+        "value": 0,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's backlog and its done archive",
+        "window": "the last 7 local days, today so far, against the 7 days before",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459574.1765072
+      }
+    },
+    {
+      "home": "delta",
+      "lead_state": "Runtime unknown",
+      "summary_read_at": 1791459573.1784582,
+      "summary_generated_epoch": 1791459417,
+      "lanes": {
+        "value": 1,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's lane records",
+        "window": "now; unreadable homes are unknown, fleet counts are at least and free capacity is unknown; compared with the sample nearest 24 hours ago",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459573.1792314
+      },
+      "plan": 4,
+      "free_lanes": {
+        "value": 3,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's lane records",
+        "window": "now; unreadable homes are unknown, fleet counts are at least and free capacity is unknown; compared with the sample nearest 24 hours ago",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459573.1792314
+      },
+      "ready": {
+        "value": 1,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's backlog",
+        "window": "now; compared with the sample nearest 24 hours ago",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459574.1744242
+      },
+      "landed": {
+        "value": 0,
+        "status": "lower_bound",
+        "reason": null,
+        "source": "each lead's merge lines in Main's records; Main's own merges from its fleet ledger",
+        "window": "local days from midnight (UTC+04:00); always at least: recording can be disabled or records unreadable",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459574.1749432
+      },
+      "closed": {
+        "value": 0,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's backlog and its done archive",
+        "window": "the last 7 local days, today so far, against the 7 days before",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459574.1765072
+      }
+    },
+    {
+      "home": "ember",
+      "lead_state": "Runtime unknown",
+      "summary_read_at": 1791459573.1784582,
+      "summary_generated_epoch": 1791459417,
+      "lanes": {
+        "value": 1,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's lane records",
+        "window": "now; unreadable homes are unknown, fleet counts are at least and free capacity is unknown; compared with the sample nearest 24 hours ago",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459573.1792314
+      },
+      "plan": 4,
+      "free_lanes": {
+        "value": 3,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's lane records",
+        "window": "now; unreadable homes are unknown, fleet counts are at least and free capacity is unknown; compared with the sample nearest 24 hours ago",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459573.1792314
+      },
+      "ready": {
+        "value": 1,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's backlog",
+        "window": "now; compared with the sample nearest 24 hours ago",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459574.1744242
+      },
+      "landed": {
+        "value": 0,
+        "status": "lower_bound",
+        "reason": null,
+        "source": "each lead's merge lines in Main's records; Main's own merges from its fleet ledger",
+        "window": "local days from midnight (UTC+04:00); always at least: recording can be disabled or records unreadable",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459574.1749432
+      },
+      "closed": {
+        "value": 0,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's backlog and its done archive",
+        "window": "the last 7 local days, today so far, against the 7 days before",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459574.1765072
+      }
+    },
+    {
+      "home": "fjord",
+      "lead_state": "Runtime unknown",
+      "summary_read_at": 1791459573.1784582,
+      "summary_generated_epoch": 1791459417,
+      "lanes": {
+        "value": 1,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's lane records",
+        "window": "now; unreadable homes are unknown, fleet counts are at least and free capacity is unknown; compared with the sample nearest 24 hours ago",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459573.1792314
+      },
+      "plan": 4,
+      "free_lanes": {
+        "value": 3,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's lane records",
+        "window": "now; unreadable homes are unknown, fleet counts are at least and free capacity is unknown; compared with the sample nearest 24 hours ago",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459573.1792314
+      },
+      "ready": {
+        "value": 1,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's backlog",
+        "window": "now; compared with the sample nearest 24 hours ago",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459574.1744242
+      },
+      "landed": {
+        "value": 0,
+        "status": "lower_bound",
+        "reason": null,
+        "source": "each lead's merge lines in Main's records; Main's own merges from its fleet ledger",
+        "window": "local days from midnight (UTC+04:00); always at least: recording can be disabled or records unreadable",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459574.1749432
+      },
+      "closed": {
+        "value": 0,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's backlog and its done archive",
+        "window": "the last 7 local days, today so far, against the 7 days before",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459574.1765072
+      }
+    },
+    {
+      "home": "gaia",
+      "lead_state": "Runtime unknown",
+      "summary_read_at": 1791459573.1784582,
+      "summary_generated_epoch": 1791459417,
+      "lanes": {
+        "value": 1,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's lane records",
+        "window": "now; unreadable homes are unknown, fleet counts are at least and free capacity is unknown; compared with the sample nearest 24 hours ago",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459573.1792314
+      },
+      "plan": 4,
+      "free_lanes": {
+        "value": 3,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's lane records",
+        "window": "now; unreadable homes are unknown, fleet counts are at least and free capacity is unknown; compared with the sample nearest 24 hours ago",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459573.1792314
+      },
+      "ready": {
+        "value": 1,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's backlog",
+        "window": "now; compared with the sample nearest 24 hours ago",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459574.1744242
+      },
+      "landed": {
+        "value": 0,
+        "status": "lower_bound",
+        "reason": null,
+        "source": "each lead's merge lines in Main's records; Main's own merges from its fleet ledger",
+        "window": "local days from midnight (UTC+04:00); always at least: recording can be disabled or records unreadable",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459574.1749432
+      },
+      "closed": {
+        "value": 0,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's backlog and its done archive",
+        "window": "the last 7 local days, today so far, against the 7 days before",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459574.1765072
+      }
+    },
+    {
+      "home": "helix",
+      "lead_state": "Runtime unknown",
+      "summary_read_at": 1791459573.1784582,
+      "summary_generated_epoch": 1791459417,
+      "lanes": {
+        "value": 1,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's lane records",
+        "window": "now; unreadable homes are unknown, fleet counts are at least and free capacity is unknown; compared with the sample nearest 24 hours ago",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459573.1792314
+      },
+      "plan": 4,
+      "free_lanes": {
+        "value": 3,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's lane records",
+        "window": "now; unreadable homes are unknown, fleet counts are at least and free capacity is unknown; compared with the sample nearest 24 hours ago",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459573.1792314
+      },
+      "ready": {
+        "value": 1,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's backlog",
+        "window": "now; compared with the sample nearest 24 hours ago",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459574.1744242
+      },
+      "landed": {
+        "value": 0,
+        "status": "lower_bound",
+        "reason": null,
+        "source": "each lead's merge lines in Main's records; Main's own merges from its fleet ledger",
+        "window": "local days from midnight (UTC+04:00); always at least: recording can be disabled or records unreadable",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459574.1749432
+      },
+      "closed": {
+        "value": 0,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's backlog and its done archive",
+        "window": "the last 7 local days, today so far, against the 7 days before",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459574.1765072
+      }
+    },
+    {
+      "home": "io",
+      "lead_state": "Runtime unknown",
+      "summary_read_at": 1791459573.1784582,
+      "summary_generated_epoch": 1791459417,
+      "lanes": {
+        "value": 1,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's lane records",
+        "window": "now; unreadable homes are unknown, fleet counts are at least and free capacity is unknown; compared with the sample nearest 24 hours ago",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459573.1792314
+      },
+      "plan": 4,
+      "free_lanes": {
+        "value": 3,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's lane records",
+        "window": "now; unreadable homes are unknown, fleet counts are at least and free capacity is unknown; compared with the sample nearest 24 hours ago",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459573.1792314
+      },
+      "ready": {
+        "value": 1,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's backlog",
+        "window": "now; compared with the sample nearest 24 hours ago",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459574.1744242
+      },
+      "landed": {
+        "value": 0,
+        "status": "lower_bound",
+        "reason": null,
+        "source": "each lead's merge lines in Main's records; Main's own merges from its fleet ledger",
+        "window": "local days from midnight (UTC+04:00); always at least: recording can be disabled or records unreadable",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459574.1749432
+      },
+      "closed": {
+        "value": 0,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's backlog and its done archive",
+        "window": "the last 7 local days, today so far, against the 7 days before",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459574.1765072
+      }
+    },
+    {
+      "home": "😀orbit",
+      "lead_state": "Runtime unknown",
+      "summary_read_at": 1791459573.1784582,
+      "summary_generated_epoch": 1791459417,
+      "lanes": {
+        "value": 1,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's lane records",
+        "window": "now; unreadable homes are unknown, fleet counts are at least and free capacity is unknown; compared with the sample nearest 24 hours ago",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459573.1792314
+      },
+      "plan": 4,
+      "free_lanes": {
+        "value": 3,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's lane records",
+        "window": "now; unreadable homes are unknown, fleet counts are at least and free capacity is unknown; compared with the sample nearest 24 hours ago",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459573.1792314
+      },
+      "ready": {
+        "value": 1,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's backlog",
+        "window": "now; compared with the sample nearest 24 hours ago",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459574.1744242
+      },
+      "landed": {
+        "value": 0,
+        "status": "lower_bound",
+        "reason": null,
+        "source": "each lead's merge lines in Main's records; Main's own merges from its fleet ledger",
+        "window": "local days from midnight (UTC+04:00); always at least: recording can be disabled or records unreadable",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459574.1749432
+      },
+      "closed": {
+        "value": 0,
+        "status": "exact",
+        "reason": null,
+        "source": "each home's backlog and its done archive",
+        "window": "the last 7 local days, today so far, against the 7 days before",
+        "cutoff": 1791459573.177692,
+        "read_at": 1791459574.1765072
+      }
+    }
+  ],
+  "held_items": [],
+  "recent_merges": [],
+  "quota_accounts": [],
+  "devices": [
+    {
+      "name": "Phone CPH2649",
+      "where": "a4b93ea2 · USB",
+      "detail": "Free · last used by firstmate 19 min ago",
+      "tone": "ok",
+      "holder": null
+    },
+    {
+      "name": "Emulator fm-mx-pm-9b",
+      "where": "emulator-5574 · 2.1 GB in use",
+      "detail": "Free · last used by ownvoice 16 min ago",
+      "tone": "ok",
+      "holder": null
+    }
+  ],
+  "machine": {
+    "free": [
+      49.493167877197266,
+      91.973388671875
+    ],
+    "free_why": "no MemAvailable in meminfo",
+    "pressure": 0.09,
+    "pressure_why": "no \"some avg10\" line",
+    "heavy": [
+      8.731674194335938,
+      32.0,
+      38.0
+    ],
+    "heavy_why": "MemoryCurrent is 9375563776",
+    "gradle": 0,
+    "gradle_why": "no count"
+  },
+  "machine_limits": {
+    "emulators": 2,
+    "gradle": 2,
+    "min_memory_gb": 12,
+    "memory_pressure": 40
+  },
+  "agents": [],
+  "lane_history": [
+    {
+      "at": 1791459417,
+      "lanes": 19,
+      "stuck": 3,
+      "ready": null
+    }
+  ],
+  "parked_homes": [],
+  "sources_unknown": [
+    {
+      "source": "merge records",
+      "reason": "Main: No such file or directory, so Main's own merges are not counted"
+    },
+    {
+      "source": "quota-axi",
+      "reason": "[Errno 2] No such file or directory: 'quotas.json'"
+    },
+    {
+      "source": "herdr agent list",
+      "reason": "herdr not found"
+    },
+    {
+      "source": "lead state",
+      "reason": "atlas: runtime evidence unavailable"
+    },
+    {
+      "source": "lead state",
+      "reason": "borealis: runtime evidence unavailable"
+    },
+    {
+      "source": "lead state",
+      "reason": "cirrus: runtime evidence unavailable"
+    },
+    {
+      "source": "lead state",
+      "reason": "delta: runtime evidence unavailable"
+    },
+    {
+      "source": "lead state",
+      "reason": "ember: runtime evidence unavailable"
+    },
+    {
+      "source": "lead state",
+      "reason": "fjord: runtime evidence unavailable"
+    },
+    {
+      "source": "lead state",
+      "reason": "gaia: runtime evidence unavailable"
+    },
+    {
+      "source": "lead state",
+      "reason": "helix: runtime evidence unavailable"
+    },
+    {
+      "source": "lead state",
+      "reason": "io: runtime evidence unavailable"
+    },
+    {
+      "source": "lead state",
+      "reason": "😀orbit: runtime evidence unavailable"
+    }
+  ],
+  "device_problems": [],
+  "build_duration_seconds": 1.0971321390243247
+}
