@@ -1,0 +1,170 @@
+[
+  {
+    "command": [
+      "press",
+      "Escape"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "pressed": "Escape"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "click",
+      ".sv-homes button:nth-child(2)"
+    ],
+    "result": {
+      "clicked": ".sv-homes button:nth-child(2)",
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      }
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "set",
+      "media",
+      "reduced-motion"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "set": true
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "get",
+      "url"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "url": "http://127.0.0.1:18787/#/ship"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "eval",
+      "({reduced:matchMedia('(prefers-reduced-motion: reduce)').matches,away:document.querySelector('.tags').classList.contains('sv-away'),selected:document.querySelector('.sv-homes [aria-selected=true]').textContent,tags:document.querySelector('.tags').textContent})"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "origin": "http://127.0.0.1:18787/#/ship",
+      "result": {
+        "away": false,
+        "reduced": true,
+        "selected": "next2",
+        "tags": "Blocked 1h 1m"
+      }
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "get",
+      "url"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "url": "http://127.0.0.1:18787/#/ship"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "screenshot",
+      "/home/umer/.no-mistakes/evidence/01M4DDM51S7CJKVSNYG7DYBWDW/reduced-motion-next.png"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "path": "/home/umer/.no-mistakes/evidence/01M4DDM51S7CJKVSNYG7DYBWDW/reduced-motion-next.png"
+    },
+    "success": true
+  }
+]

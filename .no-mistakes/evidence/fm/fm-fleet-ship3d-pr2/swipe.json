@@ -1,0 +1,196 @@
+[
+  {
+    "command": [
+      "mouse",
+      "move",
+      "560",
+      "570"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "moved": true
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "mouse",
+      "down"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "pressed": true
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "mouse",
+      "move",
+      "220",
+      "570"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "moved": true
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "mouse",
+      "up"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "released": true
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "wait",
+      "--fn",
+      "document.querySelector('.sv-homes [aria-selected=true]').textContent.includes('next') && !document.querySelector('.tags').classList.contains('sv-away') && document.querySelector('.tags').textContent.includes('Lead decides')"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "result": true
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "screenshot",
+      "/home/umer/.no-mistakes/evidence/01M4DDM51S7CJKVSNYG7DYBWDW/swipe-next-phone.png"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "path": "/home/umer/.no-mistakes/evidence/01M4DDM51S7CJKVSNYG7DYBWDW/swipe-next-phone.png"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "eval",
+      "({selected:document.querySelector('.sv-homes [aria-selected=true]').textContent,tags:document.querySelector('.tags').textContent,reduced:matchMedia('(prefers-reduced-motion: reduce)').matches})"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "origin": "http://127.0.0.1:18787/#/ship",
+      "result": {
+        "reduced": false,
+        "selected": "next2",
+        "tags": "Lead decides 1h 1mParked by captain"
+      }
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "get",
+      "url"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "url": "http://127.0.0.1:18787/#/ship"
+    },
+    "success": true
+  }
+]

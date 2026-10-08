@@ -1,0 +1,37 @@
+Real fm-dashboard.sh serve on 127.0.0.1:18787; isolated FM_HOME=.test-dashboard; generated fleet records, not network mocks.
+Native keyboard activations:
+http://127.0.0.1:18787/#/ship?card=main/blocked-worker
+http://127.0.0.1:18787/#/ship?card=main/blocked-worker
+http://127.0.0.1:18787/#/ship?card=next/decision-worker
+http://127.0.0.1:18787/#/ship?card=next/parked-worker
+http://127.0.0.1:18787/#/ship?card=next/parked-worker
+
+reduced-picking:
+{"lifecycle": {"effectiveLaunch": {"browserLaunched": true, "engine": "chrome", "launchHash": 12825947863403514000}, "launched": false, "relaunchedBrowser": false, "restartedBackground": false, "restoreStatus": "missing", "reused": true, "saveStatus": "saved"}, "url": "http://127.0.0.1:18787/#/ship?card=next/decision-worker"}
+{"lifecycle": {"effectiveLaunch": {"browserLaunched": true, "engine": "chrome", "launchHash": 12825947863403514000}, "launched": false, "relaunchedBrowser": false, "restartedBackground": false, "restoreStatus": "missing", "reused": true, "saveStatus": "saved"}, "url": "http://127.0.0.1:18787/#/ship?card=main/blocked-worker"}
+
+worker-pick:
+{"lifecycle": {"effectiveLaunch": {"browserLaunched": true, "engine": "chrome", "launchHash": 12825947863403514000}, "launched": false, "relaunchedBrowser": false, "restartedBackground": false, "restoreStatus": "missing", "reused": true, "saveStatus": "saved"}, "url": "http://127.0.0.1:18787/#/ship?card=main/review-worker"}
+
+swipe-boundaries:
+{"lifecycle": {"effectiveLaunch": {"browserLaunched": true, "engine": "chrome", "launchHash": 12825947863403514000}, "launched": false, "relaunchedBrowser": false, "restartedBackground": false, "restoreStatus": "missing", "reused": true, "saveStatus": "saved"}, "origin": "http://127.0.0.1:18787/#/ship", "result": {"events": [{"away": true, "ms": 33860, "selected": "Main2", "text": "Lead decides 1h 2mParked by captain"}, {"away": false, "ms": 35359.89999997616, "selected": "Main2", "text": "Blocked 1h 2m"}]}}
+{"lifecycle": {"effectiveLaunch": {"browserLaunched": true, "engine": "chrome", "launchHash": 12825947863403514000}, "launched": false, "relaunchedBrowser": false, "restartedBackground": false, "restoreStatus": "missing", "reused": true, "saveStatus": "saved"}, "url": "http://127.0.0.1:18787/#/ship"}
+{"lifecycle": {"effectiveLaunch": {"browserLaunched": true, "engine": "chrome", "launchHash": 12825947863403514000}, "launched": false, "relaunchedBrowser": false, "restartedBackground": false, "restoreStatus": "missing", "reused": true, "saveStatus": "saved"}, "origin": "http://127.0.0.1:18787/#/ship", "result": {"away": false, "card": "#/ship", "home": "Main2"}}
+{"lifecycle": {"effectiveLaunch": {"browserLaunched": true, "engine": "chrome", "launchHash": 12825947863403514000}, "launched": false, "relaunchedBrowser": false, "restartedBackground": false, "restoreStatus": "missing", "reused": true, "saveStatus": "saved"}, "url": "http://127.0.0.1:18787/#/ship"}
+
+motion-interruption-timing:
+{"lifecycle": {"effectiveLaunch": {"browserLaunched": true, "engine": "chrome", "launchHash": 12825947863403514000}, "launched": false, "relaunchedBrowser": false, "restartedBackground": false, "restoreStatus": "missing", "reused": true, "saveStatus": "saved"}, "origin": "http://127.0.0.1:18787/#/ship", "result": [{"away": false, "ms": 51031.79999995232, "reduced": true, "text": "Lead decides 1h 2mParked by captain"}, {"away": false, "ms": 58276.69999998808, "reduced": false, "text": "Lead decides 1h 2mParked by captain"}, {"away": true, "ms": 58309, "text": "Lead decides 1h 2mParked by captain"}, {"away": false, "ms": 58414.29999995232, "text": "Blocked 1h 2m"}, {"away": false, "ms": 58424.69999998808, "reduced": true, "text": "Blocked 1h 2m"}]}
+{"lifecycle": {"effectiveLaunch": {"browserLaunched": true, "engine": "chrome", "launchHash": 12825947863403514000}, "launched": false, "relaunchedBrowser": false, "restartedBackground": false, "restoreStatus": "missing", "reused": true, "saveStatus": "saved"}, "url": "http://127.0.0.1:18787/#/ship"}
+
+transition-guards:
+{"lifecycle": {"effectiveLaunch": {"browserLaunched": true, "engine": "chrome", "launchHash": 12825947863403514000}, "launched": false, "relaunchedBrowser": false, "restartedBackground": false, "restoreStatus": "missing", "reused": true, "saveStatus": "saved"}, "url": "http://127.0.0.1:18787/#/ship?card=next/parked-worker"}
+{"lifecycle": {"effectiveLaunch": {"browserLaunched": true, "engine": "chrome", "launchHash": 12825947863403514000}, "launched": false, "relaunchedBrowser": false, "restartedBackground": false, "restoreStatus": "missing", "reused": true, "saveStatus": "saved"}, "url": "http://127.0.0.1:18787/#/ship"}
+{"lifecycle": {"effectiveLaunch": {"browserLaunched": true, "engine": "chrome", "launchHash": 12825947863403514000}, "launched": false, "relaunchedBrowser": false, "restartedBackground": false, "restoreStatus": "missing", "reused": true, "saveStatus": "saved"}, "origin": "http://127.0.0.1:18787/#/ship", "result": {"hash": "#/ship", "selected": "Main2", "tags": "Blocked 1h 3m"}}
+{"lifecycle": {"effectiveLaunch": {"browserLaunched": true, "engine": "chrome", "launchHash": 12825947863403514000}, "launched": false, "relaunchedBrowser": false, "restartedBackground": false, "restoreStatus": "missing", "reused": true, "saveStatus": "saved"}, "url": "http://127.0.0.1:18787/#/ship"}
+
+empty-station-and-parked:
+{"lifecycle": {"effectiveLaunch": {"browserLaunched": true, "engine": "chrome", "launchHash": 12825947863403514000}, "launched": false, "relaunchedBrowser": false, "restartedBackground": false, "restoreStatus": "missing", "reused": true, "saveStatus": "saved"}, "url": "http://127.0.0.1:18787/#/ship"}
+{"lifecycle": {"effectiveLaunch": {"browserLaunched": true, "engine": "chrome", "launchHash": 12825947863403514000}, "launched": false, "relaunchedBrowser": false, "restartedBackground": false, "restoreStatus": "missing", "reused": true, "saveStatus": "saved"}, "url": "http://127.0.0.1:18787/#/ship?card=next/parked-worker"}
+{"errors": [], "lifecycle": {"effectiveLaunch": {"browserLaunched": true, "engine": "chrome", "launchHash": 12825947863403514000}, "launched": false, "relaunchedBrowser": false, "restartedBackground": false, "restoreStatus": "missing", "reused": true, "saveStatus": "saved"}}
+
+Browser regression check: PASS: reduced-motion settlement and stuck/parked row activation (mock preference fixture; supplemental, not live-product evidence).

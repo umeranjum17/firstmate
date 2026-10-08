@@ -1,0 +1,569 @@
+[
+  {
+    "command": [
+      "focus",
+      "article[data-card='main/blocked-worker']"
+    ],
+    "result": {
+      "focused": "article[data-card='main/blocked-worker']",
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      }
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "press",
+      "Enter"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "pressed": "Enter"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "get",
+      "url"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "url": "http://127.0.0.1:18787/#/ship?card=main/blocked-worker"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "press",
+      "Escape"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "pressed": "Escape"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "focus",
+      "article[data-card='main/blocked-worker']"
+    ],
+    "result": {
+      "focused": "article[data-card='main/blocked-worker']",
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      }
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "press",
+      "Space"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "pressed": "Space"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "get",
+      "url"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "url": "http://127.0.0.1:18787/#/ship?card=main/blocked-worker"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "press",
+      "Escape"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "pressed": "Escape"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "focus",
+      "article[data-card='next/decision-worker']"
+    ],
+    "result": {
+      "focused": "article[data-card='next/decision-worker']",
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      }
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "press",
+      "Space"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "pressed": "Space"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "get",
+      "url"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "url": "http://127.0.0.1:18787/#/ship?card=next/decision-worker"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "press",
+      "Escape"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "pressed": "Escape"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "focus",
+      "article[data-card='next/parked-worker']"
+    ],
+    "result": {
+      "focused": "article[data-card='next/parked-worker']",
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      }
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "press",
+      "Enter"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "pressed": "Enter"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "get",
+      "url"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "url": "http://127.0.0.1:18787/#/ship?card=next/parked-worker"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "press",
+      "Escape"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "pressed": "Escape"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "focus",
+      "article[data-card='next/parked-worker']"
+    ],
+    "result": {
+      "focused": "article[data-card='next/parked-worker']",
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      }
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "press",
+      "Space"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "pressed": "Space"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "get",
+      "url"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "url": "http://127.0.0.1:18787/#/ship?card=next/parked-worker"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "snapshot",
+      "-i"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "origin": "http://127.0.0.1:18787/#/ship?card=next/parked-worker",
+      "refs": {
+        "e1": {
+          "name": "Search",
+          "role": "button"
+        },
+        "e10": {
+          "name": "Previous lane",
+          "role": "button"
+        },
+        "e11": {
+          "name": "Next lane",
+          "role": "button"
+        },
+        "e12": {
+          "name": "Close",
+          "role": "button"
+        },
+        "e13": {
+          "name": "parked worker",
+          "role": "heading"
+        },
+        "e14": {
+          "name": "Ship",
+          "role": "heading"
+        },
+        "e15": {
+          "name": "",
+          "role": "Canvas"
+        },
+        "e16": {
+          "name": "Raw",
+          "role": "button"
+        },
+        "e17": {
+          "name": "Show less",
+          "role": "button"
+        },
+        "e18": {
+          "name": "Stuck 2 · Parked by captain 1 Show less",
+          "role": "button"
+        },
+        "e19": {
+          "name": "pi blocked worker 1h Blocked · Main · dependency unavailable",
+          "role": "button"
+        },
+        "e2": {
+          "name": "Needs you 0",
+          "role": "link"
+        },
+        "e20": {
+          "name": "Qwen decision worker 1h Lead decides · next · choose approach",
+          "role": "button"
+        },
+        "e21": {
+          "name": "pi parked worker 1h next · parked by captain",
+          "role": "button"
+        },
+        "e22": {
+          "name": "Main 2",
+          "role": "tab"
+        },
+        "e23": {
+          "name": "next 2",
+          "role": "tab"
+        },
+        "e24": {
+          "name": "blocked worker",
+          "role": "heading"
+        },
+        "e25": {
+          "name": "decision worker",
+          "role": "heading"
+        },
+        "e26": {
+          "name": "parked worker",
+          "role": "heading"
+        },
+        "e3": {
+          "name": "Board 4",
+          "role": "link"
+        },
+        "e4": {
+          "name": "Ship",
+          "role": "link"
+        },
+        "e5": {
+          "name": "Metrics",
+          "role": "link"
+        },
+        "e6": {
+          "name": "Main 2",
+          "role": "button"
+        },
+        "e7": {
+          "name": "next 2",
+          "role": "button"
+        },
+        "e8": {
+          "name": "Live",
+          "role": "button"
+        },
+        "e9": {
+          "name": "Light or dark theme",
+          "role": "button"
+        }
+      },
+      "snapshot": "- button \"Search\" [ref=e1]\n- link \"Needs you 0\" [ref=e2]\n- link \"Board 4\" [ref=e3]\n- link \"Ship\" [ref=e4]\n- link \"Metrics\" [ref=e5]\n- button \"Main 2\" [ref=e6]\n- button \"next 2\" [ref=e7]\n- button \"Live\" [ref=e8]\n- button \"Light or dark theme\" [ref=e9]\n- heading \"Ship\" [level=1, ref=e14]\n- Canvas [ref=e15] clickable [cursor:pointer]\n- tab \"Main 2\" [selected, ref=e22]\n- tab \"next 2\" [ref=e23]\n- button \"Show less\" [expanded=true, ref=e17]\n- button \"Stuck 2 · Parked by captain 1 Show less\" [expanded=true, ref=e18]\n- button \"pi blocked worker 1h Blocked · Main · dependency unavailable\" [ref=e19]\n  - heading \"blocked worker\" [level=3, ref=e24]\n- button \"Qwen decision worker 1h Lead decides · next · choose approach\" [ref=e20]\n  - heading \"decision worker\" [level=3, ref=e25]\n- button \"pi parked worker 1h next · parked by captain\" [ref=e21]\n  - heading \"parked worker\" [level=3, ref=e26]\n- button \"Previous lane\" [ref=e10]\n- button \"Next lane\" [disabled, ref=e11]\n- button \"Close\" [ref=e12]\n- heading \"parked worker\" [level=2, ref=e13]\n- button \"Raw\" [expanded=false, ref=e16]"
+    },
+    "success": true
+  }
+]

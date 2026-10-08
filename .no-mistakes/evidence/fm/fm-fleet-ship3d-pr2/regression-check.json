@@ -1,0 +1,17 @@
+{
+  "lifecycle": {
+    "effectiveLaunch": {
+      "browserLaunched": true,
+      "engine": "chrome",
+      "launchHash": 12825947863403514000
+    },
+    "launched": false,
+    "relaunchedBrowser": false,
+    "restartedBackground": false,
+    "restoreStatus": "missing",
+    "reused": true,
+    "saveStatus": "saved"
+  },
+  "origin": "http://127.0.0.1:18788/tests/assets/ship-interaction-check.html",
+  "text": "PASS: [REDACTED] settlement and stuck/parked row activation"
+}

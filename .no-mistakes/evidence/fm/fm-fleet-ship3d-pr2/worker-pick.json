@@ -1,0 +1,202 @@
+[
+  {
+    "command": [
+      "mouse",
+      "move",
+      "241",
+      "411"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "moved": true
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "mouse",
+      "down"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "pressed": true
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "mouse",
+      "up"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "released": true
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "get",
+      "url"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "url": "http://127.0.0.1:18787/#/ship?card=main/review-worker"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "snapshot",
+      "-i"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "origin": "http://127.0.0.1:18787/#/ship?card=main/review-worker",
+      "refs": {
+        "e1": {
+          "name": "Ship",
+          "role": "heading"
+        },
+        "e10": {
+          "name": "Board",
+          "role": "link"
+        },
+        "e11": {
+          "name": "Needs you",
+          "role": "link"
+        },
+        "e12": {
+          "name": "Ship",
+          "role": "link"
+        },
+        "e13": {
+          "name": "Metrics",
+          "role": "link"
+        },
+        "e14": {
+          "name": "Show all stuck work",
+          "role": "button"
+        },
+        "e15": {
+          "name": "Stuck 2 · Parked by captain 1 Show all",
+          "role": "button"
+        },
+        "e16": {
+          "name": "pi blocked worker 1h 2m Blocked · Main · dependency unavailable",
+          "role": "button"
+        },
+        "e17": {
+          "name": "Raw",
+          "role": "button"
+        },
+        "e18": {
+          "name": "Main 2",
+          "role": "tab"
+        },
+        "e19": {
+          "name": "next 2",
+          "role": "tab"
+        },
+        "e2": {
+          "name": "Light or dark theme",
+          "role": "button"
+        },
+        "e20": {
+          "name": "blocked worker",
+          "role": "heading"
+        },
+        "e3": {
+          "name": "Live",
+          "role": "button"
+        },
+        "e4": {
+          "name": "Search",
+          "role": "button"
+        },
+        "e5": {
+          "name": "Previous lane",
+          "role": "button"
+        },
+        "e6": {
+          "name": "Next lane",
+          "role": "button"
+        },
+        "e7": {
+          "name": "Close",
+          "role": "button"
+        },
+        "e8": {
+          "name": "review worker",
+          "role": "heading"
+        },
+        "e9": {
+          "name": "",
+          "role": "Canvas"
+        }
+      },
+      "snapshot": "- heading \"Ship\" [level=1, ref=e1]\n- button \"Light or dark theme\" [ref=e2]\n- button \"Live\" [ref=e3]\n- Canvas [ref=e9] clickable [cursor:pointer]\n- tab \"Main 2\" [selected, ref=e18]\n- tab \"next 2\" [ref=e19]\n- button \"Show all stuck work\" [expanded=false, ref=e14]\n- button \"Stuck 2 · Parked by captain 1 Show all\" [expanded=false, ref=e15]\n- button \"pi blocked worker 1h 2m Blocked · Main · dependency unavailable\" [ref=e16]\n  - heading \"blocked worker\" [level=3, ref=e20]\n- link \"Board\" [ref=e10]\n- link \"Needs you\" [ref=e11]\n- link \"Ship\" [ref=e12]\n- link \"Metrics\" [ref=e13]\n- button \"Search\" [ref=e4]\n- button \"Previous lane\" [ref=e5]\n- button \"Next lane\" [ref=e6]\n- button \"Close\" [ref=e7]\n- heading \"review worker\" [level=2, ref=e8]\n- button \"Raw\" [expanded=false, ref=e17]"
+    },
+    "success": true
+  }
+]

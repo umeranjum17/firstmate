@@ -1,0 +1,197 @@
+[
+  {
+    "command": [
+      "set",
+      "media",
+      "dark"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "set": true
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "click",
+      ".sv-homes button:nth-child(1)"
+    ],
+    "result": {
+      "clicked": ".sv-homes button:nth-child(1)",
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      }
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "wait",
+      "--fn",
+      "document.querySelector('.tags').classList.contains('sv-away')"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "result": true
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "set",
+      "media",
+      "reduced-motion"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "set": true
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "wait",
+      "--fn",
+      "!document.querySelector('.tags').classList.contains('sv-away') && document.querySelector('.tags').textContent.includes('Blocked')"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "result": true
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "eval",
+      "window.motionProbe"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "origin": "http://127.0.0.1:18787/#/ship",
+      "result": [
+        {
+          "away": false,
+          "ms": 51031.79999995232,
+          "reduced": true,
+          "text": "Lead decides 1h 2mParked by captain"
+        },
+        {
+          "away": false,
+          "ms": 58276.69999998808,
+          "reduced": false,
+          "text": "Lead decides 1h 2mParked by captain"
+        },
+        {
+          "away": true,
+          "ms": 58309,
+          "text": "Lead decides 1h 2mParked by captain"
+        },
+        {
+          "away": false,
+          "ms": 58414.29999995232,
+          "text": "Blocked 1h 2m"
+        },
+        {
+          "away": false,
+          "ms": 58424.69999998808,
+          "reduced": true,
+          "text": "Blocked 1h 2m"
+        }
+      ]
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "get",
+      "url"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "missing",
+        "reused": true,
+        "saveStatus": "saved"
+      },
+      "url": "http://127.0.0.1:18787/#/ship"
+    },
+    "success": true
+  }
+]
