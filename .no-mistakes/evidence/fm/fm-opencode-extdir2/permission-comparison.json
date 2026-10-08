@@ -1,0 +1,31 @@
+[
+  {
+    "revision": "base",
+    "interface": "GET /agent",
+    "agent": "build",
+    "ordered_wildcard_rules": [
+      {
+        "permission": "external_directory",
+        "pattern": "*",
+        "action": "ask"
+      }
+    ]
+  },
+  {
+    "revision": "candidate",
+    "interface": "GET /agent",
+    "agent": "build",
+    "ordered_wildcard_rules": [
+      {
+        "permission": "external_directory",
+        "pattern": "*",
+        "action": "ask"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "*",
+        "action": "allow"
+      }
+    ]
+  }
+]

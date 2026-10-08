@@ -1,0 +1,17 @@
+{
+  "commit": "49b806e294fecadabe1c99e23869e1ccc4eeebe6",
+  "cwd": "/tmp/fm-lab.5CwOIk/projects/scratch",
+  "config": {
+    "permission": {
+      "*": "allow",
+      "external_directory": "allow"
+    }
+  },
+  "prompt": "Use the read tool to read each of these absolute files outside the current directory, and report the exact contents of both: /tmp/fm-lab.5CwOIk/state/worker.inbox, /tmp/fm-lab.5CwOIk/data/tmp-scratch.txt. Do not ask for directory permission, do not modify anything, and do not use any other files.",
+  "expected_contents": {
+    "/tmp/fm-lab.5CwOIk/state/worker.inbox": "INBOX_78770d27d1f5d38de43ecb7f",
+    "/tmp/fm-lab.5CwOIk/data/tmp-scratch.txt": "TMP_948f5817e312ef03251db56b"
+  },
+  "pty_columns": 140,
+  "pty_rows": 45
+}

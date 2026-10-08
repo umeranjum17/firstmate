@@ -1,0 +1,4 @@
+ok - opencode receives --model and the effort as its config's agent variant
+ok - opencode without an effort keeps its launch config unchanged
+ok - opencode emits the variant for an effort the openai family exposes
+ok - opencode omits the variant for an effort outside the model family's list

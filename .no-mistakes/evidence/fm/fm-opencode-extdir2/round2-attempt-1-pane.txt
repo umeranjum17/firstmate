@@ -1,0 +1,46 @@
+opencode@1.18.25                                                                                                                           ◜
+
+  ┃                                                                                                 Read and report two file contents
+  ┃  Use the read tool to read each of these absolute files outside the current directory, and
+  ┃  report the exact contents of both: /tmp/fm-lab.5CwOIk/state/worker.inbox, /tmp/fm-lab.         Context
+  ┃  5CwOIk/data/tmp-scratch.txt. Do not ask for directory permission, do not modify anything,      21,886 tokens
+  ┃  and do not use any other files.                                                                11% used
+  ┃                                                                                                 $0.01 spent
+
+     + Thought: 551ms                                                                               LSP
+                                                                                                    LSPs are disabled
+     → Read /tmp/fm-lab.5CwOIk/state/worker.inbox
+     → Read /tmp/fm-lab.5CwOIk/data/tmp-scratch.txt
+
+     + Thought: 383ms
+
+     /tmp/fm-lab.5CwOIk/state/worker.inbox
+
+     INBOX_78770d27d1f5d38de43ecb7f
+
+     /tmp/fm-lab.5CwOIk/data/tmp-scratch.txt
+
+     TMP_948f5817e312ef03251db56b
+
+     ▣  Build · MiniMax-M2.7 · 8.1s
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  ┃
+  ┃
+  ┃
+  ┃  Build · MiniMax-M2.7 OpenCode Go                                                               /tmp/fm-lab.5CwOIk/projects/scratch
+  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+   /tmp/fm-lab.5CwOIk/projects/scratch                      21.9K (11%) · $0.01  ctrl+p commands    • OpenCode 1.18.25
+

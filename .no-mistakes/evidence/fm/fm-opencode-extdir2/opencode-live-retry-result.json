@@ -1,0 +1,23 @@
+{
+  "head": "49b806e294fecadabe1c99e23869e1ccc4eeebe6",
+  "model": "opencode-go/minimax-m2.7",
+  "config": {
+    "permission": {
+      "*": "allow",
+      "external_directory": "allow"
+    }
+  },
+  "reason": "provider quota blocked tool execution",
+  "live_read": "not-proven",
+  "outside_paths": [
+    "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4DN5JKS3CRT6S0MA3RXDGDN/.gate-opencode-live/home/state/live-worker.inbox",
+    "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4DN5JKS3CRT6S0MA3RXDGDN/.gate-opencode-live/scratch/outside.txt"
+  ],
+  "tmp_path_check": "not performed: intentional fixture writes outside the worktree prohibited",
+  "permission_response_submitted": false,
+  "transcript": "/home/umer/.no-mistakes/evidence/01M4DN5JKS3CRT6S0MA3RXDGDN/opencode-live-retry.ansi",
+  "exact_error": "Go limit reached: weekly usage limit reached. It will reset in 3 days 12 hours.",
+  "attempts": 1,
+  "source_changes": "none: provider quota is an external blocker, not a demonstrated code defect",
+  "verdict": "not-proven"
+}

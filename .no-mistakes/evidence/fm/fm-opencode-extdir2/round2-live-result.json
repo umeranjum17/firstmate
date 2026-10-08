@@ -1,0 +1,28 @@
+{
+  "commit": "49b806e294fecadabe1c99e23869e1ccc4eeebe6",
+  "config": {
+    "permission": {
+      "*": "allow",
+      "external_directory": "allow"
+    }
+  },
+  "results": [
+    {
+      "attempt": 1,
+      "contents_observed": true,
+      "read_tool_calls_observed": 2,
+      "external_permission_prompt_observed": false,
+      "pane_artifact": "/home/umer/.no-mistakes/evidence/01M4DN5JKS3CRT6S0MA3RXDGDN/round2-attempt-1-pane.txt"
+    },
+    {
+      "attempt": 2,
+      "contents_observed": true,
+      "read_tool_calls_observed": 2,
+      "external_permission_prompt_observed": false,
+      "pane_artifact": "/home/umer/.no-mistakes/evidence/01M4DN5JKS3CRT6S0MA3RXDGDN/round2-attempt-2-pane.txt"
+    }
+  ],
+  "private_tmux_servers_stopped": true,
+  "disposable_lab_removed": true,
+  "scope": "Real OpenCode reads with the exact generated permission configuration; not a fleet lifecycle or sustained busy-lane proof."
+}

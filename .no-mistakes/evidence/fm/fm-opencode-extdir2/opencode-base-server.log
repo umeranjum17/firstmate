@@ -1,0 +1,4 @@
+mise WARN  opencode is defined in ~/.config/mise/config.toml which overrides the global config (~/.no-mistakes/worktrees/bde6b4035eae/01M4DN5JKS3CRT6S0MA3RXDGDN/.gate-opencode-tmp/runtime/config/mise/config.toml)
+mise ~/.no-mistakes/worktrees/bde6b4035eae/01M4DN5JKS3CRT6S0MA3RXDGDN/.gate-opencode-tmp/runtime/config/mise/config.toml tools: opencode@1.18.35
+Warning: OPENCODE_SERVER_PASSWORD is not set; server is unsecured.
+opencode server listening on http://127.0.0.1:58193

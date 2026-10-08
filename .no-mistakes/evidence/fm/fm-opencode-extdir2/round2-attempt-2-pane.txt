@@ -1,0 +1,46 @@
+opencode@1.18.25                                                                                                                           ◜
+
+  ┃                                                                                                 New session - 2026-10-08T11:59:24.
+  ┃  Use the read tool to read each of these absolute files outside the current directory, and      497Z
+  ┃  report the exact contents of both: /tmp/fm-lab.5CwOIk/state/worker.inbox, /tmp/fm-lab.
+  ┃  5CwOIk/data/tmp-scratch.txt. Do not ask for directory permission, do not modify anything,      Context
+  ┃  and do not use any other files.                                                                22,525 tokens
+  ┃                                                                                                 11% used
+                                                                                                    $0.00 spent
+     + Thought: 484ms
+                                                                                                    LSP
+     → Read /tmp/fm-lab.5CwOIk/state/worker.inbox                                                   LSPs are disabled
+     → Read /tmp/fm-lab.5CwOIk/data/tmp-scratch.txt
+
+     + Thought: 117ms
+
+     /tmp/fm-lab.5CwOIk/state/worker.inbox
+
+     INBOX_78770d27d1f5d38de43ecb7f
+
+     /tmp/fm-lab.5CwOIk/data/tmp-scratch.txt
+
+     TMP_948f5817e312ef03251db56b
+
+     Both are single-line files with no trailing content.
+
+     ▣  Build · MiMo-V2.6-Flash Free · 10.0s
+
+
+
+
+
+
+
+
+
+
+
+
+  ┃
+  ┃
+  ┃
+  ┃  Build · MiMo-V2.6-Flash Free Personal / OpenCode                                               /tmp/fm-lab.5CwOIk/projects/scratch
+  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+   /tmp/fm-lab.5CwOIk/projects/scratch                              22.5K (11%)  ctrl+p commands    • OpenCode 1.18.25
+

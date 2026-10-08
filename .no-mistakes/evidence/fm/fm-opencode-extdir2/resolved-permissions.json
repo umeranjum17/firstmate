@@ -1,0 +1,1741 @@
+[
+  {
+    "revision": "base",
+    "interface": "GET /agent",
+    "agent": "build",
+    "external_directory_rules": [
+      {
+        "permission": "external_directory",
+        "pattern": "*",
+        "action": "ask"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4DN5JKS3CRT6S0MA3RXDGDN/.gate-opencode-tmp/runtime/data/opencode/tool-output/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/tmp/opencode/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/go-deep-before-parallel/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/resolve-merge-conflicts/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/pre-review-check/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/maintain-verification-skill/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/internal-comms/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/planning-and-task-breakdown/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/prototype/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/eas-app-stores/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/intent-driven-development/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/retro/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/create-verification-skill/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/constraint-driven-development/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/kun/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/terminal-browser/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/verification-before-completion/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/harness-operations/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/muxr-delivery/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/no-mistakes/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/hand-drawn-canvas-animation/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/systematic-debugging/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/show-me/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/control-flow/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/domain-modeling/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/code-simplification/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/improve-codebase-architecture/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/code-review/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/codex-gpt-image/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/remotion-upgrade/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/remotion-studio/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/remotion-saas/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/remotion-render/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/remotion-multimedia/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/remotion-markup/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/remotion-maps/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/remotion-interactivity/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/remotion-docs/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/remotion-captions/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/remotion-create/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/remotion-best-practices/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/better-typography/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/layout-grid/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/kinetic-typography/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/motion-designer/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/design-motion-principles/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/diagnose-crash/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/omarchy/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/emil-design-eng/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/v1-design/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/v1-content-engine/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/reddit-post/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/outreach-campaigns/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/linkedin-post/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/humanize-text/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/human-voice-copy/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/find-skills/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/herdr-cli/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/demo-reel/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/case-study-writing/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/pptx/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/docs/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/docx/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/xlsx/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/google-workspace/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/skill-creator/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/morning/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/computer-use/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/pdf/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/deep-research/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/built-in-browser/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/import-memory/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/chrome-browser/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/google-workspace/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/pptx/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/docx/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/docs/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/deep-research/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/chrome-browser/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/built-in-browser/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/computer-use/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/xlsx/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/skill-creator/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/morning/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/pdf/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/import-memory/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/pre-review-check/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/go-deep-before-parallel/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/resolve-merge-conflicts/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/prototype/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/retro/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/planning-and-task-breakdown/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/maintain-verification-skill/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/internal-comms/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/eas-app-stores/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/create-verification-skill/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/intent-driven-development/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/constraint-driven-development/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/kun/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/hand-drawn-canvas-animation/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/terminal-browser/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/no-mistakes/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/muxr-delivery/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/harness-operations/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/systematic-debugging/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/verification-before-completion/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/show-me/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/control-flow/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/code-simplification/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/domain-modeling/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/code-review/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/improve-codebase-architecture/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/codex-gpt-image/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/remotion-upgrade/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/remotion-studio/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/remotion-saas/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/remotion-render/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/remotion-multimedia/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/remotion-markup/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/remotion-maps/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/remotion-interactivity/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/remotion-docs/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/remotion-create/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/remotion-captions/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/remotion-best-practices/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/better-typography/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/layout-grid/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/kinetic-typography/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/motion-designer/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/design-motion-principles/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/diagnose-crash/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/omarchy/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/emil-design-eng/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/v1-design/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/v1-content-engine/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/reddit-post/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/outreach-campaigns/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/linkedin-post/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/humanize-text/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/human-voice-copy/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/herdr-cli/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/find-skills/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/demo-reel/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/case-study-writing/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/pptx/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/docx/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/docs/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/google-workspace/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/skill-creator/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/xlsx/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/morning/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/pdf/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/deep-research/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/import-memory/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/chrome-browser/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/computer-use/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/built-in-browser/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/google-workspace/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/pptx/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/docx/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/docs/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/deep-research/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/chrome-browser/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/built-in-browser/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/computer-use/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/xlsx/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/morning/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/import-memory/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/skill-creator/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/pdf/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4DN5JKS3CRT6S0MA3RXDGDN/.gate-opencode-tmp/runtime/data/opencode/tool-output/*",
+        "action": "allow"
+      }
+    ]
+  },
+  {
+    "revision": "candidate",
+    "interface": "GET /agent",
+    "agent": "build",
+    "external_directory_rules": [
+      {
+        "permission": "external_directory",
+        "pattern": "*",
+        "action": "ask"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4DN5JKS3CRT6S0MA3RXDGDN/.gate-opencode-tmp/runtime/data/opencode/tool-output/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/tmp/opencode/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/pre-review-check/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/go-deep-before-parallel/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/resolve-merge-conflicts/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/internal-comms/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/maintain-verification-skill/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/retro/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/planning-and-task-breakdown/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/intent-driven-development/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/constraint-driven-development/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/create-verification-skill/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/prototype/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/kun/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/hand-drawn-canvas-animation/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/eas-app-stores/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/terminal-browser/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/no-mistakes/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/muxr-delivery/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/verification-before-completion/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/systematic-debugging/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/show-me/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/harness-operations/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/control-flow/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/code-simplification/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/domain-modeling/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/code-review/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/codex-gpt-image/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/remotion-upgrade/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/improve-codebase-architecture/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/remotion-studio/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/remotion-saas/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/remotion-render/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/remotion-multimedia/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/remotion-markup/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/remotion-maps/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/remotion-interactivity/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/remotion-docs/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/remotion-create/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/remotion-captions/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/remotion-best-practices/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/layout-grid/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/better-typography/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/kinetic-typography/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/motion-designer/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/design-motion-principles/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/diagnose-crash/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/emil-design-eng/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/omarchy/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/v1-design/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/v1-content-engine/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/reddit-post/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/outreach-campaigns/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/linkedin-post/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/humanize-text/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/human-voice-copy/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/herdr-cli/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/find-skills/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/demo-reel/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/case-study-writing/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/pptx/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/xlsx/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/docs/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/docx/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/skill-creator/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/google-workspace/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/morning/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/pdf/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/computer-use/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/deep-research/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/built-in-browser/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/import-memory/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/chrome-browser/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/google-workspace/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/docx/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/pptx/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/docs/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/deep-research/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/chrome-browser/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/built-in-browser/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/computer-use/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/xlsx/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/skill-creator/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/morning/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/pdf/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.claude/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/import-memory/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/pre-review-check/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/go-deep-before-parallel/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/retro/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/resolve-merge-conflicts/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/prototype/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/planning-and-task-breakdown/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/maintain-verification-skill/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/internal-comms/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/intent-driven-development/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/eas-app-stores/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/create-verification-skill/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/constraint-driven-development/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/kun/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/hand-drawn-canvas-animation/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/terminal-browser/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/muxr-delivery/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/no-mistakes/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/harness-operations/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/verification-before-completion/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/systematic-debugging/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/show-me/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/control-flow/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/code-simplification/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/domain-modeling/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/improve-codebase-architecture/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/code-review/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/codex-gpt-image/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/remotion-upgrade/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/remotion-studio/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/remotion-saas/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/remotion-render/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/remotion-multimedia/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/remotion-markup/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/remotion-maps/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/remotion-interactivity/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/remotion-docs/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/remotion-create/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/remotion-captions/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/remotion-best-practices/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/better-typography/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/layout-grid/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/kinetic-typography/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/motion-designer/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/design-motion-principles/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/diagnose-crash/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/omarchy/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/emil-design-eng/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/v1-design/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/v1-content-engine/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/reddit-post/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/outreach-campaigns/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/linkedin-post/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/humanize-text/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/human-voice-copy/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/herdr-cli/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/find-skills/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/demo-reel/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/case-study-writing/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/pptx/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/docs/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/docx/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/xlsx/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/google-workspace/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/skill-creator/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/morning/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/pdf/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/deep-research/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/built-in-browser/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/computer-use/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/import-memory/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/7d6d2bdc-6f1a-43aa-9ff4-44785a467f1f_bb6d423f-540c-4f79-9fe0-27a5a85c9a66/chrome-browser/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/google-workspace/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/docx/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/pptx/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/docs/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/deep-research/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/chrome-browser/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/built-in-browser/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/computer-use/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/xlsx/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/skill-creator/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/morning/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/pdf/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.agents/skills/synced/1693f113-aecb-4351-94c5-370b4c089c01_fe1841a8-344a-4830-90ec-1fd17884cdb7/import-memory/*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "*",
+        "action": "allow"
+      },
+      {
+        "permission": "external_directory",
+        "pattern": "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4DN5JKS3CRT6S0MA3RXDGDN/.gate-opencode-tmp/runtime/data/opencode/tool-output/*",
+        "action": "allow"
+      }
+    ]
+  }
+]
