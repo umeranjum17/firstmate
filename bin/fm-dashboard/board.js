@@ -1,6 +1,6 @@
 // The board in Linear's language: columns of issue cards on a desktop (by stage, or by home for queued and landed work,
 // optionally one band per home), a list grouped by stage on a phone, and the card detail as Linear's issue peek.
-import { html, useState, useEffect, useRef, now, dur, hm, prNum, STAGES, ACTIVE, SNAME, stuck, state, reason, who, hc, hname, mname,
+import { html, useState, useEffect, useRef, now, dur, hm, prNum, STAGES, ACTIVE, SNAME, stuck, state, reason, plain, total, hc, hname, mname,
   sorted, age, I, IC, Caret, StageIcon, Av } from './ui.js'
 
 // Which lanes a tab shows, and whether its columns are stages or homes.
@@ -9,8 +9,8 @@ export const inTab = (t, c) => t === 'all' || (t === 'active' ? ACTIVE.includes(
 
 const HomePill = ({ d, id }) => html`<span class="pill"><span class="sq" style=${{ '--c': hc(d, id) }}></span>${hname(d, id)}</span>`
 export function Card({ d, c, open, home }) {
-  const st = state(c), a = age(c), n = prNum(c.pr), why = reason(d, c)
-  return html`<article class="card" tabindex="0" data-card=${c.id} onClick=${() => open(c.id)} onKeyDown=${e => e.key === 'Enter' && open(c.id)}>
+  const st = state(c), a = age(c), n = prNum(c.pr), why = reason(c)
+  return html`<article class="card" role="button" tabindex="0" data-card=${c.id} onClick=${() => open(c.id)} onKeyDown=${e => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); open(c.id) } }}>
     <div class="r1"><span class="id">${c.task}</span>${a != null ? html`<span class="num">${c.stage === 'landed' ? hm(c.since) : dur(a)}</span>` : ''}<${Av} m=${c.model}/></div>
     <h3>${c.title}</h3>
     ${why ? html`<p class="why">${why}</p>` : ''}
@@ -19,44 +19,44 @@ export function Card({ d, c, open, home }) {
 }
 
 const CAP = 20
-function Col({ d, head, cs, open, home }) {
+function Col({ d, head, cs, open, home, stage }) {
   const [all, setAll] = useState(false), k = cs.filter(stuck).length
-  return html`<section class="col"><header class="ch">${head}<span class="n num">${cs.length}</span><span class="sp"></span>${k ? html`<span class="hot">${k} stuck</span>` : ''}</header>
+  return html`<section class="col"><header class="ch">${head}<span class="n num">${total(d, cs.length, stage)}</span><span class="sp"></span>${k ? html`<span class="hot">${total(d, k)} stuck</span>` : ''}</header>
     ${(all ? cs : cs.slice(0, CAP)).map(c => html`<${Card} key=${c.id} d=${d} c=${c} open=${open} home=${home}/>`)}
     ${cs.length > CAP && !all ? html`<button class="more" onClick=${() => setAll(true)}>${cs.length - CAP} more</button>` : ''}
-    ${!cs.length ? html`<p class="empty">No lanes</p>` : ''}</section>`
+    ${!cs.length ? html`<p class="empty">No recorded lanes</p>` : ''}</section>`
 }
 const stageHead = s => html`<${StageIcon} s=${s}/><b>${SNAME[s]}</b>`
 const homeHead = (d, h) => html`<span class="sq" style=${{ '--c': hc(d, h) }}></span><b>${hname(d, h)}</b>`
 
 export function Board({ d, cards, r, open }) {
   const byStage = r.tab === 'active' || r.tab === 'all', stages = r.tab === 'all' ? STAGES : ACTIVE
-  if (!cards.length) return html`<div class="none"><p>No lanes match.</p></div>`
+  if (!cards.length) return html`<div class="none"><p>No recorded lanes match.</p></div>`
   if (!byStage) return html`<div class="board">${d.homes.filter(h => cards.some(c => c.home === h.id)).map(h =>
-    html`<${Col} key=${h.id} d=${d} head=${homeHead(d, h.id)} cs=${sorted(cards.filter(c => c.home === h.id))} open=${open} home/>`)}</div>`
-  if (r.rows !== 'home') return html`<div class="board">${stages.map(s => html`<${Col} key=${s} d=${d} head=${stageHead(s)} cs=${sorted(cards.filter(c => c.stage === s))} open=${open}/>`)}</div>`
+    html`<${Col} key=${h.id} d=${d} head=${homeHead(d, h.id)} cs=${sorted(cards.filter(c => c.home === h.id))} open=${open} home stage=${r.tab}/>`)}</div>`
+  if (r.rows !== 'home') return html`<div class="board">${stages.map(s => html`<${Col} key=${s} d=${d} head=${stageHead(s)} cs=${sorted(cards.filter(c => c.stage === s))} open=${open} stage=${s}/>`)}</div>`
   return html`<div class="lanes" style=${{ '--n': stages.length }}>
-    <div class="heads">${stages.map(s => html`<header class="ch">${stageHead(s)}<span class="n num">${cards.filter(c => c.stage === s).length}</span></header>`)}</div>
+    <div class="heads">${stages.map(s => html`<header class="ch">${stageHead(s)}<span class="n num">${total(d, cards.filter(c => c.stage === s).length, s)}</span></header>`)}</div>
     ${d.homes.filter(h => cards.some(c => c.home === h.id)).map(h => { const cs = cards.filter(c => c.home === h.id), k = cs.filter(stuck).length
-      return html`<div class="band"><${Caret}/>${homeHead(d, h.id)}<span class="n num">${cs.length}</span><span class="sp"></span>${k ? html`<span class="hot">${k} stuck</span>` : ''}</div>
+      return html`<div class="band"><${Caret}/>${homeHead(d, h.id)}<span class="n num">${total(d, cs.length, r.tab, h.id)}</span><span class="sp"></span>${k ? html`<span class="hot">${total(d, k)} stuck</span>` : ''}</div>
         <div class="row">${stages.map(s => html`<div class="col">${sorted(cs.filter(c => c.stage === s)).map(c => html`<${Card} key=${c.id} d=${d} c=${c} open=${open} home/>`)}</div>`)}</div>` })}</div>`
 }
 
 // --- phone: Linear mobile rows -----------------------------------------
 function Row({ d, c, open }) {
   const st = state(c), a = age(c), n = prNum(c.pr)
-  return html`<article class="li" tabindex="0" data-card=${c.id} onClick=${() => open(c.id)}>
+  return html`<article class="li" role="button" tabindex="0" data-card=${c.id} onClick=${() => open(c.id)} onKeyDown=${e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(c.id) } }}>
     <${Av} m=${c.model} size=${20}/>
     <div class="tx"><div class="t"><h3>${c.title}</h3>${a != null ? html`<span class="age num">${c.stage === 'landed' ? hm(c.since) : dur(a)}</span>` : ''}</div>
-      <p>${st ? html`<i style=${{ '--c': st[1] }}></i><b>${st[0]}</b> · ${reason(d, c)}` : html`<b>${hname(d, c.home)}</b> · ${c.task}${n ? ` · #${n}` : ''}`}</p></div></article>`
+      <p>${st ? html`<i style=${{ '--c': st[1] }}></i><b>${st[0]}</b> · ${reason(c)}` : html`<b>${hname(d, c.home)}</b> · ${c.task}${n ? ` · #${n}` : ''}`}</p></div></article>`
 }
 export function List({ d, cards, r, open }) {
   const groups = r.tab === 'active' || r.tab === 'all' ? (r.tab === 'all' ? STAGES : ACTIVE).map(s => [s, stageHead(s), cards.filter(c => c.stage === s)])
     : d.homes.map(h => [h.id, homeHead(d, h.id), cards.filter(c => c.home === h.id)])
   const shown = groups.filter(([, , cs]) => cs.length)
-  if (!shown.length) return html`<div class="none"><p>No lanes match.</p></div>`
+  if (!shown.length) return html`<div class="none"><p>No recorded lanes match.</p></div>`
   return shown.map(([k, head, cs]) => { const n = cs.filter(stuck).length
-    return html`<div class="gh" key=${k}><span class="n"><${Caret}/></span>${head}<span class="n num">${cs.length}</span><span class="sp"></span>${n ? html`<span class="hot">${n} stuck</span>` : ''}</div>
+    return html`<div class="gh" key=${k}><span class="n"><${Caret}/></span>${head}<span class="n num">${total(d, cs.length, r.tab === 'all' || r.tab === 'active' ? k : r.tab)}</span><span class="sp"></span>${n ? html`<span class="hot">${total(d, n)} stuck</span>` : ''}</div>
       ${sorted(cs).map(c => html`<${Row} key=${c.id} d=${d} c=${c} open=${open}/>`)}` })
 }
 
@@ -67,22 +67,11 @@ const squash = h => h.reduce((a, x) => { const p = a.at(-1), k = y => y.verb + (
 // Commit hashes, branch names and file names stay, set apart from the words around them; a long local path reads as its last part.
 const CODE = /(\b[0-9a-f]{7,40}\b|\b(?:fm|nm|no-mistakes)\/[\w./-]+|\b[\w-]+\.(?:txt|md|json|sh|js|py)\b|\b\w+_\w+\b)/g
 const words = t => (t || '').replace(/(?:~|\/home)\/[\w.@-]+(?:\/[\w.@-]+)*\/([\w.@-]+)/g, '…/$1').split(CODE).map((p, i) => i % 2 ? html`<code>${p}</code>` : p)
-// A status line in plain words: a wait reads as the card's own reason would, moving work as its stage; the worker's text is behind Raw.
-const LINE_WAIT = { blocked: 'blocked', 'needs-decision': 'decision', 'captain-held': 'parked', paused: 'waiting' }
-function said(d, c, x) {
-  const pr = x.text?.match(/\bPR (\d+)/)?.[1], checks = `${pr ? `PR ${pr}` : 'The pull request'} is open; checks are running.`
-  if (x.v === 'paused' && x.stage === 'ci') return checks
-  if (x.v === 'paused' && (x.stage === 'review' || x.stage === 'test')) return `Waiting on the ${x.stage} run; it picks up again by itself.`
-  if (LINE_WAIT[x.v]) return reason(d, c, { wait: LINE_WAIT[x.v], stage: x.stage, why: x.text })
-  if (x.v === 'done') return x.stage === 'merge' ? `${pr ? `PR ${pr}` : 'The pull request'} passed its checks; ready to merge.` : 'The build is done; checks start.'
-  return { working: { building: 'Building.', review: 'In review.', test: 'Tests are running.', ci: checks, merge: 'Ready to merge.' }[x.stage],
-    resolved: 'Back to work.', failed: `Failed; ${who(c)} picks the next step.` }[x.v] || 'A note from the worker.'
-}
-function Entry({ d, c, x }) {
+function Entry({ x }) {
   const [raw, setRaw] = useState(false)
   return html`<li><b class=${x.tone}></b><div><div class="h"><strong>${x.verb}</strong>${x.n > 1 ? html`<span>${x.n}×</span>` : ''}
     ${x.at ? html`<span class="sp"></span><span class="num">${x.n > 1 && x.first ? `${hm(x.first)} – ` : ''}${hm(x.at)}</span>` : ''}</div>
-    <p>${said(d, c, x)}${x.text ? html`<button class="rawb" aria-expanded=${raw} onClick=${() => setRaw(!raw)}>Raw</button>` : ''}</p>
+    <p>${plain(x.text) || x.verb}${x.text ? html`<button class="rawb" aria-expanded=${raw} onClick=${() => setRaw(!raw)}>Raw</button>` : ''}</p>
     ${raw && html`<p class="raw">${words(x.text)}</p>`}</div></li>`
 }
 export function Detail({ d, id, go, list }) {
@@ -97,10 +86,10 @@ export function Detail({ d, id, go, list }) {
     return () => removeEventListener('keydown', f)
   }, [id, list])
   if (!c) return null
-  const st = state(c), why = reason(d, c), n = prNum(c.pr), cur = ACTIVE.indexOf(c.stage), done = c.stage === 'landed'
+  const st = state(c), why = reason(c), n = prNum(c.pr), cur = ACTIVE.indexOf(c.stage), done = c.stage === 'landed'
   // time spent in each stage: from when it was reached to when the next one was
   const enter = { building: c.started, ...c.reached }
-  const spent = ACTIVE.map((s, i) => { const a = enter[s]; if (!a || (!done && i > cur)) return null
+  const spent = ACTIVE.map((s, i) => { const a = enter[s]; if (!a) return null
     const b = ACTIVE.slice(i + 1).map(x => enter[x]).find(Boolean) || (done ? enter.landed : i === cur ? now() : null)
     return b ? b - a : null })
   const P = (k, v) => v ? html`<dt>${k}</dt><dd>${v}</dd>` : ''
@@ -121,8 +110,8 @@ export function Detail({ d, id, go, list }) {
         ${c.started && P('Started', html`<span class="num">${dur(now() - c.started)} ago</span><small>${hm(c.started)}</small>`)}
         ${n && P('Pull request', html`<a class="pill pr" href=${c.pr} target="_blank" rel="noreferrer">${I(IC.pr, 12)}${c.pr.split('/')[4]} #${n}</a>`)}
       </dl>
-      ${c.stage !== 'queued' ? html`<div class="h4">Stages</div><div class="steps">${ACTIVE.map((s, i) => html`<div class=${'step' + (done || i < cur ? ' done' : i === cur ? ' cur' : '')} style=${{ '--st': `var(--st-${s})` }}>
+      ${c.stage !== 'queued' ? html`<div class="h4">Stages</div><div class="steps">${ACTIVE.map((s, i) => html`<div class=${'step' + (i === cur && !done ? ' cur' : done || enter[s] ? ' done' : '')} style=${{ '--st': `var(--st-${s})` }}>
         <i></i><span>${SNAME[s]}</span><small class="num">${spent[i] != null ? dur(spent[i]) : ''}</small></div>`)}</div>` : ''}
-      ${c.history.length ? html`<div class="h4">Activity</div><ul class="act">${squash(c.history).reverse().map(x => html`<${Entry} d=${d} c=${c} x=${x}/>`)}</ul>` : ''}
+      ${c.history.length ? html`<div class="h4">Activity</div><ul class="act">${squash(c.history).reverse().map(x => html`<${Entry} x=${x}/>`)}</ul>` : ''}
     </div></aside>`
 }

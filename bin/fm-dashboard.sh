@@ -1466,8 +1466,6 @@ with open(os.path.join(OUT, 'data.json'), 'w', encoding='utf-8') as fh:
     json.dump(data, fh, ensure_ascii=False, allow_nan=False, default=lambda v: v.isoformat())
 
 # --- board.json: the one document the web app reads ----------------------
-# A lane sits in the furthest lifecycle stage its status lines prove it reached; the wait it
-# is in now (blocked, a decision, an outside wait, a captain hold) is shown on top of that stage.
 STAGES = [('queued', 'Queued'), ('building', 'Building'), ('review', 'Review'), ('test', 'Test'),
           ('ci', 'PR + CI'), ('merge', 'Waiting to merge'), ('landed', 'Landed today')]
 RANK = {s: i for i, (s, _) in enumerate(STAGES)}
@@ -1490,6 +1488,7 @@ def family(model, harness):  # the model family a lane runs on, else its tool
     return 'tool-' + (harness or 'unknown'), (harness or 'Unknown').capitalize()
 disp, ledger_from = {}, {}  # (home, task) -> its dispatch event; home -> its ledger's first time
 for h in ACTIVE:
+    if h in remote_hosts: continue
     try:
         with open(os.path.join(home_dir[h], 'state/fleet-ledger.jsonl'), encoding='utf-8', errors='replace') as fh:
             for l in fh:
@@ -1526,13 +1525,13 @@ for l in live:
         text = x.split(':', 1)[1].strip() if ':' in x else ''
         s = line_stage(verb, k.group(1) if k else None, text)
         if meta.get('kind') == 'scout' and s and RANK[s] > RANK['review']: s = 'review'
-        if s and RANK[s] > RANK[stage]: stage, entered = s, at
+        if s and s != stage: stage, entered = s, at
         if s and at: reached.setdefault(s, at)
         verbs.append((verb, at))
         rows.append(dict(at=at, v=verb, stage=stage, verb=VERBS.get(verb, verb.replace('-', ' ').capitalize() or 'Note'),
                          tone={'blocked': 'bad', 'failed': 'bad', 'needs-decision': 'warn', 'done': 'ok'}.get(verb, ''), text=prose(text)[:240]))
     # a captain hold parks the lane on purpose: it is not stuck and asks nothing of anyone
-    wait, wait_since = 'parked' if l['held'] else WAIT_OF.get(l['state']), None
+    wait, wait_since = 'parked' if l['held'] else {'blocked': 'blocked', 'failed': 'blocked', 'paused': 'waiting', 'needs-decision': 'decision'}.get(verbs[-1][0] if verbs else '', WAIT_OF.get(l['state'])), None
     for verb, a in reversed(verbs):  # the current wait began with the trailing run of lines that say it
         if verb not in WAIT_VERBS.get(wait, ()): break
         wait_since = a or wait_since

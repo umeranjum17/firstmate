@@ -433,7 +433,9 @@ test_board_json_feeds_the_app() {
   now=$(date +%s) today=$(date +%F)
   # A lane in review on Opus; m-fix ran 3 h on GPT and merged a minute ago, its archived title ending in its PR.
   fm_write_meta "$home/state/m-opus.meta" "kind=ship" "project=alpha" "harness=claude" "model=claude-opus-5-5" "herdr_pane_id=pane-m-opus"
-  printf '%s\n' "working [at=$((now - 3000))]: building" "working [at=$((now - 900))] [key=nm-run-review]: no-mistakes review" > "$home/state/m-opus.status"
+  printf '%s\n' "working [at=$((now - 3000))]: building" "working [at=$((now - 900))] [key=nm-run-review]: no-mistakes review" "working [at=$((now - 600))] [key=nm-run-ci]: CI checks" "needs-decision [at=$((now - 300))] [key=nm-newrun-review]: waiting for vendor credentials" > "$home/state/m-opus.status"
+  lane "$home" m-ci ship "blocked [at=$((now - 1200))]: CI failed: approve config/release.json https://github.com/acme/alpha/pull/9"
+  lane "$home" m-paused ship "paused [at=$((now - 200))] [key=nm-run-test]: waiting for vendor credentials"
   printf '{"ts":%s,"event":"task.dispatched","task":"m-opus","harness":"claude"}\n{"ts":%s,"event":"task.dispatched","task":"m-fix","model":"gpt-5.5","harness":"codex"}\n{"ts":%s,"event":"task.merged","task":"m-fix","pr":"https://github.com/acme/alpha/pull/12"}\n' \
     "$((now - 3600))" "$((now - 10800))" "$((now - 60))" >> "$home/state/fleet-ledger.jsonl"
   printf -- '- [x] m-fix - Fix the login PR https://github.com/acme/alpha/pull/12 (repo: alpha) (kind: ship) (merged %s)\n' "$today" >> "$home/data/done-archive.md"
@@ -442,12 +444,14 @@ test_board_json_feeds_the_app() {
   jq -e --argjson now "$now" '
     def c($id): .cards[] | select(.id == $id);
     .schema == "fm-dashboard-board.v1" and ([.stages[].id] == ["queued","building","review","test","ci","merge","landed"])
-    and (c("main/m-opus") | .stage == "review" and .model == "opus" and .model_name == "Opus" and .started == $now - 3600 and .since == $now - 900
-      and ([.history[] | [.v, .stage]] == [["working","building"],["working","review"]]))
+    and (c("main/m-opus") | .stage == "review" and .model == "opus" and .model_name == "Opus" and .started == $now - 3600 and .since == $now - 300
+      and .reached.review == $now - 900 and .reached.ci == $now - 600 and .wait == "decision"
+      and ([.history[] | [.v, .stage]] == [["working","building"],["working","review"],["working","ci"],["needs-decision","review"]]))
     and (c("main/m-stuck") | .wait == "blocked" and .why == "cannot reach the build server")
     and (c("main/m-ask") | .wait == "decision" and .why == "which layout")
     and (c("main/m-done") | .stage == "merge" and .why == "PR 8 checks green" and .pr == "https://github.com/acme/alpha/pull/8" and .history[0].v == "done" and .history[0].stage == "merge")
-    and (c("main/m-ci") | .stage == "ci")
+    and (c("main/m-ci") | .stage == "ci" and .wait == "blocked" and .wait_since == $now - 1200)
+    and (c("main/m-paused") | .stage == "test" and .wait == "waiting")
     and (c("main/m-fix") | .stage == "landed" and .title == "Fix the login" and .pr == "https://github.com/acme/alpha/pull/12")
     and ([.cards[] | select(.stage == "queued") | .id] == ["main/m-ready","zephyrine/z-ready"])
     and .parked == ["beta"] and ([.cards[] | select(.home == "beta")] == [])
@@ -455,6 +459,28 @@ test_board_json_feeds_the_app() {
     and ([.asks[] | [.id, .text, .url]] == [["first","Approve the release","https://example.invalid/release"]])
     and .history[0][1:] == [5,4,0] and .landed[-1] == 3 and .landed_by_home.main[-1] == 2' "$d/board.json" >/dev/null ||
     fail "board.json does not carry each lane's stage, wait, model, reason and the day's landings: $(jq -c '{cards: [.cards[] | {id, stage, wait, why, model, title}], done, asks, history, landed}' "$d/board.json")"
+  printf -- '- zephyrine - remote (host: distant; root: /srv; home: %s; scope: work; projects: alpha; added 2026-07-11)\n' "$home/mates/zephyrine" > "$home/data/secondmates.md"
+  printf '{"ts":%s,"event":"task.dispatched","task":"z-shipped","model":"gpt-5.5"}\n' "$((now - 5000))" >> "$home/mates/zephyrine/state/fleet-ledger.jsonl"
+  build "$home"
+  jq -e '(.ledger_from | has("zephyrine") | not) and all(.done[]; .home != "zephyrine") and any(.homes[]; .id == "zephyrine" and .known == false and .ready == null)' "$d/board.json" >/dev/null || fail "remote records borrowed local dispatch or implied complete coverage"
+  cp -R "$ROOT/bin/fm-dashboard" "$home/ui"
+  printf '{"type":"module"}\n' > "$home/ui/package.json"
+  node --input-type=module - "$home/ui" <<'JS' || fail "dashboard UI behavior regressed"
+import assert from 'node:assert/strict'
+const root = process.argv[2], ui = await import(`${root}/ui.js`), board = await import(`${root}/board.js`)
+const d = { homes: [{ id: 'main', known: true, ready: 0 }, { id: 'remote', known: false, ready: null }], cards: [] }
+assert.equal(ui.total(d, 0), '≥0'); assert.equal(ui.total(d, 0, 'queued'), '≥0'); assert.equal(ui.total(d, 0, 'landed'), '≥0')
+assert.equal(ui.total(d, 2, 'active', 'main'), 2)
+const c = { id: 'main/m-test', home: 'main', task: 'm-test', title: 'Test', stage: 'review', wait: 'waiting', why: 'm-login is complete; waiting for vendor credentials', history: [] }
+assert.equal(ui.reason(c), c.why); assert.equal(ui.stuck({ ...c, wait: 'blocked' }), true)
+let opened = null
+const open = id => opened = id, desktop = board.Card({ d, c, open }), rows = board.List({ d, cards: [c], r: { tab: 'active' }, open })
+const row = rows[0][1][0], phone = row.type(row.props)
+for (const node of [desktop, phone]) {
+  assert.equal(node.props.role, 'button')
+  for (const key of ['Enter', ' ']) { opened = null; let prevented = false; node.props.onKeyDown({ key, target: node, currentTarget: node, preventDefault() { prevented = true } }); assert.equal(opened, c.id); assert.equal(prevented, true) }
+}
+JS
   pass "board.json gives each lane its stage, wait, reason in words, model and each status line's verb and stage, landed titles without their PR, cycle times and the ask list"
 }
 
@@ -718,6 +744,8 @@ assert json.loads((state / 'data.json').read_text())['metrics']['lanes']['value'
 PY
   pass "unavailable displayed readings suppress reassurance and concurrent cache updates preserve both builds"
 }
+
+if [ "${1:-}" = board ]; then test_board_json_feeds_the_app; exit; fi
 
 test_unavailable_readings_and_concurrent_caches
 test_new_lane_and_unwritten_archive_stay_exact

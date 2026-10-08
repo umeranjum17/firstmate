@@ -1,7 +1,7 @@
 // Fleet dashboard app shell: live data, routes, the Linear sidebar and header (phone: title, tabs and dock),
 // filters, the ask list, the Ship mount, the command palette and keys.
 import { render } from './vendor/preact-htm-3.1.1.js'
-import { html, useState, useEffect, useRef, now, dur, ACTIVE, STAGES, STATES, stuck, state, sid, hc, hname, mname, sorted, filterCards, I, IC, StageIcon, Av } from './ui.js'
+import { html, useState, useEffect, useRef, now, dur, ACTIVE, STAGES, STATES, stuck, state, sid, total, hc, hname, mname, sorted, filterCards, I, IC, StageIcon, Av } from './ui.js'
 import { TABS, inTab, Board, List, Detail } from './board.js'
 
 const POLL_MS = 10000, STALE_S = 15 * 60, WIDE = '(min-width: 760px)'
@@ -81,9 +81,9 @@ function Filters({ d, r, go, label }) {
   const models = [...new Set(d.cards.map(c => c.model || 'none'))]
   const on = r.home.length + r.model.length + r.state.length
   return html`<${Pop} label=${label} icon=${IC.filter} badge=${on || ''}>
-    <div class="pop-h">Home</div>${d.homes.map(h => html`<${Opt} on=${r.home.includes(h.id)} icon=${html`<span class="sq" style=${{ '--c': hc(d, h.id) }}></span>`} name=${h.name} n=${open.filter(c => c.home === h.id).length} set=${() => tog('home', h.id)}/>`)}
-    <div class="pop-h">Model</div>${models.map(m => html`<${Opt} on=${r.model.includes(m)} icon=${html`<${Av} m=${m === 'none' ? null : m}/>`} name=${mname(m === 'none' ? null : m, d)} n=${open.filter(c => (c.model || 'none') === m).length} set=${() => tog('model', m)}/>`)}
-    <div class="pop-h">State</div>${STATES.map(([id, name]) => html`<${Opt} on=${r.state.includes(id)} name=${name} n=${open.filter(c => sid(c) === id).length} set=${() => tog('state', id)}/>`)}</${Pop}>`
+    <div class="pop-h">Home</div>${d.homes.map(h => html`<${Opt} on=${r.home.includes(h.id)} icon=${html`<span class="sq" style=${{ '--c': hc(d, h.id) }}></span>`} name=${h.name} n=${total(d, open.filter(c => c.home === h.id).length, 'open', h.id)} set=${() => tog('home', h.id)}/>`)}
+    <div class="pop-h">Model</div>${models.map(m => html`<${Opt} on=${r.model.includes(m)} icon=${html`<${Av} m=${m === 'none' ? null : m}/>`} name=${mname(m === 'none' ? null : m, d)} n=${total(d, open.filter(c => (c.model || 'none') === m).length, 'open')} set=${() => tog('model', m)}/>`)}
+    <div class="pop-h">State</div>${STATES.map(([id, name]) => html`<${Opt} on=${r.state.includes(id)} name=${name} n=${total(d, open.filter(c => sid(c) === id).length, 'open')} set=${() => tog('state', id)}/>`)}</${Pop}>`
 }
 function Chips({ d, r, go }) {
   const xs = [...r.home.map(v => ['home', v, 'Home', hname(d, v)]), ...r.model.map(v => ['model', v, 'Model', mname(v === 'none' ? null : v, d)]),
@@ -117,7 +117,7 @@ function Palette({ d, go, close, toggleTheme }) {
       { n: 'Group rows by home', k: '⇧G', run: () => go({ view: 'board', rows: 'home' }) },
       { n: 'Clear filters', run: () => go({ home: [], model: [], state: [] }) },
       { n: 'Light or dark theme', k: 'T', run: toggleTheme }]],
-    ['Homes', d.homes.map(h => ({ n: h.name, k: `${h.open} open`, run: () => go({ view: 'board', home: [h.id], card: null }) }))],
+    ['Homes', d.homes.map(h => ({ n: h.name, k: `${h.known ? h.open : '?'} open`, run: () => go({ view: 'board', home: [h.id], card: null }) }))],
     ['Lanes', [...ACTIVE, 'queued', 'landed'].flatMap(s => sorted(d.cards.filter(c => c.stage === s))).map(c => ({ n: c.title, i: html`<${StageIcon} s=${c.stage}/>`,
       k: state(c)?.[0] || hname(d, c.home), bad: stuck(c), run: () => go({ view: 'board', card: c.id }) }))],
   ]
@@ -184,8 +184,8 @@ function App() {
   useEffect(() => { document.title = d?.asks?.length ? `(${d.asks.length}) Fleet` : 'Fleet' }, [d])
   if (!d) return html`<div class="none" style="height:100vh">${st.err ? `Cannot load the fleet: ${st.err}` : ''}</div>`
   const cards = filterCards(d, r), open = d.cards.filter(c => ACTIVE.includes(c.stage)), stk = open.filter(stuck)
-  const asks = d.asks?.length, today = d.landed.at(-1), opencard = id => go({ card: id })
-  const count = t => t === 'all' ? null : d.cards.filter(c => inTab(t, c)).length
+  const asks = d.asks?.length, today = total(d, d.landed.at(-1), 'landed'), opencard = id => go({ card: id })
+  const count = t => t === 'all' ? null : total(d, d.cards.filter(c => inTab(t, c)).length, t)
   const shown = cards.filter(c => inTab(r.tab, c))
   const list = (r.tab === 'all' ? STAGES : r.tab === 'active' ? ACTIVE : [r.tab]).flatMap(s => sorted(shown.filter(c => c.stage === s)))
   const title = { board: 'Board', needs: 'Needs you', ship: 'Ship' }[r.view]
@@ -194,18 +194,19 @@ function App() {
   const body = r.view === 'ship' ? html`<${Ship} d=${d}/>` : r.view === 'needs' ? html`<${Needs} d=${d}/>` : null
   if (!wide) return html`<div class="phone">
     <div class="top"><h1>${title}</h1><div class="caps">${r.view === 'board' ? html`<${Filters} d=${d} r=${r} go=${go}/>` : ''}<button class="ib" onClick=${toggleTheme} aria-label="Light or dark theme">${I(themeIcon(), 18)}</button></div></div>
-    ${r.view === 'board' ? html`<div class="sum"><b>${asks == null ? 'Ask list unreadable' : asks ? `${asks} need${asks > 1 ? '' : 's'} you` : 'Nothing needs you'}</b> · <span>${open.length} in flight</span> · <span class=${stk.length ? 'bad' : ''}>${stk.length} stuck</span> · <span>${today} landed today</span>${st.err || now() - d.generated > STALE_S ? html` · <${Live} d=${d} st=${st} refresh=${refresh}/>` : ''}</div>
+    <div class="sum"><${Live} d=${d} st=${st} refresh=${refresh}/></div>
+    ${r.view === 'board' ? html`<div class="sum"><b>${asks == null ? 'Ask list unreadable' : asks ? `${asks} need${asks > 1 ? '' : 's'} you` : 'Nothing needs you'}</b> · <span>${total(d, open.length)} in flight</span> · <span class=${stk.length ? 'bad' : ''}>${total(d, stk.length)} stuck</span> · <span>${today} landed today</span></div>
       <div class="seg">${TABS.map(([t, n]) => html`<button aria-pressed=${r.tab === t} onClick=${() => go({ tab: t })}>${n === 'Landed today' ? 'Landed' : n}${count(t) != null ? html`<small class="num">${count(t)}</small>` : ''}</button>`)}</div>
       <${Chips} d=${d} r=${r} go=${go}/><${List} d=${d} cards=${shown} r=${r} open=${opencard}/>` : body}
-    <div class="dock"><nav>${[['board', IC.board, 'Board'], ['needs', IC.inbox, 'Needs you'], ['ship', IC.ship, 'Ship']].map(([v, ic, n]) =>
-      html`<a href=${'#/' + v} aria-current=${r.view === v ? 'page' : null} aria-label=${n}>${I(ic, 20)}${v === 'needs' && asks ? html`<span class="badge">${asks}</span>` : ''}</a>`)}</nav>
+    <div class="dock"><nav>${[['board', IC.board, 'Board'], ['needs', IC.inbox, 'Needs you'], ['ship', IC.ship, 'Ship'], ['metrics', IC.display, 'Metrics']].map(([v, ic, n]) =>
+      html`<a href=${v === 'metrics' ? '/overview' : '#/' + v} aria-current=${r.view === v ? 'page' : null} aria-label=${n}>${I(ic, 20)}${v === 'needs' && asks ? html`<span class="badge">${asks}</span>` : ''}</a>`)}</nav>
       <button onClick=${() => setPal(true)} aria-label="Search">${I(IC.search, 20)}</button></div>${overlays}</div>`
   return html`<div class="app">
     <nav class="side">
       <div class="ws"><span class="logo">F</span><b>Fleet</b><span class="sp"></span><button class="ib" onClick=${() => setPal(true)} aria-label="Search" title="Search (⌘K)">${I(IC.search)}</button></div>
       <a class="nav" href="#/needs" aria-current=${r.view === 'needs' ? 'page' : null}>${I(IC.inbox)}Needs you${asks ? html`<span class="badge">${asks}</span>` : html`<span class="n num">${asks ?? '?'}</span>`}</a>
-      <a class="nav" href="#/board" aria-current=${r.view === 'board' && !r.home.length ? 'page' : null} onClick=${() => go({ view: 'board', home: [] })}>${I(IC.board)}Board<span class="n num">${open.length}</span></a>
-      <a class="nav" href="#/ship" aria-current=${r.view === 'ship' ? 'page' : null}>${I(IC.ship)}Ship</a>
+      <a class="nav" href="#/board" aria-current=${r.view === 'board' && !r.home.length ? 'page' : null} onClick=${() => go({ view: 'board', home: [] })}>${I(IC.board)}Board<span class="n num">${total(d, open.length)}</span></a>
+      <a class="nav" href="#/ship" aria-current=${r.view === 'ship' ? 'page' : null}>${I(IC.ship)}Ship</a><a class="nav" href="/overview">${I(IC.display)}Metrics</a>
       <div class="sec">Homes</div>
       ${d.homes.map(h => { const cs = open.filter(c => c.home === h.id)
         return html`<button class="nav" aria-current=${r.view === 'board' && r.home.length === 1 && r.home[0] === h.id ? 'page' : null} onClick=${() => go({ view: 'board', home: [h.id], card: null })}>
@@ -216,7 +217,7 @@ function App() {
       <header class="hd"><h1>${title}</h1>
         ${r.view === 'board' ? html`${TABS.map(([t, n]) => html`<button class="tab" aria-pressed=${r.tab === t} onClick=${() => go({ tab: t })}>${n}${count(t) != null ? html`<small class="num">${count(t)}</small>` : ''}</button>`)}
           <span class="sp"></span>
-          <div class="kpi num"><a href="#/needs">Needs you <b>${asks ?? '?'}</b></a><button class=${stk.length ? 'bad' : ''} onClick=${() => go({ state: ['blocked', 'decision'] })}>Stuck <b>${stk.length}</b></button>
+          <div class="kpi num"><a href="#/needs">Needs you <b>${asks ?? '?'}</b></a><button class=${stk.length ? 'bad' : ''} onClick=${() => go({ state: ['blocked', 'decision'] })}>Stuck <b>${total(d, stk.length)}</b></button>
             <button onClick=${() => go({ tab: 'landed' })}>Landed today <b>${today}</b></button><span title="Typical time from start to landed">Cycle p50 <b>${d.cycle_p50 == null ? '–' : dur(d.cycle_p50)}</b></span></div>
           <${Filters} d=${d} r=${r} go=${go} label="Filter"/>
           ${r.tab === 'active' || r.tab === 'all' ? html`<${Pop} label="Display" icon=${IC.display}><div class="pop-h">Rows</div>
