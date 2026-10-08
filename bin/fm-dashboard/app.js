@@ -91,12 +91,13 @@ function Chips({ d, r, go }) {
   return xs.length ? html`<div class="chips">${xs.map(([k, v, n, w]) => html`<span class="chip">${n} is <b>${w}</b><button aria-label=${`Remove ${w}`} onClick=${() => go({ [k]: r[k].filter(x => x !== v) })}>${I(IC.x, 12)}</button></span>`)}</div>` : ''
 }
 
-// The 3D ship view is its own module: ship/index.js exports mount(element, data) and may return { update(data), unmount() }.
-function Ship({ d }) {
+// The 3D ship view is its own module: ship/index.js exports mount(element, data, open) and may return { update(data), unmount() };
+// open(id) shows that card's detail.
+function Ship({ d, open }) {
   const ref = useRef(), view = useRef(), [missing, setMissing] = useState(false)
   useEffect(() => {
     let gone = false
-    import('./ship/index.js').then(m => { if (!gone) view.current = m.mount(ref.current, d) }).catch(() => setMissing(true))
+    import('./ship/index.js').then(m => { if (!gone) view.current = m.mount(ref.current, d, open) }).catch(() => setMissing(true))
     return () => { gone = true; view.current?.unmount?.() }
   }, [])
   useEffect(() => view.current?.update?.(d), [d])
@@ -196,7 +197,7 @@ function App() {
   const title = { board: 'Board', needs: 'Needs you', ship: 'Ship' }[r.view]
   const overlays = html`${r.card && html`<${Detail} d=${d} id=${r.card} go=${go} list=${list}/>`}
     ${pal && html`<${Palette} d=${d} go=${go} close=${() => setPal(false)} toggleTheme=${toggleTheme}/>`}${keys && html`<${Shortcuts} close=${() => setKeys(false)}/>`}`
-  const body = r.view === 'ship' ? html`<${Ship} d=${d}/>` : r.view === 'needs' ? html`<${Needs} d=${d}/>` : null
+  const body = r.view === 'ship' ? html`<${Ship} d=${d} open=${opencard}/>` : r.view === 'needs' ? html`<${Needs} d=${d}/>` : null
   if (!wide) return html`<div class="phone">
     <div class="top"><h1>${title}</h1><div class="caps">${r.view === 'board' ? html`<${Filters} d=${d} r=${r} go=${go}/>` : ''}<button class="ib" onClick=${toggleTheme} aria-label="Light or dark theme">${I(themeIcon(), 18)}</button></div></div>
     <div class="sum"><${Live} d=${d} st=${st} refresh=${refresh}/></div>

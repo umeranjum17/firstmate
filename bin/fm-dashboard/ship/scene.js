@@ -413,7 +413,7 @@ export function world(canvas, tagLayer) {
   const crates = new THREE.Group(); crates.position.set(7.3, deckY, 0); S.add(crates)
   S.add(lantern(8.2, deckY + 1.5, 0), lantern(-2.8, deckY + 5.6, 0))
   const figs = new Map(), tags = new Map(), V = new THREE.Vector3(), clock = new THREE.Clock()
-  let home = null, alive = true, raf = 0, roof = 0, bottom = Infinity, first = true, cw = 1, ch = 1
+  let home = null, alive = true, raf = 0, roof = 0, bottom = Infinity, first = true, cw = 1, ch = 1, sail = null, want = null
   const still = matchMedia('(prefers-reduced-motion: reduce)')
 
   // A label pinned to a point in the scene; its size is read when it renders and again whenever it changes (a web font arriving late).
@@ -446,15 +446,24 @@ export function world(canvas, tagLayer) {
         if (y < roof) { y = Math.max(roof + 2, t.y - t.h - 6); for (let n = 0; n < 6; n++) { const h = hit(x, y, t); if (!h) break; y = h.b + G } }
         off = false
       }
-      t.el.style.visibility = off ? 'hidden' : ''; if (off) continue
-      placed.push(box(x, y, t)); t.el.style.transform = `translate(${Math.round(x)}px,${Math.round(y)}px)`; t.el.style.zIndex = Math.round(y)
+      t.el.style.visibility = off ? 'hidden' : ''; t.box = off ? null : box(x, y, t); if (off) continue
+      placed.push(t.box); t.el.style.transform = `translate(${Math.round(x)}px,${Math.round(y)}px)`; t.el.style.zIndex = Math.round(y)
       // a stem from the tag down to its worker; lower tags stack on top, so a stem passes behind them
       if (!t.pin) { t.el.style.setProperty('--x', Math.round(Math.max(10, Math.min(t.w - 10, t.x - x))) + 'px'); t.el.style.setProperty('--s', Math.max(0, Math.round(t.y - y - t.h)) + 'px') }
     }
   }
   const toScreen = p => { V.copy(p).project(cam); return [(V.x + 1) / 2 * cw, (1 - V.y) / 2 * ch] }
 
+  // A new home's ship sails in: ships only ever sail bow first, so the one on screen sails off ahead (far enough that its wake
+  // clears the screen too) and the new one comes up from astern.
+  const OUT = 0.4, IN = 1.1, AHEAD = 40, ASTERN = 26
   function show(d, id) {
+    if (home && id !== home && !still.matches && !sail) sail = { t0: clock.getElapsedTime(), out: true }
+    want = [d, id]
+    if (!sail?.out) dress(d, id)
+    if (still.matches) frame()
+  }
+  function dress(d, id) {
     if (id !== home) {
       home = id; const i = d.homes.findIndex(h => h.id === id), h = d.homes[i]
       const col = tok(`--h-${(i % 8 + 8) % 8 + 1}`); mark.draw((h?.name || id)[0].toUpperCase(), col)
@@ -477,7 +486,35 @@ export function world(canvas, tagLayer) {
     const landed = d.cards.filter(c => c.stage === 'landed' && c.home === id).length
     crates.clear()
     for (const [i, [y, z]] of STACK.slice(0, landed).entries()) { const c = mesh(geos().crate, tc(i % 2 ? '#b07a40' : '#c99555'), 0.03); c.position.set(0, y * 0.5, z); crates.add(c) }
-    if (still.matches) frame()
+  }
+  // How far along its own length the ship stands from its place, and its heel, while it sails out or in.
+  function sailing(t) {
+    if (!sail) return [0, 0]
+    if (still.matches) { dress(...want); sail = null; return [0, 0] }
+    let k = t - sail.t0
+    if (sail.out && k >= OUT) { sail.out = false; sail.t0 += OUT; k -= OUT; dress(...want) }
+    if (!sail.out && k >= IN) { sail = null; return [0, 0] }
+    const u = sail.out ? (k / OUT) ** 2 : 1 - (1 - k / IN) ** 3
+    return [sail.out ? AHEAD * u : -ASTERN * (1 - u), 0.06 * Math.sin(Math.PI * (sail.out ? u : 1 - u))]
+  }
+  // What a tap at (x, y) on the canvas opens: a tag's or a worker's card, or for a station its worker in most trouble.
+  function pick(x, y) {
+    if (sail) return null
+    const inside = b => b && x >= b.l && x <= b.r && y >= b.t && y <= b.b
+    const first = k => [...figs.values()].filter(f => f.c.stage === k).sort((a, b) => stuck(b.c) - stuck(a.c) || (age(b.c) ?? 0) - (age(a.c) ?? 0))[0]?.c.id ?? null
+    for (const t of tags.values()) if (t.on && inside(t.box)) return t.card ?? first(t.stage)
+    // the nearest worker whose figure covers the spot, with room around it for a finger
+    let hit = null, near = -1
+    for (const f of figs.values()) {
+      const p = f.f.getWorldPosition(new THREE.Vector3()), [fx, fy] = toScreen(p); p.y += f.f.userData.top * SCALE; const [, ty] = toScreen(p), r = Math.max(16, (fy - ty) * 0.34)
+      if (Math.abs(x - fx) <= r && y >= ty - 4 && y <= fy + 8 && fy > near) { hit = f; near = fy }
+    }
+    if (hit) return hit.c.id
+    for (const k of ACTIVE) {
+      const ps = [[1.15, 0], [-1.15, 0], [0, 1.15], [0, -1.15]].map(([a, b]) => { V.set(SX[k] + a, deckY, b); S.localToWorld(V); return toScreen(V) })
+      if (inside({ l: Math.min(...ps.map(p => p[0])), r: Math.max(...ps.map(p => p[0])), t: Math.min(...ps.map(p => p[1])), b: Math.max(...ps.map(p => p[1])) })) return first(k)
+    }
+    return null
   }
 
   function fit(box) {
@@ -488,7 +525,8 @@ export function world(canvas, tagLayer) {
     cw = w; ch = h; r.setPixelRatio(w < 600 ? 1 : 0.5); r.setSize(w, h, false); cam.aspect = w / h; cam.clearViewOffset()
     // The hull and its crew always fit the free part of the screen and fill its width where they can; the masts take the room
     // left above and may rise behind the top panels, as a ship runs out of a picture's frame, but never off the screen.
-    S.updateMatrixWorld()
+    // framed at the ship's own place, even mid-sail
+    const [sx, sz] = [S.position.x, S.position.z]; S.position.x = S.position.z = 0; S.updateMatrixWorld()
     const world = ps => ps.map(p => S.localToWorld(p.clone())), deck = world(DECK), all = world(S.userData.outline)
     const aim = new THREE.Box3().setFromPoints(deck).getCenter(new THREE.Vector3()), pad = 12, top = box.t + pad, foot = box.b - pad - 24
     const ext = pts => { let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; for (const p of pts) { const [x, y] = toScreen(p); x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y) } return [x0, x1, y0, y1] }
@@ -499,6 +537,7 @@ export function world(canvas, tagLayer) {
     look(hi)
     // the whole ship centred in the box when it fits there, else the hull set at the box's foot
     const [x0, x1, , y1] = ext(deck), [, , t0, t1] = ext(all)
+    S.position.x = sx; S.position.z = sz
     cam.setViewOffset(w, h, (x0 + x1) / 2 - (box.l + box.r) / 2, t1 - t0 <= foot - top ? (t0 + t1) / 2 - (top + foot) / 2 : y1 - foot, w, h); cam.updateProjectionMatrix()
     if (still.matches) frame()
   }
@@ -507,26 +546,28 @@ export function world(canvas, tagLayer) {
     const t = clock.getElapsedTime()
     // the waves step ten times a second, like the frames of a sprite
     sea.t.value = t; sea.ts.value = Math.floor(t * 10) / 10; foam.material.uniforms.t.value = t
-    const h = wave(0, 0, t), [sx, sz] = tilt(0, 0, t)
-    S.position.y = h * 0.7 - 0.15; S.rotation.z = -sx * 0.5 + Math.sin(t * 0.7) * 0.012; S.rotation.x = sz * 0.6; foam.position.y = h * 0.7 + 0.02
+    const h = wave(0, 0, t), [sx, sz] = tilt(0, 0, t), [run, heel] = sailing(t)
+    S.position.set(run * Math.cos(YAW), h * 0.7 - 0.15, -run * Math.sin(YAW)); foam.position.set(S.position.x, h * 0.7 + 0.02, S.position.z)
+    S.rotation.z = -sx * 0.5 + Math.sin(t * 0.7) * 0.012; S.rotation.x = sz * 0.6 + heel
     billow(S, t)
     if (lead) { pose(lead, 'idle', t); lead.userData.arms.forEach(a => a.rotation.x = -1.3); wheel.rotation.x = Math.sin(t * 0.5) * 0.4 }
     for (const f of figs.values()) pose(f.f, f.pose, t)
     r.render(scene, cam)
     if (first) { first = false; performance.mark('ship-first-frame') }  // the first-paint measure reads this
     for (const g of tags.values()) g.on = false
+    tagLayer.classList.toggle('sv-away', !!sail)
     for (const [id, f] of figs) {
       if (!stuck(f.c) && f.c.wait !== 'parked') continue
       f.f.getWorldPosition(V); V.y += f.f.userData.top * SCALE + 0.2; const [x, y] = toScreen(V), a = age(f.c)
       const st = state(f.c)[0], ag = a == null ? '' : dur(a)
       const tg = f.c.wait === 'parked' ? tag(id, 'sv-park', 1, PARK) : tag(id, f.c.wait === 'blocked' ? 'sv-bad' : 'sv-warn', 0, st + ag, html`${st} <b class="num">${ag}</b>`)
-      tg.x = x; tg.y = y
+      tg.x = x; tg.y = y; tg.card = id
     }
     // each station's plate sits on the near rail in front of its deck mark
     for (const k of ACTIVE) {
       const u = (SX[k] + LEN / 2) / LEN; V.set(SX[k], S.userData.top(u) + 0.13, S.userData.half(u)); S.localToWorld(V)
       const [x, y] = toScreen(V), tg = tag('st' + k, 'sv-ico', 2, k, html`<${StageIcon} s=${k}/>`)
-      tg.x = x; tg.y = y; tg.pin = true
+      tg.x = x; tg.y = y; tg.pin = true; tg.stage = k
     }
     for (const [k, g] of tags) if (!g.on) removeTag(k, g)
     placeTags()
@@ -537,7 +578,7 @@ export function world(canvas, tagLayer) {
   const motion = () => { cancelAnimationFrame(raf); still.matches ? frame() : loop() }
   still.addEventListener('change', motion)
   return {
-    show, fit, start: motion,
+    show, fit, pick, start: motion,
     destroy() {
       alive = false; cancelAnimationFrame(raf); still.removeEventListener('change', motion)
       for (const [k, t] of tags) removeTag(k, t)

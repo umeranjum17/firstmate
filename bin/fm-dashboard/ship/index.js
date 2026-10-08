@@ -1,6 +1,6 @@
 // The Ship tab: one home's flagship at night, its workers at a deck station per stage, and around it the home tabs,
 // the home's lifecycle and crew by model, and a sheet with the fleet's key numbers and what is stuck and why.
-// The app mounts it with mount(element, data) and passes each new board to update(data).
+// The app mounts it with mount(element, data, detail) and passes each new board to update(data); detail(id) shows a card's detail.
 import { render } from '../vendor/preact-htm-3.1.1.js'
 import { html, dur, ACTIVE, SNAME, stuck, state, reason, total, hname, mname, age, StageIcon, Av } from '../ui.js'
 
@@ -39,16 +39,16 @@ function Kpis({ d }) {
     <div><span class="sv-l">Cycle p50</span><span class="sv-v num">${d.cycle_p50 == null ? '–' : dur(d.cycle_p50)}</span></div>
     <div><span class="sv-l">Stuck</span><span class=${'sv-v num' + (stk.length ? ' sv-bad' : '')}>${total(d, stk.length)}</span><span class="sv-l">${stk.length ? a == null ? 'oldest unknown' : `${known ? 'oldest' : 'oldest recorded'} ${dur(a)}` : known ? 'none' : 'unknown'}</span></div></div>`
 }
-// The app's phone rows: model, title, age, then the state word in its colour, the home and the reason.
-function Row({ d, c, parked }) {
+// The app's phone rows: model, title, age, then the state word in its colour, the home and the reason; each opens its card.
+function Row({ d, c, parked, detail }) {
   const st = state(c), a = age(c)
-  return html`<div class="li"><${Av} m=${c.model} size=${20}/><div class="tx"><div class="t"><h3>${c.title}</h3>${a != null ? html`<span class="age num">${dur(a)}</span>` : ''}</div>
-    <p>${parked ? '' : html`<i style=${{ '--c': st[1] }}></i><b>${st[0]}</b> · `}${hname(d, c.home)} · ${reason(c)}</p></div></div>`
+  return html`<article class="li" role="button" tabindex="0" data-card=${c.id} onClick=${() => detail(c.id)} onKeyDown=${e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); detail(c.id) } }}><${Av} m=${c.model} size=${20}/><div class="tx"><div class="t"><h3>${c.title}</h3>${a != null ? html`<span class="age num">${dur(a)}</span>` : ''}</div>
+    <p>${parked ? '' : html`<i style=${{ '--c': st[1] }}></i><b>${st[0]}</b> · `}${hname(d, c.home)} · ${reason(c)}</p></div></article>`
 }
 // Fleet-wide, and labelled so beside the home's own numbers: the key numbers, what is stuck oldest first, and what the
 // captain parked (grey, never counted as stuck).
 // Folded, it keeps the oldest stuck row in view (on a short screen only the counts) and leaves the rest of the screen to the ship.
-function Sheet({ d, folded, fold, short }) {
+function Sheet({ d, folded, fold, short, detail }) {
   const o = open(d), stk = oldest(o.filter(stuck)), park = oldest(o.filter(c => c.wait === 'parked')), k = short ? 0 : 1
   const keep = folded ? k : Infinity, more = stk.length + park.length > k, known = d.homes.every(h => h.known)
   return html`<section class=${'sv-sheet' + (folded ? ' sv-folded' : '')}>
@@ -57,14 +57,14 @@ function Sheet({ d, folded, fold, short }) {
     <div class="sv-list">
       <button class="gh" aria-expanded=${!folded} onClick=${fold}>Stuck <span class="n num">${total(d, stk.length)}</span>${park.length || !known ? html`<span class="n">· Parked by captain</span><span class="n num">${total(d, park.length)}</span>` : ''}
         <span class="sp"></span>${more ? html`<span class="n">${folded ? 'Show all' : 'Show less'}</span>` : ''}</button>
-      ${stk.length ? stk.slice(0, keep).map(c => html`<${Row} key=${c.id} d=${d} c=${c}/>`) : html`<p class="sv-calm">${known ? 'Nothing is stuck.' : 'Stuck work unknown.'}</p>`}
-      ${!folded && (park.length || !known) ? html`<div class="gh">Parked by captain <span class="n num">${total(d, park.length)}</span></div>${park.map(c => html`<${Row} key=${c.id} d=${d} c=${c} parked/>`)}${!known ? html`<p class="sv-calm">Parked work unknown.</p>` : ''}` : ''}
+      ${stk.length ? stk.slice(0, keep).map(c => html`<${Row} key=${c.id} d=${d} c=${c} detail=${detail}/>`) : html`<p class="sv-calm">${known ? 'Nothing is stuck.' : 'Stuck work unknown.'}</p>`}
+      ${!folded && (park.length || !known) ? html`<div class="gh">Parked by captain <span class="n num">${total(d, park.length)}</span></div>${park.map(c => html`<${Row} key=${c.id} d=${d} c=${c} parked detail=${detail}/>`)}${!known ? html`<p class="sv-calm">Parked work unknown.</p>` : ''}` : ''}
     </div></section>`
 }
 const Still = () => html`<div class="sv-still"><svg width="120" height="80" viewBox="0 0 120 80" aria-hidden="true"><path d="M58 8v52M60 12l26 30H60zM56 18L34 44h22z" fill="currentColor" opacity=".5"/>
   <path d="M14 58h92l-12 14H28z" fill="currentColor"/></svg><p>This browser cannot draw the 3D ship. Everything else here is live.</p></div>`
 
-export function mount(el, d) {
+export function mount(el, d, detail = () => {}) {
   const css = Object.assign(document.createElement('link'), { rel: 'stylesheet', href: new URL('ship.css', import.meta.url).href })
   const box = Object.assign(document.createElement('div'), { className: 'shipv' })
   const canvas = document.createElement('canvas'), tags = Object.assign(document.createElement('div'), { className: 'tags' }), hud = document.createElement('div')
@@ -80,10 +80,24 @@ export function mount(el, d) {
     w.fit({ l: 0, r: side ? s.left - b.left : b.width, t: t.bottom - b.top + 6, b: side ? b.height : s.top - b.top - 6 })
   }
   const draw = () => {
-    render(html`<${Top} d=${data} home=${home} pick=${id => { home = id; draw() }}/>
-      <${Sheet} d=${data} folded=${folded} short=${short.matches} fold=${() => { folded = !folded; draw() }}/>${w === false ? html`<${Still}/>` : ''}`, hud)
+    render(html`<${Top} d=${data} home=${home} pick=${go}/>
+      <${Sheet} d=${data} folded=${folded} short=${short.matches} detail=${detail} fold=${() => { folded = !folded; draw() }}/>${w === false ? html`<${Still}/>` : ''}`, hud)
     if (w) w.show(data, home)
   }
+  // a new home's tab scrolls into view, and its ship sails in
+  const go = id => { if (!id || id === home) return; home = id; draw(); hud.querySelector('.sv-homes [aria-selected=true]')?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' }) }
+  // On the sea, a tap on a worker, its tag or a station opens that card, and a sideways swipe sails to the next or previous home.
+  let p0 = null
+  const at = e => { const b = canvas.getBoundingClientRect(); return w ? w.pick(e.clientX - b.left, e.clientY - b.top) : null }
+  canvas.addEventListener('pointerdown', e => { p0 = e })
+  canvas.addEventListener('pointercancel', () => { p0 = null })
+  canvas.addEventListener('pointerup', e => {
+    if (!p0) return
+    const dx = e.clientX - p0.clientX, dy = e.clientY - p0.clientY, quick = e.timeStamp - p0.timeStamp < 800; p0 = null
+    if (quick && Math.abs(dx) > 48 && Math.abs(dx) > 1.5 * Math.abs(dy)) { const hs = data.homes, i = hs.findIndex(h => h.id === home); go(hs[i + (dx < 0 ? 1 : -1)]?.id) }
+    else if (Math.hypot(dx, dy) < 10) { const id = at(e); if (id) detail(id) }
+  })
+  canvas.addEventListener('pointermove', e => { if (e.pointerType === 'mouse') canvas.style.cursor = at(e) ? 'pointer' : '' })
   draw()
   short.addEventListener('change', draw)
   const ro = new ResizeObserver(fit); ro.observe(box); ro.observe(hud.querySelector('.sv-hd')); ro.observe(hud.querySelector('.sv-sheet'))
