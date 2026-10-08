@@ -230,7 +230,7 @@ for name, home in sorted(homes.items()):
     # Parent return-channel merge records survive child cleanup; no endpoint reads.
     reg = registering.get(name)
     for e in events(reg / 'state' / (name + '.status')) if reg is not None else []:
-        if e['state'] == 'done' and e['key'].startswith('merged-') and e['ts'] is not None:
+        if e['state'] == 'done' and e['key'] is not None and e['key'].startswith('merged-') and e['ts'] is not None:
             task = e['key'][7:]
             records.setdefault(task, []).append(dict(e, event='task.merged'))
     try:

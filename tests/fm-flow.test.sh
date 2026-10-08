@@ -16,6 +16,8 @@ for h in (main, child):
     (h / 'data/backlog.md').write_text('## Queued\n')
 (main / 'data/secondmates.md').write_text(f'- child - Worker (home: {child}; scope: app; projects: app)\n')
 (child / 'data/secondmates.md').write_text(f'- main - Parent (home: {main}; scope: fleet; projects: app)\n')
+# Exact rejected-key return from writeboost.status; key and timestamp remain unknown.
+(main / 'state/child.status').write_text('done [key=ov-rn-setup-polish corr=03b23bf8e7b2c26c]: PR 26 merged and verified - guarded merge read back state=MERGED at the exact checked head 2c7f3076 with all checks green; task cleaned up; per your words, production-phone replacement and live ChatGPT remain separately unapproved\n')
 (main / 'data/backlog.md').write_text('## Queued\n- [ ] next - Next blocked-by: prior\n'
     '- [ ] held - Held (hold: fm-hold-v1:V2FpdCBmb3IgVW1lcg==)\n'
     '- [ ] ready - Ready blocked-by: finished\n## In flight\n- [ ] prior - Prerequisite\n'
