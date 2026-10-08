@@ -54,10 +54,23 @@ fm_memory_sampler_interrupt() {
 }
 
 fm_memory_sampler_tick() {
-  local out d task reason action epoch stop=0 latch="$STATE/.host-memory-alerted"
-  local -a dirs=()
-  fm_local_firstmate_state_dirs "$STATE" 2>/dev/null || FM_LOCAL_STATE_DIRS=("$STATE")
-  for d in "${FM_LOCAL_STATE_DIRS[@]}"; do dirs+=(--state-dir "$d"); done
+  local out d meta home root child_state task reason action epoch stop=0 latch="$STATE/.host-memory-alerted"
+  local -a dirs=(--state-dir "$FM_HOME" "$STATE")
+  fm_local_firstmate_state_dirs "$STATE" "$FM_HOME" 2>/dev/null || FM_LOCAL_STATE_DIRS=("$STATE")
+  if root=$(fm_firstmate_root_home "$FM_HOME") && [ ! "$root" -ef "$FM_HOME" ]; then
+    dirs+=(--state-dir "$root" "$root/state")
+  fi
+  for d in "${FM_LOCAL_STATE_DIRS[@]}"; do
+    for meta in "$d"/*.meta; do
+      [ "$(fm_meta_get "$meta" kind)" = secondmate ] || continue
+      home=$(fm_meta_get "$meta" home)
+      [ -n "$home" ] && [ ! "$home" -ef "$FM_HOME" ] || continue
+      for child_state in "${FM_LOCAL_STATE_DIRS[@]}"; do
+        [ "$child_state" -ef "$home/state" ] || continue
+        dirs+=(--state-dir "$home" "$child_state")
+      done
+    done
+  done
   out=$("$SAMPLER_DIR/fm-jev-mem-guard.sh" --config "$CONFIG/host-memory" --record "$STATE/host-memory.tsv" --owned-top-task "$STATE" "${dirs[@]}" 2>&1) || {
     printf 'host memory guard failed: %s\n' "$out" >&2
     return 0
@@ -106,6 +119,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
   [ -d "$STATE" ] || exit 1
   SAMPLER_DIR=${MEMORY_SAMPLER_PATH%/*}
   . "$SAMPLER_DIR/fm-wake-lib.sh"
+  . "$SAMPLER_DIR/fm-backend.sh"
   fm_lock_try_acquire "$STATE/.host-memory-sampler.lock" || exit 0
   trap fm_memory_sampler_cleanup EXIT
   trap 'exit 0' HUP INT TERM
