@@ -824,8 +824,17 @@ The helper:
 Immediately before every destructive call it re-queries the named session and refuses empty, missing, literal `default`, or `default:true` identities.
 Its before/after tripwire requires the live default-session snapshot to remain byte-identical.
 
-The helper's header and `--help` own exact commands.
+Named lab servers, panes, and viewers always use disposable HOME and XDG directories, never the caller's home or configuration roots.
+Claude, Pi, and Codex credential roots are disposable too; inherited Claude/Anthropic environment overrides and the OpenAI API key are shed before runtime startup.
+No owner configuration or credentials are copied, linked, or mounted into the lab, and there is no signed-in runtime opt-in.
+Fleet observation alone retains the caller's context; selecting a different fleet home never changes the disposable runtime home.
+Teardown removes the disposable tree only after confirming lab removal and the unchanged fleet tripwire.
+Unsafe state directories, redirected disposable roots, and legacy roots are refused rather than adopted; legacy labs require guarded cleanup and fresh provisioning.
+This is environment isolation, not an operating-system filesystem sandbox: it redirects ordinary home-based tool behavior but does not prevent explicit access to other filesystem paths.
+
+The helper's header and `--help` own exact commands, environment variables, paths, and private-root requirements.
 Tests use thin compatibility wrappers in `tests/herdr-test-safety.sh` and never duplicate the destructive policy.
+Prepare-based adapter tests enter the disposable runtime environment before server startup and subsequent operations, including restarts; cleanup restores the original context only for fleet observation.
 
 ## Active limits
 

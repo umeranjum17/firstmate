@@ -21,6 +21,8 @@ TMP_ROOT=$(mktemp -d "$(cd "${TMPDIR:-/tmp}" && pwd -P)/fm-herdr-session-cleanup
 FAKEBIN="$TMP_ROOT/fakebin"
 HOME_DIR="$TMP_ROOT/home"
 mkdir -p "$FAKEBIN" "$HOME_DIR/state" "$HOME_DIR/config"
+export FM_HERDR_LAB_STATE_DIR="$TMP_ROOT/lab-state"
+CALLER_HOME=$HOME
 touch "$HOME_DIR/config/herdr-presentation-spaces"
 printf '%s\n' herdr > "$HOME_DIR/config/backend"
 
@@ -29,11 +31,87 @@ export HERDR_LAB_HELPER HERDR_LAB_SESSION REAL_HERDR HERDR_ORIGINAL_PATH
 cleanup() {
   local status=$?
   env PATH="$HERDR_ORIGINAL_PATH" "$HERDR_LAB_HELPER" teardown "$HERDR_LAB_SESSION" || status=1
+  if [ -n "${LAB_BASE:-}" ]; then
+    [ ! -e "$LAB_BASE" ] || { printf 'not ok - disposable HOME survived teardown\n' >&2; status=1; }
+  fi
   rm -rf "$TMP_ROOT"
   exit "$status"
 }
 trap cleanup EXIT
-"$HERDR_LAB_HELPER" provision "$HERDR_LAB_SESSION"
+reject_lab() {
+  if "$HERDR_LAB_HELPER" "$@" > "$TMP_ROOT/refusal.txt" 2>&1; then
+    fail "unsafe lab operation succeeded: $*"
+  fi
+}
+mkdir -m 755 "$FM_HERDR_LAB_STATE_DIR"
+reject_lab provision "$HERDR_LAB_SESSION"
+chmod 700 "$FM_HERDR_LAB_STATE_DIR"
+mv "$FM_HERDR_LAB_STATE_DIR" "$TMP_ROOT/private-state"
+ln -s "$TMP_ROOT/private-state" "$FM_HERDR_LAB_STATE_DIR"
+reject_lab provision "$HERDR_LAB_SESSION"
+rm "$FM_HERDR_LAB_STATE_DIR"
+mv "$TMP_ROOT/private-state" "$FM_HERDR_LAB_STATE_DIR"
+mkdir "$FM_HERDR_LAB_STATE_DIR/$HERDR_LAB_SESSION.xdg"
+for action in prepare provision 'run status --json' 'viewer start' 'viewer stop' stop teardown; do
+  case "$action" in
+    'run status --json') reject_lab run "$HERDR_LAB_SESSION" status --json ;;
+    'viewer start') reject_lab viewer start "$HERDR_LAB_SESSION" ;;
+    'viewer stop') reject_lab viewer stop "$HERDR_LAB_SESSION" ;;
+    *) reject_lab "$action" "$HERDR_LAB_SESSION" ;;
+  esac
+done
+rmdir "$FM_HERDR_LAB_STATE_DIR/$HERDR_LAB_SESSION.xdg"
+export CLAUDE_CONFIG_DIR="$HOME_DIR/owner-claude" PI_CODING_AGENT_DIR="$HOME_DIR/owner-pi"
+export CODEX_HOME="$HOME_DIR/owner-codex" OPENAI_API_KEY=lab-synthetic-openai
+export ANTHROPIC_API_KEY=lab-synthetic-key ANTHROPIC_AUTH_TOKEN=lab-synthetic-token
+export CLAUDE_CODE_OAUTH_TOKEN=lab-synthetic-oauth CLAUDE_CODE_USE_BEDROCK=1
+export FM_HERDR_LAB_FLEET_HOME="$CALLER_HOME"
+(
+  . "$ROOT/tests/herdr-test-safety.sh"
+  PREPARED_SESSION=$(fm_herdr_lab_name prepare-proof)
+  trap 'herdr_safe_stop_and_delete "$PREPARED_SESSION" || exit 1' EXIT
+  herdr_prepare_runtime "$PREPARED_SESSION" || exit 1
+  prepared_base=$(fm_herdr_lab_xdg_base "$PREPARED_SESSION") || exit 1
+  [ "$HOME" = "$prepared_base/home" ] && [ "$HOME" != "$CALLER_HOME" ] || exit 1
+  . "$ROOT/bin/fm-backend.sh"
+  fm_backend_source herdr || exit 1
+  fm_backend_herdr_server_ensure "$PREPARED_SESSION" || exit 1
+  fm_herdr_lab_stop "$PREPARED_SESSION" >/dev/null || exit 1
+  fm_backend_herdr_server_ensure "$PREPARED_SESSION" || exit 1
+  prepared=$(fm_backend_herdr_cli "$PREPARED_SESSION" workspace create --cwd "$ROOT" --label prepared-proof --no-focus) || exit 1
+  prepared_pane=$(printf '%s' "$prepared" | jq -er '.result.root_pane.pane_id') || exit 1
+  fm_backend_herdr_cli "$PREPARED_SESSION" pane run "$prepared_pane" \
+    "printf '%s\\n' \"\$HOME\" \"\$CODEX_HOME\" \"\${OPENAI_API_KEY-unset}\" \"\${ANTHROPIC_API_KEY-unset}\" > '$TMP_ROOT/prepared-home.txt'" >/dev/null || exit 1
+  attempt=0
+  while [ ! -s "$TMP_ROOT/prepared-home.txt" ] && [ "$attempt" -lt 100 ]; do
+    sleep 0.1
+    attempt=$((attempt + 1))
+  done
+  printf '%s\n' "$prepared_base/home" "$prepared_base/home/.codex" unset unset > "$TMP_ROOT/expected-prepared-home.txt"
+  cmp -s "$TMP_ROOT/prepared-home.txt" "$TMP_ROOT/expected-prepared-home.txt" || exit 1
+) || fail 'prepare-based adapter startup or restart escaped the disposable environment'
+[ "$HOME" = "$CALLER_HOME" ] || fail 'prepared journey changed caller context'
+pass 'real prepare-based adapter startup and restart use disposable HOME and shed authentication'
+"$HERDR_LAB_HELPER" provision "$HERDR_LAB_SESSION" || fail 'could not provision isolated lab'
+LAB_BASE=$(<"$FM_HERDR_LAB_STATE_DIR/$HERDR_LAB_SESSION.xdg-root")
+printf '%s\n' "$HOME_DIR" > "$FM_HERDR_LAB_STATE_DIR/$HERDR_LAB_SESSION.xdg-root"
+for action in prepare provision run stop teardown; do
+  if [ "$action" = run ]; then
+    reject_lab run "$HERDR_LAB_SESSION" status --json
+  else
+    reject_lab "$action" "$HERDR_LAB_SESSION"
+  fi
+done
+reject_lab viewer start "$HERDR_LAB_SESSION"
+reject_lab viewer stop "$HERDR_LAB_SESSION"
+[ -f "$HOME_DIR/config/backend" ] || fail 'invalid pointer deleted unrelated home'
+printf '%s\n' "$LAB_BASE" > "$FM_HERDR_LAB_STATE_DIR/$HERDR_LAB_SESSION.xdg-root"
+mv "$LAB_BASE/config" "$LAB_BASE/saved-config"
+ln -s "$HOME_DIR" "$LAB_BASE/config"
+reject_lab run "$HERDR_LAB_SESSION" status --json
+rm "$LAB_BASE/config"
+mv "$LAB_BASE/saved-config" "$LAB_BASE/config"
+pass 'real helper rejects public state, state symlinks, legacy roots and redirected disposable roots'
 
 # Keep the lab helper as the only CLI transport. Production adapter calls have
 # already appended the exact session; this shim strips that pair, refuses every
@@ -79,6 +157,42 @@ focus_snapshot() {
 
 ANCHOR=$(lab workspace create --cwd "$ROOT" --label captain-anchor --focus) || fail 'could not create focus anchor'
 ANCHOR_TAB=$(printf '%s' "$ANCHOR" | jq -r '.result.tab.tab_id')
+ANCHOR_PANE=$(printf '%s' "$ANCHOR" | jq -r '.result.root_pane.pane_id')
+HOME_PROOF="$TMP_ROOT/pane-home.txt"
+lab pane run "$ANCHOR_PANE" "printf '%s\\n' \"\$HOME\" \"\$XDG_CONFIG_HOME\" \"\$XDG_DATA_HOME\" \"\$XDG_STATE_HOME\" \"\$XDG_CACHE_HOME\" \"\$CLAUDE_CONFIG_DIR\" \"\$PI_CODING_AGENT_DIR\" \"\$CODEX_HOME\" \"\${OPENAI_API_KEY-unset}\" \"\${ANTHROPIC_API_KEY-unset}\" \"\${ANTHROPIC_AUTH_TOKEN-unset}\" \"\${CLAUDE_CODE_OAUTH_TOKEN-unset}\" \"\${CLAUDE_CODE_USE_BEDROCK-unset}\" > '$HOME_PROOF'" >/dev/null \
+  || fail 'could not request lab pane HOME evidence'
+attempt=0
+while [ ! -s "$HOME_PROOF" ] && [ "$attempt" -lt 100 ]; do
+  sleep 0.1
+  attempt=$((attempt + 1))
+done
+[ -s "$HOME_PROOF" ] || fail 'lab pane did not write HOME evidence'
+LAB_BASE=$(<"$FM_HERDR_LAB_STATE_DIR/$HERDR_LAB_SESSION.xdg-root")
+SOCKET_PATH=$(lab session list --json | jq -r --arg name "$HERDR_LAB_SESSION" '.sessions[] | select(.name == $name) | .socket_path')
+printf 'evidence: socket_path=%s bytes=%s\n' "$SOCKET_PATH" "${#SOCKET_PATH}"
+[ "${#SOCKET_PATH}" -lt 100 ] || fail 'lab socket path is not safely below Unix socket capacity'
+[ "$(head -n 1 "$HOME_PROOF")" = "$LAB_BASE/home" ] || fail 'lab pane HOME is not its disposable home'
+[ "$(head -n 1 "$HOME_PROOF")" != "$CALLER_HOME" ] || fail 'lab pane inherited caller HOME'
+printf '%s\n' "$LAB_BASE/home" "$LAB_BASE/config" "$LAB_BASE/data" "$LAB_BASE/state" "$LAB_BASE/cache" \
+  "$LAB_BASE/home/.claude" "$LAB_BASE/home/.pi/agent" "$LAB_BASE/home/.codex" unset unset unset unset unset > "$TMP_ROOT/expected-home.txt"
+cmp -s "$HOME_PROOF" "$TMP_ROOT/expected-home.txt" || fail 'lab pane HOME and XDG paths are inconsistent'
+HOME_MARKER="fm-lab-home-proof-$HERDR_LAB_SESSION"
+[ ! -e "$CALLER_HOME/.local/bin/$HOME_MARKER" ] || fail 'caller marker already exists'
+lab pane run "$ANCHOR_PANE" "mkdir -p \"\$HOME/.local/bin\" && printf scratch > \"\$HOME/.local/bin/$HOME_MARKER\"" >/dev/null \
+  || fail 'could not request scratch HOME write'
+attempt=0
+while [ ! -s "$LAB_BASE/home/.local/bin/$HOME_MARKER" ] && [ "$attempt" -lt 100 ]; do
+  sleep 0.1
+  attempt=$((attempt + 1))
+done
+[ "$(<"$LAB_BASE/home/.local/bin/$HOME_MARKER")" = scratch ] || fail 'scratch HOME write did not finish'
+[ ! -e "$CALLER_HOME/.local/bin/$HOME_MARKER" ] || fail 'lab HOME write touched caller HOME'
+for credentials in .claude .codex .pi .config; do
+  [ ! -e "$LAB_BASE/home/$credentials" ] || fail 'lab HOME contains inherited configuration or credentials'
+done
+pass 'real lab pane has disposable HOME, XDG and credential roots without inherited authentication'
+"$HERDR_LAB_HELPER" viewer start "$HERDR_LAB_SESSION" || fail 'isolated viewer start failed'
+"$HERDR_LAB_HELPER" viewer stop "$HERDR_LAB_SESSION" || fail 'isolated viewer stop failed'
 TOKEN=AbCdEfGhIjKlMnOpQrStUv
 ID=restored-idle-shell
 TITLE="└ $ID · p:$TOKEN"

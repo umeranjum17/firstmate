@@ -15,6 +15,18 @@ FAKE_LOG="$TMP_ROOT/herdr.log"
 TRIPWIRES="$TMP_ROOT/tripwires"
 mkdir -p "$FAKE_STATE" "$FAKE_HOME"
 : > "$FAKE_LOG"
+cleanup() {
+  local pointer base name
+  for pointer in "$TRIPWIRES"/*.xdg-root; do
+    [ -f "$pointer" ] || continue
+    name=${pointer##*/}
+    name=${name%.xdg-root}
+    base=$(FM_HERDR_LAB_STATE_DIR="$TRIPWIRES" bash -c '. "$1"; fm_herdr_lab_xdg_base "$2"' _ "$ROOT/bin/fm-herdr-lab.sh" "$name") || continue
+    rm -rf "$base"
+  done
+  fm_test_cleanup
+}
+trap cleanup EXIT
 
 cat > "$FAKEBIN/herdr" <<'SH'
 #!/usr/bin/env bash
@@ -103,7 +115,7 @@ test_isolated_lab_links_inside_lab_only() {
 
   (unset XDG_CONFIG_HOME XDG_DATA_HOME XDG_STATE_HOME
     lab_cli --isolated-xdg provision "$name") || fail "isolated provision failed"
-  base="$TRIPWIRES/$name.xdg"
+  base=$(<"$TRIPWIRES/$name.xdg-root")
   for sub in config data state; do
     [ -d "$base/$sub" ] || fail "isolated provision did not create $base/$sub"
   done
@@ -137,8 +149,8 @@ test_isolated_lab_links_inside_lab_only() {
   pass "fm-herdr-lab: --isolated-xdg links plugins inside the lab and leaves the live Herdr registry untouched"
 }
 
-test_default_behavior_still_inherits_caller_xdg() {
-  local name="fm-lab-xdg-default-$$" plugin_src="$TMP_ROOT/fake-plugin-default"
+test_default_behavior_isolates_caller_xdg() {
+  local name="fm-lab-xdg-default-$$" plugin_src="$TMP_ROOT/fake-plugin-default" base
   local sentinel="$FAKE_HOME/sentinel"
   mkdir -p "$plugin_src" "$sentinel/config" "$sentinel/data" "$sentinel/state"
   : > "$FAKE_LOG"
@@ -146,18 +158,25 @@ test_default_behavior_still_inherits_caller_xdg() {
   export FM_FAKE_HERDR_REAL_CONFIG="$sentinel/config"
   XDG_CONFIG_HOME="$sentinel/config" XDG_DATA_HOME="$sentinel/data" XDG_STATE_HOME="$sentinel/state" \
     lab_cli provision "$name" || fail "default provision failed"
-  assert_absent "$TRIPWIRES/$name.xdg" "default provision created an isolated XDG tree unasked"
+  base=$(<"$TRIPWIRES/$name.xdg-root")
+  assert_present "$base/home" "default provision did not create disposable HOME"
 
   XDG_CONFIG_HOME="$sentinel/config" XDG_DATA_HOME="$sentinel/data" XDG_STATE_HOME="$sentinel/state" \
     lab_cli run "$name" plugin link "$plugin_src" >/dev/null || fail "default plugin link failed"
-  assert_present "$sentinel/config/herdr/plugins/fake-plugin-default.link" \
-    "default plugin link did not follow the caller's XDG_CONFIG_HOME"
-  assert_contains "$(grep -m1 '^XDG_CONFIG_HOME=' "$FAKE_LOG")" "$sentinel/config" \
-    "default run did not inherit the caller's XDG environment unchanged"
+  assert_present "$base/config/herdr/plugins/fake-plugin-default.link" \
+    "default plugin link did not use isolated XDG_CONFIG_HOME"
+  assert_absent "$sentinel/config/herdr/plugins/fake-plugin-default.link" \
+    "default plugin link touched caller XDG_CONFIG_HOME"
+  assert_contains "$(grep -m1 '^HOME=' "$FAKE_LOG")" "$base/home" "default run inherited caller HOME"
+  assert_contains "$(grep -m1 '^XDG_CONFIG_HOME=' "$FAKE_LOG")" "$base/config" \
+    "default run inherited caller XDG environment"
 
   XDG_CONFIG_HOME="$sentinel/config" XDG_DATA_HOME="$sentinel/data" XDG_STATE_HOME="$sentinel/state" \
     lab_cli teardown "$name" || fail "default teardown failed"
-  pass "fm-herdr-lab: without the flag every Herdr call inherits the caller XDG environment unchanged"
+  assert_absent "$base" "default teardown retained disposable directories"
+  assert_absent "$TRIPWIRES/$name.xdg-root" "default teardown retained scratch pointer"
+  unset FM_FAKE_HERDR_REAL_CONFIG
+  pass "fm-herdr-lab: without the flag runtime HOME and XDG are disposable"
 }
 
 test_help_names_the_flag() {
@@ -198,8 +217,8 @@ test_explicit_fleet_home_preserves_private_runtime() {
   XDG_CONFIG_HOME="$TMP_ROOT/wrong-config" lab_cli --isolated-xdg provision "$name" \
     || fail "explicit fleet HOME did not observe actual default"
   lab_cli --isolated-xdg run "$name" plugin link "$plugin" >/dev/null || fail "private runtime failed"
-  assert_contains "$(cat "$FAKE_LOG")" "HOME=$FAKE_HOME" "runtime adopted fleet HOME"
-  assert_present "$TRIPWIRES/$name.xdg/config/herdr/plugins/home-plugin.link" "runtime adopted fleet XDG"
+  assert_contains "$(cat "$FAKE_LOG")" "HOME=$(<"$TRIPWIRES/$name.xdg-root")/home" "runtime inherited caller HOME"
+  assert_present "$(<"$TRIPWIRES/$name.xdg-root")/config/herdr/plugins/home-plugin.link" "runtime adopted fleet XDG"
   assert_absent "$fleet/.config/herdr/plugins/home-plugin.link" "runtime wrote fleet plugin registry"
   lab_cli --isolated-xdg stop "$name" || fail "guarded stop failed"
   local other="$TMP_ROOT/other-fleet"
@@ -222,7 +241,7 @@ test_invalid_fleet_home_refuses() {
     if out=$(FM_HERDR_LAB_FLEET_HOME="$value" lab_cli --isolated-xdg provision "$name" 2>&1); then
       fail "invalid fleet HOME provision succeeded"
     fi
-    assert_contains "$out" "cannot read Herdr sessions" "invalid context did not refuse tripwire"
+    assert_contains "$out" "cannot read Herdr sessions for the fleet-state tripwire" "invalid fleet context did not refuse before provisioning"
     if rg -q '^server |^session stop |^session delete ' "$FAKE_LOG"; then
       fail "invalid fleet HOME reached lifecycle mutation"
     fi
@@ -232,7 +251,7 @@ test_invalid_fleet_home_refuses() {
 }
 
 test_isolated_lab_links_inside_lab_only
-test_default_behavior_still_inherits_caller_xdg
+test_default_behavior_isolates_caller_xdg
 test_help_names_the_flag
 test_isolated_provision_observes_live_default
 

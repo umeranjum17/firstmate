@@ -68,7 +68,7 @@ cleanup_all() {
     [ -n "$wt" ] && treehouse return --force "$wt" >/dev/null 2>&1
   done
   WORKTREES=()
-  "$HERDR_LAB_HELPER" teardown "$HERDR_LAB_SESSION" || status=$?
+  herdr_safe_stop_and_delete "$HERDR_LAB_SESSION" || status=$?
   # Spawn leaves each state/<id>.git-hooks strip dir read-only.
   find "$TMP_ROOT" -type d -exec chmod u+rwx {} + 2>/dev/null
   rm -rf "$TMP_ROOT"
@@ -76,6 +76,7 @@ cleanup_all() {
 }
 trap cleanup_all EXIT
 "$HERDR_LAB_HELPER" provision "$HERDR_LAB_SESSION" || fail "could not provision isolated Herdr lab session"
+fm_herdr_lab_runtime_env "$HERDR_LAB_SESSION" || fail "could not enter isolated Herdr lab environment"
 
 lab() { "$HERDR_LAB_HELPER" run "$HERDR_LAB_SESSION" "$@"; }
 
@@ -429,7 +430,7 @@ pass "real herdr E2E: a --secondmate launch still stands up that secondmate's ow
 
 # --- 8. teardown closes only the worker's own pane --------------------------
 
-FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$PRIMARY_HOME/state" FM_DATA_OVERRIDE="$PRIMARY_HOME/data" \
+FM_HOME="$PRIMARY_HOME" FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$PRIMARY_HOME/state" FM_DATA_OVERRIDE="$PRIMARY_HOME/data" \
   FM_CONFIG_OVERRIDE="$PRIMARY_HOME/config" \
   "$ROOT/bin/fm-teardown.sh" dupC >"$TMP_ROOT/teardown.out" 2>&1
 status=$?

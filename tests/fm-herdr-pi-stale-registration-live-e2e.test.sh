@@ -60,7 +60,7 @@ cleanup_all() {
   exit "$status"
 }
 trap cleanup_all EXIT
-fm_herdr_lab_prepare "$SESSION" || fail "could not prepare isolated Herdr lab session"
+herdr_prepare_runtime "$SESSION" || fail "could not prepare isolated Herdr lab session"
 
 SCRATCH=$(mktemp -d "${TMPDIR:-/tmp}/fm-pi-stale.XXXXXX")
 SCRATCH=$(cd "$SCRATCH" && pwd)
@@ -72,8 +72,10 @@ fm_backend_source herdr || fail "fm_backend_source herdr failed"
 
 lab() { fm_herdr_lab_cli "$SESSION" "$@"; }
 
-# prepare only records the tripwire; the adapter's own server-ensure starts
-# the lab session's server exactly as a spawn would.
+mkdir -p "$PI_CODING_AGENT_DIR/extensions" || version_fail "could not create disposable Pi extension directory"
+lab integration install pi || version_fail "could not install the Herdr Pi integration in disposable HOME"
+
+# The adapter's own server-ensure starts the lab session's server.
 fm_backend_herdr_server_ensure "$SESSION" || fail "could not start the isolated Herdr lab server"
 WS=$(lab workspace create --label fm-pi-stale --cwd "$SCRATCH/cwd" 2>&1) \
   || fail "could not create the lab workspace: $WS"
@@ -98,7 +100,7 @@ registered_status() {
 
 # The crew shape: a nested interactive shell under the pane's top shell, then
 # the real Pi TUI with no prompt.
-lab pane run "$PANE_ID" zsh >/dev/null 2>&1 || fail "could not start the nested shell in the pane"
+lab pane run "$PANE_ID" 'bash --noprofile --norc -i' >/dev/null 2>&1 || fail "could not start the nested shell in the pane"
 sleep 1
 lab pane run "$PANE_ID" pi >/dev/null 2>&1 || fail "could not start pi in the pane"
 
@@ -114,7 +116,7 @@ done
 case "$STATUS" in
   working|idle|done|blocked) ;;
   *) version_fail \
-    "pi never reported a lifecycle state to Herdr in this pane (agent get read '${STATUS:-agent_not_found}' for 60s); the herdr pi integration (~/.pi/agent/extensions/herdr-agent-state.ts) is what reports it" ;;
+    "pi never reported a lifecycle state to Herdr in this pane (agent get read '${STATUS:-agent_not_found}' for 60s); the disposable Herdr Pi integration ($PI_CODING_AGENT_DIR/extensions/herdr-agent-state.ts) is what reports it" ;;
 esac
 
 wait_process_state agent 100 || version_fail \
