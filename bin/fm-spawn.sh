@@ -1696,6 +1696,7 @@ HOST_MEMORY_OUT=$("$SCRIPT_DIR/fm-jev-mem-guard.sh" --config "$CONFIG/host-memor
   exit 1
 }
 if [ "$KIND" = secondmate ] && [ "${FM_SECONDMATE_LIVENESS_RECOVERY:-0}" = 1 ]; then
+  # shellcheck source=bin/fm-secondmate-liveness-lib.sh
   . "$SCRIPT_DIR/fm-secondmate-liveness-lib.sh"
   fm_secondmate_liveness_probe "$STATE/$ID.meta" "$ID" poll
   if [ "$FM_SM_LIVE_STATUS" != relaunchable ]; then
