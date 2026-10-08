@@ -7,7 +7,8 @@
 # the lane's model, age, pull request and, when it waits, why in plain words; filters by
 # home, model and state; a card's detail with its stages and activity; Needs you (the ask
 # list); a mount point for the ship view (ship/index.js); a command palette and keys (?).
-# On a phone the board is a list grouped by stage, with a dock.
+# On tablet-sized viewports the header figures use their own row and the sidebar narrows
+# to an icon rail; on a phone the board is a list grouped by stage, with a dock.
 # Each build writes the app's one data file, state/dashboard/board.json: homes with their
 # lane plans, one card per open lane, ready backlog item and pull request landed today,
 # and parked home ids. Cards carry the current stage inferred from status lines (which
@@ -47,6 +48,9 @@
 #                                   status verb and [at=] time (building, validating or waiting on
 #                                   CI, waiting on a decision, blocked, waiting on something
 #                                   else, finished not landed); a secondmate record is a lead
+#                                   without a captain hold, blocked/failed stay blocked even when
+#                                   their text names CI; only paused validation/CI/checks/pipeline
+#                                   waits are validating (tests/fm-dashboard.test.sh ci-stuck)
 #   config/lane-caps                "<home> <cap>" lane plan per home (Main is "main" or the name
 #                                   of its home's parent folder); config/lane-target is the default (4)
 #   bin/fm-tasks-axi.sh list        each home's backlog (FM_HOME=<home>): queued = ready + held +

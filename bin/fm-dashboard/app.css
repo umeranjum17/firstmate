@@ -207,7 +207,7 @@ a.pill:hover{background:var(--hover)}
 .dock>button{width:52px;height:52px}
 .dock a[aria-current=page]{background:var(--sel);color:var(--ink)}
 .dock a .badge{position:absolute;top:4px;right:8px}
-/* --- iPad: the figures take their own row below 1280 px; in portrait the sidebar folds to an icon rail --- */
+/* --- tablet layout: header figures below 1280 px; sidebar icon rail below 1024 px --- */
 @media (max-width:1279px){
   .hd{flex-wrap:wrap;height:auto;min-height:44px;padding-top:8px;padding-bottom:8px;row-gap:8px}
   .hd .kpi{order:1;flex:1 0 100%;margin-right:0}
