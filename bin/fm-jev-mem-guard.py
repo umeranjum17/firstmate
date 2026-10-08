@@ -5,27 +5,26 @@ fm-jev-mem-guard.py - host memory guard: measure, admit, and alert before an oom
 On Herdr, fleet agents share one agent-runtime service, and systemd-oomd kills
 that service as a unit under the host's configured oomd pressure policy.
 Read host and runtime cgroup pressure independently and classify the worse reading.
-This helper measures or publishes a refusal only when explicitly invoked; it does
-not launch a sampler, interrupt tasks, or enforce fleet launch/relaunch admission.
-Admission refusal cannot guarantee avoidance of an oomd kill.
+Admission refusal and sampler interrupts cannot guarantee avoidance of an oomd kill.
 
 Usage (bin/fm-jev-mem-guard.sh runs this with python3):
   fm-jev-mem-guard.sh [--config FILE] [--state-dir HOME DIR]...
       Print "<verdict>\t<summary>" for the host, naming the largest consumers.
   fm-jev-mem-guard.sh [--config FILE] --admit TASK --state DIR
-      Admission decision for one proposed agent launch.
+      Admission for one agent launch (bin/fm-spawn.sh, bin/fm-control.sh relaunch).
       Exit 0 admits and removes DIR/admission-refused. Exit 1 refuses: prints the
       reason and writes DIR/admission-refused as "<epoch>\t<task>\t<reason>".
   fm-jev-mem-guard.sh [--config FILE] --record FILE [--state-dir HOME DIR]...
-      Record one sample: appends
+      One independent sampler sample (bin/fm-host-memory-sampler.sh): appends
       "<epoch>\t<MemAvailable kB>\t<swap used kB>\t<pressure some avg10>\t<verdict>"
       to FILE, trimming to the newest 8640 rows once it exceeds 8760, and prints
       "<verdict>\t<summary>"; an ALERT summary names the largest consumers.
 
   --owned-top-task DIR appends a tab and the top consumer's task ID only when
-      that consumer is a task recorded in DIR; this does not interrupt it.
+      that consumer is a task recorded in DIR (for the sampler's interrupt).
 
-Verdicts: OK; WAIT; ALERT; UNKNOWN (not measurable, for example no pressure file).
+Verdicts: OK; WAIT (new agents wait); ALERT (sampler attempts one owned-task interrupt);
+UNKNOWN (not measurable, for example no pressure file).
 --admit refuses WAIT and ALERT and admits OK and UNKNOWN; UNKNOWN records no sample.
 Pass --config FILE to read thresholds; without it the defaults apply.
 Settings are owned by docs/configuration.md "Host memory guard".

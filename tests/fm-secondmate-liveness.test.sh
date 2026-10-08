@@ -710,6 +710,49 @@ test_tmux_agent_state_classifies
 test_tmux_agent_state_rejects_malformed_targets_before_probe
 test_herdr_agent_state_preserves_husk_classifier
 test_agent_state_dispatcher_and_compatibility
+test_memory_admission_defers_recovery() {
+  local w fb tmuxfb log out i
+  w=$(new_world memory-deferral)
+  mkdir -p "$w/code"
+  ln -s "$ROOT/bin" "$w/code/bin"
+  cp "$ROOT/AGENTS.md" "$ROOT/.gitignore" "$w/code/"
+  add_sm_home "$w" sm1 firstmate:fm-sm1
+  fb=$(make_toolchain "$w"); tmuxfb=$(make_liveness_tmux "$w")
+  log="$w/calls.log"; : > "$log"
+  mkdir -p "$w/proc/pressure"
+  printf 'MemAvailable: 31457280 kB\n' > "$w/proc/meminfo"
+  printf 'some avg10=25 avg60=0 avg300=0 total=1\n' > "$w/proc/pressure/memory"
+  for i in 1 2 3 4; do
+    out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" zsh "$log" FM_ROOT_OVERRIDE="$w/code" FM_HOST_MEMORY_PROC="$w/proc" FM_HOST_MEMORY_CGROUP_ROOT="$w/no-cgroup")
+    assert_contains "$out" 'memory admission deferred:' "memory pressure defers liveness recovery"
+    [ ! -s "$log" ] || fail "memory deferral removed the endpoint: $(cat "$log")"
+    [ ! -e "$w/home/state/.secondmate-relaunch-sm1" ] || fail "memory deferral consumed retry budget"
+  done
+  printf 'some avg10=2 avg60=0 avg300=0 total=1\n' > "$w/proc/pressure/memory"
+  out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" zsh "$log" FM_ROOT_OVERRIDE="$w/code" FM_HOST_MEMORY_PROC="$w/proc" FM_HOST_MEMORY_CGROUP_ROOT="$w/no-cgroup")
+  assert_contains "$(cat "$log")" new-window "recovery resumes once memory eases: $out"
+  assert_grep relaunched "$w/home/state/.secondmate-relaunch-sm1" "successful recovery is ledgered"
+  [ "$(grep -c $'\tattempt$' "$w/home/state/.secondmate-relaunch-sm1")" -eq 1 ] || fail "only the actual launch should consume an attempt"
+  printf 'wait_pressure=nan\n' > "$w/home/config/host-memory"
+  for i in 1 2 3; do
+    out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" zsh "$log" FM_ROOT_OVERRIDE="$w/code" FM_HOST_MEMORY_PROC="$w/proc" FM_HOST_MEMORY_CGROUP_ROOT="$w/no-cgroup")
+    assert_contains "$out" 'respawn failed' "invalid configuration is a genuine recovery failure"
+  done
+  out=$(PATH="$tmuxfb:$fb:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/code" \
+    FM_TEST_PANE_CMD=zsh FM_TMUX_CALL_LOG="$log" TMUX='' FM_BACKEND=tmux \
+    FM_HOST_MEMORY_PROC="$w/proc" FM_HOST_MEMORY_CGROUP_ROOT="$w/no-cgroup" \
+    FM_SECONDMATE_LIVENESS_SECS=1 FM_SECONDMATE_LIVENESS_MAX_ATTEMPTS=4 FM_POLL=1 FM_SIGNAL_GRACE=0 \
+    "$ROOT/bin/fm-watch.sh" 2>&1)
+  assert_contains "$out" 'auto-relaunch paused after 4 attempts' "non-memory failures still consume the retry budget"
+  pass "memory deferrals preserve the endpoint and liveness retry budget"
+}
+
+if [ "${1:-}" = memory-admission ]; then
+  test_memory_admission_defers_recovery
+  exit 0
+fi
+
+test_memory_admission_defers_recovery
 test_sweep_respawns_confirmed_dead_secondmate
 test_sweep_leaves_alive_secondmate_untouched
 test_sweep_respawns_authoritatively_missing_pi_secondmate
