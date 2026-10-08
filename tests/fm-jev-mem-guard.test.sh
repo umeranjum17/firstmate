@@ -484,7 +484,7 @@ PY
   [ "$rc1" -eq 1 ] && [ "$rc2" -eq 1 ] || fail "parallel refusals lost their pressure result: $(cat "$case/"*.err)"
   [ ! -s "$case/a.err" ] && [ ! -s "$case/b.err" ] || fail "parallel refusals raised an error"
   assert_contains "$(cat "$case/a.out" "$case/b.out")" 'pressure at or above 20%' "both launches report pressure"
-  python3 - "$case/state" <<'PY'
+  python3 - "$case/state" <<'PY' || fail "the public refusal record was not published intact"
 import os
 import sys
 
@@ -495,7 +495,6 @@ assert epoch.isdigit() and task in ("build-a", "build-b")
 assert reason.startswith("host memory under pressure:")
 assert os.listdir(state) == ["admission-refused"]
 PY
-  [ "$?" -eq 0 ] || fail "the public refusal record was not published intact"
   fake_host "$case/proc" 40 2
   FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --admit build-a --state "$case/state" & first=$!
   FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --admit build-b --state "$case/state" & second=$!
