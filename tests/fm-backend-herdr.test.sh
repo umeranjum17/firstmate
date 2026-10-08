@@ -5201,6 +5201,41 @@ herdr_popup_composer_screen() {  # <typed-text>
   printf '  \xe2\x8f\xb5\xe2\x8f\xb5 bypass permissions on\n'
 }
 
+# herdr_popup_292_composer_screen: the Claude Code 2.1.292 shape captured live
+# in an isolated lab with no viewer attached after typing /exit: a short popup
+# below the composer's closing rule whose selected row carries the same agent
+# glyph as the composer itself.
+herdr_popup_292_composer_screen() {  # <typed-text>
+  local typed=$1 rule
+  rule=$(printf '%0.s\xe2\x94\x80' $(seq 1 60))
+  printf ' \xe2\x96\x90\xe2\x96\x9b\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x9c\xe2\x96\x8c   Claude Code v2.1.292\n'
+  printf '\n'
+  printf '%s\n' "$rule"
+  printf '\xe2\x9d\xaf\xc2\xa0%s\n' "$typed"
+  printf '%s\n' "$rule"
+  printf '  \xe2\x9d\xaf %s                             Exit the CLI\n' "$typed"
+  printf '    /context                          Visualize current context usage as a colored grid\n'
+  printf '    /usage-credits                    Configure usage credits or request them from your admin\n'
+}
+
+test_send_text_submit_claude_292_glyph_popup_composer_is_proven_and_submitted() {
+  local dir log resp fb out enter_count text
+  dir="$TMP_ROOT/submit-claude-292-popup"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
+  text='/exit'
+  herdr_submit_claude_prefix "$resp" "$text"
+  printf '{"result":{"agent":{"agent":"claude","agent_status":"idle"}}}\n' > "$resp/5.out"
+  printf '{"result":{"agent":{"agent_status":"working"}}}\n' > "$resp/7.out"
+  herdr_popup_292_composer_screen "$text" > "$resp/4.out"
+  fb=$(make_herdr_fakebin "$dir")
+  out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_BACKEND_HERDR_SUBMIT_POLLS=1 \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_send_text_submit default:w1:p2 "$1" 3 0.01 0.01' "$ROOT" "$text" )
+  [ "$out" = empty ] || fail "a composer above a glyph-marked slash popup must be proven and submitted, got '$out'"
+  enter_count=$(grep -c $'\x1f''pane'$'\x1f''send-keys'$'\x1f''w1:p2'$'\x1f''enter' "$log")
+  [ "$enter_count" -eq 1 ] || fail "the proven typed command should be submitted once, sent $enter_count Enter(s)"
+  [ "$(herdr_ctrl_u_count "$log")" -eq 0 ] || fail "a proven composer must not be cleared"
+  pass "fm_backend_herdr_send_text_submit: a typed /exit above Claude 2.1.292's glyph-marked popup is proven and submitted"
+}
+
 test_send_text_submit_long_literal_submits_when_composer_holds_every_byte() {
   local dir log resp fb out enter_count text
   dir="$TMP_ROOT/submit-long-exact"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
@@ -6377,6 +6412,7 @@ test_composer_state_claude_slash_popup_pushes_composer_above_tail_window
 test_composer_state_stalled_read_returns_unknown_within_bound
 test_server_ensure_releases_callers_pipe
 test_send_text_submit_claude_slash_popup_composer_is_still_proven_and_submitted
+test_send_text_submit_claude_292_glyph_popup_composer_is_proven_and_submitted
 test_send_text_submit_claude_grey_slash_command_is_proven_and_submitted
 test_send_text_submit_lone_paste_placeholder_submits_the_long_payload
 test_send_text_submit_multiline_paste_placeholder_submits_the_long_payload

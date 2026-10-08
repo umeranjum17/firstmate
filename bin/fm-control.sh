@@ -36,7 +36,11 @@
 #              every uncommitted change. Interrupts first when the task reads
 #              busy, then submits the harness's exit command. An exact Claude
 #              background-work dialog with Exit and stop tasks selected is
-#              confirmed; detach and unknown dialogs are refused. Postcondition:
+#              confirmed; detach and unknown dialogs are refused. A Claude
+#              startup gate (folder trust or external imports) is never
+#              answered, because Claude stores any answer as the project's
+#              decision; its endpoint is closed instead and the outcome is
+#              `endpoint-gone`. Postcondition:
 #              the backend's recovery-grade classifier reports the agent gone.
 #              Already-stopped is success (idempotent). An endpoint that reads
 #              `missing` is put through the control plane's per-backend absence
@@ -680,6 +684,22 @@ do_exit() {
     1) ;;
     *) die "task $ID exit confirmation could not be delivered safely" ;;
   esac
+  # A resumed Claude can wait at a startup gate with no composer yet. Any
+  # answer, Escape included, is stored as the project's decision (Escape at the
+  # imports gate records "No, disable", which then blocks every trust
+  # registration for that project), so close the endpoint instead: the agent
+  # has loaded nothing yet, and relaunch re-creates the endpoint.
+  local gate_screen
+  gate_screen=$(fm_backend_visible_capture "$BACKEND" "$T" "$LABEL" 2>/dev/null) || gate_screen=
+  if [ "$(fm_control_startup_gate "$HARNESS" "$gate_screen")" = gate ]; then
+    fm_backend_validate_task_endpoint "$META" "$ID" >/dev/null \
+      || die "task $ID's endpoint no longer validates; refusing to close it"
+    fm_backend_kill "$BACKEND" "$T" "$(fm_meta_get "$META" zellij_tab_id)" "fm-$ID" \
+      || die "task $ID waits at a Claude startup dialog and its endpoint $T could not be closed; answer nothing there and close it by hand"
+    retire_busy_incarnation
+    printf 'endpoint-gone'
+    return 0
+  fi
   # A busy agent is interrupted first before the exit command is submitted.
   case "$(busy_verdict)" in
     busy*)
@@ -970,6 +990,11 @@ safe_checkpoint() {
   wt_top_real=$(cd "$wt_top" 2>/dev/null && pwd -P) || wt_top_real=$wt_top
   [ "$wt_real" = "$wt_top_real" ] \
     || die "task $ID's recorded worktree $WT is not a worktree root (root is $wt_top); refusing to relaunch against an ambiguous checkout"
+  if fm_slot_record_owner "$WT" "$STATE" "$META"; then
+    die "task $ID's recorded worktree $WT is also recorded by task $FM_SLOT_RECORD_OWNER_ID as its $FM_SLOT_RECORD_OWNER_FIELD; refusing to relaunch two agents into one copy. Reconcile which record is stale (bin/fm-crew-state.sh $ID $FM_SLOT_RECORD_OWNER_ID)"
+  elif [ $? -eq 2 ]; then
+    die "cannot prove task $ID's worktree $WT is free of other task records: $FM_LOCAL_STATE_DIRS_ERROR; refusing to relaunch"
+  fi
   if head=$(git -C "$WT" rev-parse --verify HEAD 2>/dev/null); then
     :
   elif head_ref=$(git -C "$WT" symbolic-ref -q HEAD 2>/dev/null); then

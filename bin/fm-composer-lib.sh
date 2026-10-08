@@ -1577,7 +1577,7 @@ _fm_composer_bare_rule_sandwich() {  # <plain-screen> <row>
 }
 
 _fm_composer_select_cursorless() {
-  local plain=$1 generic=-1 next boundary raw trimmed glyph bare footer=0
+  local plain=$1 generic=-1 next boundary raw trimmed glyph bare footer=0 menu
   FM_COMPOSER_SELECTION_REFUSAL=none
   FM_COMPOSER_SELECTED_KIND=
   FM_COMPOSER_SELECTED_FIRST=-1
@@ -1605,6 +1605,45 @@ _fm_composer_select_cursorless() {
     else
       bare=-1
     fi
+  fi
+  # Claude 2.1.292 marks a slash-command popup's selected row with the same
+  # agent glyph as its composer, below the composer's closing rule. A glyph row
+  # under the last rule of a pair that already holds a glyph row is that menu,
+  # so the composer inside the pair stays the candidate. The menu hangs
+  # contiguously off that rule; a blank row between them means the lower glyph
+  # row is a composer redrawn below an old pair, which still wins. The menu
+  # only opens on typed text, so the switch needs a non-empty composer in the
+  # pair and can move the verdict toward refusing but never toward empty. Its
+  # selected row is indented, while a live composer starts at the left edge.
+  menu=0
+  raw=
+  [ "$bare" -lt 0 ] || raw=$(_fm_composer_screen_row "$bare" "$plain")
+  if [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
+     && case "$raw" in [[:space:]]*) true ;; *) false ;; esac \
+     && [ "$bare" -gt "$FM_COMPOSER_SCAN_PI_CLOSE" ] \
+     && [ "$FM_COMPOSER_SCAN_PI_LAST_SEPARATOR" = "$FM_COMPOSER_SCAN_PI_CLOSE" ]; then
+    menu=1
+    next=$((FM_COMPOSER_SCAN_PI_CLOSE + 1))
+    while [ "$next" -le "$bare" ]; do
+      trimmed=$(_fm_composer_screen_row "$next" "$plain")
+      fm_composer_normalize_trim_var trimmed
+      [ -n "$trimmed" ] || { menu=0; break; }
+      next=$((next + 1))
+    done
+  fi
+  if [ "$menu" = 1 ]; then
+    next=$((FM_COMPOSER_SCAN_PI_OPEN + 1))
+    while [ "$next" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; do
+      trimmed=$(_fm_composer_screen_row "$next" "$plain")
+      fm_composer_normalize_trim_var trimmed
+      if fm_composer_leading_agent_glyph_var glyph "$trimmed"; then
+        raw=${trimmed#*"$glyph"}
+        raw=${raw//$'\u00a0'/}
+        [ -z "${raw//[[:space:]]/}" ] || bare=$next
+        break
+      fi
+      next=$((next + 1))
+    done
   fi
   if [ "$bare" -gt "$generic" ]; then
     generic=$bare

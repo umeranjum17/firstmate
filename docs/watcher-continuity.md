@@ -209,6 +209,15 @@ The Claude hook's detached handling successor is launched by the hook itself, wh
 The turn-end guard remains the final backstop rather than the normal continuity mechanism.
 In its `--claude` mode it cooperates with the auto-arm.
 
+### Agent-runtime restart
+
+Every owner above runs inside the agent runtime, so a killed Herdr server takes all of them down at once, and a Claude primary whose turn had already ended has no Stop event left to re-arm.
+`bin/fm-sentinel.sh` is the one piece that must run outside the runtime, as a systemd user service:
+`FM_HOME=<home> bin/fm-sentinel.sh unit > ~/.config/systemd/user/fm-sentinel.service && systemctl --user enable --now fm-sentinel`.
+On a server restart it reconciles the home's direct reports, orders each live secondmate to do the same in its own home, and types an operational-input doorbell into the primary, so that turn's end re-arms through the primary's own owner.
+It also wakes the primary when supervision is needed and the beacon has been stale beyond the guard grace with no turn running.
+Its header owns the exact rules.
+
 ## Recovery episode acknowledgement
 
 A recovery episode is one generation of the `state/.watcher-down` marker.
