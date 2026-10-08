@@ -413,7 +413,7 @@ test_pull_requests_show_validation_runs_and_checks_from_local_records() {
   home=$(make_home prs)
   d="$home/state/dashboard" now=$(date +%s)
   mkdir -p "$home/wt/ci" "$home/wt/done" "$home/wt/green" "$home/data/m-done" "$home/data/m-green"
-  for wt in ci done green; do
+  for wt in ci 'done' green; do
     git init -q -b "dash-$wt" "$home/wt/$wt"
     git -C "$home/wt/$wt" -c user.name=Test -c user.email=test@example.invalid commit -qm fixture --allow-empty
   done
