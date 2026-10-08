@@ -56,7 +56,7 @@
 #   <proc> is FM_DASHBOARD_PROC (default /proc), <locks> FM_DEVICE_LOCK_DIR (default /tmp);
 #   FM_EMU_MAX, FM_GRADLE_MAX, FM_MEM_MIN_GB (defaults 2, 2, 12) mirror the memory gate's caps
 # All day comparisons use the host timezone. A build writes only under state/dashboard:
-# its pages, .quota.json (the last quota reading), filed.json (each open item's filing
+# its pages and filed.json (each open item's filing
 # day, kept 15 days, so an item filed and closed later still counts as filed) and
 # history.tsv (the tiles' numbers, sampled every 10 minutes and kept 8 days).
 #
@@ -469,6 +469,7 @@ QUEUE = {c: sum(len(bl(h, c)) for h in ACTIVE) for c in ('ready', 'held', 'waiti
 held_cap = sorted(((h, r) for h in ACTIVE for r in backlog.get(h) or []
                    if r.get('hold_kind') == 'captain' and r.get('state') != 'done'),
                   key=lambda x: (x[1]['day'] or TODAY, x[0]))
+held_all = sorted(((h, r) for h in ACTIVE for r in bl(h, 'held')), key=lambda x: (x[1]['day'] or TODAY, x[0]))
 titles = {(h, r['id']): r['title'] for h in home_dir for r in backlog.get(h) or []}
 could = {h: min(max(0, plan(h) - len(by_home[h])), len(bl(h, 'ready'))) if h not in lane_err else 0 for h in ACTIVE}
 
@@ -581,53 +582,49 @@ with open(os.path.join(STATE_DIR, '.cache.lock'), 'a') as cache_lock:
             with open(HIST + f'.tmp.{os.getpid()}', 'w') as f: f.write(''.join('\t'.join(map(str, r)) + '\n' for r in hist))
             os.replace(HIST + f'.tmp.{os.getpid()}', HIST)
         except OSError: pass  # the trend only misses this sample
-def day_ago(col): return next((r[col] for r in hist if abs(r[0] - (NOW_TS - 86400)) <= 1800 and r[col] >= 0), None)
+def day_ago(col):
+    r = min((r for r in hist if abs(r[0] - (NOW_TS - 86400)) <= 1800 and r[col] >= 0), key=lambda r: abs(r[0] - (NOW_TS - 86400)), default=None)
+    return r[col] if r else None
 
 # --- quota -------------------------------------------------------------
-def num(v): return v if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+def num(v): return v if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) else None
 def parse_ts(ts):
     try: return datetime.fromisoformat(ts.replace('Z', '+00:00')).astimezone()
     except (AttributeError, ValueError): return None
 def quota():
-    cache_p = os.path.join(STATE_DIR, '.quota.json')
-    c = load_json(cache_p)
-    at = c.get('at') if isinstance(c.get('at'), (int, float)) else None
     try:
-        if at is None or not 0 <= NOW_TS - at <= 300: raise ValueError('no recent local quota reading')
-        data = c.get('data')
-        if not isinstance(data, dict): raise ValueError('no local quota reading')
-        if data.get('schemaVersion') not in (5, 6): raise ValueError(f"unsupported quota-axi schema version: {data.get('schemaVersion')}")
+        data = json.load(open(os.path.expanduser('~/.cache/quota-axi/quotas.json'), encoding='utf-8'))
+        if not isinstance(data, dict) or data.get('schemaVersion') != 3: raise ValueError('unsupported quota-axi cache schema')
+        at = parse_ts(data.get('generatedAt'))
+        if at is None: raise ValueError('quota cache has no valid time')
         if not isinstance(data.get('providers'), list): raise ValueError('no providers')
-        return data, at
-    except (ValueError, AttributeError) as e:
+        return data, at.timestamp()
+    except (OSError, ValueError) as e:
         notes.append(('quota-axi', str(e) or 'unreadable')); return None, None
 qdata, q_at = quota()
-QNAME = {'claude': 'Claude', 'codex': 'Codex', 'opencode-go': 'OpenCode Go', 'zai': 'Z.ai', 'cursor': 'Cursor', 'copilot': 'Copilot',
-         'kimi': 'Kimi', 'deepseek': 'DeepSeek', 'grok': 'Grok', 'openrouter': 'OpenRouter', 'minimax': 'MiniMax', 'agy': 'Antigravity'}
-accounts = []  # dict(name, runout, status, limit, windows, problem, empty)
-providers = (qdata or {}).get('providers') or []
+accounts = []
 for p in (qdata or {}).get('providers') or []:
-    if not isinstance(p, dict) or p.get('notSetUp'): continue
-    st = p.get('state') or {}
-    av = next((a for a in ((p.get('quotaSemantics') or {}).get('effectiveAvailability') or []) if a.get('scope') == 'all_models'), {})
-    run = av.get('runway') or {}
+    if not isinstance(p, dict): continue
+    st = p.get('state') if isinstance(p.get('state'), dict) else {}
+    at = parse_ts(st.get('refreshedAt')) or datetime.fromtimestamp(q_at).astimezone()
     wins = []
-    for w in p.get('windows') or []:
-        rem, reserve = num(w.get('percentRemaining')), num((w.get('pace') or {}).get('reservePercentPoints'))
-        used = None if rem is None else 100 - rem
+    for w in p['windows'] if isinstance(p.get('windows'), list) else []:
+        if not isinstance(w, dict): continue
+        used, span, reset = num(w.get('percentUsed')), num(w.get('windowSeconds')), parse_ts(w.get('resetsAt'))
+        elapsed = span - (reset - at).total_seconds() if span and reset else None
+        valid = used is not None and 0 <= used <= 100 and span is not None and span > 0 and elapsed is not None and 0 < elapsed < span
+        try: out = at + timedelta(seconds=(100 - used) * elapsed / used) if valid and used else None
+        except OverflowError: out, valid = None, False
+        status = 'unknown' if not valid else 'exhausted_now' if used == 100 else 'projected_exhaustion' if out and out < reset else 'through_reset'
         wins.append(dict(id=w.get('id'), label=str(w.get('label') or w.get('id')), used=used,
-                         pace=None if used is None or reserve is None else max(0, min(100, used + reserve)),
-                         reset=parse_ts(w.get('resetsAt')) if w.get('resetsAt') else None))
-    name = QNAME.get(p.get('provider'), str(p.get('provider')).title())
-    if sum(isinstance(x, dict) and not x.get('notSetUp') and x.get('provider') == p.get('provider') for x in providers) > 1:
-        name += ' · ' + clean(p.get('accountKey') or 'account unknown')
-    problem = str(st.get('error') or st.get('status')).replace('_', ' ') if st.get('stale') or st.get('status') != 'fresh' else None
-    if run.get('status') not in ('through_reset', 'projected_exhaustion', 'exhausted_now') or (run.get('status') == 'projected_exhaustion' and parse_ts(run.get('projectedExhaustedAt')) is None): problem = problem or 'runway unknown'
-    accounts.append(dict(name=name, status=run.get('status'),
-                         runout=parse_ts(run.get('projectedExhaustedAt')) if run.get('projectedExhaustedAt') else None,
-                         limit=next((w for w in wins if w['id'] == run.get('limitingWindowId')), None), windows=wins,
-                         problem=problem, empty=not problem and run.get('status') == 'exhausted_now'))
-def runs_out(a): return a['status'] == 'projected_exhaustion' and a['runout'] and not a['problem'] and (not a['limit'] or not a['limit']['reset'] or a['runout'] < a['limit']['reset'])
+                         pace=100 * elapsed / span if valid else None, reset=reset, runout=out, status=status))
+    limit = min(wins, key=lambda w: (w['status'] != 'exhausted_now', w['status'] != 'projected_exhaustion', w['runout'] or at), default=None)
+    problem = str(st.get('status') or 'state unknown').replace('_', ' ') if st.get('status') not in ('fresh', 'stale') else None
+    if not wins or any(w['status'] == 'unknown' for w in wins): problem = problem or 'runway unknown'
+    accounts.append(dict(name=clean(p.get('label') or str(p.get('provider')).title()), status=limit['status'] if limit else 'unknown',
+                         runout=limit['runout'] if limit else None, limit=limit, windows=wins, read_at=at.timestamp(),
+                         problem=problem, empty=not problem and limit['status'] == 'exhausted_now'))
+def runs_out(a): return a['status'] == 'projected_exhaustion' and not a['problem']
 running_out = sorted((a for a in accounts if runs_out(a)), key=lambda a: a['runout'])
 
 # --- agents: the Herdr state the muxr app reads -------------------------
@@ -1080,6 +1077,7 @@ def trend(col):  # one point per hour over 7 days from the sampled history, brok
         d += f'{"L" if prev is not None and k - prev <= 2 else "M"}{k / 168 * 1000:.0f},{38 - pts[k] / top * 36:.1f}'; prev = k
     return f'<svg class="tsp" viewBox="0 0 1000 40" preserveAspectRatio="none" aria-hidden="true"><path class="ln" d="{d}" vector-effect="non-scaling-stroke"/></svg>' if 'L' in d else ''
 def tile(mid, label, value, foot, art='', tone=''):  # a tap opens the number's definition
+    if mid == 'quota' and q_at: foot += f' · as of {esc(when(q_at))}'
     return (f'<a class="tile{" t-" + tone if tone else ""}" href="measure#m-{mid}"><span class="tl">{label}</span>'
             f'<span class="tv">{value}</span>{art}<span class="ta">{foot}</span></a>')
 def tiles():
@@ -1132,13 +1130,14 @@ QREASONS = [('Ready, a lane is free', could, 'c-warn'), ('Ready, lanes full', {h
             ('Held for the captain', capt, 's-decision'), ('Held, other reason', {h: len(bl(h, 'held')) - capt[h] for h in ACTIVE}, 'c-mut'),
             ('Waiting on another item', {h: len(bl(h, 'waiting')) for h in ACTIVE}, 's-waiting')]
 if not LANES_KNOWN: QREASONS.append(('Ready, capacity unknown', {h: len(bl(h, 'ready')) if h in lane_err else 0 for h in ACTIVE}, 'c-mut'))  # why queued work waits; sums to the queue
+def held_reasons(rows): return ''.join(grow(esc(r['title']), esc(hname(h) + ': ' + prose(r.get('hold_reason') or 'no reason recorded'))) for h, r in rows)
 def queue_bars():
-    if QUEUE is None: return f'<p class="lede">{unknown(why_of("backlog"))}</p>'
-    rows = QREASONS
-    top = max(sum(v.values()) for _, v, _ in rows)
-    return (''.join(hbar(n, sum(v.values()), cls, '', ''.join(grow(esc(hname(h)), '', c) for h, c in sorted(v.items(), key=lambda x: (-x[1], x[0])) if c), top)
-                    for n, v, cls in rows)
-            + f'<div class="gtot"><span class="k">Queued</span><span class="sum">{" + ".join(str(sum(v.values())) for _, v, _ in rows)} = <b>{sum(QUEUE.values())}</b></span></div>')
+    if QUEUE is None: return f'<p class="lede">{unknown(why_of("backlog"))}</p>' + held_reasons(held_all)
+    top = max(sum(v.values()) for _, v, _ in QREASONS)
+    return (''.join(hbar(n, sum(v.values()), cls, '', ''.join(grow(esc(hname(h)), '', c) for h, c in sorted(v.items(), key=lambda x: (-x[1], x[0])) if c)
+                        + (held_reasons((h, r) for h, r in held_all if (r.get('hold_kind') == 'captain') == (n == 'Held for the captain')) if n.startswith('Held') else ''), top)
+                    for n, v, cls in QREASONS)
+            + f'<div class="gtot"><span class="k">Queued</span><span class="sum">{" + ".join(str(sum(v.values())) for _, v, _ in QREASONS)} = <b>{sum(QUEUE.values())}</b></span></div>')
 
 def nice_top(v):  # a round axis top at or above v
     m = 10 ** math.floor(math.log10(max(v, 1)))
@@ -1169,10 +1168,10 @@ def quota_bars():  # every account read: its tightest window, soonest runout fir
     for a in sorted(accounts, key=lambda a: (not runs_out(a), not a['empty'], a['problem'] is not None, a['runout'] or NOW, a['name'])):
         w = tight_window(a)
         used = w['used'] if w else None
-        used = None if a['problem'] else used
         tone = 'bad' if a['empty'] else 'warn' if runs_out(a) else 'mut' if used is None else 'ok'
         right = ('used up' if a['empty'] else f'out {when(a["runout"].timestamp())}' if runs_out(a) else 'unknown' if a['problem'] else
                  f'resets {when(w["reset"].timestamp())}' if w and w['reset'] else 'lasts')
+        right += f' · as of {when(a["read_at"])}'
         tick = f'<b style="left:{w["pace"]:.0f}%"></b>' if w and w['pace'] is not None and not a['empty'] else ''
         rows += (f'<div class="qb"><span class="qn">{esc(a["name"])}</span><span class="qt{" unk" if used is None and not a["empty"] else ""}">'
                  f'<i class="c-{tone}" style="width:{100 if a["empty"] and used is None else 0 if used is None else max(2, min(100, round(used)))}%"></i>{tick}</span>'
@@ -1183,7 +1182,7 @@ def index_body(group):
     n_asks = len(asks)
     h1 = 'Nothing needs you.' if asks_known and not asks else f'{plural(n_asks, "thing")} {"needs" if n_asks == 1 else "need"} you.' if asks_known else 'Ask list unknown.'
     tone = 'ok' if asks_known and not asks else 'warn' if asks_known else 'mut'
-    q_age = f'read <!--at:{int(q_at)}--> ago' if q_at else 'not read'
+    q_age = f'as of {esc(when(q_at))}' if q_at else 'not read'
     return f'''
 <div class="hero ov">
 <h1><span class="hd c-{tone}"></span>{h1}</h1>
@@ -1225,16 +1224,16 @@ def backlog_body(group):
         return item('', esc(r['title']), esc(hname(h)), esc(prose(r['hold_reason']) if r.get('hold_reason') not in (None, '-') else 'no reason recorded'),
                     tm=days_old(r['day']) if r['day'] else '?')
     if group == 'home':
-        hs = sorted({h for h, _ in held_cap}, key=lambda h: (-sum(x == h for x, _ in held_cap), h))
-        hgroups = [(hname(h), sum(x == h for x, _ in held_cap), ''.join(held_row(x, r) for x, r in held_cap if x == h), '', None, True) for h in hs]
+        hs = sorted({h for h, _ in held_all}, key=lambda h: (-sum(x == h for x, _ in held_all), h))
+        hgroups = [(hname(h), sum(x == h for x, _ in held_all), ''.join(held_row(x, r) for x, r in held_all if x == h), '', None, True) for h in hs]
     else:
         band = lambda r: 'Over 3 days' if r['day'] and (TODAY - r['day']).days > 3 else '1 to 3 days' if r['day'] and (TODAY - r['day']).days >= 1 else 'Today or unknown'
-        hgroups = [(b, sum(band(r) == b for _, r in held_cap), ''.join(held_row(h, r) for h, r in held_cap if band(r) == b), '', None, True)
-                   for b in ('Over 3 days', '1 to 3 days', 'Today or unknown') if any(band(r) == b for _, r in held_cap)]
-    held = (glist(hgroups, 'Held for the captain') if held_cap else '<p class="note">No item is held for the captain in any home record.</p>' if bl_known else '')
+        hgroups = [(b, sum(band(r) == b for _, r in held_all), ''.join(held_row(h, r) for h, r in held_all if band(r) == b), '', None, True)
+                   for b in ('Over 3 days', '1 to 3 days', 'Today or unknown') if any(band(r) == b for _, r in held_all)]
+    held = (glist(hgroups, 'Held queued items') if held_all else '<p class="note">No queued item is held in any home record.</p>' if bl_known else '')
     unread = [hname(h) for h in ACTIVE if backlog.get(h) is None]
-    held_h2 = (f'{plural(len(held_cap), "item")} held' + (f'; oldest {days_old(held_cap[0][1]["day"])}' if held_cap and held_cap[0][1]['day'] else '') + '. Main must triage them.'
-               if bl_known else f'At least {plural(len(held_cap), "item")} held; the backlog of {", ".join(unread)} is unknown.')
+    held_h2 = (f'{plural(len(held_all), "item")} held' + (f'; oldest {days_old(held_all[0][1]["day"])}' if held_all and held_all[0][1]['day'] else '') + '.'
+               if bl_known else f'At least {plural(len(held_all), "item")} held; the backlog of {", ".join(unread)} is unknown.')
     val = [l for l in live if l['state'] == 'validating']
     oldest_val = min(val, key=lambda l: l['since']) if val else None
     ltrows = ''.join(f'<tr><td>{esc(hname(h))}</td><td>{lane_value(len(by_home[h]), h)}</td><td>{plan(h)}</td><td>{len(bl(h, "ready")) if backlog.get(h) is not None else "–"}</td></tr>'
@@ -1263,7 +1262,7 @@ def backlog_body(group):
 </section>
 <div class="stack">
 <section id="held">
-{sh("Held for the captain · in home records, oldest first")}
+{sh("Held queued items · in home records, oldest first")}
 <h2>{held_h2}</h2>
 {held}
 </section>
@@ -1313,8 +1312,8 @@ METRICS = [  # each number's one definition: id, name, what it counts, source, w
      'now; compared with the sample nearest 24 hours ago', 'every build; sampled every 10 minutes, kept 8 days'),
     ('ready', 'Ready', 'queued items neither held nor waiting on another item', "each home's backlog",
      'now; compared with the sample nearest 24 hours ago', 'every build; sampled every 10 minutes, kept 8 days'),
-    ('quota', 'Quota runs out', "the soonest account projected to run out before its window resets; each bar is that account's tightest window, the mark is even pace",
-     'local quota cache only; unavailable runway is unknown', 'reading no older than 5 minutes', 'every build' + (f'; last read <!--at:{int(q_at)}--> ago' if q_at else '')),
+    ('quota', 'Quota runs out', "even pace per window: elapsed = windowSeconds minus time until resetsAt at the reading; exhaustion = reading time plus (100 − percentUsed) × elapsed / percentUsed. All three fields must be present, with positive elapsed time inside the window; otherwise runway is unknown. Zero use lasts through reset. Each mark is elapsed share of the window; projections are estimates",
+     'quota-axi cache ~/.cache/quota-axi/quotas.json, read-only; unavailable runway is unknown', 'as of each provider reading, retained when old', 'every build' + (f'; as of {when(q_at)}' if q_at else '')),
     ('leads', 'Lead state', 'what each lead home last published about itself; silent after 15 minutes without a new one',
      "each home's own summary, and Main's view of which leads are not running", 'now', 'every build'),
     ('machine', 'Machine and devices', 'free memory, memory pressure, heavy jobs, Gradle builds, emulators and who holds each device', 'this host and adb, read-only',
@@ -1413,7 +1412,7 @@ data = dict(build_time=NOW.isoformat(), cutoff=NOW_TS, metrics=metrics,
                 ready=reading(len(bl(h, 'ready')), 'ready', backlog.get(h) is not None, reason='backlog unavailable', read_at=backlog_read_at),
                 landed=reading(landed_on(TODAY, h), 'landed', lower=True, read_at=merges_read_at),
                 closed=reading(sum((closed[h] or {}).get(d, 0) for d in DAYS[7:]), 'closed', closed[h] is not None, reason='completion records unavailable', read_at=closed_read_at)) for h in ACTIVE],
-    held_items=[dict(home=h, title=r['title'], reason=prose(r.get('hold_reason')), filed=r['day']) for h, r in held_cap],
+    held_items=[dict(home=h, title=r['title'], reason=prose(r.get('hold_reason')), filed=r['day']) for h, r in held_all],
     recent_merges=[dict(home=h, title=done_title.get((h, task)) or titles.get((h, task)) or task, url=url, at=at)
                    for url, (at, h, task) in sorted(merges.items(), key=lambda x: -x[1][0])[:6]],
     quota_accounts=accounts, devices=[dict(zip(('name', 'where', 'detail', 'tone', 'holder'), r)) for r in dev_rows],

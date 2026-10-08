@@ -119,10 +119,10 @@ EOF
     "$((now - 172800))" "$((now - 60))" > "$home/state/fleet-ledger.jsonl"
   mkdir -p "$home/state/dashboard"
   printf '%s\t5\t4\t0\n' "$((now - 86400))" > "$home/state/dashboard/history.tsv"
-  # Quota: Codex runs out in 2 h, before its 5-hour window resets in 4 h; Claude has room.
-  printf '{"schemaVersion":6,"providers":[{"provider":"codex","state":{"status":"fresh"},"windows":[{"id":"5h","label":"5 hours","percentRemaining":20,"resetsAt":"%s"}],"quotaSemantics":{"effectiveAvailability":[{"scope":"all_models","runway":{"status":"projected_exhaustion","projectedExhaustedAt":"%s","limitingWindowId":"5h"}}]}},{"provider":"claude","state":{"status":"fresh"},"windows":[{"id":"7d","label":"7 days","percentRemaining":90,"resetsAt":"%s"}],"quotaSemantics":{"effectiveAvailability":[{"scope":"all_models","runway":{"status":"through_reset"}}]}}]}\n' \
-    "$(iso -4)" "$(iso -2.05)" "$(iso -72)" > "$home/quota.json"
-  jq --argjson at "$now" '{at:$at,data:.}' "$home/quota.json" > "$home/state/dashboard/.quota.json"
+  mkdir -p "$home/.cache/quota-axi"
+  printf '{"schemaVersion":3,"generatedAt":"%s","credentials":{"token":"quota-secret-sentinel"},"providers":[{"provider":"codex","state":{"status":"fresh"},"windows":[{"id":"12h","percentUsed":79,"windowSeconds":43200,"resetsAt":"%s"}]},{"provider":"claude","state":{"status":"fresh"},"windows":[{"id":"7d","percentUsed":10,"windowSeconds":604800,"resetsAt":"%s"}]}]}\n' \
+    "$(iso 0)" "$(iso -4)" "$(iso -72)" > "$home/quota.json"
+  cp "$home/quota.json" "$home/.cache/quota-axi/quotas.json"
   printf '#!/bin/sh\necho called > "%s/quota.called"\nexit 1\n' "$home" > "$stubs/quota-axi"
   # Agents: a busy lead, a busy Main, one busy and one idle worker, one busy unknown agent, and a parked-home worker.
   cat > "$home/herdr.json" <<EOF
@@ -154,7 +154,7 @@ EOF
 build() {  # <home> [env...]: build with the fixture's stubs first on PATH
   local home=$1 out
   shift
-  out=$(env PATH="$home/stubs:$PATH" FM_HOME="$home" FM_DEVICE_LOCK_DIR="$home/locks" FM_DASHBOARD_PROC="$home/proc" "$@" "$DASH" build 2>&1) || fail "build failed: $out"
+  out=$(env PATH="$home/stubs:$PATH" FM_HOME="$home" HOME="$home" FM_DEVICE_LOCK_DIR="$home/locks" FM_DASHBOARD_PROC="$home/proc" "$@" "$DASH" build 2>&1) || fail "build failed: $out"
   [ "$out" = "$home/state/dashboard/index.html" ] || fail "build did not print the page path: $out"
 }
 
@@ -162,7 +162,9 @@ test_overview_answers_the_four_questions_with_sums_that_add_up() {
   local home d now
   home=$(make_home overview)
   d="$home/state/dashboard"
+  printf '%s\t100\t99\t98\n%s\t5\t4\t0\n' "$(( $(date +%s) - 88100 ))" "$(( $(date +%s) - 86400 ))" > "$d/history.tsv"
   build "$home"
+  jq -e '([.. | strings] | index("quota-secret-sentinel") == null) and (.quota_accounts[0].windows[0] | .status == "projected_exhaustion" and .pace > 66 and .pace < 67)'  "$d/data.json" >/dev/null || fail "even-pace runway was not derived from cache windows"
   for p in index backlog backlog.home measure; do
     [ -s "$d/$p.html" ] || fail "no $p page"
     ! grep -Eq '<script|https?://[^"]*\.(css|js)"' "$d/$p.html" || fail "$p is not self-contained"
@@ -170,7 +172,7 @@ test_overview_answers_the_four_questions_with_sums_that_add_up() {
   # Chips name each spot with a number and an age; tiles compare with yesterday and the sample a day ago.
   has "$d/index.html" "Nothing needs you. ✕ 2 stuck 2 h ▲ 1 to land 30 min ▲ 1 held for triage 7 d ▲ 1 idle with ready work today" \
     "Landed today at least 2" "Closed 7 d 2 +2" "Lanes open 8 of 9 +3 3 building · 1 free" "Stuck 2 -2 1 blocked · oldest 2 h" \
-    "Quota runs out 2 h" "Codex before its reset" "Codex out" "Claude resets"
+    "Quota runs out 2 h" "Codex before its reset" "Codex out" "Claude resets" "Ready 2 +2"
   # Each lane is in one state and each queued item has one reason, summing to their totals.
   has "$d/index.html" "Blocked 1 2 h" "On a decision 1 1 h" "Finished, not landed 1 30 min" "Validating or CI 1 20 min" \
     "Waiting on other 1 40 min" "Building 3 10 min" "Queued 1 + 1 + 1 + 0 + 1 = 4" \
@@ -230,13 +232,13 @@ test_each_failed_source_shows_unknown_and_why() {
   has "$d/backlog.html" "Queued work unknown." "main: tasks-axi: backlog unreadable" "At least 0 items held; the backlog of Main, zephyrine is unknown." "Agents unknown."
   has "$d/measure.html" "backlog main: tasks-axi: backlog unreadable"
   lacks "$d/backlog.html" "Queued 0" "No item is held" "0 busy"
-  jq '.at -= 600' "$d/.quota.json" > "$home/q.json" && mv "$home/q.json" "$d/.quota.json"
+  jq --arg at "$(iso 1)" '.generatedAt=$at | .providers[].state.stale=true' "$home/.cache/quota-axi/quotas.json" > "$home/q.json" && mv "$home/q.json" "$home/.cache/quota-axi/quotas.json"
   build "$home"
-  has "$d/index.html" "Quota runs out unknown"
-  has "$d/measure.html" "quota-axi no recent local quota reading"
+  has "$d/index.html" "Codex out" "as of"
+  lacks "$d/index.html" "Quota runs out unknown"
   [ ! -e "$home/quota.called" ] || fail "page build collected quota"
   jq -e '.since == null and .last == null' "$d/filed.json" >/dev/null || fail "failed backlog read advanced filing coverage"
-  rm "$d/.quota.json" "$home/mates/zephyrine/state/home-summary.json"
+  rm "$home/.cache/quota-axi/quotas.json" "$home/mates/zephyrine/state/home-summary.json"
   build "$home"
   has "$d/index.html" "Quota runs out unknown" "▲ 1 lead to check" "zephyrine State unknown"
   has "$d/measure.html" "home summary zephyrine: No such file or directory"
@@ -340,7 +342,7 @@ trap '[ -z "$SERVE_PID" ] || kill "$SERVE_PID" 2>/dev/null; fm_test_cleanup' EXI
 test_serve_answers_each_page_and_remembers_the_grouping() {
   local home url got
   home=$(make_home served)
-  PATH="$home/stubs:$PATH" FM_HOME="$home" FM_DEVICE_LOCK_DIR="$home/locks" "$DASH" serve --port 0 > "$home/serve.out" 2> "$home/serve.err" &
+  PATH="$home/stubs:$PATH" FM_HOME="$home" HOME="$home" FM_DEVICE_LOCK_DIR="$home/locks" "$DASH" serve --port 0 > "$home/serve.out" 2> "$home/serve.err" &
   SERVE_PID=$!
   for _ in $(seq 1 100); do
     url=$(sed -n 's/^serving //p' "$home/serve.out")
@@ -384,7 +386,7 @@ print('group', code, 'fm_group=home' in cookie, '7 + 1 = <b>8</b>' in body)
 code, body, _ = get(base + 'backlog', 'fm_group=home')
 print('cookie', code, '7 + 1 = <b>8</b>' in body)
 code, body, _ = get(base + 'measure')
-print('ages', '<!--' not in body, re.search(r'last read \d+\u00a0s ago', body) is not None)
+print('ages', '<!--' not in body, re.search(r'as of \d\d:\d\d', body) is not None)
 for path in ('flow', 'state/', 'index.home.html', '../data/backlog.md', 'data/backlog.md'):
     print(path, get(base + path)[0])
 PY
@@ -457,13 +459,11 @@ PY
     lacks "$d/$p.html" "config/release.json" "[key=checks]"
   done
   has "$d/measure.html" "always at least: recording can be disabled" "always at least: items filed and closed between readings"
-  jq '.providers = [{provider:"cursor",state:{status:"fresh"},quotaSemantics:{status:"unknown"}},{provider:"copilot",state:{status:"auth_required"}}]' "$home/quota.json" |
-    jq --argjson at "$now" '{at:$at,data:.}' > "$d/.quota.json"
+  jq '.providers = [{provider:"cursor",state:{status:"fresh"},windows:[{percentUsed:80,resetsAt:"2030-01-01T00:00:00Z"}]},{provider:"copilot",state:{status:"auth_required"}}]' "$home/quota.json" > "$home/.cache/quota-axi/quotas.json"
   build "$home"
   has "$d/index.html" "Quota runs out unknown" "Cursor unknown" "Copilot unknown"
   lacks "$d/index.html" "Quota runs out none" "lasts"
-  jq '.providers = [.providers[0] + {accountKey:"work"}, .providers[0] + {accountKey:"personal",quotaSemantics:{effectiveAvailability:[{scope:"all_models",runway:{status:"through_reset"}}]}}]' "$home/quota.json" |
-    jq --argjson at "$now" '{at:$at,data:.}' > "$d/.quota.json"
+  jq '.providers = [.providers[0] + {label:"Codex · work"}, (.providers[0] + {label:"Codex · personal"} | .windows[0].percentUsed=10)]' "$home/quota.json" > "$home/.cache/quota-axi/quotas.json"
   build "$home"
   has "$d/index.html" "Codex · work before its reset" "Codex · work out" "Codex · personal resets"
   summary "$home" no_active_work "$now" '"endpoints":[]'
@@ -488,6 +488,12 @@ PY
   build "$home"
   has "$d/index.html" "Closed 7 d unknown" "Out: unknown"
   [ ! -e "$home/quota.called" ] || fail "page build collected quota"
+  rm "$home/.tasks.toml"
+  : > "$home/data/secondmates.md"
+  printf '\n## Queued\n- [ ] vendor - Vendor access (since %s) (hold: waiting for vendor credentials) (hold-kind: external)\n' "$today" >> "$home/data/backlog.md"
+  build "$home"
+  for p in index backlog backlog.home; do has "$d/$p.html" "waiting for vendor credentials"; done
+  jq -e 'any(.held_items[]; .reason == "waiting for vendor credentials")' "$d/data.json" >/dev/null || fail "external hold reason absent from export"
   pass "dashboard preserves lower bounds, route ownership, configured archives, runway uncertainty and wait reasons"
 }
 
@@ -580,13 +586,13 @@ test_unavailable_readings_and_concurrent_caches() {
   build "$home"
   has "$d/index.html" "All flowing"
   has "$d/measure.html" "Every source was read."
-  jq '.data.providers = [{provider:"cursor",state:{status:"fresh"},quotaSemantics:{status:"unknown"}}]' "$d/.quota.json" > "$home/q.json"
-  mv "$home/q.json" "$d/.quota.json"
+  jq '.providers = [{provider:"cursor",state:{status:"fresh"}}]' "$home/.cache/quota-axi/quotas.json" > "$home/q.json"
+  mv "$home/q.json" "$home/.cache/quota-axi/quotas.json"
   build "$home"
   lacks "$d/index.html" "All flowing"
   lacks "$d/measure.html" "Every source was read."
   jq -e 'any(.sources_unknown[]; .source == "quota-axi account" and (.reason | contains("Cursor: runway unknown")))' "$d/data.json" >/dev/null || fail "missing account runway source"
-  jq --argjson at "$(date +%s)" '{at:$at,data:.}' "$home/quota.json" > "$d/.quota.json"
+  cp "$home/quota.json" "$home/.cache/quota-axi/quotas.json"
   rm "$home/proc/meminfo" "$home/proc/pressure/memory" "$home/proc/locks"
   printf '#!/bin/sh\necho unavailable >&2\nexit 2\n' | tee "$home/stubs/adb" "$home/stubs/pgrep" > "$home/stubs/systemctl"
   build "$home"
@@ -618,7 +624,7 @@ import fcntl, json, os, pathlib, subprocess, sys, time
 home, dash = pathlib.Path(sys.argv[1]), sys.argv[2]
 state = home / 'state/dashboard'
 original = (state / 'history.tsv').read_text()
-env = dict(os.environ, PATH=str(home / 'stubs') + ':' + os.environ['PATH'], FM_HOME=str(home), FM_DEVICE_LOCK_DIR=str(home / 'locks'), FM_DASHBOARD_PROC=str(home / 'proc'))
+env = dict(os.environ, PATH=str(home / 'stubs') + ':' + os.environ['PATH'], FM_HOME=str(home), HOME=str(home), FM_DEVICE_LOCK_DIR=str(home / 'locks'), FM_DASHBOARD_PROC=str(home / 'proc'))
 processes = []
 with (state / '.cache.lock').open('a') as lock:
     fcntl.flock(lock, fcntl.LOCK_EX)
