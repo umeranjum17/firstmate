@@ -15,6 +15,7 @@ FM_PUSH_TRANSITION_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$FM_PUSH_TRANSITION_LIB_DIR/fm-backend.sh"
 # shellcheck source=bin/fm-transition-lib.sh
 . "$FM_PUSH_TRANSITION_LIB_DIR/fm-transition-lib.sh"
+# shellcheck source=bin/fm-wait-native-lib.sh
 . "$FM_PUSH_TRANSITION_LIB_DIR/fm-wait-native-lib.sh"
 
 TRIAGE_LOG="$STATE/.watch-triage.log"
@@ -26,6 +27,7 @@ task_captain_call_open() {
   local task=$1
   CAPTAIN_CALL_IDENTITY=
   [ -n "$task" ] || return 1
+  # shellcheck disable=SC2034 # Read by captain_call_stale_bound() in fm-watch.sh.
   CAPTAIN_CALL_IDENTITY=$(FM_HOME="$FM_HOME" "$FM_PUSH_TRANSITION_LIB_DIR/fm-captain-hold.sh" \
     open "$task" --identity 2>/dev/null) || return 1
   return 0

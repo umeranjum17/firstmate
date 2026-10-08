@@ -40,7 +40,7 @@ cycle() {
     FM_WAIT_ALERT_SECS=2 FM_WAIT_ESCALATE_SECS=4 \
     bash "$ROOT/bin/fm-watch.sh" > "$world/out" 2> "$world/err" &
   watch_pid=$!
-  for unused in 1 2 3 4 5 6 7 8; do
+  for _unused in 1 2 3 4 5 6 7 8; do
     kill -0 "$watch_pid" 2>/dev/null || break
     sleep 1
   done
@@ -70,7 +70,7 @@ bash "$ROOT/bin/fm-captain-hold.sh" hold held-lane --reason test
 bash "$ROOT/bin/fm-captain-hold.sh" open held-lane --identity > "$world/hold-identity"
 [ -s "$world/hold-identity" ] || exit 1
 : > "$world/events"
-for round in 1 2 3; do cycle; done
+for _round in 1 2 3; do cycle; done
 ! grep -E 'waiting-state|^stale:|stopped|possible wedge' "$world/events" || { echo 'held item alarmed'; exit 1; }
 [ ! -e "$world/state/.waiting-timers/held-lane" ] || exit 1
 ! grep -q 'waiting-timer-overdue' "$world/parent/state/lead.status" || exit 1
@@ -88,7 +88,7 @@ for verb in blocked needs-decision; do
   FM_POLL=1 FM_SIGNAL_GRACE=1 FM_WAIT_ALERT_SECS=300 FM_WAIT_ESCALATE_SECS=900 \
     bash "$ROOT/bin/fm-watch.sh" > "$world/out" 2> "$world/err" &
   watch_pid=$!
-  for unused in $(seq 1 40); do
+  for _unused in $(seq 1 40); do
     [ ! -f "$world/state/.waiting-timers/ladder" ] || break
     kill -0 "$watch_pid" || { cat "$world/err"; exit 1; }
     sleep 0.1
@@ -97,17 +97,17 @@ for verb in blocked needs-decision; do
   kill "$watch_pid"
   wait "$watch_pid" || :
   watch_pid=''
-  IFS=$'\t' read -r sig since owner parent key < "$world/state/.waiting-timers/ladder"
+  IFS=$'\t' read -r sig since owner _parent key < "$world/state/.waiting-timers/ladder"
   [ "$owner" = 0 ] || { echo 'priming woke owner'; exit 1; }
   printf '%s\t%s\t0\t0\t%s\n' "$sig" "$((since - 900))" "$key" > "$world/state/.waiting-timers/ladder"
   cycle
   grep -q "waiting-state ladder ($verb" "$world/events" || exit 1
   [ ! -s "$world/parent/state/lead.status" ] || { echo 'Main alerted before owner response interval'; exit 1; }
-  IFS=$'\t' read -r sig since owner parent key < "$world/state/.waiting-timers/ladder"
+  IFS=$'\t' read -r sig since owner _parent key < "$world/state/.waiting-timers/ladder"
   [ "$owner" -gt 1 ] || { echo 'owner delivery not recorded'; exit 1; }
   # A queued status-change wake may close the next watcher before its poll.
   # Drain that real event, then require the timer on a subsequent bounded run.
-  for unused in 1 2 3; do
+  for _unused in 1 2 3; do
     cycle
     [ ! -s "$world/parent/state/lead.status" ] || break
   done

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Real watcher/drain/parent-channel journey; only the terminal API is a fixture.
 set -eu
+# shellcheck source=tests/wake-helpers.sh
 . "$(dirname "${BASH_SOURCE[0]}")/wake-helpers.sh"
 TMP_ROOT=$(fm_test_tmproot fm-wait-timers)
 WATCH="$ROOT/bin/fm-watch.sh"
@@ -39,13 +40,13 @@ for verb in blocked needs-decision; do
   printf '%s [at=%s] [key=wait]: external condition until 2099-01-01T00:00Z\n' "$verb" "$(date +%s)" > "$dir/state/lane.status"
   cycle
   if [ "$verb" = blocked ]; then
-    IFS=$'\t' read -r sig since owner parent key < "$dir/state/.waiting-timers/lane"
+    IFS=$'\t' read -r sig since owner _parent key < "$dir/state/.waiting-timers/lane"
     printf '%s\t%s\t0\t0\t%s\n' "$sig" "$((since - 900))" "$key" > "$dir/state/.waiting-timers/lane"
   fi
   cycle
   if [ "$verb" = blocked ]; then
     [ ! -s "$channel" ] || fail 'restart escalated before owner response interval'
-    IFS=$'\t' read -r sig since owner parent key < "$dir/state/.waiting-timers/lane"
+    IFS=$'\t' read -r sig since owner _parent key < "$dir/state/.waiting-timers/lane"
     [ "$owner" -gt 1 ] || fail 'owner delivery timestamp missing'
   fi
   grep -q 'check: waiting-state lane .*level=owner' "$dir/events" || fail "$verb did not alert its owner"
