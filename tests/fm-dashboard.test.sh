@@ -254,8 +254,12 @@ test_devices_and_machine_come_from_read_only_probes() {
   proc="$home/proc" locks="$home/locks" bin="$home/stubs"
   mkdir -p "$proc/pressure" "$proc/900" "$proc/800" "$locks" "$home/projects/wt"
   fm_write_meta "$home/state/m-build.meta" "kind=ship" "worktree=$home/projects/wt" "herdr_pane_id=pane-m-build"
-  printf 'MemTotal:       67108864 kB\nMemAvailable:   10485760 kB\n' > "$proc/meminfo"
+  printf 'MemTotal:       67108864 kB\nMemAvailable:   10485760 kB\nSwapTotal:      33554432 kB\nSwapFree:       29360128 kB\n' > "$proc/meminfo"
   printf 'some avg10=3.50 avg60=8.00 avg300=12.00 total=1\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n' > "$proc/pressure/memory"
+  # The watcher's recorded samples: only the last hour counts toward the peak.
+  printf '%s\t1\t1\t88.00\tALERT\n%s\t1\t1\t41.20\tALERT\n%s\t1\t1\t6.00\tOK\n' \
+    "$(( $(date +%s) - 7200 ))" "$(( $(date +%s) - 600 ))" "$(date +%s)" > "$home/state/host-memory.tsv"
+  printf '%s\tnope-mem\tpressure at or above 20%%\n' "$(( $(date +%s) - 120 ))" > "$home/state/admission-refused"
   printf 'Name:\tqemu-system-x86\nVmRSS:\t 4194304 kB\n' > "$proc/900/status"
   printf '900 (qemu-system-x86) S 800 900 1\n' > "$proc/900/stat"
   printf '800 (flock) S 1 800 1\n' > "$proc/800/stat"
@@ -292,7 +296,9 @@ EOF
     "Phone Pixel 9 Free · last used by Main 10 min ago · PHONE1 · USB" \
     "Emulator test-avd In use by Main · 10 min · emulator-5554 · 4.0 GB in use" \
     "Free memory 10.0 GB of 64 GB" "Memory pressure 4% share of the last 10 s" "Heavy jobs 8.0 GB of 32 GB" "hard limit 38 GB" \
-    "Gradle builds 2 of 2" "Emulators 1 of 2" "✕ 10 GB free, heavy jobs wait" "▲ 2/2 Gradle builds at cap"
+    "Gradle builds 2 of 2" "Emulators 1 of 2" "✕ 10 GB free, heavy jobs wait" "▲ 2/2 Gradle builds at cap" \
+    "Pressure peak, last hour 41%" "Swap used 4.0 GB" "new agents wait (Main)" "nope-mem"
+  lacks "$d/index.html" "Pressure peak, last hour 88%"
   [ "$(sort -u "$home/adb.calls")" = "devices -l" ] || fail "adb was asked more than the device list: $(cat "$home/adb.calls")"
   jq -e '.metrics.devices.value == 2 and .metrics.connected_devices.value == 2 and .metrics.device_groups.value.action == {"In use":1,"Free":1} and .metrics.device_groups.value.home == {"Main":1,"No holder":1}' "$d/data.json" >/dev/null || fail "device groups differ from the page"
   printf 'List of devices attached\nPHONE1 device model:Pixel_9\nOFFLINE offline model:Pixel_8\n' > "$home/adb-output"
@@ -677,8 +683,16 @@ test_incomplete_lanes_and_moved_filings() {
   for p in backlog backlog.home; do has "$d/$p.html" "Oldest validation or CI wait: at least"; done
   has "$d/backlog.home.html" "missing unknown"
   jq -e '.metrics.lanes.status == "lower_bound" and .metrics.stuck.status == "lower_bound" and .metrics.free_lanes.status == "unknown" and ([.homes[] | select(.home == "missing")][0].lanes.value == null)' "$d/data.json" >/dev/null || fail "missing lane coverage looks exact"
+  printf '%s\tlocal-pressure-task\tlocal pressure refusal\n' "$now" > "$z/state/admission-refused"
+  build "$home"
+  has "$d/index.html" "new agents wait (zephyrine)" "local-pressure-task"
+  printf '%s\tmain-pressure-task\tmain pressure refusal\n' "$now" > "$home/state/admission-refused"
   printf -- '- zephyrine - remote (host: distant; root: /srv; home: %s; scope: work; projects: alpha; added 2026-07-11)\n' "$z" > "$home/data/secondmates.md"
   build "$home"
+  has "$d/index.html" "new agents wait (Main)" "main-pressure-task"
+  for p in index backlog backlog.home measure; do
+    lacks "$d/$p.html" "new agents wait (zephyrine)" "local-pressure-task" "local pressure refusal"
+  done
   has "$d/index.html" "Lanes open at least 7" "unknown of 3"
   jq -e '[.homes[] | select(.home == "zephyrine")][0] | .lanes.status == "unknown" and .free_lanes.value == null' "$d/data.json" >/dev/null || fail "remote lane capacity was inferred"
   : > "$home/data/secondmates.md"

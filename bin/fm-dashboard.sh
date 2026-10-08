@@ -740,6 +740,14 @@ def machine():
     t, err = read('pressure/memory')
     p = re.search(r'^some avg10=([0-9.]+)', t or '', re.M)
     m['pressure'], m['pressure_why'] = (float(p.group(1)) if p else None), err or 'no "some avg10" line'
+    m['swap'] = gb(int(kv['SwapTotal']) - int(kv['SwapFree'])) if 'SwapTotal' in kv and 'SwapFree' in kv else None
+    # Use the independent sampler's history (bin/fm-host-memory-sampler.sh), not the dashboard's refresh cadence.
+    try:
+        rows = [l.split('\t') for l in open(os.path.join(HOME, 'state/host-memory.tsv'), errors='replace')]
+        m['peak'] = max((float(r[3]) for r in rows if len(r) >= 5 and float(r[0]) >= NOW_TS - 3600), default=None)
+        m['peak_why'] = 'no sample in the last hour'
+    except (OSError, ValueError) as e:
+        m['peak'], m['peak_why'] = None, getattr(e, 'strerror', None) or str(e)
     out, err = probe(['systemctl', '--user', 'show', 'fm-heavy.slice', '-p', 'MemoryCurrent', '-p', 'MemoryHigh', '-p', 'MemoryMax'])
     kv = dict(l.split('=', 1) for l in (out or '').splitlines() if '=' in l)
     def size(v): return int(v) / 2**30 if (v or '').isdigit() else None
@@ -1001,6 +1009,11 @@ free, psi, (hc_, hh_, hm_) = mach['free'], mach['pressure'], mach['heavy']
 def psi_tone(v): return 'bad' if v >= 40 else 'warn' if v >= 20 else 'ok'
 gate_wait = (free is not None and free[0] < MEM_MIN_GB) or (psi is not None and psi >= 40)
 at_cap = [x for x, full in (('emulators', (emu_count or 0) >= EMU_MAX), ('Gradle builds', (mach['gradle'] or 0) >= GRADLE_MAX)) if full]
+for h in ACTIVE:  # fm-spawn.sh and fm-control.sh relaunch record why the host memory guard turned a new agent away
+    if h in remote_hosts: continue
+    try: at, task, why = open(os.path.join(home_dir[h], 'state/admission-refused'), errors='replace').read().rstrip('\n').split('\t', 2)
+    except (OSError, ValueError): continue
+    if NOW_TS - float(at) < 900: spot('bad', 'Memory', f'new agents wait ({hname(h)})', task, dur(NOW_TS - float(at)), '#devices', why)
 low = free is not None and free[0] < MEM_MIN_GB
 if gate_wait: spot('bad', 'Memory', 'free, heavy jobs wait' if low else 'memory pressure, heavy jobs wait', f'{free[0]:.0f} GB' if low else f'{psi:.0f}%', 'now', '#devices', 'the next heavy job queues')
 for x, n, cap in (('emulators', emu_count, EMU_MAX), ('Gradle builds', mach['gradle'], GRADLE_MAX)):
@@ -1014,6 +1027,11 @@ machine_rows = ''.join([
     if free else meter('Free memory', unknown(mach['free_why']), None, ''),
     meter('Memory pressure', f'{psi:.0f}%', psi / 100, psi_tone(psi), 'share of the last 10 s some job waited on memory; heavy jobs wait at 40% or more')
     if psi is not None else meter('Memory pressure', unknown(mach['pressure_why']), None, ''),
+    meter('Pressure peak, last hour', f'{mach["peak"]:.0f}%', mach['peak'] / 100, psi_tone(mach['peak']),
+          'highest 10 s share the watcher recorded; config/host-memory sets when new agents wait and when an alert goes out')
+    if mach['peak'] is not None else meter('Pressure peak, last hour', unknown(mach['peak_why']), None, ''),
+    meter('Swap used', f'{mach["swap"]:.1f} GB', None, 'warn' if mach['swap'] >= 8 else 'ok', 'memory the kernel pushed to disk')
+    if mach['swap'] is not None else meter('Swap used', unknown('no SwapTotal in meminfo'), None, ''),
     meter('Heavy jobs', f'{hc_:.1f} GB <small>of {hh_:.0f} GB</small>' if hh_ else f'{hc_:.1f} GB', hc_ / hh_ if hh_ else None,
           'warn' if hh_ and hc_ >= 0.9 * hh_ else 'ok', 'shared group for builds and emulators' + (f'; hard limit {hm_:.0f} GB' if hm_ else ''))
     if hc_ is not None else meter('Heavy jobs', unknown(mach['heavy_why']), None, ''),
