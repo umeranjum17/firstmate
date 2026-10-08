@@ -16,7 +16,7 @@
 # beyond FM_PAUSE_RESURFACE_SECS cannot extend the ordinary recheck cadence, and
 # while an away record (state/.afk-contract, never quiet mode's) exists an
 # item held for the captain is never rechecked at all, in either posture.
-# observe_window_progress owns the independent activity proof.
+# fm-watch-progress-lib.sh owns the independent activity proof.
 # While state/.afk exists, the daemon owns triage and this watcher queues and exits
 # on every wake. Printed reason lines:
 #   signal: <file>...      status/turn-end signals, surfaced when a listed status
@@ -246,6 +246,8 @@ WATCH_HOME_EXISTED=0
 . "$SCRIPT_DIR/fm-pending-reply-lib.sh"
 # shellcheck source=bin/fm-busy-lib.sh
 . "$SCRIPT_DIR/fm-busy-lib.sh"
+# shellcheck source=bin/fm-watch-progress-lib.sh
+. "$SCRIPT_DIR/fm-watch-progress-lib.sh"
 # shellcheck source=bin/fm-composer-lib.sh
 . "$SCRIPT_DIR/fm-composer-lib.sh"
 # Steering-inbox loss detection: bin/fm-task-inbox-lib.sh owns the record,
@@ -1714,29 +1716,6 @@ wedge_timer_check() {  # <window> <since-file> <triage-label> <escalation-count-
       fi
       ;;
   esac
-}
-
-# Observe native activity, execution status and turn events independently of
-# screen churn. Declared waits stay with their existing wait/escalation owner.
-observe_window_progress() {  # <window-key> <task> <last-status>
-  local key=$1 task=$2 f moved=1 identity observed="$STATE/.activity-observed-$1"
-  identity="$task:$(fm_busy_current_gen "$STATE" "$task" 2>/dev/null || true)"
-  if [ "$(cat "$observed" 2>/dev/null || true)" != "$identity" ]; then
-    rm -f "$STATE/.activity-$key"
-    printf '%s' "$identity" > "$observed"
-    return
-  fi
-  for f in "$STATE/$task.status" "$STATE/$task.turn-ended" "$STATE/$task.busy-state" "$STATE/$task.progress"; do
-    if [ "$f" = "$STATE/$task.status" ] && status_is_paused_or_captain_held "$3"; then continue; fi
-    [ ! "$f" -nt "$observed" ] || moved=0
-  done
-  touch "$observed"
-  [ "$moved" -ne 0 ] || touch "$STATE/.activity-$key"
-}
-
-task_validation_active() {  # <task>
-  [ -n "$1" ] || return 1
-  "$FM_CREW_STATE_BIN" "$1" 2>/dev/null | grep -q '^state: working · source: run-step ·'
 }
 
 # busy_turn_over_age: 0 iff the last completed turn or explicit native-harness
@@ -3422,30 +3401,7 @@ EOF
     # content cannot suppress stale detection. Read once per window per poll and
     # reused below so a busy verdict is consistent within one cycle.
     if window_is_busy "$w" "$tail40"; then busy_now=0; else busy_now=1; fi
-    if { [ "$h" = "$prev" ] && [ "$(cat "$cf" 2>/dev/null || echo 0)" -ge 1 ]; } \
-      || { [ "$busy_now" -eq 0 ] && busy_turn_over_age "$task" "$key"; }; then
-      if [ "$(age_of "$STATE/$task.progress")" -lt "$STALE_ESCALATE_SECS" ] \
-        || [ "$(age_of "$STATE/.activity-$key")" -lt "$STALE_ESCALATE_SECS" ]; then
-        clear_stale_hash_tracking "$key"
-        triage_log "absorbed stale (recent worker progress): $w"
-        continue
-      fi
-      # Bound the external read even while an active step stays on one screen.
-      # The shared wedge timer rechecks the same proof when its bound is due.
-      if afk_present && [ "$busy_now" -ne 0 ] && { [ "$(cat "$sf" 2>/dev/null || true)" != "$h" ] \
-        || [ "$(age_of "$ssf")" -ge "$STALE_ESCALATE_SECS" ]; }; then
-        if task_validation_active "$task"; then
-          printf '%s' "$h" > "$sf"
-          date +%s > "$ssf"
-          rm -f "$ewf"
-          clear_write_tracking "$key"
-          triage_log "absorbed stale (active validation step): $w"
-          continue
-        elif [ -e "$ssf" ] && afk_present; then
-          rm -f "$sf" "$ssf"
-        fi
-      fi
-    fi
+    if window_progress_absorbed "$w" "$task" "$key" "$h" "$prev" "$busy_now"; then continue; fi
     if [ "$busy_now" -ne 0 ] && [ "$kind" != secondmate ] && [ -n "$task" ]; then
       declared_wait_contradiction "$w" "$task" "$key"
     fi
