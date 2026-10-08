@@ -90,17 +90,20 @@ fm_memory_sampler_tick() {
     *) action="automatic interrupt attempted: task $task" ;;
   esac
   epoch=$(date +%s)
+  fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || return 0
   trap 'stop=1' HUP INT TERM
-  if printf '%s\t%s\t%s\n' "$epoch" "$task" "$reason; $action" >> "$STATE/host-memory-interrupts.tsv" \
-    && printf '%s\n' "$reason; $action" > "$latch"; then
+  if { fm_wake_queued_keys_locked check | grep -Fx host-memory >/dev/null 2>&1 \
+      || fm_wake_append_locked check host-memory "$reason; $action"; } \
+    && printf '%s\t%s\t%s\n' "$epoch" "$task" "$reason; $action" >> "$STATE/host-memory-interrupts.tsv" \
+    && printf '%s\n' "$reason; $action" > "$latch.$$" \
+    && mv "$latch.$$" "$latch"; then
     case "$task" in
       ''|*[!A-Za-z0-9._-]*) ;;
       *) (trap - EXIT HUP INT TERM; fm_memory_sampler_interrupt "$task") </dev/null & ;;
     esac
-    if ! fm_wake_queued_keys check | grep -Fx host-memory >/dev/null 2>&1; then
-      fm_wake_append check host-memory "$reason; $action"
-    fi
   fi
+  rm -f "$latch.$$"
+  fm_lock_release "$FM_WAKE_QUEUE_LOCK"
   trap 'exit 0' HUP INT TERM
   [ "$stop" -eq 0 ] || exit 0
 }

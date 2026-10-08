@@ -536,8 +536,41 @@ PY
   pass "parallel admission publications and clearing are independent"
 }
 
+test_failed_alert_publication() {
+  local case attempt
+  local -a tick
+  case=$(make_case alert-publication-failure)
+  make_fleet "$case"
+  prepare_control_task "$case"
+  fake_host "$case/proc" 5 41
+  tick=(env PATH="$case/fakebin:$PATH" FM_HOME="$case" FM_STATE_OVERRIDE="$case/state"
+    STATE="$case/state" CONFIG="$case/config" SAMPLER_DIR="$ROOT/bin" FM_BACKEND=tmux
+    FM_HOST_MEMORY_PROC="$case/proc" bash -c '
+      . "$1/bin/fm-wake-lib.sh"
+      . "$1/bin/fm-backend.sh"
+      . "$1/bin/fm-host-memory-sampler.sh"
+      fm_memory_sampler_tick
+      wait
+    ' _ "$ROOT")
+  mkdir "$case/state/.wake-queue.seq"
+  for attempt in 1 2; do
+    "${tick[@]}" 2> "$case/tick.err" || fail "failed publication stopped sampling"
+    [ ! -e "$case/state/.host-memory-alerted" ] || fail "failed wake publication latched the episode"
+    [ ! -e "$case/keys" ] || fail "failed wake publication dispatched an interrupt"
+  done
+  rmdir "$case/state/.wake-queue.seq"
+  "${tick[@]}" || fail "recovered publication stopped sampling"
+  [ -s "$case/state/.host-memory-alerted" ] || fail "successful publication did not latch the episode"
+  [ "$(grep -c $'\tcheck\thost-memory\t' "$case/state/.wake-queue")" -eq 1 ] || fail "recovery did not publish exactly one wake"
+  [ "$(wc -l < "$case/keys")" -eq 1 ] || fail "recovery did not dispatch exactly one interrupt"
+  drain_and_ack "$case"
+  "${tick[@]}" || fail "latched sampling failed"
+  [ "$(wc -l < "$case/keys")" -eq 1 ] || fail "restart repeated the recovered interrupt"
+  pass "failed alert publication retries across restart without premature or repeated interrupts"
+}
+
 test_shutdown_during_alert_publication() {
-  local case real_date sampler identity i=0
+  local case real_mv sampler identity i=0
   case=$(make_case alert-stop)
   make_fleet "$case"
   prepare_control_task "$case"
@@ -549,20 +582,20 @@ while [ ! -e "$FM_HOME/check-release" ]; do sleep 0.1; done
 SH
   chmod 700 "$case/state/slow.check.sh"
   FM_HOME="$case" FM_STATE_OVERRIDE="$case/state" "$ROOT/bin/fm-check-register.sh" slow >/dev/null
+  real_mv=$(command -v mv)
+  cat > "$case/fakebin/mv" <<SH
+#!/usr/bin/env bash
+"$real_mv" "\$@" || exit \$?
+if [ "\${2:-}" = "\$FM_HOME/state/.host-memory-alerted" ] && mkdir "\$FM_HOME/term-sent" 2>/dev/null; then
+  IFS=\$'\t' read -r pid identity < "\$FM_HOME/state/.host-memory-sampler.pid"
+  kill -TERM "\$pid"
+fi
+SH
+  chmod +x "$case/fakebin/mv"
   watch_leg "$case" stop
   while [ ! -e "$case/check-entered" ] && [ "$i" -lt 100 ]; do sleep 0.1; i=$((i + 1)); done
   [ -e "$case/check-entered" ] || fail "the watcher did not enter its blocking check"
   IFS=$'\t' read -r sampler identity < "$case/state/.host-memory-sampler.pid"
-  real_date=$(command -v date)
-  cat > "$case/fakebin/date" <<SH
-#!/usr/bin/env bash
-if [ -e "\$FM_HOME/state/.host-memory-alerted" ] && mkdir "\$FM_HOME/term-sent" 2>/dev/null; then
-  IFS=\$'\t' read -r pid identity < "\$FM_HOME/state/.host-memory-sampler.pid"
-  kill -TERM "\$pid"
-fi
-exec "$real_date" "\$@"
-SH
-  chmod +x "$case/fakebin/date"
   fake_host "$case/proc" 5 41
   wait_interrupt "$case/state"
   [ -d "$case/term-sent" ] || fail "termination was not injected during alert publication"
@@ -616,5 +649,6 @@ test_benign_liveness_outcomes
 test_default_home_interrupt
 test_independent_sampler_lifecycle
 test_atomic_admission_publication
+test_failed_alert_publication
 test_shutdown_during_alert_publication
 test_default_supervision_poll
