@@ -76,13 +76,6 @@ test_verdicts_samples_and_owners() {
   pass "verdicts, recorded samples, and owner mapping follow the host"
 }
 
-# wait_rows <tsv> <n>: wait up to 30 s for the watcher to have recorded n samples.
-wait_rows() {
-  local i=0
-  while [ "$(wc -l < "$1" 2>/dev/null || echo 0)" -lt "$2" ] && [ "$i" -lt 300 ]; do sleep 0.1; i=$((i + 1)); done
-  [ "$(wc -l < "$1")" -ge "$2" ] || fail "the watcher did not record sample $2: $(cat "$1" "${1%/state/*}"/watch-*.out)"
-}
-
 test_cgroup_pressure() {
   local case=$TMP_ROOT/cgroup out rc group=user.slice/user-123.slice/user@123.service/app.slice/herdr-server.service
   fake_host "$case/proc" 40 2
@@ -136,6 +129,38 @@ test_home_qualified_owners() {
   out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --state-dir "$case" "$case/state" --state-dir "$case/mate" "$case/mate/state" --owned-top-task "$case/state")
   assert_equals sm1 "${out##*$'\t'}" "a lead is controlled only through its parent-owned task record"
   pass "task ownership stays home-qualified through grouping and control selection"
+}
+
+test_homes_without_ordinary_tasks() {
+  local case=$TMP_ROOT/home-fallback mode out
+  mkdir -p "$case/mate/state"
+  fake_host "$case/proc" 5 41
+  fake_pid "$case/proc" 101 pi 9 "$case"
+  fake_pid "$case/proc" 102 claude 9 "$case"
+  fake_pid "$case/proc" 103 pi 10 "$case/mate"
+  fake_pid "$case/proc" 104 claude 10 "$case/mate"
+  fake_pid "$case/proc" 105 java 15 "$TMP_ROOT/unowned-a"
+  fake_pid "$case/proc" 106 node 14 "$TMP_ROOT/unowned-b"
+  for mode in missing empty secondmate remote; do
+    case "$mode" in
+      empty) mkdir -p "$case/state" ;;
+      secondmate) fm_write_meta "$case/state/sm1.meta" kind=secondmate "home=$case/mate" ;;
+      remote) fm_write_meta "$case/state/sm1.meta" kind=secondmate remote_host=other "home=$case/mate" ;;
+    esac
+    out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --state-dir "$case" "$case/state" --state-dir "$case/mate" "$case/mate/state" --owned-top-task "$case/state")
+    assert_contains "$out" 'lead main 18.0 GB in 2 processes' "$mode home aggregates supervisors into the top three"
+    if [ "$mode" = secondmate ]; then
+      assert_equals sm1 "${out##*$'\t'}" "secondmate-only state retains parent-owned control"
+      out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --state-dir "$case/mate" "$case/mate/state" --state-dir "$case" "$case/state" --owned-top-task "$case/mate/state")
+      assert_contains "$out" 'largest: lead sm1 20.0 GB in 2 processes, lead main 18.0 GB in 2 processes' "empty child state preserves the parent owner"
+      assert_equals '' "${out##*$'\t'}" "child fallback cannot authorize parent-owned control"
+      out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --state-dir "$case" "$case/state" --state-dir "$case/mate" "$case/mate/state" --owned-top-task "$case/state")
+      assert_equals sm1 "${out##*$'\t'}" "parent ownership is independent of argument order"
+    else
+      assert_equals '' "${out##*$'\t'}" "$mode fallback does not authorize task control"
+    fi
+  done
+  pass "explicit homes aggregate without ordinary tasks and preserve parent ownership"
 }
 
 test_remote_records_do_not_own_local_processes() {
@@ -228,6 +253,7 @@ PY
 test_verdicts_samples_and_owners
 test_cgroup_pressure
 test_home_qualified_owners
+test_homes_without_ordinary_tasks
 test_remote_records_do_not_own_local_processes
 test_finite_thresholds
 test_atomic_admission_publication

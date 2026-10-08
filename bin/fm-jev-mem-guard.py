@@ -189,7 +189,8 @@ def owners(state_dirs):
         tasks.setdefault(tid, []).append(owner)
         if m.get("worktree"):
             paths.append((os.path.realpath(m["worktree"]), owner))
-        paths.append((homes[os.path.realpath(d)], (os.path.realpath(d), "", f"lead {home}")))
+    for d, home in homes.items():
+        paths.append((home, (d, "", f"lead {lead_of.get(home, 'main')}")))
     paths.sort(key=lambda p: -len(p[0]))
     return paths, tasks, homes
 
