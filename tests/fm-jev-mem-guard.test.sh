@@ -545,13 +545,13 @@ test_failed_alert_publication() {
   fake_host "$case/proc" 5 41
   tick=(env PATH="$case/fakebin:$PATH" FM_HOME="$case" FM_STATE_OVERRIDE="$case/state"
     STATE="$case/state" CONFIG="$case/config" SAMPLER_DIR="$ROOT/bin" FM_BACKEND=tmux
-    FM_HOST_MEMORY_PROC="$case/proc" bash -c '
-      . "$1/bin/fm-wake-lib.sh"
-      . "$1/bin/fm-backend.sh"
-      . "$1/bin/fm-host-memory-sampler.sh"
+    FM_HOST_MEMORY_PROC="$case/proc" bash -c "
+      . \"\$1/bin/fm-wake-lib.sh\"
+      . \"\$1/bin/fm-backend.sh\"
+      . \"\$1/bin/fm-host-memory-sampler.sh\"
       fm_memory_sampler_tick
       wait
-    ' _ "$ROOT")
+    " _ "$ROOT")
   mkdir "$case/state/.wake-queue.seq"
   for attempt in 1 2; do
     "${tick[@]}" 2> "$case/tick.err" || fail "failed publication stopped sampling"
