@@ -454,13 +454,15 @@ test_board_json_feeds_the_app() {
   lane "$home" m-ci ship "blocked [at=$((now - 1200))]: CI failed: approve config/release.json https://github.com/acme/alpha/pull/9"
   lane "$home" m-paused ship "paused [at=$((now - 200))] [key=nm-run-test]: waiting for vendor credentials"
   lane "$home" m-gitlab ship "working [at=$((now - 900))] [key=nm-run-ci]: checks running" "done [at=$((now - 300))]: PR https://gitlab.example/team/nested/app/-/merge_requests/27 checks green"
-  fm_write_meta "$home/state/m-canonical.meta" "kind=ship" "project=alpha" "pr=https://gitlab.example/team/app/-/merge_requests/28"
+  fm_write_meta "$home/state/m-canonical.meta" "kind=ship" "project=alpha" "pr=https://review.example/c/team/app/+/28"
   printf 'working [at=%s] [key=nm-run-ci]: checks running\n' "$now" > "$home/state/m-canonical.status"
+  lane "$home" m-gerrit ship "done [at=$((now - 200))]: PR https://review.example/c/team/nested/app/+/27 published for review"
   printf '{"ts":%s,"event":"task.dispatched","task":"m-opus","harness":"claude"}\n{"ts":%s,"event":"task.dispatched","task":"m-fix","model":"gpt-5.5","harness":"codex"}\n{"ts":%s,"event":"task.merged","task":"m-fix","pr":"https://github.com/acme/alpha/pull/12"}\n' \
-    "$((now - 3600))" "$((now - 10800))" "$((now - 60))" >> "$home/state/fleet-ledger.jsonl"
+    "$((now - 3600))" "$((now - 10800))" "$((now - 600))" >> "$home/state/fleet-ledger.jsonl"
   printf -- '- [x] m-fix - Fix the login PR https://github.com/acme/alpha/pull/12 (repo: alpha) (kind: ship) (merged %s)\n' "$today" >> "$home/data/done-archive.md"
   printf 'first\t%s\tApprove the release\thttps://example.invalid/release\n' "$((now - 7200))" > "$home/data/captain-asks.tsv"
-  lane "$home" m-fix ship "done [at=$((now - 90))]: PR https://github.com/acme/alpha/pull/12 checks green"
+  fm_write_meta "$home/state/m-fix.meta" "kind=ship" "project=alpha" "pr=https://github.com/acme/alpha/pull/12"
+  printf 'working [at=%s] [key=nm-run-ci]: checks running\n' "$now" > "$home/state/m-fix.status"
   build "$home"
   jq -e --argjson now "$now" '
     def c($id): .cards[] | select(.id == $id);
@@ -474,8 +476,9 @@ test_board_json_feeds_the_app() {
     and (c("main/m-ci") | .stage == "ci" and .wait == "blocked" and .wait_since == $now - 1200)
     and (c("main/m-paused") | .stage == "test" and .wait == "waiting")
     and (c("main/m-gitlab") | .stage == "merge" and .since == $now - 300 and .pr == "https://gitlab.example/team/nested/app/-/merge_requests/27")
-    and (c("main/m-canonical") | .pr == "https://gitlab.example/team/app/-/merge_requests/28")
-    and (c("main/m-fix@https://github.com/acme/alpha/pull/12") | .stage == "landed" and .title == "Fix the login" and .pr == "https://github.com/acme/alpha/pull/12")
+    and (c("main/m-canonical") | .pr == "https://review.example/c/team/app/+/28")
+    and (c("main/m-gerrit") | .pr == "https://review.example/c/team/nested/app/+/27" and .stage == "review")
+    and (c("main/m-fix@https://github.com/acme/alpha/pull/12") | .stage == "landed" and .title == "Fix the login" and .pr == "https://github.com/acme/alpha/pull/12" and .started == $now - 10800 and .model == "gpt")
     and ([.cards[] | select(.stage == "queued") | .id] == ["main/m-ready","zephyrine/z-ready"])
     and .parked == ["beta"] and ([.cards[] | select(.home == "beta")] == [])
     and all(.cards[]; .id != "main/m-fix") and .cycle_p50 == null
@@ -487,10 +490,11 @@ test_board_json_feeds_the_app() {
   for i in 1 2 3 4; do
     printf '{"ts":%s,"event":"task.dispatched","task":"m-cycle%s","model":"gpt-5.5"}\n{"ts":%s,"event":"task.merged","task":"m-cycle%s","pr":"https://github.com/acme/alpha/pull/%s"}\n' "$((now - 60 - i * 1000))" "$i" "$((now - 60))" "$i" "$((20 + i))" >> "$home/state/fleet-ledger.jsonl"
   done
-  printf '{"ts":%s,"event":"task.merged","task":"m-fix","pr":"https://github.com/acme/alpha/pull/13"}\n' "$((now - 30))" >> "$home/state/fleet-ledger.jsonl"
-  lane "$home" m-fix ship "working [at=$now] [key=nm-renew-review]: PR https://github.com/acme/alpha/pull/99"
+  printf '{"ts":%s,"event":"task.cleaned_up","task":"m-fix"}\n{"ts":%s,"event":"task.dispatched","task":"m-fix","model":"qwen","harness":"pi"}\n{"ts":%s,"event":"task.merged","task":"m-fix","pr":"https://github.com/acme/alpha/pull/13"}\n{"ts":%s,"event":"task.dispatched","task":"m-fix","model":"opus","harness":"claude"}\n{"ts":%s,"event":"task.dispatched","task":"m-ready","model":"qwen"}\n' "$((now - 500))" "$((now - 130))" "$((now - 30))" "$((now - 10))" "$((now - 20))" >> "$home/state/fleet-ledger.jsonl"
+  fm_write_meta "$home/state/m-fix.meta" "kind=ship" "project=alpha"
+  printf 'working [at=%s] [key=nm-renew-review]: PR https://github.com/acme/alpha/pull/99\n' "$now" > "$home/state/m-fix.status"
   build "$home"
-  jq -e '.cycle_p50 == 3000 and any(.homes[]; .id == "zephyrine" and .known == false and .ready == null) and any(.cards[]; .home == "zephyrine" and .stage == "landed" and .model == null and .started == null) and ([.cards[].id] | length == (unique | length)) and ([.cards[] | select(.task == "m-fix" and .stage == "landed")] | length == 2) and any(.cards[]; .id == "main/m-fix" and .stage == "review")' "$d/board.json" >/dev/null || fail "remote dispatch or renewed card identity was misrepresented"
+  jq -e --argjson now "$now" '.cycle_p50 == 2000 and any(.cards[]; .task == "m-ready" and .stage == "queued" and .model == null and .started == null) and any(.cards[]; .pr == "https://github.com/acme/alpha/pull/13" and .model == "qwen" and .tool == "pi" and .started == $now - 130) and any(.homes[]; .id == "zephyrine" and .known == false and .ready == null) and any(.cards[]; .home == "zephyrine" and .stage == "landed" and .model == null and .started == null) and ([.cards[].id] | length == (unique | length)) and ([.cards[] | select(.task == "m-fix" and .stage == "landed")] | length == 2) and any(.cards[]; .id == "main/m-fix" and .stage == "review" and .started == $now - 10 and .model == "opus")' "$d/board.json" >/dev/null || fail "remote dispatch or renewed card identity was misrepresented"
   cp -R "$ROOT/bin/fm-dashboard" "$home/ui"
   printf '{"type":"module"}\n' > "$home/ui/package.json"
   node --input-type=module - "$home/ui" <<'JS' || fail "dashboard UI behavior regressed"
@@ -499,7 +503,7 @@ const root = process.argv[2], ui = await import(`${root}/ui.js`), board = await 
 const d = { homes: [{ id: 'main', known: true, ready: 0 }, { id: 'remote', known: false, ready: null }], cards: [] }
 assert.equal(ui.total(d, 0), '≥0'); assert.equal(ui.total(d, 0, 'queued'), '≥0'); assert.equal(ui.total(d, 0, 'landed'), '≥0')
 assert.equal(ui.total(d, 2, 'active', 'main'), 2)
-assert.equal(ui.prNum('https://gitlab.example/team/nested/app/-/merge_requests/27'), '27'); assert.equal(ui.prNum('https://github.com/team/app/pull/28'), '28')
+assert.equal(ui.prNum('https://gitlab.example/team/nested/app/-/merge_requests/27'), '27'); assert.equal(ui.prNum('https://github.com/team/app/pull/28'), '28'); assert.equal(ui.prNum('https://review.example/c/team/app/+/27'), '27')
 const note = text => ({ verb: 'Waiting', stage: 'review', text, at: 1 })
 const prefix = 'Waiting for approval of the production deployment configuration in '
 assert.equal(board.squash([note(prefix + 'production'), note(prefix + 'staging')]).length, 2)

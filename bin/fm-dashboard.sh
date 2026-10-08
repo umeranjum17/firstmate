@@ -1473,12 +1473,13 @@ STAGES = [('queued', 'Queued'), ('building', 'Building'), ('review', 'Review'), 
 RANK = {s: i for i, (s, _) in enumerate(STAGES)}
 STEP = {'intent': 'review', 'rebase': 'review', 'review': 'review', 'test': 'test', 'document': 'test',
         'lint': 'test', 'push': 'ci', 'pr': 'ci', 'ci': 'ci'}
-PR_URL = re.compile(r'https://(?:github\.com/[\w.-]+/[\w.-]+/pull|[\w.-]+/[\w./-]+/-/merge_requests)/[1-9]\d*')
+PR_URL = re.compile(r'https://(?:github\.com/[\w.-]+/[\w.-]+/pull|[\w.-]+/[\w./-]+/-/merge_requests|[\w.-]+/c/[\w./-]+/\+)/[1-9]\d*')
 def line_stage(verb, key, text):
     s = re.search(r'^nm-.*?-(' + '|'.join(STEP) + r')(?:-fix\d+)?$', key or '')
     if s: return STEP[s.group(1)]
-    if verb == 'done': return 'merge' if PR_URL.search(text) else 'review'  # a first done hands the build to validation
-    if PR_URL.search(text): return 'ci'
+    pr = PR_URL.search(text)
+    if verb == 'done': return 'merge' if pr and '/+/' not in pr.group() else 'review'
+    if pr: return 'review' if '/+/' in pr.group() else 'ci'
     if re.search(r'no-mistakes|pipeline', text, re.I): return 'test' if re.search(r'\btest (step|gate)', text, re.I) else 'review'
     return None
 def family(model, harness):  # the model family a lane runs on, else its tool
@@ -1498,15 +1499,17 @@ for h in ACTIVE:
                 try: e = json.loads(l)
                 except ValueError: continue
                 if not isinstance(e, dict) or not isinstance(e.get('ts'), int): continue
-                if e.get('event') == 'task.dispatched' and isinstance(e.get('task'), str): disp.setdefault((h, e['task']), e)
+                if e.get('event') == 'task.dispatched' and isinstance(e.get('task'), str): disp.setdefault((h, e['task']), []).append(e)
     except OSError: pass  # a home without the ledger has no dispatch history
+def dispatch(h, task, at=float('inf')):
+    return max((e for e in reversed(disp.get((h, task), [])) if e['ts'] <= at), key=lambda e: e['ts'], default={})
 VERBS = {'working': 'Working', 'resolved': 'Cleared', 'paused': 'Waiting', 'blocked': 'Blocked', 'needs-decision': 'Needs a decision',
          'done': 'Finished', 'failed': 'Failed', 'captain-held': 'Held by the captain'}
 WAIT_OF = {'blocked': 'blocked', 'decision': 'decision', 'waiting': 'waiting'}
 WAIT_VERBS = {'blocked': ('blocked', 'failed'), 'decision': ('needs-decision', 'captain-held', 'paused', 'blocked'), 'waiting': ('paused',)}
 WAIT_VERBS['parked'] = WAIT_VERBS['decision']
 def card(h, task, kind, title, stage, **kw):
-    d = disp.get((h, task)) or {}
+    d = {} if stage == 'queued' else dispatch(h, task, kw['since']) if stage == 'landed' else dispatch(h, task)
     fid, fname = family(kw.pop('model', None) or d.get('model'), kw.get('tool') or d.get('harness'))
     return dict(dict(id=f'{h}/{task}', home=h, task=task, kind=kind, title=title, stage=stage, wait=None, wait_since=None, reached={},
                      state=stage, since=None, started=d.get('ts'), pr=None, why='', model=fid if d or kw.get('tool') else None,
@@ -1514,7 +1517,6 @@ def card(h, task, kind, title, stage, **kw):
 cards = []
 for l in live:
     h, task, meta = l['home'], l['task'], l['meta']
-    if l['pr'] in merges and merges[l['pr']][1:] == (h, task): continue
     try: ls = [x.strip() for x in open(os.path.join(home_dir[h], 'state', task + '.status'), errors='replace') if x.strip()]
     except OSError: ls = []
     stage, entered, rows, at, reached, verbs, pr = 'building', None, [], None, {}, [], None
@@ -1538,12 +1540,14 @@ for l in live:
     for verb, a in reversed(verbs):  # the current wait began with the trailing run of lines that say it
         if verb not in WAIT_VERBS.get(wait, ()): break
         wait_since = a or wait_since
-    d = disp.get((h, task)) or {}
+    d = dispatch(h, task)
     pr = PR_URL.fullmatch(meta.get('pr', '')) or pr
+    pr = pr.group() if pr else None
+    if pr in merges and merges[pr][1:] == (h, task): continue
     started = d.get('ts') or (rows[0]['at'] if rows else None) or l['since']
     cards.append(card(h, task, meta.get('kind'), titles.get((h, task)) or task.replace('-', ' '), stage, model=meta.get('model'), tool=meta.get('harness') or d.get('harness'),
                       wait=wait, wait_since=(wait_since or l['since']) if wait else None, reached=reached, state=l['state'], since=entered or started,
-                      started=started, pr=pr.group() if pr else None, why=prose(l['text'])[:240], effort=meta.get('effort'), history=rows[-40:]))
+                      started=started, pr=pr, why=prose(l['text'])[:240], effort=meta.get('effort'), history=rows[-40:]))
 # a merge line's title ends in its PR number, which the card shows as its own link
 def landed_title(h, task): return re.sub(r'\s+PR \d+$', '', done_title.get((h, task)) or titles.get((h, task)) or task.replace('-', ' '))
 for url, (at, h, task) in merges.items():
@@ -1554,7 +1558,7 @@ for h in ACTIVE:
         if any(c['home'] == h and c['task'] == r['id'] and c['stage'] != 'landed' for c in cards): continue
         cards.append(card(h, r['id'], r.get('kind') or 'ship', r['title'], 'queued', since=midnight(r['day']) if r['day'] else None))
 # Cycle time: dispatch to merge, for each merged task whose dispatch is in a ledger.
-cycles = sorted(at - disp[(h, task)]['ts'] for at, h, task in merges.values() if (h, task) in disp and at >= disp[(h, task)]['ts'])
+cycles = sorted(at - d['ts'] for at, h, task in merges.values() if (d := dispatch(h, task, at)))
 board = dict(
     schema='fm-dashboard-board.v1', generated=int(NOW_TS), stages=[dict(id=s, name=n) for s, n in STAGES],
     homes=[dict(id=h, name=hname(h), plan=plan(h), open=sum(c['home'] == h and c['stage'] not in ('queued', 'landed') for c in cards), ready=len(bl(h, 'ready')) if backlog.get(h) is not None else None,
