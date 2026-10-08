@@ -113,7 +113,7 @@ function Palette({ d, go, close, toggleTheme }) {
   const groups = [
     ['Go to', [['board', 'Board'], ['needs', 'Needs you'], ['ship', 'Ship']].map(([v, n]) => ({ n, k: `G ${n[0]}`, run: () => go({ view: v, card: null }) }))],
     ['Actions', [
-      { n: 'Show stuck lanes', run: () => go({ view: 'board', state: ['blocked', 'decision'], card: null }) },
+      { n: 'Show stuck lanes', run: () => go({ view: 'board', tab: 'active', state: ['blocked', 'decision'], card: null }) },
       { n: 'Group rows by home', k: '⇧G', run: () => go({ view: 'board', rows: 'home' }) },
       { n: 'Clear filters', run: () => go({ home: [], model: [], state: [] }) },
       { n: 'Light or dark theme', k: 'T', run: toggleTheme }]],
@@ -222,7 +222,7 @@ function App() {
       <header class="hd"><h1>${title}</h1>
         ${r.view === 'board' ? html`${TABS.map(([t, n]) => html`<button class="tab" aria-pressed=${r.tab === t} onClick=${() => go({ tab: t })}>${n}${count(t) != null ? html`<small class="num">${count(t)}</small>` : ''}</button>`)}
           <span class="sp"></span>
-          <div class="kpi num"><a href="#/needs">Needs you <b>${asks ?? '?'}</b></a><button class=${stk.length ? 'bad' : ''} onClick=${() => go({ state: ['blocked', 'decision'] })}>Stuck <b>${total(d, stk.length)}</b></button>
+          <div class="kpi num"><a href="#/needs">Needs you <b>${asks ?? '?'}</b></a><button class=${stk.length ? 'bad' : ''} onClick=${() => go({ tab: 'active', state: ['blocked', 'decision'], card: null })}>Stuck <b>${total(d, stk.length)}</b></button>
             <button onClick=${() => go({ tab: 'landed' })}>Landed today <b>${today}</b></button><span title="Typical time from start to landed">Cycle p50 <b>${d.cycle_p50 == null ? '–' : dur(d.cycle_p50)}</b></span></div>
           <${Filters} d=${d} r=${r} go=${go} label="Filter"/>
           ${r.tab === 'active' || r.tab === 'all' ? html`<${Pop} label="Display" icon=${IC.display}><div class="pop-h">Rows</div>

@@ -531,7 +531,8 @@ def when(ts):  # 14:05 today, Thu 08:05 this week, else 07 Oct 14:05
 DAYS = [TODAY - timedelta(days=i) for i in range(13, -1, -1)]  # 14 local days, today last
 
 # Landed: each pull request the fleet recorded as merged, once, by the home that merged it.
-MERGED = re.compile(r'^done \[key=merged-([^\]]+)\] \[at=(\d+)\]: merged \1 (https://\S+/pull/\d+)')
+PR_URL = re.compile(r'https://(?:github\.com/[\w.-]+/[\w.-]+/pull|[\w.-]+/[\w./-]+/-/merge_requests|[\w.-]+/c/[\w./-]+/\+)/[1-9]\d*')
+MERGED = re.compile(r'^done \[key=merged-([^\]]+)\] \[at=(\d+)\]: merged \1 (' + PR_URL.pattern + r')(?=\s|$)')
 merges = {}  # PR URL -> (epoch, home, task)
 def merged(url, at, h, task):
     if url not in merges or at < merges[url][0]: merges[url] = (at, h, task)
@@ -550,7 +551,7 @@ try:
             try: e = json.loads(l)
             except ValueError: continue
             if not isinstance(e, dict) or not isinstance(e.get('ts'), int): continue
-            if e.get('event') == 'task.merged' and re.fullmatch(r'https://\S+/pull/\d+', str(e.get('pr'))): merged(e['pr'], e['ts'], 'main', str(e.get('task')))
+            if e.get('event') == 'task.merged' and PR_URL.fullmatch(str(e.get('pr'))): merged(e['pr'], e['ts'], 'main', str(e.get('task')))
 except OSError as e: notes.append(('merge records', f"Main: {e.strerror}, so Main's own merges are not counted"))
 def landed_on(d, h=None):
     lo, hi = midnight(d), midnight(d + timedelta(days=1))
@@ -1473,7 +1474,6 @@ STAGES = [('queued', 'Queued'), ('building', 'Building'), ('review', 'Review'), 
 RANK = {s: i for i, (s, _) in enumerate(STAGES)}
 STEP = {'intent': 'review', 'rebase': 'review', 'review': 'review', 'test': 'test', 'document': 'test',
         'lint': 'test', 'push': 'ci', 'pr': 'ci', 'ci': 'ci'}
-PR_URL = re.compile(r'https://(?:github\.com/[\w.-]+/[\w.-]+/pull|[\w.-]+/[\w./-]+/-/merge_requests|[\w.-]+/c/[\w./-]+/\+)/[1-9]\d*')
 def line_stage(verb, key, text):
     s = re.search(r'^nm-.*?-(' + '|'.join(STEP) + r')(?:-fix\d+)?$', key or '')
     if s: return STEP[s.group(1)]

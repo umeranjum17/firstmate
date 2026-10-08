@@ -485,6 +485,8 @@ test_board_json_feeds_the_app() {
     and ([.asks[] | [.id, .text, .url]] == [["first","Approve the release","https://example.invalid/release"]])
     and .landed[-1] == 3' "$d/board.json" >/dev/null ||
     fail "board.json does not carry each lane's stage, wait, model, reason and the day's landings: $(jq -c '{cards: [.cards[] | {id, stage, wait, why, model, title}], asks, landed, cycle_p50}' "$d/board.json")"
+  printf '{"ts":%s,"event":"task.merged","task":"m-gitlab","pr":"https://gitlab.example/team/nested/app/-/merge_requests/27"}\n{"ts":%s,"event":"task.merged","task":"m-gerrit","pr":"https://review.example/c/team/nested/app/+/27"}\n' "$((now - 60))" "$((now - 60))" >> "$home/state/fleet-ledger.jsonl"
+  printf 'done [key=merged-z-lab] [at=%s]: merged z-lab https://gitlab.example/team/app/-/merge_requests/50\ndone [key=merged-z-review] [at=%s]: merged z-review https://review.example/c/team/app/+/51\n' "$((now - 60))" "$((now - 60))" >> "$home/state/zephyrine.status"
   printf -- '- zephyrine - remote (host: distant; root: /srv; home: %s; scope: work; projects: alpha; added 2026-07-11)\n' "$home/mates/zephyrine" > "$home/data/secondmates.md"
   printf '{"ts":%s,"event":"task.dispatched","task":"z-shipped","model":"gpt-5.5"}\n' "$((now - 5000))" >> "$home/mates/zephyrine/state/fleet-ledger.jsonl"
   for i in 1 2 3 4; do
@@ -494,7 +496,10 @@ test_board_json_feeds_the_app() {
   fm_write_meta "$home/state/m-fix.meta" "kind=ship" "project=alpha"
   printf 'working [at=%s] [key=nm-renew-review]: PR https://github.com/acme/alpha/pull/99\n' "$now" > "$home/state/m-fix.status"
   build "$home"
-  jq -e --argjson now "$now" '.cycle_p50 == 2000 and any(.cards[]; .task == "m-ready" and .stage == "queued" and .model == null and .started == null) and any(.cards[]; .pr == "https://github.com/acme/alpha/pull/13" and .model == "qwen" and .tool == "pi" and .started == $now - 130) and any(.homes[]; .id == "zephyrine" and .known == false and .ready == null) and any(.cards[]; .home == "zephyrine" and .stage == "landed" and .model == null and .started == null) and ([.cards[].id] | length == (unique | length)) and ([.cards[] | select(.task == "m-fix" and .stage == "landed")] | length == 2) and any(.cards[]; .id == "main/m-fix" and .stage == "review" and .started == $now - 10 and .model == "opus")' "$d/board.json" >/dev/null || fail "remote dispatch or renewed card identity was misrepresented"
+  jq -e --argjson now "$now" '.cycle_p50 == 2000 and .landed[-1] == 12 and ([.cards[] | select(.task == "m-gitlab" or .task == "m-gerrit" or .task == "z-lab" or .task == "z-review") | .stage] == ["landed","landed","landed","landed"]) and any(.cards[]; .task == "m-ready" and .stage == "queued" and .model == null and .started == null) and any(.cards[]; .pr == "https://github.com/acme/alpha/pull/13" and .model == "qwen" and .tool == "pi" and .started == $now - 130) and any(.homes[]; .id == "zephyrine" and .known == false and .ready == null) and any(.cards[]; .home == "zephyrine" and .stage == "landed" and .model == null and .started == null) and ([.cards[].id] | length == (unique | length)) and ([.cards[] | select(.task == "m-fix" and .stage == "landed")] | length == 2) and any(.cards[]; .id == "main/m-fix" and .stage == "review" and .started == $now - 10 and .model == "opus")' "$d/board.json" >/dev/null || fail "remote dispatch or renewed card identity was misrepresented"
+  rm "$home/state/m-gitlab.meta" "$home/state/m-gerrit.meta"
+  build "$home"
+  jq -e '.landed[-1] == 12 and ([.cards[] | select(.task == "m-gitlab" or .task == "m-gerrit")] | length == 2)' "$d/board.json" >/dev/null || fail "cleanup lost forge landings"
   cp -R "$ROOT/bin/fm-dashboard" "$home/ui"
   printf '{"type":"module"}\n' > "$home/ui/package.json"
   node --input-type=module - "$home/ui" <<'JS' || fail "dashboard UI behavior regressed"
