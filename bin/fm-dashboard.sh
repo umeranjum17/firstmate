@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # fm-dashboard.sh - build the read-only fleet dashboard pages for this home.
 #
+# Each build also writes state/dashboard/data.json; GET/HEAD /data.json serves it.
 # Builds three self-contained HTML pages (inline CSS and SVG, no script, no network
 # reference), phone first, each answering one question set:
 #   index    Overview: Main's ask list only, then attention chips, six number tiles with
@@ -64,7 +65,7 @@
 #   fm-dashboard.sh serve [--bind ADDR] [--port N]
 # build (the default) writes $FM_HOME/state/dashboard/*.html and prints the index path.
 # serve runs a small read-only web server (python3 stdlib, IPv4) that answers GET or
-# HEAD for /, /index.html, /backlog and /measure only; every other path
+# HEAD for /, /index.html, /backlog, /measure and /data.json; every other path
 # is 404. ?group=home or ?group=action picks how lists are grouped and is remembered in
 # a cookie. It answers at once with the last built pages, marked "updated N s ago" (and
 # each source's own age, filled in as each request is answered), and keeps them fresh
@@ -105,7 +106,7 @@ import http.server, os, re, subprocess, sys, threading, time, urllib.parse
 SCRIPT, HOME, DIR, BIND, PORT, MAX_AGE = sys.argv[1:7]
 MAX_AGE = int(MAX_AGE)
 PAGE = os.path.join(DIR, 'index.html')
-ROUTES = {'/': 'index', '/index.html': 'index', '/backlog': 'backlog', '/measure': 'measure'}
+ROUTES = {'/': 'index', '/index.html': 'index', '/backlog': 'backlog', '/measure': 'measure', '/data.json': 'data'}
 building = threading.Lock()
 last_error = b''
 last_took = 5.0
@@ -160,6 +161,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
             a = age()
             if a is None:
                 return self.send(500, b'dashboard build failed: ' + last_error, 'text/plain; charset=utf-8')
+        if name == 'data':
+            try:
+                with open(os.path.join(DIR, 'data.json'), 'rb') as fh: body = fh.read()
+            except OSError: return self.send(404, b'not built yet\n', 'text/plain; charset=utf-8')
+            return self.send(200, body, 'application/json')
         tone = 'bad' if last_error or a >= 3 * MAX_AGE else 'warn' if a >= 1.5 * MAX_AGE else 'ok'
         note = (f'<span class="age {tone}">updated {ago(a)} ago' + (' · refreshing' if building.locked() else '')
                 + (' · last refresh failed, showing the last good page' if last_error else '') + '</span>')
@@ -200,7 +206,8 @@ trap 'rm -rf "$tmp"' EXIT
 mkdir -p "$tmp" || { echo "fm-dashboard: cannot create $tmp" >&2; exit 1; }
 
 python3 - "$FM_HOME" "$out_dir" "$tmp" "$SCRIPT_DIR" "$MAX_AGE" <<'PY' || { echo "fm-dashboard: page build failed" >&2; exit 1; }
-import hashlib, html, json, math, os, re, shutil, subprocess, sys
+import hashlib, html, json, math, os, re, shutil, subprocess, sys, time
+BUILD_STARTED = time.monotonic()
 from urllib.parse import urlsplit
 from datetime import date, datetime, timedelta
 
@@ -290,6 +297,7 @@ def summary(h):
     except ValueError as e: notes.append(('home summary', f'{h}: {str(e)[:80]}'))
     return None
 sums = {h: summary(h) for h in ACTIVE}
+summaries_read_at = time.time()
 leads = {h: sums[h] for h in ACTIVE if h != 'main'}
 main_summary = sums.get('main') or {}
 endpoints = {e.get('id'): e.get('endpoint') or {} for e in main_summary.get('endpoints') or []} if 0 <= NOW_TS - main_summary.get('generated_epoch', 0) <= SUMMARY_MAX_AGE else {}
@@ -332,6 +340,8 @@ except OSError as e:
     asks_known = False
     notes.append(('data/captain-asks.tsv', f'unreadable: {e.strerror}'))
 
+asks_read_at = time.time()
+
 # --- lanes: every ship/scout record, one state each ---------------------
 VALIDATING = re.compile(r'validat|no-mistakes|\bCI\b|\bchecks?\b|pipeline', re.I)
 STATES = {'blocked': 'Blocked, needs help', 'decision': 'Waiting on a decision', 'finished': 'Finished, not landed',
@@ -348,13 +358,15 @@ for h, d in sorted(home_dir.items()):
         lane_err.add(h); notes.append(('lane records', f'{h}: {e.strerror}')); continue
     for f in files:
         try: meta = dict(l.rstrip('\n').split('=', 1) for l in open(os.path.join(sd, f), errors='replace') if '=' in l)
-        except OSError: continue
+        except OSError as e:
+            lane_err.add(h); notes.append(('lane records', f'{h}: {e.strerror}')); continue
         metas.setdefault(h, []).append((f[:-5], meta))
         if meta.get('kind') not in ('ship', 'scout'): continue
         try:
             ls = [l.strip() for l in open(os.path.join(sd, f[:-5] + '.status'), errors='replace') if l.strip()]
             mt = os.path.getmtime(os.path.join(sd, f[:-5] + '.status'))
-        except OSError: ls, mt = [], os.path.getmtime(os.path.join(sd, f))
+        except OSError as e:
+            lane_err.add(h); notes.append(('lane records', f'{h}: {e.strerror}')); continue
         keys, verb, at, text, pr = set(), 'working', None, '', ''
         for l in ls:
             v = re.match(r'^(?:\d{9,11}\s+)?([a-z][a-z-]*)', l)
@@ -381,6 +393,9 @@ def split(ls): return {s: sum(l['state'] == s for l in ls) for s in STATES}
 SPLIT = split(live)
 OPEN = len(live)
 by_home = {h: [l for l in live if l['home'] == h] for h in ACTIVE}
+LANES_KNOWN = not lane_err & set(ACTIVE)
+lanes_read_at = time.time()
+def lane_value(n, h=None): return 'unknown' if h in lane_err else n if h is not None or LANES_KNOWN else f'at least {n}'
 
 # --- backlog per home: tasks-axi ----------------------------------------
 def toon_fields(s):
@@ -424,7 +439,7 @@ for h, d in sorted(home_dir.items()):
         backlog[h] = None; notes.append(('backlog', f'{h}: remote records not cached')); continue
     address, err = probe(['bash', '-c', '. "$1/fm-tasks-axi-lib.sh"; . "$1/fm-backlog-transition-lib.sh"; fm_backlog_tasks_axi_addressing "${FM_DATA_OVERRIDE:-$FM_HOME/data}" || exit 1; printf "%s\\n%s\\n" "$FM_BACKLOG_AXI_ROOT" "$FM_BACKLOG_AXI_FILE"', 'dashboard', BIN], env=dict(os.environ, FM_HOME=d))
     fields = address.splitlines() if address is not None else []
-    if len(fields) != 2 or not fields[1]:
+    if len(fields) != 2:
         backlog[h] = None; notes.append(('backlog', f'{h}: {err or "unsupported backlog source"}')); continue
     backlog_sources[h] = fields
     out, err = probe(['bash', os.path.join(BIN, 'fm-tasks-axi.sh'), 'list', '--limit', '10000',
@@ -441,11 +456,13 @@ for h, d in sorted(home_dir.items()):
 def bl(h, cls=None, state=None):
     return [r for r in backlog.get(h) or [] if (cls is None or r['class'] == cls) and (state is None or r.get('state') == state)]
 bl_known = all(backlog.get(h) is not None for h in ACTIVE)
+backlog_read_at = time.time()
 QUEUE = {c: sum(len(bl(h, c)) for h in ACTIVE) for c in ('ready', 'held', 'waiting')} if bl_known else None
 held_cap = sorted(((h, r) for h in ACTIVE for r in backlog.get(h) or []
                    if r.get('hold_kind') == 'captain' and r.get('state') != 'done'),
                   key=lambda x: (x[1]['day'] or TODAY, x[0]))
 titles = {(h, r['id']): r['title'] for h in home_dir for r in backlog.get(h) or []}
+could = {h: min(max(0, plan(h) - len(by_home[h])), len(bl(h, 'ready'))) if h not in lane_err else 0 for h in ACTIVE}
 
 # --- flow over local days: landed, closed, filed ------------------------
 def load_json(p):
@@ -491,6 +508,7 @@ def landed_on(d, h=None):
     lo, hi = midnight(d), midnight(d + timedelta(days=1))
     return sum(lo <= at < hi and h in (None, hh) for at, hh, _ in merges.values())
 LANDED = [landed_on(d) for d in DAYS]
+merges_read_at = time.time()
 
 # Closed: backlog items marked done, by the local day they closed (the backlog and its archive).
 CLOSED = re.compile(r'^- \[x\] (\S+) (?:- )?(.*?)(?= blocked-by:| \((?:repo|kind|priority|merged|reported|done|closed)\b|$)')
@@ -499,7 +517,7 @@ closed, done_title = {}, {}  # home -> {day: n}; (home, id) -> title
 for h in ACTIVE:
     seen, c = set(), {}
     try:
-        if h not in backlog_sources: raise ValueError('unsupported backlog source')
+        if h not in backlog_sources or not backlog_sources[h][1]: raise ValueError('unsupported backlog source')
         root, source = backlog_sources[h]
         import tomllib
         config = next((p for p in (os.path.join(root, '.tasks.toml'), os.path.expanduser('~/.tasks-axi/config.toml')) if os.path.lexists(p)), None)
@@ -521,6 +539,7 @@ for h in ACTIVE:
         closed[h] = c
     except (OSError, ValueError, ImportError) as e: closed[h] = None; notes.append(('closed items', f'{h}: {e.strerror if isinstance(e, OSError) else str(e)}'))
 CLOSED_KNOWN = all(closed[h] is not None for h in ACTIVE)
+closed_read_at = time.time()
 def closed_on(d, h=None): return sum((closed[x] or {}).get(d, 0) for x in ([h] if h else ACTIVE))
 CLOSED_N = [closed_on(d) for d in DAYS]
 
@@ -535,7 +554,7 @@ for h in ACTIVE:
         if r['day'] and r.get('state') != 'done': items.setdefault(f'{h}\t{r["id"]}', r['day'].isoformat())
 items = {k: v for k, v in items.items() if isinstance(v, str) and v >= (DAYS[0] - timedelta(days=1)).isoformat()}
 save_json(FILED, dict(since=filed_since if bl_known else None, last=NOW_TS if bl_known else None, items=items))
-FILED_N = [sum(v == d.isoformat() and k.split('\t')[0] in ACTIVE for k, v in items.items()) for d in DAYS]
+FILED_N = [len({k.split('\t', 1)[1] for k, v in items.items() if '\t' in k and v == d.isoformat() and k.split('\t', 1)[0] in ACTIVE}) for d in DAYS]
 
 # Trends: the tiles' numbers now, sampled every 10 minutes and kept 8 days (-1 is unknown).
 HIST = os.path.join(STATE_DIR, 'history.tsv')
@@ -547,8 +566,7 @@ try:
         if len(f) == 4 and all(re.fullmatch(r'-?\d+', x) for x in f): hist.append([int(x) for x in f])
 except OSError: pass
 if not hist or NOW_TS - hist[-1][0] >= 600:
-    lanes_ok = not lane_err & set(ACTIVE)
-    hist = [r for r in hist if NOW_TS - r[0] < 8 * 86400] + [[int(NOW_TS), OPEN if lanes_ok else -1, STUCK if lanes_ok else -1, QUEUE['ready'] if QUEUE else -1]]
+    hist = [r for r in hist if NOW_TS - r[0] < 8 * 86400] + [[int(NOW_TS), OPEN if LANES_KNOWN else -1, STUCK if LANES_KNOWN else -1, QUEUE['ready'] if QUEUE else -1]]
     try:
         with open(HIST + '.tmp', 'w') as f: f.write(''.join('\t'.join(map(str, r)) + '\n' for r in hist))
         os.replace(HIST + '.tmp', HIST)
@@ -611,6 +629,7 @@ try:
     if not isinstance(agents, list): raise ValueError('no agent list')
 except (ValueError, KeyError, TypeError) as e:
     agents = None; notes.append(('herdr agent list', str(e) or 'unreadable'))
+agents_read_at = time.time()
 pane_role = {}
 for h, ms in metas.items():
     for task, m in ms:
@@ -790,6 +809,7 @@ def devices():
 
 mach = machine()
 dev_rows, dev_count, emu_count, dev_problems = devices()
+machine_read_at = time.time()
 
 # --- html pieces ---------------------------------------------------------
 BUILT = NOW.strftime('%H:%M')
@@ -817,20 +837,20 @@ def glist(groups, total_label, total=None):
         s = f'<i class="sw2 {sw}"></i>' if sw is not None else ''
         out += (f'<details class="g"{" open" if op else ""}><summary><span class="cv"></span><span class="gn">{s}{esc(name)}</span>'
                 + (f'<span class="gs">{sub}</span>' if sub else '') + f'<span class="gc">{n}</span></summary><div class="gb">{rows}</div></details>')
-    counts = [g[1] for g in groups]
+    counts = [g[1] for g in groups if isinstance(g[1], int)]
     total = sum(counts) if total is None else total
     eq = f'{" + ".join(map(str, counts))} = ' if len(counts) > 1 else ''
     return f'<div class="gl">{out}<div class="gtot"><span class="k">{esc(total_label)}</span><span class="sum">{eq}<b>{total}</b></span></div></div>'
 def grow(n, w='', c=None):
     if c is None: return f'<div class="gr st"><span class="n">{n}</span><span class="w">{w}</span></div>'  # a named row: what, then where and why
     return f'<div class="gr"><span class="n">{n}</span><span class="w">{w}</span><span class="c">{c}</span></div>'
-def split_txt(sp, states): return ' · '.join(f'{sp[s]} {s if s != "decision" else "on a decision"}' for s in states if sp.get(s))
+def split_txt(sp, states): return ' · '.join(f'{lane_value(sp[s])} {s if s != "decision" else "on a decision"}' for s in states if sp.get(s))
 PARKED_LINE = (f'<p class="note">{esc(" and ".join(PARKED))} {"is" if len(PARKED) == 1 else "are"} parked by the captain and left out of every total.</p>'
                if PARKED else '')
 
 # --- lanes: the strip (graft from B) and the grouped list ----------------
-FREE = max(0, PLAN - OPEN)
-def lane_strip(): return stack(lane_parts(SPLIT), max(PLAN, OPEN), 'sb big') + lane_legend(SPLIT, FREE)
+FREE = max(0, PLAN - OPEN) if LANES_KNOWN else None
+def lane_strip(): return stack(lane_parts(SPLIT), OPEN + (FREE or 0), 'sb big') + lane_legend(SPLIT, FREE)
 def lanes_list(group, names=False, strip=True):
     """Every open lane in exactly one group; with names, each lane is a row, else one row per home with its count."""
     def lane_row(l):
@@ -846,7 +866,7 @@ def lanes_list(group, names=False, strip=True):
             need = sp['blocked'] + sp['decision']
             rows = (''.join(lane_row(l) for l in sorted(ls, key=lambda l: (list(STATES).index(l['state']), l['since']))) if names else
                     ''.join(grow(f'<i class="sw2 {sw}"></i>{esc(STATES[s])}', '', sp[s]) for _, states, sw in ACT for s in states if sp[s]))
-            groups.append((hname(h), len(ls), rows, esc(split_txt(sp, list(STATES))) if not need or names else esc(split_txt(sp, ('blocked', 'decision'))), None, bool(need) or names and bool(ls)))
+            groups.append((hname(h), lane_value(len(ls), h), rows, esc(split_txt(sp, list(STATES))) if not need or names else esc(split_txt(sp, ('blocked', 'decision'))), None, bool(need) or names and bool(ls)))
     else:
         for name, states, sw in ACT:
             ls = [l for l in live if l['state'] in states]
@@ -854,8 +874,8 @@ def lanes_list(group, names=False, strip=True):
             else:
                 per = sorted(((h, [l for l in ls if l['home'] == h]) for h in ACTIVE), key=lambda x: (-len(x[1]), x[0]))
                 rows = ''.join(grow(esc(hname(h)), esc(split_txt(split(hl), states)) if len(states) > 1 else '', len(hl)) for h, hl in per if hl)
-            groups.append((name, len(ls), rows, esc(split_txt(SPLIT, states)) if len(states) > 1 else '', sw, True))
-    return (lane_strip() if strip else '') + glist(groups, 'Open lanes', OPEN)
+            groups.append((name, lane_value(len(ls)), rows, esc(split_txt(SPLIT, states)) if len(states) > 1 else '', sw, True))
+    return (lane_strip() if strip else '') + glist(groups, 'Open lanes', lane_value(OPEN))
 
 # --- slow spots: each row a state, a number and an age ------------------
 spots = []  # dict(tone, chip, what, n, age, href, title)
@@ -866,9 +886,9 @@ def where(ls):
 def spot(tone, chip, what, n, age, href, title=''):
     spots.append(dict(tone=tone, chip=chip, what=what, n=n, age=age, href=href, title=f'{n} {what}' + (f' · {title}' if title else '')))
 stuck = [l for l in live if l['state'] in ('blocked', 'decision')]
-if stuck: spot('bad' if SPLIT['blocked'] else 'warn', 'Stuck', 'stuck', len(stuck), dur(NOW_TS - min(l['since'] for l in stuck)), 'backlog#lanes', where(stuck))
+if stuck: spot('bad' if SPLIT['blocked'] else 'warn', 'Stuck', 'stuck', lane_value(len(stuck)), dur(NOW_TS - min(l['since'] for l in stuck)), 'backlog#lanes', where(stuck))
 fin = [l for l in live if l['state'] == 'finished']
-if fin: spot('warn', 'To land', 'to land', len(fin), dur(NOW_TS - min(l['since'] for l in fin)), 'backlog#lanes', where(fin))
+if fin: spot('warn', 'To land', 'to land', lane_value(len(fin)), dur(NOW_TS - min(l['since'] for l in fin)), 'backlog#lanes', where(fin))
 if held_cap:
     c = {}
     for h, _ in held_cap: c[h] = c.get(h, 0) + 1
@@ -876,7 +896,6 @@ if held_cap:
     spot('warn', 'Held', 'held for triage', f'{"" if bl_known else "≥"}{len(held_cap)}', days_old(oldest) if oldest else 'unknown',
          'backlog?group=home#held', ', '.join(f'{hname(h)} {n}' for h, n in sorted(c.items(), key=lambda x: (-x[1], x[0]))))
 if bl_known:
-    could = {h: min(max(0, plan(h) - len(by_home[h])), len(bl(h, 'ready'))) for h in ACTIVE}
     if sum(could.values()):
         old = min((r['day'] for h in ACTIVE if could[h] for r in bl(h, 'ready') if r['day']), default=None)
         spot('warn', 'Idle', 'idle with ready work', sum(could.values()), days_old(old) if old else 'unknown', 'backlog#targets',
@@ -934,9 +953,9 @@ def home_rows():
         lw, sp, n = lead_word(h), split(by_home[h]), len(by_home[h])
         tone = 'bad' if lw[1] == 'bad' or h in lane_err else 'warn' if lw[1] == 'warn' or sp['blocked'] + sp['decision'] else 'ok' if n else 'idle'
         sub = ((lw[0] + ' · ' if h in remote_hosts else '') + 'Lane records unreadable') if h in lane_err else lw[0] if lw[1] in ('bad', 'warn') else ''
-        free = max(0, plan(h) - n)
+        free = max(0, plan(h) - n) if h not in lane_err else 0
         rows += (f'<div class="hr"><span class="hname">{dot(tone)}<b>{esc(hname(h))}</b>{f"<small>{esc(sub)}</small>" if sub else ""}</span>'
-                 f'<span class="hst"><span class="hsc"><span style="width:{100 * (n + free) / top:.1f}%">{stack(lane_parts(sp), n + free)}</span></span><small>{n} of {plan(h)}</small></span>'
+                 f'<span class="hst"><span class="hsc"><span style="width:{100 * (n + free) / top:.1f}%">{stack(lane_parts(sp, h), n + free) if h not in lane_err else ""}</span></span><small>{lane_value(n, h)} of {plan(h)}</small></span>'
                  + cell(len(bl(h, 'ready')) if backlog.get(h) is not None else None) + cell(f'at least {landed_on(TODAY, h)}')
                  + cell(sum((closed[h] or {}).get(d, 0) for d in DAYS[7:]) if closed[h] is not None else None) + '</div>')
     return ('<div class="hrs"><div class="hr hh"><span>Home</span><span>Lanes open of plan</span><span class="hn">Ready</span>'
@@ -953,9 +972,9 @@ def stack(parts, total, cls='sb'):  # parts: (class, n, title); total sets the s
     segs = ''.join(f'<i class="{c}" style="flex:{n}" title="{esc(t)}"></i>' for c, n, t in parts if n)
     free = total - used
     return f'<div class="{cls}">{segs}' + (f'<i class="free" style="flex:{free}" title="{free} free"></i>' if free > 0 else '') + '</div>'
-def lane_parts(sp): return [(f's-{s}', sp[s], f'{sp[s]} {n}') for s, n in LANE_ORDER]
+def lane_parts(sp, h=None): return [(f's-{s}', sp[s], f'{lane_value(sp[s], h)} {n}') for s, n in LANE_ORDER]
 def lane_legend(sp, free=None):
-    return legend(*[(f'k s-{s}', f'{sp[s]} {n}') for s, n in LANE_ORDER if sp[s]], *([('k free', f'{free} free of plan {PLAN}')] if free else []))
+    return legend(*[(f'k s-{s}', f'{lane_value(sp[s])} {n}') for s, n in LANE_ORDER if sp[s]], *([('k free', f'{free} free of plan {PLAN}')] if free else []))
 def card(title, window, body, cls='', more=None, cid=''):
     m = f'<a class="cm" href="{esc(more[0])}">{esc(more[1])} →</a>' if more else ''
     return f'<section class="card {cls}"{f" id={cid}" if cid else ""}><div class="ch"><h3>{title}</h3>{m}</div><p class="cw">{window}</p>{body}</section>'
@@ -1007,7 +1026,7 @@ def chips():  # the fleet's state at a glance: each spot one chip, linking to wh
     cs = [(s['tone'], s['n'], s['what'], s['age'], s['href'], s['title']) for s in spots]
     if records: cs.append(('mut', len(records), 'record mismatch' if len(records) == 1 else 'record mismatches', '', 'measure#records', ''))
     if notes: cs.append(('mut', len(notes), 'source unknown' if len(notes) == 1 else 'sources unknown', '', 'measure#unknown', '; '.join(f'{s}: {r}' for s, r in notes)))
-    if not spots: cs.insert(0, ('ok', '', 'All flowing', '', '#wait', 'nothing stuck, waiting to land or idle'))
+    if not spots and not notes and not records and asks_known and LANES_KNOWN and bl_known: cs.insert(0, ('ok', '', 'All flowing', '', '#wait', 'nothing stuck, waiting to land or idle'))
     return '<div class="chips">' + ''.join(f'<a class="chip2 c-{t}" href="{esc(h)}" title="{esc(ti)}"><i>{GLYPH[t]}</i><b>{n}</b> {esc(w)}'
                                            + (f' <small>{esc(a)}</small>' if a and a != 'now' else '') + '</a>' for t, n, w, a, h, ti in cs) + '</div>'
 
@@ -1054,8 +1073,8 @@ def tiles():
         tile('landed', 'Landed today', f'at least {LANDED[-1]}', 'recorded merges · 14 d', day_cols(LANDED, [False] * len(DAYS))),
         tile('closed', 'Closed 7 d', f'{c7}{delta(c7, sum(CLOSED_N[:7]))}' if CLOSED_KNOWN else unknown(why_of('closed')),
              f'filed at least {f7} · vs prior 7 d', day_cols(CLOSED_N, [True] * len(DAYS)) if CLOSED_KNOWN else ''),
-        tile('lanes', 'Lanes open', f'{OPEN}<small>of {PLAN}</small>{delta(OPEN, day_ago(1), None)}', f'{SPLIT["building"]} building · {FREE} free', stack(lane_parts(SPLIT), max(PLAN, OPEN), 'sb big')),
-        tile('stuck', 'Stuck', f'{STUCK}{delta(STUCK, day_ago(2), False)}', (f'{SPLIT["blocked"]} blocked · oldest {old}' if stuck else 'vs 24 h ago'),
+        tile('lanes', 'Lanes open', f'{lane_value(OPEN)}<small>of {PLAN}</small>{delta(OPEN if LANES_KNOWN else None, day_ago(1), None)}', f'{lane_value(SPLIT["building"])} building · {str(FREE) + " free" if FREE is not None else "free unknown"}', stack(lane_parts(SPLIT), OPEN + (FREE or 0), 'sb big')),
+        tile('stuck', 'Stuck', f'{lane_value(STUCK)}{delta(STUCK if LANES_KNOWN else None, day_ago(2), False)}', (f'{lane_value(SPLIT["blocked"])} blocked · oldest {old}' if stuck else 'vs 24 h ago'),
              stack([('s-blocked', SPLIT['blocked'], 'blocked'), ('s-decision', SPLIT['decision'], 'on a decision')], STUCK, 'sb big') + trend(2),
              'bad' if SPLIT['blocked'] else 'warn' if STUCK else ''),
         tile('ready', 'Ready', f'{QUEUE["ready"]}{delta(QUEUE["ready"], day_ago(3), None)}' if QUEUE else unknown(why_of('backlog')),
@@ -1063,9 +1082,9 @@ def tiles():
              (stack([(cls, sum(v.values()), n) for n, v, cls in QREASONS], sum(QUEUE.values()), 'sb big') if QUEUE else '') + trend(3)),
         q]) + '</div>'
 
-def hbar(label, n, cls, right='', body='', top=1):  # one bar on a shared scale; with a body it opens to the items
+def hbar(label, n, cls, right='', body='', top=1, partial=False):  # one bar on a shared scale; with a body it opens to the items
     head = (f'<span class="hbl"><i class="sw2 {cls}"></i>{label}</span><span class="hbt"><i class="{cls}" style="width:{100 * n / max(top, 1):.1f}%"></i></span>'
-            f'<span class="hbv{"" if n else " z"}"><b>{n}</b>{f" <small>{right}</small>" if right else ""}</span>')
+            f'<span class="hbv{"" if n else " z"}"><b>{lane_value(n) if partial else n}</b>{f" <small>{right}</small>" if right else ""}</span>')
     return f'<details class="hbr"><summary>{head}</summary><div class="gb">{body}</div></details>' if body else f'<div class="hbr">{head}</div>'
 WAIT = [('blocked', 'Blocked'), ('decision', 'On a decision'), ('finished', 'Finished, not landed'),
         ('validating', 'Validating or CI'), ('waiting', 'Waiting on other'), ('building', 'Building')]
@@ -1076,13 +1095,13 @@ def wait_bars():  # every open lane in exactly one state; why it waits, in its o
         return grow(t, f'{esc(hname(l["home"]))} · {dur(NOW_TS - l["since"])}' + (f' · {link("PR", l["pr"])}' if l['pr'] else '') + why)
     top = max(SPLIT.values())
     return ''.join(hbar(name, len(ls), f's-{s}', dur(NOW_TS - min(l['since'] for l in ls)) if ls else '',
-                        ''.join(row(l) for l in sorted(ls, key=lambda l: l['since'])), top)
+                        ''.join(row(l) for l in sorted(ls, key=lambda l: l['since'])), top, partial=True)
                    for s, name in WAIT for ls in [[l for l in live if l['state'] == s]])
-could = {h: min(max(0, plan(h) - len(by_home[h])), len(bl(h, 'ready'))) for h in ACTIVE}
 capt = {h: sum(r.get('hold_kind') == 'captain' for r in bl(h, 'held')) for h in ACTIVE}
-QREASONS = [('Ready, a lane is free', could, 'c-warn'), ('Ready, lanes full', {h: len(bl(h, 'ready')) - could[h] for h in ACTIVE}, 's-building'),
+QREASONS = [('Ready, a lane is free', could, 'c-warn'), ('Ready, lanes full', {h: len(bl(h, 'ready')) - could[h] if h not in lane_err else 0 for h in ACTIVE}, 's-building'),
             ('Held for the captain', capt, 's-decision'), ('Held, other reason', {h: len(bl(h, 'held')) - capt[h] for h in ACTIVE}, 'c-mut'),
-            ('Waiting on another item', {h: len(bl(h, 'waiting')) for h in ACTIVE}, 's-waiting')]  # why queued work waits; sums to the queue
+            ('Waiting on another item', {h: len(bl(h, 'waiting')) for h in ACTIVE}, 's-waiting')]
+if not LANES_KNOWN: QREASONS.append(('Ready, capacity unknown', {h: len(bl(h, 'ready')) if h in lane_err else 0 for h in ACTIVE}, 'c-mut'))  # why queued work waits; sums to the queue
 def queue_bars():
     if QUEUE is None: return f'<p class="lede">{unknown(why_of("backlog"))}</p>'
     rows = QREASONS
@@ -1143,7 +1162,7 @@ def index_body(group):
 </div>
 {tiles()}
 <div class="cards">
-{card("Where lanes wait", f"{OPEN} open lanes by state · oldest wait · tap for each lane", wait_bars(), cid="wait", more=("backlog#lanes", "Lanes"))}
+{card("Where lanes wait", f"{lane_value(OPEN)} open lanes by state · oldest wait · tap for each lane", wait_bars(), cid="wait", more=("backlog#lanes", "Lanes"))}
 {card("Why work is queued", "queued items by reason · tap for each home", queue_bars(), more=("backlog", "Backlog"))}
 {card("In vs out", "backlog items per local day, 14 days", inout_chart(), "wide")}
 {card("Landed recently", "pull requests merged, newest first", recent())}
@@ -1188,7 +1207,7 @@ def backlog_body(group):
                if bl_known else f'At least {plural(len(held_cap), "item")} held; the backlog of {", ".join(unread)} is unknown.')
     val = [l for l in live if l['state'] == 'validating']
     oldest_val = min(val, key=lambda l: l['since']) if val else None
-    ltrows = ''.join(f'<tr><td>{esc(hname(h))}</td><td>{len(by_home[h])}</td><td>{plan(h)}</td><td>{len(bl(h, "ready")) if backlog.get(h) is not None else "–"}</td></tr>'
+    ltrows = ''.join(f'<tr><td>{esc(hname(h))}</td><td>{lane_value(len(by_home[h]), h)}</td><td>{plan(h)}</td><td>{len(bl(h, "ready")) if backlog.get(h) is not None else "–"}</td></tr>'
                      for h in ACTIVE)
     raised = ', '.join(f'{hname(h)} {plan(h)}' for h in ACTIVE if plan(h) != lane_default)
     if group == 'home':
@@ -1203,7 +1222,7 @@ def backlog_body(group):
     return f'''
 <div class="hero">
 {sh(f"Backlog · read {BUILT} from each home's backlog")}
-<h1>{QUEUE["ready"] if QUEUE else "–"} items ready to start; {SPLIT["building"]} of {OPEN} open lanes building.</h1>
+<h1>{QUEUE["ready"] if QUEUE else "–"} items ready to start; {lane_value(SPLIT["building"])} building among {lane_value(OPEN)} open lanes.</h1>
 {switch(group)}
 </div>
 <div class="sections">
@@ -1232,15 +1251,15 @@ def backlog_body(group):
 <div class="stack">
 <section id="lanes">
 {sh(f"Every lane · now {BUILT} · age since its last status")}
-<h2>{plural(OPEN, "lane")} open; {SPLIT["blocked"] + SPLIT["decision"]} blocked or waiting.</h2>
+<h2>{lane_value(OPEN)} lanes open; {lane_value(STUCK)} blocked or waiting.</h2>
 {lanes_list(group, names=True)}
 <p class="note">Oldest validation or CI wait: {f"{dur(NOW_TS - oldest_val['since'])} ({esc(titles.get((oldest_val['home'], oldest_val['task'])) or oldest_val['task'])}, {esc(hname(oldest_val['home']))})" if oldest_val else "none running"}.</p>
 </section>
 <section id="targets">
 {sh("Lane plan · lane settings")}
-<h2>Lane settings plan {PLAN} lanes; {OPEN} are open.</h2>
+<h2>Lane settings plan {PLAN} lanes; {lane_value(OPEN)} are open.</h2>
 <table><thead><tr><th>Home</th><th>Open</th><th>Plan</th><th>Ready</th></tr></thead><tbody>{ltrows}</tbody>
-<tfoot><tr><td>Fleet</td><td>{OPEN}</td><td>{PLAN}</td><td>{QUEUE["ready"] if QUEUE else "–"}</td></tr></tfoot></table>
+<tfoot><tr><td>Fleet</td><td>{lane_value(OPEN)}</td><td>{PLAN}</td><td>{QUEUE["ready"] if QUEUE else "–"}</td></tr></tfoot></table>
 <p class="note">Plan per home from the lane settings{f" ({esc(raised)})" if raised else ""}; every other home {lane_default}.</p>
 </section>
 </div>
@@ -1257,9 +1276,9 @@ METRICS = [  # each number's one definition: id, name, what it counts, source, w
     ('closed', 'Closed', 'backlog items marked done, merged or reported, on the day they closed', "each home's backlog and its done archive",
      'the last 7 local days, today so far, against the 7 days before', 'every build'),
     ('filed', 'Filed', 'backlog items on the day they were filed', "each home's open items, plus a log that keeps each filing day after the item closes",
-     'local days; always at least: items filed and closed between readings can be missed; a failed backlog read breaks coverage', 'every build'),
+     'local days; always at least: items filed and closed between readings can be missed; matching task IDs and filing dates count once across homes; a failed backlog read breaks coverage', 'every build'),
     ('lanes', 'Lanes open', 'ship and scout lanes, each in one state by its last status line', "each home's lane records",
-     'now, against the lane plan; compared with the sample nearest 24 hours ago', 'every build; sampled every 10 minutes, kept 8 days'),
+     'now; unreadable homes are unknown, fleet counts are at least and free capacity is unknown; compared with the sample nearest 24 hours ago', 'every build; sampled every 10 minutes, kept 8 days'),
     ('stuck', 'Stuck', 'lanes blocked or waiting on a decision; age from the oldest one\'s last status', "each home's lane records",
      'now; compared with the sample nearest 24 hours ago', 'every build; sampled every 10 minutes, kept 8 days'),
     ('ready', 'Ready', 'queued items neither held nor waiting on another item', "each home's backlog",
@@ -1280,6 +1299,7 @@ def measure_body():
 <div class="hero">
 {sh(f"Method · built {BUILT}, every {MAX_AGE} s")}
 <h1>How each number is measured.</h1>
+<p class="note"><a href="data.json">data.json</a> contains the same readings, coverage and lists, with build time and duration.</p>
 <p class="lede">One definition per number. A source that cannot be read shows unknown and why, never a guess or a zero. Parked homes are left out{f" ({esc(', '.join(PARKED))})" if PARKED else ""}.</p>
 </div>
 <div class="sections">
@@ -1305,9 +1325,78 @@ pages = {'index.html': page('index', 'Fleet', index_body('action'), unknown_foot
          'measure.html': page('measure', 'Fleet method', measure_body())}
 for f, doc in pages.items():
     with open(os.path.join(OUT, f), 'w', encoding='utf-8') as fh: fh.write(doc)
+
+def reading(value, mid, known=True, lower=False, reason=None, read_at=NOW_TS):
+    definition = next(x for x in METRICS if x[0] == mid)
+    return dict(value=value if known else None, status='unknown' if not known else 'lower_bound' if lower else 'exact',
+                reason=prose(reason or why_of(mid)) if not known else None, source=definition[3],
+                window=definition[4], cutoff=NOW_TS, read_at=read_at)
+def lane_reading(value, h=None):
+    return reading(value, 'lanes', known=h not in lane_err, lower=h is None and not LANES_KNOWN,
+                   reason='lane records unavailable', read_at=lanes_read_at)
+quota_known = bool(accounts) and not any(a['problem'] for a in accounts)
+quota_value = dict(used_up=sum(a['empty'] for a in accounts),
+                   soonest_runout=running_out[0]['runout'].timestamp() if running_out else None)
+metrics = {
+    'asks': reading(len(asks), 'asks', asks_known, reason='ask list unreadable', read_at=asks_read_at),
+    'landed': reading(LANDED[-1], 'landed', lower=True, read_at=merges_read_at),
+    'closed': reading(sum(CLOSED_N[7:]), 'closed', CLOSED_KNOWN, read_at=closed_read_at),
+    'filed': reading(sum(FILED_N[7:]), 'filed', lower=True, read_at=backlog_read_at),
+    'lanes': lane_reading(OPEN),
+    'lane_states': lane_reading(SPLIT),
+    'oldest_lane_seconds': lane_reading({s: max((max(0, NOW_TS - l['since']) for l in live if l['state'] == s), default=0) for s in STATES}),
+    'lane_plan': reading(PLAN, 'lanes'),
+    'free_lanes': reading(FREE, 'lanes', LANES_KNOWN, reason='lane records unavailable', read_at=lanes_read_at),
+    'stuck': reading(STUCK, 'stuck', lower=not LANES_KNOWN, read_at=lanes_read_at),
+    'ready': reading(QUEUE['ready'] if QUEUE else None, 'ready', bl_known, reason=why_of('backlog'), read_at=backlog_read_at),
+    'queue': reading(QUEUE, 'ready', bl_known, reason=why_of('backlog'), read_at=backlog_read_at),
+    'held_for_captain': reading(len(held_cap), 'ready', lower=not bl_known, read_at=backlog_read_at),
+    'busy_agents': reading(sum(BUSY.values()), 'lanes', agents is not None, reason=why_of('herdr'), read_at=agents_read_at),
+    'agent_roles': reading(BUSY, 'lanes', agents is not None, reason=why_of('herdr'), read_at=agents_read_at),
+    'running_agents': reading(len(agent_rows), 'lanes', agents is not None, reason=why_of('herdr'), read_at=agents_read_at),
+    'quota': reading(quota_value, 'quota', quota_known, reason='runway unavailable for some accounts', read_at=q_at),
+    'free_memory_gb': reading(free[0] if free else None, 'machine', free is not None, reason=mach['free_why'], read_at=machine_read_at),
+    'total_memory_gb': reading(free[1] if free else None, 'machine', free is not None, reason=mach['free_why'], read_at=machine_read_at),
+    'memory_pressure': reading(psi, 'machine', psi is not None, reason=mach['pressure_why'], read_at=machine_read_at),
+    'gradle_builds': reading(mach['gradle'], 'machine', mach['gradle'] is not None, reason=mach['gradle_why'], read_at=machine_read_at),
+    'emulators': reading(emu_count, 'machine', emu_count is not None, reason='emulator inventory unavailable', read_at=machine_read_at),
+    'devices': reading(dev_count, 'machine', dev_count is not None, reason='device inventory unavailable', read_at=machine_read_at),
+}
+for key, value in zip(('heavy_jobs_gb', 'heavy_high_gb', 'heavy_max_gb'), mach['heavy']):
+    metrics[key] = reading(value, 'machine', value is not None, reason=mach['heavy_why'], read_at=machine_read_at)
+for key, values in (('landed', LANDED), ('closed', CLOSED_N), ('filed', FILED_N)):
+    metrics[key]['daily'] = [dict(day=d.isoformat(), value=v if key != 'closed' or CLOSED_KNOWN else None) for d, v in zip(DAYS, values)]
+for key in ('busy_agents', 'agent_roles', 'running_agents'):
+    metrics[key].update(source='Herdr agent inventory', window='now')
+metrics['lane_plan'].update(source='lane settings', window='configured plan')
+metrics['queue'].update(window='now')
+metrics['held_for_captain'].update(window='now')
+data = dict(build_time=NOW.isoformat(), cutoff=NOW_TS, metrics=metrics,
+    lanes=[dict(state=l['state'], home=l['home'], title=titles.get((l['home'], l['task'])) or l['task'],
+                age_seconds=max(0, NOW_TS - l['since']), reason=prose(l['text'])) for l in live],
+    queue_reasons=[dict(reason=n, by_home={h: count if backlog.get(h) is not None else None for h, count in v.items()}) for n, v, _ in QREASONS],
+    homes=[dict(home=h, lead_state=lead_word(h)[0], summary_read_at=summaries_read_at, summary_generated_epoch=(sums[h] or {}).get('generated_epoch'),
+                lanes=lane_reading(len(by_home[h]), h), plan=plan(h),
+                free_lanes=reading(max(0, plan(h) - len(by_home[h])), 'lanes', h not in lane_err, reason='lane records unavailable', read_at=lanes_read_at),
+                ready=reading(len(bl(h, 'ready')), 'ready', backlog.get(h) is not None, reason='backlog unavailable', read_at=backlog_read_at),
+                landed=reading(landed_on(TODAY, h), 'landed', lower=True, read_at=merges_read_at),
+                closed=reading(sum((closed[h] or {}).get(d, 0) for d in DAYS[7:]), 'closed', closed[h] is not None, reason='completion records unavailable', read_at=closed_read_at)) for h in ACTIVE],
+    held_items=[dict(home=h, title=r['title'], reason=prose(r.get('hold_reason')), filed=r['day']) for h, r in held_cap],
+    recent_merges=[dict(home=h, title=done_title.get((h, task)) or titles.get((h, task)) or task, url=url, at=at)
+                   for url, (at, h, task) in sorted(merges.items(), key=lambda x: -x[1][0])[:6]],
+    quota_accounts=accounts, devices=[dict(zip(('name', 'where', 'detail', 'tone', 'holder'), r)) for r in dev_rows],
+    machine={k: prose(v) if isinstance(v, str) else v for k, v in mach.items()},
+    machine_limits=dict(emulators=EMU_MAX, gradle=GRADLE_MAX, min_memory_gb=MEM_MIN_GB, memory_pressure=40),
+    agents=[dict(zip(('role', 'home', 'name', 'status'), a)) for a in agent_rows],
+    lane_history=[dict(at=r[0], lanes=r[1] if r[1] >= 0 else None, stuck=r[2] if r[2] >= 0 else None,
+                       ready=r[3] if r[3] >= 0 else None) for r in hist],
+    parked_homes=PARKED, sources_unknown=[dict(source=s, reason=r) for s, r in notes], device_problems=dev_problems)
+data['build_duration_seconds'] = time.monotonic() - BUILD_STARTED
+with open(os.path.join(OUT, 'data.json'), 'w', encoding='utf-8') as fh:
+    json.dump(data, fh, ensure_ascii=False, allow_nan=False, default=lambda v: v.isoformat())
 PY
 # The index lands last, so its time is the time the whole set was built.
-for f in "$tmp"/*.html; do
+for f in "$tmp"/*.html "$tmp/data.json"; do
   [ "$(basename "$f")" = index.html ] && continue
   mv -f "$f" "$out_dir/" || { echo "fm-dashboard: cannot write $out_dir/$(basename "$f")" >&2; exit 1; }
 done

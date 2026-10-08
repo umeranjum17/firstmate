@@ -335,13 +335,31 @@ test_serve_answers_each_page_and_remembers_the_grouping() {
   [ -n "$url" ] || fail "serve never reported its address: $(cat "$home/serve.err")"
   case "$url" in http://127.0.0.1:*/) ;; *) fail "serve did not default to loopback: $url" ;; esac
   got=$(python3 - "$url" <<'PY'
-import re, sys, urllib.request, urllib.error
+import json, re, sys, urllib.request, urllib.error
 def get(u, cookie=None):
     rq = urllib.request.Request(u, headers={'Cookie': cookie} if cookie else {})
     try:
         with urllib.request.urlopen(rq, timeout=120) as r: return r.status, r.read().decode(), r.headers.get('Set-Cookie') or ''
     except urllib.error.HTTPError as e: return e.code, '', ''
 base = sys.argv[1]
+with urllib.request.urlopen(base + 'data.json', timeout=120) as r:
+    assert r.headers.get_content_type() == 'application/json'
+    data = json.load(r)
+assert data['build_duration_seconds'] >= 0 and data['build_time']
+m = data['metrics']
+assert m['lanes']['value'] == 8 and m['lanes']['status'] == 'exact'
+assert m['free_lanes']['value'] == 1 and m['ready']['value'] == 2
+assert m['landed']['value'] == 2 and m['landed']['status'] == 'lower_bound'
+assert m['closed']['value'] == 2 and m['filed']['status'] == 'lower_bound'
+assert len(data['lanes']) == 8 and len(data['homes']) == 2
+assert data['held_items'][0]['reason'] == 'needs his call'
+for metric in m.values():
+    assert metric['status'] in ('exact', 'lower_bound', 'unknown')
+    assert all(k in metric for k in ('value', 'reason', 'source', 'window', 'cutoff', 'read_at'))
+    if metric['status'] == 'unknown': assert metric['value'] is None and metric['reason']
+with urllib.request.urlopen(urllib.request.Request(base + 'data.json', method='HEAD')) as r:
+    assert r.headers.get_content_type() == 'application/json' and r.read() == b''
+    assert int(r.headers['Content-Length']) > 0
 for path, want in (('', 'Nothing needs you.'), ('backlog', 'Held for the captain'), ('measure', 'How each number is measured.')):
     code, body, _ = get(base + path)
     print(path or '/', code, want in body)
@@ -457,6 +475,53 @@ PY
   pass "dashboard preserves lower bounds, route ownership, configured archives, runway uncertainty and wait reasons"
 }
 
+test_incomplete_lanes_and_moved_filings() {
+  local home d z before after now real_tasks
+  home=$(make_home coverage)
+  d="$home/state/dashboard" z="$home/mates/zephyrine" now=$(date +%s)
+  lane "$home" m-ci ship "blocked [at=$now]: CI evidence=/home/u/x/report.md ref:https://github.com/acme/alpha/pull/22"
+  build "$home"
+  before=$(jq '.metrics.filed.daily[-1].value' "$d/data.json")
+  tasks-axi mv m-ready m-after --file "$home/data/backlog.md" --to "$z/data/backlog.md" >/dev/null || fail "task move failed"
+  build "$home"
+  after=$(jq '.metrics.filed.daily[-1].value' "$d/data.json")
+  [ "$before" = "$after" ] || fail "moving tasks overcounted filings: $before -> $after"
+  has "$d/index.html" "evidence=report.md ref:PR 22"
+  lacks "$d/index.html" "evidence=/home/u" "ref:https://"
+  FM_HOME="$home" bash "$ROOT/bin/fm-tasks-axi.sh" list --limit 10000 --fields held,hold_kind,hold_reason,blocked,created,closed > "$home/backend.toon" || fail "backlog fixture failed"
+  printf 'backend = "beads"\n' > "$home/.tasks.toml"
+  real_tasks=$(command -v tasks-axi)
+  printf '#!/bin/sh\n[ "$PWD" = "%s" ] || exec "%s" "$@"\n[ -z "${TASKS_AXI_FILE:-}" ] || exit 1\necho called > "%s/backend.called"\ncat "%s/backend.toon"\n' "$home" "$real_tasks" "$home" "$home" > "$home/stubs/tasks-axi"
+  chmod +x "$home/stubs/tasks-axi"
+  build "$home"
+  [ -e "$home/backend.called" ] || fail "non-markdown listing was skipped"
+  has "$d/backlog.html" "Wait for the captain's call" "needs his call"
+  jq -e '.metrics.ready.status == "exact" and .metrics.closed.status == "unknown"' "$d/data.json" >/dev/null || fail "backend coverage was lost"
+  rm "$home/.tasks.toml" "$home/stubs/tasks-axi"
+  mkdir -p "$home/mates/missing/data"
+  printf '## Queued\n- [ ] missing-ready - Missing home ready (since %s)\n' "$(date +%F)" > "$home/mates/missing/data/backlog.md"
+  printf -- '- missing - domain (home: %s; scope: work; projects: alpha; added 2026-07-11)\n' "$home/mates/missing" >> "$home/data/secondmates.md"
+  build "$home"
+  has "$d/index.html" "Lanes open at least 8" "Stuck at least 2" "free unknown" "Ready, capacity unknown 1" "unknown of 3"
+  lacks "$d/index.html" "All flowing" "missing 0 of 3"
+  has "$d/backlog.html" "at least 8 lanes open" "Fleet at least 8" "missing unknown 3"
+  has "$d/backlog.home.html" "missing unknown"
+  jq -e '.metrics.lanes.status == "lower_bound" and .metrics.stuck.status == "lower_bound" and .metrics.free_lanes.status == "unknown" and ([.homes[] | select(.home == "missing")][0].lanes.value == null)' "$d/data.json" >/dev/null || fail "missing lane coverage looks exact"
+  printf -- '- zephyrine - remote (host: distant; root: /srv; home: %s; scope: work; projects: alpha; added 2026-07-11)\n' "$z" > "$home/data/secondmates.md"
+  build "$home"
+  has "$d/index.html" "Lanes open at least 7" "unknown of 3"
+  jq -e '[.homes[] | select(.home == "zephyrine")][0] | .lanes.status == "unknown" and .free_lanes.value == null' "$d/data.json" >/dev/null || fail "remote lane capacity was inferred"
+  : > "$home/data/secondmates.md"
+  printf '## Queued\n' > "$home/data/backlog.md"
+  rm "$home/state"/m-*.meta "$home/state"/m-*.status
+  mkdir "$home/state/unreadable.meta"
+  build "$home"
+  has "$d/index.html" "Lanes open at least 0" "free unknown"
+  lacks "$d/index.html" "All flowing" "Ready, a lane is free 1"
+  pass "moved filings count once and unavailable lanes retain unknown capacity across HTML and JSON"
+}
+
+test_incomplete_lanes_and_moved_filings
 test_review_evidence_boundaries
 test_overview_answers_the_four_questions_with_sums_that_add_up
 test_backlog_and_method_pages_show_their_numbers
