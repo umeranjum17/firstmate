@@ -262,6 +262,7 @@ export function world(canvas, tagLayer) {
     G.badge = new THREE.CircleGeometry(0.17, 20)
     G.lap = new THREE.BoxGeometry(0.5, 0.035, 0.34); G.lid = new THREE.BoxGeometry(0.5, 0.32, 0.025); G.lid.translate(0, 0.16, 0)
     G.crate = new THREE.BoxGeometry(0.62, 0.5, 0.5); G.crate.translate(0, 0.25, 0)
+    G.rope = new THREE.CylinderGeometry(0.025, 0.025, 1, 6); G.rope.translate(0, 0.5, 0)
     return G
   }
   const badges = new Map()
@@ -330,8 +331,8 @@ export function world(canvas, tagLayer) {
   // Poses, each a two- or three-beat loop with its own offset so the crew never moves in sync.
   function pose(f, s, t) {
     const u = f.userData, ph = u.phase, [aL, aR] = u.arms, b = u.body, beat = (p, n) => Math.floor(((t + ph) % p) / p * n)
-    b.position.y = 0; b.rotation.set(0, 0, 0); u.head.rotation.set(0, 0, 0); aL.rotation.set(0, 0, 0); aR.rotation.set(0, 0, 0)
-    if (u.lap) u.lap.visible = s !== 'waiting' && s !== 'parked' && s !== 'finished'
+    b.position.y = 0; b.rotation.set(0, 0, 0); u.head.rotation.set(0, 0, 0); aL.rotation.set(0, 0, 0); aR.rotation.set(0, 0, 0); for (const l of u.legs) l.rotation.x = 0
+    if (u.lap) u.lap.visible = s !== 'waiting' && s !== 'parked' && s !== 'finished' && s !== 'walking'
     if (s === 'working' || s === 'validating') {
       const k = beat(0.62, 2); aL.rotation.x = -1.15 + (k ? 0.18 : 0); aR.rotation.x = -1.15 + (k ? 0 : 0.18); u.head.rotation.x = 0.06; b.position.y = k * 0.025
       if (s === 'validating') u.head.rotation.y = Math.sin(t * 0.8 + ph) * 0.25
@@ -343,6 +344,8 @@ export function world(canvas, tagLayer) {
       b.position.y = -0.14; u.head.rotation.y = Math.sin(t * 0.5 + ph) * 0.5; aL.rotation.x = aR.rotation.x = -0.4
     } else if (s === 'parked') {  // sat down with the laptop shut until the captain releases it
       b.position.y = -0.22; u.head.rotation.x = 0.3; aL.rotation.x = aR.rotation.x = -0.6
+    } else if (s === 'walking') {  // a two-beat stride, arms against legs
+      const k = beat(0.36, 2) ? 1 : -1; u.legs.forEach((l, i) => l.rotation.x = (i ? k : -k) * 0.55); aL.rotation.x = k * 0.5; aR.rotation.x = -k * 0.5; b.position.y = beat(0.18, 2) * 0.03
     } else if (s === 'finished') {
       const k = beat(1.2, 2); aR.rotation.z = -2.4; aL.rotation.z = 0.25; b.position.y = k * 0.05
     } else { u.head.rotation.y = Math.sin(t * 0.4 + ph) * 0.4; b.position.y = Math.sin(t * 1.2 + ph) * 0.015 }
@@ -457,6 +460,9 @@ export function world(canvas, tagLayer) {
   // A new home's ship sails in: ships only ever sail bow first, so the one on screen sails off ahead (far enough that its wake
   // clears the screen too) and the new one comes up from astern.
   const OUT = 0.4, IN = 1.1, AHEAD = 40, ASTERN = 26
+  // A worker walks the deck at WALK units a second; a landed crate comes down from HOIST above its place over DROP seconds.
+  const WALK = 2.4, HOIST = 3.2, DROP = 1.1
+  let crateHome = null, crateLanded = 0
   function show(d, id) {
     if (home && id !== home && !still.matches && !sail) sail = { t0: clock.getElapsedTime(), out: true }
     want = [d, id]
@@ -479,13 +485,28 @@ export function world(canvas, tagLayer) {
       // pairs stand on a diagonal, one a step behind and aside, rows from the near rail inward, so every face shows
       const n = all.length, rows = Math.ceil(n / 2), row = Math.floor(i / 2), pair = n - row * 2 > 1, back = pair && i % 2
       const x = SX[s] + (pair ? (back ? 0.65 : -0.65) : 0), w = S.userData.half((x + LEN / 2) / LEN) * 0.75
-      f.f.position.set(x, deckY, Math.max(-w, Math.min(w, (rows - 1) * 0.9 - row * 1.8 + 0.8 - (back ? 1.1 : 0))))
-      f.f.rotation.y = 0.15
+      const to = new THREE.Vector3(x, deckY, Math.max(-w, Math.min(w, (rows - 1) * 0.9 - row * 1.8 + 0.8 - (back ? 1.1 : 0))))
+      // a worker whose lane moved on walks from where it stands to its new station; anything else takes its place at once
+      if (f.c && f.c.stage !== c.stage && !still.matches) f.walk = { from: f.f.position.clone(), t0: clock.getElapsedTime() }
+      if (f.walk) f.walk.to = to; else { f.f.position.copy(to); f.f.rotation.y = 0.15 }
       f.c = c; f.pose = poseOf(c)
     })
     const landed = d.cards.filter(c => c.stage === 'landed' && c.home === id).length
-    crates.clear()
-    for (const [i, [y, z]] of STACK.slice(0, landed).entries()) { const c = mesh(geos().crate, tc(i % 2 ? '#b07a40' : '#c99555'), 0.03); c.position.set(0, y * 0.5, z); crates.add(c) }
+    // a new home's crates are simply there; a landing on the home in view lowers its crate onto the stack on a line,
+    // and on a full stack the top crate comes down again
+    const fresh = crateHome !== id, n = Math.min(STACK.length, landed), had = crates.children.length, more = !fresh && landed > crateLanded
+    if (fresh) { crates.clear(); crateHome = id }
+    crateLanded = landed
+    while (crates.children.length > n) crates.remove(crates.children.at(-1))
+    for (let i = crates.children.length; i < n; i++) {
+      const [y, z] = STACK[i], c = mesh(geos().crate, tc(i % 2 ? '#b07a40' : '#c99555'), 0.03); c.position.set(0, y * 0.5, z); crates.add(c)
+      if (more) hoist(c, y)
+    }
+    if (more && n && had === n && !crates.children.at(-1).userData.rope) hoist(crates.children.at(-1), STACK[n - 1][0])
+  }
+  function hoist(c, y) {
+    if (still.matches) return
+    c.userData = { y: y * 0.5, t0: clock.getElapsedTime(), rope: mesh(geos().rope, tc('#d9c6a0')) }; c.add(c.userData.rope)
   }
   // How far along its own length the ship stands from its place, and its heel, while it sails out or in.
   function sailing(t) {
@@ -497,6 +518,22 @@ export function world(canvas, tagLayer) {
     const u = sail.out ? (k / OUT) ** 2 : 1 - (1 - k / IN) ** 3
     return [sail.out ? AHEAD * u : -ASTERN * (1 - u), 0.06 * Math.sin(Math.PI * (sail.out ? u : 1 - u))]
   }
+  // One step of a worker's walk, facing the way it goes and turning back to the rail when it arrives; true while it walks.
+  function walk(f, t) {
+    const w = f.walk, k = still.matches ? 1 : Math.min(1, (t - w.t0) * WALK / Math.max(0.01, w.from.distanceTo(w.to)))
+    f.f.position.lerpVectors(w.from, w.to, k)
+    f.f.rotation.y = k < 1 ? Math.atan2(w.to.x - w.from.x, w.to.z - w.from.z) : 0.15
+    if (k === 1) f.walk = null
+    return k < 1
+  }
+  // A lowering crate eases down onto its place on a line from above, which is cast off when it lands.
+  function lower(c, t) {
+    const u = c.userData, k = still.matches ? 1 : Math.min(1, (t - u.t0) / DROP), e = 1 - (1 - k) ** 3
+    c.position.y = u.y + HOIST * (1 - e)
+    u.rope.scale.y = HOIST + 4 - c.position.y
+    if (k === 1) { c.remove(u.rope); c.userData = {} }
+  }
+
   // What a tap at (x, y) on the canvas opens: a tag's or a worker's card, or for a station its worker in most trouble.
   function pick(x, y) {
     if (sail) return null
@@ -551,7 +588,8 @@ export function world(canvas, tagLayer) {
     S.rotation.z = -sx * 0.5 + Math.sin(t * 0.7) * 0.012; S.rotation.x = sz * 0.6 + heel
     billow(S, t)
     if (lead) { pose(lead, 'idle', t); lead.userData.arms.forEach(a => a.rotation.x = -1.3); wheel.rotation.x = Math.sin(t * 0.5) * 0.4 }
-    for (const f of figs.values()) pose(f.f, f.pose, t)
+    for (const f of figs.values()) pose(f.f, f.walk && walk(f, t) ? 'walking' : f.pose, t)
+    for (const c of crates.children) if (c.userData.rope) lower(c, t)
     r.render(scene, cam)
     if (first) { first = false; performance.mark('ship-first-frame') }  // the first-paint measure reads this
     for (const g of tags.values()) g.on = false
