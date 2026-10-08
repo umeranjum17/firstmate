@@ -2470,7 +2470,8 @@ run_script_bounded() {  # <script> <out> <stream> <id>
   # measure, so suites never read the runner's real memory pressure; the guard's
   # own tests point this at a fixture proc tree.
   local FM_HOST_MEMORY_PROC=${FM_HOST_MEMORY_PROC:-/nonexistent/fm-test-host-memory}
-  export FM_HOST_MEMORY_PROC
+  local FM_HOST_MEMORY_CGROUP_ROOT=${FM_HOST_MEMORY_CGROUP_ROOT:-/nonexistent/fm-test-host-cgroup}
+  export FM_HOST_MEMORY_PROC FM_HOST_MEMORY_CGROUP_ROOT
   local rc
   : "$id"
   set +e
