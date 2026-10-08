@@ -1,9 +1,23 @@
 #!/usr/bin/env bash
-# fm-dashboard.sh - build the read-only fleet dashboard pages for this home.
+# fm-dashboard.sh - build and serve the read-only fleet dashboard for this home.
 #
-# Each build atomically replaces state/dashboard/data.json; GET/HEAD /data.json serves it as application/json.
-# Builds three self-contained HTML pages (inline CSS and SVG, no script, no network
-# reference), phone first, each answering one question set:
+# The dashboard is the app in bin/fm-dashboard/ (vendored Preact, htm and Inter; no network
+# reference; light and dark): Board, a kanban of Building, Review, Test, PR + CI and To merge
+# with tabs for Queued, Landed today and All and rows by home on request, whose cards carry
+# the lane's model, age, pull request and, when it waits, why in plain words; filters by
+# home, model and state; a card's detail with its stages and activity; Needs you (the ask
+# list); a mount point for the ship view (ship/index.js); a command palette and keys (?).
+# On a phone the board is a list grouped by stage, with a dock.
+# Each build writes the app's one data file, state/dashboard/board.json: homes with their
+# lane plans, one card per open lane, ready backlog item and pull request landed today
+# (stage from its status lines, wait, model from the fleet ledger's dispatch, history), the
+# ask list (the only source of "needs you": a lane's own decision is its home's, Main's or
+# its lead's), landed per day, cycle times (dispatch to merge, with each lane's title and
+# pull request), quota and the history.tsv samples. A lane the captain holds is parked,
+# not stuck.
+# Each build also atomically replaces data.json (every metric with its status and source;
+# GET/HEAD /data.json serves it as application/json) and writes three self-contained HTML
+# pages (inline CSS and SVG, no script, no network reference), phone first:
 #   index    Overview: Main's ask list, attention chips, six tiles and trends, lane waits,
 #            14-day in/out chart, homes, quota runway, devices and machine
 #   backlog  queued, ready and held work per home, held-for-captain items, every lane, agents
@@ -56,20 +70,23 @@
 #   <proc> is FM_DASHBOARD_PROC (default /proc), <locks> FM_DEVICE_LOCK_DIR (default /tmp);
 #   FM_EMU_MAX, FM_GRADLE_MAX, FM_MEM_MIN_GB (defaults 2, 2, 12) mirror the memory gate's caps
 # All day comparisons use the host timezone. A build writes only under state/dashboard:
-# HTML, data.json, filed.json (observed open-item filing days, kept 15 days), and
+# HTML, data.json, board.json, filed.json (observed open-item filing days, kept 15 days), and
 # history.tsv (lane, stuck and ready counts sampled every 10 minutes, kept 8 days).
 # .cache.lock serializes cache updates across builds.
 #
 # Usage:
 #   fm-dashboard.sh [build]
 #   fm-dashboard.sh serve [--bind ADDR] [--port N]
-# build (the default) writes $FM_HOME/state/dashboard/*.html and prints the index path.
+# build (the default) writes $FM_HOME/state/dashboard/ and prints the index page path.
 # serve runs a small read-only web server (python3 stdlib, IPv4) that answers GET or
-# HEAD for /, /index.html, /backlog, /measure and /data.json; every other path
-# is 404. ?group=home or ?group=action picks how lists are grouped and is remembered in
+# HEAD for / (the app, its files under bin/fm-dashboard/ and /board.json), /overview (the
+# index page), /backlog, /measure and /data.json; every other path is 404. The app's
+# files and both JSON files carry an ETag, answer 304 while unchanged and are gzipped
+# for a client that accepts it (the font is not); the app's CSP allows its own origin
+# only. ?group=home or ?group=action picks how lists are grouped and is remembered in
 # a cookie. It answers at once with the last built pages, marked "updated N s ago",
-# retaining source timestamps from the build, and keeps them fresh itself:
-# a side thread starts each rebuild early enough, by the last build's length,
+# retaining source timestamps from the build, and keeps them fresh itself: a side
+# thread starts each rebuild early enough, by the last build's length,
 # for the new pages to land as the old ones turn 60 seconds old, and the pages reload
 # themselves every 60 seconds; only the very first load waits for a build. Requests are
 # answered on their own threads, so an idle connection never holds another one up.
@@ -101,12 +118,18 @@ case "$cmd" in
       esac
     done
     case "$port" in ''|*[!0-9]*) usage ;; esac
-    exec python3 - "$0" "$FM_HOME" "$out_dir" "$bind" "$port" "$MAX_AGE" <<'PY'
-import http.server, os, subprocess, sys, threading, time, urllib.parse
-SCRIPT, HOME, DIR, BIND, PORT, MAX_AGE = sys.argv[1:7]
+    exec python3 - "$0" "$FM_HOME" "$out_dir" "$bind" "$port" "$MAX_AGE" "$SCRIPT_DIR/fm-dashboard" <<'PY'
+import gzip, http.server, os, re, subprocess, sys, threading, time, urllib.parse
+SCRIPT, HOME, DIR, BIND, PORT, MAX_AGE, APP = sys.argv[1:8]
 MAX_AGE = int(MAX_AGE)
 PAGE = os.path.join(DIR, 'index.html')
-ROUTES = {'/': 'index', '/index.html': 'index', '/backlog': 'backlog', '/measure': 'measure', '/data.json': 'data'}
+ROUTES = {'/overview': 'index', '/backlog': 'backlog', '/measure': 'measure', '/data.json': 'data', '/board.json': 'board'}
+# The app's own files: one optional folder level, no hidden names, no other types.
+STATIC = re.compile(r'/((?:[\w-]+/)?[\w-][\w.-]*\.(js|css|svg|woff2))')
+TYPES = {'js': 'text/javascript; charset=utf-8', 'css': 'text/css; charset=utf-8', 'svg': 'image/svg+xml', 'woff2': 'font/woff2',
+         'html': 'text/html; charset=utf-8', 'json': 'application/json'}
+PAGE_CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:"
+APP_CSP = "default-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; frame-ancestors 'none'"
 building = threading.Lock()
 last_error = b''
 last_took = 5.0
@@ -132,19 +155,36 @@ def ago(s):
 class Handler(http.server.BaseHTTPRequestHandler):
     timeout = 10  # an idle preconnect is closed after 10 s
 
-    def send(self, code, body, ctype, cookie=None):
+    def send(self, code, body, ctype, cookie=None, csp=PAGE_CSP, etag=None, gz=False):
         self.send_response(code)
         self.send_header('Content-Type', ctype)
+        if gz: self.send_header('Content-Encoding', 'gzip')
+        if etag: self.send_header('Vary', 'Accept-Encoding')
         self.send_header('Content-Length', str(len(body)))
-        self.send_header('Cache-Control', 'no-store')
+        self.send_header('Cache-Control', 'no-cache' if etag else 'no-store')
+        if etag: self.send_header('ETag', etag)
         self.send_header('X-Content-Type-Options', 'nosniff')
-        self.send_header('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; img-src data:")
+        self.send_header('Content-Security-Policy', csp)
         if cookie: self.send_header('Set-Cookie', f'fm_group={cookie}; Path=/; Max-Age=31536000; SameSite=Lax')
         self.end_headers()
         if self.command != 'HEAD': self.wfile.write(body)
 
+    def file(self, path, ext, csp=PAGE_CSP):  # answered by version: 304 when the client already has it; text gzipped when asked
+        gz = ext != 'woff2' and 'gzip' in (self.headers.get('Accept-Encoding') or '')
+        try:
+            with open(path, 'rb') as fh:
+                st = os.fstat(fh.fileno())
+                tag = f'"{st.st_mtime_ns:x}-{st.st_size:x}{"-gz" if gz else ""}"'
+                hit = self.headers.get('If-None-Match') == tag
+                body = b'' if hit else gzip.compress(fh.read(), 6) if gz else fh.read()
+        except OSError: return self.send(404, b'not built yet\n', 'text/plain; charset=utf-8')
+        self.send(304 if hit else 200, body, TYPES[ext], csp=csp, etag=tag, gz=gz and not hit)
+
     def do_GET(self):
         path, _, query = self.path.partition('?')
+        if path in ('/', '/index.html'): return self.file(os.path.join(APP, 'index.html'), 'html', APP_CSP)
+        m = STATIC.fullmatch(path)
+        if m and os.path.isfile(os.path.join(APP, m.group(1))): return self.file(os.path.join(APP, m.group(1)), m.group(2), APP_CSP)
         name = ROUTES.get(path)
         if name is None:
             return self.send(404, b'not found\n', 'text/plain; charset=utf-8')
@@ -160,11 +200,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             a = age()
             if a is None:
                 return self.send(500, b'dashboard build failed: ' + last_error, 'text/plain; charset=utf-8')
-        if name == 'data':
-            try:
-                with open(os.path.join(DIR, 'data.json'), 'rb') as fh: body = fh.read()
-            except OSError: return self.send(404, b'not built yet\n', 'text/plain; charset=utf-8')
-            return self.send(200, body, 'application/json')
+        if name in ('data', 'board'): return self.file(os.path.join(DIR, f'{name}.json'), 'json')
         tone = 'bad' if last_error or a >= 3 * MAX_AGE else 'warn' if a >= 1.5 * MAX_AGE else 'ok'
         note = (f'<span class="age {tone}">updated {ago(a)} ago' + (' · refreshing' if building.locked() else '')
                 + (' · last refresh failed, showing the last good page' if last_error else '') + '</span>')
@@ -193,7 +229,7 @@ try: srv.serve_forever()
 except KeyboardInterrupt: pass
 PY
     ;;
-  -h|--help) sed -n '2,78p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+  -h|--help) sed -n '2,/^[^#]/s/^# \{0,1\}//p' "$0"; exit 0 ;;
   *) usage ;;
 esac
 
@@ -393,7 +429,8 @@ for h, d in sorted(home_dir.items()):
         elif verb in ('blocked', 'paused', 'failed') and VALIDATING.search(text): state = 'validating'
         elif verb in ('blocked', 'failed'): state = 'blocked'
         else: state = 'waiting'
-        lanes.append(dict(home=h, task=f[:-5], state=state, since=at or mt, text=text, pr=pr, meta=meta))
+        lanes.append(dict(home=h, task=f[:-5], state=state, since=at or mt, text=text, pr=pr, meta=meta,
+                          held=any(k.startswith('captain-hold') for k in keys)))
 live = [l for l in lanes if l['home'] not in parked]
 def split(ls): return {s: sum(l['state'] == s for l in ls) for s in STATES}
 SPLIT = split(live)
@@ -435,7 +472,8 @@ def prose(t):
         pr = re.search(r'/pull/(\d+)$', path)
         return (f'PR {pr.group(1)}' if pr else os.path.basename(path.rstrip('/')) or 'link') + suffix
     text = re.sub(r'\[(?:key|at)=[^\]]*\]', '', str(t or ''))
-    return re.sub(r'(?<![\w/])(?:https?://|~?/|(?:[\w.-]+/)+)\S+', resource, text)
+    text = re.sub(r'(?<![\w/])(?:https?://|~?/|(?:[\w.-]+/)+)\S+', resource, text)
+    return re.sub(r'\bPR PR (\d+)', r'PR \1', text)  # "PR <link>" reads as one "PR 8"
 def clean(t):
     t = prose(t)
     return t.split('\n', 1)[0].rstrip() + '…' if '\n' in t else t
@@ -1007,7 +1045,7 @@ def card(title, window, body, cls='', more=None, cid=''):
     return f'<section class="card {cls}"{f" id={cid}" if cid else ""}><div class="ch"><h3>{title}</h3>{m}</div><p class="cw">{window}</p>{body}</section>'
 
 # --- page shell ----------------------------------------------------------
-NAV = [('./', 'index', 'Overview'), ('backlog', 'backlog', 'Backlog'), ('measure', 'measure', 'Method')]
+NAV = [('./', 'app', 'Board'), ('overview', 'index', 'Overview'), ('backlog', 'backlog', 'Backlog'), ('measure', 'measure', 'Method')]
 records = []  # (title, detail): two records that give different answers
 for h in sorted(home_dir):
     fl = bl(h, state='in_flight')
@@ -1425,9 +1463,114 @@ data = dict(build_time=NOW.isoformat(), cutoff=NOW_TS, metrics=metrics,
 data['build_duration_seconds'] = time.monotonic() - BUILD_STARTED
 with open(os.path.join(OUT, 'data.json'), 'w', encoding='utf-8') as fh:
     json.dump(data, fh, ensure_ascii=False, allow_nan=False, default=lambda v: v.isoformat())
+
+# --- board.json: the one document the web app reads ----------------------
+# A lane sits in the furthest lifecycle stage its status lines prove it reached; the wait it
+# is in now (blocked, a decision, an outside wait, a captain hold) is shown on top of that stage.
+STAGES = [('queued', 'Queued'), ('building', 'Building'), ('review', 'Review'), ('test', 'Test'),
+          ('ci', 'PR + CI'), ('merge', 'Waiting to merge'), ('landed', 'Landed today')]
+RANK = {s: i for i, (s, _) in enumerate(STAGES)}
+STEP = {'intent': 'review', 'rebase': 'review', 'review': 'review', 'test': 'test', 'document': 'test',
+        'lint': 'test', 'push': 'ci', 'pr': 'ci', 'ci': 'ci'}
+PR_URL = re.compile(r'https://github\.com/[\w.-]+/[\w.-]+/pull/\d+')
+def line_stage(verb, key, text):
+    s = re.search(r'^nm-.*?-(' + '|'.join(STEP) + r')(?:-fix\d+)?$', key or '')
+    if s: return STEP[s.group(1)]
+    if verb == 'done': return 'merge' if PR_URL.search(text) else 'review'  # a first done hands the build to validation
+    if PR_URL.search(text): return 'ci'
+    if re.search(r'no-mistakes|pipeline', text, re.I): return 'test' if re.search(r'\btest (step|gate)', text, re.I) else 'review'
+    return None
+def family(model, harness):  # the model family a lane runs on, else its tool
+    m = (model or '').lower()
+    for pat, fid, name in (('opus', 'opus', 'Opus'), ('sonnet', 'sonnet', 'Sonnet'), ('fable', 'fable', 'Fable'), ('haiku', 'haiku', 'Haiku'),
+                           ('-sol', 'sol', 'Sol'), ('muse-spark', 'muse', 'Muse Spark'), ('qwen', 'qwen', 'Qwen'), ('grok', 'grok', 'Grok'),
+                           ('gemini', 'gemini', 'Gemini'), ('kimi', 'kimi', 'Kimi'), ('deepseek', 'deepseek', 'DeepSeek'), ('gpt', 'gpt', 'GPT')):
+        if pat in m: return fid, name
+    return 'tool-' + (harness or 'unknown'), (harness or 'Unknown').capitalize()
+disp, ledger_from = {}, {}  # (home, task) -> its dispatch event; home -> its ledger's first time
+for h in ACTIVE:
+    try:
+        with open(os.path.join(home_dir[h], 'state/fleet-ledger.jsonl'), encoding='utf-8', errors='replace') as fh:
+            for l in fh:
+                if '"task.dispatched"' not in l and h in ledger_from: continue
+                try: e = json.loads(l)
+                except ValueError: continue
+                if not isinstance(e, dict) or not isinstance(e.get('ts'), int): continue
+                ledger_from.setdefault(h, e['ts'])
+                if e.get('event') == 'task.dispatched' and isinstance(e.get('task'), str): disp.setdefault((h, e['task']), e)
+    except OSError: pass  # a home without the ledger has no dispatch history
+VERBS = {'working': 'Working', 'resolved': 'Cleared', 'paused': 'Waiting', 'blocked': 'Blocked', 'needs-decision': 'Needs a decision',
+         'done': 'Finished', 'failed': 'Failed', 'captain-held': 'Held by the captain'}
+WAIT_OF = {'blocked': 'blocked', 'decision': 'decision', 'waiting': 'waiting'}
+WAIT_VERBS = {'blocked': ('blocked', 'failed'), 'decision': ('needs-decision', 'captain-held', 'paused', 'blocked'), 'waiting': ('paused',)}
+WAIT_VERBS['parked'] = WAIT_VERBS['decision']
+def card(h, task, kind, title, stage, **kw):
+    d = disp.get((h, task)) or {}
+    fid, fname = family(kw.pop('model', None) or d.get('model'), kw.get('tool') or d.get('harness'))
+    return dict(dict(id=f'{h}/{task}', home=h, task=task, kind=kind, title=title, stage=stage, wait=None, wait_since=None, reached={},
+                     state=stage, since=None, started=d.get('ts'), pr=None, why='', model=fid if d or kw.get('tool') else None,
+                     model_name=fname, tool=d.get('harness'), effort=None, history=[]), **kw)
+cards = []
+for l in live:
+    h, task, meta = l['home'], l['task'], l['meta']
+    try: ls = [x.strip() for x in open(os.path.join(home_dir[h], 'state', task + '.status'), errors='replace') if x.strip()]
+    except OSError: ls = []
+    stage, entered, rows, at, reached, verbs = 'building', None, [], None, {}, []
+    for x in ls:
+        v = re.match(r'^(?:\d{9,11}\s+)?([a-z][a-z-]*)', x)
+        verb = v.group(1) if v else ''
+        a = re.search(r'\[at=(\d+)\]', x)
+        at = int(a.group(1)) if a else at
+        k = re.search(r'\[key=([^\]]+)\]', x)
+        text = x.split(':', 1)[1].strip() if ':' in x else ''
+        s = line_stage(verb, k.group(1) if k else None, text)
+        if meta.get('kind') == 'scout' and s and RANK[s] > RANK['review']: s = 'review'
+        if s and RANK[s] > RANK[stage]: stage, entered = s, at
+        if s and at: reached.setdefault(s, at)
+        verbs.append((verb, at))
+        rows.append(dict(at=at, verb=VERBS.get(verb, verb.replace('-', ' ').capitalize() or 'Note'),
+                         tone={'blocked': 'bad', 'failed': 'bad', 'needs-decision': 'warn', 'done': 'ok'}.get(verb, ''), text=prose(text)[:240]))
+    # a captain hold parks the lane on purpose: it is not stuck and asks nothing of anyone
+    wait, wait_since = 'parked' if l['held'] else WAIT_OF.get(l['state']), None
+    for verb, a in reversed(verbs):  # the current wait began with the trailing run of lines that say it
+        if verb not in WAIT_VERBS.get(wait, ()): break
+        wait_since = a or wait_since
+    d = disp.get((h, task)) or {}
+    started = d.get('ts') or (rows[0]['at'] if rows else None) or l['since']
+    cards.append(card(h, task, meta.get('kind'), titles.get((h, task)) or task.replace('-', ' '), stage, model=meta.get('model'), tool=meta.get('harness') or d.get('harness'),
+                      wait=wait, wait_since=(wait_since or l['since']) if wait else None, reached=reached, state=l['state'], since=entered or started,
+                      started=started, pr=l['pr'] or None, why=prose(l['text'])[:240], effort=meta.get('effort'), history=rows[-40:]))
+# a merge line's title ends in its PR number, which the card shows as its own link
+def landed_title(h, task): return re.sub(r'\s+PR \d+$', '', done_title.get((h, task)) or titles.get((h, task)) or task.replace('-', ' '))
+for url, (at, h, task) in merges.items():
+    if at >= midnight(TODAY) and h in ACTIVE:
+        cards.append(card(h, task, 'ship', landed_title(h, task), 'landed', since=at, pr=url))
+for h in ACTIVE:
+    for r in bl(h, 'ready'):
+        cards.append(card(h, r['id'], r.get('kind') or 'ship', r['title'], 'queued', since=midnight(r['day']) if r['day'] else None))
+# Cycle time: dispatch to merge, for each merged task whose dispatch is in a ledger.
+done_tasks = sorted((dict(id=f'{h}/{task}', home=h, at=at, cycle=at - disp[(h, task)]['ts'], model=family(disp[(h, task)].get('model'), disp[(h, task)].get('harness'))[0],
+                          title=landed_title(h, task), pr=url)
+                     for url, (at, h, task) in merges.items() if (h, task) in disp and at >= disp[(h, task)]['ts']), key=lambda t: t['at'])
+def pct(xs, p):
+    xs = sorted(xs)
+    return xs[min(len(xs) - 1, int(math.ceil(p / 100 * len(xs))) - 1)] if len(xs) >= 5 else None  # fewer than 5 is noise
+board = dict(
+    schema='fm-dashboard-board.v1', generated=int(NOW_TS), stages=[dict(id=s, name=n) for s, n in STAGES],
+    homes=[dict(id=h, name=hname(h), plan=plan(h), open=len(by_home[h]), ready=len(bl(h, 'ready')) if backlog.get(h) is not None else None,
+                known=h not in lane_err) for h in ACTIVE],
+    parked=PARKED, cards=cards,
+    asks=[dict(id=f[0], text=f[2], url=f[3] if len(f) > 3 else '', age=a) for f, a in asks] if asks_known else None,
+    days=[d.isoformat() for d in DAYS], landed=LANDED, landed_by_home={h: [landed_on(d, h) for d in DAYS] for h in ACTIVE},
+    done=done_tasks, cycle_p50=pct([t['cycle'] for t in done_tasks], 50), cycle_p85=pct([t['cycle'] for t in done_tasks], 85),
+    quota=[dict(name=a['name'], used=None if a['problem'] or not tight_window(a) else tight_window(a)['used'], runout=a['runout'].timestamp() if a['runout'] else None,
+                runs_out=bool(runs_out(a)), empty=bool(a['empty']) or (tight_window(a) or {}).get('used') == 100, problem=a['problem']) for a in accounts],
+    quota_at=q_at, ledger_from=ledger_from, history=[[x if x >= 0 else None for x in r] for r in hist], notes=[dict(source=s, why=r) for s, r in notes])
+with open(os.path.join(OUT, 'board.json'), 'w', encoding='utf-8') as fh:
+    json.dump(board, fh, ensure_ascii=False, allow_nan=False, separators=(',', ':'))
 PY
 # The index lands last, so its time is the time the whole set was built.
-for f in "$tmp"/*.html "$tmp/data.json"; do
+for f in "$tmp"/*.html "$tmp"/*.json; do
   [ "$(basename "$f")" = index.html ] && continue
   mv -f "$f" "$out_dir/" || { echo "fm-dashboard: cannot write $out_dir/$(basename "$f")" >&2; exit 1; }
 done

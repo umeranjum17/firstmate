@@ -380,9 +380,9 @@ for metric in m.values():
 with urllib.request.urlopen(urllib.request.Request(base + 'data.json', method='HEAD')) as r:
     assert r.headers.get_content_type() == 'application/json' and r.read() == b''
     assert int(r.headers['Content-Length']) > 0
-for path, want in (('', 'Nothing needs you.'), ('backlog', 'Held for the captain'), ('measure', 'How each number is measured.')):
+for path, want in (('overview', 'Nothing needs you.'), ('backlog', 'Held for the captain'), ('measure', 'How each number is measured.')):
     code, body, _ = get(base + path)
-    print(path or '/', code, want in body)
+    print(path, code, want in body)
 code, body, cookie = get(base + 'backlog?group=home')
 print('group', code, 'fm_group=home' in cookie, '7 + 1 = <b>8</b>' in body)
 code, body, _ = get(base + 'backlog', 'fm_group=home')
@@ -391,20 +391,70 @@ code, body, _ = get(base + 'measure')
 print('timestamps', '<!--' not in body, re.search(r'as of \d\d:\d\d', body) is not None)
 for path in ('flow', 'state/', 'index.home.html', '../data/backlog.md', 'data/backlog.md'):
     print(path, get(base + path)[0])
+def raw(u, **h):
+    try:
+        with urllib.request.urlopen(urllib.request.Request(u, headers=h), timeout=120) as r: return r.status, r.headers, r.read()
+    except urllib.error.HTTPError as e: return e.code, e.headers, b''
+# The app and its files: its own origin only, each file answered 304 while unchanged; the pages keep their own policy.
+s, h, b = raw(base)
+print('app', s, h.get_content_type(), "default-src 'self'" in h['Content-Security-Policy'], b'src="app.js"' in b)
+for path in ('app.js', 'vendor/preact-htm-3.1.1.js', 'board.json'):
+    s, h, b = raw(base + path)
+    print(path, s, h.get_content_type(), h['Cache-Control'], raw(base + path, **{'If-None-Match': h['ETag']})[0])
+print('board', json.loads(raw(base + 'board.json')[2])['schema'], "default-src 'none'" in raw(base + 'overview')[1]['Content-Security-Policy'])
+import gzip
+s, h, b = raw(base + 'board.json', **{'Accept-Encoding': 'gzip'})
+print('gzip', h['Content-Encoding'], json.loads(gzip.decompress(b))['schema'], raw(base + 'board.json', **{'Accept-Encoding': 'gzip', 'If-None-Match': h['ETag']})[0])
+for path in ('vendor/../app.js', '../fm-dashboard/app.js', '.hidden.js', 'a/b/app.js', 'app.py', 'missing.js'):
+    print(path, raw(base + path)[0])
 PY
 )
-  [ "$got" = "$(printf '%s\n' '/ 200 True' 'backlog 200 True' 'measure 200 True' \
-    'group 200 True True' 'cookie 200 True' 'timestamps True True' 'flow 404' 'state/ 404' 'index.home.html 404' '../data/backlog.md 404' 'data/backlog.md 404')" ] \
-    || fail "serve answers were not the three pages, the remembered grouping, then 404s: $got"
+  [ "$got" = "$(printf '%s\n' 'overview 200 True' 'backlog 200 True' 'measure 200 True' \
+    'group 200 True True' 'cookie 200 True' 'timestamps True True' 'flow 404' 'state/ 404' 'index.home.html 404' '../data/backlog.md 404' 'data/backlog.md 404' \
+    'app 200 text/html True True' 'app.js 200 text/javascript no-cache 304' 'vendor/preact-htm-3.1.1.js 200 text/javascript no-cache 304' \
+    'board.json 200 application/json no-cache 304' 'board fm-dashboard-board.v1 True' 'gzip gzip fm-dashboard-board.v1 304' 'vendor/../app.js 404' '../fm-dashboard/app.js 404' \
+    '.hidden.js 404' 'a/b/app.js 404' 'app.py 404' 'missing.js 404')" ] \
+    || fail "serve answers were not the app, the three pages, the remembered grouping, then 404s: $got"
   # An old page is answered at once, as it is, while a rebuild runs behind it.
   printf '<p>old page<!--age--></p>\n' > "$home/state/dashboard/index.html"
   touch -d '-5 minutes' "$home/state/dashboard/index.html"
-  got=$(python3 -c 'import sys, urllib.request; print(urllib.request.urlopen(sys.argv[1], timeout=5).read().decode())' "$url")
+  got=$(python3 -c 'import sys, urllib.request; print(urllib.request.urlopen(sys.argv[1], timeout=5).read().decode())' "${url}overview")
   case "$got" in *'<span class="age bad">updated 5'*'min ago'*) ;; *) fail "an old page was not answered at once, marked old: $got" ;; esac
   for _ in $(seq 1 1200); do grep -q 'old page' "$home/state/dashboard/index.html" || break; sleep 0.1; done
   grep -q 'Nothing needs you' "$home/state/dashboard/index.html" || fail "the background rebuild did not replace the old page"
   kill "$SERVE_PID" 2>/dev/null; SERVE_PID=
-  pass "serve retains source timestamps, fills page age, remembers ?group in a cookie, rebuilds old pages, and 404s every other path"
+  pass "serve answers the app and its files by version, the three pages at once retaining source timestamps, remembers ?group in a cookie, rebuilds an old page itself, and 404s every other path"
+}
+
+test_board_json_feeds_the_app() {
+  local home d now today
+  home=$(make_home board)
+  d="$home/state/dashboard"
+  now=$(date +%s) today=$(date +%F)
+  # A lane in review on Opus; m-fix ran 3 h on GPT and merged a minute ago, its archived title ending in its PR.
+  fm_write_meta "$home/state/m-opus.meta" "kind=ship" "project=alpha" "harness=claude" "model=claude-opus-5-5" "herdr_pane_id=pane-m-opus"
+  printf '%s\n' "working [at=$((now - 3000))]: building" "working [at=$((now - 900))] [key=nm-run-review]: no-mistakes review" > "$home/state/m-opus.status"
+  printf '{"ts":%s,"event":"task.dispatched","task":"m-opus","harness":"claude"}\n{"ts":%s,"event":"task.dispatched","task":"m-fix","model":"gpt-5.5","harness":"codex"}\n{"ts":%s,"event":"task.merged","task":"m-fix","pr":"https://github.com/acme/alpha/pull/12"}\n' \
+    "$((now - 3600))" "$((now - 10800))" "$((now - 60))" >> "$home/state/fleet-ledger.jsonl"
+  printf -- '- [x] m-fix - Fix the login PR https://github.com/acme/alpha/pull/12 (repo: alpha) (kind: ship) (merged %s)\n' "$today" >> "$home/data/done-archive.md"
+  printf 'first\t%s\tApprove the release\thttps://example.invalid/release\n' "$((now - 7200))" > "$home/data/captain-asks.tsv"
+  build "$home"
+  jq -e --argjson now "$now" '
+    def c($id): .cards[] | select(.id == $id);
+    .schema == "fm-dashboard-board.v1" and ([.stages[].id] == ["queued","building","review","test","ci","merge","landed"])
+    and (c("main/m-opus") | .stage == "review" and .model == "opus" and .model_name == "Opus" and .started == $now - 3600 and .since == $now - 900 and (.history | length) == 2)
+    and (c("main/m-stuck") | .wait == "blocked" and .why == "cannot reach the build server")
+    and (c("main/m-ask") | .wait == "decision" and .why == "which layout")
+    and (c("main/m-done") | .stage == "merge" and .why == "PR 8 checks green" and .pr == "https://github.com/acme/alpha/pull/8")
+    and (c("main/m-ci") | .stage == "ci")
+    and (c("main/m-fix") | .stage == "landed" and .title == "Fix the login" and .pr == "https://github.com/acme/alpha/pull/12")
+    and ([.cards[] | select(.stage == "queued") | .id] == ["main/m-ready","zephyrine/z-ready"])
+    and .parked == ["beta"] and ([.cards[] | select(.home == "beta")] == [])
+    and ([.done[] | [.id, .title, .pr, .cycle, .model]] == [["main/m-fix","Fix the login","https://github.com/acme/alpha/pull/12",10740,"gpt"]])
+    and ([.asks[] | [.id, .text, .url]] == [["first","Approve the release","https://example.invalid/release"]])
+    and .history[0][1:] == [5,4,0] and .landed[-1] == 3 and .landed_by_home.main[-1] == 2' "$d/board.json" >/dev/null ||
+    fail "board.json does not carry each lane's stage, wait, model, reason and the day's landings: $(jq -c '{cards: [.cards[] | {id, stage, wait, why, model, title}], done, asks, history, landed}' "$d/board.json")"
+  pass "board.json gives each lane its stage, wait, reason in words and model, landed titles without their PR, cycle times and the ask list"
 }
 
 test_fleet_past_twenty_mates_keeps_every_lead_row() {
@@ -675,6 +725,7 @@ test_review_evidence_boundaries
 test_overview_answers_the_four_questions_with_sums_that_add_up
 test_backlog_and_method_pages_show_their_numbers
 test_fleet_past_twenty_mates_keeps_every_lead_row
+test_board_json_feeds_the_app
 test_each_failed_source_shows_unknown_and_why
 test_devices_and_machine_come_from_read_only_probes
 test_serve_answers_each_page_and_remembers_the_grouping
