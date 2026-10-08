@@ -1,0 +1,23 @@
+{
+  "lifecycle": {
+    "effectiveLaunch": {
+      "browserLaunched": true,
+      "engine": "chrome",
+      "launchHash": 12825947863403514000
+    },
+    "launched": false,
+    "relaunchedBrowser": false,
+    "restartedBackground": false,
+    "restoreStatus": "not_configured",
+    "reused": true,
+    "saveStatus": "not_attempted"
+  },
+  "origin": "http://127.0.0.1:45549/#/ship",
+  "result": {
+    "crew": "Opus\n2\nQwen\n2\nSol\n1\nMuse Spark\n1\n≥1\nlanded today",
+    "flow": "2\nBuilding\n1\nReview\n1\nTest\n1\nPR + CI\n1\nTo merge",
+    "kpis": "Landed today\n≥1\nIn flight\n7\n/24\n17 free\nCycle p50\n–\nStuck\n2\noldest 42m",
+    "mounts": 1,
+    "selected": "Main\n6"
+  }
+}

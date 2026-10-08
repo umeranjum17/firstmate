@@ -1,0 +1,31 @@
+{
+  "lifecycle": {
+    "effectiveLaunch": {
+      "browserLaunched": true,
+      "engine": "chrome",
+      "launchHash": 12825947863403514000
+    },
+    "launched": false,
+    "relaunchedBrowser": false,
+    "restartedBackground": false,
+    "restoreStatus": "not_configured",
+    "reused": true,
+    "saveStatus": "not_attempted"
+  },
+  "origin": "http://127.0.0.1:45549/#/ship",
+  "result": {
+    "documentWidth": 390,
+    "folded": "false",
+    "tags": [
+      "Parked by captain",
+      "Blocked\n31m",
+      "Main decides\n41m",
+      "",
+      "",
+      "",
+      "",
+      ""
+    ],
+    "width": 390
+  }
+}

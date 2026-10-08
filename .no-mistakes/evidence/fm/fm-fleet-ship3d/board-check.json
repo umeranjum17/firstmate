@@ -1,0 +1,20 @@
+{
+  "lifecycle": {
+    "effectiveLaunch": {
+      "browserLaunched": true,
+      "engine": "chrome",
+      "launchHash": 4217605248652530700
+    },
+    "launched": false,
+    "relaunchedBrowser": false,
+    "restartedBackground": false,
+    "restoreStatus": "not_configured",
+    "reused": true,
+    "saveStatus": "not_attempted"
+  },
+  "origin": "http://127.0.0.1:45549/#/board",
+  "result": {
+    "text": "Board\nActive\n7\nQueued\n1\nLanded today\n≥6\nAll\nNeeds you\n0\nStuck\n0\nLanded today\n≥6\nCycle p50\n3h\nFilter\nDisplay\nBuilding\n3\nbuild\n15m\nOpus builds navigation\nMain\nrelay\n7m\nImplement relay health\nrelay\npark\n1h 5m\nCaptain parked deployment\n\nwaiting for release window\n\nOn hold\nMain\nReview\n1\nreview\n25m\nSol reviews routing\nMain\nTest\n0\n\nNo recorded lanes\n\nPR + CI\n2\nci\n45m\nQwen watches CI\nMain\n9\ntest\n2m\nMuse tests authentication\nMain\n11\nTo merge\n1\nmerge\n55m\nRelease ready to merge\nMain\n10",
+    "url": "#/board"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "lifecycle": {
+    "effectiveLaunch": {
+      "browserLaunched": true,
+      "engine": "chrome",
+      "launchHash": 12825947863403514000
+    },
+    "launched": false,
+    "relaunchedBrowser": false,
+    "restartedBackground": false,
+    "restoreStatus": "not_configured",
+    "reused": true,
+    "saveStatus": "not_attempted"
+  },
+  "origin": "http://127.0.0.1:45549/#/ship",
+  "result": {
+    "calm": "Stuck work unknown.",
+    "crew": "Crew unknown\n≥0\nlanded today",
+    "flow": "≥0\nBuilding\n≥0\nReview\n≥0\nTest\n≥0\nPR + CI\n≥0\nTo merge",
+    "home": "empty\n?",
+    "kpis": "Landed today\n≥1\nIn flight\n≥7\n/24\nunknown\nCycle p50\n–\nStuck\n≥0\nunknown"
+  }
+}

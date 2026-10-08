@@ -1,0 +1,78 @@
+[
+  {
+    "command": [
+      "find",
+      "role",
+      "button",
+      "click",
+      "--name",
+      "Live",
+      "--exact"
+    ],
+    "result": {
+      "clicked": "@e19",
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 4217605248652530700
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      }
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "wait",
+      "--fn",
+      "document.querySelector('.sv-kpis')?.innerText.includes('3h')"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 4217605248652530700
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "result": true
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "eval",
+      "document.querySelector('.sv-kpis').innerText"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 4217605248652530700
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "origin": "http://127.0.0.1:45549/#/ship",
+      "result": "Landed today\n≥6\nIn flight\n7\n/24\n17 free\nCycle p50\n3h\nStuck\n0\nnone"
+    },
+    "success": true
+  }
+]

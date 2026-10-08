@@ -1,0 +1,21 @@
+{
+  "lifecycle": {
+    "effectiveLaunch": {
+      "browserLaunched": true,
+      "engine": "chrome",
+      "launchHash": 4217605248652530700
+    },
+    "launched": false,
+    "relaunchedBrowser": false,
+    "restartedBackground": false,
+    "restoreStatus": "not_configured",
+    "reused": true,
+    "saveStatus": "not_attempted"
+  },
+  "origin": "http://127.0.0.1:45549/#/ship",
+  "result": {
+    "crew": "Sol\n1\n≥0\nlanded today",
+    "flow": "1\nBuilding\n0\nReview\n0\nTest\n0\nPR + CI\n0\nTo merge",
+    "reduced": true
+  }
+}

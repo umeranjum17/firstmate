@@ -1,0 +1,21 @@
+{
+  "lifecycle": {
+    "effectiveLaunch": {
+      "browserLaunched": true,
+      "engine": "chrome",
+      "launchHash": 11514023084768074000
+    },
+    "launched": false,
+    "relaunchedBrowser": false,
+    "restartedBackground": false,
+    "restoreStatus": "not_configured",
+    "reused": true,
+    "saveStatus": "not_attempted"
+  },
+  "origin": "http://127.0.0.1:45549/#/ship",
+  "result": {
+    "fallback": "This browser cannot draw the 3D ship. Everything else here is live.",
+    "home": "Main\n6",
+    "kpis": "Landed today\n≥1\nIn flight\n7\n/24\n17 free\nCycle p50\n–\nStuck\n0\nnone"
+  }
+}

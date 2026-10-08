@@ -1,0 +1,168 @@
+[
+  {
+    "command": [
+      "find",
+      "role",
+      "button",
+      "click",
+      "--name",
+      "Live",
+      "--exact"
+    ],
+    "result": {
+      "clicked": "@e25",
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      }
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "wait",
+      "--text",
+      "Nothing is stuck."
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "text": "Nothing is stuck.",
+      "waited": "text"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "snapshot",
+      "-i"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "origin": "http://127.0.0.1:45549/#/ship",
+      "refs": {
+        "e1": {
+          "name": "Ship",
+          "role": "heading"
+        },
+        "e10": {
+          "name": "Stuck 0 · Parked by captain 1",
+          "role": "button"
+        },
+        "e11": {
+          "name": "Main 6",
+          "role": "tab"
+        },
+        "e12": {
+          "name": "empty 0",
+          "role": "tab"
+        },
+        "e13": {
+          "name": "relay 1",
+          "role": "tab"
+        },
+        "e2": {
+          "name": "Light or dark theme",
+          "role": "button"
+        },
+        "e3": {
+          "name": "Live",
+          "role": "button"
+        },
+        "e4": {
+          "name": "Search",
+          "role": "button"
+        },
+        "e5": {
+          "name": "Board",
+          "role": "link"
+        },
+        "e6": {
+          "name": "Needs you",
+          "role": "link"
+        },
+        "e7": {
+          "name": "Ship",
+          "role": "link"
+        },
+        "e8": {
+          "name": "Metrics",
+          "role": "link"
+        },
+        "e9": {
+          "name": "Show all stuck work",
+          "role": "button"
+        }
+      },
+      "snapshot": "- heading \"Ship\" [level=1, ref=e1]\n- button \"Light or dark theme\" [ref=e2]\n- button \"Live\" [ref=e3]\n- tab \"Main 6\" [selected, ref=e11]\n- tab \"empty 0\" [ref=e12]\n- tab \"relay 1\" [ref=e13]\n- button \"Show all stuck work\" [expanded=false, ref=e9]\n- button \"Stuck 0 · Parked by captain 1\" [expanded=false, ref=e10]\n- link \"Board\" [ref=e5]\n- link \"Needs you\" [ref=e6]\n- link \"Ship\" [ref=e7]\n- link \"Metrics\" [ref=e8]\n- button \"Search\" [ref=e4]"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "eval",
+      "({flow:document.querySelector('.sv-flow').innerText,kpis:document.querySelector('.sv-kpis').innerText,tags:[...document.querySelectorAll('.sv-tag')].map(e=>e.innerText)})"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "origin": "http://127.0.0.1:45549/#/ship",
+      "result": {
+        "flow": "2\nBuilding\n1\nReview\n0\nTest\n2\nPR + CI\n1\nTo merge",
+        "kpis": "Landed today\n≥1\nIn flight\n7\n/24\n17 free\nCycle p50\n–\nStuck\n0\nnone",
+        "tags": [
+          "Parked by captain",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ]
+      }
+    },
+    "success": true
+  }
+]
