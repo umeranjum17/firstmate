@@ -947,6 +947,7 @@ def psi_tone(v): return 'bad' if v >= 40 else 'warn' if v >= 20 else 'ok'
 gate_wait = (free is not None and free[0] < MEM_MIN_GB) or (psi is not None and psi >= 40)
 at_cap = [x for x, full in (('emulators', (emu_count or 0) >= EMU_MAX), ('Gradle builds', (mach['gradle'] or 0) >= GRADLE_MAX)) if full]
 for h in ACTIVE:  # fm-spawn.sh and fm-control.sh relaunch record why the host memory guard turned a new agent away
+    if h in remote_hosts: continue
     try: at, task, why = open(os.path.join(home_dir[h], 'state/admission-refused'), errors='replace').read().rstrip('\n').split('\t', 2)
     except (OSError, ValueError): continue
     if NOW_TS - float(at) < 900: spot('bad', 'Memory', f'new agents wait ({hname(h)})', task, dur(NOW_TS - float(at)), '#devices', why)

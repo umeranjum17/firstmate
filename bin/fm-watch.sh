@@ -1150,7 +1150,7 @@ host_memory_surface_queued() {
   local reason
   [ -s "$FM_WAKE_QUEUE" ] || return 0
   fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || return 1
-  reason=$(awk -F '\t' '$3 == "check" && $4 == "host-memory" { print $5; exit }' "$FM_WAKE_QUEUE")
+  reason=$(awk -F '\t' '$3 == "check" && $4 == "host-memory" { reason=$5 } END { if (reason != "") print reason }' "$FM_WAKE_QUEUE")
   fm_lock_release "$FM_WAKE_QUEUE_LOCK"
   [ -z "$reason" ] || wake "$reason"
 }

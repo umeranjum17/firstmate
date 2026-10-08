@@ -545,8 +545,16 @@ test_incomplete_lanes_and_moved_filings() {
   for p in backlog backlog.home; do has "$d/$p.html" "Oldest validation or CI wait: at least"; done
   has "$d/backlog.home.html" "missing unknown"
   jq -e '.metrics.lanes.status == "lower_bound" and .metrics.stuck.status == "lower_bound" and .metrics.free_lanes.status == "unknown" and ([.homes[] | select(.home == "missing")][0].lanes.value == null)' "$d/data.json" >/dev/null || fail "missing lane coverage looks exact"
+  printf '%s\tlocal-pressure-task\tlocal pressure refusal\n' "$now" > "$z/state/admission-refused"
+  build "$home"
+  has "$d/index.html" "new agents wait (zephyrine)" "local-pressure-task"
+  printf '%s\tmain-pressure-task\tmain pressure refusal\n' "$now" > "$home/state/admission-refused"
   printf -- '- zephyrine - remote (host: distant; root: /srv; home: %s; scope: work; projects: alpha; added 2026-07-11)\n' "$z" > "$home/data/secondmates.md"
   build "$home"
+  has "$d/index.html" "new agents wait (Main)" "main-pressure-task"
+  for p in index backlog backlog.home measure; do
+    lacks "$d/$p.html" "new agents wait (zephyrine)" "local-pressure-task" "local pressure refusal"
+  done
   has "$d/index.html" "Lanes open at least 7" "unknown of 3"
   jq -e '[.homes[] | select(.home == "zephyrine")][0] | .lanes.status == "unknown" and .free_lanes.value == null' "$d/data.json" >/dev/null || fail "remote lane capacity was inferred"
   : > "$home/data/secondmates.md"

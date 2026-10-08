@@ -563,10 +563,27 @@ test_failed_alert_publication() {
   [ -s "$case/state/.host-memory-alerted" ] || fail "successful publication did not latch the episode"
   [ "$(grep -c $'\tcheck\thost-memory\t' "$case/state/.wake-queue")" -eq 1 ] || fail "recovery did not publish exactly one wake"
   [ "$(wc -l < "$case/keys")" -eq 1 ] || fail "recovery did not dispatch exactly one interrupt"
-  drain_and_ack "$case"
   "${tick[@]}" || fail "latched sampling failed"
   [ "$(wc -l < "$case/keys")" -eq 1 ] || fail "restart repeated the recovered interrupt"
-  pass "failed alert publication retries across restart without premature or repeated interrupts"
+  fake_host "$case/proc" 40 2
+  "${tick[@]}" || fail "healthy sampling failed"
+  [ ! -e "$case/state/.host-memory-alerted" ] || fail "healthy sample did not end the episode"
+  fake_pid "$case/proc" 105 foreign 25 / big-build
+  fake_host "$case/proc" 5 41
+  "${tick[@]}" || fail "second episode sampling failed"
+  [ "$(grep -c $'\tcheck\thost-memory\t' "$case/state/.wake-queue")" -eq 2 ] || fail "the old wake suppressed the new episode"
+  FM_HOME="$case" FM_STATE_OVERRIDE="$case/state" "$DRAIN" > "$case/drain.out" 2> "$case/drain.err" || fail "episode wakes could not be drained"
+  assert_contains "$(cat "$case/drain.out")" "foreign pid 105 25.0 GB" "the new consumer reaches supervision"
+  assert_contains "$(cat "$case/drain.out")" "automatic interrupt skipped" "the new episode action reaches supervision"
+  watch_leg "$case" newest
+  wait_for_exit "$LEG_PID" 100 || fail "pending episodes did not wake supervision"
+  assert_contains "$(cat "$case/watch-newest.out")" "foreign pid 105 25.0 GB" "the watcher surfaces the current consumer"
+  assert_contains "$(cat "$case/watch-newest.out")" "automatic interrupt skipped" "the watcher surfaces the current action"
+  "${tick[@]}" || fail "second episode latched sampling failed"
+  [ "$(grep -c $'\tcheck\thost-memory\t' "$case/state/.wake-queue")" -eq 2 ] || fail "the second episode repeated its wake"
+  [ "$(wc -l < "$case/keys")" -eq 1 ] || fail "the foreign consumer caused an interrupt"
+  drain_and_ack "$case"
+  pass "alert publication retries across restart and preserves each pending episode"
 }
 
 test_shutdown_during_alert_publication() {

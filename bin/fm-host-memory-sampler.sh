@@ -92,8 +92,7 @@ fm_memory_sampler_tick() {
   epoch=$(date +%s)
   fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || return 0
   trap 'stop=1' HUP INT TERM
-  if { fm_wake_queued_keys_locked check | grep -Fx host-memory >/dev/null 2>&1 \
-      || fm_wake_append_locked check host-memory "$reason; $action"; } \
+  if fm_wake_append_locked check host-memory "$reason; $action" \
     && printf '%s\t%s\t%s\n' "$epoch" "$task" "$reason; $action" >> "$STATE/host-memory-interrupts.tsv" \
     && printf '%s\n' "$reason; $action" > "$latch.$$" \
     && mv "$latch.$$" "$latch"; then
