@@ -313,10 +313,14 @@ fm_secondmate_liveness_relaunch() {  # <meta> <id> [timeout-secs]
   FM_SM_LIVE_RC=$rc
   case "$rc" in
     75)
-      FM_SM_LIVE_STATUS=skipped
+      FM_SM_LIVE_STATUS=deferred
       FM_SM_LIVE_REASON="memory admission deferred: $FM_SM_LIVE_OUT"
       return "$rc" ;;
     73)
+      FM_SM_LIVE_STATUS=deferred
+      FM_SM_LIVE_REASON=$(fm_sm_live_first_line "$FM_SM_LIVE_OUT")
+      return "$rc" ;;
+    74)
       FM_SM_LIVE_STATUS=skipped
       FM_SM_LIVE_REASON=$(fm_sm_live_first_line "$FM_SM_LIVE_OUT")
       return "$rc" ;;

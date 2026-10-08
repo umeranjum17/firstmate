@@ -1704,7 +1704,7 @@ if [ "$KIND" = secondmate ] && [ "${FM_SECONDMATE_LIVENESS_RECOVERY:-0}" = 1 ]; 
   fi
   if ! fm_secondmate_liveness_begin "$STATE/$ID.meta" "$ID"; then
     printf '%s\n' "$FM_SM_LIVE_REASON" >&2
-    exit 73
+    exit 74
   fi
 fi
 # Backend selection (data/fm-backend-design-d7): explicit --backend, else

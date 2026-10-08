@@ -84,7 +84,7 @@ watch_leg() {
   local case=$1 tag=$2
   env PATH="$case/fakebin:$PATH" FM_HOME="$case" FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$case/state" \
     FM_CREW_STATE_BIN="$case/fakebin/fm-crew-state.sh" FM_FAKE_CREW_STATE='state: working · source: run-step · fixture build' TMUX='' FM_BACKEND=tmux \
-    FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_SECS="${3:-1}" FM_SECONDMATE_LIVENESS_SECS=99999999 \
+    FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_SECS="${3:-1}" FM_SECONDMATE_LIVENESS_SECS="${4:-99999999}" \
     FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
     "$WATCH" > "$case/watch-$tag.out" 2> "$case/watch-$tag.err" &
   LEG_PID=$!
@@ -106,27 +106,42 @@ wait_rows() {
   [ "$(wc -l < "$1")" -ge "$2" ] || fail "the watcher did not record sample $2: $(cat "$1" "${1%/state/*}"/watch-*.out)"
 }
 
-test_watcher_wakes_once_per_alert_episode() {
-  local case out
-  case=$(make_case alert)
-  make_fleet "$case"
-  fake_host "$case/proc" 5 41.2 16
+wait_interrupt() {
+  local state=$1 expected=${2:-1} i=0 count
+  while [ "$i" -lt 100 ]; do
+    count=$(grep -c 'automatically interrupted task big-build:' "$state/host-memory-interrupts.tsv" 2>/dev/null || true)
+    [ "${count:-0}" -lt "$expected" ] || return 0
+    sleep 0.1; i=$((i + 1))
+  done
+  fail "automatic interrupt did not complete: $(cat "$state/host-memory-interrupts.tsv" "$state/.host-memory-sampler.log")"
+}
+
+prepare_control_task() {
+  local case=$1
   fm_write_meta "$case/state/big-build.meta" kind=ship harness=pi window=firstmate:fm-big-build "worktree=$case/wt" "project=$case/wt"
   cat > "$case/fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
 case "$1" in
-  list-windows) printf '%s\n' fm-big-build ;;
+  list-windows) printf '%s\n' fm-big-build fm-sm1 ;;
   display-message)
-    case "$*" in *pane_current_command*) printf 'pi\n' ;; *) printf '%%1\n' ;; esac ;;
+    case "$*" in *fm-sm1*pane_current_command*) printf 'zsh\n' ;; *pane_current_command*) printf 'pi\n' ;; *) printf '%%1\n' ;; esac ;;
   capture-pane) printf 'idle\n' ;;
   send-keys) printf '%s\n' "$*" >> "$FM_HOME/keys" ;;
   *) exit 1 ;;
 esac
 SH
   chmod +x "$case/fakebin/tmux"
-  touch -d '11 seconds ago' "$case/state/.host-memory-tick"
+}
+
+test_watcher_wakes_once_per_alert_episode() {
+  local case out
+  case=$(make_case alert)
+  make_fleet "$case"
+  fake_host "$case/proc" 5 41.2 16
+  prepare_control_task "$case"
   watch_leg "$case" alert default
   wait_for_exit "$LEG_PID" 50 || fail "the watcher did not wake on a memory alert: $(cat "$case/watch-alert.err")"
+  wait_interrupt "$case/state"
   out=$(cat "$case/watch-alert.out")
   assert_contains "$out" "check: host memory ALERT: pressure 41% (10 s average)" "the alert wake names the pressure"
   assert_contains "$out" "largest: task big-build (main) 14.0 GB in 2 processes" "the alert wake names the largest task"
@@ -136,7 +151,7 @@ SH
   assert_contains "$(cat "$case/keys")" 'send-keys -t firstmate:fm-big-build Escape' "the watcher uses the public control plane to interrupt"
   [ "$(wc -l < "$case/keys")" -eq 1 ] || fail "one interrupt key expected"
   assert_contains "$(cat "$case/state/host-memory-interrupts.tsv")" 'automatically interrupted task big-build' "the interrupt outcome is durable"
-  assert_contains "$out" 'automatically interrupted task big-build' "Main receives the interrupt outcome"
+  assert_contains "$out" 'automatic interrupt attempted: task big-build' "Main receives the interrupt reason and task"
 
   # Still under alert: the episode is latched, so the next watcher stays quiet.
   drain_and_ack "$case"
@@ -158,6 +173,7 @@ SH
   watch_leg "$case" again
   wait_for_exit "$LEG_PID" 300 || fail "a new alert episode did not wake"
   assert_contains "$(cat "$case/watch-again.out")" "check: host memory ALERT" "the second episode wakes"
+  wait_interrupt "$case/state" 2
   [ "$(wc -l < "$case/keys")" -eq 2 ] || fail "the new episode did not interrupt once"
   fake_host "$case/proc" 40 2
   drain_and_ack "$case"
@@ -232,8 +248,135 @@ test_finite_thresholds() {
   pass "all thresholds reject non-finite numbers"
 }
 
+test_benign_liveness_outcomes() {
+  local case pid
+  case=$(make_case deferred)
+  make_fleet "$case"
+  prepare_control_task "$case"
+  mkdir -p "$case/config"
+  printf 'pi\n' > "$case/config/secondmate-harness"
+  fm_write_meta "$case/state/sm1.meta" kind=secondmate harness=pi window=firstmate:fm-sm1 "home=$case/mate"
+  fake_host "$case/proc" 30 25
+  watch_leg "$case" wait 1 1
+  pid=$LEG_PID
+  wait_rows "$case/state/host-memory.tsv" 3
+  is_live_non_zombie "$pid" || fail "memory deferral exited the watcher: $(cat "$case/watch-wait.err")"
+  [ ! -e "$case/state/.secondmate-relaunch-sm1" ] || fail "a memory deferral consumed the retry budget"
+  fake_host "$case/proc" 30 41
+  wait_for_exit "$pid" 100 || fail "ALERT did not wake while recovery was deferred"
+  wait_interrupt "$case/state"
+  assert_contains "$(cat "$case/watch-wait.out")" 'automatic interrupt attempted: task big-build' "deferred recovery does not suppress critical action"
+
+  case=$(make_case endpoint-changed)
+  mkdir -p "$case/config" "$case/mate/state"
+  printf 'pi\n' > "$case/config/secondmate-harness"
+  fm_write_meta "$case/state/sm1.meta" kind=secondmate harness=pi window=firstmate:fm-sm1 "home=$case/mate"
+  fake_host "$case/proc" 40 2
+  cat > "$case/fakebin/tmux" <<'SH'
+#!/usr/bin/env bash
+case "$1" in
+  list-windows) printf 'fm-sm1\n' ;;
+  display-message)
+    case "$*" in
+      *pane_current_command*)
+        if [ -e "$FM_HOME/probed" ]; then printf 'pi\n'; else : > "$FM_HOME/probed"; printf 'zsh\n'; fi ;;
+      *) printf '%%1\n' ;;
+    esac ;;
+  *) exit 0 ;;
+esac
+SH
+  chmod +x "$case/fakebin/tmux"
+  watch_leg "$case" changed 1 1
+  wait_rows "$case/state/host-memory.tsv" 3
+  is_live_non_zombie "$LEG_PID" || fail "an endpoint change exited the watcher"
+  assert_contains "$(cat "$case/state/.watch-triage.log")" 'endpoint no longer relaunchable: alive' "the recovery race is classified as a benign deferral"
+  kill -TERM "$LEG_PID"; wait_for_exit "$LEG_PID" 50 >/dev/null || true
+  pass "memory deferral and endpoint changes keep supervision polling"
+}
+
+test_default_home_interrupt() {
+  local case state
+  case=$(make_case default-home)
+  make_fleet "$case"
+  prepare_control_task "$case"
+  state="$case/selected-state"
+  mv "$case/state" "$state"
+  fake_host "$case/proc" 5 41
+  env -u FM_HOME PATH="$case/fakebin:$PATH" FM_ROOT_OVERRIDE="$case" FM_STATE_OVERRIDE="$state" \
+    TMUX='' FM_BACKEND=tmux FM_POLL=1 FM_SIGNAL_GRACE=0 FM_HOST_MEMORY_PROC="$case/proc" \
+    FM_SECONDMATE_LIVENESS_SECS=99999999 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
+    "$WATCH" > "$case/default.out" 2> "$case/default.err" &
+  LEG_PID=$!
+  fm_test_track_watcher_state "$state"
+  wait_for_exit "$LEG_PID" 100 || fail "default-home watcher did not deliver its memory wake"
+  wait_interrupt "$state"
+  assert_contains "$(cat "$case/default.out")" 'automatic interrupt attempted: task big-build' "the resolved default home reaches control"
+  assert_contains "$(cat "$case/keys")" 'firstmate:fm-big-build Escape' "control resolves the selected state directory"
+  pass "default-home automatic interrupts preserve the selected state"
+}
+
+test_independent_sampler_lifecycle() {
+  local case other pid identity old new i=0 bystander
+  case=$(make_case slow-check)
+  make_fleet "$case"
+  prepare_control_task "$case"
+  fake_host "$case/proc" 40 2
+  cat > "$case/state/slow.check.sh" <<'SH'
+#!/usr/bin/env bash
+: > "$FM_HOME/check-entered"
+while [ ! -e "$FM_HOME/check-release" ]; do sleep 0.1; done
+SH
+  chmod 700 "$case/state/slow.check.sh"
+  FM_HOME="$case" FM_STATE_OVERRIDE="$case/state" "$ROOT/bin/fm-check-register.sh" slow >/dev/null
+  watch_leg "$case" slow default
+  while [ ! -e "$case/check-entered" ] && [ "$i" -lt 100 ]; do sleep 0.1; i=$((i + 1)); done
+  [ -e "$case/check-entered" ] || fail "the custom check did not start: $(cat "$case/watch-slow.err")"
+  wait_rows "$case/state/host-memory.tsv" 1
+  fake_host "$case/proc" 5 41
+  i=0
+  while ! grep -q $'\tcheck\thost-memory\t' "$case/state/.wake-queue" 2>/dev/null && [ "$i" -lt 120 ]; do sleep 0.1; i=$((i + 1)); done
+  [ "$i" -lt 120 ] || fail "the default sampler missed critical pressure during a blocked check"
+  is_live_non_zombie "$LEG_PID" || fail "the check was not still blocking supervision"
+  wait_interrupt "$case/state"
+  assert_contains "$(cat "$case/keys")" 'Escape' "critical action happens while the watcher is blocked"
+  [ "$(wc -l < "$case/state/host-memory.tsv")" -ge 2 ] || fail "independent samples were not recorded"
+  : > "$case/check-release"
+  wait_for_exit "$LEG_PID" 100 || fail "the watcher did not surface the durable memory wake"
+
+  case=$(make_case sampler-restart)
+  fake_host "$case/proc" 40 2
+  watch_leg "$case" restart
+  pid=$LEG_PID
+  wait_rows "$case/state/host-memory.tsv" 2
+  IFS=$'\t' read -r old identity < "$case/state/.host-memory-sampler.pid"
+  kill -TERM "$old"
+  i=0 new=$old
+  while [ "$new" = "$old" ] && [ "$i" -lt 100 ]; do
+    sleep 0.1; IFS=$'\t' read -r new identity < "$case/state/.host-memory-sampler.pid" 2>/dev/null || new=$old
+    i=$((i + 1))
+  done
+  [ "$new" != "$old" ] || fail "the watcher did not restart its dead sampler"
+  wait_rows "$case/state/host-memory.tsv" 4
+  other=$(make_case other-home)
+  fake_host "$other/proc" 40 2
+  watch_leg "$other" other
+  wait_rows "$other/state/host-memory.tsv" 2
+  IFS=$'\t' read -r old identity < "$other/state/.host-memory-sampler.pid"
+  sleep 60 & bystander=$!
+  identity=$(STATE="$case/state" bash -c '. "$1"; fm_pid_identity "$2"' _ "$ROOT/bin/fm-wake-lib.sh" "$bystander")
+  printf '%s\t%s\n' "$bystander" "$identity" > "$case/state/.host-memory-sampler.pid"
+  kill -TERM "$pid"; wait_for_exit "$pid" 50 >/dev/null || true
+  is_live_non_zombie "$bystander" || fail "sampler cleanup signalled an unrelated recorded PID"
+  is_live_non_zombie "$old" || fail "stopping one home killed another home's sampler"
+  kill -TERM "$bystander" "$LEG_PID"; wait_for_exit "$LEG_PID" 50 >/dev/null || true
+  pass "independent sampling survives slow checks, restarts, and respects PID ownership"
+}
+
 test_verdicts_samples_and_owners
 test_cgroup_pressure
 test_home_qualified_owners
 test_finite_thresholds
 test_watcher_wakes_once_per_alert_episode
+test_benign_liveness_outcomes
+test_default_home_interrupt
+test_independent_sampler_lifecycle
