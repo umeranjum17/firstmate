@@ -2,8 +2,8 @@
 # Shared owner of the watcher's native push-transition escalation.
 #
 # The watcher and event-wait smoke tests source this library instead of loading
-# the whole watcher to obtain handle_push_transition. Its source list is limited
-# to the four production boundaries the transition handler actually calls.
+# the whole watcher to obtain handle_push_transition. Native-evidence admission
+# is shared with the polling timers through fm-wait-native-lib.sh.
 
 FM_PUSH_TRANSITION_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 

@@ -602,7 +602,9 @@ The flag is a home-local supervision-noise preference and is not inherited by se
 
 Every watch poll checks recorded workers and leads for open `blocked` or `needs-decision` declarations and declared `paused` waits, independently of pane activity and the existing stale/wedge heuristics.
 Herdr's bounded `agent list` read admits `agent_status=blocked` except for Cursor, whose native blocked status is unreliable; admitted native evidence takes precedence for each recorded pane, even while its status log says working.
-Polling and native push escalation share this admission rule; Cursor declarations remain monitored. The mandatory `agent list` lookup uses the portable timeout runner, including on hosts without coreutils, with a positive `FM_BACKEND_HERDR_READ_TIMEOUT` deadline (default 10 seconds). A native API failure stops the check with its diagnostic rather than treating the pane as unblocked.
+Polling and native push escalation share this admission rule; Cursor declarations remain monitored.
+The mandatory `agent list` lookup uses the portable timeout runner, including on hosts without coreutils, with a positive `FM_BACKEND_HERDR_READ_TIMEOUT` deadline (default 10 seconds).
+A native API failure stops the check with its diagnostic rather than treating the pane as unblocked.
 
 | Environment setting | Default | Meaning |
 | --- | --- | --- |
@@ -611,13 +613,15 @@ Polling and native push escalation share this admission rule; Cursor declaration
 
 Both values must be positive decimal seconds of at most nine digits, with escalation later than the owner alert; invalid settings stop the check.
 The durable episode starts at first observation, survives watcher restarts, and re-arms when the effective declaration or endpoint changes or clears.
-Pane output and unrelated status events cannot reset an open blocker or decision; paused waits honour a future `until` time and only raise an owner recheck, never a parent escalation.
+Pane output and unrelated status events cannot reset an open blocker or decision.
+The independent timer excludes a paused wait while its declared `until` time is in the future; observation starts when the wait is first seen due, and it raises one owner recheck per episode, never a parent escalation.
+The separate stale/wedge recheck cadence is unchanged.
 Active captain holds suppress watcher wait and stale alerts, including native blocked transitions, in every posture.
 Each alert names the item, observed wait duration, and the supervisor who must act.
 Local and remote secondmate routes use the existing parent channel; the escalation is automatically resolved when the episode ends.
 Main has no automatic captain escalation: it seeks a human only when it cannot unblock the item itself.
 The existing steering-inbox retry and secondmate wake-loop recovery paths still attempt safe delivery before raising their own escalation; the owner timer itself queues and delivers an actionable wake before parent escalation becomes due.
-Timer mechanics are owned by [`bin/fm-wait-timers-lib.sh`](../bin/fm-wait-timers-lib.sh), with the real watcher/drain/parent-channel regression in `tests/fm-wait-timers.test.sh`.
+Timer mechanics are owned by [`bin/fm-wait-timers-lib.sh`](../bin/fm-wait-timers-lib.sh); [runtime backend verification](verification/runtime-backends.md#waiting-state-native-list-probe) owns the evidence and regression entry points.
 
 ## Parked-gate wait deferral (config/wedge-defer-parked-gate)
 
