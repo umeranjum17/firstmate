@@ -1,0 +1,16 @@
+{"v":1,"ts":1791441514,"event":"task.dispatched","task":"delivered","kind":"ship","project":"app","harness":"manual","model":"none"}
+{"v":1,"ts":1791441514,"event":"task.status","task":"delivered","state":"working","key":null,"text":" implementing"}
+{"v":1,"ts":1791441515,"event":"task.pr_ready","task":"delivered","pr":"https://github.com/example/app/pull/1"}
+{"v":1,"ts":1791441515,"event":"task.merged","task":"delivered","via":"local"}
+{"v":1,"ts":1791441515,"event":"task.cleaned_up","task":"delivered"}
+{"v":1,"ts":1791441516,"event":"task.status","task":"closedkey","state":"blocked","key":"a","text":" waiting for login"}
+{"v":1,"ts":1791441516,"event":"task.status","task":"closedkey","state":"resolved","key":"a","text":" [key=a] login restored"}
+{"v":1,"ts":1791441516,"event":"task.status","task":"mixed","state":"blocked","key":"a","text":" fm-mem-gate: waiting (free 1 GB)"}
+{"v":1,"ts":1791441516,"event":"task.status","task":"mixed","state":"blocked","key":"b","text":" [key=b] waiting for memory gate"}
+{"v":1,"ts":1791441516,"event":"task.status","task":"mixed","state":"blocked","key":"c","text":" waiting for memory gate"}
+{"v":1,"ts":1791441516,"event":"task.status","task":"mixed","state":"blocked","key":"m","text":" waiting for merge"}
+{"v":1,"ts":1791441516,"event":"task.status","task":"pause","state":"paused","key":null,"text":" waiting for login"}
+{"v":1,"ts":1791441516,"event":"task.status","task":"pause","state":"paused","key":null,"text":" waiting for memory gate"}
+{"v":1,"ts":1791441516,"event":"task.status","task":"reopen","state":"blocked","key":"a","text":" waiting for login"}
+{"v":1,"ts":1791441516,"event":"task.status","task":"reopen","state":"blocked","key":"a","text":" [key=a] waiting for merge"}
+{"v":1,"ts":1791441516,"event":"task.status","task":"smallmerge","state":"blocked","key":"m","text":" waiting for merge"}
