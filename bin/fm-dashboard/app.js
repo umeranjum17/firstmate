@@ -215,8 +215,8 @@ function App() {
       <a class="nav" href="#/ship" aria-current=${r.view === 'ship' ? 'page' : null}>${I(IC.ship)}Ship</a><a class="nav" href="/overview">${I(IC.display)}Metrics</a>
       <div class="sec">Homes</div>
       ${d.homes.map(h => { const cs = open.filter(c => c.home === h.id)
-        return html`<button class="nav" aria-current=${r.view === 'board' && r.home.length === 1 && r.home[0] === h.id ? 'page' : null} onClick=${() => go({ view: 'board', home: [h.id], card: null })}>
-          <span class="sq" style=${{ '--c': hc(d, h.id) }}></span>${h.name}${cs.some(stuck) ? html`<span class="dot" title="Stuck lanes"></span>` : ''}<span class="n num">${h.known ? cs.length : '?'}</span></button>` })}
+        return html`<button class="nav home-nav" aria-label=${h.name} title=${h.name} aria-current=${r.view === 'board' && r.home.length === 1 && r.home[0] === h.id ? 'page' : null} onClick=${() => go({ view: 'board', home: [h.id], card: null })}>
+          <span class="sq" style=${{ '--c': hc(d, h.id) }}></span><span class="home-name">${h.name}</span><span class="home-short" aria-hidden="true">${Array.from(h.name).slice(0, 4).join('')}</span>${cs.some(stuck) ? html`<span class="dot" title="Stuck lanes"></span>` : ''}<span class="n num">${h.known ? cs.length : '?'}</span></button>` })}
       <div class="foot"><${Live} d=${d} st=${st} refresh=${refresh}/><span class="sp"></span><button class="ib" onClick=${toggleTheme} aria-label="Light or dark theme">${I(themeIcon())}</button></div>
     </nav>
     <main class="main">

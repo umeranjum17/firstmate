@@ -18,7 +18,10 @@
 # Ship needs WebGL2; otherwise a static illustration replaces the scene while its panels stay live.
 # The system's reduced-motion preference stops continuous scene animation and tag pulsing
 # and immediately settles any home transition, restoring tags and picking.
-# On a phone the board is a list grouped by stage, with a dock.
+# At viewport widths of 760-1279 CSS pixels the header figures use their own row.
+# At 760-1023 CSS pixels the sidebar becomes a compact rail with four-character home
+# labels (or the whole name if shorter); home buttons retain the full accessible name and tooltip.
+# Below 760 CSS pixels the board is a list grouped by stage, with a dock.
 # Each build writes the app's one data file, state/dashboard/board.json: homes with their
 # lane plans, one card per open lane, ready backlog item and pull request landed today,
 # and parked home ids. Cards carry the current stage inferred from status lines (which
@@ -30,7 +33,8 @@
 # (dispatch to merge across recorded merges, shown only with at least five samples).
 # Dispatch history is local-only; each merge uses its latest preceding dispatch.
 # Quota and history samples remain on Overview, not in board.json.
-# A lane the captain holds is parked, not stuck.
+# A lane the captain holds is parked on the board, remains open, and counts as
+# waiting on other in metric lane-state totals, not as stuck or waiting on a decision.
 # Each build also atomically replaces data.json (every metric with its status and source;
 # GET/HEAD /data.json serves it as application/json) and writes three self-contained HTML
 # pages (inline CSS and SVG, no script, no network reference), phone first:
@@ -57,7 +61,10 @@
 #   <home>/state/*.meta + *.status  lanes: every ship/scout record, in one state by its last
 #                                   status verb and [at=] time (building, validating or waiting on
 #                                   CI, waiting on a decision, blocked, waiting on something
-#                                   else, finished not landed); a secondmate record is a lead
+#                                   else, finished not landed); a secondmate record is a lead.
+#                                   Without a captain hold, blocked/failed stay blocked even when
+#                                   their text names CI; only paused validation/no-mistakes/CI/checks/
+#                                   pipeline waits are validating (tests/fm-dashboard.test.sh ci-stuck)
 #   config/lane-caps                "<home> <cap>" lane plan per home (Main is "main" or the name
 #                                   of its home's parent folder); config/lane-target is the default (4)
 #   bin/fm-tasks-axi.sh list        each home's backlog (FM_HOME=<home>): queued = ready + held +
@@ -446,11 +453,11 @@ for h, d in sorted(home_dir.items()):
             elif verb in ('resolved', 'captain-held'): keys.discard(key)
             text = l.split(':', 1)[1].strip() if ':' in l else ''
             pr = (re.findall(r'https://github\.com/[\w.-]+/[\w.-]+/pull/\d+', l) or [pr])[-1]
-        if any(k.startswith('captain-hold') for k in keys): state = 'decision'
+        if any(k.startswith('captain-hold') for k in keys): state = 'waiting'
         elif verb in ('working', 'resolved'): state = 'building'
         elif verb == 'needs-decision': state = 'decision'
         elif verb == 'done': state = 'finished'
-        elif verb in ('blocked', 'paused', 'failed') and VALIDATING.search(text): state = 'validating'
+        elif verb == 'paused' and VALIDATING.search(text): state = 'validating'
         elif verb in ('blocked', 'failed'): state = 'blocked'
         else: state = 'waiting'
         lanes.append(dict(home=h, task=f[:-5], state=state, since=at or mt, text=text, pr=pr, meta=meta,

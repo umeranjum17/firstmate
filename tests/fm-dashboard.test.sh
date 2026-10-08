@@ -677,12 +677,12 @@ test_incomplete_lanes_and_moved_filings() {
   printf '## Queued\n- [ ] missing-ready - Missing home ready (since %s)\n' "$(date +%F)" > "$home/mates/missing/data/backlog.md"
   printf -- '- missing - domain (home: %s; scope: work; projects: alpha; added 2026-07-11)\n' "$home/mates/missing" >> "$home/data/secondmates.md"
   build "$home"
-  has "$d/index.html" "Lanes open at least 8" "Stuck at least 2" "free unknown" "Ready, capacity unknown 1" "unknown of 3"
+  has "$d/index.html" "Lanes open at least 8" "Stuck at least 3" "free unknown" "Ready, capacity unknown 1" "unknown of 3"
   lacks "$d/index.html" "All flowing" "missing 0 of 3"
   has "$d/backlog.html" "at least 8 lanes open" "Fleet at least 8" "missing unknown 3"
-  for p in backlog backlog.home; do has "$d/$p.html" "Oldest validation or CI wait: at least"; done
+  for p in backlog backlog.home; do has "$d/$p.html" "Oldest validation or CI wait: unknown"; done
   has "$d/backlog.home.html" "missing unknown"
-  jq -e '.metrics.lanes.status == "lower_bound" and .metrics.stuck.status == "lower_bound" and .metrics.free_lanes.status == "unknown" and ([.homes[] | select(.home == "missing")][0].lanes.value == null)' "$d/data.json" >/dev/null || fail "missing lane coverage looks exact"
+  jq -e '.metrics.lanes.status == "lower_bound" and .metrics.stuck.status == "lower_bound" and .metrics.stuck.value == 3 and .metrics.free_lanes.status == "unknown" and ([.homes[] | select(.home == "missing")][0].lanes.value == null)' "$d/data.json" >/dev/null || fail "missing lane coverage looks exact"
   printf '%s\tlocal-pressure-task\tlocal pressure refusal\n' "$now" > "$z/state/admission-refused"
   build "$home"
   has "$d/index.html" "new agents wait (zephyrine)" "local-pressure-task"
@@ -820,9 +820,63 @@ PY
   pass "unavailable displayed readings suppress reassurance and concurrent cache updates preserve both builds"
 }
 
+test_ci_failures_remain_stuck_in_metrics() {
+  local home d now
+  home=$(make_home ci-stuck)
+  d="$home/state/dashboard" now=$(date +%s)
+  lane "$home" m-stuck ship "blocked [at=$now]: CI needs credentials"
+  lane "$home" m-resume ship "failed [at=$now]: no-mistakes checks failed"
+  build "$home"
+  python3 - "$d" <<'PY' || fail "CI failures disagree between board and metrics"
+import json, pathlib, sys
+out = pathlib.Path(sys.argv[1])
+metrics = json.loads((out / 'data.json').read_text())
+board = json.loads((out / 'board.json').read_text())
+cards = {c['task']: c for c in board['cards'] if c.get('task')}
+assert cards['m-stuck']['wait'] == cards['m-resume']['wait'] == 'blocked'
+assert metrics['metrics']['stuck']['value'] == 3, metrics['metrics']['stuck']
+assert metrics['metrics']['stuck']['value'] == sum(c.get('wait') in ('blocked', 'decision') for c in board['cards'])
+states = metrics['metrics']['lane_states']['value']
+assert states['blocked'] == 2, states
+assert states['validating'] == 1, states
+PY
+  has "$d/index.html" 'Stuck 3' '2 blocked'
+  lane "$home" m-held-ci ship "paused [at=$now]: waiting for CI checks" \
+    "needs-decision [at=$now] [key=captain-hold-ci]: captain parked CI"
+  build "$home"
+  python3 - "$d" <<'PY' || fail "captain-held lane disagrees between board and metrics"
+import json, pathlib, sys
+out = pathlib.Path(sys.argv[1])
+metrics = json.loads((out / 'data.json').read_text())['metrics']
+board = json.loads((out / 'board.json').read_text())
+held = next(c for c in board['cards'] if c.get('task') == 'm-held-ci')
+assert held['wait'] == 'parked', held
+assert metrics['stuck']['value'] == 3, metrics['stuck']
+assert metrics['stuck']['value'] == sum(c.get('wait') in ('blocked', 'decision') for c in board['cards'])
+assert metrics['lanes']['value'] == sum(metrics['lane_states']['value'].values()) == 9
+PY
+  has "$d/index.html" 'Stuck 3' '2 blocked'
+  printf 'resolved [at=%s] [key=captain-hold-ci]: captain released CI\nfailed [at=%s]: CI checks failed\n' "$now" "$now" >> "$home/state/m-held-ci.status"
+  build "$home"
+  python3 - "$d" <<'PY' || fail "released CI failure was not counted as stuck"
+import json, pathlib, sys
+out = pathlib.Path(sys.argv[1])
+metrics = json.loads((out / 'data.json').read_text())['metrics']
+board = json.loads((out / 'board.json').read_text())
+released = next(c for c in board['cards'] if c.get('task') == 'm-held-ci')
+assert released['wait'] == 'blocked', released
+assert metrics['stuck']['value'] == 4, metrics['stuck']
+assert metrics['stuck']['value'] == sum(c.get('wait') in ('blocked', 'decision') for c in board['cards'])
+PY
+  has "$d/index.html" 'Stuck 4' '3 blocked'
+  pass "CI failures stay stuck unless captain-held, and releasing the hold restores the count"
+}
+
+if [ "${1:-}" = ci-stuck ]; then test_ci_failures_remain_stuck_in_metrics; exit; fi
 if [ "${1:-}" = board ]; then test_board_json_feeds_the_app; exit; fi
 if [ "${1:-}" = review ]; then test_board_json_feeds_the_app; test_serve_answers_each_page_and_remembers_the_grouping; exit; fi
 
+test_ci_failures_remain_stuck_in_metrics
 test_unavailable_readings_and_concurrent_caches
 test_new_lane_and_unwritten_archive_stay_exact
 test_incomplete_lanes_and_moved_filings
