@@ -335,15 +335,20 @@ test_relaunch_rebuilds_the_switch() {
       || fail "relaunch with allowlist=$setting did not re-export the compact-adviser switch into the pane"
     launch=$(grep 'encode launch-brief' "$dir/fake/literal" | tail -1)
     [ -n "$launch" ] || fail "relaunch with allowlist=$setting sent no replacement launch command"
-    install_env_probe "$dir/fakebin" codex
+    cat > "$dir/fakebin/codex" <<'SH'
+#!/bin/sh
+printf '%s\n' "${COMPACT_ADVISER_DISABLE-unset}|${GIT_EDITOR-unset}|${GIT_SEQUENCE_EDITOR-unset}"
+SH
+    chmod +x "$dir/fakebin/codex"
     preamble=$(grep '^export ' "$dir/fake/keys")
     seen=$(env -i HOME="$dir/user-home" PATH="$dir/fakebin:$PATH" TERM=xterm \
       TMUX=synthetic-pane COMPACT_ADVISER_DISABLE="$CONTRARY" \
+      GIT_EDITOR=nvim GIT_SEQUENCE_EDITOR=nvim \
       /bin/sh -c "$preamble
 $launch") \
       || fail "relaunch with allowlist=$setting: the replacement launch failed to run"
-    assert_equals 1 "$seen" \
-      "a relaunched agent with allowlist=$setting must start with the compact adviser disabled, exactly as a fresh spawn does"
+    assert_equals '1|true|true' "$seen" \
+      "a relaunched agent with allowlist=$setting must disable both the compact adviser and Git editors, exactly as a fresh spawn does"
   done
   pass "relaunch rebuilds the compact-adviser switch for the replacement agent in both allowlist postures"
 }
@@ -394,7 +399,25 @@ test_worker_git_editors() {
     mkdir -p "$probe_dir"
     cat > "$probe_dir/probe" <<'SH'
 #!/bin/sh
+set -eu
 printf '%s\n' "${GIT_EDITOR-unset}|${GIT_SEQUENCE_EDITOR-unset}"
+exec </dev/null
+git init -q
+git config user.name 'Editor regression'
+git config user.email 'editor@example.invalid'
+printf 'base\n' > conflict.txt
+git add conflict.txt; git commit -qm base
+base=$(git rev-parse HEAD)
+git checkout -qb topic
+printf 'topic\n' > conflict.txt; git commit -qam topic
+git checkout -qb upstream "$base"
+printf 'upstream\n' > conflict.txt; git commit -qam upstream
+git checkout -q topic
+if git rebase upstream; then exit 1; fi
+printf 'resolved\n' > conflict.txt; git add conflict.txt
+git rebase --continue
+git rebase -i HEAD~1
+printf 'git-operations-completed\n'
 SH
     chmod +x "$probe_dir/probe"
     out=$(run_case_spawn "git-editors-$setting-a1" "$PROJ_DIR" --mode no-mistakes --yolo off \
@@ -405,7 +428,8 @@ SH
     seen=$(env -i HOME="$TMP_ROOT/pane-home" PATH="$FAKEBIN_DIR:$PATH" TERM=xterm \
       GIT_EDITOR=nvim GIT_SEQUENCE_EDITOR=nvim /bin/sh -c "$launch") \
       || fail "allowlist=$setting: worker editor probe failed to run"
-    assert_equals 'true|true' "$seen" "allowlist=$setting: workers must never open a git editor"
+    assert_contains "$seen" 'true|true' "allowlist=$setting: workers must never open a git editor"
+    assert_contains "$seen" 'git-operations-completed' "allowlist=$setting: real Git must finish without stdin or an editor"
   done
   pass "worker launches disable both git editors in ordinary and cleared environments"
 }
