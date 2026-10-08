@@ -9,13 +9,15 @@
 # since the previous poll. Every other no-verb wake surfaces, so a crew
 # that finishes (or stops and waits) is never silently swallowed. A declared wait,
 # either a paused: external wait or a verified captain-held transfer, is the
-# separate idle absorb case and re-surfaces only on its long bounded cadence,
+# separate idle absorb case and uses the stale path's long bounded cadence,
 # although its initial no-verb status signal still surfaces in normal mode.
 # That cadence is hours long and condition-aware: a paused: line naming
 # `until <UTC ISO 8601>` is rechecked when that time passes, but a declared time
 # beyond FM_PAUSE_RESURFACE_SECS cannot extend the ordinary recheck cadence, and
-# while an away record (state/.afk-contract, never quiet mode's) exists an
-# item held for the captain is never rechecked at all, in either posture.
+# while an away record (state/.afk-contract, never quiet mode's) exists a
+# status-only captain-held transfer is never rechecked at all.
+# Independent wait timers and active backlog hold suppression are owned by
+# docs/configuration.md "Waiting-state escalation".
 # While state/.afk exists, the daemon owns triage and this watcher queues and exits
 # on every wake. Printed reason lines:
 #   signal: <file>...      status/turn-end signals, surfaced when a listed status
@@ -2041,12 +2043,9 @@ stale_wait_record() {  # <window-key>
   printf '%s' "$STALE_WAIT_DECLARATION" > "$STATE/.paused-resurfaced-$1"
 }
 
-# Bound a due stale alarm for an ordinary crew task held for the captain.
-# Backlog-only secondmate holds are outside this guard because the earlier gate
-# preserves their no-backlog-read hot path.
-# While the away-posture record exists the bound is absolute: an open captain
-# call is never rechecked, whatever the throttle says, because nobody is there
-# to answer it and the return brief lists it.
+# Fallback for a hold that becomes visible after the loop-top hold check.
+# The ordinary stale path skips proven active holds before reaching this helper;
+# this late read preserves the existing cadence if the hold changes mid-poll.
 captain_call_stale_bound() {  # <window-key> <task>
   local key=$1 task=$2
   STALE_WAIT_DECLARATION=
@@ -2072,9 +2071,8 @@ captain_call_stale_bound() {  # <window-key> <task>
 # and the throttle is read BEFORE anything is queued and advanced only by a wake
 # that really fires - a throttle written by the wake it should have prevented, or
 # read after that wake was already appended, bounds nothing.
-# Both records of an ordinary crew wait bound it (see task_captain_call_open
-# above): the status line the worker declared, and the backlog hold firstmate
-# recorded once the captain took the work in hand.
+# Proven active backlog holds are skipped before this path; the late hold read
+# below covers a hold that becomes visible during the poll.
 surface_nonterminal_stale() {  # <window> <hash>
   local win=$1 h=$2 key task last declared=1 bounded=1 throttled=1 until now
   key=$(window_key "$win")
@@ -3342,10 +3340,8 @@ EOF
     # An idle secondmate endpoint is healthy by design, so a mate is admitted to
     # the pane-stale path ONLY to serve a status-declared wait's bounded
     # re-surface. This gate reads the shared predicate rather than the pause verb
-    # alone so it includes a declared `captain-held` status. A hold recorded only
-    # in the backlog while the mate still says `working:` or `done:` is outside
-    # this guard: reaching it would require backlog reads for windows this gate
-    # deliberately skips, putting that read on the ordinary poll hot path.
+    # alone so it includes a declared `captain-held` status. Active backlog holds
+    # have already been checked above, independently of the status declaration.
     if [ "$kind" = secondmate ] && ! status_is_paused_or_captain_held "$last"; then
       continue
     fi
