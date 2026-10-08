@@ -602,7 +602,7 @@ The flag is a home-local supervision-noise preference and is not inherited by se
 
 Every watch poll checks recorded workers and leads for open `blocked` or `needs-decision` declarations and declared `paused` waits, independently of pane activity and the existing stale/wedge heuristics.
 Herdr's bounded `agent list` read admits `agent_status=blocked` except for Cursor, whose native blocked status is unreliable; admitted native evidence takes precedence for each recorded pane, even while its status log says working.
-A native API failure stops the check with its diagnostic rather than treating the pane as unblocked.
+Polling and native push escalation share this admission rule; Cursor declarations remain monitored. The mandatory `agent list` lookup uses the portable timeout runner, including on hosts without coreutils, with a positive `FM_BACKEND_HERDR_READ_TIMEOUT` deadline (default 10 seconds). A native API failure stops the check with its diagnostic rather than treating the pane as unblocked.
 
 | Environment setting | Default | Meaning |
 | --- | --- | --- |

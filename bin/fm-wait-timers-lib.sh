@@ -16,6 +16,8 @@
 _FM_WAIT_TIMER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=bin/fm-parent-channel-lib.sh
 . "$_FM_WAIT_TIMER_DIR/fm-parent-channel-lib.sh"
+. "$_FM_WAIT_TIMER_DIR/fm-wait-native-lib.sh"
+. "$_FM_WAIT_TIMER_DIR/fm-timeout-lib.sh"
 
 fm_wait_timer_save() {  # <record> <signature> <since> <owner> <parent> <key>
   local file=$1 temp="${1%/*}/.${1##*/}.tmp.$$"
@@ -40,7 +42,7 @@ fm_wait_timer_owner_delivered() {
 fm_wait_timers_tick() {
   local alert=${FM_WAIT_ALERT_SECS:-300} escalate=${FM_WAIT_ESCALATE_SECS:-900}
   local meta task backend window session native sessions='|' blocked='|' rows actor=Main
-  local dir="$STATE/.waiting-timers" now record declaration verb signature old since owner parent key age reason until harness
+  local dir="$STATE/.waiting-timers" now record declaration verb signature old since owner parent key age reason until bound rc
   for native in "$alert" "$escalate"; do
     case "$native" in ''|*[!0-9]*|0* ) echo "waiting timers: thresholds must be positive decimal seconds" >&2; return 1 ;; esac
     [ "${#native}" -le 9 ] || { echo "waiting timers: threshold exceeds nine digits" >&2; return 1; }
@@ -61,7 +63,20 @@ fm_wait_timers_tick() {
     session=$FM_BACKEND_HERDR_SESSION
     case "$sessions" in *"|$session|"*) continue ;; esac
     sessions="$sessions$session|"
-    native=$(FM_BACKEND_HERDR_TIMEOUT=$FM_BACKEND_HERDR_READ_TIMEOUT fm_backend_herdr_cli "$session" agent list) || return 1
+    bound=$FM_BACKEND_HERDR_READ_TIMEOUT
+    case "$bound" in ''|0*|*[!0-9]*) echo "waiting timers: native read timeout must be positive decimal seconds" >&2; return 1 ;; esac
+    [ "${#bound}" -le 9 ] || return 1
+    if native=$(fm_run_timed "$bound" bash -c '
+      . "$1"
+      fm_backend_source herdr || exit 1
+      FM_BACKEND_HERDR_TIMEOUT= fm_backend_herdr_cli "$2" agent list
+    ' fm-wait-native "$_FM_WAIT_TIMER_DIR/fm-backend.sh" "$session"); then
+      :
+    else
+      rc=$?
+      echo "waiting timers: agent list for $session failed (code $rc, deadline ${bound}s)" >&2
+      return 1
+    fi
     rows=$(printf '%s' "$native" | jq -er '
       if (.result.agents | type) != "array" then error("agent.list missing agents array")
       else [.result.agents[] | select(.agent_status == "blocked") |
@@ -91,8 +106,7 @@ EOF
     _fm_parent_channel_id_valid "$task" || { echo "waiting timers: invalid task id in $meta" >&2; return 1; }
     window=$(fm_backend_target_of_meta "$meta")
     declaration=''
-    harness=$(fm_meta_get "$meta" harness)
-    if [ "$harness" != cursor ]; then
+    if fm_native_wait_admitted "$(fm_meta_get "$meta" harness)"; then
       case "$blocked" in
         *"|$window|"*) [ -z "$window" ] || declaration=herdr-blocked ;;
       esac
