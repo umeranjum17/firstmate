@@ -54,7 +54,7 @@ fm_memory_sampler_interrupt() {
 }
 
 fm_memory_sampler_tick() {
-  local out d task reason action latch="$STATE/.host-memory-alerted"
+  local out d task reason action epoch stop=0 latch="$STATE/.host-memory-alerted"
   local -a dirs=()
   fm_local_firstmate_state_dirs "$STATE" 2>/dev/null || FM_LOCAL_STATE_DIRS=("$STATE")
   for d in "${FM_LOCAL_STATE_DIRS[@]}"; do dirs+=(--state-dir "$d"); done
@@ -76,15 +76,20 @@ fm_memory_sampler_tick() {
     ''|*[!A-Za-z0-9._-]*) ;;
     *) action="automatic interrupt attempted: task $task" ;;
   esac
-  printf '%s\t%s\t%s\n' "$(date +%s)" "$task" "$reason; $action" >> "$STATE/host-memory-interrupts.tsv" || return 0
-  printf '%s\n' "$reason; $action" > "$latch" || return 0
-  if ! fm_wake_queued_keys check | grep -Fx host-memory >/dev/null 2>&1; then
-    fm_wake_append check host-memory "$reason; $action"
+  epoch=$(date +%s)
+  trap 'stop=1' HUP INT TERM
+  if printf '%s\t%s\t%s\n' "$epoch" "$task" "$reason; $action" >> "$STATE/host-memory-interrupts.tsv" \
+    && printf '%s\n' "$reason; $action" > "$latch"; then
+    case "$task" in
+      ''|*[!A-Za-z0-9._-]*) ;;
+      *) (trap - EXIT HUP INT TERM; fm_memory_sampler_interrupt "$task") </dev/null & ;;
+    esac
+    if ! fm_wake_queued_keys check | grep -Fx host-memory >/dev/null 2>&1; then
+      fm_wake_append check host-memory "$reason; $action"
+    fi
   fi
-  case "$task" in
-    ''|*[!A-Za-z0-9._-]*) ;;
-    *) (trap - EXIT HUP INT TERM; fm_memory_sampler_interrupt "$task") </dev/null & ;;
-  esac
+  trap 'exit 0' HUP INT TERM
+  [ "$stop" -eq 0 ] || exit 0
 }
 
 fm_memory_sampler_cleanup() {

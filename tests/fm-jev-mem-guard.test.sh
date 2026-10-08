@@ -34,7 +34,7 @@ fake_pid() {
 }
 
 # A home with one ship task, one lead, and processes owned by the task (by
-# working directory and, for a daemon outside it, by FM_TASK_ID), by the lead,
+# working directory and a path-qualified FM_TASK_ID), by the lead,
 # and by nothing Firstmate records.
 make_fleet() {
   local case=$1
@@ -42,7 +42,7 @@ make_fleet() {
   fm_write_meta "$case/state/big-build.meta" kind=ship "worktree=$case/wt"
   fm_write_meta "$case/state/sm1.meta" kind=secondmate "home=$case/mate"
   fake_pid "$case/proc" 101 node 9 "$case/wt/sub"
-  fake_pid "$case/proc" 102 java 5 / big-build
+  fake_pid "$case/proc" 102 java 5 "$case/wt" big-build
   fake_pid "$case/proc" 103 claude 2 "$case/mate"
   fake_pid "$case/proc" 104 llama 6 /
 }
@@ -180,7 +180,7 @@ test_watcher_wakes_once_per_alert_episode() {
   watch_leg "$case" calm-foreign
   wait_rows "$case/state/host-memory.tsv" "$(( $(wc -l < "$case/state/host-memory.tsv") + 1 ))"
   kill -TERM "$LEG_PID" 2>/dev/null; wait_for_exit "$LEG_PID" 50 >/dev/null || true
-  fake_pid "$case/proc" 105 foreign 25 /
+  fake_pid "$case/proc" 105 foreign 25 / big-build
   fake_host "$case/proc" 5 41
   drain_and_ack "$case"
   watch_leg "$case" foreign
@@ -218,6 +218,11 @@ test_home_qualified_owners() {
   local case=$TMP_ROOT/owners out
   make_fleet "$case"
   fake_host "$case/proc" 5 41
+  fake_pid "$case/proc" 107 foreign 25 "$TMP_ROOT/independent-home/wt" big-build
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --state-dir "$case/state" --owned-top-task "$case/state")
+  assert_contains "$out" 'foreign pid 107 25.0 GB, task big-build (main) 14.0 GB in 2 processes' "a unique visible ID still requires recorded path ownership"
+  assert_equals '' "${out##*$'\t'}" "an independent home's matching ID cannot authorize control"
+  rm -r "$case/proc/107"
   fm_write_meta "$case/mate/state/big-build.meta" kind=ship "worktree=$case/mate/wt"
   mkdir -p "$case/mate/wt"
   fake_pid "$case/proc" 105 java 20 "$case/mate/wt" big-build
@@ -372,6 +377,131 @@ SH
   pass "independent sampling survives slow checks, restarts, and respects PID ownership"
 }
 
+test_atomic_admission_publication() {
+  local case=$TMP_ROOT/concurrent-admission first second rc1 rc2
+  fake_host "$case/proc" 30 25
+  mkdir -p "$case/hook" "$case/barrier" "$case/state"
+  cat > "$case/hook/sitecustomize.py" <<'PY'
+import os
+import time
+
+original_replace = os.replace
+
+def replace(src, dst, *args, **kwargs):
+    if os.fspath(dst) == os.environ.get("FM_TEST_ADMISSION_DEST"):
+        barrier = os.environ["FM_TEST_ADMISSION_BARRIER"]
+        with open(os.path.join(barrier, str(os.getpid())), "w"):
+            pass
+        for _ in range(200):
+            if len(os.listdir(barrier)) == 2:
+                break
+            time.sleep(0.01)
+        else:
+            raise TimeoutError("the parallel publisher did not reach replacement")
+    return original_replace(src, dst, *args, **kwargs)
+
+os.replace = replace
+PY
+  env PYTHONPATH="$case/hook" FM_TEST_ADMISSION_DEST="$case/state/admission-refused" FM_TEST_ADMISSION_BARRIER="$case/barrier" \
+    FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --admit build-a --state "$case/state" > "$case/a.out" 2> "$case/a.err" &
+  first=$!
+  env PYTHONPATH="$case/hook" FM_TEST_ADMISSION_DEST="$case/state/admission-refused" FM_TEST_ADMISSION_BARRIER="$case/barrier" \
+    FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --admit build-b --state "$case/state" > "$case/b.out" 2> "$case/b.err" &
+  second=$!
+  wait "$first"; rc1=$?
+  wait "$second"; rc2=$?
+  [ "$rc1" -eq 1 ] && [ "$rc2" -eq 1 ] || fail "parallel refusals lost their pressure result: $(cat "$case/"*.err)"
+  [ ! -s "$case/a.err" ] && [ ! -s "$case/b.err" ] || fail "parallel refusals raised an error"
+  assert_contains "$(cat "$case/a.out" "$case/b.out")" 'pressure at or above 20%' "both launches report pressure"
+  python3 - "$case/state" <<'PY'
+import os
+import sys
+
+state = sys.argv[1]
+with open(os.path.join(state, "admission-refused")) as f:
+    epoch, task, reason = f.read().rstrip("\n").split("\t")
+assert epoch.isdigit() and task in ("build-a", "build-b")
+assert reason.startswith("host memory under pressure:")
+assert os.listdir(state) == ["admission-refused"]
+PY
+  [ "$?" -eq 0 ] || fail "the public refusal record was not published intact"
+  fake_host "$case/proc" 40 2
+  FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --admit build-a --state "$case/state" & first=$!
+  FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --admit build-b --state "$case/state" & second=$!
+  wait "$first"; rc1=$?
+  wait "$second"; rc2=$?
+  [ "$rc1" -eq 0 ] && [ "$rc2" -eq 0 ] && [ ! -e "$case/state/admission-refused" ] || fail "parallel healthy admissions did not clear the refusal record"
+  pass "parallel admission publications and clearing are independent"
+}
+
+test_shutdown_during_alert_publication() {
+  local case real_date sampler identity i=0
+  case=$(make_case alert-stop)
+  make_fleet "$case"
+  prepare_control_task "$case"
+  fake_host "$case/proc" 40 2
+  cat > "$case/state/slow.check.sh" <<'SH'
+#!/usr/bin/env bash
+: > "$FM_HOME/check-entered"
+while [ ! -e "$FM_HOME/check-release" ]; do sleep 0.1; done
+SH
+  chmod 700 "$case/state/slow.check.sh"
+  FM_HOME="$case" FM_STATE_OVERRIDE="$case/state" "$ROOT/bin/fm-check-register.sh" slow >/dev/null
+  watch_leg "$case" stop
+  while [ ! -e "$case/check-entered" ] && [ "$i" -lt 100 ]; do sleep 0.1; i=$((i + 1)); done
+  [ -e "$case/check-entered" ] || fail "the watcher did not enter its blocking check"
+  IFS=$'\t' read -r sampler identity < "$case/state/.host-memory-sampler.pid"
+  real_date=$(command -v date)
+  cat > "$case/fakebin/date" <<SH
+#!/usr/bin/env bash
+if [ -e "\$FM_HOME/state/.host-memory-alerted" ] && mkdir "\$FM_HOME/term-sent" 2>/dev/null; then
+  IFS=\$'\t' read -r pid identity < "\$FM_HOME/state/.host-memory-sampler.pid"
+  kill -TERM "\$pid"
+fi
+exec "$real_date" "\$@"
+SH
+  chmod +x "$case/fakebin/date"
+  fake_host "$case/proc" 5 41
+  wait_interrupt "$case/state"
+  [ -d "$case/term-sent" ] || fail "termination was not injected during alert publication"
+  i=0
+  while is_live_non_zombie "$sampler" && [ "$i" -lt 100 ]; do sleep 0.1; i=$((i + 1)); done
+  ! is_live_non_zombie "$sampler" || fail "the sampler did not honor deferred termination"
+  assert_contains "$(cat "$case/state/.wake-queue")" 'automatic interrupt attempted: task big-build' "the scheduled interrupt has a durable wake"
+  [ -e "$case/state/.host-memory-alerted" ] || fail "the dispatched episode was not latched"
+  : > "$case/check-release"
+  wait_for_exit "$LEG_PID" 100 || fail "the watcher did not surface the stopped sampler's wake"
+  [ "$(wc -l < "$case/keys")" -eq 1 ] || fail "the episode interrupted more than once after restart"
+  pass "termination cannot commit an alert without dispatching its interrupt"
+}
+
+test_default_supervision_poll() {
+  local case i=0 first second
+  case=$(make_case default-poll)
+  fake_host "$case/proc" 40 2
+  cat > "$case/state/poll.check.sh" <<'SH'
+#!/usr/bin/env bash
+date +%s >> "$FM_HOME/poll-times"
+SH
+  chmod 700 "$case/state/poll.check.sh"
+  FM_HOME="$case" FM_STATE_OVERRIDE="$case/state" "$ROOT/bin/fm-check-register.sh" poll >/dev/null
+  env -u FM_POLL PATH="$case/fakebin:$PATH" FM_HOME="$case" FM_ROOT_OVERRIDE="$ROOT" \
+    TMUX='' FM_BACKEND=tmux FM_SIGNAL_GRACE=0 FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_SECS=1 \
+    FM_CHECK_INTERVAL=1 FM_HEARTBEAT=999999 FM_SECONDMATE_LIVENESS_SECS=99999999 \
+    "$WATCH" > "$case/poll.out" 2> "$case/poll.err" &
+  LEG_PID=$!
+  while [ "$i" -lt 250 ]; do
+    [ ! -f "$case/poll-times" ] || [ "$(wc -l < "$case/poll-times")" -lt 2 ] || break
+    sleep 0.1; i=$((i + 1))
+  done
+  [ "$i" -lt 250 ] || fail "the default watcher did not perform two check cycles: $(cat "$case/poll.err")"
+  { read -r first; read -r second; } < "$case/poll-times"
+  [ "$((second - first))" -ge 15 ] || fail "general supervision was sped up to $((second - first)) seconds"
+  [ "$(wc -l < "$case/state/host-memory.tsv")" -ge 10 ] || fail "sampling depended on the general supervision poll"
+  kill -TERM "$LEG_PID"; wait_for_exit "$LEG_PID" 50 >/dev/null || true
+  pass "general supervision retains its independent 15-second default"
+}
+
 test_verdicts_samples_and_owners
 test_cgroup_pressure
 test_home_qualified_owners
@@ -380,3 +510,6 @@ test_watcher_wakes_once_per_alert_episode
 test_benign_liveness_outcomes
 test_default_home_interrupt
 test_independent_sampler_lifecycle
+test_atomic_admission_publication
+test_shutdown_during_alert_publication
+test_default_supervision_poll
