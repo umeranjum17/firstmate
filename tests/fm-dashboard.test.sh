@@ -386,13 +386,13 @@ print('group', code, 'fm_group=home' in cookie, '7 + 1 = <b>8</b>' in body)
 code, body, _ = get(base + 'backlog', 'fm_group=home')
 print('cookie', code, '7 + 1 = <b>8</b>' in body)
 code, body, _ = get(base + 'measure')
-print('ages', '<!--' not in body, re.search(r'as of \d\d:\d\d', body) is not None)
+print('timestamps', '<!--' not in body, re.search(r'as of \d\d:\d\d', body) is not None)
 for path in ('flow', 'state/', 'index.home.html', '../data/backlog.md', 'data/backlog.md'):
     print(path, get(base + path)[0])
 PY
 )
   [ "$got" = "$(printf '%s\n' '/ 200 True' 'backlog 200 True' 'measure 200 True' \
-    'group 200 True True' 'cookie 200 True' 'ages True True' 'flow 404' 'state/ 404' 'index.home.html 404' '../data/backlog.md 404' 'data/backlog.md 404')" ] \
+    'group 200 True True' 'cookie 200 True' 'timestamps True True' 'flow 404' 'state/ 404' 'index.home.html 404' '../data/backlog.md 404' 'data/backlog.md 404')" ] \
     || fail "serve answers were not the three pages, the remembered grouping, then 404s: $got"
   # An old page is answered at once, as it is, while a rebuild runs behind it.
   printf '<p>old page<!--age--></p>\n' > "$home/state/dashboard/index.html"
@@ -402,7 +402,7 @@ PY
   for _ in $(seq 1 1200); do grep -q 'old page' "$home/state/dashboard/index.html" || break; sleep 0.1; done
   grep -q 'Nothing needs you' "$home/state/dashboard/index.html" || fail "the background rebuild did not replace the old page"
   kill "$SERVE_PID" 2>/dev/null; SERVE_PID=
-  pass "serve answers the three pages at once with their ages, remembers ?group in a cookie, rebuilds an old page itself, and 404s every other path"
+  pass "serve retains source timestamps, fills page age, remembers ?group in a cookie, rebuilds old pages, and 404s every other path"
 }
 
 test_fleet_past_twenty_mates_keeps_every_lead_row() {

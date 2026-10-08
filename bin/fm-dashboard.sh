@@ -67,9 +67,9 @@
 # serve runs a small read-only web server (python3 stdlib, IPv4) that answers GET or
 # HEAD for /, /index.html, /backlog, /measure and /data.json; every other path
 # is 404. ?group=home or ?group=action picks how lists are grouped and is remembered in
-# a cookie. It answers at once with the last built pages, marked "updated N s ago" (and
-# each source's own age, filled in as each request is answered), and keeps them fresh
-# itself: a side thread starts each rebuild early enough, by the last build's length,
+# a cookie. It answers at once with the last built pages, marked "updated N s ago",
+# retaining source timestamps from the build, and keeps them fresh itself:
+# a side thread starts each rebuild early enough, by the last build's length,
 # for the new pages to land as the old ones turn 60 seconds old, and the pages reload
 # themselves every 60 seconds; only the very first load waits for a build. Requests are
 # answered on their own threads, so an idle connection never holds another one up.
@@ -102,7 +102,7 @@ case "$cmd" in
     done
     case "$port" in ''|*[!0-9]*) usage ;; esac
     exec python3 - "$0" "$FM_HOME" "$out_dir" "$bind" "$port" "$MAX_AGE" <<'PY'
-import http.server, os, re, subprocess, sys, threading, time, urllib.parse
+import http.server, os, subprocess, sys, threading, time, urllib.parse
 SCRIPT, HOME, DIR, BIND, PORT, MAX_AGE = sys.argv[1:7]
 MAX_AGE = int(MAX_AGE)
 PAGE = os.path.join(DIR, 'index.html')
@@ -125,7 +125,6 @@ def build():  # call holding `building`; the build replaces each page in one ren
 def age():
     try: return time.time() - os.path.getmtime(PAGE)
     except OSError: return None
-AT = re.compile(rb'<!--at:(\d+)-->')
 def ago(s):
     s = max(0, int(s))
     return f'{s}\u00a0s' if s < 120 else f'{s // 60}\u00a0min' if s < 7200 else f'{s // 3600}\u00a0h'
@@ -173,7 +172,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if not os.path.isfile(f): f = os.path.join(DIR, f'{name}.html')
         try:
             with open(f, 'rb') as fh: body = fh.read().replace(b'<!--age-->', note.encode(), 1)
-            body = AT.sub(lambda m: ago(time.time() - int(m.group(1))).encode(), body)  # each source's own age, as of this answer
         except OSError:
             return self.send(404, b'not built yet\n', 'text/plain; charset=utf-8')
         self.send(200, body, 'text/html; charset=utf-8', asked)
