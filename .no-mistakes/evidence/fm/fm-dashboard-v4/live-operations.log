@@ -1,0 +1,159 @@
+{
+  "ok": true,
+  "action": "add",
+  "task": {
+    "id": "release",
+    "title": "Main release approval",
+    "state": "queued",
+    "kind": "ship",
+    "repo": "demo",
+    "priority": null,
+    "created": "2026-10-08",
+    "closed": null,
+    "deps": [],
+    "hold": null,
+    "links": [],
+    "body": null,
+    "blocked": false,
+    "blocked_by": [],
+    "held": false
+  }
+}
+{
+  "ok": true,
+  "action": "hold",
+  "task": {
+    "id": "release",
+    "title": "Main release approval",
+    "state": "queued",
+    "kind": "ship",
+    "repo": "demo",
+    "priority": null,
+    "created": "2026-10-08",
+    "closed": null,
+    "deps": [],
+    "hold": {
+      "reason": "Approve evidence=/home/u/x/main-release.json",
+      "kind": "captain",
+      "until": null
+    },
+    "links": [],
+    "body": null,
+    "blocked": false,
+    "blocked_by": [],
+    "held": true
+  }
+}
+{
+  "ok": true,
+  "action": "add",
+  "task": {
+    "id": "release",
+    "title": "Lead release approval",
+    "state": "queued",
+    "kind": "ship",
+    "repo": "demo",
+    "priority": null,
+    "created": "2026-10-08",
+    "closed": null,
+    "deps": [],
+    "hold": null,
+    "links": [],
+    "body": null,
+    "blocked": false,
+    "blocked_by": [],
+    "held": false
+  }
+}
+{
+  "ok": true,
+  "action": "hold",
+  "task": {
+    "id": "release",
+    "title": "Lead release approval",
+    "state": "queued",
+    "kind": "ship",
+    "repo": "demo",
+    "priority": null,
+    "created": "2026-10-08",
+    "closed": null,
+    "deps": [],
+    "hold": {
+      "reason": "Choose lead rollout",
+      "kind": "captain",
+      "until": null
+    },
+    "links": [],
+    "body": null,
+    "blocked": false,
+    "blocked_by": [],
+    "held": true
+  }
+}
+{
+  "ok": true,
+  "action": "add",
+  "task": {
+    "id": "ready",
+    "title": "Prepare dashboard rollout",
+    "state": "queued",
+    "kind": "ship",
+    "repo": "demo",
+    "priority": null,
+    "created": "2026-10-08",
+    "closed": null,
+    "deps": [],
+    "hold": null,
+    "links": [],
+    "body": null,
+    "blocked": false,
+    "blocked_by": [],
+    "held": false
+  }
+}
+{
+  "ok": true,
+  "action": "add",
+  "task": {
+    "id": "vendor",
+    "title": "Obtain vendor credentials",
+    "state": "queued",
+    "kind": "ship",
+    "repo": "demo",
+    "priority": null,
+    "created": "2026-10-08",
+    "closed": null,
+    "deps": [],
+    "hold": null,
+    "links": [],
+    "body": null,
+    "blocked": false,
+    "blocked_by": [],
+    "held": false
+  }
+}
+{
+  "ok": true,
+  "action": "hold",
+  "task": {
+    "id": "vendor",
+    "title": "Obtain vendor credentials",
+    "state": "queued",
+    "kind": "ship",
+    "repo": "demo",
+    "priority": null,
+    "created": "2026-10-08",
+    "closed": null,
+    "deps": [],
+    "hold": {
+      "reason": "waiting for vendor credentials",
+      "kind": "external",
+      "until": null
+    },
+    "links": [],
+    "body": null,
+    "blocked": false,
+    "blocked_by": [],
+    "held": true
+  }
+}
