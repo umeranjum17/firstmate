@@ -442,10 +442,11 @@ test_board_json_feeds_the_app() {
   jq -e --argjson now "$now" '
     def c($id): .cards[] | select(.id == $id);
     .schema == "fm-dashboard-board.v1" and ([.stages[].id] == ["queued","building","review","test","ci","merge","landed"])
-    and (c("main/m-opus") | .stage == "review" and .model == "opus" and .model_name == "Opus" and .started == $now - 3600 and .since == $now - 900 and (.history | length) == 2)
+    and (c("main/m-opus") | .stage == "review" and .model == "opus" and .model_name == "Opus" and .started == $now - 3600 and .since == $now - 900
+      and ([.history[] | [.v, .stage]] == [["working","building"],["working","review"]]))
     and (c("main/m-stuck") | .wait == "blocked" and .why == "cannot reach the build server")
     and (c("main/m-ask") | .wait == "decision" and .why == "which layout")
-    and (c("main/m-done") | .stage == "merge" and .why == "PR 8 checks green" and .pr == "https://github.com/acme/alpha/pull/8")
+    and (c("main/m-done") | .stage == "merge" and .why == "PR 8 checks green" and .pr == "https://github.com/acme/alpha/pull/8" and .history[0].v == "done" and .history[0].stage == "merge")
     and (c("main/m-ci") | .stage == "ci")
     and (c("main/m-fix") | .stage == "landed" and .title == "Fix the login" and .pr == "https://github.com/acme/alpha/pull/12")
     and ([.cards[] | select(.stage == "queued") | .id] == ["main/m-ready","zephyrine/z-ready"])
@@ -454,7 +455,7 @@ test_board_json_feeds_the_app() {
     and ([.asks[] | [.id, .text, .url]] == [["first","Approve the release","https://example.invalid/release"]])
     and .history[0][1:] == [5,4,0] and .landed[-1] == 3 and .landed_by_home.main[-1] == 2' "$d/board.json" >/dev/null ||
     fail "board.json does not carry each lane's stage, wait, model, reason and the day's landings: $(jq -c '{cards: [.cards[] | {id, stage, wait, why, model, title}], done, asks, history, landed}' "$d/board.json")"
-  pass "board.json gives each lane its stage, wait, reason in words and model, landed titles without their PR, cycle times and the ask list"
+  pass "board.json gives each lane its stage, wait, reason in words, model and each status line's verb and stage, landed titles without their PR, cycle times and the ask list"
 }
 
 test_fleet_past_twenty_mates_keeps_every_lead_row() {

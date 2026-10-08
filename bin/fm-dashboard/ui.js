@@ -25,17 +25,18 @@ export const SNAME = { queued: 'Queued', building: 'Building', review: 'Review',
 // Stuck is blocked or on a decision; a lane the captain put on hold waits on purpose and is not stuck.
 export const stuck = c => c.wait === 'blocked' || c.wait === 'decision'
 // A lane's own decision belongs to whoever runs its home, never to the captain: only the ask list says what needs the captain.
-const who = c => c.home === 'main' ? 'Main' : 'the lead'
+export const who = c => c.home === 'main' ? 'Main' : 'the lead'
 export const state = c => c.wait === 'blocked' ? ['Blocked', 'var(--red)'] : c.wait === 'decision' ? [c.home === 'main' ? 'Main decides' : 'Lead decides', 'var(--orange)']
   : c.wait === 'waiting' ? ['Waiting', 'var(--yellow)'] : c.wait === 'parked' ? ['On hold', 'var(--grey)'] : null
 // The reason line is plain words built from what the data knows for sure; the worker's own note stays in the card's activity.
+// It reads a wait (`x`: wait, stage and the worker's words) of the card, or of one of its status lines.
 const FINDING = { review: 'A review finding', test: 'A test finding', ci: 'A check finding' }
-export function reason(d, c) {
-  if (!c.wait) return ''
-  const dep = c.why && d.cards.find(x => x.home === c.home && x.id !== c.id && x.task.length > 3 && x.stage !== 'landed' && c.why.split(/[^\w.-]+/).includes(x.task))
-  if (dep && c.wait !== 'parked') return `Waits for “${dep.title}” to land.`
-  return { blocked: `Stopped until ${who(c)} unblocks it.`, decision: `${FINDING[c.stage] || 'A question'} needs ${who(c)}'s call.`,
-    waiting: 'Paused on an outside step; it picks up again by itself.', parked: 'On hold until you release it.' }[c.wait] || ''
+export function reason(d, c, x = c) {
+  if (!x.wait) return ''
+  const dep = x.why && d.cards.find(y => y.home === c.home && y.id !== c.id && y.task.length > 3 && y.stage !== 'landed' && x.why.split(/[^\w.-]+/).includes(y.task))
+  if (dep && x.wait !== 'parked') return `Waits for “${dep.title}” to land.`
+  return { blocked: `Stopped until ${who(c)} unblocks it.`, decision: `${FINDING[x.stage] || 'A question'} needs ${who(c)}'s call.`,
+    waiting: 'Paused on an outside step; it picks up again by itself.', parked: 'On hold until you release it.' }[x.wait] || ''
 }
 
 // Eight fixed home colours, in registry order.

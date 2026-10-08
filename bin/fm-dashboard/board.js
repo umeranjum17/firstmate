@@ -1,6 +1,6 @@
 // The board in Linear's language: columns of issue cards on a desktop (by stage, or by home for queued and landed work,
 // optionally one band per home), a list grouped by stage on a phone, and the card detail as Linear's issue peek.
-import { html, useState, useEffect, useRef, now, dur, hm, prNum, STAGES, ACTIVE, SNAME, stuck, state, reason, hc, hname, mname,
+import { html, useState, useEffect, useRef, now, dur, hm, prNum, STAGES, ACTIVE, SNAME, stuck, state, reason, who, hc, hname, mname,
   sorted, age, I, IC, Caret, StageIcon, Av } from './ui.js'
 
 // Which lanes a tab shows, and whether its columns are stages or homes.
@@ -67,11 +67,23 @@ const squash = h => h.reduce((a, x) => { const p = a.at(-1), k = y => y.verb + (
 // Commit hashes, branch names and file names stay, set apart from the words around them; a long local path reads as its last part.
 const CODE = /(\b[0-9a-f]{7,40}\b|\b(?:fm|nm|no-mistakes)\/[\w./-]+|\b[\w-]+\.(?:txt|md|json|sh|js|py)\b|\b\w+_\w+\b)/g
 const words = t => (t || '').replace(/(?:~|\/home)\/[\w.@-]+(?:\/[\w.@-]+)*\/([\w.@-]+)/g, '…/$1').split(CODE).map((p, i) => i % 2 ? html`<code>${p}</code>` : p)
-function Entry({ x }) {
-  const [full, setFull] = useState(false)
+// A status line in plain words: a wait reads as the card's own reason would, moving work as its stage; the worker's text is behind Raw.
+const LINE_WAIT = { blocked: 'blocked', 'needs-decision': 'decision', 'captain-held': 'parked', paused: 'waiting' }
+function said(d, c, x) {
+  const pr = x.text?.match(/\bPR (\d+)/)?.[1], checks = `${pr ? `PR ${pr}` : 'The pull request'} is open; checks are running.`
+  if (x.v === 'paused' && x.stage === 'ci') return checks
+  if (x.v === 'paused' && (x.stage === 'review' || x.stage === 'test')) return `Waiting on the ${x.stage} run; it picks up again by itself.`
+  if (LINE_WAIT[x.v]) return reason(d, c, { wait: LINE_WAIT[x.v], stage: x.stage, why: x.text })
+  if (x.v === 'done') return x.stage === 'merge' ? `${pr ? `PR ${pr}` : 'The pull request'} passed its checks; ready to merge.` : 'The build is done; checks start.'
+  return { working: { building: 'Building.', review: 'In review.', test: 'Tests are running.', ci: checks, merge: 'Ready to merge.' }[x.stage],
+    resolved: 'Back to work.', failed: `Failed; ${who(c)} picks the next step.` }[x.v] || 'A note from the worker.'
+}
+function Entry({ d, c, x }) {
+  const [raw, setRaw] = useState(false)
   return html`<li><b class=${x.tone}></b><div><div class="h"><strong>${x.verb}</strong>${x.n > 1 ? html`<span>${x.n}×</span>` : ''}
     ${x.at ? html`<span class="sp"></span><span class="num">${x.n > 1 && x.first ? `${hm(x.first)} – ` : ''}${hm(x.at)}</span>` : ''}</div>
-    ${x.text && html`<p class=${full ? '' : 'clamp'} onClick=${() => setFull(!full)}>${words(x.text)}</p>`}</div></li>`
+    <p>${said(d, c, x)}${x.text ? html`<button class="rawb" aria-expanded=${raw} onClick=${() => setRaw(!raw)}>Raw</button>` : ''}</p>
+    ${raw && html`<p class="raw">${words(x.text)}</p>`}</div></li>`
 }
 export function Detail({ d, id, go, list }) {
   const c = d.cards.find(x => x.id === id), at = list.findIndex(x => x.id === id), ref = useRef()
@@ -111,6 +123,6 @@ export function Detail({ d, id, go, list }) {
       </dl>
       ${c.stage !== 'queued' ? html`<div class="h4">Stages</div><div class="steps">${ACTIVE.map((s, i) => html`<div class=${'step' + (done || i < cur ? ' done' : i === cur ? ' cur' : '')} style=${{ '--st': `var(--st-${s})` }}>
         <i></i><span>${SNAME[s]}</span><small class="num">${spent[i] != null ? dur(spent[i]) : ''}</small></div>`)}</div>` : ''}
-      ${c.history.length ? html`<div class="h4">Activity</div><ul class="act">${squash(c.history).reverse().map(x => html`<${Entry} x=${x}/>`)}</ul>` : ''}
+      ${c.history.length ? html`<div class="h4">Activity</div><ul class="act">${squash(c.history).reverse().map(x => html`<${Entry} d=${d} c=${c} x=${x}/>`)}</ul>` : ''}
     </div></aside>`
 }

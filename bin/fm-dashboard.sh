@@ -10,7 +10,8 @@
 # On a phone the board is a list grouped by stage, with a dock.
 # Each build writes the app's one data file, state/dashboard/board.json: homes with their
 # lane plans, one card per open lane, ready backlog item and pull request landed today
-# (stage from its status lines, wait, model from the fleet ledger's dispatch, history), the
+# (stage from its status lines, wait, model from the fleet ledger's dispatch, and those lines
+# with each one's verb and the stage it had reached, which the app words plainly), the
 # ask list (the only source of "needs you": a lane's own decision is its home's, Main's or
 # its lead's), landed per day, cycle times (dispatch to merge, with each lane's title and
 # pull request), quota and the history.tsv samples. A lane the captain holds is parked,
@@ -1528,7 +1529,7 @@ for l in live:
         if s and RANK[s] > RANK[stage]: stage, entered = s, at
         if s and at: reached.setdefault(s, at)
         verbs.append((verb, at))
-        rows.append(dict(at=at, verb=VERBS.get(verb, verb.replace('-', ' ').capitalize() or 'Note'),
+        rows.append(dict(at=at, v=verb, stage=stage, verb=VERBS.get(verb, verb.replace('-', ' ').capitalize() or 'Note'),
                          tone={'blocked': 'bad', 'failed': 'bad', 'needs-decision': 'warn', 'done': 'ok'}.get(verb, ''), text=prose(text)[:240]))
     # a captain hold parks the lane on purpose: it is not stuck and asks nothing of anyone
     wait, wait_since = 'parked' if l['held'] else WAIT_OF.get(l['state']), None
