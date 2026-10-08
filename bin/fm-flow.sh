@@ -523,7 +523,7 @@ print(json.dumps(out))"""
         # stdin avoids expanding any caller value in the remote command.
         try:
             response = subprocess.run(['ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=3', '-o',
-                                       'StrictHostKeyChecking=yes', host, 'python3 -'], input=code,
+                                       'StrictHostKeyChecking=yes', '-o', 'UpdateHostKeys=no', host, 'python3 -'], input=code,
                                       capture_output=True, text=True, timeout=6)
             if response.returncode:
                 raise ValueError(response.stderr.strip()[-300:] or f'SSH exit {response.returncode}')

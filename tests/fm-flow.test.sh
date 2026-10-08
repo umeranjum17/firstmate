@@ -289,15 +289,25 @@ with socket.socket() as listener:
     thread.start()
     route = tmp / 'ssh-route'
     route.mkdir()
+    config = route / 'config'
+    config.write_text('Host *\n    UpdateHostKeys yes\n')
+    effective = route / 'effective-options'
+    native = shlex.quote(ssh) + ' -F ' + shlex.quote(str(config)) + \
+        f' -p {listener.getsockname()[1]} -o ConnectTimeout=30'
+    control = dict(line.split(None, 1) for line in subprocess.check_output(
+        [ssh, '-G', '-F', str(config), 'nobody@127.0.0.1'], text=True).splitlines())
+    assert control['updatehostkeys'] == 'true', 'private configuration enables host-key updates'
     wrapper = route / 'ssh'
-    wrapper.write_text('#!/bin/sh\nexec ' + shlex.quote(ssh) +
-        f' -F /dev/null -p {listener.getsockname()[1]} -o ConnectTimeout=30 "$@"\n')
+    wrapper.write_text('#!/bin/sh\n' + native + ' -G "$@" > ' + shlex.quote(str(effective)) +
+        ' || exit $?\nexec ' + native + ' "$@"\n')
     wrapper.chmod(0o700)
     before = files()
     stalled = json.loads(subprocess.check_output(['bash', script, '--json', '--capacity'],
         env=dict(clean_env, FM_MAC_HOST='nobody@127.0.0.1', PATH=str(route) + os.pathsep + os.environ['PATH']),
         timeout=45))
     thread.join(2)
+    options = dict(line.split(None, 1) for line in effective.read_text().splitlines())
+    assert options['updatehostkeys'] == 'false', 'flow CLI disables host-key updates in native SSH'
     assert banner and banner[0].startswith(b'SSH-'), 'actual SSH client reached private native transport'
     assert not thread.is_alive(), 'timed-out SSH connection closed'
     assert files() == before, 'timeout path also leaves fleet records untouched'
