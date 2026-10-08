@@ -790,9 +790,35 @@ PY
   pass "unavailable displayed readings suppress reassurance and concurrent cache updates preserve both builds"
 }
 
+test_ci_failures_remain_stuck_in_metrics() {
+  local home d now
+  home=$(make_home ci-stuck)
+  d="$home/state/dashboard" now=$(date +%s)
+  lane "$home" m-stuck ship "blocked [at=$now]: CI needs credentials"
+  lane "$home" m-resume ship "failed [at=$now]: no-mistakes checks failed"
+  build "$home"
+  python3 - "$d" <<'PY' || fail "CI failures disagree between board and metrics"
+import json, pathlib, sys
+out = pathlib.Path(sys.argv[1])
+metrics = json.loads((out / 'data.json').read_text())
+board = json.loads((out / 'board.json').read_text())
+cards = {c['task']: c for c in board['cards'] if c.get('task')}
+assert cards['m-stuck']['wait'] == cards['m-resume']['wait'] == 'blocked'
+assert metrics['metrics']['stuck']['value'] == 3, metrics['metrics']['stuck']
+assert metrics['metrics']['stuck']['value'] == sum(c.get('wait') in ('blocked', 'decision') for c in board['cards'])
+states = metrics['metrics']['lane_states']['value']
+assert states['blocked'] == 2, states
+assert states['validating'] == 1, states
+PY
+  has "$d/index.html" 'Stuck 3' '2 blocked'
+  pass "blocked and failed CI lanes stay stuck while paused CI remains validating"
+}
+
+if [ "${1:-}" = ci-stuck ]; then test_ci_failures_remain_stuck_in_metrics; exit; fi
 if [ "${1:-}" = board ]; then test_board_json_feeds_the_app; exit; fi
 if [ "${1:-}" = review ]; then test_board_json_feeds_the_app; test_serve_answers_each_page_and_remembers_the_grouping; exit; fi
 
+test_ci_failures_remain_stuck_in_metrics
 test_unavailable_readings_and_concurrent_caches
 test_new_lane_and_unwritten_archive_stay_exact
 test_incomplete_lanes_and_moved_filings

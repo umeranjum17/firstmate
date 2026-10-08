@@ -439,7 +439,7 @@ for h, d in sorted(home_dir.items()):
         elif verb in ('working', 'resolved'): state = 'building'
         elif verb == 'needs-decision': state = 'decision'
         elif verb == 'done': state = 'finished'
-        elif verb in ('blocked', 'paused', 'failed') and VALIDATING.search(text): state = 'validating'
+        elif verb == 'paused' and VALIDATING.search(text): state = 'validating'
         elif verb in ('blocked', 'failed'): state = 'blocked'
         else: state = 'waiting'
         lanes.append(dict(home=h, task=f[:-5], state=state, since=at or mt, text=text, pr=pr, meta=meta,
