@@ -18,7 +18,8 @@ for h in (main, child):
 (child / 'data/secondmates.md').write_text(f'- main - Parent (home: {main}; scope: fleet; projects: app)\n')
 (main / 'data/backlog.md').write_text('## Queued\n- [ ] next - Next blocked-by: prior\n'
     '- [ ] held - Held (hold: fm-hold-v1:V2FpdCBmb3IgVW1lcg==)\n'
-    '- [ ] ready - Ready blocked-by: finished\n## Done\n- [x] finished - Completed\n')
+    '- [ ] ready - Ready blocked-by: finished\n## In flight\n- [ ] prior - Prerequisite\n'
+    '## Done\n- [x] finished - Completed\n')
 (child / 'state/live.meta').write_text('kind=ship\nspawn_gen=s99.1.2\n')
 (child / 'state/live.status').write_text('working [at=10]: building\n'
     'needs-decision [at=20] [key=captain-hold-a]: choose scope\n'
@@ -34,7 +35,9 @@ ledger[1].update(state='working', text='building')
 def files():
     return {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for h in (main, child) for p in h.rglob('*') if p.is_file()}
 def run():
-    return subprocess.check_output(['bash', script, '--json', '--now', '100'], env=dict(os.environ, FM_HOME=str(main)))
+    return subprocess.check_output(['bash', script, '--json', '--now', '100'],
+                                   env=dict((k, v) for k, v in dict(os.environ, FM_HOME=str(main), FM_DATA_OVERRIDE='').items()
+                                            if k != 'TASKS_AXI_BACKEND'))
 before = files()
 a = run()
 assert a == run() and files() == before, 'deterministic and read-only'
@@ -208,6 +211,40 @@ for representation in ('emitted', 'captured'):
         ('a', 'review_merge', 90), (None, 'memory_gate', 80)], 'pause does not overwrite keyed decision'
 wait = rows['emitted-unknownpause']['open_waits'][0]
 assert wait['seconds'] is None and wait['since'] is None, 'unstamped pause stays unknown'
+(main / 'data/done-archive.md').write_text('## Done\n- [x] archived - Completed prerequisite\n')
+with open(main / 'data/backlog.md', 'a') as f:
+    f.write('## Queued\n- [ ] archive-ready - Archived prerequisite blocked-by: archived\n'
+            '- [ ] multiple - Multiple dependencies blocked-by: archived blocked-by: prior\n')
+with open(main / 'data/secondmates.md', 'a') as f:
+    f.write(f'- macbook - Remote (host: macbook; root: /remote/repo; home: {grand}; scope: app; projects: app)\n')
+before = files()
+coverage = json.loads(run())
+assert files() == before, 'authoritative backlog reads never mutate homes or archive'
+assert coverage['homes'] == ['child', 'grand', 'macbook', 'main'], 'remote registration remains visible'
+assert not any(l['home'] == 'macbook' for l in coverage['lanes']), 'remote path is never collected locally'
+assert not any(q['home'] == 'macbook' for q in coverage['queue'])
+remote = next(n for n in coverage['limitations'] if n['source'] == 'macbook')
+assert remote['host'] == 'macbook' and remote['home'] == str(grand)
+assert 'unknown' in remote['reason'] and 'remote' in remote['reason']
+reasons = {q['task']: q['why'] for q in coverage['queue'] if q['home'] == 'main'}
+assert reasons['archive-ready'] == 'lane cap: 0 recorded active lanes, cap 0'
+assert reasons['multiple'] == 'dependency: prior', 'completed edges excluded, unresolved edge retained'
+assert reasons['held'] == 'hold: Wait for Umer', 'consumer decodes hold reasons'
+(grand / 'data/backlog.md').unlink()
+before = files()
+missing = json.loads(run())
+assert files() == before and not (grand / 'data/backlog.md').exists(), 'missing backlog read does not create a file'
+assert any(n['source'] == 'grand/backlog' and n['reason'].startswith('unknown:')
+           for n in missing['limitations']), 'missing backlog is unknown, not a known empty queue'
+(child / '.tasks.toml').write_text('backend = "beads"\n[beads]\npath = ".beads"\n'
+                                   'bin = "./unavailable-bd"\nprefix = "flow"\n')
+(child / 'data/backlog.md').write_text('## Queued\n- [ ] stale-markdown - Must not be consumed\n')
+before = files()
+unavailable = json.loads(run())
+assert files() == before, 'unavailable alternate backend never migrates or changes its home'
+assert not any(q['home'] == 'child' for q in unavailable['queue']), 'no stale markdown fallback after migration'
+assert any(n['source'] == 'child/backlog' and n['reason'].startswith('unknown:')
+           for n in unavailable['limitations']), 'unavailable alternate backend disclosed'
 (main / 'config/fm-flow-check.sh').write_text('unrecognized clock policy\n')
 assert next(l for l in json.loads(run())['lanes'] if l['task'] == 'memory')['stage_clock']['seconds'] is None
 bad = subprocess.run(['bash', script, '--json', '--now', 'bad'], capture_output=True)

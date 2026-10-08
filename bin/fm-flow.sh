@@ -39,7 +39,7 @@ while [ "$#" -gt 0 ]; do
 done
 case "$now" in ''|*[!0-9]*) echo 'fm-flow: --now requires Unix seconds' >&2; exit 2 ;; esac
 exec python3 - "${FM_HOME:-$SCRIPT_DIR/..}" "$now" "$checks" "$SCRIPT_DIR/fm-classify-lib.sh" <<'PY'
-import base64, json, math, re, statistics, subprocess, sys, time
+import json, math, os, re, statistics, subprocess, sys, time
 from datetime import datetime, timezone
 from pathlib import Path
 ROOT, NOW = Path(sys.argv[1]).resolve(), int(sys.argv[2])
@@ -122,6 +122,59 @@ for line in read(ROOT / 'config/lane-caps', True) or []:
     elif line.strip() and not line.lstrip().startswith('#'):
         notes.append({'source': 'config/lane-caps', 'reason': 'malformed cap row'})
 
+def backlog_rows(name, home):
+    try:
+        result = subprocess.run(['bash', '-c', '''
+. "$1/fm-tasks-axi-lib.sh"
+. "$1/fm-backlog-transition-lib.sh"
+fm_backlog_tasks_axi_addressing "$FM_HOME/data" || exit 2
+if [ -n "$FM_BACKLOG_AXI_FILE" ] && { [ ! -f "$FM_BACKLOG_AXI_FILE" ] || [ ! -r "$FM_BACKLOG_AXI_FILE" ]; }; then
+    printf 'backlog unavailable: %s\\n' "$FM_BACKLOG_AXI_FILE" >&2
+    exit 2
+fi
+exec bash "$1/fm-tasks-axi.sh" list --state queued --fields blocked_by,held,hold_reason
+''', 'fm-flow', str(Path(sys.argv[4]).parent)], capture_output=True, text=True, timeout=20,
+            env=dict(os.environ, FM_HOME=str(home), FM_DATA_OVERRIDE=''))
+        if result.returncode:
+            raise ValueError(result.stderr.strip() or 'backlog consumer failed')
+        lines = result.stdout.splitlines()
+        decoder = json.JSONDecoder()
+        for i, line in enumerate(lines):
+            if line.startswith('tasks: 0 '):
+                return []
+            table = re.fullmatch(r'tasks\[(\d+)\]\{([^}]+)\}:', line)
+            if not table:
+                continue
+            columns, count = table[2].split(','), int(table[1])
+            rows = []
+            for body in lines[i + 1:i + 1 + count]:
+                body, fields = body.strip(), []
+                while body:
+                    if body.startswith('"'):
+                        value, end = decoder.raw_decode(body)
+                    else:
+                        end = body.find(',')
+                        end = len(body) if end < 0 else end
+                        value = body[:end]
+                    fields.append(value)
+                    body = body[end:]
+                    if body and not body.startswith(','):
+                        raise ValueError('invalid backlog table separator')
+                    body = body[1:]
+                if len(fields) != len(columns):
+                    raise ValueError('incomplete backlog row')
+                row = dict(zip(columns, fields))
+                if not {'id', 'blocked_by', 'held', 'hold_reason'} <= row.keys():
+                    raise ValueError('missing backlog fields')
+                rows.append(row)
+            if len(rows) != count:
+                raise ValueError('incomplete backlog table')
+            return rows
+        raise ValueError('no backlog table in consumer output')
+    except (OSError, ValueError, subprocess.TimeoutExpired) as err:
+        notes.append({'source': name + '/backlog', 'reason': 'unknown: ' + str(err)})
+        return []
+
 pending = [('main', ROOT, None)]
 seen = set()
 registering = {}
@@ -133,15 +186,22 @@ while pending:
     homes[name] = home
     registering[name] = parent
     for line in read(home / 'data/secondmates.md', True) or []:
-        m = re.match(r'^- ([\w.-]+) - .*\(home: ([^;]+);', line)
+        m = re.match(r'^- ([\w.-]+) - .*\((?:host:\s*([^;]+);\s*root:\s*([^;]+);\s*)?home:\s*([^;]+);', line)
         if m:
-            path = Path(m[2].strip())
+            if m[2]:
+                homes[m[1]] = None
+                notes.append({'source': m[1], 'host': m[2].strip(), 'home': m[4].strip(),
+                              'reason': 'remote home unavailable to local reader; lanes, backlog and lifecycle unknown'})
+                continue
+            path = Path(m[4].strip())
             if path.is_absolute():
                 pending.append((m[1], path.resolve(), home))
             else:
-                notes.append({'source': name, 'reason': 'remote home unavailable to local reader'})
+                notes.append({'source': m[1], 'reason': 'home unavailable to local reader'})
 
 for name, home in sorted(homes.items()):
+    if home is None:
+        continue
     records = {}
     ledger = read(home / 'state/fleet-ledger.jsonl')
     for n, line in enumerate(ledger or [], 1):
@@ -234,30 +294,12 @@ for name, home in sorted(homes.items()):
                               'overdue': row['seconds_in_stage'] >= seconds
                               if seconds is not None and row['seconds_in_stage'] is not None else None}
         lanes.append(row)
-    backlog = read(home / 'data/backlog.md')
-    section, rows = '', []
-    for line in backlog or []:
-        if line.startswith('## '):
-            section = line[3:].strip()
-        m = re.match(r'^- \[([ xX])\] (\S+) - (.*)', line)
-        if m:
-            rows.append((section, m[2], m[3]))
-    done = {t for s, t, _ in rows if s == 'Done'}
-    for section, task, text in rows:
-        if section != 'Queued':
-            continue
-        deps = [d for d in re.findall(r'blocked-by:\s+([^\s)]+)', text) if d not in done]
-        hold = re.search(r'\(hold:\s*([^)]*)\)', text)
-        reason = 'dependency: ' + ', '.join(deps) if deps else None
-        if hold and not reason:
-            reason = hold[1]
-            if reason.startswith('fm-hold-v1:'):
-                try:
-                    reason = base64.b64decode(reason[11:], validate=True).decode()
-                except (ValueError, UnicodeError):
-                    reason = 'unknown: malformed hold reason'
-            reason = 'hold: ' + reason
-        queue.append({'home': name, 'task': task,
+    for item in backlog_rows(name, home):
+        deps = item['blocked_by']
+        reason = 'dependency: ' + ', '.join(deps.split(',')) if deps != 'none' else None
+        if item['held'] == 'yes' and not reason:
+            reason = 'hold: ' + item['hold_reason']
+        queue.append({'home': name, 'task': item['id'],
                       'why': ' '.join(reason.split()) if reason else 'unknown: dispatch admission not recorded'})
 
 active = {h: sum(l['open'] and l['home'] == h and l['stage'] in ('working', 'resolved') and
