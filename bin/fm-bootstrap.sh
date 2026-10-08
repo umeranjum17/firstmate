@@ -1486,7 +1486,10 @@ detect_sentinel_service() {
   [ -e "$FM_HOME/.fm-secondmate-home" ] || [ -L "$FM_HOME/.fm-secondmate-home" ] && return 0
   command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1 || return 0
   systemctl --user is-active --quiet fm-sentinel && return 0
-  echo "SENTINEL: fm-sentinel is not running, so a killed Herdr server leaves supervision and workers down until someone notices (install: FM_HOME=$FM_HOME $FM_ROOT/bin/fm-sentinel.sh unit > ~/.config/systemd/user/fm-sentinel.service && systemctl --user enable --now fm-sentinel)"
+  local quoted_home quoted_sentinel
+  printf -v quoted_home %q "$FM_HOME"
+  printf -v quoted_sentinel %q "$FM_ROOT/bin/fm-sentinel.sh"
+  echo "SENTINEL: fm-sentinel is not running, so a killed Herdr server leaves supervision and workers down until someone notices (install: FM_HOME=$quoted_home $quoted_sentinel unit > ~/.config/systemd/user/fm-sentinel.service && systemctl --user enable --now fm-sentinel)"
 }
 
 # Shadow-backlog check. When this home's data directory is not the code root's,

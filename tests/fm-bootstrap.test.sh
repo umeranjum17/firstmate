@@ -628,8 +628,8 @@ ROWS
 }
 
 test_herdr_primary_without_restart_recovery_says_how_to_install_it() {
-  local case_dir fakebin out
-  case_dir="$TMP_ROOT/herdr-no-sentinel"
+  local case_dir fakebin out command notice
+  case_dir="$TMP_ROOT/herdr no sentinel"
   mkdir -p "$case_dir/home/config"
   printf '%s\n' manual > "$case_dir/home/config/backlog-backend"
   printf '%s\n' herdr > "$case_dir/home/config/backend"
@@ -637,8 +637,30 @@ test_herdr_primary_without_restart_recovery_says_how_to_install_it() {
   out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
     FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_FAKE_SENTINEL_DOWN=1 "$ROOT/bin/fm-bootstrap.sh")
   assert_contains "$out" "SENTINEL: fm-sentinel is not running" "a Herdr primary without restart recovery should say so"
-  assert_contains "$out" "install: FM_HOME=$case_dir/home $case_dir/home/bin/fm-sentinel.sh unit > ~/.config/systemd/user/fm-sentinel.service && systemctl --user enable --now fm-sentinel" \
-    "the notice carries the exact install command"
+  notice=$(printf '%s\n' "$out" | grep '^SENTINEL:')
+  command=${notice#*'(install: '}
+  command=${command%')'}
+  mkdir -p "$case_dir/home/bin" "$case_dir/shell home/.config/systemd/user"
+  cat > "$case_dir/home/bin/fm-sentinel.sh" <<'SH'
+#!/usr/bin/env bash
+printf '%s\t%s\n' "$FM_HOME" "$*" > "$FM_TEST_SENTINEL_RECEIPT"
+printf 'fixture unit\n'
+SH
+  cat > "$fakebin/systemctl" <<'SH'
+#!/usr/bin/env bash
+[ -z "${FM_FAKE_NO_USER_BUS:-}" ] || exit 1
+[ "$*" != "--user is-active --quiet fm-sentinel" ] || [ -z "${FM_FAKE_SENTINEL_DOWN:-}" ] || exit 3
+if [ "$*" = "--user enable --now fm-sentinel" ]; then
+  printf 'systemctl\t%s\n' "$*" >> "$FM_TEST_SENTINEL_RECEIPT"
+fi
+SH
+  chmod +x "$case_dir/home/bin/fm-sentinel.sh" "$fakebin/systemctl"
+  HOME="$case_dir/shell home" PATH="$fakebin:$BASE_PATH" FM_TEST_SENTINEL_RECEIPT="$case_dir/receipt" \
+    bash -c "$command" || fail "the emitted install command is not safely executable"
+  assert_equals "$case_dir/home"$'\tunit\nsystemctl\t--user enable --now fm-sentinel' \
+    "$(cat "$case_dir/receipt")" "the emitted command preserves its home, script path, and actions"
+  assert_equals 'fixture unit' "$(cat "$case_dir/shell home/.config/systemd/user/fm-sentinel.service")" \
+    "the emitted unit is redirected to the selected user's service file"
   out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
     FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_FAKE_SENTINEL_DOWN=1 FM_FAKE_NO_USER_BUS=1 "$ROOT/bin/fm-bootstrap.sh")
   [ -z "$out" ] || fail "a host without a systemd user bus has nothing to install, got: $out"
@@ -1273,6 +1295,11 @@ ROWS
   assert_not_contains "$child_env" 'secret-present' "bootstrap children never inherit the typesafe key"
   pass "bootstrap gates resolver fields and additive harnesses on the typed key"
 }
+
+if [ "${1:-}" = sentinel ]; then
+  test_herdr_primary_without_restart_recovery_says_how_to_install_it
+  exit 0
+fi
 
 test_bootstrap_reporting
 test_no_mistakes_min_version

@@ -9,13 +9,13 @@ and runtime cgroup pressure independently and classify the worse reading.
 Admission refusal and watcher interrupts cannot guarantee avoidance of an oomd kill.
 
 Usage (bin/fm-jev-mem-guard.sh runs this with python3):
-  fm-jev-mem-guard.sh [--config FILE] [--state-dir DIR ...]
+  fm-jev-mem-guard.sh [--config FILE] [--state-dir HOME DIR ...]
       Print "<verdict>\t<summary>" for the host, naming the largest consumers.
   fm-jev-mem-guard.sh [--config FILE] --admit TASK --state DIR
       Admission for one agent launch (bin/fm-spawn.sh, bin/fm-control.sh relaunch).
       Exit 0 admits and removes DIR/admission-refused. Exit 1 refuses: prints the
       reason and writes DIR/admission-refused as "<epoch>\t<task>\t<reason>".
-  fm-jev-mem-guard.sh [--config FILE] --record FILE [--state-dir DIR ...]
+  fm-jev-mem-guard.sh [--config FILE] --record FILE [--state-dir HOME DIR ...]
       One independent sampler sample (bin/fm-host-memory-sampler.sh): appends
       "<epoch>\t<MemAvailable kB>\t<swap used kB>\t<pressure some avg10>\t<verdict>"
       to FILE, keeping the newest 8640 rows (a day at the 10 s cadence), and prints
@@ -27,7 +27,7 @@ Usage (bin/fm-jev-mem-guard.sh runs this with python3):
 Verdicts: OK; WAIT (new agents wait); ALERT (watcher attempts one owned-task interrupt);
 UNKNOWN (not measurable, for example no pressure file: admits and records nothing).
 Thresholds come from config/host-memory (docs/configuration.md "Host memory guard").
-Consumers are summed RSS plus swap per owner: recorded worktree, task temp, or
+Consumers are summed RSS plus swap per owner: recorded worktree or explicit
 home paths qualify the process's working directory; FM_TASK_ID disambiguates tasks
 within that home (task records in each --state-dir), else the process is unowned.
 The proc root is FM_HOST_MEMORY_PROC (default /proc). Exit 2: usage or an invalid
@@ -166,8 +166,9 @@ def read_meta(path):
 
 def owners(state_dirs):
     """Home-qualified owners, indexed by recorded paths and task IDs."""
+    homes = {os.path.realpath(d): os.path.realpath(home) for home, d in state_dirs}
     metas = [(d, f[:-5], read_meta(os.path.join(d, f)))
-             for d in state_dirs if os.path.isdir(d) for f in sorted(os.listdir(d)) if f.endswith(".meta")]
+             for _, d in state_dirs if os.path.isdir(d) for f in sorted(os.listdir(d)) if f.endswith(".meta")]
     lead_of = {os.path.realpath(m["home"]): tid for _, tid, m in metas if m.get("kind") == "secondmate" and m.get("home")}
     paths, tasks = [], {}
     for d, tid, m in metas:
@@ -177,18 +178,19 @@ def owners(state_dirs):
                 tasks.setdefault(tid, []).append(owner)
                 paths.append((os.path.realpath(m["home"]), owner))
             continue
-        home = lead_of.get(os.path.realpath(os.path.dirname(os.path.abspath(d))), "main")
+        home = lead_of.get(homes[os.path.realpath(d)], "main")
         owner = (os.path.realpath(d), tid, f"task {tid} ({home})")
         tasks.setdefault(tid, []).append(owner)
-        paths += [(os.path.realpath(m[k]), owner) for k in ("worktree", "tasktmp") if m.get(k)]
-        paths.append((os.path.realpath(os.path.dirname(d)), (os.path.realpath(d), "", f"lead {home}")))
+        if m.get("worktree"):
+            paths.append((os.path.realpath(m["worktree"]), owner))
+        paths.append((homes[os.path.realpath(d)], (os.path.realpath(d), "", f"lead {home}")))
     paths.sort(key=lambda p: -len(p[0]))
-    return paths, tasks
+    return paths, tasks, homes
 
 
 def consumers(state_dirs, top=3):
     # ponytail: summed RSS counts shared pages once per process; fine for ranking owners, not for accounting.
-    paths, tasks = owners(state_dirs)
+    paths, tasks, homes = owners(state_dirs)
     groups = {}
     try:
         pids = [p for p in os.listdir(PROC) if p.isdigit()]
@@ -216,9 +218,9 @@ def consumers(state_dirs, top=3):
             cwd = os.path.realpath(os.readlink(f"{base}/cwd"))
             owner = next((o for p, o in paths if cwd == p or cwd.startswith(p + "/")), None)
             if matches and owner not in matches:
-                homes = [o for o in matches if cwd == os.path.dirname(o[0]) or
-                         cwd.startswith(os.path.dirname(o[0]) + "/")]
-                owner = max(homes, key=lambda o: len(o[0])) if homes else None
+                qualified = [o for o in matches if cwd == homes[o[0]] or
+                             cwd.startswith(homes[o[0]] + "/")]
+                owner = max(qualified, key=lambda o: len(homes[o[0]])) if qualified else None
         except OSError:
             pass
         owner = owner or ("", "", f"{status.get('Name', '?').strip()} pid {pid}")
@@ -281,7 +283,8 @@ def main():
     parser.add_argument("--state", metavar="DIR", help="the launching home's state directory")
     parser.add_argument("--record", metavar="FILE", help="append one sample to FILE")
     parser.add_argument("--owned-top-task", metavar="DIR", help="append the top task ID if owned by DIR")
-    parser.add_argument("--state-dir", action="append", default=[], help="state directory whose task records map consumers")
+    parser.add_argument("--state-dir", nargs=2, metavar=("HOME", "DIR"), action="append", default=[],
+                        help="explicit home and its state directory whose task records map consumers")
     args = parser.parse_args()
     if args.admit and not args.state:
         die("--admit needs --state")

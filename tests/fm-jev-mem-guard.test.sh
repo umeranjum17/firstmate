@@ -52,14 +52,14 @@ test_verdicts_samples_and_owners() {
   case=$TMP_ROOT/verdicts tsv=$case/state/host-memory.tsv
   make_fleet "$case"
   fake_host "$case/proc" 40 2.5 1
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --record "$tsv" --state-dir "$case/state")
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --record "$tsv" --state-dir "$case" "$case/state")
   assert_equals $'OK\tpressure 2% (10 s average), 40.0 GB available, 1.0 GB swap used; cgroup pressure unreadable; host-only classification' "$out" "calm host"
   fake_host "$case/proc" 30 24 3
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --record "$tsv" --state-dir "$case/state")
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --record "$tsv" --state-dir "$case" "$case/state")
   assert_equals $'WAIT\tpressure 24% (10 s average), 30.0 GB available, 3.0 GB swap used; cgroup pressure unreadable; host-only classification; pressure at or above 20%' "$out" \
     "pressure past the wait threshold makes new agents wait"
   fake_host "$case/proc" 5 41.2 16
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --record "$tsv" --state-dir "$case/state")
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --record "$tsv" --state-dir "$case" "$case/state")
   assert_equals $'ALERT\tpressure 41% (10 s average), 5.0 GB available, 16.0 GB swap used; cgroup pressure unreadable; host-only classification; pressure at or above 35%; available memory below 6 GB; largest: task big-build (main) 14.0 GB in 2 processes, llama pid 104 6.0 GB, lead sm1 2.0 GB' "$out" \
     "an alert names the largest consumers by task, lead, or process"
   [ "$(wc -l < "$tsv" | tr -d ' ')" -eq 3 ] || fail "three samples should be recorded: $(cat "$tsv")"
@@ -82,7 +82,7 @@ test_verdicts_samples_and_owners() {
 # One watcher run against the case; legs that must wake exit on their own.
 watch_leg() {
   local case=$1 tag=$2
-  env PATH="$case/fakebin:$PATH" FM_HOME="$case" FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$case/state" \
+  env PATH="$case/fakebin:$PATH" FM_HOME="$case" FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="${5:-$case/state}" \
     FM_CREW_STATE_BIN="$case/fakebin/fm-crew-state.sh" FM_FAKE_CREW_STATE='state: working · source: run-step · fixture build' TMUX='' FM_BACKEND=tmux \
     FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_SECS="${3:-1}" FM_SECONDMATE_LIVENESS_SECS="${4:-99999999}" \
     FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
@@ -219,9 +219,15 @@ test_home_qualified_owners() {
   make_fleet "$case"
   fake_host "$case/proc" 5 41
   fake_pid "$case/proc" 107 foreign 25 "$TMP_ROOT/independent-home/wt" big-build
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --state-dir "$case/state" --owned-top-task "$case/state")
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --state-dir "$case" "$case/state" --owned-top-task "$case/state")
   assert_contains "$out" 'foreign pid 107 25.0 GB, task big-build (main) 14.0 GB in 2 processes' "a unique visible ID still requires recorded path ownership"
   assert_equals '' "${out##*$'\t'}" "an independent home's matching ID cannot authorize control"
+  fm_write_meta "$case/state/big-build.meta" kind=ship "worktree=$case/wt" "tasktmp=${case}-tmp"
+  rm "$case/proc/107/cwd"
+  ln -s "${case}-tmp" "$case/proc/107/cwd"
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --state-dir "$case" "$case/state" --owned-top-task "$case/state")
+  assert_contains "$out" "foreign pid 107 25.0 GB" "a temp path outside the explicit home is not a worktree"
+  assert_equals '' "${out##*$'\t'}" "an external temp path cannot authorize control"
   rm -r "$case/proc/107"
   fm_write_meta "$case/mate/state/big-build.meta" kind=ship "worktree=$case/mate/wt"
   mkdir -p "$case/mate/wt"
@@ -229,15 +235,44 @@ test_home_qualified_owners() {
   fake_pid "$case/proc" 106 node 10 "$case/mate" big-build
   rm "$case/proc/102/cwd"
   ln -s "$case/wt" "$case/proc/102/cwd"
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --state-dir "$case/state" --state-dir "$case/mate/state" --owned-top-task "$case/state")
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --state-dir "$case" "$case/state" --state-dir "$case/mate" "$case/mate/state" --owned-top-task "$case/state")
   assert_contains "$out" 'task big-build (sm1) 30.0 GB in 2 processes, task big-build (main) 14.0 GB in 2 processes' "equal task IDs remain separate owners"
   assert_equals '' "${out##*$'\t'}" "a foreign top task cannot be interrupted by this home"
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --state-dir "$case/state" --state-dir "$case/mate/state" --owned-top-task "$case/mate/state")
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --state-dir "$case" "$case/state" --state-dir "$case/mate" "$case/mate/state" --owned-top-task "$case/mate/state")
   assert_equals big-build "${out##*$'\t'}" "the owning home receives its exact task ID"
   printf 'Name:\tpi\nVmRSS:\t41943040 kB\nVmSwap:\t0 kB\n' > "$case/proc/103/status"
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --state-dir "$case/state" --state-dir "$case/mate/state" --owned-top-task "$case/state")
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --state-dir "$case" "$case/state" --state-dir "$case/mate" "$case/mate/state" --owned-top-task "$case/state")
   assert_equals sm1 "${out##*$'\t'}" "a lead is controlled only through its parent-owned task record"
   pass "task ownership stays home-qualified through grouping and control selection"
+}
+
+test_overridden_state_ownership() {
+  local case state out
+  case=$(make_case override/A)
+  make_fleet "$case"
+  prepare_control_task "$case"
+  state="${case}-state"
+  mv "$case/state" "$state"
+  fm_test_track_watcher_state "$state"
+  mkdir -p "$case/data" "$case/mate/wt"
+  printf -- '- sm1 - mate (home: %s; scope: test; projects: demo; added 2026-01-01)\n' "$case/mate" > "$case/data/secondmates.md"
+  fm_write_meta "$case/mate/state/big-build.meta" kind=ship "worktree=$case/mate/wt"
+  fake_pid "$case/proc" 110 node 20 "$case/mate/wt" big-build
+  fake_host "$case/proc" 5 41
+  fake_pid "$case/proc" 108 foreign 25 "$TMP_ROOT/override/B/wt" big-build
+  watch_leg "$case" foreign-override 1 99999999 "$state"
+  wait_for_exit "$LEG_PID" 100 || fail "the overridden-state alert did not wake"
+  out=$(cat "$case/watch-foreign-override.out")
+  assert_contains "$out" 'foreign pid 108 25.0 GB' "a sibling home remains an unowned consumer"
+  assert_contains "$out" 'task big-build (sm1) 20.0 GB' "the sampler passes the registered secondmate home identity"
+  assert_contains "$out" 'automatic interrupt skipped' "the foreign matching ID does not authorize control"
+  [ ! -s "$case/keys" ] || fail "an overridden state caused the foreign process to interrupt a local task"
+  rm -r "$case/proc/108"
+  fake_pid "$case/proc" 109 shell 12 "$case" big-build
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --state-dir "$case" "$state" --state-dir "$case/mate" "$case/mate/state" --owned-top-task "$state")
+  assert_contains "$out" 'task big-build (main) 26.0 GB in 3 processes' "the explicit home and recorded worktree both qualify"
+  assert_equals big-build "${out##*$'\t'}" "the selected state still authorizes its owned task"
+  pass "overridden state paths never widen home ownership"
 }
 
 test_finite_thresholds() {
@@ -505,6 +540,7 @@ SH
 test_verdicts_samples_and_owners
 test_cgroup_pressure
 test_home_qualified_owners
+test_overridden_state_ownership
 test_finite_thresholds
 test_watcher_wakes_once_per_alert_episode
 test_benign_liveness_outcomes
