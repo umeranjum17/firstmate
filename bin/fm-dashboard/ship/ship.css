@@ -12,7 +12,7 @@
 @keyframes sv-ping{from{box-shadow:0 0 0 2px color-mix(in srgb,currentColor 30%,transparent)}to{box-shadow:0 0 0 5px color-mix(in srgb,currentColor 10%,transparent)}}
 @media (prefers-reduced-motion:reduce){.sv-tag::before{animation:none!important}}
 .sv-tag::after{content:'';position:absolute;left:var(--x,50%);top:100%;width:1px;height:var(--s,0);background:currentColor;opacity:.7}
-.sv-tag.sv-ico{width:26px;height:26px;padding:0;justify-content:center;border-radius:13px}
+.sv-tag.sv-ico{width:22px;height:22px;padding:0;justify-content:center;border-radius:11px;box-shadow:var(--edge)}
 
 /* top: the home tabs on the app's panel, then the home's lifecycle and crew floating over the sea */
 .sv-hd{position:absolute;left:0;right:0;top:0;z-index:2;display:flex;flex-direction:column;gap:6px;padding-bottom:4px}
@@ -37,7 +37,8 @@
 
 /* the sheet: key numbers, then what is stuck and what is parked */
 .sv-sheet{position:absolute;left:0;right:0;bottom:0;z-index:2;max-height:56%;display:flex;flex-direction:column;background:var(--panel);border-top:1px solid var(--line-2);border-radius:14px 14px 0 0;box-shadow:0 -12px 32px rgba(0,0,0,.3)}
-.sv-grab{display:grid;place-items:center;height:20px;flex:none;width:100%}
+.sv-grab{position:relative;display:grid;place-items:center;height:20px;flex:none;width:100%}
+.sv-grab span{position:absolute;left:16px;top:5px;font-size:11px;font-weight:500;letter-spacing:.02em;color:var(--ink-3)}
 .sv-grab i{width:36px;height:4px;border-radius:2px;background:var(--line-3)}
 .sv-kpis{display:flex;flex:none;margin:0 16px 10px;border:1px solid var(--line-2);border-radius:8px}
 .sv-kpis>div{flex:1 1 auto;min-width:0;padding:8px 9px 7px;display:flex;flex-direction:column;gap:2px}

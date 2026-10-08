@@ -7,7 +7,7 @@ import { html, dur, state, stuck, age, ACTIVE, StageIcon } from '../ui.js'
 
 const P = {
   horizon: '#18233a', cream: '#f3e6c9',
-  deep: '#0e1b28', mid: '#1c3546', crest: '#36606f', foam: '#dfe9ea',
+  deep: '#0d1926', mid: '#1b3344', crest: '#3a6473', foam: '#cfe2e1',
   hull: '#6a4527', hull2: '#3a2616', wale: '#b07a40', bottom: '#2a1b12', deck: '#7d5634', rail: '#2b1c12', sail: '#e9dcc0',
   skin: '#f4dcc2', ink: '#06080e', key: '#dfe6f5', hemiSky: '#6f8fae', hemiGround: '#3a2616', lamp: '#e9b44c', crate: '#c08a4a',
   coat: '#4a5d8f', trim: '#e3c47a',
@@ -52,34 +52,41 @@ function halo(col, size, k = 1.6) {
   s.scale.setScalar(size); return s
 }
 
-// ---- water: one wave function on the GPU and here, so anything afloat rides the same swell
-const WAVES = [[0.21, 0.13, 0.9, 0.16], [-0.17, 0.29, 1.3, 0.11], [0.53, -0.41, 2.1, 0.05], [0.9, 0.7, 2.9, 0.025]]
+// ---- water: one swell function on the GPU and here, so anything afloat rides the same sea
+const WAVES = [[0.21, 0.13, 0.9, 0.12], [-0.17, 0.29, 1.3, 0.08], [0.53, -0.41, 2.1, 0.04]]
 const FLOW = [-1.6, 0.2]  // the sea slides past the flagship under way
 function wave(x, z, t) { x -= FLOW[0] * t; z -= FLOW[1] * t; let h = 0; for (const [a, b, s, amp] of WAVES) h += amp * Math.sin(a * x + b * z + s * t); return h }
 const tilt = (x, z, t) => [(wave(x + 0.4, z, t) - wave(x - 0.4, z, t)) / 0.8, (wave(x, z + 0.4, t) - wave(x, z - 0.4, t)) / 0.8]
+// The surface is ship-or-die's layered waves: rows of pointed crests along the ship, each row sliding past at its own pace
+// in stepped frames, each nearer row covering the dark body of the row behind it, in four clean colour bands.
 function water(scene, moonAz) {
   const H = WAVES.map(([a, b, s, amp]) => `h += ${amp.toFixed(4)} * sin(${a.toFixed(3)} * p.x + ${b.toFixed(3)} * p.y + ${s.toFixed(3)} * t);`).join('\n')
   const FL = `vec2(${FLOW[0].toFixed(3)}, ${FLOW[1].toFixed(3)})`
-  const u = { t: { value: 0 }, deep: { value: new THREE.Color(P.deep) }, mid: { value: new THREE.Color(P.mid) }, crest: { value: new THREE.Color(P.crest) }, foam: { value: new THREE.Color(P.foam) },
+  const u = { t: { value: 0 }, ts: { value: 0 }, deep: { value: new THREE.Color(P.deep) }, mid: { value: new THREE.Color(P.mid) }, crest: { value: new THREE.Color(P.crest) }, foam: { value: new THREE.Color(P.foam) },
     hor: { value: new THREE.Color(P.horizon) }, moon: { value: new THREE.Color(P.cream) }, md: { value: new THREE.Vector3(Math.cos(moonAz), 0.12, Math.sin(moonAz)).normalize() } }
   const m = new THREE.ShaderMaterial({
     uniforms: u, fog: false,
-    vertexShader: `uniform float t; varying vec3 wp; varying vec3 n; varying float hh;
+    vertexShader: `uniform float t; varying vec3 wp; varying vec3 n;
       float H(vec2 p){ p -= ${FL} * t; float h = 0.0; ${H} return h; }
-      void main(){ vec4 w = modelMatrix * vec4(position, 1.0); float h = H(w.xz); w.y += h; hh = h;
+      void main(){ vec4 w = modelMatrix * vec4(position, 1.0); w.y += H(w.xz);
         n = normalize(vec3(H(w.xz - vec2(0.3, 0.0)) - H(w.xz + vec2(0.3, 0.0)), 0.6, H(w.xz - vec2(0.0, 0.3)) - H(w.xz + vec2(0.0, 0.3))));
         wp = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`,
-    fragmentShader: `uniform float t; uniform vec3 deep, mid, crest, foam, hor, moon, md; varying vec3 wp; varying vec3 n; varying float hh;
-      float hash(vec2 p){ return fract(sin(dot(p, vec2(12.99, 78.23))) * 43758.55); }
-      float noise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y); }
+    fragmentShader: `uniform float ts; uniform vec3 deep, mid, crest, foam, hor, moon, md; varying vec3 wp; varying vec3 n;
+      // v runs 0 to 1 across a row from its far edge; a crest line peaks at the far edge, and below it lie the bands
+      // each crest leans the way the sea runs and stands its own height, so the rows never read as a printed pattern
+      float row(float i, float x){ float sp = 0.75 + 0.5 * fract(i * 0.618), l = 2.6 + 0.8 * fract(i * 0.382), q = (x - ${FLOW[0].toFixed(3)} * ts * sp) / l + i * 0.37;
+        float f = fract(q), b = f < 0.68 ? f / 0.68 : (1.0 - f) / 0.32, a = 0.55 + 0.45 * fract(sin(floor(q) * 12.99 + i * 78.23) * 43758.55);
+        return 0.47 - 0.45 * a * b * b; }
       void main(){
-        vec2 q = wp.xz - ${FL} * t;
-        float k = hh + (noise(q * 0.9 + t * 0.3) - 0.5) * 0.08;
-        vec3 c = mix(deep, mid, step(0.02, k)); c = mix(c, crest, step(0.2, k) * step(0.55, noise(q * 1.3 + t * 0.2)));
-        float fo = step(0.27, k + (noise(q * 2.2 - t * 0.5) - 0.5) * 0.08); c = mix(c, foam, fo);
-        c = mix(c, crest, step(0.9, noise(vec2(q.x * 0.5 + t * 0.2, q.y * 2.4))) * step(0.08, k) * (1.0 - fo));
-        vec3 v = normalize(cameraPosition - wp), r = reflect(-v, normalize(n));
-        c = mix(c, moon, step(0.992, dot(r, md)) * step(0.5, noise(q * 1.6 + vec2(0.0, t * 0.6))) * 0.8);
+        float z = wp.z / 4.2, i = floor(z), v = fract(z), cl = row(i, wp.x);
+        // above this row's crest line the row behind shows its body
+        float d = v >= cl ? v - cl : v + 1.0 - row(i - 1.0, wp.x);
+        // the waves stand out around the ship and settle in steps into the dark sea beyond it, as on a lit stage
+        float far = floor(smoothstep(7.0, 24.0, length(wp.xz * vec2(0.7, 1.0))) * 3.0) / 3.0;
+        vec3 c = d < 0.04 ? foam : d < 0.12 ? crest : d < 0.34 ? mid : deep;
+        c = mix(c, d < 0.12 ? mid : deep, far);
+        vec3 e = normalize(cameraPosition - wp), r = reflect(-e, normalize(n));
+        c = mix(c, moon, step(0.985, dot(r, md)) * step(d, 0.12) * 0.85);
         c = mix(c, hor, floor(smoothstep(48.0, 240.0, length(wp - cameraPosition)) * 4.0) / 4.0);
         gl_FragColor = vec4(c, 1.0);
         #include <colorspace_fragment>
@@ -189,7 +196,7 @@ function ship({ len, beam, depth = 2.3, draft = 1.1, masts = 2, flag = P.lamp, m
   // the outline the camera frames: stern castle, the waterline, the bowsprit tip and the flags
   const hull = [[-len / 2 - 0.4, top(0) + 1.2, half(0)], [-len / 2, 0, half(0)], [0, 0, beam / 2], [len / 2, 0, 0.3], [len / 2 + 2.3, top(1) + 0.2, 0.3]].flatMap(([x, y, z]) => [-1, 1].map(k => new THREE.Vector3(x, y, k * z)))
   const outline = [...hull, ...mastX.map((mx, i) => new THREE.Vector3(mx + 1.4, deckY + mastH - i * 0.8 + 0.6, 0))]
-  grp.userData = { len, beam, deckY, top, half, sails, outline }
+  grp.userData = { len, beam, deckY, top, half, sails, hull, outline }
   billow(grp, 0)
   return grp
 }
@@ -224,25 +231,39 @@ function emblem() {
   return t
 }
 
-// ---- crew: chibi figures; a worker wears its model's colour head to toe with the model's mark on its chest,
-// the lead wears a navy coat and a tricorn at the wheel (Main a bicorne), since the data names no model for a lead.
+// ---- crew: chibi figures in their model's colour with the model's mark on the chest and the laptop lid. Each model is
+// also its own kind of sailor, so the outline alone tells them apart at phone size: Opus a broad bearded bosun in a
+// bandana, Sol a slim lookout under a wide sun hat, Muse a sea witch in a robe and a tall hat, Qwen a square-headed deck
+// robot with an aerial. The lead wears a navy coat and a tricorn at the wheel (Main a bicorne), since the data names no
+// model for a lead.
 const G = {}
 function geos() {
   if (G.body) return G
   G.body = new THREE.CapsuleGeometry(0.3, 0.34, 6, 14); G.body.translate(0, 0.47, 0)
+  G.robe = new THREE.CylinderGeometry(0.2, 0.47, 0.92, 18); G.robe.translate(0, 0.46, 0)
   G.head = new THREE.SphereGeometry(0.36, 20, 14); G.head.translate(0, 1.2, 0)
   G.arm = new THREE.CapsuleGeometry(0.085, 0.3, 4, 8); G.arm.translate(0, -0.2, 0)
   G.leg = new THREE.CapsuleGeometry(0.1, 0.16, 4, 8); G.leg.translate(0, -0.12, 0)
   G.eye = new THREE.SphereGeometry(0.062, 8, 6)
-  G.band = new THREE.CylinderGeometry(0.37, 0.37, 0.14, 20, 1, true); G.band.translate(0, 1.32, 0)
   G.cap = new THREE.SphereGeometry(0.38, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2.1); G.cap.translate(0, 1.27, 0)
+  G.band = new THREE.CylinderGeometry(0.37, 0.37, 0.14, 20, 1, true); G.band.translate(0, 1.32, 0)
   G.brim = new THREE.CylinderGeometry(0.22, 0.22, 0.04, 16, 1, false, -Math.PI / 2, Math.PI); G.brim.translate(0, 1.32, 0.3)
+  G.scarf = new THREE.SphereGeometry(0.385, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2.9); G.scarf.translate(0, 1.22, 0)
+  G.knot = new THREE.SphereGeometry(0.13, 8, 6)
+  G.tail = new THREE.BoxGeometry(0.46, 0.13, 0.04); G.tail.translate(0.23, 0, 0)
+  G.beard = new THREE.SphereGeometry(0.24, 16, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2); G.beard.scale(1, 1.2, 0.75)
+  G.straw = new THREE.CylinderGeometry(0.72, 0.72, 0.06, 28)
+  G.crownS = new THREE.CylinderGeometry(0.25, 0.31, 0.26, 18); G.crownS.translate(0, 0.15, 0)
+  G.witch = new THREE.ConeGeometry(0.36, 1.1, 18); G.witch.translate(0, 0.55, 0)
+  G.wbrim = new THREE.CylinderGeometry(0.6, 0.6, 0.04, 24)
+  G.hb = new THREE.CylinderGeometry(1, 1, 0.09, 18, 1, true)
+  G.box = new THREE.BoxGeometry(0.74, 0.64, 0.62)
+  G.face = new THREE.PlaneGeometry(0.54, 0.36)
+  G.aerial = new THREE.CylinderGeometry(0.03, 0.03, 0.42, 6); G.aerial.translate(0, 0.21, 0)
+  G.bulb = new THREE.SphereGeometry(0.09, 10, 8)
   G.tricorn = new THREE.CylinderGeometry(0.62, 0.62, 0.1, 3); G.tricorn.rotateY(Math.PI); G.tricorn.translate(0, 1.5, 0)
   G.crown = new THREE.CylinderGeometry(0.3, 0.36, 0.3, 14); G.crown.translate(0, 1.6, 0)
-  G.bicorne = new THREE.CylinderGeometry(0.75, 0.75, 0.22, 20, 1, false, 0, Math.PI); G.bicorne.rotateZ(Math.PI / 2); G.bicorne.rotateY(Math.PI / 2); G.bicorne.translate(0, 1.5, 0)
-  G.sun = new THREE.CylinderGeometry(0.64, 0.64, 0.05, 24); G.sun.translate(0, 1.36, 0)
-  G.cone = new THREE.ConeGeometry(0.4, 0.8, 16); G.cone.translate(0, 1.72, 0)
-  G.pom = new THREE.SphereGeometry(0.13, 10, 8); G.pom.translate(0, 1.68, 0)
+  G.bicorne = new THREE.CylinderGeometry(0.75, 0.75, 0.22, 20, 1, false, 0, Math.PI); G.bicorne.rotateZ(Math.PI / 2); G.bicorne.translate(0, 1.5, 0)
   G.badge = new THREE.CircleGeometry(0.17, 20)
   G.lap = new THREE.BoxGeometry(0.5, 0.035, 0.34); G.lid = new THREE.BoxGeometry(0.5, 0.32, 0.025); G.lid.translate(0, 0.16, 0)
   G.crate = new THREE.BoxGeometry(0.62, 0.5, 0.5); G.crate.translate(0, 0.25, 0)
@@ -257,38 +278,58 @@ function badge(m) {
   }) }))
   return badges.get(m)
 }
-// Each model also has its own hat, so two models never look alike even at phone size or without colour.
-function hat(m, o, d) {
-  const g = geos(), cap = mesh(g.cap, o)
-  if (m === 'sol') return [cap, mesh(g.sun, o, 0.02)]
-  if (m === 'muse') return [mesh(g.cone, o, 0.03), mesh(g.band, d)]
-  if (m === 'qwen') return [cap, mesh(g.band, d), mesh(g.pom, d)]
-  return [cap, mesh(g.band, d), mesh(g.brim, o)]
+const at = (o, x, y, z, rx = 0, ry = 0, rz = 0) => { o.position.set(x, y, z); o.rotation.set(rx, ry, rz); return o }
+// A box keeps an unbroken ink line as a slightly larger back face, where pushing out along split normals would gap at the corners.
+function boxed(geo, mat, k = 1.1) { const m = mesh(geo, mat), o = new THREE.Mesh(geo, ink(0)); o.scale.setScalar(k); m.add(o); return m }
+// The head and what sits on it, per model; returns the height of the figure's top for its tag.
+function headgear(k, head, o, d) {
+  const g = geos(), skin = () => { head.add(mesh(g.head, tc(P.skin), 0.03)); for (const sx of [-0.13, 0.13]) head.add(at(new THREE.Mesh(g.eye, tc(P.ink)), sx, 1.16, 0.33)) }
+  if (k === 'qwen') {
+    const lit = new THREE.MeshBasicMaterial({ color: new THREE.Color('#9ff3ff') })
+    head.add(at(boxed(g.box, o), 0, 1.22, 0), at(new THREE.Mesh(g.face, tc('#151a2e')), 0, 1.2, 0.315))
+    for (const sx of [-0.12, 0.12]) head.add(at(new THREE.Mesh(g.eye, lit), sx, 1.21, 0.32))
+    head.add(at(mesh(g.aerial, d), 0.16, 1.54, 0, 0, 0, -0.15), at(new THREE.Mesh(g.bulb, lit), 0.22, 1.96, 0))
+    return 2.05
+  }
+  skin()
+  if (k === 'opus') {
+    head.add(mesh(g.scarf, o, 0.025), at(mesh(g.beard, tc('#6b3f26'), 0.025), 0, 1.04, 0.14), at(mesh(g.knot, o, 0.02), -0.34, 1.3, -0.12))
+    // the bandana's tails fly out to the side, so its outline is never a plain ball
+    for (const r of [-0.35, -0.95]) head.add(at(mesh(g.tail, o, 0.02), -0.36, 1.3, -0.1, 0, Math.PI - 0.35, r))
+    return 1.62
+  }
+  // a hat is tipped back so the face shows under its brim from the camera's height
+  const hat = (y, rx, rz, ...parts) => head.add(at(new THREE.Group().add(...parts), 0, y, -0.04, rx, 0, rz))
+  const band = (r, y) => { const b = new THREE.Mesh(g.hb, d); b.scale.set(r, 1, r); b.position.y = y; return b }
+  if (k === 'sol') { hat(1.44, -0.32, 0, mesh(g.straw, o, 0.025), mesh(g.crownS, o, 0.02), band(0.29, 0.08)); return 1.8 }
+  if (k === 'muse') { hat(1.4, -0.1, 0.22, mesh(g.wbrim, d, 0.02), mesh(g.witch, o, 0.03), band(0.33, 0.1)); return 2.5 }
+  if (k === 'crew') { head.add(mesh(g.cap, o), mesh(g.band, d), mesh(g.brim, o)); return 1.62 }
+  head.add(mesh(g.cap, d))
+  if (k === 'lead') head.add(mesh(g.tricorn, tc('#1e1a2a'), 0.03), mesh(g.crown, tc('#1e1a2a')))
+  else { head.add(mesh(g.bicorne, tc('#1e1a2a'), 0.035)); const b = mesh(new THREE.TorusGeometry(0.2, 0.04, 6, 16), tc(P.trim)); b.rotation.y = Math.PI / 2; b.position.set(0.13, 1.58, 0); head.add(b) }
+  return 1.8
 }
 function crew(m, role = 'crew') {
-  const g = geos(), c = role === 'crew' ? modelCol(m) : P.coat, root = new THREE.Group(), body = new THREE.Group(); root.add(body)
-  const outfit = tc(c, 0.28), dark = tc('#' + new THREE.Color(c).multiplyScalar(0.55).getHexString()), head = new THREE.Group()
-  body.add(mesh(g.body, outfit, 0.03), head)
-  head.add(mesh(g.head, tc(P.skin), 0.03))
-  for (const sx of [-0.13, 0.13]) { const e = new THREE.Mesh(g.eye, tc(P.ink)); e.position.set(sx, 1.16, 0.33); head.add(e) }
-  if (role === 'crew') head.add(...hat(m, outfit, dark))
-  else {
-    head.add(mesh(g.cap, dark))
-    if (role === 'lead') head.add(mesh(g.tricorn, tc('#1e1a2a'), 0.03), mesh(g.crown, tc('#1e1a2a')))
-    else { head.add(mesh(g.bicorne, tc('#1e1a2a'), 0.035)); const b = mesh(new THREE.TorusGeometry(0.2, 0.04, 6, 16), tc(P.trim)); b.position.set(0, 1.58, 0.13); head.add(b) }
-  }
-  if (role === 'crew') { const b = new THREE.Mesh(g.badge, badge(m)); b.position.set(0, 0.62, 0.305); body.add(b) }
-  const arms = [-1, 1].map(sx => { const a = mesh(g.arm, outfit, 0.02); a.position.set(sx * 0.36, 0.78, 0); body.add(a); return a })
-  const legs = [-1, 1].map(sx => { const l = mesh(g.leg, dark); l.position.set(sx * 0.13, 0.2, 0); body.add(l); return l })
+  const g = geos(), worker = role === 'crew', k = worker ? (MODEL.includes(m) ? m : 'crew') : role, c = worker ? modelCol(m) : P.coat
+  const root = new THREE.Group(), body = new THREE.Group(), head = new THREE.Group(); root.add(body)
+  const outfit = tc(c, 0.28), dark = tc('#' + new THREE.Color(c).multiplyScalar(0.55).getHexString())
+  const torso = mesh(k === 'muse' ? g.robe : g.body, outfit, 0.03); body.add(torso, head)
+  // the bosun is broad, the lookout slim
+  if (k === 'opus') torso.scale.set(1.3, 1, 1.18); else if (k === 'sol') torso.scale.set(0.82, 1.06, 0.82)
+  const top = headgear(k, head, outfit, dark), front = k === 'opus' ? 0.36 : k === 'sol' ? 0.25 : 0.305
+  if (worker) body.add(at(new THREE.Mesh(g.badge, badge(m)), 0, 0.62, front))
+  const reach = k === 'opus' ? 0.46 : k === 'sol' ? 0.31 : 0.36
+  const arms = [-1, 1].map(sx => { const a = mesh(g.arm, outfit, 0.02); a.position.set(sx * reach, 0.78, 0); body.add(a); return a })
+  const legs = k === 'muse' ? [] : [-1, 1].map(sx => { const l = mesh(g.leg, dark); l.position.set(sx * 0.13, 0.2, 0); body.add(l); return l })
   let lap = null
-  if (role === 'crew') {
-    lap = new THREE.Group(); lap.position.set(0, 0.42, 0.52); lap.add(mesh(g.lap, tc('#2b2b33')))
+  if (worker) {
+    lap = new THREE.Group(); lap.position.set(0, 0.42, front + 0.22); lap.add(mesh(g.lap, tc('#2b2b33')))
     // the lid faces the viewer with the model's mark
     const lid = new THREE.Group(); lid.position.set(0, 0.02, 0.16); lid.rotation.x = 0.25
     const mk = new THREE.Mesh(g.badge, badge(m)); mk.scale.setScalar(0.75); mk.position.set(0, 0.16, 0.014)
     lid.add(mesh(g.lid, dark, 0.02), mk); lap.add(lid); root.add(lap)
   }
-  root.userData = { body, head, arms, legs, lap, phase: Math.random() * 10 }
+  root.userData = { body, head, arms, legs, lap, top, phase: Math.random() * 10 }
   return root
 }
 // Poses, each a two- or three-beat loop with its own offset so the crew never moves in sync.
@@ -329,13 +370,17 @@ export function world(canvas, tagLayer) {
   const scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(34, 1, 0.5, 1200)
   scene.fog = new THREE.Fog(P.horizon, 60, 260)
   const moonAz = -2.2, sun = new THREE.DirectionalLight(P.key, 1.9)
-  sun.position.set(-34, 22, 22); sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024); sun.shadow.bias = -0.0006
+  sun.position.set(-34, 22, 22); sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024); sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.05
   Object.assign(sun.shadow.camera, { left: -14, right: 14, top: 14, bottom: -14, near: 1, far: 120 })
   const lamp = new THREE.PointLight(P.lamp, 14, 14, 1.6); lamp.position.set(0.5, 5.2, 2.2)
   scene.add(sun, sun.target, new THREE.HemisphereLight(P.hemiSky, P.hemiGround, 1.25))
   const sea = water(scene, moonAz), foam = foamRing(LEN + 0.4, BEAM + 0.4, 22); foam.rotation.y = YAW; scene.add(foam)
   const mark = emblem(), S = ship({ len: LEN, beam: BEAM, mark }); S.rotation.y = YAW; S.add(lamp); scene.add(S)
   const deckY = S.userData.deckY
+  // what the camera must keep in view: the hull, and the crew's heights over the far side of the deck with room for a tag
+  // (the bowsprit may run off the edge, so the hull itself fills the width)
+  const { top, half } = S.userData, DECK = [[-LEN / 2 - 0.4, top(0) + 1.2, half(0)], [-LEN / 2, 0, half(0)], [0, 0, BEAM / 2], [LEN / 2 + 0.3, top(1) + 0.3, 0], [0, deckY + 4.6, -1.8]]
+    .flatMap(([x, y, z]) => [-1, 1].map(k => new THREE.Vector3(x, y, k * z))).concat([SX.building, SX.merge].map(x => new THREE.Vector3(x, deckY + 4.6, -1.8)))
   for (const k of ACTIVE) {
     const col = tok(`--st-${k}`), disc = new THREE.Mesh(new THREE.CircleGeometry(1.15, 32), new THREE.MeshBasicMaterial({ color: new THREE.Color(col).multiplyScalar(0.5), transparent: true, opacity: 0.5, depthWrite: false }))
     disc.rotation.x = -Math.PI / 2; disc.position.set(SX[k], deckY + 0.02, 0); S.add(disc)
@@ -355,28 +400,37 @@ export function world(canvas, tagLayer) {
   let home = null, alive = true, raf = 0, roof = 0, bottom = Infinity, first = true, cw = 1, ch = 1
   const still = matchMedia('(prefers-reduced-motion: reduce)')
 
-  // A label pinned to a point in the scene; it is measured only when its words change.
+  // A label pinned to a point in the scene; its size is read when it renders and again whenever it changes (a web font arriving late).
+  const sized = new ResizeObserver(es => { for (const e of es) { const t = e.target.t; t.w = e.target.offsetWidth; t.h = e.target.offsetHeight } })
   function tag(key, cls, rank, words, view = words) {
     let t = tags.get(key)
-    if (!t) { t = { el: document.createElement('div') }; tagLayer.append(t.el); tags.set(key, t) }
+    if (!t) { t = { el: document.createElement('div') }; t.el.t = t; tagLayer.append(t.el); tags.set(key, t); sized.observe(t.el) }
     if (t.cls !== cls) t.el.className = 'sv-tag ' + (t.cls = cls)
     t.rank = rank; t.on = true
     if (t.words !== words) { t.words = words; render(view, t.el); t.w = t.el.offsetWidth; t.h = t.el.offsetHeight }
     return t
   }
-  // Tags keep apart and off the lead: trouble goes first, a tag over a worker steps up out of the way, a station marker only shows where it fits.
+  // Tags never touch: trouble goes first, each over its own worker; one whose spot is taken slides sideways as far as its stem
+  // still meets it, else steps up over what is in the way. A station plate shows only where it fits.
   function placeTags() {
-    const placed = []
+    const placed = [], G = 8, clamp = x => Math.max(6, Math.min(cw - x.w - 6, x.x)), box = (x, y, t) => ({ l: x, r: x + t.w, t: y, b: y + t.h })
+    const hit = (x, y, t) => placed.find(p => x < p.r + G && x + t.w > p.l - G && y < p.b + G && y + t.h > p.t - G)
     if (lead) { const p = lead.getWorldPosition(new THREE.Vector3()), [x, y] = toScreen(p); p.y += 4; const [, top] = toScreen(p); placed.push({ l: x - 20, r: x + 20, t: top, b: y }) }
     for (const t of [...tags.values()].filter(t => t.on).sort((a, b) => a.rank - b.rank)) {
-      const x = Math.max(6, Math.min(cw - t.w - 6, t.x - t.w / 2)), m = t.below ? 1 : 4; let y = t.below ? t.y : t.y - t.h
-      const hit = () => placed.find(p => x < p.r + m && x + t.w > p.l - m && y < p.b + m && y + t.h > p.t - m)
-      if (!t.below) for (let k = 0; k < 6; k++) { const h = hit(); if (!h) break; y = h.t - t.h - 4 }
-      // a tag that would crowd another or slip under the panels stays hidden; the stage strip and the sheet still name it
-      const off = t.below ? !!hit() || y + t.h > bottom : y < roof; t.el.style.visibility = off ? 'hidden' : ''; if (off) continue
-      placed.push({ l: x, r: x + t.w, t: y, b: y + t.h }); t.el.style.transform = `translate(${Math.round(x)}px,${Math.round(y)}px)`; t.el.style.zIndex = Math.round(y)
-      // a stem from a lifted tag down to its worker; lower tags stack on top, so a stem passes behind them
-      if (!t.below) { t.el.style.setProperty('--x', Math.round(t.x - x) + 'px'); t.el.style.setProperty('--s', Math.max(0, Math.round(t.y - y - t.h)) + 'px') }
+      let x = clamp({ x: t.x - t.w / 2, w: t.w }), y = t.pin ? t.y - t.h / 2 : t.y - t.h - 6, off
+      if (t.pin) off = !!hit(x, y, t) || y + t.h > bottom || y < roof
+      else {
+        const k = t.w / 2 - 14, side = [x, clamp({ x: t.x - t.w / 2 - k, w: t.w }), clamp({ x: t.x - t.w / 2 + k, w: t.w })].find(x => !hit(x, y, t))
+        if (side != null) x = side
+        else for (let n = 0; n < 6; n++) { const h = hit(x, y, t); if (!h) break; y = h.t - t.h - G }
+        // no room above under the panels: it stacks downward instead, since a stuck worker's tag always shows
+        if (y < roof) { y = Math.max(roof + 2, t.y - t.h - 6); for (let n = 0; n < 6; n++) { const h = hit(x, y, t); if (!h) break; y = h.b + G } }
+        off = false
+      }
+      t.el.style.visibility = off ? 'hidden' : ''; if (off) continue
+      placed.push(box(x, y, t)); t.el.style.transform = `translate(${Math.round(x)}px,${Math.round(y)}px)`; t.el.style.zIndex = Math.round(y)
+      // a stem from the tag down to its worker; lower tags stack on top, so a stem passes behind them
+      if (!t.pin) { t.el.style.setProperty('--x', Math.round(Math.max(10, Math.min(t.w - 10, t.x - x))) + 'px'); t.el.style.setProperty('--s', Math.max(0, Math.round(t.y - y - t.h)) + 'px') }
     }
   }
   const toScreen = p => { V.copy(p).project(cam); return [(V.x + 1) / 2 * cw, (1 - V.y) / 2 * ch] }
@@ -413,27 +467,27 @@ export function world(canvas, tagLayer) {
     roof = box.t; bottom = box.b
     // chunky pixels on a big screen, finer on a phone so a worker stays readable
     cw = w; ch = h; r.setPixelRatio(w < 600 ? 1 : 0.5); r.setSize(w, h, false); cam.aspect = w / h; cam.clearViewOffset()
-    // frame the ship's outline in the free part of the screen: find the distance at which it just fits, then shift the lens onto the box
-    S.updateMatrixWorld(); const pts = S.userData.outline.map(p => S.localToWorld(p.clone())), aim = new THREE.Box3().setFromPoints(pts).getCenter(new THREE.Vector3())
-    const pad = 12, bw = box.r - box.l - 2 * pad, bh = box.b - box.t - 2 * pad - 24, ext = () => {
-      cam.updateMatrixWorld(); let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9
-      for (const p of pts) { const [x, y] = toScreen(p); x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y) }
-      return [x0, x1, y0, y1]
-    }
+    // The hull and its crew always fit the free part of the screen and fill its width where they can; the masts take the room
+    // left above and may rise behind the top panels, as a ship runs out of a picture's frame, but never off the screen.
+    S.updateMatrixWorld()
+    const world = ps => ps.map(p => S.localToWorld(p.clone())), deck = world(DECK), all = world(S.userData.outline)
+    const aim = new THREE.Box3().setFromPoints(deck).getCenter(new THREE.Vector3()), pad = 12, top = box.t + pad, foot = box.b - pad - 24
+    const ext = pts => { let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; for (const p of pts) { const [x, y] = toScreen(p); x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y) } return [x0, x1, y0, y1] }
+    const look = dd => { cam.position.copy(aim).addScaledVector(DIR, dd); cam.lookAt(aim); cam.updateProjectionMatrix(); cam.updateMatrixWorld() }
+    const fits = () => { const [x0, x1, y0, y1] = ext(deck), [, , t0] = ext(all); return x1 - x0 <= box.r - box.l - 2 * pad && y1 - y0 <= foot - top && y1 - t0 <= foot - 4 }
     let lo = 5, hi = 400
-    for (let k = 0; k < 22; k++) {
-      const dd = (lo + hi) / 2; cam.position.copy(aim).addScaledVector(DIR, dd); cam.lookAt(aim); cam.updateProjectionMatrix()
-      const [x0, x1, y0, y1] = ext(); x1 - x0 <= bw && y1 - y0 <= bh ? hi = dd : lo = dd
-    }
-    cam.position.copy(aim).addScaledVector(DIR, hi); cam.lookAt(aim); cam.updateProjectionMatrix()
-    const [x0, x1, y0, y1] = ext()
-    cam.setViewOffset(w, h, (x0 + x1) / 2 - (box.l + box.r) / 2, (y0 + y1) / 2 - (box.t + box.b - 24) / 2, w, h); cam.updateProjectionMatrix()
+    for (let k = 0; k < 22; k++) { const dd = (lo + hi) / 2; look(dd); fits() ? hi = dd : lo = dd }
+    look(hi)
+    // the whole ship centred in the box when it fits there, else the hull set at the box's foot
+    const [x0, x1, , y1] = ext(deck), [, , t0, t1] = ext(all)
+    cam.setViewOffset(w, h, (x0 + x1) / 2 - (box.l + box.r) / 2, t1 - t0 <= foot - top ? (t0 + t1) / 2 - (top + foot) / 2 : y1 - foot, w, h); cam.updateProjectionMatrix()
     if (still.matches) frame()
   }
 
   function frame() {
     const t = clock.getElapsedTime()
-    sea.t.value = t; foam.material.uniforms.t.value = t
+    // the waves step ten times a second, like the frames of a sprite
+    sea.t.value = t; sea.ts.value = Math.floor(t * 10) / 10; foam.material.uniforms.t.value = t
     const h = wave(0, 0, t), [sx, sz] = tilt(0, 0, t)
     S.position.y = h * 0.7 - 0.15; S.rotation.z = -sx * 0.5 + Math.sin(t * 0.7) * 0.012; S.rotation.x = sz * 0.6; foam.position.y = h * 0.7 + 0.02
     billow(S, t)
@@ -444,14 +498,16 @@ export function world(canvas, tagLayer) {
     for (const g of tags.values()) g.on = false
     for (const [id, f] of figs) {
       if (!stuck(f.c) && f.c.wait !== 'parked') continue
-      f.f.getWorldPosition(V); V.y += 3.0; const [x, y] = toScreen(V), a = age(f.c)
+      f.f.getWorldPosition(V); V.y += f.f.userData.top * SCALE + 0.2; const [x, y] = toScreen(V), a = age(f.c)
       const st = state(f.c)[0], ag = a == null ? '' : dur(a)
       const tg = f.c.wait === 'parked' ? tag(id, 'sv-park', 1, PARK) : tag(id, f.c.wait === 'blocked' ? 'sv-bad' : 'sv-warn', 0, st + ag, html`${st} <b class="num">${ag}</b>`)
       tg.x = x; tg.y = y
     }
+    // each station's plate sits on the near rail in front of its deck mark
     for (const k of ACTIVE) {
-      V.set(SX[k], deckY + 0.05, 2.2); S.localToWorld(V); const [x, y] = toScreen(V), tg = tag('st' + k, 'sv-ico', 2, k, html`<${StageIcon} s=${k}/>`)
-      tg.x = x; tg.y = y + 16; tg.below = true
+      const u = (SX[k] + LEN / 2) / LEN; V.set(SX[k], S.userData.top(u) + 0.13, S.userData.half(u)); S.localToWorld(V)
+      const [x, y] = toScreen(V), tg = tag('st' + k, 'sv-ico', 2, k, html`<${StageIcon} s=${k}/>`)
+      tg.x = x; tg.y = y; tg.pin = true
     }
     for (const [k, g] of tags) if (!g.on) { g.el.remove(); tags.delete(k) }
     placeTags()
@@ -463,6 +519,6 @@ export function world(canvas, tagLayer) {
   still.addEventListener('change', motion)
   return {
     show, fit, start: motion,
-    destroy() { alive = false; cancelAnimationFrame(raf); still.removeEventListener('change', motion); r.dispose(); tagLayer.textContent = '' },
+    destroy() { alive = false; cancelAnimationFrame(raf); sized.disconnect(); still.removeEventListener('change', motion); r.dispose(); tagLayer.textContent = '' },
   }
 }
