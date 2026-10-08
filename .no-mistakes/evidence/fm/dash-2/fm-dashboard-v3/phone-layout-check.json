@@ -1,0 +1,23 @@
+{
+  "lifecycle": {
+    "effectiveLaunch": {
+      "browserLaunched": true,
+      "engine": "chrome",
+      "launchHash": 12825947863403514000
+    },
+    "launched": false,
+    "relaunchedBrowser": false,
+    "restartedBackground": false,
+    "restoreStatus": "not_configured",
+    "reused": true,
+    "saveStatus": "not_attempted"
+  },
+  "origin": "http://127.0.0.1:43013/flow",
+  "result": {
+    "documentWidth": 724,
+    "hasCycleUnknown": true,
+    "hasFiling": true,
+    "svgCount": 2,
+    "viewport": 724
+  }
+}

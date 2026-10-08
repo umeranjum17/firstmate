@@ -1,0 +1,11 @@
+ok - the overview answers each question, and lanes, agents and groups sum to their totals
+ok - Flow, Quota, Backlog and Method pages show their numbers with windows and sums
+ok - a fleet past twenty mates keeps every lead row
+ok - each failed source shows unknown and why, reuses a dated reading where one exists, and never guesses zero
+ok - GitHub searches and caches only registered GitHub repositories, with bounded daily refreshes
+ok - the filing log records first-seen times, and filed counts are floors until the log covers the day
+ok - devices and machine come from read-only probes, name each holder's home, and say unknown with the reason
+ok - pull requests group by checks and validation, with CI wait from no-mistakes, and an unreadable run shows unknown
+ok - quota identity, runway uncertainty, quality samples, cadence, filing gaps and producing homes stay faithful
+ok - population percentiles require complete durations, and P50 makes no strict timing claim
+ok - serve answers the five pages at once, remembers ?group in a cookie, rebuilds an old page itself, and 404s every other path

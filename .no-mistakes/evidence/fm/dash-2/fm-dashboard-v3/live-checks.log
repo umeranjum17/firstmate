@@ -1,0 +1,45 @@
+/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CG7XE13QK778BCYM433TX0/.validation-tmp/live/home/state/dashboard/index.html
+http://127.0.0.1:43013/
+/ HTTP 200 32194 bytes
+flow HTTP 200 35775 bytes
+quota HTTP 200 27211 bytes
+backlog HTTP 200 31860 bytes
+measure HTTP 200 31739 bytes
+state/ HTTP 404
+../data/backlog.md HTTP 404
+index.home.html HTTP 404
+Complete durations: P50 1 h, P85 100 h; p90 target 100 h missed. Escaped ask and grouping cookie verified.
+/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CG7XE13QK778BCYM433TX0/.validation-tmp/live/home/state/dashboard/index.html
+Traceback (most recent call last):
+  File "/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CG7XE13QK778BCYM433TX0/.validation-tmp/live/adversarial.py", line 20, in <module>
+    assert 'Brand new observed filing' in flow and '1 item first seen today.' in flow
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError
+ok: added follow-up (ship, repo alpha) -> Queued
+task:
+  id: follow-up
+  title: Brand new observed filing
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: alpha
+  priority: "-"
+  created: 2026-10-08
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start follow-up` to move it to in flight
+  - Run `tasks-axi block follow-up --by <other>` to record a dependency
+/home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4CG7XE13QK778BCYM433TX0/.validation-tmp/live/home/state/dashboard/index.html
+Flow: Yesterday's cycle time unknown. Cycle time unknown: missing or invalid merge durations.
+Method: Slowest merges (p90), target at most 50 h, now unknown.
+Flow latest filings: 1 item first seen today; Brand new observed filing.
+
+Setup corrections: added PATH-accessible perl to the isolated tool allowlist; replaced an incorrectly seeded Done-section filing with real fm-tasks-axi.sh add. Both checks then passed. Browser code unavailable (unpublished Pi session); native browser batches captured evidence successfully.

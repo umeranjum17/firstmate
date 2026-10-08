@@ -1,0 +1,199 @@
+[
+  {
+    "command": [
+      "click",
+      "@e6"
+    ],
+    "result": {
+      "clicked": "@e6",
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      }
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "wait",
+      "--url",
+      "**/quota"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "url": "http://127.0.0.1:43013/quota"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "screenshot",
+      "/home/umer/.no-mistakes/evidence/01M4CG7XE13QK778BCYM433TX0/phone-quota-unknown.png",
+      "--full"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "path": "/home/umer/.no-mistakes/evidence/01M4CG7XE13QK778BCYM433TX0/phone-quota-unknown.png"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "open",
+      "http://127.0.0.1:43013/backlog?group=home"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "targetId": "5E81D952D81EA2BB54205679D6BE96DA",
+      "title": "Fleet backlog",
+      "url": "http://127.0.0.1:43013/backlog?group=home"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "screenshot",
+      "/home/umer/.no-mistakes/evidence/01M4CG7XE13QK778BCYM433TX0/phone-backlog-home.png",
+      "--full"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "path": "/home/umer/.no-mistakes/evidence/01M4CG7XE13QK778BCYM433TX0/phone-backlog-home.png"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "open",
+      "http://127.0.0.1:43013/measure"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "targetId": "5E81D952D81EA2BB54205679D6BE96DA",
+      "title": "Fleet method",
+      "url": "http://127.0.0.1:43013/measure"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "set",
+      "viewport",
+      "1440",
+      "1000"
+    ],
+    "result": {
+      "deviceScaleFactor": 1,
+      "height": 1000,
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "mobile": false,
+      "width": 1440
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "screenshot",
+      "/home/umer/.no-mistakes/evidence/01M4CG7XE13QK778BCYM433TX0/desktop-method-complete.png",
+      "--full"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "path": "/home/umer/.no-mistakes/evidence/01M4CG7XE13QK778BCYM433TX0/desktop-method-complete.png"
+    },
+    "success": true
+  }
+]

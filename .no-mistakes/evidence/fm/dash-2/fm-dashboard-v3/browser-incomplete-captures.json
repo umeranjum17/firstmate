@@ -1,0 +1,128 @@
+[
+  {
+    "command": [
+      "open",
+      "http://127.0.0.1:43013/measure"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "targetId": "5E81D952D81EA2BB54205679D6BE96DA",
+      "title": "Fleet method",
+      "url": "http://127.0.0.1:43013/measure"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "screenshot",
+      "/home/umer/.no-mistakes/evidence/01M4CG7XE13QK778BCYM433TX0/desktop-method-incomplete.png",
+      "--full"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "path": "/home/umer/.no-mistakes/evidence/01M4CG7XE13QK778BCYM433TX0/desktop-method-incomplete.png"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "set",
+      "viewport",
+      "724",
+      "960"
+    ],
+    "result": {
+      "deviceScaleFactor": 1,
+      "height": 960,
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "mobile": false,
+      "width": 724
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "open",
+      "http://127.0.0.1:43013/flow"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "targetId": "5E81D952D81EA2BB54205679D6BE96DA",
+      "title": "Fleet flow",
+      "url": "http://127.0.0.1:43013/flow"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "screenshot",
+      "/home/umer/.no-mistakes/evidence/01M4CG7XE13QK778BCYM433TX0/phone-flow-incomplete.png",
+      "--full"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 12825947863403514000
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "path": "/home/umer/.no-mistakes/evidence/01M4CG7XE13QK778BCYM433TX0/phone-flow-incomplete.png"
+    },
+    "success": true
+  }
+]
