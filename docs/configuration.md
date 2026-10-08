@@ -679,6 +679,7 @@ These controls reduce risk but cannot guarantee avoidance of an out-of-memory ki
   A refused fresh spawn leaves the task queued; a relaunch refused by its initial admission check leaves the existing agent and task record untouched.
   The replacement launch checks admission again after the old agent stops, so pressure rising between those checks can still prevent replacement; this is not a memory reservation.
   Retry once pressure eases; admission does not automatically retry a queued spawn.
+  Admission gates agent launches, not builds or other heavy subprocesses started by already-running agents; it imposes no per-agent or fleet memory limit.
 - At the alert level, the sampler attempts one automatic `fm-control.sh <task-id> interrupt` per episode if the top consumer is a task this home owns, passing the resolved home and selected state explicitly; it never exits, kills, or discards that task.
   Before latching the episode or dispatching an interrupt, it queues a durable `check: host memory ALERT` wake naming the consumer and planned interrupt attempt (or the ownership skip), then records the attempt in `state/host-memory-interrupts.tsv`.
   Failed wake publication leaves the next sample eligible, including after a sampler restart; an older episode's queued wake does not suppress a new episode's wake.

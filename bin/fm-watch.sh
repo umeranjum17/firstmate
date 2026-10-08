@@ -168,15 +168,10 @@
 #                          budget and is parked until a probe reads it live
 #                          again (FM_SECONDMATE_LIVENESS_MAX_ATTEMPTS and
 #                          FM_SECONDMATE_LIVENESS_WINDOW_SECS)
-#   check: host memory ALERT: <summary>; largest: <owner> <size>, ...
-#                          the independent per-home memory sampler (every
-#                          FM_HOST_MEMORY_SECS, default 10) records samples in
-#                          state/host-memory.tsv and attempts one interrupt of
-#                          the top consumer only if this home owns that task.
-#                          The watcher supervises its identity-bound pid file,
-#                          restarts it if dead, and stops only that exact PID.
-#                          One wake per episode: state/.host-memory-alerted
-#                          latches it until a sample reads OK again
+#   check: host memory ALERT: <summary>; largest: <owner> <size>, ...; <action>
+#                          durable sampler wake; docs/configuration.md "Host
+#                          memory guard" owns admission and alert behavior;
+#                          bin/fm-host-memory-sampler.sh owns sampler lifecycle
 # For normal supervision, resume the session-start primary-harness protocol
 # after each printed reason. Direct duplicate invocations of this script still
 # no-op through the watcher singleton lock. A live holder whose beacon is stale
