@@ -9,8 +9,12 @@
 # Stage clocks read the installed config/fm-flow-check.sh policy expression;
 # an unrecognized/missing policy yields unknown, not a copied default.
 # config/lane-caps supplies recorded-active lane caps; no free worker is inferred.
-# Reads this home and recursively registered local homes, state/*.meta/status,
-# state/fleet-ledger.jsonl (docs/fleet-ledger.md), and data/backlog.md.
+# Reads this home and recursively registered local homes: state/*.meta/status,
+# state/fleet-ledger.jsonl (docs/fleet-ledger.md), and queued tasks through the
+# home-addressed fm-tasks-axi.sh consumer (including archived dependency completions).
+# Missing/unavailable backlog backends are unknown, never a stale Markdown fallback.
+# Registered remote homes remain listed, with unavailable lanes/backlog/lifecycle
+# disclosed in limitations; remote paths are not read locally and no SSH is used.
 # Output fm-flow.v1: homes, lanes, queue, bottlenecks, executed_24h/7d,
 # time_to_merge (median, nearest-rank P85, UTC seven-day trend), and limitations.
 # Times are seconds. null means unknown, including unstamped status lines.
@@ -22,7 +26,11 @@
 # never allocated causal or lane-hours-lost durations. Full seconds stay null when any
 # same-cause wait is unstamped; known_seconds carries the max known age, cause totals carry
 # known_lane_hours alongside known_lower_bound_lane_hours, and ranking uses the lower bound.
-# Keyed waits close only on matching resolved/captain-held, not working/done.
+# Key/note parsing is owned by fm-classify-lib.sh: keys may be in the status head
+# or note head. Each key retains its latest opener's reason and timestamp;
+# keyed waits close only on matching resolved/captain-held, not working/done.
+# A current paused status also contributes a non-decision wait since that latest
+# pause line; leaving paused removes it without closing any keyed waits.
 # Historical results cover retained records only, not a complete forge history.
 # Capacity and worker-liveness probes are not collected.
 set -eu
