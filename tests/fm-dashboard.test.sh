@@ -386,9 +386,9 @@ for metric in m.values():
 with urllib.request.urlopen(urllib.request.Request(base + 'data.json', method='HEAD')) as r:
     assert r.headers.get_content_type() == 'application/json' and r.read() == b''
     assert int(r.headers['Content-Length']) > 0
-for path, want in (('', 'Nothing needs you.'), ('backlog', 'Held for the captain'), ('measure', 'How each number is measured.')):
+for path, want in (('overview', 'Nothing needs you.'), ('backlog', 'Held for the captain'), ('measure', 'How each number is measured.')):
     code, body, _ = get(base + path)
-    print(path or '/', code, want in body)
+    print(path, code, want in body)
 code, body, cookie = get(base + 'backlog?group=home')
 print('group', code, 'fm_group=home' in cookie, '7 + 1 = <b>8</b>' in body)
 code, body, _ = get(base + 'backlog', 'fm_group=home')
@@ -397,20 +397,142 @@ code, body, _ = get(base + 'measure')
 print('timestamps', '<!--' not in body, re.search(r'as of \d\d:\d\d', body) is not None)
 for path in ('flow', 'state/', 'index.home.html', '../data/backlog.md', 'data/backlog.md'):
     print(path, get(base + path)[0])
+def raw(u, **h):
+    try:
+        with urllib.request.urlopen(urllib.request.Request(u, headers=h), timeout=120) as r: return r.status, r.headers, r.read()
+    except urllib.error.HTTPError as e: return e.code, e.headers, b''
+# The app and its files: its own origin only, each file answered 304 while unchanged; the pages keep their own policy.
+s, h, b = raw(base)
+print('app', s, h.get_content_type(), "default-src 'self'" in h['Content-Security-Policy'], b'src="app.js"' in b)
+for path in ('app.js', 'vendor/preact-htm-3.1.1.js', 'board.json'):
+    s, h, b = raw(base + path)
+    print(path, s, h.get_content_type(), h['Cache-Control'], raw(base + path, **{'If-None-Match': h['ETag']})[0])
+print('board', json.loads(raw(base + 'board.json')[2])['schema'], "default-src 'none'" in raw(base + 'overview')[1]['Content-Security-Policy'])
+import gzip
+s, h, b = raw(base + 'board.json', **{'Accept-Encoding': 'gzip'})
+print('gzip', h['Content-Encoding'], json.loads(gzip.decompress(b))['schema'], raw(base + 'board.json', **{'Accept-Encoding': 'gzip', 'If-None-Match': h['ETag']})[0])
+for path in ('vendor/../app.js', '../fm-dashboard/app.js', '.hidden.js', 'a/b/app.js', 'app.py', 'missing.js'):
+    print(path, raw(base + path)[0])
 PY
 )
-  [ "$got" = "$(printf '%s\n' '/ 200 True' 'backlog 200 True' 'measure 200 True' \
-    'group 200 True True' 'cookie 200 True' 'timestamps True True' 'flow 404' 'state/ 404' 'index.home.html 404' '../data/backlog.md 404' 'data/backlog.md 404')" ] \
-    || fail "serve answers were not the three pages, the remembered grouping, then 404s: $got"
+  [ "$got" = "$(printf '%s\n' 'overview 200 True' 'backlog 200 True' 'measure 200 True' \
+    'group 200 True True' 'cookie 200 True' 'timestamps True True' 'flow 404' 'state/ 404' 'index.home.html 404' '../data/backlog.md 404' 'data/backlog.md 404' \
+    'app 200 text/html True True' 'app.js 200 text/javascript no-cache 304' 'vendor/preact-htm-3.1.1.js 200 text/javascript no-cache 304' \
+    'board.json 200 application/json no-cache 304' 'board fm-dashboard-board.v1 True' 'gzip gzip fm-dashboard-board.v1 304' 'vendor/../app.js 404' '../fm-dashboard/app.js 404' \
+    '.hidden.js 404' 'a/b/app.js 404' 'app.py 404' 'missing.js 404')" ] \
+    || fail "serve answers were not the app, the three pages, the remembered grouping, then 404s: $got"
   # An old page is answered at once, as it is, while a rebuild runs behind it.
   printf '<p>old page<!--age--></p>\n' > "$home/state/dashboard/index.html"
   touch -d '-5 minutes' "$home/state/dashboard/index.html"
-  got=$(python3 -c 'import sys, urllib.request; print(urllib.request.urlopen(sys.argv[1], timeout=5).read().decode())' "$url")
+  got=$(python3 -c 'import sys, urllib.request; print(urllib.request.urlopen(sys.argv[1], timeout=5).read().decode())' "${url}overview")
   case "$got" in *'<span class="age bad">updated 5'*'min ago'*) ;; *) fail "an old page was not answered at once, marked old: $got" ;; esac
   for _ in $(seq 1 1200); do grep -q 'old page' "$home/state/dashboard/index.html" || break; sleep 0.1; done
   grep -q 'Nothing needs you' "$home/state/dashboard/index.html" || fail "the background rebuild did not replace the old page"
+  python3 - "$url" "$home" <<'PY' || fail "failed rebuild reported a healthy JSON refresh"
+import os, time, sys, urllib.request, urllib.error
+base, home = sys.argv[1:]
+with urllib.request.urlopen(base + 'board.json') as r: tag = r.headers['ETag']
+os.unlink(home + '/state/dashboard/backlog.html')
+os.mkdir(home + '/state/dashboard/backlog.html')
+os.utime(home + '/state/dashboard/index.html', (time.time() - 300,) * 2)
+deadline = time.monotonic() + 15
+while 'last refresh failed' not in urllib.request.urlopen(base + 'overview').read().decode():
+    assert time.monotonic() < deadline, 'rebuild never failed'
+    time.sleep(.1)
+for path in ('board.json', 'data.json'):
+    for headers in ({}, {'If-None-Match': tag}):
+        try: urllib.request.urlopen(urllib.request.Request(base + path, headers=headers))
+        except urllib.error.HTTPError as e: assert e.code == 503 and e.headers['Cache-Control'] == 'no-store'
+        else: raise AssertionError('failed refresh answered successfully')
+PY
   kill "$SERVE_PID" 2>/dev/null; SERVE_PID=
-  pass "serve retains source timestamps, fills page age, remembers ?group in a cookie, rebuilds old pages, and 404s every other path"
+  pass "serve answers the app and its files by version, the three pages at once retaining source timestamps, remembers ?group in a cookie, rebuilds an old page itself, and 404s every other path"
+}
+
+test_board_json_feeds_the_app() {
+  local home d now today
+  home=$(make_home board)
+  d="$home/state/dashboard"
+  now=$(date +%s) today=$(date +%F)
+  # A lane in review on Opus; m-fix ran 3 h on GPT and merged a minute ago, its archived title ending in its PR.
+  fm_write_meta "$home/state/m-opus.meta" "kind=ship" "project=alpha" "harness=claude" "model=claude-opus-5-5" "herdr_pane_id=pane-m-opus"
+  printf '%s\n' "working [at=$((now - 3000))]: building" "working [at=$((now - 900))] [key=nm-run-review]: no-mistakes review" "working [at=$((now - 600))] [key=nm-run-ci]: CI checks" "needs-decision [at=$((now - 300))] [key=nm-newrun-review]: waiting for vendor credentials" > "$home/state/m-opus.status"
+  lane "$home" m-ci ship "blocked [at=$((now - 1200))]: CI failed: approve config/release.json https://github.com/acme/alpha/pull/9"
+  lane "$home" m-paused ship "paused [at=$((now - 200))] [key=nm-run-test]: waiting for vendor credentials"
+  lane "$home" m-gitlab ship "working [at=$((now - 900))] [key=nm-run-ci]: checks running" "done [at=$((now - 300))]: PR https://gitlab.example/team/nested/app/-/merge_requests/27 checks green"
+  fm_write_meta "$home/state/m-canonical.meta" "kind=ship" "project=alpha" "pr=https://review.example/c/team/app/+/28"
+  printf 'working [at=%s] [key=nm-run-ci]: checks running\n' "$now" > "$home/state/m-canonical.status"
+  lane "$home" m-gerrit ship "done [at=$((now - 200))]: PR https://review.example/c/team/nested/app/+/27 published for review"
+  printf '{"ts":%s,"event":"task.dispatched","task":"m-opus","harness":"claude"}\n{"ts":%s,"event":"task.dispatched","task":"m-fix","model":"gpt-5.5","harness":"codex"}\n{"ts":%s,"event":"task.merged","task":"m-fix","pr":"https://github.com/acme/alpha/pull/12"}\n' \
+    "$((now - 3600))" "$((now - 10800))" "$((now - 600))" >> "$home/state/fleet-ledger.jsonl"
+  printf -- '- [x] m-fix - Fix the login PR https://github.com/acme/alpha/pull/12 (repo: alpha) (kind: ship) (merged %s)\n' "$today" >> "$home/data/done-archive.md"
+  printf 'first\t%s\tApprove the release\thttps://example.invalid/release\n' "$((now - 7200))" > "$home/data/captain-asks.tsv"
+  fm_write_meta "$home/state/m-fix.meta" "kind=ship" "project=alpha" "pr=https://github.com/acme/alpha/pull/12"
+  printf 'working [at=%s] [key=nm-run-ci]: checks running\n' "$now" > "$home/state/m-fix.status"
+  build "$home"
+  jq -e --argjson now "$now" '
+    def c($id): .cards[] | select(.id == $id);
+    .schema == "fm-dashboard-board.v1" and ([.stages[].id] == ["queued","building","review","test","ci","merge","landed"])
+    and (c("main/m-opus") | .stage == "review" and .model == "opus" and .model_name == "Opus" and .started == $now - 3600 and .since == $now - 300
+      and .reached.review == $now - 900 and .reached.ci == $now - 600 and .wait == "decision"
+      and ([.history[] | [.v, .stage]] == [["working","building"],["working","review"],["working","ci"],["needs-decision","review"]]))
+    and (c("main/m-stuck") | .wait == "blocked" and .why == "cannot reach the build server")
+    and (c("main/m-ask") | .wait == "decision" and .why == "which layout")
+    and (c("main/m-done") | .stage == "merge" and .why == "PR 8 checks green" and .pr == "https://github.com/acme/alpha/pull/8" and .history[0].v == "done" and .history[0].stage == "merge")
+    and (c("main/m-ci") | .stage == "ci" and .wait == "blocked" and .wait_since == $now - 1200)
+    and (c("main/m-paused") | .stage == "test" and .wait == "waiting")
+    and (c("main/m-gitlab") | .stage == "merge" and .since == $now - 300 and .pr == "https://gitlab.example/team/nested/app/-/merge_requests/27")
+    and (c("main/m-canonical") | .pr == "https://review.example/c/team/app/+/28")
+    and (c("main/m-gerrit") | .pr == "https://review.example/c/team/nested/app/+/27" and .stage == "review")
+    and (c("main/m-fix@https://github.com/acme/alpha/pull/12") | .stage == "landed" and .title == "Fix the login" and .pr == "https://github.com/acme/alpha/pull/12" and .started == $now - 10800 and .model == "gpt")
+    and ([.cards[] | select(.stage == "queued") | .id] == ["main/m-ready","zephyrine/z-ready"])
+    and .parked == ["beta"] and ([.cards[] | select(.home == "beta")] == [])
+    and all(.cards[]; .id != "main/m-fix") and .cycle_p50 == null
+    and ([.asks[] | [.id, .text, .url]] == [["first","Approve the release","https://example.invalid/release"]])
+    and .landed[-1] == 3' "$d/board.json" >/dev/null ||
+    fail "board.json does not carry each lane's stage, wait, model, reason and the day's landings: $(jq -c '{cards: [.cards[] | {id, stage, wait, why, model, title}], asks, landed, cycle_p50}' "$d/board.json")"
+  printf '{"ts":%s,"event":"task.merged","task":"m-gitlab","pr":"https://gitlab.example/team/nested/app/-/merge_requests/27"}\n{"ts":%s,"event":"task.merged","task":"m-gerrit","pr":"https://review.example/c/team/nested/app/+/27"}\n' "$((now - 60))" "$((now - 60))" >> "$home/state/fleet-ledger.jsonl"
+  printf 'done [key=merged-z-lab] [at=%s]: merged z-lab https://gitlab.example/team/app/-/merge_requests/50\ndone [key=merged-z-review] [at=%s]: merged z-review https://review.example/c/team/app/+/51\n' "$((now - 60))" "$((now - 60))" >> "$home/state/zephyrine.status"
+  printf -- '- zephyrine - remote (host: distant; root: /srv; home: %s; scope: work; projects: alpha; added 2026-07-11)\n' "$home/mates/zephyrine" > "$home/data/secondmates.md"
+  printf '{"ts":%s,"event":"task.dispatched","task":"z-shipped","model":"gpt-5.5"}\n' "$((now - 5000))" >> "$home/mates/zephyrine/state/fleet-ledger.jsonl"
+  for i in 1 2 3 4; do
+    printf '{"ts":%s,"event":"task.dispatched","task":"m-cycle%s","model":"gpt-5.5"}\n{"ts":%s,"event":"task.merged","task":"m-cycle%s","pr":"https://github.com/acme/alpha/pull/%s"}\n' "$((now - 60 - i * 1000))" "$i" "$((now - 60))" "$i" "$((20 + i))" >> "$home/state/fleet-ledger.jsonl"
+  done
+  printf '{"ts":%s,"event":"task.cleaned_up","task":"m-fix"}\n{"ts":%s,"event":"task.dispatched","task":"m-fix","model":"qwen","harness":"pi"}\n{"ts":%s,"event":"task.merged","task":"m-fix","pr":"https://github.com/acme/alpha/pull/13"}\n{"ts":%s,"event":"task.dispatched","task":"m-fix","model":"opus","harness":"claude"}\n{"ts":%s,"event":"task.dispatched","task":"m-ready","model":"qwen"}\n' "$((now - 500))" "$((now - 130))" "$((now - 30))" "$((now - 10))" "$((now - 20))" >> "$home/state/fleet-ledger.jsonl"
+  fm_write_meta "$home/state/m-fix.meta" "kind=ship" "project=alpha"
+  printf 'working [at=%s] [key=nm-renew-review]: PR https://github.com/acme/alpha/pull/99\n' "$now" > "$home/state/m-fix.status"
+  build "$home"
+  jq -e --argjson now "$now" '.cycle_p50 == 2000 and .landed[-1] == 12 and ([.cards[] | select(.task == "m-gitlab" or .task == "m-gerrit" or .task == "z-lab" or .task == "z-review") | .stage] == ["landed","landed","landed","landed"]) and any(.cards[]; .task == "m-ready" and .stage == "queued" and .model == null and .started == null) and any(.cards[]; .pr == "https://github.com/acme/alpha/pull/13" and .model == "qwen" and .tool == "pi" and .started == $now - 130) and any(.homes[]; .id == "zephyrine" and .known == false and .ready == null) and any(.cards[]; .home == "zephyrine" and .stage == "landed" and .model == null and .started == null) and ([.cards[].id] | length == (unique | length)) and ([.cards[] | select(.task == "m-fix" and .stage == "landed")] | length == 2) and any(.cards[]; .id == "main/m-fix" and .stage == "review" and .started == $now - 10 and .model == "opus")' "$d/board.json" >/dev/null || fail "remote dispatch or renewed card identity was misrepresented"
+  rm "$home/state/m-gitlab.meta" "$home/state/m-gerrit.meta"
+  build "$home"
+  jq -e '.landed[-1] == 12 and ([.cards[] | select(.task == "m-gitlab" or .task == "m-gerrit")] | length == 2)' "$d/board.json" >/dev/null || fail "cleanup lost forge landings"
+  cp -R "$ROOT/bin/fm-dashboard" "$home/ui"
+  printf '{"type":"module"}\n' > "$home/ui/package.json"
+  node --input-type=module - "$home/ui" <<'JS' || fail "dashboard UI behavior regressed"
+import assert from 'node:assert/strict'
+const root = process.argv[2], ui = await import(`${root}/ui.js`), board = await import(`${root}/board.js`)
+const d = { homes: [{ id: 'main', known: true, ready: 0 }, { id: 'remote', known: false, ready: null }], cards: [] }
+assert.equal(ui.total(d, 0), '≥0'); assert.equal(ui.total(d, 0, 'queued'), '≥0'); assert.equal(ui.total(d, 0, 'landed'), '≥0')
+assert.equal(ui.total(d, 2, 'active', 'main'), 2)
+assert.equal(ui.prNum('https://gitlab.example/team/nested/app/-/merge_requests/27'), '27'); assert.equal(ui.prNum('https://github.com/team/app/pull/28'), '28'); assert.equal(ui.prNum('https://review.example/c/team/app/+/27'), '27')
+const note = text => ({ verb: 'Waiting', stage: 'review', text, at: 1 })
+const prefix = 'Waiting for approval of the production deployment configuration in '
+assert.equal(board.squash([note(prefix + 'production'), note(prefix + 'staging')]).length, 2)
+assert.equal(board.squash([note(prefix), { ...note(prefix), stage: 'ci' }]).length, 2)
+assert.equal(board.squash([note(prefix), { ...note(prefix), at: 2 }])[0].n, 2)
+assert.equal(board.stageTimes({ ci: 100, test: 200 }, 2, false)[2], null)
+assert.equal(board.stageTimes({ building: 100, review: 200, test: 300 }, 2, false)[1], 100)
+const c = { id: 'main/m-test', home: 'main', task: 'm-test', title: 'Test', stage: 'review', wait: 'waiting', why: 'm-login is complete; waiting for vendor credentials', history: [] }
+assert.equal(ui.reason(c), c.why); assert.equal(ui.stuck({ ...c, wait: 'blocked' }), true)
+let opened = null
+const open = id => opened = id, desktop = board.Card({ d, c, open }), rows = board.List({ d, cards: [c], r: { tab: 'active' }, open })
+const row = rows[0][1][0], phone = row.type(row.props)
+for (const node of [desktop, phone]) {
+  assert.equal(node.props.role, 'button')
+  for (const key of ['Enter', ' ']) { opened = null; let prevented = false; node.props.onKeyDown({ key, target: node, currentTarget: node, preventDefault() { prevented = true } }); assert.equal(opened, c.id); assert.equal(prevented, true) }
+}
+JS
+  pass "board.json gives each lane its stage, wait, reason in words, model and each status line's verb and stage, landed titles without their PR, cycle times and the ask list"
 }
 
 test_fleet_past_twenty_mates_keeps_every_lead_row() {
@@ -682,6 +804,9 @@ PY
   pass "unavailable displayed readings suppress reassurance and concurrent cache updates preserve both builds"
 }
 
+if [ "${1:-}" = board ]; then test_board_json_feeds_the_app; exit; fi
+if [ "${1:-}" = review ]; then test_board_json_feeds_the_app; test_serve_answers_each_page_and_remembers_the_grouping; exit; fi
+
 test_unavailable_readings_and_concurrent_caches
 test_new_lane_and_unwritten_archive_stay_exact
 test_incomplete_lanes_and_moved_filings
@@ -689,6 +814,7 @@ test_review_evidence_boundaries
 test_overview_answers_the_four_questions_with_sums_that_add_up
 test_backlog_and_method_pages_show_their_numbers
 test_fleet_past_twenty_mates_keeps_every_lead_row
+test_board_json_feeds_the_app
 test_each_failed_source_shows_unknown_and_why
 test_devices_and_machine_come_from_read_only_probes
 test_serve_answers_each_page_and_remembers_the_grouping
