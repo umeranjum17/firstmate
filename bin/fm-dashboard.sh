@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 # fm-dashboard.sh - build and serve the read-only fleet dashboard for this home.
 #
-# The dashboard is the app in bin/fm-dashboard/ (vendored Preact, htm and Inter; no network
-# reference; light and dark): Board, a kanban of Building, Review, Test, PR + CI and To merge
-# with tabs for Queued, Landed today and All and rows by home on request, whose cards carry
-# the lane's model, age, pull request and, when it waits, why in plain words; filters by
-# home, model and state; a card's detail with its stages and activity; Needs you (the ask
-# list); a mount point for the ship view (ship/index.js); a command palette and keys (?).
+# The dashboard is the app in bin/fm-dashboard/ (vendored Preact, htm, Inter and, for the Ship tab
+# only, three.js; no network reference; light and dark): Board, a kanban of Building, Review,
+# Test, PR + CI and To merge with tabs for Queued, Landed today and All and rows by home on
+# request, whose cards carry the lane's model, age, pull request and, when it waits, why in plain
+# words; filters by home, model and state; a card's detail with its stages and activity; Needs you
+# (the ask list); Ship (ship/: one home's ship at night with each lane a worker at its stage's
+# deck station, dressed by model, and a sheet with the key numbers and what is stuck or parked; a
+# still frame where WebGL is missing); a command palette and keys (?).
 # On a phone the board is a list grouped by stage, with a dock.
 # Each build writes the app's one data file, state/dashboard/board.json: homes with their
 # lane plans, one card per open lane, ready backlog item and pull request landed today,
