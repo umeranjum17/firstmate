@@ -788,7 +788,7 @@ EOF
 # consumer-side rule on purpose - it protects local and remote writers
 # identically, and it can never fail a whole delta or wedge a stream the way a
 # writer-side rejection would.
-FM_CLASSIFY_RESERVED_KEY_PREFIXES_DEFAULT='pending-reply-'
+FM_CLASSIFY_RESERVED_KEY_PREFIXES_DEFAULT='pending-reply- waiting-timer-'
 
 # 0 when <key> is not reserved, or is reserved and <note> speaks its vocabulary.
 _fm_decision_key_transition_allowed() {  # <key> <note>

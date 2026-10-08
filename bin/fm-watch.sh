@@ -261,6 +261,9 @@ WATCH_HOME_EXISTED=0
 # and wake emission (secondmate_liveness_tick below).
 # shellcheck source=/dev/null # Analyzed separately as a canonical lint root.
 . "$SCRIPT_DIR/fm-secondmate-liveness-lib.sh"
+# State timers are independent of the pane-staleness heuristics below.
+# shellcheck source=/dev/null # Canonical lint root with its own parent-channel graph.
+. "$SCRIPT_DIR/fm-wait-timers-lib.sh"
 
 WATCH_LOCK="$STATE/.watch.lock"
 WATCH_PATH="$SCRIPT_DIR/fm-watch.sh"
@@ -2992,6 +2995,11 @@ while :; do
   # the parent without consuming or rewriting the receiving home's record.
   secondmate_wake_stall_tick || {
     echo "watcher: secondmate wake-loop observation failed" >&2
+    exit 1
+  }
+
+  fm_wait_timers_tick || {
+    echo "watcher: waiting-state timer check failed" >&2
     exit 1
   }
 
