@@ -640,7 +640,7 @@ test_herdr_primary_without_restart_recovery_says_how_to_install_it() {
   notice=$(printf '%s\n' "$out" | grep '^SENTINEL:')
   command=${notice#*'(install: '}
   command=${command%')'}
-  mkdir -p "$case_dir/home/bin" "$case_dir/shell home/.config/systemd/user"
+  mkdir -p "$case_dir/home/bin"
   cp "$ROOT/bin/fm-sentinel.sh" "$case_dir/home/bin/fm-sentinel.sh"
   cat > "$fakebin/systemctl" <<'SH'
 #!/usr/bin/env bash
@@ -651,6 +651,8 @@ if [ "$*" = "--user enable --now fm-sentinel" ]; then
 fi
 SH
   chmod +x "$case_dir/home/bin/fm-sentinel.sh" "$fakebin/systemctl"
+  [ ! -e "$case_dir/shell home/.config/systemd/user" ] \
+    || fail "the first-install fixture must not precreate the service directory"
   HOME="$case_dir/shell home" PATH="$fakebin:$BASE_PATH" FM_TEST_SENTINEL_RECEIPT="$case_dir/receipt" \
     bash -c "$command" || fail "the emitted install command is not safely executable"
   assert_equals $'systemctl\t--user enable --now fm-sentinel' \
