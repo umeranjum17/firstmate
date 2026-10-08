@@ -23,7 +23,7 @@ function Top({ d, home, pick }) {
   const landed = total(d, d.cards.filter(c => c.stage === 'landed' && c.home === home).length, 'landed', home)
   return html`<div class="sv-hd">
     <div class="sv-homes"><div class="seg" role="tablist">${d.homes.map(h => { const cs = o.filter(c => c.home === h.id), t = tone(cs)
-      return html`<button role="tab" aria-pressed=${h.id === home} aria-selected=${h.id === home} onClick=${() => pick(h.id)}>${h.name}<small class="num">${total(d, cs.length, 'active', h.id)}</small>${t ? html`<i class=${t}></i>` : ''}</button>` })}</div></div>
+      return html`<button role="tab" aria-pressed=${h.id === home} aria-selected=${h.id === home} onClick=${() => pick(h.id)}>${h.name}<small class="num">${h.known ? cs.length : '?'}</small>${t ? html`<i class=${t}></i>` : ''}</button>` })}</div></div>
     <div class="sv-flow">${ACTIVE.map(s => html`<div class=${known && !n(s) ? 'sv-z' : ''}><span class="sv-c"><${StageIcon} s=${s} size=${13}/><b class="num">${total(d, n(s), s, home)}</b></span><span class="sv-n">${SNAME[s]}</span></div>`)}</div>
     <div class="sv-crew">${Object.entries(by).sort((a, b) => b[1] - a[1]).map(([m, k]) => html`<span class="sv-chip"><${Av} m=${m || null} size=${18}/>${mname(m || null, d)} <b class="num">${total(d, k, 'active', home)}</b></span>`)}
       ${!known ? html`<span class="sv-chip">Crew unknown</span>` : !mine.length ? html`<span class="sv-chip">Nobody on deck</span>` : ''}<span class="sp"></span>
