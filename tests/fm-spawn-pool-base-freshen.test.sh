@@ -916,8 +916,10 @@ test_real_pool_lease_survives_worker_exit_and_teardown_releases_it() {
   printf '#!/usr/bin/env bash\nexec %q -S %q "$@"\n' "$(command -v tmux)" "$socket" > "$fakebin/tmux"
   chmod +x "$fakebin/tmux"
   (
-    export HOME="$home" XDG_CONFIG_HOME="$home/.config" TMPDIR="$case_dir" TREEHOUSE_NO_UPDATE_CHECK=1
-    export FM_ROOT_OVERRIDE='' FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data"
+    local HOME="$home" XDG_CONFIG_HOME="$home/.config" TMPDIR="$case_dir" TREEHOUSE_NO_UPDATE_CHECK=1
+    local FM_ROOT_OVERRIDE='' FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data"
+    export HOME XDG_CONFIG_HOME TMPDIR TREEHOUSE_NO_UPDATE_CHECK
+    export FM_ROOT_OVERRIDE FM_HOME FM_STATE_OVERRIDE FM_DATA_OVERRIDE
     export FM_PROJECTS_OVERRIDE="$home/projects" FM_CONFIG_OVERRIDE="$home/config" FM_BACKEND=tmux FM_SPAWN_NO_GUARD=1
     # This journey launches only sleep, not a model; memory admission is not
     # the behavior under test. Keep its proc input isolated from host load.
@@ -958,7 +960,7 @@ test_real_pool_lease_survives_worker_exit_and_teardown_releases_it() {
     # Reacquisition must choose the released copy, not the retained task.
     [ "$(cd "$project" && treehouse get --lease --lease-holder next-task)" = "$second" ] || exit 1
     (cd "$project" && treehouse return --force "$second") || exit 1
-    printf '#!/usr/bin/env bash\n%q "$@" || exit $?\nif [ "$1" = get ]; then git -C %q remote add origin %q; fi\n' \
+    printf "#!/usr/bin/env bash\n%q \"\$@\" || exit \$?\nif [ \"\$1\" = get ]; then git -C %q remote add origin %q; fi\n" \
       "$(command -v treehouse)" "$project" "file://$case_dir/missing-origin.git" > "$fakebin/treehouse"
     chmod +x "$fakebin/treehouse"
     for id in recovery-cleanup recovery-relaunch; do
@@ -1005,8 +1007,10 @@ test_real_home_seed_protects_recorded_copy() {
   git -C "$project" -c user.name=Tests -c user.email=tests@example.invalid commit -qm seed-fixture
   printf '# Charter\n\nOwn firstmate work.\n\n# Routing scope\n\nFirstmate.\n\n# Project clones\n\nNone. This is a project-less domain.\n' > "$home/data/seed-home/brief.md"
   (
-    export HOME="$home" XDG_CONFIG_HOME="$home/.config" TMPDIR="$case_dir" TREEHOUSE_NO_UPDATE_CHECK=1
-    export FM_ROOT_OVERRIDE="$project" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data"
+    local HOME="$home" XDG_CONFIG_HOME="$home/.config" TMPDIR="$case_dir" TREEHOUSE_NO_UPDATE_CHECK=1
+    local FM_ROOT_OVERRIDE="$project" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data"
+    export HOME XDG_CONFIG_HOME TMPDIR TREEHOUSE_NO_UPDATE_CHECK
+    export FM_ROOT_OVERRIDE FM_HOME FM_STATE_OVERRIDE FM_DATA_OVERRIDE
     first=$(cd "$project" && treehouse get --lease --lease-holder initial) || exit 1
     second=$(cd "$project" && treehouse get --lease --lease-holder initial) || exit 1
     (cd "$project" && treehouse return --force "$first" && treehouse return --force "$second") || exit 1
@@ -1021,8 +1025,9 @@ test_real_home_seed_protects_recorded_copy() {
     . "$ROOT/bin/fm-wake-lib.sh"
     lock=$(fm_treehouse_project_lock_path "$project") || exit 1
     fm_lock_try_acquire "$lock" || exit 1
-    out=$(bash "$ROOT/bin/fm-home-seed.sh" seed-home - --no-projects 2>&1)
-    [ "$?" != 0 ] || exit 1
+    if out=$(bash "$ROOT/bin/fm-home-seed.sh" seed-home - --no-projects 2>&1); then
+      exit 1
+    fi
     printf '%s\n' "$out" | grep -F 'refusing to race it' || exit 1
     fm_lock_release "$lock" || exit 1
     out=$(bash "$ROOT/bin/fm-home-seed.sh" seed-home - --no-projects 2>&1) || { printf '%s\n' "$out"; exit 1; }
