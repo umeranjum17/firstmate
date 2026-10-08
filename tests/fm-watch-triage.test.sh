@@ -5011,7 +5011,7 @@ test_progress_observation_keeps_concurrent_writes() (
     identity="race:$(fm_busy_current_gen "$STATE" race 2>/dev/null || true)"
     printf '%s' "$identity" > "$observed"
     printf 'working: earlier\n' > "$STATE/race.$source"
-    touch -t 200001010000 "$STATE/race.$source"
+    command touch -t 200001010000 "$STATE/race.$source"
     injected=0
     inject_append() {
       [ "$injected" -eq 0 ] || return 0
