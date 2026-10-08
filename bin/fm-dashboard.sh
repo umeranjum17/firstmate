@@ -15,9 +15,13 @@
 # Select a home tab or swipe left/right on the sea for the next/previous home, without wrapping.
 # Home changes sail the outgoing ship ahead and bring the selected ship in from astern;
 # scene tags and picking pause during the transition, while the panels remain interactive.
+# Existing workers walk to their new deck stations when a refresh changes their stage.
+# Landed-today cards appear as a capped crate stack at the bow; an increased count on the home
+# in view lowers new crates on a rope, or lowers the top crate again when the stack is full.
+# Selecting another home places its existing crates immediately, without a landing animation.
 # Ship needs WebGL2; otherwise a static illustration replaces the scene while its panels stay live.
 # The system's reduced-motion preference stops continuous scene animation and tag pulsing
-# and immediately settles any home transition, restoring tags and picking.
+# and immediately settles home transitions, worker walks and crate drops, restoring tags and picking.
 # On a phone the board is a list grouped by stage, with a dock.
 # Each build writes the app's one data file, state/dashboard/board.json: homes with their
 # lane plans, one card per open lane, ready backlog item and pull request landed today,
