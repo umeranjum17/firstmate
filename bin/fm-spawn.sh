@@ -179,14 +179,7 @@
 #   root Firstmate home's state directory before slot allocation and holds it through
 #   task metadata publication. Teardown holds that same lock while proving and
 #   returning a slot, so allocation cannot reuse a slot before its owner record
-#   is published. Under that same lock it writes the slot's owner claim, which is
-#   what lets teardown leave a slot reassigned since untouched; bin/fm-wake-lib.sh
-#   owns the claim and bin/fm-teardown.sh owns what it protects. A slot that
-#   cannot be claimed refuses the spawn rather than launching a worker whose slot
-#   could later be released out from under its successor. A spawn that aborts
-#   while it still holds the allocation lock drops its own claim; an abort after
-#   metadata publication has released that lock leaves the claim in place, and
-#   the next spawn's claim replaces it.
+#   is published.
 #   The local root is whatever bin/fm-wake-lib.sh's
 #   fm_firstmate_root_home resolves, so a home seeded from another machine anchors
 #   that lock itself rather than failing to resolve one;
@@ -276,9 +269,17 @@
 #   Ship/scout spawns refuse to launch unless the resolved task path is a real
 #   git worktree root distinct from both the spawning project and its repository's
 #   primary checkout, including when the spawning project is a linked worktree.
-#   On the backends that discover that path by reading the task pane's own cwd,
-#   the same isolation test screens every read: a pane still showing the project
-#   or the repository primary while `treehouse get` prepares the slot is waited
+#   Fresh session-provider tasks acquire with `treehouse get --lease
+#   --lease-holder <task-id>` from the explicit project, not the pane's cwd.
+#   python3 bin/fm-treehouse-protect.py leases recorded copies before Treehouse
+#   can reset one. Teardown alone returns a leased copy;
+#   failed launches retain a cleanup_recovery=treehouse task record.
+#   Relaunch reuses that copy and clears the recovery marker on publication;
+#   teardown treats the recovery record as an aborted allocation, not a launched
+#   backlog worker. Existing endpoint and landed-work safety checks still apply.
+#   The pane must settle at that exact leased path. The isolation test screens
+#   every read: a pane still showing the project
+#   or the repository primary while the pane enters its leased slot is waited
 #   out as a transient rather than adopted and then refused, so a home that is
 #   itself a linked worktree of the project repository still launches. A pane
 #   that never reaches an isolated worktree refuses at the end of that wait,
@@ -1292,7 +1293,7 @@ SPAWN_TASK_SET_LOCK=
 SPAWN_TASK_SET_LOCK_HELD=0
 SPAWN_TREEHOUSE_PROJECT_LOCK=
 SPAWN_TREEHOUSE_PROJECT_LOCK_HELD=0
-SPAWN_SLOT_CLAIMED=0
+SPAWN_TREEHOUSE_LEASE=
 RELAUNCH_REPLACEMENT_PENDING=0
 RELAUNCH_REPLACEMENT_BUSY_GEN=
 RELAUNCH_REPLACEMENT_HARNESS=
@@ -1332,7 +1333,7 @@ parse_orca_worktree_result() {
 }
 
 spawn_abort_cleanup() {
-  local status=$?
+  local status=$? lease_owner_rc=0
   if [ "$RELAUNCH_REPLACEMENT_PENDING" = 1 ] &&
     [ "$SPAWN_META_PUBLISH_STARTED" = 1 ] &&
     [ -n "$SPAWN_META_TMP" ] &&
@@ -1428,22 +1429,33 @@ spawn_abort_cleanup() {
     SPAWN_META_LOCK_HELD=0
     fm_lock_release "$SPAWN_META_LOCK" || true
   fi
-  # A spawn that aborts after claiming its slot but before its record survives
-  # must not leave a claim naming a task no record describes. The release is a
-  # read-then-remove, so it runs only while the project lock that wrote the
-  # claim is still held (aborts before metadata publication); a later abort has
-  # already released that lock and leaves the claim for the next spawn's
-  # atomic replacement rather than racing it. The release itself never removes
-  # another task's claim.
-  if [ "$SPAWN_SLOT_CLAIMED" = 1 ] && [ -n "${WT:-}" ] &&
-    [ ! -e "$STATE/$ID.meta" ] && [ ! -L "$STATE/$ID.meta" ] &&
-    fm_treehouse_pool_slot "$PROJ_ABS" "$WT"; then
-    SPAWN_SLOT_CLAIMED=0
-    if [ "$SPAWN_TREEHOUSE_PROJECT_LOCK_HELD" = 1 ]; then
-      fm_treehouse_slot_owner_release "$WT" "$ID" || true
-    else
-      echo "warning: leaving task $ID's slot claim on $WT in place; the Treehouse project lock is no longer held, so the next spawn's claim replaces it" >&2
-    fi
+  # Failed launches keep their durable lease for explicit teardown, not an
+  # unrecorded reservation or an automatic reset of potentially unlanded work.
+  if [ -n "$SPAWN_TREEHOUSE_LEASE" ] && [ ! -e "$STATE/$ID.meta" ] && [ ! -L "$STATE/$ID.meta" ]; then
+    fm_slot_record_owner "$SPAWN_TREEHOUSE_LEASE" "$STATE" "$STATE/$ID.meta" || lease_owner_rc=$?
+  fi
+  if [ -n "$SPAWN_TREEHOUSE_LEASE" ] && [ "$lease_owner_rc" = 1 ] &&
+    [ ! -e "$STATE/$ID.meta" ] && [ ! -L "$STATE/$ID.meta" ]; then
+    SPAWN_META_TMP="$STATE/.$ID.meta.treehouse-recovery.${BASHPID:-$$}"
+    {
+      printf 'window=%s\nendpoint_task_id=%s\ncleanup_recovery=treehouse\n' "${T:-}" "$ID"
+      printf 'spawn_gen=%s\n' "${SPAWN_GEN:-s$(date +%s).${BASHPID:-$$}.$RANDOM}"
+      case "$BACKEND" in
+        herdr)
+          printf 'herdr_session=%s\nherdr_workspace_id=%s\nherdr_tab_id=%s\nherdr_pane_id=%s\n' \
+            "$HERDR_SES" "$HERDR_WORKSPACE_ID" "$HERDR_TAB_ID" "$HERDR_PANE_ID" ;;
+        zellij)
+          printf 'zellij_session=%s\nzellij_tab_id=%s\nzellij_pane_id=%s\n' \
+            "$ZELLIJ_SES" "$ZELLIJ_TAB_ID" "$ZELLIJ_PANE_ID" ;;
+        cmux)
+          printf 'cmux_workspace_id=%s\ncmux_surface_id=%s\n' "$CMUX_WORKSPACE_ID" "$CMUX_SURFACE_ID" ;;
+      esac
+      printf 'worktree=%s\nproject=%s\nharness=%s\nkind=%s\nbackend=%s\n' \
+        "$SPAWN_TREEHOUSE_LEASE" "$PROJ_ABS" "$HARNESS" "$KIND" "$BACKEND"
+      printf 'mode=%s\nyolo=%s\nbranch=%s\ntasktmp=%s\n' "${MODE:-}" "${YOLO:-}" "${BRANCH:-}" "${TASK_TMP:-}"
+    } > "$SPAWN_META_TMP" &&
+      fm_backlog_atomic_transition publish "$SPAWN_META_TMP" "$STATE/$ID.meta" "task record" "$STATE" ||
+      echo "error: could not record task $ID's retained lease on $SPAWN_TREEHOUSE_LEASE; reconcile it before retrying" >&2
   fi
   if [ "$SPAWN_TREEHOUSE_PROJECT_LOCK_HELD" = 1 ]; then
     SPAWN_TREEHOUSE_PROJECT_LOCK_HELD=0
@@ -3447,14 +3459,10 @@ real_path_or_raw() { # <path>
 # left holding the worktree root the check read, and SPAWN_WT_REASON a short
 # phrase naming why a rejected path failed, both for the refusal messages.
 #
-# The worktree-discovery poll below reads this same predicate, so it can never
-# adopt a path the guard would then refuse. That matters because a pane's cwd
-# read is a snapshot of whatever process is in the foreground: while `treehouse
-# get` is still fetching and checking a slot out, it reports the REPOSITORY's
-# primary checkout as its own cwd. That path differs from a linked spawning
-# project, so a poll comparing only against the project accepted it, and the
-# guard then refused a launch whose slot treehouse went on to create normally.
-# A read like that is a transient, not a destination: the poll keeps waiting.
+# The worktree-discovery poll below uses this same predicate and requires the
+# exact leased path, so it can never adopt a path the guard would then refuse.
+# A pane may still report the project or primary checkout before its shell cd
+# settles; those reads are transients, not destinations.
 SPAWN_WT_TOP=
 SPAWN_WT_REASON=
 spawn_worktree_isolated() { # <path>
@@ -3856,7 +3864,7 @@ else
     # #134 robustness (tmux): fm_backend_tmux_create_task captures a stable window
     # id and pins the window name (automatic-rename/allow-rename off) so a captain's
     # non-default tmux config cannot rename the window away from fm-<id> once
-    # treehouse cd's into the worktree. WT_TARGET carries that stable id for the
+    # the shell cd's into the worktree. WT_TARGET carries that stable id for the
     # rename-critical worktree-detection steps below; the persisted window= handle
     # stays $T (the name form), which is safe now that rename is disabled.
     WID=$(fm_backend_tmux_create_task "$SES" "$W" "$PROJ_ABS") || exit 1
@@ -4102,7 +4110,7 @@ fi
 # #134 robustness: only tmux needs a worktree-detection target distinct from $T -
 # its rename-safe stable window id, set as WT_TARGET=$WID in the tmux branch above.
 # Every other backend addresses its pane/surface by the id already in $T, so default
-# WT_TARGET to $T for them (and for any future backend) - the shared treehouse-get +
+# WT_TARGET to $T for them (and for any future backend) - the shared handoff +
 # worktree-detection steps below must never reference an unbound WT_TARGET under set -u.
 : "${WT_TARGET:=$T}"
 spawn_send_text_line() { # <target> <text>
@@ -4143,8 +4151,8 @@ spawn_send_key() { # <target> <key>
 
 # Enter the exact copy recorded for this task immediately before trust setup and
 # launch. Herdr restores a pane's shell cwd from its durable tab layout, so a
-# treehouse subshell's foreground cwd is not enough to keep a later pane restart
-# out of the primary checkout. The same explicit cd gives every backend one
+# foreground cwd alone is not enough to keep a later pane restart out of the
+# primary checkout. The same explicit cd gives every backend one
 # launch boundary and makes a dropped or ignored cwd change a refusal.
 spawn_enter_recorded_worktree() {
   [ "$KIND" = secondmate ] && return 0
@@ -4551,9 +4559,25 @@ elif [ "$RELAUNCH" -eq 1 ]; then
   fi
   [ "$KIND" = secondmate ] || validate_spawn_worktree "relaunch" "$T"
 elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
-  spawn_send_text_line "$WT_TARGET" 'treehouse get'
+  # Lease recorded task copies without touching their Git contents, then
+  # acquire in the explicit project, never the new pane's inherited cwd.
+  fm_local_firstmate_state_dirs "$STATE" || {
+    echo "error: cannot enumerate recorded Treehouse copies: $FM_LOCAL_FIRSTMATE_ERROR" >&2
+    exit 1
+  }
+  python3 "$SCRIPT_DIR/fm-treehouse-protect.py" "$PROJ_ABS" "${FM_LOCAL_FIRSTMATE_STATES[@]}" || exit 1
+  allocated=$(cd "$PROJ_ABS" && treehouse get --lease --lease-holder "$ID") || {
+    echo "error: treehouse could not lease a worktree for task $ID; copies held by tasks not yet torn down are not available until their teardown" >&2
+    exit 1
+  }
+  [ -n "$allocated" ] || { echo "error: treehouse lease returned no worktree for task $ID" >&2; exit 1; }
+  if fm_treehouse_pool_slot "$PROJ_ABS" "$allocated"; then
+    SPAWN_TREEHOUSE_LEASE=$allocated
+  fi
+  spawn_send_text_line "$WT_TARGET" "cd -- $(shell_quote "$allocated")" || exit 1
 
-  # Wait for the treehouse subshell: the pane's cwd moves from the project to the worktree.
+  # Wait for the explicit cd: accept only the leased path, with two agreeing
+  # reads, never a different isolated copy inherited from the focused pane.
   # Target the stable window id, not the name: if the name is ever lost (e.g. an
   # automatic-rename slips through), display-message -t <bad-name> falls back to the
   # active client's window, which would misread firstmate's OWN pane path as the
@@ -4566,14 +4590,10 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
   # A single read that already looks isolated is not proof the pane settled
   # there: on some tmux/WSL setups a brand-new window's pane_current_path
   # transiently reports an unrelated stale path (seen live as another real git
-  # checkout entirely) before the shell catches up with treehouse get's cd. That
-  # stale path passes spawn_worktree_isolated too (it resolves to a real,
-  # distinct worktree top-level), so accepting it on one read alone silently
-  # records the wrong worktree= in state/<id>.meta. Require two consecutive
-  # reads to agree on the same isolated path before accepting it; a mismatch
-  # just becomes the new candidate rather than resetting the wait, so a pane
-  # that is already settled by the first real read only costs the one existing
-  # inter-poll sleep as confirmation, not a whole extra cycle on top.
+  # checkout entirely) before the shell catches up with the explicit cd. That
+  # stale path may pass spawn_worktree_isolated too, so require the exact leased
+  # path and two consecutive agreeing reads. A mismatch clears the candidate;
+  # a pane settled by the first read costs only one inter-poll confirmation.
   #
   # Every candidate is screened with the isolation guard's own predicate, so a
   # read of the project itself or of the repository primary checkout is treated
@@ -4591,7 +4611,8 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
   for _ in $(seq 1 60); do
     p=$(spawn_current_path "$WT_TARGET" || true)
     [ -z "$p" ] || last_seen="$p"
-    if [ -n "$p" ] && spawn_worktree_isolated "$p"; then
+    if [ -n "$p" ] && spawn_worktree_isolated "$p" &&
+      [ "$(real_path_or_raw "$p")" = "$(real_path_or_raw "$allocated")" ]; then
       p_real=$(real_path_or_raw "$p")
       last_reason="it is an isolated worktree, but no second read agreed with it"
       if [ -n "$candidate" ] && [ "$p_real" = "$candidate" ]; then
@@ -4601,7 +4622,7 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
       candidate="$p_real"
     else
       candidate=""
-      [ -z "$p" ] || last_reason=$SPAWN_WT_REASON
+      [ -z "$p" ] || last_reason=${SPAWN_WT_REASON:-"it is not task $ID's leased copy '$allocated'"}
     fi
     sleep 1
   done
@@ -4611,42 +4632,6 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
   fi
 
   validate_spawn_worktree "treehouse get" "$T"
-
-  # Claim the pool slot for this task. The interactive `treehouse get` sent to
-  # the pane above records only a process lease (Treehouse's durable
-  # `get --lease --lease-holder`, which bin/fm-home-seed.sh uses for secondmate
-  # homes, is not this path), so Treehouse cannot say which task a slot belongs
-  # to once that task's worker exits - and that is exactly when the slot is
-  # handed on and this task's worktree= line goes stale. The claim is what lets
-  # bin/fm-teardown.sh leave a slot that has since been reassigned untouched, so
-  # a slot that cannot be claimed is refused here, at the cheapest point, rather
-  # than launching a worker whose slot teardown could later release out from
-  # under its successor.
-  # Written under the Treehouse project lock held from before slot allocation
-  # through metadata publication, so no other spawn or return sees a half-claim.
-  if fm_treehouse_pool_slot "$PROJ_ABS" "$WT"; then
-    # Treehouse frees a slot once its process lease lapses, which a killed
-    # worker's slot does while that task's record still names it (a Herdr
-    # restart resumes the agent outside the lease). Any record in any local home
-    # naming this slot is a task this spawn would overwrite, so refuse it.
-    slot_rc=0
-    fm_slot_record_owner "$WT" "$STATE" "$STATE/$ID.meta" || slot_rc=$?
-    case "$slot_rc" in
-      0)
-        echo "error: Treehouse handed out pool slot $WT, but task $FM_SLOT_RECORD_OWNER_ID still records it as its $FM_SLOT_RECORD_OWNER_FIELD; refusing to overwrite a live task's copy. Retry the spawn for a different slot, and reconcile $FM_SLOT_RECORD_OWNER_ID (bin/fm-crew-state.sh $FM_SLOT_RECORD_OWNER_ID); inspect window $T" >&2
-        exit 1
-        ;;
-      2)
-        echo "error: cannot prove Treehouse pool slot $WT is free of other task records: $FM_LOCAL_FIRSTMATE_ERROR; inspect window $T" >&2
-        exit 1
-        ;;
-    esac
-    if ! fm_treehouse_slot_owner_claim "$WT" "$ID" "$FM_HOME"; then
-      echo "error: could not claim Treehouse pool slot $WT for task $ID; refusing to launch a worker whose slot cannot later be proved to be its own; inspect window $T" >&2
-      exit 1
-    fi
-    SPAWN_SLOT_CLAIMED=1
-  fi
 fi
 if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ]; then
   freshen_spawn_worktree_base "$WT" "$BASE_BRANCH" || exit 1
@@ -5251,7 +5236,7 @@ SPAWN_META_PATH=$SPAWN_META_TMP
 preserve_relaunch_meta() {
   awk -F= '
     BEGIN {
-      split("window endpoint_task_id worktree project harness kind mode yolo branch receipt_required tasktmp base_branch model effort account account_provider busy_gen spawn_gen traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx", keys, " ")
+      split("window endpoint_task_id cleanup_recovery worktree project harness kind mode yolo branch receipt_required tasktmp base_branch model effort account account_provider busy_gen spawn_gen traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx", keys, " ")
       for (i in keys) owned[keys[i]] = 1
     }
     !($1 in owned)

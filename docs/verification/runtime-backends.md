@@ -107,6 +107,26 @@ A single-process harness has no descendant that adds a distinct verdict, which i
 The portable regression pins every half without any harness installed: `tests/fm-harness-precedence.test.sh` asserts that this two-process topology decides at comm strength, that the descent probe reaches a strength the top-of-session probe cannot, that a sibling branch answering a foreign harness contributes no verdict, that a foreign args-only verdict at the deepest vantage leaves the comm-strength identity intact, and that equal-depth ties choose the comm-strength leaf regardless of process ordering.
 The run did not reach `opencode`, `pi`, `pi-signed`, `grok`, `kimi`, or `muse`, which were not installed, and stopped at the same pre-existing liveness failure for `cursor` 3.18.9, whose resolved binary on that machine is the editor rather than `cursor-agent`; those adapters are unverified by this run.
 
+## Durable task-copy allocation
+
+The allocation and legacy-copy protection contract is owned by `bin/fm-spawn.sh` and `bin/fm-treehouse-protect.py`.
+Verified on 2026-10-09 at head `a1259b22` with Treehouse v2.0.1, tmux 3.7b and Linux 7.1.8-arch1-3, exit 0:
+
+```sh
+FM_TEST_REAL_LEASE_ONLY=1 bash tests/fm-spawn-pool-base-freshen.test.sh
+```
+
+Observed output:
+
+```text
+ok - real spawn skips an idle recorded slot, leases a free slot until teardown, and preserves the existing task
+ok - real home seeding protects recorded copies and allocates only a free home
+```
+
+These journeys use a private real Treehouse pool and tmux server, with a `sleep` worker rather than an authenticated model, and assert the pool's persistent lease state before and after real teardown.
+The shared allocation branch covers tmux, Herdr, Zellij and cmux independently of worker harness selection; Orca owns its allocation separately and does not invoke this protection.
+Only tmux and the POSIX native state lock were exercised live here; Windows uses Treehouse's LockFileEx byte-range lock and was inspected but not executed, and no live Herdr, Zellij or cmux claim is made by this run.
+
 ## tmux
 
 Foreground-process behavior was verified on 2026-07-07 with tmux 3.6a on macOS.

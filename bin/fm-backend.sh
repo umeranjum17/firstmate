@@ -307,10 +307,10 @@ fm_backend_validate_spawn() {  # <name>
 # 1 and prints nothing for an unknown backend.
 fm_backend_required_tools() {  # <backend>
   case "$1" in
-    tmux)   printf '%s' 'tmux treehouse' ;;
-    herdr)  printf '%s' 'herdr jq treehouse' ;;
-    zellij) printf '%s' 'zellij jq treehouse' ;;
-    cmux)   printf '%s' 'cmux jq treehouse' ;;
+    tmux)   printf '%s' 'tmux treehouse python3' ;;
+    herdr)  printf '%s' 'herdr jq treehouse python3' ;;
+    zellij) printf '%s' 'zellij jq treehouse python3' ;;
+    cmux)   printf '%s' 'cmux jq treehouse python3' ;;
     orca)   printf '%s' 'orca' ;;
     *) return 1 ;;
   esac

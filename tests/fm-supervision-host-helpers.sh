@@ -1103,7 +1103,13 @@ case "\$*" in
     count=\$((count + 1))
     printf '%s\n' "\$count" > "\$FM_HOME/offer-count"
     if [ "\$count" -eq 2 ]; then
+      # Keep the accepted routine queue for the per-row Pi comparison; the
+      # successor may enqueue the new decision before the host exits.
+      mkdir -p "\$FM_HOME/pi-offer-state"
+      cp "\$FM_HOME/state/.wake-queue" "\$FM_HOME/pi-offer-state/.wake-queue"
+      cp "\$FM_HOME/state/demo.meta" "\$FM_HOME/pi-offer-state/demo.meta"
       $turn
+      cp "\$FM_HOME/state/demo.status" "\$FM_HOME/pi-offer-state/demo.status"
     fi ;;
 esac
 exec "$real_node" "\$@"
@@ -1129,7 +1135,7 @@ test_attended_close_that_turns_main_only_before_its_turn_passes_to_main() {
   pi_offer=$(node --input-type=module -e '
     const dispatch = await import(process.argv[1]);
     console.log(dispatch.branchOfferForWake(process.argv[2], process.argv[3], false).eligible);
-  ' "$ROOT/.pi/extensions/lib/fm-branch-dispatch.ts" "$home/state" "signal: $home/state/demo.status")
+  ' "$ROOT/.pi/extensions/lib/fm-branch-dispatch.ts" "$home/pi-offer-state" "signal: $home/state/demo.status")
   [ "$pi_offer" = true ] || fail "the host-only transition veto changed Pi's existing offer rule"
   assert_re '	pass-through	attended	main-only	signal:' "$home/state/.supervision-host.log" "the ledger must record why the close went to main"
   watcher_live "$home" || fail "the pass-through left no successor watcher"

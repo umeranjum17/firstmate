@@ -677,7 +677,7 @@ test_stale_pin_beside_other_dirt_reports_one_verdict() {
 }
 
 # Re-lay a case's pooled worktree as a managed Treehouse slot: <pool>/<slot>/<repo>
-# with the pool's state file beside the slot, which is the shape fm-spawn claims
+# with the pool's state file beside the slot, which is the shape fm-spawn leases
 # for its task. Rewrites POOL_DIR to the relocated checkout.
 lay_out_as_pool_slot() {
   local slot_root="$CASE_DIR/slots"
@@ -686,49 +686,15 @@ lay_out_as_pool_slot() {
   printf '{"worktrees":[{"name":"1","path":"%s"}]}\n' "$slot_root/1/project" \
     > "$slot_root/treehouse-state.json"
   POOL_DIR="$slot_root/1/project"
-  SLOT_CLAIM="$slot_root/1/.fm-slot-owner"
 }
 
-# The spawn side of the slot-owner claim that bin/fm-teardown.sh later reads:
-# a launched task's claim names it, a slot that cannot be claimed refuses before
-# anything is published, and an abort while the allocation lock is still held
-# leaves no claim naming a task with no record.
-test_pool_slot_claim_follows_the_spawn_outcome() {
-  local rec id out status before
+# An abort after the lease is taken retains the leased copy with a recovery
+# record, so only teardown can return it.
+test_aborted_spawn_retains_leased_copy_with_recovery_record() {
+  local rec id out status
 
-  id='pool-slot-claim-r1'
-  rec=$(make_case slot-claim "$id")
-  read_case_record "$rec"
-  lay_out_as_pool_slot
-  out=$(run_spawn "$id" --scout)
-  status=$?
-  expect_code 0 "$status" "spawn from a Treehouse slot should launch"$'\n'"$out"
-  assert_grep "worktree=$POOL_DIR" "$HOME_DIR/state/$id.meta" \
-    "spawn did not publish the relocated slot as its worktree"
-  [ -f "$SLOT_CLAIM" ] || fail "spawn left its Treehouse slot unclaimed: $out"
-  grep -Fxq -- "task=$id" "$SLOT_CLAIM" \
-    || fail "the slot claim does not name the spawned task: $(cat "$SLOT_CLAIM")"
-  grep -Fxq -- "home=$HOME_DIR" "$SLOT_CLAIM" \
-    || fail "the slot claim does not name the spawning home: $(cat "$SLOT_CLAIM")"
-
-  id='pool-slot-unclaimable-r1'
-  rec=$(make_case slot-unclaimable "$id")
-  read_case_record "$rec"
-  lay_out_as_pool_slot
-  mkdir -p "$SLOT_CLAIM"
-  before=$(git -C "$POOL_DIR" rev-parse HEAD)
-  out=$(run_spawn "$id" --scout)
-  status=$?
-  [ "$status" -ne 0 ] || fail "spawn launched a worker on a slot it could not claim"
-  assert_contains "$out" "could not claim Treehouse pool slot" \
-    "spawn did not name the unclaimable slot as the reason"
-  [ -d "$SLOT_CLAIM" ] || fail "spawn replaced the directory blocking its slot claim"
-  [ ! -e "$HOME_DIR/state/$id.meta" ] || fail "spawn published a record for an unclaimable slot"
-  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$before" ] \
-    || fail "spawn moved the slot's HEAD after failing to claim it"
-
-  id='pool-slot-claim-aborted-r1'
-  rec=$(make_originless_case slot-claim-aborted "$id")
+  id='pool-slot-aborted-r1'
+  rec=$(make_originless_case slot-aborted "$id")
   read_case_record "$rec"
   lay_out_as_pool_slot
   git -C "$POOL_DIR" config remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*'
@@ -737,33 +703,9 @@ test_pool_slot_claim_follows_the_spawn_outcome() {
   [ "$status" -ne 0 ] || fail "spawn succeeded despite an unusable origin on the slot"
   assert_contains "$out" "could not fetch origin" \
     "the aborted spawn did not refuse on its unusable origin"
-  [ ! -e "$HOME_DIR/state/$id.meta" ] || fail "the aborted spawn published task metadata"
-  [ ! -e "$SLOT_CLAIM" ] && [ ! -L "$SLOT_CLAIM" ] \
-    || fail "the aborted spawn left a slot claim naming a task with no record: $(cat "$SLOT_CLAIM")"
-  pass "a Treehouse slot claim names the launched task, refuses when unclaimable, and is dropped by a locked abort"
-}
-
-# Treehouse frees a slot when its process lease lapses, which a killed worker's
-# slot does while that task's record still names it (a Herdr restart resumes
-# the agent outside the lease). A spawn handed such a slot must refuse it.
-test_pool_slot_still_recorded_by_another_task_refuses() {
-  local rec id out status before
-
-  id='pool-slot-recorded-r1'
-  rec=$(make_case slot-recorded "$id")
-  read_case_record "$rec"
-  lay_out_as_pool_slot
-  printf 'kind=ship\nbackend=herdr\nworktree=%s\n' "$POOL_DIR" > "$HOME_DIR/state/live-owner.meta"
-  before=$(git -C "$POOL_DIR" rev-parse HEAD)
-  out=$(run_spawn "$id" --scout)
-  status=$?
-  [ "$status" -ne 0 ] || fail "spawn launched on a slot another task record still names"
-  assert_contains "$out" "task live-owner still records it as its worktree" \
-    "spawn did not name the task whose record owns the slot"
-  [ ! -e "$HOME_DIR/state/$id.meta" ] || fail "spawn published a record for a slot another task owns"
-  [ ! -e "$SLOT_CLAIM" ] || fail "spawn claimed a slot another task owns: $(cat "$SLOT_CLAIM")"
-  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$before" ] || fail "spawn moved the owned slot's HEAD"
-  pass "a spawn refuses a Treehouse slot that another task's record still names"
+  assert_grep 'cleanup_recovery=treehouse' "$HOME_DIR/state/$id.meta" \
+    "the aborted spawn did not record its retained leased copy"
+  pass "an aborted spawn retains its Treehouse lease with a recovery record"
 }
 
 publish_feature_branch() { # <branch>
@@ -896,10 +838,161 @@ test_scout_base_branch_refused_on_gerrit_forge() {
   [ ! -e "$HOME_DIR/state/$id.meta" ] || fail "a refused gerrit scout spawn published task metadata"
   pass "a based scout on a forge=gerrit project is refused at spawn"
 }
+test_real_pool_lease_survives_worker_exit_and_teardown_releases_it() {
+  if ! command -v treehouse >/dev/null || ! command -v tmux >/dev/null; then
+    echo '# SKIP real lease journey: treehouse and tmux required'; return
+  fi
+  local case_dir="$TMP_ROOT/real-lease" home project fakebin first second pool head out socket status target
+  home="$case_dir/home"; project="$case_dir/project"; fakebin="$case_dir/bin"; socket="$case_dir/tmux.sock"
+  mkdir -p "$home/config" "$home/state" "$home/data" "$fakebin"
+  fm_git_init_commit "$project"
+  printf 'root = "%s"\nmax_trees = 3\n' "$case_dir" > "$project/treehouse.toml"
+  git -C "$project" add treehouse.toml
+  git -C "$project" -c user.name=Tests -c user.email=tests@example.invalid commit -qm pool-config
+  printf 'manual\n' > "$home/config/backlog-backend"
+  fm_test_spawn_brief "$home" lease-journey
+  # Route the actual terminal CLI to this test's own server, not a mock.
+  printf '#!/usr/bin/env bash\nexec %q -S %q "$@"\n' "$(command -v tmux)" "$socket" > "$fakebin/tmux"
+  chmod +x "$fakebin/tmux"
+  (
+    local HOME="$home" XDG_CONFIG_HOME="$home/.config" TMPDIR="$case_dir" TREEHOUSE_NO_UPDATE_CHECK=1
+    local FM_ROOT_OVERRIDE='' FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data"
+    export HOME XDG_CONFIG_HOME TMPDIR TREEHOUSE_NO_UPDATE_CHECK
+    export FM_ROOT_OVERRIDE FM_HOME FM_STATE_OVERRIDE FM_DATA_OVERRIDE
+    export FM_PROJECTS_OVERRIDE="$home/projects" FM_CONFIG_OVERRIDE="$home/config" FM_BACKEND=tmux FM_SPAWN_NO_GUARD=1
+    # This journey launches only sleep, not a model; memory admission is not
+    # the behavior under test. Keep its proc input isolated from host load.
+    mkdir -p "$case_dir/proc"
+    export FM_HOST_MEMORY_PROC="$case_dir/proc" TMUX='' PATH="$fakebin:$PATH"
+    trap 'tmux kill-server 2>/dev/null || true' EXIT
+    first=$(cd "$project" && treehouse get --lease --lease-holder seed-one) || exit 1
+    second=$(cd "$project" && treehouse get --lease --lease-holder seed-two) || exit 1
+    (cd "$project" && treehouse return --force "$first" && treehouse return --force "$second") || exit 1
+    pool=$(dirname "$(dirname "$first")")
+    git -C "$first" checkout -qb retained-task
+    printf 'retained task commit\n' > "$first/retained.txt"
+    git -C "$first" add retained.txt
+    git -C "$first" -c user.name=Tests -c user.email=tests@example.invalid commit -qm retained
+    head=$(git -C "$first" rev-parse HEAD)
+    printf 'kind=ship\nworktree=%s\n' "$first" > "$home/state/retained-task.meta"
+    tmux new-session -d -s firstmate -c "$project" || exit 1
+    out=$(bash "${FM_TEST_LEASE_SPAWN_BIN:-$ROOT/bin/fm-spawn.sh}" lease-journey "$project" --scout 'sleep 600' 2>&1)
+    status=$?
+    printf '%s\n' "$out"
+    [ "$status" = 0 ] && grep -Fxq "worktree=$second" "$home/state/lease-journey.meta" || exit 1
+    [ "$(git -C "$first" rev-parse HEAD)" = "$head" ] && [ "$(git -C "$first" branch --show-current)" = retained-task ] || exit 1
+    jq -e --arg first "$first" --arg second "$second" '
+      any(.worktrees[]; .path == $first and .leased and .lease_holder == "retained-task") and
+      any(.worktrees[]; .path == $second and .leased and .lease_holder == "lease-journey")
+    ' "$pool/treehouse-state.json" || exit 1
+    # End only this task's terminal. Its idle copy must remain leased.
+    target=$(awk -F= '$1 == "window" {print $2}' "$home/state/lease-journey.meta")
+    tmux kill-window -t "$target" || exit 1
+    jq -e --arg path "$second" 'any(.worktrees[]; .path == $path and .leased)' "$pool/treehouse-state.json" || exit 1
+    printf 'Investigation complete; no outstanding decisions.\n' > "$home/data/lease-journey/report.md"
+    printf 'done: report written\n' > "$home/state/lease-journey.status"
+    bash "$ROOT/bin/fm-captain-hold.sh" complete lease-journey --none || exit 1
+    FM_TEARDOWN_GUARD_DONE=1 bash "$ROOT/bin/fm-teardown.sh" lease-journey || exit 1
+    jq -e --arg path "$second" 'any(.worktrees[]; .path == $path and (.leased != true))' "$pool/treehouse-state.json" || exit 1
+    [ ! -e "$home/state/lease-journey.meta" ] || exit 1
+    [ "$(git -C "$first" rev-parse HEAD)" = "$head" ] || exit 1
+    # Reacquisition must choose the released copy, not the retained task.
+    [ "$(cd "$project" && treehouse get --lease --lease-holder next-task)" = "$second" ] || exit 1
+    (cd "$project" && treehouse return --force "$second") || exit 1
+    printf "#!/usr/bin/env bash\n%q \"\$@\" || exit \$?\nif [ \"\$1\" = get ]; then git -C %q remote add origin %q; fi\n" \
+      "$(command -v treehouse)" "$project" "file://$case_dir/missing-origin.git" > "$fakebin/treehouse"
+    chmod +x "$fakebin/treehouse"
+    for id in recovery-cleanup recovery-relaunch; do
+      fm_test_spawn_brief "$home" "$id"
+      out=$(bash "$ROOT/bin/fm-spawn.sh" "$id" "$project" --scout 'sleep 600' 2>&1)
+      status=$?
+      printf '%s\n' "$out"
+      [ "$status" != 0 ] || exit 1
+      grep -Fxq 'cleanup_recovery=treehouse' "$home/state/$id.meta" || exit 1
+      target=$(awk -F= '$1 == "window" {print $2}' "$home/state/$id.meta")
+      [ "$target" = "firstmate:fm-$id" ] || exit 1
+      grep -Eq '^spawn_gen=.+$' "$home/state/$id.meta" || exit 1
+      jq -e --arg path "$second" 'any(.worktrees[]; .path == $path and .leased)' "$pool/treehouse-state.json" || exit 1
+      if [ "$id" = recovery-relaunch ]; then
+        bash "$ROOT/bin/fm-spawn.sh" "$id" --relaunch --harness 'sleep 600' || exit 1
+        ! grep -q '^cleanup_recovery=' "$home/state/$id.meta" || exit 1
+      fi
+      if [ "$id" = recovery-cleanup ]; then
+        printf 'tasks-axi\n' > "$home/config/backlog-backend"
+      fi
+      FM_TEARDOWN_GUARD_DONE=1 bash "$ROOT/bin/fm-teardown.sh" "$id" --force || exit 1
+      printf 'manual\n' > "$home/config/backlog-backend"
+      [ ! -e "$home/state/$id.meta" ] || exit 1
+      jq -e --arg path "$second" 'any(.worktrees[]; .path == $path and (.leased != true))' "$pool/treehouse-state.json" || exit 1
+      [ "$(git -C "$first" rev-parse HEAD)" = "$head" ] || exit 1
+      git -C "$project" remote remove origin || exit 1
+    done
+  ) || fail "real lease journey: spawn must skip the retained copy and teardown must release only its own lease"
+  pass "real spawn skips an idle recorded slot, leases a free slot until teardown, and preserves the existing task"
+}
+
+test_real_home_seed_protects_recorded_copy() {
+  if ! command -v treehouse >/dev/null; then
+    echo '# SKIP real seed journey: treehouse required'; return
+  fi
+  local case_dir="$TMP_ROOT/real-seed" project home first second pool head lock out
+  project="$case_dir/project"; home="$case_dir/home"
+  mkdir -p "$home/data/seed-home" "$home/state" "$project/bin"
+  fm_git_init_commit "$project"
+  printf 'firstmate fixture\n' > "$project/AGENTS.md"
+  touch "$project/bin/.keep"
+  printf 'root = "%s"\nmax_trees = 2\n' "$case_dir" > "$project/treehouse.toml"
+  git -C "$project" add AGENTS.md bin treehouse.toml
+  git -C "$project" -c user.name=Tests -c user.email=tests@example.invalid commit -qm seed-fixture
+  printf '# Charter\n\nOwn firstmate work.\n\n# Routing scope\n\nFirstmate.\n\n# Project clones\n\nNone. This is a project-less domain.\n' > "$home/data/seed-home/brief.md"
+  (
+    local HOME="$home" XDG_CONFIG_HOME="$home/.config" TMPDIR="$case_dir" TREEHOUSE_NO_UPDATE_CHECK=1
+    local FM_ROOT_OVERRIDE="$project" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data"
+    export HOME XDG_CONFIG_HOME TMPDIR TREEHOUSE_NO_UPDATE_CHECK
+    export FM_ROOT_OVERRIDE FM_HOME FM_STATE_OVERRIDE FM_DATA_OVERRIDE
+    first=$(cd "$project" && treehouse get --lease --lease-holder initial) || exit 1
+    second=$(cd "$project" && treehouse get --lease --lease-holder initial) || exit 1
+    (cd "$project" && treehouse return --force "$first" && treehouse return --force "$second") || exit 1
+    pool=$(dirname "$(dirname "$first")")
+    git -C "$first" checkout -qb retained-seed-task || exit 1
+    printf 'retained commit\n' > "$first/retained.txt"
+    git -C "$first" add retained.txt
+    git -C "$first" -c user.name=Tests -c user.email=tests@example.invalid commit -qm retained
+    head=$(git -C "$first" rev-parse HEAD)
+    printf 'uncommitted retained work\n' >> "$first/retained.txt"
+    printf 'kind=ship\nworktree=%s\n' "$first" > "$home/state/retained-seed-task.meta"
+    . "$ROOT/bin/fm-wake-lib.sh"
+    lock=$(fm_treehouse_project_lock_path "$project") || exit 1
+    fm_lock_try_acquire "$lock" || exit 1
+    if out=$(bash "$ROOT/bin/fm-home-seed.sh" seed-home - --no-projects 2>&1); then
+      exit 1
+    fi
+    printf '%s\n' "$out" | grep -F 'refusing to race it' || exit 1
+    fm_lock_release "$lock" || exit 1
+    out=$(bash "$ROOT/bin/fm-home-seed.sh" seed-home - --no-projects 2>&1) || { printf '%s\n' "$out"; exit 1; }
+    printf '%s\n' "$out" | grep -Fx "home=$second" || exit 1
+    [ "$(git -C "$first" rev-parse HEAD)" = "$head" ] || exit 1
+    [ "$(git -C "$first" branch --show-current)" = retained-seed-task ] || exit 1
+    grep -Fxq 'uncommitted retained work' "$first/retained.txt" || exit 1
+    jq -e --arg first "$first" --arg second "$second" '
+      any(.worktrees[]; .path == $first and .leased and .lease_holder == "retained-seed-task") and
+      any(.worktrees[]; .path == $second and .leased and .lease_holder == "seed-home")
+    ' "$pool/treehouse-state.json" || exit 1
+    [ "$(cat "$second/.fm-secondmate-home")" = seed-home ] || exit 1
+  ) || fail "real home seeding must lock allocation and preserve recorded task copies"
+  pass "real home seeding protects recorded copies and allocates only a free home"
+}
+
+if [ "${FM_TEST_REAL_LEASE_ONLY:-0}" = 1 ]; then
+  test_real_pool_lease_survives_worker_exit_and_teardown_releases_it
+  test_real_home_seed_protects_recorded_copy
+  exit 0
+fi
 
 test_remote_seeded_home_spawns_from_treehouse_pool
-test_pool_slot_claim_follows_the_spawn_outcome
-test_pool_slot_still_recorded_by_another_task_refuses
+test_aborted_spawn_retains_leased_copy_with_recovery_record
+test_real_pool_lease_survives_worker_exit_and_teardown_releases_it
+test_real_home_seed_protects_recorded_copy
 test_linked_spawning_home_rejects_primary_before_refresh
 test_stale_pool_base_refreshes_before_branching
 test_named_base_branch_starts_from_that_branch

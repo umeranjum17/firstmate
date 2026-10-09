@@ -437,8 +437,8 @@ fm_backend_cmux_target_ready() {  # <target> [expected-label]
 #
 # Verified pitfall (finding #2 above): cmux's `current_directory` field DOES
 # reflect a `cd` run directly in the surface's own top-level shell, but stays
-# FROZEN at whatever directory that shell was in when it launched `treehouse
-# get` as a foreground command - it never follows that command's own internal
+# FROZEN at whatever directory that shell was in when it launched a legacy
+# pane-driven `treehouse get` as a foreground command - it never follows that command's own internal
 # `cd` into the acquired worktree. cmux's control socket exposes no
 # live-process cwd field either (unlike herdr's `foreground_cwd`), so passive
 # polling cannot solve this here any more than it could for zellij. Active
