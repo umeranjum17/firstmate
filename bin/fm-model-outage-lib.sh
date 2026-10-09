@@ -21,7 +21,7 @@ _FM_MODEL_ERROR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$_FM_MODEL_ERROR_DIR/fm-timeout-lib.sh"
 
 fm_model_outage_tick() {
-  local meta id backend target harness gen error hash old verdict rows file groups native mid line match
+  local meta id backend target harness gen error hash old verdict rows file groups native mid line match lanes alert kept
   local dir="$STATE/.model-outages" now batch uncertain=0 last current
   now=$(date +%s) || return 1
   # The singleton watcher owns these records; never start a second monitor.
@@ -88,21 +88,25 @@ fm_model_outage_tick() {
     [ "$uncertain" = 1 ] || [ -f "$batch/$hash.lanes" ] || rm -f "$file"
   done
   groups=
-  for file in "$batch"/*.ready; do
-    [ -f "$file" ] || continue
-    hash=${file##*/}; hash=${hash%.ready}
-    # An episode's alert records the lanes already named; only a new lane re-alerts.
-    if [ -f "$dir/alert-$hash" ]; then
-      grep -qvxFf "$dir/alert-$hash" "$batch/$hash.lanes" || continue
+  for lanes in "$batch"/*.lanes; do
+    [ -f "$lanes" ] || continue
+    hash=${lanes##*/}; hash=${hash%.lanes}
+    alert="$dir/alert-$hash"
+    [ -f "$alert" ] || : > "$alert" || return 1
+    # The alert record holds the lanes named and still failing. A recovered lane
+    # leaves it, so its later failure with the same error names it again.
+    if [ -f "$batch/$hash.ready" ] && grep -qvxFf "$alert" "$lanes"; then
+      current=$(sort -u "$lanes")
+      rows=$(printf '%s\n' "$current" | paste -sd ',' -)
+      error=$(cat "$batch/$hash.error")
+      verdict="check: model outage affected=[$rows]: $error"
+      fm_wake_append check "model-outage-$hash" "$verdict" || { rm -rf "$batch"; return 1; }
+      printf '%s\n' "$current" > "$alert" || return 1
+      groups="${groups}${verdict}"$'\n'
+    else
+      kept=$(grep -Fxf "$alert" "$lanes" | sort -u)
+      if [ -n "$kept" ]; then printf '%s\n' "$kept" > "$alert" || return 1; else : > "$alert" || return 1; fi
     fi
-    # The wake names only lanes failing in this scan; a recovered lane drops out.
-    current=$(sort -u "$batch/$hash.lanes")
-    rows=$(printf '%s\n' "$current" | paste -sd ',' -)
-    error=$(cat "$batch/$hash.error")
-    verdict="check: model outage affected=[$rows]: $error"
-    fm_wake_append check "model-outage-$hash" "$verdict" || { rm -rf "$batch"; return 1; }
-    printf '%s\n' "$current" > "$dir/alert-$hash" || return 1
-    groups="${groups}${verdict}"$'\n'
   done
   rm -rf "$batch"
   # All groups were queued before the first wake can exit the watcher.

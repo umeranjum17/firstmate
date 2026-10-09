@@ -537,22 +537,24 @@ recovered_lane_scans() {
   lane alpha "idle opencode-plugin" alive
   tick
   lane alpha "idle opencode-plugin" alive ""
-  tick
   lane bravo "idle opencode-plugin" alive
+  tick
+  lane alpha "idle opencode-plugin" alive
   tick
 }
 
-# A lane that recovered after alerting must not be named by a later wake for a
-# lane that is still failing.
+# A recovered lane leaves the wake: a lane that fails after recovering is named
+# again, and the wake lists the lanes failing in that scan.
 test_model_outage_recovered_lane_leaves_wake() {
   local case_dir="$TMP_ROOT/model-outage-recovered" expected
   run_outage_fixture "$case_dir" "$case_dir/state" recovered_lane_scans
   expected=$(printf '%s\n' \
     'check: model outage affected=[alpha]: Upstream request failed: region denied' \
-    'check: model outage affected=[bravo]: Upstream request failed: region denied')
+    'check: model outage affected=[bravo]: Upstream request failed: region denied' \
+    'check: model outage affected=[alpha,bravo]: Upstream request failed: region denied')
   [ "$(cat "$case_dir/wakes")" = "$expected" ] \
-    || fail "a recovered lane must leave the wake, got: $(cat "$case_dir/wakes")"
-  pass "a recovered lane is dropped from the wake naming the lanes still failing"
+    || fail "a recovered lane must leave the wake and re-alert on re-failure, got: $(cat "$case_dir/wakes")"
+  pass "a recovered lane leaves the alert record and re-alerts when it fails again"
 }
 
 errored_then_healthy_turn_scans() {

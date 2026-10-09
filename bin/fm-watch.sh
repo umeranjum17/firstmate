@@ -3079,7 +3079,7 @@ while :; do
 
   fm_memory_sampler_ensure || triage_log "host memory sampler failed to restart"
   host_memory_surface_queued
-  fm_model_outage_tick || { echo "watcher: model-error observation failed" >&2; exit 1; }
+  fm_model_outage_tick || triage_log "model-error observation failed"
   own_queue_resurface || { echo "watcher: own wake-queue observation failed" >&2; exit 1; }
 
   # Liveness beacon for fm-guard.sh: a fresh mtime here means a watcher is
