@@ -157,6 +157,12 @@ EOF
     if status_is_paused "$declaration" && until=$(status_paused_until "$declaration") && [ "$now" -lt "$until" ]; then
       declaration=''
     fi
+    # A captain hold waits on the captain, so a held lane never arms an episode.
+    # Checked before the record is read: a check made only once an episode is due
+    # would clear it and let the still-declared wait re-arm it on the next poll.
+    if [ -n "$declaration" ] && task_captain_call_open "$task"; then
+      declaration=''
+    fi
     record="$dir/$task"
     old=''; since=$now; owner=0; parent=0; misses=0; key="waiting-timer-$task-$now-$$-$RANDOM"
     if [ -e "$record" ] || [ -L "$record" ]; then
@@ -179,9 +185,6 @@ EOF
     due=0
     if [ "$owner" -eq 0 ] && [ "$age" -ge "$alert" ]; then due=1; fi
     if [ "$owner" -gt 1 ] && [ "$parent" -eq 0 ] && [ "$((now - owner))" -ge "$((escalate - alert))" ]; then due=1; fi
-    if [ -n "$declaration" ] && [ "$old" = "$signature" ] && [ "$due" -eq 1 ] && task_captain_call_open "$task"; then
-      declaration=''
-    fi
     if [ -z "$declaration" ] && [ -n "$old" ] && [ "$misses" -eq 0 ]; then
       fm_wait_timer_save "$record" "$old" "$since" "$owner" "$parent" "$key" 1 || return 1
       continue
