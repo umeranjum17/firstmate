@@ -741,6 +741,14 @@ None of those rows carries a structural edge, so the cursorless staleness probe 
 The classifier now declares those rows once (`FM_COMPOSER_OPENCODE_STATUS_RE_DEFAULT` in `bin/fm-composer-lib.sh`) and resumes the staleness probe past them below a proven floor; the resume is bounded by recognition, not by the floor alone, so `Working on request...` directly below the floor still refuses and a busy status row (`esc interrupt`) stays outside the pattern set in the refusing direction.
 After the change the same commands read `empty` on all four captured panes, while a typed draft above the same status area reads `pending` on styled captures and `unknown` on plain ones; `tests/fm-composer-lib.test.sh`'s opencode matrix carries both live screens, the second banner wrap variant, and that typed-text counterweight.
 
+### 2026-10-09 opencode 1.18.25 wrapped status footer
+
+Verified on 2026-10-09 on Linux against OpenCode 1.18.25 (model DeepSeek V4.1 Flash) in an isolated tmux pane whose working directory was a long path, so the right-aligned status row WRAPPED at the pane width (the fleet norm: worktree paths are long).
+The wrapped usage row keeps its `/`-leading directory prefix and its `22.1K (2%)` context cell, but its cost cell truncates to a bare `$` that abuts the palette hint (`.../a-   22.1K (2%) · $ctrl+p`), and the trailing `commands` wraps to the next row beside the directory's own continuation fragment (`really-...-name    commands`).
+The pre-fix `FM_COMPOSER_OPENCODE_STATUS_RE_DEFAULT` required digits after the `$` and a non-empty `ctrl+p`/`commands` tail, so it matched NEITHER row: the cursorless staleness probe refused `stale-envelope` and the idle, empty composer read `unknown`, and `fm-control exit` refused with `composer state is 'unknown', not proven empty`.
+After the pattern makes the cost and hint groups optional and the cost digits `[0-9]*` (a truncated `$`), the same idle pane reads `empty` and `fm-control exit` stops the agent, while a draft above the same footer still reads `pending` on styled captures and `unknown` on plain ones.
+`tests/fm-composer-lib.test.sh`'s opencode matrix carries the wrapped idle screen, its typed-draft counterweight, and an assistant-error-block screen above an empty composer; `FM_COMPOSER_MATRIX_LIVE=1 tests/fm-composer-matrix-live-e2e.test.sh` refreshes the real-harness idle result.
+
 ### 2026-09-20 claude 2.1.236 statusLine footer through Herdr
 
 Verified on 2026-09-20 on macOS arm64 (Darwin 25.6.0) against Claude Code 2.1.236 running as Firstmate workers in Herdr 0.8.0 panes, read through Herdr's ANSI capture with its exact capability descriptor (`styled=1`, `cursor=0`, `identity=1`, `rows=20`).

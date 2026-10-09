@@ -539,7 +539,24 @@ FM_COMPOSER_OMP_STATUS_RE_DEFAULT='^[[:space:]]*(π|󰵗)[[:space:]]+·[[:space:
 # any unclaimed activity fail them, keep the envelope stale, and read
 # `unknown`, the refusing direction. The square glyphs are an alternation,
 # never a bracket range, for the reason FM_OMP_SPINNER_FRAMES_RE records.
-FM_COMPOSER_OPENCODE_STATUS_RE_DEFAULT='^[[:space:]]*/.*[0-9]+(\.[0-9]+)?K[[:space:]]+\([0-9]+%\)[[:space:]]+·[[:space:]]+\$[0-9]+(\.[0-9]+)?[[:space:]]*ctrl\+p([[:space:]]+commands)?$|^[^[:space:]]+([[:space:]]+tab[[:space:]]+agents[[:space:]]+ctrl\+p)?[[:space:]]+commands$|^tab[[:space:]]+agents[[:space:]]+ctrl\+p[[:space:]]+commands$|^[[:space:]]*(■|⬝)[0-9]+(■|⬝)hour(■|⬝)usage limit reached|^[[:space:]]*(usin\.\.\.[[:space:]]+)?\(?click to expand\)[[:space:]]+\[retrying in [0-9]+[hms]([[:space:]]+[0-9]+[hms])*[[:space:]]+attempt #[0-9]+\]$'
+#
+# THE WRAP: the usage cell is right-aligned beside the directory, so on a
+# long worktree path (the fleet norm) the row WRAPS at the pane width. A
+# wrapped usage row keeps its `/`-leading directory prefix and its
+# `<n>K (<p>%)` cell, but its `· $<cost>` tail is TRUNCATED at the cost cell
+# and the `ctrl+p` hint can land with NO separating space, and the trailing
+# `commands` wraps to the next row beside the directory's own continuation
+# fragment. Captured live 2026-10-09 in the fm-opencode-composer-err repro
+# (`.../a-   22.1K (2%) · $ctrl+p` then `really-...-name    commands`): the
+# cost cell renders as a bare `$` (no digits) and the palette hint abuts it,
+# so the pre-fix `\$[0-9]+...[[:space:]]*ctrl\+p` alternative matched neither
+# row and an idle, empty composer read `unknown`. The cost and hint groups are
+# therefore each OPTIONAL and the cost digits are `[0-9]*` (a truncated `$`);
+# every other cell the row can hold (`· $`, `ctrl+p`, `commands`) remains the
+# same composer furniture, and the row still requires its `/`-leading
+# directory plus an `<n>K (<p>%)` context cell, so a busy `esc interrupt` row
+# and unclaimed activity still fail in the refusing direction.
+FM_COMPOSER_OPENCODE_STATUS_RE_DEFAULT='^[[:space:]]*/.*[0-9]+(\.[0-9]+)?[KMG]?[[:space:]]+\([0-9]+%\)([[:space:]]+·[[:space:]]+\$[0-9]*(\.[0-9]+)?)?([[:space:]]*ctrl\+p([[:space:]]+commands)?)?$|^[^[:space:]]+([[:space:]]+tab[[:space:]]+agents[[:space:]]+ctrl\+p)?[[:space:]]+commands$|^tab[[:space:]]+agents[[:space:]]+ctrl\+p[[:space:]]+commands$|^[[:space:]]*(■|⬝)[0-9]+(■|⬝)hour(■|⬝)usage limit reached|^[[:space:]]*(usin\.\.\.[[:space:]]+)?\(?click to expand\)[[:space:]]+\[retrying in [0-9]+[hms]([[:space:]]+[0-9]+[hms])*[[:space:]]+attempt #[0-9]+\]$'
 # Pi's footer stats row opens at column 0 with the session cost when every
 # token counter is zero (`$0.000 (sub) 5.4%/272k (auto)` on pi 0.85.1).
 # That leading `$` is a cost cell, not a dead-shell prompt, only when a digit

@@ -973,6 +973,31 @@ test_matrix_opencode_leftbar_signals() {
   assert_screen "opencode 1.18.25 busy esc-interrupt row below the floor stays unknown on herdr" unknown "$CAPS_STYLED" "$v125_busy"
   home_status=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   tab agents  ctrl+p commands'
   assert_screen "opencode home idle bare tab-agents row below the floor on herdr" empty "$CAPS_STYLED" "$home_status"
+  # Live 2026-10-09 WRAP shape (task fm-opencode-composer-err; panes muxr
+  # p73/p60/p6Q and takeone t1-prefilter-ssref): on a long worktree path the
+  # right-aligned status row WRAPS at the pane width. The usage row keeps its
+  # `/`-leading directory and `<n>K (<p>%)` cell, but its cost cell is
+  # TRUNCATED to a bare `$` abutting the palette hint (`· $ctrl+p`), and the
+  # trailing `commands` wraps beside the directory's continuation fragment.
+  # The pre-fix pattern matched NEITHER row, so the staleness probe refused
+  # `stale-envelope` and an idle, empty composer read `unknown` - fm-control
+  # could neither relaunch nor exit. A draft above the same footer still reads
+  # pending (never empty).
+  local wrap_idle wrap_typed wrap_error
+  wrap_idle=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/umer/.treehouse/firstmate-cff959/8/a-   22.1K (2%) · $ctrl+p\n   really-quite-long-opencode-project-directory-name   commands'
+  assert_screen "opencode 1.18.x wrapped status footer on herdr" empty "$CAPS_STYLED" "$wrap_idle"
+  assert_screen "opencode 1.18.x wrapped status footer on zellij" empty "$CAPS_STYLED_NOID" "$wrap_idle"
+  assert_screen "opencode 1.18.x wrapped status footer on cmux/orca" empty "$CAPS_PLAIN" "$wrap_idle"
+  wrap_typed=$'  ┃\n  ┃  Reply with OK.\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/umer/.treehouse/firstmate-cff959/8/a-   22.1K (2%) · $ctrl+p\n   really-quite-long-opencode-project-directory-name   commands'
+  assert_screen "opencode 1.18.x typed draft above wrapped status footer on herdr" pending "$CAPS_STYLED" "$wrap_typed"
+  assert_screen "opencode 1.18.x typed draft above wrapped status footer on cmux/orca" unknown "$CAPS_PLAIN" "$wrap_typed"
+  # An assistant error box (opencode draws it with its `┃` SplitBorder and
+  # textMuted text) sits above the composer's own `▣ Build` footer and empty
+  # left-bar run. The error text is transcript furniture; the composer below is
+  # still empty in both shapes.
+  wrap_error=$'  ┃  trigger an error please\n  ┃\n  ┃\n  ┃  Upstream request failed: Insufficient account funds\n  ┃\n     ▣  Build · DeepSeek V4.1 Flash\n  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/umer/.treehouse/firstmate-cff959/8/a-   22.1K (2%) · $ctrl+p\n   really-quite-long-opencode-project-directory-name   commands'
+  assert_screen "opencode 1.18.x assistant error block above empty composer on herdr" empty "$CAPS_STYLED" "$wrap_error"
+  assert_screen "opencode 1.18.x assistant error block above empty composer on cmux/orca" empty "$CAPS_PLAIN" "$wrap_error"
   pass "matrix: opencode's left-bar composer reads empty everywhere and scans the full active run"
 }
 
