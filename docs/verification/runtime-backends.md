@@ -2715,7 +2715,8 @@ Repeat the hooked-worker check above before publication if watcher or task-inbox
 
 ## OpenCode model-error wakes and second-mate continuity
 
-Verified on 2026-10-08 with OpenCode 1.18.25 in a credential-free named Herdr lab.
+Verified on 2026-10-08 with OpenCode 1.18.25 in a credential-free named Herdr lab, against the observation code at commit b45da13f.
+Later commits (d5806d7c through 4139b026) changed the observer and alert record; this live record does not qualify those changes, which the portable tests below cover.
 Two real OpenCode lanes selected an unavailable hosted model and emitted `session.error` followed by idle.
 One lane retained its generation-bound native error record; the other exercised the legacy visible-banner path by removing that record after the real failure.
 The ordinary watcher delivered one grouped model-error notification automatically, and the real second-mate agent drained and acknowledged it within 97 seconds of the recorded failure.

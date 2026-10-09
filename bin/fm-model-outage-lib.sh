@@ -23,7 +23,7 @@ _FM_MODEL_ERROR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 fm_model_outage_hold() {  # <dir> <batch> <id>
   local old
   old=$(cat "$1/lane-$3" 2>/dev/null) || return 0
-  [ -z "$old" ] || : > "$2/${old##*|}.hold"
+  [ -z "$old" ] || printf '%s\n' "$3" >> "$2/${old##*|}.hold"
 }
 
 fm_model_outage_tick() {
@@ -37,6 +37,7 @@ fm_model_outage_tick() {
   [ $((now - last)) -ge 60 ] || [ $((now - last)) -lt 0 ] || return 0
   printf '%s\n' "$now" > "$dir/.scan-at" || return 1
   batch=$(mktemp -d "$dir/.scan.XXXXXX") || return 1
+  trap 'rm -rf "$batch"; trap - RETURN' RETURN
   for meta in "$STATE"/*.meta; do
     [ -f "$meta" ] && [ ! -L "$meta" ] || continue
     id=${meta##*/}; id=${id%.meta}
@@ -89,12 +90,15 @@ fm_model_outage_tick() {
     id=${file##*/lane-}
     [ -f "$STATE/$id.meta" ] || rm -f "$file"
   done
-  # Forget completed episodes only after the whole scan, not per lane; a hash
-  # held by an unreadable lane keeps its record.
+  # Forget completed episodes only after the whole scan, not per lane. A hash with
+  # no readable lane keeps only its unreadable lanes' named ids.
   for file in "$dir"/alert-*; do
     [ -f "$file" ] || continue
     hash=${file##*/alert-}
-    [ -f "$batch/$hash.lanes" ] || [ -f "$batch/$hash.hold" ] || rm -f "$file"
+    [ -f "$batch/$hash.lanes" ] && continue
+    kept=
+    [ -f "$batch/$hash.hold" ] && kept=$(grep -Fxf "$batch/$hash.hold" "$file")
+    if [ -n "$kept" ]; then printf '%s\n' "$kept" > "$file" || return 1; else rm -f "$file"; fi
   done
   groups=
   for lanes in "$batch"/*.lanes; do
@@ -102,22 +106,21 @@ fm_model_outage_tick() {
     hash=${lanes##*/}; hash=${hash%.lanes}
     alert="$dir/alert-$hash"
     [ -f "$alert" ] || : > "$alert" || return 1
-    # The alert record holds the lanes named and still failing. A recovered lane
-    # leaves it, so its later failure with the same error names it again.
+    # The alert record holds the lanes named and still failing or unreadable. A
+    # recovered lane leaves it, so its later failure with the same error names it again.
     if [ -f "$batch/$hash.ready" ] && grep -qvxFf "$alert" "$lanes"; then
       current=$(sort -u "$lanes")
       rows=$(printf '%s\n' "$current" | paste -sd ',' -)
       error=$(cat "$batch/$hash.error")
       verdict="check: model outage affected=[$rows]: $error"
-      fm_wake_append check "model-outage-$hash" "$verdict" || { rm -rf "$batch"; return 1; }
-      printf '%s\n' "$current" > "$alert" || return 1
+      fm_wake_append check "model-outage-$hash" "$verdict" || return 1
       groups="${groups}${verdict}"$'\n'
+      kept=$({ cat "$lanes"; grep -Fxf "$alert" "$batch/$hash.hold" 2>/dev/null; } | sort -u)
     else
-      kept=$(grep -Fxf "$alert" "$lanes" | sort -u)
-      if [ -n "$kept" ]; then printf '%s\n' "$kept" > "$alert" || return 1; else : > "$alert" || return 1; fi
+      kept=$(cat "$lanes" "$batch/$hash.hold" 2>/dev/null | grep -Fxf "$alert" | sort -u)
     fi
+    if [ -n "$kept" ]; then printf '%s\n' "$kept" > "$alert" || return 1; else : > "$alert" || return 1; fi
   done
-  rm -rf "$batch"
   # All groups were queued before the first wake can exit the watcher.
   [ -z "$groups" ] || wake "${groups%$'\n'}"
   return 0
