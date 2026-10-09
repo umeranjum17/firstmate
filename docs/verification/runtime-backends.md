@@ -110,7 +110,7 @@ The run did not reach `opencode`, `pi`, `pi-signed`, `grok`, `kimi`, or `muse`, 
 ## Durable task-copy allocation
 
 The allocation and legacy-copy protection contract is owned by `bin/fm-spawn.sh` and `bin/fm-treehouse-protect.py`.
-Verified on 2026-10-08 with Treehouse v2.0.1, tmux 3.7b and Linux 7.1.8-arch1-3:
+Verified on 2026-10-09 at head `a1259b22` with Treehouse v2.0.1, tmux 3.7b and Linux 7.1.8-arch1-3, exit 0:
 
 ```sh
 FM_TEST_REAL_LEASE_ONLY=1 bash tests/fm-spawn-pool-base-freshen.test.sh
@@ -120,9 +120,10 @@ Observed output:
 
 ```text
 ok - real spawn skips an idle recorded slot, leases a free slot until teardown, and preserves the existing task
+ok - real home seeding protects recorded copies and allocates only a free home
 ```
 
-This journey uses a private real Treehouse pool and tmux server, with a `sleep` worker rather than an authenticated model, and asserts the pool's persistent lease state before and after real teardown.
+These journeys use a private real Treehouse pool and tmux server, with a `sleep` worker rather than an authenticated model, and assert the pool's persistent lease state before and after real teardown.
 The shared allocation branch covers tmux, Herdr, Zellij and cmux independently of worker harness selection; Orca owns its allocation separately and does not invoke this protection.
 Only tmux and the POSIX native state lock were exercised live here; Windows uses Treehouse's LockFileEx byte-range lock and was inspected but not executed, and no live Herdr, Zellij or cmux claim is made by this run.
 
