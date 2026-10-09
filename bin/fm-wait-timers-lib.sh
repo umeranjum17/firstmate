@@ -10,14 +10,13 @@
 # Changing state/declaration/endpoint clears and re-arms the episode. Parent
 # reports use the existing local/remote parent channel, never a captain alert.
 # A waiting-timer-* key belongs to this library; it resolves that report when
-# the episode ends. Main has no parent: further human escalation is judgment.
+# the episode ends. Main has no parent: its overdue wait gets one escalation wake
+# to Main itself, and any human escalation beyond that is judgment.
 # Source through fm-watch.sh; the wake library supplies hashing and wake emission.
 
 _FM_WAIT_TIMER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=bin/fm-parent-channel-lib.sh
 . "$_FM_WAIT_TIMER_DIR/fm-parent-channel-lib.sh"
-# shellcheck source=bin/fm-wait-native-lib.sh
-. "$_FM_WAIT_TIMER_DIR/fm-wait-native-lib.sh"
 # shellcheck source=bin/fm-timeout-lib.sh
 . "$_FM_WAIT_TIMER_DIR/fm-timeout-lib.sh"
 
@@ -140,7 +139,7 @@ EOF
       case "$unknown" in *"|${window%%:*}|"*) continue ;; esac
     fi
     declaration=''
-    if fm_native_wait_admitted "$(fm_meta_get "$meta" harness)"; then
+    if [ "$(fm_meta_get "$meta" harness)" != cursor ]; then
       case "$blocked" in
         *"|$window|"*) [ -z "$window" ] || declaration=herdr-blocked ;;
       esac
@@ -219,9 +218,15 @@ EOF
     if ! status_is_paused "$declaration" && [ "$owner" -gt 1 ] && [ "$((now - owner))" -ge "$((escalate - alert))" ] && [ "$parent" -eq 0 ]; then
       if [ -e "$FM_HOME/.fm-secondmate-home" ] || [ -L "$FM_HOME/.fm-secondmate-home" ]; then
         fm_wait_timer_report "blocked [key=$key]: waiting-timer-overdue: $task ($verb, observed ${age}s); owning lead has not cleared the wait; Main must unblock or steer the lead" || continue
+        parent=1
+        fm_wait_timer_save "$record" "$signature" "$since" "$owner" "$parent" "$key" "$misses" || return 1
+      else
+        reason="escalation: waiting-state $task ($verb, observed ${age}s, level=main; Main must unblock it now)"
+        fm_wake_append check "$key-escalation" "$reason" || return 1
+        parent=1
+        fm_wait_timer_save "$record" "$signature" "$since" "$owner" "$parent" "$key" "$misses" || return 1
+        wake "$reason"
       fi
-      parent=1
-      fm_wait_timer_save "$record" "$signature" "$since" "$owner" "$parent" "$key" "$misses" || return 1
     fi
   done
   return 0

@@ -72,6 +72,28 @@ for verb in blocked needs-decision; do
   pass "$verb owner alert, parent escalation, deduplication, resolution and re-arm"
 done
 
+# A Main-owned wait has no parent channel, so its escalation is one wake to Main.
+dir=$(make_case main-escalation)
+mkdir -p "$dir/home/config" "$dir/tmp" "$dir/config"
+printf 'kind=ship\nbackend=tmux\nwindow=fake:1\n' > "$dir/state/lane.meta"
+printf 'blocked [at=%s] [key=wait]: external condition until 2099-01-01T00:00Z\n' "$(date +%s)" > "$dir/state/lane.status"
+cycle
+IFS=$'\t' read -r sig since _owner _parent key _misses < "$dir/state/.waiting-timers/lane"
+printf '%s\t%s\t0\t0\t%s\t0\n' "$sig" "$((since - 900))" "$key" > "$dir/state/.waiting-timers/lane"
+cycle
+[ "$(grep -c 'level=owner' "$dir/events")" -eq 1 ] || fail 'Main-owned wait did not alert Main'
+IFS=$'\t' read -r sig since owner _parent key _misses < "$dir/state/.waiting-timers/lane"
+printf '%s\t%s\t%s\t0\t%s\t0\n' "$sig" "$since" "$((owner - 900))" "$key" > "$dir/state/.waiting-timers/lane"
+cycle
+grep -q 'escalation: waiting-state lane .*level=main' "$dir/events" || fail 'Main-owned wait did not escalate to Main'
+! grep -qi 'captain' "$dir/events" || fail 'Main-owned escalation paged the captain'
+[ "$(grep -c 'level=main' "$dir/events")" -eq 1 ] || fail 'Main-owned escalation repeated'
+IFS=$'\t' read -r _sig _since _owner parent _key _misses < "$dir/state/.waiting-timers/lane"
+[ "$parent" -eq 1 ] || fail 'Main-owned escalation was not recorded'
+cycle
+[ "$(grep -c 'level=main' "$dir/events")" -eq 1 ] || fail 'Main-owned escalation repeated on a later poll'
+pass 'a Main-owned overdue wait escalates once to Main without paging the captain'
+
 # Native blocked wins over a working log and survives unrelated status churn.
 dir=$(make_case herdr)
 mkdir -p "$dir/home/config" "$dir/tmp" "$dir/config"
