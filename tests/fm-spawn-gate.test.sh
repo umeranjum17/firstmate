@@ -130,7 +130,7 @@ test_host_memory_pressure_refuses_launches() {
   proc=$home/proc
   mkdir -p "$proc/pressure"
   printf 'MemTotal: 67108864 kB\nMemAvailable: 31457280 kB\nSwapTotal: 0 kB\nSwapFree: 0 kB\n' > "$proc/meminfo"
-  printf 'some avg10=42.00 avg60=30.00 avg300=10.00 total=1\n' > "$proc/pressure/memory"
+  printf 'some avg10=42.00 avg60=40.00 avg300=10.00 total=1\n' > "$proc/pressure/memory"
   out=$(FM_HOST_MEMORY_PROC=$proc run_spawn_home "$home" nope-mem-z5 projects/none --scout --harness 'true worker')
   status=$?
   [ "$status" -ne 0 ] || fail "a spawn under memory pressure should be refused"

@@ -721,7 +721,7 @@ test_memory_admission_defers_recovery() {
   log="$w/calls.log"; : > "$log"
   mkdir -p "$w/proc/pressure"
   printf 'MemAvailable: 31457280 kB\n' > "$w/proc/meminfo"
-  printf 'some avg10=25 avg60=0 avg300=0 total=1\n' > "$w/proc/pressure/memory"
+  printf 'some avg10=25 avg60=25 avg300=0 total=1\n' > "$w/proc/pressure/memory"
   for i in 1 2 3 4; do
     out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" zsh "$log" FM_ROOT_OVERRIDE="$w/code" FM_HOST_MEMORY_PROC="$w/proc" FM_HOST_MEMORY_CGROUP_ROOT="$w/no-cgroup")
     assert_contains "$out" 'memory admission deferred:' "memory pressure defers liveness recovery"

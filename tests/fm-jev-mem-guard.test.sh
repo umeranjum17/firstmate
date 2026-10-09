@@ -14,13 +14,13 @@ DRAIN="$ROOT/bin/fm-wake-drain.sh"
 TMP_ROOT=$(fm_test_tmproot fm-mem-guard)
 export FM_HOST_MEMORY_CGROUP_ROOT="$TMP_ROOT/no-cgroup"
 
-# fake_host <proc> <available-gb> <pressure-avg10> [swap-used-gb]
+# fake_host <proc> <available-gb> <pressure (both 10 s and 60 s averages)> [swap-used-gb]
 fake_host() {
   local proc=$1 swap_used=${4:-0}
   mkdir -p "$proc/pressure"
   printf 'MemTotal:       67108864 kB\nMemAvailable:   %s kB\nSwapTotal:      33554432 kB\nSwapFree:       %s kB\n' \
     "$(($2 * 1048576))" "$((33554432 - swap_used * 1048576))" > "$proc/meminfo"
-  printf 'some avg10=%s avg60=1.00 avg300=1.00 total=1\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n' "$3" \
+  printf 'some avg10=%s avg60=%s avg300=1.00 total=1\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n' "$3" "$3" \
     > "$proc/pressure/memory"
 }
 
@@ -53,14 +53,14 @@ test_verdicts_samples_and_owners() {
   make_fleet "$case"
   fake_host "$case/proc" 40 2.5 1
   out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --record "$tsv" --state-dir "$case" "$case/state")
-  assert_equals $'OK\tpressure 2% (10 s average), 40.0 GB available, 1.0 GB swap used; cgroup pressure unreadable; host-only classification' "$out" "calm host"
+  assert_equals $'OK\tpressure 2% (lower of 10 s and 60 s averages), 40.0 GB available, 1.0 GB swap used; cgroup pressure unreadable; host-only classification' "$out" "calm host"
   fake_host "$case/proc" 30 24 3
   out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --record "$tsv" --state-dir "$case" "$case/state")
-  assert_equals $'WAIT\tpressure 24% (10 s average), 30.0 GB available, 3.0 GB swap used; cgroup pressure unreadable; host-only classification; pressure at or above 20%' "$out" \
+  assert_equals $'WAIT\tpressure 24% (lower of 10 s and 60 s averages), 30.0 GB available, 3.0 GB swap used; cgroup pressure unreadable; host-only classification; pressure at or above 20%' "$out" \
     "pressure past the wait threshold makes new agents wait"
   fake_host "$case/proc" 5 41.2 16
   out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --record "$tsv" --state-dir "$case" "$case/state")
-  assert_equals $'ALERT\tpressure 41% (10 s average), 5.0 GB available, 16.0 GB swap used; cgroup pressure unreadable; host-only classification; pressure at or above 35%; available memory below 6 GB; largest: task big-build (main) 14.0 GB in 2 processes, llama pid 104 6.0 GB, lead sm1 2.0 GB' "$out" \
+  assert_equals $'ALERT\tpressure 41% (lower of 10 s and 60 s averages), 5.0 GB available, 16.0 GB swap used; cgroup pressure unreadable; host-only classification; pressure at or above 35%; available memory below 6 GB; largest: task big-build (main) 14.0 GB in 2 processes, llama pid 104 6.0 GB, lead sm1 2.0 GB' "$out" \
     "an alert names the largest consumers by task, lead, or process"
   [ "$(wc -l < "$tsv" | tr -d ' ')" -eq 3 ] || fail "three samples should be recorded: $(cat "$tsv")"
   assert_equals $'5242880\t16777216\t41.20\tALERT' "$(tail -n 1 "$tsv" | cut -f2-)" "the sample row carries available kB, swap kB, pressure, verdict"
@@ -143,7 +143,7 @@ test_watcher_wakes_once_per_alert_episode() {
   wait_for_exit "$LEG_PID" 50 || fail "the watcher did not wake on a memory alert: $(cat "$case/watch-alert.err")"
   wait_interrupt "$case/state"
   out=$(cat "$case/watch-alert.out")
-  assert_contains "$out" "check: host memory ALERT: pressure 41% (10 s average)" "the alert wake names the pressure"
+  assert_contains "$out" "check: host memory ALERT: pressure 41% (lower of 10 s and 60 s averages)" "the alert wake names the pressure"
   assert_contains "$out" "largest: task big-build (main) 14.0 GB in 2 processes" "the alert wake names the largest task"
   [ "$(grep -c $'\tcheck\thost-memory\t' "$case/state/.wake-queue")" -eq 1 ] \
     || fail "the alert was not queued durably exactly once: $(cat "$case/state/.wake-queue")"
@@ -204,7 +204,7 @@ test_cgroup_pressure() {
   fake_host "$case/proc" 40 2
   mkdir -p "$case/proc/self" "$case/cgroup/$group" "$case/state"
   printf '0::/%s/child\n' "$group" > "$case/proc/self/cgroup"
-  printf 'some avg10=58.88 avg60=0 avg300=0 total=1\n' > "$case/cgroup/$group/memory.pressure"
+  printf 'some avg10=58.88 avg60=60 avg300=0 total=1\n' > "$case/cgroup/$group/memory.pressure"
   out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --record "$case/state/sample")
   assert_contains "$out" $'ALERT\tpressure 59%' "cgroup pressure dominates a calm host"
   assert_contains "$out" 'host 2%, cgroup 59%' "the independent measurements are visible"
@@ -212,11 +212,33 @@ test_cgroup_pressure() {
   out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build --state "$case/state"); rc=$?
   [ "$rc" -eq 1 ] || fail "critical cgroup pressure admitted work: $out"
   rm "$case/cgroup/$group/memory.pressure"
-  mkdir -p "$case/cgroup/user.slice/user-123.slice"
-  printf 'some avg10=24 avg60=0 avg300=0 total=1\n' > "$case/cgroup/user.slice/user-123.slice/memory.pressure"
+  local app=user.slice/user-123.slice/user@123.service/app.slice
+  mkdir -p "$case/cgroup/$app"
+  printf 'some avg10=24 avg60=30 avg300=0 total=1\n' > "$case/cgroup/$app/memory.pressure"
   out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD")
-  assert_contains "$out" $'WAIT\tpressure 24%' "the parent user slice is measured when the unit is unreadable"
-  rm "$case/cgroup/user.slice/user-123.slice/memory.pressure"
+  assert_contains "$out" $'WAIT\tpressure 24%' "app.slice is measured when the runtime unit is unreadable"
+  # A capped sibling slice thrashing (fm-heavy at its swap cap) is contained by design:
+  # it must not reach the admission verdict while app.slice and herdr-server are calm.
+  mkdir -p "$case/cgroup/user.slice/user-123.slice/user@123.service/fm.slice/fm-heavy.slice"
+  printf 'some avg10=95 avg60=90 avg300=50 total=1\n' > "$case/cgroup/user.slice/user-123.slice/user@123.service/fm.slice/fm-heavy.slice/memory.pressure"
+  mkdir -p "$case/cgroup/$app/herdr-server.service"
+  printf 'some avg10=0.85 avg60=0.5 avg300=0.2 total=1\n' > "$case/cgroup/$app/herdr-server.service/memory.pressure"
+  printf 'some avg10=1 avg60=1 avg300=1 total=1\n' > "$case/cgroup/$app/memory.pressure"
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD")
+  assert_contains "$out" $'OK\tpressure 1%' "sibling heavy-slice thrash never gates the verdict"
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build --state "$case/state"); rc=$?
+  [ "$rc" -eq 0 ] || fail "heavy-slice thrash refused admission: $out"
+  # A short spike raises only the 10 s average: it must not refuse a launch.
+  printf 'some avg10=60 avg60=8 avg300=2 total=1\n' > "$case/cgroup/$app/memory.pressure"
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build --state "$case/state"); rc=$?
+  [ "$rc" -eq 0 ] || fail "a short app.slice spike refused admission: $out"
+  # The slice systemd-oomd watches at sustained kill-level pressure still holds and refuses.
+  printf 'some avg10=60 avg60=39 avg300=15 total=1\n' > "$case/cgroup/$app/memory.pressure"
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build --state "$case/state"); rc=$?
+  [ "$rc" -eq 1 ] || fail "app.slice at oomd kill pressure admitted work: $out"
+  assert_contains "$out" 'pressure at or above 35%' "the alert reason names the pressure"
+  printf 'some avg10=1 avg60=1 avg300=1 total=1\n' > "$case/cgroup/$app/memory.pressure"
+  rm "$case/cgroup/$app/memory.pressure" "$case/cgroup/$app/herdr-server.service/memory.pressure"
   out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD")
   assert_contains "$out" 'host-only classification' "unreadable cgroup pressure is explicit"
   pass "cgroup pressure participates in classification and admission"
@@ -364,7 +386,7 @@ if [ "\${3:-}" = "\$FM_HOME/state/.wake-queue.lock" ] \\
   && [ "\$PPID" = "\$(cat "\$FM_HOME/state/.watch.lock/pid" 2>/dev/null)" ] \\
   && [ -e "\$FM_HOME/publish-alert" ]; then
   rm "\$FM_HOME/publish-alert"
-  printf 'some avg10=41 avg60=1.00 avg300=1.00 total=1\\n' > "\$FM_HOME/proc/pressure/memory"
+  printf 'some avg10=41 avg60=41 avg300=1.00 total=1\\n' > "\$FM_HOME/proc/pressure/memory"
   for ((i=0; i<100; i++)); do
     grep -q \$'\\tcheck\\thost-memory\\t' "\$FM_HOME/state/.wake-queue" 2>/dev/null && break
     sleep 0.1

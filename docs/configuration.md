@@ -669,8 +669,9 @@ The helper's header owns exact parsing, publication, and report output mechanics
 ## Host memory guard (config/host-memory)
 
 On Herdr, agents across homes share the server's service cgroup, so an out-of-memory kill of that unit stops the whole fleet.
-The host memory guard reads available memory, swap, and host and runtime-cgroup pressure (the share of time some process waited on memory over 10 seconds), classifying the worse pressure reading.
-It reads the `herdr-server.service` cgroup and its parent user slice when available; unreadable cgroup pressure is reported as host-only classification.
+The host memory guard reads available memory, swap, and the pressure of the cgroups systemd-oomd watches and agents run in - the user `app.slice` and `herdr-server.service` - classifying the worse of those two readings.
+Pressure is the share of time some process waited on memory, taken as the lower of its 10-second and 60-second averages, so a spike of a few seconds does not hold launches while pressure held for about a minute does, and the reading falls as soon as the 10-second average does.
+Pressure inside capped heavy-job slices outside `app.slice` is not read, so heavy-job thrash holds agent launches only when it also stalls the agents; host-wide pressure stays in the summary as context, and unreadable cgroup pressure is reported as host-only classification.
 It classifies measurable memory as `OK`, `WAIT` (new agents should wait), or `ALERT`, and names the largest consumers by owning task; unavailable measurements read `UNKNOWN`.
 These controls reduce risk but cannot guarantee avoidance of an out-of-memory kill:
 

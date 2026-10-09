@@ -4,7 +4,12 @@ fm-jev-mem-guard.py - host memory guard: measure, admit, and alert before an oom
 
 On Herdr, fleet agents share one agent-runtime service, and systemd-oomd kills
 that service as a unit under the host's configured oomd pressure policy.
-Read host and runtime cgroup pressure independently and classify the worse reading.
+Classify by the pressure of the cgroups that policy watches and agents run in
+(the user app.slice and herdr-server.service) plus host available memory.
+Host-wide and whole-user-slice pressure aggregate capped heavy-job slices by
+design, so they are summary context only and never gate admission or alerts.
+Pressure is sustained "some" pressure, the lower of the 10 s and 60 s averages,
+so a short spike does not hold launches while pressure held for about a minute does.
 Admission refusal and sampler interrupts cannot guarantee avoidance of an oomd kill.
 
 Usage (bin/fm-jev-mem-guard.sh runs this with python3):
@@ -16,7 +21,7 @@ Usage (bin/fm-jev-mem-guard.sh runs this with python3):
       reason and writes DIR/admission-refused as "<epoch>\t<task>\t<reason>".
   fm-jev-mem-guard.sh [--config FILE] --record FILE [--state-dir HOME DIR]...
       One independent sampler sample (bin/fm-host-memory-sampler.sh): appends
-      "<epoch>\t<MemAvailable kB>\t<swap used kB>\t<pressure some avg10>\t<verdict>"
+      "<epoch>\t<MemAvailable kB>\t<swap used kB>\t<sustained pressure>\t<verdict>"
       to FILE, trimming to the newest 8640 rows once it exceeds 8760, and prints
       "<verdict>\t<summary>"; an ALERT summary names the largest consumers.
 
@@ -86,27 +91,37 @@ def load_config(path):
 
 
 def pressure_at(path):
+    """Sustained "some" pressure: the lower of the 10 s and 60 s averages.
+
+    A spike raises avg10 alone and passes; pressure held for about a minute
+    raises both, and the reading falls as soon as avg10 does.
+    """
     some = next(l for l in open(path) if l.startswith("some "))
-    value = float(dict(f.split("=", 1) for f in some.split()[1:])["avg10"])
+    fields = dict(f.split("=", 1) for f in some.split()[1:])
+    value = min(float(fields["avg10"]), float(fields["avg60"]))
     if not math.isfinite(value) or value < 0:
         raise ValueError
     return value
 
 
 def cgroup_pressure():
+    """Worse pressure across the cgroups oomd watches and agents run in.
+
+    Sibling slices (fm.slice) hold capped heavy jobs whose contained thrash
+    must not gate agent admission, so only app.slice and herdr-server.service
+    (plus the same markers found in this process's own cgroup path) qualify.
+    """
     uid = os.getuid()
-    user = f"user.slice/user-{uid}.slice"
-    paths = {user, f"{user}/user@{uid}.service/app.slice/herdr-server.service"}
+    app = f"user.slice/user-{uid}.slice/user@{uid}.service/app.slice"
+    paths = {app, f"{app}/herdr-server.service"}
     try:
         for line in open(f"{PROC}/self/cgroup"):
             if not line.startswith("0::"):
                 continue
-            group = line.strip()[3:].lstrip("/")
-            parts = group.split("/")
-            if "herdr-server.service" in parts:
-                paths.add("/".join(parts[:parts.index("herdr-server.service") + 1]))
-            paths.update("/".join(parts[:i + 1]) for i, part in enumerate(parts)
-                         if part.startswith("user-") and part.endswith(".slice"))
+            parts = line.strip()[3:].lstrip("/").split("/")
+            for marker in ("app.slice", "herdr-server.service"):
+                if marker in parts:
+                    paths.add("/".join(parts[:parts.index(marker) + 1]))
     except OSError:
         pass
     readings = []
@@ -134,7 +149,7 @@ def sample():
         cgroup, group = cgroup_pressure()
         return {"available_kb": mem["MemAvailable"],
                 "swap_used_kb": max(0, mem.get("SwapTotal", 0) - mem.get("SwapFree", 0)),
-                "pressure": max(host, cgroup) if cgroup is not None else host,
+                "pressure": cgroup if cgroup is not None else host,
                 "host_pressure": host, "cgroup_pressure": cgroup, "cgroup": group}
     except (OSError, StopIteration, KeyError, ValueError):
         return None
@@ -156,7 +171,7 @@ def verdict(s, cfg):
 
 
 def summary(s):
-    return (f"pressure {s['pressure']:.0f}% (10 s average), {s['available_kb'] / GIB_KB:.1f} GB available, "
+    return (f"pressure {s['pressure']:.0f}% (lower of 10 s and 60 s averages), {s['available_kb'] / GIB_KB:.1f} GB available, "
             f"{s['swap_used_kb'] / GIB_KB:.1f} GB swap used; " +
             (f"host {s['host_pressure']:.0f}%, cgroup {s['cgroup_pressure']:.0f}% ({s['cgroup']})"
              if s['cgroup_pressure'] is not None else "cgroup pressure unreadable; host-only classification"))
