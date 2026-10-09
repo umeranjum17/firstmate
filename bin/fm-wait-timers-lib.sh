@@ -77,13 +77,8 @@ fm_wait_timers_tick() {
   local dir="$STATE/.waiting-timers" now record declaration verb signature old since owner parent key misses age reason until bound rc
   local pause_key threshold
   for native in "$alert" "$escalate"; do
-    case "$native" in ''|*[!0-9]*|0* ) echo "waiting timers: thresholds must be positive decimal seconds" >&2; return 1 ;; esac
-    [ "${#native}" -le 9 ] || { echo "waiting timers: threshold exceeds nine digits" >&2; return 1; }
+    _fm_wait_seconds_valid "$native" || { echo "waiting timers: thresholds must be positive decimal seconds of at most nine digits" >&2; return 1; }
   done
-  _fm_wait_seconds_valid "$paused_alert" || {
-    echo "waiting timers: FM_PAUSE_RESURFACE_SECS must be positive decimal seconds of at most nine digits; using $FM_PAUSE_RESURFACE_SECS_DEFAULT" >&2
-    paused_alert=$FM_PAUSE_RESURFACE_SECS_DEFAULT
-  }
   [ "$escalate" -gt "$alert" ] || { echo "waiting timers: escalation must be later than owner alert" >&2; return 1; }
   now=$(date +%s) || return 1
   [ ! -e "$FM_HOME/.fm-secondmate-home" ] || actor='owning lead'

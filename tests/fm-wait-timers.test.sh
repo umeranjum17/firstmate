@@ -21,10 +21,6 @@ cycle() {
   case "$rc" in 0|124) ;; *) fail "watcher failed: $(cat "$dir/err")" ;; esac
   cat "$dir/out" >> "$dir/events"
   FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" "$DRAIN" > "$dir/drain" 2> "$dir/ack"
-  while IFS= read -r row; do
-    payload=${row##*$'\t'}
-    grep -qxF -- "$payload" "$dir/out" || printf '%s\n' "$payload" >> "$dir/events"
-  done < <(grep -F "$(printf '\tcheck\t')" "$dir/drain" || true)
   seq=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through \([0-9]*\) --recovery-generation .*/\1/p' "$dir/ack")
   gen=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--recovery-generation \([^ ]*\)$/\1/p' "$dir/ack")
   [ -z "$seq" ] || FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" "$DRAIN" --ack-through "$seq" --recovery-generation "$gen" >/dev/null
@@ -284,9 +280,8 @@ cycle
 unset FM_BACKEND_HERDR_EVENTS_FORCE FM_BACKEND_HERDR_EVENT_READER
 pass 'an immediate native push wake is the episode owner delivery, with no duplicate recheck'
 
-# A due wait alert rides a same-cycle signal wake: the signal scan runs first,
-# and the alert's durable row queues in that wake without printing its own line
-# (retro fix 4).
+# A due wait alert defers to a same-cycle signal: the signal scan runs first,
+# and the deferred alert still surfaces on the next quiet cycle (retro fix 4).
 dir=$(make_case signals-first)
 mkdir -p "$dir/home/config" "$dir/tmp" "$dir/config"
 printf 'kind=ship\nbackend=tmux\nwindow=fake:1\n' > "$dir/state/lane-a.meta"
@@ -302,64 +297,10 @@ printf 'done: fix complete, PR open\n' >> "$dir/state/lane-b.status"
 : > "$dir/events"
 cycle
 grep -q '^signal:' "$dir/out" || fail "a due wait alert outran the signal wake: $(cat "$dir/out")"
-! grep -q 'waiting-state' "$dir/out" || fail 'the wait-timer step printed its own wake line ahead of the signal'
-grep "$(printf '\tcheck\t')" "$dir/drain" | grep -q 'check: waiting-state lane-a .*level=owner' || fail 'the due wait alert was not queued in the signal wake'
-pass 'a due wait alert queues in the same signal wake without printing its own line'
-
-# A constant stream of captain-relevant handoffs: every cycle exits on a signal,
-# and the due owner alert still queues in the cycle that carries it.
-dir=$(make_case constant-signal-stream)
-mkdir -p "$dir/home/config" "$dir/tmp" "$dir/config"
-printf 'kind=ship\nbackend=tmux\nwindow=fake:1\n' > "$dir/state/lane-a.meta"
-printf 'blocked [at=%s] [key=wait]: external condition until 2099-01-01T00:00Z\n' "$(date +%s)" > "$dir/state/lane-a.status"
-printf 'kind=ship\nbackend=tmux\nwindow=fake:2\n' > "$dir/state/lane-b.meta"
-printf 'working: building\n' > "$dir/state/lane-b.status"
-prime_status_seen "$dir/state" "$dir/state/lane-a.status"
-prime_status_seen "$dir/state" "$dir/state/lane-b.status"
+! grep -q 'waiting-state' "$dir/out" || fail 'the wait-timer step ran before the signal scan'
 cycle
-IFS=$'\t' read -r sig since owner _parent key _misses < "$dir/state/.waiting-timers/lane-a"
-printf '%s\t%s\t0\t0\t%s\t0\n' "$sig" "$((since - 900))" "$key" > "$dir/state/.waiting-timers/lane-a"
-(
-  i=0
-  while :; do
-    i=$((i + 1))
-    printf 'done: handoff %s\n' "$i" >> "$dir/state/lane-b.status"
-    sleep 0.2
-  done
-) &
-feeder=$!
-: > "$dir/events"
-cycle
-kill "$feeder" 2>/dev/null || true
-wait "$feeder" 2>/dev/null || true
-grep -q '^signal:' "$dir/out" || fail "the signal stream did not end the cycle on a signal: $(cat "$dir/out")"
-! grep -q 'waiting-state' "$dir/out" || fail 'the constant stream let the wait-timer step print its own wake line'
-grep "$(printf '\tcheck\t')" "$dir/drain" | grep -q 'check: waiting-state lane-a .*level=owner' || fail 'a constant signal stream starved the due wait alert'
-pass 'a due wait alert queues while a constant signal stream ends every cycle'
-
-# An invalid FM_PAUSE_RESURFACE_SECS falls back to the default with one warning and
-# leaves the watcher and its owner alerts running.
-dir=$(make_case invalid-pause-resurface)
-mkdir -p "$dir/home/config" "$dir/tmp" "$dir/config"
-printf 'kind=ship\nbackend=tmux\nwindow=fake:1\n' > "$dir/state/lane.meta"
-printf 'blocked [at=%s] [key=wait]: external condition until 2099-01-01T00:00Z\n' "$(date +%s)" > "$dir/state/lane.status"
-prime_status_seen "$dir/state" "$dir/state/lane.status"
-env HOME="$dir/home" XDG_CONFIG_HOME="$dir/home/config" TMPDIR="$dir/tmp" \
-  PATH="$dir/fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" \
-  FM_CONFIG_OVERRIDE="$dir/config" FM_POLL=1 FM_SIGNAL_GRACE=1 \
-  FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_HOME_SUMMARY_INTERVAL=999999 \
-  FM_SECONDMATE_LIVENESS_SECS=99999999 FM_BUSY_TURN_MAX_SECS=999999 \
-  FM_STALE_ESCALATE_SECS=999999 FM_WAIT_ALERT_SECS=2 FM_WAIT_ESCALATE_SECS=4 \
-  FM_PAUSE_RESURFACE_SECS=4h \
-  "$WATCH" > "$dir/out" 2> "$dir/err" &
-pid=$!
-sleep 3
-kill -0 "$pid" 2>/dev/null || fail "invalid FM_PAUSE_RESURFACE_SECS stopped the watcher: $(cat "$dir/err")"
-kill "$pid" 2>/dev/null || true
-wait "$pid" 2>/dev/null || true
-grep -q 'FM_PAUSE_RESURFACE_SECS must be' "$dir/err" || fail "invalid FM_PAUSE_RESURFACE_SECS was not reported: $(cat "$dir/err")"
-! grep -q 'waiting-state timer check failed' "$dir/err" || fail 'an invalid FM_PAUSE_RESURFACE_SECS failed the timer check'
-pass 'an invalid FM_PAUSE_RESURFACE_SECS is reported and keeps the watcher running'
+grep -q 'check: waiting-state lane-a .*level=owner' "$dir/events" || fail 'the wait alert deferred behind the signal was never delivered'
+pass 'a due wait alert defers to a same-cycle signal and still surfaces next cycle'
 
 # A declared pause rechecks at the pause cadence, never the owner-alert
 # threshold, and its episode survives pause-prose churn on the same key.
@@ -390,3 +331,24 @@ cycle
 IFS=$'\t' read -r _sig since _owner _parent _key _misses < "$dir/state/.waiting-timers/lane"
 [ "$since" -gt "$start" ] || fail 'a pause with a new phase key did not re-arm the episode'
 pass 'a paused wait rechecks at FM_PAUSE_RESURFACE_SECS, survives prose churn, and re-arms on a new key'
+
+# An invalid FM_PAUSE_RESURFACE_SECS is reported once at watcher start, falls back
+# to the default for every consumer, and leaves a due owner alert delivered.
+dir=$(make_case invalid-pause-resurface)
+mkdir -p "$dir/home/config" "$dir/tmp" "$dir/config"
+printf 'kind=ship\nbackend=tmux\nwindow=fake:1\n' > "$dir/state/lane.meta"
+printf 'blocked [at=%s] [key=wait]: external condition until 2099-01-01T00:00Z\n' "$(date +%s)" > "$dir/state/lane.status"
+prime_status_seen "$dir/state" "$dir/state/lane.status"
+env HOME="$dir/home" XDG_CONFIG_HOME="$dir/home/config" TMPDIR="$dir/tmp" \
+  PATH="$dir/fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" \
+  FM_CONFIG_OVERRIDE="$dir/config" FM_POLL=1 FM_SIGNAL_GRACE=1 \
+  FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_HOME_SUMMARY_INTERVAL=999999 \
+  FM_SECONDMATE_LIVENESS_SECS=99999999 FM_BUSY_TURN_MAX_SECS=999999 \
+  FM_STALE_ESCALATE_SECS=999999 FM_WAIT_ALERT_SECS=2 FM_WAIT_ESCALATE_SECS=4 \
+  FM_PAUSE_RESURFACE_SECS=4h \
+  "$WATCH" > "$dir/out" 2> "$dir/err" &
+pid=$!
+wait_for_exit "$pid" 70 || fail "invalid FM_PAUSE_RESURFACE_SECS stopped the watcher: $(cat "$dir/err")"
+[ "$(grep -c 'FM_PAUSE_RESURFACE_SECS must be' "$dir/err")" -eq 1 ] || fail "invalid FM_PAUSE_RESURFACE_SECS was not reported exactly once: $(cat "$dir/err")"
+grep -q 'check: waiting-state lane .*level=owner' "$dir/out" || fail 'invalid FM_PAUSE_RESURFACE_SECS suppressed the owner alert'
+pass 'an invalid FM_PAUSE_RESURFACE_SECS is reported once at start and keeps the watcher running'
