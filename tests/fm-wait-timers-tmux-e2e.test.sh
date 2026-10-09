@@ -64,6 +64,16 @@ cycle
 printf 'paused: validation until 2000-01-01T00:00Z\n' >> "$world/state/held-lane.status"
 cycle
 cycle
+# The signal scan runs before the timer tick, so one cycle consumes the
+# appended pause line's signal before the episode arms; the arming cycle's
+# poll must also leave the owner unalerted even though FM_WAIT_ALERT_SECS=2,
+# because a declared pause rechecks at FM_PAUSE_RESURFACE_SECS (default 4 h).
+[ -f "$world/state/.waiting-timers/held-lane" ] || { echo 'due pause not armed'; exit 1; }
+IFS=$'\t' read -r _sig _since owner _parent _key < "$world/state/.waiting-timers/held-lane"
+[ "$owner" = 0 ] || { echo 'pause alerted at the owner-alert threshold'; exit 1; }
+IFS=$'\t' read -r sig since _owner _parent key _misses < "$world/state/.waiting-timers/held-lane"
+printf '%s\t%s\t0\t0\t%s\t0\n' "$sig" "$((since - 15000))" "$key" > "$world/state/.waiting-timers/held-lane"
+cycle
 grep -q 'waiting-state held-lane (paused' "$world/events" || exit 1
 [ ! -s "$world/parent/state/lead.status" ] || { echo 'pause escalated to Main'; exit 1; }
 bash "$ROOT/bin/fm-captain-hold.sh" hold held-lane --reason test
@@ -87,6 +97,12 @@ for verb in blocked needs-decision; do
   : > "$world/events"
   : > "$world/parent/state/lead.status"
   printf '%s [key=dependency]: fixture dependency until 2099-01-01T00:00Z\n' "$verb" > "$world/state/ladder.status"
+  # The signal scan precedes the timer tick, so mark the fresh declaration
+  # seen or the priming run exits on its signal before recording the episode.
+  FM_HOME="$world" FM_STATE_OVERRIDE="$world/state" bash -c '
+    # shellcheck disable=SC1090
+    . "$1"; fm_wake_status_mark_current "$2" "$3"
+  ' _ "$ROOT/bin/fm-wake-lib.sh" "$world/state" "$world/state/ladder.status"
   FM_POLL=1 FM_SIGNAL_GRACE=1 FM_WAIT_ALERT_SECS=300 FM_WAIT_ESCALATE_SECS=900 \
     bash "$ROOT/bin/fm-watch.sh" > "$world/out" 2> "$world/err" &
   watch_pid=$!

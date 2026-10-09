@@ -859,6 +859,10 @@ test_nonterminal_and_captain_held_states_do_not_report() {
 test_watcher_hook_and_idle_secondmate_exemption() {
   local out pid i
   make_world watcher; write_child "$MAIN" child 'done: green'; prime_seen "$MAIN/state" "$MAIN/state/child.status"
+  # Signal-first ordering (retro fix 4): an unconsumed turn-ended is a pending
+  # signal and legitimately wins the cycle before the inactive-outcome scan, so
+  # remove it to observe the reconcile wake in isolation here.
+  rm -f "$MAIN/state/child.turn-ended"
   out="$WORLD/watch.out"
   PATH="$WORLD/fakebin:$PATH" FM_HOME="$MAIN" FM_STATE_OVERRIDE="$MAIN/state" \
     FM_INACTIVE_RECONCILE_SECS=60 FM_INACTIVE_CREW_STATE_BIN="$WORLD/fakebin/fm-crew-state.sh" \
@@ -892,6 +896,10 @@ test_watcher_poll_delivers_child_ledger_line_to_parent() {
   make_world watcher-ledger; bind_secondmate local
   write_child "$MATE" child 'done: PR https://example.test/owner/repo/pull/1 checks green'
   prime_seen "$MATE/state" "$MATE/state/child.status"
+  # Signal-first ordering (retro fix 4): an unconsumed turn-ended wins the
+  # cycle before the reconcile scan that delivers the ledger line, so consume
+  # it here to observe the delivery path in isolation.
+  rm -f "$MATE/state/child.turn-ended"
   PATH="$WORLD/fakebin:$PATH" FM_HOME="$MATE" FM_STATE_OVERRIDE="$MATE/state" FM_DATA_OVERRIDE="$MATE/data" \
     FM_CONFIG_OVERRIDE="$MATE/config" FM_INACTIVE_RECONCILE_SECS=60 \
     FM_INACTIVE_CREW_STATE_BIN="$WORLD/fakebin/fm-crew-state.sh" FM_FORGE_LOG="$WORLD/forge.log" \
