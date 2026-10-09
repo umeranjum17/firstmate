@@ -125,7 +125,13 @@ cycle
 grep -q 'herdr-blocked' "$dir/events" || fail 'native blocked did not override working'
 ! grep -q 'foreign:pane' "$dir/events" || fail 'foreign pane was monitored'
 printf 'working\n' > "$dir/native"
-cycle
+# Clearing the episode takes two polls (one missed read is tolerated), and each
+# cycle's watcher is stopped after a few seconds, so repeat until it has cleared.
+for _ in 1 2 3 4 5; do
+  [ -e "$dir/state/.waiting-timers/lane" ] || break
+  cycle
+done
+[ ! -e "$dir/state/.waiting-timers/lane" ] || fail 'native working did not clear the episode'
 printf 'blocked\n' > "$dir/native"
 cycle
 cycle

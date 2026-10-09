@@ -28,6 +28,7 @@ task_captain_call_open() {  # <task>
   local task=$1
   CAPTAIN_CALL_IDENTITY=
   [ -n "$task" ] || return 1
+  # shellcheck disable=SC2034 # Consumed by the watcher's stale-path captain-call check in fm-watch.sh.
   CAPTAIN_CALL_IDENTITY=$(FM_HOME="$FM_HOME" "$FM_PUSH_TRANSITION_LIB_DIR/fm-captain-hold.sh" \
     open "$task" --identity 2>/dev/null) || return 1
   return 0

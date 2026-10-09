@@ -65,7 +65,7 @@ fm_wait_timer_push_delivered() {  # <task> <window>
 fm_wait_timers_tick() {
   local alert=${FM_WAIT_ALERT_SECS:-300} escalate=${FM_WAIT_ESCALATE_SECS:-900}
   local meta task backend window session native sessions='|' blocked='|' unknown='|' rows actor=Main
-  local dir="$STATE/.waiting-timers" now record declaration verb signature old since owner parent key misses due age reason until bound rc
+  local dir="$STATE/.waiting-timers" now record declaration verb signature old since owner parent key misses age reason until bound rc
   for native in "$alert" "$escalate"; do
     case "$native" in ''|*[!0-9]*|0* ) echo "waiting timers: thresholds must be positive decimal seconds" >&2; return 1 ;; esac
     [ "${#native}" -le 9 ] || { echo "waiting timers: threshold exceeds nine digits" >&2; return 1; }
@@ -182,9 +182,6 @@ EOF
     fi
     signature=$(printf '%s' "$window|$declaration" | hash_pane)
     age=$((now - since))
-    due=0
-    if [ "$owner" -eq 0 ] && [ "$age" -ge "$alert" ]; then due=1; fi
-    if [ "$owner" -gt 1 ] && [ "$parent" -eq 0 ] && [ "$((now - owner))" -ge "$((escalate - alert))" ]; then due=1; fi
     if [ -z "$declaration" ] && [ -n "$old" ] && [ "$misses" -eq 0 ]; then
       fm_wait_timer_save "$record" "$old" "$since" "$owner" "$parent" "$key" 1 || return 1
       continue
