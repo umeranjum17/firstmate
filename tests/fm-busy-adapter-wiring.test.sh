@@ -474,24 +474,20 @@ test_kimi_and_grok_install_no_unverified_wiring() {
   pass "kimi and grok install no unverified semantic wiring and classify through their own gates"
 }
 
-# Drives the real outage scan over a copied lib whose backend liveness is a
-# fixture: a lane that joins an alerted episode must send one updated wake naming
-# the union, and a mid-turn lane whose pane is dead must not join it.
-test_model_outage_staggered_lane_joins_union_wake() {
-  local case_dir="$TMP_ROOT/model-outage-union" bin state wakes expected
-  bin="$case_dir/bin"; state="$case_dir/state"; wakes="$case_dir/wakes"
+# run_outage_fixture <case-dir> <state-dir> <body>: runs the real
+# fm_model_outage_tick from a copied lib over fixture lanes. Backend liveness,
+# the lane verdict, and the wake sink are faked; busy-gen and the native error
+# files are the real on-disk contract. The body calls tick, and lane <id>
+# <verdict> <liveness> [error] to set a lane. Wakes land in <case-dir>/wakes.
+run_outage_fixture() {
+  local case_dir=$1 state=$2 body=$3 bin
+  bin="$case_dir/bin"
   mkdir -p "$bin" "$state" "$case_dir/liveness"
   cp "$ROOT/bin/fm-model-outage-lib.sh" "$ROOT/bin/fm-timeout-lib.sh" "$bin/"
   cat > "$bin/fm-backend.sh" <<'EOF'
 fm_backend_agent_state() { cat "$FAKE_LIVENESS/$4" 2>/dev/null || printf alive; }
 fm_backend_visible_capture_supported() { return 1; }
 EOF
-  lane() {  # <id> <verdict> <liveness>
-    : > "$state/$1.meta"
-    printf '%s\n' "$2" > "$state/$1.verdict"
-    printf '%s\n' "$3" > "$case_dir/liveness/$1"
-    printf '{"gen":"g1","error":"Upstream request failed: region denied"}\n' > "$state/$1.model-error-g1.json"
-  }
   (
     export STATE="$state" FAKE_LIVENESS="$case_dir/liveness"
     # shellcheck source=/dev/null
@@ -499,25 +495,91 @@ EOF
     fm_meta_get() { printf opencode; }
     fm_backend_target_of_meta() { printf 'fake:%s' "${1##*/}"; }
     fm_backend_of_meta() { printf fake; }
-    fm_busy_current_gen() { printf g1; }
     fm_busy_classify_semantic() { cat "$STATE/$4.verdict"; }
     hash_pane() { md5sum | cut -c1-12; }
     wake() { :; }
-    fm_wake_append() { printf '%s\n' "$3" >> "$wakes"; }
+    fm_wake_append() { printf '%s\n' "$3" >> "$case_dir/wakes"; }
+    lane() {  # <id> <verdict> <liveness> [error]
+      : > "$state/$1.meta"
+      printf 'g1\n' > "$state/$1.busy-gen"
+      printf '%s\n' "$2" > "$state/$1.verdict"
+      printf '%s\n' "$3" > "$case_dir/liveness/$1"
+      printf '{"gen":"g1","error":"%s"}\n' "${4-Upstream request failed: region denied}" > "$state/$1.model-error-g1.json"
+    }
     tick() { rm -f "$STATE/.model-outages/.scan-at"; fm_model_outage_tick; }
-    lane alpha "idle opencode-plugin" alive
-    tick
-    lane bravo "idle opencode-plugin" alive
-    lane charlie "busy opencode-plugin" missing
-    tick
-    tick
+    "$body"
   ) || fail "model-outage scans failed"
+}
+
+staggered_union_scans() {
+  lane alpha "idle opencode-plugin" alive
+  tick
+  lane bravo "idle opencode-plugin" alive
+  lane charlie "busy opencode-plugin" missing
+  tick
+  tick
+}
+
+# A lane joining an alerted episode sends one updated wake naming the union; a
+# dead mid-turn lane is not named.
+test_model_outage_staggered_lane_joins_union_wake() {
+  local case_dir="$TMP_ROOT/model-outage-union" expected
+  run_outage_fixture "$case_dir" "$case_dir/state" staggered_union_scans
   expected=$(printf '%s\n' \
     'check: model outage affected=[alpha]: Upstream request failed: region denied' \
     'check: model outage affected=[alpha,bravo]: Upstream request failed: region denied')
-  [ "$(cat "$wakes")" = "$expected" ] \
-    || fail "a lane joining an alerted episode must send one union wake and nothing for a dead lane, got: $(cat "$wakes")"
+  [ "$(cat "$case_dir/wakes")" = "$expected" ] \
+    || fail "a lane joining an alerted episode must send one union wake and nothing for a dead lane, got: $(cat "$case_dir/wakes")"
   pass "a staggered lane joins its alerted outage in one union wake; a dead mid-turn lane is not named"
+}
+
+recovered_lane_scans() {
+  lane alpha "idle opencode-plugin" alive
+  tick
+  lane alpha "idle opencode-plugin" alive ""
+  tick
+  lane bravo "idle opencode-plugin" alive
+  tick
+}
+
+# A lane that recovered after alerting must not be named by a later wake for a
+# lane that is still failing.
+test_model_outage_recovered_lane_leaves_wake() {
+  local case_dir="$TMP_ROOT/model-outage-recovered" expected
+  run_outage_fixture "$case_dir" "$case_dir/state" recovered_lane_scans
+  expected=$(printf '%s\n' \
+    'check: model outage affected=[alpha]: Upstream request failed: region denied' \
+    'check: model outage affected=[bravo]: Upstream request failed: region denied')
+  [ "$(cat "$case_dir/wakes")" = "$expected" ] \
+    || fail "a recovered lane must leave the wake, got: $(cat "$case_dir/wakes")"
+  pass "a recovered lane is dropped from the wake naming the lanes still failing"
+}
+
+errored_then_healthy_turn_scans() {
+  drive_oc_plugin "$plugin" "$(oc_status ses_main busy)" "$error_event" || fail "error drive failed"
+  tick
+  drive_oc_plugin "$plugin" "$(oc_status ses_main busy)" || fail "healthy turn drive failed"
+  tick
+  tick
+}
+
+# A recorded session error must not outlive the next turn: a healthy busy turn
+# spanning more than one scan sends no outage wake.
+test_model_outage_healthy_turn_after_error_does_not_alert() {
+  local rec id=busy-oc-2 state plugin error_event case_dir out
+  rec=$(make_spawn_case oc-healthy-turn opencode "$id")
+  read_case_record "$rec"
+  out=$(run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR")
+  expect_code 0 $? "opencode spawn should succeed: $out"
+  state="$HOME_DIR/state"
+  plugin="$WT_DIR/.opencode/plugins/fm-busy-state.js"
+  error_event='{"type":"session.error","properties":{"sessionID":"ses_main","error":{"data":{"message":"Upstream request failed: region denied"}}}}'
+  case_dir="$TMP_ROOT/model-outage-healthy-turn"
+  printf '%s\n' "busy opencode-plugin" > "$state/$id.verdict"
+  run_outage_fixture "$case_dir" "$state" errored_then_healthy_turn_scans
+  [ ! -e "$case_dir/wakes" ] \
+    || fail "a healthy turn after a recorded error must not alert, got: $(cat "$case_dir/wakes")"
+  pass "a healthy turn after a recorded error clears it and sends no outage wake"
 }
 
 test_pi_extension_semantic_lifecycle
@@ -534,5 +596,7 @@ test_raw_gemini_launch_has_no_semantic_wiring
 test_gemini_is_refused_as_a_secondmate
 test_codex_unverified_until_a_semantic_source_exists
 test_model_outage_staggered_lane_joins_union_wake
+test_model_outage_recovered_lane_leaves_wake
+test_model_outage_healthy_turn_after_error_does_not_alert
 
 echo "all fm-busy-adapter-wiring tests passed"
