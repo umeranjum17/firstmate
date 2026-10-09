@@ -6,7 +6,8 @@ Called by fm-spawn and fm-home-seed under their shared project lock.
 Only entries already in a Treehouse pool for this Git repository are leased;
 copies are never moved, reset or returned. Existing leases are preserved. JSON replacement holds
 Treehouse's own native state lock (flock on POSIX, LockFileEx on Windows).
-Unreadable state or conflicting records refuse allocation.
+Unreadable state or conflicting records refuse allocation. A recorded copy that is
+missing from Treehouse state or marked destroying is skipped with a warning.
 """
 import datetime
 import json
@@ -41,6 +42,10 @@ def lock_state(file):
     if not kernel.LockFileEx(msvcrt.get_osfhandle(file.fileno()), 2, 0, 1, 0, ctypes.byref(Overlapped())):
         raise ctypes.WinError(ctypes.get_last_error())
     # Closing the file releases the lock, on both platforms.
+
+
+def warn_skipped(task, path, reason):
+    print(f"warning: not protecting recorded copy {path} of task {task}: {reason}", file=sys.stderr)
 
 
 def protect(project, states):
@@ -80,16 +85,19 @@ def protect(project, states):
                 path = Path(entry["path"]).resolve()
                 if path not in owners:
                     continue
-                if path in found or entry.get("destroying"):
-                    raise ValueError(f"duplicate or destroying Treehouse entry: {path}")
+                if path in found:
+                    raise ValueError(f"duplicate Treehouse entry: {path}")
                 found.add(path)
+                if entry.get("destroying"):
+                    warn_skipped(owners[path], path, "Treehouse is destroying it")
+                    continue
                 if entry.get("leased"):
                     continue
                 entry.update(leased=True, lease_holder=owners[path],
                              leased_at=datetime.datetime.now(datetime.timezone.utc).isoformat())
                 changed = True
-            if found != set(owners):
-                raise ValueError(f"recorded copies missing from Treehouse state: {set(owners) - found}")
+            for path in set(owners) - found:
+                warn_skipped(owners[path], path, "missing from Treehouse state")
             if changed:
                 temporary = None
                 try:
