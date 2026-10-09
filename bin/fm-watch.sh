@@ -3401,8 +3401,6 @@ EOF
             paused) handle_paused_stale "$w" "$task" "$h" ;;
             *)      clear_pause_tracking "$key" ;;
           esac
-        elif fm_model_outage_reported_idle "$task" && ! stale_is_terminal "$w" "$STATE"; then
-          triage_log "absorbed idle stale (grouped model outage already reported): $w"
         elif afk_present; then
           # Daemon owns triage: one-shot per distinct stale hash, as before,
           # except that a captain-held pane is never handed over while the
