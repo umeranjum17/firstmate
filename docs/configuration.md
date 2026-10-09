@@ -671,8 +671,8 @@ The helper's header owns exact parsing, publication, and report output mechanics
 On Herdr, agents across homes share the server's service cgroup, so an out-of-memory kill of that unit stops the whole fleet.
 The host memory guard reads available memory, swap, host-wide pressure, and the pressure of the user `app.slice`, the cgroup systemd-oomd watches and agents run in.
 Admission and interrupts classify by `app.slice` pressure and available memory; host-wide pressure never does.
-Pressure is the share of time some process waited on memory, taken as the lower of its 10-second and 60-second averages, so a spike of a few seconds does not hold launches while pressure held for about a minute does.
-A 10-second average at or above the alert level alone raises an alert at once, so a fast ramp is not held back by the slower average.
+Pressure is the share of time some process waited on memory, taken as the lower of its 10-second and 60-second averages, so a spike of a few seconds does not alert or hold launches while pressure held for about a minute does.
+A 10-second average at or above the alert level alone holds new launches at once (`WAIT`) but never alerts or interrupts a task, so a fast ramp is not held back by the slower average.
 Capped heavy-job slices such as `fm.slice` are not read, so their thrash holds agent launches only when it also stalls the agents.
 Host-wide pressure stays in the summary as context and never holds admission, wakes Main, or interrupts a task.
 Unreadable `app.slice` pressure is reported as not judged: pressure then holds nothing and interrupts nothing, while available memory still applies.
@@ -704,7 +704,7 @@ Each setting is `key=number`, blank lines and lines beginning with `#` are ignor
 | --- | --- | --- |
 | `wait_pressure` | `20` | new agents wait while `app.slice` pressure is at or above this percentage |
 | `wait_available_gb` | `12` | new agents wait while available memory is below this many GB |
-| `alert_pressure` | `35` | the sampler alerts while `app.slice` pressure, or its 10-second average alone, is at or above this percentage |
+| `alert_pressure` | `35` | the sampler alerts while `app.slice` pressure is at or above this percentage; its 10-second average alone at or above it waits instead |
 | `alert_available_gb` | `6` | the sampler alerts while available memory is below this many GB |
 
 Thresholds must be finite, nonnegative numbers.

@@ -202,11 +202,29 @@ test_watcher_wakes_once_per_alert_episode() {
   pass "the watcher samples memory and interrupts once per alert episode, naming the largest task"
 }
 
+test_fast_spike_waits_without_alert() {
+  local case out rc app="user.slice/user-$(id -u).slice/user@$(id -u).service/app.slice"
+  case=$(make_case fast-spike)
+  make_fleet "$case"
+  prepare_control_task "$case"
+  fake_host "$case/proc" 20 2
+  printf 'some avg10=40 avg60=10 avg300=2 total=1\n' > "$case/cgroup/$app/memory.pressure"
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build --state "$case/state"); rc=$?
+  [ "$rc" -eq 1 ] || fail "a 10 s spike with ample memory admitted work: $out"
+  watch_leg "$case" fast-spike default
+  wait_rows "$case/state/host-memory.tsv" 2
+  is_live_non_zombie "$LEG_PID" || fail "a 10 s spike woke Main: $(cat "$case/watch-fast-spike.out")"
+  assert_equals WAIT "$(cut -f5 "$case/state/host-memory.tsv" | sort -u)" "a 10 s spike records WAIT, not ALERT"
+  [ ! -e "$case/keys" ] || fail "a 10 s spike interrupted a task: $(cat "$case/keys")"
+  kill -TERM "$LEG_PID" 2>/dev/null; wait_for_exit "$LEG_PID" 50 >/dev/null || true
+  pass "a 10 s app.slice spike with ample memory waits without alerting or interrupting"
+}
+
 test_cgroup_pressure() {
   local case=$TMP_ROOT/cgroup out rc app="user.slice/user-$(id -u).slice/user@$(id -u).service/app.slice"
   mkdir -p "$case/cgroup/$app" "$case/state"
   fake_host "$case/proc" 40 2
-  # A 10 s spike that the sustained average has not caught up with still holds at the alert level.
+  # A 10 s spike that the sustained average has not caught up with holds admission as WAIT.
   printf 'some avg10=60 avg60=8 avg300=2 total=1\n' > "$case/cgroup/$app/memory.pressure"
   out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build --state "$case/state"); rc=$?
   [ "$rc" -eq 1 ] || fail "a fast app.slice spike admitted work: $out"
@@ -727,6 +745,7 @@ SH
 
 test_verdicts_samples_and_owners
 test_cgroup_pressure
+test_fast_spike_waits_without_alert
 test_host_pressure_neither_holds_nor_wakes
 test_home_qualified_owners
 test_homes_without_ordinary_tasks

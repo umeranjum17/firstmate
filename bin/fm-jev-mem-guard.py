@@ -10,7 +10,7 @@ Host-wide pressure aggregates capped heavy-job slices by design, so it is summar
 context only and never gates admission or alerts.
 Pressure is sustained "some" pressure, the lower of the 10 s and 60 s averages,
 so a short spike does not hold launches while pressure held for about a minute does;
-a 10 s average at or above alert_pressure holds at once.
+a 10 s average at or above alert_pressure holds at once as WAIT, never ALERT.
 Unreadable app.slice pressure is not judged: pressure then holds nothing, while available memory still applies.
 Admission refusal and sampler interrupts cannot guarantee avoidance of an oomd kill.
 
@@ -144,15 +144,14 @@ def verdict(s, cfg):
     for level in ("alert", "wait"):
         threshold = cfg[f"{level}_pressure"]
         why = []
-        if s["pressure"] is not None:
-            if s["pressure"] >= threshold:
-                why.append(f"pressure at or above {threshold:g}%")
-            elif level == "alert" and s["fast"] >= threshold:
-                why.append(f"10 s pressure at or above {threshold:g}%")
+        if s["pressure"] is not None and s["pressure"] >= threshold:
+            why.append(f"pressure at or above {threshold:g}%")
         if gb < cfg[f"{level}_available_gb"]:
             why.append(f"available memory below {cfg[f'{level}_available_gb']:g} GB")
         if why:
             return level.upper(), why
+    if s["pressure"] is not None and s["fast"] >= cfg["alert_pressure"]:
+        return "WAIT", [f"10 s pressure at or above {cfg['alert_pressure']:g}%"]
     return "OK", []
 
 
