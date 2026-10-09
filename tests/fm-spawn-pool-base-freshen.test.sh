@@ -761,7 +761,8 @@ test_pool_slot_still_recorded_by_another_task_refuses() {
   [ "$status" -ne 0 ] || fail "spawn launched on a slot another task record still names"
   assert_contains "$out" "task live-owner still records it as its worktree" \
     "spawn did not name the task whose record owns the slot"
-  [ ! -e "$HOME_DIR/state/$id.meta" ] || fail "spawn published a record for a slot another task owns"
+  [ ! -e "$HOME_DIR/state/$id.meta" ] || grep -qx 'cleanup_recovery=treehouse' "$HOME_DIR/state/$id.meta" ||
+    fail "spawn published a launch record for a slot another task owns"
   [ ! -e "$SLOT_CLAIM" ] || fail "spawn claimed a slot another task owns: $(cat "$SLOT_CLAIM")"
   [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$before" ] || fail "spawn moved the owned slot's HEAD"
   pass "a spawn refuses a Treehouse slot that another task's record still names"

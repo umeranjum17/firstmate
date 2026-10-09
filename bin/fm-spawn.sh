@@ -1341,7 +1341,7 @@ parse_orca_worktree_result() {
 }
 
 spawn_abort_cleanup() {
-  local status=$? lease_owner_rc=0
+  local status=$?
   if [ "$RELAUNCH_REPLACEMENT_PENDING" = 1 ] &&
     [ "$SPAWN_META_PUBLISH_STARTED" = 1 ] &&
     [ -n "$SPAWN_META_TMP" ] &&
@@ -1440,10 +1440,6 @@ spawn_abort_cleanup() {
   # Failed launches keep their durable lease for explicit teardown, not an
   # unrecorded reservation or an automatic reset of potentially unlanded work.
   if [ -n "$SPAWN_TREEHOUSE_LEASE" ] && [ ! -e "$STATE/$ID.meta" ] && [ ! -L "$STATE/$ID.meta" ]; then
-    fm_slot_record_owner "$SPAWN_TREEHOUSE_LEASE" "$STATE" "$STATE/$ID.meta" || lease_owner_rc=$?
-  fi
-  if [ -n "$SPAWN_TREEHOUSE_LEASE" ] && [ "$lease_owner_rc" = 1 ] &&
-    [ ! -e "$STATE/$ID.meta" ] && [ ! -L "$STATE/$ID.meta" ]; then
     SPAWN_META_TMP="$STATE/.$ID.meta.treehouse-recovery.${BASHPID:-$$}"
     {
       printf 'window=%s\nendpoint_task_id=%s\ncleanup_recovery=treehouse\n' "${T:-}" "$ID"
