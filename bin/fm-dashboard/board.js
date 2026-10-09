@@ -11,7 +11,7 @@ const HomePill = ({ d, id }) => html`<span class="pill"><span class="sq" style=$
 export function Card({ d, c, open, home }) {
   const st = state(c), a = age(c), n = prNum(c.pr), why = reason(c)
   return html`<article class="card" role="button" tabindex="0" data-card=${c.id} onClick=${() => open(c.id)} onKeyDown=${e => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); open(c.id) } }}>
-    <div class="r1"><span class="id">${c.task}</span>${a != null ? html`<span class="num">${c.stage === 'landed' ? hm(c.since) : dur(a)}</span>` : ''}<${Av} m=${c.model}/></div>
+    <div class="r1"><span class="id">${c.task}</span><span class="who"><${Av} m=${c.model} size=${14}/><span class="mn">${mname(c.model, d)}</span></span>${a != null ? html`<span class="num age">${c.stage === 'landed' ? hm(c.since) : dur(a)}</span>` : ''}</div>
     <h3>${c.title}</h3>
     ${why ? html`<p class="why">${why}</p>` : ''}
     <div class="r3">${st ? html`<span class="pill st"><i style=${{ '--c': st[1] }}></i>${st[0]}</span>` : ''}${home ? '' : html`<${HomePill} d=${d} id=${c.home}/>`}${c.kind === 'scout' ? html`<span class="pill">Scout</span>` : ''}
@@ -42,22 +42,25 @@ export function Board({ d, cards, r, open }) {
         <div class="row">${stages.map(s => html`<div class="col">${sorted(cs.filter(c => c.stage === s)).map(c => html`<${Card} key=${c.id} d=${d} c=${c} open=${open} home/>`)}</div>`)}</div>` })}</div>`
 }
 
-// --- phone: Linear mobile rows -----------------------------------------
-function Row({ d, c, open }) {
-  const st = state(c), a = age(c), n = prNum(c.pr)
-  return html`<article class="li" role="button" tabindex="0" data-card=${c.id} onClick=${() => open(c.id)} onKeyDown=${e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(c.id) } }}>
-    <${Av} m=${c.model} size=${20}/>
-    <div class="tx"><div class="t"><h3>${c.title}</h3>${a != null ? html`<span class="age num">${c.stage === 'landed' ? hm(c.since) : dur(a)}</span>` : ''}</div>
-      <p>${st ? html`<i style=${{ '--c': st[1] }}></i><b>${st[0]}</b> · ${reason(c)}` : html`<b>${hname(d, c.home)}</b> · ${c.task}${n ? ` · #${n}` : ''}`}</p></div></article>`
-}
-export function List({ d, cards, r, open }) {
-  const groups = r.tab === 'active' || r.tab === 'all' ? (r.tab === 'all' ? STAGES : ACTIVE).map(s => [s, stageHead(s), cards.filter(c => c.stage === s)])
-    : d.homes.map(h => [h.id, homeHead(d, h.id), cards.filter(c => c.home === h.id)])
-  const shown = groups.filter(([, , cs]) => cs.length)
-  if (!shown.length) return html`<div class="none"><p>No recorded lanes match.</p></div>`
-  return shown.map(([k, head, cs]) => { const n = cs.filter(stuck).length
-    return html`<div class="gh" key=${k}><span class="n"><${Caret}/></span>${head}<span class="n num">${total(d, cs.length, r.tab === 'all' || r.tab === 'active' ? k : r.tab)}</span><span class="sp"></span>${n ? html`<span class="hot">${total(d, n)} stuck</span>` : ''}</div>
-      ${sorted(cs).map(c => html`<${Row} key=${c.id} d=${d} c=${c} open=${open}/>`)}` })
+// --- phone: a mobile kanban, one status column at a time (Linear/Jira mobile) --------
+// A sticky switcher with counts jumps the horizontal, scroll-snapped columns to any status.
+export function MobileKanban({ d, cards, r, open }) {
+  const byStage = r.tab === 'active' || r.tab === 'all', stages = r.tab === 'all' ? STAGES : ACTIVE
+  const label = (s, n) => total(d, n, byStage ? s : r.tab)
+  const cols = (byStage
+    ? stages.map(s => ({ key: s, name: SNAME[s], head: stageHead(s), cs: sorted(cards.filter(c => c.stage === s)), home: false }))
+    : d.homes.map(h => ({ key: h.id, name: hname(d, h.id), head: homeHead(d, h.id), cs: sorted(cards.filter(c => c.home === h.id)), home: true })))
+    .filter(c => c.cs.length)
+  const [i, setI] = useState(0), ref = useRef()
+  const jump = k => { setI(k); ref.current?.children[k]?.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' }) }
+  const onScroll = () => { const el = ref.current; if (el) { const k = Math.min(cols.length - 1, Math.round(el.scrollLeft / (el.scrollWidth / cols.length))); if (k !== i) setI(k) } }
+  useEffect(() => { if (i >= cols.length) setI(Math.max(0, cols.length - 1)) }, [cols.length])
+  if (!cols.length) return html`<div class="none"><p>No recorded lanes match.</p></div>`
+  return html`<div class="mk">
+    <div class="mseg" role="tablist">${cols.map((c, k) => html`<button key=${c.key} role="tab" aria-selected=${i === k} onClick=${() => jump(k)}>${c.name}<small class="num">${label(c.key, c.cs.length)}</small></button>`)}</div>
+    <div class="mcols" ref=${ref} onScroll=${onScroll}>${cols.map(c => html`<section class="mcol" key=${c.key}><header class="ch">${c.head}<span class="n num">${label(c.key, c.cs.length)}</span></header>
+      ${c.cs.map(x => html`<${Card} key=${x.id} d=${d} c=${x} open=${open} home=${c.home}/>`)}</section>`)}</div>
+  </div>`
 }
 
 // --- card detail -----------------------------------------------------------
