@@ -292,6 +292,7 @@ Codex App support is recorded in `docs/codex-app-backend.md`; it is not selectab
 
 Crewmates never intentionally touch your project clone; [treehouse](https://github.com/kunchenguid/treehouse) pools clean worktrees for tmux, herdr, zellij, and cmux tasks, while Orca creates its own worktrees for `backend=orca`.
 The [`fm-spawn.sh` header](../bin/fm-spawn.sh) owns ship/scout durable allocation, failed-launch recovery, worktree isolation, and fresh-base refusal rules, including spawns from linked homes.
+Before any pool copy is allocated, spawn and home seed lease every recorded copy in that project's pool through [`bin/fm-treehouse-protect.py`](../bin/fm-treehouse-protect.py), because treehouse's own liveness is process-based and would show a copy whose task's launching shell has exited as free; the lease, not a process check, keeps a live task's copy from being handed out. The script's docstring owns the skip and refusal rules.
 Portable regressions live in [`tests/fm-spawn-pool-base-freshen.test.sh`](../tests/fm-spawn-pool-base-freshen.test.sh) for spawn isolation and base freshness, and [`tests/fm-control-relaunch.test.sh`](../tests/fm-control-relaunch.test.sh) for preserving the recorded copy on relaunch.
 
 The firstmate repo has one extra exposure because it can dispatch crewmates to work on itself.
