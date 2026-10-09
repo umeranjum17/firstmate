@@ -382,6 +382,32 @@ test_finite_thresholds() {
   pass "all thresholds reject non-finite numbers"
 }
 
+test_alert_rearms_after_wait() {
+  local case i=0 tsv
+  case=$(make_case rearm)
+  make_fleet "$case"
+  prepare_control_task "$case"
+  tsv=$case/state/host-memory.tsv
+  fake_host "$case/proc" 5 41.2 16
+  watch_leg "$case" first default
+  wait_for_exit "$LEG_PID" 50 || fail "the first alert did not wake Main: $(cat "$case/watch-first.err")"
+  wait_interrupt "$case/state"
+  drain_and_ack "$case"
+  fake_host "$case/proc" 30 24 3
+  watch_leg "$case" wait default
+  until [ "$(tail -n 1 "$tsv" 2>/dev/null | cut -f5)" = WAIT ] || [ "$i" -ge 100 ]; do sleep 0.1; i=$((i + 1)); done
+  [ "$(tail -n 1 "$tsv" 2>/dev/null | cut -f5)" = WAIT ] || fail "the watcher did not record a WAIT sample"
+  is_live_non_zombie "$LEG_PID" || fail "a WAIT sample woke Main: $(cat "$case/watch-wait.out")"
+  kill -TERM "$LEG_PID" 2>/dev/null; wait_for_exit "$LEG_PID" 50 >/dev/null || true
+  fake_host "$case/proc" 5 41.2 16
+  drain_and_ack "$case"
+  watch_leg "$case" rearm default
+  wait_for_exit "$LEG_PID" 100 || fail "an alert after a WAIT sample did not wake Main: $(cat "$case/watch-rearm.err")"
+  wait_interrupt "$case/state" 2
+  [ "$(wc -l < "$case/keys")" -eq 2 ] || fail "the re-armed alert did not interrupt once more: $(cat "$case/keys")"
+  pass "a WAIT sample ends an alert episode so a later alert wakes and interrupts again"
+}
+
 test_benign_liveness_outcomes() {
   local case pid real_ln
   case=$(make_case deferred)
@@ -708,6 +734,7 @@ test_remote_records_do_not_own_local_processes
 test_overridden_state_ownership
 test_finite_thresholds
 test_watcher_wakes_once_per_alert_episode
+test_alert_rearms_after_wait
 test_benign_liveness_outcomes
 test_default_home_interrupt
 test_independent_sampler_lifecycle

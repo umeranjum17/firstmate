@@ -670,7 +670,7 @@ The helper's header owns exact parsing, publication, and report output mechanics
 
 On Herdr, agents across homes share the server's service cgroup, so an out-of-memory kill of that unit stops the whole fleet.
 The host memory guard reads available memory, swap, host-wide pressure, and the pressure of the user `app.slice`, the cgroup systemd-oomd watches and agents run in.
-Admission and interrupts classify by `app.slice` pressure alone.
+Admission and interrupts classify by `app.slice` pressure and available memory; host-wide pressure never does.
 Pressure is the share of time some process waited on memory, taken as the lower of its 10-second and 60-second averages, so a spike of a few seconds does not hold launches while pressure held for about a minute does.
 A 10-second average at or above the alert level alone raises an alert at once, so a fast ramp is not held back by the slower average.
 Capped heavy-job slices such as `fm.slice` are not read, so their thrash holds agent launches only when it also stalls the agents.
@@ -693,7 +693,7 @@ These controls reduce risk but cannot guarantee avoidance of an out-of-memory ki
   Failed wake publication leaves the next sample eligible, including after a sampler restart; an older episode's queued wake does not suppress a new episode's wake.
   After successful alert output, the watcher records that row's identity so its unacknowledged alert cannot immediately close the handling successor; later reminders use the [local queue backstop](watcher-continuity.md#durable-queue-and-turn-end-backstop), and only post-handling acknowledgement retires the row.
   Interrupt delivery runs independently of subsequent samples and appends its completion result to the interrupt log.
-  An OK sample ends the episode.
+  A WAIT or OK sample ends the episode, so a later ALERT wakes Main and attempts its interrupt again.
 - Local secondmate liveness recovery checks admission before consuming its retry budget or removing a dead endpoint, so memory deferral leaves recovery eligible when pressure eases.
   Memory deferral and a no-longer-relaunchable endpoint keep the watcher polling rather than failing supervision.
 
