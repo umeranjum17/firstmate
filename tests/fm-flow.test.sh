@@ -53,6 +53,7 @@ assert live['state_seconds'] == {'working': 20, 'needs-decision': 5, 'blocked': 
 closed = x['executed_24h'][0]
 assert len(x['executed_24h']) == 1 and closed['durations']['time_to_merge'] == 60
 assert closed['durations']['merge_to_cleanup'] == 10
+assert closed['state_seconds'] == {'working': 50}, 'the trailing stage runs to the merge'
 assert 'pr_opened' not in closed['times'] and 'checks_green' not in closed['times']
 assert x['time_to_merge']['median_seconds'] == x['time_to_merge']['p85_seconds'] == 60
 assert {q['task']: q['why'] for q in x['queue']} == {'next': 'dependency: prior', 'held': 'hold: Wait for Umer',

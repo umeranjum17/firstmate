@@ -302,10 +302,12 @@ for name, home in sorted(homes.items()):
             trailing.append(e)
         start = trailing[-1]['ts'] if trailing else None
         state_seconds = {}
-        for a, b in zip(status, status[1:]):
-            if working is not None and a.get('state') and isinstance(a.get('ts'), int) and isinstance(b.get('ts'), int) \
-                    and working <= a['ts'] and b['ts'] <= (times['merged'] or NOW):
-                state_seconds[a['state']] = state_seconds.get(a['state'], 0) + b['ts'] - a['ts']
+        merged_at = times['merged']
+        for a, b in zip(status, status[1:] + [dict(ts=merged_at)]):
+            end = min(b['ts'], merged_at) if merged_at is not None and isinstance(b.get('ts'), int) else b.get('ts')
+            if working is not None and a.get('state') and isinstance(a.get('ts'), int) and isinstance(end, int) \
+                    and working <= a['ts'] < end:
+                state_seconds[a['state']] = state_seconds.get(a['state'], 0) + end - a['ts']
         row = {'home': name, 'task': task, 'open': task in live, 'stage': state,
                'seconds_in_stage': age(start), 'reason': last.get('text') or 'unknown: no status reason',
                'timestamp_basis': basis, 'open_waits': [dict(key=k, since=e['ts'],
