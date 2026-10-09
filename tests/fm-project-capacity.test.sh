@@ -100,6 +100,8 @@ SH
   cat > "$fakebin/treehouse" <<'SH'
 #!/usr/bin/env bash
 printf 'treehouse %s\n' "$*" >> "$FM_FAKE_CALL_LOG"
+# A lease prints the leased copy's path; spawn refuses an empty answer.
+case "${1:-}" in get) printf '%s\n' "${FM_FAKE_PANE_PATH:-}" ;; esac
 exit 0
 SH
   chmod +x "$fakebin/tmux" "$fakebin/treehouse"
