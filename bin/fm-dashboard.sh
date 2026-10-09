@@ -1631,9 +1631,8 @@ if flow_text is not None:
             raise ValueError('unsupported flow observation format')
         for row in flow['lanes'] + flow['queue'] + flow['executed_24h'] + flow['executed_7d']:
             h, task = row['home'], row['task']
-            row.get('stage_clock', {}).pop('source', None)
             row['display_title'] = titles.get((h, task)) or re.sub(r'\s+PR \d+$', '', done_title.get((h, task), '')) or 'Task name not recorded'
-            row['display_reason'] = prose(row.pop('reason', ''))
+            row['display_reason'] = prose(row.get('reason', ''))
             why = row.get('why', '')
             if why.startswith('dependency:'):
                 row['display_why'] = 'Waiting for: ' + ', '.join(titles.get((h, t.strip()), 'earlier work (name unavailable)') for t in why[11:].split(','))
@@ -1642,23 +1641,29 @@ if flow_text is not None:
             if why:
                 row['why'] = why.partition(':')[0] + ':'
             for wait in row.get('open_waits', []):
-                wait['display_reason'] = prose(wait.pop('reason', ''))
+                wait['display_reason'] = prose(wait.get('reason', ''))
             row['pr'] = next((url for url, (at, mh, mt) in merges.items()
                               if (mh, mt) == (h, task) and at == row.get('times', {}).get('merged')), None)
-        for job in (flow.get('capacity') or {}).get('jobs', []):
+        flow['limitations'] = len(flow['limitations'])
+        cap = flow.get('capacity') or {}
+        for job in cap.get('jobs', []):
             if job['owner']:
                 job['owner']['display_title'] = titles.get((job['owner']['home'], job['owner']['task'])) or 'Task name not recorded'
-        flow['limitations'] = [dict(reason=n['reason'] if n['source'] == 'coverage' else 'Source notice') for n in flow['limitations']]
-        (flow.get('capacity') or {}).pop('gate_source', None)
-        mac = (flow.get('capacity') or {}).get('mac') or {}
+        mac = cap.get('mac') or {}
         for key in ('simulators', 'android_pids'):
             if isinstance(mac.get(key), list):
                 mac[key] = len(mac[key])
-        mac.pop('errors', None)
-        for folder in (flow.get('capacity') or {}).get('tmp', {}).get('top_folders') or []:
+        for folder in cap.get('tmp', {}).get('top_folders') or []:
             folder['display_name'] = os.path.basename(folder.pop('path'))
     except (ValueError, KeyError, TypeError):
         flow, flow_error = None, 'Flow observations unreadable'
+def scrub(node):
+    if isinstance(node, dict):
+        for key in ('reason', 'source', 'gate_source', 'errors'):
+            node.pop(key, None)
+        for value in node.values(): scrub(value)
+    elif isinstance(node, list):
+        for value in node: scrub(value)
 board = dict(
     schema='fm-dashboard-board.v1', generated=int(NOW_TS), stages=[dict(id=s, name=n) for s, n in STAGES],
     homes=[dict(id=h, name=hname(h), plan=plan(h), open=sum(c['home'] == h and c['stage'] not in ('queued', 'landed') for c in cards), ready=len(bl(h, 'ready')) if backlog.get(h) is not None else None,
@@ -1666,6 +1671,7 @@ board = dict(
     parked=PARKED, cards=cards, flow=flow, flow_error=flow_error,
     asks=[dict(id=f[0], text=f[2], url=f[3] if len(f) > 3 else '', age=a) for f, a in asks] if asks_known else None,
     landed=LANDED, cycle_p50=cycles[(len(cycles) - 1) // 2] if len(cycles) >= 5 else None)
+scrub(board)
 with open(os.path.join(OUT, 'board.json'), 'w', encoding='utf-8') as fh:
     json.dump(board, fh, ensure_ascii=False, allow_nan=False, separators=(',', ':'))
 PY

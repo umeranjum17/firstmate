@@ -244,7 +244,7 @@ function Palette({ d, go, close, toggleTheme }) {
   const [q, setQ] = useState(''), [i, setI] = useState(0), input = useRef()
   useEffect(() => input.current?.focus(), [])  // autofocus is ignored while a card holds focus
   const groups = [
-    ['Go to', [['board', 'Board'], ['overview', 'Overview'], ['insights', 'Insights'], ['needs', 'Needs you'], ['ship', 'Ship']].map(([v, n]) => ({ n, k: `G ${n[0]}`, run: () => go({ view: v, card: null }) }))],
+    ['Go to', [['board', 'Board'], ['overview', 'Overview'], ['insights', 'Insights'], ['needs', 'Needs you'], ['ship', 'Ship']].map(([v, n]) => ({ n, k: v === 'insights' ? '' : `G ${n[0]}`, run: () => go({ view: v, card: null }) }))],
     ['Actions', [
       { n: 'Show stuck lanes', run: () => go({ view: 'board', tab: 'active', state: ['blocked', 'decision'], card: null }) },
       { n: 'Group rows by home', k: '⇧G', run: () => go({ view: 'board', rows: 'home' }) },
@@ -270,7 +270,7 @@ function Palette({ d, go, close, toggleTheme }) {
       return html`<li class="opt" aria-selected=${i === j} onMouseMove=${() => i !== j && setI(j)} onClick=${() => { a.run(); close() }}>${a.i || ''}<span class="lt">${a.n}</span>${a.k ? html`<small class=${a.bad ? 'bad' : ''}>${a.k}</small>` : ''}</li>` })}`)}
       ${!flat.length && html`<li class="pop-h">Nothing matches</li>`}</ul></div>`
 }
-const KEYS = [['⌘K or /', 'Search and jump'], ['G then B, I, N, S', 'Board, Insights, Needs you, Ship'], ['H J K L or arrows', 'Move between cards'], ['Enter', 'Open the card'],
+const KEYS = [['⌘K or /', 'Search and jump'], ['G then B, N, S', 'Board, Needs you, Ship'], ['H J K L or arrows', 'Move between cards'], ['Enter', 'Open the card'],
   ['J K in a card', 'Next and previous lane'], ['Esc', 'Close'], ['⇧G', 'Rows by home on or off'], ['T', 'Light or dark theme'], ['?', 'This list']]
 function Shortcuts({ close }) {
   const ref = useRef(); useEffect(() => ref.current?.focus(), [])
@@ -298,7 +298,7 @@ function useKeys(r, go, setPal, setKeys, toggleTheme, pal, keys) {
       if (e.metaKey || e.ctrlKey) return
       if (e.key === '/') { e.preventDefault(); return setPal(true) }
       if (e.key === '?') return setKeys(true)
-      if (g) { g = false; const v = { b: 'board', i: 'insights', n: 'needs', s: 'ship' }[e.key]; if (v) go({ view: v, card: null }); return }
+      if (g) { g = false; const v = { b: 'board', n: 'needs', s: 'ship' }[e.key]; if (v) go({ view: v, card: null }); return }
       if (e.key === 'g') { g = true; setTimeout(() => g = false, 900); return }
       if (e.key === 'G') return go({ view: 'board', rows: r.rows ? '' : 'home' })
       if (e.key === 't') return toggleTheme()

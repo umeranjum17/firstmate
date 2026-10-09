@@ -582,7 +582,8 @@ const bravo = all(screen, n => n.attrs['data-card'] === 'main/b')[0]
 bravo.listeners.click.call(bravo, { type: 'click' }); assert.equal(phoneOpened, 'main/b')
 phoneOpened = null; bravo.listeners.keydown.call(bravo, { type: 'keydown', key: 'Enter', target: bravo, currentTarget: bravo, preventDefault() {} }); assert.equal(phoneOpened, 'main/b')
 JS
-  jq -e 'any(.flow.limitations[]; .reason == "Source notice") and (.flow | tostring | contains("/state") | not) and .flow.time_to_merge.unknown == 0 and (.flow.executed_7d | length) == 1' "$d/board.json" >/dev/null || fail "unavailable remote records became ghost observations or leaked host paths"
+  jq -e '.flow.limitations > 0 and .flow.time_to_merge.unknown == 0 and (.flow.executed_7d | length) == 1' "$d/board.json" >/dev/null || fail "unavailable remote records became ghost observations"
+  jq -e --arg h "$home" '[.. | strings | select(contains($h) or contains("/home/") or contains("/Users/"))] | length == 0' "$d/board.json" >/dev/null || fail "board.json carries host paths or raw status text: $(jq -c --arg h "$home" '[.. | strings | select(contains($h) or contains("/home/") or contains("/Users/"))]' "$d/board.json" | cut -c1-300)"
   pass "board.json carries stages, waits, ask list and shipped flow observations; known durations, unknown lifecycle splits, queue why-lines and read-only capacity remain distinct"
 }
 

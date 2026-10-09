@@ -73,6 +73,6 @@ export function Insights({ d }) {
         <${Rows} title=${`${c?.jobs.length ?? 'Unknown'} observed emulator/Gradle processes · memory and recorded owner`}>${c?.jobs.map(j => html`<${Row} name=${({ emulator: 'Emulator', gradle_gate_match: 'Gradle gate match', gradle_daemon: 'Gradle daemon', gradle_client: 'Gradle client' })[j.kind] + ` · process ${j.pid}`} value=${bytes(j.rss_bytes)} title=${`${number(j.rss_bytes)} bytes`} note=${j.owner ? `${hname(d, j.owner.home)} · ${title(j.owner)}` : 'Owner unknown'}/>`)}<p class="i-note">Census ${c?.census_complete === true ? 'complete' : 'unknown or incomplete'}.</p></${Rows}>
         <${Rows} title=${`Observed /tmp folders · ${tmp?.top_folders_complete === true ? 'complete' : 'partial or unknown'}`}>${tmp?.top_folders?.map((p, i) => html`<${Row} name=${p.display_name || `Observed folder ${i + 1}`} value=${p.bytes == null ? `≥ ${bytes(p.known_bytes)}` : bytes(p.bytes)} title=${`${number(p.known_bytes)} readable bytes`} note=${p.bytes == null ? 'Lower bound' : undefined}/>`)}</${Rows}>
       </section></div>
-    <p class="i-note">${f.limitations.length} coverage notices</p>
+    <p class="i-note">${f.limitations} coverage notices</p>
   </div>`
 }
