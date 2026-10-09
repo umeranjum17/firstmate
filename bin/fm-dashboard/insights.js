@@ -24,8 +24,10 @@ function Trend({ days }) {
 function Lifecycle({ lane }) {
   if (!lane) return html`<p class="i-note">Choose a task.</p>`
   const t = lane.times, before = lane.durations.pickup_to_working, total = lane.durations.time_to_merge
+  const stages = Object.entries(lane.state_seconds).map(([s, v]) => [STAGES[s] || 'Other recorded state', v])
+  const spent = stages.reduce((n, [, v]) => n + v, 0)
   const parts = before != null && (total == null || total >= before)
-    ? [['Pickup → working', before], ['Working → merge (not split further)', total == null ? null : total - before]] : [['Pickup → merge (not split)', total]]
+    ? [['Pickup → working', before], ...stages, ...(total == null ? [] : [['Not split further', total - before - spent]])] : [['Pickup → merge (not split)', total]]
   const max = parts.reduce((n, [, v]) => n + (v || 0), 0)
   return html`<div class="i-stack" aria-label="Known pickup to merge intervals">${parts.filter(([, v]) => v != null && v > 0).map(([name, v], i) => html`<i class=${'i-series-' + i} style=${{ flex: v / (max || 1) }} title=${`${name}: ${seconds(v)}`}></i>`)}</div>
     <div class="i-rows">${parts.map(([name, v]) => html`<${Row} name=${name} value=${seconds(v)}/>`)}

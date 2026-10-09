@@ -301,13 +301,18 @@ for name, home in sorted(homes.items()):
                 break
             trailing.append(e)
         start = trailing[-1]['ts'] if trailing else None
+        state_seconds = {}
+        for a, b in zip(status, status[1:]):
+            if working is not None and a.get('state') and isinstance(a.get('ts'), int) and isinstance(b.get('ts'), int) \
+                    and working <= a['ts'] and b['ts'] <= (times['merged'] or NOW):
+                state_seconds[a['state']] = state_seconds.get(a['state'], 0) + b['ts'] - a['ts']
         row = {'home': name, 'task': task, 'open': task in live, 'stage': state,
                'seconds_in_stage': age(start), 'reason': last.get('text') or 'unknown: no status reason',
                'timestamp_basis': basis, 'open_waits': [dict(key=k, since=e['ts'],
                    seconds=age(e['ts']), reason=e.get('text') or '',
                    cause=cause(k, e))
                    for k, e in sorted(waits.items())],
-               'times': dict(times, working=working),
+               'times': dict(times, working=working), 'state_seconds': state_seconds,
                'durations': {'pickup_to_working': age(times['dispatched'], working),
                    'time_to_merge': age(times['dispatched'], times['merged']),
                    'merge_to_cleanup': age(times['merged'], times['cleaned_up'])}}
@@ -464,13 +469,10 @@ def machine_capacity():
     slice_data = {k: int(heavy_values[k]) if loaded and heavy_values.get(k, '').isdigit() else None
                   for k in ('MemoryCurrent', 'MemoryMax')}
     slice_data['unlimited'] = heavy_values.get('MemoryMax') == 'infinity' if loaded else None
-    tmp = {'ram_backed': None, 'filesystem_total_bytes': None, 'filesystem_available_bytes': None,
-           'filesystem_used_bytes': None, 'directory_bytes': None, 'known_directory_bytes': None,
-           'top_folders': None, 'top_folders_complete': None}
+    tmp = {'ram_backed': None, 'filesystem_used_bytes': None, 'top_folders': None, 'top_folders_complete': None}
     try:
         fs = os.statvfs('/tmp')
-        tmp.update(filesystem_total_bytes=fs.f_blocks * fs.f_frsize, filesystem_available_bytes=fs.f_bavail * fs.f_frsize,
-                   filesystem_used_bytes=(fs.f_blocks - fs.f_bfree) * fs.f_frsize)
+        tmp['filesystem_used_bytes'] = (fs.f_blocks - fs.f_bfree) * fs.f_frsize
         mounts = []
         for line in read(Path('/proc/self/mountinfo')) or []:
             left, sep, right = line.partition(' - ')
@@ -488,10 +490,8 @@ def machine_capacity():
     full = len(notes) == previous_notes
     if folders is not None:
         values = [l.partition('\t') for l in folders.split('\0') if l]
-        totals = [int(n) * 1024 for n, sep, p in values if sep and n.isdigit() and p == '/tmp']
+        totals = [p for n, sep, p in values if sep and n.isdigit() and p == '/tmp']
         if len(totals) == 1 and all(sep and n.isdigit() for n, sep, _ in values):
-            tmp['directory_bytes'] = totals[0] if full else None
-            tmp['known_directory_bytes'] = totals[0]
             tmp['top_folders_complete'] = full
             tmp['top_folders'] = sorted([dict(path=p, bytes=int(n) * 1024 if full else None,
                                              known_bytes=int(n) * 1024) for n, _, p in values

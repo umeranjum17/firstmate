@@ -49,6 +49,7 @@ live = next(l for l in x['lanes'] if l['task'] == 'live')
 assert live['seconds_in_stage'] == 50 and len(live['open_waits']) == 1
 assert live['open_waits'][0]['seconds'] == 80, 'done/working do not close keyed wait'
 assert live['times']['dispatched'] is None, 'spawn incarnation is not pickup'
+assert live['state_seconds'] == {'working': 20, 'needs-decision': 5, 'blocked': 5, 'done': 10, 'resolved': 10}, 'stage time from recorded status intervals'
 closed = x['executed_24h'][0]
 assert len(x['executed_24h']) == 1 and closed['durations']['time_to_merge'] == 60
 assert closed['durations']['merge_to_cleanup'] == 10
@@ -267,9 +268,7 @@ for kind, limit in [('emulator', 3), ('gradle_gate_match', 2)]:
         assert c['gate_counts'][kind] == sum(j['kind'] == kind for j in c['jobs'])
         assert c['slots_under_caps'][kind] == max(limit - c['gate_counts'][kind], 0)
 assert all(j['rss_bytes'] is None or j['rss_bytes'] % 1024 == 0 for j in c['jobs'])
-assert c['tmp']['filesystem_available_bytes'] <= c['tmp']['filesystem_total_bytes']
 if c['tmp']['top_folders_complete'] is False:
-    assert c['tmp']['directory_bytes'] is None and c['tmp']['known_directory_bytes'] >= 0
     assert all(f['bytes'] is None and f['known_bytes'] >= 0 for f in c['tmp']['top_folders'])
 # Real SSH stalls on a task-owned loopback banner exchange. A private port route
 # extends SSH's own timeout so the flow CLI's six-second outer bound must win.

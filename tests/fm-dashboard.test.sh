@@ -585,7 +585,8 @@ JS
   jq -e '.flow.limitations > 0 and .flow.time_to_merge.unknown == 0 and (.flow.executed_7d | length) == 1' "$d/board.json" >/dev/null || fail "unavailable remote records became ghost observations"
   jq -e --arg h "$home" '[.. | strings | select(contains($h) or contains("/home/") or contains("/Users/") or contains("/tmp/"))] | length == 0' "$d/board.json" >/dev/null || fail "board.json carries host paths: $(jq -c --arg h "$home" '[.. | strings | select(contains($h) or contains("/home/") or contains("/Users/") or contains("/tmp/"))]' "$d/board.json" | cut -c1-300)"
   jq -e '[.. | objects | keys[] | select(. == "reason" or . == "source" or . == "gate_source" or . == "errors")] | length == 0' "$d/board.json" >/dev/null || fail "board.json carries raw reason, source, gate_source or errors keys: $(jq -c '[.. | objects | keys[] | select(. == "reason" or . == "source" or . == "gate_source" or . == "errors")]' "$d/board.json" | cut -c1-300)"
-  pass "board.json carries stages, waits, ask list and shipped flow observations; known durations, unknown lifecycle splits, queue why-lines and read-only capacity remain distinct"
+  jq -e '[.. | strings | select(test("\\[(at|key)="))] | length == 0' "$d/board.json" >/dev/null || fail "board.json carries raw status-line tokens: $(jq -c '[.. | strings | select(test("\\[(at|key)="))]' "$d/board.json" | cut -c1-300)"
+  pass "board.json carries no host paths, raw reason keys or status-line tokens, and carries stages, waits, ask list and shipped flow observations; known durations, unknown lifecycle splits, queue why-lines and read-only capacity remain distinct"
 }
 
 test_ship_view_loads_against_the_app() {
