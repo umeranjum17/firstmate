@@ -74,6 +74,12 @@ switch (process.env.MODE) {
     break;
   case "turn-end": await handlers["turn_end"]({}, ctx); break;
   case "progress": await handlers["codex-native:progress"]({ type: "commandExecution", phase: "completed" }); break;
+  case "text_delta": case "thinking_delta": case "toolcall_delta": case "empty-delta": case "message-start":
+    await handlers["message_update"]({ assistantMessageEvent: {
+      type: process.env.MODE === "empty-delta" ? "text_delta" : process.env.MODE,
+      delta: process.env.MODE === "empty-delta" ? "" : "new streamed bytes",
+    }});
+    break;
   default: throw new Error("unknown mode " + process.env.MODE);
 }
 if (["turn-end", "progress"].includes(process.env.MODE)) {
@@ -83,7 +89,7 @@ EOF
 }
 
 test_pi_extension_semantic_lifecycle() {
-  local rec id=busy-pi-1 out state ext
+  local rec id=busy-pi-1 out state ext mode
   rec=$(make_spawn_case pi-lifecycle pi "$id")
   read_case_record "$rec"
   out=$(run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR")
@@ -101,6 +107,17 @@ test_pi_extension_semantic_lifecycle() {
   [ ! -e "$state/$id.turn-ended" ] || fail "native progress fabricated a completed turn"
   out=$(classify pi "$id" "$state")
   [ "$out" = "busy fm-spawn" ] || fail "native progress changed semantic state: $out"
+  for mode in text_delta thinking_delta toolcall_delta empty-delta message-start; do
+    rm -f "$state/$id.progress"
+    out=$(drive_pi_ext "$ext" "$mode") || fail "$mode drive failed: $out"
+    case "$mode" in
+      empty-delta|message-start) [ ! -e "$state/$id.progress" ] || fail "$mode fabricated progress" ;;
+      *) [ -f "$state/$id.progress" ] || fail "$mode did not record streaming progress" ;;
+    esac
+    [ ! -e "$state/$id.turn-ended" ] || fail "$mode fabricated a completed turn"
+    out=$(classify pi "$id" "$state")
+    [ "$out" = "busy fm-spawn" ] || fail "$mode changed semantic busy state: $out"
+  done
   out=$(drive_pi_ext "$ext" turn-end) || fail "turn_end drive failed: $out"
   [ -f "$state/$id.turn-ended" ] || fail "turn_end no longer touches the notification marker"
   out=$(classify pi "$id" "$state")
@@ -173,6 +190,8 @@ test_pi_extension_stale_incarnation_rejected() {
   [ "$out" = "busy fm-spawn" ] || fail "a stale extension event must not change state, got '$out'"
   out=$(drive_pi_ext "$ext" progress) || fail "stale progress drive failed: $out"
   [ ! -e "$state/$id.progress" ] || fail "stale native progress refreshed the new incarnation"
+  out=$(drive_pi_ext "$ext" text_delta) || fail "stale streaming drive failed: $out"
+  [ ! -e "$state/$id.progress" ] || fail "stale streaming refreshed the new incarnation"
   pass "pi extension events from a superseded incarnation are rejected as stale"
 }
 

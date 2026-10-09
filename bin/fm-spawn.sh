@@ -4800,13 +4800,20 @@ export default function (pi: any) {
   // A native harness can make progress inside one Pi turn. This separate
   // marker prevents false wedge alarms without fabricating a completed turn.
   let lastProgress = 0;
-  pi.events?.on?.("codex-native:progress", () => {
+  const recordProgress = () => {
     const now = Date.now();
     if (now - lastProgress < 1000) return;
     lastProgress = now;
     execFile("$FM_ROOT/bin/fm-busy-event.sh", [
       "progress", "$STATE_REAL", "$ID", "--gen", "$BUSY_GEN",
     ]);
+  };
+  pi.events?.on?.("codex-native:progress", recordProgress);
+  pi.on("message_update", (event: any) => {
+    const update = event.assistantMessageEvent;
+    if (["text_delta", "thinking_delta", "toolcall_delta"].includes(update?.type) && update.delta) {
+      recordProgress();
+    }
   });
 }
 EOF

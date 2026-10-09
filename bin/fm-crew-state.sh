@@ -26,6 +26,11 @@
 #
 #   state: <working|parked|done|blocked|paused|failed|unknown> · source: <run-step|pane|status-log|remote-endpoint|none> · <detail>
 #
+# For a full run-step read classified working, detail starts with
+# `execution active` only when nm_run_activity_is_recent proves recent step
+# execution. Quiet, absent activity, and coarse ledger reads retain their
+# semantic state but cannot supply that proof to stale monitoring.
+#
 # Logic, in order:
 #   1. Resolve worktree + backend target + kind from state/<id>.meta. A meta
 #      recording remote_host= is a remote secondmate: its worktree and endpoint
@@ -1251,6 +1256,9 @@ if [ "$HAVE_RUN" = 1 ]; then
   esac
 
   [ -z "$SELECTED_RUN_ID" ] || RUN_DETAIL="$RUN_DETAIL${SEP}run: $SELECTED_RUN_ID"
+  if [ "$RUN_STATE" = working ] && [ "$RUN_SOURCE" = full ] && nm_run_activity_is_recent; then
+    RUN_DETAIL="execution active${SEP}$RUN_DETAIL"
+  fi
   emit "$RUN_STATE" run-step "$RUN_DETAIL"
 fi
 

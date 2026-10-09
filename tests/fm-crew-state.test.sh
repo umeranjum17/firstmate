@@ -865,6 +865,15 @@ test_daemon_claim_over_live_run_reads_run_alive() {
   assert_contains "$out" "source: run-step" "live run -> run-step source"
   assert_contains "$out" "run alive" "daemon claim over a live run is named as run alive"
   assert_contains "$out" "reattach" "the reading names the reattach steer"
+  assert_contains "$out" "source: run-step · execution active ·" "recent step activity is explicit in the state protocol"
+  printf 'working: validating\n' > "$d/state/feat-dl.status"
+  FM_FAKE_AXI_STATUS="$(run_fixing_active_quiet fm/feat-dl)"
+  local quiet_out; quiet_out=$(run_crew_state "$d" feat-dl)
+  assert_contains "$quiet_out" "state: working" "a quiet running record keeps its semantic state"
+  assert_not_contains "$quiet_out" "execution active" "quiet execution cannot suppress escalation"
+  FM_FAKE_AXI_STATUS="$(run_running fm/feat-dl)"
+  quiet_out=$(run_crew_state "$d" feat-dl)
+  assert_not_contains "$quiet_out" "execution active" "a running record without activity cannot suppress escalation"
   assert_not_contains "$out" "superseded by active run" \
     "the daemon claim gets the sharper reading, not the generic one"
   pass "daemon/timeout blocked claim over a live fixing run reads as run alive"
