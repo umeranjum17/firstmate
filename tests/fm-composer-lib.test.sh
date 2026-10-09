@@ -1029,6 +1029,17 @@ test_matrix_opencode_leftbar_signals() {
   wrap0_busy=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/umer/.treehouse/firstmate-cff959/8/relaunch-   esc interrupt ctrl+p\n   really-quite-long-opencode-project-directory-name   agents commands'
   assert_screen "opencode 1.18.x busy row above zero-usage wrapped footer still refuses on herdr" unknown "$CAPS_STYLED" "$wrap0_busy"
   assert_screen "opencode 1.18.x busy row above zero-usage wrapped footer still refuses on cmux/orca" unknown "$CAPS_PLAIN" "$wrap0_busy"
+  # Live 2026-10-09 UNANSWERED BUBBLE (Main1860): a doorbell `┃` user bubble
+  # sits above a blank row, then the composer is EMPTY. The footer wraps to a
+  # path/usage/palette row and a bare `pockit` continuation. The bubble is
+  # transcript furniture above the composer; the composer below is still empty.
+  local unans_idle unans_typed
+  unans_idle=$'  ┃\n  ┃  : Firstmate instruction waiting: list "$FM_TASK_INBOX"/*.msg in your \'mx-\n  ┃  pm-9b.inbox\' steering inbox, read and act on each in numeric order, then\n  ┃  mv each into its handled/.\n  ┃\n\n  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/umer/.treehouse/pockit-497a78/8/   538.6K (54%) · $1.0 ctrl+p commands\n   pockit'
+  assert_screen "opencode 1.18.x unanswered bubble above empty composer on herdr" empty "$CAPS_STYLED" "$unans_idle"
+  assert_screen "opencode 1.18.x unanswered bubble above empty composer on cmux/orca" empty "$CAPS_PLAIN" "$unans_idle"
+  unans_typed=$'  ┃\n  ┃  : Firstmate instruction waiting: list "$FM_TASK_INBOX"/*.msg in your \'mx-\n  ┃  pm-9b.inbox\' steering inbox, read and act on each in numeric order, then\n  ┃  mv each into its handled/.\n  ┃\n\n  ┃\n  ┃  Reply with OK.\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/umer/.treehouse/pockit-497a78/8/   538.6K (54%) · $1.0 ctrl+p commands\n   pockit'
+  assert_screen "opencode 1.18.x typed draft under unanswered bubble on herdr" pending "$CAPS_STYLED" "$unans_typed"
+  assert_screen "opencode 1.18.x typed draft under unanswered bubble on cmux/orca" unknown "$CAPS_PLAIN" "$unans_typed"
   pass "matrix: opencode's left-bar composer reads empty everywhere and scans the full active run"
 }
 
