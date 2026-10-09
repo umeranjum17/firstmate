@@ -272,6 +272,10 @@ test_opencode_plugin_semantic_lifecycle() {
   jq -e '.error=="Upstream request failed: region denied"' "$error_file" >/dev/null || fail 'native failure not persisted through idle'
   out=$(drive_oc_plugin "$plugin" "$(oc_status ses_main busy)" "$(oc_idle ses_main)") || fail "recovery drive failed: $out"
   jq -e '.error==""' "$error_file" >/dev/null || fail 'successful turn did not clear the native failure'
+  out=$(drive_oc_plugin "$plugin" "$(oc_status ses_main busy)" \
+    '{"type":"session.status","properties":{"sessionID":"ses_main","status":{"type":"retry","message":"Upstream request failed: retrying"}}}' \
+    "$(oc_idle ses_main)") || fail "retry recovery drive failed: $out"
+  jq -e '.error==""' "$error_file" >/dev/null || fail 'a retry that recovers must not latch a persisted outage'
   pass "opencode plugin classifies from session.status, scoped to the latched worker session"
 }
 

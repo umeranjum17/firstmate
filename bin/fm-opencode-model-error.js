@@ -25,7 +25,10 @@ export function modelErrorObserver(state, id, gen) {
     if (p.sessionID !== session || session === null) return;
     if (event.type === "session.error" || (event.type === "session.status" && p.status?.type === "retry")) {
       const error = p.error?.data?.message || p.error?.message || p.status?.message || p.error?.name;
-      if (error) { failed = true; save(String(error).slice(0, 1000)); }
+      if (error) {
+        if (event.type === "session.error") failed = true;
+        save(String(error).slice(0, 1000));
+      }
     }
     if (event.type === "session.idle") {
       if (!failed) save("");
