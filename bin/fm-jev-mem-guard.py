@@ -29,10 +29,10 @@ Usage (bin/fm-jev-mem-guard.sh runs this with python3):
   --owned-top-task DIR appends a tab and the top consumer's task ID only when
       that consumer is a task recorded in DIR (for the sampler's interrupt).
 
-Verdicts: OK; WAIT (new agents wait); ALERT (sampler attempts one owned-task interrupt,
-or none for host-wide pressure alone); UNKNOWN (not measurable, for example no pressure file).
---admit refuses WAIT and app.slice ALERT and admits OK, host-wide-only ALERT, and UNKNOWN;
-UNKNOWN records no sample.
+Verdicts: OK; WAIT (new agents wait); ALERT (sampler attempts one owned-task interrupt);
+HOST-ALERT (host-wide pressure alone: the sampler wakes Main, with no interrupt);
+UNKNOWN (not measurable, for example no pressure file).
+--admit refuses WAIT and ALERT and admits OK, HOST-ALERT, and UNKNOWN; UNKNOWN records no sample.
 Pass --config FILE to read thresholds; without it the defaults apply.
 Settings are owned by docs/configuration.md "Host memory guard".
 The former diagnostic --check, --json, and percentage-threshold flags are unsupported.
@@ -305,10 +305,10 @@ def main():
         sys.exit(admit(args.admit, args.state, s, v, why))
     host_only = s is not None and v == "OK" and s["host_pressure"] >= cfg["alert_pressure"]
     if host_only:
-        v, why = "ALERT", [f"host-wide pressure at or above {cfg['alert_pressure']:g}%"]
+        v, why = "HOST-ALERT", [f"host-wide pressure at or above {cfg['alert_pressure']:g}%"]
     if args.record and s is not None:
         record(args.record, s, v)
-    cons = consumers(args.state_dir) if v == "ALERT" or (not args.record and v != "UNKNOWN") else []
+    cons = consumers(args.state_dir) if v in ("ALERT", "HOST-ALERT") or (not args.record and v != "UNKNOWN") else []
     output = line(s, v, why, [text for _, text in cons])
     if args.owned_top_task:
         task = cons[0][0][1] if cons and not host_only and cons[0][0][0] == os.path.realpath(args.owned_top_task) else ""

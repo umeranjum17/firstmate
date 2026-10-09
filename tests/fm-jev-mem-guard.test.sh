@@ -225,7 +225,7 @@ test_cgroup_pressure() {
   out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build --state "$case/state"); rc=$?
   [ "$rc" -eq 0 ] || fail "host-wide pressure refused admission with a calm app.slice: $out"
   out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD")
-  assert_contains "$out" $'ALERT\tpressure 1%' "host-wide alert reports the calm app.slice reading"
+  assert_contains "$out" $'HOST-ALERT\tpressure 1%' "host-wide alert reports the calm app.slice reading"
   assert_contains "$out" 'host-wide pressure at or above 35%' "host-wide alert names its reason"
   rm "$case/cgroup/$app/memory.pressure"
   out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD")
@@ -251,6 +251,29 @@ test_host_pressure_wakes_without_hold_or_interrupt() {
   assert_contains "$out" "automatic interrupt skipped" "host-wide pressure attempts no interrupt"
   [ ! -e "$case/keys" ] || fail "host-wide pressure interrupted a task: $(cat "$case/keys")"
   pass "host-wide pressure wakes Main without holding admission or interrupting a task"
+}
+
+test_app_alert_inside_host_episode_interrupts() {
+  local case out app="user.slice/user-$(id -u).slice/user@$(id -u).service/app.slice"
+  case=$(make_case host-then-app)
+  make_fleet "$case"
+  prepare_control_task "$case"
+  fake_host "$case/proc" 40 48
+  mkdir -p "$case/cgroup/$app"
+  printf 'some avg10=3 avg60=3 avg300=1 total=1\n' > "$case/cgroup/$app/memory.pressure"
+  watch_leg "$case" host-first default
+  wait_for_exit "$LEG_PID" 50 || fail "host-wide pressure did not wake Main: $(cat "$case/watch-host-first.err")"
+  [ ! -e "$case/keys" ] || fail "host-wide pressure interrupted a task: $(cat "$case/keys")"
+  drain_and_ack "$case"
+  printf 'some avg10=60 avg60=60 avg300=20 total=1\n' > "$case/cgroup/$app/memory.pressure"
+  watch_leg "$case" app-second default
+  wait_for_exit "$LEG_PID" 100 || fail "an app.slice alert inside a host-wide episode did not wake Main: $(cat "$case/watch-app-second.err")"
+  wait_interrupt "$case/state"
+  out=$(cat "$case/watch-app-second.out")
+  assert_contains "$out" "check: host memory ALERT: pressure 60%" "the app.slice alert wakes Main inside the host-wide episode"
+  assert_contains "$out" "automatic interrupt attempted: task big-build" "the app.slice alert attempts its owned-task interrupt"
+  [ "$(wc -l < "$case/keys")" -eq 1 ] || fail "the app.slice alert did not interrupt exactly once: $(cat "$case/keys")"
+  pass "an app.slice alert inside a host-wide episode still wakes Main and interrupts its owned task"
 }
 
 test_home_qualified_owners() {
@@ -696,6 +719,7 @@ SH
 test_verdicts_samples_and_owners
 test_cgroup_pressure
 test_host_pressure_wakes_without_hold_or_interrupt
+test_app_alert_inside_host_episode_interrupts
 test_home_qualified_owners
 test_homes_without_ordinary_tasks
 test_remote_records_do_not_own_local_processes

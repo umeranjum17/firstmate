@@ -689,7 +689,8 @@ These controls reduce risk but cannot guarantee avoidance of an out-of-memory ki
   Retry once pressure eases; admission does not automatically retry a queued spawn.
   Admission gates agent launches, not builds or other heavy subprocesses started by already-running agents; it imposes no per-agent or fleet memory limit.
 - At the alert level, the sampler attempts one automatic `fm-control.sh <task-id> interrupt` per episode if the top consumer is a task this home owns, passing the resolved home and selected state explicitly; it never exits, kills, or discards that task.
-  An alert from host-wide pressure alone queues its wake and attempts no interrupt.
+  An alert from host-wide pressure alone (`HOST-ALERT`) queues its wake and attempts no interrupt.
+  An `app.slice` alert still wakes and interrupts inside a host-wide episode, and once an episode is latched by `app.slice`, later host-wide samples stay quiet until an OK sample.
   Before latching the episode or dispatching an interrupt, it queues a durable `check: host memory ALERT` wake naming the consumer and planned interrupt attempt (or the ownership skip), then records the attempt in `state/host-memory-interrupts.tsv`.
   Failed wake publication leaves the next sample eligible, including after a sampler restart; an older episode's queued wake does not suppress a new episode's wake.
   After successful alert output, the watcher records that row's identity so its unacknowledged alert cannot immediately close the handling successor; later reminders use the [local queue backstop](watcher-continuity.md#durable-queue-and-turn-end-backstop), and only post-handling acknowledgement retires the row.
