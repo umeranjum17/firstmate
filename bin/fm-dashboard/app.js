@@ -1,7 +1,7 @@
 // Fleet dashboard app shell: live data, routes, the Linear sidebar and header (phone: title, tabs and dock),
 // filters, the ask list, the Ship mount, the command palette and keys.
 import { render } from './vendor/preact-htm-3.1.1.js'
-import { html, useState, useEffect, useRef, now, dur, hm, ACTIVE, STAGES, STATES, stuck, state, sid, total, hc, hname, mname, sorted, filterCards, I, IC, StageIcon, Av } from './ui.js'
+import { html, useState, useEffect, useRef, now, dur, hm, ACTIVE, STAGES, SNAME, STATES, stuck, state, sid, total, hc, hname, mname, sorted, filterCards, I, IC, StageIcon, Av } from './ui.js'
 import { TABS, inTab, Board, MobileKanban, Detail } from './board.js'
 
 const POLL_MS = 10000, STALE_S = 15 * 60, WIDE = '(min-width: 760px)'
@@ -134,61 +134,106 @@ const Needs = ({ d }) => d.asks == null ? html`<div class="none"><p>The ask list
   : !d.asks.length ? html`<div class="none">${I(IC.inbox, 32)}<p>Nothing needs you.</p></div>`
   : html`<ul class="inbox">${d.asks.map(a => html`<li><span>${a.text}</span><small class="num">${a.age == null ? '' : dur(a.age)}</small>${a.url ? html`<a class="pill" href=${a.url} target="_blank" rel="noreferrer">Open</a>` : ''}</li>`)}</ul>`
 
-// Overview: the fleet's numbers in the app's own Linear language - compact figures, hairlines,
-// neutral bars, the accent for the primary reading and status colour only where something is wrong.
+// Overview: the fleet's numbers as charts - each figure with its trend, the lifecycle as a rail of stages,
+// colour that means something (stage colours for work in motion, orange and red only where it waits or is stuck).
+const QTONE = ['--green', '--orange', '--accent', '--grey', '--grey']
 const OV_STATES = [['building', 'Building', ''], ['validating', 'Validating or CI', 'v'], ['finished', 'Finished, not landed', 'f'],
   ['waiting', 'Waiting', 'w'], ['decision', 'On a decision', 'd'], ['blocked', 'Blocked', 'b']]
 const sum = v => Object.values(v || {}).reduce((a, b) => a + (b || 0), 0)
 const ts = v => typeof v === 'number' ? v : typeof v === 'string' ? Date.parse(v) / 1000 : null
-function OVSpark({ vals }) {
-  const vs = vals.length ? vals : [0], top = Math.max(1, ...vs), w = 100 / vs.length
-  return html`<svg class="ov-spark" viewBox="0 0 100 22" preserveAspectRatio="none" aria-hidden="true">${vs.map((v, k) => v == null ? '' :
-    html`<rect x=${(k * w + .6).toFixed(1)} y=${(22 - v / top * 20).toFixed(1)} width=${Math.max(.6, w - 1.2).toFixed(1)} height=${(v / top * 20).toFixed(1)} />`)}</svg>`
+const sign = n => n > 0 ? `+${n}` : `${n}`
+// A day's trend from the 10-minute samples: the line, and the change since the sample nearest 24 hours ago.
+function trend(hist, key, v) {
+  const t = now(), day = (hist || []).filter(x => x.at >= t - 90000 && x[key] != null)
+  if (day.length < 2 || v == null) return {}
+  const ago = day.reduce((a, b) => Math.abs(b.at - (t - 86400)) < Math.abs(a.at - (t - 86400)) ? b : a)
+  return { line: [...day.map(x => x[key]), v], delta: Math.abs(ago.at - (t - 86400)) < 7200 ? v - ago[key] : null }
+}
+function Line({ vals, c }) {
+  const top = Math.max(1, ...vals), lo = Math.min(...vals), span = Math.max(1, top - lo), dx = 100 / Math.max(1, vals.length - 1)
+  const pts = vals.map((v, k) => `${(k * dx).toFixed(1)},${(26 - (v - lo) / span * 22).toFixed(1)}`).join(' ')
+  return html`<svg class="ov-line" viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true" style=${{ color: `var(${c})` }}>
+    <polygon points=${`0,28 ${pts} 100,28`} fill="currentColor" fill-opacity=".12"/><polyline points=${pts} fill="none" stroke="currentColor" stroke-width="1.6" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>`
+}
+function Kpi({ name, v, sub, c, t, good, href, onClick }) {
+  const tag = href ? 'a' : onClick ? 'button' : 'div', d = t?.delta
+  const dc = !d || !good ? '' : (d > 0) === (good === 'up') ? 'up' : 'dn'
+  return html`<${tag} class="ov-kpi" href=${href} onClick=${onClick} style=${{ '--c': `var(${c})` }}>
+    <span><i></i>${name}${d != null ? html`<em class=${'num ' + dc} title="change since this time yesterday">${d ? sign(d) : '±0'}</em>` : ''}</span>
+    <b class="num">${v}${sub ? html`<small>${sub}</small>` : ''}</b>${t?.line ? html`<${Line} vals=${t.line} c=${c}/>` : html`<div class="ov-line"></div>`}</${tag}>`
+}
+// 14 days of a daily count: today in the accent, earlier days muted, the period average dashed.
+function Days({ rows, c, label }) {
+  if (!rows?.length) return html`<p class="ov-tot">No days on record</p>`
+  const known = rows.filter(r => r.value != null), top = Math.max(1, ...known.map(r => r.value)), w = 100 / rows.length
+  const prior = rows.slice(0, -1).filter(r => r.value != null), avg = prior.length ? prior.reduce((a, r) => a + r.value, 0) / prior.length : null
+  const day = s => new Date(`${s}T12:00:00`).toLocaleDateString([], { day: 'numeric', month: 'short' })
+  return html`<div class="ov-days" style=${{ '--c': `var(${c})` }}><svg viewBox="0 0 100 60" preserveAspectRatio="none" role="img" aria-label=${`${label}, last ${rows.length} days`}>
+    ${rows.map((r, k) => { if (r.value == null) return ''; const h = r.value / top * 56; return html`<rect class=${k === rows.length - 1 ? 'now' : ''} x=${(k * w + w * .14).toFixed(2)} y=${(60 - h).toFixed(2)} width=${(w * .72).toFixed(2)} height=${Math.max(.5, h).toFixed(2)} rx=".6"><title>${day(r.day)}: ${r.value}</title></rect>` })}
+    ${avg != null ? html`<line x1="0" x2="100" y1=${(60 - avg / top * 56).toFixed(2)} y2=${(60 - avg / top * 56).toFixed(2)} vector-effect="non-scaling-stroke"/>` : ''}</svg>
+    <div class="ov-axis"><span>${day(rows[0].day)}</span><span>today</span></div><small>${avg != null ? `avg ${Math.round(avg)} a day before today` : 'no known days to average'}</small></div>`
+}
+// The lifecycle rail: every open lane by stage, split into moving, waiting and stuck, then today's landings.
+function Rail({ d, go }) {
+  const cs = d.cards, col = s => cs.filter(c => c.stage === s)
+  const top = Math.max(1, ...ACTIVE.map(s => col(s).length))
+  return html`<div class="ov-rail">${[...ACTIVE, 'landed'].map(s => {
+    const xs = col(s), n = xs.length, st = xs.filter(stuck).length, wt = xs.filter(c => c.wait && !stuck(c)).length
+    const old = s === 'landed' ? null : Math.max(0, ...xs.map(c => c.since ? now() - c.since : 0))
+    return html`<button class="ov-stage" key=${s} style=${{ '--c': `var(--st-${s})` }} onClick=${() => go({ view: 'board', tab: s === 'landed' ? 'landed' : 'active', card: null })}>
+      <span class="ov-sh"><${StageIcon} s=${s}/>${SNAME[s]}</span><b class="num">${s === 'landed' ? total(d, n, 'landed') : n}</b>
+      ${s === 'landed' ? html`<span class="ov-sbar done"></span>` : html`<span class="ov-sbar"><i style=${{ width: `${(n - st - wt) / top * 100}%` }}></i><i class="w" style=${{ width: `${wt / top * 100}%` }}></i><i class="s" style=${{ width: `${st / top * 100}%` }}></i></span>`}
+      <small>${s === 'landed' ? 'merged today' : !n ? 'empty' : [st && html`<em class="s">${st} stuck</em>`, wt && `${wt} waiting`, old > 60 && `oldest ${dur(old)}`].filter(Boolean).flatMap((p, k) => k ? [' · ', p] : [p])}</small></button>` })}</div>`
 }
 function Overview({ d, od, go }) {
   const q = od.data
   if (!q) return html`<div class="ov"><div class="none"><p>${od.err ? `Cannot load the overview: ${od.err}` : 'Loading the overview…'}</p></div></div>`
-  const m = q.metrics, asks = d.asks, openCards = d.cards.filter(c => ACTIVE.includes(c.stage))
+  const m = q.metrics, asks = d.asks, openCards = d.cards.filter(c => ACTIVE.includes(c.stage)), hist = q.lane_history
   const stk = openCards.filter(stuck).length, toLand = openCards.filter(c => c.stage === 'merge').length
-  const states = m.lane_states?.value, qr = q.queue_reasons || [], qOk = m.queue?.value != null
-  const age = now() - ts(q.build_time)
-  const flow = (mid, label, foot) => { const r = m[mid]; return html`<div class="ov-flow"><span>${label}</span>
-    <b>${r?.status === 'unknown' ? 'unknown' : `${r?.status === 'lower_bound' && mid === 'landed' ? 'at least ' : ''}${r?.value ?? '–'}`}</b>
-    <small>${foot}</small><${OVSpark} vals=${(r?.daily || []).map(x => x.value)}/></div>` }
+  const states = m.lane_states?.value, age = now() - ts(q.build_time)
+  const qr = q.queue_reasons || [], qOk = m.queue?.value != null, qTop = Math.max(1, ...qr.map(x => sum(x.by_home)))
+  const flow = (mid, label, foot, c) => { const r = m[mid]; return html`<div class="ov-flow"><span>${label}</span>
+    <b class="num">${r?.status === 'unknown' ? 'unknown' : `${r?.status === 'lower_bound' && mid === 'landed' ? '≥' : ''}${r?.value ?? '–'}`}</b><small>${foot}</small>
+    <${Days} rows=${r?.daily} c=${c} label=${label}/></div>` }
   return html`<div class="ov">
-    <p class="ov-tot">${od.err ? 'Refresh failed · ' : ''}${age < 60 ? 'just updated' : `updated ${dur(age)} ago`}</p>
+    <p class="ov-tot">${od.err ? html`<span class="bad">Refresh failed: ${od.err} · </span>` : ''}${age < 60 ? 'just updated' : `updated ${dur(age)} ago`}</p>
     <div class="ov-kpis">
-      <a class="ov-kpi ${asks?.length ? 'warn' : ''}" href="#/needs"><span>Needs you</span><b class="num">${asks == null ? '?' : asks.length}</b></a>
-      <button class="ov-kpi ${stk ? 'bad' : ''}" onClick=${() => go({ view: 'board', tab: 'active', state: ['blocked', 'decision'], card: null })}><span>Stuck</span><b class="num">${stk}</b></button>
-      <div class="ov-kpi"><span>To land</span><b class="num">${toLand}</b></div>
-      <div class="ov-kpi"><span>Lanes open</span><b class="num">${m.lanes?.value ?? '–'}<small> of ${m.lane_plan?.value ?? '–'}</small></b></div>
-      <div class="ov-kpi"><span>Ready</span><b class="num">${m.ready?.value ?? '–'}</b></div>
+      <${Kpi} name="Needs you" v=${asks == null ? '?' : asks.length} c=${asks?.length ? '--orange' : '--green'} href="#/needs"/>
+      <${Kpi} name="Stuck" v=${stk} c=${stk ? '--red' : '--green'} t=${trend(hist, 'stuck', stk)} good="down" onClick=${() => go({ view: 'board', tab: 'active', state: ['blocked', 'decision'], card: null })}/>
+      <${Kpi} name="To land" v=${toLand} c="--st-merge" onClick=${() => go({ view: 'board', tab: 'active', card: null })}/>
+      <${Kpi} name="Lanes open" v=${m.lanes?.value ?? '–'} sub=${` of ${m.lane_plan?.value ?? '–'}`} c="--accent" t=${trend(hist, 'lanes', m.lanes?.value)} good="up"/>
+      <${Kpi} name="Ready" v=${m.ready?.value ?? '–'} c="--h-2" t=${trend(hist, 'ready', m.ready?.value)}/>
     </div>
     <div class="ov-grid">
       ${asks?.length ? html`<section class="ov-card wide"><h3>Needs you</h3><div class="ov-asks">${asks.map((a, k) =>
         html`<a class="ov-ask" key=${k} href=${a.url || '#/needs'} target=${a.url ? '_blank' : null} rel="noreferrer"><span>${a.text}</span><small class="num">${a.age == null ? '' : dur(a.age)}</small></a>`)}</div></section>` : ''}
-      <section class="ov-card"><h3>Lanes by state</h3>
+      <section class="ov-card wide"><h3>Lifecycle</h3><${Rail} d=${d} go=${go}/></section>
+      <section class="ov-card w2"><h3>Flow</h3><div class="ov-flows">${flow('landed', 'Landed today', 'recorded merges', '--st-landed')}${flow('closed', 'Closed 7 d', 'backlog items', '--green')}</div></section>
+      <section class="ov-card w1"><h3>Lanes by state</h3>
         <div class="ov-bar tall">${states ? OV_STATES.map(([k, , c]) => states[k] ? html`<i class=${c} key=${k} style=${{ flex: states[k] }}></i>` : '') : ''}</div>
         <div class="ov-legend">${OV_STATES.map(([k, nm, c]) => html`<span key=${k}><i class=${c}></i>${nm}<b class="num">${states ? states[k] : '–'}</b></span>`)}</div></section>
-      <section class="ov-card"><h3>Why work is queued</h3>
+      <section class="ov-card w1"><h3>Why work is queued</h3>
         <div class="ov-ql">${qr.map((x, k) => { const n = sum(x.by_home); return html`<div class="ov-qrow" key=${k}><span>${x.reason}</span>
-          <span class="ov-bar">${qOk && n > 0 ? html`<i style=${{ flex: n }}></i>` : ''}</span><b class="num">${qOk ? n : '–'}</b></div>` })}</div>
+          <span class="ov-bar">${qOk && n > 0 ? html`<i style=${{ width: `${n / qTop * 100}%`, background: `var(${QTONE[k] || '--grey'})` }}></i>` : ''}</span><b class="num">${qOk ? n : '–'}</b></div>` })}</div>
         <p class="ov-tot">Total <b class="num">${qOk ? sum(m.queue.value) : '–'}</b> queued</p></section>
-      <section class="ov-card"><h3>Flow</h3><div class="ov-flows">${flow('landed', 'Landed today', 'recorded merges · 14 d')}${flow('closed', 'Closed 7 d', 'backlog, vs prior 7 d')}</div></section>
-      <section class="ov-card"><h3>Quota runway</h3><div class="ov-ql">${(q.quota_accounts || []).map((a, k) => {
+      <section class="ov-card wide"><h3>Quota runway</h3><div class="ov-ql ov-quota">${(q.quota_accounts || []).map((a, k) => {
         const w = a.limit || (a.windows || []).filter(x => x.used != null).sort((x, y) => y.used - x.used)[0]
         const tone = a.empty ? 'bad' : a.problem ? 'mut' : a.status === 'projected_exhaustion' ? 'warn' : ''
         const right = a.empty ? 'used up' : a.problem ? 'unknown' : a.runout ? `out in ${dur(ts(a.runout) - now())}` : w?.reset ? `resets ${hm(ts(w.reset))}` : 'lasts'
-        return html`<div class="ov-qrow" key=${k}><span>${a.name}</span><span class="ov-bar"><i class=${a.empty ? 'b' : ''} style=${{ flex: w?.used != null ? Math.max(2, Math.min(100, w.used)) : 0 }}></i></span>
-          <b class="num ${tone}">${w?.used != null ? `${Math.round(w.used)}%` : '–'}</b></div><small class="ov-qsub ${tone}">${right}</small>` })}</div>
+        return html`<div key=${k}><div class="ov-qrow"><span>${a.name}</span><span class=${'ov-bar ' + (w?.used == null ? 'unk' : '')}><i style=${{ width: `${w?.used != null ? Math.max(2, Math.min(100, w.used)) : 0}%`,
+          background: `var(${{ bad: '--red', warn: '--orange', mut: '--grey' }[tone] || '--green'})` }}></i></span>
+          <b class="num ${tone}">${w?.used != null ? `${Math.round(w.used)}%` : '–'}</b></div><small class="ov-qsub ${tone}">${right}</small></div>` })}</div>
         ${!q.quota_accounts?.length ? html`<p class="ov-tot">No account reported a window</p>` : ''}</section>
-      <section class="ov-card wide"><h3>Homes</h3><div class="ov-homes">${(q.homes || []).map(h => html`<div class="ov-hrow" key=${h.home}>
+      <section class="ov-card wide"><h3>Homes</h3><div class="ov-homes">${(q.homes || []).map(h => {
+        const n = h.lanes?.value, xs = openCards.filter(c => c.home === h.home), cap = Math.max(h.plan || 0, n || 0, 1)
+        return html`<button class="ov-hrow" key=${h.home} onClick=${() => go({ view: 'board', tab: 'active', home: [h.home], card: null })}>
         <span class="sq" style=${{ '--c': hc(d, h.home) }}></span><b>${hname(d, h.home)}</b>
-        <span class="num">${h.lanes?.status === 'unknown' ? '?' : h.lanes?.value ?? '–'}<small> / ${h.plan}</small></span>
-        <span class="num">${h.ready?.value ?? '–'} ready</span>
-        <span class="num">${h.closed?.status === 'unknown' ? '–' : h.closed?.value} closed</span></div>`)}</div></section>
+        <span class="ov-load" title=${`${n ?? '?'} of ${h.plan} lanes`}>${ACTIVE.map(s => { const k = xs.filter(c => c.stage === s).length; return k ? html`<i key=${s} style=${{ width: `${k / cap * 100}%`, background: `var(--st-${s})` }}></i>` : '' })}</span>
+        <span class="num">${h.lanes?.status === 'unknown' ? '?' : n ?? '–'}<small>/${h.plan}</small></span>
+        <span class="num">${h.ready?.value ?? '–'}<small> ready</small></span>
+        <span class="num">${h.closed?.status === 'unknown' ? '–' : h.closed?.value}<small> closed</small></span></button>` })}</div></section>
       <section class="ov-card wide"><h3>Recently landed</h3><div class="ov-merges">${(q.recent_merges || []).map((x, k) =>
-        html`<div class="ov-mrow" key=${k}><a href=${x.url} target="_blank" rel="noreferrer">${x.title}</a><span>${hname(d, x.home)}</span><small class="num">${hm(x.at)}</small></div>`)}
+        html`<div class="ov-mrow" key=${k}><${StageIcon} s="landed"/><a href=${x.url} target="_blank" rel="noreferrer">${x.title}</a><span><span class="sq" style=${{ '--c': hc(d, x.home) }}></span>${hname(d, x.home)}</span><small class="num">${hm(x.at)}</small></div>`)}
         ${!q.recent_merges?.length ? html`<p class="ov-tot">No merge on record</p>` : ''}</div></section>
     </div></div>`
 }
