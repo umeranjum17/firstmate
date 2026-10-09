@@ -155,7 +155,7 @@ EOF
 build() {  # <home> [env...]: build with the fixture's stubs first on PATH
   local home=$1 out
   shift
-  out=$(env PATH="$home/stubs:$PATH" FM_HOME="$home" HOME="$home" FM_DEVICE_LOCK_DIR="$home/locks" FM_DASHBOARD_PROC="$home/proc" "$@" "$DASH" build 2>&1) || fail "build failed: $out"
+  out=$(env PATH="$home/stubs:$PATH" FM_HOME="$home" HOME="$home" FM_DEVICE_LOCK_DIR="$home/locks" FM_DASHBOARD_PROC="$home/proc" FM_MAC_HOST= "$@" "$DASH" build 2>&1) || fail "build failed: $out"
   [ "$out" = "$home/state/dashboard/index.html" ] || fail "build did not print the page path: $out"
 }
 
@@ -471,7 +471,7 @@ test_board_json_feeds_the_app() {
   fm_write_meta "$home/state/m-canonical.meta" "kind=ship" "project=alpha" "pr=https://review.example/c/team/app/+/28"
   printf 'working [at=%s] [key=nm-run-ci]: checks running\n' "$now" > "$home/state/m-canonical.status"
   lane "$home" m-gerrit ship "done [at=$((now - 200))]: PR https://review.example/c/team/nested/app/+/27 published for review"
-  printf '{"ts":%s,"event":"task.dispatched","task":"m-opus","harness":"claude"}\n{"ts":%s,"event":"task.dispatched","task":"m-fix","model":"gpt-5.5","harness":"codex"}\n{"ts":%s,"event":"task.merged","task":"m-fix","pr":"https://github.com/acme/alpha/pull/12"}\n' \
+  printf '{"v":1,"ts":%s,"event":"task.dispatched","task":"m-opus","harness":"claude"}\n{"v":1,"ts":%s,"event":"task.dispatched","task":"m-fix","model":"gpt-5.5","harness":"codex"}\n{"v":1,"ts":%s,"event":"task.merged","task":"m-fix","pr":"https://github.com/acme/alpha/pull/12"}\n' \
     "$((now - 3600))" "$((now - 10800))" "$((now - 600))" >> "$home/state/fleet-ledger.jsonl"
   printf -- '- [x] m-fix - Fix the login PR https://github.com/acme/alpha/pull/12 (repo: alpha) (kind: ship) (merged %s)\n' "$today" >> "$home/data/done-archive.md"
   printf 'first\t%s\tApprove the release\thttps://example.invalid/release\n' "$((now - 7200))" > "$home/data/captain-asks.tsv"
@@ -499,6 +499,18 @@ test_board_json_feeds_the_app() {
     and ([.asks[] | [.id, .text, .url]] == [["first","Approve the release","https://example.invalid/release"]])
     and .landed[-1] == 3' "$d/board.json" >/dev/null ||
     fail "board.json does not carry each lane's stage, wait, model, reason and the day's landings: $(jq -c '{cards: [.cards[] | {id, stage, wait, why, model, title}], asks, landed, cycle_p50}' "$d/board.json")"
+  jq -e '.flow.schema == "fm-flow.v1" and .flow_error == null
+    and .flow.time_to_merge.median_seconds == 10200 and .flow.time_to_merge.p85_seconds == 10200
+    and .flow.time_to_merge.known == 1 and .flow.time_to_merge.unknown == 1
+    and (.flow.executed_7d | length) == 2
+    and any(.flow.lanes[]; .task == "m-fix" and .display_title == "Fix the login"
+      and (.times | has("first_commit") | not)
+      and .pr == "https://github.com/acme/alpha/pull/12")
+    and any(.flow.queue[]; .task == "m-after" and .display_why == "Waiting for: Start the ready thing")
+    and any(.flow.bottlenecks[]; .cause == "credential_external" and .additive == false)
+    and .flow.capacity.observed_at >= .flow.at
+    and .flow.capacity.mac.reachable == null' "$d/board.json" >/dev/null || fail "Insights observation checks: $(jq -c '{present:(.flow!=null),reader_ok:(.flow_error==null),median:.flow.time_to_merge.median_seconds,p85:.flow.time_to_merge.p85_seconds,known:.flow.time_to_merge.known,unknown:.flow.time_to_merge.unknown,merged:(.flow.executed_7d|length),title_ok:any(.flow.lanes[];.task=="m-fix" and .display_title=="Fix the login"),link_ok:any(.flow.lanes[];.task=="m-fix" and .pr=="https://github.com/acme/alpha/pull/12"),dependency_ok:any(.flow.queue[];.task=="m-after" and .display_why=="Waiting for: Start the ready thing"),cause_ok:any(.flow.bottlenecks[];.cause=="credential_external" and .additive==false),capacity_ok:(.flow.capacity.observed_at>=.flow.at),mac_unknown:(.flow.capacity.mac.reachable==null)}' "$d/board.json")"
+
   printf '{"ts":%s,"event":"task.merged","task":"m-gitlab","pr":"https://gitlab.example/team/nested/app/-/merge_requests/27"}\n{"ts":%s,"event":"task.merged","task":"m-gerrit","pr":"https://review.example/c/team/nested/app/+/27"}\n' "$((now - 60))" "$((now - 60))" >> "$home/state/fleet-ledger.jsonl"
   printf 'done [key=merged-z-lab] [at=%s]: merged z-lab https://gitlab.example/team/app/-/merge_requests/50\ndone [key=merged-z-review] [at=%s]: merged z-review https://review.example/c/team/app/+/51\n' "$((now - 60))" "$((now - 60))" >> "$home/state/zephyrine.status"
   printf -- '- zephyrine - remote (host: distant; root: /srv; home: %s; scope: work; projects: alpha; added 2026-07-11)\n' "$home/mates/zephyrine" > "$home/data/secondmates.md"
@@ -570,7 +582,11 @@ const bravo = all(screen, n => n.attrs['data-card'] === 'main/b')[0]
 bravo.listeners.click.call(bravo, { type: 'click' }); assert.equal(phoneOpened, 'main/b')
 phoneOpened = null; bravo.listeners.keydown.call(bravo, { type: 'keydown', key: 'Enter', target: bravo, currentTarget: bravo, preventDefault() {} }); assert.equal(phoneOpened, 'main/b')
 JS
-  pass "board.json gives each lane its stage, wait, reason in words, model and each status line's verb and stage, landed titles without their PR, cycle times and the ask list"
+  jq -e '.flow.limitations > 0 and .flow.time_to_merge.unknown == 0 and (.flow.executed_7d | length) == 1' "$d/board.json" >/dev/null || fail "unavailable remote records became ghost observations"
+  jq -e --arg h "$home" '[.. | strings | select(contains($h) or contains("/home/") or contains("/Users/") or contains("/tmp/"))] | length == 0' "$d/board.json" >/dev/null || fail "board.json carries host paths: $(jq -c --arg h "$home" '[.. | strings | select(contains($h) or contains("/home/") or contains("/Users/") or contains("/tmp/"))]' "$d/board.json" | cut -c1-300)"
+  jq -e '[.. | objects | keys[] | select(. == "reason" or . == "source" or . == "gate_source" or . == "errors")] | length == 0' "$d/board.json" >/dev/null || fail "board.json carries raw reason, source, gate_source or errors keys: $(jq -c '[.. | objects | keys[] | select(. == "reason" or . == "source" or . == "gate_source" or . == "errors")]' "$d/board.json" | cut -c1-300)"
+  jq -e '[.. | strings | select(test("\\[(at|key)="))] | length == 0' "$d/board.json" >/dev/null || fail "board.json carries raw status-line tokens: $(jq -c '[.. | strings | select(test("\\[(at|key)="))]' "$d/board.json" | cut -c1-300)"
+  pass "board.json carries no host paths, raw reason keys or status-line tokens, and carries stages, waits, ask list and shipped flow observations; known durations, unknown lifecycle splits, queue why-lines and read-only capacity remain distinct"
 }
 
 test_ship_view_loads_against_the_app() {
@@ -819,7 +835,7 @@ import fcntl, json, os, pathlib, subprocess, sys, time
 home, dash = pathlib.Path(sys.argv[1]), sys.argv[2]
 state = home / 'state/dashboard'
 original = (state / 'history.tsv').read_text()
-env = dict(os.environ, PATH=str(home / 'stubs') + ':' + os.environ['PATH'], FM_HOME=str(home), HOME=str(home), FM_DEVICE_LOCK_DIR=str(home / 'locks'), FM_DASHBOARD_PROC=str(home / 'proc'))
+env = dict(os.environ, PATH=str(home / 'stubs') + ':' + os.environ['PATH'], FM_HOME=str(home), HOME=str(home), FM_DEVICE_LOCK_DIR=str(home / 'locks'), FM_DASHBOARD_PROC=str(home / 'proc'), FM_MAC_HOST='')
 processes = []
 with (state / '.cache.lock').open('a') as lock:
     fcntl.flock(lock, fcntl.LOCK_EX)

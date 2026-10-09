@@ -30,7 +30,10 @@
 # Registered remote homes remain listed, with unavailable lanes/backlog/lifecycle
 # disclosed in limitations; remote paths are not read locally or probed over SSH.
 # Output fm-flow.v1: homes, lanes, queue, bottlenecks, capacity, executed_24h/7d,
-# time_to_merge (median, nearest-rank P85, UTC seven-day trend), and limitations.
+# time_to_merge (median, nearest-rank P85), and limitations. trend_7d and trend_7d_by_home are
+# one UTC-day bucket per day covering [NOW-7d, NOW] (first bucket partial); their counts sum to
+# executed_7d. Each lane's state_seconds sums recorded seconds per status state from the first
+# working stamp, closing the trailing state at merge when merged is recorded; unrecorded stages are absent.
 # capacity is null unless --capacity is requested; FM_MAC_HOST alone runs no probe.
 # Times are seconds. null means unknown, including unstamped status lines.
 # Pickup and cleanup use ledger events, NOT file birth/mtime or spawn_gen
@@ -300,13 +303,20 @@ for name, home in sorted(homes.items()):
                 break
             trailing.append(e)
         start = trailing[-1]['ts'] if trailing else None
+        state_seconds = {}
+        merged_at = times['merged']
+        for a, b in zip(status, status[1:] + [dict(ts=merged_at)]):
+            end = min(b['ts'], merged_at) if merged_at is not None and isinstance(b.get('ts'), int) else b.get('ts')
+            if working is not None and a.get('state') and isinstance(a.get('ts'), int) and isinstance(end, int) \
+                    and working <= a['ts'] < end:
+                state_seconds[a['state']] = state_seconds.get(a['state'], 0) + end - a['ts']
         row = {'home': name, 'task': task, 'open': task in live, 'stage': state,
                'seconds_in_stage': age(start), 'reason': last.get('text') or 'unknown: no status reason',
                'timestamp_basis': basis, 'open_waits': [dict(key=k, since=e['ts'],
                    seconds=age(e['ts']), reason=e.get('text') or '',
                    cause=cause(k, e))
                    for k, e in sorted(waits.items())],
-               'times': dict(times, working=working, first_commit=None, pr_opened=None, checks_green=None),
+               'times': dict(times, working=working), 'state_seconds': state_seconds,
                'durations': {'pickup_to_working': age(times['dispatched'], working),
                    'time_to_merge': age(times['dispatched'], times['merged']),
                    'merge_to_cleanup': age(times['merged'], times['cleaned_up'])}}
@@ -463,13 +473,10 @@ def machine_capacity():
     slice_data = {k: int(heavy_values[k]) if loaded and heavy_values.get(k, '').isdigit() else None
                   for k in ('MemoryCurrent', 'MemoryMax')}
     slice_data['unlimited'] = heavy_values.get('MemoryMax') == 'infinity' if loaded else None
-    tmp = {'ram_backed': None, 'filesystem_total_bytes': None, 'filesystem_available_bytes': None,
-           'filesystem_used_bytes': None, 'directory_bytes': None, 'known_directory_bytes': None,
-           'top_folders': None, 'top_folders_complete': None}
+    tmp = {'ram_backed': None, 'filesystem_used_bytes': None, 'top_folders': None, 'top_folders_complete': None}
     try:
         fs = os.statvfs('/tmp')
-        tmp.update(filesystem_total_bytes=fs.f_blocks * fs.f_frsize, filesystem_available_bytes=fs.f_bavail * fs.f_frsize,
-                   filesystem_used_bytes=(fs.f_blocks - fs.f_bfree) * fs.f_frsize)
+        tmp['filesystem_used_bytes'] = (fs.f_blocks - fs.f_bfree) * fs.f_frsize
         mounts = []
         for line in read(Path('/proc/self/mountinfo')) or []:
             left, sep, right = line.partition(' - ')
@@ -487,10 +494,8 @@ def machine_capacity():
     full = len(notes) == previous_notes
     if folders is not None:
         values = [l.partition('\t') for l in folders.split('\0') if l]
-        totals = [int(n) * 1024 for n, sep, p in values if sep and n.isdigit() and p == '/tmp']
+        totals = [p for n, sep, p in values if sep and n.isdigit() and p == '/tmp']
         if len(totals) == 1 and all(sep and n.isdigit() for n, sep, _ in values):
-            tmp['directory_bytes'] = totals[0] if full else None
-            tmp['known_directory_bytes'] = totals[0]
             tmp['top_folders_complete'] = full
             tmp['top_folders'] = sorted([dict(path=p, bytes=int(n) * 1024 if full else None,
                                              known_bytes=int(n) * 1024) for n, _, p in values
@@ -580,16 +585,19 @@ def summary(rows):
     return {'known': len(values), 'unknown': len(rows) - len(values),
             'median_seconds': statistics.median(values) if values else None,
             'p85_seconds': values[math.ceil(.85 * len(values)) - 1] if values else None}
-trend = []
 today = NOW // 86400
-for day in range(today - 6, today + 1):
-    rows = [l for l in executed(7 * 86400) if l['times']['merged'] // 86400 == day]
-    trend.append(dict(day=datetime.fromtimestamp(day * 86400, timezone.utc).strftime('%Y-%m-%d'), **summary(rows)))
+def trend(rows):
+    return [dict(day=datetime.fromtimestamp(day * 86400, timezone.utc).strftime('%Y-%m-%d'),
+                 **summary([l for l in rows if l['times']['merged'] // 86400 == day]))
+            for day in range((NOW - 7 * 86400) // 86400, today + 1)]
+seven = executed(7 * 86400)
 print(json.dumps({'schema': 'fm-flow.v1', 'at': NOW, 'homes': sorted(homes), 'lanes': lanes,
                   'queue': queue, 'bottlenecks': bottlenecks, 'capacity': capacity, 'executed_24h': executed(86400),
-                  'executed_7d': executed(7 * 86400), 'time_to_merge': summary(executed(7 * 86400)),
-                  'time_to_merge_by_home': {h: summary([l for l in executed(7 * 86400) if l['home'] == h]) for h in sorted(homes)},
-                  'trend_7d': trend, 'limitations': notes + [{'source': 'coverage', 'reason':
+                  'executed_7d': seven, 'time_to_merge': summary(seven),
+                  'time_to_merge_by_home': {h: summary([l for l in seven if l['home'] == h]) for h in sorted(homes)},
+                  'trend_7d': trend(seven),
+                  'trend_7d_by_home': {h: trend([l for l in seven if l['home'] == h]) for h in sorted(homes)},
+                  'limitations': notes + [{'source': 'coverage', 'reason':
                   'Retained records only; missing pickup/PR/check/cleanup times stay unknown. '
                   'Wait ages are recorded waits, not proof of idle workers. Bottleneck items report the maximum '
                   'recorded wait age per (lane, cause); a lane in several cause buckets overlaps in time, so cause '

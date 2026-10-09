@@ -77,7 +77,8 @@ Example:
 ## Reading lifecycle metrics
 
 [`fm-flow.sh`](../bin/fm-flow.sh) reads retained fleet records into lifecycle, queue-reason, and bottleneck metrics, with optional live capacity observations; its header owns usage, output interpretation, timestamp provenance, and uncertainty limits.
-It is a standalone JSON reader, not an addition to the pages served by `fm-dashboard.sh`.
+The dashboard's Insights view consumes its output: `fm-dashboard.sh` runs the reader at each build and embeds the result as the `flow` key of `board.json`.
+`fm-dashboard.sh`'s header owns that embedding and its scrubbing.
 The real CLI regression journey is [`tests/fm-flow.test.sh`](../tests/fm-flow.test.sh).
 
 ## Not included
