@@ -1645,8 +1645,13 @@ if flow_text is not None:
         for job in (flow.get('capacity') or {}).get('jobs', []):
             if job['owner']:
                 job['owner']['display_title'] = titles.get((job['owner']['home'], job['owner']['task'])) or 'Task name not recorded'
+        mac = (flow.get('capacity') or {}).get('mac') or {}
+        for key in ('simulators', 'android_pids'):
+            if isinstance(mac.get(key), list):
+                mac[key] = len(mac[key])
+        mac.pop('errors', None)
         for folder in (flow.get('capacity') or {}).get('tmp', {}).get('top_folders') or []:
-            folder['display_name'] = os.path.basename(folder['path'])
+            folder['display_name'] = os.path.basename(folder.pop('path'))
     except (ValueError, KeyError, TypeError) as err:
         flow, flow_error = None, 'Cannot read flow observations: ' + str(err)
 board = dict(
