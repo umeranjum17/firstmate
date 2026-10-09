@@ -1352,6 +1352,33 @@ _fm_composer_row_is_opencode_status() {  # <trimmed-row>
   fm_composer_idle_matches "$1" "${FM_COMPOSER_OPENCODE_STATUS_RE:-$FM_COMPOSER_OPENCODE_STATUS_RE_DEFAULT}" sensitive
 }
 
+# _fm_composer_row_is_opencode_busy: 0 when the trimmed row carries OpenCode's
+# in-turn hint (`esc interrupt`). A busy status row is NOT furniture, so the
+# below-floor block collector excludes any block that contains it - necessary
+# because the merged busy row also carries the `ctrl+p`/`commands` cells an
+# idle status row has, so recognition alone would consume it.
+_fm_composer_row_is_opencode_busy() {  # <trimmed-row>
+  fm_composer_idle_matches "$1" 'esc[[:space:]]+interrupt' sensitive
+}
+
+# _fm_composer_row_is_opencode_path_fragment: 0 when the trimmed row is a bare
+# directory-continuation fragment - non-blank, no whitespace, and only
+# path-safe characters (`A-Za-z0-9._:/~-`). OpenCode right-aligns its status
+# cells beside the directory cell and wraps the directory internally, so a
+# long worktree path spills its trailing fragment onto a row of its own (the
+# live fm-opencode-composer-err capture ends `...directory-` then `name`).
+# The fragment is only ever accepted INSIDE a below-floor block that also
+# carries a real status row, so a lone bare word below the floor still refuses.
+_fm_composer_row_is_opencode_path_fragment() {  # <trimmed-row>
+  local row=$1
+  [ -n "$row" ] || return 1
+  case "$row" in
+    *[[:space:]]*) return 1 ;;
+    *[!A-Za-z0-9._:/~-]*) return 1 ;;
+  esac
+  return 0
+}
+
 # _fm_composer_row_is_pi_status: 0 when the trimmed row is Pi's dollar-first
 # footer stats row (FM_COMPOSER_PI_STATUS_RE_DEFAULT above). Furniture below
 # the separated pair; a `$` cost cell must not count as a dead-shell prompt.
@@ -1624,6 +1651,7 @@ _fm_composer_bare_rule_sandwich() {  # <plain-screen> <row>
 
 _fm_composer_select_cursorless() {
   local plain=$1 generic=-1 next boundary raw trimmed glyph bare footer=0 menu
+  local run_end run_has_status run_busy run_safe probe_row probe_trimmed
   FM_COMPOSER_SELECTION_REFUSAL=none
   FM_COMPOSER_SELECTED_KIND=
   FM_COMPOSER_SELECTED_FIRST=-1
@@ -1759,18 +1787,35 @@ _fm_composer_select_cursorless() {
         # OpenCode's own status area sits directly below the floor
         # (FM_COMPOSER_OPENCODE_STATUS_RE_DEFAULT): those rows are furniture,
         # so the staleness probe resumes past them instead of reading the
-        # composer stale. One unrecognized or blank row ends the walk, and the
-        # probe then judges exactly that row: unclaimed activity below the
-        # floor still refuses, keeping the asymmetry toward `unknown`.
+        # composer stale. The area is one contiguous non-blank block, so it is
+        # consumed only when it is provably furniture: at least one row carries
+        # the status cells (`<n>K (<p>%)`, `ctrl+p`, `commands`, `tab agents`),
+        # NO row carries the busy hint (`esc interrupt`), and every other row
+        # is a bare directory-continuation fragment (a long worktree path
+        # wraps the right-aligned status row's directory cell onto its own
+        # rows). A block with no status row - `Working on request...` - is not
+        # furniture, so the probe judges that row and still refuses, keeping
+        # the asymmetry toward `unknown`.
+        run_end=$boundary
+        run_has_status=0
+        run_busy=0
+        run_safe=1
         while :; do
-          next=$((boundary + 1))
-          raw=$(_fm_composer_screen_row "$next" "$plain")
-          trimmed=$raw
-          fm_composer_normalize_trim_var trimmed
-          [ -n "$trimmed" ] || break
-          _fm_composer_row_is_opencode_status "$trimmed" || break
-          boundary=$next
+          probe_row=$((run_end + 1))
+          probe_trimmed=$(_fm_composer_screen_row "$probe_row" "$plain")
+          fm_composer_normalize_trim_var probe_trimmed
+          [ -n "$probe_trimmed" ] || break
+          run_end=$probe_row
+          _fm_composer_row_is_opencode_busy "$probe_trimmed" && run_busy=1
+          if _fm_composer_row_is_opencode_status "$probe_trimmed"; then
+            run_has_status=1
+          elif ! _fm_composer_row_is_opencode_path_fragment "$probe_trimmed"; then
+            run_safe=0
+          fi
         done
+        if [ "$run_has_status" = 1 ] && [ "$run_busy" = 0 ] && [ "$run_safe" = 1 ]; then
+          boundary=$run_end
+        fi
       fi
     fi
     # The same footer zone, read from the other side: rows this envelope's own

@@ -1001,6 +1001,18 @@ test_matrix_opencode_leftbar_signals() {
   wrap_error=$'  ┃  run the check\n  ┃\n  ┃\n  ┃  Failed to execute statement\n  ┃\n     ▣  Build · DeepSeek V4.1 Flash\n  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/umer/.treehouse/firstmate-cff959/8/a-   22.1K (2%) · $ctrl+p\n   really-quite-long-opencode-project-directory-name   commands'
   assert_screen "opencode 1.18.x assistant error block above empty composer on herdr" empty "$CAPS_STYLED" "$wrap_error"
   assert_screen "opencode 1.18.x assistant error block above empty composer on cmux/orca" empty "$CAPS_PLAIN" "$wrap_error"
+  # Live 2026-10-09 THREE-row wrap (task fm-opencode-composer-err, driven in an
+  # isolated tmux pane under a longer worktree path): the directory cell wraps
+  # twice, so the status area is three rows - the usage row, a `commands` row
+  # carrying the directory's middle fragment, and a bare trailing fragment
+  # (`name`). The bare fragment is furniture only beside a real status row.
+  local wrap3_idle wrap3_typed
+  wrap3_idle=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/umer/.treehouse/firstmate-cff959/8/a-   22.1K (2%) · $ctrl+p\n   really-quite-long-opencode-project-dir-   commands\n   name'
+  assert_screen "opencode 1.18.x three-row wrapped status footer on herdr" empty "$CAPS_STYLED" "$wrap3_idle"
+  assert_screen "opencode 1.18.x three-row wrapped status footer on cmux/orca" empty "$CAPS_PLAIN" "$wrap3_idle"
+  wrap3_typed=$'  ┃\n  ┃  Reply with OK.\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/umer/.treehouse/firstmate-cff959/8/a-   22.1K (2%) · $ctrl+p\n   really-quite-long-opencode-project-dir-   commands\n   name'
+  assert_screen "opencode 1.18.x typed draft above three-row wrapped status footer on herdr" pending "$CAPS_STYLED" "$wrap3_typed"
+  assert_screen "opencode 1.18.x typed draft above three-row wrapped status footer on cmux/orca" unknown "$CAPS_PLAIN" "$wrap3_typed"
   pass "matrix: opencode's left-bar composer reads empty everywhere and scans the full active run"
 }
 
