@@ -1621,9 +1621,9 @@ for h in ACTIVE:
         cards.append(card(h, r['id'], r.get('kind') or 'ship', r['title'], 'queued', since=midnight(r['day']) if r['day'] else None))
 # Cycle time: dispatch to merge, for each merged task whose dispatch is in a ledger.
 cycles = sorted(at - d['ts'] for at, h, task in merges.values() if (d := dispatch(h, task, at)))
-flow_text, flow_error = probe(['bash', os.path.join(BIN, 'fm-flow.sh'), '--json', '--now', str(int(NOW_TS)), '--capacity'],
-                              timeout=180, env=dict(os.environ, FM_HOME=HOME))
-flow = None
+flow_text = probe(['bash', os.path.join(BIN, 'fm-flow.sh'), '--json', '--now', str(int(NOW_TS)), '--capacity'],
+                  timeout=180, env=dict(os.environ, FM_HOME=HOME))[0]
+flow, flow_error = None, None if flow_text is not None else 'Flow reader unavailable'
 if flow_text is not None:
     try:
         flow = json.loads(flow_text)
@@ -1633,14 +1633,16 @@ if flow_text is not None:
             h, task = row['home'], row['task']
             row.get('stage_clock', {}).pop('source', None)
             row['display_title'] = titles.get((h, task)) or re.sub(r'\s+PR \d+$', '', done_title.get((h, task), '')) or 'Task name not recorded'
-            row['display_reason'] = prose(row.get('reason', ''))
+            row['display_reason'] = prose(row.pop('reason', ''))
             why = row.get('why', '')
             if why.startswith('dependency:'):
                 row['display_why'] = 'Waiting for: ' + ', '.join(titles.get((h, t.strip()), 'earlier work (name unavailable)') for t in why[11:].split(','))
             else:
                 row['display_why'] = prose(why).replace('recorded active lanes', 'recorded active tasks').replace('lane cap:', 'Count limit:')
+            if why:
+                row['why'] = why.partition(':')[0] + ':'
             for wait in row.get('open_waits', []):
-                wait['display_reason'] = prose(wait['reason'])
+                wait['display_reason'] = prose(wait.pop('reason', ''))
             row['pr'] = next((url for url, (at, mh, mt) in merges.items()
                               if (mh, mt) == (h, task) and at == row.get('times', {}).get('merged')), None)
         for job in (flow.get('capacity') or {}).get('jobs', []):
@@ -1655,8 +1657,8 @@ if flow_text is not None:
         mac.pop('errors', None)
         for folder in (flow.get('capacity') or {}).get('tmp', {}).get('top_folders') or []:
             folder['display_name'] = os.path.basename(folder.pop('path'))
-    except (ValueError, KeyError, TypeError) as err:
-        flow, flow_error = None, 'Cannot read flow observations: ' + str(err)
+    except (ValueError, KeyError, TypeError):
+        flow, flow_error = None, 'Flow observations unreadable'
 board = dict(
     schema='fm-dashboard-board.v1', generated=int(NOW_TS), stages=[dict(id=s, name=n) for s, n in STAGES],
     homes=[dict(id=h, name=hname(h), plan=plan(h), open=sum(c['home'] == h and c['stage'] not in ('queued', 'landed') for c in cards), ready=len(bl(h, 'ready')) if backlog.get(h) is not None else None,

@@ -5,7 +5,7 @@ const seconds = n => n == null ? 'Unknown' : `${number(n)} s`
 const bytes = n => n == null ? 'Unknown' : `≈${(n / 2 ** 30).toFixed(2)} GiB`
 const CAUSES = { captain: 'Your decision', lead: 'Lead reply', ci_queue: 'CI queue', memory_gate: 'Memory limit', credential_external: 'Login or external wait', review_merge: 'Review or merge', unknown: 'Unclassified' }
 const STAGES = { working: 'Working', resolved: 'Working', blocked: 'Blocked', failed: 'Failed', paused: 'Waiting', 'needs-decision': 'Decision needed', 'captain-held': 'Held', done: 'Finished' }
-const Card = ({ label, value, note, title }) => html`<div class="i-stat" title=${title}><span>${label}</span><b>${value}</b><small>${note}</small></div>`
+const Card = ({ label, value, note }) => html`<div class="i-stat"><span>${label}</span><b>${value}</b><small>${note}</small></div>`
 const Rows = ({ title, children }) => html`<details class="i-panel"><summary>${title}</summary><div class="i-rows">${children}</div></details>`
 const Row = ({ name, value, note, title }) => html`<div class="i-row" title=${title}><span>${name}${note && html`<small>${note}</small>`}</span><b>${value}</b></div>`
 function Trend({ days }) {
@@ -40,7 +40,7 @@ export function Insights({ d }) {
   const mine = l => !home || l.home === home, lanes = f.lanes.filter(mine), open = lanes.filter(l => l.open), queue = f.queue.filter(mine)
   const merged = f.executed_7d.filter(mine), day = f.executed_24h.filter(mine), timed = home ? f.time_to_merge_by_home[home] : f.time_to_merge
   const days = home ? f.trend_7d_by_home[home] : f.trend_7d
-  const title = l => l.display_title || d.cards.find(c => c.home === l.home && c.task === l.task)?.title || 'Task name not recorded'
+  const title = l => l.display_title || 'Task name not recorded'
   const displayWhy = l => l.display_reason || 'Reason not recorded'
   const waiting = open.filter(l => l.open_waits.length), late = open.filter(l => l.stage_clock.overdue === true)
   const ranked = f.bottlenecks.map(b => ({ ...b, age: b.items.some(i => i.known_seconds != null) ? Math.round(b.known_lower_bound_lane_hours * 3600) : null, unknown: b.unknown_items }))
@@ -69,7 +69,7 @@ export function Insights({ d }) {
         <${Row} name="/tmp filesystem used" value=${bytes(tmp?.filesystem_used_bytes)} note=${tmp?.ram_backed == null ? 'Backing unknown' : tmp.ram_backed ? 'RAM-backed filesystem' : 'Not RAM-backed'} title=${`${number(tmp?.filesystem_used_bytes)} bytes`}/>
         <${Row} name="Mac connection" value=${mac?.reachable === true ? 'Observed' : 'Unknown'}/><${Row} name="Mac VM pages available" value=${bytes(mac?.available_bytes)} note="Free + inactive + speculative" title=${`${number(mac?.available_bytes)} bytes`}/>
         <${Row} name="Mac root disk free" value=${bytes(mac?.free_disk_bytes)} title=${`${number(mac?.free_disk_bytes)} bytes`}/><${Row} name="Mac active simulators" value=${number(mac?.simulators)}/><${Row} name="Mac Android emulator processes" value=${number(mac?.android_pids)}/>
-        <p class="i-note">Linux observed ${c?.observed_at ? new Date(c.observed_at * 1000).toISOString() : 'Unknown'} · Mac observed ${mac?.observed_at ? new Date(mac.observed_at * 1000).toISOString() : 'Unknown'}</p>
+        <p class="i-note" title=${`Linux observed ${c?.observed_at ? new Date(c.observed_at * 1000).toISOString() : 'Unknown'} · Mac observed ${mac?.observed_at ? new Date(mac.observed_at * 1000).toISOString() : 'Unknown'}`}>Observed times on hover</p>
         <${Rows} title=${`${c?.jobs.length ?? 'Unknown'} observed emulator/Gradle processes · memory and recorded owner`}>${c?.jobs.map(j => html`<${Row} name=${({ emulator: 'Emulator', gradle_gate_match: 'Gradle gate match', gradle_daemon: 'Gradle daemon', gradle_client: 'Gradle client' })[j.kind] + ` · process ${j.pid}`} value=${bytes(j.rss_bytes)} title=${`${number(j.rss_bytes)} bytes`} note=${j.owner ? `${hname(d, j.owner.home)} · ${title(j.owner)}` : 'Owner unknown'}/>`)}<p class="i-note">Census ${c?.census_complete === true ? 'complete' : 'unknown or incomplete'}.</p></${Rows}>
         <${Rows} title=${`Observed /tmp folders · ${tmp?.top_folders_complete === true ? 'complete' : 'partial or unknown'}`}>${tmp?.top_folders?.map((p, i) => html`<${Row} name=${p.display_name || `Observed folder ${i + 1}`} value=${p.bytes == null ? `≥ ${bytes(p.known_bytes)}` : bytes(p.bytes)} title=${`${number(p.known_bytes)} readable bytes`} note=${p.bytes == null ? 'Lower bound' : undefined}/>`)}</${Rows}>
       </section></div>
