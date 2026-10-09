@@ -118,6 +118,8 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-tasks-axi-lib.sh`    | Shared backlog-backend selector and `tasks-axi` compatibility probe                  |
 | `fm-backlog-transition-lib.sh` | Pair task-record changes with their backlog transitions and replay interrupted closes |
 | `fm-quota-axi-lib.sh`    | Shared `quota-axi` compatibility floor and quota snapshot schema validation           |
+| `fm-project-capacity-lib.sh` | Per-project worker capacity: `config/project-capacity` parsing, what holds a place, and the spawn-time fit check ([configuration.md](configuration.md#project-capacity-configproject-capacity)) |
+| `fm-exclude-tools-lib.sh` | Parse `config/crew-exclude-tools` and check launch-time runtime support for worker tool exclusions ([configuration.md](configuration.md#worker-tool-exclusions-configcrew-exclude-tools)) |
 | `fm-quota-choose.sh`     | Choose the first candidate with known positive quota from an ordered harness:model list |
 | `fm-vendor-auth-probe.sh`| Run one hard-bounded, non-destructive authentication probe of a named vendor CLI and report the fact |
 | `fm-wake-drain.sh`       | Present and acknowledge the current actor's claimed wake rows alongside status, outcome-backstop, decision, divergence, supervision-host outcome, recovery, and supervision checks |
