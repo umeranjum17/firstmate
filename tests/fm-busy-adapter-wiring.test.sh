@@ -556,28 +556,29 @@ test_model_outage_recovered_lane_leaves_wake() {
   pass "a recovered lane leaves the alert record and re-alerts when it fails again"
 }
 
-unreadable_hold_scans() {
+unreadable_then_failing_scans() {
   lane alpha "idle opencode-plugin" alive
   lane bravo "idle opencode-plugin" alive
   tick
   lane bravo "idle opencode-plugin" unreadable
   lane alpha "idle opencode-plugin" alive ""
   tick
-  lane alpha "idle opencode-plugin" alive
+  lane bravo "idle opencode-plugin" alive
   tick
 }
 
-# A lane that becomes unreadable keeps its named place, and a recovered lane that
-# fails again with the same error is named again.
-test_model_outage_unreadable_lane_does_not_pin_recovered_episode() {
+# An unreadable lane is not named while unreadable, and an episode whose lanes
+# all went unreadable or recovered is forgotten, so a lane that reads failing again
+# is named in a new wake.
+test_model_outage_unreadable_lane_is_named_again_when_readable() {
   local case_dir="$TMP_ROOT/model-outage-unreadable" expected
-  run_outage_fixture "$case_dir" "$case_dir/state" unreadable_hold_scans
+  run_outage_fixture "$case_dir" "$case_dir/state" unreadable_then_failing_scans
   expected=$(printf '%s\n' \
     'check: model outage affected=[alpha,bravo]: Upstream request failed: region denied' \
-    'check: model outage affected=[alpha]: Upstream request failed: region denied')
+    'check: model outage affected=[bravo]: Upstream request failed: region denied')
   [ "$(cat "$case_dir/wakes")" = "$expected" ] \
-    || fail "an unreadable lane must not pin a recovered episode, got: $(cat "$case_dir/wakes")"
-  pass "a persistently unreadable lane does not pin a recovered episode"
+    || fail "an unreadable lane must be named again once it reads failing, got: $(cat "$case_dir/wakes")"
+  pass "an unreadable lane is named again once it reads failing, never silently pinned"
 }
 
 legacy_banner_scans() {
@@ -631,7 +632,7 @@ test_gemini_is_refused_as_a_secondmate
 test_codex_unverified_until_a_semantic_source_exists
 test_model_outage_staggered_lane_joins_union_wake
 test_model_outage_recovered_lane_leaves_wake
-test_model_outage_unreadable_lane_does_not_pin_recovered_episode
+test_model_outage_unreadable_lane_is_named_again_when_readable
 test_model_outage_hung_verdict_is_bounded
 test_model_outage_wrapped_banner_keeps_episode_identity
 

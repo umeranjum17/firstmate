@@ -23,12 +23,6 @@ fm_model_outage_text() {
   LC_ALL=C tr -c '[:print:]' ' ' | awk '{$1=$1; print}' | cut -c1-1000
 }
 
-fm_model_outage_hold() {  # <dir> <batch> <id>
-  local old
-  old=$(cat "$1/lane-$3" 2>/dev/null) || return 0
-  [ -z "$old" ] || printf '%s\n' "$3" >> "$2/${old##*|}.hold"
-}
-
 fm_model_outage_tick() {
   local meta id backend target harness gen error hash old verdict rows groups mid line match key lanes alert kept
   local dir="$STATE/.model-outages" now batch last current
@@ -55,19 +49,19 @@ fm_model_outage_tick() {
     # shellcheck disable=SC2016 # The child expands its own positional arguments.
     verdict=$(fm_run_timed 3 bash -c '. "$1/fm-backend.sh"; . "$1/fm-busy-lib.sh"; fm_busy_classify_semantic "$2" "$3" "$4" "$5" "$6"' \
       model-error "$_FM_MODEL_ERROR_DIR" "$backend" "$target" "$harness" "$id" "$STATE") \
-      || { fm_model_outage_hold "$dir" "$batch" "$id"; continue; }
+      || continue
     mid=0
     if [ "${verdict%% *}" = busy ]; then mid=1; fi
     # Bound reads on every backend; a vanished/slow endpoint cannot hang the
     # rest of the fleet scan. Never discover another home's unrecorded panes.
     # shellcheck disable=SC2016 # The child expands its own positional arguments.
     rows=$(fm_run_timed 3 bash -c '. "$1/fm-backend.sh"; fm_backend_agent_state "$2" "$3" "$4" "$5"' \
-      model-error "$_FM_MODEL_ERROR_DIR" "$backend" "$target" "$meta" "$id") || { fm_model_outage_hold "$dir" "$batch" "$id"; continue; }
-    case "$rows" in alive) ;; dead|missing) rm -f "$dir/lane-$id"; continue ;; *) fm_model_outage_hold "$dir" "$batch" "$id"; continue ;; esac
+      model-error "$_FM_MODEL_ERROR_DIR" "$backend" "$target" "$meta" "$id") || continue
+    case "$rows" in alive) ;; dead|missing) rm -f "$dir/lane-$id"; continue ;; *) continue ;; esac
     if [ "$mid" = 0 ] && fm_backend_visible_capture_supported "$backend"; then
       # shellcheck disable=SC2016 # The child expands its own positional arguments.
       rows=$(fm_run_timed 3 bash -c '. "$1/fm-backend.sh"; fm_backend_visible_capture "$2" "$3"' \
-        model-error "$_FM_MODEL_ERROR_DIR" "$backend" "$target") || { fm_model_outage_hold "$dir" "$batch" "$id"; continue; }
+        model-error "$_FM_MODEL_ERROR_DIR" "$backend" "$target") || continue
       # Only explicit provider/harness banners, never worker-printed output; a
       # wrapped banner keeps up to two continuation lines.
       match=$(printf '%s\n' "$rows" | grep -Ein '^[[:space:]│┃]*(Upstream request failed|Model .+ is not supported|rate.?limit exceeded|insufficient quota|authentication failed)' | tail -1)
@@ -92,15 +86,11 @@ fm_model_outage_tick() {
     id=${file##*/lane-}
     [ -f "$STATE/$id.meta" ] || rm -f "$file"
   done
-  # Forget completed episodes only after the whole scan, not per lane. A hash with
-  # no readable lane keeps only its unreadable lanes' named ids.
+  # Forget episodes only after the whole scan, and only when no lane read failing.
   for file in "$dir"/alert-*; do
     [ -f "$file" ] || continue
     hash=${file##*/alert-}
-    [ -f "$batch/$hash.lanes" ] && continue
-    kept=
-    [ -f "$batch/$hash.hold" ] && kept=$(grep -Fxf "$batch/$hash.hold" "$file")
-    if [ -n "$kept" ]; then printf '%s\n' "$kept" > "$file" || return 1; else rm -f "$file"; fi
+    [ -f "$batch/$hash.lanes" ] || rm -f "$file"
   done
   groups=
   for lanes in "$batch"/*.lanes; do
@@ -108,8 +98,8 @@ fm_model_outage_tick() {
     hash=${lanes##*/}; hash=${hash%.lanes}
     alert="$dir/alert-$hash"
     [ -f "$alert" ] || : > "$alert" || return 1
-    # The alert record holds the lanes named and still failing or unreadable. A
-    # recovered lane leaves it, so its later failure with the same error names it again.
+    # The alert record holds the lanes named and still failing. A recovered lane
+    # leaves it, so its later failure with the same error names it again.
     if [ -f "$batch/$hash.ready" ] && grep -qvxFf "$alert" "$lanes"; then
       current=$(sort -u "$lanes")
       rows=$(printf '%s\n' "$current" | paste -sd ',' -)
@@ -117,9 +107,9 @@ fm_model_outage_tick() {
       verdict="check: model outage affected=[$rows]: $error"
       fm_wake_append check "model-outage-$hash" "$verdict" || return 1
       groups="${groups}${verdict}"$'\n'
-      kept=$({ cat "$lanes"; grep -Fxf "$alert" "$batch/$hash.hold" 2>/dev/null; } | sort -u)
+      kept=$current
     else
-      kept=$(cat "$lanes" "$batch/$hash.hold" 2>/dev/null | grep -Fxf "$alert" | sort -u)
+      kept=$(grep -Fxf "$alert" "$lanes" | sort -u)
     fi
     if [ -n "$kept" ]; then printf '%s\n' "$kept" > "$alert" || return 1; else : > "$alert" || return 1; fi
   done
