@@ -525,8 +525,9 @@ FM_COMPOSER_OMP_STATUS_RE_DEFAULT='^[[:space:]]*(π|󰵗)[[:space:]]+·[[:space:
 # OpenCode 1.18.x draws a status area directly BELOW its left-bar composer's
 # half-block floor (captured live 2026-10-09 on DeepSeek V4.1 Flash panes
 # through Herdr's ANSI capture). An idle pane shows a path/context/cost row
-# whose tail is `<n>K (<p>%) · $<cost>ctrl+p`, then a session row whose tail is
-# the `commands` hint; a rate-limited pane shows the usage-limit banner, whose
+# whose tail is `<n>K (<p>%) · $<cost>  ctrl+p [commands]` (1.18.25 draws the
+# hint on that row; older builds split it), then a session row whose tail is
+# the `commands` hint, or a bare `tab agents  ctrl+p commands` home row; a rate-limited pane shows the usage-limit banner, whose
 # head row opens with alternating U+25A0/U+2B1D square glyphs (`■5⬝hour⬝usage
 # limit reached. It will reset in ...`, truncated at the pane width) and whose
 # tail row carries `(click to expand) [retrying in 1h 8m attempt #1]` wrapped
@@ -538,7 +539,7 @@ FM_COMPOSER_OMP_STATUS_RE_DEFAULT='^[[:space:]]*(π|󰵗)[[:space:]]+·[[:space:
 # any unclaimed activity fail them, keep the envelope stale, and read
 # `unknown`, the refusing direction. The square glyphs are an alternation,
 # never a bracket range, for the reason FM_OMP_SPINNER_FRAMES_RE records.
-FM_COMPOSER_OPENCODE_STATUS_RE_DEFAULT='^[[:space:]]*/.*[0-9]+(\.[0-9]+)?K[[:space:]]+\([0-9]+%\)[[:space:]]+·[[:space:]]+\$[0-9]+(\.[0-9]+)?ctrl\+p$|^[^[:space:]]+([[:space:]]+tab[[:space:]]+agents[[:space:]]+ctrl\+p)?[[:space:]]+commands$|^[[:space:]]*(■|⬝)[0-9]+(■|⬝)hour(■|⬝)usage limit reached|^[[:space:]]*(usin\.\.\.[[:space:]]+)?\(?click to expand\)[[:space:]]+\[retrying in [0-9]+[hms]([[:space:]]+[0-9]+[hms])*[[:space:]]+attempt #[0-9]+\]$'
+FM_COMPOSER_OPENCODE_STATUS_RE_DEFAULT='^[[:space:]]*/.*[0-9]+(\.[0-9]+)?K[[:space:]]+\([0-9]+%\)[[:space:]]+·[[:space:]]+\$[0-9]+(\.[0-9]+)?[[:space:]]*ctrl\+p([[:space:]]+commands)?$|^[^[:space:]]+([[:space:]]+tab[[:space:]]+agents[[:space:]]+ctrl\+p)?[[:space:]]+commands$|^tab[[:space:]]+agents[[:space:]]+ctrl\+p[[:space:]]+commands$|^[[:space:]]*(■|⬝)[0-9]+(■|⬝)hour(■|⬝)usage limit reached|^[[:space:]]*(usin\.\.\.[[:space:]]+)?\(?click to expand\)[[:space:]]+\[retrying in [0-9]+[hms]([[:space:]]+[0-9]+[hms])*[[:space:]]+attempt #[0-9]+\]$'
 # Pi's footer stats row opens at column 0 with the session cost when every
 # token counter is zero (`$0.000 (sub) 5.4%/272k (auto)` on pi 0.85.1).
 # That leading `$` is a cost cell, not a dead-shell prompt, only when a digit

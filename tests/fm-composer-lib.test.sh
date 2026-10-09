@@ -960,6 +960,19 @@ test_matrix_opencode_leftbar_signals() {
   assert_screen "opencode typed draft above live status rows on herdr" pending "$CAPS_STYLED" "$typed_status"
   assert_screen "opencode typed draft above live status rows on zellij" pending "$CAPS_STYLED_NOID" "$typed_status"
   assert_screen "opencode typed draft above live status rows on plain backends" unknown "$CAPS_PLAIN" "$typed_status"
+  # Live 1.18.25 (captured 2026-10-09 under Herdr): the idle session draws one
+  # row, `<path>  <n>K (<p>%) · $<cost>  ctrl+p commands`, with a two-space gap
+  # before ctrl+p. The same cells on a generating pane sit behind `esc
+  # interrupt`, which must keep refusing. The home screen draws its own bare
+  # `tab agents  ctrl+p commands` row under the floor.
+  local v125_idle v125_busy home_status
+  v125_idle=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4FF56ACM65RSHMS9Y57MEZ2  36.9K (4%) · $0.01  ctrl+p commands'
+  assert_screen "opencode 1.18.25 idle session row below the floor on herdr" empty "$CAPS_STYLED" "$v125_idle"
+  assert_screen "opencode 1.18.25 idle session row below the floor on cmux/orca" empty "$CAPS_PLAIN" "$v125_idle"
+  v125_busy=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   ⬝⬝⬝⬝⬝⬝⬝⬝  esc interrupt                                                         36.9K (4%) · $0.01  ctrl+p commands'
+  assert_screen "opencode 1.18.25 busy esc-interrupt row below the floor stays unknown on herdr" unknown "$CAPS_STYLED" "$v125_busy"
+  home_status=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   tab agents  ctrl+p commands'
+  assert_screen "opencode home idle bare tab-agents row below the floor on herdr" empty "$CAPS_STYLED" "$home_status"
   pass "matrix: opencode's left-bar composer reads empty everywhere and scans the full active run"
 }
 
