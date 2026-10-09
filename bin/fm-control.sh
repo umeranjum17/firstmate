@@ -186,6 +186,8 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 . "$SCRIPT_DIR/fm-busy-lib.sh"
 # shellcheck source=bin/fm-control-lib.sh
 . "$SCRIPT_DIR/fm-control-lib.sh"
+# shellcheck source=bin/fm-composer-lib.sh
+. "$SCRIPT_DIR/fm-composer-lib.sh"
 # shellcheck source=bin/fm-pr-lib.sh
 . "$SCRIPT_DIR/fm-pr-lib.sh"
 # shellcheck source=bin/fm-wake-lib.sh
@@ -648,13 +650,16 @@ retire_busy_incarnation() {
 # Complete only an adapter-owned exact exit confirmation, with fresh endpoint
 # and agent proof immediately before Enter. Never choose the detach option.
 complete_exit_confirmation() {
-  local screen confirmation
+  local screen confirmation dialog
   [ "$HARNESS" = claude ] || return 1
   screen=$(fm_backend_visible_capture "$BACKEND" "$T" "$LABEL" 2>/dev/null) || return 1
   confirmation=$(fm_control_exit_confirmation "$HARNESS" "$screen")
   case "$confirmation" in
     none) return 1 ;;
-    refuse) die "task $ID shows an unsupported or ambiguous exit confirmation; refusing lifecycle input" ;;
+    refuse)
+      dialog=$(fm_composer_blocking_dialog "$screen") \
+        && refuse_blocking_prompt "$dialog"
+      die "task $ID shows an unsupported or ambiguous exit confirmation; refusing lifecycle input" ;;
     stop)
       fm_backend_validate_task_endpoint "$META" "$ID" || return 2
       [ "$(agent_state)" = alive ] || die "task $ID no longer proves a live agent; refusing exit confirmation"
