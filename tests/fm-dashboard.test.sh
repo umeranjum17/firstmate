@@ -155,7 +155,7 @@ EOF
 build() {  # <home> [env...]: build with the fixture's stubs first on PATH
   local home=$1 out
   shift
-  out=$(env PATH="$home/stubs:$PATH" FM_HOME="$home" HOME="$home" FM_DEVICE_LOCK_DIR="$home/locks" FM_DASHBOARD_PROC="$home/proc" "$@" "$DASH" build 2>&1) || fail "build failed: $out"
+  out=$(env PATH="$home/stubs:$PATH" FM_HOME="$home" HOME="$home" FM_DEVICE_LOCK_DIR="$home/locks" FM_DASHBOARD_PROC="$home/proc" FM_MAC_HOST= "$@" "$DASH" build 2>&1) || fail "build failed: $out"
   [ "$out" = "$home/state/dashboard/index.html" ] || fail "build did not print the page path: $out"
 }
 
@@ -832,7 +832,7 @@ import fcntl, json, os, pathlib, subprocess, sys, time
 home, dash = pathlib.Path(sys.argv[1]), sys.argv[2]
 state = home / 'state/dashboard'
 original = (state / 'history.tsv').read_text()
-env = dict(os.environ, PATH=str(home / 'stubs') + ':' + os.environ['PATH'], FM_HOME=str(home), HOME=str(home), FM_DEVICE_LOCK_DIR=str(home / 'locks'), FM_DASHBOARD_PROC=str(home / 'proc'))
+env = dict(os.environ, PATH=str(home / 'stubs') + ':' + os.environ['PATH'], FM_HOME=str(home), HOME=str(home), FM_DEVICE_LOCK_DIR=str(home / 'locks'), FM_DASHBOARD_PROC=str(home / 'proc'), FM_MAC_HOST='')
 processes = []
 with (state / '.cache.lock').open('a') as lock:
     fcntl.flock(lock, fcntl.LOCK_EX)

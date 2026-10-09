@@ -34,30 +34,30 @@ function Lifecycle({ lane }) {
     ${lane.open_waits.map(w => html`<${Row} name=${CAUSES[w.cause]} value=${seconds(w.seconds)} note=${w.display_reason}/>`)}</div><p class="i-note">Unrecorded splits are unknown.</p>`
 }
 export function Insights({ d }) {
-  const [chosen, choose] = useState('')
+  const [home, setHome] = useState(''), [chosen, choose] = useState('')
   const f = d.flow
   if (!f) return html`<div class="ins"><section class="i-panel"><h2>Observations unavailable</h2><p>${d.flow_error || 'No flow observation was collected.'}</p></section></div>`
-  const open = f.lanes.filter(l => l.open), queue = f.queue, merged = f.executed_7d, day = f.executed_24h, timed = f.time_to_merge
+  const mine = l => !home || l.home === home, lanes = f.lanes.filter(mine), open = lanes.filter(l => l.open), queue = f.queue.filter(mine)
+  const merged = f.executed_7d.filter(mine), day = f.executed_24h.filter(mine), timed = home ? f.time_to_merge_by_home[home] : f.time_to_merge
+  const days = home ? f.trend_7d_by_home[home] : f.trend_7d
   const title = l => l.display_title || d.cards.find(c => c.home === l.home && c.task === l.task)?.title || 'Task name not recorded'
   const displayWhy = l => l.display_reason || 'Reason not recorded'
   const waiting = open.filter(l => l.open_waits.length), late = open.filter(l => l.stage_clock.overdue === true)
-  const ranked = f.bottlenecks.map(b => { const known = b.items.map(i => i.known_seconds).filter(v => v != null)
-    return { ...b, age: known.reduce((n, v) => n + v, 0), unknown: b.items.filter(i => i.seconds == null).length }
-  }).filter(b => b.items.length).sort((a, b) => b.age - a.age || a.cause.localeCompare(b.cause))
+  const ranked = f.bottlenecks.map(b => ({ ...b, age: Math.round(b.known_lower_bound_lane_hours * 3600), unknown: b.unknown_items }))
   const maxWait = Math.max(...ranked.map(b => b.age), 1)
-  const picks = f.lanes.map(l => ({ l, key: `${l.home}/${l.task}` })), picked = picks.find(p => p.key === chosen)?.l
+  const picks = lanes.map(l => ({ l, key: `${l.home}/${l.task}` })), picked = picks.find(p => p.key === chosen)?.l
   const c = f.capacity, m = c?.memory_bytes, mac = c?.mac, tmp = c?.tmp
   const queueWhy = q => q.why.startsWith('dependency:') ? q.display_why : q.why.startsWith('hold:') ? q.display_why : q.why.startsWith('lane cap:') ? q.display_why : 'Start reason not recorded'
   const groups = ['dependency:', 'hold:', 'lane cap:', 'unknown:'].map((prefix, i) => [ ['Earlier work', 'Held', 'Lane limit', 'Reason unknown'][i], queue.filter(q => q.why.startsWith(prefix)).length ])
   return html`<div class="ins">
-    <div class="i-scope"><span>All registered homes</span><small>Retained records · ${new Date(f.at * 1000).toISOString().replace('T', ' ').replace('.000Z', ' UTC')}</small></div>
+    <div class="i-scope"><label>Scope <select aria-label="Insights home" value=${home} onChange=${e => { setHome(e.target.value); choose('') }}><option value="">All registered homes</option>${f.homes.map(h => html`<option value=${h}>${hname(d, h)}</option>`)}</select></label><small>Retained records · ${new Date(f.at * 1000).toISOString().replace('T', ' ').replace('.000Z', ' UTC')}</small></div>
     <div class="i-stats"><${Card} label="Merged · 24 hours" value=${number(day.length)}/><${Card} label="Merged · 7 days" value=${number(merged.length)}/>
       <${Card} label="Time to merge · P50" value=${seconds(timed.median_seconds)} note=${`${timed.known} timed · ${timed.unknown} unknown`}/><${Card} label="Time to merge · P85" value=${seconds(timed.p85_seconds)}/>
       <${Card} label="Open · recorded" value=${number(open.length)} note=${`${waiting.length} waiting · ${late.length} past stage clock`}/><${Card} label="Queued · recorded" value=${number(queue.length)} note=${`${groups[0][1]} dependencies · ${groups[1][1]} held`}/></div>
-    <section class="i-panel i-waits"><h2>Why work waits now</h2><p class="i-note">Causes overlap; not time lost.</p>
+    <section class="i-panel i-waits"><h2>Why work waits now</h2><p class="i-note">All homes · causes overlap</p>
       ${ranked.length ? ranked.map(b => html`<div class="i-wait"><span>${CAUSES[b.cause]}</span><b title=${`${seconds(b.age)} known lower bound; ${b.items.length} ${b.items.length === 1 ? 'task' : 'tasks'}; ${b.unknown} unknown durations`}>${b.unknown ? '≥ ' : ''}${seconds(b.age)}</b><div><i style=${{ width: b.age / maxWait * 100 + '%' }}></i></div><small>${b.items.length} ${b.items.length === 1 ? 'task' : 'tasks'}${b.unknown ? ` · ${b.unknown} unknown` : ''}</small></div>`) : html`<p class="i-note">No open waits recorded.</p>`}
     </section>
-    <div class="i-grid"><${Trend} days=${f.trend_7d}/><section class="i-panel"><h2>Why queued work has not started</h2>
+    <div class="i-grid"><${Trend} days=${days}/><section class="i-panel"><h2>Why queued work has not started</h2>
       ${groups.map(([name, n]) => html`<${Row} name=${name} value=${number(n)}/>`)}<${Rows} title=${`${queue.length} queued ${queue.length === 1 ? 'item' : 'items'} · why-lines`}>${queue.map(q => html`<${Row} name=${title(q)} value=${hname(d, q.home)} note=${queueWhy(q)}/>`)}</${Rows}></section>
       <${Rows} title=${`${open.length} open ${open.length === 1 ? 'task' : 'tasks'} · stage and reason`}>${[...open].sort((a, b) => (b.seconds_in_stage ?? -1) - (a.seconds_in_stage ?? -1)).map(l => html`<${Row} name=${title(l)} value=${seconds(l.seconds_in_stage)} note=${`${hname(d, l.home)} · ${STAGES[l.stage] || 'Stage unknown'} · ${displayWhy(l)}${l.stage_clock.overdue === true ? ' · past recorded stage clock' : ''}`}/>`)}</${Rows}>
       <${Rows} title=${`${merged.length} merged ${merged.length === 1 ? 'task' : 'tasks'} · last seven days`}>${merged.map(l => html`<${Row} name=${title(l)} value=${seconds(l.durations.time_to_merge)} note=${hname(d, l.home)}/>`)}${merged.filter(l => l.pr).map(l => html`<a class="i-result" href=${l.pr} target="_blank" rel="noreferrer">${title(l)} · open result</a>`)}</${Rows}>
