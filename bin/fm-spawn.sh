@@ -4562,10 +4562,10 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
   # Protect pre-lease task records without touching their Git copies, then
   # acquire in the explicit project, never the new pane's inherited cwd.
   fm_local_firstmate_state_dirs "$STATE" || {
-    echo "error: cannot enumerate recorded Treehouse copies: $FM_LOCAL_STATE_DIRS_ERROR" >&2
+    echo "error: cannot enumerate recorded Treehouse copies: $FM_LOCAL_FIRSTMATE_ERROR" >&2
     exit 1
   }
-  python3 "$SCRIPT_DIR/fm-treehouse-protect.py" "$PROJ_ABS" "${FM_LOCAL_STATE_DIRS[@]}" || exit 1
+  python3 "$SCRIPT_DIR/fm-treehouse-protect.py" "$PROJ_ABS" "${FM_LOCAL_FIRSTMATE_STATES[@]}" || exit 1
   allocated=$(cd "$PROJ_ABS" && treehouse get --lease --lease-holder "$ID") || {
     echo "error: treehouse could not lease a worktree for task $ID; copies held by tasks not yet torn down are not available until their teardown" >&2
     exit 1

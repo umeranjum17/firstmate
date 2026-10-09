@@ -396,10 +396,10 @@ acquire_treehouse_home() (
   }
   trap 'fm_lock_release "$project_lock"' EXIT
   fm_local_firstmate_state_dirs "$STATE" || {
-    echo "error: cannot enumerate recorded Treehouse copies: $FM_LOCAL_STATE_DIRS_ERROR" >&2
+    echo "error: cannot enumerate recorded Treehouse copies: $FM_LOCAL_FIRSTMATE_ERROR" >&2
     return 1
   }
-  python3 "$SCRIPT_DIR/fm-treehouse-protect.py" "$FM_ROOT" "${FM_LOCAL_STATE_DIRS[@]}" || return 1
+  python3 "$SCRIPT_DIR/fm-treehouse-protect.py" "$FM_ROOT" "${FM_LOCAL_FIRSTMATE_STATES[@]}" || return 1
   # Durably lease a firstmate worktree from the pool. The lease persists with no
   # live process and is skipped by later get/prune, so the home survives restarts
   # until teardown or rollback returns it. treehouse prints only the worktree path
