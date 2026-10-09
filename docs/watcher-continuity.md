@@ -45,6 +45,10 @@ Each adapter:
 Pi treats an arm child whose process is already gone as an empty slot even while its close event is still pending, so a repair call or a scheduled retry starts a fresh arm instead of answering unchanged.
 A failed follow-up never cancels continuity restoration.
 
+OpenCode uses the same owner in a second-mate home, retaining the primary-root and session-lock ownership checks that exclude task workers.
+Model-error observation runs in the existing poll loop; `bin/fm-model-outage-lib.sh` owns its error grouping and episode rules, and [runtime verification](verification/runtime-backends.md#opencode-model-error-wakes-and-second-mate-continuity) records the live guard.
+A running OpenCode session keeps the plugin it loaded at launch, so an existing second-mate home gains this arm only when its OpenCode session restarts; the observer never restarts workers.
+
 ### Pi session replacement
 
 Pi same-process session replacement follows the generation-owner contract in `.pi/extensions/fm-primary-pi-watch.ts`:
@@ -193,6 +197,12 @@ So a finished, hung, or identity-mismatched claim cannot suppress that recovery 
 The recovery-episode contract below owns once-per-generation announcement.
 A handling successor does not re-announce.
 It enters its poll loop immediately and keeps scanning signals, stale panes, and checks.
+The watcher's local queue backstop observes the oldest actionable row and re-delivers it after `FM_SECONDMATE_WAKE_STALL_SECS` without progress, without appending, consuming, or rewriting a row.
+Its observation timer survives watcher replacement, resets when the oldest row changes or a reminder is delivered, and clears when no actionable row remains, giving each handling successor time to establish continuity.
+A live supervision-branch grant for that row defers the reminder only until the same no-progress interval reaches `FM_BUSY_TURN_MAX_SECS`; this local path does not use main's busy verdict.
+Declared external-wait stale rows are excluded and retain their existing pause cadence.
+Reminders preserve the queued reason except that a signal payload marked `needs-decision:` is delivered as the supported `signal:` reason, leaving the durable decision marker intact for routing and drain.
+`tests/fm-watch-triage.test.sh`'s `test_own_queue_redelivers_without_churning_successors` exercises the watcher, live grant, reminder, drain, and acknowledgement journey.
 
 ### Manual recovery and other harnesses
 
@@ -213,7 +223,8 @@ In its `--claude` mode it cooperates with the auto-arm.
 
 Every owner above runs inside the agent runtime, so a killed Herdr server takes all of them down at once, and a Claude primary whose turn had already ended has no Stop event left to re-arm.
 `bin/fm-sentinel.sh` is the one piece that must run outside the runtime, as a systemd user service:
-`FM_HOME=<home> bin/fm-sentinel.sh unit > ~/.config/systemd/user/fm-sentinel.service && systemctl --user enable --now fm-sentinel`.
+`mkdir -p ~/.config/systemd/user && FM_HOME="/absolute/home" bin/fm-sentinel.sh unit > ~/.config/systemd/user/fm-sentinel.service && systemctl --user enable --now fm-sentinel`.
+While the service is inactive, session start on a primary Herdr home with a systemd user bus prints a `SENTINEL:` line carrying the install command with shell-quoted absolute home and executable paths.
 On a server restart it reconciles the home's direct reports, orders each live secondmate to do the same in its own home, and types an operational-input doorbell into the primary, so that turn's end re-arms through the primary's own owner.
 It also wakes the primary when supervision is needed and the beacon has been stale beyond the guard grace with no turn running.
 Its header owns the exact rules.
@@ -411,7 +422,7 @@ Only the watcher process touches `state/.last-watcher-beat`.
 No helper process can make a wedged watcher appear healthy.
 An arm whose own script path sits under a disposable no-mistakes validation checkout (`.no-mistakes/worktrees/`) refuses with the typed failure line before touching any state, because a watcher started there outlives the validation step and keeps writing the real home's state from a checkout about to be deleted.
 Once per poll the watcher checks that its home, its state directory, and its own code root still exist, and exits with a logged reason when one is gone, scoped to itself alone, so a torn-down temporary home or a discarded checkout never leaves an orphan watcher behind.
-The watcher uses bash's native fatal handling for HUP and TERM, including during a blocked poll, so both run its EXIT cleanup.
+The watcher uses bash's native fatal handling for HUP and TERM, including during a blocked check or a blocked `fm_backend_capture` pane read, so both run its EXIT cleanup and stop that read.
 `watcher_stop_signals` in `bin/fm-watch.sh` owns the signal-handling rationale.
 The EXIT cleanup bounds its wait for `state/.watcher-down.lock` while persisting recovery state with `FM_WATCHER_CLEANUP_LOCK_BOUND` (default 2 seconds).
 Only positive decimal integers are accepted, including leading-zero forms such as `08`; empty, non-numeric, and zero values (including `00`) fall back to 2 seconds.
@@ -477,6 +488,7 @@ They also prove that a legacy or handoff-phase watcher marker from an absent rep
 `tests/fm-watch-triage.test.sh` proves TERM stops a watcher blocked inside a poll's pane capture and still releases its lock and records an acknowledgeable stop.
 It also exercises a single TERM with a live foreign downtime-marker lock holder, retained stale singleton and subsequent arm-style recovery, including decimal `08` and zero `00` cleanup bounds.
 It checks that a newly appended keyed decision is classified without rereading earlier status bytes, so signal handling can return to the watcher's beacon refresh even when the status history is long.
+`tests/fm-wake-queue.test.sh` proves TERM likewise stops a watcher blocked in the drain-ring idle check's pane capture.
 
 `tests/fm-watcher-lock.test.sh` covers:
 

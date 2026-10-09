@@ -4,28 +4,34 @@ fm-jev-mem-guard.py - host memory guard: measure, admit, and alert before an oom
 
 On Herdr, fleet agents share one agent-runtime service, and systemd-oomd kills
 that service as a unit under the host's configured oomd pressure policy.
-Read host and runtime cgroup pressure independently and classify the worse reading.
-This helper measures or publishes a refusal only when explicitly invoked; it does
-not launch a sampler, interrupt tasks, or enforce fleet launch/relaunch admission.
-Admission refusal cannot guarantee avoidance of an oomd kill.
+Classify by the pressure of the user app.slice, the cgroup systemd-oomd watches
+and agents run in, plus host available memory.
+Host-wide pressure aggregates capped heavy-job slices by design, so it is summary
+context only and never gates admission or alerts.
+Pressure is sustained "some" pressure, the lower of the 10 s and 60 s averages,
+so a short spike does not hold launches while pressure held for about a minute does;
+a 10 s average at or above alert_pressure holds at once as WAIT, never ALERT.
+Unreadable app.slice pressure is not judged: pressure then holds nothing, while available memory still applies.
+Admission refusal and sampler interrupts cannot guarantee avoidance of an oomd kill.
 
 Usage (bin/fm-jev-mem-guard.sh runs this with python3):
   fm-jev-mem-guard.sh [--config FILE] [--state-dir HOME DIR]...
       Print "<verdict>\t<summary>" for the host, naming the largest consumers.
   fm-jev-mem-guard.sh [--config FILE] --admit TASK --state DIR
-      Admission decision for one proposed agent launch.
+      Admission for one agent launch (bin/fm-spawn.sh, bin/fm-control.sh relaunch).
       Exit 0 admits and removes DIR/admission-refused. Exit 1 refuses: prints the
       reason and writes DIR/admission-refused as "<epoch>\t<task>\t<reason>".
   fm-jev-mem-guard.sh [--config FILE] --record FILE [--state-dir HOME DIR]...
-      Record one sample: appends
-      "<epoch>\t<MemAvailable kB>\t<swap used kB>\t<pressure some avg10>\t<verdict>"
+      One independent sampler sample (bin/fm-host-memory-sampler.sh): appends
+      "<epoch>\t<MemAvailable kB>\t<swap used kB>\t<sustained pressure>\t<verdict>"
       to FILE, trimming to the newest 8640 rows once it exceeds 8760, and prints
       "<verdict>\t<summary>"; an ALERT summary names the largest consumers.
 
   --owned-top-task DIR appends a tab and the top consumer's task ID only when
-      that consumer is a task recorded in DIR; this does not interrupt it.
+      that consumer is a task recorded in DIR (for the sampler's interrupt).
 
-Verdicts: OK; WAIT; ALERT; UNKNOWN (not measurable, for example no pressure file).
+Verdicts: OK; WAIT (new agents wait); ALERT (sampler attempts one owned-task interrupt);
+UNKNOWN (not measurable, for example no pressure file).
 --admit refuses WAIT and ALERT and admits OK and UNKNOWN; UNKNOWN records no sample.
 Pass --config FILE to read thresholds; without it the defaults apply.
 Settings are owned by docs/configuration.md "Host memory guard".
@@ -87,56 +93,46 @@ def load_config(path):
 
 
 def pressure_at(path):
+    """Sustained "some" pressure (the lower of the 10 s and 60 s averages) and the 10 s average.
+
+    A spike raises avg10 alone and passes the sustained reading; pressure held for
+    about a minute raises both, and the sustained reading falls as soon as avg10 does.
+    """
     some = next(l for l in open(path) if l.startswith("some "))
-    value = float(dict(f.split("=", 1) for f in some.split()[1:])["avg10"])
-    if not math.isfinite(value) or value < 0:
+    fields = dict(f.split("=", 1) for f in some.split()[1:])
+    fast, slow = float(fields["avg10"]), float(fields["avg60"])
+    if not all(math.isfinite(v) and v >= 0 for v in (fast, slow)):
         raise ValueError
-    return value
+    return min(fast, slow), fast
 
 
-def cgroup_pressure():
+def app_slice_pressure():
+    """(sustained, 10 s) pressure of the user app.slice, or None when unreadable."""
     uid = os.getuid()
-    user = f"user.slice/user-{uid}.slice"
-    paths = {user, f"{user}/user@{uid}.service/app.slice/herdr-server.service"}
+    path = os.path.join(CGROUP_ROOT, f"user.slice/user-{uid}.slice/user@{uid}.service/app.slice/memory.pressure")
     try:
-        for line in open(f"{PROC}/self/cgroup"):
-            if not line.startswith("0::"):
-                continue
-            group = line.strip()[3:].lstrip("/")
-            parts = group.split("/")
-            if "herdr-server.service" in parts:
-                paths.add("/".join(parts[:parts.index("herdr-server.service") + 1]))
-            paths.update("/".join(parts[:i + 1]) for i, part in enumerate(parts)
-                         if part.startswith("user-") and part.endswith(".slice"))
-    except OSError:
-        pass
-    readings = []
-    root = os.path.realpath(CGROUP_ROOT)
-    for group in paths:
-        path = os.path.realpath(os.path.join(root, group, "memory.pressure"))
-        if not path.startswith(root + os.sep):
-            continue
-        try:
-            readings.append((pressure_at(path), group))
-        except (OSError, StopIteration, KeyError, ValueError):
-            pass
-    return max(readings) if readings else (None, None)
+        return pressure_at(path)
+    except (OSError, StopIteration, KeyError, ValueError):
+        return None
 
 
 def sample():
-    """{available_kb, swap_used_kb, pressure}, or None when not measurable."""
+    """{available_kb, swap_used_kb, pressure, fast, host_pressure}, or None when not measurable.
+
+    pressure and fast are None when app.slice pressure is unreadable.
+    """
     try:
         mem = {}
         for line in open(f"{PROC}/meminfo"):
             key, _, val = line.partition(":")
             if val.split() and val.split()[0].isdigit():
                 mem[key.strip()] = int(val.split()[0])
-        host = pressure_at(f"{PROC}/pressure/memory")
-        cgroup, group = cgroup_pressure()
+        host, _ = pressure_at(f"{PROC}/pressure/memory")
+        app = app_slice_pressure()
         return {"available_kb": mem["MemAvailable"],
                 "swap_used_kb": max(0, mem.get("SwapTotal", 0) - mem.get("SwapFree", 0)),
-                "pressure": max(host, cgroup) if cgroup is not None else host,
-                "host_pressure": host, "cgroup_pressure": cgroup, "cgroup": group}
+                "pressure": app[0] if app else None, "fast": app[1] if app else None,
+                "host_pressure": host}
     except (OSError, StopIteration, KeyError, ValueError):
         return None
 
@@ -146,21 +142,24 @@ def verdict(s, cfg):
         return "UNKNOWN", []
     gb = s["available_kb"] / GIB_KB
     for level in ("alert", "wait"):
+        threshold = cfg[f"{level}_pressure"]
         why = []
-        if s["pressure"] >= cfg[f"{level}_pressure"]:
-            why.append(f"pressure at or above {cfg[f'{level}_pressure']:g}%")
+        if s["pressure"] is not None and s["pressure"] >= threshold:
+            why.append(f"pressure at or above {threshold:g}%")
         if gb < cfg[f"{level}_available_gb"]:
             why.append(f"available memory below {cfg[f'{level}_available_gb']:g} GB")
         if why:
             return level.upper(), why
+    if s["pressure"] is not None and s["fast"] >= cfg["alert_pressure"]:
+        return "WAIT", [f"10 s pressure at or above {cfg['alert_pressure']:g}%"]
     return "OK", []
 
 
 def summary(s):
-    return (f"pressure {s['pressure']:.0f}% (10 s average), {s['available_kb'] / GIB_KB:.1f} GB available, "
-            f"{s['swap_used_kb'] / GIB_KB:.1f} GB swap used; " +
-            (f"host {s['host_pressure']:.0f}%, cgroup {s['cgroup_pressure']:.0f}% ({s['cgroup']})"
-             if s['cgroup_pressure'] is not None else "cgroup pressure unreadable; host-only classification"))
+    head = f"{s['available_kb'] / GIB_KB:.1f} GB available, {s['swap_used_kb'] / GIB_KB:.1f} GB swap used; host {s['host_pressure']:.0f}%"
+    if s["pressure"] is None:
+        return f"app.slice pressure unreadable, not judged; {head}"
+    return (f"pressure {s['pressure']:.0f}% (lower of 10 s and 60 s averages), {head}, app.slice {s['pressure']:.0f}%")
 
 
 def read_meta(path):
@@ -267,7 +266,8 @@ def replace_text(path, text):
 
 def record(path, s, v):
     with open(path, "a") as f:
-        f.write(f"{int(time.time())}\t{s['available_kb']}\t{s['swap_used_kb']}\t{s['pressure']:.2f}\t{v}\n")
+        pressure = "" if s["pressure"] is None else f"{s['pressure']:.2f}"
+        f.write(f"{int(time.time())}\t{s['available_kb']}\t{s['swap_used_kb']}\t{pressure}\t{v}\n")
     with open(path) as f:
         rows = f.readlines()
     if len(rows) > KEEP_ROWS + 120:

@@ -307,10 +307,10 @@ fm_backend_validate_spawn() {  # <name>
 # 1 and prints nothing for an unknown backend.
 fm_backend_required_tools() {  # <backend>
   case "$1" in
-    tmux)   printf '%s' 'tmux treehouse' ;;
-    herdr)  printf '%s' 'herdr jq treehouse' ;;
-    zellij) printf '%s' 'zellij jq treehouse' ;;
-    cmux)   printf '%s' 'cmux jq treehouse' ;;
+    tmux)   printf '%s' 'tmux treehouse python3' ;;
+    herdr)  printf '%s' 'herdr jq treehouse python3' ;;
+    zellij) printf '%s' 'zellij jq treehouse python3' ;;
+    cmux)   printf '%s' 'cmux jq treehouse python3' ;;
     orca)   printf '%s' 'orca' ;;
     *) return 1 ;;
   esac
@@ -811,18 +811,43 @@ fm_backend_send_key() {  # <backend> <target> <key> [expected-label]
 # fm_backend_send_text_submit: type text once, then submit and verify,
 # retrying only the submission (never retyping). Echoes the backend's
 # proof-carrying verdict; callers require exact empty for confirmed delivery.
+# A pane that already shows the recognised dialog is refused before any
+# adapter types, so that submit neither types the text nor sends Enter.
 fm_backend_send_text_submit() {  # <backend> <target> <text> <retries> <enter-sleep> <settle> [expected-label]
-  local backend=$1
+  local backend=$1 rc=0 target label dialog
   shift
+  target=$1
+  label=${6:-}
   fm_backend_source "$backend" || return 1
+  # Every Enter loop below reads the dialog sink, so it must exist before
+  # any adapter types: a sink that fails here leaves the composer untouched.
+  fm_composer_dialog_sink_prepare || {
+    echo "error: the dialog check for a $backend submit could not be recorded" >&2
+    return 1
+  }
+  # One composer read after the sink exists and before the adapter types.
+  # The classify writes the sink; a named dialog means the next Enter would
+  # answer it.
+  if [ -n "$label" ]; then
+    fm_backend_composer_state "$backend" "$target" "$label" >/dev/null || true
+  else
+    fm_backend_composer_state "$backend" "$target" >/dev/null || true
+  fi
+  if dialog=$(fm_composer_blocking_dialog_noted); then
+    fm_composer_dialog_sink_release
+    echo "error: blocked on a prompt: $dialog" >&2
+    return 1
+  fi
   case "$backend" in
-    tmux) fm_backend_tmux_send_text_submit "$@" ;;
-    herdr) fm_backend_herdr_send_text_submit "$@" ;;
-    zellij) fm_backend_zellij_send_text_submit "$@" ;;
-    orca) fm_backend_orca_send_text_submit "$@" ;;
-    cmux) fm_backend_cmux_send_text_submit "$@" ;;
-    *) echo "error: no send-text implementation for backend '$backend'" >&2; return 1 ;;
+    tmux) fm_backend_tmux_send_text_submit "$@" || rc=$? ;;
+    herdr) fm_backend_herdr_send_text_submit "$@" || rc=$? ;;
+    zellij) fm_backend_zellij_send_text_submit "$@" || rc=$? ;;
+    orca) fm_backend_orca_send_text_submit "$@" || rc=$? ;;
+    cmux) fm_backend_cmux_send_text_submit "$@" || rc=$? ;;
+    *) echo "error: no send-text implementation for backend '$backend'" >&2; rc=1 ;;
   esac
+  fm_composer_dialog_sink_release
+  return "$rc"
 }
 
 # fm_backend_kill: remove the task's session endpoint. An already-gone target

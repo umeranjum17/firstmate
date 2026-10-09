@@ -51,6 +51,7 @@ kbd{font:500 11px Inter,sans-serif;color:var(--ink-3);border:1px solid var(--lin
 .nav[aria-current=page]{background:var(--sel);color:var(--ink)}
 .nav svg{color:var(--ink-3);flex:none}
 .nav .n{margin-left:auto;font-size:12px}
+.home-short{display:none}
 .nav .dot{width:6px;height:6px;border-radius:50%;background:var(--red);margin-left:auto}
 .nav .dot+.n{margin-left:6px}
 .badge{margin-left:auto;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--accent);color:#fff;font-size:11px;font-weight:600;display:grid;place-items:center}
@@ -62,7 +63,7 @@ kbd{font:500 11px Inter,sans-serif;color:var(--ink-3);border:1px solid var(--lin
 .main{margin:8px 8px 8px 0;background:var(--panel);border-radius:10px;box-shadow:var(--edge);display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden}
 .hd{display:flex;align-items:center;gap:6px;height:44px;padding:0 12px 0 16px;border-bottom:1px solid var(--line);flex:none}
 .hd h1{font-size:13px;font-weight:500;margin-right:8px}
-.tab{height:24px;padding:0 9px;border-radius:6px;border:1px solid var(--line-2);color:var(--ink-3);font-size:12px;font-weight:500;display:inline-flex;align-items:center;gap:6px;transition:color .12s,background .12s}
+.tab{height:24px;padding:0 9px;white-space:nowrap;border-radius:6px;border:1px solid var(--line-2);color:var(--ink-3);font-size:12px;font-weight:500;display:inline-flex;align-items:center;gap:6px;transition:color .12s,background .12s}
 .tab:hover{color:var(--ink)}
 .tab[aria-pressed=true]{background:var(--sel);color:var(--ink);border-color:var(--line-3)}
 .tab small{color:var(--ink-4);font-size:12px}
@@ -207,6 +208,26 @@ a.pill:hover{background:var(--hover)}
 .dock>button{width:52px;height:52px}
 .dock a[aria-current=page]{background:var(--sel);color:var(--ink)}
 .dock a .badge{position:absolute;top:4px;right:8px}
+/* --- tablet layout --- */
+@media (max-width:1279px){
+  .hd{flex-wrap:wrap;height:auto;min-height:44px;padding-top:8px;padding-bottom:8px;row-gap:8px}
+  .hd .kpi{order:1;flex:1 0 100%;margin-right:0}
+  .hd .kpi>*{flex:1;justify-content:center}
+}
+@media (max-width:1023px){
+  .app{grid-template-columns:52px 1fr}
+  .side{align-items:center;padding:10px 6px}
+  .side .ws{flex-direction:column;height:auto;padding:0;gap:6px;margin-bottom:8px}
+  .side .ws b,.side .ws .sp,.side .nav .n{display:none}
+  .side .nav{font-size:0;gap:0;width:36px;height:32px;padding:0;justify-content:center;position:relative;flex:none}
+  .side .home-nav{flex-direction:column;gap:2px}
+  .side .home-name{display:none}
+  .side .home-short{display:block;font-size:10px;line-height:12px}
+  .side .nav .dot,.side .nav .badge{position:absolute;top:3px;right:3px;margin:0}
+  .side .sec{font-size:0;height:1px;width:24px;padding:0;margin:10px 0;background:var(--line-2)}
+  .side .foot{flex-direction:column;height:auto;padding:0;gap:6px}
+  .side .live{font-size:0;width:28px;height:28px;justify-content:center}
+}
 @media (max-width:759px){
   .peek{inset:0;width:auto;border-radius:0;animation:sheet .2s ease-out}
   .peek .body{padding-bottom:calc(32px + env(safe-area-inset-bottom))}
@@ -215,3 +236,75 @@ a.pill:hover{background:var(--hover)}
   .pal{top:8px}
   .opt{height:40px;font-size:15px}
 }
+
+/* --- the assignee's model name beside the avatar --- */
+.card .r1{min-width:0}
+.who{display:inline-flex;align-items:center;gap:5px;min-width:0;flex:none;max-width:58%}
+.who .mn{font-size:12px;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card .r1 .id{flex:1;min-width:0}
+.card .r1 .age{margin-left:auto}
+
+/* --- phone: a mobile kanban, one status column at a time --- */
+.mk{display:flex;flex-direction:column;flex:1;min-height:0}
+.mseg{position:sticky;top:0;z-index:3;display:flex;gap:6px;padding:6px 16px 8px;overflow-x:auto;scrollbar-width:none;background:var(--panel)}
+.mseg button{height:32px;padding:0 12px;border-radius:16px;color:var(--ink-3);font-weight:500;font-size:14px;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;flex:none}
+.mseg button[aria-selected=true]{background:var(--raise);color:var(--ink);box-shadow:0 0 0 1px var(--line)}
+.mseg small{color:var(--ink-4);font-size:13px}
+.mcols{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.mcols::-webkit-scrollbar{display:none}
+.mcol{flex:0 0 100%;width:100%;scroll-snap-align:start;display:flex;flex-direction:column;gap:6px;padding:4px 16px calc(92px + env(safe-area-inset-bottom))}
+.mcol .ch{position:static;height:32px;background:transparent;padding-left:0}
+.mcol .card{width:100%}
+.mcol .card .why{display:none}
+
+/* --- overview: the app's own Linear view of the fleet's numbers --- */
+.ov{flex:1;min-height:0;overflow:auto;padding:14px 16px 40px}
+.ov-kpis{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.ov-kpi{display:flex;flex-direction:column;gap:2px;min-width:96px;flex:1 1 96px;padding:10px 12px;border-radius:8px;background:var(--card);box-shadow:var(--edge);text-align:left}
+.ov-kpi span{font-size:11px;color:var(--ink-3)}
+.ov-kpi b{font-size:22px;font-weight:600;letter-spacing:-.02em;line-height:1.1;font-variant-numeric:tabular-nums}
+.ov-kpi b small{font-size:11px;font-weight:400;color:var(--ink-4)}
+.ov-kpi.warn b{color:var(--orange)}.ov-kpi.bad b{color:var(--red)}
+.ov-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;align-items:start}
+.ov-card{background:var(--card);border-radius:8px;box-shadow:var(--edge);padding:12px 14px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.ov-card.wide{grid-column:1/-1}
+.ov-card h3{font-size:12px;font-weight:500;color:var(--ink-3)}
+.ov-bar{display:flex;height:8px;border-radius:4px;background:var(--raise);overflow:hidden}
+.ov-bar.tall{height:10px}
+.ov-bar i{display:block;height:100%;background:var(--ink-3);min-width:2px}
+.ov-bar i.v{opacity:.72}.ov-bar i.f{opacity:.5}.ov-bar i.w{opacity:.32}
+.ov-bar i.d{background:var(--orange);opacity:1}.ov-bar i.b{background:var(--red);opacity:1}
+.ov-legend{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px}
+.ov-legend span{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-3);min-width:0}
+.ov-legend i{width:8px;height:8px;border-radius:2px;background:var(--ink-3);flex:none}
+.ov-legend i.v{opacity:.72}.ov-legend i.f{opacity:.5}.ov-legend i.w{opacity:.32}.ov-legend i.d{background:var(--orange)}.ov-legend i.b{background:var(--red)}
+.ov-legend b{margin-left:auto;color:var(--ink);font-weight:500;font-variant-numeric:tabular-nums}
+.ov-ql{display:flex;flex-direction:column;gap:9px}
+.ov-qrow{display:grid;grid-template-columns:minmax(0,1fr) 64px 24px;align-items:center;gap:10px;font-size:13px;color:var(--ink-2)}
+.ov-qrow b{color:var(--ink);font-weight:500;text-align:right;font-variant-numeric:tabular-nums}
+.ov-qsub{grid-column:1/-1;font-size:11px;color:var(--ink-4);margin-top:-3px}
+.ov-qsub.warn{color:var(--orange)}.ov-qsub.bad{color:var(--red)}.ov-qsub.mut{color:var(--ink-4)}
+.ov-tot{font-size:12px;color:var(--ink-3)}
+.ov-tot b{color:var(--ink)}
+.ov-flows{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.ov-flow{display:flex;flex-direction:column;gap:2px;min-width:0}
+.ov-flow span{font-size:11px;color:var(--ink-3)}
+.ov-flow b{font-size:20px;font-weight:600;letter-spacing:-.02em}
+.ov-flow small{font-size:11px;color:var(--ink-4)}
+.ov-spark{width:100%;height:22px;fill:var(--ink-4)}
+.ov-asks{display:flex;flex-direction:column}
+.ov-ask{display:flex;align-items:baseline;gap:12px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}
+.ov-ask:last-child{border-bottom:0}
+.ov-ask span{flex:1;min-width:0}
+.ov-ask small{color:var(--ink-3)}
+.ov-homes{display:flex;flex-direction:column}
+.ov-hrow{display:grid;grid-template-columns:10px minmax(0,1fr) auto auto auto;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:13px}
+.ov-hrow:last-child{border-bottom:0}
+.ov-hrow .num{color:var(--ink-3)}
+.ov-hrow .num small{color:var(--ink-4)}
+.ov-merges{display:flex;flex-direction:column}
+.ov-mrow{display:flex;align-items:baseline;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:13px}
+.ov-mrow:last-child{border-bottom:0}
+.ov-mrow a{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink-2)}
+.ov-mrow span{color:var(--ink-3);font-size:12px}
+.ov-mrow small{color:var(--ink-4)}

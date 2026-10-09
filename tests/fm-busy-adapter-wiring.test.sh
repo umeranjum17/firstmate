@@ -74,6 +74,12 @@ switch (process.env.MODE) {
     break;
   case "turn-end": await handlers["turn_end"]({}, ctx); break;
   case "progress": await handlers["codex-native:progress"]({ type: "commandExecution", phase: "completed" }); break;
+  case "text_delta": case "thinking_delta": case "toolcall_delta": case "empty-delta": case "message-start":
+    await handlers["message_update"]({ assistantMessageEvent: {
+      type: process.env.MODE === "empty-delta" ? "text_delta" : process.env.MODE,
+      delta: process.env.MODE === "empty-delta" ? "" : "new streamed bytes",
+    }});
+    break;
   default: throw new Error("unknown mode " + process.env.MODE);
 }
 if (["turn-end", "progress"].includes(process.env.MODE)) {
@@ -83,7 +89,7 @@ EOF
 }
 
 test_pi_extension_semantic_lifecycle() {
-  local rec id=busy-pi-1 out state ext
+  local rec id=busy-pi-1 out state ext mode
   rec=$(make_spawn_case pi-lifecycle pi "$id")
   read_case_record "$rec"
   out=$(run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR")
@@ -101,6 +107,17 @@ test_pi_extension_semantic_lifecycle() {
   [ ! -e "$state/$id.turn-ended" ] || fail "native progress fabricated a completed turn"
   out=$(classify pi "$id" "$state")
   [ "$out" = "busy fm-spawn" ] || fail "native progress changed semantic state: $out"
+  for mode in text_delta thinking_delta toolcall_delta empty-delta message-start; do
+    rm -f "$state/$id.progress"
+    out=$(drive_pi_ext "$ext" "$mode") || fail "$mode drive failed: $out"
+    case "$mode" in
+      empty-delta|message-start) [ ! -e "$state/$id.progress" ] || fail "$mode fabricated progress" ;;
+      *) [ -f "$state/$id.progress" ] || fail "$mode did not record streaming progress" ;;
+    esac
+    [ ! -e "$state/$id.turn-ended" ] || fail "$mode fabricated a completed turn"
+    out=$(classify pi "$id" "$state")
+    [ "$out" = "busy fm-spawn" ] || fail "$mode changed semantic busy state: $out"
+  done
   out=$(drive_pi_ext "$ext" turn-end) || fail "turn_end drive failed: $out"
   [ -f "$state/$id.turn-ended" ] || fail "turn_end no longer touches the notification marker"
   out=$(classify pi "$id" "$state")
@@ -173,6 +190,8 @@ test_pi_extension_stale_incarnation_rejected() {
   [ "$out" = "busy fm-spawn" ] || fail "a stale extension event must not change state, got '$out'"
   out=$(drive_pi_ext "$ext" progress) || fail "stale progress drive failed: $out"
   [ ! -e "$state/$id.progress" ] || fail "stale native progress refreshed the new incarnation"
+  out=$(drive_pi_ext "$ext" text_delta) || fail "stale streaming drive failed: $out"
+  [ ! -e "$state/$id.progress" ] || fail "stale streaming refreshed the new incarnation"
   pass "pi extension events from a superseded incarnation are rejected as stale"
 }
 
@@ -443,6 +462,161 @@ test_kimi_and_grok_install_no_unverified_wiring() {
   pass "kimi and grok install no unverified semantic wiring and classify through their own gates"
 }
 
+# run_outage_fixture <case-dir> <state-dir> <body>: runs the real
+# fm_model_outage_tick from a copied lib over fixture lanes. Backend liveness,
+# the lane verdict, and the wake sink are faked; busy-gen and the native error
+# files are the real on-disk contract. The body calls tick, and lane <id>
+# <verdict> <liveness> [error] to set a lane. Wakes land in <case-dir>/wakes.
+run_outage_fixture() {
+  local case_dir=$1 state=$2 body=$3 bin
+  bin="$case_dir/bin"
+  mkdir -p "$bin" "$state" "$case_dir/liveness"
+  cp "$ROOT/bin/fm-model-outage-lib.sh" "$ROOT/bin/fm-timeout-lib.sh" "$bin/"
+  cat > "$bin/fm-backend.sh" <<'EOF'
+fm_backend_agent_state() { cat "$FAKE_LIVENESS/$4" 2>/dev/null || printf alive; }
+fm_backend_visible_capture_supported() { return 0; }
+fm_backend_visible_capture() { local t=${2#fake:}; cat "$FAKE_LIVENESS/capture-${t%.meta}" 2>/dev/null; }
+EOF
+  cat > "$bin/fm-busy-lib.sh" <<'EOF'
+fm_busy_classify_semantic() {
+  local verdict
+  verdict=$(cat "$STATE/$4.verdict")
+  if [ "$verdict" = hang ]; then sleep 30; printf 'idle opencode-plugin\n'; return 0; fi
+  printf '%s\n' "$verdict"
+}
+EOF
+  export STATE="$state" FAKE_LIVENESS="$case_dir/liveness"
+  # shellcheck disable=SC2329 # The hooks and scan bodies are called indirectly.
+  (
+    # shellcheck source=/dev/null
+    . "$bin/fm-model-outage-lib.sh"
+    fm_meta_get() { printf opencode; }
+    fm_backend_visible_capture_supported() { return 0; }
+    fm_backend_target_of_meta() { printf 'fake:%s' "${1##*/}"; }
+    fm_backend_of_meta() { printf fake; }
+    hash_pane() { md5sum | cut -c1-12; }
+    wake() { exit 0; }
+    fm_wake_append() { printf '%s\n' "$3" >> "$case_dir/wakes"; }
+    lane() {  # <id> <verdict> <liveness> [error]
+      : > "$state/$1.meta"
+      printf 'g1\n' > "$state/$1.busy-gen"
+      printf '%s\n' "$2" > "$state/$1.verdict"
+      printf '%s\n' "$3" > "$case_dir/liveness/$1"
+      printf '%s\n' "${4-Upstream request failed: region denied}" > "$case_dir/liveness/capture-$1"
+    }
+    tick() { ( rm -f "$STATE/.model-outages/.scan-at"; fm_model_outage_tick ); }
+    "$body"
+  ) || fail "model-outage scans failed"
+  if compgen -G "$state/.model-outages/.scan.*" >/dev/null; then fail "a scan batch directory leaked"; fi
+}
+
+staggered_union_scans() {
+  lane alpha "idle opencode-plugin" alive
+  tick
+  lane bravo "idle opencode-plugin" alive
+  lane charlie "busy opencode-plugin" missing
+  tick
+  tick
+}
+
+# A lane joining an alerted episode sends one updated wake naming the union; a
+# dead mid-turn lane is not named.
+test_model_outage_staggered_lane_joins_union_wake() {
+  local case_dir="$TMP_ROOT/model-outage-union" expected
+  run_outage_fixture "$case_dir" "$case_dir/state" staggered_union_scans
+  expected=$(printf '%s\n' \
+    'check: model outage affected=[alpha]: Upstream request failed: region denied' \
+    'check: model outage affected=[alpha,bravo]: Upstream request failed: region denied')
+  [ "$(cat "$case_dir/wakes")" = "$expected" ] \
+    || fail "a lane joining an alerted episode must send one union wake and nothing for a dead lane, got: $(cat "$case_dir/wakes")"
+  pass "a staggered lane joins its alerted outage in one union wake; a dead mid-turn lane is not named"
+}
+
+recovered_lane_scans() {
+  lane alpha "idle opencode-plugin" alive
+  tick
+  lane alpha "idle opencode-plugin" alive ""
+  lane bravo "idle opencode-plugin" alive
+  tick
+  lane alpha "idle opencode-plugin" alive
+  tick
+}
+
+# A recovered lane leaves the wake: a lane that fails after recovering is named
+# again, and the wake lists the lanes failing in that scan.
+test_model_outage_recovered_lane_leaves_wake() {
+  local case_dir="$TMP_ROOT/model-outage-recovered" expected
+  run_outage_fixture "$case_dir" "$case_dir/state" recovered_lane_scans
+  expected=$(printf '%s\n' \
+    'check: model outage affected=[alpha]: Upstream request failed: region denied' \
+    'check: model outage affected=[bravo]: Upstream request failed: region denied' \
+    'check: model outage affected=[alpha,bravo]: Upstream request failed: region denied')
+  [ "$(cat "$case_dir/wakes")" = "$expected" ] \
+    || fail "a recovered lane must leave the wake and re-alert on re-failure, got: $(cat "$case_dir/wakes")"
+  pass "a recovered lane leaves the alert record and re-alerts when it fails again"
+}
+
+unreadable_then_failing_scans() {
+  lane alpha "idle opencode-plugin" alive
+  lane bravo "idle opencode-plugin" alive
+  tick
+  lane bravo "idle opencode-plugin" unreadable
+  lane alpha "idle opencode-plugin" alive ""
+  tick
+  lane bravo "idle opencode-plugin" alive
+  tick
+}
+
+# An unreadable lane is not named while unreadable, and an episode whose lanes
+# all went unreadable or recovered is forgotten, so a lane that reads failing again
+# is named in a new wake.
+test_model_outage_unreadable_lane_is_named_again_when_readable() {
+  local case_dir="$TMP_ROOT/model-outage-unreadable" expected
+  run_outage_fixture "$case_dir" "$case_dir/state" unreadable_then_failing_scans
+  expected=$(printf '%s\n' \
+    'check: model outage affected=[alpha,bravo]: Upstream request failed: region denied' \
+    'check: model outage affected=[bravo]: Upstream request failed: region denied')
+  [ "$(cat "$case_dir/wakes")" = "$expected" ] \
+    || fail "an unreadable lane must be named again once it reads failing, got: $(cat "$case_dir/wakes")"
+  pass "an unreadable lane is named again once it reads failing, never silently pinned"
+}
+
+legacy_banner_scans() {
+  lane alpha "idle opencode-plugin" alive
+  printf '%s\n' 'Upstream request failed: region denied' '' 'composer A' > "$FAKE_LIVENESS/capture-alpha"
+  tick
+  printf '%s\n' 'Upstream request failed: region denied' '' 'composer B' > "$FAKE_LIVENESS/capture-alpha"
+  tick
+}
+
+# The episode identity is the banner line; unrelated pane text below a wrapped
+# banner changes the displayed error but must not start a second episode.
+test_model_outage_wrapped_banner_keeps_episode_identity() {
+  local case_dir="$TMP_ROOT/model-outage-banner" expected
+  run_outage_fixture "$case_dir" "$case_dir/state" legacy_banner_scans
+  expected='check: model outage affected=[alpha]: Upstream request failed: region denied composer A'
+  [ "$(cat "$case_dir/wakes")" = "$expected" ] \
+    || fail "unrelated text below a wrapped banner must not re-alert, got: $(cat "$case_dir/wakes")"
+  pass "a wrapped legacy banner keeps its episode when unrelated pane text below it changes"
+}
+
+hung_verdict_scans() {
+  lane delta "hang" alive
+  tick
+}
+
+# A hung verdict read is bounded like the other per-lane reads: it cannot block
+# the scan or name a lane.
+test_model_outage_hung_verdict_is_bounded() {
+  local case_dir="$TMP_ROOT/model-outage-hung" started elapsed
+  started=$(date +%s)
+  run_outage_fixture "$case_dir" "$case_dir/state" hung_verdict_scans
+  elapsed=$(( $(date +%s) - started ))
+  [ ! -e "$case_dir/wakes" ] || fail "a hung verdict must not name a lane, got: $(cat "$case_dir/wakes")"
+  [ "$elapsed" -lt 20 ] || fail "a hung verdict read blocked the scan for ${elapsed}s"
+  pass "a hung verdict read is bounded and names no lane"
+}
+
 test_pi_extension_semantic_lifecycle
 test_pi_extension_serializes_settle_before_next_start
 test_pi_extension_stale_ctx_settles_unknown
@@ -456,5 +630,10 @@ test_gemini_hooks_stale_incarnation_harmless
 test_raw_gemini_launch_has_no_semantic_wiring
 test_gemini_is_refused_as_a_secondmate
 test_codex_unverified_until_a_semantic_source_exists
+test_model_outage_staggered_lane_joins_union_wake
+test_model_outage_recovered_lane_leaves_wake
+test_model_outage_unreadable_lane_is_named_again_when_readable
+test_model_outage_hung_verdict_is_bounded
+test_model_outage_wrapped_banner_keeps_episode_identity
 
 echo "all fm-busy-adapter-wiring tests passed"

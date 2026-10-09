@@ -82,14 +82,21 @@ GRACE=${FM_GUARD_GRACE:-300}
 LOG="$STATE/.sentinel.log"
 
 if [ "$CMD" = unit ]; then
+  unit_quote() {
+    local value=$1
+    value=${value//\\/\\\\}
+    value=${value//\"/\\\"}
+    value=${value//%/%%}
+    printf '"%s"' "$value"
+  }
   cat <<EOF
 [Unit]
-Description=Firstmate sentinel for $FM_HOME (recovers supervision after an agent-runtime restart)
+Description=Firstmate sentinel for ${FM_HOME//%/%%} (recovers supervision after an agent-runtime restart)
 
 [Service]
-Environment=FM_HOME=$FM_HOME
-Environment=PATH=$PATH
-ExecStart=$SCRIPT_DIR/fm-sentinel.sh loop
+Environment=$(unit_quote "FM_HOME=$FM_HOME")
+Environment=$(unit_quote "PATH=$PATH")
+ExecStart=$(unit_quote "$SCRIPT_DIR/fm-sentinel.sh") loop
 Restart=always
 RestartSec=10
 

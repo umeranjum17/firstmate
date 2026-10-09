@@ -254,8 +254,12 @@ test_devices_and_machine_come_from_read_only_probes() {
   proc="$home/proc" locks="$home/locks" bin="$home/stubs"
   mkdir -p "$proc/pressure" "$proc/900" "$proc/800" "$locks" "$home/projects/wt"
   fm_write_meta "$home/state/m-build.meta" "kind=ship" "worktree=$home/projects/wt" "herdr_pane_id=pane-m-build"
-  printf 'MemTotal:       67108864 kB\nMemAvailable:   10485760 kB\n' > "$proc/meminfo"
+  printf 'MemTotal:       67108864 kB\nMemAvailable:   10485760 kB\nSwapTotal:      33554432 kB\nSwapFree:       29360128 kB\n' > "$proc/meminfo"
   printf 'some avg10=3.50 avg60=8.00 avg300=12.00 total=1\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n' > "$proc/pressure/memory"
+  # The watcher's recorded samples: only the last hour counts toward the peak.
+  printf '%s\t1\t1\t88.00\tALERT\n%s\t1\t1\t41.20\tALERT\n%s\t1\t1\t6.00\tOK\n' \
+    "$(( $(date +%s) - 7200 ))" "$(( $(date +%s) - 600 ))" "$(date +%s)" > "$home/state/host-memory.tsv"
+  printf '%s\tnope-mem\tpressure at or above 20%%\n' "$(( $(date +%s) - 120 ))" > "$home/state/admission-refused"
   printf 'Name:\tqemu-system-x86\nVmRSS:\t 4194304 kB\n' > "$proc/900/status"
   printf '900 (qemu-system-x86) S 800 900 1\n' > "$proc/900/stat"
   printf '800 (flock) S 1 800 1\n' > "$proc/800/stat"
@@ -292,7 +296,9 @@ EOF
     "Phone Pixel 9 Free · last used by Main 10 min ago · PHONE1 · USB" \
     "Emulator test-avd In use by Main · 10 min · emulator-5554 · 4.0 GB in use" \
     "Free memory 10.0 GB of 64 GB" "Memory pressure 4% share of the last 10 s" "Heavy jobs 8.0 GB of 32 GB" "hard limit 38 GB" \
-    "Gradle builds 2 of 2" "Emulators 1 of 2" "✕ 10 GB free, heavy jobs wait" "▲ 2/2 Gradle builds at cap"
+    "Gradle builds 2 of 2" "Emulators 1 of 2" "✕ 10 GB free, heavy jobs wait" "▲ 2/2 Gradle builds at cap" \
+    "Pressure peak, last hour 41%" "Swap used 4.0 GB" "new agents wait (Main)" "nope-mem"
+  lacks "$d/index.html" "Pressure peak, last hour 88%"
   [ "$(sort -u "$home/adb.calls")" = "devices -l" ] || fail "adb was asked more than the device list: $(cat "$home/adb.calls")"
   jq -e '.metrics.devices.value == 2 and .metrics.connected_devices.value == 2 and .metrics.device_groups.value.action == {"In use":1,"Free":1} and .metrics.device_groups.value.home == {"Main":1,"No holder":1}' "$d/data.json" >/dev/null || fail "device groups differ from the page"
   printf 'List of devices attached\nPHONE1 device model:Pixel_9\nOFFLINE offline model:Pixel_8\n' > "$home/adb-output"
@@ -354,14 +360,15 @@ test_serve_answers_each_page_and_remembers_the_grouping() {
   done
   [ -n "$url" ] || fail "serve never reported its address: $(cat "$home/serve.err")"
   case "$url" in http://127.0.0.1:*/) ;; *) fail "serve did not default to loopback: $url" ;; esac
-  got=$(python3 - "$url" <<'PY'
+  got=$(python3 - "$url" "$ROOT/bin/fm-dashboard/index.html" <<'PY'
 import json, re, sys, urllib.request, urllib.error
 def get(u, cookie=None):
     rq = urllib.request.Request(u, headers={'Cookie': cookie} if cookie else {})
     try:
         with urllib.request.urlopen(rq, timeout=120) as r: return r.status, r.read().decode(), r.headers.get('Set-Cookie') or ''
     except urllib.error.HTTPError as e: return e.code, '', ''
-base = sys.argv[1]
+base, shell_path = sys.argv[1:3]
+APP_SHELL = open(shell_path, 'rb').read()
 with urllib.request.urlopen(base + 'data.json', timeout=120) as r:
     assert r.headers.get_content_type() == 'application/json'
     data = json.load(r)
@@ -380,7 +387,7 @@ for metric in m.values():
 with urllib.request.urlopen(urllib.request.Request(base + 'data.json', method='HEAD')) as r:
     assert r.headers.get_content_type() == 'application/json' and r.read() == b''
     assert int(r.headers['Content-Length']) > 0
-for path, want in (('overview', 'Nothing needs you.'), ('backlog', 'Held for the captain'), ('measure', 'How each number is measured.')):
+for path, want in (('backlog', 'Held for the captain'), ('measure', 'How each number is measured.')):
     code, body, _ = get(base + path)
     print(path, code, want in body)
 code, body, cookie = get(base + 'backlog?group=home')
@@ -397,11 +404,13 @@ def raw(u, **h):
     except urllib.error.HTTPError as e: return e.code, e.headers, b''
 # The app and its files: its own origin only, each file answered 304 while unchanged; the pages keep their own policy.
 s, h, b = raw(base)
-print('app', s, h.get_content_type(), "default-src 'self'" in h['Content-Security-Policy'], b'src="app.js"' in b)
+print('app', s, h.get_content_type(), "default-src 'self'" in h['Content-Security-Policy'], b == APP_SHELL)
 for path in ('app.js', 'vendor/preact-htm-3.1.1.js', 'board.json'):
     s, h, b = raw(base + path)
     print(path, s, h.get_content_type(), h['Cache-Control'], raw(base + path, **{'If-None-Match': h['ETag']})[0])
-print('board', json.loads(raw(base + 'board.json')[2])['schema'], "default-src 'none'" in raw(base + 'overview')[1]['Content-Security-Policy'])
+s, h, b = raw(base + 'overview')
+print('overview-app', s, "default-src 'self'" in h['Content-Security-Policy'], b == APP_SHELL)
+print('board', json.loads(raw(base + 'board.json')[2])['schema'], "default-src 'none'" in raw(base + 'backlog')[1]['Content-Security-Policy'])
 import gzip
 s, h, b = raw(base + 'board.json', **{'Accept-Encoding': 'gzip'})
 print('gzip', h['Content-Encoding'], json.loads(gzip.decompress(b))['schema'], raw(base + 'board.json', **{'Accept-Encoding': 'gzip', 'If-None-Match': h['ETag']})[0])
@@ -413,20 +422,20 @@ for path in ('ship/index.js', 'ship/scene.js', 'vendor/three-0.186.1.min.js', 's
     print(path, s, h.get_content_type(), raw(base + path, **{'If-None-Match': h['ETag']})[0])
 PY
 )
-  [ "$got" = "$(printf '%s\n' 'overview 200 True' 'backlog 200 True' 'measure 200 True' \
+  [ "$got" = "$(printf '%s\n' 'backlog 200 True' 'measure 200 True' \
     'group 200 True True' 'cookie 200 True' 'timestamps True True' 'flow 404' 'state/ 404' 'index.home.html 404' '../data/backlog.md 404' 'data/backlog.md 404' \
     'app 200 text/html True True' 'app.js 200 text/javascript no-cache 304' 'vendor/preact-htm-3.1.1.js 200 text/javascript no-cache 304' \
-    'board.json 200 application/json no-cache 304' 'board fm-dashboard-board.v1 True' 'gzip gzip fm-dashboard-board.v1 304' 'vendor/../app.js 404' '../fm-dashboard/app.js 404' \
+    'board.json 200 application/json no-cache 304' 'overview-app 200 True True' 'board fm-dashboard-board.v1 True' 'gzip gzip fm-dashboard-board.v1 304' 'vendor/../app.js 404' '../fm-dashboard/app.js 404' \
     '.hidden.js 404' 'a/b/app.js 404' 'app.py 404' 'missing.js 404' 'ship/index.js 200 text/javascript 304' 'ship/scene.js 200 text/javascript 304' \
     'vendor/three-0.186.1.min.js 200 text/javascript 304' 'ship/ship.css 200 text/css 304')" ] \
     || fail "serve answers were not the app, the three pages, the remembered grouping, then 404s: $got"
   # An old page is answered at once, as it is, while a rebuild runs behind it.
-  printf '<p>old page<!--age--></p>\n' > "$home/state/dashboard/index.html"
+  printf '<p>old page<!--age--></p>\n' > "$home/state/dashboard/backlog.html"
   touch -d '-5 minutes' "$home/state/dashboard/index.html"
-  got=$(python3 -c 'import sys, urllib.request; print(urllib.request.urlopen(sys.argv[1], timeout=5).read().decode())' "${url}overview")
+  got=$(python3 -c 'import sys, urllib.request; print(urllib.request.urlopen(sys.argv[1], timeout=5).read().decode())' "${url}backlog")
   case "$got" in *'<span class="age bad">updated 5'*'min ago'*) ;; *) fail "an old page was not answered at once, marked old: $got" ;; esac
-  for _ in $(seq 1 1200); do grep -q 'old page' "$home/state/dashboard/index.html" || break; sleep 0.1; done
-  grep -q 'Nothing needs you' "$home/state/dashboard/index.html" || fail "the background rebuild did not replace the old page"
+  for _ in $(seq 1 1200); do grep -q 'old page' "$home/state/dashboard/backlog.html" || break; sleep 0.1; done
+  grep -q 'Held for the captain' "$home/state/dashboard/backlog.html" || fail "the background rebuild did not replace the old page"
   python3 - "$url" "$home" <<'PY' || fail "failed rebuild reported a healthy JSON refresh"
 import os, time, sys, urllib.request, urllib.error
 base, home = sys.argv[1:]
@@ -435,7 +444,7 @@ os.unlink(home + '/state/dashboard/backlog.html')
 os.mkdir(home + '/state/dashboard/backlog.html')
 os.utime(home + '/state/dashboard/index.html', (time.time() - 300,) * 2)
 deadline = time.monotonic() + 15
-while 'last refresh failed' not in urllib.request.urlopen(base + 'overview').read().decode():
+while 'last refresh failed' not in urllib.request.urlopen(base + 'measure').read().decode():
     assert time.monotonic() < deadline, 'rebuild never failed'
     time.sleep(.1)
 for path in ('board.json', 'data.json'):
@@ -524,12 +533,42 @@ assert.equal(board.stageTimes({ building: 100, review: 200, test: 300 }, 2, fals
 const c = { id: 'main/m-test', home: 'main', task: 'm-test', title: 'Test', stage: 'review', wait: 'waiting', why: 'm-login is complete; waiting for vendor credentials', history: [] }
 assert.equal(ui.reason(c), c.why); assert.equal(ui.stuck({ ...c, wait: 'blocked' }), true)
 let opened = null
-const open = id => opened = id, desktop = board.Card({ d, c, open }), rows = board.List({ d, cards: [c], r: { tab: 'active' }, open })
-const row = rows[0][1][0], phone = row.type(row.props)
-for (const node of [desktop, phone]) {
-  assert.equal(node.props.role, 'button')
-  for (const key of ['Enter', ' ']) { opened = null; let prevented = false; node.props.onKeyDown({ key, target: node, currentTarget: node, preventDefault() { prevented = true } }); assert.equal(opened, c.id); assert.equal(prevented, true) }
+const open = id => opened = id, desktop = board.Card({ d, c, open })
+assert.equal(desktop.props.role, 'button')
+for (const key of ['Enter', ' ']) { opened = null; let prevented = false; desktop.props.onKeyDown({ key, target: desktop, currentTarget: desktop, preventDefault() { prevented = true } }); assert.equal(opened, c.id); assert.equal(prevented, true) }
+class El {
+  constructor(name, type = 1) { Object.assign(this, { localName: name, nodeType: type, data: '', childNodes: [], parentNode: null, attrs: {}, listeners: {}, style: { setProperty() {}, removeProperty() {} }, onclick: null, onkeydown: null }) }
+  get firstChild() { return this.childNodes[0] ?? null }
+  get nextSibling() { const s = this.parentNode?.childNodes ?? []; return s[s.indexOf(this) + 1] ?? null }
+  get textContent() { return this.nodeType === 3 ? this.data : this.childNodes.map(n => n.textContent).join('') }
+  insertBefore(n, ref) { n.parentNode?.removeChild(n); n.parentNode = this; const i = this.childNodes.indexOf(ref); this.childNodes.splice(i < 0 ? this.childNodes.length : i, 0, n); return n }
+  appendChild(n) { return this.insertBefore(n, null) }
+  removeChild(n) { this.childNodes.splice(this.childNodes.indexOf(n), 1); n.parentNode = null; return n }
+  setAttribute(k, v) { this.attrs[k] = String(v) }
+  removeAttribute(k) { delete this.attrs[k] }
+  addEventListener(t, f) { this.listeners[t] = f }
+  removeEventListener(t) { delete this.listeners[t] }
 }
+globalThis.document = { createElement: n => new El(n), createElementNS: (_, n) => new El(n), createTextNode: s => Object.assign(new El('#text', 3), { data: String(s) }) }
+const all = (n, p, out = []) => { if (p(n)) out.push(n); n.childNodes.forEach(k => all(k, p, out)); return out }
+const hasClass = (n, k) => (n.attrs.class ?? n.className ?? '').split(' ').includes(k)
+const { html, render } = await import(`${root}/vendor/preact-htm-3.1.1.js`)
+const phone = [
+  { id: 'main/a', home: 'main', task: 'a', title: 'Alpha', stage: 'building', history: [] },
+  { id: 'main/b', home: 'main', task: 'b', title: 'Bravo', stage: 'building', history: [] },
+  { id: 'main/c', home: 'main', task: 'c', title: 'Charlie', stage: 'review', wait: 'blocked', why: 'waiting on credentials', history: [] },
+]
+const pd = { homes: [{ id: 'main', name: 'Main', known: true, ready: 0 }], cards: phone }
+let phoneOpened = null
+const screen = new El('div')
+render(html`<${board.MobileKanban} d=${pd} cards=${phone} r=${{ tab: 'active' }} open=${id => phoneOpened = id}/>`, screen)
+assert.deepEqual(all(screen, n => n.attrs.role === 'tab').map(n => n.textContent), ['Building2', 'Review1'])
+const cols = all(screen, n => hasClass(n, 'mcol'))
+assert.deepEqual(cols.map(col => all(col, n => n.attrs['data-card']).map(n => n.attrs['data-card'])), [['main/a', 'main/b'], ['main/c']])
+assert.deepEqual(cols.map(col => all(col, n => hasClass(n, 'n'))[0].textContent), ['2', '1'])
+const bravo = all(screen, n => n.attrs['data-card'] === 'main/b')[0]
+bravo.listeners.click.call(bravo, { type: 'click' }); assert.equal(phoneOpened, 'main/b')
+phoneOpened = null; bravo.listeners.keydown.call(bravo, { type: 'keydown', key: 'Enter', target: bravo, currentTarget: bravo, preventDefault() {} }); assert.equal(phoneOpened, 'main/b')
 JS
   pass "board.json gives each lane its stage, wait, reason in words, model and each status line's verb and stage, landed titles without their PR, cycle times and the ask list"
 }
@@ -671,14 +710,22 @@ test_incomplete_lanes_and_moved_filings() {
   printf '## Queued\n- [ ] missing-ready - Missing home ready (since %s)\n' "$(date +%F)" > "$home/mates/missing/data/backlog.md"
   printf -- '- missing - domain (home: %s; scope: work; projects: alpha; added 2026-07-11)\n' "$home/mates/missing" >> "$home/data/secondmates.md"
   build "$home"
-  has "$d/index.html" "Lanes open at least 8" "Stuck at least 2" "free unknown" "Ready, capacity unknown 1" "unknown of 3"
+  has "$d/index.html" "Lanes open at least 8" "Stuck at least 3" "free unknown" "Ready, capacity unknown 1" "unknown of 3"
   lacks "$d/index.html" "All flowing" "missing 0 of 3"
   has "$d/backlog.html" "at least 8 lanes open" "Fleet at least 8" "missing unknown 3"
-  for p in backlog backlog.home; do has "$d/$p.html" "Oldest validation or CI wait: at least"; done
+  for p in backlog backlog.home; do has "$d/$p.html" "Oldest validation or CI wait: unknown"; done
   has "$d/backlog.home.html" "missing unknown"
-  jq -e '.metrics.lanes.status == "lower_bound" and .metrics.stuck.status == "lower_bound" and .metrics.free_lanes.status == "unknown" and ([.homes[] | select(.home == "missing")][0].lanes.value == null)' "$d/data.json" >/dev/null || fail "missing lane coverage looks exact"
+  jq -e '.metrics.lanes.status == "lower_bound" and .metrics.stuck.status == "lower_bound" and .metrics.stuck.value == 3 and .metrics.free_lanes.status == "unknown" and ([.homes[] | select(.home == "missing")][0].lanes.value == null)' "$d/data.json" >/dev/null || fail "missing lane coverage looks exact"
+  printf '%s\tlocal-pressure-task\tlocal pressure refusal\n' "$now" > "$z/state/admission-refused"
+  build "$home"
+  has "$d/index.html" "new agents wait (zephyrine)" "local-pressure-task"
+  printf '%s\tmain-pressure-task\tmain pressure refusal\n' "$now" > "$home/state/admission-refused"
   printf -- '- zephyrine - remote (host: distant; root: /srv; home: %s; scope: work; projects: alpha; added 2026-07-11)\n' "$z" > "$home/data/secondmates.md"
   build "$home"
+  has "$d/index.html" "new agents wait (Main)" "main-pressure-task"
+  for p in index backlog backlog.home measure; do
+    lacks "$d/$p.html" "new agents wait (zephyrine)" "local-pressure-task" "local pressure refusal"
+  done
   has "$d/index.html" "Lanes open at least 7" "unknown of 3"
   jq -e '[.homes[] | select(.home == "zephyrine")][0] | .lanes.status == "unknown" and .free_lanes.value == null' "$d/data.json" >/dev/null || fail "remote lane capacity was inferred"
   : > "$home/data/secondmates.md"
@@ -806,9 +853,63 @@ PY
   pass "unavailable displayed readings suppress reassurance and concurrent cache updates preserve both builds"
 }
 
+test_ci_failures_remain_stuck_in_metrics() {
+  local home d now
+  home=$(make_home ci-stuck)
+  d="$home/state/dashboard" now=$(date +%s)
+  lane "$home" m-stuck ship "blocked [at=$now]: CI needs credentials"
+  lane "$home" m-resume ship "failed [at=$now]: no-mistakes checks failed"
+  build "$home"
+  python3 - "$d" <<'PY' || fail "CI failures disagree between board and metrics"
+import json, pathlib, sys
+out = pathlib.Path(sys.argv[1])
+metrics = json.loads((out / 'data.json').read_text())
+board = json.loads((out / 'board.json').read_text())
+cards = {c['task']: c for c in board['cards'] if c.get('task')}
+assert cards['m-stuck']['wait'] == cards['m-resume']['wait'] == 'blocked'
+assert metrics['metrics']['stuck']['value'] == 3, metrics['metrics']['stuck']
+assert metrics['metrics']['stuck']['value'] == sum(c.get('wait') in ('blocked', 'decision') for c in board['cards'])
+states = metrics['metrics']['lane_states']['value']
+assert states['blocked'] == 2, states
+assert states['validating'] == 1, states
+PY
+  has "$d/index.html" 'Stuck 3' '2 blocked'
+  lane "$home" m-held-ci ship "paused [at=$now]: waiting for CI checks" \
+    "needs-decision [at=$now] [key=captain-hold-ci]: captain parked CI"
+  build "$home"
+  python3 - "$d" <<'PY' || fail "captain-held lane disagrees between board and metrics"
+import json, pathlib, sys
+out = pathlib.Path(sys.argv[1])
+metrics = json.loads((out / 'data.json').read_text())['metrics']
+board = json.loads((out / 'board.json').read_text())
+held = next(c for c in board['cards'] if c.get('task') == 'm-held-ci')
+assert held['wait'] == 'parked', held
+assert metrics['stuck']['value'] == 3, metrics['stuck']
+assert metrics['stuck']['value'] == sum(c.get('wait') in ('blocked', 'decision') for c in board['cards'])
+assert metrics['lanes']['value'] == sum(metrics['lane_states']['value'].values()) == 9
+PY
+  has "$d/index.html" 'Stuck 3' '2 blocked'
+  printf 'resolved [at=%s] [key=captain-hold-ci]: captain released CI\nfailed [at=%s]: CI checks failed\n' "$now" "$now" >> "$home/state/m-held-ci.status"
+  build "$home"
+  python3 - "$d" <<'PY' || fail "released CI failure was not counted as stuck"
+import json, pathlib, sys
+out = pathlib.Path(sys.argv[1])
+metrics = json.loads((out / 'data.json').read_text())['metrics']
+board = json.loads((out / 'board.json').read_text())
+released = next(c for c in board['cards'] if c.get('task') == 'm-held-ci')
+assert released['wait'] == 'blocked', released
+assert metrics['stuck']['value'] == 4, metrics['stuck']
+assert metrics['stuck']['value'] == sum(c.get('wait') in ('blocked', 'decision') for c in board['cards'])
+PY
+  has "$d/index.html" 'Stuck 4' '3 blocked'
+  pass "CI failures stay stuck unless captain-held, and releasing the hold restores the count"
+}
+
+if [ "${1:-}" = ci-stuck ]; then test_ci_failures_remain_stuck_in_metrics; exit; fi
 if [ "${1:-}" = board ]; then test_board_json_feeds_the_app; exit; fi
 if [ "${1:-}" = review ]; then test_board_json_feeds_the_app; test_serve_answers_each_page_and_remembers_the_grouping; exit; fi
 
+test_ci_failures_remain_stuck_in_metrics
 test_unavailable_readings_and_concurrent_caches
 test_new_lane_and_unwritten_archive_stay_exact
 test_incomplete_lanes_and_moved_filings

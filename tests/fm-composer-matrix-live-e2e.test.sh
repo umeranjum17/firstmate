@@ -168,6 +168,55 @@ for h in claude codex opencode pi grok kimi muse; do
   fi
 done
 
+# --- 1b. The WRAPPED OpenCode status footer, live ---------------------------
+# A long worktree path (the fleet norm) wraps the right-aligned status row at
+# the pane width: the cost cell truncates to a bare `$` abutting the palette
+# hint and the trailing `commands` wraps beside the directory's continuation
+# fragment (fm-opencode-composer-err, 2026-10-09). The pre-fix pattern matched
+# NEITHER row, so an idle, empty composer read `unknown` and fm-control refused
+# every OpenCode worker. Launch opencode in a narrow window at a long cwd and
+# require its idle composer to read `empty` cursorless.
+if command -v opencode >/dev/null 2>&1; then
+  wrap_root=$(mktemp -d "${TMPDIR:-/tmp}/fm-cmx-wrap.XXXXXX")
+  wrap_cwd="$wrap_root/a-really-quite-long-opencode-project-directory-name"
+  mkdir -p "$wrap_cwd"
+  wrap_win=wrap-opencode
+  wrap_version=$(harness_version opencode)
+  tmux -L "$SOCKET" new-window -d -t "$SESSION:" -n "$wrap_win" -c "$wrap_cwd" -- opencode \
+    || fail "opencode ($wrap_version): wrapped-footer check could not launch"
+  tmux -L "$SOCKET" resize-window -t "$SESSION:$wrap_win" -x 90 -y 45 2>/dev/null || true
+  wrap_verdict=''; wrap_i=0; wrap_budget=${FM_COMPOSER_MATRIX_LIVE_POLLS:-45}; wrap_dismissed=0
+  while [ "$wrap_i" -lt "$wrap_budget" ]; do
+    wrap_verdict=$(fm_tmux_composer_state "$SESSION:$wrap_win")
+    [ "$wrap_verdict" = empty ] && break
+    wrap_i=$((wrap_i + 1))
+    if [ "$wrap_dismissed" -eq 0 ] && [ "$wrap_i" -ge $((wrap_budget / 3)) ]; then
+      wrap_screen=$(tmux -L "$SOCKET" capture-pane -p -t "$SESSION:$wrap_win" 2>/dev/null || true)
+      if ! printf '%s\n' "$wrap_screen" | grep -qi 'trust'; then
+        tmux -L "$SOCKET" send-keys -t "$SESSION:$wrap_win" Escape 2>/dev/null || true
+      fi
+      wrap_dismissed=1
+    fi
+    sleep 1
+  done
+  if [ "$wrap_verdict" = empty ]; then
+    CHECKED=$((CHECKED + 1))
+    pass "opencode ($wrap_version): wrapped status footer idle composer classifies empty"
+    check_harness_idle_cursorless "opencode-wrap" "$wrap_version" "$SESSION:$wrap_win"
+  else
+    printf '# opencode wrapped-footer pane tail at failure:\n' >&2
+    tmux -L "$SOCKET" capture-pane -p -t "$SESSION:$wrap_win" 2>/dev/null \
+      | grep '[^[:space:]]' | tail -8 | sed 's/^/#   /' >&2
+    FAILED=1
+    printf 'not ok - opencode (%s): wrapped status footer idle composer never classified empty (last verdict: %s)\n' \
+      "$wrap_version" "${wrap_verdict:-unreadable}" >&2
+  fi
+  tmux -L "$SOCKET" kill-window -t "$SESSION:$wrap_win" 2>/dev/null || true
+  rm -rf "$wrap_root"
+else
+  note "harness absent, not verified here: opencode (wrapped-footer check not exercised)"
+fi
+
 # --- 2. The strict blank-row posture, live ----------------------------------
 # A plain shell pane parked on a blank line between two rules (the audit's
 # sleep-pane counterexample): the permissive rule read this empty; strict must

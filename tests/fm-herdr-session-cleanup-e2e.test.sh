@@ -106,11 +106,14 @@ reject_lab viewer start "$HERDR_LAB_SESSION"
 reject_lab viewer stop "$HERDR_LAB_SESSION"
 [ -f "$HOME_DIR/config/backend" ] || fail 'invalid pointer deleted unrelated home'
 printf '%s\n' "$LAB_BASE" > "$FM_HERDR_LAB_STATE_DIR/$HERDR_LAB_SESSION.xdg-root"
+# Stop the owned server before redirecting a directory it can recreate.
+"$HERDR_LAB_HELPER" stop "$HERDR_LAB_SESSION" || fail 'could not stop lab before directory redirection'
 mv "$LAB_BASE/config" "$LAB_BASE/saved-config"
 ln -s "$HOME_DIR" "$LAB_BASE/config"
 reject_lab run "$HERDR_LAB_SESSION" status --json
 rm "$LAB_BASE/config"
 mv "$LAB_BASE/saved-config" "$LAB_BASE/config"
+"$HERDR_LAB_HELPER" provision "$HERDR_LAB_SESSION" || fail 'could not restart lab after directory restoration'
 pass 'real helper rejects public state, state symlinks, legacy roots and redirected disposable roots'
 
 # Keep the lab helper as the only CLI transport. Production adapter calls have

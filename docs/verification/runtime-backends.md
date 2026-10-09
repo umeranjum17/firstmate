@@ -107,6 +107,26 @@ A single-process harness has no descendant that adds a distinct verdict, which i
 The portable regression pins every half without any harness installed: `tests/fm-harness-precedence.test.sh` asserts that this two-process topology decides at comm strength, that the descent probe reaches a strength the top-of-session probe cannot, that a sibling branch answering a foreign harness contributes no verdict, that a foreign args-only verdict at the deepest vantage leaves the comm-strength identity intact, and that equal-depth ties choose the comm-strength leaf regardless of process ordering.
 The run did not reach `opencode`, `pi`, `pi-signed`, `grok`, `kimi`, or `muse`, which were not installed, and stopped at the same pre-existing liveness failure for `cursor` 3.18.9, whose resolved binary on that machine is the editor rather than `cursor-agent`; those adapters are unverified by this run.
 
+## Durable task-copy allocation
+
+The allocation and legacy-copy protection contract is owned by `bin/fm-spawn.sh` and `bin/fm-treehouse-protect.py`.
+Verified on 2026-10-09 at head `a1259b22` with Treehouse v2.0.1, tmux 3.7b and Linux 7.1.8-arch1-3, exit 0:
+
+```sh
+FM_TEST_REAL_LEASE_ONLY=1 bash tests/fm-spawn-pool-base-freshen.test.sh
+```
+
+Observed output:
+
+```text
+ok - real spawn skips an idle recorded slot, leases a free slot until teardown, and preserves the existing task
+ok - real home seeding protects recorded copies and allocates only a free home
+```
+
+These journeys use a private real Treehouse pool and tmux server, with a `sleep` worker rather than an authenticated model, and assert the pool's persistent lease state before and after real teardown.
+The shared allocation branch covers tmux, Herdr, Zellij and cmux independently of worker harness selection; Orca owns its allocation separately and does not invoke this protection.
+Only tmux and the POSIX native state lock were exercised live here; Windows uses Treehouse's LockFileEx byte-range lock and was inspected but not executed, and no live Herdr, Zellij or cmux claim is made by this run.
+
 ## tmux
 
 Foreground-process behavior was verified on 2026-07-07 with tmux 3.6a on macOS.
@@ -733,6 +753,25 @@ Cursor is deliberately outside this cursor-anchored empty-composer matrix becaus
 
 `zellij action dump-screen --pane-id <id> --ansi` was verified at zellij 0.44.0 to preserve ANSI styling (real Claude Code rendered inside a zellij pane dumped `ESC[m` `❯` U+00A0 for its idle composer row), which is the capability the zellij composer classifier reads.
 
+### 2026-10-09 opencode 1.18.25 below-floor status area through Herdr
+
+Verified on 2026-10-09 on Linux against OpenCode 1.18.25 (model DeepSeek V4.1 Flash) running as Firstmate workers in Herdr 0.9.1 panes, read through `herdr pane read <pane> --source visible --format ansi` and classified with the shared screen classifier under Herdr's capability descriptor (`styled=1`, `cursor=0`, `identity=1`).
+OpenCode 1.18.x closes its left-bar composer with the half-block `╹▀▀▀` floor and draws its own status area directly below it: an idle pane shows a path/context/cost row ending `71.6K (27%) · $0ctrl+p` plus a session row ending `commands`, while a rate-limited pane shows the usage-limit banner (`■5⬝hour⬝usage limit reached. It will reset in ...`, then `usin... (click to expand) [retrying in 1h 8m attempt #1]` wrapped at the pane width, both truncation variants observed).
+None of those rows carries a structural edge, so the cursorless staleness probe read the furniture as unclaimed activity, refused the selection `stale-envelope`, and answered `unknown` on every live OpenCode worker - which is why `fm-control relaunch` and `exit` refused every stuck OpenCode worker with `composer state is 'unknown', not proven empty` (captured live on eleven fleet panes; the rate-limit banner on ten, the status rows on one).
+The classifier now declares those rows once (`FM_COMPOSER_OPENCODE_STATUS_RE_DEFAULT` in `bin/fm-composer-lib.sh`) and resumes the staleness probe past them below a proven floor; the resume is bounded by the block rule in the wrapped-footer entry below, not by the floor alone, so `Working on request...` directly below the floor still refuses and a busy status row (`esc interrupt`) stays outside the pattern set in the refusing direction.
+After the change the same commands read `empty` on all four captured panes, while a typed draft above the same status area reads `pending` on styled captures and `unknown` on plain ones; `tests/fm-composer-lib.test.sh`'s opencode matrix carries both live screens, the second banner wrap variant, and that typed-text counterweight.
+
+### 2026-10-09 opencode 1.18.25 wrapped status footer
+
+Verified on 2026-10-09 on Linux against OpenCode 1.18.25 (model DeepSeek V4.1 Flash) in an isolated tmux pane whose working directory was a long path, so the right-aligned status row WRAPPED at the pane width (the fleet norm: worktree paths are long).
+The wrapped usage row keeps its `/`-leading directory prefix and its `22.1K (2%)` context cell, but its cost cell truncates to a bare `$` that abuts the palette hint (`.../a-   22.1K (2%) · $ctrl+p`), and the trailing `commands` wraps to the next row beside the directory's own continuation fragment (`really-...-name    commands`).
+The pre-fix `FM_COMPOSER_OPENCODE_STATUS_RE_DEFAULT` required digits after the `$` and a non-empty `ctrl+p`/`commands` tail, so it matched NEITHER row: the cursorless staleness probe refused `stale-envelope` and the idle, empty composer read `unknown`, and `fm-control exit` refused with `composer state is 'unknown', not proven empty`.
+After the pattern makes the cost and hint groups optional and the cost digits `[0-9]*` (a truncated `$`), the same idle pane reads `empty` and `fm-control exit` stops the agent, while a draft above the same footer still reads `pending` on styled captures and `unknown` on plain ones.
+On a longer path the status area can wrap to THREE rows: the usage row (`.../a-   22.1K (2%) · $ctrl+p`), a `commands` row carrying the directory's middle fragment (`really-quite-long-opencode-project-dir-   commands`), and a bare trailing directory fragment (`name`).
+The below-floor walk now consumes that contiguous block only when it is provably furniture: at least one row matches the status pattern or carries the palette hint `ctrl+p`, and no row carries the busy hint `esc interrupt`; the same idle pane reads `empty`, while a busy block or a block with neither a status row nor the hint still refuses.
+A ZERO-USAGE session (no context/cost cell, so no `N K (P%)` row) after an upstream error wraps its footer to two rows that split the `tab`/`agents` and `ctrl+p`/`commands` cells: `.../relaunch-   tab ctrl+p` then `really-...-directory-name   agents commands`. No single row matches the full status pattern, so the palette hint anchors the block; the pre-fix walk refused it `unknown` on a real idle pane, and the same pane now reads `empty`. A busy row with `esc interrupt` in that footer still refuses.
+`tests/fm-composer-lib.test.sh`'s opencode matrix carries the wrapped idle screen, its typed-draft counterweight, the three-row wrap with its typed-draft counterweight, the zero-usage two-row wrap with its typed-draft and busy-row counterweights, an assistant-error-block screen above an empty composer, and the unanswered `┃` doorbell bubble above an empty composer with its typed-text counterweight; `FM_COMPOSER_MATRIX_LIVE=1 tests/fm-composer-matrix-live-e2e.test.sh` refreshes the real-harness idle result.
+
 ### 2026-09-20 claude 2.1.236 statusLine footer through Herdr
 
 Verified on 2026-09-20 on macOS arm64 (Darwin 25.6.0) against Claude Code 2.1.236 running as Firstmate workers in Herdr 0.8.0 panes, read through Herdr's ANSI capture with its exact capability descriptor (`styled=1`, `cursor=0`, `identity=1`, `rows=20`).
@@ -772,7 +811,7 @@ It therefore counts a footer zone only when every row in it is demonstrably furn
 A run containing unclaimed activity (`Working on request...`, `→ ran npm test (3 failures)`) is not furniture in either row order and keeps invalidating the envelope above it, and a row leading with the SAME glyph the envelope was proven by (`❯ my typed draft`) is a live composer that keeps winning, so a visible draft is never overwritten.
 `test_composer_footer_zone_refuses_rather_than_allows` pins both directions on the bordered-box and separator-pair shapes.
 
-Coverage is the bordered box and the separator pair, the two shapes claude 2.x renders. The opencode left bar is wired into the same rule but is **unexercised**: every left-bar row this repo records leads with plain text, and opencode's own prompt character is `>`, a shell glyph deliberately outside the agent set, so no opencode shape recorded here can prove a left-bar envelope or open a footer zone beneath one.
+Coverage is the bordered box and the separator pair, the two shapes claude 2.x renders. The opencode left bar is wired into the same rule but is **unexercised by this entry**, which captures no opencode pane; opencode's own prompt character is `>`, a shell glyph deliberately outside the agent set. The opencode left-bar floor and the status area beneath it are covered by the 2026-10-09 entry above.
 
 The live refresh for this entry is the cursorless arm added to the composer-matrix guard, which re-reads each harness's already-proven-idle pane the way every non-tmux backend reads it and fails naming the harness and version when that read is `pending`:
 
@@ -1178,6 +1217,26 @@ The CLI matrix was checked directly:
 All destructive verification used `bin/fm-herdr-lab.sh` with a non-default `fm-lab-` name and a byte-identical default-session tripwire.
 No ambient `herdr server stop` command is a supported test operation.
 
+### Waiting-state native list probe
+
+Verified 2026-10-08 on Linux with Herdr 0.9.1, using the task's own pane only:
+
+```sh
+herdr agent list | jq -c --arg pane "$HERDR_PANE_ID" '{resultKeys:(.result|keys),status:[.result.agents[] | select(.pane_id == $pane) | .agent_status]}'
+herdr --version
+```
+
+```text
+{"resultKeys":["agents","type"],"status":["working"]}
+herdr 0.9.1
+```
+
+This proves the native list envelope and pane/status field path, not a live permission popup or a blocked-to-working transition.
+The behavior contract is [Waiting-state escalation](../configuration.md#waiting-state-escalation).
+`bin/fm-test-run.sh tests/fm-wait-timers.test.sh` exercises the real watcher, queue drain and local/remote parent-channel publication with a terminal API fixture, including blocked overriding a working log, owner-first restart timing, declaration timers, deduplication, re-arming, Cursor exclusion and a bounded agent-list failure.
+`bin/fm-test-run.sh tests/fm-wait-timers-tmux-e2e.test.sh` exercises real tmux watcher/drain journeys for pause deadlines, owner-only pause rechecks, active captain holds and the blocked/needs-decision restart ladder.
+Neither regression proves live Cursor status behavior or a stalled native Herdr service.
+
 ### Disposable Herdr lab HOME
 
 Verified 2026-10-08 on Linux with Herdr 0.9.1 (protocol 22): a real pane created through the guarded lab helper reported disposable HOME and config/data/state/cache XDG paths, wrote a tool marker only into its disposable `$HOME/.local/bin`, and retained no inherited credential directories.
@@ -1370,6 +1429,25 @@ ok - submit refusals name the actual guard without payload, selected text, envir
 
 The token-free Claude exit guard above launches the real `ultracode` titled composer and its slash-completion view while exercising both modal scenarios.
 
+### Claude background-task exit picker
+
+Measured 2026-10-05 against Claude Code 2.1.289 in an isolated tmux session.
+The Herdr lab was not running, so the Herdr path is covered by the existing fakes.
+Typing `/exit` while a background shell is still running opens a picker whose selected row is "Exit and stop tasks" and whose footer is "Enter to confirm · Esc to cancel".
+That screen still classifies as pending, the same verdict as unsubmitted composer text.
+A second Enter would confirm the selected row.
+The picker is recognised by its recorded structure only: the heading on its own line, then the selected row alone on its row, with `Enter to confirm · Esc to cancel` as the last non-blank row.
+The same strings quoted above a normal composer, as a diff, this note, or a test fixture shows them, are not a picker.
+Submit retries now stop after the Enter that opened the picker and report unknown.
+A typed submit to a pane that already shows the picker types nothing and sends no Enter.
+Exit reports that the worker is blocked on this Claude background-task exit picker and does not type another Enter.
+The fork's separately verified exact stop confirmation described above remains supported; that different viewport places the task list before all three option rows and must pass the guarded control-plane confirmation, never a generic submit retry.
+A submit can return before any read sees the picker, so exit reads the screen once more when its wait for the agent to stop times out, and names the picker there too.
+Exit does not report a stopped agent whose pane still shows the picker text as blocked on a prompt.
+The watcher does not read the picker: a pane parked on it keeps the ordinary stale triage.
+This upstream measurement covered no model-downgrade confirmation, MCP approval, or Claude exit confirmation other than this picker; the fork's exact stop-confirmation measurement above is separate.
+Refusing an Enter that would confirm a dialog restores an existing safety path, so it is not gated behind a flag.
+
 ### Prune and respawn
 
 The real label-collision reproduction is owned by:
@@ -1512,7 +1590,10 @@ ok - real Herdr lab validation completed on Herdr 0.8.0 with the default-session
 ```
 
 The projected spawn in that run used the historical empty opt-in file, so a home that had already enabled the projection keeps it without any migration step.
-One concurrent cross-home recovery case refused under contention on a loaded machine and passed on an immediate rerun; recovery-path presentation lock contention is a deliberate hard refusal rather than a flat fallback, which default-on now makes reachable from any Herdr home.
+One concurrent cross-home recovery case refused under contention on a loaded machine and passed on an immediate rerun; recovery-path presentation lock contention remains a deliberate hard refusal by default rather than a flat fallback, which default-on makes reachable from any Herdr home.
+Callers that need concurrent recoveries to serialize can pass `fm-spawn.sh --herdr-resume-lock-wait`.
+The flag applies to a fresh ship or scout spawn, and the multi-task path forwards it to each per-pair spawn.
+It has no effect on `--relaunch` and `--secondmate`, because those paths take no exact-resume presentation-order lock.
 That run measured the default-on projection on Herdr 0.8.0 only, while the focus-flash regression below was last run on 0.7.5 before the flip, so neither run covered a defective release under default-on projection; the version floor and the focus-flash suite's Part C close that gap.
 
 The restored-shell session-start cleanup ran on 2026-07-24 against Herdr 0.7.5 protocol 17:
@@ -1741,7 +1822,7 @@ ok - real herdr: a stale registration no longer blocks relaunch, and the endpoin
 ok - real herdr: an agent that does not stop fails closed instead of being reported as stopped
 ```
 
-The registry read through `herdr pane report-agent` is the same source `fm_backend_herdr_agent_state` classifies, and since 2026-09-10 that registration counts as an agent only while `pane process-info` shows a harness process behind it, so the guard backs the registration with a real process named like a harness (a symlink to `sleep`) and then stops that process, with no real harness launched.
+The registry read through `herdr pane report-agent` is the same source `fm_backend_herdr_agent_state` classifies, and since 2026-09-10 that registration counts as an agent only while `pane process-info` shows a harness process behind it, so the guard backs the registration with a real process named like a harness (using `fm_agent_standin` from [`tests/lib.sh`](../../tests/lib.sh)) and then stops that process, with no real harness launched.
 That command is the guard that refreshes this record; run it after every Herdr upgrade rather than trusting the version above.
 
 For Pi on Herdr 0.9.0, `herdr agent get` reflects whether the agent process remains live; its registration does not persist merely because the pane and parent shell do.
@@ -2278,6 +2359,22 @@ FM_HARNESS_LIVENESS_DRIFT=1 bin/fm-test-run.sh tests/fm-harness-liveness-drift-l
 The supervision-branch extension (`.pi/extensions/fm-branch-supervision.ts`, [docs/pi-supervision-branch.md](../pi-supervision-branch.md)) builds its second session through the Pi SDK surface: `createAgentSession` (including its `model`, `modelRuntime`, and `thinkingLevel` options), `DefaultResourceLoader` with `extensionFactories`, `SessionManager`, `createBashToolDefinition` with a `spawnHook`, `sendCustomMessage` for routine notes, `appendEntry` and `registerEntryRenderer` for captain outcomes, the `before_provider_request` hook, the command context's model registry for picker candidates, a fresh `ModelRuntime` for isolated-branch resolution, and Pi's own `getSupportedThinkingLevels`/`clampThinkingLevel` plus its `getThinkingLevel` and `thinking_level_select` extension surface for effort.
 In TUI mode, its `/supervision-model` model list is drawn with Pi's own `SelectList`, `Input`, `fuzzyFilter`, and `DynamicBorder` through the extension context's `ui.custom` surface, which is what bounds and searches a long catalog.
 
+Processing-retry visibility was verified on 2026-09-27 against Pi 0.87.1 with a local intercepted provider stream, without credentials or an external provider request:
+
+```sh
+bin/fm-test-run.sh tests/fm-pi-branch-extension.test.sh
+FM_PI_BRANCH_LIVE_E2E=1 npm exec --yes --package=typescript@5.9.3 -- bin/fm-test-run.sh tests/fm-pi-branch-live-e2e.test.sh tests/fm-pi-primary-types.test.sh
+```
+
+```text
+ok - real Pi SDK 0.87.1 suppresses only empty or exact-repeat retry finals, retains first and differing replies after reopen, buffers retry streaming, and keeps outcomes retryable
+ok - tracked Pi extensions pass strict no-emit typecheck against Pi 0.87.1
+```
+
+The guard runs the extension through Pi's actual message event runner, renders its streamed replies with the stock assistant component, and checks both live agent state and a reopened session file.
+The portable processing-turn case additionally covers whitespace-only replies, a one-character difference, prose alongside acknowledgment calls, signed reasoning and tool-call preservation, rejected and partial acknowledgements, busy follow-ups, user steering, and both orderings of a user message batched with a processing request.
+Other primary harnesses do not load this Pi extension, and these event and persistence boundaries are independent of the runtime session backend.
+
 Evidence produced 2026-08-25 on macOS 26.5.2 arm64, Node v24.13.1:
 
 - Historical real-SDK guard: `FM_PI_BRANCH_LIVE_E2E=1 bin/fm-test-run.sh tests/fm-pi-branch-live-e2e.test.sh` against the globally installed `@earendil-works/pi-coding-agent` 0.81.1 printed `ok - real Pi SDK 0.81.1 accepts the branch session construction and preserves an unpromptable wake`.
@@ -2523,6 +2620,40 @@ It verifies native `ultra` on initial and operational turns and after restart, s
 Its native App Server peer and watcher-close process are deterministic fixtures; it does not claim a real backend or a live model was tested by that command.
 `tests/fm-busy-state.test.sh`, `tests/fm-busy-adapter-wiring.test.sh`, and `tests/fm-watch-triage.test.sh` cover separate progress notification, unchanged semantic busy state, rejection of a superseded worker's events, and progress refreshing the busy-age bound without fabricating a completed turn.
 
+### Worker progress monitoring
+
+The watcher consumer was checked on 2026-10-08 with GNU Bash 5.3.15 and tmux 3.7b.
+`bash bin/fm-test-run.sh tests/fm-watch-triage.test.sh` passed 154 cases using isolated state and controlled backend responses, not a live model.
+Focused regressions are `test_stale_terminal_status_overridden_by_active_run` (active validation versus a hung running record), `test_progress_observation_keeps_concurrent_writes` (post-scan eligibility for all four sources), and `test_worker_progress_sources_reset_old_wedge` (status and lifecycle activity versus replacement grace).
+`test_daemon_claim_over_live_run_reads_run_alive` in `tests/fm-crew-state.test.sh` covers recent, quiet, and absent execution evidence through the crew-state interface.
+`test_pi_extension_semantic_lifecycle` and `test_pi_extension_stale_incarnation_rejected` in `tests/fm-busy-adapter-wiring.test.sh` exercise generated ordinary-streaming handlers and predecessor rejection.
+Refresh these portable checks with:
+
+```sh
+bash bin/fm-test-run.sh tests/fm-watch-triage.test.sh
+bash bin/fm-test-run.sh tests/fm-crew-state.test.sh
+bash bin/fm-test-run.sh tests/fm-busy-adapter-wiring.test.sh
+```
+
+A guarded private tmux replay used the real watcher and crew-state entrypoints and public generation-bound lifecycle/progress writes.
+It observed three no-progress escalations, `demand-deep-inspection` on the third wake, an external wait quiet before its UTC bound and rechecked afterward, and rejected predecessor events after rearming.
+Concurrent progress writes established live consumption, not synchronization to the precise post-scan boundary.
+
+A separate real Pi worker replay on 2026-10-08 used `openai-codex/gpt-5.5`, extension discovery disabled, and the unchanged `fm-spawn.sh`-generated worker extension explicitly loaded in the same guarded private-tmux setup.
+The retained replay did not record the Pi version.
+One unfinished response produced 730 ordinary `text_delta` events over 18.06 seconds with 17 generation-bound progress updates, exceeding both configured six-second busy-age and wedge bounds without a completed-turn marker.
+The watcher remained alive with empty stdout (no stale alert); its exact log included:
+
+```text
+[2026-10-08T20:17:20+0400] absorbed stale (recent worker progress): primary:fm-stream
+[2026-10-08T20:17:35+0400] absorbed stale (recent worker progress): primary:fm-stream
+```
+
+This is live ordinary-streaming evidence, not footer/token parsing or a changed wait-timer policy.
+Hung validation and precisely post-scan writes remain automated evidence only.
+`test_captain_held_never_rechecked_while_away_record_exists` and `test_live_captain_held_first_sight_silenced_by_away_record` in `tests/fm-watch-triage.test.sh` cover existing held-lane behavior with fixtures; the live held-lane journey remains deferred and no new held-lane behavior is claimed.
+[Watcher architecture](../architecture.md#event-driven-supervision) owns the current activity contract.
+
 ## Oh My Pi (omp)
 
 omp runs crewmate, scout, secondmate, and primary work; [`supervision.md`](supervision.md#omp-oh-my-pi-native-delivery-2026-09-05) owns the primary evidence.
@@ -2615,3 +2746,47 @@ Herdr 0.9.1 refuses an empty `pane report-agent` label (`invalid_agent: agent la
 In that lab, before the fix the pane read `unknown` and recovery `unreadable`; after the fix the same pane reads `stale-agent` and recovers `dead`, which unblocks `exit` and `relaunch` in the preserved pane.
 A label-less unknown/stale registration never reads `live`: with no label it holds no process identity to keep authoritative, so only the positive shell-only proof settles it (issue #4115's intent) and every other process view stays `unknown`.
 The portable cases, including the never-live rule and the unchanged Codex and other-harness carve-outs, are in `tests/fm-backend-herdr.test.sh` (`test_unlabeled_unknown_registration_reads_the_process_view`).
+
+## Busy inbox escalation
+
+Verified at `2026-10-03T19:20:07Z` on commit `23b0232908a5adc7fbf7339ef48c34a091a7a799` with Claude Code `2.1.288 (Claude Code)` on Herdr `0.9.1`, protocol `22`, in a named isolated lab session through `bin/fm-herdr-lab.sh`.
+`bin/fm-task-inbox-lib.sh` owns the durable busy-deferral budget.
+
+A real Claude worker opened an `AskUserQuestion` panel, and Firstmate's `UserPromptSubmit` hook reported busy.
+Four due inbox checks using the original `origin/main` watcher at `1f3e769616fdf9f31f85f4c3e6a9f71606634238` against that live pane each read `busy=yes` and added zero wakes.
+With `FM_TASK_INBOX_GRACE_SECS=0 FM_TASK_INBOX_BUSY_MAX=2`, two distinct processes sourcing the fixed watcher and calling `inbox_steer_check` against the same pane produced one wake containing `stuck-busy after 2 consecutive busy-deferred due doorbells`.
+A third check left exactly one wake total; the question panel remained open and the instruction remained unhandled.
+Lab teardown completed with exit `0`, including the default-session tripwire.
+The zero grace accelerates only the experiment; the normal grace remains unchanged.
+Without Firstmate's hooks, Herdr reported the question panel as `blocked`, which did not classify as busy; that is a different path and does not establish this regression.
+
+This live proof covers the watcher and queue boundary; it does not establish live daemon-consumer delivery.
+`bin/fm-test-run.sh tests/fm-daemon.test.sh` exercises that consumer routing separately with portable regressions for busy escalation and busy-bookkeeping failures in away and quiet mode.
+Repeat the hooked-worker check above before publication if watcher or task-inbox busy code changes; `bin/fm-test-run.sh tests/fm-task-inbox.test.sh` refreshes the portable ladder regressions.
+
+## OpenCode model-error wakes and second-mate continuity
+
+Verified on 2026-10-08 with OpenCode 1.18.25 in a credential-free named Herdr lab, against the observation code at commit b45da13f.
+This live record does not qualify later observer changes, which the portable tests below cover.
+Two real OpenCode lanes selected an unavailable hosted model and emitted `session.error` followed by idle.
+The ordinary watcher delivered one grouped model-error notification automatically, and the real second-mate agent drained and acknowledged it within 97 seconds of the recorded failure.
+A later worker status event reached that same second mate automatically, and fresh beacons continued after both turns without any manual arm.
+Cleanup passed the default-session fleet-state tripwire.
+
+Refresh with:
+
+```sh
+FM_MODEL_OUTAGE_LIVE=1 bash bin/fm-test-run.sh tests/fm-model-outage-live-e2e.test.sh
+```
+
+Exact guard output:
+
+```text
+PASS OpenCode 1.18.25: grouped hosted outage delivered automatically; second mate keeps monitoring across turns
+lab cleanup: 0
+```
+
+The portable scan tests in `tests/fm-busy-adapter-wiring.test.sh` cover staggered, recovered, unreadable, wrapped-banner, and hung-verdict lanes; `tests/fm-busy-state.test.sh` retains generation and retirement coverage.
+This qualification covers OpenCode error observation on Herdr, not new error signatures for other harnesses or fresh live qualification of other backends.
+Other harnesses retain their existing stale and blocked-worker supervision.
+The bounded scan behavior belongs to `bin/fm-model-outage-lib.sh`; this record does not own another recovery mechanism.

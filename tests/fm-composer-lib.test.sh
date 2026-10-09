@@ -916,6 +916,130 @@ test_matrix_opencode_leftbar_signals() {
   assert_screen "opencode placeholder-like input on plain backends" unknown "$CAPS_PLAIN" "$typed"
   typed=$'┃  refactor the parser please\n┃\n┃  Build · GPT-5.5 Fast OpenAI · high'
   assert_screen "opencode multiline draft above blank cursor row" pending "$CAPS_TMUX" "$typed" 1
+  # Live 2026-10-09 idle shapes (opencode 1.18.x, DeepSeek V4.1 Flash, Herdr
+  # ANSI captures): the left-bar run is three blank rows plus the Build
+  # footer, and directly below the ╹▀▀▀ floor OpenCode draws its own status
+  # area - the path/context/cost row ending in the ctrl+p hint plus the
+  # session row ending in `commands`, or the usage-limit retry banner in both
+  # wrap variants. The staleness probe used to read that furniture as
+  # unclaimed activity and refuse every such pane `unknown`, so fm-control
+  # could neither relaunch nor exit a stuck OpenCode worker.
+  local floor status_screen retry_screen retry_tail typed_status
+  floor='  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀  '
+  status_screen=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/umer/.treehouse/firstmate-cff959/3/71.6K (27%) · $0ctrl+p\n   firstmate                                                commands'
+  assert_screen "opencode 1.18.x idle status rows below the floor on herdr" empty "$CAPS_STYLED" "$status_screen"
+  assert_screen "opencode 1.18.x idle status rows below the floor on zellij" empty "$CAPS_STYLED_NOID" "$status_screen"
+  assert_screen "opencode 1.18.x idle status rows below the floor on cmux/orca" empty "$CAPS_PLAIN" "$status_screen"
+  # OpenCode 1.18.35 draws its session row with a single space before the
+  # `commands` hint (`tab agents ctrl+p commands`), not the two-space gap the
+  # 1.18.x rows above show, so the same below-floor furniture reads empty.
+  local bare_status_screen
+  bare_status_screen=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/umer/.treehouse/firstmate-cff959/3/71.6K (27%) · $0ctrl+p\n   firstmate                                    tab agents ctrl+p commands'
+  assert_screen "opencode 1.18.35 idle status rows below the floor on herdr" empty "$CAPS_STYLED" "$bare_status_screen"
+  assert_screen "opencode 1.18.35 idle status rows below the floor on cmux/orca" empty "$CAPS_PLAIN" "$bare_status_screen"
+  local busy_status_screen
+  busy_status_screen=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   ⬝⬝⬝⬝ esc interrupt\n   firstmate                                    tab agents ctrl+p commands'
+  assert_screen "opencode busy esc-interrupt row below the 1.18.35 floor stays unknown" unknown "$CAPS_STYLED" "$busy_status_screen"
+  # Live 1.18.35 mid-generation: the busy hint and the cost/ctrl+p cell share
+  # one row ending in `commands`, directly below the floor. It must refuse on
+  # every profile, not read as the session row.
+  local busy_merged_screen
+  busy_merged_screen=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   ⬝⬝⬝⬝⬝⬝⬝⬝ esc interrupt ... 22.9K (11%) ctrl+p commands'
+  assert_screen "opencode busy merged esc-interrupt commands row below the floor on herdr" unknown "$CAPS_STYLED" "$busy_merged_screen"
+  assert_screen "opencode busy merged esc-interrupt commands row below the floor on zellij" unknown "$CAPS_STYLED_NOID" "$busy_merged_screen"
+  assert_screen "opencode busy merged esc-interrupt commands row below the floor on cmux/orca" unknown "$CAPS_PLAIN" "$busy_merged_screen"
+  retry_screen=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   ■5⬝hour⬝usage limit reached. It will reset in 1 hour 38 minutes. To cont\n    usin... (click to expand) [retrying in 1h 8m attempt #1]'
+  assert_screen "opencode 1.18.x usage-limit retry banner below the floor on herdr" empty "$CAPS_STYLED" "$retry_screen"
+  assert_screen "opencode 1.18.x usage-limit retry banner below the floor on zellij" empty "$CAPS_STYLED_NOID" "$retry_screen"
+  assert_screen "opencode 1.18.x usage-limit retry banner below the floor on cmux/orca" empty "$CAPS_PLAIN" "$retry_screen"
+  retry_tail=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   ⬝5■hour■usage limit reached. It will reset in 1 hour 3 minutes. To continue us\n    click to expand) [retrying in 58m 58s attempt #1]'
+  assert_screen "opencode 1.18.x retry banner wrapped without its opening paren on herdr" empty "$CAPS_STYLED" "$retry_tail"
+  # Typed text must survive the same furniture: the verdict comes from the
+  # left-bar run above the floor, never from the status area below it.
+  typed_status=$'  ┃\n  ┃  Reply with OK.\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/umer/.treehouse/firstmate-cff959/3/71.6K (27%) · $0ctrl+p\n   firstmate                                                commands'
+  assert_screen "opencode typed draft above live status rows on herdr" pending "$CAPS_STYLED" "$typed_status"
+  assert_screen "opencode typed draft above live status rows on zellij" pending "$CAPS_STYLED_NOID" "$typed_status"
+  assert_screen "opencode typed draft above live status rows on plain backends" unknown "$CAPS_PLAIN" "$typed_status"
+  # Live 1.18.25 (captured 2026-10-09 under Herdr): the idle session draws one
+  # row, `<path>  <n>K (<p>%) · $<cost>  ctrl+p commands`, with a two-space gap
+  # before ctrl+p. The same cells on a generating pane sit behind `esc
+  # interrupt`, which must keep refusing. The home screen draws its own bare
+  # `tab agents  ctrl+p commands` row under the floor.
+  local v125_idle v125_busy home_status
+  v125_idle=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4FF56ACM65RSHMS9Y57MEZ2  36.9K (4%) · $0.01  ctrl+p commands'
+  assert_screen "opencode 1.18.25 idle session row below the floor on herdr" empty "$CAPS_STYLED" "$v125_idle"
+  assert_screen "opencode 1.18.25 idle session row below the floor on cmux/orca" empty "$CAPS_PLAIN" "$v125_idle"
+  v125_busy=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   ⬝⬝⬝⬝⬝⬝⬝⬝  esc interrupt                                                         36.9K (4%) · $0.01  ctrl+p commands'
+  assert_screen "opencode 1.18.25 busy esc-interrupt row below the floor stays unknown on herdr" unknown "$CAPS_STYLED" "$v125_busy"
+  home_status=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   tab agents  ctrl+p commands'
+  assert_screen "opencode home idle bare tab-agents row below the floor on herdr" empty "$CAPS_STYLED" "$home_status"
+  # Live 2026-10-09 WRAP shape (task fm-opencode-composer-err; panes muxr
+  # p73/p60/p6Q and takeone t1-prefilter-ssref): on a long worktree path the
+  # right-aligned status row WRAPS at the pane width. The usage row keeps its
+  # `/`-leading directory and `<n>K (<p>%)` cell, but its cost cell is
+  # TRUNCATED to a bare `$` abutting the palette hint (`· $ctrl+p`), and the
+  # trailing `commands` wraps beside the directory's continuation fragment.
+  # The pre-fix pattern matched NEITHER row, so the staleness probe refused
+  # `stale-envelope` and an idle, empty composer read `unknown` - fm-control
+  # could neither relaunch nor exit. A draft above the same footer still reads
+  # pending (never empty).
+  local wrap_idle wrap_typed wrap_error
+  wrap_idle=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/umer/.treehouse/firstmate-cff959/8/a-   22.1K (2%) · $ctrl+p\n   really-quite-long-opencode-project-directory-name   commands'
+  assert_screen "opencode 1.18.x wrapped status footer on herdr" empty "$CAPS_STYLED" "$wrap_idle"
+  assert_screen "opencode 1.18.x wrapped status footer on zellij" empty "$CAPS_STYLED_NOID" "$wrap_idle"
+  assert_screen "opencode 1.18.x wrapped status footer on cmux/orca" empty "$CAPS_PLAIN" "$wrap_idle"
+  wrap_typed=$'  ┃\n  ┃  Reply with OK.\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/umer/.treehouse/firstmate-cff959/8/a-   22.1K (2%) · $ctrl+p\n   really-quite-long-opencode-project-directory-name   commands'
+  assert_screen "opencode 1.18.x typed draft above wrapped status footer on herdr" pending "$CAPS_STYLED" "$wrap_typed"
+  assert_screen "opencode 1.18.x typed draft above wrapped status footer on cmux/orca" unknown "$CAPS_PLAIN" "$wrap_typed"
+  # Shape (b): an assistant error block (opencode draws it as a `┃`-left-border
+  # box in textMuted, the rendering a shared opencode.db lock produces with the
+  # message `Failed to execute statement`) sits above the composer's own
+  # `▣ Build` footer and empty left-bar run. The error text is transcript
+  # furniture; the composer below is still empty. The real capture behind this
+  # fixture carried the same box with a different message (an upstream-provider
+  # error); the shape is byte-identical, the text is not load-bearing.
+  wrap_error=$'  ┃  run the check\n  ┃\n  ┃\n  ┃  Failed to execute statement\n  ┃\n     ▣  Build · DeepSeek V4.1 Flash\n  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/umer/.treehouse/firstmate-cff959/8/a-   22.1K (2%) · $ctrl+p\n   really-quite-long-opencode-project-directory-name   commands'
+  assert_screen "opencode 1.18.x assistant error block above empty composer on herdr" empty "$CAPS_STYLED" "$wrap_error"
+  assert_screen "opencode 1.18.x assistant error block above empty composer on cmux/orca" empty "$CAPS_PLAIN" "$wrap_error"
+  # Live 2026-10-09 THREE-row wrap (task fm-opencode-composer-err, driven in an
+  # isolated tmux pane under a longer worktree path): the directory cell wraps
+  # twice, so the status area is three rows - the usage row, a `commands` row
+  # carrying the directory's middle fragment, and a bare trailing fragment
+  # (`name`). The bare fragment is furniture only beside a real status row.
+  local wrap3_idle wrap3_typed
+  wrap3_idle=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/umer/.treehouse/firstmate-cff959/8/a-   22.1K (2%) · $ctrl+p\n   really-quite-long-opencode-project-dir-   commands\n   name'
+  assert_screen "opencode 1.18.x three-row wrapped status footer on herdr" empty "$CAPS_STYLED" "$wrap3_idle"
+  assert_screen "opencode 1.18.x three-row wrapped status footer on cmux/orca" empty "$CAPS_PLAIN" "$wrap3_idle"
+  wrap3_typed=$'  ┃\n  ┃  Reply with OK.\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/umer/.treehouse/firstmate-cff959/8/a-   22.1K (2%) · $ctrl+p\n   really-quite-long-opencode-project-dir-   commands\n   name'
+  assert_screen "opencode 1.18.x typed draft above three-row wrapped status footer on herdr" pending "$CAPS_STYLED" "$wrap3_typed"
+  assert_screen "opencode 1.18.x typed draft above three-row wrapped status footer on cmux/orca" unknown "$CAPS_PLAIN" "$wrap3_typed"
+  # Live 2026-10-09 ZERO-USAGE wrap (task fm-opencode-composer-err, real
+  # OpenCode 1.18.25 after an upstream error, long worktree path): the session
+  # has no context/cost cell, so the status area is two rows that split the
+  # `tab`/`agents` and `ctrl+p`/`commands` cells across the wrap. No single row
+  # matches the full status pattern; the palette hint `ctrl+p` anchors it. A
+  # busy row carrying `esc interrupt` in the same area must still refuse.
+  local wrap0_idle wrap0_typed wrap0_busy
+  wrap0_idle=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/umer/.treehouse/firstmate-cff959/8/relaunch-   tab ctrl+p\n   really-quite-long-opencode-project-directory-name   agents commands'
+  assert_screen "opencode 1.18.x zero-usage wrapped status footer on herdr" empty "$CAPS_STYLED" "$wrap0_idle"
+  assert_screen "opencode 1.18.x zero-usage wrapped status footer on cmux/orca" empty "$CAPS_PLAIN" "$wrap0_idle"
+  wrap0_typed=$'  ┃\n  ┃  Reply with OK.\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/umer/.treehouse/firstmate-cff959/8/relaunch-   tab ctrl+p\n   really-quite-long-opencode-project-directory-name   agents commands'
+  assert_screen "opencode 1.18.x typed draft above zero-usage wrapped status footer on herdr" pending "$CAPS_STYLED" "$wrap0_typed"
+  assert_screen "opencode 1.18.x typed draft above zero-usage wrapped status footer on cmux/orca" unknown "$CAPS_PLAIN" "$wrap0_typed"
+  wrap0_busy=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/umer/.treehouse/firstmate-cff959/8/relaunch-   esc interrupt ctrl+p\n   really-quite-long-opencode-project-directory-name   agents commands'
+  assert_screen "opencode 1.18.x busy row above zero-usage wrapped footer still refuses on herdr" unknown "$CAPS_STYLED" "$wrap0_busy"
+  assert_screen "opencode 1.18.x busy row above zero-usage wrapped footer still refuses on cmux/orca" unknown "$CAPS_PLAIN" "$wrap0_busy"
+  # Live 2026-10-09 UNANSWERED BUBBLE (Main1860): a doorbell `┃` user bubble
+  # sits above a blank row, then the composer is EMPTY. The footer wraps to a
+  # path/usage/palette row and a bare `pockit` continuation. The bubble is
+  # transcript furniture above the composer; the composer below is still empty.
+  local unans_idle unans_typed
+  unans_idle=$'  ┃\n  ┃  : Firstmate instruction waiting: list "$FM_TASK_INBOX"/*.msg in your \'mx-\n  ┃  pm-9b.inbox\' steering inbox, read and act on each in numeric order, then\n  ┃  mv each into its handled/.\n  ┃\n\n  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/umer/.treehouse/pockit-497a78/8/   538.6K (54%) · $1.0 ctrl+p commands\n   pockit'
+  assert_screen "opencode 1.18.x unanswered bubble above empty composer on herdr" empty "$CAPS_STYLED" "$unans_idle"
+  assert_screen "opencode 1.18.x unanswered bubble above empty composer on cmux/orca" empty "$CAPS_PLAIN" "$unans_idle"
+  unans_typed=$'  ┃\n  ┃  : Firstmate instruction waiting: list "$FM_TASK_INBOX"/*.msg in your \'mx-\n  ┃  pm-9b.inbox\' steering inbox, read and act on each in numeric order, then\n  ┃  mv each into its handled/.\n  ┃\n\n  ┃\n  ┃  Reply with OK.\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/umer/.treehouse/pockit-497a78/8/   538.6K (54%) · $1.0 ctrl+p commands\n   pockit'
+  assert_screen "opencode 1.18.x typed draft under unanswered bubble on herdr" pending "$CAPS_STYLED" "$unans_typed"
+  assert_screen "opencode 1.18.x typed draft under unanswered bubble on cmux/orca" unknown "$CAPS_PLAIN" "$unans_typed"
   pass "matrix: opencode's left-bar composer reads empty everywhere and scans the full active run"
 }
 
@@ -1330,3 +1454,158 @@ test_extraction_refusal_diagnostics_are_opt_in_fixed_and_content_free() {
 }
 
 test_extraction_refusal_diagnostics_are_opt_in_fixed_and_content_free
+
+# The selected row sits on cursor row 1 so a tmux read whose cursor is that
+# row, and a cursorless read, both still see unsubmitted text.
+exit_picker_screen() {
+  printf '%s\n' \
+    'Background work is running' \
+    '❯ 1. Exit and stop tasks' \
+    'The following will stop when you exit:' \
+    'shell · sleep 300' \
+    '  2. Move to background and exit' \
+    '  3. Stay' \
+    'Enter to confirm · Esc to cancel'
+}
+
+fm_test_picker_send() {
+  printf 'Enter\n' >> "$FM_TEST_PICKER_ENTERS"
+}
+
+fm_test_picker_state() {
+  fm_composer_classify_screen 'styled=1' "$FM_TEST_PICKER_SCREEN" 1
+}
+
+test_background_exit_picker_stays_pending_and_blocks_retry() {
+  local screen out rc sink enters
+  screen=$(exit_picker_screen)
+  out=$(fm_composer_blocking_dialog "$screen"); rc=$?
+  [ "$rc" -eq 0 ] || fail "the recorded picker should match"
+  [ "$out" = 'Claude background-task exit picker' ] || fail "dialog name was '$out'"
+  out=$(fm_composer_blocking_dialog 'Background work is running'); rc=$?
+  [ "$rc" -eq 1 ] || fail "a heading alone must not match"
+  [ -z "$out" ] || fail "a miss must print nothing, got '$out'"
+  out=$(fm_composer_blocking_dialog "$(printf '%s\n' 'Background work is running' 'Exit and stop tasks')"); rc=$?
+  [ "$rc" -eq 1 ] || fail "two of the three strings must not match"
+  out=$(fm_composer_blocking_dialog "$(printf '%s\n' "$screen" '' '')"); rc=$?
+  [ "$rc" -eq 0 ] || fail "blank rows below the footer should still match"
+  sink=$(mktemp)
+  FM_COMPOSER_DIALOG_SINK=$sink
+  out=$(fm_composer_classify_screen 'styled=1' "$screen" 1)
+  [ "$out" = pending ] || fail "cursor on the selected row should stay pending, got '$out'"
+  [ "$(cat "$sink")" = 'Claude background-task exit picker' ] || fail "classify should note the dialog, got '$(cat "$sink")'"
+  out=$(fm_composer_classify_screen 'styled=1' "$screen")
+  [ "$out" = pending ] || fail "a styled cursorless picker should stay pending, got '$out'"
+  unset FM_COMPOSER_DIALOG_SINK
+  rm -f "$sink"
+  FM_TEST_PICKER_SCREEN=$screen
+  FM_TEST_PICKER_ENTERS=$(mktemp)
+  : > "$FM_TEST_PICKER_ENTERS"
+  fm_composer_dialog_sink_prepare || fail "the dialog sink could not be prepared"
+  sink=$FM_COMPOSER_DIALOG_SINK
+  out=$(fm_composer_submit_retry_core fm_test_picker_send fm_test_picker_state win 3 0)
+  fm_composer_dialog_sink_release
+  [ ! -e "$sink" ] || fail "the release should remove a sink that prepare created"
+  [ -z "${FM_COMPOSER_DIALOG_SINK:-}" ] || fail "the release should unset a sink that prepare created"
+  enters=$(grep -c '^Enter$' "$FM_TEST_PICKER_ENTERS" || true)
+  [ "$out" = unknown ] || fail "a picker must stop the retry as unknown, got '$out'"
+  [ "$enters" -eq 1 ] || fail "a picker must receive one Enter, got $enters"
+  rm -f "$FM_TEST_PICKER_ENTERS"
+  unset FM_TEST_PICKER_SCREEN FM_TEST_PICKER_ENTERS
+  pass "the Claude background-task exit picker stays pending and receives no confirming Enter"
+}
+
+# The picker's own text, shown the way a worker pane shows it when it prints
+# this repository's diff, verification note, or a test fixture: quoted above a
+# normal composer. No picker is open, so the next Enter confirms nothing.
+quoted_exit_picker_screen() {
+  printf '%s\n' \
+    '● Here is the fixture the test uses:' \
+    "+    'Background work is running' \\" \
+    "+    '❯ 1. Exit and stop tasks' \\" \
+    "+    'Enter to confirm · Esc to cancel'" \
+    '  The selected row is "❯ 1. Exit and stop tasks" and the footer is "Enter to confirm · Esc to cancel".' \
+    'Background work is running' \
+    '❯ 1. Exit and stop tasks' \
+    'Enter to confirm · Esc to cancel' \
+    '' \
+    '╭──────────────╮' \
+    '│ > next steer │' \
+    '╰──────────────╯'
+}
+
+test_dialog_heading_and_footer_must_be_the_recorded_lines() {
+  local screen out rc
+  screen=$(printf '%s\n' \
+    'The fixture mentions Background work is running in a sentence' \
+    '❯ 1. Exit and stop tasks' \
+    'Enter to confirm · Esc to cancel')
+  out=$(fm_composer_blocking_dialog "$screen"); rc=$?
+  [ "$rc" -eq 1 ] || fail "a heading buried in a sentence must not match"
+  [ -z "$out" ] || fail "a miss must print nothing, got '$out'"
+  screen=$(printf '%s\n' \
+    'Background work is running' \
+    '❯ 1. Exit and stop tasks' \
+    'Enter to confirm the deployment')
+  out=$(fm_composer_blocking_dialog "$screen"); rc=$?
+  [ "$rc" -eq 1 ] || fail "a last line that only starts with the confirm words must not match"
+  [ -z "$out" ] || fail "a miss must print nothing, got '$out'"
+  pass "a buried heading or a different last line is not the exit picker"
+}
+
+test_dialog_note_skips_the_match_when_no_sink_is_set() {
+  local screen out rc before after
+  screen=$(exit_picker_screen)
+  unset FM_COMPOSER_DIALOG_SINK
+  out=$(fm_composer_note_blocking_dialog "$screen"); rc=$?
+  [ "$rc" -eq 1 ] || fail "a note without a sink should return 1, got $rc"
+  [ -z "$out" ] || fail "a note without a sink should print nothing, got '$out'"
+  [ -z "${FM_COMPOSER_DIALOG_SINK:-}" ] || fail "a note without a sink must not create one"
+  out=$(fm_composer_classify_screen 'styled=1' "$screen" 1)
+  [ "$out" = pending ] || fail "classify without a sink should stay pending, got '$out'"
+  trap 'true' RETURN
+  before=$(trap -p RETURN)
+  fm_composer_dialog_sink_prepare || fail "the dialog sink could not be prepared"
+  fm_composer_dialog_sink_release
+  after=$(trap -p RETURN)
+  trap - RETURN
+  [ "$before" = "$after" ] || fail "release replaced the caller RETURN trap: $after"
+  pass "a dialog note without a sink skips the match, and release leaves a caller RETURN trap"
+}
+
+test_quoted_exit_picker_text_is_not_a_dialog() {
+  local screen out rc sink enters
+  screen=$(quoted_exit_picker_screen)
+  out=$(fm_composer_blocking_dialog "$screen"); rc=$?
+  [ "$rc" -eq 1 ] || fail "picker text quoted above a normal composer must not match"
+  [ -z "$out" ] || fail "a miss must print nothing, got '$out'"
+  out=$(fm_composer_blocking_dialog "$(printf '%s\n' \
+    'Background work is running' \
+    "+    '❯ 1. Exit and stop tasks' \\" \
+    'Enter to confirm · Esc to cancel')"); rc=$?
+  [ "$rc" -eq 1 ] || fail "a selected row that is not alone on its row must not match"
+  out=$(fm_composer_blocking_dialog "$(printf '%s\n' \
+    '❯ 1. Exit and stop tasks' \
+    'Background work is running' \
+    'Enter to confirm · Esc to cancel')"); rc=$?
+  [ "$rc" -eq 1 ] || fail "a selected row above the heading must not match"
+  FM_TEST_PICKER_SCREEN=$screen
+  FM_TEST_PICKER_ENTERS=$(mktemp)
+  : > "$FM_TEST_PICKER_ENTERS"
+  fm_composer_dialog_sink_prepare || fail "the dialog sink could not be prepared"
+  sink=$FM_COMPOSER_DIALOG_SINK
+  out=$(fm_composer_submit_retry_core fm_test_picker_send fm_test_picker_state win 3 0)
+  [ ! -s "$sink" ] || fail "quoted picker text must not be noted as a dialog, got '$(cat "$sink")'"
+  fm_composer_dialog_sink_release
+  enters=$(grep -c '^Enter$' "$FM_TEST_PICKER_ENTERS" || true)
+  [ "$out" = pending ] || fail "quoted picker text must keep the ordinary pending verdict, got '$out'"
+  [ "$enters" -eq 3 ] || fail "quoted picker text must keep the ordinary Enter retries, got $enters"
+  rm -f "$FM_TEST_PICKER_ENTERS"
+  unset FM_TEST_PICKER_SCREEN FM_TEST_PICKER_ENTERS
+  pass "picker text quoted above a normal composer is not read as a live picker"
+}
+
+test_background_exit_picker_stays_pending_and_blocks_retry
+test_dialog_heading_and_footer_must_be_the_recorded_lines
+test_dialog_note_skips_the_match_when_no_sink_is_set
+test_quoted_exit_picker_text_is_not_a_dialog

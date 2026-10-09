@@ -22,7 +22,11 @@
 # Ship needs WebGL2; otherwise a static illustration replaces the scene while its panels stay live.
 # The system's reduced-motion preference stops continuous scene animation and tag pulsing
 # and immediately settles home transitions, worker walks and crate drops, restoring tags and picking.
-# On a phone the board is a list grouped by stage, with a dock.
+# At viewport widths of 760-1279 CSS pixels the header figures use their own row.
+# At 760-1023 CSS pixels the sidebar becomes a compact rail with four-character home
+# labels (or the whole name if shorter); home buttons retain the full accessible name and tooltip.
+# Below 760 CSS pixels the board is a mobile kanban that shows one status column at a time,
+# with a sticky switcher that jumps to any column, and a dock.
 # Each build writes the app's one data file, state/dashboard/board.json: homes with their
 # lane plans, one card per open lane, ready backlog item and pull request landed today,
 # and parked home ids. Cards carry the current stage inferred from status lines (which
@@ -34,12 +38,15 @@
 # (dispatch to merge across recorded merges, shown only with at least five samples).
 # Dispatch history is local-only; each merge uses its latest preceding dispatch.
 # Quota and history samples remain on Overview, not in board.json.
-# A lane the captain holds is parked, not stuck.
+# A lane the captain holds is parked on the board, remains open, and counts as
+# waiting on other in metric lane-state totals, not as stuck or waiting on a decision.
 # Each build also atomically replaces data.json (every metric with its status and source;
 # GET/HEAD /data.json serves it as application/json) and writes three self-contained HTML
 # pages (inline CSS and SVG, no script, no network reference), phone first:
-#   index    Overview: Main's ask list, attention chips, six tiles and trends, lane waits,
-#            14-day in/out chart, homes, quota runway, devices and machine
+#   index    the legacy Overview page; still built last as the build-completion and freshness
+#            marker, but the app serves its own native Overview in its place and never links here.
+#            (Its content: Main's ask list, attention chips, six tiles and trends, lane waits,
+#            14-day in/out chart, homes, quota runway, devices and machine.)
 #   backlog  queued, ready and held work per home, held-for-captain items, every lane, agents
 #   measure  every number's one definition (what it counts, source, window and cutoff, how
 #            often it is read), records that disagree, sources not read
@@ -61,7 +68,10 @@
 #   <home>/state/*.meta + *.status  lanes: every ship/scout record, in one state by its last
 #                                   status verb and [at=] time (building, validating or waiting on
 #                                   CI, waiting on a decision, blocked, waiting on something
-#                                   else, finished not landed); a secondmate record is a lead
+#                                   else, finished not landed); a secondmate record is a lead.
+#                                   Without a captain hold, blocked/failed stay blocked even when
+#                                   their text names CI; only paused validation/no-mistakes/CI/checks/
+#                                   pipeline waits are validating (tests/fm-dashboard.test.sh ci-stuck)
 #   config/lane-caps                "<home> <cap>" lane plan per home (Main is "main" or the name
 #                                   of its home's parent folder); config/lane-target is the default (4)
 #   bin/fm-tasks-axi.sh list        each home's backlog (FM_HOME=<home>): queued = ready + held +
@@ -100,8 +110,10 @@
 # build (the default) writes $FM_HOME/state/dashboard/ and prints the index page path.
 # serve runs a small read-only web server (python3 stdlib, IPv4) that answers GET or
 # HEAD for / and /index.html (the JavaScript app), its files under bin/fm-dashboard/,
-# /board.json, /overview (the generated index page), /backlog, /measure and /data.json;
-# every other path is 404. Metrics in the app opens /overview. The app's
+# /board.json, /overview (the same app shell; the app opens its own native Overview in
+# place of the old page), /backlog, /measure and /data.json; every other path is 404.
+# Overview and Board are one app and one navigation; the old generated Overview page is no
+# longer reachable through the app. The app's
 # files and both JSON files carry an ETag, answer 304 while unchanged and are gzipped
 # for a client that accepts it (the font is not); the app's CSP allows its own origin
 # only. The app keeps its view, tabs, filters and open card in the URL hash and its theme
@@ -149,7 +161,7 @@ import gzip, http.server, os, re, subprocess, sys, threading, time, urllib.parse
 SCRIPT, HOME, DIR, BIND, PORT, MAX_AGE, APP = sys.argv[1:8]
 MAX_AGE = int(MAX_AGE)
 PAGE = os.path.join(DIR, 'index.html')
-ROUTES = {'/overview': 'index', '/backlog': 'backlog', '/measure': 'measure', '/data.json': 'data', '/board.json': 'board'}
+ROUTES = {'/backlog': 'backlog', '/measure': 'measure', '/data.json': 'data', '/board.json': 'board'}
 # The app's own files: one optional folder level, no hidden names, no other types.
 STATIC = re.compile(r'/((?:[\w-]+/)?[\w-][\w.-]*\.(js|css|svg|woff2))')
 TYPES = {'js': 'text/javascript; charset=utf-8', 'css': 'text/css; charset=utf-8', 'svg': 'image/svg+xml', 'woff2': 'font/woff2',
@@ -208,7 +220,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def do_GET(self):
         path, _, query = self.path.partition('?')
-        if path in ('/', '/index.html'): return self.file(os.path.join(APP, 'index.html'), 'html', APP_CSP)
+        if path in ('/', '/index.html', '/overview'): return self.file(os.path.join(APP, 'index.html'), 'html', APP_CSP)
         m = STATIC.fullmatch(path)
         if m and os.path.isfile(os.path.join(APP, m.group(1))): return self.file(os.path.join(APP, m.group(1)), m.group(2), APP_CSP)
         name = ROUTES.get(path)
@@ -450,11 +462,11 @@ for h, d in sorted(home_dir.items()):
             elif verb in ('resolved', 'captain-held'): keys.discard(key)
             text = l.split(':', 1)[1].strip() if ':' in l else ''
             pr = (re.findall(r'https://github\.com/[\w.-]+/[\w.-]+/pull/\d+', l) or [pr])[-1]
-        if any(k.startswith('captain-hold') for k in keys): state = 'decision'
+        if any(k.startswith('captain-hold') for k in keys): state = 'waiting'
         elif verb in ('working', 'resolved'): state = 'building'
         elif verb == 'needs-decision': state = 'decision'
         elif verb == 'done': state = 'finished'
-        elif verb in ('blocked', 'paused', 'failed') and VALIDATING.search(text): state = 'validating'
+        elif verb == 'paused' and VALIDATING.search(text): state = 'validating'
         elif verb in ('blocked', 'failed'): state = 'blocked'
         else: state = 'waiting'
         lanes.append(dict(home=h, task=f[:-5], state=state, since=at or mt, text=text, pr=pr, meta=meta,
@@ -744,6 +756,14 @@ def machine():
     t, err = read('pressure/memory')
     p = re.search(r'^some avg10=([0-9.]+)', t or '', re.M)
     m['pressure'], m['pressure_why'] = (float(p.group(1)) if p else None), err or 'no "some avg10" line'
+    m['swap'] = gb(int(kv['SwapTotal']) - int(kv['SwapFree'])) if 'SwapTotal' in kv and 'SwapFree' in kv else None
+    # Use the independent sampler's history (bin/fm-host-memory-sampler.sh), not the dashboard's refresh cadence.
+    try:
+        rows = [l.split('\t') for l in open(os.path.join(HOME, 'state/host-memory.tsv'), errors='replace')]
+        m['peak'] = max((float(r[3]) for r in rows if len(r) >= 5 and r[3].strip() and float(r[0]) >= NOW_TS - 3600), default=None)
+        m['peak_why'] = 'no sample in the last hour'
+    except (OSError, ValueError) as e:
+        m['peak'], m['peak_why'] = None, getattr(e, 'strerror', None) or str(e)
     out, err = probe(['systemctl', '--user', 'show', 'fm-heavy.slice', '-p', 'MemoryCurrent', '-p', 'MemoryHigh', '-p', 'MemoryMax'])
     kv = dict(l.split('=', 1) for l in (out or '').splitlines() if '=' in l)
     def size(v): return int(v) / 2**30 if (v or '').isdigit() else None
@@ -1005,6 +1025,11 @@ free, psi, (hc_, hh_, hm_) = mach['free'], mach['pressure'], mach['heavy']
 def psi_tone(v): return 'bad' if v >= 40 else 'warn' if v >= 20 else 'ok'
 gate_wait = (free is not None and free[0] < MEM_MIN_GB) or (psi is not None and psi >= 40)
 at_cap = [x for x, full in (('emulators', (emu_count or 0) >= EMU_MAX), ('Gradle builds', (mach['gradle'] or 0) >= GRADLE_MAX)) if full]
+for h in ACTIVE:  # fm-spawn.sh and fm-control.sh relaunch record why the host memory guard turned a new agent away
+    if h in remote_hosts: continue
+    try: at, task, why = open(os.path.join(home_dir[h], 'state/admission-refused'), errors='replace').read().rstrip('\n').split('\t', 2)
+    except (OSError, ValueError): continue
+    if NOW_TS - float(at) < 900: spot('bad', 'Memory', f'new agents wait ({hname(h)})', task, dur(NOW_TS - float(at)), '#devices', why)
 low = free is not None and free[0] < MEM_MIN_GB
 if gate_wait: spot('bad', 'Memory', 'free, heavy jobs wait' if low else 'memory pressure, heavy jobs wait', f'{free[0]:.0f} GB' if low else f'{psi:.0f}%', 'now', '#devices', 'the next heavy job queues')
 for x, n, cap in (('emulators', emu_count, EMU_MAX), ('Gradle builds', mach['gradle'], GRADLE_MAX)):
@@ -1018,6 +1043,11 @@ machine_rows = ''.join([
     if free else meter('Free memory', unknown(mach['free_why']), None, ''),
     meter('Memory pressure', f'{psi:.0f}%', psi / 100, psi_tone(psi), 'share of the last 10 s some job waited on memory; heavy jobs wait at 40% or more')
     if psi is not None else meter('Memory pressure', unknown(mach['pressure_why']), None, ''),
+    meter('Pressure peak, last hour', f'{mach["peak"]:.0f}%', mach['peak'] / 100, psi_tone(mach['peak']),
+          'highest sustained share (lower of 10 s and 60 s averages) the watcher recorded; config/host-memory sets when new agents wait and when an alert goes out')
+    if mach['peak'] is not None else meter('Pressure peak, last hour', unknown(mach['peak_why']), None, ''),
+    meter('Swap used', f'{mach["swap"]:.1f} GB', None, 'warn' if mach['swap'] >= 8 else 'ok', 'memory the kernel pushed to disk')
+    if mach['swap'] is not None else meter('Swap used', unknown('no SwapTotal in meminfo'), None, ''),
     meter('Heavy jobs', f'{hc_:.1f} GB <small>of {hh_:.0f} GB</small>' if hh_ else f'{hc_:.1f} GB', hc_ / hh_ if hh_ else None,
           'warn' if hh_ and hc_ >= 0.9 * hh_ else 'ok', 'shared group for builds and emulators' + (f'; hard limit {hm_:.0f} GB' if hm_ else ''))
     if hc_ is not None else meter('Heavy jobs', unknown(mach['heavy_why']), None, ''),
@@ -1074,7 +1104,7 @@ def card(title, window, body, cls='', more=None, cid=''):
     return f'<section class="card {cls}"{f" id={cid}" if cid else ""}><div class="ch"><h3>{title}</h3>{m}</div><p class="cw">{window}</p>{body}</section>'
 
 # --- page shell ----------------------------------------------------------
-NAV = [('./', 'app', 'Board'), ('overview', 'index', 'Overview'), ('backlog', 'backlog', 'Backlog'), ('measure', 'measure', 'Method')]
+NAV = [('./', 'app', 'Board'), ('/#/overview', 'overview', 'Overview'), ('backlog', 'backlog', 'Backlog'), ('measure', 'measure', 'Method')]
 records = []  # (title, detail): two records that give different answers
 for h in sorted(home_dir):
     fl = bl(h, state='in_flight')
