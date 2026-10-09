@@ -56,7 +56,7 @@ fm_wait_timer_push_delivered() {  # <task> <window>
       return
     fi
     if [ "$parent" -eq 1 ] && [ -e "$FM_HOME/.fm-secondmate-home" ]; then
-      fm_wait_timer_report "resolved [key=$key]: waiting-timer-cleared: $1 changed state" || return 1
+      fm_wait_timer_report "resolved [key=$key]: waiting-timer-cleared: $1 changed state" || return 0
     fi
   fi
   mkdir -p "$STATE/.waiting-timers" || return 1
@@ -127,7 +127,7 @@ EOF
     [ ! -f "$STATE/$task.meta" ] || continue
     IFS=$'\t' read -r old since owner parent key misses < "$record" || return 1
     if [ "$parent" = 1 ] && [ -e "$FM_HOME/.fm-secondmate-home" ]; then
-      fm_wait_timer_report "resolved [key=$key]: waiting-timer-cleared: $task removed" || return 1
+      fm_wait_timer_report "resolved [key=$key]: waiting-timer-cleared: $task removed" || continue
     fi
     rm -f "$record" || return 1
   done
@@ -189,7 +189,7 @@ EOF
     fi
     if [ -z "$declaration" ] || [ "$old" != "$signature" ]; then
       if [ "$parent" -eq 1 ] && [ -e "$FM_HOME/.fm-secondmate-home" ]; then
-        fm_wait_timer_report "resolved [key=$key]: waiting-timer-cleared: $task changed state" || return 1
+        fm_wait_timer_report "resolved [key=$key]: waiting-timer-cleared: $task changed state" || continue
       fi
       rm -f "$record" || return 1
       [ -n "$declaration" ] || continue
@@ -218,7 +218,7 @@ EOF
     fi
     if ! status_is_paused "$declaration" && [ "$owner" -gt 1 ] && [ "$((now - owner))" -ge "$((escalate - alert))" ] && [ "$parent" -eq 0 ]; then
       if [ -e "$FM_HOME/.fm-secondmate-home" ] || [ -L "$FM_HOME/.fm-secondmate-home" ]; then
-        fm_wait_timer_report "blocked [key=$key]: waiting-timer-overdue: $task ($verb, observed ${age}s); owning lead has not cleared the wait; Main must unblock or steer the lead" || return 1
+        fm_wait_timer_report "blocked [key=$key]: waiting-timer-overdue: $task ($verb, observed ${age}s); owning lead has not cleared the wait; Main must unblock or steer the lead" || continue
       fi
       parent=1
       fm_wait_timer_save "$record" "$signature" "$since" "$owner" "$parent" "$key" "$misses" || return 1
