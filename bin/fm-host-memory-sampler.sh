@@ -84,7 +84,7 @@ fm_memory_sampler_tick() {
   task=${out##*$'\t'}
   out=${out%$'\t'*}
   reason="check: host memory ALERT: ${out#*$'\t'}"
-  action="automatic interrupt skipped: top consumer is not a task this home owns"
+  action="automatic interrupt skipped: no app.slice alert, or top consumer is not a task this home owns"
   case "$task" in
     ''|*[!A-Za-z0-9._-]*) ;;
     *) action="automatic interrupt attempted: task $task" ;;

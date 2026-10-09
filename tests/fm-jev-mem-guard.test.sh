@@ -84,7 +84,7 @@ watch_leg() {
   local case=$1 tag=$2
   env PATH="$case/fakebin:$PATH" FM_HOME="$case" FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="${5:-$case/state}" \
     FM_CREW_STATE_BIN="$case/fakebin/fm-crew-state.sh" FM_FAKE_CREW_STATE='state: working · source: run-step · fixture build' TMUX='' FM_BACKEND=tmux \
-    FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_SECS="${3:-1}" FM_SECONDMATE_LIVENESS_SECS="${4:-99999999}" \
+    FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" FM_HOST_MEMORY_SECS="${3:-1}" FM_SECONDMATE_LIVENESS_SECS="${4:-99999999}" \
     FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
     "$WATCH" > "$case/watch-$tag.out" 2> "$case/watch-$tag.err" &
   LEG_PID=$!
@@ -200,48 +200,57 @@ test_watcher_wakes_once_per_alert_episode() {
 }
 
 test_cgroup_pressure() {
-  local case=$TMP_ROOT/cgroup out rc group=user.slice/user-123.slice/user@123.service/app.slice/herdr-server.service
+  local case=$TMP_ROOT/cgroup out rc app="user.slice/user-$(id -u).slice/user@$(id -u).service/app.slice"
+  mkdir -p "$case/cgroup/$app" "$case/state"
   fake_host "$case/proc" 40 2
-  mkdir -p "$case/proc/self" "$case/cgroup/$group" "$case/state"
-  printf '0::/%s/child\n' "$group" > "$case/proc/self/cgroup"
-  printf 'some avg10=58.88 avg60=60 avg300=0 total=1\n' > "$case/cgroup/$group/memory.pressure"
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --record "$case/state/sample")
-  assert_contains "$out" $'ALERT\tpressure 59%' "cgroup pressure dominates a calm host"
-  assert_contains "$out" 'host 2%, cgroup 59%' "the independent measurements are visible"
-  assert_equals '58.88' "$(cut -f4 "$case/state/sample")" "the recorded pressure is the worse signal"
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build --state "$case/state"); rc=$?
-  [ "$rc" -eq 1 ] || fail "critical cgroup pressure admitted work: $out"
-  rm "$case/cgroup/$group/memory.pressure"
-  local app=user.slice/user-123.slice/user@123.service/app.slice
-  mkdir -p "$case/cgroup/$app"
-  printf 'some avg10=24 avg60=30 avg300=0 total=1\n' > "$case/cgroup/$app/memory.pressure"
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD")
-  assert_contains "$out" $'WAIT\tpressure 24%' "app.slice is measured when the runtime unit is unreadable"
-  # A capped sibling slice thrashing (fm-heavy at its swap cap) is contained by design:
-  # it must not reach the admission verdict while app.slice and herdr-server are calm.
-  mkdir -p "$case/cgroup/user.slice/user-123.slice/user@123.service/fm.slice/fm-heavy.slice"
-  printf 'some avg10=95 avg60=90 avg300=50 total=1\n' > "$case/cgroup/user.slice/user-123.slice/user@123.service/fm.slice/fm-heavy.slice/memory.pressure"
-  mkdir -p "$case/cgroup/$app/herdr-server.service"
-  printf 'some avg10=0.85 avg60=0.5 avg300=0.2 total=1\n' > "$case/cgroup/$app/herdr-server.service/memory.pressure"
-  printf 'some avg10=1 avg60=1 avg300=1 total=1\n' > "$case/cgroup/$app/memory.pressure"
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD")
-  assert_contains "$out" $'OK\tpressure 1%' "sibling heavy-slice thrash never gates the verdict"
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build --state "$case/state"); rc=$?
-  [ "$rc" -eq 0 ] || fail "heavy-slice thrash refused admission: $out"
-  # A short spike raises only the 10 s average: it must not refuse a launch.
+  # A 10 s spike that the sustained average has not caught up with still holds at the alert level.
   printf 'some avg10=60 avg60=8 avg300=2 total=1\n' > "$case/cgroup/$app/memory.pressure"
   out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build --state "$case/state"); rc=$?
-  [ "$rc" -eq 0 ] || fail "a short app.slice spike refused admission: $out"
-  # The slice systemd-oomd watches at sustained kill-level pressure still holds and refuses.
-  printf 'some avg10=60 avg60=39 avg300=15 total=1\n' > "$case/cgroup/$app/memory.pressure"
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build --state "$case/state"); rc=$?
-  [ "$rc" -eq 1 ] || fail "app.slice at oomd kill pressure admitted work: $out"
-  assert_contains "$out" 'pressure at or above 35%' "the alert reason names the pressure"
-  printf 'some avg10=1 avg60=1 avg300=1 total=1\n' > "$case/cgroup/$app/memory.pressure"
-  rm "$case/cgroup/$app/memory.pressure" "$case/cgroup/$app/herdr-server.service/memory.pressure"
+  [ "$rc" -eq 1 ] || fail "a fast app.slice spike admitted work: $out"
+  assert_contains "$out" '10 s pressure at or above 35%' "the fast spike names its reason"
+  printf 'some avg10=24 avg60=30 avg300=0 total=1\n' > "$case/cgroup/$app/memory.pressure"
   out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD")
-  assert_contains "$out" 'host-only classification' "unreadable cgroup pressure is explicit"
-  pass "cgroup pressure participates in classification and admission"
+  assert_contains "$out" $'WAIT\tpressure 24%' "sustained app.slice pressure makes new agents wait"
+  assert_contains "$out" 'host 2%, app.slice 24%' "host and app.slice are both visible"
+  # A capped sibling slice thrashing (fm-heavy at its swap cap) is contained by design:
+  # it must not reach the verdict while app.slice is calm.
+  mkdir -p "$case/cgroup/user.slice/user-$(id -u).slice/user@$(id -u).service/fm.slice/fm-heavy.slice"
+  printf 'some avg10=95 avg60=90 avg300=50 total=1\n' > "$case/cgroup/user.slice/user-$(id -u).slice/user@$(id -u).service/fm.slice/fm-heavy.slice/memory.pressure"
+  printf 'some avg10=1 avg60=1 avg300=1 total=1\n' > "$case/cgroup/$app/memory.pressure"
+  fake_host "$case/proc" 40 2
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build --state "$case/state"); rc=$?
+  [ "$rc" -eq 0 ] || fail "sibling heavy-slice thrash refused admission: $out"
+  # Host-wide pressure with a calm app.slice informs the sampler but never holds a launch.
+  fake_host "$case/proc" 40 48
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build --state "$case/state"); rc=$?
+  [ "$rc" -eq 0 ] || fail "host-wide pressure refused admission with a calm app.slice: $out"
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD")
+  assert_contains "$out" $'ALERT\tpressure 1%' "host-wide alert reports the calm app.slice reading"
+  assert_contains "$out" 'host-wide pressure at or above 35%' "host-wide alert names its reason"
+  rm "$case/cgroup/$app/memory.pressure"
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD")
+  assert_contains "$out" 'host-only classification' "unreadable app.slice pressure is explicit"
+  pass "app.slice pressure alone governs admission, host-wide pressure only informs"
+}
+
+test_host_pressure_wakes_without_hold_or_interrupt() {
+  local case out rc app="user.slice/user-$(id -u).slice/user@$(id -u).service/app.slice"
+  case=$(make_case host-only)
+  make_fleet "$case"
+  prepare_control_task "$case"
+  fake_host "$case/proc" 40 48
+  mkdir -p "$case/cgroup/$app"
+  printf 'some avg10=3 avg60=3 avg300=1 total=1\n' > "$case/cgroup/$app/memory.pressure"
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build --state "$case/state"); rc=$?
+  [ "$rc" -eq 0 ] || fail "host-wide pressure held an admission with a calm app.slice: $out"
+  watch_leg "$case" host-only default
+  wait_for_exit "$LEG_PID" 50 || fail "host-wide pressure did not wake Main: $(cat "$case/watch-host-only.err")"
+  out=$(cat "$case/watch-host-only.out")
+  assert_contains "$out" "check: host memory ALERT: pressure 3%" "the wake reports the calm app.slice reading"
+  assert_contains "$out" "host-wide pressure at or above 35%" "the wake names host-wide pressure"
+  assert_contains "$out" "automatic interrupt skipped" "host-wide pressure attempts no interrupt"
+  [ ! -e "$case/keys" ] || fail "host-wide pressure interrupted a task: $(cat "$case/keys")"
+  pass "host-wide pressure wakes Main without holding admission or interrupting a task"
 }
 
 test_home_qualified_owners() {
@@ -686,6 +695,7 @@ SH
 
 test_verdicts_samples_and_owners
 test_cgroup_pressure
+test_host_pressure_wakes_without_hold_or_interrupt
 test_home_qualified_owners
 test_homes_without_ordinary_tasks
 test_remote_records_do_not_own_local_processes

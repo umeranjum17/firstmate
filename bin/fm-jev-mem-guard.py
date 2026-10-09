@@ -4,12 +4,13 @@ fm-jev-mem-guard.py - host memory guard: measure, admit, and alert before an oom
 
 On Herdr, fleet agents share one agent-runtime service, and systemd-oomd kills
 that service as a unit under the host's configured oomd pressure policy.
-Classify by the pressure of the cgroups that policy watches and agents run in
-(the user app.slice and herdr-server.service) plus host available memory.
-Host-wide and whole-user-slice pressure aggregate capped heavy-job slices by
-design, so they are summary context only and never gate admission or alerts.
+Classify by the pressure of the user app.slice, the cgroup systemd-oomd watches
+and agents run in, plus host available memory.
+Host-wide pressure aggregates capped heavy-job slices by design, so at or above
+alert_pressure it raises an ALERT wake as information only, never a hold or an interrupt.
 Pressure is sustained "some" pressure, the lower of the 10 s and 60 s averages,
-so a short spike does not hold launches while pressure held for about a minute does.
+so a short spike does not hold launches while pressure held for about a minute does;
+a 10 s average at or above alert_pressure holds at once.
 Admission refusal and sampler interrupts cannot guarantee avoidance of an oomd kill.
 
 Usage (bin/fm-jev-mem-guard.sh runs this with python3):
@@ -28,9 +29,10 @@ Usage (bin/fm-jev-mem-guard.sh runs this with python3):
   --owned-top-task DIR appends a tab and the top consumer's task ID only when
       that consumer is a task recorded in DIR (for the sampler's interrupt).
 
-Verdicts: OK; WAIT (new agents wait); ALERT (sampler attempts one owned-task interrupt);
-UNKNOWN (not measurable, for example no pressure file).
---admit refuses WAIT and ALERT and admits OK and UNKNOWN; UNKNOWN records no sample.
+Verdicts: OK; WAIT (new agents wait); ALERT (sampler attempts one owned-task interrupt,
+or none for host-wide pressure alone); UNKNOWN (not measurable, for example no pressure file).
+--admit refuses WAIT and app.slice ALERT and admits OK, host-wide-only ALERT, and UNKNOWN;
+UNKNOWN records no sample.
 Pass --config FILE to read thresholds; without it the defaults apply.
 Settings are owned by docs/configuration.md "Host memory guard".
 The former diagnostic --check, --json, and percentage-threshold flags are unsupported.
@@ -91,66 +93,44 @@ def load_config(path):
 
 
 def pressure_at(path):
-    """Sustained "some" pressure: the lower of the 10 s and 60 s averages.
+    """Sustained "some" pressure (the lower of the 10 s and 60 s averages) and the 10 s average.
 
-    A spike raises avg10 alone and passes; pressure held for about a minute
-    raises both, and the reading falls as soon as avg10 does.
+    A spike raises avg10 alone and passes the sustained reading; pressure held for
+    about a minute raises both, and the sustained reading falls as soon as avg10 does.
     """
     some = next(l for l in open(path) if l.startswith("some "))
     fields = dict(f.split("=", 1) for f in some.split()[1:])
-    value = min(float(fields["avg10"]), float(fields["avg60"]))
-    if not math.isfinite(value) or value < 0:
+    fast, slow = float(fields["avg10"]), float(fields["avg60"])
+    if not all(math.isfinite(v) and v >= 0 for v in (fast, slow)):
         raise ValueError
-    return value
+    return min(fast, slow), fast
 
 
-def cgroup_pressure():
-    """Worse pressure across the cgroups oomd watches and agents run in.
-
-    Sibling slices (fm.slice) hold capped heavy jobs whose contained thrash
-    must not gate agent admission, so only app.slice and herdr-server.service
-    (plus the same markers found in this process's own cgroup path) qualify.
-    """
+def app_slice_pressure():
+    """(sustained, 10 s) pressure of the user app.slice, or None when unreadable."""
     uid = os.getuid()
-    app = f"user.slice/user-{uid}.slice/user@{uid}.service/app.slice"
-    paths = {app, f"{app}/herdr-server.service"}
+    path = os.path.join(CGROUP_ROOT, f"user.slice/user-{uid}.slice/user@{uid}.service/app.slice/memory.pressure")
     try:
-        for line in open(f"{PROC}/self/cgroup"):
-            if not line.startswith("0::"):
-                continue
-            parts = line.strip()[3:].lstrip("/").split("/")
-            for marker in ("app.slice", "herdr-server.service"):
-                if marker in parts:
-                    paths.add("/".join(parts[:parts.index(marker) + 1]))
-    except OSError:
-        pass
-    readings = []
-    root = os.path.realpath(CGROUP_ROOT)
-    for group in paths:
-        path = os.path.realpath(os.path.join(root, group, "memory.pressure"))
-        if not path.startswith(root + os.sep):
-            continue
-        try:
-            readings.append((pressure_at(path), group))
-        except (OSError, StopIteration, KeyError, ValueError):
-            pass
-    return max(readings) if readings else (None, None)
+        return pressure_at(path)
+    except (OSError, StopIteration, KeyError, ValueError):
+        return None
 
 
 def sample():
-    """{available_kb, swap_used_kb, pressure}, or None when not measurable."""
+    """{available_kb, swap_used_kb, pressure, fast, host_pressure, app_pressure}, or None when not measurable."""
     try:
         mem = {}
         for line in open(f"{PROC}/meminfo"):
             key, _, val = line.partition(":")
             if val.split() and val.split()[0].isdigit():
                 mem[key.strip()] = int(val.split()[0])
-        host = pressure_at(f"{PROC}/pressure/memory")
-        cgroup, group = cgroup_pressure()
+        host, host_fast = pressure_at(f"{PROC}/pressure/memory")
+        app = app_slice_pressure()
+        pressure, fast = app or (host, host_fast)
         return {"available_kb": mem["MemAvailable"],
                 "swap_used_kb": max(0, mem.get("SwapTotal", 0) - mem.get("SwapFree", 0)),
-                "pressure": cgroup if cgroup is not None else host,
-                "host_pressure": host, "cgroup_pressure": cgroup, "cgroup": group}
+                "pressure": pressure, "fast": fast,
+                "host_pressure": host, "app_pressure": app[0] if app else None}
     except (OSError, StopIteration, KeyError, ValueError):
         return None
 
@@ -160,9 +140,12 @@ def verdict(s, cfg):
         return "UNKNOWN", []
     gb = s["available_kb"] / GIB_KB
     for level in ("alert", "wait"):
+        threshold = cfg[f"{level}_pressure"]
         why = []
-        if s["pressure"] >= cfg[f"{level}_pressure"]:
-            why.append(f"pressure at or above {cfg[f'{level}_pressure']:g}%")
+        if s["pressure"] >= threshold:
+            why.append(f"pressure at or above {threshold:g}%")
+        elif level == "alert" and s["fast"] >= threshold:
+            why.append(f"10 s pressure at or above {threshold:g}%")
         if gb < cfg[f"{level}_available_gb"]:
             why.append(f"available memory below {cfg[f'{level}_available_gb']:g} GB")
         if why:
@@ -173,8 +156,8 @@ def verdict(s, cfg):
 def summary(s):
     return (f"pressure {s['pressure']:.0f}% (lower of 10 s and 60 s averages), {s['available_kb'] / GIB_KB:.1f} GB available, "
             f"{s['swap_used_kb'] / GIB_KB:.1f} GB swap used; " +
-            (f"host {s['host_pressure']:.0f}%, cgroup {s['cgroup_pressure']:.0f}% ({s['cgroup']})"
-             if s['cgroup_pressure'] is not None else "cgroup pressure unreadable; host-only classification"))
+            (f"host {s['host_pressure']:.0f}%, app.slice {s['app_pressure']:.0f}%"
+             if s['app_pressure'] is not None else "cgroup pressure unreadable; host-only classification"))
 
 
 def read_meta(path):
@@ -320,12 +303,15 @@ def main():
     v, why = verdict(s, cfg)
     if args.admit:
         sys.exit(admit(args.admit, args.state, s, v, why))
+    host_only = s is not None and v == "OK" and s["host_pressure"] >= cfg["alert_pressure"]
+    if host_only:
+        v, why = "ALERT", [f"host-wide pressure at or above {cfg['alert_pressure']:g}%"]
     if args.record and s is not None:
         record(args.record, s, v)
     cons = consumers(args.state_dir) if v == "ALERT" or (not args.record and v != "UNKNOWN") else []
     output = line(s, v, why, [text for _, text in cons])
     if args.owned_top_task:
-        task = cons[0][0][1] if cons and cons[0][0][0] == os.path.realpath(args.owned_top_task) else ""
+        task = cons[0][0][1] if cons and not host_only and cons[0][0][0] == os.path.realpath(args.owned_top_task) else ""
         output += "\t" + task
     print(output)
 
