@@ -10,8 +10,8 @@ const Rows = ({ title, children }) => html`<details class="i-panel"><summary>${t
 const Row = ({ name, value, note, title }) => html`<div class="i-row" title=${title}><span>${name}${note && html`<small>${note}</small>`}</span><b>${value}</b></div>`
 function Trend({ days }) {
   const max = Math.max(...days.flatMap(d => [d.median_seconds || 0, d.p85_seconds || 0]), 1)
-  const y = v => 110 - v / max * 95, x = i => 68 + i * 85
-  return html`<section class="i-panel"><h2>Time to merge · seven UTC days</h2><div class="i-key"><span>P50</span><span>P85</span><small>Seconds</small></div>
+  const y = v => 110 - v / max * 95, x = i => 68 + i * 510 / (days.length - 1)
+  return html`<section class="i-panel"><h2>Time to merge · last seven days</h2><div class="i-key"><span>P50</span><span>P85</span><small>Seconds</small></div>
     <svg class="i-trend" viewBox="0 0 600 140" role="img" aria-label="Recorded median and P85 time to merge by UTC day">
       ${(days.some(d => d.known > 0) ? [0, max / 2, max] : []).map(v => html`<line x1="68" x2="578" y1=${y(v)} y2=${y(v)} stroke="var(--line)"/><text x="60" y=${y(v) + 4} text-anchor="end">${number(v)}</text>`)}
       ${['median_seconds', 'p85_seconds'].map((key, k) => html`<g class=${'i-series i-series-' + k}>

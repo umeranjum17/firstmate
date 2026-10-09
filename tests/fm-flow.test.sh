@@ -58,7 +58,7 @@ assert {q['task']: q['why'] for q in x['queue']} == {'next': 'dependency: prior'
     'ready': 'unknown: dispatch admission not recorded'}
 assert next(b for b in x['bottlenecks'] if b['cause'] == 'unknown')['unknown_items'] == 1
 assert any(n.get('line') == 7 for n in x['limitations']), 'malformed durable record disclosed'
-assert len(x['trend_7d']) == 7
+assert sum(d['known'] + d['unknown'] for d in x['trend_7d']) == len(x['executed_7d'])
 grand = tmp / 'grand'
 (grand / 'state').mkdir(parents=True)
 (grand / 'data').mkdir()

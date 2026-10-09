@@ -584,8 +584,8 @@ today = NOW // 86400
 def trend(rows):
     return [dict(day=datetime.fromtimestamp(day * 86400, timezone.utc).strftime('%Y-%m-%d'),
                  **summary([l for l in rows if l['times']['merged'] // 86400 == day]))
-            for day in range(today - 6, today + 1)]
-seven = [l for l in executed(7 * 86400) if l['times']['merged'] // 86400 >= today - 6]
+            for day in range((NOW - 7 * 86400) // 86400, today + 1)]
+seven = executed(7 * 86400)
 print(json.dumps({'schema': 'fm-flow.v1', 'at': NOW, 'homes': sorted(homes), 'lanes': lanes,
                   'queue': queue, 'bottlenecks': bottlenecks, 'capacity': capacity, 'executed_24h': executed(86400),
                   'executed_7d': seven, 'time_to_merge': summary(seven),

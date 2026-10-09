@@ -583,7 +583,7 @@ bravo.listeners.click.call(bravo, { type: 'click' }); assert.equal(phoneOpened, 
 phoneOpened = null; bravo.listeners.keydown.call(bravo, { type: 'keydown', key: 'Enter', target: bravo, currentTarget: bravo, preventDefault() {} }); assert.equal(phoneOpened, 'main/b')
 JS
   jq -e '.flow.limitations > 0 and .flow.time_to_merge.unknown == 0 and (.flow.executed_7d | length) == 1' "$d/board.json" >/dev/null || fail "unavailable remote records became ghost observations"
-  jq -e --arg h "$home" '[.. | strings | select(contains($h) or contains("/home/") or contains("/Users/"))] | length == 0' "$d/board.json" >/dev/null || fail "board.json carries host paths or raw status text: $(jq -c --arg h "$home" '[.. | strings | select(contains($h) or contains("/home/") or contains("/Users/"))]' "$d/board.json" | cut -c1-300)"
+  jq -e --arg h "$home" '[.. | strings | select(contains($h) or contains("/home/") or contains("/Users/") or contains("/tmp/") or contains("[at=") or contains("[key="))] | length == 0' "$d/board.json" >/dev/null || fail "board.json carries host paths or raw status text: $(jq -c --arg h "$home" '[.. | strings | select(contains($h) or contains("/home/") or contains("/Users/") or contains("/tmp/") or contains("[at=") or contains("[key="))]' "$d/board.json" | cut -c1-300)"
   pass "board.json carries stages, waits, ask list and shipped flow observations; known durations, unknown lifecycle splits, queue why-lines and read-only capacity remain distinct"
 }
 
