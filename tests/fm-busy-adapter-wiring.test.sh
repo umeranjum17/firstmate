@@ -455,6 +455,52 @@ test_kimi_and_grok_install_no_unverified_wiring() {
   pass "kimi and grok install no unverified semantic wiring and classify through their own gates"
 }
 
+# Drives the real outage scan over a copied lib whose backend liveness is a
+# fixture: a lane that joins an alerted episode must send one updated wake naming
+# the union, and a mid-turn lane whose pane is dead must not join it.
+test_model_outage_staggered_lane_joins_union_wake() {
+  local case_dir="$TMP_ROOT/model-outage-union" bin state wakes expected
+  bin="$case_dir/bin"; state="$case_dir/state"; wakes="$case_dir/wakes"
+  mkdir -p "$bin" "$state" "$case_dir/liveness"
+  cp "$ROOT/bin/fm-model-outage-lib.sh" "$ROOT/bin/fm-timeout-lib.sh" "$bin/"
+  cat > "$bin/fm-backend.sh" <<'EOF'
+fm_backend_agent_state() { cat "$FAKE_LIVENESS/$4" 2>/dev/null || printf alive; }
+fm_backend_visible_capture_supported() { return 1; }
+EOF
+  lane() {  # <id> <verdict> <liveness>
+    : > "$state/$1.meta"
+    printf '%s\n' "$2" > "$state/$1.verdict"
+    printf '%s\n' "$3" > "$case_dir/liveness/$1"
+    printf '{"gen":"g1","error":"Upstream request failed: region denied"}\n' > "$state/$1.model-error-g1.json"
+  }
+  (
+    export STATE="$state" FAKE_LIVENESS="$case_dir/liveness"
+    # shellcheck source=/dev/null
+    . "$bin/fm-model-outage-lib.sh"
+    fm_meta_get() { printf opencode; }
+    fm_backend_target_of_meta() { printf 'fake:%s' "${1##*/}"; }
+    fm_backend_of_meta() { printf fake; }
+    fm_busy_current_gen() { printf g1; }
+    fm_busy_classify_semantic() { cat "$STATE/$4.verdict"; }
+    hash_pane() { md5sum | cut -c1-12; }
+    wake() { :; }
+    fm_wake_append() { printf '%s\n' "$3" >> "$wakes"; }
+    tick() { rm -f "$STATE/.model-outages/.scan-at"; fm_model_outage_tick; }
+    lane alpha "idle opencode-plugin" alive
+    tick
+    lane bravo "idle opencode-plugin" alive
+    lane charlie "busy opencode-plugin" missing
+    tick
+    tick
+  ) || fail "model-outage scans failed"
+  expected=$(printf '%s\n' \
+    'check: model outage affected=[alpha]: Upstream request failed: region denied' \
+    'check: model outage affected=[alpha,bravo]: Upstream request failed: region denied')
+  [ "$(cat "$wakes")" = "$expected" ] \
+    || fail "a lane joining an alerted episode must send one union wake and nothing for a dead lane, got: $(cat "$wakes")"
+  pass "a staggered lane joins its alerted outage in one union wake; a dead mid-turn lane is not named"
+}
+
 test_pi_extension_semantic_lifecycle
 test_pi_extension_serializes_settle_before_next_start
 test_pi_extension_stale_ctx_settles_unknown
@@ -468,5 +514,6 @@ test_gemini_hooks_stale_incarnation_harmless
 test_raw_gemini_launch_has_no_semantic_wiring
 test_gemini_is_refused_as_a_secondmate
 test_codex_unverified_until_a_semantic_source_exists
+test_model_outage_staggered_lane_joins_union_wake
 
 echo "all fm-busy-adapter-wiring tests passed"
