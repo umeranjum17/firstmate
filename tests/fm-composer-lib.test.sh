@@ -1013,6 +1013,22 @@ test_matrix_opencode_leftbar_signals() {
   wrap3_typed=$'  ┃\n  ┃  Reply with OK.\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/umer/.treehouse/firstmate-cff959/8/a-   22.1K (2%) · $ctrl+p\n   really-quite-long-opencode-project-dir-   commands\n   name'
   assert_screen "opencode 1.18.x typed draft above three-row wrapped status footer on herdr" pending "$CAPS_STYLED" "$wrap3_typed"
   assert_screen "opencode 1.18.x typed draft above three-row wrapped status footer on cmux/orca" unknown "$CAPS_PLAIN" "$wrap3_typed"
+  # Live 2026-10-09 ZERO-USAGE wrap (task fm-opencode-composer-err, real
+  # OpenCode 1.18.25 after an upstream error, long worktree path): the session
+  # has no context/cost cell, so the status area is two rows that split the
+  # `tab`/`agents` and `ctrl+p`/`commands` cells across the wrap. No single row
+  # matches the full status pattern; the palette hint `ctrl+p` anchors it. A
+  # busy row carrying `esc interrupt` in the same area must still refuse.
+  local wrap0_idle wrap0_typed wrap0_busy
+  wrap0_idle=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/umer/.treehouse/firstmate-cff959/8/relaunch-   tab ctrl+p\n   really-quite-long-opencode-project-directory-name   agents commands'
+  assert_screen "opencode 1.18.x zero-usage wrapped status footer on herdr" empty "$CAPS_STYLED" "$wrap0_idle"
+  assert_screen "opencode 1.18.x zero-usage wrapped status footer on cmux/orca" empty "$CAPS_PLAIN" "$wrap0_idle"
+  wrap0_typed=$'  ┃\n  ┃  Reply with OK.\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/umer/.treehouse/firstmate-cff959/8/relaunch-   tab ctrl+p\n   really-quite-long-opencode-project-directory-name   agents commands'
+  assert_screen "opencode 1.18.x typed draft above zero-usage wrapped status footer on herdr" pending "$CAPS_STYLED" "$wrap0_typed"
+  assert_screen "opencode 1.18.x typed draft above zero-usage wrapped status footer on cmux/orca" unknown "$CAPS_PLAIN" "$wrap0_typed"
+  wrap0_busy=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/umer/.treehouse/firstmate-cff959/8/relaunch-   esc interrupt ctrl+p\n   really-quite-long-opencode-project-directory-name   agents commands'
+  assert_screen "opencode 1.18.x busy row above zero-usage wrapped footer still refuses on herdr" unknown "$CAPS_STYLED" "$wrap0_busy"
+  assert_screen "opencode 1.18.x busy row above zero-usage wrapped footer still refuses on cmux/orca" unknown "$CAPS_PLAIN" "$wrap0_busy"
   pass "matrix: opencode's left-bar composer reads empty everywhere and scans the full active run"
 }
 
