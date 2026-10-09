@@ -264,6 +264,14 @@ test_opencode_plugin_semantic_lifecycle() {
   [ -f "$state/$id.turn-ended" ] || fail "the marker touch must stay a notification for every session.idle"
   out=$(classify opencode "$id" "$state")
   [ "$out" = "busy opencode-plugin" ] || fail "another session's idle must not clear the latched busy, got '$out'"
+  local gen error_file
+  gen=$(cat "$state/$id.busy-gen"); error_file="$state/$id.model-error-$gen.json"
+  out=$(drive_oc_plugin "$plugin" "$(oc_status ses_main busy)" \
+    '{"type":"session.error","properties":{"sessionID":"ses_main","error":{"data":{"message":"Upstream request failed: region denied"}}}}' \
+    "$(oc_idle ses_main)") || fail "error drive failed: $out"
+  jq -e '.error=="Upstream request failed: region denied"' "$error_file" >/dev/null || fail 'native failure not persisted through idle'
+  out=$(drive_oc_plugin "$plugin" "$(oc_status ses_main busy)" "$(oc_idle ses_main)") || fail "recovery drive failed: $out"
+  jq -e '.error==""' "$error_file" >/dev/null || fail 'successful turn did not clear the native failure'
   pass "opencode plugin classifies from session.status, scoped to the latched worker session"
 }
 
