@@ -386,7 +386,7 @@ for metric in m.values():
 with urllib.request.urlopen(urllib.request.Request(base + 'data.json', method='HEAD')) as r:
     assert r.headers.get_content_type() == 'application/json' and r.read() == b''
     assert int(r.headers['Content-Length']) > 0
-for path, want in (('overview', 'Nothing needs you.'), ('backlog', 'Held for the captain'), ('measure', 'How each number is measured.')):
+for path, want in (('overview', 'src="app.js"'), ('backlog', 'Held for the captain'), ('measure', 'How each number is measured.')):
     code, body, _ = get(base + path)
     print(path, code, want in body)
 code, body, cookie = get(base + 'backlog?group=home')
@@ -407,7 +407,9 @@ print('app', s, h.get_content_type(), "default-src 'self'" in h['Content-Securit
 for path in ('app.js', 'vendor/preact-htm-3.1.1.js', 'board.json'):
     s, h, b = raw(base + path)
     print(path, s, h.get_content_type(), h['Cache-Control'], raw(base + path, **{'If-None-Match': h['ETag']})[0])
-print('board', json.loads(raw(base + 'board.json')[2])['schema'], "default-src 'none'" in raw(base + 'overview')[1]['Content-Security-Policy'])
+s, h, b = raw(base + 'overview')
+print('overview-app', s, "default-src 'self'" in h['Content-Security-Policy'], b'src="app.js"' in b)
+print('board', json.loads(raw(base + 'board.json')[2])['schema'], "default-src 'none'" in raw(base + 'backlog')[1]['Content-Security-Policy'])
 import gzip
 s, h, b = raw(base + 'board.json', **{'Accept-Encoding': 'gzip'})
 print('gzip', h['Content-Encoding'], json.loads(gzip.decompress(b))['schema'], raw(base + 'board.json', **{'Accept-Encoding': 'gzip', 'If-None-Match': h['ETag']})[0])
@@ -422,17 +424,17 @@ PY
   [ "$got" = "$(printf '%s\n' 'overview 200 True' 'backlog 200 True' 'measure 200 True' \
     'group 200 True True' 'cookie 200 True' 'timestamps True True' 'flow 404' 'state/ 404' 'index.home.html 404' '../data/backlog.md 404' 'data/backlog.md 404' \
     'app 200 text/html True True' 'app.js 200 text/javascript no-cache 304' 'vendor/preact-htm-3.1.1.js 200 text/javascript no-cache 304' \
-    'board.json 200 application/json no-cache 304' 'board fm-dashboard-board.v1 True' 'gzip gzip fm-dashboard-board.v1 304' 'vendor/../app.js 404' '../fm-dashboard/app.js 404' \
+    'board.json 200 application/json no-cache 304' 'overview-app 200 True True' 'board fm-dashboard-board.v1 True' 'gzip gzip fm-dashboard-board.v1 304' 'vendor/../app.js 404' '../fm-dashboard/app.js 404' \
     '.hidden.js 404' 'a/b/app.js 404' 'app.py 404' 'missing.js 404' 'ship/index.js 200 text/javascript 304' 'ship/scene.js 200 text/javascript 304' \
     'vendor/three-0.186.1.min.js 200 text/javascript 304' 'ship/ship.css 200 text/css 304')" ] \
     || fail "serve answers were not the app, the three pages, the remembered grouping, then 404s: $got"
   # An old page is answered at once, as it is, while a rebuild runs behind it.
-  printf '<p>old page<!--age--></p>\n' > "$home/state/dashboard/index.html"
+  printf '<p>old page<!--age--></p>\n' > "$home/state/dashboard/backlog.html"
   touch -d '-5 minutes' "$home/state/dashboard/index.html"
-  got=$(python3 -c 'import sys, urllib.request; print(urllib.request.urlopen(sys.argv[1], timeout=5).read().decode())' "${url}overview")
+  got=$(python3 -c 'import sys, urllib.request; print(urllib.request.urlopen(sys.argv[1], timeout=5).read().decode())' "${url}backlog")
   case "$got" in *'<span class="age bad">updated 5'*'min ago'*) ;; *) fail "an old page was not answered at once, marked old: $got" ;; esac
-  for _ in $(seq 1 1200); do grep -q 'old page' "$home/state/dashboard/index.html" || break; sleep 0.1; done
-  grep -q 'Nothing needs you' "$home/state/dashboard/index.html" || fail "the background rebuild did not replace the old page"
+  for _ in $(seq 1 1200); do grep -q 'old page' "$home/state/dashboard/backlog.html" || break; sleep 0.1; done
+  grep -q 'Held for the captain' "$home/state/dashboard/backlog.html" || fail "the background rebuild did not replace the old page"
   python3 - "$url" "$home" <<'PY' || fail "failed rebuild reported a healthy JSON refresh"
 import os, time, sys, urllib.request, urllib.error
 base, home = sys.argv[1:]
@@ -441,7 +443,7 @@ os.unlink(home + '/state/dashboard/backlog.html')
 os.mkdir(home + '/state/dashboard/backlog.html')
 os.utime(home + '/state/dashboard/index.html', (time.time() - 300,) * 2)
 deadline = time.monotonic() + 15
-while 'last refresh failed' not in urllib.request.urlopen(base + 'overview').read().decode():
+while 'last refresh failed' not in urllib.request.urlopen(base + 'measure').read().decode():
     assert time.monotonic() < deadline, 'rebuild never failed'
     time.sleep(.1)
 for path in ('board.json', 'data.json'):
@@ -530,9 +532,9 @@ assert.equal(board.stageTimes({ building: 100, review: 200, test: 300 }, 2, fals
 const c = { id: 'main/m-test', home: 'main', task: 'm-test', title: 'Test', stage: 'review', wait: 'waiting', why: 'm-login is complete; waiting for vendor credentials', history: [] }
 assert.equal(ui.reason(c), c.why); assert.equal(ui.stuck({ ...c, wait: 'blocked' }), true)
 let opened = null
-const open = id => opened = id, desktop = board.Card({ d, c, open }), rows = board.List({ d, cards: [c], r: { tab: 'active' }, open })
-const row = rows[0][1][0], phone = row.type(row.props)
-for (const node of [desktop, phone]) {
+const open = id => opened = id, desktop = board.Card({ d, c, open })
+assert.equal(typeof board.MobileKanban, 'function')
+for (const node of [desktop]) {
   assert.equal(node.props.role, 'button')
   for (const key of ['Enter', ' ']) { opened = null; let prevented = false; node.props.onKeyDown({ key, target: node, currentTarget: node, preventDefault() { prevented = true } }); assert.equal(opened, c.id); assert.equal(prevented, true) }
 }

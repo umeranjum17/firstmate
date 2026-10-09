@@ -38,8 +38,10 @@
 # Each build also atomically replaces data.json (every metric with its status and source;
 # GET/HEAD /data.json serves it as application/json) and writes three self-contained HTML
 # pages (inline CSS and SVG, no script, no network reference), phone first:
-#   index    Overview: Main's ask list, attention chips, six tiles and trends, lane waits,
-#            14-day in/out chart, homes, quota runway, devices and machine
+#   index    the legacy Overview page; still built last as the build-completion and freshness
+#            marker, but the app serves its own native Overview in its place and never links here.
+#            (Its content: Main's ask list, attention chips, six tiles and trends, lane waits,
+#            14-day in/out chart, homes, quota runway, devices and machine.)
 #   backlog  queued, ready and held work per home, held-for-captain items, every lane, agents
 #   measure  every number's one definition (what it counts, source, window and cutoff, how
 #            often it is read), records that disagree, sources not read
@@ -103,8 +105,10 @@
 # build (the default) writes $FM_HOME/state/dashboard/ and prints the index page path.
 # serve runs a small read-only web server (python3 stdlib, IPv4) that answers GET or
 # HEAD for / and /index.html (the JavaScript app), its files under bin/fm-dashboard/,
-# /board.json, /overview (the generated index page), /backlog, /measure and /data.json;
-# every other path is 404. Metrics in the app opens /overview. The app's
+# /board.json, /overview (the same app shell; the app opens its own native Overview in
+# place of the old page), /backlog, /measure and /data.json; every other path is 404.
+# Overview and Board are one app and one navigation; the old generated Overview page is no
+# longer reachable through the app. The app's
 # files and both JSON files carry an ETag, answer 304 while unchanged and are gzipped
 # for a client that accepts it (the font is not); the app's CSP allows its own origin
 # only. The app keeps its view, tabs, filters and open card in the URL hash and its theme
@@ -211,7 +215,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def do_GET(self):
         path, _, query = self.path.partition('?')
-        if path in ('/', '/index.html'): return self.file(os.path.join(APP, 'index.html'), 'html', APP_CSP)
+        if path in ('/', '/index.html', '/overview'): return self.file(os.path.join(APP, 'index.html'), 'html', APP_CSP)
         m = STATIC.fullmatch(path)
         if m and os.path.isfile(os.path.join(APP, m.group(1))): return self.file(os.path.join(APP, m.group(1)), m.group(2), APP_CSP)
         name = ROUTES.get(path)
@@ -1095,7 +1099,7 @@ def card(title, window, body, cls='', more=None, cid=''):
     return f'<section class="card {cls}"{f" id={cid}" if cid else ""}><div class="ch"><h3>{title}</h3>{m}</div><p class="cw">{window}</p>{body}</section>'
 
 # --- page shell ----------------------------------------------------------
-NAV = [('./', 'app', 'Board'), ('overview', 'index', 'Overview'), ('backlog', 'backlog', 'Backlog'), ('measure', 'measure', 'Method')]
+NAV = [('./', 'app', 'Board'), ('/#/overview', 'overview', 'Overview'), ('backlog', 'backlog', 'Backlog'), ('measure', 'measure', 'Method')]
 records = []  # (title, detail): two records that give different answers
 for h in sorted(home_dir):
     fl = bl(h, state='in_flight')

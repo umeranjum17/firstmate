@@ -1,8 +1,8 @@
 // Fleet dashboard app shell: live data, routes, the Linear sidebar and header (phone: title, tabs and dock),
 // filters, the ask list, the Ship mount, the command palette and keys.
 import { render } from './vendor/preact-htm-3.1.1.js'
-import { html, useState, useEffect, useRef, now, dur, ACTIVE, STAGES, STATES, stuck, state, sid, total, hc, hname, mname, sorted, filterCards, I, IC, StageIcon, Av } from './ui.js'
-import { TABS, inTab, Board, List, Detail } from './board.js'
+import { html, useState, useEffect, useRef, now, dur, hm, ACTIVE, STAGES, STATES, stuck, state, sid, total, hc, hname, mname, sorted, filterCards, I, IC, StageIcon, Av } from './ui.js'
+import { TABS, inTab, Board, MobileKanban, Detail } from './board.js'
 
 const POLL_MS = 10000, STALE_S = 15 * 60, WIDE = '(min-width: 760px)'
 
@@ -33,6 +33,26 @@ function useBoard() {
   }, [tick])
   return [st, () => refresh(x => x + 1)]
 }
+// data.json carries what the Overview needs beyond the board: queue reasons, quota and flow history.
+function useData(active) {
+  const [st, set] = useState({ data: null, err: null })
+  useEffect(() => {
+    if (!active) return
+    let alive = true
+    async function pull() {
+      try {
+        const r = await fetch('data.json', { cache: 'no-store' })
+        if (!r.ok) throw new Error(`the dashboard server answered ${r.status}`)
+        const data = await r.json()
+        if (alive) set({ data, err: null })
+      } catch (e) { if (alive) set(s => ({ data: s.data, err: e.message || String(e) })) }
+    }
+    pull()
+    const t = setInterval(pull, POLL_MS)
+    return () => { alive = false; clearInterval(t) }
+  }, [active])
+  return st
+}
 function useWide() {
   const [w, set] = useState(matchMedia(WIDE).matches)
   useEffect(() => { const m = matchMedia(WIDE), f = () => set(m.matches); m.addEventListener('change', f); return () => m.removeEventListener('change', f) }, [])
@@ -41,12 +61,18 @@ function useWide() {
 function useTick(ms) { const [, set] = useState(0); useEffect(() => { const t = setInterval(() => set(x => x + 1), ms); return () => clearInterval(t) }, []) }
 
 // The view, tab, rows, filters and open card live in the URL hash.
-const VIEWS = ['board', 'needs', 'ship']
+const VIEWS = ['board', 'overview', 'needs', 'ship']
 function parseHash() {
   const [path, q] = location.hash.replace(/^#\/?/, '').split('?')
   const p = new URLSearchParams(q || ''), list = k => (p.get(k) || '').split(',').filter(Boolean)
   return { view: VIEWS.includes(path) ? path : 'board', tab: TABS.some(([t]) => t === p.get('tab')) ? p.get('tab') : 'active',
     rows: p.get('rows') === 'home' ? 'home' : '', home: list('home'), model: list('model'), state: list('state'), card: p.get('card') }
+}
+// An old /overview link lands on the app and opens the native Overview, its address now hash-based.
+function initialRoute() {
+  const r = parseHash()
+  if (location.pathname.replace(/\/+$/, '') === '/overview') { history.replaceState(null, '', '/#/overview'); return { ...r, view: 'overview' } }
+  return r
 }
 function toHash(r) {
   const p = new URLSearchParams()
@@ -57,7 +83,7 @@ function toHash(r) {
   return `#/${r.view}${p.size ? '?' + p.toString().replace(/%2C/g, ',').replace(/%2F/g, '/') : ''}`
 }
 function useRoute() {
-  const [r, set] = useState(parseHash)
+  const [r, set] = useState(initialRoute)
   useEffect(() => { const f = () => set(parseHash()); addEventListener('hashchange', f); return () => removeEventListener('hashchange', f) }, [])
   return [r, patch => set(cur => { const n = { ...cur, ...patch }; history[patch.view && patch.view !== cur.view ? 'pushState' : 'replaceState'](null, '', toHash(n)); return n })]
 }
@@ -108,11 +134,68 @@ const Needs = ({ d }) => d.asks == null ? html`<div class="none"><p>The ask list
   : !d.asks.length ? html`<div class="none">${I(IC.inbox, 32)}<p>Nothing needs you.</p></div>`
   : html`<ul class="inbox">${d.asks.map(a => html`<li><span>${a.text}</span><small class="num">${a.age == null ? '' : dur(a.age)}</small>${a.url ? html`<a class="pill" href=${a.url} target="_blank" rel="noreferrer">Open</a>` : ''}</li>`)}</ul>`
 
+// Overview: the fleet's numbers in the app's own Linear language - compact figures, hairlines,
+// neutral bars, the accent for the primary reading and status colour only where something is wrong.
+const OV_STATES = [['building', 'Building', ''], ['validating', 'Validating or CI', 'v'], ['finished', 'Finished, not landed', 'f'],
+  ['waiting', 'Waiting', 'w'], ['decision', 'On a decision', 'd'], ['blocked', 'Blocked', 'b']]
+const sum = v => Object.values(v || {}).reduce((a, b) => a + (b || 0), 0)
+const ts = v => typeof v === 'number' ? v : typeof v === 'string' ? Date.parse(v) / 1000 : null
+function OVSpark({ vals }) {
+  const vs = vals.length ? vals : [0], top = Math.max(1, ...vs), w = 100 / vs.length
+  return html`<svg class="ov-spark" viewBox="0 0 100 22" preserveAspectRatio="none" aria-hidden="true">${vs.map((v, k) =>
+    html`<rect x=${(k * w + .6).toFixed(1)} y=${(22 - (v || 0) / top * 20).toFixed(1)} width=${Math.max(.6, w - 1.2).toFixed(1)} height=${((v || 0) / top * 20).toFixed(1)} />`)}</svg>`
+}
+function Overview({ d, od, go }) {
+  const q = od.data
+  if (!q) return html`<div class="ov"><div class="none"><p>${od.err ? `Cannot load the overview: ${od.err}` : 'Loading the overview…'}</p></div></div>`
+  const m = q.metrics, asks = d.asks, openCards = d.cards.filter(c => ACTIVE.includes(c.stage))
+  const stk = openCards.filter(stuck).length, toLand = openCards.filter(c => c.stage === 'merge').length
+  const states = m.lane_states?.value, qr = q.queue_reasons || []
+  const flow = (mid, label, foot) => { const r = m[mid]; return html`<div class="ov-flow"><span>${label}</span>
+    <b>${r?.status === 'unknown' ? 'unknown' : `${r?.status === 'lower_bound' && mid === 'landed' ? 'at least ' : ''}${r?.value ?? '–'}`}</b>
+    <small>${foot}</small><${OVSpark} vals=${(r?.daily || []).map(x => x.value)}/></div>` }
+  return html`<div class="ov">
+    <div class="ov-kpis">
+      <a class="ov-kpi ${asks?.length ? 'warn' : ''}" href="#/needs"><span>Needs you</span><b class="num">${asks == null ? '?' : asks.length}</b></a>
+      <button class="ov-kpi ${stk ? 'bad' : ''}" onClick=${() => go({ view: 'board', tab: 'active', state: ['blocked', 'decision'], card: null })}><span>Stuck</span><b class="num">${stk}</b></button>
+      <div class="ov-kpi"><span>To land</span><b class="num">${toLand}</b></div>
+      <div class="ov-kpi"><span>Lanes open</span><b class="num">${m.lanes?.value ?? '–'}<small> of ${m.lane_plan?.value ?? '–'}</small></b></div>
+      <div class="ov-kpi"><span>Ready</span><b class="num">${m.ready?.value ?? '–'}</b></div>
+    </div>
+    <div class="ov-grid">
+      ${asks?.length ? html`<section class="ov-card wide"><h3>Needs you</h3><div class="ov-asks">${asks.map((a, k) =>
+        html`<a class="ov-ask" key=${k} href=${a.url || '#/needs'} target=${a.url ? '_blank' : null} rel="noreferrer"><span>${a.text}</span><small class="num">${a.age == null ? '' : dur(a.age)}</small></a>`)}</div></section>` : ''}
+      <section class="ov-card"><h3>Lanes by state</h3>
+        <div class="ov-bar tall">${states ? OV_STATES.map(([k, , c]) => states[k] ? html`<i class=${c} key=${k} style=${{ flex: states[k] }}></i>` : '') : ''}</div>
+        <div class="ov-legend">${OV_STATES.map(([k, nm, c]) => html`<span key=${k}><i class=${c}></i>${nm}<b class="num">${states ? states[k] : '–'}</b></span>`)}</div></section>
+      <section class="ov-card"><h3>Why work is queued</h3>
+        <div class="ov-ql">${qr.map((x, k) => { const n = sum(x.by_home); return html`<div class="ov-qrow" key=${k}><span>${x.reason}</span>
+          <span class="ov-bar">${n > 0 ? html`<i style=${{ flex: n }}></i>` : ''}</span><b class="num">${n}</b></div>` })}</div>
+        <p class="ov-tot">Total <b class="num">${sum(m.queue?.value)}</b> queued</p></section>
+      <section class="ov-card"><h3>Flow</h3><div class="ov-flows">${flow('landed', 'Landed today', 'recorded merges · 14 d')}${flow('closed', 'Closed 7 d', 'backlog, vs prior 7 d')}</div></section>
+      <section class="ov-card"><h3>Quota runway</h3><div class="ov-ql">${(q.quota_accounts || []).map((a, k) => {
+        const w = a.limit || (a.windows || []).filter(x => x.used != null).sort((x, y) => y.used - x.used)[0]
+        const tone = a.empty ? 'bad' : a.problem ? 'mut' : a.status === 'projected_exhaustion' ? 'warn' : ''
+        const right = a.empty ? 'used up' : a.problem ? 'unknown' : a.runout ? `out in ${dur(ts(a.runout) - now())}` : w?.reset ? `resets ${hm(ts(w.reset))}` : 'lasts'
+        return html`<div class="ov-qrow" key=${k}><span>${a.name}</span><span class="ov-bar"><i class=${a.empty ? 'b' : ''} style=${{ flex: w?.used != null ? Math.max(2, Math.min(100, w.used)) : 0 }}></i></span>
+          <b class="num ${tone}">${w?.used != null ? `${Math.round(w.used)}%` : '–'}</b></div><small class="ov-qsub ${tone}">${right}</small>` })}</div>
+        ${!q.quota_accounts?.length ? html`<p class="ov-tot">No account reported a window</p>` : ''}</section>
+      <section class="ov-card wide"><h3>Homes</h3><div class="ov-homes">${(q.homes || []).map(h => html`<div class="ov-hrow" key=${h.home}>
+        <span class="sq" style=${{ '--c': hc(d, h.home) }}></span><b>${hname(d, h.home)}</b>
+        <span class="num">${h.lanes?.status === 'unknown' ? '?' : h.lanes?.value ?? '–'}<small> / ${h.plan}</small></span>
+        <span class="num">${h.ready?.value ?? '–'} ready</span>
+        <span class="num">${h.closed?.status === 'unknown' ? '–' : h.closed?.value} closed</span></div>`)}</div></section>
+      <section class="ov-card wide"><h3>Recently landed</h3><div class="ov-merges">${(q.recent_merges || []).map((x, k) =>
+        html`<div class="ov-mrow" key=${k}><a href=${x.url} target="_blank" rel="noreferrer">${x.title}</a><span>${hname(d, x.home)}</span><small class="num">${hm(x.at)}</small></div>`)}
+        ${!q.recent_merges?.length ? html`<p class="ov-tot">No merge on record</p>` : ''}</div></section>
+    </div></div>`
+}
+
 function Palette({ d, go, close, toggleTheme }) {
   const [q, setQ] = useState(''), [i, setI] = useState(0), input = useRef()
   useEffect(() => input.current?.focus(), [])  // autofocus is ignored while a card holds focus
   const groups = [
-    ['Go to', [['board', 'Board'], ['needs', 'Needs you'], ['ship', 'Ship']].map(([v, n]) => ({ n, k: `G ${n[0]}`, run: () => go({ view: v, card: null }) }))],
+    ['Go to', [['board', 'Board'], ['overview', 'Overview'], ['needs', 'Needs you'], ['ship', 'Ship']].map(([v, n]) => ({ n, k: `G ${n[0]}`, run: () => go({ view: v, card: null }) }))],
     ['Actions', [
       { n: 'Show stuck lanes', run: () => go({ view: 'board', tab: 'active', state: ['blocked', 'decision'], card: null }) },
       { n: 'Group rows by home', k: '⇧G', run: () => go({ view: 'board', rows: 'home' }) },
@@ -180,7 +263,7 @@ function useKeys(r, go, setPal, setKeys, toggleTheme, pal, keys) {
 }
 
 function App() {
-  const [st, refresh] = useBoard(), [r, go] = useRoute(), wide = useWide()
+  const [st, refresh] = useBoard(), [r, go] = useRoute(), wide = useWide(), ov = useData(r.view === 'overview')
   const [pal, setPal] = useState(false), [keys, setKeys] = useState(false), [, setTheme] = useState(root.dataset.theme)
   // the button shows the theme a click turns on
   const themeIcon = () => root.dataset.theme === 'dark' ? IC.sun : IC.theme
@@ -194,25 +277,28 @@ function App() {
   const count = t => t === 'all' ? null : total(d, d.cards.filter(c => inTab(t, c)).length, t)
   const shown = cards.filter(c => inTab(r.tab, c))
   const list = (r.tab === 'all' ? STAGES : r.tab === 'active' ? ACTIVE : [r.tab]).flatMap(s => sorted(shown.filter(c => c.stage === s)))
-  const title = { board: 'Board', needs: 'Needs you', ship: 'Ship' }[r.view]
+  const title = { board: 'Board', overview: 'Overview', needs: 'Needs you', ship: 'Ship' }[r.view]
   const overlays = html`${r.card && html`<${Detail} d=${d} id=${r.card} go=${go} list=${list}/>`}
     ${pal && html`<${Palette} d=${d} go=${go} close=${() => setPal(false)} toggleTheme=${toggleTheme}/>`}${keys && html`<${Shortcuts} close=${() => setKeys(false)}/>`}`
-  const body = r.view === 'ship' ? html`<${Ship} d=${d} open=${opencard}/>` : r.view === 'needs' ? html`<${Needs} d=${d}/>` : null
+  const body = r.view === 'ship' ? html`<${Ship} d=${d} open=${opencard}/>` : r.view === 'overview' ? html`<${Overview} d=${d} od=${ov} go=${go}/>` : r.view === 'needs' ? html`<${Needs} d=${d}/>` : null
   if (!wide) return html`<div class="phone">
     <div class="top"><h1>${title}</h1><div class="caps">${r.view === 'board' ? html`<${Filters} d=${d} r=${r} go=${go}/>` : ''}<button class="ib" onClick=${toggleTheme} aria-label="Light or dark theme">${I(themeIcon(), 18)}</button></div></div>
     <div class="sum"><${Live} d=${d} st=${st} refresh=${refresh}/></div>
     ${r.view === 'board' ? html`<div class="sum"><b>${asks == null ? 'Ask list unreadable' : asks ? `${asks} need${asks > 1 ? '' : 's'} you` : 'Nothing needs you'}</b> · <span>${total(d, open.length)} in flight</span> · <span class=${stk.length ? 'bad' : ''}>${total(d, stk.length)} stuck</span> · <span>${today} landed today</span></div>
       <div class="seg">${TABS.map(([t, n]) => html`<button aria-pressed=${r.tab === t} onClick=${() => go({ tab: t })}>${n === 'Landed today' ? 'Landed' : n}${count(t) != null ? html`<small class="num">${count(t)}</small>` : ''}</button>`)}</div>
-      <${Chips} d=${d} r=${r} go=${go}/><${List} d=${d} cards=${shown} r=${r} open=${opencard}/>` : body}
-    <div class="dock"><nav>${[['board', IC.board, 'Board'], ['needs', IC.inbox, 'Needs you'], ['ship', IC.ship, 'Ship'], ['metrics', IC.display, 'Metrics']].map(([v, ic, n]) =>
-      html`<a href=${v === 'metrics' ? '/overview' : '#/' + v} aria-current=${r.view === v ? 'page' : null} aria-label=${n}>${I(ic, 20)}${v === 'needs' && asks ? html`<span class="badge">${asks}</span>` : ''}</a>`)}</nav>
+      <${Chips} d=${d} r=${r} go=${go}/><${MobileKanban} d=${d} cards=${shown} r=${r} open=${opencard}/>` : body}
+    <div class="dock"><nav>${[['board', IC.board, 'Board'], ['overview', IC.display, 'Overview'], ['needs', IC.inbox, 'Needs you'], ['ship', IC.ship, 'Ship']].map(([v, ic, n]) =>
+      html`<a href=${'#/' + v} aria-current=${r.view === v ? 'page' : null} aria-label=${n}>${I(ic, 20)}${v === 'needs' && asks ? html`<span class="badge">${asks}</span>` : ''}</a>`)}</nav>
       <button onClick=${() => setPal(true)} aria-label="Search">${I(IC.search, 20)}</button></div>${overlays}</div>`
   return html`<div class="app">
     <nav class="side">
       <div class="ws"><span class="logo">F</span><b>Fleet</b><span class="sp"></span><button class="ib" onClick=${() => setPal(true)} aria-label="Search" title="Search (⌘K)">${I(IC.search)}</button></div>
       <a class="nav" href="#/needs" aria-current=${r.view === 'needs' ? 'page' : null}>${I(IC.inbox)}Needs you${asks ? html`<span class="badge">${asks}</span>` : html`<span class="n num">${asks ?? '?'}</span>`}</a>
       <a class="nav" href="#/board" aria-current=${r.view === 'board' && !r.home.length ? 'page' : null} onClick=${() => go({ view: 'board', home: [] })}>${I(IC.board)}Board<span class="n num">${total(d, open.length)}</span></a>
-      <a class="nav" href="#/ship" aria-current=${r.view === 'ship' ? 'page' : null}>${I(IC.ship)}Ship</a><a class="nav" href="/overview">${I(IC.display)}Metrics</a>
+      <a class="nav" href="#/overview" aria-current=${r.view === 'overview' ? 'page' : null}>${I(IC.display)}Overview</a>
+      <a class="nav" href="#/ship" aria-current=${r.view === 'ship' ? 'page' : null}>${I(IC.ship)}Ship</a>
+      <a class="nav" href="/backlog">${I(IC.list)}Backlog</a>
+      <a class="nav" href="/measure">${I(IC.book)}Method</a>
       <div class="sec">Homes</div>
       ${d.homes.map(h => { const cs = open.filter(c => c.home === h.id)
         return html`<button class="nav home-nav" aria-label=${h.name} title=${h.name} aria-current=${r.view === 'board' && r.home.length === 1 && r.home[0] === h.id ? 'page' : null} onClick=${() => go({ view: 'board', home: [h.id], card: null })}>
