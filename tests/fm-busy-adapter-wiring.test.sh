@@ -471,7 +471,7 @@ run_outage_fixture() {
   local case_dir=$1 state=$2 body=$3 bin
   bin="$case_dir/bin"
   mkdir -p "$bin" "$state" "$case_dir/liveness"
-  cp "$ROOT/bin/fm-model-outage-lib.sh" "$ROOT/bin/fm-timeout-lib.sh" "$bin/"
+  cp "$ROOT/bin/fm-model-outage-lib.sh" "$ROOT/bin/fm-timeout-lib.sh" "$ROOT/bin/fm-composer-lib.sh" "$bin/"
   cat > "$bin/fm-backend.sh" <<'EOF'
 fm_backend_agent_state() { cat "$FAKE_LIVENESS/$4" 2>/dev/null || printf alive; }
 fm_backend_visible_capture_supported() { return 0; }
@@ -600,6 +600,35 @@ test_model_outage_wrapped_banner_keeps_episode_identity() {
   pass "a wrapped legacy banner keeps its episode when unrelated pane text below it changes"
 }
 
+usage_limit_banner_scans() {
+  # The real 5-hour usage-limit banner rows captured 2026-10-09
+  # (tests/fm-composer-lib.test.sh): head row plus wrapped tail row.
+  lane alpha "busy opencode-plugin" alive ""
+  printf '%s\n' '   ■5⬝hour⬝usage limit reached. It will reset in 1 hour 38 minutes. To cont' \
+    '    usin... (click to expand) [retrying in 1h 8m attempt #1]' > "$FAKE_LIVENESS/capture-alpha"
+  tick
+  # The reset and retry clocks tick on every later scan; the limit event itself
+  # is the same, so the episode and the alert must stay one.
+  printf '%s\n' '   ■5⬝hour⬝usage limit reached. It will reset in 1 hour 37 minutes. To cont' \
+    '    usin... (click to expand) [retrying in 1h 7m attempt #1]' > "$FAKE_LIVENESS/capture-alpha"
+  tick
+  printf '%s\n' '   ■5⬝hour⬝usage limit reached. It will reset in 1 hour 36 minutes. To cont' \
+    '    usin... (click to expand) [retrying in 1h 6m attempt #1]' > "$FAKE_LIVENESS/capture-alpha"
+  tick
+}
+
+# A mid-turn lane parked on the real usage-limit banner is alerted (the
+# operator stops being the detector), and the banner's ticking reset/retry
+# clocks never split or repeat the episode while the lane stays limited.
+test_model_outage_midturn_usage_limit_banner_alerts_once() {
+  local case_dir="$TMP_ROOT/model-outage-limit-banner" expected
+  run_outage_fixture "$case_dir" "$case_dir/state" usage_limit_banner_scans
+  expected='check: model outage affected=[alpha]: 5 hour usage limit reached. It will reset in 1 hour 37 minutes. To cont usin... (click to expand) [retrying in 1h 7m attempt #1]'
+  [ "$(cat "$case_dir/wakes")" = "$expected" ] \
+    || fail "a mid-turn usage-limit banner must alert exactly once, got: $(cat "$case_dir/wakes")"
+  pass "a mid-turn usage-limit lane alerts once; ticking clocks keep one episode"
+}
+
 hung_verdict_scans() {
   lane delta "hang" alive
   tick
@@ -635,5 +664,6 @@ test_model_outage_recovered_lane_leaves_wake
 test_model_outage_unreadable_lane_is_named_again_when_readable
 test_model_outage_hung_verdict_is_bounded
 test_model_outage_wrapped_banner_keeps_episode_identity
+test_model_outage_midturn_usage_limit_banner_alerts_once
 
 echo "all fm-busy-adapter-wiring tests passed"
