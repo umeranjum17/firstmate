@@ -3039,6 +3039,9 @@ resurface_after_downtime() {
 # starve a check. Checks are due only every CHECK_INTERVAL, so most cycles
 # skip this block and fall straight through.
 run_due_checks() {
+  local c id out reason is_pr_poll provider url host path number custom_snapshot
+  local merge_authority merge_authority_record_identity merge_outcome_rc
+  local rejected_checks contribution_check_output contribution_check_diagnostics contribution_check_line
   if [ "$(age_of "$STATE/.last-check")" -ge "$CHECK_INTERVAL" ]; then
     rejected_checks=
     contribution_check_output=

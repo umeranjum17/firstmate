@@ -698,6 +698,27 @@ test_secondmate_record_refuses_a_pr_watch() {
   pass "fm-pr-check refuses to record a PR or arm a merge watch on a secondmate record"
 }
 
+test_retired_secondmate_merge_poll_keeps_signal_wake() {
+  local dir rc
+  dir=$(make_case secondmate-merge-poll-signal)
+  write_task_meta "$dir"
+  FM_TEST_GH_HEAD=0123456789abcdef0123456789abcdef01234567 \
+    run_check_entry "$dir" task-a https://github.com/o/r/pull/12 >/dev/null 2>"$dir/stderr" \
+    || fail "could not arm the merge poll before the record became a secondmate: $(cat "$dir/stderr")"
+  sed 's/^kind=ship$/kind=secondmate/' "$dir/home/state/task-a.meta" > "$dir/meta.tmp"
+  mv "$dir/meta.tmp" "$dir/home/state/task-a.meta"
+  printf 'done: handoff ready\n' > "$dir/home/state/task-a.status"
+  set +e
+  FM_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch.out" 2> "$dir/watch.err"
+  rc=$?
+  set -e
+  [ "$rc" -eq 0 ] || fail "watcher did not exit on the signal: $(cat "$dir/watch.err")"
+  grep -Fq 'signal:' "$dir/watch.out" || fail "the signal wake lost its reason: $(cat "$dir/watch.out")"
+  grep -Fq 'merged' "$dir/watch.out" && fail "a retired secondmate merge poll rewrote the signal wake: $(cat "$dir/watch.out")"
+  assert_poll_absent "$dir/home/state" task-a
+  pass "a retired secondmate merge poll in a signal cycle leaves the signal wake text intact"
+}
+
 # With no forge-reported head (gh cannot supply one), the named head is the
 # worker copy's HEAD, and a HEAD that exists only there is refused.
 test_unpushed_named_head_refuses_registration() {
@@ -3491,6 +3512,7 @@ test_gitlab_merged_poll_retires
 test_invalid_entrypoints_have_zero_side_effects
 test_draft_pull_request_is_not_armed
 test_secondmate_record_refuses_a_pr_watch
+test_retired_secondmate_merge_poll_keeps_signal_wake
 test_unpushed_named_head_refuses_registration
 test_direct_pr_unpushed_commit_refuses_registration
 test_valid_recording_and_merge_derivation
