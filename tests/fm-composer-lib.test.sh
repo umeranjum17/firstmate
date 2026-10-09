@@ -991,11 +991,14 @@ test_matrix_opencode_leftbar_signals() {
   wrap_typed=$'  ┃\n  ┃  Reply with OK.\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/umer/.treehouse/firstmate-cff959/8/a-   22.1K (2%) · $ctrl+p\n   really-quite-long-opencode-project-directory-name   commands'
   assert_screen "opencode 1.18.x typed draft above wrapped status footer on herdr" pending "$CAPS_STYLED" "$wrap_typed"
   assert_screen "opencode 1.18.x typed draft above wrapped status footer on cmux/orca" unknown "$CAPS_PLAIN" "$wrap_typed"
-  # An assistant error box (opencode draws it with its `┃` SplitBorder and
-  # textMuted text) sits above the composer's own `▣ Build` footer and empty
-  # left-bar run. The error text is transcript furniture; the composer below is
-  # still empty in both shapes.
-  wrap_error=$'  ┃  trigger an error please\n  ┃\n  ┃\n  ┃  Upstream request failed: Insufficient account funds\n  ┃\n     ▣  Build · DeepSeek V4.1 Flash\n  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/umer/.treehouse/firstmate-cff959/8/a-   22.1K (2%) · $ctrl+p\n   really-quite-long-opencode-project-directory-name   commands'
+  # Shape (b): an assistant error block (opencode draws it as a `┃`-left-border
+  # box in textMuted, the rendering a shared opencode.db lock produces with the
+  # message `Failed to execute statement`) sits above the composer's own
+  # `▣ Build` footer and empty left-bar run. The error text is transcript
+  # furniture; the composer below is still empty. The real capture behind this
+  # fixture carried the same box with a different message (an upstream-provider
+  # error); the shape is byte-identical, the text is not load-bearing.
+  wrap_error=$'  ┃  run the check\n  ┃\n  ┃\n  ┃  Failed to execute statement\n  ┃\n     ▣  Build · DeepSeek V4.1 Flash\n  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/umer/.treehouse/firstmate-cff959/8/a-   22.1K (2%) · $ctrl+p\n   really-quite-long-opencode-project-directory-name   commands'
   assert_screen "opencode 1.18.x assistant error block above empty composer on herdr" empty "$CAPS_STYLED" "$wrap_error"
   assert_screen "opencode 1.18.x assistant error block above empty composer on cmux/orca" empty "$CAPS_PLAIN" "$wrap_error"
   pass "matrix: opencode's left-bar composer reads empty everywhere and scans the full active run"
