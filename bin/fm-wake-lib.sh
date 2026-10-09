@@ -1432,10 +1432,10 @@ fm_task_set_lock_path() {  # <state-dir>
 # the walk at the current home, which is the correct answer rather than an
 # error: the parent lives on another machine, so its filesystem can neither hold
 # nor be observed by a lock taken here, and a remote-seeded home is itself the
-# top of the local tree that fm_local_firstmate_state_dirs below
-# enumerates (that walk already skips remote registry entries for the same
-# reason). Refusing a remote binding instead made every operation anchored here
-# fail closed inside a remote secondmate home and its local descendants.
+# top of the local tree that fm_local_firstmate_state_dirs below enumerates
+# (that walk already skips remote registry entries for the same reason).
+# Refusing a remote binding instead made every operation anchored here fail
+# closed inside a remote secondmate home and its local descendants.
 #
 # Everything else still fails closed: an unreadable or malformed binding, an
 # unreachable local parent, a cycle, and a chain deeper than the bound.
@@ -1464,7 +1464,76 @@ fm_firstmate_root_home() {
   printf '%s\n' "$home"
 }
 
-# The one lock serializing Treehouse slot allocation and return for a project.
+# Every Firstmate state directory on THIS machine whose task records can share a
+# machine-local resource with <first-state>: <first-state> itself, then the local
+# root home and each local secondmate home registered below it, walked through
+# every data/secondmates.md breadth-first. Remote registry entries are skipped,
+# because their workers run on another machine.
+#
+# Sets FM_LOCAL_FIRSTMATE_STATES to that list, <first-state> first and without
+# duplicates however each directory is spelled. Returns 1 with
+# FM_LOCAL_FIRSTMATE_ERROR naming what could not be proved - an unresolvable
+# root, an unsafe or malformed registry, or an unavailable registered local
+# home - so a caller refuses rather than treating an unreadable home as one
+# with no tasks. Requires bin/fm-secondmate-registry-lib.sh to be sourced first.
+# shellcheck disable=SC2034 # FM_LOCAL_FIRSTMATE_ERROR is read by callers.
+fm_local_firstmate_state_dirs() {  # <first-state>
+  local first=$1 root home reg line child known existing i=0
+  local -a homes
+  FM_LOCAL_FIRSTMATE_STATES=("$first")
+  FM_LOCAL_FIRSTMATE_ERROR=
+  if ! command -v secondmate_registry_parse_line >/dev/null 2>&1; then
+    # shellcheck source=bin/fm-secondmate-registry-lib.sh
+    . "$FM_WAKE_LIB_DIR/fm-secondmate-registry-lib.sh"
+  fi
+  root=$(fm_firstmate_root_home "$FM_HOME") || {
+    FM_LOCAL_FIRSTMATE_ERROR="cannot resolve the root Firstmate home"
+    return 1
+  }
+  homes=("$root")
+  while [ "$i" -lt "${#homes[@]}" ]; do
+    home=${homes[$i]}
+    i=$((i + 1))
+    known=0
+    for existing in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
+      if [ "$existing" = "$home/state" ] || [ "$existing" -ef "$home/state" ]; then
+        known=1
+      fi
+    done
+    [ "$known" = 1 ] || FM_LOCAL_FIRSTMATE_STATES+=("$home/state")
+    reg="$home/data/secondmates.md"
+    [ ! -e "$reg" ] && [ ! -L "$reg" ] && continue
+    [ -f "$reg" ] && [ ! -L "$reg" ] || {
+      FM_LOCAL_FIRSTMATE_ERROR="local Firstmate registry is unsafe at $reg"
+      return 1
+    }
+    while IFS= read -r line || [ -n "$line" ]; do
+      case "$line" in
+        "- "*)
+          secondmate_registry_parse_line "$line" || {
+            FM_LOCAL_FIRSTMATE_ERROR="malformed local Firstmate registry entry in $reg"
+            return 1
+          }
+          [ "$SECONDMATE_REGISTRY_REMOTE" -eq 0 ] || continue
+          child=$([ -d "$SECONDMATE_REGISTRY_HOME" ] &&
+            CDPATH='' cd -- "$SECONDMATE_REGISTRY_HOME" 2>/dev/null && pwd -P) || {
+            FM_LOCAL_FIRSTMATE_ERROR="registered local Firstmate home is unavailable: $SECONDMATE_REGISTRY_HOME"
+            return 1
+          }
+          known=0
+          for existing in "${homes[@]}"; do
+            [ "$existing" != "$child" ] || known=1
+          done
+          [ "$known" = 1 ] || homes+=("$child")
+          ;;
+      esac
+    done < "$reg"
+  done
+}
+
+# The one lock serializing Treehouse slot allocation and return for a project,
+# and project capacity admission (bin/fm-project-capacity-lib.sh), which a
+# fresh spawn evaluates under it on every backend.
 #
 # It is anchored in the local root home's state directory so that every home on
 # this machine that can reach the same pool - the root, and each secondmate home
@@ -1614,67 +1683,10 @@ fm_canonical_existing_dir() {  # <path>
   ( CDPATH='' cd -- "$1" 2>/dev/null && pwd -P )
 }
 
-# Every local Firstmate home's state directory, from the local root home down
-# through each local secondmate registry (remote entries are skipped: their
-# records live on another machine). Fills FM_LOCAL_STATE_DIRS, starting with
-# <first-state>. Fails closed, with the reason in FM_LOCAL_STATE_DIRS_ERROR, on an unsafe or
-# malformed registry or an unavailable registered home.
-# shellcheck disable=SC2034 # FM_LOCAL_STATE_DIRS_ERROR is read by callers.
-fm_local_firstmate_state_dirs() {  # <first-state> [home]
-  local root home reg line child known existing i=0
-  local -a homes
-  FM_LOCAL_STATE_DIRS=("$1")
-  FM_LOCAL_STATE_DIRS_ERROR=
-  if ! command -v secondmate_registry_parse_line >/dev/null 2>&1; then
-    # shellcheck source=bin/fm-secondmate-registry-lib.sh
-    . "$FM_WAKE_LIB_DIR/fm-secondmate-registry-lib.sh"
-  fi
-  root=$(fm_firstmate_root_home "${2:-$FM_HOME}") || {
-    FM_LOCAL_STATE_DIRS_ERROR="cannot resolve the root Firstmate home"
-    return 1
-  }
-  homes=("$root")
-  while [ "$i" -lt "${#homes[@]}" ]; do
-    home=${homes[$i]}
-    i=$((i + 1))
-    known=0
-    for existing in "${FM_LOCAL_STATE_DIRS[@]}"; do
-      [ "$existing" != "$home/state" ] || known=1
-    done
-    [ "$known" = 1 ] || FM_LOCAL_STATE_DIRS+=("$home/state")
-    reg="$home/data/secondmates.md"
-    [ ! -e "$reg" ] && [ ! -L "$reg" ] && continue
-    [ -f "$reg" ] && [ ! -L "$reg" ] || {
-      FM_LOCAL_STATE_DIRS_ERROR="local Firstmate registry is unsafe at $reg"
-      return 1
-    }
-    while IFS= read -r line || [ -n "$line" ]; do
-      case "$line" in
-        "- "*)
-          secondmate_registry_parse_line "$line" || {
-            FM_LOCAL_STATE_DIRS_ERROR="malformed local Firstmate registry entry in $reg"
-            return 1
-          }
-          [ "$SECONDMATE_REGISTRY_REMOTE" -eq 0 ] || continue
-          child=$(fm_canonical_existing_dir "$SECONDMATE_REGISTRY_HOME") || {
-            FM_LOCAL_STATE_DIRS_ERROR="registered local Firstmate home is unavailable: $SECONDMATE_REGISTRY_HOME"
-            return 1
-          }
-          known=0
-          for existing in "${homes[@]}"; do
-            [ "$existing" != "$child" ] || known=1
-          done
-          [ "$known" = 1 ] || homes+=("$child")
-          ;;
-      esac
-    done < "$reg"
-  done
-}
-
 # Which other task record, in any local Firstmate home, still names <slot> as
 # its worktree= or home=. Returns 0 with FM_SLOT_RECORD_OWNER_ID and
 # FM_SLOT_RECORD_OWNER_FIELD set when one does, 1 when none does, and 2 when the
-# local homes cannot be enumerated (reason in FM_LOCAL_STATE_DIRS_ERROR). <self-meta> is skipped by
+# local homes cannot be enumerated (reason in FM_LOCAL_FIRSTMATE_ERROR). <self-meta> is skipped by
 # identity and name, so the same record reached through a differently resolved
 # state dir is still itself while a differently named hardlink is another task.
 # Callers source bin/fm-backend.sh for fm_meta_get.
@@ -1685,7 +1697,7 @@ fm_slot_record_owner() {  # <slot> <first-state> [self-meta]
   FM_SLOT_RECORD_OWNER_FIELD=
   slot=$(fm_canonical_existing_dir "$slot") || return 1
   fm_local_firstmate_state_dirs "$2" || return 2
-  for state_dir in "${FM_LOCAL_STATE_DIRS[@]}"; do
+  for state_dir in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
     for other in "$state_dir"/*.meta; do
       [ -f "$other" ] && [ ! -L "$other" ] || continue
       [ -n "$self" ] && [ "${other##*/}" = "${self##*/}" ] && [ "$other" -ef "$self" ] && continue

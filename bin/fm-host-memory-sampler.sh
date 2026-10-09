@@ -56,16 +56,16 @@ fm_memory_sampler_interrupt() {
 fm_memory_sampler_tick() {
   local out d meta home root child_state task reason action epoch stop=0 latch="$STATE/.host-memory-alerted"
   local -a dirs=(--state-dir "$FM_HOME" "$STATE")
-  fm_local_firstmate_state_dirs "$STATE" "$FM_HOME" 2>/dev/null || FM_LOCAL_STATE_DIRS=("$STATE")
+  fm_local_firstmate_state_dirs "$STATE" 2>/dev/null || FM_LOCAL_FIRSTMATE_STATES=("$STATE")
   if root=$(fm_firstmate_root_home "$FM_HOME") && [ ! "$root" -ef "$FM_HOME" ]; then
     dirs+=(--state-dir "$root" "$root/state")
   fi
-  for d in "${FM_LOCAL_STATE_DIRS[@]}"; do
+  for d in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
     for meta in "$d"/*.meta; do
       [ "$(fm_meta_get "$meta" kind)" = secondmate ] || continue
       home=$(fm_meta_get "$meta" home)
       [ -n "$home" ] && [ ! "$home" -ef "$FM_HOME" ] || continue
-      for child_state in "${FM_LOCAL_STATE_DIRS[@]}"; do
+      for child_state in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
         [ "$child_state" -ef "$home/state" ] || continue
         dirs+=(--state-dir "$home" "$child_state")
       done
