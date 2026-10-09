@@ -671,7 +671,7 @@ The helper's header owns exact parsing, publication, and report output mechanics
 On Herdr, agents across homes share the server's service cgroup, so an out-of-memory kill of that unit stops the whole fleet.
 The host memory guard reads available memory, swap, host-wide pressure, and the pressure of the user `app.slice`, the cgroup systemd-oomd watches and agents run in.
 Admission and interrupts classify by `app.slice` pressure and available memory; host-wide pressure never does.
-Pressure is the share of time some process waited on memory, taken as the lower of its 10-second and 60-second averages, so a spike of a few seconds does not alert or hold launches while pressure held for about a minute does.
+Pressure is the share of time some process waited on memory, judged as the lower of its 10-second and 60-second averages (sustained pressure), so a spike below the alert level does not hold launches while pressure held for about a minute does.
 A 10-second average at or above the alert level alone holds new launches at once (`WAIT`) but never alerts or interrupts a task, so a fast ramp is not held back by the slower average.
 Capped heavy-job slices such as `fm.slice` are not read, so their thrash holds agent launches only when it also stalls the agents.
 Host-wide pressure stays in the summary as context and never holds admission, wakes Main, or interrupts a task.
@@ -681,7 +681,7 @@ These controls reduce risk but cannot guarantee avoidance of an out-of-memory ki
 
 - Each watcher starts and supervises one independent `bin/fm-host-memory-sampler.sh` per home.
   It samples every 10 seconds by default (`FM_HOST_MEMORY_SECS`) into `state/host-memory.tsv`, even during slow recovery or custom checks.
-  The dashboard shows the last hour's peak measured pressure and current swap.
+  The dashboard shows the last hour's peak sustained pressure and current swap.
   The home-scoped `state/.host-memory-sampler.pid` records PID and process identity; the watcher restarts a dead sampler and stops only the exact recorded PID after verifying its identity, script, home, and state.
 - At the wait or alert level, local `bin/fm-spawn.sh` launches and `bin/fm-control.sh relaunch` refuse to start a new agent and record the reason in `state/admission-refused`, which the dashboard raises for 15 minutes for local homes only.
   A refused fresh spawn leaves the task queued; a relaunch refused by its initial admission check leaves the existing agent and task record untouched.
@@ -702,9 +702,9 @@ Each setting is `key=number`, blank lines and lines beginning with `#` are ignor
 
 | Key | Default | Meaning |
 | --- | --- | --- |
-| `wait_pressure` | `20` | new agents wait while `app.slice` pressure is at or above this percentage |
+| `wait_pressure` | `20` | new agents wait while sustained `app.slice` pressure is at or above this percentage |
 | `wait_available_gb` | `12` | new agents wait while available memory is below this many GB |
-| `alert_pressure` | `35` | the sampler alerts while `app.slice` pressure is at or above this percentage; its 10-second average alone at or above it waits instead |
+| `alert_pressure` | `35` | the sampler alerts while sustained `app.slice` pressure is at or above this percentage; its 10-second average alone at or above it waits instead |
 | `alert_available_gb` | `6` | the sampler alerts while available memory is below this many GB |
 
 Thresholds must be finite, nonnegative numbers.
@@ -712,7 +712,7 @@ An invalid line is refused with its line number, so a typo never silently loosen
 For fixture testing, `FM_HOST_MEMORY_PROC` selects the proc root and `FM_HOST_MEMORY_CGROUP_ROOT` selects the cgroup root; production defaults are `/proc` and `/sys/fs/cgroup`.
 Without readable host pressure and available memory, or without `python3`, the guard reads unknown and admits work without recording a sample, because it cannot measure the host.
 The guard's header owns consumer attribution, sample format, and exact output.
-`tests/fm-jev-mem-guard.test.sh` pins sampling, home-qualified ownership, remote-record exclusion, and once-per-episode dispatch; `tests/fm-control-relaunch.test.sh` and `tests/fm-secondmate-liveness.test.sh` pin admission before agent stop and recovery-budget consumption.
+`tests/fm-jev-mem-guard.test.sh` pins app.slice-only judgment, fast-spike waiting, sampling, home-qualified ownership, remote-record exclusion, and once-per-episode dispatch with re-arming after a WAIT; `tests/fm-control-relaunch.test.sh` and `tests/fm-secondmate-liveness.test.sh` pin admission before agent stop and recovery-budget consumption.
 
 ## Stow pass horizon (config/stow-pass-horizon)
 
