@@ -54,8 +54,6 @@ export const IC = {
   pr: html`<circle cx="4.5" cy="3.5" r="1.5"/><circle cx="4.5" cy="12.5" r="1.5"/><circle cx="11.5" cy="12.5" r="1.5"/><path d="M4.5 5v6M11.5 11V6.5a2 2 0 0 0-2-2H8M9.5 3L8 4.5 9.5 6"/>`,
   up: html`<path d="M4 10l4-4 4 4"/>`, down: html`<path d="M4 6l4 4 4-4"/>`, x: html`<path d="M4 4l8 8M12 4l-8 8"/>`,
   check: html`<path d="M3.5 8.3l2.8 2.7 6-6"/>`,
-  list: html`<path d="M3 4.5h10M3 8h10M3 11.5h7"/>`,
-  book: html`<path d="M3 3h7.5a2 2 0 0 1 2 2v8H5a2 2 0 0 1-2-2zM3 11a2 2 0 0 1 2-2h7.5"/>`,
 }
 export const Caret = () => html`<svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5h6L5 7z" fill="currentColor"/></svg>`
 

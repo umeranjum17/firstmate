@@ -142,8 +142,8 @@ const sum = v => Object.values(v || {}).reduce((a, b) => a + (b || 0), 0)
 const ts = v => typeof v === 'number' ? v : typeof v === 'string' ? Date.parse(v) / 1000 : null
 function OVSpark({ vals }) {
   const vs = vals.length ? vals : [0], top = Math.max(1, ...vs), w = 100 / vs.length
-  return html`<svg class="ov-spark" viewBox="0 0 100 22" preserveAspectRatio="none" aria-hidden="true">${vs.map((v, k) =>
-    html`<rect x=${(k * w + .6).toFixed(1)} y=${(22 - (v || 0) / top * 20).toFixed(1)} width=${Math.max(.6, w - 1.2).toFixed(1)} height=${((v || 0) / top * 20).toFixed(1)} />`)}</svg>`
+  return html`<svg class="ov-spark" viewBox="0 0 100 22" preserveAspectRatio="none" aria-hidden="true">${vs.map((v, k) => v == null ? '' :
+    html`<rect x=${(k * w + .6).toFixed(1)} y=${(22 - v / top * 20).toFixed(1)} width=${Math.max(.6, w - 1.2).toFixed(1)} height=${(v / top * 20).toFixed(1)} />`)}</svg>`
 }
 function Overview({ d, od, go }) {
   const q = od.data
@@ -299,8 +299,6 @@ function App() {
       <a class="nav" href="#/board" aria-current=${r.view === 'board' && !r.home.length ? 'page' : null} onClick=${() => go({ view: 'board', home: [] })}>${I(IC.board)}Board<span class="n num">${total(d, open.length)}</span></a>
       <a class="nav" href="#/overview" aria-current=${r.view === 'overview' ? 'page' : null}>${I(IC.display)}Overview</a>
       <a class="nav" href="#/ship" aria-current=${r.view === 'ship' ? 'page' : null}>${I(IC.ship)}Ship</a>
-      <a class="nav" href="/backlog">${I(IC.list)}Backlog</a>
-      <a class="nav" href="/measure">${I(IC.book)}Method</a>
       <div class="sec">Homes</div>
       ${d.homes.map(h => { const cs = open.filter(c => c.home === h.id)
         return html`<button class="nav home-nav" aria-label=${h.name} title=${h.name} aria-current=${r.view === 'board' && r.home.length === 1 && r.home[0] === h.id ? 'page' : null} onClick=${() => go({ view: 'board', home: [h.id], card: null })}>

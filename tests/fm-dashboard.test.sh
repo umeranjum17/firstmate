@@ -534,11 +534,41 @@ const c = { id: 'main/m-test', home: 'main', task: 'm-test', title: 'Test', stag
 assert.equal(ui.reason(c), c.why); assert.equal(ui.stuck({ ...c, wait: 'blocked' }), true)
 let opened = null
 const open = id => opened = id, desktop = board.Card({ d, c, open })
-assert.equal(typeof board.MobileKanban, 'function')
-for (const node of [desktop]) {
-  assert.equal(node.props.role, 'button')
-  for (const key of ['Enter', ' ']) { opened = null; let prevented = false; node.props.onKeyDown({ key, target: node, currentTarget: node, preventDefault() { prevented = true } }); assert.equal(opened, c.id); assert.equal(prevented, true) }
+assert.equal(desktop.props.role, 'button')
+for (const key of ['Enter', ' ']) { opened = null; let prevented = false; desktop.props.onKeyDown({ key, target: desktop, currentTarget: desktop, preventDefault() { prevented = true } }); assert.equal(opened, c.id); assert.equal(prevented, true) }
+class El {
+  constructor(name, type = 1) { Object.assign(this, { localName: name, nodeType: type, data: '', childNodes: [], parentNode: null, attrs: {}, listeners: {}, style: { setProperty() {}, removeProperty() {} }, onclick: null, onkeydown: null }) }
+  get firstChild() { return this.childNodes[0] ?? null }
+  get nextSibling() { const s = this.parentNode?.childNodes ?? []; return s[s.indexOf(this) + 1] ?? null }
+  get textContent() { return this.nodeType === 3 ? this.data : this.childNodes.map(n => n.textContent).join('') }
+  insertBefore(n, ref) { n.parentNode?.removeChild(n); n.parentNode = this; const i = this.childNodes.indexOf(ref); this.childNodes.splice(i < 0 ? this.childNodes.length : i, 0, n); return n }
+  appendChild(n) { return this.insertBefore(n, null) }
+  removeChild(n) { this.childNodes.splice(this.childNodes.indexOf(n), 1); n.parentNode = null; return n }
+  setAttribute(k, v) { this.attrs[k] = String(v) }
+  removeAttribute(k) { delete this.attrs[k] }
+  addEventListener(t, f) { this.listeners[t] = f }
+  removeEventListener(t) { delete this.listeners[t] }
 }
+globalThis.document = { createElement: n => new El(n), createElementNS: (_, n) => new El(n), createTextNode: s => Object.assign(new El('#text', 3), { data: String(s) }) }
+const all = (n, p, out = []) => { if (p(n)) out.push(n); n.childNodes.forEach(k => all(k, p, out)); return out }
+const hasClass = (n, k) => (n.attrs.class ?? n.className ?? '').split(' ').includes(k)
+const { html, render } = await import(`${root}/vendor/preact-htm-3.1.1.js`)
+const phone = [
+  { id: 'main/a', home: 'main', task: 'a', title: 'Alpha', stage: 'building', history: [] },
+  { id: 'main/b', home: 'main', task: 'b', title: 'Bravo', stage: 'building', history: [] },
+  { id: 'main/c', home: 'main', task: 'c', title: 'Charlie', stage: 'review', wait: 'blocked', why: 'waiting on credentials', history: [] },
+]
+const pd = { homes: [{ id: 'main', name: 'Main', known: true, ready: 0 }], cards: phone }
+let phoneOpened = null
+const screen = new El('div')
+render(html`<${board.MobileKanban} d=${pd} cards=${phone} r=${{ tab: 'active' }} open=${id => phoneOpened = id}/>`, screen)
+assert.deepEqual(all(screen, n => n.attrs.role === 'tab').map(n => n.textContent), ['Building2', 'Review1'])
+const cols = all(screen, n => hasClass(n, 'mcol'))
+assert.deepEqual(cols.map(col => all(col, n => n.attrs['data-card']).map(n => n.attrs['data-card'])), [['main/a', 'main/b'], ['main/c']])
+assert.deepEqual(cols.map(col => all(col, n => hasClass(n, 'n'))[0].textContent), ['2', '1'])
+const bravo = all(screen, n => n.attrs['data-card'] === 'main/b')[0]
+bravo.listeners.click.call(bravo, { type: 'click' }); assert.equal(phoneOpened, 'main/b')
+phoneOpened = null; bravo.listeners.keydown.call(bravo, { type: 'keydown', key: 'Enter', target: bravo, currentTarget: bravo, preventDefault() {} }); assert.equal(phoneOpened, 'main/b')
 JS
   pass "board.json gives each lane its stage, wait, reason in words, model and each status line's verb and stage, landed titles without their PR, cycle times and the ask list"
 }
