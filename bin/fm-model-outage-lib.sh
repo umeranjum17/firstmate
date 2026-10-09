@@ -30,7 +30,7 @@ fm_model_outage_text() {
 }
 
 fm_model_outage_tick() {
-  local meta id backend target harness gen error hash old verdict rows groups mid line match key lanes alert kept
+  local meta id backend target harness gen error hash old verdict rows groups mid line key lanes alert kept
   local dir="$STATE/.model-outages" now batch last current
   now=$(date +%s) || return 1
   # The singleton watcher owns these records; never start a second monitor.
@@ -50,7 +50,7 @@ fm_model_outage_tick() {
     backend=$(fm_backend_of_meta "$meta")
     harness=$(fm_meta_get "$meta" harness)
     gen=$(fm_busy_current_gen "$STATE" "$id") || gen=unarmed
-    error=; key=; match=
+    error=; key=; line=
     [ "$harness" = opencode ] || continue
     # shellcheck disable=SC2016 # The child expands its own positional arguments.
     verdict=$(fm_run_timed 3 bash -c '. "$1/fm-backend.sh"; . "$1/fm-busy-lib.sh"; fm_busy_classify_semantic "$2" "$3" "$4" "$5" "$6"' \
@@ -72,24 +72,27 @@ fm_model_outage_tick() {
       # wrapped banner keeps up to two continuation lines. The provider-error
       # read stays idle-only: a mid-turn lane is matched against the
       # usage-limit banner alone, the one outage that persists for hours while
-      # a limited lane sits mid-turn retrying.
+      # a limited lane sits mid-turn retrying. The banner is read only directly
+      # below the composer floor, OpenCode's own status area, so a banner-shaped
+      # line printed above the composer never counts.
       if [ "$mid" = 0 ]; then
-        match=$(printf '%s\n' "$rows" | grep -Ein '^[[:space:]│┃]*(Upstream request failed|Model .+ is not supported|rate.?limit exceeded|insufficient quota|authentication failed)' | tail -1)
+        line=$(printf '%s\n' "$rows" | grep -Ein '^[[:space:]│┃]*(Upstream request failed|Model .+ is not supported|rate.?limit exceeded|insufficient quota|authentication failed)' | tail -1 | cut -d: -f1)
       fi
-      if [ -n "$match" ]; then
-        line=${match%%:*}
+      if [ -n "$line" ]; then
         key=$(printf '%s\n' "$rows" | sed -n "${line}p")
-        error=$(printf '%s\n' "$rows" | sed -n "${line},$((line + 2))p")
       else
-        match=$(printf '%s\n' "$rows" | grep -En "$FM_COMPOSER_OPENCODE_LIMIT_BANNER_RE_DEFAULT" | head -1)
-        if [ -n "$match" ]; then
-          # The banner's reset and retry clocks tick every scan; digits fold
-          # out of the episode key so one limit event stays one episode while
-          # the displayed error keeps the live countdown.
-          line=${match%%:*}
+        line=$(printf '%s\n' "$rows" | FM_MODEL_OUTAGE_BANNER_RE="$FM_COMPOSER_OPENCODE_LIMIT_BANNER_RE_DEFAULT" awk '
+          prev ~ /^[[:space:]]*╹▀/ && $0 ~ ENVIRON["FM_MODEL_OUTAGE_BANNER_RE"] { print NR; exit }
+          { prev = $0 }')
+        # The banner's reset and retry clocks tick every scan; digits fold
+        # out of the episode key so one limit event stays one episode while
+        # the displayed error keeps the live countdown.
+        if [ -n "$line" ]; then
           key=$(printf '%s\n' "$rows" | sed -n "${line}p" | sed 's/[0-9][0-9]*/#/g')
-          error=$(printf '%s\n' "$rows" | sed -n "${line},$((line + 2))p")
         fi
+      fi
+      if [ -n "$line" ]; then
+        error=$(printf '%s\n' "$rows" | sed -n "${line},$((line + 2))p")
       fi
     fi
     error=$(printf '%s' "$error" | fm_model_outage_text)

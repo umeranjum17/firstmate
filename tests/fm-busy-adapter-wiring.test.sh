@@ -602,17 +602,21 @@ test_model_outage_wrapped_banner_keeps_episode_identity() {
 
 usage_limit_banner_scans() {
   # The real 5-hour usage-limit banner rows captured 2026-10-09
-  # (tests/fm-composer-lib.test.sh): head row plus wrapped tail row.
+  # (tests/fm-composer-lib.test.sh): head row plus wrapped tail row, drawn
+  # directly below the composer floor.
   lane alpha "busy opencode-plugin" alive ""
-  printf '%s\n' '   ■5⬝hour⬝usage limit reached. It will reset in 1 hour 38 minutes. To cont' \
+  printf '%s\n' '  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀' \
+    '   ■5⬝hour⬝usage limit reached. It will reset in 1 hour 38 minutes. To cont' \
     '    usin... (click to expand) [retrying in 1h 8m attempt #1]' > "$FAKE_LIVENESS/capture-alpha"
   tick
   # The reset and retry clocks tick on every later scan; the limit event itself
   # is the same, so the episode and the alert must stay one.
-  printf '%s\n' '   ■5⬝hour⬝usage limit reached. It will reset in 1 hour 37 minutes. To cont' \
+  printf '%s\n' '  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀' \
+    '   ■5⬝hour⬝usage limit reached. It will reset in 1 hour 37 minutes. To cont' \
     '    usin... (click to expand) [retrying in 1h 7m attempt #1]' > "$FAKE_LIVENESS/capture-alpha"
   tick
-  printf '%s\n' '   ■5⬝hour⬝usage limit reached. It will reset in 1 hour 36 minutes. To cont' \
+  printf '%s\n' '  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀' \
+    '   ■5⬝hour⬝usage limit reached. It will reset in 1 hour 36 minutes. To cont' \
     '    usin... (click to expand) [retrying in 1h 6m attempt #1]' > "$FAKE_LIVENESS/capture-alpha"
   tick
 }
@@ -627,6 +631,25 @@ test_model_outage_midturn_usage_limit_banner_alerts_once() {
   [ "$(cat "$case_dir/wakes")" = "$expected" ] \
     || fail "a mid-turn usage-limit banner must alert exactly once, got: $(cat "$case_dir/wakes")"
   pass "a mid-turn usage-limit lane alerts once; ticking clocks keep one episode"
+}
+
+banner_above_composer_scans() {
+  lane alpha "busy opencode-plugin" alive ""
+  printf '%s\n' '   ■5⬝hour⬝usage limit reached. It will reset in 1 hour 38 minutes. To cont' \
+    '    usin... (click to expand) [retrying in 1h 8m attempt #1]' \
+    '  ┃  typed draft' '  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀' \
+    '  /work/worktree  22.1K (2%)' > "$FAKE_LIVENESS/capture-alpha"
+  tick
+}
+
+# A banner-shaped line a worker printed above the composer is scrollback text,
+# not the lane's status area, so a busy lane must not be named as an outage.
+test_model_outage_banner_above_composer_does_not_alert() {
+  local case_dir="$TMP_ROOT/model-outage-banner-above-composer"
+  run_outage_fixture "$case_dir" "$case_dir/state" banner_above_composer_scans
+  [ ! -s "$case_dir/wakes" ] \
+    || fail "a banner-shaped line above the composer must not alert, got: $(cat "$case_dir/wakes")"
+  pass "a worker-printed banner above the composer does not alert a busy lane"
 }
 
 hung_verdict_scans() {
@@ -665,5 +688,6 @@ test_model_outage_unreadable_lane_is_named_again_when_readable
 test_model_outage_hung_verdict_is_bounded
 test_model_outage_wrapped_banner_keeps_episode_identity
 test_model_outage_midturn_usage_limit_banner_alerts_once
+test_model_outage_banner_above_composer_does_not_alert
 
 echo "all fm-busy-adapter-wiring tests passed"
