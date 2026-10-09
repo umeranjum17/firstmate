@@ -2561,6 +2561,40 @@ It verifies native `ultra` on initial and operational turns and after restart, s
 Its native App Server peer and watcher-close process are deterministic fixtures; it does not claim a real backend or a live model was tested by that command.
 `tests/fm-busy-state.test.sh`, `tests/fm-busy-adapter-wiring.test.sh`, and `tests/fm-watch-triage.test.sh` cover separate progress notification, unchanged semantic busy state, rejection of a superseded worker's events, and progress refreshing the busy-age bound without fabricating a completed turn.
 
+### Worker progress monitoring
+
+The watcher consumer was checked on 2026-10-08 with GNU Bash 5.3.15 and tmux 3.7b.
+`bash bin/fm-test-run.sh tests/fm-watch-triage.test.sh` passed 154 cases using isolated state and controlled backend responses, not a live model.
+Focused regressions are `test_stale_terminal_status_overridden_by_active_run` (active validation versus a hung running record), `test_progress_observation_keeps_concurrent_writes` (post-scan eligibility for all four sources), and `test_worker_progress_sources_reset_old_wedge` (status and lifecycle activity versus replacement grace).
+`test_daemon_claim_over_live_run_reads_run_alive` in `tests/fm-crew-state.test.sh` covers recent, quiet, and absent execution evidence through the crew-state interface.
+`test_pi_extension_semantic_lifecycle` and `test_pi_extension_stale_incarnation_rejected` in `tests/fm-busy-adapter-wiring.test.sh` exercise generated ordinary-streaming handlers and predecessor rejection.
+Refresh these portable checks with:
+
+```sh
+bash bin/fm-test-run.sh tests/fm-watch-triage.test.sh
+bash bin/fm-test-run.sh tests/fm-crew-state.test.sh
+bash bin/fm-test-run.sh tests/fm-busy-adapter-wiring.test.sh
+```
+
+A guarded private tmux replay used the real watcher and crew-state entrypoints and public generation-bound lifecycle/progress writes.
+It observed three no-progress escalations, `demand-deep-inspection` on the third wake, an external wait quiet before its UTC bound and rechecked afterward, and rejected predecessor events after rearming.
+Concurrent progress writes established live consumption, not synchronization to the precise post-scan boundary.
+
+A separate real Pi worker replay on 2026-10-08 used `openai-codex/gpt-5.5`, extension discovery disabled, and the unchanged `fm-spawn.sh`-generated worker extension explicitly loaded in the same guarded private-tmux setup.
+The retained replay did not record the Pi version.
+One unfinished response produced 730 ordinary `text_delta` events over 18.06 seconds with 17 generation-bound progress updates, exceeding both configured six-second busy-age and wedge bounds without a completed-turn marker.
+The watcher remained alive with empty stdout (no stale alert); its exact log included:
+
+```text
+[2026-10-08T20:17:20+0400] absorbed stale (recent worker progress): primary:fm-stream
+[2026-10-08T20:17:35+0400] absorbed stale (recent worker progress): primary:fm-stream
+```
+
+This is live ordinary-streaming evidence, not footer/token parsing or a changed wait-timer policy.
+Hung validation and precisely post-scan writes remain automated evidence only.
+`test_captain_held_never_rechecked_while_away_record_exists` and `test_live_captain_held_first_sight_silenced_by_away_record` in `tests/fm-watch-triage.test.sh` cover existing held-lane behavior with fixtures; the live held-lane journey remains deferred and no new held-lane behavior is claimed.
+[Watcher architecture](../architecture.md#event-driven-supervision) owns the current activity contract.
+
 ## Oh My Pi (omp)
 
 omp runs crewmate, scout, secondmate, and primary work; [`supervision.md`](supervision.md#omp-oh-my-pi-native-delivery-2026-09-05) owns the primary evidence.

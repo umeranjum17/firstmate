@@ -16,6 +16,7 @@
 # beyond FM_PAUSE_RESURFACE_SECS cannot extend the ordinary recheck cadence, and
 # while an away record (state/.afk-contract, never quiet mode's) exists an
 # item held for the captain is never rechecked at all, in either posture.
+# fm-watch-progress-lib.sh owns the independent activity proof.
 # While state/.afk exists, the daemon owns triage and this watcher queues and exits
 # on every wake. Printed reason lines:
 #   signal: <file>...      status/turn-end signals, surfaced when a listed status
@@ -35,14 +36,16 @@
 #                          (declared_wait_contradiction). Only when neither absorb class
 #                          applies does the log's latest recognized status event decide:
 #                          terminal (captain-relevant) or non-terminal (no verb),
-#                          both surfaced at once. A provably-working stale past the
-#                          wedge threshold also surfaces, with an "escalation N"
+#                          both surfaced at once. A busy verdict without progress
+#                          past the wedge threshold surfaces, with an "escalation N"
 #                          count in the reason; at FM_WEDGE_DEMAND_INSPECT_COUNT
 #                          consecutive escalations on the SAME pane, the reason
 #                          also carries a "demand-deep-inspection" marker so the
 #                          wake payload itself, not just repetition, forces a
 #                          closer look instead of another routine supervision
-#                          resume. Unless afk is active. A pane about to escalate
+#                          resume. Active validation steps are rechecked at the
+#                          threshold rather than called stale for a frozen terminal.
+#                          A pane about to escalate
 #                          that can account for its quiet - a `paused:` external
 #                          wait or a verified `captain-held` transfer its worker
 #                          declared, or, where config/wedge-defer-parked-gate
@@ -63,9 +66,9 @@
 #                          verdict escalates unchanged.
 #                          A genuinely busy pane
 #                          (window_is_busy true) is exempt from the above, but
-#                          only up to BUSY_TURN_MAX_SECS with no completed turn
-#                          (state/<id>.turn-ended, or the spawn record before any
-#                          turn completes). Past that bound, a declared external
+#                          only up to BUSY_TURN_MAX_SECS without observed progress
+#                          (busy_turn_over_age owns the activity sources).
+#                          Past that bound, a declared external
 #                          wait or verified captain-held transfer uses the long
 #                          pause recheck cadence; under daemon-backed afk an
 #                          external wait is instead handed to the daemon as this
@@ -243,6 +246,8 @@ WATCH_HOME_EXISTED=0
 . "$SCRIPT_DIR/fm-pending-reply-lib.sh"
 # shellcheck source=bin/fm-busy-lib.sh
 . "$SCRIPT_DIR/fm-busy-lib.sh"
+# shellcheck source=bin/fm-watch-progress-lib.sh
+. "$SCRIPT_DIR/fm-watch-progress-lib.sh"
 # shellcheck source=bin/fm-composer-lib.sh
 . "$SCRIPT_DIR/fm-composer-lib.sh"
 # Steering-inbox loss detection: bin/fm-task-inbox-lib.sh owns the record,
@@ -354,12 +359,13 @@ TURNEND_CHURN_ABSORB_SECS=${FM_TURNEND_CHURN_ABSORB_SECS:-900}  # longest a task
 # completion. The same classifier
 # (fm-classify-lib.sh) backs the away-mode daemon; while state/.afk exists the
 # daemon owns triage, so this watcher reverts to one-shot (enqueue + exit on every
-# wake) and never double-triages - and never runs the costly provably-working read.
+# wake) and never double-triages. The progress add-on still checks positive
+# validation execution evidence before surfacing a stale pane.
 STALE_ESCALATE_SECS=${FM_STALE_ESCALATE_SECS:-240}  # idle secs before a provably-working stale escalates as a possible wedge
 # A busy pane is unconditional proof of liveness with no built-in duration bound,
 # so a hung foreground call can remain hidden even while its rendered busy
 # footer changes every poll. BUSY_TURN_MAX_SECS bounds how long any busy pane
-# may go without a completed turn or explicit native-harness progress (the
+# may go without observed activity (the
 # marker-selection contract is in busy_turn_over_age below). Once this bound
 # is crossed, busy_turn_over_age routes the pane through
 # busy_turn_bound_check, which hands a crossed bound to the same
@@ -559,7 +565,7 @@ window_label() {
 # The ONE derivation of a window's per-window marker key: `:`, `/` and `.` become
 # `_` so a window name is usable as a filename suffix. Every per-window file the
 # watcher keeps is named by it (.hash-, .count-, .stale-, .stale-since-,
-# .wedge-escalations-, .paused-*, .writing-*, .waiting-*, .truth-*, .tracked-), and live homes
+# .wedge-escalations-, .paused-*, .writing-*, .waiting-*, .truth-*, .activity-*, .tracked-), and live homes
 # hold those markers on disk under the current format, so the format lives here alone: a second copy is
 # how a future change to it silently orphans a window's markers instead of clearing
 # them. The helpers below take the derived key rather than re-deriving it, so one
@@ -1684,6 +1690,14 @@ wedge_timer_check() {  # <window> <since-file> <triage-label> <escalation-count-
       fm_epoch_seconds_to age
       age=$(( age - since ))
       if [ "$age" -ge "$STALE_ESCALATE_SECS" ]; then
+        # A live validation step owns the wait even when its worker's terminal
+        # is frozen. Re-read at the threshold, not on every ordinary poll.
+        if task_validation_active "$task"; then
+          date +%s > "$since_file"
+          rm -f "$escalation_file"
+          triage_log "absorbed stale (active validation step): $win"
+          return 0
+        fi
         if evidence=$(wedge_wait_evidence "$task") &&
            wedge_defer_wait "$win" "$since_file" "$label" "$age" "$evidence"; then
           return 0
@@ -1710,17 +1724,20 @@ wedge_timer_check() {  # <window> <since-file> <triage-label> <escalation-count-
   esac
 }
 
-# busy_turn_over_age: 0 iff the last completed turn or explicit native-harness
-# progress is at least BUSY_TURN_MAX_SECS old. Progress is actual observed model
-# or tool activity, never a timer or a busy footer. It does not emit a wake or
-# change semantic busy state. Before either marker exists, age the spawn record.
+# busy_turn_over_age: 0 iff the newest completed-turn, generation-bound
+# progress, or independently observed activity marker is BUSY_TURN_MAX_SECS old.
+# fm-watch-progress-lib.sh owns observation; a timer or busy footer is not proof.
+# Before those markers exist, age the spawn record. Activity does not fabricate
+# a completed turn or change semantic busy state.
 # The caller checks busy state and routes a crossed bound through inspection.
-busy_turn_over_age() {  # <task>
-  local task=$1 f progress
+busy_turn_over_age() {  # <task> <window-key>
+  local task=$1 key=$2 f progress activity
   f="$STATE/$task.turn-ended"
   [ -e "$f" ] || f="$STATE/$task.meta"
   progress="$STATE/$task.progress"
   if [ -f "$progress" ] && [ "$progress" -nt "$f" ]; then f="$progress"; fi
+  activity="$STATE/.activity-$key"
+  if [ -f "$activity" ] && [ "$activity" -nt "$f" ]; then f="$activity"; fi
   [ "$(age_of "$f")" -ge "$BUSY_TURN_MAX_SECS" ]
 }
 
@@ -1921,7 +1938,8 @@ phantom_pane_prune() {
     # the next cycle retries the whole prune, while a removed sidecar with
     # markers left behind would strand the orphans unfindable.
     rm -f "$STATE/.hash-$key" "$STATE/.count-$key" "$STATE/.churn-since-$key" \
-      "$STATE/.dead-reported-$key" "$STATE/.truth-read-$key" "$STATE/.truth-raised-$key" || continue
+      "$STATE/.dead-reported-$key" "$STATE/.truth-read-$key" "$STATE/.truth-raised-$key" \
+      "$STATE/.activity-$key" "$STATE/.activity-observed-$key" "$STATE/.activity-observed-$key.next" || continue
     rm -f "$tracked" || continue
     reason="stale: $w (pane vanished, state pruned: no task record owns it and the backend confirms it is gone)"
     fm_wake_append stale "$w" "$reason" || exit 1
@@ -3431,12 +3449,14 @@ EOF
     ewf="$STATE/.wedge-escalations-$key"
     pf="$STATE/.paused-$key"   # flag: this key's stale is using the bounded pause cadence
     prev=$(cat "$hf" 2>/dev/null || true)
+    observe_window_progress "$key" "$task" "$last"
     # Busy match: a backend's native semantic state when available (herdr), else
     # the last 6 non-blank lines only (the TUI footer area, where every verified
     # harness renders its busy indicator) so busy-looking strings in displayed
     # content cannot suppress stale detection. Read once per window per poll and
     # reused below so a busy verdict is consistent within one cycle.
     if window_is_busy "$w" "$tail40"; then busy_now=0; else busy_now=1; fi
+    if window_progress_absorbed "$w" "$task" "$key" "$h" "$prev" "$busy_now"; then continue; fi
     if [ "$busy_now" -ne 0 ] && [ "$kind" != secondmate ] && [ -n "$task" ]; then
       declared_wait_contradiction "$w" "$task" "$key"
     fi
@@ -3574,7 +3594,7 @@ EOF
         # then route it through busy_turn_bound_check, which hands the crossed
         # bound to the same wedge timer unless the crew declared the wait itself.
         paused_bound=1
-        if [ "$busy_now" -eq 0 ] && busy_turn_over_age "$task"; then
+        if [ "$busy_now" -eq 0 ] && busy_turn_over_age "$task" "$key"; then
           busy_turn_bound_check "$w" "$task" "$h" "$ssf" "$ewf" && paused_bound=0
         else
           rm -f "$ssf" "$ewf"
@@ -3596,7 +3616,7 @@ EOF
       # after the record that enumerated it is gone. Written once.
       [ -e "$STATE/.tracked-$key" ] || printf '%s\t%s\n' "$w" "$backend" > "$STATE/.tracked-$key"
       paused_bound=1
-      if [ "$busy_now" -eq 0 ] && busy_turn_over_age "$task"; then
+      if [ "$busy_now" -eq 0 ] && busy_turn_over_age "$task" "$key"; then
         busy_turn_bound_check "$w" "$task" "$h" "$ssf" "$ewf" && paused_bound=0
       else
         rm -f "$ssf" "$ewf"
