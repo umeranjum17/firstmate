@@ -2716,7 +2716,7 @@ Repeat the hooked-worker check above before publication if watcher or task-inbox
 ## OpenCode model-error wakes and second-mate continuity
 
 Verified on 2026-10-08 with OpenCode 1.18.25 in a credential-free named Herdr lab, against the observation code at commit b45da13f.
-Later commits (d5806d7c through aed7398f) changed the observer and alert record; this live record does not qualify those changes, which the portable tests below cover.
+Later commits (d5806d7c through aed7398f) changed the observer and alert record; this live record does not qualify those changes, which the portable tests below cover. The native observer has since been removed, so this record describes only the visible-banner path as it existed at b45da13f.
 Two real OpenCode lanes selected an unavailable hosted model and emitted `session.error` followed by idle.
 One lane retained its generation-bound native error record; the other exercised the legacy visible-banner path by removing that record after the real failure.
 The ordinary watcher delivered one grouped model-error notification automatically, and the real second-mate agent drained and acknowledged it within 97 seconds of the recorded failure.
@@ -2736,7 +2736,7 @@ PASS OpenCode 1.18.25: grouped hosted outage delivered automatically; second mat
 lab cleanup: 0
 ```
 
-The portable generated-adapter integration in `tests/fm-busy-adapter-wiring.test.sh` verifies that a native failure persists through idle and a subsequent successful turn clears it; `tests/fm-busy-state.test.sh` retains generation and retirement coverage.
+The portable scan tests in `tests/fm-busy-adapter-wiring.test.sh` cover grouped, recovered, unreadable, and hung-verdict lanes; `tests/fm-busy-state.test.sh` retains generation and retirement coverage.
 This qualification covers OpenCode error observation on Herdr, not new error signatures for other harnesses or fresh live qualification of other backends.
 Other harnesses retain their existing stale and blocked-worker supervision.
-The native observation schema and bounded poll behavior belong to `bin/fm-opencode-model-error.js` and `bin/fm-model-outage-lib.sh`; this record does not own another recovery mechanism.
+The bounded scan behavior belongs to `bin/fm-model-outage-lib.sh`; this record does not own another recovery mechanism.

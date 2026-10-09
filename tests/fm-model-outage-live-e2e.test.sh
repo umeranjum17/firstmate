@@ -71,11 +71,8 @@ for id in lanea laneb; do
   cat > "$project/.opencode/plugins/busy.js" <<EOF
 import { execFileSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
-import { modelErrorObserver } from '$ROOT/bin/fm-opencode-model-error.js';
-const observe = modelErrorObserver('$FM_HOME/state', '$id', '$gen');
 export const Busy = async () => ({event: async ({event}) => {
   if (/session\\.(error|idle|status)/.test(event.type)) appendFileSync('$E/$id.events.jsonl', JSON.stringify(event)+'\\n');
-  observe(event);
   if(event.type === 'session.status') execFileSync('$ROOT/bin/fm-busy-event.sh', ['apply','$FM_HOME/state','$id',event.properties.status.type==='idle'?'idle':'busy','--gen','$gen','--source','opencode-plugin','--event','session-'+event.properties.status.type]);
 }});
 EOF
@@ -89,15 +86,10 @@ done
 # shellcheck source=bin/fm-wake-lib.sh
 . "$ROOT/bin/fm-wake-lib.sh"
 for id in lanea laneb; do
-  gen=$(<"$E/$id.gen")
-  for ((i=0;i<120;i++)); do jq -e '.error=="Model outage-unavailable is not supported"' "$FM_HOME/state/$id.model-error-$gen.json" >/dev/null 2>&1 && break; sleep 1; done
+  for ((i=0;i<120;i++)); do lab pane read "$(<"$E/$id.pane")" --source visible | grep -q 'Model outage-unavailable is not supported' && break; sleep 1; done
   [ "$i" -lt 120 ] || fail "OpenCode $VERSION: no hosted failure for $id"
 done
-gen=$(<"$E/lanea.gen")
-failure_at=$(fm_path_mtime "$FM_HOME/state/lanea.model-error-$gen.json")
-# An already-running old lane has no native observation file after an update.
-# Exercise its real error banner alongside laneb's native producer.
-mv "$FM_HOME/state/lanea.model-error-$gen.json" "$E/legacy-native-error.json"
+failure_at=$(date +%s)
 printf '{"plugin":["file://%s/.opencode/plugins/fm-primary-watch-arm.js"]}\n' "$FM_HOME" > "$FM_HOME/opencode.json"
 pane=$(lab workspace create --cwd "$FM_HOME" --label lead --no-focus | jq -er '.result.root_pane.pane_id')
 PANES+=("$pane")

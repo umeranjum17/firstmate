@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Model-error observation, called by fm-watch.sh before stale suppression.
-# Native OpenCode errors bind to busy-gen and clear when the next turn starts.
-# Legacy OpenCode lanes use explicit provider banners in the visible viewport,
+# OpenCode lanes use explicit provider banners in the visible viewport,
 # never scrollback or worker-printed "Error:" lines. Unchanged error observations
 # alert at the next scan even if retrying. Unknown/dead endpoints are not
 # restarted by this observer. Existing waiting timers own overdue escalation.
@@ -9,7 +8,7 @@
 # after it appears, up to 60s later. Each scan reads every recorded lane's
 # liveness serially, bounded to 3s each, before the stale checks in the same
 # poll, so a slow endpoint can delay them. Mid-turn OpenCode lanes skip the
-# visible-capture read; their native observation stands.
+# visible-capture read, so their errors are named once the lane is idle.
 # Each normalized error is one durable episode; a lane joining an alerted episode
 # sends one updated grouped wake naming the lanes failing in that scan.
 # The wake queue owns delivery; restart does not repeat an already queued alert.
@@ -31,7 +30,7 @@ fm_model_outage_hold() {  # <dir> <batch> <id>
 }
 
 fm_model_outage_tick() {
-  local meta id backend target harness gen error hash old verdict rows file groups native mid line match key lanes alert kept
+  local meta id backend target harness gen error hash old verdict rows groups mid line match key lanes alert kept
   local dir="$STATE/.model-outages" now batch last current
   now=$(date +%s) || return 1
   # The singleton watcher owns these records; never start a second monitor.
@@ -51,25 +50,21 @@ fm_model_outage_tick() {
     backend=$(fm_backend_of_meta "$meta")
     harness=$(fm_meta_get "$meta" harness)
     gen=$(fm_busy_current_gen "$STATE" "$id") || gen=unarmed
-    error=; key=; native=0
-    file="$STATE/$id.model-error-$gen.json"
-    if [ -f "$file" ] && [ ! -L "$file" ]; then
-      if error=$(jq -er --arg gen "$gen" 'select(.gen == $gen) | .error | select(type == "string")' "$file"); then native=1; else error=; fi
-    fi
-    [ "$harness" = opencode ] || [ "$native" = 1 ] || continue
+    error=; key=
+    [ "$harness" = opencode ] || continue
     # shellcheck disable=SC2016 # The child expands its own positional arguments.
     verdict=$(fm_run_timed 3 bash -c '. "$1/fm-backend.sh"; . "$1/fm-busy-lib.sh"; fm_busy_classify_semantic "$2" "$3" "$4" "$5" "$6"' \
       model-error "$_FM_MODEL_ERROR_DIR" "$backend" "$target" "$harness" "$id" "$STATE") \
       || { fm_model_outage_hold "$dir" "$batch" "$id"; continue; }
     mid=0
-    if [ "$harness" = opencode ] && [ "${verdict%% *}" = busy ]; then mid=1; fi
+    if [ "${verdict%% *}" = busy ]; then mid=1; fi
     # Bound reads on every backend; a vanished/slow endpoint cannot hang the
     # rest of the fleet scan. Never discover another home's unrecorded panes.
     # shellcheck disable=SC2016 # The child expands its own positional arguments.
     rows=$(fm_run_timed 3 bash -c '. "$1/fm-backend.sh"; fm_backend_agent_state "$2" "$3" "$4" "$5"' \
       model-error "$_FM_MODEL_ERROR_DIR" "$backend" "$target" "$meta" "$id") || { fm_model_outage_hold "$dir" "$batch" "$id"; continue; }
     case "$rows" in alive) ;; dead|missing) rm -f "$dir/lane-$id"; continue ;; *) fm_model_outage_hold "$dir" "$batch" "$id"; continue ;; esac
-    if [ "$native" = 0 ] && [ "$mid" = 0 ] && [ "$harness" = opencode ] && fm_backend_visible_capture_supported "$backend"; then
+    if [ "$mid" = 0 ] && fm_backend_visible_capture_supported "$backend"; then
       # shellcheck disable=SC2016 # The child expands its own positional arguments.
       rows=$(fm_run_timed 3 bash -c '. "$1/fm-backend.sh"; fm_backend_visible_capture "$2" "$3"' \
         model-error "$_FM_MODEL_ERROR_DIR" "$backend" "$target") || { fm_model_outage_hold "$dir" "$batch" "$id"; continue; }

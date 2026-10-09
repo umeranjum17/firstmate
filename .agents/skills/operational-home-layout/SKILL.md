@@ -70,7 +70,6 @@ state/               runtime records and signals; gitignored
   <id>.kimi-turnend-token   firstmate-owned Kimi hook registry token for the task; removed by teardown
   <id>.gemini-settings.json  firstmate-owned per-task Gemini settings carrying the busy-state and turn-end hooks, reached through GEMINI_CLI_SYSTEM_SETTINGS_PATH so nothing is written into the project's own .gemini/; removed by teardown
   <id>.devin-config.json  firstmate-owned per-task Devin config (mode 600 snapshot of the user config plus the busy-state and turn-end hooks) passed through --config so no user or project config is edited; bin/fm-devin-config.sh owns it; removed by teardown
-  <id>.model-error-<gen>.json  OpenCode native session-error record bound to one busy incarnation, written by bin/fm-opencode-model-error.js; removed by retire
   <id>.muse-session  muse busy-source binding (sessions root plus task worktree) written by fm-spawn; removed by teardown
   <id>.cursor-session  cursor busy-source binding (projects root, task worktree, prior conversations) written by fm-spawn; removed by teardown
   <id>.git-hooks/    per-task git hooksPath that strips AI commit trailers at the commit object unless config/keep-ai-trailers is present; written by fm-spawn, removed by teardown (bin/fm-git-strip-ai-trailers.sh)

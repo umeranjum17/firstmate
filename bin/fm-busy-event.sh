@@ -183,7 +183,7 @@ fi
 lock_acquire || { umask "$old_umask"; exit 1; }
 CURRENT=$(fm_busy_current_gen "$STATE" "$ID") || {
   if [ "$CMD" = retire ] && [ ! -e "$GEN_FILE" ] && [ ! -L "$GEN_FILE" ]; then
-    rm -f "$REC" "$STATE/$ID.progress" "$STATE/$ID.model-error-"*.json || {
+    rm -f "$REC" "$STATE/$ID.progress" || {
       lock_release
       umask "$old_umask"
       echo "error: busy-state retirement failed for $ID" >&2
@@ -208,7 +208,7 @@ if [ "$GEN" != "$CURRENT" ]; then
   exit 1
 fi
 if [ "$CMD" = retire ]; then
-  rm -f "$GEN_FILE" "$REC" "$STATE/$ID.progress" "$STATE/$ID.model-error-"*.json || {
+  rm -f "$GEN_FILE" "$REC" "$STATE/$ID.progress" || {
     lock_release
     umask "$old_umask"
     echo "error: busy-state retirement failed for $ID" >&2

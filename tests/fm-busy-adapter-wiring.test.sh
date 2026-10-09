@@ -264,18 +264,6 @@ test_opencode_plugin_semantic_lifecycle() {
   [ -f "$state/$id.turn-ended" ] || fail "the marker touch must stay a notification for every session.idle"
   out=$(classify opencode "$id" "$state")
   [ "$out" = "busy opencode-plugin" ] || fail "another session's idle must not clear the latched busy, got '$out'"
-  local gen error_file
-  gen=$(cat "$state/$id.busy-gen"); error_file="$state/$id.model-error-$gen.json"
-  out=$(drive_oc_plugin "$plugin" "$(oc_status ses_main busy)" \
-    '{"type":"session.error","properties":{"sessionID":"ses_main","error":{"data":{"message":"Upstream request failed: region denied"}}}}' \
-    "$(oc_idle ses_main)") || fail "error drive failed: $out"
-  jq -e '.error=="Upstream request failed: region denied"' "$error_file" >/dev/null || fail 'native failure not persisted through idle'
-  out=$(drive_oc_plugin "$plugin" "$(oc_status ses_main busy)" "$(oc_idle ses_main)") || fail "recovery drive failed: $out"
-  jq -e '.error==""' "$error_file" >/dev/null || fail 'successful turn did not clear the native failure'
-  out=$(drive_oc_plugin "$plugin" "$(oc_status ses_main busy)" \
-    '{"type":"session.status","properties":{"sessionID":"ses_main","status":{"type":"retry","message":"Upstream request failed: retrying"}}}' \
-    "$(oc_idle ses_main)") || fail "retry recovery drive failed: $out"
-  jq -e '.error==""' "$error_file" >/dev/null || fail 'a retry that recovers must not latch a persisted outage'
   pass "opencode plugin classifies from session.status, scoped to the latched worker session"
 }
 
@@ -514,7 +502,7 @@ EOF
       printf 'g1\n' > "$state/$1.busy-gen"
       printf '%s\n' "$2" > "$state/$1.verdict"
       printf '%s\n' "$3" > "$case_dir/liveness/$1"
-      printf '{"gen":"g1","error":"%s"}\n' "${4-Upstream request failed: region denied}" > "$state/$1.model-error-g1.json"
+      printf '%s\n' "${4-Upstream request failed: region denied}" > "$case_dir/liveness/capture-$1"
     }
     tick() { ( rm -f "$STATE/.model-outages/.scan-at"; fm_model_outage_tick ); }
     "$body"
@@ -594,7 +582,6 @@ test_model_outage_unreadable_lane_does_not_pin_recovered_episode() {
 
 legacy_banner_scans() {
   lane alpha "idle opencode-plugin" alive
-  rm -f "$state/alpha.model-error-g1.json"
   printf '%s\n' 'Upstream request failed: region denied' '' 'composer A' > "$FAKE_LIVENESS/capture-alpha"
   tick
   printf '%s\n' 'Upstream request failed: region denied' '' 'composer B' > "$FAKE_LIVENESS/capture-alpha"
@@ -629,57 +616,6 @@ test_model_outage_hung_verdict_is_bounded() {
   pass "a hung verdict read is bounded and names no lane"
 }
 
-errored_then_healthy_turn_scans() {
-  drive_oc_plugin "$plugin" "$(oc_status ses_main busy)" "$error_event" || fail "error drive failed"
-  tick
-  drive_oc_plugin "$plugin" "$(oc_status ses_main busy)" || fail "healthy turn drive failed"
-  tick
-  tick
-}
-
-# A recorded session error must not outlive the next turn: a healthy busy turn
-# spanning more than one scan sends no outage wake.
-test_model_outage_healthy_turn_after_error_does_not_alert() {
-  local rec id=busy-oc-2 state plugin error_event case_dir out
-  rec=$(make_spawn_case oc-healthy-turn opencode "$id")
-  read_case_record "$rec"
-  out=$(run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR")
-  expect_code 0 $? "opencode spawn should succeed: $out"
-  state="$HOME_DIR/state"
-  plugin="$WT_DIR/.opencode/plugins/fm-busy-state.js"
-  error_event='{"type":"session.error","properties":{"sessionID":"ses_main","error":{"data":{"message":"Upstream request failed: region denied"}}}}'
-  case_dir="$TMP_ROOT/model-outage-healthy-turn"
-  printf '%s\n' "busy opencode-plugin" > "$state/$id.verdict"
-  run_outage_fixture "$case_dir" "$state" errored_then_healthy_turn_scans
-  [ ! -e "$case_dir/wakes" ] \
-    || fail "a healthy turn after a recorded error must not alert, got: $(cat "$case_dir/wakes")"
-  pass "a healthy turn after a recorded error clears it and sends no outage wake"
-}
-
-aborted_turn_scans() {
-  drive_oc_plugin "$plugin" "$(oc_status ses_main busy)" "$abort_event" "$(oc_idle ses_main)" || fail "abort drive failed"
-  tick
-  tick
-}
-
-# A user abort ends the turn without a model outage, so the idle lane sends no wake.
-test_model_outage_user_abort_is_not_an_outage() {
-  local rec id=busy-oc-3 state plugin abort_event case_dir out
-  rec=$(make_spawn_case oc-user-abort opencode "$id")
-  read_case_record "$rec"
-  out=$(run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR")
-  expect_code 0 $? "opencode spawn should succeed: $out"
-  state="$HOME_DIR/state"
-  plugin="$WT_DIR/.opencode/plugins/fm-busy-state.js"
-  abort_event='{"type":"session.error","properties":{"sessionID":"ses_main","error":{"name":"MessageAbortedError","data":{"message":"The operation was aborted."}}}}'
-  case_dir="$TMP_ROOT/model-outage-user-abort"
-  printf '%s\n' "idle opencode-plugin" > "$state/$id.verdict"
-  run_outage_fixture "$case_dir" "$state" aborted_turn_scans
-  [ ! -e "$case_dir/wakes" ] \
-    || fail "a user abort must not raise an outage alert, got: $(cat "$case_dir/wakes")"
-  pass "a user abort is not a model outage, even when the turn then goes idle"
-}
-
 test_pi_extension_semantic_lifecycle
 test_pi_extension_serializes_settle_before_next_start
 test_pi_extension_stale_ctx_settles_unknown
@@ -698,7 +634,5 @@ test_model_outage_recovered_lane_leaves_wake
 test_model_outage_unreadable_lane_does_not_pin_recovered_episode
 test_model_outage_hung_verdict_is_bounded
 test_model_outage_wrapped_banner_keeps_episode_identity
-test_model_outage_healthy_turn_after_error_does_not_alert
-test_model_outage_user_abort_is_not_an_outage
 
 echo "all fm-busy-adapter-wiring tests passed"
