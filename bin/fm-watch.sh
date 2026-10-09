@@ -3268,6 +3268,7 @@ while :; do
   # hook land seconds apart, and reporting them as separate actionable wakes
   # costs a full firstmate turn each. The re-scan also picks up a newer
   # signature for an already-pending file (last write wins below).
+  signal_wake=
   pending=$(scan_signals)
   if [ -n "$pending" ]; then
     sleep "$SIGNAL_GRACE"
@@ -3359,8 +3360,7 @@ EOF
       done <<EOF
 $FM_SIGNAL_SURFACE_ENDPOINTS
 EOF
-      run_due_checks
-      wake "$reason"
+      signal_wake=$reason
     else
       while IFS=$(printf '\t') read -r sf sig f; do
         [ -n "$sf" ] || continue
@@ -3383,10 +3383,16 @@ EOF
         done <<EOF
 $pending
 EOF
-        wake "$reason"
+        signal_wake=$reason
+      else
+        triage_log "absorbed benign $reason"
       fi
-      triage_log "absorbed benign $reason"
     fi
+  fi
+
+  run_due_checks
+  if [ -n "$signal_wake" ]; then
+    wake "$signal_wake"
   fi
 
   fm_wait_timers_tick || {
@@ -3424,7 +3430,6 @@ EOF
     triage_log "inactive-outcome reconciliation unavailable"
   fi
 
-  run_due_checks
   # Layer 1 backbone: pane staleness. Two consecutive identical hashes with no busy
   # signature means the crewmate finished, is waiting, or is wedged. Each distinct
   # stale hash is surfaced, absorbed, or timed toward escalation once (.stale-*
