@@ -7,8 +7,9 @@
 # Scans run at most once per 60s, so an idle failure alerts at the first scan
 # after it appears, up to 60s later. Each scan reads every recorded lane's
 # liveness serially, bounded to 3s each, before the stale checks in the same
-# poll, so a slow endpoint can delay them. Mid-turn OpenCode lanes skip the
-# visible-capture read, so their errors are named once the lane is idle.
+# poll, so a slow endpoint can delay them. Mid-turn OpenCode lanes are read
+# for the persistent usage-limit banner only; every other error is named
+# once the lane is idle.
 # Each normalized error is one durable episode; a lane joining an alerted episode
 # sends one updated grouped wake naming the lanes failing in that scan.
 # The wake queue owns delivery; restart does not repeat an already queued alert.
@@ -18,13 +19,19 @@
 _FM_MODEL_ERROR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=bin/fm-timeout-lib.sh
 . "$_FM_MODEL_ERROR_DIR/fm-timeout-lib.sh"
+# The usage-limit banner pattern has one owner, bin/fm-composer-lib.sh; this
+# observer reads that variable so the outage alert cannot drift from the
+# staleness furniture the banner was captured with.
+# shellcheck source=bin/fm-composer-lib.sh
+. "$_FM_MODEL_ERROR_DIR/fm-composer-lib.sh"
 
 fm_model_outage_text() {
   LC_ALL=C tr -c '[:print:]' ' ' | awk '{$1=$1; print}' | cut -c1-1000
 }
 
 fm_model_outage_tick() {
-  local meta id backend target harness gen error hash old verdict rows groups mid line match key lanes alert kept
+  local meta id backend target harness gen error hash old verdict rows groups mid line key lanes alert kept floor n row trimmed
+  # shellcheck disable=SC2153 # STATE is set by the watcher (fm-watch.sh); the sourced composer lib's lowercase `state` is unrelated.
   local dir="$STATE/.model-outages" now batch last current
   now=$(date +%s) || return 1
   # The singleton watcher owns these records; never start a second monitor.
@@ -44,7 +51,7 @@ fm_model_outage_tick() {
     backend=$(fm_backend_of_meta "$meta")
     harness=$(fm_meta_get "$meta" harness)
     gen=$(fm_busy_current_gen "$STATE" "$id") || gen=unarmed
-    error=; key=
+    error=; key=; line=
     [ "$harness" = opencode ] || continue
     # shellcheck disable=SC2016 # The child expands its own positional arguments.
     verdict=$(fm_run_timed 3 bash -c '. "$1/fm-backend.sh"; . "$1/fm-busy-lib.sh"; fm_busy_classify_semantic "$2" "$3" "$4" "$5" "$6"' \
@@ -58,16 +65,40 @@ fm_model_outage_tick() {
     rows=$(fm_run_timed 3 bash -c '. "$1/fm-backend.sh"; fm_backend_agent_state "$2" "$3" "$4" "$5"' \
       model-error "$_FM_MODEL_ERROR_DIR" "$backend" "$target" "$meta" "$id") || continue
     case "$rows" in alive) ;; dead|missing) rm -f "$dir/lane-$id"; continue ;; *) continue ;; esac
-    if [ "$mid" = 0 ] && fm_backend_visible_capture_supported "$backend"; then
+    if fm_backend_visible_capture_supported "$backend"; then
       # shellcheck disable=SC2016 # The child expands its own positional arguments.
       rows=$(fm_run_timed 3 bash -c '. "$1/fm-backend.sh"; fm_backend_visible_capture "$2" "$3"' \
         model-error "$_FM_MODEL_ERROR_DIR" "$backend" "$target") || continue
       # Only explicit provider/harness banners, never worker-printed output; a
-      # wrapped banner keeps up to two continuation lines.
-      match=$(printf '%s\n' "$rows" | grep -Ein '^[[:space:]│┃]*(Upstream request failed|Model .+ is not supported|rate.?limit exceeded|insufficient quota|authentication failed)' | tail -1)
-      if [ -n "$match" ]; then
-        line=${match%%:*}
+      # wrapped banner keeps up to two continuation lines. The provider-error
+      # read stays idle-only: a mid-turn lane is matched against the
+      # usage-limit banner alone, the one outage that persists for hours while
+      # a limited lane sits mid-turn retrying. The banner is read only directly
+      # below the composer floor, OpenCode's own status area, so a banner-shaped
+      # line printed above the composer never counts.
+      if [ "$mid" = 0 ]; then
+        line=$(printf '%s\n' "$rows" | grep -Ein '^[[:space:]│┃]*(Upstream request failed|Model .+ is not supported|rate.?limit exceeded|insufficient quota|authentication failed)' | tail -1 | cut -d: -f1)
+      fi
+      if [ -n "$line" ]; then
         key=$(printf '%s\n' "$rows" | sed -n "${line}p")
+      else
+        floor=0; n=0
+        while IFS= read -r row; do
+          n=$((n + 1)); trimmed=$row
+          fm_composer_normalize_trim_var trimmed
+          if _fm_composer_leftbar_floor_row "$trimmed"; then floor=$n; fi
+        done <<< "$rows"
+        if [ "$floor" -gt 0 ] && printf '%s\n' "$rows" | sed -n "$((floor + 1))p" | grep -Eq "$FM_COMPOSER_OPENCODE_LIMIT_BANNER_RE_DEFAULT"; then
+          line=$((floor + 1))
+        fi
+        # The banner's reset and retry clocks tick every scan; digits fold
+        # out of the episode key so one limit event stays one episode while
+        # the displayed error keeps the live countdown.
+        if [ -n "$line" ]; then
+          key=$(printf '%s\n' "$rows" | sed -n "${line}p" | sed 's/[0-9][0-9]*/#/g')
+        fi
+      fi
+      if [ -n "$line" ]; then
         error=$(printf '%s\n' "$rows" | sed -n "${line},$((line + 2))p")
       fi
     fi

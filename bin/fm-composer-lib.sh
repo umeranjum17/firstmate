@@ -527,18 +527,14 @@ FM_COMPOSER_OMP_STATUS_RE_DEFAULT='^[[:space:]]*(π|󰵗)[[:space:]]+·[[:space:
 # through Herdr's ANSI capture). An idle pane shows a path/context/cost row
 # whose tail is `<n>K (<p>%) · $<cost>  ctrl+p [commands]` (1.18.25 draws the
 # hint on that row; older builds split it), then a session row whose tail is
-# the `commands` hint, or a bare `tab agents  ctrl+p commands` home row; a rate-limited pane shows the usage-limit banner, whose
-# head row opens with alternating U+25A0/U+2B1D square glyphs (`■5⬝hour⬝usage
-# limit reached. It will reset in ...`, truncated at the pane width) and whose
-# tail row carries `(click to expand) [retrying in 1h 8m attempt #1]` wrapped
-# at the pane width - both `usin... (click to expand)` and `click to expand)`
-# first-row truncations were observed. These rows are furniture, never typed
+# the `commands` hint, or a bare `tab agents  ctrl+p commands` home row; a
+# rate-limited pane shows the usage-limit banner rows
+# (FM_COMPOSER_OPENCODE_LIMIT_BANNER_RE_DEFAULT below). These rows are furniture, never typed
 # input: typed text can only land in the left-bar run ABOVE the floor, so the
 # cursorless staleness probe resumes past them below a proven floor. The
 # patterns stay deliberately narrow - a busy status row (`esc interrupt`) and
 # any unclaimed activity fail them, keep the envelope stale, and read
-# `unknown`, the refusing direction. The square glyphs are an alternation,
-# never a bracket range, for the reason FM_OMP_SPINNER_FRAMES_RE records.
+# `unknown`, the refusing direction.
 #
 # THE WRAP: the usage cell is right-aligned beside the directory, so on a
 # long worktree path (the fleet norm) the row WRAPS at the pane width. A
@@ -555,7 +551,17 @@ FM_COMPOSER_OMP_STATUS_RE_DEFAULT='^[[:space:]]*(π|󰵗)[[:space:]]+·[[:space:
 # same composer furniture, and the row still requires its `/`-leading
 # directory plus an `<n>K (<p>%)` context cell, so a busy `esc interrupt` row
 # and unclaimed activity still fail in the refusing direction.
-FM_COMPOSER_OPENCODE_STATUS_RE_DEFAULT='^[[:space:]]*/.*[0-9]+(\.[0-9]+)?[KMG]?[[:space:]]+\([0-9]+%\)([[:space:]]+·[[:space:]]+\$[0-9]*(\.[0-9]+)?)?([[:space:]]*ctrl\+p([[:space:]]+commands)?)?$|^[^[:space:]]+([[:space:]]+tab[[:space:]]+agents[[:space:]]+ctrl\+p)?[[:space:]]+commands$|^tab[[:space:]]+agents[[:space:]]+ctrl\+p[[:space:]]+commands$|^[[:space:]]*(■|⬝)[0-9]+(■|⬝)hour(■|⬝)usage limit reached|^[[:space:]]*(usin\.\.\.[[:space:]]+)?\(?click to expand\)[[:space:]]+\[retrying in [0-9]+[hms]([[:space:]]+[0-9]+[hms])*[[:space:]]+attempt #[0-9]+\]$'
+# The usage-limit banner's own two rows (the same live 2026-10-09 panes): the
+# head row opens with alternating U+25A0/U+2B1D square glyphs (`■5⬝hour⬝usage
+# limit reached. It will reset in ...`, truncated at the pane width) and the
+# tail row carries `(click to expand) [retrying in 1h 8m attempt #1]` wrapped
+# at the pane width - both `usin... (click to expand)` and `click to expand)`
+# first-row truncations were observed. The square glyphs are an alternation,
+# never a bracket range, for the reason FM_OMP_SPINNER_FRAMES_RE records.
+# bin/fm-model-outage-lib.sh reads this same variable for its outage alert, so
+# the outage banner and the staleness furniture can never drift apart.
+FM_COMPOSER_OPENCODE_LIMIT_BANNER_RE_DEFAULT='^[[:space:]]*(■|⬝)[0-9]+(■|⬝)hour(■|⬝)usage limit reached|^[[:space:]]*(usin\.\.\.[[:space:]]+)?\(?click to expand\)[[:space:]]+\[retrying in [0-9]+[hms]([[:space:]]+[0-9]+[hms])*[[:space:]]+attempt #[0-9]+\]$'
+FM_COMPOSER_OPENCODE_STATUS_RE_DEFAULT='^[[:space:]]*/.*[0-9]+(\.[0-9]+)?[KMG]?[[:space:]]+\([0-9]+%\)([[:space:]]+·[[:space:]]+\$[0-9]*(\.[0-9]+)?)?([[:space:]]*ctrl\+p([[:space:]]+commands)?)?$|^[^[:space:]]+([[:space:]]+tab[[:space:]]+agents[[:space:]]+ctrl\+p)?[[:space:]]+commands$|^tab[[:space:]]+agents[[:space:]]+ctrl\+p[[:space:]]+commands$|'"$FM_COMPOSER_OPENCODE_LIMIT_BANNER_RE_DEFAULT"
 # Pi's footer stats row opens at column 0 with the session cost when every
 # token counter is zero (`$0.000 (sub) 5.4%/272k (auto)` on pi 0.85.1).
 # That leading `$` is a cost cell, not a dead-shell prompt, only when a digit

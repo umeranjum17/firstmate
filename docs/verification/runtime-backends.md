@@ -2786,7 +2786,7 @@ PASS OpenCode 1.18.25: grouped hosted outage delivered automatically; second mat
 lab cleanup: 0
 ```
 
-The portable scan tests in `tests/fm-busy-adapter-wiring.test.sh` cover staggered, recovered, unreadable, wrapped-banner, and hung-verdict lanes; `tests/fm-busy-state.test.sh` retains generation and retirement coverage.
+The portable scan tests in `tests/fm-busy-adapter-wiring.test.sh` cover staggered, recovered, unreadable, wrapped-banner, hung-verdict, and mid-turn usage-limit-banner lanes; `tests/fm-busy-state.test.sh` retains generation and retirement coverage.
 This qualification covers OpenCode error observation on Herdr, not new error signatures for other harnesses or fresh live qualification of other backends.
 Other harnesses retain their existing stale and blocked-worker supervision.
 The bounded scan behavior belongs to `bin/fm-model-outage-lib.sh`; this record does not own another recovery mechanism.
