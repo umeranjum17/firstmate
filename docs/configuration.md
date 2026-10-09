@@ -601,7 +601,7 @@ The flag is a home-local supervision-noise preference and is not inherited by se
 ## Waiting-state escalation
 
 Every watch poll checks recorded workers and leads for open `blocked` or `needs-decision` declarations and declared `paused` waits, independently of pane activity and the existing stale/wedge heuristics.
-Herdr's bounded `agent list` read admits `agent_status=blocked` except for Cursor, whose native blocked status is unreliable; admitted native evidence takes precedence for each recorded pane, even while its status log says working.
+Herdr's bounded `agent list` read admits `agent_status=blocked` except for Cursor, whose declarations stay on the status-log path; admitted native evidence takes precedence for each recorded pane, even while its status log says working.
 Polling and native push escalation share this admission rule; Cursor declarations remain monitored.
 The mandatory `agent list` lookup uses the portable timeout runner, including on hosts without coreutils, with a positive `FM_BACKEND_HERDR_READ_TIMEOUT` deadline (default 10 seconds).
 A failed or malformed native read for one Herdr session prints one diagnostic line, marks that session's lanes unknown for that poll, and keeps their episodes untouched; every other lane is still monitored and the watcher keeps running.
@@ -612,13 +612,13 @@ A failed or malformed native read for one Herdr session prints one diagnostic li
 | `FM_WAIT_ESCALATE_SECS` | `900` | Owner alert threshold plus the response interval: a lead's overdue wait escalates to its parent, and a Main-owned wait gets one escalation wake to Main, both `FM_WAIT_ESCALATE_SECS - FM_WAIT_ALERT_SECS` seconds after successful owner wake output. |
 
 Both values must be positive decimal seconds of at most nine digits, with escalation later than the owner alert; invalid settings stop the check.
-The durable episode starts at first observation, survives watcher restarts, and re-arms when the effective declaration or endpoint changes or clears.
+The durable episode under `state/.waiting-timers/` starts at first observation, survives watcher restarts, and re-arms when the effective declaration or endpoint changes or clears.
 Pane output and unrelated status events cannot reset an open blocker or decision.
 An episode ends only after two consecutive polls without that declaration, so a blocked/working flicker keeps the original observation time.
 An immediate native push wake for an admitted blocked pane counts as that episode's owner wake, so the timer raises no second owner recheck; parent escalation still follows the normal lead-response interval.
 The independent timer excludes a paused wait while its declared `until` time is in the future; observation starts when the wait is first seen due, and it raises one owner recheck per episode, never a parent escalation.
 The separate stale/wedge recheck cadence is unchanged.
-An active captain hold on the task suppresses the timer's owner alert and escalation, including native blocked transitions, in every posture; the timer reads the hold only when an alert or escalation is due. The stale/wedge path keeps its existing bounds.
+An active captain hold on the task suppresses the timer's owner alert and escalation, including native blocked transitions, in every posture; the timer checks the hold for each lane with a current declaration before arming an episode, so a held lane never arms one. The stale/wedge path keeps its existing bounds.
 Each alert names the item, observed wait duration, and the supervisor who must act.
 Local and remote secondmate routes use the existing parent channel; the escalation is automatically resolved when the episode ends.
 Main has no parent, so a Main-owned overdue wait raises one escalation wake to Main itself, never a captain page; Main seeks a human only when it cannot unblock the item itself.
