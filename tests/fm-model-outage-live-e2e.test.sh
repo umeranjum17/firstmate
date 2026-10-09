@@ -59,7 +59,7 @@ cp "$ROOT/.opencode/plugins/fm-primary-watch-arm.js" "$FM_HOME/.opencode/plugins
 cp "$ROOT/.opencode/plugins/lib/fm-operational-input.js" "$FM_HOME/.opencode/plugins/lib/"
 printf '{"type":"module"}\n' > "$FM_HOME/.opencode/plugins/package.json"
 printf 'manual\n' > "$FM_HOME/config/backlog-backend"
-touch "$FM_HOME/.fm-secondmate-home"
+printf 'lead\n' > "$FM_HOME/.fm-secondmate-home"
 printf '# Isolated verification agent\nNo real fleet work. Only after an actual WATCHER FIRED message: run bin/fm-wake-drain.sh | tee -a data/drain.txt, execute its printed WAKE_ACK_REQUIRED command, then cp state/.wake-queue.seq state/lead-handled. Never manually arm monitoring. Reply briefly.\n' > "$FM_HOME/AGENTS.md"
 git -C "$FM_HOME" init -q
 for id in lanea laneb; do
