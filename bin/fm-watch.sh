@@ -3027,6 +3027,7 @@ resurface_after_downtime() {
   # The independent sampler can publish after the earlier queue scan, while
   # arm-check is deciding recovery. Preserve that queued alert's richer reason.
   host_memory_surface_queued
+  fm_wake_append check rearm-resurface "check: rearm-resurface" || exit 1
   wake "check: rearm-resurface"
 }
 
@@ -3168,6 +3169,47 @@ EOF
   fi
 }
 
+# Delivery steps that follow the signal scan. A quiet cycle runs them normally.
+# A cycle whose signal wake is about to exit runs them with FM_WAKE_DEFERRED=1:
+# each step still appends its durable queue row, and the signal wake delivers
+# those rows, so no step can pre-empt the signal wake.
+run_delivery_steps() {
+  fm_wait_timers_tick || {
+    echo "watcher: waiting-state timer check failed" >&2
+    exit 1
+  }
+
+  host_memory_surface_queued
+
+  # Process-to-event liveness repair. This never discovers a result by polling:
+  # each registered source has its own child blocking on that source, and this
+  # only republishes results already captured durably and restarts a source
+  # whose owner is gone. It is a no-op with nothing registered.
+  if [ -d "$STATE/procevent" ]; then
+    FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-procevent.sh" reconcile >/dev/null 2>&1 || true
+  fi
+  # Then deliver any queued-but-unsurfaced result, including one a runner
+  # published while this watcher was between cycles.
+  procevent_surface_queued
+
+  # A process-event result carries richer adapter-owned wake context than the
+  # generic recovery reason, so give that owner first refusal.
+  resurface_after_downtime
+
+  # The existing poll loop also owns the bounded inactive-outcome cadence.
+  # This is mechanical and silent unless a durable terminal-outcome obligation
+  # was created, so quiet cycles never wake firstmate or consume model tokens.
+  inactive_out=
+  if inactive_out=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+    "$SCRIPT_DIR/fm-inactive-reconcile.sh" scan 2>/dev/null); then
+    if [ -n "$inactive_out" ]; then
+      wake "check: inactive-outcome"
+    fi
+  else
+    triage_log "inactive-outcome reconciliation unavailable"
+  fi
+}
+
 while :; do
   # Home-gone exit: a deleted home, state directory, or code root means this
   # watcher's world is gone (a torn-down temporary home or a discarded
@@ -3250,18 +3292,15 @@ while :; do
     exit 1
   }
 
-  # Signals are scanned FIRST, before the wait-timer and inactive-outcome steps:
-  # wake() exits the cycle, so any earlier waking step starves the handoff path -
-  # wait-timer and check alerts once delayed done handoffs to Main by 50-72
-  # minutes (retro 2026-10-09, section 3.4). Deferring the wait-timer and
-  # inactive-outcome steps loses nothing: their alerts are durably queued by
-  # fm_wake_append and the steps themselves are time-based, so the next cycle
-  # without a signal delivers them. Due checks are the exception that runs
-  # ahead of a signal wake (run_due_checks, called before the signal's wake):
-  # their results queue in that same wake, so a constant signal stream cannot
-  # starve them. The secondmate repair ticks above stay ahead of signals
-  # because they only wake to relaunch a dead endpoint or unstick a foreign
-  # queue, never for noise.
+  # Signals are scanned FIRST, before the delivery steps: wake() exits the cycle,
+  # so any earlier waking step starves the handoff path - wait-timer and check
+  # alerts once delayed done handoffs to Main by 50-72 minutes (retro
+  # 2026-10-09, section 3.4). A cycle that wakes on a signal still runs the
+  # delivery steps (run_delivery_steps) and any due check (run_due_checks)
+  # first, so their results queue in that same wake and a constant signal
+  # stream cannot starve them. The secondmate repair ticks above stay ahead of
+  # signals because they only wake to relaunch a dead endpoint or unstick a
+  # foreign queue, never for noise.
   # On the first changed signal, linger one grace period and re-scan before
   # classifying: a crewmate's final status write and the same turn's turn-end
   # hook land seconds apart, and reporting them as separate actionable wakes
@@ -3358,6 +3397,9 @@ EOF
       done <<EOF
 $FM_SIGNAL_SURFACE_ENDPOINTS
 EOF
+      FM_WAKE_DEFERRED=1
+      run_delivery_steps
+      FM_WAKE_DEFERRED=0
       run_due_checks
       wake "$reason"
     else
@@ -3388,40 +3430,7 @@ EOF
     fi
   fi
 
-  fm_wait_timers_tick || {
-    echo "watcher: waiting-state timer check failed" >&2
-    exit 1
-  }
-
-  host_memory_surface_queued
-
-  # Process-to-event liveness repair. This never discovers a result by polling:
-  # each registered source has its own child blocking on that source, and this
-  # only republishes results already captured durably and restarts a source
-  # whose owner is gone. It is a no-op with nothing registered.
-  if [ -d "$STATE/procevent" ]; then
-    FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-procevent.sh" reconcile >/dev/null 2>&1 || true
-  fi
-  # Then deliver any queued-but-unsurfaced result, including one a runner
-  # published while this watcher was between cycles.
-  procevent_surface_queued
-
-  # A process-event result carries richer adapter-owned wake context than the
-  # generic recovery reason, so give that owner first refusal.
-  resurface_after_downtime
-
-  # The existing poll loop also owns the bounded inactive-outcome cadence.
-  # This is mechanical and silent unless a durable terminal-outcome obligation
-  # was created, so quiet cycles never wake firstmate or consume model tokens.
-  inactive_out=
-  if inactive_out=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
-    "$SCRIPT_DIR/fm-inactive-reconcile.sh" scan 2>/dev/null); then
-    if [ -n "$inactive_out" ]; then
-      wake "check: inactive-outcome"
-    fi
-  else
-    triage_log "inactive-outcome reconciliation unavailable"
-  fi
+  run_delivery_steps
 
   run_due_checks
   # Layer 1 backbone: pane staleness. Two consecutive identical hashes with no busy

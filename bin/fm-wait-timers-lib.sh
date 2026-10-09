@@ -65,16 +65,25 @@ fm_wait_timer_push_delivered() {  # <task> <window>
   fm_wait_timer_save "$record" "$signature" "$now" "$now" 0 "waiting-timer-$1-$now-$$-$RANDOM" 0
 }
 
+_fm_wait_seconds_valid() {
+  case "$1" in ''|*[!0-9]*|0*) return 1 ;; esac
+  [ "${#1}" -le 9 ]
+}
+
 fm_wait_timers_tick() {
   local alert=${FM_WAIT_ALERT_SECS:-300} escalate=${FM_WAIT_ESCALATE_SECS:-900}
   local paused_alert=${FM_PAUSE_RESURFACE_SECS:-$FM_PAUSE_RESURFACE_SECS_DEFAULT}
   local meta task backend window session native sessions='|' blocked='|' unknown='|' rows actor=Main
   local dir="$STATE/.waiting-timers" now record declaration verb signature old since owner parent key misses age reason until bound rc
   local pause_key threshold
-  for native in "$alert" "$escalate" "$paused_alert"; do
+  for native in "$alert" "$escalate"; do
     case "$native" in ''|*[!0-9]*|0* ) echo "waiting timers: thresholds must be positive decimal seconds" >&2; return 1 ;; esac
     [ "${#native}" -le 9 ] || { echo "waiting timers: threshold exceeds nine digits" >&2; return 1; }
   done
+  _fm_wait_seconds_valid "$paused_alert" || {
+    echo "waiting timers: FM_PAUSE_RESURFACE_SECS must be positive decimal seconds of at most nine digits; using $FM_PAUSE_RESURFACE_SECS_DEFAULT" >&2
+    paused_alert=$FM_PAUSE_RESURFACE_SECS_DEFAULT
+  }
   [ "$escalate" -gt "$alert" ] || { echo "waiting timers: escalation must be later than owner alert" >&2; return 1; }
   now=$(date +%s) || return 1
   [ ! -e "$FM_HOME/.fm-secondmate-home" ] || actor='owning lead'

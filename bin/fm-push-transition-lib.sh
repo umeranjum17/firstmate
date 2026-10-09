@@ -104,8 +104,17 @@ triage_log() {
 }
 
 # Exit after reporting one actionable wake. Tests override this callback.
+# A deferred wake (FM_WAKE_DEFERRED=1) belongs to a row already appended to the
+# durable queue, which the signal wake that ends this cycle delivers, so it only
+# marks that row delivered and returns instead of exiting.
 wake() {
-  local output_status=0
+  local output_status=0 deferred_action
+  if [ "${FM_WAKE_DEFERRED:-0}" = 1 ]; then
+    deferred_action=$FM_WAKE_POST_OUTPUT_ACTION
+    FM_WAKE_POST_OUTPUT_ACTION=
+    [ -z "$deferred_action" ] || "$deferred_action" 0 || true
+    return 0
+  fi
   case "$1" in
     heartbeat*) echo $(( $(cat "$STATE/.heartbeat-streak" 2>/dev/null || echo 0) + 1 )) > "$STATE/.heartbeat-streak" ;;
     *) echo 0 > "$STATE/.heartbeat-streak" ;;
