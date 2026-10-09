@@ -219,8 +219,7 @@ EOF
     [ "$declaration" != herdr-blocked ] || verb=herdr-blocked
     # A declared pause is an expected wait, so its owner recheck rides the
     # FM_PAUSE_RESURFACE_SECS cadence (the same bound the stale path uses),
-    # not the blocked/decision owner-alert threshold that produced the false
-    # lead alerts of the 2026-10-09 retro, section 3.4.
+    # never the blocked/decision owner-alert threshold.
     threshold=$alert
     status_is_paused "$declaration" && threshold=$paused_alert
     if [ "$age" -ge "$threshold" ] && [ "$owner" -eq 0 ]; then

@@ -3255,14 +3255,12 @@ while :; do
 
   # Signals are scanned FIRST, before the wait-timer, procevent, downtime-resurface
   # and inactive-outcome steps: wake() exits the cycle, so an earlier waking step
-  # starves the handoff path - wait-timer and check alerts once delayed done
-  # handoffs to Main by 50-72 minutes (retro 2026-10-09, section 3.4). Those four
-  # steps wait for the next signal-free cycle, which the retro accepts; their
-  # alerts stay durably queued until then. A due check runs ahead of a signal wake
-  # (run_due_checks) so its result queues in that same wake and a constant signal
-  # stream cannot starve it. The secondmate repair ticks above stay ahead of
-  # signals because they only wake to relaunch a dead endpoint or unstick a
-  # foreign queue, never for noise.
+  # would starve the handoff path. Those four steps run only on a cycle that does
+  # not end on a signal wake; their state is durable, so they resume on the next
+  # signal-free cycle. A due check runs ahead of a signal wake (run_due_checks) so
+  # its result queues in that same wake and a constant signal stream cannot starve
+  # it. The secondmate repair ticks above stay ahead of signals because they only
+  # wake to relaunch a dead endpoint or unstick a foreign queue, never for noise.
   # On the first changed signal, linger one grace period and re-scan before
   # classifying: a crewmate's final status write and the same turn's turn-end
   # hook land seconds apart, and reporting them as separate actionable wakes
