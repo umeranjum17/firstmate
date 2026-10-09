@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Model-error observation, called by fm-watch.sh before stale suppression.
-# Native OpenCode errors bind to busy-gen and clear on a successful turn.
+# Native OpenCode errors bind to busy-gen and clear when the next turn starts.
 # Legacy OpenCode lanes use explicit provider banners in the visible viewport,
 # never scrollback or worker-printed "Error:" lines. Unchanged error observations
 # alert at the next scan even if retrying. Unknown/dead endpoints are not
@@ -11,7 +11,7 @@
 # poll, so a slow endpoint can delay them. Mid-turn OpenCode lanes skip the
 # visible-capture read; their native observation stands.
 # Each normalized error is one durable episode; a lane joining an alerted episode
-# sends one updated grouped wake naming the union of its lanes.
+# sends one updated grouped wake naming the lanes failing in that scan.
 # The wake queue owns delivery; restart does not repeat an already queued alert.
 # No settings/model changes or recovery. The existing blocked/wait escalation
 # owns subsequent attention. Each scan reads only this home's recorded lanes.
@@ -21,14 +21,14 @@ _FM_MODEL_ERROR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$_FM_MODEL_ERROR_DIR/fm-timeout-lib.sh"
 
 fm_model_outage_tick() {
-  local meta id backend target harness gen error hash old verdict rows file groups native mid
-  local dir="$STATE/.model-outages" now batch uncertain=0 last union
+  local meta id backend target harness gen error hash old verdict rows file groups native mid line match
+  local dir="$STATE/.model-outages" now batch uncertain=0 last current
   now=$(date +%s) || return 1
   # The singleton watcher owns these records; never start a second monitor.
   [ ! -L "$dir" ] || return 1
   (umask 077; mkdir -p "$dir") || return 1
   last=$(cat "$dir/.scan-at" 2>/dev/null) || last=0
-  [ $((now - last)) -ge 60 ] || return 0
+  [ $((now - last)) -ge 60 ] || [ $((now - last)) -lt 0 ] || return 0
   printf '%s\n' "$now" > "$dir/.scan-at" || return 1
   batch=$(mktemp -d "$dir/.scan.XXXXXX") || return 1
   for meta in "$STATE"/*.meta; do
@@ -59,8 +59,13 @@ fm_model_outage_tick() {
       # shellcheck disable=SC2016 # The child expands its own positional arguments.
       rows=$(fm_run_timed 3 bash -c '. "$1/fm-backend.sh"; fm_backend_visible_capture "$2" "$3"' \
         model-error "$_FM_MODEL_ERROR_DIR" "$backend" "$target") || { uncertain=1; continue; }
-      # Only explicit provider/harness banners, never worker-printed output.
-      error=$(printf '%s\n' "$rows" | grep -Ei '^[[:space:]│┃]*(Upstream request failed|Model .+ is not supported|rate.?limit exceeded|insufficient quota|authentication failed)' | tail -1)
+      # Only explicit provider/harness banners, never worker-printed output; a
+      # wrapped banner keeps up to two continuation lines.
+      match=$(printf '%s\n' "$rows" | grep -Ein '^[[:space:]│┃]*(Upstream request failed|Model .+ is not supported|rate.?limit exceeded|insufficient quota|authentication failed)' | tail -1)
+      if [ -n "$match" ]; then
+        line=${match%%:*}
+        error=$(printf '%s\n' "$rows" | sed -n "${line},$((line + 2))p")
+      fi
     fi
     error=$(printf '%s' "$error" | LC_ALL=C tr -c '[:print:]' ' ' | awk '{$1=$1; print}' | cut -c1-1000)
     if [ -z "$error" ]; then rm -f "$dir/lane-$id"; continue; fi
@@ -90,12 +95,13 @@ fm_model_outage_tick() {
     if [ -f "$dir/alert-$hash" ]; then
       grep -qvxFf "$dir/alert-$hash" "$batch/$hash.lanes" || continue
     fi
-    union=$(cat "$dir/alert-$hash" "$batch/$hash.lanes" 2>/dev/null | sort -u)
-    rows=$(printf '%s\n' "$union" | paste -sd ',' -)
+    # The wake names only lanes failing in this scan; a recovered lane drops out.
+    current=$(sort -u "$batch/$hash.lanes")
+    rows=$(printf '%s\n' "$current" | paste -sd ',' -)
     error=$(cat "$batch/$hash.error")
     verdict="check: model outage affected=[$rows]: $error"
     fm_wake_append check "model-outage-$hash" "$verdict" || { rm -rf "$batch"; return 1; }
-    printf '%s\n' "$union" > "$dir/alert-$hash" || return 1
+    printf '%s\n' "$current" > "$dir/alert-$hash" || return 1
     groups="${groups}${verdict}"$'\n'
   done
   rm -rf "$batch"

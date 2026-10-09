@@ -21,12 +21,13 @@ export function modelErrorObserver(state, id, gen) {
     if (event.type === "session.status" && p.status?.type === "busy" && session === null) {
       session = p.sessionID;
       failed = false;
+      save("");
     }
     if (p.sessionID !== session || session === null) return;
-    if (event.type === "session.error" || (event.type === "session.status" && p.status?.type === "retry")) {
-      const error = p.error?.data?.message || p.error?.message || p.status?.message || p.error?.name;
+    if (event.type === "session.error") {
+      const error = p.error?.data?.message || p.error?.message || p.error?.name;
       if (error) {
-        if (event.type === "session.error") failed = true;
+        failed = true;
         save(String(error).slice(0, 1000));
       }
     }
