@@ -66,7 +66,10 @@
 #                the idle placeholders) - none of which is ever typed input.
 #   left-bar   - opencode: rows prefixed by a heavy left bar `┃` with no
 #                closing border, holding the idle hint, blank rows, and a
-#                mode/model footer line.
+#                mode/model footer line, closed by the half-block `╹▀▀▀` floor
+#                with OpenCode's own status area drawn directly below it
+#                (FM_COMPOSER_OPENCODE_STATUS_RE_DEFAULT bounds the staleness
+#                probe past that furniture).
 #   separated  - pi: content rows between two solid horizontal `─` rules, no
 #                glyph and no side border. Provable only with a live agent
 #                identity reporting an idle/done pi (herdr `agent
@@ -519,6 +522,23 @@ FM_COMPOSER_MODE_HINT_RE_DEFAULT='^[[:space:]]*(⏵|⏸)'
 # a middle dot. It is consulted only as the boundary BELOW a bare composer,
 # never on the composer row itself.
 FM_COMPOSER_OMP_STATUS_RE_DEFAULT='^[[:space:]]*(π|󰵗)[[:space:]]+·[[:space:]]|^[[:space:]]*'"$FM_OMP_SPINNER_FRAMES_RE"'[[:space:]]+[0-9]+[smh]([[:space:]]|$)|[[:space:]]·[[:space:]].*[0-9]+(\.[0-9]+)?%/[0-9]+K'
+# OpenCode 1.18.x draws a status area directly BELOW its left-bar composer's
+# half-block floor (captured live 2026-10-09 on DeepSeek V4.1 Flash panes
+# through Herdr's ANSI capture). An idle pane shows a path/context/cost row
+# whose tail is `<n>K (<p>%) · $<cost>ctrl+p`, then a session row whose tail is
+# the `commands` hint; a rate-limited pane shows the usage-limit banner, whose
+# head row opens with alternating U+25A0/U+2B1D square glyphs (`■5⬝hour⬝usage
+# limit reached. It will reset in ...`, truncated at the pane width) and whose
+# tail row carries `(click to expand) [retrying in 1h 8m attempt #1]` wrapped
+# at the pane width - both `usin... (click to expand)` and `click to expand)`
+# first-row truncations were observed. These rows are furniture, never typed
+# input: typed text can only land in the left-bar run ABOVE the floor, so the
+# cursorless staleness probe resumes past them below a proven floor. The
+# patterns stay deliberately narrow - a busy status row (`esc interrupt`) and
+# any unclaimed activity fail them, keep the envelope stale, and read
+# `unknown`, the refusing direction. The square glyphs are an alternation,
+# never a bracket range, for the reason FM_OMP_SPINNER_FRAMES_RE records.
+FM_COMPOSER_OPENCODE_STATUS_RE_DEFAULT='^[[:space:]]*/.*[0-9]+(\.[0-9]+)?K[[:space:]]+\([0-9]+%\)[[:space:]]+·[[:space:]]+\$[0-9]+(\.[0-9]+)?ctrl\+p$|^[^[:space:]].*[[:space:]][[:space:]]+commands$|^[[:space:]]*(■|⬝)[0-9]+(■|⬝)hour(■|⬝)usage limit reached|^[[:space:]]*(usin\.\.\.[[:space:]]+)?\(?click to expand\)[[:space:]]+\[retrying in [0-9]+[hms]([[:space:]]+[0-9]+[hms])*[[:space:]]+attempt #[0-9]+\]$'
 # Pi's footer stats row opens at column 0 with the session cost when every
 # token counter is zero (`$0.000 (sub) 5.4%/272k (auto)` on pi 0.85.1).
 # That leading `$` is a cost cell, not a dead-shell prompt, only when a digit
@@ -1306,6 +1326,14 @@ _fm_composer_row_is_omp_status() {  # <trimmed-row>
   fm_composer_idle_matches "$1" "${FM_COMPOSER_OMP_STATUS_RE:-$FM_COMPOSER_OMP_STATUS_RE_DEFAULT}" sensitive
 }
 
+# _fm_composer_row_is_opencode_status: 0 when the trimmed row is one of
+# OpenCode's below-floor status rows (FM_COMPOSER_OPENCODE_STATUS_RE_DEFAULT
+# above) - composer furniture the left-bar envelope's staleness probe resumes
+# past, the way omp's status row bounds a bare composer's wrap region.
+_fm_composer_row_is_opencode_status() {  # <trimmed-row>
+  fm_composer_idle_matches "$1" "${FM_COMPOSER_OPENCODE_STATUS_RE:-$FM_COMPOSER_OPENCODE_STATUS_RE_DEFAULT}" sensitive
+}
+
 # _fm_composer_row_is_pi_status: 0 when the trimmed row is Pi's dollar-first
 # footer stats row (FM_COMPOSER_PI_STATUS_RE_DEFAULT above). Furniture below
 # the separated pair; a `$` cost cell must not count as a dead-shell prompt.
@@ -1710,6 +1738,21 @@ _fm_composer_select_cursorless() {
       fm_composer_normalize_trim_var trimmed
       if _fm_composer_leftbar_floor_row "$trimmed"; then
         boundary=$next
+        # OpenCode's own status area sits directly below the floor
+        # (FM_COMPOSER_OPENCODE_STATUS_RE_DEFAULT): those rows are furniture,
+        # so the staleness probe resumes past them instead of reading the
+        # composer stale. One unrecognized or blank row ends the walk, and the
+        # probe then judges exactly that row: unclaimed activity below the
+        # floor still refuses, keeping the asymmetry toward `unknown`.
+        while :; do
+          next=$((boundary + 1))
+          raw=$(_fm_composer_screen_row "$next" "$plain")
+          trimmed=$raw
+          fm_composer_normalize_trim_var trimmed
+          [ -n "$trimmed" ] || break
+          _fm_composer_row_is_opencode_status "$trimmed" || break
+          boundary=$next
+        done
       fi
     fi
     # The same footer zone, read from the other side: rows this envelope's own

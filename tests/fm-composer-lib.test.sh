@@ -916,6 +916,32 @@ test_matrix_opencode_leftbar_signals() {
   assert_screen "opencode placeholder-like input on plain backends" unknown "$CAPS_PLAIN" "$typed"
   typed=$'┃  refactor the parser please\n┃\n┃  Build · GPT-5.5 Fast OpenAI · high'
   assert_screen "opencode multiline draft above blank cursor row" pending "$CAPS_TMUX" "$typed" 1
+  # Live 2026-10-09 idle shapes (opencode 1.18.x, DeepSeek V4.1 Flash, Herdr
+  # ANSI captures): the left-bar run is three blank rows plus the Build
+  # footer, and directly below the ╹▀▀▀ floor OpenCode draws its own status
+  # area - the path/context/cost row ending in the ctrl+p hint plus the
+  # session row ending in `commands`, or the usage-limit retry banner in both
+  # wrap variants. The staleness probe used to read that furniture as
+  # unclaimed activity and refuse every such pane `unknown`, so fm-control
+  # could neither relaunch nor exit a stuck OpenCode worker.
+  local floor status_screen retry_screen retry_tail typed_status
+  floor='  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀  '
+  status_screen=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/umer/.treehouse/firstmate-cff959/3/71.6K (27%) · $0ctrl+p\n   firstmate                                                commands'
+  assert_screen "opencode 1.18.x idle status rows below the floor on herdr" empty "$CAPS_STYLED" "$status_screen"
+  assert_screen "opencode 1.18.x idle status rows below the floor on zellij" empty "$CAPS_STYLED_NOID" "$status_screen"
+  assert_screen "opencode 1.18.x idle status rows below the floor on cmux/orca" empty "$CAPS_PLAIN" "$status_screen"
+  retry_screen=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   ■5⬝hour⬝usage limit reached. It will reset in 1 hour 38 minutes. To cont\n    usin... (click to expand) [retrying in 1h 8m attempt #1]'
+  assert_screen "opencode 1.18.x usage-limit retry banner below the floor on herdr" empty "$CAPS_STYLED" "$retry_screen"
+  assert_screen "opencode 1.18.x usage-limit retry banner below the floor on zellij" empty "$CAPS_STYLED_NOID" "$retry_screen"
+  assert_screen "opencode 1.18.x usage-limit retry banner below the floor on cmux/orca" empty "$CAPS_PLAIN" "$retry_screen"
+  retry_tail=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   ⬝5■hour■usage limit reached. It will reset in 1 hour 3 minutes. To continue us\n    click to expand) [retrying in 58m 58s attempt #1]'
+  assert_screen "opencode 1.18.x retry banner wrapped without its opening paren on herdr" empty "$CAPS_STYLED" "$retry_tail"
+  # Typed text must survive the same furniture: the verdict comes from the
+  # left-bar run above the floor, never from the status area below it.
+  typed_status=$'  ┃\n  ┃  Reply with OK.\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/umer/.treehouse/firstmate-cff959/3/71.6K (27%) · $0ctrl+p\n   firstmate                                                commands'
+  assert_screen "opencode typed draft above live status rows on herdr" pending "$CAPS_STYLED" "$typed_status"
+  assert_screen "opencode typed draft above live status rows on zellij" pending "$CAPS_STYLED_NOID" "$typed_status"
+  assert_screen "opencode typed draft above live status rows on plain backends" unknown "$CAPS_PLAIN" "$typed_status"
   pass "matrix: opencode's left-bar composer reads empty everywhere and scans the full active run"
 }
 
