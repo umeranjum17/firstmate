@@ -733,6 +733,14 @@ Cursor is deliberately outside this cursor-anchored empty-composer matrix becaus
 
 `zellij action dump-screen --pane-id <id> --ansi` was verified at zellij 0.44.0 to preserve ANSI styling (real Claude Code rendered inside a zellij pane dumped `ESC[m` `❯` U+00A0 for its idle composer row), which is the capability the zellij composer classifier reads.
 
+### 2026-10-09 opencode 1.18.25 below-floor status area through Herdr
+
+Verified on 2026-10-09 on Linux against OpenCode 1.18.25 (model DeepSeek V4.1 Flash) running as Firstmate workers in Herdr 0.9.1 panes, read through `herdr pane read <pane> --source visible --format ansi` and classified with the shared screen classifier under Herdr's capability descriptor (`styled=1`, `cursor=0`, `identity=1`).
+OpenCode 1.18.x closes its left-bar composer with the half-block `╹▀▀▀` floor and draws its own status area directly below it: an idle pane shows a path/context/cost row ending `71.6K (27%) · $0ctrl+p` plus a session row ending `commands`, while a rate-limited pane shows the usage-limit banner (`■5⬝hour⬝usage limit reached. It will reset in ...`, then `usin... (click to expand) [retrying in 1h 8m attempt #1]` wrapped at the pane width, both truncation variants observed).
+None of those rows carries a structural edge, so the cursorless staleness probe read the furniture as unclaimed activity, refused the selection `stale-envelope`, and answered `unknown` on every live OpenCode worker - which is why `fm-control relaunch` and `exit` refused every stuck OpenCode worker with `composer state is 'unknown', not proven empty` (captured live on eleven fleet panes; the rate-limit banner on ten, the status rows on one).
+The classifier now declares those rows once (`FM_COMPOSER_OPENCODE_STATUS_RE_DEFAULT` in `bin/fm-composer-lib.sh`) and resumes the staleness probe past them below a proven floor; the resume is bounded by recognition, not by the floor alone, so `Working on request...` directly below the floor still refuses and a busy status row (`esc interrupt`) stays outside the pattern set in the refusing direction.
+After the change the same commands read `empty` on all four captured panes, while a typed draft above the same status area reads `pending` on styled captures and `unknown` on plain ones; `tests/fm-composer-lib.test.sh`'s opencode matrix carries both live screens, the second banner wrap variant, and that typed-text counterweight.
+
 ### 2026-09-20 claude 2.1.236 statusLine footer through Herdr
 
 Verified on 2026-09-20 on macOS arm64 (Darwin 25.6.0) against Claude Code 2.1.236 running as Firstmate workers in Herdr 0.8.0 panes, read through Herdr's ANSI capture with its exact capability descriptor (`styled=1`, `cursor=0`, `identity=1`, `rows=20`).
@@ -772,7 +780,7 @@ It therefore counts a footer zone only when every row in it is demonstrably furn
 A run containing unclaimed activity (`Working on request...`, `→ ran npm test (3 failures)`) is not furniture in either row order and keeps invalidating the envelope above it, and a row leading with the SAME glyph the envelope was proven by (`❯ my typed draft`) is a live composer that keeps winning, so a visible draft is never overwritten.
 `test_composer_footer_zone_refuses_rather_than_allows` pins both directions on the bordered-box and separator-pair shapes.
 
-Coverage is the bordered box and the separator pair, the two shapes claude 2.x renders. The opencode left bar is wired into the same rule but is **unexercised**: every left-bar row this repo records leads with plain text, and opencode's own prompt character is `>`, a shell glyph deliberately outside the agent set, so no opencode shape recorded here can prove a left-bar envelope or open a footer zone beneath one.
+Coverage is the bordered box and the separator pair, the two shapes claude 2.x renders. The opencode left bar is wired into the same rule but is **unexercised by this entry**, which captures no opencode pane; opencode's own prompt character is `>`, a shell glyph deliberately outside the agent set. The opencode left-bar floor and the status area beneath it are covered by the 2026-10-09 entry above.
 
 The live refresh for this entry is the cursorless arm added to the composer-matrix guard, which re-reads each harness's already-proven-idle pane the way every non-tmux backend reads it and fails naming the harness and version when that read is `pending`:
 

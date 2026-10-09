@@ -916,6 +916,63 @@ test_matrix_opencode_leftbar_signals() {
   assert_screen "opencode placeholder-like input on plain backends" unknown "$CAPS_PLAIN" "$typed"
   typed=$'┃  refactor the parser please\n┃\n┃  Build · GPT-5.5 Fast OpenAI · high'
   assert_screen "opencode multiline draft above blank cursor row" pending "$CAPS_TMUX" "$typed" 1
+  # Live 2026-10-09 idle shapes (opencode 1.18.x, DeepSeek V4.1 Flash, Herdr
+  # ANSI captures): the left-bar run is three blank rows plus the Build
+  # footer, and directly below the ╹▀▀▀ floor OpenCode draws its own status
+  # area - the path/context/cost row ending in the ctrl+p hint plus the
+  # session row ending in `commands`, or the usage-limit retry banner in both
+  # wrap variants. The staleness probe used to read that furniture as
+  # unclaimed activity and refuse every such pane `unknown`, so fm-control
+  # could neither relaunch nor exit a stuck OpenCode worker.
+  local floor status_screen retry_screen retry_tail typed_status
+  floor='  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀  '
+  status_screen=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/umer/.treehouse/firstmate-cff959/3/71.6K (27%) · $0ctrl+p\n   firstmate                                                commands'
+  assert_screen "opencode 1.18.x idle status rows below the floor on herdr" empty "$CAPS_STYLED" "$status_screen"
+  assert_screen "opencode 1.18.x idle status rows below the floor on zellij" empty "$CAPS_STYLED_NOID" "$status_screen"
+  assert_screen "opencode 1.18.x idle status rows below the floor on cmux/orca" empty "$CAPS_PLAIN" "$status_screen"
+  # OpenCode 1.18.35 draws its session row with a single space before the
+  # `commands` hint (`tab agents ctrl+p commands`), not the two-space gap the
+  # 1.18.x rows above show, so the same below-floor furniture reads empty.
+  local bare_status_screen
+  bare_status_screen=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/umer/.treehouse/firstmate-cff959/3/71.6K (27%) · $0ctrl+p\n   firstmate                                    tab agents ctrl+p commands'
+  assert_screen "opencode 1.18.35 idle status rows below the floor on herdr" empty "$CAPS_STYLED" "$bare_status_screen"
+  assert_screen "opencode 1.18.35 idle status rows below the floor on cmux/orca" empty "$CAPS_PLAIN" "$bare_status_screen"
+  local busy_status_screen
+  busy_status_screen=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   ⬝⬝⬝⬝ esc interrupt\n   firstmate                                    tab agents ctrl+p commands'
+  assert_screen "opencode busy esc-interrupt row below the 1.18.35 floor stays unknown" unknown "$CAPS_STYLED" "$busy_status_screen"
+  # Live 1.18.35 mid-generation: the busy hint and the cost/ctrl+p cell share
+  # one row ending in `commands`, directly below the floor. It must refuse on
+  # every profile, not read as the session row.
+  local busy_merged_screen
+  busy_merged_screen=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   ⬝⬝⬝⬝⬝⬝⬝⬝ esc interrupt ... 22.9K (11%) ctrl+p commands'
+  assert_screen "opencode busy merged esc-interrupt commands row below the floor on herdr" unknown "$CAPS_STYLED" "$busy_merged_screen"
+  assert_screen "opencode busy merged esc-interrupt commands row below the floor on zellij" unknown "$CAPS_STYLED_NOID" "$busy_merged_screen"
+  assert_screen "opencode busy merged esc-interrupt commands row below the floor on cmux/orca" unknown "$CAPS_PLAIN" "$busy_merged_screen"
+  retry_screen=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   ■5⬝hour⬝usage limit reached. It will reset in 1 hour 38 minutes. To cont\n    usin... (click to expand) [retrying in 1h 8m attempt #1]'
+  assert_screen "opencode 1.18.x usage-limit retry banner below the floor on herdr" empty "$CAPS_STYLED" "$retry_screen"
+  assert_screen "opencode 1.18.x usage-limit retry banner below the floor on zellij" empty "$CAPS_STYLED_NOID" "$retry_screen"
+  assert_screen "opencode 1.18.x usage-limit retry banner below the floor on cmux/orca" empty "$CAPS_PLAIN" "$retry_screen"
+  retry_tail=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   ⬝5■hour■usage limit reached. It will reset in 1 hour 3 minutes. To continue us\n    click to expand) [retrying in 58m 58s attempt #1]'
+  assert_screen "opencode 1.18.x retry banner wrapped without its opening paren on herdr" empty "$CAPS_STYLED" "$retry_tail"
+  # Typed text must survive the same furniture: the verdict comes from the
+  # left-bar run above the floor, never from the status area below it.
+  typed_status=$'  ┃\n  ┃  Reply with OK.\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/umer/.treehouse/firstmate-cff959/3/71.6K (27%) · $0ctrl+p\n   firstmate                                                commands'
+  assert_screen "opencode typed draft above live status rows on herdr" pending "$CAPS_STYLED" "$typed_status"
+  assert_screen "opencode typed draft above live status rows on zellij" pending "$CAPS_STYLED_NOID" "$typed_status"
+  assert_screen "opencode typed draft above live status rows on plain backends" unknown "$CAPS_PLAIN" "$typed_status"
+  # Live 1.18.25 (captured 2026-10-09 under Herdr): the idle session draws one
+  # row, `<path>  <n>K (<p>%) · $<cost>  ctrl+p commands`, with a two-space gap
+  # before ctrl+p. The same cells on a generating pane sit behind `esc
+  # interrupt`, which must keep refusing. The home screen draws its own bare
+  # `tab agents  ctrl+p commands` row under the floor.
+  local v125_idle v125_busy home_status
+  v125_idle=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/umer/.no-mistakes/worktrees/bde6b4035eae/01M4FF56ACM65RSHMS9Y57MEZ2  36.9K (4%) · $0.01  ctrl+p commands'
+  assert_screen "opencode 1.18.25 idle session row below the floor on herdr" empty "$CAPS_STYLED" "$v125_idle"
+  assert_screen "opencode 1.18.25 idle session row below the floor on cmux/orca" empty "$CAPS_PLAIN" "$v125_idle"
+  v125_busy=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   ⬝⬝⬝⬝⬝⬝⬝⬝  esc interrupt                                                         36.9K (4%) · $0.01  ctrl+p commands'
+  assert_screen "opencode 1.18.25 busy esc-interrupt row below the floor stays unknown on herdr" unknown "$CAPS_STYLED" "$v125_busy"
+  home_status=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   tab agents  ctrl+p commands'
+  assert_screen "opencode home idle bare tab-agents row below the floor on herdr" empty "$CAPS_STYLED" "$home_status"
   pass "matrix: opencode's left-bar composer reads empty everywhere and scans the full active run"
 }
 
