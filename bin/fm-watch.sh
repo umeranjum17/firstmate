@@ -271,6 +271,8 @@ WATCH_HOME_EXISTED=0
 # and wake emission (secondmate_liveness_tick below).
 # shellcheck source=/dev/null # Analyzed separately as a canonical lint root.
 . "$SCRIPT_DIR/fm-secondmate-liveness-lib.sh"
+# shellcheck source=/dev/null # Canonical lint root with its own parent-channel graph.
+. "$SCRIPT_DIR/fm-wait-timers-lib.sh"
 
 WATCH_LOCK="$STATE/.watch.lock"
 WATCH_PATH="$SCRIPT_DIR/fm-watch.sh"
@@ -461,10 +463,6 @@ away_record_present() { fm_afk_contract_away_present "$STATE"; }
 # silently instead of rechecking it.
 captain_held_silenced() {  # <status-line>
   status_is_captain_held "$1" && away_record_present
-}
-
-hash_pane() {
-  if command -v md5 >/dev/null 2>&1; then md5 -q; else md5sum | cut -d' ' -f1; fi
 }
 
 # window_is_busy: 0 (busy) iff the task's harness is PROVABLY working, through
@@ -2033,17 +2031,6 @@ pause_state_class() {  # <window> <task>
 # it would put backlog reads into windows deliberately skipped on ordinary polls.
 STALE_WAIT_DECLARATION=
 
-CAPTAIN_CALL_IDENTITY=
-
-task_captain_call_open() {  # <task>
-  local task=$1
-  CAPTAIN_CALL_IDENTITY=
-  [ -n "$task" ] || return 1
-  CAPTAIN_CALL_IDENTITY=$(FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-captain-hold.sh" \
-    open "$task" --identity 2>/dev/null) || return 1
-  return 0
-}
-
 # The identity a re-surface throttle is bound to: the task's whole status-log
 # signature. Any new status event - a replacement wait, a fresh delivery, a
 # blocker - changes it and so starts its own window instead of inheriting the
@@ -3122,6 +3109,11 @@ while :; do
   # the parent without consuming or rewriting the receiving home's record.
   secondmate_wake_stall_tick || {
     echo "watcher: secondmate wake-loop observation failed" >&2
+    exit 1
+  }
+
+  fm_wait_timers_tick || {
+    echo "watcher: waiting-state timer check failed" >&2
     exit 1
   }
 
