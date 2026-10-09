@@ -30,8 +30,10 @@
 # Registered remote homes remain listed, with unavailable lanes/backlog/lifecycle
 # disclosed in limitations; remote paths are not read locally or probed over SSH.
 # Output fm-flow.v1: homes, lanes, queue, bottlenecks, capacity, executed_24h/7d,
-# time_to_merge (median, nearest-rank P85), and limitations. trend_7d is one UTC-day
-# bucket per day covering [NOW-7d, NOW] (first bucket partial); its counts sum to executed_7d.
+# time_to_merge (median, nearest-rank P85), and limitations. trend_7d and trend_7d_by_home are
+# one UTC-day bucket per day covering [NOW-7d, NOW] (first bucket partial); their counts sum to
+# executed_7d. Each lane's state_seconds sums recorded seconds per status state from the first
+# working stamp, closing the trailing state at merge when merged is recorded; unrecorded stages are absent.
 # capacity is null unless --capacity is requested; FM_MAC_HOST alone runs no probe.
 # Times are seconds. null means unknown, including unstamped status lines.
 # Pickup and cleanup use ledger events, NOT file birth/mtime or spawn_gen

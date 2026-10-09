@@ -12,7 +12,8 @@
 # lanes by stage against its plan); Needs you
 # (the ask list); Ship (ship/: the selected home's ship at night with each lane a worker at its
 # stage's deck station, dressed by model, and a sheet with fleet-wide key numbers and stuck or
-# parked work); Insights (the shipped fm-flow.sh reader's lifecycle, waits, queue, retained merge outcomes and optional read-only capacity observations); a command palette and keys (?).
+# parked work); Insights (the shipped fm-flow.sh reader's lifecycle, waits, queue, retained merge
+# outcomes and optional read-only capacity observations); a command palette and keys (?).
 # In Ship, tap a worker or its tag to open its card's detail; a station or its plate opens
 # a worker in that stage, prioritizing stuck work and then recorded age, oldest first (empty stations do nothing).
 # Stuck and parked sheet rows also open their cards, by click or focused Enter/Space.
@@ -33,8 +34,11 @@
 # with a sticky switcher that jumps to any column, and a dock.
 # Each build writes the app's one data file, state/dashboard/board.json: homes with their
 # lane plans, one card per open lane, ready backlog item and pull request landed today,
-# and parked home ids. Cards carry the current stage inferred from status lines (which
-# can move backwards), wait, metadata model or ledger dispatch model, and up to 40 recent
+# and parked home ids. Its flow key is the fm-flow.v1 Insights observation, or flow_error when
+# that reader is unavailable or unreadable; a recursive scrub removes raw reason, source,
+# gate_source and errors keys before the write.
+# Cards carry the current stage inferred from status lines (which can move backwards), wait,
+# metadata model or ledger dispatch model, and up to 40 recent
 # activity lines. Recorded merges replace matching live cards using the canonical request
 # URL; supported requests are GitHub PRs, GitLab merge requests and Gerrit changes.
 # The payload includes the ask list (the only source of "needs you": a lane's own decision
