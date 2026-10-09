@@ -486,7 +486,8 @@ run_outage_fixture() {
   cp "$ROOT/bin/fm-model-outage-lib.sh" "$ROOT/bin/fm-timeout-lib.sh" "$bin/"
   cat > "$bin/fm-backend.sh" <<'EOF'
 fm_backend_agent_state() { cat "$FAKE_LIVENESS/$4" 2>/dev/null || printf alive; }
-fm_backend_visible_capture_supported() { return 1; }
+fm_backend_visible_capture_supported() { return 0; }
+fm_backend_visible_capture() { local t=${2#fake:}; cat "$FAKE_LIVENESS/capture-${t%.meta}" 2>/dev/null; }
 EOF
   cat > "$bin/fm-busy-lib.sh" <<'EOF'
 fm_busy_classify_semantic() {
@@ -501,6 +502,7 @@ EOF
     # shellcheck source=/dev/null
     . "$bin/fm-model-outage-lib.sh"
     fm_meta_get() { printf opencode; }
+    fm_backend_visible_capture_supported() { return 0; }
     fm_backend_target_of_meta() { printf 'fake:%s' "${1##*/}"; }
     fm_backend_of_meta() { printf fake; }
     hash_pane() { md5sum | cut -c1-12; }
@@ -589,6 +591,26 @@ test_model_outage_unreadable_lane_does_not_pin_recovered_episode() {
   pass "a persistently unreadable lane does not pin a recovered episode"
 }
 
+legacy_banner_scans() {
+  lane alpha "idle opencode-plugin" alive
+  rm -f "$state/alpha.model-error-g1.json"
+  printf '%s\n' 'Upstream request failed: region denied' '' 'composer A' > "$FAKE_LIVENESS/capture-alpha"
+  tick
+  printf '%s\n' 'Upstream request failed: region denied' '' 'composer B' > "$FAKE_LIVENESS/capture-alpha"
+  tick
+}
+
+# The episode identity is the banner line; unrelated pane text below a wrapped
+# banner changes the displayed error but must not start a second episode.
+test_model_outage_wrapped_banner_keeps_episode_identity() {
+  local case_dir="$TMP_ROOT/model-outage-banner" expected
+  run_outage_fixture "$case_dir" "$case_dir/state" legacy_banner_scans
+  expected='check: model outage affected=[alpha]: Upstream request failed: region denied composer A'
+  [ "$(cat "$case_dir/wakes")" = "$expected" ] \
+    || fail "unrelated text below a wrapped banner must not re-alert, got: $(cat "$case_dir/wakes")"
+  pass "a wrapped legacy banner keeps its episode when unrelated pane text below it changes"
+}
+
 hung_verdict_scans() {
   lane delta "hang" alive
   tick
@@ -650,6 +672,7 @@ test_model_outage_staggered_lane_joins_union_wake
 test_model_outage_recovered_lane_leaves_wake
 test_model_outage_unreadable_lane_does_not_pin_recovered_episode
 test_model_outage_hung_verdict_is_bounded
+test_model_outage_wrapped_banner_keeps_episode_identity
 test_model_outage_healthy_turn_after_error_does_not_alert
 
 echo "all fm-busy-adapter-wiring tests passed"

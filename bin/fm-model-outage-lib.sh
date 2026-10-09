@@ -20,6 +20,10 @@ _FM_MODEL_ERROR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=bin/fm-timeout-lib.sh
 . "$_FM_MODEL_ERROR_DIR/fm-timeout-lib.sh"
 
+fm_model_outage_text() {
+  LC_ALL=C tr -c '[:print:]' ' ' | awk '{$1=$1; print}' | cut -c1-1000
+}
+
 fm_model_outage_hold() {  # <dir> <batch> <id>
   local old
   old=$(cat "$1/lane-$3" 2>/dev/null) || return 0
@@ -27,7 +31,7 @@ fm_model_outage_hold() {  # <dir> <batch> <id>
 }
 
 fm_model_outage_tick() {
-  local meta id backend target harness gen error hash old verdict rows file groups native mid line match lanes alert kept
+  local meta id backend target harness gen error hash old verdict rows file groups native mid line match key lanes alert kept
   local dir="$STATE/.model-outages" now batch last current
   now=$(date +%s) || return 1
   # The singleton watcher owns these records; never start a second monitor.
@@ -47,7 +51,7 @@ fm_model_outage_tick() {
     backend=$(fm_backend_of_meta "$meta")
     harness=$(fm_meta_get "$meta" harness)
     gen=$(fm_busy_current_gen "$STATE" "$id") || gen=unarmed
-    error=; native=0
+    error=; key=; native=0
     file="$STATE/$id.model-error-$gen.json"
     if [ -f "$file" ] && [ ! -L "$file" ]; then
       if error=$(jq -er --arg gen "$gen" 'select(.gen == $gen) | .error | select(type == "string")' "$file"); then native=1; else error=; fi
@@ -73,12 +77,14 @@ fm_model_outage_tick() {
       match=$(printf '%s\n' "$rows" | grep -Ein '^[[:space:]│┃]*(Upstream request failed|Model .+ is not supported|rate.?limit exceeded|insufficient quota|authentication failed)' | tail -1)
       if [ -n "$match" ]; then
         line=${match%%:*}
+        key=$(printf '%s\n' "$rows" | sed -n "${line}p")
         error=$(printf '%s\n' "$rows" | sed -n "${line},$((line + 2))p")
       fi
     fi
-    error=$(printf '%s' "$error" | LC_ALL=C tr -c '[:print:]' ' ' | awk '{$1=$1; print}' | cut -c1-1000)
+    error=$(printf '%s' "$error" | fm_model_outage_text)
     if [ -z "$error" ]; then rm -f "$dir/lane-$id"; continue; fi
-    hash=$(printf '%s' "$error" | hash_pane)
+    key=$(printf '%s' "${key:-$error}" | fm_model_outage_text)
+    hash=$(printf '%s' "$key" | hash_pane)
     old=$(cat "$dir/lane-$id" 2>/dev/null) || old=
     printf '%s\n' "$target|$gen|$hash" > "$dir/lane-$id" || return 1
     printf '%s\n' "$id" >> "$batch/$hash.lanes"
