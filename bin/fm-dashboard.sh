@@ -21,7 +21,8 @@
 # At viewport widths of 760-1279 CSS pixels the header figures use their own row.
 # At 760-1023 CSS pixels the sidebar becomes a compact rail with four-character home
 # labels (or the whole name if shorter); home buttons retain the full accessible name and tooltip.
-# Below 760 CSS pixels the board is a list grouped by stage, with a dock.
+# Below 760 CSS pixels the board is a mobile kanban that shows one status column at a time,
+# with a sticky switcher that jumps to any column, and a dock.
 # Each build writes the app's one data file, state/dashboard/board.json: homes with their
 # lane plans, one card per open lane, ready backlog item and pull request landed today,
 # and parked home ids. Cards carry the current stage inferred from status lines (which
