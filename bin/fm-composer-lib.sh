@@ -538,7 +538,7 @@ FM_COMPOSER_OMP_STATUS_RE_DEFAULT='^[[:space:]]*(π|󰵗)[[:space:]]+·[[:space:
 # any unclaimed activity fail them, keep the envelope stale, and read
 # `unknown`, the refusing direction. The square glyphs are an alternation,
 # never a bracket range, for the reason FM_OMP_SPINNER_FRAMES_RE records.
-FM_COMPOSER_OPENCODE_STATUS_RE_DEFAULT='^[[:space:]]*/.*[0-9]+(\.[0-9]+)?K[[:space:]]+\([0-9]+%\)[[:space:]]+·[[:space:]]+\$[0-9]+(\.[0-9]+)?ctrl\+p$|^[^[:space:]].*[[:space:]]+commands$|^[[:space:]]*(■|⬝)[0-9]+(■|⬝)hour(■|⬝)usage limit reached|^[[:space:]]*(usin\.\.\.[[:space:]]+)?\(?click to expand\)[[:space:]]+\[retrying in [0-9]+[hms]([[:space:]]+[0-9]+[hms])*[[:space:]]+attempt #[0-9]+\]$'
+FM_COMPOSER_OPENCODE_STATUS_RE_DEFAULT='^[[:space:]]*/.*[0-9]+(\.[0-9]+)?K[[:space:]]+\([0-9]+%\)[[:space:]]+·[[:space:]]+\$[0-9]+(\.[0-9]+)?ctrl\+p$|^[^[:space:]]+([[:space:]]+tab[[:space:]]+agents[[:space:]]+ctrl\+p)?[[:space:]]+commands$|^[[:space:]]*(■|⬝)[0-9]+(■|⬝)hour(■|⬝)usage limit reached|^[[:space:]]*(usin\.\.\.[[:space:]]+)?\(?click to expand\)[[:space:]]+\[retrying in [0-9]+[hms]([[:space:]]+[0-9]+[hms])*[[:space:]]+attempt #[0-9]+\]$'
 # Pi's footer stats row opens at column 0 with the session cost when every
 # token counter is zero (`$0.000 (sub) 5.4%/272k (auto)` on pi 0.85.1).
 # That leading `$` is a cost cell, not a dead-shell prompt, only when a digit

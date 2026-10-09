@@ -940,6 +940,14 @@ test_matrix_opencode_leftbar_signals() {
   local busy_status_screen
   busy_status_screen=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   ⬝⬝⬝⬝ esc interrupt\n   firstmate                                    tab agents ctrl+p commands'
   assert_screen "opencode busy esc-interrupt row below the 1.18.35 floor stays unknown" unknown "$CAPS_STYLED" "$busy_status_screen"
+  # Live 1.18.35 mid-generation: the busy hint and the cost/ctrl+p cell share
+  # one row ending in `commands`, directly below the floor. It must refuse on
+  # every profile, not read as the session row.
+  local busy_merged_screen
+  busy_merged_screen=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   ⬝⬝⬝⬝⬝⬝⬝⬝ esc interrupt ... 22.9K (11%) ctrl+p commands'
+  assert_screen "opencode busy merged esc-interrupt commands row below the floor on herdr" unknown "$CAPS_STYLED" "$busy_merged_screen"
+  assert_screen "opencode busy merged esc-interrupt commands row below the floor on zellij" unknown "$CAPS_STYLED_NOID" "$busy_merged_screen"
+  assert_screen "opencode busy merged esc-interrupt commands row below the floor on cmux/orca" unknown "$CAPS_PLAIN" "$busy_merged_screen"
   retry_screen=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   ■5⬝hour⬝usage limit reached. It will reset in 1 hour 38 minutes. To cont\n    usin... (click to expand) [retrying in 1h 8m attempt #1]'
   assert_screen "opencode 1.18.x usage-limit retry banner below the floor on herdr" empty "$CAPS_STYLED" "$retry_screen"
   assert_screen "opencode 1.18.x usage-limit retry banner below the floor on zellij" empty "$CAPS_STYLED_NOID" "$retry_screen"
