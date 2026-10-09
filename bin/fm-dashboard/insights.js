@@ -19,7 +19,7 @@ function Trend({ days }) {
         ${days.map((d, i) => d[key] == null ? '' : html`<circle cx=${x(i)} cy=${y(d[key])} r="3"><title>${d.day} ${k ? 'P85' : 'P50'}: ${seconds(d[key])}; ${d.known} timed, ${d.unknown} unknown</title></circle>`)}</g>`)}
       ${days.every(d => d.known === 0) ? html`<text x="320" y="60" text-anchor="middle">No recorded pickup-to-merge durations</text>` : ''}
       ${days.map((d, i) => html`<text x=${x(i)} y="134" text-anchor="middle">${d.day.slice(5)}</text>`)}</svg>
-    <div class="i-days">${days.map(d => html`<span title=${`${d.day}: P50 ${seconds(d.median_seconds)}, P85 ${seconds(d.p85_seconds)}`}><b>${d.known + d.unknown}</b><small>${d.day.slice(5)} merged</small></span>`)}</div></section>`
+    <div class="i-days" style=${{ gridTemplateColumns: `repeat(${days.length},minmax(0,1fr))` }}>${days.map(d => html`<span title=${`${d.day}: P50 ${seconds(d.median_seconds)}, P85 ${seconds(d.p85_seconds)}`}><b>${d.known + d.unknown}</b><small>${d.day.slice(5)} merged</small></span>`)}</div></section>`
 }
 function Lifecycle({ lane }) {
   if (!lane) return html`<p class="i-note">Choose a task.</p>`

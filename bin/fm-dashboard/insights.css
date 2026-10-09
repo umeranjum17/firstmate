@@ -21,7 +21,7 @@
 .i-trend{display:block;width:100%;height:160px}.i-trend text{fill:var(--ink-3);font:11px Inter,system-ui,sans-serif}
 .i-series-0{stroke:var(--i-warm);fill:var(--i-warm);background:var(--i-warm)}.i-series-1{stroke:var(--i-other);fill:var(--i-other);background:var(--i-other)}
 .i-series path{stroke-width:2}.i-series-1 path{stroke-dasharray:5 3}
-.i-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;text-align:center;font-size:12px}
+.i-days{display:grid;gap:3px;text-align:center;font-size:12px}
 .i-days b,.i-days small{display:block}.i-days small{font-size:10px;color:var(--ink-3)}
 .i-row{display:flex;justify-content:space-between;gap:12px;align-items:baseline;padding:8px 0;border-top:1px solid var(--line)}
 .i-row>span{min-width:0;font-size:12px;overflow-wrap:anywhere}.i-row small{display:block;color:var(--ink-3);line-height:17px;margin-top:3px}
