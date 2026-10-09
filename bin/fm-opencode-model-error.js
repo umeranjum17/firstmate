@@ -24,7 +24,7 @@ export function modelErrorObserver(state, id, gen) {
       save("");
     }
     if (p.sessionID !== session || session === null) return;
-    if (event.type === "session.error") {
+    if (event.type === "session.error" && p.error?.name !== "MessageAbortedError") {
       const error = p.error?.data?.message || p.error?.message || p.error?.name;
       if (error) {
         failed = true;

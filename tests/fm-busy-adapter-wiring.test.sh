@@ -656,6 +656,30 @@ test_model_outage_healthy_turn_after_error_does_not_alert() {
   pass "a healthy turn after a recorded error clears it and sends no outage wake"
 }
 
+aborted_turn_scans() {
+  drive_oc_plugin "$plugin" "$(oc_status ses_main busy)" "$abort_event" "$(oc_idle ses_main)" || fail "abort drive failed"
+  tick
+  tick
+}
+
+# A user abort ends the turn without a model outage, so the idle lane sends no wake.
+test_model_outage_user_abort_is_not_an_outage() {
+  local rec id=busy-oc-3 state plugin abort_event case_dir out
+  rec=$(make_spawn_case oc-user-abort opencode "$id")
+  read_case_record "$rec"
+  out=$(run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR")
+  expect_code 0 $? "opencode spawn should succeed: $out"
+  state="$HOME_DIR/state"
+  plugin="$WT_DIR/.opencode/plugins/fm-busy-state.js"
+  abort_event='{"type":"session.error","properties":{"sessionID":"ses_main","error":{"name":"MessageAbortedError","data":{"message":"The operation was aborted."}}}}'
+  case_dir="$TMP_ROOT/model-outage-user-abort"
+  printf '%s\n' "idle opencode-plugin" > "$state/$id.verdict"
+  run_outage_fixture "$case_dir" "$state" aborted_turn_scans
+  [ ! -e "$case_dir/wakes" ] \
+    || fail "a user abort must not raise an outage alert, got: $(cat "$case_dir/wakes")"
+  pass "a user abort is not a model outage, even when the turn then goes idle"
+}
+
 test_pi_extension_semantic_lifecycle
 test_pi_extension_serializes_settle_before_next_start
 test_pi_extension_stale_ctx_settles_unknown
@@ -675,5 +699,6 @@ test_model_outage_unreadable_lane_does_not_pin_recovered_episode
 test_model_outage_hung_verdict_is_bounded
 test_model_outage_wrapped_banner_keeps_episode_identity
 test_model_outage_healthy_turn_after_error_does_not_alert
+test_model_outage_user_abort_is_not_an_outage
 
 echo "all fm-busy-adapter-wiring tests passed"
