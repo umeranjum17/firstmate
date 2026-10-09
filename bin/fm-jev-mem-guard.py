@@ -6,11 +6,12 @@ On Herdr, fleet agents share one agent-runtime service, and systemd-oomd kills
 that service as a unit under the host's configured oomd pressure policy.
 Classify by the pressure of the user app.slice, the cgroup systemd-oomd watches
 and agents run in, plus host available memory.
-Host-wide pressure aggregates capped heavy-job slices by design, so at or above
-alert_pressure it raises an ALERT wake as information only, never a hold or an interrupt.
+Host-wide pressure aggregates capped heavy-job slices by design, so it is summary
+context only and never gates admission or alerts.
 Pressure is sustained "some" pressure, the lower of the 10 s and 60 s averages,
 so a short spike does not hold launches while pressure held for about a minute does;
 a 10 s average at or above alert_pressure holds at once.
+Unreadable app.slice pressure is not judged: pressure then holds nothing, while available memory still applies.
 Admission refusal and sampler interrupts cannot guarantee avoidance of an oomd kill.
 
 Usage (bin/fm-jev-mem-guard.sh runs this with python3):
@@ -30,9 +31,8 @@ Usage (bin/fm-jev-mem-guard.sh runs this with python3):
       that consumer is a task recorded in DIR (for the sampler's interrupt).
 
 Verdicts: OK; WAIT (new agents wait); ALERT (sampler attempts one owned-task interrupt);
-HOST-ALERT (host-wide pressure alone: the sampler wakes Main, with no interrupt);
 UNKNOWN (not measurable, for example no pressure file).
---admit refuses WAIT and ALERT and admits OK, HOST-ALERT, and UNKNOWN; UNKNOWN records no sample.
+--admit refuses WAIT and ALERT and admits OK and UNKNOWN; UNKNOWN records no sample.
 Pass --config FILE to read thresholds; without it the defaults apply.
 Settings are owned by docs/configuration.md "Host memory guard".
 The former diagnostic --check, --json, and percentage-threshold flags are unsupported.
@@ -117,20 +117,22 @@ def app_slice_pressure():
 
 
 def sample():
-    """{available_kb, swap_used_kb, pressure, fast, host_pressure, app_pressure}, or None when not measurable."""
+    """{available_kb, swap_used_kb, pressure, fast, host_pressure}, or None when not measurable.
+
+    pressure and fast are None when app.slice pressure is unreadable.
+    """
     try:
         mem = {}
         for line in open(f"{PROC}/meminfo"):
             key, _, val = line.partition(":")
             if val.split() and val.split()[0].isdigit():
                 mem[key.strip()] = int(val.split()[0])
-        host, host_fast = pressure_at(f"{PROC}/pressure/memory")
+        host, _ = pressure_at(f"{PROC}/pressure/memory")
         app = app_slice_pressure()
-        pressure, fast = app or (host, host_fast)
         return {"available_kb": mem["MemAvailable"],
                 "swap_used_kb": max(0, mem.get("SwapTotal", 0) - mem.get("SwapFree", 0)),
-                "pressure": pressure, "fast": fast,
-                "host_pressure": host, "app_pressure": app[0] if app else None}
+                "pressure": app[0] if app else None, "fast": app[1] if app else None,
+                "host_pressure": host}
     except (OSError, StopIteration, KeyError, ValueError):
         return None
 
@@ -142,10 +144,11 @@ def verdict(s, cfg):
     for level in ("alert", "wait"):
         threshold = cfg[f"{level}_pressure"]
         why = []
-        if s["pressure"] >= threshold:
-            why.append(f"pressure at or above {threshold:g}%")
-        elif level == "alert" and s["fast"] >= threshold:
-            why.append(f"10 s pressure at or above {threshold:g}%")
+        if s["pressure"] is not None:
+            if s["pressure"] >= threshold:
+                why.append(f"pressure at or above {threshold:g}%")
+            elif level == "alert" and s["fast"] >= threshold:
+                why.append(f"10 s pressure at or above {threshold:g}%")
         if gb < cfg[f"{level}_available_gb"]:
             why.append(f"available memory below {cfg[f'{level}_available_gb']:g} GB")
         if why:
@@ -154,10 +157,10 @@ def verdict(s, cfg):
 
 
 def summary(s):
-    return (f"pressure {s['pressure']:.0f}% (lower of 10 s and 60 s averages), {s['available_kb'] / GIB_KB:.1f} GB available, "
-            f"{s['swap_used_kb'] / GIB_KB:.1f} GB swap used; " +
-            (f"host {s['host_pressure']:.0f}%, app.slice {s['app_pressure']:.0f}%"
-             if s['app_pressure'] is not None else "cgroup pressure unreadable; host-only classification"))
+    head = f"{s['available_kb'] / GIB_KB:.1f} GB available, {s['swap_used_kb'] / GIB_KB:.1f} GB swap used; host {s['host_pressure']:.0f}%"
+    if s["pressure"] is None:
+        return f"app.slice pressure unreadable, not judged; {head}"
+    return (f"pressure {s['pressure']:.0f}% (lower of 10 s and 60 s averages), {head}, app.slice {s['pressure']:.0f}%")
 
 
 def read_meta(path):
@@ -264,7 +267,8 @@ def replace_text(path, text):
 
 def record(path, s, v):
     with open(path, "a") as f:
-        f.write(f"{int(time.time())}\t{s['available_kb']}\t{s['swap_used_kb']}\t{s['pressure']:.2f}\t{v}\n")
+        pressure = "" if s["pressure"] is None else f"{s['pressure']:.2f}"
+        f.write(f"{int(time.time())}\t{s['available_kb']}\t{s['swap_used_kb']}\t{pressure}\t{v}\n")
     with open(path) as f:
         rows = f.readlines()
     if len(rows) > KEEP_ROWS + 120:
@@ -303,15 +307,12 @@ def main():
     v, why = verdict(s, cfg)
     if args.admit:
         sys.exit(admit(args.admit, args.state, s, v, why))
-    host_only = s is not None and v == "OK" and s["host_pressure"] >= cfg["alert_pressure"]
-    if host_only:
-        v, why = "HOST-ALERT", [f"host-wide pressure at or above {cfg['alert_pressure']:g}%"]
     if args.record and s is not None:
         record(args.record, s, v)
-    cons = consumers(args.state_dir) if v in ("ALERT", "HOST-ALERT") or (not args.record and v != "UNKNOWN") else []
+    cons = consumers(args.state_dir) if v == "ALERT" or (not args.record and v != "UNKNOWN") else []
     output = line(s, v, why, [text for _, text in cons])
     if args.owned_top_task:
-        task = cons[0][0][1] if cons and not host_only and cons[0][0][0] == os.path.realpath(args.owned_top_task) else ""
+        task = cons[0][0][1] if cons and cons[0][0][0] == os.path.realpath(args.owned_top_task) else ""
         output += "\t" + task
     print(output)
 

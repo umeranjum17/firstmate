@@ -751,7 +751,7 @@ def machine():
     # Use the independent sampler's history (bin/fm-host-memory-sampler.sh), not the dashboard's refresh cadence.
     try:
         rows = [l.split('\t') for l in open(os.path.join(HOME, 'state/host-memory.tsv'), errors='replace')]
-        m['peak'] = max((float(r[3]) for r in rows if len(r) >= 5 and float(r[0]) >= NOW_TS - 3600), default=None)
+        m['peak'] = max((float(r[3]) for r in rows if len(r) >= 5 and r[3].strip() and float(r[0]) >= NOW_TS - 3600), default=None)
         m['peak_why'] = 'no sample in the last hour'
     except (OSError, ValueError) as e:
         m['peak'], m['peak_why'] = None, getattr(e, 'strerror', None) or str(e)

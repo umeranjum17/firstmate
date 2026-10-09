@@ -13,6 +13,7 @@ WATCH="$ROOT/bin/fm-watch.sh"
 DRAIN="$ROOT/bin/fm-wake-drain.sh"
 TMP_ROOT=$(fm_test_tmproot fm-mem-guard)
 export FM_HOST_MEMORY_CGROUP_ROOT="$TMP_ROOT/no-cgroup"
+APP_SLICE="user.slice/user-$(id -u).slice/user@$(id -u).service/app.slice"
 
 # fake_host <proc> <available-gb> <pressure (both 10 s and 60 s averages)> [swap-used-gb]
 fake_host() {
@@ -22,6 +23,8 @@ fake_host() {
     "$(($2 * 1048576))" "$((33554432 - swap_used * 1048576))" > "$proc/meminfo"
   printf 'some avg10=%s avg60=%s avg300=1.00 total=1\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n' "$3" "$3" \
     > "$proc/pressure/memory"
+  mkdir -p "$(dirname "$proc")/cgroup/$APP_SLICE"
+  printf 'some avg10=%s avg60=%s avg300=1.00 total=1\n' "$3" "$3" > "$(dirname "$proc")/cgroup/$APP_SLICE/memory.pressure"
 }
 
 # fake_pid <proc> <pid> <name> <rss-gb> <cwd> [FM_TASK_ID]
@@ -52,24 +55,24 @@ test_verdicts_samples_and_owners() {
   case=$TMP_ROOT/verdicts tsv=$case/state/host-memory.tsv
   make_fleet "$case"
   fake_host "$case/proc" 40 2.5 1
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --record "$tsv" --state-dir "$case" "$case/state")
-  assert_equals $'OK\tpressure 2% (lower of 10 s and 60 s averages), 40.0 GB available, 1.0 GB swap used; cgroup pressure unreadable; host-only classification' "$out" "calm host"
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --record "$tsv" --state-dir "$case" "$case/state")
+  assert_equals $'OK\tpressure 2% (lower of 10 s and 60 s averages), 40.0 GB available, 1.0 GB swap used; host 2%, app.slice 2%' "$out" "calm host"
   fake_host "$case/proc" 30 24 3
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --record "$tsv" --state-dir "$case" "$case/state")
-  assert_equals $'WAIT\tpressure 24% (lower of 10 s and 60 s averages), 30.0 GB available, 3.0 GB swap used; cgroup pressure unreadable; host-only classification; pressure at or above 20%' "$out" \
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --record "$tsv" --state-dir "$case" "$case/state")
+  assert_equals $'WAIT\tpressure 24% (lower of 10 s and 60 s averages), 30.0 GB available, 3.0 GB swap used; host 24%, app.slice 24%; pressure at or above 20%' "$out" \
     "pressure past the wait threshold makes new agents wait"
   fake_host "$case/proc" 5 41.2 16
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --record "$tsv" --state-dir "$case" "$case/state")
-  assert_equals $'ALERT\tpressure 41% (lower of 10 s and 60 s averages), 5.0 GB available, 16.0 GB swap used; cgroup pressure unreadable; host-only classification; pressure at or above 35%; available memory below 6 GB; largest: task big-build (main) 14.0 GB in 2 processes, llama pid 104 6.0 GB, lead sm1 2.0 GB' "$out" \
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --record "$tsv" --state-dir "$case" "$case/state")
+  assert_equals $'ALERT\tpressure 41% (lower of 10 s and 60 s averages), 5.0 GB available, 16.0 GB swap used; host 41%, app.slice 41%; pressure at or above 35%; available memory below 6 GB; largest: task big-build (main) 14.0 GB in 2 processes, llama pid 104 6.0 GB, lead sm1 2.0 GB' "$out" \
     "an alert names the largest consumers by task, lead, or process"
   [ "$(wc -l < "$tsv" | tr -d ' ')" -eq 3 ] || fail "three samples should be recorded: $(cat "$tsv")"
   assert_equals $'5242880\t16777216\t41.20\tALERT' "$(tail -n 1 "$tsv" | cut -f2-)" "the sample row carries available kB, swap kB, pressure, verdict"
   # Thresholds come from the one config file; a broken one is refused with its line.
   printf '# tighter host\nalert_pressure=50\nalert_available_gb=1\nwait_pressure = 10\n' > "$case/host-memory"
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --config "$case/host-memory")
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --config "$case/host-memory")
   assert_contains "$out" "pressure at or above 10%" "config thresholds replace the defaults"
   printf 'alert_pressure=lots\n' > "$case/host-memory"
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --config "$case/host-memory" 2>&1); rc=$?
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --config "$case/host-memory" 2>&1); rc=$?
   [ "$rc" -eq 2 ] || fail "an invalid config must exit 2, got $rc: $out"
   assert_contains "$out" "line 1: 'alert_pressure=lots'" "the invalid line is named"
   # Not measurable: no verdict is invented and nothing is recorded.
@@ -220,60 +223,39 @@ test_cgroup_pressure() {
   fake_host "$case/proc" 40 2
   out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build --state "$case/state"); rc=$?
   [ "$rc" -eq 0 ] || fail "sibling heavy-slice thrash refused admission: $out"
-  # Host-wide pressure with a calm app.slice informs the sampler but never holds a launch.
+  # Host-wide pressure with a calm app.slice holds nothing and interrupts nothing.
   fake_host "$case/proc" 40 48
+  printf 'some avg10=1 avg60=1 avg300=1 total=1\n' > "$case/cgroup/$app/memory.pressure"
   out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build --state "$case/state"); rc=$?
   [ "$rc" -eq 0 ] || fail "host-wide pressure refused admission with a calm app.slice: $out"
   out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD")
-  assert_contains "$out" $'HOST-ALERT\tpressure 1%' "host-wide alert reports the calm app.slice reading"
-  assert_contains "$out" 'host-wide pressure at or above 35%' "host-wide alert names its reason"
+  assert_contains "$out" $'OK\tpressure 1%' "host-wide pressure is not a verdict"
+  assert_contains "$out" 'host 48%, app.slice 1%' "host-wide pressure stays visible as context"
+  # Unreadable app.slice pressure is not judged, so host-wide pressure cannot hold a launch either.
   rm "$case/cgroup/$app/memory.pressure"
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build --state "$case/state"); rc=$?
+  [ "$rc" -eq 0 ] || fail "unreadable app.slice pressure held admission on host-wide pressure: $out"
   out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD")
-  assert_contains "$out" 'host-only classification' "unreadable app.slice pressure is explicit"
-  pass "app.slice pressure alone governs admission, host-wide pressure only informs"
+  assert_contains "$out" $'OK\tapp.slice pressure unreadable, not judged' "unreadable app.slice pressure is not judged"
+  pass "app.slice pressure alone governs admission; host-wide pressure is context only"
 }
 
-test_host_pressure_wakes_without_hold_or_interrupt() {
+test_host_pressure_neither_holds_nor_wakes() {
   local case out rc app="user.slice/user-$(id -u).slice/user@$(id -u).service/app.slice"
   case=$(make_case host-only)
   make_fleet "$case"
   prepare_control_task "$case"
   fake_host "$case/proc" 40 48
-  mkdir -p "$case/cgroup/$app"
   printf 'some avg10=3 avg60=3 avg300=1 total=1\n' > "$case/cgroup/$app/memory.pressure"
   out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build --state "$case/state"); rc=$?
   [ "$rc" -eq 0 ] || fail "host-wide pressure held an admission with a calm app.slice: $out"
   watch_leg "$case" host-only default
-  wait_for_exit "$LEG_PID" 50 || fail "host-wide pressure did not wake Main: $(cat "$case/watch-host-only.err")"
-  out=$(cat "$case/watch-host-only.out")
-  assert_contains "$out" "check: host memory ALERT: pressure 3%" "the wake reports the calm app.slice reading"
-  assert_contains "$out" "host-wide pressure at or above 35%" "the wake names host-wide pressure"
-  assert_contains "$out" "automatic interrupt skipped" "host-wide pressure attempts no interrupt"
+  wait_rows "$case/state/host-memory.tsv" 2
+  is_live_non_zombie "$LEG_PID" || fail "host-wide pressure woke Main: $(cat "$case/watch-host-only.out")"
+  assert_equals OK "$(cut -f5 "$case/state/host-memory.tsv" | sort -u)" "host-wide samples record OK"
   [ ! -e "$case/keys" ] || fail "host-wide pressure interrupted a task: $(cat "$case/keys")"
-  pass "host-wide pressure wakes Main without holding admission or interrupting a task"
-}
-
-test_app_alert_inside_host_episode_interrupts() {
-  local case out app="user.slice/user-$(id -u).slice/user@$(id -u).service/app.slice"
-  case=$(make_case host-then-app)
-  make_fleet "$case"
-  prepare_control_task "$case"
-  fake_host "$case/proc" 40 48
-  mkdir -p "$case/cgroup/$app"
-  printf 'some avg10=3 avg60=3 avg300=1 total=1\n' > "$case/cgroup/$app/memory.pressure"
-  watch_leg "$case" host-first default
-  wait_for_exit "$LEG_PID" 50 || fail "host-wide pressure did not wake Main: $(cat "$case/watch-host-first.err")"
-  [ ! -e "$case/keys" ] || fail "host-wide pressure interrupted a task: $(cat "$case/keys")"
-  drain_and_ack "$case"
-  printf 'some avg10=60 avg60=60 avg300=20 total=1\n' > "$case/cgroup/$app/memory.pressure"
-  watch_leg "$case" app-second default
-  wait_for_exit "$LEG_PID" 100 || fail "an app.slice alert inside a host-wide episode did not wake Main: $(cat "$case/watch-app-second.err")"
-  wait_interrupt "$case/state"
-  out=$(cat "$case/watch-app-second.out")
-  assert_contains "$out" "check: host memory ALERT: pressure 60%" "the app.slice alert wakes Main inside the host-wide episode"
-  assert_contains "$out" "automatic interrupt attempted: task big-build" "the app.slice alert attempts its owned-task interrupt"
-  [ "$(wc -l < "$case/keys")" -eq 1 ] || fail "the app.slice alert did not interrupt exactly once: $(cat "$case/keys")"
-  pass "an app.slice alert inside a host-wide episode still wakes Main and interrupts its owned task"
+  kill -TERM "$LEG_PID" 2>/dev/null; wait_for_exit "$LEG_PID" 50 >/dev/null || true
+  pass "host-wide pressure neither holds admission nor wakes Main or interrupts a task"
 }
 
 test_home_qualified_owners() {
@@ -281,13 +263,13 @@ test_home_qualified_owners() {
   make_fleet "$case"
   fake_host "$case/proc" 5 41
   fake_pid "$case/proc" 107 foreign 25 "$TMP_ROOT/independent-home/wt" big-build
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --state-dir "$case" "$case/state" --owned-top-task "$case/state")
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --state-dir "$case" "$case/state" --owned-top-task "$case/state")
   assert_contains "$out" 'foreign pid 107 25.0 GB, task big-build (main) 14.0 GB in 2 processes' "a unique visible ID still requires recorded path ownership"
   assert_equals '' "${out##*$'\t'}" "an independent home's matching ID cannot authorize control"
   fm_write_meta "$case/state/big-build.meta" kind=ship "worktree=$case/wt" "tasktmp=${case}-tmp"
   rm "$case/proc/107/cwd"
   ln -s "${case}-tmp" "$case/proc/107/cwd"
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --state-dir "$case" "$case/state" --owned-top-task "$case/state")
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --state-dir "$case" "$case/state" --owned-top-task "$case/state")
   assert_contains "$out" "foreign pid 107 25.0 GB" "a temp path outside the explicit home is not a worktree"
   assert_equals '' "${out##*$'\t'}" "an external temp path cannot authorize control"
   rm -r "$case/proc/107"
@@ -297,13 +279,13 @@ test_home_qualified_owners() {
   fake_pid "$case/proc" 106 node 10 "$case/mate" big-build
   rm "$case/proc/102/cwd"
   ln -s "$case/wt" "$case/proc/102/cwd"
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --state-dir "$case" "$case/state" --state-dir "$case/mate" "$case/mate/state" --owned-top-task "$case/state")
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --state-dir "$case" "$case/state" --state-dir "$case/mate" "$case/mate/state" --owned-top-task "$case/state")
   assert_contains "$out" 'task big-build (sm1) 30.0 GB in 2 processes, task big-build (main) 14.0 GB in 2 processes' "equal task IDs remain separate owners"
   assert_equals '' "${out##*$'\t'}" "a foreign top task cannot be interrupted by this home"
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --state-dir "$case" "$case/state" --state-dir "$case/mate" "$case/mate/state" --owned-top-task "$case/mate/state")
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --state-dir "$case" "$case/state" --state-dir "$case/mate" "$case/mate/state" --owned-top-task "$case/mate/state")
   assert_equals big-build "${out##*$'\t'}" "the owning home receives its exact task ID"
   printf 'Name:\tpi\nVmRSS:\t41943040 kB\nVmSwap:\t0 kB\n' > "$case/proc/103/status"
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --state-dir "$case" "$case/state" --state-dir "$case/mate" "$case/mate/state" --owned-top-task "$case/state")
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --state-dir "$case" "$case/state" --state-dir "$case/mate" "$case/mate/state" --owned-top-task "$case/state")
   assert_equals sm1 "${out##*$'\t'}" "a lead is controlled only through its parent-owned task record"
   pass "task ownership stays home-qualified through grouping and control selection"
 }
@@ -324,14 +306,14 @@ test_homes_without_ordinary_tasks() {
       secondmate) fm_write_meta "$case/state/sm1.meta" kind=secondmate "home=$case/mate" ;;
       remote) fm_write_meta "$case/state/sm1.meta" kind=secondmate remote_host=other "home=$case/mate" ;;
     esac
-    out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --state-dir "$case" "$case/state" --state-dir "$case/mate" "$case/mate/state" --owned-top-task "$case/state")
+    out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --state-dir "$case" "$case/state" --state-dir "$case/mate" "$case/mate/state" --owned-top-task "$case/state")
     assert_contains "$out" 'lead main 18.0 GB in 2 processes' "$mode home aggregates supervisors into the top three"
     if [ "$mode" = secondmate ]; then
       assert_equals sm1 "${out##*$'\t'}" "secondmate-only state retains parent-owned control"
-      out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --state-dir "$case/mate" "$case/mate/state" --state-dir "$case" "$case/state" --owned-top-task "$case/mate/state")
+      out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --state-dir "$case/mate" "$case/mate/state" --state-dir "$case" "$case/state" --owned-top-task "$case/mate/state")
       assert_contains "$out" 'largest: lead sm1 20.0 GB in 2 processes, lead main 18.0 GB in 2 processes' "empty child state preserves the parent owner"
       assert_equals '' "${out##*$'\t'}" "child fallback cannot authorize parent-owned control"
-      out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --state-dir "$case" "$case/state" --state-dir "$case/mate" "$case/mate/state" --owned-top-task "$case/state")
+      out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --state-dir "$case" "$case/state" --state-dir "$case/mate" "$case/mate/state" --owned-top-task "$case/state")
       assert_equals sm1 "${out##*$'\t'}" "parent ownership is independent of argument order"
     else
       assert_equals '' "${out##*$'\t'}" "$mode fallback does not authorize task control"
@@ -351,7 +333,7 @@ test_remote_records_do_not_own_local_processes() {
   fake_host "$case/proc" 5 41
   fake_pid "$case/proc" 101 node 9 "$wt/sub"
   fake_pid "$case/proc" 102 java 5 "$wt" big-build
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --state-dir "$home" "$home/state" --owned-top-task "$home/state")
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --state-dir "$home" "$home/state" --owned-top-task "$home/state")
   assert_contains "$out" 'largest: task big-build (main) 14.0 GB in 2 processes' \
     "remote task paths and lead homes cannot steal tagged or untagged local processes"
   assert_equals big-build "${out##*$'\t'}" "the local task remains the interrupt target"
@@ -381,7 +363,7 @@ test_overridden_state_ownership() {
   [ ! -s "$case/keys" ] || fail "an overridden state caused the foreign process to interrupt a local task"
   rm -r "$case/proc/108"
   fake_pid "$case/proc" 109 shell 12 "$case" big-build
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --state-dir "$case" "$state" --state-dir "$case/mate" "$case/mate/state" --owned-top-task "$state")
+  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --state-dir "$case" "$state" --state-dir "$case/mate" "$case/mate/state" --owned-top-task "$state")
   assert_contains "$out" 'task big-build (main) 26.0 GB in 3 processes' "the explicit home and recorded worktree both qualify"
   assert_equals big-build "${out##*$'\t'}" "the selected state still authorizes its owned task"
   pass "overridden state paths never widen home ownership"
@@ -393,7 +375,7 @@ test_finite_thresholds() {
   for key in wait_pressure alert_pressure wait_available_gb alert_available_gb; do
     for value in nan inf -inf; do
       printf '%s=%s\n' "$key" "$value" > "$case/config"
-      out=$(FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --config "$case/config" 2>&1); rc=$?
+      out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --config "$case/config" 2>&1); rc=$?
       [ "$rc" -eq 2 ] || fail "$key=$value should be invalid, got $rc: $out"
     done
   done
@@ -419,6 +401,7 @@ if [ "\${3:-}" = "\$FM_HOME/state/.wake-queue.lock" ] \\
   && [ -e "\$FM_HOME/publish-alert" ]; then
   rm "\$FM_HOME/publish-alert"
   printf 'some avg10=41 avg60=41 avg300=1.00 total=1\\n' > "\$FM_HOME/proc/pressure/memory"
+  printf 'some avg10=41 avg60=41 avg300=1.00 total=1\\n' > "\$FM_HOME/cgroup/$APP_SLICE/memory.pressure"
   for ((i=0; i<100; i++)); do
     grep -q \$'\\tcheck\\thost-memory\\t' "\$FM_HOME/state/.wake-queue" 2>/dev/null && break
     sleep 0.1
@@ -473,7 +456,7 @@ test_default_home_interrupt() {
   mv "$case/state" "$state"
   fake_host "$case/proc" 5 41
   env -u FM_HOME PATH="$case/fakebin:$PATH" FM_ROOT_OVERRIDE="$case" FM_STATE_OVERRIDE="$state" \
-    TMUX='' FM_BACKEND=tmux FM_POLL=1 FM_SIGNAL_GRACE=0 FM_HOST_MEMORY_PROC="$case/proc" \
+    TMUX='' FM_BACKEND=tmux FM_POLL=1 FM_SIGNAL_GRACE=0 FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" \
     FM_SECONDMATE_LIVENESS_SECS=99999999 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
     "$WATCH" > "$case/default.out" 2> "$case/default.err" &
   LEG_PID=$!
@@ -568,10 +551,10 @@ def replace(src, dst, *args, **kwargs):
 os.replace = replace
 PY
   env PYTHONPATH="$case/hook" FM_TEST_ADMISSION_DEST="$case/state/admission-refused" FM_TEST_ADMISSION_BARRIER="$case/barrier" \
-    FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --admit build-a --state "$case/state" > "$case/a.out" 2> "$case/a.err" &
+    FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build-a --state "$case/state" > "$case/a.out" 2> "$case/a.err" &
   first=$!
   env PYTHONPATH="$case/hook" FM_TEST_ADMISSION_DEST="$case/state/admission-refused" FM_TEST_ADMISSION_BARRIER="$case/barrier" \
-    FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --admit build-b --state "$case/state" > "$case/b.out" 2> "$case/b.err" &
+    FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build-b --state "$case/state" > "$case/b.out" 2> "$case/b.err" &
   second=$!
   wait "$first"; rc1=$?
   wait "$second"; rc2=$?
@@ -590,8 +573,8 @@ assert reason.startswith("host memory under pressure:")
 assert os.listdir(state) == ["admission-refused"]
 PY
   fake_host "$case/proc" 40 2
-  FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --admit build-a --state "$case/state" & first=$!
-  FM_HOST_MEMORY_PROC="$case/proc" "$GUARD" --admit build-b --state "$case/state" & second=$!
+  FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build-a --state "$case/state" & first=$!
+  FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build-b --state "$case/state" & second=$!
   wait "$first"; rc1=$?
   wait "$second"; rc2=$?
   [ "$rc1" -eq 0 ] && [ "$rc2" -eq 0 ] && [ ! -e "$case/state/admission-refused" ] || fail "parallel healthy admissions did not clear the refusal record"
@@ -607,7 +590,7 @@ test_failed_alert_publication() {
   fake_host "$case/proc" 5 41
   tick=(env PATH="$case/fakebin:$PATH" FM_HOME="$case" FM_STATE_OVERRIDE="$case/state"
     STATE="$case/state" CONFIG="$case/config" SAMPLER_DIR="$ROOT/bin" FM_BACKEND=tmux
-    FM_HOST_MEMORY_PROC="$case/proc" bash -c "
+    FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" bash -c "
       . \"\$1/bin/fm-wake-lib.sh\"
       . \"\$1/bin/fm-backend.sh\"
       . \"\$1/bin/fm-host-memory-sampler.sh\"
@@ -700,7 +683,7 @@ SH
   chmod 700 "$case/state/poll.check.sh"
   FM_HOME="$case" FM_STATE_OVERRIDE="$case/state" "$ROOT/bin/fm-check-register.sh" poll >/dev/null
   env -u FM_POLL PATH="$case/fakebin:$PATH" FM_HOME="$case" FM_ROOT_OVERRIDE="$ROOT" \
-    TMUX='' FM_BACKEND=tmux FM_SIGNAL_GRACE=0 FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_SECS=1 \
+    TMUX='' FM_BACKEND=tmux FM_SIGNAL_GRACE=0 FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" FM_HOST_MEMORY_SECS=1 \
     FM_CHECK_INTERVAL=1 FM_HEARTBEAT=999999 FM_SECONDMATE_LIVENESS_SECS=99999999 \
     "$WATCH" > "$case/poll.out" 2> "$case/poll.err" &
   LEG_PID=$!
@@ -718,8 +701,7 @@ SH
 
 test_verdicts_samples_and_owners
 test_cgroup_pressure
-test_host_pressure_wakes_without_hold_or_interrupt
-test_app_alert_inside_host_episode_interrupts
+test_host_pressure_neither_holds_nor_wakes
 test_home_qualified_owners
 test_homes_without_ordinary_tasks
 test_remote_records_do_not_own_local_processes

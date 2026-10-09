@@ -674,8 +674,8 @@ Admission and interrupts classify by `app.slice` pressure alone.
 Pressure is the share of time some process waited on memory, taken as the lower of its 10-second and 60-second averages, so a spike of a few seconds does not hold launches while pressure held for about a minute does.
 A 10-second average at or above the alert level alone raises an alert at once, so a fast ramp is not held back by the slower average.
 Capped heavy-job slices such as `fm.slice` are not read, so their thrash holds agent launches only when it also stalls the agents.
-Host-wide pressure at or above the alert level raises an `ALERT` wake as information only, with no admission hold and no interrupt.
-Unreadable `app.slice` pressure is reported as host-only classification.
+Host-wide pressure stays in the summary as context and never holds admission, wakes Main, or interrupts a task.
+Unreadable `app.slice` pressure is reported as not judged: pressure then holds nothing and interrupts nothing, while available memory still applies.
 It classifies measurable memory as `OK`, `WAIT` (new agents should wait), or `ALERT`, and names the largest consumers by owning task; unavailable measurements read `UNKNOWN`.
 These controls reduce risk but cannot guarantee avoidance of an out-of-memory kill:
 
@@ -689,8 +689,6 @@ These controls reduce risk but cannot guarantee avoidance of an out-of-memory ki
   Retry once pressure eases; admission does not automatically retry a queued spawn.
   Admission gates agent launches, not builds or other heavy subprocesses started by already-running agents; it imposes no per-agent or fleet memory limit.
 - At the alert level, the sampler attempts one automatic `fm-control.sh <task-id> interrupt` per episode if the top consumer is a task this home owns, passing the resolved home and selected state explicitly; it never exits, kills, or discards that task.
-  An alert from host-wide pressure alone (`HOST-ALERT`) queues its wake and attempts no interrupt.
-  An `app.slice` alert still wakes and interrupts inside a host-wide episode, and once an episode is latched by `app.slice`, later host-wide samples stay quiet until an OK sample.
   Before latching the episode or dispatching an interrupt, it queues a durable `check: host memory ALERT` wake naming the consumer and planned interrupt attempt (or the ownership skip), then records the attempt in `state/host-memory-interrupts.tsv`.
   Failed wake publication leaves the next sample eligible, including after a sampler restart; an older episode's queued wake does not suppress a new episode's wake.
   After successful alert output, the watcher records that row's identity so its unacknowledged alert cannot immediately close the handling successor; later reminders use the [local queue backstop](watcher-continuity.md#durable-queue-and-turn-end-backstop), and only post-handling acknowledgement retires the row.
@@ -706,7 +704,7 @@ Each setting is `key=number`, blank lines and lines beginning with `#` are ignor
 | --- | --- | --- |
 | `wait_pressure` | `20` | new agents wait while `app.slice` pressure is at or above this percentage |
 | `wait_available_gb` | `12` | new agents wait while available memory is below this many GB |
-| `alert_pressure` | `35` | the sampler alerts while `app.slice` pressure, or its 10-second average alone, is at or above this percentage; host-wide pressure at or above it raises a wake without holding launches or interrupting |
+| `alert_pressure` | `35` | the sampler alerts while `app.slice` pressure, or its 10-second average alone, is at or above this percentage |
 | `alert_available_gb` | `6` | the sampler alerts while available memory is below this many GB |
 
 Thresholds must be finite, nonnegative numbers.

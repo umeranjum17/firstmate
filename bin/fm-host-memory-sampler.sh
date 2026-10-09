@@ -54,7 +54,7 @@ fm_memory_sampler_interrupt() {
 }
 
 fm_memory_sampler_tick() {
-  local out d meta home root child_state task reason action epoch kind latched stop=0 latch="$STATE/.host-memory-alerted"
+  local out d meta home root child_state task reason action epoch stop=0 latch="$STATE/.host-memory-alerted"
   local -a dirs=(--state-dir "$FM_HOME" "$STATE")
   fm_local_firstmate_state_dirs "$STATE" "$FM_HOME" 2>/dev/null || FM_LOCAL_STATE_DIRS=("$STATE")
   if root=$(fm_firstmate_root_home "$FM_HOME") && [ ! "$root" -ef "$FM_HOME" ]; then
@@ -76,17 +76,15 @@ fm_memory_sampler_tick() {
     return 0
   }
   case "${out%%$'\t'*}" in
-    ALERT|HOST-ALERT) ;;
+    ALERT) ;;
     OK) rm -f "$latch"; return 0 ;;
     *) return 0 ;;
   esac
-  kind=${out%%$'\t'*}
-  latched=$(cat "$latch" 2>/dev/null || true)
-  case "$latched" in ALERT|"$kind") return 0 ;; esac
+  [ ! -e "$latch" ] || return 0
   task=${out##*$'\t'}
   out=${out%$'\t'*}
   reason="check: host memory ALERT: ${out#*$'\t'}"
-  action="automatic interrupt skipped: no app.slice alert, or top consumer is not a task this home owns"
+  action="automatic interrupt skipped: top consumer is not a task this home owns"
   case "$task" in
     ''|*[!A-Za-z0-9._-]*) ;;
     *) action="automatic interrupt attempted: task $task" ;;
@@ -96,7 +94,7 @@ fm_memory_sampler_tick() {
   trap 'stop=1' HUP INT TERM
   if fm_wake_append_locked check host-memory "$reason; $action" \
     && printf '%s\t%s\t%s\n' "$epoch" "$task" "$reason; $action" >> "$STATE/host-memory-interrupts.tsv" \
-    && printf '%s\n' "$kind" > "$latch.$$" \
+    && printf '%s\n' "$reason; $action" > "$latch.$$" \
     && mv "$latch.$$" "$latch"; then
     case "$task" in
       ''|*[!A-Za-z0-9._-]*) ;;

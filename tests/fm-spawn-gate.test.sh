@@ -124,13 +124,15 @@ EOF
 # spawn through and clears the record.
 test_host_memory_pressure_refuses_launches() {
   local home=$TMP_ROOT/memory proc out status
-  local FM_HOST_MEMORY_CGROUP_ROOT=$home/missing-cgroup
+  local FM_HOST_MEMORY_CGROUP_ROOT=$home/cgroup
   export FM_HOST_MEMORY_CGROUP_ROOT
   make_home "$home"
   proc=$home/proc
   mkdir -p "$proc/pressure"
   printf 'MemTotal: 67108864 kB\nMemAvailable: 31457280 kB\nSwapTotal: 0 kB\nSwapFree: 0 kB\n' > "$proc/meminfo"
   printf 'some avg10=42.00 avg60=40.00 avg300=10.00 total=1\n' > "$proc/pressure/memory"
+  mkdir -p "$home/cgroup/user.slice/user-$(id -u).slice/user@$(id -u).service/app.slice"
+  printf 'some avg10=42.00 avg60=40.00 avg300=10.00 total=1\n' > "$home/cgroup/user.slice/user-$(id -u).slice/user@$(id -u).service/app.slice/memory.pressure"
   out=$(FM_HOST_MEMORY_PROC=$proc run_spawn_home "$home" nope-mem-z5 projects/none --scout --harness 'true worker')
   status=$?
   [ "$status" -ne 0 ] || fail "a spawn under memory pressure should be refused"
@@ -142,6 +144,7 @@ test_host_memory_pressure_refuses_launches() {
   out=$(FM_HOST_MEMORY_PROC=$proc run_spawn_home "$home" mate-mem-z6 / --secondmate --harness 'true worker')
   assert_contains "$out" "task mate-mem-z6 stays queued" "a secondmate launch is refused too"
   printf 'some avg10=1.00 avg60=1.00 avg300=1.00 total=1\n' > "$proc/pressure/memory"
+  printf 'some avg10=1.00 avg60=1.00 avg300=1.00 total=1\n' > "$home/cgroup/user.slice/user-$(id -u).slice/user@$(id -u).service/app.slice/memory.pressure"
   out=$(FM_HOST_MEMORY_PROC=$proc run_spawn_home "$home" nope-mem-z5 projects/none --scout --harness 'true worker')
   assert_contains "$out" "has no brief" "a calm host lets the spawn through"
   [ ! -e "$home/state/admission-refused" ] || fail "an admitted spawn left the refusal record behind"
