@@ -137,6 +137,8 @@ const Needs = ({ d }) => d.asks == null ? html`<div class="none"><p>The ask list
 // Overview: the fleet's numbers as charts - each figure with its trend, the lifecycle as a rail of stages,
 // colour that means something (stage colours for work in motion, orange and red only where it waits or is stuck).
 const QTONE = ['--green', '--orange', '--accent', '--grey', '--grey']
+const OV_STATES = [['building', 'Building', ''], ['validating', 'Validating or CI', 'v'], ['finished', 'Finished, not landed', 'f'],
+  ['waiting', 'Waiting', 'w'], ['decision', 'On a decision', 'd'], ['blocked', 'Blocked', 'b']]
 const sum = v => Object.values(v || {}).reduce((a, b) => a + (b || 0), 0)
 const ts = v => typeof v === 'number' ? v : typeof v === 'string' ? Date.parse(v) / 1000 : null
 const sign = n => n > 0 ? `+${n}` : `${n}`
@@ -163,12 +165,13 @@ function Kpi({ name, v, sub, c, t, good, href, onClick }) {
 // 14 days of a daily count: today in the accent, earlier days muted, the period average dashed.
 function Days({ rows, c, label }) {
   if (!rows?.length) return html`<p class="ov-tot">No days on record</p>`
-  const top = Math.max(1, ...rows.map(r => r.value || 0)), w = 100 / rows.length, avg = rows.slice(0, -1).reduce((a, r) => a + (r.value || 0), 0) / Math.max(1, rows.length - 1)
+  const known = rows.filter(r => r.value != null), top = Math.max(1, ...known.map(r => r.value)), w = 100 / rows.length
+  const prior = rows.slice(0, -1).filter(r => r.value != null), avg = prior.length ? prior.reduce((a, r) => a + r.value, 0) / prior.length : null
   const day = s => new Date(`${s}T12:00:00`).toLocaleDateString([], { day: 'numeric', month: 'short' })
   return html`<div class="ov-days" style=${{ '--c': `var(${c})` }}><svg viewBox="0 0 100 60" preserveAspectRatio="none" role="img" aria-label=${`${label}, last ${rows.length} days`}>
-    ${rows.map((r, k) => { const h = (r.value || 0) / top * 56; return html`<rect class=${k === rows.length - 1 ? 'now' : ''} x=${(k * w + w * .14).toFixed(2)} y=${(60 - h).toFixed(2)} width=${(w * .72).toFixed(2)} height=${Math.max(.5, h).toFixed(2)} rx=".6"><title>${day(r.day)}: ${r.value}</title></rect>` })}
-    <line x1="0" x2="100" y1=${(60 - avg / top * 56).toFixed(2)} y2=${(60 - avg / top * 56).toFixed(2)} vector-effect="non-scaling-stroke"/></svg>
-    <div class="ov-axis"><span>${day(rows[0].day)}</span><span>today</span></div><small>avg ${Math.round(avg)} a day before today</small></div>`
+    ${rows.map((r, k) => { if (r.value == null) return ''; const h = r.value / top * 56; return html`<rect class=${k === rows.length - 1 ? 'now' : ''} x=${(k * w + w * .14).toFixed(2)} y=${(60 - h).toFixed(2)} width=${(w * .72).toFixed(2)} height=${Math.max(.5, h).toFixed(2)} rx=".6"><title>${day(r.day)}: ${r.value}</title></rect>` })}
+    ${avg != null ? html`<line x1="0" x2="100" y1=${(60 - avg / top * 56).toFixed(2)} y2=${(60 - avg / top * 56).toFixed(2)} vector-effect="non-scaling-stroke"/>` : ''}</svg>
+    <div class="ov-axis"><span>${day(rows[0].day)}</span><span>today</span></div><small>${avg != null ? `avg ${Math.round(avg)} a day before today` : 'no known days to average'}</small></div>`
 }
 // The lifecycle rail: every open lane by stage, split into moving, waiting and stuck, then today's landings.
 function Rail({ d, go }) {
@@ -180,22 +183,23 @@ function Rail({ d, go }) {
     return html`<button class="ov-stage" key=${s} style=${{ '--c': `var(--st-${s})` }} onClick=${() => go({ view: 'board', tab: s === 'landed' ? 'landed' : 'active', card: null })}>
       <span class="ov-sh"><${StageIcon} s=${s}/>${SNAME[s]}</span><b class="num">${s === 'landed' ? total(d, n, 'landed') : n}</b>
       ${s === 'landed' ? html`<span class="ov-sbar done"></span>` : html`<span class="ov-sbar"><i style=${{ width: `${(n - st - wt) / top * 100}%` }}></i><i class="w" style=${{ width: `${wt / top * 100}%` }}></i><i class="s" style=${{ width: `${st / top * 100}%` }}></i></span>`}
-      <small>${s === 'landed' ? 'merged today' : !n ? 'empty' : [st && html`<em class="s">${st} stuck</em>`, wt && `${wt} waiting`, old > 60 && `oldest ${dur(old)}`].filter(Boolean).reduce((a, b) => [a, ' · ', b])}</small></button>` })}</div>`
+      <small>${s === 'landed' ? 'merged today' : !n ? 'empty' : [st && html`<em class="s">${st} stuck</em>`, wt && `${wt} waiting`, old > 60 && `oldest ${dur(old)}`].filter(Boolean).flatMap((p, k) => k ? [' · ', p] : [p])}</small></button>` })}</div>`
 }
 function Overview({ d, od, go }) {
   const q = od.data
   if (!q) return html`<div class="ov"><div class="none"><p>${od.err ? `Cannot load the overview: ${od.err}` : 'Loading the overview…'}</p></div></div>`
   const m = q.metrics, asks = d.asks, openCards = d.cards.filter(c => ACTIVE.includes(c.stage)), hist = q.lane_history
   const stk = openCards.filter(stuck).length, toLand = openCards.filter(c => c.stage === 'merge').length
+  const states = m.lane_states?.value, age = now() - ts(q.build_time)
   const qr = q.queue_reasons || [], qOk = m.queue?.value != null, qTop = Math.max(1, ...qr.map(x => sum(x.by_home)))
   const flow = (mid, label, foot, c) => { const r = m[mid]; return html`<div class="ov-flow"><span>${label}</span>
     <b class="num">${r?.status === 'unknown' ? 'unknown' : `${r?.status === 'lower_bound' && mid === 'landed' ? '≥' : ''}${r?.value ?? '–'}`}</b><small>${foot}</small>
     <${Days} rows=${r?.daily} c=${c} label=${label}/></div>` }
   return html`<div class="ov">
-    ${od.err ? html`<p class="ov-tot bad">Refresh failed: ${od.err}</p>` : ''}
+    <p class="ov-tot">${od.err ? html`<span class="bad">Refresh failed: ${od.err} · </span>` : ''}${age < 60 ? 'just updated' : `updated ${dur(age)} ago`}</p>
     <div class="ov-kpis">
       <${Kpi} name="Needs you" v=${asks == null ? '?' : asks.length} c=${asks?.length ? '--orange' : '--green'} href="#/needs"/>
-      <${Kpi} name="Stuck" v=${stk} c=${stk ? '--red' : '--green'} t=${trend(hist, 'stuck', m.stuck?.value)} good="down" onClick=${() => go({ view: 'board', tab: 'active', state: ['blocked', 'decision'], card: null })}/>
+      <${Kpi} name="Stuck" v=${stk} c=${stk ? '--red' : '--green'} t=${trend(hist, 'stuck', stk)} good="down" onClick=${() => go({ view: 'board', tab: 'active', state: ['blocked', 'decision'], card: null })}/>
       <${Kpi} name="To land" v=${toLand} c="--st-merge" onClick=${() => go({ view: 'board', tab: 'active', card: null })}/>
       <${Kpi} name="Lanes open" v=${m.lanes?.value ?? '–'} sub=${` of ${m.lane_plan?.value ?? '–'}`} c="--accent" t=${trend(hist, 'lanes', m.lanes?.value)} good="up"/>
       <${Kpi} name="Ready" v=${m.ready?.value ?? '–'} c="--h-2" t=${trend(hist, 'ready', m.ready?.value)}/>
@@ -205,6 +209,9 @@ function Overview({ d, od, go }) {
         html`<a class="ov-ask" key=${k} href=${a.url || '#/needs'} target=${a.url ? '_blank' : null} rel="noreferrer"><span>${a.text}</span><small class="num">${a.age == null ? '' : dur(a.age)}</small></a>`)}</div></section>` : ''}
       <section class="ov-card wide"><h3>Lifecycle</h3><${Rail} d=${d} go=${go}/></section>
       <section class="ov-card w2"><h3>Flow</h3><div class="ov-flows">${flow('landed', 'Landed today', 'recorded merges', '--st-landed')}${flow('closed', 'Closed 7 d', 'backlog items', '--green')}</div></section>
+      <section class="ov-card w1"><h3>Lanes by state</h3>
+        <div class="ov-bar tall">${states ? OV_STATES.map(([k, , c]) => states[k] ? html`<i class=${c} key=${k} style=${{ flex: states[k] }}></i>` : '') : ''}</div>
+        <div class="ov-legend">${OV_STATES.map(([k, nm, c]) => html`<span key=${k}><i class=${c}></i>${nm}<b class="num">${states ? states[k] : '–'}</b></span>`)}</div></section>
       <section class="ov-card w1"><h3>Why work is queued</h3>
         <div class="ov-ql">${qr.map((x, k) => { const n = sum(x.by_home); return html`<div class="ov-qrow" key=${k}><span>${x.reason}</span>
           <span class="ov-bar">${qOk && n > 0 ? html`<i style=${{ width: `${n / qTop * 100}%`, background: `var(${QTONE[k] || '--grey'})` }}></i>` : ''}</span><b class="num">${qOk ? n : '–'}</b></div>` })}</div>

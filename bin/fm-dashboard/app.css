@@ -286,8 +286,16 @@ a.ov-kpi:hover,button.ov-kpi:hover{box-shadow:0 0 0 1px color-mix(in srgb,var(--
 .ov-sbar i.w{background:var(--orange);opacity:.75}.ov-sbar i.s{background:var(--red)}
 .ov-sbar.done{background:var(--c)}
 .ov-bar{display:flex;height:8px;border-radius:4px;background:var(--raise);overflow:hidden}
-.ov-bar i{display:block;height:100%;min-width:2px;border-radius:4px}
+.ov-bar.tall{height:10px}
+.ov-bar i{display:block;height:100%;min-width:2px;border-radius:4px;background:var(--ink-3)}
+.ov-bar i.v{opacity:.72}.ov-bar i.f{opacity:.5}.ov-bar i.w{opacity:.32}
+.ov-bar i.d{background:var(--orange);opacity:1}.ov-bar i.b{background:var(--red);opacity:1}
 .ov-bar.unk{background:repeating-linear-gradient(-45deg,var(--raise) 0 4px,var(--line-2) 4px 6px)}
+.ov-legend{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px}
+.ov-legend span{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-3);min-width:0}
+.ov-legend i{width:8px;height:8px;border-radius:2px;background:var(--ink-3);flex:none}
+.ov-legend i.v{opacity:.72}.ov-legend i.f{opacity:.5}.ov-legend i.w{opacity:.32}.ov-legend i.d{background:var(--orange)}.ov-legend i.b{background:var(--red)}
+.ov-legend b{margin-left:auto;color:var(--ink);font-weight:500;font-variant-numeric:tabular-nums}
 .ov-ql{display:flex;flex-direction:column;gap:9px}
 .ov-qrow{display:grid;grid-template-columns:minmax(0,1fr) 88px 34px;align-items:center;gap:10px;font-size:13px;color:var(--ink-2)}
 .ov-qrow b{color:var(--ink);font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
@@ -296,7 +304,7 @@ a.ov-kpi:hover,button.ov-kpi:hover{box-shadow:0 0 0 1px color-mix(in srgb,var(--
 .ov-qsub{display:block;font-size:11px;color:var(--ink-4);margin-top:1px}
 .ov-qsub.warn{color:var(--orange)}.ov-qsub.bad{color:var(--red)}.ov-qsub.mut{color:var(--ink-4)}
 .ov-tot{font-size:12px;color:var(--ink-3)}
-.ov-tot b{color:var(--ink)}.ov-tot.bad{color:var(--red);margin-bottom:8px}
+.ov-tot b{color:var(--ink)}.ov-tot .bad{color:var(--red)}
 .ov-flows{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 .ov-flow{display:flex;flex-direction:column;gap:2px;min-width:0}
 .ov-flow span{font-size:12px;color:var(--ink-3)}
