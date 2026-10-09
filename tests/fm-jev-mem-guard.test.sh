@@ -203,7 +203,8 @@ test_watcher_wakes_once_per_alert_episode() {
 }
 
 test_fast_spike_waits_without_alert() {
-  local case out rc app="user.slice/user-$(id -u).slice/user@$(id -u).service/app.slice"
+  local case out rc app
+  app="user.slice/user-$(id -u).slice/user@$(id -u).service/app.slice"
   case=$(make_case fast-spike)
   make_fleet "$case"
   prepare_control_task "$case"
@@ -221,7 +222,8 @@ test_fast_spike_waits_without_alert() {
 }
 
 test_cgroup_pressure() {
-  local case=$TMP_ROOT/cgroup out rc app="user.slice/user-$(id -u).slice/user@$(id -u).service/app.slice"
+  local case=$TMP_ROOT/cgroup out rc app
+  app="user.slice/user-$(id -u).slice/user@$(id -u).service/app.slice"
   mkdir -p "$case/cgroup/$app" "$case/state"
   fake_host "$case/proc" 40 2
   # A 10 s spike that the sustained average has not caught up with holds admission as WAIT.
@@ -259,7 +261,8 @@ test_cgroup_pressure() {
 }
 
 test_host_pressure_neither_holds_nor_wakes() {
-  local case out rc app="user.slice/user-$(id -u).slice/user@$(id -u).service/app.slice"
+  local case out rc app
+  app="user.slice/user-$(id -u).slice/user@$(id -u).service/app.slice"
   case=$(make_case host-only)
   make_fleet "$case"
   prepare_control_task "$case"
