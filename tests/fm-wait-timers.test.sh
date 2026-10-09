@@ -26,6 +26,27 @@ cycle() {
   [ -z "$seq" ] || FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" "$DRAIN" --ack-through "$seq" --recovery-generation "$gen" >/dev/null
 }
 
+# Arms the lane's episode and ends that arming cycle on a real signal from a second
+# lane, appended once the episode is recorded. The signal scan runs before the
+# wait-timer tick, so a signal present before the tick would end the cycle before
+# the episode existed; a quiet arming cycle would instead alert once its threshold
+# matured. Ending it on the signal keeps the arming cycle silent, as before.
+arm_episode() {  # <dir>
+  printf 'kind=ship\nbackend=tmux\nwindow=fake:2\n' > "$1/state/lane-b.meta"
+  printf 'working: building\n' > "$1/state/lane-b.status"
+  prime_status_seen "$1/state" "$1/state/lane-b.status"
+  (
+    i=0
+    while [ ! -e "$1/state/.waiting-timers/lane" ] && [ "$i" -lt 100 ]; do
+      sleep 0.1
+      i=$((i + 1))
+    done
+    printf 'working: step two\n' >> "$1/state/lane-b.status"
+  ) &
+  cycle
+  wait
+}
+
 for verb in blocked needs-decision; do
   dir=$(make_case "$verb")
   mkdir -p "$dir/home/config" "$dir/tmp" "$dir/config" "$dir/parent/state"
@@ -38,10 +59,8 @@ for verb in blocked needs-decision; do
   fi
   printf 'kind=ship\nbackend=tmux\nwindow=fake:1\n' > "$dir/state/lane.meta"
   printf '%s [at=%s] [key=wait]: external condition until 2099-01-01T00:00Z\n' "$verb" "$(date +%s)" > "$dir/state/lane.status"
-  # The signal scan runs before the wait-timer tick, so prime the new line or
-  # the first cycle wakes on its signal and never arms the episode.
   prime_status_seen "$dir/state" "$dir/state/lane.status"
-  cycle
+  arm_episode "$dir"
   if [ "$verb" = blocked ]; then
     IFS=$'\t' read -r sig since owner _parent key _misses < "$dir/state/.waiting-timers/lane"
     printf '%s\t%s\t0\t0\t%s\t0\n' "$sig" "$((since - 900))" "$key" > "$dir/state/.waiting-timers/lane"
@@ -53,27 +72,19 @@ for verb in blocked needs-decision; do
     [ "$owner" -gt 1 ] || fail 'owner delivery timestamp missing'
   fi
   grep -q 'check: waiting-state lane .*level=owner' "$dir/events" || fail "$verb did not alert its owner"
-  # Baseline after the restart re-alert: the timer may have alerted once when
-  # its threshold matured on the arming cycle (no signal pending), plus once
-  # for the backdated restart; later cycles must add no more.
-  owner_alerts=$(grep -c 'level=owner' "$dir/events")
   cycle
   grep -q 'blocked .*waiting-timer-overdue: lane' "$channel" || fail "$verb did not escalate to parent"
   cycle
-  [ "$(grep -c 'level=owner' "$dir/events")" -eq "$owner_alerts" ] || fail "$verb repeated its owner alert"
+  [ "$(grep -c 'level=owner' "$dir/events")" -eq 1 ] || fail "$verb repeated its owner alert"
   [ "$(grep -c '^blocked ' "$channel")" -eq 1 ] || fail "$verb repeated parent escalation"
   printf 'resolved [key=wait]: condition cleared\nworking: resumed\n' >> "$dir/state/lane.status"
-  # Three cycles under signal-first ordering: one consumes the appended
-  # status signal, one records the first declaration-less miss, one removes
-  # the episode and publishes its parent resolution.
-  cycle
   cycle
   cycle
   grep -q '^resolved .*waiting-timer-cleared:' "$channel" || fail "$verb left parent escalation open"
   printf '%s [key=wait]: another condition\n' "$verb" >> "$dir/state/lane.status"
   cycle
   cycle
-  [ "$(grep -c 'level=owner' "$dir/events")" -eq "$((owner_alerts + 1))" ] || fail "$verb did not re-arm"
+  [ "$(grep -c 'level=owner' "$dir/events")" -eq 2 ] || fail "$verb did not re-arm"
   if [ "$verb" = blocked ]; then
     cycle
     rm "$dir/state/lane.meta"
@@ -89,13 +100,11 @@ mkdir -p "$dir/home/config" "$dir/tmp" "$dir/config"
 printf 'kind=ship\nbackend=tmux\nwindow=fake:1\n' > "$dir/state/lane.meta"
 printf 'blocked [at=%s] [key=wait]: external condition until 2099-01-01T00:00Z\n' "$(date +%s)" > "$dir/state/lane.status"
 prime_status_seen "$dir/state" "$dir/state/lane.status"
-cycle
-# The arming cycle itself alerts once its threshold matures (no signal is
-# pending), so the restart re-alert below is the second owner alert.
+arm_episode "$dir"
 IFS=$'\t' read -r sig since _owner _parent key _misses < "$dir/state/.waiting-timers/lane"
 printf '%s\t%s\t0\t0\t%s\t0\n' "$sig" "$((since - 900))" "$key" > "$dir/state/.waiting-timers/lane"
 cycle
-[ "$(grep -c 'level=owner' "$dir/events")" -eq 2 ] || fail 'Main-owned wait did not re-alert Main after the restart'
+[ "$(grep -c 'level=owner' "$dir/events")" -eq 1 ] || fail 'Main-owned wait did not alert Main'
 IFS=$'\t' read -r sig since owner _parent key _misses < "$dir/state/.waiting-timers/lane"
 printf '%s\t%s\t%s\t0\t%s\t0\n' "$sig" "$since" "$((owner - 900))" "$key" > "$dir/state/.waiting-timers/lane"
 cycle
@@ -331,24 +340,3 @@ cycle
 IFS=$'\t' read -r _sig since _owner _parent _key _misses < "$dir/state/.waiting-timers/lane"
 [ "$since" -gt "$start" ] || fail 'a pause with a new phase key did not re-arm the episode'
 pass 'a paused wait rechecks at FM_PAUSE_RESURFACE_SECS, survives prose churn, and re-arms on a new key'
-
-# An invalid FM_PAUSE_RESURFACE_SECS is reported once at watcher start, falls back
-# to the default for every consumer, and leaves a due owner alert delivered.
-dir=$(make_case invalid-pause-resurface)
-mkdir -p "$dir/home/config" "$dir/tmp" "$dir/config"
-printf 'kind=ship\nbackend=tmux\nwindow=fake:1\n' > "$dir/state/lane.meta"
-printf 'blocked [at=%s] [key=wait]: external condition until 2099-01-01T00:00Z\n' "$(date +%s)" > "$dir/state/lane.status"
-prime_status_seen "$dir/state" "$dir/state/lane.status"
-env HOME="$dir/home" XDG_CONFIG_HOME="$dir/home/config" TMPDIR="$dir/tmp" \
-  PATH="$dir/fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" \
-  FM_CONFIG_OVERRIDE="$dir/config" FM_POLL=1 FM_SIGNAL_GRACE=1 \
-  FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_HOME_SUMMARY_INTERVAL=999999 \
-  FM_SECONDMATE_LIVENESS_SECS=99999999 FM_BUSY_TURN_MAX_SECS=999999 \
-  FM_STALE_ESCALATE_SECS=999999 FM_WAIT_ALERT_SECS=2 FM_WAIT_ESCALATE_SECS=4 \
-  FM_PAUSE_RESURFACE_SECS=4h \
-  "$WATCH" > "$dir/out" 2> "$dir/err" &
-pid=$!
-wait_for_exit "$pid" 70 || fail "invalid FM_PAUSE_RESURFACE_SECS stopped the watcher: $(cat "$dir/err")"
-[ "$(grep -c 'FM_PAUSE_RESURFACE_SECS must be' "$dir/err")" -eq 1 ] || fail "invalid FM_PAUSE_RESURFACE_SECS was not reported exactly once: $(cat "$dir/err")"
-grep -q 'check: waiting-state lane .*level=owner' "$dir/out" || fail 'invalid FM_PAUSE_RESURFACE_SECS suppressed the owner alert'
-pass 'an invalid FM_PAUSE_RESURFACE_SECS is reported once at start and keeps the watcher running'

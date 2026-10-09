@@ -418,13 +418,7 @@ case "$SECONDMATE_LIVENESS_WINDOW_SECS" in ''|*[!0-9]*|0) SECONDMATE_LIVENESS_WI
 # longer than the wedge threshold, but finite so a forgotten wait cannot rot
 # invisibly - except an item held for the captain while the away-posture record
 # exists, which is never rechecked (away_record_present below).
-FM_PAUSE_RESURFACE_SECS=${FM_PAUSE_RESURFACE_SECS:-$FM_PAUSE_RESURFACE_SECS_DEFAULT}
-if ! _fm_wait_seconds_valid "$FM_PAUSE_RESURFACE_SECS"; then
-  echo "watcher: FM_PAUSE_RESURFACE_SECS must be positive decimal seconds of at most nine digits; using $FM_PAUSE_RESURFACE_SECS_DEFAULT" >&2
-  FM_PAUSE_RESURFACE_SECS=$FM_PAUSE_RESURFACE_SECS_DEFAULT
-fi
-export FM_PAUSE_RESURFACE_SECS
-PAUSE_RESURFACE_SECS=$FM_PAUSE_RESURFACE_SECS
+PAUSE_RESURFACE_SECS=${FM_PAUSE_RESURFACE_SECS:-$FM_PAUSE_RESURFACE_SECS_DEFAULT}
 # A secondmate home below its lane floor with ready work re-raises the same
 # condition on this cadence instead of going silent after one wake: the lead
 # either starts the work or records why it waits, and that answer must not need a
