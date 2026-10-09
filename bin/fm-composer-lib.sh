@@ -546,13 +546,12 @@ FM_COMPOSER_OMP_STATUS_RE_DEFAULT='^[[:space:]]*(π|󰵗)[[:space:]]+·[[:space:
 # `<n>K (<p>%)` cell, but its `· $<cost>` tail is TRUNCATED at the cost cell
 # and the `ctrl+p` hint can land with NO separating space, and the trailing
 # `commands` wraps to the next row beside the directory's own continuation
-# fragment. Captured live 2026-10-09 in the fm-opencode-composer-err repro
-# (`.../a-   22.1K (2%) · $ctrl+p` then `really-...-name    commands`): the
-# cost cell renders as a bare `$` (no digits) and the palette hint abuts it,
-# so the pre-fix `\$[0-9]+...[[:space:]]*ctrl\+p` alternative matched neither
-# row and an idle, empty composer read `unknown`. The cost and hint groups are
-# therefore each OPTIONAL and the cost digits are `[0-9]*` (a truncated `$`);
-# every other cell the row can hold (`· $`, `ctrl+p`, `commands`) remains the
+# fragment, e.g. `.../a-   22.1K (2%) · $ctrl+p` then `really-...-name    commands`:
+# the cost cell renders as a bare `$` (no digits) and the palette hint abuts
+# it, so an alternative that demands digits after `$` and a hint after it
+# matches neither row, and an idle, empty composer reads `unknown`. The cost
+# and hint groups are therefore each OPTIONAL and the cost digits are `[0-9]*`
+# (a truncated `$`); every other cell the row can hold (`· $`, `ctrl+p`, `commands`) remains the
 # same composer furniture, and the row still requires its `/`-leading
 # directory plus an `<n>K (<p>%)` context cell, so a busy `esc interrupt` row
 # and unclaimed activity still fail in the refusing direction.
