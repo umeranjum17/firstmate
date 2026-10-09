@@ -721,26 +721,29 @@ test_memory_admission_defers_recovery() {
   log="$w/calls.log"; : > "$log"
   mkdir -p "$w/proc/pressure"
   printf 'MemAvailable: 31457280 kB\n' > "$w/proc/meminfo"
-  printf 'some avg10=25 avg60=0 avg300=0 total=1\n' > "$w/proc/pressure/memory"
+  printf 'some avg10=25 avg60=25 avg300=0 total=1\n' > "$w/proc/pressure/memory"
+  mkdir -p "$w/cgroup/user.slice/user-$(id -u).slice/user@$(id -u).service/app.slice"
+  printf 'some avg10=25 avg60=25 avg300=0 total=1\n' > "$w/cgroup/user.slice/user-$(id -u).slice/user@$(id -u).service/app.slice/memory.pressure"
   for i in 1 2 3 4; do
-    out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" zsh "$log" FM_ROOT_OVERRIDE="$w/code" FM_HOST_MEMORY_PROC="$w/proc" FM_HOST_MEMORY_CGROUP_ROOT="$w/no-cgroup")
+    out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" zsh "$log" FM_ROOT_OVERRIDE="$w/code" FM_HOST_MEMORY_PROC="$w/proc" FM_HOST_MEMORY_CGROUP_ROOT="$w/cgroup")
     assert_contains "$out" 'memory admission deferred:' "memory pressure defers liveness recovery"
     [ ! -s "$log" ] || fail "memory deferral removed the endpoint: $(cat "$log")"
     [ ! -e "$w/home/state/.secondmate-relaunch-sm1" ] || fail "memory deferral consumed retry budget"
   done
   printf 'some avg10=2 avg60=0 avg300=0 total=1\n' > "$w/proc/pressure/memory"
-  out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" zsh "$log" FM_ROOT_OVERRIDE="$w/code" FM_HOST_MEMORY_PROC="$w/proc" FM_HOST_MEMORY_CGROUP_ROOT="$w/no-cgroup")
+  printf 'some avg10=2 avg60=0 avg300=0 total=1\n' > "$w/cgroup/user.slice/user-$(id -u).slice/user@$(id -u).service/app.slice/memory.pressure"
+  out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" zsh "$log" FM_ROOT_OVERRIDE="$w/code" FM_HOST_MEMORY_PROC="$w/proc" FM_HOST_MEMORY_CGROUP_ROOT="$w/cgroup")
   assert_contains "$(cat "$log")" new-window "recovery resumes once memory eases: $out"
   assert_grep relaunched "$w/home/state/.secondmate-relaunch-sm1" "successful recovery is ledgered"
   [ "$(grep -c $'\tattempt$' "$w/home/state/.secondmate-relaunch-sm1")" -eq 1 ] || fail "only the actual launch should consume an attempt"
   printf 'wait_pressure=nan\n' > "$w/home/config/host-memory"
   for i in 1 2 3; do
-    out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" zsh "$log" FM_ROOT_OVERRIDE="$w/code" FM_HOST_MEMORY_PROC="$w/proc" FM_HOST_MEMORY_CGROUP_ROOT="$w/no-cgroup")
+    out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" zsh "$log" FM_ROOT_OVERRIDE="$w/code" FM_HOST_MEMORY_PROC="$w/proc" FM_HOST_MEMORY_CGROUP_ROOT="$w/cgroup")
     assert_contains "$out" 'respawn failed' "invalid configuration is a genuine recovery failure"
   done
   out=$(PATH="$tmuxfb:$fb:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/code" \
     FM_TEST_PANE_CMD=zsh FM_TMUX_CALL_LOG="$log" TMUX='' FM_BACKEND=tmux \
-    FM_HOST_MEMORY_PROC="$w/proc" FM_HOST_MEMORY_CGROUP_ROOT="$w/no-cgroup" \
+    FM_HOST_MEMORY_PROC="$w/proc" FM_HOST_MEMORY_CGROUP_ROOT="$w/cgroup" \
     FM_SECONDMATE_LIVENESS_SECS=1 FM_SECONDMATE_LIVENESS_MAX_ATTEMPTS=4 FM_POLL=1 FM_SIGNAL_GRACE=0 \
     "$ROOT/bin/fm-watch.sh" 2>&1)
   assert_contains "$out" 'auto-relaunch paused after 4 attempts' "non-memory failures still consume the retry budget"

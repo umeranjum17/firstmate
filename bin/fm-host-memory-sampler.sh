@@ -77,7 +77,7 @@ fm_memory_sampler_tick() {
   }
   case "${out%%$'\t'*}" in
     ALERT) ;;
-    OK) rm -f "$latch"; return 0 ;;
+    WAIT|OK) rm -f "$latch"; return 0 ;;
     *) return 0 ;;
   esac
   [ ! -e "$latch" ] || return 0

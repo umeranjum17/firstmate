@@ -692,8 +692,10 @@ test_relaunch_under_memory_pressure_refuses_before_stop() {
   mkdir -p "$dir/proc/pressure"
   printf 'MemTotal: 67108864 kB\nMemAvailable: 31457280 kB\n' > "$dir/proc/meminfo"
   printf 'some avg10=27.00 avg60=20.00 avg300=9.00 total=1\n' > "$dir/proc/pressure/memory"
+  mkdir -p "$dir/cgroup/user.slice/user-$(id -u).slice/user@$(id -u).service/app.slice"
+  printf 'some avg10=27.00 avg60=20.00 avg300=9.00 total=1\n' > "$dir/cgroup/user.slice/user-$(id -u).slice/user@$(id -u).service/app.slice/memory.pressure"
   before=$(cat "$dir/home/state/rl52.meta")
-  out=$(FM_HOST_MEMORY_PROC="$dir/proc" FM_HOST_MEMORY_CGROUP_ROOT="$dir/missing-cgroup" run_control "$dir" rl52 relaunch --note "stopped by a restart"); rc=$?
+  out=$(FM_HOST_MEMORY_PROC="$dir/proc" FM_HOST_MEMORY_CGROUP_ROOT="$dir/cgroup" run_control "$dir" rl52 relaunch --note "stopped by a restart"); rc=$?
   expect_code 1 "$rc" "a relaunch under memory pressure should refuse"
   assert_contains "$out" "host memory under pressure: pressure at or above 20%" "the refusal should name the pressure"
   assert_contains "$out" "refused before its agent was touched" "the refusal should say the agent is untouched"

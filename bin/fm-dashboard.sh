@@ -751,7 +751,7 @@ def machine():
     # Use the independent sampler's history (bin/fm-host-memory-sampler.sh), not the dashboard's refresh cadence.
     try:
         rows = [l.split('\t') for l in open(os.path.join(HOME, 'state/host-memory.tsv'), errors='replace')]
-        m['peak'] = max((float(r[3]) for r in rows if len(r) >= 5 and float(r[0]) >= NOW_TS - 3600), default=None)
+        m['peak'] = max((float(r[3]) for r in rows if len(r) >= 5 and r[3].strip() and float(r[0]) >= NOW_TS - 3600), default=None)
         m['peak_why'] = 'no sample in the last hour'
     except (OSError, ValueError) as e:
         m['peak'], m['peak_why'] = None, getattr(e, 'strerror', None) or str(e)
@@ -1035,7 +1035,7 @@ machine_rows = ''.join([
     meter('Memory pressure', f'{psi:.0f}%', psi / 100, psi_tone(psi), 'share of the last 10 s some job waited on memory; heavy jobs wait at 40% or more')
     if psi is not None else meter('Memory pressure', unknown(mach['pressure_why']), None, ''),
     meter('Pressure peak, last hour', f'{mach["peak"]:.0f}%', mach['peak'] / 100, psi_tone(mach['peak']),
-          'highest 10 s share the watcher recorded; config/host-memory sets when new agents wait and when an alert goes out')
+          'highest sustained share (lower of 10 s and 60 s averages) the watcher recorded; config/host-memory sets when new agents wait and when an alert goes out')
     if mach['peak'] is not None else meter('Pressure peak, last hour', unknown(mach['peak_why']), None, ''),
     meter('Swap used', f'{mach["swap"]:.1f} GB', None, 'warn' if mach['swap'] >= 8 else 'ok', 'memory the kernel pushed to disk')
     if mach['swap'] is not None else meter('Swap used', unknown('no SwapTotal in meminfo'), None, ''),
