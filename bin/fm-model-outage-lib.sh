@@ -30,7 +30,7 @@ fm_model_outage_text() {
 }
 
 fm_model_outage_tick() {
-  local meta id backend target harness gen error hash old verdict rows groups mid line key lanes alert kept
+  local meta id backend target harness gen error hash old verdict rows groups mid line key lanes alert kept floor n row trimmed
   local dir="$STATE/.model-outages" now batch last current
   now=$(date +%s) || return 1
   # The singleton watcher owns these records; never start a second monitor.
@@ -81,10 +81,15 @@ fm_model_outage_tick() {
       if [ -n "$line" ]; then
         key=$(printf '%s\n' "$rows" | sed -n "${line}p")
       else
-        line=$(printf '%s\n' "$rows" | FM_MODEL_OUTAGE_BANNER_RE="$FM_COMPOSER_OPENCODE_LIMIT_BANNER_RE_DEFAULT" awk '
-          /^[[:space:]]*╹▀/ { floor = NR }
-          floor && NR == floor + 1 && $0 ~ ENVIRON["FM_MODEL_OUTAGE_BANNER_RE"] { hit = NR }
-          END { if (hit && floor == hit - 1) print hit }')
+        floor=0; n=0
+        while IFS= read -r row; do
+          n=$((n + 1)); trimmed=$row
+          fm_composer_normalize_trim_var trimmed
+          if _fm_composer_leftbar_floor_row "$trimmed"; then floor=$n; fi
+        done <<< "$rows"
+        if [ "$floor" -gt 0 ] && printf '%s\n' "$rows" | sed -n "$((floor + 1))p" | grep -Eq "$FM_COMPOSER_OPENCODE_LIMIT_BANNER_RE_DEFAULT"; then
+          line=$((floor + 1))
+        fi
         # The banner's reset and retry clocks tick every scan; digits fold
         # out of the episode key so one limit event stays one episode while
         # the displayed error keeps the live countdown.
