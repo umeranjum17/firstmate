@@ -64,7 +64,12 @@ def protect(project, states):
                     continue
                 if state_file.is_symlink() or not state_file.is_file():
                     raise ValueError(f"unsafe Treehouse state: {state_file}")
-                if common_dir(path) != common:
+                try:
+                    copy_common = common_dir(path)
+                except subprocess.CalledProcessError:
+                    warn_skipped(meta.stem, path, "no longer a git worktree")
+                    continue
+                if copy_common != common:
                     continue
                 owners = pools.setdefault(pool, {})
                 if path in owners and owners[path] != meta.stem:

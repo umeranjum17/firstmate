@@ -53,11 +53,8 @@
 #   (w) index.lock mtime read failure                         -> lock kept, REFUSE
 #   (x) transient lock cleared after first failed return      -> retry ALLOW
 #   (y) persistent lock (never clears, not provably stale)    -> REFUSE loudly
-#   (z) stale record + slot reused by a live successor + landed slot content
-#       -> the stale record retires records-only; the successor record, the
-#       slot copy, and the slot-owner claim are untouched, and treehouse is
-#       never asked to return the slot.
-#   (aa) same setup with unlanded slot content -> REFUSE, everything retained.
+#   (z) stale record + slot reused by a live successor record -> REFUSE, nothing
+#       changed, treehouse is never asked to return the slot.
 set -u
 
 # shellcheck source=tests/lib.sh disable=SC1091
@@ -4434,42 +4431,6 @@ EOF
   pass "a process exiting during identity lookup does not block teardown"
 }
 
-# Relocate the case worktree into a Treehouse pool-slot layout
-# (<case>/pool/s1/<repo>), publish the pool state, and rewrite the case task's
-# record plus a live successor record onto the same slot, with the slot-owner
-# claim naming the successor - so the case task's record is the stale one.
-# Also publishes a home dir carrying the state dir the Treehouse project lock
-# needs. Echoes the slot path.
-relocate_wt_into_pool_slot() {
-  local case_dir=$1 slot
-  mkdir -p "$case_dir/pool/s1" "$case_dir/home/state"
-  git -C "$case_dir/project" worktree move "$case_dir/wt" "$case_dir/pool/s1/wt" >/dev/null \
-    || fail "stale-slot: could not move the worktree into a pool slot"
-  : > "$case_dir/pool/treehouse-state.json"
-  slot="$case_dir/pool/s1/wt"
-  fm_write_meta "$case_dir/state/task-x1.meta" \
-    "window=firstmate:fm-task-x1" \
-    "endpoint_task_id=task-x1" \
-    "worktree=$slot" \
-    "project=$case_dir/project" \
-    "kind=ship" \
-    "mode=local-only" \
-    "spawn_gen=teardown-test-task-x1"
-  fm_write_meta "$case_dir/state/task-x2.meta" \
-    "window=firstmate:fm-task-x2" \
-    "endpoint_task_id=task-x2" \
-    "worktree=$slot" \
-    "project=$case_dir/project" \
-    "kind=ship" \
-    "mode=local-only" \
-    "spawn_gen=teardown-test-task-x2"
-  printf 'task=task-x2\nhome=%s\n' "$case_dir/home" > "$case_dir/pool/s1/.fm-slot-owner"
-  printf '%s\n' "$slot"
-}
-
-# Stale-record hatch (teardown-slot-collision): a task whose recorded pool slot
-# was handed to another live task retires only its own records, gated on the
-# existing landed-work proof; unlanded slot content still refuses.
 test_run_abort_precedes_process_reap_precedes_worktree_removal() {
   local case_dir rc head pid abort_log
   case_dir=$(make_case abort-then-reap-then-remove-order)

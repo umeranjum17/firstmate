@@ -179,14 +179,7 @@
 #   root Firstmate home's state directory before slot allocation and holds it through
 #   task metadata publication. Teardown holds that same lock while proving and
 #   returning a slot, so allocation cannot reuse a slot before its owner record
-#   is published. Under that same lock it writes the slot's owner claim, which is
-#   what lets teardown leave a slot reassigned since untouched; bin/fm-wake-lib.sh
-#   owns the claim and bin/fm-teardown.sh owns what it protects. A slot that
-#   cannot be claimed refuses the spawn rather than launching a worker whose slot
-#   could later be released out from under its successor. A spawn that aborts
-#   while it still holds the allocation lock drops its own claim; an abort after
-#   metadata publication has released that lock leaves the claim in place, and
-#   the next spawn's claim replaces it.
+#   is published.
 #   The local root is whatever bin/fm-wake-lib.sh's
 #   fm_firstmate_root_home resolves, so a home seeded from another machine anchors
 #   that lock itself rather than failing to resolve one;
@@ -1300,7 +1293,6 @@ SPAWN_TASK_SET_LOCK=
 SPAWN_TASK_SET_LOCK_HELD=0
 SPAWN_TREEHOUSE_PROJECT_LOCK=
 SPAWN_TREEHOUSE_PROJECT_LOCK_HELD=0
-SPAWN_SLOT_CLAIMED=0
 SPAWN_TREEHOUSE_LEASE=
 RELAUNCH_REPLACEMENT_PENDING=0
 RELAUNCH_REPLACEMENT_BUSY_GEN=
@@ -1464,23 +1456,6 @@ spawn_abort_cleanup() {
     } > "$SPAWN_META_TMP" &&
       fm_backlog_atomic_transition publish "$SPAWN_META_TMP" "$STATE/$ID.meta" "task record" "$STATE" ||
       echo "error: could not record task $ID's retained lease on $SPAWN_TREEHOUSE_LEASE; reconcile it before retrying" >&2
-  fi
-  # A spawn that aborts after claiming its slot but before its record survives
-  # must not leave a claim naming a task no record describes. The release is a
-  # read-then-remove, so it runs only while the project lock that wrote the
-  # claim is still held (aborts before metadata publication); a later abort has
-  # already released that lock and leaves the claim for the next spawn's
-  # atomic replacement rather than racing it. The release itself never removes
-  # another task's claim.
-  if [ "$SPAWN_SLOT_CLAIMED" = 1 ] && [ -n "${WT:-}" ] &&
-    [ ! -e "$STATE/$ID.meta" ] && [ ! -L "$STATE/$ID.meta" ] &&
-    fm_treehouse_pool_slot "$PROJ_ABS" "$WT"; then
-    SPAWN_SLOT_CLAIMED=0
-    if [ "$SPAWN_TREEHOUSE_PROJECT_LOCK_HELD" = 1 ]; then
-      fm_treehouse_slot_owner_release "$WT" "$ID" || true
-    else
-      echo "warning: leaving task $ID's slot claim on $WT in place; the Treehouse project lock is no longer held, so the next spawn's claim replaces it" >&2
-    fi
   fi
   if [ "$SPAWN_TREEHOUSE_PROJECT_LOCK_HELD" = 1 ]; then
     SPAWN_TREEHOUSE_PROJECT_LOCK_HELD=0
@@ -4592,7 +4567,7 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
   }
   python3 "$SCRIPT_DIR/fm-treehouse-protect.py" "$PROJ_ABS" "${FM_LOCAL_STATE_DIRS[@]}" || exit 1
   allocated=$(cd "$PROJ_ABS" && treehouse get --lease --lease-holder "$ID") || {
-    echo "error: treehouse could not lease a worktree for task $ID" >&2
+    echo "error: treehouse could not lease a worktree for task $ID; copies held by tasks not yet torn down are not available until their teardown" >&2
     exit 1
   }
   [ -n "$allocated" ] || { echo "error: treehouse lease returned no worktree for task $ID" >&2; exit 1; }
@@ -4657,33 +4632,6 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
   fi
 
   validate_spawn_worktree "treehouse get" "$T"
-
-  # Keep the Firstmate ownership claim alongside the durable Treehouse lease
-  # for teardown's legacy-slot collision checks. Teardown alone returns the
-  # leased slot; worker exit no longer makes it available to another task.
-  # Written under the Treehouse project lock held from before slot allocation
-  # through metadata publication, so no other spawn or return sees a half-claim.
-  if fm_treehouse_pool_slot "$PROJ_ABS" "$WT"; then
-    # Defense in depth after legacy-copy protection: a conflicting record
-    # still forbids adopting the allocated slot, even if Treehouse leased it.
-    slot_rc=0
-    fm_slot_record_owner "$WT" "$STATE" "$STATE/$ID.meta" || slot_rc=$?
-    case "$slot_rc" in
-      0)
-        echo "error: Treehouse handed out pool slot $WT, but task $FM_SLOT_RECORD_OWNER_ID still records it as its $FM_SLOT_RECORD_OWNER_FIELD; refusing to overwrite a live task's copy. The lease on $WT remains held under task $ID for manual reconciliation; reconcile $FM_SLOT_RECORD_OWNER_ID (bin/fm-crew-state.sh $FM_SLOT_RECORD_OWNER_ID); inspect window $T" >&2
-        exit 1
-        ;;
-      2)
-        echo "error: cannot prove Treehouse pool slot $WT is free of other task records: $FM_LOCAL_FIRSTMATE_ERROR; inspect window $T" >&2
-        exit 1
-        ;;
-    esac
-    if ! fm_treehouse_slot_owner_claim "$WT" "$ID" "$FM_HOME"; then
-      echo "error: could not claim Treehouse pool slot $WT for task $ID; refusing to launch a worker whose slot cannot later be proved to be its own; inspect window $T" >&2
-      exit 1
-    fi
-    SPAWN_SLOT_CLAIMED=1
-  fi
 fi
 if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ]; then
   freshen_spawn_worktree_base "$WT" "$BASE_BRANCH" || exit 1
@@ -5288,11 +5236,7 @@ SPAWN_META_PATH=$SPAWN_META_TMP
 preserve_relaunch_meta() {
   awk -F= '
     BEGIN {
-<<<<<<< HEAD
-      split("window endpoint_task_id worktree project harness kind mode yolo branch receipt_required tasktmp base_branch model effort account account_provider busy_gen spawn_gen traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx", keys, " ")
-=======
-      split("window endpoint_task_id cleanup_recovery worktree project harness kind mode yolo branch receipt_required tasktmp model effort account account_provider busy_gen spawn_gen traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx", keys, " ")
->>>>>>> 10d63db5 (no-mistakes(review): Fix retained allocation recovery and protect home-seed slots)
+      split("window endpoint_task_id cleanup_recovery worktree project harness kind mode yolo branch receipt_required tasktmp base_branch model effort account account_provider busy_gen spawn_gen traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx", keys, " ")
       for (i in keys) owned[keys[i]] = 1
     }
     !($1 in owned)
