@@ -488,6 +488,14 @@ run_outage_fixture() {
 fm_backend_agent_state() { cat "$FAKE_LIVENESS/$4" 2>/dev/null || printf alive; }
 fm_backend_visible_capture_supported() { return 1; }
 EOF
+  cat > "$bin/fm-busy-lib.sh" <<'EOF'
+fm_busy_classify_semantic() {
+  local verdict
+  verdict=$(cat "$STATE/$4.verdict")
+  if [ "$verdict" = hang ]; then sleep 30; printf 'idle opencode-plugin\n'; return 0; fi
+  printf '%s\n' "$verdict"
+}
+EOF
   (
     export STATE="$state" FAKE_LIVENESS="$case_dir/liveness"
     # shellcheck source=/dev/null
@@ -495,7 +503,6 @@ EOF
     fm_meta_get() { printf opencode; }
     fm_backend_target_of_meta() { printf 'fake:%s' "${1##*/}"; }
     fm_backend_of_meta() { printf fake; }
-    fm_busy_classify_semantic() { cat "$STATE/$4.verdict"; }
     hash_pane() { md5sum | cut -c1-12; }
     wake() { :; }
     fm_wake_append() { printf '%s\n' "$3" >> "$case_dir/wakes"; }
@@ -557,6 +564,46 @@ test_model_outage_recovered_lane_leaves_wake() {
   pass "a recovered lane leaves the alert record and re-alerts when it fails again"
 }
 
+unreadable_lane_scans() {
+  lane alpha "idle opencode-plugin" alive
+  lane charlie "idle opencode-plugin" unreadable
+  tick
+  lane alpha "idle opencode-plugin" alive ""
+  tick
+  lane alpha "idle opencode-plugin" alive
+  tick
+}
+
+# A persistently unreadable lane must not pin an unrelated episode: a recovered
+# lane that fails again with the same error is named again.
+test_model_outage_unreadable_lane_does_not_pin_recovered_episode() {
+  local case_dir="$TMP_ROOT/model-outage-unreadable" expected
+  run_outage_fixture "$case_dir" "$case_dir/state" unreadable_lane_scans
+  expected=$(printf '%s\n' \
+    'check: model outage affected=[alpha]: Upstream request failed: region denied' \
+    'check: model outage affected=[alpha]: Upstream request failed: region denied')
+  [ "$(cat "$case_dir/wakes")" = "$expected" ] \
+    || fail "an unreadable lane must not pin a recovered episode, got: $(cat "$case_dir/wakes")"
+  pass "a persistently unreadable lane does not pin a recovered episode"
+}
+
+hung_verdict_scans() {
+  lane delta "hang" alive
+  tick
+}
+
+# A hung verdict read is bounded like the other per-lane reads: it cannot block
+# the scan or name a lane.
+test_model_outage_hung_verdict_is_bounded() {
+  local case_dir="$TMP_ROOT/model-outage-hung" started elapsed
+  started=$(date +%s)
+  run_outage_fixture "$case_dir" "$case_dir/state" hung_verdict_scans
+  elapsed=$(( $(date +%s) - started ))
+  [ ! -e "$case_dir/wakes" ] || fail "a hung verdict must not name a lane, got: $(cat "$case_dir/wakes")"
+  [ "$elapsed" -lt 20 ] || fail "a hung verdict read blocked the scan for ${elapsed}s"
+  pass "a hung verdict read is bounded and names no lane"
+}
+
 errored_then_healthy_turn_scans() {
   drive_oc_plugin "$plugin" "$(oc_status ses_main busy)" "$error_event" || fail "error drive failed"
   tick
@@ -599,6 +646,8 @@ test_gemini_is_refused_as_a_secondmate
 test_codex_unverified_until_a_semantic_source_exists
 test_model_outage_staggered_lane_joins_union_wake
 test_model_outage_recovered_lane_leaves_wake
+test_model_outage_unreadable_lane_does_not_pin_recovered_episode
+test_model_outage_hung_verdict_is_bounded
 test_model_outage_healthy_turn_after_error_does_not_alert
 
 echo "all fm-busy-adapter-wiring tests passed"

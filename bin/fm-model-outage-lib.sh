@@ -20,9 +20,15 @@ _FM_MODEL_ERROR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=bin/fm-timeout-lib.sh
 . "$_FM_MODEL_ERROR_DIR/fm-timeout-lib.sh"
 
+fm_model_outage_hold() {  # <dir> <batch> <id>
+  local old
+  old=$(cat "$1/lane-$3" 2>/dev/null) || return 0
+  [ -z "$old" ] || : > "$2/${old##*|}.hold"
+}
+
 fm_model_outage_tick() {
   local meta id backend target harness gen error hash old verdict rows file groups native mid line match lanes alert kept
-  local dir="$STATE/.model-outages" now batch uncertain=0 last current
+  local dir="$STATE/.model-outages" now batch last current
   now=$(date +%s) || return 1
   # The singleton watcher owns these records; never start a second monitor.
   [ ! -L "$dir" ] || return 1
@@ -46,19 +52,21 @@ fm_model_outage_tick() {
       if error=$(jq -er --arg gen "$gen" 'select(.gen == $gen) | .error | select(type == "string")' "$file"); then native=1; else error=; fi
     fi
     [ "$harness" = opencode ] || [ "$native" = 1 ] || continue
-    verdict=$(fm_busy_classify_semantic "$backend" "$target" "$harness" "$id" "$STATE")
+    verdict=$(fm_run_timed 3 bash -c '. "$1/fm-backend.sh"; . "$1/fm-busy-lib.sh"; fm_busy_classify_semantic "$2" "$3" "$4" "$5" "$6"' \
+      model-error "$_FM_MODEL_ERROR_DIR" "$backend" "$target" "$harness" "$id" "$STATE") \
+      || { fm_model_outage_hold "$dir" "$batch" "$id"; continue; }
     mid=0
     if [ "$harness" = opencode ] && [ "${verdict%% *}" = busy ]; then mid=1; fi
     # Bound reads on every backend; a vanished/slow endpoint cannot hang the
     # rest of the fleet scan. Never discover another home's unrecorded panes.
     # shellcheck disable=SC2016 # The child expands its own positional arguments.
     rows=$(fm_run_timed 3 bash -c '. "$1/fm-backend.sh"; fm_backend_agent_state "$2" "$3" "$4" "$5"' \
-      model-error "$_FM_MODEL_ERROR_DIR" "$backend" "$target" "$meta" "$id") || { uncertain=1; continue; }
-    case "$rows" in alive) ;; dead|missing) rm -f "$dir/lane-$id"; continue ;; *) uncertain=1; continue ;; esac
+      model-error "$_FM_MODEL_ERROR_DIR" "$backend" "$target" "$meta" "$id") || { fm_model_outage_hold "$dir" "$batch" "$id"; continue; }
+    case "$rows" in alive) ;; dead|missing) rm -f "$dir/lane-$id"; continue ;; *) fm_model_outage_hold "$dir" "$batch" "$id"; continue ;; esac
     if [ "$native" = 0 ] && [ "$mid" = 0 ] && [ "$harness" = opencode ] && fm_backend_visible_capture_supported "$backend"; then
       # shellcheck disable=SC2016 # The child expands its own positional arguments.
       rows=$(fm_run_timed 3 bash -c '. "$1/fm-backend.sh"; fm_backend_visible_capture "$2" "$3"' \
-        model-error "$_FM_MODEL_ERROR_DIR" "$backend" "$target") || { uncertain=1; continue; }
+        model-error "$_FM_MODEL_ERROR_DIR" "$backend" "$target") || { fm_model_outage_hold "$dir" "$batch" "$id"; continue; }
       # Only explicit provider/harness banners, never worker-printed output; a
       # wrapped banner keeps up to two continuation lines.
       match=$(printf '%s\n' "$rows" | grep -Ein '^[[:space:]│┃]*(Upstream request failed|Model .+ is not supported|rate.?limit exceeded|insufficient quota|authentication failed)' | tail -1)
@@ -81,11 +89,12 @@ fm_model_outage_tick() {
     id=${file##*/lane-}
     [ -f "$STATE/$id.meta" ] || rm -f "$file"
   done
-  # Forget completed episodes only after the whole scan, not per lane.
+  # Forget completed episodes only after the whole scan, not per lane; a hash
+  # held by an unreadable lane keeps its record.
   for file in "$dir"/alert-*; do
     [ -f "$file" ] || continue
     hash=${file##*/alert-}
-    [ "$uncertain" = 1 ] || [ -f "$batch/$hash.lanes" ] || rm -f "$file"
+    [ -f "$batch/$hash.lanes" ] || [ -f "$batch/$hash.hold" ] || rm -f "$file"
   done
   groups=
   for lanes in "$batch"/*.lanes; do
