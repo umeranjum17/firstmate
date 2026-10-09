@@ -82,8 +82,9 @@ fm_model_outage_tick() {
         key=$(printf '%s\n' "$rows" | sed -n "${line}p")
       else
         line=$(printf '%s\n' "$rows" | FM_MODEL_OUTAGE_BANNER_RE="$FM_COMPOSER_OPENCODE_LIMIT_BANNER_RE_DEFAULT" awk '
-          prev ~ /^[[:space:]]*╹▀/ && $0 ~ ENVIRON["FM_MODEL_OUTAGE_BANNER_RE"] { print NR; exit }
-          { prev = $0 }')
+          /^[[:space:]]*╹▀/ { floor = NR }
+          floor && NR == floor + 1 && $0 ~ ENVIRON["FM_MODEL_OUTAGE_BANNER_RE"] { hit = NR }
+          END { if (hit && floor == hit - 1) print hit }')
         # The banner's reset and retry clocks tick every scan; digits fold
         # out of the episode key so one limit event stays one episode while
         # the displayed error keeps the live countdown.

@@ -652,6 +652,27 @@ test_model_outage_banner_above_composer_does_not_alert() {
   pass "a worker-printed banner above the composer does not alert a busy lane"
 }
 
+banner_in_scrollback_scans() {
+  lane alpha "busy opencode-plugin" alive ""
+  printf '%s\n' '  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀' \
+    '   ■5⬝hour⬝usage limit reached. It will reset in 1 hour 38 minutes. To cont' \
+    '    usin... (click to expand) [retrying in 1h 8m attempt #1]' \
+    '' '  ┃  Build · DeepSeek V4.1 Flash OpenCode Go' \
+    '  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀' \
+    '  /work/worktree  22.1K (2%)' > "$FAKE_LIVENESS/capture-alpha"
+  tick
+}
+
+# A saved pane capture holding a floor and banner in scrollback is worker text,
+# not the status area under the live composer floor, so it must not alert.
+test_model_outage_banner_in_scrollback_does_not_alert() {
+  local case_dir="$TMP_ROOT/model-outage-banner-scrollback"
+  run_outage_fixture "$case_dir" "$case_dir/state" banner_in_scrollback_scans
+  [ ! -s "$case_dir/wakes" ] \
+    || fail "a floor-then-banner pair in scrollback above the live footer must not alert, got: $(cat "$case_dir/wakes")"
+  pass "a worker-printed floor-then-banner in scrollback does not alert a busy lane"
+}
+
 hung_verdict_scans() {
   lane delta "hang" alive
   tick
@@ -689,5 +710,6 @@ test_model_outage_hung_verdict_is_bounded
 test_model_outage_wrapped_banner_keeps_episode_identity
 test_model_outage_midturn_usage_limit_banner_alerts_once
 test_model_outage_banner_above_composer_does_not_alert
+test_model_outage_banner_in_scrollback_does_not_alert
 
 echo "all fm-busy-adapter-wiring tests passed"
