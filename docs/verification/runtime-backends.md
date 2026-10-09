@@ -780,7 +780,7 @@ It therefore counts a footer zone only when every row in it is demonstrably furn
 A run containing unclaimed activity (`Working on request...`, `→ ran npm test (3 failures)`) is not furniture in either row order and keeps invalidating the envelope above it, and a row leading with the SAME glyph the envelope was proven by (`❯ my typed draft`) is a live composer that keeps winning, so a visible draft is never overwritten.
 `test_composer_footer_zone_refuses_rather_than_allows` pins both directions on the bordered-box and separator-pair shapes.
 
-Coverage is the bordered box and the separator pair, the two shapes claude 2.x renders. The opencode left bar is wired into the same rule but is **unexercised**: every left-bar row this repo records leads with plain text, and opencode's own prompt character is `>`, a shell glyph deliberately outside the agent set, so no opencode shape recorded here can prove a left-bar envelope or open a footer zone beneath one.
+Coverage is the bordered box and the separator pair, the two shapes claude 2.x renders. The opencode left bar is wired into the same rule but is **unexercised by this entry**, which captures no opencode pane; opencode's own prompt character is `>`, a shell glyph deliberately outside the agent set. The opencode left-bar floor and the status area beneath it are covered by the 2026-10-09 entry above.
 
 The live refresh for this entry is the cursorless arm added to the composer-matrix guard, which re-reads each harness's already-proven-idle pane the way every non-tmux backend reads it and fails naming the harness and version when that read is `pending`:
 
