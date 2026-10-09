@@ -2164,6 +2164,30 @@ test_merged_poll_retires_once() {
   pass "validated merged polls notify once and retire before the next watcher cycle"
 }
 
+# A relaunch after PR registration republishes the record with the control
+# transaction marker after the pr rows (bin/fm-control.sh relaunch drives
+# bin/fm-spawn.sh, which writes control_relaunch_tx last). The armed poll's
+# artifact validation reads that record, so the marker must not invalidate it,
+# while any other foreign row after pr= still must.
+test_relaunch_tx_after_pr_keeps_poll_valid() {
+  local dir state
+  dir=$(make_case relaunch-tx-after-pr)
+  state="$dir/home/state"
+  write_poll_meta "$state" task-a https://github.com/o/r/pull/1
+  seed_canonical_poll "$dir" task-a https://github.com/o/r/pull/1
+  {
+    printf '%s\n' 'pr_head=0123456789abcdef0123456789abcdef01234567'
+    printf '%s\n' 'x_request=request-1'
+    printf '%s\n' 'control_relaunch_tx=9.20261009T170700Z.1'
+  } >> "$state/task-a.meta"
+  fm_pr_poll_artifacts_content_valid "$state" task-a "$POLL" \
+    || fail "a relaunch transaction marker after pr= invalidated an armed poll"
+  printf '%s\n' 'rogue_row=1' >> "$state/task-a.meta"
+  ! fm_pr_poll_artifacts_content_valid "$state" task-a "$POLL" \
+    || fail "an unknown row after pr= must still invalidate an armed poll"
+  pass "a relaunch transaction marker after pr= keeps the armed poll valid"
+}
+
 # A poll's own retirement state is scoped to ONE registration, so it cannot by
 # itself catch a poll re-registered for a task whose merge was already
 # surfaced (e.g. bin/fm-pr-check.sh re-armed after the fact). The per-task
@@ -3446,6 +3470,7 @@ test_gerrit_arming_records_no_patch_set_revision
 test_gerrit_ready_gate_reads_the_published_tree
 test_gerrit_nm_ready_gate_requires_recovered_custody
 test_merged_poll_retires_once
+test_relaunch_tx_after_pr_keeps_poll_valid
 test_merged_poll_reregistration_after_notification_is_absorbed
 test_merged_poll_retries_a_failed_upward_report
 test_self_merge_and_poll_publish_one_outcome

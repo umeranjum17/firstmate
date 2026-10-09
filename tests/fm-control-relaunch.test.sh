@@ -24,6 +24,8 @@ set -u
 # shellcheck source=/dev/null
 . "$ROOT/bin/fm-control-lib.sh"
 # shellcheck source=/dev/null
+. "$ROOT/bin/fm-pr-lib.sh"
+# shellcheck source=/dev/null
 . "$ROOT/bin/fm-trace-context-lib.sh"
 # shellcheck source=/dev/null
 . "$ROOT/bin/fm-tasks-axi-lib.sh"
@@ -519,6 +521,31 @@ test_relaunch_preserves_durable_task_metadata() {
   [ "$(meta_field "$dir" rl19 decisions_reviewed)" = 1 ] \
     || fail "the task decision state must survive relaunch"
   pass "fm-control relaunch: durable task metadata survives replacement launch publication"
+}
+
+# A relaunch after PR registration republishes the record with the control
+# transaction marker after the pr rows, so the PR poll's identity parse of the
+# published record must still accept it, or the merge poll is rejected every
+# check cycle (retro finding 5.5).
+test_relaunch_keeps_pr_poll_parse_valid() {
+  local dir out rc
+  dir=$(new_case relaunch-pr-meta rl29)
+  add_ship_task "$dir" rl29 claude
+  {
+    printf '%s\n' 'pr=https://github.com/example/repo/pull/29'
+    printf '%s\n' 'pr_head=0123456789abcdef0123456789abcdef01234567'
+    printf '%s\n' 'x_request=request-29'
+  } >> "$dir/home/state/rl29.meta"
+
+  out=$(run_control "$dir" rl29 relaunch --note "continue after PR registration"); rc=$?
+  expect_code 0 "$rc" "a relaunch after PR registration should succeed"$'\n'"$out"
+  [ -n "$(meta_field "$dir" rl29 control_relaunch_tx)" ] \
+    || fail "the relaunch did not record its transaction marker"
+  fm_pr_metadata_identity_parse "$dir/home/state/rl29.meta" \
+    || fail "the republished record failed the PR poll's identity validation"
+  [ "$FM_PR_META_URL" = "https://github.com/example/repo/pull/29" ] \
+    || fail "the republished record lost the task PR identity"
+  pass "fm-control relaunch: a relaunch after PR registration keeps the PR poll identity valid"
 }
 
 test_relaunch_serializes_concurrent_durable_metadata_publication() {
@@ -2647,6 +2674,7 @@ test_relaunch_pending_refusal_names_the_harness_clear_key
 test_relaunch_refuses_before_exit_when_the_composer_state_is_unproven
 test_relaunch_from_linked_home_preserves_recorded_worktree
 test_relaunch_preserves_durable_task_metadata
+test_relaunch_keeps_pr_poll_parse_valid
 test_relaunch_serializes_concurrent_durable_metadata_publication
 test_disabled_relaunch_clears_prior_trace_context
 test_relaunch_appends_the_progress_note_to_the_instructions
