@@ -11,7 +11,7 @@ const Row = ({ name, value, note, title }) => html`<div class="i-row" title=${ti
 function Trend({ days }) {
   const max = Math.max(...days.flatMap(d => [d.median_seconds || 0, d.p85_seconds || 0]), 1)
   const y = v => 110 - v / max * 95, x = i => 68 + i * 510 / (days.length - 1)
-  return html`<section class="i-panel"><h2>Time to merge · last seven days</h2><div class="i-key"><span>P50</span><span>P85</span><small>Seconds</small></div>
+  return html`<section class="i-panel"><h2>Time to merge · last 7 days by UTC day (first partial)</h2><div class="i-key"><span>P50</span><span>P85</span><small>Seconds</small></div>
     <svg class="i-trend" viewBox="0 0 600 140" role="img" aria-label="Recorded median and P85 time to merge by UTC day">
       ${(days.some(d => d.known > 0) ? [0, max / 2, max] : []).map(v => html`<line x1="68" x2="578" y1=${y(v)} y2=${y(v)} stroke="var(--line)"/><text x="60" y=${y(v) + 4} text-anchor="end">${number(v)}</text>`)}
       ${['median_seconds', 'p85_seconds'].map((key, k) => html`<g class=${'i-series i-series-' + k}>
@@ -24,12 +24,16 @@ function Trend({ days }) {
 function Lifecycle({ lane }) {
   if (!lane) return html`<p class="i-note">Choose a task.</p>`
   const t = lane.times, before = lane.durations.pickup_to_working, total = lane.durations.time_to_merge
-  const stages = Object.entries(lane.state_seconds).map(([s, v]) => [STAGES[s] || 'Other recorded state', v])
+  const stages = Object.entries(lane.state_seconds).reduce((acc, [s, v]) => {
+    const name = STAGES[s] || 'Other recorded state', hit = acc.find(([n]) => n === name)
+    hit ? hit[1] += v : acc.push([name, v])
+    return acc
+  }, [])
   const spent = stages.reduce((n, [, v]) => n + v, 0)
   const parts = before != null && (total == null || total >= before)
     ? [['Pickup → working', before], ...stages, ...(total == null ? [] : [['Not split further', total - before - spent]])] : [['Pickup → merge (not split)', total]]
   const max = parts.reduce((n, [, v]) => n + (v || 0), 0)
-  return html`<div class="i-stack" aria-label="Known pickup to merge intervals">${parts.filter(([, v]) => v != null && v > 0).map(([name, v], i) => html`<i class=${'i-series-' + i} style=${{ flex: v / (max || 1) }} title=${`${name}: ${seconds(v)}`}></i>`)}</div>
+  return html`<div class="i-stack" aria-label="Known pickup to merge intervals">${parts.filter(([, v]) => v != null && v > 0).map(([name, v], i) => html`<i class=${'i-series-' + i % 2} style=${{ flex: v / (max || 1) }} title=${`${name}: ${seconds(v)}`}></i>`)}</div>
     <div class="i-rows">${parts.map(([name, v]) => html`<${Row} name=${name} value=${seconds(v)}/>`)}
     ${[['Picked up', 'dispatched'], ['First recorded work', 'working'], ['Merged', 'merged'], ['Cleaned up', 'cleaned_up']].map(([name, key]) => html`<${Row} name=${name} value=${t[key] == null ? 'Unknown' : new Date(t[key] * 1000).toISOString().replace('T', ' ').replace('.000Z', ' UTC')}/>`)}
     <${Row} name="Merge → cleanup" value=${seconds(lane.durations.merge_to_cleanup)}/>
