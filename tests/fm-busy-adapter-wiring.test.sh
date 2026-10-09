@@ -497,8 +497,9 @@ fm_busy_classify_semantic() {
   printf '%s\n' "$verdict"
 }
 EOF
+  export STATE="$state" FAKE_LIVENESS="$case_dir/liveness"
+  # shellcheck disable=SC2329 # The hooks and scan bodies are called indirectly.
   (
-    export STATE="$state" FAKE_LIVENESS="$case_dir/liveness"
     # shellcheck source=/dev/null
     . "$bin/fm-model-outage-lib.sh"
     fm_meta_get() { printf opencode; }
