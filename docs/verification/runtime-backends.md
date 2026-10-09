@@ -2615,3 +2615,30 @@ Herdr 0.9.1 refuses an empty `pane report-agent` label (`invalid_agent: agent la
 In that lab, before the fix the pane read `unknown` and recovery `unreadable`; after the fix the same pane reads `stale-agent` and recovers `dead`, which unblocks `exit` and `relaunch` in the preserved pane.
 A label-less unknown/stale registration never reads `live`: with no label it holds no process identity to keep authoritative, so only the positive shell-only proof settles it (issue #4115's intent) and every other process view stays `unknown`.
 The portable cases, including the never-live rule and the unchanged Codex and other-harness carve-outs, are in `tests/fm-backend-herdr.test.sh` (`test_unlabeled_unknown_registration_reads_the_process_view`).
+
+## OpenCode model-error wakes and second-mate continuity
+
+Verified on 2026-10-08 with OpenCode 1.18.25 in a credential-free named Herdr lab.
+Two real OpenCode lanes selected an unavailable hosted model and emitted `session.error` followed by idle.
+One lane retained its generation-bound native error record; the other exercised the legacy visible-banner path by removing that record after the real failure.
+The ordinary watcher delivered one grouped model-error notification automatically, and the real second-mate agent drained and acknowledged it within 97 seconds of the recorded failure.
+A later worker status event reached that same second mate automatically, and fresh beacons continued after both turns without any manual arm.
+Cleanup passed the default-session fleet-state tripwire.
+
+Refresh with:
+
+```sh
+FM_MODEL_OUTAGE_LIVE=1 bash bin/fm-test-run.sh tests/fm-model-outage-live-e2e.test.sh
+```
+
+Exact guard output:
+
+```text
+PASS OpenCode 1.18.25: grouped hosted outage delivered automatically; second mate keeps monitoring across turns
+lab cleanup: 0
+```
+
+The portable generated-adapter integration in `tests/fm-busy-adapter-wiring.test.sh` verifies that a native failure persists through idle and a subsequent successful turn clears it; `tests/fm-busy-state.test.sh` retains generation and retirement coverage.
+This qualification covers OpenCode error observation on Herdr, not new error signatures for other harnesses or fresh live qualification of other backends.
+Other harnesses retain their existing stale and blocked-worker supervision.
+The native observation schema and bounded poll behavior belong to `bin/fm-opencode-model-error.js` and `bin/fm-model-outage-lib.sh`; this record does not own another recovery mechanism.

@@ -4715,6 +4715,8 @@ EOF
 // never clear the worker's busy state. The session.idle touch stays the
 // watcher's wake NOTIFICATION, never current-state truth.
 import { execFile } from "node:child_process";
+import { modelErrorObserver } from "$FM_ROOT/bin/fm-opencode-model-error.js";
+const observeModelError = modelErrorObserver("$STATE_REAL", "$ID", "$BUSY_GEN");
 const busyEvent = (state, event) =>
   new Promise((resolve) => {
     execFile("$FM_ROOT/bin/fm-busy-event.sh", [
@@ -4726,6 +4728,8 @@ export const FmBusyState = async () => {
   let activeSession = null;
   return {
     event: async ({ event }) => {
+      try { observeModelError(event); }
+      catch (error) { console.error("Firstmate model-error observation failed:", error.message); }
       if (event.type === "session.status") {
         const sessionID = event.properties.sessionID;
         const statusType = event.properties.status && event.properties.status.type;

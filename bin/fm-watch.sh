@@ -243,6 +243,8 @@ WATCH_HOME_EXISTED=0
 . "$SCRIPT_DIR/fm-pending-reply-lib.sh"
 # shellcheck source=bin/fm-busy-lib.sh
 . "$SCRIPT_DIR/fm-busy-lib.sh"
+# shellcheck source=bin/fm-model-outage-lib.sh
+. "$SCRIPT_DIR/fm-model-outage-lib.sh"
 # shellcheck source=bin/fm-composer-lib.sh
 . "$SCRIPT_DIR/fm-composer-lib.sh"
 # Steering-inbox loss detection: bin/fm-task-inbox-lib.sh owns the record,
@@ -3007,6 +3009,7 @@ while :; do
 
   fm_memory_sampler_ensure || triage_log "host memory sampler failed to restart"
   host_memory_surface_queued
+  fm_model_outage_tick || { echo "watcher: model-error observation failed" >&2; exit 1; }
   own_queue_resurface || { echo "watcher: own wake-queue observation failed" >&2; exit 1; }
 
   # Liveness beacon for fm-guard.sh: a fresh mtime here means a watcher is
@@ -3398,6 +3401,8 @@ EOF
             paused) handle_paused_stale "$w" "$task" "$h" ;;
             *)      clear_pause_tracking "$key" ;;
           esac
+        elif fm_model_outage_reported_idle "$task" && ! stale_is_terminal "$w" "$STATE"; then
+          triage_log "absorbed idle stale (grouped model outage already reported): $w"
         elif afk_present; then
           # Daemon owns triage: one-shot per distinct stale hash, as before,
           # except that a captain-held pane is never handed over while the
