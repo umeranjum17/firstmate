@@ -31,6 +31,7 @@ fm_model_outage_text() {
 
 fm_model_outage_tick() {
   local meta id backend target harness gen error hash old verdict rows groups mid line key lanes alert kept floor n row trimmed
+  # shellcheck disable=SC2153 # STATE is set by the watcher (fm-watch.sh); the sourced composer lib's lowercase `state` is unrelated.
   local dir="$STATE/.model-outages" now batch last current
   now=$(date +%s) || return 1
   # The singleton watcher owns these records; never start a second monitor.
