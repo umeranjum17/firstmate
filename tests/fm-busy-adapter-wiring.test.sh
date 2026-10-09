@@ -507,7 +507,7 @@ EOF
     fm_backend_target_of_meta() { printf 'fake:%s' "${1##*/}"; }
     fm_backend_of_meta() { printf fake; }
     hash_pane() { md5sum | cut -c1-12; }
-    wake() { :; }
+    wake() { exit 0; }
     fm_wake_append() { printf '%s\n' "$3" >> "$case_dir/wakes"; }
     lane() {  # <id> <verdict> <liveness> [error]
       : > "$state/$1.meta"
@@ -516,7 +516,7 @@ EOF
       printf '%s\n' "$3" > "$case_dir/liveness/$1"
       printf '{"gen":"g1","error":"%s"}\n' "${4-Upstream request failed: region denied}" > "$state/$1.model-error-g1.json"
     }
-    tick() { rm -f "$STATE/.model-outages/.scan-at"; fm_model_outage_tick; }
+    tick() { ( rm -f "$STATE/.model-outages/.scan-at"; fm_model_outage_tick ); }
     "$body"
   ) || fail "model-outage scans failed"
   if compgen -G "$state/.model-outages/.scan.*" >/dev/null; then fail "a scan batch directory leaked"; fi

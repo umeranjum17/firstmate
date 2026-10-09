@@ -128,6 +128,7 @@ fm_model_outage_tick() {
     fi
     if [ -n "$kept" ]; then printf '%s\n' "$kept" > "$alert" || return 1; else : > "$alert" || return 1; fi
   done
+  rm -rf "$batch"
   # All groups were queued before the first wake can exit the watcher.
   [ -z "$groups" ] || wake "${groups%$'\n'}"
   return 0
