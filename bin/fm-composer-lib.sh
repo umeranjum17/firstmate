@@ -539,7 +539,23 @@ FM_COMPOSER_OMP_STATUS_RE_DEFAULT='^[[:space:]]*(π|󰵗)[[:space:]]+·[[:space:
 # any unclaimed activity fail them, keep the envelope stale, and read
 # `unknown`, the refusing direction. The square glyphs are an alternation,
 # never a bracket range, for the reason FM_OMP_SPINNER_FRAMES_RE records.
-FM_COMPOSER_OPENCODE_STATUS_RE_DEFAULT='^[[:space:]]*/.*[0-9]+(\.[0-9]+)?K[[:space:]]+\([0-9]+%\)[[:space:]]+·[[:space:]]+\$[0-9]+(\.[0-9]+)?[[:space:]]*ctrl\+p([[:space:]]+commands)?$|^[^[:space:]]+([[:space:]]+tab[[:space:]]+agents[[:space:]]+ctrl\+p)?[[:space:]]+commands$|^tab[[:space:]]+agents[[:space:]]+ctrl\+p[[:space:]]+commands$|^[[:space:]]*(■|⬝)[0-9]+(■|⬝)hour(■|⬝)usage limit reached|^[[:space:]]*(usin\.\.\.[[:space:]]+)?\(?click to expand\)[[:space:]]+\[retrying in [0-9]+[hms]([[:space:]]+[0-9]+[hms])*[[:space:]]+attempt #[0-9]+\]$'
+#
+# THE WRAP: the usage cell is right-aligned beside the directory, so on a
+# long worktree path (the fleet norm) the row WRAPS at the pane width. A
+# wrapped usage row keeps its `/`-leading directory prefix and its
+# `<n>K (<p>%)` cell, but its `· $<cost>` tail is TRUNCATED at the cost cell
+# and the `ctrl+p` hint can land with NO separating space, and the trailing
+# `commands` wraps to the next row beside the directory's own continuation
+# fragment, e.g. `.../a-   22.1K (2%) · $ctrl+p` then `really-...-name    commands`:
+# the cost cell renders as a bare `$` (no digits) and the palette hint abuts
+# it, so an alternative that demands digits after `$` and a hint after it
+# matches neither row, and an idle, empty composer reads `unknown`. The cost
+# and hint groups are therefore each OPTIONAL and the cost digits are `[0-9]*`
+# (a truncated `$`); every other cell the row can hold (`· $`, `ctrl+p`, `commands`) remains the
+# same composer furniture, and the row still requires its `/`-leading
+# directory plus an `<n>K (<p>%)` context cell, so a busy `esc interrupt` row
+# and unclaimed activity still fail in the refusing direction.
+FM_COMPOSER_OPENCODE_STATUS_RE_DEFAULT='^[[:space:]]*/.*[0-9]+(\.[0-9]+)?[KMG]?[[:space:]]+\([0-9]+%\)([[:space:]]+·[[:space:]]+\$[0-9]*(\.[0-9]+)?)?([[:space:]]*ctrl\+p([[:space:]]+commands)?)?$|^[^[:space:]]+([[:space:]]+tab[[:space:]]+agents[[:space:]]+ctrl\+p)?[[:space:]]+commands$|^tab[[:space:]]+agents[[:space:]]+ctrl\+p[[:space:]]+commands$|^[[:space:]]*(■|⬝)[0-9]+(■|⬝)hour(■|⬝)usage limit reached|^[[:space:]]*(usin\.\.\.[[:space:]]+)?\(?click to expand\)[[:space:]]+\[retrying in [0-9]+[hms]([[:space:]]+[0-9]+[hms])*[[:space:]]+attempt #[0-9]+\]$'
 # Pi's footer stats row opens at column 0 with the session cost when every
 # token counter is zero (`$0.000 (sub) 5.4%/272k (auto)` on pi 0.85.1).
 # That leading `$` is a cost cell, not a dead-shell prompt, only when a digit
@@ -1335,6 +1351,29 @@ _fm_composer_row_is_opencode_status() {  # <trimmed-row>
   fm_composer_idle_matches "$1" "${FM_COMPOSER_OPENCODE_STATUS_RE:-$FM_COMPOSER_OPENCODE_STATUS_RE_DEFAULT}" sensitive
 }
 
+# _fm_composer_row_is_opencode_busy: 0 when the trimmed row carries OpenCode's
+# in-turn hint (`esc interrupt`). A busy status row is NOT furniture, so the
+# below-floor block collector excludes any block that contains it - necessary
+# because the merged busy row also carries the `ctrl+p`/`commands` cells an
+# idle status row has, so recognition alone would consume it.
+_fm_composer_row_is_opencode_busy() {  # <trimmed-row>
+  fm_composer_idle_matches "$1" 'esc[[:space:]]+interrupt' sensitive
+}
+
+# _fm_composer_row_has_opencode_hint: 0 when the trimmed row carries OpenCode's
+# palette shortcut (`ctrl+p`), the ONE token present in every idle status area
+# whether or not it has a context/cost cell. It anchors the below-floor block
+# collector: a long worktree path wraps the right-aligned status line at
+# arbitrary columns, so the zero-usage footer splits `tab`/`agents` and
+# `ctrl+p`/`commands` across rows (`.../relaunch- tab ctrl+p` then
+# `...directory-name agents commands`) and no single row matches the full
+# status pattern. The hint is present on those rows and absent from
+# `Working on request...`, so it separates furniture from activity without
+# enumerating every wrap point.
+_fm_composer_row_has_opencode_hint() {  # <trimmed-row>
+  fm_composer_idle_matches "$1" 'ctrl\+p' sensitive
+}
+
 # _fm_composer_row_is_pi_status: 0 when the trimmed row is Pi's dollar-first
 # footer stats row (FM_COMPOSER_PI_STATUS_RE_DEFAULT above). Furniture below
 # the separated pair; a `$` cost cell must not count as a dead-shell prompt.
@@ -1607,6 +1646,7 @@ _fm_composer_bare_rule_sandwich() {  # <plain-screen> <row>
 
 _fm_composer_select_cursorless() {
   local plain=$1 generic=-1 next boundary raw trimmed glyph bare footer=0 menu
+  local run_end run_has_status run_busy probe_row probe_trimmed
   FM_COMPOSER_SELECTION_REFUSAL=none
   FM_COMPOSER_SELECTED_KIND=
   FM_COMPOSER_SELECTED_FIRST=-1
@@ -1742,18 +1782,32 @@ _fm_composer_select_cursorless() {
         # OpenCode's own status area sits directly below the floor
         # (FM_COMPOSER_OPENCODE_STATUS_RE_DEFAULT): those rows are furniture,
         # so the staleness probe resumes past them instead of reading the
-        # composer stale. One unrecognized or blank row ends the walk, and the
-        # probe then judges exactly that row: unclaimed activity below the
-        # floor still refuses, keeping the asymmetry toward `unknown`.
+        # composer stale. The area is one contiguous non-blank block, consumed
+        # as a whole only when it is provably furniture: at least one row
+        # matches the status pattern OR carries the palette hint (`ctrl+p`,
+        # present in every idle footer however the wrap splits its cells), and
+        # NO row carries the busy hint (`esc interrupt`). A block with neither
+        # a status row nor the hint - `Working on request...` - is not
+        # furniture, so the probe judges that row and still refuses, keeping
+        # the asymmetry toward `unknown`.
+        run_end=$boundary
+        run_has_status=0
+        run_busy=0
         while :; do
-          next=$((boundary + 1))
-          raw=$(_fm_composer_screen_row "$next" "$plain")
-          trimmed=$raw
-          fm_composer_normalize_trim_var trimmed
-          [ -n "$trimmed" ] || break
-          _fm_composer_row_is_opencode_status "$trimmed" || break
-          boundary=$next
+          probe_row=$((run_end + 1))
+          probe_trimmed=$(_fm_composer_screen_row "$probe_row" "$plain")
+          fm_composer_normalize_trim_var probe_trimmed
+          [ -n "$probe_trimmed" ] || break
+          run_end=$probe_row
+          _fm_composer_row_is_opencode_busy "$probe_trimmed" && run_busy=1
+          if _fm_composer_row_is_opencode_status "$probe_trimmed" \
+             || _fm_composer_row_has_opencode_hint "$probe_trimmed"; then
+            run_has_status=1
+          fi
         done
+        if [ "$run_has_status" = 1 ] && [ "$run_busy" = 0 ]; then
+          boundary=$run_end
+        fi
       fi
     fi
     # The same footer zone, read from the other side: rows this envelope's own
