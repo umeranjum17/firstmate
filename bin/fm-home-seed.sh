@@ -388,7 +388,7 @@ seeded_origin_url() {
 }
 
 acquire_treehouse_home() (
-  local id=$1 home project_lock
+  local id=$1 home project_lock owner_rc
   project_lock=$(fm_treehouse_project_lock_path "$FM_ROOT") || return 1
   fm_lock_try_acquire "$project_lock" || {
     echo "error: another Treehouse slot allocation or return is in progress for $FM_ROOT; refusing to race it" >&2
@@ -409,6 +409,19 @@ acquire_treehouse_home() (
     return 1
   }
   [ -n "$home" ] || { echo "error: treehouse get --lease did not report a firstmate home" >&2; return 1; }
+  owner_rc=0
+  fm_slot_record_owner "$home" "$STATE" || owner_rc=$?
+  case "$owner_rc" in
+    0)
+      echo "error: Treehouse handed out $home, but task $FM_SLOT_RECORD_OWNER_ID still records it as its $FM_SLOT_RECORD_OWNER_FIELD; refusing to adopt a live task's copy" >&2
+      return 1
+      ;;
+    1) ;;
+    *)
+      echo "error: cannot prove Treehouse handed out $home free of other task records: $FM_LOCAL_STATE_DIRS_ERROR" >&2
+      return 1
+      ;;
+  esac
   printf '%s\n' "$home"
 )
 
