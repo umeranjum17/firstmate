@@ -516,6 +516,7 @@ EOF
     tick() { rm -f "$STATE/.model-outages/.scan-at"; fm_model_outage_tick; }
     "$body"
   ) || fail "model-outage scans failed"
+  if compgen -G "$state/.model-outages/.scan.*" >/dev/null; then fail "a scan batch directory leaked"; fi
 }
 
 staggered_union_scans() {
@@ -564,23 +565,24 @@ test_model_outage_recovered_lane_leaves_wake() {
   pass "a recovered lane leaves the alert record and re-alerts when it fails again"
 }
 
-unreadable_lane_scans() {
+unreadable_hold_scans() {
   lane alpha "idle opencode-plugin" alive
-  lane charlie "idle opencode-plugin" unreadable
+  lane bravo "idle opencode-plugin" alive
   tick
+  lane bravo "idle opencode-plugin" unreadable
   lane alpha "idle opencode-plugin" alive ""
   tick
   lane alpha "idle opencode-plugin" alive
   tick
 }
 
-# A persistently unreadable lane must not pin an unrelated episode: a recovered
-# lane that fails again with the same error is named again.
+# A lane that becomes unreadable keeps its named place, and a recovered lane that
+# fails again with the same error is named again.
 test_model_outage_unreadable_lane_does_not_pin_recovered_episode() {
   local case_dir="$TMP_ROOT/model-outage-unreadable" expected
-  run_outage_fixture "$case_dir" "$case_dir/state" unreadable_lane_scans
+  run_outage_fixture "$case_dir" "$case_dir/state" unreadable_hold_scans
   expected=$(printf '%s\n' \
-    'check: model outage affected=[alpha]: Upstream request failed: region denied' \
+    'check: model outage affected=[alpha,bravo]: Upstream request failed: region denied' \
     'check: model outage affected=[alpha]: Upstream request failed: region denied')
   [ "$(cat "$case_dir/wakes")" = "$expected" ] \
     || fail "an unreadable lane must not pin a recovered episode, got: $(cat "$case_dir/wakes")"
