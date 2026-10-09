@@ -47,7 +47,7 @@ A failed follow-up never cancels continuity restoration.
 
 OpenCode uses the same owner in a second-mate home, retaining the primary-root and session-lock ownership checks that exclude task workers.
 Model-error observation runs in the existing poll loop; `bin/fm-model-outage-lib.sh` owns its error grouping and episode rules, and [runtime verification](verification/runtime-backends.md#opencode-model-error-wakes-and-second-mate-continuity) records the live guard.
-A running OpenCode process picks up plugin changes on its next launch; use the existing guarded home update/restart procedure rather than adding a second watcher or restarting workers from the observer.
+A running OpenCode session keeps the plugin it loaded at launch, so an existing second-mate home gains this arm only when its OpenCode session restarts; the observer never restarts workers.
 
 ### Pi session replacement
 
