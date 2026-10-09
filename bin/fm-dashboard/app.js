@@ -150,11 +150,13 @@ function Overview({ d, od, go }) {
   if (!q) return html`<div class="ov"><div class="none"><p>${od.err ? `Cannot load the overview: ${od.err}` : 'Loading the overview…'}</p></div></div>`
   const m = q.metrics, asks = d.asks, openCards = d.cards.filter(c => ACTIVE.includes(c.stage))
   const stk = openCards.filter(stuck).length, toLand = openCards.filter(c => c.stage === 'merge').length
-  const states = m.lane_states?.value, qr = q.queue_reasons || []
+  const states = m.lane_states?.value, qr = q.queue_reasons || [], qOk = m.queue?.value != null
+  const age = now() - ts(q.build_time)
   const flow = (mid, label, foot) => { const r = m[mid]; return html`<div class="ov-flow"><span>${label}</span>
     <b>${r?.status === 'unknown' ? 'unknown' : `${r?.status === 'lower_bound' && mid === 'landed' ? 'at least ' : ''}${r?.value ?? '–'}`}</b>
     <small>${foot}</small><${OVSpark} vals=${(r?.daily || []).map(x => x.value)}/></div>` }
   return html`<div class="ov">
+    <p class="ov-tot">${od.err ? 'Refresh failed · ' : ''}${age < 60 ? 'just updated' : `updated ${dur(age)} ago`}</p>
     <div class="ov-kpis">
       <a class="ov-kpi ${asks?.length ? 'warn' : ''}" href="#/needs"><span>Needs you</span><b class="num">${asks == null ? '?' : asks.length}</b></a>
       <button class="ov-kpi ${stk ? 'bad' : ''}" onClick=${() => go({ view: 'board', tab: 'active', state: ['blocked', 'decision'], card: null })}><span>Stuck</span><b class="num">${stk}</b></button>
@@ -170,8 +172,8 @@ function Overview({ d, od, go }) {
         <div class="ov-legend">${OV_STATES.map(([k, nm, c]) => html`<span key=${k}><i class=${c}></i>${nm}<b class="num">${states ? states[k] : '–'}</b></span>`)}</div></section>
       <section class="ov-card"><h3>Why work is queued</h3>
         <div class="ov-ql">${qr.map((x, k) => { const n = sum(x.by_home); return html`<div class="ov-qrow" key=${k}><span>${x.reason}</span>
-          <span class="ov-bar">${n > 0 ? html`<i style=${{ flex: n }}></i>` : ''}</span><b class="num">${n}</b></div>` })}</div>
-        <p class="ov-tot">Total <b class="num">${sum(m.queue?.value)}</b> queued</p></section>
+          <span class="ov-bar">${qOk && n > 0 ? html`<i style=${{ flex: n }}></i>` : ''}</span><b class="num">${qOk ? n : '–'}</b></div>` })}</div>
+        <p class="ov-tot">Total <b class="num">${qOk ? sum(m.queue.value) : '–'}</b> queued</p></section>
       <section class="ov-card"><h3>Flow</h3><div class="ov-flows">${flow('landed', 'Landed today', 'recorded merges · 14 d')}${flow('closed', 'Closed 7 d', 'backlog, vs prior 7 d')}</div></section>
       <section class="ov-card"><h3>Quota runway</h3><div class="ov-ql">${(q.quota_accounts || []).map((a, k) => {
         const w = a.limit || (a.windows || []).filter(x => x.used != null).sort((x, y) => y.used - x.used)[0]

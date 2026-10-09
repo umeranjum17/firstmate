@@ -156,7 +156,7 @@ import gzip, http.server, os, re, subprocess, sys, threading, time, urllib.parse
 SCRIPT, HOME, DIR, BIND, PORT, MAX_AGE, APP = sys.argv[1:8]
 MAX_AGE = int(MAX_AGE)
 PAGE = os.path.join(DIR, 'index.html')
-ROUTES = {'/overview': 'index', '/backlog': 'backlog', '/measure': 'measure', '/data.json': 'data', '/board.json': 'board'}
+ROUTES = {'/backlog': 'backlog', '/measure': 'measure', '/data.json': 'data', '/board.json': 'board'}
 # The app's own files: one optional folder level, no hidden names, no other types.
 STATIC = re.compile(r'/((?:[\w-]+/)?[\w-][\w.-]*\.(js|css|svg|woff2))')
 TYPES = {'js': 'text/javascript; charset=utf-8', 'css': 'text/css; charset=utf-8', 'svg': 'image/svg+xml', 'woff2': 'font/woff2',

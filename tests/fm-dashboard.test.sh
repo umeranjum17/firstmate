@@ -360,14 +360,15 @@ test_serve_answers_each_page_and_remembers_the_grouping() {
   done
   [ -n "$url" ] || fail "serve never reported its address: $(cat "$home/serve.err")"
   case "$url" in http://127.0.0.1:*/) ;; *) fail "serve did not default to loopback: $url" ;; esac
-  got=$(python3 - "$url" <<'PY'
+  got=$(python3 - "$url" "$ROOT/bin/fm-dashboard/index.html" <<'PY'
 import json, re, sys, urllib.request, urllib.error
 def get(u, cookie=None):
     rq = urllib.request.Request(u, headers={'Cookie': cookie} if cookie else {})
     try:
         with urllib.request.urlopen(rq, timeout=120) as r: return r.status, r.read().decode(), r.headers.get('Set-Cookie') or ''
     except urllib.error.HTTPError as e: return e.code, '', ''
-base = sys.argv[1]
+base, shell_path = sys.argv[1:3]
+APP_SHELL = open(shell_path, 'rb').read()
 with urllib.request.urlopen(base + 'data.json', timeout=120) as r:
     assert r.headers.get_content_type() == 'application/json'
     data = json.load(r)
@@ -386,7 +387,7 @@ for metric in m.values():
 with urllib.request.urlopen(urllib.request.Request(base + 'data.json', method='HEAD')) as r:
     assert r.headers.get_content_type() == 'application/json' and r.read() == b''
     assert int(r.headers['Content-Length']) > 0
-for path, want in (('overview', 'src="app.js"'), ('backlog', 'Held for the captain'), ('measure', 'How each number is measured.')):
+for path, want in (('backlog', 'Held for the captain'), ('measure', 'How each number is measured.')):
     code, body, _ = get(base + path)
     print(path, code, want in body)
 code, body, cookie = get(base + 'backlog?group=home')
@@ -403,12 +404,12 @@ def raw(u, **h):
     except urllib.error.HTTPError as e: return e.code, e.headers, b''
 # The app and its files: its own origin only, each file answered 304 while unchanged; the pages keep their own policy.
 s, h, b = raw(base)
-print('app', s, h.get_content_type(), "default-src 'self'" in h['Content-Security-Policy'], b'src="app.js"' in b)
+print('app', s, h.get_content_type(), "default-src 'self'" in h['Content-Security-Policy'], b == APP_SHELL)
 for path in ('app.js', 'vendor/preact-htm-3.1.1.js', 'board.json'):
     s, h, b = raw(base + path)
     print(path, s, h.get_content_type(), h['Cache-Control'], raw(base + path, **{'If-None-Match': h['ETag']})[0])
 s, h, b = raw(base + 'overview')
-print('overview-app', s, "default-src 'self'" in h['Content-Security-Policy'], b'src="app.js"' in b)
+print('overview-app', s, "default-src 'self'" in h['Content-Security-Policy'], b == APP_SHELL)
 print('board', json.loads(raw(base + 'board.json')[2])['schema'], "default-src 'none'" in raw(base + 'backlog')[1]['Content-Security-Policy'])
 import gzip
 s, h, b = raw(base + 'board.json', **{'Accept-Encoding': 'gzip'})
@@ -421,7 +422,7 @@ for path in ('ship/index.js', 'ship/scene.js', 'vendor/three-0.186.1.min.js', 's
     print(path, s, h.get_content_type(), raw(base + path, **{'If-None-Match': h['ETag']})[0])
 PY
 )
-  [ "$got" = "$(printf '%s\n' 'overview 200 True' 'backlog 200 True' 'measure 200 True' \
+  [ "$got" = "$(printf '%s\n' 'backlog 200 True' 'measure 200 True' \
     'group 200 True True' 'cookie 200 True' 'timestamps True True' 'flow 404' 'state/ 404' 'index.home.html 404' '../data/backlog.md 404' 'data/backlog.md 404' \
     'app 200 text/html True True' 'app.js 200 text/javascript no-cache 304' 'vendor/preact-htm-3.1.1.js 200 text/javascript no-cache 304' \
     'board.json 200 application/json no-cache 304' 'overview-app 200 True True' 'board fm-dashboard-board.v1 True' 'gzip gzip fm-dashboard-board.v1 304' 'vendor/../app.js 404' '../fm-dashboard/app.js 404' \
