@@ -47,7 +47,7 @@ export function Insights({ d }) {
   const maxWait = Math.max(...ranked.map(b => b.age ?? 0), 1)
   const picks = lanes.map(l => ({ l, key: `${l.home}/${l.task}` })), picked = picks.find(p => p.key === chosen)?.l
   const c = f.capacity, m = c?.memory_bytes, mac = c?.mac, tmp = c?.tmp
-  const queueWhy = q => q.why.startsWith('dependency:') ? q.display_why : q.why.startsWith('hold:') ? q.display_why : q.why.startsWith('lane cap:') ? q.display_why : 'Start reason not recorded'
+  const queueWhy = q => q.why.startsWith('unknown:') ? 'Start reason not recorded' : q.display_why
   const groups = ['dependency:', 'hold:', 'lane cap:', 'unknown:'].map((prefix, i) => [ ['Earlier work', 'Held', 'Lane limit', 'Reason unknown'][i], queue.filter(q => q.why.startsWith(prefix)).length ])
   return html`<div class="ins">
     <div class="i-scope"><label>Scope <select aria-label="Insights home" value=${home} onChange=${e => { setHome(e.target.value); choose('') }}><option value="">All registered homes</option>${f.homes.map(h => html`<option value=${h}>${hname(d, h)}</option>`)}</select></label><small>Retained records · ${new Date(f.at * 1000).toISOString().replace('T', ' ').replace('.000Z', ' UTC')}</small></div>
