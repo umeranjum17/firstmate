@@ -6,9 +6,10 @@
 # Test, PR + CI and To merge with tabs for Queued, Landed today and All and rows by home on
 # request, whose cards carry the lane's model, age, pull request and, when it waits, why in plain
 # words; filters by home, model and state; a card's detail with its stages and activity; Overview
-# (five key figures, each with its change since yesterday and its day's trend; the lifecycle, every
-# open lane by stage split into moving, waiting and stuck, then landings; 14-day landed and closed
-# charts; queue reasons; quota runway; each home's lanes by stage against its plan); Needs you
+# (five key figures, where Stuck, Lanes open and Ready also show their change since yesterday and
+# a day's trend; the lifecycle, every open lane by stage split into moving, waiting and stuck, then
+# landings; 14-day landed and closed charts; queue reasons; quota runway; each home's lanes by stage
+# against its plan); Needs you
 # (the ask list); Ship (ship/: the selected home's ship at night with each lane a worker at its
 # stage's deck station, dressed by model, and a sheet with fleet-wide key numbers and stuck or
 # parked work); a command palette and keys (?).
