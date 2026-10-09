@@ -504,7 +504,7 @@ test_board_json_feeds_the_app() {
     and .flow.time_to_merge.known == 1 and .flow.time_to_merge.unknown == 1
     and (.flow.executed_7d | length) == 2
     and any(.flow.lanes[]; .task == "m-fix" and .display_title == "Fix the login"
-      and .times.first_commit == null and .times.pr_opened == null and .times.checks_green == null
+      and (.times | has("first_commit") | not)
       and .pr == "https://github.com/acme/alpha/pull/12")
     and any(.flow.queue[]; .task == "m-after" and .display_why == "Waiting for: Start the ready thing")
     and any(.flow.bottlenecks[]; .cause == "credential_external" and .additive == false)
@@ -582,7 +582,7 @@ const bravo = all(screen, n => n.attrs['data-card'] === 'main/b')[0]
 bravo.listeners.click.call(bravo, { type: 'click' }); assert.equal(phoneOpened, 'main/b')
 phoneOpened = null; bravo.listeners.keydown.call(bravo, { type: 'keydown', key: 'Enter', target: bravo, currentTarget: bravo, preventDefault() {} }); assert.equal(phoneOpened, 'main/b')
 JS
-  jq -e 'any(.flow.limitations[]; .reason == "remote home unavailable to local reader; lanes, backlog and lifecycle unknown") and .flow.time_to_merge.unknown == 0 and (.flow.executed_7d | length) == 1' "$d/board.json" >/dev/null || fail "unavailable remote records became ghost observations"
+  jq -e 'any(.flow.limitations[]; .reason == "Source notice") and (.flow | tostring | contains("/state") | not) and .flow.time_to_merge.unknown == 0 and (.flow.executed_7d | length) == 1' "$d/board.json" >/dev/null || fail "unavailable remote records became ghost observations or leaked host paths"
   pass "board.json carries stages, waits, ask list and shipped flow observations; known durations, unknown lifecycle splits, queue why-lines and read-only capacity remain distinct"
 }
 

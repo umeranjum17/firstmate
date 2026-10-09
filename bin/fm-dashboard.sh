@@ -1631,6 +1631,7 @@ if flow_text is not None:
             raise ValueError('unsupported flow observation format')
         for row in flow['lanes'] + flow['queue'] + flow['executed_24h'] + flow['executed_7d']:
             h, task = row['home'], row['task']
+            row.get('stage_clock', {}).pop('source', None)
             row['display_title'] = titles.get((h, task)) or re.sub(r'\s+PR \d+$', '', done_title.get((h, task), '')) or 'Task name not recorded'
             row['display_reason'] = prose(row.get('reason', ''))
             why = row.get('why', '')
@@ -1645,6 +1646,8 @@ if flow_text is not None:
         for job in (flow.get('capacity') or {}).get('jobs', []):
             if job['owner']:
                 job['owner']['display_title'] = titles.get((job['owner']['home'], job['owner']['task'])) or 'Task name not recorded'
+        flow['limitations'] = [dict(reason=n['reason'] if n['source'] == 'coverage' else 'Source notice') for n in flow['limitations']]
+        (flow.get('capacity') or {}).pop('gate_source', None)
         mac = (flow.get('capacity') or {}).get('mac') or {}
         for key in ('simulators', 'android_pids'):
             if isinstance(mac.get(key), list):

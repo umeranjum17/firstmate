@@ -29,7 +29,7 @@ function Lifecycle({ lane }) {
   const max = parts.reduce((n, [, v]) => n + (v || 0), 0)
   return html`<div class="i-stack" aria-label="Known pickup to merge intervals">${parts.filter(([, v]) => v != null && v > 0).map(([name, v], i) => html`<i class=${'i-series-' + i} style=${{ flex: v / (max || 1) }} title=${`${name}: ${seconds(v)}`}></i>`)}</div>
     <div class="i-rows">${parts.map(([name, v]) => html`<${Row} name=${name} value=${seconds(v)}/>`)}
-    ${[['Picked up', 'dispatched'], ['First recorded work', 'working'], ['First commit', 'first_commit'], ['PR opened', 'pr_opened'], ['Checks green', 'checks_green'], ['Merged', 'merged'], ['Cleaned up', 'cleaned_up']].map(([name, key]) => html`<${Row} name=${name} value=${t[key] == null ? 'Unknown' : new Date(t[key] * 1000).toISOString().replace('T', ' ').replace('.000Z', ' UTC')}/>`)}
+    ${[['Picked up', 'dispatched'], ['First recorded work', 'working'], ['Merged', 'merged'], ['Cleaned up', 'cleaned_up']].map(([name, key]) => html`<${Row} name=${name} value=${t[key] == null ? 'Unknown' : new Date(t[key] * 1000).toISOString().replace('T', ' ').replace('.000Z', ' UTC')}/>`)}
     <${Row} name="Merge → cleanup" value=${seconds(lane.durations.merge_to_cleanup)}/>
     ${lane.open_waits.map(w => html`<${Row} name=${CAUSES[w.cause]} value=${seconds(w.seconds)} note=${w.display_reason}/>`)}</div><p class="i-note">Unrecorded splits are unknown.</p>`
 }
@@ -43,8 +43,8 @@ export function Insights({ d }) {
   const title = l => l.display_title || d.cards.find(c => c.home === l.home && c.task === l.task)?.title || 'Task name not recorded'
   const displayWhy = l => l.display_reason || 'Reason not recorded'
   const waiting = open.filter(l => l.open_waits.length), late = open.filter(l => l.stage_clock.overdue === true)
-  const ranked = f.bottlenecks.map(b => ({ ...b, age: Math.round(b.known_lower_bound_lane_hours * 3600), unknown: b.unknown_items }))
-  const maxWait = Math.max(...ranked.map(b => b.age), 1)
+  const ranked = f.bottlenecks.map(b => ({ ...b, age: b.items.some(i => i.known_seconds != null) ? Math.round(b.known_lower_bound_lane_hours * 3600) : null, unknown: b.unknown_items }))
+  const maxWait = Math.max(...ranked.map(b => b.age ?? 0), 1)
   const picks = lanes.map(l => ({ l, key: `${l.home}/${l.task}` })), picked = picks.find(p => p.key === chosen)?.l
   const c = f.capacity, m = c?.memory_bytes, mac = c?.mac, tmp = c?.tmp
   const queueWhy = q => q.why.startsWith('dependency:') ? q.display_why : q.why.startsWith('hold:') ? q.display_why : q.why.startsWith('lane cap:') ? q.display_why : 'Start reason not recorded'
@@ -55,7 +55,7 @@ export function Insights({ d }) {
       <${Card} label="Time to merge · P50" value=${seconds(timed.median_seconds)} note=${`${timed.known} timed · ${timed.unknown} unknown`}/><${Card} label="Time to merge · P85" value=${seconds(timed.p85_seconds)}/>
       <${Card} label="Open · recorded" value=${number(open.length)} note=${`${waiting.length} waiting · ${late.length} past stage clock`}/><${Card} label="Queued · recorded" value=${number(queue.length)} note=${`${groups[0][1]} dependencies · ${groups[1][1]} held`}/></div>
     <section class="i-panel i-waits"><h2>Why work waits now</h2><p class="i-note">All homes · causes overlap</p>
-      ${ranked.length ? ranked.map(b => html`<div class="i-wait"><span>${CAUSES[b.cause]}</span><b title=${`${seconds(b.age)} known lower bound; ${b.items.length} ${b.items.length === 1 ? 'task' : 'tasks'}; ${b.unknown} unknown durations`}>${b.unknown ? '≥ ' : ''}${seconds(b.age)}</b><div><i style=${{ width: b.age / maxWait * 100 + '%' }}></i></div><small>${b.items.length} ${b.items.length === 1 ? 'task' : 'tasks'}${b.unknown ? ` · ${b.unknown} unknown` : ''}</small></div>`) : html`<p class="i-note">No open waits recorded.</p>`}
+      ${ranked.length ? ranked.map(b => html`<div class="i-wait"><span>${CAUSES[b.cause]}</span><b title=${`${b.age == null ? 'No known wait' : seconds(b.age) + ' known lower bound'}; ${b.items.length} ${b.items.length === 1 ? 'task' : 'tasks'}; ${b.unknown} unknown durations`}>${b.age == null ? 'Unknown' : `${b.unknown ? '≥ ' : ''}${seconds(b.age)}`}</b><div><i style=${{ width: (b.age ?? 0) / maxWait * 100 + '%' }}></i></div><small>${b.items.length} ${b.items.length === 1 ? 'task' : 'tasks'}${b.unknown ? ` · ${b.unknown} unknown` : ''}</small></div>`) : html`<p class="i-note">No open waits recorded.</p>`}
     </section>
     <div class="i-grid"><${Trend} days=${days}/><section class="i-panel"><h2>Why queued work has not started</h2>
       ${groups.map(([name, n]) => html`<${Row} name=${name} value=${number(n)}/>`)}<${Rows} title=${`${queue.length} queued ${queue.length === 1 ? 'item' : 'items'} · why-lines`}>${queue.map(q => html`<${Row} name=${title(q)} value=${hname(d, q.home)} note=${queueWhy(q)}/>`)}</${Rows}></section>

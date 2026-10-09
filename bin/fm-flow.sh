@@ -306,7 +306,7 @@ for name, home in sorted(homes.items()):
                    seconds=age(e['ts']), reason=e.get('text') or '',
                    cause=cause(k, e))
                    for k, e in sorted(waits.items())],
-               'times': dict(times, working=working, first_commit=None, pr_opened=None, checks_green=None),
+               'times': dict(times, working=working),
                'durations': {'pickup_to_working': age(times['dispatched'], working),
                    'time_to_merge': age(times['dispatched'], times['merged']),
                    'merge_to_cleanup': age(times['merged'], times['cleaned_up'])}}
@@ -580,12 +580,12 @@ def summary(rows):
     return {'known': len(values), 'unknown': len(rows) - len(values),
             'median_seconds': statistics.median(values) if values else None,
             'p85_seconds': values[math.ceil(.85 * len(values)) - 1] if values else None}
+today = NOW // 86400
 def trend(rows):
-    today = NOW // 86400
     return [dict(day=datetime.fromtimestamp(day * 86400, timezone.utc).strftime('%Y-%m-%d'),
                  **summary([l for l in rows if l['times']['merged'] // 86400 == day]))
             for day in range(today - 6, today + 1)]
-seven = executed(7 * 86400)
+seven = [l for l in executed(7 * 86400) if l['times']['merged'] // 86400 >= today - 6]
 print(json.dumps({'schema': 'fm-flow.v1', 'at': NOW, 'homes': sorted(homes), 'lanes': lanes,
                   'queue': queue, 'bottlenecks': bottlenecks, 'capacity': capacity, 'executed_24h': executed(86400),
                   'executed_7d': seven, 'time_to_merge': summary(seven),

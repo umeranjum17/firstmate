@@ -52,7 +52,7 @@ assert live['times']['dispatched'] is None, 'spawn incarnation is not pickup'
 closed = x['executed_24h'][0]
 assert len(x['executed_24h']) == 1 and closed['durations']['time_to_merge'] == 60
 assert closed['durations']['merge_to_cleanup'] == 10
-assert closed['times']['pr_opened'] is None and closed['times']['checks_green'] is None
+assert 'pr_opened' not in closed['times'] and 'checks_green' not in closed['times']
 assert x['time_to_merge']['median_seconds'] == x['time_to_merge']['p85_seconds'] == 60
 assert {q['task']: q['why'] for q in x['queue']} == {'next': 'dependency: prior', 'held': 'hold: Wait for Umer',
     'ready': 'unknown: dispatch admission not recorded'}
