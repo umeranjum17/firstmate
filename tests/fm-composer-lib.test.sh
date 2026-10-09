@@ -930,6 +930,16 @@ test_matrix_opencode_leftbar_signals() {
   assert_screen "opencode 1.18.x idle status rows below the floor on herdr" empty "$CAPS_STYLED" "$status_screen"
   assert_screen "opencode 1.18.x idle status rows below the floor on zellij" empty "$CAPS_STYLED_NOID" "$status_screen"
   assert_screen "opencode 1.18.x idle status rows below the floor on cmux/orca" empty "$CAPS_PLAIN" "$status_screen"
+  # OpenCode 1.18.35 draws its session row with a single space before the
+  # `commands` hint (`tab agents ctrl+p commands`), not the two-space gap the
+  # 1.18.x rows above show, so the same below-floor furniture reads empty.
+  local bare_status_screen
+  bare_status_screen=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/umer/.treehouse/firstmate-cff959/3/71.6K (27%) · $0ctrl+p\n   firstmate                                    tab agents ctrl+p commands'
+  assert_screen "opencode 1.18.35 idle status rows below the floor on herdr" empty "$CAPS_STYLED" "$bare_status_screen"
+  assert_screen "opencode 1.18.35 idle status rows below the floor on cmux/orca" empty "$CAPS_PLAIN" "$bare_status_screen"
+  local busy_status_screen
+  busy_status_screen=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   ⬝⬝⬝⬝ esc interrupt\n   firstmate                                    tab agents ctrl+p commands'
+  assert_screen "opencode busy esc-interrupt row below the 1.18.35 floor stays unknown" unknown "$CAPS_STYLED" "$busy_status_screen"
   retry_screen=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   ■5⬝hour⬝usage limit reached. It will reset in 1 hour 38 minutes. To cont\n    usin... (click to expand) [retrying in 1h 8m attempt #1]'
   assert_screen "opencode 1.18.x usage-limit retry banner below the floor on herdr" empty "$CAPS_STYLED" "$retry_screen"
   assert_screen "opencode 1.18.x usage-limit retry banner below the floor on zellij" empty "$CAPS_STYLED_NOID" "$retry_screen"
