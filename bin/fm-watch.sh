@@ -3030,265 +3030,15 @@ resurface_after_downtime() {
   wake "check: rearm-resurface"
 }
 
-while :; do
-  # Home-gone exit: a deleted home, state directory, or code root means this
-  # watcher's world is gone (a torn-down temporary home or a discarded
-  # disposable checkout). Exit with a logged reason rather than writing state
-  # into nothing, or into a live home from a checkout that no longer exists.
-  # A detached helper this watcher started (home-summary refresh, reconcile)
-  # can recreate a deleted state directory before the next poll, so a lock
-  # with no holder at all is read as the same teardown: only a fresh watcher
-  # ever recreates the lock, and that case is the self-eviction below.
-  # Scoped to this process alone: no other watcher is signalled.
-  if [ "$WATCH_HOME_EXISTED" -eq 1 ] && [ ! -d "$FM_HOME" ]; then
-    echo "watcher: exiting - home no longer exists: $FM_HOME" >&2
-    exit 1
-  elif [ ! -d "$STATE" ]; then
-    echo "watcher: exiting - state directory no longer exists: $STATE" >&2
-    exit 1
-  elif [ ! -e "$WATCH_LOCK/pid" ]; then
-    echo "watcher: exiting - state directory was torn down (singleton lock removed): $STATE" >&2
-    exit 1
-  elif [ ! -d "$SCRIPT_DIR" ]; then
-    echo "watcher: exiting - code root no longer exists: $SCRIPT_DIR" >&2
-    exit 1
-  fi
-
-  # Self-eviction: if the singleton lock no longer names this process, a second
-  # watcher has taken over (e.g. a transient duplicate from a racy arm). Stand
-  # down so the rightful singleton continues alone. The EXIT trap's release
-  # no-ops because the lock pid is not ours, so the survivor's lock is untouched.
-  # This makes any duplicate self-resolve within one poll instead of persisting
-  # and doubling every wake.
-  if [ "$(cat "$WATCH_LOCK/pid" 2>/dev/null || true)" != "$WATCHER_PID" ]; then
-    exit 0
-  fi
-
-  fm_memory_sampler_ensure || triage_log "host memory sampler failed to restart"
-  host_memory_surface_queued
-  fm_model_outage_tick || triage_log "model-error observation failed"
-  own_queue_resurface || { echo "watcher: own wake-queue observation failed" >&2; exit 1; }
-
-  # Liveness beacon for fm-guard.sh: a fresh mtime here means a watcher is
-  # alive. Supervision scripts warn when this goes stale with tasks in flight.
-  touch "$STATE/.last-watcher-beat"
-
-  # Opt-in fleet activity ledger (docs/fleet-ledger.md): pick up newly appended
-  # status lines before this cycle can exit on a wake. Off costs one file test.
-  [ ! -e "$CONFIG/fleet-ledger" ] || FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/fm-fleet-ledger.sh" capture || true
-
-  if [ "$(age_of "$STATE/home-summary.json")" -ge "$HOME_SUMMARY_INTERVAL" ]; then
-    home_summary_refresh_detached
-  fi
-
-  # Bearings publishes reconcile asks as local one-shot request files and
-  # returns before any mate delivery. Supervision owns their later delivery;
-  # a skipped or failed request remains durable for another poll.
-  if reconcile_requests_pending; then
-    reconcile_requests_detached
-  fi
-
-  # Parent-owned secondmate pending-reply reconciliation: resolve correlated
-  # parent reports, observe backend busy/idle turn completion, send one recovery
-  # repost after grace, and escalate once if the recovery turn is also missed.
-  # No conversation scraping; unresolved records are never silently expired.
-  fm_pending_reply_tick "$STATE" || true
-
-  # Endpoint liveness runs before queue observation: a positively dead or
-  # missing secondmate endpoint is relaunched here on a bounded cadence, which
-  # is also what unsticks that mate's foreign wake queue. The tick's single
-  # wake exits the cycle like every other wake, so its marker is stamped before
-  # any relaunch and the restarted watcher will not re-probe early.
-  secondmate_liveness_tick || {
-    echo "watcher: secondmate liveness check failed" >&2
-    exit 1
-  }
-
-  # A live secondmate endpoint does not prove that its own wake loop is alive.
-  # Observe the foreign queue before the rest of this cycle so an aged row wakes
-  # the parent without consuming or rewriting the receiving home's record.
-  secondmate_wake_stall_tick || {
-    echo "watcher: secondmate wake-loop observation failed" >&2
-    exit 1
-  }
-
-  # Signals are scanned FIRST, before the wait-timer, inactive-outcome and
-  # check steps: wake() exits the cycle, so any earlier waking step starves
-  # the handoff path - wait-timer and check alerts once delayed done handoffs
-  # to Main by 50-72 minutes (retro 2026-10-09, section 3.4). Deferring those
-  # steps instead loses nothing: their alerts are durably queued by
-  # fm_wake_append and the steps themselves are time-based, so the next cycle
-  # without a signal delivers them. The secondmate repair ticks above stay
-  # ahead of signals because they only wake to relaunch a dead endpoint or
-  # unstick a foreign queue, never for noise.
-  # On the first changed signal, linger one grace period and re-scan before
-  # classifying: a crewmate's final status write and the same turn's turn-end
-  # hook land seconds apart, and reporting them as separate actionable wakes
-  # costs a full firstmate turn each. The re-scan also picks up a newer
-  # signature for an already-pending file (last write wins below).
-  pending=$(scan_signals)
-  if [ -n "$pending" ]; then
-    sleep "$SIGNAL_GRACE"
-    pending=$(printf '%s\n%s' "$pending" "$(scan_signals)")
-    # The final coalesced signal set is the watcher-carried status-change
-    # trigger for this home's published summary. Start it before either
-    # surfacing or absorbing the signal, but never wait on it: see
-    # home_summary_refresh_detached for why publication stays off the beacon's
-    # path. Publication failure stays side-band.
-    home_summary_refresh_detached
-    files=""
-    while IFS=$(printf '\t') read -r sf sig f; do
-      [ -n "$sf" ] || continue
-      case " $files " in *" $f "*) ;; *) files="$files $f" ;; esac
-    done <<EOF
-$pending
-EOF
-    reason="signal:$files"
-    # Triage: a signal is ACTIONABLE when any of these holds (cheapest first):
-    #   - the away-mode daemon owns triage (afk) and wants every wake;
-    #   - any status file gained a captain-relevant event since it was last
-    #     classified (its whole new span, not merely its last line);
-    #   - or it is a no-verb wake (a bare turn-end, a working: note) with no
-    #     positive evidence the crew is still executing - the crew stopped its turn
-    #     with no actively-running pipeline and no busy pane, so it may be done
-    #     (even via an interactive menu that wrote no done: status), waiting on a
-    #     decision, or wedged. Absorbing such a turn-end is exactly the
-    #     swallowed-finish this change guards against.
-    # Positive evidence is either an authoritative provably-working verdict or, in a
-    # home that opts in with config/turnend-churn-absorb and for a BARE turn-end
-    # alone, a pane that rendered something since the previous poll
-    # (signal_turnend_panes_churned) - the only proof available to a harness whose
-    # busy state has no verified semantic source, bounded so it cannot defer that
-    # task's turn-ends forever. Absorb stays evidence-driven: with neither proof the
-    # wake surfaces exactly as before.
-    # Actionable -> enqueue, advance .seen-* markers, exit. Benign (a no-verb wake
-    # whose crew is still executing) in always-on mode -> advance the markers so it
-    # will not re-fire, log, and keep blocking without enqueuing. Both evidence
-    # checks are costly (a bounded no-mistakes call, then a pane capture), so the ||
-    # ordering evaluates them ONLY for a non-afk signal with no captain-relevant
-    # status span, and the capture only once the authoritative verdict comes up short.
-    FM_SIGNAL_SURFACE_ENDPOINTS=''
-    FM_SIGNAL_NEEDS_DECISION_FILES=''
-    # shellcheck disable=SC2086  # $files is a space-separated status-path list (ids carry no spaces)
-    signal_files_actionable $files
-    signal_actionable=$?
-    # A decision-owned file's queued row payload is marked "needs-decision:"
-    # instead of the ordinary "signal:" below (other files in the same batch
-    # keep the ordinary payload). The wake reason line itself, and every
-    # harness-arm consumer that pattern-matches it, stays byte-identical -
-    # only the per-row payload changes. Two readers branch on that payload:
-    # docs/pi-supervision-branch.md's Pi-only branch dispatcher, to keep a
-    # decision-owned row off the supervision branch (fm-branch-dispatch.ts,
-    # fm-primary-pi-watch.ts), and the away daemon, whose handle_durable_wakes
-    # passes it to handle_wake (see the comment above handle_wake in
-    # bin/fm-supervise-daemon.sh).
-    # shellcheck disable=SC2086  # same space-separated status-path list
-    if afk_present || [ "$signal_actionable" -eq 0 ] \
-      || { ! signal_crew_provably_working $files && ! signal_turnend_panes_churned $files; }; then
-      while IFS=$(printf '\t') read -r sf sig f; do
-        [ -n "$sf" ] || continue
-        file_reason="$reason"
-        case " $FM_SIGNAL_NEEDS_DECISION_FILES " in *" $f "*) file_reason="needs-decision:$files" ;; esac
-        fm_wake_append signal "$(basename "$f")" "$file_reason" || exit 1
-      done <<EOF
-$pending
-EOF
-      # The wake signature advances for every file in this batch, including one
-      # whose span could not be classified: it has now been reported, and this is
-      # what bounds an unreadable log to one report per distinct file state. Only
-      # a SUCCESSFULLY classified log commits a classification position below, so
-      # an unreadable log's content is still classified once it becomes readable.
-      while IFS=$(printf '\t') read -r sf sig f; do
-        [ -n "$sf" ] || continue
-        case "$f" in
-          *.status)
-            fm_wake_status_reported_commit "$STATE" "$f" "$sig" || true
-            mark_surface_reported "$f" "$sig" || true
-            ;;
-          *) printf '%s' "$sig" > "$sf" ;;
-        esac
-      done <<EOF
-$pending
-EOF
-      while IFS=$(printf '\t') read -r f surface_end surface_ident; do
-        [ -n "$f" ] || continue
-        fm_wake_status_seen_commit "$STATE" "$f" "$surface_end" "$surface_ident" || true
-        mark_surfaced "$f" "$surface_end" "$surface_ident"
-      done <<EOF
-$FM_SIGNAL_SURFACE_ENDPOINTS
-EOF
-      wake "$reason"
-    else
-      while IFS=$(printf '\t') read -r sf sig f; do
-        [ -n "$sf" ] || continue
-        case "$f" in *.status) ;; *) printf '%s' "$sig" > "$sf" ;; esac
-      done <<EOF
-$pending
-EOF
-      signal_commit_error=0
-      while IFS=$(printf '\t') read -r f surface_end surface_ident; do
-        [ -n "$f" ] || continue
-        fm_wake_status_seen_commit "$STATE" "$f" "$surface_end" "$surface_ident" \
-          || signal_commit_error=1
-      done <<EOF
-$FM_SIGNAL_SURFACE_ENDPOINTS
-EOF
-      if [ "$signal_commit_error" -ne 0 ]; then
-        while IFS=$(printf '\t') read -r sf sig f; do
-          [ -n "$sf" ] || continue
-          fm_wake_append signal "$(basename "$f")" "$reason" || exit 1
-        done <<EOF
-$pending
-EOF
-        wake "$reason"
-      fi
-      triage_log "absorbed benign $reason"
-    fi
-  fi
-
-  fm_wait_timers_tick || {
-    echo "watcher: waiting-state timer check failed" >&2
-    exit 1
-  }
-
-  host_memory_surface_queued
-
-  # Process-to-event liveness repair. This never discovers a result by polling:
-  # each registered source has its own child blocking on that source, and this
-  # only republishes results already captured durably and restarts a source
-  # whose owner is gone. It is a no-op with nothing registered.
-  if [ -d "$STATE/procevent" ]; then
-    FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-procevent.sh" reconcile >/dev/null 2>&1 || true
-  fi
-  # Then deliver any queued-but-unsurfaced result, including one a runner
-  # published while this watcher was between cycles.
-  procevent_surface_queued
-
-  # A process-event result carries richer adapter-owned wake context than the
-  # generic recovery reason, so give that owner first refusal.
-  resurface_after_downtime
-
-  # The existing poll loop also owns the bounded inactive-outcome cadence.
-  # This is mechanical and silent unless a durable terminal-outcome obligation
-  # was created, so quiet cycles never wake firstmate or consume model tokens.
-  inactive_out=
-  if inactive_out=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
-    "$SCRIPT_DIR/fm-inactive-reconcile.sh" scan 2>/dev/null); then
-    if [ -n "$inactive_out" ]; then
-      wake "check: inactive-outcome"
-    fi
-  else
-    triage_log "inactive-outcome reconciliation unavailable"
-  fi
-
-  # Slow per-task checks (firstmate writes these, e.g. a merged-PR poll).
-  # Time-based via .last-check mtime so the cadence survives watcher restarts.
-  # Evaluated AFTER the signal scan: signals are the actionable handoff path
-  # and run first (see the signal scan above), so a signal wake defers a due
-  # check to the next cycle without a signal. Nothing is lost - the cadence is
-  # time-based, and each check re-evaluates on the cycle that reaches it.
-  # Checks are due only every CHECK_INTERVAL, so most cycles skip this block
-  # and fall straight through.
+# Slow per-task checks (firstmate writes these, e.g. a merged-PR poll).
+# Time-based via .last-check mtime so the cadence survives watcher restarts.
+# A due check runs on every cycle that reaches it, including a cycle whose
+# actionable signal wake is about to exit (see the signal branch): the signal
+# rows are already durable in the queue, so a check result appended here is
+# delivered by the same drain as that signal, and a signal stream cannot
+# starve a check. Checks are due only every CHECK_INTERVAL, so most cycles
+# skip this block and fall straight through.
+run_due_checks() {
   if [ "$(age_of "$STATE/.last-check")" -ge "$CHECK_INTERVAL" ]; then
     rejected_checks=
     contribution_check_output=
@@ -3416,6 +3166,264 @@ EOF
       wake "$contribution_check_output"
     fi
   fi
+}
+
+while :; do
+  # Home-gone exit: a deleted home, state directory, or code root means this
+  # watcher's world is gone (a torn-down temporary home or a discarded
+  # disposable checkout). Exit with a logged reason rather than writing state
+  # into nothing, or into a live home from a checkout that no longer exists.
+  # A detached helper this watcher started (home-summary refresh, reconcile)
+  # can recreate a deleted state directory before the next poll, so a lock
+  # with no holder at all is read as the same teardown: only a fresh watcher
+  # ever recreates the lock, and that case is the self-eviction below.
+  # Scoped to this process alone: no other watcher is signalled.
+  if [ "$WATCH_HOME_EXISTED" -eq 1 ] && [ ! -d "$FM_HOME" ]; then
+    echo "watcher: exiting - home no longer exists: $FM_HOME" >&2
+    exit 1
+  elif [ ! -d "$STATE" ]; then
+    echo "watcher: exiting - state directory no longer exists: $STATE" >&2
+    exit 1
+  elif [ ! -e "$WATCH_LOCK/pid" ]; then
+    echo "watcher: exiting - state directory was torn down (singleton lock removed): $STATE" >&2
+    exit 1
+  elif [ ! -d "$SCRIPT_DIR" ]; then
+    echo "watcher: exiting - code root no longer exists: $SCRIPT_DIR" >&2
+    exit 1
+  fi
+
+  # Self-eviction: if the singleton lock no longer names this process, a second
+  # watcher has taken over (e.g. a transient duplicate from a racy arm). Stand
+  # down so the rightful singleton continues alone. The EXIT trap's release
+  # no-ops because the lock pid is not ours, so the survivor's lock is untouched.
+  # This makes any duplicate self-resolve within one poll instead of persisting
+  # and doubling every wake.
+  if [ "$(cat "$WATCH_LOCK/pid" 2>/dev/null || true)" != "$WATCHER_PID" ]; then
+    exit 0
+  fi
+
+  fm_memory_sampler_ensure || triage_log "host memory sampler failed to restart"
+  host_memory_surface_queued
+  fm_model_outage_tick || triage_log "model-error observation failed"
+  own_queue_resurface || { echo "watcher: own wake-queue observation failed" >&2; exit 1; }
+
+  # Liveness beacon for fm-guard.sh: a fresh mtime here means a watcher is
+  # alive. Supervision scripts warn when this goes stale with tasks in flight.
+  touch "$STATE/.last-watcher-beat"
+
+  # Opt-in fleet activity ledger (docs/fleet-ledger.md): pick up newly appended
+  # status lines before this cycle can exit on a wake. Off costs one file test.
+  [ ! -e "$CONFIG/fleet-ledger" ] || FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/fm-fleet-ledger.sh" capture || true
+
+  if [ "$(age_of "$STATE/home-summary.json")" -ge "$HOME_SUMMARY_INTERVAL" ]; then
+    home_summary_refresh_detached
+  fi
+
+  # Bearings publishes reconcile asks as local one-shot request files and
+  # returns before any mate delivery. Supervision owns their later delivery;
+  # a skipped or failed request remains durable for another poll.
+  if reconcile_requests_pending; then
+    reconcile_requests_detached
+  fi
+
+  # Parent-owned secondmate pending-reply reconciliation: resolve correlated
+  # parent reports, observe backend busy/idle turn completion, send one recovery
+  # repost after grace, and escalate once if the recovery turn is also missed.
+  # No conversation scraping; unresolved records are never silently expired.
+  fm_pending_reply_tick "$STATE" || true
+
+  # Endpoint liveness runs before queue observation: a positively dead or
+  # missing secondmate endpoint is relaunched here on a bounded cadence, which
+  # is also what unsticks that mate's foreign wake queue. The tick's single
+  # wake exits the cycle like every other wake, so its marker is stamped before
+  # any relaunch and the restarted watcher will not re-probe early.
+  secondmate_liveness_tick || {
+    echo "watcher: secondmate liveness check failed" >&2
+    exit 1
+  }
+
+  # A live secondmate endpoint does not prove that its own wake loop is alive.
+  # Observe the foreign queue before the rest of this cycle so an aged row wakes
+  # the parent without consuming or rewriting the receiving home's record.
+  secondmate_wake_stall_tick || {
+    echo "watcher: secondmate wake-loop observation failed" >&2
+    exit 1
+  }
+
+  # Signals are scanned FIRST, before the wait-timer and inactive-outcome steps:
+  # wake() exits the cycle, so any earlier waking step starves the handoff path -
+  # wait-timer and check alerts once delayed done handoffs to Main by 50-72
+  # minutes (retro 2026-10-09, section 3.4). Deferring the wait-timer and
+  # inactive-outcome steps loses nothing: their alerts are durably queued by
+  # fm_wake_append and the steps themselves are time-based, so the next cycle
+  # without a signal delivers them. Due checks are the exception that runs
+  # ahead of a signal wake (run_due_checks, called before the signal's wake):
+  # their results queue in that same wake, so a constant signal stream cannot
+  # starve them. The secondmate repair ticks above stay ahead of signals
+  # because they only wake to relaunch a dead endpoint or unstick a foreign
+  # queue, never for noise.
+  # On the first changed signal, linger one grace period and re-scan before
+  # classifying: a crewmate's final status write and the same turn's turn-end
+  # hook land seconds apart, and reporting them as separate actionable wakes
+  # costs a full firstmate turn each. The re-scan also picks up a newer
+  # signature for an already-pending file (last write wins below).
+  pending=$(scan_signals)
+  if [ -n "$pending" ]; then
+    sleep "$SIGNAL_GRACE"
+    pending=$(printf '%s\n%s' "$pending" "$(scan_signals)")
+    # The final coalesced signal set is the watcher-carried status-change
+    # trigger for this home's published summary. Start it before either
+    # surfacing or absorbing the signal, but never wait on it: see
+    # home_summary_refresh_detached for why publication stays off the beacon's
+    # path. Publication failure stays side-band.
+    home_summary_refresh_detached
+    files=""
+    while IFS=$(printf '\t') read -r sf sig f; do
+      [ -n "$sf" ] || continue
+      case " $files " in *" $f "*) ;; *) files="$files $f" ;; esac
+    done <<EOF
+$pending
+EOF
+    reason="signal:$files"
+    # Triage: a signal is ACTIONABLE when any of these holds (cheapest first):
+    #   - the away-mode daemon owns triage (afk) and wants every wake;
+    #   - any status file gained a captain-relevant event since it was last
+    #     classified (its whole new span, not merely its last line);
+    #   - or it is a no-verb wake (a bare turn-end, a working: note) with no
+    #     positive evidence the crew is still executing - the crew stopped its turn
+    #     with no actively-running pipeline and no busy pane, so it may be done
+    #     (even via an interactive menu that wrote no done: status), waiting on a
+    #     decision, or wedged. Absorbing such a turn-end is exactly the
+    #     swallowed-finish this change guards against.
+    # Positive evidence is either an authoritative provably-working verdict or, in a
+    # home that opts in with config/turnend-churn-absorb and for a BARE turn-end
+    # alone, a pane that rendered something since the previous poll
+    # (signal_turnend_panes_churned) - the only proof available to a harness whose
+    # busy state has no verified semantic source, bounded so it cannot defer that
+    # task's turn-ends forever. Absorb stays evidence-driven: with neither proof the
+    # wake surfaces exactly as before.
+    # Actionable -> enqueue, advance .seen-* markers, exit. Benign (a no-verb wake
+    # whose crew is still executing) in always-on mode -> advance the markers so it
+    # will not re-fire, log, and keep blocking without enqueuing. Both evidence
+    # checks are costly (a bounded no-mistakes call, then a pane capture), so the ||
+    # ordering evaluates them ONLY for a non-afk signal with no captain-relevant
+    # status span, and the capture only once the authoritative verdict comes up short.
+    FM_SIGNAL_SURFACE_ENDPOINTS=''
+    FM_SIGNAL_NEEDS_DECISION_FILES=''
+    # shellcheck disable=SC2086  # $files is a space-separated status-path list (ids carry no spaces)
+    signal_files_actionable $files
+    signal_actionable=$?
+    # A decision-owned file's queued row payload is marked "needs-decision:"
+    # instead of the ordinary "signal:" below (other files in the same batch
+    # keep the ordinary payload). The wake reason line itself, and every
+    # harness-arm consumer that pattern-matches it, stays byte-identical -
+    # only the per-row payload changes. Two readers branch on that payload:
+    # docs/pi-supervision-branch.md's Pi-only branch dispatcher, to keep a
+    # decision-owned row off the supervision branch (fm-branch-dispatch.ts,
+    # fm-primary-pi-watch.ts), and the away daemon, whose handle_durable_wakes
+    # passes it to handle_wake (see the comment above handle_wake in
+    # bin/fm-supervise-daemon.sh).
+    # shellcheck disable=SC2086  # same space-separated status-path list
+    if afk_present || [ "$signal_actionable" -eq 0 ] \
+      || { ! signal_crew_provably_working $files && ! signal_turnend_panes_churned $files; }; then
+      while IFS=$(printf '\t') read -r sf sig f; do
+        [ -n "$sf" ] || continue
+        file_reason="$reason"
+        case " $FM_SIGNAL_NEEDS_DECISION_FILES " in *" $f "*) file_reason="needs-decision:$files" ;; esac
+        fm_wake_append signal "$(basename "$f")" "$file_reason" || exit 1
+      done <<EOF
+$pending
+EOF
+      # The wake signature advances for every file in this batch, including one
+      # whose span could not be classified: it has now been reported, and this is
+      # what bounds an unreadable log to one report per distinct file state. Only
+      # a SUCCESSFULLY classified log commits a classification position below, so
+      # an unreadable log's content is still classified once it becomes readable.
+      while IFS=$(printf '\t') read -r sf sig f; do
+        [ -n "$sf" ] || continue
+        case "$f" in
+          *.status)
+            fm_wake_status_reported_commit "$STATE" "$f" "$sig" || true
+            mark_surface_reported "$f" "$sig" || true
+            ;;
+          *) printf '%s' "$sig" > "$sf" ;;
+        esac
+      done <<EOF
+$pending
+EOF
+      while IFS=$(printf '\t') read -r f surface_end surface_ident; do
+        [ -n "$f" ] || continue
+        fm_wake_status_seen_commit "$STATE" "$f" "$surface_end" "$surface_ident" || true
+        mark_surfaced "$f" "$surface_end" "$surface_ident"
+      done <<EOF
+$FM_SIGNAL_SURFACE_ENDPOINTS
+EOF
+      run_due_checks
+      wake "$reason"
+    else
+      while IFS=$(printf '\t') read -r sf sig f; do
+        [ -n "$sf" ] || continue
+        case "$f" in *.status) ;; *) printf '%s' "$sig" > "$sf" ;; esac
+      done <<EOF
+$pending
+EOF
+      signal_commit_error=0
+      while IFS=$(printf '\t') read -r f surface_end surface_ident; do
+        [ -n "$f" ] || continue
+        fm_wake_status_seen_commit "$STATE" "$f" "$surface_end" "$surface_ident" \
+          || signal_commit_error=1
+      done <<EOF
+$FM_SIGNAL_SURFACE_ENDPOINTS
+EOF
+      if [ "$signal_commit_error" -ne 0 ]; then
+        while IFS=$(printf '\t') read -r sf sig f; do
+          [ -n "$sf" ] || continue
+          fm_wake_append signal "$(basename "$f")" "$reason" || exit 1
+        done <<EOF
+$pending
+EOF
+        wake "$reason"
+      fi
+      triage_log "absorbed benign $reason"
+    fi
+  fi
+
+  fm_wait_timers_tick || {
+    echo "watcher: waiting-state timer check failed" >&2
+    exit 1
+  }
+
+  host_memory_surface_queued
+
+  # Process-to-event liveness repair. This never discovers a result by polling:
+  # each registered source has its own child blocking on that source, and this
+  # only republishes results already captured durably and restarts a source
+  # whose owner is gone. It is a no-op with nothing registered.
+  if [ -d "$STATE/procevent" ]; then
+    FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-procevent.sh" reconcile >/dev/null 2>&1 || true
+  fi
+  # Then deliver any queued-but-unsurfaced result, including one a runner
+  # published while this watcher was between cycles.
+  procevent_surface_queued
+
+  # A process-event result carries richer adapter-owned wake context than the
+  # generic recovery reason, so give that owner first refusal.
+  resurface_after_downtime
+
+  # The existing poll loop also owns the bounded inactive-outcome cadence.
+  # This is mechanical and silent unless a durable terminal-outcome obligation
+  # was created, so quiet cycles never wake firstmate or consume model tokens.
+  inactive_out=
+  if inactive_out=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+    "$SCRIPT_DIR/fm-inactive-reconcile.sh" scan 2>/dev/null); then
+    if [ -n "$inactive_out" ]; then
+      wake "check: inactive-outcome"
+    fi
+  else
+    triage_log "inactive-outcome reconciliation unavailable"
+  fi
+
+  run_due_checks
   # Layer 1 backbone: pane staleness. Two consecutive identical hashes with no busy
   # signature means the crewmate finished, is waiting, or is wedged. Each distinct
   # stale hash is surfaced, absorbed, or timed toward escalation once (.stale-*
