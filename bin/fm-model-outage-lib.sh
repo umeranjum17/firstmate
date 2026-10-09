@@ -57,6 +57,7 @@ fm_model_outage_tick() {
       if error=$(jq -er --arg gen "$gen" 'select(.gen == $gen) | .error | select(type == "string")' "$file"); then native=1; else error=; fi
     fi
     [ "$harness" = opencode ] || [ "$native" = 1 ] || continue
+    # shellcheck disable=SC2016 # The child expands its own positional arguments.
     verdict=$(fm_run_timed 3 bash -c '. "$1/fm-backend.sh"; . "$1/fm-busy-lib.sh"; fm_busy_classify_semantic "$2" "$3" "$4" "$5" "$6"' \
       model-error "$_FM_MODEL_ERROR_DIR" "$backend" "$target" "$harness" "$id" "$STATE") \
       || { fm_model_outage_hold "$dir" "$batch" "$id"; continue; }
