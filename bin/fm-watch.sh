@@ -466,10 +466,6 @@ captain_held_silenced() {  # <status-line>
   status_is_captain_held "$1" && away_record_present
 }
 
-hash_pane() {
-  if command -v md5 >/dev/null 2>&1; then md5 -q; else md5sum | cut -d' ' -f1; fi
-}
-
 # window_is_busy: 0 (busy) iff the task's harness is PROVABLY working, through
 # the semantic busy-state contract (bin/fm-busy-lib.sh). Only an exact busy
 # verdict returns 0: idle, unknown, and dead all return 1, so a converted
@@ -2061,7 +2057,7 @@ stale_wait_record() {  # <window-key>
   printf '%s' "$STALE_WAIT_DECLARATION" > "$STATE/.paused-resurfaced-$1"
 }
 
-# Fallback for a hold that becomes visible after the loop-top hold check.
+# Fallback for a hold that becomes visible after the stale-path hold check.
 # The ordinary stale path skips proven active holds before reaching this helper;
 # this late read preserves the existing cadence if the hold changes mid-poll.
 captain_call_stale_bound() {  # <window-key> <task>
@@ -3349,7 +3345,6 @@ EOF
     # Steering-inbox loss detection runs before the secondmate stale
     # exemption below, because a mate's steers land in an inbox too.
     [ -z "$task" ] || inbox_steer_check "$w" "$task"
-    task_captain_call_open "$task" && continue
     key=$(window_key "$w")
     last=$(status_declared_wait_line "$STATE/$task.status")
     if ! status_is_paused_or_captain_held "$last" && [ -e "$STATE/.paused-$key" ]; then
@@ -3358,8 +3353,7 @@ EOF
     # An idle secondmate endpoint is healthy by design, so a mate is admitted to
     # the pane-stale path ONLY to serve a status-declared wait's bounded
     # re-surface. This gate reads the shared predicate rather than the pause verb
-    # alone so it includes a declared `captain-held` status. Active backlog holds
-    # have already been checked above, independently of the status declaration.
+    # alone so it includes a declared `captain-held` status.
     if [ "$kind" = secondmate ] && ! status_is_paused_or_captain_held "$last"; then
       continue
     fi
@@ -3373,6 +3367,11 @@ EOF
     ewf="$STATE/.wedge-escalations-$key"
     pf="$STATE/.paused-$key"   # flag: this key's stale is using the bounded pause cadence
     prev=$(cat "$hf" 2>/dev/null || true)
+    # A stale or wait alert needs a second identical poll, so the backlog hold is
+    # read only once that threshold is due. A held window stays quiet.
+    if [ "$h" = "$prev" ] && [ "$(cat "$cf" 2>/dev/null || echo 0)" -ge 1 ]; then
+      task_captain_call_open "$task" && continue
+    fi
     observe_window_progress "$key" "$task" "$last"
     # Busy match: a backend's native semantic state when available (herdr), else
     # the last 6 non-blank lines only (the TUI footer area, where every verified

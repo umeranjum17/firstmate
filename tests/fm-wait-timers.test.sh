@@ -40,13 +40,13 @@ for verb in blocked needs-decision; do
   printf '%s [at=%s] [key=wait]: external condition until 2099-01-01T00:00Z\n' "$verb" "$(date +%s)" > "$dir/state/lane.status"
   cycle
   if [ "$verb" = blocked ]; then
-    IFS=$'\t' read -r sig since owner _parent key < "$dir/state/.waiting-timers/lane"
-    printf '%s\t%s\t0\t0\t%s\n' "$sig" "$((since - 900))" "$key" > "$dir/state/.waiting-timers/lane"
+    IFS=$'\t' read -r sig since owner _parent key _misses < "$dir/state/.waiting-timers/lane"
+    printf '%s\t%s\t0\t0\t%s\t0\n' "$sig" "$((since - 900))" "$key" > "$dir/state/.waiting-timers/lane"
   fi
   cycle
   if [ "$verb" = blocked ]; then
     [ ! -s "$channel" ] || fail 'restart escalated before owner response interval'
-    IFS=$'\t' read -r sig since owner _parent key < "$dir/state/.waiting-timers/lane"
+    IFS=$'\t' read -r sig since owner _parent key _misses < "$dir/state/.waiting-timers/lane"
     [ "$owner" -gt 1 ] || fail 'owner delivery timestamp missing'
   fi
   grep -q 'check: waiting-state lane .*level=owner' "$dir/events" || fail "$verb did not alert its owner"
@@ -56,6 +56,7 @@ for verb in blocked needs-decision; do
   [ "$(grep -c 'level=owner' "$dir/events")" -eq 1 ] || fail "$verb repeated its owner alert"
   [ "$(grep -c '^blocked ' "$channel")" -eq 1 ] || fail "$verb repeated parent escalation"
   printf 'resolved [key=wait]: condition cleared\nworking: resumed\n' >> "$dir/state/lane.status"
+  cycle
   cycle
   grep -q '^resolved .*waiting-timer-cleared:' "$channel" || fail "$verb left parent escalation open"
   printf '%s [key=wait]: another condition\n' "$verb" >> "$dir/state/lane.status"
@@ -143,23 +144,96 @@ printf 'kind=secondmate\nharness=cursor\nbackend=herdr\nwindow=fixture:w1:p1\n' 
 
 cat > "$dir/fakebin/herdr" <<'SH'
 #!/usr/bin/env bash
-if [ "$1 $2" = 'agent list' ]; then sleep 30; else exit 1; fi
+if [ "$1 $2" = 'agent list' ]; then sleep 30
+elif [ "$1" = status ]; then printf '{"server":{"running":true}}\n'
+elif [ "$1 $2" = 'session list' ]; then printf '{"sessions":[{"name":"fixture","socket_path":"fixture-socket"}]}\n'
+else exit 1; fi
 SH
 for tool in timeout gtimeout; do
   # shellcheck disable=SC2016 # The generated script expands FM_HOME at runtime.
   printf '#!/usr/bin/env bash\nprintf "coreutils-called\\n" >> "$FM_HOME/coreutils-calls"\nexit 125\n' > "$dir/fakebin/$tool"
   chmod +x "$dir/fakebin/$tool"
 done
-start=$(date +%s)
-FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_CONFIG_OVERRIDE="$dir/config" \
-  PATH="$dir/fakebin:$PATH" FM_BACKEND_HERDR_READ_TIMEOUT=1 FM_TIMEOUT_MECHANISM_OVERRIDE=bash \
-  "$WATCH" > "$dir/timeout-out" 2> "$dir/timeout-err" &
-pid=$!
-rc=0
-wait_for_exit "$pid" 80 || rc=$?
-[ "$rc" -ne 0 ] && [ "$rc" -ne 124 ] || fail 'stalled native lookup did not fail within bound'
-[ "$(( $(date +%s) - start ))" -lt 8 ] || fail 'native timeout exceeded bound'
-grep -q 'waiting-state timer check failed' "$dir/timeout-err" || fail 'native failure diagnostic missing'
-grep -q 'agent list for fixture failed (code 124, deadline 1s)' "$dir/timeout-err" || fail 'portable deadline diagnostic missing'
+rm -f "$dir/state/lane.meta" "$dir/state/lane.status"
+printf 'kind=ship\nbackend=herdr\nwindow=fixture:w1:p1\n' > "$dir/state/herdr-lane.meta"
+printf 'blocked [key=herdr-wait]: native lane dependency\n' > "$dir/state/herdr-lane.status"
+printf 'kind=ship\nbackend=tmux\nwindow=fake:1\n' > "$dir/state/tmux-lane.meta"
+printf 'blocked [key=tmux-wait]: external dependency\n' > "$dir/state/tmux-lane.status"
+prime_status_seen "$dir/state" "$dir/state/herdr-lane.status"
+prime_status_seen "$dir/state" "$dir/state/tmux-lane.status"
+: > "$dir/events"
+export FM_BACKEND_HERDR_READ_TIMEOUT=1 FM_TIMEOUT_MECHANISM_OVERRIDE=bash
+cycle
+unset FM_BACKEND_HERDR_READ_TIMEOUT FM_TIMEOUT_MECHANISM_OVERRIDE
+grep -q 'check: waiting-state tmux-lane .*level=owner' "$dir/events" || fail 'stalled native lookup stopped monitoring the healthy tmux lane'
+! grep -q 'herdr-lane' "$dir/events" || fail 'lane on a stalled native session raised an alert'
+grep -q 'agent list for fixture failed (code 124, deadline 1s); its lanes are unknown this poll' "$dir/err" || fail 'native failure diagnostic missing'
 [ ! -e "$dir/coreutils-calls" ] || fail 'portable lookup invoked optional coreutils'
-pass 'native agent-list lookup is bounded without optional coreutils'
+pass 'stalled native lookup marks only its lanes unknown and keeps the watcher monitoring the rest'
+
+dir=$(make_case flicker)
+mkdir -p "$dir/home/config" "$dir/tmp" "$dir/config"
+printf 'kind=ship\nharness=opencode\nbackend=herdr\nwindow=fixture:w1:p1\n' > "$dir/state/lane.meta"
+printf 'working: running\n' > "$dir/state/lane.status"
+printf 'blocked\n' > "$dir/native"
+cat > "$dir/fakebin/herdr" <<'SH'
+#!/usr/bin/env bash
+if [ "$1 $2" = 'agent list' ]; then
+  printf '{"result":{"agents":[{"pane_id":"w1:p1","agent_status":"%s"}]}}\n' "$(cat "$FM_HOME/native")"
+else
+  exit 1
+fi
+SH
+chmod +x "$dir/fakebin/herdr"
+prime_status_seen "$dir/state" "$dir/state/lane.status"
+cycle
+IFS=$'\t' read -r sig since owner _parent key _misses < "$dir/state/.waiting-timers/lane"
+start=$((since - 900))
+printf '%s\t%s\t0\t0\t%s\t0\n' "$sig" "$start" "$key" > "$dir/state/.waiting-timers/lane"
+printf 'working\n' > "$dir/native"
+cycle
+IFS=$'\t' read -r _sig since owner _parent key misses < "$dir/state/.waiting-timers/lane"
+[ "$since" -eq "$start" ] || fail 'one non-blocked poll reset the blocked observation time'
+[ "$misses" -eq 1 ] || fail 'one non-blocked poll was not counted as a miss'
+printf 'blocked\n' > "$dir/native"
+: > "$dir/events"
+cycle
+[ "$(grep -c 'level=owner' "$dir/events")" -eq 1 ] || fail 'flicker re-block did not alert its owner from the preserved observation time'
+pass 'a blocked/working flicker keeps the original blocked observation time'
+
+dir=$(make_case push-owner)
+mkdir -p "$dir/home/config" "$dir/tmp" "$dir/config"
+printf 'kind=ship\nharness=opencode\nbackend=herdr\nwindow=fixture:w1:p1\n' > "$dir/state/lane.meta"
+printf 'working: running\n' > "$dir/state/lane.status"
+printf 'blocked\n' > "$dir/native"
+cat > "$dir/fakebin/herdr" <<'SH'
+#!/usr/bin/env bash
+if [ "$1 $2" = 'agent list' ]; then
+  printf '{"result":{"agents":[{"pane_id":"w1:p1","agent_status":"%s"}]}}\n' "$(cat "$FM_HOME/native")"
+elif [ "$1" = status ]; then
+  printf '{"server":{"running":true}}\n'
+elif [ "$1 $2" = 'session list' ]; then
+  printf '{"sessions":[{"name":"fixture","socket_path":"fixture-socket"}]}\n'
+elif [ "$1 $2" = 'agent get' ]; then
+  printf '{"result":{"agent":{"agent_status":"%s"}}}\n' "$(cat "$FM_HOME/native")"
+else
+  exit 1
+fi
+SH
+cat > "$dir/fakebin/reader" <<'SH'
+#!/usr/bin/env bash
+printf '@subscribed\n'
+sleep "$2"
+SH
+chmod +x "$dir/fakebin/herdr" "$dir/fakebin/reader"
+export FM_BACKEND_HERDR_EVENTS_FORCE=1 FM_BACKEND_HERDR_EVENT_READER="$dir/fakebin/reader"
+prime_status_seen "$dir/state" "$dir/state/lane.status"
+: > "$dir/events"
+cycle
+grep -q 'stale: fixture:w1:p1 (herdr: agent blocked' "$dir/events" || fail 'native push did not wake the owner immediately'
+IFS=$'\t' read -r _sig _since owner _parent _key _misses < "$dir/state/.waiting-timers/lane"
+[ "$owner" -gt 1 ] || fail 'native push wake did not record owner delivery'
+cycle
+[ "$(grep -c 'level=owner' "$dir/events")" -eq 0 ] || fail 'native push wake was followed by a duplicate owner recheck'
+unset FM_BACKEND_HERDR_EVENTS_FORCE FM_BACKEND_HERDR_EVENT_READER
+pass 'an immediate native push wake is the episode owner delivery, with no duplicate recheck'

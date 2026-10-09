@@ -17,6 +17,8 @@ FM_PUSH_TRANSITION_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$FM_PUSH_TRANSITION_LIB_DIR/fm-transition-lib.sh"
 # shellcheck source=bin/fm-wait-native-lib.sh
 . "$FM_PUSH_TRANSITION_LIB_DIR/fm-wait-native-lib.sh"
+# shellcheck source=bin/fm-wait-timers-lib.sh
+. "$FM_PUSH_TRANSITION_LIB_DIR/fm-wait-timers-lib.sh"
 
 TRIAGE_LOG="$STATE/.watch-triage.log"
 TRIAGE_LOG_MAX_BYTES=${FM_WATCH_TRIAGE_LOG_MAX_BYTES:-262144}
@@ -185,5 +187,6 @@ handle_push_transition() {  # <backend> <session> <record>
   fm_wake_append stale "$window" "$reason" || exit 1
   fm_backend_commit_transition "$backend" "$STATE" "$session" "$record" || exit 1
   mark_surfaced "$STATE/$task.status" "$surface_end" "$surface_ident"
+  [ -z "$task" ] || fm_wait_timer_push_delivered "$task" "$window" || exit 1
   wake "$reason"
 }

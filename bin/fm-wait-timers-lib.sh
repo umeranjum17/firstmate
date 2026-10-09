@@ -11,7 +11,7 @@
 # reports use the existing local/remote parent channel, never a captain alert.
 # A waiting-timer-* key belongs to this library; it resolves that report when
 # the episode ends. Main has no parent: further human escalation is judgment.
-# Source through fm-watch.sh; the watcher supplies hashing and wake emission.
+# Source through fm-watch.sh; the wake library supplies hashing and wake emission.
 
 _FM_WAIT_TIMER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=bin/fm-parent-channel-lib.sh
@@ -21,10 +21,10 @@ _FM_WAIT_TIMER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=bin/fm-timeout-lib.sh
 . "$_FM_WAIT_TIMER_DIR/fm-timeout-lib.sh"
 
-fm_wait_timer_save() {  # <record> <signature> <since> <owner> <parent> <key>
+fm_wait_timer_save() {  # <record> <signature> <since> <owner> <parent> <key> <misses>
   local file=$1 temp="${1%/*}/.${1##*/}.tmp.$$"
   shift
-  printf '%s\t%s\t%s\t%s\t%s\n' "$@" > "$temp" && mv "$temp" "$file"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$@" > "$temp" && mv "$temp" "$file"
 }
 
 fm_wait_timer_report() {  # <status-line>
@@ -38,13 +38,35 @@ fm_wait_timer_report() {  # <status-line>
 
 fm_wait_timer_owner_delivered() {
   [ "$1" -eq 0 ] || return 0
-  fm_wait_timer_save "$FM_WAIT_OWNER_RECORD" "$FM_WAIT_OWNER_SIGNATURE" "$FM_WAIT_OWNER_SINCE" "$(date +%s)" 0 "$FM_WAIT_OWNER_KEY"
+  fm_wait_timer_save "$FM_WAIT_OWNER_RECORD" "$FM_WAIT_OWNER_SIGNATURE" "$FM_WAIT_OWNER_SINCE" "$(date +%s)" 0 "$FM_WAIT_OWNER_KEY" 0
+}
+
+# An immediate native push wake already told the owner about this blocked pane,
+# so the episode records that delivery and the poll timer skips its owner wake.
+fm_wait_timer_push_delivered() {  # <task> <window>
+  local record="$STATE/.waiting-timers/$1" signature now old since owner parent key misses
+  now=$(date +%s) || return 1
+  signature=$(printf '%s' "$2|herdr-blocked" | hash_pane)
+  if [ -e "$record" ] || [ -L "$record" ]; then
+    [ -f "$record" ] && [ ! -L "$record" ] || return 1
+    IFS=$'\t' read -r old since owner parent key misses < "$record" || return 1
+    if [ "$old" = "$signature" ]; then
+      [ "$owner" -eq 0 ] || return 0
+      fm_wait_timer_save "$record" "$signature" "$since" "$now" "$parent" "$key" 0
+      return
+    fi
+    if [ "$parent" -eq 1 ] && [ -e "$FM_HOME/.fm-secondmate-home" ]; then
+      fm_wait_timer_report "resolved [key=$key]: waiting-timer-cleared: $1 changed state" || return 1
+    fi
+  fi
+  mkdir -p "$STATE/.waiting-timers" || return 1
+  fm_wait_timer_save "$record" "$signature" "$now" "$now" 0 "waiting-timer-$1-$now-$$-$RANDOM" 0
 }
 
 fm_wait_timers_tick() {
   local alert=${FM_WAIT_ALERT_SECS:-300} escalate=${FM_WAIT_ESCALATE_SECS:-900}
-  local meta task backend window session native sessions='|' blocked='|' rows actor=Main
-  local dir="$STATE/.waiting-timers" now record declaration verb signature old since owner parent key age reason until bound rc
+  local meta task backend window session native sessions='|' blocked='|' unknown='|' rows actor=Main
+  local dir="$STATE/.waiting-timers" now record declaration verb signature old since owner parent key misses due age reason until bound rc
   for native in "$alert" "$escalate"; do
     case "$native" in ''|*[!0-9]*|0* ) echo "waiting timers: thresholds must be positive decimal seconds" >&2; return 1 ;; esac
     [ "${#native}" -le 9 ] || { echo "waiting timers: threshold exceeds nine digits" >&2; return 1; }
@@ -52,8 +74,9 @@ fm_wait_timers_tick() {
   [ "$escalate" -gt "$alert" ] || { echo "waiting timers: escalation must be later than owner alert" >&2; return 1; }
   now=$(date +%s) || return 1
   [ ! -e "$FM_HOME/.fm-secondmate-home" ] || actor='owning lead'
-  # One bounded native read per recorded session, not one per lane. A failed
-  # read stops the poll with its real cause rather than clearing blocked timers.
+  # One bounded native read per recorded session, not one per lane. A session whose
+  # read fails is unknown for this poll: its lanes keep their episodes untouched
+  # while every other lane is still monitored.
   for meta in "$STATE"/*.meta; do
     [ -f "$meta" ] && [ ! -L "$meta" ] || continue
     backend=$(fm_meta_get "$meta" backend)
@@ -61,7 +84,7 @@ fm_wait_timers_tick() {
     window=$(fm_meta_get "$meta" window)
     [ -n "$window" ] || continue
     fm_backend_source herdr || return 1
-    fm_backend_herdr_parse_target "$window" || return 1
+    fm_backend_herdr_parse_target "$window" || continue
     session=$FM_BACKEND_HERDR_SESSION
     case "$sessions" in *"|$session|"*) continue ;; esac
     sessions="$sessions$session|"
@@ -77,13 +100,18 @@ fm_wait_timers_tick() {
       :
     else
       rc=$?
-      echo "waiting timers: agent list for $session failed (code $rc, deadline ${bound}s)" >&2
-      return 1
+      echo "waiting timers: agent list for $session failed (code $rc, deadline ${bound}s); its lanes are unknown this poll" >&2
+      unknown="$unknown$session|"
+      continue
     fi
     rows=$(printf '%s' "$native" | jq -er '
       if (.result.agents | type) != "array" then error("agent.list missing agents array")
       else [.result.agents[] | select(.agent_status == "blocked") |
-        if (.pane_id | type) == "string" then .pane_id else error("blocked agent missing pane_id") end] | join("\n") end') || return 1
+        if (.pane_id | type) == "string" then .pane_id else error("blocked agent missing pane_id") end] | join("\n") end') || {
+      echo "waiting timers: agent list for $session is malformed; its lanes are unknown this poll" >&2
+      unknown="$unknown$session|"
+      continue
+    }
     while IFS= read -r window; do
       [ -z "$window" ] || blocked="$blocked$session:$window|"
     done <<EOF
@@ -97,7 +125,7 @@ EOF
     task=${record##*/}
     [ ! -L "$record" ] || { echo "waiting timers: symlink episode $record" >&2; return 1; }
     [ ! -f "$STATE/$task.meta" ] || continue
-    IFS=$'\t' read -r old since owner parent key < "$record" || return 1
+    IFS=$'\t' read -r old since owner parent key misses < "$record" || return 1
     if [ "$parent" = 1 ] && [ -e "$FM_HOME/.fm-secondmate-home" ]; then
       fm_wait_timer_report "resolved [key=$key]: waiting-timer-cleared: $task removed" || return 1
     fi
@@ -108,6 +136,9 @@ EOF
     task=${meta##*/}; task=${task%.meta}
     _fm_parent_channel_id_valid "$task" || { echo "waiting timers: invalid task id in $meta" >&2; return 1; }
     window=$(fm_backend_target_of_meta "$meta")
+    if [ "$(fm_backend_of_meta "$meta")" = herdr ]; then
+      case "$unknown" in *"|${window%%:*}|"*) continue ;; esac
+    fi
     declaration=''
     if fm_native_wait_admitted "$(fm_meta_get "$meta" harness)"; then
       case "$blocked" in
@@ -124,16 +155,14 @@ EOF
       [ -n "$declaration" ] || declaration=$(status_declared_wait_line "$STATE/$task.status")
       status_is_paused "$declaration" || case "$declaration" in blocked*|needs-decision*) ;; *) declaration='' ;; esac
     fi
-    if task_captain_call_open "$task"; then
-      declaration=''
-    elif status_is_paused "$declaration" && until=$(status_paused_until "$declaration") && [ "$now" -lt "$until" ]; then
+    if status_is_paused "$declaration" && until=$(status_paused_until "$declaration") && [ "$now" -lt "$until" ]; then
       declaration=''
     fi
     record="$dir/$task"
-    old=''; since=$now; owner=0; parent=0; key="waiting-timer-$task-$now-$$-$RANDOM"
+    old=''; since=$now; owner=0; parent=0; misses=0; key="waiting-timer-$task-$now-$$-$RANDOM"
     if [ -e "$record" ] || [ -L "$record" ]; then
       [ -f "$record" ] && [ ! -L "$record" ] || { echo "waiting timers: invalid episode $record" >&2; return 1; }
-      IFS=$'\t' read -r old since owner parent key < "$record" || return 1
+      IFS=$'\t' read -r old since owner parent key misses < "$record" || return 1
       case "$since:$owner:$parent:$key" in
         *[!0-9A-Za-z._:-]*) echo "waiting timers: corrupt episode $record" >&2; return 1 ;;
       esac
@@ -142,18 +171,34 @@ EOF
       case "$owner" in ''|*[!0-9]*) echo "waiting timers: invalid owner time $record" >&2; return 1 ;; esac
       [ "${#owner}" -le 12 ] || return 1
       case "$parent" in 0|1) ;; *) echo "waiting timers: invalid episode levels $record" >&2; return 1 ;; esac
+      misses=${misses:-0}
+      case "$misses" in 0|1) ;; *) echo "waiting timers: invalid episode misses $record" >&2; return 1 ;; esac
       if [ "$owner" -eq 1 ]; then owner=0; fi
     fi
     signature=$(printf '%s' "$window|$declaration" | hash_pane)
+    age=$((now - since))
+    due=0
+    if [ "$owner" -eq 0 ] && [ "$age" -ge "$alert" ]; then due=1; fi
+    if [ "$owner" -gt 1 ] && [ "$parent" -eq 0 ] && [ "$((now - owner))" -ge "$((escalate - alert))" ]; then due=1; fi
+    if [ -n "$declaration" ] && [ "$old" = "$signature" ] && [ "$due" -eq 1 ] && task_captain_call_open "$task"; then
+      declaration=''
+    fi
+    if [ -z "$declaration" ] && [ -n "$old" ] && [ "$misses" -eq 0 ]; then
+      fm_wait_timer_save "$record" "$old" "$since" "$owner" "$parent" "$key" 1 || return 1
+      continue
+    fi
     if [ -z "$declaration" ] || [ "$old" != "$signature" ]; then
       if [ "$parent" -eq 1 ] && [ -e "$FM_HOME/.fm-secondmate-home" ]; then
         fm_wait_timer_report "resolved [key=$key]: waiting-timer-cleared: $task changed state" || return 1
       fi
       rm -f "$record" || return 1
       [ -n "$declaration" ] || continue
-      since=$now; owner=0; parent=0; key="waiting-timer-$task-$now-$$-$RANDOM"
+      since=$now; owner=0; parent=0; misses=0; key="waiting-timer-$task-$now-$$-$RANDOM"
       mkdir -p "$dir" || return 1
-      fm_wait_timer_save "$record" "$signature" "$since" "$owner" "$parent" "$key" || return 1
+      fm_wait_timer_save "$record" "$signature" "$since" "$owner" "$parent" "$key" "$misses" || return 1
+    elif [ "$misses" -ne 0 ]; then
+      misses=0
+      fm_wait_timer_save "$record" "$signature" "$since" "$owner" "$parent" "$key" "$misses" || return 1
     fi
     age=$((now - since))
     verb=$(status_line_verb "$declaration")
@@ -176,7 +221,7 @@ EOF
         fm_wait_timer_report "blocked [key=$key]: waiting-timer-overdue: $task ($verb, observed ${age}s); owning lead has not cleared the wait; Main must unblock or steer the lead" || return 1
       fi
       parent=1
-      fm_wait_timer_save "$record" "$signature" "$since" "$owner" "$parent" "$key" || return 1
+      fm_wait_timer_save "$record" "$signature" "$since" "$owner" "$parent" "$key" "$misses" || return 1
     fi
   done
   return 0

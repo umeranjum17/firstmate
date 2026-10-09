@@ -70,7 +70,7 @@ bash "$ROOT/bin/fm-captain-hold.sh" hold held-lane --reason test
 bash "$ROOT/bin/fm-captain-hold.sh" open held-lane --identity > "$world/hold-identity"
 [ -s "$world/hold-identity" ] || exit 1
 : > "$world/events"
-for _round in 1 2 3; do cycle; done
+for _round in 1 2 3; do cycle; sleep 2; done
 ! grep -E 'waiting-state|^stale:|stopped|possible wedge' "$world/events" || { echo 'held item alarmed'; exit 1; }
 [ ! -e "$world/state/.waiting-timers/held-lane" ] || exit 1
 ! grep -q 'waiting-timer-overdue' "$world/parent/state/lead.status" || exit 1
@@ -116,6 +116,7 @@ for verb in blocked needs-decision; do
   [ "$(grep -c 'waiting-state ladder' "$world/events")" -eq 1 ] || { echo 'duplicate owner wake'; exit 1; }
   [ "$(grep -c '^blocked ' "$world/parent/state/lead.status")" -eq 1 ] || { echo 'duplicate Main escalation'; exit 1; }
   printf 'resolved [key=dependency]: fixture cleared\nworking: resumed\n' >> "$world/state/ladder.status"
+  cycle
   cycle
   grep -q 'waiting-timer-cleared: ladder' "$world/parent/state/lead.status" || exit 1
   [ ! -e "$world/state/.waiting-timers/ladder" ] || exit 1
