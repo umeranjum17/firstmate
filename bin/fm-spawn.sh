@@ -271,8 +271,8 @@
 #   primary checkout, including when the spawning project is a linked worktree.
 #   Fresh session-provider tasks acquire with `treehouse get --lease
 #   --lease-holder <task-id>` from the explicit project, not the pane's cwd.
-#   python3 bin/fm-treehouse-protect.py protects recorded pre-lease copies
-#   before Treehouse can reset one. Teardown alone returns a leased copy;
+#   python3 bin/fm-treehouse-protect.py leases recorded copies before Treehouse
+#   can reset one. Teardown alone returns a leased copy;
 #   failed launches retain a cleanup_recovery=treehouse task record.
 #   Relaunch reuses that copy and clears the recovery marker on publication;
 #   teardown treats the recovery record as an aborted allocation, not a launched
@@ -4559,7 +4559,7 @@ elif [ "$RELAUNCH" -eq 1 ]; then
   fi
   [ "$KIND" = secondmate ] || validate_spawn_worktree "relaunch" "$T"
 elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
-  # Protect pre-lease task records without touching their Git copies, then
+  # Lease recorded task copies without touching their Git contents, then
   # acquire in the explicit project, never the new pane's inherited cwd.
   fm_local_firstmate_state_dirs "$STATE" || {
     echo "error: cannot enumerate recorded Treehouse copies: $FM_LOCAL_FIRSTMATE_ERROR" >&2

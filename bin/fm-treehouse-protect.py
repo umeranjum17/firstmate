@@ -3,11 +3,11 @@
 
 Usage: python3 fm-treehouse-protect.py <project> <state-dir>...
 Called by fm-spawn and fm-home-seed under their shared project lock.
-Only entries already in a Treehouse pool for this Git repository are leased;
-copies are never moved, reset or returned. Existing leases are preserved. JSON replacement holds
-Treehouse's own native state lock (flock on POSIX, LockFileEx on Windows).
-Unreadable state or conflicting records refuse allocation. A recorded copy that is
-missing from Treehouse state or marked destroying is skipped with a warning.
+Only entries already in a Treehouse pool for this Git repository are leased.
+Copies are never moved, reset or returned, and existing leases are preserved.
+JSON replacement holds Treehouse's own native state lock (flock on POSIX, LockFileEx on Windows).
+Unreadable state or conflicting records refuse allocation.
+A recorded copy that is missing from Treehouse state, marked destroying, or no longer a git worktree is skipped with a warning.
 """
 import datetime
 import json
