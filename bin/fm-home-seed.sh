@@ -413,7 +413,7 @@ acquire_treehouse_home() (
   fm_slot_record_owner "$home" "$STATE" || owner_rc=$?
   case "$owner_rc" in
     0)
-      echo "error: Treehouse handed out $home, but task $FM_SLOT_RECORD_OWNER_ID still records it as its $FM_SLOT_RECORD_OWNER_FIELD; refusing to adopt a live task's copy" >&2
+      echo "error: Treehouse handed out $home, but task $FM_SLOT_RECORD_OWNER_ID still records it as its $FM_SLOT_RECORD_OWNER_FIELD; refusing to adopt a live task's copy; the lease on $home remains held under $id for manual reconciliation" >&2
       return 1
       ;;
     1) ;;
