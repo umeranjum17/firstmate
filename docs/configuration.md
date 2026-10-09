@@ -1437,7 +1437,7 @@ The per-backend delta is required only for the backend resolved from `FM_BACKEND
 | `cmux` | `cmux`, `jq`, `treehouse`, `python3` |
 
 The JSON-emitting adapters (`herdr`, `zellij`, `cmux`) need `jq` because their spawn and liveness paths parse backend JSON.
-Every session-provider-only backend (`tmux`, `herdr`, `zellij`, `cmux`) uses `treehouse` for worktrees and `python3` for the recorded-copy protection described by `bin/fm-treehouse-protect.py`.
+The `python3` entries are for the recorded-copy protection described by `bin/fm-treehouse-protect.py`, which runs before every session-provider pool allocation.
 
 Backend tool availability uses the adapter's own executable resolver, so bootstrap and spawn agree on supported non-`PATH` locations such as cmux's bundled CLI.
 An unknown resolved backend emits `BACKEND_INVALID` and blocks dispatch instead of silently dropping its dependency delta or falling back to tmux.
