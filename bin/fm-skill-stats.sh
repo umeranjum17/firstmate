@@ -122,7 +122,8 @@ def window_totals(window):
         per_skill[skill] = per_skill.get(skill, 0) + reads
         home_map = per_home.setdefault(home, {})
         home_map[skill] = home_map.get(skill, 0) + reads
-        homes_of.setdefault(skill, set()).add(home)
+        if reads > 0:
+            homes_of.setdefault(skill, set()).add(home)
     return per_skill, per_home, homes_of
 
 per = {w: window_totals(w) for w in WINDOWS}

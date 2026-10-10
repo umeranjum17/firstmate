@@ -391,6 +391,14 @@ empty = tmp / 'empty'
 empty.mkdir()
 y = json.loads(run(model, empty))
 assert y['models'] == [] and y['coverage']['outcome_rows'] == 0 and y['limitations'], 'empty model home is not an error'
+open_lane = tmp / 'open-lane'
+(open_lane / 'data/metrics').mkdir(parents=True)
+(open_lane / 'state').mkdir()
+(open_lane / 'data/metrics/task-outcomes.tsv').write_text(oh)
+(open_lane / 'data/metrics/lanes.tsv').write_text(lh + '%s\tmain\tstuck\tship\tacme\tpi\topencode-go/deepseek-v4.1-flash\tmedium\tno-mistakes\t\n' % iso(now - day))
+ow = json.loads(run(model, open_lane))
+st = by(ow['models'], 'opencode-go/deepseek-v4.1-flash')['w7']
+assert (st['n_started'], st['n_finished'], st['unknown_outcome']) == (1, 0, 1), 'a sampled lane with no merged PR is unknown, not finished'
 
 # Skills: reads, windows, ranking, zero-read discovery, remote disclosure.
 s, sb = tmp / 's', tmp / 'sb'
@@ -437,6 +445,13 @@ stale = tmp / 'stale-skill'
 (stale / 'data/metrics/skills.tsv').write_text('day\thome\tskill\treads\n' + f'{onday(40)}\tmain\twidget\t1\n')
 zs = json.loads(run(skill, stale))
 assert zs['zero_read_w7'] == [] and zs['zero_read_w30'] == [], 'a collector whose coverage ends before the window claims no zero reads'
+zc = tmp / 'zero-count'
+(zc / 'skills/beta').mkdir(parents=True)
+(zc / 'skills/beta/SKILL.md').write_text('x')
+(zc / 'data/metrics').mkdir(parents=True)
+(zc / 'data/metrics/skills.tsv').write_text('day\thome\tskill\treads\n' + f'{onday(0)}\tmain\talpha\t3\n{onday(0)}\tmain\tbeta\t0\n')
+zz = json.loads(run(skill, zc))
+assert next(r for r in zz['skills'] if r['skill'] == 'beta')['w7'] == {'reads': 0, 'homes': 0}, 'a zero-count row does not count as reading a home'
 
 # Outcome recorder: one durable row per finished task, best effort.
 o = tmp / 'o'

@@ -249,7 +249,9 @@ def stats_for(cohort, window):
         cancelled_failed=sum(1 for t, _, _ in finished if t['outcome'] in ('cancelled', 'failed')),
         switches=switches,
         switch_share=(round(switches / len(finished), 4) if finished else None),
-        unknown_outcome=sum(1 for t, _, _ in finished if t['outcome'] == 'unknown'),
+        unknown_outcome=(sum(1 for t, _, _ in finished if t['outcome'] == 'unknown') +
+                         sum(1 for t in cohort if t['sampled'] and t['outcome'] == 'unknown' and
+                             t['started'] is not None and lo <= t['started'] <= NOW)),
         sampled=any(t['sampled'] for t, _, _ in finished),
     )
     out['merge_rate_sample'] = len(ended_ship)
