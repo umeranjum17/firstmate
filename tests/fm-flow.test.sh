@@ -430,6 +430,13 @@ nr = tmp / 'no-reads'
 (nr / 'skills/widget/SKILL.md').write_text('x')
 znr = json.loads(run(skill, nr))
 assert znr['zero_read_w7'] == [] and znr['zero_read_w30'] == [], 'known skills are not zero-read without any read records'
+stale = tmp / 'stale-skill'
+(stale / 'skills/widget').mkdir(parents=True)
+(stale / 'skills/widget/SKILL.md').write_text('x')
+(stale / 'data/metrics').mkdir(parents=True)
+(stale / 'data/metrics/skills.tsv').write_text('day\thome\tskill\treads\n' + f'{onday(40)}\tmain\twidget\t1\n')
+zs = json.loads(run(skill, stale))
+assert zs['zero_read_w7'] == [] and zs['zero_read_w30'] == [], 'a collector whose coverage ends before the window claims no zero reads'
 
 # Outcome recorder: one durable row per finished task, best effort.
 o = tmp / 'o'

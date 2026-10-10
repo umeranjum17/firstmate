@@ -152,7 +152,8 @@ def home_entries():
     return out
 
 def zero_read(window):
-    if not days or days[0] > cutoff(window):
+    lo = cutoff(window)
+    if not days or days[0] > lo or days[-1] < lo:
         return []
     return sorted(s for s in known if per[window][0].get(s, 0) == 0)
 
