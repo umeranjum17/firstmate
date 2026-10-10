@@ -118,6 +118,10 @@ for verb in blocked needs-decision; do
   IFS=$'\t' read -r sig since owner _parent key < "$world/state/.waiting-timers/ladder"
   [ "$owner" = 0 ] || { echo 'priming woke owner'; exit 1; }
   printf '%s\t%s\t0\t0\t%s\n' "$sig" "$((since - 900))" "$key" > "$world/state/.waiting-timers/ladder"
+  # The priming run was killed, so the next watcher start surfaces that
+  # downtime recovery first and ends its cycle before the wait-timer tick.
+  # Drain that recovery in its own cycle, then the tick records the owner wake.
+  cycle
   cycle
   grep -q "waiting-state ladder ($verb" "$world/events" || exit 1
   [ ! -s "$world/parent/state/lead.status" ] || { echo 'Main alerted before owner response interval'; exit 1; }
