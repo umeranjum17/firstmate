@@ -607,7 +607,7 @@ The flag is a home-local supervision-noise preference and is not inherited by se
 ## Waiting-state escalation
 
 Every watch poll checks recorded workers and leads for open `blocked` or `needs-decision` declarations and declared `paused` waits, independently of pane activity and the existing stale/wedge heuristics.
-The watcher scans actionable signals before this timer on every cycle, so a cycle that exits on a signal wake defers the timer's alerts to the first signal-free cycle; a continuous signal stream can delay a wait alert but never starves a due check.
+The watcher scans actionable signals and runs due checks before this timer on every cycle, so a cycle that exits on a signal or process-event wake defers the timer's alerts to the first cycle that reaches them; a continuous signal or process-event stream can delay a wait alert but never starves a due check.
 Herdr's bounded `agent list` read admits `agent_status=blocked` except for Cursor, whose declarations stay on the status-log path; admitted native evidence takes precedence for each recorded pane, even while its status log says working.
 Polling and native push escalation share this admission rule; Cursor declarations remain monitored.
 The mandatory `agent list` lookup uses the portable timeout runner, including on hosts without coreutils, with a positive `FM_BACKEND_HERDR_READ_TIMEOUT` deadline (default 10 seconds).
