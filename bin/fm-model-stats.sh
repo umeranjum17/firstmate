@@ -222,10 +222,10 @@ def stats_for(cohort, window):
                   and not x[0]['sampled']]
     hours = sorted((x[2] - x[0]['started']) / 3600.0 for x in merged
                    if x[0]['started'] is not None and x[2] is not None and x[2] >= x[0]['started'])
-    first_rows = [x[1] for x in merged if x[1] is not None]
+    first_rows = [x[1] for x in merged_recorded if x[1] is not None]
     def total(field):
-        return sum(int(x[1].get(field) or 0) for x in merged if x[1] is not None)
-    rework = [x for x in merged if x[1] is not None and int(x[1].get('commits_after_open') or 0) > 0]
+        return sum(int(x[1].get(field) or 0) for x in merged_recorded if x[1] is not None)
+    rework = [x for x in merged_recorded if x[1] is not None and int(x[1].get('commits_after_open') or 0) > 0]
     switches = sum(1 for t, _, _ in finished if len({m for _, m, _ in t['models']}) > 1)
     out = dict(
         n_started=n_started,
@@ -244,7 +244,7 @@ def stats_for(cohort, window):
         rework_pipeline=total('rework_pipeline'),
         rework_other=total('rework_other'),
         reverted=total('reverted'),
-        escaped=sum(1 for x in merged if x[1] is not None and int(x[1].get('escaped') or 0) > 0),
+        escaped=sum(1 for x in merged_recorded if x[1] is not None and int(x[1].get('escaped') or 0) > 0),
         cancelled_failed=sum(1 for t, _, _ in finished if t['outcome'] in ('cancelled', 'failed')),
         switches=switches,
         switch_share=(round(switches / len(finished), 4) if finished else None),

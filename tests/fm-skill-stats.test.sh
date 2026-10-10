@@ -46,6 +46,7 @@ rows = [
     f'{day(0)}\tbyokit\tshared\t4\n',
     f'{day(20)}\tmain\told\t10\n',
     f'{day(10)}\tmain\tgadget\t100\n',
+    f'{day(7)}\tmain\twidget\t9\n',
 ]
 (main / 'data/metrics/skills.tsv').write_text(header + ''.join(rows))
 
@@ -59,9 +60,9 @@ def home(name):
     return x['by_home'][name]
 
 assert x['schema'] == 'fm-skill-stats.v1' and x['windows'] == [7, 30], 'schema and windows'
-assert x['coverage']['rows'] == 6 and x['coverage']['skills'] == 4 and x['coverage']['homes'] == 2, 'coverage counts'
+assert x['coverage']['rows'] == 7 and x['coverage']['skills'] == 5 and x['coverage']['homes'] == 2, 'coverage counts'
 assert [s['skill'] for s in x['skills']][:2] == ['used-heavy', 'shared'], 'skills ranked by reads'
-assert [s['skill'] for s in x['skills']][2:] == ['gadget', 'old'], 'zero-read-in-7d skills rank by the wider window'
+assert [s['skill'] for s in x['skills']][2:] == ['gadget', 'old', 'widget'], 'zero-read-in-7d skills rank by the wider window'
 
 heavy = skill('used-heavy')
 assert heavy['w7'] == {'reads': 8, 'homes': 1} and heavy['w30']['reads'] == 8, 'window sums'
@@ -72,7 +73,8 @@ assert gadget['w7']['reads'] == 0 and gadget['w30']['reads'] == 100, 'a skill re
 
 # Zero-read skills are the known directory skills with no reads in the window.
 assert x['zero_read_w7'] == ['gadget', 'spanner', 'widget'], 'known skills with no 7-day reads'
-assert x['zero_read_w30'] == ['spanner', 'widget'], 'known skills with no 30-day reads'
+assert x['zero_read_w30'] == ['spanner'], 'known skills with no 30-day reads'
+assert skill('widget')['w7']['reads'] == 0 and skill('widget')['w30']['reads'] == 9, 'a read exactly 7 days back is outside the 7-day window'
 
 assert [s['skill'] for s in home('main')][:3] == ['used-heavy', 'shared', 'gadget'], 'per-home ranking'
 assert [s['skill'] for s in home('byokit')] == ['shared'], 'per-home breakdown isolates each home'

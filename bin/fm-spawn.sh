@@ -5370,16 +5370,6 @@ if [ "$RELAUNCH" -eq 1 ]; then
   SPAWN_META_PUBLISH_STARTED=0
   SPAWN_META_TMP=
 fi
-# Durable per-incarnation runtime history, one line per published launch (fresh
-# or relaunch). bin/fm-task-outcome.sh reads it at task end to attribute the task
-# to every harness/model/effort it ran on, in order, instead of sampling live
-# records (which misses short lanes and collapses mid-task model changes). Best
-# effort: a write failure never blocks the launch; a task with no history file
-# still records its final meta model. The record is retired with the task's state.
-if [ -n "$ID" ]; then
-  printf '%s\t%s\t%s\t%s\n' "$(date +%s)" "${HARNESS:-default}" "${MODEL:-default}" "${EFFORT:-default}" \
-    >> "$STATE/$ID.models" 2>/dev/null || true
-fi
 # A dispatch or relaunch keeps the per-task meta lock through launch delivery.
 # The backlog mutation is deliberately the final fallible commit below, so
 # teardown cannot remove a relaunched record while its replacement worker is
@@ -5821,6 +5811,17 @@ if [ "$SPAWN_META_LOCK_HELD" != 1 ]; then
   SPAWN_META_LOCK=$(fm_meta_lock_path "$STATE/$ID.meta") || exit 1
   fm_lock_acquire_wait "$SPAWN_META_LOCK"
   SPAWN_META_LOCK_HELD=1
+fi
+# Durable per-incarnation runtime history, one line per launch that reached the
+# commit point (fresh or relaunch). bin/fm-task-outcome.sh reads it at task end to
+# attribute the task to every harness/model/effort it ran on, in order, instead of
+# sampling live records (which misses short lanes and collapses mid-task model
+# changes). Written only after launch delivery has succeeded, so a spawn that
+# fails before delivery leaves no phantom incarnation. Best effort: a write
+# failure never blocks the launch.
+if [ -n "$ID" ]; then
+  printf '%s\t%s\t%s\t%s\n' "$(date +%s)" "${HARNESS:-default}" "${MODEL:-default}" "${EFFORT:-default}" \
+    >> "$STATE/$ID.models" 2>/dev/null || true
 fi
 SPAWN_DEFERRED_SIGNAL=
 if [ "$BACKLOG_TRANSITION" = 1 ]; then

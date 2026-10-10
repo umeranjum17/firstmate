@@ -57,7 +57,7 @@ def read_tsv(path):
     return rows
 
 def cutoff(window):
-    return datetime.fromtimestamp(NOW - DAY * window, timezone.utc).strftime('%Y-%m-%d')
+    return datetime.fromtimestamp(NOW - DAY * (window - 1), timezone.utc).strftime('%Y-%m-%d')
 
 # --- homes ---------------------------------------------------------------
 homes, seen = {}, set()

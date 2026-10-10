@@ -89,7 +89,7 @@ assert m7['merge_rate'] == 0.5 and m7['merge_rate_sample'] == 2, 'sampled merges
 assert m7['unknown_outcome'] == 0 and m7['sampled'] is True, 'sampled cohort is disclosed'
 assert m7['cancelled_failed'] == 1, 'cancelled task counted'
 assert m7['switches'] == 1 and m7['switch_share'] == 0.25, 'a mid-task model change counts as a switch'
-assert m7['first_pass_n'] == 1 and m7['first_pass_sample'] == 2 and m7['first_pass_rate'] == 0.5, 'first-pass join'
+assert m7['first_pass_n'] == 0 and m7['first_pass_sample'] == 1 and m7['first_pass_rate'] == 0.0, 'first-pass counts recorded outcomes only'
 assert m7['rework'] == 1 and m7['rework_ci'] == 1 and m7['rework_pipeline'] == 1, 'rework join'
 
 deep = home_model('byokit', 'opencode-go/deepseek-v4.1-flash')

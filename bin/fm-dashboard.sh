@@ -1670,7 +1670,7 @@ if flow_text is not None:
     except (ValueError, KeyError, TypeError):
         flow, flow_error = None, 'Flow observations unreadable'
 model_text = probe(['bash', os.path.join(BIN, 'fm-model-stats.sh'), '--json', '--now', str(int(NOW_TS))],
-                   timeout=60, env=dict(os.environ, FM_HOME=HOME))[0]
+                   timeout=10, env=dict(os.environ, FM_HOME=HOME))[0]
 models, models_error = None, None if model_text is not None else 'Model statistics reader unavailable'
 if model_text is not None:
     try:
@@ -1681,7 +1681,7 @@ if model_text is not None:
     except (ValueError, KeyError, TypeError):
         models, models_error = None, 'Model statistics unreadable'
 skill_text = probe(['bash', os.path.join(BIN, 'fm-skill-stats.sh'), '--json', '--now', str(int(NOW_TS))],
-                   timeout=60, env=dict(os.environ, FM_HOME=HOME))[0]
+                   timeout=10, env=dict(os.environ, FM_HOME=HOME))[0]
 skills, skills_error = None, None if skill_text is not None else 'Skill statistics reader unavailable'
 if skill_text is not None:
     try:
