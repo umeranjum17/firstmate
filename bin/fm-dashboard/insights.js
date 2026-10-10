@@ -128,7 +128,7 @@ function Models({ d, w, setW }) {
     <div class="i-mtoggle" role="group" aria-label="Model statistics window">
       ${d.models.windows.map(x => html`<button type="button" class=${x === w ? 'on' : ''} aria-pressed=${x === w} onClick=${() => setW(x)}>${x} days</button>`)}
     </div>
-    <p class="i-note">All homes · every figure shows its sample size · small samples (finished &lt; 5) are greyed, not hidden</p>
+    <p class="i-note">All homes · every figure shows its sample size · small samples (finished ${'<'} 5) are greyed, not hidden</p>
     ${rows.length ? rows.map(m => html`<${ModelRow} m=${m} w=${w} d=${d}/>`) : html`<p class="i-note">No per-model records yet.</p>`}
     <p class="i-note">${nOf(cov.outcome_rows)} recorded outcomes · ${nOf(cov.sampled_tasks)} older tasks from the sampled lane ledger${d.models.limitations ? ` · ${d.models.limitations} coverage notices` : ''}</p>
   </section>`
