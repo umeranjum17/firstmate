@@ -101,9 +101,20 @@ ai_trailer_hooks_prefix() {  # <home> <id>
   printf "export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0='%s'; " "$state/$2.git-hooks"
 }
 
+calm_host_memory() {  # prints a host-memory probe root that never reads as pressured
+  local root=$TMP_ROOT/calm-host
+  mkdir -p "$root/proc/pressure" "$root/cgroup/user.slice/user-$(id -u).slice/user@$(id -u).service/app.slice" || return 1
+  printf 'MemTotal: 67108864 kB\nMemAvailable: 53687091 kB\nSwapTotal: 0 kB\nSwapFree: 0 kB\n' > "$root/proc/meminfo"
+  printf 'some avg10=1.00 avg60=1.00 avg300=1.00 total=1\n' > "$root/proc/pressure/memory"
+  printf 'some avg10=1.00 avg60=1.00 avg300=1.00 total=1\n' \
+    > "$root/cgroup/user.slice/user-$(id -u).slice/user@$(id -u).service/app.slice/memory.pressure"
+  printf '%s\n' "$root"
+}
+
 run_spawn() {
-  local home=$1 wt=$2 fakebin=$3 launchlog=$4
+  local home=$1 wt=$2 fakebin=$3 launchlog=$4 calm
   shift 4
+  calm=$(calm_host_memory) || fail "cannot create the calm host-memory probe"
   : > "$launchlog"
   # CLAUDE_CONFIG_DIR is forwarded onto claude launches by fm-spawn, so pin it
   # explicitly (empty by default) instead of leaking the invoking shell's value,
@@ -115,6 +126,7 @@ run_spawn() {
     FM_FAKE_CURSOR_MODELS="${FM_TEST_CURSOR_MODELS:-}" \
     FM_FAKE_CURSOR_LIST_STATUS="${FM_TEST_CURSOR_LIST_STATUS:-0}" \
     GROK_HOME="$home/grok-home" \
+    FM_HOST_MEMORY_PROC="$calm/proc" FM_HOST_MEMORY_CGROUP_ROOT="$calm/cgroup" \
     fm_test_run_spawn "$home" "$wt" "$fakebin" "$@"
 }
 
@@ -804,6 +816,65 @@ test_opencode_console_model_keeps_shared_store() {
   assert_not_contains "$launch" "OPENCODE_DB=" \
     "opencode console-account launch must keep the shared store that holds the account"
   pass "opencode on a console-account model keeps the shared session store"
+}
+
+test_opencode_no_model_keeps_shared_store() {
+  local rec id out status launch
+  id=profile-opencode-nomodel-z7f
+  rec=$(make_spawn_case profile-opencode-nomodel opencode "$id")
+  read_case_record "$rec"
+
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
+  status=$?
+  expect_code 0 "$status" "opencode spawn with no model should succeed"
+  launch=$(cat "$LAUNCH_LOG")
+  assert_not_contains "$launch" "OPENCODE_DB=" \
+    "opencode launch with no model must keep the shared store, since its provider is unknown"
+  pass "opencode with no model keeps the shared session store"
+}
+
+test_opencode_equal_task_ids_in_two_homes_get_two_stores() {
+  local rec id model out status launch_a launch_b db_a db_b
+  id=profile-opencode-twohome-z7g
+  model=openrouter/deepseek/deepseek-v4.1-flash
+
+  rec=$(make_spawn_case profile-opencode-twohome-a opencode "$id")
+  read_case_record "$rec"
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --model "$model")
+  status=$?
+  expect_code 0 "$status" "opencode spawn in the first home should succeed"
+  launch_a=$(cat "$LAUNCH_LOG")
+
+  rec=$(make_spawn_case profile-opencode-twohome-b opencode "$id")
+  read_case_record "$rec"
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --model "$model")
+  status=$?
+  expect_code 0 "$status" "opencode spawn of the same task id in a second home should succeed"
+  launch_b=$(cat "$LAUNCH_LOG")
+
+  db_a=$(printf '%s\n' "$launch_a" | grep -oE "OPENCODE_DB='firstmate-[0-9a-f]{12}-$id\.db'")
+  db_b=$(printf '%s\n' "$launch_b" | grep -oE "OPENCODE_DB='firstmate-[0-9a-f]{12}-$id\.db'")
+  [ -n "$db_a" ] || fail "first home launch has no per-task store: $launch_a"
+  [ -n "$db_b" ] || fail "second home launch has no per-task store: $launch_b"
+  [ "$db_a" != "$db_b" ] || fail "equal task ids in two homes shared a store: $db_a"
+  pass "equal task ids in two homes get two separate OpenCode stores"
+}
+
+test_opencode_hostile_task_id_is_refused() {
+  local rec hostile out status launch
+  rec=$(make_spawn_case profile-opencode-hostile opencode)
+  read_case_record "$rec"
+  hostile="x';touch pwned;'"
+
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$hostile" "$PROJ_DIR" --model openrouter/deepseek/deepseek-v4.1-flash 2>&1)
+  status=$?
+  [ "$status" -ne 0 ] || fail "hostile task id spawn should exit nonzero"
+  assert_contains "$out" "invalid task id" "hostile task id should be refused as an invalid task id"
+  launch=$(cat "$LAUNCH_LOG")
+  [ -z "$launch" ] || fail "hostile task id reached the launch: $launch"
+  [ ! -e "$WT_DIR/pwned" ] && [ ! -e "$PROJ_DIR/pwned" ] && [ ! -e "$HOME_DIR/pwned" ] \
+    || fail "hostile task id created a pwned file"
+  pass "hostile task id is refused before any OpenCode launch"
 }
 
 test_opencode_emits_variant_for_openai_family_effort() {
@@ -2235,6 +2306,9 @@ test_cursor_failed_catalog_probe_does_not_block_spawn
 test_opencode_threads_model_and_effort_variant
 test_opencode_without_effort_keeps_launch_config_unchanged
 test_opencode_console_model_keeps_shared_store
+test_opencode_no_model_keeps_shared_store
+test_opencode_equal_task_ids_in_two_homes_get_two_stores
+test_opencode_hostile_task_id_is_refused
 test_opencode_emits_variant_for_openai_family_effort
 test_opencode_omits_variant_when_model_family_lacks_effort
 test_native_effort_validator_keeps_axes_separate
