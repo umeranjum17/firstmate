@@ -418,13 +418,18 @@ def sk(name):
 assert [r['skill'] for r in z['skills']][:2] == ['used-heavy', 'shared'] and [r['skill'] for r in z['skills']][2:] == ['gadget', 'old', 'widget'], 'skill ranking by reads'
 assert sk('used-heavy')['w7'] == {'reads': 8, 'homes': 1} and sk('shared')['w7'] == {'reads': 6, 'homes': 2}, 'window sums and cross-home reads'
 assert sk('gadget')['w7']['reads'] == 0 and sk('gadget')['w30']['reads'] == 100 and sk('widget')['w30']['reads'] == 9, 'a skill read only outside 7 days'
-assert z['zero_read_w7'] == ['gadget', 'spanner', 'widget'] and z['zero_read_w30'] == ['spanner'], 'known skills with no reads'
+assert z['zero_read_w7'] == ['gadget', 'spanner', 'widget'] and z['zero_read_w30'] == [], 'known skills with no reads, only for windows the collector covered'
 assert [r['skill'] for r in z['by_home']['main']][:3] == ['used-heavy', 'shared', 'gadget'] and [r['skill'] for r in z['by_home']['byokit']] == ['shared'], 'per-home skill breakdown'
 assert any('distant' in n for n in z['limitations']), 'a remote home is disclosed as unreadable'
 ze = tmp / 'empty-skill'
 ze.mkdir()
 zempty = json.loads(run(skill, ze))
 assert zempty['skills'] == [] and zempty['by_home'] == {} and zempty['limitations'], 'absent skill record is empty, not fatal'
+nr = tmp / 'no-reads'
+(nr / 'skills/widget').mkdir(parents=True)
+(nr / 'skills/widget/SKILL.md').write_text('x')
+znr = json.loads(run(skill, nr))
+assert znr['zero_read_w7'] == [] and znr['zero_read_w30'] == [], 'known skills are not zero-read without any read records'
 
 # Outcome recorder: one durable row per finished task, best effort.
 o = tmp / 'o'

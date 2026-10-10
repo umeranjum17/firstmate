@@ -152,6 +152,8 @@ def home_entries():
     return out
 
 def zero_read(window):
+    if not days or days[0] > cutoff(window):
+        return []
     return sorted(s for s in known if per[window][0].get(s, 0) == 0)
 
 skills, by_home = skill_entries(), home_entries()
