@@ -562,6 +562,24 @@ FM_COMPOSER_OMP_STATUS_RE_DEFAULT='^[[:space:]]*(π|󰵗)[[:space:]]+·[[:space:
 # the outage banner and the staleness furniture can never drift apart.
 FM_COMPOSER_OPENCODE_LIMIT_BANNER_RE_DEFAULT='^[[:space:]]*(■|⬝)[0-9]+(■|⬝)hour(■|⬝)usage limit reached|^[[:space:]]*(usin\.\.\.[[:space:]]+)?\(?click to expand\)[[:space:]]+\[retrying in [0-9]+[hms]([[:space:]]+[0-9]+[hms])*[[:space:]]+attempt #[0-9]+\]$'
 FM_COMPOSER_OPENCODE_STATUS_RE_DEFAULT='^[[:space:]]*/.*[0-9]+(\.[0-9]+)?[KMG]?[[:space:]]+\([0-9]+%\)([[:space:]]+·[[:space:]]+\$[0-9]*(\.[0-9]+)?)?([[:space:]]*ctrl\+p([[:space:]]+commands)?)?$|^[^[:space:]]+([[:space:]]+tab[[:space:]]+agents[[:space:]]+ctrl\+p)?[[:space:]]+commands$|^tab[[:space:]]+agents[[:space:]]+ctrl\+p[[:space:]]+commands$|'"$FM_COMPOSER_OPENCODE_LIMIT_BANNER_RE_DEFAULT"
+# OpenCode 1.18.x also right-aligns a `<dir>:<branch>` cell INSIDE the
+# composer, on the agent/model row itself (already furniture through the
+# left-bar footer prefix). On a long worktree path that cell WRAPS at the pane
+# width, so its directory fragment lands ALONE on the bar row directly above
+# the model row, right-aligned behind wide left padding (captured live
+# 2026-10-10 on the fm-model-scorecard worker, OpenCode 1.18.25 through Herdr:
+# `  ┃                     ~/.treehouse/firstmate-cff959/2/` above `  ┃  Build
+# · DeepSeek V4.1 Flash (Ollama) Ollama Cloud      firstmate:fm/fm-model-
+# scorecard`). The classifier used to read that fragment as typed text, so an
+# idle, EMPTY composer read `pending`: fm-send skipped the doorbell and
+# fm-control refused exit and relaunch on a healthy worker. The fragment is
+# furniture ONLY in this exact shape - wide left padding (a wrapped
+# right-aligned cell, never the two-space indent typed rows carry), a path
+# opening `~/` or `/`, no whitespace inside it, and the row DIRECTLY below a
+# model row - so typed text in that position keeps its shallow indent and
+# stays pending. Consulted on the post-bar row body before trimming, by the
+# left-bar classifier and the extractor alike.
+FM_COMPOSER_OPENCODE_RIGHT_CELL_WRAP_RE_DEFAULT='^[[:space:]]{8,}(~/|/)[^[:space:]]+$'
 # Pi's footer stats row opens at column 0 with the session cost when every
 # token counter is zero (`$0.000 (sub) 5.4%/272k (auto)` on pi 0.85.1).
 # That leading `$` is a cost cell, not a dead-shell prompt, only when a digit
@@ -1357,6 +1375,16 @@ _fm_composer_row_is_opencode_status() {  # <trimmed-row>
   fm_composer_idle_matches "$1" "${FM_COMPOSER_OPENCODE_STATUS_RE:-$FM_COMPOSER_OPENCODE_STATUS_RE_DEFAULT}" sensitive
 }
 
+# _fm_composer_row_is_opencode_right_cell_wrap: 0 when <padded-body> - a
+# left-bar row's content after its `┃` is stripped, BEFORE trimming - is the
+# wrapped right-aligned directory fragment of the agent/model row's
+# `<dir>:<branch>` cell (FM_COMPOSER_OPENCODE_RIGHT_CELL_WRAP_RE_DEFAULT
+# above). The caller must additionally prove the row directly below is a
+# model row; the shape is furniture only in that position.
+_fm_composer_row_is_opencode_right_cell_wrap() {  # <padded-body>
+  fm_composer_idle_matches "$1" "${FM_COMPOSER_OPENCODE_RIGHT_CELL_WRAP_RE:-$FM_COMPOSER_OPENCODE_RIGHT_CELL_WRAP_RE_DEFAULT}" sensitive
+}
+
 # _fm_composer_row_is_opencode_busy: 0 when the trimmed row carries OpenCode's
 # in-turn hint (`esc interrupt`). A busy status row is NOT furniture, so the
 # below-floor block collector excludes any block that contains it - necessary
@@ -1472,8 +1500,19 @@ _fm_composer_classify_bare_wrap() {  # <screen> <styled> <glyph-row> <cursor-row
 # can prove it real, unknown otherwise.
 _fm_composer_classify_leftbar() {  # <screen> <styled> <first-row> <last-row>
   local screen=$1 styled=$2 first=$3 last=$4
-  local row raw content pending_seen=0 footer_re leading_blank=1 placeholder_position=0
+  local row raw content padded pending_seen=0 footer_re leading_blank=1 placeholder_position=0
+  local last_body last_is_model=0
   footer_re=${FM_COMPOSER_LEFTBAR_FOOTER_RE:-$FM_COMPOSER_LEFTBAR_FOOTER_RE_DEFAULT}
+  # The agent/model row's wrapped `<dir>:<branch>` directory fragment is
+  # furniture only directly above a model row, so prove the run's LAST row is
+  # one before any row may claim that shape.
+  raw=$(_fm_composer_screen_row "$last" "$screen")
+  last_body=$(_fm_composer_row_content "$raw" "$styled")
+  case "$last_body" in '┃'*) last_body=${last_body#┃} ;; esac
+  fm_composer_normalize_trim_var last_body
+  if fm_composer_idle_matches "$last_body" "$footer_re" sensitive; then
+    last_is_model=1
+  fi
   row=$first
   while [ "$row" -le "$last" ]; do
     raw=$(_fm_composer_screen_row "$row" "$screen")
@@ -1481,6 +1520,7 @@ _fm_composer_classify_leftbar() {  # <screen> <styled> <first-row> <last-row>
     case "$content" in
       '┃'*) content=${content#┃} ;;
     esac
+    padded=$content
     fm_composer_normalize_trim_var content
     if [ -z "$content" ]; then row=$((row + 1)); continue; fi
     if [ "$leading_blank" = 1 ] && [ "$row" -gt "$first" ]; then
@@ -1495,6 +1535,10 @@ _fm_composer_classify_leftbar() {  # <screen> <styled> <first-row> <last-row>
     fi
     if [ "$row" -eq "$last" ] \
        && fm_composer_idle_matches "$content" "$footer_re" sensitive; then
+      row=$((row + 1)); continue
+    fi
+    if [ "$row" -eq $((last - 1)) ] && [ "$last_is_model" = 1 ] \
+       && _fm_composer_row_is_opencode_right_cell_wrap "$padded"; then
       row=$((row + 1)); continue
     fi
     pending_seen=1
@@ -1860,6 +1904,7 @@ _fm_composer_extract_refusal_geometry() {  # <plain-screen>
 fm_composer_extract_selected_content() {  # <caps> <screen> [diagnostics=0]
   local caps=$1 screen=$2 styled=0 kv plain row raw content glyph joined='' footer_re prompt_row=-1
   local leading_blank=1 placeholder_position=0 prompt_is_shell=0 diagnostics=${3:-0}
+  local padded='' last_body last_is_model=0
   footer_re=${FM_COMPOSER_LEFTBAR_FOOTER_RE:-$FM_COMPOSER_LEFTBAR_FOOTER_RE_DEFAULT}
   while IFS= read -r kv; do
     [ "$kv" = styled=1 ] && styled=1
@@ -1873,9 +1918,23 @@ EOF
     return 1
   fi
   row=$FM_COMPOSER_SELECTED_FIRST
+  # The left-bar run's wrapped `<dir>:<branch>` directory fragment is
+  # furniture only directly above a model row; prove the run's last row is
+  # one before any row may claim that shape, the same rule the classifier
+  # applies, so extraction never returns the fragment as composer content.
+  if [ "$FM_COMPOSER_SELECTED_KIND" = leftbar ]; then
+    raw=$(_fm_composer_screen_row "$FM_COMPOSER_SELECTED_LAST" "$screen")
+    last_body=$(_fm_composer_row_content "$raw" "$styled")
+    case "$last_body" in '┃'*) last_body=${last_body#┃} ;; esac
+    fm_composer_normalize_trim_var last_body
+    if fm_composer_idle_matches "$last_body" "$footer_re" sensitive; then
+      last_is_model=1
+    fi
+  fi
   while [ "$row" -le "$FM_COMPOSER_SELECTED_LAST" ]; do
     raw=$(_fm_composer_screen_row "$row" "$screen")
     content=$(_fm_composer_row_content "$raw" "$styled")
+    padded=''
     placeholder_position=0
     if [ "$FM_COMPOSER_SELECTED_KIND" = pi ] \
        && _fm_composer_row_is_pi_notice "$raw" "$styled"; then
@@ -1891,6 +1950,7 @@ EOF
         ;;
       leftbar)
         case "$content" in '┃'*) content=${content#┃} ;; esac
+        padded=$content
         fm_composer_normalize_trim_var content
         if [ -z "$content" ]; then
           :
@@ -1931,7 +1991,11 @@ EOF
             && fm_composer_idle_matches "$content" "${FM_COMPOSER_IDLE_RE:-$FM_COMPOSER_IDLE_RE_DEFAULT}" insensitive; } \
        || { [ "$FM_COMPOSER_SELECTED_KIND" = leftbar ] \
             && [ "$row" -eq "$FM_COMPOSER_SELECTED_LAST" ] \
-            && fm_composer_idle_matches "$content" "$footer_re" sensitive; }; then
+            && fm_composer_idle_matches "$content" "$footer_re" sensitive; } \
+       || { [ "$FM_COMPOSER_SELECTED_KIND" = leftbar ] \
+            && [ "$last_is_model" = 1 ] \
+            && [ "$row" -eq $((FM_COMPOSER_SELECTED_LAST - 1)) ] \
+            && _fm_composer_row_is_opencode_right_cell_wrap "$padded"; }; then
       row=$((row + 1))
       continue
     fi
