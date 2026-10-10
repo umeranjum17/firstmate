@@ -13,7 +13,10 @@
 # (the ask list); Ship (ship/: the selected home's ship at night with each lane a worker at its
 # stage's deck station, dressed by model, and a sheet with fleet-wide key numbers and stuck or
 # parked work); Insights (the shipped fm-flow.sh reader's lifecycle, waits, queue, retained merge
-# outcomes and optional read-only capacity observations); a command palette and keys (?).
+# outcomes and optional read-only capacity observations, plus a Models section with per-model
+# start/finish, merge rate, time to merge, first-pass, rework, revert/escape, switch and
+# cancelled/failed counts over 7- and 30-day windows from bin/fm-model-stats.sh, plus a Skills
+# section with per-skill read counts over the same windows from bin/fm-skill-stats.sh); a command palette and keys (?).
 # In Ship, tap a worker or its tag to open its card's detail; a station or its plate opens
 # a worker in that stage, prioritizing stuck work and then recorded age, oldest first (empty stations do nothing).
 # Stuck and parked sheet rows also open their cards, by click or focused Enter/Space.
@@ -35,8 +38,9 @@
 # Each build writes the app's one data file, state/dashboard/board.json: homes with their
 # lane plans, one card per open lane, ready backlog item and pull request landed today,
 # and parked home ids. Its flow key is the fm-flow.v1 Insights observation, or flow_error when
-# that reader is unavailable or unreadable; a recursive scrub removes raw reason, source,
-# gate_source and errors keys before the write.
+# that reader is unavailable or unreadable; its models and skills keys are the fm-model-stats.v1
+# and fm-skill-stats.v1 observations, or the matching *_error when a reader is unavailable or
+# unreadable; a recursive scrub removes raw reason, source, gate_source and errors keys before the write.
 # Cards carry the current stage inferred from status lines (which can move backwards), wait,
 # metadata model or ledger dispatch model, and up to 40 recent
 # activity lines. Recorded merges replace matching live cards using the canonical request
@@ -66,6 +70,10 @@
 # FM_MAC_HOST opts into that reader's bounded read-only Mac SSH probe; unset means unknown.
 # The reader's live capacity timestamps remain separate from the durable-record cutoff.
 # Remote lane/backlog records are unavailable, not read from same-named local paths.
+# Insights also invokes fm-model-stats.sh for the Models section; it reads each local home's
+# data/metrics/{task-outcomes,lanes,prs}.tsv and writes nothing.
+# Insights also invokes fm-skill-stats.sh for the Skills section; it reads the main home's
+# data/metrics/skills.tsv and each local home's skill directories, and writes nothing.
 #   data/captain-asks.tsv           Waiting on you: Main's fleet-wide headerless
 #                                   id<TAB>since-epoch<TAB>text<TAB>url; each row with an id and
 #                                   text is an ask (a bad time or duplicate id shows as a record
@@ -1661,6 +1669,28 @@ if flow_text is not None:
             folder['display_name'] = os.path.basename(folder.pop('path'))
     except (ValueError, KeyError, TypeError):
         flow, flow_error = None, 'Flow observations unreadable'
+model_text = probe(['bash', os.path.join(BIN, 'fm-model-stats.sh'), '--json', '--now', str(int(NOW_TS))],
+                   timeout=60, env=dict(os.environ, FM_HOME=HOME))[0]
+models, models_error = None, None if model_text is not None else 'Model statistics reader unavailable'
+if model_text is not None:
+    try:
+        models = json.loads(model_text)
+        if not isinstance(models, dict) or models.get('schema') != 'fm-model-stats.v1':
+            raise ValueError('unsupported model statistics format')
+        models['limitations'] = len(models.get('limitations') or [])
+    except (ValueError, KeyError, TypeError):
+        models, models_error = None, 'Model statistics unreadable'
+skill_text = probe(['bash', os.path.join(BIN, 'fm-skill-stats.sh'), '--json', '--now', str(int(NOW_TS))],
+                   timeout=60, env=dict(os.environ, FM_HOME=HOME))[0]
+skills, skills_error = None, None if skill_text is not None else 'Skill statistics reader unavailable'
+if skill_text is not None:
+    try:
+        skills = json.loads(skill_text)
+        if not isinstance(skills, dict) or skills.get('schema') != 'fm-skill-stats.v1':
+            raise ValueError('unsupported skill statistics format')
+        skills['limitations'] = len(skills.get('limitations') or [])
+    except (ValueError, KeyError, TypeError):
+        skills, skills_error = None, 'Skill statistics unreadable'
 def scrub(node):
     if isinstance(node, dict):
         for key in ('reason', 'source', 'gate_source', 'errors'):
@@ -1673,6 +1703,8 @@ board = dict(
     homes=[dict(id=h, name=hname(h), plan=plan(h), open=sum(c['home'] == h and c['stage'] not in ('queued', 'landed') for c in cards), ready=len(bl(h, 'ready')) if backlog.get(h) is not None else None,
                 known=h not in lane_err) for h in ACTIVE],
     parked=PARKED, cards=cards, flow=flow, flow_error=flow_error,
+    models=models, models_error=models_error,
+    skills=skills, skills_error=skills_error,
     asks=[dict(id=f[0], text=f[2], url=f[3] if len(f) > 3 else '', age=a) for f, a in asks] if asks_known else None,
     landed=LANDED, cycle_p50=cycles[(len(cycles) - 1) // 2] if len(cycles) >= 5 else None)
 scrub(board)

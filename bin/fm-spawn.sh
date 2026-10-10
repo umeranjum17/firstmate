@@ -5370,6 +5370,16 @@ if [ "$RELAUNCH" -eq 1 ]; then
   SPAWN_META_PUBLISH_STARTED=0
   SPAWN_META_TMP=
 fi
+# Durable per-incarnation runtime history, one line per published launch (fresh
+# or relaunch). bin/fm-task-outcome.sh reads it at task end to attribute the task
+# to every harness/model/effort it ran on, in order, instead of sampling live
+# records (which misses short lanes and collapses mid-task model changes). Best
+# effort: a write failure never blocks the launch; a task with no history file
+# still records its final meta model. The record is retired with the task's state.
+if [ -n "$ID" ]; then
+  printf '%s\t%s\t%s\t%s\n' "$(date +%s)" "${HARNESS:-default}" "${MODEL:-default}" "${EFFORT:-default}" \
+    >> "$STATE/$ID.models" 2>/dev/null || true
+fi
 # A dispatch or relaunch keeps the per-task meta lock through launch delivery.
 # The backlog mutation is deliberately the final fallible commit below, so
 # teardown cannot remove a relaunched record while its replacement worker is
