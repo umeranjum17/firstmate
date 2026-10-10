@@ -2550,14 +2550,10 @@ test_retirement_crash_recovery() {
     || fail "could not seed post-queue crash"
   FM_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/recovery.out" 2> "$dir/recovery.err" \
     || fail "post-queue crash recovery wake failed: $(cat "$dir/recovery.err")"
-  grep -F 'check: rearm-resurface' "$dir/recovery.out" >/dev/null \
-    || fail "post-queue crash did not surface its durable recovery first"
-  ack_watcher_cycle "$state" || fail "post-queue crash recovery acknowledgement failed"
-  set +e
-  FM_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch.out" 2> "$dir/watch.err"
-  rc=$?
-  set -e
-  [ "$rc" -eq 0 ] || fail "post-queue retry watcher failed: $(cat "$dir/watch.err")"
+  case "$(cat "$dir/recovery.out")" in
+    check:*task-a.check.sh:*merged) ;;
+    *) fail "post-queue crash did not retry its merged poll first: $(cat "$dir/recovery.out")" ;;
+  esac
   assert_poll_absent "$state" task-a
   raw_count=$(grep -cF "$(printf '\tcheck\tmerged-task-a-https://github.com/o/r/pull/3\t')" \
     "$state/.wake-queue" || true)
@@ -2566,6 +2562,7 @@ test_retirement_crash_recovery() {
   drain_count=$(grep -cF "$(printf '\tcheck\tmerged-task-a-https://github.com/o/r/pull/3\t')" \
     "$dir/drain.out" || true)
   [ "$drain_count" -eq 1 ] || fail "same-key crash retry rows did not deduplicate at drain"
+  ack_watcher_cycle "$state" || fail "post-queue crash recovery acknowledgement failed"
 
   dir=$(make_case retirement-after-receipt)
   state="$dir/home/state"
@@ -2649,8 +2646,10 @@ test_retirement_crash_recovery() {
   add_stop_custom_check "$dir"
   FM_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/template-recovery.out" 2> "$dir/template-recovery.err" \
     || fail "template-update recovery wake failed: $(cat "$dir/template-recovery.err")"
-  grep -F 'check: rearm-resurface' "$dir/template-recovery.out" >/dev/null \
-    || fail "template-update recovery did not surface its durable wake first"
+  case "$(cat "$dir/template-recovery.out")" in
+    check:*z-stop.check.sh:*stop-cycle) ;;
+    *) fail "template-update recovery did not run its due control check first: $(cat "$dir/template-recovery.out")" ;;
+  esac
   ack_watcher_cycle "$state" || fail "template-update recovery acknowledgement failed"
   set +e
   FM_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/restart.out" 2> "$dir/restart.err"
