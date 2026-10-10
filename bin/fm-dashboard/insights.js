@@ -52,9 +52,9 @@ function modelMetrics(s) {
     METRIC('Time to merge · P50', hrs(s.p50_hours), s.timed_merges),
     METRIC('Time to merge · P75', hrs(s.p75_hours), s.timed_merges),
     METRIC('First pass', pct(s.first_pass_rate), s.first_pass_sample),
-    METRIC('Rework', nOf(s.rework), s.merged),
-    METRIC('Reverted', nOf(s.reverted), s.merged),
-    METRIC('Escaped', nOf(s.escaped), s.merged),
+    METRIC('Rework', nOf(s.rework), s.first_pass_sample),
+    METRIC('Reverted', nOf(s.reverted), s.first_pass_sample),
+    METRIC('Escaped', nOf(s.escaped), s.first_pass_sample),
     METRIC('Cancelled or failed', nOf(s.cancelled_failed), s.n_finished),
     METRIC('Model switches', nOf(s.switches), s.switch_sample),
   ]

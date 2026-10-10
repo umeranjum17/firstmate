@@ -95,7 +95,7 @@ Its header owns usage (`--json [--now <epoch>]`), attribution, and uncertainty l
 A task is attributed to the model of its final launch, and one that changed model mid-flight counts as a switch under that model.
 Every recorded outcome is authoritative; a sampled lane that predates the recorder is used only as a fallback and is disclosed.
 Merge rate is computed over recorded outcomes only, so sampled lanes never fabricate a rate.
-First-pass, rework, revert and escape figures use every merged PR, including those from sampled-lane history, and the panel's coverage line counts the sampled tasks.
+First-pass, rework, revert and escape figures use the same recorded merged PRs as merge rate, because a sampled-lane row has no recorded task to join its PR to; the panel's coverage line counts the sampled tasks that these figures leave out.
 Each figure shows its sample size.
 The dashboard's Insights view consumes its output: `fm-dashboard.sh` runs the reader at each build and embeds the result as the `models` key of `board.json`.
 The real CLI regression journeys for the reader and the recorder are the model/outcome sections of [`tests/fm-flow.test.sh`](../tests/fm-flow.test.sh).
