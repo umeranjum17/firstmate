@@ -93,3 +93,10 @@ assert_equals "$after" "$(wc -l < "$HOME_DIR/data/metrics/task-outcomes.tsv")" "
 assert_equals 'home	task	kind	project	models	started	ended	outcome	pr' "$(head -n 1 "$HOME_DIR/data/metrics/task-outcomes.tsv")" "one header row"
 assert_equals "$(awk -F'\t' 'NR > 1 { print NF }' "$HOME_DIR/data/metrics/task-outcomes.tsv" | sort -u)" "9" "every row has nine columns"
 pass "discard, scout, fallback and skip paths all record correctly"
+
+# 10. A retried teardown for the same task does not append a second row.
+meta rl-retry "kind=ship" "harness=claude" "model=claude-opus-5-5" "effort=medium" "pr=https://github.com/acme/app/pull/11"
+record rl-retry
+record rl-retry
+assert_equals 1 "$(awk -F'\t' -v id=rl-retry 'NR > 1 && $2 == id' "$HOME_DIR/data/metrics/task-outcomes.tsv" | wc -l)" "a retried task is recorded once"
+pass "a retried teardown keeps one outcome row per task"

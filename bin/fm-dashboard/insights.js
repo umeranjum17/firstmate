@@ -74,7 +74,7 @@ function ModelRow({ m, w, d }) {
       <span class="i-mnums"><b>${nOf(s.n_finished)}</b><small>finished</small></span>
     </summary>
     <div class="i-mbody">
-      <div class="i-mbar" aria-hidden="true">${['merge_rate'].map(() => html`<i style=${{ width: `${(s.merge_rate == null ? 0 : s.merge_rate) * 100}%` }}></i>`)}</div>
+      <div class="i-mbar" aria-hidden="true"><i style=${{ width: `${(s.merge_rate == null ? 0 : s.merge_rate) * 100}%` }}></i></div>
       <div class="i-mtable">${metrics.map(x => html`<div class="i-mcell"><span>${x.label}</span><b>${x.value}</b><small>n=${nOf(x.sample)}</small></div>`)}</div>
       ${homes.length ? html`<${Rows} title=${`By home · ${homes.length}`}>${homes.map(h => html`<${Row} name=${hname(d, h.home)} value=${`${pct(h.s.merge_rate)} merge · ${nOf(h.s.n_finished)} finished`} note=${`n=${nOf(h.s.merge_rate_sample)}`}/>`)}</${Rows}>` : ''}
       <p class="i-note">${m.model}${small ? ' · small sample, greyed' : ''}</p>
@@ -107,7 +107,7 @@ function SkillRow({ s, w, d, max }) {
 const SKILL_TOP = 15
 function Skills({ d, w, setW }) {
   if (!d.skills) return html`<section class="i-panel i-skills"><h2>Skills</h2><p class="i-note">${d.skills_error || 'Skill statistics unavailable.'}</p></section>`
-  const all = d.skills.skills || [], cov = d.skills.coverage || {}
+  const all = [...(d.skills.skills || [])].sort((a, b) => b['w' + w].reads - a['w' + w].reads || a.skill.localeCompare(b.skill)), cov = d.skills.coverage || {}
   const rows = all.slice(0, SKILL_TOP), max = Math.max(...all.map(s => s['w' + w].reads), 1)
   const zero = d.skills['zero_read_w' + w] || []
   return html`<section class="i-panel i-skills"><h2>Skills · last ${w} days</h2>

@@ -140,6 +140,10 @@ fi
 
 OUT="$DATA/metrics/task-outcomes.tsv"
 mkdir -p "$DATA/metrics" 2>/dev/null || exit 0
+if [ -f "$OUT" ] && awk -F'\t' -v h="$(clean_field "$HOME_NAME")" -v t="$(clean_field "$ID")" \
+  'NR > 1 && $1 == h && $2 == t { found = 1 } END { exit !found }' "$OUT" 2>/dev/null; then
+  exit 0
+fi
 if [ ! -f "$OUT" ]; then
   printf 'home\ttask\tkind\tproject\tmodels\tstarted\tended\toutcome\tpr\n' > "$OUT" 2>/dev/null || exit 0
 fi
