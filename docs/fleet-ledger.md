@@ -98,7 +98,7 @@ Merge rate is computed over recorded outcomes only, so sampled lanes never fabri
 First-pass, rework, revert and escape figures use every merged PR, including those from sampled-lane history, and the panel's coverage line counts the sampled tasks.
 Each figure shows its sample size.
 The dashboard's Insights view consumes its output: `fm-dashboard.sh` runs the reader at each build and embeds the result as the `models` key of `board.json`.
-The real CLI regression journeys are [`tests/fm-model-stats.test.sh`](../tests/fm-model-stats.test.sh) and [`tests/fm-task-outcome.test.sh`](../tests/fm-task-outcome.test.sh).
+The real CLI regression journeys for the reader and the recorder are the model/outcome sections of [`tests/fm-flow.test.sh`](../tests/fm-flow.test.sh).
 
 ## Skill statistics
 
@@ -108,7 +108,7 @@ Known skill names come from each local home's `skills/` and `.agents/skills/` di
 A registered remote home's reads are not readable locally and are disclosed in the limitations.
 Its header owns usage (`--json [--now <epoch>]`), window arithmetic, and uncertainty limits.
 The dashboard's Insights view runs it at each build and embeds the result as the `skills` key of `board.json`.
-The real CLI regression journey is [`tests/fm-skill-stats.test.sh`](../tests/fm-skill-stats.test.sh).
+The real CLI regression journey is the skill section of [`tests/fm-flow.test.sh`](../tests/fm-flow.test.sh).
 
 ## Not included
 
