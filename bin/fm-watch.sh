@@ -3024,6 +3024,9 @@ resurface_after_downtime() {
     fi
     [ "$FM_RECOVERY_MARKER_ACTION" = recover ] || return 0
   fi
+  # A process-event result carries richer adapter-owned wake context than the
+  # generic recovery reason, so give that owner first refusal.
+  procevent_surface_queued
   # The independent sampler can publish after the earlier queue scan, while
   # arm-check is deciding recovery. Preserve that queued alert's richer reason.
   host_memory_surface_queued
@@ -3256,18 +3259,14 @@ while :; do
   # Process-to-event liveness repair. This never discovers a result by polling:
   # each registered source has its own child blocking on that source, and this
   # only republishes results already captured durably and restarts a source
-  # whose owner is gone. It is a no-op with nothing registered.
+  # whose owner is gone. It is a no-op with nothing registered. It never wakes,
+  # so it stays ahead of signals: a constant signal stream must not stop a dead
+  # source from being restarted.
   if [ -d "$STATE/procevent" ]; then
     FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-procevent.sh" reconcile >/dev/null 2>&1 || true
   fi
-  # Then deliver any queued-but-unsurfaced result, including one a runner
-  # published while this watcher was between cycles.
-  procevent_surface_queued
 
-  # A process-event result carries richer adapter-owned wake context than the
-  # generic recovery reason, so give that owner first refusal.
-  # Both this and the resurface run BEFORE the signal scan and run_due_checks:
-  # the decision must read the wake queue as it stood at cycle start, because
+  # The decision must read the wake queue as it stood at cycle start, because
   # the signal scan below appends this cycle's own rows. While unconsumed rows
   # from a previous cycle exist (a post-queue crash left its terminal row
   # undelivered), the durable recovery must surface before any check can
@@ -3279,7 +3278,7 @@ while :; do
   # an empty wake queue the resurface falls through without waking.
   resurface_after_downtime
 
-  # Signals are scanned FIRST, before the wait-timer and
+  # Signals are scanned FIRST, before the process-event, wait-timer and
   # inactive-outcome steps: wake() exits the cycle, so an earlier waking step
   # would starve the handoff path. Those steps run only on a cycle that does
   # not end on a signal wake; their state is durable, so they resume on the next
@@ -3420,6 +3419,12 @@ EOF
   if [ -n "$signal_wake" ]; then
     wake "$signal_wake"
   fi
+
+  # Deliver any queued-but-unsurfaced process-event result, including one a
+  # runner published while this watcher was between cycles. It waits behind
+  # signals and due checks, which are durable and surface on this cycle or the
+  # next, so a continuous result stream cannot starve them.
+  procevent_surface_queued
 
   fm_wait_timers_tick || {
     echo "watcher: waiting-state timer check failed" >&2

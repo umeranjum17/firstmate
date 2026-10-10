@@ -6114,6 +6114,29 @@ test_procevent_captured_result_surfaces_proactively() {
   pass "a captured process-event result wakes a healthy watcher proactively, with no manual drain"
 }
 
+test_signal_wake_precedes_captured_procevent_result() {
+  local dir state out drain_out pid
+  dir=$(make_case procevent-signal-first); state="$dir/state"
+  out="$dir/watch.out"; drain_out="$dir/drain.out"
+  seed_captured_procevent_result "$dir" || fail "the fixture captured no process-event result"
+  printf 'done: handoff 0\n' > "$state/task.status"
+
+  FM_WATCH_HANDLING_SUCCESSOR=1 procevent_watch_bg "$dir" "$out"
+  pid=$!
+  wait_for_exit "$pid" 100 || fail "the watcher did not exit on the first wake: $(cat "$out")"
+  grep -F "signal:" "$out" >/dev/null \
+    || fail "a captured process-event result pre-empted the signal wake: $(cat "$out")"
+  ! grep -F "procevent:delivery-src:1" "$out" >/dev/null \
+    || fail "the process-event result was surfaced ahead of the signal: $(cat "$out")"
+
+  FM_WATCH_HANDLING_SUCCESSOR=1 procevent_watch_bg "$dir" "$out"
+  pid=$!
+  wait_for_exit "$pid" 100 || fail "the watcher did not surface the process-event result on the next cycle: $(cat "$out")"
+  grep -F "procevent:delivery-src:1" "$out" >/dev/null \
+    || fail "the process-event result was lost behind the signal wake: $(cat "$out")"
+  pass "a captured process-event result waits behind a pending signal wake and surfaces on the next cycle"
+}
+
 test_procevent_unacknowledged_result_redrains_until_handled() {
   local dir state out replay_out replay_err pid before after sequence generation
   dir=$(make_case procevent-redrain); state="$dir/state"
@@ -7480,6 +7503,7 @@ test_timer_repair_drops_a_finished_write_deferral_chain
 test_terminal_first_sight_drops_a_finished_write_deferral_chain
 test_triage_log_size_cap_accepts_spaced_wc_counts
 test_procevent_captured_result_surfaces_proactively
+test_signal_wake_precedes_captured_procevent_result
 test_procevent_unacknowledged_result_redrains_until_handled
 test_procevent_marker_keys_are_injective
 test_procevent_headlines_classify_queue_keys
