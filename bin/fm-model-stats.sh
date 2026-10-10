@@ -156,7 +156,7 @@ for row in prs or []:
 outcome_rows, outcome_homes, sampled_rows = 0, [], 0
 tasks = {}
 def add_task(home, task, kind, project, models, started, ended, outcome, pr, sampled):
-    tasks[(home, task)] = dict(home=home, task=task, kind=kind or 'ship', project=project or '-',
+    tasks[(home, task, started)] = dict(home=home, task=task, kind=kind or 'ship', project=project or '-',
                                models=models, started=started, ended=ended, outcome=outcome, pr=pr or '',
                                sampled=sampled)
 for name, home in homes.items():
@@ -173,10 +173,11 @@ for name, home in homes.items():
                  models, to_epoch(row.get('started')), to_epoch(row.get('ended')),
                  row.get('outcome') or 'unknown', row.get('pr') or '', False)
 # lanes.tsv fallback: only for (home, task) the outcomes file does not cover.
+covered = {(t['home'], t['task']) for t in tasks.values()}
 lane_groups = {}
 for row in lanes or []:
     home, task = row.get('home') or '', row.get('task') or ''
-    if not home or not task or (home, task) in tasks:
+    if not home or not task or (home, task) in covered:
         continue
     key = (home, task)
     lane_groups.setdefault(key, []).append(row)
@@ -258,7 +259,6 @@ def stats_for(cohort, window):
     out['switch_sample'] = len(finished)
     return out
 
-MAXW = max(WINDOWS)
 def model_rows(cohort):
     groups = {}
     for t in cohort:

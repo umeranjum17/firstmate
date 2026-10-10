@@ -399,6 +399,18 @@ open_lane = tmp / 'open-lane'
 ow = json.loads(run(model, open_lane))
 st = by(ow['models'], 'opencode-go/deepseek-v4.1-flash')['w7']
 assert (st['n_started'], st['n_finished'], st['unknown_outcome']) == (1, 0, 1), 'a sampled lane with no merged PR is unknown, not finished'
+reuse_home = tmp / 'reuse'
+(reuse_home / 'data/metrics').mkdir(parents=True)
+(reuse_home / 'state').mkdir()
+(reuse_home / 'data/metrics/task-outcomes.tsv').write_text(oh +
+    'main\trl\tship\tacme\tpi:opencode-go/muse-spark-1.3-contributor:medium\t%d\t%d\tcancelled\t\n' % (now - 2*day, now - 2*day + 3600) +
+    'main\trl\tship\tacme\tclaude:claude-opus-5-5:medium\t%d\t%d\tmerged\thttps://github.com/acme/app/pull/12\n' % (now - day, now - day + 3600))
+(reuse_home / 'data/metrics/lanes.tsv').write_text(lh + '%s\tmain\trl\tship\tacme\tpi\topencode-go/deepseek-v4.1-flash\tmedium\tno-mistakes\t\n' % iso(now - 3*day))
+rr = json.loads(run(model, reuse_home))
+assert not any(r['model'] == 'opencode-go/deepseek-v4.1-flash' for r in rr['models']), 'a sampled lane for a task id the outcome file covers is skipped'
+rm = by(rr['models'], 'opencode-go/muse-spark-1.3-contributor')['w7']
+ro = by(rr['models'], 'claude-opus-5-5')['w7']
+assert (rm['n_finished'], rm['cancelled_failed']) == (1, 1) and (ro['n_finished'], ro['merged'], ro['merge_rate']) == (1, 1, 1.0), 'a reused task id keeps every launch outcome'
 
 # Skills: reads, windows, ranking, zero-read discovery, remote disclosure.
 s, sb = tmp / 's', tmp / 'sb'
