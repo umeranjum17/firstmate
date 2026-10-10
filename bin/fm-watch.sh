@@ -3253,13 +3253,41 @@ while :; do
     exit 1
   }
 
-  # Signals are scanned FIRST, before the wait-timer, procevent, downtime-resurface
-  # and inactive-outcome steps: wake() exits the cycle, so an earlier waking step
-  # would starve the handoff path. Those four steps run only on a cycle that does
+  # Process-to-event liveness repair. This never discovers a result by polling:
+  # each registered source has its own child blocking on that source, and this
+  # only republishes results already captured durably and restarts a source
+  # whose owner is gone. It is a no-op with nothing registered.
+  if [ -d "$STATE/procevent" ]; then
+    FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-procevent.sh" reconcile >/dev/null 2>&1 || true
+  fi
+  # Then deliver any queued-but-unsurfaced result, including one a runner
+  # published while this watcher was between cycles.
+  procevent_surface_queued
+
+  # A process-event result carries richer adapter-owned wake context than the
+  # generic recovery reason, so give that owner first refusal.
+  # Both this and the resurface run BEFORE the signal scan and run_due_checks:
+  # the decision must read the wake queue as it stood at cycle start, because
+  # the signal scan below appends this cycle's own rows. While unconsumed rows
+  # from a previous cycle exist (a post-queue crash left its terminal row
+  # undelivered), the durable recovery must surface before any check can
+  # retire polls and append a fresh terminal row ahead of the crashed cycle's
+  # row. The resurface wake ends the cycle; the signal scan and due checks
+  # then run on the next cycle, losing nothing - signal markers only advance
+  # when a signal is actually surfaced, check cadences are time-based, and
+  # retirement receipts are durable. Quiet homes never enter this path: with
+  # an empty wake queue the resurface falls through without waking.
+  resurface_after_downtime
+
+  # Signals are scanned FIRST, before the wait-timer and
+  # inactive-outcome steps: wake() exits the cycle, so an earlier waking step
+  # would starve the handoff path. Those steps run only on a cycle that does
   # not end on a signal wake; their state is durable, so they resume on the next
-  # signal-free cycle. A due check runs ahead of a signal wake (run_due_checks) so
-  # its result queues in that same wake and a constant signal stream cannot starve
-  # it. The secondmate repair ticks above stay ahead of signals because they only
+  # signal-free cycle. A due check runs ahead of a signal wake (run_due_checks)
+  # so its result queues in that same wake and a constant signal stream cannot
+  # starve it - but still after the downtime resurface above, because a pending
+  # durable recovery outranks any new signal or check result. The secondmate
+  # repair ticks above stay ahead of signals because they only
   # wake to relaunch a dead endpoint or unstick a foreign queue, never for noise.
   # On the first changed signal, linger one grace period and re-scan before
   # classifying: a crewmate's final status write and the same turn's turn-end
@@ -3399,21 +3427,6 @@ EOF
   }
 
   host_memory_surface_queued
-
-  # Process-to-event liveness repair. This never discovers a result by polling:
-  # each registered source has its own child blocking on that source, and this
-  # only republishes results already captured durably and restarts a source
-  # whose owner is gone. It is a no-op with nothing registered.
-  if [ -d "$STATE/procevent" ]; then
-    FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-procevent.sh" reconcile >/dev/null 2>&1 || true
-  fi
-  # Then deliver any queued-but-unsurfaced result, including one a runner
-  # published while this watcher was between cycles.
-  procevent_surface_queued
-
-  # A process-event result carries richer adapter-owned wake context than the
-  # generic recovery reason, so give that owner first refusal.
-  resurface_after_downtime
 
   # The existing poll loop also owns the bounded inactive-outcome cadence.
   # This is mechanical and silent unless a durable terminal-outcome obligation
