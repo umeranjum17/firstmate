@@ -100,3 +100,14 @@ record rl-retry
 record rl-retry
 assert_equals 1 "$(awk -F'\t' -v id=rl-retry 'NR > 1 && $2 == id' "$HOME_DIR/data/metrics/task-outcomes.tsv" | wc -l)" "a retried task is recorded once"
 pass "a retried teardown keeps one outcome row per task"
+
+# 11. A reused task id that runs again is a new launch and records its own row.
+meta rl-reuse "kind=ship" "harness=pi" "model=muse" "effort=medium"
+printf '1700000400\tpi\tmuse\tmedium\n' > "$HOME_DIR/state/rl-reuse.models"
+record rl-reuse --force
+meta rl-reuse "kind=ship" "harness=claude" "model=claude-opus-5-5" "effort=medium" "pr=https://github.com/acme/app/pull/12"
+printf '1700000900\tclaude\tclaude-opus-5-5\tmedium\n' > "$HOME_DIR/state/rl-reuse.models"
+record rl-reuse
+assert_equals 2 "$(row_for rl-reuse | wc -l)" "a reused task id records each launch"
+assert_contains "$(row_for rl-reuse | tail -n 1)" $'\tmerged\t' "the second launch's outcome is recorded"
+pass "a reused task id is recorded once per launch"
