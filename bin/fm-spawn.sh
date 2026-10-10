@@ -5854,6 +5854,7 @@ fi
 # harness/model/effort it ran on, in order. Best effort: a write failure never
 # blocks the launch.
 if [ -n "$ID" ] && { [ "$RELAUNCH" -eq 1 ] || [ "$SPAWN_BACKLOG_COMMIT_STATUS" -eq 0 ]; }; then
+  [ "$RELAUNCH" -eq 1 ] || rm -f "$STATE/$ID.models"
   printf '%s\t%s\t%s\t%s\n' "$(date +%s)" "${HARNESS:-default}" "${MODEL:-default}" "${EFFORT:-default}" \
     >> "$STATE/$ID.models" 2>/dev/null || true
 fi
