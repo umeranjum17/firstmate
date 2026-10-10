@@ -1040,8 +1040,8 @@ test_matrix_opencode_leftbar_signals() {
   unans_typed=$'  ┃\n  ┃  : Firstmate instruction waiting: list "$FM_TASK_INBOX"/*.msg in your \'mx-\n  ┃  pm-9b.inbox\' steering inbox, read and act on each in numeric order, then\n  ┃  mv each into its handled/.\n  ┃\n\n  ┃\n  ┃  Reply with OK.\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/umer/.treehouse/pockit-497a78/8/   538.6K (54%) · $1.0 ctrl+p commands\n   pockit'
   assert_screen "opencode 1.18.x typed draft under unanswered bubble on herdr" pending "$CAPS_STYLED" "$unans_typed"
   assert_screen "opencode 1.18.x typed draft under unanswered bubble on cmux/orca" unknown "$CAPS_PLAIN" "$unans_typed"
-  # Live 2026-10-10 (task fm-oc-composer-path, OpenCode 1.18.25 through Herdr,
-  # the fm-model-scorecard worker): the composer's agent/model row carries a
+  # Live 2026-10-10 (OpenCode 1.18.25 through Herdr, the fm-model-scorecard
+  # worker): the composer's agent/model row carries a
   # right-aligned `<dir>:<branch>` cell, and on the fleet's long worktree
   # paths that cell WRAPS at the pane width - its `~/...` directory fragment
   # lands ALONE on the bar row directly above the model row, behind wide left
