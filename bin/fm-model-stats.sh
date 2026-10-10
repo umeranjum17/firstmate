@@ -83,7 +83,8 @@ def to_epoch(value):
 FAMILIES = (('opus', 'opus', 'Opus'), ('sonnet', 'sonnet', 'Sonnet'), ('fable', 'fable', 'Fable'),
             ('haiku', 'haiku', 'Haiku'), ('-sol', 'sol', 'Sol'), ('muse-spark', 'muse', 'Muse Spark'),
             ('qwen', 'qwen', 'Qwen'), ('grok', 'grok', 'Grok'), ('gemini', 'gemini', 'Gemini'),
-            ('kimi', 'kimi', 'Kimi'), ('deepseek', 'deepseek', 'DeepSeek'), ('gpt', 'gpt', 'GPT'))
+            ('kimi', 'kimi', 'Kimi'), ('deepseek', 'deepseek', 'DeepSeek'), ('glm', 'glm', 'GLM'),
+            ('gpt', 'gpt', 'GPT'))
 PROVIDERS = {'ollama': 'Ollama', 'opencode-go': 'OpenCode Go', 'openai-codex': 'OpenAI Codex',
              'anthropic': 'Anthropic', 'google': 'Google', 'xai': 'xAI', 'moonshot': 'Moonshot',
              'zhipu': 'Zhipu', 'z-ai': 'Z.AI', 'mistral': 'Mistral'}
