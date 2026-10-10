@@ -2225,7 +2225,8 @@ launch_template() {
     fi
     ;;
   # OpenCode separately asks for paths outside the worktree, including the inbox.
-  opencode) printf '%s' 'OPENCODE_CONFIG_CONTENT='\''{"permission":{"*":"allow","external_directory":"allow"}__EFFORTFLAG__}'\'' opencode __MODELFLAG__--prompt "$(__OPINPUT__ encode launch-brief < __BRIEF__)"' ;;
+  # __OPENCODEDB__ is the per-task session store; see opencode_db_assignment.
+  opencode) printf '%s' '__OPENCODEDB__OPENCODE_CONFIG_CONTENT='\''{"permission":{"*":"allow","external_directory":"allow"}__EFFORTFLAG__}'\'' opencode __MODELFLAG__--prompt "$(__OPINPUT__ encode launch-brief < __BRIEF__)"' ;;
   pi | pi-signed)
     printf '%s' '__PIBIN____PITUIMODE____PIAPPROVE____PIEXCLUDE____PIRESUME__'
     if [ "$kind" = secondmate ]; then
@@ -5390,6 +5391,51 @@ fi
 "$SCRIPT_DIR/fm-home-summary-refresh.sh" --best-effort || true
 [ "$BACKEND" = orca ] && ORCA_ABORT_CLEANUP=0
 
+# Implement the launch-delivery contract in this script's header. The full
+# home-identity hash isolates equal task ids across homes, and the spawn token in
+# the final filename keeps a buffered source line bound to this incarnation.
+spawn_launch_home_token() {
+  local home=$1 root hash
+  root=$(cd "$home" 2>/dev/null && pwd -P) || root=$home
+  if command -v shasum >/dev/null 2>&1; then
+    hash=$(printf '%s' "$root" | shasum -a 256 | awk '{print $1}')
+  elif command -v sha256sum >/dev/null 2>&1; then
+    hash=$(printf '%s' "$root" | sha256sum | awk '{print $1}')
+  else
+    return 1
+  fi
+  case "$hash" in
+    *[!0-9a-fA-F]*|'') return 1 ;;
+  esac
+  printf '%s' "$hash"
+}
+LAUNCH_HOME_TOKEN=$(spawn_launch_home_token "$FM_HOME") || LAUNCH_HOME_TOKEN=
+if [ -z "$LAUNCH_HOME_TOKEN" ]; then
+  echo "error: could not derive a home identity for the staged launch file" >&2
+  exit 1
+fi
+# OpenCode keeps every session in one SQLite store, and OpenCode 1.18.25 fails
+# a write after a fixed 5000 ms busy timeout. Workers sharing the default
+# ~/.local/share/opencode/opencode.db (20.7 GB on 2026-10-10) lost turns to
+# "database is locked": one worker held the WAL write lock for up to 11 s.
+# So each launch gets its own store through OpenCode's OPENCODE_DB setting.
+# The name is relative, so OpenCode resolves it inside its own data directory
+# ($XDG_DATA_HOME/opencode, default ~/.local/share/opencode), next to the shared
+# auth.json, snapshots, and log, and this script writes nothing there itself.
+# It is keyed by home identity and task id, so a relaunch reopens the same
+# store and equal task ids in different homes never share one. Readers of
+# OpenCode sessions and usage read <opencode data dir>/opencode.db plus every
+# <opencode data dir>/firstmate-*.db; the stores are kept after teardown.
+# OpenCode console accounts (the opencode and opencode-go providers) keep their
+# access and refresh tokens inside the shared store, and a fresh store has no
+# account, so those launches, and a launch whose provider is unknown because
+# no model was given, keep the shared store rather than copying credentials.
+opencode_db_assignment() {  # <model>
+  case "${1:-}" in
+    '' | default | opencode/* | opencode-go/*) return 0 ;;
+  esac
+  printf "OPENCODE_DB='firstmate-%s-%s.db' " "${LAUNCH_HOME_TOKEN:0:12}" "$ID"
+}
 sq_brief=$(shell_quote "$BRIEF")
 sq_turnend=$(shell_quote "$TURNEND")
 sq_piext=$(shell_quote "$STATE/$ID.pi-ext.ts")
@@ -5405,6 +5451,7 @@ MODELFLAG=$(model_flag_for_harness "$HARNESS" "$MODEL")
 EFFORTFLAG=$(effort_flag_for_harness "$HARNESS" "$EFFORT" "$MODEL") || exit 1
 LAUNCH=${LAUNCH//__MODELFLAG__/$MODELFLAG}
 LAUNCH=${LAUNCH//__EFFORTFLAG__/$EFFORTFLAG}
+LAUNCH=${LAUNCH//__OPENCODEDB__/$(opencode_db_assignment "$MODEL")}
 # Relaunch session continuity. Computed here, where the adopted endpoint (T) is
 # known, and substituted only into the Pi-family template's `__PIRESUME__`
 # placeholder; an empty value leaves every other launch byte-identical.
@@ -5667,29 +5714,6 @@ if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
     LAUNCH_ENV_PREFIX="$LAUNCH_ENV_PREFIX "'${TRACEPARENT+"TRACEPARENT=$TRACEPARENT"}'
   fi
   LAUNCH="$LAUNCH_ENV_PREFIX /bin/sh -c $(shell_quote "$LAUNCH")"
-fi
-# Implement the launch-delivery contract in this script's header. The full
-# home-identity hash isolates equal task ids across homes, and the spawn token in
-# the final filename keeps a buffered source line bound to this incarnation.
-spawn_launch_home_token() {
-  local home=$1 root hash
-  root=$(cd "$home" 2>/dev/null && pwd -P) || root=$home
-  if command -v shasum >/dev/null 2>&1; then
-    hash=$(printf '%s' "$root" | shasum -a 256 | awk '{print $1}')
-  elif command -v sha256sum >/dev/null 2>&1; then
-    hash=$(printf '%s' "$root" | sha256sum | awk '{print $1}')
-  else
-    return 1
-  fi
-  case "$hash" in
-    *[!0-9a-fA-F]*|'') return 1 ;;
-  esac
-  printf '%s' "$hash"
-}
-LAUNCH_HOME_TOKEN=$(spawn_launch_home_token "$FM_HOME") || LAUNCH_HOME_TOKEN=
-if [ -z "$LAUNCH_HOME_TOKEN" ]; then
-  echo "error: could not derive a home identity for the staged launch file" >&2
-  exit 1
 fi
 case "$SPAWN_GEN" in
   *[!A-Za-z0-9.]*|'') echo "error: spawn incarnation token is not a usable launch-file nonce" >&2; exit 1 ;;

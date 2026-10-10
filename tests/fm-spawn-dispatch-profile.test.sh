@@ -784,7 +784,26 @@ test_opencode_without_effort_keeps_launch_config_unchanged() {
     "OPENCODE_CONFIG_CONTENT='{\"permission\":{\"*\":\"allow\",\"external_directory\":\"allow\"}}' opencode --model 'anthropic/claude-sonnet-4-5' --prompt" \
     "opencode launch without effort must keep the permission-only config byte-identical"
   assert_not_contains "$launch" '"variant"' "opencode launch without effort must not write a variant"
+  assert_contains "$launch" "OPENCODE_DB='firstmate-" "opencode launch did not get its own session store"
+  assert_contains "$launch" "-$id.db' OPENCODE_CONFIG_CONTENT=" "opencode session store is not keyed by the task id"
   pass "opencode without an effort keeps its launch config unchanged"
+}
+
+test_opencode_console_model_keeps_shared_store() {
+  local rec id out status launch
+  id=profile-opencode-go-z7e
+  rec=$(make_spawn_case profile-opencode-go opencode "$id")
+  read_case_record "$rec"
+
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --model opencode-go/deepseek-v4.1-flash)
+  status=$?
+  expect_code 0 "$status" "opencode spawn on a console-account model should succeed"
+  launch=$(cat "$LAUNCH_LOG")
+  assert_contains "$launch" "opencode --model 'opencode-go/deepseek-v4.1-flash' --prompt" \
+    "opencode console-account launch lost its model"
+  assert_not_contains "$launch" "OPENCODE_DB=" \
+    "opencode console-account launch must keep the shared store that holds the account"
+  pass "opencode on a console-account model keeps the shared session store"
 }
 
 test_opencode_emits_variant_for_openai_family_effort() {
@@ -2215,6 +2234,7 @@ test_cursor_refuses_model_absent_from_live_catalog
 test_cursor_failed_catalog_probe_does_not_block_spawn
 test_opencode_threads_model_and_effort_variant
 test_opencode_without_effort_keeps_launch_config_unchanged
+test_opencode_console_model_keeps_shared_store
 test_opencode_emits_variant_for_openai_family_effort
 test_opencode_omits_variant_when_model_family_lacks_effort
 test_native_effort_validator_keeps_axes_separate
