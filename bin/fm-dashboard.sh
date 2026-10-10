@@ -13,10 +13,8 @@
 # (the ask list); Ship (ship/: the selected home's ship at night with each lane a worker at its
 # stage's deck station, dressed by model, and a sheet with fleet-wide key numbers and stuck or
 # parked work); Insights (the shipped fm-flow.sh reader's lifecycle, waits, queue, retained merge
-# outcomes and optional read-only capacity observations, plus a Models section with per-model
-# start/finish, merge rate, time to merge, first-pass, rework, revert/escape, switch and
-# cancelled/failed counts over 7- and 30-day windows from bin/fm-model-stats.sh, plus a Skills
-# section with per-skill read counts over the same windows from bin/fm-skill-stats.sh); a command palette and keys (?).
+# outcomes and optional read-only capacity observations, plus the Models and Skills sections
+# from bin/fm-model-stats.sh and bin/fm-skill-stats.sh, defined in docs/fleet-ledger.md); a command palette and keys (?).
 # In Ship, tap a worker or its tag to open its card's detail; a station or its plate opens
 # a worker in that stage, prioritizing stuck work and then recorded age, oldest first (empty stations do nothing).
 # Stuck and parked sheet rows also open their cards, by click or focused Enter/Space.
@@ -70,10 +68,9 @@
 # FM_MAC_HOST opts into that reader's bounded read-only Mac SSH probe; unset means unknown.
 # The reader's live capacity timestamps remain separate from the durable-record cutoff.
 # Remote lane/backlog records are unavailable, not read from same-named local paths.
-# Insights also invokes fm-model-stats.sh for the Models section; it reads each local home's
-# data/metrics/{task-outcomes,lanes,prs}.tsv and writes nothing.
-# Insights also invokes fm-skill-stats.sh for the Skills section; it reads the main home's
-# data/metrics/skills.tsv and each local home's skill directories, and writes nothing.
+# Insights also invokes fm-model-stats.sh and fm-skill-stats.sh at each build. Both are read-only,
+# each probe has a 10 s timeout, and both sit outside the flow reader's 180 s deadline; their
+# source files are named in their script headers.
 #   data/captain-asks.tsv           Waiting on you: Main's fleet-wide headerless
 #                                   id<TAB>since-epoch<TAB>text<TAB>url; each row with an id and
 #                                   text is an ask (a bad time or duplicate id shows as a record
