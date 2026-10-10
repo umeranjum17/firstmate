@@ -85,7 +85,7 @@ The real CLI regression journey is [`tests/fm-flow.test.sh`](../tests/fm-flow.te
 
 [`fm-task-outcome.sh`](../bin/fm-task-outcome.sh) appends one durable row per finished task to the home-local `data/metrics/task-outcomes.tsv`, so per-model figures survive independently of the sampled lane ledger.
 Its columns are `home`, `task`, `kind`, `project`, `models`, `started`, `ended`, `outcome`, and `pr`.
-`models` lists every launch of the task in order as `harness:model:effort`, joined by `;`, sourced from the `state/<id>.models` history that `fm-spawn.sh` appends on each launch, so a mid-task model switch is recorded rather than lost.
+`models` lists every launch of the task in order as `harness:model:effort`, joined by `;`, sourced from the `state/<id>.models` history that `fm-spawn.sh` starts on a fresh spawn and appends to on each relaunch, so a mid-task model switch is recorded rather than lost.
 `outcome` is `merged`, `closed`, `cancelled`, `scout`, or `failed`; a secondmate retirement is not a task and records nothing.
 The recorder runs best-effort from `bin/fm-teardown.sh` before the task's durable presentation is retired, and never blocks cleanup.
 The file has a header row and is append-only; give it the same trust as `state/`.
@@ -102,7 +102,7 @@ The real CLI regression journeys for the reader and the recorder are the model/o
 
 ## Skill statistics
 
-[`fm-skill-stats.sh`](../bin/fm-skill-stats.sh) reads the main home's `data/metrics/skills.tsv` into `fm-skill-stats.v1`: per skill over 7- and 30-day windows, its read count and the number of homes it was read in, plus a per-home breakdown and the known skills that had no reads in the window.
+[`fm-skill-stats.sh`](../bin/fm-skill-stats.sh) reads the main home's `data/metrics/skills.tsv` into `fm-skill-stats.v1`: per skill over 7- and 30-day windows, its read count and the number of homes it was read in, plus a per-home breakdown and, for each window the file's coverage spans, the known skills that had no reads in it.
 The file is written by a private skill collector and has the columns `day`, `home`, `skill`, and `reads`; it may be absent, and the reader then reports no rows rather than failing.
 Known skill names come from each local home's `skills/` and `.agents/skills/` directories, so a skill that exists but was never read can be named; a home with no such directories simply contributes none.
 A registered remote home's reads are not readable locally and are disclosed in the limitations; while one is registered the reader makes no zero-read claim, since a skill it never saw locally may still have been read there.

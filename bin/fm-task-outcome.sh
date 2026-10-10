@@ -2,8 +2,8 @@
 # fm-task-outcome.sh - append one durable task-outcome line to
 # <home>/data/metrics/task-outcomes.tsv for per-model fleet statistics.
 #
-# Called best-effort by bin/fm-teardown.sh as the last thing before a task's
-# record is removed, so the outcome file survives the volatile state it reads.
+# Called best-effort by bin/fm-teardown.sh before the task's status and record
+# are retired, so the outcome file survives the volatile state it reads.
 # A failure to write never blocks or fails teardown: the caller ignores the exit
 # status, and this script itself only ever exits non-zero on a usage error.
 #
@@ -14,9 +14,10 @@
 #   kind     ship | scout (secondmate retirements are not tasks and are skipped).
 #   project  the project directory basename, or "-" when none is recorded.
 #   models   every harness:model:effort the task ran on, in launch order, joined
-#            by ";". Read from state/<id>.models, which bin/fm-spawn.sh appends
-#            to on every fresh spawn and relaunch; falls back to the record's
-#            final harness/model/effort when no history file exists.
+#            by ";". Read from state/<id>.models, which bin/fm-spawn.sh starts
+#            anew on every fresh spawn and appends to on every relaunch; falls
+#            back to the record's final harness/model/effort when no history
+#            file exists.
 #   started  unix seconds of the first recorded launch (history file first line,
 #            else the spawn_gen epoch, else the record's mtime); empty when
 #            unknown.
