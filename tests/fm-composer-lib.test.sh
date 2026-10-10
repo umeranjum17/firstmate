@@ -1040,6 +1040,41 @@ test_matrix_opencode_leftbar_signals() {
   unans_typed=$'  ┃\n  ┃  : Firstmate instruction waiting: list "$FM_TASK_INBOX"/*.msg in your \'mx-\n  ┃  pm-9b.inbox\' steering inbox, read and act on each in numeric order, then\n  ┃  mv each into its handled/.\n  ┃\n\n  ┃\n  ┃  Reply with OK.\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/umer/.treehouse/pockit-497a78/8/   538.6K (54%) · $1.0 ctrl+p commands\n   pockit'
   assert_screen "opencode 1.18.x typed draft under unanswered bubble on herdr" pending "$CAPS_STYLED" "$unans_typed"
   assert_screen "opencode 1.18.x typed draft under unanswered bubble on cmux/orca" unknown "$CAPS_PLAIN" "$unans_typed"
+  # Live 2026-10-10 (task fm-oc-composer-path, OpenCode 1.18.25 through Herdr,
+  # the fm-model-scorecard worker): the composer's agent/model row carries a
+  # right-aligned `<dir>:<branch>` cell, and on the fleet's long worktree
+  # paths that cell WRAPS at the pane width - its `~/...` directory fragment
+  # lands ALONE on the bar row directly above the model row, behind wide left
+  # padding. The classifier read that fragment as typed text, so an idle,
+  # EMPTY composer read `pending`: fm-send skipped the doorbell and fm-control
+  # refused exit and relaunch on a healthy worker. The fragment is furniture
+  # only in that exact shape - a `~/`- or `/`-opening path with no whitespace,
+  # wide left padding, directly above a model row - and the extraction read
+  # must drop it too, or the Herdr payload proof would see pending text. The
+  # pane's below-floor status row also carries the `• OpenCode 1.18.25`
+  # version cell, which no strict status row matches; the ctrl+p hint anchors
+  # that block, exactly the wrap rule the footer collector already owns. A
+  # short path keeps the whole `<dir>:<branch>` cell on the model row
+  # (unwrapped), and typed text in the fragment's position keeps its shallow
+  # two-space indent and stays pending.
+  local v11825_wrap v11825_nowrap v11825_typed v11825_typed_wrap
+  v11825_wrap=$'  ┃\n     ▣  Build · DeepSeek V4.1 Flash (Ollama)\n  ┃\n  ┃\n  ┃                                                                  ~/.treehouse/firstmate-cff959/2/\n  ┃  Build · DeepSeek V4.1 Flash (Ollama) Ollama Cloud                       firstmate:fm/fm-model-scorecard\n'"$floor"$'\n   /home/umer/.treehouse/firstmate-cff959/2/firstmate             87.1K (33%) · $0.33  ctrl+p commands    • OpenCode 1.18.25'
+  assert_screen "opencode 1.18.25 wrapped dir fragment above model row on herdr" empty "$CAPS_STYLED" "$v11825_wrap"
+  assert_screen "opencode 1.18.25 wrapped dir fragment above model row on zellij" empty "$CAPS_STYLED_NOID" "$v11825_wrap"
+  assert_screen "opencode 1.18.25 wrapped dir fragment above model row on cmux/orca" empty "$CAPS_PLAIN" "$v11825_wrap"
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED" "$v11825_wrap")
+  [ -z "$out" ] || fail "the wrapped dir fragment must never extract as composer content, got '$out'"
+  v11825_nowrap=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash (Ollama) Ollama Cloud          ~/pockit:fm/fm-model-scorecard\n'"$floor"$'\n   /home/umer/pockit  3.1K (1%) · $0.00  ctrl+p commands'
+  assert_screen "opencode 1.18.25 unwrapped dir:branch cell on the model row on herdr" empty "$CAPS_STYLED" "$v11825_nowrap"
+  assert_screen "opencode 1.18.25 unwrapped dir:branch cell on the model row on cmux/orca" empty "$CAPS_PLAIN" "$v11825_nowrap"
+  v11825_typed=$'  ┃\n  ┃\n  ┃  Reply with OK.\n  ┃  Build · DeepSeek V4.1 Flash (Ollama) Ollama Cloud          ~/pockit:fm/fm-model-scorecard\n'"$floor"
+  assert_screen "opencode typed row directly above the model row on herdr" pending "$CAPS_STYLED" "$v11825_typed"
+  assert_screen "opencode typed row directly above the model row on plain backends" unknown "$CAPS_PLAIN" "$v11825_typed"
+  v11825_typed_wrap=$'  ┃\n  ┃  Reply with OK.\n  ┃\n  ┃                                                                  ~/.treehouse/firstmate-cff959/2/\n  ┃  Build · DeepSeek V4.1 Flash (Ollama) Ollama Cloud                       firstmate:fm/fm-model-scorecard\n'"$floor"
+  assert_screen "opencode typed draft above the wrapped dir fragment on herdr" pending "$CAPS_STYLED" "$v11825_typed_wrap"
+  assert_screen "opencode typed draft above the wrapped dir fragment on plain backends" unknown "$CAPS_PLAIN" "$v11825_typed_wrap"
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED" "$v11825_typed_wrap")
+  [ "$out" = 'Reply with OK.' ] || fail "a draft above the wrapped fragment must survive extraction, got '$out'"
   pass "matrix: opencode's left-bar composer reads empty everywhere and scans the full active run"
 }
 
