@@ -7,7 +7,10 @@
 # pause. Admitted Herdr agent.list blocked overrides it immediately, scoped to
 # recorded panes only (admission policy: configuration reference above).
 # Time starts at first observation and survives watcher restarts.
-# Changing state/declaration/endpoint clears and re-arms the episode. Parent
+# Changing state/declaration/endpoint clears and re-arms the episode; a paused
+# episode instead keys on window, verb and phase key, so reason-text churn on
+# the same pause re-arms nothing. A paused wait rechecks at the
+# FM_PAUSE_RESURFACE_SECS cadence, never the owner-alert threshold. Parent
 # reports use the existing local/remote parent channel, never a captain alert.
 # A waiting-timer-* key belongs to this library; it resolves that report when
 # the episode ends. Main has no parent: its overdue wait gets one escalation wake
@@ -64,8 +67,10 @@ fm_wait_timer_push_delivered() {  # <task> <window>
 
 fm_wait_timers_tick() {
   local alert=${FM_WAIT_ALERT_SECS:-300} escalate=${FM_WAIT_ESCALATE_SECS:-900}
+  local paused_alert=${FM_PAUSE_RESURFACE_SECS:-$FM_PAUSE_RESURFACE_SECS_DEFAULT}
   local meta task backend window session native sessions='|' blocked='|' unknown='|' rows actor=Main
   local dir="$STATE/.waiting-timers" now record declaration verb signature old since owner parent key misses age reason until bound rc
+  local pause_key threshold
   for native in "$alert" "$escalate"; do
     case "$native" in ''|*[!0-9]*|0* ) echo "waiting timers: thresholds must be positive decimal seconds" >&2; return 1 ;; esac
     [ "${#native}" -le 9 ] || { echo "waiting timers: threshold exceeds nine digits" >&2; return 1; }
@@ -180,7 +185,17 @@ EOF
       case "$misses" in 0|1) ;; *) echo "waiting timers: invalid episode misses $record" >&2; return 1 ;; esac
       if [ "$owner" -eq 1 ]; then owner=0; fi
     fi
-    signature=$(printf '%s' "$window|$declaration" | hash_pane)
+    if status_is_paused "$declaration"; then
+      # A paused episode keys on window, verb and phase key, not the full
+      # declaration line: a worker refreshing its pause prose (or the [at=]
+      # stamp moving) is the same wait, so its original observation time and
+      # the one owner recheck per episode survive the rewrite. A different
+      # phase key is a different wait and re-arms.
+      pause_key=$(_fm_decision_key "$declaration") || pause_key=default
+      signature=$(printf '%s' "$window|$(status_line_verb "$declaration")|$pause_key" | hash_pane)
+    else
+      signature=$(printf '%s' "$window|$declaration" | hash_pane)
+    fi
     age=$((now - since))
     if [ -z "$declaration" ] && [ -n "$old" ] && [ "$misses" -eq 0 ]; then
       fm_wait_timer_save "$record" "$old" "$since" "$owner" "$parent" "$key" 1 || return 1
@@ -202,7 +217,12 @@ EOF
     age=$((now - since))
     verb=$(status_line_verb "$declaration")
     [ "$declaration" != herdr-blocked ] || verb=herdr-blocked
-    if [ "$age" -ge "$alert" ] && [ "$owner" -eq 0 ]; then
+    # A declared pause is an expected wait, so its owner recheck rides the
+    # FM_PAUSE_RESURFACE_SECS cadence (the same bound the stale path uses),
+    # never the blocked/decision owner-alert threshold.
+    threshold=$alert
+    status_is_paused "$declaration" && threshold=$paused_alert
+    if [ "$age" -ge "$threshold" ] && [ "$owner" -eq 0 ]; then
       reason="check: waiting-state $task ($verb, observed ${age}s, level=owner; $actor must recheck and unblock)"
       if ! fm_wake_queued_keys check | grep -Fx "$key-owner" >/dev/null; then
         fm_wake_append check "$key-owner" "$reason" || return 1

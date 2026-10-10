@@ -26,6 +26,27 @@ cycle() {
   [ -z "$seq" ] || FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" "$DRAIN" --ack-through "$seq" --recovery-generation "$gen" >/dev/null
 }
 
+# Arms the lane's episode and ends that arming cycle on a real signal from a second
+# lane, appended once the episode is recorded. The signal scan runs before the
+# wait-timer tick, so a signal present before the tick would end the cycle before
+# the episode existed; a quiet arming cycle would instead alert once its threshold
+# matured. Ending it on the signal keeps the arming cycle silent, as before.
+arm_episode() {  # <dir>
+  printf 'kind=ship\nbackend=tmux\nwindow=fake:2\n' > "$1/state/lane-b.meta"
+  printf 'working: building\n' > "$1/state/lane-b.status"
+  prime_status_seen "$1/state" "$1/state/lane-b.status"
+  (
+    i=0
+    while [ ! -e "$1/state/.waiting-timers/lane" ] && [ "$i" -lt 100 ]; do
+      sleep 0.1
+      i=$((i + 1))
+    done
+    printf 'working: step two\n' >> "$1/state/lane-b.status"
+  ) &
+  cycle
+  wait
+}
+
 for verb in blocked needs-decision; do
   dir=$(make_case "$verb")
   mkdir -p "$dir/home/config" "$dir/tmp" "$dir/config" "$dir/parent/state"
@@ -38,7 +59,8 @@ for verb in blocked needs-decision; do
   fi
   printf 'kind=ship\nbackend=tmux\nwindow=fake:1\n' > "$dir/state/lane.meta"
   printf '%s [at=%s] [key=wait]: external condition until 2099-01-01T00:00Z\n' "$verb" "$(date +%s)" > "$dir/state/lane.status"
-  cycle
+  prime_status_seen "$dir/state" "$dir/state/lane.status"
+  arm_episode "$dir"
   if [ "$verb" = blocked ]; then
     IFS=$'\t' read -r sig since owner _parent key _misses < "$dir/state/.waiting-timers/lane"
     printf '%s\t%s\t0\t0\t%s\t0\n' "$sig" "$((since - 900))" "$key" > "$dir/state/.waiting-timers/lane"
@@ -77,7 +99,8 @@ dir=$(make_case main-escalation)
 mkdir -p "$dir/home/config" "$dir/tmp" "$dir/config"
 printf 'kind=ship\nbackend=tmux\nwindow=fake:1\n' > "$dir/state/lane.meta"
 printf 'blocked [at=%s] [key=wait]: external condition until 2099-01-01T00:00Z\n' "$(date +%s)" > "$dir/state/lane.status"
-cycle
+prime_status_seen "$dir/state" "$dir/state/lane.status"
+arm_episode "$dir"
 IFS=$'\t' read -r sig since _owner _parent key _misses < "$dir/state/.waiting-timers/lane"
 printf '%s\t%s\t0\t0\t%s\t0\n' "$sig" "$((since - 900))" "$key" > "$dir/state/.waiting-timers/lane"
 cycle
@@ -265,3 +288,55 @@ cycle
 [ "$(grep -c 'level=owner' "$dir/events")" -eq 0 ] || fail 'native push wake was followed by a duplicate owner recheck'
 unset FM_BACKEND_HERDR_EVENTS_FORCE FM_BACKEND_HERDR_EVENT_READER
 pass 'an immediate native push wake is the episode owner delivery, with no duplicate recheck'
+
+# A due wait alert defers to a same-cycle signal: the signal scan runs first,
+# and the deferred alert still surfaces on the next quiet cycle (retro fix 4).
+dir=$(make_case signals-first)
+mkdir -p "$dir/home/config" "$dir/tmp" "$dir/config"
+printf 'kind=ship\nbackend=tmux\nwindow=fake:1\n' > "$dir/state/lane-a.meta"
+printf 'blocked [at=%s] [key=wait]: external condition until 2099-01-01T00:00Z\n' "$(date +%s)" > "$dir/state/lane-a.status"
+printf 'kind=ship\nbackend=tmux\nwindow=fake:2\n' > "$dir/state/lane-b.meta"
+printf 'working: building\n' > "$dir/state/lane-b.status"
+prime_status_seen "$dir/state" "$dir/state/lane-a.status"
+prime_status_seen "$dir/state" "$dir/state/lane-b.status"
+cycle
+IFS=$'\t' read -r sig since owner _parent key _misses < "$dir/state/.waiting-timers/lane-a"
+printf '%s\t%s\t0\t0\t%s\t0\n' "$sig" "$((since - 900))" "$key" > "$dir/state/.waiting-timers/lane-a"
+printf 'done: fix complete, PR open\n' >> "$dir/state/lane-b.status"
+: > "$dir/events"
+cycle
+grep -q '^signal:' "$dir/out" || fail "a due wait alert outran the signal wake: $(cat "$dir/out")"
+! grep -q 'waiting-state' "$dir/out" || fail 'the wait-timer step ran before the signal scan'
+cycle
+grep -q 'check: waiting-state lane-a .*level=owner' "$dir/events" || fail 'the wait alert deferred behind the signal was never delivered'
+pass 'a due wait alert defers to a same-cycle signal and still surfaces next cycle'
+
+# A declared pause rechecks at the pause cadence, never the owner-alert
+# threshold, and its episode survives pause-prose churn on the same key.
+dir=$(make_case paused-recheck)
+mkdir -p "$dir/home/config" "$dir/tmp" "$dir/config"
+printf 'kind=ship\nbackend=tmux\nwindow=fake:1\n' > "$dir/state/lane.meta"
+printf 'paused: waiting on the pipeline run\n' > "$dir/state/lane.status"
+prime_status_seen "$dir/state" "$dir/state/lane.status"
+cycle
+cycle
+[ -e "$dir/state/.waiting-timers/lane" ] || fail 'a due paused wait armed no episode'
+[ "$(grep -c 'waiting-state lane' "$dir/events")" -eq 0 ] || fail 'a paused wait alerted at the owner-alert threshold'
+IFS=$'\t' read -r sig since owner _parent key _misses < "$dir/state/.waiting-timers/lane"
+start=$((since - 15000))
+printf '%s\t%s\t0\t0\t%s\t0\n' "$sig" "$start" "$key" > "$dir/state/.waiting-timers/lane"
+: > "$dir/events"
+cycle
+grep -q 'check: waiting-state lane (paused, observed .*level=owner' "$dir/events" || fail 'a paused wait never rechecked its owner at the pause cadence'
+printf 'paused [at=%s]: refreshed prose, still waiting on the pipeline run\n' "$(date +%s)" >> "$dir/state/lane.status"
+cycle
+cycle
+[ "$(grep -c 'level=owner' "$dir/events")" -eq 1 ] || fail 'refreshed pause prose re-alerted the owner'
+IFS=$'\t' read -r _sig since _owner _parent _key _misses < "$dir/state/.waiting-timers/lane"
+[ "$since" -eq "$start" ] || fail 'refreshed pause prose re-armed the episode'
+printf 'paused [key=phase-two]: a different wait\n' >> "$dir/state/lane.status"
+cycle
+cycle
+IFS=$'\t' read -r _sig since _owner _parent _key _misses < "$dir/state/.waiting-timers/lane"
+[ "$since" -gt "$start" ] || fail 'a pause with a new phase key did not re-arm the episode'
+pass 'a paused wait rechecks at FM_PAUSE_RESURFACE_SECS, survives prose churn, and re-arms on a new key'

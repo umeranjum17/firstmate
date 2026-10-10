@@ -921,6 +921,47 @@ test_turn_ended_not_working_surfaced() {
   pass "a bare turn-end whose crew is not provably working is surfaced (the swallowed-finish fix)"
 }
 
+test_due_check_queues_behind_a_constant_signal_stream() {
+  local dir state fakebin out drain_out status_file check_file pid feeder
+  dir=$(make_case due-check-signal-stream); state="$dir/state"; fakebin="$dir/fakebin"
+  out="$dir/watch.out"; drain_out="$dir/drain.out"
+  status_file="$state/task.status"; check_file="$state/task.check.sh"
+  cat > "$check_file" <<'SH'
+#!/usr/bin/env bash
+printf 'merged: https://example.test/pr/9\n'
+SH
+  chmod 0700 "$check_file"
+  FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-check-register.sh" task >/dev/null \
+    || fail "could not register the due custom check"
+  # A captain-relevant handoff lands every cycle, so each cycle carries an actionable
+  # signal and the check is due (no .last-check yet) on the cycle that surfaces it.
+  printf 'done: handoff 0\n' > "$status_file"
+  (
+    i=0
+    while :; do
+      i=$((i + 1))
+      printf 'done: handoff %s\n' "$i" >> "$status_file"
+      sleep 0.2
+    done
+  ) &
+  feeder=$!
+  export FM_FAKE_CREW_STATE='state: unknown · source: none · no current-state source available'
+  PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_CREW_STATE_BIN="$fakebin/fm-crew-state.sh" \
+    FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=300 FM_HEARTBEAT=999999 \
+    FM_SECONDMATE_LIVENESS_SECS=99999999 "$WATCH" > "$out" &
+  pid=$!
+  wait_for_exit "$pid" 100 || { kill "$feeder" 2>/dev/null; fail "watcher did not exit on the signal stream"; }
+  kill "$feeder" 2>/dev/null; wait "$feeder" 2>/dev/null || true
+  grep -F "check: $check_file: merged: https://example.test/pr/9" "$out" >/dev/null \
+    || fail "the due check did not run in the cycle that carried the signal: $(cat "$out")"
+  FM_STATE_OVERRIDE="$state" "$DRAIN" > "$drain_out" 2>/dev/null || fail "drain after the signal-stream wake failed"
+  grep "$(printf '\tcheck\t')" "$drain_out" | grep -F "$check_file" | grep -F 'merged: https://example.test/pr/9' >/dev/null \
+    || fail "the due check result was not queued in the signal wake"
+  grep "$(printf '\tsignal\t')" "$drain_out" | grep -F "$status_file" >/dev/null \
+    || fail "the signal that carried the due check was not queued"
+  pass "a due check runs and queues its result in the cycle of a constant signal stream"
+}
+
 # --- bare turn-end, unverifiable harness: pane churn is the third proof --------
 # A harness whose semantic busy state has no verified source (codex) can never
 # report working, so the two proofs above are unreachable for it and EVERY worker
@@ -6073,6 +6114,29 @@ test_procevent_captured_result_surfaces_proactively() {
   pass "a captured process-event result wakes a healthy watcher proactively, with no manual drain"
 }
 
+test_signal_wake_precedes_captured_procevent_result() {
+  local dir state out drain_out pid
+  dir=$(make_case procevent-signal-first); state="$dir/state"
+  out="$dir/watch.out"; drain_out="$dir/drain.out"
+  seed_captured_procevent_result "$dir" || fail "the fixture captured no process-event result"
+  printf 'done: handoff 0\n' > "$state/task.status"
+
+  FM_WATCH_HANDLING_SUCCESSOR=1 procevent_watch_bg "$dir" "$out"
+  pid=$!
+  wait_for_exit "$pid" 100 || fail "the watcher did not exit on the first wake: $(cat "$out")"
+  grep -F "signal:" "$out" >/dev/null \
+    || fail "a captured process-event result pre-empted the signal wake: $(cat "$out")"
+  ! grep -F "procevent:delivery-src:1" "$out" >/dev/null \
+    || fail "the process-event result was surfaced ahead of the signal: $(cat "$out")"
+
+  FM_WATCH_HANDLING_SUCCESSOR=1 procevent_watch_bg "$dir" "$out"
+  pid=$!
+  wait_for_exit "$pid" 100 || fail "the watcher did not surface the process-event result on the next cycle: $(cat "$out")"
+  grep -F "procevent:delivery-src:1" "$out" >/dev/null \
+    || fail "the process-event result was lost behind the signal wake: $(cat "$out")"
+  pass "a captured process-event result waits behind a pending signal wake and surfaces on the next cycle"
+}
+
 test_procevent_unacknowledged_result_redrains_until_handled() {
   local dir state out replay_out replay_err pid before after sequence generation
   dir=$(make_case procevent-redrain); state="$dir/state"
@@ -7334,6 +7398,7 @@ test_secondmate_status_routine_absorbed_routed_surfaced_classifier
 test_provably_working_signal_absorbed
 test_turn_ended_provably_working_absorbed
 test_turn_ended_not_working_surfaced
+test_due_check_queues_behind_a_constant_signal_stream
 test_turn_ended_churning_pane_absorbed
 test_turn_ended_churn_resets_prior_stale_classification
 test_turn_ended_churn_resets_wedge_state_before_stale_poll
@@ -7438,6 +7503,7 @@ test_timer_repair_drops_a_finished_write_deferral_chain
 test_terminal_first_sight_drops_a_finished_write_deferral_chain
 test_triage_log_size_cap_accepts_spaced_wc_counts
 test_procevent_captured_result_surfaces_proactively
+test_signal_wake_precedes_captured_procevent_result
 test_procevent_unacknowledged_result_redrains_until_handled
 test_procevent_marker_keys_are_injective
 test_procevent_headlines_classify_queue_keys
