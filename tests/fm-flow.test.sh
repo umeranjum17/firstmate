@@ -373,19 +373,18 @@ before = stamps(m)
 x = json.loads(run(model, m))
 assert run(model, m) == run(model, m) and stamps(m) == before, 'model reader deterministic and read-only'
 assert x['schema'] == 'fm-model-stats.v1' and x['windows'] == [7, 30] and x['coverage']['outcome_rows'] == 6 and x['coverage']['sampled_tasks'] == 1, 'model schema, windows and coverage'
-assert sorted(x['by_home']) == ['byokit', 'main'], 'both homes present'
 def by(rows, name):
     return next(r for r in rows if r['model'] == name)
 opus = by(x['models'], 'claude-opus-5-5')['w7']
-assert (opus['n_finished'], opus['merged'], opus['ended_ship'], opus['merge_rate'], opus['merge_rate_sample']) == (1, 1, 1, 1.0, 1), 'opus recorded cohort and rate'
+assert (opus['n_finished'], opus['merged'], opus['ended_ship'], opus['merge_rate']) == (1, 1, 1, 1.0), 'opus recorded cohort and rate'
 assert (opus['p50_hours'], opus['p75_hours'], opus['timed_merges'], opus['first_pass_n'], opus['first_pass_rate'], opus['switches']) == (24.0, 24.0, 1, 1, 1.0, 0), 'opus time, first pass, switches'
 muse = by(x['models'], 'opencode-go/muse-spark-1.3-contributor')['w7']
-assert (muse['n_finished'], muse['merged'], muse['ended_ship'], muse['merge_rate'], muse['merge_rate_sample']) == (4, 2, 2, 0.5, 2), 'muse cohort and recorded-only rate'
+assert (muse['n_finished'], muse['merged'], muse['ended_ship'], muse['merge_rate']) == (4, 2, 2, 0.5), 'muse cohort and recorded-only rate'
 assert muse['sampled'] is True and muse['unknown_outcome'] == 0 and muse['cancelled_failed'] == 1, 'sampled disclosed and cancelled counted'
-assert (muse['switches'], muse['switch_share'], muse['first_pass_n'], muse['first_pass_sample'], muse['first_pass_rate']) == (1, 0.25, 0, 1, 0.0), 'switch and first-pass sample'
+assert (muse['switches'], muse['first_pass_n'], muse['first_pass_sample'], muse['first_pass_rate']) == (1, 0, 1, 0.0), 'switch and first-pass sample'
 assert (muse['rework'], muse['rework_ci'], muse['rework_pipeline']) == (1, 1, 1), 'rework join'
-deep = next(r for r in x['by_home']['byokit'] if r['model'] == 'opencode-go/deepseek-v4.1-flash')
-assert deep['provider'] == 'OpenCode Go' and deep['name'] == 'DeepSeek' and deep['w7']['merge_rate'] == 1.0, 'per-home model naming'
+deep = by(x['models'], 'opencode-go/deepseek-v4.1-flash')
+assert deep['provider'] == 'OpenCode Go' and deep['name'] == 'DeepSeek' and deep['w7']['merge_rate'] == 1.0, 'model naming'
 assert by(x['models'], 'opencode-go/muse-spark-1.3-contributor')['w30']['merged'] >= 3 and by(x['models'], 'claude-opus-5-5')['w30']['n_finished'] == 1, '30-day window'
 empty = tmp / 'empty'
 empty.mkdir()
@@ -438,7 +437,7 @@ def sk(name):
 assert [r['skill'] for r in z['skills']][:2] == ['used-heavy', 'shared'] and [r['skill'] for r in z['skills']][2:] == ['gadget', 'old', 'widget'], 'skill ranking by reads'
 assert sk('used-heavy')['w7'] == {'reads': 8, 'homes': 1} and sk('shared')['w7'] == {'reads': 6, 'homes': 2}, 'window sums and cross-home reads'
 assert sk('gadget')['w7']['reads'] == 0 and sk('gadget')['w30']['reads'] == 100 and sk('widget')['w30']['reads'] == 9, 'a skill read only outside 7 days'
-assert z['zero_read_w7'] == ['gadget', 'spanner', 'widget'] and z['zero_read_w30'] == [], 'known skills with no reads, only for windows the collector covered'
+assert z['zero_read_w7'] == [] and z['zero_read_w30'] == [], 'a registered remote home suppresses zero-read claims'
 assert [r['skill'] for r in z['by_home']['main']][:3] == ['used-heavy', 'shared', 'gadget'] and [r['skill'] for r in z['by_home']['byokit']] == ['shared'], 'per-home skill breakdown'
 assert any('distant' in n for n in z['limitations']), 'a remote home is disclosed as unreadable'
 ze = tmp / 'empty-skill'
@@ -461,8 +460,9 @@ zc = tmp / 'zero-count'
 (zc / 'skills/beta').mkdir(parents=True)
 (zc / 'skills/beta/SKILL.md').write_text('x')
 (zc / 'data/metrics').mkdir(parents=True)
-(zc / 'data/metrics/skills.tsv').write_text('day\thome\tskill\treads\n' + f'{onday(0)}\tmain\talpha\t3\n{onday(0)}\tmain\tbeta\t0\n')
+(zc / 'data/metrics/skills.tsv').write_text('day\thome\tskill\treads\n' + f'{onday(6)}\tmain\talpha\t1\n{onday(0)}\tmain\talpha\t3\n{onday(0)}\tmain\tbeta\t0\n')
 zz = json.loads(run(skill, zc))
+assert zz['zero_read_w7'] == ['beta'] and zz['zero_read_w30'] == [], 'a covered window lists known skills with no reads; a window the coverage does not span lists none'
 assert next(r for r in zz['skills'] if r['skill'] == 'beta')['w7'] == {'reads': 0, 'homes': 0}, 'a zero-count row does not count as reading a home'
 
 # Outcome recorder: one durable row per finished task, best effort.

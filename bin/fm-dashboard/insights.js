@@ -48,7 +48,7 @@ function modelMetrics(s) {
     METRIC('Started', nOf(s.n_started), s.n_started),
     METRIC('Finished', nOf(s.n_finished), s.n_finished),
     METRIC('Merged', nOf(s.merged), s.merged),
-    METRIC('Merge rate', pct(s.merge_rate), s.merge_rate_sample),
+    METRIC('Merge rate', pct(s.merge_rate), s.ended_ship),
     METRIC('Time to merge · P50', hrs(s.p50_hours), s.timed_merges),
     METRIC('Time to merge · P75', hrs(s.p75_hours), s.timed_merges),
     METRIC('First pass', pct(s.first_pass_rate), s.first_pass_sample),
@@ -56,27 +56,22 @@ function modelMetrics(s) {
     METRIC('Reverted', nOf(s.reverted), s.first_pass_sample),
     METRIC('Escaped', nOf(s.escaped), s.first_pass_sample),
     METRIC('Cancelled or failed', nOf(s.cancelled_failed), s.n_finished),
-    METRIC('Model switches', nOf(s.switches), s.switch_sample),
+    METRIC('Model switches', nOf(s.switches), s.n_finished),
   ]
 }
 function ModelRow({ m, w, d }) {
   const s = m['w' + w], small = s.n_finished < 5
-  const homes = Object.keys(d.models.by_home).map(home => {
-    const entry = d.models.by_home[home].find(e => e.model === m.model)
-    return entry && entry['w' + w].n_finished ? { home, s: entry['w' + w] } : null
-  }).filter(Boolean).sort((a, b) => b.s.n_finished - a.s.n_finished)
   const metrics = modelMetrics(s)
   return html`<details class=${'i-model' + (small ? ' i-model-small' : '')}>
     <summary>
       <${Av} m=${m.family}/>
       <span class="i-mname"><b>${m.name}</b>${m.provider && html`<small>${m.provider}</small>`}</span>
-      <span class="i-mnums"><b>${pct(s.merge_rate)}</b><small>merge · n=${nOf(s.merge_rate_sample)}</small></span>
+      <span class="i-mnums"><b>${pct(s.merge_rate)}</b><small>merge · n=${nOf(s.ended_ship)}</small></span>
       <span class="i-mnums"><b>${nOf(s.n_finished)}</b><small>finished</small></span>
     </summary>
     <div class="i-mbody">
       <div class="i-mbar" aria-hidden="true"><i style=${{ width: `${(s.merge_rate == null ? 0 : s.merge_rate) * 100}%` }}></i></div>
       <div class="i-mtable">${metrics.map(x => html`<div class="i-mcell"><span>${x.label}</span><b>${x.value}</b><small>n=${nOf(x.sample)}</small></div>`)}</div>
-      ${homes.length ? html`<${Rows} title=${`By home · ${homes.length}`}>${homes.map(h => html`<${Row} name=${hname(d, h.home)} value=${`${pct(h.s.merge_rate)} merge · ${nOf(h.s.n_finished)} finished`} note=${`n=${nOf(h.s.merge_rate_sample)}`}/>`)}</${Rows}>` : ''}
       <p class="i-note">${m.model}${small ? ' · small sample, greyed' : ''}</p>
     </div></details>`
 }

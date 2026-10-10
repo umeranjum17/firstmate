@@ -17,7 +17,6 @@
 # Output fm-model-stats.v1 (times in seconds, null means unknown):
 #   at, now, windows [7, 30]
 #   models[w]    one entry per model over the window, largest finished first
-#   by_home[w]   the same entries keyed by home, for the per-home breakdown
 #   coverage     which sources were present, how many task rows each supplied,
 #                and whether any sampled task contributed
 #   limitations  human-readable coverage notices (the dashboard shows the count)
@@ -229,7 +228,7 @@ def stats_for(cohort, window):
         return sum(int(x[1].get(field) or 0) for x in merged_recorded if x[1] is not None)
     rework = [x for x in merged_recorded if x[1] is not None and int(x[1].get('commits_after_open') or 0) > 0]
     switches = sum(1 for t, _, _ in finished if len({m for _, m, _ in t['models']}) > 1)
-    out = dict(
+    return dict(
         n_started=n_started,
         n_finished=len(finished),
         merged=len(merged),
@@ -249,15 +248,11 @@ def stats_for(cohort, window):
         escaped=sum(1 for x in merged_recorded if x[1] is not None and int(x[1].get('escaped') or 0) > 0),
         cancelled_failed=sum(1 for t, _, _ in finished if t['outcome'] in ('cancelled', 'failed')),
         switches=switches,
-        switch_share=(round(switches / len(finished), 4) if finished else None),
         unknown_outcome=(sum(1 for t, _, _ in finished if t['outcome'] == 'unknown') +
                          sum(1 for t in cohort if t['sampled'] and t['outcome'] == 'unknown' and
                              t['started'] is not None and lo <= t['started'] <= NOW)),
         sampled=any(t['sampled'] for t, _, _ in finished),
     )
-    out['merge_rate_sample'] = len(ended_ship)
-    out['switch_sample'] = len(finished)
-    return out
 
 def model_rows(cohort):
     groups = {}
@@ -275,12 +270,6 @@ def model_rows(cohort):
     return rows
 
 all_models = model_rows(list(tasks.values()))
-by_home = {}
-for name, home in sorted(homes.items()):
-    if home is None:
-        continue
-    cohort = [t for t in tasks.values() if t['home'] == name]
-    by_home[name] = model_rows(cohort)
 
 limitations = []
 if outcome_rows == 0:
@@ -301,7 +290,6 @@ print(json.dumps({
     'now': NOW,
     'windows': list(WINDOWS),
     'models': all_models,
-    'by_home': by_home,
     'coverage': dict(outcome_rows=outcome_rows, sampled_tasks=sampled_rows,
                      outcome_homes=sorted(outcome_homes), prs_rows=len(prs or []), lanes_rows=len(lanes or [])),
     'limitations': limitations,

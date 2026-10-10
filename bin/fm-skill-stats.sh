@@ -13,7 +13,9 @@
 #   skills[w]     read counts per skill for the window, most-read first,
 #                 each with the number of homes it was read in
 #   by_home[w]    per-home read counts, most-read first
-#   zero_read_w7, zero_read_w30  known skills with no reads in that window
+#   zero_read_w7, zero_read_w30  known skills with no reads in that window, only
+#                 for windows the coverage spans and while no remote home is
+#                 registered (a remote home's reads are not readable here)
 #   coverage      whether skills.tsv was present, its row/day/skill/home counts
 #   limitations   human-readable coverage notices (the dashboard shows the count)
 set -eu
@@ -152,9 +154,10 @@ def home_entries():
         out[home] = items
     return out
 
+remote_registered = any(home is None for home in homes.values())
 def zero_read(window):
     lo = cutoff(window)
-    if not days or days[0] > lo or days[-1] < lo:
+    if remote_registered or not days or days[0] > lo or days[-1] < lo:
         return []
     return sorted(s for s in known if per[window][0].get(s, 0) == 0)
 
