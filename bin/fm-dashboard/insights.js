@@ -1,7 +1,7 @@
 // Native SVG over the shipped durable-record reader. Missing observations never become zero.
-import { html, useState, hname } from './ui.js'
+import { html, useState, hname, dur } from './ui.js'
 const DAY = 86400, number = n => n == null ? 'Unknown' : n.toLocaleString('en-US', { maximumFractionDigits: 12 })
-const seconds = n => n == null ? 'Unknown' : `${number(n)} s`
+const seconds = n => n == null ? 'Unknown' : n < 60 ? '<1m' : dur(n)
 const bytes = n => n == null ? 'Unknown' : `≈${(n / 2 ** 30).toFixed(2)} GiB`
 const CAUSES = { captain: 'Your decision', lead: 'Lead reply', ci_queue: 'CI queue', memory_gate: 'Memory limit', credential_external: 'Login or external wait', review_merge: 'Review or merge', unknown: 'Unclassified' }
 const STAGES = { working: 'Working', resolved: 'Working', blocked: 'Blocked', failed: 'Failed', paused: 'Waiting', 'needs-decision': 'Decision needed', 'captain-held': 'Held', done: 'Finished' }
