@@ -81,6 +81,35 @@ The dashboard's Insights view consumes its output: `fm-dashboard.sh` runs the re
 `fm-dashboard.sh`'s header owns that embedding and its scrubbing.
 The real CLI regression journey is [`tests/fm-flow.test.sh`](../tests/fm-flow.test.sh).
 
+## Per-model statistics
+
+[`fm-task-outcome.sh`](../bin/fm-task-outcome.sh) appends one durable row per finished task to the home-local `data/metrics/task-outcomes.tsv`, so per-model figures survive independently of the sampled lane ledger.
+Its columns are `home`, `task`, `kind`, `project`, `models`, `started`, `ended`, `outcome`, and `pr`.
+`models` lists every launch of the task in order as `harness:model:effort`, joined by `;`, sourced from the `state/<id>.models` history that `fm-spawn.sh` starts on a fresh spawn and appends to on each relaunch, so a mid-task model switch is recorded rather than lost.
+`outcome` is `merged`, `closed`, `cancelled`, `scout`, or `failed`; a secondmate retirement is not a task and records nothing.
+The recorder runs best-effort from `bin/fm-teardown.sh` before the task's durable presentation is retired, and never blocks cleanup.
+The file has a header row and is append-only; give it the same trust as `state/`.
+
+[`fm-model-stats.sh`](../bin/fm-model-stats.sh) reads every local home's `task-outcomes.tsv` and the main home's sampled `lanes.tsv`/`prs.tsv` into `fm-model-stats.v1`: per model, a 7-day and 30-day window of started, finished, merged, merge rate, time-to-merge P50/P75, first-pass rate, rework, revert, escape, cancelled/failed, and model switches.
+Its header owns usage (`--json [--now <epoch>]`), attribution, and uncertainty limits.
+A task is attributed to the model of its final launch, and one that changed model mid-flight counts as a switch under that model.
+Every recorded outcome is authoritative; a sampled lane that predates the recorder is used only as a fallback and is disclosed.
+Merge rate is computed over recorded outcomes only, so sampled lanes never fabricate a rate.
+First-pass, rework, revert and escape figures use the same recorded merged PRs as merge rate, because a sampled-lane row has no recorded task to join its PR to; the panel's coverage line counts the sampled tasks that these figures leave out.
+Each figure shows its sample size.
+The dashboard's Insights view consumes its output: `fm-dashboard.sh` runs the reader at each build and embeds the result as the `models` key of `board.json`.
+The real CLI regression journeys for the reader and the recorder are the model/outcome sections of [`tests/fm-flow.test.sh`](../tests/fm-flow.test.sh).
+
+## Skill statistics
+
+[`fm-skill-stats.sh`](../bin/fm-skill-stats.sh) reads the main home's `data/metrics/skills.tsv` into `fm-skill-stats.v1`: per skill over 7- and 30-day windows, its read count and the number of homes it was read in, plus a per-home breakdown and, for each window the file's coverage spans, the known skills that had no reads in it.
+The file is written by a private skill collector and has the columns `day`, `home`, `skill`, and `reads`; it may be absent, and the reader then reports no rows rather than failing.
+Known skill names come from each local home's `skills/` and `.agents/skills/` directories, so a skill that exists but was never read can be named; a home with no such directories simply contributes none.
+A registered remote home's reads are not readable locally and are disclosed in the limitations; while one is registered the reader makes no zero-read claim, since a skill it never saw locally may still have been read there.
+Its header owns usage (`--json [--now <epoch>]`), window arithmetic, and uncertainty limits.
+The dashboard's Insights view runs it at each build and embeds the result as the `skills` key of `board.json`.
+The real CLI regression journey is the skill section of [`tests/fm-flow.test.sh`](../tests/fm-flow.test.sh).
+
 ## Not included
 
 These are possible follow-ups, deliberately left out of this version:
