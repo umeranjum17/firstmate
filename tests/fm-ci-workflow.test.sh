@@ -288,7 +288,7 @@ RUBY
 # GitHub-hosted runners by clearing that one variable instead of reverting.
 test_review_box_runner_selection_is_fork_safe() {
   local moved job line
-  moved='lint test-coverage invariants'
+  moved='test-coverage invariants'
   for job in $moved; do
     # Fork PR: never the box, even with the opt-in variable set.
     line=$(resolve_runs_on pull_request "someuser/firstmate" 1 "$job") \
@@ -312,8 +312,9 @@ test_review_box_runner_selection_is_fork_safe() {
       || fail "clearing FM_REVIEW_BOX must fall back to ubuntu-latest for $job, got $(printf '%s' "$line" | cut -f2)"
   done
 
-  # Heavyweight shards and the Herdr lane stay on GitHub-hosted runners.
-  for job in tests-portable-parallel-1 tests-portable-parallel-2 tests-portable-serial tests-herdr; do
+  # The lint partitions (ShellCheck peaks above the box's memory cap), the
+  # heavyweight shards, and the Herdr lane stay on GitHub-hosted runners.
+  for job in lint tests-portable-parallel-1 tests-portable-parallel-2 tests-portable-serial tests-herdr; do
     line=$(resolve_runs_on pull_request "umeranjum17/firstmate" 1 "$job") \
       || fail "could not resolve $job runs-on"
     [ "$(printf '%s' "$line" | cut -f2)" = "ubuntu-latest" ] \

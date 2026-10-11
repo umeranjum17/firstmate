@@ -26,7 +26,7 @@ concurrency:
 # tiers and their rationale; tests/fm-ci-workflow.test.sh guards this workflow.
 # Each job comment identifies the tier implemented by its executable value.
 
-# Runner selection for the light Linux jobs:
+# Runner selection for the light Linux jobs that fit the review box:
 #   * A run is trusted only when it is a push to main, or a pull_request whose
 #     head repository is this repository. A fork pull_request runs untrusted
 #     code, so it must never reach the self-hosted box and always uses
@@ -36,14 +36,19 @@ concurrency:
 #     set FM_REVIEW_BOX to 0 (or delete it) to send every job back to
 #     ubuntu-latest on the next run, with no code change and no revert, when the
 #     box is offline.
-# The macOS job and the Herdr lane stay on GitHub; the heavyweight test shards
-# stay on ubuntu-latest because one runner instance on the box would serialize
-# them. See data/fm-review-box-runner/evidence.md for the migration rationale.
+# Only test-coverage and invariants move: they finish in seconds and stay
+# inside the box's 1500M runner cap. The lint partitions stay on ubuntu-latest
+# because ShellCheck's dataflow analysis peaks above that cap - linting
+# bin/fm-promote.sh was OOM-killed at ~1.48GB - and the cap exists so the
+# review service keeps priority on the 4GB box; raising it would put that
+# service at risk. The macOS job and the Herdr lane stay on GitHub, and the
+# heavyweight test shards stay on ubuntu-latest because one runner instance
+# would serialize them. See data/fm-review-box-runner/evidence.md.
 
 jobs:
   lint:
     name: Lint ${{ matrix.partition }}
-    runs-on: ${{ (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) && vars.FM_REVIEW_BOX == '1' && fromJSON('["self-hosted","review-box"]') || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     # Normal tier (see the timeout policy above).
     timeout-minutes: 30
     strategy:
