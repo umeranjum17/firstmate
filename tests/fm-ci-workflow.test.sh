@@ -117,10 +117,11 @@ context = {
 }
 ARGV[4..].each do |job|
   raw = doc.fetch("jobs").fetch(job).fetch("runs-on").to_s.strip
+  match = raw.match(/\A\s*\$\{\{\s*(.*?)\s*\}\}\s*\z/m)
   labels =
-    if raw.include?("${{")
-      inner = raw.sub(/\A\$\{\{\s*/, "").sub(/\s*\}\}\z/, "")
-      inner = inner.gsub(%r{fromJSON\(([^)]*)\)}) { $1.gsub("\x27", "") }
+    if match
+      inner = match[1]
+      inner = inner.gsub(%r{fromJSON\(([^)]*)\)}) { Regexp.last_match(1).gsub("\x27", "") }
       context.each { |key, value| inner = inner.gsub(key, value.inspect) }
       value = eval(inner) # rubocop:disable Security/Eval
       value.is_a?(Array) ? value.join(",") : value.to_s
