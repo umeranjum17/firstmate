@@ -1454,7 +1454,7 @@ Required tools come in two parts: a universal toolchain every home needs regardl
 Every home requires:
 
 - node and git.
-- gh, with GitHub authentication through `gh auth login`.
+- gh; GitHub authentication through `gh auth login` is needed for a home with a GitHub-hosted project, since the session-start auth probe is skipped while every registered project is local-only.
 - no-mistakes v1.46.0 or newer.
 - Compatible gh-axi.
 - chrome-devtools-axi.
@@ -2161,8 +2161,7 @@ While armed, `bin/fm-captain-hold.sh hold` also raises a board card for that hol
 Each hold occurrence gets its own card, so a task held again after an answered card gets a new live one.
 The adapter needs `sign-off-axi` on PATH: `arm` refuses without it, and the card attempt prints an install hint.
 Board keys carry a digest of this home's `FM_HOME` and the hold's stamp, so the machine's one shared board never delivers another home's answer or an earlier card's answer to this one.
-An answer is marked delivered once the keyed-answer intake has taken it or settled it for good: a batch whose every skip is permanent (the reserved `reconcile` value, which is also warned once, already closed, not held for the captain, an unknown close mode, or a migrated hold whose marker line matches several rows) exits 3 and is acknowledged.
-A transient skip or failure, including a migrated-hold scan that cannot read the beads graph or a migrated hold whose only evidence is an ambiguous configured-prefix match, leaves the answer to be offered again on the next round.
+An answer is marked delivered only when the keyed-answer intake exits 0 or 3, so a transient skip or failure leaves it to be offered again on the next round; the adapter's header owns which skips are permanent.
 The adapter's header owns its commands, the deliverable-answer rule, and its limits, including that sign-off cannot withdraw a card for a hold answered through another channel; `retire` turns it off again.
 
 **Capture and publish results**
@@ -2259,7 +2258,7 @@ Some built-in sources carry the captain's answer to a captain-held task, and wha
 **Reconcile selections and handling boundaries**
 
 - The reserved Reconcile selection uses the parallel optional `reconciles` adapter command and binding-verified `reconcile-requests` intake rather than entering keyed answers; [`captain-hold-lifecycle.md`](captain-hold-lifecycle.md#reconcile-re-check-reality-never-a-blind-close) owns those semantics.
-- Feeding is independent of handling: it never acknowledges a result and never suppresses a wake, because recording the answer or request is transcription while acting on it is firstmate's judgement.
+- Feeding is independent of handling: it never suppresses a wake, and the runner acknowledges a keyed-answer result only after the intake exits 0 or 3 (`bin/fm-procevent.sh`'s header owns that rule), because recording the answer or request is transcription while acting on it is firstmate's judgement.
 - An unbound built-in source, a built-in adapter without the corresponding command, and a failure on either side all leave the capture untouched and still announced.
 - External binding responses never enter either authority-bearing intake.
 
