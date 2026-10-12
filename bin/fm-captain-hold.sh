@@ -90,8 +90,10 @@
 # not held for the captain, or a task already closed is reported as `skipped:`
 # and feeds nothing. A replayed delivery whose answer digest and requested
 # close mode both match the newest record is reported `closed:` and is a no-op;
-# a mode mismatch is skipped. The command exits nonzero when any key was
-# skipped; the reserved reconcile value is refused for good, reported once on
+# a mode mismatch is skipped. The command exits 3 when every skip was permanent
+# (the reserved reconcile value, already closed, not held for the captain, unknown
+# close mode, or migrated-hold scan refused) and 1 for any other skip; the reserved
+# reconcile value is refused for good, reported once on
 # stderr, and is not a skip. `--source` is provenance text recorded in the
 # durable decision, never a behavior switch: this command has no per-channel
 # branch and no knowledge of chat, review decks, or any transport.
@@ -1328,7 +1330,7 @@ sanitize_reconcile_provenance() {
 
 command_answers() {
   local origin='' source='' row rest key answer label mode id show state hold_kind body digest legacy_digest legacy_key
-  local recorded_digest recorded_mode occurrence tmp err closed=0 skipped=0 reason release_flag tab=$'\t'
+  local recorded_digest recorded_mode occurrence tmp err closed=0 skipped=0 permanent=0 reason release_flag tab=$'\t'
   local resolve_rc
   while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -1367,6 +1369,7 @@ command_answers() {
     label=$(sanitize_field "${label:-}")
     if [ "$answer" = "$RECONCILE_VALUE" ]; then
       printf 'refused: %s (reconcile requests require a bound captured source)\n' "$key" >&2
+      skipped=$((skipped + 1)); permanent=$((permanent + 1))
       continue
     fi
     release_flag=''
@@ -1375,7 +1378,7 @@ command_answers() {
       release) release_flag=--release ;;
       *)
         printf 'skipped: %s (unknown close mode %s)\n' "$key" "$(sanitize_field "$mode")"
-        skipped=$((skipped + 1))
+        skipped=$((skipped + 1)); permanent=$((permanent + 1))
         continue
         ;;
     esac
@@ -1385,7 +1388,7 @@ command_answers() {
     if [ "$resolve_rc" = 2 ]; then
       reason=$(tr -d '\n' < "$err")
       printf 'skipped: %s (migrated-hold scan refused%s)\n' "$key" "${reason:+: $reason}"
-      skipped=$((skipped + 1))
+      skipped=$((skipped + 1)); permanent=$((permanent + 1))
       continue
     fi
     if [ "$resolve_rc" -ne 0 ]; then
@@ -1442,12 +1445,12 @@ command_answers() {
     fi
     if [ "$state" = "done" ]; then
       printf 'skipped: %s (already closed)\n' "$id"
-      skipped=$((skipped + 1))
+      skipped=$((skipped + 1)); permanent=$((permanent + 1))
       continue
     fi
     if [ "$hold_kind" != captain ]; then
       printf 'skipped: %s (not held for the captain)\n' "$id"
-      skipped=$((skipped + 1))
+      skipped=$((skipped + 1)); permanent=$((permanent + 1))
       continue
     fi
     # shellcheck disable=SC2086  # release_flag is empty or a single literal flag.
@@ -1465,7 +1468,9 @@ command_answers() {
   done
   rm -f -- "$tmp" "$err"
   printf 'answers: closed=%s skipped=%s\n' "$closed" "$skipped"
-  [ "$skipped" -eq 0 ]
+  [ "$skipped" -eq 0 ] && return 0
+  [ "$skipped" -eq "$permanent" ] && return 3
+  return 1
 }
 
 # --- reconcile: verify latest state, then close with evidence or annotate ----

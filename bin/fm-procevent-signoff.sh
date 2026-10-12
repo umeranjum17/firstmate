@@ -38,18 +38,20 @@
 #            `<task-id>\t<answer>\t<label>\t<close>` for each, with tabs and
 #            newlines inside the answer or label turned into spaces (the intake
 #            stores them that way too). It records nothing.
-# ack        Run by the runner only after the keyed-answer intake exits 0 for
+# ack        Run by the runner only after the keyed-answer intake exits 0 or 3 for
 #            this result: it records each answer in the captured poll lines as
-#            delivered. The intake exits 0 when every answer was taken or refused
-#            for good (the reserved reconcile value), so only a transient skip or
-#            failure leaves an answer undelivered.
+#            delivered. The intake exits 0 when every answer was taken, and 3 when
+#            every skip is permanent (the reserved reconcile value, already closed,
+#            not held for the captain, unknown close mode, migrated-hold scan
+#            refused), so only a transient skip or failure leaves an answer
+#            undelivered.
 #
 # An answer is deliverable only when its key carries this home's tag, its bare
 # task id is one this home still holds for the captain (`fm-captain-hold.sh
 # open --identity`), its key names that hold's current stamp, and it was not
 # already acknowledged. The open hold is the cursor: an answer saved while no
 # poll ran is still found on the next round, and an answer on an earlier card
-# never resolves a re-held task. An answer the intake skips or fails on stays
+# never resolves a re-held task. An answer the intake fails on, or skips for a transient reason, stays
 # deliverable and is offered again on the next round. Answers on the same board from other
 # agents are never read as Firstmate's. What an answer DOES is owned by the
 # keyed-answer intake in bin/fm-captain-hold.sh; this adapter maps nothing and

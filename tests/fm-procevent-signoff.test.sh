@@ -133,6 +133,19 @@ case "$out" in *"answers-fed: signoff"*) : ;; *) fail "the answer was not offere
 delivered | grep -qF "T2" || fail "an accepted answer was not acknowledged"
 pass "an answer the intake fails on is offered again through the runner until the intake takes it"
 
+hold_as '2026-10-12T13:00:00Z#0'
+adapter raise T3 'Ship T3' 'needs a call' done >/dev/null 2>&1 || fail "hold T3 raised no card"
+key3=$(jq -r --arg k "$key" 'keys[] | select(. != $k)' "$SIGNOFF_BOARD")
+answer_card "$key3" 'not for the captain' '2026-10-12T13:05:00Z'
+printf '3' > "$INTAKE_RC"
+: > "$INTAKE_LOG"
+out=$(runner start signoff 2>&1) || true
+case "$out" in *"answers-fed: signoff"*) : ;; *) fail "a permanently skipped answer was not acknowledged: $out" ;; esac
+delivered | grep -qF "T3" || fail "a permanently skipped answer was not recorded as delivered"
+[ -z "$(adapter poll 2>/dev/null)" ] || fail "a permanently skipped answer was offered again"
+printf '0' > "$INTAKE_RC"
+pass "a batch whose every skip is permanent is acknowledged and not offered again"
+
 TASKS_AXI_BIN=$(command -v tasks-axi || true)
 
 probe_tasks_axi_beads() {
@@ -229,8 +242,8 @@ case "$out" in *"answers-fed: signoff"*) : ;; *) fail "a permanently refused ans
 show=$(cd "$real_home" && BEADS_ACTOR=fixture tasks-axi show fm-sample-q --full 2>&1)
 case "$show" in *"held: yes"*) : ;; *) fail "a refused reconcile answer released the hold: $show" ;; esac
 grep -qF 'fm-sample-q' "$real_home/state/signoff-delivered" || fail "the refused answer was not recorded as delivered"
-out=$(real_env "$real_home" "$ROOT/bin/fm-procevent.sh" start signoff 2>&1) || true
-case "$out" in *"refused: fm-sample-q"*) fail "the refused answer was offered again: $out" ;; esac
+[ -z "$(real_env "$real_home" "$ROOT/bin/fm-procevent-signoff.sh" poll 2>/dev/null)" ] \
+  || fail "the refused answer was offered again"
 pass "a permanently refused reserved answer is acked once, reported once, and leaves its hold open"
 
 echo "all fm-procevent-signoff tests passed"
