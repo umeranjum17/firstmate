@@ -322,7 +322,7 @@ every_project_local_only() {
     mode=$(FM_HOME="$FM_HOME" FM_DATA_OVERRIDE="$DATA" "$SCRIPT_DIR/fm-project-mode.sh" "$name" 2>/dev/null) || return 1
     [ "${mode%% *}" = local-only ] || return 1
     seen=1
-  done < <(awk '$1 == "-" && $2 != "" { print $2 }' "$DATA/projects.md")
+  done < <(sed -nE 's/^- (.+)$/\1/p' "$DATA/projects.md" | sed -E 's/ (\[| - ).*//')
   [ "$seen" = 1 ]
 }
 
