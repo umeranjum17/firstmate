@@ -588,6 +588,25 @@ test_worker_role_names_skill_and_fallback_file() {
 
 test_worker_role_names_skill_and_fallback_file
 
+# A local-only task with no recorded worktree hands the gate "-" in the worktree
+# slot; the gate must treat it as "no worktree" and never cd into it.
+test_merge_gate_gets_dash_without_worktree() {
+  local home meta
+  home="$TMP_ROOT/gate-no-worktree-home"
+  mkdir -p "$home/config"
+  meta="$TMP_ROOT/gate-no-worktree.meta"
+  printf 'mode=local-only\n' > "$meta"
+  printf '%s\n' '#!/usr/bin/env bash' 'printf "%s\n" "$*" > "$FM_HOME/gate.args"' 'exit 0' > "$home/config/merge-gate"
+  chmod +x "$home/config/merge-gate"
+  fm_dod_merge_gate "$home/config" "$home" fm-T1 "$meta" abc123 - \
+    || fail "merge gate refused a passing local-only merge without a worktree"
+  [ "$(cat "$home/gate.args")" = "fm-T1 - abc123 -" ] \
+    || fail "merge gate got wrong arguments without a worktree: $(cat "$home/gate.args")"
+  pass "merge gate receives - for the worktree when the task records none"
+}
+
+test_merge_gate_gets_dash_without_worktree
+
 test_completion_receipt_gates
 
 echo "all fm-dod-lib tests passed"

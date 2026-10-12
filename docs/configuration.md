@@ -1082,6 +1082,7 @@ The gate's own content is home-local policy (for example a per-home lane limit);
 The optional local, gitignored `config/merge-gate` is an executable that hard-blocks a task merge, for example until a proof tool such as done-done passes for the exact head being merged.
 When the file exists and is executable, `bin/fm-merge-local.sh` runs `config/merge-gate <task-id> <worktree> <head> -` right before its fast-forward, and `bin/fm-pr-merge.sh` runs `config/merge-gate <task-id> <worktree> <head> <pr-url>` right before the forge merge, both with `FM_HOME` set.
 `<worktree>` is the task's recorded worktree, or `-` when none is recorded, and `<head>` is the exact commit the merge will land.
+`-` means no worktree: a gate must treat it as a plain argument and must not `cd` into it (`cd -` changes to the previous directory, or fails with `OLDPWD not set`).
 A nonzero exit refuses the merge and prints the gate's output; an absent file leaves merge behavior unchanged, and a file that exists, including a dangling symlink, but is not executable refuses the merge and names the file.
 The gate runs after Firstmate's own merge checks, so it can only add a refusal, never waive one.
 The gate's content is home-local policy; [`fm_dod_merge_gate`](../bin/fm-dod-lib.sh) owns the invocation mechanics, and the README's "Proof and decision tools" section installs done-done-axi's shipped gate script.
