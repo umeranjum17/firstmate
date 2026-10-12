@@ -492,8 +492,15 @@ EOF
   assert_grep 'merge-gate is not executable' "$home/merge.out" "dangling merge gate was not named"
   [ "$(git -C "$repo" rev-parse HEAD)" = "$before" ] || fail "dangling gate landing changed main"
   rm "$home/config/merge-gate"
-  FM_HOME="$home" "$ROOT/bin/fm-merge-local.sh" receipt > "$home/merge.out" 2>&1 \
-    || fail "valid local landing failed: $(cat "$home/merge.out")"
+  printf '#!/usr/bin/env bash\nsleep 30\n' > "$home/config/merge-gate"
+  chmod +x "$home/config/merge-gate"
+  fm_run_timed 60 env FM_MERGE_GATE_TIMEOUT=1 FM_HOME="$home" "$ROOT/bin/fm-merge-local.sh" receipt > "$home/merge.out" 2>&1 \
+    && fail "local landing ignored a timed-out merge gate"
+  assert_grep 'merge refused: merge gate timed out after 1s' "$home/merge.out" "timed-out merge gate was not named"
+  [ "$(git -C "$repo" rev-parse HEAD)" = "$before" ] || fail "timed-out gate landing changed main"
+  rm "$home/config/merge-gate"
+  fm_run_timed 60 env FM_HOME="$home" "$ROOT/bin/fm-merge-local.sh" receipt > "$home/merge.out" 2>&1 \
+    || fail "valid local landing failed after a timed-out merge gate released the lock: $(cat "$home/merge.out")"
   [ "$(git -C "$repo" rev-parse HEAD)" = "$(git -C "$wt" rev-parse HEAD)" ] \
     || fail "valid local landing did not land proved candidate"
   # Legacy tasks remain compatible when no receipt exists.
