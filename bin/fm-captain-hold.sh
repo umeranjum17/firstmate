@@ -57,7 +57,8 @@
 # --until`, so a "revisit later" answer is stored as a date instead of a live
 # card.
 # When this home has armed bin/fm-procevent-signoff.sh, an undated `hold` also
-# raises a sign-off board card keyed by the task id; that adapter owns the card,
+# raises a sign-off board card keyed by this home's tag, the task id and the hold
+# stamp; that adapter owns the card,
 # and a card it cannot raise is a warning, never a failed hold.
 #
 # `answer` records the captain's exact words and resolves the call in the same

@@ -2155,6 +2155,7 @@ The adapter automates only the exact deterministic subset: anything needing judg
 
 The `signoff` adapter (`bin/fm-procevent-signoff.sh`) connects captain holds to a [sign-off](https://github.com/umeranjum17/sign-off) decision board, and it does nothing until a home runs its `arm` command.
 Armed, it binds itself to the keyed-answer intake above and registers one source whose child waits in `sign-off-axi wait` without waking firstmate.
+Arming is per home: a secondmate home arms itself, and a hold recorded in a home that is not armed raises no card.
 An answer saved on the board for a task this home still holds for the captain is captured, woken as an ordinary `check` wake, and fed to `bin/fm-captain-hold.sh answers`, so the person never copies the answer across by hand.
 While armed, `bin/fm-captain-hold.sh hold` also raises a board card for that hold, with the task title as its title and the hold reason as its subject; a card that cannot be raised prints a warning and never fails the hold, and a dated deferral gets no card.
 Each hold occurrence gets its own card, so a task held again after an answered card gets a new live one.

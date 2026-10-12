@@ -58,7 +58,7 @@ The runner then passes each captured result to that source's own adapter `answer
 This is generic across built-in adapters with an `answers` command, and the runner still wakes you to act on the result.
 External process-event bindings intentionally expose no answer operation and cannot feed the captain-answer intake.
 `captain-hold-lifecycle` owns when a binding is required and what the keys must be.
-A sign-off board is the one built-in answer source that binds itself: `bin/fm-procevent-signoff.sh arm` binds and registers it in one step, and from then on each undated captain hold also raises a board card keyed by its task id.
+A sign-off board is the one built-in answer source that binds itself: `bin/fm-procevent-signoff.sh arm` binds and registers it in one step, and from then on each undated captain hold also raises a board card keyed by this home's tag, its task id and its hold stamp.
 
 A configured remote secondmate reply source is armed and handled through `bin/fm-procevent-remote-reply.sh`.
 Its header owns exact commands, while the adapter owns cursor continuity, validated deduplicated status ingest, path-confined document fetch, acknowledgement, and re-arming after a good delta.

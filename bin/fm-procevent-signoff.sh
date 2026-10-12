@@ -15,6 +15,7 @@
 #            the keyed-answer intake (bin/fm-captain-hold.sh bind), and register
 #            the `signoff` source with bin/fm-procevent.sh. Nothing here runs
 #            until a home arms it, so an unarmed home behaves exactly as before.
+#            Arming is per home; secondmate homes arm themselves.
 # retire     Opt out: retire the registration and drop the binding.
 # raise      Called by `fm-captain-hold.sh hold` after a hold is recorded. While
 #            enabled it raises one board card keyed by this home's tag, the task
