@@ -94,7 +94,7 @@
 # (the reserved reconcile value, already closed, not held for the captain, unknown
 # close mode, or migrated hold ambiguous) and 1 for any other skip; the reserved
 # reconcile value is refused for good, reported once on
-# stderr, and is not a skip. `--source` is provenance text recorded in the
+# stderr, and counts as a permanent skip. `--source` is provenance text recorded in the
 # durable decision, never a behavior switch: this command has no per-channel
 # branch and no knowledge of chat, review decks, or any transport.
 # Legacy input: an optional positional origin (or a stored concrete-origin

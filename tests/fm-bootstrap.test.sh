@@ -1021,8 +1021,8 @@ SH
 }
 
 # GitHub auth only matters to a home that ships through GitHub: when every
-# project clone is registered local-only the probe stays quiet, and one clone
-# that ships by PR brings it back.
+# registered project is local-only the probe stays quiet, and one registered
+# project that ships by PR brings it back, even with no clone for it yet.
 test_gh_auth_probe_skips_all_local_only_homes() {
   local case_dir fakebin out
   case_dir="$TMP_ROOT/gh-auth-local-only"
@@ -1035,12 +1035,11 @@ test_gh_auth_probe_skips_all_local_only_homes() {
   out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
     FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_BOOTSTRAP_NETWORK=only "$ROOT/bin/fm-bootstrap.sh")
   assert_not_contains "$out" "NEEDS_GH_AUTH" "an all-local-only home was told to log in to GitHub"
-  mkdir -p "$case_dir/home/projects/site"
   printf -- '- site [direct-PR] - Umer site (added 2026-10-12)\n' >> "$case_dir/home/data/projects.md"
   out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
     FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_BOOTSTRAP_NETWORK=only "$ROOT/bin/fm-bootstrap.sh")
-  assert_contains "$out" "NEEDS_GH_AUTH" "a home with a PR project lost its GitHub auth check"
-  pass "bootstrap: the GitHub auth probe is skipped only when every clone is local-only"
+  assert_contains "$out" "NEEDS_GH_AUTH" "a home with a PR project and no clone lost its GitHub auth check"
+  pass "bootstrap: the GitHub auth probe is skipped only when every registered project is local-only"
 }
 
 test_network_sweeps_recheck_lock_ownership() {

@@ -304,19 +304,25 @@ fleet_sync_origin_backed_project_count() {
   echo "$count"
 }
 
-# 0 when at least one project clone is present and every one is registered
-# local-only, so no project needs GitHub and the sign-in probe has nothing to
-# protect. bin/fm-project-mode.sh owns the registry reading; an unregistered
-# clone resolves to no-mistakes and keeps the probe.
+# 0 when at least one project is registered and every registered project is
+# local-only with a clone present, and no clone is unregistered, so no project
+# needs GitHub and the sign-in probe has nothing to protect. A registered project
+# with no clone keeps the probe. bin/fm-project-mode.sh owns the posture lookup;
+# an unregistered clone resolves to no-mistakes and keeps the probe.
 every_project_local_only() {
-  local proj mode seen=0
-  [ -d "$PROJECTS" ] || return 1
+  local proj name mode seen=0
+  [ -f "$DATA/projects.md" ] || return 1
   for proj in "$PROJECTS"/*; do
     [ -d "$proj" ] || continue
     mode=$(FM_HOME="$FM_HOME" FM_DATA_OVERRIDE="$DATA" "$SCRIPT_DIR/fm-project-mode.sh" "${proj##*/}" 2>/dev/null) || return 1
     [ "${mode%% *}" = local-only ] || return 1
-    seen=1
   done
+  while IFS= read -r name; do
+    [ -d "$PROJECTS/$name" ] || return 1
+    mode=$(FM_HOME="$FM_HOME" FM_DATA_OVERRIDE="$DATA" "$SCRIPT_DIR/fm-project-mode.sh" "$name" 2>/dev/null) || return 1
+    [ "${mode%% *}" = local-only ] || return 1
+    seen=1
+  done < <(awk '$1 == "-" && $2 != "" { print $2 }' "$DATA/projects.md")
   [ "$seen" = 1 ]
 }
 
