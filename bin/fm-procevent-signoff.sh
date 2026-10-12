@@ -19,23 +19,28 @@
 # retire     Opt out: retire the registration and drop the binding.
 # enabled    Exit 0 only while the source is registered in this home.
 # raise      Called by `fm-captain-hold.sh hold` after a hold is recorded. While
-#            enabled it raises one board card keyed by the task id, with the
-#            hold reason as its `about` and the given close mode; otherwise it is
-#            a silent no-op. A failure exits nonzero with sign-off's own output;
-#            the caller warns and keeps the hold.
+#            enabled it raises one board card keyed by this home's tag and the
+#            task id, with the hold reason as its `about` and the given close
+#            mode; otherwise it is a silent no-op. A failure, including a missing
+#            sign-off-axi, exits nonzero with sign-off's own output; the caller
+#            warns and keeps the hold.
 # poll       The blocking child the runner executes; never run it in a
-#            conversational turn. It prints one line per deliverable answer,
-#            `<task-id>\t<answer>\t<label>\t<close>\t<at>`, and exits 0. With
-#            nothing deliverable it blocks in `sign-off-axi wait` for up to
-#            --timeout seconds (600 by default) and exits 75 with no output, the
-#            runner's clean empty wait, so `relisten` polls again.
+#            conversational turn. It prints one JSON object per line for each
+#            deliverable answer, `{"key","answer","label","close","at"}` with the
+#            bare task id as key, and exits 0. With nothing deliverable it blocks
+#            in `sign-off-axi wait` for up to --timeout seconds (600 by default)
+#            and exits 75 with no output, the runner's clean empty wait, so
+#            `relisten` polls again.
 # answers    This adapter's half of the keyed-answer contract in
-#            bin/fm-procevent.sh: print `<task-id>\t<answer>\t<label>\t<close>`
-#            for each captured line and record it as delivered.
+#            bin/fm-procevent.sh: read the captured poll lines and print
+#            `<task-id>\t<answer>\t<label>\t<close>` for each, with tabs and
+#            newlines inside the answer or label turned into spaces (the intake
+#            stores them that way too), and record it as delivered.
 #
-# An answer is deliverable only when its key is a task this home still holds
-# for the captain (`fm-captain-hold.sh open --identity`), it was saved at or
-# after that hold's `Captain hold set:` stamp, and this key and save time were
+# An answer is deliverable only when its key carries this home's tag, its bare
+# task id is one this home still holds for the captain (`fm-captain-hold.sh
+# open --identity`), it was saved at or after that hold's `Captain hold set:`
+# stamp, and this key and save time were
 # not already delivered. The open hold is the cursor: an answer saved while no
 # poll ran is still found on the next round, an old answer never resolves a
 # re-held task, and an intake that refuses an answer does not wake the fleet on
@@ -43,8 +48,11 @@
 # Firstmate's. What an answer DOES is owned by the keyed-answer intake in
 # bin/fm-captain-hold.sh; this adapter maps nothing and closes nothing.
 #
-# sign-off-axi runs from PATH when installed and otherwise through
-# `npx -y sign-off-axi`. Cards and answers use sign-off's default board
+# Board keys are `fm-<tag>-<task-id>`, where <tag> is a stable digest of FM_HOME,
+# so the default board, shared by every home on the machine, never hands one
+# home another home's answer. sign-off-axi must be on PATH: without it `arm`
+# refuses, and `raise` prints an install hint and fails, so a hold is kept and
+# only warns. Cards and answers use sign-off's default board
 # (~/.sign-off/decisions.json), the one `sign-off-axi open` shows.
 # ponytail: one default board per machine; add a board option when a home needs its own.
 # sign-off-axi has no command to withdraw a card, so a hold answered through
@@ -77,11 +85,13 @@ usage() {
 die() { printf 'error: %s\n' "$1" >&2; exit 1; }
 
 signoff() {
-  if command -v sign-off-axi >/dev/null 2>&1; then
-    sign-off-axi "$@"
-  else
-    npx -y sign-off-axi "$@"
-  fi
+  command -v sign-off-axi >/dev/null 2>&1 \
+    || { printf 'sign-off-axi is not on PATH; install it from https://github.com/umeranjum17/sign-off\n' >&2; return 127; }
+  sign-off-axi "$@"
+}
+
+home_key_prefix() {
+  printf 'fm-%s-' "$(printf '%s' "$FM_HOME" | cksum | awk '{printf "%08x", $1}')"
 }
 
 cmd_enabled() { [ -f "$(fm_procevent_registry_dir "$STATE")/$SOURCE_ID.source" ]; }
@@ -89,7 +99,7 @@ cmd_enabled() { [ -f "$(fm_procevent_registry_dir "$STATE")/$SOURCE_ID.source" ]
 cmd_arm() {
   local out
   out=$(signoff --version 2>&1) \
-    || die "sign-off-axi does not run here (install it, or check npx): $out"
+    || die "sign-off-axi does not run here: $out"
   "$SCRIPT_DIR/fm-captain-hold.sh" bind "$SOURCE_ID" >/dev/null || die "could not bind $SOURCE_ID to the keyed-answer intake"
   "$SCRIPT_DIR/fm-procevent.sh" register signoff "$SOURCE_ID" -- "$SCRIPT_DIR/fm-procevent-signoff.sh" poll || exit 1
   printf 'armed: %s\nsign-off-axi: %s\n' "$SOURCE_ID" "$out"
@@ -104,7 +114,7 @@ cmd_raise() {
   [ "$#" -eq 4 ] || usage
   local out
   cmd_enabled || return 0
-  out=$(signoff raise --key "$1" --title "$2" --about "$3" --close "$4" 2>&1) || {
+  out=$(signoff raise --key "$(home_key_prefix)$1" --title "$2" --about "$3" --close "$4" 2>&1) || {
     printf 'sign-off-axi raise failed: %s\n' "$out" >&2
     return 1
   }
@@ -117,18 +127,24 @@ cmd_raise() {
   printf 'sign-off card on the board for %s\n' "$1" >&2
 }
 
-# Print every deliverable answer as `key\tanswer\tlabel\tclose\tat`.
+# Print every deliverable answer as one JSON object per line, keyed by bare task id.
 deliverable() {
-  local json key answer label close at identity
+  local json prefix line key answer at identity
+  prefix=$(home_key_prefix)
   json=$(signoff answers --json 2>/dev/null) || return 0
   printf '%s\n' "$json" \
-    | jq -r 'to_entries[] | [.key, .value.answer, .value.label, .value.close, .value.at] | @tsv' 2>/dev/null \
-    | while IFS=$'\t' read -r key answer label close at; do
+    | jq -c --arg prefix "$prefix" '
+        to_entries[] | select(.key | startswith($prefix))
+        | {key: .key[($prefix | length):], answer: (.value.answer // ""), label: (.value.label // ""), close: (.value.close // ""), at: (.value.at // "")}' 2>/dev/null \
+    | while IFS= read -r line; do
+        key=$(jq -r '.key' <<<"$line")
+        answer=$(jq -r '.answer' <<<"$line")
+        at=$(jq -r '.at' <<<"$line")
         fm_procevent_source_id_valid "$key" && [ -n "$answer" ] && [ -n "$at" ] || continue
         [ ! -f "$DELIVERED" ] || ! grep -qxF "$key"$'\t'"$at" "$DELIVERED" || continue
         identity=$("$SCRIPT_DIR/fm-captain-hold.sh" open "$key" --identity 2>/dev/null) || continue
         [[ ! "$at" < "${identity%%#*}" ]] || continue
-        printf '%s\t%s\t%s\t%s\t%s\n' "$key" "$answer" "$label" "$close" "$at"
+        printf '%s\n' "$line"
       done
 }
 
@@ -154,11 +170,14 @@ cmd_poll() {
 }
 
 cmd_answers() {
-  local file=${1-} key answer label close at
+  local file=${1-} line key answer at
   [ -f "$file" ] || die "result file does not exist: $file"
-  while IFS=$'\t' read -r key answer label close at; do
+  while IFS= read -r line; do
+    key=$(jq -r '.key' <<<"$line")
+    answer=$(jq -r '.answer' <<<"$line")
+    at=$(jq -r '.at' <<<"$line")
     fm_procevent_source_id_valid "$key" && [ -n "$answer" ] && [ -n "$at" ] || continue
-    printf '%s\t%s\t%s\t%s\n' "$key" "$answer" "$label" "$close"
+    jq -r '[.key, .answer, .label, .close] | map(gsub("[\n\r\t]"; " ")) | join("\t")' <<<"$line"
     printf '%s\t%s\n' "$key" "$at" >> "$DELIVERED"
   done < "$file"
 }

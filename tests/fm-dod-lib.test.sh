@@ -480,6 +480,12 @@ EOF
     || fail "merge gate got wrong arguments: $(cat "$home/gate.args")"
   [ "$(git -C "$repo" rev-parse HEAD)" = "$before" ] || fail "gate-refused landing changed main"
   rm "$home/config/merge-gate"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$home/config/merge-gate"
+  FM_HOME="$home" "$ROOT/bin/fm-merge-local.sh" receipt > "$home/merge.out" 2>&1 \
+    && fail "local landing ignored a non-executable merge gate"
+  assert_grep 'merge-gate is not executable' "$home/merge.out" "non-executable merge gate was not named"
+  [ "$(git -C "$repo" rev-parse HEAD)" = "$before" ] || fail "non-executable gate landing changed main"
+  rm "$home/config/merge-gate"
   FM_HOME="$home" "$ROOT/bin/fm-merge-local.sh" receipt > "$home/merge.out" 2>&1 \
     || fail "valid local landing failed: $(cat "$home/merge.out")"
   [ "$(git -C "$repo" rev-parse HEAD)" = "$(git -C "$wt" rev-parse HEAD)" ] \

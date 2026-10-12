@@ -236,7 +236,7 @@ To make the merge itself ask done-done, add an executable `config/merge-gate` ([
 set -eu
 id=$1 worktree=$2 head=$3 pr=$4
 dd() { npx -y --allow-git=all github:umeranjum17/done-done "$@"; }
-cd "$worktree"
+[ "$worktree" = - ] || cd "$worktree"
 if [ "$pr" = - ]; then
   dd check --from "$FM_HOME/data/$id/checks.md"
 else
@@ -248,7 +248,7 @@ dd receipt --verify "$head"
 **[sign-off](https://github.com/umeranjum17/sign-off) - answer decisions with one click.**
 Install its skill with `npx skills add umeranjum17/sign-off --skill sign-off-axi`.
 Run `bin/fm-procevent-signoff.sh arm` once in a home: from then on every task held for you raises a card on the sign-off board, and your click comes back to Firstmate as the answer to that hold ([details](docs/configuration.md#process-to-event-sources-stateprocevent)).
-The adapter runs `sign-off-axi` from your PATH, or through `npx -y sign-off-axi` when it is not installed; open the board with `sign-off-axi open`, and turn the link off with `bin/fm-procevent-signoff.sh retire`.
+The adapter needs `sign-off-axi` on your PATH; open the board with `sign-off-axi open`, and turn the link off with `bin/fm-procevent-signoff.sh retire`.
 
 **[learn-from-mistakes](https://github.com/umeranjum17/learn-from-mistakes) - stop repeated mistakes.**
 Install its skill with `npx skills add umeranjum17/learn-from-mistakes --skill learn-from-mistakes -g`.
