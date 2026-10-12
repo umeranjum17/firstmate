@@ -92,7 +92,7 @@
 # close mode both match the newest record is reported `closed:` and is a no-op;
 # a mode mismatch is skipped. The command exits 3 when every skip was permanent
 # (the reserved reconcile value, already closed, not held for the captain, unknown
-# close mode, or migrated-hold scan refused) and 1 for any other skip; the reserved
+# close mode, or migrated hold ambiguous) and 1 for any other skip; the reserved
 # reconcile value is refused for good, reported once on
 # stderr, and is not a skip. `--source` is provenance text recorded in the
 # durable decision, never a behavior switch: this command has no per-channel
@@ -701,7 +701,7 @@ resolve_migrated_entry() {  # <origin-or-empty> <entry>
       *)
         printf 'fm-captain-hold: the migrated hold of %s is ambiguous: %s rows carry its marker line (identities tried: %s)\n' \
           "$entry" "$count" "$(printf '%s' "$CAPTAIN_MIGRATION_IDENTITIES" | tr ' ' ',')" >&2
-        return 2
+        return 3
         ;;
     esac
   fi
@@ -759,7 +759,7 @@ resolve_entry() {  # <origin-or-empty> <entry>; prints "<id> <how>" or fails
   migrated=$(resolve_migrated_entry "$origin" "$entry") || rc=$?
   case "$rc" in
     0) printf '%s' "$migrated"; return 0 ;;
-    2) return 2 ;;
+    2 | 3) return "$rc" ;;
     124) return 124 ;;
   esac
   if [ -n "$origin" ] && [ "$origin" != "$BINDING_ANY" ]; then
@@ -1385,10 +1385,11 @@ command_answers() {
     resolve_rc=0
     id=$(resolve_entry "$origin" "$key" 2>"$err") || resolve_rc=$?
     id=${id%% *}
-    if [ "$resolve_rc" = 2 ]; then
+    if [ "$resolve_rc" = 2 ] || [ "$resolve_rc" = 3 ]; then
       reason=$(tr -d '\n' < "$err")
       printf 'skipped: %s (migrated-hold scan refused%s)\n' "$key" "${reason:+: $reason}"
-      skipped=$((skipped + 1)); permanent=$((permanent + 1))
+      skipped=$((skipped + 1))
+      if [ "$resolve_rc" = 3 ]; then permanent=$((permanent + 1)); fi
       continue
     fi
     if [ "$resolve_rc" -ne 0 ]; then

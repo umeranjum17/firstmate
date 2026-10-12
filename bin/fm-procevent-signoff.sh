@@ -42,9 +42,9 @@
 #            this result: it records each answer in the captured poll lines as
 #            delivered. The intake exits 0 when every answer was taken, and 3 when
 #            every skip is permanent (the reserved reconcile value, already closed,
-#            not held for the captain, unknown close mode, migrated-hold scan
-#            refused), so only a transient skip or failure leaves an answer
-#            undelivered.
+#            not held for the captain, unknown close mode, migrated hold ambiguous),
+#            so only a transient skip or failure leaves an answer undelivered; a
+#            migrated-hold scan that cannot read its graph is transient.
 #
 # An answer is deliverable only when its key carries this home's tag, its bare
 # task id is one this home still holds for the captain (`fm-captain-hold.sh

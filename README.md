@@ -225,6 +225,8 @@ cat "$(npm root -g)/done-done-axi/integrations/firstmate/brief-include.md" >> "$
 cp "$(npm root -g)/done-done-axi/integrations/firstmate/merge-gate" "$FM_HOME/config/merge-gate"
 ```
 
+Run the `cat >>` line once: each run appends the brief include again, duplicating it in every brief.
+
 - `config/brief-include.md` is appended to every ship and scout brief, so every worker proves its change with done-done ([details](docs/configuration.md#home-brief-include-configbrief-includemd)).
 - `config/merge-gate` runs `done-done check` against the task's PR, or its `data/<task-id>/checks.md` when there is no PR, with the default-branch rules, then `receipt --verify <head>`. A nonzero exit refuses the merge and shows its output ([details](docs/configuration.md#merge-gate-configmerge-gate)). Run `git fetch origin` first, since the gate reads local origin refs.
 
