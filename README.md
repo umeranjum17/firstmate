@@ -210,6 +210,51 @@ Firstmate's skills live in two separate places with different audiences:
   Today that is `skills/stow`, a generic session-knowledge-sweep skill that routes findings by explicit instruction first, then existing local conventions, then a private `.stow-notes.md` fallback, and curates tiered entries through decay, local archival, and user-approved on-demand offload proposals.
   It intentionally shares no code with the firstmate-internal `.agents/skills/stow` it is named after, so the two can evolve independently.
 
+## Proof and decision tools
+
+Three companion tools fit Firstmate without changing it, and each also works with no Firstmate at all.
+Every hook below is optional and does nothing until you add it.
+
+**[done-done](https://github.com/umeranjum17/done-done) - proof that "done" is real.**
+Install its skill with `npx skills add umeranjum17/done-done --skill done-done -g`.
+To have every worker prove its change, put the standing instruction in `config/brief-include.md`, which Firstmate appends to every ship and scout brief ([details](docs/configuration.md#home-brief-include-configbrief-includemd)):
+
+```md
+## Proof with done-done
+Before you report done, load the done-done skill and follow it.
+- Commit your change, then run a done-done journey that drives the real app.
+- Write a `## Checks` block in the PR body, or for local-only work in `data/<task-id>/checks.md` under the supervising home, citing the run's files.
+- `done-done check --from <that PR URL or file>` must exit 0; then record it with `done-done receipt --from <same>`.
+Never report done on a failed or inconclusive check; report the finding instead.
+```
+
+To make the merge itself ask done-done, add an executable `config/merge-gate` ([details](docs/configuration.md#merge-gate-configmerge-gate)); a nonzero exit refuses the merge and shows its output:
+
+```sh
+#!/usr/bin/env bash
+# config/merge-gate <task-id> <worktree> <head> <pr-url|->
+set -eu
+id=$1 worktree=$2 head=$3 pr=$4
+dd() { npx -y --allow-git=all github:umeranjum17/done-done "$@"; }
+cd "$worktree"
+if [ "$pr" = - ]; then
+  dd check --from "$FM_HOME/data/$id/checks.md"
+else
+  dd check --from "$pr" --trusted-ref "$(git rev-parse --abbrev-ref origin/HEAD)"
+fi
+dd receipt --verify "$head"
+```
+
+**[sign-off](https://github.com/umeranjum17/sign-off) - answer decisions with one click.**
+Install its skill with `npx skills add umeranjum17/sign-off --skill sign-off-axi`.
+Run `bin/fm-procevent-signoff.sh arm` once in a home: from then on every task held for you raises a card on the sign-off board, and your click comes back to Firstmate as the answer to that hold ([details](docs/configuration.md#process-to-event-sources-stateprocevent)).
+The adapter runs `sign-off-axi` from your PATH, or through `npx -y sign-off-axi` when it is not installed; open the board with `sign-off-axi open`, and turn the link off with `bin/fm-procevent-signoff.sh retire`.
+
+**[learn-from-mistakes](https://github.com/umeranjum17/learn-from-mistakes) - stop repeated mistakes.**
+Install its skill with `npx skills add umeranjum17/learn-from-mistakes --skill learn-from-mistakes -g`.
+Point it at the records your fleet already keeps, such as a defect log or failed pipeline steps, and it counts the causes that keep coming back and proposes changes that cite the real records.
+It needs no Firstmate hook.
+
 ## Documentation
 
 - [docs/architecture.md](docs/architecture.md) - maintainer architecture for the crew, supervision, worktrees, secondmates, and project modes.

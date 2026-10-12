@@ -56,6 +56,9 @@
 # `--until` records the captain's own deferral date through `tasks-axi hold
 # --until`, so a "revisit later" answer is stored as a date instead of a live
 # card.
+# When this home has armed bin/fm-procevent-signoff.sh, an undated `hold` also
+# raises a sign-off board card keyed by the task id; that adapter owns the card,
+# and a card it cannot raise is a warning, never a failed hold.
 #
 # `answer` records the captain's exact words and resolves the call in the same
 # act. It requires a non-empty captain decision file of at most 8192 bytes and
@@ -902,7 +905,7 @@ verify_entry_durable() {  # <origin-or-empty> <entry>; prints "<id> <how> <origi
 
 command_hold() {
   local id=${1:-} title='' reason='' repo='' origin='' until='' show state existing_title body='' hold_kind hold_set occurrence
-  local existing_hold_kind='' existing_held='' preserve_hold_set=0 stored_reason previous_origin='' hold_status=0
+  local existing_hold_kind='' existing_held='' preserve_hold_set=0 stored_reason previous_origin='' hold_status=0 card_close=release
   [ "$#" -ge 1 ] || { usage >&2; exit 2; }
   shift
   while [ "$#" -gt 0 ]; do
@@ -952,6 +955,7 @@ command_hold() {
     fi
   else
     [ -n "$title" ] || fail "--title is required to create task $id"
+    card_close='done'
     validate_one_line title "$title"
     if [ -z "$repo" ] && [ -n "$origin" ] && [ -f "$STATE/$origin.meta" ]; then
       repo=$(meta_value "$STATE/$origin.meta" project)
@@ -1008,6 +1012,14 @@ command_hold() {
   [ -n "$(body_hold_set_timestamp "$(show_field_value "$show" body)")" ] \
     || fail "task $id lost its hold-set stamp while being held"
   publish_parent_hold "$id" "$occurrence" needs-decision "$reason"
+  # Optional sign-off card: a no-op unless bin/fm-procevent-signoff.sh is armed
+  # here. A created question closes on answer, held work is released; a dated
+  # deferral gets no live card, and a card failure never fails the hold.
+  if [ -z "$until" ]; then
+    release_task_control_lock
+    "$SCRIPT_DIR/fm-procevent-signoff.sh" raise "$id" "$(show_field_value "$show" title)" "$reason" "$card_close" \
+      || printf 'warning: task %s is held, but no sign-off card was raised for it\n' "$id" >&2
+  fi
   printf '%s\n' "$id"
 }
 

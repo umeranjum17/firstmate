@@ -1077,6 +1077,15 @@ When the file exists and is executable, `bin/fm-spawn.sh` runs `config/spawn-gat
 Secondmate spawns and relaunches never run it, and an absent file leaves spawn behavior unchanged.
 The gate's own content is home-local policy (for example a per-home lane limit); [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the invocation mechanics.
 
+## Merge gate (config/merge-gate)
+
+The optional local, gitignored `config/merge-gate` is an executable that hard-blocks a task merge, for example until a proof tool such as done-done passes for the exact head being merged.
+When the file exists and is executable, `bin/fm-merge-local.sh` runs `config/merge-gate <task-id> <worktree> <head> -` right before its fast-forward, and `bin/fm-pr-merge.sh` runs `config/merge-gate <task-id> <worktree> <head> <pr-url>` right before the forge merge, both with `FM_HOME` set.
+`<worktree>` is the task's recorded worktree, or `-` when none is recorded, and `<head>` is the exact commit the merge will land.
+A nonzero exit refuses the merge and prints the gate's output; an absent or non-executable file leaves merge behavior unchanged.
+The gate runs after Firstmate's own merge checks, so it can only add a refusal, never waive one.
+The gate's content is home-local policy; [`fm_dod_merge_gate`](../bin/fm-dod-lib.sh) owns the invocation mechanics, and the README's "Proof and decision tools" section shows a done-done gate.
+
 ## Home brief include (config/brief-include.md)
 
 The optional gitignored `config/brief-include-shared.md` and home-local `config/brief-include.md` add standing worker instructions to every ship and scout brief.
@@ -2139,6 +2148,14 @@ A repo update that fast-forwards an in-repo action's bytes in place would otherw
 
 Every failure path - a mutated spec or action executable, a condition error past its budget, an expired deadline, a failed action, or an earlier fire whose outcome was never captured - produces a terminal captured outcome that wakes firstmate rather than a silent retry, and a durable single-fire marker claimed before the action makes restarts and re-polls unable to fire it twice.
 The adapter automates only the exact deterministic subset: anything needing judgment, and anything destructive, irreversible, or security-sensitive, keeps the ordinary check-fires-then-firstmate-decides flow, and the adapter's header and `--help` own its commands, flags, and outcome document.
+
+**Sign-off board answers and hold cards**
+
+The `signoff` adapter (`bin/fm-procevent-signoff.sh`) connects captain holds to a [sign-off](https://github.com/umeranjum17/sign-off) decision board, and it does nothing until a home runs its `arm` command.
+Armed, it binds itself to the keyed-answer intake above and registers one source whose child waits in `sign-off-axi wait` without waking firstmate.
+An answer saved on the board for a task this home still holds for the captain is captured, woken as an ordinary `check` wake, and fed to `bin/fm-captain-hold.sh answers`, so the person never copies the answer across by hand.
+While armed, `bin/fm-captain-hold.sh hold` also raises a board card keyed by the task id, with the task title as its title and the hold reason as its subject; a card that cannot be raised prints a warning and never fails the hold, and a dated deferral gets no card.
+The adapter's header owns its commands, the deliverable-answer rule, and its limits, including that sign-off cannot withdraw a card for a hold answered through another channel; `retire` turns it off again.
 
 **Capture and publish results**
 

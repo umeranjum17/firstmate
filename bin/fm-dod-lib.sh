@@ -156,6 +156,22 @@ fm_dod_receipt_accept() {  # <state> <id> <meta> <candidate-head>
   return 1
 }
 
+# The optional home merge gate (docs/configuration.md "Merge gate"). When
+# <config>/merge-gate exists and is executable, both landing entrypoints run
+# `merge-gate <task-id> <worktree> <head> <pr-url|->` with FM_HOME set, after
+# their own live checks and before the merge command; a nonzero exit refuses
+# the merge with the gate's output. An absent file changes nothing.
+fm_dod_merge_gate() {  # <config-dir> <home> <id> <meta> <candidate-head> <pr-url|->
+  local gate=$1/merge-gate worktree out rc=0
+  [ -f "$gate" ] && [ -x "$gate" ] || return 0
+  worktree=$(fm_dod_meta_value "$4" worktree)
+  out=$(FM_HOME="$2" "$gate" "$3" "${worktree:--}" "$5" "$6" 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || return 0
+  [ -z "$out" ] || printf '%s\n' "$out"
+  echo "merge refused by config/merge-gate (exit $rc)"
+  return 1
+}
+
 fm_brief_worker_role() {  # <state-dir> <task-id> <code-root>
   local state=$1 task_id=$2 root=$3
   cat <<'EOF'

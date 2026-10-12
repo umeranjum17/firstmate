@@ -463,6 +463,23 @@ test_completion_receipt_gates() {
   grep -v '^receipt_required=' "$meta" > "$home/meta.new"
   printf 'receipt_required=1\n' >> "$home/meta.new"
   mv "$home/meta.new" "$meta"
+  # The optional home merge gate sees the proved candidate and refuses with its
+  # own words; a non-executable gate file is not a gate.
+  cat > "$home/config/merge-gate" <<'EOF'
+#!/usr/bin/env bash
+printf '%s|%s\n' "$FM_HOME" "$*" > "$FM_HOME/gate.args"
+echo "done-done: proof missing for this head"
+exit 3
+EOF
+  chmod +x "$home/config/merge-gate"
+  FM_HOME="$home" "$ROOT/bin/fm-merge-local.sh" receipt > "$home/merge.out" 2>&1 \
+    && fail "local landing ignored a refusing merge gate"
+  assert_grep 'done-done: proof missing for this head' "$home/merge.out" "merge gate output was not shown"
+  assert_grep 'merge refused by config/merge-gate (exit 3)' "$home/merge.out" "merge gate refusal was not named"
+  [ "$(cat "$home/gate.args")" = "$home|receipt $wt $(git -C "$wt" rev-parse HEAD) -" ] \
+    || fail "merge gate got wrong arguments: $(cat "$home/gate.args")"
+  [ "$(git -C "$repo" rev-parse HEAD)" = "$before" ] || fail "gate-refused landing changed main"
+  chmod -x "$home/config/merge-gate"
   FM_HOME="$home" "$ROOT/bin/fm-merge-local.sh" receipt > "$home/merge.out" 2>&1 \
     || fail "valid local landing failed: $(cat "$home/merge.out")"
   [ "$(git -C "$repo" rev-parse HEAD)" = "$(git -C "$wt" rev-parse HEAD)" ] \
@@ -471,7 +488,7 @@ test_completion_receipt_gates() {
   grep -v '^receipt_required=' "$meta" > "$home/state/legacy.meta"
   fm_dod_receipt_accept "$home/state" legacy "$home/state/legacy.meta" "$head" \
     || fail "legacy absent receipt refused"
-  pass "durable completion evidence binds candidate, mode and incarnation and gates local landing"
+  pass "durable completion evidence and the optional merge gate bind candidate, mode and incarnation and gate local landing"
 }
 
 
