@@ -91,7 +91,8 @@
 # and feeds nothing. A replayed delivery whose answer digest and requested
 # close mode both match the newest record is reported `closed:` and is a no-op;
 # a mode mismatch is skipped. The command exits nonzero when any key was
-# skipped. `--source` is provenance text recorded in the
+# skipped; the reserved reconcile value is refused for good, reported once on
+# stderr, and is not a skip. `--source` is provenance text recorded in the
 # durable decision, never a behavior switch: this command has no per-channel
 # branch and no knowledge of chat, review decks, or any transport.
 # Legacy input: an optional positional origin (or a stored concrete-origin
@@ -1365,8 +1366,7 @@ command_answers() {
     [ -n "$answer" ] || continue
     label=$(sanitize_field "${label:-}")
     if [ "$answer" = "$RECONCILE_VALUE" ]; then
-      printf 'refused: %s (reconcile requests require a bound captured source)\n' "$key"
-      skipped=$((skipped + 1))
+      printf 'refused: %s (reconcile requests require a bound captured source)\n' "$key" >&2
       continue
     fi
     release_flag=''

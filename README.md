@@ -215,35 +215,18 @@ Firstmate's skills live in two separate places with different audiences:
 Three companion tools fit Firstmate without changing it, and each also works with no Firstmate at all.
 Every hook below is optional and does nothing until you add it.
 
-**[done-done](https://github.com/umeranjum17/done-done) - proof that "done" is real.**
-Install its skill with `npx skills add umeranjum17/done-done --skill done-done -g`.
-To have every worker prove its change, put the standing instruction in `config/brief-include.md`, which Firstmate appends to every ship and scout brief ([details](docs/configuration.md#home-brief-include-configbrief-includemd)):
-
-```md
-## Proof with done-done
-Before you report done, load the done-done skill and follow it.
-- Commit your change, then run a done-done journey that drives the real app.
-- Write a `## Checks` block in the PR body, or for local-only work in `data/<task-id>/checks.md` under the supervising home, citing the run's files.
-- `done-done check --from <that PR URL or file>` must exit 0; then record it with `done-done receipt --from <same>`.
-Never report done on a failed or inconclusive check; report the finding instead.
-```
-
-To make the merge itself ask done-done, add an executable `config/merge-gate` ([details](docs/configuration.md#merge-gate-configmerge-gate)); a nonzero exit refuses the merge and shows its output:
+**[done-done](https://github.com/umeranjum17/done-done-axi) - proof that "done" is real.**
+Install it and its Firstmate files with these commands:
 
 ```sh
-#!/usr/bin/env bash
-# config/merge-gate <task-id> <worktree> <head> <pr-url|->
-set -eu
-id=$1 worktree=$2 head=$3 pr=$4
-dd() { npx -y --allow-git=all github:umeranjum17/done-done "$@"; }
-[ "$worktree" = - ] || cd "$worktree"
-if [ "$pr" = - ]; then
-  dd check --from "$FM_HOME/data/$id/checks.md"
-else
-  dd check --from "$pr" --trusted-ref "$(git rev-parse --abbrev-ref origin/HEAD)"
-fi
-dd receipt --verify "$head"
+npx skills add umeranjum17/done-done-axi --skill done-done -g -a claude-code -y
+npm install -g --allow-git=all github:umeranjum17/done-done-axi
+cat "$(npm root -g)/done-done-axi/integrations/firstmate/brief-include.md" >> "$FM_HOME/config/brief-include.md"
+cp "$(npm root -g)/done-done-axi/integrations/firstmate/merge-gate" "$FM_HOME/config/merge-gate"
 ```
+
+- `config/brief-include.md` is appended to every ship and scout brief, so every worker proves its change with done-done ([details](docs/configuration.md#home-brief-include-configbrief-includemd)).
+- `config/merge-gate` runs `done-done check` against the task's PR, or its `data/<task-id>/checks.md` when there is no PR, with the default-branch rules, then `receipt --verify <head>`. A nonzero exit refuses the merge and shows its output ([details](docs/configuration.md#merge-gate-configmerge-gate)). Run `git fetch origin` first, since the gate reads local origin refs.
 
 **[sign-off](https://github.com/umeranjum17/sign-off) - answer decisions with one click.**
 Install its skill with `npx skills add umeranjum17/sign-off --skill sign-off-axi`.

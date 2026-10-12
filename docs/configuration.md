@@ -1084,7 +1084,7 @@ When the file exists and is executable, `bin/fm-merge-local.sh` runs `config/mer
 `<worktree>` is the task's recorded worktree, or `-` when none is recorded, and `<head>` is the exact commit the merge will land.
 A nonzero exit refuses the merge and prints the gate's output; an absent file leaves merge behavior unchanged, and a file that exists, including a dangling symlink, but is not executable refuses the merge and names the file.
 The gate runs after Firstmate's own merge checks, so it can only add a refusal, never waive one.
-The gate's content is home-local policy; [`fm_dod_merge_gate`](../bin/fm-dod-lib.sh) owns the invocation mechanics, and the README's "Proof and decision tools" section shows a done-done gate.
+The gate's content is home-local policy; [`fm_dod_merge_gate`](../bin/fm-dod-lib.sh) owns the invocation mechanics, and the README's "Proof and decision tools" section installs done-done-axi's shipped gate script.
 
 ## Home brief include (config/brief-include.md)
 
@@ -2158,7 +2158,7 @@ While armed, `bin/fm-captain-hold.sh hold` also raises a board card for that hol
 Each hold occurrence gets its own card, so a task held again after an answered card gets a new live one.
 The adapter needs `sign-off-axi` on PATH: `arm` refuses without it, and the card attempt prints an install hint.
 Board keys carry a digest of this home's `FM_HOME` and the hold's stamp, so the machine's one shared board never delivers another home's answer or an earlier card's answer to this one.
-An answer is marked delivered only after the keyed-answer intake accepts it, so an answer the intake refuses is offered again on the next round.
+An answer is marked delivered once the keyed-answer intake has taken it or refused it for good (the reserved `reconcile` value, reported once); a skip or failure leaves it to be offered again on the next round.
 The adapter's header owns its commands, the deliverable-answer rule, and its limits, including that sign-off cannot withdraw a card for a hold answered through another channel; `retire` turns it off again.
 
 **Capture and publish results**

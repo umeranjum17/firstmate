@@ -468,7 +468,7 @@ feed_keyed_answers() {  # <adapter> <source-id> <result-file>
   seq=$(fm_procevent_result_sequence "$result") || return 1
   "$script" answers "$result" 2>/dev/null \
     | "$SCRIPT_DIR/fm-captain-hold.sh" answers "$origin" \
-        --source "the captured result $id sequence $seq" >/dev/null 2>&1 || return 1
+        --source "the captured result $id sequence $seq" >/dev/null || return 1
   "$script" ack "$result" >/dev/null 2>&1
   return 0
 }

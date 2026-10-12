@@ -30,8 +30,9 @@
 #            conversational turn. It prints one JSON object per line for each
 #            deliverable answer, `{"key","answer","label","close","at"}` with the
 #            bare task id as key, and exits 0. With nothing deliverable it blocks
-#            in `sign-off-axi wait` for up to 600 seconds and exits 75 with no
-#            output, the runner's clean empty wait, so `relisten` polls again.
+#            in `sign-off-axi wait` for up to 600 seconds, rests when still
+#            nothing is deliverable, and exits 75 with no output, the runner's
+#            clean empty wait, so `relisten` polls again.
 # answers    This adapter's half of the keyed-answer contract in
 #            bin/fm-procevent.sh: read the captured poll lines and print
 #            `<task-id>\t<answer>\t<label>\t<close>` for each, with tabs and
@@ -39,15 +40,17 @@
 #            stores them that way too). It records nothing.
 # ack        Run by the runner only after the keyed-answer intake exits 0 for
 #            this result: it records each answer in the captured poll lines as
-#            delivered. An answer the intake did not take is never recorded.
+#            delivered. The intake exits 0 when every answer was taken or refused
+#            for good (the reserved reconcile value), so only a transient skip or
+#            failure leaves an answer undelivered.
 #
 # An answer is deliverable only when its key carries this home's tag, its bare
 # task id is one this home still holds for the captain (`fm-captain-hold.sh
 # open --identity`), its key names that hold's current stamp, and it was not
 # already acknowledged. The open hold is the cursor: an answer saved while no
 # poll ran is still found on the next round, and an answer on an earlier card
-# never resolves a re-held task. An answer the intake refuses stays deliverable
-# and is offered again on the next round. Answers on the same board from other
+# never resolves a re-held task. An answer the intake skips or fails on stays
+# deliverable and is offered again on the next round. Answers on the same board from other
 # agents are never read as Firstmate's. What an answer DOES is owned by the
 # keyed-answer intake in bin/fm-captain-hold.sh; this adapter maps nothing and
 # closes nothing.
@@ -80,7 +83,7 @@ export FM_HOME
 
 SOURCE_ID=signoff
 DELIVERED="$STATE/signoff-delivered"
-# How long a round rests after sign-off-axi could not wait at all (no board yet,
+# How long a round rests when nothing is deliverable after a wait (no board yet,
 # nothing waiting, or the tool failing), so an idle home does not spin.
 IDLE_REST=30
 WAIT_SECS=600
@@ -164,15 +167,13 @@ deliverable() {
 }
 
 cmd_poll() {
-  local found start
+  local found
   [ "$#" -eq 0 ] || usage
   found=$(deliverable)
   if [ -z "$found" ]; then
-    start=$SECONDS
-    if ! signoff wait --json --timeout "$WAIT_SECS" >/dev/null 2>&1 && [ $((SECONDS - start)) -lt "$WAIT_SECS" ]; then
-      sleep "$IDLE_REST"
-    fi
+    signoff wait --json --timeout "$WAIT_SECS" >/dev/null 2>&1
     found=$(deliverable)
+    [ -n "$found" ] || sleep "$IDLE_REST"
   fi
   [ -n "$found" ] || exit 75
   printf '%s\n' "$found"
