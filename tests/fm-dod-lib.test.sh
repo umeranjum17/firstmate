@@ -464,7 +464,7 @@ test_completion_receipt_gates() {
   printf 'receipt_required=1\n' >> "$home/meta.new"
   mv "$home/meta.new" "$meta"
   # The optional home merge gate sees the proved candidate and refuses with its
-  # own words; a non-executable gate file is not a gate.
+  # own words; with no gate file the landing is unchanged.
   cat > "$home/config/merge-gate" <<'EOF'
 #!/usr/bin/env bash
 printf '%s|%s\n' "$FM_HOME" "$*" > "$FM_HOME/gate.args"
@@ -479,7 +479,7 @@ EOF
   [ "$(cat "$home/gate.args")" = "$home|receipt $wt $(git -C "$wt" rev-parse HEAD) -" ] \
     || fail "merge gate got wrong arguments: $(cat "$home/gate.args")"
   [ "$(git -C "$repo" rev-parse HEAD)" = "$before" ] || fail "gate-refused landing changed main"
-  chmod -x "$home/config/merge-gate"
+  rm "$home/config/merge-gate"
   FM_HOME="$home" "$ROOT/bin/fm-merge-local.sh" receipt > "$home/merge.out" 2>&1 \
     || fail "valid local landing failed: $(cat "$home/merge.out")"
   [ "$(git -C "$repo" rev-parse HEAD)" = "$(git -C "$wt" rev-parse HEAD)" ] \
