@@ -603,6 +603,7 @@ test_merge_gate_gets_dash_without_worktree() {
   mkdir -p "$home/config"
   meta="$TMP_ROOT/gate-no-worktree.meta"
   printf 'mode=local-only\n' > "$meta"
+  # shellcheck disable=SC2016  # the gate script's $* and $FM_HOME must expand when the gate runs, not now
   printf '%s\n' '#!/usr/bin/env bash' 'printf "%s\n" "$*" > "$FM_HOME/gate.args"' 'exit 0' > "$home/config/merge-gate"
   chmod +x "$home/config/merge-gate"
   fm_dod_merge_gate "$home/config" "$home" fm-T1 "$meta" abc123 - \

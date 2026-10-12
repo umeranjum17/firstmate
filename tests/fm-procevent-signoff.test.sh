@@ -119,7 +119,7 @@ pass "a task held again after an answered card gets a live card of its own"
 rm -f "$HOLD_FILE" "$SIGNOFF_BOARD" "$FM_HOME_DIR/state/signoff-delivered"
 printf '{}\n' > "$SIGNOFF_BOARD"
 hold_as '2026-10-12T12:00:00Z#0'
-adapter raise T2 'Ship T2' 'needs a call' done >/dev/null 2>&1 || fail "hold T2 raised no card"
+adapter raise T2 'Ship T2' 'needs a call' "done" >/dev/null 2>&1 || fail "hold T2 raised no card"
 key=$(jq -r 'keys[0]' "$SIGNOFF_BOARD")
 answer_card "$key" 'ship it' '2026-10-12T12:05:00Z'
 
@@ -134,7 +134,7 @@ delivered | grep -qF "T2" || fail "an accepted answer was not acknowledged"
 pass "an answer the intake fails on is offered again through the runner until the intake takes it"
 
 hold_as '2026-10-12T13:00:00Z#0'
-adapter raise T3 'Ship T3' 'needs a call' done >/dev/null 2>&1 || fail "hold T3 raised no card"
+adapter raise T3 'Ship T3' 'needs a call' "done" >/dev/null 2>&1 || fail "hold T3 raised no card"
 key3=$(jq -r --arg k "$key" 'keys[] | select(. != $k)' "$SIGNOFF_BOARD")
 answer_card "$key3" 'not for the captain' '2026-10-12T13:05:00Z'
 printf '3' > "$INTAKE_RC"

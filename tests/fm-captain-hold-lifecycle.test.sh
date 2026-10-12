@@ -1755,7 +1755,7 @@ test_keyed_answer_exit_status_separates_settled_from_retried() {
   home=$(make_home keyed-exit-status)
   tasks_in "$home" add sample-closed "Closed call" --repo sample >/dev/null \
     || fail "could not create the closed task"
-  tasks_in "$home" done sample-closed >/dev/null || fail "could not close the task"
+  tasks_in "$home" "done" sample-closed >/dev/null || fail "could not close the task"
   tasks_in "$home" add sample-free "Free work" --repo sample >/dev/null \
     || fail "could not create the unheld task"
 
