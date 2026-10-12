@@ -5,20 +5,17 @@
 # Usage:
 #   fm-procevent-signoff.sh arm
 #   fm-procevent-signoff.sh retire
-#   fm-procevent-signoff.sh enabled
 #   fm-procevent-signoff.sh raise <task-id> <title> <reason> <done|release>
 #   fm-procevent-signoff.sh poll
 #   fm-procevent-signoff.sh answers <result-file>
 #   fm-procevent-signoff.sh ack <result-file>
 #   fm-procevent-signoff.sh relisten
-#   fm-procevent-signoff.sh source-id
 #
 # arm        Opt this home in: check that sign-off-axi runs, bind the source to
 #            the keyed-answer intake (bin/fm-captain-hold.sh bind), and register
 #            the `signoff` source with bin/fm-procevent.sh. Nothing here runs
 #            until a home arms it, so an unarmed home behaves exactly as before.
 # retire     Opt out: retire the registration and drop the binding.
-# enabled    Exit 0 only while the source is registered in this home.
 # raise      Called by `fm-captain-hold.sh hold` after a hold is recorded. While
 #            enabled it raises one board card keyed by this home's tag, the task
 #            id and the hold-set stamp of that hold, so every hold gets its own
@@ -207,13 +204,11 @@ cmd_ack() {
 case "${1-}" in
   arm) shift; cmd_arm "$@" ;;
   retire) shift; cmd_retire "$@" ;;
-  enabled) shift; cmd_enabled ;;
   raise) shift; cmd_raise "$@" ;;
   poll) shift; cmd_poll "$@" ;;
   answers) shift; cmd_answers "$@" ;;
   ack) shift; cmd_ack "$@" ;;
   relisten) exit 0 ;;
-  source-id) printf '%s\n' "$SOURCE_ID" ;;
   ''|-h|--help|help) usage ;;
   *) die "unknown command: $1" ;;
 esac
