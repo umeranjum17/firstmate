@@ -486,6 +486,12 @@ EOF
   assert_grep 'merge-gate is not executable' "$home/merge.out" "non-executable merge gate was not named"
   [ "$(git -C "$repo" rev-parse HEAD)" = "$before" ] || fail "non-executable gate landing changed main"
   rm "$home/config/merge-gate"
+  ln -s "$home/no-such-gate" "$home/config/merge-gate"
+  FM_HOME="$home" "$ROOT/bin/fm-merge-local.sh" receipt > "$home/merge.out" 2>&1 \
+    && fail "local landing ignored a dangling merge-gate symlink"
+  assert_grep 'merge-gate is not executable' "$home/merge.out" "dangling merge gate was not named"
+  [ "$(git -C "$repo" rev-parse HEAD)" = "$before" ] || fail "dangling gate landing changed main"
+  rm "$home/config/merge-gate"
   FM_HOME="$home" "$ROOT/bin/fm-merge-local.sh" receipt > "$home/merge.out" 2>&1 \
     || fail "valid local landing failed: $(cat "$home/merge.out")"
   [ "$(git -C "$repo" rev-parse HEAD)" = "$(git -C "$wt" rev-parse HEAD)" ] \

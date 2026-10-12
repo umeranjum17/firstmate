@@ -164,7 +164,7 @@ fm_dod_receipt_accept() {  # <state> <id> <meta> <candidate-head>
 # exists but is not executable refuses the merge, naming it.
 fm_dod_merge_gate() {  # <config-dir> <home> <id> <meta> <candidate-head> <pr-url|->
   local gate=$1/merge-gate worktree out rc=0
-  [ -e "$gate" ] || return 0
+  [ -e "$gate" ] || [ -L "$gate" ] || return 0
   [ -x "$gate" ] || { echo "merge refused: $gate is not executable"; return 1; }
   worktree=$(fm_dod_meta_value "$4" worktree)
   out=$(FM_HOME="$2" "$gate" "$3" "${worktree:--}" "$5" "$6" 2>&1) || rc=$?
