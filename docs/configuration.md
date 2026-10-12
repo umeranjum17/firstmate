@@ -1085,7 +1085,7 @@ When the file exists and is executable, `bin/fm-merge-local.sh` runs `config/mer
 `-` means no worktree: a gate must treat it as a plain argument and must not `cd` into it (`cd -` changes to the previous directory, or fails with `OLDPWD not set`).
 The gate runs under `FM_MERGE_GATE_TIMEOUT` seconds (default `600`), because it runs while the task's control lock is held; a gate that outlives the bound is killed and refuses the merge with `merge gate timed out after Ns or exited <rc>` (a gate that exits 124 or 137 on its own gets the same wording), so the lock is always released.
 A nonzero exit refuses the merge and prints the gate's output; an absent file leaves merge behavior unchanged, and a file that exists, including a dangling symlink, but is not executable refuses the merge and names the file.
-The gate runs after Firstmate's own merge checks, so it can only add a refusal, never waive one.
+On the pull-request path the gate runs after the live merge checks and before the completion-receipt check; on the local-only path it runs after the completion-receipt check, right before the fast-forward. The gate can only add a refusal, never waive one.
 The gate's content is home-local policy; [`fm_dod_merge_gate`](../bin/fm-dod-lib.sh) owns the invocation mechanics, and the README's "Proof and decision tools" section installs done-done-axi's shipped gate script.
 
 ## Home brief include (config/brief-include.md)
