@@ -2159,7 +2159,8 @@ While armed, `bin/fm-captain-hold.sh hold` also raises a board card for that hol
 Each hold occurrence gets its own card, so a task held again after an answered card gets a new live one.
 The adapter needs `sign-off-axi` on PATH: `arm` refuses without it, and the card attempt prints an install hint.
 Board keys carry a digest of this home's `FM_HOME` and the hold's stamp, so the machine's one shared board never delivers another home's answer or an earlier card's answer to this one.
-An answer is marked delivered once the keyed-answer intake has taken it or settled it for good: a batch whose every skip is permanent (the reserved `reconcile` value, which is also warned once, already closed, not held for the captain, an unknown close mode, or a migrated hold that is ambiguous) exits 3 and is acknowledged. A transient skip or failure, including a migrated-hold scan that cannot read the beads graph, leaves the answer to be offered again on the next round.
+An answer is marked delivered once the keyed-answer intake has taken it or settled it for good: a batch whose every skip is permanent (the reserved `reconcile` value, which is also warned once, already closed, not held for the captain, an unknown close mode, or a migrated hold whose marker line matches several rows) exits 3 and is acknowledged.
+A transient skip or failure, including a migrated-hold scan that cannot read the beads graph or a migrated hold whose only evidence is an ambiguous configured-prefix match, leaves the answer to be offered again on the next round.
 The adapter's header owns its commands, the deliverable-answer rule, and its limits, including that sign-off cannot withdraw a card for a hold answered through another channel; `retire` turns it off again.
 
 **Capture and publish results**

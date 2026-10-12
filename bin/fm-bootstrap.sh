@@ -8,8 +8,8 @@
 #          Lines: "MISSING: <tool> (install: <command>)",
 #                 "PRESENTATION_UNAVAILABLE: lavish-axi (requires >=<floor>; install: <command>) - nonvisual work may proceed with plain-text decisions and reports; install or upgrade before using Lavish",
 #                 "MISSING_MANUAL: <tool> (instructions: <url>)",
-#                 "NEEDS_GH_AUTH" (skipped when every project clone is
-#                 registered local-only),
+#                 "NEEDS_GH_AUTH" (skipped when every registered project is
+#                 local-only with a clone and no clone is unregistered),
 #                 "BACKEND_INVALID: <name> (known: <names>)",
 #                 "STARTUP_MEMORY_BUDGET: invalid config/startup-memory-budget - <reason>",
 #                 "SENTINEL: fm-sentinel is not running ... (install: <command>)",
