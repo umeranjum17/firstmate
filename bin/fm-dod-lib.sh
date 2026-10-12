@@ -178,7 +178,7 @@ fm_dod_merge_gate() {  # <config-dir> <home> <id> <meta> <candidate-head> <pr-ur
   [ "$rc" -ne 0 ] || return 0
   [ -z "$out" ] || printf '%s\n' "$out"
   if fm_timed_out "$rc"; then
-    echo "merge refused: merge gate timed out after ${seconds}s"
+    echo "merge refused: merge gate timed out after ${seconds}s or exited $rc"
     return 1
   fi
   echo "merge refused by config/merge-gate (exit $rc)"
