@@ -1685,8 +1685,14 @@ ${context.command}
     // prompt; the plain `prompt` field is the older Pi (<= 1.1.0) user event.
     const prompt =
       event.messageType === "custom" ? null : typeof event.prompt === "string" ? event.prompt : null;
+    const processingRequest =
+      event.messageType === "custom" &&
+      isProcessingCustomMessage(event.message) &&
+      typeof event.message.content === "string" &&
+      event.message.content === queuedProcessingContent;
+    processingOpenedThisRun =
+      queuedProcessingContent !== null && (processingRequest || prompt === queuedProcessingContent);
     if (prompt === null) return;
-    processingOpenedThisRun = queuedProcessingContent !== null && prompt === queuedProcessingContent;
     const trimmed = prompt.trim();
     if (!trimmed || isOperationalUserText(trimmed)) return;
     const file = currentMainSession.getSessionFile() ?? "";
