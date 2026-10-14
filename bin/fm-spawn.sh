@@ -5431,11 +5431,10 @@ fi
 # the shared store rather than copying credentials, as does a launch whose
 # provider is unknown because no model was given. The opencode-go provider is
 # different: its key lives in the data dir's auth.json, not in the store, so a
-# fresh store still bills that key (verified 2026-10-14 on
-# opencode-go/space-bunny, which answered). A Go model therefore gets its own
-# store whenever that auth.json carries an opencode-go entry, which keeps it off
-# the console account the shared store bills. Only key presence is tested; the
-# value is never read.
+# fresh store still bills that key (verified live with an opencode-go model). A
+# Go model therefore gets its own store whenever that auth.json carries an
+# opencode-go entry, which keeps it off the console account the shared store
+# bills. Only key presence is tested; the value is never read.
 opencode_go_auth_present() {
   local auth="${XDG_DATA_HOME:-${HOME:-}/.local/share}/opencode/auth.json"
   command -v jq >/dev/null 2>&1 || return 1
