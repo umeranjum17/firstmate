@@ -1309,7 +1309,7 @@ This single-provider table is separate from the frozen legacy mapping used by `f
   A relaunch of the same task in the same home reopens that store.
   An `opencode-go/*` launch also gets that store when OpenCode's `auth.json` in its data directory carries an `opencode-go` entry, because that provider's key lives in the file rather than in the shared store, so the fresh store bills the Go key instead of the console account.
   Without that entry, an `opencode-go` launch, an `opencode` console-account launch, and any launch with no model keep the shared store, because their account credentials live there.
-  `opencode_db_assignment` in `bin/fm-spawn.sh` owns the rule and tests key presence only.
+  `opencode_db_assignment` in `bin/fm-spawn.sh` owns the rule and checks key presence only, never the value.
 - Every profile array is an implicit quota-aware choice resolved through `quota-array-dispatch`.
 - If no dispatch rule fits, firstmate resolves `default` through the same object-or-array path before falling back to `config/crew-harness`.
 - Except for `ultra`, which refuses unsupported profiles under the native-effort contract above, an effort value the chosen harness does not accept is recorded as `effort=` in task meta for traceability but omitted from the launch flags.
