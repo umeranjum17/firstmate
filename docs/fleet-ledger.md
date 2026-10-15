@@ -92,7 +92,7 @@ The recorder runs best-effort from `bin/fm-teardown.sh` before the task's durabl
 Its header owns usage (`--json [--now <epoch>]`), attribution, and uncertainty limits.
 A task is attributed to the model of its final launch, and one that changed model mid-flight counts as a switch under that model.
 Every recorded outcome is authoritative; a sampled lane that predates the recorder is a disclosed fallback, and merge rate is computed over recorded outcomes only so a sampled row never fabricates a rate.
-First-pass, rework, revert and escape figures use the same recorded merged PRs as merge rate, because a sampled-lane row has no recorded task to join its PR to; the coverage line counts the sampled tasks they leave out.
+First-pass, rework, revert and escape figures use the same recorded merged PRs as merge rate, since a sampled lane only proves the merges it observed and never the tasks that ended without one; the coverage line counts the sampled tasks they leave out.
 The dashboard's Insights view embeds the reader as the `models` key of `board.json`, and the model/outcome sections of [`tests/fm-flow.test.sh`](../tests/fm-flow.test.sh) are its regression journeys.
 
 ## Skill statistics
