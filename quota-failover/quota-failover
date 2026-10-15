@@ -1,24 +1,37 @@
 #!/usr/bin/env bash
-# quota-failover - move limit-stopped Firstmate workers to the next live route.
+# quota-failover - move limit-stopped Firstmate workers and leads to the next
+# live route, and keep a route that is answering errors out of new dispatch.
 #
 # Usage: quota-failover <fm-home>
 #
 # One pass over <fm-home>/state/*.meta, under a non-blocking lock.
-# A worker counts as stopped by a limit when its status says working (or it has
-# none), it is not progressing (no status, turn-end, progress or re-arm write
-# for QUOTA_FAILOVER_STALL_SECS, default 240), it is not busy unless the
-# harness is only retrying a provider error (a session-retry busy event), and
-# either its visible screen shows a provider limit error or its route's
-# provider reads exhausted_now in quota-axi.
+# A worker or lead counts as stopped by a limit when its status says working
+# (or it has none), it is not progressing (no status, turn-end, progress or
+# re-arm write for QUOTA_FAILOVER_STALL_SECS, default 240), it is not busy
+# unless the harness is only retrying a provider error (a session-retry busy
+# event), and one of: its screen shows a provider limit error; its route's
+# provider reads exhausted_now in quota-axi (alone never marks the route out);
+# its pinned route is already out of dispatch; or a one-line test of its
+# pinned route answers a limit or 429/5xx error (once per
+# QUOTA_FAILOVER_PROBE_SECS, default 900, per task).
 # A busy, progressing worker is never touched.
-# A stopped worker moves to the first route, from the crew-dispatch rules that
-# hold its current route and then the default, whose provider is not exhausted
-# and that answers a one-prompt live test, through bin/fm-control.sh relaunch
-# with a note naming the old route, the new route and why.
-# A route held by an Opus-only rule only ever moves to another Opus route.
-# Leads (secondmates) and remote tasks are detected and logged, never switched.
-# Every decision is one line in state/quota-failover.log. A worker left with no
-# live route also gets one failed line on the home's parent channel, if any.
+# A stopped task moves to the first route, from the crew-dispatch rules that
+# hold its current route and then the default, that is not out of dispatch,
+# whose provider is not exhausted and that answers a one-prompt live test
+# (QUOTA_FAILOVER_TEST_SECS, default 90), through bin/fm-control.sh relaunch
+# with a note naming the old route, the new route and why; an Opus-only rule
+# only ever moves to another Opus route, and a remote task is logged, never
+# switched.
+# A route whose screen shows a limit, or that answers its pinned one-line test
+# with a limit or 429/5xx error, is OUT until it answers that test again: its
+# profile objects leave config/crew-dispatch.json (schema unchanged; a rule
+# left with no profiles goes too) into state/quota-failover-dead.json, and it
+# is passed over as a move target. Each pass re-tests it after
+# QUOTA_FAILOVER_RETEST_SECS (default 1800) and puts its profiles back at the
+# end of their list when it answers; the filter reads the file on disk, so
+# hand edits survive while it is out.
+# Every decision is one line in state/quota-failover.log. A worker left with
+# no live route also gets one failed line on the home's parent channel, if any.
 set -u
 
 die() { echo "quota-failover: $*" >&2; exit 1; }
@@ -29,9 +42,15 @@ FM_HOME=$(cd "$home" && pwd) || die "cannot read $home"
 export FM_HOME
 STATE=$FM_HOME/state BIN=$FM_HOME/bin LOG=$FM_HOME/state/quota-failover.log
 DISPATCH=$FM_HOME/config/crew-dispatch.json
+DEAD=$STATE/quota-failover-dead.json
 STALL=${QUOTA_FAILOVER_STALL_SECS:-240}
 TEST_SECS=${QUOTA_FAILOVER_TEST_SECS:-90}
+PROBE_SECS=${QUOTA_FAILOVER_PROBE_SECS:-900}
+RETEST=${QUOTA_FAILOVER_RETEST_SECS:-1800}
 LIMIT_RE='(usage|rate|quota|weekly|monthly|daily|hour|session) limit (has been )?reached|hit your (usage )?limit|rate[ _-]?limit(ed|_error| exceeded)|quota (exceeded|exhausted)|exceeded your (current )?quota|insufficient[ _-]quota|too many requests|retrying in [0-9]+h'
+# The provider hard-error class a limit-capped free model answers with (the
+# 15 Oct step-5-preview-free 429) plus the 5xx class, kept apart from prose.
+HTTP_ERR_RE='(^|[^0-9])429($|[^0-9])|(status|error|code|http)[^0-9]{0,16}5[0-9]{2}|upstream request failed|internal server error|service unavailable|bad gateway|gateway timeout'
 
 exec 9>"$STATE/.quota-failover.lock" && flock -n 9 || exit 0
 for lib in fm-backend.sh fm-busy-lib.sh fm-quota-axi-lib.sh fm-parent-channel-lib.sh; do
@@ -70,19 +89,124 @@ exhausted() { # <provider> <harness> <model>
     | length > 0' <<<"$QUOTA" >/dev/null
 }
 
-live_test() { # <harness> <model>: one prompt must come back answered
-  local dir out rc prompt='Reply with the single word PONG.'
+probe() { # <harness> <model>: the one-line prompt through the harness CLI
+  local dir rc prompt='Reply with the single word PONG.'
   dir=$(mktemp -d) || return 1
-  out=$(cd "$dir" && case $1 in
+  ( cd "$dir" && case $1 in
     opencode*) timeout "$TEST_SECS" opencode run --model "$2" "$prompt" ;;
     pi*) timeout "$TEST_SECS" pi --model "$2" -p --no-session "$prompt" ;;
     claude*) timeout "$TEST_SECS" claude -p --model "$2" "$prompt" ;;
     codex*) timeout "$TEST_SECS" codex exec --skip-git-repo-check --model "$2" "$prompt" ;;
     *) exit 1 ;;
-  esac 2>&1 </dev/null)
+  esac ) 2>&1 </dev/null
   rc=$?
   rm -rf "$dir"
+  return "$rc"
+}
+
+live_test() { # <harness> <model>: one prompt must come back answered
+  local out rc
+  out=$(probe "$1" "$2")
+  rc=$?
   [ "$rc" = 0 ] && grep -q PONG <<<"$out" && ! grep -qiE "$LIMIT_RE" <<<"$out"
+}
+
+pinned_out() { # <id> <harness> <model>: the pinned route's limit/429/5xx line
+  local id=$1 out t now
+  now=$(date +%s)
+  t=$(stat -c %Y "$STATE/$id.probe-at" 2>/dev/null) || t=0
+  [ $((now - t)) -ge "$PROBE_SECS" ] || return 1
+  printf '%s\n' "$now" >"$STATE/$id.probe-at"
+  out=$(probe "$2" "$3") || true
+  grep -oiE "$LIMIT_RE|$HTTP_ERR_RE" <<<"$out" | head -n 1 | sed 's/^ *//; s/ *$//'
+}
+
+# A route is OUT while state/quota-failover-dead.json lists it. Each entry
+# keeps the profile objects dropped from config/crew-dispatch.json, keyed by
+# their rule's `when` (null for default), so a revive rejoins them at the end
+# of the list they came from.
+DEAD_JSON=$(jq -c . "$DEAD" 2>/dev/null) || DEAD_JSON='[]'
+
+dead_write() { # <json>
+  local tmp
+  tmp=$(mktemp "$STATE/.quota-failover-dead.XXXXXX") || return 1
+  printf '%s\n' "$1" >"$tmp" && mv -f "$tmp" "$DEAD"
+}
+
+dead_has() { # <harness> <model>
+  jq -e --arg h "$1" --arg m "$2" \
+    'any(.[]; .harness == $h and .model == $m)' <<<"$DEAD_JSON" >/dev/null
+}
+
+dispatch_sync() { # rewrite $DISPATCH without every out route; no-op when unchanged
+  [ -f "$DISPATCH" ] || return 0
+  local tmp
+  tmp=$(mktemp "$STATE/.crew-dispatch.XXXXXX") || return 1
+  jq --argjson dead "$DEAD_JSON" '
+    def deadp($p): any($dead[]?; .harness == $p.harness and .model == $p.model);
+    def clean:
+      if type == "array" then (map(select(deadp(.) | not)) | if length == 0 then null else . end)
+      elif deadp(.) then null
+      else . end;
+    if has("rules") then .rules |= (map(.use |= clean) | map(select(.use != null))) else . end
+    | .default |= clean
+    | if .default == null then del(.default) else . end
+  ' "$DISPATCH" >"$tmp" 2>/dev/null || { rm -f "$tmp"; return 1; }
+  if [ "$(jq -S -c . "$DISPATCH" 2>/dev/null)" != "$(jq -S -c . "$tmp")" ]; then
+    cp "$tmp" "$DISPATCH"
+  fi
+  rm -f "$tmp"
+}
+
+dead_mark_out() { # <harness> <model>: record the route out; dispatch_sync drops it
+  dead_has "$1" "$2" && return 0
+  local removed
+  removed=$(jq -c --arg h "$1" --arg m "$2" '
+    def profiles: if type == "array" then .[] elif type == "object" then . else empty end;
+    [ (.rules[]? as $r | ($r.use | profiles) | select(.harness == $h and .model == $m) | {when: $r.when, profile: .}),
+      ((.default // null | profiles) | select(.harness == $h and .model == $m) | {when: null, profile: .}) ]
+  ' "$DISPATCH" 2>/dev/null) || removed='[]'
+  DEAD_JSON=$(jq -c --arg h "$1" --arg m "$2" --argjson removed "$removed" \
+      --argjson now "$(date +%s)" \
+      '. + [{harness: $h, model: $m, out_at: $now, last_test: $now, removed: $removed}]' \
+      <<<"$DEAD_JSON") || return 1
+  dead_write "$DEAD_JSON" || return 1
+  log "dispatch: $1 $2 is out until it answers its one-line test"
+}
+
+dead_restore() { # <entry>: put the entry's dropped profiles back in dispatch
+  [ -f "$DISPATCH" ] || return 0
+  local tmp
+  tmp=$(mktemp "$STATE/.crew-dispatch.XXXXXX") || return 1
+  jq --argjson e "$1" '
+    def as_list: if type == "array" then . elif . == null then [] else [.] end;
+    reduce $e.removed[] as $r (.;
+      if $r.when == null then .default = ((.default // []) | as_list) + [$r.profile]
+      else .rules |= (map(if .when == $r.when then .use = ((.use // []) | as_list) + [$r.profile] else . end))
+      end)
+  ' "$DISPATCH" >"$tmp" 2>/dev/null || { rm -f "$tmp"; return 1; }
+  cp "$tmp" "$DISPATCH"
+  rm -f "$tmp"
+}
+
+dead_retest() { # revive every out route whose one-line test answers again
+  local h m last entry
+  while IFS=$'\t' read -r h m last; do
+    [ -n "${h:-}" ] && [ $(( $(date +%s) - last )) -ge "$RETEST" ] || continue
+    if live_test "$h" "$m"; then
+      entry=$(jq -c --arg h "$h" --arg m "$m" \
+        'first(.[] | select(.harness == $h and .model == $m))' <<<"$DEAD_JSON")
+      dead_restore "$entry" || true
+      DEAD_JSON=$(jq -c --arg h "$h" --arg m "$m" \
+        'map(select(.harness != $h or .model != $m))' <<<"$DEAD_JSON") || continue
+      log "dispatch: $h $m answers its one-line test again; restored to crew-dispatch"
+    else
+      DEAD_JSON=$(jq -c --arg h "$h" --arg m "$m" --argjson now "$(date +%s)" \
+        'map(if .harness == $h and .model == $m then .last_test = $now else . end)' \
+        <<<"$DEAD_JSON") || continue
+    fi
+    dead_write "$DEAD_JSON" || true
+  done < <(jq -r '.[] | [.harness, .model, .last_test] | @tsv' <<<"$DEAD_JSON" 2>/dev/null)
 }
 
 # Line 1: <opus-pinned> <declared provider of the route>; then one
@@ -100,6 +224,8 @@ CANDIDATES_JQ='
      | .[] | select((same | not) and (($pinned | not) or opus))
      | [.harness, .model, .effort // "default", .provider // ""])
   | @tsv'
+
+dead_retest
 
 for meta in "$STATE"/*.meta; do
   [ -f "$meta" ] || continue
@@ -130,20 +256,27 @@ for meta in "$STATE"/*.meta; do
   prov=$(provider "$h" "$m" "${declared:-}")
   if grep -qiE "$LIMIT_RE" <<<"$screen"; then
     why="its screen shows a provider limit error"
+    dead_mark_out "$h" "$m" || true
   elif exhausted "$prov" "$h" "$m"; then
     why="quota-axi reads provider $prov exhausted"
+  elif dead_has "$h" "$m"; then
+    why="its pinned route is already out of dispatch"
+  elif err=$(pinned_out "$id" "$h" "$m") && [ -n "$err" ]; then
+    why="its pinned route answered a provider error ($err)"
+    dead_mark_out "$h" "$m" || true
   else
     continue
   fi
-  if [ "$(fm_meta_get "$meta" kind)" = secondmate ] || [ -n "$(fm_meta_get "$meta" remote_host)" ]; then
-    note "$id" "lead on $route looks stopped by a limit ($why); not switched, lead routes are out of scope"
+  if [ -n "$(fm_meta_get "$meta" remote_host)" ]; then
+    note "$id" "stopped on $route ($why); remote task, not switched"
     continue
   fi
 
   next='' passed=''
   for c in "${cands[@]}"; do
     IFS=$'\t' read -r ch cm ce cp <<<"$c"
-    if exhausted "$(provider "$ch" "$cm" "$cp")" "$ch" "$cm"; then passed+=", $cm exhausted"
+    if dead_has "$ch" "$cm"; then passed+=", $cm is out of dispatch"
+    elif exhausted "$(provider "$ch" "$cm" "$cp")" "$ch" "$cm"; then passed+=", $cm exhausted"
     elif live_test "$ch" "$cm"; then next=$c; break
     else passed+=", $cm failed its live test"
     fi
@@ -170,3 +303,7 @@ for meta in "$STATE"/*.meta; do
   fi
   rm -f "$notefile"
 done
+
+# One dispatch write per pass: every route marked out above loses its profile
+# objects here, so the next spawn's intake cannot rank it.
+dispatch_sync || true

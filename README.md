@@ -35,27 +35,31 @@ Test: `merge-card/tests/merge-card-e2e.sh` drives the real script end to end aga
 
 ## quota-failover
 
-Workers stopped by a provider usage limit move to the next live route on their own, with nobody relaunching them by hand.
+Workers and leads stopped by a provider usage limit or a provider 429/5xx move to the next live route on their own, and the dead route stays out of new dispatch until it answers again.
 
-`quota-failover/quota-failover <fm-home>` is one bash script that makes one pass over the home's workers under a lock, so any cadence can run it.
-A worker counts as stopped by a limit when all of these hold:
+`quota-failover/quota-failover <fm-home>` is one bash script that makes one pass over the home's workers and leads under a lock, so any cadence can run it.
+A worker or lead counts as stopped by a limit when all of these hold:
 
 - its status says working, or it has no status yet;
 - it has written no status, turn end or progress for `QUOTA_FAILOVER_STALL_SECS` (default 240), and it was not spawned or relaunched inside that window;
 - it is not busy, where a harness that is only retrying a provider error counts as not busy;
-- its visible screen shows a provider limit error, or `quota-axi` reads its route's provider as exhausted now.
+- one of: its visible screen shows a provider limit error; `quota-axi` reads its route's provider as exhausted now; its pinned route is already out of dispatch; or a one-line test of its pinned route answers a provider limit or 429/5xx error (that probe runs at most once per `QUOTA_FAILOVER_PROBE_SECS`, default 900, per task).
 
 A busy worker that is making progress is never touched.
-A stopped worker gets the routes of the `config/crew-dispatch.json` rules that hold its current route, then the default list, in order.
-Routes whose provider reads exhausted are passed over, and the first other route that answers a one-prompt live test (`QUOTA_FAILOVER_TEST_SECS`, default 90) wins.
-The worker is relaunched there with `bin/fm-control.sh <task> relaunch`, with a note naming the old route, the new route and why.
-A route that sits only in rules whose models all contain `opus` moves only to another such model; with none live, the worker is left waiting and the reason is logged.
-Leads and remote tasks are detected and logged, never switched.
+A stopped task gets the routes of the `config/crew-dispatch.json` rules that hold its current route, then the default list, in order.
+Routes that are out of dispatch or whose provider reads exhausted are passed over, and the first other route that answers a one-prompt live test (`QUOTA_FAILOVER_TEST_SECS`, default 90) wins.
+The task is relaunched there with `bin/fm-control.sh <task> relaunch`, with a note naming the old route, the new route and why.
+A route that sits only in rules whose models all contain `opus` moves only to another such model; with none live, the task is left waiting and the reason is logged.
+A remote task is detected and logged, never switched.
+A route whose screen shows a limit, or that answers its pinned one-line test with a limit or 429/5xx error, is out until it answers that test again: its profile objects are dropped from `config/crew-dispatch.json` (a rule left with no profiles goes with them; the schema never changes) into `state/quota-failover-dead.json`, so a new dispatch cannot rank it, and every pass re-tests it after `QUOTA_FAILOVER_RETEST_SECS` (default 1800) to put the profiles back at the end of their list when it answers.
+The filter reads the dispatch file on disk, so hand edits survive while a route is out, but a dropped profile cannot be re-added by hand until it answers again.
 Every decision is one line in `state/quota-failover.log`.
-A worker left with no live route also gets one failed line on the home's parent channel; nothing else is sent there, and `config/` is never edited.
+A worker left with no live route also gets one failed line on the home's parent channel; nothing else is sent there.
 
 It needs `quota-axi`, `jq`, `flock` and the harness command of each dispatch route on `PATH`.
 `QUOTA_FAILOVER_MAX_AGE` (default `10m`) is the oldest quota reading it trusts.
+
+Test: `quota-failover/tests/quota-failover-e2e.sh` drives the real script end to end against a fixture home (stub firstmate libs in its `bin/`, stub `quota-axi` and `opencode` on `PATH`): a lead on a route that answers every one-line test with the 15 Oct 429, and a screen-stopped worker on a second dead route ranked first in the dispatch rules. It asserts both move to the live candidate, the dead routes are passed over and dropped from `crew-dispatch.json`, and a second pass with the routes answering again restores them and moves nothing.
 
 Install into one home as a watcher check, so it runs on the watcher's own cadence:
 
