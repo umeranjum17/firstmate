@@ -50,3 +50,37 @@ An unanswered ask gets a safe, pre-declared default instead of blocking the home
 
 The add-on decides; it does not wire itself in. A home discovers open asks and calls `decide` per ask from its own supervision loop, which is a thin hook in the firstmate fork, not in this repo.
 
+## tailscale-resilience
+
+One host watchdog for the two failures that quietly take a lane offline: the Tailscale network going unreachable while `tailscaled` still runs, and a display/session dying while logind still lists it.
+
+`tailscale-resilience/tailscale-resilience` is one bash script with one subcommand:
+
+- `tailscale-resilience check [--samples N] [--window S] [--cooldown S] [--state-dir DIR]` reads both detectors from the real CLI, advances their bounded sample windows in the state dir, and on the first window that holds a failure for the whole window it heals, alerts and records.
+  - `net` uses `tailscale status --json` (BackendState, peer Online flags) and `tailscale netcheck --format json` (RegionLatency): the network is unreachable when the daemon answers but nothing else does - the status call fails, `BackendState` is not `Running`, or no DERP relay and no peer is reachable.
+  - `display` uses `loginctl list-sessions` and `show-session`: a session logind still lists is dead when it is closing, its leader PID is gone from `/proc`, or a graphical session has no display socket left for its user.
+  - A window needs `--samples` (3) consecutive failing samples inside `--window` (600) seconds, so one transient failure never heals and never alerts.
+  - The heal is one `tailscale up` per detected outage and never twice inside `--cooldown` (300) seconds.
+  - It reattaches the connection and changes nothing else, so a dead `tailscaled` or a `NeedsLogin` node is recorded with the real cause instead of being papered over.
+  - Alerting never uses Tailscale: `$STATE_DIR/alerts.log` always works, and `TSR_ALERT_CMD` adds a local channel - a LAN webhook, `notify-send`, an SMS gateway - run with the alert text on stdin and as `$1`.
+  - Every detection, heal and alert is appended to `$STATE_DIR/events.jsonl`, one JSON line each, naming what was detected, when, and the heal result.
+
+It needs `bash`, `jq`, `tailscale` and `loginctl` on `PATH`, and one instance owns the state dir.
+
+Install it as a timer so the windows are fed at the fleet's scan cadence (60s matches a Firstmate scan):
+
+```sh
+printf '%s\n' '[Unit]' 'Description=Tailscale and display resilience check' \
+  '[Service]' 'Type=oneshot' 'ExecStart=<addons>/tailscale-resilience/tailscale-resilience check' \
+  'Environment=TSR_ALERT_CMD=<a local push channel, never a tailnet address>' \
+  'EnvironmentFile=-/etc/default/tailscale-resilience' > /etc/systemd/system/tailscale-resilience.service
+printf '%s\n' '[Unit]' 'Description=Run the resilience check' \
+  '[Timer]' 'OnCalendar=minutely' 'Persistent=true' \
+  '[Install]' 'WantedBy=timers.target' > /etc/systemd/system/tailscale-resilience.timer
+systemctl enable --now tailscale-resilience.timer
+```
+
+The state defaults to `${XDG_STATE_HOME:-$HOME/.local/state}/tailscale-resilience`, so a timer runs it as one user and that user owns the record.
+`TSR_SAMPLES`, `TSR_WINDOW`, `TSR_COOLDOWN` and `TSR_STATE_DIR` set the same knobs as the flags.
+
+The dead-display case is detected, recorded and alerted but not healed; a heal for it is a later slice.
