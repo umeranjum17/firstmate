@@ -1050,8 +1050,8 @@ A remote secondmate is launched on its host from its own home's configuration, s
 A home that keeps a pool of logins for one tool can have its launches pick the account with the most room instead of always starting on the one default login.
 The pool is opt-in and secondary to the pin: with no file every launch is unchanged, and a home pin always wins for its own runner.
 The file is local and gitignored.
-It holds one `state=<absolute pool folder>`, the folder that holds the pool's `pool.json`, and optionally one `command=<absolute path to byokit-accounts>`, which defaults to `byokit-accounts` from `PATH`.
-Blank lines and `#` comments are ignored, and a file with no usable `state=`, or a relative path on either line, refuses the launch and names the file.
+It holds one `state=<absolute pool folder>`, the folder that holds the pool's `pool.json`, and optionally one `command=<byokit-accounts command>`, either a bare name resolved from `PATH` (the default `byokit-accounts`) or an absolute path.
+Blank lines and `#` comments are ignored, and a file with no usable `state=`, a relative `state=` path, or a `command=` value that names a relative path, refuses the launch and names the file.
 
 The pool applies only to the harnesses whose pool tool exists today: `claude` to `claude`, `codex` to `codex`, and `pi` and `pi-signed` to `pi`.
 Every other harness keeps today's behavior; the Cursor and OpenCode Go pools are later work.
@@ -1063,7 +1063,7 @@ The spawn prints the pick as `account=<id>` and records the same field in the ta
 Because the pool's `env` prefix and the pick's `unset` list are prepended to a raw launch command, a raw launch command whose leading `NAME=VALUE` words set the picked store variable or one of those unset names refuses before anything is created; remove the assignment, or remove `config/account-pool`.
 
 A malformed file (including a `config/account-pool` that exists but is not a readable regular file, such as a broken symlink), a `pick` that exits non-zero, an answer whose `unset` is not an array of environment-variable names, or an answer that names no usable account folder - not the tool's own store variable (`CLAUDE_CONFIG_DIR` for Claude, `CODEX_HOME` for Codex, `PI_CODING_AGENT_DIR` for Pi) or not an existing readable, searchable directory - refuses the launch before anything is created.
-The refusal names the tool and the login to do and says which accounts are resting or signed out, in the tone of the pin's sign-in refusal; Firstmate never falls back to an ambient login or copies a credential.
+A failed `pick` refusal names the tool and the login to do and says which accounts are resting or signed out, in the tone of the pin's sign-in refusal; Firstmate never falls back to an ambient login or copies a credential.
 Like the pin, the pool is not inherited into secondmate homes: a local secondmate agent launches on the launching home's pool, while the secondmate's own workers read the secondmate home's file.
 
 [`bin/fm-account-pool-lib.sh`](../bin/fm-account-pool-lib.sh) owns parsing, the harness-to-tool map, the `pick` invocation, and the refusal messages; [`bin/fm-spawn.sh`](../bin/fm-spawn.sh)'s header owns the launch-line mechanics.
