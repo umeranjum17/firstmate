@@ -4,7 +4,8 @@
 #   merge-card gate <task-id> <worktree|-> <head|-> <pr-url|->
 #     Install as $FM_HOME/config/merge-gate. In the task's worktree it runs
 #     `done-done check --from <pr-url>` (or $FM_HOME/data/<task-id>/checks.md with no PR),
-#     with done-done's judge, prints the verdict and saves it for the card in $FM_HOME/data/<task-id>/merge-card.json.
+#     with done-done's judge and its evidence cited from $FM_HOME/data/<task-id> (--citation-base),
+#     prints the verdict and saves it for the card in $FM_HOME/data/<task-id>/merge-card.json.
 #     Report only: it always exits 0, so it never refuses a merge.
 #   merge-card post --board <board.json> <task-id> <worktree|-> <head|-> <pr-url|->
 #     Install as $FM_HOME/config/post-merge. Posts one card per merge: the Checks outcome as the
@@ -13,7 +14,7 @@
 #     at the merged head through `done-done signoff`. The card key is the merge's own, so a repeat
 #     post, or another home posting the same merge, finds it on the board and adds nothing.
 #     sign-off-axi writes the board under its lock: it appends and never rewrites other cards.
-# Needs done-done, sign-off-axi, jq and gh on PATH.
+# Needs done-done >= 0.3.1 (--citation-base), sign-off-axi, jq and gh on PATH.
 set -u
 
 die() { echo "merge-card: $*" >&2; exit 1; }
@@ -26,7 +27,9 @@ check() {
   if [ "$wt" = - ] || [ ! -d "$wt" ]; then
     verdict="not checked: its work copy was already cleaned up"
   else
-    out=$(cd "$wt" && done-done check --from "$src" --judge --json 2>&1) || rc=$?
+    # The Checks evidence lives in the task folder, so resolve relative citations there
+    # (--citation-base leaves absolute paths unchanged); the work copy is only the repo identity.
+    out=$(cd "$wt" && done-done check --from "$src" --citation-base "$FM_HOME/data/$id" --judge --json 2>&1) || rc=$?
     case $rc in
       0) verdict=pass ;;
       1) verdict=fail ;;
@@ -99,7 +102,7 @@ post() {
     media=$(jq -r '.media[]?' "$f" | sed "s|^|${f%/*}/|")
   else
     run=null
-    media=$(jq -r '.check.evidence[]?' "$record" | grep -iE '\.(png|jpe?g|webp|mp4|webm)$')
+    media=$(jq -r --arg base "$FM_HOME/data/$id" '.check.evidence[]? | select(test("\\.(png|jpe?g|webp|mp4|webm)$"; "i")) | if startswith("/") then . else "\($base)/\(.)" end' "$record")
   fi
   while IFS= read -r f; do
     [ -f "$f" ] && [ "$n" -lt 12 ] || continue

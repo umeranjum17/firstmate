@@ -8,7 +8,8 @@ Every merge runs done-done and posts one evidence card to a sign-off board, with
 
 `merge-card/merge-card` is one bash script with two subcommands:
 
-- `merge-card gate <task-id> <worktree|-> <head|-> <pr-url|->` runs `done-done check --from <source> --judge --json` in the task's worktree, where `<source>` is the pull request when there is one and `$FM_HOME/data/<task-id>/checks.md` otherwise.
+- `merge-card gate <task-id> <worktree|-> <head|-> <pr-url|->` runs `done-done check --from <source> --citation-base $FM_HOME/data/<task-id> --judge --json` in the task's worktree, where `<source>` is the pull request when there is one and `$FM_HOME/data/<task-id>/checks.md` otherwise.
+  The Checks evidence lives in `$FM_HOME/data/<task-id>`, so `--citation-base` resolves the block's relative evidence paths there while absolute paths stay unchanged; the work copy only supplies the repo identity.
   It prints the verdict and saves it for the card in `$FM_HOME/data/<task-id>/merge-card.json`.
   It is report only: it always exits 0, so it never refuses a merge the checks lint passes.
   Hand-captured evidence legitimately comes back inconclusive and the merge still lands.
@@ -18,7 +19,7 @@ Every merge runs done-done and posts one evidence card to a sign-off board, with
   The card key is the merge's own (`merge-<owner>-<repo>-pull-<n>`, or `merge-<head>` for a local merge), so a repeat post or a second home adds nothing.
   sign-off-axi writes the board under its lock and only appends.
 
-Both subcommands need `done-done`, `sign-off-axi`, `jq` and `gh` on `PATH`, plus `FM_HOME` set.
+Both subcommands need `done-done >= 0.3.1` (`--citation-base`), `sign-off-axi`, `jq` and `gh` on `PATH`, plus `FM_HOME` set.
 
 Install into one home, so the post-merge hook calls `post` once for each recorded merge:
 
