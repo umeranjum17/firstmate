@@ -127,7 +127,7 @@ expect_nudges() {  # <pass-label>
 restart
 # The acted lane posted a busy event after the restart, as a relaunched or
 # already-resumed lane does.
-sed -i "s/ ts=[0-9]*$/ ts=$(date +%s)/" "$STATE/acted.busy-state"
+sed -i.bak "s/ ts=[0-9]*$/ ts=$(date +%s)/" "$STATE/acted.busy-state" && rm -f "$STATE/acted.busy-state.bak"
 OUT=$(reconcile) || fail "reconcile failed: $OUT"
 [ -z "$EVID" ] || printf '%s\n' "$OUT" > "$EVID/pass1.txt"
 expect_nudges "first pass"
@@ -146,7 +146,7 @@ printf '%s\n' "$OUT" | grep -q '^lost: already nudged in this state' || fail "re
 pass "a repeat pass after the same restart nudges nothing new"
 
 restart
-sed -i "s/ ts=[0-9]*$/ ts=$(date +%s)/" "$STATE/acted.busy-state"
+sed -i.bak "s/ ts=[0-9]*$/ ts=$(date +%s)/" "$STATE/acted.busy-state" && rm -f "$STATE/acted.busy-state.bak"
 OUT=$(reconcile) || fail "third reconcile failed: $OUT"
 [ -z "$EVID" ] || { printf '%s\n' "$OUT" > "$EVID/pass3.txt"; cp -r "$STATE"/*.inbox "$EVID/" 2>/dev/null; }
 expect_nudges "second restart"

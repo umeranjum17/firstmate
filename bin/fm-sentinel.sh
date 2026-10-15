@@ -23,8 +23,11 @@
 #      recreates on every start. A stopped server is left alone: its supervisor
 #      restarts it, and this script never starts one.
 #   2. On the first identity it records it in state/.sentinel-herdr-identity.
-#      On a changed identity it runs `reconcile`, records the new identity, and
-#      leaves a pending restart wake in state/.sentinel-wake-pending.
+#      On a changed identity it runs `reconcile`, leaves one pending restart
+#      wake per identity in state/.sentinel-wake-pending (state/.sentinel-woken-for
+#      keeps the identity it was left for), and records the new identity once no
+#      lane is unsettled or 30 minutes have passed since the restart, logging any
+#      lane still unsettled then; until that, every tick reconciles again.
 #   3. Wakes the primary session when a restart wake is pending, or when
 #      supervision is needed and the watcher beacon is older than the grace
 #      (bin/fm-supervision-lib.sh owns that predicate). A beacon-only wake is
@@ -43,8 +46,9 @@
 # startup, so each home resumes its own lanes):
 #   - The restart epoch is the server's socket bind time, the second half of the
 #     identity. A lane whose busy record (state/<id>.busy-state ts=) or spawn or
-#     relaunch (spawn_gen=) is at or after it acted since the restart and is
-#     left alone; so is a lane whose agent reads busy, which is mid-turn.
+#     relaunch (spawn_gen=) is at or after it acted since the restart and gets
+#     no nudge or order; its placement and exit corrections below still run. A
+#     lane whose agent reads busy is mid-turn and is left alone.
 #   - An agent state other than alive, dead, or missing is not settled yet (a
 #     server still resuming its sessions): the lane is left for the next pass.
 #   - A secondmate whose agent is alive gets one recovery order through
@@ -205,8 +209,9 @@ nudge_once() {  # <id> <meta> <done-message> <text>
 }
 
 reconcile() {  # <episode>
-  local restarted=${1##*:} meta id kind target agent cwd wt current note why
+  local restarted=${1##*:} meta id kind target agent cwd wt current note why acted
   RECONCILE_RC=0
+  RECONCILE_UNSETTLED=
   case "$restarted" in ''|*[!0-9]*) say "no Herdr server identity for $SESSION; nothing to reconcile"; return 0 ;; esac
   for meta in "$STATE"/*.meta; do
     [ -f "$meta" ] && [ ! -L "$meta" ] || continue
@@ -217,14 +222,12 @@ reconcile() {  # <episode>
     case "$kind" in ship|scout|secondmate) ;; *) continue ;; esac
     target=$(fm_backend_target_of_meta "$meta")
     [ "${target%%:*}" = "$SESSION" ] || continue
-    if [ "$(lane_acted_at "$id" "$meta")" -ge "$restarted" ]; then
-      say "$id: acted since the restart; left alone"
-      continue
-    fi
+    acted=0
+    [ "$(lane_acted_at "$id" "$meta")" -lt "$restarted" ] || acted=1
     agent=$(fm_backend_agent_state herdr "$target" "$meta" "$id" 2>/dev/null)
     case "$agent" in
       alive|dead|missing) ;;
-      *) say "$id: agent ${agent:-unreadable}; not settled, left for the next pass"; RECONCILE_RC=1; continue ;;
+      *) say "$id: agent ${agent:-unreadable}; not settled, left for the next pass"; RECONCILE_UNSETTLED="$RECONCILE_UNSETTLED $id"; continue ;;
     esac
     if [ "$agent" = alive ] && [ "$(fm_backend_busy_state herdr "$target")" = busy ]; then
       say "$id: mid-turn; left alone"
@@ -235,6 +238,7 @@ reconcile() {  # <episode>
         say "$id: secondmate agent $agent; left to the watcher's secondmate liveness relaunch"
         continue
       fi
+      [ "$acted" -eq 0 ] || { say "$id: acted since the restart; left alone"; continue; }
       nudge_once "$id" "$meta" "ordered to recover" \
         "The host session restarted, so your last turn was lost and your supervision stopped. Run bin/fm-session-start.sh, which resumes your own home's lanes, then reconcile what remains and end the turn so your supervision re-arms."
       continue
@@ -270,7 +274,9 @@ reconcile() {  # <episode>
       alive:*)
         case "$cwd/" in
           "$wt"/*)
-            if why=$(lane_waiting "$id" "$kind" "$current"); then
+            if [ "$acted" -eq 1 ]; then
+              say "$id: acted since the restart; left alone"
+            elif why=$(lane_waiting "$id" "$kind" "$current"); then
               say "$id: properly waiting ($why); left alone"
             else
               nudge_once "$id" "$meta" "idle with its turn lost; nudged" \
@@ -326,9 +332,15 @@ tick() {
     if [ -n "$prev" ]; then
       say "herdr session $SESSION restarted (socket $prev -> $id)"
       if reconcile "$id"; then
-        printf '%s\n' "The Herdr server restarted at $(date -u +%Y-%m-%dT%H:%M:%SZ), which stopped every agent and watcher in it. The sentinel already reconciled this home's direct reports; its lines are in $LOG. Run bin/fm-session-start.sh if this session was resumed, reconcile what remains, then end the turn so supervision re-arms." \
+        [ "$(cat "$STATE/.sentinel-woken-for" 2>/dev/null)" = "$id" ] || {
+          printf '%s\n' "$id" >"$STATE/.sentinel-woken-for"
+          printf '%s\n' "The Herdr server restarted at $(date -u +%Y-%m-%dT%H:%M:%SZ), which stopped every agent and watcher in it. The sentinel already reconciled this home's direct reports; its lines are in $LOG. Run bin/fm-session-start.sh if this session was resumed, reconcile what remains, then end the turn so supervision re-arms." \
           >"$STATE/.sentinel-wake-pending"
-        printf '%s\n' "$id" >"$STATE/.sentinel-herdr-identity"
+        }
+        if [ -z "$RECONCILE_UNSETTLED" ] || [ $(( $(date +%s) - ${id##*:} )) -ge 1800 ]; then
+          [ -z "$RECONCILE_UNSETTLED" ] || say "still not settled 30 minutes after the restart; left to the primary:$RECONCILE_UNSETTLED"
+          printf '%s\n' "$id" >"$STATE/.sentinel-herdr-identity"
+        fi
       else
         rc=1
       fi
