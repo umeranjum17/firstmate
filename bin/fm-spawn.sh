@@ -2602,10 +2602,9 @@ fi
 RAW_COMMAND=
 [ "$RAW_LAUNCH" = 0 ] || RAW_COMMAND=$ARG3
 WORKER_ACCOUNT=$(fm_worker_account_select "$HARNESS" "$CONFIG" "$MODEL" "${PI_BIN:-$HARNESS}" "$RAW_COMMAND") || exit 1
-WORKER_ACCOUNT_DECLARED=${WORKER_ACCOUNT%%$'\t'*}
-WORKER_ACCOUNT_ROOT=${WORKER_ACCOUNT#*$'\t'}
-WORKER_ACCOUNT_PROVIDER=${WORKER_ACCOUNT_ROOT#*$'\t'}
-WORKER_ACCOUNT_ROOT=${WORKER_ACCOUNT_ROOT%%$'\t'*}
+WORKER_ACCOUNT_DECLARED=$(fm_worker_account_tuple_field "$WORKER_ACCOUNT" 1)
+WORKER_ACCOUNT_ROOT=$(fm_worker_account_tuple_field "$WORKER_ACCOUNT" 2)
+WORKER_ACCOUNT_PROVIDER=$(fm_worker_account_tuple_field "$WORKER_ACCOUNT" 3)
 if [ -n "$WORKER_ACCOUNT" ] && [ "$HARNESS" = claude ]; then
   if [ -n "$WORKER_ACCOUNT_ROOT" ]; then
     export CLAUDE_CONFIG_DIR=$WORKER_ACCOUNT_ROOT
@@ -2626,12 +2625,10 @@ POOL_ACCOUNT_VAR=
 POOL_ACCOUNT_FOLDER=
 POOL_ACCOUNT_UNSET=
 if [ -n "$POOL_ACCOUNT" ]; then
-  POOL_ACCOUNT_ID=${POOL_ACCOUNT%%$'\t'*}
-  POOL_ACCOUNT_VAR=${POOL_ACCOUNT#*$'\t'}
-  POOL_ACCOUNT_FOLDER=${POOL_ACCOUNT_VAR#*$'\t'}
-  POOL_ACCOUNT_UNSET=${POOL_ACCOUNT_FOLDER#*$'\t'}
-  POOL_ACCOUNT_VAR=${POOL_ACCOUNT_VAR%%$'\t'*}
-  POOL_ACCOUNT_FOLDER=${POOL_ACCOUNT_FOLDER%%$'\t'*}
+  POOL_ACCOUNT_ID=$(fm_worker_account_tuple_field "$POOL_ACCOUNT" 1)
+  POOL_ACCOUNT_VAR=$(fm_worker_account_tuple_field "$POOL_ACCOUNT" 2)
+  POOL_ACCOUNT_FOLDER=$(fm_worker_account_tuple_field "$POOL_ACCOUNT" 3)
+  POOL_ACCOUNT_UNSET=$(fm_worker_account_tuple_field "$POOL_ACCOUNT" 4)
   if [ "$POOL_ACCOUNT_VAR" = CLAUDE_CONFIG_DIR ]; then
     export CLAUDE_CONFIG_DIR=$POOL_ACCOUNT_FOLDER
   fi
@@ -5583,9 +5580,9 @@ if [ -n "$WORKER_ACCOUNT" ]; then
   case "$HARNESS" in
   claude)
     if [ -n "$WORKER_ACCOUNT_ROOT" ]; then
-      LAUNCH="$(fm_worker_account_claude_shed) CLAUDE_CONFIG_DIR=$(shell_quote "$WORKER_ACCOUNT_ROOT") $LAUNCH"
+      LAUNCH="$(fm_worker_account_claude_shed "$FM_WORKER_ACCOUNT_CLAUDE_SHED") CLAUDE_CONFIG_DIR=$(shell_quote "$WORKER_ACCOUNT_ROOT") $LAUNCH"
     else
-      LAUNCH="$(fm_worker_account_claude_shed) -u CLAUDE_CONFIG_DIR $LAUNCH"
+      LAUNCH="$(fm_worker_account_claude_shed "$FM_WORKER_ACCOUNT_CLAUDE_SHED") -u CLAUDE_CONFIG_DIR $LAUNCH"
     fi
     ;;
   pi | pi-signed)
@@ -5593,11 +5590,7 @@ if [ -n "$WORKER_ACCOUNT" ]; then
     ;;
   esac
 elif [ -n "$POOL_ACCOUNT" ]; then
-  POOL_PREFIX='env'
-  for pool_unset in $POOL_ACCOUNT_UNSET; do
-    POOL_PREFIX="$POOL_PREFIX -u $pool_unset"
-  done
-  LAUNCH="$POOL_PREFIX $POOL_ACCOUNT_VAR=$(shell_quote "$POOL_ACCOUNT_FOLDER") $LAUNCH"
+  LAUNCH="$(fm_worker_account_claude_shed "$POOL_ACCOUNT_UNSET") $POOL_ACCOUNT_VAR=$(shell_quote "$POOL_ACCOUNT_FOLDER") $LAUNCH"
 elif [ "$HARNESS" = claude ] && [ -n "${CLAUDE_CONFIG_DIR:-}" ]; then
   LAUNCH="CLAUDE_CONFIG_DIR=$(shell_quote "$CLAUDE_CONFIG_DIR") $LAUNCH"
 fi

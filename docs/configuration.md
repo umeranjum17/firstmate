@@ -1055,7 +1055,7 @@ Blank lines and `#` comments are ignored, and a file with no usable `state=`, or
 
 The pool applies only to the harnesses whose pool tool exists today: `claude` to `claude`, `codex` to `codex`, and `pi` and `pi-signed` to `pi`.
 Every other harness keeps today's behavior; the Cursor and OpenCode Go pools are later work.
-When no pin applies and the harness is mapped, Firstmate runs `<command> pick <tool> --json --state <state>` before any endpoint, local copy, or task record exists, and the command answers with the account with the most room among that tool's ready, not-resting accounts, from the same list the captain reads and switches with `byokit-accounts list` and `byokit-accounts use`.
+When no pin applies and the harness is mapped, Firstmate runs `<command> pick <tool> --json --state <state>` before any endpoint, local copy, or task record exists, and before a relaunch stops the running worker, and the command answers with the account with the most room among that tool's ready, not-resting accounts, from the same list the captain reads and switches with `byokit-accounts list` and `byokit-accounts use`.
 
 A launch carries the picked folder the same way a pin carries its root: an `env -u <name> ... <VAR>=<folder>` prefix on the launch line, so the launch line and the task record hold folder paths only.
 No key, token, or login file ever reaches a launch line, a task record, a log, a status line, or an error message.

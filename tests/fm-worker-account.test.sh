@@ -449,6 +449,24 @@ test_pool_selects_an_account_when_no_pin_applies() {
   pass "the pool picks an account, the launch carries its folder, and no credential is recorded"
 }
 
+test_pool_sheds_exactly_the_picks_unset_list() {
+  local out rc id=acct-pool-shed
+  new_case pool-shed claude
+  enable_pool "$HOME_DIR" "$CASE/pool"
+  mkdir -p "$CASE/pool/claude"
+  pool_pick_ok "$CASE" claude pa_ee55ff66 CLAUDE_CONFIG_DIR "$CASE/pool/claude" '[]'
+  out=$(spawn_ship "$id"); rc=$?
+  expect_code 0 "$rc" "a pool pick with an empty unset list should succeed: $out"
+  run_pane
+  assert_grep "CLAUDE_CONFIG_DIR=$CASE/pool/claude" "$CASE/claude-worker" \
+    "the worker should run under the picked account folder"
+  assert_grep "ANTHROPIC_API_KEY=ambient-pane-key" "$CASE/claude-worker" \
+    "an empty pick unset list must leave the pane's credentials alone rather than shed the pin's list"
+  assert_grep "CLAUDE_CODE_USE_BEDROCK=1" "$CASE/claude-worker" \
+    "an empty pick unset list must leave every ambient credential alone"
+  pass "the pool sheds exactly the pick's unset list"
+}
+
 test_a_pin_still_wins_over_the_pool() {
   local out rc id=acct-pool-pin
   new_case pool-pin claude
@@ -502,6 +520,7 @@ test_raw_claude_account_override_refuses_under_a_pin
 test_raw_claude_account_override_is_kept_without_a_pin
 test_local_secondmate_reads_the_launching_home_pin
 test_pool_selects_an_account_when_no_pin_applies
+test_pool_sheds_exactly_the_picks_unset_list
 test_a_pin_still_wins_over_the_pool
 test_pool_refusals_create_nothing
 
