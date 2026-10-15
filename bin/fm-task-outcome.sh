@@ -29,6 +29,8 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=bin/fm-wake-lib.sh
+. "$SCRIPT_DIR/fm-wake-lib.sh"
 FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
 STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
@@ -137,6 +139,9 @@ fi
 
 OUT="$DATA/metrics/task-outcomes.tsv"
 mkdir -p "$DATA/metrics" 2>/dev/null || exit 0
+LOCK="$OUT.lock"
+fm_lock_acquire_wait_max "$LOCK" 30 2>/dev/null || exit 0
+trap 'fm_lock_release "$LOCK" 2>/dev/null || true' EXIT
 if [ -f "$OUT" ] && awk -F'\t' -v h="$(clean_field "$HOME_NAME")" -v t="$(clean_field "$ID")" -v s="$STARTED" \
   'NR > 1 && $1 == h && $2 == t && $6 == s { found = 1 } END { exit !found }' "$OUT" 2>/dev/null; then
   exit 0
