@@ -6,20 +6,22 @@ Fleet dashboard and add-ons for running a fleet of coding agents.
 
 Every merge runs done-done and posts one evidence card to a sign-off board, with nobody posting by hand.
 
-`merge-card/merge-card` is one bash script with two subcommands:
+`merge-card/merge-card` is one bash script with three subcommands:
 
-- `merge-card gate <task-id> <worktree|-> <head|-> <pr-url|->` runs `done-done check --from <source> --citation-base $FM_HOME/data/<task-id> --judge --json` in the task's worktree, where `<source>` is the pull request when there is one and `$FM_HOME/data/<task-id>/checks.md` otherwise.
-  The Checks evidence lives in `$FM_HOME/data/<task-id>`, so `--citation-base` resolves the block's relative evidence paths there while absolute paths stay unchanged; the work copy only supplies the repo identity.
+- `merge-card gate <task-id> <worktree|-> <head|-> <pr-url|->` runs `done-done check --from <source> --judge --json` in the task's worktree, where `<source>` is the pull request when there is one and `$FM_HOME/data/<task-id>/checks.md` otherwise.
+  The Checks evidence lives in `$FM_HOME/data/<task-id>`, so it is cited from there while absolute paths stay unchanged: `done-done check --citation-base $FM_HOME/data/<task-id>` resolves the relative names itself on done-done 0.3.1+, and on an older one merge-card runs done-done without the flag and resolves the verdict's relative citations against the task folder itself, before the card copies the media.
+  The work copy only supplies the repo identity.
   It prints the verdict and saves it for the card in `$FM_HOME/data/<task-id>/merge-card.json`.
   It is report only: it always exits 0, so it never refuses a merge the checks lint passes.
   Hand-captured evidence legitimately comes back inconclusive and the merge still lands.
-  A judge that is not configured degrades to a plain "not checked" verdict.
+  A judge that is not configured degrades to a plain "not checked" verdict; a done-done that could not check at all names the real reason (an older done-done rejecting `--citation-base`, say) instead of a bare exit code.
+  `merge-card check <task-id> <worktree|-> <head|-> <pr-url|->` runs the gate's check alone: it saves and prints the verdict and posts nothing.
 - `merge-card post --board <board.json> <task-id> <worktree|-> <head|-> <pr-url|->` posts exactly one card per merge.
   The card carries the Checks outcome as the title, done-done's verdict in plain words, the pull request link (the merged commit when there is no PR), and the Checks evidence media (at most 12 screens or recordings), or those of a done-done evidence run at the merged head.
   The card key is the merge's own (`merge-<owner>-<repo>-pull-<n>`, or `merge-<head>` for a local merge), so a repeat post or a second home adds nothing.
   sign-off-axi writes the board under its lock and only appends.
 
-Both subcommands need `done-done >= 0.3.1` (`--citation-base`), `sign-off-axi`, `jq` and `gh` on `PATH`, plus `FM_HOME` set.
+`merge-card` needs `done-done` on `PATH` (0.3.1+ lets it resolve the block's relative evidence names itself; on an older one the card still carries its retained proof, but that older done-done sees a relatively cited file as missing and says so in the verdict), plus `sign-off-axi`, `jq` and `gh`.
 
 Install into one home, so the post-merge hook calls `post` once for each recorded merge:
 
@@ -28,6 +30,8 @@ printf '#!/bin/sh\nexec <addons>/merge-card/merge-card gate "$@"\n' > $FM_HOME/c
 printf '#!/bin/sh\nexec <addons>/merge-card/merge-card post --board <board.json> "$@"\n' > $FM_HOME/config/post-merge
 chmod +x $FM_HOME/config/merge-gate $FM_HOME/config/post-merge
 ```
+
+Test: `merge-card/tests/merge-card-e2e.sh` drives the real script end to end against a task folder holding a retained PNG, with a stub `done-done` placed earlier on `PATH` (one accepting `--citation-base`, one rejecting it, and one that lies about supporting it), and asserts the recorded verdict, the invocation the stub saw, and that the card's media resolves in each case.
 
 ## quota-failover
 

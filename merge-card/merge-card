@@ -4,9 +4,13 @@
 #   merge-card gate <task-id> <worktree|-> <head|-> <pr-url|->
 #     Install as $FM_HOME/config/merge-gate. In the task's worktree it runs
 #     `done-done check --from <pr-url>` (or $FM_HOME/data/<task-id>/checks.md with no PR),
-#     with done-done's judge and its evidence cited from $FM_HOME/data/<task-id> (--citation-base),
-#     prints the verdict and saves it for the card in $FM_HOME/data/<task-id>/merge-card.json.
+#     with done-done's judge and its evidence cited from $FM_HOME/data/<task-id> (--citation-base
+#     on done-done 0.3.1+; on an older one the verdict's relative citations are resolved against
+#     the task folder here instead), prints the verdict and saves it for the card in
+#     $FM_HOME/data/<task-id>/merge-card.json.
 #     Report only: it always exits 0, so it never refuses a merge.
+#   merge-card check <task-id> <worktree|-> <head|-> <pr-url|->
+#     The gate's check alone: run done-done, save and print the verdict, post nothing.
 #   merge-card post --board <board.json> <task-id> <worktree|-> <head|-> <pr-url|->
 #     Install as $FM_HOME/config/post-merge. Posts one card per merge: the Checks outcome as the
 #     title, done-done's verdict in plain words, the pull request link (the merged commit with no PR), and the
@@ -14,29 +18,75 @@
 #     at the merged head through `done-done signoff`. The card key is the merge's own, so a repeat
 #     post, or another home posting the same merge, finds it on the board and adds nothing.
 #     sign-off-axi writes the board under its lock: it appends and never rewrites other cards.
-# Needs done-done >= 0.3.1 (--citation-base), sign-off-axi, jq and gh on PATH.
+# Needs done-done on PATH (0.3.1+ cites the task folder's evidence itself; an older one is
+# still covered), sign-off-axi, jq and gh.
 set -u
 
 die() { echo "merge-card: $*" >&2; exit 1; }
 
-# check <task-id> <worktree|-> <head|-> <pr-url|-> <record>: run done-done, save and print the verdict.
+# version_at_least <version> <minimum>: a dotted numeric version of at least the minimum.
+version_at_least() {
+  case $1 in
+    [0-9]*.[0-9]*) ;;
+    *) return 1 ;;
+  esac
+  [ "$(printf '%s\n%s\n' "$2" "$1" | sort -V | head -n 1)" = "$2" ]
+}
+
+# not_checked_reason <output>: the one line of <output> that names why done-done could not check.
+not_checked_reason() {
+  local why
+  why=$(printf '%s\n' "$1" | jq -r 'if type == "object" then (.error // empty) else empty end' 2>/dev/null | head -n 1)
+  [ -n "$why" ] || why=$(printf '%s\n' "$1" | sed 's/^.*: line [0-9][0-9]*: //' | head -n 1)
+  printf '%s' "${why:0:100}"
+}
+
+# check <task-id> <worktree|-> <head|-> <pr-url|->: run done-done, save and print the verdict.
 check() {
-  local id=$1 wt=$2 head=$3 pr=$4 record=$5 src out='' rc=0 verdict signoff=''
+  [ $# -eq 4 ] || { echo "usage: merge-card check <task-id> <worktree|-> <head|-> <pr-url|->"; return; }
+  [ -n "${FM_HOME:-}" ] || { echo "merge-card: FM_HOME is not set, so done-done did not run"; return; }
+  local id=$1 wt=$2 head=$3 pr=$4 src out='' rc=0 verdict signoff=''
+  local record=$FM_HOME/data/$id/merge-card.json cite=0 dd_v='' args fixed reason
   src=$pr
   [ "$pr" != - ] || src=$FM_HOME/data/$id/checks.md
   if [ "$wt" = - ] || [ ! -d "$wt" ]; then
     verdict="not checked: its work copy was already cleaned up"
   else
-    # The Checks evidence lives in the task folder, so resolve relative citations there
-    # (--citation-base leaves absolute paths unchanged); the work copy is only the repo identity.
-    out=$(cd "$wt" && done-done check --from "$src" --citation-base "$FM_HOME/data/$id" --judge --json 2>&1) || rc=$?
+    # A done-done of 0.3.1 or newer resolves the verdict's relative evidence names itself from
+    # --citation-base; an older one rejects that flag, so probe once (offline, cheap) and, on the
+    # older one, leave the names relative and resolve them against the task folder below.
+    dd_v=$(done-done --version 2>/dev/null | head -n 1)
+    args=(check --from "$src" --judge --json)
+    if done-done check --help 2>&1 | grep -q -- '--citation-base' ||
+       version_at_least "$dd_v" 0.3.1; then
+      args+=(--citation-base "$FM_HOME/data/$id")
+      cite=1
+    fi
+    # The Checks evidence lives in the task folder, so relative citations resolve there
+    # (absolute paths stay unchanged); the work copy is only the repo identity.
+    out=$(cd "$wt" && done-done "${args[@]}" 2>&1) || rc=$?
     case $rc in
       0) verdict=pass ;;
       1) verdict=fail ;;
       3) verdict=inconclusive ;;
-      # No judge configured is a config stop (exit 2), not a proof result: report it as not checked.
-      *) case $out in *"no judge is set"*) verdict="not checked: no judge is set" ;; *) verdict="error (exit $rc)" ;; esac ;;
+      # An exit 2 is a usage or config stop, not a proof result: report it as not checked.
+      *) case $out in
+           *"no judge is set"*) verdict="not checked: no judge is set" ;;
+           *"Unknown option '--citation-base'"*) verdict="not checked: installed done-done${dd_v:+ $dd_v} rejects --citation-base" ;;
+           *) reason=$(not_checked_reason "$out")
+              [ -n "$reason" ] && verdict="not checked: $reason" || verdict="error (exit $rc)" ;;
+         esac ;;
     esac
+    if [ "$cite" = 0 ]; then
+      # The older done-done left the verdict's evidence citations as the Checks block named them;
+      # resolve each relative one against the task folder, so the card still finds its media.
+      fixed=$(jq -e --arg base "$FM_HOME/data/$id" '
+        if type != "object" then error("not an object")
+        else (if .evidence != null
+              then .evidence |= map(if startswith("/") then . else "\($base)/\(.)" end)
+              else . end)
+        end' <<<"$out" 2>/dev/null) && out=$fixed
+    fi
     # A done-done verify run at this exact head brings its own sign-off message and captures.
     signoff=$(cd "$wt" && done-done signoff --json 2>/dev/null | jq -r 'select(.kind == "evidence") | .file // empty')
     { [ -n "$signoff" ] && [ "$(jq -r .run.commit "$signoff" 2>/dev/null)" = "$head" ]; } || signoff=''
@@ -52,7 +102,7 @@ check() {
 gate() {
   [ $# -eq 4 ] || { echo "usage: merge-card gate <task-id> <worktree|-> <head|-> <pr-url|->"; return; }
   [ -n "${FM_HOME:-}" ] || { echo "merge-card: FM_HOME is not set, so done-done did not run"; return; }
-  check "$1" "$2" "$3" "$4" "$FM_HOME/data/$1/merge-card.json"
+  check "$1" "$2" "$3" "$4"
   echo "merge-card: report only; done-done's verdict never refuses this merge"
 }
 
@@ -76,7 +126,7 @@ post() {
   # The gate's verdict for this merge, else run done-done now (a merge the gate never saw).
   jq -e --arg pr "$pr" --arg head "$head" '.pr == $pr and ($pr != "-" or .head == $head)' "$record" >/dev/null 2>&1 || {
     [ "$head" != - ] || head=$(gh pr view "$pr" --json headRefOid --jq .headRefOid 2>/dev/null) || head=-
-    check "$id" "$wt" "${head:--}" "$pr" "$record"
+    check "$id" "$wt" "${head:--}" "$pr"
   }
   title=$(jq -r '.check.claim // empty' "$record")
   [ -n "$title" ] || [ "$pr" = - ] || title=$(gh pr view "$pr" --json title --jq .title 2>/dev/null)
@@ -134,6 +184,7 @@ post() {
 
 case ${1:-} in
   gate) shift; gate "$@"; exit 0 ;;
+  check) shift; check "$@"; exit 0 ;;
   post) shift; post "$@" ;;
-  *) die "usage: merge-card gate|post ... (see the header of $0)" ;;
+  *) die "usage: merge-card gate|check|post ... (see the header of $0)" ;;
 esac

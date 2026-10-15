@@ -1,0 +1,133 @@
+#!/usr/bin/env bash
+# merge-card e2e: the real script, a stub done-done placed earlier on PATH, and a
+# task folder holding a retained PNG. The stub runs in three modes: newer (accepts
+# --citation-base like 0.3.1), older (rejects it like 0.3.0, so merge-card must
+# resolve the verdict's relative citations itself) and liar (claims 0.3.1 and the
+# flag, then rejects it, so the verdict must name the real reason). The recorded
+# verdict, the invocation the stub saw, and whether the card's media resolves are
+# asserted in each mode. Needs bash, jq, base64, cmp and sort -V on PATH; nothing
+# is posted anywhere and no real tool outside this directory is touched.
+set -u
+
+here=$(cd "$(dirname "$0")" && pwd) || exit 1
+[ -f "$here/../merge-card" ] || { echo "not ok - $here/../merge-card is missing"; exit 1; }
+work=$(mktemp -d) || exit 1
+trap 'rm -rf "$work"' EXIT
+
+home=$work/home
+wt=$work/wt
+mkdir -p "$home/data" "$wt" "$work/bin"
+
+# The retained proof: a real 1x1 PNG in the task folder, as a Checks block cites it.
+shot=$work/shot.png
+base64 -d > "$shot" <<'PNG' || exit 1
+iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==
+PNG
+
+fails=0
+ok() { printf 'ok - %s\n' "$1"; }
+no() { printf 'not ok - %s\n' "$1"; fails=$((fails + 1)); }
+is() { # is <name> <got> <want>
+  if [ "$2" = "$3" ]; then ok "$1"; else no "$1: got [$2], want [$3]"; fi
+}
+holds() { # holds <name> <file>
+  if [ -f "$2" ]; then ok "$1"; else no "$1: $2 is missing"; fi
+}
+
+# The stub done-done: MODE picks which done-done it emulates, and every argv line
+# is logged so the test can prove which invocation merge-card chose.
+cat > "$work/bin/done-done" <<'STUB' || exit 1
+#!/usr/bin/env bash
+printf '%s\n' "$*" >>"$DD_LOG"
+case $1 in
+  --version) case $MODE in older) echo 0.3.0 ;; *) echo 0.3.1 ;; esac; exit 0 ;;
+esac
+[ "${1:-}" = check ] || exit 0 # signoff: this checkout has no run record
+if [ "${2:-}" = --help ]; then
+  echo "usage: done-done check --from <file | - | PR URL> [--claim-id <id>] [--judge]"
+  case $MODE in newer | liar) echo "  --citation-base <dir>  resolve relative evidence names from <dir>" ;; esac
+  exit 0
+fi
+flag=0
+for a in "$@"; do [ "$a" = --citation-base ] && flag=1; done
+if [ "$flag" = 1 ] && [ "$MODE" != newer ]; then
+  jq -n '{error: "Unknown option \u0027--citation-base\u0027."}'
+  exit 2
+fi
+if [ "$MODE" = newer ]; then
+  jq -n --arg e "$DD_EVID_ABS" '{result:"pass",claim:"a stopped worker moves to the next live route",evidence:[$e]}'
+else
+  jq -n --arg e "$DD_EVID_REL" '{result:"pass",claim:"a stopped worker moves to the next live route",evidence:[$e]}'
+fi
+STUB
+
+# The stub sign-off-axi: capture the card and the media copied beside it.
+cat > "$work/bin/sign-off-axi" <<'STUB' || exit 1
+#!/usr/bin/env bash
+[ "${1:-}" = post ] || exit 0
+from=''
+while [ $# -gt 0 ]; do
+  if [ "$1" = --from ]; then from=$2; shift 2; else shift; fi
+done
+[ -n "$from" ] || exit 0
+rm -rf "$SO_CAPTURE"
+cp -r "$(dirname "$from")" "$SO_CAPTURE"
+STUB
+chmod +x "$work/bin/done-done" "$work/bin/sign-off-axi"
+
+head_c=e2ehead0000000000000000000000000000000000
+
+run_check_and_post() { # run_check_and_post <task-id> (<mode> is already exported)
+  PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" check "$1" "$wt" "$head_c" -
+  PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" "$1" "$wt" "$head_c" -
+}
+
+# A newer done-done: the flag is passed, the verdict's evidence already resolved,
+# and the card carries the PNG.
+MODE=newer DD_LOG=$work/args.log DD_EVID_ABS="$home/data/newer/shot.png" DD_EVID_REL=shot.png SO_CAPTURE=$work/card-newer
+export MODE DD_LOG DD_EVID_ABS DD_EVID_REL SO_CAPTURE
+mkdir -p "$home/data/newer" && cp "$shot" "$home/data/newer/shot.png"
+: >"$DD_LOG"
+run_check_and_post newer
+is "newer: recorded verdict" "$(jq -r .verdict "$home/data/newer/merge-card.json")" pass
+if grep -q -- '--citation-base' "$DD_LOG"; then ok "newer: --citation-base passed"; else no "newer: --citation-base passed"; fi
+is "newer: evidence as the stub cited it" "$(jq -c .check.evidence "$home/data/newer/merge-card.json")" '["'"$home/data/newer/shot.png"'"]'
+holds "newer: card captured" "$work/card-newer/card.json"
+is "newer: card kind" "$(jq -r .kind "$work/card-newer/card.json")" evidence
+is "newer: card media" "$(jq -c .media "$work/card-newer/card.json")" '["1.png"]'
+if [ -f "$work/card-newer/1.png" ] && cmp -s "$work/card-newer/1.png" "$shot"; then ok "newer: card media resolves to the retained PNG"; else no "newer: card media is not the retained PNG"; fi
+
+# A 0.3.0 done-done: the flag is never passed, the verdict's relative citation is
+# resolved against the task folder, and the card still carries the PNG.
+MODE=older DD_LOG=$work/args.log DD_EVID_ABS="$home/data/older/shot.png" DD_EVID_REL=shot.png SO_CAPTURE=$work/card-older
+export MODE DD_LOG DD_EVID_ABS DD_EVID_REL SO_CAPTURE
+mkdir -p "$home/data/older" && cp "$shot" "$home/data/older/shot.png"
+: >"$DD_LOG"
+run_check_and_post older
+is "older: recorded verdict" "$(jq -r .verdict "$home/data/older/merge-card.json")" pass
+if grep -q -- '--citation-base' "$DD_LOG"; then no "older: --citation-base was passed to a 0.3.0 done-done"; else ok "older: --citation-base never passed"; fi
+is "older: relative citation resolved against the task folder" "$(jq -c .check.evidence "$home/data/older/merge-card.json")" '["'"$home/data/older/shot.png"'"]'
+holds "older: card captured" "$work/card-older/card.json"
+is "older: card kind" "$(jq -r .kind "$work/card-older/card.json")" evidence
+is "older: card media" "$(jq -c .media "$work/card-older/card.json")" '["1.png"]'
+if [ -f "$work/card-older/1.png" ] && cmp -s "$work/card-older/1.png" "$shot"; then ok "older: card media resolves to the retained PNG"; else no "older: card media is not the retained PNG"; fi
+
+# A done-done that lies: the flag is passed and rejected, so the verdict names the
+# real reason instead of a bare exit code.
+MODE=liar DD_LOG=$work/args.log DD_EVID_ABS="$home/data/liar/shot.png" DD_EVID_REL=shot.png SO_CAPTURE=$work/card-liar
+export MODE DD_LOG DD_EVID_ABS DD_EVID_REL SO_CAPTURE
+mkdir -p "$home/data/liar" && cp "$shot" "$home/data/liar/shot.png"
+: >"$DD_LOG"
+PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" check liar "$wt" "$head_c" -
+is "liar: verdict names the real reason" "$(jq -r .verdict "$home/data/liar/merge-card.json")" "not checked: installed done-done 0.3.1 rejects --citation-base"
+
+# No done-done on PATH at all: the verdict still names why nothing was checked.
+PATH="/usr/bin:/bin" FM_HOME=$home "$here/../merge-card" check missing "$wt" "$head_c" -
+is "missing: verdict names the real reason" "$(jq -r .verdict "$home/data/missing/merge-card.json")" "not checked: done-done: command not found"
+
+if [ "$fails" -eq 0 ]; then
+  echo "merge-card e2e: all assertions held"
+else
+  echo "merge-card e2e: $fails assertion(s) failed"
+  exit 1
+fi
