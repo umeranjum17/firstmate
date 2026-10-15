@@ -2618,7 +2618,7 @@ fi
 # writes the store the worker will actually read.
 POOL_ACCOUNT=
 if [ -z "$WORKER_ACCOUNT" ]; then
-  POOL_ACCOUNT=$(fm_account_pool_select "$HARNESS" "$CONFIG") || exit 1
+  POOL_ACCOUNT=$(fm_account_pool_select "$HARNESS" "$CONFIG" "$RAW_COMMAND") || exit 1
 fi
 POOL_ACCOUNT_ID=
 POOL_ACCOUNT_VAR=

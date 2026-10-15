@@ -537,6 +537,56 @@ ANSWERS
   pass "the pool refuses a malformed unset list, a foreign store variable, and a non-directory folder"
 }
 
+test_pool_refuses_a_raw_command_that_overrides_the_pick() {
+  local out rc id=acct-pool-raw var
+  new_case pool-raw claude
+  enable_pool "$HOME_DIR" "$CASE/pool"
+  mkdir -p "$CASE/pool/claude" "$CASE/other"
+  pool_pick_ok "$CASE" claude pa_aa11bb22 CLAUDE_CONFIG_DIR "$CASE/pool/claude" '["ANTHROPIC_API_KEY"]'
+  for var in "CLAUDE_CONFIG_DIR=$CASE/other" ANTHROPIC_API_KEY=override-key; do
+    out=$(spawn_ship "$id-${var%%=*}" --harness "FOO=1 $var claude --print raw"); rc=$?
+    expect_code 1 "$rc" "a raw Claude command setting ${var%%=*} must refuse under a pool pick"
+    assert_refused_before_launch "$id-${var%%=*}" "$out" "the raw launch command sets ${var%%=*}"
+    assert_contains "$out" "remove ${var%%=*} from the raw command, or remove config/account-pool" \
+      "the refusal should say how to proceed"
+  done
+  assert_absent "$CASE/claude-worker" "a refused raw override must never start Claude"
+
+  new_case pool-raw-ok claude
+  enable_pool "$HOME_DIR" "$CASE/pool"
+  mkdir -p "$CASE/pool/claude"
+  pool_pick_ok "$CASE" claude pa_cc33dd44 CLAUDE_CONFIG_DIR "$CASE/pool/claude" '["ANTHROPIC_API_KEY"]'
+  out=$(spawn_ship acct-pool-raw-ok --harness "FOO=1 claude --print raw"); rc=$?
+  expect_code 0 "$rc" "a raw Claude command that sets nothing the pick needs should still launch: $out"
+  assert_contains "$out" "account=pa_cc33dd44" "the raw spawn should report the picked account"
+  run_pane
+  assert_grep "CLAUDE_CONFIG_DIR=$CASE/pool/claude" "$CASE/claude-worker" \
+    "a raw Claude worker should run under the picked folder"
+  assert_grep "ANTHROPIC_API_KEY=unset" "$CASE/claude-worker" \
+    "a raw Claude worker should still shed the pick's unset list"
+  pass "a pool home refuses a raw launch command that overrides the pick, and keeps one that does not"
+}
+
+test_pool_config_broken_symlink_refuses() {
+  local out rc id=acct-pool-link
+  new_case pool-link claude
+  ln -s "$CASE/missing-pool-file" "$HOME_DIR/config/account-pool"
+  out=$(spawn_ship "$id"); rc=$?
+  expect_code 1 "$rc" "a config/account-pool broken symlink must refuse the spawn"
+  assert_refused_before_launch "$id" "$out" "config/account-pool must be a readable regular file"
+  assert_absent "$CASE/pool-calls" "a broken pool symlink must refuse before running the command"
+
+  new_case pool-link-ok claude
+  mkdir -p "$CASE/pool/claude"
+  printf 'state=%s\n' "$CASE/pool" > "$CASE/pool.conf"
+  ln -s "$CASE/pool.conf" "$HOME_DIR/config/account-pool"
+  pool_pick_ok "$CASE" claude pa_aa11bb22 CLAUDE_CONFIG_DIR "$CASE/pool/claude" '["ANTHROPIC_API_KEY"]'
+  out=$(spawn_ship acct-pool-link-ok); rc=$?
+  expect_code 0 "$rc" "a config/account-pool symlink to a readable file should still be a usable pool: $out"
+  assert_contains "$out" "account=pa_aa11bb22" "the pool behind a symlink should still be picked"
+  pass "a broken config/account-pool symlink refuses, and a resolvable one still works"
+}
+
 test_absent_pin_keeps_the_launch_unchanged
 test_claude_pin_selects_the_root_and_sheds_ambient_credentials
 test_claude_pin_refuses_a_signed_out_root_despite_an_ambient_login
@@ -553,6 +603,8 @@ test_local_secondmate_reads_the_launching_home_pin
 test_pool_selects_an_account_when_no_pin_applies
 test_pool_sheds_exactly_the_picks_unset_list
 test_pool_refuses_an_unusable_answer
+test_pool_refuses_a_raw_command_that_overrides_the_pick
+test_pool_config_broken_symlink_refuses
 test_a_pin_still_wins_over_the_pool
 test_pool_refusals_create_nothing
 

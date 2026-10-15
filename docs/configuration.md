@@ -1060,8 +1060,9 @@ When no pin applies and the harness is mapped, Firstmate runs `<command> pick <t
 A launch carries the picked folder the same way a pin carries its root: an `env -u <name> ... <VAR>=<folder>` prefix on the launch line, so the launch line and the task record hold folder paths only.
 No key, token, or login file ever reaches a launch line, a task record, a log, a status line, or an error message.
 The spawn prints the pick as `account=<id>` and records the same field in the task record.
+Because the pool's `env` prefix and the pick's `unset` list are prepended to a raw launch command, a raw launch command whose leading `NAME=VALUE` words set the picked store variable or one of those unset names refuses before anything is created; remove the assignment, or remove `config/account-pool`.
 
-A malformed file, a `pick` that exits non-zero, an answer whose `unset` is not an array of environment-variable names, or an answer that names no usable account folder - not the tool's own store variable (`CLAUDE_CONFIG_DIR` for Claude, `CODEX_HOME` for Codex, `PI_CODING_AGENT_DIR` for Pi) or not an existing readable, searchable directory - refuses the launch before anything is created.
+A malformed file (including a `config/account-pool` that exists but is not a readable regular file, such as a broken symlink), a `pick` that exits non-zero, an answer whose `unset` is not an array of environment-variable names, or an answer that names no usable account folder - not the tool's own store variable (`CLAUDE_CONFIG_DIR` for Claude, `CODEX_HOME` for Codex, `PI_CODING_AGENT_DIR` for Pi) or not an existing readable, searchable directory - refuses the launch before anything is created.
 The refusal names the tool and the login to do and says which accounts are resting or signed out, in the tone of the pin's sign-in refusal; Firstmate never falls back to an ambient login or copies a credential.
 Like the pin, the pool is not inherited into secondmate homes: a local secondmate agent launches on the launching home's pool, while the secondmate's own workers read the secondmate home's file.
 
