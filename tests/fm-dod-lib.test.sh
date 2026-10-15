@@ -512,6 +512,11 @@ EOF
   [ "$(cat "$home/post.args")" = "receipt $wt $(git -C "$wt" rev-parse HEAD) -" ] \
     || fail "post-merge hook got wrong arguments or ran more than once: $(cat "$home/post.args")"
   assert_grep 'post-merge hook failed (exit 5); the merge stands' "$home/merge.out" "post-merge hook failure was not named"
+  # Repeating the landing is a fast-forward no-op, so the hook must not rerun.
+  fm_run_timed 60 env FM_HOME="$home" "$ROOT/bin/fm-merge-local.sh" receipt > "$home/merge.out" 2>&1 \
+    || fail "repeat local landing of an unchanged default branch failed: $(cat "$home/merge.out")"
+  [ "$(cat "$home/post.args")" = "receipt $wt $(git -C "$wt" rev-parse HEAD) -" ] \
+    || fail "repeat landing reran the post-merge hook: $(cat "$home/post.args")"
   rm "$home/config/merge-gate" "$home/config/post-merge"
   # Legacy tasks remain compatible when no receipt exists.
   grep -v '^receipt_required=' "$meta" > "$home/state/legacy.meta"
