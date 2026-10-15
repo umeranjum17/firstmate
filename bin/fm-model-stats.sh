@@ -24,42 +24,16 @@
 # sampled row never fabricates a verdict.
 set -eu
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-[ "${1:-}" = --json ] || { echo 'usage: fm-model-stats.sh --json [--now <unix-seconds>]' >&2; exit 2; }
-shift
-now=$(date +%s)
-while [ "$#" -gt 0 ]; do
-  case "$1" in
-    --now) [ "$#" -ge 2 ] || exit 2; now=$2; shift 2 ;;
-    *) exit 2 ;;
-  esac
-done
-case "$now" in ''|*[!0-9]*) echo 'fm-model-stats: --now requires Unix seconds' >&2; exit 2 ;; esac
-exec python3 - "${FM_HOME:-$SCRIPT_DIR/..}" "$now" <<'PY'
+exec python3 - "$SCRIPT_DIR" "${FM_HOME:-$SCRIPT_DIR/..}" "$@" <<'PY'
 import json, math, re, statistics, sys
 from datetime import datetime
-from pathlib import Path
 
-ROOT, NOW = Path(sys.argv[1]).resolve(), int(sys.argv[2])
+sys.path.insert(0, sys.argv[1])
+from fm_stats_lib import parse_args, read_tsv, walk_homes
+
+ROOT, NOW = parse_args(sys.argv[2:], 'fm-model-stats.sh')
 WINDOWS = (7, 30)
 DAY = 86400
-
-def read_tsv(path):
-    try:
-        lines = Path(path).read_text(errors='replace').splitlines()
-    except OSError:
-        return None
-    if not lines:
-        return []
-    cols = lines[0].split('\t')
-    rows = []
-    for line in lines[1:]:
-        if line == '':
-            continue
-        fields = line.split('\t')
-        if len(fields) != len(cols):
-            continue
-        rows.append(dict(zip(cols, fields)))
-    return rows
 
 def to_epoch(value):
     if value is None:
@@ -111,28 +85,7 @@ def pr_key(url):
     return (m[1], m[2]) if m else None
 
 # --- homes ---------------------------------------------------------------
-homes, seen = {}, set()
-pending = [('main', ROOT)]
-while pending:
-    name, home = pending.pop(0)
-    if home in seen:
-        continue
-    seen.add(home)
-    homes[name] = home
-    try:
-        lines = (home / 'data/secondmates.md').read_text(errors='replace').splitlines()
-    except OSError:
-        continue
-    for line in lines:
-        m = re.match(r'^- ([\w.-]+) - .*\((?:host:\s*([^;]+);\s*root:\s*([^;]+);\s*)?home:\s*([^;]+);', line)
-        if not m:
-            continue
-        if m.group(2):
-            homes[m.group(1)] = None
-            continue
-        path = Path(m.group(4).strip())
-        if path.is_absolute():
-            pending.append((m.group(1), path.resolve()))
+homes = walk_homes(ROOT)
 
 # --- sources -------------------------------------------------------------
 prs = read_tsv(ROOT / 'data/metrics/prs.tsv')

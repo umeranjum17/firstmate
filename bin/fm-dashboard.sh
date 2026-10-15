@@ -1665,28 +1665,21 @@ if flow_text is not None:
             folder['display_name'] = os.path.basename(folder.pop('path'))
     except (ValueError, KeyError, TypeError):
         flow, flow_error = None, 'Flow observations unreadable'
-model_text = probe(['bash', os.path.join(BIN, 'fm-model-stats.sh'), '--json', '--now', str(int(NOW_TS))],
+def read_stat(kind, script):
+    text = probe(['bash', os.path.join(BIN, script), '--json', '--now', str(int(NOW_TS))],
                    timeout=10, env=dict(os.environ, FM_HOME=HOME))[0]
-models, models_error = None, None if model_text is not None else 'Model statistics reader unavailable'
-if model_text is not None:
+    if text is None:
+        return None, f'{kind} statistics reader unavailable'
     try:
-        models = json.loads(model_text)
-        if not isinstance(models, dict) or models.get('schema') != 'fm-model-stats.v1':
-            raise ValueError('unsupported model statistics format')
-        models['limitations'] = len(models.get('limitations') or [])
+        data = json.loads(text)
+        if not isinstance(data, dict) or data.get('schema') != f'fm-{kind.lower()}-stats.v1':
+            raise ValueError(f'unsupported {kind.lower()} statistics format')
+        data['limitations'] = len(data.get('limitations') or [])
     except (ValueError, KeyError, TypeError):
-        models, models_error = None, 'Model statistics unreadable'
-skill_text = probe(['bash', os.path.join(BIN, 'fm-skill-stats.sh'), '--json', '--now', str(int(NOW_TS))],
-                   timeout=10, env=dict(os.environ, FM_HOME=HOME))[0]
-skills, skills_error = None, None if skill_text is not None else 'Skill statistics reader unavailable'
-if skill_text is not None:
-    try:
-        skills = json.loads(skill_text)
-        if not isinstance(skills, dict) or skills.get('schema') != 'fm-skill-stats.v1':
-            raise ValueError('unsupported skill statistics format')
-        skills['limitations'] = len(skills.get('limitations') or [])
-    except (ValueError, KeyError, TypeError):
-        skills, skills_error = None, 'Skill statistics unreadable'
+        return None, f'{kind} statistics unreadable'
+    return data, None
+models, models_error = read_stat('Model', 'fm-model-stats.sh')
+skills, skills_error = read_stat('Skill', 'fm-skill-stats.sh')
 def scrub(node):
     if isinstance(node, dict):
         for key in ('reason', 'source', 'gate_source', 'errors'):

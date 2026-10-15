@@ -19,70 +19,23 @@
 #   limitations   human-readable coverage notices (the dashboard shows the count)
 set -eu
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-[ "${1:-}" = --json ] || { echo 'usage: fm-skill-stats.sh --json [--now <unix-seconds>]' >&2; exit 2; }
-shift
-now=$(date +%s)
-while [ "$#" -gt 0 ]; do
-  case "$1" in
-    --now) [ "$#" -ge 2 ] || exit 2; now=$2; shift 2 ;;
-    *) exit 2 ;;
-  esac
-done
-case "$now" in ''|*[!0-9]*) echo 'fm-skill-stats: --now requires Unix seconds' >&2; exit 2 ;; esac
-exec python3 - "${FM_HOME:-$SCRIPT_DIR/..}" "$now" <<'PY'
-import json, re, sys
+exec python3 - "$SCRIPT_DIR" "${FM_HOME:-$SCRIPT_DIR/..}" "$@" <<'PY'
+import json, sys
 from datetime import datetime, timezone
-from pathlib import Path
 
-ROOT, NOW = Path(sys.argv[1]).resolve(), int(sys.argv[2])
+sys.path.insert(0, sys.argv[1])
+from fm_stats_lib import parse_args, read_tsv, walk_homes
+
+ROOT, NOW = parse_args(sys.argv[2:], 'fm-skill-stats.sh')
 WINDOWS = (7, 30)
 DAY = 86400
 TODAY = datetime.fromtimestamp(NOW, timezone.utc).strftime('%Y-%m-%d')
-
-def read_tsv(path):
-    try:
-        lines = Path(path).read_text(errors='replace').splitlines()
-    except OSError:
-        return None
-    if not lines:
-        return []
-    cols = lines[0].split('\t')
-    rows = []
-    for line in lines[1:]:
-        if line == '':
-            continue
-        fields = line.split('\t')
-        if len(fields) != len(cols):
-            continue
-        rows.append(dict(zip(cols, fields)))
-    return rows
 
 def cutoff(window):
     return datetime.fromtimestamp(NOW - DAY * (window - 1), timezone.utc).strftime('%Y-%m-%d')
 
 # --- homes ---------------------------------------------------------------
-homes, seen = {}, set()
-pending = [('main', ROOT)]
-while pending:
-    name, home = pending.pop(0)
-    if home in seen:
-        continue
-    seen.add(home)
-    homes[name] = home
-    try:
-        lines = (home / 'data/secondmates.md').read_text(errors='replace').splitlines()
-    except OSError:
-        continue
-    for line in lines:
-        m = re.match(r'^- ([\w.-]+) - .*\((?:host:\s*([^;]+);\s*root:\s*([^;]+);\s*)?home:\s*([^;]+);', line)
-        if not m:
-            continue
-        if m.group(2):
-            homes[m.group(1)] = None
-            continue
-        path = Path(m.group(4).strip())
-        if path.is_absolute():
-            pending.append((m.group(1), path.resolve()))
+homes = walk_homes(ROOT)
 
 # Known skill names from each local home's skill directories; used only to name
 # skills that were never read. A missing directory is simply skipped.
