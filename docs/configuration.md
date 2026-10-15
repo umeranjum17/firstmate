@@ -1091,7 +1091,7 @@ The gate's content is home-local policy; [`fm_dod_merge_gate`](../bin/fm-dod-lib
 ## Post-merge hook (config/post-merge)
 
 The optional local, gitignored `config/post-merge` is an executable that runs once after a confirmed merge, for example to post the merge's evidence card to a sign-off board.
-When the file exists and is executable, `bin/fm-merge-local.sh` runs `config/post-merge <task-id> <worktree|-> <head> -` after its fast-forward, and the shared PR merge outcome runs `config/post-merge <task-id> <worktree|-> - <pr-url>` the first time it records a merge, whether this home merged it or its merge poll saw it, both with `FM_HOME` set.
+When the file exists and is executable, `bin/fm-merge-local.sh` runs `config/post-merge <task-id> <worktree|-> <head> -` after its fast-forward when the fast-forward moved the branch, and the shared PR merge outcome runs `config/post-merge <task-id> <worktree|-> - <pr-url>` the first time it records a merge, whether this home merged it or its merge poll saw it, both with `FM_HOME` set.
 The merge has already landed, so the hook can never undo or refuse it: its output is printed, and a failure, a timeout after `FM_POST_MERGE_TIMEOUT` seconds (default `120`), or a file that is not executable is reported and otherwise ignored.
 The hook's content is home-local policy; [`fm_merge_post_hook`](../bin/fm-merge-outcome-lib.sh) owns the invocation mechanics.
 
