@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+# merge-card: every Firstmate merge runs done-done and posts one evidence card to a sign-off board.
+#
+#   merge-card gate <task-id> <worktree|-> <head|-> <pr-url|->
+#     Install as $FM_HOME/config/merge-gate. In the task's worktree it runs
+#     `done-done check --from <pr-url>` (or $FM_HOME/data/<task-id>/checks.md with no PR),
+#     with done-done's judge, prints the verdict and saves it for the card in $FM_HOME/data/<task-id>/merge-card.json.
+#     Report only: it always exits 0, so it never refuses a merge.
+#   merge-card post --board <board.json> <task-id> <worktree|-> <head|-> <pr-url|->
+#     Install as $FM_HOME/config/post-merge. Posts one card per merge: the Checks outcome as the
+#     title, done-done's verdict in plain words, the pull request link (the merged commit with no PR), and the
+#     Checks evidence screenshots and recordings (at most 12), or those of a done-done verify run
+#     at the merged head through `done-done signoff`. The card key is the merge's own, so a repeat
+#     post, or another home posting the same merge, finds it on the board and adds nothing.
+#     sign-off-axi writes the board under its lock: it appends and never rewrites other cards.
+# Needs done-done, sign-off-axi, jq and gh on PATH.
+set -u
+
+die() { echo "merge-card: $*" >&2; exit 1; }
+
+# check <task-id> <worktree|-> <head|-> <pr-url|-> <record>: run done-done, save and print the verdict.
+check() {
+  local id=$1 wt=$2 head=$3 pr=$4 record=$5 src out='' rc=0 verdict signoff=''
+  src=$pr
+  [ "$pr" != - ] || src=$FM_HOME/data/$id/checks.md
+  if [ "$wt" = - ] || [ ! -d "$wt" ]; then
+    verdict="not checked: its work copy was already cleaned up"
+  else
+    out=$(cd "$wt" && done-done check --from "$src" --judge --json 2>&1) || rc=$?
+    case $rc in
+      0) verdict=pass ;;
+      1) verdict=fail ;;
+      3) verdict=inconclusive ;;
+      # No judge configured is a config stop (exit 2), not a proof result: report it as not checked.
+      *) case $out in *"no judge is set"*) verdict="not checked: no judge is set" ;; *) verdict="error (exit $rc)" ;; esac ;;
+    esac
+    # A done-done verify run at this exact head brings its own sign-off message and captures.
+    signoff=$(cd "$wt" && done-done signoff --json 2>/dev/null | jq -r 'select(.kind == "evidence") | .file // empty')
+    { [ -n "$signoff" ] && [ "$(jq -r .run.commit "$signoff" 2>/dev/null)" = "$head" ]; } || signoff=''
+  fi
+  printf '%s' "$out" | jq -e 'type == "object"' >/dev/null 2>&1 || out=$(jq -n --arg e "$out" 'if $e == "" then {} else {error: $e} end')
+  mkdir -p "${record%/*}" &&
+    jq -n --arg head "$head" --arg pr "$pr" --arg verdict "$verdict" --arg signoff "$signoff" --argjson check "$out" \
+      '{$head, $pr, $verdict, $signoff, $check}' > "$record.$$" && mv "$record.$$" "$record"
+  echo "done-done check: $verdict ($src)"
+  printf '%s' "$out" | jq -r '(.findings // [])[:3][].why, (.error // empty)' | sed 's/^/  /'
+}
+
+gate() {
+  [ $# -eq 4 ] || { echo "usage: merge-card gate <task-id> <worktree|-> <head|-> <pr-url|->"; return; }
+  [ -n "${FM_HOME:-}" ] || { echo "merge-card: FM_HOME is not set, so done-done did not run"; return; }
+  check "$1" "$2" "$3" "$4" "$FM_HOME/data/$1/merge-card.json"
+  echo "merge-card: report only; done-done's verdict never refuses this merge"
+}
+
+post() {
+  local board='' id wt head pr record key link title about kind media run tmp out rc n=0 f
+  [ "${1:-}" = --board ] && [ -n "${2:-}" ] && board=$2 && shift 2
+  [ -n "$board" ] && [ $# -eq 4 ] || die "usage: merge-card post --board <board.json> <task-id> <worktree|-> <head|-> <pr-url|->"
+  [ -n "${FM_HOME:-}" ] || die "FM_HOME is not set"
+  id=$1 wt=$2 head=$3 pr=$4 record=$FM_HOME/data/$1/merge-card.json
+  if [ "$pr" != - ]; then
+    key=${pr#*://} link=$pr
+    key=merge-$(printf '%s' "${key#*/}" | tr -c 'A-Za-z0-9._-' -)
+  else
+    [ "$head" != - ] || die "a local merge needs its head"
+    key=merge-$head link=$head
+  fi
+  key=${key:0:128}
+  if [ -f "$board" ] && jq -e --arg k "$key" 'any(.items[]?; .key == $k)' "$board" >/dev/null; then
+    echo "merge-card: $key is already on the board"; return 0
+  fi
+  # The gate's verdict for this merge, else run done-done now (a merge the gate never saw).
+  jq -e --arg pr "$pr" --arg head "$head" '.pr == $pr and ($pr != "-" or .head == $head)' "$record" >/dev/null 2>&1 || {
+    [ "$head" != - ] || head=$(gh pr view "$pr" --json headRefOid --jq .headRefOid 2>/dev/null) || head=-
+    check "$id" "$wt" "${head:--}" "$pr" "$record"
+  }
+  title=$(jq -r '.check.claim // empty' "$record")
+  [ -n "$title" ] || [ "$pr" = - ] || title=$(gh pr view "$pr" --json title --jq .title 2>/dev/null)
+  [ -n "$title" ] || title="Merged $id"
+  # done-done's verdict in plain words, then its first finding (or the judge's reason on a pass)
+  # with the file named without its folder, so the card shows no local paths.
+  about=$(jq -r '
+    def plain: sub("^/[^ ]*/"; "")
+      | sub(": not in any done-done run record, so it is not tied to a commit"; " was captured by hand, not in a done-done run, so nothing ties it to this commit")
+      | sub(": judge says wrong screen: "; " does not show the outcome: ")
+      | sub(": judge says unsure: .*"; " may not show the outcome: the judge was not sure");
+    ({pass: "done-done checked the proof and it holds up", fail: "done-done checked the proof and it does not hold up",
+      inconclusive: "done-done could not confirm the proof"}[.verdict]
+      // if (.verdict | startswith("not checked")) then "done-done did not check this merge: " + (.verdict | sub("^not checked: "; ""))
+         else "done-done could not run (" + .verdict + ")" end)
+    + ([(.check.findings[]?.why | plain), (.check.judge.judged[]? | select(.verdict == "pass") | .reason)][:1] | map(": " + .) | join(""))' "$record")
+  tmp=$(mktemp -d) || die "cannot make a scratch folder"
+  trap 'rm -rf "$tmp"' RETURN
+  # Media and run: the verify run's sign-off message, else the Checks evidence files.
+  f=$(jq -r '.signoff' "$record")
+  if [ -n "$f" ] && [ -f "$f" ]; then
+    run=$(jq -c .run "$f")
+    media=$(jq -r '.media[]?' "$f" | sed "s|^|${f%/*}/|")
+  else
+    run=null
+    media=$(jq -r '.check.evidence[]?' "$record" | grep -iE '\.(png|jpe?g|webp|mp4|webm)$')
+  fi
+  while IFS= read -r f; do
+    [ -f "$f" ] && [ "$n" -lt 12 ] || continue
+    n=$((n + 1)) && cp "$f" "$tmp/$n.$(printf '%s' "${f##*.}" | tr '[:upper:]' '[:lower:]')"
+  done <<< "$media"
+  media=$(cd "$tmp" && for f in $(seq 1 "$n"); do printf '%s\n' "$f".*; done | jq -R . | jq -s .)
+  kind=evidence
+  [ "$n" -gt 0 ] || [ "$run" != null ] || kind=report
+  jq -n --arg kind "$kind" --arg key "$key" --arg title "$title" --arg about "$about" --arg link "$link" \
+    --argjson run "$run" --argjson media "$media" --arg filed "$(date -u +%FT%TZ)" '
+    def clean(max): gsub("[\u0000-\u0009\u000b-\u001f\u007f-\u009f]"; " ") | if length > max then .[:max - 3] + "..." else . end;
+    {contract: 1, kind: $kind, schema: 1, key: $key, title: ($title | clean(160)), about: ($about | clean(500)), link: $link}
+    + if $kind == "report" then {filed: $filed} else {} end
+    + if $media != [] then {media: $media} else {} end
+    + if $run != null then {run: $run} else {} end' > "$tmp/card.json" || die "cannot write the card"
+  for _ in 1 2 3; do
+    rc=0
+    out=$(sign-off-axi post "$board" --kind "$kind" --from "$tmp/card.json" --filer firstmate-merge 2>&1) || rc=$?
+    case $out in
+      *"already holds a different"* | *"is already used"*) echo "merge-card: $key is already on the board"; return 0 ;;
+      *BUSY* | *"still writing"*) sleep 2 ;;
+      *) break ;;
+    esac
+  done
+  printf '%s\n' "$out"
+  [ "$rc" -eq 0 ] || die "sign-off-axi could not post $key (exit $rc)"
+  echo "merge-card: posted $key ($kind, $n media, $about)"
+}
+
+case ${1:-} in
+  gate) shift; gate "$@"; exit 0 ;;
+  post) shift; post "$@" ;;
+  *) die "usage: merge-card gate|post ... (see the header of $0)" ;;
+esac
