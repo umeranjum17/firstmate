@@ -2,30 +2,26 @@
 # fm-model-stats.sh - per-model fleet statistics for the dashboard's Models view.
 # Usage: FM_HOME=<home> fm-model-stats.sh --json [--now <unix-seconds>]
 #
-# Read-only: it writes nothing and never touches an endpoint. It reads this
-# home, then every locally registered home discovered recursively through each
-# home's data/secondmates.md, and combines three durable sources:
-#   <home>/data/metrics/task-outcomes.tsv  the authoritative record written once
-#     per task end by bin/fm-task-outcome.sh at teardown, carrying the model
-#     history (harness:model:effort in launch order), spawn and end times,
-#     outcome and PR URL. Never sampled.
-#   <home>/data/metrics/lanes.tsv          the older sampled lane ledger. Used
-#     only for tasks the outcomes file predates, marked sampled=true.
-#   <home>/data/metrics/prs.tsv            one row per merged PR; joined by PR
-#     URL for time-to-merge, first-pass, rework, revert and escape counts.
+# Read-only: it writes nothing and never touches an endpoint. It reads this home,
+# then every locally registered home found through each home's data/secondmates.md,
+# from three durable sources: data/metrics/task-outcomes.tsv (the authoritative
+# record bin/fm-task-outcome.sh writes per task end, never sampled), the older
+# sampled data/metrics/lanes.tsv (used only for tasks the outcomes file predates,
+# marked sampled=true), and data/metrics/prs.tsv (one row per merged PR, joined by
+# PR URL for time-to-merge, first-pass, rework, revert and escape counts).
 #
 # Output fm-model-stats.v1 (times in seconds, null means unknown):
 #   at, now, windows [7, 30]
 #   models[w]    one entry per model over the window, largest finished first
-#   coverage     which sources were present, how many task rows each supplied,
-#                and whether any sampled task contributed
+#   coverage     which sources were present, how many task rows each supplied, and
+#                whether any sampled task contributed
 #   limitations  human-readable coverage notices (the dashboard shows the count)
 #
 # A task is attributed to the model it ended on; a task whose history names more
 # than one model also counts as a switch. Merge rate is merged ship tasks over
-# finished ship tasks with a recorded terminal outcome; tasks with an unknown
-# outcome (sampled lanes with no merged PR) are reported in unknown_outcome and
-# left out of the denominator so a sampled row never fabricates a verdict.
+# finished ship tasks with a recorded terminal outcome; a sampled lane with no
+# merged PR is reported in unknown_outcome and left out of the denominator so a
+# sampled row never fabricates a verdict.
 set -eu
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 [ "${1:-}" = --json ] || { echo 'usage: fm-model-stats.sh --json [--now <unix-seconds>]' >&2; exit 2; }
@@ -39,8 +35,8 @@ while [ "$#" -gt 0 ]; do
 done
 case "$now" in ''|*[!0-9]*) echo 'fm-model-stats: --now requires Unix seconds' >&2; exit 2 ;; esac
 exec python3 - "${FM_HOME:-$SCRIPT_DIR/..}" "$now" <<'PY'
-import json, math, os, re, statistics, sys
-from datetime import datetime, timezone
+import json, math, re, statistics, sys
+from datetime import datetime
 from pathlib import Path
 
 ROOT, NOW = Path(sys.argv[1]).resolve(), int(sys.argv[2])

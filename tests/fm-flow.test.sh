@@ -440,28 +440,23 @@ assert sk('gadget')['w7']['reads'] == 0 and sk('gadget')['w30']['reads'] == 100 
 assert z['zero_read_w7'] == [] and z['zero_read_w30'] == [], 'a registered remote home suppresses zero-read claims'
 assert [r['skill'] for r in z['by_home']['main']][:3] == ['used-heavy', 'shared', 'gadget'] and [r['skill'] for r in z['by_home']['byokit']] == ['shared'], 'per-home skill breakdown'
 assert any('distant' in n for n in z['limitations']), 'a remote home is disclosed as unreadable'
-ze = tmp / 'empty-skill'
-ze.mkdir()
-zempty = json.loads(run(skill, ze))
+def mk_skill_home(name, skills=(), tsv=None):
+    h = tmp / name
+    (h / 'data/metrics').mkdir(parents=True)
+    for s in skills:
+        (h / 'skills' / s).mkdir(parents=True)
+        (h / 'skills' / s / 'SKILL.md').write_text('x')
+    if tsv is not None:
+        (h / 'data/metrics/skills.tsv').write_text('day\thome\tskill\treads\n' + tsv)
+    return h
+zempty = json.loads(run(skill, mk_skill_home('empty-skill')))
 assert zempty['skills'] == [] and zempty['by_home'] == {} and zempty['limitations'], 'absent skill record is empty, not fatal'
-nr = tmp / 'no-reads'
-(nr / 'skills/widget').mkdir(parents=True)
-(nr / 'skills/widget/SKILL.md').write_text('x')
-znr = json.loads(run(skill, nr))
+znr = json.loads(run(skill, mk_skill_home('no-reads', ['widget'])))
 assert znr['zero_read_w7'] == [] and znr['zero_read_w30'] == [], 'known skills are not zero-read without any read records'
-stale = tmp / 'stale-skill'
-(stale / 'skills/widget').mkdir(parents=True)
-(stale / 'skills/widget/SKILL.md').write_text('x')
-(stale / 'data/metrics').mkdir(parents=True)
-(stale / 'data/metrics/skills.tsv').write_text('day\thome\tskill\treads\n' + f'{onday(40)}\tmain\twidget\t1\n')
-zs = json.loads(run(skill, stale))
+zs = json.loads(run(skill, mk_skill_home('stale-skill', ['widget'], f'{onday(40)}\tmain\twidget\t1\n')))
 assert zs['zero_read_w7'] == [] and zs['zero_read_w30'] == [], 'a collector whose coverage ends before the window claims no zero reads'
-zc = tmp / 'zero-count'
-(zc / 'skills/beta').mkdir(parents=True)
-(zc / 'skills/beta/SKILL.md').write_text('x')
-(zc / 'data/metrics').mkdir(parents=True)
-(zc / 'data/metrics/skills.tsv').write_text('day\thome\tskill\treads\n' + f'{onday(6)}\tmain\talpha\t1\n{onday(0)}\tmain\talpha\t3\n{onday(0)}\tmain\tbeta\t0\n')
-zz = json.loads(run(skill, zc))
+zz = json.loads(run(skill, mk_skill_home('zero-count', ['beta'],
+    f'{onday(6)}\tmain\talpha\t1\n{onday(0)}\tmain\talpha\t3\n{onday(0)}\tmain\tbeta\t0\n')))
 assert zz['zero_read_w7'] == ['beta'] and zz['zero_read_w30'] == [], 'a covered window lists known skills with no reads; a window the coverage does not span lists none'
 assert next(r for r in zz['skills'] if r['skill'] == 'beta')['w7'] == {'reads': 0, 'homes': 0}, 'a zero-count row does not count as reading a home'
 

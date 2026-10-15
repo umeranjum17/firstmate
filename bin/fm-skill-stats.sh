@@ -3,19 +3,18 @@
 # Usage: FM_HOME=<home> fm-skill-stats.sh --json [--now <unix-seconds>]
 #
 # Read-only: it writes nothing and never touches an endpoint. It reads
-# <home>/data/metrics/skills.tsv, one row per (day, home, skill) with the reads
-# that private collector recorded for that day; the file may be absent, in which
-# case the reader reports no rows rather than failing. It also enumerates each
-# local home's skill directories so it can name skills that were never read.
+# data/metrics/skills.tsv, one row per (day, home, skill) with the reads a private
+# collector recorded; the file may be absent, and the reader then reports no rows
+# rather than failing. It also enumerates each local home's skill directories so it
+# can name skills that were never read.
 #
 # Output fm-skill-stats.v1 (null means unknown):
 #   at, now, windows [7, 30]
-#   skills[w]     read counts per skill for the window, most-read first,
-#                 each with the number of homes it was read in
+#   skills[w]     read counts per skill for the window, most-read first, each with
+#                 the number of homes it was read in
 #   by_home[w]    per-home read counts, most-read first
-#   zero_read_w7, zero_read_w30  known skills with no reads in that window, only
-#                 for windows the coverage spans and while no remote home is
-#                 registered (a remote home's reads are not readable here)
+#   zero_read_w7, zero_read_w30  known skills with no reads in that window, only for
+#                 windows the coverage spans and while no remote home is registered
 #   coverage      whether skills.tsv was present, its row/day/skill/home counts
 #   limitations   human-readable coverage notices (the dashboard shows the count)
 set -eu

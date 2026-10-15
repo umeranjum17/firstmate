@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # fm-task-outcome.sh - append one durable task-outcome line to
 # <home>/data/metrics/task-outcomes.tsv for per-model fleet statistics.
+# Usage: fm-task-outcome.sh <task-id> [--force]
 #
-# Called best-effort by bin/fm-teardown.sh before the task's status and record
-# are retired, so the outcome file survives the volatile state it reads.
-# A failure to write never blocks or fails teardown: the caller ignores the exit
-# status, and this script itself only ever exits non-zero on a usage error.
+# Called best-effort by bin/fm-teardown.sh before the task's status and record are
+# retired; a write failure never blocks or fails teardown, and this script itself
+# only ever exits non-zero on a usage error.
 #
 # One tab-separated row per ended task; the first line is the header:
 #   home     the home that ran the task: "main" or the secondmate id whose home
@@ -13,23 +13,19 @@
 #   task     the task id.
 #   kind     ship | scout (secondmate retirements are not tasks and are skipped).
 #   project  the project directory basename, or "-" when none is recorded.
-#   models   every harness:model:effort the task ran on, in launch order, joined
-#            by ";". Read from state/<id>.models, which bin/fm-spawn.sh starts
-#            anew on every fresh spawn and appends to on every relaunch; falls
-#            back to the record's final harness/model/effort when no history
-#            file exists.
+#   models   every harness:model:effort the task ran on, in launch order, joined by
+#            ";", read from state/<id>.models, which bin/fm-spawn.sh starts anew on
+#            every fresh spawn and appends to on every relaunch; falls back to the
+#            record's final harness/model/effort when no history file exists.
 #   started  unix seconds of the first recorded launch (history file first line,
-#            else the spawn_gen epoch, else the record's mtime); empty when
-#            unknown.
+#            else the spawn_gen epoch, else the record's mtime); empty when unknown.
 #   ended    unix seconds when this cleanup ran.
-#   outcome  merged | closed | cancelled | scout | failed: a non-forced teardown
-#            only proceeds on landed work, so "merged" also covers a local-only
-#            landing; "closed" is a discarded task that had a recorded PR,
-#            "cancelled" a discarded task with none, "failed" one whose last
-#            status verb was failed, "scout" a scout whose report is the product.
+#   outcome  merged | closed | cancelled | scout | failed: a non-forced teardown only
+#            proceeds on landed work, so "merged" also covers a local-only landing;
+#            "closed" is a discarded task with a recorded PR, "cancelled" one with
+#            none, "failed" one whose last status verb was failed, "scout" a scout
+#            whose report is the product.
 #   pr       the recorded PR URL, else empty.
-#
-# Usage: fm-task-outcome.sh <task-id> [--force]
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

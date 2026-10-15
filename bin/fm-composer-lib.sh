@@ -570,16 +570,32 @@ FM_COMPOSER_OPENCODE_STATUS_RE_DEFAULT='^[[:space:]]*/.*[0-9]+(\.[0-9]+)?[KMG]?[
 # 2026-10-10 on the fm-model-scorecard worker, OpenCode 1.18.25 through Herdr:
 # `  ┃                     ~/.treehouse/firstmate-cff959/2/` above `  ┃  Build
 # · DeepSeek V4.1 Flash (Ollama) Ollama Cloud      firstmate:fm/fm-model-
-# scorecard`). The classifier used to read that fragment as typed text, so an
-# idle, EMPTY composer read `pending`: fm-send skipped the doorbell and
-# fm-control refused exit and relaunch on a healthy worker. The fragment is
-# furniture ONLY in this exact shape - wide left padding (a wrapped
-# right-aligned cell, never the two-space indent typed rows carry), a path
-# opening `~/` or `/`, no whitespace inside it, and the row DIRECTLY below a
-# model row - so typed text in that position keeps its shallow indent and
-# stays pending. Consulted on the post-bar row body before trimming, by the
-# left-bar classifier and the extractor alike.
+# scorecard`). On an even longer worktree path the SAME cell wraps over
+# CONSECUTIVE rows (captured live 2026-10-10 on the desklink lead's engine-fix
+# worker, OpenCode 1.18.25 through Herdr): `  ┃
+# ~/.treehouse/desklink-f2d1d8/4/`, then `  ┃
+# desklink:fm/dl-engine-restart-keeps-` (the continuation row carries no `~/`
+# or `/` lead), then `  ┃  Build · DeepSeek V4.1 Flash pair`. The classifier
+# used to read that fragment as typed text, so an idle, EMPTY composer read
+# `pending`: fm-send skipped the doorbell and fm-control refused exit and
+# relaunch on a healthy worker. The fragment is furniture ONLY in this exact
+# shape - wide left padding (a wrapped right-aligned cell, never the
+# two-space indent typed rows carry), an opening row whose path begins `~/` or
+# `/` with no whitespace, zero or more no-whitespace continuation rows below
+# it, all ending DIRECTLY above a model row - so typed text in that position
+# keeps its shallow indent and stays pending. The opening row matches
+# FM_COMPOSER_OPENCODE_RIGHT_CELL_WRAP_RE_DEFAULT and each continuation row
+# matches FM_COMPOSER_OPENCODE_WRAP_CONT_RE_DEFAULT below; the caller proves
+# the run against the model row through
+# _fm_composer_opencode_wrap_run_start. Consulted on the post-bar row body
+# before trimming, by the left-bar classifier and the extractor alike.
 FM_COMPOSER_OPENCODE_RIGHT_CELL_WRAP_RE_DEFAULT='^[[:space:]]{8,}(~/|/)[^[:space:]]+$'
+# A wrapped `<dir>:<branch>` cell's continuation row: the same wide
+# right-aligned padding, but no `~/` or `/` lead (the wrap broke mid-token), so
+# the opening row is the only row that carries the path lead and every row here
+# is one unbroken no-whitespace token. Typed text never matches - it keeps its
+# two-space indent - so this only ever extends the opening row's furniture run.
+FM_COMPOSER_OPENCODE_WRAP_CONT_RE_DEFAULT='^[[:space:]]{8,}[^[:space:]]+$'
 # Pi's footer stats row opens at column 0 with the session cost when every
 # token counter is zero (`$0.000 (sub) 5.4%/272k (auto)` on pi 0.85.1).
 # That leading `$` is a cost cell, not a dead-shell prompt, only when a digit
@@ -840,14 +856,59 @@ fm_composer_classify_content() {  # <bordered> <content> [idle_re] [idle_case] [
 # closes over a bare agent-glyph row classifies through that same bare row,
 # while any other pair still needs a pi identity to prove anything, so this
 # can only ever move a verdict toward refusing, never toward a false `empty`.
+#
+# A rule CORRUPTED by a pi stderr notice still counts: the notice overwrites
+# the rule's leading columns and leaves its text followed by the remaining
+# dashes (`⚠️ Live session indexing failed: database is locked──────`, captured
+# live on the Ownvoice lead pane). That row is the composer's own bottom rule,
+# not typed input, so dropping it loses the separated pair and an idle, empty
+# composer reads `unknown`. The notice family is the exact one
+# _fm_composer_row_is_pi_notice owns, and the trailing 8-column run plus the
+# requirement that at least one dash be present keep a real draft (which has no
+# notice-family prefix) out.
 _fm_composer_pi_separator_row() {  # <trimmed-row>
-  local row=$1
+  local row=$1 rest
   [ -n "$row" ] || return 1
-  [ -z "${row//─/}" ] || return 1
-  case "$row" in
-    *────────*) return 0 ;;
-  esac
+  if [ -z "${row//─/}" ]; then
+    case "$row" in
+      *────────*) return 0 ;;
+    esac
+    return 1
+  fi
+  rest=${row//─/}
+  if [ "$rest" != "$row" ] \
+     && fm_composer_idle_matches "$rest" "${FM_COMPOSER_PI_NOTICE_RE:-$FM_COMPOSER_PI_NOTICE_RE_DEFAULT}" sensitive; then
+    case "$row" in
+      *────────*) return 0 ;;
+    esac
+  fi
   return 1
+}
+
+# _fm_composer_pi_wave_art_row: 0 when <trimmed-row> is one row of the animated
+# boat Pi's Calm working presentation draws in the composer's rule slot (the
+# ponytail/pi wave extension on the fleet panes): low block bars (▁▂▃▄), the
+# swell strokes (╲ ╱), the sail cells (◿ ◣), and the mast (│). These rows are
+# animation furniture, not typed input, and they stand where the composer's top
+# rule would be, so the separated pair must open on them or an idle, empty
+# composer reads `unknown`.
+#
+# The two-part test keeps a draft out: the row must carry at least one
+# distinctive wave MARK (a bar, a swell stroke, or a sail cell - never the bare
+# mast `│`, which is also an ordinary box side border) and its non-whitespace
+# content must be drawn ONLY from the wave set. Typed text is ASCII, so it
+# fails the mark test outright; a box content row (`│ foo │`) fails the
+# only-wave-set test. Both patterns are grep ALTERNATIONS of literal glyphs,
+# never a bracket range between multibyte endpoints, for the reason
+# FM_OMP_SPINNER_FRAMES_RE records.
+FM_COMPOSER_PI_WAVE_MARK_RE_DEFAULT='(▁|▂|▃|▄|╲|╱|◿|◣)'
+FM_COMPOSER_PI_WAVE_RE_DEFAULT='^[[:space:]]*(▁|▂|▃|▄|╲|╱|◿|◣|│)*[[:space:]]*$'
+_fm_composer_pi_wave_art_row() {  # <trimmed-row>
+  local row=$1
+  fm_composer_normalize_trim_var row
+  [ -n "$row" ] || return 1
+  fm_composer_idle_matches "$row" "${FM_COMPOSER_PI_WAVE_MARK_RE:-$FM_COMPOSER_PI_WAVE_MARK_RE_DEFAULT}" sensitive || return 1
+  fm_composer_idle_matches "$row" "${FM_COMPOSER_PI_WAVE_RE:-$FM_COMPOSER_PI_WAVE_RE_DEFAULT}" sensitive
 }
 
 # _fm_composer_pi_titled_rule_row: 0 when a trimmed row is Pi's LIVE turn frame
@@ -943,6 +1004,11 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
   FM_COMPOSER_SCAN_PI_PAIR_VALID=0
   FM_COMPOSER_SCAN_PI_OPEN=-1
   FM_COMPOSER_SCAN_PI_CLOSE=-1
+  # 1 when the recorded pair OPENED on a plain separator (pi's idle
+  # presentation) rather than on a titled rule or wave art (the working
+  # presentations); _fm_composer_pi_verdict reads it to settle a `working`
+  # identity over the idle shape.
+  FM_COMPOSER_SCAN_PI_OPEN_PLAIN=0
   FM_COMPOSER_SCAN_PI_LAST_SEPARATOR=-1
   # The glyph PROOF of each envelope: the first row strictly inside it whose
   # content leads with an agent prompt glyph once its side borders are
@@ -956,6 +1022,7 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
   FM_COMPOSER_SCAN_LEFTBAR_GLYPH_ROW=-1
   FM_COMPOSER_SCAN_LEFTBAR_GLYPH=
   local leftbar_start=-1 pi_open=-1 pi_lines=0 pi_max pi_sep pi_titled
+  local pi_open_plain=0
   local probe row_glyph row_glyph_row
   local box_glyph_row=-1 box_glyph='' pi_glyph_row=-1 pi_glyph=''
   pi_max=$FM_COMPOSER_PI_MAX_LINES
@@ -1001,10 +1068,16 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
     # Pi separator rows: a solid `─` rule at least 8 columns wide. A separator
     # closes the preceding candidate and immediately opens the next, so an
     # earlier transcript rule can never outrank the live bottom composer pair.
+    # A Calm wave-art row stands where the composer's top rule would be, so it
+    # opens the candidate like a titled top rule does (and, like it, does not
+    # move the staleness boundary, which stays with the closing rule below).
     pi_sep=0
     pi_titled=0
     if _fm_composer_pi_separator_row "$trimmed"; then pi_sep=1; fi
     if [ "$pi_sep" = 0 ] && _fm_composer_pi_titled_rule_row "$trimmed"; then
+      pi_titled=1
+    fi
+    if [ "$pi_sep" = 0 ] && [ "$pi_titled" = 0 ] && _fm_composer_pi_wave_art_row "$trimmed"; then
       pi_titled=1
     fi
     if [ "$pi_sep" = 1 ] || [ "$pi_titled" = 1 ]; then
@@ -1015,6 +1088,7 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
         FM_COMPOSER_SCAN_PI_PAIR_FOUND=1
         FM_COMPOSER_SCAN_PI_OPEN=$pi_open
         FM_COMPOSER_SCAN_PI_CLOSE=$row
+        FM_COMPOSER_SCAN_PI_OPEN_PLAIN=$pi_open_plain
         if [ "$pi_lines" -le "$pi_max" ]; then
           FM_COMPOSER_SCAN_PI_PAIR_VALID=1
         else
@@ -1024,6 +1098,7 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
         FM_COMPOSER_SCAN_PI_GLYPH=$pi_glyph
       fi
       pi_open=$row
+      pi_open_plain=$pi_sep
       pi_lines=0
       pi_glyph_row=-1
       pi_glyph=''
@@ -1385,6 +1460,54 @@ _fm_composer_row_is_opencode_right_cell_wrap() {  # <padded-body>
   fm_composer_idle_matches "$1" "${FM_COMPOSER_OPENCODE_RIGHT_CELL_WRAP_RE:-$FM_COMPOSER_OPENCODE_RIGHT_CELL_WRAP_RE_DEFAULT}" sensitive
 }
 
+# _fm_composer_row_is_opencode_wrap_continuation: 0 when <padded-body> - a
+# left-bar row's content after its `┃` is stripped, BEFORE trimming - is a
+# continuation row of a wrapped right-aligned `<dir>:<branch>` directory
+# fragment (FM_COMPOSER_OPENCODE_WRAP_CONT_RE_DEFAULT above): the same wide
+# right-aligned padding with no `~/` or `/` lead and no interior whitespace.
+# Furniture only as part of a run whose opening row is
+# _fm_composer_row_is_opencode_right_cell_wrap and which ends directly above a
+# model row.
+_fm_composer_row_is_opencode_wrap_continuation() {  # <padded-body>
+  fm_composer_idle_matches "$1" "${FM_COMPOSER_OPENCODE_WRAP_CONT_RE:-$FM_COMPOSER_OPENCODE_WRAP_CONT_RE_DEFAULT}" sensitive
+}
+
+# _fm_composer_opencode_wrap_run_start: print the FIRST row of a wrapped
+# right-aligned `<dir>:<branch>` directory fragment that ends on the row
+# directly above <last> and lies within [<first>,<last>), else print nothing
+# and return 1. A one-row wrap is the PR 55 shape (that row is the opening
+# FM_COMPOSER_OPENCODE_RIGHT_CELL_WRAP itself); a taller wrap is a run of
+# no-whitespace continuation rows below a `~/`- or `/`-opening row. The caller
+# must confirm <last> is a model row first, because the fragment is furniture
+# only in that position. Every row keeps the wide right-aligned padding, so
+# typed text's shallow indent never matches and is never consumed.
+_fm_composer_opencode_wrap_run_start() {  # <screen> <styled> <first> <last>
+  local screen=$1 styled=$2 first=$3 last=$4 row raw body
+  row=$((last - 1))
+  [ "$row" -ge "$first" ] || return 1
+  raw=$(_fm_composer_screen_row "$row" "$screen")
+  body=$(_fm_composer_row_content "$raw" "$styled")
+  case "$body" in '┃'*) body=${body#┃} ;; esac
+  if _fm_composer_row_is_opencode_right_cell_wrap "$body"; then
+    printf '%s' "$row"
+    return 0
+  fi
+  _fm_composer_row_is_opencode_wrap_continuation "$body" || return 1
+  row=$((row - 1))
+  while [ "$row" -ge "$first" ]; do
+    raw=$(_fm_composer_screen_row "$row" "$screen")
+    body=$(_fm_composer_row_content "$raw" "$styled")
+    case "$body" in '┃'*) body=${body#┃} ;; esac
+    if _fm_composer_row_is_opencode_right_cell_wrap "$body"; then
+      printf '%s' "$row"
+      return 0
+    fi
+    _fm_composer_row_is_opencode_wrap_continuation "$body" || return 1
+    row=$((row - 1))
+  done
+  return 1
+}
+
 # _fm_composer_row_is_opencode_busy: 0 when the trimmed row carries OpenCode's
 # in-turn hint (`esc interrupt`). A busy status row is NOT furniture, so the
 # below-floor block collector excludes any block that contains it - necessary
@@ -1500,18 +1623,19 @@ _fm_composer_classify_bare_wrap() {  # <screen> <styled> <glyph-row> <cursor-row
 # can prove it real, unknown otherwise.
 _fm_composer_classify_leftbar() {  # <screen> <styled> <first-row> <last-row>
   local screen=$1 styled=$2 first=$3 last=$4
-  local row raw content padded pending_seen=0 footer_re leading_blank=1 placeholder_position=0
-  local last_body last_is_model=0
+  local row raw content pending_seen=0 footer_re leading_blank=1 placeholder_position=0
+  local last_body wrap_first=-1
   footer_re=${FM_COMPOSER_LEFTBAR_FOOTER_RE:-$FM_COMPOSER_LEFTBAR_FOOTER_RE_DEFAULT}
   # The agent/model row's wrapped `<dir>:<branch>` directory fragment is
   # furniture only directly above a model row, so prove the run's LAST row is
-  # one before any row may claim that shape.
+  # one before any row may claim that shape, then resolve the whole wrapped
+  # run (one or more rows) that ends on the row directly above it.
   raw=$(_fm_composer_screen_row "$last" "$screen")
   last_body=$(_fm_composer_row_content "$raw" "$styled")
   case "$last_body" in '┃'*) last_body=${last_body#┃} ;; esac
   fm_composer_normalize_trim_var last_body
   if fm_composer_idle_matches "$last_body" "$footer_re" sensitive; then
-    last_is_model=1
+    wrap_first=$(_fm_composer_opencode_wrap_run_start "$screen" "$styled" "$first" "$last") || wrap_first=-1
   fi
   row=$first
   while [ "$row" -le "$last" ]; do
@@ -1520,7 +1644,6 @@ _fm_composer_classify_leftbar() {  # <screen> <styled> <first-row> <last-row>
     case "$content" in
       '┃'*) content=${content#┃} ;;
     esac
-    padded=$content
     fm_composer_normalize_trim_var content
     if [ -z "$content" ]; then row=$((row + 1)); continue; fi
     if [ "$leading_blank" = 1 ] && [ "$row" -gt "$first" ]; then
@@ -1537,8 +1660,7 @@ _fm_composer_classify_leftbar() {  # <screen> <styled> <first-row> <last-row>
        && fm_composer_idle_matches "$content" "$footer_re" sensitive; then
       row=$((row + 1)); continue
     fi
-    if [ "$row" -eq $((last - 1)) ] && [ "$last_is_model" = 1 ] \
-       && _fm_composer_row_is_opencode_right_cell_wrap "$padded"; then
+    if [ "$wrap_first" -ge 0 ] && [ "$row" -ge "$wrap_first" ] && [ "$row" -lt "$last" ]; then
       row=$((row + 1)); continue
     fi
     pending_seen=1
@@ -1904,7 +2026,7 @@ _fm_composer_extract_refusal_geometry() {  # <plain-screen>
 fm_composer_extract_selected_content() {  # <caps> <screen> [diagnostics=0]
   local caps=$1 screen=$2 styled=0 kv plain row raw content glyph joined='' footer_re prompt_row=-1
   local leading_blank=1 placeholder_position=0 prompt_is_shell=0 diagnostics=${3:-0}
-  local padded='' last_body last_is_model=0
+  local last_body wrap_first=-1
   footer_re=${FM_COMPOSER_LEFTBAR_FOOTER_RE:-$FM_COMPOSER_LEFTBAR_FOOTER_RE_DEFAULT}
   while IFS= read -r kv; do
     [ "$kv" = styled=1 ] && styled=1
@@ -1928,13 +2050,13 @@ EOF
     case "$last_body" in '┃'*) last_body=${last_body#┃} ;; esac
     fm_composer_normalize_trim_var last_body
     if fm_composer_idle_matches "$last_body" "$footer_re" sensitive; then
-      last_is_model=1
+      wrap_first=$(_fm_composer_opencode_wrap_run_start "$screen" "$styled" \
+        "$FM_COMPOSER_SELECTED_FIRST" "$FM_COMPOSER_SELECTED_LAST") || wrap_first=-1
     fi
   fi
   while [ "$row" -le "$FM_COMPOSER_SELECTED_LAST" ]; do
     raw=$(_fm_composer_screen_row "$row" "$screen")
     content=$(_fm_composer_row_content "$raw" "$styled")
-    padded=''
     placeholder_position=0
     if [ "$FM_COMPOSER_SELECTED_KIND" = pi ] \
        && _fm_composer_row_is_pi_notice "$raw" "$styled"; then
@@ -1950,7 +2072,6 @@ EOF
         ;;
       leftbar)
         case "$content" in '┃'*) content=${content#┃} ;; esac
-        padded=$content
         fm_composer_normalize_trim_var content
         if [ -z "$content" ]; then
           :
@@ -1993,9 +2114,9 @@ EOF
             && [ "$row" -eq "$FM_COMPOSER_SELECTED_LAST" ] \
             && fm_composer_idle_matches "$content" "$footer_re" sensitive; } \
        || { [ "$FM_COMPOSER_SELECTED_KIND" = leftbar ] \
-            && [ "$last_is_model" = 1 ] \
-            && [ "$row" -eq $((FM_COMPOSER_SELECTED_LAST - 1)) ] \
-            && _fm_composer_row_is_opencode_right_cell_wrap "$padded"; }; then
+            && [ "$wrap_first" -ge 0 ] \
+            && [ "$row" -ge "$wrap_first" ] \
+            && [ "$row" -lt "$FM_COMPOSER_SELECTED_LAST" ]; }; then
       row=$((row + 1))
       continue
     fi
@@ -2328,11 +2449,28 @@ _fm_composer_classify_bare_pi_overlap() {  # <screen> <styled> <has-identity> <i
 # rule, now fleet-wide). A missing identity capability keeps the shape
 # unknown; an unfetched identity on an identity-capable backend asks the
 # adapter to probe (lazily) and re-call. Proven input remains pending for every
-# live pi state, while only an idle/done pi proves an empty composer. A blocked
+# live pi state, while an idle/done pi proves an empty composer. A blocked
 # pi is parked on an interactive prompt waiting for a human keystroke: its menu
 # is drawn above the separator pair, so the composer region looks free while the
 # keys would answer the prompt instead of composing (issue #2797). Structure
 # cannot disprove that, so a blocked pi defers rather than claiming empty.
+#
+# A `working` identity is the one status structure CAN contradict. Pi's live
+# turn replaces the idle pair's plain top rule for the whole turn - with the
+# titled `── ⠧ Working ─` frame (_fm_composer_pi_titled_rule_row) or with the
+# Calm presentation's boat art, which opens the pair on wave rows
+# (_fm_composer_pi_wave_art_row) - so a pair that opens on a plain separator is
+# the idle presentation itself. A `working` registration over that shape is
+# provably stale, not a live turn: herdr keeps a pane's last report when the
+# turn-end report never lands (the aborted-operation freeze, measured live on
+# the Ownvoice lead pane 2026-10-11: `agent get` still reported working hours
+# after the operation aborted while the pane sat at a visibly empty composer,
+# every read returned `unknown`, fm-control refused every relaunch with
+# `not proven empty`, and the doorbell stayed undelivered for about an hour).
+# The stale registration therefore reads `empty` over the idle pair; typed text
+# still reads `pending` first, and a working-consistent structure (titled
+# frame, wave art) still defers. Blocked defers on every structure because its
+# menu sits above the pair, so even the plain idle shape cannot disprove it.
 _fm_composer_pi_verdict() {  # <screen> <styled> <has_identity> <identity>
   local screen=$1 styled=$2 has_identity=$3 identity=$4 agent agent_status state
   if [ "$has_identity" != 1 ]; then
@@ -2360,6 +2498,13 @@ _fm_composer_pi_verdict() {  # <screen> <styled> <has_identity> <identity>
   fi
   case "$agent_status" in
     idle|done) printf 'empty' ;;
+    working)
+      if [ "$FM_COMPOSER_SCAN_PI_OPEN_PLAIN" = 1 ]; then
+        printf 'empty'
+      else
+        printf 'unknown'
+      fi
+      ;;
     *) printf 'unknown' ;;
   esac
 }

@@ -31,7 +31,8 @@
 /* Models: one collapsible row per model; the summary shows merge rate and volume, the body shows every figure with its sample size. */
 .i-mtoggle{display:inline-flex;gap:2px;padding:2px;border:1px solid var(--line-3);border-radius:8px;margin:2px 0 6px}
 .i-mtoggle button{padding:4px 10px;border:0;border-radius:6px;background:none;color:var(--ink-3);font:inherit;font-size:12px;cursor:pointer}
-.i-mtoggle button.on{background:var(--i-warm);color:var(--bg);font-weight:600}
+.i-mtoggle button.on{background:var(--i-warm,#dfaa7d);color:var(--bg,#08090a);font-weight:600}
+[data-theme=light] .i-mtoggle button.on{background:var(--i-warm,#a75426);color:var(--bg,#f2f1ed)}
 .i-model{border-top:1px solid var(--line)}
 .i-model>summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:8px;padding:9px 0}
 .i-model>summary::-webkit-details-marker{display:none}

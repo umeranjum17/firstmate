@@ -101,9 +101,20 @@ ai_trailer_hooks_prefix() {  # <home> <id>
   printf "export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0='%s'; " "$state/$2.git-hooks"
 }
 
+calm_host_memory() {  # prints a host-memory probe root that never reads as pressured
+  local root=$TMP_ROOT/calm-host
+  mkdir -p "$root/proc/pressure" "$root/cgroup/user.slice/user-$(id -u).slice/user@$(id -u).service/app.slice" || return 1
+  printf 'MemTotal: 67108864 kB\nMemAvailable: 53687091 kB\nSwapTotal: 0 kB\nSwapFree: 0 kB\n' > "$root/proc/meminfo"
+  printf 'some avg10=1.00 avg60=1.00 avg300=1.00 total=1\n' > "$root/proc/pressure/memory"
+  printf 'some avg10=1.00 avg60=1.00 avg300=1.00 total=1\n' \
+    > "$root/cgroup/user.slice/user-$(id -u).slice/user@$(id -u).service/app.slice/memory.pressure"
+  printf '%s\n' "$root"
+}
+
 run_spawn() {
-  local home=$1 wt=$2 fakebin=$3 launchlog=$4
+  local home=$1 wt=$2 fakebin=$3 launchlog=$4 calm
   shift 4
+  calm=$(calm_host_memory) || fail "cannot create the calm host-memory probe"
   : > "$launchlog"
   # CLAUDE_CONFIG_DIR is forwarded onto claude launches by fm-spawn, so pin it
   # explicitly (empty by default) instead of leaking the invoking shell's value,
@@ -115,6 +126,7 @@ run_spawn() {
     FM_FAKE_CURSOR_MODELS="${FM_TEST_CURSOR_MODELS:-}" \
     FM_FAKE_CURSOR_LIST_STATUS="${FM_TEST_CURSOR_LIST_STATUS:-0}" \
     GROK_HOME="$home/grok-home" \
+    FM_HOST_MEMORY_PROC="$calm/proc" FM_HOST_MEMORY_CGROUP_ROOT="$calm/cgroup" \
     fm_test_run_spawn "$home" "$wt" "$fakebin" "$@"
 }
 
@@ -784,7 +796,154 @@ test_opencode_without_effort_keeps_launch_config_unchanged() {
     "OPENCODE_CONFIG_CONTENT='{\"permission\":{\"*\":\"allow\",\"external_directory\":\"allow\"}}' opencode --model 'anthropic/claude-sonnet-4-5' --prompt" \
     "opencode launch without effort must keep the permission-only config byte-identical"
   assert_not_contains "$launch" '"variant"' "opencode launch without effort must not write a variant"
+  assert_contains "$launch" "OPENCODE_DB='firstmate-" "opencode launch did not get its own session store"
+  assert_contains "$launch" "-$id.db' OPENCODE_CONFIG_CONTENT=" "opencode session store is not keyed by the task id"
   pass "opencode without an effort keeps its launch config unchanged"
+}
+
+# The opencode-go provider's key lives in <opencode data dir>/auth.json, not in
+# the shared store, so a per-task store still bills that key while the shared
+# store bills the console account. The fixture value is a dummy that no launch
+# can use; only the key's presence is ever read.
+make_opencode_auth_data_home() {  # <dir> <json body>
+  local dir=$1
+  mkdir -p "$dir/opencode"
+  printf '%s\n' "$2" > "$dir/opencode/auth.json"
+  printf '%s\n' "$dir"
+}
+
+test_opencode_go_model_takes_per_task_store_when_auth_has_key() {
+  local rec id out status launch data_home
+  id=profile-opencode-goauth-z7h
+  rec=$(make_spawn_case profile-opencode-goauth opencode "$id")
+  read_case_record "$rec"
+
+  data_home=$(make_opencode_auth_data_home "$CASE_DIR/xdg-data" '{"opencode-go":{"type":"api","key":"fixture-dummy"}}')
+  out=$(FM_TEST_XDG_DATA_HOME="$data_home" run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --model opencode-go/deepseek-v4.1-flash)
+  status=$?
+  expect_code 0 "$status" "opencode spawn on a Go model with an auth.json key should succeed"
+  launch=$(cat "$LAUNCH_LOG")
+  assert_contains "$launch" "opencode --model 'opencode-go/deepseek-v4.1-flash' --prompt" \
+    "opencode Go launch lost its model"
+  assert_contains "$launch" "OPENCODE_DB='firstmate-" \
+    "opencode Go launch must take its own store, which bills the auth.json key instead of the console account"
+  assert_contains "$launch" "-$id.db' OPENCODE_CONFIG_CONTENT=" "opencode Go session store is not keyed by the task id"
+  assert_not_contains "$launch" "fixture-dummy" "opencode launch exposed the auth.json value in its command"
+  pass "opencode on a Go model with an auth.json key takes its own session store"
+}
+
+test_opencode_go_model_keeps_shared_store_without_key() {
+  local rec id out status launch data_home
+  id=profile-opencode-go-nokey-z7i
+  rec=$(make_spawn_case profile-opencode-go-nokey opencode "$id")
+  read_case_record "$rec"
+
+  data_home=$(make_opencode_auth_data_home "$CASE_DIR/xdg-data" '{"opencode":{"type":"oauth"}}')
+  out=$(FM_TEST_XDG_DATA_HOME="$data_home" run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --model opencode-go/deepseek-v4.1-flash)
+  status=$?
+  expect_code 0 "$status" "opencode spawn on a Go model without an auth.json key should succeed"
+  launch=$(cat "$LAUNCH_LOG")
+  assert_contains "$launch" "opencode --model 'opencode-go/deepseek-v4.1-flash' --prompt" \
+    "opencode Go launch lost its model"
+  assert_not_contains "$launch" "OPENCODE_DB=" \
+    "opencode Go launch with no auth.json key must keep today's shared store"
+  pass "opencode on a Go model without an auth.json key keeps the shared session store"
+}
+
+test_opencode_console_model_keeps_shared_store() {
+  local rec id out status launch
+  id=profile-opencode-go-z7e
+  rec=$(make_spawn_case profile-opencode-go opencode "$id")
+  read_case_record "$rec"
+
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --model opencode-go/deepseek-v4.1-flash)
+  status=$?
+  expect_code 0 "$status" "opencode spawn on a console-account model should succeed"
+  launch=$(cat "$LAUNCH_LOG")
+  assert_contains "$launch" "opencode --model 'opencode-go/deepseek-v4.1-flash' --prompt" \
+    "opencode console-account launch lost its model"
+  assert_not_contains "$launch" "OPENCODE_DB=" \
+    "opencode console-account launch must keep the shared store that holds the account"
+  pass "opencode on a console-account model keeps the shared session store"
+}
+
+test_opencode_console_provider_keeps_shared_store() {
+  local rec id out status launch data_home
+  id=profile-opencode-console-z7j
+  rec=$(make_spawn_case profile-opencode-console opencode "$id")
+  read_case_record "$rec"
+
+  # An opencode-go key in auth.json must not pull the console provider off the
+  # shared store, whose account credentials live in the store itself.
+  data_home=$(make_opencode_auth_data_home "$CASE_DIR/xdg-data" '{"opencode-go":{"type":"api","key":"fixture-dummy"}}')
+  out=$(FM_TEST_XDG_DATA_HOME="$data_home" run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --model opencode/grok-code-fast-1)
+  status=$?
+  expect_code 0 "$status" "opencode spawn on a console-provider model should succeed"
+  launch=$(cat "$LAUNCH_LOG")
+  assert_contains "$launch" "opencode --model 'opencode/grok-code-fast-1' --prompt" \
+    "opencode console launch lost its model"
+  assert_not_contains "$launch" "OPENCODE_DB=" \
+    "an opencode console launch must keep the shared store even when auth.json holds a Go key"
+  pass "opencode on the console provider keeps the shared session store"
+}
+
+test_opencode_no_model_keeps_shared_store() {
+  local rec id out status launch
+  id=profile-opencode-nomodel-z7f
+  rec=$(make_spawn_case profile-opencode-nomodel opencode "$id")
+  read_case_record "$rec"
+
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
+  status=$?
+  expect_code 0 "$status" "opencode spawn with no model should succeed"
+  launch=$(cat "$LAUNCH_LOG")
+  assert_not_contains "$launch" "OPENCODE_DB=" \
+    "opencode launch with no model must keep the shared store, since its provider is unknown"
+  pass "opencode with no model keeps the shared session store"
+}
+
+test_opencode_equal_task_ids_in_two_homes_get_two_stores() {
+  local rec id model out status launch_a launch_b db_a db_b
+  id=profile-opencode-twohome-z7g
+  model=openrouter/deepseek/deepseek-v4.1-flash
+
+  rec=$(make_spawn_case profile-opencode-twohome-a opencode "$id")
+  read_case_record "$rec"
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --model "$model")
+  status=$?
+  expect_code 0 "$status" "opencode spawn in the first home should succeed"
+  launch_a=$(cat "$LAUNCH_LOG")
+
+  rec=$(make_spawn_case profile-opencode-twohome-b opencode "$id")
+  read_case_record "$rec"
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --model "$model")
+  status=$?
+  expect_code 0 "$status" "opencode spawn of the same task id in a second home should succeed"
+  launch_b=$(cat "$LAUNCH_LOG")
+
+  db_a=$(printf '%s\n' "$launch_a" | grep -oE "OPENCODE_DB='firstmate-[0-9a-f]{12}-$id\.db'")
+  db_b=$(printf '%s\n' "$launch_b" | grep -oE "OPENCODE_DB='firstmate-[0-9a-f]{12}-$id\.db'")
+  [ -n "$db_a" ] || fail "first home launch has no per-task store: $launch_a"
+  [ -n "$db_b" ] || fail "second home launch has no per-task store: $launch_b"
+  [ "$db_a" != "$db_b" ] || fail "equal task ids in two homes shared a store: $db_a"
+  pass "equal task ids in two homes get two separate OpenCode stores"
+}
+
+test_opencode_hostile_task_id_is_refused() {
+  local rec hostile out status launch
+  rec=$(make_spawn_case profile-opencode-hostile opencode)
+  read_case_record "$rec"
+  hostile="x';touch pwned;'"
+
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$hostile" "$PROJ_DIR" --model openrouter/deepseek/deepseek-v4.1-flash 2>&1)
+  status=$?
+  [ "$status" -ne 0 ] || fail "hostile task id spawn should exit nonzero"
+  assert_contains "$out" "invalid task id" "hostile task id should be refused as an invalid task id"
+  launch=$(cat "$LAUNCH_LOG")
+  [ -z "$launch" ] || fail "hostile task id reached the launch: $launch"
+  [ ! -e "$WT_DIR/pwned" ] && [ ! -e "$PROJ_DIR/pwned" ] && [ ! -e "$HOME_DIR/pwned" ] \
+    || fail "hostile task id created a pwned file"
+  pass "hostile task id is refused before any OpenCode launch"
 }
 
 test_opencode_emits_variant_for_openai_family_effort() {
@@ -2215,6 +2374,13 @@ test_cursor_refuses_model_absent_from_live_catalog
 test_cursor_failed_catalog_probe_does_not_block_spawn
 test_opencode_threads_model_and_effort_variant
 test_opencode_without_effort_keeps_launch_config_unchanged
+test_opencode_go_model_takes_per_task_store_when_auth_has_key
+test_opencode_go_model_keeps_shared_store_without_key
+test_opencode_console_model_keeps_shared_store
+test_opencode_console_provider_keeps_shared_store
+test_opencode_no_model_keeps_shared_store
+test_opencode_equal_task_ids_in_two_homes_get_two_stores
+test_opencode_hostile_task_id_is_refused
 test_opencode_emits_variant_for_openai_family_effort
 test_opencode_omits_variant_when_model_family_lacks_effort
 test_native_effort_validator_keeps_axes_separate

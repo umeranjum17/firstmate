@@ -36,9 +36,9 @@
 # Each build writes the app's one data file, state/dashboard/board.json: homes with their
 # lane plans, one card per open lane, ready backlog item and pull request landed today,
 # and parked home ids. Its flow key is the fm-flow.v1 Insights observation, or flow_error when
-# that reader is unavailable or unreadable; its models and skills keys are the fm-model-stats.v1
-# and fm-skill-stats.v1 observations, or the matching *_error when a reader is unavailable or
-# unreadable; a recursive scrub removes raw reason, source, gate_source and errors keys before the write.
+# that reader is unavailable or unreadable; its models and skills keys hold the fm-model-stats.v1
+# and fm-skill-stats.v1 observations, or the matching *_error; a recursive scrub removes raw
+# reason, source, gate_source and errors keys before the write.
 # Cards carry the current stage inferred from status lines (which can move backwards), wait,
 # metadata model or ledger dispatch model, and up to 40 recent
 # activity lines. Recorded merges replace matching live cards using the canonical request
@@ -68,9 +68,8 @@
 # FM_MAC_HOST opts into that reader's bounded read-only Mac SSH probe; unset means unknown.
 # The reader's live capacity timestamps remain separate from the durable-record cutoff.
 # Remote lane/backlog records are unavailable, not read from same-named local paths.
-# Insights also invokes fm-model-stats.sh and fm-skill-stats.sh at each build. Both are read-only,
-# each probe has a 10 s timeout, and both sit outside the flow reader's 180 s deadline; their
-# source files are named in their script headers.
+# Insights also invokes fm-model-stats.sh and fm-skill-stats.sh (read-only, 10 s timeout each,
+# outside the flow reader's 180 s deadline); their script headers name their sources.
 #   data/captain-asks.tsv           Waiting on you: Main's fleet-wide headerless
 #                                   id<TAB>since-epoch<TAB>text<TAB>url; each row with an id and
 #                                   text is an ask (a bad time or duplicate id shows as a record

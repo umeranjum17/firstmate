@@ -621,9 +621,9 @@ test_matrix_codex_idle_starfield_furniture() {
 
 test_matrix_pi_separated_needs_identity() {
   # Real idle pi: a blank row between two solid rules. The blank row alone is
-  # exactly what the strict rule refuses; only structure PLUS a live
-  # idle/done pi identity proves the composer (herdr's rule, now
-  # fleet-wide; tmux supplies identity from its foreground-process probe).
+  # exactly what the strict rule refuses; only structure PLUS a live pi
+  # identity the shape does not contradict proves the composer (herdr's rule,
+  # now fleet-wide; tmux supplies identity from its foreground-process probe).
   local screen typed pi_idle pi_working pi_blocked none
   screen=$'transcript\n────────────────────────\n\n────────────────────────\n footer'
   pi_idle=$(printf 'pi\tidle'); pi_working=$(printf 'pi\tworking'); none=$(printf 'zsh\t')
@@ -636,8 +636,12 @@ test_matrix_pi_separated_needs_identity() {
     || fail "an identity-capable profile should request the lazy identity probe"
   # No identity capability (cmux/orca/zellij): the shape is unprovable.
   assert_screen "pi pair without identity capability" unknown "$CAPS_PLAIN" "$screen"
-  # A working pi cannot authorize injection into the blank region.
-  assert_screen "working pi defers" unknown "$CAPS_STYLED" "$screen" '' "$pi_working"
+  # A `working` registration over the plain-rule idle pair is the STALE
+  # registration: a live working turn replaces the plain top rule with the
+  # titled frame or the boat art, so the idle shape reads empty; the
+  # working-consistent openings still defer, pinned in their own matrices.
+  assert_screen "working registration over the idle pair reads empty" empty \
+    "$CAPS_STYLED" "$screen" '' "$pi_working"
   # A pi parked on an interactive prompt reports `blocked`: it is waiting on a
   # human keystroke, so the blank region is a menu's, not a free composer's.
   # Typing there answers the prompt and the text is discarded (issue #2797).
@@ -675,7 +679,7 @@ test_matrix_pi_dollar_status_footer_is_empty() {
   [ "$(fm_composer_classify_screen "$CAPS_STYLED" "$dollar")" = need-identity ] \
     || fail "a dollar-first Pi footer must still request the lazy identity probe"
   assert_screen "dollar-first status without identity capability" unknown "$CAPS_PLAIN" "$dollar"
-  assert_screen "working pi with dollar-first status defers" unknown \
+  assert_screen "working registration with dollar-first status reads empty" empty \
     "$CAPS_STYLED" "$dollar" '' "$pi_working"
   assert_screen "non-pi identity with dollar-first status defers" unknown \
     "$CAPS_STYLED" "$dollar" '' "$none"
@@ -793,17 +797,84 @@ tail+=$' ○ 🐴 ponytail: ⚡ FULL'
     "$CAPS_STYLED" "$tail" '' "$pi_done"
   # The same tall region changes no verdict: a draft IN that composer is still
   # pending (it goes in the blank line between the two rules, where a real
-  # composer holds it), and the identity conjunction is unchanged.
+  # composer holds it), and a non-pi identity still cannot prove it.
   rule='─────────────────────────────────────────────────────────────────────'
   typed=${tail/"$rule"$'\n\n'"$rule"/"$rule"$'\nfix the flaky test\n'"$rule"}
   [ "$typed" != "$tail" ] || fail "fixture edit: the draft row was not placed between the rules"
   assert_screen "typed pi lead beneath the same error" pending \
     "$CAPS_STYLED" "$typed" '' "$pi_done"
-  assert_screen "working pi beneath the same error still defers" unknown \
+  assert_screen "working registration beneath the same error reads empty" empty \
     "$CAPS_STYLED" "$tail" '' "$pi_working"
   assert_screen "non-pi identity cannot prove it either" unknown \
     "$CAPS_STYLED" "$tail" '' "$none"
   pass "matrix: a done pi lead composer under a tall wrapped extension error still reads empty"
+}
+test_matrix_pi_idle_pair_over_stale_working_registration() {
+  # Real bytes: the Ownvoice (writeboost) lead pane (herdr default:w25T:p55,
+  # pi), captured verbatim to data/fm-pi-idle-composer/pane-capture.txt in the
+  # supervising home on 2026-10-11 ~15:42Z. pi aborted its operation (the
+  # broken pi-hermes-memory extension), and the pane settled at the visibly
+  # idle composer - plain rule, one blank row, plain rule, then the cwd row,
+  # the stats row carrying the `(openai-codex)` provider label, and the
+  # ponytail extension row - while herdr's registration FROZE at
+  # agent_status=working because the turn-end report never landed (verified
+  # live hours later: `agent get` still reported working over this same idle
+  # shape, and `fm_backend_herdr_composer_state` on the live pane printed
+  # `unknown`). fm-control therefore refused the relaunch twice with
+  # "composer state 'unknown', not proven empty" and the doorbell stayed
+  # undelivered for about an hour. The pair opens on a plain separator - the
+  # idle presentation; a live working turn replaces that rule with the titled
+  # frame or draws the Calm boat in the rule slot - so a `working`
+  # registration over it is provably stale and reads empty.
+  local tail typed rule pi_idle pi_done pi_working pi_blocked none
+  pi_idle=$(printf 'pi\tidle'); pi_done=$(printf 'pi\tdone')
+  pi_working=$(printf 'pi\tworking'); pi_blocked=$(printf 'pi\tblocked')
+  none=$(printf 'zsh\t')
+  tail=$' : Firstmate instruction waiting: list "$FM_TASK_INBOX"/*.msg in your\n'
+  tail+=$' \'writeboost.inbox\' steering inbox, read and act on each in numeric order, then\n'
+  tail+=$' mv each into its handled/.\n'
+  tail+=$'\n'
+  tail+=$'\n'
+  tail+=$' Operation aborted\n'
+  tail+=$'\n'
+  tail+=$'                                                                           ◿│◣\n'
+  tail+=$'▄▃▃▂▂▂▁▁▁▁▁▁▂▂▂▃▃▃▄▄▄▄▄▄▃▃▂▂▁▁▁▁▁▂▂▃▃▄▄▄▄▄▃▃▂▂▁▁▁▁▁▂▂▂▃▃▄▄▄▄▄▄▃▃▃▂▂▂▁▁▁▁▁▁╲▁▁▁╱▁▁\n'
+  tail+=$'─────────────────────────────────────────────────────────────────────────────────\n'
+  tail+=$'\n'
+  tail+=$'─────────────────────────────────────────────────────────────────────────────────\n'
+  tail+=$'~/.treehouse/firstmate-8bf1b0/4/firstmate (detached)\n'
+  tail+=$'↑902k ↓99k R22M $5.013 (sub) 83.4%/272k (auto)  (openai-codex) gpt-6.1-sol • high\n'
+  tail+=$' ○ 🐴 ponytail: ⚡ FULL\n'
+  # The incident: the stale working registration over the idle pair.
+  assert_screen "stale working registration over the idle pair" empty \
+    "$CAPS_STYLED" "$tail" '' "$pi_working"
+  # The same shape keeps its verdicts for every non-stale identity.
+  assert_screen "idle pi over the idle pair" empty "$CAPS_STYLED" "$tail" '' "$pi_idle"
+  assert_screen "done pi over the idle pair" empty "$CAPS_STYLED" "$tail" '' "$pi_done"
+  [ "$(fm_composer_classify_screen "$CAPS_STYLED" "$tail")" = need-identity ] \
+    || fail "the idle pair must still request the lazy identity probe"
+  # The identity gate below the status is unchanged: no capability, no
+  # probe, or a non-pi pane still refuses the blank row.
+  assert_screen "idle pair without identity capability" unknown "$CAPS_STYLED_NOID" "$tail"
+  assert_screen "idle pair on a plain capture" unknown "$CAPS_PLAIN" "$tail"
+  assert_screen "absent identity cannot prove the idle pair" unknown \
+    "$CAPS_STYLED" "$tail" '' probe-absent
+  assert_screen "non-pi identity cannot prove the idle pair" unknown \
+    "$CAPS_STYLED" "$tail" '' "$none"
+  # A blocked pi still defers: its menu is drawn above the pair, so even the
+  # plain idle shape cannot disprove a parked prompt (issue #2797).
+  assert_screen "blocked pi over the idle pair still defers" unknown \
+    "$CAPS_STYLED" "$tail" '' "$pi_blocked"
+  # Negative control: the same layout with typed text in the blank row
+  # between the rules still reads pending, stale registration or not.
+  rule='─────────────────────────────────────────────────────────────────────────────────'
+  typed=${tail/"$rule"$'\n\n'"$rule"/"$rule"$'\nfix the flaky test\n'"$rule"}
+  [ "$typed" != "$tail" ] || fail "fixture edit: the draft row was not placed between the rules"
+  assert_screen "typed text over the stale working registration" pending \
+    "$CAPS_STYLED" "$typed" '' "$pi_working"
+  assert_screen "typed text over an idle pi" pending \
+    "$CAPS_STYLED" "$typed" '' "$pi_idle"
+  pass "matrix: a stale working registration over the plain idle pair reads empty; typed text and every weaker identity still refuse"
 }
 test_matrix_pi_stderr_notice_rows() {
   # Real pi 0.87.0 pane bytes (captured live through `tmux capture-pane -e`
@@ -833,9 +904,11 @@ test_matrix_pi_stderr_notice_rows() {
   assert_screen "pi stderr notice alone on plain capture, idle" empty \
     $'styled=0\ncursor=0\nidentity=1\nrows=20' \
     $'transcript\n────────────────────────\n⚠️ Live session indexing failed: database is locked\n────────────────────────' '' "$pi_idle"
-  # A working or unidentifiable pi still refuses; the notice row must not
+  # A `working` registration over the plain-rule idle pair is the stale
+  # registration, so the notice-corrupted empty composer reads empty under it
+  # too; an unidentifiable pi still refuses, and the notice row must not
   # weaken the identity gate that owns the separated shape.
-  assert_screen "pi stderr notice alone, working identity" unknown \
+  assert_screen "pi stderr notice alone, stale working registration" empty \
     "$CAPS_STYLED" $'transcript\n'"$rules"$'\n'"$notice"$'\n'"$rules" '' "$pi_working"
   assert_screen "pi stderr notice alone without identity" unknown \
     "$CAPS_STYLED_NOID" $'transcript\n'"$rules"$'\n'"$notice"$'\n'"$rules"
@@ -882,6 +955,67 @@ test_matrix_pi_stderr_notice_rows() {
   [ "$out" = 'fix the login bug' ] \
     || fail "a real draft must survive extraction beside the notice, got '$out'"
   pass "matrix: pi stderr notice rows are furniture, real drafts beside them stay pending"
+}
+
+test_matrix_pi_wave_art_and_notice_embedded_rule() {
+  # Real bytes: the Ownvoice (writeboost) lead pane, captured verbatim to
+  # data/fm-composer-pi-wave/pane-capture.txt in the supervising home. Pi's
+  # Calm working presentation draws its animated boat (the ponytail/pi wave
+  # extension) in the composer's rule slot - rows of low block bars (▁▂▃▄),
+  # swell strokes (╲ ╱), and sail cells (◿◣) - and a pi stderr notice overwrote
+  # the leading columns of the composer's BOTTOM rule, leaving the notice text
+  # followed by the rule's remaining dashes. Read as ordinary rows neither is a
+  # separator, so no pi pair was found and the idle lead read `unknown`:
+  # fm-control refused every relaunch ("composer state 'unknown', not proven
+  # empty"). The wave rows open the candidate like a titled top rule and the
+  # notice-corrupted rule closes it, so an idle/done pi reads empty.
+  local capture typed pi_idle pi_working none out
+  pi_idle=$(printf 'pi\tidle')
+  pi_working=$(printf 'pi\tworking')
+  none=$(printf 'zsh\t')
+  capture=$'                                            ◿│◣\n'
+  capture+=$'▁▁▂▂▃▃▄▄▄▄▄▃▃▂▂▁▁▁▁▁▂▂▃▃▃▄▄▄▄▄▄▃▃▃▂▂▂▁▁▁▁▁▁╲▁▁▁╱▁▁▁▁▁▂▂▃▃▃▄▄▄▄▄▃▃▂▂▂▁▁▁▁▁▁▂▂▂▃▃▃▄\n'
+  capture+=$'                                           ◿│◣\n'
+  capture+=$'\n'
+  capture+=$' Captain, shipshape.\n'
+  capture+=$'\n'
+  capture+=$'                              ◿│◣\n'
+  capture+=$'                          ◿│◣\n'
+  capture+=$'▁▁▂▂▃▃▃▄▄▄▄▄▄▃▃▃▂▂▂▁▁▁▁▁▁╲▁▁▁╱▁▁▁▁▁▂▂▃▃▃▄▄▄▄▄▃▃▂▂▂▁▁▁▁▁▁▂▂▂▃▃▃▄▄▄▄▄▄▃▃▃▂▂▂▁▁▁▁▁▁▂\n'
+  capture+=$'▁▁▂▂▃▃▄▄▄▄▄▄▃▃▃▃▂▂▂▁▁▁▁▁▁╲▁▁▁╱▁▁▁▁▁▂▂▃▃▄▄▄▄▄▄▃▃▂▂▁▁▁▁▁▁▂▂▂▃▃▃▃▄▄▄▄▄▄▃▃▃▂▂▂▁▁▁▁▁▁▂\n'
+  capture+=$'⚠️ Live session indexing failed: database is locked──────────────────────────────\n'
+  capture+=$'~/.treehouse/firstmate-8bf1b0/4/firstmate (detached)\n'
+  capture+=$'↑2.0M ↓185k R58M CH99.9% $11.537 (sub) 59.3%/272k (auto)       gpt-6.1-sol • high\n'
+  capture+=$'↑2.0M ↓185k R58M CH99.8% $11.554 (sub) 59.3%/272k (auto)       gpt-6.1-sol • high\n'
+  # 1. The incident: idle/done pi on herdr (styled + identity) reads empty.
+  assert_screen "idle pi lead under wave art + notice rule on herdr" empty \
+    "$CAPS_STYLED" "$capture" '' "$pi_idle"
+  # The separated shape still needs identity: without it (zellij) or on a plain
+  # capture (cmux/orca) the pane refuses rather than claims a false empty.
+  assert_screen "wave art + notice rule without identity capability" unknown \
+    "$CAPS_STYLED_NOID" "$capture"
+  assert_screen "wave art + notice rule on a plain capture" unknown \
+    "$CAPS_PLAIN" "$capture"
+  # A working pi defers - the boat is drawn only while a turn runs.
+  assert_screen "working pi under wave art still defers" unknown \
+    "$CAPS_STYLED" "$capture" '' "$pi_working"
+  assert_screen "non-pi identity cannot prove the wave-art composer" unknown \
+    "$CAPS_STYLED" "$capture" '' "$none"
+  # 2. Negative control: a real draft between the last wave row and the
+  #    notice-corrupted rule keeps its verdict and survives extraction. The
+  #    notice row is unique, so this inserts the draft directly above it.
+  typed=${capture//$'\n⚠️'/$'\nfix the flaky test\n⚠️'}
+  [ "$typed" != "$capture" ] || fail "fixture edit: the draft row was not inserted"
+  assert_screen "typed pi lead under wave art + notice rule" pending \
+    "$CAPS_STYLED" "$typed" '' "$pi_idle"
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED" "$typed")
+  [ "$out" = 'fix the flaky test' ] \
+    || fail "the draft beside the notice-corrupted rule must survive extraction, got '$out'"
+  # The idle wave-art composer extracts nothing: the notice text and the wave
+  # rows are furniture, never composer content.
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED" "$capture")
+  [ -z "$out" ] || fail "the idle wave-art composer must extract nothing, got '$out'"
+  pass "matrix: pi Calm wave-art rows and a notice-corrupted rule are furniture; a draft between them stays pending"
 }
 
 test_matrix_opencode_leftbar_signals() {
@@ -1075,6 +1209,35 @@ test_matrix_opencode_leftbar_signals() {
   assert_screen "opencode typed draft above the wrapped dir fragment on plain backends" unknown "$CAPS_PLAIN" "$v11825_typed_wrap"
   out=$(fm_composer_extract_selected_content "$CAPS_STYLED" "$v11825_typed_wrap")
   [ "$out" = 'Reply with OK.' ] || fail "a draft above the wrapped fragment must survive extraction, got '$out'"
+  # Live 2026-10-10 (OpenCode 1.18.25 through Herdr, the desklink lead's
+  # engine-fix worker): on a still-longer worktree path the SAME right-aligned
+  # `<dir>:<branch>` cell wraps over TWO rows - its `~/...` directory fragment
+  # on one row, the `desklink:fm/...` continuation on the next (which carries
+  # NO `~/` or `/` lead), both behind wide right-aligned padding - and the
+  # model row directly below ends `pair`. The single-row PR 55 rule only
+  # claimed the row DIRECTLY above the model row, so the continuation read as
+  # pending and the idle, empty composer stranded: fm-send skipped the
+  # doorbell and fm-control refused exit and relaunch. The rule now resolves
+  # the whole wrapped run (opening `~/`/`/` row plus no-whitespace
+  # continuation rows) that ENDS on the row directly above the model row, in
+  # the classifier and the extractor alike. A run whose rows do NOT end in an
+  # opening path row is still typed text, so a bare continuation above the
+  # model row stays pending.
+  local v11825_wrap2 v11825_typed2 v11825_orphan2
+  v11825_wrap2=$'  ┃\n  ┃\n  ┃                                                                  ~/.treehouse/desklink-f2d1d8/4/\n  ┃                                                                  desklink:fm/dl-engine-restart-keeps-\n  ┃  Build · DeepSeek V4.1 Flash pair\n'"$floor"$'\n   /home/umer/.treehouse/desklink-f2d1d8/4/desklink             87.1K (33%) · $0.33  ctrl+p commands    • OpenCode 1.18.25'
+  assert_screen "opencode 1.18.25 two-row wrapped dir fragment above model row on herdr" empty "$CAPS_STYLED" "$v11825_wrap2"
+  assert_screen "opencode 1.18.25 two-row wrapped dir fragment above model row on zellij" empty "$CAPS_STYLED_NOID" "$v11825_wrap2"
+  assert_screen "opencode 1.18.25 two-row wrapped dir fragment above model row on cmux/orca" empty "$CAPS_PLAIN" "$v11825_wrap2"
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED" "$v11825_wrap2")
+  [ -z "$out" ] || fail "the two-row wrapped dir fragment must never extract as composer content, got '$out'"
+  v11825_typed2=$'  ┃\n  ┃  Reply with OK.\n  ┃\n  ┃                                                                  ~/.treehouse/desklink-f2d1d8/4/\n  ┃                                                                  desklink:fm/dl-engine-restart-keeps-\n  ┃  Build · DeepSeek V4.1 Flash pair\n'"$floor"
+  assert_screen "opencode typed draft above the two-row wrapped fragment on herdr" pending "$CAPS_STYLED" "$v11825_typed2"
+  assert_screen "opencode typed draft above the two-row wrapped fragment on plain backends" unknown "$CAPS_PLAIN" "$v11825_typed2"
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED" "$v11825_typed2")
+  [ "$out" = 'Reply with OK.' ] || fail "a draft above the two-row wrapped fragment must survive extraction, got '$out'"
+  v11825_orphan2=$'  ┃\n  ┃  Reply with OK.\n  ┃                                                                  desklink:fm/dl-engine-restart-keeps-\n  ┃  Build · DeepSeek V4.1 Flash pair\n'"$floor"
+  assert_screen "opencode bare wrap continuation with no opening path row stays pending on herdr" pending "$CAPS_STYLED" "$v11825_orphan2"
+  assert_screen "opencode bare wrap continuation with no opening path row stays unknown on plain backends" unknown "$CAPS_PLAIN" "$v11825_orphan2"
   pass "matrix: opencode's left-bar composer reads empty everywhere and scans the full active run"
 }
 
@@ -1409,7 +1572,9 @@ test_matrix_pi_separated_needs_identity
 test_matrix_pi_dollar_status_footer_is_empty
 test_matrix_pi_lead_turn_frame_and_extension_rows
 test_matrix_pi_lead_beneath_extension_error_is_empty
+test_matrix_pi_idle_pair_over_stale_working_registration
 test_matrix_pi_stderr_notice_rows
+test_matrix_pi_wave_art_and_notice_embedded_rule
 test_matrix_opencode_leftbar_signals
 test_matrix_grok_titled_bottom_border
 test_matrix_claude_titled_top_rule
