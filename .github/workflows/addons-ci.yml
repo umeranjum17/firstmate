@@ -1,0 +1,64 @@
+name: Add-ons CI
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# Pull requests only: these checks exist so a pull request can be concluded
+# (no-mistakes waits for registered checks on the PR head), and every change
+# reaches main through a pull request, so a separate push run on main would
+# only repeat the verdict the PR already reported.
+jobs:
+  self-check:
+    name: Add-on self-checks
+    runs-on: ubuntu-latest
+    # Normal tier: both steps are a shellcheck pass and a bash parse over a
+    # handful of scripts.
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      # An add-on script is a shell script one level under a top-level add-on
+      # directory (`merge-card/merge-card`, `ask-default/ask-default`), so a new
+      # add-on needs no edit here and a non-script file is left alone.
+      # The runner image ships shellcheck, so nothing is downloaded at run time.
+      - name: ShellCheck add-on scripts
+        run: |
+          set -euo pipefail
+          shellcheck --version
+          # SC2015 is excluded because both add-ons use the deliberate
+          # `A && B || fallback` idiom where the fallback is the intent:
+          # ask-default's incomplete-record check and merge-card's usage guard
+          # and media cap. The advisory also disagrees between the runner
+          # image's ShellCheck 0.9.0 and the fleet's 0.11.0, so leaving it on
+          # would make the gate follow the image instead of the code.
+          # Every other check stays on at every severity.
+          found=0
+          for f in ./*/*; do
+            [ -f "$f" ] || continue
+            head -n 1 "$f" | grep -Eq '^#!.*\b(bash|sh)\b' || continue
+            found=$((found + 1))
+            echo "== shellcheck -x -e SC2015 $f =="
+            shellcheck -x -e SC2015 "$f"
+          done
+          if [ "$found" -eq 0 ]; then
+            echo "no add-on script found in any <add-on>/ directory" >&2
+            exit 1
+          fi
+      - name: Syntax-check add-on scripts
+        run: |
+          set -euo pipefail
+          found=0
+          for f in ./*/*; do
+            [ -f "$f" ] || continue
+            head -n 1 "$f" | grep -Eq '^#!.*\b(bash|sh)\b' || continue
+            found=$((found + 1))
+            echo "== bash -n $f =="
+            bash -n "$f"
+          done
+          if [ "$found" -eq 0 ]; then
+            echo "no add-on script found in any <add-on>/ directory" >&2
+            exit 1
+          fi
