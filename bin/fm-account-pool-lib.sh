@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # fm-account-pool-lib.sh - the account-pool spawn hook: config/account-pool
 # parsing, the harness-to-tool map, the `byokit-accounts pick` invocation, and
-# the launch prefix its answer applies. Sourced by bin/fm-spawn.sh.
+# the launch prefix its answer applies. Sourced by bin/fm-spawn.sh and by
+# bin/fm-control.sh, whose relaunch preflight resolves the pool before it stops
+# the running agent.
 #
 # docs/configuration.md "Worker account pool (config/account-pool)" owns the
 # operator-facing contract. A pick answers with folder paths only, so no key,
@@ -18,6 +20,17 @@ fm_account_pool_tool() {
   claude) printf '%s\n' claude ;;
   codex) printf '%s\n' codex ;;
   pi | pi-signed) printf '%s\n' pi ;;
+  *) return 1 ;;
+  esac
+}
+
+# fm_account_pool_store_var <tool>: the environment variable a launch assigns
+# the picked account folder to, or non-zero for an unmapped tool.
+fm_account_pool_store_var() {
+  case "$1" in
+  claude) printf '%s\n' CLAUDE_CONFIG_DIR ;;
+  codex) printf '%s\n' CODEX_HOME ;;
+  pi) printf '%s\n' PI_CODING_AGENT_DIR ;;
   *) return 1 ;;
   esac
 }
@@ -71,10 +84,11 @@ fm_account_pool_detail() {
 # names" for a mapped harness with a usable pool; nothing when the pool is off;
 # one error and non-zero on any refusal, never a fallback to an ambient login.
 fm_account_pool_select() {
-  local harness=$1 config=$2 tool cfg command state out errf rc id var folder shed name reason detail shed_bad=0
+  local harness=$1 config=$2 tool store_var cfg command state out errf rc id var folder shed reason detail shed_bad=0
   tool=$(fm_account_pool_tool "$harness") || return 0
   cfg=$(fm_account_pool_config "$config") || return 1
   [ -n "$cfg" ] || return 0
+  store_var=$(fm_account_pool_store_var "$tool") || return 1
   command=${cfg%%$'\t'*}
   state=${cfg#*$'\t'}
   errf=$(mktemp "${TMPDIR:-/tmp}/fm-account-pool.XXXXXX") || {
@@ -100,17 +114,21 @@ fm_account_pool_select() {
   id=$(printf '%s' "$out" | jq -r '.id // empty' 2>/dev/null)
   var=$(printf '%s' "$out" | jq -r 'if (.set | type) == "object" and (.set | length) == 1 then (.set | keys[0]) else empty end' 2>/dev/null)
   folder=$(printf '%s' "$out" | jq -r --arg v "$var" 'if $v == "" then empty else (.set[$v] // empty) end' 2>/dev/null)
-  shed=$(printf '%s' "$out" | jq -r '.unset // [] | .[] | select(type == "string")' 2>/dev/null | tr '\n' ' ')
+  if ! shed=$(printf '%s' "$out" | jq -r '
+      .unset // []
+      | if type == "array" and all(.[]; type == "string" and test("^[A-Za-z_][A-Za-z0-9_]*\\z"))
+        then .[] else error("the unset list is not an array of variable names") end' 2>/dev/null); then
+    shed=
+    shed_bad=1
+  fi
+  shed=$(printf '%s' "$shed" | tr '\n' ' ')
   shed=${shed% }
   case "$id" in '' | *[!A-Za-z0-9._-]*) id= ;; esac
-  case "$var" in [A-Za-z_][A-Za-z0-9_]*) ;; *) var= ;; esac
+  case "$var" in "$store_var") ;; *) var= ;; esac
   case "$folder" in /*) ;; *) folder= ;; esac
-  for name in $shed; do
-    case "$name" in
-    [A-Za-z_][A-Za-z0-9_]*) ;;
-    *) shed_bad=1 ;;
-    esac
-  done
+  if [ -n "$folder" ] && { [ ! -d "$folder" ] || [ ! -r "$folder" ] || [ ! -x "$folder" ]; }; then
+    folder=
+  fi
   if [ -z "$id" ] || [ -z "$var" ] || [ -z "$folder" ] || [ "$shed_bad" = 1 ]; then
     echo "error: config/account-pool's '$command' answered with an unusable $tool account selection; expected an account id and one absolute account folder, with no secret" >&2
     return 1

@@ -1061,7 +1061,7 @@ A launch carries the picked folder the same way a pin carries its root: an `env 
 No key, token, or login file ever reaches a launch line, a task record, a log, a status line, or an error message.
 The spawn prints the pick as `account=<id>` and records the same field in the task record.
 
-A malformed file, a `pick` that exits non-zero, or an answer that names no usable account folder refuses the launch before anything is created.
+A malformed file, a `pick` that exits non-zero, an answer whose `unset` is not an array of environment-variable names, or an answer that names no usable account folder - not the tool's own store variable (`CLAUDE_CONFIG_DIR` for Claude, `CODEX_HOME` for Codex, `PI_CODING_AGENT_DIR` for Pi) or not an existing readable, searchable directory - refuses the launch before anything is created.
 The refusal names the tool and the login to do and says which accounts are resting or signed out, in the tone of the pin's sign-in refusal; Firstmate never falls back to an ambient login or copies a credential.
 Like the pin, the pool is not inherited into secondmate homes: a local secondmate agent launches on the launching home's pool, while the secondmate's own workers read the secondmate home's file.
 

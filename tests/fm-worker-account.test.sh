@@ -420,6 +420,13 @@ pool_pick_ok() {
   rm -f "$1/pick.rc"
 }
 
+# pool_pick_answer <case-dir> <tool> <answer-json>: write one raw pick answer,
+# so a test can drive a malformed or unusable contract through the real spawn.
+pool_pick_answer() {
+  printf '%s\n' "$3" > "$1/pick-$2.json"
+  rm -f "$1/pick.rc"
+}
+
 test_pool_selects_an_account_when_no_pin_applies() {
   local out rc id=acct-pool canary
   new_case pool-claude claude
@@ -506,6 +513,30 @@ JSON
   pass "a failed pick and a malformed pool file both refuse before launch"
 }
 
+test_pool_refuses_an_unusable_answer() {
+  local out rc n=0 answer
+  while IFS= read -r answer; do
+    n=$((n + 1))
+    new_case "pool-bad-$n" claude
+    enable_pool "$HOME_DIR" "$CASE/pool"
+    mkdir -p "$CASE/pool/claude"
+    printf '{}\n' > "$CASE/pool/login.json"
+    pool_pick_answer "$CASE" claude "${answer//FOLDER/$CASE/pool/claude}"
+    out=$(spawn_ship "acct-pool-bad-$n"); rc=$?
+    expect_code 1 "$rc" "an unusable pick answer must refuse the spawn ($answer): $out"
+    assert_refused_before_launch "acct-pool-bad-$n" "$out" "answered with an unusable claude account selection"
+  done <<'ANSWERS'
+{"id":"pa_x","set":{"CLAUDE_CONFIG_DIR":"FOLDER"},"unset":"ANTHROPIC_API_KEY"}
+{"id":"pa_x","set":{"CLAUDE_CONFIG_DIR":"FOLDER"},"unset":[123]}
+{"id":"pa_x","set":{"CLAUDE_CONFIG_DIR":"FOLDER"},"unset":{"CLAUDE_CONFIG_DIR":"/x"}}
+{"id":"pa_x","set":{"CLAUDE_CONFIG_DIR":"FOLDER"},"unset":["A B"]}
+{"id":"pa_x","set":{"CLAUDE_CONFIG_DIR":"FOLDER"},"unset":["1BAD"]}
+{"id":"pa_x","set":{"HOME":"FOLDER"},"unset":[]}
+{"id":"pa_x","set":{"CLAUDE_CONFIG_DIR":"FOLDER/login.json"},"unset":[]}
+ANSWERS
+  pass "the pool refuses a malformed unset list, a foreign store variable, and a non-directory folder"
+}
+
 test_absent_pin_keeps_the_launch_unchanged
 test_claude_pin_selects_the_root_and_sheds_ambient_credentials
 test_claude_pin_refuses_a_signed_out_root_despite_an_ambient_login
@@ -521,6 +552,7 @@ test_raw_claude_account_override_is_kept_without_a_pin
 test_local_secondmate_reads_the_launching_home_pin
 test_pool_selects_an_account_when_no_pin_applies
 test_pool_sheds_exactly_the_picks_unset_list
+test_pool_refuses_an_unusable_answer
 test_a_pin_still_wins_over_the_pool
 test_pool_refusals_create_nothing
 
