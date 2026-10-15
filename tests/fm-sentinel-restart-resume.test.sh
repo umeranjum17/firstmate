@@ -105,7 +105,7 @@ restart() {
     state=idle
     [ "$lane" != midturn ] || state=working
     sleep 0.5
-    lab pane report-agent --source fm-resume-test --agent claude --state "$state" "w$i:p1" >/dev/null \
+    lab pane report-agent "w$i:p1" --source fm-resume-test --agent claude --state "$state" >/dev/null \
       || fail "report $state for $lane"
   done
 }
