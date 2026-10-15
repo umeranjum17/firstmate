@@ -17,6 +17,8 @@ set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
+command -v herdr >/dev/null 2>&1 || { echo "skip: herdr not found"; exit 0; }
+
 fm_live_gate default-on FM_SENTINEL_RESUME_E2E herdr jq git
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

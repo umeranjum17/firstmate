@@ -200,7 +200,7 @@ nudge_once() {  # <id> <meta> <done-message> <text>
     return 0
   fi
   [ "$(fm_meta_get "$2" kind)" != secondmate ] || ff=(--fire-and-forget "$key")
-  act "$1" "$3" "$SCRIPT_DIR/fm-send.sh" "$1" "${ff[@]}" "$4" \
+  act "$1" "$3" "$SCRIPT_DIR/fm-send.sh" "$1" ${ff[@]+"${ff[@]}"} "$4" \
     && printf '%s\n' "$key" >"$rec"
 }
 
