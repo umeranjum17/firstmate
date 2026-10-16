@@ -2,6 +2,24 @@
 
 Fleet dashboard and add-ons for running a fleet of coding agents.
 
+## delete-guard
+
+No agent can recursively delete `/`, `/home`, a home folder or a folder directly in it, or a bare `.` `..` `*` or `$VAR` target, and every attempt wakes the main firstmate.
+`delete-guard/guard.mjs` holds the one rule, and each runtime adapter hands it the shell command before it runs.
+A block is final: there is no allow-once, flag or environment override, and no agent, reviewer or pipeline gate can approve the delete.
+The one `$VAR` exception: when `d=$(mktemp)` or `d=$(mktemp -d)` is its own statement and the last assignment to `d` in the same command, `rm -rf -- "$d"` runs (never for `HOME` or another shell or runtime variable).
+Each block appends one JSON line (time, home, task, cwd, runtime, target, command) to `<fm-home>/state/delete-guard.log`.
+The `delete-guard` watcher check turns new lines into one wake on the watcher's check cadence (5 minutes by default).
+A second block by the same task (or, with no task, the same cwd) within 10 minutes queues an immediate `delete guard REPEAT` wake.
+A heredoc body fed to a shell (`bash <<EOF`, `cat <<EOF | sh`) is checked as commands, and one fed to anything else (`python3`, `cat > file`) is data.
+Only the command string is checked, so a delete inside a script file the agent runs is not seen.
+Covered: Claude Code (workers, leads, Main and the no-mistakes Claude agent) by a `PreToolUse` Bash hook in `~/.claude/settings.json`, pi by `~/.pi/agent/extensions/fm-rm-guard.ts` (replacing the 16 Oct stopgap), and OpenCode by `~/.config/opencode/plugins/fm-delete-guard.js`.
+Not covered: Codex, because Firstmate launches its crewmates and scouts with `--disable hooks` and a new `~/.codex/hooks.json` entry puts a hook-trust prompt in front of every Codex launch, and cursor-agent, grok, omp, kimi and gemini, which the fleet does not dispatch.
+
+Install or update with `delete-guard/install.sh [--dry-run] <main-fm-home>`; it is idempotent, and `--dry-run` prints the changes and writes nothing.
+It backs up each file it changes as `<file>.bak-delete-guard-<epoch>`, copies the rule to `${XDG_DATA_HOME:-~/.local/share}/fm-delete-guard/`, writes the adapters, merges the Claude hook without dropping other settings, and registers the check in `<main-fm-home>`.
+Test: `delete-guard/tests/delete-guard.test.sh <firstmate-checkout> [ref]` installs into a throwaway HOME against a home built from that checkout's `bin/`, then drives the installed hook through every rule case and the log, check and repeat-wake journey.
+
 ## merge-card
 
 Every merge runs done-done and, only with passed proof, posts one evidence card to a sign-off board, with nobody posting by hand.
