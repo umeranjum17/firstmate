@@ -760,6 +760,13 @@ secondmate_liveness_sweep() {
     # Identity for the timing record is read here, in the loop, so the per-meta
     # body below keeps its single-exit-per-outcome shape.
     id=$(basename "$meta" .meta)
+    # Parked-home guard (firstmate-addons/parked-homes): a parked home gets no
+    # liveness probe and no session-start relaunch - one line names the skip.
+    # No-op without the add-on checkout.
+    if fm_parked_meta "$meta" "$id"; then
+      echo "SECONDMATE_LIVENESS: secondmate $id: skipped: its home is parked (config/parked-homes)"
+      continue
+    fi
     remote_host=$(fm_meta_get "$meta" remote_host)
     label=$id
     [ -z "$remote_host" ] || label="$id@$remote_host"

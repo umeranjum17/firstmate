@@ -1247,6 +1247,13 @@ secondmate_liveness_tick() {
     id=${meta##*/}
     id=${id%.meta}
     case "$id" in ''|*[!A-Za-z0-9._-]*) continue ;; esac
+    # Parked-home guard (firstmate-addons/parked-homes): a parked home gets no
+    # liveness probe and no auto-relaunch - one triage line names the skip.
+    # No-op without the add-on checkout.
+    if fm_parked_meta "$meta" "$id"; then
+      triage_log "secondmate $id liveness skipped: its home is parked (config/parked-homes)"
+      continue
+    fi
     fm_secondmate_liveness_lock "$id" || continue
     fm_secondmate_liveness_probe "$meta" "$id" poll
     bound_marker="$STATE/.secondmate-relaunch-bound-$id"
