@@ -4,8 +4,10 @@ The read-only fleet dashboard — server, builder and app — moved **verbatim**
 of the Firstmate fork into this add-on repository. Nothing serves it from here
 yet: the live dashboard keeps building and serving from the fork's
 `bin/fm-dashboard.sh`, and the fork-side shim that will exec into this directory
-lands in a later PR. Until that swap this directory is dormant, and every moved
-byte below is identical to the fork copy the live service runs today.
+lands in a later PR. Until that swap this directory is dormant. The app under
+`fm-dashboard/` is still identical to the fork copy the live service runs
+today, and `fm-dashboard.sh` carries one deliberate difference, described under
+Provenance.
 
 ## Layout
 
@@ -19,7 +21,7 @@ byte below is identical to the fork copy the live service runs today.
   `fleet-dashboard/fm-dashboard/vendor/three-*.min.js` out of whitespace checks
   and folds it in review diffs.
 
-## Frozen contract (identical to the fork)
+## Frozen contract (unchanged)
 
 - CLI: `fm-dashboard.sh [build]` and `fm-dashboard.sh serve [--bind ADDR]
   [--port N]` (plus `-h`); every other invocation prints the usage line and
@@ -32,7 +34,7 @@ byte below is identical to the fork copy the live service runs today.
   with the matching `models_error` / `skills_error` keys for the statistics
   readers.
 
-## Provenance: byte-identical to the fork
+## Provenance: one deliberate change from the fork
 
 Every moved file was compared byte for byte against its fork source
 (`bin/fm-dashboard.sh` and `bin/fm-dashboard/`) at move time; the 16-file
@@ -42,11 +44,21 @@ copies used by the proof below
 task data). Treat any future diff against the fork file as a contract change,
 not a refactor.
 
+One change is deliberate. `fm-dashboard.sh` no longer blanks the fleet's Ready
+and queue numbers when a single home's backlog cannot be read: it counts the
+homes that were read, marks a partial count as a lower bound (`≥`), names each
+unread home with its reason, and reports the partial metric with status
+`partial` in `data.json`. Only when no home could be read does the tile show
+the unknown dash as before. Every other moved file, the whole `fm-dashboard/`
+app included, remains byte-identical to the fork.
+
 ## Side-by-side proof (re-run before the served path swaps)
 
 The acceptance proof builds the fork copy and this copy in two throwaway
 `FM_HOME` dirs over one identical fixture and diffs the two
-`state/dashboard/` outputs byte for byte.
+`state/dashboard/` outputs byte for byte. Its fixture reads every home's
+backlog, so the two copies still agree there; the one deliberate backlog-read
+difference above is the only case where they are now expected to diverge.
 
 One command (harness lives with this task's evidence):
 
@@ -60,7 +72,8 @@ Manual recipe if the harness is gone:
 
 1. Copy `bin/fm-dashboard.sh` + `bin/fm-dashboard/` from the fork and
    `fleet-dashboard/` from this repo into two scratch dirs; verify sha256 of
-   every moved file matches across both.
+   every moved file matches across both except `fm-dashboard.sh`, the one
+   deliberate difference above.
 2. Overlay identical deterministic reader stubs next to both scripts
    (`fm-flow.sh` exiting non-zero for pass 1, a fixed `fm-flow.v1` JSON for
    pass 2; fixed `fm-model-stats.sh` / `fm-skill-stats.sh`; a fixed TOON

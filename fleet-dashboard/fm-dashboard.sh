@@ -554,9 +554,14 @@ for h, d in sorted(home_dir.items()):
     backlog[h] = rows
 def bl(h, cls=None, state=None):
     return [r for r in backlog.get(h) or [] if (cls is None or r['class'] == cls) and (state is None or r.get('state') == state)]
-bl_known = all(backlog.get(h) is not None for h in ACTIVE)
+bl_unread = [h for h in ACTIVE if backlog.get(h) is None]
+bl_known = not bl_unread  # every active home was read
+bl_any = bl_known or len(bl_unread) < len(ACTIVE)  # some home was read, or there was none to read
+bl_partial = bl_any and not bl_known  # the read homes' numbers, a lower bound for the fleet
+def bl_unread_line():  # each unread home with its one-line reason, for under the number
+    return '; '.join(next((r for s, r in notes if s == 'backlog' and r.startswith(h + ': ')), h) for h in bl_unread)
 backlog_read_at = time.time()
-QUEUE = {c: sum(len(bl(h, c)) for h in ACTIVE) for c in ('ready', 'held', 'waiting')} if bl_known else None
+QUEUE = {c: sum(len(bl(h, c)) for h in ACTIVE) for c in ('ready', 'held', 'waiting')} if bl_any else None
 held_cap = sorted(((h, r) for h in ACTIVE for r in backlog.get(h) or []
                    if r.get('hold_kind') == 'captain' and r.get('state') != 'done'), key=lambda x: (x[1]['day'] or TODAY, x[0]))
 held_all = sorted(held_cap + [(h, r) for h in ACTIVE for r in bl(h, 'held') if r.get('hold_kind') != 'captain'],
@@ -1025,10 +1030,10 @@ if held_cap:
     oldest = held_cap[0][1]['day']
     spot('warn', 'Held', 'held for triage', f'{"" if bl_known else "≥"}{len(held_cap)}', days_old(oldest) if oldest else 'unknown',
          'backlog?group=home#held', ', '.join(f'{hname(h)} {n}' for h, n in sorted(c.items(), key=lambda x: (-x[1], x[0]))))
-if bl_known:
+if bl_any:
     if sum(could.values()):
         old = min((r['day'] for h in ACTIVE if could[h] for r in bl(h, 'ready') if r['day']), default=None)
-        spot('warn', 'Idle', 'idle with ready work', sum(could.values()), days_old(old) if old else 'unknown', 'backlog#targets',
+        spot('warn', 'Idle', 'idle with ready work', f'{"" if bl_known else "≥"}{sum(could.values())}', days_old(old) if old else 'unknown', 'backlog#targets',
              ', '.join(f'{hname(h)} {len(bl(h, "ready"))} ready, {len(by_home[h])} of {plan(h)} open' for h in ACTIVE if could[h]))
 down = {h for h in leads if lead_word(h)[0] == 'Not running'}
 if down: spot('bad', 'Down', 'lead down' if len(down) == 1 else 'leads down', len(down), 'now', '#homes', ', '.join(sorted(down)))
@@ -1217,14 +1222,15 @@ def tiles():
         tile('stuck', 'Stuck', f'{lane_value(STUCK)}{delta(STUCK if LANES_KNOWN else None, day_ago(2), False)}', (f'{lane_value(SPLIT["blocked"])} blocked · oldest {old}' if stuck else 'vs 24 h ago'),
              stack([('s-blocked', SPLIT['blocked'], 'blocked'), ('s-decision', SPLIT['decision'], 'on a decision')], STUCK, 'sb big') + trend(2),
              'bad' if SPLIT['blocked'] else 'warn' if STUCK else ''),
-        tile('ready', 'Ready', f'{QUEUE["ready"]}{delta(QUEUE["ready"], day_ago(3), None)}' if QUEUE else unknown(why_of('backlog')),
-             f'{QUEUE["held"]} held · {QUEUE["waiting"]} waiting' if QUEUE else '',
+        tile('ready', 'Ready', f'{"≥" if bl_partial else ""}{QUEUE["ready"]}{delta(QUEUE["ready"], day_ago(3), None)}' if QUEUE else unknown(why_of('backlog')),
+             (f'{QUEUE["held"]} held · {QUEUE["waiting"]} waiting' if QUEUE else '')
+             + (f' · {unknown(bl_unread_line())}' if bl_partial else ''),
              (stack([(cls, sum(v.values()), n) for n, v, cls in QREASONS], sum(QUEUE.values()), 'sb big') if QUEUE else '') + trend(3)),
         q]) + '</div>'
 
-def hbar(label, n, cls, right='', body='', top=1, partial=False):  # one bar on a shared scale; with a body it opens to the items
+def hbar(label, n, cls, right='', body='', top=1, partial=False, lower=False):  # one bar on a shared scale; with a body it opens to the items
     head = (f'<span class="hbl"><i class="sw2 {cls}"></i>{label}</span><span class="hbt"><i class="{cls}" style="width:{100 * n / max(top, 1):.1f}%"></i></span>'
-            f'<span class="hbv{"" if n else " z"}"><b>{lane_value(n) if partial else n}</b>{f" <small>{right}</small>" if right else ""}</span>')
+            f'<span class="hbv{"" if n else " z"}"><b>{"≥" if lower else ""}{lane_value(n) if partial else n}</b>{f" <small>{right}</small>" if right else ""}</span>')
     return f'<details class="hbr"><summary>{head}</summary><div class="gb">{body}</div></details>' if body else f'<div class="hbr">{head}</div>'
 WAIT = [('blocked', 'Blocked'), ('decision', 'On a decision'), ('finished', 'Finished, not landed'),
         ('validating', 'Validating or CI'), ('waiting', 'Waiting on other'), ('building', 'Building')]
@@ -1246,10 +1252,11 @@ def held_reasons(rows): return ''.join(grow(esc(r['title']), esc(hname(h) + ': '
 def queue_bars():
     if QUEUE is None: return f'<p class="lede">{unknown(why_of("backlog"))}</p>' + held_reasons(held_all)
     top = max([sum(v.values()) for _, v, _ in QREASONS] + [len(held_all)])
-    return (''.join(hbar(n, sum(v.values()), cls, '', ''.join(grow(esc(hname(h)), '', c) for h, c in sorted(v.items(), key=lambda x: (-x[1], x[0])) if c), top)
+    return (''.join(hbar(n, sum(v.values()), cls, '', ''.join(grow(esc(hname(h)), '', c) for h, c in sorted(v.items(), key=lambda x: (-x[1], x[0])) if c), top, lower=bl_partial)
                     for n, v, cls in QREASONS)
-            + f'<div class="gtot"><span class="k">Queued</span><span class="sum">{" + ".join(str(sum(v.values())) for _, v, _ in QREASONS)} = <b>{sum(QUEUE.values())}</b></span></div>'
-            + hbar('Captain calls and queued holds', len(held_all), 's-decision', '', held_reasons(held_all), top))
+            + f'<div class="gtot"><span class="k">Queued</span><span class="sum">{" + ".join(str(sum(v.values())) for _, v, _ in QREASONS)} = <b>{"≥" if bl_partial else ""}{sum(QUEUE.values())}</b></span></div>'
+            + hbar('Captain calls and queued holds', len(held_all), 's-decision', '', held_reasons(held_all), top, lower=bl_partial)
+            + (f'<p class="note">{unknown(bl_unread_line())}</p>' if bl_partial else ''))
 
 def nice_top(v):  # a round axis top at or above v
     m = 10 ** math.floor(math.log10(max(v, 1)))
@@ -1318,19 +1325,20 @@ def backlog_body(group):
         eq = f'<p class="lede">{unknown("; ".join(r for s, r in notes if s == "backlog"))}</p>'
         queued = ''
     else:
-        total = sum(QUEUE.values())
-        eq = (f'<div class="eq"><div><span>Queued</span><b>{total}</b></div><span class="op">=</span><div><span>Ready</span><b>{QUEUE["ready"]}</b></div>'
-              f'<span class="op">+</span><div><span>Held</span><b>{QUEUE["held"]}</b></div><span class="op">+</span><div><span>Waiting on another item</span><b>{QUEUE["waiting"]}</b></div></div>'
-              f'<p class="note">In flight: {plural(sum(len(bl(h, state="in_flight")) for h in ACTIVE), "item")}, counted apart from the queue. Held for the captain: {len(held_cap)}.</p>')
+        total, lb = sum(QUEUE.values()), '≥' if bl_partial else ''
+        eq = (f'<div class="eq"><div><span>Queued</span><b>{lb}{total}</b></div><span class="op">=</span><div><span>Ready</span><b>{lb}{QUEUE["ready"]}</b></div>'
+              f'<span class="op">+</span><div><span>Held</span><b>{lb}{QUEUE["held"]}</b></div><span class="op">+</span><div><span>Waiting on another item</span><b>{lb}{QUEUE["waiting"]}</b></div></div>'
+              f'<p class="note">In flight: {plural(sum(len(bl(h, state="in_flight")) for h in ACTIVE), "item")}, counted apart from the queue. Held for the captain: {len(held_cap)}.</p>'
+              + (f'<p class="note">{unknown(bl_unread_line())}</p>' if bl_partial else ''))
         CL = (('ready', 'Ready to start'), ('held', 'Held'), ('waiting', 'Waiting on another item'))
         if group == 'home':
-            gs = [(hname(h), len([r for r in backlog[h] if r['class']]),
+            gs = [(hname(h), len([r for r in bl(h) if r['class']]),
                    ''.join(grow(esc(n), '', len(bl(h, c))) for c, n in CL if bl(h, c)), '', None, False)
-                  for h in sorted(ACTIVE, key=lambda h: (-len([r for r in backlog[h] if r['class']]), h)) if any(r['class'] for r in backlog[h])]
+                  for h in sorted(ACTIVE, key=lambda h: (-len([r for r in bl(h) if r['class']]), h)) if any(r['class'] for r in bl(h))]
         else:
             gs = [(n, QUEUE[c], ''.join(grow(esc(hname(h)), '', len(bl(h, c))) for h in sorted(ACTIVE, key=lambda h: (-len(bl(h, c)), h)) if bl(h, c)), '', None, c == 'ready')
                   for c, n in CL]
-        queued = glist(gs, 'Queued', total)
+        queued = glist(gs, 'Queued', f'{lb}{total}')
     def held_row(h, r):
         return item('', esc(r['title']), esc(hname(h)), esc(prose(r['hold_reason']) if r.get('hold_reason') not in (None, '-') else 'no reason recorded'),
                     tm=days_old(r['day']) if r['day'] else '?')
@@ -1362,7 +1370,7 @@ def backlog_body(group):
     return f'''
 <div class="hero">
 {sh(f"Backlog · read {BUILT} from each home's backlog")}
-<h1>{QUEUE["ready"] if QUEUE else "–"} items ready to start; {lane_value(SPLIT["building"])} building among {lane_value(OPEN)} open lanes.</h1>
+<h1>{("≥" if bl_partial else "") + str(QUEUE["ready"]) if QUEUE else "–"} items ready to start; {lane_value(SPLIT["building"])} building among {lane_value(OPEN)} open lanes.</h1>
 {switch(group)}
 </div>
 <div class="sections">
@@ -1379,7 +1387,7 @@ def backlog_body(group):
 </section>
 <section>
 {sh(f"Queued work · now {BUILT}")}
-<h2>{"Queued work unknown." if QUEUE is None else f"{sum(QUEUE.values())} queued."}</h2>
+<h2>{"Queued work unknown." if QUEUE is None else f"{'at least ' if bl_partial else ''}{sum(QUEUE.values())} queued."}</h2>
 {queued}
 </section>
 <section id="agents">
@@ -1399,7 +1407,7 @@ def backlog_body(group):
 {sh("Lane plan · lane settings")}
 <h2>Lane settings plan {PLAN} lanes; {lane_value(OPEN)} are open.</h2>
 <table><thead><tr><th>Home</th><th>Open</th><th>Plan</th><th>Ready</th></tr></thead><tbody>{ltrows}</tbody>
-<tfoot><tr><td>Fleet</td><td>{lane_value(OPEN)}</td><td>{PLAN}</td><td>{QUEUE["ready"] if QUEUE else "–"}</td></tr></tfoot></table>
+<tfoot><tr><td>Fleet</td><td>{lane_value(OPEN)}</td><td>{PLAN}</td><td>{("≥" if bl_partial else "") + str(QUEUE["ready"]) if QUEUE else "–"}</td></tr></tfoot></table>
 <p class="note">Plan per home from the lane settings{f" ({esc(raised)})" if raised else ""}; every other home {lane_default}.</p>
 </section>
 </div>
@@ -1466,11 +1474,12 @@ pages = {'index.html': page('index', 'Fleet', index_body('action'), unknown_foot
 for f, doc in pages.items():
     with open(os.path.join(OUT, f), 'w', encoding='utf-8') as fh: fh.write(doc)
 
-def reading(value, mid, known=True, lower=False, reason=None, read_at=NOW_TS):
+def reading(value, mid, known=True, lower=False, reason=None, read_at=NOW_TS, partial=False):
     definition = next(x for x in METRICS if x[0] == mid)
-    return dict(value=value if known else None, status='unknown' if not known else 'lower_bound' if lower else 'exact',
-                reason=prose(reason or why_of(mid)) if not known else None, source=definition[3],
-                window=definition[4], cutoff=NOW_TS, read_at=read_at)
+    return dict(value=value if known else None,
+                status='unknown' if not known else 'partial' if partial else 'lower_bound' if lower else 'exact',
+                reason=prose(reason or why_of(mid)) if not known else prose(reason) if partial and reason else None,
+                source=definition[3], window=definition[4], cutoff=NOW_TS, read_at=read_at)
 def lane_reading(value, h=None):
     return reading(value, 'lanes', known=h not in lane_err, lower=h is None and not LANES_KNOWN,
                    reason='lane records unavailable', read_at=lanes_read_at)
@@ -1488,9 +1497,12 @@ metrics = {
     'lane_plan': reading(PLAN, 'lanes'),
     'free_lanes': reading(FREE, 'lanes', LANES_KNOWN, reason='lane records unavailable', read_at=lanes_read_at),
     'stuck': reading(STUCK, 'stuck', lower=not LANES_KNOWN, read_at=lanes_read_at),
-    'ready': reading(QUEUE['ready'] if QUEUE else None, 'ready', bl_known, reason=why_of('backlog'), read_at=backlog_read_at),
-    'queue': reading(QUEUE, 'ready', bl_known, reason=why_of('backlog'), read_at=backlog_read_at),
-    'held_for_captain': reading(len(held_cap), 'ready', lower=not bl_known, read_at=backlog_read_at),
+    'ready': reading(QUEUE['ready'] if QUEUE else None, 'ready', bl_any, partial=bl_partial, read_at=backlog_read_at,
+                     reason=bl_unread_line() if bl_partial else why_of('backlog')),
+    'queue': reading(QUEUE, 'ready', bl_any, partial=bl_partial, read_at=backlog_read_at,
+                     reason=bl_unread_line() if bl_partial else why_of('backlog')),
+    'held_for_captain': reading(len(held_cap), 'ready', lower=not bl_known, partial=bl_partial, read_at=backlog_read_at,
+                                reason=bl_unread_line() if bl_partial else None),
     'busy_agents': reading(sum(BUSY.values()), 'lanes', agents is not None, reason=why_of('herdr'), read_at=agents_read_at),
     'agent_roles': reading(BUSY, 'lanes', agents is not None, reason=why_of('herdr'), read_at=agents_read_at),
     'running_agents': reading(len(agent_rows), 'lanes', agents is not None, reason=why_of('herdr'), read_at=agents_read_at),
