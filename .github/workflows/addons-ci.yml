@@ -91,6 +91,9 @@ jobs:
       # Quota JSON fixtures and a private repeat-state file: nothing real is touched.
       - name: Z.AI quota check test
         run: bash zai-quota-check/tests/zai-quota-check-e2e.sh
+      # Quota JSON fixtures, a throwaway home and HOME, and a stub register: nothing real is touched.
+      - name: Claude quota check test
+        run: bash claude-quota/tests/claude-quota.test.sh
       # Fixture homes, stub herdr and a temp state dir: nothing real is touched.
       - name: Fleet stall check test
         run: bash fleet-stall/tests/fleet-stall-e2e.sh
