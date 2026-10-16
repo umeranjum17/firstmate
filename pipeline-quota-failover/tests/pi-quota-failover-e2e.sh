@@ -122,6 +122,16 @@ OUT=$(printf '%s' "$prompt" | "$wrapper" --model muse-spark-1.3-contributor --mo
 is "plain passthrough exits 0" "$?" "0"
 out_has "prompt reached pi" "PONG"
 
+# 6b. A profile set to a later chain model fails over to the earlier ones in
+# chain order (B2: Muse first, GLM backup), the requested model tried once.
+: >"$log"
+OUT=$(printf '%s' "$prompt" | PI_QUOTA_FAILOVER_CHAIN='deepseek/deepseek-v4.1-flash bad/always-429 muse-spark-1.3-contributor' "$wrapper" --model bad/always-429 --mode json --no-session 2>"$work/err6b")
+is "requested-first failover exits 0" "$?" "0"
+out_has "earlier chain model answers" '"model":"deepseek/deepseek-v4.1-flash"'
+out_count "later chain model not tried" '"model":"muse' 0
+log_has "moves to the earlier chain model" 'model=bad/always-429 quota-error.*moving to deepseek/deepseek-v4.1-flash'
+if [ "$(grep -c 'quota-error' "$log")" = 1 ]; then ok "requested model attempted once"; else no "wrong attempt count in log"; fi
+
 # 7. Host-memory gate: runs before pi with no command, its output kept off the stream; a gate still waiting at the
 #    bound lets pi start anyway with one log line.
 cat >"$stub/gate" <<'GATE'
