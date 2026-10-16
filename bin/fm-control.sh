@@ -88,12 +88,14 @@
 #              while relaunching it: 'next' rests the account the running
 #              worker launched on and launches it on another, and an explicit
 #              id selects that account for this launch, which is the only way
-#              to select an OpenCode Go one. The choice, the rest, and the
-#              pick are all proven here on the pre-stop side of the
-#              transaction, a home pin still wins and refuses the flag rather
-#              than ignoring it, and the replacement records the selected
-#              account as account=. The isolated copy, its commits, and its
-#              uncommitted work are untouched.
+#              to select an OpenCode Go one. The choice, the rest, and a
+#              proving pick are all taken on the pre-stop side of the
+#              transaction; the launch owner re-picks at launch, so a pool
+#              state that changed in between refuses there rather than
+#              launching a wrong account. A home pin still wins and refuses
+#              the flag rather than ignoring it, and the replacement records
+#              the selected account as account=. The isolated copy, its
+#              commits, and its uncommitted work are untouched.
 #              The same pre-stop refusal applies to this home's worker tool
 #              exclusions (bin/fm-exclude-tools-lib.sh): a malformed list, or a
 #              replacement runtime that cannot hide the listed tools.

@@ -89,13 +89,15 @@
 #   rebind is a recovery, never a teardown. Only a crewmate or scout rebinds: a
 #   secondmate whose endpoint is gone is respawned by its own owner
 #   (`--secondmate`, driven by the session-start liveness sweep).
-#   --account <id|next> is a relaunch-only axis: it moves the worker between
-#   pool accounts, an explicit id selecting that account and 'next' resting
-#   the recorded one (the control plane's preflight takes that rest, so this
-#   flag picks plainly). A fresh spawn refuses it, an explicit id whose
-#   answer is a different account refuses rather than launching the wrong
-#   one, and a home whose pool cannot answer it at all refuses rather than
-#   launching on the ambient login.
+#   --account <id|next> is the control plane's relaunch axis, carried here to
+#   the launch owner: an explicit id selects that account, and 'next' is
+#   honored only on an fm-control-driven relaunch, whose pre-stop gate has
+#   already rested the recorded account, so here it just picks plainly; a
+#   direct relaunch refuses 'next' rather than silently re-picking the same
+#   account. A fresh spawn refuses it, an explicit id whose answer is a
+#   different account refuses rather than launching the wrong one, and a home
+#   whose pool cannot answer it at all refuses rather than launching on the
+#   ambient login.
 #   Every fresh ship/scout launch and replacement explicitly enters the recorded
 #   worktree immediately before trust setup and brief delivery, and a pre-launch
 #   cwd check refuses any endpoint that still reports another copy; a Herdr shell
@@ -998,6 +1000,10 @@ if [ "$RELAUNCH" -eq 1 ]; then
   }
   [ "$UPSTREAM_CONSENT_SET" -eq 0 ] || {
     echo "error: --relaunch reuses the task's recorded upstream consent; --upstream-consent cannot override it" >&2
+    exit 1
+  }
+  [ "$ACCOUNT_SET" -eq 0 ] || [ "$ACCOUNT_ARG" != next ] || [ -n "${FM_CONTROL_RELAUNCH_TX:-}" ] || {
+    echo "error: --account next rests the recorded account only in fm-control's pre-stop gate; a direct relaunch would ignore it and may re-pick the same account - use 'bin/fm-control.sh <task-id> relaunch --account next'" >&2
     exit 1
   }
 else

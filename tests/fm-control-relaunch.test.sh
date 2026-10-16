@@ -1295,7 +1295,7 @@ test_spawn_relaunch_account_refuses_without_a_pool() {
   dir=$(new_case acct-spawn-nopool "$id")
   add_ship_task "$dir" "$id" claude
   printf 'zsh' > "$dir/fake/command"
-  out=$(run_spawn "$dir" "$id" --relaunch --harness claude --account next); rc=$?
+  out=$(run_spawn "$dir" "$id" --relaunch --harness claude --account pa_named); rc=$?
   expect_code 1 "$rc" "a direct relaunch --account without a pool must refuse"$'\n'"$out"
   assert_contains "$out" "no account pool for claude workers" \
     "the refusal should name the missing pool and the harness"
@@ -1317,6 +1317,32 @@ test_spawn_relaunch_account_refuses_a_harness_with_no_pool_tool() {
   assert_absent "$dir/fake/created-windows" "a refused relaunch must launch nothing"
   [ ! -s "$dir/fake/literal" ] || fail "a refused relaunch must send no lifecycle input"
   pass "fm-spawn --relaunch --account: a harness whose pool tool does not exist refuses instead of ignoring the flag"
+}
+
+# 'next' is the control plane's move: the rest of the recorded account happens
+# in fm-control's pre-stop gate before it hands --account next to this launch
+# owner. A direct relaunch would only plain-pick - possibly re-answering the
+# recorded account - so it refuses instead.
+test_spawn_relaunch_account_next_refuses_outside_the_control_plane() {
+  local dir out rc id=rl-acct-spawn-next folder
+  dir=$(new_case acct-spawn-next "$id")
+  add_ship_task "$dir" "$id" claude
+  make_pool_command_stub "$dir"
+  mkdir -p "$dir/home/config" "$dir/pool/claude"
+  folder="$dir/pool/claude"
+  printf 'state=%s\n' "$dir/pool" > "$dir/home/config/account-pool"
+  printf 'account=pa_old\n' >> "$dir/home/state/$id.meta"
+  pool_ready_account "$dir" pa_old claude
+  pool_pick_answer "$dir" pa_old "$folder"
+  printf 'zsh' > "$dir/fake/command"
+  out=$(run_spawn "$dir" "$id" --relaunch --harness claude --account next); rc=$?
+  expect_code 1 "$rc" "a direct relaunch --account next must refuse rather than re-pick"$'\n'"$out"
+  assert_contains "$out" "fm-control.sh <task-id> relaunch --account next" \
+    "the refusal should name the control-plane command that takes the rest"
+  assert_absent "$dir/fake/created-windows" "a refused relaunch must launch nothing"
+  [ ! -s "$dir/fake/literal" ] || fail "a refused relaunch must send no lifecycle input"
+  [ ! -e "$dir/pool-calls" ] || fail "a direct next refusal must not consult the pool"
+  pass "fm-spawn --relaunch --account next: refuses outside fm-control instead of re-picking the same account"
 }
 
 test_signed_out_worker_account_pin_refuses_before_stop() {
@@ -3172,6 +3198,7 @@ test_relaunch_without_account_keeps_the_plain_pick
 test_spawn_refuses_account_on_a_fresh_spawn
 test_spawn_relaunch_account_refuses_without_a_pool
 test_spawn_relaunch_account_refuses_a_harness_with_no_pool_tool
+test_spawn_relaunch_account_next_refuses_outside_the_control_plane
 test_worker_account_pin_follows_the_relaunch
 test_pi_exclude_tools_follow_the_relaunch
 test_exclude_tools_refusals_happen_before_the_agent_stops
