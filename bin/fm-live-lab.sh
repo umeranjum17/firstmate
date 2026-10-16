@@ -65,7 +65,7 @@
 #                    <lab-root>/home/data/<worker-id>/gate until that file
 #                    exists; touch the gate and message the worker to resume.
 #   primary          window main: claude --setting-sources project,local
-#                    (default sonnet, medium, permission mode auto) or pi
+#                    (default claude-haiku-5-5, medium, permission mode auto) or pi
 #                    (default openai-codex/gpt-6-luna, medium), launched
 #                    after the mate and worker so its first turn end arms
 #                    supervision. up then sends one harmless probe prompt.
@@ -442,7 +442,7 @@ open(path, "w", encoding="utf-8").write(text)
 PY
   (cd "$LAB" && lab_run FM_HOME="$LAB" "$LAB/bin/fm-tasks-axi.sh" add "$WORKER_ID" "lab gated worker" --kind ship --repo notes) >/dev/null || return 1
   (cd "$LAB" && lab_run FM_HOME="$LAB" "$LAB/bin/fm-spawn.sh" "$WORKER_ID" "$LAB/projects/notes" \
-    --mode local-only --yolo on --harness claude --model sonnet --effort low)
+    --mode local-only --yolo on --harness claude --model claude-haiku-5-5 --effort low)
 }
 
 spawn_mate() {
@@ -480,7 +480,7 @@ cmd_up() {
   [ "$host_line" != __default__ ] || { [ "$harness" = claude ] && host_line=claude || host_line=none; }
   HOST_OFF=no
   [ "$host_line" != off ] || HOST_OFF=yes
-  [ -n "$model" ] || { [ "$harness" = claude ] && model=sonnet || model=openai-codex/gpt-6-luna; }
+  [ -n "$model" ] || { [ "$harness" = claude ] && model=claude-haiku-5-5 || model=openai-codex/gpt-6-luna; }
   CLAUDE_DIR=${CLAUDE_CONFIG_DIR:-}
   case "$CLAUDE_DIR" in ''|/*) ;; *) die "CLAUDE_CONFIG_DIR must be an absolute path" ;; esac
   CLAUDE_STORE="${CLAUDE_DIR:-$HOME}/.claude.json"
@@ -530,7 +530,7 @@ cmd_up() {
   mkdir -p "$LAB/state" "$LAB/data" "$LAB/config" "$LAB/projects" "$ROOT/treehouse"
   printf 'tmux\n' > "$LAB/config/backend"
   printf 'claude\n' > "$LAB/config/crew-harness"
-  printf 'claude sonnet low\n' > "$LAB/config/secondmate-harness"
+  printf 'claude claude-haiku-5-5 low\n' > "$LAB/config/secondmate-harness"
   printf 'auto\n' > "$LAB/config/claude-permission-mode"
   case "$host_line" in
     none) ;;
