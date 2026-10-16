@@ -240,13 +240,13 @@ fm_account_pool_next_ok() {
   case " $FM_ACCOUNT_POOL_AUTO_TOOLS " in
     *" $tool "*) ;;
     *)
-      echo "error: '--account next' cannot move an account of tool '$tool' automatically; move this worker by hand with 'bin/fm-control.sh relaunch $task --account <id>'" >&2
+      echo "error: '--account next' cannot move an account of tool '$tool' automatically; move this worker by hand with 'bin/fm-control.sh $task relaunch --account <id>'" >&2
       return 1
       ;;
   esac
   case "$from_model$to_model" in
     *opencode-go*)
-      echo "error: '--account next' cannot move a worker on the opencode-go provider automatically; move this worker by hand with 'bin/fm-control.sh relaunch $task --account <id>'" >&2
+      echo "error: '--account next' cannot move a worker on the opencode-go provider automatically; move this worker by hand with 'bin/fm-control.sh $task relaunch --account <id>'" >&2
       return 1
       ;;
   esac

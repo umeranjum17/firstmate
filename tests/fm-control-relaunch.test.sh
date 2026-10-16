@@ -1094,7 +1094,7 @@ test_relaunch_account_next_refuses_a_go_account_and_names_the_manual_command() {
   expect_code 1 "$rc" "next must refuse an OpenCode Go account"
   assert_contains "$out" "cannot move an account of tool 'opencode' automatically" \
     "the refusal should say which account cannot move automatically"
-  assert_contains "$out" "relaunch $id --account <id>" "the refusal should name the manual command"
+  assert_contains "$out" "bin/fm-control.sh $id relaunch --account <id>" "the refusal should name the manual command"
   case "$(cat "$dir/pool-calls")" in
     *"rest "*|*"pick "*) fail "a Go refusal must rest and pick nothing, got: $(cat "$dir/pool-calls")" ;;
   esac
@@ -1124,7 +1124,7 @@ test_relaunch_account_next_refuses_a_go_model_worker() {
   expect_code 1 "$rc" "next must refuse a worker on the opencode-go provider"
   assert_contains "$out" "cannot move a worker on the opencode-go provider automatically" \
     "the refusal should name the provider it cannot move"
-  assert_contains "$out" "relaunch $id --account <id>" "the refusal should name the manual command"
+  assert_contains "$out" "bin/fm-control.sh $id relaunch --account <id>" "the refusal should name the manual command"
   case "$(cat "$dir/pool-calls")" in
     *"rest "*|*"pick "*) fail "a Go-provider refusal must rest and pick nothing, got: $(cat "$dir/pool-calls")" ;;
   esac
@@ -1157,7 +1157,7 @@ test_relaunch_account_next_refuses_a_recorded_go_worker_when_the_model_switches(
   expect_code 1 "$rc" "next must refuse a recorded opencode-go worker even when the replacement names another model"$'\n'"$out"
   assert_contains "$out" "cannot move a worker on the opencode-go provider automatically" \
     "the refusal should name the provider it cannot move"
-  assert_contains "$out" "relaunch $id --account <id>" "the refusal should name the manual command"
+  assert_contains "$out" "bin/fm-control.sh $id relaunch --account <id>" "the refusal should name the manual command"
   case "$(cat "$dir/pool-calls")" in
     *"rest "*|*"pick "*) fail "a Go-provider refusal must rest and pick nothing, got: $(cat "$dir/pool-calls")" ;;
   esac
