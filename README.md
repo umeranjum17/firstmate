@@ -2,6 +2,8 @@
 
 Fleet dashboard and add-ons for running a fleet of coding agents.
 
+Every change still on the fork that is not on Kun's main, with its exit path and status, is tracked in [FORK-EXIT.md](FORK-EXIT.md).
+
 ## delete-guard
 
 No agent can recursively delete `/`, `/home`, a home folder or a folder directly in it, or a bare `.` `..` `*` or `$VAR` target, and every attempt wakes the main firstmate.
