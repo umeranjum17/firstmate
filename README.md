@@ -7,7 +7,7 @@ Fleet dashboard and add-ons for running a fleet of coding agents.
 No agent can recursively delete `/`, `/home`, a home folder or a folder directly in it, or a bare `.` `..` `*` or `$VAR` target, and every attempt wakes the main firstmate.
 `delete-guard/guard.mjs` holds the one rule, and each runtime adapter hands it the shell command before it runs.
 A block is final: there is no allow-once, flag or environment override, and no agent, reviewer or pipeline gate can approve the delete.
-The one `$VAR` exception: when `d=$(mktemp)` or `d=$(mktemp -d)` is its own statement and the last assignment to `d` in the same command, `rm -rf -- "$d"` runs (never for `HOME` or another shell or runtime variable).
+The one `$VAR` exception: when `d=$(mktemp ...)` with any options, or `d=$(mktemp ... || mktemp ...)` where every `||` alternative is a mktemp call, is its own statement (optionally after `export`, `local`, `readonly`, `typeset` or `declare` with only `-r`, `-x`, `-g`; never a `-n` nameref) and the last assignment to `d` in the same command, `rm -rf -- "$d"` runs (never for `HOME` or another shell or runtime variable). A literal-path assignment takes the same prefixes.
 Each block appends one JSON line (time, home, task, cwd, runtime, target, command) to `<fm-home>/state/delete-guard.log`.
 The `delete-guard` watcher check turns new lines into one wake on the watcher's check cadence (5 minutes by default).
 A second block by the same task (or, with no task, the same cwd) within 10 minutes queues an immediate `delete guard REPEAT` wake.
