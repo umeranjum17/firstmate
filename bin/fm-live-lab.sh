@@ -31,11 +31,10 @@
 #                    checkout this script runs from) checked out as a genuine
 #                    primary checkout, with FM_HOME at its root.
 #   config/          backend tmux, Claude crews and second mates, and
-#                    supervision-host <line> (default claude claude-haiku-5-5 on
-#                    Claude, absent
-#                    on Pi; none leaves the file absent; off writes the
-#                    inherited supervision-host-off opt-out instead, so the
-#                    mate spawn inherits it).
+#                    supervision-host <line> (default claude claude-haiku-5-5
+#                    on Claude, absent on Pi; none leaves the file absent;
+#                    off writes the inherited supervision-host-off opt-out
+#                    instead, so the mate spawn inherits it).
 #   tmux server      private, through the lab home's bin/fm-lab-home.sh
 #                    tmux-dir, with no user tmux config (its plugins never run
 #                    in a lab), started from an empty environment so no inherited
@@ -66,8 +65,8 @@
 #                    <lab-root>/home/data/<worker-id>/gate until that file
 #                    exists; touch the gate and message the worker to resume.
 #   primary          window main: claude --setting-sources project,local
-#                    (default claude-haiku-5-5, medium, permission mode auto) or pi
-#                    (default openai-codex/gpt-6-luna, medium), launched
+#                    (default claude-haiku-5-5, medium, permission mode auto)
+#                    or pi (default openai-codex/gpt-6-luna, medium), launched
 #                    after the mate and worker so its first turn end arms
 #                    supervision. up then sends one harmless probe prompt.
 #
