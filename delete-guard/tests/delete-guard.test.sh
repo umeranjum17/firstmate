@@ -65,9 +65,11 @@ for c in "${allowed[@]}"; do n=$((n + 1)); hookrun "/tmp/case-$n" "$c" || no "FA
 tail -n1 "$T/fm/state/delete-guard.log" | jq -e '.command | contains("rm -rf \"$HOME\"")' >/dev/null && ok "long command keeps the part around the delete" || no "long command lost its delete part"
 [ ! -s "$T/fm/state/.wake-queue" ] && ok "no repeat wake for distinct agents" || no "unexpected wake"
 
-out=$("$T/fm/state/delete-guard.check.sh")
-case "$out" in "delete guard blocked ${#blocked[@]} recursive delete(s)"*) ok "check wakes on new lines" ;; *) no "check output: $out" ;; esac
-[ -z "$("$T/fm/state/delete-guard.check.sh")" ] && ok "check quiet with nothing new" || no "check repeats old lines"
+# The check expands ~ with HOME; a fixed one keeps a throwaway HOME under /tmp from reading as a temp folder.
+check() { HOME=/home/fixture/users/user-014 "$@"; }
+[ -z "$(check "$T/fm/state/delete-guard.check.sh")" ] && [ "$(cut -f2 "$T/fm/state/delete-guard.counted")" = "${#blocked[@]}" ] \
+  && ok "check counts blocks from agents in temp folders without a wake" || no "temp-folder blocks: $(cat "$T/fm/state/delete-guard.counted")"
+[ -z "$(check "$T/fm/state/delete-guard.check.sh")" ] && ok "check quiet with nothing new" || no "check repeats old lines"
 
 FM_TASK_ID=t1 FM_TASK_INBOX="$T/lead/state/t1.inbox" hookrun /w 'rm -rf ~' || true
 grep -q 'delete-guard' "$T/fm/state/.wake-queue" 2>/dev/null && no "first block woke at once" || ok "first block waits for the check"
@@ -78,4 +80,18 @@ FM_TASK_ID=t2 FM_TASK_INBOX="$T/lead/state/t2.inbox" hookrun "$T/fm/state" 'rm -
 jq -e --arg h "$T/fm" '.task == "t2" and .home == $h' <(tail -n1 "$T/fm/state/delete-guard.log") >/dev/null && ok "home is the firstmate home of cwd, not an inherited inbox" || no "cwd home lost to inbox"
 FM_HOME=/elsewhere hookrun "$T/fm/state" 'rm -rf ~' || true # a lead with an inherited FM_HOME, working in its own home
 tail -n1 "$T/fm/state/delete-guard.log" | jq -e --arg h "$T/fm" '.home == $h and .task == ""' >/dev/null && ok "no-task block logs the home holding cwd" || no "home from cwd"
+out=$(check "$T/fm/state/delete-guard.check.sh")
+case "$out" in "delete guard blocked 1 recursive delete(s)"*"task t1 (claude, home $T/lead, cwd /w, "*"/home/fixture/users/user-014: rm -rf ~") ok "check wakes on a literal home target, not on its repeat or temp-folder blocks" ;; *) no "check output: $out" ;; esac
+
+# Replay of the 16 Oct log, one sweep per row: only the 14:22 literal /home/fixture/users/user-019/mt-test block wakes; the build probes,
+# variable targets and that task's $d repeat 15 s later are counted.
+mkdir -p "$T/replay/state"; wakes=()
+while IFS= read -r row; do
+  printf '%s\n' "$row" >> "$T/replay/state/delete-guard.log"
+  w=$(HOME=/home/fixture/users/user-019 "$T/home/fixture/users/user-004/share/fm-delete-guard/check.sh" "$T/replay"); [ -z "$w" ] || wakes+=("$w")
+done < "$ADDON/tests/fixtures/delete-guard-2026-10-16.log"
+[ "${#wakes[@]}" -eq 1 ] && case "${wakes[0]}" in *"task rd-stale-screen-on-return (pi, "*", 14:22Z) /home/fixture/users/user-019/mt-test: "*) true ;; *) false ;; esac \
+  && ok "replay of 16 Oct wakes only on the 14:22 /home/fixture/users/user-019/mt-test block" || no "replay wakes: $(printf '%s\n' "${wakes[@]}")"
+[ "$(cat "$T/replay/state/delete-guard.counted")" = "$(printf '2026-10-16\t%s' $(($(wc -l < "$ADDON/tests/fixtures/delete-guard-2026-10-16.log") - 1)))" ] \
+  && ok "replay counts every other block for the day" || no "replay count: $(cat "$T/replay/state/delete-guard.counted")"
 [ "$fail" -eq 0 ] && echo PASS || { echo FAIL; exit 1; }
