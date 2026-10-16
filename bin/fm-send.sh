@@ -542,6 +542,16 @@ if [ -n "$TARGET_SELECTOR" ] && [ -n "$TARGET_META" ] && [ "$(fm_meta_get "$TARG
   TARGET_TASK_ID=$(fm_send_id_from_meta "$TARGET_META")
 fi
 
+# Parked-home guard (firstmate-addons/parked-homes): a parked secondmate home
+# gets no message, steer, answer or nudge. The add-on lib answers "not parked"
+# when the add-on checkout is absent, so behavior is unchanged without it.
+# shellcheck source=bin/fm-parked-homes-lib.sh
+. "$SCRIPT_DIR/fm-parked-homes-lib.sh"
+if [ -n "$TARGET_META" ] && fm_parked_meta "$TARGET_META" "$TARGET_TASK_ID"; then
+  echo "error: nothing sent to ${TARGET_TASK_ID:+fm-$TARGET_TASK_ID}: its home is parked (config/parked-homes); a parked home gets no message, steer, answer or nudge" >&2
+  exit 1
+fi
+
 # Validate the answerer-closes request before any durable mutation or send: the
 # target must have a task ledger in THIS home, the send must carry an answer
 # message, and every named key must be open right now in that ledger per the

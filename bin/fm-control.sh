@@ -1358,6 +1358,14 @@ case "$VERB" in
     echo "$result $ID harness=$HARNESS backend=$BACKEND endpoint=$T worktree=$WT"
     ;;
   relaunch)
+    # Parked-home guard (firstmate-addons/parked-homes): a parked secondmate
+    # home gets no relaunch. No-op without the add-on checkout.
+    # shellcheck source=bin/fm-parked-homes-lib.sh
+    . "$SCRIPT_DIR/fm-parked-homes-lib.sh"
+    if fm_parked_meta "$META" "$ID"; then
+      echo "error: relaunch refused for $ID: its home is parked (config/parked-homes); a parked home gets no relaunch" >&2
+      exit 1
+    fi
     do_relaunch
     ;;
 esac

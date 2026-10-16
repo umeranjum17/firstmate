@@ -19,6 +19,10 @@
 _FM_MODEL_ERROR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=bin/fm-timeout-lib.sh
 . "$_FM_MODEL_ERROR_DIR/fm-timeout-lib.sh"
+# Parked-home reader (firstmate-addons/parked-homes); no-op predicates when
+# the add-on checkout is absent.
+# shellcheck source=bin/fm-parked-homes-lib.sh
+. "$_FM_MODEL_ERROR_DIR/fm-parked-homes-lib.sh"
 # The usage-limit banner pattern has one owner, bin/fm-composer-lib.sh; this
 # observer reads that variable so the outage alert cannot drift from the
 # staleness furniture the banner was captured with.
@@ -46,6 +50,9 @@ fm_model_outage_tick() {
     [ -f "$meta" ] && [ ! -L "$meta" ] || continue
     id=${meta##*/}; id=${id%.meta}
     fm_busy_token_valid "$id" || continue
+    # Parked-home guard (firstmate-addons/parked-homes): a parked home's lane
+    # is never scanned and never alerts. No-op without the add-on checkout.
+    if fm_parked_meta "$meta" "$id"; then continue; fi
     target=$(fm_backend_target_of_meta "$meta")
     [ -n "$target" ] || continue
     backend=$(fm_backend_of_meta "$meta")

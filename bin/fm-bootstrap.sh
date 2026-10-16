@@ -196,6 +196,8 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 . "$SCRIPT_DIR/fm-config-inherit-lib.sh"
 # shellcheck source=bin/fm-secondmate-nudge-lib.sh disable=SC1091
 . "$SCRIPT_DIR/fm-secondmate-nudge-lib.sh"
+# shellcheck source=bin/fm-parked-homes-lib.sh disable=SC1091
+. "$SCRIPT_DIR/fm-parked-homes-lib.sh"
 # shellcheck source=bin/fm-startup-memory-budget-lib.sh disable=SC1091
 . "$SCRIPT_DIR/fm-startup-memory-budget-lib.sh"
 # shellcheck source=bin/fm-x-lib.sh disable=SC1091
@@ -558,6 +560,12 @@ secondmate_sync() {
   SECONDMATE_RESPAWNED_IDS=${SECONDMATE_RESPAWNED_IDS:-}
   while IFS='|' read -r id home _window _meta; do
     validate_secondmate_home "$id" "$home" || continue
+    # Parked-home guard (firstmate-addons/parked-homes): a parked home gets no
+    # inherited config push and no reread nudge. No-op without the add-on.
+    if fm_parked_meta "$STATE/$id.meta" "$id"; then
+      echo "CONFIG_REREAD: secondmate $id: skipped - its home is parked (config/parked-homes)"
+      continue
+    fi
     home_real="$VALIDATED_HOME"
     case " $FF_SEEN_HOMES " in
       *" $home_real "*) ;;
@@ -697,6 +705,12 @@ secondmate_sync() {
     parallel=1
   fi
   while IFS='|' read -r id _home _window meta; do
+    # Parked-home guard (firstmate-addons/parked-homes): a parked home gets no
+    # remote inheritance push and no reread nudge. No-op without the add-on.
+    if fm_parked_meta "$meta" "$id"; then
+      echo "SECONDMATE_SYNC: secondmate $id: skipped - its home is parked (config/parked-homes)"
+      continue
+    fi
     remote_host=$(fm_meta_get "$meta" remote_host)
     [ -n "$remote_host" ] || continue
     if [ "$parallel" -eq 1 ]; then
