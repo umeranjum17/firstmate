@@ -29,7 +29,7 @@ Every merge runs done-done and, only with passed proof, posts one evidence card 
 `merge-card/merge-card` is one bash script with three subcommands:
 
 - `merge-card gate <task-id> <worktree|-> <head|-> <pr-url|->` runs `done-done check --from <source> --judge --json` in the task's worktree, where `<source>` is the pull request when there is one and `$FM_HOME/data/<task-id>/checks.md` otherwise.
-  The Checks evidence lives in `$FM_HOME/data/<task-id>`, so it is cited from there while absolute paths stay unchanged: `done-done check --citation-base $FM_HOME/data/<task-id>` resolves the relative names itself on done-done 0.3.1+, and on an older one merge-card runs done-done without the flag and resolves the verdict's relative citations against the task folder itself, before the card copies the media.
+  The Checks evidence lives in `$FM_HOME/data/<task-id>`, so each relative or bare name resolves there before done-done checks that the file exists, while absolute paths stay unchanged: `done-done check --citation-base $FM_HOME/data/<task-id>` resolves the names itself on done-done 0.3.1+, and on an older one merge-card resolves them in the Checks block and hands it to `done-done check --from -` (with the pull request's branch as `--claim-id`). A name still missing there is reported missing at its resolved path.
   The work copy only supplies the repo identity.
   It prints the verdict and saves it for the card in `$FM_HOME/data/<task-id>/merge-card.json`.
   It is report only: it always exits 0, so it never refuses a merge the checks lint passes.
@@ -43,7 +43,7 @@ Every merge runs done-done and, only with passed proof, posts one evidence card 
   The card key is the merge's own (`merge-<owner>-<repo>-pull-<n>`, or `merge-<head>` for a local merge), so a repeat post or a second home adds nothing.
   sign-off-axi writes the board under its lock and only appends.
 
-`merge-card` needs `done-done` on `PATH` (0.3.1+ lets it resolve the block's relative evidence names itself; on an older one the card still carries its retained proof, but that older done-done sees a relatively cited file as missing and says so in the verdict), plus `sign-off-axi`, `jq` and `gh`.
+`merge-card` needs `done-done` on `PATH` (0.3.1+ resolves the block's relative evidence names itself; on an older one merge-card resolves them first), plus `sign-off-axi`, `jq` and `gh`.
 
 Install into one home, so the post-merge hook calls `post` once for each recorded merge:
 
