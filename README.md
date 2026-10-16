@@ -6,13 +6,16 @@ Every change still on the fork that is not on Kun's main, with its exit path and
 
 ## delete-guard
 
-No agent can recursively delete `/`, `/home`, a home folder or a folder directly in it, or a bare `.` `..` `*` or `$VAR` target, and every attempt wakes the main firstmate.
+No agent can recursively delete `/`, `/home`, a home folder or a folder directly in it, or a bare `.` `..` `*` or `$VAR` target, and an attempt on a real folder wakes the main firstmate.
 `delete-guard/guard.mjs` holds the one rule, and each runtime adapter hands it the shell command before it runs.
 A block is final: there is no allow-once, flag or environment override, and no agent, reviewer or pipeline gate can approve the delete.
 The one `$VAR` exception: when `d=$(mktemp ...)` with any options or template (plain `$NAME` or `${NAME}` expansions allowed; no command substitution, backticks, `;`, `&`, `|` or parentheses), or `d=$(mktemp ... || mktemp ...)` where every `||` alternative is a mktemp call, is its own statement (optionally after `export`, `local`, `readonly`, `typeset` or `declare` with only `-r`, `-x`, `-g`; never a `-n` nameref) and the last assignment to `d` in the same command, `rm -rf -- "$d"` runs (never for `HOME` or another shell or runtime variable). A literal-path assignment takes the same prefixes.
 Each block appends one JSON line (time, home, task, cwd, runtime, target, command) to `<fm-home>/state/delete-guard.log`.
 The block message names the literal-path fix: delete the folder in a later command by its literal path (`rm -rf -- /tmp/tmp.Ab12`), delete a variable only when the same command sets it (`d=$(mktemp -d); ...; rm -rf -- "$d"`), and treat the block as final.
-The `delete-guard` watcher check turns new lines into one wake on the watcher's check cadence (5 minutes by default).
+The `delete-guard` watcher check turns new lines into one wake on the watcher's check cadence (5 minutes by default), but only for a block whose target is a literal path, or a variable the same command set to one (`$HOME` with no assignment is the home folder), outside temp and scratch folders (`/tmp`, `/var/tmp`, `/dev/shm`, `.cache/fm-scratch`).
+Every other block is counted, not woken: a `$VAR` with no literal value, a bare `.` `..` `*`, a temp or scratch target, a block from an agent working in a temp or scratch folder (a lab or probe), and a repeat the guard already woke on.
+The blocks themselves are unchanged; an agent that needs a blocked delete reports blocked to its lead, and the lead asks Main.
+The check keeps the counts per UTC day as `<day><TAB><count>` lines in `<main-fm-home>/state/delete-guard.counted`; a daily fleet summary reads yesterday's with `awk -F'\t' -v d="$(date -u -d yesterday +%F)" '$1 == d { print $2 }' <main-fm-home>/state/delete-guard.counted`.
 A second block by the same task (or, with no task, the same cwd) within 10 minutes queues an immediate `delete guard REPEAT` wake.
 A heredoc body fed to a shell (`bash <<EOF`, `cat <<EOF | sh`) is checked as commands, and one fed to anything else (`python3`, `cat > file`) is data.
 Only the command string is checked, so a delete inside a script file the agent runs is not seen.
@@ -21,7 +24,7 @@ Not covered: Codex, because Firstmate launches its crewmates and scouts with `--
 
 Install or update with `delete-guard/install.sh [--dry-run] <main-fm-home>`; it is idempotent, and `--dry-run` prints the changes and writes nothing.
 It backs up each file it changes as `<file>.bak-delete-guard-<epoch>`, copies the rule to `${XDG_DATA_HOME:-~/.local/share}/fm-delete-guard/`, writes the adapters, merges the Claude hook without dropping other settings, and registers the check in `<main-fm-home>`.
-Test: `delete-guard/tests/delete-guard.test.sh <firstmate-checkout> [ref]` installs into a throwaway HOME against a home built from that checkout's `bin/`, then drives the installed hook through every rule case and the log, check and repeat-wake journey.
+Test: `delete-guard/tests/delete-guard.test.sh <firstmate-checkout> [ref]` installs into a throwaway HOME against a home built from that checkout's `bin/`, then drives the installed hook through every rule case and the log, check and repeat-wake journey, then replays the 16 Oct log (`delete-guard/tests/fixtures/`) one check sweep per row and asserts the only wake is the 14:22 `/home/fixture/users/user-019/mt-test` block.
 
 ## pipeline-literal-delete
 
