@@ -122,7 +122,25 @@ OUT=$(printf '%s' "$prompt" | "$wrapper" --model muse-spark-1.3-contributor --mo
 is "plain passthrough exits 0" "$?" "0"
 out_has "prompt reached pi" "PONG"
 
-# 7. install.sh: key-level config edit in a throwaway config, never printing it.
+# 7. Host-memory gate: runs before pi with no command, its output kept off the stream; a gate still waiting at the
+#    bound lets pi start anyway with one log line.
+cat >"$stub/gate" <<'GATE'
+#!/bin/sh
+[ $# -eq 0 ] && echo "gate ran" >>"$GATE_LOG" && echo "fm-mem-gate: waiting" && sleep "${GATE_SLEEP:-0}"
+GATE
+chmod +x "$stub/gate"
+export GATE_LOG=$work/gate.log
+OUT=$(printf '%s' "$prompt" | PI_QUOTA_FAILOVER_GATE="$stub/gate" "$wrapper" --model muse-spark-1.3-contributor --mode json --no-session 2>"$work/err7")
+is "gated call exits 0" "$?" "0"
+is "gate ran once, with no command" "$(cat "$work/gate.log" 2>/dev/null)" "gate ran"
+out_has "gated prompt reached pi" "PONG"
+out_count "gate output kept off the stream" "fm-mem-gate" 0
+OUT=$(printf '%s' "$prompt" | GATE_SLEEP=5 PI_QUOTA_FAILOVER_GATE="$stub/gate" PI_QUOTA_FAILOVER_GATE_SECS=1 "$wrapper" --model muse-spark-1.3-contributor --mode json --no-session 2>"$work/err7b")
+is "bounded gate wait still runs pi" "$?" "0"
+out_has "pi answered after the bound" "PONG"
+log_has "bound logged" "memory gate still waiting after 1s; starting pi anyway"
+
+# 8. install.sh: key-level config edit in a throwaway config, never printing it.
 cfg=$work/config.yaml
 printf '# no-mistakes global configuration\nagent: pi\nagent_config:\n  pi:\n    model: zai/glm-5.3-flash\n' >"$cfg"
 python3 -c 'import yaml' 2>/dev/null || { echo "not ok - python3-yaml missing; skipping install tests"; exit "$fails"; }

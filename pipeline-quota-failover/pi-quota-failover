@@ -26,6 +26,9 @@
 #   PI_QUOTA_FAILOVER_REAL_PI  absolute path to the real pi binary
 #   PI_QUOTA_FAILOVER_CHAIN    space-separated ordered model chain
 #   PI_QUOTA_FAILOVER_LOG      log file (default ~/.local/state/pi-quota-failover.log)
+#   PI_QUOTA_FAILOVER_GATE     host-memory gate run before each call (default ~/firstmate/config/fm-mem-gate.sh
+#                              when executable; empty disables it)
+#   PI_QUOTA_FAILOVER_GATE_SECS  longest gate wait before pi starts anyway (default 600)
 set -u
 
 # The real quota-error classes seen in this fleet's pipeline logs (see the
@@ -60,6 +63,15 @@ log_dir=${XDG_STATE_HOME:-$HOME/.local/state}
 mkdir -p "$log_dir" 2>/dev/null || true
 log=${PI_QUOTA_FAILOVER_LOG:-$log_dir/pi-quota-failover.log}
 log_line() { printf '%s %s\n' "$(date -u +%FT%TZ)" "$*" >>"$log" 2>/dev/null; printf 'pi-quota-failover: %s\n' "$*" >&2; }
+
+# Host-memory gate (speed-report B3: model calls under heavy host load crash): every pipeline model call goes
+# through this wrapper, so wait here until the host has room. The gate given no command only waits; pi keeps its
+# normal priority and no memory cap. The wait is bounded so it never eats the whole step timeout.
+gate=${PI_QUOTA_FAILOVER_GATE-$HOME/firstmate/config/fm-mem-gate.sh}
+gate_secs=${PI_QUOTA_FAILOVER_GATE_SECS:-600}
+if [ -n "$gate" ] && [ -x "$gate" ]; then
+  timeout "$gate_secs" "$gate" </dev/null >&2 || log_line "memory gate still waiting after ${gate_secs}s; starting pi anyway"
+fi
 
 # rewrite_model <new-model> <args...>: print args with the --model <m> /
 # --model=<m> argument rewritten in place; everything else (--thinking, --mode
