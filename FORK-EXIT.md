@@ -28,6 +28,7 @@ against the files, not against this table. PRs at the top until they are resolve
 | Replace fleet dashboard copy with the firstmate-addons shim | [80](https://github.com/umeranjum17/firstmate/pull/80) (561cc47e) | `bin/fm-dashboard.sh` (now a ~20-line exec shim) | add-on `fleet-dashboard` | done — moved to fleet-dashboard + fork shim PR 80; live dashboard serves from the add-on |
 | Withdraw stale ready-work wakes instead of replaying them | [81](https://github.com/umeranjum17/firstmate/pull/81) (c66d9594) | `bin/fm-wake-lib.sh`, `bin/fm-wake-drain.sh`, `bin/fm-watch.sh` | offer to Kun | on fork |
 | Move a relaunching worker to another pool account (`--account`) | [83](https://github.com/umeranjum17/firstmate/pull/83) (merged 0766f3c3) | `bin/fm-account-pool-lib.sh`, `bin/fm-control.sh`, `bin/fm-spawn.sh` | add-on `account-pool` if fm-control gains an account hook, else offer to Kun | on fork (see named item fm/fm-acct-f2-relaunch) |
+| Retry the watch-triage drain ack under load and log missed attempts | [84](https://github.com/umeranjum17/firstmate/pull/84) (merged 5758e520) | `tests/fm-watch-triage.test.sh` | offer to Kun (test hardening, only with the captain's word) | on fork — diagnostics only; the flake was not reproduced |
 
 ## Named items (16 Oct)
 
