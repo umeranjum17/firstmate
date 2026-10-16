@@ -17,6 +17,9 @@
 #   6. fm-spawn --relaunch refuses on its own: a live agent, a contradicting
 #      flag, an extra positional, or a backend that cannot prove the previous
 #      agent exited.
+#   7. The --account pool move: the choice gate refuses before the stop, 'next'
+#      rests the recorded account before it picks, a home pin wins, and the
+#      launch owner re-picks and refuses a wrong or empty answer.
 set -u
 
 # shellcheck source=tests/lib.sh
