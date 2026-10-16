@@ -26,10 +26,11 @@ else
   printf '%s\n' "$SHIM" > "$FMH/state/$ID.check.sh"
   chmod 700 "$FMH/state/$ID.check.sh"
 fi
-run env FM_HOME="$FMH" "$FMH/bin/fm-check-register.sh" "$ID"
+# An FM_STATE_OVERRIDE in the caller env, even empty, would redirect the unregister away from FMH/state.
+run env -u FM_STATE_OVERRIDE FM_HOME="$FMH" "$FMH/bin/fm-check-register.sh" "$ID"
 for old in nm-quiet nm-update nm-upgrade; do
   if [ -e "$FMH/state/$old.check.sh" ] || [ -e "$FMH/state/$old.check-trust" ]; then
-    run env FM_HOME="$FMH" "$FMH/bin/fm-check-unregister.sh" "$old"
+    run env -u FM_STATE_OVERRIDE FM_HOME="$FMH" "$FMH/bin/fm-check-unregister.sh" "$old"
   else
     echo "absent: $FMH/state/$old.check.sh"
   fi
