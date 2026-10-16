@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 # merge-card e2e: the real script, a stub done-done placed earlier on PATH, and a
-# task folder holding a retained PNG. The stub runs in three modes: newer (accepts
+# task folder holding a retained PNG. The stub runs in six modes: newer (accepts
 # --citation-base like 0.3.1), older (rejects it like 0.3.0, so merge-card must
-# resolve the verdict's relative citations itself) and liar (claims 0.3.1 and the
-# flag, then rejects it, so the verdict must name the real reason). The recorded
+# resolve the verdict's relative citations itself), liar (claims 0.3.1 and the
+# flag, then rejects it, so the verdict must name the real reason),
+# inconclusive (the proof does not hold up), nomedia (a pass that cites no
+# proof file) and noclaim (a pass with media but no claim). Pass + media posts
+# one evidence card titled with the claim; every gap posts nothing, prints one
+# gap line and exits 0, and no run ever posts a report card. The recorded
 # verdict, the invocation the stub saw, and whether the card's media resolves are
 # asserted in each mode. Needs bash, jq, base64, cmp and sort -V on PATH; nothing
 # is posted anywhere and no real tool outside this directory is touched.
@@ -50,20 +54,34 @@ if [ "${2:-}" = --help ]; then
 fi
 flag=0
 for a in "$@"; do [ "$a" = --citation-base ] && flag=1; done
-if [ "$flag" = 1 ] && [ "$MODE" != newer ]; then
-  jq -n '{error: "Unknown option \u0027--citation-base\u0027."}'
-  exit 2
-fi
-if [ "$MODE" = newer ]; then
-  jq -n --arg e "$DD_EVID_ABS" '{result:"pass",claim:"a stopped worker moves to the next live route",evidence:[$e]}'
-else
-  jq -n --arg e "$DD_EVID_REL" '{result:"pass",claim:"a stopped worker moves to the next live route",evidence:[$e]}'
-fi
+case $MODE in
+  newer | inconclusive | nomedia | noclaim) ;;
+  *)
+    if [ "$flag" = 1 ]; then
+      jq -n '{error: "Unknown option \u0027--citation-base\u0027."}'
+      exit 2
+    fi ;;
+esac
+case $MODE in
+  inconclusive)
+    jq -n '{result:"inconclusive",claim:"a stopped worker moves to the next live route",evidence:[]}'
+    exit 3 ;;
+  nomedia)
+    jq -n '{result:"pass",claim:"a stopped worker moves to the next live route",evidence:[]}' ;;
+  noclaim)
+    jq -n --arg e "$DD_EVID_ABS" '{result:"pass",evidence:[$e]}' ;;
+  newer)
+    jq -n --arg e "$DD_EVID_ABS" '{result:"pass",claim:"a stopped worker moves to the next live route",evidence:[$e]}' ;;
+  *)
+    jq -n --arg e "$DD_EVID_REL" '{result:"pass",claim:"a stopped worker moves to the next live route",evidence:[$e]}' ;;
+esac
 STUB
 
-# The stub sign-off-axi: capture the card and the media copied beside it.
+# The stub sign-off-axi: capture the card and the media copied beside it, and
+# log every invocation so the test can prove a gap never reached a post call.
 cat > "$work/bin/sign-off-axi" <<'STUB' || exit 1
 #!/usr/bin/env bash
+printf '%s\n' "$*" >>"$SO_LOG"
 [ "${1:-}" = post ] || exit 0
 from=''
 while [ $# -gt 0 ]; do
@@ -76,6 +94,8 @@ STUB
 chmod +x "$work/bin/done-done" "$work/bin/sign-off-axi"
 
 head_c=e2ehead0000000000000000000000000000000000
+: >"$work/so.log"
+export SO_LOG=$work/so.log
 
 run_check_and_post() { # run_check_and_post <task-id> (<mode> is already exported)
   PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" check "$1" "$wt" "$head_c" -
@@ -94,6 +114,7 @@ if grep -q -- '--citation-base' "$DD_LOG"; then ok "newer: --citation-base passe
 is "newer: evidence as the stub cited it" "$(jq -c .check.evidence "$home/data/newer/merge-card.json")" '["'"$home/data/newer/shot.png"'"]'
 holds "newer: card captured" "$work/card-newer/card.json"
 is "newer: card kind" "$(jq -r .kind "$work/card-newer/card.json")" evidence
+is "newer: card title is the claim" "$(jq -r .title "$work/card-newer/card.json")" "a stopped worker moves to the next live route"
 is "newer: card media" "$(jq -c .media "$work/card-newer/card.json")" '["1.png"]'
 if [ -f "$work/card-newer/1.png" ] && cmp -s "$work/card-newer/1.png" "$shot"; then ok "newer: card media resolves to the retained PNG"; else no "newer: card media is not the retained PNG"; fi
 
@@ -109,6 +130,7 @@ if grep -q -- '--citation-base' "$DD_LOG"; then no "older: --citation-base was p
 is "older: relative citation resolved against the task folder" "$(jq -c .check.evidence "$home/data/older/merge-card.json")" '["'"$home/data/older/shot.png"'"]'
 holds "older: card captured" "$work/card-older/card.json"
 is "older: card kind" "$(jq -r .kind "$work/card-older/card.json")" evidence
+is "older: card title is the claim" "$(jq -r .title "$work/card-older/card.json")" "a stopped worker moves to the next live route"
 is "older: card media" "$(jq -c .media "$work/card-older/card.json")" '["1.png"]'
 if [ -f "$work/card-older/1.png" ] && cmp -s "$work/card-older/1.png" "$shot"; then ok "older: card media resolves to the retained PNG"; else no "older: card media is not the retained PNG"; fi
 
@@ -124,6 +146,55 @@ is "liar: verdict names the real reason" "$(jq -r .verdict "$home/data/liar/merg
 # No done-done on PATH at all: the verdict still names why nothing was checked.
 PATH="/usr/bin:/bin" FM_HOME=$home "$here/../merge-card" check missing "$wt" "$head_c" -
 is "missing: verdict names the real reason" "$(jq -r .verdict "$home/data/missing/merge-card.json")" "not checked: done-done: command not found"
+
+# A gap posts nothing: no card, no sign-off call, one gap line, exit 0.
+# run_gap <task-id> <capture-dir>: the stub mode is already exported.
+run_gap() {
+  local before after out rc
+  rm -rf "$2"
+  before=$(wc -l < "$SO_LOG")
+  out=$(PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" "$1" "$wt" "$head_c" - 2>&1) || rc=$?
+  rc=${rc:-0}
+  after=$(wc -l < "$SO_LOG")
+  is "$1: post exits 0" "$rc" 0
+  case $out in
+    *"merge-card: no evidence card for merge-$head_c"*": "*"; the lane owner must fix the proof"*)
+      ok "$1: gap line names the merge and the lane owner" ;;
+    *) no "$1: gap line missing or misshapen: [$out]" ;;
+  esac
+  if [ -e "$2" ]; then no "$1: no card posted"; else ok "$1: no card posted"; fi
+  is "$1: sign-off never called" "$after" "$before"
+}
+
+# An inconclusive proof posts no card.
+MODE=inconclusive DD_LOG=$work/args.log DD_EVID_ABS="$home/data/gap-inconclusive/shot.png" DD_EVID_REL=shot.png SO_CAPTURE=$work/card-gap-inconclusive
+export MODE DD_LOG DD_EVID_ABS DD_EVID_REL SO_CAPTURE
+mkdir -p "$home/data/gap-inconclusive" && cp "$shot" "$home/data/gap-inconclusive/shot.png"
+run_gap gap-inconclusive "$work/card-gap-inconclusive"
+
+# A pass with no proof media posts no card.
+MODE=nomedia DD_LOG=$work/args.log DD_EVID_ABS="$home/data/gap-nomedia/shot.png" DD_EVID_REL=shot.png SO_CAPTURE=$work/card-gap-nomedia
+export MODE DD_LOG DD_EVID_ABS DD_EVID_REL SO_CAPTURE
+mkdir -p "$home/data/gap-nomedia"
+run_gap gap-nomedia "$work/card-gap-nomedia"
+
+# A pass with media but no claim posts no card.
+MODE=noclaim DD_LOG=$work/args.log DD_EVID_ABS="$home/data/gap-noclaim/shot.png" DD_EVID_REL=shot.png SO_CAPTURE=$work/card-gap-noclaim
+export MODE DD_LOG DD_EVID_ABS DD_EVID_REL SO_CAPTURE
+mkdir -p "$home/data/gap-noclaim" && cp "$shot" "$home/data/gap-noclaim/shot.png"
+run_gap gap-noclaim "$work/card-gap-noclaim"
+
+# No run anywhere posted, or even asked for, a report card.
+if grep -q -- '--kind report' "$SO_LOG"; then
+  no "never any report kind: sign-off saw --kind report"
+else
+  ok "never any report kind on the wire"
+fi
+for c in "$work"/card-*/card.json; do
+  [ -f "$c" ] || continue
+  if [ "$(jq -r .kind "$c")" = report ]; then no "never any report kind: $c"; else ok "never any report kind: $(basename "$(dirname "$c")")"; fi
+  if jq -e 'has("filed")' "$c" >/dev/null; then no "no filed field: $c"; else ok "no filed field: $(basename "$(dirname "$c")")"; fi
+done
 
 if [ "$fails" -eq 0 ]; then
   echo "merge-card e2e: all assertions held"

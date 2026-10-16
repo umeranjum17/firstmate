@@ -4,7 +4,7 @@ Fleet dashboard and add-ons for running a fleet of coding agents.
 
 ## merge-card
 
-Every merge runs done-done and posts one evidence card to a sign-off board, with nobody posting by hand.
+Every merge runs done-done and, only with passed proof, posts one evidence card to a sign-off board, with nobody posting by hand.
 
 `merge-card/merge-card` is one bash script with three subcommands:
 
@@ -16,8 +16,10 @@ Every merge runs done-done and posts one evidence card to a sign-off board, with
   Hand-captured evidence legitimately comes back inconclusive and the merge still lands.
   A judge that is not configured degrades to a plain "not checked" verdict; a done-done that could not check at all names the real reason (an older done-done rejecting `--citation-base`, say) instead of a bare exit code.
   `merge-card check <task-id> <worktree|-> <head|-> <pr-url|->` runs the gate's check alone: it saves and prints the verdict and posts nothing.
-- `merge-card post --board <board.json> <task-id> <worktree|-> <head|-> <pr-url|->` posts exactly one card per merge.
-  The card carries the Checks outcome as the title, done-done's verdict in plain words, the pull request link (the merged commit when there is no PR), and the Checks evidence media (at most 12 screens or recordings), or those of a done-done evidence run at the merged head.
+- `merge-card post --board <board.json> <task-id> <worktree|-> <head|-> <pr-url|->` posts exactly one evidence card per merge, and only when the proof is real and passed.
+  A merge posts only an evidence card: the plain outcome as the title and the passed proof on the card.
+  A merge with missing or unconfirmed proof posts no card; the gap goes back to the lane owner to fix the proof and re-run the post.
+  The card carries the Checks claim (what a user can now do) as the title, done-done's verdict in plain words, the pull request link (the merged commit when there is no PR), and the passed proof media (at most 12 screens or recordings), or those of a verify run at the merged head.
   The card key is the merge's own (`merge-<owner>-<repo>-pull-<n>`, or `merge-<head>` for a local merge), so a repeat post or a second home adds nothing.
   sign-off-axi writes the board under its lock and only appends.
 

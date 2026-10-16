@@ -12,11 +12,17 @@
 #   merge-card check <task-id> <worktree|-> <head|-> <pr-url|->
 #     The gate's check alone: run done-done, save and print the verdict, post nothing.
 #   merge-card post --board <board.json> <task-id> <worktree|-> <head|-> <pr-url|->
-#     Install as $FM_HOME/config/post-merge. Posts one card per merge: the Checks outcome as the
-#     title, done-done's verdict in plain words, the pull request link (the merged commit with no PR), and the
-#     Checks evidence screenshots and recordings (at most 12), or those of a done-done verify run
-#     at the merged head through `done-done signoff`. The card key is the merge's own, so a repeat
-#     post, or another home posting the same merge, finds it on the board and adds nothing.
+#     Install as $FM_HOME/config/post-merge. Posts one evidence card per merge, and
+#     only when the proof is real and passed: done-done's recorded verdict is pass,
+#     the check names its claim (what a user can now do), and at least one proof
+#     media file was copied, or a done-done verify run at the merged head brought
+#     its own sign-off run. The card title is the claim; its media is the Checks
+#     evidence screenshots and recordings (at most 12), or those of the verify run
+#     through `done-done signoff`. A merge with missing or unconfirmed proof posts
+#     no card: the gap is printed for the merging lead and the lane owner fixes the
+#     proof and re-runs the post. The card key is the merge's own, so a repeat
+#     post, or another home posting the same merge, finds it on the board and adds
+#     nothing.
 #     sign-off-axi writes the board under its lock: it appends and never rewrites other cards.
 # Needs done-done on PATH (0.3.1+ cites the task folder's evidence itself; an older one is
 # still covered), sign-off-axi, jq and gh.
@@ -107,7 +113,7 @@ gate() {
 }
 
 post() {
-  local board='' id wt head pr record key link title about kind media run tmp out rc n=0 f
+  local board='' id wt head pr record key link title about kind media run tmp out rc n=0 f verdict claim
   [ "${1:-}" = --board ] && [ -n "${2:-}" ] && board=$2 && shift 2
   [ -n "$board" ] && [ $# -eq 4 ] || die "usage: merge-card post --board <board.json> <task-id> <worktree|-> <head|-> <pr-url|->"
   [ -n "${FM_HOME:-}" ] || die "FM_HOME is not set"
@@ -128,9 +134,20 @@ post() {
     [ "$head" != - ] || head=$(gh pr view "$pr" --json headRefOid --jq .headRefOid 2>/dev/null) || head=-
     check "$id" "$wt" "${head:--}" "$pr"
   }
-  title=$(jq -r '.check.claim // empty' "$record")
-  [ -n "$title" ] || [ "$pr" = - ] || title=$(gh pr view "$pr" --json title --jq .title 2>/dev/null)
-  [ -n "$title" ] || title="Merged $id"
+  verdict=$(jq -r '.verdict // empty' "$record")
+  claim=$(jq -r '.check.claim // empty' "$record")
+  # Evidence only: a merge without passed proof posts no card, and the gap goes
+  # back to the lane owner to fix the proof and re-run the post. Never fail the
+  # merge over it.
+  if [ "$verdict" != pass ]; then
+    echo "merge-card: no evidence card for $key: done-done verdict is ${verdict:-unknown}; the lane owner must fix the proof (real screens or a clip that done-done passes) and re-run merge-card post"
+    return 0
+  fi
+  if [ -z "$claim" ]; then
+    echo "merge-card: no evidence card for $key: the passed check names no claim; the lane owner must fix the proof (real screens or a clip that done-done passes) and re-run merge-card post"
+    return 0
+  fi
+  title=$claim
   # done-done's verdict in plain words, then its first finding (or the judge's reason on a pass)
   # with the file named without its folder, so the card shows no local paths.
   about=$(jq -r '
@@ -159,13 +176,15 @@ post() {
     n=$((n + 1)) && cp "$f" "$tmp/$n.$(printf '%s' "${f##*.}" | tr '[:upper:]' '[:lower:]')"
   done <<< "$media"
   media=$(cd "$tmp" && for f in $(seq 1 "$n"); do printf '%s\n' "$f".*; done | jq -R . | jq -s .)
+  if [ "$n" -eq 0 ] && [ "$run" = null ]; then
+    echo "merge-card: no evidence card for $key: no passed proof media; the lane owner must fix the proof (real screens or a clip that done-done passes) and re-run merge-card post"
+    return 0
+  fi
   kind=evidence
-  [ "$n" -gt 0 ] || [ "$run" != null ] || kind=report
   jq -n --arg kind "$kind" --arg key "$key" --arg title "$title" --arg about "$about" --arg link "$link" \
-    --argjson run "$run" --argjson media "$media" --arg filed "$(date -u +%FT%TZ)" '
+    --argjson run "$run" --argjson media "$media" '
     def clean(max): gsub("[\u0000-\u0009\u000b-\u001f\u007f-\u009f]"; " ") | if length > max then .[:max - 3] + "..." else . end;
     {contract: 1, kind: $kind, schema: 1, key: $key, title: ($title | clean(160)), about: ($about | clean(500)), link: $link}
-    + if $kind == "report" then {filed: $filed} else {} end
     + if $media != [] then {media: $media} else {} end
     + if $run != null then {run: $run} else {} end' > "$tmp/card.json" || die "cannot write the card"
   for _ in 1 2 3; do
