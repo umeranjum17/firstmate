@@ -92,18 +92,24 @@ A route that sits only in rules whose models all contain `opus` moves only to an
 A remote task is detected and logged, never switched.
 A route whose screen shows a limit, or that answers its pinned one-line test with a limit or 429/5xx error, is out until it answers that test again: its profile objects are dropped from `config/crew-dispatch.json` (a rule left with no profiles goes with them; the schema never changes) into `state/quota-failover-dead.json`, so a new dispatch cannot rank it, and every pass re-tests it after `QUOTA_FAILOVER_RETEST_SECS` (default 1800) to put the profiles back at the end of their list when it answers.
 The filter reads the dispatch file on disk, so hand edits survive while a route is out, but a dropped profile cannot be re-added by hand until it answers again.
+A stopped task on a pool account (`account=` in its meta and a usable `config/account-pool`) hit that account's limit, not its route's, so its route stays in dispatch (a route-scoped verdict, its pinned probe, still takes it out as above):
+
+- While `$FM_HOME/config/account-pool-autorelaunch` exists (content ignored) and the task's tool may change accounts automatically, it first runs `bin/fm-control.sh <task> relaunch --account next` (which rests the account) with a note naming the old account and why; only when that fails, for example with no next account ready, does the route move above run.
+- Otherwise the account only rests, through the pool's own rest, and one line naming the task, the account and the manual `bin/fm-control.sh <task> relaunch --account ...` command goes to the log and to `state/quota-failover.wake`, which the watcher check prints as a wake. The rest and the wake happen once per stop.
+
+The tools that may change accounts automatically are fixed in code, not config: Claude Code, Cursor and Pi subscription logins. OpenCode Go never does (its terms ban several accounts used to get around limits; the captain switches by hand). Codex and Pi on an OpenAI login (`openai-codex/`, `codex-native/`) stay rest + wake: OpenAI's consumer terms (effective 1 Jan 2026) bar using the service to "circumvent any rate limits or restrictions".
 Every decision is one line in `state/quota-failover.log`.
 A worker left with no live route also gets one failed line on the home's parent channel; nothing else is sent there.
 
 It needs `quota-axi`, `jq`, `flock` and the harness command of each dispatch route on `PATH`.
 `QUOTA_FAILOVER_MAX_AGE` (default `10m`) is the oldest quota reading it trusts.
 
-Test: `quota-failover/tests/quota-failover-e2e.sh` drives the real script end to end against a fixture home (stub firstmate libs in its `bin/`, stub `quota-axi` and `opencode` on `PATH`): a lead on a route that answers every one-line test with the 15 Oct 429, and a screen-stopped worker on a second dead route ranked first in the dispatch rules. It asserts both move to the live candidate, the dead routes are passed over and dropped from `crew-dispatch.json`, and a second pass with the routes answering again restores them and moves nothing.
+Test: `quota-failover/tests/quota-failover-e2e.sh` drives the real script end to end against a fixture home (stub firstmate libs in its `bin/`, stub `quota-axi` and `opencode` on `PATH`): a lead on a route that answers every one-line test with the 15 Oct 429, and a screen-stopped worker on a second dead route ranked first in the dispatch rules. It asserts both move to the live candidate, the dead routes are passed over and dropped from `crew-dispatch.json`, and a second pass with the routes answering again restores them and moves nothing. Five more passes add pool workers: with the switch file present a Claude worker moves to the next account with no route move, a Claude worker with no next account takes the route move, and OpenCode Go and Codex workers only rest and wake; with the file gone a Claude worker only rests and wakes, once across two passes and again when the same account stops a new incarnation, and a pool rest that fails still wakes the home, once; a pool worker wedged with a clean screen loses its route to the pinned probe's verdict, and the stop's changed label re-fires nothing.
 
-Install into one home as a watcher check, so it runs on the watcher's own cadence:
+Install into one home as a watcher check, so it runs on the watcher's own cadence; `check.sh` prints any pending wake line and starts the pass detached (an install with the older `setsid -f .../quota-failover` line keeps working but never wakes, so re-run this):
 
 ```sh
-printf 'setsid -f <addons>/quota-failover/quota-failover %s >/dev/null 2>&1 </dev/null\n' "$FM_HOME" > $FM_HOME/state/quota-failover-watch.check.sh && chmod 700 $FM_HOME/state/quota-failover-watch.check.sh && $FM_HOME/bin/fm-check-register.sh quota-failover-watch
+printf '<addons>/quota-failover/check.sh %s\n' "$FM_HOME" > $FM_HOME/state/quota-failover-watch.check.sh && chmod 700 $FM_HOME/state/quota-failover-watch.check.sh && $FM_HOME/bin/fm-check-register.sh quota-failover-watch
 ```
 
 Remove it with `$FM_HOME/bin/fm-check-unregister.sh quota-failover-watch`.
