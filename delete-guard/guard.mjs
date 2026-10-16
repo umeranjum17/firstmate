@@ -17,23 +17,72 @@ function words(segment) {
 	return (segment.match(/(?:"[^"]*"|'[^']*'|[^\s"'])+/g) ?? []).map((t) => t.replace(/"([^"]*)"|'([^']*)'/g, "$1$2"));
 }
 
-// The one bare-variable exception: the last assignment to it before the delete, in the same command, is its own statement
-// d=$(mktemp) or d=$(mktemp -d), and it is not a variable the shell or runtime sets. The target must be exactly "$d" or "${d}".
+// Assignments to $name, including read/unset/for and ${name:=x} forms: any of these replaces a previous value.
+// Tested on the segment with quoted spans removed, so a word like "unset" inside a string never counts as one.
+function assignsRe(name) {
+	return new RegExp(`(^|[\\s;({])(export\\s+|local\\s+|readonly\\s+|typeset\\s+|declare(\\s+-\\w+)*\\s+)?${name}\\+?=|\\$\\{${name}:?=|\\b(read|for|unset|mapfile|readarray|printf\\s+-v)\\b.*\\b${name}\\b`);
+}
+
+function unquoted(s) {
+	return s.replace(/'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"/g, " ");
+}
+
+// The mktemp bare-variable exception: the last assignment to it before the delete, in the same command, is its own
+// statement d=$(mktemp ...) with any options or template (mktemp always makes a fresh unique path), and it is not a
+// variable the shell or runtime sets. The target must be exactly "$d" or "${d}".
 function freshTempVar(arg, segments, at) {
 	const name = (arg.match(/^\$(\w+)$|^\$\{(\w+)\}$/) ?? []).slice(1).find(Boolean);
 	if (!name || SHELL_VARS.test(name)) return false;
-	const assigns = new RegExp(`(^|[\\s;({])(export\\s+|local\\s+|readonly\\s+|typeset\\s+|declare(\\s+-\\w+)*\\s+)?${name}\\+?=|\\$\\{${name}:?=|\\b(read|for|unset|mapfile|readarray|printf\\s+-v)\\b.*\\b${name}\\b`);
+	const assigns = assignsRe(name);
 	let fresh = false;
 	for (let j = 0; j <= at; j++) {
-		if (!assigns.test(segments[j])) continue;
-		fresh = j < at && new RegExp(`^${name}=("?)\\$\\(mktemp( -d)?\\)\\1$`).test(segments[j].trim());
+		if (!assigns.test(unquoted(segments[j].s))) continue;
+		fresh = j < at && new RegExp(`^${name}=("?)\\$\\(\\s*mktemp\\s*[^\\x60;$&()]*\\)\\1$`).test(segments[j].s.trim());
 	}
 	return fresh;
 }
 
+// Inside a block keyword (if/for/while/until/case) or an unmatched ( or { group in the segments before at?
+function nested(segments, at) {
+	let kw = 0, group = 0;
+	for (let i = 0; i < at; i++) {
+		const t = segments[i].s.trim();
+		group += (t.match(/\(/g) ?? []).length - (t.match(/\)/g) ?? []).length + (t.match(/\{/g) ?? []).length - (t.match(/\}/g) ?? []).length;
+		if (/^(if|for|while|until|case)\b/.test(t)) kw++;
+		if (/^(fi|done|esac)\b/.test(t)) kw--;
+	}
+	return kw > 0 || group > 0;
+}
+
+// The literal-assignment exception: the last assignment to the variable before the delete, in the same command, is an
+// unconditional statement (after ; or a newline or at the start, not inside an if or loop, a subshell or a {} group,
+// and not after && || | &) whose value is a literal path: plain characters with an optional leading ~ or ~/, no $,
+// backticks, command substitution, glob, or .. segment. HOME and other shell or runtime variables are never substituted.
+function literalValue(arg, segments, at) {
+	const name = (arg.match(/^\$(\w+)$|^\$\{(\w+)\}$/) ?? []).slice(1).find(Boolean);
+	if (!name || SHELL_VARS.test(name)) return null;
+	const assigns = assignsRe(name);
+	const stmt = new RegExp(`^(?:export\\s+|local\\s+|readonly\\s+|typeset\\s+|declare(?:\\s+-\\w+)*\\s+)?${name}=(.+)$`);
+	let value = null;
+	for (let j = 0; j < at; j++) {
+		if (!assigns.test(unquoted(segments[j].s))) continue;
+		value = null; // the last assignment decides; anything else it could be leaves the value unknown
+		const m = segments[j].s.trim().match(stmt);
+		if (!m || !["", ";", "\n"].includes(segments[j].sep) || nested(segments, j)) continue;
+		const v = m[1].replace(/^"(.*)"$/s, "$1").replace(/^'(.*)'$/s, "$1");
+		if (/^[~/\p{L}\p{N}.@%+=:,+-]+$/u.test(v) && !/(^|\/)\.\.(\/|$)/.test(v)) value = v;
+	}
+	return value;
+}
+
 function dangerousTarget(arg, segments, at) {
 	if (!arg || arg === "--") return false;
-	if (BARE_VAR.test(arg)) return !freshTempVar(arg, segments, at); // otherwise blocked whatever the variable holds
+	if (BARE_VAR.test(arg)) {
+		if (freshTempVar(arg, segments, at)) return false;
+		const lit = literalValue(arg, segments, at);
+		if (lit === null) return true; // otherwise blocked whatever the variable holds
+		arg = lit; // set to a literal path in the same command: judge it exactly like a direct target
+	}
 	if (arg.includes("$") && /(^|\/)\.\.(\/|$)/.test(arg)) return true; // $d/.. and $d/../x
 	let a = arg.replace(/^(\$HOME|\$\{HOME\}|~)(?=\/|$)/, HOMES[0]);
 	a = posix.normalize(a.replace(/\/\.?\*$/, "")).replace(/\/+$/, "") || "/";
@@ -42,16 +91,18 @@ function dangerousTarget(arg, segments, at) {
 	return HOMES.some((h) => a === h || (a.startsWith(h + "/") && !a.slice(h.length + 1).includes("/")));
 }
 
-// Simple commands, split on ; | & and newlines outside quotes. A heredoc body fed to a shell stays commands; any other is data.
+// Simple commands, split on ; | & and newlines outside quotes; sep records the character that started each segment
+// ("" for the first), so a plain statement can be told from one guarded by && or ||. A heredoc body fed to a shell
+// stays commands; any other is data.
 function segmentsOf(command) {
 	const text = command.replace(/([^\n]*?)<<-?\s*(['"]?)(\w+)\2([^\n]*)\n([\s\S]*?)\n[ \t]*\3[ \t]*(?=\n|$)/g, (m, pre, q, tag, rest, body) =>
 		/(^|[\s;&|(/])(ba|z|da)?sh(\s|$)/.test(pre + rest) ? `${pre}${rest}\n${body}` : pre + rest);
-	const out = [""];
+	const out = [{ s: "", sep: "" }];
 	for (let i = 0, q = ""; i < text.length; i++) {
 		const c = text[i];
-		if (!q && ";|&\n".includes(c)) { out.push(""); continue; }
-		if (c === "\\" && q !== "'") out[out.length - 1] += c + (text[++i] ?? "");
-		else out[out.length - 1] += c;
+		if (!q && ";|&\n".includes(c)) { out.push({ s: "", sep: c }); continue; }
+		if (c === "\\" && q !== "'") out[out.length - 1].s += c + (text[++i] ?? "");
+		else out[out.length - 1].s += c;
 		if (c === q) q = "";
 		else if (!q && (c === '"' || c === "'")) q = c;
 	}
@@ -61,7 +112,7 @@ function segmentsOf(command) {
 export function blockedDelete(command) {
 	const segments = segmentsOf(command);
 	for (const [at, segment] of segments.entries()) {
-		const w = words(segment.trim());
+		const w = words(segment.s.trim());
 		const shell = w.findIndex((t, i) => /(^|\/)(ba|z|da)?sh$/.test(t) && w[i + 1] === "-c");
 		if (shell >= 0 && w[shell + 2]) {
 			const inner = blockedDelete(w[shell + 2]);
@@ -79,6 +130,15 @@ export function blockedDelete(command) {
 		if (target !== undefined) return target;
 	}
 	return null;
+}
+
+// Log rows keep any block replayable: the whole command, or the head plus the part around the blocked delete.
+function loggedCommand(command, target) {
+	const cmd = String(command);
+	if (cmd.length <= 600) return cmd;
+	const at = cmd.lastIndexOf(target);
+	const around = cmd.slice(Math.max(0, (at < 0 ? cmd.length : at) - 250), (at < 0 ? cmd.length : at) + 350);
+	return `${cmd.slice(0, 600)} …[${cmd.length} chars total; around the delete: ${around}]`;
 }
 
 function escalate(row) {
@@ -102,15 +162,18 @@ export function guard(command, { cwd = process.cwd(), runtime = "unknown" } = {}
 	const target = blockedDelete(String(command ?? ""));
 	if (target === null) return null;
 	const env = process.env;
-	// The true home: the task's inbox, else the firstmate home holding cwd (a lead or Main may inherit another FM_HOME), else FM_HOME.
-	let home = env.FM_TASK_INBOX ? dirname(dirname(env.FM_TASK_INBOX)) : "";
+	// The true home: the firstmate home holding cwd (the lane the command ran in, even when an inbox or FM_HOME from
+	// elsewhere is inherited), else the task's inbox, else FM_HOME.
+	let home = "";
 	for (let d = resolve(cwd); !home && d !== "/"; d = dirname(d)) if (existsSync(`${d}/bin/fm-wake-lib.sh`) && existsSync(`${d}/state`)) home = d;
-	const row = { at: new Date().toISOString(), home: home || env.FM_HOME || "", task: env.FM_TASK_ID || "", cwd, runtime, target, command: String(command).slice(0, 600) };
+	if (!home && env.FM_TASK_INBOX) home = dirname(dirname(env.FM_TASK_INBOX));
+	home = home || env.FM_HOME || "";
+	const row = { at: new Date().toISOString(), home, task: env.FM_TASK_ID || "", cwd, runtime, target, command: loggedCommand(command, target) };
 	let note = "";
 	try { escalate(row); } catch (e) { note = ` (the block could not be logged: ${e.message})`; }
 	return (
 		`BLOCKED by the fleet delete guard: a recursive delete aimed at "${target}" (/, /home, a home folder or a folder directly in it, a bare . .. * ` +
-		`or a $VAR target; only a d=$(mktemp -d) made in the same command may be deleted as "$d"). This block is final and has been reported to your ` +
+		`or a $VAR target; only a d=$(mktemp ...) made in the same command, or a variable set to a literal path earlier in the same command, may be deleted as "$d"). This block is final and has been reported to your ` +
 		`supervisor: do not retry it or work around it. If you truly need this delete, stop and report it as blocked.${note}`
 	);
 }
