@@ -136,10 +136,10 @@ _FM_PENDING_REPLY_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd 2>/dev/n
 # bin/fm-wake-lib.sh's single directed expansion below; a second directive
 # here would re-expand the same transitive graph.
 . "$_FM_PENDING_REPLY_LIB_DIR/fm-classify-lib.sh"
-# Parked-home reader (firstmate-addons/parked-homes); no-op predicates when
-# the add-on checkout is absent.
-# shellcheck source=bin/fm-parked-homes-lib.sh
-. "$_FM_PENDING_REPLY_LIB_DIR/fm-parked-homes-lib.sh"
+# Parked-home reader (firstmate-addons/parked-homes). Optional source: a
+# checkout or test fake root without the lib never parks anything.
+fm_parked_meta() { return 1; }
+[ ! -r "$_FM_PENDING_REPLY_LIB_DIR/fm-parked-homes-lib.sh" ] || . "$_FM_PENDING_REPLY_LIB_DIR/fm-parked-homes-lib.sh"
 
 FM_PENDING_REPLY_SCHEMA='fm-pending-reply.v1'
 FM_PENDING_REPLY_CORR_RE='corr=[A-Fa-f0-9]{16}'

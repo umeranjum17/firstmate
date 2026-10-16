@@ -91,8 +91,10 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 
 # shellcheck source=bin/fm-wake-lib.sh
 . "$SCRIPT_DIR/fm-wake-lib.sh"
-# shellcheck source=bin/fm-parked-homes-lib.sh
-. "$SCRIPT_DIR/fm-parked-homes-lib.sh"
+# Parked-home guard (firstmate-addons/parked-homes): a parked home is never
+# reconciled. Optional source: absent lib = never parked (stock behavior).
+fm_parked_meta() { return 1; }
+[ ! -r "$SCRIPT_DIR/fm-parked-homes-lib.sh" ] || . "$SCRIPT_DIR/fm-parked-homes-lib.sh"
 
 # One nudge per home per four hours.
 FM_RECONCILE_COOLDOWN_SECONDS=${FM_RECONCILE_COOLDOWN_SECONDS:-14400}

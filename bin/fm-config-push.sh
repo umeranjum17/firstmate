@@ -78,8 +78,10 @@ SECONDMATES_MD="$DATA/secondmates.md"
 . "$SCRIPT_DIR/fm-config-inherit-lib.sh"
 # shellcheck source=bin/fm-secondmate-nudge-lib.sh
 . "$SCRIPT_DIR/fm-secondmate-nudge-lib.sh"
-# shellcheck source=bin/fm-parked-homes-lib.sh
-. "$SCRIPT_DIR/fm-parked-homes-lib.sh"
+# Parked-home guard (firstmate-addons/parked-homes): a parked home gets no
+# config push. Optional source: absent lib = never parked (stock behavior).
+fm_parked_meta() { return 1; }
+[ ! -r "$SCRIPT_DIR/fm-parked-homes-lib.sh" ] || . "$SCRIPT_DIR/fm-parked-homes-lib.sh"
 
 print_item_report() {
   local report=$1 item status reason

@@ -251,9 +251,10 @@ WATCH_HOME_EXISTED=0
 # shellcheck source=bin/fm-model-outage-lib.sh
 . "$SCRIPT_DIR/fm-model-outage-lib.sh"
 # Parked-home reader (firstmate-addons/parked-homes): the shared predicate
-# every parked-home guard in the watcher calls. No-op without the add-on.
-# shellcheck source=bin/fm-parked-homes-lib.sh
-. "$SCRIPT_DIR/fm-parked-homes-lib.sh"
+# every parked-home guard in the watcher calls. Optional source: absent lib =
+# never parked (stock behavior).
+fm_parked_meta() { return 1; }
+[ ! -r "$SCRIPT_DIR/fm-parked-homes-lib.sh" ] || . "$SCRIPT_DIR/fm-parked-homes-lib.sh"
 # shellcheck source=bin/fm-composer-lib.sh
 . "$SCRIPT_DIR/fm-composer-lib.sh"
 # Steering-inbox loss detection: bin/fm-task-inbox-lib.sh owns the record,
