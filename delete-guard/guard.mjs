@@ -31,7 +31,8 @@ function unquoted(s) {
 }
 
 // The mktemp bare-variable exception: the last assignment to it before the delete, in the same command, is its own
-// statement d=$(mktemp ...) (optionally after export, local, declare -r and the like) with any options or template (mktemp always makes a fresh unique path), or
+// statement d=$(mktemp ...) (optionally after export, local, declare -r and the like) with any options or template (mktemp always makes a fresh unique path),
+// where the arguments may hold plain $NAME or ${NAME} expansions but no command substitution, backticks or ; & | ( ), or
 // d=$(mktemp ... || mktemp ...) where every || alternative is a mktemp call, and it is not a variable the shell or
 // runtime sets. The target must be exactly "$d" or "${d}".
 function freshTempVar(arg, segments, at) {
@@ -46,7 +47,7 @@ function freshTempVar(arg, segments, at) {
 		let s = segments[j].s, end = j;
 		while (end + 1 < at && (s.match(/\(/g) ?? []).length > (s.match(/\)/g) ?? []).length) s += segments[++end].sep + segments[end].s;
 		const body = j < at && s.trim().match(stmt)?.[2];
-		fresh = !!body && body.split("||").every((alt) => /^\s*mktemp(\s[^\x60;$&|()]*)?$/.test(alt));
+		fresh = !!body && body.split("||").every((alt) => /^\s*mktemp(\s([^\x60;$&|()]|\$\w+|\$\{\w+\})*)?$/.test(alt));
 	}
 	return fresh;
 }
