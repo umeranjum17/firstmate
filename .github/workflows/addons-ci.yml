@@ -20,9 +20,11 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-      # An add-on script is a shell script one level under a top-level add-on
-      # directory (`merge-card/merge-card`, `ask-default/ask-default`), so a new
-      # add-on needs no edit here and a non-script file is left alone.
+      # An add-on script is a shell script under a top-level add-on directory,
+      # either one level down (`merge-card/merge-card`, `fleet-dashboard/fm-dashboard.sh`)
+      # or two levels down in its `bin/` and `tests/` subdirectories
+      # (`fleet-flow/bin/fm-flow.sh`, `fleet-flow/tests/fm-flow.test.sh`), so a new
+      # add-on in either shape needs no edit here and a non-script file is left alone.
       # The runner image ships shellcheck, so nothing is downloaded at run time.
       - name: ShellCheck add-on scripts
         run: |
@@ -36,7 +38,7 @@ jobs:
           # would make the gate follow the image instead of the code.
           # Every other check stays on at every severity.
           found=0
-          for f in ./*/*; do
+          for f in ./*/* ./*/*/*; do
             [ -f "$f" ] || continue
             head -n 1 "$f" | grep -Eq '^#!.*\b(bash|sh)\b' || continue
             found=$((found + 1))
@@ -51,7 +53,7 @@ jobs:
         run: |
           set -euo pipefail
           found=0
-          for f in ./*/*; do
+          for f in ./*/* ./*/*/*; do
             [ -f "$f" ] || continue
             head -n 1 "$f" | grep -Eq '^#!.*\b(bash|sh)\b' || continue
             found=$((found + 1))
