@@ -182,8 +182,9 @@ export function guard(command, { cwd = process.cwd(), runtime = "unknown" } = {}
 	try { escalate(row); } catch (e) { note = ` (the block could not be logged: ${e.message})`; }
 	return (
 		`BLOCKED by the fleet delete guard: a recursive delete aimed at "${target}" (/, /home, a home folder or a folder directly in it, a bare . .. * ` +
-		`or a $VAR target; only a d=$(mktemp ...) made in the same command, or a variable set to a literal path earlier in the same command, may be deleted as "$d"). This block is final and has been reported to your ` +
-		`supervisor: do not retry it or work around it. If you truly need this delete, stop and report it as blocked.${note}`
+		`or a $VAR target). To delete the folder in a later command, write its literal path: rm -rf -- /tmp/tmp.Ab12. A variable may be deleted only when the same command sets it: ` +
+		`d=$(mktemp -d); ...; rm -rf -- "$d". A $VAR set in an earlier command is unknown to the guard and is always blocked. This block is final and has been reported to your ` +
+		`supervisor: do not retry it, reword it, or work around it. If you truly need this delete, stop and report it as blocked.${note}`
 	);
 }
 

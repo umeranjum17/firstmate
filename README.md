@@ -11,6 +11,7 @@ No agent can recursively delete `/`, `/home`, a home folder or a folder directly
 A block is final: there is no allow-once, flag or environment override, and no agent, reviewer or pipeline gate can approve the delete.
 The one `$VAR` exception: when `d=$(mktemp ...)` with any options, or `d=$(mktemp ... || mktemp ...)` where every `||` alternative is a mktemp call, is its own statement (optionally after `export`, `local`, `readonly`, `typeset` or `declare` with only `-r`, `-x`, `-g`; never a `-n` nameref) and the last assignment to `d` in the same command, `rm -rf -- "$d"` runs (never for `HOME` or another shell or runtime variable). A literal-path assignment takes the same prefixes.
 Each block appends one JSON line (time, home, task, cwd, runtime, target, command) to `<fm-home>/state/delete-guard.log`.
+The block message names the literal-path fix: delete the folder in a later command by its literal path (`rm -rf -- /tmp/tmp.Ab12`), delete a variable only when the same command sets it (`d=$(mktemp -d); ...; rm -rf -- "$d"`), and treat the block as final.
 The `delete-guard` watcher check turns new lines into one wake on the watcher's check cadence (5 minutes by default).
 A second block by the same task (or, with no task, the same cwd) within 10 minutes queues an immediate `delete guard REPEAT` wake.
 A heredoc body fed to a shell (`bash <<EOF`, `cat <<EOF | sh`) is checked as commands, and one fed to anything else (`python3`, `cat > file`) is data.
@@ -21,6 +22,22 @@ Not covered: Codex, because Firstmate launches its crewmates and scouts with `--
 Install or update with `delete-guard/install.sh [--dry-run] <main-fm-home>`; it is idempotent, and `--dry-run` prints the changes and writes nothing.
 It backs up each file it changes as `<file>.bak-delete-guard-<epoch>`, copies the rule to `${XDG_DATA_HOME:-~/.local/share}/fm-delete-guard/`, writes the adapters, merges the Claude hook without dropping other settings, and registers the check in `<main-fm-home>`.
 Test: `delete-guard/tests/delete-guard.test.sh <firstmate-checkout> [ref]` installs into a throwaway HOME against a home built from that checkout's `bin/`, then drives the installed hook through every rule case and the log, check and repeat-wake journey.
+
+## pipeline-literal-delete
+
+Pipeline agents (the no-mistakes review, test, document and lint steps on pi and Claude) never read the worker brief, and the gate neutralizes repository AGENTS.md/CLAUDE.md, so they kept deleting a `$VAR` set in an earlier command and losing the step to a delete-guard block.
+This add-on gives every pipeline agent the literal-path delete rule before it deletes, delivered once at the one place every agent in every home already reads: the runtime's own user-level instruction surface.
+
+The rule (`pipeline-literal-delete/rule.txt`): recursive deletes (`rm -r`, `rm -rf`, `find -delete`, `rimraf`) name a literal path (`rm -rf -- /tmp/tmp.Ab12`), or keep the mktemp variable and the delete in the same command (`d=$(mktemp -d); ...; rm -rf -- "$d"`); never delete a `$VAR` set in an earlier command; a delete-guard block is final - do not retry it or reword it.
+
+Surfaces: pi gets `~/.pi/agent/extensions/fm-literal-delete.ts`, which appends the rule to the system prompt of every pi session on `before_agent_start` (gate agents run with project context files disabled, but user extensions still load - the delete guard's own pi adapter proves it fires there).
+Claude gets a `SessionStart` hook in `~/.claude/settings.json` whose `additionalContext` carries the rule into every session, gate agents included.
+One install covers every firstmate home, because both surfaces live under the Unix user's home, not under any FM_HOME.
+
+Install or update with `pipeline-literal-delete/install.sh [--dry-run]`; it is idempotent and needs no fm-home argument (no watcher is registered).
+It backs up each file it changes as `<file>.bak-pipeline-literal-delete-<epoch>`, copies the rule to `${XDG_DATA_HOME:-~/.local/share}/fm-pipeline-literal-delete/`, writes the pi extension, and merges the Claude hook without dropping other settings.
+It touches no `~/.no-mistakes/config.yaml` and no project `.no-mistakes.yaml`.
+Test: `pipeline-literal-delete/tests/pipeline-literal-delete.test.sh` installs into a throwaway HOME/XDG copy, drives the installed pi handler and the installed hook command, and checks the idempotent rerun and the delete-guard block message's literal-path hint.
 
 ## merge-card
 
