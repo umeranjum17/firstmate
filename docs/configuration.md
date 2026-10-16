@@ -1129,7 +1129,20 @@ A malformed file (including a `config/account-pool` that exists but is not a rea
 A failed `pick` refusal names the tool and the login to do and says which accounts are resting or signed out, in the tone of the pin's sign-in refusal; Firstmate never falls back to an ambient login or copies a credential.
 Like the pin, the pool is not inherited into secondmate homes: a local secondmate agent launches on the launching home's pool, while the secondmate's own workers read the secondmate home's file.
 
-[`bin/fm-account-pool-lib.sh`](../bin/fm-account-pool-lib.sh) owns parsing, the harness-to-tool map, the `pick` invocation, and the refusal messages; [`bin/fm-spawn.sh`](../bin/fm-spawn.sh)'s header owns the launch-line mechanics.
+### Moving one worker between accounts (relaunch --account)
+
+`bin/fm-control.sh <task-id> relaunch --account <id|next>` moves a running worker onto a different pool account while it replaces the agent, and the local copy, its commits, and its uncommitted work stay exactly as they are, as with any relaunch.
+
+`--account <id>` selects that account for this launch, and it is the only way to select an OpenCode Go one; the launch refuses unless the pool answers with exactly that account, so an account that is resting, signed out, or another tool's is never launched by accident.
+`--account next` rests the account the running worker launched on, for that account's own default rest, and launches the worker on another one; `byokit-accounts unrest <id>` returns a rested account to the rotation.
+
+Every refusal happens before the running agent is stopped: a malformed choice, a harness whose pool tool does not exist yet, a home with no `config/account-pool`, `next` on a task that records no pool account to move from, an OpenCode Go account or a worker on an `opencode-go` provider (the approved plan's terms review keeps Go moves manual, and the refusal names the manual command), an account that cannot take the worker, or a pick that answers with a different account than the requested one.
+With exactly one account in the pool, `next` rests it and then refuses, so the running worker keeps working while its account rests; relaunch again with no flag, or with `--account <id>`.
+A home pin still wins: with a pin file for that runner, `--account` refuses rather than being silently ignored.
+
+The replacement records the selected account as `account=`, exactly as a spawn-time pick does, and the rest and the pick follow the same folder-paths-only rule: no key, token, or login file reaches a command line, a task record, a log, or an error message.
+
+[`bin/fm-account-pool-lib.sh`](../bin/fm-account-pool-lib.sh) owns parsing, the harness-to-tool map, the `pick` invocation, the relaunch-time rest and choice gate, and the refusal messages; [`bin/fm-spawn.sh`](../bin/fm-spawn.sh)'s header owns the launch-line mechanics.
 
 ## Lavish server address (config/lavish-axi-host)
 
