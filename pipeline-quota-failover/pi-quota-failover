@@ -1,0 +1,164 @@
+#!/usr/bin/env bash
+# pi-quota-failover - drop-in pi wrapper for the no-mistakes pipeline agent.
+#
+# no-mistakes calls pi once per agent invocation with one model from
+# agent_config.pi.model, and retries the same model up to 4 times when the
+# provider answers a quota error ("limit used up" and friends reach the retry
+# classifier as transient because they carry a 429; only seven exact quota
+# phrasings are terminal). A dead first model then wastes 4 attempts and the
+# run fails, costing a restart.
+#
+# This wrapper runs the real pi; when an attempt answers a QUOTA error, it
+# moves at once to the next model in an allowed chain (default GLM 5.3 Flash,
+# then Go Muse 1.3 Contributor, then DeepSeek v4.1 Flash - never Claude, never
+# Step 5) inside the same invocation. Any non-quota failure passes through
+# byte-for-byte with its original exit code, so the pipeline's own handling is
+# untouched. When every model in the chain is quota-dead it fails once with a
+# line containing "quota exhausted", which no-mistakes classifies as terminal,
+# so the dead chain is never re-retried.
+#
+# Install (idempotent): pipeline-quota-failover/install.sh
+# It copies this script to ~/.local/share/fm-pipeline-quota-failover/ and sets
+# agent_path_override.pi in ~/.no-mistakes/config.yaml. The daemon re-reads
+# the config per run, so the next pipeline run picks it up without a restart.
+#
+# Knobs (environment):
+#   PI_QUOTA_FAILOVER_REAL_PI  absolute path to the real pi binary
+#   PI_QUOTA_FAILOVER_CHAIN    space-separated ordered model chain
+#   PI_QUOTA_FAILOVER_LOG      log file (default ~/.local/state/pi-quota-failover.log)
+set -u
+
+# The real quota-error classes seen in this fleet's pipeline logs (see the
+# lane evidence): zai weekly/5-hour usage limits, GoUsageLimitError, upstream
+# rate limits, credit exhaustion, and the report's "limit used up" phrasing.
+# Case-insensitive; matched against pi's error surface only.
+QUOTA_RE='limit used up|usage limit|limit has been reached|GoUsageLimitError|rate limit exceeded|quota|available credits|insufficient credits'
+
+chain=${PI_QUOTA_FAILOVER_CHAIN:-'zai/glm-5.3-flash muse-spark-1.3-contributor deepseek/deepseek-v4.1-flash'}
+
+real_pi=${PI_QUOTA_FAILOVER_REAL_PI:-}
+if [ -z "$real_pi" ]; then
+  real_pi=$(command -v pi 2>/dev/null || true)
+fi
+if [ -z "$real_pi" ] || [ "$real_pi" -ef "$0" ] || [ "$real_pi" = "$0" ]; then
+  echo "pi-quota-failover: cannot resolve the real pi binary; set PI_QUOTA_FAILOVER_REAL_PI" >&2
+  exit 127
+fi
+
+# The pipeline prompt arrives on stdin (no-mistakes writes it to the child's
+# stdin), and a failover attempt must re-feed it.
+stdin_file=$(mktemp) || exit 127
+out_file=$(mktemp) || exit 127
+err_file=$(mktemp) || exit 127
+have_stdin=0
+if [ ! -t 0 ]; then
+  cat >"$stdin_file" && have_stdin=1
+fi
+trap 'rm -f "$stdin_file" "$out_file" "$err_file"' EXIT
+
+log_dir=${XDG_STATE_HOME:-$HOME/.local/state}
+mkdir -p "$log_dir" 2>/dev/null || true
+log=${PI_QUOTA_FAILOVER_LOG:-$log_dir/pi-quota-failover.log}
+log_line() { printf '%s %s\n' "$(date -u +%FT%TZ)" "$*" >>"$log" 2>/dev/null; printf 'pi-quota-failover: %s\n' "$*" >&2; }
+
+# rewrite_model <new-model> <args...>: print args with the --model <m> /
+# --model=<m> argument rewritten in place; everything else (--thinking, --mode
+# and any other flags) is kept untouched.
+rewrite_model() {
+  local new=$1
+  shift
+  while [ $# -gt 0 ]; do
+    case $1 in
+      --model=*) printf '%s\n' "--model=$new" ;;
+      --model) printf '%s\n' --model; printf '%s\n' "$new"; shift ;;
+      *) printf '%s\n' "$1" ;;
+    esac
+    shift
+  done
+}
+
+# drop_session: read args one per line on stdin; remove a --session <id> pair
+# so a failover attempt starts fresh, mirroring no-mistakes' own fresh-session
+# retry after a provider switch. The dead model answered nothing, so no
+# context is lost.
+drop_session() {
+  local skip=0 a
+  while IFS= read -r a; do
+    if [ "$skip" = 1 ]; then skip=0; continue; fi
+    if [ "$a" = "--session" ]; then skip=1; continue; fi
+    printf '%s\n' "$a"
+  done
+}
+
+# run_real <args...>: the real pi with the captured stdin re-attached.
+run_real() { "$real_pi" "$@" <"$stdin_file"; }
+
+# error_text <exit-code>: pi exits 0 even when the provider fails - the error
+# rides in its JSON stream as an errorMessage field (verified with a 401
+# probe: stopReason "error" in the stream, exit 0; the pipeline's own run
+# errors read "pi reported error: 429: ..."). Failure text is therefore the
+# stream's errorMessage lines, plus stderr for non-zero exits.
+error_text() {
+  # The value carries escaped quotes, so the capture allows backslash escapes.
+  grep -oE '"errorMessage":"(\\.|[^"])*"' "$out_file" 2>/dev/null \
+    | sed -E 's/^"errorMessage":"//; s/"$//; s/\\"/"/g; s/\\\\/\\/g'
+  if [ "$1" != 0 ]; then cat "$err_file" 2>/dev/null; fi
+}
+
+IFS=' ' read -r -a models <<<"$chain"
+args=("$@")
+requested=''
+i=0
+while [ $i -lt ${#args[@]} ]; do
+  case ${args[$i]} in
+    --model=*) requested=${args[$i]#--model=} ;;
+    --model) i=$((i + 1)); requested=${args[$i]:-} ;;
+  esac
+  i=$((i + 1))
+done
+
+# Only intercept calls whose model is in the chain: an operator-pinned profile
+# (axi run --model) for any other model passes through untouched, which also
+# keeps the pi-only pinned-profile rule intact.
+start=-1
+for idx in "${!models[@]}"; do
+  [ "${models[$idx]}" = "$requested" ] && { start=$idx; break; }
+done
+if [ "$start" -lt 0 ]; then
+  # Keep this process as pi for signal semantics: re-point stdin at the
+  # captured file, unlink it (the open fd survives), then exec.
+  [ "$have_stdin" = 1 ] && exec 0<"$stdin_file"
+  rm -f "$stdin_file"
+  exec "$real_pi" "${args[@]}"
+fi
+
+detail=''
+for ((attempt = start; attempt < ${#models[@]}; attempt++)); do
+  model=${models[$attempt]}
+  t0=$(date +%s%3N)
+  run_real "${args[@]}" >"$out_file" 2>"$err_file"
+  rc=$?
+  t1=$(date +%s%3N)
+  errs=$(error_text "$rc")
+  if ! grep -qiE "$QUOTA_RE" <<<"$errs"; then
+    # Not a quota failure: hand the pipeline exactly what real pi produced.
+    cat "$out_file"
+    cat "$err_file" >&2
+    exit "$rc"
+  fi
+  detail=$(head -n 1 <<<"$errs")
+  if [ $((attempt + 1)) -lt ${#models[@]} ]; then
+    next=${models[$((attempt + 1))]}
+    log_line "model=$model quota-error in $((t1 - t0))ms ($detail); moving to $next"
+    mapfile -t args < <(rewrite_model "$next" "${args[@]}" | drop_session)
+  else
+    log_line "model=$model quota-error in $((t1 - t0))ms ($detail); no model left in the chain"
+    break
+  fi
+done
+
+# Every model in the chain answered a quota error. "quota exhausted" is one of
+# no-mistakes' terminal needles (internal/agent/retry.go), so the failed
+# invocation is not re-retried 4 times on the dead chain.
+log_line "quota exhausted on every model in the chain ($chain); last error: ${detail:-unknown}"
+exit 1

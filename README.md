@@ -89,6 +89,17 @@ printf 'setsid -f <addons>/quota-failover/quota-failover %s >/dev/null 2>&1 </de
 
 Remove it with `$FM_HOME/bin/fm-check-unregister.sh quota-failover-watch`.
 
+## pipeline-quota-failover
+
+The no-mistakes pipeline agent moves to the next allowed model the moment a provider answers a quota error, instead of retrying the same model 4 times and failing the run (speed-report row Q1: about 1,650 pipeline minutes a day).
+
+`pipeline-quota-failover/pi-quota-failover` is one bash wrapper installed as the pipeline's `pi` through `agent_path_override.pi`. It runs the real `pi`; when an attempt answers a quota error (pi reports provider errors inside its JSON stream and still exits 0, and no-mistakes' terminal list covers only seven exact quota phrasings, so real limit errors are retried up to 4 times on the same model), the wrapper starts the next model in the chain inside the same invocation: `zai/glm-5.3-flash` (GLM 5.3 Flash), then `muse-spark-1.3-contributor` (Go Muse 1.3 Contributor), then `deepseek/deepseek-v4.1-flash` - never Claude, never Step 5. A non-quota failure passes through byte-for-byte with its original exit code. A resumed `--session` is dropped on the failover attempt (fresh-session retry, the pipeline's own semantics after a provider switch). When every chain model is quota-dead the wrapper fails once with a line containing "quota exhausted", which no-mistakes classifies as terminal, so the dead chain is never re-retried. Calls pinned to a model outside the chain (for example `axi run --model`) pass through untouched. Each decision is one timed line in `~/.local/state/pi-quota-failover.log` and on the step's stderr.
+
+Neither installed v1.79 nor current v1.84 can express this in config: `agent:` fallback is per agent and fires only on process-unavailable errors (`pi reported error:` matches none of its needles), and `agent_config.<agent>.model` is a single string, so one agent cannot carry a model chain. The daemon re-reads the config per run, so wiring needs no daemon restart.
+
+Install or remove with `pipeline-quota-failover/install.sh [--dry-run] [--restore]`; it copies the wrapper to `~/.local/share/fm-pipeline-quota-failover/`, makes one key-level edit to `~/.no-mistakes/config.yaml` (timestamped backup next to it, key name only in output, no config contents printed), and is idempotent.
+Test: `pipeline-quota-failover/tests/pi-quota-failover-e2e.sh` drives the real wrapper against a stub pi in a throwaway HOME with the exact argv shape no-mistakes builds (quota-dead GLM route using the fleet's real 429 usage-limit surface, healthy muse route): one attempt per model, the winning stream on stdout, timed log lines, non-quota and pinned-model passthrough, session drop on failover, chain exhaustion exiting 1 with the terminal line, and the install edit's add, idempotence, restore and backup.
+
 ## ask-default
 
 An unanswered ask gets a safe, pre-declared default instead of blocking the home, and work continues.
