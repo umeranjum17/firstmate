@@ -45,6 +45,8 @@ SH
   chmod +x "$HOME_DIR/config/launch-env-hook"
 }
 
+SPAWN_OUT='' # the spawn's merged output, set by spawn_and_run for warning assertions
+
 spawn_and_run() {  # <id>; prints the probe output, returns the launch status
   local out status
   : > "$LAUNCH_LOG"
@@ -52,6 +54,7 @@ spawn_and_run() {  # <id>; prints the probe output, returns the launch status
   out=$(FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" FM_FAKE_PANE_LOG="$PANE_LOG" \
     fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$1" "$PROJ_DIR" --mode no-mistakes --yolo off)
   status=$?
+  SPAWN_OUT=$out
   expect_code 0 "$status" "spawn $1 should succeed: $out"
   env -i HOME="$TMP_ROOT/pane-home" PATH="$FAKEBIN_DIR:$PATH" TERM=xterm TMUX=synthetic-pane \
     /bin/sh -c "$(grep '^export ' "$PANE_LOG")
@@ -100,7 +103,21 @@ test_failing_hook_stops_the_launch() {
   pass "a failing launch-env hook stops the launch before the worker runs"
 }
 
+test_nonexecutable_hook_warns_and_launch_proceeds() {
+  local seen
+  make_case noexec noexec-a1
+  write_hook 0
+  chmod -x "$HOME_DIR/config/launch-env-hook"
+  spawn_and_run noexec-a1 >"$TMP_ROOT/noexec-probe.out" || fail "non-executable hook: the launch failed: $SPAWN_OUT"
+  printf '%s\n' "$SPAWN_OUT" | grep -q "warning: config/launch-env-hook exists but is not executable" \
+    || fail "a present non-executable hook must print a warning naming the file: $SPAWN_OUT"
+  seen=$(cat "$TMP_ROOT/noexec-probe.out")
+  assert_equals "1 core.hooksPath core.hooksPath" "$seen" "a non-executable hook leaves only the trailer entry"
+  pass "a present non-executable launch-env hook warns and the launch proceeds without it"
+}
+
 test_absent_hook_changes_nothing
 test_hook_entries_precede_the_trailer_entry
 test_hook_without_trailer_strip
 test_failing_hook_stops_the_launch
+test_nonexecutable_hook_warns_and_launch_proceeds

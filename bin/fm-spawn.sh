@@ -5954,6 +5954,8 @@ fi
 if [ -f "$CONFIG/launch-env-hook" ] && [ -x "$CONFIG/launch-env-hook" ]; then
   LAUNCH_ENV_HOOK_FILE=$(shell_quote "$LAUNCH_DIR/launch-env.$SPAWN_GEN.sh")
   LAUNCH="$(shell_quote "$CONFIG/launch-env-hook") $LAUNCH_ENV_HOOK_FILE && . $LAUNCH_ENV_HOOK_FILE || return 1 2>/dev/null || exit 1; $LAUNCH"
+elif [ -f "$CONFIG/launch-env-hook" ]; then
+  echo "warning: config/launch-env-hook exists but is not executable; the launch proceeds without it" >&2
 fi
 # Every agent this fleet launches - crewmate, scout, and secondmate, on a fresh
 # spawn and on a relaunch alike - runs with the compact-adviser kill switch on.

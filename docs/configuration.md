@@ -1184,7 +1184,7 @@ The gate's own content is home-local policy (for example a per-home lane limit);
 The optional local, gitignored `config/launch-env-hook` is an executable that adds environment to every local launch: ship, scout, secondmate, and relaunch.
 When the file exists and is executable, the pane runs `config/launch-env-hook <out-file>` from the launch directory (the worktree for ship and scout) right before the worker starts, then sources `<out-file>`, which must hold one plain `export` statement.
 It runs before the AI-trailer step in "Commit attribution", so `GIT_CONFIG_*` entries it appends after the inherited `GIT_CONFIG_COUNT` come before the trailer `core.hooksPath` entry.
-A nonzero exit, or an export the pane shell cannot source, stops the launch before the worker runs; an absent or non-executable file changes nothing.
+A nonzero exit, or an export the pane shell cannot source, stops the launch before the worker runs; an absent file changes nothing, and a present but non-executable file prints a warning at spawn and the launch proceeds without it.
 The hook's content is home-local policy, for example the firstmate-addons `git-identity` add-on, which pins a lane's git identity and pre-push identity check; [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the invocation mechanics.
 
 ## Merge gate (config/merge-gate)
