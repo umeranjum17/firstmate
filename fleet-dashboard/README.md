@@ -1,0 +1,98 @@
+# fleet-dashboard
+
+The read-only fleet dashboard — server, builder and app — moved **verbatim** out
+of the Firstmate fork into this add-on repository. Nothing serves it from here
+yet: the live dashboard keeps building and serving from the fork's
+`bin/fm-dashboard.sh`, and the fork-side shim that will exec into this directory
+lands in a later PR. Until that swap this directory is dormant, and every moved
+byte below is identical to the fork copy the live service runs today.
+
+## Layout
+
+- `fm-dashboard.sh` — the `build | serve` entry: collects every source, writes
+  the three static pages plus `board.json` and `data.json`, and serves the app
+  read-only (python3 stdlib, no network reference).
+- `fm-dashboard/` — the app: `index.html`, `app.js`, `app.css`, `board.js`,
+  `ui.js`, `insights.js`, `insights.css`, `icon.svg`, `ship/` (the Ship tab),
+  and `vendor/` (Preact + htm, Inter, three.js, and the vendored `LICENSES`).
+- `../.gitattributes` — the vendor line that keeps
+  `fleet-dashboard/fm-dashboard/vendor/three-*.min.js` out of whitespace checks
+  and folds it in review diffs.
+
+## Frozen contract (identical to the fork)
+
+- CLI: `fm-dashboard.sh [build]` and `fm-dashboard.sh serve [--bind ADDR]
+  [--port N]` (plus `-h`); every other invocation prints the usage line and
+  exits 2.
+- Output: `$FM_HOME/state/dashboard/` — `board.json`, `data.json`, the static
+  pages `index.html`, `backlog.html` (+ its `backlog.home.html` variant) and
+  `measure.html`, plus the retained `filed.json` and `history.tsv`.
+- Data keys: `board.json` carries the flow reader's `fm-flow.v1` observation
+  under `flow`, or `flow_error` when that reader is unavailable or unreadable,
+  with the matching `models_error` / `skills_error` keys for the statistics
+  readers.
+
+## Provenance: byte-identical to the fork
+
+Every moved file was compared byte for byte against its fork source
+(`bin/fm-dashboard.sh` and `bin/fm-dashboard/`) at move time; the 16-file
+sha256 manifest matched across fork source, this directory, and both scratch
+copies used by the proof below
+(evidence: `data/addons-extraction/parity/identity-manifest.txt` in this home's
+task data). Treat any future diff against the fork file as a contract change,
+not a refactor.
+
+## Side-by-side proof (re-run before the served path swaps)
+
+The acceptance proof builds the fork copy and this copy in two throwaway
+`FM_HOME` dirs over one identical fixture and diffs the two
+`state/dashboard/` outputs byte for byte.
+
+One command (harness lives with this task's evidence):
+
+```sh
+bash /home/fixture/users/user-019/.treehouse/fixture-home/4/firstmate/data/addons-extraction/parity/run-parity.sh
+```
+
+It must end with `ALL CHECKS PASSED`, with both
+`diff-fork-vs-moved-pass1.txt` and `diff-fork-vs-moved-pass2.txt` empty.
+Manual recipe if the harness is gone:
+
+1. Copy `bin/fm-dashboard.sh` + `bin/fm-dashboard/` from the fork and
+   `fleet-dashboard/` from this repo into two scratch dirs; verify sha256 of
+   every moved file matches across both.
+2. Overlay identical deterministic reader stubs next to both scripts
+   (`fm-flow.sh` exiting non-zero for pass 1, a fixed `fm-flow.v1` JSON for
+   pass 2; fixed `fm-model-stats.sh` / `fm-skill-stats.sh`; a fixed TOON
+   `fm-tasks-axi.sh` + addressing lib), and PATH stubs for `herdr`, `adb`,
+   `pgrep`, `systemctl`, a fake `/proc` (`FM_DASHBOARD_PROC`) and an empty
+   `FM_DEVICE_LOCK_DIR`.
+3. Copy one synthesized fixture into two throwaway `FM_HOME` dirs: the most
+   tasks, the longest titles, a lane in every state plus a captain hold, asks,
+   recorded merges, quota and machine samples, and a home whose flow reader is
+   broken so `flow_error` is exercised; pin `TZ=UTC LC_ALL=C` and freeze the
+   clock (`PYTHONPATH=sitecustomize.py` stubbing `datetime.now`/`time`) so
+   both builds run at one instant.
+4. Run `fm-dashboard.sh build` with each home, capture
+   `$FM_HOME/state/dashboard/`, and `diff -r` the captures: identical
+   `board.json`, `data.json` and page HTML. The only path a build prints is
+   its index page path, which names its own `FM_HOME` — normalize that line
+   and the stdout must match too.
+5. Check the CLI contract (`-h`, bad subcommand, bad port, extra build
+   argument → usage line and exit 2) and smoke `serve --bind 127.0.0.1
+   --port 18787` from the moved copy: 200 on `/`, `/app.js`, `/board.json`,
+   `/backlog`, `/measure`, `/data.json`, 404 elsewhere.
+
+## For the fork shim lane
+
+The shipped `fm-dashboard.service` runs
+`/home/fixture/users/user-019/firstmate/bin/fm-dashboard.sh serve --bind "$(tailscale ip -4 |
+head -1)" --port 4390` with `FM_HOME=/home/fixture/users/user-019/firstmate`; the later shim
+must keep that exact path and argv (it will exec
+`fleet-dashboard/fm-dashboard.sh`). Re-run the side-by-side proof above
+immediately before the served path swaps, and keep this README's proof
+sections honest when the harness moves.
+
+CI note: `.github/workflows/addons-ci.yml` ShellChecks and syntax-checks this
+directory's `fm-dashboard.sh` (an add-on script is a shell script one level
+under a top-level add-on directory) — it passed at move time.
