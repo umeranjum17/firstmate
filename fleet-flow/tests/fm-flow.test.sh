@@ -255,12 +255,24 @@ assert next(l for l in json.loads(run())['lanes'] if l['task'] == 'memory')['sta
     '[ "$psi" -lt 40 ] && [ "$running" -lt "${FM_EMU_MAX:-3}" ] && [ "$builds" -lt "${FM_GRADLE_MAX:-2}" ]\n'
     'echo "${FM_MEM_JOB_GB:-10}G"\n')
 clean_env = dict(os.environ, FM_HOME=str(main))
-for key in ('FM_MAC_HOST', 'FM_MEM_MIN_GB', 'FM_EMU_MAX', 'FM_GRADLE_MAX', 'FM_MEM_JOB_GB'):
+for key in ('FM_MAC_HOST', 'XDG_DATA_HOME', 'FM_MEM_MIN_GB', 'FM_EMU_MAX', 'FM_GRADLE_MAX', 'FM_MEM_JOB_GB'):
     clean_env.pop(key, None)
 before = files()
 c = json.loads(subprocess.check_output(['bash', script, '--json', '--capacity'], env=clean_env))['capacity']
 assert files() == before, 'native read-only census never writes the isolated home'
 assert c['limits']['FM_EMU_MAX'] == 3 and c['limits']['FM_GRADLE_MAX'] == 2
+assert c['gate_source'] == str(main / 'config/fm-mem-gate.sh')
+# Installed gate (host-memory/install.sh): config/fm-mem-gate.sh is a shim, so the policy is read from the copy.
+installed = tmp / 'home/.local/share/fm-host-memory/fm-mem-gate.sh'
+installed.parent.mkdir(parents=True)
+installed.write_text('min=${FM_MEM_MIN_GB:-12}\n[ "$psi" -lt 40 ] && [ "$running" -lt "${FM_EMU_MAX:-2}" ]\n'
+    '[ "$builds" -lt "${FM_GRADLE_MAX:-1}" ] && echo "${FM_MEM_JOB_GB:-10}G"\n')
+shim = (main / 'config/fm-mem-gate.sh').read_text()
+(main / 'config/fm-mem-gate.sh').write_text('#!/usr/bin/env bash\nexec "${XDG_DATA_HOME:-$HOME/.local/share}/fm-host-memory/fm-mem-gate.sh" "$@"\n')
+s = json.loads(subprocess.check_output(['bash', script, '--json', '--capacity'], env=clean_env))['capacity']
+assert s['gate_source'] == str(installed), s['gate_source']
+assert s['limits'] == dict(c['limits'], FM_EMU_MAX=2, FM_GRADLE_MAX=1), s['limits']
+installed.unlink(); (main / 'config/fm-mem-gate.sh').write_text(shim)
 assert c['mac']['reachable'] is None and c['mac']['available_bytes'] is None and c['mac']['simulators'] is None
 if Path('/proc/meminfo').exists():
     assert c['memory_bytes']['MemTotal'] > 0 and 0 <= c['memory_bytes']['MemAvailable'] <= c['memory_bytes']['MemTotal']

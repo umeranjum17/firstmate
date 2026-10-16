@@ -15,8 +15,8 @@ jobs:
   self-check:
     name: Add-on self-checks
     runs-on: ubuntu-latest
-    # Normal tier: both steps are a shellcheck pass and a bash parse over a
-    # handful of scripts.
+    # Normal tier: a shellcheck pass and a bash parse over a handful of
+    # scripts, plus the memory gate's stubbed integration test (about 20 s).
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
@@ -77,3 +77,6 @@ jobs:
             echo "no add-on script found in any <add-on>/ directory" >&2
             exit 1
           fi
+      # Stub emulator, Gradle, pgrep and memory files only: nothing heavy starts.
+      - name: Memory gate test
+        run: bash host-memory/tests/fm-mem-gate.test.sh

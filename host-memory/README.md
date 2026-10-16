@@ -17,6 +17,10 @@ live watcher runs today.
   `fm_memory_sampler_tick`, `fm_memory_sampler_interrupt`,
   `fm_memory_sampler_cleanup`), and executable as
   `run <HOME> <STATE> <CONFIG>` for the one sampler loop per home.
+- `bin/fm-mem-gate.sh` — the memory gate for heavy jobs (below); unlike
+  the sampler it is live once installed.
+- `install.sh` — installs the gate.
+- `tests/fm-mem-gate.test.sh` — the gate's integration test.
 
 ## Frozen contract (identical to the fork)
 
@@ -79,8 +83,9 @@ refactor.
    can miss the journey's own timing budget, so record a run that fails
    only on timing rather than treating it as a behavior change (at most 3
    runs; with no pass, stop with the outputs).
-4. Run the repository CI gate (ShellCheck plus the syntax check over every
-   add-on script); it must pass on the PR head. The moved script carries
+4. Run the repository CI gate (ShellCheck, the syntax check over every
+   add-on script, and the memory gate's stubbed integration test); it must
+   pass on the PR head. The moved script carries
    `# shellcheck source=bin/...` directives for sibling fork libraries
    that did not move, so the gate exempts `SC1091` for `host-memory/bin/`
    only, never editing the copy.
@@ -88,3 +93,39 @@ refactor.
 Do **not** run the sampler against a real home, touch the memory guard or
 any service, or change memory thresholds; the moved copy is dormant until
 the fork hook lands.
+
+## Memory gate
+
+`fm-mem-gate.sh <command...>` waits until the host has room, then runs the
+command at lowest CPU and disk priority in its own scope in
+`fm-heavy.slice`; with no command it only waits. Room is `MemAvailable` at
+least `FM_MEM_MIN_GB` (12) and memory pressure (lower of `some` avg10 and
+avg60) under 40. An emulator job also waits while `FM_EMU_MAX` (2)
+emulators run, and a Gradle job while `FM_GRADLE_MAX` (1) builds run; those
+two checks and the start share one host lock.
+
+The emulator and Gradle caps look past known wrappers to the real program:
+`timeout`, `flock` (including `flock <lock> -c <string>`), `nice`,
+`ionice`, `env`, `exec`, `NAME=VALUE`, and `bash -c` / `sh -c` (the first
+word of the string), so `flock L timeout 60 bash -c "emulator ..."` is
+held at the emulator cap. Any other first word is the program, as before.
+Not seen: emulators the no-mistakes daemon boots for its test steps, which
+never pass through this gate.
+
+Moved from Main's `config/fm-mem-gate.sh` (sha256 `4dd4531e...b682`, its
+test `5feb7ddf...2e04`) in the first commit, then changed. Install with
+`host-memory/install.sh [--dry-run]`: it copies the gate to
+`${XDG_DATA_HOME:-~/.local/share}/fm-host-memory/fm-mem-gate.sh`, is
+idempotent, and `--dry-run` writes nothing. Main's `config/fm-mem-gate.sh`
+then becomes a one-line shim that execs that copy:
+
+```sh
+#!/usr/bin/env bash
+exec "${XDG_DATA_HOME:-$HOME/.local/share}/fm-host-memory/fm-mem-gate.sh" "$@"
+```
+
+Test: `host-memory/tests/fm-mem-gate.test.sh [gate]` runs the gate with
+stub `emulator`, `gradlew`, `pgrep` and `systemd-run`, fixture memory
+files (`FM_MEM_GATE_PROC`) and private lock dirs, and checks that a waiting
+emulator job does not hold the lock, that wrapped emulator and Gradle jobs
+are held at their caps, and that a wrapped emulator starts with a free slot.
