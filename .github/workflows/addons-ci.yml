@@ -53,6 +53,7 @@ jobs:
             case "$f" in
               ./sentinel/*|./supervisor-guard/*|./wait-timers/bin/*|./signoff/bin/*|./host-memory/bin/*|./alerts/*|./receipts/bin/*|./fleet-stats/bin/*) exclude=SC2015,SC1091 ;;
               ./wait-timers/tests/fm-wait-timers.test.sh) exclude=SC2015,SC1091,SC2034 ;;
+              ./fleet-dashboard/tests/fm-dashboard.test.sh) exclude=SC2015,SC1091,SC2034 ;;
             esac
             echo "== shellcheck -x -e $exclude $f =="
             shellcheck -x -e "$exclude" "$f"

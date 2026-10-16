@@ -21,6 +21,11 @@ Provenance.
   `fleet-dashboard/fm-dashboard/vendor/three-*.min.js` out of whitespace checks
   and folds it in review diffs.
 
+## Tests
+
+Run the behavior suite with `fleet-dashboard/tests/run-fork-suite.sh [checkout]`: it copies a Firstmate checkout (the argument, `FM_FIRSTMATE_DIR`, or a fresh clone when neither is set) to a scratch tree, swaps in this directory's `fm-dashboard.sh` and `fm-dashboard/`, and runs the suite there.
+`fleet-dashboard/tests/fm-dashboard-partial-backlog.test.sh` runs on its own and checks the lower-bound counts when a single home's backlog cannot be read.
+
 ## Frozen contract (unchanged)
 
 - CLI: `fm-dashboard.sh [build]` and `fm-dashboard.sh serve [--bind ADDR]
