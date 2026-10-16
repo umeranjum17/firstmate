@@ -88,3 +88,6 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq python3-yaml
           bash route-change/tests/route-change-e2e.sh
+      # Quota JSON fixtures and a private repeat-state file: nothing real is touched.
+      - name: Z.AI quota check test
+        run: bash zai-quota-check/tests/zai-quota-check-e2e.sh
