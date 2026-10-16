@@ -29,10 +29,10 @@ TMP_ROOT=$(fm_test_tmproot fm-watch-triage-tests)
 
 # A drain whose acknowledgement is missing is re-presented for a few attempts -
 # a loaded machine can hold the queue lock or settle the stopped watcher's
-# downtime marker past one presentation - and, still unanswered, the helper
-# prints the last drain's exit status, both output streams, and the
-# downtime-marker token to stderr before the case fails, so a rare CI miss
-# names which silent path fired instead of only "could not acknowledge".
+# downtime marker past one presentation - and every missed attempt prints its
+# number, the drain's exit status, both output streams, and the downtime-marker
+# token to stderr, so a rare CI miss names which silent path fired - and which
+# retry healed it - instead of only "could not acknowledge".
 ack_stopped_cycle() {  # <state>
   local state=$1 out err rc=0 sequence generation attempt
   out="$state/.test-cycle-drain.out"
@@ -43,19 +43,18 @@ ack_stopped_cycle() {  # <state>
     sequence=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through \([0-9][0-9]*\) --recovery-generation [A-Za-z0-9._-][A-Za-z0-9._-]*$/\1/p' "$err")
     generation=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through [0-9][0-9]* --recovery-generation \([A-Za-z0-9._-][A-Za-z0-9._-]*\)$/\1/p' "$err")
     [ "$rc" -eq 0 ] && [ -n "$sequence" ] && [ -n "$generation" ] && break
-    [ "$attempt" -eq 5 ] || sleep 0.2
-  done
-  if [ "$rc" -ne 0 ] || [ -z "$sequence" ] || [ -z "$generation" ]; then
     {
-      printf 'ack_stopped_cycle: drain exit=%s, no usable WAKE_ACK_REQUIRED\n' "$rc"
+      printf 'ack_stopped_cycle: attempt %s missed: drain exit=%s, no usable WAKE_ACK_REQUIRED\n' "$attempt" "$rc"
       printf -- '--- drain stdout\n'; cat "$out"
       printf -- '--- drain stderr\n'; cat "$err"
       printf -- '--- downtime marker: %s\n' "$(cat "$state/.watcher-down" 2>/dev/null || echo absent)"
     } >&2
-    rm -f "$out" "$err"
+    [ "$attempt" -eq 5 ] || sleep 0.2
+  done
+  rm -f "$out" "$err"
+  if [ "$rc" -ne 0 ] || [ -z "$sequence" ] || [ -z "$generation" ]; then
     return 1
   fi
-  rm -f "$out" "$err"
   FM_STATE_OVERRIDE="$state" "$DRAIN" --ack-through "$sequence" \
     --recovery-generation "$generation"
 }
