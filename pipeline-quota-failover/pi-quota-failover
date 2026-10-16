@@ -26,6 +26,7 @@
 # Knobs (environment):
 #   PI_QUOTA_FAILOVER_REAL_PI  absolute path to the real pi binary
 #   PI_QUOTA_FAILOVER_CHAIN    space-separated ordered model chain
+#   PI_QUOTA_FAILOVER_PRINT_CHAIN  non-empty: print the chain and exit (route-change reads it)
 #   PI_QUOTA_FAILOVER_LOG      log file (default ~/.local/state/pi-quota-failover.log)
 #   PI_QUOTA_FAILOVER_GATE     host-memory gate run before each call (default ~/firstmate/config/fm-mem-gate.sh
 #                              when executable; empty disables it)
@@ -39,6 +40,8 @@ set -u
 QUOTA_RE='limit used up|usage limit|limit has been reached|GoUsageLimitError|rate limit exceeded|quota|available credits|insufficient credits'
 
 chain=${PI_QUOTA_FAILOVER_CHAIN:-'zai/glm-5.3-flash muse-spark-1.3-contributor deepseek/deepseek-v4.1-flash'}
+# The chain is the fleet's one route list: route-change reads it from here.
+[ -z "${PI_QUOTA_FAILOVER_PRINT_CHAIN:-}" ] || { printf '%s\n' "$chain"; exit 0; }
 
 real_pi=${PI_QUOTA_FAILOVER_REAL_PI:-}
 if [ -z "$real_pi" ]; then
