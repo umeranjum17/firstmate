@@ -30,6 +30,15 @@
 # QUOTA_FAILOVER_RETEST_SECS (default 1800) and puts its profiles back at the
 # end of their list when it answers; the filter reads the file on disk, so
 # hand edits survive while it is out.
+# A stopped task on a pool account (account= in its meta and a usable
+# config/account-pool) hit that account's limit, so its route stays in
+# dispatch (a route-scoped probe verdict still takes it out). While
+# config/account-pool-autorelaunch exists (content ignored)
+# and the task's tool may change accounts automatically, it first moves
+# through bin/fm-control.sh relaunch --account next, which rests the account;
+# only when that fails does the route move above run. Otherwise the account
+# only rests, and one line in state/quota-failover.wake names it and the
+# manual command; check.sh prints that line as the watcher's wake.
 # Every decision is one line in state/quota-failover.log. A worker left with
 # no live route also gets one failed line on the home's parent channel, if any.
 set -u
@@ -43,6 +52,7 @@ export FM_HOME
 STATE=$FM_HOME/state BIN=$FM_HOME/bin LOG=$FM_HOME/state/quota-failover.log
 DISPATCH=$FM_HOME/config/crew-dispatch.json
 DEAD=$STATE/quota-failover-dead.json
+WAKE=$STATE/quota-failover.wake
 STALL=${QUOTA_FAILOVER_STALL_SECS:-240}
 TEST_SECS=${QUOTA_FAILOVER_TEST_SECS:-90}
 PROBE_SECS=${QUOTA_FAILOVER_PROBE_SECS:-900}
@@ -53,15 +63,23 @@ LIMIT_RE='(usage|rate|quota|weekly|monthly|daily|hour|session) limit (has been )
 HTTP_ERR_RE='(^|[^0-9])429($|[^0-9])|(status|error|code|http)[^0-9]{0,16}5[0-9]{2}|upstream request failed|internal server error|service unavailable|bad gateway|gateway timeout'
 
 exec 9>"$STATE/.quota-failover.lock" && flock -n 9 || exit 0
-for lib in fm-backend.sh fm-busy-lib.sh fm-quota-axi-lib.sh fm-parent-channel-lib.sh; do
+for lib in fm-backend.sh fm-busy-lib.sh fm-quota-axi-lib.sh fm-parent-channel-lib.sh fm-account-pool-lib.sh; do
   # shellcheck source=/dev/null
   . "$BIN/$lib" || die "cannot load $BIN/$lib"
 done
 
 log() { printf '%s %s\n' "$(date -u +%FT%TZ)" "$*" >> "$LOG"; }
+last() { sed -n "s|^[^ ]* $1: ||p" "$LOG" 2>/dev/null | tail -n 1; } # <id>
 # A repeated verdict is logged once until the task's last line changes.
-note() { # <id> <text>
-  [ "$(sed -n "s|^[^ ]* $1: ||p" "$LOG" 2>/dev/null | tail -n 1)" = "$2" ] || log "$1: $2"
+note() { [ "$(last "$1")" = "$2" ] || log "$1: $2"; } # <id> <text>
+
+# D1, fixed in code: the tools whose terms allow an automatic account change.
+# OpenCode Go bans several accounts used to get around limits, and OpenAI's
+# consumer terms (effective 1 Jan 2026) bar circumventing rate limits, so Go,
+# Codex and every OpenAI-login route stay rest + wake.
+auto_move() { # <harness> <model>
+  case $1 in claude|cursor|pi|pi-signed) ;; *) return 1 ;; esac
+  case $2 in *opencode-go*|openai-codex/*|codex-native/*) return 1 ;; esac
 }
 
 QUOTA=$(quota-axi --json --no-credential-refresh --max-age "${QUOTA_FAILOVER_MAX_AGE:-10m}" 2>/dev/null)
@@ -250,13 +268,15 @@ for meta in "$STATE"/*.meta; do
   [ "${verdict%% *}" != busy ] || [[ $(fm_busy_record_read "$STATE" "$id" 2>/dev/null) = *" session-retry "* ]] || continue
 
   h=$(fm_meta_get "$meta" harness) m=$(fm_meta_get "$meta" model) gen=$(fm_meta_get "$meta" spawn_gen)
-  route="$h $m" cands=() pinned=false declared=
+  route="$h $m" cands=() pinned=false declared='' pool=''
+  acct=$(fm_meta_get "$meta" account)
+  [ -z "$acct" ] || pool=$(fm_account_pool_config "$FM_HOME/config" 2>/dev/null)
   [ -f "$DISPATCH" ] && { IFS=$'\t' read -r pinned declared; mapfile -t cands; } \
     < <(jq -r --arg h "$h" --arg m "$m" "$CANDIDATES_JQ" "$DISPATCH" 2>/dev/null)
   prov=$(provider "$h" "$m" "${declared:-}")
   if grep -qiE "$LIMIT_RE" <<<"$screen"; then
     why="its screen shows a provider limit error"
-    dead_mark_out "$h" "$m" || true
+    [ -n "$pool" ] || dead_mark_out "$h" "$m" || true
   elif exhausted "$prov" "$h" "$m"; then
     why="quota-axi reads provider $prov exhausted"
   elif dead_has "$h" "$m"; then
@@ -270,6 +290,38 @@ for meta in "$STATE"/*.meta; do
   if [ -n "$(fm_meta_get "$meta" remote_host)" ]; then
     note "$id" "stopped on $route ($why); remote task, not switched"
     continue
+  fi
+
+  if [ -n "$pool" ]; then
+    if [ -e "$FM_HOME/config/account-pool-autorelaunch" ] && auto_move "$h" "$m"; then
+      [ "$(fm_meta_get "$meta" spawn_gen)" = "$gen" ] || continue
+      notefile=$(mktemp)
+      echo "quota-failover moved this task off pool account $acct to the next $h account because $why. Continue the task from where it stopped." > "$notefile"
+      out=$("$BIN/fm-control.sh" "$id" relaunch --account next --note-file "$notefile" 2>&1) && rc=0 || rc=$?
+      rm -f "$notefile"
+      if [ "$rc" = 0 ]; then
+        log "$id: moved $route off account $acct to the next $h account ($why)"
+        continue
+      fi
+      note "$id" "account move off $acct failed, trying a route move: $(grep -m1 '^error: ' <<<"$out" || tail -n 1 <<<"$out")"
+    else
+      [ "$(fm_meta_get "$meta" spawn_gen)" = "$gen" ] || continue
+      hand='<id|next>'
+      auto_move "$h" "$m" || hand='<id>'
+      text="stopped on $route account $acct ($why, gen $gen); account rested, move it by hand: bin/fm-control.sh $id relaunch --account $hand"
+      case $(last "$id") in *"account $acct ("*"gen $gen); account rested"*) continue ;; esac
+      if out=$(fm_account_pool_rest "${pool%%$'\t'*}" "${pool#*$'\t'}" "$acct" 2>&1); then
+        log "$id: $text"
+        printf 'quota-failover: %s %s\n' "$id" "$text" >>"$WAKE"
+      else
+        errline=${out%%$'\n'*}
+        ftext="stopped on $route account $acct ($why, gen $gen); rest failed ($errline), move it by hand: bin/fm-control.sh $id relaunch --account $hand"
+        case $(last "$id") in *"account $acct ("*"gen $gen); rest failed ("*) continue ;; esac
+        log "$id: $ftext"
+        printf 'quota-failover: %s %s\n' "$id" "$ftext" >>"$WAKE"
+      fi
+      continue
+    fi
   fi
 
   next='' passed=''
