@@ -51,7 +51,7 @@ jobs:
             found=$((found + 1))
             exclude=SC2015
             case "$f" in
-              ./sentinel/*|./supervisor-guard/*|./wait-timers/bin/*) exclude=SC2015,SC1091 ;;
+              ./sentinel/*|./supervisor-guard/*|./wait-timers/bin/*|./signoff/bin/*) exclude=SC2015,SC1091 ;;
               ./wait-timers/tests/fm-wait-timers.test.sh) exclude=SC2015,SC1091,SC2034 ;;
             esac
             echo "== shellcheck -x -e $exclude $f =="
