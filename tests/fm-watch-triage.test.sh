@@ -27,14 +27,28 @@ DRAIN="$ROOT/bin/fm-wake-drain.sh"
 
 TMP_ROOT=$(fm_test_tmproot fm-watch-triage-tests)
 
+# A drain that yields no acknowledgement prints its exit status, both output
+# streams, and the downtime-marker token to stderr before the case fails, so a
+# rare CI miss names which silent path fired instead of only "could not
+# acknowledge".
 ack_stopped_cycle() {  # <state>
-  local state=$1 err sequence generation
+  local state=$1 out err rc=0 sequence generation
+  out="$state/.test-cycle-drain.out"
   err="$state/.test-cycle-drain.err"
-  FM_STATE_OVERRIDE="$state" "$DRAIN" >/dev/null 2> "$err" || return 1
+  FM_STATE_OVERRIDE="$state" "$DRAIN" > "$out" 2> "$err" || rc=$?
   sequence=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through \([0-9][0-9]*\) --recovery-generation [A-Za-z0-9._-][A-Za-z0-9._-]*$/\1/p' "$err")
   generation=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through [0-9][0-9]* --recovery-generation \([A-Za-z0-9._-][A-Za-z0-9._-]*\)$/\1/p' "$err")
-  rm -f "$err"
-  [ -n "$sequence" ] && [ -n "$generation" ] || return 1
+  if [ "$rc" -ne 0 ] || [ -z "$sequence" ] || [ -z "$generation" ]; then
+    {
+      printf 'ack_stopped_cycle: drain exit=%s, no usable WAKE_ACK_REQUIRED\n' "$rc"
+      printf -- '--- drain stdout\n'; cat "$out"
+      printf -- '--- drain stderr\n'; cat "$err"
+      printf -- '--- downtime marker: %s\n' "$(cat "$state/.watcher-down" 2>/dev/null || echo absent)"
+    } >&2
+    rm -f "$out" "$err"
+    return 1
+  fi
+  rm -f "$out" "$err"
   FM_STATE_OVERRIDE="$state" "$DRAIN" --ack-through "$sequence" \
     --recovery-generation "$generation"
 }
