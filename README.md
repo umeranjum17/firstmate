@@ -103,6 +103,28 @@ Neither installed v1.79 nor current v1.84 can express this in config: `agent:` f
 Install or remove with `pipeline-quota-failover/install.sh [--dry-run] [--restore]`; it copies the wrapper to `~/.local/share/fm-pipeline-quota-failover/`, makes one key-level edit to `~/.no-mistakes/config.yaml` (timestamped backup next to it, key name only in output, no config contents printed), and is idempotent.
 Test: `pipeline-quota-failover/tests/pi-quota-failover-e2e.sh` drives the real wrapper against a stub pi in a throwaway HOME with the exact argv shape no-mistakes builds (quota-dead GLM route using the fleet's real 429 usage-limit surface, healthy muse route): one attempt per model, the winning stream on stdout, timed log lines, non-quota and pinned-model passthrough, session drop on failover, chain exhaustion exiting 1 with the terminal line, and the install edit's add, idempotence, restore and backup.
 
+## route-change
+
+One command moves worker dispatch, the no-mistakes gate and the lead pins to one route together, so no route is edited by hand.
+
+`route-change/route-change [--dry-run] <fm-home> <route>` takes a route from the pipeline-quota-failover chain, the fleet's one route list, which it reads from the wrapper the gate runs (`agent_path_override.pi`).
+Every route runs on pi, with the provider `pi --list-models` names for it.
+It refuses a route whose provider quota-axi reads exhausted now, naming the scope and window, and a route quota-failover holds out of dispatch; nothing is written then.
+Otherwise it backs up each file it changes as `<file>.bak-route-change-<stamp>` and writes all of them:
+
+- `config/crew-dispatch.json`: in the default and every rule, the route leads the non-Claude profiles; Claude and Opus entries keep their place and an Opus-only rule is left alone.
+  A list that already holds the route, as `<route>` or `<provider>/<route>` on any harness, moves that entry; any other list gets a pi profile for it.
+- the gate: `agent` and `agent_config.pi.model` in `~/.no-mistakes/config.yaml` (or `$NM_CONFIG`), edited by key name and checked so no other key changes; only route names are printed.
+- the lead pins `config/secondmate-harness` and `config/secondmates/*/harness`, except pins on Claude or Opus.
+
+Then it sends one real request through pi on the route, the way the gate calls it; when that fails it restores every backup and prints the cause.
+`--dry-run` runs the quota check, prints the planned edits and writes nothing.
+Each switch is one line in `<fm-home>/state/route-change.log`, and it holds quota-failover's lock while it works.
+Secondmate homes get the new `crew-dispatch.json` through firstmate's config inheritance.
+
+Install with `route-change/install.sh [--dry-run]` after `pipeline-quota-failover/install.sh` from the same checkout (the route list needs the wrapper's `PI_QUOTA_FAILOVER_PRINT_CHAIN`).
+Test: `route-change/tests/route-change-e2e.sh` runs the real script and the real wrapper against a fixture home and config with stub quota-axi and pi: an exhausted route is refused with nothing written, a good route moves every pin and keeps backups, and a failed real request restores every file.
+
 ## ask-default
 
 An unanswered ask gets a safe, pre-declared default instead of blocking the home, and work continues.

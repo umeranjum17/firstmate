@@ -16,7 +16,8 @@ jobs:
     name: Add-on self-checks
     runs-on: ubuntu-latest
     # Normal tier: a shellcheck pass and a bash parse over a handful of
-    # scripts, plus the memory gate's stubbed integration test (about 20 s).
+    # scripts, plus the stubbed memory-gate and route-change e2e tests
+    # (about 20 s and a python3-yaml install).
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
@@ -80,3 +81,10 @@ jobs:
       # Stub emulator, Gradle, pgrep and memory files only: nothing heavy starts.
       - name: Memory gate test
         run: bash host-memory/tests/fm-mem-gate.test.sh
+      # Fixture home and config, stub quota-axi and pi: nothing real is touched.
+      - name: Route change test
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq python3-yaml
+          bash route-change/tests/route-change-e2e.sh
