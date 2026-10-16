@@ -73,7 +73,7 @@ puts YAML.load_file(ARGV[0]).fetch("jobs").fetch(ARGV[1]).fetch("timeout-minutes
 # Tier membership is the executable inventory of the timeout policy: a new job
 # must join a tier, and a job-level value outside these tiers is exactly the
 # one-off number the policy removed.
-FAST_TIER_JOBS='test-coverage invariants tests-timing-aggregate'
+FAST_TIER_JOBS='changes test-coverage invariants tests-timing-aggregate ci-result'
 NORMAL_TIER_JOBS='lint tests-portable-parallel-1 tests-portable-parallel-2 tests-portable-serial macos-stock-bash'
 HEAVY_TIER_JOBS='tests-herdr'
 
@@ -289,7 +289,7 @@ RUBY
 # GitHub-hosted runners by clearing that one variable instead of reverting.
 test_review_box_runner_selection_is_fork_safe() {
   local moved job line
-  moved='test-coverage invariants'
+  moved='changes test-coverage invariants ci-result'
   for job in $moved; do
     # Fork PR: never the box, even with the opt-in variable set.
     line=$(resolve_runs_on pull_request "someuser/firstmate" 1 "$job") \
