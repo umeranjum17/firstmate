@@ -455,7 +455,9 @@ def machine_capacity():
             pass  # ownership is unknown; never inspect another process's environment
         jobs.append(dict(pid=int(p.name), kind=kind, rss_bytes=int(rss[1]) * 1024 if rss else None,
                          process_state=state[1] if state else None, owner=owner))
-    policy_source = ROOT / 'config/fm-mem-gate.sh'
+    # The gate installed by host-memory/install.sh holds the policy once config/fm-mem-gate.sh is its one-line shim.
+    installed = Path(os.environ.get('XDG_DATA_HOME') or Path.home() / '.local/share') / 'fm-host-memory/fm-mem-gate.sh'
+    policy_source = installed if installed.is_file() else ROOT / 'config/fm-mem-gate.sh'
     gate = '\n'.join(read(policy_source) or [])
     limits = {}
     for key in ('FM_MEM_MIN_GB', 'FM_EMU_MAX', 'FM_GRADLE_MAX', 'FM_MEM_JOB_GB'):

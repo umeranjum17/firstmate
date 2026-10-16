@@ -49,6 +49,13 @@ Every moved file was compared byte for byte against its fork source at
 Treat any future diff against the fork file as a contract change, not a
 refactor.
 
+Contract change since the move (16 Oct, mem-gate-wrappers): the capacity
+census reads the gate policy from the installed gate
+`${XDG_DATA_HOME:-~/.local/share}/fm-host-memory/fm-mem-gate.sh` when it
+exists (Main's `config/fm-mem-gate.sh` is then a one-line shim to it), else
+from `config/fm-mem-gate.sh` as before, and `gate_source` names the file it
+read. Both moved files now differ from the fork at that census only.
+
 ## Side-by-side proof (re-run before the served path swaps)
 
 The acceptance proof runs the fork copy and this copy on the same synthesized
