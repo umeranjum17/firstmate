@@ -123,6 +123,8 @@
 #   fm-dashboard.sh [build]
 #   fm-dashboard.sh serve [--bind ADDR] [--port N]
 # build (the default) writes $FM_HOME/state/dashboard/ and prints the index page path.
+# FM_BIN names the Firstmate bin/ holding the helper scripts this build runs (fm-tasks-axi.sh,
+# fm-flow.sh, ...); unset, it defaults to this script's own directory.
 # serve runs a small read-only web server (python3 stdlib, IPv4) that answers GET or
 # HEAD for / and /index.html (the JavaScript app), its files under bin/fm-dashboard/,
 # /board.json, /overview (the same app shell; the app opens its own native Overview in
@@ -149,6 +151,14 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# The directory holding the Firstmate helper scripts this build runs. It defaults
+# to this script's own directory (the fork's bin/), so a fork copy needs nothing;
+# else FM_BIN names the Firstmate bin/ when this script runs from another repo.
+if [ -n "${FM_BIN+x}" ]; then
+  [ -d "$FM_BIN" ] && [ -f "$FM_BIN/fm-tasks-axi.sh" ] || { echo "fm-dashboard: FM_BIN is not a Firstmate bin directory (no fm-tasks-axi.sh): $FM_BIN" >&2; exit 1; }
+else
+  FM_BIN="$SCRIPT_DIR"
+fi
 FM_HOME="${FM_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 out_dir="$FM_HOME/state/dashboard"
 page="$out_dir/index.html"
@@ -294,7 +304,7 @@ tmp="$out_dir/.build.$$"
 trap 'rm -rf "$tmp"' EXIT
 mkdir -p "$tmp" || { echo "fm-dashboard: cannot create $tmp" >&2; exit 1; }
 
-python3 - "$FM_HOME" "$out_dir" "$tmp" "$SCRIPT_DIR" "$MAX_AGE" <<'PY' || { echo "fm-dashboard: page build failed" >&2; exit 1; }
+python3 - "$FM_HOME" "$out_dir" "$tmp" "$FM_BIN" "$MAX_AGE" <<'PY' || { echo "fm-dashboard: page build failed" >&2; exit 1; }
 import fcntl, hashlib, html, json, math, os, re, shutil, subprocess, sys, time
 BUILD_STARTED = time.monotonic()
 from urllib.parse import urlsplit

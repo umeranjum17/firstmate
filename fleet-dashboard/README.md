@@ -6,7 +6,7 @@ yet: the live dashboard keeps building and serving from the fork's
 `bin/fm-dashboard.sh`, and the fork-side shim that will exec into this directory
 lands in a later PR. Until that swap this directory is dormant. The app under
 `fm-dashboard/` is still identical to the fork copy the live service runs
-today, and `fm-dashboard.sh` carries one deliberate difference, described under
+today, and `fm-dashboard.sh` carries two deliberate differences, described under
 Provenance.
 
 ## Layout
@@ -44,13 +44,15 @@ copies used by the proof below
 task data). Treat any future diff against the fork file as a contract change,
 not a refactor.
 
-One change is deliberate. `fm-dashboard.sh` no longer blanks the fleet's Ready
+Two changes are deliberate. `fm-dashboard.sh` no longer blanks the fleet's Ready
 and queue numbers when a single home's backlog cannot be read: it counts the
 homes that were read, marks a partial count as a lower bound (`≥`), names each
 unread home with its reason, and reports the partial metric with status
 `partial` in `data.json`. Only when no home could be read does the tile show
-the unknown dash as before. Every other moved file, the whole `fm-dashboard/`
-app included, remains byte-identical to the fork.
+the unknown dash as before. It also adds one environment input, `FM_BIN` (see
+For the fork shim lane), defaulting to the script's own directory so a fork
+copy behaves exactly as before. Every other moved file, the whole
+`fm-dashboard/` app included, remains byte-identical to the fork.
 
 ## Side-by-side proof (re-run before the served path swaps)
 
@@ -97,6 +99,9 @@ Manual recipe if the harness is gone:
    `/backlog`, `/measure`, `/data.json`, 404 elsewhere.
 
 ## For the fork shim lane
+
+`FM_BIN` names the directory holding the Firstmate helper scripts a build runs (`fm-tasks-axi.sh`, `fm-flow.sh`, ...); unset, it defaults to this script's own directory, so a fork copy is unaffected.
+Run from this repository it must point at the Firstmate `bin/`, which makes the later shim `FM_BIN=<firstmate>/bin exec <addons>/fleet-dashboard/fm-dashboard.sh "$@"`: a set `FM_BIN` without `fm-tasks-axi.sh` is refused.
 
 The shipped `fm-dashboard.service` runs
 `/home/fixture/users/user-019/firstmate/bin/fm-dashboard.sh serve --bind "$(tailscale ip -4 |
