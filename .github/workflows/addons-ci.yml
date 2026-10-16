@@ -16,8 +16,8 @@ jobs:
     name: Add-on self-checks
     runs-on: ubuntu-latest
     # Normal tier: a shellcheck pass and a bash parse over a handful of
-    # scripts, plus the stubbed memory-gate and route-change e2e tests
-    # (about 20 s and a python3-yaml install).
+    # scripts, plus the stubbed e2e tests of the memory gate, route change and
+    # home flow check (about 20 s and a python3-yaml install).
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
@@ -94,3 +94,6 @@ jobs:
       # Fixture homes, stub herdr and a temp state dir: nothing real is touched.
       - name: Fleet stall check test
         run: bash fleet-stall/tests/fleet-stall-e2e.sh
+      # Fixture Main and lead homes with stub fm-tasks-axi.sh and fm-crew-state.sh: lane slots and dry.
+      - name: Home flow check test
+        run: bash fleet-flow/tests/fm-flow-check.test.sh
