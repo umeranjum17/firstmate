@@ -227,6 +227,7 @@ CONTROL_LOCK=
 CONTROL_LOCK_HELD=0
 RELAUNCH_ACTIVE=0
 RELAUNCH_PHASE=start
+RELAUNCH_POOL_MOVE=0
 
 control_cleanup() {
   local status=$?
@@ -1101,7 +1102,8 @@ resolve_relaunch_profile() {
   # changed yet. A pin always wins, exactly as it does in the launch owner, so
   # an --account that contradicts it refuses here too rather than being
   # silently ignored. The relaunch-time pool hook (bin/fm-account-pool-lib.sh)
-  # takes the rest and proves the pick on this same pre-stop side.
+  # reads its whole choice gate on this pre-stop side; its rest and pick run
+  # last, in do_relaunch, after every cheaper refusal below has passed.
   local account_model=$TARGET_MODEL account_selection
   [ "$account_model" != default ] || account_model=
   account_selection=$(fm_worker_account_select "$TARGET_HARNESS" "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" \
@@ -1114,6 +1116,7 @@ resolve_relaunch_profile() {
   elif [ "$ACCOUNT_SET" = 1 ]; then
     fm_account_pool_relaunch_pre "$TARGET_HARNESS" "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" \
       "$ACCOUNT_CHOICE" "$(fm_meta_get "$META" account)" "$account_model" "$ID" || return 1
+    RELAUNCH_POOL_MOVE=1
   else
     fm_account_pool_select "$TARGET_HARNESS" "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" >/dev/null || return 1
   fi
@@ -1271,6 +1274,15 @@ do_relaunch() {
 
   record_note
   journal_write noted "${CHECKPOINT_LINES[@]}" "$note_line"
+
+  # The account move's one mutation - resting the recorded account - and the
+  # pick that proves the replacement launch can answer without it are the last
+  # pre-stop steps: every cheaper refusal above has already passed, so the
+  # pool changes only when this verb can no longer refuse.
+  if [ "$RELAUNCH_POOL_MOVE" = 1 ]; then
+    fm_account_pool_relaunch_commit "$TARGET_HARNESS" "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" \
+      "$ACCOUNT_CHOICE" "$(fm_meta_get "$META" account)" || return 1
+  fi
 
   journal_write stopping "${CHECKPOINT_LINES[@]}" "$note_line"
   exit_result=$(do_exit)

@@ -92,9 +92,10 @@
 #   --account <id|next> is a relaunch-only axis: it moves the worker between
 #   pool accounts, an explicit id selecting that account and 'next' resting
 #   the recorded one (the control plane's preflight takes that rest, so this
-#   flag picks plainly). A fresh spawn refuses it, and an explicit id whose
+#   flag picks plainly). A fresh spawn refuses it, an explicit id whose
 #   answer is a different account refuses rather than launching the wrong
-#   one.
+#   one, and a home whose pool cannot answer it at all refuses rather than
+#   launching on the ambient login.
 #   Every fresh ship/scout launch and replacement explicitly enters the recorded
 #   worktree immediately before trust setup and brief delivery, and a pre-launch
 #   cwd check refuses any endpoint that still reports another copy; a Herdr shell
@@ -2769,6 +2770,10 @@ fi
 POOL_ACCOUNT=
 if [ -z "$WORKER_ACCOUNT" ]; then
   POOL_ACCOUNT=$(fm_account_pool_select "$HARNESS" "$CONFIG" "$ACCOUNT_ARG") || exit 1
+  [ "$ACCOUNT_SET" -eq 0 ] || [ -n "$POOL_ACCOUNT" ] || {
+    echo "error: this home has no account pool for $HARNESS workers (no config/account-pool, or $HARNESS has no pool tool), so --account '$ACCOUNT_ARG' cannot be honored; add config/account-pool or relaunch without it" >&2
+    exit 1
+  }
 fi
 POOL_ACCOUNT_ID=
 POOL_ACCOUNT_VAR=

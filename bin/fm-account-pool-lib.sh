@@ -253,14 +253,13 @@ fm_account_pool_next_ok() {
 }
 
 # fm_account_pool_relaunch_pre <harness> <config-dir> <choice> <recorded-id>
-#   <model> <task-id>: the relaunch-time account gate. A relaunch stops the
-#   running agent before the launch owner picks, so every refusal this verb
-#   can reach - a malformed choice, an unmapped harness, no pool, a missing
-#   or unreadable recorded account, an account the plan forbids moving
-#   automatically, an account too tired or signed out to take the worker, or
-#   an explicit account the pick does not answer with - happens here, while
-#   nothing has changed. For 'next' the recorded account rests first, so the
-#   canary pick below proves the replacement launch can answer without it.
+#   <model> <task-id>: the relaunch-time account gate's read-only half. Every
+#   refusal the verb can reach without touching the pool happens here, while
+#   nothing has changed: a malformed choice, an unmapped harness, no pool, a
+#   missing or unreadable recorded account, or an account the plan forbids
+#   moving automatically. The rest and the pick that prove the move run in
+#   fm_account_pool_relaunch_commit, which the caller takes last, after every
+#   cheaper refusal has passed.
 fm_account_pool_relaunch_pre() {
   local harness=$1 config=$2 choice=$3 recorded=$4 model=$5 task=$6 cfg command state recorded_tool
   fm_account_pool_want_valid "$choice" || {
@@ -276,15 +275,34 @@ fm_account_pool_relaunch_pre() {
     echo "error: --account needs this home's account pool: config/account-pool naming state=<pool folder>" >&2
     return 1
   }
-  command=${cfg%%$'\t'*}
-  state=${cfg#*$'\t'}
   if [ "$choice" = next ]; then
     [ -n "$recorded" ] || {
       echo "error: '--account next' moves the account the running worker launched on, and task $task records none; move it with '--account <id>' instead" >&2
       return 1
     }
+    command=${cfg%%$'\t'*}
+    state=${cfg#*$'\t'}
     recorded_tool=$(fm_account_pool_recorded_tool "$command" "$state" "$recorded") || return 1
     fm_account_pool_next_ok "$recorded_tool" "$model" "$task" || return 1
+  fi
+}
+
+# fm_account_pool_relaunch_commit <harness> <config-dir> <choice> <recorded-id>:
+# the account gate's mutating half and a relaunch's last pre-stop step, taken
+# only after fm_account_pool_relaunch_pre and every cheaper refusal have
+# passed. For 'next' the recorded account rests here, and the canary pick
+# below proves the replacement launch can answer without it; an explicit id
+# only picks, and the answer must be exactly that account.
+fm_account_pool_relaunch_commit() {
+  local harness=$1 config=$2 choice=$3 recorded=$4 cfg command state
+  cfg=$(fm_account_pool_config "$config") || return 1
+  [ -n "$cfg" ] || {
+    echo "error: --account needs this home's account pool: config/account-pool naming state=<pool folder>" >&2
+    return 1
+  }
+  command=${cfg%%$'\t'*}
+  state=${cfg#*$'\t'}
+  if [ "$choice" = next ]; then
     fm_account_pool_rest "$command" "$state" "$recorded" || return 1
   fi
   fm_account_pool_select "$harness" "$config" "$choice" >/dev/null || return 1

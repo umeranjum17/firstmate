@@ -974,12 +974,6 @@ SH
   chmod +x "$1/fakebin/byokit-accounts"
 }
 
-# A pool whose claude tool owns the folders its picks answer with, and whose
-# account-pool config points at it. <case-dir> <fails-after-rest?>
-make_pool_home() {  # <case-dir>
-  printf 'state=%s\n' "$1/pool" > "$1/home/config/account-pool"
-}
-
 test_pool_with_no_free_account_refuses_before_stop() {
   local dir out rc id=rl-pool-out
   dir=$(new_case pool-out "$id")
@@ -1290,6 +1284,39 @@ test_spawn_refuses_account_on_a_fresh_spawn() {
   expect_code 1 "$rc" "a fresh spawn must refuse --account"
   assert_contains "$out" "--account applies to a relaunch only" "the refusal should name the relaunch-only scope"
   pass "fm-spawn --account: a fresh launch refuses the relaunch-only flag"
+}
+
+# A direct fm-spawn --relaunch --account runs without fm-control's preflight,
+# so the launch owner itself must refuse any account choice its pool cannot
+# answer - a home with no config/account-pool, or a harness with no pool tool -
+# instead of silently launching the replacement on the ambient login.
+test_spawn_relaunch_account_refuses_without_a_pool() {
+  local dir out rc id=rl-acct-spawn-nopool
+  dir=$(new_case acct-spawn-nopool "$id")
+  add_ship_task "$dir" "$id" claude
+  printf 'zsh' > "$dir/fake/command"
+  out=$(run_spawn "$dir" "$id" --relaunch --harness claude --account next); rc=$?
+  expect_code 1 "$rc" "a direct relaunch --account without a pool must refuse"$'\n'"$out"
+  assert_contains "$out" "no account pool for claude workers" \
+    "the refusal should name the missing pool and the harness"
+  assert_absent "$dir/fake/created-windows" "a refused relaunch must launch nothing"
+  [ ! -s "$dir/fake/literal" ] || fail "a refused relaunch must send no lifecycle input"
+  assert_no_grep "account=" "$dir/home/state/$id.meta" "a refused relaunch must not record an account"
+  pass "fm-spawn --relaunch --account: a home with no pool refuses instead of launching on the ambient login"
+}
+
+test_spawn_relaunch_account_refuses_a_harness_with_no_pool_tool() {
+  local dir out rc id=rl-acct-spawn-unmapped
+  dir=$(new_case acct-spawn-unmapped "$id")
+  add_ship_task "$dir" "$id" opencode
+  printf 'zsh' > "$dir/fake/command"
+  out=$(run_spawn "$dir" "$id" --relaunch --harness opencode --account pa_named); rc=$?
+  expect_code 1 "$rc" "a direct relaunch --account on a harness with no pool tool must refuse"$'\n'"$out"
+  assert_contains "$out" "no account pool for opencode workers" \
+    "the refusal should name the harness that has no pool tool"
+  assert_absent "$dir/fake/created-windows" "a refused relaunch must launch nothing"
+  [ ! -s "$dir/fake/literal" ] || fail "a refused relaunch must send no lifecycle input"
+  pass "fm-spawn --relaunch --account: a harness whose pool tool does not exist refuses instead of ignoring the flag"
 }
 
 test_signed_out_worker_account_pin_refuses_before_stop() {
@@ -3143,6 +3170,8 @@ test_relaunch_account_refuses_when_the_pick_answers_a_different_account
 test_relaunch_account_refuses_on_a_harness_with_no_pool_tool
 test_relaunch_without_account_keeps_the_plain_pick
 test_spawn_refuses_account_on_a_fresh_spawn
+test_spawn_relaunch_account_refuses_without_a_pool
+test_spawn_relaunch_account_refuses_a_harness_with_no_pool_tool
 test_worker_account_pin_follows_the_relaunch
 test_pi_exclude_tools_follow_the_relaunch
 test_exclude_tools_refusals_happen_before_the_agent_stops
