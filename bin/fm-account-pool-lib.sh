@@ -111,7 +111,7 @@ fm_account_pool_want_valid() {
 # launching a different one; `next` picks plainly, because the relaunch verb
 # has already rested the recorded account.
 fm_account_pool_select() {
-  local harness=$1 config=$2 want=${3:-} tool store_var cfg command state out errf rc id var folder shed reason detail shed_bad=0 word
+  local harness=$1 config=$2 want=${3:-} tool store_var cfg command state out errf rc id var folder shed reason detail shed_bad=0
   local -a prefer_arg=()
   tool=$(fm_account_pool_tool "$harness") || return 0
   cfg=$(fm_account_pool_config "$config") || return 1
