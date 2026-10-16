@@ -1117,7 +1117,7 @@ resolve_relaunch_profile() {
     }
   elif [ "$ACCOUNT_SET" = 1 ]; then
     fm_account_pool_relaunch_pre "$TARGET_HARNESS" "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" \
-      "$ACCOUNT_CHOICE" "$(fm_meta_get "$META" account)" "$account_model" "$ID" || return 1
+      "$ACCOUNT_CHOICE" "$(fm_meta_get "$META" account)" "$PRIOR_MODEL" "$account_model" "$ID" || return 1
     RELAUNCH_POOL_MOVE=1
   else
     fm_account_pool_select "$TARGET_HARNESS" "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" >/dev/null || return 1

@@ -227,15 +227,16 @@ fm_account_pool_rest() {
 # The tools a relaunch may move a worker between automatically, fixed in code
 # from the account-pool plan's terms review (plan v2 section 3): Claude,
 # Codex, and Pi subscription logins allow it; OpenCode Go does not, so an
-# automatic move refuses a Go account and a worker on an opencode-go
-# provider. Deliberately not a config value.
+# automatic move refuses a Go account, a worker that runs on an opencode-go
+# provider, and a replacement that would run one. Deliberately not a config
+# value.
 FM_ACCOUNT_POOL_AUTO_TOOLS="claude codex pi"
 
-# fm_account_pool_next_ok <tool> <model> <task-id>: 0 when this relaunch may
-# move the worker automatically; otherwise one plain error naming the manual
-# command, and 1.
+# fm_account_pool_next_ok <tool> <from-model> <to-model> <task-id>: 0 when
+# this relaunch may move the worker automatically; otherwise one plain error
+# naming the manual command, and 1.
 fm_account_pool_next_ok() {
-  local tool=$1 model=$2 task=$3
+  local tool=$1 from_model=$2 to_model=$3 task=$4
   case " $FM_ACCOUNT_POOL_AUTO_TOOLS " in
     *" $tool "*) ;;
     *)
@@ -243,8 +244,8 @@ fm_account_pool_next_ok() {
       return 1
       ;;
   esac
-  case "$model" in
-    opencode-go/*)
+  case "$from_model$to_model" in
+    *opencode-go*)
       echo "error: '--account next' cannot move a worker on the opencode-go provider automatically; move this worker by hand with 'bin/fm-control.sh relaunch $task --account <id>'" >&2
       return 1
       ;;
@@ -261,7 +262,7 @@ fm_account_pool_next_ok() {
 #   fm_account_pool_relaunch_commit, which the caller takes last, after every
 #   cheaper refusal has passed.
 fm_account_pool_relaunch_pre() {
-  local harness=$1 config=$2 choice=$3 recorded=$4 model=$5 task=$6 cfg command state recorded_tool
+  local harness=$1 config=$2 choice=$3 recorded=$4 from_model=$5 to_model=$6 task=$7 cfg command state recorded_tool
   fm_account_pool_want_valid "$choice" || {
     echo "error: --account takes 'next' or one account id, not '$choice'" >&2
     return 1
@@ -283,7 +284,7 @@ fm_account_pool_relaunch_pre() {
     command=${cfg%%$'\t'*}
     state=${cfg#*$'\t'}
     recorded_tool=$(fm_account_pool_recorded_tool "$command" "$state" "$recorded") || return 1
-    fm_account_pool_next_ok "$recorded_tool" "$model" "$task" || return 1
+    fm_account_pool_next_ok "$recorded_tool" "$from_model" "$to_model" "$task" || return 1
   fi
 }
 

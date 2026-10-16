@@ -1134,6 +1134,39 @@ test_relaunch_account_next_refuses_a_go_model_worker() {
   pass "fm-control relaunch --account next: a worker on the opencode-go provider refuses with the manual command named"
 }
 
+# The Go gate reads the model the RUNNING worker is on, not the replacement's:
+# an explicit --model (or a harness switch) must not let a recorded
+# opencode-go worker be moved automatically.
+test_relaunch_account_next_refuses_a_recorded_go_worker_when_the_model_switches() {
+  local dir out rc id=rl-acct-gomodel2
+  dir=$(new_case acct-gomodel2 "$id")
+  add_ship_task "$dir" "$id" pi
+  printf pi > "$dir/fake/command"
+  printf pi > "$dir/fake/becomes"
+  printf '#!/usr/bin/env bash\nprintf "Options: --tui-mode\\n"\n' > "$dir/fakebin/pi"
+  chmod +x "$dir/fakebin/pi"
+  make_pool_command_stub "$dir"
+  mkdir -p "$dir/home/config" "$dir/pool/two"
+  printf 'state=%s\n' "$dir/pool" > "$dir/home/config/account-pool"
+  sed -i 's|^model=default$|model=opencode-go/step-5-preview-free|' "$dir/home/state/$id.meta"
+  printf 'account=pa_pi\n' >> "$dir/home/state/$id.meta"
+  pool_ready_account "$dir" pa_pi pi
+  pool_pick_answer "$dir" pa_pi2 "$dir/pool/two"
+  cp "$dir/home/state/$id.meta" "$dir/meta-before"
+  out=$(run_control "$dir" "$id" relaunch --model pi/sonnet-x --account next --note "switch off go"); rc=$?
+  expect_code 1 "$rc" "next must refuse a recorded opencode-go worker even when the replacement names another model"$'\n'"$out"
+  assert_contains "$out" "cannot move a worker on the opencode-go provider automatically" \
+    "the refusal should name the provider it cannot move"
+  assert_contains "$out" "relaunch $id --account <id>" "the refusal should name the manual command"
+  case "$(cat "$dir/pool-calls")" in
+    *"rest "*|*"pick "*) fail "a Go-provider refusal must rest and pick nothing, got: $(cat "$dir/pool-calls")" ;;
+  esac
+  [ "$(cat "$dir/fake/command")" = pi ] || fail "a Go-provider refusal must leave the running agent working"
+  [ ! -s "$dir/fake/literal" ] || fail "a Go-provider refusal must send no lifecycle input"
+  cmp -s "$dir/meta-before" "$dir/home/state/$id.meta" || fail "a refused relaunch must leave the task record untouched"
+  pass "fm-control relaunch --account next: a recorded opencode-go worker refuses even when --model switches the replacement"
+}
+
 test_relaunch_account_refuses_when_a_pin_wins() {
   local dir out rc id=rl-acct-pin
   dir=$(new_case acct-pin "$id")
@@ -3188,6 +3221,7 @@ test_relaunch_account_next_rests_the_recorded_account_before_it_picks
 test_relaunch_account_next_refuses_when_the_pool_has_no_other_account
 test_relaunch_account_next_refuses_a_go_account_and_names_the_manual_command
 test_relaunch_account_next_refuses_a_go_model_worker
+test_relaunch_account_next_refuses_a_recorded_go_worker_when_the_model_switches
 test_relaunch_account_refuses_when_a_pin_wins
 test_relaunch_account_refuses_without_a_pool
 test_relaunch_account_malformed_choice_refuses
