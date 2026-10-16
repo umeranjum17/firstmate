@@ -257,3 +257,14 @@ It then drives `install.sh` against a throwaway home, as `--dry-run` and as a re
 Install with `fleet-stall/install.sh [--dry-run]` and `FM_HOME` set: it copies the check to `${XDG_DATA_HOME:-~/.local/share}/fm-fleet-stall/fleet-stall-check`, writes `$FM_HOME/state/fleet-stall.check.sh` as a shim that execs it (mode 700; a different old file is kept as `.bak-fleet-stall-<epoch>`) and registers the fleet-stall check with the home's `bin/fm-check-register.sh`; idempotent.
 
 Test: `fleet-stall/tests/fleet-stall-e2e.sh` runs the real check against a fixture fleet (Main's lead records, the muxr and writeboost homes, a stub herdr showing both leads idle): the 17:18Z lines no longer count, while `waiting on firstmate for the decision` and `awaiting main instruction` still do. `FLEET_STALL_BIN` runs another copy against the same fixture.
+
+## glm-queue
+
+Every pi GLM call waits in one local line instead of drawing Z.AI's 1302 "Rate limit reached for requests" refusal and backing off (Main3517: 423 refusals across 21 of 21 GLM sessions in the 17Z hour of 16 Oct).
+`glm-queue/glm-queue.mjs` is a Node proxy on `127.0.0.1` (port `GLM_QUEUE_PORT`, default 8787) that forwards to `https://api.z.ai` (`GLM_QUEUE_UPSTREAM`) with at most `GLM_QUEUE_MAX` calls in flight (default 8) and a FIFO line for the rest.
+Method, path, headers (Authorization included) and body pass through unchanged, responses and SSE streams are piped back as they arrive, and a caller that leaves while waiting hands its slot on unused. An upstream request that goes idle is cut after 5 minutes, and an upstream that dies mid-response (a truncated body, say) cuts the client connection immediately so the caller sees the failure and re-queues instead of hanging; its slot is freed at once.
+It logs only one line per call to the journal: upstream status, ms waited, ms in flight, and the in-flight and waiting counts (`journalctl --user -u fm-glm-queue`).
+
+Install or update with `glm-queue/install.sh [--dry-run] [--max N] [--port P]`: it copies the proxy to `${XDG_DATA_HOME:-~/.local/share}/fm-glm-queue/`, writes the `fm-glm-queue` systemd user service, and restarts it only when either file changed (a restart cuts calls in flight); it is idempotent and `--dry-run` writes nothing.
+pi uses the queue once `.providers.zai.baseUrl` in `~/.pi/agent/models.json` is `http://127.0.0.1:8787/api/coding/paas/v4`; new pi sessions pick it up, running ones keep the direct URL.
+Test: `glm-queue/tests/glm-queue.test.sh` runs the proxy against a stub upstream: 20 parallel clients through N=4 all complete unchanged while the upstream never sees more than 4 at once, a streamed response reaches the client before it ends, and a truncated Content-Length response fails the client in milliseconds with its slot freed for the next call.
