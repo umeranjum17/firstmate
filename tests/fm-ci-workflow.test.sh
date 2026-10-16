@@ -136,6 +136,43 @@ end
 group_of() { printf '%s\n' "$1" | cut -f1; }
 cancel_of() { printf '%s\n' "$1" | cut -f2; }
 
+# Print ci.yml's real changes-job classify step script: the decision text the
+# Actions runner executes, extracted through the YAML, not a copy of it.
+classify_step_script() {
+  ruby -ryaml -e '
+steps = YAML.load_file(ARGV[0]).fetch("jobs").fetch("changes").fetch("steps")
+index = steps.index { |s| s["id"] == "scope" }
+raise "changes job has no scope-classifying step" unless index
+puts steps[index].fetch("run")
+' "$CI_WORKFLOW"
+}
+
+# Run ci.yml's classify step inside a fixture repository with a pull_request
+# event and print the heavy value it writes to GITHUB_OUTPUT.
+run_classify_step() {  # <fixture-repo> <step-script>
+  local repo=$1 step=$2 out value
+  out="$repo/../classify-output"
+  rm -f "$out"
+  (cd "$repo" && EVENT_NAME=pull_request GITHUB_OUTPUT="$out" bash -c "$step") 1>&2 \
+    || { echo "classify step failed in $repo" >&2; return 1; }
+  value=$(sed -n 's/^heavy=//p' "$out")
+  [ -n "$value" ] || { echo "classify step wrote no heavy output" >&2; return 1; }
+  printf '%s\n' "$value"
+}
+
+# Build a fixture repository under the registered temp root with bin/ tracked
+# (the classify step calls bin/fm-test-run.sh) and one tracked payload file.
+build_classify_repo() {  # <repo> <payload-rel-path> <payload-content>
+  local repo=$1 path=$2 content=$3 dir
+  dir=$(dirname "$path")
+  mkdir -p "$repo/bin" "$repo/$dir"
+  cp "$ROOT/bin/fm-test-run.sh" "$repo/bin/"
+  printf '%s\n' "$content" >"$repo/$path"
+  git -C "$repo" -c init.defaultBranch=main init -q
+  git -C "$repo" add -A
+  git -C "$repo" -c user.email=ci@firstmate.test -c user.name=ci commit -qm base
+}
+
 test_pr_pushes_supersede_within_one_pr() {
   local first second
   first=$(resolve_concurrency pull_request 108 900001) || fail "could not resolve PR concurrency"
@@ -324,8 +361,50 @@ test_review_box_runner_selection_is_fork_safe() {
   pass "review-box runner selection stays fork-safe and falls back on one variable"
 }
 
+# The docs-only skip decides from an empty test selection, but a deleted
+# tests/ or bin/ path also selects nothing by design, so deleting coverage
+# must not ride that skip to a green required check. This executes ci.yml's
+# real classify step against fixture repositories and asserts the decision.
+test_changes_decision_runs_everything_for_deleted_tests() {
+  local step repo root heavy
+  step=$(classify_step_script) || fail "could not read the changes job's classify step"
+
+  # A pull request that only deletes a test file must run the heavy lanes.
+  root=$(fm_test_tmproot fm-ci-delete-test)
+  repo="$root/repo"
+  build_classify_repo "$repo" tests/fm-deleted-classify.test.sh 'exit 0'
+  git -C "$repo" rm -q tests/fm-deleted-classify.test.sh
+  git -C "$repo" -c user.email=ci@firstmate.test -c user.name=ci commit -qm "delete the test"
+  heavy=$(run_classify_step "$repo" "$step") || fail "classify step failed for a deleted test"
+  [ "$heavy" = true ] \
+    || fail "a deletion-only pull request must run the heavy lanes, got heavy=$heavy"
+
+  # Deleting a docs-only path keeps the skip: docs changes select nothing.
+  root=$(fm_test_tmproot fm-ci-delete-doc)
+  repo="$root/repo"
+  build_classify_repo "$repo" docs/notes.md notes
+  git -C "$repo" rm -q docs/notes.md
+  git -C "$repo" -c user.email=ci@firstmate.test -c user.name=ci commit -qm "delete the note"
+  heavy=$(run_classify_step "$repo" "$step") || fail "classify step failed for a deleted doc"
+  [ "$heavy" = false ] \
+    || fail "deleting a docs-only path must stay skippable, got heavy=$heavy"
+
+  # An ordinary docs-only pull request (edit, no deletion) keeps the skip.
+  root=$(fm_test_tmproot fm-ci-edit-doc)
+  repo="$root/repo"
+  build_classify_repo "$repo" docs/notes.md notes
+  printf '%s\n' edited >"$repo/docs/notes.md"
+  git -C "$repo" -c user.email=ci@firstmate.test -c user.name=ci commit -qam "edit the note"
+  heavy=$(run_classify_step "$repo" "$step") || fail "classify step failed for an edited doc"
+  [ "$heavy" = false ] \
+    || fail "an ordinary docs-only pull request must stay skippable, got heavy=$heavy"
+
+  pass "the changes job runs everything for deleted tests and keeps the docs-only skip"
+}
+
 test_ci_matrices_match_executable_partitions
 test_review_box_runner_selection_is_fork_safe
+test_changes_decision_runs_everything_for_deleted_tests
 test_pr_pushes_supersede_within_one_pr
 test_separate_prs_do_not_cancel_each_other
 test_main_pushes_are_never_cancelled

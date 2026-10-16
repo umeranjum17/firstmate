@@ -50,7 +50,11 @@ jobs:
   # bin/fm-test-run.sh's changed-file map (README, LICENSE, assets, and docs/
   # outside the mapped contract docs) skips lint and the behavior lanes. That
   # map is the single owner of which paths need no test; an unmapped path makes
-  # the selection fail, which runs everything. Pushes to main always run all.
+  # the selection fail, which runs everything. A deleted path outside that
+  # docs-only set (under tests/ or bin/, say) also runs everything: retired
+  # paths select nothing by design, so an empty selection cannot tell them
+  # from docs-only, and removing coverage is never docs-only. Pushes to main
+  # always run all.
   changes:
     name: Change scope
     runs-on: ${{ (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) && vars.FM_REVIEW_BOX == '1' && fromJSON('["self-hosted","review-box"]') || 'ubuntu-latest' }}
@@ -71,10 +75,26 @@ jobs:
           heavy=true
           # The pull_request checkout is the merge commit; its first parent is
           # the base tip, so HEAD^1..HEAD is exactly this pull request's change.
-          if [ "$EVENT_NAME" = pull_request ] \
-            && selected=$(bin/fm-test-run.sh --changed --base HEAD^1 --list) \
-            && [ -z "$selected" ]; then
-            heavy=false
+          if [ "$EVENT_NAME" = pull_request ]; then
+            # A deleted path outside the docs-only set selects nothing by
+            # design, so the empty-selection check below cannot tell it from
+            # docs-only; deleting tests or code must run everything.
+            deleted_heavy=false
+            while IFS= read -r path; do
+              [ -n "$path" ] || continue
+              case "$path" in
+                README.md|LICENSE|assets/*|docs/*|.gitignore) continue ;;
+              esac
+              if [ ! -e "$path" ]; then
+                deleted_heavy=true
+                break
+              fi
+            done < <(git diff --name-only --diff-filter=D HEAD^1 HEAD)
+            if [ "$deleted_heavy" = false ] \
+              && selected=$(bin/fm-test-run.sh --changed --base HEAD^1 --list) \
+              && [ -z "$selected" ]; then
+              heavy=false
+            fi
           fi
           echo "heavy=$heavy" >> "$GITHUB_OUTPUT"
           echo "heavy lanes: $heavy"
