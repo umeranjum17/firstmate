@@ -36,8 +36,8 @@ concurrency:
 #     set FM_REVIEW_BOX to 0 (or delete it) to send every job back to
 #     ubuntu-latest on the next run, with no code change and no revert, when the
 #     box is offline.
-# Only test-coverage and invariants move: they finish in seconds and stay
-# inside the box's 1500M runner cap. The lint partitions stay on ubuntu-latest
+# Only changes, test-coverage, invariants, and ci-result move: they finish in
+# seconds and stay inside the box's 1500M runner cap. The lint partitions stay on ubuntu-latest
 # because ShellCheck's dataflow analysis peaks above that cap - linting
 # bin/fm-promote.sh was OOM-killed at ~1.48GB - and the cap exists so the
 # review service keeps priority on the 4GB box; raising it would put that

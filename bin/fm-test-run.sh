@@ -1453,6 +1453,14 @@ families_for_changed_path() {
       # A single test file change selects only that script via basename family
       # resolution in the caller; emit a marker family of __script__
       printf '%s\n' "__script__:$(basename "$path")"
+      # The watch-triage split keeps every case in fm-watch-triage.test.sh;
+      # fm-watch-triage-2.test.sh only re-execs it with FM_WATCH_TRIAGE_PART=2,
+      # so a case change there must also select the second half.
+      case "$(basename "$path")" in
+        fm-watch-triage.test.sh)
+          printf '%s\n' __script__:fm-watch-triage-2.test.sh
+          ;;
+      esac
       ;;
     bin/fm-test-run.sh)
       # Deliberately the WHOLE family, not just the two contract tests. This
