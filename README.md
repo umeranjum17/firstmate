@@ -236,18 +236,18 @@ Test: `zai-quota-check/tests/zai-quota-check-e2e.sh` drives the real check in th
 
 `claude-quota/claude-quota.check.sh` is Main's `state/claude-quota.check.sh` (16 Oct) as a shippable add-on: it wakes Main when the shared Claude Max account burns ahead of time.
 The 5 h rule is unchanged: the 5 h window under 35% with more than 60 min to its reset wakes Main, and again on each 10% step while it holds.
-The week rule wakes once when the week drops under 40%, with the action: no new Opus build workers, leads move build work to the GLM/Go mix, and Main reports to the captain.
+The week rule wakes once when the week is at or below 40% of the week left, with the action: no new Opus build workers, leads move build work to the GLM/Go mix, and Main reports to the captain.
 That wake carries the week's burn rate over the last 1-5 h.
 The 17 Oct fix over the state copy: the burn rate alone no longer wakes.
-The captain's 16 Oct 15:00Z order lets Opus (effort medium) take build work while the week is at or above 40%, but the state copy woke Main with a "no new Opus workers" rate alarm on every 10% step of the 5 h window or the week (14 wakes on 16 Oct, none needing action).
+The captain's 16 Oct 15:00Z order lets Opus (effort medium) take build work while the week is above 40% left, but the state copy woke Main with a "no new Opus workers" rate alarm on every 10% step of the 5 h window or the week (14 wakes on 16 Oct, none needing action).
 It reads `quota-axi --json` at most once per 10 min.
 `$0 <quota-json-file>` is the test mode: it reads the file, and `CQ_MARK` and `CQ_HIST` name the repeat-state and history files (default fresh temp files).
 
 Install with `claude-quota/install.sh [--dry-run] <main-fm-home>`: it copies the check to `${XDG_DATA_HOME:-~/.local/share}/fm-claude-quota/`, backs up a replaced `state/claude-quota.check.sh` as `<file>.bak-claude-quota-<epoch>`, writes that path as an exec shim (mode 700), and re-registers the `claude-quota` check with `bin/fm-check-register.sh`; idempotent.
 The live repeat state stays at `/home/fixture/users/user-019/firstmate/state/.claude-quota.last`, the file the state copy used.
 
-Test: `claude-quota/tests/claude-quota.test.sh` replays 16 Oct's readings through the real check: the 14 week readings that woke Main, then readings from the check's history, with made-up 5 h readings and a week tail under 40%, since no log keeps those.
-It wakes only on the 5 h rule and the first reading under 40%.
+Test: `claude-quota/tests/claude-quota.test.sh` replays 16 Oct's readings through the real check: the 14 week readings that woke Main, then readings from the check's history, with made-up 5 h readings and a week tail at or under 40% left, since no log keeps those.
+It wakes only on the 5 h rule and the first reading at or below 40% of the week left: 41% left stays quiet, 40% left wakes once, and 39% left right after does not wake again.
 It then drives `install.sh` against a throwaway home, as `--dry-run` and as a real install and rerun.
 
 ## fleet-stall

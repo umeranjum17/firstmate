@@ -31,7 +31,7 @@ while read -r label fp mins wp; do
   out=$("$SRC/claude-quota.check.sh" "$d/q.json")
   [ -z "$out" ] || wakes="$wakes $label"
   [ "$label" != 5h-low ] || five_low=$out
-  [ "$label" != week-39 ] || week_out=$out
+  [ "$label" != week-40 ] || week_out=$out
 done <<'ROWS'
 w79 90 280 79
 w76 85 250 76
@@ -52,13 +52,14 @@ w58 91 270 58
 w52 100 299 52
 w45 80 240 45
 w41 70 200 41
+week-40 70 200 40
 week-39 60 180 39
 w37 50 150 37
 5h-low 30 90 33
 w29 90 280 29
 ROWS
-check "a: wakes only on the 5 h rule and the first reading under 40%" "$wakes" " 5h-34 5h-28 week-39 5h-low"
-has "a: the week wake names the action" "$week_out" "Week under 40%: no new Opus build workers; leads move build work to the GLM/Go mix"
+check "a: wakes only on the 5 h rule and the first reading at or under 40% left (41 quiet, 40 once, no second at 39)" "$wakes" " 5h-34 5h-28 week-40 5h-low"
+has "a: the week wake names the action" "$week_out" "At or under 40% left: no new Opus build workers; leads move build work to the GLM/Go mix"
 has "a: ... with the burn rate" "$week_out" "burning "
 has "a: Main reports to the captain" "$week_out" "Main reports this to the captain"
 check "a: the week wake is one line" "$(printf '%s\n' "$week_out" | wc -l)" 1
