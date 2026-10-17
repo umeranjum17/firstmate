@@ -139,6 +139,7 @@ _FM_PENDING_REPLY_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd 2>/dev/n
 # Parked-home reader (firstmate-addons/parked-homes). Optional source: a
 # checkout or test fake root without the lib never parks anything.
 fm_parked_meta() { return 1; }
+# shellcheck source=/dev/null
 [ ! -r "$_FM_PENDING_REPLY_LIB_DIR/fm-parked-homes-lib.sh" ] || . "$_FM_PENDING_REPLY_LIB_DIR/fm-parked-homes-lib.sh"
 
 FM_PENDING_REPLY_SCHEMA='fm-pending-reply.v1'

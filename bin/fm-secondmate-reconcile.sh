@@ -94,6 +94,7 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 # Parked-home guard (firstmate-addons/parked-homes): a parked home is never
 # reconciled. Optional source: absent lib = never parked (stock behavior).
 fm_parked_meta() { return 1; }
+# shellcheck source=/dev/null
 [ ! -r "$SCRIPT_DIR/fm-parked-homes-lib.sh" ] || . "$SCRIPT_DIR/fm-parked-homes-lib.sh"
 
 # One nudge per home per four hours.

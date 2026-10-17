@@ -546,6 +546,7 @@ fi
 # gets no message, steer, answer or nudge. Optional source: a checkout or test
 # fake root without the lib never parks anything (stock behavior).
 fm_parked_meta() { return 1; }
+# shellcheck source=/dev/null
 [ ! -r "$SCRIPT_DIR/fm-parked-homes-lib.sh" ] || . "$SCRIPT_DIR/fm-parked-homes-lib.sh"
 if [ -n "$TARGET_META" ] && fm_parked_meta "$TARGET_META" "$TARGET_TASK_ID"; then
   echo "error: nothing sent to ${TARGET_TASK_ID:+fm-$TARGET_TASK_ID}: its home is parked (config/parked-homes); a parked home gets no message, steer, answer or nudge" >&2

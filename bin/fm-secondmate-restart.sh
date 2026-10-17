@@ -129,6 +129,7 @@ done
 # gets no restart pass at all - no persist request, no relaunch, no nudge. One
 # line names each skip. Optional source: absent lib = never parked.
 fm_parked_meta() { return 1; }
+# shellcheck source=/dev/null
 [ ! -r "$SCRIPT_DIR/fm-parked-homes-lib.sh" ] || . "$SCRIPT_DIR/fm-parked-homes-lib.sh"
 LIVE_IDS=()
 for id in ${IDS[@]+"${IDS[@]}"}; do

@@ -22,6 +22,7 @@ _FM_MODEL_ERROR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Parked-home reader (firstmate-addons/parked-homes). Optional source: a
 # checkout or test fake root without the lib never parks anything.
 fm_parked_meta() { return 1; }
+# shellcheck source=/dev/null
 [ ! -r "$_FM_MODEL_ERROR_DIR/fm-parked-homes-lib.sh" ] || . "$_FM_MODEL_ERROR_DIR/fm-parked-homes-lib.sh"
 # The usage-limit banner pattern has one owner, bin/fm-composer-lib.sh; this
 # observer reads that variable so the outage alert cannot drift from the

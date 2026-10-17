@@ -254,6 +254,7 @@ WATCH_HOME_EXISTED=0
 # every parked-home guard in the watcher calls. Optional source: absent lib =
 # never parked (stock behavior).
 fm_parked_meta() { return 1; }
+# shellcheck source=/dev/null
 [ ! -r "$SCRIPT_DIR/fm-parked-homes-lib.sh" ] || . "$SCRIPT_DIR/fm-parked-homes-lib.sh"
 # shellcheck source=bin/fm-composer-lib.sh
 . "$SCRIPT_DIR/fm-composer-lib.sh"
