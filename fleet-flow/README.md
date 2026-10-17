@@ -1,30 +1,31 @@
 # fleet-flow
 
 The read-only fleet flow reader — the lifecycle, queue, bottleneck and capacity
-JSON reader the dashboard consumes as its `fm-flow.v1` observation — moved
-**verbatim** out of the Firstmate fork into this add-on repository. Nothing
-calls it from here yet: the fork's `bin/fm-flow.sh` stays the live reader the
-shipped dashboard runs, and the fork-side shim that will exec into this
-directory lands in a later PR. Until that swap the reader stays dormant, and
-every moved reader byte below is identical to the fork copy the live reader
-runs today.
+JSON reader the dashboard consumes as its `fm-flow.v1` observation — moved out
+of the Firstmate fork into this add-on repository. The fork's `bin/fm-flow.sh`
+is a thin shim that resolves this checkout (`FM_ADDONS_DIR`, default
+`$FM_HOME/projects/firstmate-addons`) and execs `fleet-flow/bin/fm-flow.sh`
+with `FM_BIN` pointing at the fork's `bin/`; the served dashboard reaches the
+reader only through that shim.
 
 ## Layout
 
 - `bin/fm-flow.sh` — the `--json` reader: FM_HOME plus recursively registered
   local homes in, one `fm-flow.v1` document out; no endpoint or cache writes.
-- `tests/fm-flow.test.sh` — the fork's integration test for that reader over
-  isolated durable records.
+- `tests/fm-flow.test.sh` — the integration test for that reader over isolated
+  durable records; run it with `FM_BIN` pointing at a Firstmate checkout's
+  `bin/` (it prints one PASS line for the reader and one for the fork's
+  model/skill statistics and outcome-recording readers).
 - `bin/fm-flow-check.sh` — the home flow check (below); live once installed.
 - `install.sh` — installs the flow check.
 - `tests/fm-flow-check.test.sh` — the flow check's integration test.
 
 The reader sources `fm-classify-lib.sh`, `fm-tasks-axi-lib.sh` and
-`fm-backlog-transition-lib.sh` from its own directory and runs the
-home-addressed `fm-tasks-axi.sh` backlog consumer beside it; those fork files
-did not move, so the moved copy only runs with them next to it (see the proof
-below). The same is true of the moved test, which also drives the fork's
-model/skill statistics and outcome-recording readers.
+`fm-backlog-transition-lib.sh` from `${FM_BIN:-its own directory}` and runs
+the home-addressed `fm-tasks-axi.sh` backlog consumer from the same directory;
+those fork files did not move, so a Firstmate checkout copy needs nothing and
+this copy runs only with `FM_BIN` naming such a `bin/` (the fork shim always
+sets it).
 
 ## Home flow check: lane slots and dry
 
@@ -81,56 +82,24 @@ census reads the gate policy from the installed gate
 `${XDG_DATA_HOME:-~/.local/share}/fm-host-memory/fm-mem-gate.sh` when it
 exists (Main's `config/fm-mem-gate.sh` is then a one-line shim to it), else
 from `config/fm-mem-gate.sh` as before, and `gate_source` names the file it
-read. Both moved files now differ from the fork at that census only.
+read.
 
-## Side-by-side proof (re-run before the served path swaps)
+Contract change at the shim swap: the reader takes `FM_BIN` for the fork
+helper libraries and the fork copy became the shim, so this repository now
+holds the only reader.
 
-The acceptance proof runs the fork copy and this copy on the same synthesized
-fixture homes with the same fixed `--now` and diffs the JSON byte for byte.
-It also runs the moved test against the moved copy with the fork libraries
-overlaid beside it.
+## Proofs
 
-One command (harness lives with this task's evidence):
+At move time the fork copy and this copy were run side by side on synthesized
+fixture homes with a frozen clock and redirected `/proc`, `/tmp` and PATH
+stubs, and their `fm-flow.v1` JSON diffed byte for byte; the harness lived
+with that task's evidence and ended `ALL CHECKS PASSED`.
 
-```sh
-bash /home/fixture/users/user-019/.treehouse/fixture-home/4/firstmate/data/addons-fleet-flow/parity/run-parity.sh
-```
-
-It must end with `ALL CHECKS PASSED`, with every `diff-*.txt` empty. Manual
-recipe if the harness is gone:
-
-1. Copy `bin/fm-flow.sh` and `tests/fm-flow.test.sh` from the fork at the
-   commit above and `fleet-flow/` from this repo into two scratch dirs;
-   verify sha256 of every moved file matches across both.
-2. Overlay the rest of the fork's `bin/` (the reader's libraries and backlog
-   consumer) next to both copies, never editing a moved file; the moved test
-   needs the whole bin tree beside it.
-3. Synthesize fixture homes: several lanes in different states (a live lane
-   with keyed waits including a captain hold, a paused lane, an unstamped
-   lane, reused task ids, a live-relaunched lane), a ledger with lifecycle
-   rows plus one malformed row, queued/held/blocked backlog rows including an
-   archived dependency, one home with no `config/fm-flow-check.sh`, one empty
-   home, one with an unavailable alternate backlog backend, and one with a
-   recorded PR head for `--checks`.
-4. Pin `TZ=UTC LC_ALL=C` and freeze the clock, redirect `/proc` and `/tmp` to
-   fixtures through a `PYTHONPATH` sitecustomize, and put PATH stubs for
-   `gh-axi`, `systemctl` and `du` ahead of the real tools, so the two runs
-   see one identical instant and one identical host census.
-5. Run both copies with the same `--now` on each fixture — plain, `--checks`,
-   `--capacity`, and both together — and diff stdout byte for byte. Assert
-   the home is untouched across each run with a sha256 manifest taken before
-   and after. Check the CLI contract (no flags, a bad flag, a missing or
-   non-numeric `--now` value: usage line and exit 2) on both copies.
-6. Run `tests/fm-flow.test.sh` against the moved copy with the fork bin tree
-   beside it; it must print both of its PASS lines.
-
-## For the fork shim lane
-
-The shipped dashboard reads the flow observation by running the fork's
-`bin/fm-flow.sh` with `FM_HOME` set to the reading home; the later shim must
-keep that exact path and argv (it will exec `fleet-flow/bin/fm-flow.sh`).
-Re-run the side-by-side proof above immediately before the served path swaps,
-and keep this README's proof sections honest when the harness moves.
+At the shim swap the moved integration test ran against this checkout with
+`FM_BIN` naming a Firstmate `bin/` and printed both PASS lines, and the fork
+shim was proven live: `FM_HOME=<Main home> bin/fm-flow.sh --json --capacity`
+through the shim reported the real installed memory/emulator/Gradle limits,
+not unknown.
 
 CI note: `.github/workflows/addons-ci.yml` ShellChecks and syntax-checks the
 shell scripts in an add-on's top level and its `bin/` and `tests/`
