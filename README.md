@@ -1,10 +1,129 @@
 # firstmate-addons
 
-Fleet dashboard and add-ons for running a fleet of coding agents.
+Add-ons for running a fleet of coding agents on one machine: small, independent fixes for the gaps a busy fleet hits — runaway deletes, burned provider quota, stalled tasks, merges nobody watches. Every add-on installs and removes on its own; take only the ones you need.
 
-Every change still on the fork that is not on Kun's main, with its exit path and status, is tracked in [FORK-EXIT.md](FORK-EXIT.md).
+Who needs this: anyone running that fleet on their own machine who wants it to keep moving when a provider slows down, a task wedges, or an agent tries something destructive.
 
-## delete-guard
+## The add-ons
+
+One line per add-on, with how it wires in. `<home>` is your home folder for the fleet manager — the one with `bin/` and `state/` in it.
+
+- `alerts` — groups tasks stopped by a provider outage into one alert per scan. Dormant copy: the fork still runs its own.
+- `ask-default` — an unanswered ask falls back to its pre-declared safe default instead of blocking the home. Needs a fork hook (FORK-EXIT.md).
+- `claude-model-guard` — keeps agent runs off Sonnet and Fable: aliases resolve to Haiku, full model ids are refused. Wire in: `claude-model-guard/install.sh`.
+- `claude-quota` — alarms when the shared Claude plan burns ahead of its 5-hour or weekly window. Wire in: `claude-quota/install.sh <home>`.
+- `delete-guard` — stops any agent from recursively deleting `/` or a home folder; a block alerts you and is final. Wire in: `delete-guard/install.sh <home>`.
+- `fleet-dashboard` — the read-only fleet dashboard: board, charts, kanban, insights, ship view. Served through the fork shim (FORK-EXIT.md).
+- `fleet-flow` — reads fleet lifecycle, queue and bottleneck JSON; installs the home flow check for task slots. Wire in: `fleet-flow/install.sh`.
+- `fleet-stall` — alerts you when a team lead idles with ready work, or workers sit stuck waiting on their team lead. Wire in: `FM_HOME=<home> fleet-stall/install.sh`.
+- `fleet-stats` — per-model and per-skill fleet statistics plus the task outcome recorder. Dormant copy: the fork still runs its own.
+- `git-identity` — task commits always carry the configured git identity; pushes of foreign-author commits are refused. Wire in: `git-identity/install.sh <home>`, plus a fork hook.
+- `glm-queue` — one local line in front of the GLM API, so parallel calls queue instead of hitting rate limits. Wire in: `glm-queue/install.sh`, then point pi at the queue.
+- `host-memory` — a gate that makes heavy jobs wait for host memory instead of crashing. Wire in: `host-memory/install.sh`.
+- `local-qwen-tuning` — operator reference for the local Qwen model server: launch, tuning, limits, rollback. Reference only, nothing to install.
+- `merge-card` — runs the merge gate and posts one evidence card per merge to the sign-off board. Wire in: config shims, see Install.
+- `merge-on-green` — merges a PR you allowed to auto-merge once its checks are green and its proof receipt passes. Wire in: `merge-on-green/install.sh <home>`.
+- `nm-drain` — updates the shared pipeline service through a planned drain, never over live runs. Wire in: `nm-drain/install.sh <home>`.
+- `parked-homes` — a paused team home gets no messages, nudges, relaunches or config pushes. Needs fork hooks (FORK-EXIT.md).
+- `pipeline-literal-delete` — gives pipeline agents the safe recursive-delete rule in their own instructions. Wire in: `pipeline-literal-delete/install.sh`.
+- `pipeline-quota-failover` — moves pipeline model calls to the next model in the chain on a quota error. Wire in: `pipeline-quota-failover/install.sh`.
+- `quota-failover` — relaunches stalled workers onto a live route and rests dead routes until they answer again. Wire in: a watcher check you add, see Install.
+- `receipts` — publishes one PASS or FAIL completion receipt per task for guarded landing checks. Dormant copy: the fork still runs its own.
+- `route-change` — one command moves worker dispatch, the pipeline gate and team-lead pins to one route together. Wire in: `route-change/install.sh`.
+- `sentinel` — re-arms supervision after an agent-runtime restart killed every agent and watcher. Dormant copy: the fork still runs its own.
+- `signoff` — turns sign-off board answers into hold answers and merge-gate events. Dormant copy: the fork still runs its own.
+- `supervisor-guard` — stops a supervisor session from doing a worker's job, via a pre-tool check. Dormant copy: the fork still runs its own.
+- `tailscale-resilience` — heals a Tailscale connection that died while its daemon still runs; alerts on a dead display. Wire in: a systemd timer you add, see Install.
+- `wait-timers` — owner-alert and escalation timers for tasks that declared a wait. Dormant copy: the fork still runs its own.
+- `zai-quota-check` — alarms when the GLM plan burns ahead of its window, naming the route moves that protect the pipeline. Wire in: `FM_HOME=<home> zai-quota-check/install.sh`.
+
+Every change still on the fork that is not upstream yet, with its exit path and status, is tracked in [FORK-EXIT.md](FORK-EXIT.md). Add-ons marked "dormant copy" or "fork hook" do not wire into an unmodified install of the host tool yet; FORK-EXIT.md lists the fork changes each one waits for.
+
+## Install
+
+There is no install-all script yet. The shortest real install for the add-ons that work on an unmodified install of the host tool is this loop, run from a clone of this repo (any installer accepts `--dry-run` first to print what it would change and write nothing):
+
+```sh
+git clone https://github.com/umeranjum17/firstmate-addons && cd firstmate-addons
+export FM_HOME=~/firstmate    # your home folder for the fleet manager
+for d in pipeline-literal-delete pipeline-quota-failover host-memory fleet-flow glm-queue route-change claude-model-guard; do "$d/install.sh"; done
+for d in delete-guard claude-quota merge-on-green git-identity nm-drain; do "$d/install.sh" "$FM_HOME"; done
+FM_HOME="$FM_HOME" fleet-stall/install.sh
+FM_HOME="$FM_HOME" zai-quota-check/install.sh
+```
+
+`route-change` must come after `pipeline-quota-failover` from the same clone (the loop's order). To route GLM calls through the queue, set `.providers.zai.baseUrl` to `http://127.0.0.1:8787/api/coding/paas/v4` in `~/.pi/agent/models.json`; new pi sessions pick it up. `git-identity` prints a note until the fork's launch-env hook is merged — until then lanes stay unguarded.
+
+Three add-ons wire in by hand:
+
+```sh
+# quota-failover, as a watcher check in your home:
+printf '%s\n' "<this-clone>/quota-failover/check.sh \$FM_HOME" > "$FM_HOME/state/quota-failover-watch.check.sh" \
+  && chmod 700 "$FM_HOME/state/quota-failover-watch.check.sh" && "$FM_HOME/bin/fm-check-register.sh" quota-failover-watch
+
+# merge-card, one shim per home (needs done-done on PATH; see its Details section):
+printf '#!/bin/sh\nexec <this-clone>/merge-card/merge-card gate "$@"\n' > "$FM_HOME/config/merge-gate"
+printf '#!/bin/sh\nexec <this-clone>/merge-card/merge-card post --board <board.json> "$@"\n' > "$FM_HOME/config/post-merge"
+chmod +x "$FM_HOME/config/merge-gate" "$FM_HOME/config/post-merge"
+```
+
+`tailscale-resilience` installs as a systemd user timer; copy the unit from its Details section. The dormant and fork-hook add-ons install nothing.
+
+## Check
+
+One command per add-on, from the repo root — all of these were run and pass:
+
+```sh
+bash claude-quota/tests/claude-quota.test.sh
+bash claude-quota/install.sh --dry-run <home>            # what it would write; same shape as every --dry-run below
+bash delete-guard/install.sh --dry-run <home>
+bash claude-model-guard/install.sh --dry-run
+bash zai-quota-check/tests/zai-quota-check-e2e.sh
+bash pipeline-quota-failover/tests/pi-quota-failover-e2e.sh
+bash pipeline-literal-delete/tests/pipeline-literal-delete.test.sh
+bash quota-failover/tests/quota-failover-e2e.sh
+bash glm-queue/tests/glm-queue.test.sh
+bash route-change/tests/route-change-e2e.sh
+bash merge-on-green/tests/merge-on-green.test.sh
+bash merge-card/tests/merge-card-e2e.sh
+bash nm-drain/tests/nm-drain.test.sh
+bash fleet-stall/tests/fleet-stall-e2e.sh
+bash fleet-flow/tests/fm-flow-check.test.sh
+bash host-memory/tests/fm-mem-gate.test.sh
+bash git-identity/tests/git-identity.test.sh
+parked-homes/install.sh <home>                           # verify-only; prints MISSING until the fork hooks merge
+tailscale-resilience/tailscale-resilience check --state-dir /tmp/tsr-check
+```
+
+The dormant and fork-hook add-ons are not wired into an unmodified install of the host tool, so there is nothing to check for them here.
+
+## Remove
+
+```sh
+claude-model-guard/install.sh --restore                  # removes exactly its keys and hook entries
+pipeline-quota-failover/install.sh --restore             # removes the wrapper and its config key
+"$FM_HOME/bin/fm-check-unregister.sh" quota-failover-watch
+"$FM_HOME/bin/fm-check-unregister.sh" claude-quota       # then rm "$FM_HOME/state/claude-quota.check.sh" ~/.local/share/fm-claude-quota -r
+"$FM_HOME/bin/fm-check-unregister.sh" merge-on-green     # then rm "$FM_HOME/state/merge-on-green.check.sh" ~/.local/share/fm-merge-on-green -r
+"$FM_HOME/bin/fm-check-unregister.sh" 0-nm-drain         # then rm "$FM_HOME/state/0-nm-drain.check.sh" ~/.local/share/fm-nm-drain -r
+"$FM_HOME/bin/fm-check-unregister.sh" fleet-stall        # then rm "$FM_HOME/state/fleet-stall.check.sh" ~/.local/share/fm-fleet-stall -r
+"$FM_HOME/bin/fm-check-unregister.sh" zai-quota          # then rm "$FM_HOME/state/zai-quota.check.sh"
+rm "$FM_HOME/config/merge-gate" "$FM_HOME/config/post-merge"                    # merge-card
+rm "$FM_HOME/config/parked-homes"                        # parked-homes: a missing file parks nothing
+systemctl --user disable --now fm-glm-queue && rm -r ~/.local/share/fm-glm-queue ~/.config/systemd/user/fm-glm-queue.service   # glm-queue
+rm -r ~/.local/share/fm-route-change ~/.local/bin/route-change                  # route-change
+rm -r ~/.local/share/fm-host-memory ~/.local/share/fm-fleet-flow                # host-memory, fleet-flow
+rm -r ~/.local/share/fm-git-identity                     # git-identity: also restore the backed-up "$FM_HOME/config/launch-env-hook"
+"$FM_HOME/bin/fm-check-unregister.sh" delete-guard      # delete-guard: then rm -r ~/.local/share/fm-delete-guard and drop its hook entries (its .bak files show what it added)
+rm ~/.pi/agent/extensions/fm-literal-delete.ts           # pipeline-literal-delete: also drop its Claude SessionStart hook entry
+systemctl disable --now tailscale-resilience.timer       # tailscale-resilience: then remove its unit files
+```
+
+The dormant and fork-hook add-ons install nothing from this repo — removing them means removing the fork-side hook ([FORK-EXIT.md](FORK-EXIT.md)).
+
+## Details
+
+### delete-guard
 
 No agent can recursively delete `/`, `/home`, a home folder or a folder directly in it, or a bare `.` `..` `*` or `$VAR` target, and an attempt on a real folder wakes the main firstmate.
 `delete-guard/guard.mjs` holds the one rule, and each runtime adapter hands it the shell command before it runs.
@@ -14,19 +133,19 @@ Each block appends one JSON line (time, home, task, cwd, runtime, target, comman
 The block message names the literal-path fix: delete the folder in a later command by its literal path (`rm -rf -- /tmp/tmp.Ab12`), delete a variable only when the same command sets it under the agent's own name, never a shell or runtime variable (`d=$(mktemp -d); ...; rm -rf -- "$d"`), and treat the block as final.
 The `delete-guard` watcher check turns new lines into one wake on the watcher's check cadence (5 minutes by default), but only for a block whose target is a literal path, or a variable the same command set to one (`$HOME` with no assignment is the home folder), outside temp and scratch folders (`/tmp`, `/var/tmp`, `/dev/shm`, `.cache/fm-scratch`).
 Every other block is counted, not woken: a `$VAR` with no literal value, a bare `.` `..` `*`, a temp or scratch target, a block from an agent working in a temp or scratch folder (a lab or probe), and a repeat the guard already woke on.
-The blocks themselves are unchanged; an agent that needs a blocked delete reports blocked to its lead, and the lead asks Main.
+The blocks themselves are unchanged; an agent that needs a blocked delete reports blocked to its lead, and the lead escalates.
 The check keeps the counts per UTC day as `<day><TAB><count>` lines in `<main-fm-home>/state/delete-guard.counted`; a daily fleet summary reads yesterday's with `awk -F'\t' -v d="$(date -u -d yesterday +%F)" '$1 == d { print $2 }' <main-fm-home>/state/delete-guard.counted`.
 A second block by the same task (or, with no task, the same cwd) within 10 minutes queues an immediate `delete guard REPEAT` wake.
 A heredoc body fed to a shell (`bash <<EOF`, `cat <<EOF | sh`) is checked as commands, and one fed to anything else (`python3`, `cat > file`) is data.
 Only the command string is checked, so a delete inside a script file the agent runs is not seen.
-Covered: Claude Code (workers, leads, Main and the no-mistakes Claude agent) by a `PreToolUse` Bash hook in `~/.claude/settings.json`, pi by `~/.pi/agent/extensions/fm-rm-guard.ts` (replacing the 16 Oct stopgap), and OpenCode by `~/.config/opencode/plugins/fm-delete-guard.js`.
+Covered: Claude Code (workers, leads and the pipeline's Claude agent) by a `PreToolUse` Bash hook in `~/.claude/settings.json`, pi by `~/.pi/agent/extensions/fm-rm-guard.ts`, and OpenCode by `~/.config/opencode/plugins/fm-delete-guard.js`.
 Not covered: Codex, because Firstmate launches its crewmates and scouts with `--disable hooks` and a new `~/.codex/hooks.json` entry puts a hook-trust prompt in front of every Codex launch, and cursor-agent, grok, omp, kimi and gemini, which the fleet does not dispatch.
 
 Install or update with `delete-guard/install.sh [--dry-run] <main-fm-home>`; it is idempotent, and `--dry-run` prints the changes and writes nothing.
 It backs up each file it changes as `<file>.bak-delete-guard-<epoch>`, copies the rule to `${XDG_DATA_HOME:-~/.local/share}/fm-delete-guard/`, writes the adapters, merges the Claude hook without dropping other settings, and registers the check in `<main-fm-home>`.
-Test: `delete-guard/tests/delete-guard.test.sh <firstmate-checkout> [ref]` installs into a throwaway HOME against a home built from that checkout's `bin/`, then drives the installed hook through every rule case and the log, check and repeat-wake journey, then replays the 16 Oct log (`delete-guard/tests/fixtures/`) one check sweep per row and asserts the only wake is the 14:22 `/home/fixture/users/user-019/mt-test` block.
+Test: `delete-guard/tests/delete-guard.test.sh <firstmate-checkout> [ref]` installs into a throwaway HOME against a home built from that checkout's `bin/`, then drives the installed hook through every rule case and the log, check and repeat-wake journey, then replays the retained log (`delete-guard/tests/fixtures/`) one check sweep per row and asserts the only wake is the recorded real-folder block.
 
-## pipeline-literal-delete
+### pipeline-literal-delete
 
 Pipeline agents (the no-mistakes review, test, document and lint steps on pi and Claude) never read the worker brief, and the gate neutralizes repository AGENTS.md/CLAUDE.md, so they kept deleting a `$VAR` set in an earlier command and losing the step to a delete-guard block.
 This add-on gives every pipeline agent the literal-path delete rule before it deletes, delivered once at the one place every agent in every home already reads: the runtime's own user-level instruction surface.
@@ -42,7 +161,7 @@ It backs up each file it changes as `<file>.bak-pipeline-literal-delete-<epoch>`
 It touches no `~/.no-mistakes/config.yaml` and no project `.no-mistakes.yaml`.
 Test: `pipeline-literal-delete/tests/pipeline-literal-delete.test.sh` installs into a throwaway HOME/XDG copy, drives the installed pi handler and the installed hook command, and checks the idempotent rerun and the delete-guard block message's literal-path hint.
 
-## merge-card
+### merge-card
 
 Every merge runs done-done and, only with passed proof, posts one evidence card to a sign-off board, with nobody posting by hand.
 
@@ -75,7 +194,7 @@ chmod +x $FM_HOME/config/merge-gate $FM_HOME/config/post-merge
 
 Test: `merge-card/tests/merge-card-e2e.sh` drives the real script end to end against a task folder holding a retained PNG, with a stub `done-done` placed earlier on `PATH` (one accepting `--citation-base`, one rejecting it, and one that lies about supporting it), and asserts the recorded verdict, the invocation the stub saw, and that the card's media resolves in each case.
 
-## quota-failover
+### quota-failover
 
 Workers and leads stopped by a provider usage limit or a provider 429/5xx move to the next live route on their own, and the dead route stays out of new dispatch until it answers again.
 
@@ -100,14 +219,14 @@ A stopped task on a pool account (`account=` in its meta and a usable `config/ac
 - While `$FM_HOME/config/account-pool-autorelaunch` exists (content ignored) and the task's tool may change accounts automatically, it first runs `bin/fm-control.sh <task> relaunch --account next` (which rests the account) with a note naming the old account and why; only when that fails, for example with no next account ready, does the route move above run.
 - Otherwise the account only rests, through the pool's own rest, and one line naming the task, the account and the manual `bin/fm-control.sh <task> relaunch --account ...` command goes to the log and to `state/quota-failover.wake`, which the watcher check prints as a wake. The rest and the wake happen once per stop.
 
-The tools that may change accounts automatically are fixed in code, not config: Claude Code, Cursor and Pi subscription logins. OpenCode Go never does (its terms ban several accounts used to get around limits; the captain switches by hand). Codex and Pi on an OpenAI login (`openai-codex/`, `codex-native/`) stay rest + wake: OpenAI's consumer terms (effective 1 Jan 2026) bar using the service to "circumvent any rate limits or restrictions".
+The tools that may change accounts automatically are fixed in code, not config: Claude Code, Cursor and Pi subscription logins. OpenCode's Go tier never does (its terms ban several accounts used to get around limits; switch it by hand). Codex and Pi on an OpenAI login (`openai-codex/`, `codex-native/`) stay rest + wake: OpenAI's consumer terms (effective 1 Jan 2026) bar using the service to "circumvent any rate limits or restrictions".
 Every decision is one line in `state/quota-failover.log`.
 A worker left with no live route also gets one failed line on the home's parent channel; nothing else is sent there.
 
 It needs `quota-axi`, `jq`, `flock` and the harness command of each dispatch route on `PATH`.
 `QUOTA_FAILOVER_MAX_AGE` (default `10m`) is the oldest quota reading it trusts.
 
-Test: `quota-failover/tests/quota-failover-e2e.sh` drives the real script end to end against a fixture home (stub firstmate libs in its `bin/`, stub `quota-axi` and `opencode` on `PATH`): a lead on a route that answers every one-line test with the 15 Oct 429, and a screen-stopped worker on a second dead route ranked first in the dispatch rules. It asserts both move to the live candidate, the dead routes are passed over and dropped from `crew-dispatch.json`, and a second pass with the routes answering again restores them and moves nothing. Five more passes add pool workers: with the switch file present a Claude worker moves to the next account with no route move, a Claude worker with no next account takes the route move, and OpenCode Go and Codex workers only rest and wake; with the file gone a Claude worker only rests and wakes, once across two passes and again when the same account stops a new incarnation, and a pool rest that fails still wakes the home, once; a pool worker wedged with a clean screen loses its route to the pinned probe's verdict, and the stop's changed label re-fires nothing.
+Test: `quota-failover/tests/quota-failover-e2e.sh` drives the real script end to end against a fixture home (stub firstmate libs in its `bin/`, stub `quota-axi` and `opencode` on `PATH`): a lead on a route that answers every one-line test with a provider 429, and a screen-stopped worker on a second dead route ranked first in the dispatch rules. It asserts both move to the live candidate, the dead routes are passed over and dropped from `crew-dispatch.json`, and a second pass with the routes answering again restores them and moves nothing. Five more passes add pool workers: with the switch file present a Claude worker moves to the next account with no route move, a Claude worker with no next account takes the route move, and OpenCode's Go-tier and Codex workers only rest and wake; with the file gone a Claude worker only rests and wakes, once across two passes and again when the same account stops a new incarnation, and a pool rest that fails still wakes the home, once; a pool worker wedged with a clean screen loses its route to the pinned probe's verdict, and the stop's changed label re-fires nothing.
 
 Install into one home as a watcher check, so it runs on the watcher's own cadence; `check.sh` prints any pending wake line and starts the pass detached (an install with the older `setsid -f .../quota-failover` line keeps working but never wakes, so re-run this):
 
@@ -117,7 +236,7 @@ printf '<addons>/quota-failover/check.sh %s\n' "$FM_HOME" > $FM_HOME/state/quota
 
 Remove it with `$FM_HOME/bin/fm-check-unregister.sh quota-failover-watch`.
 
-## pipeline-quota-failover
+### pipeline-quota-failover
 
 The no-mistakes pipeline agent moves to the next allowed model the moment a provider answers a quota error, instead of retrying the same model 4 times and failing the run (speed-report row Q1: about 1,650 pipeline minutes a day).
 
@@ -129,7 +248,7 @@ Neither installed v1.79 nor current v1.84 can express this in config: `agent:` f
 Install or remove with `pipeline-quota-failover/install.sh [--dry-run] [--restore]`; it copies the wrapper to `~/.local/share/fm-pipeline-quota-failover/`, makes one key-level edit to `~/.no-mistakes/config.yaml` (timestamped backup next to it, key name only in output, no config contents printed), and is idempotent.
 Test: `pipeline-quota-failover/tests/pi-quota-failover-e2e.sh` drives the real wrapper against a stub pi in a throwaway HOME with the exact argv shape no-mistakes builds (quota-dead GLM route using the fleet's real 429 usage-limit surface, healthy muse route): one attempt per model, the winning stream on stdout, timed log lines, non-quota and pinned-model passthrough, session drop on failover, chain exhaustion exiting 1 with the terminal line, and the install edit's add, idempotence, restore and backup.
 
-## route-change
+### route-change
 
 One command moves worker dispatch, the no-mistakes gate and the lead pins to one route together, so no route is edited by hand.
 
@@ -151,7 +270,7 @@ Secondmate homes get the new `crew-dispatch.json` through firstmate's config inh
 Install with `route-change/install.sh [--dry-run]` after `pipeline-quota-failover/install.sh` from the same checkout (the route list needs the wrapper's `PI_QUOTA_FAILOVER_PRINT_CHAIN`).
 Test: `route-change/tests/route-change-e2e.sh` runs the real script and the real wrapper against a fixture home and config with stub quota-axi and pi: an exhausted route is refused with nothing written, a good route moves every pin and keeps backups, and a failed real request restores every file.
 
-## ask-default
+### ask-default
 
 An unanswered ask gets a safe, pre-declared default instead of blocking the home, and work continues.
 
@@ -160,9 +279,9 @@ An unanswered ask gets a safe, pre-declared default instead of blocking the home
 - `ask-default open <ask-id> --wait-until <YYYY-MM-DDTHH:MM:SSZ> | --wait <seconds> --default-cmd <command> --safety <class> --reason <one line>` records one ask in `$FM_HOME/data/ask-default/asks/<ask-id>`: its wait clock, the pre-declared default action, that action's safety class, and the reason.
   A class of `safe` means the default action is reversible and touches no destructive, irreversible, money, credential, or merge action, and it must name the command that performs it; any other class (`destructive`, `irreversible`, `money`, `credential`, `merge`) or `none` declares that no safe default exists and the ask must stay held.
   Re-opening refreshes the wait clock; a defaulted ask is settled and never re-opens under the same id.
-- `ask-default decide <ask-id> [--probe-cmd <command>] [--timeout <seconds>]` probes the captain once under a hard timeout and decides what the home does about the ask.
+- `ask-default decide <ask-id> [--probe-cmd <command>] [--timeout <seconds>]` probes the operator once under a hard timeout and decides what the home does about the ask.
   The probe command exits 0 for reachable; anything else, including the timeout, resolves to unreachable inside the bound, so a hanging endpoint never wedges the caller.
-  Its command comes from `--probe-cmd` or `$ASK_DEFAULT_PROBE` and its timeout from `--timeout`, `$ASK_DEFAULT_TIMEOUT`, or 5 seconds; with no probe configured it refuses rather than assume the captain is unreachable.
+  Its command comes from `--probe-cmd` or `$ASK_DEFAULT_PROBE` and its timeout from `--timeout`, `$ASK_DEFAULT_TIMEOUT`, or 5 seconds; with no probe configured it refuses rather than assume the operator is unreachable.
   Exit codes: `0` defaulted (or already-defaulted), so the caller may continue unrelated work, `10` held (the clock expired but no safe default exists), `11` waiting (the clock has not expired), `12` reachable (the ask stays open for the real answer), `1` error on stderr.
   A defaulted ask runs its default action exactly once, under a per-ask lock, and appends `{ask, applied_at, default_cmd, reason, rc}` to the append-only `$FM_HOME/data/ask-default/applied.log`.
 - `ask-default probe <command> [--timeout <seconds>]` runs one bounded reachability probe on its own: exit 0 reachable, 1 unreachable.
@@ -172,7 +291,7 @@ An unanswered ask gets a safe, pre-declared default instead of blocking the home
 
 The add-on decides; it does not wire itself in. A home discovers open asks and calls `decide` per ask from its own supervision loop, which is a thin hook in the firstmate fork, not in this repo.
 
-## tailscale-resilience
+### tailscale-resilience
 
 One host watchdog for the two failures that quietly take a lane offline: the Tailscale network going unreachable while `tailscaled` still runs, and a display/session dying while logind still lists it.
 
@@ -207,15 +326,15 @@ The state defaults to `${XDG_STATE_HOME:-$HOME/.local/state}/tailscale-resilienc
 
 The dead-display case is detected, recorded and alerted but not healed; a heal for it is a later slice.
 
-## claude-model-guard
+### claude-model-guard
 
-Claude Code on this host never starts Sonnet or Fable (Main3410: a live lab ran `--model sonnet`).
+Claude Code never starts Sonnet or Fable (a live lab once ran `--model sonnet`).
 `claude-model-guard/install.sh [--dry-run] [--restore] [--config-dir <dir>]` edits `<dir>/settings.json` (default `${CLAUDE_CONFIG_DIR:-~/.claude}`) at key level, with a timestamped backup, so every Sonnet or Fable form ends on Haiku or is refused, never on another model: `env.ANTHROPIC_DEFAULT_SONNET_MODEL` and `env.ANTHROPIC_DEFAULT_FABLE_MODEL` = `claude-haiku-5-5`, so the `sonnet`, `opusplan` and `fable` aliases (a `--model sonnet` launch, an agent's `model: sonnet`) run on Haiku; and a `UserPromptSubmit` hook plus a `PreToolUse` hook for `Agent|Task` running `refuse-model.sh` (copied to `${XDG_DATA_HOME:-~/.local/share}/fm-claude-model-guard`), which refuses the prompt or the subagent call before any request is sent when a full id such as `claude-sonnet-5-5` or `claude-fable-5-1` comes from `--model`, `ANTHROPIC_MODEL`, a settings `model` key or an Agent call. It prints only its own keys and never reads or touches credentials; `--restore` removes exactly its keys and hook entries.
 Claude Code itself cannot refuse a full id from user settings: `availableModels` and the managed-only `deniedModels` both fall back to the default model (Opus), and `modelOverrides` does not remap first-party ids. Not covered: a launch with `--setting-sources` that leaves out `user` (the `fm-live-lab.sh` primary uses `project,local`) loads no user settings, so neither the mapping nor the hook applies there; a session with its own `CLAUDE_CONFIG_DIR` needs the installer run with `--config-dir` for that dir. The hook fails open if it cannot run.
 
 Test: `claude-model-guard/tests/claude-model-guard-e2e.sh` installs into a throwaway HOME with no credential and drives the real `claude` binary: each `--model` (the sonnet, fable and opusplan aliases, full Sonnet and Fable ids, `--model=`, `ANTHROPIC_MODEL`, a settings `model`, opus, haiku, none) is checked against the model Claude Code dispatches to, or the hook refusal, in its debug log, so no API call is made and a banned model can never run; the Agent-call check feeds the hook a tool input; plus key-only output, other settings kept, idempotence, backup and restore.
 
-## merge-on-green
+### merge-on-green
 
 A yolo task's PR merges itself once the required checks are green, instead of waiting for the lead to notice and merge (about 21 minutes per change).
 
@@ -224,43 +343,43 @@ A yolo task's PR merges itself once the required checks are green, instead of wa
 Install with `merge-on-green/install.sh [--dry-run] <fm-home>`; it copies the script to `${XDG_DATA_HOME:-~/.local/share}/fm-merge-on-green/`, writes the `state/merge-on-green.check.sh` shim, and registers the check with `bin/fm-check-register.sh`; it is idempotent and `--dry-run` writes nothing.
 Test: `merge-on-green/tests/merge-on-green.test.sh` drives the check end to end against a fixture home with stub `fm-crew-state.sh` and `fm-pr-merge.sh` in the home's `bin/` and a stub `fm-checks-lint.sh`, covering the `merge=manual` and "not proven" skips, the merged status line, the skip and refusal cases, the per-head and per-refusal memory, the timeout contract, and `install.sh` in both `--dry-run` and real mode.
 
-## zai-quota-check
+### zai-quota-check
 
-`zai-quota-check/zai-quota-check` is Main's `state/zai-quota.check.sh` (16 Oct) as a shippable add-on: it wakes Main when the captain's Z.AI GLM plan burns ahead of time - the 5 h window under 30% with more than 45 min to its reset, or the week's used share more than 15 points ahead of the week's elapsed share, or the week under 20% - with the message naming the route moves that keep the pipeline's share. It reads `quota-axi --json` at most once per 10 min (the check cadence bounds it further) and repeats only when its repeat signature changes: on a 10% step of the 5 h window only while the 5 h condition holds, otherwise on a 10% step of the week alone. That is the 16 Oct fix over the state copy it shipped from, whose `fp//10|wp//10` signature carried the 5 h step on every week-ahead wake and so woke Main about 10 times per 5 h window while the week-ahead condition stayed true all week. `$0 <quota-json-file>` is the test mode: it reads the file instead of `quota-axi`, and `ZAI_QUOTA_MARK` then names the repeat-state file (default a fresh temp file), so a fixture sequence can exercise the repeat logic with no live quota read.
+`zai-quota-check/zai-quota-check` is a shippable version of a proven state check: it alerts you when the GLM plan it watches burns ahead of time - the 5 h window under 30% with more than 45 min to its reset, or the week's used share more than 15 points ahead of the week's elapsed share, or the week under 20% - with the message naming the route moves that keep the pipeline's share. It reads `quota-axi --json` at most once per 10 min (the check cadence bounds it further) and repeats only when its repeat signature changes: on a 10% step of the 5 h window only while the 5 h condition holds, otherwise on a 10% step of the week alone. The fix over the state copy it shipped from: its `fp//10|wp//10` signature carried the 5 h step on every week-ahead wake and so woke about 10 times per 5 h window while the week-ahead condition stayed true all week. `$0 <quota-json-file>` is the test mode: it reads the file instead of `quota-axi`, and `ZAI_QUOTA_MARK` then names the repeat-state file (default a fresh temp file), so a fixture sequence can exercise the repeat logic with no live quota read.
 
-Install with `zai-quota-check/install.sh [--dry-run]` and `FM_HOME` set: it copies the check to `$FM_HOME/state/zai-quota.check.sh` (mode 700) and registers the zai-quota check with the home's `bin/fm-check-register.sh`; idempotent. Out of the box the live repeat state lives at `/home/fixture/users/user-019/firstmate/state/.zai-quota.last`, the same file the state copy used, so the install replaces it in place with no re-wake.
+Install with `zai-quota-check/install.sh [--dry-run]` and `FM_HOME` set: it copies the check to `$FM_HOME/state/zai-quota.check.sh` (mode 700) and registers the zai-quota check with the home's `bin/fm-check-register.sh`; idempotent. Out of the box the live repeat state lives at `~/firstmate/state/.zai-quota.last`, the same file the state copy used, so the install replaces it in place with no re-wake.
 
 Test: `zai-quota-check/tests/zai-quota-check-e2e.sh` drives the real check in the file-argument mode over fixture sequences: with the week-ahead condition true all week and the 5 h window above 30%, fp 90->80->...->40 wakes once (the old signature woke on every run); with the 5 h condition each 10% step wakes once (29, 19, 9); a week 50->40->30 step wakes once per step.
 
-## claude-quota
+### claude-quota
 
-`claude-quota/claude-quota.check.sh` is Main's `state/claude-quota.check.sh` (16 Oct) as a shippable add-on: it wakes Main when the shared Claude Max account burns ahead of time.
-The 5 h rule is unchanged: the 5 h window under 35% with more than 60 min to its reset wakes Main, and again on each 10% step while it holds.
-The week rule wakes once when the week is at or below 40% of the week left, with the action: no new Opus build workers, leads move build work to the GLM/Go mix, and Main reports to the captain.
+`claude-quota/claude-quota.check.sh` is a shippable version of a proven state check: it alerts you when the shared Claude plan burns ahead of time.
+The 5 h rule is unchanged: the 5 h window under 35% with more than 60 min to its reset alerts, and again on each 10% step while it holds.
+The week rule wakes once when the week is at or below 40% of the week left, with the action: no new Opus build workers, leads move build work to the other live models, and the home's lead reports to the operator.
 That wake carries the week's burn rate over the last 1-5 h.
-The 17 Oct fix over the state copy: the burn rate alone no longer wakes.
-The captain's 16 Oct 15:00Z order lets Opus (effort medium) take build work while the week is above 40% left, but the state copy woke Main with a "no new Opus workers" rate alarm on every 10% step of the 5 h window or the week (14 wakes on 16 Oct, none needing action).
+Fix over the state copy: the burn rate alone no longer wakes.
+Opus (effort medium) may take build work while the week is above 40% left, but the state copy woke with a "no new Opus workers" rate alarm on every 10% step of the 5 h window or the week, none needing action.
 It reads `quota-axi --json` at most once per 10 min.
 `$0 <quota-json-file>` is the test mode: it reads the file, and `CQ_MARK` and `CQ_HIST` name the repeat-state and history files (default fresh temp files).
 
 Install with `claude-quota/install.sh [--dry-run] <main-fm-home>`: it copies the check to `${XDG_DATA_HOME:-~/.local/share}/fm-claude-quota/`, backs up a replaced `state/claude-quota.check.sh` as `<file>.bak-claude-quota-<epoch>`, writes that path as an exec shim (mode 700), and re-registers the `claude-quota` check with `bin/fm-check-register.sh`; idempotent.
-The live repeat state stays at `/home/fixture/users/user-019/firstmate/state/.claude-quota.last`, the file the state copy used.
+The live repeat state stays at `~/firstmate/state/.claude-quota.last`, the file the state copy used.
 
-Test: `claude-quota/tests/claude-quota.test.sh` replays 16 Oct's readings through the real check: the 14 week readings that woke Main, then readings from the check's history, with made-up 5 h readings and a week tail at or under 40% left, since no log keeps those.
+Test: `claude-quota/tests/claude-quota.test.sh` replays a recorded day's readings through the real check: the week readings that woke it, then readings from the check's history, with made-up 5 h readings and a week tail at or under 40% left, since no log keeps those.
 It wakes only on the 5 h rule and the first reading at or below 40% of the week left: 41% left stays quiet, 40% left wakes once, and 39% left right after does not wake again.
 It then drives `install.sh` against a throwaway home, as `--dry-run` and as a real install and rerun.
 
-## fleet-stall
+### fleet-stall
 
-`fleet-stall/fleet-stall-check` is Main's `state/fleet-stall.check.sh` (16 Oct) as a shippable add-on: it wakes Main at most every 45 min when a home lead is idle while it has 0 busy lanes and ready work, or while live workers have sat more than 45 min in a `paused:` that waits on the lead; the missed-wake guard, fleet-pause marker, zero-busy guard, live-lane filter and `slot` exclusion are unchanged. The 16 Oct fix: the paused-reason word list is matched against the reason text only, with absolute paths, URLs, `key=value` tokens (`evidence=...`) and `[at=...]`/`[key=...]` stamps removed first. Before it, a `/home/fixture/users/user-019/.treehouse/firstmate-...` evidence path matched `firstmate`, so workers waiting on their own CI or emulator runs counted as waiting on the lead (the 17:18Z false stall for muxr and writeboost). `FM_STALL_ROOT` (Main's home) and `FM_STALL_BASE` (the leads' homes) default to the live paths and exist for the fixture test.
+`fleet-stall/fleet-stall-check` is a shippable version of a proven state check: it alerts at most every 45 min when a home lead is idle while it has 0 busy lanes and ready work, or while live workers have sat more than 45 min in a `paused:` that waits on the lead; the missed-wake guard, fleet-pause marker, zero-busy guard, live-lane filter and `slot` exclusion are unchanged. Fix over the state copy: the paused-reason word list is matched against the reason text only, with absolute paths, URLs, `key=value` tokens (`evidence=...`) and `[at=...]`/`[key=...]` stamps removed first. Before it, a treehouse evidence path matched `firstmate`, so workers waiting on their own CI or emulator runs counted as waiting on the lead. `FM_STALL_ROOT` (the main home) and `FM_STALL_BASE` (the leads' homes) default to the live paths and exist for the fixture test.
 
 Install with `fleet-stall/install.sh [--dry-run]` and `FM_HOME` set: it copies the check to `${XDG_DATA_HOME:-~/.local/share}/fm-fleet-stall/fleet-stall-check`, writes `$FM_HOME/state/fleet-stall.check.sh` as a shim that execs it (mode 700; a different old file is kept as `.bak-fleet-stall-<epoch>`) and registers the fleet-stall check with the home's `bin/fm-check-register.sh`; idempotent.
 
-Test: `fleet-stall/tests/fleet-stall-e2e.sh` runs the real check against a fixture fleet (Main's lead records, the muxr and writeboost homes, a stub herdr showing both leads idle): the 17:18Z lines no longer count, while `waiting on firstmate for the decision` and `awaiting main instruction` still do. `FLEET_STALL_BIN` runs another copy against the same fixture.
+Test: `fleet-stall/tests/fleet-stall-e2e.sh` runs the real check against a fixture fleet (the main home's lead records, two fixture homes, a stub herdr showing both leads idle): the false-stall lines no longer count, while `waiting on firstmate for the decision` and `awaiting main instruction` still do. `FLEET_STALL_BIN` runs another copy against the same fixture.
 
-## glm-queue
+### glm-queue
 
-Every pi GLM call waits in one local line instead of drawing Z.AI's 1302 "Rate limit reached for requests" refusal and backing off (Main3517: 423 refusals across 21 of 21 GLM sessions in the 17Z hour of 16 Oct).
+Every pi GLM call waits in one local line instead of drawing the provider's "Rate limit reached for requests" refusal and backing off.
 `glm-queue/glm-queue.mjs` is a Node proxy on `127.0.0.1` (port `GLM_QUEUE_PORT`, default 8787) that forwards to `https://api.z.ai` (`GLM_QUEUE_UPSTREAM`) with at most `GLM_QUEUE_MAX` calls in flight (default 8) and a FIFO line for the rest.
 Method, path, headers (Authorization included) and body pass through unchanged, responses and SSE streams are piped back as they arrive, and a caller that leaves while waiting hands its slot on unused. An upstream request that goes idle is cut after 5 minutes, and an upstream that dies mid-response (a truncated body, say) cuts the client connection immediately so the caller sees the failure and re-queues instead of hanging; its slot is freed at once.
 It logs only one line per call to the journal: upstream status, ms waited, ms in flight, and the in-flight and waiting counts (`journalctl --user -u fm-glm-queue`).
@@ -269,17 +388,17 @@ Install or update with `glm-queue/install.sh [--dry-run] [--max N] [--port P]`: 
 pi uses the queue once `.providers.zai.baseUrl` in `~/.pi/agent/models.json` is `http://127.0.0.1:8787/api/coding/paas/v4`; new pi sessions pick it up, running ones keep the direct URL.
 Test: `glm-queue/tests/glm-queue.test.sh` runs the proxy against a stub upstream: 20 parallel clients through N=4 all complete unchanged while the upstream never sees more than 4 at once, a streamed response reaches the client before it ends, and a truncated Content-Length response fails the client in milliseconds with its slot freed for the next call.
 
-## git-identity
+### git-identity
 
-No lane can commit or push as anyone but the captain (`umeranjum17@gmail.com`), even when its project clone's shared `.git/config` carries a stray `[user]`.
-The 15 Oct leak: a pi worker's `git config user.email t@e.c` ran in its pooled worktree, and since pooled worktrees share the clone's `.git/config`, every later lane on that clone committed as `t <t@e.c>` for about 37 hours (done-done PRs 72, 73, 74, 75 and 77; PR 71 carried the separate `fm <fm@local>` placeholder from another producer).
-`git-identity/git-identity env-file <out>` runs in the lane pane through the home's `config/launch-env-hook` (a thin hook in the fork's `bin/fm-spawn.sh`) and exports two `includeIf.gitdir` entries through `GIT_CONFIG_*`, scoped to the lane worktree's clone (its common dir and every linked worktree under it), that include `identity.gitconfig`: the captain's `user.name`/`user.email` and `core.hooksPath` = the add-on's `hooks/`.
+No task can commit or push as anyone but the configured identity, even when its project clone's shared `.git/config` carries a stray `[user]`.
+Why: a worker's `git config user.email t@e.c` in its pooled worktree leaks to every later task on that clone, because pooled worktrees share the clone's `.git/config`.
+`git-identity/git-identity env-file <out>` runs in the lane pane through the home's `config/launch-env-hook` (a thin hook in the fork's `bin/fm-spawn.sh`) and exports two `includeIf.gitdir` entries through `GIT_CONFIG_*`, scoped to the lane worktree's clone (its common dir and every linked worktree under it), that include `identity.gitconfig`: the configured `user.name`/`user.email` and `core.hooksPath` = the add-on's `hooks/`.
 Command-scope config beats the clone's `.git/config`, so a stray repo-local `[user]` cannot reach lane commits, in every engine the pane runs (claude, pi, opencode and the rest inherit the environment); `git -c user.email=...`, `GIT_AUTHOR_*` and repositories outside the clone (test fixtures) keep their own identity.
 Its `pre-push` refuses any pushed commit not already on a remote whose author or committer email is not the configured one, prints each bad commit and the fix (find and unset the stray `[user]`, then `git rebase -r --exec 'git commit --amend --no-edit --reset-author' <oldest>~1`), and refuses outright when a pushed commit cannot be inspected; a forge-made commit (committer `noreply@github.com`) passes only because it is already on a remote.
 Every hook in `hooks/` then runs the repository's own hook of that name (its `core.hooksPath`, else `.git/hooks`; pre-push gets git's stdin), behind the fork's AI-trailer hooks, which chain to it the same way.
 The no-mistakes pipeline commits and pushes from its own repositories with the global identity, outside any lane clone, so it needs neither part.
 
-Install or update with `git-identity/install.sh [--dry-run] [--email <email>] [--name <name>] <fm-home>`: it copies the script to `${XDG_DATA_HOME:-~/.local/share}/fm-git-identity/`, writes `identity.gitconfig` there (a configured identity is kept unless a flag replaces it; default `umer <umeranjum17@gmail.com>`) and one read-only wrapper per client hook in `hooks/`, backs up a different `<fm-home>/config/launch-env-hook` as `<file>.bak-git-identity-<epoch>` and writes it as an exec shim (mode 700); idempotent, and `--dry-run` writes nothing. It says so when the home's `fm-spawn.sh` does not run `config/launch-env-hook` yet.
+Install or update with `git-identity/install.sh [--dry-run] [--email <email>] [--name <name>] <fm-home>`: it copies the script to `${XDG_DATA_HOME:-~/.local/share}/fm-git-identity/`, writes `identity.gitconfig` there (a configured identity is kept unless a flag replaces it; default `you <you@example.com>`) and one read-only wrapper per client hook in `hooks/`, backs up a different `<fm-home>/config/launch-env-hook` as `<file>.bak-git-identity-<epoch>` and writes it as an exec shim (mode 700); idempotent, and `--dry-run` writes nothing. It says so when the home's `fm-spawn.sh` does not run `config/launch-env-hook` yet.
 
-Test: `git-identity/tests/git-identity.test.sh` builds a pooled-style lane (a shared clone whose `.git/config` holds `t <t@e.c>` and its own logging pre-push, a linked worktree, a bare origin carrying a forge-made squash commit), shows the leak without the add-on, then launches the lane the way `fm-spawn` runs the hook: lane commits carry the captain identity, a push of a hand-made `t@e.c` commit is refused with the commit and the fix and reaches nothing, a clean push on the forge-made base passes and runs the repository's own pre-push with git's stdin, a push whose inspection fails (a `git log` error) is refused instead of let through, a fixture repository outside the clone keeps its identity and pushes freely, and `--email` changes what is pinned and allowed; it also drives `install.sh` as `--dry-run`, a real install with a backup and an idempotent rerun.
+Test: `git-identity/tests/git-identity.test.sh` builds a pooled-style lane (a shared clone whose `.git/config` holds `t <t@e.c>` and its own logging pre-push, a linked worktree, a bare origin carrying a forge-made squash commit), shows the leak without the add-on, then launches the lane the way `fm-spawn` runs the hook: task commits carry the configured identity, a push of a hand-made `t@e.c` commit is refused with the commit and the fix and reaches nothing, a clean push on the forge-made base passes and runs the repository's own pre-push with git's stdin, a push whose inspection fails (a `git log` error) is refused instead of let through, a fixture repository outside the clone keeps its identity and pushes freely, and `--email` changes what is pinned and allowed; it also drives `install.sh` as `--dry-run`, a real install with a backup and an idempotent rerun.
 With `FM_ROOT=<firstmate checkout>` the lane also gets that checkout's AI-trailer hooks dir layered on top, as a real spawn does.
