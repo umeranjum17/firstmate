@@ -24,7 +24,7 @@ One line per add-on, with how it wires in. `<home>` is your home folder for the 
 - `merge-card` — runs the merge gate and posts one evidence card per merge to the sign-off board. Wire in: config shims, see Install.
 - `merge-on-green` — merges a PR you allowed to auto-merge once its checks are green and its proof receipt passes. Wire in: `merge-on-green/install.sh <home>`.
 - `nm-drain` — updates the shared pipeline service through a planned drain, never over live runs. Wire in: `nm-drain/install.sh <home>`.
-- `owner-guard` — refuses commits and pushes that add the owner's private details, and scans public repos for them once a day. Wire in: `owner-guard/install.sh <home>` and `owner-guard/install-scan.sh`.
+- `owner-guard` — refuses commits, pushes and PR merges that add the owner's private details, and scans public repos for them once a day. Wire in: `owner-guard/install.sh <home>` and `owner-guard/install-scan.sh`.
 - `parked-homes` — a paused team home gets no messages, nudges, relaunches or config pushes. Needs fork hooks (FORK-EXIT.md).
 - `pipeline-literal-delete` — gives pipeline agents the safe recursive-delete rule in their own instructions. Wire in: `pipeline-literal-delete/install.sh`.
 - `pipeline-quota-failover` — moves pipeline model calls to the next model in the chain on a quota error. Wire in: `pipeline-quota-failover/install.sh`.
@@ -67,6 +67,7 @@ printf '%s\n' "<this-clone>/quota-failover/check.sh \$FM_HOME" > "$FM_HOME/state
 printf '#!/bin/sh\nexec <this-clone>/merge-card/merge-card gate "$@"\n' > "$FM_HOME/config/merge-gate"
 printf '#!/bin/sh\nexec <this-clone>/merge-card/merge-card post --board <board.json> "$@"\n' > "$FM_HOME/config/post-merge"
 chmod +x "$FM_HOME/config/merge-gate" "$FM_HOME/config/post-merge"
+owner-guard/install.sh "$FM_HOME"   # re-chain: the owner-details merge scan runs first, then the shim
 ```
 
 `tailscale-resilience` installs as a systemd user timer; copy the unit from its Details section. The dormant and fork-hook add-ons install nothing.
@@ -89,6 +90,9 @@ bash route-change/tests/route-change-e2e.sh
 bash merge-on-green/tests/merge-on-green.test.sh
 bash merge-card/tests/merge-card-e2e.sh
 bash nm-drain/tests/nm-drain.test.sh
+bash owner-guard/tests/owner-guard.test.sh
+bash owner-guard/tests/owner-guard-global.test.sh
+bash owner-guard/tests/owner-guard-merge.test.sh
 bash fleet-stall/tests/fleet-stall-e2e.sh
 bash fleet-flow/tests/fm-flow-check.test.sh
 bash host-memory/tests/fm-mem-gate.test.sh
@@ -110,7 +114,8 @@ pipeline-quota-failover/install.sh --restore             # removes the wrapper a
 "$FM_HOME/bin/fm-check-unregister.sh" 0-nm-drain         # then rm "$FM_HOME/state/0-nm-drain.check.sh" ~/.local/share/fm-nm-drain -r
 "$FM_HOME/bin/fm-check-unregister.sh" fleet-stall        # then rm "$FM_HOME/state/fleet-stall.check.sh" ~/.local/share/fm-fleet-stall -r
 "$FM_HOME/bin/fm-check-unregister.sh" zai-quota          # then rm "$FM_HOME/state/zai-quota.check.sh"
-rm "$FM_HOME/config/merge-gate" "$FM_HOME/config/post-merge"                    # merge-card
+rm "$FM_HOME/config/merge-gate" "$FM_HOME/config/post-merge"                    # merge-card (with owner-guard: its config/merge-gate.pre-owner-guard instead of merge-gate)
+owner-guard/install.sh --uninstall "$FM_HOME"            # owner-guard: also restores the home's previous config/merge-gate
 rm "$FM_HOME/config/parked-homes"                        # parked-homes: a missing file parks nothing
 systemctl --user disable --now fm-glm-queue && rm -r ~/.local/share/fm-glm-queue ~/.config/systemd/user/fm-glm-queue.service   # glm-queue
 rm -r ~/.local/share/fm-route-change ~/.local/bin/route-change                  # route-change
@@ -193,6 +198,8 @@ printf '#!/bin/sh\nexec <addons>/merge-card/merge-card gate "$@"\n' > $FM_HOME/c
 printf '#!/bin/sh\nexec <addons>/merge-card/merge-card post --board <board.json> "$@"\n' > $FM_HOME/config/post-merge
 chmod +x $FM_HOME/config/merge-gate $FM_HOME/config/post-merge
 ```
+
+With `owner-guard` installed, rerun `owner-guard/install.sh "$FM_HOME"` after rewriting the gate shim, so the owner-details merge scan is chained back in front of it (see [owner-guard](owner-guard/README.md)).
 
 Test: `merge-card/tests/merge-card-e2e.sh` drives the real script end to end against a task folder holding a retained PNG, with a stub `done-done` placed earlier on `PATH` (one accepting `--citation-base`, one rejecting it, and one that lies about supporting it), and asserts the recorded verdict, the invocation the stub saw, and that the card's media resolves in each case.
 

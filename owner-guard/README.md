@@ -15,7 +15,13 @@ pushing the owner's private details to a public repo, shaped like
   else the installing home's file (full-line `#` comments and blank lines
   ignored). A hit refuses with
   `file:line` plus a placeholder hint, never the pattern list. A missing or
-  empty patterns file allows with one note line.
+  empty patterns file allows with one note line. `merge-gate <task-id>
+  <worktree|-> <head> <pr-url|->` is the home's `config/merge-gate`
+  contract: it fetches the PR's exact `<head>` and base branch from GitHub
+  into a scratch repo and scans every line the PR adds against their
+  merge-base, so a leak from any commit on the branch refuses the merge
+  with `file:line`. A forge or fetch failure refuses (nothing merges
+  unscanned); a local merge with no PR is left to the push guard.
 - `install.sh` — installs the guard, keeps the patterns file private (mode
   600, never created and never overwritten; the recorded patterns home is
   kept when the new home has no file), chains both hooks
@@ -30,7 +36,11 @@ pushing the owner's private details to a public repo, shaped like
   wrapper replays git's exact input (byte-for-byte, NULs included) to
   each chained hook. Install is idempotent, records a replaced global
   hooksPath instead of dropping it, and `--uninstall` restores it; a
-  repo-local `core.hooksPath` is never touched.
+  repo-local `core.hooksPath` is never touched. It also writes the home's
+  `config/merge-gate`: the merge scan first, then the home's previous gate
+  with the same args (moved aside to `config/merge-gate.pre-owner-guard`;
+  `--uninstall [<home>]` moves it back). Rerun it after writing another
+  gate shim over `config/merge-gate` to re-chain it.
 - `tests/owner-guard.test.sh` — fixture-repo proof (throwaway HOME and repo,
   made-up patterns only): matching commit refused, clean commit passes,
   matching push refused, removal-only commit passes, the repo's own hook
@@ -44,6 +54,13 @@ pushing the owner's private details to a public repo, shaped like
   consumers see the rewritten lines, `proc-receive` replay is byte-exact),
   double install is a no-op, uninstall restores the previous global
   hooksPath.
+- `tests/owner-guard-merge.test.sh` — fixture proof for the merge gate
+  (throwaway HOME, home and patterns, a local bare repo standing in for
+  GitHub, a stub `gh`): a PR whose middle commit adds a leak, committed and
+  pushed with hooks skipped the way the pipeline does, is refused at
+  `file:line`; a clean PR passes; the previous gate still runs and its
+  refusal still refuses; forge and fetch failures refuse; install twice is
+  a no-op; uninstall restores the previous gate.
 
 ## Known limits
 
@@ -51,10 +68,13 @@ A refusal only fires when a client-side hook runs: `git commit --no-verify`
 skips the pre-commit check, and a repo-local `core.hooksPath` (for example
 a hook manager) replaces the global wrappers for that repo, so neither is
 caught. The no-mistakes pipeline pins a per-worktree `core.hooksPath` and
-pushes with client hooks skipped, so commits the pipeline itself authors
-are unguarded; worker commits are still checked at commit time. Fixture
-evidence for the bypass (made-up values only) is kept with the task
-record, outside this repo.
+pushes with client hooks skipped, so a commit the pipeline itself authors
+(a fix round) is not checked at commit or push time; it is stopped at
+merge instead, by the merge-gate scan, so the PR branch can still carry
+such a leak until it is fixed. Worker commits are still checked at commit
+time. The later upgrade is a user-level pipeline hook that runs the guard
+before the pipeline pushes. The merge scan reads GitHub PRs only: a PR on
+another forge is refused as unscannable while a patterns file exists.
 
 ## Daily scan
 
