@@ -102,6 +102,8 @@ FIXTURE
 sed -i "s|WRAPPER|$wrapper|" "$work/nm.yaml"
 chmod +x "$stub/pi" "$stub/quota-axi"
 export PATH="$stub:$PATH" NM_CONFIG=$work/nm.yaml STUB_QUOTA=$work/quota.json STUB_LOG=$work/pi.log
+# A fixed three-route list, so these journeys do not follow the wrapper's default chain.
+export PI_QUOTA_FAILOVER_CHAIN='zai/glm-5.3-flash muse-spark-1.3-contributor deepseek/deepseek-v4.1-flash'
 : >"$STUB_LOG"
 
 pins=("$home/config/crew-dispatch.json" "$NM_CONFIG" "$home/config/secondmate-harness"

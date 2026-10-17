@@ -31,7 +31,7 @@ wel=max(0,min(100,round(100-100*(P(wr)-now)/D.timedelta(days=7))))
 five=fp<30 and left>45
 if not (five or 100-wp>wel+15 or wp<20): sys.exit()
 print(f"{fp//10}|{wp//10}" if five else f"|{wp//10}")
-print(f"zai-quota: Z.AI GLM plan 5 h window {fp}% left with {left} min to its reset; week {wp}% left with {wel}% of the week gone (resets {wr}). GLM 5.3 Flash carries reviews, the shared no-mistakes pipeline and normal workers: move the newest GLM workers to Go Muse / DeepSeek within the Go pace (never Step 5; never Claude for reviews) so the pipeline keeps its share; if the 5 h window empties, set the no-mistakes pi model back to opencode-go/muse-spark-1.3-contributor until it resets")
+print(f"zai-quota: Z.AI GLM plan 5 h window {fp}% left with {left} min to its reset; week {wp}% left with {wel}% of the week gone (resets {wr}). GLM 5.3 Flash carries reviews, the shared no-mistakes pipeline and normal workers: move the newest GLM workers to Go Muse / DeepSeek within the Go pace (never Step 5) so the pipeline keeps its share; if the 5 h window empties, the no-mistakes pipeline and its reviews fail over to Claude Haiku 5.5 on their own (pipeline-quota-failover) until it resets, so leave the pipeline model as it is")
 ')
 [ -n "$out" ] || { : > "$MARK"; exit 0; }
 sig=${out%%$'\n'*}
