@@ -294,6 +294,13 @@ test_forge_head_mismatch_or_unreadable_is_still_refused() {
   git -C "$wt2" checkout -q --detach HEAD
   git -C "$wt2" branch -q -D fm/forklo
   sha2=$(git -C "$wt2" rev-parse HEAD)
+  # shellcheck disable=SC2016  # runtime expansions must stay in the stub
+  cat > "$fakebin/gh" <<SH
+#!/usr/bin/env bash
+[ "\$1 \${2:-}" = "pr view" ] || exit 1
+printf '%s\n' "$sha2"
+SH
+  chmod +x "$fakebin/gh"
   reason=$(PATH="$fakebin:$PATH" accept_done ship local-only "$wt2" "$repo2" \
     "done: PR https://github.com/o/r/pull/92" "$state" forkpub "$state/forkpub.meta")
   rc=$?
