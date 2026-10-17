@@ -57,9 +57,12 @@ the unknown dash as before. It also adds one environment input, `FM_BIN` (see
 For the fork shim lane), defaulting to the script's own directory so a fork
 copy behaves exactly as before. The third changes the ask list: it lists
 newest first by default with an oldest-first toggle, and each ask carries a
-type tag (yes/no, pick or approval, read from the ask text) with a matching
-filter — once in `fm-dashboard.sh`'s static overview page and again in the
-app (`ui.js`, `app.js`, `app.css`), whose remaining bytes are unchanged.
+type tag (yes/no, pick or approval) with a matching filter. The ask type reads
+from the optional fifth column of `data/captain-asks.tsv` (the row is `id`,
+`since`, `text`, `url`, `type`) when it is `yn`, `pick` or `approval`, and is
+otherwise inferred from the ask text — once in `fm-dashboard.sh`'s static
+overview page and again in the app (`ui.js`, `app.js`, `app.css`), whose
+remaining bytes are unchanged.
 Every other moved file remains byte-identical to the fork.
 
 ## Side-by-side proof (re-run before the served path swaps)
