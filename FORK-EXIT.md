@@ -29,6 +29,7 @@ against the files, not against this table. PRs at the top until they are resolve
 | Withdraw stale ready-work wakes instead of replaying them | [81](https://github.com/umeranjum17/firstmate/pull/81) (c66d9594) | `bin/fm-wake-lib.sh`, `bin/fm-wake-drain.sh`, `bin/fm-watch.sh` | offer to Kun | on fork |
 | Move a relaunching worker to another pool account (`--account`) | [83](https://github.com/umeranjum17/firstmate/pull/83) (merged 0766f3c3) | `bin/fm-account-pool-lib.sh`, `bin/fm-control.sh`, `bin/fm-spawn.sh` | add-on `account-pool` if fm-control gains an account hook, else offer to Kun | on fork (see named item fm/fm-acct-f2-relaunch) |
 | Retry the watch-triage drain ack under load and log missed attempts | [84](https://github.com/umeranjum17/firstmate/pull/84) (merged 5758e520) | `tests/fm-watch-triage.test.sh` | offer to Kun (test hardening, only with the captain's word) | on fork — diagnostics only; the flake was not reproduced |
+| Home launch-env hook: `config/launch-env-hook <out>` runs in the pane and its export is sourced before the AI-trailer step | [90](https://github.com/umeranjum17/firstmate/pull/90) (open) | `bin/fm-spawn.sh` (thin hook), `docs/configuration.md` | stays (thin hook; the logic is add-on `git-identity`) | on fork — needed because no existing spawn hook point reaches the pane environment |
 
 ## Named items (16 Oct)
 
