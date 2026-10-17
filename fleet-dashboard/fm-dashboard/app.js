@@ -136,7 +136,7 @@ const Needs = ({ d }) => {
   const [newest, setNewest] = useState(true), [kind, setKind] = useState('all')
   if (d.asks == null) return html`<div class="none"><p>The ask list could not be read.</p></div>`
   if (!d.asks.length) return html`<div class="none">${I(IC.inbox, 32)}<p>Nothing needs you.</p></div>`
-  const shown = askOrder(d.asks, newest).map(a => ({ ...a, kind: askType(a.text) })).filter(a => kind === 'all' || a.kind === kind)
+  const shown = askOrder(d.asks, newest).map(a => ({ ...a, kind: askType(a.text, a.type) })).filter(a => kind === 'all' || a.kind === kind)
   return html`<div class="asks-ctl">
     <div class="seg" role="group" aria-label="Sort asks">
       <button aria-pressed=${newest ? 'true' : 'false'} onClick=${() => setNewest(true)}>Newest first</button>
@@ -219,7 +219,7 @@ function Overview({ d, od, go }) {
     </div>
     <div class="ov-grid">
       ${asks?.length ? html`<section class="ov-card wide"><h3>Needs you</h3><div class="ov-asks">${askOrder(asks).map((a, k) =>
-        html`<a class="ov-ask" key=${k} href=${a.url || '#/needs'} target=${a.url ? '_blank' : null} rel="noreferrer"><span><em class="ktag">${ASK_TAG[askType(a.text)]}</em>${a.text}</span><small class="num">${a.age == null ? '' : dur(a.age)}</small></a>`)}</div></section>` : ''}
+        html`<a class="ov-ask" key=${k} href=${a.url || '#/needs'} target=${a.url ? '_blank' : null} rel="noreferrer"><span><em class="ktag">${ASK_TAG[askType(a.text, a.type)]}</em>${a.text}</span><small class="num">${a.age == null ? '' : dur(a.age)}</small></a>`)}</div></section>` : ''}
       <section class="ov-card wide"><h3>Lifecycle</h3><${Rail} d=${d} go=${go}/></section>
       <section class="ov-card w2"><h3>Flow</h3><div class="ov-flows">${flow('landed', 'Landed today', 'recorded merges', '--st-landed')}${flow('closed', 'Closed 7 d', 'backlog items', '--green')}</div></section>
       <section class="ov-card w1"><h3>Lanes by state</h3>

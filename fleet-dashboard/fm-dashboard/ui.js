@@ -37,9 +37,12 @@ export const hname = (d, id) => d.homes.find(h => h.id === id)?.name || id
 
 // Stuck first, then waiting, then by time in stage; on hold last; landed newest first.
 const rank = c => stuck(c) ? 0 : c.wait === 'waiting' ? 1 : c.wait === 'parked' ? 3 : 2
-// An ask's type from its text, the same rule as fm-dashboard.sh: pick on a pick/choose/which verb, the word options, or two option markers; approval on approv*/merg*; else yes/no.
+// An ask's type, the same rule as fm-dashboard.sh: an explicit type field wins; else pick on a pick/choose/which verb, the word options, two option markers ("1)" or "A Foo, C Bar"), or three or more choices ending "or ...?"; approval on approv*/merg*; else yes/no.
 export const ASK_TAG = { yn: 'yes/no', pick: 'pick', approval: 'approval' }
-export const askType = text => /\b(?:pick|choose|which)\b|\boptions?\b/i.test(text) || (text.match(/(?:^|\s)\(?[1-9a-h]\)/gi) || []).length >= 2 ? 'pick' : /\b(?:approv|merg)\w*/i.test(text) ? 'approval' : 'yn'
+export const askType = (text, explicit) => Object.hasOwn(ASK_TAG, explicit) ? explicit
+  : /\b(?:pick|choose|which)\b|\boptions?\b/i.test(text) || (text.match(/(?:^|\s)\(?[1-9a-h]\)/gi) || []).length >= 2
+    || (text.match(/(?:^|[:,;]\s+)[A-H]\s+[A-Z]/g) || []).length >= 2 || /(?:[^,?]*,){2}\s*or\s[^,?]*\?\s*$/i.test(text) ? 'pick'
+  : /\b(?:approv|merg)\w*/i.test(text) ? 'approval' : 'yn'
 // Newest first unless asked otherwise; asks with no usable time go last, in their own order.
 export const askOrder = (asks, newest = true) => {
   const dated = asks.filter(a => a.age != null).sort((a, b) => newest ? a.age - b.age : b.age - a.age)

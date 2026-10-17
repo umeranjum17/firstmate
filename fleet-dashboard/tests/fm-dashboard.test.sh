@@ -229,9 +229,18 @@ test_waiting_on_you_types_follow_the_wording() {
   now=$(date +%s)
   printf 'a\t%s\tPick a date\t\nb\t%s\tChoose a date\t\nc\t%s\tHas CI approved the deploy?\t\nd\t%s\tTry step 3) tomorrow\t\n' \
     "$((now - 400))" "$((now - 300))" "$((now - 200))" "$((now - 100))" > "$home/data/captain-asks.tsv"
+  {
+    printf 'e\t%s\tCrewhouse app direction: A Open House (recommended), C Stack, F Galleon (pirate), G Greenhouse / H Pass, or revise?\t\n' "$((now - 90))"
+    printf 'f\t%s\tCrewhouse crew: Peg (...), Tide (...), Clay (...), or the pirate Galleon crew?\t\n' "$((now - 80))"
+    printf 'g\t%s\tSay yes or no: ship the build?\t\nh\t%s\tShip the build? Yes recommended.\t\n' "$((now - 70))" "$((now - 60))"
+    printf 'i\t%s\tIs the date right?\t\tpick\nj\t%s\tPick a layout, or revise?\t\tyn\n' "$((now - 50))" "$((now - 40))"
+    printf 'k\t%s\tApprove the release?\t\t\nl\t%s\tApprove the rollout?\t\tsoon\n' "$((now - 30))" "$((now - 20))"
+  } >> "$home/data/captain-asks.tsv"
   build "$home"
-  has "$d/index.html" "pick Pick a date" "pick Choose a date" "approval Has CI approved the deploy?" "yes/no Try step 3) tomorrow"
-  pass "pick, choose and approved wording tag as pick and approval, and a single step marker in prose stays yes/no"
+  has "$d/index.html" "pick Pick a date" "pick Choose a date" "approval Has CI approved the deploy?" "yes/no Try step 3) tomorrow" \
+    "pick Crewhouse app direction: A Open House" "pick Crewhouse crew: Peg" "yes/no Say yes or no: ship the build?" "yes/no Ship the build? Yes recommended." \
+    "pick Is the date right?" "yes/no Pick a layout, or revise?" "approval Approve the release?" "approval Approve the rollout?"
+  pass "pick, choose and approved wording tag as pick and approval; the quoted multi-option asks tag as pick; yes/no wording stays yes/no; an explicit type column wins, and an empty or unknown one falls back to the wording"
 }
 
 test_backlog_and_method_pages_show_their_numbers() {
@@ -577,7 +586,10 @@ const asks = [{ text: 'Approve the merge', age: 7200 }, { text: 'Pick a layout: 
 assert.deepEqual(ui.askOrder(asks).map(a => a.text), ['Is the date right?', 'Pick a layout: 1) blue 2) red', 'Approve the merge', 'Fix the time'])
 assert.deepEqual(ui.askOrder(asks, false).map(a => a.text), ['Approve the merge', 'Pick a layout: 1) blue 2) red', 'Is the date right?', 'Fix the time'])
 assert.deepEqual(asks.map(a => ui.askType(a.text)), ['approval', 'pick', 'yn', 'yn'])
-assert.deepEqual(['Pick a date', 'Choose a date', 'Has CI approved the deploy?', 'Try step 3) tomorrow'].map(ui.askType), ['pick', 'pick', 'approval', 'yn'])
+assert.deepEqual(['Pick a date', 'Choose a date', 'Has CI approved the deploy?', 'Try step 3) tomorrow'].map(t => ui.askType(t)), ['pick', 'pick', 'approval', 'yn'])
+assert.deepEqual(['Crewhouse app direction: A Open House (recommended), C Stack, F Galleon (pirate), G Greenhouse / H Pass, or revise?', 'Crewhouse crew: Peg (...), Tide (...), Clay (...), or the pirate Galleon crew?'].map(t => ui.askType(t)), ['pick', 'pick'])
+assert.deepEqual(['Say yes or no: ship the build?', 'Ship the build? Yes recommended.', 'Ship it, or not?'].map(t => ui.askType(t)), ['yn', 'yn', 'yn'])
+assert.equal(ui.askType('Is the date right?', 'pick'), 'pick'); assert.equal(ui.askType('Pick a date', 'yn'), 'yn'); assert.equal(ui.askType('Pick a date', 'toString'), 'pick')
 const note = text => ({ verb: 'Waiting', stage: 'review', text, at: 1 })
 const prefix = 'Waiting for approval of the production deployment configuration in '
 assert.equal(board.squash([note(prefix + 'production'), note(prefix + 'staging')]).length, 2)
