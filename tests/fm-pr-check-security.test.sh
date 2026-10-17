@@ -792,7 +792,7 @@ test_cross_repo_receipt_candidate() {
   ln -sf "$REAL_JQ" "$dir/fakebin/jq"
   fm_write_meta "$dir/home/state/task-a.meta" \
     "window=firstmate:fm-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
-    "project=$dir/project" "kind=ship" "mode=direct-PR" "receipt_required=1"
+    "project=$dir/project" "kind=ship" "mode=direct-PR" "harness=claude" "receipt_required=1"
   git -C "$dir/wt" remote add origin https://github.com/example/repo-a.git
   wt_head=$(git -C "$dir/wt" rev-parse HEAD)
   repo_b="$dir/repo-b"
@@ -817,6 +817,44 @@ test_cross_repo_receipt_candidate() {
     || fail "the merge refused the receipt that registration accepted: $(cat "$dir/merge.err")"
   grep -qF "pr merge 2 --repo example/repo-b --match-head-commit $forge_head" "$dir/gh.log" \
     || fail "the merge was not bound to the cross-repo forge head"
+
+  # The real post-merge flow: the armed watcher detects the merged state and
+  # retires the poll, recording the durable merged marker the gate's
+  # recorded-pr check reads from local state alone. The shared gate then takes
+  # the recorded pr_head as the receipt candidate, so the worker's one receipt
+  # passes the current-state read and a landed lane reports done, not blocked.
+  printf 'done: PR https://github.com/example/repo-b/pull/2 checks green\n' > "$dir/home/state/task-a.status"
+  cat > "$dir/fakebin/tmux" <<'SH'
+#!/usr/bin/env bash
+case "${1:-}" in
+  display-message) printf '%%1\n' ;;
+  capture-pane) printf 'all quiet\n> \n' ;;
+esac
+exit 0
+SH
+  chmod +x "$dir/fakebin/tmux"
+  gen=$("$ROOT/bin/fm-busy-event.sh" arm "$dir/home/state" task-a)
+  "$ROOT/bin/fm-busy-event.sh" apply "$dir/home/state" task-a idle --gen "$gen" \
+    --source claude-hook --event stop
+  ack_watcher_cycle "$dir/home/state" || fail "merge outcome acknowledgement failed"
+  add_stop_custom_check "$dir"
+  set +e
+  FM_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" \
+    > "$dir/merged-watch.out" 2> "$dir/merged-watch.err"
+  rc=$?
+  set -e
+  [ "$rc" -eq 0 ] || fail "the cross-repo merge poll did not retire: $(cat "$dir/merged-watch.err")"
+  [ -f "$dir/home/state/task-a.pr-poll-merge-notified" ] \
+    || fail "the retired cross-repo poll recorded no merged marker"
+  out=$(FM_STATE_OVERRIDE="$dir/home/state" FM_CREW_STATE_NO_FORGE=1 FM_TEST_NM_FAIL=1 \
+    PATH="$dir/fakebin:$BASE_PATH" "$ROOT/bin/fm-crew-state.sh" task-a 2> "$dir/crew.err")
+  case "$out" in
+    "state: done"*) ;;
+    *) fail "a landed cross-repo lane did not read done: $out $(cat "$dir/crew.err")" ;;
+  esac
+  case "$out" in
+    *"state: blocked"*) fail "a landed cross-repo lane read blocked: $out" ;;
+  esac
 
   dir=$(make_case cross-repo-receipt-refused)
   ln -sf "$REAL_JQ" "$dir/fakebin/jq"
@@ -843,7 +881,7 @@ test_cross_repo_receipt_candidate() {
   ln -sf "$REAL_JQ" "$dir/fakebin/jq"
   fm_write_meta "$dir/home/state/task-a.meta" \
     "window=firstmate:fm-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
-    "project=$dir/project" "kind=ship" "mode=direct-PR" "receipt_required=1"
+    "project=$dir/project" "kind=ship" "mode=direct-PR" "harness=claude" "receipt_required=1"
   git -C "$dir/wt" remote add origin https://github.com/o/r.git
   printf 'bash targeted-test: PASS\n' > "$dir/evidence.txt"
   FM_HOME="$dir/home" "$ROOT/bin/fm-run-receipt.sh" task-a PASS "$dir/evidence.txt" "$dir/wt" >/dev/null \
@@ -851,7 +889,30 @@ test_cross_repo_receipt_candidate() {
   FM_TEST_GH_HEAD=$forge_head run_check_entry "$dir" task-a https://github.com/o/r/pull/4 \
     > "$dir/stdout" 2> "$dir/stderr" \
     || fail "a same-repo receipt for the worktree HEAD did not register: $(cat "$dir/stderr")"
-  pass "one cross-repo forge-head receipt passes registration and merge; the worktree HEAD still refuses"
+  # A same-repository direct-PR keeps the worktree-HEAD receipt candidate: a
+  # commit made after the receipt was published leaves the receipt naming the
+  # older head, so the current-state read stays blocked.
+  git -C "$dir/wt" commit -q --allow-empty -m 'later unpushed commit'
+  printf 'done: PR https://github.com/o/r/pull/4 checks green\n' > "$dir/home/state/task-a.status"
+  cat > "$dir/fakebin/tmux" <<'SH'
+#!/usr/bin/env bash
+case "${1:-}" in
+  display-message) printf '%%1\n' ;;
+  capture-pane) printf 'all quiet\n> \n' ;;
+esac
+exit 0
+SH
+  chmod +x "$dir/fakebin/tmux"
+  gen=$("$ROOT/bin/fm-busy-event.sh" arm "$dir/home/state" task-a)
+  "$ROOT/bin/fm-busy-event.sh" apply "$dir/home/state" task-a idle --gen "$gen" \
+    --source claude-hook --event stop
+  out=$(FM_STATE_OVERRIDE="$dir/home/state" FM_CREW_STATE_NO_FORGE=1 FM_TEST_NM_FAIL=1 \
+    PATH="$dir/fakebin:$BASE_PATH" "$ROOT/bin/fm-crew-state.sh" task-a 2> "$dir/crew.err")
+  case "$out" in
+    *"state: blocked"*"completion receipt refused"*) ;;
+    *) fail "a same-repo direct-PR with a later unpushed commit did not stay blocked: $out $(cat "$dir/crew.err")" ;;
+  esac
+  pass "one cross-repo forge-head receipt registers, merges, and reads done; the worktree HEAD and a later unpushed commit still refuse"
 }
 
 test_valid_recording_and_merge_derivation() {

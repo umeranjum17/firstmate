@@ -168,14 +168,8 @@ fi
 # request, an unverified forge head, or an origin whose repository cannot be
 # isolated keep the worktree HEAD candidate.
 RECEIPT_CANDIDATE=
-if [ -n "$PR_HEAD" ] && [ -n "$WT" ] && [ -d "$WT" ] \
-  && ORIGIN_URL=$(git -C "$WT" remote get-url origin 2>/dev/null) \
-  && fm_pr_repo_from_git_url "$ORIGIN_URL" \
-  && [ -n "$FM_PR_GIT_HOST" ] && [ -n "$FM_PR_GIT_REPO" ]; then
-  if [ "$(printf '%s' "$FM_PR_GIT_HOST" | tr '[:upper:]' '[:lower:]')" != "$(printf '%s' "$HOST" | tr '[:upper:]' '[:lower:]')" ] \
-    || [ "$(printf '%s' "$FM_PR_GIT_REPO" | tr '[:upper:]' '[:lower:]')" != "$(printf '%s' "$PROJECT_PATH" | tr '[:upper:]' '[:lower:]')" ]; then
-    RECEIPT_CANDIDATE=$PR_HEAD
-  fi
+if [ -n "$PR_HEAD" ] && fm_dod_pr_outside_origin "$WT" "$URL"; then
+  RECEIPT_CANDIDATE=$PR_HEAD
 fi
 
 MODE=$(grep '^mode=' "$META" | tail -1 | cut -d= -f2- || true)
