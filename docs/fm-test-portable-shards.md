@@ -116,7 +116,7 @@ Its `--list-files` interface exposes partition membership; `tests/fm-lint.test.s
 The workflow uploads each partition's quiet telemetry plus its per-root lifecycle sidecar to distinguish analysis cost, memory use, and host contention.
 Each partition lints one root at a time, because the heaviest roots reach about 8 GiB resident and two of them overflow the 16 GB hosted runner; more partitions, not more concurrent jobs, shorten lint.
 No fast mode or paid runner provisioning is part of this layout.
-The one path skip is the docs-only scope in `.github/workflows/ci.yml`: a pull request whose changes select no test in `bin/fm-test-run.sh --changed` skips lint and the behavior lanes, and its `CI result` gate still reports.
+The one path skip is the docs-only scope in `.github/workflows/ci.yml`, whose changes job owns the full classification: a pull request it classifies docs-only skips lint and the behavior lanes, and its `CI result` gate still reports.
 
 The longer-term performance objective remains a complete green run under fifteen minutes including start delay, but the slowest serial shard alone still exceeds that objective.
 The immediate packing target is the runner's modeled script budget, not a claim that more shards alone can make an indivisible script faster.
