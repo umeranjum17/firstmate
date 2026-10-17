@@ -67,6 +67,12 @@ for lib in fm-backend.sh fm-busy-lib.sh fm-quota-axi-lib.sh fm-parent-channel-li
   # shellcheck source=/dev/null
   . "$BIN/$lib" || die "cannot load $BIN/$lib"
 done
+# Parked-home reader (firstmate-addons/parked-homes): a parked home is never
+# failover-moved - a parked home gets no relaunch. No-op when the reader is
+# absent (the predicate then answers "not parked").
+_FM_PARKED_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../parked-homes/bin/fm-parked-homes-lib.sh"
+# shellcheck source=/dev/null # sibling add-on path, resolved at runtime
+[ -f "$_FM_PARKED_LIB" ] && . "$_FM_PARKED_LIB"
 
 log() { printf '%s %s\n' "$(date -u +%FT%TZ)" "$*" >> "$LOG"; }
 last() { sed -n "s|^[^ ]* $1: ||p" "$LOG" 2>/dev/null | tail -n 1; } # <id>
@@ -248,6 +254,11 @@ dead_retest
 for meta in "$STATE"/*.meta; do
   [ -f "$meta" ] || continue
   id=${meta##*/} id=${id%.meta}
+  # A parked home never moves: the skip is logged once per change, not per pass.
+  if fm_parked_meta "$meta" "$id"; then
+    note "$id" "parked: its home is parked (config/parked-homes); skipped"
+    continue
+  fi
   [ ! -e "$STATE/$id.backlog-close" ] || continue
   # Busy-state is not progress: a harness retrying a limit rewrites it on every
   # attempt. busy-gen is re-armed at every spawn or relaunch, so a fresh

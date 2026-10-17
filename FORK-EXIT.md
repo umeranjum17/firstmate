@@ -22,6 +22,7 @@ against the files, not against this table. PRs at the top until they are resolve
 
 | Feature | Fork PR | Key files | Exit path | Status |
 |---|---|---|---|---|
+| Skip parked homes in every supervision producer | [85](https://github.com/umeranjum17/firstmate/pull/85) (88e57fe1) | `bin/fm-parked-homes-lib.sh` (new shim), gate lines in `bin/fm-send.sh`, `bin/fm-control.sh`, `bin/fm-remote-secondmate-relaunch.sh`, `bin/fm-secondmate-restart.sh`, `bin/fm-secondmate-reconcile.sh`, `bin/fm-config-push.sh`, `bin/fm-bootstrap.sh`, `bin/fm-pending-reply-lib.sh`, `bin/fm-model-outage-lib.sh`, `bin/fm-watch.sh` | add-on `parked-homes` (the reader + policy live there; fork carries only the shim and one predicate call per producer) | on fork |
 | Fork catch-up with Kun's main | [74](https://github.com/umeranjum17/firstmate/pull/74) (merge e9e2ef20) | merge commits only | stays (sync, no feature content) | done — merged; upstream ports (capacity, exclusions, spend, growth check) now byte-identical to Kun's main |
 | Label the Main-owned wait escalation as the check wake | [78](https://github.com/umeranjum17/firstmate/pull/78) (4df0ed20) | `bin/fm-wait-timers-lib.sh` | offer to Kun | on fork |
 | Fold open decisions without forking per status line | [79](https://github.com/umeranjum17/firstmate/pull/79) (226ea2b2) | `bin/fm-classify-lib.sh` | offer to Kun | on fork |
