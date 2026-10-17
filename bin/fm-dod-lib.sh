@@ -829,7 +829,7 @@ fm_dod_pr_outside_origin() {  # <worktree> <pr-url>
 # because it runs inside done-acceptance paths that supervision calls on every
 # poll. Sets FM_DOD_LIVE_HEAD on success.
 fm_dod_forge_pr_head_live() {  # <provider> <host> <path> <number> <url>
-  local provider=$1 host=$2 path=$3 number=$4 url=$5 json
+  local provider=$1 host=$2 path=$3 number=$4 url=$5 json lib
   FM_DOD_LIVE_HEAD=
   case "$provider" in
     github)
@@ -846,8 +846,13 @@ fm_dod_forge_pr_head_live() {  # <provider> <host> <path> <number> <url>
       FM_DOD_LIVE_HEAD=$(printf '%s' "$json" | jq -er 'if (type == "object") and (.sha | type == "string") then .sha else error("pull request record has no sha") end' 2>/dev/null) || return 1
       ;;
     forgejo)
-      fm_pr_forgejo_read_record "$host" "$path" "$number" || return 1
-      FM_DOD_LIVE_HEAD=$FM_PR_RECORD_HEAD
+      lib="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/fm-pr-lib.sh"
+      # shellcheck disable=SC2016  # The inner script expands after bash -c receives positional args.
+      FM_DOD_LIVE_HEAD=$(fm_run_timed 15 bash -c '
+        . "$1"
+        fm_pr_forgejo_read_record "$2" "$3" "$4" || exit 1
+        printf "%s\n" "$FM_PR_RECORD_HEAD"
+      ' _ "$lib" "$host" "$path" "$number" 2>/dev/null) || return 1
       ;;
     *)
       return 1
