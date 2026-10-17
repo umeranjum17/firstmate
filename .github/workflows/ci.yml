@@ -53,8 +53,11 @@ jobs:
   # the selection fail, which runs everything. A deleted path outside that
   # docs-only set (under tests/ or bin/, say) also runs everything: retired
   # paths select nothing by design, so an empty selection cannot tell them
-  # from docs-only, and removing coverage is never docs-only. Pushes to main
-  # always run all.
+  # from docs-only, and removing coverage is never docs-only. A change to the
+  # runner or to anything under .github/workflows/ also runs everything: on a
+  # pull_request those files come from the merge commit, so the skip is never
+  # decided by code the pull request itself carries. Pushes to main always
+  # run all.
   changes:
     name: Change scope
     runs-on: ${{ (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) && vars.FM_REVIEW_BOX == '1' && fromJSON('["self-hosted","review-box"]') || 'ubuntu-latest' }}
@@ -76,12 +79,19 @@ jobs:
           # The pull_request checkout is the merge commit; its first parent is
           # the base tip, so HEAD^1..HEAD is exactly this pull request's change.
           if [ "$EVENT_NAME" = pull_request ]; then
-            # A deleted path outside the docs-only set selects nothing by
-            # design, so the empty-selection check below cannot tell it from
-            # docs-only; deleting tests or code must run everything.
             deleted_heavy=false
+            trusted=true
             while IFS= read -r path; do
               [ -n "$path" ] || continue
+              # The runner and the workflow files themselves come from the
+              # merge commit on pull_request, so a change to either must run
+              # everything without being classified by the code it carries.
+              case "$path" in
+                bin/fm-test-run.sh|.github/workflows/*) trusted=false ;;
+              esac
+              # A deleted path outside the docs-only set selects nothing by
+              # design, so the empty-selection check below cannot tell it from
+              # docs-only; deleting tests or code must run everything.
               case "$path" in
                 README.md|LICENSE|assets/*|docs/*|.gitignore) continue ;;
               esac
@@ -89,8 +99,8 @@ jobs:
                 deleted_heavy=true
                 break
               fi
-            done < <(git diff --name-only --diff-filter=D HEAD^1 HEAD)
-            if [ "$deleted_heavy" = false ] \
+            done < <(git diff --name-only HEAD^1 HEAD)
+            if [ "$deleted_heavy" = false ] && [ "$trusted" = true ] \
               && selected=$(bin/fm-test-run.sh --changed --base HEAD^1 --list) \
               && [ -z "$selected" ]; then
               heavy=false

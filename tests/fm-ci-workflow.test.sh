@@ -399,7 +399,35 @@ test_changes_decision_runs_everything_for_deleted_tests() {
   [ "$heavy" = false ] \
     || fail "an ordinary docs-only pull request must stay skippable, got heavy=$heavy"
 
-  pass "the changes job runs everything for deleted tests and keeps the docs-only skip"
+  # A pull request that carries the runner itself must not be classified by
+  # it: the head commit swaps in a runner that reports an empty selection,
+  # so only the untrusted-source rule can keep the heavy lanes running.
+  root=$(fm_test_tmproot fm-ci-touch-runner)
+  repo="$root/repo"
+  build_classify_repo "$repo" docs/notes.md notes
+  printf '#!/usr/bin/env bash\nexit 0\n' >"$repo/bin/fm-test-run.sh"
+  chmod +x "$repo/bin/fm-test-run.sh"
+  git -C "$repo" -c user.email=ci@firstmate.test -c user.name=ci commit -qam "swap in a lying runner"
+  heavy=$(run_classify_step "$repo" "$step") || fail "classify step failed for a runner change"
+  [ "$heavy" = true ] \
+    || fail "a pull request changing bin/fm-test-run.sh must run the heavy lanes, got heavy=$heavy"
+
+  # The same holds when the pull request touches the workflow files, whose
+  # text also comes from the merge commit: the skip is never consulted.
+  root=$(fm_test_tmproot fm-ci-touch-workflow)
+  repo="$root/repo"
+  build_classify_repo "$repo" docs/notes.md notes
+  mkdir -p "$repo/.github/workflows"
+  printf '%s\n' 'name: other' >"$repo/.github/workflows/other.yml"
+  printf '#!/usr/bin/env bash\nexit 0\n' >"$repo/bin/fm-test-run.sh"
+  chmod +x "$repo/bin/fm-test-run.sh"
+  git -C "$repo" add -A
+  git -C "$repo" -c user.email=ci@firstmate.test -c user.name=ci commit -qm "add a workflow and a lying runner"
+  heavy=$(run_classify_step "$repo" "$step") || fail "classify step failed for a workflow change"
+  [ "$heavy" = true ] \
+    || fail "a pull request changing .github/workflows/ must run the heavy lanes, got heavy=$heavy"
+
+  pass "the changes job runs everything for deleted tests, never trusts the pull request's own classifier, and keeps the docs-only skip"
 }
 
 test_ci_matrices_match_executable_partitions
