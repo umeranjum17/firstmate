@@ -842,7 +842,7 @@ fm_dod_forge_pr_head_live() {  # <provider> <host> <path> <number> <url>
       if ! command -v glab >/dev/null 2>&1 || ! command -v jq >/dev/null 2>&1; then
         return 1
       fi
-      json=$(fm_run_timed 15 glab mr view "$number" -R "https://$host/$path" -F json 2>/dev/null) || return 1
+      json=$(fm_run_timed 15 env GITLAB_HOST="$host" glab mr view "$number" -R "https://$host/$path" -F json 2>/dev/null) || return 1
       FM_DOD_LIVE_HEAD=$(printf '%s' "$json" | jq -er 'if (type == "object") and (.sha | type == "string") then .sha else error("pull request record has no sha") end' 2>/dev/null) || return 1
       ;;
     forgejo)

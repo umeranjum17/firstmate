@@ -12,6 +12,12 @@ set -u
 TMP_ROOT=$(fm_test_tmproot fm-dod-lib)
 fm_git_identity fmtest fmtest@example.invalid
 
+FAKEBIN=$(fm_fakebin "$TMP_ROOT/suite-fakebin")
+printf '#!/usr/bin/env bash\nexit 1\n' > "$FAKEBIN/gh"
+chmod +x "$FAKEBIN/gh"
+PATH="$FAKEBIN:$PATH"
+export PATH
+
 accept_done() {  # <kind> <mode> <worktree> <project> <line> [<state> <id> <meta>]
   fm_dod_accept_ship_done "$@"
 }
