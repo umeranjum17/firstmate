@@ -141,4 +141,14 @@ out=$(lane git push origin corrupt 2>&1) && rc=0 || rc=$?
 check "unscannable commit refuses the push" "$rc" 1
 check "unscannable push reached nothing" "$(git -C "$d/origin.git" rev-parse -q --verify refs/heads/corrupt)" ""
 
+# A missing trailing newline never hides the following added line.
+printf 'old' >"$d/fresh/nonnl.txt"
+git -C "$d/fresh" add nonnl.txt
+lanein "$d/fresh" git commit -q --no-verify -m 'seed without trailing newline'
+printf 'old\nreach testguard-fake-surname here\n' >"$d/fresh/nonnl.txt"
+git -C "$d/fresh" add nonnl.txt
+out=$(lanein "$d/fresh" git commit -m 'nonewline leak' 2>&1) && rc=0 || rc=$?
+check "missing-newline leak refused" "$rc" 1
+has "missing-newline refusal prints file:line" "$out" "nonnl.txt:2"
+
 if [ "$fails" -eq 0 ]; then echo "PASS"; else echo "FAILED: $fails"; exit 1; fi
