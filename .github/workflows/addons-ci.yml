@@ -109,3 +109,6 @@ jobs:
       # Fixture origin, clone, lane worktree and a throwaway HOME, home and patterns file: nothing real is touched.
       - name: Owner guard test
         run: bash owner-guard/tests/owner-guard.test.sh
+      # Fixture origin, plain repo and a throwaway HOME, global gitconfig, home and patterns file: nothing real is touched.
+      - name: Owner guard global test
+        run: bash owner-guard/tests/owner-guard-global.test.sh

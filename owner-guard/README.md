@@ -18,12 +18,35 @@ pushing the owner's private details to a public repo, shaped like
   empty patterns file allows with one note line.
 - `install.sh` — installs the guard, keeps the patterns file private (mode
   600, never created and never overwritten; the recorded patterns home is
-  kept when the new home has no file), and chains both hooks
-  through the git-identity `hooks.d/` dir so every lane commit runs them.
+  kept when the new home has no file), chains both hooks
+  through the git-identity `hooks.d/` dir so every lane commit runs them,
+  and points the user's global `core.hooksPath` at `global-hook.sh`
+  wrappers so plain-shell commits and pushes are checked too. Each wrapper
+  runs the guard (pre-commit and pre-push only), then the previous global
+  hooks dir's hook and the repository's own hook, so repos with their own
+  hooks keep working. Install is idempotent, records a replaced global
+  hooksPath instead of dropping it, and `--uninstall` restores it; a
+  repo-local `core.hooksPath` is never touched.
 - `tests/owner-guard.test.sh` — fixture-repo proof (throwaway HOME and repo,
   made-up patterns only): matching commit refused, clean commit passes,
   matching push refused, removal-only commit passes, the repo's own hook
   still chains. The patterns file is never copied into the repo or a log.
+- `tests/owner-guard-global.test.sh` — fixture proof for the machine-wide
+  guard (throwaway HOME and global gitconfig, made-up patterns only):
+  plain-shell and lane leaks refused, clean commits and pushes pass, the
+  repo's own hooks and a previous global hooks dir still chain, double
+  install is a no-op, uninstall restores the previous global hooksPath.
+
+## Known limits
+
+A refusal only fires when a client-side hook runs: `git commit --no-verify`
+skips the pre-commit check, and a repo-local `core.hooksPath` (for example
+a hook manager) replaces the global wrappers for that repo, so neither is
+caught. The no-mistakes pipeline pins a per-worktree `core.hooksPath` and
+pushes with client hooks skipped, so commits the pipeline itself authors
+are unguarded; worker commits are still checked at commit time. Fixture
+evidence for the bypass (made-up values only) is kept with the task
+record, outside this repo.
 
 ## Daily scan
 
