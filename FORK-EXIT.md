@@ -66,12 +66,12 @@ against the files, not against this table. PRs at the top until they are resolve
 | Supervisor-work guard | e4a6c5e0 | `bin/fm-supervisor-work-command-policy.mjs`, `bin/fm-supervisor-work-pretool-check.sh` | add-on `supervisor-guard` + pretool hook | dormant copy |
 | Model-outage, usage-limit and stuck-wait alerts | 16e04a41 ([48](https://github.com/umeranjum17/firstmate/pull/48)), da71f161 ([52](https://github.com/umeranjum17/firstmate/pull/52)), 01f01944 ([47](https://github.com/umeranjum17/firstmate/pull/47)) | `bin/fm-model-outage-lib.sh`, watch hunks | add-on `alerts` + watch hook | dormant copy |
 | Local Qwen tuning docs + bench | 78cc325a | `docs/local-qwen-tuning/` (fork copy still differs from Kun's main) | add-on `local-qwen-tuning` (reference lives there) | dormant copy — drop fork docs on next cleanup |
+| Bearings board milestones + evidence thumbnails | 9ad8e1fb, 08472745 | `bin/fm-bearings-board.sh`, `bin/fm-bearings-snapshot.sh`, `.agents/skills/bearings/` | add-on `bearings-board` + fork shim | dormant copy — fork shim next |
 
 ### Still on the fork, add-on planned
 
 | Feature | Commits / PRs | Key files | Exit path | Status |
 |---|---|---|---|---|
-| Bearings board milestones + evidence thumbnails | 9ad8e1fb, 08472745 | `bin/fm-bearings-board.sh`, `bin/fm-bearings-snapshot.sh`, `.agents/skills/bearings/` | add-on (skill assets + board scripts) | on fork |
 | Lead-wake fleet policy (lane floor, idle lead, stalled ring, ready-work) | afd00e42, bd86f55b, 0ef3188b ([9](https://github.com/umeranjum17/firstmate/pull/9)), 49d4ea80, d4881b01 ([7](https://github.com/umeranjum17/firstmate/pull/7)), a7d3b2cc ([8](https://github.com/umeranjum17/firstmate/pull/8)), c66d9594 ([81](https://github.com/umeranjum17/firstmate/pull/81)) | `bin/fm-watch.sh`, `bin/fm-wake-lib.sh` | add-on (watch-side policy seam); never offer upstream as a "fix" | on fork |
 | Worker account pooling at spawn + raw-launch refusal | aa56a40c ([72](https://github.com/umeranjum17/firstmate/pull/72)), 46e2273b ([76](https://github.com/umeranjum17/firstmate/pull/76)) | `bin/fm-account-pool-lib.sh`, `bin/fm-worker-account-lib.sh`, `bin/fm-spawn.sh` | add-on if fm-control gains an account hook, else offer to Kun only with the owner's approval | on fork |
 | Shared worker-brief inheritance | e2071b0a | brief builder hunks | add-on (brief seam) | on fork |
