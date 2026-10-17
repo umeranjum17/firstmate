@@ -2708,9 +2708,8 @@ record_ready_work_surfaced() {
 # is unreachable and the ask's clock has run out. Located like the other add-on
 # shims (FM_ADDONS_DIR, default $FM_HOME/projects/firstmate-addons); with the
 # add-on absent this returns at once, writing nothing, and the loop is unchanged.
-# Runs once per CHECK_INTERVAL. The probe is
-# $ASK_DEFAULT_PROBE when set, else the away record: the captain is reachable
-# unless an away record (never quiet mode's) exists. Held, waiting, and
+# Runs once per CHECK_INTERVAL. The probe reads the away record: the captain is
+# reachable unless an away record (never quiet mode's) exists. Held, waiting, and
 # reachable asks stay exactly as they are; a decide error is logged, never a wake.
 # Sets ASK_DEFAULT_REASON and returns 0 when at least one ask was just defaulted.
 ask_default_tick() {
@@ -2720,8 +2719,8 @@ ask_default_tick() {
   [ "$(age_of "$STATE/.last-ask-default-check")" -ge "$CHECK_INTERVAL" ] || return 1
   touch "$STATE/.last-ask-default-check"
   # shellcheck disable=SC2016 # the probe's own command substitution runs inside decide
-  probe=${ASK_DEFAULT_PROBE:-$(printf '[ "$(%q mode --path %q 2>/dev/null)" != away ]' \
-    "$SCRIPT_DIR/fm-afk-contract.sh" "$STATE/.afk-contract")}
+  probe=$(printf '[ "$(%q mode --path %q 2>/dev/null)" != away ]' \
+    "$SCRIPT_DIR/fm-afk-contract.sh" "$STATE/.afk-contract")
   for rec in "$FM_HOME/data/ask-default/asks"/*; do
     [ -f "$rec" ] || continue
     id=${rec##*/}
