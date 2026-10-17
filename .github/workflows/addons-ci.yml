@@ -103,3 +103,6 @@ jobs:
       # Stub upstream on 127.0.0.1 only: never reaches Z.AI.
       - name: GLM queue test
         run: bash glm-queue/tests/glm-queue.test.sh
+      # Fixture origin, shared clone, lane worktree and a throwaway HOME and home: nothing real is touched.
+      - name: Git identity test
+        run: bash git-identity/tests/git-identity.test.sh
