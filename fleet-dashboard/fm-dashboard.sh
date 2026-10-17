@@ -1165,14 +1165,48 @@ def unknown_foot(*sources):
     return f'<p>Unknown now: {esc("; ".join(hit))}.</p>' if hit else ''
 
 # --- overview ------------------------------------------------------------
+ASK_TAG = {'yn': 'yes/no', 'pick': 'pick', 'approval': 'approval'}
+def ask_type(text):  # pick: a pick/choose/which verb, the word options, or two option markers; approval: approv*/merg*; else yes/no
+    if re.search(r'\b(?:pick|choose|which)\b|\boptions?\b', text, re.I) or len(re.findall(r'(?:^|\s)\(?[1-9a-h]\)', text, re.I)) >= 2: return 'pick'
+    if re.search(r'\b(?:approv|merg)\w*', text, re.I): return 'approval'
+    return 'yn'
+# Sort and filter are CSS-only (the page has no script): hidden radios sit before the list and the
+# rules below read their state. Each ask carries its newest-first rank (--n) and oldest-first rank (--o).
+ASK_CONTROLS = ('<input class="ctl" type="radio" name="asort" id="as-new" checked>'
+                '<input class="ctl" type="radio" name="asort" id="as-old">'
+                + ''.join(f'<input class="ctl" type="radio" name="atype" id="at-{k}"{" checked" if k == "all" else ""}>' for k in ('all', 'yn', 'pick', 'approval')))
+ASK_BAR = ('<div class="actl"><nav class="seg" aria-label="Sort asks"><label for="as-new">Newest first</label><label for="as-old">Oldest first</label></nav>'
+           '<nav class="seg" aria-label="Filter asks by type"><label for="at-all">All</label><label for="at-yn">Yes/no</label>'
+           '<label for="at-pick">Pick</label><label for="at-approval">Approval</label></nav></div>')
+ASK_CSS = ('.ctl{position:absolute;opacity:0;pointer-events:none}'
+           '.actl{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px}'
+           '.actl .seg label{display:inline-flex;align-items:center;min-height:36px;padding:8px 11px;border-radius:6px;color:var(--text2);cursor:pointer;white-space:nowrap;font-size:14px}'
+           '.ktag{display:inline-block;margin-right:6px;padding:0 5px;border:1px solid var(--line2);border-radius:5px;font-size:12px;font-weight:400;color:var(--text2);white-space:nowrap}'
+           '.rows.asks{display:flex;flex-direction:column}'
+           '.rows.asks .item{order:var(--n)}'
+           '#as-old:checked ~ .rows.asks .item{order:var(--o)}'
+           '#at-yn:checked ~ .rows.asks .item:not(.k-yn),#at-pick:checked ~ .rows.asks .item:not(.k-pick),#at-approval:checked ~ .rows.asks .item:not(.k-approval){display:none}'
+           + ''.join(f'#{s}:checked ~ .actl label[for={s}]{{background:var(--track);color:var(--text);font-weight:600}}'
+                     f'#{s}:focus-visible ~ .actl label[for={s}]{{outline:2px solid var(--acc);outline-offset:2px}}' for s in ('as-new', 'as-old', 'at-all', 'at-yn', 'at-pick', 'at-approval')))
+CSS += ASK_CSS
 def ask_rows():
     if not asks_known: return f'<p class="lede">{unknown("the ask list is unreadable")}</p>'
     if not asks: return ''
+    # Newest first by default; asks with no usable time go last in both orders, in file order.
+    dated = [a for a in asks if a[1] is not None]
+    undated = [a for a in asks if a[1] is None]
+    newest = sorted(dated, key=lambda a: a[1]) + undated
+    oldest = sorted(dated, key=lambda a: -a[1]) + undated
+    rank_old = {id(a): i for i, a in enumerate(oldest)}
     rs = []
-    for fields, age in asks:
-        if age is None: rs.append(item('bad', 'Ask record needs correction', '', ''))
-        else: rs.append(item('warn', link(fields[2], fields[3]), esc(dur(age))))
-    return f'<div class="rows asks">{"".join(rs)}</div>'
+    for i, ask in enumerate(newest):
+        fields, age = ask
+        kind = ask_type(fields[2])
+        tag = f'<span class="ktag">{ASK_TAG[kind]}</span>'
+        if age is None: row = item('bad', tag + 'Ask record needs correction', '', '')
+        else: row = item('warn', tag + link(fields[2], fields[3]), esc(dur(age)))
+        rs.append(row.replace('class="item"', f'class="item k-{kind}" style="--n:{i};--o:{rank_old[id(ask)]}"', 1))
+    return f'{ASK_CONTROLS}{ASK_BAR}<div class="rows asks">{"".join(rs)}</div>'
 def busy_split():  # leads + Main + workers (+ other), always summing to the busy total
     return ' + '.join(f'{BUSY[r]} Main' if r == 'main' else plural(BUSY[r], r) for r, n in ROLES if BUSY[r] or r != 'other')
 GLYPH = {'bad': '✕', 'warn': '▲', 'ok': '●', 'mut': '?'}

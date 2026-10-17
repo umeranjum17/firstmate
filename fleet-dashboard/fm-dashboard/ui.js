@@ -37,6 +37,14 @@ export const hname = (d, id) => d.homes.find(h => h.id === id)?.name || id
 
 // Stuck first, then waiting, then by time in stage; on hold last; landed newest first.
 const rank = c => stuck(c) ? 0 : c.wait === 'waiting' ? 1 : c.wait === 'parked' ? 3 : 2
+// An ask's type from its text, the same rule as fm-dashboard.sh: pick on a pick/choose/which verb, the word options, or two option markers; approval on approv*/merg*; else yes/no.
+export const ASK_TAG = { yn: 'yes/no', pick: 'pick', approval: 'approval' }
+export const askType = text => /\b(?:pick|choose|which)\b|\boptions?\b/i.test(text) || (text.match(/(?:^|\s)\(?[1-9a-h]\)/gi) || []).length >= 2 ? 'pick' : /\b(?:approv|merg)\w*/i.test(text) ? 'approval' : 'yn'
+// Newest first unless asked otherwise; asks with no usable time go last, in their own order.
+export const askOrder = (asks, newest = true) => {
+  const dated = asks.filter(a => a.age != null).sort((a, b) => newest ? a.age - b.age : b.age - a.age)
+  return [...dated, ...asks.filter(a => a.age == null)]
+}
 export const sorted = cs => [...cs].sort((a, b) => a.stage === 'landed' && b.stage === 'landed' ? b.since - a.since : rank(a) - rank(b) || (a.since || 9e9) - (b.since || 9e9))
 // A waiting lane's age is its time in that wait, any other lane's its time in stage.
 export const age = c => c.wait_since && c.wait ? now() - c.wait_since : c.since ? now() - c.since : null

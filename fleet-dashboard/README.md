@@ -4,10 +4,9 @@ The read-only fleet dashboard — server, builder and app — moved **verbatim**
 of the Firstmate fork into this add-on repository. Nothing serves it from here
 yet: the live dashboard keeps building and serving from the fork's
 `bin/fm-dashboard.sh`, and the fork-side shim that will exec into this directory
-lands in a later PR. Until that swap this directory is dormant. The app under
-`fm-dashboard/` is still identical to the fork copy the live service runs
-today, and `fm-dashboard.sh` carries two deliberate differences, described under
-Provenance.
+lands in a later PR. Until that swap this directory is dormant. `fm-dashboard.sh`
+and the app under `fm-dashboard/` carry the deliberate differences from the
+fork described under Provenance.
 
 ## Layout
 
@@ -39,7 +38,7 @@ Run the behavior suite with `fleet-dashboard/tests/run-fork-suite.sh [checkout]`
   with the matching `models_error` / `skills_error` keys for the statistics
   readers.
 
-## Provenance: one deliberate change from the fork
+## Provenance: deliberate changes from the fork
 
 Every moved file was compared byte for byte against its fork source
 (`bin/fm-dashboard.sh` and `bin/fm-dashboard/`) at move time; the 16-file
@@ -49,23 +48,27 @@ copies used by the proof below
 task data). Treat any future diff against the fork file as a contract change,
 not a refactor.
 
-Two changes are deliberate. `fm-dashboard.sh` no longer blanks the fleet's Ready
+Three changes are deliberate. `fm-dashboard.sh` no longer blanks the fleet's Ready
 and queue numbers when a single home's backlog cannot be read: it counts the
 homes that were read, marks a partial count as a lower bound (`≥`), names each
 unread home with its reason, and reports the partial metric with status
 `partial` in `data.json`. Only when no home could be read does the tile show
 the unknown dash as before. It also adds one environment input, `FM_BIN` (see
 For the fork shim lane), defaulting to the script's own directory so a fork
-copy behaves exactly as before. Every other moved file, the whole
-`fm-dashboard/` app included, remains byte-identical to the fork.
+copy behaves exactly as before. The third changes the ask list: it lists
+newest first by default with an oldest-first toggle, and each ask carries a
+type tag (yes/no, pick or approval, read from the ask text) with a matching
+filter — once in `fm-dashboard.sh`'s static overview page and again in the
+app (`ui.js`, `app.js`, `app.css`), whose remaining bytes are unchanged.
+Every other moved file remains byte-identical to the fork.
 
 ## Side-by-side proof (re-run before the served path swaps)
 
 The acceptance proof builds the fork copy and this copy in two throwaway
 `FM_HOME` dirs over one identical fixture and diffs the two
 `state/dashboard/` outputs byte for byte. Its fixture reads every home's
-backlog, so the two copies still agree there; the one deliberate backlog-read
-difference above is the only case where they are now expected to diverge.
+backlog, so the two copies still agree there; the deliberate differences
+above are the cases where they are now expected to diverge.
 
 One command (harness lives with this task's evidence):
 
@@ -79,8 +82,8 @@ Manual recipe if the harness is gone:
 
 1. Copy `bin/fm-dashboard.sh` + `bin/fm-dashboard/` from the fork and
    `fleet-dashboard/` from this repo into two scratch dirs; verify sha256 of
-   every moved file matches across both except `fm-dashboard.sh`, the one
-   deliberate difference above.
+   every moved file matches across both except the files named in the
+   deliberate differences above.
 2. Overlay identical deterministic reader stubs next to both scripts
    (`fm-flow.sh` exiting non-zero for pass 1, a fixed `fm-flow.v1` JSON for
    pass 2; fixed `fm-model-stats.sh` / `fm-skill-stats.sh`; a fixed TOON
@@ -95,7 +98,8 @@ Manual recipe if the harness is gone:
    both builds run at one instant.
 4. Run `fm-dashboard.sh build` with each home, capture
    `$FM_HOME/state/dashboard/`, and `diff -r` the captures: identical
-   `board.json`, `data.json` and page HTML. The only path a build prints is
+   `board.json` and `data.json`, page HTML identical outside the deliberate
+   differences above. The only path a build prints is
    its index page path, which names its own `FM_HOME` — normalize that line
    and the stdout must match too.
 5. Check the CLI contract (`-h`, bad subcommand, bad port, extra build
