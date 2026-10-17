@@ -57,7 +57,7 @@ claude claude-opus-5-5 high
 pi zai/glm-5.3-flash high
 #--- nm.yaml
 # no-mistakes config
-agent: opencode # 14 Oct captain: pipeline and reviews on free/cheap models only, never Claude
+agent: opencode # pipeline and reviews stay on free/cheap models, never Claude
 api_key: SECRET-never-printed
 agent_config:
   claude:
@@ -65,7 +65,7 @@ agent_config:
     effort: low
   pi:
     # the gate model
-    model: zai/glm-5.3-flash # 16 Oct 08:05Z captain on the board
+    model: zai/glm-5.3-flash # operator decision on the board
     effort: medium
   opencode:
     model: opencode-go/muse-spark-1.3-contributor
@@ -162,9 +162,9 @@ is "gate keys move" "$(python3 -c 'import yaml,sys; c=yaml.safe_load(open(sys.ar
   "pi muse-spark-1.3-contributor"
 is "gate: every other key and comment is unchanged" \
   "$(diff "$NM_CONFIG" "$NM_CONFIG".bak-route-change-* | grep -c '^[<>]')" 4
-is "the agent line keeps its provenance comment" "$(grep -cF 'agent: pi # 14 Oct captain' "$NM_CONFIG")" 1
+is "the agent line keeps its provenance comment" "$(grep -cF 'agent: pi # pipeline and reviews stay on free/cheap models' "$NM_CONFIG")" 1
 is "the model line keeps its provenance comment" \
-  "$(grep -cF 'model: muse-spark-1.3-contributor # 16 Oct 08:05Z captain on the board' "$NM_CONFIG")" 1
+  "$(grep -cF 'model: muse-spark-1.3-contributor # operator decision on the board' "$NM_CONFIG")" 1
 is "global lead pin" "$(tail -n 1 "$home/config/secondmate-harness")" "pi muse-spark-1.3-contributor high"
 is "Claude lead pin stays" "$(cat "$home/config/secondmates/lead-claude/harness")" "claude claude-opus-5-5 high"
 is "route lead pin" "$(cat "$home/config/secondmates/lead-glm/harness")" "pi muse-spark-1.3-contributor high"

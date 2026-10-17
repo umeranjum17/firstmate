@@ -8,12 +8,12 @@
 # directory that holds it, so this builds a scratch copy of a fork tree's bin/
 # with this add-on's fm-dashboard.sh swapped in and drives the real script
 # there. Skipped when that tree or a required tool is absent. FM_FORK points at
-# the fork tree (default /home/fixture/users/user-019/firstmate).
+# the fork tree (default ~/firstmate).
 set -u
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ADDON=$(dirname "$HERE")
-FORK=${FM_FORK:-/home/fixture/users/user-019/firstmate}
+FORK=${FM_FORK:-$HOME/firstmate}
 command -v python3 >/dev/null 2>&1 || { echo "skip: python3 not found"; exit 0; }
 command -v jq >/dev/null 2>&1 || { echo "skip: jq not found"; exit 0; }
 command -v tasks-axi >/dev/null 2>&1 || { echo "skip: tasks-axi not found"; exit 0; }

@@ -28,7 +28,7 @@ set -u
 [ "$#" -eq 2 ] && [ "$1" = check ] && [ -d "$2/state" ] || { echo "usage: merge-on-green.sh check <fm-home>" >&2; exit 2; }
 FMH=$(cd "$2" && pwd -P)
 STATE=$FMH/state
-LINT=${FM_MOG_CHECKS_LINT:-/home/fixture/users/user-019/firstmate/config/fm-checks-lint.sh}
+LINT=${FM_MOG_CHECKS_LINT:-${FM_MAIN_HOME:-$HOME/firstmate}/config/fm-checks-lint.sh}
 DATA=$FMH/data/fm-merge-on-green
 umask 077
 # One third of the watcher's per-check bound per command (floor 5s). Gate commands start only while

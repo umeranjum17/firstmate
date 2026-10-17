@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# End-to-end: replay 16 Oct's Claude readings through the real check in its file-argument mode, then drive install.sh
+# End-to-end: replay recorded Claude readings through the real check in its file-argument mode, then drive install.sh
 # against a throwaway firstmate home and HOME. Usage: claude-quota/tests/claude-quota.test.sh
 set -euo pipefail
 SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
@@ -20,10 +20,10 @@ print(json.dumps({"providers":[{"provider":"claude","windows":[
   {"id":"seven_day","percentRemaining":int(sys.argv[3]),"resetsAt":iso(8000)}]}]}))' "$@" > "$d/q.json"
 }
 
-# (a) Replay. The week readings are 16 Oct's 14 burn-rate wakes from Main's supervision log (79% -> 53%), each of
-# which woke Main, then the next readings in state/.claude-quota.hist. The 5 h readings and the week tail under 45%
-# are made up: no log keeps them. The history starts at 98% 4 h back (16 Oct 02:57-07:05Z went 98% -> 87%), so the
-# burn rate stays above the old rule's line all replay. Each row: label, 5 h %, min to 5 h reset, week %.
+# (a) Replay. The week readings are 14 burn-rate wakes from the supervision log (79% -> 53%), each of which woke
+# Main, then the next readings in state/.claude-quota.hist. The 5 h readings and the week tail under 45% are
+# synthesized. The history starts at 98% 4 h back, so the burn rate stays above the old rule's line all replay.
+# Each row: label, 5 h %, min to 5 h reset, week %.
 echo "$(($(date +%s) - 14400)) 98" > "$CQ_HIST"
 wakes='' five_low='' week_out=''
 while read -r label fp mins wp; do

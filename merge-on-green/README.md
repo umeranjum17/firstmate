@@ -7,11 +7,11 @@ lead to notice and merge (about 21 minutes per change).
 `state/<task>.meta` in that home with `yolo=on` and a recorded `pr=` and `pr_head=`, it acts only
 when the task's resolved state (`bin/fm-crew-state.sh <task>`) says checks green / PR ready. It
 silently skips a task whose meta says `merge=manual` (the lead sets it at intake on destructive,
-irreversible or security-sensitive work, and on work waiting for the captain's own review), and a PR
+irreversible or security-sensitive work, and on work waiting for your own review), and a PR
 whose evidence-gate PASS is a not-proven PASS — `fm-checks-lint.sh` reads the PR's newest `## Checks`
 block itself (filing the proof gap stays with the lead). Then it runs, in this order and as separate sequential commands, never piped and never in parallel:
 
-1. `FM_HOME=<home> /home/fixture/users/user-019/firstmate/config/fm-checks-lint.sh <PR URL> <home>/data/<task>` —
+1. `FM_HOME=<home> ${FM_MAIN_HOME:-$HOME/firstmate}/config/fm-checks-lint.sh <PR URL> <home>/data/<task>` —
    the evidence gate must print PASS.
 2. `state/<task>.run-receipt.json` must read verdict PASS, head == the meta's `pr_head`, and
    spawn_gen == the meta's `spawn_gen`.

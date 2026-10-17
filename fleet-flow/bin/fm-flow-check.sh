@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Home flow check (flow playbook R1-R3, captain 5 Oct). Read-only, local files only (runs inside the
+# Home flow check (flow playbook R1-R3). Read-only, local files only (runs inside the
 # watcher's 30 s check window, so no GitHub call).
 # Usage: fm-flow-check.sh <home>              lines for the lead, at most 5, only new or age-doubled ones
 #        fm-flow-check.sh <home> --can-start  exit 0 when the lead may start a lane, 1 otherwise (prints why)
@@ -10,11 +10,11 @@
 # Lane = live state/<task>.meta with kind=ship|scout. Lane age starts at the birth of data/<task>/.
 # A lane in a long external wait (see FREE_AFTER) keeps its record but stops counting toward the cap:
 # counted = open lanes that count; dry = 1 when ready = 0 and working < cap.
-# FM_MAIN_HOME names Main's home (default /home/fixture/users/user-019/firstmate), where lane-caps, the status rollup and bin/ live.
+# FM_MAIN_HOME names the main home (default ~/firstmate), where lane-caps, the status rollup and bin/ live.
 import os, re, sys, glob, json, time, subprocess, statistics as st
 
 CAP = 4
-MAIN = os.environ.get('FM_MAIN_HOME') or '/home/fixture/users/user-019/firstmate'
+MAIN = os.environ.get('FM_MAIN_HOME') or os.path.expanduser('~/firstmate')
 NAMES = {'1': 'takeone', '3': 'crewhouse', '4': 'writeboost', '8': 'muxr', '9': 'desklink', '10': 'byokit'}
 AT = re.compile(r'\[at=(\d+)\]')
 VERB = re.compile(r'^(?:\d{9,11}\s+)?([a-z][a-z-]*)')
@@ -22,8 +22,10 @@ VERB = re.compile(r'^(?:\d{9,11}\s+)?([a-z][a-z-]*)')
 home = os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 else sys.exit('usage: fm-flow-check.sh <home> [--can-start|--target|--summary]')
 mode = sys.argv[2] if len(sys.argv) > 2 else ''
 S, D = f'{home}/state', f'{home}/data'
-name = 'relayiptv' if '/firstmate-cff959/1/' in home + '/' else NAMES.get(os.path.basename(os.path.dirname(home)), os.path.basename(os.path.dirname(home)))  # slot 1 of the cff959 pool is relayiptv, not takeone (7 Oct)
-# Per-home cap override (captain 6 Oct): config/lane-caps lines '<home> <cap>'.
+# Slot nicknames for --summary/--target rows; override one slot with FM_SLOT_<n>_NAME.
+_slot = os.path.basename(os.path.dirname(home))
+name = os.environ.get(f'FM_SLOT_{_slot}_NAME') or NAMES.get(_slot, _slot)
+# Per-home cap override: config/lane-caps lines '<home> <cap>'.
 CAP = next((int(l.split()[1]) for l in open(f'{MAIN}/config/lane-caps') if l.split()[:1] == [name]), CAP) if os.path.exists(f'{MAIN}/config/lane-caps') else CAP
 NOW = int(time.time())
 
@@ -92,9 +94,9 @@ for m in glob.glob(f'{S}/*.meta'):
                       at=stamp(last, None) if ls else None, age=NOW - (birth(f'{D}/{t}') or mt),
                       captain=any(k.startswith('captain-hold') for k in keys)))
 open_n = len(lanes)
-# Retro 16 Oct #4 (Main3491): a lane whose last event is paused, blocked or failed, stamped more than 4 h ago, not
-# waiting on the captain, and still that wait in bin/fm-crew-state.sh (so validating and own busy work stay working)
-# stops counting toward the cap; a ready item takes its slot. An unstamped wait or an unreadable state keeps counting.
+# A lane whose last event is a paused, blocked or failed wait stamped more than 4 h ago, and still that wait in
+# bin/fm-crew-state.sh (so validating and own busy work stay working), stops counting toward the cap; a ready item
+# takes its slot. An unstamped wait or an unreadable state keeps counting.
 FREE_AFTER = 4 * 3600
 
 def crew_state(t):
@@ -114,13 +116,13 @@ for L in lanes:
         except subprocess.TimeoutExpired: p.kill(); p.wait()
     L['free'] = bool(re.match(r'state: (paused|blocked|failed) ', out))
 count_n = open_n - sum(L['free'] for L in lanes)
-# Working lanes count toward the cap; waiting, parked and captain-held lanes do not (captain 7 Oct "Do what you
-# feel is right" on the 200-merges plan). HARD bounds the open lanes that count, so waits under FREE_AFTER cannot pile up.
+# Working lanes count toward the cap; waiting, parked and captain-held lanes do not. HARD bounds the open lanes
+# that count, so waits under FREE_AFTER cannot pile up.
 active_n = sum(L['verb'] in ('working', 'resolved') and not L['captain'] for L in lanes)
 HARD = CAP + 2
 
 def ready_ids():
-    # Raises on a failed query: a failed read must never look like a proven zero (dashboard-exact, 7 Oct).
+    # Raises on a failed query: a failed read must never look like a proven zero.
     r = subprocess.run([f'{MAIN}/bin/fm-tasks-axi.sh', 'ready'], capture_output=True, text=True, timeout=8,
                        env={**os.environ, 'FM_HOME': home})
     if r.returncode: raise RuntimeError(f'ready query exit {r.returncode}: ' + (r.stderr.strip().splitlines() or [''])[-1])
@@ -144,7 +146,7 @@ if mode == '--can-start':
     why = []
     if active_n >= CAP: why.append(f'{active_n} working lanes, cap {CAP}: finish one first')
     if count_n >= HARD: why.append(f'{count_n} open lanes, hard cap {HARD}: land or close a waiting lane first')
-    # Captain 10 Oct (retro C3, Main2060): a done lane blocks starts only after 60 min unmerged; open >= cap+2 still blocks.
+    # A done lane blocks starts only after 60 min unmerged; open >= cap+2 still blocks.
     why += [f'{L["t"]} is done {h(NOW - L["since"])} ago: land and clean it up first' for L in land if not L['captain'] and NOW - L['since'] >= 3600]
     for w in why: print(w)
     sys.exit(1 if why else 0)
@@ -156,7 +158,7 @@ if count_n > HARD:
     out.append((f'over-cap', count_n, f'home lead {count_n}/{HARD} over hard cap: start nothing; land nearest-to-merge, stop the oldest with a learned note'))
 for L in lanes:
     clock = 1800 if L['verb'] == 'needs-decision' else 7200
-    # failed = stopped on purpose, kept for an unlanded-work refusal; no one waits on it, the red age rule still surfaces it (takeone, 8 Oct)
+    # failed = stopped on purpose, kept for an unlanded-work refusal; no one waits on it, the red age rule still surfaces it
     if L['verb'] not in ('working', 'resolved', 'done', 'failed') and NOW - L['since'] >= clock and not L['captain']:
         out.append((f'wait {L["t"]}', NOW - L['since'], f'{L["t"]} lead {h(NOW - L["since"])} {L["verb"]} past its clock: decide, restart, route or stop it'))
 p50, p85, _ = target()
@@ -172,7 +174,7 @@ for L in lanes:
     if not os.path.isdir(wt): continue
     try:
         head = subprocess.run(['git', '-C', wt, 'rev-parse', 'HEAD'], capture_output=True, text=True, timeout=3).stdout.strip()
-        k = 'a:' + head  # added lines only, same rule as fm-checks-lint.sh; deletions are not penalised (7 Oct)
+        k = 'a:' + head  # added lines only, same rule as fm-checks-lint.sh; deletions are not penalised
         if k not in cache:
             base = subprocess.run(['git', '-C', wt, 'merge-base', 'HEAD', 'origin/HEAD'], capture_output=True, text=True, timeout=3).stdout.strip()
             stat = subprocess.run(['git', '-C', wt, 'diff', '--shortstat', base, head], capture_output=True, text=True, timeout=3).stdout if base else ''
@@ -205,7 +207,7 @@ except Exception: last = {}
 new, shown = {}, 0
 for key, age, text in out:
     prev = last.get(key)
-    if key == 'pull':  # floor (captain 5 Oct): repeat every 30 min while slots are free and ready work waits
+    if key == 'pull':  # floor: repeat every 30 min while slots are free and ready work waits
         if shown < 5 and (prev is None or NOW - prev >= 1800):
             print(f'flow: {text}'); shown += 1; new[key] = NOW
         elif prev is not None:

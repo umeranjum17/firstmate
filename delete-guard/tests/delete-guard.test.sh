@@ -24,17 +24,17 @@ ls "$T/home/fixture/users/user-001/"settings.json.bak-delete-guard-* >/dev/null 
 grep -q "$T/home/fixture/users/user-004/share/fm-delete-guard/guard.mjs" "$T/home/fixture/users/user-007/agent/extensions/fm-rm-guard.ts" && ok "pi adapter replaces fm-rm-guard.ts" || no "pi adapter"
 
 hookrun() { jq -n --arg c "$2" --arg d "$1" '{tool_input:{command:$c},cwd:$d}' | HOME="$T/home" node "$T/home/fixture/users/user-004/share/fm-delete-guard/guard.mjs" --runtime claude 2>/dev/null; } # exit 2 = blocked
-blocked=('rm -rf "$HOME"' 'rm -rf ~' 'rm -rf ~/' 'rm -fr $HOME/*' 'rm -r -f /home/fixture/users/user-019' 'rm -rf /home/fixture/users/user-019/.config' 'rm -rf ~/.agents'
+blocked=('rm -rf "$HOME"' 'rm -rf ~' 'rm -rf ~/' 'rm -fr $HOME/*' 'rm -r -f /home/you' 'rm -rf $HOME/.config' 'rm -rf ~/.agents'
   'cd x && rm -rf ${HOME}' 'rm -rf /' 'rm -rf /*' 'rm -rf .' 'rm -rf *' 'rm -Rf $BUILD/*' 'find ~ -delete' 'npx rimraf $HOME'
   'rm -rf -- "$HOME"' 'HOME=$(mktemp -d) node t.js; rm -rf "$HOME"' '/usr/bin/rm -rf /home'
   'export HOME=$(mktemp -d); rm -rf "$HOME"' 'rm -rf "${HOME:?}"' 'rm -rf "$TMPHOME/"'
-  'bash -c "rm -rf ~"' '\rm -rf ~' 'rm -rf /home/fixture/users/user-019/..' 'rm -rf ../..' 'rm -rf ~/.fm-guard-probe-nonexistent'
+  'bash -c "rm -rf ~"' '\rm -rf ~' 'rm -rf /home/you/..' 'rm -rf ../..' 'rm -rf ~/.fm-guard-probe-nonexistent'
   'rm -rf -- "$d"' 'd=$(mktemp -d); d=$HOME; rm -rf "$d"' 'd=$(mktemp -d); rm -rf "$d/.."' 'd=$(mktemp -d); rm -rf "$d"/../x'
   'd=$(mktemp -d); rm -rf ${d:-/}' 'HOME=$(mktemp -d); rm -rf "$HOME"' 'd=$(mktemp -d) node t.js; rm -rf "$d"'
   'd=$(mktemp -d); read d; rm -rf "$d"' 'TMPDIR=$(mktemp -d); rm -rf "$TMPDIR"' 'TMP=$(mktemp -d /tmp/x.XXXXXX); rm -rf -- "$TMP"' '(d=$(mktemp -d)); rm -rf "$d"' $'cat > f <<EOF\nhi\nEOF\nrm -rf ~'
   'd=$(mktemp -d || echo ~); rm -rf -- "$d"' 'd=$(mktemp -d && echo ~); rm -rf -- "$d"' 'd=$(mktemp -d || mktemp -d) || d=~; rm -rf "$d"'
   $'bash <<EOF\nrm -rf ~\nEOF' $'cat <<\'EOF\' | sh\nrm -rf "$HOME"\nEOF' $'zsh <<-EOF\n\trm -rf /\n\tEOF'
-  'S=~; rm -rf "$S"' 'S=/home/fixture/users/user-019; rm -rf "$S"' 'S=$HOME/x; rm -rf "$S"' 'S=~/.cache/x; S=~; rm -rf "$S"'
+  'S=~; rm -rf "$S"' 'S=/home/you; rm -rf "$S"' 'S=$HOME/x; rm -rf "$S"' 'S=~/.cache/x; S=~; rm -rf "$S"'
   '[ -n x ] && S=~/.cache/x && rm -rf "$S"' 'rm -rf "$S"' 'S=~/.cache/x; rm -rf "$S/.."' 'd=$(mktemp -d); d=~; rm -rf "$d"'
   'export T=~; rm -rf "$T"' 'declare -n T=HOME; rm -rf "$T"' 'local -n T=HOME; rm -rf "$T"' 'typeset -n T=HOME; rm -rf -- "$T"'
   'declare -rn T=HOME; rm -rf "$T"' 'export T=$(mktemp -d); T=~; rm -rf "$T"'
@@ -42,8 +42,8 @@ blocked=('rm -rf "$HOME"' 'rm -rf ~' 'rm -rf ~/' 'rm -fr $HOME/*' 'rm -r -f /hom
   'd=$(mktemp -d "$(echo ~)/x.XXXX"); rm -rf -- "$d"' 'd=$(mktemp -d `echo ~`); rm -rf "$d"'
   $'d=$(mktemp -d /tmp/t1-keyiso-probe-XXXX); mkdir -p "$d/home" "$d/runtime"; dbus-run-session -- bash -ceu \'\n  d="\'$d\'"\n  export XDG_RUNTIME_DIR="$d/runtime" HOME="$d/home"\n  export XDG_CONFIG_HOME="$HOME/.config" XDG_DATA_HOME="$HOME/.local/share" XDG_CACHE_HOME="$HOME/.cache"\n  mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME"\n  echo -n "throwaway" | gnome-keyring-daemon --unlock --replace --components=secrets --daemonize\n  sleep 1\n  printf "sk-host-keyring-poison" | secret-tool store --label=byokit:takeone:jev service takeone account jev\n  echo "lookup: $(secret-tool lookup service takeone account jev)"\n  find "$HOME/.local/share/keyrings" -maxdepth 1 2>/dev/null\n\'; echo "probe exit: $?"; d=$(echo /tmp/t1-keyiso-probe-*/); [ -d "$d" ] && rm -rf -- "$d"; echo cleaned'
   "$(printf 'echo x;%.0s' {1..120}) rm -rf \"\$HOME\"")
-allowed=('rm -rf ./build' 'rm -rf node_modules' 'd=$(mktemp -d); rm -rf -- "$d/x"' 'rm -rf ~/.cache/foo/bar' 'rm -f ~/.bashrc.bak'
-  'rm -rf /tmp/abc' 'rm -rf $HOME/.cache/pockit' 'echo rm -rf is bad' 'git rm -r --cached x/y' 'rm -rf /home/fixture/users/user-019/.treehouse/x/y'
+allowed=(  'rm -rf ./build' 'rm -rf node_modules' 'd=$(mktemp -d); rm -rf -- "$d/x"' 'rm -rf ~/.cache/foo/bar' 'rm -f ~/.bashrc.bak'
+  'rm -rf /tmp/abc' 'rm -rf $HOME/.cache/pockit' 'echo rm -rf is bad' 'git rm -r --cached x/y' 'rm -rf /home/you/.treehouse/x/y'
   'HOME=$(mktemp -d) npm test' 'd=$(mktemp -d); cd "$d" && make; rm -rf -- "$d"' 'T="$(mktemp -d)" || exit 1; rm -rf "${T}"' 'f=$(mktemp); rm -rf "$f"'
   $'cat > f <<\'EOF\'\nnever rm -rf on /, ~ or a bare . target\nEOF' $'git commit -m "guard\n\nrm -rf ~ is blocked"' 'gh pr create --body "rm -rf ~/x was blocked; rm -rf . too"'
   $'python3 - <<\'EOF\'\nprint("rm -rf ~")\nEOF'
@@ -54,9 +54,9 @@ allowed=('rm -rf ./build' 'rm -rf node_modules' 'd=$(mktemp -d); rm -rf -- "$d/x
   $'d=$(mktemp -d -p /tmp/x 2>/dev/null || mktemp -d)\ncd "$d" && make\nrm -rf -- "$d"'
   'export T=$(mktemp -d); rm -rf -- "$T"' 'local -r d=$(mktemp -d); rm -rf "$d"' 'declare -x T=~/.cache/x; rm -rf "$T"'
   $'export T=$(mktemp -d --tmpdir=/dev/shm lfm-wt-XXXXXX); export LFM_HOME=$T/home PROJ=$T/proj; mkdir -p $LFM_HOME $PROJ; git init -q $PROJ; node bin/learn-from-mistakes-axi.mjs init --no-skill --dir $PROJ --agent claude --model m --judge-agent codex --judge-model m2 >/tmp/init-out.txt 2>&1; echo "exit=$?"; awk \'{ if (length($0)>100) print FILENAME" "FNR" ("length($0)"): "$0 }\' $LFM_HOME/config.yaml $PROJ/.learn-from-mistakes.yaml; echo "CONFIG-CHECK-DONE"; cat /tmp/init-out.txt; echo "---json---"; node bin/learn-from-mistakes-axi.mjs init --json --dir $PROJ 2>&1 | head -5; rm -rf -- "$T"'
-  $'d=$(mktemp -d); REPO=/repo; CLI=$REPO/bin/cli.mjs; FAKE=$REPO/test/fake-agent/claude\nmkdir -p "$d/fakes" "$d/home" "$d/p"\nln -s "$FAKE" "$d/fakes/claude"; ln -s "$FAKE" "$d/fakes/codex"\nprintf \'agent: claude\\njudge_agent: codex\\n\' > "$d/home/fixture/users/user-011"\ncp "$REPO/examples/defects.md" "$d/p/"\nprintf \'\\n## %s\\n\\n- [tests] Umer tests failed: UMER_FIXTURES was unset.\\n- [tests] They failed again for the same reason.\\n\' "$(date -Is)" >> "$d/p/defects.md"\nHOME="$d/home" node "$CLI" retro --project "$d/p" || true\nrm -rf -- "$d"'
+  $'d=$(mktemp -d); REPO=/repo; CLI=$REPO/bin/cli.mjs; FAKE=$REPO/test/fake-agent/claude\nmkdir -p "$d/fakes" "$d/home" "$d/p"\nln -s "$FAKE" "$d/fakes/claude"; ln -s "$FAKE" "$d/fakes/codex"\nprintf \'agent: claude\\njudge_agent: codex\\n\' > "$d/home/fixture/users/user-011"\ncp "$REPO/examples/defects.md" "$d/p/"\nprintf \'\\n## %s\\n\\n- [tests] Fixture tests failed: EXAMPLE_FIXTURES was unset.\\n- [tests] They failed again for the same reason.\\n\' "$(date -Is)" >> "$d/p/defects.md"\nHOME="$d/home" node "$CLI" retro --project "$d/p" || true\nrm -rf -- "$d"'
   'd=$(mktemp -d ${X}/a.XXXX); rm -rf "$d"'
-  $'cd /home/fixture/users/user-019/.no-mistakes/worktrees/bde6b4035eae/01M536DFY4TZQ15TNT5Q8E99VP && grep -n \'^ROOT=\' bin/fm-test-run.sh && d=$(mktemp -d "$PWD/.review-base-XXXX") && mkdir -p "$d/bin" "$d/tests" && git show 5758e52046f49dcc7297a2f0952cfa1bbdf969b0:bin/fm-test-run.sh > "$d/bin/fm-test-run.sh" && chmod +x "$d/bin/fm-test-run.sh" && git archive 5758e52046f49dcc7297a2f0952cfa1bbdf969b0 tests | tar -x -C "$d" && (cd "$d" && bash bin/fm-test-run.sh --check-coverage; echo "base rc=$?") ; rm -rf -- "$d"')
+  $'cd /home/you/.no-mistakes/worktrees/example-review-base && grep -n \'^ROOT=\' bin/fm-test-run.sh && d=$(mktemp -d "$PWD/.review-base-XXXX") && mkdir -p "$d/bin" "$d/tests" && git show 5758e52046f49dcc7297a2f0952cfa1bbdf969b0:bin/fm-test-run.sh > "$d/bin/fm-test-run.sh" && chmod +x "$d/bin/fm-test-run.sh" && git archive 5758e52046f49dcc7297a2f0952cfa1bbdf969b0 tests | tar -x -C "$d" && (cd "$d" && bash bin/fm-test-run.sh --check-coverage; echo "base rc=$?") ; rm -rf -- "$d"')
 n=0
 for c in "${blocked[@]}"; do n=$((n + 1)); if hookrun "/tmp/case-$n" "$c"; then no "MISSED: $c"; fi; done
 for c in "${allowed[@]}"; do n=$((n + 1)); hookrun "/tmp/case-$n" "$c" || no "FALSE BLOCK: $c"; done
@@ -83,15 +83,15 @@ tail -n1 "$T/fm/state/delete-guard.log" | jq -e --arg h "$T/fm" '.home == $h and
 out=$(check "$T/fm/state/delete-guard.check.sh")
 case "$out" in "delete guard blocked 1 recursive delete(s)"*"task t1 (claude, home $T/lead, cwd /w, "*"/home/fixture/users/user-014: rm -rf ~") ok "check wakes on a literal home target, not on its repeat or temp-folder blocks" ;; *) no "check output: $out" ;; esac
 
-# Replay of the 16 Oct log, one sweep per row: only the 14:22 literal /home/fixture/users/user-019/mt-test block wakes; the build probes,
-# variable targets and that task's $d repeat 15 s later are counted.
+# Replay of the fixture log, one sweep per row: only the 14:22 literal /home/you/scratch-test block wakes; the
+# build probes, variable targets and that task's $d repeat 15 s later are counted.
 mkdir -p "$T/replay/state"; wakes=()
 while IFS= read -r row; do
   printf '%s\n' "$row" >> "$T/replay/state/delete-guard.log"
-  w=$(HOME=/home/fixture/users/user-019 "$T/home/fixture/users/user-004/share/fm-delete-guard/check.sh" "$T/replay"); [ -z "$w" ] || wakes+=("$w")
+  w=$(HOME=/home/you "$T/home/fixture/users/user-004/share/fm-delete-guard/check.sh" "$T/replay"); [ -z "$w" ] || wakes+=("$w")
 done < "$ADDON/tests/fixtures/delete-guard-2026-10-16.log"
-[ "${#wakes[@]}" -eq 1 ] && case "${wakes[0]}" in *"task rd-stale-screen-on-return (pi, "*", 14:22Z) /home/fixture/users/user-019/mt-test: "*) true ;; *) false ;; esac \
-  && ok "replay of 16 Oct wakes only on the 14:22 /home/fixture/users/user-019/mt-test block" || no "replay wakes: $(printf '%s\n' "${wakes[@]}")"
+[ "${#wakes[@]}" -eq 1 ] && case "${wakes[0]}" in *"task rd-stale-screen-on-return (pi, "*", 14:22Z) /home/you/scratch-test: "*) true ;; *) false ;; esac \
+  && ok "replay wakes only on the 14:22 /home/you/scratch-test block" || no "replay wakes: $(printf '%s\n' "${wakes[@]}")"
 [ "$(cat "$T/replay/state/delete-guard.counted")" = "$(printf '2026-10-16\t%s' $(($(wc -l < "$ADDON/tests/fixtures/delete-guard-2026-10-16.log") - 1)))" ] \
   && ok "replay counts every other block for the day" || no "replay count: $(cat "$T/replay/state/delete-guard.counted")"
 [ "$fail" -eq 0 ] && echo PASS || { echo FAIL; exit 1; }

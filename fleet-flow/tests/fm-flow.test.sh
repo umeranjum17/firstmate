@@ -26,7 +26,7 @@ for h in (main, child):
 # Exact rejected-key return from writeboost.status; key and timestamp remain unknown.
 (main / 'state/child.status').write_text('done [key=ov-rn-setup-polish corr=03b23bf8e7b2c26c]: PR 26 merged and verified - guarded merge read back state=MERGED at the exact checked head 2c7f3076 with all checks green; task cleaned up; per your words, production-phone replacement and live ChatGPT remain separately unapproved\n')
 (main / 'data/backlog.md').write_text('## Queued\n- [ ] next - Next blocked-by: prior\n'
-    '- [ ] held - Held (hold: fm-hold-v1:V2FpdCBmb3IgVW1lcg==)\n'
+    '- [ ] held - Held (hold: fm-hold-v1:V2FpdCBmb3IgWW91)\n'
     '- [ ] ready - Ready blocked-by: finished\n## In flight\n- [ ] prior - Prerequisite\n'
     '## Done\n- [x] finished - Completed\n')
 (child / 'state/live.meta').write_text('kind=ship\nspawn_gen=s99.1.2\n')
@@ -63,7 +63,7 @@ assert closed['durations']['merge_to_cleanup'] == 10
 assert closed['state_seconds'] == {'working': 50}, 'the trailing stage runs to the merge'
 assert 'pr_opened' not in closed['times'] and 'checks_green' not in closed['times']
 assert x['time_to_merge']['median_seconds'] == x['time_to_merge']['p85_seconds'] == 60
-assert {q['task']: q['why'] for q in x['queue']} == {'next': 'dependency: prior', 'held': 'hold: Wait for Umer',
+assert {q['task']: q['why'] for q in x['queue']} == {'next': 'dependency: prior', 'held': 'hold: Wait for You',
     'ready': 'unknown: dispatch admission not recorded'}
 assert next(b for b in x['bottlenecks'] if b['cause'] == 'unknown')['unknown_items'] == 1
 assert any(n.get('line') == 7 for n in x['limitations']), 'malformed durable record disclosed'
@@ -240,7 +240,7 @@ assert 'unknown' in remote['reason'] and 'remote' in remote['reason']
 reasons = {q['task']: q['why'] for q in coverage['queue'] if q['home'] == 'main'}
 assert reasons['archive-ready'] == 'lane cap: 0 recorded active lanes, cap 0'
 assert reasons['multiple'] == 'dependency: prior', 'completed edges excluded, unresolved edge retained'
-assert reasons['held'] == 'hold: Wait for Umer', 'consumer decodes hold reasons'
+assert reasons['held'] == 'hold: Wait for You', 'consumer decodes hold reasons'
 (grand / 'data/backlog.md').unlink()
 before = files()
 missing = json.loads(run())

@@ -70,7 +70,7 @@ difference above is the only case where they are now expected to diverge.
 One command (harness lives with this task's evidence):
 
 ```sh
-bash /home/fixture/users/user-019/.treehouse/fixture-home/4/firstmate/data/addons-extraction/parity/run-parity.sh
+bash <task-data>/run-parity.sh  # the harness lives with this task's evidence
 ```
 
 It must end with `ALL CHECKS PASSED`, with both
@@ -88,7 +88,7 @@ Manual recipe if the harness is gone:
    `pgrep`, `systemctl`, a fake `/proc` (`FM_DASHBOARD_PROC`) and an empty
    `FM_DEVICE_LOCK_DIR`.
 3. Copy one synthesized fixture into two throwaway `FM_HOME` dirs: the most
-   tasks, the longest titles, a lane in every state plus a captain hold, asks,
+   tasks, the longest titles, a lane in every state plus a held lane, asks,
    recorded merges, quota and machine samples, and a home whose flow reader is
    broken so `flow_error` is exercised; pin `TZ=UTC LC_ALL=C` and freeze the
    clock (`PYTHONPATH=sitecustomize.py` stubbing `datetime.now`/`time`) so
@@ -109,8 +109,8 @@ Manual recipe if the harness is gone:
 Run from this repository it must point at the Firstmate `bin/`, which makes the later shim `FM_BIN=<firstmate>/bin exec <addons>/fleet-dashboard/fm-dashboard.sh "$@"`: a set `FM_BIN` without `fm-tasks-axi.sh` is refused.
 
 The shipped `fm-dashboard.service` runs
-`/home/fixture/users/user-019/firstmate/bin/fm-dashboard.sh serve --bind "$(tailscale ip -4 |
-head -1)" --port 4390` with `FM_HOME=/home/fixture/users/user-019/firstmate`; the later shim
+`<fm-home>/bin/fm-dashboard.sh serve --bind "$(tailscale ip -4 |
+head -1)" --port 4390` with `FM_HOME=<fm-home>`; the later shim
 must keep that exact path and argv (it will exec
 `fleet-dashboard/fm-dashboard.sh`). Re-run the side-by-side proof above
 immediately before the served path swaps, and keep this README's proof

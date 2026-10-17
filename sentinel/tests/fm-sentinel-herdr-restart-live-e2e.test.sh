@@ -121,7 +121,7 @@ mkdir -p "$FAKEBIN" "$LABROOT/treehouse"
 [ -z "$EVID" ] || mkdir -p "$EVID"
 ln -s "$CRED_HOME/.claude" "$LABHOME/.claude"
 ln -s "$CRED_HOME/.claude.json" "$LABHOME/.claude.json"
-printf '[user]\n\tname = Umer\n\temail = umer@example.invalid\n' > "$LABHOME/.gitconfig"
+printf '[user]\n\tname = You\n\temail = you@example.invalid\n' > "$LABHOME/.gitconfig"
 
 # Every Herdr call from a lab pane resolves this shim first: it strips the lab
 # session flag the adapter appends, refuses any other session, and delegates to
@@ -240,7 +240,7 @@ git -C "$MAIN" fetch -q "$ROOT" HEAD
 git -C "$MAIN" checkout -q -f -B main FETCH_HEAD
 cp -R "$ROOT/bin/." "$MAIN/bin/"
 git -C "$MAIN" add -A bin
-git -C "$MAIN" -c user.name=Umer -c user.email=umer@example.invalid commit -q -m "lab: working tree" >/dev/null || true
+git -C "$MAIN" -c user.name=You -c user.email=you@example.invalid commit -q -m "lab: working tree" >/dev/null || true
 mkdir -p "$MAIN/state" "$MAIN/data" "$MAIN/config" "$MAIN/projects"
 printf 'herdr\n' > "$MAIN/config/backend"
 printf 'claude\n' > "$MAIN/config/crew-harness"
@@ -261,7 +261,7 @@ printf '# notes\n' > "$LABROOT/notes-seed/README.md"
 mkdir -p "$LABROOT/notes-seed/.claude"
 cp "$LEAD/.claude/settings.local.json" "$LABROOT/notes-seed/.claude/settings.json"
 git -C "$LABROOT/notes-seed" add -A
-git -C "$LABROOT/notes-seed" -c user.name=Umer -c user.email=umer@example.invalid commit -q -m seed
+git -C "$LABROOT/notes-seed" -c user.name=You -c user.email=you@example.invalid commit -q -m seed
 git clone -q --bare "$LABROOT/notes-seed" "$LABROOT/notes.git"
 git clone -q "$LABROOT/notes.git" "$NOTES"
 printf '# Projects\n\n- notes [local-only +yolo] - lab notes fixture\n' > "$LEAD/data/projects.md"

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2016 # jq programs are literal
-# Keep Claude Code off Sonnet and Fable for every session that reads this config dir's user settings (Main3410: a live lab
+# Keep Claude Code off Sonnet and Fable for every session that reads this config dir's user settings (a lab once
 # ran --model sonnet). Every Sonnet or Fable form ends on Haiku or is refused, never on another model:
 #   env.ANTHROPIC_DEFAULT_SONNET_MODEL, env.ANTHROPIC_DEFAULT_FABLE_MODEL = claude-haiku-5-5
 #     the sonnet, opusplan and fable aliases (--model sonnet, agent "model: sonnet") resolve to Haiku;

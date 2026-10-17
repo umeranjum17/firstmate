@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # quota-failover e2e: the real script against a fixture home (one stub lib
 # symlinked under the five names it sources, stub quota-axi and opencode on
-# PATH). The fixture is the 15 Oct ~21:55Z step-5-preview-free incident: a
+# PATH). The fixture is a step-5-preview-free incident: a
 # lead whose pinned route answers its one-line test with a 429, and a worker
 # whose screen shows a limit on a second dead route. One pass must move both
 # to the live candidate, pass the dead routes over, and drop them from
@@ -67,7 +67,7 @@ date +%s >"$FM_HOME/state/$id.status"
 #--- bin/opencode
 #!/usr/bin/env bash
 # Every model answers PONG except the two dead routes, which answer the
-# 15 Oct 429, "Upstream request failed: Rate limit exceeded".
+# 429, "Upstream request failed: Rate limit exceeded".
 case $* in
   *step-5-preview-free*) [ "${OC_STEP5:-dead}" = dead ] || { echo PONG; exit 0; } ;;
   *gpt-5.6-luna*) [ "${OC_LUNA:-dead}" = dead ] || { echo PONG; exit 0; } ;;
@@ -84,7 +84,7 @@ for lib in fm-backend.sh fm-busy-lib.sh fm-quota-axi-lib.sh fm-parent-channel-li
 done
 chmod +x "$home/bin/fm-crew-state.sh" "$home/bin/fm-control.sh" "$stub/opencode" "$stub/quota-axi"
 
-# Step 5 ranked first (as on 15 Oct), a second dead route, then the live ones.
+# Step 5 ranked first, a second dead route, then the live ones.
 cat >"$home/config/crew-dispatch.json" <<'JSON' || exit 1
 {"rules": [{"when": "free preview models first", "use": [
   {"harness": "opencode", "model": "opencode-go/step-5-preview-free"},

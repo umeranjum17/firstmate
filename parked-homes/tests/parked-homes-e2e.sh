@@ -54,7 +54,7 @@ trap '{
 
 # --- the fixture fleet: a supervising home with two secondmate homes ---------
 mkdir -p "$P/config" "$P/state" "$P/data" "$work/home-a/state" "$work/home-b/state"
-printf '# Homes the captain parked: no work, nothing merges.\nhome-b\n' > "$P/config/parked-homes"
+printf '# Parked homes: no work, nothing merges.\nhome-b\n' > "$P/config/parked-homes"
 printf 'manual\n' > "$P/config/backlog-backend"
 printf 'Shared captain context for every mate.\n' > "$P/data/captain-shared.md"
 : > "$P/data/secondmates.md"

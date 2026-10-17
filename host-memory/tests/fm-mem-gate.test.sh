@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Integration check for bin/fm-mem-gate.sh, run with stub commands, fixture memory files and private lock dirs.
 # Usage: fm-mem-gate.test.sh [gate-script]   exit 0 = PASS. Never starts a real emulator or Gradle build.
-# 1. (16 Oct, byokit key fm-mem-gate-deadlock) an emulator job that waits for an emulator slot must not hold the host
+# 1. (lock-deadlock regression) an emulator job that waits for an emulator slot must not hold the host
 #    lock while it sleeps, so a Gradle job with room gets through.
-# 2. (16 Oct, Main3473: 3 emulators on a cap of 2) a job behind known wrappers (flock, timeout, nice, ionice, env,
-#    bash/sh -c) is still held at the emulator or Gradle cap, and starts when there is a slot.
+# 2. (wrapper-resolution regression: more emulators than the cap) a job behind known wrappers (flock, timeout,
+#    nice, ionice, env, bash/sh -c) is still held at the emulator or Gradle cap, and starts when there is a slot.
 G=${1:-$(dirname "$(readlink -f "$0")")/../bin/fm-mem-gate.sh}
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
 mkdir -p "$T/bin" "$T/run" "$T/run2" "$T/proc/pressure"
