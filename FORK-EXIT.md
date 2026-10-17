@@ -52,7 +52,7 @@ against the files, not against this table. PRs at the top until they are resolve
 
 | Feature | Commits / PRs | Key files (fork, still live) | Exit path | Status |
 |---|---|---|---|---|
-| Fleet flow reader (lifecycle/queue/bottleneck JSON) | 3b00213c ([23](https://github.com/umeranjum17/firstmate/pull/23)) | `bin/fm-flow.sh` | add-on `fleet-flow` + fork shim | dormant copy |
+| Fleet flow reader (lifecycle/queue/bottleneck JSON) | 3b00213c ([23](https://github.com/umeranjum17/firstmate/pull/23)) | `bin/fm-flow.sh` | add-on `fleet-flow` + fork shim | done — shimmed; the add-on copy is the only reader, reached through the fork shim ([88](https://github.com/umeranjum17/firstmate/pull/88)) |
 | Home flow check (lane slots, dry pulse column) | Retro 16 Oct #4 (add-on branch `fm/retro-lane-slots`) | `config/fm-flow-check.sh` | add-on `fleet-flow` + operator symlink (fleet-flow README install runbook); never a shim — `bin/fm-flow.sh` reads its stage-clock policy from the file's text | dormant copy — symlink pending |
 | Fleet stats (per-model, per-skill, outcome recorder) | 877ded84 ([56](https://github.com/umeranjum17/firstmate/pull/56)), eb0cb110 ([75](https://github.com/umeranjum17/firstmate/pull/75)) | `bin/fm-model-stats.sh`, `bin/fm-skill-stats.sh`, `bin/fm-task-outcome.sh` | add-on `fleet-stats` + fork hook | dormant copy |
 | Host memory sampling + admission | 2b3097c7 ([29](https://github.com/umeranjum17/firstmate/pull/29)), 9f63932e ([33](https://github.com/umeranjum17/firstmate/pull/33)), de32a41f ([45](https://github.com/umeranjum17/firstmate/pull/45)) | `bin/fm-host-memory-sampler.sh`, `bin/fm-jev-mem-guard.py` delta, `config/host-memory` flag | add-on `host-memory` + flag hook | dormant copy |

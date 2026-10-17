@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
 # Integration: query the real flow CLI over isolated durable fleet records.
+# Run it with FM_BIN pointing at a Firstmate checkout's bin/: the reader sources
+# its helper libraries from there and the second block drives the fork's
+# model/skill statistics and outcome-recording readers, which did not move.
 set -eu
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+[ -n "${FM_BIN:-}" ] && [ -f "$FM_BIN/fm-classify-lib.sh" ] || {
+  echo "fm-flow test: set FM_BIN to a Firstmate checkout's bin/ (helper libraries live there)" >&2
+  exit 2
+}
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 mkdir -p "$TMP/home" "$TMP/xdg" "$TMP/tmp"
@@ -336,7 +343,7 @@ PY
 # over isolated durable records and read the JSON the dashboard's Models and Skills views consume.
 mkdir -p "$TMP/stats"
 HOME="$TMP/stats/home" XDG_CONFIG_HOME="$TMP/xdg" TMPDIR="$TMP/tmp" python3 - \
-  "$ROOT/bin/fm-model-stats.sh" "$ROOT/bin/fm-skill-stats.sh" "$ROOT/bin/fm-task-outcome.sh" "$TMP/stats" <<'PY'
+  "$FM_BIN/fm-model-stats.sh" "$FM_BIN/fm-skill-stats.sh" "$FM_BIN/fm-task-outcome.sh" "$TMP/stats" <<'PY'
 import json, os, subprocess, sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path

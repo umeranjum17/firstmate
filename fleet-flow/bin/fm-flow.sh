@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # fm-flow.sh - read-only flow data, no endpoint or cache writes.
 # Usage: FM_HOME=<home> fm-flow.sh --json [--now <unix-seconds>] [--checks] [--capacity]
+# FM_BIN names the Firstmate bin/ holding the helper libraries this reader runs
+# (fm-classify-lib.sh, fm-tasks-axi-lib.sh, fm-backlog-transition-lib.sh, fm-tasks-axi.sh);
+# unset, it defaults to this script's own directory, so a Firstmate checkout copy needs nothing.
 # --capacity reads Linux procfs, installed memory-gate defaults, the heavy slice,
 # and /tmp filesystem usage (du limited to 3 s). Partial du exposes readable
 # lower bounds, not complete directory sizes/ranks. RSS is per process, not additive
@@ -53,6 +56,14 @@
 # Worker-liveness and task-specific admission probes are not collected.
 set -eu
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# The directory holding the Firstmate helper libraries this reader runs. It defaults
+# to this script's own directory (the fork's bin/), so a fork copy needs nothing;
+# else FM_BIN names the Firstmate bin/ when this script runs from another repo.
+if [ -n "${FM_BIN+x}" ]; then
+  [ -d "$FM_BIN" ] && [ -f "$FM_BIN/fm-tasks-axi.sh" ] || { echo "fm-flow: FM_BIN is not a Firstmate bin directory (no fm-tasks-axi.sh): $FM_BIN" >&2; exit 1; }
+else
+  FM_BIN="$SCRIPT_DIR"
+fi
 [ "${1:-}" = --json ] || { echo 'usage: fm-flow.sh --json [--now <unix-seconds>] [--checks] [--capacity]' >&2; exit 2; }
 shift
 now=$(date +%s) checks=0 capacity=0
@@ -65,7 +76,7 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 case "$now" in ''|*[!0-9]*) echo 'fm-flow: --now requires Unix seconds' >&2; exit 2 ;; esac
-exec python3 - "${FM_HOME:-$SCRIPT_DIR/..}" "$now" "$checks" "$SCRIPT_DIR/fm-classify-lib.sh" "$capacity" <<'PY'
+exec python3 - "${FM_HOME:-$SCRIPT_DIR/..}" "$now" "$checks" "$FM_BIN/fm-classify-lib.sh" "$capacity" <<'PY'
 import json, math, os, re, statistics, subprocess, sys, time
 from datetime import datetime, timezone
 from pathlib import Path
