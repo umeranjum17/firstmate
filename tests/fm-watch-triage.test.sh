@@ -6651,6 +6651,23 @@ a4 probe=1" ] || fail "decide ran on the wrong asks or the away record read reac
   [ ! -s "$out" ] || fail "a held or settled ask printed a wake: $(cat "$out")"
   grep -Fx 'a2 probe=0' "$dir/decide.log" >/dev/null || fail "the default probe did not read a present captain: $(cat "$dir/decide.log")"
   grep -F 'a1 ' "$dir/decide.log" >/dev/null && fail "a defaulted ask was decided again"
+
+  # A dot-free ask id (all digits) on a dot-free home is a real ask, never the
+  # add-on's <id>.<pid> in-flight staging, however the home is named.
+  dotfree=$(mktemp -d /tmp/fm-askdotfree-XXXXXX) || fail "fixture: could not create a dot-free home"
+  case "$dotfree" in *.*) fail "fixture: the dot-free home has a dot: $dotfree" ;; esac
+  printf '%s\n%s\n' "$$" "$FM_TEST_OWNER_IDENTITY" > "$dotfree/.fm-test-fixture"
+  printf '%s\n' "$dotfree" >> "$FM_TEST_CLEANUP_REGISTRY"
+  mkdir -p "$dotfree/data/ask-default/asks" "$dotfree/state"
+  printf 'fake=defaulted\n' > "$dotfree/data/ask-default/asks/1730000000"
+  make_fake_ask_default "$dotfree/addons"
+  write_away_record "$dotfree/state"
+  expected="check: ask-default safe default applied while the captain was unreachable: 1730000000 (recorded in data/ask-default/applied.log)"
+  watch_bg "$dotfree/state" "$fakebin" "$out" env FM_HOME="$dotfree" FM_ADDONS_DIR="$dotfree/addons" FM_CHECK_INTERVAL=1
+  pid=$!
+  wait_for_exit "$pid" 100 || { reap "$pid"; fail "a dot-free ask id was not decided: $(cat "$out")"; }
+  grep -Fx "$expected" "$out" >/dev/null || fail "the dot-free ask id did not wake: $(cat "$out")"
+  grep -Fx '1730000000 probe=1' "$dotfree/decide.log" >/dev/null || fail "a dot-free ask id was skipped as staging: $(cat "$dotfree/decide.log")"
   pass "the ask-default hook decides open asks through the add-on and is inert without it"
 }
 

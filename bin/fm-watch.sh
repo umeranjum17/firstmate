@@ -2726,8 +2726,10 @@ ask_default_tick() {
     [ -f "$rec" ] || continue
     id=${rec##*/}
     # Skip the add-on's apply locks and its in-flight <id>.<pid> record staging.
-    case "$id" in *.lock) continue ;; esac
-    case "${id##*.}" in *[!0-9]*) ;; *) [ ! -f "${rec%.*}" ] || continue ;; esac
+    case "$id" in
+      *.lock) continue ;;
+      *.*) case "${id##*.}" in *[!0-9]*) ;; *) [ ! -f "${rec%.*}" ] || continue ;; esac ;;
+    esac
     grep -q '^defaulted_at=' "$rec" && continue
     rc=0
     out=$(FM_HOME="$FM_HOME" "$tool" decide "$id" --probe-cmd "$probe" 2>&1) || rc=$?
