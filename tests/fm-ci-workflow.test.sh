@@ -413,16 +413,20 @@ test_changes_decision_runs_everything_for_deleted_tests() {
     || fail "a pull request changing bin/fm-test-run.sh must run the heavy lanes, got heavy=$heavy"
 
   # The same holds when the pull request touches the workflow files, whose
-  # text also comes from the merge commit: the skip is never consulted.
+  # text also comes from the merge commit. The fixture's base already runs a
+  # stub that reports an empty selection, and the head commit changes only
+  # the workflow file, so heavy=true can come from the workflow arm alone.
   root=$(fm_test_tmproot fm-ci-touch-workflow)
   repo="$root/repo"
   build_classify_repo "$repo" docs/notes.md notes
-  mkdir -p "$repo/.github/workflows"
-  printf '%s\n' 'name: other' >"$repo/.github/workflows/other.yml"
   printf '#!/usr/bin/env bash\nexit 0\n' >"$repo/bin/fm-test-run.sh"
   chmod +x "$repo/bin/fm-test-run.sh"
+  git -C "$repo" -c user.email=ci@firstmate.test -c user.name=ci commit -q --amend -am "base with a lying runner" \
+    || fail "could not rebuild the workflow fixture's base"
+  mkdir -p "$repo/.github/workflows"
+  printf '%s\n' 'name: other' >"$repo/.github/workflows/other.yml"
   git -C "$repo" add -A
-  git -C "$repo" -c user.email=ci@firstmate.test -c user.name=ci commit -qm "add a workflow and a lying runner"
+  git -C "$repo" -c user.email=ci@firstmate.test -c user.name=ci commit -qm "add a workflow file"
   heavy=$(run_classify_step "$repo" "$step") || fail "classify step failed for a workflow change"
   [ "$heavy" = true ] \
     || fail "a pull request changing .github/workflows/ must run the heavy lanes, got heavy=$heavy"
