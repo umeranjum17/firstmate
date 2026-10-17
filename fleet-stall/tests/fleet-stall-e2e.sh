@@ -3,11 +3,10 @@
 # (FM_STALL_ROOT) with lead records for muxr and writeboost, their two homes
 # (FM_STALL_BASE) with live lanes paused for more than 45 min, and a stub herdr
 # on PATH that shows both leads idle. No fm-flow-check or fm-tasks-axi exists in
-# the fixture, so the zero-busy guard stays out of the way. Journeys (16 Oct
-# 17:18Z false stall): a muxr worker on its own local CI with a firstmate-...
-# evidence path, and two writeboost workers on their own emulator runs with
-# /home/fixture/users/user-019/.treehouse/firstmate-... paths, no longer count; "waiting on
-# firstmate for the decision" and "awaiting main instruction" still do.
+# the fixture, so the zero-busy guard stays out of the way. A worker on its own
+# local CI and two workers on their own emulator runs, all behind example home
+# paths, no longer count; "waiting on firstmate for the decision" and
+# "awaiting main instruction" still do.
 # FLEET_STALL_BIN runs another copy of the check against the same fixture.
 # Needs bash and python3 on PATH; no real home, herdr or lead is touched.
 set -u
@@ -36,9 +35,9 @@ lane() { # lane <home-number> <task> <last status line>: a live lane paused >45m
   printf '%s\n' "$3" > "$d/$2.status"
   touch -d "@$old" "$d/$2.status"
 }
-lane 8 rd-local-ci "paused [at=1792181100]: local CI (./ci.sh) on my candidate running; resumes when it exits; evidence=/home/fixture/users/user-019/.treehouse/fixture-home/8/firstmate/data/rd-local-ci/ci.log"
-lane 4 ov-f6a-real-writer-proof "paused [at=1792177868]: own run: rebuild then one queued emulator-5630 lock hold (FM_DEVICE_WAIT=10800) for preflight+full live Go writer legs; /home/fixture/users/user-019/.treehouse/fixture-home/4/firstmate/data/ov-f6a-real-writer-proof/status/queued.status"
-lane 4 ov-live-writer-proof-1015 "paused [at=1792179350]: APK rebuilt at 31bce97; chunk a (Go connect+workspace pick, one real draft, ov-pm-12) queued on emulator-5630 lock (3h wait); completes at status/go-legs.status chunk a rc. Evidence: /home/fixture/users/user-019/.treehouse/fixture-home/4/firstmate/data/ov-live-writer-proof-1015/status/go-legs.status"
+lane 8 rd-local-ci "paused [at=1792181100]: local CI (./ci.sh) on my candidate running; resumes when it exits; evidence=/home/you/.treehouse/fleet/8/firstmate/data/rd-local-ci/ci.log"
+lane 4 ov-f6a-real-writer-proof "paused [at=1792177868]: own run: rebuild then one queued emulator-5630 lock hold (FM_DEVICE_WAIT=10800) for preflight+full live Go writer legs; /home/you/.treehouse/fleet/4/firstmate/data/ov-f6a-real-writer-proof/status/queued.status"
+lane 4 ov-live-writer-proof-1015 "paused [at=1792179350]: APK rebuilt at 31bce97; chunk a (Go connect+workspace pick, one real draft, ov-pm-12) queued on emulator-5630 lock (3h wait); completes at status/go-legs.status chunk a rc. Evidence: /home/you/.treehouse/fleet/4/firstmate/data/ov-live-writer-proof-1015/status/go-legs.status"
 
 fails=0
 ok() { printf 'ok - %s\n' "$1"; }

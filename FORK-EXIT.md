@@ -1,12 +1,12 @@
 # Fork exit list
 
 Every change on `umeranjum17/firstmate` main that is not on `kunchenguid/firstmate` main
-(137 commits, 285 fork-only files, +25,737/−11,895 as of 17 Oct), grouped by feature,
+(137 commits, 285 fork-only files, +25,737/−11,895), grouped by feature,
 with its exit path and status. The rule behind the list: **the next core gap goes in an
 add-on when it can; a fork patch only when it cannot — and it joins this list the same day.**
 
 Exit paths: **add-on** `<dir>` (move to firstmate-addons) · **offer to Kun** (upstream fix,
-only with the captain's word) · **stays** (thin hook or fork-only policy, nothing to move).
+only with the owner's approval) · **stays** (thin hook or fork-only policy, nothing to move).
 Statuses: **on fork** · **moved to** add-on + fork shim · **dormant copy** (add-on holds a
 verbatim copy; the fork still runs its own) · **done**.
 
@@ -14,8 +14,8 @@ verbatim copy; the fork still runs its own) · **done**.
 
 The same-day rule: any new fork commit (or PR merge) lands a row here the same day, with its
 exit path decided at entry. Reuse a row when the commit belongs to a listed feature; otherwise
-add one. Source of truth: `git -C /home/fixture/users/user-019/firstmate fetch origin && git -C /home/fixture/users/user-019/firstmate
-fetch kun && git -C /home/fixture/users/user-019/firstmate log --oneline kun/main..origin/main`. Check each status
+add one. Source of truth: `git -C ~/firstmate fetch origin && git -C ~/firstmate
+fetch kun && git -C ~/firstmate log --oneline kun/main..origin/main`. Check each status
 against the files, not against this table. PRs at the top until they are resolved.
 
 ## Priority: open and recent fork PRs
@@ -24,7 +24,7 @@ against the files, not against this table. PRs at the top until they are resolve
 |---|---|---|---|---|
 | Watcher check cadence calls the ask-default add-on's decide for each open ask | [92](https://github.com/umeranjum17/firstmate/pull/92) (merged cfb646f2) | `bin/fm-watch.sh`, `docs/configuration.md`, `docs/scripts.md`, `tests/fm-watch-triage.test.sh` | stays (thin hook; the logic is add-on `ask-default`) | on fork |
 | Ready-work nudge reads the fleet-flow add-on's counted lanes | [91](https://github.com/umeranjum17/firstmate/pull/91) (merged 852a3488) | `bin/fm-watch.sh`, `tests/fm-watch-triage.test.sh` | stays (thin hook; the logic is add-on `fleet-flow`) | on fork |
-| Live labs write `treehouse.toml` so lab copies stay under the lab root | [86](https://github.com/umeranjum17/firstmate/pull/86) (merged e43cddbc) | `bin/fm-live-lab.sh`, `bin/fm-claude-trust.sh`, `tests/fm-live-lab-up-mate.test.sh` | offer to Kun (lab containment fix, only with the captain's word) | on fork |
+| Live labs write `treehouse.toml` so lab copies stay under the lab root | [86](https://github.com/umeranjum17/firstmate/pull/86) (merged e43cddbc) | `bin/fm-live-lab.sh`, `bin/fm-claude-trust.sh`, `tests/fm-live-lab-up-mate.test.sh` | offer to Kun (lab containment fix, only with the owner's approval) | on fork |
 | Skip parked homes in every supervision producer | [85](https://github.com/umeranjum17/firstmate/pull/85) (88e57fe1) | `bin/fm-parked-homes-lib.sh` (new shim), gate lines in `bin/fm-send.sh`, `bin/fm-control.sh`, `bin/fm-remote-secondmate-relaunch.sh`, `bin/fm-secondmate-restart.sh`, `bin/fm-secondmate-reconcile.sh`, `bin/fm-config-push.sh`, `bin/fm-bootstrap.sh`, `bin/fm-pending-reply-lib.sh`, `bin/fm-model-outage-lib.sh`, `bin/fm-watch.sh` | add-on `parked-homes` (the reader + policy live there; fork carries only the shim and one predicate call per producer) | on fork |
 | Fork catch-up with Kun's main | [74](https://github.com/umeranjum17/firstmate/pull/74) (merge e9e2ef20) | merge commits only | stays (sync, no feature content) | done — merged; upstream ports (capacity, exclusions, spend, growth check) now byte-identical to Kun's main |
 | Label the Main-owned wait escalation as the check wake | [78](https://github.com/umeranjum17/firstmate/pull/78) (4df0ed20) | `bin/fm-wait-timers-lib.sh` | offer to Kun | on fork |
@@ -32,15 +32,15 @@ against the files, not against this table. PRs at the top until they are resolve
 | Replace fleet dashboard copy with the firstmate-addons shim | [80](https://github.com/umeranjum17/firstmate/pull/80) (561cc47e) | `bin/fm-dashboard.sh` (now a ~20-line exec shim) | add-on `fleet-dashboard` | done — moved to fleet-dashboard + fork shim PR 80; live dashboard serves from the add-on |
 | Withdraw stale ready-work wakes instead of replaying them | [81](https://github.com/umeranjum17/firstmate/pull/81) (c66d9594) | `bin/fm-wake-lib.sh`, `bin/fm-wake-drain.sh`, `bin/fm-watch.sh` | offer to Kun | on fork |
 | Move a relaunching worker to another pool account (`--account`) | [83](https://github.com/umeranjum17/firstmate/pull/83) (merged 0766f3c3) | `bin/fm-account-pool-lib.sh`, `bin/fm-control.sh`, `bin/fm-spawn.sh` | add-on `account-pool` if fm-control gains an account hook, else offer to Kun | on fork (see named item fm/fm-acct-f2-relaunch) |
-| Retry the watch-triage drain ack under load and log missed attempts | [84](https://github.com/umeranjum17/firstmate/pull/84) (merged 5758e520) | `tests/fm-watch-triage.test.sh` | offer to Kun (test hardening, only with the captain's word) | on fork — diagnostics only; the flake was not reproduced |
+| Retry the watch-triage drain ack under load and log missed attempts | [84](https://github.com/umeranjum17/firstmate/pull/84) (merged 5758e520) | `tests/fm-watch-triage.test.sh` | offer to Kun (test hardening, only with the owner's approval) | on fork — diagnostics only; the flake was not reproduced |
 | Home launch-env hook: `config/launch-env-hook <out>` runs in the pane and its export is sourced before the AI-trailer step | [90](https://github.com/umeranjum17/firstmate/pull/90) (merged adcfce9e) | `bin/fm-spawn.sh` (thin hook), `docs/configuration.md` | stays (thin hook; the logic is add-on `git-identity`) | on fork — needed because no existing spawn hook point reaches the pane environment |
 
-## Named items (16 Oct)
+## Named items
 
 | Item | Fork PR / commits | Key files | Exit path | Status |
 |---|---|---|---|---|
-| fm/fm-acct-f2-relaunch | [83](https://github.com/umeranjum17/firstmate/pull/83) (0766f3c3) | fm-control relaunch `--account <id\|next>` | move to an add-on if fm-control gains an account hook, else offer to Kun only with the captain's word | on fork |
-| fork-live-lab-haiku | [82](https://github.com/umeranjum17/firstmate/pull/82) (c19ba5f7) | `bin/fm-live-lab.sh` — Claude lab runtime, supervision host and second-mate defaults all `claude-haiku-5-5` | offer to Kun only with the captain's word (fleet lab policy); pair with add-on `claude-model-guard` | on fork — verified in files |
+| fm/fm-acct-f2-relaunch | [83](https://github.com/umeranjum17/firstmate/pull/83) (0766f3c3) | fm-control relaunch `--account <id\|next>` | move to an add-on if fm-control gains an account hook, else offer to Kun only with the owner's approval | on fork |
+| fork-live-lab-haiku | [82](https://github.com/umeranjum17/firstmate/pull/82) (c19ba5f7) | `bin/fm-live-lab.sh` — Claude lab runtime, supervision host and second-mate defaults all `claude-haiku-5-5` | offer to Kun only with the owner's approval (fleet lab policy); pair with add-on `claude-model-guard` | on fork — verified in files |
 | fork-live-lab-treehouse-leak | (no fork-only commit; rule on the shared lab script) | `bin/fm-live-lab.sh:171` — `TREEHOUSE_ROOT` points inside the lab root, so lab copies stay under it | stays (lab containment rule; re-check on every lab change) | holds today — verified in files |
 | cicd-ci-tuning Q6/B4 (FM_LINT_JOBS 2–4, shard rebalance) | 7c6b3525 ([18](https://github.com/umeranjum17/firstmate/pull/18)) and later CI commits | `.github/workflows/ci.yml` (still pins `FM_LINT_JOBS: '1'`), `bin/fm-lint.sh` (default 2), `docs/fm-test-portable-shards.md` | stays (fleet CI policy, never an add-on; tune in place) | open — CI still pins 1; raise to 2–4 and rebalance shards |
 
@@ -57,7 +57,7 @@ against the files, not against this table. PRs at the top until they are resolve
 | Feature | Commits / PRs | Key files (fork, still live) | Exit path | Status |
 |---|---|---|---|---|
 | Fleet flow reader (lifecycle/queue/bottleneck JSON) | 3b00213c ([23](https://github.com/umeranjum17/firstmate/pull/23)) | `bin/fm-flow.sh` | add-on `fleet-flow` + fork shim | done — shimmed; the add-on copy is the only reader, reached through the fork shim ([88](https://github.com/umeranjum17/firstmate/pull/88)) |
-| Home flow check (lane slots, dry pulse column) | Retro 16 Oct #4 (add-on branch `fm/retro-lane-slots`) | `config/fm-flow-check.sh` | add-on `fleet-flow` + operator symlink (fleet-flow README install runbook); never a shim — `bin/fm-flow.sh` reads its stage-clock policy from the file's text | dormant copy — symlink pending |
+| Home flow check (lane slots, dry pulse column) | fleet retro (add-on branch `fm/retro-lane-slots`) | `config/fm-flow-check.sh` | add-on `fleet-flow` + operator symlink (fleet-flow README install runbook); never a shim — `bin/fm-flow.sh` reads its stage-clock policy from the file's text | dormant copy — symlink pending |
 | Fleet stats (per-model, per-skill, outcome recorder) | 877ded84 ([56](https://github.com/umeranjum17/firstmate/pull/56)), eb0cb110 ([75](https://github.com/umeranjum17/firstmate/pull/75)) | `bin/fm-model-stats.sh`, `bin/fm-skill-stats.sh`, `bin/fm-task-outcome.sh` | add-on `fleet-stats` + fork hook | dormant copy |
 | Host memory sampling + admission | 2b3097c7 ([29](https://github.com/umeranjum17/firstmate/pull/29)), 9f63932e ([33](https://github.com/umeranjum17/firstmate/pull/33)), de32a41f ([45](https://github.com/umeranjum17/firstmate/pull/45)) | `bin/fm-host-memory-sampler.sh`, `bin/fm-jev-mem-guard.py` delta, `config/host-memory` flag | add-on `host-memory` + flag hook | dormant copy |
 | Wait timers lib + watcher integration | 3d9c09cc ([54](https://github.com/umeranjum17/firstmate/pull/54)), 4df0ed20 ([78](https://github.com/umeranjum17/firstmate/pull/78)) | `bin/fm-wait-timers-lib.sh`, one source line in `bin/fm-watch.sh` | add-on `wait-timers` + source hook | dormant copy |
@@ -73,10 +73,10 @@ against the files, not against this table. PRs at the top until they are resolve
 |---|---|---|---|---|
 | Bearings board milestones + evidence thumbnails | 9ad8e1fb, 08472745 | `bin/fm-bearings-board.sh`, `bin/fm-bearings-snapshot.sh`, `.agents/skills/bearings/` | add-on (skill assets + board scripts) | on fork |
 | Lead-wake fleet policy (lane floor, idle lead, stalled ring, ready-work) | afd00e42, bd86f55b, 0ef3188b ([9](https://github.com/umeranjum17/firstmate/pull/9)), 49d4ea80, d4881b01 ([7](https://github.com/umeranjum17/firstmate/pull/7)), a7d3b2cc ([8](https://github.com/umeranjum17/firstmate/pull/8)), c66d9594 ([81](https://github.com/umeranjum17/firstmate/pull/81)) | `bin/fm-watch.sh`, `bin/fm-wake-lib.sh` | add-on (watch-side policy seam); never offer upstream as a "fix" | on fork |
-| Worker account pooling at spawn + raw-launch refusal | aa56a40c ([72](https://github.com/umeranjum17/firstmate/pull/72)), 46e2273b ([76](https://github.com/umeranjum17/firstmate/pull/76)) | `bin/fm-account-pool-lib.sh`, `bin/fm-worker-account-lib.sh`, `bin/fm-spawn.sh` | add-on if fm-control gains an account hook, else offer to Kun only with the captain's word | on fork |
+| Worker account pooling at spawn + raw-launch refusal | aa56a40c ([72](https://github.com/umeranjum17/firstmate/pull/72)), 46e2273b ([76](https://github.com/umeranjum17/firstmate/pull/76)) | `bin/fm-account-pool-lib.sh`, `bin/fm-worker-account-lib.sh`, `bin/fm-spawn.sh` | add-on if fm-control gains an account hook, else offer to Kun only with the owner's approval | on fork |
 | Shared worker-brief inheritance | e2071b0a | brief builder hunks | add-on (brief seam) | on fork |
 
-### Fork fixes to offer to Kun (captain's word required first)
+### Fork fixes to offer to Kun (owner approval required first)
 
 | Feature | Commits / PRs | Key files | Exit path | Status |
 |---|---|---|---|---|
@@ -101,4 +101,4 @@ against the files, not against this table. PRs at the top until they are resolve
 
 Counts and method: 137 commits ahead of `kun/main` (`git log --oneline kun/main..origin/main`);
 285 fork-only files (+25,737/−11,895, two-dot diff). Statuses re-checked against fork files and
-add-on READMEs on 17 Oct. Short SHAs resolve at https://github.com/umeranjum17/firstmate.
+add-on READMEs. Short SHAs resolve at https://github.com/umeranjum17/firstmate.

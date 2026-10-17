@@ -1,11 +1,10 @@
 # parked-homes
 
-When the captain parks a secondmate home, nothing may reach it: no message,
+When you park a secondmate home, nothing may reach it: no message,
 steer, answer, nudge or relaunch, and no config push. Before this add-on the
-only record of a park was a line in `data/captain.md`, which no supervision
+only record of a park was a line in a home data file, which no supervision
 producer reads — so a parked home still got config-reread nudges, a pending
-reply retry ladder, and quota-failover relaunches (Main3404: relayiptv and
-v1design were parked and were still nudged and relaunched onto Muse).
+reply retry ladder, and quota-failover relaunches onto a new model.
 
 Every supervision producer now gates on **one shared reader**,
 `fm_parked_home <id>`, instead of carrying its own copy of the rule.
@@ -16,7 +15,7 @@ Every supervision producer now gates on **one shared reader**,
 lines are ignored:
 
 ```
-# Homes the captain parked: no work, nothing merges.
+# Parked homes: no work, nothing merges.
 v1design
 relayiptv
 ```

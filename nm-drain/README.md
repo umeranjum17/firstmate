@@ -27,7 +27,7 @@ It replaces three overlapping one-shot checks (`nm-quiet`, `nm-update` and `nm-u
 
 A run counts as active when its status is `pending` or `running`, which is exactly what `no-mistakes update` refuses on.
 That includes a run that only monitors its PR and CI after the push.
-A daemon restart would only mark such a run `ci_monitor_interrupted` and leave its PR open, but the update still refuses on it without `--force`, and `--force` needs the captain.
+A daemon restart would only mark such a run `ci_monitor_interrupted` and leave its PR open, but the update still refuses on it without `--force`, and `--force` needs you.
 `status` shows how many active runs are only in PR/CI monitoring.
 The state database is read only from a backup copy, which is deleted right after.
 

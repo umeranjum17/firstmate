@@ -160,7 +160,7 @@ MODE=older DD_LOG=$work/args.log SO_CAPTURE=$work/card-older GH_BODY=$work/pr-bo
 export MODE DD_LOG SO_CAPTURE GH_BODY
 checks older shot.png && mv "$home/data/older/checks.md" "$GH_BODY" && cp "$shot" "$home/data/older/shot.png"
 : >"$DD_LOG"
-run_check_and_post older https://github.com/umer/demo/pull/24
+run_check_and_post older https://github.com/example/demo/pull/24
 is "older: PR branch is the claim id" "$(grep -c -- '--from - --claim-id fm/older' "$DD_LOG")" 1
 is "older: recorded verdict" "$(jq -r .verdict "$home/data/older/merge-card.json")" pass
 if grep -q -- '--citation-base' "$DD_LOG"; then no "older: --citation-base was passed to a 0.3.0 done-done"; else ok "older: --citation-base never passed"; fi

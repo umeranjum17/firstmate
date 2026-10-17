@@ -1,4 +1,4 @@
-// Fleet delete guard for pi (installed by firstmate-addons delete-guard/install.sh; replaces the 16 Oct stopgap).
+// Fleet delete guard for pi (installed by firstmate-addons delete-guard/install.sh; replaces the earlier pi-only stopgap).
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { guard } from "__GUARD__";
 

@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Wake Main when the captain's Z.AI GLM plan burns ahead of time (captain 16 Oct 08:05Z: "Yes use glm flash 5.3 I will
-# say" - GLM 5.3 Flash now carries reviews, the shared no-mistakes pipeline and normal workers). An empty 5 h window
-# stops every home's pipeline runs until it resets. Fires when the 5 h window is under 30% with more than 45 min to its
-# reset, or the week's used share runs more than 15 points ahead of the week's elapsed share, or the week is under 20%;
-# repeats on a 10% step of the 5 h window only while the 5 h condition holds, otherwise on a 10% step of the week alone
-# (16 Oct fix: the week-ahead condition stays true all week, so a 5 h term in every repeat signature woke Main on every
-# 10% step of the window, about 10 wakes per 5 h). At most one read per 10 min. Usage: $0 [quota-json-file]
-# (file = test input; ZAI_QUOTA_MARK names the repeat-state file then, default a fresh temp file).
+# Wake Main when the shared Z.AI GLM plan burns ahead of time. GLM 5.3 Flash carries reviews, the shared no-mistakes
+# pipeline and normal workers. An empty 5 h window stops every home's pipeline runs until it resets. Fires when the
+# 5 h window is under 30% with more than 45 min to its reset, or the week's used share runs more than 15 points ahead
+# of the week's elapsed share, or the week is under 20%; repeats on a 10% step of the 5 h window only while the 5 h
+# condition holds, otherwise on a 10% step of the week alone (the week-ahead condition stays true all week, so the
+# repeat signature carries the 5 h step only while the 5 h condition holds). At most one read per 10 min.
+# Usage: $0 [quota-json-file] (file = test input; ZAI_QUOTA_MARK then names the repeat-state file, default a fresh temp file).
 # ponytail: fixed thresholds; tune here if the number of GLM lanes changes.
 set -u
-MARK=/home/fixture/users/user-019/firstmate/state/.zai-quota.last
+FM_MAIN=${FM_MAIN_HOME:-$HOME/firstmate}
+MARK=$FM_MAIN/state/.zai-quota.last
 now=$(date +%s)
 if [ $# -eq 0 ]; then
   [ -f "$MARK" ] && [ $((now - $(stat -c %Y "$MARK"))) -lt 600 ] && exit 0

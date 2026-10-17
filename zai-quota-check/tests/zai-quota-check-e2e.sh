@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # zai-quota-check e2e: the real check in its file-argument test mode against a
 # quota JSON fixture sequence, with ZAI_QUOTA_MARK holding the repeat state
-# across the runs of one sequence. Journeys (16 Oct repeat fix): with the
+# across the runs of one sequence. Journeys (repeat-signature fix): with the
 # week-ahead condition true all week and the 5 h window above 30%, fp
 # 90->80->...->40 wakes once, where the old fp//10|wp//10 signature woke on
 # every run; with the 5 h condition (under 30% left, more than 45 min to its

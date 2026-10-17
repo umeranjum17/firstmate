@@ -18,8 +18,14 @@ FMH=$(cd "$1" && pwd -P)
 SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 DEST=${XDG_DATA_HOME:-$HOME/.local/share}/fm-git-identity
 CONF=$DEST/identity.gitconfig
-[ -n "$EMAIL" ] || EMAIL=$(git config -f "$CONF" user.email 2>/dev/null) || EMAIL=umeranjum17@gmail.com
-[ -n "$NAME" ] || NAME=$(git config -f "$CONF" user.name 2>/dev/null) || NAME=umer
+if [ -z "$EMAIL" ]; then
+  EMAIL=$(git config -f "$CONF" user.email 2>/dev/null || git config --global user.email 2>/dev/null || true)
+  [ -n "$EMAIL" ] || { echo "install.sh: no identity: pass --email or set git user.email (no default identity)" >&2; exit 1; }
+fi
+if [ -z "$NAME" ]; then
+  NAME=$(git config -f "$CONF" user.name 2>/dev/null || git config --global user.name 2>/dev/null || true)
+  [ -n "$NAME" ] || { echo "install.sh: no identity: pass --name or set git user.name (no default identity)" >&2; exit 1; }
+fi
 # Every client-side hook name the fork's lane hooks dir chains (bin/fm-git-strip-ai-trailers.sh), plus commit-msg:
 # a lane resolves this dir as the repository's hooks dir, so a missing name would skip the repository's own hook.
 HOOKS='applypatch-msg pre-applypatch post-applypatch pre-commit pre-merge-commit prepare-commit-msg commit-msg
