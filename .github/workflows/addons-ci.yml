@@ -112,3 +112,6 @@ jobs:
       # Fixture origin, plain repo and a throwaway HOME, global gitconfig, home and patterns file: nothing real is touched.
       - name: Owner guard global test
         run: bash owner-guard/tests/owner-guard-global.test.sh
+      # Fixture home, merge gate and patterns, a local bare repo standing in for GitHub and a stub gh: nothing real is touched.
+      - name: Owner guard merge gate test
+        run: bash owner-guard/tests/owner-guard-merge.test.sh
