@@ -9,10 +9,11 @@
 # run fails, costing a restart.
 #
 # This wrapper runs the real pi; the requested chain model goes first, then
-# the other chain models in chain order (default GLM 5.3 Flash, then Go Muse
-# 1.3 Contributor, then DeepSeek v4.1 Flash - never Claude, never Step 5), and
-# when an attempt answers a QUOTA error it moves at once to the next model in
-# that order inside the same invocation. Any non-quota failure passes through
+# the other chain models in chain order (default GLM 5.3 Flash, then Claude
+# Haiku 5.5 through the claude-bridge provider - Claude Haiku 5.5 only as the
+# GLM failover; never Opus, Sonnet, Fable or Step 5), and when an attempt
+# answers a QUOTA error it moves at once to the next model in that order
+# inside the same invocation. Any non-quota failure passes through
 # byte-for-byte with its original exit code, so the pipeline's own handling is
 # untouched. When every model in the chain is quota-dead it fails once with a
 # line containing "quota exhausted", which no-mistakes classifies as terminal,
@@ -31,15 +32,18 @@
 #   PI_QUOTA_FAILOVER_GATE     host-memory gate run before each call (default ~/firstmate/config/fm-mem-gate.sh
 #                              when executable; empty disables it)
 #   PI_QUOTA_FAILOVER_GATE_SECS  longest gate wait before pi starts anyway (default 600)
+#   PI_QUOTA_FAILOVER_DEAD_SECS  how long a quota error keeps a chain model skipped (default 3600)
 set -u
 
 # The real quota-error classes seen in this fleet's pipeline logs (see the
 # lane evidence): zai weekly/5-hour usage limits, GoUsageLimitError, upstream
-# rate limits, credit exhaustion, and the report's "limit used up" phrasing.
-# Case-insensitive; matched against pi's error surface only.
-QUOTA_RE='limit used up|usage limit|limit has been reached|GoUsageLimitError|rate limit exceeded|quota|available credits|insufficient credits'
+# rate limits, credit exhaustion, the report's "limit used up" phrasing, and
+# claude-bridge's Claude subscription limit ("Claude rate limit (five_hour) ...:
+# You're out of extra usage"). Case-insensitive; matched against pi's error
+# surface only.
+QUOTA_RE='limit used up|usage limit|limit has been reached|GoUsageLimitError|rate limit exceeded|quota|available credits|insufficient credits|Claude rate limit|out of extra usage'
 
-chain=${PI_QUOTA_FAILOVER_CHAIN:-'zai/glm-5.3-flash muse-spark-1.3-contributor deepseek/deepseek-v4.1-flash'}
+chain=${PI_QUOTA_FAILOVER_CHAIN:-'zai/glm-5.3-flash claude-bridge/claude-haiku-5-5'}
 # The chain is the fleet's one route list: route-change reads it from here.
 [ -z "${PI_QUOTA_FAILOVER_PRINT_CHAIN:-}" ] || { printf '%s\n' "$chain"; exit 0; }
 
@@ -67,6 +71,21 @@ log_dir=${XDG_STATE_HOME:-$HOME/.local/state}
 mkdir -p "$log_dir" 2>/dev/null || true
 log=${PI_QUOTA_FAILOVER_LOG:-$log_dir/pi-quota-failover.log}
 log_line() { printf '%s %s\n' "$(date -u +%FT%TZ)" "$*" >>"$log" 2>/dev/null; printf 'pi-quota-failover: %s\n' "$*" >&2; }
+
+# A quota error leaves a marker (model and epoch) so later calls skip that
+# model for PI_QUOTA_FAILOVER_DEAD_SECS instead of sitting through pi's own
+# retries on it again (13-16 min per call on a dead GLM); after the window the
+# model is tried again, and an answer without a quota error clears the marker.
+dead_dir=$log_dir/pi-quota-failover-dead
+dead_secs=${PI_QUOTA_FAILOVER_DEAD_SECS:-3600}
+marker() { printf '%s/%s\n' "$dead_dir" "${1//\//%}"; }
+# dead_age <model>: seconds since its quota marker; empty when it has none.
+dead_age() {
+  local m at
+  read -r m at 2>/dev/null <"$(marker "$1")" || return 0
+  case $at in '' | *[!0-9]*) return 0 ;; esac
+  [ "$m" = "$1" ] && echo $(($(date +%s) - at))
+}
 
 # Host-memory gate (speed-report B3: model calls under heavy host load crash): every pipeline model call goes
 # through this wrapper, so wait here until the host has room. The gate given no command only waits; pi keeps its
@@ -136,8 +155,8 @@ done
 # Only intercept calls whose model is in the chain: an operator-pinned profile
 # (axi run --model) for any other model passes through untouched, which also
 # keeps the pi-only pinned-profile rule intact. The requested model goes first,
-# then every other chain model in chain order, so a profile set to Muse fails
-# over to GLM, then DeepSeek.
+# then every other chain model in chain order, so a profile set to Haiku fails
+# over to GLM.
 order=()
 for m in "${models[@]}"; do
   [ "$m" = "$requested" ] || order+=("$m")
@@ -151,7 +170,20 @@ if [ ${#order[@]} = ${#models[@]} ]; then
 fi
 
 order=("$requested" "${order[@]}")
-detail=''
+live=()
+for m in "${order[@]}"; do
+  age=$(dead_age "$m")
+  if [ -n "$age" ] && [ "$age" -lt "$dead_secs" ]; then
+    log_line "model=$m skipped: quota error ${age}s ago (skip window ${dead_secs}s)"
+  else
+    live+=("$m")
+  fi
+done
+detail="every chain model hit a quota error in the last ${dead_secs}s"
+if [ ${#live[@]} -gt 0 ] && [ "${live[0]}" != "$requested" ]; then
+  mapfile -t args < <(rewrite_model "${live[0]}" "${args[@]}" | drop_session)
+fi
+order=("${live[@]}")
 for ((attempt = 0; attempt < ${#order[@]}; attempt++)); do
   model=${order[$attempt]}
   t0=$(date +%s%3N)
@@ -160,12 +192,15 @@ for ((attempt = 0; attempt < ${#order[@]}; attempt++)); do
   t1=$(date +%s%3N)
   errs=$(error_text "$rc")
   if ! grep -qiE "$QUOTA_RE" <<<"$errs"; then
+    rm -f "$(marker "$model")"
     # Not a quota failure: hand the pipeline exactly what real pi produced.
     cat "$out_file"
     cat "$err_file" >&2
     exit "$rc"
   fi
   detail=$(head -n 1 <<<"$errs")
+  mkdir -p "$dead_dir" 2>/dev/null
+  printf '%s %s\n' "$model" "$(date +%s)" >"$(marker "$model")" 2>/dev/null
   if [ $((attempt + 1)) -lt ${#order[@]} ]; then
     next=${order[$((attempt + 1))]}
     log_line "model=$model quota-error in $((t1 - t0))ms ($detail); moving to $next"
