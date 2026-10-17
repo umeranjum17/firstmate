@@ -172,7 +172,8 @@ if [ -n "$PR_HEAD" ] && [ -n "$WT" ] && [ -d "$WT" ] \
   && ORIGIN_URL=$(git -C "$WT" remote get-url origin 2>/dev/null) \
   && fm_pr_repo_from_git_url "$ORIGIN_URL" \
   && [ -n "$FM_PR_GIT_HOST" ] && [ -n "$FM_PR_GIT_REPO" ]; then
-  if [ "${FM_PR_GIT_HOST,,}" != "${HOST,,}" ] || [ "${FM_PR_GIT_REPO,,}" != "${PROJECT_PATH,,}" ]; then
+  if [ "$(printf '%s' "$FM_PR_GIT_HOST" | tr '[:upper:]' '[:lower:]')" != "$(printf '%s' "$HOST" | tr '[:upper:]' '[:lower:]')" ] \
+    || [ "$(printf '%s' "$FM_PR_GIT_REPO" | tr '[:upper:]' '[:lower:]')" != "$(printf '%s' "$PROJECT_PATH" | tr '[:upper:]' '[:lower:]')" ]; then
     RECEIPT_CANDIDATE=$PR_HEAD
   fi
 fi

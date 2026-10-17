@@ -204,11 +204,13 @@ fm_pr_forgejo_segment_valid() {
 # The forge host and owner/repository of a git clone URL, for comparing a
 # pull request's repository with a worktree's origin. Accepted forms are the
 # remotes git itself accepts: https://, http://, ssh://, and git:// URLs with
-# an optional user@ and host:port, and scp-like [user@]host:path. A .git
-# suffix and a trailing slash are dropped. FM_PR_GIT_REPO is set only when the
-# path is exactly owner/repository, so a subgroup, nested, or local path and
-# any URL whose repository cannot be isolated leave it empty and the caller
-# keeps its existing behavior instead of guessing a repository.
+# an optional user@, and scp-like [user@]host:path. A .git suffix and a
+# trailing slash are dropped. FM_PR_GIT_REPO is set only when the path is
+# exactly owner/repository, so a subgroup, nested, or local path and any URL
+# whose repository cannot be isolated leave it empty and the caller keeps its
+# existing behavior instead of guessing a repository. An explicit port in a
+# scheme URL (ssh://host:2222/owner/repo.git) stays in the path, so such a
+# remote also leaves FM_PR_GIT_REPO empty and is never isolated.
 fm_pr_repo_from_git_url() {  # <url>
   local url=$1 rest path
   FM_PR_GIT_HOST=
