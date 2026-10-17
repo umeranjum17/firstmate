@@ -52,7 +52,7 @@ scan_diff() {
     if [ "$pend" -gt 0 ]; then
       pend=$((pend - 1))
       case "$rest" in
-      "\\\\"*) pend=$((pend + 1)) ;; # "\ No newline" marker: not counted in the header
+      $'\\'*) pend=$((pend + 1)) ;; # "\ No newline" marker: not counted in the header
       '+'*) [ -n "$file" ] && [ "$file" != /dev/null ] || continue
         printf '%s\n' "${rest#+}" >>"$CONT"
         printf '%s\034%s\n' "$file" "$line" >>"$BODY"
