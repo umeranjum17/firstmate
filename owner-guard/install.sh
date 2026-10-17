@@ -47,12 +47,19 @@ MG=$FMH/config/merge-gate
 MGPREV=$MG.pre-owner-guard
 ours_gate() { [ -f "$MG" ] && grep -qxF "$MGMARK" "$MG"; }
 present() { [ -e "$1" ] || [ -L "$1" ]; }
+# The hooks run under whatever PATH git's caller has, so the installed copies
+# carry absolute paths resolved here, at install time: a ref update under a
+# PATH with no bash used to fail on "env: bash: No such file or directory".
+abs_tool() { # abs_tool <name>: set ABS to the installed tool's absolute path, or fail naming it.
+  ABS=$(command -v "$1" 2>/dev/null || true)
+  [ -n "$ABS" ] && [ -x "$ABS" ] || { echo "error: $1 is not installed; install it, then rerun" >&2; exit 1; }
+}
 
 install_global() { # Write one wrapper per hook name; adopt the global hooksPath, keeping the old value chained.
   mkdir -p "$GHOOKS"
   # shellcheck disable=SC2086
   for name in $HOOK_NAMES; do
-    sed "s/__NAME__/$name/g" "$SRC/global-hook.sh" >"$GHOOKS/$name"
+    sed -e "s/__NAME__/$name/g" -e "1s|^#!.*|#!$BASH_BIN|" -e "s|__CAT__|$CAT_BIN|g" -e "s|__MKTEMP__|$MKTEMP_BIN|g" -e "s|__RM__|$RM_BIN|g" "$SRC/global-hook.sh" >"$GHOOKS/$name"
     chmod 755 "$GHOOKS/$name"
   done
   if [ "$CURGLOBAL" = "$GHOOKS" ]; then
@@ -156,6 +163,11 @@ if [ "$UNINST" -eq 1 ]; then
   uninstall_merge_gate
   exit 0
 fi
+BASH_BIN=$(command -v bash 2>/dev/null || true)
+[ -x "$BASH_BIN" ] || BASH_BIN=/bin/bash
+abs_tool cat; CAT_BIN=$ABS
+abs_tool mktemp; MKTEMP_BIN=$ABS
+abs_tool rm; RM_BIN=$ABS
 PAT=$FMH/config/owner-details-patterns
 REC=$(cat "$DEST/home" 2>/dev/null || true)
 if [ "$DRY" -eq 1 ]; then
@@ -177,7 +189,8 @@ if [ "$DRY" -eq 1 ]; then
   exit 0
 fi
 mkdir -p "$DEST"
-install -m 755 "$SRC/owner-guard" "$DEST/owner-guard"
+sed "1s|.*|#!$BASH_BIN|" "$SRC/owner-guard" >"$DEST/owner-guard"
+chmod 755 "$DEST/owner-guard"
 if [ -e "$PAT" ]; then
   chmod 600 "$PAT"
 else
@@ -190,7 +203,7 @@ else
 fi
 mkdir -p "$GDEST/hooks.d/pre-commit" "$GDEST/hooks.d/pre-push"
 for name in pre-commit pre-push; do
-  printf '#!/usr/bin/env bash\nexec %q %s "$@"\n' "$DEST/owner-guard" "$name" >"$GDEST/hooks.d/$name/owner-guard"
+  printf '#!%s\nexec %q %s "$@"\n' "$BASH_BIN" "$DEST/owner-guard" "$name" >"$GDEST/hooks.d/$name/owner-guard"
   chmod 755 "$GDEST/hooks.d/$name/owner-guard"
 done
 [ -d "$GDEST/hooks" ] || echo "note: $GDEST/hooks is missing (git-identity not installed); chaining activates when it installs"

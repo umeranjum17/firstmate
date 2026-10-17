@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # fm-owner-guard global hook template (install.sh stamps one copy per hook
-# name, replacing __NAME__). Runs the owner-details guard first (__NAME__
+# name, replacing __NAME__, its first line with the absolute bash path, and
+# __CAT__, __MKTEMP__ and __RM__ with absolute tool paths). Runs the owner-details guard first (__NAME__
 # runs it only for pre-commit and pre-push), then chains the previous global
 # hooks dir's hook and the repository's own hook, so repos with their own
 # hooks keep working — including bare repos' server-side hooks, which a
@@ -10,9 +11,12 @@
 # git's input to every chained hook on stdin.
 set -u -o pipefail
 unset CDPATH
-HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
+# The stamped absolute paths let the hook run with a PATH that holds only git;
+# the chained hooks below still get the caller's environment, PATH included.
+CAT=__CAT__ MKTEMP=__MKTEMP__ RM=__RM__
+HERE=$(cd "${BASH_SOURCE[0]%/*}/.." && pwd -P)
 NAME=__NAME__
-PREV=$(cat "$HERE/prev-hooks-path" 2>/dev/null || true)
+PREV=$("$CAT" "$HERE/prev-hooks-path" 2>/dev/null || true)
 if [ "$NAME" = pre-commit ]; then
   "$HERE/owner-guard" pre-commit "$@" || exit $?
 else
@@ -23,9 +27,9 @@ else
   # exit status wins even when it stops reading early.
   case $NAME in
   pre-push|post-rewrite|pre-receive|post-receive|proc-receive|reference-transaction)
-    FEED=$(mktemp) || exit 1
-    trap 'rm -f -- "$FEED"' EXIT
-    cat >"$FEED"
+    FEED=$("$MKTEMP") || exit 1
+    trap '"$RM" -f -- "$FEED"' EXIT
+    "$CAT" >"$FEED"
     FED_STDIN=1 ;;
   esac
   if [ "$NAME" = pre-push ]; then

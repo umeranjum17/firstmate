@@ -34,7 +34,11 @@ pushing the owner's private details to a public repo, shaped like
   names a global `core.hooksPath` would otherwise hide, so a local bare
   repo's own `pre-receive`/`post-receive` still run, and every stdin-fed
   wrapper replays git's exact input (byte-for-byte, NULs included) to
-  each chained hook. Install is idempotent, records a replaced global
+  each chained hook. The installed guard and wrappers name bash and the
+  tools they use by absolute path, resolved at install time, so a ref
+  update (for example `git branch`) runs under a PATH that holds only git;
+  the scan refuses by name when grep, sed or another scan tool is not on
+  PATH. Install is idempotent, records a replaced global
   hooksPath instead of dropping it, and `--uninstall` restores it; a
   repo-local `core.hooksPath` is never touched. It also writes the home's
   `config/merge-gate`: the merge scan first, then the home's previous gate
@@ -47,8 +51,10 @@ pushing the owner's private details to a public repo, shaped like
   still chains. The patterns file is never copied into the repo or a log.
 - `tests/owner-guard-global.test.sh` — fixture proof for the machine-wide
   guard (throwaway HOME and global gitconfig, made-up patterns only):
-  plain-shell and lane leaks refused, clean commits and pushes pass, the
-  repo's own hooks and a previous global hooks dir still chain (client- and
+  plain-shell and lane leaks refused, clean commits and pushes pass, a
+  commit under a PATH holding only git is refused by name (a ref update
+  there still runs the chained hooks), the repo's own hooks and a previous
+  global hooks dir still chain (client- and
   server-side: a bare repo's `pre-receive`/`post-receive` get their ref
   lines, a big push survives an early-exit chained hook, both `post-rewrite`
   consumers see the rewritten lines, `proc-receive` replay is byte-exact),
