@@ -106,3 +106,6 @@ jobs:
       # Fixture origin, shared clone, lane worktree and a throwaway HOME and home: nothing real is touched.
       - name: Git identity test
         run: bash git-identity/tests/git-identity.test.sh
+      # Fixture origin, clone, lane worktree and a throwaway HOME, home and patterns file: nothing real is touched.
+      - name: Owner guard test
+        run: bash owner-guard/tests/owner-guard.test.sh

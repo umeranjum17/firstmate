@@ -12,8 +12,9 @@
 #   git-identity hook <name> [args...]
 #       Run by hooks/<name>. pre-push refuses when any pushed commit not already on a remote has an author or
 #       committer email other than identity.gitconfig's user.email, or when a pushed commit cannot be inspected.
-#       Every hook then runs the repository's own hook
-#       of that name (core.hooksPath without our include, else $GIT_DIR/hooks), pre-push with the same stdin.
+#       Every hook then runs any add-on extensions in hooks.d/<name>/ (sorted, same args; a non-zero exit refuses)
+#       and the repository's own hook of that name (core.hooksPath without our include, else $GIT_DIR/hooks),
+#       pre-push with the same stdin.
 set -u -o pipefail
 unset CDPATH
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
@@ -72,6 +73,18 @@ the commits and push again:
 EOF
       exit 1
     fi
+  fi
+  # Add-on hook extensions (e.g. owner-guard): every executable in hooks.d/<name>/ runs in sorted
+  # order with the same args (pre-push gets the same stdin); a non-zero exit refuses the operation.
+  if [ -d "$HERE/hooks.d/$name" ]; then
+    for ext in "$HERE/hooks.d/$name/"*; do
+      if [ ! -x "$ext" ] || [ ! -f "$ext" ]; then continue; fi
+      if [ "$name" = pre-push ] && [ -n "$input" ]; then
+        printf '%s\n' "$input" | "$ext" "$@" || exit $?
+      else
+        "$ext" "$@" || exit $?
+      fi
+    done
   fi
   # Drop our include entries from GIT_CONFIG_* so the repository's own core.hooksPath shows through; later entries
   # shift down. Ignore GIT_CONFIG_PARAMETERS like the fork's trailer wrappers do.
