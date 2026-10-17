@@ -132,6 +132,21 @@ out=$(lane git commit -m 'lane leak' 2>&1) && rc=0 || rc=$?
 check "lane leak refused" "$rc" 1
 has "lane refusal prints file:line" "$out" "details.txt:1"
 
+# A PATH holding only git (the ledger case: no bash, no coreutils): a ref
+# update still runs the chained hooks, and a commit is refused by name, never
+# allowed because a missing grep read as "no match".
+gitonly=$d/gitonly
+mkdir -p "$gitonly"
+ln -s "$(command -v git)" "$gitonly/git"
+gitonly_run() { (cd "$d/plain" && env PATH="$gitonly" "$@"); }
+out=$(gitonly_run git branch probe-stripped 2>&1) && rc=0 || rc=$?
+check "git branch with a git-only PATH passes" "$rc" 0
+check "branch made under a git-only PATH" "$(git -C "$d/plain" rev-parse --verify -q refs/heads/probe-stripped >/dev/null && echo yes || echo no)" yes
+gitonly_run git branch -D probe-stripped >/dev/null 2>&1 || true
+out=$(gitonly_run git -c user.name=You -c user.email=$ME commit -q --allow-empty -m 'no tools' 2>&1) && rc=0 || rc=$?
+check "commit with a git-only PATH is refused" "$rc" 1
+has "refusal names the missing tool" "$out" "is not on PATH"
+
 # Missing patterns file allows with one note line, outside lanes too.
 mv "$FM/config/owner-details-patterns" "$d/patterns.off"
 out=$(plain git -c user.name=You -c user.email=$ME commit -q --allow-empty -m 'no patterns' 2>&1) && rc=0 || rc=$?

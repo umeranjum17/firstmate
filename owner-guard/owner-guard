@@ -7,6 +7,11 @@
 # home's config/merge-gate contract).
 set -u -o pipefail
 unset CDPATH
+# A missing scan tool would read as "no match" or "no patterns" and allow a
+# leak, so refuse by name before scanning anything.
+for tool in awk cat dirname git grep mktemp rm sed; do
+  command -v "$tool" >/dev/null 2>&1 || { echo "owner-guard: refused: $tool is not on PATH, so the scan cannot run; put it on PATH and retry. This refusal is final." >&2; exit 1; }
+done
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 
 # Patterns path: the lane home when it holds a patterns file; else the home
