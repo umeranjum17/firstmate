@@ -190,7 +190,7 @@ test_overview_answers_the_four_questions_with_sums_that_add_up() {
   printf 'first\t%s\tApprove the release\thttps://example.invalid/release\nsecond\t%s\tChoose a date\t\n' \
     "$((now - 7200))" "$((now - 3600))" > "$home/data/captain-asks.tsv"
   build "$home"
-  has "$d/index.html" "2 things need you. Approve the release 2 h Choose a date 1 h"
+  has "$d/index.html" "2 things need you. Newest first Oldest first All Yes/no Pick Approval pick Choose a date 1 h approval Approve the release 2 h"
   grep -q 'href="https://example.invalid/release"' "$d/index.html" || fail "ask URL not linked"
   # A blank row, or one without an id or text, is not an ask; a real ask with a bad time still counts.
   printf '\nbad row\n\t%s\tNo id\t\nfourth\t%s\t\t\nfifth\tsoon\tFix the time\t\n' "$now" "$now" >> "$home/data/captain-asks.tsv"
@@ -200,6 +200,38 @@ test_overview_answers_the_four_questions_with_sums_that_add_up() {
   has "$d/measure.html" "data/captain-asks.tsv row 4 skipped: no id or text" "row 5 skipped: no id or text" \
     "row 6 skipped: no id or text" "data/captain-asks.tsv malformed row 7"
   pass "the overview answers each question, and lanes, agents and groups sum to their totals"
+}
+
+test_waiting_on_you_is_newest_first_with_a_type_tag_and_filter() {
+  local home d now text
+  home=$(make_home asks)
+  d="$home/state/dashboard"
+  now=$(date +%s)
+  printf 'old\t%s\tApprove the merge\thttps://example.invalid/merge\nmid\t%s\tPick a layout: 1) blue 2) red\t\nnew\t%s\tIs the date right?\t\n' \
+    "$((now - 7200))" "$((now - 3600))" "$((now - 600))" > "$home/data/captain-asks.tsv"
+  build "$home"
+  text=$(page_text "$d/index.html")
+  case "$text" in *"Is the date right? "*"Pick a layout"*"Approve the merge"*) ;; *) fail "asks are not newest first by default: $text" ;; esac
+  has "$d/index.html" "yes/no Is the date right?" "pick Pick a layout" "approval Approve the merge" \
+    "Newest first" "Oldest first" "All" "Yes/no" "Pick" "Approval"
+  # Each ask carries its type class for the filter, and its newest-first and oldest-first ranks for the sort.
+  grep -q 'class="item k-yn" style="--n:0;--o:2"' "$d/index.html" || fail "the newest ask is not ranked 0 newest and 2 oldest"
+  grep -q 'class="item k-pick" style="--n:1;--o:1"' "$d/index.html" || fail "the pick ask is not ranked 1 newest and 1 oldest"
+  grep -q 'class="item k-approval" style="--n:2;--o:0"' "$d/index.html" || fail "the approval ask is not ranked 2 newest and 0 oldest"
+  grep -q '#as-new:focus-visible ~ \.actl label\[for=as-new\]{outline:2px solid var(--acc);outline-offset:2px}' "$d/index.html" || fail "the sort control has no visible keyboard focus ring"
+  pass "waiting on you lists newest first, tags each ask by type, and carries the sort and filter hooks"
+}
+
+test_waiting_on_you_types_follow_the_wording() {
+  local home d now
+  home=$(make_home asktypes)
+  d="$home/state/dashboard"
+  now=$(date +%s)
+  printf 'a\t%s\tPick a date\t\nb\t%s\tChoose a date\t\nc\t%s\tHas CI approved the deploy?\t\nd\t%s\tTry step 3) tomorrow\t\n' \
+    "$((now - 400))" "$((now - 300))" "$((now - 200))" "$((now - 100))" > "$home/data/captain-asks.tsv"
+  build "$home"
+  has "$d/index.html" "pick Pick a date" "pick Choose a date" "approval Has CI approved the deploy?" "yes/no Try step 3) tomorrow"
+  pass "pick, choose and approved wording tag as pick and approval, and a single step marker in prose stays yes/no"
 }
 
 test_backlog_and_method_pages_show_their_numbers() {
@@ -541,6 +573,11 @@ const d = { homes: [{ id: 'main', known: true, ready: 0 }, { id: 'remote', known
 assert.equal(ui.total(d, 0), '≥0'); assert.equal(ui.total(d, 0, 'queued'), '≥0'); assert.equal(ui.total(d, 0, 'landed'), '≥0')
 assert.equal(ui.total(d, 2, 'active', 'main'), 2)
 assert.equal(ui.prNum('https://gitlab.example/team/nested/app/-/merge_requests/27'), '27'); assert.equal(ui.prNum('https://github.com/team/app/pull/28'), '28'); assert.equal(ui.prNum('https://review.example/c/team/app/+/27'), '27')
+const asks = [{ text: 'Approve the merge', age: 7200 }, { text: 'Pick a layout: 1) blue 2) red', age: 3600 }, { text: 'Is the date right?', age: 600 }, { text: 'Fix the time', age: null }]
+assert.deepEqual(ui.askOrder(asks).map(a => a.text), ['Is the date right?', 'Pick a layout: 1) blue 2) red', 'Approve the merge', 'Fix the time'])
+assert.deepEqual(ui.askOrder(asks, false).map(a => a.text), ['Approve the merge', 'Pick a layout: 1) blue 2) red', 'Is the date right?', 'Fix the time'])
+assert.deepEqual(asks.map(a => ui.askType(a.text)), ['approval', 'pick', 'yn', 'yn'])
+assert.deepEqual(['Pick a date', 'Choose a date', 'Has CI approved the deploy?', 'Try step 3) tomorrow'].map(ui.askType), ['pick', 'pick', 'approval', 'yn'])
 const note = text => ({ verb: 'Waiting', stage: 'review', text, at: 1 })
 const prefix = 'Waiting for approval of the production deployment configuration in '
 assert.equal(board.squash([note(prefix + 'production'), note(prefix + 'staging')]).length, 2)
@@ -938,6 +975,8 @@ test_incomplete_lanes_and_moved_filings
 test_review_evidence_boundaries
 test_overview_answers_the_four_questions_with_sums_that_add_up
 test_backlog_and_method_pages_show_their_numbers
+test_waiting_on_you_is_newest_first_with_a_type_tag_and_filter
+test_waiting_on_you_types_follow_the_wording
 test_fleet_past_twenty_mates_keeps_every_lead_row
 test_board_json_feeds_the_app
 test_ship_view_loads_against_the_app

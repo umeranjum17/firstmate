@@ -1,7 +1,7 @@
 // Fleet dashboard app shell: live data, routes, the Linear sidebar and header (phone: title, tabs and dock),
 // filters, the ask list, the Ship mount, the command palette and keys.
 import { render } from './vendor/preact-htm-3.1.1.js'
-import { html, useState, useEffect, useRef, now, dur, hm, ACTIVE, STAGES, SNAME, STATES, stuck, state, sid, total, hc, hname, mname, sorted, filterCards, I, IC, StageIcon, Av } from './ui.js'
+import { html, useState, useEffect, useRef, now, dur, hm, ACTIVE, STAGES, SNAME, STATES, stuck, state, sid, total, hc, hname, mname, sorted, filterCards, I, IC, StageIcon, Av, ASK_TAG, askType, askOrder } from './ui.js'
 import { TABS, inTab, Board, MobileKanban, Detail } from './board.js'
 import { Insights } from './insights.js'
 const IC_CHART = html`<path d="M2.5 13.5h11M4.5 11V8.5M8 11V4.5M11.5 11V7"/>`
@@ -132,9 +132,20 @@ function Ship({ d, open }) {
   return html`<div id="ship-mount" ref=${ref}>${missing ? html`<div class="none">${I(IC.ship, 32)}<p>The 3D ship view mounts here.</p></div>` : ''}</div>`
 }
 // Needs you is the ask list and nothing else.
-const Needs = ({ d }) => d.asks == null ? html`<div class="none"><p>The ask list could not be read.</p></div>`
-  : !d.asks.length ? html`<div class="none">${I(IC.inbox, 32)}<p>Nothing needs you.</p></div>`
-  : html`<ul class="inbox">${d.asks.map(a => html`<li><span>${a.text}</span><small class="num">${a.age == null ? '' : dur(a.age)}</small>${a.url ? html`<a class="pill" href=${a.url} target="_blank" rel="noreferrer">Open</a>` : ''}</li>`)}</ul>`
+const Needs = ({ d }) => {
+  const [newest, setNewest] = useState(true), [kind, setKind] = useState('all')
+  if (d.asks == null) return html`<div class="none"><p>The ask list could not be read.</p></div>`
+  if (!d.asks.length) return html`<div class="none">${I(IC.inbox, 32)}<p>Nothing needs you.</p></div>`
+  const shown = askOrder(d.asks, newest).map(a => ({ ...a, kind: askType(a.text) })).filter(a => kind === 'all' || a.kind === kind)
+  return html`<div class="asks-ctl">
+    <div class="seg" role="group" aria-label="Sort asks">
+      <button aria-pressed=${newest ? 'true' : 'false'} onClick=${() => setNewest(true)}>Newest first</button>
+      <button aria-pressed=${newest ? 'false' : 'true'} onClick=${() => setNewest(false)}>Oldest first</button></div>
+    <div class="seg" role="group" aria-label="Filter asks by type">${[['all', 'All'], ['yn', 'Yes/no'], ['pick', 'Pick'], ['approval', 'Approval']].map(([k, n]) =>
+      html`<button aria-pressed=${kind === k ? 'true' : 'false'} onClick=${() => setKind(k)}>${n}</button>`)}</div>
+  </div>
+  <ul class="inbox">${shown.map(a => html`<li><span><em class="ktag">${ASK_TAG[a.kind]}</em>${a.text}</span><small class="num">${a.age == null ? '' : dur(a.age)}</small>${a.url ? html`<a class="pill" href=${a.url} target="_blank" rel="noreferrer">Open</a>` : ''}</li>`)}</ul>`
+}
 
 // Overview: the fleet's numbers as charts - each figure with its trend, the lifecycle as a rail of stages,
 // colour that means something (stage colours for work in motion, orange and red only where it waits or is stuck).
@@ -207,8 +218,8 @@ function Overview({ d, od, go }) {
       <${Kpi} name="Ready" v=${m.ready?.value ?? '–'} c="--h-2" t=${trend(hist, 'ready', m.ready?.value)}/>
     </div>
     <div class="ov-grid">
-      ${asks?.length ? html`<section class="ov-card wide"><h3>Needs you</h3><div class="ov-asks">${asks.map((a, k) =>
-        html`<a class="ov-ask" key=${k} href=${a.url || '#/needs'} target=${a.url ? '_blank' : null} rel="noreferrer"><span>${a.text}</span><small class="num">${a.age == null ? '' : dur(a.age)}</small></a>`)}</div></section>` : ''}
+      ${asks?.length ? html`<section class="ov-card wide"><h3>Needs you</h3><div class="ov-asks">${askOrder(asks).map((a, k) =>
+        html`<a class="ov-ask" key=${k} href=${a.url || '#/needs'} target=${a.url ? '_blank' : null} rel="noreferrer"><span><em class="ktag">${ASK_TAG[askType(a.text)]}</em>${a.text}</span><small class="num">${a.age == null ? '' : dur(a.age)}</small></a>`)}</div></section>` : ''}
       <section class="ov-card wide"><h3>Lifecycle</h3><${Rail} d=${d} go=${go}/></section>
       <section class="ov-card w2"><h3>Flow</h3><div class="ov-flows">${flow('landed', 'Landed today', 'recorded merges', '--st-landed')}${flow('closed', 'Closed 7 d', 'backlog items', '--green')}</div></section>
       <section class="ov-card w1"><h3>Lanes by state</h3>

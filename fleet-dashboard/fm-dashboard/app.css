@@ -343,3 +343,6 @@ a.ov-kpi:hover,button.ov-kpi:hover{box-shadow:0 0 0 1px color-mix(in srgb,var(--
   .ov-hrow{grid-template-columns:10px minmax(0,1fr) 64px 40px 66px;gap:8px}
   .ov-hrow>.num:last-child{display:none}
 }
+.asks-ctl{display:flex;flex-wrap:wrap;gap:6px 0;padding-bottom:4px}
+.asks-ctl .seg{padding-bottom:6px}
+.ktag{display:inline-block;margin-right:6px;padding:0 5px;border:1px solid var(--line);border-radius:5px;font-size:12px;font-style:normal;color:var(--ink-3);white-space:nowrap}
