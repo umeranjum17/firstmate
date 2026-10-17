@@ -780,6 +780,80 @@ test_direct_pr_unpushed_commit_refuses_registration() {
   pass "fm-pr-check refuses a direct-PR registration while a later commit is only in the copy"
 }
 
+# A cross-repo lane lands its second pull request in a repository other than
+# its worktree's origin. One completion receipt naming that pull request's
+# verified forge head must register and then merge, because bin/fm-pr-merge.sh
+# binds the merge to that same live head; a receipt naming only the worktree
+# HEAD refuses, and a same-repository pull request keeps the worktree HEAD
+# candidate.
+test_cross_repo_receipt_candidate() {
+  local dir repo_b wt_head forge_head out rc
+  dir=$(make_case cross-repo-receipt-registered)
+  ln -sf "$REAL_JQ" "$dir/fakebin/jq"
+  fm_write_meta "$dir/home/state/task-a.meta" \
+    "window=firstmate:fm-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
+    "project=$dir/project" "kind=ship" "mode=direct-PR" "receipt_required=1"
+  git -C "$dir/wt" remote add origin https://github.com/example/repo-a.git
+  wt_head=$(git -C "$dir/wt" rev-parse HEAD)
+  repo_b="$dir/repo-b"
+  git init -q "$repo_b"
+  git -C "$repo_b" commit -q --allow-empty -m 'fork PR head'
+  forge_head=$(git -C "$repo_b" rev-parse HEAD)
+  [ "$forge_head" != "$wt_head" ] || fail "the fixture's two repositories share one head"
+  printf 'bash targeted-test: PASS\n' > "$dir/evidence.txt"
+  FM_HOME="$dir/home" "$ROOT/bin/fm-run-receipt.sh" task-a PASS "$dir/evidence.txt" "$repo_b" >/dev/null \
+    || fail "could not publish the cross-repo completion receipt"
+
+  FM_TEST_GH_HEAD=$forge_head run_check_entry "$dir" task-a https://github.com/example/repo-b/pull/2 \
+    > "$dir/stdout" 2> "$dir/stderr" \
+    || fail "a cross-repo receipt for the verified forge head did not register: $(cat "$dir/stderr")"
+  grep -qxF 'pr=https://github.com/example/repo-b/pull/2' "$dir/home/state/task-a.meta" \
+    || fail "cross-repo registration did not record pr="
+  grep -qxF "pr_head=$forge_head" "$dir/home/state/task-a.meta" \
+    || fail "cross-repo registration did not record the verified forge head"
+
+  FM_TEST_GH_HEAD=$forge_head run_merge_entry "$dir" task-a https://github.com/example/repo-b/pull/2 -- \
+    > "$dir/merge.out" 2> "$dir/merge.err" \
+    || fail "the merge refused the receipt that registration accepted: $(cat "$dir/merge.err")"
+  grep -qF "pr merge 2 --repo example/repo-b --match-head-commit $forge_head" "$dir/gh.log" \
+    || fail "the merge was not bound to the cross-repo forge head"
+
+  dir=$(make_case cross-repo-receipt-refused)
+  ln -sf "$REAL_JQ" "$dir/fakebin/jq"
+  fm_write_meta "$dir/home/state/task-a.meta" \
+    "window=firstmate:fm-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
+    "project=$dir/project" "kind=ship" "mode=direct-PR" "receipt_required=1"
+  git -C "$dir/wt" remote add origin https://github.com/example/repo-a.git
+  printf 'bash targeted-test: PASS\n' > "$dir/evidence.txt"
+  FM_HOME="$dir/home" "$ROOT/bin/fm-run-receipt.sh" task-a PASS "$dir/evidence.txt" "$dir/wt" >/dev/null \
+    || fail "could not publish the worktree-HEAD completion receipt"
+  set +e
+  out=$(FM_TEST_GH_HEAD=$forge_head run_check_entry "$dir" task-a https://github.com/example/repo-b/pull/2 2>&1)
+  rc=$?
+  set -e
+  [ "$rc" -ne 0 ] || fail "a cross-repo receipt naming the worktree HEAD was registered"
+  case "$out" in
+    *"completion receipt refused"*) ;;
+    *) fail "the cross-repo refusal did not name the receipt: $out" ;;
+  esac
+  ! grep -q '^pr=' "$dir/home/state/task-a.meta" || fail "a refused cross-repo receipt still recorded pr="
+  [ ! -e "$dir/home/state/task-a.check.sh" ] || fail "a refused cross-repo receipt still armed a poll"
+
+  dir=$(make_case same-repo-receipt)
+  ln -sf "$REAL_JQ" "$dir/fakebin/jq"
+  fm_write_meta "$dir/home/state/task-a.meta" \
+    "window=firstmate:fm-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
+    "project=$dir/project" "kind=ship" "mode=direct-PR" "receipt_required=1"
+  git -C "$dir/wt" remote add origin https://github.com/o/r.git
+  printf 'bash targeted-test: PASS\n' > "$dir/evidence.txt"
+  FM_HOME="$dir/home" "$ROOT/bin/fm-run-receipt.sh" task-a PASS "$dir/evidence.txt" "$dir/wt" >/dev/null \
+    || fail "could not publish the same-repo completion receipt"
+  FM_TEST_GH_HEAD=$forge_head run_check_entry "$dir" task-a https://github.com/o/r/pull/4 \
+    > "$dir/stdout" 2> "$dir/stderr" \
+    || fail "a same-repo receipt for the worktree HEAD did not register: $(cat "$dir/stderr")"
+  pass "one cross-repo forge-head receipt passes registration and merge; the worktree HEAD still refuses"
+}
+
 test_valid_recording_and_merge_derivation() {
   local dir expected sidecar count rc
   dir=$(make_case valid-recording)
@@ -3680,6 +3754,7 @@ test_secondmate_record_refuses_a_pr_watch
 test_retired_secondmate_merge_poll_keeps_signal_wake
 test_unpushed_named_head_refuses_registration
 test_direct_pr_unpushed_commit_refuses_registration
+test_cross_repo_receipt_candidate
 test_valid_recording_and_merge_derivation
 test_rejected_metacharacter_bytes_are_inert
 test_static_poll_contract

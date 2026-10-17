@@ -809,10 +809,20 @@ fm_dod_named_head_reachable_outside_worktree() {  # <worktree> <project> <mode> 
 # same mode-specific declaration and named-head proof, not a new opt-in marker.
 # Optional captured run output preserves an explicit unreturned-custody refusal
 # even when the declared head is already on the forge.
-fm_dod_accept_ship_done() {  # <kind> <mode> <worktree> <project> <line> [<state> <id> <meta> <run-output>]
-  local kind=$1 mode=$2 wt=$3 project=$4 line=$5 state=${6:-} id=${7:-} meta=${8:-} run_out=${9:-} url sha gerrit
+# The optional trailing <forge-head> is a verified forge head the caller read
+# for a pull request that lives outside the worktree's origin repository. A
+# cross-repository lane's one completion receipt names that pull request's
+# head, because bin/fm-pr-merge.sh binds the merge to the live forge head, so
+# the receipt is checked against it instead of the worktree's HEAD; an absent
+# or invalid value keeps the worktree HEAD candidate, and a forge-head mode's
+# recorded pr_head still wins over it.
+fm_dod_accept_ship_done() {  # <kind> <mode> <worktree> <project> <line> [<state> <id> <meta> <run-output> [<forge-head>]]
+  local kind=$1 mode=$2 wt=$3 project=$4 line=$5 state=${6:-} id=${7:-} meta=${8:-} run_out=${9:-} forge_head=${10:-} url sha gerrit
   fm_dod_should_gate_ship_done "$kind" "$mode" "$line" || return 0
   sha=$(git -C "$wt" rev-parse --verify HEAD 2>/dev/null) || sha=
+  if [ -n "$forge_head" ] && fm_pr_head_valid "$forge_head"; then
+    sha=$forge_head
+  fi
   if fm_dod_forge_head_is_named_head "$mode" && [ -f "$meta" ]; then
     url=$(fm_dod_pr_url_from_done_note "$(status_line_note "$line")") || url=
     if [ -n "$url" ] && [ "$(fm_dod_meta_value "$meta" pr)" = "$url" ]; then
