@@ -76,6 +76,50 @@ has "push refusal prints file:line" "$out" "pushed.txt:1"
 check "refused push reached nothing" "$(git -C "$d/origin.git" rev-parse refs/heads/main)" "$(git -C "$d/plain" rev-parse HEAD~1)"
 git -C "$d/plain" reset -q --hard HEAD~1
 
+# A bare repo's own server-side hooks still run under the global guard.
+git init -q --bare -b main "$d/srv.git"
+printf '#!/bin/sh\necho srv-pre >>%q\ncat >>%q\n' "$d/hook.log" "$d/hook.log" >"$d/srv.git/hooks/pre-receive"
+printf '#!/bin/sh\necho srv-post >>%q\n' "$d/hook.log" >"$d/srv.git/hooks/post-receive"
+chmod +x "$d/srv.git/hooks/pre-receive" "$d/srv.git/hooks/post-receive"
+plain git push "$d/srv.git" main
+srvlog=$(cat "$d/hook.log")
+has "bare pre-receive still chained" "$srvlog" "srv-pre"
+has "bare pre-receive got its ref lines" "$srvlog" "refs/heads/main"
+has "bare post-receive still chained" "$srvlog" "srv-post"
+printf '#!/bin/sh\nexit 1\n' >"$d/srv.git/hooks/pre-receive"
+out=$(plain git push "$d/srv.git" +HEAD:refuse 2>&1) && rc=0 || rc=$?
+check "refusing bare pre-receive still refuses" "$rc" 1
+
+# A push whose ref lines exceed the pipe buffer still succeeds when the
+# repo's own pre-receive stops reading after one line: the chained hook's
+# verdict decides, not the replay.
+git init -q --bare -b main "$d/big.git"
+printf '#!/bin/sh\nread first\nexit 0\n' >"$d/big.git/hooks/pre-receive"
+chmod +x "$d/big.git/hooks/pre-receive"
+i=0; while [ "$i" -lt 1000 ]; do git -C "$d/plain" branch "b$i" >/dev/null; i=$((i+1)); done
+plain git push -q "$d/big.git" --all
+check "big push to an early-exit pre-receive passes" "$?" 0
+
+# Both chained post-rewrite consumers get git's rewritten-commit lines.
+printf '#!/bin/sh\ncat >>%q\n' "$d/rw.log" >"$d/prevhooks/post-rewrite"
+printf '#!/bin/sh\ncat >>%q\n' "$d/rw.log" >"$d/plain/.git/hooks/post-rewrite"
+chmod +x "$d/prevhooks/post-rewrite" "$d/plain/.git/hooks/post-rewrite"
+: >"$d/rw.log"
+plain git -C "$d/plain" -c user.name=You -c user.email=$ME commit -q --amend -m 'clean commit'
+check "both chained post-rewrite consumers fed" "$(grep -c . "$d/rw.log")" "2"
+check "post-rewrite replay identical to both" "$(sort -u "$d/rw.log" | wc -l)" "1"
+
+# proc-receive speaks a NUL-bearing pkt-line protocol: both chained
+# consumers must see git's exact bytes (version pkt with NUL caps, command
+# pkt, flushes).
+printf '#!/bin/sh\ncat >%q\n' "$d/pv-prev.log" >"$d/prevhooks/proc-receive"
+printf '#!/bin/sh\ncat >%q\n' "$d/pv-repo.log" >"$d/plain/.git/hooks/proc-receive"
+chmod +x "$d/prevhooks/proc-receive" "$d/plain/.git/hooks/proc-receive"
+printf '0020version=1\x00push-options atomic00000041aaaa 1111111111111111111111111111111111111111 refs/heads/pv\n0000' >"$d/pv-stream"
+(cd "$d/plain" && "$GH/proc-receive" <"$d/pv-stream" >/dev/null)
+check "proc-receive replay byte-exact to prev consumer" "$(cmp -s "$d/pv-stream" "$d/pv-prev.log" && echo same || echo diff)" "same"
+check "proc-receive replay byte-exact to repo consumer" "$(cmp -s "$d/pv-stream" "$d/pv-repo.log" && echo same || echo diff)" "same"
+
 # Lane env still refuses: the command-scope hooksPath wins over global, one verdict.
 git clone -q "$d/origin.git" "$d/clone"
 git -C "$d/clone" worktree add -q -b lane "$d/wt" origin/main
@@ -96,9 +140,9 @@ has "missing patterns prints one note" "$out" "nothing to protect"
 mv "$d/patterns.off" "$FM/config/owner-details-patterns"
 
 # Install twice is a no-op.
-before=$(git config --global --get core.hooksPath; cat "$d/data/fm-owner-guard/prev-hooks-path"; sha256sum "$GH"/pre-commit "$GH"/pre-push)
+before=$(git config --global --get core.hooksPath; cat "$d/data/fm-owner-guard/prev-hooks-path"; sha256sum "$GH"/pre-commit "$GH"/pre-push "$GH"/pre-receive "$GH"/post-receive)
 out=$("$SRC/install.sh" "$FM")
-after=$(git config --global --get core.hooksPath; cat "$d/data/fm-owner-guard/prev-hooks-path"; sha256sum "$GH"/pre-commit "$GH"/pre-push)
+after=$(git config --global --get core.hooksPath; cat "$d/data/fm-owner-guard/prev-hooks-path"; sha256sum "$GH"/pre-commit "$GH"/pre-push "$GH"/pre-receive "$GH"/post-receive)
 check "second install changes nothing" "$after" "$before"
 
 # Uninstall restores the previous global hooksPath; the guard stops firing.

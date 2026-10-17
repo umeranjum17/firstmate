@@ -24,7 +24,11 @@ pushing the owner's private details to a public repo, shaped like
   wrappers so plain-shell commits and pushes are checked too. Each wrapper
   runs the guard (pre-commit and pre-push only), then the previous global
   hooks dir's hook and the repository's own hook, so repos with their own
-  hooks keep working. Install is idempotent, records a replaced global
+  hooks keep working. The wrapper set also covers the server-side hook
+  names a global `core.hooksPath` would otherwise hide, so a local bare
+  repo's own `pre-receive`/`post-receive` still run, and every stdin-fed
+  wrapper replays git's exact input (byte-for-byte, NULs included) to
+  each chained hook. Install is idempotent, records a replaced global
   hooksPath instead of dropping it, and `--uninstall` restores it; a
   repo-local `core.hooksPath` is never touched.
 - `tests/owner-guard.test.sh` — fixture-repo proof (throwaway HOME and repo,
@@ -34,8 +38,12 @@ pushing the owner's private details to a public repo, shaped like
 - `tests/owner-guard-global.test.sh` — fixture proof for the machine-wide
   guard (throwaway HOME and global gitconfig, made-up patterns only):
   plain-shell and lane leaks refused, clean commits and pushes pass, the
-  repo's own hooks and a previous global hooks dir still chain, double
-  install is a no-op, uninstall restores the previous global hooksPath.
+  repo's own hooks and a previous global hooks dir still chain (client- and
+  server-side: a bare repo's `pre-receive`/`post-receive` get their ref
+  lines, a big push survives an early-exit chained hook, both `post-rewrite`
+  consumers see the rewritten lines, `proc-receive` replay is byte-exact),
+  double install is a no-op, uninstall restores the previous global
+  hooksPath.
 
 ## Known limits
 

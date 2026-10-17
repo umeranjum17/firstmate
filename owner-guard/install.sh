@@ -29,10 +29,12 @@ DEST=${XDG_DATA_HOME:-$HOME/.local/share}/fm-owner-guard
 GDEST=${XDG_DATA_HOME:-$HOME/.local/share}/fm-git-identity
 GHOOKS=$DEST/hooks
 PREVF=$DEST/prev-hooks-path
-# Same client-side hook names git-identity chains: this dir becomes the
-# hooks dir git consults, so a missing name would skip the repo's own hook.
+# The client-side hook names git-identity chains, plus the server-side names
+# a global hooksPath would otherwise hide: this dir becomes the hooks dir git
+# consults, so a missing name would skip the repo's own hook.
 HOOK_NAMES='applypatch-msg pre-applypatch post-applypatch pre-commit pre-merge-commit prepare-commit-msg commit-msg
-post-commit pre-rebase post-checkout post-merge pre-push post-rewrite pre-auto-gc sendemail-validate'
+post-commit pre-rebase post-checkout post-merge pre-push post-rewrite pre-auto-gc sendemail-validate
+pre-receive update post-receive post-update push-to-checkout proc-receive reference-transaction post-index-change'
 CURGLOBAL=$(git config --global --get --type=path core.hooksPath 2>/dev/null || true)
 
 install_global() { # Write one wrapper per hook name; adopt the global hooksPath, keeping the old value chained.
