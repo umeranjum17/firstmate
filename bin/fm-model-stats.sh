@@ -16,4 +16,4 @@ if [ ! -f "$TARGET" ]; then
   echo "fm-model-stats: firstmate-addons checkout not found (set FM_ADDONS_DIR): looked for $TARGET" >&2
   exit 1
 fi
-FM_BIN="$SCRIPT_DIR" exec "$TARGET" "$@"
+FM_BIN="$SCRIPT_DIR" FM_HOME="$HOME_DIR" exec "$TARGET" "$@"
