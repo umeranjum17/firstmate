@@ -16,8 +16,9 @@ Kun's diagnostic guard must remain intact when the admission rule moves: the add
   `run <HOME> <STATE> <CONFIG>` for the one sampler loop per home.
 - `bin/fm-mem-gate.sh` — the memory gate for heavy jobs (below); unlike
   the sampler it is live once installed.
-- `install.sh` — installs the gate.
+- `install.sh` — installs the gate and `fm-heavy-adopt` timer.
 - `tests/fm-mem-gate.test.sh` — the gate's integration test.
+- `tests/fm-heavy-adopt.test.sh` — fixture-backed mover install, traversal and uninstall test.
 
 ## Sampler contract
 
@@ -73,6 +74,8 @@ Run the CI ShellCheck and syntax steps plus the other `host-memory/tests` script
 ## Memory gate
 
 `fm-mem-gate.sh <command...>` waits until the host has room, then starts a command in a user scope in `fm-heavy.slice`; with no command it only waits. Room is `MemAvailable` at least `FM_MEM_MIN_GB` (12) and memory pressure (lower of `some` avg10 and avg60) under 40. An emulator job also waits while `FM_EMU_MAX` (2) emulators run, and a Gradle job while `FM_GRADLE_MAX` (1) builds run; those two checks and the start share one host lock.
+
+The installer deploys `bin/fm-heavy-adopt.sh` and enables a 20-second user timer. It retains the existing memory/process-name rule and also moves a process using more than 2 CPU-seconds during the prior interval, plus its descendants, into the heavy scope. Herdr, no-mistakes and agent CLI processes are excluded; descendant expansion stops at each excluded process, while a CPU-heavy child can still move on its own. The threshold is below the 14-30 CPU-seconds measured per worker in the bounded 64-worker reproduction, which drove Herdr run-delay to 54-121 ms/s and CPU PSI `some avg10` to 66%; the integration test uses fixture proc/cgroup trees. Main must replace `firstmate/config/fm-heavy-adopt.sh` with a shim to the installed copy or update the unit's `ExecStart` to `${XDG_DATA_HOME:-$HOME/.local/share}/fm-host-memory/fm-heavy-adopt.sh`.
 
 The installer gives `fm.slice` and `fm-heavy.slice` CPUWeight=20 with user drop-ins, so heavy scopes are weighted against sibling `app.slice`.
 IOWeight=20 only works when the user manager delegates `io`; this host delegates no `io` controller and its NVMe uses the `none` scheduler.
