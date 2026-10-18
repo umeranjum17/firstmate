@@ -640,7 +640,7 @@ test_failed_alert_publication() {
     FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" bash -c "
       . \"\$1/bin/fm-wake-lib.sh\"
       . \"\$1/bin/fm-backend.sh\"
-      . \"\$1/bin/fm-host-memory-sampler.sh\"
+      . \"\$FM_ADDONS_DIR/host-memory/bin/fm-host-memory-lib.sh\"
       fm_memory_sampler_tick
       wait
     " _ "$ROOT")
