@@ -2,8 +2,9 @@
 # Integration test for fleet-flow/bin/fm-flow-check.sh over a fixture Main home and one muxr home.
 # Stub fm-tasks-axi.sh and fm-crew-state.sh in the fixture Main's bin/ stand in for the fork.
 # Proves: a 5 h external-wait lane (paused or failed) stops counting toward the cap, a 3 h one,
-# a working one, a captain-held one and a 5 h one that has resumed still count; only long-wait
-# candidates are probed; --can-start frees the slot; --summary prints dry=1 and dry=0.
+# a working one, a captain-held one and a 5 h one that has resumed still count; paused lanes and long
+# blocked or failed waits are probed; --can-start frees the slot; --summary prints dry=1 and dry=0.
+# A paused lane whose crew-state run is working (its own no-mistakes run) is busy: --summary and --can-start count it.
 set -euo pipefail
 export PYTHONDONTWRITEBYTECODE=1
 CHECK=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)/bin/fm-flow-check.sh
@@ -48,8 +49,8 @@ row=$(run --summary)
 expect 'open lanes stay listed' 6 "$(cut -f2 <<<"$row")"
 expect 'counted excludes only the 5 h paused and failed waits' 4 "$(cut -f8 <<<"$row")"
 expect 'dry=0 while ready work waits' 0 "$(cut -f9 <<<"$row")"
-expect 'only long-wait candidates are probed' 'ext5 fail5 resumed5' "$(sort -u "$home/probed" | paste -sd ' ')"
-expect 'captain-held and short waits are never probed' '' "$(grep -xE 'held5|ext3|work' "$home/probed" || true)"
+expect 'paused lanes at any age and long blocked or failed waits are probed' 'ext3 ext5 fail5 resumed5' "$(sort -u "$home/probed" | paste -sd ' ')"
+expect 'captain-held and working lanes are never probed' '' "$(grep -xE 'held5|work' "$home/probed" || true)"
 rc=0; out=$(run --can-start) || rc=$?
 expect '--can-start passes with freed slots' '0 ' "$rc $out"
 
@@ -86,5 +87,18 @@ printf '%s\n' '- [ ] bl-held - held for the captain (kind: ship) (hold: fm-hold-
 bout=$(FM_MAIN_HOME=$main python3 "$CHECK" "$bhome")
 expect 'backlog captain hold raises no red line' '' "$(grep -F 'bl-held' <<<"$bout" || true)"
 expect 'control lane without a hold still reads red' 1 "$(grep -cE 'bl-open lead .* red \(limit' <<<"$bout")"
+
+# Real muxr shape (2026-10-18): a lane whose own no-mistakes run is executing keeps a paused: stamp, and crew-state reads
+# that run-step as working, so it is busy. A short external wait is not busy, and a working lane still is.
+home=$d/own/8/firstmate
+mkdir -p "$home/state" "$home/data" "$home/crew"
+echo 3 > "$home/ready-count"
+lane own-run "paused [at=$((now - 600))]: own run: no-mistakes fix round executing on fm/own-run" working
+lane quota-wait "paused [at=$((now - 600))]: waiting on quota reset" paused
+lane writer "working [at=$((now - 60))]: building"
+printf 'muxr 2\n' > "$main/config/lane-caps"
+expect 'paused own-run and working lanes count as busy, a short external wait does not' 2 "$(run --summary | cut -f3)"
+rc=0; out=$(run --can-start) || rc=$?
+expect '--can-start sees the busy lanes at cap 2' '1 2 working lanes, cap 2: finish one first' "$rc $out"
 
 [ "$fail" -eq 0 ] && echo "PASS: fm-flow-check lane slots" || { echo "FAIL: fm-flow-check lane slots"; exit 1; }
