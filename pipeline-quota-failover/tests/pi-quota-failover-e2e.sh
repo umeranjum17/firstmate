@@ -15,7 +15,8 @@
 # cleared by an answer), plain passthrough keeping stdin flowing, and install.sh's key-level config edit in a throwaway config.
 # Also covers the quota-axi pre-check (a stub quota-axi: exhausted_now skips the route without a pi call, a failing
 # quota-axi still calls it), the idle watchdog (a silent stub is killed after a short IDLE_SECS and fails over for that
-# call only: no marker, the next call tries the route again, a stall on the last model is not "quota exhausted"), a
+# call only: no marker, the next call tries the route again, a stall on the last model is not "quota exhausted"; the
+# limit is per model, claude-bridge/* on BRIDGE_IDLE_SECS and every other model on IDLE_SECS), a
 # future-dated marker's skip line showing the time left, and a call killed from outside keeping its marker. Also covers
 # the extension set every call runs with (-ne plus the extensions pi would load, minus pi-hermes-memory).
 set -u
@@ -61,6 +62,8 @@ case $model in
   bad/hang) sleep 600 & printf '%s\n' "$!" >"$STUB_CHILD"; wait; exit 0 ;;
   bad/graceful) trap 'exit 0' TERM; bash -c 'trap "sleep 2; touch \"\$STUB_CLEANUP\"; exit 0" TERM; sleep 600 & wait' & wait; exit 0 ;;
   bad/quiet) printf '%s\n' "$$" >"$STUB_PI"; sleep 600; exit 0 ;;
+  bad/quiet-3s | claude-bridge/quiet-3s) sleep 3 ;;
+  claude-bridge/silent) sleep 600; exit 0 ;;
   bad/stubborn) trap '' TERM; bash -c 'sleep 600 & printf "%s\n" "$!" >"$STUB_CHILD"; wait' & while :; do sleep 1; done ;;
   bad/flaky) n=$(cat "$STUB_FLAKY" 2>/dev/null || echo 0); echo $((n + 1)) >"$STUB_FLAKY"; [ "$n" -lt "${STUB_FLAKY_STALLS:-1}" ] && sleep 600 ;;
   bad/slow-stream)
@@ -422,6 +425,27 @@ is "one silent call on the last route exits 0" "$?" "0"
 out_has "retried call answers from the same route" '"model":"bad/flaky"'
 is "silent-then-answering route was called twice" "$(cat "$work/flaky")" "2"
 is "stall retry writes no marker" "$(age_of bad/flaky)" none
+
+# 9p. The idle limit is per model: a claude-bridge route silent for 3 s is not killed under BRIDGE_IDLE_SECS=4 and answers
+#     itself; a non-bridge route silent for the same 3 s is killed under IDLE_SECS=1 and the chain moves on.
+nodead
+: >"$log"
+OUT=$(printf '%s' "$prompt" | PI_QUOTA_FAILOVER_IDLE_SECS=1 PI_QUOTA_FAILOVER_BRIDGE_IDLE_SECS=4 PI_QUOTA_FAILOVER_CHAIN='claude-bridge/quiet-3s openai-codex/gpt-6-luna' "$wrapper" --model claude-bridge/quiet-3s --mode json --no-session 2>"$work/err9p1")
+is "silent bridge route under its limit exits 0" "$?" "0"
+out_has "silent bridge route answers itself" '"model":"claude-bridge/quiet-3s"'
+if grep -q 'no output for' "$log"; then no "bridge route under its limit was killed"; else ok "bridge route under its limit is not killed"; fi
+nodead
+OUT=$(printf '%s' "$prompt" | PI_QUOTA_FAILOVER_IDLE_SECS=1 PI_QUOTA_FAILOVER_BRIDGE_IDLE_SECS=4 PI_QUOTA_FAILOVER_CHAIN='bad/quiet-3s openai-codex/gpt-6-luna' "$wrapper" --model bad/quiet-3s --mode json --no-session 2>"$work/err9p2")
+is "silent non-bridge route over its limit exits 0" "$?" "0"
+out_has "silent non-bridge route fails over to GPT-6 Luna" '"model":"openai-codex/gpt-6-luna"'
+log_has "non-bridge kill names IDLE_SECS" "pi produced no output for 1s; killing it"
+# The bridge route's own limit is named when it is killed: BRIDGE_IDLE_SECS=2 kills a silent claude-bridge route at 2 s.
+nodead
+: >"$log"
+OUT=$(printf '%s' "$prompt" | PI_QUOTA_FAILOVER_IDLE_SECS=1 PI_QUOTA_FAILOVER_BRIDGE_IDLE_SECS=2 PI_QUOTA_FAILOVER_CHAIN='claude-bridge/silent openai-codex/gpt-6-luna' "$wrapper" --model claude-bridge/silent --mode json --no-session 2>"$work/err9p3")
+is "silent bridge route over its limit exits 0" "$?" "0"
+log_has "bridge kill names BRIDGE_IDLE_SECS" "pi produced no output for 2s; killing it"
+log_has "bridge stall detail names BRIDGE_IDLE_SECS" "model=claude-bridge/silent stalled.*no output for 2s"
 
 # 9d. A call killed from outside (not a quota error) keeps the route's existing marker and passes its exit through.
 nodead
