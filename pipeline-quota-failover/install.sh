@@ -83,8 +83,11 @@ if [ "$dry" = 1 ]; then
 fi
 
 mkdir -p "$install_root" || die "cannot create $install_root"
-cp -p "$src" "$wrapper" || die "cannot copy wrapper"
-chmod +x "$wrapper"
+tmp_wrapper=$install_root/.pi-quota-failover.$$
+if ! cp -p "$src" "$tmp_wrapper" || ! chmod +x "$tmp_wrapper" || ! mv -f "$tmp_wrapper" "$wrapper"; then
+  rm -f -- "$tmp_wrapper"
+  die "cannot atomically install wrapper at $wrapper"
+fi
 
 if [ -z "$have" ]; then
   cp -p "$config" "$config.bak-pqf-$(date +%Y%m%d-%H%M%S)" || die "cannot back up $config"
