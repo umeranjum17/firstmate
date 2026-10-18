@@ -37,6 +37,7 @@
 #   PI_QUOTA_FAILOVER_DEAD_SECS  how long a quota error keeps a chain model skipped (default 3600)
 #   PI_QUOTA_FAILOVER_IDLE_SECS  a pi call with no stdout and no stderr for this long is killed; the chain moves on
 #                              for that call only and writes no quota marker (default 120). Measured 2026-10-18 on
+#   PI_QUOTA_FAILOVER_STALL_RETRIES  retries for a stalled last route (default 3; four calls total).
 #                              Haiku 5.5 with a 103 KB review prompt: pi streams JSON events (text and thinking
 #                              deltas, 1400+ lines per call), the longest gap was 26 s (pi start before the first
 #                              event) and 12 s mid-stream, so 120 s is about 4.5x the worst observed gap.
@@ -122,6 +123,7 @@ quota_exhausted() {
   jq -e --arg p "$qp" --arg s "model:${1#*/}" '[.providers[]? | select(.provider == $p) | .quotaSemantics.effectiveAvailability[]? | select((.scope == "all_models" or .scope == $s) and .runway.status == "exhausted_now")] | length > 0' <<<"$answer" >/dev/null 2>&1
 }
 idle_secs=${PI_QUOTA_FAILOVER_IDLE_SECS:-120}
+stall_retries=${PI_QUOTA_FAILOVER_STALL_RETRIES:-3}
 
 # Host-memory gate (speed-report B3: model calls under heavy host load crash): every pipeline model call goes
 # through this wrapper, so wait here until the host has room. The gate given no command only waits; pi keeps its
@@ -337,7 +339,7 @@ if [ ${#live[@]} -gt 0 ] && [ "${live[0]}" != "$requested" ]; then
 fi
 order=("${live[@]}")
 any_stall=0
-stall_retried=0
+stall_retries_used=0
 for ((attempt = 0; attempt < ${#order[@]}; attempt++)); do
   model=${order[$attempt]}
   t0=$(date +%s%3N)
@@ -374,11 +376,10 @@ for ((attempt = 0; attempt < ${#order[@]}; attempt++)); do
   else
     kind="stalled"
   fi
-  # A silent call on the last route gets one more try on that route: the stalls seen on Haiku were per call, and a
-  # retry is cheaper than failing the pipeline step. A second stall fails the call as before.
-  if [ "$kind" = stalled ] && [ $((attempt + 1)) -ge ${#order[@]} ] && [ "$stall_retried" = 0 ]; then
-    stall_retried=1
-    log_line "model=$model stalled in $((t1 - t0))ms (no output for ${idle_secs}s); retrying it once"
+  # Retry a stalled final route up to the configured count; quota errors never retry.
+  if [ "$kind" = stalled ] && [ $((attempt + 1)) -ge ${#order[@]} ] && [ "$stall_retries_used" -lt "$stall_retries" ]; then
+    stall_retries_used=$((stall_retries_used + 1))
+    log_line "model=$model stalled in $((t1 - t0))ms (no output for ${idle_secs}s); retrying it ($stall_retries_used/$stall_retries)"
     attempt=$((attempt - 1))
     continue
   fi
