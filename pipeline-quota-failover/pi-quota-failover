@@ -34,7 +34,10 @@
 #   PI_QUOTA_FAILOVER_GATE_SECS  longest gate wait before pi starts anyway (default 600)
 #   PI_QUOTA_FAILOVER_DEAD_SECS  how long a quota error keeps a chain model skipped (default 3600)
 #   PI_QUOTA_FAILOVER_IDLE_SECS  a pi call with no stdout and no stderr for this long is killed; the chain moves on
-#                              for that call only and writes no quota marker (default 300)
+#                              for that call only and writes no quota marker (default 120). Measured 2026-10-18 on
+#                              Haiku 5.5 with a 103 KB review prompt: pi streams JSON events (text and thinking
+#                              deltas, 1400+ lines per call), the longest gap was 26 s (pi start before the first
+#                              event) and 12 s mid-stream, so 120 s is about 4.5x the worst observed gap.
 #
 # Before each route, quota-axi (on PATH) is asked for that route's provider: a runway of exhausted_now skips the
 # route without calling it. quota-axi missing, slower than 10s or failing leaves the route to be tried as before.
@@ -107,7 +110,7 @@ quota_exhausted() {
   }
   jq -e --arg p "${1%%/*}" --arg s "model:${1#*/}" '[.providers[]? | select(.provider == $p) | .quotaSemantics.effectiveAvailability[]? | select((.scope == "all_models" or .scope == $s) and .runway.status == "exhausted_now")] | length > 0' <<<"$answer" >/dev/null 2>&1
 }
-idle_secs=${PI_QUOTA_FAILOVER_IDLE_SECS:-300}
+idle_secs=${PI_QUOTA_FAILOVER_IDLE_SECS:-120}
 
 # Host-memory gate (speed-report B3: model calls under heavy host load crash): every pipeline model call goes
 # through this wrapper, so wait here until the host has room. The gate given no command only waits; pi keeps its
@@ -261,6 +264,7 @@ if [ ${#live[@]} -gt 0 ] && [ "${live[0]}" != "$requested" ]; then
 fi
 order=("${live[@]}")
 any_stall=0
+stall_retried=0
 for ((attempt = 0; attempt < ${#order[@]}; attempt++)); do
   model=${order[$attempt]}
   t0=$(date +%s%3N)
@@ -295,6 +299,14 @@ for ((attempt = 0; attempt < ${#order[@]}; attempt++)); do
     kind="quota-error"
   else
     kind="stalled"
+  fi
+  # A silent call on the last route gets one more try on that route: the stalls seen on Haiku were per call, and a
+  # retry is cheaper than failing the pipeline step. A second stall fails the call as before.
+  if [ "$kind" = stalled ] && [ $((attempt + 1)) -ge ${#order[@]} ] && [ "$stall_retried" = 0 ]; then
+    stall_retried=1
+    log_line "model=$model stalled in $((t1 - t0))ms (no output for ${idle_secs}s); retrying it once"
+    attempt=$((attempt - 1))
+    continue
   fi
   if [ $((attempt + 1)) -lt ${#order[@]} ]; then
     next=${order[$((attempt + 1))]}
