@@ -5,7 +5,7 @@
 # The stub's zai/glm-5.3-flash route answers with the fleet's real quota
 # error surface (pi exits 0, the error rides in the stream as errorMessage,
 # 429 "You've reached your 5-hour usage limit"); openai-codex/gpt-6-luna
-# answers normally, or with a codex usage-limit surface when STUB_LUNA_DEAD is set. Asserts on the default chain: one glm attempt,
+# answers normally, or with a codex usage-limit surface when STUB_LUNA_DEAD is set. Asserts on the pinned GLM -> GPT-6 Luna chain: one glm attempt,
 # then one GPT-6 Luna attempt, the successful Luna stream on stdout, failover
 # logged with timings, and the whole call under 10s; a quota-dead Luna after
 # glm ends in the terminal "quota exhausted" line, exit 1. Also covers:
@@ -151,8 +151,12 @@ child_gone() {
   return 1
 }
 
-is "default chain is GLM, then GPT-6 Luna" "$(PI_QUOTA_FAILOVER_PRINT_CHAIN=1 "$wrapper" </dev/null)" \
-  "zai/glm-5.3-flash openai-codex/gpt-6-luna"
+is "default chain is GLM, then Claude Haiku" "$(PI_QUOTA_FAILOVER_PRINT_CHAIN=1 "$wrapper" </dev/null)" \
+  "zai/glm-5.3-flash claude-bridge/claude-haiku-5-5"
+
+# The failover cases below exercise the GLM -> GPT-6 Luna route (the stub's codex usage-limit surface and the
+# quota-axi codex name are about that pair), so they pin the chain; the default is checked above.
+export PI_QUOTA_FAILOVER_CHAIN='zai/glm-5.3-flash openai-codex/gpt-6-luna'
 
 # 1. Quota failover: glm dead -> GPT-6 Luna answers, one attempt each.
 t0=$(date +%s%3N)

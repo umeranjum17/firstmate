@@ -9,8 +9,8 @@
 # run fails, costing a restart.
 #
 # This wrapper runs the real pi; the requested chain model goes first, then
-# the other chain models in chain order (default GLM 5.3 Flash, then GPT-6 Luna
-# through the openai-codex provider - GPT-6 Luna only as the GLM failover; never
+# the other chain models in chain order (default GLM 5.3 Flash, then Claude Haiku
+# 5.5 through claude-bridge - Haiku only as the GLM failover; never
 # Opus, Sonnet, Fable or Step 5), and when an attempt
 # answers a QUOTA error it moves at once to the next model in that order
 # inside the same invocation. Any non-quota failure passes through
@@ -54,7 +54,7 @@ set -u
 # surface only.
 QUOTA_RE='limit used up|usage limit|limit has been reached|GoUsageLimitError|rate limit exceeded|quota|available credits|insufficient credits|Claude rate limit|out of extra usage'
 
-chain=${PI_QUOTA_FAILOVER_CHAIN:-'zai/glm-5.3-flash openai-codex/gpt-6-luna'}
+chain=${PI_QUOTA_FAILOVER_CHAIN:-'zai/glm-5.3-flash claude-bridge/claude-haiku-5-5'}
 # The chain is the fleet's one route list: route-change reads it from here.
 [ -z "${PI_QUOTA_FAILOVER_PRINT_CHAIN:-}" ] || { printf '%s\n' "$chain"; exit 0; }
 
@@ -303,8 +303,8 @@ done
 # Only intercept calls whose model is in the chain: an operator-pinned profile
 # (axi run --model) for any other model passes through untouched, which also
 # keeps the pi-only pinned-profile rule intact. The requested model goes first,
-# then every other chain model in chain order, so a profile set to GPT-6 Luna fails
-# over to GLM.
+# then every other chain model in chain order, so a profile pinned to any chain
+# model fails over to the rest of the chain.
 order=()
 for m in "${models[@]}"; do
   [ "$m" = "$requested" ] || order+=("$m")
