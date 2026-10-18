@@ -26,7 +26,8 @@ fm_memory_sampler_matches() {
 fm_memory_sampler_ensure() {
   local i=0
   fm_memory_sampler_matches && return 0
-  env FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_CONFIG_OVERRIDE="$CONFIG" \
+  env FM_HOST_MEMORY_FORK_BIN="${SAMPLER_DIR:-${SCRIPT_DIR:-${MEMORY_SAMPLER_PATH%/*}}}" \
+    FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_CONFIG_OVERRIDE="$CONFIG" \
     "$MEMORY_SAMPLER_PATH" run "$FM_HOME" "$STATE" "$CONFIG" \
     </dev/null >> "$STATE/.host-memory-sampler.log" 2>&1 &
   while [ "$i" -lt 30 ]; do
@@ -119,7 +120,8 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
   [ "$#" -eq 4 ] && [ "$1" = run ] || exit 2
   FM_HOME=$2 STATE=$3 CONFIG=$4
   [ -d "$STATE" ] || exit 1
-  SAMPLER_DIR=${MEMORY_SAMPLER_PATH%/*}
+  # Libraries, control and (until the admission slice moves) guard stay in the fork.
+  SAMPLER_DIR=${FM_HOST_MEMORY_FORK_BIN:-${MEMORY_SAMPLER_PATH%/*}}
   # shellcheck source=bin/fm-wake-lib.sh
   . "$SAMPLER_DIR/fm-wake-lib.sh"
   # shellcheck source=bin/fm-backend.sh
