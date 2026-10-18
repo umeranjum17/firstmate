@@ -4,6 +4,17 @@ set -euo pipefail
 DRY=0; [ "${1:-}" = --dry-run ] && { DRY=1; shift; }
 [ "$#" -eq 0 ] || { echo 'usage: uninstall.sh [--dry-run]' >&2; exit 2; }
 f=${XDG_DATA_HOME:-$HOME/.local/share}/fm-host-memory/fm-mem-gate.sh
+config=${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user
+reload=0
 [ ! -e "$f" ] || { echo "remove: $f"; [ "$DRY" -eq 1 ] || rm -f -- "$f"; }
-[ "$DRY" -eq 1 ] || rmdir "${f%/*}" 2>/dev/null || true
-[ "$DRY" -eq 0 ] || echo 'dry run: nothing written'
+for d in "$config/fm.slice.d" "$config/fm-heavy.slice.d"; do
+  dropin=$d/50-fm-heavy-weight.conf
+  if [ -e "$dropin" ]; then
+    echo "remove: $dropin"
+    if [ "$DRY" -eq 0 ]; then rm -f -- "$dropin"; reload=1; rmdir "$d" 2>/dev/null || true; fi
+  fi
+done
+if [ "$DRY" -eq 0 ]; then
+  rmdir "${f%/*}" 2>/dev/null || true
+  [ "$reload" -eq 0 ] || systemctl --user daemon-reload || { echo 'host-memory: systemctl --user daemon-reload failed' >&2; exit 1; }
+else echo 'dry run: nothing written'; fi

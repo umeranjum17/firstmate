@@ -49,14 +49,14 @@ while :; do
   echo "fm-mem-gate: waiting (free ${avail} GB, pressure ${psi}%, emulators ${running}, builds ${builds})" >&2
   sleep $((20 + RANDOM % 20))
 done
-# Heavy jobs run at lowest CPU and disk priority so interactive work stays fast.
-# Guard rail: after repeated host OOM kills, each job runs in its own scope in fm-heavy.slice (30 GB cap for all
-# heavy jobs), with its own cap, so it never grows herdr-server's memory.
-# ponytail: one per-job cap (FM_MEM_JOB_GB, default 10); raise it for one known-big job.
 [ $# -gt 0 ] || exit 0
 [ $((emu + grd)) -gt 0 ] && { sleep 30 & } && exec 9>&-  # holder child keeps the lock 30 s; this process lets go
-if command -v systemd-run >/dev/null && systemd-run --user --scope --quiet --slice=fm-heavy.slice true 2>/dev/null; then
-  exec systemd-run --user --scope --quiet --slice=fm-heavy.slice -p MemoryMax="${FM_MEM_JOB_GB:-10}G" -p MemorySwapMax=4G \
-    nice -n 19 ionice -c3 "$@"
+if command -v systemd-run >/dev/null; then
+  if err=$(systemd-run --user --scope --quiet --slice=fm-heavy.slice --collect -- true 2>&1); then
+    exec systemd-run --user --scope --quiet --slice=fm-heavy.slice --collect -p MemoryMax="${FM_MEM_JOB_GB:-10}G" -p MemorySwapMax=4G -- "$@"
+  fi
+  printf 'fm-mem-gate: systemd scope unavailable (%s); running directly\n' "${err:-user manager unavailable}" >&2
+else
+  echo 'fm-mem-gate: systemd-run missing from PATH; running directly' >&2
 fi
 exec nice -n 19 ionice -c3 "$@"

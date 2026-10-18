@@ -96,13 +96,10 @@ the fork hook lands.
 
 ## Memory gate
 
-`fm-mem-gate.sh <command...>` waits until the host has room, then runs the
-command at lowest CPU and disk priority in its own scope in
-`fm-heavy.slice`; with no command it only waits. Room is `MemAvailable` at
-least `FM_MEM_MIN_GB` (12) and memory pressure (lower of `some` avg10 and
-avg60) under 40. An emulator job also waits while `FM_EMU_MAX` (2)
-emulators run, and a Gradle job while `FM_GRADLE_MAX` (1) builds run; those
-two checks and the start share one host lock.
+`fm-mem-gate.sh <command...>` waits until the host has room, then starts a command in a user scope in `fm-heavy.slice`; with no command it only waits. Room is `MemAvailable` at least `FM_MEM_MIN_GB` (12) and memory pressure (lower of `some` avg10 and avg60) under 40. An emulator job also waits while `FM_EMU_MAX` (2) emulators run, and a Gradle job while `FM_GRADLE_MAX` (1) builds run; those two checks and the start share one host lock.
+
+The installer gives `fm.slice` and `fm-heavy.slice` CPUWeight=20 with user drop-ins, so heavy scopes are weighted against sibling `app.slice`.
+IOWeight=20 only works when the user manager delegates `io`; this host delegates no `io` controller and its NVMe uses the `none` scheduler.
 
 The emulator and Gradle caps look past known wrappers to the real program:
 `timeout`, `flock` (including `flock <lock> -c <string>`), `nice`,
