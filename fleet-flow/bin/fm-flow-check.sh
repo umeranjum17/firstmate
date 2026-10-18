@@ -120,19 +120,22 @@ def crew_state(t):
     except OSError:
         return None
 
-probes = {L['t']: crew_state(L['t']) for L in lanes
-          if L['verb'] in ('paused', 'blocked', 'failed') and not L['captain'] and L['at'] and NOW - L['at'] > FREE_AFTER}
+# A paused lane is probed at any age: its own no-mistakes run can execute under a paused stamp (the brief's own-run wait),
+# and crew-state reads that run-step as working. Blocked and failed lanes are probed only past FREE_AFTER, to free slots.
+probes = {L['t']: crew_state(L['t']) for L in lanes if not L['captain'] and (L['verb'] == 'paused' or
+          (L['verb'] in ('blocked', 'failed') and L['at'] and NOW - L['at'] > FREE_AFTER))}
 deadline = time.time() + 15
 for L in lanes:
     p, out = probes.get(L['t']), ''
     if p:
         try: out = p.communicate(timeout=max(0.1, deadline - time.time()))[0]
         except subprocess.TimeoutExpired: p.kill(); p.wait()
-    L['free'] = bool(re.match(r'state: (paused|blocked|failed) ', out))
+    L['free'] = bool(re.match(r'state: (paused|blocked|failed) ', out)) and bool(L['at']) and NOW - L['at'] > FREE_AFTER
+    L['busy'] = L['verb'] in ('working', 'resolved') or (L['verb'] == 'paused' and bool(re.match(r'state: working ', out)))
 count_n = open_n - sum(L['free'] for L in lanes)
-# Working lanes count toward the cap; waiting, parked and captain-held lanes do not. HARD bounds the open lanes
-# that count, so waits under FREE_AFTER cannot pile up.
-active_n = sum(L['verb'] in ('working', 'resolved') and not L['captain'] for L in lanes)
+# Busy lanes count toward the cap: working, resolved, and a paused lane whose run crew-state reads as working.
+# Waiting, parked and captain-held lanes do not. HARD bounds the open lanes that count, so waits under FREE_AFTER cannot pile up.
+active_n = sum(L['busy'] and not L['captain'] for L in lanes)
 HARD = CAP + 2
 
 def ready_ids():

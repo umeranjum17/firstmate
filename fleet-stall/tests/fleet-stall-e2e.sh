@@ -3,7 +3,8 @@
 # (FM_STALL_ROOT) with lead records for muxr and writeboost, their two homes
 # (FM_STALL_BASE) with live lanes paused for more than 45 min, and a stub herdr
 # on PATH that shows both leads idle. No fm-flow-check or fm-tasks-axi exists in
-# the fixture, so the zero-busy guard stays out of the way. A worker on its own
+# the fixture until the last case, so the zero-busy guard stays out of the way
+# before it. A worker on its own
 # local CI and two workers on their own emulator runs, all behind example home
 # paths, no longer count; "waiting on firstmate for the decision" and
 # "awaiting main instruction" still do.
@@ -53,5 +54,26 @@ is "workers waiting on their own runs behind firstmate paths do not count" "$(ru
 lane 8 rd-decision "paused [at=1792181200]: waiting on firstmate for the decision"
 lane 4 ov-instruction "paused [at=1792181300] [key=ov-next]: awaiting main instruction"
 is "lead waits still count, path-only matches still do not" "$(run)" "muxr(1) writeboost(1)"
+
+# Zero-busy guard, the 2026-10-18 muxr shape: the idle lead's lane runs its own no-mistakes run under a paused: stamp, and
+# crew-state reads that run as working. The add-on's real flow check must count it busy, so muxr raises no 0-busy line.
+# The fixture Main gets that check, a 3-item ready queue and a crew-state stub that reads working only for lanes under working/.
+export FM_MAIN_HOME=$FM_STALL_ROOT
+mkdir -p "$FM_STALL_ROOT/config" "$FM_STALL_ROOT/bin" "$FM_STALL_ROOT/working"
+ln -s "${FLEET_FLOW_CHECK:-$here/../../fleet-flow/bin/fm-flow-check.sh}" "$FM_STALL_ROOT/config/fm-flow-check.sh"
+cat > "$FM_STALL_ROOT/bin/fm-tasks-axi.sh" <<'EOF'
+#!/usr/bin/env bash
+echo "count: 3"; echo "ready[3]{id,state}:"; echo "  item-1,queued"; echo "  item-2,queued"; echo "  item-3,queued"
+EOF
+cat > "$FM_STALL_ROOT/bin/fm-crew-state.sh" <<'EOF'
+#!/usr/bin/env bash
+if [ -e "$FM_STALL_ROOT/working/$1" ]; then echo "state: working · source: run-step · execution active"; else echo "state: paused · source: status-log"; fi
+EOF
+chmod +x "$FM_STALL_ROOT/bin/"*.sh
+lane 8 own-run "paused [at=$(date +%s)]: own run: no-mistakes fix round executing on fm/own-run"
+echo kind=ship > "$FM_STALL_BASE/8/firstmate/state/own-run.meta"
+: > "$FM_STALL_ROOT/working/own-run"
+rm -f "$FM_STALL_ROOT/state/.fleet-stall.last"
+is "a paused own-run lane keeps muxr out of the zero-busy guard" "$("$bin" | grep -c 'muxr(0-busy' || true)" 0
 
 exit "$fails"
