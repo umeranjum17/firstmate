@@ -49,14 +49,29 @@ block "$$" "pkill 'h[[:lower:]]rdr'" 'cannot be resolved'
 block "$$" 'killall /usr/bin/herdr' 'cannot be resolved'
 block "$$" 'kill -9 -1' 'cannot be resolved'
 block "$$" 'xargs kill' 'come from xargs'
+block "$$" 'sudo -u root kill -9 1' 'PID 1 (init)'
+block "$$" 'timeout -s KILL 5 kill 1' 'PID 1 (init)'
+block "$$" "echo \"\$(printf ')'; kill -9 1)\"" 'PID 1 (init)'
 block "$$" $'bash <<EOF\nkill -9 1\nEOF' 'PID 1 (init)'
 block "$$" $'echo $((1<<2))\nkill -9 1' 'PID 1 (init)'
+block "$$" $'echo $((1 << n))\nkill -9 1' 'PID 1 (init)'
+block "$$" 'function f { kill -9 1; }; f' 'PID 1 (init)'
+block "$$" "env -S 'kill -9 1'" 'PID 1 (init)'
+block "$$" 'f(){ kill -9 1; }; f' 'PID 1 (init)'
+block "$$" 'diff <(kill 1) /dev/null' 'PID 1 (init)'
+block "$$" 'kill>/dev/null 1' 'PID 1 (init)'
+block "$$" '../bin/kill 1' 'PID 1 (init)'
 block "$C" "kill $S" 'which this task did not start'
 allow "$$" "kill $C"
 allow "$$" "kill $C 2>/dev/null"
-allow "$$" 'kill -l 99999999'
+allow "$$" 'diff <(echo hi) /dev/null'
 allow "$$" 'grep -r kill src'
+allow "$$" "git commit -m 'stop \`kill 1\` leak'"
+allow "$$" 'sudo -u root nohup server'
 allow "$$" $'git commit -m "$(cat <<\'EOF\'\nkill stale lanes\nEOF\n)"'
+
+printf 'not json' | node "$T/home/fixture/users/user-004/share/fm-kill-guard/guard.mjs" --caller "$$" 2> "$T/err" && rc=0 || rc=$?
+[ "$rc" -eq 2 ] && [[ "$(cat "$T/err")" == *"BLOCKED by the fleet kill guard"* ]] && ok "unparseable hook input blocks" || no "unparseable hook input allowed"
 
 hook "$$" 'kill 1'; sh -c "$HOOK" < "$T/in.json" 2>"$T/err" && rc=0 || rc=$?
 [ "$rc" -eq 2 ] && [[ "$(cat "$T/err")" == *"PID 1 (init)"* ]] && ok "installed hook blocks kill 1" || no "installed hook did not block kill 1"

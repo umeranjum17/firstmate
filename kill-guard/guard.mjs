@@ -1,20 +1,24 @@
+// Fleet kill guard, the rule every adapter calls. A kill, pkill or killall may signal only the caller's own descendants,
+// never PID 1, the systemd user manager or the herdr server, and never a target it cannot resolve. A block is final.
 import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { basename } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const SELF = realpathSync(fileURLToPath(import.meta.url));
 const MODELLED = { kill: "lL", pkill: "f", killall: "" }; // options the guard reads; any other option refuses
-const WRAPPERS = /^(sudo|env|nohup|exec|command|builtin|time|nice|ionice|taskset|stdbuf|timeout|setsid|doas|runuser|chrt|flock|unbuffer|xargs|then|do|else|if|elif|case|while|until|\{|[\w.-]+\(\))$/;
+const WRAPPERS = /^(sudo|env|nohup|exec|command|builtin|time|nice|ionice|taskset|stdbuf|timeout|setsid|doas|runuser|chrt|flock|unbuffer|xargs|then|do|else|if|elif|case|while|until|function|\{)$/;
+const KNOWN = /^(kill|pkill|killall|eval|(ba|z|da)?sh)$/;
 const SIGNAL = /^-(\d+|[A-Z][A-Z0-9]*)$/; // -9, -KILL, -SIGTERM
 const REDIRECT = /^\d*[<>]|^&>/;
 const commandName = (t) => basename(t).replace(/\\/g, "");
 
 // Heredoc bodies are data, except when a shell reads them: drop each body from the line after its marker through the closing word.
+const bare = (line) => line.replace(/\(\(.*?\)\)/g, "").replace(/(?<!<<-?\s*)"[^"]*"|(?<!<<-?\s*)'[^']*'/g, "''");
 function dropHeredocBodies(command) {
 	let end = null, shell = false;
 	return command.split("\n").filter((line) => {
 		if (end !== null) { if (line.trim() === end) end = null; return shell; }
-		end = line.match(/(?<!<)<<(?!<)-?\s*(['"]?)([A-Za-z_]\w*)\1/)?.[2] ?? null, shell = /\b(ba|z|da)?sh\b/.test(line);
+		end = bare(line).match(/(?<!<)<<(?!<)-?\s*(['"]?)([A-Za-z_]\w*)\1/)?.[2] ?? null, shell = /\b(ba|z|da)?sh\b/.test(line);
 		return true;
 	}).join("\n");
 }
@@ -37,7 +41,7 @@ function segments(command) {
 
 // The words of a simple command with its redirections dropped: `kill 4242 2>/dev/null` has one operand.
 function words(s) {
-	const raw = s.match(/(?:"[^"]*"|'[^']*'|\S)+/g) ?? [];
+	const raw = s.match(/\d*[<>]+&?|&>|(?:"[^"]*"|'[^']*'|[^\s<>])+/g) ?? [];
 	const out = [];
 	for (let i = 0; i < raw.length; i++) {
 		if (!REDIRECT.test(raw[i])) out.push(raw[i]);
@@ -48,9 +52,14 @@ function words(s) {
 
 // The command word past assignments and wrappers. xargs means the targets come from stdin.
 function commandOf(w) {
-	let i = 0, piped = false;
-	for (; i < w.length && (/^[A-Za-z_]\w*=|^[-\d.]/.test(w[i]) || WRAPPERS.test(w[i])); i++) piped ||= w[i] === "xargs";
-	return { words: w.slice(i), piped };
+	let i = 0, piped = false, wrapped = false; const split = [];
+	for (; i < w.length; i++) {
+		const skip = /^[A-Za-z_]\w*=|^[-\d]/.test(w[i]) || WRAPPERS.test(w[i]);
+		if (!skip && (!wrapped || KNOWN.test(commandName(w[i])))) break;
+		if (wrapped && /\s/.test(w[i])) split.push(w[i].replace(/^(-S|--split-string=)/, ""));
+		piped ||= w[i] === "xargs"; wrapped ||= WRAPPERS.test(w[i]);
+	}
+	return { words: w.slice(i), piped, split };
 }
 
 // Every process from /proc. Throws when /proc cannot be read.
@@ -89,7 +98,7 @@ function judge(name, args, text, caller, procs) {
 	}
 	const unresolved = (why) => `"${text}" cannot be resolved to processes: ${why}`;
 	if (flags.some((f) => !MODELLED[name].includes(f))) return unresolved("an option the guard does not read");
-	if (!ops.length || (name === "kill" && flags.includes("l"))) return null;
+	if (!ops.length) return null;
 	let hits;
 	if (name === "kill") {
 		const bad = ops.find((a) => !/^[1-9]\d*$/.test(a));
@@ -115,23 +124,39 @@ function judge(name, args, text, caller, procs) {
 	return reason ? `"${text}" aims at ${reason}` : null;
 }
 
-// Every $( ) and backtick body, nested $( ) included.
+// Index of the ) closing the $( opened at open, skipping quoted and escaped text.
+function closeOf(text, open) {
+	let depth = 0, q = "";
+	for (let j = open; j < text.length; j++) {
+		const c = text[j];
+		if (q === "'") { if (c === "'") q = ""; }
+		else if (c === "\\") j++;
+		else if (c === '"') q = q ? "" : '"';
+		else if (c === "'" && !q) q = "'";
+		else if (!q && c === "(") depth++;
+		else if (!q && c === ")" && --depth === 0) return j;
+	}
+	return text.length;
+}
+
+// Every $( ), <( ), >( ) and backtick body that the shell runs, nested $( ) included; single-quoted text is data.
 function substitutions(text) {
 	const out = [];
-	for (let i = 0; i < text.length; i++) {
-		if (text[i] === "`") {
+	for (let i = 0, q = ""; i < text.length; i++) {
+		const c = text[i];
+		if (q === "'") { if (c === "'") q = ""; }
+		else if (c === "\\") i++;
+		else if (c === '"') q = q ? "" : '"';
+		else if (c === "'" && !q) q = "'";
+		else if (c === "`") {
 			const end = text.indexOf("`", i + 1);
 			if (end < 0) break;
 			out.push(text.slice(i + 1, end));
 			i = end;
-		} else if (text[i] === "$" && text[i + 1] === "(") {
-			let depth = 0, j = i + 1;
-			for (; j < text.length; j++) {
-				if (text[j] === "(") depth++;
-				else if (text[j] === ")" && --depth === 0) break;
-			}
-			out.push(text.slice(i + 2, j));
-			i = j;
+		} else if ((c === "$" || (!q && (c === "<" || c === ">"))) && text[i + 1] === "(") {
+			const end = closeOf(text, i + 1);
+			out.push(text.slice(i + 2, end));
+			i = end;
 		}
 	}
 	return out;
@@ -140,12 +165,13 @@ function substitutions(text) {
 // The first kill, pkill or killall in the command (also inside sh -c, eval, $( ) or backticks) aimed outside the caller's tree.
 function blockedBy(command, caller, procs) {
 	for (const seg of segments(dropHeredocBodies(command))) {
-		const text = seg.trim().replace(/^[\s({!]+/, "");
+		const text = seg.trim().replace(/^[\s({!]+/, "").replace(/^[\w.-]+\s*\(\s*\)\s*/, "");
 		const inner = substitutions(text);
-		const { words: w, piped } = commandOf(words(text));
+		const { words: w, piped, split } = commandOf(words(text));
 		const name = w.length ? commandName(w[0]) : "";
 		const shellC = /^(ba|z|da)?sh$/.test(name) ? w.findIndex((t, k) => k > 0 && /^-[a-zA-Z]*c[a-zA-Z]*$/.test(t)) : -1;
 		const t = inner.map((c) => blockedBy(c, caller, procs)).find(Boolean) ??
+			split.map((s) => blockedBy(s, caller, procs)).find(Boolean) ??
 			(shellC >= 0 && w[shellC + 1] ? blockedBy(w[shellC + 1], caller, procs) :
 			name === "eval" ? blockedBy(w.slice(1).join(" "), caller, procs) :
 			!Object.hasOwn(MODELLED, name) ? null :
@@ -159,12 +185,11 @@ function blockedBy(command, caller, procs) {
 // Returns the block message, or null to allow. caller is the process whose descendants may be signalled: in-process
 // adapters leave it at this process, the Claude hook passes the agent's pid. Unreadable /proc refuses.
 export function guard(command, { caller = process.pid } = {}) {
-	const text = String(command ?? "");
 	let table, target;
 	try {
-		target = blockedBy(text, caller, () => (table ??= procTable()));
+		target = typeof command === "string" ? blockedBy(command, caller, () => (table ??= procTable())) : "no command string was given";
 	} catch (e) {
-		target = `"${text}" cannot be checked: /proc was unreadable (${e.message})`;
+		target = `"${command}" cannot be checked: /proc was unreadable (${e.message})`;
 	}
 	if (target === null) return null;
 	return `BLOCKED by the fleet kill guard: ${target}. Kill only process IDs you started yourself in this task; never PID 1, the systemd user manager, the herdr server, or a process found by name or pattern that you did not start. This block is final: do not retry it, reword it, or work around it. If another process is in your way, write \`blocked:\` naming it and stop.`;
@@ -172,9 +197,9 @@ export function guard(command, { caller = process.pid } = {}) {
 
 // Hook CLI for Claude Code: PreToolUse JSON on stdin; exit 2 with the reason on stderr blocks. --caller is the agent's pid.
 if (process.argv[1] && realpathSync(process.argv[1]) === SELF) {
-	let p = {};
-	try { p = JSON.parse(readFileSync(0, "utf8")); } catch {}
+	let command;
+	try { command = JSON.parse(readFileSync(0, "utf8"))?.tool_input?.command; } catch {}
 	const i = process.argv.indexOf("--caller");
-	const reason = guard(p?.tool_input?.command, { caller: Number(process.argv[i + 1]) || process.ppid });
+	const reason = guard(command, { caller: Number(process.argv[i + 1]) || process.ppid });
 	if (reason !== null) { process.stderr.write(reason + "\n"); process.exit(2); }
 }
