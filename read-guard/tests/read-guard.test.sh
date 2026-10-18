@@ -65,6 +65,33 @@ allow "cat > $T/report.md <<'EOF'
 ## Report
 Status ${STARS} why? ${STARS} done
 EOF"
+# A JS doc-comment opener is text: a "/**" or "/*" fragment is not a root-wide glob, whether written in a heredoc or echoed.
+OPEN=$(printf '/\052\052')
+allow "cat > $T/doc.js <<'EOF'
+$OPEN
+ * Docs
+ */
+EOF"
+for opener in "$OPEN" "$(printf '/\052')" "$(printf '/\052\052/')"; do allow "echo $opener"; done
+# Text-only commands (echo, printf, fm-send.sh) may name a login folder as an example.
+allow "bin/fm-send.sh task-1 'never read ~/.codex'"
+allow "echo 'never read ~/.codex/auth.json'"
+allow "printf '%s\n' 'never read ~/.codex'"
+# Text-only commands still block when a login path is substituted, redirected, read as input, or chained after a read.
+block 'echo "$(cat ~/.codex/auth.json)"'
+block 'bin/fm-send.sh task-1 "$(cat ~/.codex/auth.json)"'
+block 'bin/fm-send.sh task-1 < ~/.codex/auth.json'
+block 'echo hi > ~/.codex/auth.json'
+block 'echo hi; cat ~/.codex/auth.json'
+# A piped text-only command passes its path on to a reader, so the whole command must have no pipe.
+block "printf '%s\n' ~/.codex/auth.json | xargs cat"
+block 'echo ~/.codex/auth.json | sh'
+# A glob with no literal path segment is text, but "~/" plus a wildcard is still a glob reference.
+TILDE_GLOB=$(printf '\176/\052\052')
+block "cat $TILDE_GLOB"
+# Absolute globs with a literal segment (the fixture root) still block.
+block "cat $T/*/.pi/agent/*"
+block "cat $T/*/.codex/*"
 # The exact incident command reaches the installed Claude PreToolUse hook and is refused.
 HOOK=$(jq -r '.hooks.PreToolUse[] | select(.matcher | contains("Bash")) | .hooks[] | select(.command | contains("fm-read-guard")) | .command' "$H/.claude/settings.json")
 printf '{"tool_name":"Bash","tool_input":{"command":"cat ~/.local/share/opencode/auth.json | head -c 300"}}' |

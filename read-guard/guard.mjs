@@ -19,6 +19,7 @@ const sensitive = [
 ];
 const protectedFiles = ["~/.codex/auth.json", "~/.local/share/opencode/auth.json", "~/.pi/agent/auth.json", "~/.claude/.credentials.json", "~/.no-mistakes/config.yaml", "~/.no-mistakes/config.yml"];
 const metadata = new Set(["ls", "stat", "test", "["]);
+const textOnly = new Set(["echo", "printf", "fm-send.sh"]);
 const pathFields = new Set(["path", "file_path", "filePath", "paths", "glob"]);
 
 function tokens(command) {
@@ -27,8 +28,9 @@ function tokens(command) {
 }
 
 function globMatches(pattern, path) {
-  // Only a path glob ("~/" or "/" rooted) is a reference; "**bold**", "why?" and "a*b" are text.
+  // Only a path glob ("~/" or "/" rooted, with a literal segment; "~" counts) is a reference: "**bold**", "why?", "a*b" and a doc-comment "/**" are text.
   if (!/^(~\/|\/)/.test(pattern) || !/[*?]/.test(pattern)) return false;
+  if (!pattern.split("/").some((segment) => segment && !/[*?]/.test(segment))) return false;
   const re = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replaceAll("**", "\0").replaceAll("*", "[^/]*").replaceAll("?", "[^/]").replaceAll("\0", ".*");
   return new RegExp(`^${re}$`).test(path);
 }
@@ -48,7 +50,7 @@ function protectedToken(token) { return protectedReference(token) !== null; }
 
 function references(command) {
   const found = [];
-  for (const segment of command.split(/(?:&&?|\|\|?|\n)/)) {
+  for (const segment of command.split(/(?:&&?|\|\|?|;|\n)/)) {
     const words = tokens(segment);
     if (!words.length) continue;
     const cmd = words[0].split("/").at(-1);
@@ -56,6 +58,8 @@ function references(command) {
     if (target === null) continue;
     const refs = words.slice(1).filter(protectedToken);
     if (metadata.has(cmd) && refs.length && !/[`]|\$\(|<\(|>\(/.test(segment)) continue;
+    // Text-only commands print or send their arguments; a pipe, redirect or substitution anywhere in the command can still read a file.
+    if (textOnly.has(cmd) && !protectedToken(words[0]) && !/[`<>|]|\$\(/.test(command)) continue;
     found.push(target);
   }
   return found[0] ?? null;
