@@ -15,8 +15,9 @@
 # on a quota error, the model skipped while fresh, tried again once expired,
 # cleared by an answer), plain passthrough keeping stdin flowing, and install.sh's key-level config edit in a throwaway config.
 # Also covers the quota-axi pre-check (a stub quota-axi: exhausted_now skips the route without a pi call, a failing
-# quota-axi still calls it), the idle watchdog (a silent stub is killed after a short IDLE_SECS and fails over), and
-# a call killed from outside keeping its marker.
+# quota-axi still calls it), the idle watchdog (a silent stub is killed after a short IDLE_SECS and fails over for that
+# call only: no marker, the next call tries the route again, a stall on the last model is not "quota exhausted"), a
+# future-dated marker's skip line showing the time left, and a call killed from outside keeping its marker.
 set -u
 
 here=$(cd "$(dirname "$0")" && pwd) || exit 1
@@ -222,6 +223,20 @@ is "expired-marker call exits 0" "$?" "0"
 is "expired glm tried again first" "$(sed -n 1p "$STUB_ARGV")" "--model zai/glm-5.3-flash --mode json --no-session"
 fresh "glm marker renewed" zai/glm-5.3-flash
 
+# 5f. A marker dated 120s in the future (clock step): glm is skipped, and the skip line shows the time left until it
+#     expires (window plus the 120s offset), never a negative number.
+nodead
+: >"$log"
+: >"$STUB_ARGV"
+mkdir -p "$dead"
+printf '%s %s\n' zai/glm-5.3-flash $(($(date +%s) + 120)) >"$dead/zai%glm-5.3-flash"
+OUT=$(printf '%s' "$prompt" | "$wrapper" --model zai/glm-5.3-flash --mode json --no-session 2>"$work/err5f")
+is "future-dated marker call exits 0" "$?" "0"
+out_has "future-dated glm skipped, Haiku 5.5 answers" '"model":"claude-bridge/claude-haiku-5-5"'
+log_has "future-dated skip shows time left" 'model=zai/glm-5.3-flash skipped: quota error dated in the future, 37[0-9][0-9]s until it expires'
+skip_msg=$(grep 'skipped: quota error dated' "$log" | sed 's/^[^ ]* //')
+case $skip_msg in *" -"[0-9]*) no "future-dated skip line has a negative number: $skip_msg" ;; *) ok "future-dated skip line has no negative number" ;; esac
+
 # 6. Plain passthrough keeps stdin flowing (prompt reaches the real pi).
 OUT=$(printf '%s' "$prompt" | "$wrapper" --model muse-spark-1.3-contributor --mode json --no-session)
 is "plain passthrough exits 0" "$?" "0"
@@ -296,19 +311,43 @@ is "failing quota-axi: failover exits 0" "$?" "0"
 is "failing quota-axi: glm still called first" "$(sed -n 1p "$STUB_ARGV")" "--model zai/glm-5.3-flash --mode json --no-session"
 out_has "failing quota-axi: Haiku 5.5 answers" '"model":"claude-bridge/claude-haiku-5-5"'
 
-# 9c. A silent pi (stub hangs with no output) is killed after IDLE_SECS and counts as a quota failure: the next
-#     chain model answers, and the hung route gets its marker.
+# 9c. A silent pi (stub hangs with no output) is killed after IDLE_SECS: the next chain model answers for that call,
+#     and the stall writes no marker, so the hung route is not dead.
 nodead
 : >"$log"
+: >"$STUB_ARGV"
 t0=$(date +%s)
 OUT=$(printf '%s' "$prompt" | PI_QUOTA_FAILOVER_IDLE_SECS=2 PI_QUOTA_FAILOVER_CHAIN='bad/hang claude-bridge/claude-haiku-5-5' "$wrapper" --model bad/hang --mode json --no-session 2>"$work/err9c")
 is "silent hang exits 0" "$?" "0"
 out_has "silent hang fails over to Haiku 5.5" '"model":"claude-bridge/claude-haiku-5-5"'
 log_has "idle kill logged" "pi produced no output for 2s; killing it"
-log_has "idle kill moves on to Haiku 5.5" "model=bad/hang quota-error.*no output for 2s.*moving to claude-bridge/claude-haiku-5-5"
+log_has "idle kill moves on to Haiku 5.5" "model=bad/hang stalled.*no output for 2s.*moving to claude-bridge/claude-haiku-5-5"
 if [ $(($(date +%s) - t0)) -lt 10 ]; then ok "silent hang failed over in under 10s"; else no "silent hang took $(($(date +%s) - t0))s"; fi
-fresh "hung route gets a dead marker" bad/hang
+is "stall writes no marker" "$(age_of bad/hang)" none
 if child_gone; then ok "idle kill reached the tool child"; else no "tool child survived the idle kill"; fi
+
+# 9c2. The next call still tries the stalled route first (no marker to skip it), stalls again and fails over.
+: >"$STUB_ARGV"
+OUT=$(printf '%s' "$prompt" | PI_QUOTA_FAILOVER_IDLE_SECS=2 PI_QUOTA_FAILOVER_CHAIN='bad/hang claude-bridge/claude-haiku-5-5' "$wrapper" --model bad/hang --mode json --no-session 2>"$work/err9c2")
+is "second stall exits 0" "$?" "0"
+is "next call tries the stalled route first" "$(sed -n 1p "$STUB_ARGV")" "--model bad/hang --mode json --no-session"
+out_has "second stall fails over to Haiku 5.5" '"model":"claude-bridge/claude-haiku-5-5"'
+if grep -q 'model=bad/hang skipped' "$log"; then no "stalled route was skipped on the next call"; else ok "stalled route is not skipped on the next call"; fi
+is "second stall writes no marker" "$(age_of bad/hang)" none
+
+# 9c3. A stall on the last chain model is not "quota exhausted": the call fails with no marker, so the pipeline may retry it.
+nodead
+OUT=$(printf '%s' "$prompt" | PI_QUOTA_FAILOVER_IDLE_SECS=2 PI_QUOTA_FAILOVER_CHAIN='bad/hang' "$wrapper" --model bad/hang --mode json --no-session 2>"$work/err9c3")
+is "stalled last route exits 1" "$?" "1"
+if grep -q 'quota exhausted' "$work/err9c3"; then no "stalled chain reported as quota exhausted"; else ok "stalled chain is not reported as quota exhausted"; fi
+is "stalled last route writes no marker" "$(age_of bad/hang)" none
+
+# 9c4. A real quota error still writes its marker and the chain moves on, as before.
+nodead
+OUT=$(printf '%s' "$prompt" | PI_QUOTA_FAILOVER_CHAIN='zai/glm-5.3-flash claude-bridge/claude-haiku-5-5' "$wrapper" --model zai/glm-5.3-flash --mode json --no-session 2>"$work/err9c4")
+is "quota error call exits 0" "$?" "0"
+out_has "quota error still fails over to Haiku 5.5" '"model":"claude-bridge/claude-haiku-5-5"'
+fresh "quota error still writes its marker" zai/glm-5.3-flash
 
 # 9k. A silent pi that ignores TERM is KILLed after the idle grace, its tool child with it, and the next model answers.
 nodead
