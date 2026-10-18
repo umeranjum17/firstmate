@@ -9,15 +9,17 @@
 # run fails, costing a restart.
 #
 # This wrapper runs the real pi; the requested chain model goes first, then
-# the other chain models in chain order (default GLM 5.3 Flash, then Claude
-# Haiku 5.5 through the claude-bridge provider - Claude Haiku 5.5 only as the
-# GLM failover; never Opus, Sonnet, Fable or Step 5), and when an attempt
+# the other chain models in chain order (default GLM 5.3 Flash, then GPT-6 Luna
+# through the openai-codex provider - GPT-6 Luna only as the GLM failover; never
+# Opus, Sonnet, Fable or Step 5), and when an attempt
 # answers a QUOTA error it moves at once to the next model in that order
 # inside the same invocation. Any non-quota failure passes through
 # byte-for-byte with its original exit code, so the pipeline's own handling is
 # untouched. When every model in the chain is quota-dead it fails once with a
 # line containing "quota exhausted", which no-mistakes classifies as terminal,
 # so the dead chain is never re-retried.
+#
+# Each call runs pi with -ne and -e for every extension pi would load, except pi-hermes-memory (see README.md).
 #
 # Install (idempotent): pipeline-quota-failover/install.sh
 # It copies this script to ~/.local/share/fm-pipeline-quota-failover/ and sets
@@ -51,7 +53,7 @@ set -u
 # surface only.
 QUOTA_RE='limit used up|usage limit|limit has been reached|GoUsageLimitError|rate limit exceeded|quota|available credits|insufficient credits|Claude rate limit|out of extra usage'
 
-chain=${PI_QUOTA_FAILOVER_CHAIN:-'zai/glm-5.3-flash claude-bridge/claude-haiku-5-5'}
+chain=${PI_QUOTA_FAILOVER_CHAIN:-'zai/glm-5.3-flash openai-codex/gpt-6-luna'}
 # The chain is the fleet's one route list: route-change reads it from here.
 [ -z "${PI_QUOTA_FAILOVER_PRINT_CHAIN:-}" ] || { printf '%s\n' "$chain"; exit 0; }
 
@@ -99,16 +101,25 @@ mark_dead() {
   mkdir -p "$dead_dir" 2>/dev/null
   printf '%s %s\n' "$1" "$(date +%s)" >"$(marker "$1")" 2>/dev/null
 }
+# quota_provider <pi-provider>: the quota-axi name of a pi provider. quota-axi calls the openai-codex provider "codex"
+# and has no claude-bridge provider; any other name is the same in both.
+quota_provider() {
+  case $1 in
+    openai-codex) echo codex ;;
+    *) echo "$1" ;;
+  esac
+}
 # quota_exhausted <model>: quota-axi reports exhausted_now for this model's provider with scope all_models or model:<id>.
 # Missing, slow (10s cap), failing or unparseable quota-axi answers no, so the route is tried as before.
 quota_exhausted() {
-  local answer
+  local answer qp
+  qp=$(quota_provider "${1%%/*}")
   command -v jq >/dev/null 2>&1 || { log_line "jq missing: quota pre-check off, model=$1 tried as before"; return 1; }
-  answer=$(timeout 10 quota-axi --provider "${1%%/*}" --json --max-age 5m --no-credential-refresh 2>/dev/null) || {
-    log_line "quota-axi gave no answer for ${1%%/*} (exit $?); model=$1 not pre-checked"
+  answer=$(timeout 10 quota-axi --provider "$qp" --json --max-age 5m --no-credential-refresh 2>/dev/null) || {
+    log_line "quota-axi gave no answer for $qp (exit $?); model=$1 not pre-checked"
     return 1
   }
-  jq -e --arg p "${1%%/*}" --arg s "model:${1#*/}" '[.providers[]? | select(.provider == $p) | .quotaSemantics.effectiveAvailability[]? | select((.scope == "all_models" or .scope == $s) and .runway.status == "exhausted_now")] | length > 0' <<<"$answer" >/dev/null 2>&1
+  jq -e --arg p "$qp" --arg s "model:${1#*/}" '[.providers[]? | select(.provider == $p) | .quotaSemantics.effectiveAvailability[]? | select((.scope == "all_models" or .scope == $s) and .runway.status == "exhausted_now")] | length > 0' <<<"$answer" >/dev/null 2>&1
 }
 idle_secs=${PI_QUOTA_FAILOVER_IDLE_SECS:-120}
 
@@ -150,6 +161,60 @@ drop_session() {
   done
 }
 
+# ext_list <dir>: the extension files pi finds in a directory: direct .ts/.js files and subdirectories' index.ts/index.js.
+ext_list() {
+  local f
+  for f in "$1"/*.ts "$1"/*.js "$1"/*/index.ts "$1"/*/index.js; do [ -f "$f" ] && printf '%s\n' "$f"; done
+}
+# ext_entry <path>: what pi loads for a manifest or settings path: a file as is, a directory's index, else the directory's
+# extensions (a bare -e on a directory without an index does not load).
+ext_entry() {
+  if [ ! -d "$1" ]; then printf '%s\n' "$1"
+  elif [ -f "$1/index.ts" ]; then printf '%s\n' "$1/index.ts"
+  elif [ -f "$1/index.js" ]; then printf '%s\n' "$1/index.js"
+  else ext_list "$1"
+  fi
+}
+# package_extensions <package dir>: its pi.extensions entries when it has a pi manifest, else its extensions/ directory.
+package_extensions() {
+  local p
+  if jq -e 'has("pi")' "$1/package.json" >/dev/null 2>&1; then
+    jq -r '.pi.extensions[]?' "$1/package.json" | while IFS= read -r p; do
+      if [ -e "$1/${p#./}" ]; then ext_entry "$1/${p#./}"; else log_line "manifest entry $p not found in $1; not loaded"; fi
+    done
+  else
+    ext_list "$1/extensions"
+  fi
+}
+# pi_extension_args: prints "-ne" and "-e <path>" pairs for every extension pi would load here except pi-hermes-memory:
+# the user packages (pi list), the user extensions dir, the settings' extensions array and pi's built-ins minus any the
+# settings turn off. An unreadable list prints the reason and returns 1; the caller then runs pi as before.
+pi_extension_args() {
+  local agent_dir=${PI_CODING_AGENT_DIR:-$HOME/.pi/agent} settings list src dir e b
+  command -v jq >/dev/null 2>&1 || { echo "jq missing"; return 1; }
+  settings=$(cat "$agent_dir/settings.json" 2>/dev/null || echo '{}')
+  jq -e . <<<"$settings" >/dev/null 2>&1 || { echo "$agent_dir/settings.json does not parse"; return 1; }
+  list=$("$real_pi" list 2>/dev/null) || { echo "pi list exited $?"; return 1; }
+  printf '%s\n' -ne
+  {
+    while IFS=$'\t' read -r src dir; do
+      [ "$src" = npm:pi-hermes-memory ] || package_extensions "$dir"
+    done < <(awk '/^  [^ ]/ {src=$1} /^    \// {print src "\t" $1}' <<<"$list")
+    ext_list "$agent_dir/extensions"
+    while IFS= read -r e; do
+      case $e in
+        builtin:* | /*) ;;
+        ~*) e=$HOME${e#\~} ;;
+        *) e=$agent_dir/$e ;;
+      esac
+      ext_entry "$e"
+    done < <(jq -r '.extensions[]? | select(startswith("-") or startswith("+") or startswith("!") | not)' <<<"$settings")
+    for b in mcp llama.cpp codemode tool-search; do
+      jq -e --arg d "-builtin:$b" '(.extensions // []) | index($d) | not' <<<"$settings" >/dev/null 2>&1 && echo "builtin:$b"
+    done
+  } | while IFS= read -r p; do printf '%s\n' -e "$p"; done
+}
+
 tree_pids() {
   local c
   for c in $(pgrep -P "$1" 2>/dev/null); do
@@ -179,7 +244,7 @@ end_pi() {
 run_watched() {
   local pid='' sizes seen='' last now s
   idle_killed=0
-  ( trap - INT; exec "$real_pi" "$@" ) <"$stdin_file" >"$out_file" 2>"$err_file" &
+  ( trap - INT; exec "$real_pi" "${ext_args[@]}" "$@" ) <"$stdin_file" >"$out_file" 2>"$err_file" &
   pid=$!
   last=$(date +%s)
   while kill -0 "$pid" 2>/dev/null; do
@@ -213,6 +278,14 @@ error_text() {
   if [ "$1" != 0 ]; then cat "$err_file" 2>/dev/null; fi
 }
 
+# Every pi call runs with -ne and the extension list (pi-hermes-memory is out: its startup sync delayed pi's first event).
+ext_args=()
+if ext_out=$(pi_extension_args); then
+  mapfile -t ext_args <<<"$ext_out"
+else
+  log_line "extension list unreadable ($ext_out); pi runs with its default extensions, pi-hermes-memory included"
+fi
+
 IFS=' ' read -r -a models <<<"$chain"
 args=("$@")
 requested=''
@@ -228,7 +301,7 @@ done
 # Only intercept calls whose model is in the chain: an operator-pinned profile
 # (axi run --model) for any other model passes through untouched, which also
 # keeps the pi-only pinned-profile rule intact. The requested model goes first,
-# then every other chain model in chain order, so a profile set to Haiku fails
+# then every other chain model in chain order, so a profile set to GPT-6 Luna fails
 # over to GLM.
 order=()
 for m in "${models[@]}"; do
@@ -239,7 +312,7 @@ if [ ${#order[@]} = ${#models[@]} ]; then
   # captured file, unlink it (the open fd survives), then exec.
   [ "$have_stdin" = 1 ] && exec 0<"$stdin_file"
   rm -f "$stdin_file"
-  exec "$real_pi" "${args[@]}"
+  exec "$real_pi" "${ext_args[@]}" "${args[@]}"
 fi
 
 order=("$requested" "${order[@]}")
@@ -287,6 +360,7 @@ for ((attempt = 0; attempt < ${#order[@]}; attempt++)); do
     # Only a real answer clears the route's marker; a kill, a timeout or any other failure keeps it.
     if [ "$rc" = 0 ] && [ -z "$(error_text 0)" ]; then
       rm -f "$(marker "$model")"
+      log_line "model=$model answered in $((t1 - t0))ms ($(stat -c %s "$out_file") bytes)"
     fi
     # Not a quota failure: hand the pipeline exactly what real pi produced.
     cat "$out_file"
