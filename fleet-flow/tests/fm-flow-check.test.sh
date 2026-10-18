@@ -72,4 +72,19 @@ lane work2 "working [at=$now]: building"
 rc=0; out=$(run --can-start) || rc=$?
 expect '--can-start refuses at the hard cap of counting lanes' '1 6 open lanes, hard cap 6: land or close a waiting lane first' "$rc $out"
 
+# A lane held for the captain only through its backlog item (fm-captain-hold.sh hold) is captain-held, not red:
+# both lanes are 30 h old past the 24 h red limit, and only the unheld control lane goes red.
+bhome=$d/bl/8/firstmate
+mkdir -p "$bhome/state" "$bhome/data"
+for t in bl-held bl-open; do
+  printf 'kind=ship\n' > "$bhome/state/$t.meta"
+  printf 'working [at=%s]: building\n' "$((now - 30 * h))" > "$bhome/state/$t.status"
+  touch -d "@$((now - 30 * h))" "$bhome/state/$t.meta" "$bhome/state/$t.status"
+done
+printf '%s\n' '- [ ] bl-held - held for the captain (kind: ship) (hold: fm-hold-v1:eA==) (hold-kind: captain)' \
+  '- [ ] bl-open - not held (kind: ship)' > "$bhome/data/backlog.md"
+bout=$(FM_MAIN_HOME=$main python3 "$CHECK" "$bhome")
+expect 'backlog captain hold raises no red line' '' "$(grep -F 'bl-held' <<<"$bout" || true)"
+expect 'control lane without a hold still reads red' 1 "$(grep -cE 'bl-open lead .* red \(limit' <<<"$bout")"
+
 [ "$fail" -eq 0 ] && echo "PASS: fm-flow-check lane slots" || { echo "FAIL: fm-flow-check lane slots"; exit 1; }

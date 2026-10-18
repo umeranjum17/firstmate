@@ -7,6 +7,8 @@
 #        fm-flow-check.sh <home> --summary    one TSV row for Main's pulse:
 #                                             home open working ready donewait oldest_wait_h min_since_working counted dry
 # Line order: land, over-cap, wait, red, split, budget, key, pull. Format: <task> <actor> <age> <next action>.
+# Captain-held = a captain-hold key in the status file, or an open backlog line with hold-kind captain (data/backlog.md);
+# captain-held lanes raise no wait or red line.
 # Lane = live state/<task>.meta with kind=ship|scout. Lane age starts at the birth of data/<task>/.
 # A lane in a long external wait (see FREE_AFTER) keeps its record but stops counting toward the cap:
 # counted = open lanes that count; dry = 1 when ready = 0 and working < cap.
@@ -18,6 +20,8 @@ MAIN = os.environ.get('FM_MAIN_HOME') or os.path.expanduser('~/firstmate')
 NAMES = {'1': 'takeone', '3': 'crewhouse', '4': 'writeboost', '8': 'muxr', '9': 'desklink', '10': 'byokit'}
 AT = re.compile(r'\[at=(\d+)\]')
 VERB = re.compile(r'^(?:\d{9,11}\s+)?([a-z][a-z-]*)')
+HOLD_KIND = re.compile(r'\(hold-kind:\s*captain\)')
+HOLD_UNTIL = re.compile(r'\(hold-until:\s*(\d{4}-\d{2}-\d{2})\)')
 
 home = os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 else sys.exit('usage: fm-flow-check.sh <home> [--can-start|--target|--summary]')
 mode = sys.argv[2] if len(sys.argv) > 2 else ''
@@ -58,6 +62,16 @@ def open_keys(ls, fallback):
         elif v in ('resolved', 'captain-held'): op.pop(k, None)
     return op
 
+def backlog_held(t):
+    # fm-captain-hold.sh hold writes "(hold-kind: captain)" on the open backlog line; the hold is inactive on and
+    # after its "(hold-until: DATE)" date. Local file only.
+    today = time.strftime('%Y-%m-%d', time.gmtime(NOW))
+    for l in lines(f'{D}/backlog.md'):
+        if l.startswith(f'- [ ] {t} '):
+            u = HOLD_UNTIL.search(l)
+            return bool(HOLD_KIND.search(l)) and not (u and u.group(1) <= today)
+    return False
+
 def h(sec): return f'{sec / 3600:.1f}h'
 
 def landed14():
@@ -92,7 +106,7 @@ for m in glob.glob(f'{S}/*.meta'):
     keys = open_keys(ls, mt)
     lanes.append(dict(t=t, meta=meta, verb=v, since=stamp(last, mt), keys=keys,
                       at=stamp(last, None) if ls else None, age=NOW - (birth(f'{D}/{t}') or mt),
-                      captain=any(k.startswith('captain-hold') for k in keys)))
+                      captain=any(k.startswith('captain-hold') for k in keys) or backlog_held(t)))
 open_n = len(lanes)
 # A lane whose last event is a paused, blocked or failed wait stamped more than 4 h ago, and still that wait in
 # bin/fm-crew-state.sh (so validating and own busy work stay working), stops counting toward the cap; a ready item
@@ -164,7 +178,7 @@ for L in lanes:
 p50, p85, _ = target()
 red = min(p85 * 3600, 86400) if p85 else 86400
 for L in lanes:
-    if L['age'] > red:
+    if L['age'] > red and not L['captain']:
         out.append((f'red {L["t"]}', L['age'], f'{L["t"]} lead {h(L["age"])} red (limit {h(red)}): land, cut scope, change method or stop'))
 cache_p = f'{S}/.flow.cache'
 try: cache = json.load(open(cache_p))
