@@ -1,10 +1,10 @@
 // Fleet kill guard, the rule every adapter calls. A kill, pkill or killall may signal only the caller's own descendants,
-// never PID 1, the systemd user manager or the herdr server, and never a target it cannot resolve. A block is final.
+// never PID 1, the systemd user manager or the herdr server, and never a target it cannot resolve. A block is final,
+// except a kill whose PID the shell sets ($pid, $!, %1, $(...)): that one asks for the literal PID.
 import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { basename } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const SELF = realpathSync(fileURLToPath(import.meta.url));
 const MODELLED = { kill: "lL", pkill: "f", killall: "" }; // options the guard reads; any other option refuses
 const WRAPPERS = /^(sudo|env|nohup|exec|command|builtin|time|nice|ionice|taskset|stdbuf|timeout|setsid|doas|runuser|chrt|flock|unbuffer|xargs|then|do|else|if|elif|case|while|until|function|\{)$/;
 const KNOWN = /^(kill|pkill|killall|eval|(ba|z|da)?sh)$/;
@@ -13,14 +13,22 @@ const REDIRECT = /^\d*[<>]|^&>/;
 const commandName = (t) => basename(t).replace(/\\/g, "");
 
 // Heredoc bodies are data, except when a shell reads them: drop each body from the line after its marker through the closing word.
+// An unquoted marker still runs the body's $( ) and backticks, so those come back as runs.
 const bare = (line) => line.replace(/\(\(.*?\)\)/g, "").replace(/(?<!<<-?\s*)"[^"]*"|(?<!<<-?\s*)'[^']*'/g, "''");
 function dropHeredocBodies(command) {
-	let end = null, shell = false;
-	return command.split("\n").filter((line) => {
-		if (end !== null) { if (line.trim() === end) end = null; return shell; }
-		end = bare(line).match(/(?<!<)<<(?!<)-?\s*(['"]?)([A-Za-z_]\w*)\1/)?.[2] ?? null, shell = /\b(ba|z|da)?sh\b/.test(line);
-		return true;
-	}).join("\n");
+	let end = null, shell = false, quoted = false, body = [];
+	const runs = [], rest = command.split("\n").filter((line) => {
+		if (end === null) {
+			const m = bare(line).match(/(?<!<)<<(?!<)-?\s*(['"]?)([A-Za-z_]\w*)\1/);
+			end = m?.[2] ?? null, quoted = !!m?.[1], shell = /(^|[\s;&|(`])(\S*\/)?(ba|z|da)?sh(?=[\s<;&|)]|$)/.test(bare(line));
+			return true;
+		}
+		if (line.trim() !== end) { if (!shell) body.push(line); return shell; }
+		if (!quoted) runs.push(...substitutions(body.join("\n"), true));
+		end = null, body = [];
+		return shell;
+	});
+	return { rest: rest.join("\n"), runs };
 }
 
 // Simple commands, split on ; | & and newlines outside quotes.
@@ -41,7 +49,7 @@ function segments(command) {
 
 // The words of a simple command with its redirections dropped: `kill 4242 2>/dev/null` has one operand.
 function words(s) {
-	const raw = s.match(/\d*[<>]+&?|&>|(?:"[^"]*"|'[^']*'|[^\s<>])+/g) ?? [];
+	const raw = s.match(/\d*[<>]+&?|&>|(?:"[^"]*"|'[^']*'|\$\((?:[^()]|\([^()]*\))*\)|`[^`]*`|[^\s<>])+/g) ?? [];
 	const out = [];
 	for (let i = 0; i < raw.length; i++) {
 		if (!REDIRECT.test(raw[i])) out.push(raw[i]);
@@ -99,11 +107,13 @@ function judge(name, args, text, caller, procs) {
 	const unresolved = (why) => `"${text}" cannot be resolved to processes: ${why}`;
 	if (flags.some((f) => !MODELLED[name].includes(f))) return unresolved("an option the guard does not read");
 	if (!ops.length) return null;
-	let hits;
+	let hits, shellSet;
 	if (name === "kill") {
-		const bad = ops.find((a) => !/^[1-9]\d*$/.test(a));
+		const pid = (a) => /^[1-9]\d*$/.test(a), fromShell = (a) => /[$`]|^%/.test(a); // $pid, $!, $(...), %1
+		const bad = ops.find((a) => !pid(a) && !fromShell(a));
 		if (bad !== undefined) return unresolved(`"${bad}" is not a PID`);
-		hits = ops.map((a) => procs().get(+a) ?? { pid: +a, missing: true });
+		shellSet = ops.find(fromShell);
+		hits = ops.filter(pid).map((a) => procs().get(+a) ?? { pid: +a, missing: true });
 	} else {
 		if (ops.some((o) => /[$`]/.test(o))) return unresolved("the pattern is set by the shell");
 		if (name === "killall" && ops.some((o) => o.includes("/"))) return unresolved("a name with a slash selects processes by executable path");
@@ -121,7 +131,8 @@ function judge(name, args, text, caller, procs) {
 	const own = new Set(), todo = [caller];
 	while (todo.length) for (const c of kids.get(todo.pop()) ?? []) if (!own.has(c)) { own.add(c); todo.push(c); }
 	const reason = hits.map((p) => reasonFor(p, own)).find(Boolean);
-	return reason ? `"${text}" aims at ${reason}` : null;
+	if (reason) return `"${text}" aims at ${reason}`;
+	return shellSet === undefined ? null : { retry: `"${text}": the shell sets its target (${shellSet})` };
 }
 
 // Index of the ) closing the $( opened at open, skipping quoted and escaped text.
@@ -140,14 +151,15 @@ function closeOf(text, open) {
 }
 
 // Every $( ), <( ), >( ) and backtick body that the shell runs, nested $( ) included; single-quoted text is data.
-function substitutions(text) {
+// In a heredoc body (literal) quotes are plain characters.
+function substitutions(text, literal = false) {
 	const out = [];
 	for (let i = 0, q = ""; i < text.length; i++) {
 		const c = text[i];
 		if (q === "'") { if (c === "'") q = ""; }
 		else if (c === "\\") i++;
-		else if (c === '"') q = q ? "" : '"';
-		else if (c === "'" && !q) q = "'";
+		else if (c === '"' && !literal) q = q ? "" : '"';
+		else if (c === "'" && !q && !literal) q = "'";
 		else if (c === "`") {
 			const end = text.indexOf("`", i + 1);
 			if (end < 0) break;
@@ -163,23 +175,22 @@ function substitutions(text) {
 }
 
 // The first kill, pkill or killall in the command (also inside sh -c, eval, $( ) or backticks) aimed outside the caller's tree.
+// A final block anywhere beats a retry, so "kill $p; kill 1" is refused for good.
+const worst = (ts) => ts.find((t) => t && !t.retry) ?? ts.find(Boolean) ?? null;
 function blockedBy(command, caller, procs) {
-	for (const seg of segments(dropHeredocBodies(command))) {
+	const { rest, runs } = dropHeredocBodies(command);
+	return worst([...runs.map((c) => blockedBy(c, caller, procs)), ...segments(rest).map((seg) => {
 		const text = seg.trim().replace(/^[\s({!]+/, "").replace(/^[\w.-]+\s*\(\s*\)\s*/, "");
-		const inner = substitutions(text);
 		const { words: w, piped, split } = commandOf(words(text));
 		const name = w.length ? commandName(w[0]) : "";
 		const shellC = /^(ba|z|da)?sh$/.test(name) ? w.findIndex((t, k) => k > 0 && /^-[a-zA-Z]*c[a-zA-Z]*$/.test(t)) : -1;
-		const t = inner.map((c) => blockedBy(c, caller, procs)).find(Boolean) ??
-			split.map((s) => blockedBy(s, caller, procs)).find(Boolean) ??
-			(shellC >= 0 && w[shellC + 1] ? blockedBy(w[shellC + 1], caller, procs) :
+		return worst([...substitutions(text).map((c) => blockedBy(c, caller, procs)), ...split.map((s) => blockedBy(s, caller, procs)),
+			shellC >= 0 && w[shellC + 1] ? blockedBy(w[shellC + 1], caller, procs) :
 			name === "eval" ? blockedBy(w.slice(1).join(" "), caller, procs) :
 			!Object.hasOwn(MODELLED, name) ? null :
 			piped ? `"${text}" cannot be resolved to processes: its targets come from xargs` :
-			judge(name, w.slice(1), text, caller, procs));
-		if (t) return t;
-	}
-	return null;
+			judge(name, w.slice(1), text, caller, procs)]);
+	})]);
 }
 
 // Returns the block message, or null to allow. caller is the process whose descendants may be signalled: in-process
@@ -192,11 +203,15 @@ export function guard(command, { caller = process.pid } = {}) {
 		target = `"${command}" cannot be checked: /proc was unreadable (${e.message})`;
 	}
 	if (target === null) return null;
+	if (target.retry) return `The fleet kill guard cannot check ${target.retry}. This is not a final block: print the PID (echo it, or jobs -l for a job number), then run kill again with the literal number; the guard allows it when this task started that process.`;
 	return `BLOCKED by the fleet kill guard: ${target}. Kill only process IDs you started yourself in this task; never PID 1, the systemd user manager, the herdr server, or a process found by name or pattern that you did not start. This block is final: do not retry it, reword it, or work around it. If another process is in your way, write \`blocked:\` naming it and stop.`;
 }
 
 // Hook CLI for Claude Code: PreToolUse JSON on stdin; exit 2 with the reason on stderr blocks. --caller is the agent's pid.
-if (process.argv[1] && realpathSync(process.argv[1]) === SELF) {
+// argv[1] may name no file on disk: the compiled pi binary's is /$bunfs/root/pi, which its own existsSync still reports.
+let entry = null;
+try { entry = realpathSync(process.argv[1]); } catch {}
+if (entry === realpathSync(fileURLToPath(import.meta.url))) {
 	let command;
 	try { command = JSON.parse(readFileSync(0, "utf8"))?.tool_input?.command; } catch {}
 	const i = process.argv.indexOf("--caller");
