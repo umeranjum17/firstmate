@@ -19,6 +19,7 @@ const sensitive = [
 ];
 const protectedFiles = ["~/.codex/auth.json", "~/.local/share/opencode/auth.json", "~/.pi/agent/auth.json", "~/.claude/.credentials.json", "~/.no-mistakes/config.yaml", "~/.no-mistakes/config.yml"];
 const metadata = new Set(["ls", "stat", "test", "["]);
+const pathFields = new Set(["path", "file_path", "filePath", "paths", "glob"]);
 
 function tokens(command) {
   return (command.match(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^\s;|&<>]+/g) ?? [])
@@ -26,7 +27,8 @@ function tokens(command) {
 }
 
 function globMatches(pattern, path) {
-  if (!pattern.includes("*") && !pattern.includes("?")) return false;
+  // Only a path glob ("~/" or "/" rooted) is a reference; "**bold**", "why?" and "a*b" are text.
+  if (!/^(~\/|\/)/.test(pattern) || !/[*?]/.test(pattern)) return false;
   const re = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replaceAll("**", "\0").replaceAll("*", "[^/]*").replaceAll("?", "[^/]").replaceAll("\0", ".*");
   return new RegExp(`^${re}$`).test(path);
 }
@@ -37,7 +39,7 @@ function protectedReference(text) {
   for (let value of fragments) {
     value = value.replaceAll("${HOME}", "~").replaceAll("$HOME", "~");
     for (const home of homes) if (value === home || value.startsWith(home + "/")) value = "~" + value.slice(home.length);
-    if (sensitive.some((rule) => rule.test(value)) || protectedFiles.some((path) => globMatches(value, path))) return value;
+    if (sensitive.some((rule) => rule.test(value)) || protectedFiles.some((path) => globMatches(value, path) || homes.some((home) => globMatches(value, path.replace("~", home))))) return value;
   }
   return null;
 }
@@ -78,7 +80,9 @@ export function guardTool(tool, input) {
   const scan = (value) => typeof value === "string" ? (protectedToken(value) ? value : null)
     : Array.isArray(value) ? value.map(scan).find(Boolean)
     : value && typeof value === "object" ? Object.values(value).map(scan).find(Boolean) : null;
-  return scan(input) ? `BLOCKED by the fleet read guard: protected file access. This block is final: do not retry, reword, or work around it.` : null;
+  // Only path-like fields name a file; body text such as write content or edit strings is never a path.
+  const named = Object.entries(input ?? {}).filter(([key]) => pathFields.has(key) || (key === "pattern" && /^(glob|find)$/i.test(tool)));
+  return named.some(([, value]) => scan(value)) ? `BLOCKED by the fleet read guard: protected file access. This block is final: do not retry, reword, or work around it.` : null;
 }
 
 // Claude PreToolUse entry: inspect only tool arguments; never intercept process/library file reads.

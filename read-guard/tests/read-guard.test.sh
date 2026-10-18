@@ -35,6 +35,7 @@ for cmd in \
   'cat ~/.claude' \
   'cat ~/.codex/*' \
   'cat ~/.codex/a*' \
+  'cat ~/*/auth.json' \
   'grep -r secret ~/.no-mistakes' \
   'cp -r ~/.local/share/byokit/people/1 /tmp'; do block "$cmd"; done
 # Non-secret files and runtime session data remain readable.
@@ -58,6 +59,12 @@ allow 'ls -l ~/.codex/auth.json'
 allow "ls -l $H/.codex/auth.json"
 allow 'stat ~/.local/share/opencode/auth.json'
 allow 'test -e "$HOME/.claude/.credentials.json"'
+# A markdown report is body text, not a path: bold markers and question marks pass.
+STARS=$(printf '\052\052')
+allow "cat > $T/report.md <<'EOF'
+## Report
+Status ${STARS} why? ${STARS} done
+EOF"
 # The exact incident command reaches the installed Claude PreToolUse hook and is refused.
 HOOK=$(jq -r '.hooks.PreToolUse[] | select(.matcher | contains("Bash")) | .hooks[] | select(.command | contains("fm-read-guard")) | .command' "$H/.claude/settings.json")
 printf '{"tool_name":"Bash","tool_input":{"command":"cat ~/.local/share/opencode/auth.json | head -c 300"}}' |
@@ -83,6 +90,10 @@ const { guardTool } = await import(process.argv[2]); const home = process.argv[3
 for (const [tool, input] of [["read", {path:`${home}/.codex/auth.json`}], ["Read", {file_path:`${home}/.claude/.credentials.json`}], ["Grep", {path:`${home}/.pi/agent/auth.json`}], ["Grep", {path:"~/.codex"}], ["Glob", {pattern:`${home}/.local/share/opencode/auth*`}]])
   if (!guardTool(tool, input)?.includes("fleet read guard")) throw Error(`${tool} was allowed`);
 if (guardTool("Grep", {path:"~/.pi/agent/sessions"})) throw Error("Claude Grep over sessions was blocked");
+// Pi write of a markdown report: its content is body text, so bold markers and question marks pass.
+if (guardTool("write", {path:`${home}/report.md`, content:`Status ${"\x2a\x2a"} why? ${"\x2a\x2a"} done`})) throw Error("Pi write of markdown report was blocked");
+// Pi find takes a glob pattern, so a home-rooted codex login glob is still blocked.
+if (!guardTool("find", {path:home, pattern:"~/.codex/a*"})?.includes("fleet read guard")) throw Error("Pi find of codex login glob was allowed");
 EOF
 # Guarding is at the agent boundary: normal process/library reads of fixture credentials still work.
 printf 'fixture-secret' > "$H/.codex/auth.json"
