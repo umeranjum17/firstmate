@@ -170,7 +170,8 @@ if mode == '--can-start':
 
 out = []  # (key, age_seconds, text)
 for L in land:
-    out.append((f'land {L["t"]}', NOW - L['since'], f'{L["t"]} lead {h(NOW - L["since"])} land it: merge if green (bin/fm-pr-merge.sh), then bin/fm-teardown.sh'))
+    if not L['captain']:
+        out.append((f'land {L["t"]}', NOW - L['since'], f'{L["t"]} lead {h(NOW - L["since"])} land it: merge if green (bin/fm-pr-merge.sh), then bin/fm-teardown.sh'))
 if count_n > HARD:
     out.append((f'over-cap', count_n, f'home lead {count_n}/{HARD} over hard cap: start nothing; land nearest-to-merge, stop the oldest with a learned note'))
 for L in lanes:
