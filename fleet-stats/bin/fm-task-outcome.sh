@@ -30,8 +30,14 @@ set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 [ "$#" -eq 0 ] || [ -f "${FM_STATE_OVERRIDE:-${FM_HOME:-${FM_ROOT_OVERRIDE:-$SCRIPT_DIR/..}}/state}/$1.meta" ] || exit 0
-# shellcheck source=bin/fm-wake-lib.sh
-. "$SCRIPT_DIR/fm-wake-lib.sh"
+# The lock helpers live in the Firstmate checkout, not in this add-on: FM_BIN, else $FM_HOME/bin.
+WAKE_LIB="${FM_BIN:-${FM_HOME:-}/bin}/fm-wake-lib.sh"
+[ -f "$WAKE_LIB" ] || {
+  echo "fm-task-outcome.sh: cannot find $WAKE_LIB (set FM_BIN to a Firstmate checkout's bin/, or FM_HOME to its root)" >&2
+  exit 2
+}
+# shellcheck source=/dev/null
+. "$WAKE_LIB"
 FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
 STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"

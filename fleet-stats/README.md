@@ -8,7 +8,8 @@ here yet: the live flow keeps running the fork's `bin/fm-model-stats.sh`,
 `bin/fm-skill-stats.sh` and `bin/fm-task-outcome.sh`, and the fork-side hook
 that will exec into this directory lands in a later PR. Until that swap this
 directory is dormant, and every moved byte below is identical to the fork
-copy the live flow runs today.
+copy the live flow runs today, except the lock-library line of
+`bin/fm-task-outcome.sh` (see Layout).
 
 ## Layout
 
@@ -34,9 +35,10 @@ copy the live flow runs today.
   `<home>/data/metrics/task-outcomes.tsv` per task end. Called best-effort
   by `bin/fm-teardown.sh` before the task's status and record are retired; a
   write failure never blocks or fails teardown, and the script itself only
-  ever exits non-zero on a usage error. It sources `fm-wake-lib.sh` from its
-  own directory for the file lock; that sibling library did not move, so the
-  moved copy only runs with the fork tree around it (see the proof below).
+  ever exits non-zero on a usage error, or with exit 2 when it cannot find its
+  lock library. It sources `fm-wake-lib.sh` from the Firstmate checkout for the
+  file lock: `FM_BIN` when set, else `$FM_HOME/bin`. The library is not copied
+  into this add-on; a missing file prints one error naming the path and exits 2.
 
 ## Frozen contract (identical to the fork)
 
@@ -74,7 +76,10 @@ copy the live flow runs today.
 Every moved file was compared byte for byte against its fork source at
 `umeranjum17/firstmate@0689b4b9d9ab3594f846cfe07c400edfa58244bf` at move time,
 keeping file modes (`100755` for the scripts, `100644` for the library, on
-both sides):
+both sides). The one deliberate exception is `fleet-stats/bin/fm-task-outcome.sh`:
+its lock-library source now resolves to `FM_BIN` or `$FM_HOME/bin` instead of a
+sibling file, so its hash below no longer matches the fork and is the moved
+copy's pre-change value:
 
 | moved file | fork source | sha256 |
 |---|---|---|
@@ -101,7 +106,7 @@ refactor.
    dashboard stay in the fork and are NOT moved); one PASS proves the
    identical bytes.
 4. Run the repo CI gate (shellcheck plus syntax check over every add-on
-   script) on the PR head. `bin/fm-task-outcome.sh` carries the fork's
-   `# shellcheck source=bin/fm-wake-lib.sh` directive naming the sibling
-   fork library beside it, which did not move, so the gate exempts `SC1091`
-   for `fleet-stats/bin/` only, never for any other directory.
+   script) on the PR head. `bin/fm-task-outcome.sh` sources the lock library
+   through a variable path with `# shellcheck source=/dev/null`, so it needs no
+   `SC1091` exemption; the gate's `fleet-stats/bin/` exemption stays for the
+   other moved readers.
