@@ -8,7 +8,7 @@ Kun's Firstmate has no such guard.
 
 ## Layout
 
-- `bin/fm-supervisor-work-pretool-check.sh` — the hook. It scopes to the one home
+- `bin/fm-supervisor-work-pretool-check.sh` — the hook. It scopes to any listed home
   it was installed for, prefilters the Bash command in shell, asks the decider,
   and writes the deny object on stderr. Fails open.
 - `bin/fm-supervisor-work-decide.mjs` — the command-line entry for the policy.
@@ -18,7 +18,8 @@ Kun's Firstmate has no such guard.
 - `install.sh` / `uninstall.sh` — copy the three files to
   `${XDG_DATA_HOME:-$HOME/.local/share}/fm-supervisor-guard`, record the home in
   its `home` file, and merge or remove one PreToolUse Bash hook in
-  `~/.claude/settings.json`. Both take `--dry-run` and back up what they change.
+  `~/.claude/settings.json`. Install adds a home; `uninstall.sh <fm-home>` removes
+  only that home, while no-argument uninstall removes everything. Both take `--dry-run` and back up what they change.
 - `tests/fm-supervisor-work-guard.test.sh` — installs into a throwaway HOME, runs
   the installed hook against a fixture home and a linked worktree, then uninstalls.
 
@@ -31,9 +32,11 @@ both with no merge here.
 
 ## Behaviour
 
-- Scope: only a session whose root is the registered home is judged. A linked
+- Scope: only a session whose root is one of the registered homes is judged. A linked
   worktree of that home, or any other repo, is allowed. The root is
   `CLAUDE_PROJECT_DIR`, else the hook payload's `cwd` git root.
+- The hook accepts Claude `PreToolUse` JSON with `tool_input.command` and `cwd`; Pi and omp
+  callers can use the same payload.
 - Fail open: missing `jq`, `node`, the home file, the scope lib or the lexer
   each print one stderr line naming the cause, then allow.
 - Prefilter: a command naming none of `no-mistakes`, `sleep`, `herdr` or `tmux`,

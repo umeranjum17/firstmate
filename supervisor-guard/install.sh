@@ -52,6 +52,6 @@ for f in fm-supervisor-work-pretool-check.sh fm-supervisor-work-decide.mjs fm-su
   put "$DEST/$f" "$TMP/$f"
   [ "$DRY" -eq 1 ] || chmod 755 "$DEST/$f"
 done
-printf '%s\n' "$FMH" > "$TMP/home"
+{ [ ! -f "$DEST/home" ] || cat "$DEST/home"; printf '%s\n' "$FMH"; } | awk 'NF && !seen[$0]++' > "$TMP/home"
 put "$DEST/home" "$TMP/home"
 [ "$DRY" -eq 0 ] || echo "dry run: nothing written"

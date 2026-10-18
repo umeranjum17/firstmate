@@ -141,6 +141,13 @@ check expect 2 'herdr pane send-text "go"; sleep 25; herdr pane send-keys Enter'
 check expect 0 'herdr pane capture' "$SECOND"
 "$HERE/install.sh" "$FMH" >/dev/null
 
+CHECK_NAME="removing one of two homes keeps the other guarded"
+"$HERE/uninstall.sh" "$SECOND" >/dev/null
+check test "$(cat "$DEST/home")" = "$FMH"
+check expect 2 'no-mistakes axi run --intent x' "$FMH" supervisor-no-mistakes-run
+check expect 0 'no-mistakes axi run --intent x' "$SECOND"
+check expect 0 'no-mistakes axi run --intent x' "$TMP"
+
 CHECK_NAME="uninstall removes the hook and the installed files"
 "$HERE/uninstall.sh" >/dev/null
 check jq -e '[.hooks.PreToolUse[]?.hooks[]?.command? | select(contains("fm-supervisor-work-pretool-check.sh"))] | length == 0' "$SETTINGS"
