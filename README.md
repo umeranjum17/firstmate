@@ -10,6 +10,7 @@ One line per add-on, with how it wires in. `<home>` is your home folder for the 
 
 - `alerts` — groups tasks stopped by a provider outage into one alert per scan. Dormant copy: the fork still runs its own.
 - `ask-default` — an unanswered ask falls back to its pre-declared safe default instead of blocking the home. Needs a fork hook (FORK-EXIT.md).
+- `backlog-lock-reclaim` — reclaims a 0-byte `<home>/data/backlog.md.lock` left by a dead tasks-axi writer, once it is older than 60 s and no process has it open; until then every backlog write fails LOCKED. Wire in: `backlog-lock-reclaim/install.sh <home>`.
 - `claude-model-guard` — keeps agent runs off Sonnet and Fable: aliases resolve to Haiku, full model ids are refused. Wire in: `claude-model-guard/install.sh`.
 - `claude-quota` — alarms when the shared Claude plan burns ahead of its 5-hour or weekly window. Wire in: `claude-quota/install.sh <home>`.
 - `delete-guard` — stops any agent from recursively deleting `/` or a home folder; a block alerts you and is final. Wire in: `delete-guard/install.sh <home>`.
