@@ -101,6 +101,7 @@ meta_for home-b 'sx-b'
 
 export FM_HOME=$P
 export FM_ADDONS_DIR=$addons
+. "$addons/parked-homes/bin/fm-parked-homes-lib.sh"
 fork() { local script=$1; shift; "$FM/bin/$script" "$@"; }
 
 # --- 1. supervision session: steer via fm-send -------------------------------
@@ -263,7 +264,7 @@ fi
 Q=$work/qhome
 mkdir -p "$Q/state" "$Q/config" "$Q/bin" "$Q/stub"
 printf 'home-b\n' > "$Q/config/parked-homes"
-for lib in fm-backend.sh fm-busy-lib.sh fm-quota-axi-lib.sh fm-parent-channel-lib.sh; do
+for lib in fm-backend.sh fm-busy-lib.sh fm-quota-axi-lib.sh fm-parent-channel-lib.sh fm-account-pool-lib.sh; do
   # SC2016: the stub bodies are written verbatim for the fixture home to
   # source; their $1/$2 belong to the stub's own callers, not this script.
   printf '%s\n' \
@@ -341,6 +342,38 @@ bash -c '
 is "remote secondmate meta without home= is parked (set -u)" "$(sed -n 1p "$work/reader.out")" "parked"
 is "ship meta without kind= is silently not parked (set -u)" "$(sed -n 2p "$work/reader.out")" "silent"
 lacks "reader under set -u prints no unbound-variable errors" "$work/reader.out" "unbound variable"
+
+# --- 10. shared fork gate helpers: exact refusal text and absent-source fallback
+G=$work/gate-meta
+printf 'kind=secondmate\nhome=%s\n' "$work/home-b" > "$G"
+printf 'kind=secondmate\nhome=%s\n' "$work/home-a" > "$G-allowed"
+if out=$(fm_parked_refuse_meta "$G" home-b send 2>&1); then rc=0; else rc=$?; fi
+is "parked send gate refuses" "$rc" "1"
+is "parked send gate keeps exact error" "$out" "error: nothing sent to fm-home-b: its home is parked (config/parked-homes); a parked home gets no message, steer, answer or nudge"
+if out=$(fm_parked_refuse_meta "$G" home-b relaunch 2>&1); then rc=0; else rc=$?; fi
+is "parked relaunch gate refuses" "$rc" "1"
+is "parked relaunch gate keeps exact error" "$out" "error: relaunch refused for home-b: its home is parked (config/parked-homes); a parked home gets no relaunch"
+fm_parked_refuse_meta "$G-allowed" home-a send > "$work/allowed.out" 2>&1
+is "unparked refusal gate allows" "$?" "0"
+is "unparked refusal gate is silent" "$(cat "$work/allowed.out")" ""
+fm_parked_skip_meta "$G" home-b config-push > "$work/skip.out" 2>&1
+is "parked skip gate selects skip" "$?" "0"
+is "parked skip gate keeps exact output" "$(cat "$work/skip.out")" "secondmate home-b: skipped - its home is parked (config/parked-homes)"
+if fm_parked_skip_meta "$G-allowed" home-a config-push > "$work/allowed.out" 2>&1; then rc=0; else rc=$?; fi
+is "unparked skip gate allows continuation" "$rc" "1"
+is "unparked skip gate is silent" "$(cat "$work/allowed.out")" ""
+# This is the no-op API that the fork shim supplies when the add-on is absent.
+if bash -c '
+  fm_parked_refuse_meta() { return 0; }
+  fm_parked_skip_meta() { return 1; }
+  fm_parked_refuse_meta absent home-b send || exit 1
+  if fm_parked_skip_meta absent home-b config-push; then exit 1; fi
+  exit 0
+'; then
+  ok "absent add-on permits refusal and skip call sites"
+else
+  no "absent add-on fallbacks refused a call site"
+fi
 
 if [ "$fails" -eq 0 ]; then
   echo "ALL PASS"
