@@ -36,11 +36,13 @@
 #   PI_QUOTA_FAILOVER_GATE_SECS  longest gate wait before pi starts anyway (default 600)
 #   PI_QUOTA_FAILOVER_DEAD_SECS  how long a quota error keeps a chain model skipped (default 3600)
 #   PI_QUOTA_FAILOVER_IDLE_SECS  a pi call with no stdout and no stderr for this long is killed; the chain moves on
-#                              for that call only and writes no quota marker (default 120). Measured 2026-10-18 on
+#                              for that call only and writes no quota marker (default 120; claude-bridge/* models use the knob below). Measured 2026-10-18 on
 #   PI_QUOTA_FAILOVER_STALL_RETRIES  retries for a stalled last route (default 3; four calls total).
 #                              Haiku 5.5 with a 103 KB review prompt: pi streams JSON events (text and thinking
 #                              deltas, 1400+ lines per call), the longest gap was 26 s (pi start before the first
 #                              event) and 12 s mid-stream, so 120 s is about 4.5x the worst observed gap.
+#   PI_QUOTA_FAILOVER_BRIDGE_IDLE_SECS  the same idle limit for claude-bridge/* models (default 300). Their Haiku calls
+#                              answer in 30-166 s on the fleet's logs, so the 120 s limit killed slow answers.
 #
 # Before each route, quota-axi (on PATH) is asked for that route's provider: a runway of exhausted_now skips the
 # route without calling it. quota-axi missing, slower than 10s or failing leaves the route to be tried as before.
@@ -123,6 +125,11 @@ quota_exhausted() {
   jq -e --arg p "$qp" --arg s "model:${1#*/}" '[.providers[]? | select(.provider == $p) | .quotaSemantics.effectiveAvailability[]? | select((.scope == "all_models" or .scope == $s) and .runway.status == "exhausted_now")] | length > 0' <<<"$answer" >/dev/null 2>&1
 }
 idle_secs=${PI_QUOTA_FAILOVER_IDLE_SECS:-120}
+bridge_idle_secs=${PI_QUOTA_FAILOVER_BRIDGE_IDLE_SECS:-300}
+# idle_for <model>: the idle limit for that model's call; claude-bridge/* models get their own.
+idle_for() {
+  case $1 in claude-bridge/*) echo "$bridge_idle_secs" ;; *) echo "$idle_secs" ;; esac
+}
 stall_retries=${PI_QUOTA_FAILOVER_STALL_RETRIES:-3}
 
 # Host-memory gate (speed-report B3: model calls under heavy host load crash): every pipeline model call goes
@@ -241,7 +248,7 @@ end_pi() {
   for p in "$1" $kids; do kill -0 "$p" 2>/dev/null && kill -KILL "$p" 2>/dev/null; done
 }
 
-# run_watched <args...>: the real pi with the captured stdin re-attached. No stdout and no stderr for idle_secs ends it
+# run_watched <args...>: the real pi with the captured stdin re-attached. No stdout and no stderr for idle_limit ends it
 # and sets idle_killed=1.
 run_watched() {
   local pid='' sizes seen='' last now s
@@ -256,9 +263,9 @@ run_watched() {
     if [ "$sizes" != "$seen" ]; then
       seen=$sizes
       last=$now
-    elif [ $((now - last)) -ge "$idle_secs" ]; then
+    elif [ $((now - last)) -ge "$idle_limit" ]; then
       idle_killed=1
-      log_line "pi produced no output for ${idle_secs}s; killing it"
+      log_line "pi produced no output for ${idle_limit}s; killing it"
       end_pi "$pid"
       break
     fi
@@ -342,6 +349,7 @@ any_stall=0
 stall_retries_used=0
 for ((attempt = 0; attempt < ${#order[@]}; attempt++)); do
   model=${order[$attempt]}
+  idle_limit=$(idle_for "$model")
   t0=$(date +%s%3N)
   run_watched "${args[@]}"
   rc=$?
@@ -350,7 +358,7 @@ for ((attempt = 0; attempt < ${#order[@]}; attempt++)); do
   if [ "$idle_killed" = 1 ]; then
     stall=1
     any_stall=1
-    detail="no output for ${idle_secs}s"
+    detail="no output for ${idle_limit}s"
   else
     errs=$(error_text "$rc")
     if grep -qiE "$QUOTA_RE" <<<"$errs"; then
@@ -379,7 +387,7 @@ for ((attempt = 0; attempt < ${#order[@]}; attempt++)); do
   # Retry a stalled final route up to the configured count; quota errors never retry.
   if [ "$kind" = stalled ] && [ $((attempt + 1)) -ge ${#order[@]} ] && [ "$stall_retries_used" -lt "$stall_retries" ]; then
     stall_retries_used=$((stall_retries_used + 1))
-    log_line "model=$model stalled in $((t1 - t0))ms (no output for ${idle_secs}s); retrying it ($stall_retries_used/$stall_retries)"
+    log_line "model=$model stalled in $((t1 - t0))ms (no output for ${idle_limit}s); retrying it ($stall_retries_used/$stall_retries)"
     attempt=$((attempt - 1))
     continue
   fi
