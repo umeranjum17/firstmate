@@ -4,11 +4,10 @@
 # (--model <m> --thinking <e> --mode json --no-session, prompt on stdin).
 # The stub's zai/glm-5.3-flash route answers with the fleet's real quota
 # error surface (pi exits 0, the error rides in the stream as errorMessage,
-# 429 "You've reached your 5-hour usage limit"); claude-bridge/claude-haiku-5-5
-# answers normally, or with claude-bridge's Claude subscription-limit surface
-# when STUB_HAIKU_DEAD is set. Asserts on the default chain: one glm attempt,
-# then one Haiku 5.5 attempt, the successful Haiku stream on stdout, failover
-# logged with timings, and the whole call under 10s; a quota-dead Haiku after
+# 429 "You've reached your 5-hour usage limit"); openai-codex/gpt-6-luna
+# answers normally, or with a codex usage-limit surface when STUB_LUNA_DEAD is set. Asserts on the default chain: one glm attempt,
+# then one GPT-6 Luna attempt, the successful Luna stream on stdout, failover
+# logged with timings, and the whole call under 10s; a quota-dead Luna after
 # glm ends in the terminal "quota exhausted" line, exit 1. Also covers:
 # non-quota (401) passthrough byte-for-byte, pinned-model passthrough, a
 # --session resume dropping the session on failover, quota-dead markers (written
@@ -17,7 +16,8 @@
 # Also covers the quota-axi pre-check (a stub quota-axi: exhausted_now skips the route without a pi call, a failing
 # quota-axi still calls it), the idle watchdog (a silent stub is killed after a short IDLE_SECS and fails over for that
 # call only: no marker, the next call tries the route again, a stall on the last model is not "quota exhausted"), a
-# future-dated marker's skip line showing the time left, and a call killed from outside keeping its marker.
+# future-dated marker's skip line showing the time left, and a call killed from outside keeping its marker. Also covers
+# the extension set every call runs with (-ne plus the extensions pi would load, minus pi-hermes-memory).
 set -u
 
 here=$(cd "$(dirname "$0")" && pwd) || exit 1
@@ -43,11 +43,13 @@ log_has() { if grep -q -- "$2" "$log" 2>/dev/null; then ok "$1"; else no "$1: $l
 err_has() { if grep -q -- "$3" "$2" 2>/dev/null; then ok "$1"; else no "$1: $2 lacks [$3]"; fi; }
 
 # The stub pi: a quota-dead glm route (real 429 usage-limit surface, exit 0),
-# a Haiku 5.5 route that is healthy unless STUB_HAIKU_DEAD, and a route that
+# a GPT-6 Luna route that is healthy unless STUB_LUNA_DEAD, and a route that
 # echoes the requested model for passthrough checks. Each call's argv is one
 # line in $STUB_ARGV.
 cat >"$stub/pi" <<'STUB'
 #!/usr/bin/env bash
+# pi list (the wrapper's extension lookup) prints $STUB_PI_LIST and exits $STUB_PI_LIST_EXIT; it is not a model call.
+[ "${1:-}" = list ] && { [ -n "${STUB_PI_LIST:-}" ] && cat "$STUB_PI_LIST"; exit "${STUB_PI_LIST_EXIT:-0}"; }
 printf '%s\n' "$*" >>"$STUB_ARGV"
 model=''
 prev=''
@@ -74,9 +76,9 @@ case $model in
   zai/glm-5.3-flash*)
     printf '%s\n' '{"type":"message_update","errorMessage":"429: {\"message\":\"You'"'"'ve reached your 5-hour usage limit for your plan. Your limit resets at 2026-10-17\"}"}'
     exit 0 ;;
-  claude-bridge/claude-haiku-5-5)
-    if [ -n "${STUB_HAIKU_DEAD:-}" ]; then
-      printf '%s\n' '{"type":"message_update","errorMessage":"Claude rate limit (five_hour) — resets 6:30:00 PM: You'"'"'re out of extra usage · resets 6:30pm"}'
+  openai-codex/gpt-6-luna)
+    if [ -n "${STUB_LUNA_DEAD:-}" ]; then
+      printf '%s\n' '{"type":"message_update","errorMessage":"429: {\"type\":\"usage_limit_reached\",\"message\":\"The usage limit has been reached\"}"}'
       exit 0
     fi
     printf '%s\n' "{\"type\":\"message_end\",\"role\":\"assistant\",\"model\":\"$model\",\"content\":\"PONG\"}"
@@ -96,7 +98,8 @@ chmod +x "$stub/pi"
 
 # The stub quota-axi: each call is one line in $STUB_QUOTA_LOG; providers named in $STUB_QUOTA_EXHAUSTED (comma
 # list) report all_models exhausted_now, $STUB_QUOTA_FAIL makes it exit 1, $STUB_QUOTA_JSON replaces the answer verbatim.
-# claude-bridge is answered with the real quota-axi rejection (it is not a quota-axi provider on this host).
+# A provider name outside quota-axi's list gets the real quota-axi rejection. quota-axi calls openai-codex "codex",
+# and the wrapper maps the pi name before asking.
 cat >"$stub/quota-axi" <<'STUB'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >>"$STUB_QUOTA_LOG"
@@ -107,7 +110,10 @@ for a in "$@"; do
   [ "$prev" = "--provider" ] && p=$a
   prev=$a
 done
-[ "$p" != claude-bridge ] || { printf '%s\n' 'error: "unsupported provider: claude-bridge"' 'code: VALIDATION_ERROR' 'help[1]: "Supported providers: claude, codex, cursor, copilot, grok, kimi, zai, agy, alibaba, opencode-go, commandcode, minimax, mimo, deepseek, openrouter, elevenlabs, devin"'; exit 2; }
+case $p in
+  claude|codex|cursor|copilot|grok|kimi|zai|agy|alibaba|opencode-go|commandcode|minimax|mimo|deepseek|openrouter|elevenlabs|devin) ;;
+  *) printf '%s\n' "error: \"unsupported provider: $p\"" 'code: VALIDATION_ERROR' 'help[1]: "Supported providers: claude, codex, cursor, copilot, grok, kimi, zai, agy, alibaba, opencode-go, commandcode, minimax, mimo, deepseek, openrouter, elevenlabs, devin"'; exit 2 ;;
+esac
 [ -z "${STUB_QUOTA_JSON:-}" ] || { printf '%s\n' "$STUB_QUOTA_JSON"; exit 0; }
 status=known
 case ",${STUB_QUOTA_EXHAUSTED:-}," in *",$p,"*) status=exhausted_now ;; esac
@@ -115,6 +121,9 @@ printf '{"providers":[{"provider":"%s","quotaSemantics":{"effectiveAvailability"
 STUB
 chmod +x "$stub/quota-axi"
 
+# The argv every wrapped call carries before the caller's flags: -ne, then the built-in extensions (no user packages or
+# extension files in this HOME, so the list is just pi's built-ins).
+ext_prefix='-ne -e builtin:mcp -e builtin:llama.cpp -e builtin:codemode -e builtin:tool-search'
 export PI_QUOTA_FAILOVER_REAL_PI="$stub/pi"
 export PI_QUOTA_FAILOVER_LOG="$log" STUB_ARGV=$work/argv STUB_QUOTA_LOG=$work/quota.log
 export HOME="$home" XDG_STATE_HOME="$work/state" STUB_CHILD=$work/child STUB_PI=$work/pi.pid
@@ -142,29 +151,34 @@ child_gone() {
   return 1
 }
 
-is "default chain is GLM, then Haiku 5.5" "$(PI_QUOTA_FAILOVER_PRINT_CHAIN=1 "$wrapper" </dev/null)" \
-  "zai/glm-5.3-flash claude-bridge/claude-haiku-5-5"
+is "default chain is GLM, then GPT-6 Luna" "$(PI_QUOTA_FAILOVER_PRINT_CHAIN=1 "$wrapper" </dev/null)" \
+  "zai/glm-5.3-flash openai-codex/gpt-6-luna"
 
-# 1. Quota failover: glm dead -> Haiku 5.5 answers, one attempt each.
+# 1. Quota failover: glm dead -> GPT-6 Luna answers, one attempt each.
 t0=$(date +%s%3N)
 OUT=$(printf '%s' "$prompt" | "$wrapper" --model zai/glm-5.3-flash --thinking medium --mode json --no-session 2>"$work/err1")
 rc=$?
 t1=$(date +%s%3N)
 is "failover exits 0" "$rc" "0"
-out_has "stdout is the Haiku 5.5 stream" '"model":"claude-bridge/claude-haiku-5-5"'
+out_has "stdout is the GPT-6 Luna stream" '"model":"openai-codex/gpt-6-luna"'
 out_count "no glm attempt delivered" '"model":"zai/glm-5.3-flash"' 0
 out_count "no error event delivered" 'errorMessage' 0
-log_has "failover logged with timing" "moving to claude-bridge/claude-haiku-5-5"
+log_has "failover logged with timing" "moving to openai-codex/gpt-6-luna"
 log_has "log names the failed model" 'model=zai/glm-5.3-flash quota-error'
 log_has "log names the quota cause" "usage limit"
 if [ "$(grep -c 'quota-error' "$log")" = 1 ]; then ok "exactly one failed attempt (no same-model retry)"; else no "wrong attempt count in log"; fi
 if [ $((t1 - t0)) -lt 10000 ]; then ok "failover took $((t1 - t0))ms (< 10s)"; else no "failover took $((t1 - t0))ms, expected < 10s"; fi
+# quota-axi is asked for the codex provider under its own name, so the GPT-6 Luna route is pre-checked, not skipped.
+is "quota-axi asked for codex, not the pi name" "$(grep -c -- '--provider codex ' "$STUB_QUOTA_LOG")" "1"
+if grep -q -- '--provider openai-codex' "$STUB_QUOTA_LOG"; then no "quota-axi was asked for openai-codex"; else ok "quota-axi was never asked for openai-codex"; fi
+if grep -q 'not pre-checked' "$log"; then no "GPT-6 Luna route was not pre-checked"; else ok "GPT-6 Luna route was pre-checked"; fi
+log_has "success logged with model, duration and bytes" 'model=openai-codex/gpt-6-luna answered in [0-9]*ms ([0-9]* bytes)'
 
 # 2. Non-quota failure passes through untouched (pi's real 401 surface, exit 0).
 OUT=$(printf '%s' "$prompt" | "$wrapper" --model bad/http401 --mode json --no-session 2>"$work/err2")
 is "401 passthrough exits 0" "$?" "0"
 out_has "401 stream untouched" "token expired or incorrect"
-log_has "no failover for non-quota" "moving to claude-bridge"
+log_has "no failover for non-quota" "moving to openai-codex"
 
 # 3. A model outside the chain passes through untouched (pinned profile case).
 OUT=$(printf '%s' "$prompt" | "$wrapper" --model kimi/k2 --mode json --no-session 2>"$work/err3")
@@ -177,29 +191,29 @@ nodead
 : >"$STUB_ARGV"
 OUT=$(printf '%s' "$prompt" | "$wrapper" --model zai/glm-5.3-flash --mode json --session 01234567-89ab-cdef-0123-456789abcdef 2>"$work/err4")
 is "session failover exits 0" "$?" "0"
-out_has "failover stream is Haiku 5.5" '"model":"claude-bridge/claude-haiku-5-5"'
+out_has "failover stream is GPT-6 Luna" '"model":"openai-codex/gpt-6-luna"'
 is "first attempt keeps the session" "$(sed -n 1p "$STUB_ARGV")" \
-  "--model zai/glm-5.3-flash --mode json --session 01234567-89ab-cdef-0123-456789abcdef"
+  "$ext_prefix --model zai/glm-5.3-flash --mode json --session 01234567-89ab-cdef-0123-456789abcdef"
 is "failover attempt drops the session" "$(sed -n 2p "$STUB_ARGV")" \
-  "--model claude-bridge/claude-haiku-5-5 --mode json"
+  "$ext_prefix --model openai-codex/gpt-6-luna --mode json"
 
-# 5. Default chain exhausted (glm, then a quota-dead Haiku 5.5): each model
+# 5. Default chain exhausted (glm, then a quota-dead GPT-6 Luna): each model
 #    once, terminal "quota exhausted", exit 1.
 : >"$log"
 nodead
-OUT=$(printf '%s' "$prompt" | STUB_HAIKU_DEAD=1 "$wrapper" --model zai/glm-5.3-flash --mode json --no-session 2>"$work/err5")
+OUT=$(printf '%s' "$prompt" | STUB_LUNA_DEAD=1 "$wrapper" --model zai/glm-5.3-flash --mode json --no-session 2>"$work/err5")
 rc=$?
 is "exhausted chain exits 1" "$rc" "1"
 err_has "terminal line present" "$work/err5" "quota exhausted"
 if [ -z "$OUT" ]; then ok "no error stream delivered on exhaustion"; else no "stdout should be empty on exhaustion"; fi
 if [ "$(grep -c 'quota-error' "$log")" = 2 ]; then ok "each chain model attempted once"; else no "wrong attempt count in log: $(grep -c 'quota-error' "$log")"; fi
 log_has "glm attempt logged" 'model=zai/glm-5.3-flash quota-error'
-log_has "Haiku 5.5 Claude-limit attempt logged" 'model=claude-bridge/claude-haiku-5-5 quota-error.*Claude rate limit'
+log_has "GPT-6 Luna usage-limit attempt logged" 'model=openai-codex/gpt-6-luna quota-error.*usage limit'
 log_has "exhaustion logged" "no model left in the chain"
 
 # 5b. Each quota error left a marker holding the model and the time.
 fresh "glm marker written" zai/glm-5.3-flash
-fresh "Haiku marker written" claude-bridge/claude-haiku-5-5
+fresh "Luna marker written" openai-codex/gpt-6-luna
 is "marker names the model" "$(cut -d' ' -f1 "$dead/zai%glm-5.3-flash")" "zai/glm-5.3-flash"
 
 # 5c. Every model inside its window: no pi call at all, terminal line, exit 1.
@@ -210,15 +224,15 @@ err_has "all-skipped terminal line" "$work/err5c" "quota exhausted"
 is "no pi call while every marker is fresh" "$(wc -l <"$STUB_ARGV")" "0"
 log_has "skip logged with its window" 'model=zai/glm-5.3-flash skipped: quota error [0-9]*s ago (skip window 3600s)'
 
-# 5d. glm fresh, Haiku's window over: glm is skipped, Haiku runs first with the
+# 5d. glm fresh, Luna's window over: glm is skipped, Luna runs first with the
 #     session dropped, and its answer clears its marker.
-backdate claude-bridge/claude-haiku-5-5
+backdate openai-codex/gpt-6-luna
 : >"$STUB_ARGV"
 OUT=$(printf '%s' "$prompt" | "$wrapper" --model zai/glm-5.3-flash --mode json --session 01234567-89ab-cdef-0123-456789abcdef 2>"$work/err5d")
 is "skipped-glm call exits 0" "$?" "0"
-out_has "skipped-glm call answers from Haiku" '"model":"claude-bridge/claude-haiku-5-5"'
-is "glm skipped: one pi call, Haiku, no session" "$(cat "$STUB_ARGV")" "--model claude-bridge/claude-haiku-5-5 --mode json"
-is "Haiku answer cleared its marker" "$(age_of claude-bridge/claude-haiku-5-5)" "none"
+out_has "skipped-glm call answers from Luna" '"model":"openai-codex/gpt-6-luna"'
+is "glm skipped: one pi call, Luna, no session" "$(cat "$STUB_ARGV")" "$ext_prefix --model openai-codex/gpt-6-luna --mode json"
+is "Luna answer cleared its marker" "$(age_of openai-codex/gpt-6-luna)" "none"
 
 # 5e. glm's window over: glm is tried again first, and its new quota error
 #     renews the marker.
@@ -226,7 +240,7 @@ backdate zai/glm-5.3-flash
 : >"$STUB_ARGV"
 OUT=$(printf '%s' "$prompt" | "$wrapper" --model zai/glm-5.3-flash --mode json --no-session 2>"$work/err5e")
 is "expired-marker call exits 0" "$?" "0"
-is "expired glm tried again first" "$(sed -n 1p "$STUB_ARGV")" "--model zai/glm-5.3-flash --mode json --no-session"
+is "expired glm tried again first" "$(sed -n 1p "$STUB_ARGV")" "$ext_prefix --model zai/glm-5.3-flash --mode json --no-session"
 fresh "glm marker renewed" zai/glm-5.3-flash
 
 # 5f. A marker dated 120s in the future (clock step): glm is skipped, and the skip line shows the time left until it
@@ -238,7 +252,7 @@ mkdir -p "$dead"
 printf '%s %s\n' zai/glm-5.3-flash $(($(date +%s) + 120)) >"$dead/zai%glm-5.3-flash"
 OUT=$(printf '%s' "$prompt" | "$wrapper" --model zai/glm-5.3-flash --mode json --no-session 2>"$work/err5f")
 is "future-dated marker call exits 0" "$?" "0"
-out_has "future-dated glm skipped, Haiku 5.5 answers" '"model":"claude-bridge/claude-haiku-5-5"'
+out_has "future-dated glm skipped, GPT-6 Luna answers" '"model":"openai-codex/gpt-6-luna"'
 log_has "future-dated skip shows time left" 'model=zai/glm-5.3-flash skipped: quota error dated in the future, 37[0-9][0-9]s until it expires'
 skip_msg=$(grep 'skipped: quota error dated' "$log" | sed 's/^[^ ]* //')
 case $skip_msg in *" -"[0-9]*) no "future-dated skip line has a negative number: $skip_msg" ;; *) ok "future-dated skip line has no negative number" ;; esac
@@ -282,9 +296,9 @@ nodead
 : >"$STUB_QUOTA_LOG"
 OUT=$(printf '%s' "$prompt" | STUB_QUOTA_EXHAUSTED=zai "$wrapper" --model zai/glm-5.3-flash --mode json --no-session 2>"$work/err9")
 is "exhausted route call exits 0" "$?" "0"
-out_has "exhausted route answers from Haiku 5.5" '"model":"claude-bridge/claude-haiku-5-5"'
+out_has "exhausted route answers from GPT-6 Luna" '"model":"openai-codex/gpt-6-luna"'
 is "exhausted glm never called" "$(grep -c 'zai/glm' "$STUB_ARGV")" "0"
-is "Haiku 5.5 called once" "$(wc -l <"$STUB_ARGV")" "1"
+is "GPT-6 Luna called once" "$(wc -l <"$STUB_ARGV")" "1"
 log_has "exhausted skip logged" "model=zai/glm-5.3-flash skipped: quota-axi reports exhausted_now"
 fresh "exhausted route gets a dead marker" zai/glm-5.3-flash
 is "quota-axi asked for the glm provider" "$(grep -c -- '--provider zai ' "$STUB_QUOTA_LOG")" "1"
@@ -293,29 +307,29 @@ is "quota-axi asked for the glm provider" "$(grep -c -- '--provider zai ' "$STUB
 #     the route is still called first and answers, so the second chain model is never called.
 nodead
 : >"$STUB_ARGV"
-OUT=$(printf '%s' "$prompt" | PI_QUOTA_FAILOVER_CHAIN='zai/glm-5.2-test claude-bridge/claude-haiku-5-5' STUB_QUOTA_JSON='{"providers":[{"provider":"zai","quotaSemantics":{"effectiveAvailability":[{"scope":"model:glm-5.3-flash","runway":{"status":"exhausted_now"}}]}}]}' "$wrapper" --model zai/glm-5.2-test --mode json --no-session 2>"$work/err9e")
+OUT=$(printf '%s' "$prompt" | PI_QUOTA_FAILOVER_CHAIN='zai/glm-5.2-test openai-codex/gpt-6-luna' STUB_QUOTA_JSON='{"providers":[{"provider":"zai","quotaSemantics":{"effectiveAvailability":[{"scope":"model:glm-5.3-flash","runway":{"status":"exhausted_now"}}]}}]}' "$wrapper" --model zai/glm-5.2-test --mode json --no-session 2>"$work/err9e")
 is "other model exhausted: exits 0" "$?" "0"
 out_has "other model exhausted: route answers" '"model":"zai/glm-5.2-test"'
 is "other model exhausted: route called once" "$(wc -l <"$STUB_ARGV")" "1"
-is "other model exhausted: Haiku never called" "$(grep -c 'claude-bridge' "$STUB_ARGV")" "0"
+is "other model exhausted: Luna never called" "$(grep -c 'openai-codex' "$STUB_ARGV")" "0"
 
-# 9f. quota-axi reports the route's own model (model:<id> scope) exhausted_now: the route is skipped without a call, and the
-#     unsupported chain provider is logged as not pre-checked and called.
+# 9f. quota-axi reports the route's own model (model:<id> scope) exhausted_now: the route is skipped without a call, and a
+#     chain provider quota-axi does not know is logged as not pre-checked and called.
 nodead
 : >"$STUB_ARGV"
 : >"$log"
-OUT=$(printf '%s' "$prompt" | PI_QUOTA_FAILOVER_CHAIN='zai/glm-5.2-test claude-bridge/claude-haiku-5-5' STUB_QUOTA_JSON='{"providers":[{"provider":"zai","quotaSemantics":{"effectiveAvailability":[{"scope":"model:glm-5.2-test","runway":{"status":"exhausted_now"}}]}}]}' "$wrapper" --model zai/glm-5.2-test --mode json --no-session 2>"$work/err9f")
-is "own model exhausted: Haiku answers" "$(grep -c 'claude-bridge/claude-haiku-5-5' "$STUB_ARGV")" "1"
+OUT=$(printf '%s' "$prompt" | PI_QUOTA_FAILOVER_CHAIN='zai/glm-5.2-test bogus/fallback-model' STUB_QUOTA_JSON='{"providers":[{"provider":"zai","quotaSemantics":{"effectiveAvailability":[{"scope":"model:glm-5.2-test","runway":{"status":"exhausted_now"}}]}}]}' "$wrapper" --model zai/glm-5.2-test --mode json --no-session 2>"$work/err9f")
+is "own model exhausted: fallback answers" "$(grep -c 'bogus/fallback-model' "$STUB_ARGV")" "1"
 is "own model exhausted: route not called" "$(grep -c 'zai/glm-5.2-test' "$STUB_ARGV")" "0"
-log_has "unsupported provider logged as not pre-checked" "model=claude-bridge/claude-haiku-5-5 not pre-checked"
+log_has "unknown provider logged as not pre-checked" "model=bogus/fallback-model not pre-checked"
 
 # 9b. quota-axi failing: the route is still called as before, and its quota error fails over as usual.
 nodead
 : >"$STUB_ARGV"
 OUT=$(printf '%s' "$prompt" | STUB_QUOTA_FAIL=1 "$wrapper" --model zai/glm-5.3-flash --mode json --no-session 2>"$work/err9b")
 is "failing quota-axi: failover exits 0" "$?" "0"
-is "failing quota-axi: glm still called first" "$(sed -n 1p "$STUB_ARGV")" "--model zai/glm-5.3-flash --mode json --no-session"
-out_has "failing quota-axi: Haiku 5.5 answers" '"model":"claude-bridge/claude-haiku-5-5"'
+is "failing quota-axi: glm still called first" "$(sed -n 1p "$STUB_ARGV")" "$ext_prefix --model zai/glm-5.3-flash --mode json --no-session"
+out_has "failing quota-axi: GPT-6 Luna answers" '"model":"openai-codex/gpt-6-luna"'
 
 # 9c. A silent pi (stub hangs with no output) is killed after IDLE_SECS: the next chain model answers for that call,
 #     and the stall writes no marker, so the hung route is not dead.
@@ -323,21 +337,21 @@ nodead
 : >"$log"
 : >"$STUB_ARGV"
 t0=$(date +%s)
-OUT=$(printf '%s' "$prompt" | PI_QUOTA_FAILOVER_IDLE_SECS=2 PI_QUOTA_FAILOVER_CHAIN='bad/hang claude-bridge/claude-haiku-5-5' "$wrapper" --model bad/hang --mode json --no-session 2>"$work/err9c")
+OUT=$(printf '%s' "$prompt" | PI_QUOTA_FAILOVER_IDLE_SECS=2 PI_QUOTA_FAILOVER_CHAIN='bad/hang openai-codex/gpt-6-luna' "$wrapper" --model bad/hang --mode json --no-session 2>"$work/err9c")
 is "silent hang exits 0" "$?" "0"
-out_has "silent hang fails over to Haiku 5.5" '"model":"claude-bridge/claude-haiku-5-5"'
+out_has "silent hang fails over to GPT-6 Luna" '"model":"openai-codex/gpt-6-luna"'
 log_has "idle kill logged" "pi produced no output for 2s; killing it"
-log_has "idle kill moves on to Haiku 5.5" "model=bad/hang stalled.*no output for 2s.*moving to claude-bridge/claude-haiku-5-5"
+log_has "idle kill moves on to GPT-6 Luna" "model=bad/hang stalled.*no output for 2s.*moving to openai-codex/gpt-6-luna"
 if [ $(($(date +%s) - t0)) -lt 10 ]; then ok "silent hang failed over in under 10s"; else no "silent hang took $(($(date +%s) - t0))s"; fi
 is "stall writes no marker" "$(age_of bad/hang)" none
 if child_gone; then ok "idle kill reached the tool child"; else no "tool child survived the idle kill"; fi
 
 # 9c2. The next call still tries the stalled route first (no marker to skip it), stalls again and fails over.
 : >"$STUB_ARGV"
-OUT=$(printf '%s' "$prompt" | PI_QUOTA_FAILOVER_IDLE_SECS=2 PI_QUOTA_FAILOVER_CHAIN='bad/hang claude-bridge/claude-haiku-5-5' "$wrapper" --model bad/hang --mode json --no-session 2>"$work/err9c2")
+OUT=$(printf '%s' "$prompt" | PI_QUOTA_FAILOVER_IDLE_SECS=2 PI_QUOTA_FAILOVER_CHAIN='bad/hang openai-codex/gpt-6-luna' "$wrapper" --model bad/hang --mode json --no-session 2>"$work/err9c2")
 is "second stall exits 0" "$?" "0"
-is "next call tries the stalled route first" "$(sed -n 1p "$STUB_ARGV")" "--model bad/hang --mode json --no-session"
-out_has "second stall fails over to Haiku 5.5" '"model":"claude-bridge/claude-haiku-5-5"'
+is "next call tries the stalled route first" "$(sed -n 1p "$STUB_ARGV")" "$ext_prefix --model bad/hang --mode json --no-session"
+out_has "second stall fails over to GPT-6 Luna" '"model":"openai-codex/gpt-6-luna"'
 if grep -q 'model=bad/hang skipped' "$log"; then no "stalled route was skipped on the next call"; else ok "stalled route is not skipped on the next call"; fi
 is "second stall writes no marker" "$(age_of bad/hang)" none
 
@@ -350,9 +364,9 @@ is "stalled last route writes no marker" "$(age_of bad/hang)" none
 
 # 9c4. A real quota error still writes its marker and the chain moves on, as before.
 nodead
-OUT=$(printf '%s' "$prompt" | PI_QUOTA_FAILOVER_CHAIN='zai/glm-5.3-flash claude-bridge/claude-haiku-5-5' "$wrapper" --model zai/glm-5.3-flash --mode json --no-session 2>"$work/err9c4")
+OUT=$(printf '%s' "$prompt" | PI_QUOTA_FAILOVER_CHAIN='zai/glm-5.3-flash openai-codex/gpt-6-luna' "$wrapper" --model zai/glm-5.3-flash --mode json --no-session 2>"$work/err9c4")
 is "quota error call exits 0" "$?" "0"
-out_has "quota error still fails over to Haiku 5.5" '"model":"claude-bridge/claude-haiku-5-5"'
+out_has "quota error still fails over to GPT-6 Luna" '"model":"openai-codex/gpt-6-luna"'
 fresh "quota error still writes its marker" zai/glm-5.3-flash
 
 # 9k. A silent pi that ignores TERM is KILLed after the idle grace, its tool child with it, and the next model answers.
@@ -360,29 +374,29 @@ nodead
 : >"$STUB_ARGV"
 rm -f "$STUB_CHILD"
 printf '%s' "$prompt" >"$work/prompt9k"
-PI_QUOTA_FAILOVER_IDLE_SECS=2 PI_QUOTA_FAILOVER_CHAIN='bad/stubborn claude-bridge/claude-haiku-5-5' "$wrapper" --model bad/stubborn --mode json --no-session <"$work/prompt9k" >"$work/out9k" 2>"$work/err9k"
+PI_QUOTA_FAILOVER_IDLE_SECS=2 PI_QUOTA_FAILOVER_CHAIN='bad/stubborn openai-codex/gpt-6-luna' "$wrapper" --model bad/stubborn --mode json --no-session <"$work/prompt9k" >"$work/out9k" 2>"$work/err9k"
 is "TERM-ignoring silent pi: failover exits 0" "$?" "0"
 OUT=$(cat "$work/out9k")
-out_has "TERM-ignoring silent pi: Haiku 5.5 answers" '"model":"claude-bridge/claude-haiku-5-5"'
+out_has "TERM-ignoring silent pi: GPT-6 Luna answers" '"model":"openai-codex/gpt-6-luna"'
 is "TERM-ignoring silent pi: one pi call per model" "$(wc -l <"$STUB_ARGV")" "2"
 if child_gone; then ok "TERM-ignoring pi's tool child was KILLed"; else no "tool child survived the KILL escalation"; fi
 
 # 9l. A silent pi that exits on TERM leaves its tool child a grace to finish cleanup: the child's cleanup runs before KILL.
 nodead
 rm -f "$work/cleanup"
-OUT=$(printf '%s' "$prompt" | STUB_CLEANUP="$work/cleanup" PI_QUOTA_FAILOVER_IDLE_SECS=2 PI_QUOTA_FAILOVER_CHAIN='bad/graceful claude-bridge/claude-haiku-5-5' "$wrapper" --model bad/graceful --mode json --no-session 2>"$work/err9l")
+OUT=$(printf '%s' "$prompt" | STUB_CLEANUP="$work/cleanup" PI_QUOTA_FAILOVER_IDLE_SECS=2 PI_QUOTA_FAILOVER_CHAIN='bad/graceful openai-codex/gpt-6-luna' "$wrapper" --model bad/graceful --mode json --no-session 2>"$work/err9l")
 is "graceful tool child: failover exits 0" "$?" "0"
-out_has "graceful tool child: Haiku 5.5 answers" '"model":"claude-bridge/claude-haiku-5-5"'
+out_has "graceful tool child: GPT-6 Luna answers" '"model":"openai-codex/gpt-6-luna"'
 if [ -f "$work/cleanup" ]; then ok "tool child finished cleanup within the grace"; else no "tool child was killed before its cleanup"; fi
 
 # 9n. A call that streams steadily for longer than its idle limit (a large answer) is not killed: its own answer
 #     passes through and the chain never moves on.
 nodead
 logged=$(wc -l <"$log" 2>/dev/null || echo 0)
-OUT=$(printf '%s' "$prompt" | PI_QUOTA_FAILOVER_IDLE_SECS=2 PI_QUOTA_FAILOVER_CHAIN='bad/slow-stream claude-bridge/claude-haiku-5-5' "$wrapper" --model bad/slow-stream --mode json --no-session 2>"$work/err9n")
+OUT=$(printf '%s' "$prompt" | PI_QUOTA_FAILOVER_IDLE_SECS=2 PI_QUOTA_FAILOVER_CHAIN='bad/slow-stream openai-codex/gpt-6-luna' "$wrapper" --model bad/slow-stream --mode json --no-session 2>"$work/err9n")
 is "steady stream past the idle limit exits 0" "$?" "0"
 out_has "steady stream answer is the route's own" '"model":"bad/slow-stream"'
-out_count "steady stream never fails over" '"model":"claude-bridge' 0
+out_count "steady stream never fails over" '"model":"openai-codex' 0
 if tail -n +"$((logged + 1))" "$log" | grep -q 'no output for'; then no "steady stream was killed as idle"; else ok "steady stream is not killed as idle"; fi
 
 # 9o. A route that stays silent on its first call and answers on the next is retried once when it is the last route,
@@ -425,6 +439,56 @@ for _ in $(seq 30); do
 done
 kill -KILL "$spid" 2>/dev/null
 is "INT to the wrapper's group leaves no pi alive" "$gone" yes
+
+# 10. Extensions: every call runs pi with -ne and -e for each extension pi would load except pi-hermes-memory: pi list
+#     packages (manifests, or extensions/ without one), the user extensions dir without backup copies, settings and the
+#     built-ins. A settings "-builtin:" entry turns that built-in off. An unreadable pi list runs pi as before, one log line.
+pkgs=$work/pkgs
+mkdir -p "$pkgs/pi-hermes-memory/src" "$pkgs/pi-claude-bridge/src" "$pkgs/pi-web-access/dist" "$pkgs/pi-plain/extensions" "$home/.pi/agent/extensions"
+printf '%s\n' '{"pi":{"extensions":["./src/index.ts"]}}' >"$pkgs/pi-hermes-memory/package.json"
+printf '%s\n' '{"pi":{"extensions":["./src/index.ts"]}}' >"$pkgs/pi-claude-bridge/package.json"
+printf '%s\n' '{"pi":{"extensions":["./dist"]}}' >"$pkgs/pi-web-access/package.json"
+for f in "$pkgs/pi-hermes-memory/src/index.ts" "$pkgs/pi-claude-bridge/src/index.ts" "$pkgs/pi-web-access/dist/index.js" \
+  "$pkgs/pi-plain/extensions/a.ts" "$home/.pi/agent/extensions/fm-rm-guard.ts" "$home/.pi/agent/extensions/fm-literal-delete.ts" \
+  "$home/.pi/agent/extensions/fm-rm-guard.ts.bak-x"; do echo '// stub' >"$f"; done
+printf 'User packages:\n  npm:pi-hermes-memory\n    %s\n  npm:pi-claude-bridge\n    %s\n  npm:pi-web-access\n    %s\n  npm:pi-plain\n    %s\n' \
+  "$pkgs/pi-hermes-memory" "$pkgs/pi-claude-bridge" "$pkgs/pi-web-access" "$pkgs/pi-plain" >"$work/pi-list.txt"
+export STUB_PI_LIST=$work/pi-list.txt
+nodead
+has_arg() { case " $(sed -n 1p "$STUB_ARGV") " in *" $1 "*) ok "$2" ;; *) no "$2: argv lacks [$1]: $(sed -n 1p "$STUB_ARGV")" ;; esac; }
+: >"$STUB_ARGV"
+OUT=$(printf '%s' "$prompt" | "$wrapper" --model zai/glm-5.3-flash --mode json --no-session 2>"$work/err10")
+is "extension run exits 0" "$?" "0"
+case $(sed -n 1p "$STUB_ARGV") in "-ne "*) ok "pi runs with -ne" ;; *) no "pi argv lacks -ne first" ;; esac
+has_arg "-e $home/.pi/agent/extensions/fm-rm-guard.ts" "fm-rm-guard loads"
+has_arg "-e $home/.pi/agent/extensions/fm-literal-delete.ts" "fm-literal-delete loads"
+has_arg "-e $pkgs/pi-claude-bridge/src/index.ts" "a package's manifest entry loads"
+has_arg "-e $pkgs/pi-web-access/dist/index.js" "a manifest directory loads its index"
+has_arg "-e $pkgs/pi-plain/extensions/a.ts" "a package without a manifest loads its extensions dir"
+has_arg "-e builtin:mcp" "built-in mcp loads"
+case " $(sed -n 1p "$STUB_ARGV") " in *pi-hermes-memory* | *.bak-x*) no "hermes or a backup copy is in argv" ;; *) ok "no pi-hermes-memory and no backup copy in argv" ;; esac
+
+# A settings "-builtin:mcp" turns that built-in off; a pinned model passes through with -ne as well.
+printf '%s\n' '{"extensions":["-builtin:mcp"]}' >"$home/.pi/agent/settings.json"
+: >"$STUB_ARGV"
+OUT=$(printf '%s' "$prompt" | "$wrapper" --model kimi/k2 --mode json --no-session 2>"$work/err10b")
+case " $(sed -n 1p "$STUB_ARGV") " in *" builtin:mcp "*) no "settings -builtin:mcp still loads mcp" ;; *) ok "settings -builtin:mcp turns mcp off" ;; esac
+case $(sed -n 1p "$STUB_ARGV") in "-ne "*) ok "pinned passthrough runs with -ne" ;; *) no "pinned passthrough lacks -ne" ;; esac
+has_arg "-e builtin:llama.cpp" "other built-ins stay on"
+rm -f -- "$home/.pi/agent/settings.json"
+
+# An unreadable pi list: pi runs as before (no -ne), one log line says why, and the call still answers.
+nodead
+: >"$log"
+: >"$STUB_ARGV"
+OUT=$(printf '%s' "$prompt" | STUB_PI_LIST_EXIT=1 "$wrapper" --model zai/glm-5.3-flash --mode json --no-session 2>"$work/err10c")
+is "unreadable list: call exits 0" "$?" "0"
+case $(sed -n 1p "$STUB_ARGV") in "--model "*) ok "unreadable list: pi runs without -ne" ;; *) no "unreadable list: argv is $(sed -n 1p "$STUB_ARGV")" ;; esac
+is "unreadable list: one log line per call" "$(grep -c 'extension list unreadable (pi list exited 1)' "$log")" "1"
+out_has "unreadable list: call still answers" '"model":"openai-codex/gpt-6-luna"'
+
+unset STUB_PI_LIST
+rm -f -- "$home/.pi/agent/extensions/fm-rm-guard.ts" "$home/.pi/agent/extensions/fm-literal-delete.ts" "$home/.pi/agent/extensions/fm-rm-guard.ts.bak-x"
 
 # 8. install.sh: key-level config edit in a throwaway config, never printing it.
 cfg=$work/config.yaml
