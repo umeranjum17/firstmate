@@ -88,6 +88,17 @@ bout=$(FM_MAIN_HOME=$main python3 "$CHECK" "$bhome")
 expect 'backlog captain hold raises no red line' '' "$(grep -F 'bl-held' <<<"$bout" || true)"
 expect 'control lane without a hold still reads red' 1 "$(grep -cE 'bl-open lead .* red \(limit' <<<"$bout")"
 
+# Done lanes are still counted by --summary, but captain-held lanes must not get a land action.
+for t in bl-done-held bl-done-open; do
+  printf 'kind=ship\n' > "$bhome/state/$t.meta"
+  printf 'done [at=%s]: PR ready\n' "$((now - 2 * h))" > "$bhome/state/$t.status"
+done
+printf '%s\n' '- [ ] bl-done-held - waiting (hold: fm-hold-v1:eA==) (hold-kind: captain)' \
+  '- [ ] bl-done-open - not held' > "$bhome/data/backlog.md"
+bout=$(FM_MAIN_HOME=$main python3 "$CHECK" "$bhome")
+expect 'backlog-held done lane raises no land line' '' "$(grep -F 'bl-done-held lead' <<<"$bout" || true)"
+expect 'unheld done lane still raises land line' 1 "$(grep -cF 'bl-done-open lead' <<<"$bout")"
+
 # Real muxr shape (2026-10-18): a lane whose own no-mistakes run is executing keeps a paused: stamp, and crew-state reads
 # that run-step as working, so it is busy. A short external wait is not busy, and a working lane still is.
 home=$d/own/8/firstmate
