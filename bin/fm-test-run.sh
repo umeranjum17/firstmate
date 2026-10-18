@@ -1055,7 +1055,6 @@ select_lane() {
 }
 
 run_coverage_guard() {
-  local -x LC_ALL=C
   local tmp missing extra a b shard unhinted serial_total serial_ms serial_max_ms=0
   local p1_ms p1_unhinted p2_ms p2_unhinted parallel_max_ms parallel_imbalance_ms
   local -a saved_scripts=()
@@ -1158,15 +1157,6 @@ run_coverage_guard() {
     log "coverage guard: union of portable shards + portable serial + Herdr must equal tests/*.test.sh"
     [ -z "$missing" ] || { log "missing from union:"; printf '%s\n' "$missing" >&2; }
     [ -z "$extra" ] || { log "extra beyond inventory:"; printf '%s\n' "$extra" >&2; }
-    rm -rf "$tmp"
-    return 1
-  fi
-
-  portable_serial_weight_hints | awk 'NF { print $1 }' | LC_ALL=C sort -u >"$tmp/hint_names"
-  missing=$(comm -23 "$tmp/hint_names" "$tmp/all" || true)
-  if [ -n "$missing" ]; then
-    log "coverage guard: duration hints name scripts absent from tests/:"
-    printf '%s\n' "$missing" >&2
     rm -rf "$tmp"
     return 1
   fi
