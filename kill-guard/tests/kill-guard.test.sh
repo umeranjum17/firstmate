@@ -34,11 +34,11 @@ fake() {
   for _ in $(seq 100); do [ "$(cat "/proc/$FAKE/comm" 2>/dev/null)" = "$1" ] && break; sleep 0.05; done
 }
 fake systemd --user; SYSD=$FAKE; fake herdr server; HERDR=$FAKE
-sleep 300 & C=$!; sleep 300 & S=$!; PIDS+=("$C" "$S")
+sleep 300 & C=$!; (cd "$T" && exec sleep 300) & S=$!; PIDS+=("$C" "$S")
 
 hook() {
   jq -n --arg c "$2" '{tool_input:{command:$c}}' > "$T/in.json"
-  if err=$(node "$T/home/fixture/users/user-004/share/fm-kill-guard/guard.mjs" --caller "$1" < "$T/in.json" 2>&1 >/dev/null); then rc=0; else rc=$?; fi
+  if err=$(HOME="$T/home" node "$T/home/fixture/users/user-004/share/fm-kill-guard/guard.mjs" --caller "$1" < "$T/in.json" 2>&1 >/dev/null); then rc=0; else rc=$?; fi
 }
 block() { hook "$1" "$2"; [ "$rc" -eq 2 ] && [[ "$err" == *"BLOCKED by the fleet kill guard"* && "$err" == *"$3"* ]] && ok "blocked: $2" || no "not blocked: $2 (rc=$rc) $err"; }
 allow() { hook "$1" "$2"; [ "$rc" -eq 0 ] && ok "allowed: $2" || no "blocked: $2 ($err)"; }
@@ -66,7 +66,26 @@ block "$$" 'diff <(kill 1) /dev/null' 'PID 1 (init)'
 block "$$" 'kill>/dev/null 1' 'PID 1 (init)'
 block "$$" '../bin/kill 1' 'PID 1 (init)'
 block "$C" "kill $S" 'which this task did not start'
-allow "$$" "kill $C"
+
+mkdir -p "$T/worktree" "$T/worktree/a" "$T/worktree/a-other" "$T/home-shaped/state" "$T/home-shaped/data" "$T/home-shaped/bin"
+git -C "$T/worktree" init -q
+git -C "$T/home" init -q
+git -C "$T/home-shaped" init -q
+git -C "$T/worktree/a" init -q
+git -C "$T/worktree/a-other" init -q
+touch "$T/home-shaped/bin/fm-spawn.sh"
+detached() { DET=$(bash -c 'setsid nohup bash -c '\''cd "$1"; exec sleep 600'\'' _ "$1" >/dev/null 2>&1 & echo $!' _ "$1"); sleep 0.2; }
+caller_in() { bash -c 'cd "$1"; exec sleep 600' _ "$1" >/dev/null 2>&1 & CALLER_PID=$!; PIDS+=("$CALLER_PID"); sleep 0.1; }
+descends_from_test() { p=$1; while [ "$p" -gt 1 ]; do p=$(awk '{print $4}' "/proc/$p/stat" 2>/dev/null) || return 1; [ "$p" = "$$" ] && return 0; done; return 1; }
+detached "$ADDON"; REPARENTED=$DET; PIDS+=("$REPARENTED")
+! descends_from_test "$REPARENTED" && ok "detached process was reparented" || no "detached process remains in caller's tree"
+allow "$$" "kill $REPARENTED"
+caller_in "$T/worktree"; block "$CALLER_PID" "kill $REPARENTED" 'which this task did not start'
+caller_in "$T/home"; block "$CALLER_PID" "kill $REPARENTED" 'which this task did not start'
+caller_in "$T/home-shaped"; block "$CALLER_PID" "kill $REPARENTED" 'which this task did not start'
+detached "$T/worktree/a-other"; PREFIX_TARGET=$DET; PIDS+=("$PREFIX_TARGET")
+caller_in "$T/worktree/a"; block "$CALLER_PID" "kill $PREFIX_TARGET" 'which this task did not start'
+
 allow "$$" "kill $C 2>/dev/null"
 allow "$$" 'diff <(echo hi) /dev/null'
 allow "$$" 'grep -r kill src'
