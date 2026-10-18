@@ -13,6 +13,12 @@
 #   fm_parked_meta_id <meta> [task]   -> prints the home id a task meta
 #                                        belongs to (empty when unknown)
 #   fm_parked_meta <meta> [task]      -> 0 when that meta's home is parked
+#   fm_parked_refuse_meta <meta> <task> <action>
+#                                      -> reports an attempted action and returns 1
+#                                      when parked; returns 0 otherwise
+#   fm_parked_skip_meta <meta> <task> <action>
+#                                      -> reports an existing skip (if any) and
+#                                      returns 0 when parked; returns 1 otherwise
 #
 # Home-id resolution (fm_parked_meta_id): a meta belongs to a parked home only
 # when its kind is secondmate. A local secondmate's home path carries
@@ -62,4 +68,32 @@ fm_parked_meta() {  # <meta-file> [task-id] -> 0 when that home is parked
   local id
   id=$(fm_parked_meta_id "$@") || return 1
   fm_parked_home "$id"
+}
+
+fm_parked_refuse_meta() {  # <meta> <task> <send|relaunch>
+  local meta=$1 task=$2 action=$3
+  fm_parked_meta "$meta" "$task" || return 0
+  case "$action" in
+    send) printf 'error: nothing sent to %s: its home is parked (config/parked-homes); a parked home gets no message, steer, answer or nudge\n' "${task:+fm-$task}" >&2 ;;
+    relaunch) printf 'error: relaunch refused for %s: its home is parked (config/parked-homes); a parked home gets no relaunch\n' "$task" >&2 ;;
+    *) return 2 ;;
+  esac
+  return 1
+}
+
+fm_parked_skip_meta() {  # <meta> <task> <action>
+  local meta=$1 task=$2 action=$3
+  fm_parked_meta "$meta" "$task" || return 1
+  case "$action" in
+    config-reread) echo "CONFIG_REREAD: secondmate $task: skipped - its home is parked (config/parked-homes)" ;;
+    sync) echo "SECONDMATE_SYNC: secondmate $task: skipped - its home is parked (config/parked-homes)" ;;
+    bootstrap-liveness) echo "SECONDMATE_LIVENESS: secondmate $task: skipped: its home is parked (config/parked-homes)" ;;
+    config-push) printf 'secondmate %s: skipped - its home is parked (config/parked-homes)\n' "$task" ;;
+    model-outage|pending-reply|wake-doorbell) : ;;
+    reconcile) printf 'skipped: %s parked\n' "$task" ;;
+    restart) printf 'parked: %s: its home is parked (config/parked-homes); the restart pass skipped it\n' "$task" ;;
+    watch-wake-stall|watch-liveness) : ;;
+    *) return 2 ;;
+  esac
+  return 0
 }
