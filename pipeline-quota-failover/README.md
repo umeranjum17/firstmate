@@ -18,5 +18,7 @@ An answer that is not parseable JSON is treated as not exhausted, without a log 
 ## Idle watchdog
 
 A pi call that writes no stdout and no stderr for `PI_QUOTA_FAILOVER_IDLE_SECS` (default 300) is ended with TERM to pi
-and its descendants, then KILL of the same set after a 5 s grace, and counts as a quota failure. pi stays in the
-wrapper's process group, so a group kill of the wrapper reaches it.
+and its descendants, then KILL of the same set after a 5 s grace. A stall is not a quota error: the chain moves on to the next model for that
+call only and writes no quota marker, so the stalled route is tried again on the next call. Only a real quota error
+(or quota-axi `exhausted_now`) writes a marker. pi stays in the wrapper's process group, so a group kill of the wrapper
+reaches it.
