@@ -1,8 +1,9 @@
 // Fleet kill guard, the rule every adapter calls. A kill, pkill or killall may signal only the caller's own descendants,
-// never PID 1, the systemd user manager or the herdr server, and never a target it cannot resolve. A block is final,
+// never PID 1, the systemd user manager or the herdr server, and never a target it cannot resolve. A reparented target inside the caller's non-home git worktree is also owned. A block is final,
 // except a kill whose PID the shell sets ($pid, $!, %1, $(...)): that one asks for the literal PID.
 import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
-import { basename } from "node:path";
+import { basename, isAbsolute, relative, sep } from "node:path";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const MODELLED = { kill: "lL", pkill: "f", killall: "" }; // options the guard reads; any other option refuses
@@ -83,13 +84,28 @@ function procTable() {
 	return table;
 }
 
+function inCallerWorktree(target, caller) {
+	try {
+		const cwd = realpathSync(`/proc/${caller}/cwd`);
+		const root = realpathSync(execFileSync("git", ["-C", cwd, "rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim());
+		const home = realpathSync(process.env.HOME);
+		const under = (parent, path) => { const rel = relative(parent, path); return rel === "" || (!rel.startsWith(`..${sep}`) && rel !== ".." && !isAbsolute(rel)); };
+		if (cwd !== root || root === "/" || root === "/tmp" || under(root, home) ||
+			(existsSync(`${root}/state`) && existsSync(`${root}/data`) && existsSync(`${root}/bin/fm-spawn.sh`))) return false;
+		const rel = relative(root, target);
+		return rel === "" || (!rel.startsWith(`..${sep}`) && rel !== ".." && !isAbsolute(rel));
+	} catch { return false; }
+}
+
 // Why a process may not be signalled, or null when the caller started it.
-function reasonFor(p, own) {
+function reasonFor(p, own, caller) {
 	if (p.missing) return `PID ${p.pid} (no such process)`;
 	if (p.pid === 1) return "PID 1 (init)";
 	if (p.comm === "systemd" && p.argv.includes("--user")) return `PID ${p.pid} (the systemd user manager)`;
 	if (p.comm === "herdr" && p.argv.includes("server")) return `PID ${p.pid} (the herdr server)`;
-	return own.has(p.pid) ? null : `PID ${p.pid} (${p.comm}), which this task did not start`;
+	let cwd;
+	try { cwd = realpathSync(`/proc/${p.pid}/cwd`); } catch { return `PID ${p.pid} (${p.comm}), whose cwd cannot be read`; }
+	return own.has(p.pid) || inCallerWorktree(cwd, caller) ? null : `PID ${p.pid} (${p.comm}), which this task did not start`;
 }
 
 // The block for one kill, pkill or killall, or null when every process it would signal is the caller's own.
@@ -130,7 +146,7 @@ function judge(name, args, text, caller, procs) {
 	for (const p of procs().values()) kids.set(p.ppid, [...(kids.get(p.ppid) ?? []), p.pid]);
 	const own = new Set(), todo = [caller];
 	while (todo.length) for (const c of kids.get(todo.pop()) ?? []) if (!own.has(c)) { own.add(c); todo.push(c); }
-	const reason = hits.map((p) => reasonFor(p, own)).find(Boolean);
+	const reason = hits.map((p) => reasonFor(p, own, caller)).find(Boolean);
 	if (reason) return `"${text}" aims at ${reason}`;
 	return shellSet === undefined ? null : { retry: `"${text}": the shell sets its target (${shellSet})` };
 }
