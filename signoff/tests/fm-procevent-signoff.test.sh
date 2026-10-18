@@ -9,11 +9,15 @@
 # reconcile answer is refused for good, acked once, and leaves the hold open.
 set -u
 
-# shellcheck source=tests/lib.sh
-# shellcheck disable=SC1091
-. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# The Firstmate checkout owns tests/lib.sh; FM_CODE_ROOT names that checkout.
+CODE_ROOT=${FM_CODE_ROOT:-}
+[ -n "$CODE_ROOT" ] && [ -f "$CODE_ROOT/tests/lib.sh" ] \
+  || { echo "skip: set FM_CODE_ROOT to a Firstmate checkout"; exit 0; }
+ADAPTER="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/bin/fm-procevent-signoff.sh"
+# shellcheck source=/dev/null
+. "$CODE_ROOT/tests/lib.sh"
 
-command -v jq >/dev/null 2>&1 || { echo "skip: jq not found"; exit 0; }
+if ! command -v jq >/dev/null 2>&1; then echo "skip: jq not found"; exit 0; fi
 
 TMP_ROOT=$(fm_test_tmproot fm-procevent-signoff)
 export HOME="$TMP_ROOT/home" XDG_DATA_HOME="$TMP_ROOT/xdg-data" \
@@ -24,7 +28,7 @@ ROOTCOPY="$TMP_ROOT/root"
 mkdir -p "$ROOTCOPY"
 cp -R "$ROOT/bin" "$ROOTCOPY/bin"
 
-FAKEBIN="$TMP_ROOT/fakebin"
+FAKEBIN="$TMP_ROOT/fake-bin"
 FM_HOME_DIR="$TMP_ROOT/fmhome"
 mkdir -p "$FAKEBIN" "$FM_HOME_DIR/state"
 export SIGNOFF_BOARD="$TMP_ROOT/board.json" HOLD_FILE="$TMP_ROOT/hold" \
@@ -77,13 +81,13 @@ SH
 chmod +x "$ROOTCOPY/bin/fm-captain-hold.sh"
 
 adapter() {
-  PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOTCOPY" FM_HOME="$FM_HOME_DIR" \
+  PATH="$FAKEBIN:$PATH" FM_CODE_ROOT="$ROOTCOPY" FM_HOME="$FM_HOME_DIR" \
     FM_STATE_OVERRIDE="$FM_HOME_DIR/state" FM_PROCEVENT_CLAIM_ROOT="$TMP_ROOT/claims" \
-    "$ROOTCOPY/bin/fm-procevent-signoff.sh" "$@"
+    "$ADAPTER" "$@"
 }
 
 runner() {
-  PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOTCOPY" FM_HOME="$FM_HOME_DIR" \
+  PATH="$FAKEBIN:$PATH" FM_CODE_ROOT="$ROOTCOPY" FM_HOME="$FM_HOME_DIR" \
     FM_STATE_OVERRIDE="$FM_HOME_DIR/state" FM_PROCEVENT_CLAIM_ROOT="$TMP_ROOT/claims" \
     "$ROOTCOPY/bin/fm-procevent.sh" "$@"
 }
@@ -97,7 +101,7 @@ answer_card() {  # <key> <answer> <at>
 
 delivered() { cat "$FM_HOME_DIR/state/signoff-delivered" 2>/dev/null || true; }
 
-runner register signoff signoff -- "$ROOTCOPY/bin/fm-procevent-signoff.sh" poll >/dev/null 2>&1 \
+runner register signoff signoff -- "$ADAPTER" poll >/dev/null 2>&1 \
   || fail "could not register the sign-off source for the runner"
 hold_as '2026-10-12T10:00:00Z#0'
 adapter raise T1 'Ship T1' 'needs a call' release >/dev/null 2>&1 || fail "first hold raised no card"
@@ -146,56 +150,40 @@ delivered | grep -qF "T3" || fail "a permanently skipped answer was not recorded
 printf '0' > "$INTAKE_RC"
 pass "a batch whose every skip is permanent is acknowledged and not offered again"
 
-TASKS_AXI_BIN=$(command -v tasks-axi || true)
+TASKS_AXI_BIN=$(command -v tasks-axi 2>/dev/null || :)
 
-probe_tasks_axi_beads() {
-  local probe_home="$TMP_ROOT/.probe" probe_graph="$TMP_ROOT/.probe-fm"
-  mkdir -p "$probe_home/data" "$probe_graph"
-  git -C "$probe_graph" init -q
-  (cd "$probe_graph" && bd init >/dev/null 2>&1) || return 1
-  cat > "$probe_home/.tasks.toml" <<PROBEEOF
-backend = "beads"
-
-[beads]
-path = "$probe_graph/.beads"
-binary = "bd"
-prefix = "fm"
-PROBEEOF
-  (cd "$probe_home" && tasks-axi list) >/dev/null 2>&1
+# Own minimal beads fixture: the upstream copy lives inside a test body, not in a
+# sourceable helper, so no upstream function is shared here. Keep this small.
+beads_probe() {
+  local base="$TMP_ROOT/beads-probe"
+  mkdir -p "$base/home" && git init -q "$base/graph" || return 1
+  (cd "$base/graph" && bd init) >/dev/null 2>&1 || return 1
+  printf 'backend = "beads"\n[beads]\npath = "%s/graph/.beads"\nbinary = "bd"\nprefix = "fm"\n' "$base" > "$base/home/fixture/users/user-008"
+  (cd "$base/home" && tasks-axi list) >/dev/null 2>&1
 }
 
-if [ -z "$TASKS_AXI_BIN" ] || ! command -v bd >/dev/null 2>&1 || ! probe_tasks_axi_beads; then
+if [ -z "$TASKS_AXI_BIN" ] || ! command -v bd >/dev/null 2>&1 || ! beads_probe; then
   pass "skipped the real-hold section: no beads-capable tasks-axi and bd on this machine"
   echo "all fm-procevent-signoff tests passed"
   exit 0
 fi
 
-make_beads_home() {  # <name>; echoes the home
-  local home="$TMP_ROOT/$1/home" graph="$TMP_ROOT/$1/fm"
-  mkdir -p "$home/data" "$home/config" "$home/projects" "$graph" "$home/state"
-  git -C "$graph" init -q
-  (cd "$graph" && bd init >"$TMP_ROOT/$1-bd-init.log" 2>&1) || fail "fixture bd init failed"
-  cat > "$home/.tasks.toml" <<EOF
-backend = "beads"
-
-[beads]
-path = "$graph/.beads"
-binary = "bd"
-prefix = "fm"
-
-[markdown]
-path = "data/backlog.md"
-archive = "data/done-archive.md"
-done_keep = 10
-EOF
-  printf '%s\n' "$home"
+make_beads_home() {  # <name>; prints the fixture home
+  local base="$TMP_ROOT/$1" home graph
+  home="$base/home"
+  graph="$base/fm"
+  mkdir -p "$home/data" "$home/config" "$home/projects" "$home/state" "$graph"
+  git init -q "$graph"
+  (cd "$graph" && bd init) >"$base.init.log" 2>&1 || fail "fixture bd init failed for $1"
+  printf 'backend = "beads"\n[beads]\npath = "%s/.beads"\nbinary = "bd"\nprefix = "fm"\n[markdown]\npath = "data/backlog.md"\narchive = "data/done-archive.md"\ndone_keep = 10\n' "$graph" > "$home/.tasks.toml"
+  printf "%s\n" "$home"
 }
 
 real_env() {  # <home> <command args...>; the real adapter, hold, runner and intake
   local home=$1
   shift
-  PATH="$FAKEBIN:$PATH" REAL_TASKS_AXI="$TASKS_AXI_BIN" FM_ROOT_OVERRIDE="$ROOT" \
-    FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
+  PATH="$FAKEBIN:$PATH" REAL_TASKS_AXI="$TASKS_AXI_BIN" FM_CODE_ROOT="$ROOT" \
+    FM_STATE_OVERRIDE="$home/state" FM_HOME="$home" FM_DATA_OVERRIDE="$home/data" \
     FM_CONFIG_OVERRIDE="$home/config" FM_PROCEVENT_CLAIM_ROOT="$home/claims" "$@"
 }
 
@@ -206,7 +194,7 @@ export SIGNOFF_BOARD
 printf '{}\n' > "$SIGNOFF_BOARD"
 (cd "$real_home" && BEADS_ACTOR=fixture tasks-axi add fm-sample-work "Gated work") >/dev/null 2>&1 \
   || fail "could not create the existing work item"
-real_env "$real_home" "$ROOT/bin/fm-procevent-signoff.sh" arm >/dev/null \
+real_env "$real_home" "$ADAPTER" arm >/dev/null \
   || fail "the real sign-off adapter did not arm"
 
 board_count() { jq 'length' "$SIGNOFF_BOARD"; }
@@ -242,7 +230,7 @@ case "$out" in *"answers-fed: signoff"*) : ;; *) fail "a permanently refused ans
 show=$(cd "$real_home" && BEADS_ACTOR=fixture tasks-axi show fm-sample-q --full 2>&1)
 case "$show" in *"held: yes"*) : ;; *) fail "a refused reconcile answer released the hold: $show" ;; esac
 grep -qF 'fm-sample-q' "$real_home/state/signoff-delivered" || fail "the refused answer was not recorded as delivered"
-[ -z "$(real_env "$real_home" "$ROOT/bin/fm-procevent-signoff.sh" poll 2>/dev/null)" ] \
+[ -z "$(real_env "$real_home" "$ADAPTER" poll 2>/dev/null)" ] \
   || fail "the refused answer was offered again"
 pass "a permanently refused reserved answer is acked once, reported once, and leaves its hold open"
 
