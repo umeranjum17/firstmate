@@ -33,6 +33,11 @@
 #                              when executable; empty disables it)
 #   PI_QUOTA_FAILOVER_GATE_SECS  longest gate wait before pi starts anyway (default 600)
 #   PI_QUOTA_FAILOVER_DEAD_SECS  how long a quota error keeps a chain model skipped (default 3600)
+#   PI_QUOTA_FAILOVER_IDLE_SECS  a pi call with no stdout and no stderr for this long is killed and counts as a
+#                              quota failure (default 300)
+#
+# Before each route, quota-axi (on PATH) is asked for that route's provider: a runway of exhausted_now skips the
+# route without calling it. quota-axi missing, slower than 10s or failing leaves the route to be tried as before.
 set -u
 
 # The real quota-error classes seen in this fleet's pipeline logs (see the
@@ -86,6 +91,23 @@ dead_age() {
   case $at in '' | *[!0-9]*) return 0 ;; esac
   [ "$m" = "$1" ] && echo $(($(date +%s) - at))
 }
+# mark_dead <model>: record a quota failure for the route.
+mark_dead() {
+  mkdir -p "$dead_dir" 2>/dev/null
+  printf '%s %s\n' "$1" "$(date +%s)" >"$(marker "$1")" 2>/dev/null
+}
+# quota_exhausted <model>: quota-axi reports exhausted_now for this model's provider with scope all_models or model:<id>.
+# Missing, slow (10s cap), failing or unparseable quota-axi answers no, so the route is tried as before.
+quota_exhausted() {
+  local answer
+  command -v jq >/dev/null 2>&1 || { log_line "jq missing: quota pre-check off, model=$1 tried as before"; return 1; }
+  answer=$(timeout 10 quota-axi --provider "${1%%/*}" --json --max-age 5m --no-credential-refresh 2>/dev/null) || {
+    log_line "quota-axi gave no answer for ${1%%/*} (exit $?); model=$1 not pre-checked"
+    return 1
+  }
+  jq -e --arg p "${1%%/*}" --arg s "model:${1#*/}" '[.providers[]? | select(.provider == $p) | .quotaSemantics.effectiveAvailability[]? | select((.scope == "all_models" or .scope == $s) and .runway.status == "exhausted_now")] | length > 0' <<<"$answer" >/dev/null 2>&1
+}
+idle_secs=${PI_QUOTA_FAILOVER_IDLE_SECS:-300}
 
 # Host-memory gate (speed-report B3: model calls under heavy host load crash): every pipeline model call goes
 # through this wrapper, so wait here until the host has room. The gate given no command only waits; pi keeps its
@@ -125,8 +147,56 @@ drop_session() {
   done
 }
 
-# run_real <args...>: the real pi with the captured stdin re-attached.
-run_real() { "$real_pi" "$@" <"$stdin_file"; }
+tree_pids() {
+  local c
+  for c in $(pgrep -P "$1" 2>/dev/null); do
+    tree_pids "$c"
+    echo "$c"
+  done
+}
+
+# end_pi <pid>: TERM pi and its descendants, then KILL the ones still alive after a 5s grace.
+end_pi() {
+  local g p kids alive
+  kids=$(tree_pids "$1")
+  # kids is one numeric pid per line; word splitting is the list
+  # shellcheck disable=SC2086
+  kill -TERM "$1" $kids 2>/dev/null
+  for ((g = 0; g < 5; g++)); do
+    alive=0
+    for p in "$1" $kids; do kill -0 "$p" 2>/dev/null && alive=1; done
+    [ "$alive" = 1 ] || return 0
+    sleep 1
+  done
+  for p in "$1" $kids; do kill -0 "$p" 2>/dev/null && kill -KILL "$p" 2>/dev/null; done
+}
+
+# run_watched <args...>: the real pi with the captured stdin re-attached. No stdout and no stderr for idle_secs ends it
+# and sets idle_killed=1.
+run_watched() {
+  local pid='' sizes seen='' last now s
+  idle_killed=0
+  ( trap - INT; exec "$real_pi" "$@" ) <"$stdin_file" >"$out_file" 2>"$err_file" &
+  pid=$!
+  last=$(date +%s)
+  while kill -0 "$pid" 2>/dev/null; do
+    sleep 1
+    sizes=$(stat -c %s "$out_file" "$err_file" 2>/dev/null | tr '\n' ' ')
+    now=$(date +%s)
+    if [ "$sizes" != "$seen" ]; then
+      seen=$sizes
+      last=$now
+    elif [ $((now - last)) -ge "$idle_secs" ]; then
+      idle_killed=1
+      log_line "pi produced no output for ${idle_secs}s; killing it"
+      end_pi "$pid"
+      break
+    fi
+  done
+  wait "$pid"
+  s=$?
+  return "$s"
+}
 
 # error_text <exit-code>: pi exits 0 even when the provider fails - the error
 # rides in its JSON stream as an errorMessage field (verified with a 401
@@ -171,15 +241,19 @@ fi
 
 order=("$requested" "${order[@]}")
 live=()
+detail="every chain model hit a quota error in the last ${dead_secs}s"
 for m in "${order[@]}"; do
   age=$(dead_age "$m")
   if [ -n "$age" ] && [ "$age" -lt "$dead_secs" ]; then
     log_line "model=$m skipped: quota error ${age}s ago (skip window ${dead_secs}s)"
+  elif quota_exhausted "$m"; then
+    mark_dead "$m"
+    detail="quota-axi reports $m exhausted_now"
+    log_line "model=$m skipped: quota-axi reports exhausted_now"
   else
     live+=("$m")
   fi
 done
-detail="every chain model hit a quota error in the last ${dead_secs}s"
 if [ ${#live[@]} -gt 0 ] && [ "${live[0]}" != "$requested" ]; then
   mapfile -t args < <(rewrite_model "${live[0]}" "${args[@]}" | drop_session)
 fi
@@ -187,20 +261,31 @@ order=("${live[@]}")
 for ((attempt = 0; attempt < ${#order[@]}; attempt++)); do
   model=${order[$attempt]}
   t0=$(date +%s%3N)
-  run_real "${args[@]}" >"$out_file" 2>"$err_file"
+  run_watched "${args[@]}"
   rc=$?
   t1=$(date +%s%3N)
-  errs=$(error_text "$rc")
-  if ! grep -qiE "$QUOTA_RE" <<<"$errs"; then
-    rm -f "$(marker "$model")"
+  if [ "$idle_killed" = 1 ]; then
+    quota=1
+    detail="no output for ${idle_secs}s"
+  else
+    errs=$(error_text "$rc")
+    quota=0
+    if grep -qiE "$QUOTA_RE" <<<"$errs"; then
+      quota=1
+      detail=$(head -n 1 <<<"$errs")
+    fi
+  fi
+  if [ "$quota" = 0 ]; then
+    # Only a real answer clears the route's marker; a kill, a timeout or any other failure keeps it.
+    if [ "$rc" = 0 ] && [ -z "$(error_text 0)" ]; then
+      rm -f "$(marker "$model")"
+    fi
     # Not a quota failure: hand the pipeline exactly what real pi produced.
     cat "$out_file"
     cat "$err_file" >&2
     exit "$rc"
   fi
-  detail=$(head -n 1 <<<"$errs")
-  mkdir -p "$dead_dir" 2>/dev/null
-  printf '%s %s\n' "$model" "$(date +%s)" >"$(marker "$model")" 2>/dev/null
+  mark_dead "$model"
   if [ $((attempt + 1)) -lt ${#order[@]} ]; then
     next=${order[$((attempt + 1))]}
     log_line "model=$model quota-error in $((t1 - t0))ms ($detail); moving to $next"
