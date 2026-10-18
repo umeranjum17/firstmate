@@ -1,18 +1,15 @@
 # host-memory
 
-The host memory sampler — the per-home loop that samples host memory
-pressure for admission and monitoring — moved **verbatim** out of the
-supervising fork into this add-on repository. Nothing runs it from here
-yet: the live watcher keeps sourcing the fork's
-`bin/fm-host-memory-sampler.sh`, and the fork-side hook that will source
-this directory instead lands in a later PR. Until that swap this directory
-is dormant, and every moved byte below is identical to the fork copy the
-live watcher runs today.
+The per-home host memory sampler lives here, with its existing lifecycle API.
+`bin/fm-host-memory-lib.sh` is the optional watcher source entrypoint.
+The current fork still uses its own copy until a later fork-side hook lands.
+This first slice relocates the sampler only; the admission rule and alert presentation still live in the fork.
+Kun's diagnostic guard must remain intact when the admission rule moves: the add-on may add a refusal, never override Kun's refusal.
 
 ## Layout
 
-- `bin/fm-host-memory-sampler.sh` — the sampler: sourced by the watcher
-  for its lifecycle functions (`fm_memory_sampler_ensure`,
+- `bin/fm-host-memory-lib.sh` - watcher source entrypoint, resolving fork dependencies through the watcher's `SCRIPT_DIR`.
+- `bin/fm-host-memory-sampler.sh` - the sampler, providing lifecycle functions (`fm_memory_sampler_ensure`,
   `fm_memory_sampler_stop`, `fm_memory_sampler_matches`,
   `fm_memory_sampler_tick`, `fm_memory_sampler_interrupt`,
   `fm_memory_sampler_cleanup`), and executable as
@@ -22,7 +19,7 @@ live watcher runs today.
 - `install.sh` — installs the gate.
 - `tests/fm-mem-gate.test.sh` — the gate's integration test.
 
-## Frozen contract (identical to the fork)
+## Sampler contract
 
 - CLI: `fm-host-memory-sampler.sh run <HOME> <STATE> <CONFIG>`; any other
   argv exits 2, a missing state directory exits 1, an already-held sampler
@@ -30,7 +27,7 @@ live watcher runs today.
   above; the watcher calls `fm_memory_sampler_ensure` to start (or reuse)
   the loop and `fm_memory_sampler_stop` to end it.
 - Cadence: one sample every `FM_HOST_MEMORY_SECS` (default 10), each tick
-  calling the sibling guard beside it as
+  calling the fork guard as
   `fm-jev-mem-guard.sh --config <CONFIG>/host-memory --record
   <STATE>/host-memory.tsv --owned-top-task <STATE> --state-dir ...`.
   The guard itself stays in the fork and is not moved.
@@ -57,42 +54,21 @@ live watcher runs today.
   read only as `<CONFIG>/host-memory`; thresholds there are owned by the
   guard and never changed here.
 
-## Provenance: byte-identical to the fork
+## Relocation and integration proof
 
-Every moved file was compared byte for byte against its fork source at
-`umeranjum17/firstmate@0689b4b9d9ab3594f846cfe07c400edfa58244bf` at move time;
-the mode is `100755` on both sides:
+Originally copied from `umeranjum17/firstmate@0689b4b9d9ab3594f846cfe07c400edfa58244bf`, the sampler now passes `FM_HOST_MEMORY_FORK_BIN` to its child instead of assuming fork libraries are add-on siblings.
+The fork's wake/backend libraries, control CLI, watcher identity and current guard remain the dependency owner.
+Existing `fm_memory_sampler_*` names, PID validation, cadence, durable wakes and interrupt behavior are unchanged.
+No installer changes are needed for the source entrypoint: the fork hook resolves `${FM_ADDONS_DIR:-$FM_HOME/projects/firstmate-addons}`.
+An absent checkout skips both sourcing and lifecycle dispatch, leaving no sampler and no errors.
+Removing the checkout affects the next watcher; restart an existing watcher to unload already-sourced functions.
 
-| moved file | sha256 at the fork commit | sha256 here |
-| --- | --- | --- |
-| `bin/fm-host-memory-sampler.sh` | `9a8c7a892e9df592d3cf8b8e79bc3e4dc13934bc256d0845256451972e4a945a` | `9a8c7a892e9df592d3cf8b8e79bc3e4dc13934bc256d0845256451972e4a945a` |
+Run `bash host-memory/tests/fm-host-memory.test.sh <fork-checkout>` through the host memory gate.
+It clones the supplied fork into a private temporary directory, isolates HOME/XDG/TMPDIR, runs the fork's guard and sampler journeys unchanged, then reruns them with the optional sampler seams in that scratch copy only.
+The absent-addon leg proves an ordinary custom-check wake works without sampler state or errors.
+No live home, service, thresholds or supplied fork files are changed.
+Run the CI ShellCheck and syntax steps plus the other `host-memory/tests` scripts too.
 
-Treat any future diff against the fork file as a contract change, not a
-refactor.
-
-## Side-by-side proof (re-run before the fork hook swaps the sourced path)
-
-1. Unpack the fork tree at the commit above into two scratch roots:
-   `git -C <fork> archive 0689b4b9d9ab3594f846cfe07c400edfa58244bf | tar -x -C <rootA>`,
-   then `cp -a <rootA>/. <rootB>/`.
-2. In `rootB` only, overwrite `bin/fm-host-memory-sampler.sh` with the
-   moved file; `diff -r <rootA> <rootB>` must be empty, and the file's
-   sha256 and mode must equal the fork's.
-3. Run `tests/fm-jev-mem-guard.test.sh` in a scratch root; it exercises
-   the sampler path and one PASS proves the identical bytes. A loaded host
-   can miss the journey's own timing budget, so record a run that fails
-   only on timing rather than treating it as a behavior change (at most 3
-   runs; with no pass, stop with the outputs).
-4. Run the repository CI gate (ShellCheck, the syntax check over every
-   add-on script, and the memory gate's stubbed integration test); it must
-   pass on the PR head. The moved script carries
-   `# shellcheck source=bin/...` directives for sibling fork libraries
-   that did not move, so the gate exempts `SC1091` for `host-memory/bin/`
-   only, never editing the copy.
-
-Do **not** run the sampler against a real home, touch the memory guard or
-any service, or change memory thresholds; the moved copy is dormant until
-the fork hook lands.
 
 ## Memory gate
 
