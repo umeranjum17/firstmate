@@ -62,7 +62,7 @@ case $model in
   bad/graceful) trap 'exit 0' TERM; bash -c 'trap "sleep 2; touch \"\$STUB_CLEANUP\"; exit 0" TERM; sleep 600 & wait' & wait; exit 0 ;;
   bad/quiet) printf '%s\n' "$$" >"$STUB_PI"; sleep 600; exit 0 ;;
   bad/stubborn) trap '' TERM; bash -c 'sleep 600 & printf "%s\n" "$!" >"$STUB_CHILD"; wait' & while :; do sleep 1; done ;;
-  bad/flaky) n=$(cat "$STUB_FLAKY" 2>/dev/null || echo 0); echo $((n + 1)) >"$STUB_FLAKY"; [ "$n" = 0 ] && sleep 600 ;;
+  bad/flaky) n=$(cat "$STUB_FLAKY" 2>/dev/null || echo 0); echo $((n + 1)) >"$STUB_FLAKY"; [ "$n" -lt "${STUB_FLAKY_STALLS:-1}" ] && sleep 600 ;;
   bad/slow-stream)
     printf '%s\n' '{"type":"session","id":"s-1"}'
     for _ in 1 2 3 4; do sleep 1; printf '%s\n' '{"type":"message_update","assistantMessageEvent":{"type":"text_delta","delta":"x"}}'; done
@@ -355,11 +355,21 @@ out_has "second stall fails over to GPT-6 Luna" '"model":"openai-codex/gpt-6-lun
 if grep -q 'model=bad/hang skipped' "$log"; then no "stalled route was skipped on the next call"; else ok "stalled route is not skipped on the next call"; fi
 is "second stall writes no marker" "$(age_of bad/hang)" none
 
-# 9c3. A stall on the last chain model is not "quota exhausted": the call fails with no marker, so the pipeline may retry it.
+# 9c3. The last route retries three stalls, then fails (four calls total); transient stalls can recover.
 nodead
-OUT=$(printf '%s' "$prompt" | PI_QUOTA_FAILOVER_IDLE_SECS=2 PI_QUOTA_FAILOVER_CHAIN='bad/hang' "$wrapper" --model bad/hang --mode json --no-session 2>"$work/err9c3")
-is "stalled last route exits 1" "$?" "1"
-if grep -q 'quota exhausted' "$work/err9c3"; then no "stalled chain reported as quota exhausted"; else ok "stalled chain is not reported as quota exhausted"; fi
+rm -f "$work/flaky"
+OUT=$(printf '%s' "$prompt" | STUB_FLAKY="$work/flaky" STUB_FLAKY_STALLS=2 PI_QUOTA_FAILOVER_IDLE_SECS=2 PI_QUOTA_FAILOVER_CHAIN='bad/flaky' "$wrapper" --model bad/flaky --mode json --no-session 2>"$work/err9c3a")
+is "two stalls then answer exits 0" "$?" "0"
+is "two stalls then answer is third call" "$(cat "$work/flaky")" "3"
+out_has "third call answer passes through" '"model":"bad/flaky"'
+is "successful stall retry writes no marker" "$(age_of bad/flaky)" none
+nodead
+: >"$STUB_ARGV"
+OUT=$(printf '%s' "$prompt" | PI_QUOTA_FAILOVER_IDLE_SECS=2 PI_QUOTA_FAILOVER_CHAIN='bad/hang' "$wrapper" --model bad/hang --mode json --no-session 2>"$work/err9c3b")
+is "always-stalled last route exits 1" "$?" "1"
+is "always-stalled last route gets four calls" "$(wc -l <"$STUB_ARGV")" "4"
+if grep -q 'no model in the chain answered' "$work/err9c3b"; then ok "stalled chain keeps current failure message"; else no "stalled chain lost current failure message"; fi
+if grep -q 'quota exhausted' "$work/err9c3b"; then no "stalled chain reported as quota exhausted"; else ok "stalled chain is not reported as quota exhausted"; fi
 is "stalled last route writes no marker" "$(age_of bad/hang)" none
 
 # 9c4. A real quota error still writes its marker and the chain moves on, as before.
