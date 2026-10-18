@@ -22,9 +22,13 @@
 // of the submitted command.
 // See docs/supervisor-work-guard.md for the full contract and validation record.
 
-import { Lexer, splitProgram, commandPosition } from "./fm-arm-command-policy.mjs";
-import { realpathSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+// The lexer module is bound at run time from the Firstmate checkout that owns it
+// (see fm-supervisor-work-decide.mjs), so this file carries no path of its own.
+let shell = null;
+
+export function bindLexer(api) {
+  shell = api;
+}
 
 const REASONS = {
   "supervisor-no-mistakes-run":
@@ -37,6 +41,8 @@ const REASONS = {
 
 // Subcommands that hand the run to a supervisor session. `status` is read-only
 // and deliberately absent: reading a worker's run record is supervision.
+const ALLOW = Object.freeze({ decision: "allow" });
+
 const OWNED_SUBCOMMANDS = new Set(["run", "respond"]);
 
 // Seconds of sleep a supervisor turn may still spend for its own bounded wait.
@@ -50,14 +56,9 @@ const PANE_TYPING = new Map([
   ["tmux", new Set(["send-keys"])],
 ]);
 
-function deny(code) {
-  return { decision: "deny", code, reason: REASONS[code] };
-}
+const deny = (code) => ({ decision: "deny", code, reason: REASONS[code] });
 
-function basename(value) {
-  const parts = value.split("/");
-  return parts[parts.length - 1];
-}
+const leafName = (value) => value.split("/").pop();
 
 // The no-mistakes command word plus its own subcommand, tolerating leading
 // global flags (`no-mistakes --json axi run`) without tolerating a value-taking
@@ -102,7 +103,7 @@ function sleepsTooLong(position) {
 
 function typedIntoPane(position) {
   const words = position.words.slice(position.index + 1).map((word) => word.value);
-  const actions = PANE_TYPING.get(basename(position.command.value));
+  const actions = PANE_TYPING.get(leafName(position.command.value));
   if (!actions) return false;
   // `herdr pane send-keys Enter` and `tmux send-keys -t w0 Enter` both aim at a
   // pane; the target argument is irrelevant to the rule.
@@ -111,21 +112,22 @@ function typedIntoPane(position) {
 
 // One pass over the top-level command positions, because (b) is a property of
 // the whole command: a loop and its sleep are separate command positions.
-function decision(command, options = {}) {
+export function decision(command, options = {}) {
+  const { Lexer, splitProgram, commandPosition } = shell;
   const secondmate = Boolean(options.secondmate);
-  const lexed = new Lexer(command).tokenize();
+  const scan = new Lexer(command).tokenize();
   // Fail open on shell syntax this tokenizer cannot lex. This guard's threat
   // model is a supervisor drifting into its worker's job, which is ordinary
   // well-formed shell, so zero false blocks outrank catching malformed input.
-  if (lexed.error) return { decision: "allow" };
+  if (scan.error) return ALLOW;
 
-  const { nodes } = splitProgram(lexed.tokens);
+  const { nodes } = splitProgram(scan.tokens);
   const positions = nodes
     .map((node) => commandPosition(node))
     .filter((position) => position.command && !position.unresolvedWrapperOption);
 
   for (const position of positions) {
-    const name = basename(position.command.value);
+    const name = leafName(position.command.value);
     if (name === "no-mistakes" && ownedNoMistakesSubcommand(position)) {
       return deny("supervisor-no-mistakes-run");
     }
@@ -135,68 +137,13 @@ function decision(command, options = {}) {
   // Second, because (b) is a property of the whole command: a loop and its sleep
   // are separate command positions, and `do sleep 5` lexes as one node whose
   // command word is `do`.
-  const inLoop = positions.some((position) => SHELL_LOOPS.has(basename(position.command.value)));
+  const inLoop = positions.some((position) => SHELL_LOOPS.has(leafName(position.command.value)));
   for (const position of positions) {
-    const name = basename(position.command.value);
+    const name = leafName(position.command.value);
     if (name === "sleep" && sleepsTooLong(position)) return deny("supervisor-poll-in-turn");
-    if (inLoop && position.words.some((word) => basename(word.value) === "sleep")) {
+    if (inLoop && position.words.some((word) => leafName(word.value) === "sleep")) {
       return deny("supervisor-poll-in-turn");
     }
   }
-  return { decision: "allow" };
+  return ALLOW;
 }
-
-function parseArguments(argv) {
-  const result = { command: "", commandSet: false, secondmate: false };
-  for (let i = 0; i < argv.length; i += 1) {
-    const name = argv[i];
-    if (name === "--command") {
-      if (i + 1 >= argv.length) throw new Error("--command requires a value");
-      result.command = argv[i + 1];
-      result.commandSet = true;
-      i += 1;
-      continue;
-    }
-    if (name.startsWith("--command=")) {
-      result.command = name.slice("--command=".length);
-      result.commandSet = true;
-      continue;
-    }
-    if (name === "--secondmate") {
-      result.secondmate = true;
-      continue;
-    }
-    throw new Error(`unknown argument: ${name}`);
-  }
-  return result;
-}
-
-function invokedDirectly() {
-  const entry = process.argv[1];
-  if (!entry) return false;
-  const self = fileURLToPath(import.meta.url);
-  try {
-    return realpathSync(entry) === realpathSync(self);
-  } catch {
-    return entry === self;
-  }
-}
-
-if (invokedDirectly()) {
-  try {
-    const args = parseArguments(process.argv.slice(2));
-    const result = args.commandSet && args.command
-      ? decision(args.command, { secondmate: args.secondmate })
-      : { decision: "allow" };
-    if (result.decision === "allow") {
-      process.stdout.write("allow\n");
-    } else {
-      process.stdout.write(`deny\t${result.code}\t${result.reason}\n`);
-    }
-  } catch (error) {
-    process.stderr.write(`${error.message}\n`);
-    process.exitCode = 1;
-  }
-}
-
-export { decision, MAX_TURN_SLEEP_SECONDS };

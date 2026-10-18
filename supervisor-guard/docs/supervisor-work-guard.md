@@ -2,8 +2,8 @@
 
 This document is the authoritative human-readable contract for the guard that stops a firstmate SUPERVISOR session from doing a worker's job.
 `bin/fm-supervisor-work-command-policy.mjs` is the single decision owner and the only place the patterns live.
-`bin/fm-supervisor-work-pretool-check.sh` is the harness transport, supervisor scope, and output renderer.
-The tracked harness adapters forward command text without classifying it.
+`bin/fm-supervisor-work-pretool-check.sh` is the hook transport, supervisor scope, and output renderer; `bin/fm-supervisor-work-decide.mjs` is the command-line entry it calls.
+The hook passes the command text on untouched and classifies nothing itself.
 
 It belongs to the family of primary-session guards that share the same cross-harness hook machinery: the watcher-arm seatbelt (`docs/arm-pretool-check.md`), the cd-guard (`docs/cd-guard.md`), the subagent guard (`docs/subagent-guard.md`), and the turn-end supervision guard (`docs/turnend-guard.md`).
 
@@ -23,7 +23,7 @@ Three rules, each with one reason string:
 | `supervisor-pane-typing` | `herdr pane send-text`, `herdr pane send-keys`, `tmux send-keys` | Steer a worker with `bin/fm-send.sh` and drive its lifecycle with `bin/fm-control.sh`. The primary home is exempt; only a secondmate lead owns workers whose panes this would type into. |
 
 This is not a general sandbox.
-It classifies shell command positions only; it never evaluates, expands, sources, or runs any byte of the submitted command.
+It looks only at shell command positions; the submitted command is never evaluated, expanded, sourced or run.
 Its threat model is agent drift, the same as the cd-guard: ordinary well-formed shell, not a deliberately obfuscated bypass.
 
 ## Scope: supervisor sessions only
@@ -35,35 +35,32 @@ Any failure to confirm the home is inert, never a block, so a broken environment
 
 ## Shipped mechanism
 
-`bin/fm-supervisor-work-pretool-check.sh` acquires the harness payload, extracts the exact command, and invokes the policy; it owns no pattern.
-Its prefilter is transport only: a command that cannot contain `no-mistakes`, `sleep`, `herdr`, or `tmux` after the tokenizer's byte normalization can never be deniable, so it is fast-allowed without starting Node.
-Its quoting-decoder marker set is COUPLED to the policy tokenizer's decoder set in `bin/fm-arm-command-policy.mjs`: adding a quote or expansion form the tokenizer decodes REQUIRES extending it here in the same change.
+`bin/fm-supervisor-work-pretool-check.sh` reads the harness payload, extracts the exact command, skips node when no quote-stripped word names no-mistakes, sleep, herdr or tmux, and otherwise passes the command to the decider; it owns no pattern.
 
-The policy imports the same `Lexer`, `splitProgram`, and `commandPosition` from `bin/fm-arm-command-policy.mjs` that the cd-guard and watcher-arm seatbelts use, so no shell lexing is duplicated anywhere in the repo.
+`install.sh` copies the hook, the decider and the policy into `${XDG_DATA_HOME:-$HOME/.local/share}/fm-supervisor-guard` and records the Firstmate home in its `home` file. The scope predicate and the shell lexer are read from that home's checkout (`bin/fm-primary-scope-lib.sh` and `bin/fm-arm-command-policy.mjs`), so the add-on copies no shell lexing and no upstream code.
+
+The policy never evaluates the command; shell syntax the lexer cannot tokenize is an allow.
 Because `for i in ...; do sleep 5; done` lexes as one node whose command word is `do`, the loop rule is a property of the whole command rather than of any single command position.
 
 ## Harness registrations
 
-- Claude: `.claude/settings.json`, PreToolUse `Bash`.
-- Pi and omp: `.pi/extensions/fm-primary-turnend-guard.ts` and `.omp/extensions/fm-primary-turnend-guard.ts`, piggybacking on the `tool_call` block the primary already loads for the turn-end guard.
+- Claude: `install.sh` merges one PreToolUse `Bash` hook into `~/.claude/settings.json`. `uninstall.sh` removes it.
 
-Both transports are implemented and tested for every harness shape (`--claude`, Grok stdout decision object, and the `--command` CLI mode used by Pi and OpenCode), but only the two harnesses above are registered in tracked config; registering another harness's hook file is a separate verified change.
+The add-on registers only this Claude hook, which reads the Claude payload from stdin.
 
 ## Exit/output contract
 
-Identical to `bin/fm-cd-pretool-check.sh`:
+The same contract as the other Firstmate PreToolUse seatbelts:
 
 - ALLOW - exit 0 and no output.
-- DENY - exit 2, a Claude-shaped deny object on stderr, and a Grok-shaped deny object on stdout unless `--claude` was supplied.
+- DENY - exit 2 and a Claude-shaped deny object on stderr; stdout stays empty.
 - INERT - not a genuine supervisor home: exit 0 and no output.
 - FAIL OPEN - malformed or empty stdin, missing jq for stdin transport, or a missing Node runtime or policy owner.
 
 Claude requires stdout to remain empty on deny.
 Codex blocks on exit 2 and displays stderr.
-Grok consumes the stdout decision object.
-OpenCode and Pi consume exit 2 plus stderr.
 
 ## Validation
 
-`tests/fm-supervisor-work-pretool-check.test.sh` drives the shipped transport against real fixture homes: a primary checkout, a marked secondmate home, and a linked crewmate worktree, using the incident command shapes above.
-It asserts the refusals, the allowed reads, the secondmate-only rule, that a worker worktree is never refused, that the tracked Claude and pi/omp registrations call the guard, that every transport denies, and that a malformed payload fails open.
+`tests/fm-supervisor-work-guard.test.sh` installs into a throwaway HOME and drives the installed hook against real fixture homes: a primary checkout, a marked secondmate home, and a linked crewmate worktree, using the incident command shapes above.
+It asserts the exit code, empty stdout, and the deny code on stderr for each refusal, the allowed reads, the sleep and loop thresholds, wrapped and backgrounded runs, the secondmate-only pane rule, that a worker worktree and an outside session are never refused, that a malformed payload fails open, and that uninstall leaves unrelated settings untouched.
