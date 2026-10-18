@@ -20,6 +20,7 @@ One line per add-on, with how it wires in. `<home>` is your home folder for the 
 - `fleet-stats` — per-model and per-skill fleet statistics plus the task outcome recorder. Dormant copy: the fork still runs its own.
 - `git-identity` — task commits always carry the configured git identity; pushes of foreign-author commits are refused. Wire in: `git-identity/install.sh <home>`, plus a fork hook.
 - `kill-guard` — stops any agent from signalling PID 1, the systemd user manager, the herdr server, or a process it did not start; reparented processes in the caller's own non-home git worktree are allowed. A block is final, except a kill whose PID the shell sets (`$pid`, `$!`, `%1`), which asks for the literal PID. Wire in: `kill-guard/install.sh`; remove: `kill-guard/uninstall.sh`.
+- `read-guard` — blocks agent tool access to provider logins, BYOKit person credentials and no-mistakes config; metadata-only `ls`, `stat`, `test` and `[` checks are allowed. Process/library reads are unaffected. Wire in: `read-guard/install.sh`; remove: `read-guard/uninstall.sh`.
 - `glm-queue` — one local line in front of the GLM API, so parallel calls queue instead of hitting rate limits. Wire in: `glm-queue/install.sh`, then point pi at the queue.
 - `host-memory` — a gate that makes heavy jobs wait for host memory instead of crashing. Wire in: `host-memory/install.sh`.
 - `local-qwen-tuning` — operator reference for the local Qwen model server: launch, tuning, limits, rollback. Reference only, nothing to install.
@@ -51,6 +52,7 @@ git clone https://github.com/umeranjum17/firstmate-addons && cd firstmate-addons
 export FM_HOME=~/firstmate    # your home folder for the fleet manager
 for d in pipeline-literal-delete pipeline-quota-failover host-memory fleet-flow glm-queue route-change claude-model-guard; do "$d/install.sh"; done
 for d in delete-guard claude-quota merge-on-green git-identity nm-drain owner-guard; do "$d/install.sh" "$FM_HOME"; done
+read-guard/install.sh
 FM_HOME="$FM_HOME" fleet-stall/install.sh
 FM_HOME="$FM_HOME" owner-guard/install-scan.sh
 FM_HOME="$FM_HOME" zai-quota-check/install.sh
@@ -82,6 +84,7 @@ One command per add-on, from the repo root — all of these were run and pass:
 bash claude-quota/tests/claude-quota.test.sh
 bash claude-quota/install.sh --dry-run <home>            # what it would write; same shape as every --dry-run below
 bash delete-guard/install.sh --dry-run <home>
+bash read-guard/tests/read-guard.test.sh
 bash claude-model-guard/install.sh --dry-run
 bash zai-quota-check/tests/zai-quota-check-e2e.sh
 bash pipeline-quota-failover/tests/pi-quota-failover-e2e.sh
