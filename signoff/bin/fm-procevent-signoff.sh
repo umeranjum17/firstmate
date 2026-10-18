@@ -69,18 +69,22 @@
 # another channel leaves its card waiting on the board.
 set -u
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# The Firstmate checkout owns the runner, the keyed-answer intake and the libraries.
+# FM_CODE_ROOT defaults to FM_HOME, the checkout a home runs from (as in the sentinel wrapper).
+CODE_ROOT="${FM_CODE_ROOT:-${FM_HOME:-}}"
+BIN="$CODE_ROOT/bin"
+if [ -z "$CODE_ROOT" ] || [ ! -f "$BIN/fm-procevent-lib.sh" ]; then
+  echo "fm-procevent-signoff: no Firstmate checkout with bin/fm-procevent-lib.sh; set FM_CODE_ROOT" >&2
+  exit 2
+fi
+FM_HOME="${FM_HOME:-$CODE_ROOT}"
+STATE=${FM_STATE_OVERRIDE:-"$FM_HOME/state"}
 export FM_HOME
 
-# shellcheck source=bin/fm-pr-lib.sh
-. "$SCRIPT_DIR/fm-pr-lib.sh"
-# shellcheck source=bin/fm-wake-lib.sh
-. "$SCRIPT_DIR/fm-wake-lib.sh"
-# shellcheck source=bin/fm-procevent-lib.sh
-. "$SCRIPT_DIR/fm-procevent-lib.sh"
+. "$BIN/fm-pr-lib.sh"
+. "$BIN/fm-wake-lib.sh"
+. "$BIN/fm-procevent-lib.sh"
 
 SOURCE_ID=signoff
 DELIVERED="$STATE/signoff-delivered"
@@ -93,7 +97,7 @@ usage() {
   awk 'NR == 1 { next } /^#/ { sub(/^# ?/, ""); print; next } { exit }' "${BASH_SOURCE[0]}"
   exit 2
 }
-die() { printf 'error: %s\n' "$1" >&2; exit 1; }
+die() { printf "error: %s\n" "$1" >&2; exit 1; }
 
 signoff() {
   command -v sign-off-axi >/dev/null 2>&1 \
@@ -113,21 +117,21 @@ cmd_arm() {
   local out
   out=$(signoff --version 2>&1) \
     || die "sign-off-axi does not run here: $out"
-  "$SCRIPT_DIR/fm-captain-hold.sh" bind "$SOURCE_ID" >/dev/null || die "could not bind $SOURCE_ID to the keyed-answer intake"
-  "$SCRIPT_DIR/fm-procevent.sh" register signoff "$SOURCE_ID" -- "$SCRIPT_DIR/fm-procevent-signoff.sh" poll || exit 1
+  "$BIN/fm-captain-hold.sh" bind "$SOURCE_ID" >/dev/null || die "could not bind $SOURCE_ID to the keyed-answer intake"
+  "$BIN/fm-procevent.sh" register signoff "$SOURCE_ID" -- "$SCRIPT_DIR/fm-procevent-signoff.sh" poll || exit 1
   printf 'armed: %s\nsign-off-axi: %s\n' "$SOURCE_ID" "$out"
 }
 
 cmd_retire() {
-  "$SCRIPT_DIR/fm-procevent.sh" retire "$SOURCE_ID" || exit 1
-  "$SCRIPT_DIR/fm-captain-hold.sh" unbind "$SOURCE_ID" >/dev/null || exit 1
+  "$BIN/fm-procevent.sh" retire "$SOURCE_ID" || exit 1
+  "$BIN/fm-captain-hold.sh" unbind "$SOURCE_ID" >/dev/null || exit 1
 }
 
 cmd_raise() {
-  [ "$#" -eq 4 ] || usage
+  [ $# -eq 4 ] || usage
   local out identity
   cmd_enabled || return 0
-  identity=$("$SCRIPT_DIR/fm-captain-hold.sh" open "$1" --identity 2>/dev/null) || {
+  identity=$("$BIN/fm-captain-hold.sh" open "$1" --identity 2>/dev/null) || {
     printf 'sign-off card not raised: the hold identity of %s could not be read\n' "$1" >&2
     return 1
   }
@@ -154,14 +158,14 @@ deliverable() {
         to_entries[] | select(.key | startswith($prefix))
         | (.key[($prefix | length):]) as $rest
         | {key: ($rest | sub("-[^-]*$"; "")), stamp: ($rest | sub("^.*-"; "")), answer: (.value.answer // ""), label: (.value.label // ""), close: (.value.close // ""), at: (.value.at // "")}' 2>/dev/null \
-    | while IFS= read -r line; do
+    | while IFS= read -r line ; do
         key=$(jq -r '.key' <<<"$line")
         stamp=$(jq -r '.stamp' <<<"$line")
         answer=$(jq -r '.answer' <<<"$line")
         at=$(jq -r '.at' <<<"$line")
         fm_procevent_source_id_valid "$key" && [ -n "$answer" ] && [ -n "$at" ] || continue
         [ ! -f "$DELIVERED" ] || ! grep -qxF "$key"$'\t'"$at" "$DELIVERED" || continue
-        identity=$("$SCRIPT_DIR/fm-captain-hold.sh" open "$key" --identity 2>/dev/null) || continue
+        identity=$("$BIN/fm-captain-hold.sh" open "$key" --identity 2>/dev/null) || continue
         [ "$stamp" = "$(stamp_token "${identity%%#*}")" ] || continue
         jq -c 'del(.stamp)' <<<"$line"
       done
@@ -169,7 +173,7 @@ deliverable() {
 
 cmd_poll() {
   local found
-  [ "$#" -eq 0 ] || usage
+  [ $# -eq 0 ] || usage
   found=$(deliverable)
   if [ -z "$found" ]; then
     signoff wait --json --timeout "$WAIT_SECS" >/dev/null 2>&1
@@ -177,13 +181,13 @@ cmd_poll() {
     [ -n "$found" ] || sleep "$IDLE_REST"
   fi
   [ -n "$found" ] || exit 75
-  printf '%s\n' "$found"
+  printf "%s\n" "$found"
 }
 
 cmd_answers() {
   local file=${1-} line key answer at
-  [ -f "$file" ] || die "result file does not exist: $file"
-  while IFS= read -r line; do
+  [ -f "$file" ] || die "result file does not exist: ${file}"
+  while IFS= read -r line ; do
     key=$(jq -r '.key' <<<"$line")
     answer=$(jq -r '.answer' <<<"$line")
     at=$(jq -r '.at' <<<"$line")
@@ -194,8 +198,8 @@ cmd_answers() {
 
 cmd_ack() {
   local file=${1-} line key at
-  [ -f "$file" ] || die "result file does not exist: $file"
-  while IFS= read -r line; do
+  [ -f "$file" ] || die "result file does not exist: ${file}"
+  while IFS= read -r line ; do
     key=$(jq -r '.key' <<<"$line")
     at=$(jq -r '.at' <<<"$line")
     fm_procevent_source_id_valid "$key" && [ -n "$at" ] || continue
@@ -211,6 +215,6 @@ case "${1-}" in
   answers) shift; cmd_answers "$@" ;;
   ack) shift; cmd_ack "$@" ;;
   relisten) exit 0 ;;
-  ''|-h|--help|help) usage ;;
-  *) die "unknown command: $1" ;;
+  -h|--help|help|'') usage ;;
+  *) die "unknown command: ${1}" ;;
 esac
