@@ -50,12 +50,13 @@
 #   - a markdown `<data>/backlog.md` that is itself a symlink, because the
 #     first write would replace the link with a private copy, exactly the fork
 #     this command exists to prevent. Lifecycle transitions refuse the same file.
-#   - `rm`/`delete`, `done`/`close`, `hold --kind parked`, or an `update --title`
-#     that drops `[captain-ask]` from a row whose title carries it, unless `bin/fm-captain-hold.sh answered <id>`
-#     finds a recorded captain answer or the row's `pr:` link is a merged PR,
-#     so no cap or triage can drop a captain's ask. The automatic dispatch and
-#     teardown transitions use bin/fm-backlog-transition-lib.sh, not this
-#     wrapper, and a merged-PR done passes the second test.
+#   - `rm`/`delete`, `done`/`close`, `hold --kind parked`, or `update` or
+#     `edit --title` that drops `[captain-ask]` from a row whose title carries it,
+#     unless `bin/fm-captain-hold.sh answered <id>` finds a recorded captain
+#     answer or the row's `pr:` link is a merged PR. Not covered: reconcile
+#     close, tasks-axi auto-prune of Done rows, `fm-tasks-axi.sh prune`, and
+#     direct tasks-axi calls. The automatic dispatch and teardown transitions
+#     use bin/fm-backlog-transition-lib.sh, not this wrapper.
 # Otherwise the exit status is tasks-axi's own, unless decoding a read fails;
 # in that case the decoder's nonzero status is returned.
 set -u
