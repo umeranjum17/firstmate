@@ -59,8 +59,9 @@ set -u
 # You're out of extra usage"). Case-insensitive; matched against pi's error
 # surface only. The balance and budget phrasings come from pi's own terminal list (isTerminalRateLimitError); Z.AI's
 # "Insufficient balance" and "Rate limit reached for requests" refusals were passed through as non-quota failures,
-# so the run ended instead of moving on.
-QUOTA_RE='limit used up|usage limit|limit has been reached|rate limit reached|GoUsageLimitError|FreeUsageLimitError|rate limit exceeded|quota|available credits|available balance|insufficient credits|insufficient balance|insufficient_quota|out of budget|Claude rate limit|out of extra usage'
+# so the run ended instead of moving on. OpenRouter's empty balance answers 402 "This request requires more credits,
+# or fewer max_tokens. You requested up to N tokens, but can only afford M": that is the "more credits" / "can only afford" pair.
+QUOTA_RE='limit used up|usage limit|limit has been reached|rate limit reached|GoUsageLimitError|FreeUsageLimitError|rate limit exceeded|quota|available credits|available balance|insufficient credits|insufficient balance|insufficient_quota|out of budget|Claude rate limit|out of extra usage|more credits|can only afford|out of credits|key limit exceeded'
 
 # A non-zero pi exit whose error surface names the Go exec WaitDelay ("pi parse events: exec: WaitDelay expired") or an
 # extension warning/failure is a route failure: the chain moves on without a quota marker (fleet retro 19 Oct, fix 2).

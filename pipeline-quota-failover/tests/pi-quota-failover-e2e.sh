@@ -231,9 +231,9 @@ is "deepseek over its own limit exits 0" "$?" "0"
 log_has "deepseek own limit kills the silent call" "model=deepseek/deepseek-flash stalled.*no output for 2s.*moving to claude-bridge/claude-haiku-5-5"
 out_has "deepseek over its own limit moves to Haiku" '"model":"claude-bridge/claude-haiku-5-5"'
 
-# 0e. A GLM quota failure moves on to the next hop. Z.AI's balance refusal and its rate-limit refusal are quota failures,
+# 0e. A GLM quota failure moves on to the next hop. Z.AI's balance refusal, its rate-limit refusal and OpenRouter's 402 requires-more-credits text are quota failures,
 #     so GLM writes its marker and DeepSeek answers the same call (before this change the run ended on them).
-for text in 'Insufficient balance or no resource package. Please recharge.' 'Rate limit reached for requests'; do
+for text in 'Insufficient balance or no resource package. Please recharge.' 'Rate limit reached for requests' '402: {"message":"This request requires more credits, or fewer max_tokens. You requested up to 64000 tokens, but can only afford 2118. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account","code":402}'; do
   nodead
   : >"$log"
   OUT=$(printf '%s' "$prompt" | PI_QUOTA_FAILOVER_CHAIN='zai/glm-5.3-flash deepseek/deepseek-flash claude-bridge/claude-haiku-5-5' STUB_GLM_TEXT="$text" "$wrapper" --model zai/glm-5.3-flash --mode json --no-session 2>"$work/err0e")
