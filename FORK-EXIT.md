@@ -67,7 +67,7 @@ against the files, not against this table. PRs at the top until they are resolve
 | Supervisor-work guard | e4a6c5e0 | `bin/fm-supervisor-work-command-policy.mjs`, `bin/fm-supervisor-work-pretool-check.sh` | add-on `supervisor-guard` (code moved from fork commit e4a6c5e0, fork-only and not in Kun upstream, 0 lines copied from Kun upstream; `install.sh` merges the hook; reads the checkout's scope lib and lexer) + pretool hook | dormant; fork runs its own |
 | Model-outage, usage-limit and stuck-wait alerts | 16e04a41 ([48](https://github.com/umeranjum17/firstmate/pull/48)), da71f161 ([52](https://github.com/umeranjum17/firstmate/pull/52)), 01f01944 ([47](https://github.com/umeranjum17/firstmate/pull/47)) | `bin/fm-model-outage-lib.sh`, watch hunks | add-on `alerts` + watch hook | dormant copy |
 | Local Qwen tuning docs + bench | 78cc325a | `docs/local-qwen-tuning/` (fork copy still differs from Kun's main) | add-on `local-qwen-tuning` (reference lives there) | dormant copy — drop fork docs on next cleanup |
-| Bearings board milestones + evidence thumbnails | 9ad8e1fb, 08472745 | `bin/fm-bearings-board.sh`, `.agents/skills/bearings/` | dropped; fork keeps Kun's plain board | dropped |
+| Bearings board milestones + evidence thumbnails | 9ad8e1fb, 08472745 | `bin/fm-bearings-board.sh`, `.agents/skills/bearings/` | add-on `bearings-board` (thin wrapper, no copied upstream code); extras in later slices | dormant thin wrapper; fork runs its own |
 
 ### Still on the fork, add-on planned
 

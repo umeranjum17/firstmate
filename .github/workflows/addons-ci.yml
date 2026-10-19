@@ -115,3 +115,6 @@ jobs:
       # Fixture home, merge gate and patterns, a local bare repo standing in for GitHub and a stub gh: nothing real is touched.
       - name: Owner guard merge gate test
         run: bash owner-guard/tests/owner-guard-merge.test.sh
+      # Stub Firstmate checkout and a fixture home: no real board, hook or launcher is touched.
+      - name: Bearings board test
+        run: bash bearings-board/tests/bearings-board.test.sh
