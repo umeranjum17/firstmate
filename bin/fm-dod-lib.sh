@@ -172,7 +172,7 @@ fm_dod_receipt_accept() {  # <state> <id> <meta> <candidate-head>
 }
 
 # Optional merge-card add-on: defines fm_dod_merge_gate and fm_merge_post_hook.
-[ ! -r "${FM_ADDONS_DIR:-${FM_HOME:-.}/projects/firstmate-addons}/merge-card/bin/fm-merge-hooks-lib.sh" ] || . "${FM_ADDONS_DIR:-${FM_HOME:-.}/projects/firstmate-addons}/merge-card/bin/fm-merge-hooks-lib.sh"
+[ ! -r "${FM_ADDONS_DIR:-${FM_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/projects/firstmate-addons}/merge-card/bin/fm-merge-hooks-lib.sh" ] || . "${FM_ADDONS_DIR:-${FM_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/projects/firstmate-addons}/merge-card/bin/fm-merge-hooks-lib.sh"
 
 fm_brief_worker_role() {  # <state-dir> <task-id> <code-root>
   local state=$1 task_id=$2 root=$3
