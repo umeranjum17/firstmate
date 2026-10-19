@@ -62,6 +62,10 @@ set -u
 # so the run ended instead of moving on.
 QUOTA_RE='limit used up|usage limit|limit has been reached|rate limit reached|GoUsageLimitError|FreeUsageLimitError|rate limit exceeded|quota|available credits|available balance|insufficient credits|insufficient balance|insufficient_quota|out of budget|Claude rate limit|out of extra usage'
 
+# A non-zero pi exit whose error surface names the Go exec WaitDelay ("pi parse events: exec: WaitDelay expired") or an
+# extension warning/failure is a route failure: the chain moves on without a quota marker (fleet retro 19 Oct, fix 2).
+ROUTE_FAIL_RE='WaitDelay|parse events|extension.*(warning|failed|error)|(warning|error|failed).*extension'
+
 chain=${PI_QUOTA_FAILOVER_CHAIN:-'deepseek/deepseek-flash claude-bridge/claude-haiku-5-5'}
 # The chain is the fleet's one route list: route-change reads it from here.
 [ -z "${PI_QUOTA_FAILOVER_PRINT_CHAIN:-}" ] || { printf '%s\n' "$chain"; exit 0; }
@@ -128,6 +132,14 @@ quota_exhausted() {
     return 1
   }
   jq -e --arg p "$qp" --arg s "model:${1#*/}" '[.providers[]? | select(.provider == $p) | .quotaSemantics.effectiveAvailability[]? | select((.scope == "all_models" or .scope == $s) and .runway.status == "exhausted_now")] | length > 0' <<<"$answer" >/dev/null 2>&1
+}
+# credit_empty <model>: a 1-request probe (the real pi, one "ok" prompt) answers a QUOTA_RE balance error. Any other answer,
+# a timeout or a failed start leaves the route to be tried. PI_QUOTA_FAILOVER_PROBE=0 turns the probe off.
+credit_empty() {
+  local probe_out
+  [ "${PI_QUOTA_FAILOVER_PROBE:-1}" != 0 ] || return 1
+  probe_out=$(printf 'ok' | timeout "${PI_QUOTA_FAILOVER_PROBE_SECS:-60}" "$real_pi" "${ext_args[@]}" --model "$1" --mode json --no-session 2>&1) || true
+  grep -oE '"errorMessage":"(\\.|[^"])*"' <<<"$probe_out" | grep -qiE "$QUOTA_RE"
 }
 idle_secs=${PI_QUOTA_FAILOVER_IDLE_SECS:-120}
 bridge_idle_secs=${PI_QUOTA_FAILOVER_BRIDGE_IDLE_SECS:-300}
@@ -345,6 +357,10 @@ for m in "${order[@]}"; do
     mark_dead "$m"
     detail="quota-axi reports $m exhausted_now"
     log_line "model=$m skipped: quota-axi reports exhausted_now"
+  elif [ ${#live[@]} -eq 0 ] && credit_empty "$m"; then
+    mark_dead "$m"
+    detail="credit probe found no balance on $m"
+    log_line "pulse: model=$m skipped: credit probe found no balance"
   else
     live+=("$m")
   fi
@@ -362,7 +378,7 @@ for ((attempt = 0; attempt < ${#order[@]}; attempt++)); do
   run_watched "${args[@]}"
   rc=$?
   t1=$(date +%s%3N)
-  quota=0 stall=0
+  quota=0 stall=0 rfail=0
   if [ "$idle_killed" = 1 ]; then
     stall=1
     any_stall=1
@@ -372,9 +388,13 @@ for ((attempt = 0; attempt < ${#order[@]}; attempt++)); do
     if grep -qiE "$QUOTA_RE" <<<"$errs"; then
       quota=1
       detail=$(head -n 1 <<<"$errs")
+    elif [ "$rc" != 0 ] && grep -qiE "$ROUTE_FAIL_RE" <<<"$errs"; then
+      rfail=1
+      any_stall=1
+      detail=$(grep -iE -m1 "$ROUTE_FAIL_RE" <<<"$errs")
     fi
   fi
-  if [ "$quota" = 0 ] && [ "$stall" = 0 ]; then
+  if [ "$quota" = 0 ] && [ "$stall" = 0 ] && [ "$rfail" = 0 ]; then
     # Only a real answer clears the route's marker; a kill, a timeout or any other failure keeps it.
     if [ "$rc" = 0 ] && [ -z "$(error_text 0)" ]; then
       rm -f "$(marker "$model")"
@@ -389,6 +409,8 @@ for ((attempt = 0; attempt < ${#order[@]}; attempt++)); do
   if [ "$quota" = 1 ]; then
     mark_dead "$model"
     kind="quota-error"
+  elif [ "$rfail" = 1 ]; then
+    kind="route-failure"
   else
     kind="stalled"
   fi

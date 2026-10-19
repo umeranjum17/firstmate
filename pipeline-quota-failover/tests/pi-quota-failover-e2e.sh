@@ -101,6 +101,15 @@ case $model in
     fi
     printf '%s\n' "{\"type\":\"message_end\",\"role\":\"assistant\",\"model\":\"$model\",\"content\":\"PONG\"}"
     exit 0 ;;
+  bad/waitdelay)
+    echo 'pi parse events: exec: WaitDelay expired before I/O complete' >&2
+    exit 1 ;;
+  bad/extwarn)
+    echo 'Warning: extension /x/ext.ts failed to load' >&2
+    exit 1 ;;
+  bad/nocredit)
+    printf '%s\n' '{"type":"message_update","errorMessage":"402: {\"message\":\"Insufficient credits\"}"}'
+    exit 0 ;;
   bad/always-429)
     printf '%s\n' '{"type":"message_update","errorMessage":"429: {\"type\":\"GoUsageLimitError\",\"message\":\"Go usage limit exceeded\"}"}'
     exit 0 ;;
@@ -146,6 +155,8 @@ export PI_QUOTA_FAILOVER_REAL_PI="$stub/pi"
 export PI_QUOTA_FAILOVER_LOG="$log" STUB_ARGV=$work/argv STUB_QUOTA_LOG=$work/quota.log
 export HOME="$home" XDG_STATE_HOME="$work/state" STUB_CHILD=$work/child STUB_PI=$work/pi.pid
 PATH="$stub:$PATH"
+# The credit probe is one more pi call per run; it is off except in its own journey (section R below).
+export PI_QUOTA_FAILOVER_PROBE=0
 prompt='Reply with the single word PONG.'
 prompt_file=$work/prompt
 printf '%s' "$prompt" >"$prompt_file"
@@ -656,6 +667,34 @@ else
   no "restore left the key behind or broke the config"
 fi
 ls "$cfg".bak-pqf-* >/dev/null 2>&1 && ok "backup written" || no "no backup file"
+
+# R. Route failures fall through: a WaitDelay exit, an extension-warning exit and a route with no credit (probe) each
+#    move to the next route; a healthy first route is unaffected and is not failed over.
+for bad in waitdelay extwarn; do
+  nodead
+  : >"$log"
+  OUT=$(printf '%s' "$prompt" | PI_QUOTA_FAILOVER_CHAIN="bad/$bad deepseek/deepseek-flash" "$wrapper" --model bad/$bad --mode json --no-session 2>"$work/errR")
+  is "$bad exit falls through, exit 0" "$?" "0"
+  out_has "$bad exit lands on the next route" '"model":"deepseek/deepseek-flash"'
+  log_has "$bad exit logged as a route failure" 'route-failure'
+  is "$bad exit writes no quota marker" "$(age_of "bad/$bad")" "none"
+done
+nodead
+: >"$log"
+: >"$STUB_ARGV"
+OUT=$(printf '%s' "$prompt" | PI_QUOTA_FAILOVER_PROBE=1 PI_QUOTA_FAILOVER_CHAIN="bad/nocredit deepseek/deepseek-flash" "$wrapper" --model bad/nocredit --thinking high --mode json --no-session 2>"$work/errR")
+is "no-credit route falls through, exit 0" "$?" "0"
+out_has "no-credit route lands on the next route" '"model":"deepseek/deepseek-flash"'
+log_has "no-credit probe writes a pulse line" 'pulse: model=bad/nocredit skipped'
+is "no-credit route never runs for real" "$(grep -c 'bad/nocredit.*--thinking' "$STUB_ARGV")" "0"
+nodead
+: >"$log"
+: >"$STUB_ARGV"
+OUT=$(printf '%s' "$prompt" | PI_QUOTA_FAILOVER_PROBE=1 PI_QUOTA_FAILOVER_CHAIN="deepseek/deepseek-flash claude-bridge/claude-haiku-5-5" "$wrapper" --model deepseek/deepseek-flash --thinking high --mode json --no-session 2>"$work/errR")
+is "healthy first route exits 0" "$?" "0"
+out_has "healthy first route answers" '"model":"deepseek/deepseek-flash"'
+is "healthy first route: no haiku call" "$(grep -c 'claude-bridge' "$STUB_ARGV")" "0"
+if grep -q 'skipped\|moving to' "$log"; then no "healthy first route was failed over"; else ok "healthy first route logs no skip"; fi
 
 echo
 if [ "$fails" = 0 ]; then echo "all tests passed"; else echo "$fails test(s) failed"; exit 1; fi
