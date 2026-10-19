@@ -116,4 +116,5 @@ fm_merge_outcome_report() {  # <home> <state> <task-id> <pr-url> <origin> [autho
 }
 
 # Optional merge-card add-on: defines fm_merge_post_hook.
+# shellcheck source=/dev/null
 [ ! -r "${FM_ADDONS_DIR:-${FM_HOME:-$_FM_MERGE_OUTCOME_LIB_DIR/..}/projects/firstmate-addons}/merge-card/bin/fm-merge-hooks-lib.sh" ] || . "${FM_ADDONS_DIR:-${FM_HOME:-$_FM_MERGE_OUTCOME_LIB_DIR/..}/projects/firstmate-addons}/merge-card/bin/fm-merge-hooks-lib.sh"
