@@ -236,6 +236,22 @@ export MODE DD_LOG SO_CAPTURE
 checks gap-noclaim shot.png && cp "$shot" "$home/data/gap-noclaim/shot.png"
 run_gap gap-noclaim "$work/card-gap-noclaim"
 
+# The gate refuses a PR merge with no checks-lint PASS row for its head.
+MODE=newer DD_LOG=$work/args.log SO_CAPTURE=$work/card-lint
+export MODE DD_LOG SO_CAPTURE
+checks lint shot.png && cp "$shot" "$home/data/lint/shot.png"
+gate_rc() { PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" gate lint "$wt" "$head_c" https://github.com/o/r/pull/1 >/dev/null 2>&1; echo $?; }
+rm -f "$home/data/checks-gate.log"
+is "gate: no PASS row is refused" "$(gate_rc)" 1
+printf 't\thttps://github.com/o/r/pull/1\totherhead\tpass\t1 evidence files\n' > "$home/data/checks-gate.log"
+is "gate: PASS row for another head is refused" "$(gate_rc)" 1
+printf 't\thttps://github.com/o/r/pull/1\t%s\tfail\tx\n' "$head_c" >> "$home/data/checks-gate.log"
+is "gate: FAIL row for the head is refused" "$(gate_rc)" 1
+printf 't\thttps://github.com/o/r/pull/1\t%s\tpass\t1 evidence files\n' "$head_c" >> "$home/data/checks-gate.log"
+is "gate: PASS row for the head is allowed" "$(gate_rc)" 0
+PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" lint "$wt" "$head_c" https://github.com/o/r/pull/1 >/dev/null 2>&1
+is "post: the card logged its evidence folder on the head's row" "$(grep -c "$head_c	card	evidence folder $home/data/lint" "$home/data/checks-gate.log")" 1
+
 # No run anywhere posted, or even asked for, a report card.
 if grep -q -- '--kind report' "$SO_LOG"; then
   no "never any report kind: sign-off saw --kind report"
