@@ -139,7 +139,7 @@ card_split() {  # <reason>; prints "<title sentence>\t<rest of reason>"
   head=$flat
   sentence=$flat
   case "$flat" in
-    *\?*) head=${flat%\?*}; sentence=${head##*[.!?]} ;;
+    *\?*) head=${flat%\?*}; sentence=$(printf '%s' "$head" | sed -E 's/.*[.!?][[:space:]]+//') ;;
   esac
   printf '%s\t%s\n' "$sentence" "$(printf '%s' "${head%"$sentence"}" | sed -E 's/[[:space:]]+$//')"
 }

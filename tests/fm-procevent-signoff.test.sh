@@ -179,27 +179,31 @@ out=$(PATH="$TMP_ROOT/refusebin:$PATH" FM_ROOT_OVERRIDE="$ROOTCOPY" FM_HOME="$FM
 case "$out" in *"--why is required"*) : ;; *) fail "the refusal text was lost: $out" ;; esac
 pass "a refused raise exits nonzero with the sign-off-axi error text"
 
-md_home="$TMP_ROOT/md-home"
-mkdir -p "$md_home/data" "$md_home/config" "$md_home/projects" "$md_home/state"
-printf '# Backlog\n\n## Backlog\n\n## In flight\n\n## Done\n' > "$md_home/data/backlog.md"
-printf 'backend = "markdown"\n\n[markdown]\npath = "data/backlog.md"\narchive = "data/done-archive.md"\ndone_keep = 10\n' > "$md_home/.tasks.toml"
-md_env() {
-  PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$md_home" FM_STATE_OVERRIDE="$md_home/state" \
-    FM_DATA_OVERRIDE="$md_home/data" FM_CONFIG_OVERRIDE="$md_home/config" FM_PROCEVENT_CLAIM_ROOT="$TMP_ROOT/md-claims" "$@"
-}
-md_env "$ROOT/bin/fm-procevent-signoff.sh" arm >/dev/null || fail "the markdown home did not arm the sign-off adapter"
-(cd "$md_home" && BEADS_ACTOR=fixture tasks-axi add fm-sample-refused "Refused card") >/dev/null 2>&1 \
-  || fail "could not create the refused-card work item"
-export SIGNOFF_REFUSE=1
-if err=$(md_env "$ROOT/bin/fm-captain-hold.sh" hold fm-sample-refused --title "Refused card" --reason "needs a call" 2>&1 >/dev/null); then
+if ! command -v tasks-axi >/dev/null 2>&1; then
+  echo "skip: tasks-axi is not installed; the refused-card hold was not checked"
+else
+  md_home="$TMP_ROOT/md-home"
+  mkdir -p "$md_home/data" "$md_home/config" "$md_home/projects" "$md_home/state"
+  printf '# Backlog\n\n## Backlog\n\n## In flight\n\n## Done\n' > "$md_home/data/backlog.md"
+  printf 'backend = "markdown"\n\n[markdown]\npath = "data/backlog.md"\narchive = "data/done-archive.md"\ndone_keep = 10\n' > "$md_home/.tasks.toml"
+  md_env() {
+    PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$md_home" FM_STATE_OVERRIDE="$md_home/state" \
+      FM_DATA_OVERRIDE="$md_home/data" FM_CONFIG_OVERRIDE="$md_home/config" FM_PROCEVENT_CLAIM_ROOT="$TMP_ROOT/md-claims" "$@"
+  }
+  md_env "$ROOT/bin/fm-procevent-signoff.sh" arm >/dev/null || fail "the markdown home did not arm the sign-off adapter"
+  (cd "$md_home" && BEADS_ACTOR=fixture tasks-axi add fm-sample-refused "Refused card") >/dev/null 2>&1 \
+    || fail "could not create the refused-card work item"
+  export SIGNOFF_REFUSE=1
+  if err=$(md_env "$ROOT/bin/fm-captain-hold.sh" hold fm-sample-refused --title "Refused card" --reason "needs a call" 2>&1 >/dev/null); then
+    unset SIGNOFF_REFUSE
+    fail "a hold whose card was refused exited zero"
+  fi
   unset SIGNOFF_REFUSE
-  fail "a hold whose card was refused exited zero"
+  case "$err" in *"refused by the stub"*) : ;; *) fail "the card refusal text was lost: $err" ;; esac
+  show=$(cd "$md_home" && BEADS_ACTOR=fixture tasks-axi show fm-sample-refused --full 2>&1)
+  case "$show" in *"held: yes"*) : ;; *) fail "a refused card released the hold: $show" ;; esac
+  pass "a hold whose card is refused exits nonzero with the sign-off error and stays held"
 fi
-unset SIGNOFF_REFUSE
-case "$err" in *"refused by the stub"*) : ;; *) fail "the card refusal text was lost: $err" ;; esac
-show=$(cd "$md_home" && BEADS_ACTOR=fixture tasks-axi show fm-sample-refused --full 2>&1)
-case "$show" in *"held: yes"*) : ;; *) fail "a refused card released the hold: $show" ;; esac
-pass "a hold whose card is refused exits nonzero with the sign-off error and stays held"
 
 TASKS_AXI_BIN=$(command -v tasks-axi || true)
 
