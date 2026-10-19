@@ -123,20 +123,45 @@ cmd_retire() {
   "$SCRIPT_DIR/fm-captain-hold.sh" unbind "$SOURCE_ID" >/dev/null || exit 1
 }
 
-# sign-off's question standard wants one plain question of 12 words or fewer. A
-# reason that opens with such a question is the title; otherwise the title is
-# built from the task title. The whole reason, flattened and cut to 200
-# characters, is the card's why.
-card_question() {  # <task-title> <reason>
-  local first
-  first=$(printf '%s' "$2" | tr '\n' ' ' | sed 's/^ *//; s/\([?]\).*/\1/')
-  case "$first" in
-    *\?) [ "$(printf '%s' "$first" | wc -w)" -le 12 ] && { printf '%s' "$first"; return; } ;;
-  esac
-  printf 'What is your call on %s?' "$(printf '%s' "$1" | sed 's/^\[[^]]*\] *//' | tr -d '?' | awk '{n = NF < 6 ? NF : 6; for (i = 1; i <= n; i++) printf "%s%s", $i, i < n ? " " : ""}')"
+# sign-off's question standard wants one plain question of 12 words or fewer,
+# with no leading "Captain hold:" or [tag]. The title is the reason's last
+# question sentence, or the whole reason when it has no question; the rest of
+# the reason is the why. Without any reason words the title is built from the
+# task title.
+card_flat() {
+  printf '%s' "$1" | tr '\t\n' '  ' \
+    | sed -E 's/^[[:space:]]+//; s/^(\[[^]]*\][[:space:]]*)+//; s/^[Cc][Aa][Pp][Tt][Aa][Ii][Nn] [Hh][Oo][Ll][Dd]:[[:space:]]*//; s/[[:space:]]+$//'
 }
 
-card_why() { printf '%s' "$1" | tr '\n' ' ' | cut -c1-200; }
+card_split() {  # <reason>; prints "<title sentence>\t<rest of reason>"
+  local flat head sentence
+  flat=$(card_flat "$1")
+  head=$flat
+  sentence=$flat
+  case "$flat" in
+    *\?*) head=${flat%\?*}; sentence=${head##*[.!?]} ;;
+  esac
+  printf '%s\t%s\n' "$sentence" "$(printf '%s' "${head%"$sentence"}" | sed -E 's/[[:space:]]+$//')"
+}
+
+card_question() {  # <task-title> <reason>
+  local split title
+  split=$(card_split "$2")
+  title=$(printf '%s' "${split%%$'\t'*}" | sed -E 's/^[[:space:]]+//; s/[?.![:space:]]+$//' \
+    | awk '{n = NF < 12 ? NF : 12; for (i = 1; i <= n; i++) printf "%s%s", $i, i < n ? " " : ""}')
+  if [ -n "$title" ]; then
+    printf '%s?' "$title"
+    return
+  fi
+  printf 'What is your call on %s?' "$(card_flat "$1" | tr -d '?' | awk '{n = NF < 6 ? NF : 6; for (i = 1; i <= n; i++) printf "%s%s", $i, i < n ? " " : ""}')"
+}
+
+card_why() {  # <reason>
+  local split rest
+  split=$(card_split "$1")
+  rest=${split#*$'\t'}
+  printf '%s' "${rest:-$(card_flat "$1")}" | cut -c1-200
+}
 
 cmd_raise() {
   [ "$#" -eq 4 ] || usage
@@ -150,7 +175,7 @@ cmd_raise() {
     --title "$(card_question "$2" "$3")" --about "$3" --why "$(card_why "$3")" \
     --outcome yes="Your yes is recorded and the work moves on." \
     --outcome no="Your no is recorded and the work stays on hold." \
-    --recommend yes --recommend-reason "The hold records no recommendation; yes unblocks the work." \
+    --recommend no --recommend-reason "The hold records no recommendation; no is the safe default because the item stays held." \
     --default no --close "$4" 2>&1) || {
     printf 'sign-off-axi raise failed: %s\n' "$out" >&2
     return 1
