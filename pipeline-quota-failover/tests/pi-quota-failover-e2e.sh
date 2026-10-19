@@ -180,8 +180,8 @@ child_gone() {
   return 1
 }
 
-is "default chain is DeepSeek Flash, then Claude Haiku (GLM removed)" "$(PI_QUOTA_FAILOVER_PRINT_CHAIN=1 "$wrapper" </dev/null)" \
-  "deepseek/deepseek-flash claude-bridge/claude-haiku-5-5"
+is "default chain is Claude Haiku, then the free MiniMax route (DeepSeek and GLM removed)" "$(PI_QUOTA_FAILOVER_PRINT_CHAIN=1 "$wrapper" </dev/null)" \
+  "claude-bridge/claude-haiku-5-5 openrouter/minimax/minimax-m3.1-flash:free"
 
 # 0. The default chain, no override. A Codex-pinned call (the first-draft fix step's route) runs the chain and lands on
 #    DeepSeek: quota-axi is asked for DeepSeek and does not skip it, and Codex, GLM and Haiku are not called.
@@ -190,24 +190,24 @@ nodead
 : >"$STUB_QUOTA_LOG"
 OUT=$(printf '%s' "$prompt" | env -u PI_QUOTA_FAILOVER_CHAIN "$wrapper" --model openai-codex/gpt-6-luna --mode json --no-session 2>"$work/err0a")
 is "codex-pinned call exits 0" "$?" "0"
-out_has "codex-pinned call lands on DeepSeek" '"model":"deepseek/deepseek-flash"'
+out_has "codex-pinned call lands on Haiku" '"model":"claude-bridge/claude-haiku-5-5"'
 is "codex-pinned call makes one pi call" "$(wc -l <"$STUB_ARGV")" "1"
 is "codex never called" "$(grep -c 'openai-codex' "$STUB_ARGV")" "0"
-is "quota-axi asked for deepseek" "$(grep -c -- '--provider deepseek ' "$STUB_QUOTA_LOG")" "1"
+is "quota-axi never asked for deepseek" "$(grep -c -- '--provider deepseek ' "$STUB_QUOTA_LOG")" "0"
 
 # 0b. GLM is out of the chain: a GLM-pinned call never reaches GLM, it runs DeepSeek.
 nodead
 : >"$STUB_ARGV"
 OUT=$(printf '%s' "$prompt" | env -u PI_QUOTA_FAILOVER_CHAIN "$wrapper" --model zai/glm-5.3-flash --mode json --no-session 2>"$work/err0b")
 is "glm-pinned call exits 0" "$?" "0"
-out_has "glm-pinned call runs DeepSeek" '"model":"deepseek/deepseek-flash"'
+out_has "glm-pinned call runs Haiku" '"model":"claude-bridge/claude-haiku-5-5"'
 is "glm never called with the default chain" "$(grep -c 'zai/glm' "$STUB_ARGV")" "0"
 
 # 0c. A DeepSeek quota error moves on to Claude Haiku in the same call, and writes its marker.
 nodead
 : >"$log"
 : >"$STUB_ARGV"
-OUT=$(printf '%s' "$prompt" | STUB_DS_DEAD=1 env -u PI_QUOTA_FAILOVER_CHAIN "$wrapper" --model deepseek/deepseek-flash --mode json --no-session 2>"$work/err0c")
+OUT=$(printf '%s' "$prompt" | STUB_DS_DEAD=1 PI_QUOTA_FAILOVER_CHAIN="deepseek/deepseek-flash claude-bridge/claude-haiku-5-5" "$wrapper" --model deepseek/deepseek-flash --mode json --no-session 2>"$work/err0c")
 is "deepseek quota error exits 0" "$?" "0"
 out_has "deepseek quota error moves to Haiku" '"model":"claude-bridge/claude-haiku-5-5"'
 is "deepseek quota error: DeepSeek then Haiku, nothing else" "$(sed -e 's/^.*--model //' -e 's/ .*//' "$STUB_ARGV" | tr '\n' ' ')" "deepseek/deepseek-flash claude-bridge/claude-haiku-5-5 "
@@ -219,14 +219,14 @@ fresh "deepseek quota error writes its marker" deepseek/deepseek-flash
 nodead
 : >"$log"
 : >"$STUB_ARGV"
-OUT=$(printf '%s' "$prompt" | STUB_DS_SILENT=4 PI_QUOTA_FAILOVER_IDLE_SECS=2 env -u PI_QUOTA_FAILOVER_CHAIN "$wrapper" --model deepseek/deepseek-flash --mode json --no-session 2>"$work/err0d")
+OUT=$(printf '%s' "$prompt" | STUB_DS_SILENT=4 PI_QUOTA_FAILOVER_IDLE_SECS=2 PI_QUOTA_FAILOVER_CHAIN="deepseek/deepseek-flash claude-bridge/claude-haiku-5-5" "$wrapper" --model deepseek/deepseek-flash --mode json --no-session 2>"$work/err0d")
 is "silent deepseek under its own limit exits 0" "$?" "0"
 out_has "silent deepseek answers itself" '"model":"deepseek/deepseek-flash"'
 is "silent deepseek under its own limit: one pi call" "$(wc -l <"$STUB_ARGV")" "1"
 if grep -q 'no output for' "$log"; then no "silent deepseek was killed under its own limit"; else ok "silent deepseek is not killed under the generic limit"; fi
 nodead
 : >"$log"
-OUT=$(printf '%s' "$prompt" | STUB_DS_SILENT=4 PI_QUOTA_FAILOVER_IDLE_SECS=2 PI_QUOTA_FAILOVER_DEEPSEEK_IDLE_SECS=2 env -u PI_QUOTA_FAILOVER_CHAIN "$wrapper" --model deepseek/deepseek-flash --mode json --no-session 2>"$work/err0d2")
+OUT=$(printf '%s' "$prompt" | STUB_DS_SILENT=4 PI_QUOTA_FAILOVER_IDLE_SECS=2 PI_QUOTA_FAILOVER_DEEPSEEK_IDLE_SECS=2 PI_QUOTA_FAILOVER_CHAIN="deepseek/deepseek-flash claude-bridge/claude-haiku-5-5" "$wrapper" --model deepseek/deepseek-flash --mode json --no-session 2>"$work/err0d2")
 is "deepseek over its own limit exits 0" "$?" "0"
 log_has "deepseek own limit kills the silent call" "model=deepseek/deepseek-flash stalled.*no output for 2s.*moving to claude-bridge/claude-haiku-5-5"
 out_has "deepseek over its own limit moves to Haiku" '"model":"claude-bridge/claude-haiku-5-5"'
@@ -695,6 +695,23 @@ is "healthy first route exits 0" "$?" "0"
 out_has "healthy first route answers" '"model":"deepseek/deepseek-flash"'
 is "healthy first route: no haiku call" "$(grep -c 'claude-bridge' "$STUB_ARGV")" "0"
 if grep -q 'skipped\|moving to' "$log"; then no "healthy first route was failed over"; else ok "healthy first route logs no skip"; fi
+
+# S. The free MiniMax route heads the default chain and is never credit-probed; an empty-credit route is skipped.
+nodead
+: >"$log"
+: >"$STUB_ARGV"
+OUT=$(printf '%s' "$prompt" | PI_QUOTA_FAILOVER_PROBE=1 PI_QUOTA_FAILOVER_CHAIN="openrouter/minimax/minimax-m3.1-flash:free bad/nocredit" "$wrapper" --model openrouter/minimax/minimax-m3.1-flash:free --mode json --no-session 2>"$work/errS")
+is "free route ahead of an empty-credit route: exit 0" "$?" "0"
+out_has "free route answers" '"model":"openrouter/minimax/minimax-m3.1-flash:free"'
+is "free route: one pi call, no probe" "$(grep -c ':free' "$STUB_ARGV")" "1"
+if grep -q 'skipped' "$log"; then no "free route was skipped"; else ok "free route logs no skip"; fi
+nodead
+: >"$log"
+: >"$STUB_ARGV"
+OUT=$(printf '%s' "$prompt" | PI_QUOTA_FAILOVER_PROBE=1 PI_QUOTA_FAILOVER_CHAIN="bad/nocredit openrouter/minimax/minimax-m3.1-flash:free" "$wrapper" --model bad/nocredit --mode json --no-session 2>"$work/errS2")
+is "empty-credit route first, free route second: exit 0" "$?" "0"
+out_has "empty-credit route skipped, free route answers" '"model":"openrouter/minimax/minimax-m3.1-flash:free"'
+log_has "empty-credit route skipped by the probe" 'pulse: model=bad/nocredit skipped'
 
 echo
 if [ "$fails" = 0 ]; then echo "all tests passed"; else echo "$fails test(s) failed"; exit 1; fi

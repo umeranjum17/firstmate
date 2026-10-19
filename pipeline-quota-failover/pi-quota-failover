@@ -9,8 +9,8 @@
 # run fails, costing a restart.
 #
 # This wrapper runs the real pi; the requested chain model goes first, then
-# the other chain models in chain order (default DeepSeek Flash, then Claude
-# Haiku 5.5 through claude-bridge - Haiku only as the last failover; never
+# the other chain models in chain order (default Claude
+# Haiku 5.5 through claude-bridge, the free MiniMax route on OpenRouter; never
 # Opus, Sonnet, Fable, Codex, Go, Muse or Step 5). A call pinned to a model
 # outside the chain runs the chain in chain order, so no pipeline role reaches
 # a model the chain does not name. When an attempt answers a QUOTA error it
@@ -66,7 +66,7 @@ QUOTA_RE='limit used up|usage limit|limit has been reached|rate limit reached|Go
 # extension warning/failure is a route failure: the chain moves on without a quota marker (fleet retro 19 Oct, fix 2).
 ROUTE_FAIL_RE='WaitDelay|parse events|extension.*(warning|failed|error)|(warning|error|failed).*extension'
 
-chain=${PI_QUOTA_FAILOVER_CHAIN:-'deepseek/deepseek-flash claude-bridge/claude-haiku-5-5'}
+chain=${PI_QUOTA_FAILOVER_CHAIN:-'claude-bridge/claude-haiku-5-5 openrouter/minimax/minimax-m3.1-flash:free'}
 # The chain is the fleet's one route list: route-change reads it from here.
 [ -z "${PI_QUOTA_FAILOVER_PRINT_CHAIN:-}" ] || { printf '%s\n' "$chain"; exit 0; }
 
@@ -134,10 +134,11 @@ quota_exhausted() {
   jq -e --arg p "$qp" --arg s "model:${1#*/}" '[.providers[]? | select(.provider == $p) | .quotaSemantics.effectiveAvailability[]? | select((.scope == "all_models" or .scope == $s) and .runway.status == "exhausted_now")] | length > 0' <<<"$answer" >/dev/null 2>&1
 }
 # credit_empty <model>: a 1-request probe (the real pi, one "ok" prompt) answers a QUOTA_RE balance error. Any other answer,
-# a timeout or a failed start leaves the route to be tried. PI_QUOTA_FAILOVER_PROBE=0 turns the probe off.
+# a timeout or a failed start leaves the route to be tried; a model id ending in :free is never probed. PI_QUOTA_FAILOVER_PROBE=0 turns the probe off.
 credit_empty() {
   local probe_out
   [ "${PI_QUOTA_FAILOVER_PROBE:-1}" != 0 ] || return 1
+  case $1 in *:free) return 1 ;; esac # a :free model needs no balance
   probe_out=$(printf 'ok' | timeout "${PI_QUOTA_FAILOVER_PROBE_SECS:-60}" "$real_pi" "${ext_args[@]}" --model "$1" --mode json --no-session 2>&1) || true
   grep -oE '"errorMessage":"(\\.|[^"])*"' <<<"$probe_out" | grep -qiE "$QUOTA_RE"
 }
