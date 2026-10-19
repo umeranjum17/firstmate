@@ -239,6 +239,33 @@ test_wrapper_single_home() {
   pass "fm-tasks-axi.sh keeps the single-home layout addressing its own code-root backlog"
 }
 
+test_wrapper_captain_ask_guard() {
+  local dir bin
+  dir=$(make_split captain-ask)
+  bin="$dir/bin"
+  mkdir -p "$bin"
+  printf '#!/bin/sh\necho MERGED\n' > "$bin/gh"
+  chmod +x "$bin/gh"
+  printf 'Yes, ship it.\n' > "$dir/answer.txt"
+  wrapper_from_code "$dir" add ca-1 "[captain-ask] pick one" >/dev/null
+  wrapper_from_code "$dir" add ca-2 "[captain-ask] pick two" >/dev/null
+  wrapper_from_code "$dir" add ca-3 "[captain-ask] pick three" >/dev/null
+  wrapper_from_code "$dir" add plain-1 "ordinary" >/dev/null
+  wrapper_from_code "$dir" rm ca-1 >/dev/null 2>&1 && fail "rm of an unanswered [captain-ask] item was allowed"
+  wrapper_from_code "$dir" "done" ca-1 >/dev/null 2>&1 && fail "done of an unanswered [captain-ask] item was allowed"
+  wrapper_from_code "$dir" hold ca-1 --reason parked --kind parked >/dev/null 2>&1 \
+    && fail "parking an unanswered [captain-ask] item was allowed"
+  assert_grep "ca-1" "$dir/home/data/backlog.md" "the refused item left the backlog"
+  (cd "$dir/code" && FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code" "$ROOT/bin/fm-captain-hold.sh" hold ca-1 --reason "pick one" >/dev/null \
+    && FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code" "$ROOT/bin/fm-captain-hold.sh" answer ca-1 --decision-file "$dir/answer.txt" >/dev/null) \
+    || fail "could not record a captain answer"
+  wrapper_from_code "$dir" rm ca-1 >/dev/null 2>&1 || fail "rm of an answered [captain-ask] item was refused"
+  wrapper_from_code "$dir" update ca-2 --pr https://github.com/o/r/pull/1 >/dev/null
+  (PATH="$bin:$PATH" wrapper_from_code "$dir" "done" ca-2 >/dev/null 2>&1) || fail "done with a merged PR was refused"
+  wrapper_from_code "$dir" rm plain-1 >/dev/null 2>&1 || fail "an untagged item was refused"
+  pass "fm-tasks-axi.sh keeps [captain-ask] items until answered or merged and leaves other items alone"
+}
+
 test_guard_reports_regular_code_root_backlog
 test_guard_reports_foreign_link_and_archive
 test_guard_silent_for_single_home
@@ -249,6 +276,7 @@ if [ "$HAVE_TASKS_AXI" = 1 ]; then
   test_wrapper_refusals
   test_wrapper_refuses_add_start
   test_wrapper_single_home
+  test_wrapper_captain_ask_guard
 else
   echo "skip: tasks-axi not found; home-addressing cases not run"
 fi

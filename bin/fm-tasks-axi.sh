@@ -50,6 +50,12 @@
 #   - a markdown `<data>/backlog.md` that is itself a symlink, because the
 #     first write would replace the link with a private copy, exactly the fork
 #     this command exists to prevent. Lifecycle transitions refuse the same file.
+#   - `rm`/`delete`, `done`/`close`, or `hold --kind parked` on a row whose title
+#     carries `[captain-ask]`, unless `bin/fm-captain-hold.sh answered <id>`
+#     finds a recorded captain answer or the row's `pr:` link is a merged PR,
+#     so no cap or triage can drop a captain's ask. The automatic dispatch and
+#     teardown transitions use bin/fm-backlog-transition-lib.sh, not this
+#     wrapper, and a merged-PR done passes the second test.
 # Otherwise the exit status is tasks-axi's own, unless decoding a read fails;
 # in that case the decoder's nonzero status is returned.
 set -u
@@ -144,6 +150,30 @@ else
 fi
 
 cd "$FM_BACKLOG_AXI_ROOT" || fail "cannot enter the backlog root $FM_BACKLOG_AXI_ROOT"
+
+# A [captain-ask] row leaves the backlog only with the captain's answer or a merged PR.
+guard_captain_ask() {  # <id>
+  local show pr
+  show=$(tasks-axi show "$1" --full 2>/dev/null) || return 0
+  case "$(printf '%s\n' "$show" | sed -n 's/^  title: //p' | head -1)" in
+    *'[captain-ask]'*) ;;
+    *) return 0 ;;
+  esac
+  "$SCRIPT_DIR/fm-captain-hold.sh" answered "$1" && return 0
+  pr=$(printf '%s\n' "$show" | sed -n 's/^  links: .*pr:\([^" ,]*\).*/\1/p' | head -1)
+  if [ -n "$pr" ] && [ "$(gh pr view "$pr" --json state -q .state 2>/dev/null)" = MERGED ]; then
+    return 0
+  fi
+  fail "$1 is a [captain-ask] item with no recorded captain answer (bin/fm-captain-hold.sh answer) and no merged PR (tasks-axi update --pr); it cannot leave the backlog"
+}
+case "${1:-}" in
+  rm|delete|done|close) guard_captain_ask "${2:-}" ;;
+  hold)
+    case " ${ARGS[*]} " in
+      *' --kind parked '*|*' --kind=parked '*) guard_captain_ask "${2:-}" ;;
+    esac
+    ;;
+esac
 case "${1:-}" in
   show|view|list)
     set -o pipefail
