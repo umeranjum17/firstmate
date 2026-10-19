@@ -1177,8 +1177,8 @@ EOF
 # budget. The per-mate liveness lock serializes this tick against a concurrent
 # session-start sweep, so neither side can kill or re-probe an endpoint the
 # other is mid-relaunch on.
-# shellcheck disable=SC1091 # The optional add-on source is installed outside this repository.
 fm_host_memory_lib="${FM_ADDONS_DIR:-$FM_HOME/projects/firstmate-addons}/host-memory/bin/fm-host-memory-lib.sh"
+# shellcheck disable=SC1090,SC1091 # The optional add-on source is installed outside this repository.
 if [ -f "$fm_host_memory_lib" ]; then . "$fm_host_memory_lib"; fi
 
 # Publication and acknowledgement remain the sampler and drain's jobs. A
