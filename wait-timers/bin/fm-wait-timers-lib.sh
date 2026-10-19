@@ -17,7 +17,8 @@
 # to Main itself, and any human escalation beyond that is judgment.
 # Source through fm-watch.sh; the wake library supplies hashing and wake emission.
 
-_FM_WAIT_TIMER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Sibling libraries live in the fork's bin/, not beside this add-on file.
+_FM_WAIT_TIMER_DIR="${SCRIPT_DIR:-${FM_PUSH_TRANSITION_LIB_DIR:-$FM_HOME/bin}}"
 # shellcheck source=bin/fm-parent-channel-lib.sh
 . "$_FM_WAIT_TIMER_DIR/fm-parent-channel-lib.sh"
 # shellcheck source=bin/fm-timeout-lib.sh

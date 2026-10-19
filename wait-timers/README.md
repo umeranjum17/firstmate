@@ -8,6 +8,24 @@ will source this directory instead lands in a later PR. Until that swap this
 directory is dormant, and every moved byte below is identical to the fork copy
 the live watcher runs today.
 
+Step A of the fork exit: the library runs from this directory. Its sibling
+libraries (`fm-parent-channel-lib.sh`, `fm-timeout-lib.sh`) are read from the
+fork's `bin/` (`$SCRIPT_DIR`, else `$FM_PUSH_TRANSITION_LIB_DIR`, else
+`$FM_HOME/bin`). The library body is otherwise identical to the fork copy.
+
+## Step-B hook lines (fork)
+
+- `bin/fm-watch.sh` and `bin/fm-push-transition-lib.sh`: replace the sourcing of
+  the fork's `fm-wait-timers-lib.sh` with
+  `[ ! -r "${FM_ADDONS_DIR:-$FM_HOME/projects/firstmate-addons}/wait-timers/bin/fm-wait-timers-lib.sh" ] || . "${FM_ADDONS_DIR:-$FM_HOME/projects/firstmate-addons}/wait-timers/bin/fm-wait-timers-lib.sh"`.
+- Tick: `if declare -F fm_wait_timers_tick >/dev/null; then fm_wait_timers_tick || { echo "watcher: waiting-state timer check failed" >&2; exit 1; }; fi`.
+- Push: `if [ -n "$task" ] && declare -F fm_wait_timer_push_delivered >/dev/null; then fm_wait_timer_push_delivered "$task" "$window" || exit 1; fi`.
+
+`tests/wait-timers-hook-e2e.sh` (set `FM_TEST_FORK` to a Firstmate checkout)
+applies those lines to a private copy of the fork and runs the fork's real
+`tests/fm-wait-timers.test.sh` journey over this library; with the add-on absent
+the lines are a no-op.
+
 ## Layout
 
 - `bin/fm-wait-timers-lib.sh` — the timer library the watcher sources once per
