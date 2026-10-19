@@ -255,7 +255,16 @@ test_wrapper_captain_ask_guard() {
   wrapper_from_code "$dir" "done" ca-1 >/dev/null 2>&1 && fail "done of an unanswered [captain-ask] item was allowed"
   wrapper_from_code "$dir" hold ca-1 --reason parked --kind parked >/dev/null 2>&1 \
     && fail "parking an unanswered [captain-ask] item was allowed"
+  wrapper_from_code "$dir" rm --json ca-1 >/dev/null 2>&1 && fail "rm --json of an unanswered [captain-ask] item was allowed"
+  wrapper_from_code "$dir" task rm ca-3 >/dev/null 2>&1 && fail "task rm of an unanswered [captain-ask] item was allowed"
+  wrapper_from_code "$dir" hold --kind parked --reason parked ca-1 >/dev/null 2>&1 \
+    && fail "parking an unanswered [captain-ask] item with flags first was allowed"
+  mkdir -p "$dir/unreadable"
+  printf '#!/bin/sh\n[ "$1" = show ] && exit 1\nexec "%s" "$@"\n' "$(command -v tasks-axi)" > "$dir/unreadable/tasks-axi"
+  chmod +x "$dir/unreadable/tasks-axi"
+  (PATH="$dir/unreadable:$PATH" wrapper_from_code "$dir" rm ca-3 >/dev/null 2>&1) && fail "rm with an unreadable row was allowed"
   assert_grep "ca-1" "$dir/home/data/backlog.md" "the refused item left the backlog"
+  assert_grep "ca-3" "$dir/home/data/backlog.md" "a refused item left the backlog"
   (cd "$dir/code" && FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code" "$ROOT/bin/fm-captain-hold.sh" hold ca-1 --reason "pick one" >/dev/null \
     && FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code" "$ROOT/bin/fm-captain-hold.sh" answer ca-1 --decision-file "$dir/answer.txt" >/dev/null) \
     || fail "could not record a captain answer"

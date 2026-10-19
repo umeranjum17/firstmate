@@ -153,9 +153,13 @@ cd "$FM_BACKLOG_AXI_ROOT" || fail "cannot enter the backlog root $FM_BACKLOG_AXI
 
 # A [captain-ask] row leaves the backlog only with the captain's answer or a merged PR.
 guard_captain_ask() {  # <id>
-  local show pr
-  show=$(tasks-axi show "$1" --full 2>/dev/null) || return 0
-  case "$(printf '%s\n' "$show" | sed -n 's/^  title: //p' | head -1)" in
+  local show pr title
+  [ -n "$1" ] || return 0
+  show=$(tasks-axi show "$1" --full 2>/dev/null) \
+    || fail "cannot read $1 to check whether it is a [captain-ask] item; it stays in the backlog until the read succeeds"
+  title=$(printf '%s\n' "$show" | sed -n 's/^  title: //p' | head -1)
+  case "$title" in
+    '') fail "cannot read the title of $1 to check whether it is a [captain-ask] item; it stays in the backlog" ;;
     *'[captain-ask]'*) ;;
     *) return 0 ;;
   esac
@@ -166,14 +170,29 @@ guard_captain_ask() {  # <id>
   fi
   fail "$1 is a [captain-ask] item with no recorded captain answer (bin/fm-captain-hold.sh answer) and no merged PR (tasks-axi update --pr); it cannot leave the backlog"
 }
-case "${1:-}" in
-  rm|delete|done|close) guard_captain_ask "${2:-}" ;;
-  hold)
-    case " ${ARGS[*]} " in
-      *' --kind parked '*|*' --kind=parked '*) guard_captain_ask "${2:-}" ;;
+captain_guard() {  # <tasks-axi args>
+  local verb id='' value=0 arg
+  [ "${1:-}" = task ] && shift
+  verb=${1:-}
+  [ "$#" -gt 0 ] && shift
+  for arg in "$@"; do
+    if [ "$value" = 1 ]; then value=0; continue; fi
+    case "$arg" in
+      --backend|--pr|--report|--note|--keep|--reason|--until|--kind) value=1 ;;
+      -*) ;;
+      *) id=$arg ;;
     esac
-    ;;
-esac
+  done
+  case "$verb" in
+    rm|delete|done|close) guard_captain_ask "$id" ;;
+    hold)
+      case " $* " in
+        *' --kind parked '*|*' --kind=parked '*) guard_captain_ask "$id" ;;
+      esac
+      ;;
+  esac
+}
+captain_guard ${ARGS[@]+"${ARGS[@]}"}
 case "${1:-}" in
   show|view|list)
     set -o pipefail
