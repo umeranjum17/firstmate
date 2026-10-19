@@ -136,8 +136,7 @@ _FM_PENDING_REPLY_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd 2>/dev/n
 # bin/fm-wake-lib.sh's single directed expansion below; a second directive
 # here would re-expand the same transitive graph.
 . "$_FM_PENDING_REPLY_LIB_DIR/fm-classify-lib.sh"
-# Parked-home reader (firstmate-addons/parked-homes). Optional source: a
-# checkout or test fake root without the lib never parks anything.
+# Parked-home gate (firstmate-addons/parked-homes); the shim answers "not parked" without the add-on.
 . "$_FM_PENDING_REPLY_LIB_DIR/fm-parked-homes-lib.sh"
 
 FM_PENDING_REPLY_SCHEMA='fm-pending-reply.v1'

@@ -543,8 +543,7 @@ if [ -n "$TARGET_SELECTOR" ] && [ -n "$TARGET_META" ] && [ "$(fm_meta_get "$TARG
 fi
 
 # Parked-home guard (firstmate-addons/parked-homes): a parked secondmate home
-# gets no message, steer, answer or nudge. Optional source: a checkout or test
-# fake root without the lib never parks anything (stock behavior).
+# gets no message, steer, answer or nudge; the shim answers "not parked" without the add-on.
 . "$SCRIPT_DIR/fm-parked-homes-lib.sh"
 [ -z "$TARGET_META" ] || fm_parked_refuse_meta "$TARGET_META" "$TARGET_TASK_ID" send || exit 1
 
