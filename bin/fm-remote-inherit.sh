@@ -27,12 +27,12 @@ file_link_count() {
 sha256_file() {
   if command -v shasum >/dev/null 2>&1; then shasum -a 256 "$1" | awk '{print $1}'; else sha256sum "$1" | awk '{print $1}'; fi
 }
-# Writable set, derived from the inherited-material owner
-# (fm_config_inherit_items in bin/fm-config-inherit-lib.sh). The set follows this
-# home's brief-inherit add-on install state, so a sender whose set differs from
-# this receiver's is refused for the item it cannot agree on. This runs under the
-# remote entrypoint's fixed empty environment, so a caller cannot widen the set
-# over SSH.
+# Writable set, derived from the ONE declared inherited-material owner
+# (FM_INHERITABLE_CONFIG in bin/fm-config-inherit-lib.sh), so this code root's
+# receiver and sender cannot drift silently. This runs under the remote
+# entrypoint's fixed empty environment, so the declaration is this code root's
+# own, never something the caller can widen over SSH; a caller from a different
+# revision must match it or the transfer fails closed.
 allowed() {
   local candidate
   while IFS= read -r candidate; do

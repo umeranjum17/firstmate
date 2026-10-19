@@ -59,8 +59,7 @@
 #
 # Extensible by design: FM_INHERITABLE_CONFIG is the single declared list of
 # config-dir-relative items the primary propagates. Add an item there and every
-# convergence point inherits it. The set also follows the brief-inherit add-on's
-# install state, which appends an item at source time. config/secondmate-harness
+# convergence point inherits it - no other change needed. config/secondmate-harness
 # is deliberately NOT in the list: it is the primary's own setting for launching
 # secondmates, and a secondmate never spawns secondmates, so it must not flow
 # downstream.
@@ -69,11 +68,10 @@
 # allowlist for remote routes: bin/fm-remote-inherit-push.sh (sender) and
 # bin/fm-remote-inherit.sh (receiver, executing inside the remote home) both
 # derive their item set from fm_config_inherit_items rather than restating it,
-# so a new inheritable item is declared in one place. The brief-inherit add-on's
-# install state is part of the set on both ends. A local and remote code root that
-# disagree about this list must be reconciled by the ordinary remote sync/update
-# path before the transfer succeeds; there is no separate allowlist version
-# negotiation.
+# so a new inheritable item cannot be accepted by one side and refused by the
+# other. A local and remote code root that disagree about this list must be
+# reconciled by the ordinary remote sync/update path before the transfer
+# succeeds; there is no separate allowlist version negotiation.
 #
 # shellcheck source=bin/fm-startup-memory-budget-lib.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/fm-startup-memory-budget-lib.sh"
@@ -124,9 +122,8 @@ fm_config_inherit_item_session_scoped() {  # <item>
 
 # The complete declared inherited-material set as home-relative paths, one per
 # line, in propagation order: every FM_INHERITABLE_CONFIG item under config/,
-# then the one shared data file, then brief-include-shared.md when the
-# brief-inherit add-on is installed. Remote senders and receivers derive from it,
-# so an item one end does not declare is refused by the other.
+# then the one shared data file. This is what remote senders and receivers
+# derive from, so both ends of a transfer agree by construction.
 fm_config_inherit_items() {
   local item
   for item in $FM_INHERITABLE_CONFIG; do
