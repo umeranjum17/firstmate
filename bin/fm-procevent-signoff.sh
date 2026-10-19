@@ -130,7 +130,7 @@ cmd_retire() {
 # task title.
 card_flat() {
   printf '%s' "$1" | tr '\t\n' '  ' \
-    | sed -E 's/^[[:space:]]+//; s/^(\[[^]]*\][[:space:]]*)+//; s/^[Cc][Aa][Pp][Tt][Aa][Ii][Nn] [Hh][Oo][Ll][Dd]:[[:space:]]*//; s/[[:space:]]+$//'
+    | sed -E 's/^[[:space:]]+//; s/^((\[[^]]*\]|[Cc][Aa][Pp][Tt][Aa][Ii][Nn] [Hh][Oo][Ll][Dd]:)[[:space:]]*)+//; s/[[:space:]]+$//'
 }
 
 card_split() {  # <reason>; prints "<title>\t<why>"
