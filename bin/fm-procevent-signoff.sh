@@ -125,8 +125,7 @@ cmd_retire() {
 
 ANSWER_NOTE='Answer yes or no. The hold stays open until you answer.'
 
-# Card text per sign-off's question standard: the title is the reason's last
-# question sentence verbatim, or the whole reason when it has no question.
+# Card text per sign-off's question standard.
 strip_tags() {
   local s=$1 prev=
   while [ "$s" != "$prev" ]; do
@@ -140,26 +139,22 @@ card_flat() {
   printf '%s' "$1" | tr '\t\n' '  ' | sed -E 's/[[:space:]]+/ /g; s/^ //; s/ $//'
 }
 
-card_split() {  # <reason>; prints "<title>\t<why>"
-  local flat head pre sentence stripped lead after body title
-  flat=$(strip_tags "$(card_flat "$1")")
+card_title() {  # <reason>; prints the last question sentence, or the first sentence when it has none; empty when nothing is left
+  local flat head sentence
+  flat=$(card_flat "$1")
   head=$(printf '%s' "$flat" | sed -nE 's/^(.*\?)( |$).*/\1/p')
   if [ -n "$head" ]; then
-    pre=${head%\?}
-    sentence=$(printf '%s' "$pre" | sed -E 's/^(.*(\. |\? ))?//')
-    lead=${pre%"$sentence"}
-    lead=${lead% }
-    after=${flat#"$head"}
-    after=${after# }
-    stripped=$(strip_tags "$sentence")
-    title=${stripped:+$stripped?}
-    body=$(printf '%s %s' "$lead" "$after" | sed -E 's/^ +| +$//g')
+    sentence=$(printf '%s' "${head%\?}" | sed -E 's/^(.*(\. |\? ))?//')
   else
-    title=$flat
-    body=
+    sentence=$(printf '%s' "$flat" | sed -E 's/[.!] .*$//')
   fi
-  [ -n "$body" ] || body=$(card_flat "$1")
-  printf '%s\t%s %s\n' "$title" "$(printf '%s' "$body" | cut -c1-$((200 - ${#ANSWER_NOTE} - 1)))" "$ANSWER_NOTE"
+  title=$(strip_tags "$sentence" | sed -E 's/[[:space:].?!]+$//' | awk '{n = NF < 12 ? NF : 12; for (i = 1; i <= n; i++) printf "%s%s", $i, i < n ? " " : ""}')
+  [ -n "$title" ] && printf '%s?' "$title"
+  return 0
+}
+
+card_why() {  # <reason>
+  printf '%s %s' "$(card_flat "$1" | cut -c1-$((200 - ${#ANSWER_NOTE} - 1)))" "$ANSWER_NOTE"
 }
 
 built_title() {  # <task-title>
@@ -170,18 +165,16 @@ built_title() {  # <task-title>
 
 cmd_raise() {
   [ "$#" -eq 4 ] || usage
-  local out identity split title why rc=0
+  local out identity title rc=0
   cmd_enabled || return 0
   identity=$("$SCRIPT_DIR/fm-captain-hold.sh" open "$1" --identity 2>/dev/null) || {
     printf 'sign-off card not raised: the hold identity of %s could not be read\n' "$1" >&2
     return 1
   }
-  split=$(card_split "$3")
-  title=${split%%$'\t'*}
-  why=${split#*$'\t'}
+  title=$(card_title "$3")
   [ -n "$title" ] || title=$(built_title "$2")
   out=$(signoff raise --key "$(home_key_prefix)$1-$(stamp_token "${identity%%#*}")" \
-    --title "$title" --about "$3" --why "$why" \
+    --title "$title" --about "$3" --why "$(card_why "$3")" \
     --outcome yes="Answer recorded: yes." \
     --outcome no="Answer recorded: no." \
     --recommend yes --recommend-reason "The hold records no recommendation." \

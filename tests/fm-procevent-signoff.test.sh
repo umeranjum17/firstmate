@@ -163,6 +163,25 @@ if command -v sign-off-axi >/dev/null 2>&1; then
   grep -qF 'Does the live contract hold up?' "$HOME/.sign-off/decisions.json" \
     || fail "the installed sign-off-axi holds no card for the hold"
   pass "the installed sign-off-axi accepts the card a hold raises"
+
+  raise_live() {  # <task-id> <reason>
+    PATH="$TMP_ROOT/realbin:$PATH" FM_ROOT_OVERRIDE="$ROOTCOPY" FM_HOME="$FM_HOME_DIR" \
+      FM_STATE_OVERRIDE="$FM_HOME_DIR/state" FM_PROCEVENT_CLAIM_ROOT="$TMP_ROOT/claims" \
+      "$ROOTCOPY/bin/fm-procevent-signoff.sh" raise "$1" 'Live task' "$2" done >/dev/null 2>"$TMP_ROOT/real-stderr"
+  }
+  card_titled() { jq -e --arg t "$1" '[.. | objects | select(.title? == $t)] | length > 0' "$HOME/.sign-off/decisions.json" >/dev/null; }
+
+  hold_as '2026-10-12T14:00:00Z#0'
+  raise_live noq 'needs a call' || fail "the installed sign-off-axi refused a card for a reason with no question: $(cat "$TMP_ROOT/real-stderr")"
+  card_titled 'needs a call?' || fail "the card for a reason with no question has no title"
+  pass "a reason with no question raises a card with a question title"
+
+  hold_as '2026-10-12T14:01:00Z#0'
+  raise_live long 'Should we move the card raise to the nightly job after the migration lands on main?' \
+    || fail "the installed sign-off-axi refused a card for a question over 12 words: $(cat "$TMP_ROOT/real-stderr")"
+  card_titled 'Should we move the card raise to the nightly job after the?' \
+    || fail "the card for a question over 12 words kept more than 12 words in its title"
+  pass "a question over 12 words raises a card whose title is cut to 12 words"
 else
   echo "skip: sign-off-axi is not installed; the live raise contract was not checked"
 fi
@@ -183,7 +202,7 @@ pass "a refused raise exits nonzero with the sign-off-axi error text"
 hold_as '2026-10-12T13:10:00Z#0'
 adapter raise T10 'Ship T10' 'Pick route? Ship v1 or v2? Reply by Friday.' done >/dev/null 2>&1 \
   || fail "a card for a reason with several questions was not raised"
-jq -e '.[] | select(.title == "Ship v1 or v2?" and .why == "Pick route? Reply by Friday. Answer yes or no. The hold stays open until you answer.")' "$SIGNOFF_BOARD" >/dev/null \
+jq -e '.[] | select(.title == "Ship v1 or v2?" and .why == "Pick route? Ship v1 or v2? Reply by Friday. Answer yes or no. The hold stays open until you answer.")' "$SIGNOFF_BOARD" >/dev/null \
   || fail "the card dropped reason text: $(jq -c . "$SIGNOFF_BOARD")"
 hold_as '2026-10-12T13:11:00Z#0'
 adapter raise T11 'Ship T11' 'Captain hold:' done >/dev/null 2>&1 \
