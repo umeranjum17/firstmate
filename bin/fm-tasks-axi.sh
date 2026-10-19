@@ -175,6 +175,7 @@ captain_guard() {  # <tasks-axi args>
   verb=${1:-}
   [ "$#" -gt 0 ] && shift
   for arg in "$@"; do
+    if [ "$arg" = --json ]; then continue; fi
     if [ "$value" = 1 ]; then value=0; continue; fi
     if [ "$title_next" = 1 ]; then title_next=0; new_title=$arg; continue; fi
     case "$arg" in

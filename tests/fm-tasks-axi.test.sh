@@ -267,6 +267,7 @@ test_wrapper_captain_ask_guard() {
   expect_captain_refusal "$dir" ca-1 done ca-1
   expect_captain_refusal "$dir" ca-1 hold ca-1 --reason parked --kind parked
   expect_captain_refusal "$dir" ca-1 rm --json ca-1
+  expect_captain_refusal "$dir" ca-1 done --note --json plain ca-1
   expect_captain_refusal "$dir" ca-3 task rm ca-3
   expect_captain_refusal "$dir" ca-1 hold --kind parked --reason parked ca-1
   expect_captain_refusal "$dir" ca-5 rm ca-5
