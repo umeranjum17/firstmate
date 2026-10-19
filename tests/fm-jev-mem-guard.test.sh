@@ -773,20 +773,26 @@ SH
 
 test_verdicts_samples_and_owners
 test_cgroup_pressure
-test_fast_spike_waits_without_alert
-test_host_pressure_neither_holds_nor_wakes
 test_home_qualified_owners
 test_homes_without_ordinary_tasks
 test_remote_records_do_not_own_local_processes
-test_overridden_state_ownership
 test_finite_thresholds
+test_atomic_admission_publication
+test_spawn_memory_admission
+
+# The sampler ships in the optional host-memory add-on; without it the watcher runs no sampler.
+if [ ! -f "${FM_ADDONS_DIR:-/nonexistent}/host-memory/bin/fm-host-memory-lib.sh" ]; then
+  echo "skip: watcher sampler tests need FM_ADDONS_DIR with the host-memory add-on"
+  exit 0
+fi
+test_fast_spike_waits_without_alert
+test_host_pressure_neither_holds_nor_wakes
+test_overridden_state_ownership
 test_watcher_wakes_once_per_alert_episode
 test_alert_rearms_after_wait
 test_benign_liveness_outcomes
 test_default_home_interrupt
 test_independent_sampler_lifecycle
-test_atomic_admission_publication
 test_failed_alert_publication
 test_shutdown_during_alert_publication
-test_spawn_memory_admission
 test_default_supervision_poll
