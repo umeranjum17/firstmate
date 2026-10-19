@@ -184,6 +184,10 @@ cmd_raise() {
       printf 'sign-off card for %s is already answered; reusing it\n' "$1" >&2
       return 0
       ;;
+    *"already holds a different question"*)
+      printf 'sign-off card for %s already exists with another question; keeping it\n' "$1" >&2
+      return 0
+      ;;
   esac
   [ "$rc" -eq 0 ] || {
     printf 'sign-off-axi raise failed: %s\n' "$out" >&2

@@ -199,6 +199,17 @@ out=$(PATH="$TMP_ROOT/refusebin:$PATH" FM_ROOT_OVERRIDE="$ROOTCOPY" FM_HOME="$FM
 case "$out" in *"--why is required"*) : ;; *) fail "the refusal text was lost: $out" ;; esac
 pass "a refused raise exits nonzero with the sign-off-axi error text"
 
+cat > "$TMP_ROOT/refusebin/sign-off-axi" <<'SH'
+#!/usr/bin/env bash
+echo 'error: key already holds a different question'; exit 1
+SH
+out=$(PATH="$TMP_ROOT/refusebin:$PATH" FM_ROOT_OVERRIDE="$ROOTCOPY" FM_HOME="$FM_HOME_DIR" \
+  FM_STATE_OVERRIDE="$FM_HOME_DIR/state" FM_PROCEVENT_CLAIM_ROOT="$TMP_ROOT/claims" \
+  "$ROOTCOPY/bin/fm-procevent-signoff.sh" raise T9 'Ship T9' 'Changed reason?' done 2>&1) \
+  || fail "a re-raise of an existing card with a changed question exited nonzero: $out"
+case "$out" in *"already exists with another question"*) : ;; *) fail "the kept card was not reported: $out" ;; esac
+pass "a re-raise of an existing card with a changed question keeps the card and exits zero"
+
 hold_as '2026-10-12T13:10:00Z#0'
 adapter raise T10 'Ship T10' 'Pick route? Ship v1 or v2? Reply by Friday.' done >/dev/null 2>&1 \
   || fail "a card for a reason with several questions was not raised"
