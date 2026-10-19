@@ -39,3 +39,11 @@ settings. If the list cannot be read, pi runs as before and one log line says wh
 Not included: project-level `.pi/extensions/`. pi loads those only for a trusted project, and `pi list` reports user
 packages only, so a pipeline call run from a trusted checkout that has them loses them under `-ne`. The firstmate
 checkout does (`fm-calm`, `fm-branch-supervision`).
+
+## Route failures and credit probe
+
+A pi exit that is non-zero and whose error surface names a Go `WaitDelay` / `parse events` failure or an extension
+warning or failure is a route failure: the chain moves to the next route for that call, with no quota marker (like a
+stall). Before the first route is run, a 1-request probe (the real pi, one `ok` prompt, `PI_QUOTA_FAILOVER_PROBE_SECS`
+cap, default 60) skips a route whose answer is a balance error, marks it dead and logs a `pulse:` line.
+`PI_QUOTA_FAILOVER_PROBE=0` turns the probe off.
