@@ -239,6 +239,14 @@ test_wrapper_single_home() {
   pass "fm-tasks-axi.sh keeps the single-home layout addressing its own code-root backlog"
 }
 
+expect_captain_refusal() {  # <case-dir> <id> <tasks-axi args...>
+  local dir=$1 id=$2 err status
+  shift 2
+  err=$(wrapper_from_code "$dir" "$@" 2>&1 >/dev/null); status=$?
+  [ "$status" = 2 ] || fail "expected exit 2 refusing: $* (got $status)"
+  case "$err" in *"$id"*) ;; *) fail "refusal of $* did not name $id: $err" ;; esac
+}
+
 test_wrapper_captain_ask_guard() {
   local dir bin
   dir=$(make_split captain-ask)
@@ -252,18 +260,21 @@ test_wrapper_captain_ask_guard() {
   wrapper_from_code "$dir" add ca-3 "[captain-ask] pick three" >/dev/null
   wrapper_from_code "$dir" add plain-1 "ordinary" >/dev/null
   wrapper_from_code "$dir" add ca-4 "[captain-ask] pick four" >/dev/null
-  wrapper_from_code "$dir" rm ca-1 >/dev/null 2>&1 && fail "rm of an unanswered [captain-ask] item was allowed"
-  wrapper_from_code "$dir" "done" ca-1 >/dev/null 2>&1 && fail "done of an unanswered [captain-ask] item was allowed"
-  wrapper_from_code "$dir" hold ca-1 --reason parked --kind parked >/dev/null 2>&1 \
-    && fail "parking an unanswered [captain-ask] item was allowed"
-  wrapper_from_code "$dir" rm --json ca-1 >/dev/null 2>&1 && fail "rm --json of an unanswered [captain-ask] item was allowed"
-  wrapper_from_code "$dir" task rm ca-3 >/dev/null 2>&1 && fail "task rm of an unanswered [captain-ask] item was allowed"
-  wrapper_from_code "$dir" hold --kind parked --reason parked ca-1 >/dev/null 2>&1 \
-    && fail "parking an unanswered [captain-ask] item with flags first was allowed"
+  wrapper_from_code "$dir" add ca-5 "[captain-ask] reconciled only" >/dev/null
+  wrapper_from_code "$dir" update ca-5 --body "$(printf 'Resolution recorded by fm-captain-hold.\nDecision digest: d\nResolution mode: reconciled\n\nReconciliation evidence:\nmoot\n')" >/dev/null \
+    || fail "could not write a reconciled-only record"
+  expect_captain_refusal "$dir" ca-1 rm ca-1
+  expect_captain_refusal "$dir" ca-1 done ca-1
+  expect_captain_refusal "$dir" ca-1 hold ca-1 --reason parked --kind parked
+  expect_captain_refusal "$dir" ca-1 rm --json ca-1
+  expect_captain_refusal "$dir" ca-3 task rm ca-3
+  expect_captain_refusal "$dir" ca-1 hold --kind parked --reason parked ca-1
+  expect_captain_refusal "$dir" ca-5 rm ca-5
+  expect_captain_refusal "$dir" ca-1 update ca-1 --title "pick one, untagged"
   mkdir -p "$dir/unreadable"
   printf '#!/bin/sh\n[ "$1" = show ] && exit 1\nexec "%s" "$@"\n' "$(command -v tasks-axi)" > "$dir/unreadable/tasks-axi"
   chmod +x "$dir/unreadable/tasks-axi"
-  (PATH="$dir/unreadable:$PATH" wrapper_from_code "$dir" rm ca-3 >/dev/null 2>&1) && fail "rm with an unreadable row was allowed"
+  PATH="$dir/unreadable:$PATH" expect_captain_refusal "$dir" ca-3 rm ca-3
   assert_grep "ca-1" "$dir/home/data/backlog.md" "the refused item left the backlog"
   assert_grep "ca-3" "$dir/home/data/backlog.md" "a refused item left the backlog"
   (cd "$dir/code" && FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code" "$ROOT/bin/fm-captain-hold.sh" hold ca-1 --reason "pick one" >/dev/null \
@@ -271,7 +282,7 @@ test_wrapper_captain_ask_guard() {
     || fail "could not record a captain answer"
   wrapper_from_code "$dir" rm ca-1 >/dev/null 2>&1 || fail "rm of an answered [captain-ask] item was refused"
   wrapper_from_code "$dir" update ca-4 --pr https://github.com/o/r/pull/2 >/dev/null
-  (PATH="$bin:$PATH" wrapper_from_code "$dir" "done" ca-4 >/dev/null 2>&1) && fail "done with only an open PR was allowed"
+  PATH="$bin:$PATH" expect_captain_refusal "$dir" ca-4 done ca-4
   wrapper_from_code "$dir" update ca-2 --pr https://github.com/o/r/pull/1 >/dev/null
   wrapper_from_code "$dir" update ca-2 --pr https://github.com/o/r/pull/2 >/dev/null
   (PATH="$bin:$PATH" wrapper_from_code "$dir" "done" ca-2 >/dev/null 2>&1) || fail "done with a merged PR among several links was refused"

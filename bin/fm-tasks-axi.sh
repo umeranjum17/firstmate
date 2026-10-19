@@ -50,8 +50,8 @@
 #   - a markdown `<data>/backlog.md` that is itself a symlink, because the
 #     first write would replace the link with a private copy, exactly the fork
 #     this command exists to prevent. Lifecycle transitions refuse the same file.
-#   - `rm`/`delete`, `done`/`close`, or `hold --kind parked` on a row whose title
-#     carries `[captain-ask]`, unless `bin/fm-captain-hold.sh answered <id>`
+#   - `rm`/`delete`, `done`/`close`, `hold --kind parked`, or an `update --title`
+#     that drops `[captain-ask]` from a row whose title carries it, unless `bin/fm-captain-hold.sh answered <id>`
 #     finds a recorded captain answer or the row's `pr:` link is a merged PR,
 #     so no cap or triage can drop a captain's ask. The automatic dispatch and
 #     teardown transitions use bin/fm-backlog-transition-lib.sh, not this
@@ -170,16 +170,19 @@ guard_captain_ask() {  # <id>
   fail "$1 is a [captain-ask] item with no recorded captain answer (bin/fm-captain-hold.sh answer) and no merged PR (tasks-axi update --pr); it cannot leave the backlog"
 }
 captain_guard() {  # <tasks-axi args>
-  local verb id='' value=0 arg
+  local verb id='' value=0 title_next=0 has_title=0 new_title='' arg
   [ "${1:-}" = task ] && shift
   verb=${1:-}
   [ "$#" -gt 0 ] && shift
   for arg in "$@"; do
     if [ "$value" = 1 ]; then value=0; continue; fi
+    if [ "$title_next" = 1 ]; then title_next=0; new_title=$arg; continue; fi
     case "$arg" in
+      --title) title_next=1; has_title=1 ;;
+      --title=*) has_title=1; new_title=${arg#--title=} ;;
       --backend|--pr|--report|--note|--keep|--reason|--until|--kind) value=1 ;;
       -*) ;;
-      *) id=$arg ;;
+      *) id=${id:-$arg} ;;
     esac
   done
   case "$verb" in
@@ -188,6 +191,14 @@ captain_guard() {  # <tasks-axi args>
       case " $* " in
         *' --kind parked '*|*' --kind=parked '*) guard_captain_ask "$id" ;;
       esac
+      ;;
+    update)
+      if [ "$has_title" = 1 ]; then
+        case "$new_title" in
+          *'[captain-ask]'*) ;;
+          *) guard_captain_ask "$id" ;;
+        esac
+      fi
       ;;
   esac
 }
