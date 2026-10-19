@@ -13,6 +13,7 @@ WATCH="$ROOT/bin/fm-watch.sh"
 DRAIN="$ROOT/bin/fm-wake-drain.sh"
 TMP_ROOT=$(fm_test_tmproot fm-mem-guard)
 export FM_HOST_MEMORY_CGROUP_ROOT="$TMP_ROOT/no-cgroup"
+export FM_ADDONS_DIR="${FM_ADDONS_DIR:-${FM_HOME:-$ROOT}/projects/firstmate-addons}"
 APP_SLICE="user.slice/user-$(id -u).slice/user@$(id -u).service/app.slice"
 
 # fake_host <proc> <available-gb> <pressure (both 10 s and 60 s averages)> [swap-used-gb]
@@ -781,7 +782,7 @@ test_atomic_admission_publication
 test_spawn_memory_admission
 
 # The sampler ships in the optional host-memory add-on; without it the watcher runs no sampler.
-if [ ! -f "${FM_ADDONS_DIR:-${FM_HOME:-$ROOT}/projects/firstmate-addons}/host-memory/bin/fm-host-memory-lib.sh" ]; then
+if [ ! -f "$FM_ADDONS_DIR/host-memory/bin/fm-host-memory-lib.sh" ]; then
   echo "skip: watcher sampler tests need FM_ADDONS_DIR with the host-memory add-on"
   exit 0
 fi
