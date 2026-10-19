@@ -137,6 +137,7 @@ _FM_PENDING_REPLY_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd 2>/dev/n
 # here would re-expand the same transitive graph.
 . "$_FM_PENDING_REPLY_LIB_DIR/fm-classify-lib.sh"
 # Parked-home gate (firstmate-addons/parked-homes); the shim answers "not parked" without the add-on.
+# shellcheck source=bin/fm-parked-homes-lib.sh
 . "$_FM_PENDING_REPLY_LIB_DIR/fm-parked-homes-lib.sh"
 
 FM_PENDING_REPLY_SCHEMA='fm-pending-reply.v1'

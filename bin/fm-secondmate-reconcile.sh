@@ -93,6 +93,7 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 . "$SCRIPT_DIR/fm-wake-lib.sh"
 # Parked-home guard (firstmate-addons/parked-homes): a parked home is never
 # reconciled. The shim answers not parked when the add-on is absent (stock behavior).
+# shellcheck source=bin/fm-parked-homes-lib.sh
 . "$SCRIPT_DIR/fm-parked-homes-lib.sh"
 
 # One nudge per home per four hours.

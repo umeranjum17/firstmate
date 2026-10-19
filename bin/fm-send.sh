@@ -544,6 +544,7 @@ fi
 
 # Parked-home guard (firstmate-addons/parked-homes): a parked secondmate home
 # gets no message, steer, answer or nudge; the shim answers "not parked" without the add-on.
+# shellcheck source=bin/fm-parked-homes-lib.sh
 . "$SCRIPT_DIR/fm-parked-homes-lib.sh"
 [ -z "$TARGET_META" ] || fm_parked_refuse_meta "$TARGET_META" "$TARGET_TASK_ID" send || exit 1
 

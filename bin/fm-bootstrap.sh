@@ -198,6 +198,7 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 . "$SCRIPT_DIR/fm-secondmate-nudge-lib.sh"
 # Parked-home guard (firstmate-addons/parked-homes): a parked home gets no
 # config push or reread nudge. The shim answers not parked when the add-on is absent.
+# shellcheck source=bin/fm-parked-homes-lib.sh
 . "$SCRIPT_DIR/fm-parked-homes-lib.sh"
 # shellcheck source=bin/fm-startup-memory-budget-lib.sh disable=SC1091
 . "$SCRIPT_DIR/fm-startup-memory-budget-lib.sh"

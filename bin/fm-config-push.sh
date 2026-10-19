@@ -80,6 +80,7 @@ SECONDMATES_MD="$DATA/secondmates.md"
 . "$SCRIPT_DIR/fm-secondmate-nudge-lib.sh"
 # Parked-home guard (firstmate-addons/parked-homes): a parked home gets no
 # config push. The shim answers not parked when the add-on is absent (stock behavior).
+# shellcheck source=bin/fm-parked-homes-lib.sh
 . "$SCRIPT_DIR/fm-parked-homes-lib.sh"
 
 print_item_report() {

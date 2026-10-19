@@ -128,6 +128,7 @@ done
 # Parked-home guard (firstmate-addons/parked-homes): a parked secondmate home
 # gets no restart pass at all - no persist request, no relaunch, no nudge. One
 # line names each skip. The shim answers not parked when the add-on is absent.
+# shellcheck source=bin/fm-parked-homes-lib.sh
 . "$SCRIPT_DIR/fm-parked-homes-lib.sh"
 LIVE_IDS=()
 for id in ${IDS[@]+"${IDS[@]}"}; do

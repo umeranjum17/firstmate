@@ -48,6 +48,7 @@ REMOTE_HOST=$(fm_meta_get "$META" remote_host)
 
 # Parked-home guard (firstmate-addons/parked-homes): a parked secondmate home
 # gets no relaunch, remote or local. The shim answers not parked when the add-on is absent.
+# shellcheck source=bin/fm-parked-homes-lib.sh
 . "$SCRIPT_DIR/fm-parked-homes-lib.sh"
 fm_parked_refuse_meta "$META" "$ID" relaunch || exit 1
 
