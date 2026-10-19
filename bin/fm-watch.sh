@@ -258,8 +258,8 @@ WATCH_HOME_EXISTED=0
 # shellcheck source=bin/fm-model-outage-lib.sh
 . "$SCRIPT_DIR/fm-model-outage-lib.sh"
 # Parked-home reader (firstmate-addons/parked-homes): the shared predicate
-# every parked-home guard in the watcher calls. Optional source: absent lib =
-# never parked (stock behavior).
+# every parked-home guard in the watcher calls. The shim answers not parked
+# when the add-on is absent (stock behavior).
 . "$SCRIPT_DIR/fm-parked-homes-lib.sh"
 # shellcheck source=bin/fm-composer-lib.sh
 . "$SCRIPT_DIR/fm-composer-lib.sh"
