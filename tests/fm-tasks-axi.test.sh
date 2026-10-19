@@ -244,13 +244,14 @@ test_wrapper_captain_ask_guard() {
   dir=$(make_split captain-ask)
   bin="$dir/bin"
   mkdir -p "$bin"
-  printf '#!/bin/sh\necho MERGED\n' > "$bin/gh"
+  printf '#!/bin/sh\ncase "$3" in */pull/1) echo MERGED ;; *) echo OPEN ;; esac\n' > "$bin/gh"
   chmod +x "$bin/gh"
   printf 'Yes, ship it.\n' > "$dir/answer.txt"
   wrapper_from_code "$dir" add ca-1 "[captain-ask] pick one" >/dev/null
   wrapper_from_code "$dir" add ca-2 "[captain-ask] pick two" >/dev/null
   wrapper_from_code "$dir" add ca-3 "[captain-ask] pick three" >/dev/null
   wrapper_from_code "$dir" add plain-1 "ordinary" >/dev/null
+  wrapper_from_code "$dir" add ca-4 "[captain-ask] pick four" >/dev/null
   wrapper_from_code "$dir" rm ca-1 >/dev/null 2>&1 && fail "rm of an unanswered [captain-ask] item was allowed"
   wrapper_from_code "$dir" "done" ca-1 >/dev/null 2>&1 && fail "done of an unanswered [captain-ask] item was allowed"
   wrapper_from_code "$dir" hold ca-1 --reason parked --kind parked >/dev/null 2>&1 \
@@ -269,8 +270,11 @@ test_wrapper_captain_ask_guard() {
     && FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code" "$ROOT/bin/fm-captain-hold.sh" answer ca-1 --decision-file "$dir/answer.txt" >/dev/null) \
     || fail "could not record a captain answer"
   wrapper_from_code "$dir" rm ca-1 >/dev/null 2>&1 || fail "rm of an answered [captain-ask] item was refused"
+  wrapper_from_code "$dir" update ca-4 --pr https://github.com/o/r/pull/2 >/dev/null
+  (PATH="$bin:$PATH" wrapper_from_code "$dir" "done" ca-4 >/dev/null 2>&1) && fail "done with only an open PR was allowed"
   wrapper_from_code "$dir" update ca-2 --pr https://github.com/o/r/pull/1 >/dev/null
-  (PATH="$bin:$PATH" wrapper_from_code "$dir" "done" ca-2 >/dev/null 2>&1) || fail "done with a merged PR was refused"
+  wrapper_from_code "$dir" update ca-2 --pr https://github.com/o/r/pull/2 >/dev/null
+  (PATH="$bin:$PATH" wrapper_from_code "$dir" "done" ca-2 >/dev/null 2>&1) || fail "done with a merged PR among several links was refused"
   wrapper_from_code "$dir" rm plain-1 >/dev/null 2>&1 || fail "an untagged item was refused"
   pass "fm-tasks-axi.sh keeps [captain-ask] items until answered or merged and leaves other items alone"
 }

@@ -164,10 +164,9 @@ guard_captain_ask() {  # <id>
     *) return 0 ;;
   esac
   "$SCRIPT_DIR/fm-captain-hold.sh" answered "$1" && return 0
-  pr=$(printf '%s\n' "$show" | sed -n 's/^  links: .*pr:\([^" ,]*\).*/\1/p' | head -1)
-  if [ -n "$pr" ] && [ "$(gh pr view "$pr" --json state -q .state 2>/dev/null)" = MERGED ]; then
-    return 0
-  fi
+  for pr in $(printf '%s\n' "$show" | sed -n 's/^  links: //p' | grep -o 'pr:[^" ,]*' | sed 's/^pr://'); do
+    [ "$(gh pr view "$pr" --json state -q .state 2>/dev/null)" = MERGED ] && return 0
+  done
   fail "$1 is a [captain-ask] item with no recorded captain answer (bin/fm-captain-hold.sh answer) and no merged PR (tasks-axi update --pr); it cannot leave the backlog"
 }
 captain_guard() {  # <tasks-axi args>
