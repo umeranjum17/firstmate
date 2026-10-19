@@ -180,7 +180,7 @@ captain_guard() {  # <tasks-axi args>
     case "$arg" in
       --title) title_next=1; has_title=1 ;;
       --title=*) has_title=1; new_title=${arg#--title=} ;;
-      --backend|--pr|--report|--note|--keep|--reason|--until|--kind) value=1 ;;
+      --backend|--pr|--report|--note|--keep|--reason|--until|--kind|--repo|--priority|--body|--body-file|--by|--state|--fields|--limit|--prefix|--work-ref|--blocked-by|--relation|--purpose|--approved-by|--delivery-state|--expires-at|--payload-hash|--to|--*-file) value=1 ;;
       -*) ;;
       *) id=${id:-$arg} ;;
     esac
@@ -192,7 +192,7 @@ captain_guard() {  # <tasks-axi args>
         *' --kind parked '*|*' --kind=parked '*) guard_captain_ask "$id" ;;
       esac
       ;;
-    update)
+    update|edit)
       if [ "$has_title" = 1 ]; then
         case "$new_title" in
           *'[captain-ask]'*) ;;

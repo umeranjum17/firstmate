@@ -271,6 +271,8 @@ test_wrapper_captain_ask_guard() {
   expect_captain_refusal "$dir" ca-1 hold --kind parked --reason parked ca-1
   expect_captain_refusal "$dir" ca-5 rm ca-5
   expect_captain_refusal "$dir" ca-1 update ca-1 --title "pick one, untagged"
+  expect_captain_refusal "$dir" ca-1 edit ca-1 --title "pick one, untagged"
+  expect_captain_refusal "$dir" ca-2 update --repo plain-1 ca-2 --title "pick two, untagged"
   mkdir -p "$dir/unreadable"
   printf '#!/bin/sh\n[ "$1" = show ] && exit 1\nexec "%s" "$@"\n' "$(command -v tasks-axi)" > "$dir/unreadable/tasks-axi"
   chmod +x "$dir/unreadable/tasks-axi"
