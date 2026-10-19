@@ -89,8 +89,10 @@
 #   the backend confirms it is gone)
 #                          a vanished pane's orphaned per-pane markers were
 #                          pruned after one authoritative absence verdict; the
-#                          pane is gone from every later poll by construction,
-#                          so this is one notice, never a new escalation series
+#                          key is recorded in state/.pruned-panes (bounded to
+#                          the last 1024 keys) before this notice, so a re-created
+#                          sidecar is pruned silently: one notice, never a new
+#                          escalation series
 #   stale: <window> (steering-inbox ladder bookkeeping unwritable: ...)
 #   stale: <window> (steering-inbox busy bookkeeping unwritable: ...)
 #                          steering-inbox recovery; bin/fm-task-inbox-lib.sh owns
