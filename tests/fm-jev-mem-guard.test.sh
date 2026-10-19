@@ -781,7 +781,7 @@ test_atomic_admission_publication
 test_spawn_memory_admission
 
 # The sampler ships in the optional host-memory add-on; without it the watcher runs no sampler.
-if [ ! -f "${FM_ADDONS_DIR:-/nonexistent}/host-memory/bin/fm-host-memory-lib.sh" ]; then
+if [ ! -f "${FM_ADDONS_DIR:-${FM_HOME:-$ROOT}/projects/firstmate-addons}/host-memory/bin/fm-host-memory-lib.sh" ]; then
   echo "skip: watcher sampler tests need FM_ADDONS_DIR with the host-memory add-on"
   exit 0
 fi
