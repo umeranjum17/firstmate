@@ -239,6 +239,22 @@ export MODE DD_LOG SO_CAPTURE
 checks gap-noclaim shot.png && cp "$shot" "$home/data/gap-noclaim/shot.png"
 run_gap gap-noclaim "$work/card-gap-noclaim"
 
+# A merge whose Checks block says `screen: none` posts no card and runs no done-done:
+# exit 0, one skip line pointing to the merge note, sign-off never called.
+MODE=newer DD_LOG=$work/args.log SO_CAPTURE=$work/card-internal
+export MODE DD_LOG SO_CAPTURE
+checks internal shot.png && printf 'screen: none\n' >> "$home/data/internal/checks.md" && cp "$shot" "$home/data/internal/shot.png"
+: >"$DD_LOG"
+so_before=$(wc -l < "$SO_LOG")
+out=$(PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" internal "$wt" "$head_c" - 2>&1); rc=$?
+is "internal: post exits 0" "$rc" 0
+case $out in
+  *"no evidence card for merge-$head_c"*"screen: none"*"merge note"*) ok "internal: one skip line pointing to the merge note" ;;
+  *) no "internal: skip line missing or misshapen: [$out]" ;;
+esac
+is "internal: sign-off never called" "$(wc -l < "$SO_LOG")" "$so_before"
+is "internal: done-done never run" "$(wc -c < "$DD_LOG")" 0
+
 # The gate refuses a PR merge with no checks-lint PASS row for its head.
 MODE=newer DD_LOG=$work/args.log SO_CAPTURE=$work/card-lint
 export MODE DD_LOG SO_CAPTURE
