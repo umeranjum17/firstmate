@@ -9,10 +9,13 @@
 # then one GPT-6 Luna attempt, the successful Luna stream on stdout, failover
 # logged with timings, and the whole call under 10s; a quota-dead Luna after
 # glm ends in the terminal "quota exhausted" line, exit 1. Also covers:
-# non-quota (401) passthrough byte-for-byte, pinned-model passthrough, a
+# non-quota (401) passthrough byte-for-byte, a pin outside the chain running the chain (never the pinned model), a
 # --session resume dropping the session on failover, quota-dead markers (written
 # on a quota error, the model skipped while fresh, tried again once expired,
-# cleared by an answer), plain passthrough keeping stdin flowing, and install.sh's key-level config edit in a throwaway config.
+# cleared by an answer), stdin kept flowing to pi, and install.sh's key-level config edit in a throwaway config.
+# The default chain is DeepSeek Flash then Claude Haiku (GLM is out): a Codex-pinned call lands on DeepSeek, a
+# DeepSeek quota error moves to Haiku, a silent DeepSeek call has its own idle limit, and GLM quota failures (Z.AI's
+# balance and rate-limit refusals too) move on to the next hop.
 # Also covers the quota-axi pre-check (a stub quota-axi: exhausted_now skips the route without a pi call, a failing
 # quota-axi still calls it), the idle watchdog (a silent stub is killed after a short IDLE_SECS and fails over for that
 # call only: no marker, the next call tries the route again, a stall on the last model is not "quota exhausted"; the
@@ -72,12 +75,24 @@ case $model in
     printf '%s\n' '{"type":"message_end","role":"assistant","model":"bad/slow-stream","content":"PONG"}'
     exit 0 ;;
   zai/glm-5.3-flash*) [ -n "${STUB_GLM_KILL:-}" ] && kill -TERM $$ ;;
+  deepseek/deepseek-flash) [ -n "${STUB_DS_SILENT:-}" ] && sleep "$STUB_DS_SILENT" ;;
 esac
 printf '%s\n' '{"type":"session","id":"s-1"}'
 printf '%s\n' "{\"type\":\"attempt\",\"model\":\"$model\"}"
 case $model in
   zai/glm-5.3-flash*)
+    if [ -n "${STUB_GLM_TEXT:-}" ]; then
+      printf '{"type":"message_update","errorMessage":%s}\n' "$(jq -Rn --arg t "$STUB_GLM_TEXT" '$t')"
+      exit 0
+    fi
     printf '%s\n' '{"type":"message_update","errorMessage":"429: {\"message\":\"You'"'"'ve reached your 5-hour usage limit for your plan. Your limit resets at 2026-10-17\"}"}'
+    exit 0 ;;
+  deepseek/deepseek-flash)
+    if [ -n "${STUB_DS_DEAD:-}" ]; then
+      printf '%s\n' '{"type":"message_update","errorMessage":"402: {\"message\":\"Insufficient Balance\"}"}'
+      exit 0
+    fi
+    printf '%s\n' "{\"type\":\"message_end\",\"role\":\"assistant\",\"model\":\"$model\",\"content\":\"PONG\"}"
     exit 0 ;;
   openai-codex/gpt-6-luna)
     if [ -n "${STUB_LUNA_DEAD:-}" ]; then
@@ -154,14 +169,76 @@ child_gone() {
   return 1
 }
 
-is "default chain is GLM, then DeepSeek Flash, then Claude Haiku" "$(PI_QUOTA_FAILOVER_PRINT_CHAIN=1 "$wrapper" </dev/null)" \
-  "zai/glm-5.3-flash deepseek/deepseek-flash claude-bridge/claude-haiku-5-5"
+is "default chain is DeepSeek Flash, then Claude Haiku (GLM removed)" "$(PI_QUOTA_FAILOVER_PRINT_CHAIN=1 "$wrapper" </dev/null)" \
+  "deepseek/deepseek-flash claude-bridge/claude-haiku-5-5"
+
+# 0. The default chain, no override. A Codex-pinned call (the first-draft fix step's route) runs the chain and lands on
+#    DeepSeek: quota-axi is asked for DeepSeek and does not skip it, and Codex, GLM and Haiku are not called.
+nodead
+: >"$STUB_ARGV"
+: >"$STUB_QUOTA_LOG"
+OUT=$(printf '%s' "$prompt" | env -u PI_QUOTA_FAILOVER_CHAIN "$wrapper" --model openai-codex/gpt-6-luna --mode json --no-session 2>"$work/err0a")
+is "codex-pinned call exits 0" "$?" "0"
+out_has "codex-pinned call lands on DeepSeek" '"model":"deepseek/deepseek-flash"'
+is "codex-pinned call makes one pi call" "$(wc -l <"$STUB_ARGV")" "1"
+is "codex never called" "$(grep -c 'openai-codex' "$STUB_ARGV")" "0"
+is "quota-axi asked for deepseek" "$(grep -c -- '--provider deepseek ' "$STUB_QUOTA_LOG")" "1"
+
+# 0b. GLM is out of the chain: a GLM-pinned call never reaches GLM, it runs DeepSeek.
+nodead
+: >"$STUB_ARGV"
+OUT=$(printf '%s' "$prompt" | env -u PI_QUOTA_FAILOVER_CHAIN "$wrapper" --model zai/glm-5.3-flash --mode json --no-session 2>"$work/err0b")
+is "glm-pinned call exits 0" "$?" "0"
+out_has "glm-pinned call runs DeepSeek" '"model":"deepseek/deepseek-flash"'
+is "glm never called with the default chain" "$(grep -c 'zai/glm' "$STUB_ARGV")" "0"
+
+# 0c. A DeepSeek quota error moves on to Claude Haiku in the same call, and writes its marker.
+nodead
+: >"$log"
+: >"$STUB_ARGV"
+OUT=$(printf '%s' "$prompt" | STUB_DS_DEAD=1 env -u PI_QUOTA_FAILOVER_CHAIN "$wrapper" --model deepseek/deepseek-flash --mode json --no-session 2>"$work/err0c")
+is "deepseek quota error exits 0" "$?" "0"
+out_has "deepseek quota error moves to Haiku" '"model":"claude-bridge/claude-haiku-5-5"'
+is "deepseek quota error: DeepSeek then Haiku, nothing else" "$(sed -e 's/^.*--model //' -e 's/ .*//' "$STUB_ARGV" | tr '\n' ' ')" "deepseek/deepseek-flash claude-bridge/claude-haiku-5-5 "
+log_has "deepseek quota error logged with its hop" "model=deepseek/deepseek-flash quota-error.*moving to claude-bridge/claude-haiku-5-5"
+fresh "deepseek quota error writes its marker" deepseek/deepseek-flash
+
+# 0d. A silent DeepSeek call is killed only by its own limit: 4 s of silence survives IDLE_SECS=2 (the generic limit),
+#     and DEEPSEEK_IDLE_SECS=2 kills the same call and moves on to Haiku.
+nodead
+: >"$log"
+: >"$STUB_ARGV"
+OUT=$(printf '%s' "$prompt" | STUB_DS_SILENT=4 PI_QUOTA_FAILOVER_IDLE_SECS=2 env -u PI_QUOTA_FAILOVER_CHAIN "$wrapper" --model deepseek/deepseek-flash --mode json --no-session 2>"$work/err0d")
+is "silent deepseek under its own limit exits 0" "$?" "0"
+out_has "silent deepseek answers itself" '"model":"deepseek/deepseek-flash"'
+is "silent deepseek under its own limit: one pi call" "$(wc -l <"$STUB_ARGV")" "1"
+if grep -q 'no output for' "$log"; then no "silent deepseek was killed under its own limit"; else ok "silent deepseek is not killed under the generic limit"; fi
+nodead
+: >"$log"
+OUT=$(printf '%s' "$prompt" | STUB_DS_SILENT=4 PI_QUOTA_FAILOVER_IDLE_SECS=2 PI_QUOTA_FAILOVER_DEEPSEEK_IDLE_SECS=2 env -u PI_QUOTA_FAILOVER_CHAIN "$wrapper" --model deepseek/deepseek-flash --mode json --no-session 2>"$work/err0d2")
+is "deepseek over its own limit exits 0" "$?" "0"
+log_has "deepseek own limit kills the silent call" "model=deepseek/deepseek-flash stalled.*no output for 2s.*moving to claude-bridge/claude-haiku-5-5"
+out_has "deepseek over its own limit moves to Haiku" '"model":"claude-bridge/claude-haiku-5-5"'
+
+# 0e. A GLM quota failure moves on to the next hop. Z.AI's balance refusal and its rate-limit refusal are quota failures,
+#     so GLM writes its marker and DeepSeek answers the same call (before this change the run ended on them).
+for text in 'Insufficient balance or no resource package. Please recharge.' 'Rate limit reached for requests'; do
+  nodead
+  : >"$log"
+  OUT=$(printf '%s' "$prompt" | PI_QUOTA_FAILOVER_CHAIN='zai/glm-5.3-flash deepseek/deepseek-flash claude-bridge/claude-haiku-5-5' STUB_GLM_TEXT="$text" "$wrapper" --model zai/glm-5.3-flash --mode json --no-session 2>"$work/err0e")
+  is "glm failure [$text] exits 0" "$?" "0"
+  out_has "glm failure [$text] moves to DeepSeek" '"model":"deepseek/deepseek-flash"'
+  log_has "glm failure [$text] is a quota error" "model=zai/glm-5.3-flash quota-error.*moving to deepseek/deepseek-flash"
+  fresh "glm failure [$text] writes the glm marker" zai/glm-5.3-flash
+done
 
 # The failover cases below exercise the GLM -> GPT-6 Luna route (the stub's codex usage-limit surface and the
 # quota-axi codex name are about that pair), so they pin the chain; the default is checked above.
 export PI_QUOTA_FAILOVER_CHAIN='zai/glm-5.3-flash openai-codex/gpt-6-luna'
 
 # 1. Quota failover: glm dead -> GPT-6 Luna answers, one attempt each.
+nodead
+: >"$log"
 t0=$(date +%s%3N)
 OUT=$(printf '%s' "$prompt" | "$wrapper" --model zai/glm-5.3-flash --thinking medium --mode json --no-session 2>"$work/err1")
 rc=$?
@@ -181,17 +258,22 @@ if grep -q -- '--provider openai-codex' "$STUB_QUOTA_LOG"; then no "quota-axi wa
 if grep -q 'not pre-checked' "$log"; then no "GPT-6 Luna route was not pre-checked"; else ok "GPT-6 Luna route was pre-checked"; fi
 log_has "success logged with model, duration and bytes" 'model=openai-codex/gpt-6-luna answered in [0-9]*ms ([0-9]* bytes)'
 
-# 2. Non-quota failure passes through untouched (pi's real 401 surface, exit 0).
-OUT=$(printf '%s' "$prompt" | "$wrapper" --model bad/http401 --mode json --no-session 2>"$work/err2")
+# 2. Non-quota failure passes through untouched (pi's real 401 surface, exit 0), with no failover.
+nodead
+: >"$log"
+OUT=$(printf '%s' "$prompt" | PI_QUOTA_FAILOVER_CHAIN='bad/http401 openai-codex/gpt-6-luna' "$wrapper" --model bad/http401 --mode json --no-session 2>"$work/err2")
 is "401 passthrough exits 0" "$?" "0"
 out_has "401 stream untouched" "token expired or incorrect"
-log_has "no failover for non-quota" "moving to openai-codex"
+if grep -q 'moving to' "$log"; then no "non-quota error failed over"; else ok "no failover for non-quota"; fi
 
-# 3. A model outside the chain passes through untouched (pinned profile case).
+# 3. A model outside the chain never runs: the chain runs in chain order instead (no passthrough).
+nodead
+: >"$log"
+: >"$STUB_ARGV"
 OUT=$(printf '%s' "$prompt" | "$wrapper" --model kimi/k2 --mode json --no-session 2>"$work/err3")
-is "pinned-model passthrough exits 0" "$?" "0"
-out_has "pinned stream untouched" '"model":"kimi/k2"'
-if [ "$(grep -c 'moving to' "$log")" = 1 ]; then ok "still one failover line total"; else no "unexpected extra failover lines"; fi
+is "off-chain pin: call exits 0" "$?" "0"
+if grep -q kimi "$STUB_ARGV"; then no "off-chain pin reached kimi"; else ok "off-chain pin never reaches kimi"; fi
+case $(sed -n 1p "$STUB_ARGV") in *zai/glm-5.3-flash*) ok "off-chain pin runs the chain head" ;; *) no "off-chain pin argv: $(sed -n 1p "$STUB_ARGV")" ;; esac
 
 # 4. A resumed session is dropped on the failover attempt only.
 nodead
@@ -264,10 +346,15 @@ log_has "future-dated skip shows time left" 'model=zai/glm-5.3-flash skipped: qu
 skip_msg=$(grep 'skipped: quota error dated' "$log" | sed 's/^[^ ]* //')
 case $skip_msg in *" -"[0-9]*) no "future-dated skip line has a negative number: $skip_msg" ;; *) ok "future-dated skip line has no negative number" ;; esac
 
-# 6. Plain passthrough keeps stdin flowing (prompt reaches the real pi).
-OUT=$(printf '%s' "$prompt" | "$wrapper" --model muse-spark-1.3-contributor --mode json --no-session)
-is "plain passthrough exits 0" "$?" "0"
-out_has "prompt reached pi" "PONG"
+# 6. A pin outside the chain (Muse) is not run: the chain runs in chain order, Muse is never called, and the prompt
+#    still reaches pi (stdin kept flowing through the chain).
+nodead
+: >"$STUB_ARGV"
+OUT=$(printf '%s' "$prompt" | "$wrapper" --model muse-spark-1.3-contributor --mode json --no-session 2>"$work/err6")
+is "non-chain pin exits 0" "$?" "0"
+out_has "prompt reached pi through the chain" "PONG"
+is "muse never called" "$(grep -c 'muse' "$STUB_ARGV")" "0"
+is "non-chain pin runs the chain head first" "$(sed -n 1p "$STUB_ARGV")" "$ext_prefix --model zai/glm-5.3-flash --mode json --no-session"
 
 # 6b. A profile set to a later chain model fails over to the earlier ones in
 # chain order (B2: Muse first, GLM backup), the requested model tried once.
@@ -461,7 +548,7 @@ is "killed attempt keeps the glm marker" "$(cat "$dead/zai%glm-5.3-flash")" "$be
 nodead
 rm -f "$work/pi.pid"
 set -m
-"$wrapper" --model bad/quiet --mode json --no-session <"$prompt_file" >"$work/out9m" 2>"$work/err9m" &
+PI_QUOTA_FAILOVER_CHAIN='bad/quiet openai-codex/gpt-6-luna' "$wrapper" --model bad/quiet --mode json --no-session <"$prompt_file" >"$work/out9m" 2>"$work/err9m" &
 wpid=$!
 set +m
 for _ in $(seq 50); do [ -s "$work/pi.pid" ] && break; sleep 0.1; done
@@ -506,12 +593,12 @@ has_arg "-e $pkgs/pi-plain/extensions/a.ts" "a package without a manifest loads 
 has_arg "-e builtin:mcp" "built-in mcp loads"
 case " $(sed -n 1p "$STUB_ARGV") " in *pi-hermes-memory* | *.bak-x*) no "hermes or a backup copy is in argv" ;; *) ok "no pi-hermes-memory and no backup copy in argv" ;; esac
 
-# A settings "-builtin:mcp" turns that built-in off; a pinned model passes through with -ne as well.
+# A settings "-builtin:mcp" turns that built-in off; a pinned call runs with -ne as well.
 printf '%s\n' '{"extensions":["-builtin:mcp"]}' >"$home/.pi/agent/settings.json"
 : >"$STUB_ARGV"
-OUT=$(printf '%s' "$prompt" | "$wrapper" --model kimi/k2 --mode json --no-session 2>"$work/err10b")
+OUT=$(printf '%s' "$prompt" | "$wrapper" --model zai/glm-5.3-flash --mode json --no-session 2>"$work/err10b")
 case " $(sed -n 1p "$STUB_ARGV") " in *" builtin:mcp "*) no "settings -builtin:mcp still loads mcp" ;; *) ok "settings -builtin:mcp turns mcp off" ;; esac
-case $(sed -n 1p "$STUB_ARGV") in "-ne "*) ok "pinned passthrough runs with -ne" ;; *) no "pinned passthrough lacks -ne" ;; esac
+case $(sed -n 1p "$STUB_ARGV") in "-ne "*) ok "pinned call runs with -ne" ;; *) no "pinned call lacks -ne" ;; esac
 has_arg "-e builtin:llama.cpp" "other built-ins stay on"
 rm -f -- "$home/.pi/agent/settings.json"
 

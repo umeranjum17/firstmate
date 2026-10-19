@@ -17,10 +17,10 @@ An answer that is not parseable JSON is treated as not exhausted, without a log 
 
 ## Idle watchdog
 
-A pi call that writes no stdout and no stderr for `PI_QUOTA_FAILOVER_IDLE_SECS` (default 120; `PI_QUOTA_FAILOVER_BRIDGE_IDLE_SECS`, default 300, for `claude-bridge/*` models) is ended with TERM to pi
+A pi call that writes no stdout and no stderr for `PI_QUOTA_FAILOVER_IDLE_SECS` (default 120; `PI_QUOTA_FAILOVER_BRIDGE_IDLE_SECS`, default 300, for `claude-bridge/*` models; `PI_QUOTA_FAILOVER_DEEPSEEK_IDLE_SECS`, default 300, for `deepseek/*` models) is ended with TERM to pi
 and its descendants, then KILL of the same set after a 5 s grace. A stall is not a quota error: the chain moves on to the next model for that
 call only and writes no quota marker, so the stalled route is tried again on the next call. A stall on the last route is retried up to `PI_QUOTA_FAILOVER_STALL_RETRIES` times (default 3, four calls total) before the call fails. Only a real quota error
-(or quota-axi `exhausted_now`) writes a marker. pi stays in the wrapper's process group, so a group kill of the wrapper
+(or quota-axi `exhausted_now`) writes a marker. Quota errors are matched by `QUOTA_RE`: pi's own terminal phrasings plus the balance and rate-limit texts that Z.AI (`Insufficient balance or no resource package`, `Rate limit reached for requests`) and DeepSeek (`Insufficient Balance`) return, so those move on to the next hop instead of ending the run. pi stays in the wrapper's process group, so a group kill of the wrapper
 reaches it.
 
 The watch starts at the call's first byte, with no separate start limit. Before the extension change below, the silence
