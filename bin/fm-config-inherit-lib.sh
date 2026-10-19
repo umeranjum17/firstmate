@@ -122,8 +122,9 @@ fm_config_inherit_item_session_scoped() {  # <item>
 
 # The complete declared inherited-material set as home-relative paths, one per
 # line, in propagation order: every FM_INHERITABLE_CONFIG item under config/,
-# then the one shared data file. This is what remote senders and receivers
-# derive from, so both ends of a transfer agree by construction.
+# then the one shared data file, minus the shared file when this home lacks the
+# brief-inherit add-on. Remote senders and receivers derive from it, so an item
+# one end does not declare is refused by the other.
 fm_config_inherit_items() {
   local item
   for item in $FM_INHERITABLE_CONFIG; do
