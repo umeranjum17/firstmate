@@ -252,7 +252,10 @@ test_wrapper_captain_ask_guard() {
   dir=$(make_split captain-ask)
   bin="$dir/bin"
   mkdir -p "$bin"
-  printf '#!/bin/sh\ncase "$3" in */pull/1) echo MERGED ;; *) echo OPEN ;; esac\n' > "$bin/gh"
+  cat > "$bin/gh" <<'EOF'
+#!/bin/sh
+case "$3" in */pull/1) echo MERGED ;; *) echo OPEN ;; esac
+EOF
   chmod +x "$bin/gh"
   printf 'Yes, ship it.\n' > "$dir/answer.txt"
   wrapper_from_code "$dir" add ca-1 "[captain-ask] pick one" >/dev/null
@@ -264,10 +267,10 @@ test_wrapper_captain_ask_guard() {
   wrapper_from_code "$dir" update ca-5 --body "$(printf 'Resolution recorded by fm-captain-hold.\nDecision digest: d\nResolution mode: reconciled\n\nReconciliation evidence:\nmoot\n')" >/dev/null \
     || fail "could not write a reconciled-only record"
   expect_captain_refusal "$dir" ca-1 rm ca-1
-  expect_captain_refusal "$dir" ca-1 done ca-1
+  expect_captain_refusal "$dir" ca-1 "done" ca-1
   expect_captain_refusal "$dir" ca-1 hold ca-1 --reason parked --kind parked
   expect_captain_refusal "$dir" ca-1 rm --json ca-1
-  expect_captain_refusal "$dir" ca-1 done --note --json plain ca-1
+  expect_captain_refusal "$dir" ca-1 "done" --note --json plain ca-1
   expect_captain_refusal "$dir" ca-3 task rm ca-3
   expect_captain_refusal "$dir" ca-1 hold --kind parked --reason parked ca-1
   expect_captain_refusal "$dir" ca-5 rm ca-5
@@ -275,7 +278,11 @@ test_wrapper_captain_ask_guard() {
   expect_captain_refusal "$dir" ca-1 edit ca-1 --title "pick one, untagged"
   expect_captain_refusal "$dir" ca-2 update --repo plain-1 ca-2 --title "pick two, untagged"
   mkdir -p "$dir/unreadable"
-  printf '#!/bin/sh\n[ "$1" = show ] && exit 1\nexec "%s" "$@"\n' "$(command -v tasks-axi)" > "$dir/unreadable/tasks-axi"
+  cat > "$dir/unreadable/tasks-axi" <<EOF
+#!/bin/sh
+[ "\$1" = show ] && exit 1
+exec "$(command -v tasks-axi)" "\$@"
+EOF
   chmod +x "$dir/unreadable/tasks-axi"
   PATH="$dir/unreadable:$PATH" expect_captain_refusal "$dir" ca-3 rm ca-3
   assert_grep "ca-1" "$dir/home/data/backlog.md" "the refused item left the backlog"
@@ -285,7 +292,7 @@ test_wrapper_captain_ask_guard() {
     || fail "could not record a captain answer"
   wrapper_from_code "$dir" rm ca-1 >/dev/null 2>&1 || fail "rm of an answered [captain-ask] item was refused"
   wrapper_from_code "$dir" update ca-4 --pr https://github.com/o/r/pull/2 >/dev/null
-  PATH="$bin:$PATH" expect_captain_refusal "$dir" ca-4 done ca-4
+  PATH="$bin:$PATH" expect_captain_refusal "$dir" ca-4 "done" ca-4
   wrapper_from_code "$dir" update ca-2 --pr https://github.com/o/r/pull/1 >/dev/null
   wrapper_from_code "$dir" update ca-2 --pr https://github.com/o/r/pull/2 >/dev/null
   (PATH="$bin:$PATH" wrapper_from_code "$dir" "done" ca-2 >/dev/null 2>&1) || fail "done with a merged PR among several links was refused"
