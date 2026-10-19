@@ -23,7 +23,7 @@
 #            live card; the hold reason is its `about` and the given close
 #            mode; otherwise it is a silent no-op. A failure, including a missing
 #            sign-off-axi, exits nonzero with sign-off's own output; the caller
-#            warns and keeps the hold.
+#            fails the hold command with that output (the hold stays recorded).
 # poll       The blocking child the runner executes; never run it in a
 #            conversational turn. It prints one JSON object per line for each
 #            deliverable answer, `{"key","answer","label","close","at"}` with the
@@ -62,7 +62,7 @@
 # being handed another home's answer, and the stamp gives each hold occurrence
 # its own card. sign-off-axi must be on PATH: without it `arm`
 # refuses, and `raise` prints an install hint and fails, so a hold is kept and
-# only warns. Cards and answers use sign-off's default board
+# fails the hold command. Cards and answers use sign-off's default board
 # (~/.sign-off/decisions.json), the one `sign-off-axi open` shows.
 # ponytail: one default board per machine; add a board option when a home needs its own.
 # sign-off-axi has no command to withdraw a card, so a hold answered through
@@ -123,6 +123,21 @@ cmd_retire() {
   "$SCRIPT_DIR/fm-captain-hold.sh" unbind "$SOURCE_ID" >/dev/null || exit 1
 }
 
+# sign-off's question standard wants one plain question of 12 words or fewer. A
+# reason that opens with such a question is the title; otherwise the title is
+# built from the task title. The whole reason, flattened and cut to 200
+# characters, is the card's why.
+card_question() {  # <task-title> <reason>
+  local first
+  first=$(printf '%s' "$2" | tr '\n' ' ' | sed 's/^ *//; s/\([?]\).*/\1/')
+  case "$first" in
+    *\?) [ "$(printf '%s' "$first" | wc -w)" -le 12 ] && { printf '%s' "$first"; return; } ;;
+  esac
+  printf 'What is your call on %s?' "$(printf '%s' "$1" | tr -d '?' | awk '{n = NF < 6 ? NF : 6; for (i = 1; i <= n; i++) printf "%s%s", $i, i < n ? " " : ""}')"
+}
+
+card_why() { printf '%s' "$1" | tr '\n' ' ' | cut -c1-200; }
+
 cmd_raise() {
   [ "$#" -eq 4 ] || usage
   local out identity
@@ -131,7 +146,12 @@ cmd_raise() {
     printf 'sign-off card not raised: the hold identity of %s could not be read\n' "$1" >&2
     return 1
   }
-  out=$(signoff raise --key "$(home_key_prefix)$1-$(stamp_token "${identity%%#*}")" --title "$2" --about "$3" --close "$4" 2>&1) || {
+  out=$(signoff raise --key "$(home_key_prefix)$1-$(stamp_token "${identity%%#*}")" \
+    --title "$(card_question "$2" "$3")" --about "$3" --why "$(card_why "$3")" \
+    --outcome yes="Your yes is recorded and the work moves on." \
+    --outcome no="Your no is recorded and the work stays on hold." \
+    --recommend yes --recommend-reason "The hold records no recommendation; yes unblocks the work." \
+    --default no --close "$4" 2>&1) || {
     printf 'sign-off-axi raise failed: %s\n' "$out" >&2
     return 1
   }

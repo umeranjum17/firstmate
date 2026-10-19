@@ -146,6 +146,38 @@ delivered | grep -qF "T3" || fail "a permanently skipped answer was not recorded
 printf '0' > "$INTAKE_RC"
 pass "a batch whose every skip is permanent is acknowledged and not offered again"
 
+# The installed sign-off-axi is the contract: a raise it refuses must break here.
+if command -v sign-off-axi >/dev/null 2>&1; then
+  real_signoff=$(command -v sign-off-axi)
+  mkdir -p "$TMP_ROOT/realbin"
+  ln -s "$real_signoff" "$TMP_ROOT/realbin/sign-off-axi"
+  hold_as '2026-10-12T13:00:00Z#0'
+  # The tool is armed by the source file alone; $HOME is the throwaway one, so its default board is private.
+  PATH="$TMP_ROOT/realbin:$PATH" FM_ROOT_OVERRIDE="$ROOTCOPY" FM_HOME="$FM_HOME_DIR" \
+    FM_STATE_OVERRIDE="$FM_HOME_DIR/state" FM_PROCEVENT_CLAIM_ROOT="$TMP_ROOT/claims" \
+    "$ROOTCOPY/bin/fm-procevent-signoff.sh" raise live 'Live contract' \
+    'Does the live contract hold up? More detail follows.' done >/dev/null 2>"$TMP_ROOT/real-stderr" \
+    || fail "the installed sign-off-axi refused the card: $(cat "$TMP_ROOT/real-stderr")"
+  grep -qF 'Does the live contract hold up?' "$HOME/.sign-off/decisions.json" \
+    || fail "the installed sign-off-axi holds no card for the hold"
+  pass "the installed sign-off-axi accepts the card a hold raises"
+else
+  echo "skip: sign-off-axi is not installed; the live raise contract was not checked"
+fi
+
+# A refused raise must be loud: the adapter exits nonzero with the tool's own text.
+cat > "$TMP_ROOT/refusebin-sign-off-axi" <<'SH'
+#!/usr/bin/env bash
+echo 'error: --why is required'; exit 1
+SH
+mkdir -p "$TMP_ROOT/refusebin"; mv "$TMP_ROOT/refusebin-sign-off-axi" "$TMP_ROOT/refusebin/sign-off-axi"; chmod +x "$TMP_ROOT/refusebin/sign-off-axi"
+out=$(PATH="$TMP_ROOT/refusebin:$PATH" FM_ROOT_OVERRIDE="$ROOTCOPY" FM_HOME="$FM_HOME_DIR" \
+  FM_STATE_OVERRIDE="$FM_HOME_DIR/state" FM_PROCEVENT_CLAIM_ROOT="$TMP_ROOT/claims" \
+  "$ROOTCOPY/bin/fm-procevent-signoff.sh" raise T9 'Ship T9' 'needs a call' done 2>&1) \
+  && fail "a refused raise exited zero"
+case "$out" in *"--why is required"*) : ;; *) fail "the refusal text was lost: $out" ;; esac
+pass "a refused raise exits nonzero with the sign-off-axi error text"
+
 TASKS_AXI_BIN=$(command -v tasks-axi || true)
 
 probe_tasks_axi_beads() {
@@ -224,11 +256,11 @@ real_env "$real_home" "$ROOT/bin/fm-captain-hold.sh" hold fm-sample-later \
   || fail "the dated deferral was not held"
 [ "$(board_count)" = "$before" ] || fail "a dated deferral raised a card: $(cat "$SIGNOFF_BOARD")"
 
-q=$(card_for "Pick the route")
+q=$(card_for "Which route?")
 [ -n "$q" ] || fail "the held question raised no card: $(cat "$SIGNOFF_BOARD")"
 jq -e --arg k "$q" '.[$k] | .about == "Which route?" and .close == "done"' "$SIGNOFF_BOARD" >/dev/null \
   || fail "the question card lost its reason or close: $(cat "$SIGNOFF_BOARD")"
-w=$(card_for "Gated work")
+w=$(card_for "What is your call on Gated work?")
 [ -n "$w" ] || fail "the held existing work item raised no card: $(cat "$SIGNOFF_BOARD")"
 jq -e --arg k "$w" '.[$k] | .about == "captain approves the work" and .close == "release"' "$SIGNOFF_BOARD" >/dev/null \
   || fail "the work card lost its reason or close: $(cat "$SIGNOFF_BOARD")"
