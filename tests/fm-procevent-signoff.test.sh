@@ -183,12 +183,12 @@ pass "a refused raise exits nonzero with the sign-off-axi error text"
 hold_as '2026-10-12T13:10:00Z#0'
 adapter raise T10 'Ship T10' 'Pick route? Ship v1 or v2? Reply by Friday.' done >/dev/null 2>&1 \
   || fail "a card for a reason with several questions was not raised"
-jq -e '.[] | select(.title == "Ship v1 or v2?" and .why == "Pick route? Reply by Friday.")' "$SIGNOFF_BOARD" >/dev/null \
+jq -e '.[] | select(.title == "Ship v1 or v2?" and .why == "Pick route? Reply by Friday. Answer yes or no. The hold stays open until you answer.")' "$SIGNOFF_BOARD" >/dev/null \
   || fail "the card dropped reason text: $(jq -c . "$SIGNOFF_BOARD")"
 hold_as '2026-10-12T13:11:00Z#0'
 adapter raise T11 'Ship T11' 'Captain hold:' done >/dev/null 2>&1 \
   || fail "a card for a reason that is only the hold prefix was not raised"
-jq -e '.[] | select(.why == "Captain hold:")' "$SIGNOFF_BOARD" >/dev/null \
+jq -e '.[] | select(.why == "Captain hold: Answer yes or no. The hold stays open until you answer.")' "$SIGNOFF_BOARD" >/dev/null \
   || fail "the card for a prefix-only reason has no why"
 pass "a card keeps every sentence of the reason and falls back to the raw reason for why"
 
@@ -300,7 +300,7 @@ q=$(card_for "Which route?")
 [ -n "$q" ] || fail "the held question raised no card: $(cat "$SIGNOFF_BOARD")"
 jq -e --arg k "$q" '.[$k] | .about == "Which route?" and .close == "done"' "$SIGNOFF_BOARD" >/dev/null \
   || fail "the question card lost its reason or close: $(cat "$SIGNOFF_BOARD")"
-w=$(card_for "captain approves the work?")
+w=$(card_for "captain approves the work")
 [ -n "$w" ] || fail "the held existing work item raised no card: $(cat "$SIGNOFF_BOARD")"
 jq -e --arg k "$w" '.[$k] | .about == "captain approves the work" and .close == "release"' "$SIGNOFF_BOARD" >/dev/null \
   || fail "the work card lost its reason or close: $(cat "$SIGNOFF_BOARD")"

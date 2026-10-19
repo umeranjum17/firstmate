@@ -123,77 +123,79 @@ cmd_retire() {
   "$SCRIPT_DIR/fm-captain-hold.sh" unbind "$SOURCE_ID" >/dev/null || exit 1
 }
 
-# sign-off's question standard wants one plain question of 12 words or fewer,
-# with no leading "Captain hold:" or [tag]. The title is the reason's last
-# question sentence, or the whole reason when it has no question; the rest of
-# the reason is the why. Without any reason words the title is built from the
-# task title.
+ANSWER_NOTE='Answer yes or no. The hold stays open until you answer.'
+
+# Card text per sign-off's question standard: the title is the reason's last
+# question sentence verbatim, or the whole reason when it has no question.
+strip_tags() {
+  local s=$1 prev=
+  while [ "$s" != "$prev" ]; do
+    prev=$s
+    s=$(printf '%s' "$s" | sed -E 's/^[[:space:]]*(\[[^]]*\]|[Cc][Aa][Pp][Tt][Aa][Ii][Nn] [Hh][Oo][Ll][Dd]:|[Cc][Aa][Pp][Tt][Aa][Ii][Nn]:|[Ss][Aa][Yy] [Yy][Ee][Ss] [Oo][Rr] [Nn][Oo]:)[[:space:]]*//')
+  done
+  printf '%s' "$s"
+}
+
 card_flat() {
-  printf '%s' "$1" | tr '\t\n' '  ' \
-    | sed -E 's/^[[:space:]]+//; s/^((\[[^]]*\]|[Cc][Aa][Pp][Tt][Aa][Ii][Nn] [Hh][Oo][Ll][Dd]:)[[:space:]]*)+//; s/[[:space:]]+$//'
+  printf '%s' "$1" | tr '\t\n' '  ' | sed -E 's/[[:space:]]+/ /g; s/^ //; s/ $//'
 }
 
 card_split() {  # <reason>; prints "<title>\t<why>"
-  local flat sentence lead tail title overflow why
-  flat=$(card_flat "$1")
-  sentence=$flat
-  lead=
-  tail=
-  case "$flat" in
-    *\?*)
-      lead=${flat%\?*}
-      tail=${flat##*\?}
-      sentence=$(printf '%s' "$lead" | sed -E 's/.*[.!?][[:space:]]+//')
-      lead=${lead%"$sentence"}
-      ;;
-  esac
-  title=$(printf '%s' "$sentence" | sed -E 's/^[[:space:]]+//; s/[?.![:space:]]+$//' \
-    | awk '{n = NF < 12 ? NF : 12; for (i = 1; i <= n; i++) printf "%s%s", $i, i < n ? " " : ""}')
-  overflow=$(printf '%s' "$sentence" | awk '{for (i = 13; i <= NF; i++) printf "%s%s", $i, i < NF ? " " : ""}')
-  why=$(printf '%s %s %s' "$lead" "$overflow" "$tail" | tr -s '[:space:]' ' ' | sed -E 's/^ //; s/ $//')
-  printf '%s\t%s\n' "$title" "${why:-$(printf '%s' "$1" | tr '\t\n' '  ')}"
-}
-
-card_question() {  # <task-title> <reason>
-  local title
-  title=$(card_split "$2")
-  title=${title%%$'\t'*}
-  if [ -n "$title" ]; then
-    printf '%s?' "$title"
-    return
+  local flat head pre sentence stripped lead after body title
+  flat=$(strip_tags "$(card_flat "$1")")
+  head=$(printf '%s' "$flat" | sed -nE 's/^(.*\?)( |$).*/\1/p')
+  if [ -n "$head" ]; then
+    pre=${head%\?}
+    sentence=$(printf '%s' "$pre" | sed -E 's/^(.*(\. |\? ))?//')
+    lead=${pre%"$sentence"}
+    lead=${lead% }
+    after=${flat#"$head"}
+    after=${after# }
+    stripped=$(strip_tags "$sentence")
+    title=${stripped:+$stripped?}
+    body=$(printf '%s %s' "$lead" "$after" | sed -E 's/^ +| +$//g')
+  else
+    title=$flat
+    body=
   fi
-  printf 'What is your call on %s?' "$(card_flat "$1" | tr -d '?' | awk '{n = NF < 6 ? NF : 6; for (i = 1; i <= n; i++) printf "%s%s", $i, i < n ? " " : ""}')"
+  [ -n "$body" ] || body=$(card_flat "$1")
+  printf '%s\t%s %s\n' "$title" "$(printf '%s' "$body" | cut -c1-$((200 - ${#ANSWER_NOTE} - 1)))" "$ANSWER_NOTE"
 }
 
-card_why() {  # <reason>
-  local split
-  split=$(card_split "$1")
-  printf '%s' "${split#*$'\t'}" | cut -c1-200
+built_title() {  # <task-title>
+  local words
+  words=$(strip_tags "$(card_flat "$1")" | tr -d '?' | awk '{n = NF < 6 ? NF : 6; for (i = 1; i <= n; i++) printf "%s%s", $i, i < n ? " " : ""}')
+  printf 'What is your call on %s?' "$words"
 }
 
 cmd_raise() {
   [ "$#" -eq 4 ] || usage
-  local out identity
+  local out identity split title why rc=0
   cmd_enabled || return 0
   identity=$("$SCRIPT_DIR/fm-captain-hold.sh" open "$1" --identity 2>/dev/null) || {
     printf 'sign-off card not raised: the hold identity of %s could not be read\n' "$1" >&2
     return 1
   }
+  split=$(card_split "$3")
+  title=${split%%$'\t'*}
+  why=${split#*$'\t'}
+  [ -n "$title" ] || title=$(built_title "$2")
   out=$(signoff raise --key "$(home_key_prefix)$1-$(stamp_token "${identity%%#*}")" \
-    --title "$(card_question "$2" "$3")" --about "$3" --why "$(card_why "$3")" \
-    --outcome yes="Your yes is recorded and the work moves on." \
-    --outcome no="Your no is recorded and the work stays on hold." \
-    --recommend no --recommend-reason "The hold records no recommendation; no is the safe default because the item stays held." \
-    --default no --close "$4" 2>&1) || {
+    --title "$title" --about "$3" --why "$why" \
+    --outcome yes="Answer recorded: yes." \
+    --outcome no="Answer recorded: no." \
+    --recommend yes --recommend-reason "The hold records no recommendation." \
+    --default no --close "$4" 2>&1) || rc=$?
+  case "$out" in
+    *"already answered"*)
+      printf 'sign-off card for %s is already answered; reusing it\n' "$1" >&2
+      return 0
+      ;;
+  esac
+  [ "$rc" -eq 0 ] || {
     printf 'sign-off-axi raise failed: %s\n' "$out" >&2
     return 1
   }
-  case "$out" in
-    *"already answered"*)
-      printf 'sign-off already holds an answered card under %s; this hold has no live card\n' "$1" >&2
-      return 1
-      ;;
-  esac
   printf 'sign-off card on the board for %s\n' "$1" >&2
 }
 
