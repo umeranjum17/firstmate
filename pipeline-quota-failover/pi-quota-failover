@@ -9,11 +9,13 @@
 # run fails, costing a restart.
 #
 # This wrapper runs the real pi; the requested chain model goes first, then
-# the other chain models in chain order (default GLM 5.3 Flash, then DeepSeek
-# Flash, then Claude Haiku 5.5 through claude-bridge - Haiku only as the last
-# failover; never Opus, Sonnet, Fable or Step 5), and when an attempt
-# answers a QUOTA error it moves at once to the next model in that order
-# inside the same invocation. Any non-quota failure passes through
+# the other chain models in chain order (default DeepSeek Flash, then Claude
+# Haiku 5.5 through claude-bridge - Haiku only as the last failover; never
+# Opus, Sonnet, Fable, Codex, Go, Muse or Step 5). A call pinned to a model
+# outside the chain runs the chain in chain order, so no pipeline role reaches
+# a model the chain does not name. When an attempt answers a QUOTA error it
+# moves at once to the next model in that order inside the same invocation.
+# Any non-quota failure passes through
 # byte-for-byte with its original exit code, so the pipeline's own handling is
 # untouched. When every model in the chain is quota-dead it fails once with a
 # line containing "quota exhausted", which no-mistakes classifies as terminal,
@@ -36,13 +38,15 @@
 #   PI_QUOTA_FAILOVER_GATE_SECS  longest gate wait before pi starts anyway (default 600)
 #   PI_QUOTA_FAILOVER_DEAD_SECS  how long a quota error keeps a chain model skipped (default 3600)
 #   PI_QUOTA_FAILOVER_IDLE_SECS  a pi call with no stdout and no stderr for this long is killed; the chain moves on
-#                              for that call only and writes no quota marker (default 120; claude-bridge/* models use the knob below). Measured 2026-10-18 on
+#                              for that call only and writes no quota marker (default 120; claude-bridge/* and deepseek/* models use the knobs below). Measured 2026-10-18 on
 #   PI_QUOTA_FAILOVER_STALL_RETRIES  retries for a stalled last route (default 3; four calls total).
 #                              Haiku 5.5 with a 103 KB review prompt: pi streams JSON events (text and thinking
 #                              deltas, 1400+ lines per call), the longest gap was 26 s (pi start before the first
 #                              event) and 12 s mid-stream, so 120 s is about 4.5x the worst observed gap.
 #   PI_QUOTA_FAILOVER_BRIDGE_IDLE_SECS  the same idle limit for claude-bridge/* models (default 300). Their Haiku calls
 #                              answer in 30-166 s on the fleet's logs, so the 120 s limit killed slow answers.
+#   PI_QUOTA_FAILOVER_DEEPSEEK_IDLE_SECS  the same idle limit for deepseek/* models (default 300). The fleet's log from
+#                              2026-10-19 shows 8 DeepSeek calls silent for 120 s and killed, each then moved to Haiku.
 #
 # Before each route, quota-axi (on PATH) is asked for that route's provider: a runway of exhausted_now skips the
 # route without calling it. quota-axi missing, slower than 10s or failing leaves the route to be tried as before.
@@ -53,10 +57,12 @@ set -u
 # rate limits, credit exhaustion, the report's "limit used up" phrasing, and
 # claude-bridge's Claude subscription limit ("Claude rate limit (five_hour) ...:
 # You're out of extra usage"). Case-insensitive; matched against pi's error
-# surface only.
-QUOTA_RE='limit used up|usage limit|limit has been reached|GoUsageLimitError|rate limit exceeded|quota|available credits|insufficient credits|Claude rate limit|out of extra usage'
+# surface only. The balance and budget phrasings come from pi's own terminal list (isTerminalRateLimitError); Z.AI's
+# "Insufficient balance" and "Rate limit reached for requests" refusals were passed through as non-quota failures,
+# so the run ended instead of moving on.
+QUOTA_RE='limit used up|usage limit|limit has been reached|rate limit reached|GoUsageLimitError|FreeUsageLimitError|rate limit exceeded|quota|available credits|available balance|insufficient credits|insufficient balance|insufficient_quota|out of budget|Claude rate limit|out of extra usage'
 
-chain=${PI_QUOTA_FAILOVER_CHAIN:-'zai/glm-5.3-flash deepseek/deepseek-flash claude-bridge/claude-haiku-5-5'}
+chain=${PI_QUOTA_FAILOVER_CHAIN:-'deepseek/deepseek-flash claude-bridge/claude-haiku-5-5'}
 # The chain is the fleet's one route list: route-change reads it from here.
 [ -z "${PI_QUOTA_FAILOVER_PRINT_CHAIN:-}" ] || { printf '%s\n' "$chain"; exit 0; }
 
@@ -74,9 +80,8 @@ fi
 stdin_file=$(mktemp) || exit 127
 out_file=$(mktemp) || exit 127
 err_file=$(mktemp) || exit 127
-have_stdin=0
 if [ ! -t 0 ]; then
-  cat >"$stdin_file" && have_stdin=1
+  cat >"$stdin_file"
 fi
 trap 'rm -f "$stdin_file" "$out_file" "$err_file"' EXIT
 
@@ -126,9 +131,14 @@ quota_exhausted() {
 }
 idle_secs=${PI_QUOTA_FAILOVER_IDLE_SECS:-120}
 bridge_idle_secs=${PI_QUOTA_FAILOVER_BRIDGE_IDLE_SECS:-300}
-# idle_for <model>: the idle limit for that model's call; claude-bridge/* models get their own.
+deepseek_idle_secs=${PI_QUOTA_FAILOVER_DEEPSEEK_IDLE_SECS:-300}
+# idle_for <model>: the idle limit for that model's call; claude-bridge/* and deepseek/* models get their own.
 idle_for() {
-  case $1 in claude-bridge/*) echo "$bridge_idle_secs" ;; *) echo "$idle_secs" ;; esac
+  case $1 in
+    claude-bridge/*) echo "$bridge_idle_secs" ;;
+    deepseek/*) echo "$deepseek_idle_secs" ;;
+    *) echo "$idle_secs" ;;
+  esac
 }
 stall_retries=${PI_QUOTA_FAILOVER_STALL_RETRIES:-3}
 
@@ -307,24 +317,22 @@ while [ $i -lt ${#args[@]} ]; do
   i=$((i + 1))
 done
 
-# Only intercept calls whose model is in the chain: an operator-pinned profile
-# (axi run --model) for any other model passes through untouched, which also
-# keeps the pi-only pinned-profile rule intact. The requested model goes first,
+# Every pipeline call runs the chain. A requested model in the chain goes first,
 # then every other chain model in chain order, so a profile pinned to any chain
-# model fails over to the rest of the chain.
+# model fails over to the rest of the chain. A model outside the chain (a pin to
+# Codex, Go, Muse or any other route) is not run: the chain runs in chain order,
+# and a call with no --model gets the chain head.
 order=()
+in_chain=0
 for m in "${models[@]}"; do
-  [ "$m" = "$requested" ] || order+=("$m")
+  if [ "$m" = "$requested" ]; then in_chain=1; else order+=("$m"); fi
 done
-if [ ${#order[@]} = ${#models[@]} ]; then
-  # Keep this process as pi for signal semantics: re-point stdin at the
-  # captured file, unlink it (the open fd survives), then exec.
-  [ "$have_stdin" = 1 ] && exec 0<"$stdin_file"
-  rm -f "$stdin_file"
-  exec "$real_pi" "${ext_args[@]}" "${args[@]}"
+if [ "$in_chain" = 1 ]; then
+  order=("$requested" "${order[@]}")
+else
+  order=("${models[@]}")
+  [ -n "$requested" ] || args+=(--model "${models[0]}")
 fi
-
-order=("$requested" "${order[@]}")
 live=()
 detail="every chain model hit a quota error in the last ${dead_secs}s"
 for m in "${order[@]}"; do
