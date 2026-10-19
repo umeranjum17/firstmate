@@ -16,9 +16,14 @@
 # No settings/model changes or recovery. The existing blocked/wait escalation
 # owns subsequent attention. Each scan reads only this home's recorded lanes.
 
-_FM_MODEL_ERROR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Sibling libraries live in the fork's bin/, not beside this add-on file: the
+# watcher sets SCRIPT_DIR, other callers FM_HOME.
+_FM_MODEL_ERROR_DIR="${SCRIPT_DIR:-$FM_HOME/bin}"
 # shellcheck source=bin/fm-timeout-lib.sh
 . "$_FM_MODEL_ERROR_DIR/fm-timeout-lib.sh"
+# Parked-home reader (firstmate-addons/parked-homes): the watcher defines it;
+# without it nothing is ever parked.
+declare -F fm_parked_meta >/dev/null || fm_parked_meta() { return 1; }
 # The usage-limit banner pattern has one owner, bin/fm-composer-lib.sh; this
 # observer reads that variable so the outage alert cannot drift from the
 # staleness furniture the banner was captured with.
@@ -46,6 +51,9 @@ fm_model_outage_tick() {
     [ -f "$meta" ] && [ ! -L "$meta" ] || continue
     id=${meta##*/}; id=${id%.meta}
     fm_busy_token_valid "$id" || continue
+    # Parked-home guard (firstmate-addons/parked-homes): a parked home's lane
+    # is never scanned and never alerts. No-op without the add-on checkout.
+    if fm_parked_meta "$meta" "$id"; then continue; fi
     target=$(fm_backend_target_of_meta "$meta")
     [ -n "$target" ] || continue
     backend=$(fm_backend_of_meta "$meta")
