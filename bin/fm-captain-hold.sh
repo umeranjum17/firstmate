@@ -201,7 +201,8 @@
 # `answered` is the read-only predicate bin/fm-tasks-axi.sh asks before it lets a
 # `[captain-ask]` row leave the backlog: exit 0 when the task body carries a
 # recorded captain answer (an evidence-only `reconciled` record does not count),
-# 1 when it does not, 2 when the task cannot be read. It prints nothing.
+# 1 when it does not, and any other non-zero status when the task cannot be read.
+# It prints nothing.
 #
 # `diverged` is the read-only guard over the seam between the two records of
 # one captain call. See "record divergence" beside command_diverged below.
