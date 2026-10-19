@@ -24,6 +24,7 @@ One line per add-on, with how it wires in. `<home>` is your home folder for the 
 - `read-guard` — blocks agent tool access to provider logins, BYOKit person credentials and no-mistakes config; metadata-only `ls`, `stat`, `test` and `[` checks are allowed. Process/library reads are unaffected. Wire in: `read-guard/install.sh`; remove: `read-guard/uninstall.sh`.
 - `glm-queue` — one local line in front of the GLM API, so parallel calls queue instead of hitting rate limits. Wire in: `glm-queue/install.sh`, then point pi at the queue.
 - `host-memory` — a gate that makes heavy jobs wait for host memory instead of crashing. Wire in: `host-memory/install.sh`.
+- `brief-inherit` — shared worker instructions (`config/brief-include-shared.md`) reach every home's briefs. Needs fork hooks (FORK-EXIT.md); step A only.
 - `local-qwen-tuning` — operator reference for the local Qwen model server: launch, tuning, limits, rollback. Reference only, nothing to install.
 - `lead-wake` — wakes a secondmate home that sits below its lane floor with ready backlog work, and withdraws the wake when the work is gone. Needs fork hooks (FORK-EXIT.md); step A only.
 - `merge-card` — runs the merge gate and posts one evidence card per merge to the sign-off board. Wire in: config shims, see Install.
