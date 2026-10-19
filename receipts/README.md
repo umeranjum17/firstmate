@@ -8,6 +8,27 @@ Nothing publishes from here yet: the live flow keeps running the fork's
 directory lands in a later PR. Until that swap this directory is dormant, and
 every moved byte below is identical to the fork copy the live flow runs today.
 
+Step A of the fork exit: the publisher runs from this directory and the
+acceptance/brief/meta logic lives in `bin/fm-receipts-lib.sh`. The publisher reads
+the fork libraries from `$FM_FORK_BIN`, else `$FM_HOME/bin`; otherwise its body is
+identical to the fork copy.
+
+## Step-B hooks (fork)
+
+- `bin/fm-dod-lib.sh`: replace the `fm_dod_receipt_accept` definition with the optional
+  source `[ ! -r "${FM_ADDONS_DIR:-$FM_HOME/projects/firstmate-addons}/receipts/bin/fm-receipts-lib.sh" ] || . "${FM_ADDONS_DIR:-$FM_HOME/projects/firstmate-addons}/receipts/bin/fm-receipts-lib.sh"`;
+  the merge-local / pr-merge call sites become
+  `if declare -F fm_dod_receipt_accept >/dev/null; then fm_dod_receipt_accept ... || exit 1; fi`.
+- Brief: `if declare -F fm_receipts_brief >/dev/null; then fm_receipts_brief "$id"; fi`.
+- Spawn meta: `if declare -F fm_receipts_inherit >/dev/null; then fm_receipts_inherit "$KIND" "$BRIEF" "${RELAUNCH_META:-}"; fi`.
+- Promote: `if declare -F fm_receipts_promote >/dev/null; then fm_receipts_promote "$TMP"; fi`.
+- Not in this step: `fm_dod_accept_ship_done`'s cross-repo head selection stays in the fork.
+
+`tests/receipts-hook-e2e.sh` (set `FM_TEST_FORK`) applies the acceptance/publisher
+swap to a private fork copy and runs the fork's real `tests/fm-dod-lib.test.sh`
+receipt journey over this add-on, then checks the helpers; with the add-on absent
+the guarded lines are a no-op.
+
 ## Layout
 
 - `bin/fm-run-receipt.sh` — publishes the completion receipt for one task's

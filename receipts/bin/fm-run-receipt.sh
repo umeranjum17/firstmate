@@ -11,7 +11,8 @@ if [ "${1:-}" = --help ]; then
   sed -n '2,/^set -eu/{ /^set -eu/d; s/^# \{0,1\}//; p; }' "${BASH_SOURCE[0]}"
   exit 0
 fi
-SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# The fork libraries live in the fork's bin/ (FM_FORK_BIN, else $FM_HOME/bin), not beside this add-on script.
+SCRIPT_DIR=${FM_FORK_BIN:-${FM_HOME:?explicit supervising FM_HOME required}/bin}
 # shellcheck source=bin/fm-dod-lib.sh
 . "$SCRIPT_DIR/fm-dod-lib.sh"
 # shellcheck source=bin/fm-wake-lib.sh
