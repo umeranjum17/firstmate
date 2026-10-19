@@ -76,7 +76,7 @@ check() {
     dd_v=$(done-done --version 2>/dev/null | head -n 1)
     if done-done check --help 2>&1 | grep -q -- '--citation-base' ||
        version_at_least "$dd_v" 0.3.1; then
-      out=$(cd "$wt" && done-done check --from "$src" --judge --json --citation-base "$FM_HOME/data/$id" 2>&1) || rc=$?
+      out=$(cd "$wt" && done-done check --from "$src" --json --citation-base "$FM_HOME/data/$id" 2>&1) || rc=$?
     else
       args=()
       if [ "$pr" = - ]; then
@@ -88,7 +88,7 @@ check() {
         rc=2
       fi
       if [ "$rc" = 0 ]; then
-        out=$(cd "$wt" && resolve_evidence "$FM_HOME/data/$id" <<<"$body" | done-done check --from - "${args[@]}" --judge --json 2>&1) || rc=$?
+        out=$(cd "$wt" && resolve_evidence "$FM_HOME/data/$id" <<<"$body" | done-done check --from - "${args[@]}" --json 2>&1) || rc=$?
       else
         out=$body
       fi

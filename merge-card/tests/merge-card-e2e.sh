@@ -61,6 +61,9 @@ while [ $# -gt 0 ]; do
   case $1 in
     --from) src=$2; shift 2 ;;
     --citation-base) flag=1 base=$2; shift 2 ;;
+    --judge) # done-done 0.4.1: a route is required, so a bare flag is ambiguous
+      case ${2:-} in "" | --*) jq -n '{error: "Option --judge argument is ambiguous"}'; exit 2 ;; esac
+      shift 2 ;;
     *) shift ;;
   esac
 done
