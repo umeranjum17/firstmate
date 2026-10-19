@@ -133,22 +133,31 @@ card_flat() {
     | sed -E 's/^[[:space:]]+//; s/^(\[[^]]*\][[:space:]]*)+//; s/^[Cc][Aa][Pp][Tt][Aa][Ii][Nn] [Hh][Oo][Ll][Dd]:[[:space:]]*//; s/[[:space:]]+$//'
 }
 
-card_split() {  # <reason>; prints "<title sentence>\t<rest of reason>"
-  local flat head sentence
+card_split() {  # <reason>; prints "<title>\t<why>"
+  local flat sentence lead tail title overflow why
   flat=$(card_flat "$1")
-  head=$flat
   sentence=$flat
+  lead=
+  tail=
   case "$flat" in
-    *\?*) head=${flat%\?*}; sentence=$(printf '%s' "$head" | sed -E 's/.*[.!?][[:space:]]+//') ;;
+    *\?*)
+      lead=${flat%\?*}
+      tail=${flat##*\?}
+      sentence=$(printf '%s' "$lead" | sed -E 's/.*[.!?][[:space:]]+//')
+      lead=${lead%"$sentence"}
+      ;;
   esac
-  printf '%s\t%s\n' "$sentence" "$(printf '%s' "${head%"$sentence"}" | sed -E 's/[[:space:]]+$//')"
+  title=$(printf '%s' "$sentence" | sed -E 's/^[[:space:]]+//; s/[?.![:space:]]+$//' \
+    | awk '{n = NF < 12 ? NF : 12; for (i = 1; i <= n; i++) printf "%s%s", $i, i < n ? " " : ""}')
+  overflow=$(printf '%s' "$sentence" | awk '{for (i = 13; i <= NF; i++) printf "%s%s", $i, i < NF ? " " : ""}')
+  why=$(printf '%s %s %s' "$lead" "$overflow" "$tail" | tr -s '[:space:]' ' ' | sed -E 's/^ //; s/ $//')
+  printf '%s\t%s\n' "$title" "${why:-$(printf '%s' "$1" | tr '\t\n' '  ')}"
 }
 
 card_question() {  # <task-title> <reason>
-  local split title
-  split=$(card_split "$2")
-  title=$(printf '%s' "${split%%$'\t'*}" | sed -E 's/^[[:space:]]+//; s/[?.![:space:]]+$//' \
-    | awk '{n = NF < 12 ? NF : 12; for (i = 1; i <= n; i++) printf "%s%s", $i, i < n ? " " : ""}')
+  local title
+  title=$(card_split "$2")
+  title=${title%%$'\t'*}
   if [ -n "$title" ]; then
     printf '%s?' "$title"
     return
@@ -157,10 +166,9 @@ card_question() {  # <task-title> <reason>
 }
 
 card_why() {  # <reason>
-  local split rest
+  local split
   split=$(card_split "$1")
-  rest=${split#*$'\t'}
-  printf '%s' "${rest:-$(card_flat "$1")}" | cut -c1-200
+  printf '%s' "${split#*$'\t'}" | cut -c1-200
 }
 
 cmd_raise() {

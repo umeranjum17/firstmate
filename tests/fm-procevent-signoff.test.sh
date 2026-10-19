@@ -39,12 +39,13 @@ case "${1-}" in
   raise)
     shift
     [ -z "${SIGNOFF_REFUSE-}" ] || { echo 'error: refused by the stub'; exit 1; }
-    key='' title='' about='' close=''
+    key='' title='' about='' close='' why=''
     while [ "$#" -gt 1 ]; do
       case "$1" in
         --key) key=$2 ;;
         --title) title=$2 ;;
         --about) about=$2 ;;
+        --why) why=$2 ;;
         --close) close=$2 ;;
       esac
       shift 2
@@ -53,8 +54,8 @@ case "${1-}" in
       echo 'already answered'
       exit 0
     fi
-    jq --arg k "$key" --arg t "$title" --arg a "$about" --arg c "$close" \
-      '.[$k] = {answer: null, label: "", close: $c, at: null, title: $t, about: $a}' \
+    jq --arg k "$key" --arg t "$title" --arg a "$about" --arg c "$close" --arg w "$why" \
+      '.[$k] = {answer: null, label: "", close: $c, at: null, title: $t, about: $a, why: $w}' \
       "$SIGNOFF_BOARD" > "$SIGNOFF_BOARD.tmp" && mv "$SIGNOFF_BOARD.tmp" "$SIGNOFF_BOARD"
     echo raised
     ;;
@@ -178,6 +179,18 @@ out=$(PATH="$TMP_ROOT/refusebin:$PATH" FM_ROOT_OVERRIDE="$ROOTCOPY" FM_HOME="$FM
   && fail "a refused raise exited zero"
 case "$out" in *"--why is required"*) : ;; *) fail "the refusal text was lost: $out" ;; esac
 pass "a refused raise exits nonzero with the sign-off-axi error text"
+
+hold_as '2026-10-12T13:10:00Z#0'
+adapter raise T10 'Ship T10' 'Pick route? Ship v1 or v2? Reply by Friday.' done >/dev/null 2>&1 \
+  || fail "a card for a reason with several questions was not raised"
+jq -e '.[] | select(.title == "Ship v1 or v2?" and .why == "Pick route? Reply by Friday.")' "$SIGNOFF_BOARD" >/dev/null \
+  || fail "the card dropped reason text: $(jq -c . "$SIGNOFF_BOARD")"
+hold_as '2026-10-12T13:11:00Z#0'
+adapter raise T11 'Ship T11' 'Captain hold:' done >/dev/null 2>&1 \
+  || fail "a card for a reason that is only the hold prefix was not raised"
+jq -e '.[] | select(.why == "Captain hold:")' "$SIGNOFF_BOARD" >/dev/null \
+  || fail "the card for a prefix-only reason has no why"
+pass "a card keeps every sentence of the reason and falls back to the raw reason for why"
 
 if ! command -v tasks-axi >/dev/null 2>&1; then
   echo "skip: tasks-axi is not installed; the refused-card hold was not checked"
