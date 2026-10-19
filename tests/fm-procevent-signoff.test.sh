@@ -158,7 +158,7 @@ if command -v sign-off-axi >/dev/null 2>&1; then
   PATH="$TMP_ROOT/realbin:$PATH" FM_ROOT_OVERRIDE="$ROOTCOPY" FM_HOME="$FM_HOME_DIR" \
     FM_STATE_OVERRIDE="$FM_HOME_DIR/state" FM_PROCEVENT_CLAIM_ROOT="$TMP_ROOT/claims" \
     "$ROOTCOPY/bin/fm-procevent-signoff.sh" raise live 'Live contract' \
-    'Does the live contract hold up? More detail follows.' done >/dev/null 2>"$TMP_ROOT/real-stderr" \
+    'Does the live contract hold up? More detail follows.' 'done' >/dev/null 2>"$TMP_ROOT/real-stderr" \
     || fail "the installed sign-off-axi refused the card: $(cat "$TMP_ROOT/real-stderr")"
   grep -qF 'Does the live contract hold up?' "$HOME/.sign-off/decisions.json" \
     || fail "the installed sign-off-axi holds no card for the hold"
@@ -167,7 +167,7 @@ if command -v sign-off-axi >/dev/null 2>&1; then
   raise_live() {  # <task-id> <reason>
     PATH="$TMP_ROOT/realbin:$PATH" FM_ROOT_OVERRIDE="$ROOTCOPY" FM_HOME="$FM_HOME_DIR" \
       FM_STATE_OVERRIDE="$FM_HOME_DIR/state" FM_PROCEVENT_CLAIM_ROOT="$TMP_ROOT/claims" \
-      "$ROOTCOPY/bin/fm-procevent-signoff.sh" raise "$1" 'Live task' "$2" done >/dev/null 2>"$TMP_ROOT/real-stderr"
+      "$ROOTCOPY/bin/fm-procevent-signoff.sh" raise "$1" 'Live task' "$2" 'done' >/dev/null 2>"$TMP_ROOT/real-stderr"
   }
   card_titled() { jq -e --arg t "$1" '[.. | objects | select(.title? == $t)] | length > 0' "$HOME/.sign-off/decisions.json" >/dev/null; }
 
@@ -194,7 +194,7 @@ SH
 mkdir -p "$TMP_ROOT/refusebin"; mv "$TMP_ROOT/refusebin-sign-off-axi" "$TMP_ROOT/refusebin/sign-off-axi"; chmod +x "$TMP_ROOT/refusebin/sign-off-axi"
 out=$(PATH="$TMP_ROOT/refusebin:$PATH" FM_ROOT_OVERRIDE="$ROOTCOPY" FM_HOME="$FM_HOME_DIR" \
   FM_STATE_OVERRIDE="$FM_HOME_DIR/state" FM_PROCEVENT_CLAIM_ROOT="$TMP_ROOT/claims" \
-  "$ROOTCOPY/bin/fm-procevent-signoff.sh" raise T9 'Ship T9' 'needs a call' done 2>&1) \
+  "$ROOTCOPY/bin/fm-procevent-signoff.sh" raise T9 'Ship T9' 'needs a call' 'done' 2>&1) \
   && fail "a refused raise exited zero"
 case "$out" in *"--why is required"*) : ;; *) fail "the refusal text was lost: $out" ;; esac
 pass "a refused raise exits nonzero with the sign-off-axi error text"
@@ -205,18 +205,18 @@ echo 'error: key already holds a different question'; exit 1
 SH
 out=$(PATH="$TMP_ROOT/refusebin:$PATH" FM_ROOT_OVERRIDE="$ROOTCOPY" FM_HOME="$FM_HOME_DIR" \
   FM_STATE_OVERRIDE="$FM_HOME_DIR/state" FM_PROCEVENT_CLAIM_ROOT="$TMP_ROOT/claims" \
-  "$ROOTCOPY/bin/fm-procevent-signoff.sh" raise T9 'Ship T9' 'Changed reason?' done 2>&1) \
+  "$ROOTCOPY/bin/fm-procevent-signoff.sh" raise T9 'Ship T9' 'Changed reason?' 'done' 2>&1) \
   || fail "a re-raise of an existing card with a changed question exited nonzero: $out"
 case "$out" in *"already exists with another question"*) : ;; *) fail "the kept card was not reported: $out" ;; esac
 pass "a re-raise of an existing card with a changed question keeps the card and exits zero"
 
 hold_as '2026-10-12T13:10:00Z#0'
-adapter raise T10 'Ship T10' 'Pick route? Ship v1 or v2? Reply by Friday.' done >/dev/null 2>&1 \
+adapter raise T10 'Ship T10' 'Pick route? Ship v1 or v2? Reply by Friday.' 'done' >/dev/null 2>&1 \
   || fail "a card for a reason with several questions was not raised"
 jq -e '.[] | select(.title == "Ship v1 or v2?" and .why == "Pick route? Ship v1 or v2? Reply by Friday. Answer yes or no. The hold stays open until you answer.")' "$SIGNOFF_BOARD" >/dev/null \
   || fail "the card dropped reason text: $(jq -c . "$SIGNOFF_BOARD")"
 hold_as '2026-10-12T13:11:00Z#0'
-adapter raise T11 'Ship T11' 'Captain hold:' done >/dev/null 2>&1 \
+adapter raise T11 'Ship T11' 'Captain hold:' 'done' >/dev/null 2>&1 \
   || fail "a card for a reason that is only the hold prefix was not raised"
 jq -e '.[] | select(.why == "Captain hold: Answer yes or no. The hold stays open until you answer.")' "$SIGNOFF_BOARD" >/dev/null \
   || fail "the card for a prefix-only reason has no why"
