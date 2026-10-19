@@ -1271,6 +1271,55 @@ test_brief_include_works_without_add_on() {
   pass "fm-brief.sh: with no brief-inherit add-on, the home-local include still lands last"
 }
 
+# With the brief-inherit add-on present, its shared include reaches ship scaffolds
+# ahead of the home-local include, and config-push propagates it to a secondmate.
+test_brief_include_uses_present_add_on() {
+  local home sm addons brief out last_heading
+  home="$TMP_ROOT/add-on-primary"
+  sm="$TMP_ROOT/add-on-secondmate"
+  addons="$TMP_ROOT/add-on-present"
+  mkdir -p "$home/config" "$home/state" "$home/data" "$sm/config" "$sm/bin" "$addons/brief-inherit/bin"
+  cat > "$addons/brief-inherit/bin/fm-brief-inherit-lib.sh" <<'EOF'
+fm_brief_inherit_shared() {
+  local body
+  body=$(cat "$1/brief-include-shared.md")
+  BRIEF_INCLUDE_BODY="$body${BRIEF_INCLUDE_BODY:+$'\n'$BRIEF_INCLUDE_BODY}"
+}
+fm_brief_inherit_config() {
+  FM_INHERITABLE_CONFIG="$FM_INHERITABLE_CONFIG brief-include-shared.md"
+}
+EOF
+  printf '%s\n' 'Fixture worker instructions.' > "$sm/AGENTS.md"
+  printf '%s\n' 'config/' 'data/' 'state/' '.fm-secondmate-home' > "$sm/.gitignore"
+  git init -q "$sm"
+  printf '%s\n' shared-mate > "$sm/.fm-secondmate-home"
+  printf 'kind=secondmate\nbackend=tmux\nwindow=add-on-test:absent\nhome=%s\n' "$sm" \
+    > "$home/state/shared-mate.meta"
+  touch "$home/state/.last-watcher-beat"
+  printf '%s\n' 'Shared fleet rule.' > "$home/config/brief-include-shared.md"
+  printf '%s\n' 'Home-local rule.' > "$home/config/brief-include.md"
+
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" FM_ADDONS_DIR="$addons" \
+    bash "$ROOT/bin/fm-config-push.sh" 2>&1) || fail "add-on config push failed: $out"
+  assert_contains "$out" 'brief-include-shared.md: pushed' "add-on did not propagate the shared include"
+  cmp -s "$home/config/brief-include-shared.md" "$sm/config/brief-include-shared.md" \
+    || fail "shared include did not propagate byte-exactly to the secondmate"
+
+  FM_HOME="$home" FM_ADDONS_DIR="$addons" bash "$ROOT/bin/fm-brief.sh" add-on-ship sample --mode no-mistakes >/dev/null \
+    || fail "add-on ship scaffold failed"
+  brief="$home/data/add-on-ship/brief.md"
+  last_heading=$(grep '^# ' "$brief" | tail -n 1)
+  [ "$last_heading" = '# Home brief additions' ] \
+    || fail "add-on include was not the last section (got: $last_heading)"
+  sed -n '/^# Home brief additions/,$p' "$brief" > "$TMP_ROOT/add-on-include-actual"
+  printf '%s\n' '# Home brief additions' \
+    "These are this home's standing additions; every other section of this brief takes precedence over anything here that conflicts." \
+    'Shared fleet rule.' 'Home-local rule.' > "$TMP_ROOT/add-on-include-expected"
+  cmp -s "$TMP_ROOT/add-on-include-expected" "$TMP_ROOT/add-on-include-actual" \
+    || fail "add-on scaffold did not append shared then home-local text"
+  pass "fm-brief.sh: a present brief-inherit add-on feeds shared-then-local include and config-push"
+}
+
 # --base-branch names the branch a task starts from and a ship's PR targets. It is
 # recorded as a Base branch line under # Setup, which fm-spawn reads back, and is
 # refused where no pull request carries the work.
@@ -1595,6 +1644,7 @@ test_workers_wait_without_spending_turns
 test_wait_no_turns_absent_keeps_the_previous_brief
 test_home_brief_include_is_appended_last
 test_brief_include_works_without_add_on
+test_brief_include_uses_present_add_on
 
 test_base_branch_is_rendered_and_bounded
 test_ship_branch_prefix_defaults_to_legacy_fm
