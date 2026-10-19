@@ -17,9 +17,4 @@ fm_parked_skip_meta() { return 1; }
 if [ -f "$_FM_PARKED_ADDONS/parked-homes/bin/fm-parked-homes-lib.sh" ]; then
   # shellcheck source=/dev/null
   . "$_FM_PARKED_ADDONS/parked-homes/bin/fm-parked-homes-lib.sh"
-else
-  fm_parked_homes_file() { return 1; }
-  fm_parked_home() { return 1; }
-  fm_parked_meta_id() { return 1; }
-  fm_parked_meta() { return 1; }
 fi
