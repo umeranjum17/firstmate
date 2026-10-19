@@ -24,6 +24,9 @@
 #     proof and re-runs the post. The card key is the merge's own, so a repeat
 #     post, or another home posting the same merge, finds it on the board and adds
 #     nothing.
+#     An internal fleet-tool merge with no user-visible screen puts a `screen: none` line in
+#     its Checks block: post then skips the card (exit 0, one skip line pointing to the merge
+#     note) and runs no done-done.
 #     sign-off-axi writes the board under its lock: it appends and never rewrites other cards.
 # Needs done-done on PATH (0.3.1+ cites the task folder's evidence itself; an older one is
 # still covered), sign-off-axi, jq and gh.
@@ -145,6 +148,13 @@ post() {
   key=${key:0:128}
   if [ -f "$board" ] && jq -e --arg k "$key" 'any(.items[]?; .key == $k)' "$board" >/dev/null; then
     echo "merge-card: $key is already on the board"; return 0
+  fi
+  # An internal fleet-tool merge declares `screen: none` in its Checks block: the board takes
+  # passed proof of a real screen, not merge receipts, so it gets no card and no done-done run.
+  if { [ "$pr" != - ] && gh pr view "$pr" --json body --jq .body 2>/dev/null || cat -- "$FM_HOME/data/$id/checks.md" 2>/dev/null; } |
+     grep -qiE '^[[:space:]]*screen[[:space:]]*:[[:space:]]*none[[:space:]]*$'; then
+    echo "merge-card: no evidence card for $key: the merge declares screen: none (no user-visible screen); the passed-test receipt is in the merge note"
+    return 0
   fi
   # The gate's verdict for this merge, else run done-done now (a merge the gate never saw).
   jq -e --arg pr "$pr" --arg head "$head" '.pr == $pr and ($pr != "-" or .head == $head)' "$record" >/dev/null 2>&1 || {
