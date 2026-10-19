@@ -1204,6 +1204,7 @@ The hook's content is home-local policy; [`fm_merge_post_hook`](../bin/fm-merge-
 
 The optional local, gitignored `config/brief-include.md` adds standing worker instructions to every ship and scout brief.
 This keeps private brief content out of tracked files.
+The shared `config/brief-include-shared.md` is not part of this repository: it takes effect only where the firstmate-addons `brief-inherit` add-on is installed, and that add-on owns its propagation to secondmate homes and its exclusion from secondmate charters.
 When the file exists, `bin/fm-brief.sh` appends its text verbatim as the scaffold's last section, `# Home brief additions`, which defers to every other section of the brief, including the ship contract a later scout promotion appends below it.
 
 An absent or blank file changes nothing, while a present path that is not a readable regular file, or text carrying its own `Delivery contract: mode=` line, stops the scaffold before anything is written.

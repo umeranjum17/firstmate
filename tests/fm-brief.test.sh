@@ -1253,6 +1253,24 @@ test_home_brief_include_is_appended_last() {
   pass "fm-brief.sh: the home brief include lands last on ship and scout, verbatim, and fails closed"
 }
 
+# With the brief-inherit add-on uninstalled, the scaffold still succeeds and the
+# home-local include lands last.
+test_brief_include_works_without_add_on() {
+  local home addons brief last_heading
+  home="$TMP_ROOT/no-add-on-home"
+  addons="$TMP_ROOT/no-add-on-empty"
+  mkdir -p "$home/config" "$addons"
+  printf '%s\n' 'Prefer small commits.' > "$home/config/brief-include.md"
+  FM_HOME="$home" FM_ADDONS_DIR="$addons" "$ROOT/bin/fm-brief.sh" no-add-on some-proj --scout >/dev/null \
+    || fail "scout scaffold failed without the brief-inherit add-on"
+  brief="$home/data/no-add-on/brief.md"
+  assert_grep 'Prefer small commits.' "$brief" "home-local include missing without the add-on"
+  last_heading=$(grep '^# ' "$brief" | tail -n 1)
+  [ "$last_heading" = '# Home brief additions' ] \
+    || fail "home-local include was not the last section without the add-on (got: $last_heading)"
+  pass "fm-brief.sh: with no brief-inherit add-on, the home-local include still lands last"
+}
+
 # --base-branch names the branch a task starts from and a ship's PR targets. It is
 # recorded as a Base branch line under # Setup, which fm-spawn reads back, and is
 # refused where no pull request carries the work.
@@ -1576,6 +1594,7 @@ test_scout_lavish_line_follows_presentation_floor
 test_workers_wait_without_spending_turns
 test_wait_no_turns_absent_keeps_the_previous_brief
 test_home_brief_include_is_appended_last
+test_brief_include_works_without_add_on
 
 test_base_branch_is_rendered_and_bounded
 test_ship_branch_prefix_defaults_to_legacy_fm
