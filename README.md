@@ -9,6 +9,7 @@ Who needs this: anyone running that fleet on their own machine who wants it to k
 One line per add-on, with how it wires in. `<home>` is your home folder for the fleet manager — the one with `bin/` and `state/` in it.
 
 - `alerts` — groups tasks stopped by a provider outage into one alert per scan. Dormant copy: the fork still runs its own.
+- `bearings-board` — runs the Bearings board from the Firstmate checkout as a thin wrapper, with no copied upstream code. Wire in: `bearings-board/install.sh <home>`.
 - `ask-default` — an unanswered ask falls back to its pre-declared safe default instead of blocking the home. Needs a fork hook (FORK-EXIT.md).
 - `backlog-lock-reclaim` — reclaims a 0-byte `<home>/data/backlog.md.lock` left by a dead tasks-axi writer, once it is older than 60 s and no process has it open; until then every backlog write fails LOCKED. Wire in: `backlog-lock-reclaim/install.sh <home>`.
 - `claude-model-guard` — keeps agent runs off Sonnet and Fable: aliases resolve to Haiku, full model ids are refused. Wire in: `claude-model-guard/install.sh`.
