@@ -154,8 +154,8 @@ child_gone() {
   return 1
 }
 
-is "default chain is GLM, then Claude Haiku" "$(PI_QUOTA_FAILOVER_PRINT_CHAIN=1 "$wrapper" </dev/null)" \
-  "zai/glm-5.3-flash claude-bridge/claude-haiku-5-5"
+is "default chain is GLM, then DeepSeek Flash, then Claude Haiku" "$(PI_QUOTA_FAILOVER_PRINT_CHAIN=1 "$wrapper" </dev/null)" \
+  "zai/glm-5.3-flash deepseek/deepseek-flash claude-bridge/claude-haiku-5-5"
 
 # The failover cases below exercise the GLM -> GPT-6 Luna route (the stub's codex usage-limit surface and the
 # quota-axi codex name are about that pair), so they pin the chain; the default is checked above.

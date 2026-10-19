@@ -9,9 +9,9 @@
 # run fails, costing a restart.
 #
 # This wrapper runs the real pi; the requested chain model goes first, then
-# the other chain models in chain order (default GLM 5.3 Flash, then Claude Haiku
-# 5.5 through claude-bridge - Haiku only as the GLM failover; never
-# Opus, Sonnet, Fable or Step 5), and when an attempt
+# the other chain models in chain order (default GLM 5.3 Flash, then DeepSeek
+# Flash, then Claude Haiku 5.5 through claude-bridge - Haiku only as the last
+# failover; never Opus, Sonnet, Fable or Step 5), and when an attempt
 # answers a QUOTA error it moves at once to the next model in that order
 # inside the same invocation. Any non-quota failure passes through
 # byte-for-byte with its original exit code, so the pipeline's own handling is
@@ -56,7 +56,7 @@ set -u
 # surface only.
 QUOTA_RE='limit used up|usage limit|limit has been reached|GoUsageLimitError|rate limit exceeded|quota|available credits|insufficient credits|Claude rate limit|out of extra usage'
 
-chain=${PI_QUOTA_FAILOVER_CHAIN:-'zai/glm-5.3-flash claude-bridge/claude-haiku-5-5'}
+chain=${PI_QUOTA_FAILOVER_CHAIN:-'zai/glm-5.3-flash deepseek/deepseek-flash claude-bridge/claude-haiku-5-5'}
 # The chain is the fleet's one route list: route-change reads it from here.
 [ -z "${PI_QUOTA_FAILOVER_PRINT_CHAIN:-}" ] || { printf '%s\n' "$chain"; exit 0; }
 
