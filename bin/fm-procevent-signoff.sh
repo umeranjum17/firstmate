@@ -133,7 +133,7 @@ card_question() {  # <task-title> <reason>
   case "$first" in
     *\?) [ "$(printf '%s' "$first" | wc -w)" -le 12 ] && { printf '%s' "$first"; return; } ;;
   esac
-  printf 'What is your call on %s?' "$(printf '%s' "$1" | tr -d '?' | awk '{n = NF < 6 ? NF : 6; for (i = 1; i <= n; i++) printf "%s%s", $i, i < n ? " " : ""}')"
+  printf 'What is your call on %s?' "$(printf '%s' "$1" | sed 's/^\[[^]]*\] *//' | tr -d '?' | awk '{n = NF < 6 ? NF : 6; for (i = 1; i <= n; i++) printf "%s%s", $i, i < n ? " " : ""}')"
 }
 
 card_why() { printf '%s' "$1" | tr '\n' ' ' | cut -c1-200; }
