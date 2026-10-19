@@ -8,7 +8,8 @@
 #     $FM_HOME/data/<task-id> before done-done checks it exists (--citation-base on done-done
 #     0.3.1+; on an older one merge-card resolves the names itself), prints the verdict and
 #     saves it for the card in $FM_HOME/data/<task-id>/merge-card.json.
-#     Report only: it always exits 0, so it never refuses a merge.
+#     done-done's verdict is report only. A PR merge is refused (exit 1) when
+#     $FM_HOME/data/checks-gate.log has no pass row for the head from fm-checks-lint.sh.
 #   merge-card check <task-id> <worktree|-> <head|-> <pr-url|->
 #     The gate's check alone: run done-done, save and print the verdict, post nothing.
 #   merge-card post --board <board.json> <task-id> <worktree|-> <head|-> <pr-url|->
@@ -121,6 +122,11 @@ gate() {
   [ -n "${FM_HOME:-}" ] || { echo "merge-card: FM_HOME is not set, so done-done did not run"; return; }
   check "$1" "$2" "$3" "$4"
   echo "merge-card: report only; done-done's verdict never refuses this merge"
+  [ "$4" != - ] && [ "$3" != - ] || return 0
+  # Row: <time> <src> <head> pass|fail <why>, one per fm-checks-lint.sh run.
+  awk -F'\t' -v h="$3" '$3 == h && $4 == "pass" { f = 1 } END { exit !f }' "$FM_HOME/data/checks-gate.log" 2>/dev/null && return 0
+  echo "merge refused: no checks-lint PASS row for head $3 in data/checks-gate.log; run fm-checks-lint.sh on this PR until PASS"
+  return 1
 }
 
 post() {
@@ -210,10 +216,12 @@ post() {
   printf '%s\n' "$out"
   [ "$rc" -eq 0 ] || die "sign-off-axi could not post $key (exit $rc)"
   echo "merge-card: posted $key ($kind, $n media, $about)"
+  # Tie the evidence folder to the lint row's PR and head.
+  printf '%s\t%s\t%s\tcard\tevidence folder %s\n' "$(date -u +%FT%TZ)" "$pr" "$head" "$FM_HOME/data/$id" >> "$FM_HOME/data/checks-gate.log"
 }
 
 case ${1:-} in
-  gate) shift; gate "$@"; exit 0 ;;
+  gate) shift; gate "$@"; exit $? ;;
   check) shift; check "$@"; exit 0 ;;
   post) shift; post "$@" ;;
   *) die "usage: merge-card gate|check|post ... (see the header of $0)" ;;

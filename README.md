@@ -185,7 +185,7 @@ Every merge runs done-done and, only with passed proof, posts one evidence card 
   The Checks evidence lives in `$FM_HOME/data/<task-id>`, so each relative or bare name resolves there before done-done checks that the file exists, while absolute paths stay unchanged: `done-done check --citation-base $FM_HOME/data/<task-id>` resolves the names itself on done-done 0.3.1+, and on an older one merge-card resolves them in the Checks block and hands it to `done-done check --from -` (with the pull request's branch as `--claim-id`). A name still missing there is reported missing at its resolved path.
   The work copy only supplies the repo identity.
   It prints the verdict and saves it for the card in `$FM_HOME/data/<task-id>/merge-card.json`.
-  It is report only: it always exits 0, so it never refuses a merge the checks lint passes.
+  done-done's verdict is report only, but a PR merge is refused (exit 1) when `$FM_HOME/data/checks-gate.log` has no `pass` row for the head (rows come from `fm-checks-lint.sh`).
   Hand-captured evidence legitimately comes back inconclusive and the merge still lands.
   A judge that is not configured degrades to a plain "not checked" verdict; a done-done that could not check at all names the real reason (an older done-done rejecting `--citation-base`, say) instead of a bare exit code.
   `merge-card check <task-id> <worktree|-> <head|-> <pr-url|->` runs the gate's check alone: it saves and prints the verdict and posts nothing.
