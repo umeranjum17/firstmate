@@ -782,18 +782,23 @@ test_atomic_admission_publication
 test_spawn_memory_admission
 
 # The sampler ships in the optional host-memory add-on; without it the watcher runs no sampler.
+watcher_sampler_tests=(
+  test_fast_spike_waits_without_alert
+  test_host_pressure_neither_holds_nor_wakes
+  test_overridden_state_ownership
+  test_watcher_wakes_once_per_alert_episode
+  test_alert_rearms_after_wait
+  test_benign_liveness_outcomes
+  test_default_home_interrupt
+  test_independent_sampler_lifecycle
+  test_failed_alert_publication
+  test_shutdown_during_alert_publication
+  test_default_supervision_poll
+)
 if [ ! -f "$FM_ADDONS_DIR/host-memory/bin/fm-host-memory-lib.sh" ]; then
-  echo "skip: watcher sampler tests need FM_ADDONS_DIR with the host-memory add-on"
+  echo "skip: host-memory add-on absent, ${#watcher_sampler_tests[@]} watcher sampler tests not run"
   exit 0
 fi
-test_fast_spike_waits_without_alert
-test_host_pressure_neither_holds_nor_wakes
-test_overridden_state_ownership
-test_watcher_wakes_once_per_alert_episode
-test_alert_rearms_after_wait
-test_benign_liveness_outcomes
-test_default_home_interrupt
-test_independent_sampler_lifecycle
-test_failed_alert_publication
-test_shutdown_during_alert_publication
-test_default_supervision_poll
+for watcher_sampler_test in "${watcher_sampler_tests[@]}"; do
+  "$watcher_sampler_test"
+done
