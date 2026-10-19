@@ -118,3 +118,6 @@ jobs:
       # Stub Firstmate checkout and a fixture home: no real board, hook or launcher is touched.
       - name: Bearings board test
         run: bash bearings-board/tests/bearings-board.test.sh
+      # Stub byokit-accounts and a throwaway config: nothing real is touched.
+      - name: Account pool test
+        run: bash account-pool/tests/account-pool.test.sh
