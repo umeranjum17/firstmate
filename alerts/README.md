@@ -17,9 +17,15 @@ and the per-cycle call with
 Absent add-on = kun behavior. `tests/model-outage-hook-e2e.sh` (with
 `FM_TEST_FORK` set to a Firstmate checkout) proves both cases over fixture lanes.
 
+The same library defines `fm_alerts_push_suppress <task>`, which the fork's
+`handle_push_transition` calls (when defined) instead of its old inline check: it
+returns 0 for a cursor-harness task or one with an open captain call, non-zero
+otherwise or when the watcher's `fm_meta_get`/`task_captain_call_open` are absent.
+
 ## Layout
 
-- `bin/fm-model-outage-lib.sh` — the observer. `fm_model_outage_tick` reads each
+- `bin/fm-model-outage-lib.sh` — the observer, plus the push-transition hook
+  described above. `fm_model_outage_tick` reads each
   recorded lane once per 60-second scan, before the watcher's stale suppression,
   matches explicit provider/harness outage banners in a lane's visible viewport,
   and appends one grouped wake naming every lane failing with the same
@@ -45,6 +51,7 @@ Absent add-on = kun behavior. `tests/model-outage-hook-e2e.sh` (with
   normalization, pane hashing, and wake-queue append (`fm_busy_token_valid`,
   `fm_backend_target_of_meta`, `fm_backend_of_meta`, `fm_meta_get`,
   `fm_busy_current_gen`, `fm_run_timed`, `fm_backend_agent_state`,
+  `task_captain_call_open` (push-transition hook only),
   `fm_backend_visible_capture_supported`, `fm_backend_visible_capture`,
   `fm_composer_normalize_trim_var`, `_fm_composer_leftbar_floor_row`,
   `hash_pane`, `fm_wake_append`, `wake`). It owns no settings, model changes, or
