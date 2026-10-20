@@ -736,6 +736,19 @@ test_relaunch_under_memory_pressure_refuses_before_stop() {
   pass "fm-control relaunch: host memory pressure refuses before the running agent is stopped"
 }
 
+test_relaunch_refuses_missing_stored_model_before_stopping() {
+  local dir out rc
+  dir=$(new_case missingmodel rl79)
+  add_ship_task "$dir" rl79 claude
+  sed -i '/^model=/d' "$dir/home/state/rl79.meta"
+  out=$(run_control "$dir" rl79 relaunch --note "restart after restore"); rc=$?
+  expect_code 1 "$rc" "a relaunch without its stored Claude model should refuse"
+  assert_contains "$out" "no stored model for claude" "the refusal should name the missing model"
+  [ "$(cat "$dir/fake/command")" = claude ] || fail "a missing-model refusal must not stop the current agent"
+  [ -z "$(cat "$dir/fake/literal")" ] || fail "a missing-model refusal must not send anything"
+  pass "fm-control relaunch: missing stored model refuses before stopping the agent"
+}
+
 test_relaunch_requires_a_note_for_a_ship_task() {
   local dir out rc before
   dir=$(new_case nonote rl3)
@@ -2567,6 +2580,19 @@ test_spawn_relaunch_refuses_contradicting_flags() {
   pass "fm-spawn --relaunch: every identity axis comes from the record, and a contradicting flag refuses"
 }
 
+test_spawn_relaunch_refuses_a_missing_stored_model() {
+  local dir out rc
+  dir=$(new_case spawnmissingmodel rl80)
+  add_ship_task "$dir" rl80 claude
+  sed -i '/^model=/d' "$dir/home/state/rl80.meta"
+  printf 'zsh' > "$dir/fake/command"
+  out=$(run_spawn "$dir" rl80 --relaunch); rc=$?
+  expect_code 1 "$rc" "a direct recorded-state relaunch without its model should refuse"
+  assert_contains "$out" "no stored model for claude" "the refusal should name the missing model"
+  [ -z "$(cat "$dir/fake/keys")" ] || fail "a missing-model refusal must not send launch commands"
+  pass "fm-spawn --relaunch: missing stored model refuses instead of using the default"
+}
+
 test_spawn_relaunch_refuses_an_unrecorded_task() {
   local dir out rc
   dir=$(new_case norecord rl17)
@@ -3208,6 +3234,7 @@ test_relaunch_serializes_concurrent_durable_metadata_publication
 test_disabled_relaunch_clears_prior_trace_context
 test_relaunch_appends_the_progress_note_to_the_instructions
 test_relaunch_requires_a_note_for_a_ship_task
+test_relaunch_refuses_missing_stored_model_before_stopping
 test_relaunch_refuses_a_copy_another_task_records
 test_relaunch_under_memory_pressure_refuses_before_stop
 test_relaunch_closes_a_claude_startup_gate_unanswered
@@ -3281,6 +3308,7 @@ test_spawn_relaunch_keeps_its_early_meta_lock_continuous
 test_spawn_relaunch_refuses_a_pending_authoritative_close
 test_spawn_relaunch_refuses_contradicting_flags
 test_spawn_relaunch_refuses_an_unrecorded_task
+test_spawn_relaunch_refuses_a_missing_stored_model
 test_spawn_relaunch_refuses_a_pane_outside_the_worktree
 test_tmux_refuses_a_window_missing_from_its_session
 test_tmux_refuses_a_session_that_cannot_be_found

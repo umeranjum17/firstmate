@@ -1028,6 +1028,8 @@ resolve_relaunch_profile() {
   PRIOR_HARNESS=$HARNESS
   PRIOR_RECORDED_HARNESS=$RECORDED_HARNESS
   PRIOR_MODEL=$(fm_meta_get "$META" model)
+  PRIOR_MODEL_MISSING=0
+  [ -n "$PRIOR_MODEL" ] || PRIOR_MODEL_MISSING=1
   PRIOR_EFFORT=$(fm_meta_get "$META" effort)
   [ -n "$PRIOR_MODEL" ] || PRIOR_MODEL=default
   [ -n "$PRIOR_EFFORT" ] || PRIOR_EFFORT=default
@@ -1085,6 +1087,14 @@ resolve_relaunch_profile() {
     TARGET_MODEL=$PRIOR_MODEL
   else
     TARGET_MODEL=default
+  fi
+  if [ "$KIND" != secondmate ] && [ "$MODEL_SET" = 0 ] \
+     && [ "$PRIOR_MODEL_MISSING" = 1 ] && [ "$TARGET_HARNESS" = "$PRIOR_HARNESS" ]; then
+    case "$TARGET_HARNESS" in
+      claude|codex|pi)
+        die "task $ID has no stored model for $TARGET_HARNESS; refusing to relaunch on its default model; pass --model explicitly"
+        ;;
+    esac
   fi
   if [ "$EFFORT_SET" = 1 ]; then
     TARGET_EFFORT=$NEW_EFFORT
@@ -1294,8 +1304,7 @@ do_relaunch() {
   # per-task harness wiring before arming the new one, so nothing to do here.
   RELAUNCH_TX="${BASHPID:-$$}.$(date -u +%Y%m%dT%H%M%SZ).$RANDOM"
   journal_write launching "${CHECKPOINT_LINES[@]}" "$note_line" "relaunch_tx=$RELAUNCH_TX"
-  spawn_args=("$ID" --relaunch --harness "$TARGET_HARNESS")
-  [ "$TARGET_MODEL" = default ] || spawn_args+=(--model "$TARGET_MODEL")
+  spawn_args=("$ID" --relaunch --harness "$TARGET_HARNESS" --model "$TARGET_MODEL")
   [ "$TARGET_EFFORT" = default ] || spawn_args+=(--effort "$TARGET_EFFORT")
   [ "$ACCOUNT_SET" = 0 ] || spawn_args+=(--account "$ACCOUNT_CHOICE")
   if FM_CONTROL_RELAUNCH_TX="$RELAUNCH_TX" \
