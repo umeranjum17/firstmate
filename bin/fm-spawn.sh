@@ -5566,7 +5566,10 @@ preserve_relaunch_meta() {
   [ -z "$POOL_ACCOUNT" ] || echo "account=$POOL_ACCOUNT_ID"
   [ -z "${BUSY_GEN:-}" ] || echo "busy_gen=$BUSY_GEN"
   echo "spawn_gen=$SPAWN_GEN"
-  if declare -F fm_receipts_inherit >/dev/null; then fm_receipts_inherit "$BRIEF" "${RELAUNCH_META:-}"; fi
+  if declare -F fm_receipts_inherit >/dev/null && ! fm_receipts_inherit "$BRIEF" "${RELAUNCH_META:-}"; then
+    echo "error: completion receipt requirement for $ID could not be carried into the task record" >&2
+    exit 1
+  fi
   # Default-off writes no traceparent= line.
   # backend= is written only for a non-default (non-tmux) backend, so the
   # default path's meta stays byte-identical (absent backend= means tmux;

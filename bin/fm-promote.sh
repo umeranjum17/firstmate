@@ -373,7 +373,12 @@ grep -v -e '^kind=' -e '^mode=' -e '^yolo=' -e '^branch=' -e '^upstream_consent=
   echo "branch=$BRANCH"
   [ -z "$UPSTREAM_CONSENT" ] || echo "upstream_consent=$UPSTREAM_CONSENT"
 } >> "$TMP"
-if declare -F fm_receipts_promote >/dev/null; then fm_receipts_promote "$META" "$TMP"; fi
+if declare -F fm_receipts_promote >/dev/null && ! fm_receipts_promote "$META" "$TMP"; then
+  rm -f -- "$TMP"
+  TMP=
+  echo "error: completion receipt requirement for $ID could not be carried into the task record" >&2
+  exit 1
+fi
 if ! fm_backlog_atomic_transition publish "$TMP" "$META" "task record" "$STATE"; then
   rm -f -- "$TMP"
   TMP=
