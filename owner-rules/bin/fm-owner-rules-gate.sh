@@ -46,7 +46,7 @@ if [ ! -r "$board" ] || ! jq -e '.items | type == "array"' "$board" >/dev/null 2
 fi
 key=merge-$(printf '%s' "${4#*://}" | sed 's|^[^/]*/||' | tr -c 'A-Za-z0-9._-' -)
 key=${key:0:128}
-if jq -e --arg k "$key" --arg h "$3" 'any(.items[]?; .key == $k and .kind == "evidence" and ((.run.commit? // .evidence.commit?) == $h) and ((.run.commit? == null) or .run.commit == $h) and ((.evidence.commit? == null) or .evidence.commit == $h))' "$board" >/dev/null; then
+if jq -e --arg k "$key" --arg h "$3" 'any(.items[]?; (.key == $k or (.key | startswith($k + "-"))) and .kind == "evidence" and ((.run.commit? // .evidence.commit?) == $h) and ((.run.commit? == null) or .run.commit == $h) and ((.evidence.commit? == null) or .evidence.commit == $h))' "$board" >/dev/null; then
   exit 0
 fi
 if [ "$none" -eq 1 ] && "$mc" receipt "$1" "$3"; then
@@ -55,7 +55,7 @@ if [ "$none" -eq 1 ] && "$mc" receipt "$1" "$3"; then
     echo "owner-rules: could not post Evidence card for $what (merge-card exit $rc)"
     exit 1
   }
-  jq -e --arg k "$key" --arg h "$3" 'any(.items[]?; .key == $k and .kind == "evidence" and ((.run.commit? // .evidence.commit?) == $h) and ((.run.commit? == null) or .run.commit == $h) and ((.evidence.commit? == null) or .evidence.commit == $h))' "$board" >/dev/null && exit 0
+  jq -e --arg k "$key" --arg h "$3" 'any(.items[]?; (.key == $k or (.key | startswith($k + "-"))) and .kind == "evidence" and ((.run.commit? // .evidence.commit?) == $h) and ((.run.commit? == null) or .run.commit == $h) and ((.evidence.commit? == null) or .evidence.commit == $h))' "$board" >/dev/null && exit 0
 fi
 echo "owner-rules: no passed-proof Evidence card for $what; run merge-card post --board $board $1 $2 $3 $4"
 exit 1

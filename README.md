@@ -191,7 +191,7 @@ Every merge runs done-done and, only with passed proof, posts one evidence card 
   Hand-captured evidence legitimately comes back inconclusive and the merge still lands.
   A judge that is not configured degrades to a plain "not checked" verdict; a done-done that could not check at all names the real reason (an older done-done rejecting `--citation-base`, say) instead of a bare exit code.
   `merge-card check <task-id> <worktree|-> <head|-> <pr-url|->` runs the gate's check alone: it saves and prints the verdict and posts nothing.
-- `merge-card post --board <board.json> <task-id> <worktree|-> <head|-> <pr-url|->` posts exactly one evidence card per merge, and only when the proof is real and passed.
+- `merge-card post --board <board.json> <task-id> <worktree|-> <head|-> <pr-url|->` posts one evidence card per PR head, retaining earlier-head cards; only real, passed proof is posted.
   A merge whose Checks block has a `screen: none` line (an internal fleet tool with no user-visible screen) is skipped instead: exit 0, one skip line pointing to the merge note for the passed-test receipt, no done-done run.
   A merge posts only an evidence card: the plain outcome as the title and the passed proof on the card.
   A merge with missing or unconfirmed proof posts no card; the gap goes back to the lane owner to fix the proof and re-run the post.
