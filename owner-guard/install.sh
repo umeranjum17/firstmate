@@ -91,6 +91,9 @@ install_merge_gate() { # Chain the home's previous gate behind the guard's merge
   {
     printf '#!/usr/bin/env bash\n%s\n' "$MGMARK"
     printf '# owner-guard/install.sh wrote this: the owner-details merge scan runs\n# first, then the home'"'"'s previous gate, if any, with the same args.\n'
+    printf 'guard=%q\n' "$DEST/owner-guard"
+    # shellcheck disable=SC2016 # This is emitted code; $guard expands in the generated gate.
+    printf '[[ -x "$guard" ]] || { echo "merge refused: owner-guard is missing from this home; reinstall the owner-guard add-on before merging: $guard" >&2; exit 1; }\n'
     printf '%q merge-gate "$@" || exit $?\nprev=%q\n' "$DEST/owner-guard" "$MGPREV"
     cat <<'EOF'
 [ -e "$prev" ] || [ -L "$prev" ] || exit 0
