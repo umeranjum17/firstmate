@@ -197,7 +197,7 @@ post() {
     local text_run
     text_run=$(receipt_run "$id" "$head" "$record")
     [ -n "$text_run" ] || { echo "merge-card: no passed-test receipt for $key"; return 1; }
-    local outcome evidence body
+    local outcome evidence body capture command exit_code excerpt note
     outcome=$(jq -r '.check.claim // empty' "$record")
     evidence=$(jq -r '[.check.evidence[]? | split("/") | last] | join(", ")' "$record")
     if [ -z "$outcome" ]; then
@@ -209,10 +209,34 @@ post() {
     outcome=${outcome:0:1000}
     text_run=$(jq -c --arg outcome "$outcome" --arg evidence "$evidence" '.outcome=$outcome | .evidence=$evidence' <<<"$text_run")
     [ -n "$outcome" ] || { echo "merge-card: no Checks outcome for $key"; return 1; }
+    # Include a bounded excerpt from a text capture in the sealed run folder, when present.
+    capture=''
+    local root run_record run_id
+    root=$(dd_root)
+    run_id=$(jq -r .run_id <<<"$text_run")
+    run_record=$FM_HOME/data/$id/.done-done/runs/$run_id.json
+    [ -f "$run_record" ] || run_record=$root/.done-done/runs/$run_id.json
+    command=$(jq -r '.command // empty' "$run_record" 2>/dev/null)
+    exit_code=$(jq -r '.exit // empty' "$run_record" 2>/dev/null)
+    local candidate relative
+    while IFS= read -r relative; do
+      case $relative in *.txt|*.log|*.out|*.stdout|*.stderr) ;; *) continue ;; esac
+      candidate=$root/$relative
+      [ -f "$candidate" ] || candidate=$FM_HOME/data/$id/$relative
+      [ -f "$candidate" ] && { capture=$candidate; break; }
+    done < <(jq -r '.files[]?.path // empty' "$run_record" 2>/dev/null)
+    if [ -n "$capture" ]; then
+      excerpt=$(tail -n 40 -- "$capture")
+      note=$(printf 'Command output%s%s:\n%s' "${command:+ ($command)}" "${exit_code:+; exit code $exit_code}" "$excerpt")
+      if [ "${#note}" -gt 400 ]; then note="Command output${command:+ ($command)}${exit_code:+; exit code $exit_code}: output truncated, full run $(jq -r .run_id <<<"$text_run")"; fi
+      about=$(printf '%s\n\n%s' 'No user-visible screen; sealed done-done receipt attached.' "$note")
+    else
+      about='No user-visible screen; sealed done-done receipt attached.'
+    fi
     media_dir=$FM_HOME/data/$id/merge-card-media
     mkdir -p "$media_dir" || die "cannot create the task's persistent media folder"
-    jq -n --arg key "$key" --arg link "$link" --argjson run "$text_run" \
-      '{contract:1,kind:"evidence",schema:1,key:$key,title:"Internal change passed its checks",about:"No user-visible screen; sealed done-done receipt attached.",link:$link,run:$run}' > "$media_dir/card.json" || die "cannot write the card"
+    jq -n --arg key "$key" --arg link "$link" --arg about "$about" --argjson run "$text_run" \
+      '{contract:1,kind:"evidence",schema:1,key:$key,title:"Internal change passed its checks",about:$about,link:$link,run:$run}' > "$media_dir/card.json" || die "cannot write the card"
     if [ -n "$replace" ]; then
       jq --slurpfile c "$media_dir/card.json" --arg k "$key" '.items = ([.items[]? | select(.key != $k)] + [$c[0]])' "$board" > "$media_dir/feed.json" || die "cannot prepare replacement for $key"
       out=$(sign-off-axi post "$board" --from "$media_dir/feed.json" --replace 2>&1) || die "sign-off-axi could not post $key: $out"
