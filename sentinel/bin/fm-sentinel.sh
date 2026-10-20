@@ -96,7 +96,7 @@ usage() {
 }
 
 case "${1:-}" in
-  tick|loop|reconcile|unit) CMD=$1 ;;
+  tick|loop|reconcile|unit|model-reconcile) CMD=$1 ;;
   -h|--help) usage; exit 0 ;;
   *) usage >&2; exit 2 ;;
 esac
@@ -412,6 +412,42 @@ reconcile_episode() {  # <episode>
   return "$rc"
 }
 
+# Restore Claude's recorded model after Herdr's bare --resume restart.
+# The pane process-info API is read-only; all relaunches use their guarded owner.
+relaunch_model_mismatches() {
+  local meta id harness model kind pane info cmd rc=0 has_model event marker
+  for meta in "$STATE"/*.meta; do
+    [ -f "$meta" ] && [ ! -L "$meta" ] || continue
+    id=$(basename "$meta" .meta)
+    [ "$(fm_backend_of_meta "$meta")" = herdr ] || continue
+    [ -z "$(fm_meta_get "$meta" remote_host)" ] || continue
+    [ "$(fm_meta_get "$meta" herdr_session)" = "$SESSION" ] || continue
+    harness=$(fm_meta_get "$meta" harness)
+    [ "$harness" = claude ] || continue
+    model=$(fm_meta_get "$meta" model)
+    [ -n "$model" ] || continue
+    kind=$(fm_meta_get "$meta" kind)
+    pane=$(fm_meta_get "$meta" herdr_pane_id)
+    [ -n "$pane" ] || continue
+    info=$(fm_backend_herdr_cli "$SESSION" pane process-info --pane "$pane" 2>/dev/null) || { say "$id: model check failed; skipped"; rc=1; continue; }
+    cmd=$(printf '%s' "$info" | jq -r '.result.process_info.foreground_processes[]? | select((.name // "") == "claude" or (((.argv // [])[0] // .argv0 // "") | test("(^|/)claude$"))) | (.cmdline // ((.argv // []) | join(" ")))' 2>/dev/null | head -n 1)
+    [ -n "$cmd" ] || continue
+    has_model=0
+    case " $cmd " in *" --model $model "*|*" --model=$model "*) has_model=1 ;; esac
+    [ "$has_model" -eq 0 ] || continue
+    event=${FM_SENTINEL_MODEL_EVENT:-unknown}
+    marker="$STATE/$id.model-relaunch"
+    [ "$(cat "$marker" 2>/dev/null)" = "$event" ] && continue
+    printf '%s\n' "$event" >"$marker"
+    if [ "$kind" = secondmate ]; then
+      act "$id" "Claude model missing; guarded lead restart requested" "$BIN/fm-secondmate-restart.sh" "$id" || rc=1
+    else
+      act "$id" "Claude model missing; guarded worker relaunch requested" "$BIN/fm-control.sh" "$id" relaunch --model "$model" || rc=1
+    fi
+  done
+  return "$rc"
+}
+
 tick() {
   local id prev beat woken_beat age last body rc=0
   id=$(herdr_identity)
@@ -430,6 +466,7 @@ tick() {
       else
         rc=1
       fi
+      FM_SENTINEL_MODEL_EVENT=$id relaunch_model_mismatches || rc=1
     else
       printf '%s\n' "$id" >"$STATE/.sentinel-herdr-identity"
     fi
@@ -463,6 +500,7 @@ locked() {
 case "$CMD" in
   tick) locked tick ;;
   reconcile) locked reconcile_episode "${FM_SENTINEL_EPISODE:-$(herdr_identity)}" ;;
+  model-reconcile) locked relaunch_model_mismatches ;;
   loop)
     while :; do
       locked tick || true
