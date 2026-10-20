@@ -5538,7 +5538,7 @@ SPAWN_META_PATH=$SPAWN_META_TMP
 preserve_relaunch_meta() {
   awk -F= '
     BEGIN {
-      split("window endpoint_task_id cleanup_recovery worktree project harness kind mode yolo branch receipt_required tasktmp base_branch upstream_consent model effort account account_provider busy_gen spawn_gen traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx", keys, " ")
+      split("window endpoint_task_id cleanup_recovery worktree project harness kind mode yolo branch tasktmp base_branch upstream_consent model effort account account_provider busy_gen spawn_gen traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx", keys, " ")
       for (i in keys) owned[keys[i]] = 1
     }
     !($1 in owned)
@@ -5566,10 +5566,7 @@ preserve_relaunch_meta() {
   [ -z "$POOL_ACCOUNT" ] || echo "account=$POOL_ACCOUNT_ID"
   [ -z "${BUSY_GEN:-}" ] || echo "busy_gen=$BUSY_GEN"
   echo "spawn_gen=$SPAWN_GEN"
-  if [ "$KIND" = ship ] && { grep -qx 'Completion receipt: required' "$BRIEF" \
-    || { [ "$RELAUNCH" = 1 ] && grep -qx 'receipt_required=1' "$RELAUNCH_META"; }; }; then
-    echo 'receipt_required=1'
-  fi
+  if declare -F fm_receipts_inherit >/dev/null; then fm_receipts_inherit "$BRIEF" "${RELAUNCH_META:-}"; fi
   # Default-off writes no traceparent= line.
   # backend= is written only for a non-default (non-tmux) backend, so the
   # default path's meta stays byte-identical (absent backend= means tmux;
