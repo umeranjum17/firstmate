@@ -36,6 +36,7 @@ One line per add-on, with how it wires in. `<home>` is your home folder for the 
 - `pipeline-literal-delete` — gives pipeline agents the safe recursive-delete rule in their own instructions. Wire in: `pipeline-literal-delete/install.sh`.
 - `pipeline-quota-failover` — moves pipeline model calls to the next model in the chain on a quota error. Wire in: `pipeline-quota-failover/install.sh`.
 - `quota-failover` — relaunches stalled workers onto a live route and rests dead routes until they answer again. Wire in: a watcher check you add, see Install.
+- `status-wait-check` — refuses `blocked` status text that describes a wait and directs the worker to `paused:`; the fork's `bin/fm-secondmate-report.sh` must call it before appending status (thin hook documented in the add-on README).
 - `receipts` — publishes one PASS or FAIL completion receipt per task for guarded landing checks. Dormant copy: the fork still runs its own.
 - `route-change` — one command moves worker dispatch, the pipeline gate and team-lead pins to one route together. Wire in: `route-change/install.sh`.
 - `sentinel` — re-arms supervision after an agent-runtime restart killed every agent and watcher. Dormant copy: the fork still runs its own.
