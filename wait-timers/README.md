@@ -22,9 +22,10 @@ fork's `bin/` (`$SCRIPT_DIR`, else `$FM_PUSH_TRANSITION_LIB_DIR`, else
 - Push: `if [ -n "$task" ] && declare -F fm_wait_timer_push_delivered >/dev/null; then fm_wait_timer_push_delivered "$task" "$window" || exit 1; fi`.
 
 `tests/wait-timers-hook-e2e.sh` (set `FM_TEST_FORK` to a Firstmate checkout)
-applies those lines to a private copy of the fork and runs the fork's real
-`tests/fm-wait-timers.test.sh` journey over this library; with the add-on absent
-the lines are a no-op.
+uses the fork's post-step-B hook lines unchanged, copies this add-on's moved
+`tests/fm-wait-timers.test.sh` journey into a private fork copy, and runs it with
+this library installed; it also checks that the optional hooks are no-ops when
+the add-on is absent.
 
 ## Layout
 
