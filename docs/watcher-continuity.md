@@ -46,7 +46,7 @@ Pi treats an arm child whose process is already gone as an empty slot even while
 A failed follow-up never cancels continuity restoration.
 
 OpenCode uses the same owner in a second-mate home, retaining the primary-root and session-lock ownership checks that exclude task workers.
-A running OpenCode session keeps the plugin it loaded at launch, so an existing second-mate home gains this arm only when its OpenCode session restarts; the observer never restarts workers.
+A running OpenCode session keeps the plugin it loaded at launch, so an existing second-mate home gains this arm only when its OpenCode session restarts.
 
 ### Pi session replacement
 
