@@ -1244,25 +1244,38 @@ test_helper_report_resolves() {
 }
 
 test_helper_blocked_wait_hook_is_optional() {
-  local home state sm_home addons hook out rc
+  local home state sm_home addons hook capture out rc before
   home=$(setup_parent wait-hook)
   state="$home/state"
   sm_home=$(bind_local_mate "$home" hibit)
-  FM_HOME="$sm_home" "$REPORT" blocked abcdef0123456789 'waiting for CI' \
+  env -u FM_ADDONS_DIR FM_HOME="$sm_home" "$REPORT" blocked abcdef0123456789 'waiting for CI' \
     || fail "missing add-on hook should be a no-op"
   addons="$home/addons"
   hook="$addons/status-blocked-wait/bin/fm-status-blocked-wait.sh"
+  capture="$home/hook-args"
   mkdir -p "$(dirname "$hook")"
-  printf '#!/usr/bin/env bash\necho "use paused: waiting for CI" >&2\nexit 1\n' > "$hook"
+  cat > "$hook" <<EOF
+#!/usr/bin/env bash
+printf '%s|%s\n' "\$1" "\$2" > "$capture"
+echo "add-on refused wait" >&2
+exit 1
+EOF
   chmod +x "$hook"
+  before=$(cat "$state/hibit.status")
   if out=$(FM_HOME="$sm_home" FM_ADDONS_DIR="$addons" "$REPORT" blocked abcdef0123456789 'waiting for CI' 2>&1); then
     fail "nonzero add-on hook should refuse report"
   else
     rc=$?
   fi
   [ "$rc" -eq 2 ] || fail "hook refusal should exit 2"
-  assert_contains "$out" 'use paused:' "hook refusal message was lost"
-  pass "blocked-wait hook is optional and propagates add-on refusal"
+  assert_contains "$out" 'add-on refused wait' "hook refusal message was lost"
+  [ "$(cat "$capture")" = 'blocked|waiting for CI' ] || fail "hook must receive verb and text"
+  [ "$(cat "$state/hibit.status")" = "$before" ] || fail "refused report must not reach the parent status file"
+  if FM_HOME="$sm_home" FM_ADDONS_DIR="$addons" "$REPORT" --doc blocked abcdef0123456789 data/x/report.md 'waiting for CI' >/dev/null 2>&1; then
+    fail "refused --doc report should exit nonzero"
+  fi
+  [ "$(cat "$state/hibit.status")" = "$before" ] || fail "refused --doc report must not reach the parent status file"
+  pass "blocked-wait hook is optional, receives verb and text, and refusal blocks the append"
 }
 
 test_busy_idle_observation_via_backend_abstraction() {
