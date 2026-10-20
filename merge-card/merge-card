@@ -29,6 +29,9 @@
 #     An internal fleet-tool merge with no user-visible screen puts a `screen: none` line in
 #     its Checks block: post then skips the card (exit 0, one skip line pointing to the merge
 #     note) and runs no done-done.
+#   merge-card screen-none <task-id> <pr-url|->, merge-card receipt <task-id> <head>
+#     Exit 0 when the merge declares `screen: none`, or when the task folder holds a sealed clean
+#     done-done run at <head> (the card's passed-test receipt). Used by owner-rules' merge gate.
 #     sign-off-axi writes the board under its lock: it appends and never rewrites other cards.
 # Needs done-done on PATH (0.3.1+ cites the task folder's evidence itself; an older one is
 # still covered), sign-off-axi, jq and gh.
@@ -145,6 +148,12 @@ receipt_run() {
     | {run_id, commit, outcome: $claim, repro: "see the merge note", proof: "done-done run \(.run_id)", evidence: $ev}' "$FM_HOME"/data/"$1"/.done-done/runs/*.json 2>/dev/null
 }
 
+# screen_none <task-id> <pr-url|->: the merge's Checks block declares `screen: none`.
+screen_none() {
+  { [ "$2" != - ] && gh pr view "$2" --json body --jq .body 2>/dev/null || cat -- "$FM_HOME/data/$1/checks.md" 2>/dev/null; } |
+    grep -qiE '^[[:space:]]*screen[[:space:]]*:[[:space:]]*none[[:space:]]*$'
+}
+
 post() {
   local board='' id wt head pr record key link title about kind media run receipt=null tmp out rc n=0 f verdict claim
   [ "${1:-}" = --board ] && [ -n "${2:-}" ] && board=$2 && shift 2
@@ -164,8 +173,7 @@ post() {
   fi
   # An internal fleet-tool merge declares `screen: none` in its Checks block: the board takes
   # passed proof of a real screen, not merge receipts, so it gets no card and no done-done run.
-  if { [ "$pr" != - ] && gh pr view "$pr" --json body --jq .body 2>/dev/null || cat -- "$FM_HOME/data/$id/checks.md" 2>/dev/null; } |
-     grep -qiE '^[[:space:]]*screen[[:space:]]*:[[:space:]]*none[[:space:]]*$'; then
+  if screen_none "$id" "$pr"; then
     echo "merge-card: no evidence card for $key: the merge declares screen: none (no user-visible screen); the passed-test receipt is in the merge note"
     return 0
   fi
@@ -249,5 +257,8 @@ case ${1:-} in
   gate) shift; gate "$@"; exit $? ;;
   check) shift; check "$@"; exit 0 ;;
   post) shift; post "$@" ;;
+  # For owner-rules' merge gate: exit 0 when the merge is exempt / has a sealed clean run at <head>.
+  screen-none) [ -n "${FM_HOME:-}" ] && screen_none "${2:-}" "${3:--}"; exit $? ;;
+  receipt) [ -n "${FM_HOME:-}" ] && [ -n "$(receipt_run "${2:-}" "${3:-}" /dev/null)" ]; exit $? ;;
   *) die "usage: merge-card gate|check|post ... (see the header of $0)" ;;
 esac

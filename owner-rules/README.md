@@ -1,7 +1,6 @@
 # owner-rules
 
-Two owner rules enforced when a lane's brief is created, not left as prose. Slice 1 of 3; the merge-gate
-refusal and the leads skill section follow.
+Two owner rules enforced when a lane's brief is created, not left as prose. Slices 1 and 2 of 3; the leads skill section follows.
 
 1. **Owner ask.** A lane (ship or scout) must serve a named owner ask: its backlog item (the entry whose
    id equals the task id in `data/backlog.md`) has a title starting `[captain-ask]`, or its title or body
@@ -16,5 +15,18 @@ A refusal exits 1 before `fm-brief.sh` writes `data/<id>/brief.md`, with a one-l
 - Seam: `brief-inherit`'s `fm_brief_inherit_shared` (already called by the fork's `fm-brief.sh`) calls it when
   `config/owner-rules` exists. Without that file the check is a no-op, so an unmodified upstream Firstmate is
   unaffected. A marker whose lib is missing stops the scaffold. Needs the brief-inherit seam.
-- `install.sh [--dry-run] <fm-home>` writes `config/owner-rules`; `uninstall.sh` removes it.
+- `install.sh [--dry-run] <fm-home>` writes `config/owner-rules` and makes `config/merge-gate` run the merge gate below first, then the
+  home's previous gate (moved to `config/merge-gate.pre-owner-rules`); `uninstall.sh` removes the marker and gives the gate back.
 - Test: `tests/owner-rules.test.sh <firstmate-checkout>` drives the checkout's real `fm-brief.sh`.
+
+## Merge gate (slice 2)
+
+3. **Done-done receipt.** `bin/fm-owner-rules-gate.sh` refuses a merge (exit 1) unless the task folder
+   `$FM_HOME/data/<id>/.done-done/runs/` holds a sealed clean done-done run at the merge head. That is merge-card's own
+   `receipt_run` check (`merge-card receipt`: exit 0, clean, files captured, run id). It checks only that the receipt
+   exists, not what it shows: merge-card posts the Evidence-tab card after the merge, and only when the proof is real.
+   Refusal, naming the PR URL (`local merge <head>` with no PR):
+   `owner-rules: no passed-proof receipt for <PR url>; run the done-done check and post the evidence to the sign-off Evidence tab first`.
+   Exempt: a merge whose Checks block says `screen: none`, the skip merge-card's post already uses (`merge-card screen-none`).
+   A no-op without `config/owner-rules`. Needs the sibling `merge-card/` of this checkout.
+- Test: `tests/owner-rules-gate.test.sh` installs into a temp home and runs the real `config/merge-gate` against a stubbed receipt.
