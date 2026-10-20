@@ -9,7 +9,7 @@ if [ -n "${MARKER:-}" ]; then
   for arg in "$@"; do case "$arg" in */.pi-quota-failover.*) touch "$MARKER"; while [ ! -e "$RELEASE" ]; do sleep 0.02; done ;; esac; done
 fi
 CP
-chmod +x "$T/bin/cp"; E=(env HOME="$T/home" PATH="$T/bin:$PATH")
+chmod +x "$T/bin/cp"; E=(env HOME="$T/home" XDG_DATA_HOME="$T/data" PATH="$T/bin:$PATH")
 "${E[@]}" "$A/install.sh" --home "$T/home/fixture/users/user-012" --config "$T/home/fixture/users/user-006/config.yaml" >/dev/null
 cp "$T/home/fixture/users/user-012/pi-quota-failover" "$T/old-wrapper"; MARKER="$T/marker" RELEASE="$T/release" "${E[@]}" "$A/install.sh" --home "$T/home/fixture/users/user-012" --config "$T/home/fixture/users/user-006/config.yaml" >/dev/null & pid=$!
 for _ in $(seq 1 200); do [ -e "$T/marker" ] && break; sleep 0.02; done

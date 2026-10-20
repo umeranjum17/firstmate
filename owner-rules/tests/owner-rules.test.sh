@@ -11,6 +11,7 @@ FM=${1:-}
   || { echo "usage: $0 <firstmate-checkout with the brief-inherit seam>" >&2; exit 1; }
 work=$(mktemp -d "${TMPDIR:-/tmp}/owner-rules-e2e.XXXXXX") || exit 1
 trap 'rm -rf -- "$work"' EXIT
+export HOME=$work/user XDG_DATA_HOME=$work/data
 fails=0
 ok() { printf 'ok - %s\n' "$1"; }
 no() { printf 'not ok - %s\n' "$1"; fails=$((fails + 1)); }

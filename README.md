@@ -31,8 +31,8 @@ One line per add-on, with how it wires in. `<home>` is your home folder for the 
 - `merge-on-green` — merges a PR you allowed to auto-merge once its checks are green and its proof receipt passes. Wire in: `merge-on-green/install.sh <home>`.
 - `nm-drain` — updates the shared pipeline service through a planned drain, never over live runs. Wire in: `nm-drain/install.sh <home>`.
 - `owner-rules` — a lane brief is refused without an owner ask, and no-mistakes mode without one listed risk reason. Needs the brief-inherit seam. Wire in: `owner-rules/install.sh <home>`.
-- `owner-guard` — refuses commits, pushes and PR merges that add the owner's private details, and scans public repos for them once a day. Wire in: `owner-guard/install.sh <home>` and `owner-guard/install-scan.sh`.
-- `parked-homes` — a paused team home gets no messages, nudges, relaunches or config pushes. Needs fork hooks (FORK-EXIT.md).
+- `owner-guard` — refuses commits, pushes and PR merges that add the owner's private details, and scans public repos for them once a day. Wire in: `owner-guard/install.sh <home>` and `owner-guard/install-scan.sh`; remove with `owner-guard/uninstall.sh <home>`. Installation reversal covers both hook guards and the daily scan.
+- `parked-homes` — a paused team home gets no messages, nudges, relaunches or config pushes. Verify-only install/uninstall: `parked-homes/install.sh`, `parked-homes/uninstall.sh`. Needs fork hooks (FORK-EXIT.md).
 - `pipeline-literal-delete` — gives pipeline agents the safe recursive-delete rule in their own instructions. Wire in: `pipeline-literal-delete/install.sh`.
 - `pipeline-quota-failover` — moves pipeline model calls to the next model in the chain on a quota error. Wire in: `pipeline-quota-failover/install.sh`.
 - `quota-failover` — relaunches stalled workers onto a live route and rests dead routes until they answer again. Wire in: a watcher check you add, see Install.

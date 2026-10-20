@@ -9,6 +9,7 @@ ADDON=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 WRAPPER="$ADDON/bin/fm-bearings-board.sh"
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/bearings-board-test.XXXXXX")
 trap 'rm -rf -- "$TMP"' EXIT
+export HOME=$TMP/home XDG_DATA_HOME=$TMP/data
 
 fail() { printf 'not ok: %s\n' "$*" >&2; exit 1; }
 FMH="$TMP/fm"
