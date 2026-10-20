@@ -170,8 +170,9 @@ pass 'lead native blocked overrides log, ignores foreign panes, re-arms, and exc
 
 if (
   export FM_HOME="$ROOT" SCRIPT_DIR="$ROOT/bin"
-  [ -r "$ADDONS_DIR/alerts/bin/fm-model-outage-lib.sh" ] &&
-  . "$ADDONS_DIR/alerts/bin/fm-model-outage-lib.sh" &&
+  [ -r "$ADDONS_DIR/alerts/bin/fm-model-outage-lib.sh" ] || exit 1
+  # shellcheck source=/dev/null
+  . "$ADDONS_DIR/alerts/bin/fm-model-outage-lib.sh" || exit 1
   declare -F fm_alerts_push_suppress >/dev/null
 ) 2>/dev/null; then
   printf 'kind=ship\nharness=cursor\nbackend=herdr\nwindow=fixture:w1:p1\n' > "$dir/state/lane.meta"
