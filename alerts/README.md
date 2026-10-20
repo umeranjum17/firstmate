@@ -31,6 +31,9 @@ otherwise or when the watcher's `fm_meta_get`/`task_captain_call_open` are absen
   and appends one grouped wake naming every lane failing with the same
   normalized error. `fm_model_outage_text` normalizes one error to a single
   printable line.
+- `tests/model-outage-scan-e2e.sh` — the scan behaviour over fixture lanes (union wake,
+  recovered/unreadable lanes, hung verdict, wrapped banner, usage-limit banner once,
+  banner above the composer or in scrollback); run with `FM_TEST_FORK` set to a Firstmate checkout.
 - `tests/fm-model-outage-live-e2e.test.sh` — the opt-in credentialed live
   journey. Moved verbatim and **never run from here**: it drives live agents
   (see the proof note).
