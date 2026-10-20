@@ -169,6 +169,7 @@ cycle
 pass 'lead native blocked overrides log, ignores foreign panes, re-arms, and excludes child reports'
 
 if (
+  export FM_HOME="$ROOT" SCRIPT_DIR="$ROOT/bin"
   [ -r "$ADDONS_DIR/alerts/bin/fm-model-outage-lib.sh" ] &&
   . "$ADDONS_DIR/alerts/bin/fm-model-outage-lib.sh" &&
   declare -F fm_alerts_push_suppress >/dev/null
