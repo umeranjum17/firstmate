@@ -1243,6 +1243,28 @@ test_helper_report_resolves() {
   pass "optional helper report resolves without being required for correctness"
 }
 
+test_helper_blocked_wait_hook_is_optional() {
+  local home state sm_home addons hook out rc
+  home=$(setup_parent wait-hook)
+  state="$home/state"
+  sm_home=$(bind_local_mate "$home" hibit)
+  FM_HOME="$sm_home" "$REPORT" blocked abcdef0123456789 'waiting for CI' \
+    || fail "missing add-on hook should be a no-op"
+  addons="$home/addons"
+  hook="$addons/status-blocked-wait/bin/fm-status-blocked-wait.sh"
+  mkdir -p "$(dirname "$hook")"
+  printf '#!/usr/bin/env bash\necho "use paused: waiting for CI" >&2\nexit 1\n' > "$hook"
+  chmod +x "$hook"
+  if out=$(FM_HOME="$sm_home" FM_ADDONS_DIR="$addons" "$REPORT" blocked abcdef0123456789 'waiting for CI' 2>&1); then
+    fail "nonzero add-on hook should refuse report"
+  else
+    rc=$?
+  fi
+  [ "$rc" -eq 2 ] || fail "hook refusal should exit 2"
+  assert_contains "$out" 'use paused:' "hook refusal message was lost"
+  pass "blocked-wait hook is optional and propagates add-on refusal"
+}
+
 test_busy_idle_observation_via_backend_abstraction() {
   local home state corr
   home=$(setup_parent busy-idle)
@@ -2134,6 +2156,7 @@ test_unmarked_captain_input_creates_no_expectation
 test_fm_send_marked_secondmate_creates_pending_and_embeds_corr
 test_document_pointer_resolves
 test_helper_report_resolves
+test_helper_blocked_wait_hook_is_optional
 test_busy_idle_observation_via_backend_abstraction
 test_unknown_backend_state_uses_capture_fallback
 test_kimi_capture_fallback_uses_recorded_harness

@@ -30,6 +30,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=bin/fm-parent-channel-lib.sh
 . "$SCRIPT_DIR/fm-parent-channel-lib.sh"
 
+fm_secondmate_report_status_blocked_wait() {  # <verb> <text>
+  [ "$1" = blocked ] || return 0
+  local hook="${FM_ADDONS_DIR:-${CALLER_FM_HOME}/projects/firstmate-addons}/status-blocked-wait/bin/fm-status-blocked-wait.sh"
+  [ ! -x "$hook" ] || "$hook" "$1" "$2" || { echo "${FM_STATUS_BLOCKED_WAIT_MESSAGE:-use paused: <reason> (until <YYYY-MM-DDTHH:MMZ> when known)}" >&2; exit 2; }
+}
+
 usage() {
   cat <<'EOF' >&2
 Usage:
@@ -93,6 +99,7 @@ if [ "$DOC_MODE" = 1 ]; then
   DOC_PATH=$1
   shift
   NOTE=$*
+  fm_secondmate_report_status_blocked_wait "$VERB" "$NOTE"
   if [ -n "$NOTE" ]; then
     printf -v line '%s [%s]: %s (%s via-helper)' "$VERB" "$token" "$NOTE" "$DOC_PATH"
   else
@@ -100,6 +107,7 @@ if [ "$DOC_MODE" = 1 ]; then
   fi
 else
   NOTE=$*
+  fm_secondmate_report_status_blocked_wait "$VERB" "$NOTE"
   printf -v line '%s [%s]: %s (via-helper)' "$VERB" "$token" "$NOTE"
 fi
 printf '%s\n' "$(status_stamp_line "$line")" >> "$DESTINATION"
