@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Real local landing through the proposed optional-source seam in a private bin
-# copy. FM_TEST_FORK names a read-only Firstmate checkout; no watcher is armed.
+# Real local landing through the fork's unmodified bin, which sources this
+# add-on's loader from FM_ADDONS_DIR. FM_TEST_FORK names a read-only Firstmate
+# checkout; no watcher is armed.
 set -euo pipefail
 addons=$(cd "$(dirname "$0")/../.." && pwd)
 : "${FM_TEST_FORK:?set FM_TEST_FORK to a Firstmate checkout}"
@@ -16,32 +17,8 @@ export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR
 mkdir -p "$HOME" "$TMPDIR" "$d/fork"
 cp -a "$FM_TEST_FORK/bin" "$d/fork/"
-# Step-B simulation only, never edit the supplied checkout. Keep all other
-# production code and dependencies real; the new library is reached by its
-# exact future loader, not by copying it on top of the fork implementation.
-python3 - "$d/fork" <<'PY'
-from pathlib import Path
-import sys
-root = Path(sys.argv[1]) / 'bin'
-loader = '[ ! -r "${FM_ADDONS_DIR:-$FM_HOME/projects/firstmate-addons}/merge-card/bin/fm-merge-hooks-lib.sh" ] || . "${FM_ADDONS_DIR:-$FM_HOME/projects/firstmate-addons}/merge-card/bin/fm-merge-hooks-lib.sh"'
-for name, function in [('fm-dod-lib.sh', 'fm_dod_merge_gate'), ('fm-merge-outcome-lib.sh', 'fm_merge_post_hook')]:
-    p = root / name
-    lines = p.read_text().splitlines()
-    start = next(i for i, line in enumerate(lines) if line.startswith(function + '()'))
-    end = next(i for i in range(start + 1, len(lines)) if lines[i] == '}')
-    lines[start:end + 1] = [loader]
-    p.write_text('\n'.join(lines) + '\n')
-for name in ['fm-merge-local.sh', 'fm-pr-merge.sh', 'fm-merge-outcome-lib.sh']:
-    p = root / name
-    lines = p.read_text().splitlines()
-    for i, line in enumerate(lines):
-        if line.lstrip().startswith('fm_dod_merge_gate '):
-            lines[i] = 'if declare -F fm_dod_merge_gate >/dev/null; then ' + line.strip() + '; fi'
-        elif '|| fm_merge_post_hook ' in line:
-            condition, call = line.split(' || ', 1)
-            lines[i] = 'if ! ' + condition.strip() + ' && declare -F fm_merge_post_hook >/dev/null; then ' + call + '; fi'
-    p.write_text('\n'.join(lines) + '\n')
-PY
+# No rewriting: fm-dod-lib.sh and fm-merge-outcome-lib.sh load the add-on
+# library themselves from FM_ADDONS_DIR, and fm-merge-local.sh calls the hooks.
 
 fail() { echo "not ok - $*" >&2; exit 1; }
 run_merge() { FM_HOME=$home bash "$d/fork/bin/fm-merge-local.sh" task > "$d/out" 2>&1; }
