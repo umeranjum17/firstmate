@@ -1251,7 +1251,7 @@ test_helper_blocked_wait_hook_is_optional() {
   env -u FM_ADDONS_DIR FM_HOME="$sm_home" "$REPORT" blocked abcdef0123456789 'waiting for CI' \
     || fail "missing add-on hook should be a no-op"
   addons="$home/addons"
-  hook="$addons/status-blocked-wait/bin/fm-status-blocked-wait.sh"
+  hook="$addons/status-wait-check/status-wait-check"
   capture="$home/hook-args"
   mkdir -p "$(dirname "$hook")"
   cat > "$hook" <<EOF

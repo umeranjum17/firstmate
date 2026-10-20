@@ -31,7 +31,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SCRIPT_DIR/fm-parent-channel-lib.sh"
 
 fm_secondmate_report_status_blocked_wait() {  # <verb> <text>
-  local hook="${FM_ADDONS_DIR:-${CALLER_FM_HOME}/projects/firstmate-addons}/status-blocked-wait/bin/fm-status-blocked-wait.sh"
+  local hook="${FM_ADDONS_DIR:-${CALLER_FM_HOME}/projects/firstmate-addons}/status-wait-check/status-wait-check"
   [ -x "$hook" ] || return 0
   local out rc=0
   out=$("$hook" "$1" "$2" 2>&1) || rc=$?
