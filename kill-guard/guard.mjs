@@ -1,12 +1,37 @@
 // Fleet kill guard, the rule every adapter calls. A kill, pkill or killall may signal only the caller's own descendants,
 // never PID 1, the systemd user manager or the herdr server, and never a target it cannot resolve. A reparented target inside the caller's non-home git worktree is also owned. A block is final,
 // except a kill whose PID the shell sets ($pid, $!, %1, $(...)): that one asks for the literal PID.
-import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { basename, isAbsolute, relative, sep } from "node:path";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const MODELLED = { kill: "lL", pkill: "f", killall: "" }; // options the guard reads; any other option refuses
+const DEVICE_RECORD = ".fm-kill-guard-device-pids.json";
+const worktreeRoot = (caller) => {
+	const cwd = realpathSync(`/proc/${caller}/cwd`);
+	const root = realpathSync(execFileSync("git", ["-C", cwd, "rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim());
+	if (cwd !== root) throw new Error("caller must be at its worktree root");
+	return root;
+};
+const quote = (s) => `'${s.replace(/'/g, "'\\''")}'`;
+function ownStart(args, caller) {
+	const sepAt = args.indexOf("--");
+	if (sepAt !== 2 || !args[0] || args.length < 4) throw new Error("usage: own start <serial> -- <device command>");
+	const [serial, ...command] = [args[1], ...args.slice(3)];
+	const root = worktreeRoot(caller);
+	const payload = `"$@" & p=$!; while [ ! -r /proc/$p/stat ]; do sleep 0.05; done; s=$(cat /proc/$p/stat); r=${"${s##*) }"}; set -- $r; printf '%s %s\\n' "$p" "${"${20}"}"`;
+	const result = spawnSync("adb", ["-s", serial, "shell", "sh", "-c", payload, "own-start", ...command], { encoding: "utf8" });
+	if (result.status !== 0) throw new Error(result.stderr || `adb launch failed (${result.status})`);
+	const match = result.stdout.trim().match(/^(\d+) (\d+)$/);
+	if (!match) throw new Error("device did not return a pid and start time");
+	const file = `${root}/${DEVICE_RECORD}`;
+	let records = [];
+	if (existsSync(file)) records = JSON.parse(readFileSync(file, "utf8"));
+	records.push({ serial, pid: Number(match[1]), starttime: match[2] });
+	writeFileSync(file, JSON.stringify(records) + "\n", { mode: 0o600 });
+	return root;
+}
 const WRAPPERS = /^(sudo|env|nohup|exec|command|builtin|time|nice|ionice|taskset|stdbuf|timeout|setsid|doas|runuser|chrt|flock|unbuffer|xargs|then|do|else|if|elif|case|while|until|function|\{)$/;
 const KNOWN = /^(kill|pkill|killall|eval|(ba|z|da)?sh)$/;
 const SIGNAL = /^-(\d+|[A-Z][A-Z0-9]*)$/; // -9, -KILL, -SIGTERM
@@ -190,6 +215,31 @@ function substitutions(text, literal = false) {
 	return out;
 }
 
+function judgeAdb(args, text, caller) {
+	let serial = null, i = 0;
+	if (args[0] === "-s" && args[1]) { serial = args[1]; i = 2; }
+	if (args[i++] !== "shell") return null;
+	const shell = args.slice(i).filter((a) => a !== "");
+	if (!shell.length) return null;
+	if (!["kill", "pkill"].includes(commandName(shell[0]))) return shell.some((a) => /\b(kill|pkill)\b/.test(a)) ? `"${text}" cannot be resolved to processes: nested adb shell kills are not supported` : null;
+	if (commandName(shell[0]) !== "kill") return `"${text}" cannot be resolved to processes: device name/pattern kills are not supported`;
+	const operands = shell.slice(1).filter((a) => !/^-[A-Z0-9]+$/.test(a));
+	if (!serial || !operands.length || operands.some((p) => !/^[1-9]\d*$/.test(p))) return `"${text}" cannot be resolved to processes: adb device kill must use a serial and literal PID`;
+	let root;
+	try { root = worktreeRoot(caller); } catch { return `"${text}" cannot be resolved to processes: caller worktree is unavailable`; }
+	let records;
+	try { records = JSON.parse(readFileSync(`${root}/${DEVICE_RECORD}`, "utf8")); } catch { records = []; }
+	for (const p of operands) {
+		const record = records.find((r) => r.serial === serial && r.pid === Number(p));
+		if (!record) return `"${text}" aims at device PID ${p}, which this task did not start`;
+		const stat = spawnSync("adb", ["-s", serial, "shell", "cat", `/proc/${p}/stat`], { encoding: "utf8" });
+		if (stat.status !== 0) return `"${text}" cannot be resolved to processes: device PID ${p} start time could not be checked`;
+		const rest = stat.stdout.trim().slice(stat.stdout.trim().lastIndexOf(")") + 2).split(/\s+/);
+		if (rest[19] !== String(record.starttime)) return `"${text}" aims at device PID ${p}, whose start time does not match this task's record`;
+	}
+	return null;
+}
+
 // The first kill, pkill or killall in the command (also inside sh -c, eval, $( ) or backticks) aimed outside the caller's tree.
 // A final block anywhere beats a retry, so "kill $p; kill 1" is refused for good.
 const worst = (ts) => ts.find((t) => t && !t.retry) ?? ts.find(Boolean) ?? null;
@@ -203,6 +253,7 @@ function blockedBy(command, caller, procs) {
 		return worst([...substitutions(text).map((c) => blockedBy(c, caller, procs)), ...split.map((s) => blockedBy(s, caller, procs)),
 			shellC >= 0 && w[shellC + 1] ? blockedBy(w[shellC + 1], caller, procs) :
 			name === "eval" ? blockedBy(w.slice(1).join(" "), caller, procs) :
+			name === "adb" ? judgeAdb(w.slice(1), text, caller) :
 			!Object.hasOwn(MODELLED, name) ? null :
 			piped ? `"${text}" cannot be resolved to processes: its targets come from xargs` :
 			judge(name, w.slice(1), text, caller, procs)]);
@@ -228,9 +279,14 @@ export function guard(command, { caller = process.pid } = {}) {
 let entry = null;
 try { entry = realpathSync(process.argv[1]); } catch {}
 if (entry === realpathSync(fileURLToPath(import.meta.url))) {
+	const i = process.argv.indexOf("--caller");
+	const caller = Number(process.argv[i + 1]) || process.ppid;
+	if (process.argv[2] === "own" && process.argv[3] === "start") {
+		try { ownStart(process.argv.slice(3), caller); process.exit(0); }
+		catch (e) { process.stderr.write(`kill-guard own start: ${e.message}\n`); process.exit(2); }
+	}
 	let command;
 	try { command = JSON.parse(readFileSync(0, "utf8"))?.tool_input?.command; } catch {}
-	const i = process.argv.indexOf("--caller");
-	const reason = guard(command, { caller: Number(process.argv[i + 1]) || process.ppid });
+	const reason = guard(command, { caller });
 	if (reason !== null) { process.stderr.write(reason + "\n"); process.exit(2); }
 }
