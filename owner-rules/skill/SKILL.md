@@ -40,7 +40,15 @@ Refusal at merge time (`$what` is the PR URL, or `local merge <head>` with no PR
 owner-rules: no passed-proof receipt for $what; run the done-done check and post the evidence to the sign-off Evidence tab first
 ```
 
-Fix: run the done-done check on the real journey at the merge head and post its evidence, then merge again. A merge whose Checks block says `screen: none` is exempt.
+Fix: run the done-done check on the real journey at the merge head and post its evidence, then merge again. A merge whose Checks block says `screen: none` is exempt from this receipt only.
+
+Refusal (`$src` is the PR URL, `$3` the merge head) when checks-lint has no PASS row for the PR head in `data/checks-gate.log`:
+
+```
+owner-rules: no checks-lint PASS for $src at $3; run FM_HOME=$FM_HOME config/fm-checks-lint.sh $src <evidence folder> first
+```
+
+Fix: run that command (it logs the row), then merge again.
 
 ## Install
 
