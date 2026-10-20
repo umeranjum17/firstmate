@@ -1275,7 +1275,12 @@ EOF
     fail "refused --doc report should exit nonzero"
   fi
   [ "$(cat "$state/hibit.status")" = "$before" ] || fail "refused --doc report must not reach the parent status file"
-  pass "blocked-wait hook is optional, receives verb and text, and refusal blocks the append"
+  if FM_HOME="$sm_home" FM_ADDONS_DIR="$addons" "$REPORT" blocked: abcdef0123456789 'waiting for CI' >/dev/null 2>&1; then
+    fail "colon-suffixed blocked verb should be refused"
+  fi
+  [ "$(cat "$capture")" = 'blocked:|waiting for CI' ] || fail "hook must receive the verb exactly as typed"
+  [ "$(cat "$state/hibit.status")" = "$before" ] || fail "colon-suffixed refused report must not reach the parent status file"
+  pass "blocked-wait hook is optional, receives the verb as typed, and refusal blocks the append"
 }
 
 test_busy_idle_observation_via_backend_abstraction() {

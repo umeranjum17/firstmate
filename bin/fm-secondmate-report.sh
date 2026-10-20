@@ -31,9 +31,15 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SCRIPT_DIR/fm-parent-channel-lib.sh"
 
 fm_secondmate_report_status_blocked_wait() {  # <verb> <text>
-  [ "$1" = blocked ] || return 0
   local hook="${FM_ADDONS_DIR:-${CALLER_FM_HOME}/projects/firstmate-addons}/status-blocked-wait/bin/fm-status-blocked-wait.sh"
-  [ ! -x "$hook" ] || "$hook" "$1" "$2" || { echo "${FM_STATUS_BLOCKED_WAIT_MESSAGE:-use paused: <reason> (until <YYYY-MM-DDTHH:MMZ> when known)}" >&2; exit 2; }
+  [ -x "$hook" ] || return 0
+  local out rc=0
+  out=$("$hook" "$1" "$2" 2>&1) || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    if [ -n "$out" ]; then printf '%s\n' "$out" >&2; else echo 'refused by the status-wait-check add-on' >&2; fi
+    exit 2
+  fi
+  [ -z "$out" ] || printf '%s\n' "$out" >&2
 }
 
 usage() {
