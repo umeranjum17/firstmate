@@ -19,7 +19,7 @@ set -u
 
 here=$(cd "$(dirname "$0")" && pwd) || exit 1
 [ -f "$here/../merge-card" ] || { echo "not ok - $here/../merge-card is missing"; exit 1; }
-work=$(mktemp -d) || exit 1
+work=$(mktemp -d /var/tmp/merge-card-e2e.XXXXXX) || exit 1
 trap 'rm -rf "$work"' EXIT
 
 home=$work/home
@@ -132,6 +132,7 @@ while [ $# -gt 0 ]; do
   if [ "$1" = --from ]; then from=$2; shift 2; elif [ "$1" = --replace ]; then replace=1; shift; else shift; fi
 done
 [ -n "$from" ] || exit 0
+case "$from" in /tmp/*) echo "refusing temporary card path: $from" >&2; exit 1 ;; esac
 if jq -e '.run? and ((.run.outcome // "") == "")' "$from" >/dev/null; then echo 'run.outcome must be text'; exit 2; fi
 rm -rf "$SO_CAPTURE"
 cp -r "$(dirname "$from")" "$SO_CAPTURE"
@@ -168,6 +169,8 @@ is "newer: recorded verdict" "$(jq -r .verdict "$home/data/newer/merge-card.json
 if grep -q -- '--citation-base' "$DD_LOG"; then ok "newer: --citation-base passed"; else no "newer: --citation-base passed"; fi
 is "newer: evidence as the stub cited it" "$(jq -c .check.evidence "$home/data/newer/merge-card.json")" '["'"$home/data/newer/shot.png"'"]'
 holds "newer: card captured" "$work/card-newer/card.json"
+is "newer: handoff card is outside /tmp" "$(case "$(grep -- '--from ' "$SO_LOG" | tail -n 1)" in /tmp/*) echo tmp ;; *) echo persistent ;; esac)" persistent
+holds "newer: media persisted in task folder" "$home/data/newer/merge-card-media/1.png"
 is "newer: card kind" "$(jq -r .kind "$work/card-newer/card.json")" evidence
 is "newer: card title is the claim" "$(jq -r .title "$work/card-newer/card.json")" "a stopped worker moves to the next live route"
 is "newer: card media" "$(jq -c .media "$work/card-newer/card.json")" '["1.png"]'
