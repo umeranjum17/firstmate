@@ -17,7 +17,7 @@ FM_PUSH_TRANSITION_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$FM_PUSH_TRANSITION_LIB_DIR/fm-transition-lib.sh"
 # Optional wait-timers add-on.
 # shellcheck source=/dev/null
-[ ! -r "${FM_ADDONS_DIR:-$FM_HOME/projects/firstmate-addons}/wait-timers/bin/fm-wait-timers-lib.sh" ] || . "${FM_ADDONS_DIR:-$FM_HOME/projects/firstmate-addons}/wait-timers/bin/fm-wait-timers-lib.sh"
+[ ! -r "${FM_ADDONS_DIR:-${FM_HOME:-$FM_PUSH_TRANSITION_LIB_DIR/..}/projects/firstmate-addons}/wait-timers/bin/fm-wait-timers-lib.sh" ] || . "${FM_ADDONS_DIR:-${FM_HOME:-$FM_PUSH_TRANSITION_LIB_DIR/..}/projects/firstmate-addons}/wait-timers/bin/fm-wait-timers-lib.sh"
 
 TRIAGE_LOG="$STATE/.watch-triage.log"
 TRIAGE_LOG_MAX_BYTES=${FM_WATCH_TRIAGE_LOG_MAX_BYTES:-262144}
