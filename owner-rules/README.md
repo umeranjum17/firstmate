@@ -1,6 +1,6 @@
 # owner-rules
 
-Two owner rules enforced when a lane's brief is created, not left as prose. Slices 1 and 2 of 3; the leads skill section follows.
+Two owner rules enforced when a lane's brief is created, not left as prose. Slices 1 and 2 of 3 are below; slice 3 is the leads skill.
 
 1. **Owner ask.** A lane (ship or scout) must serve a named owner ask: its backlog item (the entry whose
    id equals the task id in `data/backlog.md`) has a title starting `[captain-ask]`, or its title or body
@@ -30,3 +30,9 @@ A refusal exits 1 before `fm-brief.sh` writes `data/<id>/brief.md`, with a one-l
    Exempt: a merge whose Checks block says `screen: none`, the skip merge-card's post already uses (`merge-card screen-none`).
    A no-op without `config/owner-rules`. Needs the sibling `merge-card/` of this checkout.
 - Test: `tests/owner-rules-gate.test.sh` installs into a temp home and runs the real `config/merge-gate` against a stubbed receipt.
+
+## Leads skill (slice 3)
+
+`skill/SKILL.md` tells the leads both rules, the exact refusal lines and the one-step fix for each. No add-on installs skills, so
+there is no installer; link it into a home once: `ln -s <firstmate-addons>/owner-rules/skill <fm-home>/.agents/skills/owner-rules`.
+`tests/owner-rules.test.sh` fails if a refusal line quoted in the skill stops matching the lib or the gate.

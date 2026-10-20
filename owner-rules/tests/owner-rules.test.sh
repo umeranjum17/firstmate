@@ -74,4 +74,13 @@ FM_HOME=$home FM_ADDONS_DIR=$addons FM_SECONDMATE_CHARTER=x bash "$FM/bin/fm-bri
 "$addons/owner-rules/uninstall.sh" "$home" >/dev/null
 is "uninstalled: check is off again" "$(brief no-ask --mode direct-PR | tail -1)" "rc=0"
 
+# the leads skill quotes each real refusal line (with $id / $what in place of the runtime value)
+n=0
+while IFS= read -r q; do
+  n=$((n + 1))
+  grep -qF -- "${q#owner-rules: }" "$addons/owner-rules/bin/fm-owner-rules-lib.sh" "$addons/owner-rules/bin/fm-owner-rules-gate.sh" \
+    && ok "skill quote matches the code: ${q:0:40}" || no "skill quote not in lib or gate: $q"
+done < <(grep '^owner-rules: ' "$addons/owner-rules/skill/SKILL.md")
+is "skill quotes all three refusals" "$n" "3"
+
 [ "$fails" -eq 0 ] && echo "PASS owner-rules" || { echo "FAIL owner-rules: $fails"; exit 1; }
