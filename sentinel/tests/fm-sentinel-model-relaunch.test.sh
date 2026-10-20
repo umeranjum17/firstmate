@@ -37,7 +37,7 @@ printf '%s %s %s\n' "$FM_HOME" "$(basename "$0")" "$*" >> "$RELAUNCH_LOG"
 SH
   chmod +x "$d/home/fixture/users/user-009/$cmd"
 done
-for row in 'match:match' 'mismatch:mismatch'; do
+for row in 'match:match' 'mismatch:mismatch' 'unmodeled:mismatch'; do
   IFS=: read -r id pane <<<"$row"
   cat >"$d/home/fixture/users/user-017/$id.meta" <<EOF
 harness=claude
@@ -47,11 +47,14 @@ backend=herdr
 herdr_session=default
 herdr_pane_id=$pane
 EOF
+  [ "$id" != unmodeled ] || sed -i '/^model=/d' "$d/home/fixture/users/user-017/$id.meta"
 done
 : > "$d/relaunch.log"
-PATH="$PATH" RELAUNCH_LOG="$d/relaunch.log" FM_HOME="$d/home" FM_SENTINEL_MODEL_EVENT=fixture-event \
-  "$ROOT/sentinel/bin/fm-sentinel.sh" model-reconcile
+OUT=$(PATH="$PATH" RELAUNCH_LOG="$d/relaunch.log" FM_HOME="$d/home" FM_SENTINEL_MODEL_EVENT=fixture-event \
+  "$ROOT/sentinel/bin/fm-sentinel.sh" model-reconcile 2>&1) || :
+printf '%s\n' "$OUT" | grep -q '^unmodeled: stored model missing; model restore refused$'
 [ "$(wc -l < "$d/relaunch.log")" -eq 1 ]
+rm "$d/home/fixture/users/user-017/unmodeled.meta"
 grep -q "$d/home fm-control.sh mismatch relaunch --model claude-sonnet-5-5" "$d/relaunch.log"
 PATH="$PATH" RELAUNCH_LOG="$d/relaunch.log" FM_HOME="$d/home" FM_SENTINEL_MODEL_EVENT=fixture-event \
   "$ROOT/sentinel/bin/fm-sentinel.sh" model-reconcile
