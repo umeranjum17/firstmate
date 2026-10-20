@@ -71,7 +71,9 @@
 #              a tmux `missing` cannot be proven absent from a task record, so
 #              it refuses.
 #              An explicit `default` model or effort clears that
-#              axis for the replacement. With no explicit axis, a secondmate
+#              axis for the replacement. A same-harness relaunch whose record
+#              has no stored model refuses unless a model is named or resolved
+#              from configuration. With no explicit axis, a secondmate
 #              re-resolves its durable profile through fm-harness.sh with its
 #              id (per-mate pin or global fallback), exactly as any other
 #              respawn does, while a ship or scout keeps the exact adapter
