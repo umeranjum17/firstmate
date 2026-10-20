@@ -21,6 +21,13 @@ does all three. The hook slice has to exec this adapter with the fork's argv
 (`poll`, `answers`, `ack`, `raise`) and keep the `ack` step. The full table and
 the decision are in the seam record kept with the evidence.
 
+## Firstmate owner engagement route
+
+`engage-route/bin/fm-engage-route.sh dispatch <board.json>` forwards each open Go deeper request only to the Firstmate task named by its filer, or to an explicit `config/engage-owners` binding.
+Firstmate-home producers must post with `--filer <task-id>` (or set `SIGN_OFF_FILER=<task-id>`); use `bind <filer> <task-id>` only when they differ.
+Missing or finished owners remain queued with a reason.
+The adapter reads deeper requests only and never consumes captain-hold answers.
+
 ## Tests
 
 `tests/fm-procevent-signoff.test.sh` sources `tests/lib.sh` from the Firstmate
