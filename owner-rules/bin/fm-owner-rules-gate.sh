@@ -30,6 +30,15 @@ awk -F'\t' -v pr="$4" -v head="$3" -v task="$1" '
 }
 # Local merges retain the existing receipt/lint behavior; only PRs have board keys.
 [ "$4" != - ] || exit 0
+# Canary config lists exact FM_HOME paths; without it every home keeps today's gate behavior.
+canary=$FM_HOME/config/owner-rules-canary
+if [ -r "$canary" ] && ! grep -Fqx -- "$FM_HOME" "$canary"; then exit 0; fi
+# An explicitly dated UTC expiry permits a canary home to self-waive this new refusal until then.
+waiver=$FM_HOME/config/owner-rules-canary-waiver
+if [ -r "$waiver" ]; then
+  IFS= read -r expires < "$waiver"
+  if [[ $expires =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}Z$ ]] && [[ $(date -u +%Y-%m-%dT%H:%MZ) < $expires ]]; then exit 0; fi
+fi
 board=${FM_FLEET_BOARD:-}
 if [ -z "$board" ] && [ -r "$FM_HOME/config/fleet-board" ]; then
   IFS= read -r board < "$FM_HOME/config/fleet-board"
