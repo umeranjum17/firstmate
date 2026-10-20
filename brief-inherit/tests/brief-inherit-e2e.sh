@@ -4,8 +4,10 @@
 # Usage: brief-inherit/tests/brief-inherit-e2e.sh <firstmate-checkout>
 #   A checkout without the seam (today's fork) is copied to a temp root and Kun's single-file
 #   include read plus the two seam lines are applied there, which is step B. A checkout that
-#   already carries the seam runs as is. Present must equal the fork's own output; absent (an
-#   empty FM_ADDONS_DIR) must be Kun's behavior: local include only, no error, also under set -e.
+#   already carries the seam runs as is. Present must equal the pre-seam fork's output, the
+#   reference: the checkout itself when it lacks the seam, else a temp copy with
+#   pre-seam-reference.patch (fork PR 114 reversed, committed) applied. Absent (an empty
+#   FM_ADDONS_DIR) must be Kun's behavior: local include only, no error, also under set -e.
 # shellcheck disable=SC2016 # literal backticks and $ in fixture text
 set -u
 
@@ -27,7 +29,8 @@ SEAM_LIST='_bi="${FM_ADDONS_DIR:-${FM_HOME:-$HOME}/projects/firstmate-addons}/br
 
 # The seam root: the checkout itself when it has the seam, else a step-B copy of it.
 root=$FM
-if ! grep -q fm_brief_inherit_shared "$FM/bin/fm-brief.sh"; then
+seamed=0; grep -q fm_brief_inherit_shared "$FM/bin/fm-brief.sh" && seamed=1
+if [ "$seamed" = 0 ]; then
   root=$work/root
   mkdir -p "$root" && cp -R "$FM/bin" "$root/bin" && cp "$FM"/AGENTS.md "$root/" 2>/dev/null
   awk -v seam="$SEAM_BRIEF" '
@@ -51,6 +54,14 @@ fi
 grep -q fm_brief_inherit_shared "$root/bin/fm-brief.sh" && grep -q fm_brief_inherit_config "$root/bin/fm-config-inherit-lib.sh" \
   && ok "seam applied" || { no "seam not applied to the checkout copy"; exit 1; }
 
+# The reference: the fork's pre-seam output, never the live checkout once it carries the seam.
+ref=$FM
+if [ "$seamed" = 1 ]; then
+  ref=$work/ref
+  mkdir -p "$ref" && cp -R "$FM/bin" "$ref/bin" && cp "$FM"/AGENTS.md "$ref/" 2>/dev/null
+  patch -s -F0 -p1 -d "$ref" < "$here/pre-seam-reference.patch" || { no "pre-seam reference patch does not apply to the checkout"; exit 1; }
+fi
+
 empty=$work/no-addon; mkdir -p "$empty"
 # scaffold <fm-root> <addons-dir|-> <home> <id> <ship|scout>: prints stderr, exit code on the last line.
 scaffold() {
@@ -70,9 +81,9 @@ for h in fork present absent; do
   printf '%s\n' "$local_rule" > "$work/$h/config/brief-include.md"
 done
 
-# present == the fork's own output today, ship and scout
+# present == the pre-seam fork's output, ship and scout
 for kind in ship scout; do
-  scaffold "$FM" - "$work/fork" "b-$kind" "$kind" > "$work/fork-$kind.out"
+  scaffold "$ref" - "$work/fork" "b-$kind" "$kind" > "$work/fork-$kind.out"
   scaffold "$root" "$addons" "$work/present" "b-$kind" "$kind" > "$work/present-$kind.out"
   same "present: $kind scaffold exits and prints like the fork" "$work/fork-$kind.out" "$work/present-$kind.out"
   same "present: $kind include section is byte-identical to the fork's" <(tail_of "$work/fork" "b-$kind") <(tail_of "$work/present" "b-$kind")
@@ -97,7 +108,7 @@ for bad in contract dir; do
     if [ "$bad" = contract ]; then printf '%s\n' 'Delivery contract: mode=local-only' > "$h/config/brief-include-shared.md"
     else mkdir "$h/config/brief-include-shared.md"; fi
   done
-  scaffold "$FM" - "$work/bad-fork-$bad" r scout | sed "s#$work/bad-fork-$bad#H#" > "$work/bad-fork.out"
+  scaffold "$ref" - "$work/bad-fork-$bad" r scout | sed "s#$work/bad-fork-$bad#H#" > "$work/bad-fork.out"
   scaffold "$root" "$addons" "$work/bad-present-$bad" r scout | sed "s#$work/bad-present-$bad#H#" > "$work/bad-present.out"
   same "present: $bad shared include is refused exactly like the fork" "$work/bad-fork.out" "$work/bad-present.out"
   [ -e "$work/bad-present-$bad/data/r" ] && no "present: refused $bad include left a partial scaffold"
