@@ -6,11 +6,22 @@
 #   fm_brief_inherit_config                       (bin/fm-config-inherit-lib.sh)
 # With the add-on absent the seam lines are no-ops: only config/brief-include.md applies.
 
+# owner-rules add-on: run its lane check when owner-rules/install.sh wrote config/owner-rules.
+# Marker without the lib is an error, so a moved add-ons clone cannot silently drop the rules.
+fm_brief_inherit_owner_rules() {
+  local lib=${BASH_SOURCE[0]%/*}/../../owner-rules/bin/fm-owner-rules-lib.sh
+  [ -f "$1/owner-rules" ] || return 0
+  [ -f "$lib" ] || { echo "error: $1/owner-rules is installed but $lib is missing" >&2; exit 1; }
+  # shellcheck disable=SC1090 # the add-on lib is found at run time
+  . "$lib" && fm_owner_rules_check "${DATA:-}" "${ID:-}" "${MODE:-}" "$2"
+}
+
 # Prepend config/brief-include-shared.md to BRIEF_INCLUDE_BODY, which already holds the
 # home-local include. Same rules as the local include: a present path that is not a readable
 # regular file, or text carrying its own delivery-contract line, stops the scaffold.
 fm_brief_inherit_shared() {
   local config=$1 kind=$2 file body
+  fm_brief_inherit_owner_rules "$config" "$kind"
   [ "$kind" != secondmate ] || return 0
   file=$config/brief-include-shared.md
   { [ -e "$file" ] || [ -L "$file" ]; } || return 0
