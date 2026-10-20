@@ -134,6 +134,7 @@ done
 [ -n "$from" ] || exit 0
 case "$from" in /tmp/*) echo "refusing temporary card path: $from" >&2; exit 1 ;; esac
 if jq -e '.run? and ((.run.outcome // "") == "")' "$from" >/dev/null; then echo 'run.outcome must be text'; exit 2; fi
+if jq -e '(.about | length) > 500 or (.run.outcome | length) > 1000' "$from" >/dev/null; then echo 'about/run field exceeds contract limit'; exit 2; fi
 rm -rf "$SO_CAPTURE"
 cp -r "$(dirname "$from")" "$SO_CAPTURE"
 if [ -f "$board" ]; then
@@ -221,6 +222,7 @@ SO_CAPTURE=$work/card-failedrun
 export SO_CAPTURE
 run_check_and_post failedrun
 is "receipt: card carries the clean run" "$(jq -c .run "$work/card-receipt/card.json")" "$(jq -cn --arg c "$head_c" '{run_id:"20261020T000000Z-receipt0001", commit:$c, outcome:"a stopped worker moves to the next live route", repro:"see the merge note", proof:"done-done run 20261020T000000Z-receipt0001", evidence:"shot.png"}')"
+# Non-screen-free receipt cards retain the existing outcome text.
 # A sealed clean run in done-done's own evidence root (a throwaway DONE_DONE_HOME, the real done-done) is accepted
 # for its head with no task folder run; one at another head is refused.
 if command -v done-done >/dev/null; then
@@ -298,6 +300,9 @@ export MODE DD_LOG SO_CAPTURE
 checks internal shot.png && printf 'screen: none\n' >> "$home/data/internal/checks.md" && cp "$shot" "$home/data/internal/shot.png"
 printf '{"schema":1,"answers_only":false,"items":[]}\n' > "$work/board.json"
 mk_run internal 20261020T000000Z-internal0001 0
+mkdir -p "$home/data/internal/20261020T000000Z-internal0001"
+printf 'command proof line one\ncommand proof line two\n' > "$home/data/internal/20261020T000000Z-internal0001/stdout.log"
+jq --arg cmd 'printf captured output' '.command=$cmd | .files=[{path:"20261020T000000Z-internal0001/stdout.log"}]' "$home/data/internal/.done-done/runs/20261020T000000Z-internal0001.json" > "$work/run.json" && mv "$work/run.json" "$home/data/internal/.done-done/runs/20261020T000000Z-internal0001.json"
 jq '.check.claim="" | .check.evidence=[]' "$home/data/internal/merge-card.json" > "$work/internal-record.json" && mv "$work/internal-record.json" "$home/data/internal/merge-card.json"
 : >"$DD_LOG"
 so_before=$(wc -l < "$SO_LOG")
@@ -311,6 +316,28 @@ is "internal: card has no media" "$(jq -c 'has("media")' "$work/card-internal/ca
 is "internal: card carries receipt" "$(jq -r '.run.run_id' "$work/card-internal/card.json")" 20261020T000000Z-internal0001
 is "internal: missing claim uses Checks outcome" "$(jq -r '.run.outcome' "$work/card-internal/card.json")" "a stopped worker moves to the next live route"
 is "internal: missing citation uses Checks evidence" "$(jq -r '.run.evidence' "$work/card-internal/card.json")" shot.png
+is "internal: output excerpt is shown" "$(jq -r .about "$work/card-internal/card.json" | grep -c 'command proof line')" 2
+is "internal: command and exit code are shown" "$(jq -r .about "$work/card-internal/card.json" | grep -c 'exit code 0')" 1
+# A capture beyond the text field cap is called out rather than silently clipped.
+jq '.items=[]' "$work/board.json" > "$work/board.tmp" && mv "$work/board.tmp" "$work/board.json"
+checks longoutput shot.png && printf 'screen: none\n' >> "$home/data/longoutput/checks.md" && cp "$shot" "$home/data/longoutput/shot.png"
+mk_run longoutput 20261020T000000Z-longoutput0001 0
+mkdir -p "$home/data/longoutput/20261020T000000Z-longoutput0001"
+python3 -c 'print("x" * 700)' > "$home/data/longoutput/20261020T000000Z-longoutput0001/stdout.log"
+jq '.files=[{path:"20261020T000000Z-longoutput0001/stdout.log"}]' "$home/data/longoutput/.done-done/runs/20261020T000000Z-longoutput0001.json" > "$work/run.json" && mv "$work/run.json" "$home/data/longoutput/.done-done/runs/20261020T000000Z-longoutput0001.json"
+SO_CAPTURE=$work/card-longoutput
+export SO_CAPTURE
+PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" longoutput "$wt" "$head_c" - >/dev/null
+holds "long output: card captured" "$work/card-longoutput/card.json"
+is "long output: visible truncation note" "$(jq -r .about "$work/card-longoutput/card.json" | grep -c 'output truncated, full run 20261020T000000Z-longoutput0001')" 1
+is "long output: field stays within contract" "$(jq -e '.about | length <= 500' "$work/card-longoutput/card.json")" true
+jq '.items=[]' "$work/board.json" > "$work/board.tmp" && mv "$work/board.tmp" "$work/board.json"
+checks nocapture shot.png && printf 'screen: none\n' >> "$home/data/nocapture/checks.md" && cp "$shot" "$home/data/nocapture/shot.png"
+mk_run nocapture 20261020T000000Z-nocapture0001 0
+SO_CAPTURE=$work/card-nocapture
+export SO_CAPTURE
+PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" nocapture "$wt" "$head_c" - >/dev/null
+is "no capture: receipt-only text remains" "$(jq -r .about "$work/card-nocapture/card.json")" 'No user-visible screen; sealed done-done receipt attached.'
 so_before=$(wc -l < "$SO_LOG")
 PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" internal "$wt" "$head_c" - >/dev/null
 is "internal: repeat post is deduped" "$(wc -l < "$SO_LOG")" "$so_before"
