@@ -1,5 +1,5 @@
 ---
-name: owner-rules
+name: firstmate-addons-owner-rules
 description: >-
   Use before writing a lane brief or merging a lane, and when a brief or merge is refused with an "owner-rules:" line.
   States the two owner rules (every lane serves an owner ask; no-mistakes only for listed risks) and the one-step fix for each refusal.

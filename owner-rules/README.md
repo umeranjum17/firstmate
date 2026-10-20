@@ -38,5 +38,6 @@ A refusal exits 1 before `fm-brief.sh` writes `data/<id>/brief.md`, with a one-l
 ## Leads skill (slice 3)
 
 `skill/SKILL.md` tells the leads both rules, the exact refusal lines and the one-step fix for each. No add-on installs skills, so
-there is no installer; link it into a home once: `ln -s <firstmate-addons>/owner-rules/skill <fm-home>/.agents/skills/owner-rules`.
+there is no installer; link it into a home once: `ln -s <firstmate-addons>/owner-rules/skill <fm-home>/.agents/skills/firstmate-addons-owner-rules`.
+A home that linked the old name relinks with one line: `ln -sfn <firstmate-addons>/owner-rules/skill <fm-home>/.agents/skills/firstmate-addons-owner-rules && rm <fm-home>/.agents/skills/owner-rules`.
 `tests/owner-rules.test.sh` fails if a refusal line quoted in the skill stops matching the lib or the gate.
