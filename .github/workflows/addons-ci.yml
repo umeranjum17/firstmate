@@ -21,6 +21,11 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+      - name: Wait-timers hook journey
+        run: |
+          git clone --depth 1 --filter=blob:none --sparse https://github.com/umeranjum17/firstmate.git "$RUNNER_TEMP/firstmate"
+          git -C "$RUNNER_TEMP/firstmate" sparse-checkout set bin tests
+          FM_TEST_FORK="$RUNNER_TEMP/firstmate" bash wait-timers/tests/wait-timers-hook-e2e.sh
       # An add-on script is a shell script under a top-level add-on directory,
       # either one level down (`merge-card/merge-card`, `fleet-dashboard/fm-dashboard.sh`)
       # or two levels down in its `bin/` and `tests/` subdirectories

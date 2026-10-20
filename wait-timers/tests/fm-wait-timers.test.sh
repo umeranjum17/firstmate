@@ -47,6 +47,7 @@ arm_episode() {  # <dir>
   wait
 }
 
+if [ "${FM_WAIT_TIMERS_MAIN_ESCALATION_ONLY:-0}" != 1 ]; then
 for verb in blocked needs-decision; do
   dir=$(make_case "$verb")
   mkdir -p "$dir/home/fixture/users/user-010" "$dir/tmp" "$dir/config" "$dir/parent/state"
@@ -93,6 +94,7 @@ for verb in blocked needs-decision; do
   fi
   pass "$verb owner alert, parent escalation, deduplication, resolution and re-arm"
 done
+fi
 
 # A Main-owned wait has no parent channel, so its escalation is one wake to Main.
 dir=$(make_case main-escalation)
@@ -116,6 +118,7 @@ IFS=$'\t' read -r _sig _since _owner parent _key _misses < "$dir/state/.waiting-
 cycle
 [ "$(grep -c 'level=main' "$dir/events")" -eq 1 ] || fail 'Main-owned escalation repeated on a later poll'
 pass 'a Main-owned overdue wait escalates once to Main without paging the captain'
+[ "${FM_WAIT_TIMERS_MAIN_ESCALATION_ONLY:-0}" != 1 ] || exit 0
 
 # Native blocked wins over a working log and survives unrelated status churn.
 dir=$(make_case herdr)
