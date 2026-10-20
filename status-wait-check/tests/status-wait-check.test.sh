@@ -16,6 +16,9 @@ done
 for text in 'failing CI' 'failed check, waiting on rerun' 'missing credential' 'error awaiting restart' 'needs a decision'; do
   check 0 blocked "$text"
 done
+check 1 'blocked:' 'waiting on CI'
+check 0 'blocked:' 'real blocker'
+check 0 'paused:' 'waiting on CI'
 check 0 paused 'waiting on CI'
 check 0 working 'waiting on CI'
 printf 'status-wait-check: ok\n'
