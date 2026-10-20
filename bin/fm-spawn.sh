@@ -1136,14 +1136,6 @@ spawn_remote_secondmate() {
     return 1
     ;;
   esac
-  if [ "$RELAUNCH" -eq 1 ] && [ "$MODEL_SET" -eq 0 ] \
-     && [ "$harness" = "$(fm_meta_get "$STATE/$id.meta" harness)" ] \
-     && [ -z "$(fm_meta_get "$STATE/$id.meta" model)" ]; then
-    fm_lock_release "$registry_lock" || true
-    fm_lock_release "$SPAWN_TASK_LOCK" || true
-    echo "error: task $id has no stored model for $harness; refusing to relaunch on its default model; pass --model explicitly" >&2
-    return 1
-  fi
   model=${MODEL:--}
   effort=${EFFORT:--}
   if [ -z "$HARNESS_ARG" ] && [ -z "$positional" ]; then

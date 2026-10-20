@@ -2648,6 +2648,64 @@ test_spawn_relaunch_refuses_a_missing_stored_model() {
   pass "fm-spawn --relaunch: missing stored model refuses instead of using the default"
 }
 
+test_spawn_relaunch_refuses_a_secondmate_missing_stored_model() {
+  local dir home out rc
+  dir=$(new_case spsmmissingmodel sm9)
+  home="$dir/home"
+  mkdir -p "$home/data/sm9" "$home/config/secondmates/sm9"
+  printf '# secondmate brief\n' > "$home/data/sm9/brief.md"
+  fm_git_worktree "$dir/proj" "$dir/smhome" sm-branch9
+  mkdir -p "$dir/smhome/state" "$dir/smhome/data" "$dir/smhome/bin"
+  printf 'sm9\n' > "$dir/smhome/.fm-secondmate-home"
+  printf '# agents\n' > "$dir/smhome/AGENTS.md"
+  {
+    echo "window=fmses:fm-sm9"
+    echo "endpoint_task_id=sm9"
+    echo "worktree=$dir/smhome"
+    echo "project=$dir/smhome"
+    echo "harness=claude"
+    echo "kind=secondmate"
+    echo "mode=secondmate"
+    echo "yolo=off"
+    echo "effort=default"
+    echo "home=$dir/smhome"
+  } > "$home/state/sm9.meta"
+  printf 'zsh' > "$dir/fake/command"
+  printf '%s' "$dir/smhome" > "$dir/fake/cwd"
+  out=$(run_spawn "$dir" sm9 --relaunch); rc=$?
+  expect_code 1 "$rc" "a direct secondmate relaunch without its stored model should refuse"$'\n'"$out"
+  assert_contains "$out" "no stored model for claude" "the refusal should name the missing model"
+  [ -z "$(cat "$dir/fake/keys")" ] || fail "a missing-model secondmate refusal must not send launch commands"
+  pass "fm-spawn --relaunch: a secondmate without a stored model refuses instead of using the default"
+}
+
+test_spawn_relaunch_refuses_a_remote_secondmate_missing_stored_model() {
+  local dir home out rc
+  dir=$(new_case spremotesmmissing rsm1)
+  home="$dir/home"
+  printf -- '- rsm1 - rsm1 delivery (host: host-rsm; root: /remote/root; home: /remote/home; scope: test work; projects: alpha; added 2026-08-02)\n' > "$home/data/secondmates.md"
+  fm_git_worktree "$dir/proj" "$dir/smhome" sm-branch-rsm1
+  {
+    echo "window=fmses:fm-rsm1"
+    echo "remote_host=host-rsm"
+    echo "endpoint_task_id=rsm1"
+    echo "worktree=$dir/smhome"
+    echo "project=$dir/smhome"
+    echo "harness=claude"
+    echo "kind=secondmate"
+    echo "mode=secondmate"
+    echo "yolo=off"
+    echo "effort=default"
+    echo "home=/remote/home"
+  } > "$home/state/rsm1.meta"
+  printf 'zsh' > "$dir/fake/command"
+  printf '%s' "$dir/smhome" > "$dir/fake/cwd"
+  out=$(run_spawn "$dir" rsm1 --relaunch); rc=$?
+  expect_code 1 "$rc" "a remote secondmate relaunch without its stored model should refuse"$'\n'"$out"
+  assert_contains "$out" "no stored model for claude" "the refusal should name the missing model"
+  pass "fm-spawn --relaunch: a remote secondmate without a stored model refuses instead of using the default"
+}
+
 test_spawn_relaunch_refuses_an_unrecorded_task() {
   local dir out rc
   dir=$(new_case norecord rl17)
@@ -3293,6 +3351,8 @@ test_relaunch_refuses_missing_stored_model_before_stopping
 test_relaunch_refuses_missing_stored_model_for_any_harness
 test_relaunch_keeps_a_recorded_default_model_without_refusing
 test_relaunch_refuses_a_secondmate_missing_stored_model
+test_spawn_relaunch_refuses_a_secondmate_missing_stored_model
+test_spawn_relaunch_refuses_a_remote_secondmate_missing_stored_model
 test_relaunch_refuses_a_copy_another_task_records
 test_relaunch_under_memory_pressure_refuses_before_stop
 test_relaunch_closes_a_claude_startup_gate_unanswered
