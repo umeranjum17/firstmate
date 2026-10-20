@@ -27,7 +27,7 @@ cat > "$d/fork/bin/fm-busy-lib.sh" <<'FAKE'
 fm_busy_classify_semantic() { printf 'idle opencode-plugin\n'; }
 FAKE
 
-# shellcheck disable=SC2317,SC2329 # the watcher helpers are called by the sourced library
+# shellcheck disable=SC2317,SC2329,SC2030 # the watcher helpers are called by the sourced library
 # run <addons-dir> <wake-file>: the exact step-B watcher lines over two idle lanes
 # that fail with the same provider error.
 run() {
@@ -62,4 +62,18 @@ grep -q 'check: model outage affected=\[alpha,bravo\]: Upstream request failed: 
 run "$d/no-addons" "$d/absent.wakes"
 [ ! -e "$d/absent.wakes" ] || { echo "FAIL: absent add-on must raise no wake" >&2; exit 1; }
 [ ! -e "$d/triage.log" ] || { echo "FAIL: absent add-on must log nothing" >&2; cat "$d/triage.log" >&2; exit 1; }
+# Push-transition hook: cursor and open-captain-call tasks suppress, others do not.
+# shellcheck disable=SC2031,SC2317,SC2329 # the sourced hook calls the stubs
+(
+  export FM_HOME=$d/fork SCRIPT_DIR=$d/fork/bin STATE=$d/state-push
+  mkdir -p "$STATE"
+  # shellcheck source=/dev/null
+  . "$addons/alerts/bin/fm-model-outage-lib.sh"
+  ! fm_alerts_push_suppress cursor-task || { echo "FAIL: hook suppressed without watcher helpers" >&2; exit 1; }
+  fm_meta_get() { case $1 in *cursor-task.meta) printf cursor ;; *) printf claude ;; esac; }
+  task_captain_call_open() { [ "$1" = call-task ]; }
+  fm_alerts_push_suppress cursor-task || { echo "FAIL: cursor task must suppress" >&2; exit 1; }
+  fm_alerts_push_suppress call-task || { echo "FAIL: open captain call must suppress" >&2; exit 1; }
+  ! fm_alerts_push_suppress plain-task || { echo "FAIL: ordinary task must not suppress" >&2; exit 1; }
+)
 echo "ok: alerts observer present -> grouped wake; absent -> kun behavior"

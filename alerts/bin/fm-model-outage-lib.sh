@@ -157,3 +157,12 @@ fm_model_outage_tick() {
   [ -z "$groups" ] || wake "${groups%$'\n'}"
   return 0
 }
+
+# Push-transition suppression, called by the fork's handle_push_transition: a
+# cursor-harness task or one with an open captain call is committed without
+# escalating. Returns 0 to suppress; non-zero (never suppress) when the
+# watcher's helpers are not in scope.
+fm_alerts_push_suppress() {  # <task>
+  declare -F fm_meta_get >/dev/null && declare -F task_captain_call_open >/dev/null || return 1
+  [ "$(fm_meta_get "$STATE/$1.meta" harness)" = cursor ] || task_captain_call_open "$1"
+}
