@@ -35,10 +35,18 @@ seal other; is "refusal: a run at a different head" "$(gate | tail -1)" "rc=1"
 seal "$head"; printf '{"schema":1,"exit":0,"dirty":true,"commit":"%s","files":["a"],"run_id":"r1"}\n' "$head" > "$run"
 is "refusal: a dirty run" "$(gate | tail -1)" "rc=1"
 seal "$head"
+LINT="owner-rules: no checks-lint PASS for $pr at $head; run FM_HOME=$home config/fm-checks-lint.sh $pr <evidence folder> first"
+is "refusal: receipt but no checks-lint row" "$(gate)" "$LINT
+rc=1"
+log=$home/data/checks-gate.log
+printf 't\t%s\tother\tpass\tok\nt\t%s\t%s\tfail\tno\n' "$pr" "$pr" "$head" > "$log"
+is "refusal: lint row for another head, or failed" "$(gate | tail -1)" "rc=1"
+printf 't\t%s\t%s\tpass\tok\n' "$pr" "$head" >> "$log"
 is "pass: sealed clean run at the head, then the previous gate" "$(gate)" "prev gate ran: lane - $head $pr
 rc=0"
 rm -f "$run"; printf 'screen: none\n' > "$work/body"
-is "pass: screen: none is exempt" "$(gate | tail -1)" "rc=0"
+is "pass: screen: none is exempt from the receipt" "$(gate | tail -1)" "rc=0"
+rm -f "$log"; is "refusal: screen: none still needs lint" "$(gate | tail -1)" "rc=1"
 rm -f "$work/body"
 
 "$addons/owner-rules/uninstall.sh" "$home" >/dev/null

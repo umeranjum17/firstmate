@@ -29,6 +29,10 @@ A refusal exits 1 before `fm-brief.sh` writes `data/<id>/brief.md`, with a one-l
    `owner-rules: no passed-proof receipt for <PR url>; run the done-done check and post the evidence to the sign-off Evidence tab first`.
    Exempt: a merge whose Checks block says `screen: none`, the skip merge-card's post already uses (`merge-card screen-none`).
    A no-op without `config/owner-rules`. Needs the sibling `merge-card/` of this checkout.
+4. **Checks-lint PASS.** After the receipt, the gate reads `$FM_HOME/data/checks-gate.log` (never reruns lint) and refuses unless a
+   `pass` row names the PR url at the merge head (a local merge matches the report-file rows of its own task folder; they carry no head).
+   `screen: none` exempts the receipt only. Refusal:
+   `owner-rules: no checks-lint PASS for <pr> at <head>; run FM_HOME=<home> config/fm-checks-lint.sh <pr-url> <evidence folder> first`.
 - Test: `tests/owner-rules-gate.test.sh` installs into a temp home and runs the real `config/merge-gate` against a stubbed receipt.
 
 ## Leads skill (slice 3)
