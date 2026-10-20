@@ -164,12 +164,13 @@ if [ "$PROVIDER" = github ] && [ -n "$WT" ] && [ -d "$WT" ] && command -v gh >/d
   fi
 fi
 
-# A cross-repository lane's pull request is passed to the gate with its verified
-# forge head, which is also what bin/fm-pr-merge.sh binds the merge to, when the
-# pull request's owner and repository are not this worktree's origin. The
-# receipts add-on decides which candidate it accepts. A same-repository pull
-# request, an unverified forge head, or an origin whose repository cannot be
-# isolated passes no forge head.
+# The fork decides whether a verified forge head is forwarded to the gate: a
+# cross-repository pull request's head, which is also what bin/fm-pr-merge.sh
+# binds the merge to, is forwarded when the pull request's owner and repository
+# are not this worktree's origin. A same-repository pull request, an unverified
+# forge head, or an origin whose repository cannot be isolated forwards none.
+# The receipts add-on (fm_receipts_accept_done) picks the candidate from what it
+# is given.
 RECEIPT_CANDIDATE=
 if [ -n "$PR_HEAD" ] && fm_dod_pr_outside_origin "$WT" "$URL"; then
   RECEIPT_CANDIDATE=$PR_HEAD
