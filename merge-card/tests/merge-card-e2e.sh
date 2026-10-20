@@ -114,17 +114,32 @@ STUB
 # log every invocation so the test can prove a gap never reached a post call.
 cat > "$work/bin/sign-off-axi" <<'STUB' || exit 1
 #!/usr/bin/env bash
-printf '%s\n' "$*" >>"$SO_LOG"
+if [ "${1:-}" = restore ]; then
+  jq --arg k "$2" '.items |= map(if .key == $k then .dismissed=false else . end)' "$3" > "$3.tmp" && mv "$3.tmp" "$3"
+  exit 0
+fi
+if [ "${1:-}" = list ]; then
+  board=$2
+  [ "$board" = --json ] && board=$1
+  jq '{board:"fixture",decisions:[.items[]? | {key,dismissed}]}' "$board"
+  exit 0
+fi
 [ "${1:-}" = post ] || exit 0
+printf '%s\n' "$*" >>"$SO_LOG"
 board=$2
-from=''
+from='' replace=0
 while [ $# -gt 0 ]; do
-  if [ "$1" = --from ]; then from=$2; shift 2; else shift; fi
+  if [ "$1" = --from ]; then from=$2; shift 2; elif [ "$1" = --replace ]; then replace=1; shift; else shift; fi
 done
 [ -n "$from" ] || exit 0
+if jq -e '.run? and ((.run.outcome // "") == "")' "$from" >/dev/null; then echo 'run.outcome must be text'; exit 2; fi
 rm -rf "$SO_CAPTURE"
 cp -r "$(dirname "$from")" "$SO_CAPTURE"
-if [ -f "$board" ]; then jq --slurpfile c "$from" '.items += [($c[0] + {type:"evidence",filer:"firstmate-merge"})]' "$board" > "$board.tmp" && mv "$board.tmp" "$board"; fi
+if [ -f "$board" ]; then
+  if [ "$replace" = 1 ]; then jq --slurpfile c "$from" '.items = $c[0].items' "$board" > "$board.tmp"
+  else jq --slurpfile c "$from" '.items += [($c[0] + {type:"evidence",filer:"firstmate-merge",dismissed:false})]' "$board" > "$board.tmp"; fi
+  mv "$board.tmp" "$board"
+fi
 STUB
 chmod +x "$work/bin/done-done" "$work/bin/sign-off-axi" "$work/bin/gh"
 
@@ -280,6 +295,7 @@ export MODE DD_LOG SO_CAPTURE
 checks internal shot.png && printf 'screen: none\n' >> "$home/data/internal/checks.md" && cp "$shot" "$home/data/internal/shot.png"
 printf '{"schema":1,"answers_only":false,"items":[]}\n' > "$work/board.json"
 mk_run internal 20261020T000000Z-internal0001 0
+jq '.check.claim="" | .check.evidence=[]' "$home/data/internal/merge-card.json" > "$work/internal-record.json" && mv "$work/internal-record.json" "$home/data/internal/merge-card.json"
 : >"$DD_LOG"
 so_before=$(wc -l < "$SO_LOG")
 out=$(PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" internal "$wt" "$head_c" - 2>&1); rc=$?
@@ -290,9 +306,26 @@ if grep -q '^check ' "$DD_LOG"; then no "internal: done-done check never run"; e
 holds "internal: card captured" "$work/card-internal/card.json"
 is "internal: card has no media" "$(jq -c 'has("media")' "$work/card-internal/card.json")" false
 is "internal: card carries receipt" "$(jq -r '.run.run_id' "$work/card-internal/card.json")" 20261020T000000Z-internal0001
+is "internal: missing claim uses Checks outcome" "$(jq -r '.run.outcome' "$work/card-internal/card.json")" "a stopped worker moves to the next live route"
+is "internal: missing citation uses Checks evidence" "$(jq -r '.run.evidence' "$work/card-internal/card.json")" shot.png
 so_before=$(wc -l < "$SO_LOG")
 PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" internal "$wt" "$head_c" - >/dev/null
 is "internal: repeat post is deduped" "$(wc -l < "$SO_LOG")" "$so_before"
+
+# Dismissed key is replaced; an otherwise identical live key remains deduped.
+key=merge-$head_c
+jq -n --arg k "$key" '{schema:1,answers_only:false,items:[{key:$k,type:"evidence",kind:"evidence",filer:"firstmate-merge",dismissed:true,title:"dismissed placeholder"}]}' > "$work/board.json"
+MODE=newer DD_LOG=$work/args.log SO_CAPTURE=$work/card-dismissed
+export MODE DD_LOG SO_CAPTURE
+checks dismissed shot.png && cp "$shot" "$home/data/dismissed/shot.png"
+mk_run dismissed 20261020T000000Z-dismissed0001 0
+PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" dismissed "$wt" "$head_c" - >/dev/null
+is "dismissed: card replaced" "$(jq -r '.items[0].title' "$work/board.json")" "a stopped worker moves to the next live route"
+is "dismissed: replacement retains key" "$(jq -r '.items[0].key' "$work/board.json")" "$key"
+jq '.items[0].dismissed=false' "$work/board.json" > "$work/board.tmp" && mv "$work/board.tmp" "$work/board.json"
+so_before=$(wc -l < "$SO_LOG")
+PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" dismissed "$wt" "$head_c" - >/dev/null
+is "live same-key card is deduped" "$(wc -l < "$SO_LOG")" "$so_before"
 
 # The gate refuses a PR merge with no checks-lint PASS row for its head.
 MODE=newer DD_LOG=$work/args.log SO_CAPTURE=$work/card-lint
