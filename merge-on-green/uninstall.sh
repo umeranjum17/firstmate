@@ -8,6 +8,8 @@ if [ -e "$f" ]; then
   [ -x "$FMH/bin/fm-check-unregister.sh" ] || { echo "remove manually: $f" >&2; exit 1; }
   if [ "$DRY" -eq 1 ]; then echo "would run: $FMH/bin/fm-check-unregister.sh merge-on-green"; else env -u FM_STATE_OVERRIDE FM_HOME="$FMH" "$FMH/bin/fm-check-unregister.sh" merge-on-green; fi
 fi
-[ ! -e "$DEST/merge-on-green.sh" ] || { echo "remove: $DEST/merge-on-green.sh"; [ "$DRY" -eq 1 ] || rm -f -- "$DEST/merge-on-green.sh"; }
+for f in merge-on-green.sh checks-lint.sh .done-done.yaml; do
+  [ ! -e "$DEST/$f" ] || { echo "remove: $DEST/$f"; [ "$DRY" -eq 1 ] || rm -f -- "$DEST/$f"; }
+done
 [ "$DRY" -eq 1 ] || rmdir "$DEST" 2>/dev/null || true
 [ "$DRY" -eq 0 ] || echo 'dry run: nothing written'

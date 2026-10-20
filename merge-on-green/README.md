@@ -8,10 +8,10 @@ lead to notice and merge (about 21 minutes per change).
 when the task's resolved state (`bin/fm-crew-state.sh <task>`) says checks green / PR ready. It
 silently skips a task whose meta says `merge=manual` (the lead sets it at intake on destructive,
 irreversible or security-sensitive work, and on work waiting for your own review), and a PR
-whose evidence-gate PASS is a not-proven PASS — `fm-checks-lint.sh` reads the PR's newest `## Checks`
+whose evidence-gate PASS is a not-proven PASS — the installed `checks-lint.sh` reads the PR's newest `## Checks`
 block itself (filing the proof gap stays with the lead). Then it runs, in this order and as separate sequential commands, never piped and never in parallel:
 
-1. `FM_HOME=<home> ${FM_MAIN_HOME:-$HOME/firstmate}/config/fm-checks-lint.sh <PR URL> <home>/data/<task>` —
+1. `FM_HOME=<home> checks-lint.sh <PR URL> <home>/data/<task>` — pinned done-done-axi 0.4.5 with the Firstmate size rules, falling back to the legacy lint when unavailable;
    the evidence gate must print PASS.
 2. `state/<task>.run-receipt.json` must read verdict PASS, head == the meta's `pr_head`, and
    spawn_gen == the meta's `spawn_gen`.
@@ -38,7 +38,7 @@ merge.
 
 ## Install
 
-`merge-on-green/install.sh [--dry-run] <fm-home>` copies `merge-on-green.sh` to
+`merge-on-green/install.sh [--dry-run] <fm-home>` copies `merge-on-green.sh`, `checks-lint.sh` and its `.done-done.yaml` to
 `${XDG_DATA_HOME:-~/.local/share}/fm-merge-on-green/`, writes the shim
 `state/merge-on-green.check.sh` (mode 0700), and registers it with `bin/fm-check-register.sh`.
 It is idempotent; `--dry-run` prints the steps and writes nothing. Run it once per home; the lead

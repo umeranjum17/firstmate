@@ -23,7 +23,9 @@ awk -F'\t' -v pr="$4" -v head="$3" -v task="$1" '
   $3 == head || ($3 == "-" && $2 !~ /^https?:/ && $2 ~ ("/" task "/[^/]*$")) { f = 1 }
   END { exit !f }' "$FM_HOME/data/checks-gate.log" 2>/dev/null || {
   src=$4; [ "$4" != - ] || src="<report file>"
-  echo "owner-rules: no checks-lint PASS for $src at $3; run FM_HOME=$FM_HOME config/fm-checks-lint.sh $src <evidence folder> first"
+  lint=${FM_CHECKS_LINT:-${XDG_DATA_HOME:-$HOME/.local/share}/fm-merge-on-green/checks-lint.sh}
+  [ -x "$lint" ] || lint=${FM_MAIN_HOME:-$HOME/firstmate}/config/fm-checks-lint.sh
+  echo "owner-rules: no checks-lint PASS for $src at $3; run FM_HOME=$FM_HOME $lint $src <evidence folder> first"
   exit 1
 }
 # Local merges retain the existing receipt/lint behavior; only PRs have board keys.

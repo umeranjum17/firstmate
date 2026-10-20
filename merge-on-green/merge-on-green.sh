@@ -8,7 +8,7 @@
 # marked merge=manual and a PR whose evidence-gate PASS is a not-proven PASS (the gate reads the PR's
 # newest "## Checks" block; the lead files the proof gap first). Then, in this order and as separate
 # sequential commands, never piped and never in parallel:
-#   1. FM_HOME=<home> fm-checks-lint.sh <PR URL> <home>/data/<task> - require a PASS in its output.
+#   1. FM_HOME=<home> checks-lint.sh <PR URL> <home>/data/<task> - use done-done lint, or the legacy Firstmate lint if unavailable.
 #   2. state/<task>.run-receipt.json - require verdict PASS, head == pr_head, spawn_gen == the meta's spawn_gen.
 #   3. FM_HOME=<home> bin/fm-pr-merge.sh <task> <PR URL> - never --auto, never gh merge directly.
 # Any refusal or FAIL: one wake line naming the task, the PR URL and the first refusal reason, so the lead
@@ -28,7 +28,8 @@ set -u
 [ "$#" -eq 2 ] && [ "$1" = check ] && [ -d "$2/state" ] || { echo "usage: merge-on-green.sh check <fm-home>" >&2; exit 2; }
 FMH=$(cd "$2" && pwd -P)
 STATE=$FMH/state
-LINT=${FM_MOG_CHECKS_LINT:-${FM_MAIN_HOME:-$HOME/firstmate}/config/fm-checks-lint.sh}
+SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+LINT=${FM_MOG_CHECKS_LINT:-$SRC/checks-lint.sh}
 DATA=$FMH/data/fm-merge-on-green
 umask 077
 # One third of the watcher's per-check bound per command (floor 5s). Gate commands start only while
