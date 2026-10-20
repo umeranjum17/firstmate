@@ -1299,7 +1299,8 @@ do_relaunch() {
   # per-task harness wiring before arming the new one, so nothing to do here.
   RELAUNCH_TX="${BASHPID:-$$}.$(date -u +%Y%m%dT%H%M%SZ).$RANDOM"
   journal_write launching "${CHECKPOINT_LINES[@]}" "$note_line" "relaunch_tx=$RELAUNCH_TX"
-  spawn_args=("$ID" --relaunch --harness "$TARGET_HARNESS" --model "$TARGET_MODEL")
+  spawn_args=("$ID" --relaunch --harness "$TARGET_HARNESS")
+  [ "$TARGET_MODEL" = default ] || spawn_args+=(--model "$TARGET_MODEL")
   [ "$TARGET_EFFORT" = default ] || spawn_args+=(--effort "$TARGET_EFFORT")
   [ "$ACCOUNT_SET" = 0 ] || spawn_args+=(--account "$ACCOUNT_CHOICE")
   if FM_CONTROL_RELAUNCH_TX="$RELAUNCH_TX" \
