@@ -44,6 +44,7 @@ block() { hook "$1" "$2"; [ "$rc" -eq 2 ] && [[ "$err" == *"BLOCKED by the fleet
 allow() { hook "$1" "$2"; [ "$rc" -eq 0 ] && ok "allowed: $2" || no "blocked: $2 ($err)"; }
 retry() { hook "$$" "$1"; [ "$rc" -eq 2 ] && [[ "$err" == *"run kill again with the literal number"* && "$err" != *"block is final"* ]] && ok "asks for the PID: $1" || no "no retry message: $1 (rc=$rc) $err"; }
 
+
 block "$$" "sh -c 'kill -KILL 1'" 'PID 1 (init)'
 block "$$" 'ionice -c3 kill 1' 'PID 1 (init)'
 block "$$" "kill $SYSD" 'the systemd user manager'
@@ -76,6 +77,18 @@ git -C "$T/worktree/a-other" init -q
 touch "$T/home-shaped/bin/fm-spawn.sh"
 detached() { DET=$(bash -c 'setsid nohup bash -c '\''cd "$1"; exec sleep 600'\'' _ "$1" >/dev/null 2>&1 & echo $!' _ "$1"); sleep 0.2; }
 caller_in() { bash -c 'cd "$1"; exec sleep 600' _ "$1" >/dev/null 2>&1 & CALLER_PID=$!; PIDS+=("$CALLER_PID"); sleep 0.1; }
+caller_in "$T/worktree"; DEVICE_CALLER=$CALLER_PID
+printf '[{"serial":"fixture-device-001","pid":43210,"starttime":"9876"}]\n' > "$T/worktree/.fm-kill-guard-device-pids.json"
+printf '#!/bin/sh\nprintf "43210 (fake) S 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 9876\\n"\n' > "$T/bin/adb"; chmod +x "$T/bin/adb"
+PATH="$T/bin:$PATH" hook "$DEVICE_CALLER" 'adb -s fixture-device-001 shell kill 43210'
+[ "$rc" -eq 0 ] && ok "allowed recorded device pid" || no "recorded device pid: $err"
+PATH="$T/bin:$PATH" hook "$DEVICE_CALLER" 'adb -s fixture-device-001 shell kill 43211'
+[ "$rc" -eq 2 ] && [[ "$err" == *"device PID 43211"* ]] && ok "refused unrecorded device pid" || no "unrecorded device pid: $err"
+printf '#!/bin/sh\nprintf "43210 (fake) S 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 9999\\n"\n' > "$T/bin/adb"; chmod +x "$T/bin/adb"
+PATH="$T/bin:$PATH" hook "$DEVICE_CALLER" 'adb -s fixture-device-001 shell kill 43210'
+[ "$rc" -eq 2 ] && [[ "$err" == *"start time does not match"* ]] && ok "refused reused device pid" || no "reused device pid: $err"
+PATH="$T/bin:$PATH" hook "$DEVICE_CALLER" 'adb -s fixture-device-001 shell sh -c "kill 43210"'
+[ "$rc" -eq 2 ] && ok "refused spoofed command text" || no "spoofed command text: $err"
 descends_from_test() { p=$1; while [ "$p" -gt 1 ]; do p=$(awk '{print $4}' "/proc/$p/stat" 2>/dev/null) || return 1; [ "$p" = "$$" ] && return 0; done; return 1; }
 detached "$ADDON"; REPARENTED=$DET; PIDS+=("$REPARENTED")
 ! descends_from_test "$REPARENTED" && ok "detached process was reparented" || no "detached process remains in caller's tree"
@@ -124,4 +137,4 @@ un >/dev/null && set -- "$T"/home/fixture/users/user-001/settings.json.bak-kill-
 [ ! -e "$G" ] && [ ! -e "$T/home/fixture/users/user-007/agent/extensions/fm-kill-guard.ts" ] && [ ! -e "$T/home/fixture/users/user-003/opencode/plugins/fm-kill-guard.js" ] && ok "uninstall removes the rule and adapters" || no "uninstall left files"
 [ -z "$(un)" ] && ok "uninstall again changes nothing" || no "uninstall not idempotent"
 
-[ "$fail" -eq 0 ] && echo "kill-guard e2e: all passed" || { echo "kill-guard e2e: FAILED"; exit 1; }
+[ "$fail" -eq 0 ] && { echo "kill-guard e2e: all passed"; [ -z "${DONE_DONE_EVIDENCE_ROOT:-}" ] || printf 'kill-guard e2e: all passed\\n' > "$DONE_DONE_EVIDENCE_ROOT/result.txt"; } || { echo "kill-guard e2e: FAILED"; exit 1; }
