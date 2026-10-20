@@ -2081,17 +2081,6 @@ pause_state_class() {  # <window> <task>
 # it would put backlog reads into windows deliberately skipped on ordinary polls.
 STALE_WAIT_DECLARATION=
 
-CAPTAIN_CALL_IDENTITY=
-
-task_captain_call_open() {  # <task>
-  local task=$1
-  CAPTAIN_CALL_IDENTITY=
-  [ -n "$task" ] || return 1
-  CAPTAIN_CALL_IDENTITY=$(FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-captain-hold.sh" \
-    open "$task" --identity 2>/dev/null) || return 1
-  return 0
-}
-
 # The identity a re-surface throttle is bound to: the task's whole status-log
 # signature. Any new status event - a replacement wait, a fresh delivery, a
 # blocker - changes it and so starts its own window instead of inheriting the
