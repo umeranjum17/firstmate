@@ -31,7 +31,7 @@
 #     note) and runs no done-done.
 #   merge-card screen-none <task-id> <pr-url|->, merge-card receipt <task-id> <head>
 #     Exit 0 when the merge declares `screen: none`, or when the task folder holds a sealed clean
-#     done-done run at <head> (the card's passed-test receipt). Used by owner-rules' merge gate.
+#     done-done run at <head>, there or in done-done's own evidence root (the card's passed-test receipt). Used by owner-rules' merge gate.
 #     sign-off-axi writes the board under its lock: it appends and never rewrites other cards.
 # Needs done-done on PATH (0.3.1+ cites the task folder's evidence itself; an older one is
 # still covered), sign-off-axi, jq and gh.
@@ -137,15 +137,27 @@ gate() {
   return 1
 }
 
-# receipt_run <task-id> <head> <record>: the task folder's first sealed clean done-done run at <head>, else nothing.
+# dd_root: done-done's own evidence root, asked of done-done (`doctor`
+# prints <root>/<app>); nothing when done-done is absent or does not answer, so only the task folder counts.
+dd_root() {
+  local root
+  root=$(cd "$FM_HOME" 2>/dev/null && done-done doctor --json 2>/dev/null |
+    jq -r '.checks[]? | select(.check == "evidence_root") | .detail | capture("^writable: (?<p>.+)/[^/]+$").p' 2>/dev/null)
+  printf '%s' "${root/#\~/$HOME}"
+}
+
+# receipt_run <task-id> <head> <record>: the first sealed clean done-done run at <head>, from the task folder or
+# done-done's default evidence root, else nothing.
 receipt_run() {
-  local claim evidence
+  local claim evidence root ddruns=()
+  root=$(dd_root)
+  [ -z "$root" ] || ddruns=("$root"/*/.done-done/runs/*.json)
   claim=$(jq -r '.check.claim // empty' "$3")
   evidence=$(jq -r '[.check.evidence[]? | split("/") | last] | join(", ")' "$3")
   jq -cs --arg head "$2" --arg claim "$claim" --arg ev "$evidence" '
     map(select(.schema == 1 and .exit == 0 and .dirty == false and .commit == $head and (.files | length) > 0 and (.run_id // "") != ""))
     | .[0] // empty
-    | {run_id, commit, outcome: $claim, repro: "see the merge note", proof: "done-done run \(.run_id)", evidence: $ev}' "$FM_HOME"/data/"$1"/.done-done/runs/*.json 2>/dev/null
+    | {run_id, commit, outcome: $claim, repro: "see the merge note", proof: "done-done run \(.run_id)", evidence: $ev}' "$FM_HOME"/data/"$1"/.done-done/runs/*.json "${ddruns[@]}" 2>/dev/null
 }
 
 # screen_none <task-id> <pr-url|->: the merge's Checks block declares `screen: none`.

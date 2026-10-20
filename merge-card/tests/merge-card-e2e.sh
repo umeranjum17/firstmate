@@ -201,6 +201,19 @@ SO_CAPTURE=$work/card-failedrun
 export SO_CAPTURE
 run_check_and_post failedrun
 is "receipt: card carries the clean run" "$(jq -c .run "$work/card-receipt/card.json")" "$(jq -cn --arg c "$head_c" '{run_id:"20261020T000000Z-receipt0001", commit:$c, outcome:"a stopped worker moves to the next live route", repro:"see the merge note", proof:"done-done run 20261020T000000Z-receipt0001", evidence:"shot.png"}')"
+# A sealed clean run in done-done's own evidence root (a throwaway DONE_DONE_HOME, the real done-done) is accepted
+# for its head with no task folder run; one at another head is refused.
+if command -v done-done >/dev/null; then
+  git init -q "$home" # FM_HOME is a Firstmate checkout; done-done answers from inside a repo
+  mkdir -p "$work/ddhome/evidence/app/.done-done/runs"
+  jq -n --arg c "$head_c" '{schema:1, run_id:"20261020T000000Z-default0001", commit:$c, dirty:false, exit:0, files:[{path:"x/shot.png"}]}' \
+    >"$work/ddhome/evidence/app/.done-done/runs/20261020T000000Z-default0001.json"
+  dd_receipt() { DONE_DONE_HOME=$work/ddhome FM_HOME=$home "$here/../merge-card" receipt norun "$1" >/dev/null 2>&1; echo $?; }
+  is "default root: run at the head is accepted" "$(dd_receipt "$head_c")" 0
+  is "default root: run at another head is refused" "$(dd_receipt otherhead)" 1
+else
+  ok "default root: skipped, no done-done on PATH"
+fi
 is "failed run: card carries no receipt" "$(jq -c 'has("run")' "$work/card-failedrun/card.json")" false
 is "no run record: card carries no receipt" "$(jq -c 'has("run")' "$work/card-newer/card.json")" false
 checks gone gone.png
