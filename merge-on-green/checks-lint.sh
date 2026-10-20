@@ -46,7 +46,7 @@ fi
 for meta in "$FM_HOME"/state/*.meta; do
   [ -f "$meta" ] && grep -Fxq "pr=$source" "$meta" || continue
   task=${meta##*/}; task=${task%.meta}
-  helper=${FM_MAIN_HOME:-$HOME/firstmate}/bin/fm-run-receipt.sh
+  helper=${FM_ADDONS_DIR:-$(cd "$SRC/.." && pwd -P)}/receipts/bin/fm-run-receipt.sh
   if [ -x "$helper" ]; then
     report=$(mktemp) || exit 1
     printf 'checks-lint %s %s head %s: %s\n' "$receipt_verdict" "$source" "$head" "${why:-$out}" > "$report"
