@@ -6,8 +6,8 @@
 # head is that named head and is already stored on the forge. A pull request
 # that lives in a repository other than the worktree's origin (a cross-repo
 # lane's second PR) checks the completion receipt against its verified forge
-# head instead of the worktree's HEAD, because the merge binds to that forge
-# head and the worker's one receipt names it. The gate also
+# head to the gate as a hook argument instead of the worktree's HEAD, because
+# the merge binds to that forge head. The gate also
 # reads a pull request's live forge head itself when the worker copy holds no
 # remote-tracking ref for it, so a push that opened the PR from outside this
 # copy's ref sync still registers.
@@ -164,12 +164,12 @@ if [ "$PROVIDER" = github ] && [ -n "$WT" ] && [ -d "$WT" ] && command -v gh >/d
   fi
 fi
 
-# A cross-repository lane's completion receipt names the pull request's forge
-# head, which is also what bin/fm-pr-merge.sh binds the merge to, so the
-# gate's receipt candidate is that verified forge head when the pull request's
-# owner and repository are not this worktree's origin. A same-repository pull
+# A cross-repository lane's pull request is passed to the gate with its verified
+# forge head, which is also what bin/fm-pr-merge.sh binds the merge to, when the
+# pull request's owner and repository are not this worktree's origin. The
+# receipts add-on decides which candidate it accepts. A same-repository pull
 # request, an unverified forge head, or an origin whose repository cannot be
-# isolated keep the worktree HEAD candidate.
+# isolated passes no forge head.
 RECEIPT_CANDIDATE=
 if [ -n "$PR_HEAD" ] && fm_dod_pr_outside_origin "$WT" "$URL"; then
   RECEIPT_CANDIDATE=$PR_HEAD

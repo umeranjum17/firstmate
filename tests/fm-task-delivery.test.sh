@@ -1678,6 +1678,36 @@ EOF
   pass "fm-project-mode: --branch-prefix resolves order-independently and defaults to the legacy fm/ prefix"
 }
 
+# The receipts add-on is optional. When it is installed, promotion must stamp exactly
+# one completion requirement and a ship brief must carry the receipt instruction.
+test_receipt_hooks_run_with_the_addon() {
+  local addons home id meta out
+  addons=${FM_ADDONS_DIR:-${FM_HOME:-$ROOT}/projects/firstmate-addons}
+  if [ ! -r "$addons/receipts/bin/fm-receipts-lib.sh" ]; then
+    echo "skip: receipts add-on absent, receipt hook sites not run"
+    return 0
+  fi
+  home="$TMP_ROOT/receipt-hooks/home"
+  id=receipt-hooks-a1
+  meta="$home/state/$id.meta"
+  mkdir -p "$home/state"
+  FM_ADDONS_DIR="$addons" FM_HOME="$home" "$BRIEF" "$id" fixture-project --scout >/dev/null 2>&1 \
+    || fail "scout brief generation should succeed"
+  fill_brief_subsections "$home/data/$id/brief.md" "Ship the receipt change." "Keep the receipt hook."
+  printf 'window=fm-%s\nkind=scout\nworktree=/tmp/wt\n' "$id" > "$meta"
+  out=$(FM_ADDONS_DIR="$addons" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
+    "$PROMOTE" "$id" --mode direct-PR --yolo off 2>&1) \
+    || fail "promotion with the receipts add-on should succeed: $out"
+  assert_equals 1 "$(grep -c '^receipt_required=1$' "$meta")" \
+    "promotion must record exactly one completion requirement"
+
+  FM_ADDONS_DIR="$addons" FM_HOME="$home" "$BRIEF" "$id-ship" fixture-project --mode direct-PR >/dev/null 2>&1 \
+    || fail "ship brief generation with the receipts add-on should succeed"
+  assert_grep 'Completion receipt: required' "$home/data/$id-ship/brief.md" \
+    "ship brief omitted the completion receipt requirement"
+  pass "receipt hooks: promotion records one requirement and ship briefs carry it with the add-on"
+}
+
 test_ship_spawn_requires_a_valid_delivery_contract
 test_scout_and_secondmate_refuse_delivery_flags
 test_spawn_refuses_a_brief_mode_mismatch
@@ -1704,4 +1734,5 @@ test_promotion_carries_the_forge_binding
 test_forge_forgejo_rides_the_same_binding
 test_spawn_and_promote_require_filled_task_subsections
 test_project_mode_resolves_branch_prefix
+test_receipt_hooks_run_with_the_addon
 echo "# all fm-task-delivery tests passed"
