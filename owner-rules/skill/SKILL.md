@@ -55,7 +55,7 @@ Fix: run that command (it logs the row), then merge again.
 No add-on installs skills, so link this folder into the home's skills by hand:
 
 ```
-ln -s <firstmate-addons>/owner-rules/skill <fm-home>/.agents/skills/owner-rules
+ln -s <firstmate-addons>/owner-rules/skill <fm-home>/.agents/skills/firstmate-addons-owner-rules
 ```
 
 `owner-rules/install.sh <fm-home>` turns the refusals on; the skill is only the reading for the leads.
