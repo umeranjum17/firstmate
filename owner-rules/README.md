@@ -27,11 +27,11 @@ A refusal exits 1 before `fm-brief.sh` writes `data/<id>/brief.md`, with a one-l
    exists, not what it shows: merge-card posts the Evidence-tab card after the merge, and only when the proof is real.
    Refusal, naming the PR URL (`local merge <head>` with no PR):
    `owner-rules: no passed-proof receipt for <PR url>; run the done-done check and post the evidence to the sign-off Evidence tab first`.
-   Exempt: a merge whose Checks block says `screen: none`, the skip merge-card's post already uses (`merge-card screen-none`).
+   Exempt: a merge whose Checks block says `screen: none`; it still needs a sealed receipt for its text-only Evidence card (`merge-card screen-none`).
    A no-op without `config/owner-rules`. Needs the sibling `merge-card/` of this checkout.
 4. **Checks-lint PASS.** After the receipt, the gate reads `$FM_HOME/data/checks-gate.log` (never reruns lint) and refuses unless a
    `pass` row names the PR url at the merge head (a local merge matches the report-file rows of its own task folder; they carry no head).
-   `screen: none` exempts the receipt only. Refusal:
+   `screen: none` exempts the receipt only. PR merges also require a passed-proof Evidence card on the fleet board, configured by `FM_FLEET_BOARD` or the one-line `$FM_HOME/config/fleet-board`; a screen-free PR with a sealed receipt gets a text-only card automatically. Local merges keep the existing receipt/lint behavior. Refusal:
    `owner-rules: no checks-lint PASS for <pr> at <head>; run FM_HOME=<home> config/fm-checks-lint.sh <pr-url> <evidence folder> first`.
 - Test: `tests/owner-rules-gate.test.sh` installs into a temp home and runs the real `config/merge-gate` against a stubbed receipt.
 

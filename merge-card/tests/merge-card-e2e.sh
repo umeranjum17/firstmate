@@ -116,6 +116,7 @@ cat > "$work/bin/sign-off-axi" <<'STUB' || exit 1
 #!/usr/bin/env bash
 printf '%s\n' "$*" >>"$SO_LOG"
 [ "${1:-}" = post ] || exit 0
+board=$2
 from=''
 while [ $# -gt 0 ]; do
   if [ "$1" = --from ]; then from=$2; shift 2; else shift; fi
@@ -123,6 +124,7 @@ done
 [ -n "$from" ] || exit 0
 rm -rf "$SO_CAPTURE"
 cp -r "$(dirname "$from")" "$SO_CAPTURE"
+if [ -f "$board" ]; then jq --slurpfile c "$from" '.items += [($c[0] + {type:"evidence",filer:"firstmate-merge"})]' "$board" > "$board.tmp" && mv "$board.tmp" "$board"; fi
 STUB
 chmod +x "$work/bin/done-done" "$work/bin/sign-off-axi" "$work/bin/gh"
 
@@ -272,21 +274,25 @@ export MODE DD_LOG SO_CAPTURE
 checks gap-noclaim shot.png && cp "$shot" "$home/data/gap-noclaim/shot.png"
 run_gap gap-noclaim "$work/card-gap-noclaim"
 
-# A merge whose Checks block says `screen: none` posts no card and runs no done-done:
-# exit 0, one skip line pointing to the merge note, sign-off never called.
+# A screen-free merge posts a text-only Evidence card only with a sealed clean receipt.
 MODE=newer DD_LOG=$work/args.log SO_CAPTURE=$work/card-internal
 export MODE DD_LOG SO_CAPTURE
 checks internal shot.png && printf 'screen: none\n' >> "$home/data/internal/checks.md" && cp "$shot" "$home/data/internal/shot.png"
+printf '{"schema":1,"answers_only":false,"items":[]}\n' > "$work/board.json"
+mk_run internal 20261020T000000Z-internal0001 0
 : >"$DD_LOG"
 so_before=$(wc -l < "$SO_LOG")
 out=$(PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" internal "$wt" "$head_c" - 2>&1); rc=$?
 is "internal: post exits 0" "$rc" 0
-case $out in
-  *"no evidence card for merge-$head_c"*"screen: none"*"merge note"*) ok "internal: one skip line pointing to the merge note" ;;
-  *) no "internal: skip line missing or misshapen: [$out]" ;;
-esac
-is "internal: sign-off never called" "$(wc -l < "$SO_LOG")" "$so_before"
-is "internal: done-done never run" "$(wc -c < "$DD_LOG")" 0
+case $out in *"posted text-only merge-$head_c evidence card"*) ok "internal: short text evidence card posted" ;; *) no "internal: text card confirmation missing: [$out]" ;; esac
+is "internal: sign-off called once" "$(wc -l < "$SO_LOG")" "$((so_before + 1))"
+if grep -q '^check ' "$DD_LOG"; then no "internal: done-done check never run"; else ok "internal: done-done check never run"; fi
+holds "internal: card captured" "$work/card-internal/card.json"
+is "internal: card has no media" "$(jq -c 'has("media")' "$work/card-internal/card.json")" false
+is "internal: card carries receipt" "$(jq -r '.run.run_id' "$work/card-internal/card.json")" 20261020T000000Z-internal0001
+so_before=$(wc -l < "$SO_LOG")
+PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" internal "$wt" "$head_c" - >/dev/null
+is "internal: repeat post is deduped" "$(wc -l < "$SO_LOG")" "$so_before"
 
 # The gate refuses a PR merge with no checks-lint PASS row for its head.
 MODE=newer DD_LOG=$work/args.log SO_CAPTURE=$work/card-lint

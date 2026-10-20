@@ -19,8 +19,18 @@ pr=https://github.com/umeranjum17/firstmate-addons/pull/9 head=abc123
 printf '#!/bin/sh\ncat "%s/body" 2>/dev/null\n' "$work" > "$work/bin/gh"; chmod +x "$work/bin/gh"
 # A previous gate that records it ran.
 printf '#!/bin/sh\necho "prev gate ran: $*"\n' > "$home/config/merge-gate"; chmod +x "$home/config/merge-gate"
+cat > "$work/bin/sign-off-axi" <<'STUB'
+#!/usr/bin/env bash
+[ "$1" = post ] || exit 2
+shift; board=$1; shift
+while [ "$1" != --from ]; do shift; done
+card=$2
+jq --slurpfile c "$card" '.items += [($c[0] + {type:"evidence",filer:"firstmate-merge"})]' "$board" > "$board.tmp" && mv "$board.tmp" "$board"
+STUB
+chmod +x "$work/bin/sign-off-axi"
+printf '{"schema":1,"answers_only":false,"items":[]}\n' > "$work/board.json"
 # shellcheck disable=SC2119,SC2120
-gate() { PATH=$work/bin:$PATH FM_HOME=$home "$home/config/merge-gate" lane - "${1:-$head}" "${2:-$pr}" 2>&1; printf 'rc=%s\n' "$?"; }
+gate() { PATH=$work/bin:$PATH FM_HOME=$home FM_FLEET_BOARD=${3:-$work/board.json} "$home/config/merge-gate" lane - "${1:-$head}" "${2:-$pr}" 2>&1; printf 'rc=%s\n' "$?"; }
 run=$home/data/lane/.done-done/runs/r1.json
 seal() { printf '{"schema":1,"exit":0,"dirty":false,"commit":"%s","files":["a.png"],"run_id":"r1"}\n' "$1" > "$run"; }
 
@@ -42,10 +52,22 @@ log=$home/data/checks-gate.log
 printf 't\t%s\tother\tpass\tok\nt\t%s\t%s\tfail\tno\n' "$pr" "$pr" "$head" > "$log"
 is "refusal: lint row for another head, or failed" "$(gate | tail -1)" "rc=1"
 printf 't\t%s\t%s\tpass\tok\n' "$pr" "$head" >> "$log"
-is "pass: sealed clean run at the head, then the previous gate" "$(gate)" "prev gate ran: lane - $head $pr
+is "refusal: receipt and lint but missing board card" "$(gate | tail -1)" "rc=1"
+cardkey=merge-umeranjum17-firstmate-addons-pull-9
+jq --arg k "$cardkey" --arg h "$head" '.items += [{kind:"evidence",type:"evidence",filer:"firstmate-merge",key:$k,run:{commit:$h}}]' "$work/board.json" > "$work/board.tmp" && mv "$work/board.tmp" "$work/board.json"
+is "pass: receipt, lint, and card then previous gate" "$(gate)" "prev gate ran: lane - $head $pr
 rc=0"
 rm -f "$run"; printf 'screen: none\n' > "$work/body"
-is "pass: screen: none is exempt from the receipt" "$(gate | tail -1)" "rc=0"
+printf '{"schema":1,"answers_only":false,"items":[]}\n' > "$work/board.json"
+is "refusal: screen: none without receipt refuses" "$(gate | tail -1)" "rc=1"
+seal "$head"
+jq -n '{schema:1,answers_only:false,items:[]}' > "$work/board.json"
+is "pass: screen: none and receipt auto-posts text card" "$(gate)" "merge-card: posted text-only $cardkey evidence card
+prev gate ran: lane - $head $pr
+rc=0"
+jq -e --arg k "$cardkey" '.items | any(.[]; .key==$k and .kind=="evidence" and .media==null and .run.commit!=null)' "$work/board.json" >/dev/null && ok "auto-post: text-only receipt card exists" || no "auto-post: text-only receipt card missing"
+printf '{"schema":1,"answers_only":false,"items":[]}\n' > "$work/board.json"
+is "refusal: unreadable board refuses" "$(gate "$head" "$pr" "$work/missing-board" | tail -1)" "rc=1"
 rm -f "$log"; is "refusal: screen: none still needs lint" "$(gate | tail -1)" "rc=1"
 rm -f "$work/body"
 
