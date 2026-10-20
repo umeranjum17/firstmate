@@ -166,7 +166,7 @@ screen_none() {
 }
 
 post() {
-  local board='' id wt head pr record key link title about kind media run receipt=null tmp out rc n=0 f verdict claim
+  local board='' id wt head pr record key link title about kind media run receipt=null media_dir out rc n=0 f verdict claim
   [ "${1:-}" = --board ] && [ -n "${2:-}" ] && board=$2 && shift 2
   [ -n "$board" ] && [ $# -eq 4 ] || die "usage: merge-card post --board <board.json> <task-id> <worktree|-> <head|-> <pr-url|->"
   [ -n "${FM_HOME:-}" ] || die "FM_HOME is not set"
@@ -193,11 +193,10 @@ post() {
     local text_run
     text_run=$(receipt_run "$id" "$head" "$record")
     [ -n "$text_run" ] || { echo "merge-card: no passed-test receipt for $key"; return 1; }
-    local outcome evidence
+    local outcome evidence body
     outcome=$(jq -r '.check.claim // empty' "$record")
     evidence=$(jq -r '[.check.evidence[]? | split("/") | last] | join(", ")' "$record")
     if [ -z "$outcome" ]; then
-      local body
       if [ "$pr" != - ]; then body=$(gh pr view "$pr" --json body --jq .body 2>/dev/null); else body=$(cat -- "$FM_HOME/data/$id/checks.md" 2>/dev/null); fi
       outcome=$(printf '%s\n' "$body" | sed -n 's/^outcome: *//p' | head -n 1)
       evidence=$(printf '%s\n' "$body" | sed -n 's/^evidence: *//p' | head -n 1)
@@ -206,15 +205,15 @@ post() {
     outcome=${outcome:0:1000}
     text_run=$(jq -c --arg outcome "$outcome" --arg evidence "$evidence" '.outcome=$outcome | .evidence=$evidence' <<<"$text_run")
     [ -n "$outcome" ] || { echo "merge-card: no Checks outcome for $key"; return 1; }
-    tmp=$(mktemp -d) || die "cannot make a scratch folder"
-    trap 'rm -rf "$tmp"' RETURN
+    media_dir=$FM_HOME/data/$id/merge-card-media
+    mkdir -p "$media_dir" || die "cannot create the task's persistent media folder"
     jq -n --arg key "$key" --arg link "$link" --argjson run "$text_run" \
-      '{contract:1,kind:"evidence",schema:1,key:$key,title:"Internal change passed its checks",about:"No user-visible screen; sealed done-done receipt attached.",link:$link,run:$run}' > "$tmp/card.json" || die "cannot write the card"
+      '{contract:1,kind:"evidence",schema:1,key:$key,title:"Internal change passed its checks",about:"No user-visible screen; sealed done-done receipt attached.",link:$link,run:$run}' > "$media_dir/card.json" || die "cannot write the card"
     if [ -n "$replace" ]; then
-      jq --slurpfile c "$tmp/card.json" --arg k "$key" '.items = ([.items[]? | select(.key != $k)] + [$c[0]])' "$board" > "$tmp/feed.json" || die "cannot prepare replacement for $key"
-      out=$(sign-off-axi post "$board" --from "$tmp/feed.json" --replace 2>&1) || die "sign-off-axi could not post $key: $out"
+      jq --slurpfile c "$media_dir/card.json" --arg k "$key" '.items = ([.items[]? | select(.key != $k)] + [$c[0]])' "$board" > "$media_dir/feed.json" || die "cannot prepare replacement for $key"
+      out=$(sign-off-axi post "$board" --from "$media_dir/feed.json" --replace 2>&1) || die "sign-off-axi could not post $key: $out"
     else
-      out=$(sign-off-axi post "$board" --kind evidence --from "$tmp/card.json" --filer firstmate-merge 2>&1) || die "sign-off-axi could not post $key: $out"
+      out=$(sign-off-axi post "$board" --kind evidence --from "$media_dir/card.json" --filer firstmate-merge 2>&1) || die "sign-off-axi could not post $key (exit $?)"
     fi
     [ -z "$out" ] || printf '%s\n' "$out"
     echo "merge-card: posted text-only $key evidence card"
@@ -251,8 +250,8 @@ post() {
       // if (.verdict | startswith("not checked")) then "done-done did not check this merge: " + (.verdict | sub("^not checked: "; ""))
          else "done-done could not run (" + .verdict + ")" end)
     + ([(.check.findings[]?.why | plain), (.check.judge.judged[]? | select(.verdict == "pass") | .reason)][:1] | map(": " + .) | join(""))' "$record")
-  tmp=$(mktemp -d) || die "cannot make a scratch folder"
-  trap 'rm -rf "$tmp"' RETURN
+  media_dir=$FM_HOME/data/$id/merge-card-media
+  mkdir -p "$media_dir" || die "cannot create the task's persistent media folder"
   # Media and run: the verify run's sign-off message, else the Checks evidence files.
   f=$(jq -r '.signoff' "$record")
   if [ -n "$f" ] && [ -f "$f" ]; then
@@ -265,9 +264,9 @@ post() {
   fi
   while IFS= read -r f; do
     [ -f "$f" ] && [ "$n" -lt 12 ] || continue
-    n=$((n + 1)) && cp "$f" "$tmp/$n.$(printf '%s' "${f##*.}" | tr '[:upper:]' '[:lower:]')"
+    n=$((n + 1)) && cp "$f" "$media_dir/$n.$(printf '%s' "${f##*.}" | tr '[:upper:]' '[:lower:]')"
   done <<< "$media"
-  media=$(cd "$tmp" && for f in $(seq 1 "$n"); do printf '%s\n' "$f".*; done | jq -R . | jq -s .)
+  media=$(cd "$media_dir" && for f in $(seq 1 "$n"); do printf '%s\n' "$f".*; done | jq -R . | jq -s .)
   if [ "$n" -eq 0 ] && [ "$run" = null ]; then
     echo "merge-card: no evidence card for $key: no passed proof media; the lane owner must fix the proof (real screens or a clip that done-done passes) and re-run merge-card post"
     return 0
@@ -279,14 +278,14 @@ post() {
     def clean(max): gsub("[\u0000-\u0009\u000b-\u001f\u007f-\u009f]"; " ") | if length > max then .[:max - 3] + "..." else . end;
     {contract: 1, kind: $kind, schema: 1, key: $key, title: ($title | clean(160)), about: ($about | clean(500)), link: $link}
     + if $media != [] then {media: $media} else {} end
-    + if $run != null then {run: $run} else {} end' > "$tmp/card.json" || die "cannot write the card"
+    + if $run != null then {run: $run} else {} end' > "$media_dir/card.json" || die "cannot write the card"
   for _ in 1 2 3; do
     rc=0
     if [ -n "$replace" ]; then
-      jq --slurpfile c "$tmp/card.json" --arg k "$key" '.items = ([.items[]? | select(.key != $k)] + [$c[0]])' "$board" > "$tmp/feed.json" || die "cannot prepare replacement for $key"
-      out=$(sign-off-axi post "$board" --from "$tmp/feed.json" --replace 2>&1) || rc=$?
+      jq --slurpfile c "$media_dir/card.json" --arg k "$key" '.items = ([.items[]? | select(.key != $k)] + [$c[0]])' "$board" > "$media_dir/feed.json" || die "cannot prepare replacement for $key"
+      out=$(sign-off-axi post "$board" --from "$media_dir/feed.json" --replace 2>&1) || rc=$?
     else
-      out=$(sign-off-axi post "$board" --kind "$kind" --from "$tmp/card.json" --filer firstmate-merge 2>&1) || rc=$?
+      out=$(sign-off-axi post "$board" --kind "$kind" --from "$media_dir/card.json" --filer firstmate-merge 2>&1) || rc=$?
     fi
     case $out in
       *"already holds a different"* | *"is already used"*) echo "merge-card: $key is already on the board"; return 0 ;;
