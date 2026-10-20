@@ -68,5 +68,5 @@ if [ "$none" -eq 1 ] && "$mc" receipt "$1" "$3"; then
   }
   jq -e --arg k "$key" --arg h "$3" 'any(.items[]?; (.key == $k or (.key | startswith($k + "-"))) and .kind == "evidence" and ((.run.commit? // .evidence.commit?) == $h) and ((.run.commit? == null) or .run.commit == $h) and ((.evidence.commit? == null) or .evidence.commit == $h))' "$board" >/dev/null && exit 0
 fi
-echo "owner-rules: no passed-proof Evidence card for $what; run merge-card post --board $board $1 $2 $3 $4"
+echo "owner-rules: no passed-proof Evidence card for $what; run FM_HOME=$FM_HOME $mc post --board $board $1 $2 $3 $4"
 exit 1
