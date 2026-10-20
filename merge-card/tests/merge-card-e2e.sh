@@ -183,6 +183,26 @@ run_check_and_post absolute
 is "absolute: recorded verdict" "$(jq -r .verdict "$home/data/absolute/merge-card.json")" pass
 is "absolute: evidence unchanged" "$(jq -c .check.evidence "$home/data/absolute/merge-card.json")" '["'"$shot"'"]'
 if [ -f "$work/card-absolute/1.png" ] && cmp -s "$work/card-absolute/1.png" "$shot"; then ok "absolute: card media resolves to the PNG"; else no "absolute: card media is not the PNG"; fi
+# The passed-test receipt: a sealed clean done-done run at the merged head goes on the card; a failed run, or no run record, adds none.
+mk_run() { # mk_run <task-id> <run-id> <exit>: a done-done run record at head_c, listing its shot
+  mkdir -p "$home/data/$1/.done-done/runs"
+  jq -n --arg id "$2" --arg c "$head_c" --argjson e "$3" \
+    '{schema:1, run_id:$id, commit:$c, dirty:false, exit:$e, files:[{path:"\($id)/shot.png"}]}' \
+    >"$home/data/$1/.done-done/runs/$2.json"
+}
+mk_run receipt 20261020T000000Z-receipt0001 0
+checks receipt shot.png && cp "$shot" "$home/data/receipt/shot.png"
+MODE=newer DD_LOG=$work/args.log SO_CAPTURE=$work/card-receipt
+export MODE DD_LOG SO_CAPTURE
+run_check_and_post receipt
+mk_run failedrun 20261020T000000Z-failedrun0001 1
+checks failedrun shot.png && cp "$shot" "$home/data/failedrun/shot.png"
+SO_CAPTURE=$work/card-failedrun
+export SO_CAPTURE
+run_check_and_post failedrun
+is "receipt: card carries the clean run" "$(jq -c .run "$work/card-receipt/card.json")" "$(jq -cn --arg c "$head_c" '{run_id:"20261020T000000Z-receipt0001", commit:$c, outcome:"a stopped worker moves to the next live route", repro:"see the merge note", proof:"done-done run 20261020T000000Z-receipt0001", evidence:"shot.png"}')"
+is "failed run: card carries no receipt" "$(jq -c 'has("run")' "$work/card-failedrun/card.json")" false
+is "no run record: card carries no receipt" "$(jq -c 'has("run")' "$work/card-newer/card.json")" false
 checks gone gone.png
 PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" check gone "$wt" "$head_c" -
 is "gone: recorded verdict" "$(jq -r .verdict "$home/data/gone/merge-card.json")" fail
