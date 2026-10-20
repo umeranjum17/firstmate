@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# owner-rules merge-gate e2e: the config/merge-gate that install.sh writes, run with the args fm-pr-merge.sh passes.
+# Usage: owner-rules/tests/owner-rules-gate.test.sh
+# Proves one refusal (no receipt) and one clean pass (a stubbed sealed clean done-done run at the head), plus the
+# screen: none exemption, the chained previous gate, and the no-op once uninstalled. No forge, no done-done.
+set -u
+here=$(cd "$(dirname "$0")" && pwd) || exit 1
+addons=$(cd "$here/../.." && pwd) || exit 1
+work=$(mktemp -d "${TMPDIR:-/tmp}/owner-rules-gate.XXXXXX") || exit 1
+trap 'rm -rf -- "$work"' EXIT
+fails=0
+ok() { printf 'ok - %s\n' "$1"; }
+no() { printf 'not ok - %s\n' "$1"; fails=$((fails + 1)); }
+is() { if [ "$2" = "$3" ]; then ok "$1"; else no "$1: got [$2], want [$3]"; fi; }
+
+home=$work/home; mkdir -p "$home/config" "$home/data/lane/.done-done/runs" "$work/bin"
+pr=https://github.com/umeranjum17/firstmate-addons/pull/9 head=abc123
+# gh stub: the PR body is whatever is in $work/body.
+printf '#!/bin/sh\ncat "%s/body" 2>/dev/null\n' "$work" > "$work/bin/gh"; chmod +x "$work/bin/gh"
+# A previous gate that records it ran.
+printf '#!/bin/sh\necho "prev gate ran: $*"\n' > "$home/config/merge-gate"; chmod +x "$home/config/merge-gate"
+# shellcheck disable=SC2119,SC2120
+gate() { PATH=$work/bin:$PATH FM_HOME=$home "$home/config/merge-gate" lane - "${1:-$head}" "${2:-$pr}" 2>&1; printf 'rc=%s\n' "$?"; }
+run=$home/data/lane/.done-done/runs/r1.json
+seal() { printf '{"schema":1,"exit":0,"dirty":false,"commit":"%s","files":["a.png"],"run_id":"r1"}\n' "$1" > "$run"; }
+
+"$addons/owner-rules/install.sh" "$home" >/dev/null
+is "installed: previous gate moved aside" "$([ -x "$home/config/merge-gate.pre-owner-rules" ] && echo yes)" yes
+"$addons/owner-rules/install.sh" "$home" >/dev/null && ok "install is idempotent" || no "second install failed"
+
+REFUSAL="owner-rules: no passed-proof receipt for $pr; run the done-done check and post the evidence to the sign-off Evidence tab first"
+is "refusal: no receipt" "$(gate)" "$REFUSAL
+rc=1"
+seal other; is "refusal: a run at a different head" "$(gate | tail -1)" "rc=1"
+seal "$head"; printf '{"schema":1,"exit":0,"dirty":true,"commit":"%s","files":["a"],"run_id":"r1"}\n' "$head" > "$run"
+is "refusal: a dirty run" "$(gate | tail -1)" "rc=1"
+seal "$head"
+is "pass: sealed clean run at the head, then the previous gate" "$(gate)" "prev gate ran: lane - $head $pr
+rc=0"
+rm -f "$run"; printf 'screen: none\n' > "$work/body"
+is "pass: screen: none is exempt" "$(gate | tail -1)" "rc=0"
+rm -f "$work/body"
+
+"$addons/owner-rules/uninstall.sh" "$home" >/dev/null
+is "uninstalled: no receipt is fine again" "$(gate)" "prev gate ran: lane - $head $pr
+rc=0"
+
+[ "$fails" -eq 0 ] && echo "PASS owner-rules-gate" || { echo "FAIL owner-rules-gate: $fails"; exit 1; }
