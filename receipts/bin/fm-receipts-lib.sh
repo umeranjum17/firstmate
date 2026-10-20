@@ -61,19 +61,46 @@ Regenerate the receipt after any candidate change, including validation fixes or
 EOF
 }
 
-# Meta line for a spawn: prints receipt_required=1 for a ship task whose brief
-# asks for receipts, or whose relaunch meta already carried it.
-fm_receipts_inherit() {  # <kind> <brief> [<relaunch-meta>]
-  [ "$1" = ship ] || return 0
-  if grep -qx 'Completion receipt: required' "$2" \
-    || { [ -n "${3:-}" ] && [ -f "$3" ] && grep -qx 'receipt_required=1' "$3"; }; then
+# Done acceptance for a ship task: picks the candidate head (worktree HEAD, the
+# verified forge head, or the recorded pr_head for a named-head or cross-origin
+# PR) and refuses when the receipt does not bind it. Called after the core
+# decided the done line is gated. Needs the fork libs (fm_dod_*, status_line_note).
+fm_receipts_accept_done() {  # <worktree> <mode> <line> <state> <id> <meta> [<forge-head>]
+  local wt=$1 mode=$2 line=$3 state=$4 id=$5 meta=$6 forge_head=${7:-} url sha
+  sha=$(git -C "$wt" rev-parse --verify HEAD 2>/dev/null) || sha=
+  if [ -n "$forge_head" ] && fm_pr_head_valid "$forge_head"; then
+    sha=$forge_head
+  fi
+  if [ -f "$meta" ]; then
+    url=$(fm_dod_pr_url_from_done_note "$(status_line_note "$line")") || url=
+    if [ -n "$url" ] && [ "$(fm_dod_meta_value "$meta" pr)" = "$url" ]; then
+      if fm_dod_forge_head_is_named_head "$mode"; then
+        if fm_pr_head_valid "$(fm_dod_meta_value "$meta" pr_head)"; then
+          sha=$(fm_dod_meta_value "$meta" pr_head)
+        fi
+      elif [ "$mode" = direct-PR ] && fm_dod_pr_outside_origin "$wt" "$url" \
+        && fm_pr_head_valid "$(fm_dod_meta_value "$meta" pr_head)"; then
+        sha=$(fm_dod_meta_value "$meta" pr_head)
+      fi
+    fi
+  fi
+  fm_dod_receipt_accept "$state" "$id" "$meta" "$sha" || return 1
+}
+
+# Meta line for a spawn: prints receipt_required=1 for a ship task (the caller's
+# $KIND, default ship) whose brief asks for receipts, or whose relaunch meta
+# already carried it.
+fm_receipts_inherit() {  # <brief> [<relaunch-meta>]
+  [ "${KIND:-ship}" = ship ] || return 0
+  if grep -qx 'Completion receipt: required' "$1" \
+    || { [ -n "${2:-}" ] && [ -f "$2" ] && grep -qx 'receipt_required=1' "$2"; }; then
     echo 'receipt_required=1'
   fi
 }
 
 # Promotion: replace any stale requirement in the temp meta with the live one.
-fm_receipts_promote() {  # <tmp-meta>
-  local tmp=$1
+fm_receipts_promote() {  # <meta> <tmp-meta>
+  local tmp=$2
   grep -v '^receipt_required=' "$tmp" > "$tmp.rr" || true
   echo 'receipt_required=1' >> "$tmp.rr"
   mv "$tmp.rr" "$tmp"

@@ -41,14 +41,24 @@ mkdir -p "$FM_HOME"
 # shellcheck source=/dev/null
 . "$addons/receipts/bin/fm-receipts-lib.sh"
 printf 'x\nCompletion receipt: required\n' > "$d/brief"
-[ "$(fm_receipts_inherit ship "$d/brief")" = receipt_required=1 ] || { echo "FAIL: inherit from brief" >&2; exit 1; }
-[ -z "$(fm_receipts_inherit scout "$d/brief")" ] || { echo "FAIL: scout must not require" >&2; exit 1; }
+[ "$(fm_receipts_inherit "$d/brief")" = receipt_required=1 ] || { echo "FAIL: inherit from brief" >&2; exit 1; }
+[ -z "$(KIND=scout fm_receipts_inherit "$d/brief")" ] || { echo "FAIL: scout must not require" >&2; exit 1; }
 printf 'receipt_required=1\n' > "$d/old.meta"; : > "$d/plain"
-[ "$(fm_receipts_inherit ship "$d/plain" "$d/old.meta")" = receipt_required=1 ] || { echo "FAIL: relaunch inherit" >&2; exit 1; }
+[ "$(fm_receipts_inherit "$d/plain" "$d/old.meta")" = receipt_required=1 ] || { echo "FAIL: relaunch inherit" >&2; exit 1; }
 printf 'kind=ship\nreceipt_required=0\n' > "$d/tmp.meta"
-fm_receipts_promote "$d/tmp.meta"
+fm_receipts_promote "$d/old.meta" "$d/tmp.meta"
 [ "$(grep -c '^receipt_required=' "$d/tmp.meta")" -eq 1 ] && grep -qx 'receipt_required=1' "$d/tmp.meta" || { echo "FAIL: promote" >&2; exit 1; }
 fm_receipts_brief demo-id | grep -q "$addons/receipts/bin/fm-run-receipt.sh demo-id PASS" || { echo "FAIL: brief contract" >&2; exit 1; }
+
+# Done acceptance through the helper: a PASS receipt bound to the worktree head
+# accepts; a FAIL receipt for the same head refuses.
+w=$d/wt; mkdir "$w"; git -C "$w" init -q; git -C "$w" -c user.name=t -c user.email=t@t commit -q --allow-empty -m c
+h=$(git -C "$w" rev-parse HEAD); st=$d/state; mkdir "$st"; printf 'mode=direct-PR\nspawn_gen=1\nreceipt_required=1\n' > "$st/t.meta"
+rcpt() { printf '{"schema":1,"task":"t","mode":"direct-PR","spawn_gen":"1","head":"%s","verdict":"%s","evidence":"ran","at":1}\n' "$h" "$1" > "$st/t.run-receipt.json"; }
+rcpt PASS
+fm_receipts_accept_done "$w" direct-PR "done: x" "$st" t "$st/t.meta" "" >/dev/null || { echo "FAIL: accept_done accept" >&2; exit 1; }
+rcpt FAIL
+! fm_receipts_accept_done "$w" direct-PR "done: x" "$st" t "$st/t.meta" "" >/dev/null || { echo "FAIL: accept_done refuse" >&2; exit 1; }
 
 # Absent: the same guarded lines load nothing and survive set -e.
 ( set -e; FM_ADDONS_DIR=$d/none
