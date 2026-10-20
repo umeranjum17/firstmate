@@ -180,6 +180,10 @@ post() {
   fi
   key=${key:0:128}
   local replace=''
+  if [ "$pr" != - ] && [ -f "$board" ] && jq -e --arg k "$key" --arg h "$head" 'any(.items[]?; .key == $k and ((.run.commit? // .evidence.commit?) != $h))' "$board" >/dev/null; then
+    key=${key:0:115}-${head:0:12}
+    key=${key:0:128}
+  fi
   if [ -f "$board" ] && jq -e --arg k "$key" 'any(.items[]?; .key == $k)' "$board" >/dev/null; then
     if sign-off-axi list "$board" --json | jq -e --arg k "$key" 'any(.decisions[]?; .key == $k and .dismissed == true)' >/dev/null; then
       sign-off-axi restore "$key" "$board" >/dev/null || die "sign-off-axi could not restore dismissed $key"

@@ -71,6 +71,10 @@ cardkey=merge-umeranjum17-firstmate-addons-pull-9
 jq --arg k "$cardkey" --arg h "$head" '.items += [{kind:"evidence",type:"evidence",filer:"firstmate-merge",key:$k,run:{commit:$h}}]' "$work/board.json" > "$work/board.tmp" && mv "$work/board.tmp" "$work/board.json"
 is "pass: receipt, lint, and card then previous gate" "$(gate)" "prev gate ran: lane - $head $pr
 rc=0"
+jq --arg k "$cardkey-$head" --arg h "$head" '.items = [{kind:"evidence",key:$k,run:{commit:$h}}]' "$work/board.json" > "$work/board.tmp" && mv "$work/board.tmp" "$work/board.json"
+is "pass: head-suffixed card matches" "$(gate | tail -1)" "rc=0"
+jq --arg k "merge-umeranjum17-firstmate-addons-pull-12-$head" --arg h "$head" '.items = [{kind:"evidence",key:$k,run:{commit:$h}}]' "$work/board.json" > "$work/board.tmp" && mv "$work/board.tmp" "$work/board.json"
+is "refusal: similar pull-12 prefix does not match pull-1" "$(gate | tail -1)" "rc=1"
 for fields in '{"run":{"commit":"abc123"}}' '{"evidence":{"commit":"abc123"}}'; do
   jq --argjson fields "$fields" --arg k "$cardkey" '.items = [{kind:"evidence",key:$k} + $fields]' "$work/board.json" > "$work/board.tmp" && mv "$work/board.tmp" "$work/board.json"
   is "pass: card commit field $fields" "$(gate | tail -1)" "rc=0"
@@ -80,10 +84,11 @@ for fields in '{}' '{"run":{"commit":"wrong"}}' '{"evidence":{"commit":"wrong"}}
   is "refusal: invalid card commit fields $fields" "$(gate | tail -1)" "rc=1"
 done
 jq --arg k "$cardkey" --arg h "$head" '.items = [{kind:"evidence",key:$k,run:{commit:$h}}]' "$work/board.json" > "$work/board.tmp" && mv "$work/board.tmp" "$work/board.json"
-rm -f "$run"; printf 'screen: none\n' > "$work/body"
+rm -f "$run"; printf 'screen: none\noutcome: checks passed\nevidence: sealed receipt\n' > "$work/body"
 printf '{"schema":1,"answers_only":false,"items":[]}\n' > "$work/board.json"
 is "refusal: screen: none without receipt refuses" "$(gate | tail -1)" "rc=1"
 seal "$head"
+printf '{"verdict":"pass","check":{"claim":"checks passed","evidence":[]}}\n' > "$home/data/lane/merge-card.json"
 jq -n '{schema:1,answers_only:false,items:[]}' > "$work/board.json"
 is "pass: screen: none and receipt auto-posts text card" "$(gate)" "merge-card: posted text-only $cardkey evidence card
 prev gate ran: lane - $head $pr

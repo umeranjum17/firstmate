@@ -330,6 +330,23 @@ so_before=$(wc -l < "$SO_LOG")
 PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" dismissed "$wt" "$head_c" - >/dev/null
 is "live same-key card is deduped" "$(wc -l < "$SO_LOG")" "$so_before"
 
+# A PR gets a new key for a new head; its old card remains and repeats dedupe.
+pr=https://github.com/o/r/pull/12
+head_c=firsthead0000000000000000000000000000000000
+checks follows shot.png && cp "$shot" "$home/data/follows/shot.png"
+mk_run follows 20261020T000000Z-follows0001 0
+printf '{"schema":1,"answers_only":false,"items":[]}\n' > "$work/board.json"
+MODE=newer DD_LOG=$work/args.log SO_CAPTURE=$work/card-follows
+export MODE DD_LOG SO_CAPTURE
+PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" follows "$wt" "$head_c" "$pr" >/dev/null
+head_c=secondhead0000000000000000000000000000000000
+mk_run follows 20261020T000000Z-follows0002 0
+PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" follows "$wt" "$head_c" "$pr" >/dev/null
+is "new head: both PR head cards remain" "$(jq -r '[.items[].key] | sort | join(",")' "$work/board.json")" "merge-o-r-pull-12,merge-o-r-pull-12-secondhead00"
+so_before=$(wc -l < "$SO_LOG")
+PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" follows "$wt" "$head_c" "$pr" >/dev/null
+is "new head: repeat post dedupes" "$(wc -l < "$SO_LOG")" "$so_before"
+
 # The gate refuses a PR merge with no checks-lint PASS row for its head.
 MODE=newer DD_LOG=$work/args.log SO_CAPTURE=$work/card-lint
 export MODE DD_LOG SO_CAPTURE
