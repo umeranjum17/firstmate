@@ -8,7 +8,8 @@ a lane whose turn was lost, and wakes the primary session.
 
 The sentinel's own code lives here (`bin/fm-sentinel.sh`). It calls the host
 tool's scripts and libraries from the home's checkout (`$FM_HOME/bin`) and
-copies none of them.
+copies none of them. After a Herdr restart it also restores a recorded Claude
+model when a direct report resumed without its `--model` argument.
 
 ## Layout
 
@@ -48,6 +49,8 @@ owner stops it by hand. Running it again when nothing is installed prints
 - `bash sentinel/tests/fm-sentinel-install.test.sh` — hermetic: a throwaway HOME
   and XDG dirs and a stub `systemctl` on `PATH`. The real user manager is never
   read or changed.
+- `bash sentinel/tests/fm-sentinel-model-relaunch.test.sh` — fixture-based check
+  that only a Claude pane missing its recorded model is relaunched, once per event.
 
 The restart tests (dead relaunch, restart resume, and the live Herdr e2e) are
 not in this slice yet; they follow in a second slice.
