@@ -330,12 +330,13 @@ test_forge_recorded_head_is_accepted_without_local_object() {
   accept_done ship no-mistakes "$wt" "$repo" "done: PR https://github.com/o/r/pull/5 checks green" \
     "$state" forge "$meta" \
     || fail "forge-recorded pr_head the worker clone never fetched was refused"
-  unset -f fm_receipts_accept_done
   [ "$(cat "$state/candidate")" = "$forge_head" ] \
     || fail "named-head default did not forward the recorded pr_head as the receipt candidate"
   accept_done ship no-mistakes "$wt" "$repo" "done: PR https://github.com/o/r/pull/6 checks green" \
-    "$state" forge "$meta" >/dev/null \
-    && fail "pr_head recorded for PR 5 was accepted for a done naming PR 6"
+    "$state" forge "$meta" >/dev/null || true
+  [ -z "$(cat "$state/candidate")" ] \
+    || fail "pr_head recorded for PR 5 was forwarded as the receipt candidate for a done naming PR 6"
+  unset -f fm_receipts_accept_done
   pass "a forge-recorded head for the named PR is accepted without a local object"
 }
 
