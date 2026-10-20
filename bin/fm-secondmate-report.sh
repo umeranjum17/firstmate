@@ -35,11 +35,8 @@ fm_secondmate_report_status_blocked_wait() {  # <verb> <text>
   [ -x "$hook" ] || return 0
   local out rc=0
   out=$("$hook" "$1" "$2" 2>&1) || rc=$?
-  if [ "$rc" -ne 0 ]; then
-    if [ -n "$out" ]; then printf '%s\n' "$out" >&2; else echo 'refused by the status-wait-check add-on' >&2; fi
-    exit 2
-  fi
   [ -z "$out" ] || printf '%s\n' "$out" >&2
+  [ "$rc" -eq 0 ] || exit 2
 }
 
 usage() {
