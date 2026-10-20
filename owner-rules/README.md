@@ -32,7 +32,7 @@ A refusal exits 1 before `fm-brief.sh` writes `data/<id>/brief.md`, with a one-l
 4. **Checks-lint PASS.** After the receipt, the gate reads `$FM_HOME/data/checks-gate.log` (never reruns lint) and refuses unless a
    `pass` row names the PR url at the merge head (a local merge matches the report-file rows of its own task folder; they carry no head).
    `screen: none` exempts the receipt only. PR merges also require a passed-proof Evidence card on the fleet board, configured by `FM_FLEET_BOARD`, then the one-line `$FM_HOME/config/fleet-board`, then the main home board (`${FM_MAIN_HOME:-$HOME/firstmate}/config/fleet-board`); a screen-free PR with a sealed receipt gets a text-only card automatically. Local merges keep the existing receipt/lint behavior. Refusal:
-   `owner-rules: no checks-lint PASS for <pr> at <head>; run FM_HOME=<home> config/fm-checks-lint.sh <pr-url> <evidence folder> first`.
+   `owner-rules: no checks-lint PASS for <pr> at <head>; run FM_HOME=<home> <XDG_DATA_HOME>/fm-merge-on-green/checks-lint.sh <pr-url> <evidence folder> first`.
 - Test: `tests/owner-rules-gate.test.sh` installs into a temp home and runs the real `config/merge-gate` against a stubbed receipt.
 
 ## Leads skill (slice 3)

@@ -17,11 +17,15 @@ run() {
 
 if [ "$DRY" -eq 1 ]; then
   echo "would copy: $SRC/merge-on-green.sh -> $DEST/merge-on-green.sh"
+  echo "would copy: $SRC/checks-lint.sh -> $DEST/checks-lint.sh"
+  echo "would copy: $SRC/.done-done.yaml -> $DEST/.done-done.yaml"
   echo "would write: $FMH/state/$ID.check.sh:"
   printf '%s\n' "$SHIM" | sed 's/^/  /'
 else
   mkdir -p "$DEST"
   install -m 755 "$SRC/merge-on-green.sh" "$DEST/merge-on-green.sh"
+  install -m 755 "$SRC/checks-lint.sh" "$DEST/checks-lint.sh"
+  install -m 644 "$SRC/.done-done.yaml" "$DEST/.done-done.yaml"
   printf '%s\n' "$SHIM" > "$FMH/state/$ID.check.sh"
   chmod 700 "$FMH/state/$ID.check.sh"
 fi

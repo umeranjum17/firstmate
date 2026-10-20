@@ -229,6 +229,8 @@ chmod +x "$FM/bin/fm-check-register.sh"
 before=$(find "$d" -mindepth 1 | sort)
 out=$("$SRC/install.sh" --dry-run "$FM" 2>&1)
 has "g: would copy" "$out" "would copy: $SRC/merge-on-green.sh -> $d/data/fm-merge-on-green/merge-on-green.sh"
+has "g: lint adapter copied" "$out" "would copy: $SRC/checks-lint.sh -> $d/data/fm-merge-on-green/checks-lint.sh"
+has "g: done-done config copied" "$out" "would copy: $SRC/.done-done.yaml -> $d/data/fm-merge-on-green/.done-done.yaml"
 has "g: would register" "$out" "would run: env -u FM_STATE_OVERRIDE FM_HOME=$FM $FM/bin/fm-check-register.sh merge-on-green"
 check "g: nothing written" "$(find "$d" -mindepth 1 | sort)" "$before"
 
@@ -236,6 +238,8 @@ check "g: nothing written" "$(find "$d" -mindepth 1 | sort)" "$before"
 out=$(FM_STATE_OVERRIDE='' "$SRC/install.sh" "$FM" 2>&1) && rc=0 || rc=$?
 check "h: install exits 0 with FM_STATE_OVERRIDE=''" "$rc" 0
 check "h: register ran without the override" "$(cat "$FM/reg-calls")" "register merge-on-green"
+check "h: adapter installed" "$([ -x "$d/data/fm-merge-on-green/checks-lint.sh" ] && echo yes)" yes
+check "h: done-done config installed" "$([ -f "$d/data/fm-merge-on-green/.done-done.yaml" ] && echo yes)" yes
 check "h: shim execs the check" "$(sed -n 2p "$FM/state/merge-on-green.check.sh")" "exec $d/data/fm-merge-on-green/merge-on-green.sh check $FM"
 check "h: shim mode 0700" "$(stat -c %a "$FM/state/merge-on-green.check.sh")" 700
 check "h: installed script runs from the shim" "$(FM_CHECK_TIMEOUT=30 "$FM/state/merge-on-green.check.sh")" ""

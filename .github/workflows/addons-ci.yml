@@ -126,3 +126,18 @@ jobs:
       # Stub byokit-accounts and a throwaway config: nothing real is touched.
       - name: Account pool test
         run: bash account-pool/tests/account-pool.test.sh
+      # done-done-axi 0.4.5 requires Node 22.18 and reads generated path globs in the lint fixtures.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.18.0
+      # Fake GitHub responses and isolated homes; no real PRs are changed.
+      - name: Checks lint parity test
+        run: bash merge-on-green/tests/checks-lint-parity.test.sh
+      # Fixture home and gate logs; no merge runs.
+      - name: Merge-on-green test
+        run: bash merge-on-green/tests/merge-on-green.test.sh
+      - name: Merge-on-green uninstall test
+        run: bash merge-on-green/tests/merge-on-green-uninstall.test.sh
+      # Fixture home, stub gh and receipts; no merge runs.
+      - name: Owner-rules gate test
+        run: bash owner-rules/tests/owner-rules-gate.test.sh

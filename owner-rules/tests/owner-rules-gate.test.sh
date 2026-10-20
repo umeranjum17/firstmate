@@ -13,7 +13,8 @@ ok() { printf 'ok - %s\n' "$1"; }
 no() { printf 'not ok - %s\n' "$1"; fails=$((fails + 1)); }
 is() { if [ "$2" = "$3" ]; then ok "$1"; else no "$1: got [$2], want [$3]"; fi; }
 
-home=$work/home; mkdir -p "$home/config" "$home/data/lane/.done-done/runs" "$work/bin"
+home=$work/home; mkdir -p "$home/config" "$home/data/lane/.done-done/runs" "$work/bin" "$work/data/fm-merge-on-green"
+printf '#!/bin/sh\nexit 0\n' > "$work/data/fm-merge-on-green/checks-lint.sh"; chmod +x "$work/data/fm-merge-on-green/checks-lint.sh"
 pr=https://github.com/umeranjum17/firstmate-addons/pull/9 head=abc123
 # gh stub: the PR body is whatever is in $work/body.
 printf '#!/bin/sh\ncat "%s/body" 2>/dev/null\n' "$work" > "$work/bin/gh"; chmod +x "$work/bin/gh"
@@ -30,7 +31,7 @@ STUB
 chmod +x "$work/bin/sign-off-axi"
 printf '{"schema":1,"answers_only":false,"items":[]}\n' > "$work/board.json"
 # shellcheck disable=SC2119,SC2120
-gate() { PATH=$work/bin:$PATH FM_HOME=$home FM_FLEET_BOARD=${3:-$work/board.json} "$home/config/merge-gate" lane - "${1:-$head}" "${2:-$pr}" 2>&1; printf 'rc=%s\n' "$?"; }
+gate() { PATH=$work/bin:$PATH XDG_DATA_HOME=$work/data FM_HOME=$home FM_FLEET_BOARD=${3:-$work/board.json} "$home/config/merge-gate" lane - "${1:-$head}" "${2:-$pr}" 2>&1; printf 'rc=%s\n' "$?"; }
 main=$work/main; mkdir -p "$main/config"
 gate_inherit() { env -u FM_FLEET_BOARD PATH="$work/bin:$PATH" FM_HOME="$home" FM_MAIN_HOME="$main" "$home/config/merge-gate" lane - "$head" "$pr" 2>&1; printf 'rc=%s\n' "$?"; }
 run=$home/data/lane/.done-done/runs/r1.json
@@ -47,7 +48,7 @@ seal other; is "refusal: a run at a different head" "$(gate | tail -1)" "rc=1"
 seal "$head"; printf '{"schema":1,"exit":0,"dirty":true,"commit":"%s","files":["a"],"run_id":"r1"}\n' "$head" > "$run"
 is "refusal: a dirty run" "$(gate | tail -1)" "rc=1"
 seal "$head"
-LINT="owner-rules: no checks-lint PASS for $pr at $head; run FM_HOME=$home config/fm-checks-lint.sh $pr <evidence folder> first"
+LINT="owner-rules: no checks-lint PASS for $pr at $head; run FM_HOME=$home $work/data/fm-merge-on-green/checks-lint.sh $pr <evidence folder> first"
 is "refusal: receipt but no checks-lint row" "$(gate)" "$LINT
 rc=1"
 log=$home/data/checks-gate.log

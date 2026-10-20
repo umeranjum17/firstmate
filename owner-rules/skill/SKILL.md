@@ -45,7 +45,7 @@ Fix: run the done-done check on the real journey at the merge head and post its 
 Refusal (`$src` is the PR URL, `$3` the merge head) when checks-lint has no PASS row for the PR head in `data/checks-gate.log`:
 
 ```
-owner-rules: no checks-lint PASS for $src at $3; run FM_HOME=$FM_HOME config/fm-checks-lint.sh $src <evidence folder> first
+owner-rules: no checks-lint PASS for $src at $3; run FM_HOME=$FM_HOME <XDG_DATA_HOME>/fm-merge-on-green/checks-lint.sh $src <evidence folder> first
 ```
 
 Fix: run that command (it logs the row), then merge again.
