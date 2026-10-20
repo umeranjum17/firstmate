@@ -21,6 +21,10 @@
 # Examples:
 #   fm-secondmate-report.sh done abcdef0123456789 "audit clean"
 #   fm-secondmate-report.sh --doc done abcdef0123456789 data/x/report.md "see report"
+#
+# An optional firstmate-addons status-wait-check add-on (${FM_ADDONS_DIR:-<home>/projects/firstmate-addons}/status-wait-check/status-wait-check)
+# receives <verb> <note> before the append and owns the wait rules. Its output is shown and a nonzero
+# exit refuses the report with exit 2; an absent add-on is a no-op.
 set -eu
 
 CALLER_FM_HOME=${FM_HOME:-}
