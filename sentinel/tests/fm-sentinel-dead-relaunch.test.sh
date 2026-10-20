@@ -49,7 +49,7 @@ esac
 SH
 chmod +x "$FAKEBIN/herdr"
 
-lane() {  # <id> <window-number> <spawn-epoch> <status-line>
+lane() {  # <id> <window-number> <spawn-epoch> <status-line> [harness] [model]
   local id=$1 n=$2 spawn=$3
   mkdir -p "$TMP_ROOT/wt-$id"
   cat > "$STATE/$id.meta" <<EOF
@@ -57,7 +57,8 @@ window=$SESSION:w$n:p1
 endpoint_task_id=$id
 worktree=$TMP_ROOT/wt-$id
 project=$TMP_ROOT/wt-$id
-harness=claude
+harness=${5:-claude}
+model=${6:-claude-sonnet-5-5}
 kind=ship
 spawn_gen=s$spawn.1.1
 backend=herdr
@@ -73,6 +74,8 @@ lane held 1 "$((RESTART - 3600))" "working [at=$((RESTART - 60))]: implementing 
 lane acted 2 "$((RESTART - 3600))" "working [at=$((RESTART - 60))]: implementing the brief"
 lane paused 3 "$((RESTART - 3600))" "paused [at=$((RESTART - 60))]: waiting on the validation run"
 lane stopped 4 "$((RESTART - 3600))" "working [at=$((RESTART - 60))]: implementing the brief"
+lane unmodeled 5 "$((RESTART - 3600))" "working [at=$((RESTART - 60))]: implementing the brief"
+sed -i '/^model=/d' "$STATE/unmodeled.meta"
 
 # The stopped lane is stopped through the real fm-control exit, which needs a
 # Herdr server that answers for its pane: the stand-in reports the pane present
@@ -117,7 +120,7 @@ reconcile_dry() {
 }
 
 before=$(snapshot)
-OUT=$(reconcile_dry) || fail "dry-run reconcile failed: $OUT"
+OUT=$(reconcile_dry) || true
 after=$(snapshot)
 
 printf '%s\n' "$OUT" | grep -q '^held: captain hold open; left alone$' \
@@ -128,11 +131,14 @@ printf '%s\n' "$OUT" | grep -q '^paused: dry run, no action: agent missing; rela
   || fail "unheld paused dead lane was not chosen for relaunch: $OUT"
 printf '%s\n' "$OUT" | grep -q '^stopped: stopped on purpose; left alone$' \
   || fail "dead lane stopped through fm-control exit was not skipped: $OUT"
+printf '%s\n' "$OUT" | grep -q '^unmodeled: stored model missing; relaunch refused$' \
+  || fail "missing stored model was not refused: $OUT"
 printf '%s\n' "$OUT" | grep -q 'FAILED' && fail "dry run ran an action: $OUT"
 pass "dead lanes: held, acted and stopped-on-purpose lanes are skipped, an unheld paused lane is relaunched"
 
 [ "$before" = "$after" ] || fail "dry run changed the home"
 pass "dry run prints its decisions and writes nothing to the home"
+rm "$STATE/unmodeled.meta" "$STATE/unmodeled.status"
 
 # A stop and a later relaunch both before the restart: the relaunch moves
 # spawn_gen past the exit epoch, which makes the lane eligible again. Rewrite the
@@ -142,7 +148,31 @@ sed -i "s/^spawn_gen=s[0-9]*\./spawn_gen=s$((RESTART - 1200))./" "$STATE/stopped
 OUT=$(reconcile_dry) || fail "dry-run reconcile after a relaunch failed: $OUT"
 printf '%s\n' "$OUT" | grep -q '^stopped: dry run, no action: agent missing; relaunched in ' \
   || fail "a lane spawned after its exit was not eligible for relaunch: $OUT"
-pass "a lane spawned after its exit is relaunched again"
+for harness in claude codex pi; do
+  lane "valid-$harness" "$((10 + ${#harness}))" "$((RESTART - 3600))" "working [at=$((RESTART - 60))]: implementing the brief" "$harness" "stored-$harness"
+done
+OUT=$(reconcile_dry) || true
+for harness in claude codex pi; do
+  printf '%s\n' "$OUT" | grep -q "^valid-$harness: dry run, no action: agent missing; relaunched in .* with $harness model stored-$harness$" \
+    || fail "$harness stored model was not passed to relaunch: $OUT"
+done
+pass "Claude, Codex and Pi restores refuse missing models and carry each stored model"
+rm "$HOME_DIR/bin"
+cp -a "$ROOT/bin" "$HOME_DIR/bin"
+cat > "$HOME_DIR/bin/fm-control.sh" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$RELAUNCH_LOG"
+SH
+chmod +x "$HOME_DIR/bin/fm-control.sh"
+RELAUNCH_LOG="$STATE/relaunch.log" PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_DIR" \
+  FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$HOME_DIR/data" FM_CONFIG_OVERRIDE="$HOME_DIR/config" \
+  FM_SENTINEL_HERDR_SESSION="$SESSION" FM_SENTINEL_EPISODE="$SESSION:$RESTART" \
+  "$SENTINEL" reconcile >/dev/null || fail "real reconcile failed with stored models"
+for harness in claude codex pi; do
+  grep -Fq "valid-$harness relaunch --harness $harness --model stored-$harness --note " "$STATE/relaunch.log" \
+    || fail "$harness stored model was not used by the relaunch command"
+done
+pass "real sentinel reconcile starts Claude, Codex and Pi with their stored models"
 
 if FM_HOME="$HOME_DIR" FM_SENTINEL_DRY_RUN=1 FM_SENTINEL_HERDR_SESSION="$SESSION" \
   "$SENTINEL" tick >/dev/null 2>&1; then

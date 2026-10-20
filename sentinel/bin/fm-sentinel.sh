@@ -269,7 +269,7 @@ captain_held() {  # <id>
 }
 
 reconcile() {  # <episode>
-  local restarted=${1##*:} meta id kind target agent cwd wt current note why acted
+  local restarted=${1##*:} meta id kind target agent cwd wt current note why acted harness model
   RECONCILE_RC=0
   RECONCILE_UNSETTLED=
   case "$restarted" in ''|*[!0-9]*) say "no Herdr server identity for $SESSION; nothing to reconcile"; return 0 ;; esac
@@ -309,6 +309,8 @@ reconcile() {  # <episode>
     fi
     current=$(FM_CREW_STATE_NO_FORGE=1 "$BIN/fm-crew-state.sh" "$id" 2>/dev/null | awk '{print $2}')
     note="The host session restarted and stopped this task's agent; this relaunch put it back in its recorded worktree. Your last recorded status: $(status_current_line "$STATE/$id.status" "$kind" | cut -c1-300). Continue the brief you are already on from the local copy as it stands; this is not new work."
+    harness=$(fm_meta_get "$meta" harness)
+    model=$(fm_meta_get "$meta" model)
     wt=$(fm_canonical_existing_dir "$(fm_meta_get "$meta" worktree)")
     cwd=
     if [ "$agent" = alive ]; then
@@ -349,16 +351,26 @@ reconcile() {  # <episode>
             ;;
           *)
             captain_held "$id" && continue
-            act "$id" "was live in ${cwd:-an unreadable folder}; relaunched in $wt" \
-              "$BIN/fm-control.sh" "$id" relaunch --note "$note"
+            if [ -z "$model" ]; then
+              say "$id: stored model missing; relaunch refused"
+              RECONCILE_RC=1
+              continue
+            fi
+            act "$id" "was live in ${cwd:-an unreadable folder}; relaunched in $wt with $harness model $model" \
+              "$BIN/fm-control.sh" "$id" relaunch --harness "$harness" --model "$model" --note "$note"
             ;;
         esac
         ;;
       *)
         captain_held "$id" && continue
         [ "$acted" -eq 0 ] || { say "$id: acted since the restart; left alone"; continue; }
-        act "$id" "agent $agent; relaunched in $wt" \
-          "$BIN/fm-control.sh" "$id" relaunch --note "$note"
+        if [ -z "$model" ]; then
+          say "$id: stored model missing; relaunch refused"
+          RECONCILE_RC=1
+          continue
+        fi
+        act "$id" "agent $agent; relaunched in $wt with $harness model $model" \
+          "$BIN/fm-control.sh" "$id" relaunch --harness "$harness" --model "$model" --note "$note"
         ;;
     esac
   done
@@ -445,7 +457,11 @@ relaunch_model_mismatches() {
     harness=$(fm_meta_get "$meta" harness)
     [ "$harness" = claude ] || continue
     model=$(fm_meta_get "$meta" model)
-    [ -n "$model" ] || continue
+    if [ -z "$model" ]; then
+      say "$id: stored model missing; model restore refused"
+      rc=1
+      continue
+    fi
     kind=$(fm_meta_get "$meta" kind)
     pane=$(fm_meta_get "$meta" herdr_pane_id)
     [ -n "$pane" ] || continue
