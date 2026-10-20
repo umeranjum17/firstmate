@@ -1,0 +1,4 @@
+app: firstmate-addons
+journeys:
+  fleet-pulse-chat-tsv-refresh:
+    command: bash fleet-pulse/tests/chat-tsv.test.sh > "$DONE_DONE_EVIDENCE_ROOT/${RUN_ID}.log" 2>&1
