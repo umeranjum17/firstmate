@@ -8,6 +8,7 @@ here=$(cd "$(dirname "$0")" && pwd) || exit 1
 addons=$(cd "$here/../.." && pwd) || exit 1
 work=$(mktemp -d "${TMPDIR:-/tmp}/owner-rules-gate.XXXXXX") || exit 1
 trap 'rm -rf -- "$work"' EXIT
+export HOME=$work/user XDG_DATA_HOME=$work/data
 fails=0
 ok() { printf 'ok - %s\n' "$1"; }
 no() { printf 'not ok - %s\n' "$1"; fails=$((fails + 1)); }

@@ -13,8 +13,6 @@ d=$(mktemp -d)
 trap 'chmod -R u+w -- "$d"; rm -rf -- "$d"' EXIT
 for v in $(env | sed -n 's/^\(GIT_CONFIG_[A-Z_0-9]*\)=.*/\1/p'); do unset "$v"; done
 unset GIT_CONFIG_PARAMETERS GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL GIT_DIR GIT_WORK_TREE
-ORIG_HOME=$HOME ORIG_XDG=${XDG_CONFIG_HOME:-}
-REALHK_BEFORE=$(GIT_CONFIG_NOSYSTEM=1 git config --global --get core.hooksPath 2>/dev/null || true)
 export HOME=$d/home XDG_DATA_HOME=$d/data XDG_CONFIG_HOME=$d/xdg TMPDIR=$d GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=$d/global.gitconfig
 FM=$d/fm
 mkdir -p "$HOME" "$FM/config" "$XDG_CONFIG_HOME"
@@ -168,11 +166,7 @@ printf 'reach testguard-fake-surname here\n' >"$d/plain/after.txt"
 git -C "$d/plain" add after.txt
 plain git -c user.name=You -c user.email=$ME commit -q -m 'after uninstall'
 check "leak passes once uninstalled" "$?" 0
-if [ -n "$ORIG_XDG" ]; then
-  REALHK_AFTER=$(env -u GIT_CONFIG_GLOBAL HOME="$ORIG_HOME" XDG_CONFIG_HOME="$ORIG_XDG" GIT_CONFIG_NOSYSTEM=1 git config --global --get core.hooksPath 2>/dev/null || true)
-else
-  REALHK_AFTER=$(env -u GIT_CONFIG_GLOBAL -u XDG_CONFIG_HOME HOME="$ORIG_HOME" GIT_CONFIG_NOSYSTEM=1 git config --global --get core.hooksPath 2>/dev/null || true)
-fi
-check "real global hooksPath unchanged" "$REALHK_AFTER" "$REALHK_BEFORE"
+REALHK_AFTER=$(git config --global --get core.hooksPath 2>/dev/null || true)
+check "fixture global hooksPath restored" "$REALHK_AFTER" "$d/prevhooks"
 
 if [ "$fails" -eq 0 ]; then echo "PASS"; else echo "FAILED: $fails"; exit 1; fi

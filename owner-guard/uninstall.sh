@@ -5,8 +5,10 @@ DRY=0; [ "${1:-}" = --dry-run ] && { DRY=1; shift; }; [ "$#" -le 1 ] || { echo '
 SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P); DEST=${XDG_DATA_HOME:-$HOME/.local/share}/fm-owner-guard; GDEST=${XDG_DATA_HOME:-$HOME/.local/share}/fm-git-identity; FMH=${1:-$(cat "$DEST/home" 2>/dev/null || true)}
 if [ "$DRY" -eq 1 ]; then
   if [ -n "$FMH" ]; then "$SRC/install.sh" --dry-run --uninstall "$FMH"; else "$SRC/install.sh" --dry-run --uninstall; fi
+  if [ -n "$FMH" ]; then "$SRC/install-scan.sh" --dry-run --uninstall "$FMH"; else "$SRC/install-scan.sh" --dry-run --uninstall; fi
 else
   if [ -n "$FMH" ]; then "$SRC/install.sh" --uninstall "$FMH"; else "$SRC/install.sh" --uninstall; fi
+  if [ -n "$FMH" ]; then "$SRC/install-scan.sh" --uninstall "$FMH"; else "$SRC/install-scan.sh" --uninstall; fi
 fi
 for f in "$DEST/owner-guard" "$DEST/home" "$GDEST/hooks.d/pre-commit/owner-guard" "$GDEST/hooks.d/pre-push/owner-guard"; do
   [ ! -e "$f" ] || { echo "remove: $f"; [ "$DRY" -eq 1 ] || rm -f -- "$f"; }

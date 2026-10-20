@@ -9,7 +9,7 @@ trap cleanup EXIT
 mkdir -p "$T/home/fixture/users/user-001" "$T/home/fixture/users/user-007/agent" "$T/home/fixture/users/user-003/opencode" "$T/bin"
 echo '{"env":{"KEEP":"1"},"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"other-hook"}]}]}}' > "$T/home/fixture/users/user-001/settings.json"
 fail=0; ok() { echo "ok: $*"; }; no() { echo "FAIL: $*"; fail=1; }
-inst() { env -u XDG_DATA_HOME HOME="$T/home" "$ADDON/install.sh"; }
+inst() { env HOME="$T/home" XDG_DATA_HOME="$T/home/fixture/users/user-004/share" "$ADDON/install.sh"; }
 
 inst >/dev/null && inst > "$T/re.out" && [ "$(grep -c '^unchanged: ' "$T/re.out")" -eq 4 ] && ok "reinstall changes nothing" || no "reinstall not idempotent"
 jq -e '([.hooks.PreToolUse[].hooks[].command] | index("other-hook") == 0) and .env.KEEP == "1"' "$T/home/fixture/users/user-001/settings.json" >/dev/null && ok "claude settings merged" || no "claude settings merge"
@@ -128,7 +128,7 @@ hook "$$" 'kill 1'; sh -c "$HOOK" < "$T/in.json" 2>"$T/err" && rc=0 || rc=$?
 ln -s "$T/home/fixture/users/user-004/share" "$T/link"; jq -n '{tool_input:{command:"kill -9 1"}}' | node "$T/link/fm-kill-guard/guard.mjs" --caller "$$" 2> "$T/err" && rc=0 || rc=$?
 [ "$rc" -eq 2 ] && [[ "$(cat "$T/err")" == *"PID 1 (init)"* ]] && ok "symlinked install blocks kill -9 1" || no "symlinked install allowed kill -9 1"
 
-un() { env -u XDG_DATA_HOME HOME="$T/home" "$ADDON/uninstall.sh" "$@"; }
+un() { env HOME="$T/home" XDG_DATA_HOME="$T/home/fixture/users/user-004/share" "$ADDON/uninstall.sh" "$@"; }
 G=$T/home/fixture/users/user-004/share/fm-kill-guard; mkdir -p "$G/disabled"; cp "$T/home/fixture/users/user-007/agent/extensions/fm-kill-guard.ts" "$G/disabled/"
 cp "$T/home/fixture/users/user-001/settings.json" "$T/before.json"; un --dry-run >/dev/null
 cmp -s "$T/before.json" "$T/home/fixture/users/user-001/settings.json" && [ -e "$G/guard.mjs" ] && [ -e "$G/disabled/fm-kill-guard.ts" ] && ok "uninstall --dry-run writes nothing" || no "uninstall --dry-run wrote"
