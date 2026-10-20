@@ -2679,7 +2679,7 @@ test_spawn_relaunch_refuses_a_secondmate_missing_stored_model() {
   pass "fm-spawn --relaunch: a secondmate without a stored model refuses instead of using the default"
 }
 
-test_spawn_relaunch_refuses_a_remote_secondmate_missing_stored_model() {
+test_spawn_relaunch_refuses_a_secondmate_record_with_a_remote_host_missing_model_locally() {
   local dir home out rc
   dir=$(new_case spremotesmmissing rsm1)
   home="$dir/home"
@@ -2703,7 +2703,7 @@ test_spawn_relaunch_refuses_a_remote_secondmate_missing_stored_model() {
   out=$(run_spawn "$dir" rsm1 --relaunch); rc=$?
   expect_code 1 "$rc" "a remote secondmate relaunch without its stored model should refuse"$'\n'"$out"
   assert_contains "$out" "no stored model for claude" "the refusal should name the missing model"
-  pass "fm-spawn --relaunch: a remote secondmate without a stored model refuses instead of using the default"
+  pass "fm-spawn --relaunch: a secondmate record carrying a remote host refuses locally when its stored model is missing"
 }
 
 test_spawn_relaunch_refuses_an_unrecorded_task() {
@@ -3352,7 +3352,7 @@ test_relaunch_refuses_missing_stored_model_for_any_harness
 test_relaunch_keeps_a_recorded_default_model_without_refusing
 test_relaunch_refuses_a_secondmate_missing_stored_model
 test_spawn_relaunch_refuses_a_secondmate_missing_stored_model
-test_spawn_relaunch_refuses_a_remote_secondmate_missing_stored_model
+test_spawn_relaunch_refuses_a_secondmate_record_with_a_remote_host_missing_model_locally
 test_relaunch_refuses_a_copy_another_task_records
 test_relaunch_under_memory_pressure_refuses_before_stop
 test_relaunch_closes_a_claude_startup_gate_unanswered
