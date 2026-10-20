@@ -2077,15 +2077,6 @@ if [ "$RELAUNCH" -eq 1 ]; then
   RELAUNCH_PRIOR_HARNESS=$(fm_meta_get "$RELAUNCH_META" harness)
   KIND=$(fm_meta_get "$RELAUNCH_META" kind)
   [ -n "$KIND" ] || KIND=ship
-  if [ "$MODEL_SET" -eq 0 ] && [ "$KIND" != secondmate ]; then
-    MODEL=$(fm_meta_get "$RELAUNCH_META" model)
-    case "$RELAUNCH_PRIOR_HARNESS:$MODEL" in
-      claude:|codex:|pi:)
-        echo "error: task $ID has no stored model for $RELAUNCH_PRIOR_HARNESS; refusing to relaunch on its default model" >&2
-        exit 1
-        ;;
-    esac
-  fi
   # A secondmate whose endpoint is gone already has ONE owner for that
   # recovery: the session-start liveness sweep respawns it with
   # `fm-spawn.sh <id> --secondmate`, which stands its home's own workspace back
@@ -2159,6 +2150,15 @@ if [ "$RELAUNCH" -eq 1 ]; then
     echo "error: task $ID has no recorded harness; pass --harness to relaunch it" >&2
     exit 1
   }
+  if [ "$MODEL_SET" -eq 0 ] && [ "$KIND" != secondmate ] && [ "$ARG3" = "$RELAUNCH_PRIOR_HARNESS" ]; then
+    MODEL=$(fm_meta_get "$RELAUNCH_META" model)
+    case "$ARG3:$MODEL" in
+      claude:|codex:|pi:)
+        echo "error: task $ID has no stored model for $ARG3; refusing to relaunch on its default model" >&2
+        exit 1
+        ;;
+    esac
+  fi
 elif [ "$KIND" = secondmate ]; then
   case "${POS[1]:-}" in
   '' | claude | codex | opencode | pi | pi-signed | grok | kimi | cursor | gemini | muse | rovo | omp | agy | devin)
