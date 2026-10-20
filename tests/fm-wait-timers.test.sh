@@ -168,8 +168,11 @@ cycle
 [ "$(grep -c 'level=owner' "$dir/events")" -eq 2 ] || fail 'child report was mistaken for the lead waiting'
 pass 'lead native blocked overrides log, ignores foreign panes, re-arms, and excludes child reports'
 
-# Cursor push suppression is served by the alerts add-on (fm_alerts_push_suppress); without it the watcher behaves as Kun, so this journey runs only when the add-on is present.
-if [ -r "$ADDONS_DIR/alerts/bin/fm-model-outage-lib.sh" ]; then
+if (
+  [ -r "$ADDONS_DIR/alerts/bin/fm-model-outage-lib.sh" ] &&
+  . "$ADDONS_DIR/alerts/bin/fm-model-outage-lib.sh" &&
+  declare -F fm_alerts_push_suppress >/dev/null
+) 2>/dev/null; then
   printf 'kind=ship\nharness=cursor\nbackend=herdr\nwindow=fixture:w1:p1\n' > "$dir/state/lane.meta"
 cat > "$dir/fakebin/reader" <<'SH'
 #!/usr/bin/env bash
