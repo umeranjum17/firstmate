@@ -19,11 +19,13 @@
 #     media file was copied, or a done-done verify run at the merged head brought
 #     its own sign-off run. The card title is the claim; its media is the Checks
 #     evidence screenshots and recordings (at most 12), or those of the verify run
-#     through `done-done signoff`. A merge with missing or unconfirmed proof posts
-#     no card: the gap is printed for the merging lead and the lane owner fixes the
-#     proof and re-runs the post. The card key is the merge's own, so a repeat
-#     post, or another home posting the same merge, finds it on the board and adds
-#     nothing.
+#     through `done-done signoff`. The card carries the passed-test receipt (its `run`,
+#     which sign-off's board checks against the run record to file it under Evidence): the
+#     verify run's, else a sealed clean done-done run at the merged head in the task folder.
+#     A merge with missing or unconfirmed proof posts no card: the gap is printed for the
+#     merging lead and the lane owner fixes the proof and re-runs the post. The card key is
+#     the merge's own, so a repeat post, or another home posting the same merge, finds it on
+#     the board and adds nothing.
 #     An internal fleet-tool merge with no user-visible screen puts a `screen: none` line in
 #     its Checks block: post then skips the card (exit 0, one skip line pointing to the merge
 #     note) and runs no done-done.
@@ -132,8 +134,19 @@ gate() {
   return 1
 }
 
+# receipt_run <task-id> <head> <record>: the task folder's first sealed clean done-done run at <head>, else nothing.
+receipt_run() {
+  local claim evidence
+  claim=$(jq -r '.check.claim // empty' "$3")
+  evidence=$(jq -r '[.check.evidence[]? | split("/") | last] | join(", ")' "$3")
+  jq -cs --arg head "$2" --arg claim "$claim" --arg ev "$evidence" '
+    map(select(.schema == 1 and .exit == 0 and .dirty == false and .commit == $head and (.files | length) > 0 and (.run_id // "") != ""))
+    | .[0] // empty
+    | {run_id, commit, outcome: $claim, repro: "see the merge note", proof: "done-done run \(.run_id)", evidence: $ev}' "$FM_HOME"/data/"$1"/.done-done/runs/*.json 2>/dev/null
+}
+
 post() {
-  local board='' id wt head pr record key link title about kind media run tmp out rc n=0 f verdict claim
+  local board='' id wt head pr record key link title about kind media run receipt=null tmp out rc n=0 f verdict claim
   [ "${1:-}" = --board ] && [ -n "${2:-}" ] && board=$2 && shift 2
   [ -n "$board" ] && [ $# -eq 4 ] || die "usage: merge-card post --board <board.json> <task-id> <worktree|-> <head|-> <pr-url|->"
   [ -n "${FM_HOME:-}" ] || die "FM_HOME is not set"
@@ -196,6 +209,7 @@ post() {
     media=$(jq -r '.media[]?' "$f" | sed "s|^|${f%/*}/|")
   else
     run=null
+    receipt=$(receipt_run "$id" "$head" "$record"); receipt=${receipt:-null}
     media=$(jq -r '.check.evidence[]? | select(test("\\.(png|jpe?g|webp|mp4|webm)$"; "i"))' "$record")
   fi
   while IFS= read -r f; do
@@ -208,6 +222,7 @@ post() {
     return 0
   fi
   kind=evidence
+  if [ "$run" = null ]; then run=$receipt; fi
   jq -n --arg kind "$kind" --arg key "$key" --arg title "$title" --arg about "$about" --arg link "$link" \
     --argjson run "$run" --argjson media "$media" '
     def clean(max): gsub("[\u0000-\u0009\u000b-\u001f\u007f-\u009f]"; " ") | if length > max then .[:max - 3] + "..." else . end;

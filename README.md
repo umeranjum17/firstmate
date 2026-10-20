@@ -195,6 +195,7 @@ Every merge runs done-done and, only with passed proof, posts one evidence card 
   A merge posts only an evidence card: the plain outcome as the title and the passed proof on the card.
   A merge with missing or unconfirmed proof posts no card; the gap goes back to the lane owner to fix the proof and re-run the post.
   The card carries the Checks claim (what a user can now do) as the title, done-done's verdict in plain words, the pull request link (the merged commit when there is no PR), and the passed proof media (at most 12 screens or recordings), or those of a verify run at the merged head.
+  It also carries the passed-test receipt as its `run`: the verify run's, else a sealed clean done-done run at the merged head in the task folder. The sign-off board files a card with a receipt under Evidence.
   The card key is the merge's own (`merge-<owner>-<repo>-pull-<n>`, or `merge-<head>` for a local merge), so a repeat post or a second home adds nothing.
   sign-off-axi writes the board under its lock and only appends.
 
