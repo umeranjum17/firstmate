@@ -57,6 +57,15 @@ cardkey=merge-umeranjum17-firstmate-addons-pull-9
 jq --arg k "$cardkey" --arg h "$head" '.items += [{kind:"evidence",type:"evidence",filer:"firstmate-merge",key:$k,run:{commit:$h}}]' "$work/board.json" > "$work/board.tmp" && mv "$work/board.tmp" "$work/board.json"
 is "pass: receipt, lint, and card then previous gate" "$(gate)" "prev gate ran: lane - $head $pr
 rc=0"
+for fields in '{"run":{"commit":"abc123"}}' '{"evidence":{"commit":"abc123"}}'; do
+  jq --argjson fields "$fields" --arg k "$cardkey" '.items = [{kind:"evidence",key:$k} + $fields]' "$work/board.json" > "$work/board.tmp" && mv "$work/board.tmp" "$work/board.json"
+  is "pass: card commit field $fields" "$(gate | tail -1)" "rc=0"
+done
+for fields in '{}' '{"run":{"commit":"wrong"}}' '{"evidence":{"commit":"wrong"}}' '{"run":{"commit":"abc123"},"evidence":{"commit":"wrong"}}'; do
+  jq --argjson fields "$fields" --arg k "$cardkey" '.items = [{kind:"evidence",key:$k} + $fields]' "$work/board.json" > "$work/board.tmp" && mv "$work/board.tmp" "$work/board.json"
+  is "refusal: invalid card commit fields $fields" "$(gate | tail -1)" "rc=1"
+done
+jq --arg k "$cardkey" --arg h "$head" '.items = [{kind:"evidence",key:$k,run:{commit:$h}}]' "$work/board.json" > "$work/board.tmp" && mv "$work/board.tmp" "$work/board.json"
 rm -f "$run"; printf 'screen: none\n' > "$work/body"
 printf '{"schema":1,"answers_only":false,"items":[]}\n' > "$work/board.json"
 is "refusal: screen: none without receipt refuses" "$(gate | tail -1)" "rc=1"
