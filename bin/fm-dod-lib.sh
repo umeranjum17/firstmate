@@ -805,17 +805,17 @@ fm_dod_forge_pr_head_live() {  # <provider> <host> <path> <number> <url>
 # even when the declared head is already on the forge.
 # The optional trailing <forge-head> is a verified forge head the caller read
 # for a pull request outside the worktree's origin repository. When none is
-# given and the done note names the registered pr= outside that origin, the
-# recorded pr_head stands in, so every caller binds the receipt to the same
-# candidate. The receipts add-on (fm_receipts_accept_done) uses the head it is
-# given.
+# given and the done note names the registered pr= in a named-head mode, or a
+# direct-PR outside that origin, the recorded pr_head stands in, so every caller
+# binds the receipt to the same candidate. The receipts add-on
+# (fm_receipts_accept_done) uses the head it is given.
 fm_dod_accept_ship_done() {  # <kind> <mode> <worktree> <project> <line> [<state> <id> <meta> <run-output> [<forge-head>]]
   local kind=$1 mode=$2 wt=$3 project=$4 line=$5 state=${6:-} id=${7:-} meta=${8:-} run_out=${9:-} forge_head=${10:-} url sha gerrit recorded_head
   fm_dod_should_gate_ship_done "$kind" "$mode" "$line" || return 0
   url=$(fm_dod_pr_url_from_done_note "$(status_line_note "$line")") || url=
   if [ -z "$forge_head" ] && [ -n "$url" ] && [ -n "$meta" ] && [ -f "$meta" ] \
     && [ "$(fm_dod_meta_value "$meta" pr)" = "$url" ] \
-    && fm_dod_pr_outside_origin "$wt" "$url"; then
+    && { fm_dod_forge_head_is_named_head "$mode" || { [ "$mode" = direct-PR ] && fm_dod_pr_outside_origin "$wt" "$url"; }; }; then
     recorded_head=$(fm_dod_meta_value "$meta" pr_head)
     fm_pr_head_valid "$recorded_head" && forge_head=$recorded_head
   fi
