@@ -804,11 +804,18 @@ fm_dod_forge_pr_head_live() {  # <provider> <host> <path> <number> <url>
 # Optional captured run output preserves an explicit unreturned-custody refusal
 # even when the declared head is already on the forge.
 # The optional trailing <forge-head> is a verified forge head the caller read
-# for a pull request outside the worktree's origin repository; the optional
-# receipts add-on (fm_receipts_accept_done) uses it as its candidate.
+# for a pull request outside the worktree's origin repository. When none is
+# given and the registered pr= lies outside that origin, the recorded pr_head
+# stands in, so every caller binds the receipt to the same candidate. The
+# receipts add-on (fm_receipts_accept_done) uses the head it is given.
 fm_dod_accept_ship_done() {  # <kind> <mode> <worktree> <project> <line> [<state> <id> <meta> <run-output> [<forge-head>]]
-  local kind=$1 mode=$2 wt=$3 project=$4 line=$5 state=${6:-} id=${7:-} meta=${8:-} run_out=${9:-} forge_head=${10:-} url sha gerrit
+  local kind=$1 mode=$2 wt=$3 project=$4 line=$5 state=${6:-} id=${7:-} meta=${8:-} run_out=${9:-} forge_head=${10:-} url sha gerrit recorded_head
   fm_dod_should_gate_ship_done "$kind" "$mode" "$line" || return 0
+  if [ -z "$forge_head" ] && [ -n "$meta" ] && [ -f "$meta" ] \
+    && fm_dod_pr_outside_origin "$wt" "$(fm_dod_meta_value "$meta" pr)"; then
+    recorded_head=$(fm_dod_meta_value "$meta" pr_head)
+    fm_pr_head_valid "$recorded_head" && forge_head=$recorded_head
+  fi
   if declare -F fm_receipts_accept_done >/dev/null; then fm_receipts_accept_done "$wt" "$mode" "$line" "$state" "$id" "$meta" "$forge_head" || return 1; fi
   [ -z "$run_out" ] || fm_dod_nm_custody_released "$run_out" || return 1
   if [ "$mode" = local-only ] && [ -n "$run_out" ]; then

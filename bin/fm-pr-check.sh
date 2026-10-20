@@ -169,8 +169,9 @@ fi
 # binds the merge to, is forwarded when the pull request's owner and repository
 # are not this worktree's origin. A same-repository pull request, an unverified
 # forge head, or an origin whose repository cannot be isolated forwards none.
-# The receipts add-on (fm_receipts_accept_done) picks the candidate from what it
-# is given.
+# fm_dod_accept_ship_done binds an outside-origin pull request to its recorded
+# pr_head when no head is forwarded, and the receipts add-on
+# (fm_receipts_accept_done) picks the candidate from what it is given.
 RECEIPT_CANDIDATE=
 if [ -n "$PR_HEAD" ] && fm_dod_pr_outside_origin "$WT" "$URL"; then
   RECEIPT_CANDIDATE=$PR_HEAD
