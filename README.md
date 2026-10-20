@@ -19,6 +19,7 @@ One line per add-on, with how it wires in. `<home>` is your home folder for the 
 - `fleet-flow` — reads fleet lifecycle, queue and bottleneck JSON; installs the home flow check for task slots. Wire in: `fleet-flow/install.sh`.
 - `fleet-stall` — alerts you when a team lead idles with ready work, or workers sit stuck waiting on their team lead. Wire in: `FM_HOME=<home> fleet-stall/install.sh`.
 - `fleet-stats` — per-model and per-skill fleet statistics plus the task outcome recorder. Dormant copy: the fork still runs its own.
+- `fleet-pulse` — appends redacted captain chat from Claude transcripts to a private, gitignored TSV. Wire in: `fleet-pulse/install.sh <home>`.
 - `git-identity` — task commits always carry the configured git identity; pushes of foreign-author commits are refused. Wire in: `git-identity/install.sh <home>`, plus a fork hook.
 - `kill-guard` — stops any agent from signalling PID 1, the systemd user manager, the herdr server, or a process it did not start; reparented processes in the caller's own non-home git worktree are allowed. Record device launches with `node guard.mjs own start <serial> -- <command>`; records bind device PID to start time and serial, while unrecorded legacy device processes stay refused (stop a stuck one via its owned host adb parent or have the lead stop it). A block is final, except a kill whose PID the shell sets (`$pid`, `$!`, `%1`), which asks for the literal PID. Wire in: `kill-guard/install.sh`; remove: `kill-guard/uninstall.sh`.
 - `read-guard` — blocks agent tool access to provider logins, BYOKit person credentials and no-mistakes config; metadata-only `ls`, `stat`, `test` and `[` checks are allowed. Process/library reads are unaffected. Wire in: `read-guard/install.sh`; remove: `read-guard/uninstall.sh`.
@@ -107,6 +108,8 @@ bash owner-guard/tests/owner-guard-global.test.sh
 bash owner-guard/tests/owner-guard-merge.test.sh
 bash fleet-stall/tests/fleet-stall-e2e.sh
 bash fleet-flow/tests/fm-flow-check.test.sh
+bash fleet-pulse/tests/chat-tsv.test.sh
+bash fleet-pulse/install.sh --dry-run <home>
 bash host-memory/tests/fm-mem-gate.test.sh
 bash git-identity/tests/git-identity.test.sh
 parked-homes/install.sh <home>                           # verify-only; prints MISSING until the fork hooks merge
