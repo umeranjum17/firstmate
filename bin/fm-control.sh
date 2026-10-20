@@ -1088,13 +1088,8 @@ resolve_relaunch_profile() {
   else
     TARGET_MODEL=default
   fi
-  if [ "$KIND" != secondmate ] && [ "$MODEL_SET" = 0 ] \
-     && [ "$PRIOR_MODEL_MISSING" = 1 ] && [ "$TARGET_HARNESS" = "$PRIOR_HARNESS" ]; then
-    case "$TARGET_HARNESS" in
-      claude|codex|pi)
-        die "task $ID has no stored model for $TARGET_HARNESS; refusing to relaunch on its default model; pass --model explicitly"
-        ;;
-    esac
+  if [ "$MODEL_SET" = 0 ] && [ "$PRIOR_MODEL_MISSING" = 1 ] && [ "$TARGET_HARNESS" = "$PRIOR_HARNESS" ] && [ "$TARGET_MODEL" = default ]; then
+    die "task $ID has no stored model for $TARGET_HARNESS; refusing to relaunch on its default model; pass --model explicitly"
   fi
   if [ "$EFFORT_SET" = 1 ]; then
     TARGET_EFFORT=$NEW_EFFORT

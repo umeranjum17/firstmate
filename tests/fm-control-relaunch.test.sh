@@ -749,6 +749,59 @@ test_relaunch_refuses_missing_stored_model_before_stopping() {
   pass "fm-control relaunch: missing stored model refuses before stopping the agent"
 }
 
+test_relaunch_refuses_missing_stored_model_for_any_harness() {
+  local dir out rc
+  dir=$(new_case missingmodel-opencode rl81)
+  add_ship_task "$dir" rl81 opencode
+  sed -i '/^model=/d' "$dir/home/state/rl81.meta"
+  out=$(run_control "$dir" rl81 relaunch --note "restart after restore"); rc=$?
+  expect_code 1 "$rc" "a relaunch without its stored model should refuse for any harness"
+  assert_contains "$out" "no stored model for opencode" "the refusal should name the missing model"
+  [ "$(cat "$dir/fake/command")" = claude ] || fail "a missing-model refusal must not stop the current agent"
+  pass "fm-control relaunch: missing stored model refuses for an unlisted harness"
+}
+
+test_relaunch_keeps_a_recorded_default_model_without_refusing() {
+  local dir out rc
+  dir=$(new_case recorded-default rl82)
+  add_ship_task "$dir" rl82 claude
+  out=$(run_control "$dir" rl82 relaunch --note "restart after restore"); rc=$?
+  expect_code 0 "$rc" "a recorded model=default is a deliberate default and must relaunch"$'\n'"$out"
+  [ "$(meta_field "$dir" rl82 model)" = default ] || fail "the recorded default model should be kept"
+  pass "fm-control relaunch: a recorded model=default relaunches without refusing"
+}
+
+test_relaunch_refuses_a_secondmate_missing_stored_model() {
+  local dir home out rc
+  dir=$(new_case smmissingmodel sm8)
+  home="$dir/home"
+  mkdir -p "$home/data/sm8" "$home/config/secondmates/sm8"
+  printf '# secondmate brief\n' > "$home/data/sm8/brief.md"
+  fm_git_worktree "$dir/proj" "$dir/smhome" sm-branch
+  mkdir -p "$dir/smhome/state" "$dir/smhome/data" "$dir/smhome/bin"
+  printf 'sm8\n' > "$dir/smhome/.fm-secondmate-home"
+  printf '# agents\n' > "$dir/smhome/AGENTS.md"
+  {
+    echo "window=fmses:fm-sm8"
+    echo "endpoint_task_id=sm8"
+    echo "worktree=$dir/smhome"
+    echo "project=$dir/smhome"
+    echo "harness=claude"
+    echo "kind=secondmate"
+    echo "mode=secondmate"
+    echo "yolo=off"
+    echo "effort=default"
+    echo "home=$dir/smhome"
+  } > "$home/state/sm8.meta"
+  printf '%s\n' "fm-sm8" > "$dir/fake/windows"
+  printf '%s' "$dir/smhome" > "$dir/fake/cwd"
+  out=$(run_control "$dir" sm8 relaunch --harness claude); rc=$?
+  expect_code 1 "$rc" "a secondmate relaunch without its stored model should refuse"$'\n'"$out"
+  assert_contains "$out" "no stored model for claude" "the refusal should name the missing model"
+  [ "$(cat "$dir/fake/command")" = claude ] || fail "a missing-model secondmate refusal must not stop the current agent"
+  pass "fm-control relaunch: a secondmate without a stored model refuses before stopping"
+}
+
 test_relaunch_requires_a_note_for_a_ship_task() {
   local dir out rc before
   dir=$(new_case nonote rl3)
@@ -2272,6 +2325,7 @@ test_secondmate_relaunch_refuses_an_unmarked_home() {
     echo "kind=secondmate"
     echo "mode=secondmate"
     echo "yolo=off"
+    echo "model=default"
   } > "$home/state/sm2.meta"
   printf '%s\n' "fm-sm2" > "$dir/fake/windows"
   out=$(run_control "$dir" sm2 relaunch); rc=$?
@@ -2300,6 +2354,7 @@ test_secondmate_checkpoint_refuses_unreadable_child_state() {
     echo "kind=secondmate"
     echo "mode=secondmate"
     echo "yolo=off"
+    echo "model=default"
     echo "home=$dir/smhome"
   } > "$home/state/sm5.meta"
   printf '%s\n' "fm-sm5" > "$dir/fake/windows"
@@ -3235,6 +3290,9 @@ test_disabled_relaunch_clears_prior_trace_context
 test_relaunch_appends_the_progress_note_to_the_instructions
 test_relaunch_requires_a_note_for_a_ship_task
 test_relaunch_refuses_missing_stored_model_before_stopping
+test_relaunch_refuses_missing_stored_model_for_any_harness
+test_relaunch_keeps_a_recorded_default_model_without_refusing
+test_relaunch_refuses_a_secondmate_missing_stored_model
 test_relaunch_refuses_a_copy_another_task_records
 test_relaunch_under_memory_pressure_refuses_before_stop
 test_relaunch_closes_a_claude_startup_gate_unanswered

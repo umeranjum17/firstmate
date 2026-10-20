@@ -1136,6 +1136,14 @@ spawn_remote_secondmate() {
     return 1
     ;;
   esac
+  if [ "$RELAUNCH" -eq 1 ] && [ "$MODEL_SET" -eq 0 ] \
+     && [ "$harness" = "$(fm_meta_get "$STATE/$id.meta" harness)" ] \
+     && [ -z "$(fm_meta_get "$STATE/$id.meta" model)" ]; then
+    fm_lock_release "$registry_lock" || true
+    fm_lock_release "$SPAWN_TASK_LOCK" || true
+    echo "error: task $id has no stored model for $harness; refusing to relaunch on its default model; pass --model explicitly" >&2
+    return 1
+  fi
   model=${MODEL:--}
   effort=${EFFORT:--}
   if [ -z "$HARNESS_ARG" ] && [ -z "$positional" ]; then
@@ -2150,14 +2158,12 @@ if [ "$RELAUNCH" -eq 1 ]; then
     echo "error: task $ID has no recorded harness; pass --harness to relaunch it" >&2
     exit 1
   }
-  if [ "$MODEL_SET" -eq 0 ] && [ "$KIND" != secondmate ] && [ "$ARG3" = "$RELAUNCH_PRIOR_HARNESS" ]; then
+  if [ "$MODEL_SET" -eq 0 ] && [ "$ARG3" = "$RELAUNCH_PRIOR_HARNESS" ]; then
     MODEL=$(fm_meta_get "$RELAUNCH_META" model)
-    case "$ARG3:$MODEL" in
-      claude:|codex:|pi:)
-        echo "error: task $ID has no stored model for $ARG3; refusing to relaunch on its default model" >&2
-        exit 1
-        ;;
-    esac
+    [ -n "$MODEL" ] || {
+      echo "error: task $ID has no stored model for $ARG3; refusing to relaunch on its default model" >&2
+      exit 1
+    }
   fi
 elif [ "$KIND" = secondmate ]; then
   case "${POS[1]:-}" in
