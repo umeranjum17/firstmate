@@ -8,8 +8,9 @@ a lane whose turn was lost, and wakes the primary session.
 
 The sentinel's own code lives here (`bin/fm-sentinel.sh`). It calls the host
 tool's scripts and libraries from the home's checkout (`$FM_HOME/bin`) and
-copies none of them. After a Herdr restart it also restores a recorded Claude
-model when a direct report resumed without its `--model` argument.
+copies none of them. After a Herdr restart it also restores a recorded Claude model when a direct
+report resumed without its `--model` argument, then checks each registered,
+local, unparked lead home with that home's own sentinel state and relaunch tools.
 
 ## Layout
 
