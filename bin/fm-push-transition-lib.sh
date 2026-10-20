@@ -21,19 +21,6 @@ FM_PUSH_TRANSITION_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TRIAGE_LOG="$STATE/.watch-triage.log"
 TRIAGE_LOG_MAX_BYTES=${FM_WATCH_TRIAGE_LOG_MAX_BYTES:-262144}
 FM_WAKE_POST_OUTPUT_ACTION=
-
-CAPTAIN_CALL_IDENTITY=
-
-task_captain_call_open() {  # <task>
-  local task=$1
-  CAPTAIN_CALL_IDENTITY=
-  [ -n "$task" ] || return 1
-  # shellcheck disable=SC2034 # Consumed by the watcher's stale-path captain-call check in fm-watch.sh.
-  CAPTAIN_CALL_IDENTITY=$(FM_HOME="$FM_HOME" "$FM_PUSH_TRANSITION_LIB_DIR/fm-captain-hold.sh" \
-    open "$task" --identity 2>/dev/null) || return 1
-  return 0
-}
-
 # Set only after this watcher has printed a durable actionable reason. The
 # watcher's EXIT cleanup uses it to distinguish an ordinary delivered close from
 # an interruption that leaves a recovery gap before the next arm.
@@ -165,7 +152,8 @@ handle_push_transition() {  # <backend> <session> <record>
   [ -n "$pane_id" ] || { sleep 1; return; }
   window="$session:$pane_id"
   task=$(window_to_task "$window" "$STATE")
-  if [ "$(fm_meta_get "$STATE/$task.meta" harness)" = cursor ] || task_captain_call_open "$task"; then
+  # Optional alerts add-on: suppresses the immediate wake for lanes it names (Cursor, held for the captain).
+  if declare -F fm_alerts_push_suppress >/dev/null && fm_alerts_push_suppress "$task"; then
     fm_backend_commit_transition "$backend" "$STATE" "$session" "$record" || exit 1
     return
   fi
