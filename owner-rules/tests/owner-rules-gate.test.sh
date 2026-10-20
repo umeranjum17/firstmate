@@ -31,6 +31,8 @@ chmod +x "$work/bin/sign-off-axi"
 printf '{"schema":1,"answers_only":false,"items":[]}\n' > "$work/board.json"
 # shellcheck disable=SC2119,SC2120
 gate() { PATH=$work/bin:$PATH FM_HOME=$home FM_FLEET_BOARD=${3:-$work/board.json} "$home/config/merge-gate" lane - "${1:-$head}" "${2:-$pr}" 2>&1; printf 'rc=%s\n' "$?"; }
+main=$work/main; mkdir -p "$main/config"
+gate_inherit() { env -u FM_FLEET_BOARD PATH="$work/bin:$PATH" FM_HOME="$home" FM_MAIN_HOME="$main" "$home/config/merge-gate" lane - "$head" "$pr" 2>&1; printf 'rc=%s\n' "$?"; }
 run=$home/data/lane/.done-done/runs/r1.json
 seal() { printf '{"schema":1,"exit":0,"dirty":false,"commit":"%s","files":["a.png"],"run_id":"r1"}\n' "$1" > "$run"; }
 
@@ -53,6 +55,18 @@ printf 't\t%s\tother\tpass\tok\nt\t%s\t%s\tfail\tno\n' "$pr" "$pr" "$head" > "$l
 is "refusal: lint row for another head, or failed" "$(gate | tail -1)" "rc=1"
 printf 't\t%s\t%s\tpass\tok\n' "$pr" "$head" >> "$log"
 is "refusal: receipt and lint but missing board card" "$(gate | tail -1)" "rc=1"
+# Main-home fallback, home precedence, then the three-source refusal.
+printf '%s\n' "$work/board.json" > "$main/config/fleet-board"
+jq --arg h "$head" '.items += [{kind:"evidence",key:"merge-umeranjum17-firstmate-addons-pull-9",run:{commit:$h}}]' "$work/board.json" > "$work/board.tmp" && mv "$work/board.tmp" "$work/board.json"
+is "pass: lead without board config inherits main board" "$(gate_inherit)" "prev gate ran: lane - $head $pr
+rc=0"
+printf '%s\n' "$work/own-board.json" > "$home/config/fleet-board"
+printf '{"schema":1,"answers_only":false,"items":[]}\n' > "$work/own-board.json"
+is "refusal: lead board takes precedence over main board" "$(gate_inherit | tail -1)" "rc=1"
+rm -f "$home/config/fleet-board" "$main/config/fleet-board"
+expected_board="owner-rules: fleet board is not configured (set FM_FLEET_BOARD or $home/config/fleet-board or $main/config/fleet-board) for $pr"
+is "refusal: all three board sources missing" "$(gate_inherit | tail -2)" "$expected_board
+rc=1"
 cardkey=merge-umeranjum17-firstmate-addons-pull-9
 jq --arg k "$cardkey" --arg h "$head" '.items += [{kind:"evidence",type:"evidence",filer:"firstmate-merge",key:$k,run:{commit:$h}}]' "$work/board.json" > "$work/board.tmp" && mv "$work/board.tmp" "$work/board.json"
 is "pass: receipt, lint, and card then previous gate" "$(gate)" "prev gate ran: lane - $head $pr

@@ -32,8 +32,12 @@ board=${FM_FLEET_BOARD:-}
 if [ -z "$board" ] && [ -r "$FM_HOME/config/fleet-board" ]; then
   IFS= read -r board < "$FM_HOME/config/fleet-board"
 fi
+main_home=${FM_MAIN_HOME:-$HOME/firstmate}
+if [ -z "$board" ] && [ -r "$main_home/config/fleet-board" ]; then
+  IFS= read -r board < "$main_home/config/fleet-board"
+fi
 if [ -z "$board" ]; then
-  echo "owner-rules: fleet board is not configured (set FM_FLEET_BOARD or $FM_HOME/config/fleet-board) for $what"
+  echo "owner-rules: fleet board is not configured (set FM_FLEET_BOARD or $FM_HOME/config/fleet-board or $main_home/config/fleet-board) for $what"
   exit 1
 fi
 if [ ! -r "$board" ] || ! jq -e '.items | type == "array"' "$board" >/dev/null 2>&1; then
