@@ -136,6 +136,9 @@ jobs:
       # Fake GitHub responses and isolated homes; no real PRs are changed.
       - name: Checks lint parity test
         run: bash merge-on-green/tests/checks-lint-parity.test.sh
+
+      - name: No old receipt path test
+        run: bash merge-on-green/tests/no-old-receipt-path.test.sh
       # Fixture home and gate logs; no merge runs.
       - name: Merge-on-green test
         run: bash merge-on-green/tests/merge-on-green.test.sh

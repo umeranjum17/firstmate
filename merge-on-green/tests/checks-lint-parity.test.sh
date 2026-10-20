@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)
 d=$(mktemp -d)
 trap 'rm -rf -- "$d"' EXIT
-mkdir -p "$d/bin" "$d/home" "$d/data" "$d/fm/state" "$d/fm/data/evidence" "$d/main/bin" "$d/cwd/data/evidence"
+mkdir -p "$d/bin" "$d/home" "$d/data" "$d/fm/state" "$d/fm/data/evidence" "$d/addons/receipts/bin" "$d/main" "$d/cwd/data/evidence"
 export HOME=$d/home XDG_DATA_HOME=$d/data TMPDIR=$d
 cat > "$d/bin/done-done" <<'EOF'
 #!/usr/bin/env bash
@@ -29,7 +29,7 @@ case "$1 $2" in
   *) echo "unexpected gh call: $*" >&2; exit 2 ;;
 esac
 EOF
-cat > "$d/main/bin/fm-run-receipt.sh" <<'EOF'
+cat > "$d/addons/receipts/bin/fm-run-receipt.sh" <<'EOF'
 #!/usr/bin/env bash
 printf '%s|%s|%s|%s\n' "$1" "$2" "$3" "$(cat "$3")" >> "$FM_MAIN_HOME/revocations"
 EOF
@@ -37,8 +37,8 @@ cat > "$d/legacy.sh" <<'EOF'
 #!/usr/bin/env bash
 case "$1" in */bad) echo 'checks-lint: FAIL: 1000 added non-generated lines'; exit 1 ;; *) echo 'checks-lint: PASS: fixture' ;; esac
 EOF
-chmod +x "$d/bin/gh" "$d/bin/done-done" "$d/legacy.sh" "$d/main/bin/fm-run-receipt.sh"
-export PATH="$d/bin:$PATH" FM_DONE_DONE_BIN="$d/bin/done-done" FM_LEGACY_CHECKS_LINT="$d/legacy.sh" FM_MAIN_HOME="$d/main" DONE_DONE_ARGS_LOG="$d/done-done-args"
+chmod +x "$d/bin/gh" "$d/bin/done-done" "$d/legacy.sh" "$d/addons/receipts/bin/fm-run-receipt.sh"
+export PATH="$d/bin:$PATH" FM_DONE_DONE_BIN="$d/bin/done-done" FM_LEGACY_CHECKS_LINT="$d/legacy.sh" FM_ADDONS_DIR="$d/addons" FM_MAIN_HOME="$d/main" DONE_DONE_ARGS_LOG="$d/done-done-args"
 failures=0
 for id in good generated routes bad; do
   mkdir -p "$d/fm-$id/state" "$d/fm-$id/data"
