@@ -20,8 +20,9 @@ identical to the fork copy.
   the merge-local / pr-merge call sites become
   `if declare -F fm_dod_receipt_accept >/dev/null; then fm_dod_receipt_accept ... || exit 1; fi`.
 - Brief: `if declare -F fm_receipts_brief >/dev/null; then fm_receipts_brief "$id"; fi`.
-- Spawn meta: `if declare -F fm_receipts_inherit >/dev/null; then fm_receipts_inherit "$KIND" "$BRIEF" "${RELAUNCH_META:-}"; fi`.
-- Promote: `if declare -F fm_receipts_promote >/dev/null; then fm_receipts_promote "$TMP"; fi`.
+- Spawn meta: `if declare -F fm_receipts_inherit >/dev/null; then fm_receipts_inherit "$BRIEF" "${RELAUNCH_META:-}"; fi`.
+- Done acceptance: `if declare -F fm_receipts_accept_done >/dev/null; then fm_receipts_accept_done "$wt" "$mode" "$line" "$state" "$id" "$meta" "$forge_head" || return 1; fi`.
+- Promote: `if declare -F fm_receipts_promote >/dev/null; then fm_receipts_promote "$META" "$TMP"; fi`.
 - Not in this step: `fm_dod_accept_ship_done`'s cross-repo head selection stays in the fork.
 
 `tests/receipts-hook-e2e.sh` (set `FM_TEST_FORK`) applies the acceptance/publisher
