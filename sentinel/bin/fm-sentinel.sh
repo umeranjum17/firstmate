@@ -96,7 +96,7 @@ usage() {
 }
 
 case "${1:-}" in
-  tick|loop|reconcile|unit|model-reconcile) CMD=$1 ;;
+  tick|loop|reconcile|unit|model-reconcile|lead-model-reconcile) CMD=$1 ;;
   -h|--help) usage; exit 0 ;;
   *) usage >&2; exit 2 ;;
 esac
@@ -414,6 +414,26 @@ reconcile_episode() {  # <episode>
 
 # Restore Claude's recorded model after Herdr's bare --resume restart.
 # The pane process-info API is read-only; all relaunches use their guarded owner.
+relaunch_lead_model_mismatches() {
+  local line lead home remote rc=0
+  while IFS= read -r line; do
+    lead=$(printf '%s\n' "$line" | sed -n 's/^[[:space:]]*-[[:space:]]*\([^[:space:]]*\).*/\1/p')
+    remote=$(printf '%s\n' "$line" | grep -q '(host:' && echo yes || echo no)
+    home=$(printf '%s\n' "$line" | sed -n 's/.*(home: \([^;)]*\).*/\1/p')
+    [ "$remote" = no ] && [ -n "$home" ] || continue
+    if [ -f "$FM_HOME/config/parked-homes" ] && grep -Eq "^[[:space:]]*$lead([[:space:]]|$|#)" "$FM_HOME/config/parked-homes"; then
+      say "$lead: parked lead home skipped"
+      continue
+    fi
+    [ -d "$home/state" ] && [ -x "$home/bin/fm-control.sh" ] || { say "$lead: unavailable lead home skipped"; continue; }
+    if ! FM_HOME="$home" FM_SENTINEL_MODEL_EVENT="$FM_SENTINEL_MODEL_EVENT" "$SCRIPT_DIR/fm-sentinel.sh" model-reconcile; then
+      say "$lead: lead model reconciliation failed"
+      rc=1
+    fi
+  done < <(grep -E '^[[:space:]]*-[[:space:]]' "$FM_HOME/data/secondmates.md" 2>/dev/null || true)
+  return "$rc"
+}
+
 relaunch_model_mismatches() {
   local meta id harness model kind pane info cmd rc=0 has_model event marker
   for meta in "$STATE"/*.meta; do
@@ -467,6 +487,8 @@ tick() {
         rc=1
       fi
       FM_SENTINEL_MODEL_EVENT=$id relaunch_model_mismatches || rc=1
+      # The lead pane is handled above; each lead owns its worker pass.
+      FM_SENTINEL_MODEL_EVENT=$id relaunch_lead_model_mismatches || rc=1
     else
       printf '%s\n' "$id" >"$STATE/.sentinel-herdr-identity"
     fi
@@ -501,6 +523,7 @@ case "$CMD" in
   tick) locked tick ;;
   reconcile) locked reconcile_episode "${FM_SENTINEL_EPISODE:-$(herdr_identity)}" ;;
   model-reconcile) locked relaunch_model_mismatches ;;
+  lead-model-reconcile) locked relaunch_lead_model_mismatches ;;
   loop)
     while :; do
       locked tick || true
