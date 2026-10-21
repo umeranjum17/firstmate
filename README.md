@@ -32,6 +32,7 @@ One line per add-on, with how it wires in. `<home>` is your home folder for the 
 - `merge-on-green` — merges a PR you allowed to auto-merge once its checks are green and its proof receipt passes. Wire in: `merge-on-green/install.sh <home>`.
 - `nm-drain` — updates the shared pipeline service through a planned drain, never over live runs. Wire in: `nm-drain/install.sh <home>`.
 - `owner-rules` — a lane brief is refused without an owner ask, and no-mistakes mode without one listed risk reason. Needs the brief-inherit seam. Wire in: `owner-rules/install.sh <home>`.
+- `pane-titles` — gives worker and lead panes a stable readable terminal title and matching Herdr tab label. Wire in: `pane-titles/install.sh <home>`; remove: `pane-titles/uninstall.sh <home>`.
 - `owner-guard` — refuses commits, pushes and PR merges that add the owner's private details, and scans public repos for them once a day. Wire in: `owner-guard/install.sh <home>` and `owner-guard/install-scan.sh`; remove with `owner-guard/uninstall.sh <home>`. Installation reversal covers both hook guards and the daily scan.
 - `parked-homes` — a paused team home gets no messages, nudges, relaunches or config pushes. Verify-only install/uninstall: `parked-homes/install.sh`, `parked-homes/uninstall.sh`. Needs fork hooks (FORK-EXIT.md).
 - `pipeline-literal-delete` — gives pipeline agents the safe recursive-delete rule in their own instructions. Wire in: `pipeline-literal-delete/install.sh`.
@@ -57,7 +58,7 @@ There is no install-all script yet. The shortest real install for the add-ons th
 git clone https://github.com/umeranjum17/firstmate-addons && cd firstmate-addons
 export FM_HOME=~/firstmate    # your home folder for the fleet manager
 for d in pipeline-literal-delete pipeline-quota-failover host-memory fleet-flow glm-queue route-change claude-model-guard; do "$d/install.sh"; done
-for d in delete-guard claude-quota merge-on-green git-identity nm-drain owner-guard; do "$d/install.sh" "$FM_HOME"; done
+for d in delete-guard claude-quota merge-on-green git-identity nm-drain owner-guard pane-titles; do "$d/install.sh" "$FM_HOME"; done
 read-guard/install.sh
 FM_HOME="$FM_HOME" fleet-stall/install.sh
 FM_HOME="$FM_HOME" owner-guard/install-scan.sh
@@ -111,6 +112,7 @@ bash fleet-flow/tests/fm-flow-check.test.sh
 bash fleet-pulse/tests/chat-tsv.test.sh
 bash fleet-pulse/install.sh --dry-run <home>
 bash host-memory/tests/fm-mem-gate.test.sh
+bash pane-titles/tests/pane-titles.test.sh
 bash git-identity/tests/git-identity.test.sh
 parked-homes/install.sh <home>                           # verify-only; prints MISSING until the fork hooks merge
 tailscale-resilience/tailscale-resilience check --state-dir /tmp/tsr-check
@@ -131,6 +133,7 @@ pipeline-quota-failover/install.sh --restore             # removes the wrapper a
 "$FM_HOME/bin/fm-check-unregister.sh" zai-quota          # then rm "$FM_HOME/state/zai-quota.check.sh"
 rm "$FM_HOME/config/merge-gate" "$FM_HOME/config/post-merge"                    # merge-card (with owner-guard: its config/merge-gate.pre-owner-guard instead of merge-gate)
 owner-guard/install.sh --uninstall "$FM_HOME"            # owner-guard: also restores the home's previous config/merge-gate
+pane-titles/uninstall.sh "$FM_HOME"                      # pane-titles: restores the home's previous launch-env-hook
 rm "$FM_HOME/config/parked-homes"                        # parked-homes: a missing file parks nothing
 systemctl --user disable --now fm-glm-queue && rm -r ~/.local/share/fm-glm-queue ~/.config/systemd/user/fm-glm-queue.service   # glm-queue
 rm -r ~/.local/share/fm-route-change ~/.local/bin/route-change                  # route-change
