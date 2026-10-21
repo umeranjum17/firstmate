@@ -107,6 +107,7 @@ STUB
 # The stub gh: a PR's Checks body and branch, as `gh pr view --json body,headRefName` gives them.
 cat > "$work/bin/gh" <<'STUB' || exit 1
 #!/usr/bin/env bash
+case " $* " in *" --jq .body "*) cat "$GH_BODY"; exit 0 ;; esac
 jq -n --rawfile body "$GH_BODY" '{body: $body, headRefName: "fm/older"}'
 STUB
 
@@ -357,7 +358,7 @@ so_before=$(wc -l < "$SO_LOG")
 PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" dismissed "$wt" "$head_c" - >/dev/null
 is "live same-key card is deduped" "$(wc -l < "$SO_LOG")" "$so_before"
 
-# A PR gets a new key for a new head; its old card remains and repeats dedupe.
+# One card per PR: a new head replaces the old card (newest proof kept), another PR gets its own, repeats dedupe.
 pr=https://github.com/o/r/pull/12
 head_c=firsthead0000000000000000000000000000000000
 checks follows shot.png && cp "$shot" "$home/data/follows/shot.png"
@@ -366,13 +367,30 @@ printf '{"schema":1,"answers_only":false,"items":[]}\n' > "$work/board.json"
 MODE=newer DD_LOG=$work/args.log SO_CAPTURE=$work/card-follows
 export MODE DD_LOG SO_CAPTURE
 PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" follows "$wt" "$head_c" "$pr" >/dev/null
+# A card an older merge-card filed under a head-suffixed key goes with the replacement.
+jq '.items += [(.items[0] | .key += "-oldhead00000" | .run.commit = "oldhead")]' "$work/board.json" > "$work/board.tmp" && mv "$work/board.tmp" "$work/board.json"
 head_c=secondhead0000000000000000000000000000000000
 mk_run follows 20261020T000000Z-follows0002 0
 PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" follows "$wt" "$head_c" "$pr" >/dev/null
-is "new head: both PR head cards remain" "$(jq -r '[.items[].key] | sort | join(",")' "$work/board.json")" "merge-o-r-pull-12,merge-o-r-pull-12-secondhead00"
+is "new head: one card for the PR" "$(jq -r '[.items[].key] | join(",")' "$work/board.json")" "merge-o-r-pull-12"
+is "new head: the newest proof is kept" "$(jq -r '.items[0].run.run_id' "$work/board.json")" 20261020T000000Z-follows0002
 so_before=$(wc -l < "$SO_LOG")
 PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" follows "$wt" "$head_c" "$pr" >/dev/null
 is "new head: repeat post dedupes" "$(wc -l < "$SO_LOG")" "$so_before"
+PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" follows "$wt" "$head_c" https://github.com/o/r/pull/13 >/dev/null
+is "two PRs: two cards" "$(jq -r '[.items[].key] | sort | join(",")' "$work/board.json")" "merge-o-r-pull-12,merge-o-r-pull-13"
+
+# A screen-free PR's card is titled with its repo and PR number.
+GH_BODY=$work/titled-body.md
+export GH_BODY
+checks titled shot.png && printf 'screen: none\n' >> "$home/data/titled/checks.md" && cp "$shot" "$home/data/titled/shot.png" && cp "$home/data/titled/checks.md" "$GH_BODY"
+mk_run titled 20261020T000000Z-titled0001 0
+jq '.items=[]' "$work/board.json" > "$work/board.tmp" && mv "$work/board.tmp" "$work/board.json"
+SO_CAPTURE=$work/card-titled
+export SO_CAPTURE
+PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" titled "$wt" "$head_c" https://github.com/o/muxr/pull/1012 >/dev/null
+is "internal title names repo and PR" "$(jq -r .title "$work/card-titled/card.json")" "muxr #1012: internal change passed its checks"
+GH_BODY=$work/pr-body.md
 
 # The gate refuses a PR merge with no checks-lint PASS row for its head.
 MODE=newer DD_LOG=$work/args.log SO_CAPTURE=$work/card-lint
