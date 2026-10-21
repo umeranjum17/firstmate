@@ -9,8 +9,9 @@
 # run fails, costing a restart.
 #
 # This wrapper runs the real pi; the requested chain model goes first, then
-# the other chain models in chain order (default Claude
-# Haiku 5.5 through claude-bridge, the free MiniMax route on OpenRouter; never
+# the other chain models in chain order (default the OpenRouter DeepSeek floor
+# route openrouter/deepseek/deepseek-v4.1-flash-1017:floor, the one route the
+# no-mistakes config holds; claude-bridge and direct DeepSeek are out; never
 # Opus, Sonnet, Fable, Codex, Go, Muse or Step 5). A call pinned to a model
 # outside the chain runs the chain in chain order, so no pipeline role reaches
 # a model the chain does not name. When an attempt answers a QUOTA error it
@@ -38,15 +39,16 @@
 #   PI_QUOTA_FAILOVER_GATE_SECS  longest gate wait before pi starts anyway (default 600)
 #   PI_QUOTA_FAILOVER_DEAD_SECS  how long a quota error keeps a chain model skipped (default 3600)
 #   PI_QUOTA_FAILOVER_IDLE_SECS  a pi call with no stdout and no stderr for this long is killed; the chain moves on
-#                              for that call only and writes no quota marker (default 120; claude-bridge/* and deepseek/* models use the knobs below). Measured 2026-10-18 on
+#                              for that call only and writes no quota marker (default 120; claude-bridge/*, deepseek/* and openrouter/* models use the knobs below). Measured 2026-10-18 on
 #   PI_QUOTA_FAILOVER_STALL_RETRIES  retries for a stalled last route (default 3; four calls total).
 #                              Haiku 5.5 with a 103 KB review prompt: pi streams JSON events (text and thinking
 #                              deltas, 1400+ lines per call), the longest gap was 26 s (pi start before the first
 #                              event) and 12 s mid-stream, so 120 s is about 4.5x the worst observed gap.
 #   PI_QUOTA_FAILOVER_BRIDGE_IDLE_SECS  the same idle limit for claude-bridge/* models (default 300). Their Haiku calls
 #                              answer in 30-166 s on the fleet's logs, so the 120 s limit killed slow answers.
-#   PI_QUOTA_FAILOVER_DEEPSEEK_IDLE_SECS  the same idle limit for deepseek/* models (default 300). The fleet's log from
+#   PI_QUOTA_FAILOVER_DEEPSEEK_IDLE_SECS  the same idle limit for deepseek/* and openrouter/* models (default 300). The fleet's log from
 #                              2026-10-19 shows 8 DeepSeek calls silent for 120 s and killed, each then moved to Haiku.
+#                              The OpenRouter DeepSeek floor route answers on the same clock, so openrouter/* takes this limit too.
 #
 # Before each route, quota-axi (on PATH) is asked for that route's provider: a runway of exhausted_now skips the
 # route without calling it. quota-axi missing, slower than 10s or failing leaves the route to be tried as before.
@@ -67,7 +69,9 @@ QUOTA_RE='limit used up|usage limit|limit has been reached|rate limit reached|Go
 # extension warning/failure is a route failure: the chain moves on without a quota marker (fleet retro 19 Oct, fix 2).
 ROUTE_FAIL_RE='WaitDelay|parse events|extension.*(warning|failed|error)|(warning|error|failed).*extension'
 
-chain=${PI_QUOTA_FAILOVER_CHAIN:-'claude-bridge/claude-haiku-5-5 openrouter/minimax/minimax-m3.1-flash:free'}
+# The default chain is the pipeline route the no-mistakes config holds: one route, the OpenRouter DeepSeek floor
+# route. A pinned model outside the chain does not run, so the config's route is the route that runs.
+chain=${PI_QUOTA_FAILOVER_CHAIN:-'openrouter/deepseek/deepseek-v4.1-flash-1017:floor'}
 # The chain is the fleet's one route list: route-change reads it from here.
 [ -z "${PI_QUOTA_FAILOVER_PRINT_CHAIN:-}" ] || { printf '%s\n' "$chain"; exit 0; }
 
@@ -146,11 +150,12 @@ credit_empty() {
 idle_secs=${PI_QUOTA_FAILOVER_IDLE_SECS:-120}
 bridge_idle_secs=${PI_QUOTA_FAILOVER_BRIDGE_IDLE_SECS:-300}
 deepseek_idle_secs=${PI_QUOTA_FAILOVER_DEEPSEEK_IDLE_SECS:-300}
-# idle_for <model>: the idle limit for that model's call; claude-bridge/* and deepseek/* models get their own.
+# idle_for <model>: the idle limit for that model's call; claude-bridge/*, deepseek/* and openrouter/* models get their own.
 idle_for() {
   case $1 in
     claude-bridge/*) echo "$bridge_idle_secs" ;;
     deepseek/*) echo "$deepseek_idle_secs" ;;
+    openrouter/*) echo "$deepseek_idle_secs" ;;
     *) echo "$idle_secs" ;;
   esac
 }

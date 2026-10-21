@@ -13,9 +13,10 @@
 # --session resume dropping the session on failover, quota-dead markers (written
 # on a quota error, the model skipped while fresh, tried again once expired,
 # cleared by an answer), stdin kept flowing to pi, and install.sh's key-level config edit in a throwaway config.
-# The default chain is DeepSeek Flash then Claude Haiku (GLM is out): a Codex-pinned call lands on DeepSeek, a
-# DeepSeek quota error moves to Haiku, a silent DeepSeek call has its own idle limit, and GLM quota failures (Z.AI's
-# balance and rate-limit refusals too) move on to the next hop.
+# The default chain is the pipeline route, the OpenRouter DeepSeek floor route: a Codex-pinned call and a
+# GLM-pinned call land on it, and the pinned model never runs. The failover journeys below pin their own chain
+# (a DeepSeek quota error moves to Haiku, a silent DeepSeek call has its own idle limit, and GLM quota failures
+# (Z.AI's balance and rate-limit refusals too) move on to the next hop), so they are unaffected by the default.
 # Also covers the quota-axi pre-check (a stub quota-axi: exhausted_now skips the route without a pi call, a failing
 # quota-axi still calls it), the idle watchdog (a silent stub is killed after a short IDLE_SECS and fails over for that
 # call only: no marker, the next call tries the route again, a stall on the last model is not "quota exhausted"; the
@@ -180,27 +181,27 @@ child_gone() {
   return 1
 }
 
-is "default chain is Claude Haiku, then the free MiniMax route (DeepSeek and GLM removed)" "$(PI_QUOTA_FAILOVER_PRINT_CHAIN=1 "$wrapper" </dev/null)" \
-  "claude-bridge/claude-haiku-5-5 openrouter/minimax/minimax-m3.1-flash:free"
+is "default chain is the OpenRouter DeepSeek floor route (the pipeline route)" "$(PI_QUOTA_FAILOVER_PRINT_CHAIN=1 "$wrapper" </dev/null)" \
+  "openrouter/deepseek/deepseek-v4.1-flash-1017:floor"
 
 # 0. The default chain, no override. A Codex-pinned call (the first-draft fix step's route) runs the chain and lands on
-#    DeepSeek: quota-axi is asked for DeepSeek and does not skip it, and Codex, GLM and Haiku are not called.
+#    the pipeline route: quota-axi is asked for OpenRouter and does not skip it, and Codex, GLM and Haiku are not called.
 nodead
 : >"$STUB_ARGV"
 : >"$STUB_QUOTA_LOG"
 OUT=$(printf '%s' "$prompt" | env -u PI_QUOTA_FAILOVER_CHAIN "$wrapper" --model openai-codex/gpt-6-luna --mode json --no-session 2>"$work/err0a")
 is "codex-pinned call exits 0" "$?" "0"
-out_has "codex-pinned call lands on Haiku" '"model":"claude-bridge/claude-haiku-5-5"'
+out_has "codex-pinned call lands on the pipeline route" '"model":"openrouter/deepseek/deepseek-v4.1-flash-1017:floor"'
 is "codex-pinned call makes one pi call" "$(wc -l <"$STUB_ARGV")" "1"
 is "codex never called" "$(grep -c 'openai-codex' "$STUB_ARGV")" "0"
-is "quota-axi never asked for deepseek" "$(grep -c -- '--provider deepseek ' "$STUB_QUOTA_LOG")" "0"
+is "quota-axi asked for openrouter" "$(grep -c -- '--provider openrouter ' "$STUB_QUOTA_LOG")" "1"
 
-# 0b. GLM is out of the chain: a GLM-pinned call never reaches GLM, it runs DeepSeek.
+# 0b. GLM is out of the chain: a GLM-pinned call never reaches GLM, it runs the pipeline route.
 nodead
 : >"$STUB_ARGV"
 OUT=$(printf '%s' "$prompt" | env -u PI_QUOTA_FAILOVER_CHAIN "$wrapper" --model zai/glm-5.3-flash --mode json --no-session 2>"$work/err0b")
 is "glm-pinned call exits 0" "$?" "0"
-out_has "glm-pinned call runs Haiku" '"model":"claude-bridge/claude-haiku-5-5"'
+out_has "glm-pinned call runs the pipeline route" '"model":"openrouter/deepseek/deepseek-v4.1-flash-1017:floor"'
 is "glm never called with the default chain" "$(grep -c 'zai/glm' "$STUB_ARGV")" "0"
 
 # 0c. A DeepSeek quota error moves on to Claude Haiku in the same call, and writes its marker.
