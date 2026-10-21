@@ -1,0 +1,13 @@
+# Claude accounts quota view
+
+## User outcome
+
+Every Claude account signed in on this machine shows its 5-hour and 7-day quota left on the dashboard, and `state/claude-accounts.json` carries the same numbers for dispatch.
+
+## Drive
+
+Run `bash claude-accounts/tests/claude-accounts.test.sh` from the repository root. It reads a fixture muxr registry through a stub quota-axi and proves both windows per account, a failing account's recorded cause, and that no secret field reaches the file. For the card, run `FM_HOME=<throwaway home> claude-accounts/bin/claude-accounts-quota.sh`, build and serve the dashboard with that home and capture the Overview at 390px; `bash fleet-dashboard/tests/run-fork-suite.sh <fork checkout>` covers the card's text.
+
+## Evidence
+
+Capture the test output and exit status, and the 390px screenshot, in done-done's run evidence directory. Pass only profile folder paths to quota-axi; never open files inside a login folder.

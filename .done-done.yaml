@@ -8,3 +8,5 @@ journeys:
     command: bash pipeline-quota-failover/run-proof.sh
   fleet-dashboard-wait-reasons:
     command: bash fleet-dashboard/run-proof.sh
+  claude-accounts-quota:
+    command: bash claude-accounts/run-proof.sh

@@ -288,6 +288,19 @@ test_each_failed_source_shows_unknown_and_why() {
   pass "each failed source shows unknown and why, and never guesses zero"
 }
 
+test_claude_accounts_card_shows_each_account_five_hour_and_seven_day_left() {
+  local home d
+  home=$(make_home claude-accounts)
+  d="$home/state/dashboard"
+  build "$home"
+  lacks "$d/index.html" "Claude accounts"
+  printf '{"schema":1,"generated_at":%s,"accounts":[{"id":"a","name":"default","folder":"/x","five_hour":{"left":63,"resets_at":null},"seven_day":{"left":34,"resets_at":null},"problem":null},{"id":"b","name":"Two","folder":"/y","five_hour":{"left":100,"resets_at":null},"seven_day":null,"problem":"not signed in"}]}\n' "$(date +%s)" > "$home/state/claude-accounts.json"
+  build "$home"
+  has "$d/index.html" "Claude accounts" "default 5 hours 63% left 7 days 34% left" "Two 5 hours 100% left 7 days not signed in"
+  [ "$(jq -r '[.claude_accounts[].name] | join(",")' "$d/data.json")" = default,Two ] || fail "data.json lacks the Claude accounts"
+  [ "$(jq -c '.claude_accounts[0] | has("folder")' "$d/data.json")" = false ] || fail "data.json carries a profile folder"
+}
+
 test_devices_and_machine_come_from_read_only_probes() {
   local home d proc locks bin key at nopath
   home=$(make_home probes)
@@ -993,5 +1006,6 @@ test_fleet_past_twenty_mates_keeps_every_lead_row
 test_board_json_feeds_the_app
 test_ship_view_loads_against_the_app
 test_each_failed_source_shows_unknown_and_why
+test_claude_accounts_card_shows_each_account_five_hour_and_seven_day_left
 test_devices_and_machine_come_from_read_only_probes
 test_serve_answers_each_page_and_remembers_the_grouping

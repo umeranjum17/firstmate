@@ -135,6 +135,9 @@ jobs:
       # Stub byokit-accounts and a throwaway config: nothing real is touched.
       - name: Account pool test
         run: bash account-pool/tests/account-pool.test.sh
+      # Fixture muxr registry and a stub quota-axi: nothing real is touched.
+      - name: Claude accounts test
+        run: bash claude-accounts/tests/claude-accounts.test.sh
       # done-done-axi 0.4.5 requires Node 22.18 and reads generated path globs in the lint fixtures.
       - uses: actions/setup-node@v4
         with:
