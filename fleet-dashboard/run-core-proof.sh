@@ -36,7 +36,7 @@ seed() {
   now=$(date +%s) today=$(date +%F) held_day=$(date -d '7 days ago' +%F)
   mkdir -p "$home"/{data,state,config,stubs,locks,proc/pressure} "$bin"
   printf '3\n' > "$home/config/lane-target"
-  printf 'main 6\n' > "$home/config/lane-caps"
+  printf 'main 3\n' > "$home/config/lane-caps"  # four open Main lanes against a cap of three: over the cap
   cat > "$home/data/backlog.md" <<EOF
 ## In flight
 - [ ] m-build - Build the main thing (repo: alpha) (kind: ship) (since $today)
@@ -106,6 +106,22 @@ chrome-devtools-axi resize 390 844 >/dev/null
 chrome-devtools-axi wait "m-stuck" >/dev/null
 chrome-devtools-axi eval 'JSON.stringify({ viewport: innerWidth, text: document.body.innerText })' >"$DONE_DONE_EVIDENCE_ROOT/board.txt"
 chrome-devtools-axi screenshot "$DONE_DONE_EVIDENCE_ROOT/board-390.png" >/dev/null
+# The board at a desktop width, then the one-tap Stuck and Waiting tabs and the lane cap beside a home's count.
+# BOARD_SHOTS_ONLY=1 captures the same shots without judging them (for a build that lacks the tabs).
+shot() {  # <name> <route> <width> <wait text>
+  chrome-devtools-axi open "$url$2" >/dev/null
+  chrome-devtools-axi resize "$3" 900 >/dev/null
+  chrome-devtools-axi wait "$4" >/dev/null
+  chrome-devtools-axi eval 'JSON.stringify({ viewport: innerWidth, text: document.body.innerText })' >"$DONE_DONE_EVIDENCE_ROOT/$1.txt"
+  chrome-devtools-axi screenshot "$DONE_DONE_EVIDENCE_ROOT/$1.png" >/dev/null
+}
+for w in 390 1280; do
+  shot "board-active-$w" '#/board' "$w" m-stuck
+  shot "board-stuck-$w" '#/board?tab=stuck' "$w" m-stuck
+  shot "board-waiting-$w" '#/board?tab=waiting' "$w" m-ci
+  shot "board-homes-$w" '#/board?rows=home' "$w" m-stuck
+done
+chrome-devtools-axi resize 390 844 >/dev/null
 chrome-devtools-axi open "${url}#/insights" >/dev/null
 chrome-devtools-axi wait "Why work waits" >/dev/null
 sleep 2
@@ -120,6 +136,16 @@ for want in "Why work waits now" "Blocked · own note" "Lead reply" "Held"; do
   grep -qF -- "$want" "$DONE_DONE_EVIDENCE_ROOT/queue.txt" || { echo "run-core-proof: Insights lacks '$want'" >&2; exit 1; }
 done
 
+if [ -z "${BOARD_SHOTS_ONLY:-}" ]; then
+  e=$DONE_DONE_EVIDENCE_ROOT
+  for w in 390 1280; do
+    grep -qF 'm-ci' "$e/board-waiting-$w.txt" && ! grep -qF 'm-stuck' "$e/board-waiting-$w.txt" || { echo "run-core-proof: Waiting tab at $w is not just the waiting lane" >&2; exit 1; }
+    grep -qF 'm-stuck' "$e/board-stuck-$w.txt" && ! grep -qF 'm-build' "$e/board-stuck-$w.txt" || { echo "run-core-proof: Stuck tab at $w is not just the stuck lanes" >&2; exit 1; }
+  done
+  grep -qF '4 / 3' "$e/board-homes-1280.txt" || { echo "run-core-proof: home band lacks the count against the lane cap" >&2; exit 1; }
+  grep -qF '4 / 3' "$e/board-homes-390.txt" || { echo "run-core-proof: phone home column lacks the count against the lane cap" >&2; exit 1; }
+fi
+
 # The steps and result the check judges the captures against.
 python3 - "$DONE_DONE_EVIDENCE_ROOT/steps.json" "$(git -C "$root" rev-parse --short HEAD)" <<'PY'
 import json, sys
@@ -129,9 +155,10 @@ steps = {
     "steps": [
         "Open the fleet dashboard in headless Chrome at 390px",
         "Read the Board: each lane with its title and state",
+        "Open the Stuck and Waiting tabs and the by-home view at 390px and 1280px",
         "Open Insights: the queue and wait reasons",
     ],
-    "result": "The Board lists m-stuck, m-ask, m-ci and m-build with their titles and states; Insights shows Why work waits now with the Blocked, Lead reply and Held groups",
+    "result": "The Board lists m-stuck, m-ask, m-ci and m-build with their titles and states; the Stuck tab holds only stuck lanes, the Waiting tab only the waiting lane, and a home with four open lanes against a cap of three reads 4 / 3; Insights shows Why work waits now with the Blocked, Lead reply and Held groups",
 }
 with open(sys.argv[1], "w") as f:
     json.dump(steps, f, indent=2, ensure_ascii=False)
