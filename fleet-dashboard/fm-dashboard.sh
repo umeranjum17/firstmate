@@ -1700,6 +1700,8 @@ if flow_text is not None:
             h, task = row['home'], row['task']
             row['display_title'] = titles.get((h, task)) or re.sub(r'\s+PR \d+$', '', done_title.get((h, task), '')) or 'Task name not recorded'
             row['display_reason'] = prose(row.get('reason', ''))
+            row['display_hold_reason'] = prose(row.get('hold_reason', ''))
+            row['display_parked_reason'] = prose(row.get('parked_reason', ''))
             why = row.get('why', '')
             if why.startswith('dependency:'):
                 row['display_why'] = 'Waiting for: ' + ', '.join(titles.get((h, t.strip()), 'earlier work (name unavailable)') for t in why[11:].split(','))

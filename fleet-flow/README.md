@@ -60,6 +60,12 @@ The symlink is deliberate, not an exec shim: `bin/fm-flow.sh` reads its stage-cl
   `executed_7d`, `time_to_merge` (median, nearest-rank P85),
   `time_to_merge_by_home`, `trend_7d`, `trend_7d_by_home` and `limitations`;
   `at` carries the effective now.
+- Open lanes include their recorded `kind`, `project`, in-flight backlog
+  `hold_kind` / `hold_reason`, and a `parked_reason` only when the matching
+  project appears in a captain-shared park, pause, starvation or soft-pause
+  note.
+- An in-flight captain or external backlog hold contributes an `open_waits`
+  entry with unknown age; no timestamp is inferred from backlog prose.
 - Read-only: no endpoint or cache writes. Missing or unavailable probes yield
   null with a limitation, never a fabricated zero; live capacity observations
   carry their own timestamp, independent of `--now`.

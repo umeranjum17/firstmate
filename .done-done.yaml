@@ -6,3 +6,5 @@ journeys:
     command: bash quota-failover/run-proof.sh
   pipeline-route:
     command: bash pipeline-quota-failover/run-proof.sh
+  fleet-dashboard-wait-reasons:
+    command: bash fleet-dashboard/run-proof.sh

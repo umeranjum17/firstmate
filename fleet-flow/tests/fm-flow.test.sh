@@ -114,6 +114,12 @@ assert relive['reason'] == 'unknown: no status reason'
 (main / 'config').mkdir()
 (main / 'config/fm-flow-check.sh').write_text("clock = 30 if L['verb'] == 'needs-decision' else 50\n")
 (main / 'config/lane-caps').write_text('main 0\n')
+(main / 'data/captain-shared.md').write_text('# Captain notes\n- project-x: soft pause pending budget review\n')
+(child / 'data/backlog.md').write_text('## In flight\n- [ ] hold-lane - Captain held task (hold: wait for captain) (hold-kind: captain)\n')
+(child / 'state/hold-lane.meta').write_text('kind=ship\nproject=project-y\n')
+(child / 'state/hold-lane.status').write_text('working [at=10]: started\n')
+(child / 'state/project-paused.meta').write_text('kind=ship\nproject=project-x\n')
+(child / 'state/project-paused.status').write_text('paused [at=10]: soft pause\n')
 for task, reason in [('memory', 'fm-mem-gate: waiting (free 1 GB)'), ('credential', 'waiting for login'),
                      ('ci', 'waiting for CI queue'), ('merge', 'waiting for merge'),
                      ('mention', 'memory gate code fixed; waiting for new instructions')]:
@@ -131,6 +137,11 @@ for task, reason in [('memory', 'fm-mem-gate: waiting (free 1 GB)'), ('credentia
 (child / 'state/smallmerge.status').write_text('blocked [at=90] [key=wait]: waiting for merge\n')
 z = json.loads(run())
 new = {l['task']: l for l in z['lanes'] if l['open']}
+assert new['hold-lane']['kind'] == 'ship' and new['hold-lane']['hold_kind'] == 'captain', new['hold-lane']
+assert new['hold-lane']['open_waits'][-1]['cause'] == 'captain'
+assert new['hold-lane']['open_waits'][-1]['reason'] == 'wait for captain'
+assert new['project-paused']['project'] == 'project-x'
+assert new['project-paused']['parked_reason'] == 'project-x: soft pause pending budget review'
 for task, expected in [('memory', 'memory_gate'), ('credential', 'credential_external'),
                        ('ci', 'ci_queue'), ('merge', 'review_merge'), ('mention', 'unknown')]:
     assert new[task]['open_waits'][0]['cause'] == expected
