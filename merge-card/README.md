@@ -3,6 +3,11 @@
 `merge-card` remains the gate/check/post executable documented in the root [README](../README.md#merge-card).
 Its existing config shims and card behavior are unchanged.
 
+## One card per PR
+
+The card key is the PR's alone (`merge-<owner>-<repo>-pull-<n>`). A post for a new head replaces that PR's card, and any head-suffixed card an older merge-card filed for it, so the board keeps the newest proof; a repeat post for the same head adds nothing.
+A screen-free merge's card is titled `<repo> #<n>: internal change passed its checks`.
+
 ## Optional fork adapters
 
 `bin/fm-merge-hooks-lib.sh` owns the fork-only `fm_dod_merge_gate` and `fm_merge_post_hook` adapters, with their existing names, arguments, timeout defaults and messages.
