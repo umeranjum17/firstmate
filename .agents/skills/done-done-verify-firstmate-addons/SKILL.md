@@ -7,6 +7,7 @@ description: Verify firstmate-addons changes through their executable integratio
 
 ## Feature map
 
+- [Pipeline route switch](features/pipeline-route-switch.md): run `bash pipeline-quota-failover/tests/switch-route.test.sh`; it uses a fixture config and a stub pi, proves that a switch edits only the agent and model keys, writes a backup first and restores it, and never touches a real config or model.
 - [Incremental fleet-pulse chat export](features/incremental-fleet-pulse-chat-export.md): run `bash fleet-pulse/tests/chat-tsv.test.sh`; it uses synthetic transcripts and a disposable Git home, proves append/idempotence and redaction, and never reads real transcripts.
 - [Quota failover screen matching](features/quota-failover-screen-match.md): run `bash quota-failover/run-proof.sh`; it invokes the real failover against wrapper text and Claude's own limit banner in a disposable fixture home.
 - [Persisted pipeline route](features/pipeline-route.md): run `bash pipeline-quota-failover/tests/pi-quota-failover-route.test.sh`; it uses a stub pi and quota-axi in a throwaway HOME, proves the chain is the route the config holds and that an `openrouter/*` route keeps the deepseek idle limit, and never calls a real pi or reads a real config.

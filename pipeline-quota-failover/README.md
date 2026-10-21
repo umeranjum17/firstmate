@@ -21,6 +21,10 @@ Fail-open cases (the route is tried as before, one log line says so):
 
 An answer that is not parseable JSON is treated as not exhausted, without a log line.
 
+## Moving the pipeline agent and route
+
+`switch.sh` moves the no-mistakes pipeline agent, and every pipeline step with it, to one accepted agent and one model. It edits only two keys by name (`agent`, `agent_config.<agent>.model`), leaves every other key, value and comment alone, writes a timestamped backup first and keeps the backup's version when the model does not answer PONG. `--dry-run` prints the planned edit and writes nothing, `--restore-latest` puts the last backup back, and the default model is the OpenRouter DeepSeek floor route `openrouter/deepseek/deepseek-v4.1-flash-1017:floor`.
+
 ## Idle watchdog
 
 A pi call that writes no stdout and no stderr for `PI_QUOTA_FAILOVER_IDLE_SECS` (default 120; `PI_QUOTA_FAILOVER_BRIDGE_IDLE_SECS`, default 300, for `claude-bridge/*` models; `PI_QUOTA_FAILOVER_DEEPSEEK_IDLE_SECS`, default 300, for `deepseek/*` models) is ended with TERM to pi

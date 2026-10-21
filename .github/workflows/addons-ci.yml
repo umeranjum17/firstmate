@@ -153,3 +153,5 @@ jobs:
       # Fixture home, stub gh and receipts; no merge runs.
       - name: Owner-rules gate test
         run: bash owner-rules/tests/owner-rules-gate.test.sh
+      - name: Pipeline route switch test
+        run: bash pipeline-quota-failover/tests/switch-route.test.sh
