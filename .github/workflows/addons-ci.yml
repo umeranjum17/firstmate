@@ -15,17 +15,19 @@ jobs:
   self-check:
     name: Add-on self-checks
     runs-on: ubuntu-latest
-    # Normal tier: a shellcheck pass and a bash parse over a handful of
-    # scripts, plus the stubbed e2e tests of the memory gate, route change,
-    # home flow check and GLM queue (about 20 s and a python3-yaml install).
-    timeout-minutes: 5
+    # The full-fork hook journeys take several minutes; leave room for them
+    # alongside shell checks and the stubbed add-on integration suites.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+      - name: Install tasks-axi for fork lifecycle tests
+        run: npm install --global tasks-axi
       - name: Wait-timers hook journey
         run: |
-          git clone --depth 1 --filter=blob:none --sparse https://github.com/umeranjum17/firstmate.git "$RUNNER_TEMP/firstmate"
-          git -C "$RUNNER_TEMP/firstmate" sparse-checkout set bin tests
+          git clone --no-single-branch https://github.com/umeranjum17/firstmate.git "$RUNNER_TEMP/firstmate"
           FM_TEST_FORK="$RUNNER_TEMP/firstmate" bash wait-timers/tests/wait-timers-hook-e2e.sh
+      - name: Receipts hook journeys
+        run: FM_TEST_FORK="$RUNNER_TEMP/firstmate" bash receipts/tests/receipts-hook-e2e.sh
       # An add-on script is a shell script under a top-level add-on directory,
       # either one level down (`merge-card/merge-card`, `fleet-dashboard/fm-dashboard.sh`)
       # or two levels down in its `bin/` and `tests/` subdirectories

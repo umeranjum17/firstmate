@@ -1,34 +1,17 @@
 # receipts
 
-The completion-receipt publisher — the script that publishes one task's
-candidate-bound PASS or FAIL completion receipt that guarded landing checks —
-moved **verbatim** out of the supervising fork into this add-on repository.
-Nothing publishes from here yet: the live flow keeps running the fork's
-`bin/fm-run-receipt.sh`, and the fork-side hook that will exec into this
-directory lands in a later PR. Until that swap this directory is dormant, and
-every moved byte below is identical to the fork copy the live flow runs today.
+The completion-receipt publisher and acceptance helpers run from this add-on;
+the fork optionally sources them from `bin/fm-dod-lib.sh`.
+The publisher reads fork libraries from `$FM_FORK_BIN`, else `$FM_HOME/bin`.
 
-Step A of the fork exit: the publisher runs from this directory and the
-acceptance/brief/meta logic lives in `bin/fm-receipts-lib.sh`. The publisher reads
-the fork libraries from `$FM_FORK_BIN`, else `$FM_HOME/bin`; otherwise its body is
-identical to the fork copy.
+The fork's done-acceptance hook delegates to `fm_receipts_accept_done`.
+Its local merge and both PR merge paths delegate to `fm_dod_receipt_accept`.
+The add-on owns brief rendering, receipt inheritance, promotion, publishing, and receipt validation.
+The fork still owns verified forge-head selection in `fm-pr-check.sh`; moving that decision requires a separate fork hook.
 
-## Step-B hooks (fork)
-
-- `bin/fm-dod-lib.sh`: replace the `fm_dod_receipt_accept` definition with the optional
-  source `[ ! -r "${FM_ADDONS_DIR:-$FM_HOME/projects/firstmate-addons}/receipts/bin/fm-receipts-lib.sh" ] || . "${FM_ADDONS_DIR:-$FM_HOME/projects/firstmate-addons}/receipts/bin/fm-receipts-lib.sh"`;
-  the merge-local / pr-merge call sites become
-  `if declare -F fm_dod_receipt_accept >/dev/null; then fm_dod_receipt_accept ... || exit 1; fi`.
-- Brief: `if declare -F fm_receipts_brief >/dev/null; then fm_receipts_brief "$id"; fi`.
-- Spawn meta: `if declare -F fm_receipts_inherit >/dev/null; then fm_receipts_inherit "$BRIEF" "${RELAUNCH_META:-}"; fi`.
-- Done acceptance: `if declare -F fm_receipts_accept_done >/dev/null; then fm_receipts_accept_done "$wt" "$mode" "$line" "$state" "$id" "$meta" "$forge_head" || return 1; fi`.
-- Promote: `if declare -F fm_receipts_promote >/dev/null; then fm_receipts_promote "$META" "$TMP"; fi`.
-- Not in this step: `fm_dod_accept_ship_done`'s cross-repo head selection stays in the fork.
-
-`tests/receipts-hook-e2e.sh` (set `FM_TEST_FORK`) applies the acceptance/publisher
-swap to a private fork copy and runs the fork's real `tests/fm-dod-lib.test.sh`
-receipt journey over this add-on, then checks the helpers; with the add-on absent
-the guarded lines are a no-op.
+`tests/receipts-hook-e2e.sh` (set `FM_TEST_FORK`) copies the real fork scripts,
+runs its done-acceptance, local-delivery, and PR-merge integration journeys with
+the add-on loaded, then checks the helpers and absent-add-on behavior.
 
 ## Layout
 
