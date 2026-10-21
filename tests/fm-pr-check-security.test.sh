@@ -923,24 +923,6 @@ test_receipt_candidate_hook_skipped_when_gate_ignores_candidate() {
   pass "fm-pr-check arms a verified no-mistakes pull request without consulting the receipts hook"
 }
 
-test_receipt_candidate_without_hook_forwards_cross_repo_head() {
-  local dir sha addons
-  sha=0123456789abcdef0123456789abcdef01234567
-  dir=$(make_case receipt-candidate-cross-repo)
-  git -C "$dir/wt" remote add origin https://github.com/x/y.git
-  addons="$dir/addons"
-  mkdir -p "$addons/receipts/bin"
-  printf '%s\n' 'fm_receipts_accept_done() { printf "%s" "${7:-}" > "$FM_TEST_CANDIDATE_OUT"; }' > "$addons/receipts/bin/fm-receipts-lib.sh"
-  fm_write_meta "$dir/home/state/task-a.meta" \
-    "window=firstmate:fm-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
-    "project=$dir/project" "kind=ship" "mode=direct-PR"
-  FM_ADDONS_DIR="$addons" FM_TEST_CANDIDATE_OUT="$dir/candidate" FM_TEST_GH_HEAD=$sha \
-    run_check_entry "$dir" task-a https://github.com/o/r/pull/4 > "$dir/stdout" 2> "$dir/stderr" \
-    || fail "cross-repo check without a receipt hook failed: $(cat "$dir/stderr")"
-  [ "$(cat "$dir/candidate")" = "$sha" ] || fail "cross-repo verified head was not forwarded: $(cat "$dir/candidate")"
-  pass "fm-pr-check forwards the verified head for a cross-repo pull request without the hook"
-}
-
 test_valid_recording_and_merge_derivation() {
   local dir expected sidecar count rc
   dir=$(make_case valid-recording)
@@ -3848,7 +3830,6 @@ test_receipt_candidate_hook_junk_output_refuses
 test_receipt_candidate_hook_empty_output_passes_on_non_github
 test_receipt_candidate_hook_older_head_refuses
 test_receipt_candidate_hook_skipped_when_gate_ignores_candidate
-test_receipt_candidate_without_hook_forwards_cross_repo_head
 test_valid_recording_and_merge_derivation
 test_rejected_metacharacter_bytes_are_inert
 test_static_poll_contract

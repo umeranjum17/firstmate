@@ -167,9 +167,7 @@ PROJECT=$(grep '^project=' "$META" | tail -1 | cut -d= -f2- || true)
 # The optional receipts add-on chooses the receipt candidate from the worktree,
 # pull request URL, mode, metadata path and verified forge head PR_HEAD (empty
 # when unverified); its output must be empty (no candidate) or exactly PR_HEAD, or
-# the check refuses. Without
-# the add-on, a pull request outside the worktree's origin forwards its verified
-# forge head, which bin/fm-pr-merge.sh binds the merge to.
+# the check refuses.
 # The gate is asked about the ready report this task's worker was told to give;
 # on a Gerrit change both publishing modes report the same published line.
 case "$PROVIDER:$MODE" in
@@ -188,8 +186,6 @@ if [ -z "$PR_HEAD" ] || ! fm_dod_forge_head_is_named_head "$MODE"; then
       echo "error: receipts add-on hook fm_receipts_pr_candidate returned a candidate other than the verified pull request head; no receipt candidate was chosen" >&2
       exit 1
     fi
-  elif [ -n "$PR_HEAD" ] && fm_dod_pr_outside_origin "$WT" "$URL"; then
-    RECEIPT_CANDIDATE=$PR_HEAD
   fi
   if ! GATE_REASON=$(fm_dod_accept_ship_done "${KIND:-ship}" "$MODE" "$WT" "$PROJECT" "$DONE_LINE" "$STATE" "$ID" "$META" "" "$RECEIPT_CANDIDATE"); then
     echo "error: $GATE_REASON" >&2
