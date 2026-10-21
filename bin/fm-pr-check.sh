@@ -5,9 +5,10 @@
 # outside the worker's disposable copy; in no-mistakes mode a forge-reported
 # head is that named head and is already stored on the forge. The optional
 # receipts add-on picks the receipt candidate from the verified forge head and
-# the gate receives it as a hook argument. The gate also reads a pull request's live forge head itself when
-# the worker copy holds no remote-tracking ref for it, so a push that opened the
-# PR from outside this copy's ref sync still registers.
+# the gate receives it as a hook argument. The gate also reads a pull request's
+# live forge head itself when the worker copy holds no remote-tracking ref for
+# it, so a push that opened the PR from outside this copy's ref sync still
+# registers.
 # The watcher check source is byte-for-byte bin/fm-pr-poll.sh; task and PR data
 # live only in a private sidecar and are never interpolated into shell source.
 # A GitHub pull request URL, a GitLab merge request URL, and a Gerrit change URL
@@ -163,17 +164,23 @@ fi
 
 MODE=$(grep '^mode=' "$META" | tail -1 | cut -d= -f2- || true)
 PROJECT=$(grep '^project=' "$META" | tail -1 | cut -d= -f2- || true)
-# The optional receipts add-on chooses the receipt candidate: it is given the
-# worktree, the pull request URL, the mode, the metadata path and the verified
-# forge head PR_HEAD (empty when unverified), and prints the candidate to bind.
-# Without the add-on no candidate is forwarded, and fm_dod_accept_ship_done
-# binds a named-head or outside-origin pull request to its recorded pr_head.
+# The optional receipts add-on chooses the receipt candidate from the worktree,
+# pull request URL, mode, metadata path and verified forge head PR_HEAD (empty
+# when unverified); its output must be a commit SHA or the check refuses. Without
+# the add-on, a pull request outside the worktree's origin forwards its verified
+# forge head, which bin/fm-pr-merge.sh binds the merge to.
 RECEIPT_CANDIDATE=
 if declare -F fm_receipts_pr_candidate >/dev/null; then
   if ! RECEIPT_CANDIDATE=$(fm_receipts_pr_candidate "$WT" "$URL" "$MODE" "$META" "$PR_HEAD"); then
     echo "error: receipts add-on hook fm_receipts_pr_candidate failed; no receipt candidate was chosen" >&2
     exit 1
   fi
+  if ! fm_pr_head_valid "$RECEIPT_CANDIDATE"; then
+    echo "error: receipts add-on hook fm_receipts_pr_candidate returned no valid commit SHA; no receipt candidate was chosen" >&2
+    exit 1
+  fi
+elif [ -n "$PR_HEAD" ] && fm_dod_pr_outside_origin "$WT" "$URL"; then
+  RECEIPT_CANDIDATE=$PR_HEAD
 fi
 
 # The gate is asked about the ready report this task's worker was told to give;
