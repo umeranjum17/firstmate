@@ -31,15 +31,20 @@ read_one() { # id name folder -> one account JSON object
   rc=$?
   err=$(sed -n '1p' "$errf" | cut -c1-160)
   rm -f "$errf"
-  jq -cn --arg id "$id" --arg name "${name:-default}" --arg folder "$folder" --arg raw "$raw" --arg err "$err" --argjson rc "$rc" '
+  # A failed read (a vendor rate limit, say) keeps the account's last good windows, marked stale with their own read_at.
+  jq -cn --arg id "$id" --arg name "${name:-default}" --arg folder "$folder" --arg raw "$raw" --arg err "$err" --argjson rc "$rc" \
+    --argjson now "$NOW" --argjson prev "$(jq -c --arg id "$id" '(.generated_at) as $g | [.accounts[]? | select(.id == $id and (.five_hour != null or .seven_day != null)) | . + {read_at: (.read_at // $g)}] | first // null' "$OUT" 2>/dev/null || echo null)" '
     def win($w): ([ $raw | fromjson? | (.providers[0]? // .) | .windows[]? | select(.id == $w) ] | first) as $x
       | if $x == null then null else {left: $x.percentRemaining, resets_at: $x.resetsAt} end;
     (win("five_hour")) as $h | (win("seven_day")) as $d
-    | {id: $id, name: $name, folder: $folder, five_hour: $h, seven_day: $d,
-       problem: (if $rc != 0 then ($err | if . == "" then "quota-axi exited \($rc)" else . end)
-                 elif $h == null and $d == null then "no 5h or 7d window in the reading" else null end)}'
+    | ([$raw | fromjson? | (.providers[0]? // .) | .state.error?] | first) as $verr
+    | (if $rc != 0 then (if $err != "" then $err else ($verr // "quota-axi exited \($rc)") end)
+       elif $h == null and $d == null then ($verr // "no 5h or 7d window in the reading") else null end) as $problem
+    | {id: $id, name: $name, folder: $folder, five_hour: $h, seven_day: $d, read_at: $now, problem: $problem, stale: false}
+    | if .problem != null and $prev != null then . + {five_hour: $prev.five_hour, seven_day: $prev.seven_day, read_at: $prev.read_at, stale: true} else . end'
 }
 
+NOW=$(date +%s)
 ACCOUNTS=()
 for row in "${ROWS[@]}"; do
   IFS=$'\037' read -r id name folder <<<"$row"

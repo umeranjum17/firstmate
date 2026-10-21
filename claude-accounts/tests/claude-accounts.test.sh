@@ -17,7 +17,8 @@ R
 cat > "$w/bin/quota-axi" <<'S'
 #!/usr/bin/env bash
 case "$CLAUDE_CONFIG_DIR" in
-*/a1) echo '{"providers":[{"provider":"claude","windows":[{"id":"five_hour","percentRemaining":63,"resetsAt":"2026-10-21T08:00:00+00:00"},{"id":"seven_day","percentRemaining":34,"resetsAt":"2026-10-26T12:00:00+00:00"},{"id":"model:fable","percentRemaining":100}]}]}' ;;
+*/a1) [ ! -e "$QDIR/rate-limit" ] || { echo '{"providers":[{"windows":[],"state":{"error":"Claude quota endpoint rate limited"}}]}'; exit 1; }
+  echo '{"providers":[{"provider":"claude","windows":[{"id":"five_hour","percentRemaining":63,"resetsAt":"2026-10-21T08:00:00+00:00"},{"id":"seven_day","percentRemaining":34,"resetsAt":"2026-10-26T12:00:00+00:00"},{"id":"model:fable","percentRemaining":100}]}]}' ;;
 */a2) echo '{"providers":[{"provider":"claude","windows":[{"id":"five_hour","percentRemaining":100},{"id":"seven_day","percentRemaining":69,"resetsAt":"2026-10-22T07:00:00+00:00"}]}]}' ;;
 *) echo "error: not signed in" >&2; exit 2 ;;
 esac
@@ -25,7 +26,7 @@ S
 chmod +x "$w/bin/quota-axi"
 fails=0
 is() { if [ "$2" = "$3" ]; then echo "ok - $1"; else echo "not ok - $1: got [$2], want [$3]"; fails=$((fails + 1)); fi; }
-run() { out=$(env -i PATH="$w/bin:$PATH" HOME="$w" TMPDIR="$w" FM_HOME="$w/home" FM_CLAUDE_ACCOUNTS_REGISTRY="${REG:-$w/registry.json}" bash "$here/../bin/claude-accounts-quota.sh" "$@" 2>&1); rc=$?; }
+run() { out=$(env -i QDIR="$w" PATH="$w/bin:$PATH" HOME="$w" TMPDIR="$w" FM_HOME="$w/home" FM_CLAUDE_ACCOUNTS_REGISTRY="${REG:-$w/registry.json}" bash "$here/../bin/claude-accounts-quota.sh" "$@" 2>&1); rc=$?; }
 f=$w/home/fixture/users/user-017/claude-accounts.json
 
 run --print
@@ -36,6 +37,11 @@ is "an unnamed account is called default" "$(jq -r '.accounts[0].name' "$f")" de
 is "5h and 7d left per account" "$(jq -r '.accounts[]|select(.problem==null)|"\(.five_hour.left)/\(.seven_day.left)"' "$f" | paste -sd,)" "63/34,100/69"
 is "a failing account carries its cause" "$(jq -r '.accounts[2].problem' "$f")" "error: not signed in"
 is "no secret field reaches the file" "$(grep -c 'SECRET-NOT-FOR-OUTPUT\|token' "$f")" 0
+
+touch "$w/rate-limit"; run
+is "a rate-limited account keeps its last good windows, marked stale, with the vendor's cause" "$(jq -r '.accounts[0]|"\(.five_hour.left)/\(.seven_day.left) \(.stale) \(.problem)"' "$f")" "63/34 true Claude quota endpoint rate limited"
+rm "$w/rate-limit"; run
+is "the next good read clears the stale mark" "$(jq -r '.accounts[0].stale' "$f")" false
 
 printf '%s\n' '{"accounts":[{"id":"x","provider":"claude","name":"X","folder":"'"$w/a3"'"}]}' > "$w/only-bad.json"
 REG=$w/only-bad.json run

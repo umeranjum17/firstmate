@@ -10,3 +10,5 @@ journeys:
     command: bash fleet-dashboard/run-proof.sh
   claude-accounts-quota:
     command: bash claude-accounts/run-proof.sh
+  claude-accounts-pick:
+    command: bash claude-accounts/run-proof-pick.sh

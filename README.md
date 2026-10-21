@@ -12,7 +12,7 @@ One line per add-on, with how it wires in. `<home>` is your home folder for the 
 - `bearings-board` — runs the Bearings board from the Firstmate checkout as a thin wrapper, with no copied upstream code. Wire in: `bearings-board/install.sh <home>`.
 - `ask-default` — an unanswered ask falls back to its pre-declared safe default instead of blocking the home. Needs a fork hook (FORK-EXIT.md).
 - `backlog-lock-reclaim` — reclaims a 0-byte `<home>/data/backlog.md.lock` left by a dead tasks-axi writer, once it is older than 60 s and no process has it open; until then every backlog write fails LOCKED. Wire in: `backlog-lock-reclaim/install.sh <home>`.
-- `claude-accounts` — one quota view of every signed-in Claude account (5-hour and 7-day left), shown on the dashboard and written for dispatch. Wire in: run `FM_HOME=<home> claude-accounts/bin/claude-accounts-quota.sh` on a timer; see `claude-accounts/README.md`.
+- `claude-accounts` — one quota view of every signed-in Claude account (5-hour and 7-day left), shown on the dashboard and written for dispatch; new Claude workers start on the account with the most runway. Wire in: `claude-accounts/install.sh <home>` plus the reader on a timer; see `claude-accounts/README.md`.
 - `claude-model-guard` — keeps agent runs off Fable (Sonnet is allowed): the fable alias resolves to Haiku, full Fable ids are refused. Wire in: `claude-model-guard/install.sh`.
 - `claude-quota` — alarms when the shared Claude plan burns ahead of its 5-hour or weekly window. Wire in: `claude-quota/install.sh <home>`.
 - `delete-guard` — stops any agent from recursively deleting `/` or a home folder; a block alerts you and is final. Wire in: `delete-guard/install.sh <home>`.
