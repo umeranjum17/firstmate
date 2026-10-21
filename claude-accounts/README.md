@@ -26,3 +26,9 @@ Test: `bash claude-accounts/tests/claude-accounts.test.sh`.
 Wire in: `claude-accounts/install.sh <home>` writes `<home>/config/account-pool`; remove with `claude-accounts/uninstall.sh <home>`. It refuses to replace a different account-pool file, and it never touches a pin file (`config/claude-account`). Install from merged main only.
 
 Test: `bash claude-accounts/tests/claude-accounts-pick.test.sh`.
+
+## Refresh timer
+
+`install-timer.sh [--dry-run] <home>` installs a systemd user timer (`fm-claude-accounts-quota.timer`) that runs the reader every 5 minutes for that home, so the dashboard card and `state/claude-accounts.json` stay current; `--dry-run` prints what would be written. It copies the reader to `~/.local/share/fm-claude-accounts/` and enables the timer only when something changed. Remove with `uninstall-timer.sh`. Install from merged main only.
+
+Test: `bash claude-accounts/tests/claude-accounts-timer.test.sh`.

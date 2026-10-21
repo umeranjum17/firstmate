@@ -13,6 +13,7 @@ description: Verify firstmate-addons changes through their executable integratio
 - [Persisted pipeline route](features/pipeline-route.md): run `bash pipeline-quota-failover/tests/pi-quota-failover-route.test.sh`; it uses a stub pi and quota-axi in a throwaway HOME, proves the chain is the route the config holds and that an `openrouter/*` route keeps the deepseek idle limit, and never calls a real pi or reads a real config.
 - [Claude accounts quota view](features/claude-accounts-quota.md): run `bash claude-accounts/tests/claude-accounts.test.sh`; it uses a fixture muxr registry and a stub quota-axi, proves 5h and 7d left per account and a recorded failure cause, and never opens a login folder.
 - [Claude accounts chooser](features/claude-accounts-pick.md): run `bash claude-accounts/tests/claude-accounts-pick.test.sh`; it uses a fixture registry and stub quota-axi, proves the most-runway pick, the switch when one account runs low, and install/uninstall of config/account-pool.
+- [Claude accounts refresh timer](features/claude-accounts-timer.md): run `bash claude-accounts/tests/claude-accounts-timer.test.sh`; it installs the units into a throwaway tree with a stub systemctl, proves dry run, rerun and uninstall, and never touches the host's timers.
 
 ## Procedure
 
