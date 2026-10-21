@@ -771,6 +771,17 @@ test_relaunch_keeps_a_recorded_default_model_without_refusing() {
   pass "fm-control relaunch: a recorded model=default relaunches without refusing"
 }
 
+test_relaunch_explicit_default_model_relaunches_a_record_without_a_model() {
+  local dir out rc
+  dir=$(new_case explicit-default rl83)
+  add_ship_task "$dir" rl83 claude
+  sed -i '/^model=/d' "$dir/home/state/rl83.meta"
+  out=$(run_control "$dir" rl83 relaunch --model default --note "restart on default"); rc=$?
+  expect_code 0 "$rc" "an explicit --model default must clear a missing stored model"$'\n'"$out"
+  [ "$(meta_field "$dir" rl83 model)" = default ] || fail "the explicit default model should be recorded"
+  pass "fm-control relaunch: an explicit --model default relaunches a record without a stored model"
+}
+
 test_relaunch_refuses_a_secondmate_missing_stored_model() {
   local dir home out rc
   dir=$(new_case smmissingmodel sm8)
@@ -3350,6 +3361,7 @@ test_relaunch_requires_a_note_for_a_ship_task
 test_relaunch_refuses_missing_stored_model_before_stopping
 test_relaunch_refuses_missing_stored_model_for_any_harness
 test_relaunch_keeps_a_recorded_default_model_without_refusing
+test_relaunch_explicit_default_model_relaunches_a_record_without_a_model
 test_relaunch_refuses_a_secondmate_missing_stored_model
 test_spawn_relaunch_refuses_a_secondmate_missing_stored_model
 test_spawn_relaunch_refuses_a_secondmate_record_with_a_remote_host_missing_model_locally
