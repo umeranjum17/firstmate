@@ -14,3 +14,6 @@ journeys:
     command: bash claude-accounts/run-proof-pick.sh
   claude-accounts-timer:
     command: bash claude-accounts/run-proof-timer.sh
+  core:
+    command: bash fleet-dashboard/run-core-proof.sh
+    core: true
