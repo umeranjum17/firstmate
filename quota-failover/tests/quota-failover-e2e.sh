@@ -75,6 +75,13 @@ case $* in
 esac
 echo 'ERROR: 429 Upstream request failed: Rate limit exceeded'
 exit 1
+#--- bin/claude
+#!/usr/bin/env bash
+if [ "${CLAUDE_LIMIT:-}" = yes ]; then
+  echo "You've hit your usage limit for your plan; try again in 3h"
+  exit 1
+fi
+echo PONG
 #--- bin/quota-axi
 #!/usr/bin/env bash
 echo '{"schemaVersion":5,"providers":[]}'
@@ -82,7 +89,7 @@ STUBS
 for lib in fm-backend.sh fm-busy-lib.sh fm-quota-axi-lib.sh fm-parent-channel-lib.sh fm-account-pool-lib.sh; do
   ln -s fm-stub-lib.sh "$home/bin/$lib" || exit 1
 done
-chmod +x "$home/bin/fm-crew-state.sh" "$home/bin/fm-control.sh" "$stub/opencode" "$stub/quota-axi"
+chmod +x "$home/bin/fm-crew-state.sh" "$home/bin/fm-control.sh" "$stub/opencode" "$stub/claude" "$stub/quota-axi"
 
 # Step 5 ranked first, a second dead route, then the live ones.
 cat >"$home/config/crew-dispatch.json" <<'JSON' || exit 1
@@ -119,8 +126,8 @@ has "pass1: the dead 429 route was passed over, not chosen for a move" "$log" \
   'passed over opencode-go/step-5-preview-free is out of dispatch'
 count "pass1: two relaunches onto the live candidate" "$ctl" \
   ' relaunch --harness opencode --model opencode-go/mimo-v2.6-flash ' 2
-is "pass1: the dead routes are gone from new dispatch" \
-  "$(grep -Eo 'step-5-preview-free|gpt-5.6-luna' "$disp" 2>/dev/null | sort -u | paste -sd, -)" ""
+is "pass1: only the probe-confirmed dead route leaves dispatch" \
+  "$(grep -Eo 'step-5-preview-free|gpt-5.6-luna' "$disp" 2>/dev/null | sort -u | paste -sd, -)" "gpt-5.6-luna"
 
 # The routes answer again: one pass restores them to dispatch and moves
 # nothing back.
@@ -213,6 +220,21 @@ count "pass7: the stop's changed label re-fires nothing" "$wake" 'q1 stopped' 1
 is "pass7: and the out route is not rested a second time" "$(cat "$pooll")" "rest c3
 rest c3
 rest go9"
+
+# Wrapper/file text is not Claude's limit banner and must not remove its route.
+printf '[]\n' >"$dead"
+printf '{"rules":[],"default":[{"harness":"claude","model":"claude-haiku-5-5"}]}\n' >"$disp"
+printf 'endpoint_task_id=cw\nharness=claude\nmodel=claude-haiku-5-5\nkind=crewmate\nspawn_gen=s0.cw\n' >"$home/state/cw.meta"
+printf 'quota exhausted' >"$home/state/cw.screen"
+run
+is "pass8: wrapper text leaves Haiku dispatch intact" "$(jq -r '.default[0].model' "$disp")" claude-haiku-5-5
+is "pass8: wrapper text does not mark Haiku dead" "$(jq -r 'any(.[]; .model == "claude-haiku-5-5")' "$dead")" false
+
+# The actual Claude banner is confirmed by the one-line probe before removal.
+printf "%s\n" "You've hit your usage limit for your plan; try again in 3h" >"$home/state/cw.screen"
+CLAUDE_LIMIT=yes run
+is "pass9: confirmed Claude limit removes Haiku" "$(jq -r '.default // [] | length' "$disp")" 0
+is "pass9: confirmed Claude limit is recorded out" "$(jq -r 'any(.[]; .model == "claude-haiku-5-5")' "$dead")" true
 
 if [ "$fails" -eq 0 ]; then
   echo "quota-failover e2e: all assertions held"
