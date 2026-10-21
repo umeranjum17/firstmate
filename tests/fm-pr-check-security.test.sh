@@ -870,6 +870,21 @@ test_receipt_candidate_hook_junk_output_refuses() {
   pass "fm-pr-check refuses when the receipts add-on hook prints a non-SHA"
 }
 
+test_receipt_candidate_hook_skipped_when_gate_ignores_candidate() {
+  local dir
+  dir=$(make_case receipt-candidate-no-mistakes-skip)
+  mkdir -p "$dir/addons/receipts/bin"
+  printf '%s\n' 'fm_receipts_pr_candidate() { return 3; }' > "$dir/addons/receipts/bin/fm-receipts-lib.sh"
+  fm_write_meta "$dir/home/state/task-a.meta" \
+    "window=firstmate:fm-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
+    "project=$dir/project" "kind=ship" "mode=no-mistakes"
+  FM_ADDONS_DIR="$dir/addons" FM_TEST_GH_HEAD=0123456789abcdef0123456789abcdef01234567 \
+    run_check_entry "$dir" task-a https://github.com/o/r/pull/4 > "$dir/stdout" 2> "$dir/stderr" \
+    || fail "a no-mistakes check with a verified head refused on an unused receipt hook: $(cat "$dir/stderr")"
+  [ -e "$dir/home/state/task-a.check.sh" ] || fail "a no-mistakes check with a verified head did not arm the merge poll"
+  pass "fm-pr-check arms a verified no-mistakes pull request without consulting the receipts hook"
+}
+
 test_receipt_candidate_without_hook_forwards_cross_repo_head() {
   local dir sha addons
   sha=0123456789abcdef0123456789abcdef01234567
@@ -3792,6 +3807,7 @@ test_fork_head_without_tracking_ref_registers
 test_receipt_candidate_hook
 test_receipt_candidate_hook_failure_refuses
 test_receipt_candidate_hook_junk_output_refuses
+test_receipt_candidate_hook_skipped_when_gate_ignores_candidate
 test_receipt_candidate_without_hook_forwards_cross_repo_head
 test_valid_recording_and_merge_derivation
 test_rejected_metacharacter_bytes_are_inert
