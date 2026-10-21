@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# claude-accounts-pick - config/account-pool's `command=` for a home that spreads new Claude workers over
+# every signed-in Claude account. fm-spawn runs `<command> pick <tool> --json [--prefer <id>] --state <dir>`
+# for each new worker; the answer names one existing profile folder for CLAUDE_CONFIG_DIR and the credential
+# variable names to unset (names only). The account with the most runway wins: the larger of the two
+# windows' tighter side (min of 5h and 7d left). An account under FM_CLAUDE_ACCOUNTS_LOW percent (default 5)
+# is skipped, so new workers go to the other account when one runs low. A running worker is never moved:
+# the pick only happens at launch. Other tools get their ambient default folder, unchanged.
+# Env: FM_HOME (required for Claude), FM_CLAUDE_ACCOUNTS_FRESH (seconds a reading is reused, 120).
+set -uo pipefail
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+SHED='CLAUDE_CODE_USE_BEDROCK CLAUDE_CODE_USE_VERTEX CLAUDE_CODE_USE_FOUNDRY CLAUDE_CODE_USE_ANTHROPIC_AWS CLAUDE_CODE_USE_MANTLE ANTHROPIC_AUTH_TOKEN ANTHROPIC_API_KEY CLAUDE_CODE_OAUTH_TOKEN ANTHROPIC_PROFILE ANTHROPIC_FEDERATION_RULE_ID'
+
+fail() { jq -cn --arg r "$1" '{ok: false, reason: $r}'; echo "error: $1" >&2; exit 1; }
+[ "${1:-}" = pick ] && [ -n "${2:-}" ] || fail "usage: claude-accounts-pick pick <tool> --json [--prefer <id>] --state <dir>"
+tool=$2
+shift 2
+prefer=
+while [ $# -gt 0 ]; do
+  case "$1" in --prefer) prefer=${2:-}; shift ;; esac
+  shift
+done
+
+case "$tool" in
+  claude) ;;
+  codex) jq -cn --arg d "${CODEX_HOME:-$HOME/.codex}" '{ok: true, id: "ambient", set: {CODEX_HOME: $d}, unset: []}'; exit 0 ;;
+  pi) jq -cn --arg d "${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}" '{ok: true, id: "ambient", set: {PI_CODING_AGENT_DIR: $d}, unset: []}'; exit 0 ;;
+  *) fail "no account choice for $tool" ;;
+esac
+
+FM_HOME=${FM_HOME:?set FM_HOME to the Firstmate home}
+file=$FM_HOME/state/claude-accounts.json
+fresh=${FM_CLAUDE_ACCOUNTS_FRESH:-120}
+if ! jq -e --argjson now "$(date +%s)" --argjson s "$fresh" '.generated_at > $now - $s' "$file" >/dev/null 2>&1; then
+  err=$("$here/claude-accounts-quota.sh" 2>&1 >/dev/null) || [ -s "$file" ] || fail "cannot read the Claude accounts' quota: ${err:-the reader failed}"
+fi
+
+low=${FM_CLAUDE_ACCOUNTS_LOW:-5}
+# runway: the tighter of the windows that were read; an account with neither is not eligible.
+# A failed read keeps the last good windows (stale); they count while younger than FM_CLAUDE_ACCOUNTS_STALE_MAX (3600 s).
+pick=$(jq -c --arg prefer "$prefer" --argjson low "$low" --argjson now "$(date +%s)" --argjson max "${FM_CLAUDE_ACCOUNTS_STALE_MAX:-3600}" '
+  [.accounts[] | select(.problem == null or (.stale == true and $now - .read_at <= $max))
+   | . + {runway: ([.five_hour.left, .seven_day.left] | map(select(. != null)) | min)}
+   | select(.runway != null and .runway >= $low and ($prefer == "" or $prefer == "next" or .id == $prefer))]
+  | sort_by(-.runway, -(.seven_day.left // 0)) | first // empty' "$file")
+[ -n "$pick" ] || fail "no Claude account has quota to spare${prefer:+ (asked for $prefer)}: each is unread, stale or under $low% left"
+folder=$(jq -r '.folder' <<<"$pick")
+[ -d "$folder" ] || fail "the chosen Claude account's folder is missing"
+jq -cn --argjson p "$pick" --arg shed "$SHED" '{ok: true, id: $p.id, set: {CLAUDE_CONFIG_DIR: $p.folder}, unset: ($shed | split(" "))}'

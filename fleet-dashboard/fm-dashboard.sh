@@ -740,7 +740,7 @@ def claude_accounts():  # state/claude-accounts.json from the claude-accounts ad
         d = json.load(open(os.path.join(HOME, 'state/claude-accounts.json'), encoding='utf-8'))
         win = lambda w: dict(left=num(w.get('left')), resets_at=w.get('resets_at')) if isinstance(w, dict) else None
         return [dict(name=clean(str(a.get('name') or 'default')), five_hour=win(a.get('five_hour')), seven_day=win(a.get('seven_day')),
-                     problem=prose(a['problem']) if a.get('problem') else None, read_at=num(d.get('generated_at'))) for a in d['accounts']]
+                     problem=prose(a['problem']) if a.get('problem') else None, stale=bool(a.get('stale')), read_at=num(d.get('generated_at'))) for a in d['accounts']]
     except FileNotFoundError: return []
     except (OSError, ValueError, KeyError, TypeError, AttributeError) as e:
         notes.append(('claude-accounts', str(e) or 'unreadable')); return []
@@ -1363,7 +1363,7 @@ def claude_bars():  # per account: 5 h and 7 d left, bar = what is used
             left = (a[key] or {}).get('left')
             tone = 'mut' if left is None else 'bad' if left <= 10 else 'warn' if left <= 25 else 'ok'
             used = 0 if left is None else max(2, min(100, round(100 - left)))
-            right = a['problem'] or 'unknown' if left is None else f'{left:.0f}% left'
+            right = a['problem'] or 'unknown' if left is None else f'{left:.0f}% left' + (' · old' if a['stale'] else '')
             rows += (f'<div class="qb"><span class="qn">{label}</span><span class="qt{" unk" if left is None else ""}"><i class="c-{tone}" style="width:{used}%"></i></span>'
                      f'<span class="qr {tone}">{esc(right)}</span></div>')
     return rows
