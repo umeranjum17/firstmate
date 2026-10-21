@@ -812,8 +812,10 @@ test_receipt_candidate_hook() {
     addons="$dir/addons"
     mkdir -p "$addons/receipts/bin"
     {
+      # shellcheck disable=SC2016 # Literal stub source is written to the add-on file.
       printf '%s\n' 'fm_receipts_accept_done() { printf "%s" "${7:-}" > "$FM_TEST_CANDIDATE_OUT"; }'
       if [ "$arg" = present ]; then
+        # shellcheck disable=SC2016 # Literal stub source is written to the add-on file.
         printf '%s\n' 'fm_receipts_pr_candidate() { printf "%s|%s|%s|%s|%s" "$1" "$2" "$3" "$4" "$5" > "$FM_TEST_HOOK_ARGS"; printf "%s" "$5"; }'
       fi
     } > "$addons/receipts/bin/fm-receipts-lib.sh"
@@ -875,6 +877,7 @@ test_receipt_candidate_hook_empty_output_passes_on_non_github() {
   dir=$(make_case receipt-candidate-gitlab-empty)
   mkdir -p "$dir/addons/receipts/bin"
   {
+    # shellcheck disable=SC2016 # Literal stub source is written to the add-on file.
     printf '%s\n' 'fm_receipts_accept_done() { printf "%s" "${7:-}" > "$FM_TEST_CANDIDATE_OUT"; }'
     printf '%s\n' 'fm_receipts_pr_candidate() { return 0; }'
   } > "$dir/addons/receipts/bin/fm-receipts-lib.sh"
