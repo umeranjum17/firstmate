@@ -27,8 +27,9 @@
 # an unrecognized/missing policy yields unknown, not a copied default.
 # config/lane-caps supplies recorded-active lane caps; no free worker is inferred.
 # Reads this home and recursively registered local homes: state/*.meta/status,
-# state/fleet-ledger.jsonl (docs/fleet-ledger.md), and queued tasks through the
-# home-addressed fm-tasks-axi.sh consumer (including archived dependency completions).
+# state/fleet-ledger.jsonl (docs/fleet-ledger.md), and queued/in-flight tasks through
+# the home-addressed fm-tasks-axi.sh consumer (including archived dependency completions).
+# In-flight waits also use backlog hold metadata and the main captain-shared park/pause notes.
 # Missing/unavailable backlog backends are unknown, never a stale Markdown fallback.
 # Registered remote homes remain listed, with unavailable lanes/backlog/lifecycle
 # disclosed in limitations; remote paths are not read locally or probed over SSH.
@@ -146,6 +147,15 @@ def cause(key, event):
         return 'review_merge'
     return 'lead' if event.get('state') == 'needs-decision' else 'unknown'
 
+shared_captain = read(ROOT / 'data/captain-shared.md', True) or []
+park_terms = r'(?:park(?:ed|ing)?|paus(?:e|ed|ing)|starv(?:e|ed|ing)|soft[- ]pause)'
+def parked_project_reason(*names):
+    names = [n for n in names if n]
+    if not names:
+        return None
+    match = re.compile(r'(?<![\w.-])(?:' + '|'.join(re.escape(n) for n in names) + r')(?![\w.-])[^.;]{0,30}?\b' + park_terms + r'\b', re.I)
+    return next((line.strip().lstrip('-* ').strip()[:240] for line in shared_captain if match.search(line)), None)
+
 clock_source = ROOT / 'config/fm-flow-check.sh'
 policy = '\n'.join(read(clock_source, True) or [])
 clock = re.search(r"^\s*clock = (\d+) if L\['verb'\] == 'needs-decision' else (\d+)\s*$", policy, re.M)
@@ -160,7 +170,7 @@ for line in read(ROOT / 'config/lane-caps', True) or []:
     elif line.strip() and not line.lstrip().startswith('#'):
         notes.append({'source': 'config/lane-caps', 'reason': 'malformed cap row'})
 
-def backlog_rows(name, home):
+def backlog_rows(name, home, state='queued'):
     try:
         result = subprocess.run(['bash', '-c', '''
 . "$1/fm-tasks-axi-lib.sh"
@@ -170,8 +180,8 @@ if [ -n "$FM_BACKLOG_AXI_FILE" ] && { [ ! -f "$FM_BACKLOG_AXI_FILE" ] || [ ! -r 
     printf 'backlog unavailable: %s\\n' "$FM_BACKLOG_AXI_FILE" >&2
     exit 2
 fi
-exec bash "$1/fm-tasks-axi.sh" list --state queued --fields blocked_by,held,hold_reason
-''', 'fm-flow', str(Path(sys.argv[4]).parent)], capture_output=True, text=True, timeout=20,
+exec bash "$1/fm-tasks-axi.sh" list --state "$2" --fields blocked_by,held,hold_kind,hold_reason
+''', 'fm-flow', str(Path(sys.argv[4]).parent), state], capture_output=True, text=True, timeout=20,
             env=dict(os.environ, FM_HOME=str(home), FM_DATA_OVERRIDE=''))
         if result.returncode:
             raise ValueError(result.stderr.strip() or 'backlog consumer failed')
@@ -202,7 +212,7 @@ exec bash "$1/fm-tasks-axi.sh" list --state queued --fields blocked_by,held,hold
                 if len(fields) != len(columns):
                     raise ValueError('incomplete backlog row')
                 row = dict(zip(columns, fields))
-                if not {'id', 'blocked_by', 'held', 'hold_reason'} <= row.keys():
+                if not {'id', 'blocked_by', 'held', 'hold_kind', 'hold_reason'} <= row.keys():
                     raise ValueError('missing backlog fields')
                 rows.append(row)
             if len(rows) != count:
@@ -240,6 +250,7 @@ while pending:
 for name, home in sorted(homes.items()):
     if home is None:
         continue
+    inflight = {row['id']: row for row in backlog_rows(name, home, 'in_flight')}
     records = {}
     ledger = read(home / 'state/fleet-ledger.jsonl')
     for n, line in enumerate(ledger or [], 1):
@@ -321,12 +332,21 @@ for name, home in sorted(homes.items()):
             if working is not None and a.get('state') and isinstance(a.get('ts'), int) and isinstance(end, int) \
                     and working <= a['ts'] < end:
                 state_seconds[a['state']] = state_seconds.get(a['state'], 0) + end - a['ts']
+        open_waits = [dict(key=k, since=e['ts'], seconds=age(e['ts']),
+                           reason=e.get('text') or '', cause=cause(k, e))
+                      for k, e in sorted(waits.items())]
+        held = inflight.get(task, {})
+        if held.get('held') == 'yes' and not any(w['reason'] == held.get('hold_reason') for w in open_waits):
+            open_waits.append(dict(key=None, since=None, seconds=None, reason=held.get('hold_reason') or '',
+                                   cause={'captain': 'captain', 'external': 'credential_external'}.get(
+                                       held.get('hold_kind'), 'unknown'), source='backlog'))
+        project = live.get(task, {}).get('project')
         row = {'home': name, 'task': task, 'open': task in live, 'stage': state,
                'seconds_in_stage': age(start), 'reason': last.get('text') or 'unknown: no status reason',
-               'timestamp_basis': basis, 'open_waits': [dict(key=k, since=e['ts'],
-                   seconds=age(e['ts']), reason=e.get('text') or '',
-                   cause=cause(k, e))
-                   for k, e in sorted(waits.items())],
+               'timestamp_basis': basis, 'open_waits': open_waits,
+               'kind': live.get(task, {}).get('kind'), 'project': project,
+               'hold_kind': held.get('hold_kind'), 'hold_reason': held.get('hold_reason') or '',
+               'parked_reason': parked_project_reason(name if name != 'main' else None, Path(project).name if project else None),
                'times': dict(times, working=working), 'state_seconds': state_seconds,
                'durations': {'pickup_to_working': age(times['dispatched'], working),
                    'time_to_merge': age(times['dispatched'], times['merged']),
@@ -345,10 +365,12 @@ for name, home in sorted(homes.items()):
         if item['held'] == 'yes' and not reason:
             reason = 'hold: ' + item['hold_reason']
         queue.append({'home': name, 'task': item['id'],
-                      'why': ' '.join(reason.split()) if reason else 'unknown: dispatch admission not recorded'})
+                      'why': ' '.join(reason.split()) if reason else 'unknown: dispatch admission not recorded',
+                      'hold_kind': item['hold_kind'], 'hold_reason': item['hold_reason']})
 
 active = {h: sum(l['open'] and l['home'] == h and l['stage'] in ('working', 'resolved') and
-                 not any(w['cause'] == 'captain' for w in l['open_waits']) for l in lanes) for h in homes}
+                 not l.get('parked_reason') and not any(w['cause'] == 'captain' for w in l['open_waits'])
+                 for l in lanes) for h in homes}
 for q in queue:
     if q['why'].startswith('unknown:') and q['home'] in caps and active[q['home']] >= caps[q['home']]:
         q['why'] = f"lane cap: {active[q['home']]} recorded active lanes, cap {caps[q['home']]}"
