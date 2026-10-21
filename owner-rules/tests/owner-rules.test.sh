@@ -79,7 +79,8 @@ is "uninstalled: check is off again" "$(brief no-ask --mode direct-PR | tail -1)
 n=0
 while IFS= read -r q; do
   n=$((n + 1))
-  grep -qF -- "${q#owner-rules: }" "$addons/owner-rules/bin/fm-owner-rules-lib.sh" "$addons/owner-rules/bin/fm-owner-rules-gate.sh" \
+  refusal=${q%%; run *}
+  grep -qF -- "${refusal#owner-rules: }" "$addons/owner-rules/bin/fm-owner-rules-lib.sh" "$addons/owner-rules/bin/fm-owner-rules-gate.sh" \
     && ok "skill quote matches the code: ${q:0:40}" || no "skill quote not in lib or gate: $q"
 done < <(grep '^owner-rules: ' "$addons/owner-rules/skill/SKILL.md")
 is "skill quotes all four refusals" "$n" "4"
