@@ -4,8 +4,17 @@ import { html, useState, useEffect, useRef, now, dur, hm, prNum, STAGES, ACTIVE,
   sorted, age, I, IC, Caret, StageIcon, Av } from './ui.js'
 
 // Which lanes a tab shows, and whether its columns are stages or homes.
-export const TABS = [['active', 'Active'], ['queued', 'Queued'], ['landed', 'Landed today'], ['all', 'All']]
-export const inTab = (t, c) => t === 'all' || (t === 'active' ? ACTIVE.includes(c.stage) : c.stage === t)
+export const TABS = [['active', 'Active'], ['stuck', 'Stuck'], ['waiting', 'Waiting'], ['queued', 'Queued'], ['landed', 'Landed today'], ['all', 'All']]
+const PICK = { active: () => true, stuck: stuck, waiting: c => c.wait === 'waiting' }
+export const inTab = (t, c) => t === 'all' || (PICK[t] ? ACTIVE.includes(c.stage) && PICK[t](c) : c.stage === t)
+// Queued and landed work is grouped by home; every other tab is grouped by stage.
+export const byStage = t => t !== 'queued' && t !== 'landed'
+export const stagesOf = t => t === 'all' ? STAGES : ACTIVE
+// A home's count against its lane cap ("5 / 6"), amber over the cap; only when the group holds exactly that home's open lanes.
+const Count = ({ d, n, home, cs }) => {
+  const h = d.homes.find(x => x.id === home), cap = h?.plan
+  return cap != null && cs.length === h.open ? html`<span class=${'n num cap' + (n > cap ? ' over' : '')} title="Open lanes of the lane cap">${n} / ${cap}</span>` : html`<span class="n num">${n}</span>`
+}
 
 const HomePill = ({ d, id }) => html`<span class="pill"><span class="sq" style=${{ '--c': hc(d, id) }}></span>${hname(d, id)}</span>`
 export function Card({ d, c, open, home }) {
@@ -30,24 +39,24 @@ const stageHead = s => html`<${StageIcon} s=${s}/><b>${SNAME[s]}</b>`
 const homeHead = (d, h) => html`<span class="sq" style=${{ '--c': hc(d, h) }}></span><b>${hname(d, h)}</b>`
 
 export function Board({ d, cards, r, open }) {
-  const byStage = r.tab === 'active' || r.tab === 'all', stages = r.tab === 'all' ? STAGES : ACTIVE
+  const stages = stagesOf(r.tab)
   if (!cards.length) return html`<div class="none"><p>No recorded lanes match.</p></div>`
-  if (!byStage) return html`<div class="board">${d.homes.filter(h => cards.some(c => c.home === h.id)).map(h =>
+  if (!byStage(r.tab)) return html`<div class="board">${d.homes.filter(h => cards.some(c => c.home === h.id)).map(h =>
     html`<${Col} key=${h.id} d=${d} head=${homeHead(d, h.id)} cs=${sorted(cards.filter(c => c.home === h.id))} open=${open} home stage=${r.tab}/>`)}</div>`
   if (r.rows !== 'home') return html`<div class="board">${stages.map(s => html`<${Col} key=${s} d=${d} head=${stageHead(s)} cs=${sorted(cards.filter(c => c.stage === s))} open=${open} stage=${s}/>`)}</div>`
   return html`<div class="lanes" style=${{ '--n': stages.length }}>
     <div class="heads">${stages.map(s => html`<header class="ch">${stageHead(s)}<span class="n num">${total(d, cards.filter(c => c.stage === s).length, s)}</span></header>`)}</div>
     ${d.homes.filter(h => cards.some(c => c.home === h.id)).map(h => { const cs = cards.filter(c => c.home === h.id), k = cs.filter(stuck).length
-      return html`<div class="band"><${Caret}/>${homeHead(d, h.id)}<span class="n num">${total(d, cs.length, r.tab, h.id)}</span><span class="sp"></span>${k ? html`<span class="hot">${total(d, k)} stuck</span>` : ''}</div>
+      return html`<div class="band"><${Caret}/>${homeHead(d, h.id)}<${Count} d=${d} n=${total(d, cs.length, r.tab, h.id)} home=${h.id} cs=${cs}/><span class="sp"></span>${k ? html`<span class="hot">${total(d, k)} stuck</span>` : ''}</div>
         <div class="row">${stages.map(s => html`<div class="col">${sorted(cs.filter(c => c.stage === s)).map(c => html`<${Card} key=${c.id} d=${d} c=${c} open=${open} home/>`)}</div>`)}</div>` })}</div>`
 }
 
 // --- phone: a mobile kanban, one status column at a time (Linear/Jira mobile) --------
 // A sticky switcher with counts jumps the horizontal, scroll-snapped columns to any status.
 export function MobileKanban({ d, cards, r, open }) {
-  const byStage = r.tab === 'active' || r.tab === 'all', stages = r.tab === 'all' ? STAGES : ACTIVE
-  const label = (s, n) => total(d, n, byStage ? s : r.tab)
-  const cols = (byStage
+  const stages = stagesOf(r.tab), grouped = byStage(r.tab) && r.rows !== 'home'
+  const label = (s, n) => total(d, n, grouped ? s : r.tab)
+  const cols = (grouped
     ? stages.map(s => ({ key: s, name: SNAME[s], head: stageHead(s), cs: sorted(cards.filter(c => c.stage === s)), home: false }))
     : d.homes.map(h => ({ key: h.id, name: hname(d, h.id), head: homeHead(d, h.id), cs: sorted(cards.filter(c => c.home === h.id)), home: true })))
     .filter(c => c.cs.length)
@@ -58,7 +67,7 @@ export function MobileKanban({ d, cards, r, open }) {
   if (!cols.length) return html`<div class="none"><p>No recorded lanes match.</p></div>`
   return html`<div class="mk">
     <div class="mseg" role="tablist">${cols.map((c, k) => html`<button key=${c.key} role="tab" aria-selected=${i === k} onClick=${() => jump(k)}>${c.name}<small class="num">${label(c.key, c.cs.length)}</small></button>`)}</div>
-    <div class="mcols" ref=${ref} onScroll=${onScroll}>${cols.map(c => html`<section class="mcol" key=${c.key}><header class="ch">${c.head}<span class="n num">${label(c.key, c.cs.length)}</span></header>
+    <div class="mcols" ref=${ref} onScroll=${onScroll}>${cols.map(c => html`<section class="mcol" key=${c.key}><header class="ch">${c.head}${c.home ? html`<${Count} d=${d} n=${label(c.key, c.cs.length)} home=${c.key} cs=${c.cs}/>` : html`<span class="n num">${label(c.key, c.cs.length)}</span>`}</header>
       ${c.cs.map(x => html`<${Card} key=${x.id} d=${d} c=${x} open=${open} home=${c.home}/>`)}</section>`)}</div>
   </div>`
 }

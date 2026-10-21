@@ -2,7 +2,7 @@
 // filters, the ask list, the Ship mount, the command palette and keys.
 import { render } from './vendor/preact-htm-3.1.1.js'
 import { html, useState, useEffect, useRef, now, dur, hm, ACTIVE, STAGES, SNAME, STATES, stuck, state, sid, total, hc, hname, mname, sorted, filterCards, I, IC, StageIcon, Av, ASK_TAG, askType, askOrder } from './ui.js'
-import { TABS, inTab, Board, MobileKanban, Detail } from './board.js'
+import { TABS, inTab, byStage, stagesOf, Board, MobileKanban, Detail } from './board.js'
 import { Insights } from './insights.js'
 const IC_CHART = html`<path d="M2.5 13.5h11M4.5 11V8.5M8 11V4.5M11.5 11V7"/>`
 
@@ -341,7 +341,7 @@ function App() {
   const asks = d.asks?.length, today = total(d, d.landed.at(-1), 'landed'), opencard = id => go({ card: id })
   const count = t => t === 'all' ? null : total(d, d.cards.filter(c => inTab(t, c)).length, t)
   const shown = cards.filter(c => inTab(r.tab, c))
-  const list = (r.tab === 'all' ? STAGES : r.tab === 'active' ? ACTIVE : [r.tab]).flatMap(s => sorted(shown.filter(c => c.stage === s)))
+  const list = (byStage(r.tab) ? stagesOf(r.tab) : [r.tab]).flatMap(s => sorted(shown.filter(c => c.stage === s)))
   const title = { board: 'Board', overview: 'Overview', insights: 'Insights', needs: 'Needs you', ship: 'Ship' }[r.view]
   const overlays = html`${r.card && html`<${Detail} d=${d} id=${r.card} go=${go} list=${list}/>`}
     ${pal && html`<${Palette} d=${d} go=${go} close=${() => setPal(false)} toggleTheme=${toggleTheme}/>`}${keys && html`<${Shortcuts} close=${() => setKeys(false)}/>`}`
@@ -376,7 +376,7 @@ function App() {
           <div class="kpi num"><a href="#/needs">Needs you <b>${asks ?? '?'}</b></a><button class=${stk.length ? 'bad' : ''} onClick=${() => go({ tab: 'active', state: ['blocked', 'decision'], card: null })}>Stuck <b>${total(d, stk.length)}</b></button>
             <button onClick=${() => go({ tab: 'landed' })}>Landed today <b>${today}</b></button><span title="Typical time from start to landed">Cycle p50 <b>${d.cycle_p50 == null ? '–' : dur(d.cycle_p50)}</b></span></div>
           <${Filters} d=${d} r=${r} go=${go} label="Filter"/>
-          ${r.tab === 'active' || r.tab === 'all' ? html`<${Pop} label="Display" icon=${IC.display}><div class="pop-h">Rows</div>
+          ${byStage(r.tab) ? html`<${Pop} label="Display" icon=${IC.display}><div class="pop-h">Rows</div>
             ${[['', 'No grouping'], ['home', 'Home']].map(([v, n]) => html`<button class="opt" aria-pressed=${r.rows === v} onClick=${() => go({ rows: v })}><span class="ck">${r.rows === v ? I(IC.check, 11) : ''}</span>${n}</button>`)}</${Pop}>` : ''}` : ''}
       </header>
       ${r.view === 'board' ? html`<${Chips} d=${d} r=${r} go=${go}/><${Board} d=${d} cards=${shown} r=${r} open=${opencard}/>` : body}
