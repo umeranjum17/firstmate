@@ -94,6 +94,7 @@ bash delete-guard/install.sh --dry-run <home>
 bash read-guard/tests/read-guard.test.sh
 bash claude-model-guard/install.sh --dry-run
 bash zai-quota-check/tests/zai-quota-check-e2e.sh
+bash pipeline-quota-failover/tests/switch-route.test.sh
 bash pipeline-quota-failover/tests/pi-quota-failover-e2e.sh
 bash pipeline-quota-failover/tests/pi-quota-failover-route.test.sh
 bash pipeline-literal-delete/tests/pipeline-literal-delete.test.sh
