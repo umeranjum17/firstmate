@@ -6,3 +6,5 @@
 - The output and sidecar are mode 600, the data directory is mode 700, and `uninstall.sh <home>` removes only the installed script.
 ## Check
 - `bash tests/chat-tsv.test.sh` covers wrapper filtering, mixed human text, audit counts, redaction, truncation, permissions, idempotency, and incremental refresh with disposable fixtures.
+- `bash tests/gate-audit.test.sh` covers pass/card ordering, later failure, card-only/missing rows, and number-only matching.
+- `bin/gate-audit.sh <checks-gate.log> <pr-url>...` prints each URL with `pass` only when its latest non-card row says pass; otherwise it prints `bypass`.
