@@ -170,7 +170,10 @@ PROJECT=$(grep '^project=' "$META" | tail -1 | cut -d= -f2- || true)
 # binds a named-head or outside-origin pull request to its recorded pr_head.
 RECEIPT_CANDIDATE=
 if declare -F fm_receipts_pr_candidate >/dev/null; then
-  RECEIPT_CANDIDATE=$(fm_receipts_pr_candidate "$WT" "$URL" "$MODE" "$META" "$PR_HEAD") || RECEIPT_CANDIDATE=
+  if ! RECEIPT_CANDIDATE=$(fm_receipts_pr_candidate "$WT" "$URL" "$MODE" "$META" "$PR_HEAD"); then
+    echo "error: receipts add-on hook fm_receipts_pr_candidate failed; no receipt candidate was chosen" >&2
+    exit 1
+  fi
 fi
 
 # The gate is asked about the ready report this task's worker was told to give;

@@ -834,6 +834,24 @@ test_receipt_candidate_hook() {
   pass "fm-pr-check lets the receipts add-on hook choose the receipt candidate"
 }
 
+test_receipt_candidate_hook_failure_refuses() {
+  local dir
+  dir=$(make_case receipt-candidate-failing)
+  mkdir -p "$dir/addons/receipts/bin"
+  printf '%s\n' 'fm_receipts_pr_candidate() { return 3; }' > "$dir/addons/receipts/bin/fm-receipts-lib.sh"
+  fm_write_meta "$dir/home/state/task-a.meta" \
+    "window=firstmate:fm-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
+    "project=$dir/project" "kind=ship" "mode=direct-PR"
+  if FM_ADDONS_DIR="$dir/addons" FM_TEST_GH_HEAD=0123456789abcdef0123456789abcdef01234567 \
+    run_check_entry "$dir" task-a https://github.com/o/r/pull/4 > "$dir/stdout" 2> "$dir/stderr"; then
+    fail "a failing receipt hook did not refuse the check"
+  fi
+  grep -Fq 'fm_receipts_pr_candidate' "$dir/stderr" || fail "refusal did not name the hook: $(cat "$dir/stderr")"
+  grep -q '^pr=' "$dir/home/state/task-a.meta" && fail "a refused check recorded pr="
+  [ -e "$dir/home/state/task-a.check.sh" ] && fail "a refused check armed the merge poll"
+  pass "fm-pr-check refuses when the receipts add-on hook fails"
+}
+
 test_valid_recording_and_merge_derivation() {
   local dir expected sidecar count rc
   dir=$(make_case valid-recording)
@@ -3736,6 +3754,7 @@ test_unpushed_named_head_refuses_registration
 test_direct_pr_unpushed_commit_refuses_registration
 test_fork_head_without_tracking_ref_registers
 test_receipt_candidate_hook
+test_receipt_candidate_hook_failure_refuses
 test_valid_recording_and_merge_derivation
 test_rejected_metacharacter_bytes_are_inert
 test_static_poll_contract
