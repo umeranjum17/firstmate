@@ -4,3 +4,5 @@ journeys:
     command: bash fleet-pulse/tests/chat-tsv.test.sh > "$DONE_DONE_EVIDENCE_ROOT/${RUN_ID}.log" 2>&1
   quota-failover-screen-match:
     command: bash quota-failover/run-proof.sh
+  pipeline-route:
+    command: bash pipeline-quota-failover/run-proof.sh

@@ -2,6 +2,12 @@
 
 Drop-in pi wrapper for the no-mistakes pipeline agent. It runs the real pi and moves to the next chain model when a call hits a quota error or goes silent.
 
+## Pipeline route
+
+The default chain is one route, `openrouter/deepseek/deepseek-v4.1-flash-1017:floor` (the OpenRouter DeepSeek floor route). It is the same route the no-mistakes config holds in `agent_config.pi.model`, so the config's route is the route that runs: a call pinned to a model outside the chain does not run that model, it runs the chain. `PI_QUOTA_FAILOVER_CHAIN` overrides the chain, and `PI_QUOTA_FAILOVER_PRINT_CHAIN=1` prints it: the chain is the fleet's one route list, and `route-change` reads it from here.
+
+An `openrouter/*` route takes the deepseek idle limit (`PI_QUOTA_FAILOVER_DEEPSEEK_IDLE_SECS`, default 300), not the generic one (default 120), because the floor route answers on the same clock as direct DeepSeek.
+
 ## Quota pre-check
 
 Before each route is called, `quota-axi --provider <prefix> --json` is asked about that route's provider. A route whose
@@ -47,3 +53,11 @@ warning or failure is a route failure: the chain moves to the next route for tha
 stall). Before the first route is run, a 1-request probe (the real pi, one `ok` prompt, `PI_QUOTA_FAILOVER_PROBE_SECS`
 cap, default 60) skips a route whose answer is a balance error, marks it dead and logs a `pulse:` line.
 `PI_QUOTA_FAILOVER_PROBE=0` turns the probe off.
+
+## Daemon environment caveat
+
+The OpenRouter key that route needs lives only in the systemd user manager environment: it was imported with
+`systemctl --user import-environment` and is not copied into any file. It survives a daemon restart, but not a reboot
+or a systemd manager restart. After either, re-import it from `~/.config/openrouter/api_key` before starting the
+daemon, or install a start-time reader that does not copy the key into a file. Never print the key and never copy it
+into a file.
