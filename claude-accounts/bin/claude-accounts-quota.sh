@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# claude-accounts-quota.sh - one quota view of every Claude account the owner has signed in.
+# Reads the account list from the muxr registry, asks `quota-axi --profile-only` about each profile
+# folder (the folder path is the only thing passed; nothing inside a login folder is opened), and writes
+# <home>/state/claude-accounts.json for the dashboard card and for dispatch input.
+# Usage: claude-accounts-quota.sh [--print]     (--print: also show the file on stdout)
+# Env:   FM_HOME (required), FM_CLAUDE_ACCOUNTS_REGISTRY
+#        (default: ~/.muxr/plans/accounts-v1.json), FM_CLAUDE_ACCOUNTS_SECONDS (per-account read limit, 60).
+set -uo pipefail
+
+FM_HOME=${FM_HOME:?set FM_HOME to the Firstmate home}
+REGISTRY=${FM_CLAUDE_ACCOUNTS_REGISTRY:-$HOME/.muxr/plans/accounts-v1.json}
+SECONDS_MAX=${FM_CLAUDE_ACCOUNTS_SECONDS:-60}
+OUT=$FM_HOME/state/claude-accounts.json
+PRINT=0
+[ "${1:-}" = --print ] && PRINT=1
+for tool in jq quota-axi; do
+  command -v "$tool" >/dev/null 2>&1 || { echo "error: claude-accounts needs $tool on PATH" >&2; exit 1; }
+done
+[ -r "$REGISTRY" ] || { echo "error: muxr account registry not readable: $REGISTRY" >&2; exit 1; }
+
+# id, name and folder only: the filter names these three fields, so nothing else is ever printed.
+mapfile -t ROWS < <(jq -r '.accounts[]? | select(.provider == "claude" and (.folder | type) == "string" and (.folder | startswith("/")))
+  | [.id, (.name // ""), .folder] | join("\u001f")' "$REGISTRY")
+[ "${#ROWS[@]}" -gt 0 ] || { echo "error: no Claude account in $REGISTRY" >&2; exit 1; }
+
+read_one() { # id name folder -> one account JSON object
+  local id=$1 name=$2 folder=$3 raw err rc errf
+  errf=$(mktemp "${TMPDIR:-/tmp}/claude-accounts.XXXXXX") || return 1
+  raw=$(CLAUDE_CONFIG_DIR=$folder timeout "$SECONDS_MAX" quota-axi --provider claude --profile-only --json 2>"$errf")
+  rc=$?
+  err=$(sed -n '1p' "$errf" | cut -c1-160)
+  rm -f "$errf"
+  jq -cn --arg id "$id" --arg name "${name:-default}" --arg folder "$folder" --arg raw "$raw" --arg err "$err" --argjson rc "$rc" '
+    def win($w): ([ $raw | fromjson? | (.providers[0]? // .) | .windows[]? | select(.id == $w) ] | first) as $x
+      | if $x == null then null else {left: $x.percentRemaining, resets_at: $x.resetsAt} end;
+    (win("five_hour")) as $h | (win("seven_day")) as $d
+    | {id: $id, name: $name, folder: $folder, five_hour: $h, seven_day: $d,
+       problem: (if $rc != 0 then ($err | if . == "" then "quota-axi exited \($rc)" else . end)
+                 elif $h == null and $d == null then "no 5h or 7d window in the reading" else null end)}'
+}
+
+ACCOUNTS=()
+for row in "${ROWS[@]}"; do
+  IFS=$'\037' read -r id name folder <<<"$row"
+  ACCOUNTS+=("$(read_one "$id" "$name" "$folder")") || exit 1
+done
+JSON=$(printf '%s\n' "${ACCOUNTS[@]}" | jq -sc --argjson at "$(date +%s)" '{schema: 1, generated_at: $at, accounts: .}') || exit 1
+mkdir -p "$FM_HOME/state"
+tmp=$(mktemp "$OUT.XXXXXX") && printf '%s\n' "$JSON" >"$tmp" && mv -f "$tmp" "$OUT" || { echo "error: cannot write $OUT" >&2; exit 1; }
+[ "$PRINT" -eq 0 ] || printf '%s\n' "$JSON"
+jq -e 'any(.accounts[]; .problem == null)' "$OUT" >/dev/null
