@@ -802,6 +802,38 @@ test_fork_head_without_tracking_ref_registers() {
   pass "fm-pr-check registers a fork head the forge holds without any tracking ref"
 }
 
+# The receipts add-on owns the receipt candidate choice: without its hook the
+# gate is given no candidate, and with it the gate gets what the hook returns.
+test_receipt_candidate_hook() {
+  local dir sha addons arg
+  sha=0123456789abcdef0123456789abcdef01234567
+  for arg in absent present; do
+    dir=$(make_case "receipt-candidate-$arg")
+    addons="$dir/addons"
+    mkdir -p "$addons/receipts/bin"
+    {
+      printf '%s\n' 'fm_receipts_accept_done() { printf "%s" "${7:-}" > "$FM_TEST_CANDIDATE_OUT"; }'
+      if [ "$arg" = present ]; then
+        printf '%s\n' 'fm_receipts_pr_candidate() { printf "%s|%s|%s|%s|%s" "$1" "$2" "$3" "$4" "$5" > "$FM_TEST_HOOK_ARGS"; printf "hook-candidate"; }'
+      fi
+    } > "$addons/receipts/bin/fm-receipts-lib.sh"
+    fm_write_meta "$dir/home/state/task-a.meta" \
+      "window=firstmate:fm-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
+      "project=$dir/project" "kind=ship" "mode=direct-PR"
+    FM_ADDONS_DIR="$addons" FM_TEST_CANDIDATE_OUT="$dir/candidate" FM_TEST_HOOK_ARGS="$dir/hook-args" \
+      FM_TEST_GH_HEAD=$sha run_check_entry "$dir" task-a https://github.com/o/r/pull/4 \
+      > "$dir/stdout" 2> "$dir/stderr" || fail "check failed with receipt hook $arg: $(cat "$dir/stderr")"
+    if [ "$arg" = absent ]; then
+      [ -z "$(cat "$dir/candidate")" ] || fail "no hook still forwarded a candidate: $(cat "$dir/candidate")"
+    else
+      [ "$(cat "$dir/candidate")" = hook-candidate ] || fail "the hook's candidate was not forwarded: $(cat "$dir/candidate")"
+      [ "$(cat "$dir/hook-args")" = "$dir/wt|https://github.com/o/r/pull/4|direct-PR|$dir/home/state/task-a.meta|$sha" ] \
+        || fail "the hook got the wrong arguments: $(cat "$dir/hook-args")"
+    fi
+  done
+  pass "fm-pr-check lets the receipts add-on hook choose the receipt candidate"
+}
+
 test_valid_recording_and_merge_derivation() {
   local dir expected sidecar count rc
   dir=$(make_case valid-recording)
@@ -3703,6 +3735,7 @@ test_retired_secondmate_merge_poll_keeps_signal_wake
 test_unpushed_named_head_refuses_registration
 test_direct_pr_unpushed_commit_refuses_registration
 test_fork_head_without_tracking_ref_registers
+test_receipt_candidate_hook
 test_valid_recording_and_merge_derivation
 test_rejected_metacharacter_bytes_are_inert
 test_static_poll_contract
