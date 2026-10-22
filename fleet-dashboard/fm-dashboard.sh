@@ -1711,10 +1711,12 @@ TAGS = re.compile(r'^(?:\[[\w-]+\]\s*)+')
 # the first quote near the word captain, with the day written beside it.
 BOOKKEEPING = re.compile(r'^\s*(?:(?:captain hold (?:set|origin)|resolution (?:recorded|mode)|decision digest|origin|release)\b.*$|type:(?: [\w -]+?:)?\s*)', re.M | re.I)
 ASKED = re.compile(r'captain\b[^"\n]{0,48}?(?:(\d{1,2} [A-Z][a-z]{2})[^"\n]{0,24})?"([^"]{12,})"(?:\s*\((\d{1,2} [A-Z][a-z]{2})\b)?', re.I)
-def describe(body, ask):  # the body without bookkeeping, the quoted ask itself or Main message refs
+def describe(body, ask, cut):  # the body without bookkeeping, the quoted ask itself or Main message refs; a cut one ends in …
     text = body[:ask.start()] + re.sub(r'^\s*\([^()]*\)', '', body[ask.end(2) + 1:]) if ask else body
     text = re.sub(r'\bMain\d+\b', 'Main', re.sub(r'\s*\([^()]*\bMain\d+[^()]*\)', '', BOOKKEEPING.sub('', text)))
-    return re.sub(r'^[\s.,;:)]+', '', prose(re.sub(r'\n{3,}', '\n\n', text))).strip()[:480]
+    text = re.sub(r'(?m)^\s*(?:[A-Z][\w ]{0,30}:)?[\s.,;:)]*$', '', text)  # a label or punctuation the cuts left alone on its line
+    text = re.sub(r'^[\s.,;:)]+', '', prose(re.sub(r'\n{3,}', '\n\n', text))).strip()
+    return re.sub(r'\s+\S*$', '', text[:480]) + '…' if cut or len(text) > 480 else text
 def ticket(h, r):
     c = next((c for c in cards if c['id'] == f"{h}/{r['id']}"), {})
     merged_pr = next((u for u, (_, mh, mt) in merges.items() if (mh, mt) == (h, r['id'])), None)
@@ -1731,7 +1733,7 @@ def ticket(h, r):
                 title=re.sub(r'\s*\(Main\d+[^)]*\)|\bMain\d+:?\s*|\s+PR \d+$', '', r['title'][tags.end() if tags else 0:]).strip(),
                 asked='captain-ask' in (tags.group() if tags else ''), priority=int(r['priority']) if str(r.get('priority')).isdigit() else None,
                 release=rel.group(1) if rel else 'later', state=st, pr=c.get('pr') or merged_pr or (link.group() if link else None),
-                updated=max(seen) if seen else c.get('started') or day, desc=describe(body, ask),
+                updated=max(seen) if seen else c.get('started') or day, desc=describe(body, ask, bool(cut)),
                 ask=dict(words=ask.group(2), day=ask.group(1) or ask.group(3)) if ask else None)
 tickets = [ticket(h, r) for h in ACTIVE for r in backlog.get(h) or []]
 # Cycle time: dispatch to merge, for each merged task whose dispatch is in a ledger.
