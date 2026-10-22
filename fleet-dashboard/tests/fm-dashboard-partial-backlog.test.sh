@@ -121,6 +121,10 @@ main() {
     and .metrics.held_for_captain.status == "partial" and .metrics.lanes.status == "exact"
     and any(.queue_reasons[]; .reason == "Held for the captain" and .by_home.main == 1 and .by_home.zephyrine == null)' \
     "$d/data.json" >/dev/null || fail "data.json did not mark the partial backlog reading: $(jq -c '.metrics.ready, .metrics.queue, .queue_reasons' "$d/data.json")"
+  # Tickets: the read home's items, the captain-held one On hold, and the unread home named instead of guessed.
+  jq -e '.tickets_unread == ["zephyrine"] and ([.tickets[].task] | sort) == ["m-held", "m-ready"]
+    and any(.tickets[]; .task == "m-held" and .state == "hold") and any(.tickets[]; .task == "m-ready" and .state == "todo" and .release == "later")' \
+    "$d/board.json" >/dev/null || fail "board.json tickets did not follow the partial backlog: $(jq -c '.tickets, .tickets_unread' "$d/board.json")"
 
   # No home readable: back to the unknown dash, as before.
   printf '#!/bin/sh\necho "tasks-axi: backlog unreadable" >&2\nexit 1\n' > "$fix/stubs/tasks-axi"
@@ -129,7 +133,7 @@ main() {
   has "$d/index.html" "Ready unknown:" "unknown: main: tasks-axi: backlog unreadable"
   jq -e '.metrics.ready.status == "unknown" and .metrics.ready.value == null and .metrics.queue.status == "unknown"' \
     "$d/data.json" >/dev/null || fail "an all-unread fleet was not unknown: $(jq -c '.metrics.ready, .metrics.queue' "$d/data.json")"
-  pass "one unread home keeps the readable homes' Ready and queue counts, marked as a lower bound and named; no readable home falls back to unknown"
+  pass "tickets list only the read homes and name the unread one; one unread home keeps the readable homes' Ready and queue counts, marked as a lower bound and named; no readable home falls back to unknown"
 }
 
 main

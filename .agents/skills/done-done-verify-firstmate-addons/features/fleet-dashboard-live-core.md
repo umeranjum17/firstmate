@@ -2,7 +2,7 @@
 
 ## User outcome
 
-The fleet dashboard shows live fleet state in a real browser at a 390px phone width: each lane with its task title and state on the Board, and the queue and wait reasons on Insights. The one-tap Stuck and Waiting tabs (`#/board?tab=stuck`, `tab=waiting`) hold only those lanes, and a home's count reads against its lane cap (`4 / 3`, amber when over) in the by-home view (`rows=home`), at 390px and 1280px.
+The fleet dashboard shows live fleet state in a real browser at a 390px phone width: each lane with its task title and state on the Board, and the queue and wait reasons on Insights. The one-tap Stuck and Waiting tabs (`#/board?tab=stuck`, `tab=waiting`) hold only those lanes, and a home's count reads against its lane cap (`4 / 3`, amber when over) in the by-home view (`rows=home`), at 390px and 1280px. Tickets (`#/tickets`) puts every backlog item on a board, To do, In progress, In review, Done and On hold, each card with its P0-P3 priority chip, target release, owner home and pull request, and only the ask list under Waiting on captain; a phone opens on that column, one column at a time.
 
 ## Drive
 
@@ -10,4 +10,4 @@ Run `done-done run core` from the repo root (it runs `bash fleet-dashboard/run-c
 
 ## Evidence
 
-`board-390.png` and `board.txt` show the Board lanes with their titles and states (Blocked, Main decides, waiting). `queue-390.png` and `queue.txt` show Insights with the queue and wait reasons ("Why work waits now", "Blocked · own note", "Lead reply", "Held"). Check that every lane named in the Board is one the seed wrote, and that no page text shows a raw path, id or internal word. `board-{active,stuck,waiting,homes}-{390,1280}.png` and `.txt` show the tabs and the cap; the run fails unless the Stuck tab lacks `m-build`, the Waiting tab lacks `m-stuck`, and both by-home views read `4 / 3`. Do not use a real fleet home as the proof.
+`board-390.png` and `board.txt` show the Board lanes with their titles and states (Blocked, Main decides, waiting). `queue-390.png` and `queue.txt` show Insights with the queue and wait reasons ("Why work waits now", "Blocked · own note", "Lead reply", "Held"). Check that every lane named in the Board is one the seed wrote, and that no page text shows a raw path, id or internal word. `board-{active,stuck,waiting,homes}-{390,1280}.png` and `.txt` show the tabs and the cap; the run fails unless the Stuck tab lacks `m-build`, the Waiting tab lacks `m-stuck`, and both by-home views read `4 / 3`. `tickets-390.png`, `tickets-progress-390.png`, `tickets-1280.png` and `tickets-dark-{390,1280}.png` show Tickets in both themes; the run fails unless `board.json` maps the seeded items to their columns, priority, release and project, puts the captain-held item On hold, strips the `[captain-ask]` tag and Main ref from the name while marking it asked, and leaves Waiting on captain to the one seeded ask. Do not use a real fleet home as the proof.

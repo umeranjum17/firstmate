@@ -5,7 +5,10 @@
 # only, three.js; no network reference; light and dark): Board, a kanban of Building, Review,
 # Test, PR + CI and To merge with tabs for Queued, Landed today and All and rows by home on
 # request, whose cards carry the lane's model, age, pull request and, when it waits, why in plain
-# words; filters by home, model and state; a card's detail with its stages and activity; Overview
+# words; filters by home, model and state; a card's detail with its stages and activity; Tickets
+# (tickets.js: every backlog item as a card in To do, In progress, In review, Done or On hold, with its
+# P0-P3 priority, target release, owner home and pull request, the ask list as Waiting on captain,
+# filtered by project; a phone shows one column at a time); Overview
 # (five key figures, where Stuck, Lanes open and Ready also show their change since yesterday and
 # a day's trend; the lifecycle, every open lane by stage split into moving, waiting and stuck, then
 # landings; lanes by state; 14-day landed and closed charts; queue reasons; quota runway; each home's
@@ -35,6 +38,7 @@
 # with a sticky switcher that jumps to any column, and a dock.
 # Each build writes the app's one data file, state/dashboard/board.json: homes with their
 # lane plans, one card per open lane, ready backlog item and pull request landed today,
+# one ticket per backlog item of each read home (tickets_unread names the homes not read),
 # and parked home ids. Its flow key is the fm-flow.v1 Insights observation, or flow_error when
 # that reader is unavailable or unreadable; its models and skills keys hold the fm-model-stats.v1
 # and fm-skill-stats.v1 observations, or the matching *_error; a recursive scrub removes raw
@@ -553,7 +557,7 @@ for h, d in sorted(home_dir.items()):
         backlog[h] = None; notes.append(('backlog', f'{h}: {err or "unsupported backlog source"}')); continue
     backlog_sources[h] = fields
     out, err = probe(['bash', os.path.join(BIN, 'fm-tasks-axi.sh'), 'list', '--limit', '10000',
-                      '--fields', 'held,hold_kind,hold_reason,blocked,created,closed'],
+                      '--fields', 'held,hold_kind,hold_reason,blocked,created,closed,priority,body,links'],
                      timeout=20, env=dict(os.environ, FM_HOME=d))
     rows = toon_rows(out) if out is not None else None
     if rows is None:
@@ -1711,6 +1715,29 @@ for h in ACTIVE:
     for r in bl(h, 'ready'):
         if any(c['home'] == h and c['task'] == r['id'] and c['stage'] != 'landed' for c in cards): continue
         cards.append(card(h, r['id'], r.get('kind') or 'ship', r['title'], 'queued', since=midnight(r['day']) if r['day'] else None))
+# Tickets: every backlog item of each read home, with its priority, its target release (a 'release: <name>' line in
+# its body, else later) and its board column; a live lane gives the stage, the pull request and the time of its last
+# status line, a merge record the pull request and done. A held or parked item is on hold: only the ask list waits on
+# the captain. The name drops leading [tags] and Main message refs; a [captain-ask] tag marks the item asked.
+RELEASE = re.compile(r'^\s*release:\s*(\S.*?)\s*$', re.M | re.I)
+TAGS = re.compile(r'^(?:\[[\w-]+\]\s*)+')
+def ticket(h, r):
+    c = next((c for c in cards if c['id'] == f"{h}/{r['id']}"), {})
+    merged_pr = next((u for u, (_, mh, mt) in merges.items() if (mh, mt) == (h, r['id'])), None)
+    link = PR_URL.search(r.get('links') or '')
+    st = ('done' if r.get('state') == 'done' or merged_pr else 'hold' if r.get('held') == 'yes' or c.get('wait') == 'parked'
+          else 'todo' if r.get('state') == 'queued' else 'review' if RANK.get(c.get('stage'), 0) >= RANK['review'] else 'progress')
+    tags = TAGS.match(r['title'])
+    seen = [x['at'] for x in c.get('history', []) if x['at']]
+    day = next((d for d in (r.get('closed'), r.get('created')) if re.fullmatch(r'\d{4}-\d\d-\d\d', d or '')), None)
+    body, cut, _ = (r.get('body') or '').partition('\n... (truncated, ')  # a long body is cut: its last line may be partial
+    rel = RELEASE.search(body[:body.rfind('\n') + 1] if cut else body)
+    return dict(id=f"{h}/{r['id']}", home=h, task=r['id'], project=None if r.get('repo') in (None, '', '-') else r['repo'],
+                title=re.sub(r'\s*\(Main\d+[^)]*\)|\bMain\d+:?\s*|\s+PR \d+$', '', r['title'][tags.end() if tags else 0:]).strip(),
+                asked='captain-ask' in (tags.group() if tags else ''), priority=int(r['priority']) if str(r.get('priority')).isdigit() else None,
+                release=rel.group(1) if rel else 'later', state=st, pr=c.get('pr') or merged_pr or (link.group() if link else None),
+                updated=max(seen) if seen else c.get('started') or day)
+tickets = [ticket(h, r) for h in ACTIVE for r in backlog.get(h) or []]
 # Cycle time: dispatch to merge, for each merged task whose dispatch is in a ledger.
 cycles = sorted(at - d['ts'] for at, h, task in merges.values() if (d := dispatch(h, task, at)))
 flow_text = probe(['bash', os.path.join(BIN, 'fm-flow.sh'), '--json', '--now', str(int(NOW_TS)), '--capacity'],
@@ -1777,7 +1804,7 @@ board = dict(
     schema='fm-dashboard-board.v1', generated=int(NOW_TS), stages=[dict(id=s, name=n) for s, n in STAGES],
     homes=[dict(id=h, name=hname(h), plan=plan(h), open=sum(c['home'] == h and c['stage'] not in ('queued', 'landed') for c in cards), ready=len(bl(h, 'ready')) if backlog.get(h) is not None else None,
                 known=h not in lane_err) for h in ACTIVE],
-    parked=PARKED, cards=cards, flow=flow, flow_error=flow_error,
+    parked=PARKED, cards=cards, tickets=tickets, tickets_unread=bl_unread, flow=flow, flow_error=flow_error,
     models=models, models_error=models_error,
     skills=skills, skills_error=skills_error,
     asks=[dict(id=f[0], text=f[2], url=f[3] if len(f) > 3 else '', type=f[4] if len(f) == 5 else None, age=a) for f, a in asks] if asks_known else None,

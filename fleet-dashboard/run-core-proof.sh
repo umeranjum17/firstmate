@@ -42,16 +42,18 @@ seed() {
 - [ ] m-build - Build the main thing (repo: alpha) (kind: ship) (since $today)
 - [ ] m-ci - Get the layout pull request through CI (repo: alpha) (kind: ship) (since $today)
 - [ ] m-stuck - Publish the release from the build server (repo: alpha) (kind: ship) (since $today)
-- [ ] m-ask - Choose the layout for the new screen (repo: alpha) (kind: ship) (since $today)
+- [ ] m-ask - [captain-ask] Choose the layout for the new screen (Main42) (repo: alpha) (kind: ship) (priority: 0) (since $today)
 
 ## Queued
-- [ ] m-ready - Start the ready thing (repo: alpha) (kind: ship) (since $today)
+- [ ] m-ready - Start the ready thing (repo: beta) (kind: ship) (priority: 1) (since $today)
+  release: next
 - [ ] m-held - Wait for the captain's call (repo: alpha) (kind: ship) (since $held_day) (hold: needs his call) (hold-kind: captain)
 - [ ] m-after - After the ready thing blocked-by: m-ready (repo: alpha) (kind: ship) (since $today)
 
 ## Done
 - [x] m-shipped - Ship the main thing (repo: alpha) (kind: ship) (merged $today)
 EOF
+  printf 'npm-2fa\t%s\tLink the alpha npm package to GitHub?\thttps://www.npmjs.com/package/alpha/access\n' "$((now - 900))" > "$home/data/captain-asks.tsv"
   lane m-build ship "working [at=$((now - 600))]: building the main thing"
   lane m-ci ship "paused [at=$((now - 1200))]: waiting for CI checks https://github.com/acme/alpha/pull/9"
   lane m-stuck ship "blocked [at=$((now - 7200))]: cannot reach the build server"
@@ -120,6 +122,28 @@ for w in 390 1280; do
   shot "board-stuck-$w" '#/board?tab=stuck' "$w" m-stuck
   shot "board-waiting-$w" '#/board?tab=waiting' "$w" m-ci
   shot "board-homes-$w" '#/board?rows=home' "$w" m-stuck
+  shot "tickets-$w" '#/tickets' "$w" 'Link the alpha npm package'
+done
+# A phone opens on Waiting on captain; its In progress column holds the ticket cards.
+shot tickets-390 '#/tickets' 390 'Link the alpha npm package'
+chrome-devtools-axi eval 'document.querySelectorAll(".mseg button")[1].click()' >/dev/null
+sleep 1
+chrome-devtools-axi screenshot "$DONE_DONE_EVIDENCE_ROOT/tickets-progress-390.png" >/dev/null
+# The new Tickets screen in the dark theme too: the stored theme applies on the next full load (a new query string).
+chrome-devtools-axi eval 'localStorage.setItem("fm-theme", "dark")' >/dev/null
+for w in 390 1280; do shot "tickets-dark-$w" "?dark-$w#/tickets" "$w" 'Link the alpha npm package'; done
+chrome-devtools-axi eval 'localStorage.removeItem("fm-theme")' >/dev/null
+# Tickets: the backlog mapped to board columns, and only the ask list waits on the captain.
+jq -e '([.tickets[] | {(.task): .state}] | add) as $s | ([.tickets[] | {(.task): .}] | add) as $t
+  | $s["m-build"] == "progress" and $s["m-ci"] == "review" and $s["m-held"] == "hold" and $s["m-ready"] == "todo" and $s["m-shipped"] == "done"
+  and $t["m-ready"].priority == 1 and $t["m-ready"].release == "next" and $t["m-ready"].project == "beta" and $t["m-build"].release == "later"
+  and $t["m-ask"].asked and $t["m-ask"].title == "Choose the layout for the new screen" and $t["m-ask"].priority == 0
+  and $t["m-shipped"].pr == "https://github.com/acme/alpha/pull/4" and all(.tickets[]; .state != "captain") and (.asks | length) == 1' \
+  "$home/state/dashboard/board.json" >/dev/null || { echo "run-core-proof: tickets mapping wrong: $(jq -c '.tickets' "$home/state/dashboard/board.json")" >&2; exit 1; }
+for w in 390 1280; do
+  for want in "Waiting on captain" "Link the alpha npm package to GitHub?" "Your ask" P0; do
+    grep -qF -- "$want" "$DONE_DONE_EVIDENCE_ROOT/tickets-$w.txt" || { echo "run-core-proof: Tickets at $w lacks '$want'" >&2; exit 1; }
+  done
 done
 chrome-devtools-axi resize 390 844 >/dev/null
 chrome-devtools-axi open "${url}#/insights" >/dev/null
@@ -157,8 +181,9 @@ steps = {
         "Read the Board: each lane with its title and state",
         "Open the Stuck and Waiting tabs and the by-home view at 390px and 1280px",
         "Open Insights: the queue and wait reasons",
+        "Open Tickets at 390px and 1280px: every backlog item on the board, the ask list as Waiting on captain",
     ],
-    "result": "The Board lists m-stuck, m-ask, m-ci and m-build with their titles and states; the Stuck tab holds only stuck lanes, the Waiting tab only the waiting lane, and a home with four open lanes against a cap of three reads 4 / 3; Insights shows Why work waits now with the Blocked, Lead reply and Held groups",
+    "result": "The Board lists m-stuck, m-ask, m-ci and m-build with their titles and states; the Stuck tab holds only stuck lanes, the Waiting tab only the waiting lane, and a home with four open lanes against a cap of three reads 4 / 3; Insights shows Why work waits now with the Blocked, Lead reply and Held groups; Tickets puts each backlog item in its column with its priority chip and release, the captain-held item On hold, and only the one ask under Waiting on captain",
 }
 with open(sys.argv[1], "w") as f:
     json.dump(steps, f, indent=2, ensure_ascii=False)
