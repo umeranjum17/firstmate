@@ -842,14 +842,15 @@ An idle empty composer with that fragment must read `empty`, and the fragment mu
 The shape is furniture only there: the wrapped run must end directly above a proven model row, its opening row must carry the wide-padding, no-whitespace `~/` or `/` path shape that `FM_COMPOSER_OPENCODE_RIGHT_CELL_WRAP_RE_DEFAULT` in `bin/fm-composer-lib.sh` defines, and each continuation row must match `FM_COMPOSER_OPENCODE_WRAP_CONT_RE_DEFAULT`, so typed text at the same position with its shallow indent stays `pending`.
 `tests/fm-composer-lib.test.sh`'s opencode matrix carries the wrapped idle screen, its typed-draft counterweight, the three-row wrap with its typed-draft counterweight, the zero-usage two-row wrap with its typed-draft and busy-row counterweights, an assistant-error-block screen above an empty composer, the unanswered `┃` doorbell bubble above an empty composer with its typed-text counterweight, and the wrapped `<dir>:<branch>` fragment - one-row and two-row - with their unwrapped, typed-draft, and orphan-continuation counterweights; `FM_COMPOSER_MATRIX_LIVE=1 tests/fm-composer-matrix-live-e2e.test.sh` refreshes the real-harness idle result.
 
-### 2026-10-22 opencode 1.18.25 zero-space in-box badge wrap
+### 2026-10-22 opencode 1.18.25 wrapped in-box badge and hint
 
-On a narrow pane OpenCode 1.18.25 draws its agent/model badge inside the bar box with no spaces around the dot (`Build·MiniMax M3.1 Flash free (OpenRouter) OpenR`), and the tail wraps onto wide-padded continuation rows below it, followed by blank bar rows.
-The spaced footer rule (`FM_COMPOSER_LEFTBAR_FOOTER_RE_DEFAULT`) does not match that shape, so an empty composer read `pending` and the doorbell, interrupt, and relaunch refused.
-`_fm_composer_opencode_badge_wrap_start` in `bin/fm-composer-lib.sh` treats the badge row and its continuation rows as furniture only when the badge row matches `FM_COMPOSER_LEFTBAR_BADGE_WRAP_RE_DEFAULT` and the joined tail completes a word of that badge row (`OpenR` plus `outer` completes `OpenRouter`).
-A typed draft above the badge still reads `pending` and extracts its text, and a badge-like row with no wrapped tail is not claimed.
-The opencode matrix in `tests/fm-composer-lib.test.sh` pins these cases, including the multi-row split of a badge word.
-The completes-word proof does not cover every pane width: a live capture on this change still read `pending` at 40 to 44 and 48 to 51 columns, and the draft extraction there carried badge fragments, so the change alters the verdict only in the 45 to 47 column band.
+On a narrow pane OpenCode 1.18.25 wraps the agent/model badge inside the bar box: the dot loses or keeps a space (`Build·`, `Buil ·`, `Build ·`), the first word can break (`Buil` then `d`), and the model tail lands in fragment rows below it.
+The idle hint's quoted suggestion wraps too (`Ask anything... "Fix a TODO in the` then `codebase"`).
+The spaced footer rule (`FM_COMPOSER_LEFTBAR_FOOTER_RE_DEFAULT`) matches none of that, so an empty composer read `pending` and the doorbell, interrupt, and relaunch refused.
+The badge is always the last thing in the box, so `_fm_composer_opencode_badge_wrap_start` in `bin/fm-composer-lib.sh` takes the last row opening it (`FM_COMPOSER_LEFTBAR_BADGE_WRAP_RE_DEFAULT`) with a non-blank row below it, and treats that row and everything after it in the run as furniture.
+A hint row with an unbalanced quote makes the rows below it, up to the one that closes the quote, hint furniture.
+Typed text lives only above the badge, so a draft stays `pending` and extracts only its own text.
+Real panes captured with `opencode -m openrouter/minimax/minimax-m3.1-flash:free` at 40 to 60 columns, empty and with `fix login bug` typed, are in `tests/captures/opencode-badge-wrap` and are pinned by the opencode matrix in `tests/fm-composer-lib.test.sh`.
 
 ### 2026-09-20 claude 2.1.236 statusLine footer through Herdr
 

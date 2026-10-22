@@ -496,13 +496,13 @@ FM_COMPOSER_IDLE_RE_DEFAULT='^Type a message\.\.\.$|^Ask anything(\.\.\.|…)|^P
 # ("Build · GPT-5.5 Fast OpenAI · high"). It is composer furniture, not typed
 # text, and only the run's LAST row is ever matched against it.
 FM_COMPOSER_LEFTBAR_FOOTER_RE_DEFAULT='^(Build|Plan)[[:space:]]+·[[:space:]]+'
-# On a narrow pane OpenCode draws that same badge inside the bar box with no
-# spaces around the dot (`Build·MiniMax M3.1 Flash free (OpenRouter) OpenR`) and
-# the model's tail wraps onto a wide-padded continuation row below it
-# (FM_COMPOSER_OPENCODE_WRAP_CONT_RE_DEFAULT), with blank bar rows after. Only
-# that badge row plus such continuation rows whose text completes the badge's
-# last word is furniture.
-FM_COMPOSER_LEFTBAR_BADGE_WRAP_RE_DEFAULT='^(Build|Plan)·[^[:space:]]'
+# On a narrow pane OpenCode wraps the badge inside the bar box: the dot loses its
+# spaces or keeps one before it (`Buil ·MiniMax M3.1 Flash free (OpenRouter) O`),
+# the first word itself can break (`Buil` then `d` on the next row), and the
+# model's tail wraps into fragment rows below. The badge is always the LAST thing
+# in the composer box, so its opening row (this pattern) and every row after it
+# in the run are furniture; typed text lives only above it.
+FM_COMPOSER_LEFTBAR_BADGE_WRAP_RE_DEFAULT='^(Build|Buil|Bui|Plan|Pla)[[:space:]]*·[[:space:]]*[^[:space:]]'
 # Claude draws its permission-mode hint on its own row directly below the
 # composer (` ⏵⏵ bypass permissions on (shift+tab to cycle)`, ` ⏵⏵ accept edits
 # on`, ` ⏸ plan mode on`; verified live through Herdr on claude 2.1.236). The
@@ -1513,54 +1513,27 @@ _fm_composer_opencode_wrap_run_start() {  # <screen> <styled> <first> <last>
   return 1
 }
 
-# _fm_composer_badge_completes_word: 0 when <wrapped-tail> is the suffix of the
-# badge row's last word, i.e. that word joined to the tail equals a word earlier
-# in the same badge row (`OpenR` + `outer` completes `(OpenRouter)`).
-_fm_composer_badge_completes_word() {  # <trimmed-badge-row> <wrapped-tail>
-  local badge=$1 tail=$2 head word want
-  head=${badge% *}
-  [ "$head" != "$badge" ] || return 1
-  want=${badge##* }$tail
-  local -a words
-  read -ra words <<< "${head//·/ }"
-  for word in "${words[@]}"; do
-    if [[ $word =~ ^[^[:alnum:]]*([[:alnum:]].*[[:alnum:]]|[[:alnum:]])[^[:alnum:]]*$ ]] \
-      && [ "${BASH_REMATCH[1]}" = "$want" ]; then
-      return 0
-    fi
-  done
-  return 1
-}
-
-# _fm_composer_opencode_badge_wrap_start: print the row of a wrapped agent/model
-# badge (FM_COMPOSER_LEFTBAR_BADGE_WRAP_RE_DEFAULT) whose wide-padded
-# continuation rows, with only blank bar rows after them, end the run at <last>,
-# else print nothing and return 1. A badge with no continuation row is the
-# ordinary footer, owned by FM_COMPOSER_LEFTBAR_FOOTER_RE.
+# _fm_composer_opencode_badge_wrap_start: print the LAST row in [<first>,<last>]
+# that opens the agent/model badge (FM_COMPOSER_LEFTBAR_BADGE_WRAP_RE_DEFAULT),
+# else print nothing and return 1. Only a badge with a wrapped row after it
+# (a non-blank row below, so a single unwrapped footer stays with
+# FM_COMPOSER_LEFTBAR_FOOTER_RE) is claimed.
 _fm_composer_opencode_badge_wrap_start() {  # <screen> <styled> <first> <last>
-  local screen=$1 styled=$2 first=$3 last=$4 row raw body tail='' conts=0
+  local screen=$1 styled=$2 first=$3 last=$4 row raw body wrapped=0
   row=$last
   while [ "$row" -ge "$first" ]; do
     raw=$(_fm_composer_screen_row "$row" "$screen")
     body=$(_fm_composer_row_content "$raw" "$styled")
     case "$body" in '┃'*) body=${body#┃} ;; esac
-    if [ "$conts" = 0 ]; then
-      case "$body" in *[![:space:]]*) ;; *) row=$((row - 1)); continue ;; esac
-    fi
-    if _fm_composer_row_is_opencode_wrap_continuation "$body"; then
-      fm_composer_normalize_trim_var body
-      tail=$body$tail
-      conts=$((conts + 1))
-      row=$((row - 1))
-      continue
-    fi
-    [ "$conts" -gt 0 ] || return 1
     fm_composer_normalize_trim_var body
-    fm_composer_idle_matches "$body" \
-      "${FM_COMPOSER_LEFTBAR_BADGE_WRAP_RE:-$FM_COMPOSER_LEFTBAR_BADGE_WRAP_RE_DEFAULT}" sensitive || return 1
-    _fm_composer_badge_completes_word "$body" "$tail" || return 1
-    printf '%s' "$row"
-    return 0
+    if fm_composer_idle_matches "$body" \
+        "${FM_COMPOSER_LEFTBAR_BADGE_WRAP_RE:-$FM_COMPOSER_LEFTBAR_BADGE_WRAP_RE_DEFAULT}" sensitive; then
+      [ "$wrapped" = 1 ] || return 1
+      printf '%s' "$row"
+      return 0
+    fi
+    [ -z "$body" ] || wrapped=1
+    row=$((row - 1))
   done
   return 1
 }
@@ -1674,6 +1647,20 @@ _fm_composer_classify_bare_wrap() {  # <screen> <styled> <glyph-row> <cursor-row
   if [ "$styled" = 1 ]; then printf 'pending'; else printf 'unknown'; fi
 }
 
+# OpenCode's idle hint carries a quoted suggestion (`Ask anything... "Fix a TODO
+# in the codebase"`) that wraps onto the next bar row on a narrow pane, leaving
+# the closing fragment (`codebase"`) alone on its row. A hint row whose quotes are
+# unbalanced opens such a wrap; the rows directly below it, up to the one that
+# closes the quote, are hint furniture. Both helpers set <var> to the row the wrap
+# is still open on, else -1.
+_fm_composer_placeholder_wrap_open_var() {  # <var> <row> <hint-content>
+  local q=${3//[^\"]/}
+  if [ $(( ${#q} % 2 )) = 1 ]; then printf -v "$1" '%s' "$2"; else printf -v "$1" '%s' -1; fi
+}
+_fm_composer_placeholder_wrap_next_var() {  # <var> <row> <continuation-content>
+  case "$3" in *\") printf -v "$1" '%s' -1 ;; *) printf -v "$1" '%s' "$2" ;; esac
+}
+
 # _fm_composer_classify_leftbar: opencode's left-bar composer. Blank rows and
 # the idle hint read empty; the run's LAST row may be the mode/model footer
 # (composer furniture, never typed text). Real content is pending when styling
@@ -1681,7 +1668,7 @@ _fm_composer_classify_bare_wrap() {  # <screen> <styled> <glyph-row> <cursor-row
 _fm_composer_classify_leftbar() {  # <screen> <styled> <first-row> <last-row>
   local screen=$1 styled=$2 first=$3 last=$4
   local row raw content pending_seen=0 footer_re leading_blank=1 placeholder_position=0
-  local last_body wrap_first=-1 badge_first=-1
+  local last_body wrap_first=-1 badge_first=-1 ph_cont=-1
   footer_re=${FM_COMPOSER_LEFTBAR_FOOTER_RE:-$FM_COMPOSER_LEFTBAR_FOOTER_RE_DEFAULT}
   badge_first=$(_fm_composer_opencode_badge_wrap_start "$screen" "$styled" "$first" "$last") || badge_first=-1
   # The agent/model row's wrapped `<dir>:<branch>` directory fragment is
@@ -1710,8 +1697,13 @@ _fm_composer_classify_leftbar() {  # <screen> <styled> <first-row> <last-row>
       placeholder_position=0
     fi
     leading_blank=0
+    if [ "$ph_cont" -ge 0 ] && [ "$row" -eq $((ph_cont + 1)) ]; then
+      _fm_composer_placeholder_wrap_next_var ph_cont "$row" "$content"
+      row=$((row + 1)); continue
+    fi
     if [ "$placeholder_position" = 1 ] \
        && fm_composer_idle_matches "$content" "${FM_COMPOSER_IDLE_RE:-$FM_COMPOSER_IDLE_RE_DEFAULT}" insensitive; then
+      _fm_composer_placeholder_wrap_open_var ph_cont "$row" "$content"
       row=$((row + 1)); continue
     fi
     if [ "$row" -eq "$last" ] \
@@ -2087,7 +2079,7 @@ _fm_composer_extract_refusal_geometry() {  # <plain-screen>
 fm_composer_extract_selected_content() {  # <caps> <screen> [diagnostics=0]
   local caps=$1 screen=$2 styled=0 kv plain row raw content glyph joined='' footer_re prompt_row=-1
   local leading_blank=1 placeholder_position=0 prompt_is_shell=0 diagnostics=${3:-0}
-  local last_body wrap_first=-1 badge_first=-1
+  local last_body wrap_first=-1 badge_first=-1 ph_cont=-1
   footer_re=${FM_COMPOSER_LEFTBAR_FOOTER_RE:-$FM_COMPOSER_LEFTBAR_FOOTER_RE_DEFAULT}
   while IFS= read -r kv; do
     [ "$kv" = styled=1 ] && styled=1
@@ -2168,6 +2160,16 @@ EOF
     # OpenCode's left-bar hint and legacy shell-glyph boxed placeholders have no
     # such styling proof, so their structurally fixed positions remain the two
     # idle-regex exceptions here.
+    if [ "$FM_COMPOSER_SELECTED_KIND" = leftbar ] && [ -n "$content" ] \
+       && [ "$ph_cont" -ge 0 ] && [ "$row" -eq $((ph_cont + 1)) ]; then
+      _fm_composer_placeholder_wrap_next_var ph_cont "$row" "$content"
+      row=$((row + 1))
+      continue
+    fi
+    if [ "$FM_COMPOSER_SELECTED_KIND" = leftbar ] && [ "$placeholder_position" = 1 ] \
+       && fm_composer_idle_matches "$content" "${FM_COMPOSER_IDLE_RE:-$FM_COMPOSER_IDLE_RE_DEFAULT}" insensitive; then
+      _fm_composer_placeholder_wrap_open_var ph_cont "$row" "$content"
+    fi
     if [ -z "$content" ] \
        || { { [ "$FM_COMPOSER_SELECTED_KIND" = leftbar ] \
               || { [ "$FM_COMPOSER_SELECTED_KIND" = box ] && [ "$prompt_is_shell" = 1 ]; }; } \
