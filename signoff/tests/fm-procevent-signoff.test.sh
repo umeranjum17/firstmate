@@ -63,6 +63,7 @@ case "${1-}" in
       exit 1
     fi
     case "$title" in *\?) ;; *) echo 'VALIDATION_ERROR: --title must be a question ending in "?"'; exit 1 ;; esac
+    [ "$(wc -w <<<"$title")" -le 12 ] || { echo 'VALIDATION_ERROR: Write one plain question, 12 words or fewer; put the rest in --why'; exit 1; }
     for need in why yes no rec recwhy dflt; do
       [ -n "${!need}" ] || { echo "VALIDATION_ERROR: key $key: --$need is required"; exit 1; }
     done
@@ -135,6 +136,22 @@ out=$(adapter poll 2>/dev/null) || fail "poll found no answer for the re-held ta
 jq -e 'to_entries | all(.value.ask_ref == "T1" and (.value.title == "Ship T1?"))' "$SIGNOFF_BOARD" >/dev/null \
   || fail "a raised card lacks the hold task id as its ask reference: $(cat "$SIGNOFF_BOARD")"
 pass "a task held again after an answered card gets a live card of its own, each raised with the hold id as --ask-ref"
+
+rm -f "$HOLD_FILE" "$SIGNOFF_BOARD" "$FM_HOME_DIR/state/signoff-delivered"
+printf '{}\n' > "$SIGNOFF_BOARD"
+long_title='Capture account planner for the TakeOne live proof run with the spare MiniMax key today'
+long_reason='Let TakeOne use the MiniMax key for its live proof run, given that the planner needs a paid account and nobody has approved the spend yet?'
+hold_as '2026-10-12T11:30:00Z#0'
+adapter raise TQ "$long_title" "$long_reason" release >/dev/null 2>&1 || fail "a long reason and long title raised no card"
+hold_as '2026-10-12T11:40:00Z#0'
+adapter raise TQ "$long_title" 'Let TakeOne use the MiniMax key for its live proof?' release >/dev/null 2>&1 \
+  || fail "a re-hold with a short question raised no card"
+jq -e --arg r "$long_reason" '[.[]] as $c | ($c | length) == 2
+  and ($c | map(select(.title == "Capture account planner for the TakeOne live proof run with the spare?")) | length) == 1
+  and ($c | map(select(.title == "Let TakeOne use the MiniMax key for its live proof?")) | length) == 1
+  and ($c | map(select(.about == $r)) | length) == 1' "$SIGNOFF_BOARD" >/dev/null \
+  || fail "the card question did not follow the 12-word rule: $(cat "$SIGNOFF_BOARD")"
+pass "the card question is the hold reason when it is one short question, else the title cut to 12 words; a re-hold uses its new reason"
 
 rm -f "$HOLD_FILE" "$SIGNOFF_BOARD" "$FM_HOME_DIR/state/signoff-delivered"
 printf '{}\n' > "$SIGNOFF_BOARD"
@@ -228,7 +245,7 @@ real_env "$real_home" "$ROOT/bin/fm-captain-hold.sh" hold fm-sample-later \
   || fail "the dated deferral was not held"
 [ "$(board_count)" = "$before" ] || fail "a dated deferral raised a card: $(cat "$SIGNOFF_BOARD")"
 
-q=$(card_for "Pick the route?")
+q=$(card_for "Which route?")
 [ -n "$q" ] || fail "the held question raised no card: $(cat "$SIGNOFF_BOARD")"
 jq -e --arg k "$q" '.[$k] | .about == "Which route?" and .close == "done"' "$SIGNOFF_BOARD" >/dev/null \
   || fail "the question card lost its reason or close: $(cat "$SIGNOFF_BOARD")"

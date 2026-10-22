@@ -20,9 +20,10 @@
 # raise      Called by `fm-captain-hold.sh hold` after a hold is recorded. While
 #            enabled it raises one board card keyed by this home's tag, the task
 #            id and the hold-set stamp of that hold, so every hold gets its own
-#            live card; the hold reason is its `about` and `why`, the task title
-#            (with a `?` added when missing) its question, and the given close
-#            mode; the card carries the fields sign-off-axi requires for a new
+#            live card; the hold reason is its `about` and `why`; its question is
+#            the hold reason when that is a single question of 12 words or
+#            fewer, else the task title cut to 12 words with a `?`; and the
+#            given close mode; the card carries the fields sign-off-axi requires for a new
 #            Decide card (--ask-ref is the task id); otherwise it is a silent no-op. A failure, including a missing
 #            sign-off-axi, exits nonzero with sign-off's own output; the caller
 #            warns and keeps the hold.
@@ -129,6 +130,20 @@ cmd_retire() {
   "$BIN/fm-captain-hold.sh" unbind "$SOURCE_ID" >/dev/null || exit 1
 }
 
+# The card question sign-off-axi accepts is one question of at most QUESTION_WORDS
+# words. The hold reason when it is that; otherwise the task title cut to that
+# length. The full reason always goes in --about and --why.
+QUESTION_WORDS=12
+card_question() {
+  local title=$1 reason=$2 words
+  if [[ "$reason" == *\? && "$reason" != *$'\n'* && "${reason%\?}" != *\?* ]]; then
+    words=$(wc -w <<<"$reason")
+    if [ "$words" -le "$QUESTION_WORDS" ]; then printf '%s' "$reason"; return; fi
+  fi
+  title=${title%\?}
+  printf '%s?' "$(printf '%s' "$title" | tr -s '[:space:]' ' ' | cut -d' ' -f1-"$QUESTION_WORDS" | sed 's/ *$//')"
+}
+
 cmd_raise() {
   [ $# -eq 4 ] || usage
   local out identity title next
@@ -137,8 +152,7 @@ cmd_raise() {
     printf 'sign-off card not raised: the hold identity of %s could not be read\n' "$1" >&2
     return 1
   }
-  title=$2
-  case "$title" in *\?) ;; *) title="$title?" ;; esac
+  title=$(card_question "$2" "$3")
   case "$4" in release) next='the held work resumes' ;; *) next='the question closes' ;; esac
   out=$(signoff raise --key "$(home_key_prefix)$1-$(stamp_token "${identity%%#*}")" --title "$title" --about "$3" --close "$4" --ask-ref "$1" \
     --why "${3:0:200}" --outcome yes="Your yes is recorded and $next." --outcome no="Your no is recorded and $next." \
