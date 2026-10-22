@@ -18,6 +18,7 @@ description: Verify firstmate-addons changes through their executable integratio
 - [Claude accounts refresh timer](features/claude-accounts-timer.md): run `bash claude-accounts/tests/claude-accounts-timer.test.sh`; it installs the units into a throwaway tree with a stub systemctl, proves dry run, rerun and uninstall, and never touches the host's timers.
 - [Merge evidence one card per PR](features/merge-card-one-card-per-pr.md): run `bash merge-card/tests/merge-card-e2e.sh`; it uses a fixture board and stub sign-off-axi, proves a new head leaves one live card and archives the old one (posted one at a time, never `--replace`), two PRs keep two cards, and the internal-change title names repo and PR. Also run `bash merge-card/tests/real-board.test.sh` for the same journey with the real sign-off-axi on a seeded temp board.
 - Merge-gate lint pin: run `bash merge-on-green/tests/checks-lint-parity.test.sh`; it uses a fake gh and isolated homes, runs the pinned done-done-axi lint against size fixtures (plain, generated, routes, oversized) and proves its PASS/FAIL verdicts match the legacy lint.
+- Fleet contract check: run `done-done run fleet-contract-check` (`bash fleet-contract-check/run-proof.sh`); it runs the real script on the installed fork in a throwaway HOME (one ok or FAIL line per caller) and then the fixture journey that breaks a caller and must name it.
 
 ## Procedure
 

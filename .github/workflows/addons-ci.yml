@@ -104,6 +104,9 @@ jobs:
       # Quota JSON fixtures, a throwaway home and HOME, and a stub register: nothing real is touched.
       - name: Claude quota check test
         run: bash claude-quota/tests/claude-quota.test.sh
+      # Fixture fork home with stub callers and a throwaway HOME: nothing real is touched.
+      - name: Fleet contract check test
+        run: bash fleet-contract-check/tests/fleet-contract-check.test.sh
       # Fixture homes, stub herdr and a temp state dir: nothing real is touched.
       - name: Fleet stall check test
         run: bash fleet-stall/tests/fleet-stall-e2e.sh
