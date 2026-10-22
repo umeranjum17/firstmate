@@ -50,6 +50,11 @@ seed() {
 - [ ] m-ready - Start the ready thing (repo: beta) (kind: ship) (priority: 1) (since $today)
   release: next
 - [ ] m-held - Wait for the captain's call (repo: alpha) (kind: ship) (since $held_day) (hold: needs his call) (hold-kind: captain)
+  Resolution recorded by fm-captain-hold.
+  Decision digest: 0f0f
+  Resolution mode: released
+  Captain decision:
+  Captain 22 Oct chat: "keep the old layout until the new one is proven". Main decides: wait for the new layout.
 - [ ] m-after - After the ready thing blocked-by: m-ready (repo: alpha) (kind: ship) (since $today)
 
 ## Done
@@ -164,8 +169,10 @@ jq -e '([.tickets[] | {(.task): .state}] | add) as $s | ([.tickets[] | {(.task):
   "$home/state/dashboard/board.json" >/dev/null || { echo "run-core-proof: tickets mapping wrong: $(jq -c '.tickets' "$home/state/dashboard/board.json")" >&2; exit 1; }
 # The ticket page: the description without bookkeeping, the captain's words it serves, and the lane's status lines.
 for w in 390 1280; do shot "ticket-page-$w" '#/tickets?ticket=main/m-ask' "$w" 'Serves your ask'; done
+shot ticket-held-390 '#/tickets?ticket=main/m-held' 390 'Main decides: wait for the new layout.'
 jq -e '(.tickets[] | select(.task == "m-ask")) as $t | $t.ask == {"words": "Show the new screen in the layout a phone reads first", "day": "22 Oct"}
-  and $t.desc == "Two layouts are drawn; the lead picks one."' \
+  and $t.desc == "Two layouts are drawn; the lead picks one."
+  and ([.tickets[] | select(.task == "m-held")][0] | .desc == "Main decides: wait for the new layout." and .ask.day == "22 Oct")' \
   "$home/state/dashboard/board.json" >/dev/null || { echo "run-core-proof: ticket page fields wrong: $(jq -c '.tickets[] | select(.task == "m-ask")' "$home/state/dashboard/board.json")" >&2; exit 1; }
 for w in 390 1280; do
   for want in "Serves your ask of 22 Oct" "Two layouts are drawn" "Needs a decision" "Owner"; do
@@ -216,6 +223,7 @@ steps = {
         "Look at the sidebar at 1280px and the phone dock at 390px: no Ship tab, only Board, Tickets, Overview, Insights and Needs you",
         "Open Tickets at 390px and 1280px: every backlog item on the board, the ask list as Waiting on captain",
         "Open a ticket at 390px and 1280px: its description, the captain's words it serves, its fields and its activity",
+        "Open the held ticket at 390px: its description is the plain decision, with no leftover labels or punctuation",
         "Open Overview at 390px and 1280px: each card names its source; scroll Overview, Insights and Tickets to the end at 390px",
     ],
     "result": "The Board lists m-stuck, m-ask, m-ci and m-build with their titles and states; the Stuck tab holds only stuck lanes, the Waiting tab only the waiting lane, and a home with four open lanes against a cap of three reads 4 / 3; Insights shows Why work waits now with the Blocked, Lead reply and Held groups; Tickets puts each backlog item in its column with its priority chip and release, the captain-held item On hold, and only the one ask under Waiting on captain; a ticket page shows its description, the captain's words with their day, and the lane's activity; Overview names the source of every figure, and each page's end clears the tab bar at 390px; the sidebar and the phone dock no longer offer a Ship tab",
