@@ -849,7 +849,7 @@ The idle hint's quoted suggestion wraps too (`Ask anything... "Fix a TODO in the
 The spaced footer rule (`FM_COMPOSER_LEFTBAR_FOOTER_RE_DEFAULT`) matches none of that, so an empty composer read `pending` and the doorbell, interrupt, and relaunch refused.
 The badge is always the last thing in the box, so `_fm_composer_opencode_badge_wrap_start` in `bin/fm-composer-lib.sh` takes the last row opening it (`FM_COMPOSER_LEFTBAR_BADGE_WRAP_RE_DEFAULT`) that has a blank bar row above it and a non-blank row below it, and treats that row and everything after it in the run as furniture.
 A hint row with an unbalanced quote makes the single row directly below it hint furniture when that row ends in a closing double quote.
-Typed text above the badge stays `pending` and extracts its own text, except that a typed line starting with `Build·`, `Buil·`, or `Plan·` above a blank bar row is read as badge furniture; that is the accepted residual of the badge-wrap policy.
+Typed text above the badge stays `pending` and extracts its own text, except that a typed line starting with `Build·`, `Buil·`, or `Plan·` (spaced dot forms included) above a blank bar row is read as badge furniture when a non-blank row sits below it in the run; that is the accepted residual of the badge-wrap policy.
 Real panes captured with `opencode -m openrouter/minimax/minimax-m3.1-flash:free` at 40 to 60 columns, empty and with `fix login bug` typed, are in `tests/captures/opencode-badge-wrap` and are pinned by the opencode matrix in `tests/fm-composer-lib.test.sh`.
 
 ### 2026-09-20 claude 2.1.236 statusLine footer through Herdr
