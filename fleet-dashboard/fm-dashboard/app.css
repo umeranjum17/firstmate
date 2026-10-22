@@ -374,3 +374,5 @@ a.ov-kpi:hover,button.ov-kpi:hover{box-shadow:0 0 0 1px color-mix(in srgb,var(--
 .tk-desc{white-space:pre-line;overflow-wrap:anywhere}
 .tk-ask{margin:0 0 16px;padding:10px 14px;border-radius:8px;background:var(--raise);border-left:2px solid var(--accent);font-size:14px;line-height:21px;color:var(--ink)}
 .tk-ask small{display:block;margin-bottom:4px;color:var(--ink-3);font-size:12px}
+.ov-src{margin-top:10px;font-size:11.5px;line-height:16px;color:var(--ink-4)}
+.ov-kpis+.ov-src{margin:8px 2px 12px}

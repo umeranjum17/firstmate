@@ -131,6 +131,17 @@ shot tickets-390 '#/tickets' 390 'Link the alpha npm package'
 chrome-devtools-axi eval 'document.querySelectorAll(".mseg button")[1].click()' >/dev/null
 sleep 1
 chrome-devtools-axi screenshot "$DONE_DONE_EVIDENCE_ROOT/tickets-progress-390.png" >/dev/null
+# Overview names the records behind every figure; at 390 the end of each page clears the floating tab bar.
+for w in 390 1280; do shot "overview-$w" '#/overview' "$w" 'Lifecycle'; done
+for want in "Source: Needs you: Main's ask list" "Source: each home's lane records" "each home's backlog and its done archive" "Source: quota-axi cache, read-only"; do
+  grep -qF -- "$want" "$DONE_DONE_EVIDENCE_ROOT/overview-390.txt" || { echo "run-core-proof: Overview lacks '$want'" >&2; exit 1; }
+done
+for v in overview insights tickets; do
+  shot "end-$v-390" "#/$v" 390 "$( [ "$v" = insights ] && echo 'Why work waits' || echo Live )"
+  chrome-devtools-axi eval '(() => { scrollTo(0, 1e6); document.querySelectorAll(".ins, .mcols > .tkc").forEach(e => e.scrollTop = 1e6); return 1 })()' >/dev/null
+  sleep 1
+  chrome-devtools-axi screenshot "$DONE_DONE_EVIDENCE_ROOT/end-$v-390.png" >/dev/null
+done
 # The new Tickets screen in the dark theme too: the stored theme applies on the next full load (a new query string).
 chrome-devtools-axi eval 'localStorage.setItem("fm-theme", "dark")' >/dev/null
 for w in 390 1280; do
@@ -198,8 +209,9 @@ steps = {
         "Open Insights: the queue and wait reasons",
         "Open Tickets at 390px and 1280px: every backlog item on the board, the ask list as Waiting on captain",
         "Open a ticket at 390px and 1280px: its description, the captain's words it serves, its fields and its activity",
+        "Open Overview at 390px and 1280px: each card names its source; scroll Overview, Insights and Tickets to the end at 390px",
     ],
-    "result": "The Board lists m-stuck, m-ask, m-ci and m-build with their titles and states; the Stuck tab holds only stuck lanes, the Waiting tab only the waiting lane, and a home with four open lanes against a cap of three reads 4 / 3; Insights shows Why work waits now with the Blocked, Lead reply and Held groups; Tickets puts each backlog item in its column with its priority chip and release, the captain-held item On hold, and only the one ask under Waiting on captain; a ticket page shows its description, the captain's words with their day, and the lane's activity",
+    "result": "The Board lists m-stuck, m-ask, m-ci and m-build with their titles and states; the Stuck tab holds only stuck lanes, the Waiting tab only the waiting lane, and a home with four open lanes against a cap of three reads 4 / 3; Insights shows Why work waits now with the Blocked, Lead reply and Held groups; Tickets puts each backlog item in its column with its priority chip and release, the captain-held item On hold, and only the one ask under Waiting on captain; a ticket page shows its description, the captain's words with their day, and the lane's activity; Overview names the source of every figure, and each page's end clears the tab bar at 390px",
 }
 with open(sys.argv[1], "w") as f:
     json.dump(steps, f, indent=2, ensure_ascii=False)

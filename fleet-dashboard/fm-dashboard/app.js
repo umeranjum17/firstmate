@@ -170,10 +170,10 @@ function Line({ vals, c }) {
   return html`<svg class="ov-line" viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true" style=${{ color: `var(${c})` }}>
     <polygon points=${`0,28 ${pts} 100,28`} fill="currentColor" fill-opacity=".12"/><polyline points=${pts} fill="none" stroke="currentColor" stroke-width="1.6" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>`
 }
-function Kpi({ name, v, sub, c, t, good, href, onClick }) {
+function Kpi({ name, v, sub, c, t, good, href, onClick, src }) {
   const tag = href ? 'a' : onClick ? 'button' : 'div', d = t?.delta
   const dc = !d || !good ? '' : (d > 0) === (good === 'up') ? 'up' : 'dn'
-  return html`<${tag} class="ov-kpi" href=${href} onClick=${onClick} style=${{ '--c': `var(${c})` }}>
+  return html`<${tag} class="ov-kpi" href=${href} onClick=${onClick} title=${src && `Source: ${src}`} style=${{ '--c': `var(${c})` }}>
     <span><i></i>${name}${d != null ? html`<em class=${'num ' + dc} title="change since this time yesterday">${d ? sign(d) : '±0'}</em>` : ''}</span>
     <b class="num">${v}${sub ? html`<small>${sub}</small>` : ''}</b>${t?.line ? html`<${Line} vals=${t.line} c=${c}/>` : html`<div class="ov-line"></div>`}</${tag}>`
 }
@@ -200,6 +200,8 @@ function Rail({ d, go }) {
       ${s === 'landed' ? html`<span class="ov-sbar done"></span>` : html`<span class="ov-sbar"><i style=${{ width: `${(n - st - wt) / top * 100}%` }}></i><i class="w" style=${{ width: `${wt / top * 100}%` }}></i><i class="s" style=${{ width: `${st / top * 100}%` }}></i></span>`}
       <small>${s === 'landed' ? 'merged today' : !n ? 'empty' : [st && html`<em class="s">${st} stuck</em>`, wt && `${wt} waiting`, old > 60 && `oldest ${dur(old)}`].filter(Boolean).flatMap((p, k) => k ? [' · ', p] : [p])}</small></button>` })}</div>`
 }
+// Every figure names the records it is computed from: on hover, and as a footnote under its card.
+const Src = ({ m, ids, text }) => html`<p class="ov-src" title=${ids?.map(i => m[i]?.window).find(Boolean) || ''}>Source: ${(text || [...new Set(ids.map(i => m[i]?.source).filter(Boolean))].join(' · ') || 'not recorded').replace(/\s*~?\/[\w./-]+/g, '')}</p>`
 function Overview({ d, od, go }) {
   const q = od.data
   if (!q) return html`<div class="ov"><div class="none"><p>${od.err ? `Cannot load the overview: ${od.err}` : 'Loading the overview…'}</p></div></div>`
@@ -213,29 +215,29 @@ function Overview({ d, od, go }) {
   return html`<div class="ov">
     <p class="ov-tot">${od.err ? html`<span class="bad">Refresh failed: ${od.err} · </span>` : ''}${age < 60 ? 'just updated' : `updated ${dur(age)} ago`}</p>
     <div class="ov-kpis">
-      <${Kpi} name="Needs you" v=${asks == null ? '?' : asks.length} c=${asks?.length ? '--orange' : '--green'} href="#/needs"/>
-      <${Kpi} name="Stuck" v=${stk} c=${stk ? '--red' : '--green'} t=${trend(hist, 'stuck', stk)} good="down" onClick=${() => go({ view: 'board', tab: 'active', state: ['blocked', 'decision'], card: null })}/>
-      <${Kpi} name="To land" v=${toLand} c="--st-merge" onClick=${() => go({ view: 'board', tab: 'active', card: null })}/>
-      <${Kpi} name="Lanes open" v=${m.lanes?.value ?? '–'} sub=${` of ${m.lane_plan?.value ?? '–'}`} c="--accent" t=${trend(hist, 'lanes', m.lanes?.value)} good="up"/>
-      <${Kpi} name="Ready" v=${m.ready?.value ?? '–'} c="--h-2" t=${trend(hist, 'ready', m.ready?.value)}/>
-    </div>
+      <${Kpi} name="Needs you" v=${asks == null ? '?' : asks.length} c=${asks?.length ? '--orange' : '--green'} href="#/needs" src=${m.asks?.source}/>
+      <${Kpi} name="Stuck" v=${stk} c=${stk ? '--red' : '--green'} t=${trend(hist, 'stuck', stk)} good="down" src=${m.stuck?.source} onClick=${() => go({ view: 'board', tab: 'active', state: ['blocked', 'decision'], card: null })}/>
+      <${Kpi} name="To land" v=${toLand} c="--st-merge" src=${m.lanes?.source} onClick=${() => go({ view: 'board', tab: 'active', card: null })}/>
+      <${Kpi} name="Lanes open" v=${m.lanes?.value ?? '–'} sub=${` of ${m.lane_plan?.value ?? '–'}`} c="--accent" t=${trend(hist, 'lanes', m.lanes?.value)} good="up" src=${m.lanes?.source}/>
+      <${Kpi} name="Ready" v=${m.ready?.value ?? '–'} c="--h-2" t=${trend(hist, 'ready', m.ready?.value)} src=${m.ready?.source}/>
+    </div><${Src} m=${m} text=${`Needs you: ${m.asks?.source || 'not recorded'} · Stuck, To land, Lanes open: ${m.lanes?.source || 'not recorded'} · Ready: ${m.ready?.source || 'not recorded'}`}/>
     <div class="ov-grid">
       ${asks?.length ? html`<section class="ov-card wide"><h3>Needs you</h3><div class="ov-asks">${askOrder(asks).map((a, k) =>
         html`<a class="ov-ask" key=${k} href=${a.url || '#/needs'} target=${a.url ? '_blank' : null} rel="noreferrer"><span><em class="ktag">${ASK_TAG[askType(a.text, a.type)]}</em>${a.text}</span><small class="num">${a.age == null ? '' : dur(a.age)}</small></a>`)}</div></section>` : ''}
-      <section class="ov-card wide"><h3>Lifecycle</h3><${Rail} d=${d} go=${go}/></section>
-      <section class="ov-card w2"><h3>Flow</h3><div class="ov-flows">${flow('landed', 'Landed today', 'recorded merges', '--st-landed')}${flow('closed', 'Closed 7 d', 'backlog items', '--green')}</div></section>
+      <section class="ov-card wide"><h3>Lifecycle</h3><${Rail} d=${d} go=${go}/><${Src} m=${m} ids=${['lanes', 'landed']}/></section>
+      <section class="ov-card w2"><h3>Flow</h3><div class="ov-flows">${flow('landed', 'Landed today', 'recorded merges', '--st-landed')}${flow('closed', 'Closed 7 d', 'backlog items', '--green')}</div><${Src} m=${m} ids=${['landed', 'closed']}/></section>
       <section class="ov-card w1"><h3>Lanes by state</h3>
         <div class="ov-bar tall">${states ? OV_STATES.map(([k, , c]) => states[k] ? html`<i class=${c} key=${k} style=${{ flex: states[k] }}></i>` : '') : ''}</div>
-        <div class="ov-legend">${OV_STATES.map(([k, nm, c]) => html`<span key=${k}><i class=${c}></i>${nm}<b class="num">${states ? states[k] : '–'}</b></span>`)}</div></section>
+        <div class="ov-legend">${OV_STATES.map(([k, nm, c]) => html`<span key=${k}><i class=${c}></i>${nm}<b class="num">${states ? states[k] : '–'}</b></span>`)}</div><${Src} m=${m} ids=${['lane_states']}/></section>
       <section class="ov-card w1"><h3>Why work is queued</h3>
         <div class="ov-ql">${qr.map((x, k) => { const n = sum(x.by_home); return html`<div class="ov-qrow" key=${k}><span>${x.reason}</span>
           <span class="ov-bar">${qOk && n > 0 ? html`<i style=${{ width: `${n / qTop * 100}%`, background: `var(${QTONE[k] || '--grey'})` }}></i>` : ''}</span><b class="num">${qOk ? n : '–'}</b></div>` })}</div>
-        <p class="ov-tot">Total <b class="num">${qOk ? sum(m.queue.value) : '–'}</b> queued</p></section>
+        <p class="ov-tot">Total <b class="num">${qOk ? sum(m.queue.value) : '–'}</b> queued</p><${Src} m=${m} ids=${['queue']}/></section>
       ${q.claude_accounts?.length ? html`<section class="ov-card wide"><h3>Claude accounts</h3><div class="ov-ql ov-quota ov-ca">${q.claude_accounts.map((a, k) => html`<div key=${k}><b class="ov-can">${a.name}</b>
         ${[['5 h', a.five_hour], ['7 d', a.seven_day]].map(([nm, w]) => { const left = w?.left, tone = left == null ? 'mut' : left <= 10 ? 'bad' : left <= 25 ? 'warn' : ''
           return html`<div class="ov-qrow" key=${nm}><span>${nm}</span><span class=${'ov-bar ' + (left == null ? 'unk' : '')}><i style=${{ width: `${left == null ? 0 : Math.max(2, Math.min(100, 100 - left))}%`,
             background: `var(${{ bad: '--red', warn: '--orange', mut: '--grey' }[tone] || '--green'})` }}></i></span><b class=${'num ' + tone}>${left == null ? '–' : `${Math.round(left)}% left`}</b></div>` })}
-        ${a.problem ? html`<small class="ov-qsub mut">${a.problem}</small>` : ''}</div>`)}</div></section>` : ''}
+        ${a.problem ? html`<small class="ov-qsub mut">${a.problem}</small>` : ''}</div>`)}</div><${Src} m=${m} text="the claude-accounts add-on's account readings"/></section>` : ''}
       <section class="ov-card wide"><h3>Quota runway</h3><div class="ov-ql ov-quota">${(q.quota_accounts || []).map((a, k) => {
         const w = a.limit || (a.windows || []).filter(x => x.used != null).sort((x, y) => y.used - x.used)[0]
         const tone = a.empty ? 'bad' : a.problem ? 'mut' : a.status === 'projected_exhaustion' ? 'warn' : ''
@@ -243,7 +245,7 @@ function Overview({ d, od, go }) {
         return html`<div key=${k}><div class="ov-qrow"><span>${a.name}</span><span class=${'ov-bar ' + (w?.used == null ? 'unk' : '')}><i style=${{ width: `${w?.used != null ? Math.max(2, Math.min(100, w.used)) : 0}%`,
           background: `var(${{ bad: '--red', warn: '--orange', mut: '--grey' }[tone] || '--green'})` }}></i></span>
           <b class="num ${tone}">${w?.used != null ? `${Math.round(w.used)}%` : '–'}</b></div><small class="ov-qsub ${tone}">${right}</small></div>` })}</div>
-        ${!q.quota_accounts?.length ? html`<p class="ov-tot">No account reported a window</p>` : ''}</section>
+        ${!q.quota_accounts?.length ? html`<p class="ov-tot">No account reported a window</p>` : ''}<${Src} m=${m} ids=${['quota']}/></section>
       <section class="ov-card wide"><h3>Homes</h3><div class="ov-homes">${(q.homes || []).map(h => {
         const n = h.lanes?.value, xs = openCards.filter(c => c.home === h.home), cap = Math.max(h.plan || 0, n || 0, 1)
         return html`<button class="ov-hrow" key=${h.home} onClick=${() => go({ view: 'board', tab: 'active', home: [h.home], card: null })}>
@@ -251,10 +253,10 @@ function Overview({ d, od, go }) {
         <span class="ov-load" title=${`${n ?? '?'} of ${h.plan} lanes`}>${ACTIVE.map(s => { const k = xs.filter(c => c.stage === s).length; return k ? html`<i key=${s} style=${{ width: `${k / cap * 100}%`, background: `var(--st-${s})` }}></i>` : '' })}</span>
         <span class="num">${h.lanes?.status === 'unknown' ? '?' : n ?? '–'}<small> of ${h.plan}</small></span>
         <span class="num">${h.ready?.value ?? '–'}<small> ready</small></span>
-        <span class="num">${h.closed?.status === 'unknown' ? '–' : h.closed?.value}<small> closed</small></span></button>` })}</div></section>
+        <span class="num">${h.closed?.status === 'unknown' ? '–' : h.closed?.value}<small> closed</small></span></button>` })}</div><${Src} m=${m} ids=${['lanes', 'ready', 'closed']}/></section>
       <section class="ov-card wide"><h3>Recently landed</h3><div class="ov-merges">${(q.recent_merges || []).map((x, k) =>
         html`<div class="ov-mrow" key=${k}><${StageIcon} s="landed"/><a href=${x.url} target="_blank" rel="noreferrer">${x.title}</a><span><span class="sq" style=${{ '--c': hc(d, x.home) }}></span>${hname(d, x.home)}</span><small class="num">${hm(x.at)}</small></div>`)}
-        ${!q.recent_merges?.length ? html`<p class="ov-tot">No merge on record</p>` : ''}</div></section>
+        ${!q.recent_merges?.length ? html`<p class="ov-tot">No merge on record</p>` : ''}</div><${Src} m=${m} ids=${['landed']}/></section>
     </div></div>`
 }
 

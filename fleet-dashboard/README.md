@@ -65,7 +65,8 @@ overview page and again in the app (`ui.js`, `app.js`, `app.css`). The fourth
 adds the Tickets board: `tickets.js`, its route and styles in `app.js` and `app.css`, the
 `Entry` export in `board.js` that its ticket page reuses, and
 the `tickets` and `tickets_unread` keys `fm-dashboard.sh` adds to `board.json` from the
-backlog it already reads.
+backlog it already reads, and Overview naming the source of every figure (from each
+metric's `source` in `data.json`) on hover and under its card.
 Every other moved file remains byte-identical to the fork.
 
 ## Side-by-side proof (re-run before the served path swaps)

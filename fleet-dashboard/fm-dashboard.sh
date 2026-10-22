@@ -13,7 +13,7 @@
 # (five key figures, where Stuck, Lanes open and Ready also show their change since yesterday and
 # a day's trend; the lifecycle, every open lane by stage split into moving, waiting and stuck, then
 # landings; lanes by state; 14-day landed and closed charts; queue reasons; quota runway; each home's
-# lanes by stage against its plan); Needs you
+# lanes by stage against its plan; every figure names the records it comes from, on hover and under its card); Needs you
 # (the ask list); Ship (ship/: the selected home's ship at night with each lane a worker at its
 # stage's deck station, dressed by model, and a sheet with fleet-wide key numbers and stuck or
 # parked work); Insights (the shipped fm-flow.sh reader's lifecycle, waits, queue, retained merge
