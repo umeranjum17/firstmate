@@ -107,10 +107,12 @@ IFS=$'\t' read -r sig since _owner _parent key _misses < "$dir/state/.waiting-ti
 printf '%s\t%s\t0\t0\t%s\t0\n' "$sig" "$((since - 900))" "$key" > "$dir/state/.waiting-timers/lane"
 cycle
 [ "$(grep -c 'level=owner' "$dir/events")" -eq 1 ] || fail 'Main-owned wait did not alert Main'
+grep -q 'waiting-state lane (blocked key=wait, .*level=owner' "$dir/events" || fail 'owner recheck did not name the decision key'
 IFS=$'\t' read -r sig since owner _parent key _misses < "$dir/state/.waiting-timers/lane"
 printf '%s\t%s\t%s\t0\t%s\t0\n' "$sig" "$since" "$((owner - 900))" "$key" > "$dir/state/.waiting-timers/lane"
 cycle
 grep -q 'check: waiting-state lane .*level=main' "$dir/events" || fail 'Main-owned wait did not escalate to Main'
+grep -q 'waiting-state lane (blocked key=wait, .*level=main' "$dir/events" || fail 'Main escalation did not name the decision key'
 ! grep -qi 'captain' "$dir/events" || fail 'Main-owned escalation paged the captain'
 [ "$(grep -c 'level=main' "$dir/events")" -eq 1 ] || fail 'Main-owned escalation repeated'
 IFS=$'\t' read -r _sig _since _owner parent _key _misses < "$dir/state/.waiting-timers/lane"
@@ -331,6 +333,7 @@ printf '%s\t%s\t0\t0\t%s\t0\n' "$sig" "$start" "$key" > "$dir/state/.waiting-tim
 : > "$dir/events"
 cycle
 grep -q 'check: waiting-state lane (paused, observed .*level=owner' "$dir/events" || fail 'a paused wait never rechecked its owner at the pause cadence'
+! grep 'waiting-state lane (paused' "$dir/events" | grep -q 'key=' || fail 'an unkeyed paused wait named a decision key'
 printf 'paused [at=%s]: refreshed prose, still waiting on the pipeline run\n' "$(date +%s)" >> "$dir/state/lane.status"
 cycle
 cycle

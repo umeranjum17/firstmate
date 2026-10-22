@@ -71,7 +71,7 @@ fm_wait_timers_tick() {
   local paused_alert=${FM_PAUSE_RESURFACE_SECS:-$FM_PAUSE_RESURFACE_SECS_DEFAULT}
   local meta task backend window session native sessions='|' blocked='|' unknown='|' rows actor=Main
   local dir="$STATE/.waiting-timers" now record declaration verb signature old since owner parent key misses age reason until bound rc
-  local pause_key threshold
+  local pause_key threshold dkey
   for native in "$alert" "$escalate"; do
     case "$native" in ''|*[!0-9]*|0* ) echo "waiting timers: thresholds must be positive decimal seconds" >&2; return 1 ;; esac
     [ "${#native}" -le 9 ] || { echo "waiting timers: threshold exceeds nine digits" >&2; return 1; }
@@ -144,7 +144,7 @@ EOF
     if [ "$(fm_backend_of_meta "$meta")" = herdr ]; then
       case "$unknown" in *"|${window%%:*}|"*) continue ;; esac
     fi
-    declaration=''
+    declaration=''; dkey=''
     if [ "$(fm_meta_get "$meta" harness)" != cursor ]; then
       case "$blocked" in
         *"|$window|"*) [ -z "$window" ] || declaration=herdr-blocked ;;
@@ -153,7 +153,7 @@ EOF
     if [ -z "$declaration" ]; then
       rows=$(status_own_open_decisions "$STATE/$task.status")
       while IFS=$'\t' read -r old verb native; do
-        case "$verb" in blocked|needs-decision) declaration="$verb [key=$old]: $native" ;; esac
+        case "$verb" in blocked|needs-decision) declaration="$verb [key=$old]: $native"; dkey=$old ;; esac
       done <<EOF
 $rows
 EOF
@@ -218,6 +218,8 @@ EOF
     age=$((now - since))
     verb=$(status_line_verb "$declaration")
     [ "$declaration" != herdr-blocked ] || verb=herdr-blocked
+    # An open decision names its key so the recipient clears the right one.
+    [ -z "$dkey" ] || verb="$verb key=$dkey"
     # A declared pause is an expected wait, so its owner recheck rides the
     # FM_PAUSE_RESURFACE_SECS cadence (the same bound the stale path uses),
     # never the blocked/decision owner-alert threshold.
