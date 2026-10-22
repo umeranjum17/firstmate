@@ -107,6 +107,7 @@ STUB
 # The stub gh: a PR's Checks body and branch, as `gh pr view --json body,headRefName` gives them.
 cat > "$work/bin/gh" <<'STUB' || exit 1
 #!/usr/bin/env bash
+case " $* " in *" --jq .headRefOid "*) printf '%s\n' "${GH_HEAD:-}"; exit 0 ;; esac
 case " $* " in *" --jq .body "*) cat "$GH_BODY"; exit 0 ;; esac
 jq -n --rawfile body "$GH_BODY" '{body: $body, headRefName: "fm/older"}'
 STUB
@@ -400,6 +401,22 @@ SO_CAPTURE=$work/card-titled
 export SO_CAPTURE
 PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" titled "$wt" "$head_c" https://github.com/o/muxr/pull/1012 >/dev/null
 is "internal title names repo and PR" "$(jq -r .title "$work/card-titled/card.json")" "muxr #1012: internal change passed its checks"
+GH_BODY=$work/pr-body.md
+
+# A merge hook passes head `-` for a PR: a screen-free PR still finds its sealed run at the PR head, from gh.
+GH_BODY=$work/headdash-body.md
+export GH_BODY
+checks headdash shot.png && printf 'screen: none\n' >> "$home/data/headdash/checks.md" && cp "$shot" "$home/data/headdash/shot.png" && cp "$home/data/headdash/checks.md" "$GH_BODY"
+mk_run headdash 20261020T000000Z-headdash0001 0
+jq '.items=[]' "$work/board.json" > "$work/board.tmp" && mv "$work/board.tmp" "$work/board.json"
+SO_CAPTURE=$work/card-headdash
+export SO_CAPTURE
+out=$(GH_HEAD=$head_c PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" headdash "$wt" - https://github.com/o/r/pull/77 2>&1); rc=$?
+is "head dash: post exits 0" "$rc" 0
+is "head dash: card carries the PR head's run" "$(jq -r .run.run_id "$work/card-headdash/card.json" 2>/dev/null)" 20261020T000000Z-headdash0001
+out=$(GH_HEAD="" PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" headdash "$wt" - https://github.com/o/r/pull/78 2>&1); rc=$?
+is "head dash: an unresolvable head fails" "$rc" 1
+case $out in *"cannot resolve the head of https://github.com/o/r/pull/78"*) ok "head dash: error names the PR" ;; *) no "head dash: error missing: [$out]" ;; esac
 GH_BODY=$work/pr-body.md
 
 # The gate refuses a PR merge with no checks-lint PASS row for its head.

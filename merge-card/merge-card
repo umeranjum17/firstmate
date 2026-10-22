@@ -180,6 +180,9 @@ post() {
   [ -n "$board" ] && [ $# -eq 4 ] || die "usage: merge-card post --board <board.json> <task-id> <worktree|-> <head|-> <pr-url|->"
   [ -n "${FM_HOME:-}" ] || die "FM_HOME is not set"
   id=$1 wt=$2 head=$3 pr=$4 record=$FM_HOME/data/$1/merge-card.json
+  if [ "$head" = - ] && [ "$pr" != - ]; then
+    head=$(gh pr view "$pr" --json headRefOid --jq .headRefOid 2>&1) && [ -n "$head" ] || die "cannot resolve the head of $pr: ${head:-empty answer from gh}"
+  fi
   if [ "$pr" != - ]; then
     key=${pr#*://} link=$pr
     key=merge-$(printf '%s' "${key#*/}" | tr -c 'A-Za-z0-9._-' -)
@@ -261,8 +264,7 @@ post() {
   fi
   # The gate's verdict for this merge, else run done-done now (a merge the gate never saw).
   jq -e --arg pr "$pr" --arg head "$head" '.pr == $pr and ($pr != "-" or .head == $head)' "$record" >/dev/null 2>&1 || {
-    [ "$head" != - ] || head=$(gh pr view "$pr" --json headRefOid --jq .headRefOid 2>/dev/null) || head=-
-    check "$id" "$wt" "${head:--}" "$pr"
+    check "$id" "$wt" "$head" "$pr"
   }
   verdict=$(jq -r '.verdict // empty' "$record")
   claim=$(jq -r '.check.claim // empty' "$record")

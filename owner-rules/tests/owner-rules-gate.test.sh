@@ -99,6 +99,7 @@ jq --arg k "$cardkey" --arg h "$head" '.items = [{kind:"evidence",key:$k,run:{co
 rm -f "$run"; printf 'screen: none\noutcome: checks passed\nevidence: sealed receipt\n' > "$work/body"
 printf '{"schema":1,"answers_only":false,"items":[]}\n' > "$work/board.json"
 is "refusal: screen: none without receipt refuses" "$(gate | tail -1)" "rc=1"
+seal other; is "refusal: screen: none with a sealed run at another head refuses" "$(gate | tail -1)" "rc=1"
 seal "$head"
 printf '{"verdict":"pass","check":{"claim":"checks passed","evidence":[]}}\n' > "$home/data/lane/merge-card.json"
 jq -n '{schema:1,answers_only:false,items:[]}' > "$work/board.json"

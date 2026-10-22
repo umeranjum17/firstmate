@@ -9,7 +9,11 @@ command -v sign-off-axi >/dev/null || { echo "skip - sign-off-axi is not on PATH
 work=$(mktemp -d /var/tmp/merge-card-real.XXXXXX) || exit 1
 trap 'rm -rf "$work"' EXIT
 mkdir -p "$work/bin" "$work/home/fixture/users/user-012/t" "$work/board"
-printf '#!/usr/bin/env bash\nprintf "outcome: a user sees one card\\nevidence: x.png\\nscreen: none\\n"\n' > "$work/bin/gh"
+cat > "$work/bin/gh" <<'STUB'
+#!/usr/bin/env bash
+case " $* " in *" --jq .headRefOid "*) printf '%s\n' "$GH_HEAD"; exit 0 ;; esac
+printf 'outcome: a user sees one card\nevidence: x.png\nscreen: none\n'
+STUB
 chmod +x "$work/bin/gh"
 export SIGN_OFF_HOME=$work/board FM_HOME=$work/home PATH="$work/bin:$PATH"
 board=$work/board/decisions.json
@@ -33,4 +37,11 @@ is "new head: old card archived, history kept" "$(sign-off-axi list "$board" --j
 is "new head: first card keeps the PR key" "$(sign-off-axi list "$board" --json --full | jq -r '.decisions[] | select(.dismissed == true) | .key')" merge-o-r-pull-12
 out=$(post_at 20261022T000000Z-second0001 "$h2")
 case $out in *"already on the board"*) echo "ok - repeat post adds nothing" ;; *) echo "not ok - repeat post: [$out]"; fails=$((fails + 1)) ;; esac
+# A merge hook passes head `-` for a PR: the screen: none card still finds the run sealed at the PR head.
+h3=$(printf 'c%.0s' $(seq 40))
+pr=https://github.com/o/r/pull/13
+mkdir -p "$work/home/fixture/users/user-012/t/.done-done/runs"
+jq -n --arg c "$h3" '{schema:1,run_id:"20261022T000000Z-hookdash01",commit:$c,dirty:false,exit:0,files:[{path:"a.log"}]}' > "$work/home/fixture/users/user-012/t/.done-done/runs/20261022T000000Z-hookdash01.json"
+out=$(GH_HEAD=$h3 "$here/../merge-card" post --board "$board" t - - "$pr" 2>&1) || { echo "$out"; fails=$((fails + 1)); }
+is "hook head dash: the PR's card carries the run sealed at its head" "$(sign-off-axi list "$board" --json --full | jq -r '.decisions[] | select(.key == "merge-o-r-pull-13") | .evidence.run_id')" 20261022T000000Z-hookdash01
 [ "$fails" -eq 0 ] && echo "real-board: all assertions held" || { echo "real-board: $fails failed"; exit 1; }
