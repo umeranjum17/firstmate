@@ -1243,11 +1243,15 @@ test_matrix_opencode_leftbar_signals() {
   [ "$out" = 'Build·x' ] || fail "a Build·x draft above the wrapped badge must extract its text, got '$out'"
   badge_lone=$'  ┃\n  ┃\n  ┃  Build·MiniMax M3.1 Flash free (OpenRouter)\n  ┃\n'"$floor"
   assert_screen "opencode badge-like row without a wrapped tail is not claimed on herdr" pending "$CAPS_STYLED" "$badge_lone"
-  local badge_typed_tail
-  badge_typed_tail=$'  ┃\n  ┃  Build·fix the tests\n  ┃  and more\n  ┃\n'"$floor"
-  assert_screen "opencode typed Build· line followed by a non-continuation row stays pending" pending "$CAPS_STYLED" "$badge_typed_tail"
+  local badge_typed_tail hint_open_quote
+  badge_typed_tail=$'  ┃  Build·fix the tests\n  ┃  and more\n  ┃\n'"$floor"
+  assert_screen "opencode typed Build· line with no bar row above it stays pending" pending "$CAPS_STYLED" "$badge_typed_tail"
   out=$(fm_composer_extract_selected_content "$CAPS_STYLED" "$badge_typed_tail")
-  case $out in *'Build·fix the tests'*) ;; *) fail "typed Build· draft must keep its text, got '$out'" ;; esac
+  [ "$out" = 'Build·fix the tests and more' ] || fail "typed Build· draft must keep its text, got '$out'"
+  hint_open_quote=$'  ┃\n  ┃  Ask anything... "hi\n  ┃  one\n  ┃  two\n  ┃\n'"$floor"
+  assert_screen "opencode hint with an open quote is not a wrap over two plain rows" pending "$CAPS_STYLED" "$hint_open_quote"
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED" "$hint_open_quote")
+  [ "$out" = 'one two' ] || fail "plain rows below an open hint quote must keep their text, got '$out'"
   # The original stuck pane's trimmed shape (single `outer` tail row).
   local badge_idle
   badge_idle=$'  ┃\n  ┃\n  ┃\n  ┃  Build·MiniMax M3.1 Flash free (OpenRouter) OpenR\n  ┃                                             outer\n  ┃\n'"$floor"

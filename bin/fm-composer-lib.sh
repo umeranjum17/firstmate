@@ -500,8 +500,9 @@ FM_COMPOSER_LEFTBAR_FOOTER_RE_DEFAULT='^(Build|Plan)[[:space:]]+·[[:space:]]+'
 # spaces or keeps one before it (`Buil ·MiniMax M3.1 Flash free (OpenRouter) O`),
 # the first word itself can break (`Buil` then `d` on the next row), and the
 # model's tail wraps into fragment rows below. The badge is always the LAST thing
-# in the composer box, so its opening row (this pattern) and every row after it
-# in the run are furniture; typed text lives only above it.
+# in the composer box: its opening row (this pattern) sits directly below a blank
+# bar row, and every row from it to the box end is furniture; typed text lives
+# only above that blank row.
 FM_COMPOSER_LEFTBAR_BADGE_WRAP_RE_DEFAULT='^(Build|Buil|Plan)[[:space:]]*·[[:space:]]*[^[:space:]]'
 # Claude draws its permission-mode hint on its own row directly below the
 # composer (` ⏵⏵ bypass permissions on (shift+tab to cycle)`, ` ⏵⏵ accept edits
@@ -1513,50 +1514,30 @@ _fm_composer_opencode_wrap_run_start() {  # <screen> <styled> <first> <last>
   return 1
 }
 
-# _fm_composer_badge_tail_completes: 0 when the nearest non-blank row below a
-# badge row (<tail>) carries a fragment that continues the badge's truncated last
-# word: the fragment extends that word, or joining it onto that word yields a
-# prefix of a word the badge row contains.
-_fm_composer_badge_tail_completes() {  # <badge-row> <tail-row>
-  local -a bw tw
-  local badge=$1 tail=$2 last t w
-  read -ra bw <<<"$badge"
-  read -ra tw <<<"$tail"
-  [ "${#bw[@]}" -gt 0 ] || return 1
-  for w in "${!bw[@]}"; do bw[$w]=${bw[$w]//[^[:alnum:]]/}; done
-  last=${bw[${#bw[@]}-1]}
-  [ -n "$last" ] || return 1
-  for t in "${tw[@]}"; do
-    t=${t//[^[:alnum:]]/}
-    [ -n "$t" ] || continue
-    case $t in "$last"?*) return 0 ;; esac
-    for w in "${bw[@]}"; do
-      case $w in "$last$t"*) return 0 ;; esac
-    done
-  done
-  return 1
-}
-
-# _fm_composer_opencode_badge_wrap_start: print the LAST row in [<first>,<last>]
-# that opens the agent/model badge (FM_COMPOSER_LEFTBAR_BADGE_WRAP_RE_DEFAULT),
-# else print nothing and return 1. Only a badge whose nearest non-blank row below
-# continues its truncated last word is claimed (see _fm_composer_badge_tail_completes),
-# so a typed line that merely starts with the badge opener stays typed text.
+# _fm_composer_opencode_badge_wrap_start: print the LAST badge-shaped row in
+# [<first>,<last>) (FM_COMPOSER_LEFTBAR_BADGE_WRAP_RE_DEFAULT), else print nothing
+# and return 1. That row is the badge only when a blank bar row sits directly above
+# it inside the run and a non-blank wrapped row sits below it.
 _fm_composer_opencode_badge_wrap_start() {  # <screen> <styled> <first> <last>
-  local screen=$1 styled=$2 first=$3 last=$4 row raw body tail=''
+  local screen=$1 styled=$2 first=$3 last=$4 row raw body above below=0
   row=$last
-  while [ "$row" -ge "$first" ]; do
+  while [ "$row" -gt "$first" ]; do
     raw=$(_fm_composer_screen_row "$row" "$screen")
     body=$(_fm_composer_row_content "$raw" "$styled")
     case "$body" in '┃'*) body=${body#┃} ;; esac
     fm_composer_normalize_trim_var body
     if fm_composer_idle_matches "$body" \
         "${FM_COMPOSER_LEFTBAR_BADGE_WRAP_RE:-$FM_COMPOSER_LEFTBAR_BADGE_WRAP_RE_DEFAULT}" sensitive; then
-      _fm_composer_badge_tail_completes "$body" "$tail" || return 1
+      [ "$below" = 1 ] || return 1
+      raw=$(_fm_composer_screen_row "$((row - 1))" "$screen")
+      above=$(_fm_composer_row_content "$raw" "$styled")
+      case "$above" in '┃'*) above=${above#┃} ;; esac
+      fm_composer_normalize_trim_var above
+      [ -z "$above" ] || return 1
       printf '%s' "$row"
       return 0
     fi
-    [ -z "$body" ] || tail=$body
+    [ -z "$body" ] || below=1
     row=$((row - 1))
   done
   return 1
@@ -1674,15 +1655,12 @@ _fm_composer_classify_bare_wrap() {  # <screen> <styled> <glyph-row> <cursor-row
 # OpenCode's idle hint carries a quoted suggestion (`Ask anything... "Fix a TODO
 # in the codebase"`) that wraps onto the next bar row on a narrow pane, leaving
 # the closing fragment (`codebase"`) alone on its row. A hint row whose quotes are
-# unbalanced opens such a wrap; the rows directly below it, up to the one that
-# closes the quote, are hint furniture. Both helpers set <var> to the row the wrap
-# is still open on, else -1.
+# unbalanced opens such a wrap; the single row directly below it is hint furniture
+# only when it closes the quote. _fm_composer_placeholder_wrap_open_var sets <var>
+# to the hint row when it opens a wrap, else -1.
 _fm_composer_placeholder_wrap_open_var() {  # <var> <row> <hint-content>
   local q=${3//[^\"]/}
   if [ $(( ${#q} % 2 )) = 1 ]; then printf -v "$1" '%s' "$2"; else printf -v "$1" '%s' -1; fi
-}
-_fm_composer_placeholder_wrap_next_var() {  # <var> <row> <continuation-content>
-  case "$3" in *\") printf -v "$1" '%s' -1 ;; *) printf -v "$1" '%s' "$2" ;; esac
 }
 
 # _fm_composer_classify_leftbar: opencode's left-bar composer. Blank rows and
@@ -1722,8 +1700,8 @@ _fm_composer_classify_leftbar() {  # <screen> <styled> <first-row> <last-row>
     fi
     leading_blank=0
     if [ "$ph_cont" -ge 0 ] && [ "$row" -eq $((ph_cont + 1)) ]; then
-      _fm_composer_placeholder_wrap_next_var ph_cont "$row" "$content"
-      row=$((row + 1)); continue
+      ph_cont=-1
+      case $content in *\") row=$((row + 1)); continue ;; esac
     fi
     if [ "$placeholder_position" = 1 ] \
        && fm_composer_idle_matches "$content" "${FM_COMPOSER_IDLE_RE:-$FM_COMPOSER_IDLE_RE_DEFAULT}" insensitive; then
@@ -2186,9 +2164,8 @@ EOF
     # idle-regex exceptions here.
     if [ "$FM_COMPOSER_SELECTED_KIND" = leftbar ] && [ -n "$content" ] \
        && [ "$ph_cont" -ge 0 ] && [ "$row" -eq $((ph_cont + 1)) ]; then
-      _fm_composer_placeholder_wrap_next_var ph_cont "$row" "$content"
-      row=$((row + 1))
-      continue
+      ph_cont=-1
+      case $content in *\") row=$((row + 1)); continue ;; esac
     fi
     if [ "$FM_COMPOSER_SELECTED_KIND" = leftbar ] && [ "$placeholder_position" = 1 ] \
        && fm_composer_idle_matches "$content" "${FM_COMPOSER_IDLE_RE:-$FM_COMPOSER_IDLE_RE_DEFAULT}" insensitive; then
