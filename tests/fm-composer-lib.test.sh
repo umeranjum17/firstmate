@@ -1225,6 +1225,11 @@ test_matrix_opencode_leftbar_signals() {
   assert_screen "opencode typed draft above wrapped in-box badge on herdr" pending "$CAPS_STYLED" "$badge_typed"
   badge_lone=$'  ┃\n  ┃\n  ┃  Build·MiniMax M3.1 Flash free (OpenRouter)\n  ┃\n'"$floor"
   assert_screen "opencode badge-like row without a wrapped tail is not claimed on herdr" pending "$CAPS_STYLED" "$badge_lone"
+  local badge_draft
+  badge_draft=$'  ┃\n  ┃\n  ┃\n  ┃  Build·fix the tests\n  ┃                                             --flag\n  ┃\n'"$floor"
+  assert_screen "opencode typed Build draft with an indented flag line stays pending" pending "$CAPS_STYLED" "$badge_draft"
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED" "$badge_draft")
+  case "$out" in *'fix the tests'*) ;; *) fail "a typed Build draft must survive extraction, got '$out'" ;; esac
   # Live 2026-10-10 (OpenCode 1.18.25 through Herdr, the desklink lead's
   # engine-fix worker): on a still-longer worktree path the SAME right-aligned
   # `<dir>:<branch>` cell wraps over TWO rows - its `~/...` directory fragment

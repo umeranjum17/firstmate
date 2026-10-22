@@ -500,8 +500,10 @@ FM_COMPOSER_LEFTBAR_FOOTER_RE_DEFAULT='^(Build|Plan)[[:space:]]+·[[:space:]]+'
 # spaces around the dot (`Build·MiniMax M3.1 Flash free (OpenRouter) OpenR`) and
 # the model's tail wraps onto a wide-padded continuation row below it
 # (FM_COMPOSER_OPENCODE_WRAP_CONT_RE_DEFAULT), with blank bar rows after. Only
-# that badge row plus at least one such continuation row is furniture.
-FM_COMPOSER_LEFTBAR_BADGE_WRAP_RE_DEFAULT='^(Build|Plan)[[:space:]]*·[[:space:]]*[^[:space:]]'
+# that badge row plus at least one such continuation row is furniture. A model
+# name always carries a version digit, which keeps a typed `Build·fix the tests`
+# draft from matching.
+FM_COMPOSER_LEFTBAR_BADGE_WRAP_RE_DEFAULT='^(Build|Plan)·[^[:space:]].*[0-9]'
 # Claude draws its permission-mode hint on its own row directly below the
 # composer (` ⏵⏵ bypass permissions on (shift+tab to cycle)`, ` ⏵⏵ accept edits
 # on`, ` ⏸ plan mode on`; verified live through Herdr on claude 2.1.236). The
