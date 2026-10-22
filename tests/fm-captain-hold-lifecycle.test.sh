@@ -656,7 +656,7 @@ SH
 
 signoff_hold() {  # <home> <task-id> <addons-dir> <log> <stub-status>
   local home=$1 id=$2 addons=$3 log=$4 status=$5
-  PATH="$home/fakebin:$PATH" FM_HOME="$home" FM_ADDONS_DIR="$addons" \
+  env -u FM_CODE_ROOT PATH="$home/fakebin:$PATH" FM_HOME="$home" FM_ADDONS_DIR="$addons" \
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" FM_CONFIG_OVERRIDE="$home/config" \
     SIGNOFF_LOG="$log" SIGNOFF_STATUS="$status" \
     "$ROOT/bin/fm-captain-hold.sh" hold "$id" --title "Route the card" \
