@@ -34,6 +34,9 @@ A lane whose last status event is `paused`, `blocked` or `failed`, stamped `[at=
 Validating and own busy work read as working there and keep counting; an unstamped wait, or a state that cannot be read within 15 s, keeps counting.
 Only those long-wait candidates are probed, in parallel.
 `--summary` appends `counted` (open lanes that count) and `dry` (1 when ready = 0 and working < cap) to its row.
+A lane whose last event is `parked` leaves the open count and the cap.
+`parked [key=lane-cap]` is ready work with its branch kept: `--summary` counts it in `ready`, and `--resume` prints the oldest ones, one per free slot, for the watcher to restart with no steer; `--can-start` sends a free slot to them first.
+Any other park names `(resume-on: YYYY-MM-DD | PR URL | captain)`; without it the pulse shows `stalled` and `--summary` counts it in its last column (after `parked`).
 `FM_MAIN_HOME` names the main home (default `~/firstmate`).
 
 Moved from Main's `config/fm-flow-check.sh` (sha256 `6e353c9e...4ed2`) in the first commit, then changed.

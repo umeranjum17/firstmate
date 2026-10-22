@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Integration test for fleet-flow/bin/fm-flow-check.sh over a fixture Main home and one muxr home.
 # Stub fm-tasks-axi.sh and fm-crew-state.sh in the fixture Main's bin/ stand in for the fork.
-# Proves: a 5 h external-wait lane (paused or failed) stops counting toward the cap, a 3 h one,
+# Proves: parked lanes (lane-cap park resumes, unnamed park is STALLED); a 5 h external-wait lane (paused or failed) stops counting toward the cap, a 3 h one,
 # a working one, a captain-held one and a 5 h one that has resumed still count; paused lanes and long
 # blocked or failed waits are probed; --can-start frees the slot; --summary prints dry=1 and dry=0.
 # A paused lane whose crew-state run is working (its own no-mistakes run) is busy: --summary and --can-start count it.
@@ -111,5 +111,33 @@ printf 'muxr 2\n' > "$main/config/lane-caps"
 expect 'paused own-run and working lanes count as busy, a short external wait does not' 2 "$(run --summary | cut -f3)"
 rc=0; out=$(run --can-start) || rc=$?
 expect '--can-start sees the busy lanes at cap 2' '1 2 working lanes, cap 2: finish one first' "$rc $out"
+
+# Parked lanes (retro fix 3): they leave the open count and the cap; a lane-cap park is ready work that the next free
+# slot resumes with no steer (--resume, oldest first, one per free slot); any other park without a named resume
+# condition is STALLED; one that names a date, a PR or the captain is not.
+home=$d/park/8/firstmate
+mkdir -p "$home/state" "$home/data" "$home/crew"
+echo 0 > "$home/ready-count"
+printf 'muxr 2\n' > "$main/config/lane-caps"
+lane writer1 "working [at=$((now - 60))]: building"
+lane cap-old "parked [key=lane-cap] [at=$((now - 5 * h))]: lane cap full, branch fm/cap-old pushed"
+lane cap-new "parked [key=lane-cap] [at=$((now - 1 * h))]: lane cap full, branch fm/cap-new pushed"
+lane p-date "parked [at=$((now - 20 * h))]: waiting on quota (resume-on: 2026-11-01)"
+lane p-pr "parked [at=$((now - 20 * h))]: waiting on merge (resume-on: https://github.com/acme/app/pull/7)"
+lane p-captain "parked [at=$((now - 20 * h))]: waiting (resume-on: captain)"
+lane p-bare "parked [at=$((now - 20 * h))]: waiting until Main says"
+row=$(run --summary)
+expect 'parked lanes leave the open count' 1 "$(cut -f2 <<<"$row")"
+expect 'lane-cap parked lanes count as ready work' '2 0' "$(cut -f4,9 <<<"$row" | tr '\t' ' ')"
+expect 'pulse counts 6 parked, 1 stalled' '6 1' "$(cut -f10,11 <<<"$row" | tr '\t' ' ')"
+expect 'one free slot resumes the oldest lane-cap park' 'cap-old' "$(run --resume)"
+lane writer2 "working [at=$((now - 60))]: building"
+expect 'no free slot resumes nothing' '' "$(run --resume)"
+rm -f "$home/state/writer2".*
+expect '--can-start sends the free slot to the parked lane first' '1 cap-old is parked for the lane cap and takes the free slot: resume it first' "$(rc=0; o=$(run --can-start) || rc=$?; echo "$rc $o")"
+out=$(run)
+expect 'only the park with no resume condition is STALLED' '1' "$(grep -c 'STALLED' <<<"$out")"
+expect 'the stalled line names it' 1 "$(grep -cE '^flow: p-bare parked 20\.0h STALLED' <<<"$out")"
+expect 'parked lanes raise no wait line' '' "$(grep -E 'past its clock' <<<"$out" || true)"
 
 [ "$fail" -eq 0 ] && echo "PASS: fm-flow-check lane slots" || { echo "FAIL: fm-flow-check lane slots"; exit 1; }

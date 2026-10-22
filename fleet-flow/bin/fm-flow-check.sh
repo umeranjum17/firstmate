@@ -5,13 +5,19 @@
 #        fm-flow-check.sh <home> --can-start  exit 0 when the lead may start a lane, 1 otherwise (prints why)
 #        fm-flow-check.sh <home> --target     P50/P85 lane hours from lanes landed in 14 days
 #        fm-flow-check.sh <home> --summary    one TSV row for Main's pulse:
-#                                             home open working ready donewait oldest_wait_h min_since_working counted dry
+#                                             home open working ready donewait oldest_wait_h min_since_working counted dry parked stalled
+#        fm-flow-check.sh <home> --resume     task ids of lane-cap parked lanes to restart on their branch, one per free slot, oldest first
 # Line order: land, over-cap, wait, red, split, budget, key, pull. Format: <task> <actor> <age> <next action>.
 # Captain-held = a captain-hold key in the status file, or an open backlog line with hold-kind captain (data/backlog.md);
 # captain-held lanes raise no wait or red line.
 # Lane = live state/<task>.meta with kind=ship|scout. Lane age starts at the birth of data/<task>/.
 # A lane in a long external wait (see FREE_AFTER) keeps its record but stops counting toward the cap:
 # counted = open lanes that count; dry = 1 when ready = 0 and working < cap.
+# Parked lane = last status verb `parked`. It leaves the open count, the cap and every wait line.
+#   parked [key=lane-cap] ...        parked for the lane cap: it counts as ready work in its home's queue, keeps its branch,
+#                                    and --resume names it for the next free slot, oldest first; no steer is needed.
+#   parked ... (resume-on: <when>)   any other park names its resume condition: a date (YYYY-MM-DD), a PR URL or `captain`.
+#                                    A park without one is STALLED: the pulse counts it and a stalled line names it.
 # FM_MAIN_HOME names the main home (default ~/firstmate), where lane-caps, the status rollup and bin/ live.
 import os, re, sys, glob, json, time, subprocess, statistics as st
 
@@ -21,6 +27,7 @@ NAMES = {'1': 'takeone', '3': 'crewhouse', '4': 'writeboost', '8': 'muxr', '9': 
 AT = re.compile(r'\[at=(\d+)\]')
 VERB = re.compile(r'^(?:\d{9,11}\s+)?([a-z][a-z-]*)')
 HOLD_KIND = re.compile(r'\(hold-kind:\s*captain\)')
+RESUME_ON = re.compile(r'\(resume-on:\s*(?:\d{4}-\d{2}-\d{2}|https?://\S+/pull/\d+|captain)\s*\)')
 HOLD_UNTIL = re.compile(r'\(hold-until:\s*(\d{4}-\d{2}-\d{2})\)')
 
 home = os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 else sys.exit('usage: fm-flow-check.sh <home> [--can-start|--target|--summary]')
@@ -105,8 +112,13 @@ for m in glob.glob(f'{S}/*.meta'):
     v = VERB.match(last); v = v.group(1) if v else 'working'
     keys = open_keys(ls, mt)
     lanes.append(dict(t=t, meta=meta, verb=v, since=stamp(last, mt), keys=keys,
-                      at=stamp(last, None) if ls else None, age=NOW - (birth(f'{D}/{t}') or mt),
+                      last=last, at=stamp(last, None) if ls else None, age=NOW - (birth(f'{D}/{t}') or mt),
                       captain=any(k.startswith('captain-hold') for k in keys) or backlog_held(t)))
+parked = [L for L in lanes if L['verb'] == 'parked']
+lanes = [L for L in lanes if L['verb'] != 'parked']
+for L in parked:
+    L['cap'] = bool(re.search(r'\[key=lane-cap\]', L['last']))
+    L['stalled'] = not L['cap'] and not RESUME_ON.search(L['last'])
 open_n = len(lanes)
 # A lane whose last event is a paused, blocked or failed wait stamped more than 4 h ago, and still that wait in
 # bin/fm-crew-state.sh (so validating and own busy work stay working), stops counting toward the cap; a ready item
@@ -150,17 +162,23 @@ if mode == '--summary':
     # Exact counts: working = active_n (held lanes excluded, same rule as --can-start); done = every done lane,
     # not only those past the 15-minute landing grace that --can-start and the action lines use.
     working = active_n
-    try: ready_n = len(ready_ids())
+    try: ready_n = len(ready_ids()) + sum(L['cap'] for L in parked)
     except Exception as e: sys.exit(f'{name}: {e}')
     waits = [NOW - L['since'] for L in lanes if L['verb'] not in ('working', 'resolved', 'done', 'failed')]
     lw = max([L['since'] for L in lanes if L['verb'] in ('working', 'resolved')] or [0])
     print('\t'.join(map(str, [name, open_n, working, ready_n, sum(L['verb'] == 'done' for L in lanes),
                               f'{max(waits) / 3600:.1f}' if waits else '0', (NOW - lw) // 60 if lw else -1,
-                              count_n, int(ready_n == 0 and active_n < CAP)])))
+                              count_n, int(ready_n == 0 and active_n < CAP), len(parked), sum(L['stalled'] for L in parked)])))
+    sys.exit(0)
+
+waiting = sorted((L for L in parked if L['cap']), key=lambda L: L['since'])
+if mode == '--resume':
+    for L in waiting[:max(0, CAP - active_n)]: print(L['t'])
     sys.exit(0)
 
 if mode == '--can-start':
     why = []
+    if waiting and active_n < CAP: why.append(f'{waiting[0]["t"]} is parked for the lane cap and takes the free slot: resume it first')
     if active_n >= CAP: why.append(f'{active_n} working lanes, cap {CAP}: finish one first')
     if count_n >= HARD: why.append(f'{count_n} open lanes, hard cap {HARD}: land or close a waiting lane first')
     # A done lane blocks starts only after 60 min unmerged; open >= cap+2 still blocks.
@@ -184,6 +202,9 @@ red = min(p85 * 3600, 86400) if p85 else 86400
 for L in lanes:
     if L['age'] > red and not L['captain']:
         out.append((f'red {L["t"]}', L['age'], f'{L["t"]} lead {h(L["age"])} red (limit {h(red)}): land, cut scope, change method or stop'))
+for L in parked:
+    if L['stalled']:
+        out.append((f'stalled {L["t"]}', NOW - L['since'], f'{L["t"]} parked {h(NOW - L["since"])} STALLED, no resume condition: add (resume-on: DATE, PR URL or captain) or resume or stop it'))
 cache_p = f'{S}/.flow.cache'
 try: cache = json.load(open(cache_p))
 except Exception: cache = {}
