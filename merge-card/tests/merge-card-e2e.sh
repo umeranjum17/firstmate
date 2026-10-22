@@ -187,6 +187,15 @@ is "newer: card title is the claim" "$(jq -r .title "$work/card-newer/card.json"
 is "newer: card media" "$(jq -c .media "$work/card-newer/card.json")" '["1.png"]'
 if [ -f "$work/card-newer/1.png" ] && cmp -s "$work/card-newer/1.png" "$shot"; then ok "newer: card media resolves to the retained PNG"; else no "newer: card media is not the retained PNG"; fi
 
+# post --claim-id: the named claim reaches `done-done check` and the check re-runs over the gate's
+# record; without the flag no claim id is passed. A throwaway board keeps the earlier card out of it.
+: >"$DD_LOG"
+PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board-claim.json" newer "$wt" "$head_c" - >/dev/null 2>&1
+if grep -q -- '--claim-id' "$DD_LOG"; then no "claim id: none passed without the flag"; else ok "claim id: none passed without the flag"; fi
+: >"$DD_LOG"
+PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board-claim.json" --claim-id fd-studio-hide-brief newer "$wt" "$head_c" - >/dev/null 2>&1
+if grep -q -- '^check .* --claim-id fd-studio-hide-brief' "$DD_LOG"; then ok "claim id: post passes it to done-done check"; else no "claim id: post passes it to done-done check: $(cat "$DD_LOG")"; fi
+
 # A 0.3.0 done-done on PR 24's shape: the PR body names the PNG bare, the file
 # is in the task folder, the flag is never passed, and merge-card hands done-done
 # the block with the name resolved there, so the card still carries the PNG.

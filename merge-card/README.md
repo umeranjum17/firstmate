@@ -3,6 +3,10 @@
 `merge-card` remains the gate/check/post executable documented in the root [README](../README.md#merge-card).
 Its existing config shims and card behavior are unchanged.
 
+## Naming the claim
+
+`merge-card post --board <board.json> --claim-id <id> <task-id> <worktree|-> <head|-> <pr-url|->` passes `--claim-id <id>` to the `done-done check` it runs, for a PR whose evidence is bound to a claim other than done-done's default (the PR branch name). The check re-runs even when the gate left a record. Without the flag nothing changes. `merge-card check` takes the same flag.
+
 ## One card per PR
 
 The first card for a PR takes the PR's key (`merge-<owner>-<repo>-pull-<n>`). A post for a new head posts its card through `sign-off-axi post --kind evidence` under that key plus a 12-character head suffix, then archives (`sign-off-axi dismiss`) the PR's earlier live cards, so the board has one live card and the history stays under Archived. sign-off-axi takes evidence one post at a time and holds a key to its first message, so there is no `--from --replace` feed. A repeat post for a head adds nothing; a post for a head whose card was dismissed restores that card.
