@@ -1538,7 +1538,7 @@ _fm_composer_badge_completes_word() {  # <trimmed-badge-row> <wrapped-tail>
 # else print nothing and return 1. A badge with no continuation row is the
 # ordinary footer, owned by FM_COMPOSER_LEFTBAR_FOOTER_RE.
 _fm_composer_opencode_badge_wrap_start() {  # <screen> <styled> <first> <last>
-  local screen=$1 styled=$2 first=$3 last=$4 row raw body tail= conts=0
+  local screen=$1 styled=$2 first=$3 last=$4 row raw body tail='' conts=0
   row=$last
   while [ "$row" -ge "$first" ]; do
     raw=$(_fm_composer_screen_row "$row" "$screen")
