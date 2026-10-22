@@ -46,10 +46,13 @@
 # adapter maps it to native issue type `task`. Captain holds have no due
 # semantics (`--until` is the optional hold deferral), so the create waives
 # Beads `due.required` through `BD_DUE_REQUIRED` rather than inventing a due
-# date or registering a `types.custom` captain issue type. The command records
-# a UTC `Captain hold set:` timestamp in the task body: repeating an active
-# hold preserves the existing timestamp, while re-holding released work starts
-# a new lifecycle. A task already closed is refused rather than reopened.
+# date or registering a `types.custom` captain issue type. When the optional
+# task-priority add-on is installed, a created task needs `--priority 0-3`; the
+# add-on's refusal is returned as-is (bin/fm-tasks-axi.sh owns that hook).
+# The command records a UTC `Captain hold set:` timestamp in the task body:
+# repeating an active hold preserves the existing timestamp, while re-holding
+# released work starts a new lifecycle. A task already closed is refused rather
+# than reopened.
 # `--origin` also records the origin on a `Captain hold origin:` body line, which
 # `complete` and `verify` check. The reason may hold parentheses and line breaks:
 # tasks-axi refuses them, so `hold` escapes them where it writes the reason and
