@@ -20,6 +20,7 @@ description: Verify firstmate-addons changes through their executable integratio
 - Merge-gate lint pin: run `bash merge-on-green/tests/checks-lint-parity.test.sh`; it uses a fake gh and isolated homes, runs the pinned done-done-axi lint against size fixtures (plain, generated, routes, oversized) and proves its PASS/FAIL verdicts match the legacy lint.
 - Fleet contract check: run `done-done run fleet-contract-check` (`bash fleet-contract-check/run-proof.sh`); it runs the real script on the installed fork in a throwaway HOME (one ok or FAIL line per caller) and then the fixture journey that breaks a caller and must name it.
 - Sign-off hold card: run `FM_CODE_ROOT=<Firstmate checkout> bash signoff/tests/fm-procevent-signoff.test.sh`; it uses a stub sign-off-axi that rejects a raise without `--ask-ref` (the real VALIDATION_ERROR), proves a hold raises its card with the hold task id as ask reference, and never touches a real board.
+- Task priority check: run `bash task-priority/tests/task-priority.test.sh`; it installs the check into a throwaway `XDG_DATA_HOME`, proves a task add without `--priority 0-3` is refused naming the flag, that a priority passes with release `later`, and that an explicit `release:` line is kept.
 
 ## Procedure
 
