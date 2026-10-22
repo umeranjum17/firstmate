@@ -916,7 +916,7 @@ verify_entry_durable() {  # <origin-or-empty> <entry>; prints "<id> <how> <origi
 
 command_hold() {
   local id=${1:-} title='' reason='' repo='' origin='' until='' show state existing_title body='' hold_kind hold_set occurrence
-  local existing_hold_kind='' existing_held='' preserve_hold_set=0 stored_reason previous_origin='' hold_status=0 card_close=release
+  local signoff_script addon_signoff existing_hold_kind='' existing_held='' preserve_hold_set=0 stored_reason previous_origin='' hold_status=0 card_close=release
   [ "$#" -ge 1 ] || { usage >&2; exit 2; }
   shift
   while [ "$#" -gt 0 ]; do
@@ -1023,12 +1023,16 @@ command_hold() {
   [ -n "$(body_hold_set_timestamp "$(show_field_value "$show" body)")" ] \
     || fail "task $id lost its hold-set stamp while being held"
   publish_parent_hold "$id" "$occurrence" needs-decision "$reason"
-  # Optional sign-off card: a no-op unless bin/fm-procevent-signoff.sh is armed
-  # here. A created question closes on answer, held work is released; a dated
+  # Optional sign-off card: a no-op unless the sign-off adapter is armed here.
+  # The firstmate-addons signoff script is used when installed, else this repo's
+  # bin/fm-procevent-signoff.sh. A created question closes on answer, held work is released; a dated
   # deferral gets no live card, and a card failure exits nonzero (the hold stays recorded).
   if [ -z "$until" ]; then
     release_task_control_lock
-    "$SCRIPT_DIR/fm-procevent-signoff.sh" raise "$id" "$(show_field_value "$show" title)" "$reason" "$card_close" \
+    signoff_script=$SCRIPT_DIR/fm-procevent-signoff.sh
+    addon_signoff=${FM_ADDONS_DIR:-${FM_HOME:-$SCRIPT_DIR/..}/projects/firstmate-addons}/signoff/bin/fm-procevent-signoff.sh
+    [ ! -f "$addon_signoff" ] || signoff_script=$addon_signoff
+    FM_CODE_ROOT=${FM_CODE_ROOT:-$SCRIPT_DIR/..} "$signoff_script" raise "$id" "$(show_field_value "$show" title)" "$reason" "$card_close" \
       || { printf 'error: task %s is held, but no sign-off card was raised for it\n' "$id" >&2; exit 1; }
   fi
   printf '%s\n' "$id"

@@ -642,6 +642,30 @@ SH
   pass "captain-hold mutations address the beads backend without a markdown override"
 }
 
+# The live hold path raises its sign-off card through the firstmate-addons
+# signoff script when that checkout is installed, and through this repo's own
+# adapter otherwise.
+test_hold_raises_its_signoff_card_through_the_addon_script() {
+  local home addons log id=signoff-addon-route
+  home=$(make_home signoff-addon-route)
+  addons="$home/addons"
+  log="$home/signoff.log"
+  mkdir -p "$addons/signoff/bin" "$home/projects/sample"
+  cat > "$addons/signoff/bin/fm-procevent-signoff.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'addon %s|%s|%s\n' "$1" "$2" "${FM_CODE_ROOT:+code-root}" >> "$SIGNOFF_LOG"
+SH
+  chmod +x "$addons/signoff/bin/fm-procevent-signoff.sh"
+  SIGNOFF_LOG="$log" PATH="$home/fakebin:$PATH" FM_HOME="$home" FM_ADDONS_DIR="$addons" \
+    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" FM_CONFIG_OVERRIDE="$home/config" \
+    "$ROOT/bin/fm-captain-hold.sh" hold "$id" --title "Route the card" \
+    --reason "captain must decide" --repo sample >/dev/null \
+    || fail "a hold with the signoff add-on installed failed"
+  assert_grep "addon raise|$id|code-root" "$log" \
+    "the hold did not raise its card through the add-on signoff script"
+  pass "a hold raises its sign-off card through the installed add-on script"
+}
+
 # A Beads workspace with due.required and no types.custom captain type is the
 # live fleet shape. hold must still create a fresh captain row there: waive
 # due rather than invent one, and map to native type task rather than register
@@ -4748,3 +4772,4 @@ test_verify_names_the_unresolvable_legacy_id_once
 test_verify_resolves_a_pre_collapse_key_through_its_derived_marker
 test_captain_hold_mutations_address_the_beads_backend
 test_hold_creates_a_captain_row_when_beads_requires_due_without_custom_type
+test_hold_raises_its_signoff_card_through_the_addon_script
