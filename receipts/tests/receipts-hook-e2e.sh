@@ -54,6 +54,38 @@ fm_receipts_accept_done "$w" direct-PR "done: x" "$st" t "$st/t.meta" "" >/dev/n
 rcpt FAIL
 ! fm_receipts_accept_done "$w" direct-PR "done: x" "$st" t "$st/t.meta" "" >/dev/null || { echo "FAIL: accept_done refuse" >&2; exit 1; }
 
+# PR candidate hook: the policy through the real fork fm_dod_pr_outside_origin, then the
+# real fork bin/fm-pr-check.sh driven with the add-on's own library (gate stubbed to log
+# the candidate it receives), so the hook output contract is exercised end to end.
+sha=0123456789abcdef0123456789abcdef01234567
+git -C "$w" remote add origin https://github.com/o/r.git
+cand() { fm_receipts_pr_candidate "$w" "$1" direct-PR "$st/t.meta" "$2"; }
+[ "$(cand https://github.com/o/other/pull/4 "$sha")" = "$sha" ] || { echo "FAIL: outside-origin PR must print PR_HEAD" >&2; exit 1; }
+[ -z "$(cand https://github.com/o/r/pull/4 "$sha")" ] || { echo "FAIL: same-repo PR must print nothing" >&2; exit 1; }
+[ -z "$(cand https://github.com/o/other/pull/4 "")" ] || { echo "FAIL: empty PR_HEAD must print nothing" >&2; exit 1; }
+cand https://github.com/o/other/pull/4 "$sha" >/dev/null || { echo "FAIL: hook must exit 0" >&2; exit 1; }
+hook_run() {  # <name> <pr-url> <want-candidate>
+  local hd=$d/hook-$1 got
+  mkdir -p "$hd/home/fixture/users/user-017" "$hd/home/fixture/users/user-012" "$hd/home/fixture/users/user-010" "$hd/wt" "$hd/addons/receipts/bin" "$hd/fakebin" "$hd/guardroot/bin"
+  git -C "$hd/wt" init -q; git -C "$hd/wt" -c user.name=t -c user.email=t@t commit -q --allow-empty -m init
+  git -C "$hd/wt" remote add origin https://github.com/o/r.git
+  git -C "$hd/wt" update-ref refs/remotes/origin/main "$(git -C "$hd/wt" rev-parse HEAD)"
+  printf 'window=fm:t\nendpoint_task_id=task-a\nworktree=%s\nproject=%s\nkind=ship\nmode=direct-PR\n' "$hd/wt" "$hd/project" > "$hd/home/fixture/users/user-017/task-a.meta"
+  { cat "$addons/receipts/bin/fm-receipts-lib.sh"
+    # shellcheck disable=SC2016 # stub body expands when the gate runs
+    echo 'fm_receipts_accept_done() { printf "%s" "${7:-}" > "$GATE_LOG"; }'; } > "$hd/addons/receipts/bin/fm-receipts-lib.sh"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$hd/guardroot/bin/fm-guard.sh"
+  printf '#!/usr/bin/env bash\ncase " $* " in *" --json isDraft "*) echo "{\\"isDraft\\":false}" ;; *headRefOid*) echo %s ;; esac\n' "$sha" > "$hd/fakebin/gh"
+  chmod +x "$hd/guardroot/bin/fm-guard.sh" "$hd/fakebin/gh"
+  FM_ROOT_OVERRIDE=$hd/guardroot FM_HOME=$hd/home FM_ADDONS_DIR=$hd/addons GATE_LOG=$hd/gate PATH=$hd/fakebin:$PATH \
+    "$d/fork/bin/fm-pr-check.sh" task-a "$2" >"$hd/out" 2>"$hd/err" \
+    || { echo "FAIL: fm-pr-check with add-on hook ($1): $(cat "$hd/err")" >&2; exit 1; }
+  got=$(cat "$hd/gate")
+  [ "$got" = "$3" ] || { echo "FAIL: gate candidate ($1): want [$3] got [$got]" >&2; exit 1; }
+}
+hook_run outside https://github.com/o/other/pull/4 "$sha"
+hook_run same-repo https://github.com/o/r/pull/4 ""
+
 # Absent: source the real fork library with no add-on and prove it defines no hooks.
 ( set -e; FM_ADDONS_DIR=$d/none FM_HOME=$d/absent-home
   unset -f fm_receipts_brief fm_receipts_inherit fm_receipts_promote fm_receipts_accept_done fm_dod_receipt_accept
@@ -63,4 +95,4 @@ rcpt FAIL
     if declare -F "$fn" >/dev/null; then exit 1; fi
   done ) \
   || { echo "FAIL: absent add-on must be a no-op" >&2; exit 1; }
-echo "ok: done-acceptance, local-delivery and both PR-merge suites pass with add-on loaded; absent add-on loads no hooks"
+echo "ok: done-acceptance, local-delivery and both PR-merge suites pass with add-on loaded; the PR candidate hook prints PR_HEAD only outside the origin through the real fm-pr-check.sh; absent add-on loads no hooks"

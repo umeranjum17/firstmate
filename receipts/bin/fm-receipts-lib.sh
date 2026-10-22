@@ -105,3 +105,17 @@ fm_receipts_promote() {  # <meta> <tmp-meta>
   echo 'receipt_required=1' >> "$tmp.rr"
   mv "$tmp.rr" "$tmp"
 }
+
+# Receipt candidate for bin/fm-pr-check.sh: the verified forge head when the pull
+# request lives outside the worktree's origin repository (the merge binds to that
+# head, not the worktree's HEAD), else nothing so the worker HEAD stands. The
+# caller refuses any other output. PR_HEAD is empty when the forge head is
+# unverified. Needs the fork lib (fm_dod_pr_outside_origin).
+fm_receipts_pr_candidate() {  # <worktree> <pr-url> <mode> <meta> <verified-pr-head>
+  local wt=$1 url=$2 pr_head=${5:-}
+  [ -n "$pr_head" ] || return 0
+  if fm_dod_pr_outside_origin "$wt" "$url"; then
+    printf '%s' "$pr_head"
+  fi
+  return 0
+}
