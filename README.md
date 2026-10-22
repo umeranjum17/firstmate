@@ -16,6 +16,7 @@ One line per add-on, with how it wires in. `<home>` is your home folder for the 
 - `claude-model-guard` — keeps agent runs off Fable (Sonnet is allowed): the fable alias resolves to Haiku, full Fable ids are refused. Wire in: `claude-model-guard/install.sh`.
 - `claude-quota` — alarms when the shared Claude plan burns ahead of its 5-hour or weekly window. Wire in: `claude-quota/install.sh <home>`.
 - `delete-guard` — stops any agent from recursively deleting `/` or a home folder; a block alerts you and is final. Wire in: `delete-guard/install.sh <home>`.
+- `fleet-contract-check` — runs each real cross-repo call (dispatch-resolve, owner-guard, checks-lint) in a throwaway HOME and names the caller that breaks. Nothing to install: run `fleet-contract-check/fleet-contract-check`.
 - `fleet-dashboard` — the read-only fleet dashboard: board, charts, kanban, insights, ship view. Served through the fork shim (FORK-EXIT.md).
 - `fleet-flow` — reads fleet lifecycle, queue and bottleneck JSON; installs the home flow check for task slots. Wire in: `fleet-flow/install.sh`.
 - `fleet-stall` — alerts you when a team lead idles with ready work, or workers sit stuck waiting on their team lead. Wire in: `FM_HOME=<home> fleet-stall/install.sh`.
