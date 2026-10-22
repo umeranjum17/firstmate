@@ -17,3 +17,5 @@ journeys:
   core:
     command: bash fleet-dashboard/run-core-proof.sh
     core: true
+  merge-card-real-board:
+    command: bash merge-card/tests/real-board.test.sh > "$DONE_DONE_EVIDENCE_ROOT/${RUN_ID}.log" 2>&1

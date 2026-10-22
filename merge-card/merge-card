@@ -13,7 +13,7 @@
 #   merge-card check <task-id> <worktree|-> <head|-> <pr-url|->
 #     The gate's check alone: run done-done, save and print the verdict, post nothing.
 #   merge-card post --board <board.json> <task-id> <worktree|-> <head|-> <pr-url|->
-#     Install as $FM_HOME/config/post-merge. Posts one evidence card per merge (one per PR: a new head replaces the old card), and
+#     Install as $FM_HOME/config/post-merge. Posts one evidence card per merge (one live card per PR: a new head posts its card and archives the old one), and
 #     only when the proof is real and passed: done-done's recorded verdict is pass,
 #     the check names its claim (what a user can now do), and at least one proof
 #     media file was copied, or a done-done verify run at the merged head brought
@@ -25,7 +25,7 @@
 #     A merge with missing or unconfirmed proof posts no card: the gap is printed for the
 #     merging lead and the lane owner fixes the proof and re-runs the post. The card key is
 #     the PR's own (the merge's head for a local merge): a repeat post at the same head, or
-#     another home posting it, adds nothing, and a post at a new head replaces the PR's card.
+#     another home posting it, adds nothing, and a post at a new head archives the PR's live card and posts the new one.
 #     A PR whose Checks block says `screen: none` gets a text-only Evidence card when its
 #     task folder has a sealed clean done-done receipt; the same key makes repeated posts no-ops.
 #   merge-card screen-none <task-id> <pr-url|->, merge-card receipt <task-id> <head>
@@ -165,6 +165,15 @@ screen_none() {
     grep -qiE '^[[:space:]]*screen[[:space:]]*:[[:space:]]*none[[:space:]]*$'
 }
 
+# file_card <board> <card.json> <kind>: put the card on the board the one-at-a-time way, then archive
+# the PR's other live cards (kept under Archived). Reads post()'s card_key, restore and old_keys.
+file_card() {
+  local k
+  if [ -n "$restore" ]; then sign-off-axi restore "$card_key" "$1" || return $?
+  else sign-off-axi post "$1" --kind "$3" --from "$2" --filer firstmate-merge || return $?; fi
+  for k in $old_keys; do sign-off-axi dismiss "$k" "$1" >/dev/null || return $?; done
+}
+
 post() {
   local board='' id wt head pr record key link title about kind media run receipt=null media_dir out rc n=0 f verdict claim
   [ "${1:-}" = --board ] && [ -n "${2:-}" ] && board=$2 && shift 2
@@ -179,24 +188,23 @@ post() {
     key=merge-$head link=$head
   fi
   key=${key:0:128}
-  # One card per PR: the key is the PR's alone. A card for another head, or an older head-suffixed
-  # card, is replaced (the newest proof wins); the same head, or a repeat post, adds nothing.
-  local replace='' state=none stale_filter
-  # shellcheck disable=SC2016 # jq variables, not shell
-  stale_filter='select(.key != $k and ((.key | startswith($k + "-") and length == ($k | length) + 13) | not))'
+  # One card per PR: the first card takes the PR's key; a new head archives (dismisses) the live
+  # card and posts its own under that key plus a head suffix, because sign-off-axi takes evidence
+  # one post at a time and refuses a changed message under a key it already holds. The same head,
+  # or a repeat post, adds nothing.
+  local cards='' card_key=$key restore='' old_keys=''
   if [ -f "$board" ]; then
-    state=$(jq -r --arg k "$key" --arg h "$head" '
-      [.items[]? | select(.key == $k or (.key | startswith($k + "-") and length == ($k | length) + 13))]
-      | if length == 0 then "none" elif any(.[]; (.run.commit? // .evidence.commit?) == $h) then "same" else "stale" end' "$board")
+    cards=$(sign-off-axi list "$board" --json --full | jq -c --arg k "$key" '
+      [.decisions[]? | select(.key == $k or (.key | startswith($k + "-") and length == ($k | length) + 13))
+       | {key, live: (.dismissed != true), commit: (.evidence.commit? // null)}]') || die "sign-off-axi could not list $board"
   fi
-  if [ "$state" != none ] && jq -e --arg k "$key" 'any(.items[]?; .key == $k)' "$board" >/dev/null &&
-     sign-off-axi list "$board" --json | jq -e --arg k "$key" 'any(.decisions[]?; .key == $k and .dismissed == true)' >/dev/null; then
-    sign-off-axi restore "$key" "$board" >/dev/null || die "sign-off-axi could not restore dismissed $key"
-    replace=--replace
-  elif [ "$state" = stale ]; then
-    replace=--replace
-  elif [ "$state" = same ]; then
-    echo "merge-card: $key is already on the board"; return 0
+  if [ -n "$cards" ] && [ "$cards" != '[]' ]; then
+    if jq -e --arg h "$head" 'any(.[]; .live and .commit == $h)' <<<"$cards" >/dev/null; then
+      echo "merge-card: $key is already on the board"; return 0
+    fi
+    card_key=$(jq -r --arg h "$head" '[.[] | select(.commit == $h) | .key][0] // empty' <<<"$cards")
+    if [ -n "$card_key" ]; then restore=1; else card_key=$key-$(printf '%s' "$head" | sha1sum | cut -c1-12); fi
+    old_keys=$(jq -r '.[] | select(.live) | .key' <<<"$cards")
   fi
   # Screen-free PRs use their sealed done-done receipt as a short text-only card.
   if screen_none "$id" "$pr"; then
@@ -244,16 +252,11 @@ post() {
     local label='' card_title='Internal change passed its checks'
     [ "$pr" = - ] || label=$(printf '%s' "${pr#*://}" | awk -F/ 'NF >= 5 { printf "%s #%s", $3, $5 }')
     [ -z "$label" ] || card_title="$label: internal change passed its checks"
-    jq -n --arg key "$key" --arg link "$link" --arg about "$about" --arg title "$card_title" --argjson run "$text_run" \
+    jq -n --arg key "$card_key" --arg link "$link" --arg about "$about" --arg title "$card_title" --argjson run "$text_run" \
       '{contract:1,kind:"evidence",schema:1,key:$key,title:$title,about:$about,link:$link,run:$run}' > "$media_dir/card.json" || die "cannot write the card"
-    if [ -n "$replace" ]; then
-      jq --slurpfile c "$media_dir/card.json" --arg k "$key" '.items = ([.items[]? | '"$stale_filter"'] + [$c[0]])' "$board" > "$media_dir/feed.json" || die "cannot prepare replacement for $key"
-      out=$(sign-off-axi post "$board" --from "$media_dir/feed.json" --replace 2>&1) || die "sign-off-axi could not post $key: $out"
-    else
-      out=$(sign-off-axi post "$board" --kind evidence --from "$media_dir/card.json" --filer firstmate-merge 2>&1) || die "sign-off-axi could not post $key (exit $?)"
-    fi
+    out=$(file_card "$board" "$media_dir/card.json" evidence 2>&1) || die "sign-off-axi could not post $key: $out"
     [ -z "$out" ] || printf '%s\n' "$out"
-    echo "merge-card: posted text-only $key evidence card"
+    echo "merge-card: posted text-only $card_key evidence card"
     return 0
   fi
   # The gate's verdict for this merge, else run done-done now (a merge the gate never saw).
@@ -310,7 +313,7 @@ post() {
   fi
   kind=evidence
   if [ "$run" = null ]; then run=$receipt; fi
-  jq -n --arg kind "$kind" --arg key "$key" --arg title "$title" --arg about "$about" --arg link "$link" \
+  jq -n --arg kind "$kind" --arg key "$card_key" --arg title "$title" --arg about "$about" --arg link "$link" \
     --argjson run "$run" --argjson media "$media" '
     def clean(max): gsub("[\u0000-\u0009\u000b-\u001f\u007f-\u009f]"; " ") | if length > max then .[:max - 3] + "..." else . end;
     {contract: 1, kind: $kind, schema: 1, key: $key, title: ($title | clean(160)), about: ($about | clean(500)), link: $link}
@@ -318,12 +321,7 @@ post() {
     + if $run != null then {run: $run} else {} end' > "$media_dir/card.json" || die "cannot write the card"
   for _ in 1 2 3; do
     rc=0
-    if [ -n "$replace" ]; then
-      jq --slurpfile c "$media_dir/card.json" --arg k "$key" '.items = ([.items[]? | '"$stale_filter"'] + [$c[0]])' "$board" > "$media_dir/feed.json" || die "cannot prepare replacement for $key"
-      out=$(sign-off-axi post "$board" --from "$media_dir/feed.json" --replace 2>&1) || rc=$?
-    else
-      out=$(sign-off-axi post "$board" --kind "$kind" --from "$media_dir/card.json" --filer firstmate-merge 2>&1) || rc=$?
-    fi
+    out=$(file_card "$board" "$media_dir/card.json" "$kind" 2>&1) || rc=$?
     case $out in
       *"already holds a different"* | *"is already used"*) echo "merge-card: $key is already on the board"; return 0 ;;
       *BUSY* | *"still writing"*) sleep 2 ;;
@@ -332,7 +330,7 @@ post() {
   done
   printf '%s\n' "$out"
   [ "$rc" -eq 0 ] || die "sign-off-axi could not post $key (exit $rc)"
-  echo "merge-card: posted $key ($kind, $n media, $about)"
+  echo "merge-card: posted $card_key ($kind, $n media, $about)"
   # Tie the evidence folder to the lint row's PR and head.
   printf '%s\t%s\t%s\tcard\tevidence folder %s\n' "$(date -u +%FT%TZ)" "$pr" "$head" "$FM_HOME/data/$id" >> "$FM_HOME/data/checks-gate.log"
 }

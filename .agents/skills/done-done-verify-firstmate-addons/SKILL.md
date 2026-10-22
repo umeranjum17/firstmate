@@ -16,7 +16,7 @@ description: Verify firstmate-addons changes through their executable integratio
 - [Claude accounts quota view](features/claude-accounts-quota.md): run `bash claude-accounts/tests/claude-accounts.test.sh`; it uses a fixture muxr registry and a stub quota-axi, proves 5h and 7d left per account and a recorded failure cause, and never opens a login folder.
 - [Claude accounts chooser](features/claude-accounts-pick.md): run `bash claude-accounts/tests/claude-accounts-pick.test.sh`; it uses a fixture registry and stub quota-axi, proves the most-runway pick, the switch when one account runs low, and install/uninstall of config/account-pool.
 - [Claude accounts refresh timer](features/claude-accounts-timer.md): run `bash claude-accounts/tests/claude-accounts-timer.test.sh`; it installs the units into a throwaway tree with a stub systemctl, proves dry run, rerun and uninstall, and never touches the host's timers.
-- [Merge evidence one card per PR](features/merge-card-one-card-per-pr.md): run `bash merge-card/tests/merge-card-e2e.sh`; it uses a fixture board and stub sign-off-axi, proves a new head replaces the PR's card, two PRs keep two cards, and the internal-change title names repo and PR.
+- [Merge evidence one card per PR](features/merge-card-one-card-per-pr.md): run `bash merge-card/tests/merge-card-e2e.sh`; it uses a fixture board and stub sign-off-axi, proves a new head leaves one live card and archives the old one (posted one at a time, never `--replace`), two PRs keep two cards, and the internal-change title names repo and PR. Also run `bash merge-card/tests/real-board.test.sh` for the same journey with the real sign-off-axi on a seeded temp board.
 
 ## Procedure
 

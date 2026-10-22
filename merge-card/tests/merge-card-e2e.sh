@@ -115,14 +115,19 @@ STUB
 # log every invocation so the test can prove a gap never reached a post call.
 cat > "$work/bin/sign-off-axi" <<'STUB' || exit 1
 #!/usr/bin/env bash
+# Like sign-off-axi 0.5.3: evidence is posted one at a time (a --from --replace feed of evidence is
+# refused), a key it holds takes only the same message again, and dismiss keeps the card (archived).
 if [ "${1:-}" = restore ]; then
   jq --arg k "$2" '.items |= map(if .key == $k then .dismissed=false else . end)' "$3" > "$3.tmp" && mv "$3.tmp" "$3"
   exit 0
 fi
+if [ "${1:-}" = dismiss ]; then
+  printf 'dismiss %s\n' "$2" >>"$SO_LOG"
+  jq --arg k "$2" '.items |= map(if .key == $k then .dismissed=true else . end)' "$3" > "$3.tmp" && mv "$3.tmp" "$3"
+  exit 0
+fi
 if [ "${1:-}" = list ]; then
-  board=$2
-  [ "$board" = --json ] && board=$1
-  jq '{board:"fixture",decisions:[.items[]? | {key,dismissed}]}' "$board"
+  jq '{board:"fixture",decisions:[.items[]? | {key,dismissed,evidence:(.run // .evidence)}]}' "$2"
   exit 0
 fi
 [ "${1:-}" = post ] || exit 0
@@ -133,14 +138,17 @@ while [ $# -gt 0 ]; do
   if [ "$1" = --from ]; then from=$2; shift 2; elif [ "$1" = --replace ]; then replace=1; shift; else shift; fi
 done
 [ -n "$from" ] || exit 0
+if [ "$replace" = 1 ]; then echo "feed.json: items[0]: evidence is posted one at a time, not in a --from file"; exit 2; fi
+if [ -f "$board" ] && jq -e --slurpfile c "$from" 'any(.items[]?; .key == $c[0].key)' "$board" >/dev/null; then
+  echo "key already holds a different message"; exit 2
+fi
 case "$from" in /tmp/*) echo "refusing temporary card path: $from" >&2; exit 1 ;; esac
 if jq -e '.run? and ((.run.outcome // "") == "")' "$from" >/dev/null; then echo 'run.outcome must be text'; exit 2; fi
 if jq -e '(.about | length) > 500 or (.run.outcome | length) > 1000' "$from" >/dev/null; then echo 'about/run field exceeds contract limit'; exit 2; fi
 rm -rf "$SO_CAPTURE"
 cp -r "$(dirname "$from")" "$SO_CAPTURE"
 if [ -f "$board" ]; then
-  if [ "$replace" = 1 ]; then jq --slurpfile c "$from" '.items = $c[0].items' "$board" > "$board.tmp"
-  else jq --slurpfile c "$from" '.items += [($c[0] + {type:"evidence",filer:"firstmate-merge",dismissed:false})]' "$board" > "$board.tmp"; fi
+  jq --slurpfile c "$from" '.items += [($c[0] + {type:"evidence",filer:"firstmate-merge",dismissed:false})]' "$board" > "$board.tmp"
   mv "$board.tmp" "$board"
 fi
 STUB
@@ -343,7 +351,7 @@ so_before=$(wc -l < "$SO_LOG")
 PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" internal "$wt" "$head_c" - >/dev/null
 is "internal: repeat post is deduped" "$(wc -l < "$SO_LOG")" "$so_before"
 
-# Dismissed key is replaced; an otherwise identical live key remains deduped.
+# A dismissed card stays archived and the new card goes up beside it; an identical live card remains deduped.
 key=merge-$head_c
 jq -n --arg k "$key" '{schema:1,answers_only:false,items:[{key:$k,type:"evidence",kind:"evidence",filer:"firstmate-merge",dismissed:true,title:"dismissed placeholder"}]}' > "$work/board.json"
 MODE=newer DD_LOG=$work/args.log SO_CAPTURE=$work/card-dismissed
@@ -351,9 +359,8 @@ export MODE DD_LOG SO_CAPTURE
 checks dismissed shot.png && cp "$shot" "$home/data/dismissed/shot.png"
 mk_run dismissed 20261020T000000Z-dismissed0001 0
 PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" dismissed "$wt" "$head_c" - >/dev/null
-is "dismissed: card replaced" "$(jq -r '.items[0].title' "$work/board.json")" "a stopped worker moves to the next live route"
-is "dismissed: replacement retains key" "$(jq -r '.items[0].key' "$work/board.json")" "$key"
-jq '.items[0].dismissed=false' "$work/board.json" > "$work/board.tmp" && mv "$work/board.tmp" "$work/board.json"
+is "dismissed: card posted beside the archived one" "$(jq -r '.items[1].title' "$work/board.json")" "a stopped worker moves to the next live route"
+is "dismissed: archived card kept" "$(jq -r '.items[0] | "\(.key) \(.dismissed)"' "$work/board.json")" "$key true"
 so_before=$(wc -l < "$SO_LOG")
 PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" dismissed "$wt" "$head_c" - >/dev/null
 is "live same-key card is deduped" "$(wc -l < "$SO_LOG")" "$so_before"
@@ -372,13 +379,16 @@ jq '.items += [(.items[0] | .key += "-oldhead00000" | .run.commit = "oldhead")]'
 head_c=secondhead0000000000000000000000000000000000
 mk_run follows 20261020T000000Z-follows0002 0
 PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" follows "$wt" "$head_c" "$pr" >/dev/null
-is "new head: one card for the PR" "$(jq -r '[.items[].key] | join(",")' "$work/board.json")" "merge-o-r-pull-12"
-is "new head: the newest proof is kept" "$(jq -r '.items[0].run.run_id' "$work/board.json")" 20261020T000000Z-follows0002
+# The real sign-off-axi refuses a --from --replace feed of evidence and a changed message under a held key (see the stub).
+is "new head: exactly one live card for the PR" "$(jq -r '[.items[] | select(.dismissed != true) | .run.run_id] | join(",")' "$work/board.json")" 20261020T000000Z-follows0002
+is "new head: old cards archived, history kept" "$(jq -r '[.items[] | select(.dismissed == true) | .run.run_id] | length' "$work/board.json")" 2
+is "new head: first card keeps the PR key" "$(jq -r '.items[0].key' "$work/board.json")" merge-o-r-pull-12
+if grep -q -- '--replace' "$SO_LOG"; then no "new head: posted through --replace"; else ok "new head: posted one at a time"; fi
 so_before=$(wc -l < "$SO_LOG")
 PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" follows "$wt" "$head_c" "$pr" >/dev/null
 is "new head: repeat post dedupes" "$(wc -l < "$SO_LOG")" "$so_before"
 PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" follows "$wt" "$head_c" https://github.com/o/r/pull/13 >/dev/null
-is "two PRs: two cards" "$(jq -r '[.items[].key] | sort | join(",")' "$work/board.json")" "merge-o-r-pull-12,merge-o-r-pull-13"
+is "two PRs: two live cards" "$(jq -r '[.items[] | select(.dismissed != true) | .key | sub("-[0-9a-f]{12}$"; "")] | sort | join(",")' "$work/board.json")" "merge-o-r-pull-12,merge-o-r-pull-13"
 
 # A screen-free PR's card is titled with its repo and PR number.
 GH_BODY=$work/titled-body.md
