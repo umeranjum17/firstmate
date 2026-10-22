@@ -110,6 +110,12 @@ chrome-devtools-axi resize 390 844 >/dev/null
 chrome-devtools-axi wait "m-stuck" >/dev/null
 chrome-devtools-axi eval 'JSON.stringify({ viewport: innerWidth, text: document.body.innerText })' >"$DONE_DONE_EVIDENCE_ROOT/board.txt"
 chrome-devtools-axi screenshot "$DONE_DONE_EVIDENCE_ROOT/board-390.png" >/dev/null
+# The Ship tab is gone: no link, dock button or palette entry leads to it.
+for w in 390 1280; do
+  chrome-devtools-axi resize "$w" 900 >/dev/null
+  n=$(chrome-devtools-axi eval 'document.querySelectorAll("a[href=\"#/ship\"], [aria-label=Ship]").length' | sed -n 's/^result: //p' | tr -d '"')
+  [ "$n" = 0 ] || { echo "run-core-proof: a Ship entry remains at $w: $n" >&2; exit 1; }
+done
 # The board at a desktop width, then the one-tap Stuck and Waiting tabs and the lane cap beside a home's count.
 # BOARD_SHOTS_ONLY=1 captures the same shots without judging them (for a build that lacks the tabs).
 shot() {  # <name> <route> <width> <wait text>
@@ -207,11 +213,12 @@ steps = {
         "Read the Board: each lane with its title and state",
         "Open the Stuck and Waiting tabs and the by-home view at 390px and 1280px",
         "Open Insights: the queue and wait reasons",
+        "Look at the sidebar at 1280px and the phone dock at 390px: no Ship tab, only Board, Tickets, Overview, Insights and Needs you",
         "Open Tickets at 390px and 1280px: every backlog item on the board, the ask list as Waiting on captain",
         "Open a ticket at 390px and 1280px: its description, the captain's words it serves, its fields and its activity",
         "Open Overview at 390px and 1280px: each card names its source; scroll Overview, Insights and Tickets to the end at 390px",
     ],
-    "result": "The Board lists m-stuck, m-ask, m-ci and m-build with their titles and states; the Stuck tab holds only stuck lanes, the Waiting tab only the waiting lane, and a home with four open lanes against a cap of three reads 4 / 3; Insights shows Why work waits now with the Blocked, Lead reply and Held groups; Tickets puts each backlog item in its column with its priority chip and release, the captain-held item On hold, and only the one ask under Waiting on captain; a ticket page shows its description, the captain's words with their day, and the lane's activity; Overview names the source of every figure, and each page's end clears the tab bar at 390px",
+    "result": "The Board lists m-stuck, m-ask, m-ci and m-build with their titles and states; the Stuck tab holds only stuck lanes, the Waiting tab only the waiting lane, and a home with four open lanes against a cap of three reads 4 / 3; Insights shows Why work waits now with the Blocked, Lead reply and Held groups; Tickets puts each backlog item in its column with its priority chip and release, the captain-held item On hold, and only the one ask under Waiting on captain; a ticket page shows its description, the captain's words with their day, and the lane's activity; Overview names the source of every figure, and each page's end clears the tab bar at 390px; the sidebar and the phone dock no longer offer a Ship tab",
 }
 with open(sys.argv[1], "w") as f:
     json.dump(steps, f, indent=2, ensure_ascii=False)

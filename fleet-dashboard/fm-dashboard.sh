@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # fm-dashboard.sh - build and serve the read-only fleet dashboard for this home.
 #
-# The dashboard is the app in bin/fm-dashboard/ (vendored Preact, htm, Inter and, for the Ship tab
-# only, three.js; no network reference; light and dark): Board, a kanban of Building, Review,
+# The dashboard is the app in bin/fm-dashboard/ (vendored Preact, htm and Inter; no network
+# reference; light and dark): Board, a kanban of Building, Review,
 # Test, PR + CI and To merge with tabs for Queued, Landed today and All and rows by home on
 # request, whose cards carry the lane's model, age, pull request and, when it waits, why in plain
 # words; filters by home, model and state; a card's detail with its stages and activity; Tickets
@@ -14,24 +14,9 @@
 # a day's trend; the lifecycle, every open lane by stage split into moving, waiting and stuck, then
 # landings; lanes by state; 14-day landed and closed charts; queue reasons; quota runway; each home's
 # lanes by stage against its plan; every figure names the records it comes from, on hover and under its card); Needs you
-# (the ask list); Ship (ship/: the selected home's ship at night with each lane a worker at its
-# stage's deck station, dressed by model, and a sheet with fleet-wide key numbers and stuck or
-# parked work); Insights (the shipped fm-flow.sh reader's lifecycle, waits, queue, retained merge
+# (the ask list); Insights (the shipped fm-flow.sh reader's lifecycle, waits, queue, retained merge
 # outcomes and optional read-only capacity observations, plus the Models and Skills sections
 # from bin/fm-model-stats.sh and bin/fm-skill-stats.sh, defined in docs/fleet-ledger.md); a command palette and keys (?).
-# In Ship, tap a worker or its tag to open its card's detail; a station or its plate opens
-# a worker in that stage, prioritizing stuck work and then recorded age, oldest first (empty stations do nothing).
-# Stuck and parked sheet rows also open their cards, by click or focused Enter/Space.
-# Select a home tab or swipe left/right on the sea for the next/previous home, without wrapping.
-# Home changes sail the outgoing ship ahead and bring the selected ship in from astern;
-# scene tags and picking pause during the transition, while the panels remain interactive.
-# Existing workers walk to their new deck stations when a refresh changes their stage.
-# Landed-today cards appear as a capped crate stack at the bow; an increased count on the home
-# in view lowers new crates on a rope, or lowers the top crate again when the stack is full.
-# Selecting another home places its existing crates immediately, without a landing animation.
-# Ship needs WebGL2; otherwise a static illustration replaces the scene while its panels stay live.
-# The system's reduced-motion preference stops continuous scene animation and tag pulsing
-# and immediately settles home transitions, worker walks and crate drops, restoring tags and picking.
 # At viewport widths of 760-1279 CSS pixels the header figures use their own row.
 # At 760-1023 CSS pixels the sidebar becomes a compact rail with four-character home
 # labels (or the whole name if shorter); home buttons retain the full accessible name and tooltip.

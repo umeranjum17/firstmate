@@ -1,4 +1,4 @@
-/* Warm, graphs-first observations; the Board and Ship keep their existing design system. */
+/* Warm, graphs-first observations; the Board keeps its existing design system. */
 .ins{--i-warm:#dfaa7d;--i-other:#c48e97;--i-surface:#1c1916;flex:1;min-height:0;overflow:auto;background:var(--i-surface);padding:16px;display:flex;flex-direction:column;gap:12px}
 [data-theme=light] .ins{--i-warm:#a75426;--i-other:#8c485d;--i-surface:#faf3e9}
 .i-scope{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
