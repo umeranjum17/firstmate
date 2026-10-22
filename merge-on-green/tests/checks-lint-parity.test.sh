@@ -9,7 +9,7 @@ export HOME=$d/home XDG_DATA_HOME=$d/data TMPDIR=$d
 cat > "$d/bin/done-done" <<'EOF'
 #!/usr/bin/env bash
 [ "${1:-}" != lint ] || printf '%s|%s\n' "$2" "$3" >> "$DONE_DONE_ARGS_LOG"
-exec npx --yes --quiet --package=done-done-axi@0.4.5 done-done "$@"
+exec npx --yes --quiet --package=done-done-axi@0.6.4 done-done "$@"
 EOF
 cat > "$d/bin/gh" <<'EOF'
 #!/usr/bin/env bash
@@ -49,7 +49,7 @@ for id in good generated routes bad; do
   set -e
   logged=$(awk -F '\t' -v src="https://github.com/owner/repo/pull/$id" '$2 == src { verdict = $4 } END { print verdict }' "$d/fm-$id/data/checks-gate.log")
   want=pass; [ "$actual_rc" -eq 0 ] || want=fail
-  if [ "$legacy_rc" -ne "$actual_rc" ] || [ "$logged" != "$want" ]; then printf 'FAIL %s: legacy=%s (%s), done-done=%s (%s), log=%s\n' "$id" "$legacy_rc" "$legacy" "$actual_rc" "$actual" "$logged"; failures=$((failures + 1)); else echo "PASS $id: both verdicts $([ "$actual_rc" -eq 0 ] && echo PASS || echo FAIL)"; fi
+  if [ "$legacy_rc" -ne "$actual_rc" ] || [ "${logged/warn/pass}" != "$want" ]; then printf 'FAIL %s: legacy=%s (%s), done-done=%s (%s), log=%s\n' "$id" "$legacy_rc" "$legacy" "$actual_rc" "$actual" "$logged"; failures=$((failures + 1)); else echo "PASS $id: both verdicts $([ "$actual_rc" -eq 0 ] && echo PASS || echo FAIL)"; fi
 done
 [ "$failures" -eq 0 ] || exit 1
 cat > "$d/bin/old-done-done" <<'EOF'

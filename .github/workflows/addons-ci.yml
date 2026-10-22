@@ -145,7 +145,7 @@ jobs:
       # A throwaway HOME and XDG paths and a stub systemctl: no real timer is touched.
       - name: Claude accounts timer test
         run: bash claude-accounts/tests/claude-accounts-timer.test.sh
-      # done-done-axi 0.4.5 requires Node 22.18 and reads generated path globs in the lint fixtures.
+      # done-done-axi 0.6.4 requires Node 22.18 and reads generated path globs in the lint fixtures.
       - uses: actions/setup-node@v4
         with:
           node-version: 22.18.0

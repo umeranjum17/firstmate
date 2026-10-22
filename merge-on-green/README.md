@@ -11,7 +11,7 @@ irreversible or security-sensitive work, and on work waiting for your own review
 whose evidence-gate PASS is a not-proven PASS — the installed `checks-lint.sh` reads the PR's newest `## Checks`
 block itself (filing the proof gap stays with the lead). Then it runs, in this order and as separate sequential commands, never piped and never in parallel:
 
-1. `FM_HOME=<home> checks-lint.sh <PR URL> <home>/data/<task>` — pinned done-done-axi 0.4.5 with the Firstmate size rules, falling back to the legacy lint when unavailable;
+1. `FM_HOME=<home> checks-lint.sh <PR URL> <home>/data/<task>` — pinned done-done-axi 0.6.4 with the Firstmate size rules, falling back to the legacy lint when unavailable;
    the evidence gate must print PASS.
 2. `state/<task>.run-receipt.json` must read verdict PASS, head == the meta's `pr_head`, and
    spawn_gen == the meta's `spawn_gen`.
