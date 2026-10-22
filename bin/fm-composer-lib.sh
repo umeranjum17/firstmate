@@ -1513,13 +1513,37 @@ _fm_composer_opencode_wrap_run_start() {  # <screen> <styled> <first> <last>
   return 1
 }
 
+# _fm_composer_badge_tail_completes: 0 when the nearest non-blank row below a
+# badge row (<tail>) carries a fragment that continues the badge's truncated last
+# word: the fragment extends that word, or joining it onto that word yields a
+# prefix of a word the badge row contains.
+_fm_composer_badge_tail_completes() {  # <badge-row> <tail-row>
+  local -a bw tw
+  local badge=$1 tail=$2 last t w
+  read -ra bw <<<"$badge"
+  read -ra tw <<<"$tail"
+  [ "${#bw[@]}" -gt 0 ] || return 1
+  for w in "${!bw[@]}"; do bw[$w]=${bw[$w]//[^[:alnum:]]/}; done
+  last=${bw[${#bw[@]}-1]}
+  [ -n "$last" ] || return 1
+  for t in "${tw[@]}"; do
+    t=${t//[^[:alnum:]]/}
+    [ -n "$t" ] || continue
+    case $t in "$last"?*) return 0 ;; esac
+    for w in "${bw[@]}"; do
+      case $w in "$last$t"*) return 0 ;; esac
+    done
+  done
+  return 1
+}
+
 # _fm_composer_opencode_badge_wrap_start: print the LAST row in [<first>,<last>]
 # that opens the agent/model badge (FM_COMPOSER_LEFTBAR_BADGE_WRAP_RE_DEFAULT),
-# else print nothing and return 1. Only a badge with a wrapped row after it
-# (a non-blank row below, so a single unwrapped footer stays with
-# FM_COMPOSER_LEFTBAR_FOOTER_RE) is claimed.
+# else print nothing and return 1. Only a badge whose nearest non-blank row below
+# continues its truncated last word is claimed (see _fm_composer_badge_tail_completes),
+# so a typed line that merely starts with the badge opener stays typed text.
 _fm_composer_opencode_badge_wrap_start() {  # <screen> <styled> <first> <last>
-  local screen=$1 styled=$2 first=$3 last=$4 row raw body wrapped=0
+  local screen=$1 styled=$2 first=$3 last=$4 row raw body tail=''
   row=$last
   while [ "$row" -ge "$first" ]; do
     raw=$(_fm_composer_screen_row "$row" "$screen")
@@ -1528,11 +1552,11 @@ _fm_composer_opencode_badge_wrap_start() {  # <screen> <styled> <first> <last>
     fm_composer_normalize_trim_var body
     if fm_composer_idle_matches "$body" \
         "${FM_COMPOSER_LEFTBAR_BADGE_WRAP_RE:-$FM_COMPOSER_LEFTBAR_BADGE_WRAP_RE_DEFAULT}" sensitive; then
-      [ "$wrapped" = 1 ] || return 1
+      _fm_composer_badge_tail_completes "$body" "$tail" || return 1
       printf '%s' "$row"
       return 0
     fi
-    [ -z "$body" ] || wrapped=1
+    [ -z "$body" ] || tail=$body
     row=$((row - 1))
   done
   return 1

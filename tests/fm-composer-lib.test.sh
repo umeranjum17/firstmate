@@ -1243,6 +1243,11 @@ test_matrix_opencode_leftbar_signals() {
   [ "$out" = 'Build·x' ] || fail "a Build·x draft above the wrapped badge must extract its text, got '$out'"
   badge_lone=$'  ┃\n  ┃\n  ┃  Build·MiniMax M3.1 Flash free (OpenRouter)\n  ┃\n'"$floor"
   assert_screen "opencode badge-like row without a wrapped tail is not claimed on herdr" pending "$CAPS_STYLED" "$badge_lone"
+  local badge_typed_tail
+  badge_typed_tail=$'  ┃\n  ┃  Build·fix the tests\n  ┃  and more\n  ┃\n'"$floor"
+  assert_screen "opencode typed Build· line followed by a non-continuation row stays pending" pending "$CAPS_STYLED" "$badge_typed_tail"
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED" "$badge_typed_tail")
+  case $out in *'Build·fix the tests'*) ;; *) fail "typed Build· draft must keep its text, got '$out'" ;; esac
   # The original stuck pane's trimmed shape (single `outer` tail row).
   local badge_idle
   badge_idle=$'  ┃\n  ┃\n  ┃\n  ┃  Build·MiniMax M3.1 Flash free (OpenRouter) OpenR\n  ┃                                             outer\n  ┃\n'"$floor"
