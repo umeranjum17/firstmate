@@ -15,3 +15,5 @@ The `new head`, `two PRs` and `internal title` assertions print `ok`; the run en
 ## Real sign-off-axi
 
 Run `bash merge-card/tests/real-board.test.sh`. It runs the real `merge-card post` against the real `sign-off-axi` on a seeded temp board (its own `SIGN_OFF_HOME`), posts a PR's card at one head and again at a new head, and prints `all assertions held` when exactly one card is live, the old one is archived with its history kept, and a repeat post adds nothing.
+
+A third post passes head `-` the way the merge hook does for a PR (a stub `gh` answers `headRefOid`): the `hook head dash` assertion prints `ok` when the screen: none card carries the run sealed at the PR head; without the head lookup it prints `no passed-test receipt` and fails.
