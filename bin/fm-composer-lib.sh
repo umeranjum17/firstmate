@@ -500,10 +500,9 @@ FM_COMPOSER_LEFTBAR_FOOTER_RE_DEFAULT='^(Build|Plan)[[:space:]]+·[[:space:]]+'
 # spaces around the dot (`Build·MiniMax M3.1 Flash free (OpenRouter) OpenR`) and
 # the model's tail wraps onto a wide-padded continuation row below it
 # (FM_COMPOSER_OPENCODE_WRAP_CONT_RE_DEFAULT), with blank bar rows after. Only
-# that badge row plus at least one such continuation row is furniture. A model
-# name always carries a version digit, which keeps a typed `Build·fix the tests`
-# draft from matching.
-FM_COMPOSER_LEFTBAR_BADGE_WRAP_RE_DEFAULT='^(Build|Plan)·[^[:space:]].*[0-9]'
+# that badge row plus such continuation rows whose text completes the badge's
+# last word is furniture.
+FM_COMPOSER_LEFTBAR_BADGE_WRAP_RE_DEFAULT='^(Build|Plan)·[^[:space:]]'
 # Claude draws its permission-mode hint on its own row directly below the
 # composer (` ⏵⏵ bypass permissions on (shift+tab to cycle)`, ` ⏵⏵ accept edits
 # on`, ` ⏸ plan mode on`; verified live through Herdr on claude 2.1.236). The
@@ -1514,13 +1513,32 @@ _fm_composer_opencode_wrap_run_start() {  # <screen> <styled> <first> <last>
   return 1
 }
 
+# _fm_composer_badge_completes_word: 0 when <wrapped-tail> is the suffix of the
+# badge row's last word, i.e. that word joined to the tail equals a word earlier
+# in the same badge row (`OpenR` + `outer` completes `(OpenRouter)`).
+_fm_composer_badge_completes_word() {  # <trimmed-badge-row> <wrapped-tail>
+  local badge=$1 tail=$2 head word want
+  head=${badge% *}
+  [ "$head" != "$badge" ] || return 1
+  want=${badge##* }$tail
+  local -a words
+  read -ra words <<< "$head"
+  for word in "${words[@]}"; do
+    if [[ $word =~ ^[^[:alnum:]]*([[:alnum:]].*[[:alnum:]]|[[:alnum:]])[^[:alnum:]]*$ ]] \
+      && [ "${BASH_REMATCH[1]}" = "$want" ]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 # _fm_composer_opencode_badge_wrap_start: print the row of a wrapped agent/model
 # badge (FM_COMPOSER_LEFTBAR_BADGE_WRAP_RE_DEFAULT) whose wide-padded
 # continuation rows, with only blank bar rows after them, end the run at <last>,
 # else print nothing and return 1. A badge with no continuation row is the
 # ordinary footer, owned by FM_COMPOSER_LEFTBAR_FOOTER_RE.
 _fm_composer_opencode_badge_wrap_start() {  # <screen> <styled> <first> <last>
-  local screen=$1 styled=$2 first=$3 last=$4 row raw body conts=0
+  local screen=$1 styled=$2 first=$3 last=$4 row raw body tail= conts=0
   row=$last
   while [ "$row" -ge "$first" ]; do
     raw=$(_fm_composer_screen_row "$row" "$screen")
@@ -1530,6 +1548,8 @@ _fm_composer_opencode_badge_wrap_start() {  # <screen> <styled> <first> <last>
       case "$body" in *[![:space:]]*) ;; *) row=$((row - 1)); continue ;; esac
     fi
     if _fm_composer_row_is_opencode_wrap_continuation "$body"; then
+      fm_composer_normalize_trim_var body
+      tail=$body$tail
       conts=$((conts + 1))
       row=$((row - 1))
       continue
@@ -1538,6 +1558,7 @@ _fm_composer_opencode_badge_wrap_start() {  # <screen> <styled> <first> <last>
     fm_composer_normalize_trim_var body
     fm_composer_idle_matches "$body" \
       "${FM_COMPOSER_LEFTBAR_BADGE_WRAP_RE:-$FM_COMPOSER_LEFTBAR_BADGE_WRAP_RE_DEFAULT}" sensitive || return 1
+    _fm_composer_badge_completes_word "$body" "$tail" || return 1
     printf '%s' "$row"
     return 0
   done

@@ -1230,6 +1230,20 @@ test_matrix_opencode_leftbar_signals() {
   assert_screen "opencode typed Build draft with an indented flag line stays pending" pending "$CAPS_STYLED" "$badge_draft"
   out=$(fm_composer_extract_selected_content "$CAPS_STYLED" "$badge_draft")
   case "$out" in *'fix the tests'*) ;; *) fail "a typed Build draft must survive extraction, got '$out'" ;; esac
+  local badge_digit_draft badge_digitless
+  badge_digit_draft=$'  ┃\n  ┃\n  ┃\n  ┃  Build·run 2 tests\n  ┃                                             --flag\n  ┃\n'"$floor"
+  assert_screen "opencode typed Build draft with a digit and an indented flag line stays pending" pending "$CAPS_STYLED" "$badge_digit_draft"
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED" "$badge_digit_draft")
+  case "$out" in *'run 2 tests'*) ;; *) fail "a digit-bearing typed Build draft must survive extraction, got '$out'" ;; esac
+  badge_digitless=$'  ┃\n  ┃\n  ┃  Build·Big Pickle free (OpenRouter) OpenR\n  ┃                                             outer\n  ┃\n'"$floor"
+  assert_screen "opencode digit-less wrapped in-box badge reads empty" empty "$CAPS_STYLED" "$badge_digitless"
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED" "$badge_digitless")
+  [ -z "$out" ] || fail "a digit-less wrapped badge must never extract as composer content, got '$out'"
+  local badge_short_draft
+  badge_short_draft=$'  ┃\n  ┃\n  ┃\n  ┃  Build·x\n  ┃                                             --flag\n  ┃\n'"$floor"
+  assert_screen "opencode typed Build·x draft with an indented flag line stays pending" pending "$CAPS_STYLED" "$badge_short_draft"
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED" "$badge_short_draft")
+  case "$out" in *'Build·x'*) ;; *) fail "a typed Build·x draft must survive extraction, got '$out'" ;; esac
   # Live 2026-10-10 (OpenCode 1.18.25 through Herdr, the desklink lead's
   # engine-fix worker): on a still-longer worktree path the SAME right-aligned
   # `<dir>:<branch>` cell wraps over TWO rows - its `~/...` directory fragment
