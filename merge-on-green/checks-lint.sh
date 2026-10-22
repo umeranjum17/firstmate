@@ -8,7 +8,7 @@ case "$1" in https://*) source=$1 ;; *) source=$(cd "$(dirname "$1")" && printf 
 evidence=$(cd "$(dirname "$2")" && printf '%s/%s\n' "$PWD" "$(basename "$2")")
 LEGACY=${FM_LEGACY_CHECKS_LINT:-${FM_MAIN_HOME:-$HOME/firstmate}/config/fm-checks-lint.sh}
 DD_HOME=$FM_HOME/data/done-done-lint
-DD=(npx --yes --quiet --package=done-done-axi@0.4.5 done-done)
+DD=(npx --yes --quiet --package=done-done-axi@0.6.4 done-done)
 if [ -n "${FM_DONE_DONE_BIN:-}" ]; then DD=("$FM_DONE_DONE_BIN"); fi
 
 # Pin the released CLI: older installed done-done binaries do not have the config keys.
