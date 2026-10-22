@@ -131,6 +131,9 @@ jobs:
       # Sentinel user install proves the uninstaller journey cannot escape its temporary HOME/XDG paths.
       - name: Owner guard uninstall isolation test
         run: bash owner-guard/tests/uninstall-isolation.test.sh
+      # Throwaway XDG_DATA_HOME: the installer and check touch nothing real.
+      - name: Task priority test
+        run: bash task-priority/tests/task-priority.test.sh
       # Stub Firstmate checkout and a fixture home: no real board, hook or launcher is touched.
       - name: Bearings board test
         run: bash bearings-board/tests/bearings-board.test.sh
