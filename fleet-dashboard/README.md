@@ -14,8 +14,8 @@ fork described under Provenance.
   the three static pages plus `board.json` and `data.json`, and serves the app
   read-only (python3 stdlib, no network reference).
 - `fm-dashboard/` — the app: `index.html`, `app.js`, `app.css`, `board.js`,
-  `ui.js`, `insights.js`, `insights.css`, `tickets.js` (the Tickets board, new here), `icon.svg`, `ship/` (the Ship tab),
-  and `vendor/` (Preact + htm, Inter, three.js, and the vendored `LICENSES`).
+  `ui.js`, `insights.js`, `insights.css`, `tickets.js` (the Tickets board, new here), `icon.svg`, `ship/` (the removed Ship tab's files, unused and deleted next),
+  and `vendor/` (Preact + htm, Inter, three.js for the removed Ship tab, and the vendored `LICENSES`).
 - `../.gitattributes` — the vendor line that keeps
   `fleet-dashboard/fm-dashboard/vendor/three-*.min.js` out of whitespace checks
   and folds it in review diffs.
@@ -66,7 +66,7 @@ adds the Tickets board: `tickets.js`, its route and styles in `app.js` and `app.
 `Entry` export in `board.js` that its ticket page reuses, and
 the `tickets` and `tickets_unread` keys `fm-dashboard.sh` adds to `board.json` from the
 backlog it already reads, and Overview naming the source of every figure (from each
-metric's `source` in `data.json`) on hover and under its card.
+metric's `source` in `data.json`) on hover and under its card. The Ship tab is removed: the app no longer routes to, links or loads it.
 Every other moved file remains byte-identical to the fork.
 
 ## Side-by-side proof (re-run before the served path swaps)

@@ -1,5 +1,5 @@
 // Fleet dashboard app shell: live data, routes, the Linear sidebar and header (phone: title, tabs and dock),
-// filters, the ask list, the Ship mount, the command palette and keys.
+// filters, the ask list, the command palette and keys.
 import { render } from './vendor/preact-htm-3.1.1.js'
 import { html, useState, useEffect, useRef, now, dur, hm, ACTIVE, STAGES, SNAME, STATES, stuck, state, sid, total, hc, hname, mname, sorted, filterCards, I, IC, StageIcon, Av, ASK_TAG, askType, askOrder } from './ui.js'
 import { TABS, inTab, byStage, stagesOf, Board, MobileKanban, Detail } from './board.js'
@@ -64,7 +64,7 @@ function useWide() {
 function useTick(ms) { const [, set] = useState(0); useEffect(() => { const t = setInterval(() => set(x => x + 1), ms); return () => clearInterval(t) }, []) }
 
 // The view, tab, rows, filters and open card live in the URL hash.
-const VIEWS = ['board', 'tickets', 'overview', 'insights', 'needs', 'ship']
+const VIEWS = ['board', 'tickets', 'overview', 'insights', 'needs']
 function parseHash() {
   const [path, q] = location.hash.replace(/^#\/?/, '').split('?')
   const p = new URLSearchParams(q || ''), list = k => (p.get(k) || '').split(',').filter(Boolean)
@@ -121,18 +121,6 @@ function Chips({ d, r, go }) {
   return xs.length ? html`<div class="chips">${xs.map(([k, v, n, w]) => html`<span class="chip">${n} is <b>${w}</b><button aria-label=${`Remove ${w}`} onClick=${() => go({ [k]: r[k].filter(x => x !== v) })}>${I(IC.x, 12)}</button></span>`)}</div>` : ''
 }
 
-// The 3D ship view is its own module: ship/index.js exports mount(element, data, open) and may return { update(data), unmount() };
-// open(id) shows that card's detail.
-function Ship({ d, open }) {
-  const ref = useRef(), view = useRef(), [missing, setMissing] = useState(false)
-  useEffect(() => {
-    let gone = false
-    import('./ship/index.js').then(m => { if (!gone) view.current = m.mount(ref.current, d, open) }).catch(() => setMissing(true))
-    return () => { gone = true; view.current?.unmount?.() }
-  }, [])
-  useEffect(() => view.current?.update?.(d), [d])
-  return html`<div id="ship-mount" ref=${ref}>${missing ? html`<div class="none">${I(IC.ship, 32)}<p>The 3D ship view mounts here.</p></div>` : ''}</div>`
-}
 // Needs you is the ask list and nothing else.
 const Needs = ({ d }) => {
   const [newest, setNewest] = useState(true), [kind, setKind] = useState('all')
@@ -264,7 +252,7 @@ function Palette({ d, go, close, toggleTheme }) {
   const [q, setQ] = useState(''), [i, setI] = useState(0), input = useRef()
   useEffect(() => input.current?.focus(), [])  // autofocus is ignored while a card holds focus
   const groups = [
-    ['Go to', [['board', 'Board'], ['tickets', 'Tickets'], ['overview', 'Overview'], ['insights', 'Insights'], ['needs', 'Needs you'], ['ship', 'Ship']].map(([v, n]) => ({ n, k: v === 'insights' ? '' : `G ${n[0]}`, run: () => go({ view: v, card: null }) }))],
+    ['Go to', [['board', 'Board'], ['tickets', 'Tickets'], ['overview', 'Overview'], ['insights', 'Insights'], ['needs', 'Needs you']].map(([v, n]) => ({ n, k: v === 'insights' ? '' : `G ${n[0]}`, run: () => go({ view: v, card: null }) }))],
     ['Actions', [
       { n: 'Show stuck lanes', run: () => go({ view: 'board', tab: 'active', state: ['blocked', 'decision'], card: null }) },
       { n: 'Group rows by home', k: '⇧G', run: () => go({ view: 'board', rows: 'home' }) },
@@ -290,7 +278,7 @@ function Palette({ d, go, close, toggleTheme }) {
       return html`<li class="opt" aria-selected=${i === j} onMouseMove=${() => i !== j && setI(j)} onClick=${() => { a.run(); close() }}>${a.i || ''}<span class="lt">${a.n}</span>${a.k ? html`<small class=${a.bad ? 'bad' : ''}>${a.k}</small>` : ''}</li>` })}`)}
       ${!flat.length && html`<li class="pop-h">Nothing matches</li>`}</ul></div>`
 }
-const KEYS = [['⌘K or /', 'Search and jump'], ['G then B, T, N, S', 'Board, Tickets, Needs you, Ship'], ['H J K L or arrows', 'Move between cards'], ['Enter', 'Open the card'],
+const KEYS = [['⌘K or /', 'Search and jump'], ['G then B, T, N', 'Board, Tickets, Needs you'], ['H J K L or arrows', 'Move between cards'], ['Enter', 'Open the card'],
   ['J K in a card', 'Next and previous lane'], ['Esc', 'Close'], ['⇧G', 'Rows by home on or off'], ['T', 'Light or dark theme'], ['?', 'This list']]
 function Shortcuts({ close }) {
   const ref = useRef(); useEffect(() => ref.current?.focus(), [])
@@ -318,7 +306,7 @@ function useKeys(r, go, setPal, setKeys, toggleTheme, pal, keys) {
       if (e.metaKey || e.ctrlKey) return
       if (e.key === '/') { e.preventDefault(); return setPal(true) }
       if (e.key === '?') return setKeys(true)
-      if (g) { g = false; const v = { b: 'board', t: 'tickets', n: 'needs', s: 'ship' }[e.key]; if (v) go({ view: v, card: null }); return }
+      if (g) { g = false; const v = { b: 'board', t: 'tickets', n: 'needs' }[e.key]; if (v) go({ view: v, card: null }); return }
       if (e.key === 'g') { g = true; setTimeout(() => g = false, 900); return }
       if (e.key === 'G') return go({ view: 'board', rows: r.rows ? '' : 'home' })
       if (e.key === 't') return toggleTheme()
@@ -346,17 +334,17 @@ function App() {
   const count = t => t === 'all' ? null : total(d, d.cards.filter(c => inTab(t, c)).length, t)
   const shown = cards.filter(c => inTab(r.tab, c))
   const list = (byStage(r.tab) ? stagesOf(r.tab) : [r.tab]).flatMap(s => sorted(shown.filter(c => c.stage === s)))
-  const title = { board: 'Board', tickets: 'Tickets', overview: 'Overview', insights: 'Insights', needs: 'Needs you', ship: 'Ship' }[r.view]
+  const title = { board: 'Board', tickets: 'Tickets', overview: 'Overview', insights: 'Insights', needs: 'Needs you' }[r.view]
   const overlays = html`${r.card && html`<${Detail} d=${d} id=${r.card} go=${go} list=${list}/>`}
     ${pal && html`<${Palette} d=${d} go=${go} close=${() => setPal(false)} toggleTheme=${toggleTheme}/>`}${keys && html`<${Shortcuts} close=${() => setKeys(false)}/>`}`
-  const body = r.view === 'tickets' ? html`<${Tickets} d=${d} r=${r} go=${go} wide=${wide}/>` : r.view === 'ship' ? html`<${Ship} d=${d} open=${opencard}/>` : r.view === 'overview' ? html`<${Overview} d=${d} od=${ov} go=${go}/>` : r.view === 'insights' ? html`<${Insights} d=${d}/>` : r.view === 'needs' ? html`<${Needs} d=${d}/>` : null
+  const body = r.view === 'tickets' ? html`<${Tickets} d=${d} r=${r} go=${go} wide=${wide}/>` : r.view === 'overview' ? html`<${Overview} d=${d} od=${ov} go=${go}/>` : r.view === 'insights' ? html`<${Insights} d=${d}/>` : r.view === 'needs' ? html`<${Needs} d=${d}/>` : null
   if (!wide) return html`<div class="phone">
     <div class="top"><h1>${title}</h1><div class="caps">${r.view === 'board' ? html`<${Filters} d=${d} r=${r} go=${go}/>` : ''}<button class="ib" onClick=${toggleTheme} aria-label="Light or dark theme">${I(themeIcon(), 18)}</button></div></div>
     <div class="sum"><${Live} d=${d} st=${st} refresh=${refresh}/></div>
     ${r.view === 'board' ? html`<div class="sum"><b>${asks == null ? 'Ask list unreadable' : asks ? `${asks} need${asks > 1 ? '' : 's'} you` : 'Nothing needs you'}</b> · <span>${total(d, open.length)} in flight</span> · <span class=${stk.length ? 'bad' : ''}>${total(d, stk.length)} stuck</span> · <span>${today} landed today</span></div>
       <div class="seg">${TABS.map(([t, n]) => html`<button aria-pressed=${r.tab === t} onClick=${() => go({ tab: t })}>${n === 'Landed today' ? 'Landed' : n}${count(t) != null ? html`<small class="num">${count(t)}</small>` : ''}</button>`)}</div>
       <${Chips} d=${d} r=${r} go=${go}/><${MobileKanban} d=${d} cards=${shown} r=${r} open=${opencard}/>` : body}
-    <div class="dock"><nav>${[['board', IC.board, 'Board'], ['tickets', IC_TICKET, 'Tickets'], ['overview', IC.display, 'Overview'], ['insights', IC_CHART, 'Insights'], ['needs', IC.inbox, 'Needs you'], ['ship', IC.ship, 'Ship']].map(([v, ic, n]) =>
+    <div class="dock"><nav>${[['board', IC.board, 'Board'], ['tickets', IC_TICKET, 'Tickets'], ['overview', IC.display, 'Overview'], ['insights', IC_CHART, 'Insights'], ['needs', IC.inbox, 'Needs you']].map(([v, ic, n]) =>
       html`<a href=${'#/' + v} aria-current=${r.view === v ? 'page' : null} aria-label=${n}>${I(ic, 20)}${v === 'needs' && asks ? html`<span class="badge">${asks}</span>` : ''}</a>`)}</nav>
       <button onClick=${() => setPal(true)} aria-label="Search">${I(IC.search, 20)}</button></div>${overlays}</div>`
   return html`<div class="app">
@@ -367,7 +355,6 @@ function App() {
       <a class="nav" href="#/tickets" aria-current=${r.view === 'tickets' ? 'page' : null}>${I(IC_TICKET)}Tickets<span class="n num">${(d.tickets || []).filter(t => t.state !== 'done').length}</span></a>
       <a class="nav" href="#/overview" aria-current=${r.view === 'overview' ? 'page' : null}>${I(IC.display)}Overview</a>
       <a class="nav" href="#/insights" aria-current=${r.view === 'insights' ? 'page' : null}>${I(IC_CHART)}Insights</a>
-      <a class="nav" href="#/ship" aria-current=${r.view === 'ship' ? 'page' : null}>${I(IC.ship)}Ship</a>
       <div class="sec">Homes</div>
       ${d.homes.map(h => { const cs = open.filter(c => c.home === h.id)
         return html`<button class="nav home-nav" aria-label=${h.name} title=${h.name} aria-current=${r.view === 'board' && r.home.length === 1 && r.home[0] === h.id ? 'page' : null} onClick=${() => go({ view: 'board', home: [h.id], card: null })}>

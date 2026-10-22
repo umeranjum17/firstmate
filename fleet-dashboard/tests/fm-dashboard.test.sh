@@ -657,17 +657,6 @@ JS
   pass "board.json carries no host paths, raw reason keys or status-line tokens, and carries stages, waits, ask list and shipped flow observations; known durations, unknown lifecycle splits, queue why-lines and read-only capacity remain distinct"
 }
 
-test_ship_view_loads_against_the_app() {
-  command -v node >/dev/null 2>&1 || { echo "skip: node not found for the Ship tab modules"; return 0; }
-  local got
-  # Loading links every name the Ship tab takes from the app's helpers and three.js; a renamed helper fails here.
-  got=$(cd "$ROOT/bin/fm-dashboard" && node --input-type=module -e "
-const ship = await import('./ship/index.js'), scene = await import('./ship/scene.js')
-console.log(typeof ship.mount, typeof scene.world)" 2>&1) || fail "the Ship tab modules did not load: $got"
-  [ "$got" = "function function" ] || fail "the Ship tab modules lack mount or world: $got"
-  pass "the Ship tab's modules load against the app's helpers and export mount and world"
-}
-
 test_fleet_past_twenty_mates_keeps_every_lead_row() {
   local home d i mdir
   home=$(make_home many)
@@ -1004,7 +993,6 @@ test_waiting_on_you_is_newest_first_with_a_type_tag_and_filter
 test_waiting_on_you_types_follow_the_wording
 test_fleet_past_twenty_mates_keeps_every_lead_row
 test_board_json_feeds_the_app
-test_ship_view_loads_against_the_app
 test_each_failed_source_shows_unknown_and_why
 test_claude_accounts_card_shows_each_account_five_hour_and_seven_day_left
 test_devices_and_machine_come_from_read_only_probes
