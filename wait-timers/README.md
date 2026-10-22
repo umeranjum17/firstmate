@@ -32,7 +32,8 @@ the add-on is absent.
 - `bin/fm-wait-timers-lib.sh` — the timer library the watcher sources once per
   poll: one durable episode per waiting lane under `state/.waiting-timers/`,
   an owner recheck once the alert threshold matures, then escalation when the
-  owner has not cleared the wait.
+  owner has not cleared the wait. A blocked or needs-decision wake names its
+  decision as `key=<key>` after the verb; paused waits carry none.
 - `tests/fm-wait-timers.test.sh` — the watcher/drain journey that proves the
   timers (owner alert, escalation, deduplication, resolution, re-arm).
 - `tests/fm-wait-timers-tmux-e2e.test.sh` — the live-terminal end-to-end
