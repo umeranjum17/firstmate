@@ -348,3 +348,26 @@ a.ov-kpi:hover,button.ov-kpi:hover{box-shadow:0 0 0 1px color-mix(in srgb,var(--
 .asks-ctl{display:flex;flex-wrap:wrap;gap:6px 0;padding-bottom:4px}
 .asks-ctl .seg{padding-bottom:6px}
 .ktag{display:inline-block;margin-right:6px;padding:0 5px;border:1px solid var(--line);border-radius:5px;font-size:12px;font-style:normal;color:var(--ink-3);white-space:nowrap}
+
+/* --- tickets: a Jira-like board of every backlog item, the ask list as Waiting on captain --- */
+.tks{display:flex;flex-direction:column;flex:1;min-height:0}
+.tkp{padding:12px 16px 4px}
+.tkp button{height:28px;font-size:13px}
+.tkb{flex:1;min-height:0;display:grid;grid-template-columns:repeat(6,minmax(150px,1fr));gap:8px;padding:8px 12px 12px 16px;overflow:auto;align-items:start}
+.tkc{background:var(--raise);border-radius:10px;padding:0 6px 6px;box-shadow:0 0 0 1px var(--line)}
+.tkc .ch{background:var(--raise);border-radius:10px 10px 0 0;padding:0 6px;gap:6px;white-space:nowrap}
+.tkc .ch b{overflow:hidden;text-overflow:ellipsis}
+.tkc.you{background:color-mix(in srgb,var(--accent) 9%,var(--panel));box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 40%,transparent)}
+.tkc.you .ch{background:transparent}
+.tkc.you .ch .n{min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--accent);color:#fff;font-size:11px;font-weight:600;display:grid;place-items:center}
+.tk .r1 .sq{width:8px;height:8px;border-radius:2px}
+.tk .r3 .pill{height:20px;font-size:11.5px;padding:0 6px}
+.pill.prio{font-weight:600;color:var(--ink)}
+.pill.prio.p0{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+.pill.asked{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 45%,transparent)}
+.tk.ask h3{-webkit-line-clamp:4}
+.mcols>.tkc{flex:0 0 100%;width:100%;scroll-snap-align:start;background:transparent;box-shadow:none;border-radius:0;display:flex;flex-direction:column;gap:6px;padding:4px 16px calc(92px + env(safe-area-inset-bottom))}
+.mcols>.tkc .ch{display:none}
+.mcols>.tkc .card h3{font-size:15px;line-height:20px}
+.tkb .card{margin-top:6px}
+@media (max-width:759px){.dock a{width:48px}.tkp{padding:0 16px 8px}}

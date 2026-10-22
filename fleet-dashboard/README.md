@@ -14,7 +14,7 @@ fork described under Provenance.
   the three static pages plus `board.json` and `data.json`, and serves the app
   read-only (python3 stdlib, no network reference).
 - `fm-dashboard/` — the app: `index.html`, `app.js`, `app.css`, `board.js`,
-  `ui.js`, `insights.js`, `insights.css`, `icon.svg`, `ship/` (the Ship tab),
+  `ui.js`, `insights.js`, `insights.css`, `tickets.js` (the Tickets board, new here), `icon.svg`, `ship/` (the Ship tab),
   and `vendor/` (Preact + htm, Inter, three.js, and the vendored `LICENSES`).
 - `../.gitattributes` — the vendor line that keeps
   `fleet-dashboard/fm-dashboard/vendor/three-*.min.js` out of whitespace checks
@@ -48,7 +48,7 @@ copies used by the proof below
 task data). Treat any future diff against the fork file as a contract change,
 not a refactor.
 
-Three changes are deliberate. `fm-dashboard.sh` no longer blanks the fleet's Ready
+Four changes are deliberate. `fm-dashboard.sh` no longer blanks the fleet's Ready
 and queue numbers when a single home's backlog cannot be read: it counts the
 homes that were read, marks a partial count as a lower bound (`≥`), names each
 unread home with its reason, and reports the partial metric with status
@@ -61,8 +61,10 @@ type tag (yes/no, pick or approval) with a matching filter. The ask type reads
 from the optional fifth column of `data/captain-asks.tsv` (the row is `id`,
 `since`, `text`, `url`, `type`) when it is `yn`, `pick` or `approval`, and is
 otherwise inferred from the ask text — once in `fm-dashboard.sh`'s static
-overview page and again in the app (`ui.js`, `app.js`, `app.css`), whose
-remaining bytes are unchanged.
+overview page and again in the app (`ui.js`, `app.js`, `app.css`). The fourth
+adds the Tickets board: `tickets.js`, its route and styles in `app.js` and `app.css`, and
+the `tickets` and `tickets_unread` keys `fm-dashboard.sh` adds to `board.json` from the
+backlog it already reads.
 Every other moved file remains byte-identical to the fork.
 
 ## Side-by-side proof (re-run before the served path swaps)
