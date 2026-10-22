@@ -79,7 +79,7 @@ export const squash = h => h.reduce((a, x) => { const p = a.at(-1)
 // Commit hashes, branch names and file names stay, set apart from the words around them; a long local path reads as its last part.
 const CODE = /(\b[0-9a-f]{7,40}\b|\b(?:fm|nm|no-mistakes)\/[\w./-]+|\b[\w-]+\.(?:txt|md|json|sh|js|py)\b|\b\w+_\w+\b)/g
 const words = t => (t || '').replace(/(?:~|\/home)\/[\w.@-]+(?:\/[\w.@-]+)*\/([\w.@-]+)/g, '…/$1').split(CODE).map((p, i) => i % 2 ? html`<code>${p}</code>` : p)
-function Entry({ x }) {
+export function Entry({ x }) {
   const [raw, setRaw] = useState(false)
   return html`<li><b class=${x.tone}></b><div><div class="h"><strong>${x.verb}</strong>${x.n > 1 ? html`<span>${x.n}×</span>` : ''}
     ${x.at ? html`<span class="sp"></span><span class="num">${x.n > 1 && x.first ? `${hm(x.first)} – ` : ''}${hm(x.at)}</span>` : ''}</div>

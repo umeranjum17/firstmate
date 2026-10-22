@@ -43,6 +43,8 @@ seed() {
 - [ ] m-ci - Get the layout pull request through CI (repo: alpha) (kind: ship) (since $today)
 - [ ] m-stuck - Publish the release from the build server (repo: alpha) (kind: ship) (since $today)
 - [ ] m-ask - [captain-ask] Choose the layout for the new screen (Main42) (repo: alpha) (kind: ship) (priority: 0) (since $today)
+  Captain hold set: 2026-10-20T08:00:00Z
+  type: captain-ask: "Show the new screen in the layout a phone reads first" (22 Oct, Main42). Two layouts are drawn; the lead picks one.
 
 ## Queued
 - [ ] m-ready - Start the ready thing (repo: beta) (kind: ship) (priority: 1) (since $today)
@@ -131,7 +133,10 @@ sleep 1
 chrome-devtools-axi screenshot "$DONE_DONE_EVIDENCE_ROOT/tickets-progress-390.png" >/dev/null
 # The new Tickets screen in the dark theme too: the stored theme applies on the next full load (a new query string).
 chrome-devtools-axi eval 'localStorage.setItem("fm-theme", "dark")' >/dev/null
-for w in 390 1280; do shot "tickets-dark-$w" "?dark-$w#/tickets" "$w" 'Link the alpha npm package'; done
+for w in 390 1280; do
+  shot "tickets-dark-$w" "?dark-$w#/tickets" "$w" 'Link the alpha npm package'
+  shot "ticket-page-dark-$w" "?dark-page-$w#/tickets?ticket=main/m-ask" "$w" 'Serves your ask'
+done
 chrome-devtools-axi eval 'localStorage.removeItem("fm-theme")' >/dev/null
 # Tickets: the backlog mapped to board columns, and only the ask list waits on the captain.
 jq -e '([.tickets[] | {(.task): .state}] | add) as $s | ([.tickets[] | {(.task): .}] | add) as $t
@@ -140,6 +145,16 @@ jq -e '([.tickets[] | {(.task): .state}] | add) as $s | ([.tickets[] | {(.task):
   and $t["m-ask"].asked and $t["m-ask"].title == "Choose the layout for the new screen" and $t["m-ask"].priority == 0
   and $t["m-shipped"].pr == "https://github.com/acme/alpha/pull/4" and all(.tickets[]; .state != "captain") and (.asks | length) == 1' \
   "$home/state/dashboard/board.json" >/dev/null || { echo "run-core-proof: tickets mapping wrong: $(jq -c '.tickets' "$home/state/dashboard/board.json")" >&2; exit 1; }
+# The ticket page: the description without bookkeeping, the captain's words it serves, and the lane's status lines.
+for w in 390 1280; do shot "ticket-page-$w" '#/tickets?ticket=main/m-ask' "$w" 'Serves your ask'; done
+jq -e '(.tickets[] | select(.task == "m-ask")) as $t | $t.ask == {"words": "Show the new screen in the layout a phone reads first", "day": "22 Oct"}
+  and $t.desc == "Two layouts are drawn; the lead picks one."' \
+  "$home/state/dashboard/board.json" >/dev/null || { echo "run-core-proof: ticket page fields wrong: $(jq -c '.tickets[] | select(.task == "m-ask")' "$home/state/dashboard/board.json")" >&2; exit 1; }
+for w in 390 1280; do
+  for want in "Serves your ask of 22 Oct" "Two layouts are drawn" "Needs a decision" "Owner"; do
+    grep -qF -- "$want" "$DONE_DONE_EVIDENCE_ROOT/ticket-page-$w.txt" || { echo "run-core-proof: ticket page at $w lacks '$want'" >&2; exit 1; }
+  done
+done
 for w in 390 1280; do
   for want in "Waiting on captain" "Link the alpha npm package to GitHub?" "Your ask" P0; do
     grep -qF -- "$want" "$DONE_DONE_EVIDENCE_ROOT/tickets-$w.txt" || { echo "run-core-proof: Tickets at $w lacks '$want'" >&2; exit 1; }
@@ -182,8 +197,9 @@ steps = {
         "Open the Stuck and Waiting tabs and the by-home view at 390px and 1280px",
         "Open Insights: the queue and wait reasons",
         "Open Tickets at 390px and 1280px: every backlog item on the board, the ask list as Waiting on captain",
+        "Open a ticket at 390px and 1280px: its description, the captain's words it serves, its fields and its activity",
     ],
-    "result": "The Board lists m-stuck, m-ask, m-ci and m-build with their titles and states; the Stuck tab holds only stuck lanes, the Waiting tab only the waiting lane, and a home with four open lanes against a cap of three reads 4 / 3; Insights shows Why work waits now with the Blocked, Lead reply and Held groups; Tickets puts each backlog item in its column with its priority chip and release, the captain-held item On hold, and only the one ask under Waiting on captain",
+    "result": "The Board lists m-stuck, m-ask, m-ci and m-build with their titles and states; the Stuck tab holds only stuck lanes, the Waiting tab only the waiting lane, and a home with four open lanes against a cap of three reads 4 / 3; Insights shows Why work waits now with the Blocked, Lead reply and Held groups; Tickets puts each backlog item in its column with its priority chip and release, the captain-held item On hold, and only the one ask under Waiting on captain; a ticket page shows its description, the captain's words with their day, and the lane's activity",
 }
 with open(sys.argv[1], "w") as f:
     json.dump(steps, f, indent=2, ensure_ascii=False)

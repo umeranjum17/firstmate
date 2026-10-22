@@ -8,7 +8,8 @@
 # words; filters by home, model and state; a card's detail with its stages and activity; Tickets
 # (tickets.js: every backlog item as a card in To do, In progress, In review, Done or On hold, with its
 # P0-P3 priority, target release, owner home and pull request, the ask list as Waiting on captain,
-# filtered by project; a phone shows one column at a time); Overview
+# filtered by project; a phone shows one column at a time; a card opens its ticket page with the description,
+# the captain's words it serves and the lane's status lines); Overview
 # (five key figures, where Stuck, Lanes open and Ready also show their change since yesterday and
 # a day's trend; the lifecycle, every open lane by stage split into moving, waiting and stuck, then
 # landings; lanes by state; 14-day landed and closed charts; queue reasons; quota runway; each home's
@@ -1721,6 +1722,14 @@ for h in ACTIVE:
 # the captain. The name drops leading [tags] and Main message refs; a [captain-ask] tag marks the item asked.
 RELEASE = re.compile(r'^\s*release:\s*(\S.*?)\s*$', re.M | re.I)
 TAGS = re.compile(r'^(?:\[[\w-]+\]\s*)+')
+# The description is the body in plain words without the hold and release bookkeeping lines; the ask it serves is
+# the first quote near the word captain, with the day written beside it.
+BOOKKEEPING = re.compile(r'^\s*(?:(?:captain hold (?:set|origin)|resolution (?:recorded|mode)|decision digest|origin|release)\b.*$|type:(?: [\w -]+?:)?\s*)', re.M | re.I)
+ASKED = re.compile(r'captain\b[^"\n]{0,48}?(?:(\d{1,2} [A-Z][a-z]{2})[^"\n]{0,24})?"([^"]{12,})"(?:\s*\((\d{1,2} [A-Z][a-z]{2})\b)?', re.I)
+def describe(body, ask):  # the body without bookkeeping, the quoted ask itself or Main message refs
+    text = body[:ask.start()] + re.sub(r'^\s*\([^()]*\)', '', body[ask.end(2) + 1:]) if ask else body
+    text = re.sub(r'\bMain\d+\b', 'Main', re.sub(r'\s*\([^()]*\bMain\d+[^()]*\)', '', BOOKKEEPING.sub('', text)))
+    return re.sub(r'^[\s.,;:)]+', '', prose(re.sub(r'\n{3,}', '\n\n', text))).strip()[:480]
 def ticket(h, r):
     c = next((c for c in cards if c['id'] == f"{h}/{r['id']}"), {})
     merged_pr = next((u for u, (_, mh, mt) in merges.items() if (mh, mt) == (h, r['id'])), None)
@@ -1732,11 +1741,13 @@ def ticket(h, r):
     day = next((d for d in (r.get('closed'), r.get('created')) if re.fullmatch(r'\d{4}-\d\d-\d\d', d or '')), None)
     body, cut, _ = (r.get('body') or '').partition('\n... (truncated, ')  # a long body is cut: its last line may be partial
     rel = RELEASE.search(body[:body.rfind('\n') + 1] if cut else body)
+    ask = ASKED.search(body)
     return dict(id=f"{h}/{r['id']}", home=h, task=r['id'], project=None if r.get('repo') in (None, '', '-') else r['repo'],
                 title=re.sub(r'\s*\(Main\d+[^)]*\)|\bMain\d+:?\s*|\s+PR \d+$', '', r['title'][tags.end() if tags else 0:]).strip(),
                 asked='captain-ask' in (tags.group() if tags else ''), priority=int(r['priority']) if str(r.get('priority')).isdigit() else None,
                 release=rel.group(1) if rel else 'later', state=st, pr=c.get('pr') or merged_pr or (link.group() if link else None),
-                updated=max(seen) if seen else c.get('started') or day)
+                updated=max(seen) if seen else c.get('started') or day, desc=describe(body, ask),
+                ask=dict(words=ask.group(2), day=ask.group(1) or ask.group(3)) if ask else None)
 tickets = [ticket(h, r) for h in ACTIVE for r in backlog.get(h) or []]
 # Cycle time: dispatch to merge, for each merged task whose dispatch is in a ledger.
 cycles = sorted(at - d['ts'] for at, h, task in merges.values() if (d := dispatch(h, task, at)))

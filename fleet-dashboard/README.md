@@ -62,7 +62,8 @@ from the optional fifth column of `data/captain-asks.tsv` (the row is `id`,
 `since`, `text`, `url`, `type`) when it is `yn`, `pick` or `approval`, and is
 otherwise inferred from the ask text — once in `fm-dashboard.sh`'s static
 overview page and again in the app (`ui.js`, `app.js`, `app.css`). The fourth
-adds the Tickets board: `tickets.js`, its route and styles in `app.js` and `app.css`, and
+adds the Tickets board: `tickets.js`, its route and styles in `app.js` and `app.css`, the
+`Entry` export in `board.js` that its ticket page reuses, and
 the `tickets` and `tickets_unread` keys `fm-dashboard.sh` adds to `board.json` from the
 backlog it already reads.
 Every other moved file remains byte-identical to the fork.
