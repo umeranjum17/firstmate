@@ -496,6 +496,12 @@ FM_COMPOSER_IDLE_RE_DEFAULT='^Type a message\.\.\.$|^Ask anything(\.\.\.|…)|^P
 # ("Build · GPT-5.5 Fast OpenAI · high"). It is composer furniture, not typed
 # text, and only the run's LAST row is ever matched against it.
 FM_COMPOSER_LEFTBAR_FOOTER_RE_DEFAULT='^(Build|Plan)[[:space:]]+·[[:space:]]+'
+# On a narrow pane OpenCode draws that same badge inside the bar box with no
+# spaces around the dot (`Build·MiniMax M3.1 Flash free (OpenRouter) OpenR`) and
+# the model's tail wraps onto a wide-padded continuation row below it
+# (FM_COMPOSER_OPENCODE_WRAP_CONT_RE_DEFAULT), with blank bar rows after. Only
+# that badge row plus at least one such continuation row is furniture.
+FM_COMPOSER_LEFTBAR_BADGE_WRAP_RE_DEFAULT='^(Build|Plan)[[:space:]]*·[[:space:]]*[^[:space:]]'
 # Claude draws its permission-mode hint on its own row directly below the
 # composer (` ⏵⏵ bypass permissions on (shift+tab to cycle)`, ` ⏵⏵ accept edits
 # on`, ` ⏸ plan mode on`; verified live through Herdr on claude 2.1.236). The
@@ -1506,6 +1512,36 @@ _fm_composer_opencode_wrap_run_start() {  # <screen> <styled> <first> <last>
   return 1
 }
 
+# _fm_composer_opencode_badge_wrap_start: print the row of a wrapped agent/model
+# badge (FM_COMPOSER_LEFTBAR_BADGE_WRAP_RE_DEFAULT) whose wide-padded
+# continuation rows, with only blank bar rows after them, end the run at <last>,
+# else print nothing and return 1. A badge with no continuation row is the
+# ordinary footer, owned by FM_COMPOSER_LEFTBAR_FOOTER_RE.
+_fm_composer_opencode_badge_wrap_start() {  # <screen> <styled> <first> <last>
+  local screen=$1 styled=$2 first=$3 last=$4 row raw body conts=0
+  row=$last
+  while [ "$row" -ge "$first" ]; do
+    raw=$(_fm_composer_screen_row "$row" "$screen")
+    body=$(_fm_composer_row_content "$raw" "$styled")
+    case "$body" in '┃'*) body=${body#┃} ;; esac
+    if [ "$conts" = 0 ]; then
+      case "$body" in *[![:space:]]*) ;; *) row=$((row - 1)); continue ;; esac
+    fi
+    if _fm_composer_row_is_opencode_wrap_continuation "$body"; then
+      conts=$((conts + 1))
+      row=$((row - 1))
+      continue
+    fi
+    [ "$conts" -gt 0 ] || return 1
+    fm_composer_normalize_trim_var body
+    fm_composer_idle_matches "$body" \
+      "${FM_COMPOSER_LEFTBAR_BADGE_WRAP_RE:-$FM_COMPOSER_LEFTBAR_BADGE_WRAP_RE_DEFAULT}" sensitive || return 1
+    printf '%s' "$row"
+    return 0
+  done
+  return 1
+}
+
 # _fm_composer_row_is_opencode_busy: 0 when the trimmed row carries OpenCode's
 # in-turn hint (`esc interrupt`). A busy status row is NOT furniture, so the
 # below-floor block collector excludes any block that contains it - necessary
@@ -1622,8 +1658,9 @@ _fm_composer_classify_bare_wrap() {  # <screen> <styled> <glyph-row> <cursor-row
 _fm_composer_classify_leftbar() {  # <screen> <styled> <first-row> <last-row>
   local screen=$1 styled=$2 first=$3 last=$4
   local row raw content pending_seen=0 footer_re leading_blank=1 placeholder_position=0
-  local last_body wrap_first=-1
+  local last_body wrap_first=-1 badge_first=-1
   footer_re=${FM_COMPOSER_LEFTBAR_FOOTER_RE:-$FM_COMPOSER_LEFTBAR_FOOTER_RE_DEFAULT}
+  badge_first=$(_fm_composer_opencode_badge_wrap_start "$screen" "$styled" "$first" "$last") || badge_first=-1
   # The agent/model row's wrapped `<dir>:<branch>` directory fragment is
   # furniture only directly above a model row, so prove the run's LAST row is
   # one before any row may claim that shape, then resolve the whole wrapped
@@ -1656,6 +1693,9 @@ _fm_composer_classify_leftbar() {  # <screen> <styled> <first-row> <last-row>
     fi
     if [ "$row" -eq "$last" ] \
        && fm_composer_idle_matches "$content" "$footer_re" sensitive; then
+      row=$((row + 1)); continue
+    fi
+    if [ "$badge_first" -ge 0 ] && [ "$row" -ge "$badge_first" ]; then
       row=$((row + 1)); continue
     fi
     if [ "$wrap_first" -ge 0 ] && [ "$row" -ge "$wrap_first" ] && [ "$row" -lt "$last" ]; then
@@ -2024,7 +2064,7 @@ _fm_composer_extract_refusal_geometry() {  # <plain-screen>
 fm_composer_extract_selected_content() {  # <caps> <screen> [diagnostics=0]
   local caps=$1 screen=$2 styled=0 kv plain row raw content glyph joined='' footer_re prompt_row=-1
   local leading_blank=1 placeholder_position=0 prompt_is_shell=0 diagnostics=${3:-0}
-  local last_body wrap_first=-1
+  local last_body wrap_first=-1 badge_first=-1
   footer_re=${FM_COMPOSER_LEFTBAR_FOOTER_RE:-$FM_COMPOSER_LEFTBAR_FOOTER_RE_DEFAULT}
   while IFS= read -r kv; do
     [ "$kv" = styled=1 ] && styled=1
@@ -2043,6 +2083,8 @@ EOF
   # one before any row may claim that shape, the same rule the classifier
   # applies, so extraction never returns the fragment as composer content.
   if [ "$FM_COMPOSER_SELECTED_KIND" = leftbar ]; then
+    badge_first=$(_fm_composer_opencode_badge_wrap_start "$screen" "$styled" \
+      "$FM_COMPOSER_SELECTED_FIRST" "$FM_COMPOSER_SELECTED_LAST") || badge_first=-1
     raw=$(_fm_composer_screen_row "$FM_COMPOSER_SELECTED_LAST" "$screen")
     last_body=$(_fm_composer_row_content "$raw" "$styled")
     case "$last_body" in '┃'*) last_body=${last_body#┃} ;; esac
@@ -2114,7 +2156,10 @@ EOF
        || { [ "$FM_COMPOSER_SELECTED_KIND" = leftbar ] \
             && [ "$wrap_first" -ge 0 ] \
             && [ "$row" -ge "$wrap_first" ] \
-            && [ "$row" -lt "$FM_COMPOSER_SELECTED_LAST" ]; }; then
+            && [ "$row" -lt "$FM_COMPOSER_SELECTED_LAST" ]; } \
+       || { [ "$FM_COMPOSER_SELECTED_KIND" = leftbar ] \
+            && [ "$badge_first" -ge 0 ] \
+            && [ "$row" -ge "$badge_first" ]; }; then
       row=$((row + 1))
       continue
     fi

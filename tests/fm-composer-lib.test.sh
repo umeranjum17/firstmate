@@ -1209,6 +1209,22 @@ test_matrix_opencode_leftbar_signals() {
   assert_screen "opencode typed draft above the wrapped dir fragment on plain backends" unknown "$CAPS_PLAIN" "$v11825_typed_wrap"
   out=$(fm_composer_extract_selected_content "$CAPS_STYLED" "$v11825_typed_wrap")
   [ "$out" = 'Reply with OK.' ] || fail "a draft above the wrapped fragment must survive extraction, got '$out'"
+  # Live fork pane (OpenCode on a narrow pane): the mode/model badge is drawn
+  # INSIDE the bar box with no spaces around the dot and its tail wraps onto a
+  # wide-padded continuation row, with a blank bar row after it. The badge and
+  # its tail are status, so the empty composer must read empty (the doorbell,
+  # interrupt and relaunch all refused on it). A draft above the badge stays
+  # pending, and a badge-like draft with no wrapped tail row is not claimed.
+  local badge_idle badge_typed badge_lone
+  badge_idle=$'  ┃\n  ┃\n  ┃\n  ┃  Build·MiniMax M3.1 Flash free (OpenRouter) OpenR\n  ┃                                             outer\n  ┃\n'"$floor"$'\n   /home/you/.treehouse/crewhouse-  269.8K (2ctrl+p\n   0ec48b/15/crewhouse                        commands'
+  assert_screen "opencode wrapped in-box badge on herdr" empty "$CAPS_STYLED" "$badge_idle"
+  assert_screen "opencode wrapped in-box badge on cmux/orca" empty "$CAPS_PLAIN" "$badge_idle"
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED" "$badge_idle")
+  [ -z "$out" ] || fail "the wrapped badge must never extract as composer content, got '$out'"
+  badge_typed=$'  ┃\n  ┃  Reply with OK.\n  ┃\n  ┃  Build·MiniMax M3.1 Flash free (OpenRouter) OpenR\n  ┃                                             outer\n  ┃\n'"$floor"
+  assert_screen "opencode typed draft above wrapped in-box badge on herdr" pending "$CAPS_STYLED" "$badge_typed"
+  badge_lone=$'  ┃\n  ┃\n  ┃  Build·MiniMax M3.1 Flash free (OpenRouter)\n  ┃\n'"$floor"
+  assert_screen "opencode badge-like row without a wrapped tail is not claimed on herdr" pending "$CAPS_STYLED" "$badge_lone"
   # Live 2026-10-10 (OpenCode 1.18.25 through Herdr, the desklink lead's
   # engine-fix worker): on a still-longer worktree path the SAME right-aligned
   # `<dir>:<branch>` cell wraps over TWO rows - its `~/...` directory fragment
