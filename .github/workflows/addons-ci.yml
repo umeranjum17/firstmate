@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     # The full-fork hook journeys take several minutes; leave room for them
     # alongside shell checks and the stubbed add-on integration suites.
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - name: Install tasks-axi for fork lifecycle tests

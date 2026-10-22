@@ -5,7 +5,7 @@ Its existing config shims and card behavior are unchanged.
 
 ## One card per PR
 
-The card key is the PR's alone (`merge-<owner>-<repo>-pull-<n>`). A post for a new head replaces that PR's card, and any head-suffixed card an older merge-card filed for it, so the board keeps the newest proof; a repeat post for the same head adds nothing.
+The first card for a PR takes the PR's key (`merge-<owner>-<repo>-pull-<n>`). A post for a new head posts its card through `sign-off-axi post --kind evidence` under that key plus a 12-character head suffix, then archives (`sign-off-axi dismiss`) the PR's earlier live cards, so the board has one live card and the history stays under Archived. sign-off-axi takes evidence one post at a time and holds a key to its first message, so there is no `--from --replace` feed. A repeat post for a head adds nothing; a post for a head whose card was dismissed restores that card.
 A screen-free merge's card is titled `<repo> #<n>: internal change passed its checks`.
 
 ## Optional fork adapters
@@ -27,8 +27,11 @@ Removing the add-on directory disables this integration; removing only the confi
 ```bash
 FM_TEST_FORK=/path/to/read-only/firstmate bash merge-card/tests/merge-hooks-e2e.sh
 bash merge-card/tests/merge-card-e2e.sh
+bash merge-card/tests/real-board.test.sh
 ```
 
 The seam test runs the unmodified fork bin against the add-on loader selected by `FM_ADDONS_DIR`.
 It exercises real local merges and actual config executables, testing refusal, exact arguments, non-executable/dangling gates, timeout, successful output, post failure, repeat suppression, missing config hooks and a completely absent add-on.
 It does not start or arm a watcher, contact a forge, post cards or launch a harness.
+
+`real-board.test.sh` runs the real `merge-card post` against the real `sign-off-axi` on a seeded temp board (its own `SIGN_OFF_HOME`) and proves a new head leaves one live card with the old one archived.
