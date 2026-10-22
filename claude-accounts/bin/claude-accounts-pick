@@ -6,20 +6,44 @@
 # windows' tighter side (min of 5h and 7d left). An account under FM_CLAUDE_ACCOUNTS_LOW percent (default 5)
 # is skipped, so new workers go to the other account when one runs low. A running worker is never moved:
 # the pick only happens at launch. Other tools get their ambient default folder, unchanged.
+# `status <id> --json` names the tool of one account and `rest <id> --json` sets it aside (5 h, or until
+# its 5h window resets) so the next pick moves to the other account; `unrest <id>` returns it. A rested
+# account is never replaced by a paid fallback: with every account rested the pick refuses.
 # Env: FM_HOME (required for Claude), FM_CLAUDE_ACCOUNTS_FRESH (seconds a reading is reused, 120).
 set -uo pipefail
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 SHED='CLAUDE_CODE_USE_BEDROCK CLAUDE_CODE_USE_VERTEX CLAUDE_CODE_USE_FOUNDRY CLAUDE_CODE_USE_ANTHROPIC_AWS CLAUDE_CODE_USE_MANTLE ANTHROPIC_AUTH_TOKEN ANTHROPIC_API_KEY CLAUDE_CODE_OAUTH_TOKEN ANTHROPIC_PROFILE ANTHROPIC_FEDERATION_RULE_ID'
 
 fail() { jq -cn --arg r "$1" '{ok: false, reason: $r}'; echo "error: $1" >&2; exit 1; }
-[ "${1:-}" = pick ] && [ -n "${2:-}" ] || fail "usage: claude-accounts-pick pick <tool> --json [--prefer <id>] --state <dir>"
+usage="usage: claude-accounts-pick pick <tool> --json [--prefer <id>] --state <dir>"
+verb=${1:-}
+case "$verb" in pick | status | rest | unrest) ;; *) fail "$usage" ;; esac
+[ -n "${2:-}" ] || fail "$usage"
 tool=$2
 shift 2
 prefer=
+state=
 while [ $# -gt 0 ]; do
-  case "$1" in --prefer) prefer=${2:-}; shift ;; esac
+  case "$1" in --prefer) prefer=${2:-}; shift ;; --state) state=${2:-}; shift ;; esac
   shift
 done
+
+if [ "$verb" != pick ]; then
+  id=$tool
+  REGISTRY=${FM_CLAUDE_ACCOUNTS_REGISTRY:-$HOME/.muxr/plans/accounts-v1.json}
+  jq -e --arg id "$id" 'any(.accounts[]?; .provider == "claude" and .id == $id)' "$REGISTRY" >/dev/null 2>&1 \
+    || fail "no Claude account $id in the pool"
+  rested=${state:-${FM_HOME:?set FM_HOME to the Firstmate home}/state}/claude-accounts-rested
+  case "$verb" in
+    status) jq -cn --arg id "$id" '{ok: true, id: $id, tool: "claude"}' ;;
+    rest)
+      mkdir -p "$rested" || fail "cannot write the rested list in $rested"
+      echo $(($(date +%s) + ${FM_CLAUDE_ACCOUNTS_REST_SECONDS:-18000})) >"$rested/$id" || fail "cannot rest $id in $rested"
+      jq -cn --arg id "$id" '{ok: true, id: $id, rested: true}' ;;
+    unrest) rm -f "$rested/$id"; jq -cn --arg id "$id" '{ok: true, id: $id, rested: false}' ;;
+  esac
+  exit 0
+fi
 
 case "$tool" in
   claude) ;;
@@ -36,10 +60,14 @@ if ! jq -e --argjson now "$(date +%s)" --argjson s "$fresh" '.generated_at > $no
 fi
 
 low=${FM_CLAUDE_ACCOUNTS_LOW:-5}
+rested_dir=${state:-$FM_HOME/state}/claude-accounts-rested
+rested_ids=$(for f in "$rested_dir"/*; do
+  [ -f "$f" ] && [ "$(cat "$f" 2>/dev/null)" -gt "$(date +%s)" ] 2>/dev/null && basename "$f"
+done | jq -Rsc 'split("\n") | map(select(. != ""))')
 # runway: the tighter of the windows that were read; an account with neither is not eligible.
 # A failed read keeps the last good windows (stale); they count while younger than FM_CLAUDE_ACCOUNTS_STALE_MAX (3600 s).
-pick=$(jq -c --arg prefer "$prefer" --argjson low "$low" --argjson now "$(date +%s)" --argjson max "${FM_CLAUDE_ACCOUNTS_STALE_MAX:-3600}" '
-  [.accounts[] | select(.problem == null or (.stale == true and $now - .read_at <= $max))
+pick=$(jq -c --arg prefer "$prefer" --argjson low "$low" --argjson now "$(date +%s)" --argjson max "${FM_CLAUDE_ACCOUNTS_STALE_MAX:-3600}" --argjson rested "$rested_ids" '
+  [.accounts[] | select(([.id] | inside($rested) | not) and (.problem == null or (.stale == true and $now - .read_at <= $max)))
    | . + {runway: ([.five_hour.left, .seven_day.left] | map(select(. != null)) | min)}
    | select(.runway != null and .runway >= $low and ($prefer == "" or $prefer == "next" or .id == $prefer))]
   | sort_by(-.runway, -(.seven_day.left // 0)) | first // empty' "$file")
