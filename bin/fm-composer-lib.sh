@@ -1522,7 +1522,7 @@ _fm_composer_badge_completes_word() {  # <trimmed-badge-row> <wrapped-tail>
   [ "$head" != "$badge" ] || return 1
   want=${badge##* }$tail
   local -a words
-  read -ra words <<< "$head"
+  read -ra words <<< "${head//·/ }"
   for word in "${words[@]}"; do
     if [[ $word =~ ^[^[:alnum:]]*([[:alnum:]].*[[:alnum:]]|[[:alnum:]])[^[:alnum:]]*$ ]] \
       && [ "${BASH_REMATCH[1]}" = "$want" ]; then

@@ -1244,6 +1244,17 @@ test_matrix_opencode_leftbar_signals() {
   assert_screen "opencode typed Build·x draft with an indented flag line stays pending" pending "$CAPS_STYLED" "$badge_short_draft"
   out=$(fm_composer_extract_selected_content "$CAPS_STYLED" "$badge_short_draft")
   case "$out" in *'Build·x'*) ;; *) fail "a typed Build·x draft must survive extraction, got '$out'" ;; esac
+  # Live 44-column OpenCode 1.18.25 shape: the zero-space badge word `MiniMax`
+  # is split across its row's tail and three single-token continuation rows.
+  local badge_multirow badge_multirow_draft
+  badge_multirow=$'  ┃\n  ┃\n  ┃\n  ┃  Build·MiniMax M3.1 Flash Preview Mi\n  ┃                                 ni\n  ┃                                 Ma\n  ┃                                 x\n  ┃\n'"$floor"
+  assert_screen "opencode multi-row wrapped in-box badge reads empty" empty "$CAPS_STYLED" "$badge_multirow"
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED" "$badge_multirow")
+  [ -z "$out" ] || fail "a multi-row wrapped badge must never extract as composer content, got '$out'"
+  badge_multirow_draft=$'  ┃\n  ┃\n  ┃\n  ┃  fix login bug\n  ┃\n  ┃  Build·MiniMax M3.1 Flash Preview Mi\n  ┃                                 ni\n  ┃                                 Ma\n  ┃                                 x\n  ┃\n'"$floor"
+  assert_screen "opencode typed draft above multi-row wrapped badge stays pending" pending "$CAPS_STYLED" "$badge_multirow_draft"
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED" "$badge_multirow_draft")
+  [ "$out" = 'fix login bug' ] || fail "the draft above a multi-row badge must extract only its text, got '$out'"
   # Live 2026-10-10 (OpenCode 1.18.25 through Herdr, the desklink lead's
   # engine-fix worker): on a still-longer worktree path the SAME right-aligned
   # `<dir>:<branch>` cell wraps over TWO rows - its `~/...` directory fragment
