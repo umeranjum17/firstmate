@@ -7,11 +7,12 @@ The publisher reads fork libraries from `$FM_FORK_BIN`, else `$FM_HOME/bin`.
 The fork's done-acceptance hook delegates to `fm_receipts_accept_done`.
 Its local merge and both PR merge paths delegate to `fm_dod_receipt_accept`.
 The add-on owns brief rendering, receipt inheritance, promotion, publishing, and receipt validation.
-The fork still owns verified forge-head selection in `fm-pr-check.sh`; moving that decision requires a separate fork hook.
+`fm_receipts_pr_candidate` is the receipt-candidate hook `bin/fm-pr-check.sh` calls: for a pull request outside the worktree's origin repository it prints the verified PR head, otherwise nothing, so the worker HEAD stands. It prints nothing when the head is unverified and always exits 0.
 
 `tests/receipts-hook-e2e.sh` (set `FM_TEST_FORK`) copies the real fork scripts,
 runs its done-acceptance, local-delivery, and PR-merge integration journeys with
-the add-on loaded, then checks the helpers and absent-add-on behavior.
+the add-on loaded, then checks the helpers, the PR candidate hook through the real `fm-pr-check.sh`, and absent-add-on behavior.
+`run-proof.sh` runs that journey under done-done (`receipts-pr-candidate`).
 
 ## Layout
 
