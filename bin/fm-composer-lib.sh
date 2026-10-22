@@ -502,7 +502,7 @@ FM_COMPOSER_LEFTBAR_FOOTER_RE_DEFAULT='^(Build|Plan)[[:space:]]+·[[:space:]]+'
 # model's tail wraps into fragment rows below. The badge is always the LAST thing
 # in the composer box, so its opening row (this pattern) and every row after it
 # in the run are furniture; typed text lives only above it.
-FM_COMPOSER_LEFTBAR_BADGE_WRAP_RE_DEFAULT='^(Build|Buil|Bui|Plan|Pla)[[:space:]]*·[[:space:]]*[^[:space:]]'
+FM_COMPOSER_LEFTBAR_BADGE_WRAP_RE_DEFAULT='^(Build|Buil|Plan)[[:space:]]*·[[:space:]]*[^[:space:]]'
 # Claude draws its permission-mode hint on its own row directly below the
 # composer (` ⏵⏵ bypass permissions on (shift+tab to cycle)`, ` ⏵⏵ accept edits
 # on`, ` ⏸ plan mode on`; verified live through Herdr on claude 2.1.236). The
