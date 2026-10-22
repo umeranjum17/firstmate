@@ -69,7 +69,7 @@ function parseHash() {
   const [path, q] = location.hash.replace(/^#\/?/, '').split('?')
   const p = new URLSearchParams(q || ''), list = k => (p.get(k) || '').split(',').filter(Boolean)
   return { view: VIEWS.includes(path) ? path : 'board', tab: TABS.some(([t]) => t === p.get('tab')) ? p.get('tab') : 'active',
-    rows: p.get('rows') === 'home' ? 'home' : '', home: list('home'), model: list('model'), state: list('state'), project: list('project'), card: p.get('card') }
+    rows: p.get('rows') === 'home' ? 'home' : '', home: list('home'), model: list('model'), state: list('state'), project: list('project'), card: p.get('card'), ticket: p.get('ticket') }
 }
 // An old /overview link lands on the app and opens the native Overview, its address now hash-based.
 function initialRoute() {
@@ -83,6 +83,7 @@ function toHash(r) {
   if (r.rows) p.set('rows', r.rows)
   for (const k of ['home', 'model', 'state', 'project']) if (r[k].length) p.set(k, r[k].join(','))
   if (r.card) p.set('card', r.card)
+  if (r.ticket) p.set('ticket', r.ticket)
   return `#/${r.view}${p.size ? '?' + p.toString().replace(/%2C/g, ',').replace(/%2F/g, '/') : ''}`
 }
 function useRoute() {

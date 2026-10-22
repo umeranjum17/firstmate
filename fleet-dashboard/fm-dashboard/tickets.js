@@ -1,7 +1,9 @@
 // Tickets: every backlog item across the homes on one Jira-like board - To do, In progress, In review, Waiting on
 // captain, Done, On hold - filtered by project; a phone shows one column at a time. Waiting on captain is the ask list
-// and nothing else, so its count is the Needs you count everywhere.
-import { html, useState, useEffect, useRef, now, dur, prNum, hc, hname, I, IC, ASK_TAG, askType, askOrder } from './ui.js'
+// and nothing else, so its count is the Needs you count everywhere. A card opens the ticket page: its description, the
+// captain's words it serves, its fields and, for a live lane, the lane's status lines as its thread.
+import { html, useState, useEffect, useRef, now, dur, hm, prNum, hc, hname, I, IC, ASK_TAG, askType, askOrder } from './ui.js'
+import { squash, Entry } from './board.js'
 
 export const IC_TICKET = html`<path d="M2.5 4.5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v2a1.5 1.5 0 0 0 0 3v2a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1v-2a1.5 1.5 0 0 0 0-3zM10 5.5v1M10 9.5v1"/>`
 const IC_RELEASE = html`<path d="M8 2.5l5.5 5.5L8 13.5 2.5 8z"/>`
@@ -13,23 +15,41 @@ const ago = u => typeof u === 'number' ? dur(now() - u) : u ? (k => k < 1 ? 'tod
 const order = (s, ts) => [...ts].sort(s === 'done' ? (a, b) => at(b.updated) - at(a.updated) : (a, b) => (a.priority ?? 9) - (b.priority ?? 9) || at(b.updated) - at(a.updated))
 const PRIO = ['Urgent', 'High', 'Medium', 'Low']
 
-function Ticket({ d, t }) {
+const open = (go, id) => e => { if (e.type === 'click' || e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go({ ticket: id }) } }
+function Ticket({ d, t, go }) {
   const n = prNum(t.pr)
-  return html`<article class="card tk">
+  return html`<article class="card tk" role="button" tabindex="0" onClick=${open(go, t.id)} onKeyDown=${e => e.target === e.currentTarget && open(go, t.id)(e)}>
     <div class="r1"><span class="id">${t.project || 'No project'}</span><span class="num age" title="Last update">${ago(t.updated)}</span>
       <span class="sq" style=${{ '--c': hc(d, t.home) }} title=${`Owner: ${hname(d, t.home)}`}></span></div>
     <h3>${t.title}</h3>
     <div class="r3">${t.priority != null ? html`<span class=${'pill prio p' + t.priority} title=${PRIO[t.priority] || ''}>P${t.priority}</span>` : ''}
       ${t.asked ? html`<span class="pill asked">Your ask</span>` : ''}<span class="pill" title="Target release">${I(IC_RELEASE, 11)}${t.release[0].toUpperCase() + t.release.slice(1)}</span>
-      ${n ? html`<a class="pill pr" href=${t.pr} target="_blank" rel="noreferrer">${I(IC.pr, 12)}${n}</a>` : ''}</div></article>`
+      ${n ? html`<a class="pill pr" href=${t.pr} target="_blank" rel="noreferrer" onClick=${e => e.stopPropagation()}>${I(IC.pr, 12)}${n}</a>` : ''}</div></article>`
+}
+
+function TicketPage({ d, t, go }) {
+  const c = d.cards.find(x => x.id === t.id), n = prNum(t.pr), close = () => go({ ticket: null }), ref = useRef()
+  useEffect(() => { ref.current?.focus(); const f = e => e.key === 'Escape' && close(); addEventListener('keydown', f); return () => removeEventListener('keydown', f) }, [t.id])
+  const P = (k, v) => v ? html`<dt>${k}</dt><dd>${v}</dd>` : ''
+  return html`<div class="scrim dim" onClick=${close}></div><aside class="peek" role="dialog" aria-label=${t.title} tabindex="-1" ref=${ref}>
+    <div class="bar"><span>${COLS.find(([s]) => s === t.state)[1]}</span><span class="sp"></span><button class="ib" onClick=${close} aria-label="Close">${I(IC.x)}</button></div>
+    <div class="body"><div class="id">${t.project || 'No project'}</div><h2>${t.title}</h2>${t.desc ? html`<p class="why tk-desc">${t.desc}</p>` : ''}
+      ${t.ask ? html`<blockquote class="tk-ask"><small>Serves your ask${t.ask.day ? ` of ${t.ask.day}` : ''}</small>“${t.ask.words}”</blockquote>` : ''}
+      <dl class="props">${P('Priority', t.priority != null && html`<span class=${'pill prio p' + t.priority}>P${t.priority}</span>${PRIO[t.priority] || ''}`)}
+        ${P('Release', html`${I(IC_RELEASE, 12)}${t.release[0].toUpperCase() + t.release.slice(1)}`)}
+        ${P('Owner', html`<span class="pill"><span class="sq" style=${{ '--c': hc(d, t.home) }}></span>${hname(d, t.home)}</span>`)}
+        ${P('Pull request', n && html`<a class="pill pr" href=${t.pr} target="_blank" rel="noreferrer">${I(IC.pr, 12)}#${n}</a>`)}
+        ${P('Last update', html`<span class="num">${ago(t.updated)}</span>${typeof t.updated === 'number' ? html`<small>${hm(t.updated)}</small>` : ''}`)}</dl>
+      <div class="h4">Activity</div>${c?.history.length ? html`<ul class="act">${squash(c.history).reverse().map(x => html`<${Entry} x=${x}/>`)}</ul>` : html`<p class="empty">No status lines yet: the thread starts when a lane works on it.</p>`}
+    </div></aside>`
 }
 const Ask = ({ a }) => html`<article class="card tk ask"><div class="r1"><span class="id">${ASK_TAG[askType(a.text, a.type)]}</span>${a.age != null ? html`<span class="num age">${dur(a.age)}</span>` : ''}</div>
   <h3>${a.text}</h3>${a.url ? html`<div class="r3"><a class="pill" href=${a.url} target="_blank" rel="noreferrer">Open</a></div>` : ''}</article>`
 
-function Col({ d, s, name, xs, asks, n }) {
+function Col({ d, s, name, xs, asks, n, go }) {
   const [all, setAll] = useState(false)
   return html`<section class=${'col tkc' + (s === 'captain' ? ' you' : '')}><header class="ch"><b>${name}</b><span class="n num">${n}</span></header>
-    ${asks ? asks.map(a => html`<${Ask} key=${a.id} a=${a}/>`) : (all ? xs : xs.slice(0, CAP)).map(t => html`<${Ticket} key=${t.id} d=${d} t=${t}/>`)}
+    ${asks ? asks.map(a => html`<${Ask} key=${a.id} a=${a}/>`) : (all ? xs : xs.slice(0, CAP)).map(t => html`<${Ticket} key=${t.id} d=${d} t=${t} go=${go}/>`)}
     ${!asks && xs.length > CAP && !all ? html`<button class="more" onClick=${() => setAll(true)}>${xs.length - CAP} more</button>` : ''}
     ${n === '?' ? html`<p class="empty">The ask list could not be read</p>` : !n ? html`<p class="empty">Nothing here</p>` : ''}</section>`
 }
@@ -39,6 +59,7 @@ export function Tickets({ d, r, go, wide }) {
   const projects = [...new Set(all.map(t => t.project || 'none'))].sort((a, b) => (a === 'none') - (b === 'none') || a.localeCompare(b))
   const cols = COLS.map(([s, name]) => { const xs = s === 'captain' ? [] : order(s, ts.filter(t => t.state === s)), asks = s === 'captain' ? askOrder(d.asks || []) : null
     return { s, name, xs, asks, n: !asks ? xs.length : d.asks == null ? '?' : asks.length } })
+  const page = r.ticket && all.find(t => t.id === r.ticket)
   const [i, setI] = useState(COLS.findIndex(([s]) => s === 'captain')), ref = useRef()
   useEffect(() => { if (!wide) ref.current?.children[i]?.scrollIntoView({ inline: 'start', block: 'nearest' }) }, [wide])
   useEffect(() => { if (!wide) document.querySelector('.mseg [aria-selected=true]')?.scrollIntoView({ inline: 'center', block: 'nearest' }) }, [i, wide])
@@ -49,5 +70,6 @@ export function Tickets({ d, r, go, wide }) {
       .map(([v, n, k]) => html`<button aria-pressed=${v ? r.project.length === 1 && r.project[0] === v : !r.project.length} onClick=${() => go({ project: v ? [v] : [] })}>${n}<small class="num">${k}</small></button>`)}</div>
     ${unread.length ? html`<p class="sum"><span class="bad">Backlog not read: ${unread.map(h => hname(d, h)).join(', ')}</span></p>` : ''}
     ${wide ? '' : html`<div class="mseg" role="tablist">${cols.map((c, k) => html`<button role="tab" aria-selected=${i === k} onClick=${() => jump(k)}>${c.name}<small class="num">${c.n}</small></button>`)}</div>`}
-    <div class=${wide ? 'tkb' : 'mcols'} ref=${ref} onScroll=${wide ? null : onScroll}>${cols.map(c => html`<${Col} key=${c.s} d=${d} ...${c}/>`)}</div></div>`
+    <div class=${wide ? 'tkb' : 'mcols'} ref=${ref} onScroll=${wide ? null : onScroll}>${cols.map(c => html`<${Col} key=${c.s} d=${d} go=${go} ...${c}/>`)}</div>
+    ${page ? html`<${TicketPage} d=${d} t=${page} go=${go}/>` : ''}</div>`
 }
