@@ -72,6 +72,8 @@ FM_HOME="$FM_HOME" zai-quota-check/install.sh
 
 `route-change` must come after `pipeline-quota-failover` from the same clone (the loop's order). To route GLM calls through the queue, set `.providers.zai.baseUrl` to `http://127.0.0.1:8787/api/coding/paas/v4` in `~/.pi/agent/models.json`; new pi sessions pick it up. `git-identity` prints a note until the fork's launch-env hook is merged — until then lanes stay unguarded.
 
+The delete, kill and read guards put their Claude hook in `~/.claude` and in every Claude account folder listed in the account pool's registry (`~/.muxr/plans/accounts-v1.json`), since a worker started with `CLAUDE_CONFIG_DIR` reads only that folder's settings: rerun them after adding an account.
+
 Three add-ons wire in by hand:
 
 ```sh

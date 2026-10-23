@@ -33,6 +33,8 @@ For authorized live cleanup, open a done-done run, use `chrome-devtools-axi` to 
 
 - Pool accounts for tools: run `done-done run pool-tool-account` (`bash account-pool/run-tool-proof.sh`); a fixture pool selects Umer, the installed done-done judge backend spawns a stub Claude, and its recorded `CLAUDE_CONFIG_DIR` must equal the pick. No login or model call. Also run `bash merge-card/tests/merge-card-e2e.sh` for cached-pick fallback with age, a loud failure without cache, and no ambient judge launch.
 
+- Guard hooks on pool accounts: run `bash kill-guard/tests/kill-guard.test.sh`, `bash read-guard/tests/read-guard.test.sh` and `bash delete-guard/tests/delete-guard-uninstall.test.sh`; each installs into a throwaway HOME with a fixture account registry and proves the Claude hook lands in the pool account folder's `settings.json` (other keys kept) and uninstall removes it. After a live install from main, a fresh `claude -p --model claude-haiku-5-5` with `CLAUDE_CONFIG_DIR=<pool folder>` asked to `cat` a planted fixture under a `.codex/auth.json` path must be refused.
+
 ## Procedure
 
 Run the feature's integration journey from the repository root and save its output under done-done's run evidence directory.

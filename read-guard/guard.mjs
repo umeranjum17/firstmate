@@ -11,6 +11,7 @@ const sensitive = [
   /(?:^|\/)\.pi\/agent\/auth[^/]*$/,
   /(?:^|\/)\.claude\/(?:\.credentials[^/]*)$/,
   /(?:^|\/)\.claude$/,
+  /(?:^|\/)\.muxr\/plans\/[^/]+\/[^/]+\/(?:\.credentials|auth)[^/]*$/,
   /(?:^|\/)\.no-mistakes(?:\/(?:\*{1,2})?\/?)?$/,
   /(?:^|\/)\.no-mistakes\/config\.ya?ml$/,
   /(?:^|\/)\.local\/state\/crewhouse\/people\/[^/]+(?:\/.*)?$/,

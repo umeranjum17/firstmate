@@ -11,6 +11,10 @@ DEST=${XDG_DATA_HOME:-$HOME/.local/share}/fm-delete-guard
 STAMP=$(date +%s)
 TMP=$(mktemp -d)
 trap 'rm -rf -- "$TMP"' EXIT
+# Every Claude config folder: ~/.claude and each Claude account folder in the muxr registry the account pool launches
+# workers with (CLAUDE_CONFIG_DIR), whose settings.json replaces ~/.claude's. Rerun after adding an account.
+REG=${FM_CLAUDE_ACCOUNTS_REGISTRY:-$HOME/.muxr/plans/accounts-v1.json}
+CLAUDE_DIRS=$( { echo "$HOME/.claude"; [ ! -e "$REG" ] || jq -r '.accounts[] | select(.provider == "claude") | .folder' "$REG" || echo "warning: cannot read $REG; only ~/.claude is covered" >&2; } | awk '!seen[$0]++')
 
 # put <target> <candidate> [jq-path]: replace target with candidate after a backup; prints the diff (JSON: only jq-path).
 put() {
@@ -49,7 +53,7 @@ put "$DEST/check.sh" "$SRC/check.sh"
 for a in pi-extension.ts opencode-plugin.js; do sed "s|__GUARD__|$DEST/guard.mjs|" "$SRC/$a" > "$TMP/$a"; done
 if [ -d "$HOME/.pi/agent" ]; then put "$HOME/.pi/agent/extensions/fm-rm-guard.ts" "$TMP/pi-extension.ts"; else echo "skipped: pi (not installed)"; fi
 if [ -d "$HOME/.config/opencode" ]; then put "$HOME/.config/opencode/plugins/fm-delete-guard.js" "$TMP/opencode-plugin.js"; else echo "skipped: opencode (not installed)"; fi
-hook "$HOME/.claude/settings.json" claude
+while read -r d; do hook "$d/settings.json" claude; done <<<"$CLAUDE_DIRS"
 
 printf '#!/usr/bin/env bash\nexec %q %q\n' "$DEST/check.sh" "$FMH" > "$TMP/check"
 put "$FMH/state/delete-guard.check.sh" "$TMP/check"
