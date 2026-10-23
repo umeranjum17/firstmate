@@ -299,6 +299,11 @@ test_claude_accounts_card_shows_each_account_five_hour_and_seven_day_left() {
   has "$d/index.html" "Claude accounts" "default 5 hours 63% left 7 days 34% left" "Two 5 hours 100% left 7 days not signed in"
   [ "$(jq -r '[.claude_accounts[].name] | join(",")' "$d/data.json")" = default,Two ] || fail "data.json lacks the Claude accounts"
   [ "$(jq -c '.claude_accounts[0] | has("folder")' "$d/data.json")" = false ] || fail "data.json carries a profile folder"
+  jq --argjson until "$(($(date +%s) + 3600))" '.accounts[0].rested_until=$until' "$home/state/claude-accounts.json" > "$home/state/quota.next"
+  mv "$home/state/quota.next" "$home/state/claude-accounts.json"
+  build "$home"
+  has "$d/index.html" "Rested until"
+  jq -e '.claude_accounts[0].rested_until > now' "$d/data.json" >/dev/null || fail "dashboard lost rest expiry"
 }
 
 test_devices_and_machine_come_from_read_only_probes() {
