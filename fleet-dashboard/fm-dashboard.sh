@@ -14,7 +14,8 @@
 # a day's trend; the lifecycle, every open lane by stage split into moving, waiting and stuck, then
 # landings, each stage opening the Board filtered to it (To land opens To merge); time in stage, each open lane by its
 # time in its current stage with the bottleneck named; lanes by state; 14-day landed and closed charts; queue reasons; quota runway; each home's
-# lanes by stage against its plan; every figure names the records it comes from, on hover and under its card); Needs you
+# lanes by stage against its plan; GitHub's merges in the fleet's repositories beside the recorded ones, with the
+# records' coverage; every figure names the records it comes from, on hover and under its card); Needs you
 # (the ask list); Insights (the shipped fm-flow.sh reader's lifecycle, waits, queue, retained merge
 # outcomes and optional read-only capacity observations, plus the Models and Skills sections
 # from bin/fm-model-stats.sh and bin/fm-skill-stats.sh, defined in docs/fleet-ledger.md); a command palette and keys (?).
@@ -54,7 +55,8 @@
 # Method owns the metric definitions shared with data.json's coverage and source metadata.
 # Backlog lists default to action grouping, with a by-home variant.
 # Board and Overview leave parked homes out of totals; Insights labels its all-registered-home scope.
-# Sources are local records, existing caches and read-only probes; no GitHub collection runs during builds.
+# Sources are local records, existing caches and read-only probes; the one GitHub read is the forge count of merged
+# pull requests in the fleet's repositories (gh pr list, at most every 30 minutes, FM_DASHBOARD_FORGE=off skips it).
 # Insights invokes fm-flow.sh --json --capacity at the build cutoff (180 s overall deadline).
 # FM_MAC_HOST opts into that reader's bounded read-only Mac SSH probe; unset means unknown.
 # The reader's live capacity timestamps remain separate from the durable-record cutoff.
@@ -111,7 +113,8 @@
 #   <proc> is FM_DASHBOARD_PROC (default /proc), <locks> FM_DEVICE_LOCK_DIR (default /tmp);
 #   FM_EMU_MAX, FM_GRADLE_MAX, FM_MEM_MIN_GB (defaults 2, 2, 12) mirror the memory gate's caps
 # All day comparisons use the host timezone. A build writes only under state/dashboard:
-# HTML, data.json, board.json, filed.json (observed open-item filing days, kept 15 days), full-text.json (the whole
+# HTML, data.json, board.json, filed.json (observed open-item filing days, kept 15 days), forge.json (GitHub's merge
+# times per fleet repository, read at most every 30 minutes), full-text.json (the whole
 # title and body of each backlog item tasks-axi list cuts, from show --full, kept while the item stays cut), and
 # history.tsv (lane, stuck and ready counts sampled every 10 minutes, kept 8 days).
 # .cache.lock serializes cache updates across builds.
@@ -704,6 +707,34 @@ def landed_on(d, h=None):
     return sum(lo <= at < hi and h in (None, hh) for at, hh, _ in merges.values())
 LANDED = [landed_on(d) for d in DAYS]
 merges_read_at = time.time()
+# Forge: the pull requests GitHub shows merged in the repositories the fleet recorded merges in over these 14 days,
+# counted by local merge day like Landed, so the records' coverage shows. One read-only gh pr list per repository, at
+# most every 30 minutes (forge.json keeps the last good read and the cause of a failed one); FM_DASHBOARD_FORGE=off skips it.
+FORGE_AGE, GH_REPO = 1800, re.compile(r'https://github\.com/([\w.-]+/[\w.-]+)/pull/\d+')
+forge_repos = sorted({m[1] for url, (at, _, _) in merges.items() if at >= midnight(DAYS[0]) and (m := GH_REPO.match(url))})
+def forge_read(repo):
+    out, err = probe(['gh', 'pr', 'list', '-R', repo, '--state', 'merged', '--search', f'merged:>={DAYS[0] - timedelta(days=1)}',
+                      '--limit', '1000', '--json', 'mergedAt'], timeout=30)
+    try: ats = [datetime.fromisoformat(x['mergedAt'].replace('Z', '+00:00')).timestamp() for x in json.loads(out)]
+    except (TypeError, ValueError, KeyError, AttributeError): return dict(error=err or 'gh answered no merge list')
+    return dict(merged=ats, capped=len(ats) >= 1000)
+forge = {}
+if os.environ.get('FM_DASHBOARD_FORGE', 'on') != 'off' and forge_repos:
+    with open(os.path.join(STATE_DIR, '.cache.lock'), 'a') as cache_lock:
+        fcntl.flock(cache_lock, fcntl.LOCK_EX)
+        FORGE = os.path.join(STATE_DIR, 'forge.json')
+        forge = load_json(FORGE)
+        stale = [r for r in forge_repos if NOW_TS - (forge.get(r) or {}).get('at', 0) >= FORGE_AGE]
+        with ThreadPoolExecutor(4) as pool:
+            for r, v in zip(stale, pool.map(forge_read, stale)):  # a failed read keeps the last good one, with its cause
+                old = forge.get(r) or {}
+                forge[r] = dict(v, at=NOW_TS, read=NOW_TS) if 'merged' in v else dict(old, at=NOW_TS, error=v['error'])
+        forge = {r: forge[r] for r in forge_repos if isinstance(forge.get(r), dict)}
+        save_json(FORGE, forge)
+forge_got = {r: v for r, v in forge.items() if isinstance(v.get('merged'), list)}
+forge_problems = [f"{r}: {v['error']}" for r, v in forge.items() if v.get('error')] + [f'{r}: not read' for r in forge_repos if r not in forge]
+forge_problems += [f'{r}: 1000 or more merges, counted as at least' for r, v in forge_got.items() if v.get('capped')]
+FORGE_N = [sum(midnight(d) <= at < midnight(d + timedelta(days=1)) for v in forge_got.values() for at in v['merged']) for d in DAYS]
 
 # Closed: backlog items marked done, by the local day they closed (the backlog and its archive).
 CLOSED = re.compile(r'^- \[x\] (\S+) (?:- )?(.*?)(?= blocked-by:| \((?:repo|kind|priority|merged|reported|done|closed)\b|$)')
@@ -1585,6 +1616,9 @@ METRICS = [  # each number's one definition: id, name, what it counts, source, w
     ('landed', 'Landed', 'pull requests the fleet recorded as merged, each once, on the day of its first merge record',
      "each lead's merge lines in Main's records; Main's own merges from its fleet ledger",
      f"local days from midnight (UTC{OFF[:3]}:{OFF[3:]}); always at least: recording can be disabled or records unreadable", 'every build'),
+    ('landed_forge', 'Merged on GitHub', "pull requests GitHub shows merged in the repositories the fleet recorded merges in over the 14 days, on their local merge day",
+     'GitHub, read-only (gh pr list per repository)', f"local days from midnight (UTC{OFF[:3]}:{OFF[3:]}); a repository GitHub did not answer is named and its last good read kept",
+     'at most every 30 minutes'),
     ('closed', 'Closed', 'backlog items marked done, merged or reported, on the day they closed', "each home's backlog and its done archive",
      'the last 7 local days, today so far, against the 7 days before', 'every build'),
     ('filed', 'Filed', 'backlog items on the day they were filed', "each home's open items, plus a log that keeps each filing day after the item closes",
@@ -1683,6 +1717,10 @@ metrics = {
 metrics['quota'].update(read_at_latest=quota_times[-1] if quota_times else None, read_at_policy='oldest contributing account reading')
 for key, value in zip(('heavy_jobs_gb', 'heavy_high_gb', 'heavy_max_gb'), mach['heavy']):
     metrics[key] = reading(value, 'machine', value is not None, reason=mach['heavy_why'], read_at=machine_read_at)
+if forge_repos and os.environ.get('FM_DASHBOARD_FORGE', 'on') != 'off':
+    metrics['landed_forge'] = reading(FORGE_N[-1], 'landed_forge', bool(forge_got), partial=bool(forge_problems),
+                                      reason='; '.join(forge_problems) or 'GitHub did not answer', read_at=min((v['read'] for v in forge_got.values()), default=None))
+    metrics['landed_forge'].update(repos=forge_repos, daily=[dict(day=d.isoformat(), value=v if forge_got else None) for d, v in zip(DAYS, FORGE_N)])
 for key, values in (('landed', LANDED), ('closed', CLOSED_N), ('filed', FILED_N)):
     metrics[key]['daily'] = [dict(day=d.isoformat(), value=v if key != 'closed' or CLOSED_KNOWN else None) for d, v in zip(DAYS, values)]
 for key in ('busy_agents', 'agent_roles', 'running_agents'):

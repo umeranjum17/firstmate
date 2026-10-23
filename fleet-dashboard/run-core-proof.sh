@@ -86,6 +86,15 @@ EOF
   # Stubs keep the dashboard off the real herdr, quota, device and service state.
   printf '#!/bin/sh\ncat "%s/herdr.json"\n' "$home" > "$home/stubs/herdr"
   printf '#!/bin/sh\nexit 1\n' > "$home/stubs/quota-axi"
+  # GitHub, read-only: the alpha repository the fleet recorded a merge in answers with two merges today and three yesterday.
+  python3 - "$home/gh-alpha.json" <<'PY'
+import json, sys, datetime as D
+now = D.datetime.now().astimezone(); noon = now.replace(hour=12, minute=0, second=0, microsecond=0) - D.timedelta(days=1)
+ts = [now - D.timedelta(seconds=40), now - D.timedelta(seconds=70)] + [noon - D.timedelta(hours=h) for h in (0, 1, 2)]
+json.dump([{'mergedAt': t.astimezone(D.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')} for t in ts], open(sys.argv[1], 'w'))
+PY
+  # shellcheck disable=SC2016 # the single-quoted stub expands when it runs
+  printf '#!/bin/sh\n[ "$4" = acme/alpha ] && exec cat "%s/gh-alpha.json"\necho "HTTP 404: Could not resolve to a Repository" >&2; exit 1\n' "$home" > "$home/stubs/gh"
   printf '#!/bin/sh\nprintf "List of devices attached\\n\\n"\n' > "$home/stubs/adb"
   # shellcheck disable=SC2016 # the single-quoted stub expands when it runs
   printf '#!/bin/sh\n[ "$1" = "-cf" ] && { echo 0; exit 0; }\nexit 1\n' > "$home/stubs/pgrep"
@@ -178,6 +187,16 @@ done
 chrome-devtools-axi eval 'document.querySelector(".ov-abn").click()' >/dev/null
 sleep 1
 chrome-devtools-axi eval 'location.hash' | grep -qF '#/board?stage=building' || { echo "run-core-proof: the bottleneck row did not open the Building Board" >&2; exit 1; }
+# Metrics puts GitHub's merges in the fleet's repositories beside the recorded ones: today, the average before today and
+# how many of GitHub's merges the records hold (one recorded today, none on earlier days: 1 of 3 before today is 0).
+for w in 390 1280; do
+  shot "forge-$w" '#/overview' "$w" 'records hold'
+  chrome-devtools-axi eval '(() => { const h = [...document.querySelectorAll(".ov-card h3")].find(e => e.textContent === "Flow"); h.scrollIntoView({ block: "start" }); return h.parentElement.innerText })()' >"$DONE_DONE_EVIDENCE_ROOT/forge-card-$w.txt"
+  chrome-devtools-axi screenshot "$DONE_DONE_EVIDENCE_ROOT/forge-$w.png" >/dev/null
+  grep -qF 'GitHub 2 today' "$DONE_DONE_EVIDENCE_ROOT/forge-card-$w.txt" && grep -qF '(0 of 3) in 1 repository' "$DONE_DONE_EVIDENCE_ROOT/forge-card-$w.txt" \
+    || { echo "run-core-proof: the Flow card at $w lacks GitHub's count beside the records: $(cat "$DONE_DONE_EVIDENCE_ROOT/forge-card-$w.txt")" >&2; exit 1; }
+done
+[ "$(chrome-devtools-axi eval 'document.querySelectorAll(".ov-days rect.ref").length' | sed -n 's/^result: //p' | tr -d '"')" = 2 ] || { echo "run-core-proof: the Landed chart does not mark GitHub's two merge days (today and yesterday)" >&2; exit 1; }
 # Metrics shows memory as the memory gate reads it: the 10 s spike of 45% is not the pressure, the sustained 8% is.
 shot memory-390 '#/overview' 390 'as the memory gate reads it'
 chrome-devtools-axi eval '(() => { const h = [...document.querySelectorAll(".ov-card h3")].find(e => e.textContent === "Memory"); h.scrollIntoView({ block: "center" }); return h.parentElement.innerText })()' >"$DONE_DONE_EVIDENCE_ROOT/memory-card.txt"
@@ -360,8 +379,9 @@ steps = {
         "Open the Memory card on Metrics at 390px with a 45% 10 s spike over an 8% 60 s average",
         "Open Time in stage on Metrics at 390px and 1280px, then tap the bottleneck row",
         "Open the ticket with a long name at 390px and 1280px, and the m-ci ticket with its proof",
+        "Open the Flow card on Metrics at 390px and 1280px: GitHub's merges beside the recorded ones",
     ],
-    "result": "The Board lists m-stuck, m-ask, m-ci and m-build with their titles and states; the Stuck tab holds only stuck lanes, the Waiting tab only the waiting lane, and a home with four open lanes against a cap of three reads 4 / 3; Insights shows Why work waits now with the Blocked, Lead reply and Held groups; Tickets puts each backlog item in its column with its priority chip and release, the captain-held item On hold, and only the one ask under Waiting on captain; a ticket page shows its description, the captain's words with their day, and the lane's activity; Overview names the source of every figure, and each page's end clears the tab bar at 390px; the sidebar and the phone dock no longer offer a Ship tab; a post without the owner's board token is refused, the board's cookie lets the page send a comment with no pasted secret, the comment reaches Main's inbox and shows in the ticket thread as sent with Main's pickup and reply under it, and a comment on a lead's ticket reaches that lead's endpoint through fm-send and shows the lead's pickup and its own answer; By release puts alpha's v0.2.0 and beta's next item under Next release, the v0.3.0 item under After and items with no release under Later, and the v0.2.0 filter leaves only its item; the PR + CI stage opens the Board filtered to that stage with a removable Stage chip, and To land opens it filtered to To merge; a failing flow reader shows its own error on Insights; the Metrics Memory card reads 32 GB free of 64 GB and 8.0% pressure, not the 45% spike; Time in stage draws the four open lanes, names Building the bottleneck and its row opens the Building Board; a ticket whose name and body the backlog list cuts shows both whole, with its ask's day and Main message, and the m-ci ticket page shows Receipt PASS · done-done pass · abc1234",
+    "result": "The Board lists m-stuck, m-ask, m-ci and m-build with their titles and states; the Stuck tab holds only stuck lanes, the Waiting tab only the waiting lane, and a home with four open lanes against a cap of three reads 4 / 3; Insights shows Why work waits now with the Blocked, Lead reply and Held groups; Tickets puts each backlog item in its column with its priority chip and release, the captain-held item On hold, and only the one ask under Waiting on captain; a ticket page shows its description, the captain's words with their day, and the lane's activity; Overview names the source of every figure, and each page's end clears the tab bar at 390px; the sidebar and the phone dock no longer offer a Ship tab; a post without the owner's board token is refused, the board's cookie lets the page send a comment with no pasted secret, the comment reaches Main's inbox and shows in the ticket thread as sent with Main's pickup and reply under it, and a comment on a lead's ticket reaches that lead's endpoint through fm-send and shows the lead's pickup and its own answer; By release puts alpha's v0.2.0 and beta's next item under Next release, the v0.3.0 item under After and items with no release under Later, and the v0.2.0 filter leaves only its item; the PR + CI stage opens the Board filtered to that stage with a removable Stage chip, and To land opens it filtered to To merge; a failing flow reader shows its own error on Insights; the Metrics Memory card reads 32 GB free of 64 GB and 8.0% pressure, not the 45% spike; Time in stage draws the four open lanes, names Building the bottleneck and its row opens the Building Board; a ticket whose name and body the backlog list cuts shows both whole, with its ask's day and Main message, and the m-ci ticket page shows Receipt PASS · done-done pass · abc1234; the Flow card shows GitHub 2 today, the average before today and that the records hold 0 of 3 of GitHub's earlier merges in 1 repository, with GitHub's count marked on each day of the Landed chart",
 }
 with open(sys.argv[1], "w") as f:
     json.dump(steps, f, indent=2, ensure_ascii=False)
