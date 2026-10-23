@@ -171,3 +171,8 @@ jobs:
         run: bash owner-rules/tests/owner-rules-gate.test.sh
       - name: Pipeline route switch test
         run: bash pipeline-quota-failover/tests/switch-route.test.sh
+      - name: Owner ask real-board journey
+        run: |
+          npm install --global sign-off-axi
+          bash ask-default/tests-owner-ask.test.sh
+          FM_CODE_ROOT="$RUNNER_TEMP/firstmate" bash signoff/tests/fm-procevent-signoff.test.sh
