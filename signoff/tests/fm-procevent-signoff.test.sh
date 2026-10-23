@@ -4,7 +4,7 @@
 # sign-off-axi and a stub keyed-answer intake: a transient intake failure is
 # offered again until the intake takes it, and a task held again after an
 # answered card gets a live card of its own. Section B runs the real arm, hold
-# and keyed-answer intake on a beads-backed home: a hold raises its card with the
+# and keyed-answer intake on a markdown-backed home: a hold raises its card with the
 # right title, reason and close, a dated deferral raises none, and the reserved
 # reconcile answer is refused for good, acked once, and leaves the hold open.
 set -u
@@ -13,6 +13,7 @@ set -u
 CODE_ROOT=${FM_CODE_ROOT:-}
 [ -n "$CODE_ROOT" ] && [ -f "$CODE_ROOT/tests/lib.sh" ] \
   || { echo "skip: set FM_CODE_ROOT to a Firstmate checkout"; exit 0; }
+ADDONS=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 ADAPTER="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/bin/fm-procevent-signoff.sh"
 # shellcheck source=/dev/null
 . "$CODE_ROOT/tests/lib.sh"
@@ -119,6 +120,17 @@ delivered() { cat "$FM_HOME_DIR/state/signoff-delivered" 2>/dev/null || true; }
 runner register signoff signoff -- "$ADAPTER" poll >/dev/null 2>&1 \
   || fail "could not register the sign-off source for the runner"
 hold_as '2026-10-12T10:00:00Z#0'
+if adapter raise internal-call '[captain-ask] Main42: Run a proof?' 'Needs a key from Main' release >/dev/null 2>&1; then
+  fail 'a team call without an authored owner ask reached the board'
+fi
+[ "$(jq 'length' "$SIGNOFF_BOARD")" = 0 ] || fail 'the refused call left a card'
+author() {
+  FM_HOME="$1" python3 "$ADDONS/ask-default/bin/fm-captain-ask.py" add "$2" "${3:-Can you sign in to the release account?}" \
+    --owner-must login --about 'The release account needs your sign in.' --why 'Publishing waits for your account access.' \
+    --already 'The release checks passed.' --option 'Yes=Publishing continues after you sign in.' \
+    --option 'No=The release stays unpublished.' --recommend Yes --reason 'The release checks passed.' --default No
+}
+for ask_id in T1 T2 T3; do author "$FM_HOME_DIR" "$ask_id"; done
 adapter raise T1 'Ship T1' 'needs a call' release >/dev/null 2>&1 || fail "first hold raised no card"
 first=$(jq -r 'keys[0]' "$SIGNOFF_BOARD")
 answer_card "$first" 'use the cheap plan' '2026-10-12T10:05:00Z'
@@ -133,26 +145,12 @@ out=$(adapter poll 2>/dev/null) || fail "poll found no answer for the re-held ta
 [ "$(printf '%s\n' "$out" | jq -s 'length')" = 1 ] || fail "poll offered more than the new answer: $out"
 [ "$(printf '%s\n' "$out" | jq -r .answer)" = 'use the other plan' ] \
   || fail "poll offered the earlier card's answer: $out"
-jq -e 'to_entries | all(.value.ask_ref == "T1" and (.value.title == "Ship T1?"))' "$SIGNOFF_BOARD" >/dev/null \
+jq -e 'to_entries | all(.value.ask_ref == "T1" and (.value.title == "Can you sign in to the release account?"))' "$SIGNOFF_BOARD" >/dev/null \
   || fail "a raised card lacks the hold task id as its ask reference: $(cat "$SIGNOFF_BOARD")"
 pass "a task held again after an answered card gets a live card of its own, each raised with the hold id as --ask-ref"
 
 rm -f "$HOLD_FILE" "$SIGNOFF_BOARD" "$FM_HOME_DIR/state/signoff-delivered"
 printf '{}\n' > "$SIGNOFF_BOARD"
-long_title='Capture account planner for the TakeOne live proof run with the spare MiniMax key today'
-long_reason='Let TakeOne use the MiniMax key for its live proof run, given that the planner needs a paid account and nobody has approved the spend yet?'
-hold_as '2026-10-12T11:30:00Z#0'
-adapter raise TQ "$long_title" "$long_reason" release >/dev/null 2>&1 || fail "a long reason and long title raised no card"
-hold_as '2026-10-12T11:40:00Z#0'
-adapter raise TQ "$long_title" 'Let TakeOne use the MiniMax key for its live proof?' release >/dev/null 2>&1 \
-  || fail "a re-hold with a short question raised no card"
-jq -e --arg r "$long_reason" '[.[]] as $c | ($c | length) == 2
-  and ($c | map(select(.title == "Capture account planner for the TakeOne live proof run with the spare?")) | length) == 1
-  and ($c | map(select(.title == "Let TakeOne use the MiniMax key for its live proof?")) | length) == 1
-  and ($c | map(select(.about == $r)) | length) == 1' "$SIGNOFF_BOARD" >/dev/null \
-  || fail "the card question did not follow the 12-word rule: $(cat "$SIGNOFF_BOARD")"
-pass "the card question is the hold reason when it is one short question, else the title cut to 12 words; a re-hold uses its new reason"
-
 rm -f "$HOLD_FILE" "$SIGNOFF_BOARD" "$FM_HOME_DIR/state/signoff-delivered"
 printf '{}\n' > "$SIGNOFF_BOARD"
 hold_as '2026-10-12T12:00:00Z#0'
@@ -195,15 +193,21 @@ beads_probe() {
   (cd "$base/home" && tasks-axi list) >/dev/null 2>&1
 }
 
+BEADS_AVAILABLE=yes
 if [ -z "$TASKS_AXI_BIN" ] || ! command -v bd >/dev/null 2>&1 || ! beads_probe; then
-  pass "skipped the real-hold section: no beads-capable tasks-axi and bd on this machine"
-  echo "all fm-procevent-signoff tests passed"
-  exit 0
+  BEADS_AVAILABLE=no
+  echo "using markdown for the real-hold journey: beads is unavailable"
 fi
 
 make_beads_home() {  # <name>; prints the fixture home
   local base="$TMP_ROOT/$1" home graph
   home="$base/home"
+  if [ "$BEADS_AVAILABLE" = no ]; then
+    mkdir -p "$home/data" "$home/config" "$home/projects" "$home/state"
+    fm_test_tasks_toml "$home/.tasks.toml"
+    printf '%s\n' "$home"
+    return
+  fi
   graph="$base/fm"
   mkdir -p "$home/data" "$home/config" "$home/projects" "$home/state" "$graph"
   git init -q "$graph"
@@ -217,7 +221,7 @@ real_env() {  # <home> <command args...>; the real adapter, hold, runner and int
   shift
   PATH="$FAKEBIN:$PATH" REAL_TASKS_AXI="$TASKS_AXI_BIN" FM_CODE_ROOT="$ROOT" \
     FM_STATE_OVERRIDE="$home/state" FM_HOME="$home" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" FM_PROCEVENT_CLAIM_ROOT="$home/claims" "$@"
+    FM_ADDONS_DIR="$ADDONS" FM_CONFIG_OVERRIDE="$home/config" FM_PROCEVENT_CLAIM_ROOT="$home/claims" "$@"
 }
 
 fm_fake_exit0 "$FAKEBIN" tmux treehouse no-mistakes gh gh-axi
@@ -233,6 +237,12 @@ real_env "$real_home" "$ADAPTER" arm >/dev/null \
 board_count() { jq 'length' "$SIGNOFF_BOARD"; }
 card_for() { jq -r --arg t "$1" 'to_entries[] | select(.value.title == $t) | .key' "$SIGNOFF_BOARD"; }
 
+if real_env "$real_home" "$ROOT/bin/fm-captain-hold.sh" hold fm-sample-team --title 'Main picks' --reason 'Needs a key from Main' >/dev/null 2>&1; then
+  fail 'the real hold caller posted a team call without an authored owner ask'
+fi
+[ "$(board_count)" = 0 ] || fail 'the real hold caller leaked a team card'
+author "$real_home" fm-sample-q 'Can you sign in to the release account?'
+author "$real_home" fm-sample-work 'Can you sign in to the test account?'
 real_env "$real_home" "$ROOT/bin/fm-captain-hold.sh" hold fm-sample-q \
   --title "Pick the route" --reason "Which route?" >/dev/null \
   || fail "the captain question was not held"
@@ -245,15 +255,15 @@ real_env "$real_home" "$ROOT/bin/fm-captain-hold.sh" hold fm-sample-later \
   || fail "the dated deferral was not held"
 [ "$(board_count)" = "$before" ] || fail "a dated deferral raised a card: $(cat "$SIGNOFF_BOARD")"
 
-q=$(card_for "Which route?")
+q=$(card_for "Can you sign in to the release account?")
 [ -n "$q" ] || fail "the held question raised no card: $(cat "$SIGNOFF_BOARD")"
-jq -e --arg k "$q" '.[$k] | .about == "Which route?" and .close == "done"' "$SIGNOFF_BOARD" >/dev/null \
+jq -e --arg k "$q" '.[$k] | .about == "The release account needs your sign in.\nPublishing waits for your account access.\nThe release checks passed." and .close == "done"' "$SIGNOFF_BOARD" >/dev/null \
   || fail "the question card lost its reason or close: $(cat "$SIGNOFF_BOARD")"
-w=$(card_for "Gated work?")
+w=$(card_for "Can you sign in to the test account?")
 [ -n "$w" ] || fail "the held existing work item raised no card: $(cat "$SIGNOFF_BOARD")"
-jq -e --arg k "$w" '.[$k] | .about == "captain approves the work" and .close == "release"' "$SIGNOFF_BOARD" >/dev/null \
+jq -e --arg k "$w" '.[$k] | .about == "The release account needs your sign in.\nPublishing waits for your account access.\nThe release checks passed." and .close == "release"' "$SIGNOFF_BOARD" >/dev/null \
   || fail "the work card lost its reason or close: $(cat "$SIGNOFF_BOARD")"
-pass "a new question raises a done card and an existing work item a release card, each with its title and reason; a dated deferral raises none"
+pass "a new question raises a done card and an existing work item a release card, each with authored context; raw backlog titles are never published; a dated deferral raises none"
 
 jq --arg k "$q" '.[$k] += {answer: "reconcile", label: "", close: "done", at: "2026-10-12T23:00:00Z"}' \
   "$SIGNOFF_BOARD" > "$SIGNOFF_BOARD.tmp" && mv "$SIGNOFF_BOARD.tmp" "$SIGNOFF_BOARD"
