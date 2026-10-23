@@ -2,7 +2,8 @@
 // captain, Done, On hold - filtered by project and release, or the open items in release lanes (Next release, After,
 // Later); a phone shows one column at a time. Waiting on captain is the ask list
 // and nothing else, so its count is the Needs you count everywhere. A card opens the ticket page: its description, the
-// captain's words it serves, its fields and, for a live lane, the lane's status lines as its thread.
+// captain's words it serves, its fields and its thread: the captain's comments with the lead's answers and, for a live
+// lane, the lane's status lines.
 import { html, useState, useEffect, useRef, now, dur, hm, prNum, toCol, hc, hname, I, IC, ASK_TAG, askType, askOrder } from './ui.js'
 import { squash, Entry } from './board.js'
 
@@ -41,31 +42,24 @@ function Ticket({ d, t, go }) {
       ${n ? html`<a class="pill pr" href=${t.pr} target="_blank" rel="noreferrer" onClick=${e => e.stopPropagation()}>${I(IC.pr, 12)}${n}</a>` : ''}</div></article>`
 }
 
-// A comment goes to the ticket's lead as a steer. The server takes it only with this device's comment token, which the
-// captain pastes once from state/dashboard/comment-token on the dashboard host; the browser keeps it.
-const TOKEN = 'fm-comment-token'
+// A comment goes to the ticket's lead as a steer. The server takes it only from a device that opened the owner's
+// sign-off board link at this address, whose cookie this page never sees.
 function Comment({ t, onSent }) {
-  const [text, setText] = useState(''), [ask, setAsk] = useState(false), [note, setNote] = useState(''), [busy, setBusy] = useState(false)
-  let saved = ''
-  try { saved = localStorage.getItem(TOKEN) || '' } catch {}
+  const [text, setText] = useState(''), [note, setNote] = useState(''), [busy, setBusy] = useState(false)
   async function send(e) {
     e.preventDefault()
-    const tok = ask ? e.target.token.value.trim() : saved
-    if (!tok) return setAsk(true)
     setBusy(true)
     try {
-      const r = await fetch('comment', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Comment-Token': tok }, body: JSON.stringify({ ticket: t.id, text }) })
+      const r = await fetch('comment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticket: t.id, text }) })
       const a = await r.json().catch(() => ({ error: `the dashboard server answered ${r.status}` }))
-      if (r.status === 401) { try { localStorage.removeItem(TOKEN) } catch {} setAsk(true); return setNote('That token was not accepted. Paste the current one.') }
       if (!r.ok) return setNote(a.error || `the dashboard server answered ${r.status}`)
-      try { localStorage.setItem(TOKEN, tok) } catch {}
-      onSent({ at: Math.floor(Date.now() / 1000), text: text.trim(), to: a.to }); setText(''); setAsk(false); setNote('')
+      onSent({ at: Math.floor(Date.now() / 1000), text: text.trim(), to: a.to }); setText(''); setNote('')
     } catch (err) { setNote(`Not sent: ${err.message || err}`) } finally { setBusy(false) }
   }
   return html`<form class="tk-say" onSubmit=${send}><textarea aria-label="Comment" placeholder=${t.home === 'main' ? 'Comment to Main…' : `Comment to the ${t.home} lead…`} maxlength="1000" rows="2" value=${text} onInput=${e => setText(e.target.value)}></textarea>
-    ${ask ? html`<label>Comment token for this device<input name="token" type="password" autocomplete="off" placeholder="from state/dashboard/comment-token on the dashboard host"/></label>` : ''}
-    <div class="row"><small role="status">${note || 'Goes to the owning lead as a steer'}</small><span class="sp"></span><button class="btn" type="submit" disabled=${busy || !text.trim()}>${ask ? 'Save and send' : 'Send'}</button></div></form>`
+    <div class="row"><small role="status">${note || 'Goes to the owning lead as a steer'}</small><span class="sp"></span><button class="btn" type="submit" disabled=${busy || !text.trim()}>Send</button></div></form>`
 }
+const lead = (d, h) => h === 'main' ? 'Main' : `${hname(d, h)} lead`
 function TicketPage({ d, t, go }) {
   const c = d.cards.find(x => x.id === t.id), n = prNum(t.pr), close = () => go({ ticket: null }), ref = useRef(), [sent, setSent] = useState([])
   // a comment shows at once; the build's copy replaces it on the next refresh
@@ -81,9 +75,11 @@ function TicketPage({ d, t, go }) {
         ${P('Owner', html`<span class="pill"><span class="sq" style=${{ '--c': hc(d, t.home) }}></span>${hname(d, t.home)}</span>`)}
         ${P('Pull request', n && html`<a class="pill pr" href=${t.pr} target="_blank" rel="noreferrer">${I(IC.pr, 12)}#${n}</a>`)}
         ${P('Last update', html`<span class="num">${ago(t.updated)}</span>${typeof t.updated === 'number' ? html`<small>${hm(t.updated)}</small>` : ''}`)}</dl>
-      <div class="h4">Activity</div><${Comment} t=${t} onSent=${x => setSent([...sent, x])}/>${c?.history.length || said.length ? html`<ul class="act">${[...said.map(x => ({ ...x, mine: true })), ...squash(c?.history || [])]
-        .sort((a, b) => (b.at || 0) - (a.at || 0)).map(x => x.mine ? html`<li class="mine"><b class=${x.error ? 'bad' : 'ok'}></b><div><div class="h"><strong>You</strong><span class="sp"></span><span class="num">${hm(x.at)}</span></div>
-          <p>${x.text}</p><small>${x.error ? `Not delivered: ${x.error}` : x.to === 'main' ? 'Sent to Main' : `Sent to the ${x.to} lead as a steer`}</small></div></li>` : html`<${Entry} x=${x}/>`)}</ul>`
+      <div class="h4">Activity</div><${Comment} t=${t} onSent=${x => setSent([...sent, x])}/>${c?.history.length || said.length ? html`<ul class="act">${[...said.flatMap(x => [{ ...x, mine: true }, ...(x.picked ? [{ at: x.picked, by: x.to, text: 'Picked up your comment', answer: true }] : []),
+          ...(x.replies || []).map(y => ({ ...y, at: y.at || x.at, answer: true }))]), ...squash(c?.history || [])]
+        .sort((a, b) => (b.at || 0) - (a.at || 0)).map(x => x.answer ? html`<li class="mine"><b class="ok"></b><div><div class="h"><strong>${lead(d, x.by)}</strong><span class="sp"></span><span class="num">${hm(x.at)}</span></div><p>${x.text}</p></div></li>`
+          : x.mine ? html`<li class="mine"><b class=${x.error ? 'bad' : 'ok'}></b><div><div class="h"><strong>You</strong><span class="sp"></span><span class="num">${hm(x.at)}</span></div>
+          <p>${x.text}</p><small>${x.error ? `Not delivered: ${x.error}` : x.to === 'main' ? 'Sent to Main' : `Sent to the ${lead(d, x.to)} as a steer`}</small></div></li>` : html`<${Entry} x=${x}/>`)}</ul>`
         : html`<p class="empty">No status lines yet: the thread starts when a lane works on it.</p>`}
     </div></aside>`
 }
