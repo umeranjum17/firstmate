@@ -23,6 +23,8 @@ description: Verify firstmate-addons changes through their executable integratio
 - Sign-off hold card: run `FM_CODE_ROOT=<Firstmate checkout> bash signoff/tests/fm-procevent-signoff.test.sh`; it uses a stub sign-off-axi that rejects a raise without `--ask-ref` (the real VALIDATION_ERROR), proves a hold raises its card with the hold task id as ask reference, and never touches a real board.
 - Task priority check: run `bash task-priority/tests/task-priority.test.sh`; it installs the check into a throwaway `XDG_DATA_HOME`, proves a task add without `--priority 0-3` is refused naming the flag, that a priority passes with release `later`, and that an explicit `release:` line is kept.
 
+- Pool accounts for tools: run `done-done run pool-tool-account` (`bash account-pool/run-tool-proof.sh`); a fixture pool selects Umer, the installed done-done judge backend spawns a stub Claude, and its recorded `CLAUDE_CONFIG_DIR` must equal the pick. No login or model call. Also run `bash merge-card/tests/merge-card-e2e.sh` for cached-pick fallback with age, a loud failure without cache, and no ambient judge launch.
+
 ## Procedure
 
 Run the feature's integration journey from the repository root and save its output under done-done's run evidence directory.

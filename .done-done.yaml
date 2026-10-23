@@ -25,3 +25,5 @@ journeys:
     command: bash merge-card/run-retitle-proof.sh > "$DONE_DONE_EVIDENCE_ROOT/${RUN_ID}.log" 2>&1
   fleet-contract-check:
     command: bash fleet-contract-check/run-proof.sh
+  pool-tool-account:
+    command: bash account-pool/run-tool-proof.sh

@@ -37,6 +37,10 @@
 #     Exit 0 when the merge declares `screen: none`, or when the task folder holds a sealed clean
 #     done-done run at <head>, there or in done-done's own evidence root (the card's passed-test receipt). Used by owner-rules' merge gate.
 #     sign-off-axi writes the board under its lock: it appends and never rewrites other cards.
+# The done-done check runs as the pool's claude account when the home has one
+# (config/account-pool): the check's env carries that account's profile folder in
+# CLAUDE_CONFIG_DIR and the pool's login variables unset, so the judge never answers on
+# the default login. Failed reads use a last good pick or report that no judge ran.
 # Needs done-done on PATH (0.3.1+ cites the task folder's evidence itself; an older one is
 # still covered), sign-off-axi, jq and gh.
 set -u
@@ -69,6 +73,16 @@ resolve_evidence() {
     else . end'
 }
 
+# shellcheck source=account-pool/bin/fm-pool-claude-env.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/account-pool/bin/fm-pool-claude-env.sh"
+
+# The executable selects before capturing judge JSON, keeping diagnostics out of it.
+pool_env_run() {
+  local wt=$1
+  shift
+  ( cd "$wt" && "$@" )
+}
+
 # check [--claim-id <id>] [--judge <route>] <task-id> <worktree|-> <head|-> <pr-url|->: run done-done, save and print the verdict.
 check() {
   local claim_id=() judge=()
@@ -89,9 +103,14 @@ check() {
     # an older one rejects the flag and resolves against its cwd, so probe once (offline, cheap)
     # and, on the older one, hand it the Checks block with its names already resolved, on stdin.
     dd_v=$(done-done --version 2>/dev/null | head -n 1)
-    if done-done check --help 2>&1 | grep -q -- '--citation-base' ||
+    # The judge is a claude caller: it takes its account from the pool pick, so a
+    # rate-limited default login cannot answer for the merge.
+    if ! fm_pool_claude_env; then
+      rc=2
+      out='pool: no usable account; judge was not started'
+    elif done-done check --help 2>&1 | grep -q -- '--citation-base' ||
        version_at_least "$dd_v" 0.3.1; then
-      out=$(cd "$wt" && done-done check --from "$src" --json --citation-base "$FM_HOME/data/$id" "${judge[@]}" "${claim_id[@]}" 2>&1) || rc=$?
+      out=$(pool_env_run "$wt" done-done check --from "$src" --json --citation-base "$FM_HOME/data/$id" "${judge[@]}" "${claim_id[@]}" 2>&1) || rc=$?
     else
       args=()
       if [ "$pr" = - ]; then
@@ -105,7 +124,7 @@ check() {
       fi
       [ "$pr" != - ] || args=("${claim_id[@]}")
       if [ "$rc" = 0 ]; then
-        out=$(cd "$wt" && resolve_evidence "$FM_HOME/data/$id" <<<"$body" | done-done check --from - "${args[@]}" "${judge[@]}" --json 2>&1) || rc=$?
+        out=$(resolve_evidence "$FM_HOME/data/$id" <<<"$body" | pool_env_run "$wt" done-done check --from - "${args[@]}" "${judge[@]}" --json 2>&1) || rc=$?
       else
         out=$body
       fi
