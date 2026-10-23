@@ -9,7 +9,7 @@
 # (tickets.js: every backlog item as a card in To do, In progress, In review, Done or On hold, with its
 # P0-P3 priority, target release, owner home and pull request, the ask list as Waiting on captain,
 # filtered by project and release, or the open items in Next release, After and Later lanes; a phone shows one column at a time; a card opens its ticket page with the description,
-# the captain's words it serves and the lane's status lines); Overview
+# the captain's words it serves with the Main message that carried them, the lane's proof and its status lines); Overview
 # (five key figures, where Stuck, Lanes open and Ready also show their change since yesterday and
 # a day's trend; the lifecycle, every open lane by stage split into moving, waiting and stuck, then
 # landings, each stage opening the Board filtered to it (To land opens To merge); time in stage, each open lane by its
@@ -111,7 +111,8 @@
 #   <proc> is FM_DASHBOARD_PROC (default /proc), <locks> FM_DEVICE_LOCK_DIR (default /tmp);
 #   FM_EMU_MAX, FM_GRADLE_MAX, FM_MEM_MIN_GB (defaults 2, 2, 12) mirror the memory gate's caps
 # All day comparisons use the host timezone. A build writes only under state/dashboard:
-# HTML, data.json, board.json, filed.json (observed open-item filing days, kept 15 days), and
+# HTML, data.json, board.json, filed.json (observed open-item filing days, kept 15 days), full-text.json (the whole
+# title and body of each backlog item tasks-axi list cuts, from show --full, kept while the item stays cut), and
 # history.tsv (lane, stuck and ready counts sampled every 10 minutes, kept 8 days).
 # .cache.lock serializes cache updates across builds.
 #
@@ -360,6 +361,7 @@ import fcntl, hashlib, html, json, math, os, re, shutil, subprocess, sys, time
 BUILD_STARTED = time.monotonic()
 from urllib.parse import urlsplit
 from datetime import date, datetime, timedelta
+from concurrent.futures import ThreadPoolExecutor
 
 HOME, STATE_DIR, OUT, BIN, MAX_AGE = sys.argv[1:6]
 MAX_AGE = int(MAX_AGE)
@@ -610,7 +612,6 @@ for h, d in sorted(home_dir.items()):
     if rows is None:
         backlog[h] = None; notes.append(('backlog', f'{h}: {err or "no task table in its output"}')); continue
     for r in rows:
-        r['title'] = clean(r.get('title'))
         r['day'] = iso_day(r.get('created'))
         r['class'] = ('held' if r.get('held') == 'yes' else 'waiting' if r.get('blocked') == 'yes' else 'ready') if r.get('state') == 'queued' else None
     backlog[h] = rows
@@ -642,6 +643,32 @@ def save_json(p, v):
         with open(p + f'.tmp.{os.getpid()}', 'w') as f: json.dump(v, f)
         os.replace(p + f'.tmp.{os.getpid()}', p)
     except OSError: pass  # no cache only means the next build reads again
+# tasks-axi list cuts a long title or body ("... (truncated, N chars total"); show --full gives the whole text. It is
+# cached by the cut text in full-text.json, so an unchanged item costs no call on the next build.
+CUT = '\n... (truncated, '
+def show_full(h, task):  # {title, body} of one backlog item, or None when show fails
+    out, _ = probe(['bash', os.path.join(BIN, 'fm-tasks-axi.sh'), 'show', task, '--full'], timeout=10, env=dict(os.environ, FM_HOME=home_dir[h]))
+    f = {}
+    for l in (out or '').splitlines():
+        m = re.match(r'^  (title|body): (.*)$', l)
+        if m: f[m[1]] = json.loads(m[2]) if m[2].startswith('"') else m[2]
+    return f if 'title' in f else None
+cut_rows = [(h, r) for h, rows in backlog.items() for r in rows or [] if CUT in f"{r.get('title')}{r.get('body')}"]
+def cut_key(h, r): return hashlib.sha1(f"{h}\t{r['id']}\t{r.get('title')}\t{r.get('body')}".encode()).hexdigest()
+with open(os.path.join(STATE_DIR, '.cache.lock'), 'a') as cache_lock:
+    fcntl.flock(cache_lock, fcntl.LOCK_EX)
+    FULL = os.path.join(STATE_DIR, 'full-text.json')
+    full = load_json(FULL)
+    miss = [(h, r) for h, r in cut_rows if cut_key(h, r) not in full]
+    with ThreadPoolExecutor(8) as pool:
+        for (h, r), f in zip(miss, pool.map(lambda x: show_full(x[0], x[1]['id']), miss)):
+            if f: full[cut_key(h, r)] = f
+    full = {k: full[k] for k in {cut_key(h, r) for h, r in cut_rows} if k in full}  # only items still cut
+    save_json(FULL, full)
+for h, r in cut_rows:
+    if (f := full.get(cut_key(h, r))): r['title'], r['body'] = f['title'], f.get('body', r.get('body'))
+for rows in backlog.values():
+    for r in rows or []: r['title'] = clean(r.get('title'))
 def midnight(d): return datetime.combine(d, datetime.min.time()).astimezone().timestamp()
 def when(ts):  # 14:05 today, Thu 08:05 this week, else 07 Oct 14:05
     t = datetime.fromtimestamp(ts).astimezone()
@@ -1729,7 +1756,8 @@ WAIT_VERBS = {'blocked': ('blocked', 'failed'), 'decision': ('needs-decision', '
 WAIT_VERBS['parked'] = WAIT_VERBS['decision']
 TAGS = re.compile(r'^(?:\[[\w-]+\]\s*)+')
 def plain(title):  # a lane or ticket name without its leading [tags], Main message refs or a trailing PR number
-    t = re.sub(r'\s*\(Main\d+[^)]*\)|\bMain\d+:?\s*|\s+PR \d+$', '', TAGS.sub('', title)).strip()
+    t = re.sub(r'\s*\(Main\d+[^)]*\)|^\s*Main\d+:?\s*|\s+PR \d+$', '', TAGS.sub('', title)).strip()
+    t = re.sub(r'\bMain\d+\b', 'Main', t)  # mid-sentence ("approved by Main42") the ref reads as Main
     return title if not t else t if t == title else t[0].upper() + t[1:]  # a name cut at its front starts a sentence
 def card(h, task, kind, title, stage, **kw):
     d = {} if stage == 'queued' else dispatch(h, task, kw['since']) if stage == 'landed' else dispatch(h, task)
@@ -1786,15 +1814,23 @@ for h in ACTIVE:
 # the captain. The name drops leading [tags] and Main message refs; a [captain-ask] tag marks the item asked.
 RELEASE = re.compile(r'^\s*release:\s*(\S.*?)\s*$', re.M | re.I)
 # The description is the body in plain words without the hold and release bookkeeping lines; the ask it serves is
-# the first quote near the word captain, with the day written beside it.
+# the first quote near the word captain, with the day written beside it and the Main message that carried it. Proof is
+# the lane's completion receipt (state/<task>.run-receipt.json) and the done-done verdict on its merge card.
 BOOKKEEPING = re.compile(r'^\s*(?:(?:captain hold (?:set|origin)|resolution (?:recorded|mode)|decision digest|origin|release)\b.*$|type:(?: [\w -]+?:)?\s*)', re.M | re.I)
 ASKED = re.compile(r'captain\b[^"\n]{0,48}?(?:(\d{1,2} [A-Z][a-z]{2})[^"\n]{0,24})?"([^"]{12,})"(?:\s*\((\d{1,2} [A-Z][a-z]{2})\b)?', re.I)
-def describe(body, ask, cut):  # the body without bookkeeping, the quoted ask itself or Main message refs; a cut one ends in …
-    text = body[:ask.start()] + re.sub(r'^\s*\([^()]*\)', '', body[ask.end(2) + 1:]) if ask else body
+def describe(body, ask, cut):  # the body without bookkeeping, the sentence quoting the ask or Main message refs; a cut one ends in …
+    text = ' '.join(filter(None, (re.sub(r'[^.\n]*$', '', body[:ask.start()]).rstrip(' \t'), re.sub(r'^[^.\n]*\.?[ \t]*', '', body[ask.end(2) + 1:])))) if ask else body
     text = re.sub(r'\bMain\d+\b', 'Main', re.sub(r'\s*\([^()]*\bMain\d+[^()]*\)', '', BOOKKEEPING.sub('', text)))
     text = re.sub(r'(?m)^\s*(?:[A-Z][\w ]{0,30}:)?[\s.,;:)]*$', '', text)  # a label or punctuation the cuts left alone on its line
     text = re.sub(r'^[\s.,;:)]+', '', prose(re.sub(r'\n{3,}', '\n\n', text))).strip()
     return re.sub(r'\s+\S*$', '', text[:480]) + '…' if cut or len(text) > 480 else text
+def proof(h, task):  # the lane's completion receipt and the done-done check its merge card recorded, when either exists
+    if h in remote_hosts: return None
+    rc = load_json(os.path.join(home_dir[h], 'state', task + '.run-receipt.json'))
+    mc = load_json(os.path.join(home_dir[h], 'data', task, 'merge-card.json'))
+    if rc.get('verdict') not in ('PASS', 'FAIL') and not isinstance(mc.get('verdict'), str): return None
+    return dict(receipt=rc.get('verdict') if rc.get('verdict') in ('PASS', 'FAIL') else None, head=(rc.get('head') or '')[:7] or None,
+                at=rc.get('at') if isinstance(rc.get('at'), int) else None, check=mc.get('verdict') if isinstance(mc.get('verdict'), str) else None)
 def ticket(h, r):
     c = next((c for c in cards if c['id'] == f"{h}/{r['id']}"), {})
     merged_pr = next((u for u, (_, mh, mt) in merges.items() if (mh, mt) == (h, r['id'])), None)
@@ -1804,7 +1840,7 @@ def ticket(h, r):
     tags = TAGS.match(r['title'])
     seen = [x['at'] for x in c.get('history', []) if x['at']]
     day = next((d for d in (r.get('closed'), r.get('created')) if re.fullmatch(r'\d{4}-\d\d-\d\d', d or '')), None)
-    body, cut, _ = (r.get('body') or '').partition('\n... (truncated, ')  # a long body is cut: its last line may be partial
+    body, cut, _ = (r.get('body') or '').partition(CUT)  # a body show --full could not fill is cut: its last line may be partial
     rel = RELEASE.search(body[:body.rfind('\n') + 1] if cut else body)
     ask = ASKED.search(body)
     return dict(id=f"{h}/{r['id']}", home=h, task=r['id'], project=None if r.get('repo') in (None, '', '-') else r['repo'],
@@ -1812,7 +1848,8 @@ def ticket(h, r):
                 asked='captain-ask' in (tags.group() if tags else ''), priority=int(r['priority']) if str(r.get('priority')).isdigit() else None,
                 release=rel.group(1) if rel else 'later', state=st, pr=c.get('pr') or merged_pr or (link.group() if link else None),
                 updated=max(seen) if seen else c.get('started') or day, desc=describe(body, ask, bool(cut)),
-                ask=dict(words=ask.group(2), day=ask.group(1) or ask.group(3)) if ask else None)
+                ask=dict(words=ask.group(2), day=ask.group(1) or ask.group(3), ref=ref.group() if (ref := re.search(r'\bMain\d+\b', body[ask.start():ask.end() + 40])) else None)
+                if ask else None, proof=proof(h, r['id']))
 said = {}  # the captain's comments from the dashboard, by ticket, oldest first, each with the answers it got
 try:
     for l in open(os.path.join(STATE_DIR, 'comments.jsonl'), encoding='utf-8', errors='replace'):
