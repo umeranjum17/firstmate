@@ -145,7 +145,7 @@ EOF
   printf '#!/bin/sh\nprintf "MemoryCurrent=0\\nMemoryHigh=34359738368\\nMemoryMax=40802189312\\n"\n' > "$stubs/systemctl"
   mkdir -p "$home/proc/pressure"
   printf 'MemTotal: 67108864 kB\nMemAvailable: 33554432 kB\n' > "$home/proc/meminfo"
-  printf 'some avg10=0.00\n' > "$home/proc/pressure/memory"
+  printf 'some avg10=0.00 avg60=0.00 avg300=0.00 total=0\n' > "$home/proc/pressure/memory"
   : > "$home/proc/locks"
   mkdir -p "$home/locks"
   chmod +x "$stubs/herdr" "$stubs/adb" "$stubs/pgrep" "$stubs/systemctl" "$stubs/quota-axi"
@@ -354,7 +354,7 @@ EOF
   has "$d/index.html" "In use 1" "Free 1" "Devices 1 + 1 = 2" \
     "Phone Pixel 9 Free · last used by Main 10 min ago · PHONE1 · USB" \
     "Emulator test-avd In use by Main · 10 min · emulator-5554 · 4.0 GB in use" \
-    "Free memory 10.0 GB of 64 GB" "Memory pressure 4% share of the last 10 s" "Heavy jobs 8.0 GB of 32 GB" "hard limit 38 GB" \
+    "Free memory 10.0 GB of 64 GB" "Memory pressure 4% share of time some job waited on memory, the lower of the 10 s and 60 s averages" "Heavy jobs 8.0 GB of 32 GB" "hard limit 38 GB" \
     "Gradle builds 2 of 2" "Emulators 1 of 2" "✕ 10 GB free, heavy jobs wait" "▲ 2/2 Gradle builds at cap" \
     "Pressure peak, last hour 41%" "Swap used 4.0 GB" "new agents wait (Main)" "nope-mem"
   lacks "$d/index.html" "Pressure peak, last hour 88%"
@@ -368,12 +368,18 @@ EOF
   has "$d/index.html" "Problem 1" "In use 1" "Free 1" "Devices 1 + 1 + 1 = 3" "Lock muxr-emu"
   jq -e '.metrics.devices.value == 3 and .metrics.connected_devices.value == 1 and .metrics.device_groups.value.action == {"Problem":1,"In use":1,"Free":1} and (.devices | length) == 3' "$d/data.json" >/dev/null || fail "offline devices or unmatched locks disappeared from JSON"
   printf '#!/bin/sh\n[ -e "%s/adb.fail" ] && { echo "error: daemon not running" >&2; exit 1; }\ncat "%s/adb-output"\n' "$home" "$home" > "$bin/adb"
-  # Memory pressure is one number, the gate's 10 s share, in the chip and the card alike.
+  # Memory pressure is one number, the gate's own sustained reading (the lower of avg10 and avg60), in the chip,
+  # the card and data.json alike: a 10 s spike the gate lets pass waits nobody.
   printf 'MemTotal:       67108864 kB\nMemAvailable:   20971520 kB\n' > "$proc/meminfo"
   printf 'some avg10=45.00 avg60=8.00 avg300=12.00 total=1\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n' > "$proc/pressure/memory"
   build "$home" FM_DASHBOARD_PROC="$proc" FM_DEVICE_LOCK_DIR="$locks"
-  has "$d/index.html" "✕ 45% memory pressure, heavy jobs wait" "Memory pressure 45%"
-  lacks "$d/index.html" "12%"
+  has "$d/index.html" "Memory pressure 8%"
+  lacks "$d/index.html" "memory pressure, heavy jobs wait" "45%" "12%"
+  jq -e '.metrics.memory_pressure.value == 8' "$d/data.json" >/dev/null || fail "data.json memory pressure is not the gate's sustained reading: $(jq -c .metrics.memory_pressure "$d/data.json")"
+  printf 'some avg10=45.00 avg60=42.00 avg300=12.00 total=1\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n' > "$proc/pressure/memory"
+  build "$home" FM_DASHBOARD_PROC="$proc" FM_DEVICE_LOCK_DIR="$locks"
+  has "$d/index.html" "✕ 42% memory pressure, heavy jobs wait" "Memory pressure 42%"
+  lacks "$d/index.html" "45%"
   rm "$proc/locks"
   build "$home" FM_DASHBOARD_PROC="$proc"
   has "$d/index.html" "Unknown 2"

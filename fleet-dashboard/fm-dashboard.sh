@@ -101,8 +101,8 @@
 #   pgrep -a '^qemu-system'         running emulators (-avd, -port; VmRSS from <proc>/<pid>/status)
 #   pgrep -cf 'appname=gradle[w]'   Gradle builds, counted as config/fm-mem-gate.sh counts them
 #   systemctl --user show fm-heavy.slice   MemoryCurrent, MemoryHigh, MemoryMax
-#   <proc>/meminfo, <proc>/pressure/memory   MemAvailable; "some avg10", the memory gate's own
-#                                   pressure, the one pressure number on every page
+#   <proc>/meminfo, <proc>/pressure/memory   MemAvailable; the lower of "some avg10" and "avg60", the memory
+#                                   gate's own sustained pressure, the one pressure number on every page
 #   <locks>/fm-phone-<name>.lock + <proc>/locks   who holds a device now (flock by inode);
 #   <locks>/fm-device-lock.log      the holder's pid, time and cwd, mapped to its home by
 #                                   each home's state/*.meta worktree=, tasktmp= or task id;
@@ -846,9 +846,10 @@ def machine():
     kv = dict(re.findall(r'^(\w+):\s+(\d+)', t or '', re.M))
     m['free'] = (gb(int(kv['MemAvailable'])), gb(int(kv['MemTotal']))) if 'MemAvailable' in kv and 'MemTotal' in kv else None
     m['free_why'] = err or 'no MemAvailable in meminfo'
+    # The memory gate's own reading: the lower of "some" avg10 and avg60, so a 10-30 s spike does not count.
     t, err = read('pressure/memory')
-    p = re.search(r'^some avg10=([0-9.]+)', t or '', re.M)
-    m['pressure'], m['pressure_why'] = (float(p.group(1)) if p else None), err or 'no "some avg10" line'
+    p = re.search(r'^some avg10=([0-9.]+) avg60=([0-9.]+)', t or '', re.M)
+    m['pressure'], m['pressure_why'] = (min(float(p[1]), float(p[2])) if p else None), err or 'no "some avg10 avg60" line'
     m['swap'] = gb(int(kv['SwapTotal']) - int(kv['SwapFree'])) if 'SwapTotal' in kv and 'SwapFree' in kv else None
     # Use the independent sampler's history (bin/fm-host-memory-sampler.sh), not the dashboard's refresh cadence.
     try:
@@ -1134,7 +1135,7 @@ machine_rows = ''.join([
     meter('Free memory', f'{free[0]:.1f} GB <small>of {free[1]:.0f} GB</small>', free[0] / free[1] if free[1] else None,
           'bad' if free[0] < MEM_MIN_GB else 'ok', f'heavy jobs wait below {MEM_MIN_GB} GB')
     if free else meter('Free memory', unknown(mach['free_why']), None, ''),
-    meter('Memory pressure', f'{psi:.0f}%', psi / 100, psi_tone(psi), 'share of the last 10 s some job waited on memory; heavy jobs wait at 40% or more')
+    meter('Memory pressure', f'{psi:.0f}%', psi / 100, psi_tone(psi), 'share of time some job waited on memory, the lower of the 10 s and 60 s averages as the memory gate reads it; heavy jobs wait at 40% or more')
     if psi is not None else meter('Memory pressure', unknown(mach['pressure_why']), None, ''),
     meter('Pressure peak, last hour', f'{mach["peak"]:.0f}%', mach['peak'] / 100, psi_tone(mach['peak']),
           'highest sustained share (lower of 10 s and 60 s averages) the watcher recorded; config/host-memory sets when new agents wait and when an alert goes out')
@@ -1561,7 +1562,7 @@ METRICS = [  # each number's one definition: id, name, what it counts, source, w
     ('leads', 'Lead state', 'what each lead home last published about itself; silent after 15 minutes without a new one',
      "each home's own summary, and Main's view of which leads are not running", 'now', 'every build'),
     ('machine', 'Machine and devices', 'free memory, memory pressure, heavy jobs, Gradle builds, emulators and who holds each device', 'this host and adb, read-only',
-     'now; memory pressure is the share of the last 10 seconds some job waited on memory, the memory gate\'s own rule', 'every build'),
+     'now; memory pressure is the share of time some job waited on memory, the lower of the 10 and 60 second averages, the memory gate\'s own rule', 'every build'),
 ]
 def measure_body():
     defs = ''.join(f'<div class="def" id="m-{i}"><h3>{esc(n)}</h3><dl><dt>Counts</dt><dd>{esc(c)}</dd><dt>Source</dt><dd>{esc(src)}</dd>'

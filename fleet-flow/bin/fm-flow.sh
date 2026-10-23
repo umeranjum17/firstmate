@@ -444,8 +444,9 @@ def machine_capacity():
     memory = {k: int(m[1]) * 1024 if (m := re.search(r'^' + k + r':\s+(\d+) kB$', mem, re.M)) else None
               for k in ('MemTotal', 'MemAvailable', 'SwapTotal', 'SwapFree')}
     pressure = '\n'.join(read(Path('/proc/pressure/memory')) or [])
-    psi = re.search(r'^some avg10=(\d+(?:\.\d+)?)\b', pressure, re.M)
-    psi = float(psi[1]) if psi else None
+    # The memory gate's sustained reading: the lower of "some" avg10 and avg60.
+    psi = re.search(r'^some avg10=(\d+(?:\.\d+)?) avg60=(\d+(?:\.\d+)?)\b', pressure, re.M)
+    psi = min(float(psi[1]), float(psi[2])) if psi else None
     jobs, complete = [], True
     try:
         processes = sorted(p for p in Path('/proc').iterdir() if p.name.isdigit())
@@ -584,7 +585,7 @@ print(json.dumps(out))"""
             notes.append({'source': 'Mac SSH probe', 'reason': str(err)})
     else:
         notes.append({'source': 'FM_MAC_HOST', 'reason': 'Mac probe not configured or target invalid'})
-    return dict(observed_at=int(time.time()), memory_bytes=memory, memory_some_avg10_percent=psi,
+    return dict(observed_at=int(time.time()), memory_bytes=memory, memory_pressure_percent=psi,
                 jobs=jobs, census_complete=complete, gate_source=str(policy_source), gate_scope='observer environment and installed defaults',
                 limits=limits, gate_counts=counts, slots_under_caps=free, heavy_slice=slice_data, tmp=tmp, mac=mac)
 
