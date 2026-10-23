@@ -23,6 +23,7 @@ printf '#!/bin/sh\ncat "%s/body" 2>/dev/null\n' "$work" > "$work/bin/gh"; chmod 
 printf '#!/bin/sh\necho "prev gate ran: $*"\n' > "$home/config/merge-gate"; chmod +x "$home/config/merge-gate"
 cat > "$work/bin/sign-off-axi" <<'STUB'
 #!/usr/bin/env bash
+[ "$1" = list ] && { jq '{decisions: .items}' "$2"; exit; }
 [ "$1" = post ] || exit 2
 shift; board=$1; shift
 while [ "$1" != --from ]; do shift; done
