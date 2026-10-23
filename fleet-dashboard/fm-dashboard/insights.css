@@ -1,6 +1,5 @@
-/* Warm, graphs-first observations; the Board keeps its existing design system. */
-.ins{--i-warm:#dfaa7d;--i-other:#c48e97;--i-surface:#1c1916;flex:1;min-height:0;overflow:auto;background:var(--i-surface);padding:16px;display:flex;flex-direction:column;gap:12px}
-[data-theme=light] .ins{--i-warm:#a75426;--i-other:#8c485d;--i-surface:#faf3e9}
+/* Graphs-first observations in the app's neutral palette, its one accent marking the leading series. */
+.ins{--i-warm:var(--accent);--i-other:var(--ink-3);--i-surface:transparent;flex:1;min-height:0;overflow:auto;background:var(--i-surface);padding:16px;display:flex;flex-direction:column;gap:12px}
 .i-scope{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
 .ins label,.i-scope small,.i-note{font-size:12px;line-height:18px;color:var(--ink-3)}
 .ins select{max-width:100%;padding:6px 8px;background:var(--card);color:var(--ink);border:1px solid var(--line-3);border-radius:6px;font:inherit}
@@ -8,7 +7,7 @@
 .i-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .i-stat,.i-panel{background:var(--card);border:1px solid var(--line-2);border-radius:12px;padding:12px;min-width:0}
 .i-stat{display:flex;flex-direction:column;gap:4px}.i-stat>span{font-size:12px;color:var(--ink-3)}
-.i-stat>b{font-size:24px;font-weight:600;letter-spacing:-.02em;line-height:30px;overflow-wrap:anywhere;color:var(--i-warm)}
+.i-stat>b{font-size:24px;font-weight:600;letter-spacing:-.02em;line-height:30px;overflow-wrap:anywhere;color:var(--ink)}
 .i-stat small{font-size:11px;color:var(--ink-3);line-height:15px}
 .i-panel h2{font-size:14px;font-weight:600;margin-bottom:6px}
 .i-panel summary{cursor:pointer;font-size:13px;line-height:20px;font-weight:500}
@@ -32,8 +31,7 @@
 /* Models: one collapsible row per model; the summary shows merge rate and volume, the body shows every figure with its sample size. */
 .i-mtoggle{display:inline-flex;gap:2px;padding:2px;border:1px solid var(--line-3);border-radius:8px;margin:2px 0 6px}
 .i-mtoggle button{padding:4px 10px;border:0;border-radius:6px;background:none;color:var(--ink-3);font:inherit;font-size:12px;cursor:pointer}
-.i-mtoggle button.on{background:var(--i-warm,#dfaa7d);color:var(--bg,#08090a);font-weight:600}
-[data-theme=light] .i-mtoggle button.on{background:var(--i-warm,#a75426);color:var(--bg,#f2f1ed)}
+.i-mtoggle button.on{background:var(--i-warm);color:var(--panel);font-weight:600}
 .i-model{border-top:1px solid var(--line)}
 .i-model>summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:8px;padding:9px 0}
 .i-model>summary::-webkit-details-marker{display:none}
@@ -42,7 +40,7 @@
 .i-mname b{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .i-mname small{font-size:11px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .i-mnums{text-align:right;display:flex;flex-direction:column;line-height:1.2;white-space:nowrap}
-.i-mnums b{font-size:14px;font-weight:600;color:var(--i-warm)}
+.i-mnums b{font-size:14px;font-weight:600;color:var(--ink)}
 .i-mnums small{font-size:10px;color:var(--ink-3)}
 .i-model-small{opacity:.5}
 .i-mbody{padding:2px 0 10px;min-width:0}
