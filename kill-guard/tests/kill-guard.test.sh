@@ -8,10 +8,13 @@ cleanup() { for p in "${PIDS[@]}"; do pkill -P "$p" 2>/dev/null || true; kill "$
 trap cleanup EXIT
 mkdir -p "$T/home/fixture/users/user-001" "$T/home/fixture/users/user-007/agent" "$T/home/fixture/users/user-003/opencode" "$T/bin"
 echo '{"env":{"KEEP":"1"},"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"other-hook"}]}]}}' > "$T/home/fixture/users/user-001/settings.json"
+mkdir -p "$T/pool1" "$T/home/fixture/users/user-005/plans"; echo '{"theme":"dark"}' > "$T/pool1/settings.json" # a pool account's CLAUDE_CONFIG_DIR
+jq -n --arg f "$T/pool1" '{accounts: [{provider: "claude", folder: $f}, {provider: "codex", folder: "/nonexistent"}]}' > "$T/home/fixture/users/user-005/plans/accounts-v1.json"
 fail=0; ok() { echo "ok: $*"; }; no() { echo "FAIL: $*"; fail=1; }
 inst() { env HOME="$T/home" XDG_DATA_HOME="$T/home/fixture/users/user-004/share" "$ADDON/install.sh"; }
 
-inst >/dev/null && inst > "$T/re.out" && [ "$(grep -c '^unchanged: ' "$T/re.out")" -eq 4 ] && ok "reinstall changes nothing" || no "reinstall not idempotent"
+inst >/dev/null && inst > "$T/re.out" && [ "$(grep -c '^unchanged: ' "$T/re.out")" -eq 5 ] && ok "reinstall changes nothing" || no "reinstall not idempotent"
+jq -e '.theme == "dark" and ([.hooks.PreToolUse[].hooks[].command] | any(contains("fm-kill-guard")))' "$T/pool1/settings.json" >/dev/null && ok "pool account settings get the hook" || no "pool account settings"
 jq -e '([.hooks.PreToolUse[].hooks[].command] | index("other-hook") == 0) and .env.KEEP == "1"' "$T/home/fixture/users/user-001/settings.json" >/dev/null && ok "claude settings merged" || no "claude settings merge"
 
 cat > "$T/adapters.mjs" <<'EOF'
@@ -135,6 +138,7 @@ cmp -s "$T/before.json" "$T/home/fixture/users/user-001/settings.json" && [ -e "
 un >/dev/null && set -- "$T"/home/fixture/users/user-001/settings.json.bak-kill-guard-* && jq -e '[.hooks.PreToolUse[].hooks[].command] == ["other-hook"] and .env.KEEP == "1"' "$T/home/fixture/users/user-001/settings.json" >/dev/null &&
   cmp -s "$T/before.json" "${!#}" && ok "uninstall drops only the kill-guard hook, with a backup" || no "uninstall settings"
 [ ! -e "$G" ] && [ ! -e "$T/home/fixture/users/user-007/agent/extensions/fm-kill-guard.ts" ] && [ ! -e "$T/home/fixture/users/user-003/opencode/plugins/fm-kill-guard.js" ] && ok "uninstall removes the rule and adapters" || no "uninstall left files"
+jq -e '.theme == "dark" and (has("hooks") | not)' "$T/pool1/settings.json" >/dev/null && ok "uninstall drops the pool account hook" || no "pool account uninstall"
 [ -z "$(un)" ] && ok "uninstall again changes nothing" || no "uninstall not idempotent"
 
 [ "$fail" -eq 0 ] && { echo "kill-guard e2e: all passed"; [ -z "${DONE_DONE_EVIDENCE_ROOT:-}" ] || printf 'kill-guard e2e: all passed\\n' > "$DONE_DONE_EVIDENCE_ROOT/result.txt"; } || { echo "kill-guard e2e: FAILED"; exit 1; }

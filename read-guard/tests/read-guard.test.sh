@@ -6,7 +6,10 @@ ADDON=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 T=$(mktemp -d); trap 'rm -rf -- "$T"' EXIT
 H=$T/home; mkdir -p "$H/.claude" "$H/.pi/agent" "$H/.config/opencode" "$H/.local/state/crewhouse/people/person1" "$H/.local/share/byokit/people/1" "$H/.codex" "$H/.local/share/opencode" "$H/.pi/agent" "$H/.no-mistakes"
 echo '{"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"keep-me"}]}]}}' > "$H/.claude/settings.json"
+mkdir -p "$T/pool1" "$H/.muxr/plans"; echo '{}' > "$T/pool1/settings.json" # a pool account's CLAUDE_CONFIG_DIR
+jq -n --arg f "$T/pool1" '{accounts: [{provider: "claude", folder: $f}]}' > "$H/.muxr/plans/accounts-v1.json"
 HOME=$H XDG_DATA_HOME=$H/.local/share "$ADDON/install.sh" >/dev/null
+jq -e '[.hooks.PreToolUse[].hooks[].command] == ["node '\''\($d)/fm-read-guard/guard.mjs'\''"]' --arg d "$H/.local/share" "$T/pool1/settings.json" >/dev/null || { echo "FAIL pool account settings lack the hook"; exit 1; }
 G=$H/.local/share/fm-read-guard/guard.mjs
 run() { HOME=$H node "$G" --runtime claude; }
 block() {
@@ -37,6 +40,7 @@ for cmd in \
   'cat ~/.codex/a*' \
   'cat ~/*/auth.json' \
   'grep -r secret ~/.no-mistakes' \
+  'cat ~/.muxr/plans/claude/f22e0bd0/.credentials.json' \
   'cp -r ~/.local/share/byokit/people/1 /tmp'; do block "$cmd"; done
 # Non-secret files and runtime session data remain readable.
 allow 'cat ~/.pi/agent/sessions/x/y.jsonl'
@@ -125,5 +129,8 @@ EOF
 # Guarding is at the agent boundary: normal process/library reads of fixture credentials still work.
 printf 'fixture-secret' > "$H/.codex/auth.json"
 HOME=$H node -e 'const fs=require("node:fs"); if(fs.readFileSync(process.env.HOME+"/.codex/auth.json","utf8")!=="fixture-secret") process.exit(1)'
+HOME=$H XDG_DATA_HOME=$H/.local/share "$ADDON/uninstall.sh" >/dev/null
+jq -e '[.hooks.PreToolUse[].hooks[].command] == ["keep-me"]' "$H/.claude/settings.json" >/dev/null && jq -e '(has("hooks") | not)' "$T/pool1/settings.json" >/dev/null \
+  || { echo "FAIL uninstall left a read-guard hook"; exit 1; }
 # No real auth contents are read, copied, or printed.
 echo 'read-guard e2e: PASS'
