@@ -258,7 +258,7 @@ function Overview({ d, od, go }) {
           <span class="ov-bar">${qOk && n > 0 ? html`<i style=${{ width: `${n / qTop * 100}%`, background: `var(${QTONE[k] || '--grey'})` }}></i>` : ''}</span><b class="num">${qOk ? n : '–'}</b></div>` })}</div>
         <p class="ov-tot">Total <b class="num">${qOk ? sum(m.queue.value) : '–'}</b> queued</p><${Src} m=${m} ids=${['queue']}/></section>
       <section class="ov-card w1"><h3>Memory</h3><${Memory} m=${m} q=${q}/><${Src} m=${m} ids=${['memory_pressure']}/></section>
-      ${q.claude_accounts?.length ? html`<section class="ov-card wide"><h3>Claude accounts</h3><div class="ov-ql ov-quota ov-ca">${q.claude_accounts.map((a, k) => html`<div key=${k}><b class="ov-can">${a.name}</b>
+      ${q.claude_accounts?.length ? html`<section class="ov-card wide"><h3>Claude accounts</h3><div class="ov-ql ov-quota ov-ca">${q.claude_accounts.map((a, k) => html`<div key=${k}><b class="ov-can">${a.name}<span class="ov-cload">${a.workers ? `${a.workers} worker${a.workers > 1 ? 's' : ''}` : 'no workers'}</span></b>
         ${[['5 h', a.five_hour], ['7 d', a.seven_day]].map(([nm, w]) => { const left = w?.left, tone = left == null ? 'mut' : left <= 10 ? 'bad' : left <= 25 ? 'warn' : ''
           return html`<div class="ov-qrow" key=${nm}><span>${nm}</span><span class=${'ov-bar ' + (left == null ? 'unk' : '')}><i style=${{ width: `${left == null ? 0 : Math.max(2, Math.min(100, 100 - left))}%`,
             background: `var(${{ bad: '--red', warn: '--orange', mut: '--grey' }[tone] || '--green'})` }}></i></span><b class=${'num ' + tone}>${left == null ? '–' : `${Math.round(left)}% left`}</b></div>` })}

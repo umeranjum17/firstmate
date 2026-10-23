@@ -790,7 +790,16 @@ def claude_accounts():  # state/claude-accounts.json from the claude-accounts ad
     try:
         d = json.load(open(os.path.join(HOME, 'state/claude-accounts.json'), encoding='utf-8'))
         win = lambda w: dict(left=num(w.get('left')), resets_at=w.get('resets_at')) if isinstance(w, dict) else None
-        return [dict(name=clean(str(a.get('name') or 'default')), five_hour=win(a.get('five_hour')), seven_day=win(a.get('seven_day')),
+        # Load: the live task records (local homes) whose account= is this account. A repeated
+        # profile name gets an ordinal, so two "default" logins stay apart without showing ids.
+        load, seen = {}, {}
+        for rows in metas.values():
+            for _, m in rows:
+                if m.get('account'): load[m['account']] = load.get(m['account'], 0) + 1
+        def label(a):
+            n = clean(str(a.get('name') or 'default')); seen[n] = seen.get(n, 0) + 1
+            return n if seen[n] == 1 else f'{n} {seen[n]}'
+        return [dict(name=label(a), workers=load.get(a.get('id'), 0), five_hour=win(a.get('five_hour')), seven_day=win(a.get('seven_day')),
                      problem=' · '.join(filter(None, [prose(a['problem']) if a.get('problem') else None,
                          f"Rested until {when(a['rested_until'])}" if (num(a.get('rested_until')) or 0) > NOW_TS else None])) or None,
                      rested_until=num(a.get('rested_until')), stale=bool(a.get('stale')), read_at=num(d.get('generated_at'))) for a in d['accounts']]
@@ -1409,10 +1418,11 @@ def quota_bars():  # every account read: its tightest window, soonest runout fir
                  f'<span class="qr {tone}">{esc(right)}</span></div>')
     return rows or '<p class="note">No account reported a window.</p>'
 
-def claude_bars():  # per account: 5 h and 7 d left, bar = what is used
+def workers_text(n): return 'no workers' if not n else f'{n} worker' + ('s' if n > 1 else '')
+def claude_bars():  # per account: workers on it, 5 h and 7 d left, bar = what is used
     rows = ''
     for a in claude_rows:
-        rows += f'<div class="can">{esc(a["name"])}</div>'
+        rows += f'<div class="can">{esc(a["name"])} <span class="mut">· {workers_text(a["workers"])}</span></div>'
         if (a['rested_until'] or 0) > NOW_TS: rows += f'<div class="mut">Rested until {esc(when(a["rested_until"]))}</div>'
         for label, key in (('5 hours', 'five_hour'), ('7 days', 'seven_day')):
             left = (a[key] or {}).get('left')
@@ -1439,7 +1449,7 @@ def index_body(group):
 {card("Why work is queued", "queued items by reason · tap for each home", queue_bars(), more=("backlog", "Backlog"))}
 {card("In vs out", "backlog items per local day, 14 days", inout_chart(), "wide")}
 {card("Landed recently", "pull requests merged, newest first", recent())}
-{card("Claude accounts", f"5-hour and 7-day quota left per signed-in account · as of {esc(when(claude_rows[0]['read_at']))}", claude_bars()) if claude_rows and claude_rows[0]['read_at'] else ''}
+{card("Claude accounts", f"Workers on each signed-in account, and its 5-hour and 7-day quota left · as of {esc(when(claude_rows[0]['read_at']))}", claude_bars()) if claude_rows and claude_rows[0]['read_at'] else ''}
 {card("Quota runway", f"tightest window per account · even-pace mark · {quota_stamp}", quota_bars() if qdata is not None else f'<p class="lede">{unknown(why_of("quota-axi"))}</p>')}
 {card("Homes", "lanes now · landed today · closed 7 days", home_rows(), "wide", ("backlog", "Backlog"), "homes")}
 <section class="card wide" id="devices"><div class="ch"><h3>Devices and machine</h3></div><p class="cw">now</p><div class="devm"><div>{devices_list(group)}</div><div class="mach">{machine_rows}</div></div></section>
