@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# fm-dashboard.sh - build and serve the read-only fleet dashboard for this home.
+# fm-dashboard.sh - build and serve the fleet dashboard for this home (read-only but for ticket comments).
 #
 # The dashboard is the app in bin/fm-dashboard/ (vendored Preact, htm and Inter; no network
 # reference; light and dark): Board, a kanban of Building, Review,
@@ -116,10 +116,15 @@
 # build (the default) writes $FM_HOME/state/dashboard/ and prints the index page path.
 # FM_BIN names the Firstmate bin/ holding the helper scripts this build runs (fm-tasks-axi.sh,
 # fm-flow.sh, ...); unset, it defaults to this script's own directory.
-# serve runs a small read-only web server (python3 stdlib, IPv4) that answers GET or
+# serve runs a small web server (python3 stdlib, IPv4) that answers GET or
 # HEAD for / and /index.html (the JavaScript app), its files under bin/fm-dashboard/,
 # /board.json, /overview (the same app shell; the app opens its own native Overview in
 # place of the old page), /backlog, /measure and /data.json; every other path is 404.
+# Its one write is POST /comment ({ticket, text}, 1-1000 characters, a ticket on the current board): it
+# needs the X-Comment-Token header to equal state/dashboard/comment-token, which the first serve creates
+# (mode 600, never printed) and the captain pastes once per device; it delivers the comment as a steer to
+# the ticket's lead with fm-send.sh (or to Main with fm-inbox.sh note) and appends the attempt and its
+# result to state/dashboard/comments.jsonl, which the build shows in each ticket's thread.
 # Overview and Board are one app and one navigation; the old generated Overview page is no
 # longer reachable through the app. The app's
 # files and both JSON files carry an ETag, answer 304 while unchanged and are gzipped
@@ -137,8 +142,8 @@
 # build, while the app shell is served immediately. Requests are
 # answered on their own threads, so an idle connection never holds another one up.
 # It prints `serving http://ADDR:PORT/` once listening. ADDR defaults to
-# 127.0.0.1 and PORT to 8787; port 0 picks a free port. There is no authentication:
-# reach is whatever the bind address exposes.
+# 127.0.0.1 and PORT to 8787; port 0 picks a free port. Reading needs no authentication:
+# reach is whatever the bind address exposes; only a comment needs the token.
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -172,9 +177,9 @@ case "$cmd" in
       esac
     done
     case "$port" in ''|*[!0-9]*) usage ;; esac
-    exec python3 - "$0" "$FM_HOME" "$out_dir" "$bind" "$port" "$MAX_AGE" "$SCRIPT_DIR/fm-dashboard" <<'PY'
-import gzip, http.server, os, re, subprocess, sys, threading, time, urllib.parse
-SCRIPT, HOME, DIR, BIND, PORT, MAX_AGE, APP = sys.argv[1:8]
+    exec python3 - "$0" "$FM_HOME" "$out_dir" "$bind" "$port" "$MAX_AGE" "$SCRIPT_DIR/fm-dashboard" "$FM_BIN" <<'PY'
+import gzip, hmac, http.server, json, os, re, secrets, subprocess, sys, threading, time, urllib.parse
+SCRIPT, HOME, DIR, BIND, PORT, MAX_AGE, APP, BIN = sys.argv[1:9]
 MAX_AGE = int(MAX_AGE)
 PAGE = os.path.join(DIR, 'index.html')
 ROUTES = {'/backlog': 'backlog', '/measure': 'measure', '/data.json': 'data', '/board.json': 'board'}
@@ -268,6 +273,40 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self.send(404, b'not built yet\n', 'text/plain; charset=utf-8')
         self.send(200, body, 'text/html; charset=utf-8', asked)
     do_HEAD = do_GET
+
+    # A comment on a ticket goes to the lead that owns it as a steer (fm-send.sh), or to Main as a note
+    # (fm-inbox.sh): the one write this server takes. It needs this device's comment token, a ticket on the
+    # current board and 1-1000 characters; every attempt and its delivery result is kept for the ticket thread.
+    def do_POST(self):
+        def answer(code, **kw): self.send(code, json.dumps(kw).encode(), 'application/json', csp=APP_CSP)
+        if self.path != '/comment': return answer(404, error='Not found')
+        if not hmac.compare_digest(self.headers.get('X-Comment-Token', '').encode(), TOKEN.encode()):
+            return answer(401, error='This device has no valid comment token')
+        n = int(self.headers.get('Content-Length') or 0) if (self.headers.get('Content-Length') or '0').isdigit() else -1
+        if not 0 < n <= 8192: return answer(413, error='The comment is too long')
+        try: req = json.loads(self.rfile.read(n))
+        except ValueError: return answer(400, error='The comment was not readable')
+        text = re.sub(r'[^\S\n]+', ' ', re.sub(r'[\x00-\x09\x0b-\x1f\x7f]', ' ', str(req.get('text') or ''))).strip()
+        if not 0 < len(text) <= 1000: return answer(400, error='Write 1 to 1000 characters')
+        try: t = next(x for x in json.load(open(os.path.join(DIR, 'board.json')))['tickets'] if x['id'] == req.get('ticket'))
+        except (OSError, ValueError, KeyError, StopIteration): return answer(404, error='That ticket is not on the board')
+        cid, msg = secrets.token_hex(8), f"Captain comment on ticket {t['task']} ({t['title']}), from the fleet dashboard:\n{text}"
+        cmd = ['fm-inbox.sh', 'note', '--request-id', f'dash-{cid}', '--', msg] if t['home'] == 'main' else ['fm-send.sh', t['home'], '--fire-and-forget', cid, msg]
+        try:
+            r = subprocess.run(['bash', os.path.join(BIN, cmd[0]), *cmd[1:]], env=dict(os.environ, FM_HOME=HOME), capture_output=True, text=True, timeout=60)
+            err = None if r.returncode == 0 else ((r.stderr or r.stdout).strip().splitlines() or [f'{cmd[0]} exited {r.returncode}'])[-1][:300]
+        except (OSError, subprocess.TimeoutExpired) as e: err = f'{cmd[0]} did not finish: {e}'
+        with comment_lock, open(os.path.join(DIR, 'comments.jsonl'), 'a', encoding='utf-8') as fh:
+            fh.write(json.dumps(dict(ticket=t['id'], id=cid, at=int(time.time()), text=text, to=t['home'], error=err)) + '\n')
+        return answer(502, error=f'Not delivered: {err}') if err else answer(200, id=cid, to=t['home'])
+
+# The comment token is made once, readable by this user only, and never printed: the captain copies it to each device.
+os.makedirs(DIR, exist_ok=True)
+try:
+    with os.fdopen(os.open(os.path.join(DIR, 'comment-token'), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), 'w') as fh: fh.write(secrets.token_urlsafe(24))
+except FileExistsError: pass
+TOKEN = open(os.path.join(DIR, 'comment-token')).read().strip()
+comment_lock = threading.Lock()
 
 # Each request on its own thread; rebuilds run on a side thread, one at a time.
 def refresh():  # rebuild on age, not on requests, so an idle phone never opens a minutes-old page
@@ -1735,7 +1774,13 @@ def ticket(h, r):
                 release=rel.group(1) if rel else 'later', state=st, pr=c.get('pr') or merged_pr or (link.group() if link else None),
                 updated=max(seen) if seen else c.get('started') or day, desc=describe(body, ask, bool(cut)),
                 ask=dict(words=ask.group(2), day=ask.group(1) or ask.group(3)) if ask else None)
-tickets = [ticket(h, r) for h in ACTIVE for r in backlog.get(h) or []]
+said = {}  # the captain's comments from the dashboard, by ticket, oldest first
+try:
+    for l in open(os.path.join(STATE_DIR, 'comments.jsonl'), encoding='utf-8', errors='replace'):
+        try: c = json.loads(l); said.setdefault(c['ticket'], []).append(dict(at=c['at'], text=c['text'], to=c['to'], error=c.get('error')))
+        except (ValueError, KeyError, TypeError): pass
+except OSError: pass
+tickets = [dict(ticket(h, r), comments=said.get(f"{h}/{r['id']}", [])[-50:]) for h in ACTIVE for r in backlog.get(h) or []]
 # Cycle time: dispatch to merge, for each merged task whose dispatch is in a ledger.
 cycles = sorted(at - d['ts'] for at, h, task in merges.values() if (d := dispatch(h, task, at)))
 flow_text = probe(['bash', os.path.join(BIN, 'fm-flow.sh'), '--json', '--now', str(int(NOW_TS)), '--capacity'],

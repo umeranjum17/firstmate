@@ -170,6 +170,23 @@ jq -e '([.tickets[] | {(.task): .state}] | add) as $s | ([.tickets[] | {(.task):
 # The ticket page: the description without bookkeeping, the captain's words it serves, and the lane's status lines.
 for w in 390 1280; do shot "ticket-page-$w" '#/tickets?ticket=main/m-ask' "$w" 'Serves your ask'; done
 shot ticket-held-390 '#/tickets?ticket=main/m-held' 390 'Main decides: wait for the new layout.'
+# A comment needs this device's token: none or a wrong one is refused, an unknown ticket too; then the captain's
+# comment from the page reaches Main as a note and shows in the ticket's thread after the next build.
+post() { curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -H "X-Comment-Token: $1" --data "$2" "${url}comment"; }
+[ "$(post '' '{"ticket":"main/m-ask","text":"hi"}')" = 401 ] && [ "$(post wrong '{"ticket":"main/m-ask","text":"hi"}')" = 401 ] \
+  && [ "$(post "$(cat "$home/state/dashboard/comment-token")" '{"ticket":"main/nope","text":"hi"}')" = 404 ] || { echo "run-core-proof: the comment endpoint took a bad request" >&2; exit 1; }
+shot ticket-comment-390 '#/tickets?ticket=main/m-ask' 390 'Serves your ask'
+chrome-devtools-axi eval '(() => { const t = document.querySelector(".tk-say textarea"); t.value = "Pick the layout that keeps the ask list on top."; t.dispatchEvent(new Event("input", { bubbles: true })); return 1 })()' >/dev/null
+chrome-devtools-axi eval 'setTimeout(() => document.querySelector(".tk-say").requestSubmit(), 50)' >/dev/null
+chrome-devtools-axi wait 'Comment token for this device' >/dev/null
+chrome-devtools-axi eval "(() => { const f = document.querySelector('.tk-say'); f.token.value = '$(cat "$home/state/dashboard/comment-token")'; setTimeout(() => f.requestSubmit(), 50); return 1 })()" >/dev/null
+chrome-devtools-axi wait 'Sent to Main' >/dev/null  # the comment shows in the thread at once
+chrome-devtools-axi screenshot "$DONE_DONE_EVIDENCE_ROOT/ticket-comment-sent-390.png" >/dev/null
+env PATH="$home/stubs:$PATH" HOME="$home" FM_HOME="$home" bash "$bin/fm-inbox.sh" list | grep -qF 'Pick the layout that keeps the ask list on top.' \
+  || { echo "run-core-proof: the comment did not reach Main's inbox" >&2; exit 1; }
+dash build >/dev/null
+for w in 390 1280; do shot "ticket-thread-$w" "?thread-$w#/tickets?ticket=main/m-ask" "$w" 'Pick the layout that keeps'; done
+grep -qF 'Sent to Main' "$DONE_DONE_EVIDENCE_ROOT/ticket-thread-390.txt" || { echo "run-core-proof: the thread lacks the sent comment" >&2; exit 1; }
 jq -e '(.tickets[] | select(.task == "m-ask")) as $t | $t.ask == {"words": "Show the new screen in the layout a phone reads first", "day": "22 Oct"}
   and $t.desc == "Two layouts are drawn; the lead picks one."
   and ([.tickets[] | select(.task == "m-held")][0] | .desc == "Main decides: wait for the new layout." and .ask.day == "22 Oct")' \
@@ -225,8 +242,9 @@ steps = {
         "Open a ticket at 390px and 1280px: its description, the captain's words it serves, its fields and its activity",
         "Open the held ticket at 390px: its description is the plain decision, with no leftover labels or punctuation",
         "Open Overview at 390px and 1280px: each card names its source; scroll Overview, Insights and Tickets to the end at 390px",
+        "Write a comment on the ticket, paste the device's comment token once and send it to the owning lead (Main here)",
     ],
-    "result": "The Board lists m-stuck, m-ask, m-ci and m-build with their titles and states; the Stuck tab holds only stuck lanes, the Waiting tab only the waiting lane, and a home with four open lanes against a cap of three reads 4 / 3; Insights shows Why work waits now with the Blocked, Lead reply and Held groups; Tickets puts each backlog item in its column with its priority chip and release, the captain-held item On hold, and only the one ask under Waiting on captain; a ticket page shows its description, the captain's words with their day, and the lane's activity; Overview names the source of every figure, and each page's end clears the tab bar at 390px; the sidebar and the phone dock no longer offer a Ship tab",
+    "result": "The Board lists m-stuck, m-ask, m-ci and m-build with their titles and states; the Stuck tab holds only stuck lanes, the Waiting tab only the waiting lane, and a home with four open lanes against a cap of three reads 4 / 3; Insights shows Why work waits now with the Blocked, Lead reply and Held groups; Tickets puts each backlog item in its column with its priority chip and release, the captain-held item On hold, and only the one ask under Waiting on captain; a ticket page shows its description, the captain's words with their day, and the lane's activity; Overview names the source of every figure, and each page's end clears the tab bar at 390px; the sidebar and the phone dock no longer offer a Ship tab; a comment sent from the ticket page reaches Main's inbox and shows in the ticket thread as sent",
 }
 with open(sys.argv[1], "w") as f:
     json.dump(steps, f, indent=2, ensure_ascii=False)
