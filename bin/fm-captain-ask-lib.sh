@@ -36,7 +36,7 @@ guard_captain_ask_hold() {  # <id>
 captain_ask_done_keep() {  # <root>
   local toml value
   for toml in "$1/.tasks.toml" "${HOME:-}/.tasks-axi/config.toml"; do
-    value=$(LC_ALL=C awk '/^\[/ { md = ($0 == "[markdown]") } md && /^done_keep *=/ { sub(/^[^=]*= */, ""); sub(/ *#.*/, ""); sub(/ +$/, ""); print; exit }' "$toml" 2>/dev/null)
+    value=$(LC_ALL=C awk '{ l = $0; sub(/#.*/, "", l); gsub(/^[ \t]+|[ \t]+$/, "", l) } l ~ /^\[.*\]$/ { s = substr(l, 2, length(l) - 2); gsub(/^[ \t]+|[ \t]+$/, "", s); md = (s == "markdown") } md && l ~ /^done_keep[ \t]*=/ { v = l; sub(/^done_keep[ \t]*=[ \t]*/, "", v); k = v } END { print k }' "$toml" 2>/dev/null)
     case "$value" in ''|*[!0-9]*) ;; *) printf '%s\n' "$value"; return 0 ;; esac
   done
   printf '%s\n' 10

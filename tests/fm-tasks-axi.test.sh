@@ -374,7 +374,7 @@ test_captain_hold_preflights_archive_candidates_only() {
   out=$(wrapper_from_code "$dir" public-followup record-delivery nobody 2>&1) || true
   assert_not_contains "$out" "no recorded captain answer" "a legacy ask within keep blocked public-followup delivery"
 
-  printf 'backend = "markdown"\n\n[markdown]\npath = "data/backlog.md"\narchive = "data/done-archive.md"\ndone_keep = 0\n' > "$home/.tasks.toml"
+  printf 'backend = "markdown"\n\n[markdown] # backlog\npath = "data/backlog.md"\narchive = "data/done-archive.md"\n  done_keep = 0 # surplus\n' > "$home/.tasks.toml"
   wrapper_from_code "$dir" add call-surplus "captain call past keep" >/dev/null
   FM_HOME="$home" "$ROOT/bin/fm-captain-hold.sh" hold call-surplus --reason decide >/dev/null || fail "could not hold call-surplus"
   rc=0
