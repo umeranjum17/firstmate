@@ -50,7 +50,8 @@
 #   - a markdown `<data>/backlog.md` that is itself a symlink, because the
 #     first write would replace the link with a private copy, exactly the fork
 #     this command exists to prevent. Lifecycle transitions refuse the same file.
-#   - `rm`/`delete`, `done`/`close`, `hold --kind parked`, or `update` or
+#   - `rm`/`delete`, `done`/`close`, `hold` of a [captain-ask] item (the sanctioned
+#     `bin/fm-captain-hold.sh hold` records the new hold), or `update` or
 #     `edit --title` that drops `[captain-ask]` from a row whose title carries it,
 #     unless `bin/fm-captain-hold.sh answered <id>` finds a recorded captain
 #     answer or the row's `pr:` link is a merged PR. Prune and auto-prune
@@ -163,7 +164,7 @@ tasks_axi() { tasks-axi "$@"; }
 . "$SCRIPT_DIR/fm-captain-ask-lib.sh"
 captain_guard() {  # <tasks-axi args>
   local prune_state="done" no_prune=0
-  local verb id='' value=0 title_next=0 has_title=0 new_title='' arg
+  local verb id='' value=0 title_next=0 state_next=0 has_title=0 new_title='' arg
   [ "${1:-}" = task ] && shift
   verb=${1:-}
   [ "$#" -gt 0 ] && shift
@@ -171,8 +172,10 @@ captain_guard() {  # <tasks-axi args>
     if [ "$arg" = --json ]; then continue; fi
     if [ "$value" = 1 ]; then value=0; continue; fi
     if [ "$title_next" = 1 ]; then title_next=0; new_title=$arg; continue; fi
+    if [ "$state_next" = 1 ]; then state_next=0; prune_state=$arg; continue; fi
     case "$arg" in
       --no-prune) no_prune=1 ;;
+      --state) state_next=1 ;;
       --state=*) prune_state=${arg#--state=} ;;
       --title) title_next=1; has_title=1 ;;
       --title=*) has_title=1; new_title=${arg#--title=} ;;
@@ -181,13 +184,7 @@ captain_guard() {  # <tasks-axi args>
       *) id=${id:-$arg} ;;
     esac
   done
-  # State flags for explicit prune accept both tasks-axi spellings.
   if [ "$verb" = prune ]; then
-    local previous=''
-    for arg in "$@"; do
-      [ "$previous" != --state ] || prune_state=$arg
-      previous=$arg
-    done
     guard_captain_ask_prune "$prune_state"
   fi
   case "$verb" in
@@ -201,11 +198,7 @@ captain_guard() {  # <tasks-axi args>
       esac
       ;;
     rm|delete) guard_captain_ask "$id" ;;
-    hold)
-      case " $* " in
-        *' --kind parked '*|*' --kind=parked '*) guard_captain_ask "$id" ;;
-      esac
-      ;;
+    hold) guard_captain_ask_hold "$id" ;;
     update|edit)
       if [ "$has_title" = 1 ]; then
         case "$new_title" in

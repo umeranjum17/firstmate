@@ -1220,6 +1220,7 @@ command_answer() {
     # its own record on top. Either way the close mode is the caller's flag,
     # checked against an interrupted close's recorded mode so a retry cannot
     # silently flip a release into a close.
+    [ "$release" = 1 ] || guard_captain_ask_prune "done"
     if body_has_resolution_record "$body" \
       && [ "$(recorded_decision_digest "$body" || true)" = "$DECISION_DIGEST" ]; then
       recorded_mode=$(recorded_resolution_mode "$body" || true)
@@ -1701,6 +1702,7 @@ reconcile_close() {
   [ "$hold_kind" = captain ] \
     || fail "task $id is not held for the captain; there is no captain call to reconcile"
   guard_captain_ask "$id"
+  guard_captain_ask_prune "done"
   if body_has_resolution_record "$body" \
     && [ "$(recorded_decision_digest "$body" || true)" = "$DECISION_DIGEST" ]; then
     recorded_mode=$(recorded_resolution_mode "$body" || true)

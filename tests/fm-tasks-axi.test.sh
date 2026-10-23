@@ -339,6 +339,58 @@ test_captain_ask_guard_gaps() {
   pass "current holds, reconcile close, auto-prune and explicit prune preserve unanswered asks"
 }
 
+# A raw hold of a released ask must not revive the old answer: the sanctioned hold writes the new hold set.
+test_raw_rehold_of_a_released_ask_is_refused() {
+  local dir home
+  dir=$(make_split raw-rehold)
+  home="$dir/home"
+  printf 'Ship the first choice.\n' > "$dir/answer.txt"
+  wrapper_from_code "$dir" add raw-rehold "[captain-ask] choose once" >/dev/null
+  FM_HOME="$home" "$ROOT/bin/fm-captain-hold.sh" hold raw-rehold --reason choose >/dev/null
+  FM_HOME="$home" "$ROOT/bin/fm-captain-hold.sh" answer raw-rehold --release --decision-file "$dir/answer.txt" >/dev/null
+  expect_captain_refusal "$dir" raw-rehold hold raw-rehold --reason "choose again" --kind captain
+  expect_captain_refusal "$dir" raw-rehold hold raw-rehold --reason "choose again"
+  expect_captain_refusal "$dir" raw-rehold hold --kind=external raw-rehold --reason "choose again"
+  pass "a raw wrapper hold of a released [captain-ask] item is refused"
+}
+
+# A refused preflight records nothing, and only an archiving close is refused.
+test_captain_hold_preflights_before_recording() {
+  local dir home out rc
+  dir=$(make_split captain-preflight)
+  home="$dir/home"
+  printf 'Ship the first choice.\n' > "$dir/answer.txt"
+  (cd "$home" && tasks-axi add legacy "[captain-ask] unanswered legacy row" >/dev/null && tasks-axi "done" legacy --no-prune >/dev/null) \
+    || fail "could not seed the legacy unanswered ask"
+  wrapper_from_code "$dir" add call-held "captain call" >/dev/null
+  wrapper_from_code "$dir" add call-released "captain call to release" >/dev/null
+  FM_HOME="$home" "$ROOT/bin/fm-captain-hold.sh" hold call-held --reason decide >/dev/null || fail "could not hold call-held"
+  FM_HOME="$home" "$ROOT/bin/fm-captain-hold.sh" hold call-released --reason decide >/dev/null || fail "could not hold call-released"
+  rc=0
+  FM_HOME="$home" "$ROOT/bin/fm-captain-hold.sh" answer call-held --decision-file "$dir/answer.txt" >/dev/null 2>&1 || rc=$?
+  [ "$rc" != 0 ] || fail "answer closed a call while the legacy unanswered ask would be archived"
+  out=$(wrapper_from_code "$dir" show call-held --full)
+  assert_not_contains "$out" "Resolution mode:" "a refused answer left a resolution record"
+  assert_contains "$out" "held: yes" "a refused answer released the call"
+  FM_HOME="$home" "$ROOT/bin/fm-captain-hold.sh" answer call-released --release --decision-file "$dir/answer.txt" >/dev/null \
+    || fail "a release, which archives nothing, was blocked by the legacy unanswered ask"
+
+  wrapper_from_code "$dir" add call-reconciled "captain call to reconcile" >/dev/null
+  FM_HOME="$home" "$ROOT/bin/fm-captain-hold.sh" hold call-reconciled --reason decide >/dev/null || fail "could not hold call-reconciled"
+  FM_HOME="$home" "$ROOT/bin/fm-captain-hold.sh" bind board >/dev/null
+  printf 'call-reconciled\n' | FM_HOME="$home" "$ROOT/bin/fm-captain-hold.sh" reconcile-requests --source-id board --source test >/dev/null
+  printf 'The original choice is moot.\n' > "$dir/evidence.txt"
+  rc=0
+  FM_HOME="$home" "$ROOT/bin/fm-captain-hold.sh" reconcile close call-reconciled --evidence-file "$dir/evidence.txt" >/dev/null 2>&1 || rc=$?
+  [ "$rc" != 0 ] || fail "reconcile closed a call while the legacy unanswered ask would be archived"
+  out=$(wrapper_from_code "$dir" show call-reconciled --full)
+  assert_not_contains "$out" "Resolution mode:" "a refused reconcile left a resolution record"
+
+  expect_captain_refusal "$dir" legacy prune --state "done" --keep 0
+  expect_captain_refusal "$dir" legacy prune --state=done --keep 0
+  pass "captain answer and reconcile preflight the archive before recording, and release is not blocked"
+}
+
 # The optional task-priority add-on check refuses an add before tasks-axi runs; absent, it does nothing.
 test_wrapper_runs_the_task_priority_check() {
   local dir stub rc
@@ -378,6 +430,8 @@ if [ "$HAVE_TASKS_AXI" = 1 ]; then
   test_wrapper_single_home
   test_wrapper_captain_ask_guard
   test_captain_ask_guard_gaps
+  test_raw_rehold_of_a_released_ask_is_refused
+  test_captain_hold_preflights_before_recording
   test_wrapper_runs_the_task_priority_check
 else
   echo "skip: tasks-axi not found; home-addressing cases not run"
