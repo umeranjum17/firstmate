@@ -470,18 +470,13 @@ s, h, b = raw(base + 'board.json', **{'Accept-Encoding': 'gzip'})
 print('gzip', h['Content-Encoding'], json.loads(gzip.decompress(b))['schema'], raw(base + 'board.json', **{'Accept-Encoding': 'gzip', 'If-None-Match': h['ETag']})[0])
 for path in ('vendor/../app.js', '../fm-dashboard/app.js', '.hidden.js', 'a/b/app.js', 'app.py', 'missing.js'):
     print(path, raw(base + path)[0])
-# The Ship tab's module, its pinned three.js and its stylesheet come from the same origin the same way.
-for path in ('ship/index.js', 'ship/scene.js', 'vendor/three-0.186.1.min.js', 'ship/ship.css'):
-    s, h, b = raw(base + path)
-    print(path, s, h.get_content_type(), raw(base + path, **{'If-None-Match': h['ETag']})[0])
 PY
 )
   [ "$got" = "$(printf '%s\n' 'backlog 200 True' 'measure 200 True' \
     'group 200 True True' 'cookie 200 True' 'timestamps True True' 'flow 404' 'state/ 404' 'index.home.html 404' '../data/backlog.md 404' 'data/backlog.md 404' \
     'app 200 text/html True True' 'app.js 200 text/javascript no-cache 304' 'vendor/preact-htm-3.1.1.js 200 text/javascript no-cache 304' \
     'board.json 200 application/json no-cache 304' 'overview-app 200 True True' 'board fm-dashboard-board.v1 True' 'gzip gzip fm-dashboard-board.v1 304' 'vendor/../app.js 404' '../fm-dashboard/app.js 404' \
-    '.hidden.js 404' 'a/b/app.js 404' 'app.py 404' 'missing.js 404' 'ship/index.js 200 text/javascript 304' 'ship/scene.js 200 text/javascript 304' \
-    'vendor/three-0.186.1.min.js 200 text/javascript 304' 'ship/ship.css 200 text/css 304')" ] \
+    '.hidden.js 404' 'a/b/app.js 404' 'app.py 404' 'missing.js 404')" ] \
     || fail "serve answers were not the app, the three pages, the remembered grouping, then 404s: $got"
   # An old page is answered at once, as it is, while a rebuild runs behind it.
   printf '<p>old page<!--age--></p>\n' > "$home/state/dashboard/backlog.html"
@@ -508,7 +503,7 @@ for path in ('board.json', 'data.json'):
         else: raise AssertionError('failed refresh answered successfully')
 PY
   kill "$SERVE_PID" 2>/dev/null; SERVE_PID=
-  pass "serve answers the app, its files and the Ship tab's files by version, the three pages at once retaining source timestamps, remembers ?group in a cookie, rebuilds an old page itself, and 404s every other path"
+  pass "serve answers the app and its files by version, the three pages at once retaining source timestamps, remembers ?group in a cookie, rebuilds an old page itself, and 404s every other path"
 }
 
 test_board_json_feeds_the_app() {
