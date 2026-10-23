@@ -1,10 +1,10 @@
 /* The fleet app's one design system, in Linear's language: near-neutral greys, one accent, Inter, 1px hairlines, flat surfaces. */
 @font-face{font-family:Inter;src:url(vendor/inter-latin-wght-5.2.8.woff2) format('woff2');font-weight:100 900;font-display:swap}
 :root{
-  --bg:#08090a;--panel:#0f1011;--card:#141516;--raise:#18191b;--hover:#1c1d20;--sel:#232427;
-  --line:rgba(255,255,255,.06);--line-2:rgba(255,255,255,.09);--line-3:rgba(255,255,255,.15);
-  --ink:#f7f8f8;--ink-2:#d0d6e0;--ink-3:#8a8f98;--ink-4:#62666d;
-  --accent:#5e6ad2;
+  --bg:#0a0a0b;--panel:#111113;--card:#1b1b1e;--raise:#161618;--hover:#222226;--sel:#29292e;
+  --line:rgba(255,255,255,.06);--line-2:rgba(255,255,255,.1);--line-3:rgba(255,255,255,.16);
+  --ink:#f4f4f5;--ink-2:#d4d4d8;--ink-3:#8e8e96;--ink-4:#5c5c64;
+  --accent:#7c84e8;
   --yellow:#f0bf00;--green:#4cb782;--red:#eb5757;--orange:#f2994a;--grey:#8a8f98;
   --st-queued:var(--grey);--st-building:var(--yellow);--st-review:var(--yellow);--st-test:var(--yellow);--st-ci:var(--green);--st-merge:var(--green);--st-landed:var(--accent);
   --m-opus:#e0805e;--m-sol:#2fb58f;--m-muse:#9d7bf5;--m-qwen:#6f8ffc;--m-other:#8a8f98;
@@ -13,12 +13,12 @@
   color-scheme:dark
 }
 :root[data-theme=light]{
-  --bg:#f2f1ed;--panel:#fcfbf9;--card:#fff;--raise:#f4f3ef;--hover:#efeee9;--sel:#e6e5df;
-  --line:rgba(20,18,12,.07);--line-2:rgba(20,18,12,.1);--line-3:rgba(20,18,12,.17);
-  --ink:#1b1a17;--ink-2:#3b3934;--ink-3:#6b6860;--ink-4:#9d9a92;
-  --yellow:#c99700;--green:#2a9363;--red:#d33b3b;--orange:#d2701a;--grey:#8d8a82;
+  --bg:#f4f4f5;--panel:#fff;--card:#fff;--raise:#f6f6f7;--hover:#f1f1f3;--sel:#e9e9ec;
+  --line:rgba(16,16,20,.07);--line-2:rgba(16,16,20,.1);--line-3:rgba(16,16,20,.18);
+  --ink:#17171a;--ink-2:#3c3c43;--ink-3:#6e6e78;--ink-4:#a2a2ab;--accent:#5662d6;
+  --yellow:#c99700;--green:#2a9363;--red:#d33b3b;--orange:#d2701a;--grey:#8e8e96;
   --m-opus:#c4613d;--m-sol:#16906d;--m-muse:#7a55e0;--m-qwen:#4766e0;--m-other:#8d8a82;--h-7:#7d8796;--h-8:#d4a72c;
-  --edge:0 0 0 1px var(--line-2),0 1px 2px rgba(20,18,12,.04);--float:0 0 0 1px var(--line-2),0 12px 32px rgba(20,18,12,.12);
+  --edge:0 0 0 1px var(--line-2),0 1px 2px rgba(16,16,20,.04);--float:0 0 0 1px var(--line-2),0 16px 40px rgba(16,16,20,.14);
   color-scheme:light
 }
 *{box-sizing:border-box;margin:0;padding:0}
@@ -204,10 +204,10 @@ a.pill:hover{background:var(--hover)}
 .dock{position:fixed;left:0;right:0;bottom:calc(14px + env(safe-area-inset-bottom));display:flex;justify-content:center;gap:10px;pointer-events:none;z-index:10}
 .dock>*{pointer-events:auto}
 .dock nav,.dock>button{display:flex;gap:2px;padding:4px;border-radius:26px;background:color-mix(in srgb,var(--raise) 88%,transparent);box-shadow:var(--float);backdrop-filter:blur(14px)}
-.dock a,.dock>button{width:56px;height:44px;border-radius:22px;display:grid;place-items:center;color:var(--ink-3);position:relative}
+.dock a,.dock>button{width:58px;height:48px;border-radius:24px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--ink-3);position:relative;font-size:10.5px;font-weight:500;white-space:nowrap}
 .dock>button{width:52px;height:52px}
 .dock a[aria-current=page]{background:var(--sel);color:var(--ink)}
-.dock a .badge{position:absolute;top:4px;right:8px}
+.dock a .badge{position:absolute;top:2px;right:6px;margin:0;min-width:16px;height:16px;font-size:10px}
 /* --- tablet layout --- */
 @media (max-width:1279px){
   .hd{flex-wrap:wrap;height:auto;min-height:44px;padding-top:8px;padding-bottom:8px;row-gap:8px}
@@ -260,8 +260,8 @@ a.pill:hover{background:var(--hover)}
 /* --- overview: the fleet's numbers as charts --- */
 .ov{flex:1;min-height:0;overflow:auto;padding:14px 16px 40px}
 .ov-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:10px}
-.ov-kpi{position:relative;display:flex;flex-direction:column;gap:4px;padding:12px 14px 0;border-radius:10px;background:linear-gradient(180deg,color-mix(in srgb,var(--c) 9%,var(--card)),var(--card) 70%);box-shadow:var(--edge);text-align:left;overflow:hidden;min-width:0}
-a.ov-kpi:hover,button.ov-kpi:hover{box-shadow:0 0 0 1px color-mix(in srgb,var(--c) 45%,transparent)}
+.ov-kpi{position:relative;display:flex;flex-direction:column;gap:4px;padding:12px 14px 0;border-radius:10px;background:var(--card);box-shadow:var(--edge);text-align:left;overflow:hidden;min-width:0}
+a.ov-kpi:hover,button.ov-kpi:hover{box-shadow:0 0 0 1px var(--line-3)}
 .ov-kpi span{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-3)}
 .ov-kpi span i{width:7px;height:7px;border-radius:50%;background:var(--c);box-shadow:0 0 0 3px color-mix(in srgb,var(--c) 22%,transparent)}
 .ov-kpi em{margin-left:auto;font-style:normal;font-size:11px;padding:1px 6px;border-radius:9px;background:var(--raise);color:var(--ink-3)}

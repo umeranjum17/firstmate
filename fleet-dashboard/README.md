@@ -65,7 +65,7 @@ the `tickets` and `tickets_unread` keys `fm-dashboard.sh` adds to `board.json` f
 backlog it already reads, Overview naming the source of every figure (from each
 metric's `source` in `data.json`) on hover and under its card, and the ticket comment: the server's one write, `POST /comment`
 with a per-device token (`state/dashboard/comment-token`), delivered to the owning lead with
-`fm-send.sh` (or to Main with `fm-inbox.sh note`) and shown in the ticket thread. The Ship tab is removed, with its `ship/` files and the vendored three.js it alone used.
+`fm-send.sh` (or to Main with `fm-inbox.sh note`) and shown in the ticket thread. The Ship tab is removed, with its `ship/` files and the vendored three.js it alone used. The app takes the approved Tickets prototype's look: neutral greys and one accent in both themes (Insights included), Tickets as the landing view, Overview labelled Metrics, a phone dock that names each view, flat neutral Metrics cards, and Board cards whose names drop leading tags and Main refs as tickets do.
 Every other moved file remains byte-identical to the fork.
 
 ## Side-by-side proof (re-run before the served path swaps)

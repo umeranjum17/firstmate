@@ -2,7 +2,7 @@
 # fm-dashboard.sh - build and serve the fleet dashboard for this home (read-only but for ticket comments).
 #
 # The dashboard is the app in bin/fm-dashboard/ (vendored Preact, htm and Inter; no network
-# reference; light and dark): Board, a kanban of Building, Review,
+# reference; light and dark; neutral greys and one accent; it opens on Tickets and labels Overview Metrics): Board, a kanban of Building, Review,
 # Test, PR + CI and To merge with tabs for Queued, Landed today and All and rows by home on
 # request, whose cards carry the lane's model, age, pull request and, when it waits, why in plain
 # words; filters by home, model and state; a card's detail with its stages and activity; Tickets
@@ -1691,10 +1691,14 @@ VERBS = {'working': 'Working', 'resolved': 'Cleared', 'paused': 'Waiting', 'bloc
 WAIT_OF = {'blocked': 'blocked', 'decision': 'decision', 'waiting': 'waiting'}
 WAIT_VERBS = {'blocked': ('blocked', 'failed'), 'decision': ('needs-decision', 'captain-held', 'paused', 'blocked'), 'waiting': ('paused',)}
 WAIT_VERBS['parked'] = WAIT_VERBS['decision']
+TAGS = re.compile(r'^(?:\[[\w-]+\]\s*)+')
+def plain(title):  # a lane or ticket name without its leading [tags], Main message refs or a trailing PR number
+    t = re.sub(r'\s*\(Main\d+[^)]*\)|\bMain\d+:?\s*|\s+PR \d+$', '', TAGS.sub('', title)).strip()
+    return title if not t else t if t == title else t[0].upper() + t[1:]  # a name cut at its front starts a sentence
 def card(h, task, kind, title, stage, **kw):
     d = {} if stage == 'queued' else dispatch(h, task, kw['since']) if stage == 'landed' else dispatch(h, task)
     fid, fname = family(kw.pop('model', None) or d.get('model'), kw.get('tool') or d.get('harness'))
-    return dict(dict(id=f'{h}/{task}', home=h, task=task, kind=kind, title=title, stage=stage, wait=None, wait_since=None, reached={},
+    return dict(dict(id=f'{h}/{task}', home=h, task=task, kind=kind, title=plain(title), stage=stage, wait=None, wait_since=None, reached={},
                      state=stage, since=None, started=d.get('ts'), pr=None, why='', model=fid if d or kw.get('tool') else None,
                      model_name=fname, tool=d.get('harness'), effort=None, history=[]), **kw)
 cards = []
@@ -1745,7 +1749,6 @@ for h in ACTIVE:
 # status line, a merge record the pull request and done. A held or parked item is on hold: only the ask list waits on
 # the captain. The name drops leading [tags] and Main message refs; a [captain-ask] tag marks the item asked.
 RELEASE = re.compile(r'^\s*release:\s*(\S.*?)\s*$', re.M | re.I)
-TAGS = re.compile(r'^(?:\[[\w-]+\]\s*)+')
 # The description is the body in plain words without the hold and release bookkeeping lines; the ask it serves is
 # the first quote near the word captain, with the day written beside it.
 BOOKKEEPING = re.compile(r'^\s*(?:(?:captain hold (?:set|origin)|resolution (?:recorded|mode)|decision digest|origin|release)\b.*$|type:(?: [\w -]+?:)?\s*)', re.M | re.I)
@@ -1769,7 +1772,7 @@ def ticket(h, r):
     rel = RELEASE.search(body[:body.rfind('\n') + 1] if cut else body)
     ask = ASKED.search(body)
     return dict(id=f"{h}/{r['id']}", home=h, task=r['id'], project=None if r.get('repo') in (None, '', '-') else r['repo'],
-                title=re.sub(r'\s*\(Main\d+[^)]*\)|\bMain\d+:?\s*|\s+PR \d+$', '', r['title'][tags.end() if tags else 0:]).strip(),
+                title=plain(r['title']),
                 asked='captain-ask' in (tags.group() if tags else ''), priority=int(r['priority']) if str(r.get('priority')).isdigit() else None,
                 release=rel.group(1) if rel else 'later', state=st, pr=c.get('pr') or merged_pr or (link.group() if link else None),
                 updated=max(seen) if seen else c.get('started') or day, desc=describe(body, ask, bool(cut)),

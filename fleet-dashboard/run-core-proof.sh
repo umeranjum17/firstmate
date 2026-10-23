@@ -110,7 +110,7 @@ done
 [ -n "$url" ] || { cat "$home/serve.log" >&2; exit 1; }
 
 export CHROME_DEVTOOLS_AXI_SESSION=$session
-chrome-devtools-axi open "$url" >/dev/null
+chrome-devtools-axi open "$url#/board" >/dev/null
 chrome-devtools-axi resize 390 844 >/dev/null
 chrome-devtools-axi wait "m-stuck" >/dev/null
 chrome-devtools-axi eval 'JSON.stringify({ viewport: innerWidth, text: document.body.innerText })' >"$DONE_DONE_EVIDENCE_ROOT/board.txt"
@@ -160,11 +160,15 @@ for w in 390 1280; do
   shot "ticket-page-dark-$w" "?dark-page-$w#/tickets?ticket=main/m-ask" "$w" 'Serves your ask'
 done
 chrome-devtools-axi eval 'localStorage.removeItem("fm-theme")' >/dev/null
-# Tickets: the backlog mapped to board columns, and only the ask list waits on the captain.
+# The app opens on Tickets, and the phone dock names each view under its icon.
+shot landing-390 '?landing' 390 'Waiting on captain'
+for want in Tickets Board Metrics Insights 'Needs you'; do grep -qF -- "$want" "$DONE_DONE_EVIDENCE_ROOT/landing-390.txt" || { echo "run-core-proof: the landing page or dock lacks '$want'" >&2; exit 1; }; done
+# Tickets: the backlog mapped to board columns, and only the ask list waits on the captain; a Board card drops tags and Main refs too.
 jq -e '([.tickets[] | {(.task): .state}] | add) as $s | ([.tickets[] | {(.task): .}] | add) as $t
   | $s["m-build"] == "progress" and $s["m-ci"] == "review" and $s["m-held"] == "hold" and $s["m-ready"] == "todo" and $s["m-shipped"] == "done"
   and $t["m-ready"].priority == 1 and $t["m-ready"].release == "next" and $t["m-ready"].project == "beta" and $t["m-build"].release == "later"
   and $t["m-ask"].asked and $t["m-ask"].title == "Choose the layout for the new screen" and $t["m-ask"].priority == 0
+  and ([.cards[] | select(.task == "m-ask")][0].title == "Choose the layout for the new screen")
   and $t["m-shipped"].pr == "https://github.com/acme/alpha/pull/4" and all(.tickets[]; .state != "captain") and (.asks | length) == 1' \
   "$home/state/dashboard/board.json" >/dev/null || { echo "run-core-proof: tickets mapping wrong: $(jq -c '.tickets' "$home/state/dashboard/board.json")" >&2; exit 1; }
 # The ticket page: the description without bookkeeping, the captain's words it serves, and the lane's status lines.
