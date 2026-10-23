@@ -17,6 +17,7 @@ One line per add-on, with how it wires in. `<home>` is your home folder for the 
 - `claude-accounts` — one quota view of every signed-in Claude account (5-hour and 7-day left), shown on the dashboard and written for dispatch; new Claude workers start on the account with the most runway. Wire in: `claude-accounts/install.sh <home>` plus the reader on a timer; see `claude-accounts/README.md`.
 - `claude-model-guard` — keeps agent runs off Fable (Sonnet is allowed): the fable alias resolves to Haiku, full Fable ids are refused. Wire in: `claude-model-guard/install.sh`.
 - `claude-quota` — alarms when the shared Claude plan burns ahead of its 5-hour or weekly window. Wire in: `claude-quota/install.sh <home>`.
+- `codex-guard` — runs the delete, kill and read guards before every Codex shell command; Codex workers start with hooks off, so Codex's own shell environment carries it. Wire in: `codex-guard/install.sh` after the guards; remove: `codex-guard/uninstall.sh`.
 - `delete-guard` — stops any agent from recursively deleting `/` or a home folder; a block alerts you and is final. Wire in: `delete-guard/install.sh <home>`.
 - `fleet-contract-check` — runs each real cross-repo call (dispatch-resolve, owner-guard, checks-lint) in a throwaway HOME and names the caller that breaks. Nothing to install: run `fleet-contract-check/fleet-contract-check`.
 - `fleet-dashboard` — the read-only fleet dashboard: board, charts, kanban, insights, ship view. Served through the fork shim (FORK-EXIT.md).
@@ -65,6 +66,7 @@ export FM_HOME=~/firstmate    # your home folder for the fleet manager
 for d in pipeline-literal-delete pipeline-quota-failover host-memory fleet-flow glm-queue route-change claude-model-guard; do "$d/install.sh"; done
 for d in delete-guard claude-quota merge-on-green git-identity nm-drain owner-guard pane-titles; do "$d/install.sh" "$FM_HOME"; done
 read-guard/install.sh
+codex-guard/install.sh
 FM_HOME="$FM_HOME" fleet-stall/install.sh
 FM_HOME="$FM_HOME" owner-guard/install-scan.sh
 FM_HOME="$FM_HOME" zai-quota-check/install.sh

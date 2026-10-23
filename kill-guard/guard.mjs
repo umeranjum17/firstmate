@@ -20,8 +20,10 @@ function ownStart(args, caller) {
 	if (sepAt !== 2 || !args[0] || args.length < 4) throw new Error("usage: own start <serial> -- <device command>");
 	const [serial, ...command] = [args[1], ...args.slice(3)];
 	const root = worktreeRoot(caller);
-	const payload = `"$@" & p=$!; while [ ! -r /proc/$p/stat ]; do sleep 0.05; done; s=$(cat /proc/$p/stat); r=${"${s##*) }"}; set -- $r; printf '%s %s\\n' "$p" "${"${20}"}"`;
-	const result = spawnSync("adb", ["-s", serial, "shell", "sh", "-c", payload, "own-start", ...command], { encoding: "utf8" });
+	// adb joins its shell arguments with spaces for the device shell, so each one is quoted; the child's stdio is detached
+	// so adb returns at once instead of waiting for the command to end.
+	const payload = `"$@" </dev/null >/dev/null 2>&1 & p=$!; while [ ! -r /proc/$p/stat ]; do sleep 0.05; done; s=$(cat /proc/$p/stat); r=${"${s##*) }"}; set -- $r; printf '%s %s\\n' "$p" "${"${20}"}"`;
+	const result = spawnSync("adb", ["-s", serial, "shell", ["sh", "-c", payload, "own-start", ...command].map(quote).join(" ")], { encoding: "utf8" });
 	if (result.status !== 0) throw new Error(result.stderr || `adb launch failed (${result.status})`);
 	const match = result.stdout.trim().match(/^(\d+) (\d+)$/);
 	if (!match) throw new Error("device did not return a pid and start time");

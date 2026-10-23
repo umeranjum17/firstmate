@@ -116,6 +116,9 @@ jobs:
       # Stub upstream on 127.0.0.1 only: never reaches Z.AI.
       - name: GLM queue test
         run: bash glm-queue/tests/glm-queue.test.sh
+      # The real guard installers in a throwaway HOME; commands run the way Codex runs them: nothing real is touched.
+      - name: Codex guard test
+        run: bash codex-guard/tests/codex-guard.test.sh
       # Fixture origin, shared clone, lane worktree and a throwaway HOME and home: nothing real is touched.
       - name: Git identity test
         run: bash git-identity/tests/git-identity.test.sh
