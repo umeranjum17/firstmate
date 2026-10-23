@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Point one Firstmate home's config/account-pool at the claude-accounts chooser, so every new Claude worker
-# starts on the signed-in account with the most quota runway. Refuses to replace a different account-pool file.
+# shares signed-in accounts in proportion to quota runway. Refuses to replace a different account-pool file.
 # Usage: install.sh <fm-home>          Undo: uninstall.sh <fm-home>
 set -euo pipefail
 [ "$#" -eq 1 ] && [ -d "$1/config" ] || { echo "usage: install.sh <fm-home>" >&2; exit 2; }

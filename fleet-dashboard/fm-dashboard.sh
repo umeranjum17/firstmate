@@ -769,7 +769,9 @@ def claude_accounts():  # state/claude-accounts.json from the claude-accounts ad
         d = json.load(open(os.path.join(HOME, 'state/claude-accounts.json'), encoding='utf-8'))
         win = lambda w: dict(left=num(w.get('left')), resets_at=w.get('resets_at')) if isinstance(w, dict) else None
         return [dict(name=clean(str(a.get('name') or 'default')), five_hour=win(a.get('five_hour')), seven_day=win(a.get('seven_day')),
-                     problem=prose(a['problem']) if a.get('problem') else None, stale=bool(a.get('stale')), read_at=num(d.get('generated_at'))) for a in d['accounts']]
+                     problem=' · '.join(filter(None, [prose(a['problem']) if a.get('problem') else None,
+                         f"Rested until {when(a['rested_until'])}" if (num(a.get('rested_until')) or 0) > NOW_TS else None])) or None,
+                     rested_until=num(a.get('rested_until')), stale=bool(a.get('stale')), read_at=num(d.get('generated_at'))) for a in d['accounts']]
     except FileNotFoundError: return []
     except (OSError, ValueError, KeyError, TypeError, AttributeError) as e:
         notes.append(('claude-accounts', str(e) or 'unreadable')); return []
@@ -1388,6 +1390,7 @@ def claude_bars():  # per account: 5 h and 7 d left, bar = what is used
     rows = ''
     for a in claude_rows:
         rows += f'<div class="can">{esc(a["name"])}</div>'
+        if (a['rested_until'] or 0) > NOW_TS: rows += f'<div class="mut">Rested until {esc(when(a["rested_until"]))}</div>'
         for label, key in (('5 hours', 'five_hour'), ('7 days', 'seven_day')):
             left = (a[key] or {}).get('left')
             tone = 'mut' if left is None else 'bad' if left <= 10 else 'warn' if left <= 25 else 'ok'

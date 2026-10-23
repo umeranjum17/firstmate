@@ -6,7 +6,7 @@ Every Claude account signed in on this machine shows its 5-hour and 7-day quota 
 
 ## Drive
 
-Run `bash claude-accounts/tests/claude-accounts.test.sh` from the repository root. It reads a fixture muxr registry through a stub quota-axi and proves both windows per account, a failing account's recorded cause, and that no secret field reaches the file. For the card, run `FM_HOME=<throwaway home> claude-accounts/bin/claude-accounts-quota.sh`, build and serve the dashboard with that home and capture the Overview at 390px; `bash fleet-dashboard/tests/run-fork-suite.sh <fork checkout>` covers the card's text.
+Run `bash claude-accounts/tests/claude-accounts.test.sh` from the repository root. It reads a fixture muxr registry through a stub quota-axi and proves both windows per account, a failing account's recorded cause, active rest expiry and its removal at 100/100 headroom, and that no secret field reaches the file. For the card, run `FM_HOME=<throwaway home> claude-accounts/bin/claude-accounts-quota.sh`, build and serve the dashboard with that home and capture the Overview at 390px; `bash fleet-dashboard/tests/run-fork-suite.sh <fork checkout>` covers the card's text, including its visible rest expiry.
 
 ## Evidence
 

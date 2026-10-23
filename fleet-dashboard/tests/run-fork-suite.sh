@@ -28,4 +28,4 @@ cp "$HERE/fm-dashboard.test.sh" "$TREE/tests/fm-dashboard.test.sh"
 chmod +x "$TREE/bin/fm-dashboard.sh" "$TREE/tests/fm-dashboard.test.sh"
 
 cd "$TREE"
-bash tests/fm-dashboard.test.sh
+FM_ADDONS_DIR=$(cd "$ADDON/.." && pwd) bash tests/fm-dashboard.test.sh
