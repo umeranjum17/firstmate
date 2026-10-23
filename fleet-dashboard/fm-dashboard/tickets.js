@@ -1,8 +1,9 @@
 // Tickets: every backlog item across the homes on one Jira-like board - To do, In progress, In review, Waiting on
-// captain, Done, On hold - filtered by project; a phone shows one column at a time. Waiting on captain is the ask list
+// captain, Done, On hold - filtered by project and release, or the open items in release lanes (Next release, After,
+// Later); a phone shows one column at a time. Waiting on captain is the ask list
 // and nothing else, so its count is the Needs you count everywhere. A card opens the ticket page: its description, the
 // captain's words it serves, its fields and, for a live lane, the lane's status lines as its thread.
-import { html, useState, useEffect, useRef, now, dur, hm, prNum, hc, hname, I, IC, ASK_TAG, askType, askOrder } from './ui.js'
+import { html, useState, useEffect, useRef, now, dur, hm, prNum, toCol, hc, hname, I, IC, ASK_TAG, askType, askOrder } from './ui.js'
 import { squash, Entry } from './board.js'
 
 export const IC_TICKET = html`<path d="M2.5 4.5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v2a1.5 1.5 0 0 0 0 3v2a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1v-2a1.5 1.5 0 0 0 0-3zM10 5.5v1M10 9.5v1"/>`
@@ -14,6 +15,19 @@ const at = u => typeof u === 'number' ? u : u ? Date.parse(`${u}T12:00:00`) / 10
 const ago = u => typeof u === 'number' ? dur(now() - u) : u ? (k => k < 1 ? 'today' : `${k}d`)(Math.round((new Date().setHours(12, 0, 0, 0) / 1000 - at(u)) / 86400)) : ''
 const order = (s, ts) => [...ts].sort(s === 'done' ? (a, b) => at(b.updated) - at(a.updated) : (a, b) => (a.priority ?? 9) - (b.priority ?? 9) || at(b.updated) - at(a.updated))
 const PRIO = ['Urgent', 'High', 'Medium', 'Low']
+// Release lanes: a project's open items by target release. Next, After and Later are their own lanes; of a project's
+// named releases (v0.2.0, muxr 0.2.10) the lowest version is its Next release unless it already has items marked next.
+const LANES = [['next', 'Next release'], ['after', 'After'], ['later', 'Later']]
+const rel = t => t.release.toLowerCase(), cap = r => /^(?:next|after|later)$/i.test(r) ? r[0].toUpperCase() + r.slice(1).toLowerCase() : r
+const nat = (a, b) => a.localeCompare(b, undefined, { numeric: true })
+function laneOf(ts) {
+  const first = {}
+  for (const t of ts) { const r = rel(t), p = t.project || 'none'
+    if (r === 'next') first[p] = r
+    else if (r !== 'after' && r !== 'later' && first[p] !== 'next' && (first[p] == null || nat(r, first[p]) < 0)) first[p] = r }
+  return t => { const r = rel(t); return r === 'after' || r === 'later' ? r : r === first[t.project || 'none'] ? 'next' : 'after' }
+}
+const relRank = r => ({ next: 0, after: 2, later: 3 })[r] ?? 1
 
 const open = (go, id) => e => { if (e.type === 'click' || e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go({ ticket: id }) } }
 function Ticket({ d, t, go }) {
@@ -23,7 +37,7 @@ function Ticket({ d, t, go }) {
       <span class="sq" style=${{ '--c': hc(d, t.home) }} title=${`Owner: ${hname(d, t.home)}`}></span></div>
     <h3>${t.title}</h3>
     <div class="r3">${t.priority != null ? html`<span class=${'pill prio p' + t.priority} title=${PRIO[t.priority] || ''}>P${t.priority}</span>` : ''}
-      ${t.asked ? html`<span class="pill asked">Your ask</span>` : ''}<span class="pill" title="Target release">${I(IC_RELEASE, 11)}${t.release[0].toUpperCase() + t.release.slice(1)}</span>
+      ${t.asked ? html`<span class="pill asked">Your ask</span>` : ''}<span class="pill" title="Target release">${I(IC_RELEASE, 11)}${cap(t.release)}</span>
       ${n ? html`<a class="pill pr" href=${t.pr} target="_blank" rel="noreferrer" onClick=${e => e.stopPropagation()}>${I(IC.pr, 12)}${n}</a>` : ''}</div></article>`
 }
 
@@ -63,7 +77,7 @@ function TicketPage({ d, t, go }) {
     <div class="body"><div class="id">${t.project || 'No project'}</div><h2>${t.title}</h2>${t.desc ? html`<p class="why tk-desc">${t.desc}</p>` : ''}
       ${t.ask ? html`<blockquote class="tk-ask"><small>Serves your ask${t.ask.day ? ` of ${t.ask.day}` : ''}</small>“${t.ask.words}”</blockquote>` : ''}
       <dl class="props">${P('Priority', t.priority != null && html`<span class=${'pill prio p' + t.priority}>P${t.priority}</span>${PRIO[t.priority] || ''}`)}
-        ${P('Release', html`${I(IC_RELEASE, 12)}${t.release[0].toUpperCase() + t.release.slice(1)}`)}
+        ${P('Release', html`${I(IC_RELEASE, 12)}${cap(t.release)}`)}
         ${P('Owner', html`<span class="pill"><span class="sq" style=${{ '--c': hc(d, t.home) }}></span>${hname(d, t.home)}</span>`)}
         ${P('Pull request', n && html`<a class="pill pr" href=${t.pr} target="_blank" rel="noreferrer">${I(IC.pr, 12)}#${n}</a>`)}
         ${P('Last update', html`<span class="num">${ago(t.updated)}</span>${typeof t.updated === 'number' ? html`<small>${hm(t.updated)}</small>` : ''}`)}</dl>
@@ -85,19 +99,25 @@ function Col({ d, s, name, xs, asks, n, go }) {
 }
 
 export function Tickets({ d, r, go, wide }) {
-  const all = d.tickets || [], ts = all.filter(t => !r.project.length || r.project.includes(t.project || 'none')), unread = d.tickets_unread || []
+  const all = d.tickets || [], unread = d.tickets_unread || [], lane = laneOf(all.filter(t => t.state !== 'done'))
+  const ts = all.filter(t => (!r.project.length || r.project.includes(t.project || 'none')) && (!r.release.length || r.release.includes(rel(t))))
   const projects = [...new Set(all.map(t => t.project || 'none'))].sort((a, b) => (a === 'none') - (b === 'none') || a.localeCompare(b))
-  const cols = COLS.map(([s, name]) => { const xs = s === 'captain' ? [] : order(s, ts.filter(t => t.state === s)), asks = s === 'captain' ? askOrder(d.asks || []) : null
-    return { s, name, xs, asks, n: !asks ? xs.length : d.asks == null ? '?' : asks.length } })
+  const releases = [...new Set(all.map(rel))].sort((a, b) => relRank(a) - relRank(b) || nat(a, b))
+  const cols = r.by ? LANES.map(([s, name]) => { const xs = order(s, ts.filter(t => t.state !== 'done' && lane(t) === s)); return { s, name, xs, n: xs.length } })
+    : COLS.map(([s, name]) => { const xs = s === 'captain' ? [] : order(s, ts.filter(t => t.state === s)), asks = s === 'captain' ? askOrder(d.asks || []) : null
+      return { s, name, xs, asks, n: !asks ? xs.length : d.asks == null ? '?' : asks.length } })
   const page = r.ticket && all.find(t => t.id === r.ticket)
-  const [i, setI] = useState(COLS.findIndex(([s]) => s === 'captain')), ref = useRef()
-  useEffect(() => { if (!wide) ref.current?.children[i]?.scrollIntoView({ inline: 'start', block: 'nearest' }) }, [wide])
+  const start = r.by ? 0 : COLS.findIndex(([s]) => s === 'captain'), [i, setI] = useState(start), ref = useRef()
+  useEffect(() => { setI(start); if (!wide) toCol(ref.current, start) }, [wide, r.by])
   useEffect(() => { if (!wide) document.querySelector('.mseg [aria-selected=true]')?.scrollIntoView({ inline: 'center', block: 'nearest' }) }, [i, wide])
-  const jump = k => { setI(k); ref.current?.children[k]?.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' }) }
+  const jump = k => { setI(k); toCol(ref.current, k, 'smooth') }
   const onScroll = () => { const el = ref.current; if (el) { const k = Math.round(el.scrollLeft / el.clientWidth); if (k !== i) setI(k) } }
   return html`<div class="tks">
     <div class="seg tkp" role="group" aria-label="Project">${[['', 'All projects', all.length], ...projects.map(p => [p, p === 'none' ? 'No project' : p, all.filter(t => (t.project || 'none') === p).length])]
       .map(([v, n, k]) => html`<button aria-pressed=${v ? r.project.length === 1 && r.project[0] === v : !r.project.length} onClick=${() => go({ project: v ? [v] : [] })}>${n}<small class="num">${k}</small></button>`)}</div>
+    <div class="seg tkp"><span class="seg" role="group" aria-label="Columns">${[['', 'By state'], ['release', 'By release']].map(([v, n]) =>
+      html`<button aria-pressed=${r.by === v} onClick=${() => go({ by: v })}>${n}</button>`)}</span><span class="seg" role="group" aria-label="Release">${[['', 'All releases', all.length], ...releases.map(v => [v, cap(v), all.filter(t => rel(t) === v).length])]
+      .map(([v, n, k]) => html`<button aria-pressed=${v ? r.release.length === 1 && r.release[0] === v : !r.release.length} onClick=${() => go({ release: v ? [v] : [] })}>${n}<small class="num">${k}</small></button>`)}</span></div>
     ${unread.length ? html`<p class="sum"><span class="bad">Backlog not read: ${unread.map(h => hname(d, h)).join(', ')}</span></p>` : ''}
     ${wide ? '' : html`<div class="mseg" role="tablist">${cols.map((c, k) => html`<button role="tab" aria-selected=${i === k} onClick=${() => jump(k)}>${c.name}<small class="num">${c.n}</small></button>`)}</div>`}
     <div class=${wide ? 'tkb' : 'mcols'} ref=${ref} onScroll=${wide ? null : onScroll}>${cols.map(c => html`<${Col} key=${c.s} d=${d} go=${go} ...${c}/>`)}</div>

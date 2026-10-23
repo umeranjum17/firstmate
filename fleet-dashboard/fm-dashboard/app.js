@@ -69,7 +69,8 @@ function parseHash() {
   const [path, q] = location.hash.replace(/^#\/?/, '').split('?')
   const p = new URLSearchParams(q || ''), list = k => (p.get(k) || '').split(',').filter(Boolean)
   return { view: VIEWS.includes(path) ? path : 'tickets', tab: TABS.some(([t]) => t === p.get('tab')) ? p.get('tab') : 'active',
-    rows: p.get('rows') === 'home' ? 'home' : '', home: list('home'), model: list('model'), state: list('state'), project: list('project'), card: p.get('card'), ticket: p.get('ticket') }
+    rows: p.get('rows') === 'home' ? 'home' : '', home: list('home'), model: list('model'), state: list('state'), stage: list('stage').filter(s => STAGES.includes(s)),
+    project: list('project'), release: list('release'), by: p.get('by') === 'release' ? 'release' : '', card: p.get('card'), ticket: p.get('ticket') }
 }
 // An old /overview link lands on the app and opens the native Overview, its address now hash-based.
 function initialRoute() {
@@ -81,7 +82,8 @@ function toHash(r) {
   const p = new URLSearchParams()
   if (r.tab !== 'active') p.set('tab', r.tab)
   if (r.rows) p.set('rows', r.rows)
-  for (const k of ['home', 'model', 'state', 'project']) if (r[k].length) p.set(k, r[k].join(','))
+  for (const k of ['home', 'model', 'state', 'stage', 'project', 'release']) if (r[k].length) p.set(k, r[k].join(','))
+  if (r.by) p.set('by', r.by)
   if (r.card) p.set('card', r.card)
   if (r.ticket) p.set('ticket', r.ticket)
   return `#/${r.view}${p.size ? '?' + p.toString().replace(/%2C/g, ',').replace(/%2F/g, '/') : ''}`
@@ -117,7 +119,7 @@ function Filters({ d, r, go, label }) {
 }
 function Chips({ d, r, go }) {
   const xs = [...r.home.map(v => ['home', v, 'Home', hname(d, v)]), ...r.model.map(v => ['model', v, 'Model', mname(v === 'none' ? null : v, d)]),
-    ...r.state.map(v => ['state', v, 'State', STATES.find(s => s[0] === v)?.[1] || v])]
+    ...r.state.map(v => ['state', v, 'State', STATES.find(s => s[0] === v)?.[1] || v]), ...r.stage.map(v => ['stage', v, 'Stage', SNAME[v]])]
   return xs.length ? html`<div class="chips">${xs.map(([k, v, n, w]) => html`<span class="chip">${n} is <b>${w}</b><button aria-label=${`Remove ${w}`} onClick=${() => go({ [k]: r[k].filter(x => x !== v) })}>${I(IC.x, 12)}</button></span>`)}</div>` : ''
 }
 
@@ -183,7 +185,7 @@ function Rail({ d, go }) {
   return html`<div class="ov-rail">${[...ACTIVE, 'landed'].map(s => {
     const xs = col(s), n = xs.length, st = xs.filter(stuck).length, wt = xs.filter(c => c.wait && !stuck(c)).length
     const old = s === 'landed' ? null : Math.max(0, ...xs.map(c => c.since ? now() - c.since : 0))
-    return html`<button class="ov-stage" key=${s} style=${{ '--c': `var(--st-${s})` }} onClick=${() => go({ view: 'board', tab: s === 'landed' ? 'landed' : 'active', card: null })}>
+    return html`<button class="ov-stage" key=${s} style=${{ '--c': `var(--st-${s})` }} onClick=${() => go({ view: 'board', tab: s === 'landed' ? 'landed' : 'active', stage: s === 'landed' ? [] : [s], state: [], card: null })}>
       <span class="ov-sh"><${StageIcon} s=${s}/>${SNAME[s]}</span><b class="num">${s === 'landed' ? total(d, n, 'landed') : n}</b>
       ${s === 'landed' ? html`<span class="ov-sbar done"></span>` : html`<span class="ov-sbar"><i style=${{ width: `${(n - st - wt) / top * 100}%` }}></i><i class="w" style=${{ width: `${wt / top * 100}%` }}></i><i class="s" style=${{ width: `${st / top * 100}%` }}></i></span>`}
       <small>${s === 'landed' ? 'merged today' : !n ? 'empty' : [st && html`<em class="s">${st} stuck</em>`, wt && `${wt} waiting`, old > 60 && `oldest ${dur(old)}`].filter(Boolean).flatMap((p, k) => k ? [' · ', p] : [p])}</small></button>` })}</div>`
@@ -204,8 +206,8 @@ function Overview({ d, od, go }) {
     ${od.err ? html`<p class="ov-tot"><span class="bad">Refresh failed: ${od.err}</span></p>` : ''}
     <div class="ov-kpis">
       <${Kpi} name="Needs you" v=${asks == null ? '?' : asks.length} c=${asks?.length ? '--orange' : '--green'} href="#/needs" src=${m.asks?.source}/>
-      <${Kpi} name="Stuck" v=${stk} c=${stk ? '--red' : '--green'} t=${trend(hist, 'stuck', stk)} good="down" src=${m.stuck?.source} onClick=${() => go({ view: 'board', tab: 'active', state: ['blocked', 'decision'], card: null })}/>
-      <${Kpi} name="To land" v=${toLand} c="--st-merge" src=${m.lanes?.source} onClick=${() => go({ view: 'board', tab: 'active', card: null })}/>
+      <${Kpi} name="Stuck" v=${stk} c=${stk ? '--red' : '--green'} t=${trend(hist, 'stuck', stk)} good="down" src=${m.stuck?.source} onClick=${() => go({ view: 'board', tab: 'active', state: ['blocked', 'decision'], stage: [], card: null })}/>
+      <${Kpi} name="To land" v=${toLand} c="--st-merge" src=${m.lanes?.source} onClick=${() => go({ view: 'board', tab: 'active', stage: ['merge'], state: [], card: null })}/>
       <${Kpi} name="Lanes open" v=${m.lanes?.value ?? '–'} sub=${` of ${m.lane_plan?.value ?? '–'}`} c="--accent" t=${trend(hist, 'lanes', m.lanes?.value)} good="up" src=${m.lanes?.source}/>
       <${Kpi} name="Ready" v=${m.ready?.value ?? '–'} c="--h-2" t=${trend(hist, 'ready', m.ready?.value)} src=${m.ready?.source}/>
     </div><${Src} m=${m} text=${`Needs you: ${m.asks?.source || 'not recorded'} · Stuck, To land, Lanes open: ${m.lanes?.source || 'not recorded'} · Ready: ${m.ready?.source || 'not recorded'}`}/>
@@ -254,9 +256,9 @@ function Palette({ d, go, close, toggleTheme }) {
   const groups = [
     ['Go to', [['tickets', 'Tickets'], ['board', 'Board'], ['overview', 'Metrics'], ['insights', 'Insights'], ['needs', 'Needs you']].map(([v, n]) => ({ n, k: v === 'insights' ? '' : `G ${n[0]}`, run: () => go({ view: v, card: null }) }))],
     ['Actions', [
-      { n: 'Show stuck lanes', run: () => go({ view: 'board', tab: 'active', state: ['blocked', 'decision'], card: null }) },
+      { n: 'Show stuck lanes', run: () => go({ view: 'board', tab: 'active', state: ['blocked', 'decision'], stage: [], card: null }) },
       { n: 'Group rows by home', k: '⇧G', run: () => go({ view: 'board', rows: 'home' }) },
-      { n: 'Clear filters', run: () => go({ home: [], model: [], state: [] }) },
+      { n: 'Clear filters', run: () => go({ home: [], model: [], state: [], stage: [] }) },
       { n: 'Light or dark theme', k: 'T', run: toggleTheme }]],
     ['Homes', d.homes.map(h => ({ n: h.name, k: `${h.known ? h.open : '?'} open`, run: () => go({ view: 'board', home: [h.id], card: null }) }))],
     ['Lanes', [...ACTIVE, 'queued', 'landed'].flatMap(s => sorted(d.cards.filter(c => c.stage === s))).map(c => ({ n: c.title, i: html`<${StageIcon} s=${c.stage}/>`,
@@ -333,7 +335,7 @@ function App() {
   const asks = d.asks?.length, today = total(d, d.landed.at(-1), 'landed'), opencard = id => go({ card: id })
   const count = t => t === 'all' ? null : total(d, d.cards.filter(c => inTab(t, c)).length, t)
   const shown = cards.filter(c => inTab(r.tab, c))
-  const list = (byStage(r.tab) ? stagesOf(r.tab) : [r.tab]).flatMap(s => sorted(shown.filter(c => c.stage === s)))
+  const list = (byStage(r.tab) ? stagesOf(r.tab, r.stage) : [r.tab]).flatMap(s => sorted(shown.filter(c => c.stage === s)))
   const title = { board: 'Board', tickets: 'Tickets', overview: 'Metrics', insights: 'Insights', needs: 'Needs you' }[r.view]
   const overlays = html`${r.card && html`<${Detail} d=${d} id=${r.card} go=${go} list=${list}/>`}
     ${pal && html`<${Palette} d=${d} go=${go} close=${() => setPal(false)} toggleTheme=${toggleTheme}/>`}${keys && html`<${Shortcuts} close=${() => setKeys(false)}/>`}`
@@ -365,7 +367,7 @@ function App() {
       <header class="hd"><h1>${title}</h1>
         ${r.view === 'board' ? html`${TABS.map(([t, n]) => html`<button class="tab" aria-pressed=${r.tab === t} onClick=${() => go({ tab: t })}>${n}${count(t) != null ? html`<small class="num">${count(t)}</small>` : ''}</button>`)}
           <span class="sp"></span>
-          <div class="kpi num"><a href="#/needs">Needs you <b>${asks ?? '?'}</b></a><button class=${stk.length ? 'bad' : ''} onClick=${() => go({ tab: 'active', state: ['blocked', 'decision'], card: null })}>Stuck <b>${total(d, stk.length)}</b></button>
+          <div class="kpi num"><a href="#/needs">Needs you <b>${asks ?? '?'}</b></a><button class=${stk.length ? 'bad' : ''} onClick=${() => go({ tab: 'active', state: ['blocked', 'decision'], stage: [], card: null })}>Stuck <b>${total(d, stk.length)}</b></button>
             <button onClick=${() => go({ tab: 'landed' })}>Landed today <b>${today}</b></button><span title="Typical time from start to landed">Cycle p50 <b>${d.cycle_p50 == null ? '–' : dur(d.cycle_p50)}</b></span></div>
           <${Filters} d=${d} r=${r} go=${go} label="Filter"/>
           ${byStage(r.tab) ? html`<${Pop} label="Display" icon=${IC.display}><div class="pop-h">Rows</div>

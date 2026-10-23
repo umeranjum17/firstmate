@@ -1,7 +1,7 @@
 // The board in Linear's language: columns of issue cards on a desktop (by stage, or by home for queued and landed work,
 // optionally one band per home), a list grouped by stage on a phone, and the card detail as Linear's issue peek.
 import { html, useState, useEffect, useRef, now, dur, hm, prNum, STAGES, ACTIVE, SNAME, stuck, state, reason, plain, total, hc, hname, mname,
-  sorted, age, I, IC, Caret, StageIcon, Av } from './ui.js'
+  sorted, age, toCol, I, IC, Caret, StageIcon, Av } from './ui.js'
 
 // Which lanes a tab shows, and whether its columns are stages or homes.
 export const TABS = [['active', 'Active'], ['stuck', 'Stuck'], ['waiting', 'Waiting'], ['queued', 'Queued'], ['landed', 'Landed today'], ['all', 'All']]
@@ -9,7 +9,8 @@ const PICK = { active: () => true, stuck: stuck, waiting: c => c.wait === 'waiti
 export const inTab = (t, c) => t === 'all' || (PICK[t] ? ACTIVE.includes(c.stage) && PICK[t](c) : c.stage === t)
 // Queued and landed work is grouped by home; every other tab is grouped by stage.
 export const byStage = t => t !== 'queued' && t !== 'landed'
-export const stagesOf = t => t === 'all' ? STAGES : ACTIVE
+// A stage filter (the Metrics lifecycle rail or To land) keeps only its own columns.
+export const stagesOf = (t, only = []) => (t === 'all' ? STAGES : ACTIVE).filter(s => !only.length || only.includes(s))
 // A home's count against its lane cap ("5 / 6"), amber over the cap; only when the group holds exactly that home's open lanes.
 const Count = ({ d, n, home, cs }) => {
   const h = d.homes.find(x => x.id === home), cap = h?.plan
@@ -39,7 +40,7 @@ const stageHead = s => html`<${StageIcon} s=${s}/><b>${SNAME[s]}</b>`
 const homeHead = (d, h) => html`<span class="sq" style=${{ '--c': hc(d, h) }}></span><b>${hname(d, h)}</b>`
 
 export function Board({ d, cards, r, open }) {
-  const stages = stagesOf(r.tab)
+  const stages = stagesOf(r.tab, r.stage)
   if (!cards.length) return html`<div class="none"><p>No recorded lanes match.</p></div>`
   if (!byStage(r.tab)) return html`<div class="board">${d.homes.filter(h => cards.some(c => c.home === h.id)).map(h =>
     html`<${Col} key=${h.id} d=${d} head=${homeHead(d, h.id)} cs=${sorted(cards.filter(c => c.home === h.id))} open=${open} home stage=${r.tab}/>`)}</div>`
@@ -54,14 +55,14 @@ export function Board({ d, cards, r, open }) {
 // --- phone: a mobile kanban, one status column at a time (Linear/Jira mobile) --------
 // A sticky switcher with counts jumps the horizontal, scroll-snapped columns to any status.
 export function MobileKanban({ d, cards, r, open }) {
-  const stages = stagesOf(r.tab), grouped = byStage(r.tab) && r.rows !== 'home'
+  const stages = stagesOf(r.tab, r.stage), grouped = byStage(r.tab) && r.rows !== 'home'
   const label = (s, n) => total(d, n, grouped ? s : r.tab)
   const cols = (grouped
     ? stages.map(s => ({ key: s, name: SNAME[s], head: stageHead(s), cs: sorted(cards.filter(c => c.stage === s)), home: false }))
     : d.homes.map(h => ({ key: h.id, name: hname(d, h.id), head: homeHead(d, h.id), cs: sorted(cards.filter(c => c.home === h.id)), home: true })))
     .filter(c => c.cs.length)
   const [i, setI] = useState(0), ref = useRef()
-  const jump = k => { setI(k); ref.current?.children[k]?.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' }) }
+  const jump = k => { setI(k); toCol(ref.current, k, 'smooth') }
   const onScroll = () => { const el = ref.current; if (el) { const k = Math.min(cols.length - 1, Math.round(el.scrollLeft / (el.scrollWidth / cols.length))); if (k !== i) setI(k) } }
   useEffect(() => { if (i >= cols.length) setI(Math.max(0, cols.length - 1)) }, [cols.length])
   if (!cols.length) return html`<div class="none"><p>No recorded lanes match.</p></div>`

@@ -40,6 +40,7 @@ seed() {
   cat > "$home/data/backlog.md" <<EOF
 ## In flight
 - [ ] m-build - Build the main thing (repo: alpha) (kind: ship) (since $today)
+  release: v0.2.0
 - [ ] m-ci - Get the layout pull request through CI (repo: alpha) (kind: ship) (since $today)
 - [ ] m-stuck - Publish the release from the build server (repo: alpha) (kind: ship) (since $today)
 - [ ] m-ask - [captain-ask] Choose the layout for the new screen (Main42) (repo: alpha) (kind: ship) (priority: 0) (since $today)
@@ -56,6 +57,7 @@ seed() {
   Captain decision:
   Captain 22 Oct chat: "keep the old layout until the new one is proven". Main decides: wait for the new layout.
 - [ ] m-after - After the ready thing blocked-by: m-ready (repo: alpha) (kind: ship) (since $today)
+  release: v0.3.0
 
 ## Done
 - [x] m-shipped - Ship the main thing (repo: alpha) (kind: ship) (merged $today)
@@ -166,7 +168,7 @@ for want in Tickets Board Metrics Insights 'Needs you'; do grep -qF -- "$want" "
 # Tickets: the backlog mapped to board columns, and only the ask list waits on the captain; a Board card drops tags and Main refs too.
 jq -e '([.tickets[] | {(.task): .state}] | add) as $s | ([.tickets[] | {(.task): .}] | add) as $t
   | $s["m-build"] == "progress" and $s["m-ci"] == "review" and $s["m-held"] == "hold" and $s["m-ready"] == "todo" and $s["m-shipped"] == "done"
-  and $t["m-ready"].priority == 1 and $t["m-ready"].release == "next" and $t["m-ready"].project == "beta" and $t["m-build"].release == "later"
+  and $t["m-ready"].priority == 1 and $t["m-ready"].release == "next" and $t["m-ready"].project == "beta" and $t["m-build"].release == "v0.2.0" and $t["m-ci"].release == "later"
   and $t["m-ask"].asked and $t["m-ask"].title == "Choose the layout for the new screen" and $t["m-ask"].priority == 0
   and ([.cards[] | select(.task == "m-ask")][0].title == "Choose the layout for the new screen")
   and $t["m-shipped"].pr == "https://github.com/acme/alpha/pull/4" and all(.tickets[]; .state != "captain") and (.asks | length) == 1' \
@@ -205,6 +207,29 @@ for w in 390 1280; do
     grep -qF -- "$want" "$DONE_DONE_EVIDENCE_ROOT/tickets-$w.txt" || { echo "run-core-proof: Tickets at $w lacks '$want'" >&2; exit 1; }
   done
 done
+# Release lanes: a project's lowest named release is its Next release (alpha v0.2.0), a literal next stays Next
+# (beta), a later named release is After, and no release line is Later; done work is not in a lane.
+cols() { chrome-devtools-axi eval 'JSON.stringify([...document.querySelectorAll(".tkc")].map(c => [c.querySelector(".ch b").textContent, ...[...c.querySelectorAll("h3")].map(h => h.textContent).sort()]))' \
+  | sed -n 's/^result: //p' | jq -c 'fromjson | if type == "string" then fromjson else . end'; }
+for w in 390 1280; do shot "tickets-release-$w" '#/tickets?by=release' "$w" 'Next release'; done
+want='[["Next release","Build the main thing","Start the ready thing"],["After","After the ready thing"],["Later","Choose the layout for the new screen","Get the layout pull request through CI","Publish the release from the build server","Wait for the captain'"'"'s call"]]'
+[ "$(cols)" = "$want" ] || { echo "run-core-proof: release lanes wrong: $(cols)" >&2; exit 1; }
+shot tickets-release-filter-1280 '#/tickets?release=v0.2.0' 1280 'Build the main thing'
+[ "$(cols | jq -c '[.[] | select(.[0] != "Waiting on captain") | .[1:][]]')" = '["Build the main thing"]' ] || { echo "run-core-proof: the v0.2.0 filter shows $(cols)" >&2; exit 1; }
+# The Metrics lifecycle rail opens the Board filtered to that stage, and To land to To merge.
+for w in 390 1280; do
+  shot "rail-$w" '#/overview' "$w" Lifecycle
+  chrome-devtools-axi eval '[...document.querySelectorAll(".ov-stage")].find(b => b.textContent.includes("PR + CI")).click()' >/dev/null
+  chrome-devtools-axi wait m-ci >/dev/null
+  chrome-devtools-axi eval 'JSON.stringify({ viewport: innerWidth, hash: location.hash, text: document.body.innerText })' >"$DONE_DONE_EVIDENCE_ROOT/board-stage-$w.txt"
+  chrome-devtools-axi screenshot "$DONE_DONE_EVIDENCE_ROOT/board-stage-$w.png" >/dev/null
+  grep -qF '#/board?stage=ci' "$DONE_DONE_EVIDENCE_ROOT/board-stage-$w.txt" && grep -qF 'Stage is' "$DONE_DONE_EVIDENCE_ROOT/board-stage-$w.txt" \
+    && ! grep -qF m-build "$DONE_DONE_EVIDENCE_ROOT/board-stage-$w.txt" || { echo "run-core-proof: the PR + CI stage at $w did not open the filtered Board" >&2; exit 1; }
+done
+shot to-land-1280 '#/overview' 1280 Lifecycle
+chrome-devtools-axi eval '[...document.querySelectorAll(".ov-kpi")].find(b => b.textContent.includes("To land")).click()' >/dev/null
+sleep 1
+chrome-devtools-axi eval 'location.hash' | grep -qF '#/board?stage=merge' || { echo "run-core-proof: To land did not open the To merge Board" >&2; exit 1; }
 chrome-devtools-axi resize 390 844 >/dev/null
 chrome-devtools-axi open "${url}#/insights" >/dev/null
 chrome-devtools-axi wait "Why work waits" >/dev/null
@@ -230,6 +255,14 @@ if [ -z "${BOARD_SHOTS_ONLY:-}" ]; then
   grep -qF '4 / 3' "$e/board-homes-390.txt" || { echo "run-core-proof: phone home column lacks the count against the lane cap" >&2; exit 1; }
 fi
 
+# A failing flow reader names its cause on Insights instead of a bare "unavailable".
+mkdir "$home/badbin" && for f in "$bin"/*; do ln -s "$(readlink "$f")" "$home/badbin/${f##*/}"; done
+rm -- "$home/badbin/fm-flow.sh" && printf '#!/bin/sh\necho "fm-flow: lane records unreadable" >&2\nexit 3\n' > "$home/badbin/fm-flow.sh"
+bin=$home/badbin dash build >/dev/null
+jq -e '.flow == null and .flow_error == "Flow reader unavailable: fm-flow: lane records unreadable"' "$home/state/dashboard/board.json" >/dev/null \
+  || { echo "run-core-proof: flow_error lacks the reader's cause: $(jq -c .flow_error "$home/state/dashboard/board.json")" >&2; exit 1; }
+shot flow-error-390 '?flow-error#/insights' 390 'lane records unreadable'
+
 # The steps and result the check judges the captures against.
 python3 - "$DONE_DONE_EVIDENCE_ROOT/steps.json" "$(git -C "$root" rev-parse --short HEAD)" <<'PY'
 import json, sys
@@ -247,8 +280,11 @@ steps = {
         "Open the held ticket at 390px: its description is the plain decision, with no leftover labels or punctuation",
         "Open Overview at 390px and 1280px: each card names its source; scroll Overview, Insights and Tickets to the end at 390px",
         "Write a comment on the ticket, paste the device's comment token once and send it to the owning lead (Main here)",
+        "Switch Tickets to By release at 390px and 1280px, then filter it to release v0.2.0",
+        "On Metrics at 390px and 1280px, tap the PR + CI stage of the lifecycle rail; tap To land at 1280px",
+        "Build with a flow reader that fails and open Insights at 390px",
     ],
-    "result": "The Board lists m-stuck, m-ask, m-ci and m-build with their titles and states; the Stuck tab holds only stuck lanes, the Waiting tab only the waiting lane, and a home with four open lanes against a cap of three reads 4 / 3; Insights shows Why work waits now with the Blocked, Lead reply and Held groups; Tickets puts each backlog item in its column with its priority chip and release, the captain-held item On hold, and only the one ask under Waiting on captain; a ticket page shows its description, the captain's words with their day, and the lane's activity; Overview names the source of every figure, and each page's end clears the tab bar at 390px; the sidebar and the phone dock no longer offer a Ship tab; a comment sent from the ticket page reaches Main's inbox and shows in the ticket thread as sent",
+    "result": "The Board lists m-stuck, m-ask, m-ci and m-build with their titles and states; the Stuck tab holds only stuck lanes, the Waiting tab only the waiting lane, and a home with four open lanes against a cap of three reads 4 / 3; Insights shows Why work waits now with the Blocked, Lead reply and Held groups; Tickets puts each backlog item in its column with its priority chip and release, the captain-held item On hold, and only the one ask under Waiting on captain; a ticket page shows its description, the captain's words with their day, and the lane's activity; Overview names the source of every figure, and each page's end clears the tab bar at 390px; the sidebar and the phone dock no longer offer a Ship tab; a comment sent from the ticket page reaches Main's inbox and shows in the ticket thread as sent; By release puts alpha's v0.2.0 and beta's next item under Next release, the v0.3.0 item under After and items with no release under Later, and the v0.2.0 filter leaves only its item; the PR + CI stage opens the Board filtered to that stage with a removable Stage chip, and To land opens it filtered to To merge; a failing flow reader shows its own error on Insights",
 }
 with open(sys.argv[1], "w") as f:
     json.dump(steps, f, indent=2, ensure_ascii=False)

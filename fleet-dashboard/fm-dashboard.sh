@@ -8,11 +8,11 @@
 # words; filters by home, model and state; a card's detail with its stages and activity; Tickets
 # (tickets.js: every backlog item as a card in To do, In progress, In review, Done or On hold, with its
 # P0-P3 priority, target release, owner home and pull request, the ask list as Waiting on captain,
-# filtered by project; a phone shows one column at a time; a card opens its ticket page with the description,
+# filtered by project and release, or the open items in Next release, After and Later lanes; a phone shows one column at a time; a card opens its ticket page with the description,
 # the captain's words it serves and the lane's status lines); Overview
 # (five key figures, where Stuck, Lanes open and Ready also show their change since yesterday and
 # a day's trend; the lifecycle, every open lane by stage split into moving, waiting and stuck, then
-# landings; lanes by state; 14-day landed and closed charts; queue reasons; quota runway; each home's
+# landings, each stage opening the Board filtered to it (To land opens To merge); lanes by state; 14-day landed and closed charts; queue reasons; quota runway; each home's
 # lanes by stage against its plan; every figure names the records it comes from, on hover and under its card); Needs you
 # (the ask list); Insights (the shipped fm-flow.sh reader's lifecycle, waits, queue, retained merge
 # outcomes and optional read-only capacity observations, plus the Models and Skills sections
@@ -25,7 +25,7 @@
 # Each build writes the app's one data file, state/dashboard/board.json: homes with their
 # lane plans, one card per open lane, ready backlog item and pull request landed today,
 # one ticket per backlog item of each read home (tickets_unread names the homes not read),
-# and parked home ids. Its flow key is the fm-flow.v1 Insights observation, or flow_error when
+# and parked home ids. Its flow key is the fm-flow.v1 Insights observation, or flow_error, naming the cause, when
 # that reader is unavailable or unreadable; its models and skills keys hold the fm-model-stats.v1
 # and fm-skill-stats.v1 observations, or the matching *_error; a recursive scrub removes raw
 # reason, source, gate_source and errors keys before the write.
@@ -366,12 +366,13 @@ def adb_path():  # a server started outside a login shell often lacks the SDK on
     return shutil.which('adb') or next((p for d in sdks if d and os.access(p := os.path.join(os.path.expanduser(d), 'platform-tools', 'adb'), os.X_OK)), 'adb')
 
 def probe(cmd, ok=(0,), timeout=5, env=None, cwd=None):
-    """(stdout, None) from a read-only command, or (None, reason)."""
+    """(stdout, None) from a read-only command, or (None, reason), naming the script bash runs."""
+    name = os.path.basename(next((x for x in cmd[1:2] if x.endswith('.sh')), cmd[0]))
     try: r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env, cwd=cwd)
     except FileNotFoundError: return None, f'{cmd[0]} not found'
-    except subprocess.TimeoutExpired: return None, f'{os.path.basename(cmd[0])} gave no answer in {timeout} s'
+    except subprocess.TimeoutExpired: return None, f'{name} gave no answer in {timeout} s'
     except OSError as e: return None, f'{cmd[0]}: {e.strerror}'
-    if r.returncode not in ok: return None, (r.stderr.strip().splitlines() or [f'{cmd[0]} exit {r.returncode}'])[-1]
+    if r.returncode not in ok: return None, (r.stderr.strip().splitlines() or [f'{name} exit {r.returncode}'])[-1]
     return r.stdout, None
 
 # --- homes ---------------------------------------------------------------
@@ -1789,9 +1790,10 @@ except OSError: pass
 tickets = [dict(ticket(h, r), comments=said.get(f"{h}/{r['id']}", [])[-50:]) for h in ACTIVE for r in backlog.get(h) or []]
 # Cycle time: dispatch to merge, for each merged task whose dispatch is in a ledger.
 cycles = sorted(at - d['ts'] for at, h, task in merges.values() if (d := dispatch(h, task, at)))
-flow_text = probe(['bash', os.path.join(BIN, 'fm-flow.sh'), '--json', '--now', str(int(NOW_TS)), '--capacity'],
-                  timeout=180, env=dict(os.environ, FM_HOME=HOME))[0]
-flow, flow_error = None, None if flow_text is not None else 'Flow reader unavailable'
+# A failed read names its cause (the reader's last error line, its exit or the deadline), shown on Insights.
+flow_text, flow_why = probe(['bash', os.path.join(BIN, 'fm-flow.sh'), '--json', '--now', str(int(NOW_TS)), '--capacity'],
+                            timeout=180, env=dict(os.environ, FM_HOME=HOME))
+flow, flow_error = None, None if flow_text is not None else f'Flow reader unavailable: {prose(flow_why)}'
 if flow_text is not None:
     try:
         flow = json.loads(flow_text)
@@ -1825,8 +1827,8 @@ if flow_text is not None:
                 mac[key] = len(mac[key])
         for folder in cap.get('tmp', {}).get('top_folders') or []:
             folder['display_name'] = os.path.basename(folder.pop('path'))
-    except (ValueError, KeyError, TypeError):
-        flow, flow_error = None, 'Flow observations unreadable'
+    except (ValueError, KeyError, TypeError) as e:
+        flow, flow_error = None, f'Flow observations unreadable: {e}'
 def read_stat(kind, script):
     text = probe(['bash', os.path.join(BIN, script), '--json', '--now', str(int(NOW_TS))],
                    timeout=10, env=dict(os.environ, FM_HOME=HOME))[0]

@@ -31,7 +31,8 @@ Run the behavior suite with `fleet-dashboard/tests/run-fork-suite.sh [checkout]`
   pages `index.html`, `backlog.html` (+ its `backlog.home.html` variant) and
   `measure.html`, plus the retained `filed.json` and `history.tsv`.
 - Data keys: `board.json` carries the flow reader's `fm-flow.v1` observation
-  under `flow`, or `flow_error` when that reader is unavailable or unreadable,
+  under `flow`, or `flow_error` naming the cause (the reader's last error line,
+  its exit or the 180 s deadline) when that reader is unavailable or unreadable,
   with the matching `models_error` / `skills_error` keys for the statistics
   readers.
 
@@ -65,7 +66,7 @@ the `tickets` and `tickets_unread` keys `fm-dashboard.sh` adds to `board.json` f
 backlog it already reads, Overview naming the source of every figure (from each
 metric's `source` in `data.json`) on hover and under its card, and the ticket comment: the server's one write, `POST /comment`
 with a per-device token (`state/dashboard/comment-token`), delivered to the owning lead with
-`fm-send.sh` (or to Main with `fm-inbox.sh note`) and shown in the ticket thread. The Ship tab is removed, with its `ship/` files and the vendored three.js it alone used. The app takes the approved Tickets prototype's look: neutral greys and one accent in both themes (Insights included), Tickets as the landing view, Overview labelled Metrics, a phone dock that names each view, flat neutral Metrics cards, and Board cards whose names drop leading tags and Main refs as tickets do.
+`fm-send.sh` (or to Main with `fm-inbox.sh note`) and shown in the ticket thread. The Ship tab is removed, with its `ship/` files and the vendored three.js it alone used. The app takes the approved Tickets prototype's look: neutral greys and one accent in both themes (Insights included), Tickets as the landing view, Overview labelled Metrics, a phone dock that names each view, flat neutral Metrics cards, and Board cards whose names drop leading tags and Main refs as tickets do. Tickets filters by release as well as project and lays open items in release lanes (Next release, After, Later; `#/tickets?by=release`); each Metrics lifecycle stage and To land open the Board filtered to that stage (`#/board?stage=ci`, a removable Stage chip); a phone's column switcher scrolls sideways only, never the page.
 Every other moved file remains byte-identical to the fork.
 
 ## Side-by-side proof (re-run before the served path swaps)
