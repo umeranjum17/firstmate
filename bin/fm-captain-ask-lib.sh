@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Shared fork guard for captain asks. Callers supply tasks_axi (home addressing),
-# SCRIPT_DIR, and fail; these checks run before any close or archive mutation.
+# Shared fork guard for captain asks; callers supply tasks_axi, SCRIPT_DIR, and fail.
 # A [captain-ask] row leaves the backlog only with the captain's answer or a merged PR.
 captain_ask_row() {  # <id>; sets CAPTAIN_ASK_SHOW to the row's show output when it is a [captain-ask] item
   local title
@@ -27,17 +26,26 @@ guard_captain_ask() {  # <id>
   fail "$1 is a [captain-ask] item with no recorded captain answer (bin/fm-captain-hold.sh answer) and no merged PR (tasks-axi update --pr); it cannot leave the backlog"
 }
 
-# A new hold of a [captain-ask] item must be the sanctioned captain hold, which
-# starts a new hold set; a raw hold would revive the old answer's record.
+# A raw hold would revive an old answer's record; the sanctioned hold starts a new hold set.
 guard_captain_ask_hold() {  # <id>
   captain_ask_row "$1"
-  [ -z "$CAPTAIN_ASK_SHOW" ] \
-    || fail "$1 is a [captain-ask] item; hold it with bin/fm-captain-hold.sh hold so the new hold is recorded"
+  [ -z "$CAPTAIN_ASK_SHOW" ] || fail "$1 is a [captain-ask] item; hold it with bin/fm-captain-hold.sh hold so the new hold is recorded"
 }
 
-# Conservative preflight: do not archive any section with an unanswered ask.
-guard_captain_ask_prune() {  # <state>
-  local listing ids id count backlog root backend
+# tasks-axi's done_keep: the root's .tasks.toml, then the home config, then its default of 10.
+captain_ask_done_keep() {  # <root>
+  local toml value
+  for toml in "$1/.tasks.toml" "${HOME:-}/.tasks-axi/config.toml"; do
+    value=$(LC_ALL=C awk '/^\[/ { md = ($0 == "[markdown]") } md && /^done_keep *=/ { sub(/^[^=]*= */, ""); sub(/ *#.*/, ""); sub(/ +$/, ""); print; exit }' "$toml" 2>/dev/null)
+    case "$value" in ''|*[!0-9]*) ;; *) printf '%s\n' "$value"; return 0 ;; esac
+  done
+  printf '%s\n' 10
+}
+
+# Inspects only the rows tasks-axi archives: those past keep. A call target not
+# yet in <state> is inserted at its top, pushing one row further past keep.
+guard_captain_ask_archive() {  # <state> <keep-or-empty> <call-target-or-empty>
+  local listing ids id count backlog root backend keep ahead=0 skip
   backlog=$(fm_backlog_data_absolute "$DATA") || fail "cannot resolve backlog data before pruning"
   root=$(fm_backlog_root "$backlog") || fail "$FM_BACKLOG_TRANSITION_ERROR"
   backend=$(fm_tasks_axi_backend "$root") || fail "cannot read backlog backend before pruning"
@@ -47,5 +55,9 @@ guard_captain_ask_prune() {  # <state>
   ids=$(printf '%s\n' "$listing" | sed -nE 's/^  ([A-Za-z0-9._-]+),.*/\1/p')
   [ "$(printf '%s\n' "$ids" | sed '/^$/d' | wc -l | tr -d ' ')" = "$count" ] \
     || fail "cannot read every $1 task before pruning"
-  for id in $ids; do guard_captain_ask "$id"; done
+  if [ -n "$3" ] && ! printf '%s\n' "$ids" | grep -qxF -- "$3"; then ahead=1; fi
+  keep=${2:-$(captain_ask_done_keep "$root")}
+  skip=$(( keep - ahead ))
+  [ "$skip" -ge 0 ] || skip=0
+  for id in $(printf '%s\n' "$ids" | tail -n +"$(( skip + 1 ))"); do guard_captain_ask "$id"; done
 }

@@ -50,15 +50,12 @@
 #   - a markdown `<data>/backlog.md` that is itself a symlink, because the
 #     first write would replace the link with a private copy, exactly the fork
 #     this command exists to prevent. Lifecycle transitions refuse the same file.
-#   - `rm`/`delete`, `done`/`close`, `hold` of a [captain-ask] item (the sanctioned
-#     `bin/fm-captain-hold.sh hold` records the new hold), or `update` or
-#     `edit --title` that drops `[captain-ask]` from a row whose title carries it,
-#     unless `bin/fm-captain-hold.sh answered <id>` finds a recorded captain
-#     answer or the row's `pr:` link is a merged PR. Prune and auto-prune
-#     refuse a section containing any unanswered ask (use --no-prune to close
-#     an unrelated task). Reconcile close shares this guard. Direct tasks-axi
-#     calls remain outside the wrapper. The automatic dispatch and teardown transitions
-#     use bin/fm-backlog-transition-lib.sh, not this wrapper.
+#   - `rm`/`delete`, `done`/`close`, or `hold` of a [captain-ask] item, or `update`
+#     or `edit --title` that drops `[captain-ask]`, unless `bin/fm-captain-hold.sh
+#     answered <id>` finds a recorded answer or the row's `pr:` link is a merged
+#     PR (`bin/fm-captain-hold.sh hold` records a new hold). Prune refuses when an
+#     unanswered ask lies beyond keep (`--no-prune` skips the done auto-prune).
+#     Direct tasks-axi calls and bin/fm-backlog-transition-lib.sh stay outside.
 #   - `add` (or `create`) that the optional task-priority add-on check refuses,
 #     e.g. no `--priority 0-3`; its message and exit status are returned and
 #     nothing runs. The check is ${XDG_DATA_HOME:-~/.local/share}/fm-task-priority/check.sh
@@ -163,38 +160,40 @@ tasks_axi() { tasks-axi "$@"; }
 # shellcheck source=bin/fm-captain-ask-lib.sh disable=SC1091
 . "$SCRIPT_DIR/fm-captain-ask-lib.sh"
 captain_guard() {  # <tasks-axi args>
-  local prune_state="done" no_prune=0
+  local prune_state="done" no_prune=0 keep_arg='' keep_next=0 sub=''
   local verb id='' value=0 title_next=0 state_next=0 has_title=0 new_title='' arg
   [ "${1:-}" = task ] && shift
   verb=${1:-}
   [ "$#" -gt 0 ] && shift
+  if [ "$verb" = public-followup ]; then sub=${1:-}; [ "$#" -gt 0 ] && shift; fi
   for arg in "$@"; do
     if [ "$arg" = --json ]; then continue; fi
     if [ "$value" = 1 ]; then value=0; continue; fi
     if [ "$title_next" = 1 ]; then title_next=0; new_title=$arg; continue; fi
     if [ "$state_next" = 1 ]; then state_next=0; prune_state=$arg; continue; fi
+    if [ "$keep_next" = 1 ]; then keep_next=0; keep_arg=$arg; continue; fi
     case "$arg" in
       --no-prune) no_prune=1 ;;
+      --keep) keep_next=1 ;;
+      --keep=*) keep_arg=${arg#--keep=} ;;
       --state) state_next=1 ;;
       --state=*) prune_state=${arg#--state=} ;;
       --title) title_next=1; has_title=1 ;;
       --title=*) has_title=1; new_title=${arg#--title=} ;;
-      --pr|--report|--note|--keep|--reason|--until|--kind|--repo|--priority|--body|--body-file) value=1 ;;
+      --pr|--report|--note|--reason|--until|--kind|--repo|--priority|--body|--body-file) value=1 ;;
       -*) ;;
       *) id=${id:-$arg} ;;
     esac
   done
-  if [ "$verb" = prune ]; then
-    guard_captain_ask_prune "$prune_state"
-  fi
   case "$verb" in
+    prune) guard_captain_ask_archive "$prune_state" "$keep_arg" "" ;;
     done|close)
       guard_captain_ask "$id"
-      [ "$no_prune" = 1 ] || guard_captain_ask_prune "done"
+      [ "$no_prune" = 1 ] || guard_captain_ask_archive "done" "$keep_arg" "$id"
       ;;
     public-followup)
-      case "${1:-}" in
-        record-delivery|waive) guard_captain_ask_prune "done" ;;
+      case "$sub" in
+        record-delivery|waive) guard_captain_ask_archive "done" "" "$id" ;;
       esac
       ;;
     rm|delete) guard_captain_ask "$id" ;;
