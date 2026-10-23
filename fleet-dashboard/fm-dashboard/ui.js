@@ -56,7 +56,6 @@ export const I = (d, size = 16) => html`<svg width=${size} height=${size} viewBo
 export const IC = {
   inbox: html`<path d="M2.5 9.5h3l1 1.8h3l1-1.8h3M2.5 9.5l1.4-5.1a1 1 0 0 1 1-.7h6.2a1 1 0 0 1 1 .7l1.4 5.1v3a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1z"/>`,
   board: html`<rect x="2.5" y="2.5" width="11" height="11" rx="2"/><path d="M6.2 2.5v11M9.8 2.5v11"/>`,
-  ship: html`<path d="M8 1.8l5.5 3v6.4L8 14.2l-5.5-3V4.8zM2.5 4.8L8 7.8l5.5-3M8 7.8v6.4"/>`,
   search: html`<circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5l3 3"/>`,
   filter: html`<path d="M2.5 4.5h11M4.5 8h7M6.5 11.5h3"/>`,
   display: html`<path d="M2.5 5h6M11.5 5h2M2.5 11h2M7.5 11h6"/><circle cx="10" cy="5" r="1.5"/><circle cx="6" cy="11" r="1.5"/>`,
