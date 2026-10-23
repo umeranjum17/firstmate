@@ -32,13 +32,17 @@
 # hand edits survive while it is out.
 # A stopped task on a pool account (account= in its meta and a usable
 # config/account-pool) hit that account's limit, so its route stays in
-# dispatch (a route-scoped probe verdict still takes it out). While
-# config/account-pool-autorelaunch exists (content ignored)
-# and the task's tool may change accounts automatically, it first moves
+# dispatch: neither its screen nor the account's own one-line test can take
+# the route out for everyone else. Its limit is read on the account's own
+# profile folder, the folder the pool command names for that account, not on
+# the ambient login, so a full account cannot look like a full route. When
+# the task's tool may change accounts automatically (D1 below) it moves
 # through bin/fm-control.sh relaunch --account next, which rests the account;
-# only when that fails does the route move above run. Otherwise the account
-# only rests, and one line in state/quota-failover.wake names it and the
-# manual command; check.sh prints that line as the watcher's wake.
+# only when that fails does the route move above run. A home that wants the
+# human in the loop instead writes config/account-pool-autorelaunch-off
+# (content ignored): then the account only rests, and one line in
+# state/quota-failover.wake names it and the manual command; check.sh prints
+# that line as the watcher's wake.
 # Every decision is one line in state/quota-failover.log. A worker left with
 # no live route also gets one failed line on the home's parent channel, if any.
 set -u
@@ -91,6 +95,20 @@ auto_move() { # <harness> <model>
   case $2 in *opencode-go*|openai-codex/*|codex-native/*) return 1 ;; esac
 }
 
+# pool_account_folder <id>: the profile folder the pool command names for one
+# account, or nothing when it will not say (then the test asks the ambient
+# login, as before). The folder path is the only thing read; nothing inside it
+# is opened and no credential is printed.
+pool_account_folder() {
+  local out folder
+  [ -n "${1:-}" ] || return 0
+  out=$(timeout "${QUOTA_FAILOVER_POOL_SECONDS:-30}" "${pool%%$'\t'*}" status "$1" --json --state "${pool#*$'\t'}" 2>/dev/null) || return 0
+  folder=$(printf '%s' "$out" | jq -r 'if (.folder | type) == "string" then .folder else empty end' 2>/dev/null) || return 0
+  case "$folder" in /*) ;; *) return 0 ;; esac
+  [ -d "$folder" ] || return 0
+  printf '%s\n' "$folder"
+}
+
 QUOTA=$(quota-axi --json --no-credential-refresh --max-age "${QUOTA_FAILOVER_MAX_AGE:-10m}" 2>/dev/null)
 fm_quota_json_valid <<<"$QUOTA" || QUOTA='{"schemaVersion":5,"providers":[]}'
 
@@ -116,14 +134,18 @@ exhausted() { # <provider> <harness> <model>
     | length > 0' <<<"$QUOTA" >/dev/null
 }
 
-probe() { # <harness> <model>: the one-line prompt through the harness CLI
+probe() { # <harness> <model> [account folder]: the one-line prompt through the harness CLI,
+  # on that account's profile folder when the caller names one, with the login
+  # variables a pool launch sheds also shed here so the answer is the account's own
+  local -a on_account=()
   local dir rc prompt='Reply with the single word PONG.'
+  [ -z "${3:-}" ] || on_account=(env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN -u CLAUDE_CODE_OAUTH_TOKEN CLAUDE_CONFIG_DIR="$3")
   dir=$(mktemp -d) || return 1
   ( cd "$dir" && case $1 in
-    opencode*) timeout "$TEST_SECS" opencode run --model "$2" "$prompt" ;;
-    pi*) timeout "$TEST_SECS" pi --model "$2" -p --no-session "$prompt" ;;
-    claude*) timeout "$TEST_SECS" claude -p --model "$2" "$prompt" ;;
-    codex*) timeout "$TEST_SECS" codex exec --skip-git-repo-check --model "$2" "$prompt" ;;
+    opencode*) timeout "$TEST_SECS" "${on_account[@]}" opencode run --model "$2" "$prompt" ;;
+    pi*) timeout "$TEST_SECS" "${on_account[@]}" pi --model "$2" -p --no-session "$prompt" ;;
+    claude*) timeout "$TEST_SECS" "${on_account[@]}" claude -p --model "$2" "$prompt" ;;
+    codex*) timeout "$TEST_SECS" "${on_account[@]}" codex exec --skip-git-repo-check --model "$2" "$prompt" ;;
     *) exit 1 ;;
   esac ) 2>&1 </dev/null
   rc=$?
@@ -138,13 +160,27 @@ live_test() { # <harness> <model>: one prompt must come back answered
   [ "$rc" = 0 ] && grep -q PONG <<<"$out" && ! grep -qiE "$LIMIT_RE" <<<"$out"
 }
 
-pinned_out() { # <id> <harness> <model>: the pinned route's limit/429/5xx line
+# account_out <id> <model> <account folder>: the limit/429/5xx line that account's
+# own profile folder answers, throttled on its own stamp. It says the account is
+# full, never that the route is dead, so it is never a reason to take a route out
+# of dispatch for every other task on it.
+account_out() {
+  local id=$1 out t now
+  now=$(date +%s)
+  t=$(stat -c %Y "$STATE/$id.account-probe-at" 2>/dev/null) || t=0
+  [ $((now - t)) -ge "$PROBE_SECS" ] || return 1
+  printf '%s\n' "$now" >"$STATE/$id.account-probe-at"
+  out=$(probe claude "$2" "$3") || true
+  grep -oiE "$LIMIT_RE|$HTTP_ERR_RE" <<<"$out" | head -n 1 | sed 's/^ *//; s/ *$//'
+}
+
+pinned_out() { # <id> <harness> <model> [account folder]: the pinned route's limit/429/5xx line
   local id=$1 out t now
   now=$(date +%s)
   t=$(stat -c %Y "$STATE/$id.probe-at" 2>/dev/null) || t=0
   [ $((now - t)) -ge "$PROBE_SECS" ] || return 1
   printf '%s\n' "$now" >"$STATE/$id.probe-at"
-  out=$(probe "$2" "$3") || true
+  out=$(probe "$2" "$3" "${4:-}") || true
   grep -oiE "$LIMIT_RE|$HTTP_ERR_RE" <<<"$out" | head -n 1 | sed 's/^ *//; s/ *$//'
 }
 
@@ -284,7 +320,9 @@ for meta in "$STATE"/*.meta; do
   h=$(fm_meta_get "$meta" harness) m=$(fm_meta_get "$meta" model) gen=$(fm_meta_get "$meta" spawn_gen)
   route="$h $m" cands=() pinned=false declared='' pool=''
   acct=$(fm_meta_get "$meta" account)
+  acct_folder=''
   [ -z "$acct" ] || pool=$(fm_account_pool_config "$FM_HOME/config" 2>/dev/null)
+  [ -n "$pool" ] && acct_folder=$(pool_account_folder "$acct")
   [ -f "$DISPATCH" ] && { IFS=$'\t' read -r pinned declared; mapfile -t cands; } \
     < <(jq -r --arg h "$h" --arg m "$m" "$CANDIDATES_JQ" "$DISPATCH" 2>/dev/null)
   prov=$(provider "$h" "$m" "${declared:-}")
@@ -293,6 +331,8 @@ for meta in "$STATE"/*.meta; do
     if [ -z "$pool" ] && err=$(pinned_out "$id" "$h" "$m") && grep -qiE "$LIMIT_RE" <<<"$err"; then
       dead_mark_out "$h" "$m" || true
     fi
+  elif [ "$h" = claude ] && [ -n "$acct_folder" ] && err=$(account_out "$id" "$m" "$acct_folder") && [ -n "$err" ]; then
+    why="its pool account $acct answered a provider error ($err)"
   elif exhausted "$prov" "$h" "$m"; then
     why="quota-axi reads provider $prov exhausted"
   elif dead_has "$h" "$m"; then
@@ -309,7 +349,7 @@ for meta in "$STATE"/*.meta; do
   fi
 
   if [ -n "$pool" ]; then
-    if [ -e "$FM_HOME/config/account-pool-autorelaunch" ] && auto_move "$h" "$m"; then
+    if auto_move "$h" "$m" && [ ! -e "$FM_HOME/config/account-pool-autorelaunch-off" ]; then
       [ "$(fm_meta_get "$meta" spawn_gen)" = "$gen" ] || continue
       notefile=$(mktemp)
       echo "quota-failover moved this task off pool account $acct to the next $h account because $why. Continue the task from where it stopped." > "$notefile"
@@ -324,6 +364,8 @@ for meta in "$STATE"/*.meta; do
       [ "$(fm_meta_get "$meta" spawn_gen)" = "$gen" ] || continue
       hand='<id|next>'
       auto_move "$h" "$m" || hand='<id>'
+      # config/account-pool-autorelaunch-off, or a tool whose terms bar an automatic move:
+      # rest the account, then wake the home with the command that moves it.
       text="stopped on $route account $acct ($why, gen $gen); account rested, move it by hand: bin/fm-control.sh $id relaunch --account $hand"
       case $(last "$id") in *"account $acct ("*"gen $gen); account rested"*) continue ;; esac
       if out=$(fm_account_pool_rest "${pool%%$'\t'*}" "${pool#*$'\t'}" "$acct" 2>&1); then
