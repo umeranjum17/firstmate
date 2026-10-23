@@ -148,7 +148,16 @@ EOF
   printf 'some avg10=0.00 avg60=0.00 avg300=0.00 total=0\n' > "$home/proc/pressure/memory"
   : > "$home/proc/locks"
   mkdir -p "$home/locks"
-  chmod +x "$stubs/herdr" "$stubs/adb" "$stubs/pgrep" "$stubs/systemctl" "$stubs/quota-axi"
+  # GitHub, read-only: gh pr list answers from gh/<owner>_<repo>.json, logs each call, and fails for a repository without one.
+  mkdir -p "$home/gh" && printf '[]\n' > "$home/gh/acme_alpha.json"
+  cat > "$stubs/gh" <<EOF
+#!/bin/sh
+echo "\$*" >> "$home/gh.calls"
+f="$home/gh/\$(echo "\$4" | tr / _).json"
+[ -f "\$f" ] || { echo "HTTP 404: Could not resolve to a Repository" >&2; exit 1; }
+cat "\$f"
+EOF
+  chmod +x "$stubs/herdr" "$stubs/adb" "$stubs/pgrep" "$stubs/systemctl" "$stubs/quota-axi" "$stubs/gh"
   printf '%s\n' "$home"
 }
 
@@ -157,6 +166,33 @@ build() {  # <home> [env...]: build with the fixture's stubs first on PATH
   shift
   out=$(env PATH="$home/stubs:$PATH" FM_HOME="$home" HOME="$home" FM_DEVICE_LOCK_DIR="$home/locks" FM_DASHBOARD_PROC="$home/proc" FM_MAC_HOST= "$@" "$DASH" build 2>&1) || fail "build failed: $out"
   [ "$out" = "$home/state/dashboard/index.html" ] || fail "build did not print the page path: $out"
+}
+
+# GitHub's merges in the repositories the fleet recorded merges in, by local day beside the recorded ones: a repository
+# GitHub does not answer is named and leaves the count partial, a read lasts 30 minutes, and FM_DASHBOARD_FORGE=off skips it.
+test_forge_counts_merges_beside_the_recorded_ones() {
+  local home d now
+  home=$(make_home forge)
+  d="$home/state/dashboard"
+  now=$(date +%s)
+  printf '{"ts":%s,"event":"task.merged","task":"m-beta","pr":"https://github.com/acme/beta/pull/3"}\n' "$((now - 30))" >> "$home/state/fleet-ledger.jsonl"
+  python3 - "$home/gh/acme_alpha.json" <<'PY'
+import json, sys, datetime as D
+now = D.datetime.now().astimezone()
+ts = [now - D.timedelta(seconds=30), now - D.timedelta(seconds=90), now.replace(hour=12, minute=0, second=0, microsecond=0) - D.timedelta(days=1)]
+json.dump([{'mergedAt': t.astimezone(D.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')} for t in ts], open(sys.argv[1], 'w'))
+PY
+  build "$home"
+  jq -e '.metrics.landed_forge | .value == 2 and .status == "partial" and .repos == ["acme/alpha", "acme/beta"]
+    and .daily[-2].value == 1 and (.reason | test("beta: HTTP 404"))' "$d/data.json" >/dev/null \
+    || fail "forge count wrong: $(jq -c .metrics.landed_forge "$d/data.json")"
+  [ "$(wc -l < "$home/gh.calls")" = 2 ] || fail "one gh read per repository expected: $(cat "$home/gh.calls")"
+  build "$home"
+  [ "$(wc -l < "$home/gh.calls")" = 2 ] || fail "a forge read within 30 minutes was repeated: $(cat "$home/gh.calls")"
+  has "$d/measure.html" "Merged on GitHub"
+  build "$home" FM_DASHBOARD_FORGE=off
+  jq -e '.metrics | has("landed_forge") | not' "$d/data.json" >/dev/null || fail "FM_DASHBOARD_FORGE=off still reads GitHub"
+  pass "GitHub's merges sit beside the recorded ones by local day, a repository it does not answer is named, a read lasts 30 minutes"
 }
 
 test_overview_answers_the_four_questions_with_sums_that_add_up() {
@@ -1013,4 +1049,5 @@ test_board_json_feeds_the_app
 test_each_failed_source_shows_unknown_and_why
 test_claude_accounts_card_shows_each_account_five_hour_and_seven_day_left
 test_devices_and_machine_come_from_read_only_probes
+test_forge_counts_merges_beside_the_recorded_ones
 test_serve_answers_each_page_and_remembers_the_grouping

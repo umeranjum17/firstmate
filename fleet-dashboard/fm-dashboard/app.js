@@ -167,16 +167,29 @@ function Kpi({ name, v, sub, c, t, good, href, onClick, src }) {
     <span><i></i>${name}${d != null ? html`<em class=${'num ' + dc} title="change since this time yesterday">${d ? sign(d) : '±0'}</em>` : ''}</span>
     <b class="num">${v}${sub ? html`<small>${sub}</small>` : ''}</b>${t?.line ? html`<${Line} vals=${t.line} c=${c}/>` : html`<div class="ov-line"></div>`}</${tag}>`
 }
-// 14 days of a daily count: today in the accent, earlier days muted, the period average dashed.
-function Days({ rows, c, label }) {
+// 14 days of a daily count: today in the accent, earlier days muted, the period average dashed; marks, when given,
+// marks another count of the same days (GitHub's merges beside the recorded ones) as a tick on each bar.
+function Days({ rows, c, label, marks }) {
   if (!rows?.length) return html`<p class="ov-tot">No days on record</p>`
-  const known = rows.filter(r => r.value != null), top = Math.max(1, ...known.map(r => r.value)), w = 100 / rows.length
+  const known = rows.filter(r => r.value != null), top = Math.max(1, ...known.map(r => r.value), ...(marks || []).map(r => r.value || 0)), w = 100 / rows.length
   const prior = rows.slice(0, -1).filter(r => r.value != null), avg = prior.length ? prior.reduce((a, r) => a + r.value, 0) / prior.length : null
   const day = s => new Date(`${s}T12:00:00`).toLocaleDateString([], { day: 'numeric', month: 'short' })
   return html`<div class="ov-days" style=${{ '--c': `var(${c})` }}><svg viewBox="0 0 100 60" preserveAspectRatio="none" role="img" aria-label=${`${label}, last ${rows.length} days`}>
     ${rows.map((r, k) => { if (r.value == null) return ''; const h = r.value / top * 56; return html`<rect class=${k === rows.length - 1 ? 'now' : ''} x=${(k * w + w * .14).toFixed(2)} y=${(60 - h).toFixed(2)} width=${(w * .72).toFixed(2)} height=${Math.max(.5, h).toFixed(2)} rx=".6"><title>${day(r.day)}: ${r.value}</title></rect>` })}
+    ${(marks || []).map((r, k) => !r.value ? '' : html`<rect class="ref" x=${(k * w + w * .06).toFixed(2)} y=${(60 - r.value / top * 56 - .6).toFixed(2)} width=${(w * .88).toFixed(2)} height="1.2"><title>${day(r.day)}: ${r.value} on GitHub</title></rect>`)}
     ${avg != null ? html`<line x1="0" x2="100" y1=${(60 - avg / top * 56).toFixed(2)} y2=${(60 - avg / top * 56).toFixed(2)} vector-effect="non-scaling-stroke"/>` : ''}</svg>
     <div class="ov-axis"><span>${day(rows[0].day)}</span><span>today</span></div><small>${avg != null ? `avg ${Math.round(avg)} a day before today` : 'no known days to average'}</small></div>`
+}
+// GitHub's merges in the fleet's repositories beside the recorded ones: today, the average of the days before today
+// (the same days as the recorded average) and how many of GitHub's merges the records hold.
+function Forge({ m }) {
+  const f = m.landed_forge
+  if (!f) return ''
+  if (f.status === 'unknown') return html`<small class="ov-fg bad">GitHub merges unknown: ${f.reason}</small>`
+  const days = (f.daily || []).slice(0, -1).map((x, k) => [m.landed?.daily?.[k]?.value, x.value]).filter(([r, g]) => r != null && g != null)
+  const rec = days.reduce((n, [r]) => n + r, 0), gh = days.reduce((n, [, g]) => n + g, 0)
+  return html`<small class="ov-fg" title=${`${f.repos?.length} repositories: ${(f.repos || []).join(', ')}`}><i></i>GitHub ${f.value} today · avg ${days.length ? Math.round(gh / days.length) : '–'} a day before today ·
+    records hold ${gh ? `${Math.round(rec / gh * 1000) / 10}%` : '–'} (${rec} of ${gh}) in ${f.repos?.length} ${f.repos?.length === 1 ? 'repository' : 'repositories'}${f.status === 'partial' ? html` · <span class="bad">${f.reason}</span>` : ''}</small>`
 }
 // The lifecycle rail: every open lane by stage, split into moving, waiting and stuck, then today's landings.
 function Rail({ d, go }) {
@@ -234,7 +247,7 @@ function Overview({ d, od, go }) {
   const qr = q.queue_reasons || [], qOk = m.queue?.value != null, qTop = Math.max(1, ...qr.map(x => sum(x.by_home)))
   const flow = (mid, label, foot, c) => { const r = m[mid]; return html`<div class="ov-flow"><span>${label}</span>
     <b class="num">${r?.status === 'unknown' ? 'unknown' : `${r?.status === 'lower_bound' && mid === 'landed' ? '≥' : ''}${r?.value ?? '–'}`}</b><small>${foot}</small>
-    <${Days} rows=${r?.daily} c=${c} label=${label}/></div>` }
+    <${Days} rows=${r?.daily} c=${c} label=${label} marks=${mid === 'landed' ? m.landed_forge?.daily : null}/>${mid === 'landed' ? html`<${Forge} m=${m}/>` : ''}</div>` }
   return html`<div class="ov">
     ${od.err ? html`<p class="ov-tot"><span class="bad">Refresh failed: ${od.err}</span></p>` : ''}
     <div class="ov-kpis">
@@ -249,7 +262,7 @@ function Overview({ d, od, go }) {
         html`<a class="ov-ask" key=${k} href=${a.url || '#/needs'} target=${a.url ? '_blank' : null} rel="noreferrer"><span><em class="ktag">${ASK_TAG[askType(a.text, a.type)]}</em>${a.text}</span><small class="num">${a.age == null ? '' : dur(a.age)}</small></a>`)}</div></section>` : ''}
       <section class="ov-card wide"><h3>Lifecycle</h3><${Rail} d=${d} go=${go}/><${Src} m=${m} ids=${['lanes', 'landed']}/></section>
       <section class="ov-card wide"><h3>Time in stage</h3><${Aging} d=${d} go=${go}/><${Src} m=${m} ids=${['lanes']}/></section>
-      <section class="ov-card w2"><h3>Flow</h3><div class="ov-flows">${flow('landed', 'Landed today', 'recorded merges', '--st-landed')}${flow('closed', 'Closed 7 d', 'backlog items', '--green')}</div><${Src} m=${m} ids=${['landed', 'closed']}/></section>
+      <section class="ov-card w2"><h3>Flow</h3><div class="ov-flows">${flow('landed', 'Landed today', 'recorded merges', '--st-landed')}${flow('closed', 'Closed 7 d', 'backlog items', '--green')}</div><${Src} m=${m} ids=${['landed', 'landed_forge', 'closed']}/></section>
       <section class="ov-card w1"><h3>Lanes by state</h3>
         <div class="ov-bar tall">${states ? OV_STATES.map(([k, , c]) => states[k] ? html`<i class=${c} key=${k} style=${{ flex: states[k] }}></i>` : '') : ''}</div>
         <div class="ov-legend">${OV_STATES.map(([k, nm, c]) => html`<span key=${k}><i class=${c}></i>${nm}<b class="num">${states ? states[k] : '–'}</b></span>`)}</div><${Src} m=${m} ids=${['lane_states']}/></section>
