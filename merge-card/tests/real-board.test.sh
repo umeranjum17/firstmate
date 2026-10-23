@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # merge-card against the real sign-off-axi on a seeded temp board: a PR's card at one head, then a
-# re-post at a new head. The old card must be archived (dismissed, kept) and exactly one card live.
+# re-post at a new head. The old card must be archived (dismissed, kept) and exactly one card live,
+# and another filer's cards for the PR are archived too (one-card-per-pr keeps the newest valid proof).
 # The screen-free path needs no done-done, only a sealed run record; gh is a stub. Skips (exit 0)
 # when sign-off-axi is not on PATH. Never touches a real board: SIGN_OFF_HOME is a temp folder.
 set -u
@@ -29,14 +30,30 @@ post_at() { # post_at <run-id> <head>: a sealed clean run at the head, then the 
 }
 h1=$(printf 'a%.0s' $(seq 40)) h2=$(printf 'b%.0s' $(seq 40))
 live() { sign-off-axi list "$board" --json --full | jq -r '[.decisions[] | select(.dismissed != true) | .evidence.run_id] | join(",")'; }
+# Another filer's evidence card for the same PR (a lane's own proof, no passed-test receipt).
+printf '\x89PNG\r\n\x1a\n' > "$work/shot.png"
+lane_post() { sign-off-axi post "$board" --type evidence --title "$1" --about "Umer sees one card" --media "$work/shot.png" --link "$pr" --filer other-lane >/dev/null; }
+live_keys() { sign-off-axi list "$board" --json --full | jq -r '[.decisions[] | select(.dismissed != true) | .key] | join(",")'; }
+lane_post "Lane proof before the merge" || fails=$((fails + 1))
 post_at 20261022T000000Z-first0001 "$h1" >/dev/null || fails=$((fails + 1))
 is "first head: one live card" "$(live)" 20261022T000000Z-first0001
+is "first head: the other filer's older card is archived" "$(live_keys)" merge-o-r-pull-12
 out=$(post_at 20261022T000000Z-second0001 "$h2") || { echo "$out"; fails=$((fails + 1)); }
 is "new head: exactly one live card, the newest" "$(live)" 20261022T000000Z-second0001
-is "new head: old card archived, history kept" "$(sign-off-axi list "$board" --json --full | jq -r '[.decisions[] | select(.dismissed == true) | .evidence.run_id] | join(",")')" 20261022T000000Z-first0001
-is "new head: first card keeps the PR key" "$(sign-off-axi list "$board" --json --full | jq -r '.decisions[] | select(.dismissed == true) | .key')" merge-o-r-pull-12
+is "new head: old card archived, history kept" "$(sign-off-axi list "$board" --json --full | jq -r '[.decisions[] | select(.dismissed == true and .filer == "firstmate-merge") | .evidence.run_id] | join(",")')" 20261022T000000Z-first0001
+is "new head: first card keeps the PR key" "$(sign-off-axi list "$board" --json --full | jq -r '.decisions[] | select(.dismissed == true and .filer == "firstmate-merge") | .key')" merge-o-r-pull-12
 out=$(post_at 20261022T000000Z-second0001 "$h2")
 case $out in *"already on the board"*) echo "ok - repeat post adds nothing" ;; *) echo "not ok - repeat post: [$out]"; fails=$((fails + 1)) ;; esac
+# A newer card from another filer without a receipt: the sweep keeps the valid proof and archives it.
+lane_post "Lane proof after the merge" || fails=$((fails + 1))
+lane_key=$(sign-off-axi list "$board" --json --full | jq -r '.decisions[] | select(.dismissed != true and .filer == "other-lane") | .key')
+out=$("$here/../one-card-per-pr" "$board")
+is "sweep dry run: names the card and changes nothing" "$out|$(live_keys)" "archive $lane_key (other-lane, o/r#12) keep merge-o-r-pull-12-$(printf '%s' "$h2" | sha1sum | cut -c1-12)
+one-card-per-pr: would archive 1 card(s)|$(live_keys)"
+"$here/../one-card-per-pr" --apply "$board" >/dev/null || fails=$((fails + 1))
+is "sweep: the newest valid proof stays across filers" "$(live)" 20261022T000000Z-second0001
+is "sweep: the other filer's card is archived, not deleted" "$(sign-off-axi list "$board" --json --full | jq -r --arg k "$lane_key" '.decisions[] | select(.key == $k) | .dismissed')" true
+is "sweep: a rerun archives nothing" "$("$here/../one-card-per-pr" --apply "$board")" "one-card-per-pr: archived 0 card(s)"
 # A merge hook passes head `-` for a PR: the screen: none card still finds the run sealed at the PR head.
 h3=$(printf 'c%.0s' $(seq 40))
 pr=https://github.com/o/r/pull/13

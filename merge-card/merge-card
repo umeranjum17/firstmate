@@ -31,6 +31,8 @@
 #     merging lead and the lane owner fixes the proof and re-runs the post. The card key is
 #     the PR's own (the merge's head for a local merge): a repeat post at the same head, or
 #     another home posting it, adds nothing, and a post at a new head archives the PR's live card and posts the new one.
+#     After each filed card, `one-card-per-pr --apply` keeps one live card per PR on the board across
+#     filers: the newest valid proof stays and the rest are archived, never deleted.
 #     A PR whose Checks block says `screen: none` gets a text-only Evidence card when its
 #     task folder has a sealed clean done-done receipt; the same key makes repeated posts no-ops.
 #   merge-card screen-none <task-id> <pr-url|->, merge-card receipt <task-id> <head>
@@ -197,9 +199,9 @@ screen_none() {
 }
 
 # file_card <board> <card.json> <kind>: put the card on the board the one-at-a-time way, then archive
-# the PR's other live cards (kept under Archived). Reads post()'s card_key, restore and old_keys.
+# the PR's other live cards, from any filer (kept under Archived). Reads post()'s card_key, restore and old_keys.
 file_card() {
-  local k checker text
+  local k checker text sweep
   if [ -f "$FM_HOME/config/owner-rules" ]; then
     checker=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/owner-rules/bin/fm-owner-rules-text-check.sh
     text=$(jq -r '.. | strings' "$2") || return $?
@@ -208,6 +210,9 @@ file_card() {
   if [ -n "$restore" ]; then sign-off-axi restore "$card_key" "$1" || return $?
   else sign-off-axi post "$1" --kind "$3" --from "$2" --filer firstmate-merge || return $?; fi
   for k in $old_keys; do sign-off-axi dismiss "$k" "$1" >/dev/null || return $?; done
+  # Other filers' cards for the same PR too: the newest valid proof stays, the rest are archived.
+  sweep=$("$(dirname "${BASH_SOURCE[0]}")/one-card-per-pr" --apply "$1" 2>&1) || { printf '%s\n' "$sweep"; return 1; }
+  case $sweep in *"archived 0 card"*) ;; *) printf '%s\n' "$sweep" ;; esac
 }
 
 post() {
