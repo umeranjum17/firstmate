@@ -62,9 +62,14 @@ seed() {
 
 ## Done
 - [x] m-shipped - Ship the main thing (repo: alpha) (kind: ship) (merged $today)
+- [x] m-long - Keep every ticket name whole on the board so a long name that runs past eighty characters still reads to its very end (repo: alpha) (kind: ship) (merged $today)
+  The captain asked on 23 Oct for "ticket names that are never cut short on the fleet board" (23 Oct, Main77). Names and descriptions come from the whole backlog item, not the cut list view. More words follow here so that the list view cuts this body. More words follow here so that the list view cuts this body. More words follow here so that the list view cuts this body. The description ends here.
 EOF
   printf 'npm-2fa\t%s\tLink the alpha npm package to GitHub?\thttps://www.npmjs.com/package/alpha/access\n' "$((now - 900))" > "$home/data/captain-asks.tsv"
   lane m-build ship "working [at=$((now - 600))]: building the main thing"
+  # m-ci's completion receipt and the done-done verdict on its merge card: the ticket page's Proof.
+  printf '{"schema":1,"task":"m-ci","head":"abc1234def5678","verdict":"PASS","at":%s}\n' "$((now - 300))" > "$home/state/m-ci.run-receipt.json"
+  mkdir -p "$home/data/m-ci" && printf '{"head":"abc1234def5678","verdict":"pass"}\n' > "$home/data/m-ci/merge-card.json"
   lane m-ci ship "paused [at=$((now - 1200))]: waiting for CI checks https://github.com/acme/alpha/pull/9"
   lane m-stuck ship "blocked [at=$((now - 7200))]: cannot reach the build server"
   lane m-ask ship "needs-decision [at=$((now - 3600))] [key=scope]: which layout"
@@ -203,6 +208,18 @@ jq -e '([.tickets[] | {(.task): .state}] | add) as $s | ([.tickets[] | {(.task):
   and ([.cards[] | select(.task == "m-ask")][0].title == "Choose the layout for the new screen")
   and $t["m-shipped"].pr == "https://github.com/acme/alpha/pull/4" and all(.tickets[]; .state != "captain") and (.asks | length) == 1' \
   "$home/state/dashboard/board.json" >/dev/null || { echo "run-core-proof: tickets mapping wrong: $(jq -c '.tickets' "$home/state/dashboard/board.json")" >&2; exit 1; }
+# tasks-axi list cuts a long name and body; the ticket carries the whole of both (from show --full, then cached), the
+# ask's Main message, and a lane's proof: its completion receipt and the done-done verdict on its merge card.
+jq -e '(.tickets[] | select(.task == "m-long")) as $t
+  | $t.title == "Keep every ticket name whole on the board so a long name that runs past eighty characters still reads to its very end"
+  and ($t.desc | startswith("Names and descriptions come from") and endswith("The description ends here.")) and $t.ask.ref == "Main77" and $t.ask.day == "23 Oct"
+  and ([.tickets[] | select(.task == "m-ask")][0].ask.ref == "Main42")
+  and ([.tickets[] | select(.task == "m-ci")][0].proof == {"receipt": "PASS", "head": "abc1234", "at": '"$(jq '.at' "$home/state/m-ci.run-receipt.json")"', "check": "pass"})' \
+  "$home/state/dashboard/board.json" >/dev/null || { echo "run-core-proof: whole names, ask refs or proof wrong: $(jq -c '[.tickets[] | select(.task == "m-long" or .task == "m-ci") | {title, desc, ask, proof}]' "$home/state/dashboard/board.json")" >&2; exit 1; }
+[ "$(jq length "$home/state/dashboard/full-text.json")" = 1 ] || { echo "run-core-proof: full-text cache does not hold exactly the one cut item" >&2; exit 1; }
+for w in 390 1280; do shot "ticket-long-$w" "#/tickets?ticket=main/m-long" "$w" 'reads to its very end'; shot "ticket-proof-$w" "#/tickets?ticket=main/m-ci" "$w" 'Receipt PASS'; done
+grep -qF 'Receipt PASS · done-done pass · abc1234' "$DONE_DONE_EVIDENCE_ROOT/ticket-proof-390.txt" && grep -qF 'Main77' "$DONE_DONE_EVIDENCE_ROOT/ticket-long-390.txt" \
+  || { echo "run-core-proof: the ticket page lacks the proof line or the ask's Main message" >&2; exit 1; }
 # The ticket page: the description without bookkeeping, the captain's words it serves, and the lane's status lines.
 for w in 390 1280; do shot "ticket-page-$w" '#/tickets?ticket=main/m-ask' "$w" 'Serves your ask'; done
 shot ticket-held-390 '#/tickets?ticket=main/m-held' 390 'Main decides: wait for the new layout.'
@@ -248,7 +265,7 @@ grep -qF 'Sent to Main' "$DONE_DONE_EVIDENCE_ROOT/ticket-thread-390.txt" && grep
 jq -e '[.tickets[] | .comments[] | select(.picked > 0) | .replies[] | select(.at > 0) | [.by, .text]] | sort
   == [["alpha", "Read: the ask list stays above the fold."], ["main", "Agreed: the ask list stays on top in both layouts."]]' \
   "$home/state/dashboard/board.json" >/dev/null || { echo "run-core-proof: a pickup or answer is not on its ticket thread: $(jq -c '[.tickets[] | .comments[]]' "$home/state/dashboard/board.json")" >&2; exit 1; }
-jq -e '(.tickets[] | select(.task == "m-ask")) as $t | $t.ask == {"words": "Show the new screen in the layout a phone reads first", "day": "22 Oct"}
+jq -e '(.tickets[] | select(.task == "m-ask")) as $t | $t.ask == {"words": "Show the new screen in the layout a phone reads first", "day": "22 Oct", "ref": "Main42"}
   and $t.desc == "Two layouts are drawn; the lead picks one."
   and ([.tickets[] | select(.task == "m-held")][0] | .desc == "Main decides: wait for the new layout." and .ask.day == "22 Oct")' \
   "$home/state/dashboard/board.json" >/dev/null || { echo "run-core-proof: ticket page fields wrong: $(jq -c '.tickets[] | select(.task == "m-ask")' "$home/state/dashboard/board.json")" >&2; exit 1; }
@@ -342,8 +359,9 @@ steps = {
         "Build with a flow reader that fails and open Insights at 390px",
         "Open the Memory card on Metrics at 390px with a 45% 10 s spike over an 8% 60 s average",
         "Open Time in stage on Metrics at 390px and 1280px, then tap the bottleneck row",
+        "Open the ticket with a long name at 390px and 1280px, and the m-ci ticket with its proof",
     ],
-    "result": "The Board lists m-stuck, m-ask, m-ci and m-build with their titles and states; the Stuck tab holds only stuck lanes, the Waiting tab only the waiting lane, and a home with four open lanes against a cap of three reads 4 / 3; Insights shows Why work waits now with the Blocked, Lead reply and Held groups; Tickets puts each backlog item in its column with its priority chip and release, the captain-held item On hold, and only the one ask under Waiting on captain; a ticket page shows its description, the captain's words with their day, and the lane's activity; Overview names the source of every figure, and each page's end clears the tab bar at 390px; the sidebar and the phone dock no longer offer a Ship tab; a post without the owner's board token is refused, the board's cookie lets the page send a comment with no pasted secret, the comment reaches Main's inbox and shows in the ticket thread as sent with Main's pickup and reply under it, and a comment on a lead's ticket reaches that lead's endpoint through fm-send and shows the lead's pickup and its own answer; By release puts alpha's v0.2.0 and beta's next item under Next release, the v0.3.0 item under After and items with no release under Later, and the v0.2.0 filter leaves only its item; the PR + CI stage opens the Board filtered to that stage with a removable Stage chip, and To land opens it filtered to To merge; a failing flow reader shows its own error on Insights; the Metrics Memory card reads 32 GB free of 64 GB and 8.0% pressure, not the 45% spike; Time in stage draws the four open lanes, names Building the bottleneck and its row opens the Building Board",
+    "result": "The Board lists m-stuck, m-ask, m-ci and m-build with their titles and states; the Stuck tab holds only stuck lanes, the Waiting tab only the waiting lane, and a home with four open lanes against a cap of three reads 4 / 3; Insights shows Why work waits now with the Blocked, Lead reply and Held groups; Tickets puts each backlog item in its column with its priority chip and release, the captain-held item On hold, and only the one ask under Waiting on captain; a ticket page shows its description, the captain's words with their day, and the lane's activity; Overview names the source of every figure, and each page's end clears the tab bar at 390px; the sidebar and the phone dock no longer offer a Ship tab; a post without the owner's board token is refused, the board's cookie lets the page send a comment with no pasted secret, the comment reaches Main's inbox and shows in the ticket thread as sent with Main's pickup and reply under it, and a comment on a lead's ticket reaches that lead's endpoint through fm-send and shows the lead's pickup and its own answer; By release puts alpha's v0.2.0 and beta's next item under Next release, the v0.3.0 item under After and items with no release under Later, and the v0.2.0 filter leaves only its item; the PR + CI stage opens the Board filtered to that stage with a removable Stage chip, and To land opens it filtered to To merge; a failing flow reader shows its own error on Insights; the Metrics Memory card reads 32 GB free of 64 GB and 8.0% pressure, not the 45% spike; Time in stage draws the four open lanes, names Building the bottleneck and its row opens the Building Board; a ticket whose name and body the backlog list cuts shows both whole, with its ask's day and Main message, and the m-ci ticket page shows Receipt PASS · done-done pass · abc1234",
 }
 with open(sys.argv[1], "w") as f:
     json.dump(steps, f, indent=2, ensure_ascii=False)

@@ -69,11 +69,13 @@ function TicketPage({ d, t, go }) {
   return html`<div class="scrim dim" onClick=${close}></div><aside class="peek" role="dialog" aria-label=${t.title} tabindex="-1" ref=${ref}>
     <div class="bar"><span>${COLS.find(([s]) => s === t.state)[1]}</span><span class="sp"></span><button class="ib" onClick=${close} aria-label="Close">${I(IC.x)}</button></div>
     <div class="body"><div class="id">${t.project || 'No project'}</div><h2>${t.title}</h2>${t.desc ? html`<p class="why tk-desc">${t.desc}</p>` : ''}
-      ${t.ask ? html`<blockquote class="tk-ask"><small>Serves your ask${t.ask.day ? ` of ${t.ask.day}` : ''}</small>“${t.ask.words}”</blockquote>` : ''}
+      ${t.ask ? html`<blockquote class="tk-ask"><small>Serves your ask${t.ask.day ? ` of ${t.ask.day}` : ''}${t.ask.ref ? ` · ${t.ask.ref}` : ''}</small>“${t.ask.words}”</blockquote>` : ''}
       <dl class="props">${P('Priority', t.priority != null && html`<span class=${'pill prio p' + t.priority}>P${t.priority}</span>${PRIO[t.priority] || ''}`)}
         ${P('Release', html`${I(IC_RELEASE, 12)}${cap(t.release)}`)}
         ${P('Owner', html`<span class="pill"><span class="sq" style=${{ '--c': hc(d, t.home) }}></span>${hname(d, t.home)}</span>`)}
         ${P('Pull request', n && html`<a class="pill pr" href=${t.pr} target="_blank" rel="noreferrer">${I(IC.pr, 12)}#${n}</a>`)}
+        ${P('Proof', t.proof && html`<span class=${'num ' + (t.proof.receipt === 'FAIL' || t.proof.check && t.proof.check !== 'pass' ? 'bad' : '')}>${[t.proof.receipt && `Receipt ${t.proof.receipt}`,
+          t.proof.check && `done-done ${t.proof.check}`, t.proof.head].filter(Boolean).join(' · ')}</span>${t.proof.at ? html`<small>${hm(t.proof.at)}</small>` : ''}`)}
         ${P('Last update', html`<span class="num">${ago(t.updated)}</span>${typeof t.updated === 'number' ? html`<small>${hm(t.updated)}</small>` : ''}`)}</dl>
       <div class="h4">Activity</div><${Comment} t=${t} onSent=${x => setSent([...sent, x])}/>${c?.history.length || said.length ? html`<ul class="act">${[...said.flatMap(x => [{ ...x, mine: true }, ...(x.picked ? [{ at: x.picked, by: x.to, text: 'Picked up your comment', answer: true }] : []),
           ...(x.replies || []).map(y => ({ ...y, at: y.at || x.at, answer: true }))]), ...squash(c?.history || [])]
