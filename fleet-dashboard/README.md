@@ -12,7 +12,7 @@ fork described under Provenance.
 
 - `fm-dashboard.sh` — the `build | serve` entry: collects every source, writes
   the three static pages plus `board.json` and `data.json`, and serves the app
-  read-only (python3 stdlib, no network reference).
+  read-only but for ticket comments (python3 stdlib, no network reference).
 - `fm-dashboard/` — the app: `index.html`, `app.js`, `app.css`, `board.js`,
   `ui.js`, `insights.js`, `insights.css`, `tickets.js` (the Tickets board, new here), `icon.svg`,
   and `vendor/` (Preact + htm, Inter, and the vendored `LICENSES`).
@@ -62,8 +62,10 @@ overview page and again in the app (`ui.js`, `app.js`, `app.css`). The fourth
 adds the Tickets board: `tickets.js`, its route and styles in `app.js` and `app.css`, the
 `Entry` export in `board.js` that its ticket page reuses, and
 the `tickets` and `tickets_unread` keys `fm-dashboard.sh` adds to `board.json` from the
-backlog it already reads, and Overview naming the source of every figure (from each
-metric's `source` in `data.json`) on hover and under its card. The Ship tab is removed, with its `ship/` files and the vendored three.js it alone used.
+backlog it already reads, Overview naming the source of every figure (from each
+metric's `source` in `data.json`) on hover and under its card, and the ticket comment: the server's one write, `POST /comment`
+with a per-device token (`state/dashboard/comment-token`), delivered to the owning lead with
+`fm-send.sh` (or to Main with `fm-inbox.sh note`) and shown in the ticket thread. The Ship tab is removed, with its `ship/` files and the vendored three.js it alone used.
 Every other moved file remains byte-identical to the fork.
 
 ## Side-by-side proof (re-run before the served path swaps)

@@ -27,8 +27,35 @@ function Ticket({ d, t, go }) {
       ${n ? html`<a class="pill pr" href=${t.pr} target="_blank" rel="noreferrer" onClick=${e => e.stopPropagation()}>${I(IC.pr, 12)}${n}</a>` : ''}</div></article>`
 }
 
+// A comment goes to the ticket's lead as a steer. The server takes it only with this device's comment token, which the
+// captain pastes once from state/dashboard/comment-token on the dashboard host; the browser keeps it.
+const TOKEN = 'fm-comment-token'
+function Comment({ t, onSent }) {
+  const [text, setText] = useState(''), [ask, setAsk] = useState(false), [note, setNote] = useState(''), [busy, setBusy] = useState(false)
+  let saved = ''
+  try { saved = localStorage.getItem(TOKEN) || '' } catch {}
+  async function send(e) {
+    e.preventDefault()
+    const tok = ask ? e.target.token.value.trim() : saved
+    if (!tok) return setAsk(true)
+    setBusy(true)
+    try {
+      const r = await fetch('comment', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Comment-Token': tok }, body: JSON.stringify({ ticket: t.id, text }) })
+      const a = await r.json().catch(() => ({ error: `the dashboard server answered ${r.status}` }))
+      if (r.status === 401) { try { localStorage.removeItem(TOKEN) } catch {} setAsk(true); return setNote('That token was not accepted. Paste the current one.') }
+      if (!r.ok) return setNote(a.error || `the dashboard server answered ${r.status}`)
+      try { localStorage.setItem(TOKEN, tok) } catch {}
+      onSent({ at: Math.floor(Date.now() / 1000), text: text.trim(), to: a.to }); setText(''); setAsk(false); setNote('')
+    } catch (err) { setNote(`Not sent: ${err.message || err}`) } finally { setBusy(false) }
+  }
+  return html`<form class="tk-say" onSubmit=${send}><textarea aria-label="Comment" placeholder=${t.home === 'main' ? 'Comment to Main…' : `Comment to the ${t.home} lead…`} maxlength="1000" rows="2" value=${text} onInput=${e => setText(e.target.value)}></textarea>
+    ${ask ? html`<label>Comment token for this device<input name="token" type="password" autocomplete="off" placeholder="from state/dashboard/comment-token on the dashboard host"/></label>` : ''}
+    <div class="row"><small role="status">${note || 'Goes to the owning lead as a steer'}</small><span class="sp"></span><button class="btn" type="submit" disabled=${busy || !text.trim()}>${ask ? 'Save and send' : 'Send'}</button></div></form>`
+}
 function TicketPage({ d, t, go }) {
-  const c = d.cards.find(x => x.id === t.id), n = prNum(t.pr), close = () => go({ ticket: null }), ref = useRef()
+  const c = d.cards.find(x => x.id === t.id), n = prNum(t.pr), close = () => go({ ticket: null }), ref = useRef(), [sent, setSent] = useState([])
+  // a comment shows at once; the build's copy replaces it on the next refresh
+  const said = [...(t.comments || []), ...sent.filter(x => !(t.comments || []).some(y => y.text === x.text))]
   useEffect(() => { ref.current?.focus(); const f = e => e.key === 'Escape' && close(); addEventListener('keydown', f); return () => removeEventListener('keydown', f) }, [t.id])
   const P = (k, v) => v ? html`<dt>${k}</dt><dd>${v}</dd>` : ''
   return html`<div class="scrim dim" onClick=${close}></div><aside class="peek" role="dialog" aria-label=${t.title} tabindex="-1" ref=${ref}>
@@ -40,7 +67,10 @@ function TicketPage({ d, t, go }) {
         ${P('Owner', html`<span class="pill"><span class="sq" style=${{ '--c': hc(d, t.home) }}></span>${hname(d, t.home)}</span>`)}
         ${P('Pull request', n && html`<a class="pill pr" href=${t.pr} target="_blank" rel="noreferrer">${I(IC.pr, 12)}#${n}</a>`)}
         ${P('Last update', html`<span class="num">${ago(t.updated)}</span>${typeof t.updated === 'number' ? html`<small>${hm(t.updated)}</small>` : ''}`)}</dl>
-      <div class="h4">Activity</div>${c?.history.length ? html`<ul class="act">${squash(c.history).reverse().map(x => html`<${Entry} x=${x}/>`)}</ul>` : html`<p class="empty">No status lines yet: the thread starts when a lane works on it.</p>`}
+      <div class="h4">Activity</div><${Comment} t=${t} onSent=${x => setSent([...sent, x])}/>${c?.history.length || said.length ? html`<ul class="act">${[...said.map(x => ({ ...x, mine: true })), ...squash(c?.history || [])]
+        .sort((a, b) => (b.at || 0) - (a.at || 0)).map(x => x.mine ? html`<li class="mine"><b class=${x.error ? 'bad' : 'ok'}></b><div><div class="h"><strong>You</strong><span class="sp"></span><span class="num">${hm(x.at)}</span></div>
+          <p>${x.text}</p><small>${x.error ? `Not delivered: ${x.error}` : x.to === 'main' ? 'Sent to Main' : `Sent to the ${x.to} lead as a steer`}</small></div></li>` : html`<${Entry} x=${x}/>`)}</ul>`
+        : html`<p class="empty">No status lines yet: the thread starts when a lane works on it.</p>`}
     </div></aside>`
 }
 const Ask = ({ a }) => html`<article class="card tk ask"><div class="r1"><span class="id">${ASK_TAG[askType(a.text, a.type)]}</span>${a.age != null ? html`<span class="num age">${dur(a.age)}</span>` : ''}</div>
