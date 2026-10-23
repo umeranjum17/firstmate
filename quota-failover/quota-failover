@@ -48,6 +48,9 @@
 # relaunch --account next, but only when its status says working and its own
 # lifecycle source reads idle between turns for QUOTA_FAILOVER_PRELIMIT_IDLE_SECS
 # (60), once per incarnation; a tool D1 bars from moving wakes the home instead.
+# With config/account-pool, a Claude test that names no account runs on the
+# pool's pick (account-pool/bin/fm-pool-claude-env.sh); a failed pick fails the
+# test instead of falling back to the default login.
 # Every decision is one line in state/quota-failover.log. A worker left with
 # no live route also gets one failed line on the home's parent channel, if any.
 set -u
@@ -85,6 +88,8 @@ done
 _FM_PARKED_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../parked-homes/bin/fm-parked-homes-lib.sh"
 # shellcheck source=/dev/null # sibling add-on path, resolved at runtime
 [ -f "$_FM_PARKED_LIB" ] && . "$_FM_PARKED_LIB"
+# A Claude test that names no account takes the pool's pick (account-pool add-on), never the default login.
+_FM_POOL_ENV="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../account-pool/bin/fm-pool-claude-env.sh"
 
 log() { printf '%s %s\n' "$(date -u +%FT%TZ)" "$*" >> "$LOG"; }
 last() { sed -n "s|^[^ ]* $1: ||p" "$LOG" 2>/dev/null | tail -n 1; } # <id>
@@ -146,7 +151,12 @@ probe() { # <harness> <model> [account folder]: the one-line prompt through the 
   local dir rc prompt='Reply with the single word PONG.'
   [ -z "${3:-}" ] || on_account=(env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN -u CLAUDE_CODE_OAUTH_TOKEN CLAUDE_CONFIG_DIR="$3")
   dir=$(mktemp -d) || return 1
-  ( cd "$dir" && case $1 in
+  ( cd "$dir" || exit 1
+  if [ -z "${3:-}" ] && [[ $1 = claude* ]] && [ -f "$FM_HOME/config/account-pool" ]; then
+    # shellcheck source=/dev/null # sibling add-on path, resolved at runtime
+    . "$_FM_POOL_ENV" && fm_pool_claude_env || exit 1
+  fi
+  case $1 in
     opencode*) timeout "$TEST_SECS" "${on_account[@]}" opencode run --model "$2" "$prompt" ;;
     pi*) timeout "$TEST_SECS" "${on_account[@]}" pi --model "$2" -p --no-session "$prompt" ;;
     claude*) timeout "$TEST_SECS" "${on_account[@]}" claude -p --model "$2" "$prompt" ;;
