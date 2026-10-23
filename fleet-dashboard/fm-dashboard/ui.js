@@ -16,6 +16,8 @@ export const hm = t => {
   const d = new Date(t * 1000), tm = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
   return d.toDateString() === new Date().toDateString() ? tm : `${d.toLocaleDateString([], { weekday: 'short' })} ${tm}`
 }
+// A phone's columns move sideways only: scrollIntoView would also scroll the page down to a tall column's top.
+export const toCol = (el, k, behavior = 'auto') => el?.scrollTo({ left: k * el.clientWidth, behavior })
 export const prNum = u => (u || '').match(/\/(?:pull|merge_requests|\+)\/(\d+)(?:[/?#]|$)/)?.[1]
 
 export const STAGES = ['queued', 'building', 'review', 'test', 'ci', 'merge', 'landed']
@@ -95,8 +97,8 @@ export function Av({ m, size = 16 }) {
       : html`<text x="8" y="11" text-anchor="middle" font-size="8" font-weight="600" fill="currentColor">${m[0].toUpperCase()}</text>`}</svg>`
 }
 
-// The filters every view shares, kept in the URL: home, model and state.
+// The filters every view shares, kept in the URL: home, model, state and stage.
 export const sid = c => c.wait || 'moving'
 export const STATES = [['blocked', 'Blocked'], ['decision', 'Main or lead decides'], ['waiting', 'Waiting'], ['parked', 'On hold'], ['moving', 'Moving']]
 export const filterCards = (d, r) => d.cards.filter(c => (!r.home.length || r.home.includes(c.home)) && (!r.model.length || r.model.includes(c.model || 'none'))
-  && (!r.state.length || r.state.includes(sid(c))))
+  && (!r.state.length || r.state.includes(sid(c))) && (!r.stage.length || r.stage.includes(c.stage)))
