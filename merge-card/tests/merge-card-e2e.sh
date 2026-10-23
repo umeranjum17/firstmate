@@ -196,6 +196,27 @@ if grep -q -- '--claim-id' "$DD_LOG"; then no "claim id: none passed without the
 PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board-claim.json" --claim-id fd-studio-hide-brief newer "$wt" "$head_c" - >/dev/null 2>&1
 if grep -q -- '^check .* --claim-id fd-studio-hide-brief' "$DD_LOG"; then ok "claim id: post passes it to done-done check"; else no "claim id: post passes it to done-done check: $(cat "$DD_LOG")"; fi
 
+# post --judge: the route reaches `done-done check` for that call alone, so a lane whose
+# configured judge route is rate limited can name another one instead of waiting on the
+# fallback; without the flag done-done keeps its own configured judge. A throwaway board
+# keeps this card out of the next one.
+: >"$DD_LOG"
+PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board-judge.json" newer "$wt" "$head_c" - >/dev/null 2>&1
+if grep -q -- '--judge' "$DD_LOG"; then no "judge: none passed without the flag"; else ok "judge: none passed without the flag"; fi
+: >"$DD_LOG"
+SO_CAPTURE=$work/card-judge
+export SO_CAPTURE
+PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board-judge.json" --judge minimax:key newer "$wt" "$head_c" - >/dev/null 2>&1
+if grep -q -- '^check .* --judge minimax:key' "$DD_LOG"; then ok "judge: post passes the route to done-done check"; else no "judge: post passes the route to done-done check: $(cat "$DD_LOG")"; fi
+holds "judge: card still posts with a named route" "$work/card-judge/card.json"
+# gate --judge: the gate's own check carries the route too, so the merge gate judges the
+# proof with the route the caller named rather than the configured one.
+: >"$DD_LOG"
+PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" gate --judge minimax:key newer "$wt" "$head_c" - >"$work/gate-judge.log" 2>&1
+if grep -q -- '^check .* --judge minimax:key' "$DD_LOG"; then ok "judge: gate passes the route to done-done check"; else no "judge: gate passes the route to done-done check: $(cat "$DD_LOG")"; fi
+is "judge: gate recorded the verdict" "$(jq -r .verdict "$home/data/newer/merge-card.json")" pass
+grep -q -- 'done-done check: pass' "$work/gate-judge.log" && ok "judge: gate reports the verdict" || no "judge: gate reports the verdict: $(cat "$work/gate-judge.log")"
+
 # A 0.3.0 done-done on PR 24's shape: the PR body names the PNG bare, the file
 # is in the task folder, the flag is never passed, and merge-card hands done-done
 # the block with the name resolved there, so the card still carries the PNG.

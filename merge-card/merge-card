@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # merge-card: every Firstmate merge runs done-done and posts one evidence card to a sign-off board.
 #
-#   merge-card gate <task-id> <worktree|-> <head|-> <pr-url|->
+#   merge-card gate [--judge <route>] <task-id> <worktree|-> <head|-> <pr-url|->
 #     Install as $FM_HOME/config/merge-gate. In the task's worktree it runs
 #     `done-done check --from <pr-url>` (or $FM_HOME/data/<task-id>/checks.md with no PR),
 #     with done-done's judge and each relative Checks evidence name resolved against
@@ -10,9 +10,13 @@
 #     saves it for the card in $FM_HOME/data/<task-id>/merge-card.json.
 #     done-done's verdict is report only. A PR merge is refused (exit 1) when
 #     $FM_HOME/data/checks-gate.log has no pass row for the head from fm-checks-lint.sh.
-#   merge-card check <task-id> <worktree|-> <head|-> <pr-url|->
+#   merge-card check [--judge <route>] <task-id> <worktree|-> <head|-> <pr-url|->
 #     The gate's check alone: run done-done, save and print the verdict, post nothing.
-#   merge-card post --board <board.json> [--claim-id <id>] <task-id> <worktree|-> <head|-> <pr-url|->
+#     gate, check and post all take `--judge <route>`: it reaches `done-done check --judge <route>`
+#     for that call alone, so a lane whose configured judge route is rate limited can name another
+#     one instead of waiting on the fallback. Without it done-done checks with its own configured
+#     judge, as before.
+#   merge-card post --board <board.json> [--claim-id <id>] [--judge <route>] <task-id> <worktree|-> <head|-> <pr-url|->
 #     Install as $FM_HOME/config/post-merge. --claim-id names the done-done claim to check (passed to
 #     `done-done check --claim-id`, and the check is re-run); without it done-done picks its own. Posts one evidence card per merge (one live card per PR: a new head posts its card and archives the old one), and
 #     only when the proof is real and passed: done-done's recorded verdict is pass,
@@ -65,11 +69,12 @@ resolve_evidence() {
     else . end'
 }
 
-# check [--claim-id <id>] <task-id> <worktree|-> <head|-> <pr-url|->: run done-done, save and print the verdict.
+# check [--claim-id <id>] [--judge <route>] <task-id> <worktree|-> <head|-> <pr-url|->: run done-done, save and print the verdict.
 check() {
-  local claim_id=()
+  local claim_id=() judge=()
   [ "${1:-}" = --claim-id ] && [ -n "${2:-}" ] && claim_id=(--claim-id "$2") && shift 2
-  [ $# -eq 4 ] || { echo "usage: merge-card check [--claim-id <id>] <task-id> <worktree|-> <head|-> <pr-url|->"; return; }
+  [ "${1:-}" = --judge ] && [ -n "${2:-}" ] && judge=(--judge "$2") && shift 2
+  [ $# -eq 4 ] || { echo "usage: merge-card check [--claim-id <id>] [--judge <route>] <task-id> <worktree|-> <head|-> <pr-url|->"; return; }
   [ -n "${FM_HOME:-}" ] || { echo "merge-card: FM_HOME is not set, so done-done did not run"; return; }
   local id=$1 wt=$2 head=$3 pr=$4 src out='' rc=0 verdict signoff=''
   local record=$FM_HOME/data/$id/merge-card.json dd_v='' args body reason
@@ -86,7 +91,7 @@ check() {
     dd_v=$(done-done --version 2>/dev/null | head -n 1)
     if done-done check --help 2>&1 | grep -q -- '--citation-base' ||
        version_at_least "$dd_v" 0.3.1; then
-      out=$(cd "$wt" && done-done check --from "$src" --json --citation-base "$FM_HOME/data/$id" "${claim_id[@]}" 2>&1) || rc=$?
+      out=$(cd "$wt" && done-done check --from "$src" --json --citation-base "$FM_HOME/data/$id" "${judge[@]}" "${claim_id[@]}" 2>&1) || rc=$?
     else
       args=()
       if [ "$pr" = - ]; then
@@ -100,7 +105,7 @@ check() {
       fi
       [ "$pr" != - ] || args=("${claim_id[@]}")
       if [ "$rc" = 0 ]; then
-        out=$(cd "$wt" && resolve_evidence "$FM_HOME/data/$id" <<<"$body" | done-done check --from - "${args[@]}" --json 2>&1) || rc=$?
+        out=$(cd "$wt" && resolve_evidence "$FM_HOME/data/$id" <<<"$body" | done-done check --from - "${args[@]}" "${judge[@]}" --json 2>&1) || rc=$?
       else
         out=$body
       fi
@@ -130,9 +135,11 @@ check() {
 }
 
 gate() {
-  [ $# -eq 4 ] || { echo "usage: merge-card gate <task-id> <worktree|-> <head|-> <pr-url|->"; return; }
+  local judge=()
+  [ "${1:-}" = --judge ] && [ -n "${2:-}" ] && judge=(--judge "$2") && shift 2
+  [ $# -eq 4 ] || { echo "usage: merge-card gate [--judge <route>] <task-id> <worktree|-> <head|-> <pr-url|->"; return; }
   [ -n "${FM_HOME:-}" ] || { echo "merge-card: FM_HOME is not set, so done-done did not run"; return; }
-  check "$1" "$2" "$3" "$4"
+  check "${judge[@]}" "$1" "$2" "$3" "$4"
   echo "merge-card: report only; done-done's verdict never refuses this merge"
   [ "$4" != - ] && [ "$3" != - ] || return 0
   # Row: <time> <src> <head> pass|fail <why>, one per fm-checks-lint.sh run.
@@ -181,10 +188,11 @@ file_card() {
 
 post() {
   local board='' id wt head pr record key link title about kind media run receipt=null media_dir out rc n=0 f verdict claim
-  local claim_id=()
+  local claim_id=() judge=()
   [ "${1:-}" = --board ] && [ -n "${2:-}" ] && board=$2 && shift 2
   [ "${1:-}" = --claim-id ] && [ -n "${2:-}" ] && claim_id=(--claim-id "$2") && shift 2
-  [ -n "$board" ] && [ $# -eq 4 ] || die "usage: merge-card post --board <board.json> [--claim-id <id>] <task-id> <worktree|-> <head|-> <pr-url|->"
+  [ "${1:-}" = --judge ] && [ -n "${2:-}" ] && judge=(--judge "$2") && shift 2
+  [ -n "$board" ] && [ $# -eq 4 ] || die "usage: merge-card post --board <board.json> [--claim-id <id>] [--judge <route>] <task-id> <worktree|-> <head|-> <pr-url|->"
   [ -n "${FM_HOME:-}" ] || die "FM_HOME is not set"
   id=$1 wt=$2 head=$3 pr=$4 record=$FM_HOME/data/$1/merge-card.json
   if [ "$head" = - ] && [ "$pr" != - ]; then
@@ -270,8 +278,8 @@ post() {
     return 0
   fi
   # The gate's verdict for this merge, else run done-done now (a merge the gate never saw).
-  [ "${#claim_id[@]}" -eq 0 ] && jq -e --arg pr "$pr" --arg head "$head" '.pr == $pr and ($pr != "-" or .head == $head)' "$record" >/dev/null 2>&1 || {
-    check "${claim_id[@]}" "$id" "$wt" "$head" "$pr"
+  [ "${#claim_id[@]}" -eq 0 ] && [ "${#judge[@]}" -eq 0 ] && jq -e --arg pr "$pr" --arg head "$head" '.pr == $pr and ($pr != "-" or .head == $head)' "$record" >/dev/null 2>&1 || {
+    check "${claim_id[@]}" "${judge[@]}" "$id" "$wt" "$head" "$pr"
   }
   verdict=$(jq -r '.verdict // empty' "$record")
   claim=$(jq -r '.check.claim // empty' "$record")
