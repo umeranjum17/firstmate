@@ -199,7 +199,12 @@ screen_none() {
 # file_card <board> <card.json> <kind>: put the card on the board the one-at-a-time way, then archive
 # the PR's other live cards (kept under Archived). Reads post()'s card_key, restore and old_keys.
 file_card() {
-  local k
+  local k checker text
+  if [ -f "$FM_HOME/config/owner-rules" ]; then
+    checker=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/owner-rules/bin/fm-owner-rules-text-check.sh
+    text=$(jq -r '.. | strings' "$2") || return $?
+    printf '%s\n' "$text" | bash "$checker" || return $?
+  fi
   if [ -n "$restore" ]; then sign-off-axi restore "$card_key" "$1" || return $?
   else sign-off-axi post "$1" --kind "$3" --from "$2" --filer firstmate-merge || return $?; fi
   for k in $old_keys; do sign-off-axi dismiss "$k" "$1" >/dev/null || return $?; done

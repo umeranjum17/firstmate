@@ -1,7 +1,9 @@
 # merge-card
 
 `merge-card` remains the gate/check/post executable documented in the root [README](../README.md#merge-card).
-Its existing config shims and card behavior are unchanged.
+
+Homes with `config/owner-rules` use the [owner-rules publication check](../owner-rules/README.md#lavish-refusal-secondmate-notes-and-merge-card-posts) before posting or restoring a card.
+Its existing config shims are unchanged.
 
 ## Naming the claim
 

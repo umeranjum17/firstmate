@@ -36,6 +36,21 @@ A refusal exits 1 before `fm-brief.sh` writes `data/<id>/brief.md`, with a one-l
 - Test: `tests/owner-rules-gate.test.sh` covers receipt and lint refusals, verifies the Evidence-card hint is an executable absolute path, and scans gate/check scripts for bare add-on command hints. `tests/gate-contract.test.sh` uses installed `sign-off-axi` to post a merge-card-shaped Evidence card, then proves matching commits pass and mismatches refuse; it skips only when the CLI is absent.
 - Roll out a new refusing gate with `config/owner-rules-canary`, one exact `FM_HOME` path per line; only listed homes enforce the new Evidence-card refusal while other homes retain prior behavior. A canary may self-waive that refusal by writing a future UTC expiry (`YYYY-MM-DDTHH:MMZ`) to `config/owner-rules-canary-waiver`; expired or malformed waivers do not apply. Remove the waiver after resolving any issue, then add homes to the canary file to expand rollout. With no canary config, all homes retain today's enforcement.
 
+## Lavish refusal: secondmate notes and merge-card posts
+
+With `config/owner-rules` present, `status-wait-check` checks secondmate report notes before append, and `merge-card` checks decoded card strings before posting or restoring a card.
+`bin/fm-owner-rules-text-check.sh` reads proposed text on stdin and refuses HTTP(S) links to port 4387 or the word `lavish-axi`, ignoring case.
+It exits 1 and prints `owner-rules: Lavish publication refused; use the sign-off board (sign-off-axi) instead`.
+Other text, including clean sign-off links, passes; read errors retain their diagnostics and exit code.
+This covers secondmate notes and merge-card posts only: raw status appends, report files (including `--doc` contents), and `lavish-axi` commands are not intercepted.
+Retiring existing registrations and removing old files remain outside this publication check.
+
+Existing homes need no reinstall when their add-on checkout is updated: the report hook and merge-card shims execute files from that checkout, and the existing owner-rules marker enables the checks.
+Homes without the marker enable it with `install.sh <fm-home>`; the report helper still needs the existing status-wait-check fork hook.
+Run `bash tests/no-lavish.test.sh` from this directory for the executable contract, note hook, and real sign-off board journey.
+Set `FM_TEST_FORK=<Firstmate checkout>` to also prove the real secondmate helper refuses before writing status; `FM_TEST_KEEP=1` preserves isolated fixtures for diagnosis.
+Capture the real commands and their outputs with `FM_PROOF_FORK=<Firstmate checkout> done-done run owner-rules-publication`, then check its `publication.txt` with done-done.
+
 ## Leads skill (slice 3)
 
 `skill/SKILL.md` tells the leads both rules, the exact refusal lines and the one-step fix for each. No add-on installs skills, so

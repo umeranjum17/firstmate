@@ -7,6 +7,10 @@ if [ "$#" -ne 2 ]; then
 fi
 verb=${1%:}
 text=$2
+if [ -n "${FM_HOME:-}" ] && [ -f "$FM_HOME/config/owner-rules" ]; then
+  checker=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/owner-rules/bin/fm-owner-rules-text-check.sh
+  printf '%s\n' "$text" | bash "$checker" || exit $?
+fi
 [ "$verb" = blocked ] || exit 0
 
 # Explicit failure causes are blockers, even when they mention a wait or CI.

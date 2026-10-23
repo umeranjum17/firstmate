@@ -1,5 +1,7 @@
 app: firstmate-addons
 journeys:
+  owner-rules-publication:
+    command: bash owner-rules/run-proof.sh
   fleet-pulse-chat-tsv-refresh:
     command: bash fleet-pulse/tests/chat-tsv.test.sh > "$DONE_DONE_EVIDENCE_ROOT/${RUN_ID}.log" 2>&1
   quota-failover-screen-match:
