@@ -379,8 +379,6 @@ a.ov-kpi:hover,button.ov-kpi:hover{box-shadow:0 0 0 1px var(--line-3)}
 .ov-kpis+.ov-src{margin:8px 2px 12px}
 .tk-say{margin-bottom:12px;border:1px solid var(--line-2);border-radius:8px;background:var(--card)}
 .tk-say textarea{display:block;width:100%;min-height:58px;resize:vertical;padding:10px 12px 4px;border:0;background:none;color:var(--ink);font:inherit;font-size:14px;outline:0}
-.tk-say label{display:flex;flex-direction:column;gap:4px;padding:4px 12px;font-size:12px;color:var(--ink-3)}
-.tk-say input{padding:6px 8px;border-radius:6px;border:1px solid var(--line-3);background:var(--panel);color:var(--ink)}
 .tk-say .row{display:flex;align-items:center;gap:8px;padding:4px 8px 8px 12px}
 .tk-say small{color:var(--ink-3);font-size:12px}
 .tk-say .btn:disabled{opacity:.45}

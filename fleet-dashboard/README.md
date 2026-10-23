@@ -64,9 +64,13 @@ adds the Tickets board: `tickets.js`, its route and styles in `app.js` and `app.
 `Entry` export in `board.js` that its ticket page reuses, and
 the `tickets` and `tickets_unread` keys `fm-dashboard.sh` adds to `board.json` from the
 backlog it already reads, Overview naming the source of every figure (from each
-metric's `source` in `data.json`) on hover and under its card, and the ticket comment: the server's one write, `POST /comment`
-with a per-device token (`state/dashboard/comment-token`), delivered to the owning lead with
-`fm-send.sh` (or to Main with `fm-inbox.sh note`) and shown in the ticket thread. The Ship tab is removed, with its `ship/` files and the vendored three.js it alone used. The app takes the approved Tickets prototype's look: neutral greys and one accent in both themes (Insights included), Tickets as the landing view, Overview labelled Metrics, a phone dock that names each view, flat neutral Metrics cards, and Board cards whose names drop leading tags and Main refs as tickets do. Tickets filters by release as well as project and lays open items in release lanes (Next release, After, Later; `#/tickets?by=release`); each Metrics lifecycle stage and To land open the Board filtered to that stage (`#/board?stage=ci`, a removable Stage chip); a phone's column switcher scrolls sideways only, never the page.
+metric's `source` in `data.json`) on hover and under its card, and the ticket comment: the server's one write, `POST /comment`.
+It takes the owner's sign-off board token: `config/owner-board` names the board's `board.json`, and its `<board>.token` is read on each comment.
+A device that opened the board's access link carries the board's `sign-off-<port>` cookie, and the browser sends it to the dashboard too when both are opened at the same address, so nothing is pasted (with no such config, comments are off).
+The comment goes to the owning lead with `fm-send.sh` (or to Main with `fm-inbox.sh note`) and asks for the answer in the thread:
+the lead runs `"$FM_HOME/bin/fm-secondmate-report.sh" note <comment id> <answer>`, Main `fm-inbox.sh reply <note id> <answer>`.
+The build shows each comment with its pickup (the steer or note moved to `handled/`) and answer (the lead's `corr=<comment id>` line on its channel, or Main's inbox reply).
+The Ship tab is removed, with its `ship/` files and the vendored three.js it alone used. The app takes the approved Tickets prototype's look: neutral greys and one accent in both themes (Insights included), Tickets as the landing view, Overview labelled Metrics, a phone dock that names each view, flat neutral Metrics cards, and Board cards whose names drop leading tags and Main refs as tickets do. Tickets filters by release as well as project and lays open items in release lanes (Next release, After, Later; `#/tickets?by=release`); each Metrics lifecycle stage and To land open the Board filtered to that stage (`#/board?stage=ci`, a removable Stage chip); a phone's column switcher scrolls sideways only, never the page.
 Every other moved file remains byte-identical to the fork.
 
 ## Side-by-side proof (re-run before the served path swaps)

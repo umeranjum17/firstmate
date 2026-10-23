@@ -18,6 +18,7 @@ session=core-journey-$$
 srv_pid=
 cleanup() {
   CHROME_DEVTOOLS_AXI_SESSION=$session chrome-devtools-axi stop >/dev/null 2>&1 || true
+  env -u TMUX TMUX_TMPDIR="$home/tmux" tmux kill-server 2>/dev/null || true
   [ -z "$srv_pid" ] || kill "$srv_pid" 2>/dev/null || true
   rm -rf -- "$home"
 }
@@ -90,10 +91,21 @@ EOF
   : > "$home/proc/locks"
   # The Firstmate helpers the build runs, linked in.
   for f in "$FM_BIN"/*; do ln -s "$f" "$bin/${f##*/}"; done
+  # The owner's sign-off board token, and a lead home, alpha, whose steering endpoint is a window on a private tmux server.
+  mkdir -p "$home/board" "$home/alpha/data" "$home/alpha/state" "$home/tmux"
+  printf 'core-owner-token-%s\n' "$(od -An -N12 -tx1 /dev/urandom | tr -d ' \n')" > "$home/board/board.token"
+  printf 'board/board.json\n' > "$home/config/owner-board"
+  ln -s "$bin" "$home/alpha/bin"
+  printf 'alpha\n' > "$home/alpha/.fm-secondmate-home"
+  printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$home" > "$home/alpha/.fm-secondmate-parent"
+  printf -- '- alpha - Owns the alpha screens. (home: %s/alpha; scope: alpha)\n' "$home" > "$home/data/secondmates.md"
+  printf 'kind=secondmate\nwindow=core:alpha\nbackend=tmux\n' > "$home/state/alpha.meta"
+  printf '## In flight\n- [ ] t-lead - Keep the ask list on top (repo: alpha) (kind: ship) (priority: 1) (since %s)\n' "$today" > "$home/alpha/data/backlog.md"
+  env -u TMUX TMUX_TMPDIR="$home/tmux" tmux new-session -d -s core -n alpha cat
 }
 
 dash() {  # <build|serve> [args]: the dashboard against the seed home, with the stubs first on PATH
-  env PATH="$home/stubs:$PATH" HOME="$home" FM_HOME="$home" FM_BIN="$bin" FM_ADDONS_DIR="$root" \
+  env -u TMUX PATH="$home/stubs:$PATH" HOME="$home" FM_HOME="$home" FM_BIN="$bin" FM_ADDONS_DIR="$root" TMUX_TMPDIR="$home/tmux" \
     FM_DEVICE_LOCK_DIR="$home/locks" FM_DASHBOARD_PROC="$home/proc" FM_MAC_HOST= \
     bash "$here/fm-dashboard.sh" "$@"
 }
@@ -176,23 +188,48 @@ jq -e '([.tickets[] | {(.task): .state}] | add) as $s | ([.tickets[] | {(.task):
 # The ticket page: the description without bookkeeping, the captain's words it serves, and the lane's status lines.
 for w in 390 1280; do shot "ticket-page-$w" '#/tickets?ticket=main/m-ask' "$w" 'Serves your ask'; done
 shot ticket-held-390 '#/tickets?ticket=main/m-held' 390 'Main decides: wait for the new layout.'
-# A comment needs this device's token: none or a wrong one is refused, an unknown ticket too; then the captain's
-# comment from the page reaches Main as a note and shows in the ticket's thread after the next build.
-post() { curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -H "X-Comment-Token: $1" --data "$2" "${url}comment"; }
-[ "$(post '' '{"ticket":"main/m-ask","text":"hi"}')" = 401 ] && [ "$(post wrong '{"ticket":"main/m-ask","text":"hi"}')" = 401 ] \
-  && [ "$(post "$(cat "$home/state/dashboard/comment-token")" '{"ticket":"main/nope","text":"hi"}')" = 404 ] || { echo "run-core-proof: the comment endpoint took a bad request" >&2; exit 1; }
-shot ticket-comment-390 '#/tickets?ticket=main/m-ask' 390 'Serves your ask'
-chrome-devtools-axi eval '(() => { const t = document.querySelector(".tk-say textarea"); t.value = "Pick the layout that keeps the ask list on top."; t.dispatchEvent(new Event("input", { bubbles: true })); return 1 })()' >/dev/null
-chrome-devtools-axi eval 'setTimeout(() => document.querySelector(".tk-say").requestSubmit(), 50)' >/dev/null
-chrome-devtools-axi wait 'Comment token for this device' >/dev/null
-chrome-devtools-axi eval "(() => { const f = document.querySelector('.tk-say'); f.token.value = '$(cat "$home/state/dashboard/comment-token")'; setTimeout(() => f.requestSubmit(), 50); return 1 })()" >/dev/null
+# A comment needs the owner's sign-off board token, which the board's sign-off-<port> cookie carries: none, a wrong one
+# or a form post is refused, an unknown ticket too. With the board's cookie in the browser, as opening the board's link
+# at this address leaves it, the captain's comment goes from the page with no pasted secret, reaches Main as a note,
+# and Main's pickup and reply show under it in the thread.
+tok=$(cat "$home/board/board.token")
+post() { curl -s -o /dev/null -w '%{http_code}' -X POST -H "Content-Type: $1" -H "Cookie: $2" --data "$3" "${url}comment"; }
+[ "$(post application/json '' '{"ticket":"main/m-ask","text":"hi"}')" = 401 ] && [ "$(post application/json sign-off-4420=wrong '{"ticket":"main/m-ask","text":"hi"}')" = 401 ] \
+  && [ "$(post application/json "sign-off-4420=$tok" '{"ticket":"main/nope","text":"hi"}')" = 404 ] \
+  && [ "$(post application/x-www-form-urlencoded "sign-off-4420=$tok" '{"ticket":"main/m-ask","text":"hi"}')" = 415 ] \
+  || { echo "run-core-proof: the comment endpoint took a bad request" >&2; exit 1; }
+say() {  # <ticket> <text>: send a comment from the ticket page
+  shot "ticket-comment-$1" "?c-$1#/tickets?ticket=$2" 390 'Activity'
+  chrome-devtools-axi eval "(() => { const t = document.querySelector('.tk-say textarea'); t.value = '$3'; t.dispatchEvent(new Event('input', { bubbles: true })); setTimeout(() => document.querySelector('.tk-say').requestSubmit(), 50); return 1 })()" >/dev/null
+}
+chrome-devtools-axi eval "document.cookie = 'sign-off-4420=$tok; path=/'" >/dev/null  # what the board's link leaves
+say main main/m-ask 'Pick the layout that keeps the ask list on top.'
 chrome-devtools-axi wait 'Sent to Main' >/dev/null  # the comment shows in the thread at once
 chrome-devtools-axi screenshot "$DONE_DONE_EVIDENCE_ROOT/ticket-comment-sent-390.png" >/dev/null
-env PATH="$home/stubs:$PATH" HOME="$home" FM_HOME="$home" bash "$bin/fm-inbox.sh" list | grep -qF 'Pick the layout that keeps the ask list on top.' \
-  || { echo "run-core-proof: the comment did not reach Main's inbox" >&2; exit 1; }
+inbox() { env PATH="$home/stubs:$PATH" HOME="$home" FM_HOME="$home" bash "$bin/fm-inbox.sh" "$@"; }
+note=$(jq -r 'select(.ticket == "main/m-ask") | .note' "$home/state/dashboard/comments.jsonl")
+grep -qF 'Answer the captain in the ticket thread: bin/fm-inbox.sh reply' "$home/state/inbox/$note.note" || { echo "run-core-proof: the comment did not reach Main's inbox with how to answer" >&2; exit 1; }
+inbox drain --ack "$note" >/dev/null
+inbox reply "$note" "Agreed: the ask list stays on top in both layouts." >/dev/null
+# The lead: the comment goes through fm-send to its endpoint, which rings; the lead picks the steer up (moves it to
+# handled/) and runs the answer command it carries, unchanged, with its own FM_HOME.
+say alpha alpha/t-lead 'Keep the ask list above the fold on a phone.'
+chrome-devtools-axi wait 'Sent to the alpha lead as a steer' >/dev/null
+steer=$(grep -lF 'Keep the ask list above the fold on a phone.' "$home"/state/alpha.inbox/*.msg)
+env -u TMUX TMUX_TMPDIR="$home/tmux" tmux capture-pane -p -t core:alpha | grep -qF 'instruction waiting' || { echo "run-core-proof: the lead's endpoint was not rung" >&2; exit 1; }
+mv "$steer" "$home/state/alpha.inbox/handled/"
+answer=$(sed -n 's/.*(your FM_HOME already names your own home): //p' "$home/state/alpha.inbox/handled/${steer##*/}" | sed 's/<your answer in plain words>/Read: the ask list stays above the fold./')
+(cd "$home/alpha" && env PATH="$home/stubs:$PATH" HOME="$home" FM_HOME="$home/alpha" bash -c "$answer") >/dev/null
 dash build >/dev/null
-for w in 390 1280; do shot "ticket-thread-$w" "?thread-$w#/tickets?ticket=main/m-ask" "$w" 'Pick the layout that keeps'; done
-grep -qF 'Sent to Main' "$DONE_DONE_EVIDENCE_ROOT/ticket-thread-390.txt" || { echo "run-core-proof: the thread lacks the sent comment" >&2; exit 1; }
+for w in 390 1280; do
+  shot "ticket-thread-$w" "?thread-$w#/tickets?ticket=main/m-ask" "$w" 'Agreed: the ask list stays on top'
+  shot "lead-thread-$w" "?lead-$w#/tickets?ticket=alpha/t-lead" "$w" 'Read: the ask list stays above the fold.'
+done
+grep -qF 'Sent to Main' "$DONE_DONE_EVIDENCE_ROOT/ticket-thread-390.txt" && grep -qF 'Picked up your comment' "$DONE_DONE_EVIDENCE_ROOT/lead-thread-390.txt" \
+  || { echo "run-core-proof: a thread lacks the sent comment or its pickup" >&2; exit 1; }
+jq -e '[.tickets[] | .comments[] | select(.picked > 0) | .replies[] | select(.at > 0) | [.by, .text]] | sort
+  == [["alpha", "Read: the ask list stays above the fold."], ["main", "Agreed: the ask list stays on top in both layouts."]]' \
+  "$home/state/dashboard/board.json" >/dev/null || { echo "run-core-proof: a pickup or answer is not on its ticket thread: $(jq -c '[.tickets[] | .comments[]]' "$home/state/dashboard/board.json")" >&2; exit 1; }
 jq -e '(.tickets[] | select(.task == "m-ask")) as $t | $t.ask == {"words": "Show the new screen in the layout a phone reads first", "day": "22 Oct"}
   and $t.desc == "Two layouts are drawn; the lead picks one."
   and ([.tickets[] | select(.task == "m-held")][0] | .desc == "Main decides: wait for the new layout." and .ask.day == "22 Oct")' \
@@ -212,7 +249,7 @@ done
 cols() { chrome-devtools-axi eval 'JSON.stringify([...document.querySelectorAll(".tkc")].map(c => [c.querySelector(".ch b").textContent, ...[...c.querySelectorAll("h3")].map(h => h.textContent).sort()]))' \
   | sed -n 's/^result: //p' | jq -c 'fromjson | if type == "string" then fromjson else . end'; }
 for w in 390 1280; do shot "tickets-release-$w" '#/tickets?by=release' "$w" 'Next release'; done
-want='[["Next release","Build the main thing","Start the ready thing"],["After","After the ready thing"],["Later","Choose the layout for the new screen","Get the layout pull request through CI","Publish the release from the build server","Wait for the captain'"'"'s call"]]'
+want='[["Next release","Build the main thing","Start the ready thing"],["After","After the ready thing"],["Later","Choose the layout for the new screen","Get the layout pull request through CI","Keep the ask list on top","Publish the release from the build server","Wait for the captain'"'"'s call"]]'
 [ "$(cols)" = "$want" ] || { echo "run-core-proof: release lanes wrong: $(cols)" >&2; exit 1; }
 shot tickets-release-filter-1280 '#/tickets?release=v0.2.0' 1280 'Build the main thing'
 [ "$(cols | jq -c '[.[] | select(.[0] != "Waiting on captain") | .[1:][]]')" = '["Build the main thing"]' ] || { echo "run-core-proof: the v0.2.0 filter shows $(cols)" >&2; exit 1; }
@@ -279,12 +316,14 @@ steps = {
         "Open a ticket at 390px and 1280px: its description, the captain's words it serves, its fields and its activity",
         "Open the held ticket at 390px: its description is the plain decision, with no leftover labels or punctuation",
         "Open Overview at 390px and 1280px: each card names its source; scroll Overview, Insights and Tickets to the end at 390px",
-        "Write a comment on the ticket, paste the device's comment token once and send it to the owning lead (Main here)",
+        "With the owner's sign-off board cookie in the browser, write a comment on the ticket and send it to the owning lead (Main here), with no pasted secret",
+        "Pick the note up and reply to it as Main with fm-inbox.sh, and open the ticket thread at 390px and 1280px",
+        "Comment on the alpha lead's ticket; as the lead, pick the steer up and run the answer command it carries; open that thread at 390px and 1280px",
         "Switch Tickets to By release at 390px and 1280px, then filter it to release v0.2.0",
         "On Metrics at 390px and 1280px, tap the PR + CI stage of the lifecycle rail; tap To land at 1280px",
         "Build with a flow reader that fails and open Insights at 390px",
     ],
-    "result": "The Board lists m-stuck, m-ask, m-ci and m-build with their titles and states; the Stuck tab holds only stuck lanes, the Waiting tab only the waiting lane, and a home with four open lanes against a cap of three reads 4 / 3; Insights shows Why work waits now with the Blocked, Lead reply and Held groups; Tickets puts each backlog item in its column with its priority chip and release, the captain-held item On hold, and only the one ask under Waiting on captain; a ticket page shows its description, the captain's words with their day, and the lane's activity; Overview names the source of every figure, and each page's end clears the tab bar at 390px; the sidebar and the phone dock no longer offer a Ship tab; a comment sent from the ticket page reaches Main's inbox and shows in the ticket thread as sent; By release puts alpha's v0.2.0 and beta's next item under Next release, the v0.3.0 item under After and items with no release under Later, and the v0.2.0 filter leaves only its item; the PR + CI stage opens the Board filtered to that stage with a removable Stage chip, and To land opens it filtered to To merge; a failing flow reader shows its own error on Insights",
+    "result": "The Board lists m-stuck, m-ask, m-ci and m-build with their titles and states; the Stuck tab holds only stuck lanes, the Waiting tab only the waiting lane, and a home with four open lanes against a cap of three reads 4 / 3; Insights shows Why work waits now with the Blocked, Lead reply and Held groups; Tickets puts each backlog item in its column with its priority chip and release, the captain-held item On hold, and only the one ask under Waiting on captain; a ticket page shows its description, the captain's words with their day, and the lane's activity; Overview names the source of every figure, and each page's end clears the tab bar at 390px; the sidebar and the phone dock no longer offer a Ship tab; a post without the owner's board token is refused, the board's cookie lets the page send a comment with no pasted secret, the comment reaches Main's inbox and shows in the ticket thread as sent with Main's pickup and reply under it, and a comment on a lead's ticket reaches that lead's endpoint through fm-send and shows the lead's pickup and its own answer; By release puts alpha's v0.2.0 and beta's next item under Next release, the v0.3.0 item under After and items with no release under Later, and the v0.2.0 filter leaves only its item; the PR + CI stage opens the Board filtered to that stage with a removable Stage chip, and To land opens it filtered to To merge; a failing flow reader shows its own error on Insights",
 }
 with open(sys.argv[1], "w") as f:
     json.dump(steps, f, indent=2, ensure_ascii=False)

@@ -88,6 +88,10 @@
 #   state/<lead>.status, state/fleet-ledger.jsonl   Landed: each pull request the fleet
 #                                   recorded as merged, once (bin/fm-merge-outcome-lib.sh writes a
 #                                   lead's merges to Main's channel for it, Main's own to its ledger)
+#   state/dashboard/comments.jsonl  ticket comments; a lead's pickup is the steer in state/<lead>.inbox/handled, its
+#                                   answer its line carrying corr=<comment id> in state/<lead>.status; Main's pickup is
+#                                   the note in state/inbox/handled, its answer fm-inbox.sh receipts --all-replies
+#   config/owner-board              the owner's sign-off board.json; its <board>.token lets a comment in (serve only)
 #   resolved markdown backlog + configured archive    Out: closed per local day; missing backlog or unsupported backend is unknown, absent archive is empty
 #   ~/.cache/quota-axi/quotas.json  schema-3 quota cache, read-only; no collector runs during builds
 # Machine and devices, each probe read-only with a 5 s timeout:
@@ -120,11 +124,16 @@
 # HEAD for / and /index.html (the JavaScript app), its files under bin/fm-dashboard/,
 # /board.json, /overview (the same app shell; the app opens its own native Overview in
 # place of the old page), /backlog, /measure and /data.json; every other path is 404.
-# Its one write is POST /comment ({ticket, text}, 1-1000 characters, a ticket on the current board): it
-# needs the X-Comment-Token header to equal state/dashboard/comment-token, which the first serve creates
-# (mode 600, never printed) and the captain pastes once per device; it delivers the comment as a steer to
-# the ticket's lead with fm-send.sh (or to Main with fm-inbox.sh note) and appends the attempt and its
-# result to state/dashboard/comments.jsonl, which the build shows in each ticket's thread.
+# Its one write is POST /comment ({ticket, text} as JSON, 1-1000 characters, a ticket on the current board): it
+# needs the owner's sign-off board token, the <board>.token beside the board.json that config/owner-board names, read
+# on each comment. A device carries it once the owner opened the board's access link on it: the board's
+# sign-off-<port> cookie, which the browser also sends here when the dashboard is opened at the same address. It
+# delivers the comment as a steer to the ticket's lead with fm-send.sh (or to Main with fm-inbox.sh note), asking for
+# the answer in the thread, and appends the attempt and its result to state/dashboard/comments.jsonl. The build shows
+# each comment in its ticket's thread with the lead's pickup (the steer moved to handled/ in state/<lead>.inbox, or
+# Main's note in state/inbox/handled) and answer: the lead's status line carrying corr=<comment id> on its channel
+# (state/<lead>.status: the lead runs "$FM_HOME/bin/fm-secondmate-report.sh" note <comment id> <answer> with its own
+# FM_HOME), or Main's fm-inbox.sh reply.
 # Overview and Board are one app and one navigation; the old generated Overview page is no
 # longer reachable through the app. The app's
 # files and both JSON files carry an ETag, answer 304 while unchanged and are gzipped
@@ -143,7 +152,7 @@
 # answered on their own threads, so an idle connection never holds another one up.
 # It prints `serving http://ADDR:PORT/` once listening. ADDR defaults to
 # 127.0.0.1 and PORT to 8787; port 0 picks a free port. Reading needs no authentication:
-# reach is whatever the bind address exposes; only a comment needs the token.
+# reach is whatever the bind address exposes; only a comment needs the owner token.
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -214,6 +223,8 @@ def ago(s):
 class Handler(http.server.BaseHTTPRequestHandler):
     timeout = 10  # an idle preconnect is closed after 10 s
 
+    def cookies(self): return dict(c.strip().split('=', 1) for c in (self.headers.get('Cookie') or '').split(';') if '=' in c)
+
     def send(self, code, body, ctype, cookie=None, csp=PAGE_CSP, etag=None, gz=False):
         self.send_response(code)
         self.send_header('Content-Type', ctype)
@@ -249,8 +260,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self.send(404, b'not found\n', 'text/plain; charset=utf-8')
         asked = urllib.parse.parse_qs(query).get('group', [''])[0]
         asked = asked if asked in ('home', 'action') else None
-        jar = dict(c.strip().split('=', 1) for c in (self.headers.get('Cookie') or '').split(';') if '=' in c)
-        group = asked or jar.get('fm_group')
+        group = asked or self.cookies().get('fm_group')
         a = age()
         if a is None:  # the first load ever waits for the first pages
             building.acquire()  # a build already under way finishes first
@@ -275,13 +285,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
     do_HEAD = do_GET
 
     # A comment on a ticket goes to the lead that owns it as a steer (fm-send.sh), or to Main as a note
-    # (fm-inbox.sh): the one write this server takes. It needs this device's comment token, a ticket on the
-    # current board and 1-1000 characters; every attempt and its delivery result is kept for the ticket thread.
+    # (fm-inbox.sh): the one write this server takes. It needs the owner's board token, JSON (so no other
+    # site's form can post it), a ticket on the current board and 1-1000 characters; every attempt and its
+    # delivery result is kept for the ticket thread, with the note id Main replies to.
     def do_POST(self):
         def answer(code, **kw): self.send(code, json.dumps(kw).encode(), 'application/json', csp=APP_CSP)
         if self.path != '/comment': return answer(404, error='Not found')
-        if not hmac.compare_digest(self.headers.get('X-Comment-Token', '').encode(), TOKEN.encode()):
-            return answer(401, error='This device has no valid comment token')
+        tok = owner_token()
+        if not tok: return answer(503, error='Comments are off: config/owner-board names no sign-off board with an access token')
+        if not any(re.fullmatch(r'sign-off-\d+', k) and hmac.compare_digest(v.encode(), tok.encode()) for k, v in self.cookies().items()):
+            return answer(401, error="This device has not opened the sign-off board: open the board's link on it once, at this dashboard's address")
+        if (self.headers.get('Content-Type') or '').split(';')[0].strip() != 'application/json': return answer(415, error='Send the comment as JSON')
         n = int(self.headers.get('Content-Length') or 0) if (self.headers.get('Content-Length') or '0').isdigit() else -1
         if not 0 < n <= 8192: return answer(413, error='The comment is too long')
         try: req = json.loads(self.rfile.read(n))
@@ -290,22 +304,28 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if not 0 < len(text) <= 1000: return answer(400, error='Write 1 to 1000 characters')
         try: t = next(x for x in json.load(open(os.path.join(DIR, 'board.json')))['tickets'] if x['id'] == req.get('ticket'))
         except (OSError, ValueError, KeyError, StopIteration): return answer(404, error='That ticket is not on the board')
-        cid, msg = secrets.token_hex(8), f"Captain comment on ticket {t['task']} ({t['title']}), from the fleet dashboard:\n{text}"
-        cmd = ['fm-inbox.sh', 'note', '--request-id', f'dash-{cid}', '--', msg] if t['home'] == 'main' else ['fm-send.sh', t['home'], '--fire-and-forget', cid, msg]
+        cid, msg = secrets.token_hex(8), f"Captain comment on ticket {t['task']} ({t['title']}), from the fleet dashboard:\n{text}\n\n"
+        if t['home'] == 'main':
+            cmd = ['fm-inbox.sh', 'note', '--request-id', f'dash-{cid}', '--json', '--', msg + 'Answer the captain in the ticket thread: bin/fm-inbox.sh reply <this note id> "<your answer in plain words>"']
+        else:
+            cmd = ['fm-send.sh', t['home'], '--fire-and-forget', cid, msg + f'Answer the captain in the ticket thread by running this as is (your FM_HOME already names your own home): "$FM_HOME/bin/fm-secondmate-report.sh" note {cid} "<your answer in plain words>"']
+        note = None
         try:
             r = subprocess.run(['bash', os.path.join(BIN, cmd[0]), *cmd[1:]], env=dict(os.environ, FM_HOME=HOME), capture_output=True, text=True, timeout=60)
             err = None if r.returncode == 0 else ((r.stderr or r.stdout).strip().splitlines() or [f'{cmd[0]} exited {r.returncode}'])[-1][:300]
+            if not err and t['home'] == 'main': note = json.loads(r.stdout).get('id')
         except (OSError, subprocess.TimeoutExpired) as e: err = f'{cmd[0]} did not finish: {e}'
+        except ValueError: err = 'fm-inbox.sh saved the note but gave no readable id'
         with comment_lock, open(os.path.join(DIR, 'comments.jsonl'), 'a', encoding='utf-8') as fh:
-            fh.write(json.dumps(dict(ticket=t['id'], id=cid, at=int(time.time()), text=text, to=t['home'], error=err)) + '\n')
+            fh.write(json.dumps(dict(ticket=t['id'], id=cid, at=int(time.time()), text=text, to=t['home'], error=err, note=note)) + '\n')
         return answer(502, error=f'Not delivered: {err}') if err else answer(200, id=cid, to=t['home'])
 
-# The comment token is made once, readable by this user only, and never printed: the captain copies it to each device.
-os.makedirs(DIR, exist_ok=True)
-try:
-    with os.fdopen(os.open(os.path.join(DIR, 'comment-token'), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), 'w') as fh: fh.write(secrets.token_urlsafe(24))
-except FileExistsError: pass
-TOKEN = open(os.path.join(DIR, 'comment-token')).read().strip()
+# The owner token is the sign-off board's access token: <board>.token beside the board.json config/owner-board names.
+def owner_token():
+    try:
+        board = next(l.strip() for l in open(os.path.join(HOME, 'config', 'owner-board')) if l.strip() and not l.startswith('#'))
+        return open(re.sub(r'\.json$', '', os.path.join(HOME, board)) + '.token').read().strip() or None
+    except (OSError, StopIteration): return None
 comment_lock = threading.Lock()
 
 # Each request on its own thread; rebuilds run on a side thread, one at a time.
@@ -1781,12 +1801,41 @@ def ticket(h, r):
                 release=rel.group(1) if rel else 'later', state=st, pr=c.get('pr') or merged_pr or (link.group() if link else None),
                 updated=max(seen) if seen else c.get('started') or day, desc=describe(body, ask, bool(cut)),
                 ask=dict(words=ask.group(2), day=ask.group(1) or ask.group(3)) if ask else None)
-said = {}  # the captain's comments from the dashboard, by ticket, oldest first
+said = {}  # the captain's comments from the dashboard, by ticket, oldest first, each with the answers it got
 try:
     for l in open(os.path.join(STATE_DIR, 'comments.jsonl'), encoding='utf-8', errors='replace'):
-        try: c = json.loads(l); said.setdefault(c['ticket'], []).append(dict(at=c['at'], text=c['text'], to=c['to'], error=c.get('error')))
+        try: c = json.loads(l); said.setdefault(c['ticket'], []).append(dict(at=c['at'], text=c['text'], to=c['to'], error=c.get('error'), id=c.get('id'), note=c.get('note')))
         except (ValueError, KeyError, TypeError): pass
 except OSError: pass
+# A lead answers on its channel with a status line carrying corr=<comment id>; Main replies to the inbox note.
+sent = [c for cs in said.values() for c in cs if not c['error']]
+answers = {}
+for h in {c['to'] for c in sent if c['to'] != 'main'}:
+    try:
+        for l in open(os.path.join(HOME, 'state', f'{h}.status'), encoding='utf-8', errors='replace'):
+            m, a = re.search(r'\bcorr=([0-9a-f]{16})\b', l), re.search(r'\[at=(\d+)\]', l)
+            w = re.match(r'[\w-]+(?: \[[^\]]*\])*:\s*(.*?)(?:\s*\(via-helper\))?\s*$', l)
+            if m and w and w.group(1): answers.setdefault(m.group(1), []).append(dict(at=int(a.group(1)) if a else None, text=w.group(1), by=h))
+    except OSError: pass
+if any(c['note'] for c in sent):
+    out, why = probe(['bash', os.path.join(BIN, 'fm-inbox.sh'), 'receipts', '--all-replies'], timeout=10, env=dict(os.environ, FM_HOME=HOME))
+    try: replies = {r['id']: r for r in json.loads(out)['replies']} if out else {}
+    except (ValueError, KeyError, TypeError): replies, why = {}, 'unreadable receipts'
+    if why: notes.append(("Main's inbox replies", why))
+    for c in sent:
+        if (r := replies.get(c['note'])):
+            try: at = int(datetime.fromisoformat(r['at'].replace('Z', '+00:00')).timestamp())
+            except (AttributeError, ValueError): at = None
+            answers.setdefault(c['id'], []).append(dict(at=at, text=r['body'].strip(), by='main'))
+def picked(paths):  # the time the steer or note was moved to handled/ (a move changes ctime only), when it was
+    return next((int(os.path.getctime(p)) for p in paths if os.path.isfile(p)), None)
+for cs in said.values():
+    for c in cs:
+        box = os.path.join(HOME, 'state', f"{c['to']}.inbox", 'handled')
+        msgs = [os.path.join(box, f) for f in (os.listdir(box) if os.path.isdir(box) else []) if f.endswith('.msg')]
+        c['picked'] = None if c['error'] else picked([os.path.join(HOME, 'state', 'inbox', 'handled', f"{c['note']}.note")] if c['note']
+                                                    else [p for p in msgs if f"delivery={c['id']}" in open(p, errors='replace').read()])
+        c.pop('note'); c['replies'] = answers.get(c.pop('id'), [])
 tickets = [dict(ticket(h, r), comments=said.get(f"{h}/{r['id']}", [])[-50:]) for h in ACTIVE for r in backlog.get(h) or []]
 # Cycle time: dispatch to merge, for each merged task whose dispatch is in a ledger.
 cycles = sorted(at - d['ts'] for at, h, task in merges.values() if (d := dispatch(h, task, at)))
