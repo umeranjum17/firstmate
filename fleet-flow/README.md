@@ -93,6 +93,11 @@ exists (Main's `config/fm-mem-gate.sh` is then a one-line shim to it), else
 from `config/fm-mem-gate.sh` as before, and `gate_source` names the file it
 read.
 
+Contract change (approval audit D16): the capacity pressure is the memory
+gate's own sustained reading, the lower of `some` avg10 and avg60, under
+`memory_pressure_percent`; it replaces the raw `memory_some_avg10_percent`,
+which counted 10-30 s spikes the gate lets pass.
+
 Contract change at the shim swap: the reader takes `FM_BIN` for the fork
 helper libraries and the fork copy became the shim, so this repository now
 holds the only reader.

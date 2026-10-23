@@ -190,6 +190,17 @@ function Rail({ d, go }) {
       ${s === 'landed' ? html`<span class="ov-sbar done"></span>` : html`<span class="ov-sbar"><i style=${{ width: `${(n - st - wt) / top * 100}%` }}></i><i class="w" style=${{ width: `${wt / top * 100}%` }}></i><i class="s" style=${{ width: `${st / top * 100}%` }}></i></span>`}
       <small>${s === 'landed' ? 'merged today' : !n ? 'empty' : [st && html`<em class="s">${st} stuck</em>`, wt && `${wt} waiting`, old > 60 && `oldest ${dur(old)}`].filter(Boolean).flatMap((p, k) => k ? [' · ', p] : [p])}</small></button>` })}</div>`
 }
+// Memory as the memory gate reads it: free memory and the sustained pressure (the lower of the 10 s and 60 s averages),
+// each against the line where heavy jobs wait, and the watcher's peak over the last hour.
+function Memory({ m, q }) {
+  const free = m.free_memory_gb?.value, all = m.total_memory_gb?.value, psi = m.memory_pressure?.value, peak = q.machine?.peak, lim = q.machine_limits || {}
+  const tone = v => v == null ? '--grey' : v >= lim.memory_pressure ? '--red' : v >= lim.memory_pressure / 2 ? '--orange' : '--green'
+  const pct = v => v == null ? '–' : `${v < 10 ? v.toFixed(1) : Math.round(v)}%`
+  const row = (name, frac, c, value) => html`<div class="ov-qrow"><span>${name}</span><span class=${'ov-bar' + (frac == null ? ' unk' : '')}><i style=${{ width: `${frac == null ? 0 : Math.max(2, Math.min(100, frac * 100))}%`, background: `var(${c})` }}></i></span><b class="num">${value}</b></div>`
+  return html`<div class="ov-ql">${row(all ? `Free of ${Math.round(all)} GB` : 'Free', free != null && all ? free / all : null, free != null && free < lim.min_memory_gb ? '--red' : '--green', free == null ? '–' : `${Math.round(free)} GB`)}
+    ${row('Pressure', psi == null ? null : psi / 100, tone(psi), pct(psi))}${row('Peak, last hour', peak == null ? null : peak / 100, tone(peak), pct(peak))}</div>
+    <p class="ov-tot">Pressure is the lower of the 10 s and 60 s averages, as the memory gate reads it; heavy jobs wait below ${lim.min_memory_gb} GB free or at ${lim.memory_pressure}%</p>`
+}
 // Every figure names the records it is computed from: on hover, and as a footnote under its card.
 const Src = ({ m, ids, text }) => html`<p class="ov-src" title=${ids?.map(i => m[i]?.window).find(Boolean) || ''}>Source: ${(text || [...new Set(ids.map(i => m[i]?.source).filter(Boolean))].join(' · ') || 'not recorded').replace(/\s*~?\/[\w./-]+/g, '')}</p>`
 function Overview({ d, od, go }) {
@@ -223,6 +234,7 @@ function Overview({ d, od, go }) {
         <div class="ov-ql">${qr.map((x, k) => { const n = sum(x.by_home); return html`<div class="ov-qrow" key=${k}><span>${x.reason}</span>
           <span class="ov-bar">${qOk && n > 0 ? html`<i style=${{ width: `${n / qTop * 100}%`, background: `var(${QTONE[k] || '--grey'})` }}></i>` : ''}</span><b class="num">${qOk ? n : '–'}</b></div>` })}</div>
         <p class="ov-tot">Total <b class="num">${qOk ? sum(m.queue.value) : '–'}</b> queued</p><${Src} m=${m} ids=${['queue']}/></section>
+      <section class="ov-card w1"><h3>Memory</h3><${Memory} m=${m} q=${q}/><${Src} m=${m} ids=${['memory_pressure']}/></section>
       ${q.claude_accounts?.length ? html`<section class="ov-card wide"><h3>Claude accounts</h3><div class="ov-ql ov-quota ov-ca">${q.claude_accounts.map((a, k) => html`<div key=${k}><b class="ov-can">${a.name}</b>
         ${[['5 h', a.five_hour], ['7 d', a.seven_day]].map(([nm, w]) => { const left = w?.left, tone = left == null ? 'mut' : left <= 10 ? 'bad' : left <= 25 ? 'warn' : ''
           return html`<div class="ov-qrow" key=${nm}><span>${nm}</span><span class=${'ov-bar ' + (left == null ? 'unk' : '')}><i style=${{ width: `${left == null ? 0 : Math.max(2, Math.min(100, 100 - left))}%`,
