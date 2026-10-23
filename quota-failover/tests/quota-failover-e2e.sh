@@ -15,7 +15,8 @@
 # incarnation, while a pool rest that fails still wakes the home, once; a
 # Claude worker whose account folder answers a limit moves on that account's
 # own reading, a pool worker wedged with a clean screen still loses its route
-# to the pinned probe's verdict. Needs bash, jq, flock, timeout, sed and stat
+# to the pinned probe's verdict. Passes 11 to 13 cover the pre-limit move off a
+# low account. Needs bash, jq, flock, timeout, sed and stat
 # on PATH; no real tool or home is touched.
 set -u
 
@@ -46,13 +47,14 @@ fm_meta_get() { [ -f "$1" ] || return 0; sed -n "s|^$2=||p" "$1" | tail -n 1; }
 fm_backend_of_meta() { echo fixture; }
 fm_backend_target_of_meta() { fm_meta_get "$1" endpoint_task_id; }
 fm_backend_visible_capture() { [ -f "$FM_HOME/state/$2.screen" ] && cat "$FM_HOME/state/$2.screen"; return 0; }
-fm_busy_classify_meta() { echo 'idle no-busy-record'; }
+fm_busy_classify_meta() { cat "$FM_HOME/state/$2.verdict" 2>/dev/null || echo 'idle no-busy-record'; }
 fm_busy_record_read() { echo ''; }
 FM_QUOTA_ROW_JQ='def quota_lane($harness; $model): ""; def quota_row($snapshot; $provider; $lane): null;'
 fm_quota_json_valid() { jq -e '.schemaVersion == 5 and (.providers | type) == "array"' >/dev/null 2>&1; }
 fm_quota_single_provider_for_harness() { return 1; }
 fm_parent_channel_report() { printf '%s\n' "$3" >>"$1/state/parent-channel.log"; }
 fm_account_pool_config() { [ ! -f "$1/account-pool" ] || printf 'byokit-accounts\t/pool\n'; }
+fm_account_pool_tool() { case $1 in claude|codex) echo "$1" ;; *) return 1 ;; esac; }
 fm_account_pool_rest() { [ "$3" = deadpool ] && { echo "pool lib broken at $(date +%s%N)" >&2; return 1; }; printf 'rest %s\n' "$3" >>"$FM_HOME/state/pool.log"; }
 #--- home/bin/fm-crew-state.sh
 #!/usr/bin/env bash
@@ -64,6 +66,8 @@ printf '%s\n' "$*" >>"$FM_HOME/state/fm-control.log"
 id=${1:-}
 # d1's pool has no next account ready, as fm-control answers after its rest.
 [ "$id $3 $4" != "d1 --account next" ] || { echo "error: config/account-pool cannot start a claude worker: no account is ready"; exit 1; }
+# p6's relaunch replaces the incarnation, then fails a later launch step.
+[ "$id $3 $4" != "p6 --account next" ] || { printf 'spawn_gen=s1.p6\naccount=nextacct\n' >>"$FM_HOME/state/p6.meta"; echo "error: launch step failed"; exit 1; }
 rm -f "$FM_HOME/state/$id.screen"
 date +%s >"$FM_HOME/state/$id.status"
 #--- bin/opencode
@@ -272,6 +276,45 @@ printf "%s\n" "You've hit your usage limit for your plan; try again in 3h" >"$ho
 CLAUDE_LIMIT=yes run
 is "pass10: confirmed Claude limit removes Haiku" "$(jq -r '.default // [] | length' "$disp")" 0
 is "pass10: confirmed Claude limit is recorded out" "$(jq -r 'any(.[]; .model == "claude-haiku-5-5")' "$dead")" true
+
+# Pre-limit: an account at or below the floor sheds its working, idle-between-turns workers
+# before they stop on the limit; a busy worker, a healthy account, a stale reading and a second
+# pass move nobody, and Codex (D1) only wakes the home.
+rm -f "$wake"
+now=$(date +%s)
+reading() { # <tool> <generated_at> <id 5h 7d>...
+  local tool=$1 at=$2; shift 2
+  printf '%s\n' "$@" | jq -Rn --argjson at "$at" '{schema: 1, generated_at: $at, accounts: [inputs | split(" ")
+    | {id: .[0], five_hour: {left: (.[1] | tonumber)}, seven_day: {left: (.[2] | tonumber)}, problem: null}]}' \
+    >"$home/state/$tool-accounts.json"
+}
+reading claude "$now" "lowacct 90 3" "okacct 60 70"
+reading codex "$now" "lowcx 12 80"
+prelim() { # <id> <harness> <model> <account>
+  printf 'endpoint_task_id=%s\nharness=%s\nmodel=%s\nkind=crewmate\nspawn_gen=s0.%s\naccount=%s\n' "$1" "$2" "$3" "$1" "$4" >"$home/state/$1.meta"
+}
+prelim p1 claude claude-opus-4-8 lowacct
+prelim p2 claude claude-opus-4-8 lowacct
+echo 'busy claude-hook' >"$home/state/p2.verdict"
+prelim p3 claude claude-opus-4-8 okacct
+prelim p4 codex gpt-5.5-codex lowcx
+run
+run
+count "pass11: the idle worker on the low account moved once" "$ctl" '^p1 relaunch --account next --note-file ' 1
+has "pass11: the move names the account and its headroom" "$log" 'p1: moved idle claude claude-opus-4-8 off low account lowacct (90% 5h, 3% week)'
+count "pass11: a worker mid-turn is never moved" "$ctl" '^p2 ' 0
+count "pass11: a worker on a healthy account stays" "$ctl" '^p3 ' 0
+count "pass11: Codex never moves on its own" "$ctl" '^p4 ' 0
+count "pass11: Codex wakes the home once with the manual command" "$wake" 'p4 account lowcx is low (12% 5h, 80% week); move it by hand' 1
+reading claude "$((now - 4000))" "lowacct 90 3"
+prelim p5 claude claude-opus-4-8 lowacct
+run
+count "pass12: a stale reading moves nobody" "$ctl" '^p5 ' 0
+reading claude "$(date +%s)" "lowacct 90 3"
+prelim p6 claude claude-opus-4-8 lowacct
+run
+has "pass13: a relaunch that fails after the swap reports the account it moved to" "$log" \
+  'p6: moved idle claude claude-opus-4-8 off low account lowacct (90% 5h, 3% week) to account nextacct, but the relaunch reported: error: launch step failed'
 
 if [ "$fails" -eq 0 ]; then
   echo "quota-failover e2e: all assertions held"
