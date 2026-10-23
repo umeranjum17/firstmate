@@ -16,7 +16,8 @@
 # Claude worker whose account folder answers a limit moves on that account's
 # own reading, a pool worker wedged with a clean screen still loses its route
 # to the pinned probe's verdict. Passes 11 to 13 cover the pre-limit move off a
-# low account. Needs bash, jq, flock, timeout, sed and stat
+# low account; passes 14 and 15 prove a Claude route test with no account
+# runs on the pool's pick, never the default login. Needs bash, jq, flock, timeout, sed and stat
 # on PATH; no real tool or home is touched.
 set -u
 
@@ -105,6 +106,9 @@ case ${1:-} in
   status) id=${2:-}
     [ -d "$FM_HOME/state/profiles/$id" ] || { echo "error: no account $id" >&2; exit 1; }
     printf '{"ok":true,"id":"%s","tool":"claude","folder":"%s"}\n' "$id" "$FM_HOME/state/profiles/$id" ;;
+  pick) [ -z "${POOL_PICK_FAIL:-}" ] || { echo "error: no account can take a worker" >&2; exit 1; }
+    mkdir -p "$FM_HOME/state/profiles/pooled"
+    printf '{"ok":true,"id":"pooled","set":{"CLAUDE_CONFIG_DIR":"%s"},"unset":["ANTHROPIC_API_KEY"]}\n' "$FM_HOME/state/profiles/pooled" ;;
   *) echo "usage: byokit-accounts status <id>" >&2; exit 1 ;;
 esac
 STUBS
@@ -134,8 +138,8 @@ printf '%s\n' "You've hit your usage limit for your plan; try again in 3h" >"$ho
 log=$home/state/quota-failover.log ctl=$home/state/fm-control.log
 dead=$home/state/quota-failover-dead.json disp=$home/config/crew-dispatch.json
 run() { # one watcher pass, with the knobs the fixture needs
-  PATH="$stub:$PATH" FM_HOME=$home QUOTA_FAILOVER_PROBE_SECS=0 \
-    QUOTA_FAILOVER_RETEST_SECS=${RETEST_SECS:-1800} "$here/../quota-failover" "$home"
+  env -u CLAUDE_CONFIG_DIR PATH="$stub:$PATH" FM_HOME="$home" QUOTA_FAILOVER_PROBE_SECS=0 \
+    QUOTA_FAILOVER_RETEST_SECS="${RETEST_SECS:-1800}" "$here/../quota-failover" "$home"
 }
 
 run
@@ -315,6 +319,14 @@ prelim p6 claude claude-opus-4-8 lowacct
 run
 has "pass13: a relaunch that fails after the swap reports the account it moved to" "$log" \
   'p6: moved idle claude claude-opus-4-8 off low account lowacct (90% 5h, 3% week) to account nextacct, but the relaunch reported: error: launch step failed'
+# A Claude route test that names no account runs on the pool's pick; when the pick fails it
+# reuses the last good pick and never the default login.
+is "pass14: the route tests ran on the pool's pick" "$(tail -n 1 "$home/state/claude-probe.log")" "$home/state/profiles/pooled"
+printf 'endpoint_task_id=cz\nharness=claude\nmodel=claude-sonnet-test\nkind=crewmate\nspawn_gen=s0.cz\n' >"$home/state/cz.meta"
+printf "%s\n" "You've hit your usage limit for your plan; try again in 3h" >"$home/state/cz.screen"
+POOL_PICK_FAIL=1 run
+is "pass15: a failed pick reuses the last good pick" "$(tail -n 1 "$home/state/claude-probe.log")" "$home/state/profiles/pooled"
+count "pass15: no Claude test ever ran on the default login" "$home/state/claude-probe.log" '^ambient$' 0
 
 if [ "$fails" -eq 0 ]; then
   echo "quota-failover e2e: all assertions held"
