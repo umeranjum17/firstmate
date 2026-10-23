@@ -100,13 +100,15 @@ def age(start, end=NOW):
 def parse_status(lines):
     if not lines:
         return []
+    # The library's out-variable forms parse each line in this one shell: a $(...) per field forked
+    # four subshells a line, which took over 120 s of a live read across a few thousand lanes.
     parsed = subprocess.check_output(['bash', '-c', '''
 source "$1"
 while IFS= read -r -d '' line; do
-    verb=$(status_line_verb "$line")
-    key=$(_fm_decision_key "$line") || key=''
-    epoch=$(status_line_at_epoch "$line") || epoch=''
-    note=$(status_line_note "$line")
+    status_line_verb "$line" verb
+    _fm_decision_key "$line" default key || key=''
+    _fm_status_at_epoch "$line" epoch || epoch=''
+    status_line_note "$line" note
     printf '%s\\0%s\\0%s\\0%s\\0' "$verb" "$key" "$epoch" "$note"
 done
 ''', 'fm-flow', sys.argv[4]], input=''.join(line + '\0' for line in lines).encode())
