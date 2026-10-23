@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # Shared fork guard for captain asks; callers supply tasks_axi, SCRIPT_DIR, and fail.
-# A [captain-ask] row leaves the backlog only with the captain's answer or a merged PR.
 captain_ask_row() {  # <id>; sets CAPTAIN_ASK_SHOW to the row's show output when it is a [captain-ask] item
   local title
   CAPTAIN_ASK_SHOW=''
@@ -32,7 +31,6 @@ guard_captain_ask_hold() {  # <id>
   [ -z "$CAPTAIN_ASK_SHOW" ] || fail "$1 is a [captain-ask] item; hold it with bin/fm-captain-hold.sh hold so the new hold is recorded"
 }
 
-# tasks-axi's done_keep: the root's .tasks.toml, then the home config, then its default of 10.
 captain_ask_done_keep() {  # <root>
   local toml value
   for toml in "$1/.tasks.toml" "${HOME:-}/.tasks-axi/config.toml"; do

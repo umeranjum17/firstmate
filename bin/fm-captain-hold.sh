@@ -204,8 +204,7 @@
 #
 # `answered` is the read-only predicate bin/fm-tasks-axi.sh asks before it lets a
 # `[captain-ask]` row leave the backlog: exit 0 when the task body carries a
-# recorded captain answer (an evidence-only `reconciled` record does not count;
-# a body still carrying a hold-set stamp is a new hold and does not count),
+# recorded captain answer (an evidence-only `reconciled` record or an open hold-set stamp does not count),
 # 1 when it does not, and any other non-zero status when the task cannot be read.
 # It prints nothing.
 #
@@ -382,7 +381,6 @@ tasks_axi() {
 
 # shellcheck source=bin/fm-captain-ask-lib.sh disable=SC1091
 . "$SCRIPT_DIR/fm-captain-ask-lib.sh"
-
 require_tasks_axi() {
   fm_tasks_axi_compatible || fail "compatible tasks-axi is required"
   tasks-axi hold --help 2>&1 | grep -F -- '--kind captain' >/dev/null \
@@ -526,7 +524,6 @@ recorded_resolution_mode() {  # <task-body>
   printf '%s' "$rest"
 }
 
-# A record whose close finished is marked, so a later hold does not replay it.
 recorded_resolution_completed() {  # <task-body>
   local rest
   rest=$(decode_shown_value "$1") || return 1
