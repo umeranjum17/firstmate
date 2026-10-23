@@ -214,6 +214,8 @@ Every merge runs done-done and, only with passed proof, posts one evidence card 
   The card key is the merge's own (`merge-<owner>-<repo>-pull-<n>`, or `merge-<head>` for a local merge), so a repeat post or a second home adds nothing.
   sign-off-axi writes the board under its lock and only appends.
 
+In a home with a worker account pool (`config/account-pool`), the judge is a claude caller, so the check runs it on the account the pool picks: that account's profile folder goes into `CLAUDE_CONFIG_DIR` and the login variables the pool sheds are unset for the call, so the judge never answers on the default login. The line says which account ran. A failed pool read uses the last good pick with its age; without a usable pick the judge is not started: a proof check never refuses a merge over the pool.
+
 `merge-card` needs `done-done` on `PATH` (0.3.1+ resolves the block's relative evidence names itself; on an older one merge-card resolves them first), plus `sign-off-axi`, `jq` and `gh`.
 
 Install into one home, so the post-merge hook calls `post` once for each recorded merge:

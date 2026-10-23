@@ -23,6 +23,12 @@ if [ "$#" -lt 3 ] || [ "$#" -gt 4 ] || ! fm_pr_task_id_valid "$1"; then
   echo "usage: FM_HOME=<home> fm-run-receipt.sh <id> PASS|FAIL <evidence-file> [repo]" >&2
   exit 2
 fi
+# These adapters do not themselves call Claude; when a pool is configured,
+# downstream tools inherit its account rather than an ambient default login.
+# shellcheck source=account-pool/bin/fm-pool-claude-env.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/account-pool/bin/fm-pool-claude-env.sh"
+if [ -f "$FM_HOME/config/account-pool" ]; then fm_pool_claude_env || exit 1; fi
+
 ID=$1 VERDICT=$2 EVIDENCE=$3 REPO=${4:-.}
 case "$VERDICT" in PASS|FAIL) ;; *) echo 'error: verdict must be PASS or FAIL' >&2; exit 2 ;; esac
 : "${FM_HOME:?explicit supervising FM_HOME required}"

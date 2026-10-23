@@ -89,6 +89,12 @@ export FM_HOME
 . "$BIN/fm-wake-lib.sh"
 . "$BIN/fm-procevent-lib.sh"
 
+# These adapters do not themselves call Claude; when a pool is configured,
+# downstream tools inherit its account rather than an ambient default login.
+# shellcheck source=account-pool/bin/fm-pool-claude-env.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/account-pool/bin/fm-pool-claude-env.sh"
+if [ -f "$FM_HOME/config/account-pool" ]; then fm_pool_claude_env || exit 1; fi
+
 SOURCE_ID=signoff
 DELIVERED="$STATE/signoff-delivered"
 # How long a round rests when nothing is deliverable after a wait (no board yet,
