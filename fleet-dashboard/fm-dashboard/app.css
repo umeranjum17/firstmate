@@ -305,6 +305,17 @@ a.ov-kpi:hover,button.ov-kpi:hover{box-shadow:0 0 0 1px var(--line-3)}
 .ov-qsub{display:block;font-size:11px;color:var(--ink-4);margin-top:1px}
 .ov-qsub.warn{color:var(--orange)}.ov-qsub.bad{color:var(--red)}.ov-qsub.mut{color:var(--ink-4)}
 .ov-tot{font-size:12px;color:var(--ink-3)}
+.ov-age{display:flex;flex-direction:column;gap:2px}
+.ov-arow{display:grid;grid-template-columns:110px minmax(0,1fr) 52px;align-items:center;gap:10px;padding:6px 4px;border-radius:6px;font-size:13px;color:var(--ink-2);text-align:left}
+button.ov-arow:hover{background:var(--hover)}.ov-arow.ov-abn{background:var(--raise)}
+.ov-arow>span:first-child{display:flex;align-items:center;gap:6px;white-space:nowrap}
+.ov-arow small{text-align:right;color:var(--ink-3);font-size:12px}
+.ov-atrack{position:relative;height:16px;border-bottom:1px solid var(--line)}
+.ov-atrack i{position:absolute;top:3px;width:9px;height:9px;margin-left:-4.5px;border-radius:50%;opacity:.85;box-shadow:0 0 0 1.5px var(--card)}
+.ov-atrack b{position:absolute;top:0;bottom:-1px;width:2px;margin-left:-1px;background:var(--ink)}
+.ov-aaxis .ov-atrack{border:0;height:14px}.ov-aaxis em{position:absolute;transform:translateX(-50%);font-style:normal;font-size:11px;color:var(--ink-4)}
+.ov-aaxis small{color:var(--ink-4)}
+@media (max-width:759px){.ov-arow{grid-template-columns:84px minmax(0,1fr) 40px;gap:8px}}
 .ov-tot b{color:var(--ink)}.ov-tot .bad{color:var(--red)}
 .ov-flows{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 .ov-flow{display:flex;flex-direction:column;gap:2px;min-width:0}

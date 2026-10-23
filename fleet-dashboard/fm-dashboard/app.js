@@ -201,6 +201,28 @@ function Memory({ m, q }) {
     ${row('Pressure', psi == null ? null : psi / 100, tone(psi), pct(psi))}${row('Peak, last hour', peak == null ? null : peak / 100, tone(peak), pct(peak))}</div>
     <p class="ov-tot">Pressure is the lower of the 10 s and 60 s averages, as the memory gate reads it; heavy jobs wait below ${lim.min_memory_gb} GB free or at ${lim.memory_pressure}%</p>`
 }
+// Time in stage: each open lane as a dot at its time in its current stage, counted from the status line that
+// entered the stage (log scale), one row per stage with its median. The bottleneck is the stage holding the most
+// lane-hours now, leaving out lanes the captain holds on purpose. A row opens the Board filtered to its stage.
+const AGE_TICKS = [[3600, '1h'], [21600, '6h'], [86400, '1d'], [259200, '3d'], [604800, '7d'], [2592000, '30d']]
+const short = a => a < 3600 ? `${Math.floor(a / 60)}m` : a < 86400 ? `${Math.round(a / 3600)}h` : `${Math.round(a / 86400)}d`
+function Aging({ d, go }) {
+  const t = now(), open = d.cards.filter(c => ACTIVE.includes(c.stage)), untimed = open.filter(c => !c.since).length
+  const rows = ACTIVE.map(s => { const xs = open.filter(c => c.stage === s && c.since).map(c => ({ c, a: Math.max(60, t - c.since) })).sort((x, y) => x.a - y.a)
+    const live = xs.filter(x => x.c.wait !== 'parked')
+    return { s, xs, live, sum: live.reduce((n, x) => n + x.a, 0), med: xs.length ? xs[(xs.length - 1) >> 1].a : null } })
+  const top = rows.reduce((a, b) => b.sum > a.sum ? b : a), max = Math.max(604800, ...open.filter(c => c.since).map(c => t - c.since))
+  const f = a => Math.log(a / 60) / Math.log(max / 60) * 100, x = a => `${f(a).toFixed(1)}%`
+  const ticks = AGE_TICKS.filter(([v]) => v <= max).reduce((k, tk) => !k.length || f(tk[0]) - f(k.at(-1)[0]) >= 14 ? [...k, tk] : k, [])  // labels never crowd
+  const tone = c => stuck(c) ? 'var(--red)' : c.wait === 'parked' ? 'var(--grey)' : c.wait ? 'var(--orange)' : `var(--st-${c.stage})`
+  return html`${top.sum ? html`<p class="ov-tot">Bottleneck now: <b>${SNAME[top.s]}</b> · ${top.live.length} ${top.live.length === 1 ? 'lane' : 'lanes'} not on hold · oldest ${dur(top.live.at(-1).a)} · ${Math.round(top.sum / 3600)} lane-hours</p>`
+      : html`<p class="ov-tot">No open lane has a recorded stage time</p>`}
+    <div class="ov-age">${rows.map(r => html`<button key=${r.s} class=${'ov-arow' + (r === top && r.sum ? ' ov-abn' : '')} onClick=${() => go({ view: 'board', tab: 'active', stage: [r.s], state: [], card: null })}>
+      <span><${StageIcon} s=${r.s}/>${SNAME[r.s]}</span><span class="ov-atrack">${r.xs.map(({ c, a }) => html`<i key=${c.id} style=${{ left: x(a), background: tone(c) }} title=${`${c.title}: ${dur(a)} in ${SNAME[r.s]}`}></i>`)}
+        ${r.med ? html`<b style=${{ left: x(r.med) }} title=${`median ${dur(r.med)}`}></b>` : ''}</span><small class="num" title=${r.med ? `median ${dur(r.med)}` : ''}>${r.med ? short(r.med) : '–'}</small></button>`)}
+      <div class="ov-arow ov-aaxis"><span></span><span class="ov-atrack">${ticks.map(([v, n]) => html`<em key=${n} style=${{ left: x(v) }}>${n}</em>`)}</span><small>median</small></div></div>
+    <p class="ov-tot">Stage colour moving · orange waiting · red stuck · grey on hold, not counted in the bottleneck${untimed ? ` · ${untimed} open ${untimed === 1 ? 'lane has' : 'lanes have'} no recorded stage time` : ''}</p>`
+}
 // Every figure names the records it is computed from: on hover, and as a footnote under its card.
 const Src = ({ m, ids, text }) => html`<p class="ov-src" title=${ids?.map(i => m[i]?.window).find(Boolean) || ''}>Source: ${(text || [...new Set(ids.map(i => m[i]?.source).filter(Boolean))].join(' · ') || 'not recorded').replace(/\s*~?\/[\w./-]+/g, '')}</p>`
 function Overview({ d, od, go }) {
@@ -226,6 +248,7 @@ function Overview({ d, od, go }) {
       ${asks?.length ? html`<section class="ov-card wide"><h3>Needs you</h3><div class="ov-asks">${askOrder(asks).map((a, k) =>
         html`<a class="ov-ask" key=${k} href=${a.url || '#/needs'} target=${a.url ? '_blank' : null} rel="noreferrer"><span><em class="ktag">${ASK_TAG[askType(a.text, a.type)]}</em>${a.text}</span><small class="num">${a.age == null ? '' : dur(a.age)}</small></a>`)}</div></section>` : ''}
       <section class="ov-card wide"><h3>Lifecycle</h3><${Rail} d=${d} go=${go}/><${Src} m=${m} ids=${['lanes', 'landed']}/></section>
+      <section class="ov-card wide"><h3>Time in stage</h3><${Aging} d=${d} go=${go}/><${Src} m=${m} ids=${['lanes']}/></section>
       <section class="ov-card w2"><h3>Flow</h3><div class="ov-flows">${flow('landed', 'Landed today', 'recorded merges', '--st-landed')}${flow('closed', 'Closed 7 d', 'backlog items', '--green')}</div><${Src} m=${m} ids=${['landed', 'closed']}/></section>
       <section class="ov-card w1"><h3>Lanes by state</h3>
         <div class="ov-bar tall">${states ? OV_STATES.map(([k, , c]) => states[k] ? html`<i class=${c} key=${k} style=${{ flex: states[k] }}></i>` : '') : ''}</div>

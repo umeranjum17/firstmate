@@ -161,6 +161,18 @@ for w in 390 1280; do shot "overview-$w" '#/overview' "$w" 'Lifecycle'; done
 for want in "Source: Needs you: Main's ask list" "Source: each home's lane records" "each home's backlog and its done archive" "Source: quota-axi cache, read-only"; do
   grep -qF -- "$want" "$DONE_DONE_EVIDENCE_ROOT/overview-390.txt" || { echo "run-core-proof: Overview lacks '$want'" >&2; exit 1; }
 done
+# Time in stage: each open lane at its time in its current stage; Building holds the most lane-hours (m-stuck blocked
+# two hours, m-build ten minutes), so it is the bottleneck, and its row opens the Board filtered to Building.
+for w in 390 1280; do
+  shot "aging-$w" '#/overview' "$w" 'Bottleneck now'
+  chrome-devtools-axi eval '(() => { const h = [...document.querySelectorAll(".ov-card h3")].find(e => e.textContent === "Time in stage"); h.scrollIntoView({ block: "start" }); return h.parentElement.innerText })()' >"$DONE_DONE_EVIDENCE_ROOT/aging-card-$w.txt"
+  chrome-devtools-axi screenshot "$DONE_DONE_EVIDENCE_ROOT/aging-$w.png" >/dev/null
+  grep -qF 'Bottleneck now: Building' "$DONE_DONE_EVIDENCE_ROOT/aging-card-$w.txt" || { echo "run-core-proof: Time in stage at $w names no Building bottleneck: $(cat "$DONE_DONE_EVIDENCE_ROOT/aging-card-$w.txt")" >&2; exit 1; }
+  [ "$(chrome-devtools-axi eval 'document.querySelectorAll(".ov-atrack i").length' | sed -n 's/^result: //p' | tr -d '"')" = 4 ] || { echo "run-core-proof: Time in stage at $w does not draw the four open lanes" >&2; exit 1; }
+done
+chrome-devtools-axi eval 'document.querySelector(".ov-abn").click()' >/dev/null
+sleep 1
+chrome-devtools-axi eval 'location.hash' | grep -qF '#/board?stage=building' || { echo "run-core-proof: the bottleneck row did not open the Building Board" >&2; exit 1; }
 # Metrics shows memory as the memory gate reads it: the 10 s spike of 45% is not the pressure, the sustained 8% is.
 shot memory-390 '#/overview' 390 'as the memory gate reads it'
 chrome-devtools-axi eval '(() => { const h = [...document.querySelectorAll(".ov-card h3")].find(e => e.textContent === "Memory"); h.scrollIntoView({ block: "center" }); return h.parentElement.innerText })()' >"$DONE_DONE_EVIDENCE_ROOT/memory-card.txt"
@@ -329,8 +341,9 @@ steps = {
         "On Metrics at 390px and 1280px, tap the PR + CI stage of the lifecycle rail; tap To land at 1280px",
         "Build with a flow reader that fails and open Insights at 390px",
         "Open the Memory card on Metrics at 390px with a 45% 10 s spike over an 8% 60 s average",
+        "Open Time in stage on Metrics at 390px and 1280px, then tap the bottleneck row",
     ],
-    "result": "The Board lists m-stuck, m-ask, m-ci and m-build with their titles and states; the Stuck tab holds only stuck lanes, the Waiting tab only the waiting lane, and a home with four open lanes against a cap of three reads 4 / 3; Insights shows Why work waits now with the Blocked, Lead reply and Held groups; Tickets puts each backlog item in its column with its priority chip and release, the captain-held item On hold, and only the one ask under Waiting on captain; a ticket page shows its description, the captain's words with their day, and the lane's activity; Overview names the source of every figure, and each page's end clears the tab bar at 390px; the sidebar and the phone dock no longer offer a Ship tab; a post without the owner's board token is refused, the board's cookie lets the page send a comment with no pasted secret, the comment reaches Main's inbox and shows in the ticket thread as sent with Main's pickup and reply under it, and a comment on a lead's ticket reaches that lead's endpoint through fm-send and shows the lead's pickup and its own answer; By release puts alpha's v0.2.0 and beta's next item under Next release, the v0.3.0 item under After and items with no release under Later, and the v0.2.0 filter leaves only its item; the PR + CI stage opens the Board filtered to that stage with a removable Stage chip, and To land opens it filtered to To merge; a failing flow reader shows its own error on Insights; the Metrics Memory card reads 32 GB free of 64 GB and 8.0% pressure, not the 45% spike",
+    "result": "The Board lists m-stuck, m-ask, m-ci and m-build with their titles and states; the Stuck tab holds only stuck lanes, the Waiting tab only the waiting lane, and a home with four open lanes against a cap of three reads 4 / 3; Insights shows Why work waits now with the Blocked, Lead reply and Held groups; Tickets puts each backlog item in its column with its priority chip and release, the captain-held item On hold, and only the one ask under Waiting on captain; a ticket page shows its description, the captain's words with their day, and the lane's activity; Overview names the source of every figure, and each page's end clears the tab bar at 390px; the sidebar and the phone dock no longer offer a Ship tab; a post without the owner's board token is refused, the board's cookie lets the page send a comment with no pasted secret, the comment reaches Main's inbox and shows in the ticket thread as sent with Main's pickup and reply under it, and a comment on a lead's ticket reaches that lead's endpoint through fm-send and shows the lead's pickup and its own answer; By release puts alpha's v0.2.0 and beta's next item under Next release, the v0.3.0 item under After and items with no release under Later, and the v0.2.0 filter leaves only its item; the PR + CI stage opens the Board filtered to that stage with a removable Stage chip, and To land opens it filtered to To merge; a failing flow reader shows its own error on Insights; the Metrics Memory card reads 32 GB free of 64 GB and 8.0% pressure, not the 45% spike; Time in stage draws the four open lanes, names Building the bottleneck and its row opens the Building Board",
 }
 with open(sys.argv[1], "w") as f:
     json.dump(steps, f, indent=2, ensure_ascii=False)

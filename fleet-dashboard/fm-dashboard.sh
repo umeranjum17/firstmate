@@ -12,7 +12,8 @@
 # the captain's words it serves and the lane's status lines); Overview
 # (five key figures, where Stuck, Lanes open and Ready also show their change since yesterday and
 # a day's trend; the lifecycle, every open lane by stage split into moving, waiting and stuck, then
-# landings, each stage opening the Board filtered to it (To land opens To merge); lanes by state; 14-day landed and closed charts; queue reasons; quota runway; each home's
+# landings, each stage opening the Board filtered to it (To land opens To merge); time in stage, each open lane by its
+# time in its current stage with the bottleneck named; lanes by state; 14-day landed and closed charts; queue reasons; quota runway; each home's
 # lanes by stage against its plan; every figure names the records it comes from, on hover and under its card); Needs you
 # (the ask list); Insights (the shipped fm-flow.sh reader's lifecycle, waits, queue, retained merge
 # outcomes and optional read-only capacity observations, plus the Models and Skills sections
