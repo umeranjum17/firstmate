@@ -50,12 +50,13 @@
 #   - a markdown `<data>/backlog.md` that is itself a symlink, because the
 #     first write would replace the link with a private copy, exactly the fork
 #     this command exists to prevent. Lifecycle transitions refuse the same file.
-#   - `rm`/`delete`, `done`/`close`, or `hold` of a [captain-ask] item, or `update`
-#     or `edit --title` that drops `[captain-ask]`, unless `bin/fm-captain-hold.sh
-#     answered <id>` finds a recorded answer or the row's `pr:` link is a merged
-#     PR (`bin/fm-captain-hold.sh hold` records a new hold). Prune refuses when an
-#     unanswered ask lies beyond keep (`--no-prune` skips the done auto-prune).
-#     Direct tasks-axi calls and bin/fm-backlog-transition-lib.sh stay outside.
+#   - `rm`/`delete`, `done`/`close`, or `update`/`edit --title` that drops `[captain-ask]`
+#     from a [captain-ask] row, unless `bin/fm-captain-hold.sh answered <id>` finds a
+#     recorded answer or the row's `pr:` link is a merged PR. A raw `hold` of such a
+#     row is always refused (`bin/fm-captain-hold.sh hold` records a new hold). Done
+#     auto-prune, `prune`, and record-delivery/waive refuse only an unanswered ask an
+#     archive would move past keep (`--no-prune` skips the done prune). Direct tasks-axi
+#     calls and bin/fm-backlog-transition-lib.sh stay outside.
 #   - `add` (or `create`) that the optional task-priority add-on check refuses,
 #     e.g. no `--priority 0-3`; its message and exit status are returned and
 #     nothing runs. The check is ${XDG_DATA_HOME:-~/.local/share}/fm-task-priority/check.sh

@@ -204,7 +204,8 @@
 #
 # `answered` is the read-only predicate bin/fm-tasks-axi.sh asks before it lets a
 # `[captain-ask]` row leave the backlog: exit 0 when the task body carries a
-# recorded captain answer (an evidence-only `reconciled` record does not count),
+# recorded captain answer (an evidence-only `reconciled` record does not count;
+# a body still carrying a hold-set stamp is a new hold and does not count),
 # 1 when it does not, and any other non-zero status when the task cannot be read.
 # It prints nothing.
 #

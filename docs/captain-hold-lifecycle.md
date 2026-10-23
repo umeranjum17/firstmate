@@ -82,17 +82,16 @@ It then works in this order:
 
 1. It durably writes a resolution block carrying the decision digest and a `Resolution mode:`.
 2. It retains the leading hold-set stamp until the selected `tasks-axi done` or `tasks-axi unhold` transition succeeds.
-3. It then restores the successful record's resolution-first body ordering.
+3. It then restores the successful record's resolution-first body ordering and marks the record `Resolution completed: yes`.
    The previous body remains preserved below the block and archived through tasks-axi `--archive-body`.
 
 If the close is interrupted, the still-held task therefore keeps its original age basis.
 A matching retry also completes any resolution-first normalization left unfinished after the close itself succeeded.
-
 ### Answer retries and tasks closed elsewhere
 
 - An exact retry is idempotent only when the requested close mode matches the newest record.
 - A drifted answer or a mode mismatch is rejected.
-- A re-held task accepts a new answer as a new record on top.
+- A re-held task accepts a new answer as a new record on top, even when its decision file matches a finished earlier record; a hold-set stamp above that record marks the re-hold.
 
 On a task closed outside the script, `answer` records the missing block only when the captain-hold annotations tasks-axi preserves through a close prove the captain owned it.
 It also verifies the task stays closed.
