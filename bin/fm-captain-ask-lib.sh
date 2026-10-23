@@ -42,8 +42,7 @@ captain_ask_done_keep() {  # <root>
   printf '%s\n' 10
 }
 
-# Inspects only the rows tasks-axi archives: those past keep. A call target not
-# yet in <state> is inserted at its top, pushing one row further past keep.
+# Inspects only the rows tasks-axi archives: those past keep; a call target not yet in <state> pushes one row further.
 guard_captain_ask_archive() {  # <state> <keep-or-empty> <call-target-or-empty>
   local listing ids id count backlog root backend keep ahead=0 skip
   backlog=$(fm_backlog_data_absolute "$DATA") || fail "cannot resolve backlog data before pruning"
