@@ -4,6 +4,8 @@ Add-ons for running a fleet of coding agents on one machine: small, independent 
 
 Who needs this: anyone running that fleet on their own machine who wants it to keep moving when a provider slows down, a task wedges, or an agent tries something destructive.
 
+Where this is going: [VISION.md](VISION.md).
+
 ## The add-ons
 
 One line per add-on, with how it wires in. `<home>` is your home folder for the fleet manager — the one with `bin/` and `state/` in it.
