@@ -7,6 +7,9 @@ description: Verify firstmate-addons changes through their executable integratio
 
 ## Feature map
 
+- Lavish publication refusal (secondmate notes and merge-card posts only): run `bash owner-rules/tests/no-lavish.test.sh`; the executable checker and note hook refuse Lavish and accept sign-off links, and the real sign-off writer receives only the clean card on an isolated board.
+  Set `FM_TEST_FORK=<Firstmate checkout>` to also prove the real secondmate helper writes no refused status line; raw status appends, report files and commands are outside this check.
+  Capture the real publishing commands with `FM_PROOF_FORK=<Firstmate checkout> done-done run owner-rules-publication`; this records the actual refusals, absent status, unchanged board, and clean sign-off posts.
 - [Pipeline route switch](features/pipeline-route-switch.md): run `bash pipeline-quota-failover/tests/switch-route.test.sh`; it uses a fixture config and a stub pi, proves that a switch edits only the agent and model keys, writes a backup first and restores it, and never touches a real config or model.
 - [Incremental fleet-pulse chat export](features/incremental-fleet-pulse-chat-export.md): run `bash fleet-pulse/tests/chat-tsv.test.sh`; it uses synthetic transcripts and a disposable Git home, proves append/idempotence and redaction, and never reads real transcripts.
 - Receipt hooks across the fork boundary: with a full Firstmate checkout on disk and compatible `tasks-axi` on `PATH`, run `FM_TEST_FORK=<checkout> bash receipts/tests/receipts-hook-e2e.sh`; it clones the real fork scripts and proves done acceptance, local delivery, both PR-merge call sites, the PR candidate hook (outside-origin prints PR_HEAD, same-repo and unverified print nothing) through the real `bin/fm-pr-check.sh`, and absent-add-on no-op behavior; `done-done run receipts-pr-candidate` runs it and keeps the transcript.
