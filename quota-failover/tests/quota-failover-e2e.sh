@@ -7,13 +7,15 @@
 # to the live candidate, pass the dead routes over, and drop them from
 # crew-dispatch.json; a second pass with the routes answering again must
 # restore them and move nothing. Passes 3 to 7 add workers on pool
-# accounts: with config/account-pool-autorelaunch present a Claude worker
-# moves to the next account, a Claude worker with no next account takes the
-# route move, and OpenCode Go and Codex workers only rest; with the file gone
-# a Claude worker only rests, once, and rests and wakes again when the same
-# account stops a new incarnation, while a pool rest that fails still wakes
-# the home, once; a pool worker wedged with a clean screen still loses its
-# route to the pinned probe's verdict. Needs bash, jq, flock, timeout, sed and stat
+# accounts: a Claude worker stopped on an account moves to the next account
+# without a human, a Claude worker with no next account takes the route move,
+# and OpenCode Go and Codex workers only rest; with
+# config/account-pool-autorelaunch-off written a Claude worker only rests,
+# once, and rests and wakes again when the same account stops a new
+# incarnation, while a pool rest that fails still wakes the home, once; a
+# Claude worker whose account folder answers a limit moves on that account's
+# own reading, a pool worker wedged with a clean screen still loses its route
+# to the pinned probe's verdict. Needs bash, jq, flock, timeout, sed and stat
 # on PATH; no real tool or home is touched.
 set -u
 
@@ -77,6 +79,13 @@ echo 'ERROR: 429 Upstream request failed: Rate limit exceeded'
 exit 1
 #--- bin/claude
 #!/usr/bin/env bash
+# The one-line test records the profile folder it ran on, so a pass can prove a
+# pool task's limit was read on its own account and not on the ambient login.
+printf '%s\n' "${CLAUDE_CONFIG_DIR:-ambient}" >>"$FM_HOME/state/claude-probe.log"
+case ${CLAUDE_LIMIT_ACCOUNT:-} in
+  '') ;;
+  *) case "${CLAUDE_CONFIG_DIR:-}" in *"/profiles/$CLAUDE_LIMIT_ACCOUNT") echo "You've hit your usage limit for your plan; try again in 3h"; exit 1 ;; esac ;;
+esac
 if [ "${CLAUDE_LIMIT:-}" = yes ]; then
   echo "You've hit your usage limit for your plan; try again in 3h"
   exit 1
@@ -85,11 +94,20 @@ echo PONG
 #--- bin/quota-axi
 #!/usr/bin/env bash
 echo '{"schemaVersion":5,"providers":[]}'
+#--- bin/byokit-accounts
+#!/usr/bin/env bash
+# The pool command: `status <id>` names one account's tool and profile folder.
+case ${1:-} in
+  status) id=${2:-}
+    [ -d "$FM_HOME/state/profiles/$id" ] || { echo "error: no account $id" >&2; exit 1; }
+    printf '{"ok":true,"id":"%s","tool":"claude","folder":"%s"}\n' "$id" "$FM_HOME/state/profiles/$id" ;;
+  *) echo "usage: byokit-accounts status <id>" >&2; exit 1 ;;
+esac
 STUBS
 for lib in fm-backend.sh fm-busy-lib.sh fm-quota-axi-lib.sh fm-parent-channel-lib.sh fm-account-pool-lib.sh; do
   ln -s fm-stub-lib.sh "$home/bin/$lib" || exit 1
 done
-chmod +x "$home/bin/fm-crew-state.sh" "$home/bin/fm-control.sh" "$stub/opencode" "$stub/claude" "$stub/quota-axi"
+chmod +x "$home/bin/fm-crew-state.sh" "$home/bin/fm-control.sh" "$stub/opencode" "$stub/claude" "$stub/quota-axi" "$stub/byokit-accounts"
 
 # Step 5 ranked first, a second dead route, then the live ones.
 cat >"$home/config/crew-dispatch.json" <<'JSON' || exit 1
@@ -141,7 +159,7 @@ is "pass2: every route is back in dispatch" \
 
 # Pool workers, each stopped with the limit on its screen.
 printf 'state=/pool\n' >"$home/config/account-pool"
-touch "$home/config/account-pool-autorelaunch"
+mkdir -p "$home/state/profiles/c1" "$home/state/profiles/c2"
 pool() { # <id> <harness> <model> <account> [generation]
   printf 'endpoint_task_id=%s\nharness=%s\nmodel=%s\nkind=crewmate\nspawn_gen=%s\naccount=%s\n' \
     "$1" "$2" "$3" "${5:-s0.$1}" "$4" >"$home/state/$1.meta"
@@ -158,6 +176,9 @@ run
 has "pass3: the Claude worker moved to the next pool account" "$ctl" '^a1 relaunch --account next --note-file '
 count "pass3: and took no route move" "$ctl" '^a1 relaunch --harness' 0
 has "pass3: the move is logged with the old account" "$log" 'a1: moved claude claude-opus-4-8 off account c1 to the next claude account'
+is "pass3: with no opt-out file the move needs no human" \
+  "$([ -e "$home/config/account-pool-autorelaunch-off" ] && echo present || echo absent)" absent
+rm -f "$home/config/account-pool-autorelaunch"
 has "pass3: with no next account the existing route move still happens" "$ctl" \
   '^d1 relaunch --harness opencode --model opencode-go/deepseek-v4.1-flash '
 count "pass3: OpenCode Go never moves accounts or routes" "$ctl" '^g1 ' 0
@@ -167,16 +188,17 @@ has "pass3: the Go wake names the account and the manual command" "$wake" \
   'g1 stopped on opencode opencode-go/mimo-v2.6-flash account go1 .*bin/fm-control.sh g1 relaunch --account <id>$'
 is "pass3: an account limit leaves the route in dispatch" "$(jq -c . "$dead")" '[]'
 
-# The switch file is gone: a Claude pool worker only rests, a second pass
-# rests and wakes nothing more, and a worker whose pool rest fails still
-# wakes the home, once.
-rm -f "$home/config/account-pool-autorelaunch" "$wake" "$pooll"
+# The home asks for the human instead: a Claude pool worker only rests, a
+# second pass rests and wakes nothing more, and a worker whose pool rest fails
+# still wakes the home, once.
+touch "$home/config/account-pool-autorelaunch-off"
+rm -f "$wake" "$pooll"
 pool b1 claude claude-opus-4-8 c3
 pool f1 claude claude-opus-4-8 deadpool
 run
 run
 
-count "pass4: no relaunch without the switch file" "$ctl" '^b1 ' 0
+count "pass4: no relaunch with the opt-out file" "$ctl" '^b1 ' 0
 count "pass4: no relaunch for the failed-rest worker either" "$ctl" '^f1 ' 0
 is "pass4: the account rested once" "$(cat "$pooll")" "rest c3"
 has "pass4: one log line names the account and the manual command" "$log" \
@@ -221,20 +243,35 @@ is "pass7: and the out route is not rested a second time" "$(cat "$pooll")" "res
 rest c3
 rest go9"
 
+# A Claude pool worker whose screen is clean but whose own account folder
+# answers a limit moves on that account's reading, and its route stays in
+# dispatch for every other task.
+rm -f "$home/config/account-pool-autorelaunch-off" "$wake" "$home/state/claude-probe.log"
+mkdir -p "$home/state/profiles/c9"
+pool h1 claude claude-opus-4-8 c9
+: >"$home/state/h1.screen"
+CLAUDE_LIMIT_ACCOUNT=c9 run
+has "pass8: the account's own limit moves the worker to the next account" "$ctl" '^h1 relaunch --account next'
+count "pass8: it is read on that account's profile folder" "$home/state/claude-probe.log" \
+  "^$home/state/profiles/c9$" 1
+is "pass8: an account limit leaves the claude route in dispatch" \
+  "$(jq -r '[.[].model | select(startswith("claude"))] | join(",")' "$dead")" ""
+
+
 # Wrapper/file text is not Claude's limit banner and must not remove its route.
 printf '[]\n' >"$dead"
 printf '{"rules":[],"default":[{"harness":"claude","model":"claude-haiku-5-5"}]}\n' >"$disp"
 printf 'endpoint_task_id=cw\nharness=claude\nmodel=claude-haiku-5-5\nkind=crewmate\nspawn_gen=s0.cw\n' >"$home/state/cw.meta"
 printf 'quota exhausted' >"$home/state/cw.screen"
 run
-is "pass8: wrapper text leaves Haiku dispatch intact" "$(jq -r '.default[0].model' "$disp")" claude-haiku-5-5
-is "pass8: wrapper text does not mark Haiku dead" "$(jq -r 'any(.[]; .model == "claude-haiku-5-5")' "$dead")" false
+is "pass9: wrapper text leaves Haiku dispatch intact" "$(jq -r '.default[0].model' "$disp")" claude-haiku-5-5
+is "pass9: wrapper text does not mark Haiku dead" "$(jq -r 'any(.[]; .model == "claude-haiku-5-5")' "$dead")" false
 
 # The actual Claude banner is confirmed by the one-line probe before removal.
 printf "%s\n" "You've hit your usage limit for your plan; try again in 3h" >"$home/state/cw.screen"
 CLAUDE_LIMIT=yes run
-is "pass9: confirmed Claude limit removes Haiku" "$(jq -r '.default // [] | length' "$disp")" 0
-is "pass9: confirmed Claude limit is recorded out" "$(jq -r 'any(.[]; .model == "claude-haiku-5-5")' "$dead")" true
+is "pass10: confirmed Claude limit removes Haiku" "$(jq -r '.default // [] | length' "$disp")" 0
+is "pass10: confirmed Claude limit is recorded out" "$(jq -r 'any(.[]; .model == "claude-haiku-5-5")' "$dead")" true
 
 if [ "$fails" -eq 0 ]; then
   echo "quota-failover e2e: all assertions held"

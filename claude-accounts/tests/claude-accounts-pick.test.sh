@@ -42,7 +42,7 @@ rm "$w/limit"
 q a2 "40 80"; pick; is "the tighter window sets the runway: account 2 (40) beats account 1 (34)" "$(cut -f1 <<<"$out")" pa_2f1d0a9b7c3e5d4a61
 q a1 "63 34"; q a2 "100 69"; pick claude pa_536c925c8580938938; is "--prefer an account that is fine" "$(cut -f1 <<<"$out")" pa_536c925c8580938938
 q a2 "100 3"; pick claude pa_2f1d0a9b7c3e5d4a61; is "--prefer a low account is refused with the cause" "$rc|${out%%:*}" "1|error"
-q a1 "2 90"; pick; is "every account low: refused" "$rc|$(grep -c 'no Claude account has quota to spare' <<<"$out")" "1|1"
+q a1 "2 90"; pick; is "every account low: refused" "$rc|$(grep -c 'no Claude account can take a worker' <<<"$out")" "1|1"
 pick codex; is "other tools keep their ambient default" "$rc|$(cut -f1,3 <<<"$out")" "0|ambient	$w/other"
 
 # The relaunch verbs: the fork asks the pool command for `status <id>` and `rest <id>` with the pool's pa_ ids,
@@ -56,9 +56,44 @@ is "status refuses an unknown id" "$(cmd status pa_nope --json --state "$w/pool"
 is "rest sets the current account aside" "$(cmd rest $A2 --json --state "$w/pool" | jq -r .rested)" true
 pick claude next; is "next: the pick moves to the other account" "$rc|$(cut -f1 <<<"$out")" "0|$A1"
 pick claude $A2; is "an explicit id that is rested is refused" "$rc" 1
-cmd rest $A1 --json --state "$w/pool" >/dev/null; pick; is "every account rested: refused, no paid fallback" "$rc|$(grep -c 'no Claude account has quota' <<<"$out")" "1|1"
+cmd rest $A1 --json --state "$w/pool" >/dev/null; pick; is "every account rested: refused, no paid fallback" "$rc|$(grep -c 'no Claude account can take a worker' <<<"$out")" "1|1"
 cmd unrest $A1 --json --state "$w/pool" >/dev/null; cmd unrest $A2 --json --state "$w/pool" >/dev/null
 pick claude $A2; is "an explicit pa_ id resolves once unrested" "$rc|$(cut -f1 <<<"$out")" "0|$A2"
+
+# A quota-reader failure never refuses a launch. Each case drives the picker the way fm-spawn does,
+# with the reader unable to answer: no FM_HOME at all, a reader that cannot run, a reading nobody has
+# refreshed, and a reading so old the 5h window is meaningless. The roster is the registry, so the
+# pick still answers, and it says where its numbers came from and how old they are.
+reading() { # age_s five1 seven1 five2 seven2 [problem2]: the pool's own last good reading
+  local a="$A1" b="$A2" at=$(( $(date +%s) - $1 )) f1="$w/a1" f2="$w/a2" p2=${6:-null}
+  jq -n --argjson at "$at" --arg a "$a" --arg b "$b" --arg f1 "$f1" --arg f2 "$f2" --arg p2 "$p2" \
+    --argjson h1 "$2" --argjson d1 "$3" --argjson h2 "$4" --argjson d2 "$5" \
+    '{schema: 1, generated_at: $at, accounts: [
+      {id: $a, name: "One", folder: $f1, five_hour: {left: $h1}, seven_day: {left: $d1}, read_at: $at, problem: null, stale: false},
+      {id: $b, name: "Two", folder: $f2, five_hour: {left: $h2}, seven_day: {left: $d2}, read_at: $at, problem: $p2, stale: ($p2 != null)}]}' \
+    > "$w/pool/claude-accounts.json"
+}
+cmd_nohome() { env -i PATH="$w/bin:$PATH" HOME="$w" TMPDIR="$w" QDIR="$w" FM_CLAUDE_ACCOUNTS_REGISTRY="$w/registry.json" FM_CLAUDE_ACCOUNTS_FRESH=0 "$pool" "$@" 2>&1; }
+rm -f "$w/home/fixture/users/user-017/claude-accounts.json"
+reading 600 90 95 99 1
+out=$(cmd_nohome pick claude --json --state "$w/pool"); rc=$?
+is "FM_HOME unset: the pick answers from the pool's own reading" "$rc|$(jq -r '[.id, .read.source] | join(" ")' <<<"$out")" "0|$A1 reading"
+is "the answer carries the age of the reading it used" "$(jq -r '.read.at > 0 and .read.age >= 0' <<<"$out")" true
+reading 0 90 95 99 1
+out=$(cmd_nohome pick claude --json --state "$w/pool"); rc=$?
+is "a reader that cannot run, with no FM_HOME, still answers" "$rc|$(jq -r .ok <<<"$out")" "0|true"
+is "...and names the account with the most 7-day runway" "$(jq -r .id <<<"$out")" "$A1"
+# A reading nobody has refreshed in two hours: the 5h window is worth nothing, the 7-day side is not.
+reading 7200 4 95 99 1
+out=$(cmd_nohome pick claude --json --state "$w/pool"); rc=$?
+is "a two-hour-old reading still answers, on its 7-day side" "$rc|$(jq -r '[.id, .read.source, (.read.age > 7000)] | join(" ")' <<<"$out")" "0|$A1 last-good true"
+# An account whose last reading says it must sign in again is out, however much runway it shows.
+reading 0 90 95 100 100 "Claude sign-in required"
+out=$(cmd_nohome pick claude --json --state "$w/pool"); rc=$?
+is "a signed-out account is skipped however much runway it shows" "$rc|$(jq -r .id <<<"$out")" "0|$A1"
+rm -f "$w/pool/claude-accounts.json"
+out=$(cmd_nohome pick claude --json --state "$w/pool"); rc=$?
+is "no reading at all still answers: the roster alone is enough" "$rc|$(jq -r '[.ok, .read.source, (.set.CLAUDE_CONFIG_DIR | startswith("/"))] | join(" ")' <<<"$out")" "0|true none true"
 
 # install wires config/account-pool, is idempotent, refuses a different file; uninstall removes only its own.
 rm -f "$w/home/fixture/users/user-010/account-pool"
