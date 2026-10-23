@@ -302,6 +302,43 @@ EOF
   pass "fm-tasks-axi.sh keeps [captain-ask] items until answered or merged and leaves other items alone"
 }
 
+# Exercise current-hold identity and every archive/close entry through real CLIs.
+test_captain_ask_guard_gaps() {
+  local dir home out rc
+  dir=$(make_split captain-gaps)
+  home="$dir/home"
+  printf 'Ship the first choice.\n' > "$dir/answer.txt"
+  wrapper_from_code "$dir" add reheld "[captain-ask] choose again" >/dev/null
+  FM_HOME="$home" "$ROOT/bin/fm-captain-hold.sh" hold reheld --reason choose >/dev/null
+  FM_HOME="$home" "$ROOT/bin/fm-captain-hold.sh" answer reheld --release --decision-file "$dir/answer.txt" >/dev/null
+  FM_HOME="$home" "$ROOT/bin/fm-captain-hold.sh" answered reheld || fail "released answer was not recognized"
+  FM_HOME="$home" "$ROOT/bin/fm-captain-hold.sh" hold reheld --reason "choose again" >/dev/null
+  expect_captain_refusal "$dir" reheld "done" reheld
+  FM_HOME="$home" "$ROOT/bin/fm-captain-hold.sh" bind board >/dev/null
+  printf 'reheld\n' | FM_HOME="$home" "$ROOT/bin/fm-captain-hold.sh" reconcile-requests --source-id board --source test >/dev/null
+  printf 'The original choice is moot.\n' > "$dir/evidence.txt"
+  rc=0
+  out=$(FM_HOME="$home" "$ROOT/bin/fm-captain-hold.sh" reconcile close reheld --evidence-file "$dir/evidence.txt" 2>&1) || rc=$?
+  [ "$rc" != 0 ] || fail "reconcile closed an unanswered ask"
+  assert_contains "$out" "reheld" "reconcile refusal did not name the ask"
+  out=$(wrapper_from_code "$dir" show reheld --full)
+  assert_contains "$out" 'held: yes' "reconcile released the ask"
+  assert_not_contains "$out" 'Resolution mode: reconciled' "refused reconcile changed the history"
+
+  FM_HOME="$home" "$ROOT/bin/fm-captain-hold.sh" answer reheld --release --decision-file "$dir/evidence.txt" >/dev/null
+  FM_HOME="$home" "$ROOT/bin/fm-captain-hold.sh" answered reheld || fail "newest answer was not recognized"
+  wrapper_from_code "$dir" "done" reheld >/dev/null || fail "a newly answered ask could not close"
+
+  # Simulate a legacy Done row that predates the guard.
+  (cd "$home" && tasks-axi add legacy "[captain-ask] unanswered legacy row" >/dev/null && tasks-axi "done" legacy --no-prune >/dev/null)
+  wrapper_from_code "$dir" add ordinary ordinary >/dev/null
+  expect_captain_refusal "$dir" legacy "done" ordinary --keep 0
+  assert_grep legacy "$home/data/backlog.md" "auto-prune archived an unanswered ask"
+  expect_captain_refusal "$dir" legacy prune --keep 0
+  wrapper_from_code "$dir" "done" ordinary --no-prune >/dev/null || fail "explicit no-prune close was blocked"
+  pass "current holds, reconcile close, auto-prune and explicit prune preserve unanswered asks"
+}
+
 # The optional task-priority add-on check refuses an add before tasks-axi runs; absent, it does nothing.
 test_wrapper_runs_the_task_priority_check() {
   local dir stub rc
@@ -340,6 +377,7 @@ if [ "$HAVE_TASKS_AXI" = 1 ]; then
   test_wrapper_refuses_add_start
   test_wrapper_single_home
   test_wrapper_captain_ask_guard
+  test_captain_ask_guard_gaps
   test_wrapper_runs_the_task_priority_check
 else
   echo "skip: tasks-axi not found; home-addressing cases not run"

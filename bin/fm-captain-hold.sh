@@ -368,6 +368,9 @@ load_decision() {  # <path>; sets DECISION_TEXT and DECISION_DIGEST
 # mutate path.
 tasks_axi() {
   local data file root backend
+  case "${1:-}" in
+    done|close) guard_captain_ask_prune "done" ;;
+  esac
   data=$(fm_backlog_data_absolute "$DATA") || fail "data directory cannot be resolved: $DATA"
   root=$(fm_backlog_root "$data") || fail "$FM_BACKLOG_TRANSITION_ERROR"
   backend=$(fm_tasks_axi_backend "$root") || return 2
@@ -378,6 +381,9 @@ tasks_axi() {
     (cd "$root" && tasks-axi "$@")
   fi
 }
+
+# shellcheck source=bin/fm-captain-ask-lib.sh disable=SC1091
+. "$SCRIPT_DIR/fm-captain-ask-lib.sh"
 
 require_tasks_axi() {
   fm_tasks_axi_compatible || fail "compatible tasks-axi is required"
@@ -1673,6 +1679,7 @@ reconcile_close() {
   state=$(show_field "$show" state)
   hold_kind=$(show_field_value "$show" hold_kind)
   body=$(show_field "$show" body)
+  guard_captain_ask "$id"
   occurrence=$(( $(resolution_record_count "$body") + 1 ))
   if [ "$state" = "done" ]; then
     # An exact retry finishes an interrupted close and stays idempotent; a
@@ -2016,6 +2023,8 @@ command_answered() {  # <task-id>
   task_show "$1" || exit 2
   show=$TASK_SHOW_OUTPUT
   body=$(show_field "$show" body)
+  # A newly set hold precedes every historical resolution, even a release.
+  [ -z "$(body_hold_set_timestamp "$(decode_shown_value "$body")")" ] || return 1
   body_has_resolution_record "$body" || return 1
   [ "$(recorded_resolution_mode "$body" || true)" != reconciled ]
 }
