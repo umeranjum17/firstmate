@@ -43,6 +43,11 @@
 # (content ignored): then the account only rests, and one line in
 # state/quota-failover.wake names it and the manual command; check.sh prints
 # that line as the watcher's wake.
+# Before the limit: a worker whose pool account's fresh reading is at or below
+# FM_ACCOUNT_POOL_REST_FLOOR (15%) on 5h or week moves off it through the same
+# relaunch --account next, but only when its status says working and its own
+# lifecycle source reads idle between turns for QUOTA_FAILOVER_PRELIMIT_IDLE_SECS
+# (60), once per incarnation; a tool D1 bars from moving wakes the home instead.
 # Every decision is one line in state/quota-failover.log. A worker left with
 # no live route also gets one failed line on the home's parent channel, if any.
 set -u
@@ -288,6 +293,57 @@ CANDIDATES_JQ='
      | [.harness, .model, .effort // "default", .provider // ""])
   | @tsv'
 
+# account_low <tool> <id> <pool state>: "<5h>% 5h, <7d>% week" when the newest pool reading (home
+# state or pool state, as the pick reads it) is fresh and puts the account at or below the rest floor.
+PRELIMIT_FLOOR=${FM_ACCOUNT_POOL_REST_FLOOR:-15}
+account_low() {
+  local f a at=0 best=''
+  for f in "$FM_HOME/state/$1-accounts.json" "$3/$1-accounts.json"; do
+    a=$(jq -r '.generated_at // 0' "$f" 2>/dev/null) || continue
+    [ "$a" -gt "$at" ] 2>/dev/null && { at=$a; best=$f; }
+  done
+  [ -n "$best" ] && [ $(($(date +%s) - at)) -le "${QUOTA_FAILOVER_PRELIMIT_MAX_AGE:-1800}" ] || return 1
+  jq -er --arg id "$2" --argjson floor "$PRELIMIT_FLOOR" 'first(.accounts[]? | select(.id == $id and .problem == null)
+    | select([.five_hour.left, .seven_day.left] | map(select(. != null)) | length > 0 and min <= $floor)
+    | "\(.five_hour.left // "?")% 5h, \(.seven_day.left // "?")% week")' "$best" 2>/dev/null
+}
+
+# prelimit <meta> <id> <account> <left>: move a worker off an account that is about to run out, before it
+# stops on the limit. Only a task whose status says working and whose own lifecycle source reads idle
+# between turns moves (never mid-turn, never unknown), once per incarnation. relaunch --account next
+# rests the account only after a fresh reading confirms it is at or below the floor, so a stale reading
+# refuses before the worker stops. A tool whose terms bar an automatic move (D1) gets the wake line.
+prelimit() {
+  local meta=$1 id=$2 acct=$3 left=$4 h m gen crew verdict notefile out
+  h=$(fm_meta_get "$meta" harness) m=$(fm_meta_get "$meta" model) gen=$(fm_meta_get "$meta" spawn_gen)
+  [ -z "$(fm_meta_get "$meta" remote_host)" ] || return 1
+  crew=$(FM_CREW_STATE_NO_FORGE=1 "$BIN/fm-crew-state.sh" "$id" 2>/dev/null) crew=${crew#state: } crew=${crew%% *}
+  [ "$crew" = working ] || return 1
+  verdict=$(fm_busy_classify_meta "$meta" "$id" "$STATE" \
+    "$(fm_backend_visible_capture "$(fm_backend_of_meta "$meta")" "$(fm_backend_target_of_meta "$meta")" 2>/dev/null)")
+  [ "${verdict%% *}" = idle ] || return 1
+  printf '%s\n' "$gen" >"$STATE/$id.prelimit-gen"
+  if ! auto_move "$h" "$m" || [ -e "$FM_HOME/config/account-pool-autorelaunch-off" ]; then
+    log "$id: account $acct is low ($left) under idle $h $m; move it by hand: bin/fm-control.sh $id relaunch --account <id>"
+    printf 'quota-failover: %s account %s is low (%s); move it by hand: bin/fm-control.sh %s relaunch --account <id>\n' "$id" "$acct" "$left" "$id" >>"$WAKE"
+    return 0
+  fi
+  notefile=$(mktemp)
+  echo "quota-failover moved this task off pool account $acct ($left left) to the next $h account before it ran out. Continue the task from where it stopped." >"$notefile"
+  if out=$("$BIN/fm-control.sh" "$id" relaunch --account next --note-file "$notefile" 2>&1); then
+    log "$id: moved idle $h $m off low account $acct ($left) to the next $h account"
+  else
+    out=$(grep -m1 '^error: ' <<<"$out" || tail -n 1 <<<"$out")
+    # A relaunch can fail after it replaced the incarnation; say what the meta now records.
+    if [ "$(fm_meta_get "$meta" spawn_gen)" != "$gen" ]; then
+      log "$id: moved idle $h $m off low account $acct ($left) to account $(fm_meta_get "$meta" account), but the relaunch reported: $out"
+    else
+      log "$id: pre-limit move off $acct ($left) refused: $out"
+    fi
+  fi
+  rm -f "$notefile"
+}
+
 dead_retest
 
 for meta in "$STATE"/*.meta; do
@@ -307,6 +363,14 @@ for meta in "$STATE"/*.meta; do
   for f in "$STATE/$id".{status,turn-ended,progress} "$STATE/$id.busy-gen"; do
     t=$(stat -c %Y "$f" 2>/dev/null) && [ "$t" -gt "$newest" ] && newest=$t
   done
+  acct=$(fm_meta_get "$meta" account)
+  if [ -n "$acct" ] && [ $(($(date +%s) - newest)) -ge "${QUOTA_FAILOVER_PRELIMIT_IDLE_SECS:-60}" ] \
+    && [ "$(cat "$STATE/$id.prelimit-gen" 2>/dev/null)" != "$(fm_meta_get "$meta" spawn_gen)" ] \
+    && pool=$(fm_account_pool_config "$FM_HOME/config" 2>/dev/null) && [ -n "$pool" ] \
+    && tool=$(fm_account_pool_tool "$(fm_meta_get "$meta" harness)") \
+    && left=$(account_low "$tool" "$acct" "${pool#*$'\t'}") && prelimit "$meta" "$id" "$acct" "$left"; then
+    continue
+  fi
   [ $(($(date +%s) - newest)) -ge "$STALL" ] || continue
   crew=$(FM_CREW_STATE_NO_FORGE=1 "$BIN/fm-crew-state.sh" "$id" 2>/dev/null) crew=${crew#state: } crew=${crew%% *}
   [[ $crew = working || $crew = unknown ]] || continue
