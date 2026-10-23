@@ -301,7 +301,7 @@ a.ov-kpi:hover,button.ov-kpi:hover{box-shadow:0 0 0 1px var(--line-3)}
 .ov-qrow b{color:var(--ink);font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
 .ov-qrow b.warn{color:var(--orange)}.ov-qrow b.bad{color:var(--red)}.ov-qrow b.mut{color:var(--ink-4)}
 .ov-quota{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px 28px}
-.ov-ca .ov-qrow{grid-template-columns:2.2em minmax(0,1fr) 5.2em}.ov-can{display:block;font-size:13px;font-weight:600;margin-bottom:3px}
+.ov-ca .ov-qrow{grid-template-columns:2.2em minmax(0,1fr) 5.2em}.ov-can{display:flex;justify-content:space-between;gap:8px;font-size:13px;font-weight:600;margin-bottom:3px}.ov-cload{font-weight:400;color:var(--ink-4);white-space:nowrap}
 .ov-qsub{display:block;font-size:11px;color:var(--ink-4);margin-top:1px}
 .ov-qsub.warn{color:var(--orange)}.ov-qsub.bad{color:var(--red)}.ov-qsub.mut{color:var(--ink-4)}
 .ov-tot{font-size:12px;color:var(--ink-3)}

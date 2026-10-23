@@ -296,7 +296,7 @@ test_claude_accounts_card_shows_each_account_five_hour_and_seven_day_left() {
   lacks "$d/index.html" "Claude accounts"
   printf '{"schema":1,"generated_at":%s,"accounts":[{"id":"a","name":"default","folder":"/x","five_hour":{"left":63,"resets_at":null},"seven_day":{"left":34,"resets_at":null},"problem":null},{"id":"b","name":"Two","folder":"/y","five_hour":{"left":100,"resets_at":null},"seven_day":null,"problem":"not signed in"}]}\n' "$(date +%s)" > "$home/state/claude-accounts.json"
   build "$home"
-  has "$d/index.html" "Claude accounts" "default 5 hours 63% left 7 days 34% left" "Two 5 hours 100% left 7 days not signed in"
+  has "$d/index.html" "Claude accounts" "default · no workers 5 hours 63% left 7 days 34% left" "Two · no workers 5 hours 100% left 7 days not signed in"
   [ "$(jq -r '[.claude_accounts[].name] | join(",")' "$d/data.json")" = default,Two ] || fail "data.json lacks the Claude accounts"
   [ "$(jq -c '.claude_accounts[0] | has("folder")' "$d/data.json")" = false ] || fail "data.json carries a profile folder"
   jq --argjson until "$(($(date +%s) + 3600))" '.accounts[0].rested_until=$until' "$home/state/claude-accounts.json" > "$home/state/quota.next"
@@ -304,6 +304,17 @@ test_claude_accounts_card_shows_each_account_five_hour_and_seven_day_left() {
   build "$home"
   has "$d/index.html" "Rested until"
   jq -e '.claude_accounts[0].rested_until > now' "$d/data.json" >/dev/null || fail "dashboard lost rest expiry"
+  # Load: live task records count against their account; a repeated profile name gets an ordinal, never an id.
+  printf 'kind=crewmate\nharness=claude\naccount=a\n' > "$home/state/w1.meta"
+  printf 'kind=crewmate\nharness=claude\naccount=a\n' > "$home/state/w2.meta"
+  jq '.accounts += [{"id":"c","name":"default","folder":"/z","five_hour":{"left":90,"resets_at":null},"seven_day":{"left":80,"resets_at":null},"problem":null}]' \
+    "$home/state/claude-accounts.json" > "$home/state/quota.next"
+  mv "$home/state/quota.next" "$home/state/claude-accounts.json"
+  build "$home"
+  has "$d/index.html" "default · 2 workers" "Two · no workers" "default 2 · no workers"
+  [ "$(jq -r '[.claude_accounts[] | "\(.name)=\(.workers)"] | join(",")' "$d/data.json")" = "default=2,Two=0,default 2=0" ] \
+    || fail "data.json lacks per-account worker load"
+  pass "the Claude accounts card shows each account's workers and 5-hour and 7-day quota left"
 }
 
 test_devices_and_machine_come_from_read_only_probes() {
