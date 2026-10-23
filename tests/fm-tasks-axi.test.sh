@@ -404,6 +404,21 @@ test_rehold_answer_closes_as_the_new_hold() {
   pass "an answer under a new hold closes the call even when the same decision was released before"
 }
 
+# A CRLF .tasks.toml must give the same done_keep as tasks-axi, or a legacy ask past keep is archived unguarded.
+test_crlf_done_keep_guards_the_legacy_archive_candidate() {
+  local dir home out
+  dir=$(make_split crlf-keep)
+  home="$dir/home"
+  (cd "$home" && tasks-axi add legacy "[captain-ask] unanswered legacy row" >/dev/null && tasks-axi "done" legacy --no-prune >/dev/null) \
+    || fail "could not seed the legacy unanswered ask"
+  wrapper_from_code "$dir" add ordinary "ordinary work" >/dev/null
+  printf 'backend = "markdown"\r\n\r\n[markdown]\r\npath = "data/backlog.md"\r\narchive = "data/done-archive.md"\r\ndone_keep = 0\r\n' > "$home/.tasks.toml"
+  expect_captain_refusal "$dir" legacy done ordinary
+  out=$(wrapper_from_code "$dir" show legacy --full)
+  assert_contains "$out" "state: done" "a refused done archived the legacy ask"
+  pass "a CRLF done_keep of 0 guards the legacy ask that an ordinary done would archive"
+}
+
 # The optional task-priority add-on check refuses an add before tasks-axi runs; absent, it does nothing.
 test_wrapper_runs_the_task_priority_check() {
   local dir stub rc
@@ -446,6 +461,7 @@ if [ "$HAVE_TASKS_AXI" = 1 ]; then
   test_raw_rehold_of_a_released_ask_is_refused
   test_captain_hold_preflights_archive_candidates_only
   test_rehold_answer_closes_as_the_new_hold
+  test_crlf_done_keep_guards_the_legacy_archive_candidate
   test_wrapper_runs_the_task_priority_check
 else
   echo "skip: tasks-axi not found; home-addressing cases not run"
