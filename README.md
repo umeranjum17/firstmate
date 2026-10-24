@@ -43,6 +43,7 @@ One line per add-on, with how it wires in. `<home>` is your home folder for the 
 - `parked-homes` — a paused team home gets no messages, nudges, relaunches or config pushes. Verify-only install/uninstall: `parked-homes/install.sh`, `parked-homes/uninstall.sh`. Needs fork hooks (FORK-EXIT.md).
 - `pipeline-literal-delete` — gives pipeline agents the safe recursive-delete rule in their own instructions. Wire in: `pipeline-literal-delete/install.sh`.
 - `pipeline-quota-failover` — moves pipeline model calls to the next model in the chain on a quota error, and pins the pipeline route (the OpenRouter DeepSeek floor route the no-mistakes config holds). Wire in: `pipeline-quota-failover/install.sh`.
+- `limit-prompt-move` — a Claude worker or lead sitting on Claude's usage-limit menu ("What do you want to do? 1. Stop and wait ...") is interrupted and relaunched on another pool account through `fm-control`, every 5 minutes, never choosing a menu option. Wire in: `limit-prompt-move/install.sh --all <main home>`.
 - `quota-failover` — relaunches stalled workers onto a live route and rests dead routes until they answer again; moves an idle worker off a pool account at or below 15% before it hits the limit; with an account pool, its Claude route tests run on the pool's pick, never the default login. Wire in: a watcher check you add, see Install.
 - `status-wait-check` — refuses `blocked` status text that describes a wait and directs the worker to `paused:`; the fork's `bin/fm-secondmate-report.sh` must call it before appending status (thin hook documented in the add-on README).
 - `receipts` — publishes one PASS or FAIL completion receipt per task for guarded landing checks. Dormant copy: the fork still runs its own.
@@ -108,6 +109,7 @@ bash pipeline-quota-failover/tests/pi-quota-failover-e2e.sh
 bash pipeline-quota-failover/tests/pi-quota-failover-route.test.sh
 bash pipeline-literal-delete/tests/pipeline-literal-delete.test.sh
 bash quota-failover/tests/quota-failover-e2e.sh
+bash limit-prompt-move/tests/limit-prompt-move-e2e.sh
 bash glm-queue/tests/glm-queue.test.sh
 bash route-change/tests/route-change-e2e.sh
 bash merge-on-green/tests/merge-on-green.test.sh
