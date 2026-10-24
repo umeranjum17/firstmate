@@ -118,7 +118,9 @@ jobs:
       # Fixture homes, stub herdr and a temp state dir: nothing real is touched.
       # A real Claude limit-menu capture on fixture panes, stub fm-control: nothing real is touched.
       - name: Limit prompt move test
-        run: bash limit-prompt-move/tests/limit-prompt-move-e2e.sh
+        run: |
+          bash limit-prompt-move/tests/limit-prompt-move-e2e.sh
+          bash limit-prompt-move/tests/limit-prompt-move-e2e.sh --installed
       - name: Fleet stall check test
         run: bash fleet-stall/tests/fleet-stall-e2e.sh
       # Fixture Main and lead homes with stub fm-tasks-axi.sh and fm-crew-state.sh: lane slots and dry.

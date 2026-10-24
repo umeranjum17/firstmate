@@ -37,6 +37,7 @@ homes() {
 install -D -m 755 "$SRC/$ID/$ID" "$DEST/$ID/$ID"
 install -D -m 755 "$SRC/$ID/check.sh" "$DEST/$ID/check.sh"
 install -D -m 644 "$SRC/parked-homes/bin/fm-parked-homes-lib.sh" "$DEST/parked-homes/bin/fm-parked-homes-lib.sh"
+install -D -m 644 "$SRC/account-pool/bin/fm-account-pool-lib.sh" "$DEST/account-pool/bin/fm-account-pool-lib.sh"
 fails=0
 while IFS=$'\t' read -r name home; do
   [ -x "$home/bin/fm-check-register.sh" ] && [ -d "$home/state" ] || {

@@ -23,10 +23,17 @@ export FM_HOME
 STATE=$FM_HOME/state BIN=$FM_HOME/bin LOG=$FM_HOME/state/limit-prompt-move.log
 
 exec 9>"$STATE/.limit-prompt-move.lock" && flock -n 9 || exit 0
-for lib in fm-backend.sh fm-account-pool-lib.sh; do
-  # shellcheck source=/dev/null
-  . "$BIN/$lib" || die "cannot load $BIN/$lib"
-done
+# shellcheck source=/dev/null
+. "$BIN/fm-backend.sh" || die "cannot load $BIN/fm-backend.sh"
+# The pool library is the account-pool add-on's (the sibling folder, or its installed copy beside this
+# script), as in quota-failover; a fork bin/ copy is used only if the add-on is absent and the copy exists.
+# The library finds fm-timeout-lib.sh in SCRIPT_DIR, the home's bin/.
+_pool=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../account-pool/bin/fm-account-pool-lib.sh
+[ -f "$_pool" ] || _pool=$BIN/fm-account-pool-lib.sh
+# shellcheck disable=SC2034 # read by the sourced pool lib
+SCRIPT_DIR=$BIN
+# shellcheck source=/dev/null
+. "$_pool" || die "cannot load $_pool"
 _FM_PARKED_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../parked-homes/bin/fm-parked-homes-lib.sh"
 # shellcheck source=/dev/null # sibling add-on path, resolved at runtime
 [ -f "$_FM_PARKED_LIB" ] && . "$_FM_PARKED_LIB"
