@@ -56,13 +56,20 @@ if [ "$VERDICT" = PASS ] && [ -n "$(git -C "$REPO" status --porcelain)" ]; then
   exit 1
 fi
 GEN=$FM_BACKLOG_META_SPAWN_GEN
+# The receipt names the pull request it covers (the URL carries the repository);
+# acceptance compares it with the pr= the merge path recorded. FM_RECEIPT_PR
+# overrides the lookup of the candidate branch's open PR.
+PR_URL=${FM_RECEIPT_PR:-}
+if [ -z "$PR_URL" ] && command -v gh >/dev/null; then
+  PR_URL=$(cd "$REPO" && gh pr view --json url --jq .url 2>/dev/null) || PR_URL=
+fi
 umask 077
 TMP=$(mktemp "$STATE/.$ID.run-receipt.XXXXXX")
 jq -n --arg task "$ID" --arg mode "$MODE" --arg gen "$GEN" \
-  --arg head "$HEAD_SHA" --arg verdict "$VERDICT" --argjson at "$(date +%s)" \
+  --arg head "$HEAD_SHA" --arg pr "$PR_URL" --arg verdict "$VERDICT" --argjson at "$(date +%s)" \
   --rawfile evidence "$EVIDENCE" '
   if ($evidence | test("[^[:space:]]")) then
-    {schema:1, task:$task, mode:$mode, spawn_gen:$gen, head:$head,
+    {schema:1, task:$task, mode:$mode, spawn_gen:$gen, head:$head, pr:$pr,
      verdict:$verdict, at:$at, evidence:$evidence}
   else error("nonempty evidence required") end
 ' > "$TMP"
