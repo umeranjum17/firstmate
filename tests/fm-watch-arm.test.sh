@@ -242,6 +242,42 @@ test_attached_arm_reports_the_delivered_wake_after_drain() {
   pass "watch-arm: a delivered wake consumed by the handling turn still closes the attached arm cleanly"
 }
 
+test_pending_reply_scan_does_not_starve_ordinary_wake() {
+  local dir state fakebin out armout i
+  dir=$(make_case pending-scan-starvation)
+  state="$dir/state"
+  fakebin="$dir/fakebin"
+  out="$dir/watch.out"
+  armout="$dir/arm.out"
+  awk 'BEGIN { for (i = 1; i <= 20000; i++) printf "umer: ordinary status line %d, unremarkable progress text to make the file realistic\n", i }' > "$state/umer.status"
+  bash -c '
+    . "$1"; . "$2"
+    state=$3; status=$4; home=$5
+    for i in 1 2 3 4 5 6 7 8; do
+      corr=$(fm_pending_reply_create "$home" "$state" umer "request $i") || exit 1
+      rec=$(fm_pending_reply_path "$state" "$corr")
+      fm_pending_reply_set "$rec" parent_status "$status" || exit 1
+      fm_pending_reply_set "$rec" escalated_epoch 1 || exit 1
+      fm_pending_reply_write_delivery_confirmation "$state" "$corr" attempted 1 || exit 1
+    done
+  ' _ "$ROOT/bin/fm-marker-lib.sh" "$ROOT/bin/fm-pending-reply-lib.sh" "$state" "$state/umer.status" "$dir/home" \
+    || fail "could not create undelivered escalated pending replies"
+  start_seed_watcher "$state" "$fakebin" "$out"
+  start_attached_arm "$state" "$fakebin" "$armout" 1
+
+  printf 'done: fixture finished\n' > "$state/demo.status"
+  i=0
+  while is_live_non_zombie "$SEED_PID" && [ "$i" -lt 600 ]; do
+    sleep 0.1
+    i=$((i + 1))
+  done
+  is_live_non_zombie "$SEED_PID" && fail "ordinary wake was not surfaced within 60s while pending-reply scans ran"
+  wait_for_exit "$SEED_PID" 20 >/dev/null 2>&1 || true
+  grep -q '^signal:' "$out" || fail "seed watcher exited without surfacing the ordinary wake: $(cat "$out")"
+  wait_for_exit "$ARM_PID" 200 >/dev/null 2>&1
+  pass "watch-arm: undelivered escalated pending replies do not starve an ordinary wake"
+}
+
 test_attached_arm_still_fails_on_a_wake_it_did_not_deliver() {
   local dir state fakebin out armout status
   dir=$(make_case attached-no-delivery)
@@ -1820,6 +1856,7 @@ EOF
 
 test_attached_arm_reports_the_delivered_wake
 test_attached_arm_reports_the_delivered_wake_after_drain
+test_pending_reply_scan_does_not_starve_ordinary_wake
 test_arm_refuses_an_unusable_launch_confirm_window
 test_arm_refuses_a_disposable_validation_checkout
 test_watcher_exits_when_its_state_directory_is_removed
