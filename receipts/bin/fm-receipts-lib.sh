@@ -13,11 +13,14 @@
 # receipt_required=1 is set only for briefs carrying Completion receipt: required.
 # Older records need no absent receipt, but ANY present receipt must validate:
 # explicit FAIL, malformed, stale incarnation/head and empty proof all refuse.
+# Once the merge path has recorded pr=, the receipt must name that same pull
+# request (its URL carries the repository); only the receipt file counts, a
+# posted evidence card or PR comment is never a substitute.
 # This is evidence supplied by the worker, not a replacement for forge checks,
 # no-mistakes validation or merge authority. Both landing entrypoints consume
 # the same gate against the exact head they will submit to the merge command.
 fm_dod_receipt_accept() {  # <state> <id> <meta> <candidate-head>
-  local state=$1 id=$2 meta=$3 head=$4 receipt required mode gen count
+  local state=$1 id=$2 meta=$3 head=$4 receipt required mode gen count pr
   [ -n "$state" ] && [ -n "$id" ] && [ -f "$meta" ] || return 0
   receipt="$state/$id.run-receipt.json"
   required=$(fm_dod_meta_value "$meta" receipt_required)
@@ -33,10 +36,11 @@ fm_dod_receipt_accept() {  # <state> <id> <meta> <candidate-head>
   fi
   mode=$(fm_dod_meta_value "$meta" mode)
   gen=$(fm_dod_meta_value "$meta" spawn_gen)
+  pr=$(fm_dod_meta_value "$meta" pr)
   if fm_pr_head_valid "$head" && [ -f "$receipt" ] && [ ! -L "$receipt" ] && command -v jq >/dev/null 2>&1 \
-    && jq -se --arg task "$id" --arg mode "$mode" --arg gen "$gen" --arg head "$head" '
+    && jq -se --arg task "$id" --arg mode "$mode" --arg gen "$gen" --arg head "$head" --arg pr "$pr" '
       length == 1 and (.[0] | .schema == 1 and .task == $task and .mode == $mode and
-      .spawn_gen == $gen and .head == $head and .verdict == "PASS" and
+      .spawn_gen == $gen and .head == $head and ($pr == "" or .pr == $pr) and .verdict == "PASS" and
       (.evidence | type == "string" and test("[^[:space:]]")) and
       (.at | type == "number" and . > 0))
     ' "$receipt" >/dev/null 2>&1; then

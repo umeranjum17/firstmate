@@ -54,6 +54,23 @@ fm_receipts_accept_done "$w" direct-PR "done: x" "$st" t "$st/t.meta" "" >/dev/n
 rcpt FAIL
 ! fm_receipts_accept_done "$w" direct-PR "done: x" "$st" t "$st/t.meta" "" >/dev/null || { echo "FAIL: accept_done refuse" >&2; exit 1; }
 
+# Merge-time binding: once meta records pr=, only a PASS receipt for the exact head
+# and that same pull request accepts; missing, FAIL, stale-head, other-PR, unbound
+# receipts and a posted evidence card all refuse.
+pr1=https://github.com/o/r/pull/1; pr2=https://github.com/o/r/pull/2
+printf 'mode=direct-PR\nspawn_gen=1\nreceipt_required=1\npr=%s\n' "$pr1" > "$st/t.meta"
+bound() { printf '{"schema":1,"task":"t","mode":"direct-PR","spawn_gen":"1","head":"%s","pr":"%s","verdict":"%s","evidence":"ran","at":1}\n' "$2" "$3" "$1" > "$st/t.run-receipt.json"; }
+stale=1111111111111111111111111111111111111111
+gate() { fm_dod_receipt_accept "$st" t "$st/t.meta" "$h" >/dev/null; }
+bound PASS "$h" "$pr1"; gate || { echo "FAIL: bound receipt accepts" >&2; exit 1; }
+bound FAIL "$h" "$pr1"; ! gate || { echo "FAIL: FAIL receipt refuses" >&2; exit 1; }
+bound PASS "$stale" "$pr1"; ! gate || { echo "FAIL: stale head refuses" >&2; exit 1; }
+bound PASS "$h" "$pr2"; ! gate || { echo "FAIL: other PR refuses" >&2; exit 1; }
+bound PASS "$h" ""; ! gate || { echo "FAIL: unbound receipt refuses" >&2; exit 1; }
+rm "$st/t.run-receipt.json"; echo "evidence card: PASS $h $pr1" > "$st/t.evidence-card"
+! gate || { echo "FAIL: card without receipt refuses" >&2; exit 1; }
+rm "$st/t.evidence-card"; printf 'mode=direct-PR\nspawn_gen=1\nreceipt_required=1\n' > "$st/t.meta"
+
 # PR candidate hook: the policy through the real fork fm_dod_pr_outside_origin, then the
 # real fork bin/fm-pr-check.sh driven with the add-on's own library (gate stubbed to log
 # the candidate it receives), so the hook output contract is exercised end to end.
