@@ -28,6 +28,10 @@ journeys:
     command: bash claude-accounts/run-proof-timer.sh
   receipts-pr-candidate:
     command: bash receipts/run-proof.sh
+  lookout-adapter-live:
+    command: bash lookout-adapter/run-proof.sh
+  lookout-service-dry:
+    command: bash lookout-adapter/run-service-proof.sh
   core:
     command: bash fleet-dashboard/run-core-proof.sh
     core: true

@@ -193,3 +193,9 @@ jobs:
           bash owner-rules/tests/no-lavish.test.sh
           bash ask-default/tests-owner-ask.test.sh
           FM_CODE_ROOT="$RUNNER_TEMP/firstmate" bash signoff/tests/fm-procevent-signoff.test.sh
+      # Fixture home: fleet JSON for Lookout from the builder's output files; no real home is read.
+      - name: Lookout adapter test
+        run: bash lookout-adapter/tests/test.sh
+      # Stub upstream and fixture url file; install.sh only in --dry-run, so no unit is touched.
+      - name: Lookout front and install dry-run test
+        run: bash lookout-adapter/tests/front.test.sh
