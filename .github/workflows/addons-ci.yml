@@ -128,6 +128,10 @@ jobs:
       - name: GLM queue test
         run: bash glm-queue/tests/glm-queue.test.sh
       # The real guard installers in a throwaway HOME; commands run the way Codex runs them: nothing real is touched.
+      - name: Kill guard Main allowance and CLI journeys
+        run: |
+          node kill-guard/tests/main-allowance.test.mjs
+          bash kill-guard/tests/kill-guard.test.sh --guard-only
       - name: Codex guard test
         run: bash codex-guard/tests/codex-guard.test.sh
       # Fixture origin, shared clone, lane worktree and a throwaway HOME and home: nothing real is touched.

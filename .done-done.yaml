@@ -51,3 +51,5 @@ journeys:
     command: bash codex-guard/run-proof.sh
   kill-guard-device:
     command: bash kill-guard/run-device-proof.sh
+  kill-guard-main-live:
+    command: node kill-guard/run-main-proof.mjs
