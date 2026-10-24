@@ -12,6 +12,6 @@ free_port() { python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1
 ap=$(free_port); lp=$(free_port)
 trap 'kill $(jobs -p) 2>/dev/null || true' EXIT
 "$here/lookout-firstmate" --serve --port "$ap" & 
-(cd "$LOOKOUT_DIR" && exec node server.js --source "http://127.0.0.1:$ap/fleet.json" --port "$lp") &
+(cd "$LOOKOUT_DIR" && exec node bin/lookout.js serve --adapter "http://127.0.0.1:$ap/fleet.json" --port "$lp") &
 "$here/lookout-front" --upstream "http://127.0.0.1:$lp" --bind "$bind" --port "$port" --board-url-file "${FM_SIGNOFF_URL_FILE:-$FM_HOME/state/signoff-board.url}" &
 wait -n

@@ -2,7 +2,7 @@
 """lookout-firstmate - print or serve this fleet as Lookout's lookout.fleet.v1 document (read-only).
 
   lookout-firstmate [--home DIR] [--no-build]            print the JSON
-  lookout-firstmate --serve [--port N] [--bind ADDR]     serve it at /fleet.json (Lookout's --source URL)
+  lookout-firstmate --serve [--port N] [--bind ADDR]     serve it at /fleet.json (Lookout's --adapter URL)
 
 The data is the fleet dashboard builder's own output (fleet-dashboard/fm-dashboard.sh build), reused as is: state/dashboard/
 data.json and board.json under FM_HOME. A build older than 2 minutes is rebuilt first (it writes only under state/dashboard)
