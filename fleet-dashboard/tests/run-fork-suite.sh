@@ -23,6 +23,7 @@ git clone --depth 1 --quiet "$FORK" "$TREE"
 
 rm -rf "$TREE/bin/fm-dashboard"
 cp "$ADDON/fm-dashboard.sh" "$TREE/bin/fm-dashboard.sh"
+cp "$ADDON/task_rows.py" "$TREE/bin/task_rows.py"
 cp -R "$ADDON/fm-dashboard" "$TREE/bin/fm-dashboard"
 cp "$HERE/fm-dashboard.test.sh" "$TREE/tests/fm-dashboard.test.sh"
 chmod +x "$TREE/bin/fm-dashboard.sh" "$TREE/tests/fm-dashboard.test.sh"

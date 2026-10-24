@@ -375,8 +375,10 @@ tmp="$out_dir/.build.$$"
 trap 'rm -rf "$tmp"' EXIT
 mkdir -p "$tmp" || { echo "fm-dashboard: cannot create $tmp" >&2; exit 1; }
 
-python3 - "$FM_HOME" "$out_dir" "$tmp" "$FM_BIN" "$MAX_AGE" <<'PY' || { echo "fm-dashboard: page build failed" >&2; exit 1; }
+FM_DASHBOARD_MODULES="$SCRIPT_DIR" python3 - "$FM_HOME" "$out_dir" "$tmp" "$FM_BIN" "$MAX_AGE" <<'PY' || { echo "fm-dashboard: page build failed" >&2; exit 1; }
 import fcntl, hashlib, html, json, math, os, re, shutil, subprocess, sys, time
+sys.path.insert(0, os.environ["FM_DASHBOARD_MODULES"])
+from task_rows import toon_rows, TAGS, plain
 BUILD_STARTED = time.monotonic()
 from urllib.parse import urlsplit
 from datetime import date, datetime, timedelta
@@ -586,29 +588,6 @@ lanes_read_at = time.time()
 def lane_value(n, h=None): return 'unknown' if h in lane_err else n if h is not None or LANES_KNOWN else f'at least {n}'
 
 # --- backlog per home: tasks-axi ----------------------------------------
-def toon_fields(s):
-    out, i = [], 0
-    while i <= len(s):
-        if s.startswith('"', i):
-            j = i + 1
-            while j < len(s) and s[j] != '"': j += 2 if s[j] == '\\' else 1
-            out.append(json.loads(s[i:j + 1])); i = j + 2
-        else:
-            j = s.find(',', i); j = len(s) if j < 0 else j
-            out.append(s[i:j]); i = j + 1
-    return out
-def toon_rows(text, name='tasks'):
-    """Rows of the named tabular TOON block, [] when it says there are none, else None."""
-    lines = text.splitlines()
-    for i, l in enumerate(lines):
-        m = re.match(rf'^{name}\[(\d+)\]\{{([^}}]*)\}}:$', l)
-        if m:
-            cols = m.group(2).split(',')
-            body = lines[i + 1:i + 1 + int(m.group(1))]
-            if len(body) < int(m.group(1)): return None
-            return [dict(zip(cols, toon_fields(r.strip()))) for r in body]
-        if re.match(rf'^{name}: 0 ', l): return []
-    return None
 def prose(t):
     def resource(m):
         token = m.group().rstrip('.,;:)`')
@@ -1822,11 +1801,6 @@ VERBS = {'working': 'Working', 'resolved': 'Cleared', 'paused': 'Waiting', 'bloc
 WAIT_OF = {'blocked': 'blocked', 'decision': 'decision', 'waiting': 'waiting'}
 WAIT_VERBS = {'blocked': ('blocked', 'failed'), 'decision': ('needs-decision', 'captain-held', 'paused', 'blocked'), 'waiting': ('paused',)}
 WAIT_VERBS['parked'] = WAIT_VERBS['decision']
-TAGS = re.compile(r'^(?:\[[\w-]+\]\s*)+')
-def plain(title):  # a lane or ticket name without its leading [tags], Main message refs or a trailing PR number
-    t = re.sub(r'\s*\(Main\d+[^)]*\)|^\s*Main\d+:?\s*|\s+PR \d+$', '', TAGS.sub('', title)).strip()
-    t = re.sub(r'\bMain\d+\b', 'Main', t)  # mid-sentence ("approved by Main42") the ref reads as Main
-    return title if not t else t if t == title else t[0].upper() + t[1:]  # a name cut at its front starts a sentence
 def card(h, task, kind, title, stage, **kw):
     d = {} if stage == 'queued' else dispatch(h, task, kw['since']) if stage == 'landed' else dispatch(h, task)
     fid, fname = family(kw.pop('model', None) or d.get('model'), kw.get('tool') or d.get('harness'))

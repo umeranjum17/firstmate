@@ -30,6 +30,7 @@ mkdir -p "$TMP/bin"
 cp -R "$FORK/bin/." "$TMP/bin/" || { echo "skip: cannot copy $FORK/bin"; exit 0; }
 rm -rf "$TMP/bin/fm-dashboard"
 cp "${FM_DASHBOARD_SRC:-$ADDON/fm-dashboard.sh}" "$TMP/bin/fm-dashboard.sh"
+cp "$ADDON/task_rows.py" "$TMP/bin/task_rows.py"
 cp -R "$ADDON/fm-dashboard" "$TMP/bin/fm-dashboard"
 DASH="$TMP/bin/fm-dashboard.sh"
 # Fast, failing stubs for the unrelated readers: this case is about the backlog.
