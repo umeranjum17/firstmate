@@ -4,7 +4,7 @@
 
 ```
 lookout-firstmate [--home DIR] [--no-build]          # print the JSON
-lookout-firstmate --serve [--port N] [--bind ADDR]   # serve it at /fleet.json, for `lookout --source http://…/fleet.json`
+lookout-firstmate --serve [--port N] [--bind ADDR]   # serve it at /fleet.json, for `lookout serve --adapter http://…/fleet.json`
 ```
 
 It reuses the fleet dashboard builder (`fleet-dashboard/fm-dashboard.sh build`, run when `state/dashboard/data.json` is over 2 minutes old) and maps its `data.json` and `board.json` onto the contract; nothing is copied from the builder. Every home and state file is only read, and only whitelisted fields are taken (a lane's `.meta` gives model, harness and account id, nothing else).

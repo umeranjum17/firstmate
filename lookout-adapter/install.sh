@@ -42,7 +42,7 @@ if [ "$mode" = rollback ] || [ "$mode" = rollback-dry ]; then
   exit 0
 fi
 : "${LOOKOUT_DIR:?set LOOKOUT_DIR to the lookout clone}"
-[ -f "$LOOKOUT_DIR/server.js" ] || { echo "install: $LOOKOUT_DIR has no server.js" >&2; exit 1; }
+[ -f "$LOOKOUT_DIR/bin/lookout.js" ] || { echo "install: $LOOKOUT_DIR has no bin/lookout.js" >&2; exit 1; }
 echo "== unit $unit_dir/$NEW"; unit
 echo "== 1. spare port: the unit's own command on $BIND:$SPARE_PORT, checked before anything is stopped"
 probe=fm-dashboard-lookout-probe

@@ -16,7 +16,7 @@ trap cleanup EXIT
 free_port() { python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])'; }
 ap=$(free_port); lp=$(free_port)
 "$here/lookout-firstmate" --home "$FM_HOME" --no-build --serve --port "$ap" >"$tmp/adapter.log" 2>&1 & pids+=("$!")
-(cd "$LOOKOUT_DIR" && exec node server.js --source "http://127.0.0.1:$ap/fleet.json" --port "$lp" >"$tmp/lookout.log" 2>&1) & pids+=("$!")
+(cd "$LOOKOUT_DIR" && exec node bin/lookout.js serve --adapter "http://127.0.0.1:$ap/fleet.json" --port "$lp" >"$tmp/lookout.log" 2>&1) & pids+=("$!")
 for _ in $(seq 50); do curl -fs "http://127.0.0.1:$lp/api/fleet" -o "$tmp/api.json" && break; sleep 0.2; done
 python3 - "$tmp/api.json" >"$DONE_DONE_EVIDENCE_ROOT/document.txt" <<'P'
 import json, sys
