@@ -8,3 +8,4 @@ Parked homes and held items stay On hold; completion clears hold.
 Captain asks are epic roots; `parent: <item id>` confirms hierarchy, `parent: upkeep` alone means System, and unconfirmed items sit under Needs a parent.
 Each poll uses a field-hash ledger and a 20-second cursor budget; `sync.py --audit` runs the full ticket list separately.
 Public titles cap at 160 characters: names may be abbreviated and excess links counted; release/state use the suffix, and existing cards need their producer to set `--ticket`.
+Each real project name gets the dashboard's own local image (`fleet-dashboard/fm-dashboard/icons`) through `sign-off-axi project --icon`, only when it passes `identify` or the XML parser and the registry hash differs; missing or broken images are named once, when their state changes.

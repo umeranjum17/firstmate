@@ -10,7 +10,9 @@ import re
 import subprocess as sp
 import sys
 import time
+import shutil
 import tomllib
+import xml.etree.ElementTree as xml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'fleet-dashboard'))
 from task_rows import toon_rows, plain
@@ -27,6 +29,36 @@ def rows(args, env, cwd=None):
     if result is None or re.search(r'count: \d+ of (?!0\b)\d+ total', text) and len(result) >= 100000:
         raise RuntimeError('tasks-axi returned an unreadable or capped task list')
     return result
+
+ICONS = Path(__file__).resolve().parents[1] / 'fleet-dashboard/fm-dashboard/icons'
+ALIAS = {'firstmate-fork': 'firstmate', 'main': 'firstmate', 'muxr': 'pockit'}  # the dashboard's own project-to-image names
+
+def icon_problem(image):
+    if image.suffix == '.svg':
+        try: root = xml.parse(image).getroot()
+        except xml.ParseError as error: return f'not valid XML ({error})'
+        return None if root.tag in ('svg', '{http://www.w3.org/2000/svg}svg') else 'not an svg root'
+    try: r = sp.run(['identify', '-format', '%m %w %h', str(image) + '[0]'], text=True, capture_output=True, timeout=60)
+    except FileNotFoundError: return 'ImageMagick identify is not installed'
+    kind, _, size = r.stdout.partition(' ')
+    return None if r.returncode == 0 and kind in ('PNG', 'JPEG', 'WEBP') and all(int(n) > 0 for n in size.split()) else 'not a readable ' + image.suffix[1:] + ' image'
+
+def register_icon(board, project, registry):
+    """Registers the dashboard's local image for a project; returns a skip reason or None."""
+    found = sorted(ICONS.glob(ALIAS.get(project.lower(), project.lower()) + '.*'))
+    if not found: return 'no local image'
+    image = found[0]
+    problem = icon_problem(image)
+    if problem: return problem
+    digest = hashlib.sha256(image.read_bytes()).hexdigest()
+    if registry.get(project.lower()) == digest: return None
+    target = board.parent / 'icons' / (project.lower() + image.suffix)
+    target.parent.mkdir(exist_ok=True)
+    shutil.copyfile(image, target)
+    try: run(['sign-off-axi', 'project', str(board), '--name', project, '--icon', 'icons/' + target.name])
+    except RuntimeError as error: return str(error)[:120]
+    registry[project.lower()] = digest
+    return None
 
 def ticket_id(home, item):
     return "fm-" + hashlib.sha256(f"{home}/{item}".encode()).hexdigest()[:32]
@@ -58,6 +90,10 @@ def sync():
         ordered = list(homes.items())
         if resume.get('home') in homes: ordered = ordered[list(homes).index(resume['home']):]
         changed = gaps = 0
+        registry = {p['name'].lower(): p.get('icon', {}).get('sha256') for p in json.loads(run(['sign-off-axi', 'project', str(board), '--json'])).get('projects', [])}
+        skip_file = state / 'icons-skipped.json'
+        skipped = json.loads(skip_file.read_text()) if skip_file.exists() else {}
+        tried = set()
         def save(path, value):
             temp = path.with_suffix('.tmp'); temp.write_text(json.dumps(value)); temp.replace(path)
         def publish(tid, desired):
@@ -127,6 +163,11 @@ def sync():
                     origin = run(['git', '-C', str(clone), 'remote', 'get-url', 'origin']).strip() if (clone / '.git').exists() else repo
                     projects[repo] = origin.rstrip('/').split('/')[-1].removesuffix('.git')
                 project = projects[repo]
+                if project not in tried:
+                    tried.add(project); reason = register_icon(board, project, registry)
+                    if reason != skipped.get(project):
+                        skipped.pop(project, None) if reason is None else skipped.__setitem__(project, reason)
+                        save(skip_file, skipped); print(f'tickets-sync: {project} icon ' + (f'skipped ({reason})' if reason else 'registered'))
                 parent = '' if epic else field('parent')
                 if parent in tasks and ticket_id(name, parent) not in ledger:
                     required.add(parent); ids.append(parent)
