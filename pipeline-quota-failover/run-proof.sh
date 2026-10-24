@@ -23,7 +23,7 @@ run() { # <name> <command...>: capture the command's output and its exit code
   set -e
 }
 
-# The chain the pipeline runs: one route, the OpenRouter DeepSeek floor route.
+# The chain the pipeline runs: one route, Claude Haiku through claude-bridge on the subscription accounts.
 PI_QUOTA_FAILOVER_PRINT_CHAIN=1 pipeline-quota-failover/pi-quota-failover >"$evidence/chain.txt" 2>&1
 
 # The live config's route, read-only: the agent and the model it names for the

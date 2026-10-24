@@ -2,11 +2,13 @@
 
 ## User outcome
 
-The pipeline runs the route the no-mistakes config holds: the OpenRouter DeepSeek floor route, and a call pinned to a model outside the chain lands on that route instead of the pinned model.
+The pipeline runs one route, Claude Haiku through claude-bridge on the subscription accounts: a Claude limit on one account moves the call to the next account on the same route, nothing paid is ever called, and a call pinned to a model outside the chain lands on that route instead of the pinned model.
 
 ## Drive
 
 Run `bash pipeline-quota-failover/run-proof.sh` from the repository root (the done-done journey `pipeline-route`). It drives the real wrapper `pipeline-quota-failover/pi-quota-failover` against a stub pi and a stub quota-axi in a throwaway HOME and captures the chain it holds, the fixture journey `pipeline-quota-failover/tests/pi-quota-failover-route.test.sh` and their exit codes in `$DONE_DONE_EVIDENCE_ROOT`.
+
+Live: `done-done run pipeline-route-live` (`bash pipeline-quota-failover/run-live-proof.sh`) sends a review, a test and a fix prompt through this checkout's wrapper with no-mistakes' argv shape, on the real Claude account pool with rests in a throwaway pool state folder. A pi shim answers claude-bridge's own limit text for the first account each call lands on, and the next account answers with real Haiku through the real pi and bridge. Evidence: `roles.txt` (each role's account move and answer), `wrapper.log` (account ids only) and the step record `steps.json`.
 
 The same wrapper's longer journey is `pipeline-quota-failover/tests/pi-quota-failover-e2e.sh`. `pipeline-quota-failover/README.md`, the root `README.md` and `.github/workflows/addons-ci.yml` name the same commands.
 

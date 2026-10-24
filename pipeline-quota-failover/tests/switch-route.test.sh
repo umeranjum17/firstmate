@@ -10,7 +10,7 @@ script=$here/../switch.sh
 [ -f "$script" ] || { echo "not ok - $script is missing"; exit 1; }
 
 # The persisted pipeline route: the route the wrapper's chain holds and the config must name.
-route=openrouter/deepseek/deepseek-v4.1-flash-1017:floor
+route=claude-bridge/claude-haiku-5-5
 
 work=$(mktemp -d) || exit 1
 trap 'rm -rf "$work"' EXIT

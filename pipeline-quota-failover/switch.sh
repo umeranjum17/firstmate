@@ -28,7 +28,7 @@ dry=0
 restore=0
 config=${NM_CONFIG:-${HOME:?}/.no-mistakes/config.yaml}
 agent=pi
-model=openrouter/deepseek/deepseek-v4.1-flash-1017:floor
+model=claude-bridge/claude-haiku-5-5
 while [ $# -gt 0 ]; do
   case $1 in
     --dry-run) dry=1 ;;
