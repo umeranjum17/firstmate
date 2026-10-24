@@ -9,10 +9,9 @@
 # run fails, costing a restart.
 #
 # This wrapper runs the real pi; the requested chain model goes first, then
-# the other chain models in chain order (default the OpenRouter DeepSeek floor
-# route openrouter/deepseek/deepseek-v4.1-flash-1017:floor, the one route the
-# no-mistakes config holds; claude-bridge and direct DeepSeek are out; never
-# Opus, Sonnet, Fable, Codex, Go, Muse or Step 5). A call pinned to a model
+# the other chain models in chain order (default one route, Claude Haiku 5.5
+# through claude-bridge on the Claude subscription accounts, with no paid
+# fallback; never Opus, Sonnet, Fable, Codex, Go, Muse or Step 5). A call pinned to a model
 # outside the chain runs the chain in chain order, so no pipeline role reaches
 # a model the chain does not name. When an attempt answers a QUOTA error it
 # moves at once to the next model in that order inside the same invocation.
@@ -32,6 +31,9 @@
 # Knobs (environment):
 #   PI_QUOTA_FAILOVER_REAL_PI  absolute path to the real pi binary
 #   PI_QUOTA_FAILOVER_CHAIN    space-separated ordered model chain
+#   PI_QUOTA_FAILOVER_ACCOUNT_POOL  a firstmate config/account-pool file (default ~/firstmate/config/account-pool when it
+#                              exists; empty turns it off): a claude-bridge/* call runs on the pool's Claude pick, and a
+#                              Claude limit rests that account and runs the same route on the next pick
 #   PI_QUOTA_FAILOVER_PRINT_CHAIN  non-empty: print the chain and exit (route-change reads it)
 #   PI_QUOTA_FAILOVER_LOG      log file (default ~/.local/state/pi-quota-failover.log)
 #   PI_QUOTA_FAILOVER_GATE     host-memory gate run before each call (default ~/firstmate/config/fm-mem-gate.sh
@@ -69,9 +71,9 @@ QUOTA_RE='limit used up|usage limit|limit has been reached|rate limit reached|Go
 # extension warning/failure is a route failure: the chain moves on without a quota marker (fleet retro 19 Oct, fix 2).
 ROUTE_FAIL_RE='WaitDelay|parse events|extension.*(warning|failed|error)|(warning|error|failed).*extension'
 
-# The default chain is the pipeline route the no-mistakes config holds: one route, the OpenRouter DeepSeek floor
-# route. A pinned model outside the chain does not run, so the config's route is the route that runs.
-chain=${PI_QUOTA_FAILOVER_CHAIN:-'openrouter/deepseek/deepseek-v4.1-flash-1017:floor'}
+# The default chain is the pipeline route: Claude Haiku through claude-bridge on the subscription
+# accounts, never extra credits. A pinned model outside the chain does not run, so the chain's route is the route that runs.
+chain=${PI_QUOTA_FAILOVER_CHAIN:-'claude-bridge/claude-haiku-5-5'}
 # The chain is the fleet's one route list: route-change reads it from here.
 [ -z "${PI_QUOTA_FAILOVER_PRINT_CHAIN:-}" ] || { printf '%s\n' "$chain"; exit 0; }
 
@@ -146,6 +148,29 @@ credit_empty() {
   case $1 in *:free) return 1 ;; esac # a :free model needs no balance
   probe_out=$(printf 'ok' | timeout "${PI_QUOTA_FAILOVER_PROBE_SECS:-60}" "$real_pi" "${ext_args[@]}" --model "$1" --mode json --no-session 2>&1) || true
   grep -oE '"errorMessage":"(\\.|[^"])*"' <<<"$probe_out" | grep -qiE "$QUOTA_RE"
+}
+# Claude subscription accounts: claude-bridge runs Claude Code with the CLAUDE_CONFIG_DIR it inherits, so a bridge
+# call runs on the account the pool picks, exactly as a pool worker does. pool_use exports the pick and sheds the
+# credential variables the pool names; non-zero with the pool's reason in detail when it has no Claude account.
+pool_file=${PI_QUOTA_FAILOVER_ACCOUNT_POOL-$HOME/firstmate/config/account-pool}
+pool_cmd='' pool_state='' pool_id=''
+if [ -n "$pool_file" ] && [ -f "$pool_file" ]; then
+  pool_cmd=$(sed -n 's/^command=//p' "$pool_file" | tail -n 1)
+  pool_cmd=${pool_cmd:-byokit-accounts}
+  pool_state=$(sed -n 's/^state=//p' "$pool_file" | tail -n 1)
+fi
+pool_use() {
+  local out folder v
+  out=$(timeout 120 "$pool_cmd" pick claude --json --state "$pool_state" 2>/dev/null)
+  folder=$(jq -r 'select(.ok == true) | .set.CLAUDE_CONFIG_DIR // empty' <<<"$out" 2>/dev/null)
+  if [ -z "$folder" ] || [ ! -d "$folder" ]; then
+    detail="the account pool has no Claude account left: $(jq -r '.reason // "no answer"' <<<"$out" 2>/dev/null)"
+    return 1
+  fi
+  for v in $(jq -r '.unset[]?' <<<"$out"); do [[ $v =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] && unset "$v"; done
+  export CLAUDE_CONFIG_DIR=$folder
+  pool_id=$(jq -r '.id' <<<"$out")
+  log_line "claude-bridge runs on pool account $pool_id"
 }
 idle_secs=${PI_QUOTA_FAILOVER_IDLE_SECS:-120}
 bridge_idle_secs=${PI_QUOTA_FAILOVER_BRIDGE_IDLE_SECS:-300}
@@ -354,9 +379,14 @@ else
 fi
 live=()
 detail="every chain model hit a quota error in the last ${dead_secs}s"
+pool_ok=1
+if [ -n "$pool_cmd" ] && [[ " ${order[*]}" = *" claude-bridge/"* ]]; then pool_use || pool_ok=0; fi
 for m in "${order[@]}"; do
   age=$(dead_age "$m")
-  if [ -n "$age" ] && [ "$age" -lt "$dead_secs" ]; then
+  if [ "$pool_ok" = 0 ] && [[ $m = claude-bridge/* ]]; then
+    # With every pool account rested a bridge call never falls back to the default login or paid usage.
+    log_line "model=$m skipped: $detail"
+  elif [ -n "$age" ] && [ "$age" -lt "$dead_secs" ]; then
     # A marker dated in the future (clock step) shows the time left until it expires, never a negative age.
     if [ "$age" -ge 0 ]; then when="${age}s ago"; else when="dated in the future, $((dead_secs - age))s until it expires"; fi
     log_line "model=$m skipped: quota error $when (skip window ${dead_secs}s)"
@@ -412,9 +442,24 @@ for ((attempt = 0; attempt < ${#order[@]}; attempt++)); do
     cat "$err_file" >&2
     exit "$rc"
   fi
+  # A Claude limit on a pool account is that account's: rest it and run the same route on the next pick. Each rest
+  # takes one account off the pick, so this ends when the pool has none left. The pool, not a route marker, decides
+  # which account the next call runs on, so an account limit never marks the route dead for every account.
+  if [ "$quota" = 1 ] && [ -n "$pool_id" ] && [[ $model = claude-bridge/* ]]; then
+    old=$pool_id quota=2
+    why=$(timeout 60 "$pool_cmd" rest "$old" --json --state "$pool_state" 2>&1 >/dev/null) ||
+      log_line "the pool did not rest account $old: ${why:-no answer}"
+    if pool_use && [ "$pool_id" != "$old" ]; then
+      log_line "model=$model quota-error on account $old in $((t1 - t0))ms ($detail); same route on account $pool_id"
+      mapfile -t args < <(printf '%s\n' "${args[@]}" | drop_session)
+      attempt=$((attempt - 1))
+      continue
+    fi
+    pool_id=''
+  fi
   # Only a real quota error marks the route dead; a stall moves on for this call alone.
-  if [ "$quota" = 1 ]; then
-    mark_dead "$model"
+  if [ "$quota" != 0 ]; then
+    [ "$quota" = 2 ] || mark_dead "$model"
     kind="quota-error"
   elif [ "$rfail" = 1 ]; then
     kind="route-failure"
