@@ -133,6 +133,17 @@ cat > "$work/bin/sign-off-axi" <<'STUB' || exit 1
 #!/usr/bin/env bash
 # Like sign-off-axi 0.5.3: evidence is posted one at a time (a --from --replace feed of evidence is
 # refused), a key it holds takes only the same message again, and dismiss keeps the card (archived).
+# feedback as sign-off-axi 0.6.1 answers it (FB_MODE ok), NOT_FOUND (nothing sent on the card),
+# an older one without the command (old), or a refusal (busy); every call is logged.
+if [ "${1:-}" = feedback ]; then
+  printf '%s\n' "$*" >>"${FB_LOG:-/dev/null}"
+  case ${FB_MODE:-ok} in
+    notfound) printf 'error: "nothing was sent on %s yet"\ncode: NOT_FOUND\n' "$2"; exit 1 ;;
+    old) printf 'error: "Unknown command: feedback"\ncode: VALIDATION_ERROR\n'; exit 2 ;;
+    busy) printf 'error: "the board is busy"\ncode: BUSY\n'; exit 1 ;;
+  esac
+  echo 'shows: Replied'; exit 0
+fi
 if [ "${1:-}" = restore ]; then
   jq --arg k "$2" '.items |= map(if .key == $k then .dismissed=false else . end)' "$3" > "$3.tmp" && mv "$3.tmp" "$3"
   exit 0
@@ -517,6 +528,45 @@ printf 't\thttps://github.com/o/r/pull/1\t%s\tpass\t1 evidence files\n' "$head_c
 is "gate: PASS row for the head is allowed" "$(gate_rc)" 0
 PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" lint "$wt" "$head_c" https://github.com/o/r/pull/1 >/dev/null 2>&1
 is "post: the card logged its evidence folder on the head's row" "$(grep -c "$head_c	card	evidence folder $home/data/lint" "$home/data/checks-gate.log")" 1
+
+# Feedback trail: after a merge, each sign-off card the task's brief or the PR body names is
+# marked acted on with the PR link, once per card and PR, whatever the evidence card does.
+# NOT_FOUND counts as done, a sign-off-axi without the feedback command skips with one line,
+# a refusal is printed and retried on the next post, and a `sign-off reply:` line replies.
+FB_LOG=$work/feedback.log GH_BODY=$work/fb-body.md
+export FB_LOG GH_BODY
+: >"$FB_LOG"
+checks fb shot.png && cp "$shot" "$home/data/fb/shot.png"
+printf '{"items":[]}\n' >"$work/board-fb.json"
+printf 'Build the trail.\nsign-off cards: fleet-dashboard-full\n' >"$home/data/fb/brief.md"
+cat "$home/data/fb/checks.md" - >"$GH_BODY" <<'BODY'
+sign-off card: `design-two`
+BODY
+fb_post() { # fb_post <pr-number> [<mode>]: the post-merge call for that PR
+  FB_MODE=${2:-ok} PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board-fb.json" fb "$wt" "$head_c" "https://github.com/o/r/pull/$1" 2>&1
+}
+fb_post 245 >/dev/null
+is "feedback: each named card is marked acted on with the PR link" "$(cat "$FB_LOG")" "feedback design-two $work/board-fb.json --acted --link https://github.com/o/r/pull/245
+feedback fleet-dashboard-full $work/board-fb.json --acted --link https://github.com/o/r/pull/245"
+fb_post 245 >/dev/null
+is "feedback: a repeat post marks nothing again" "$(wc -l <"$FB_LOG")" 2
+: >"$FB_LOG"
+fb_post 246 notfound >"$work/fb.out"; fb_post 246 >/dev/null
+is "feedback: NOT_FOUND is done and not asked again" "$(wc -l <"$FB_LOG")" 2
+is "feedback: NOT_FOUND prints nothing" "$(grep -c feedback "$work/fb.out")" 0
+: >"$FB_LOG"
+fb_post 247 old >"$work/fb.out"; rc=$?; fb_post 247 >/dev/null
+is "feedback: an older sign-off-axi skips with one line" "$(grep -c 'no feedback command' "$work/fb.out")" 1
+is "feedback: an older sign-off-axi leaves the post's exit alone" "$rc" 0
+is "feedback: an older sign-off-axi is not asked again" "$(wc -l <"$FB_LOG")" 2
+: >"$FB_LOG"
+fb_post 248 busy >"$work/fb.out"; fb_post 248 >/dev/null
+is "feedback: a refusal is printed with its cause" "$(grep -c 'feedback design-two failed (exit 1).*BUSY' "$work/fb.out")" 1
+is "feedback: a refused card is marked on the next post" "$(wc -l <"$FB_LOG")" 4
+: >"$FB_LOG"
+printf 'sign-off reply: The trail shows on every card.\n' >>"$home/data/fb/brief.md"
+fb_post 249 >/dev/null
+is "feedback: a reply line replies with the PR link" "$(head -n 1 "$FB_LOG")" "feedback design-two $work/board-fb.json --reply The trail shows on every card. --link https://github.com/o/r/pull/249"
 
 # No run anywhere posted, or even asked for, a report card.
 if grep -q -- '--kind report' "$SO_LOG"; then

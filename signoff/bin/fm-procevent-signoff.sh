@@ -27,8 +27,8 @@
 #            warns and keeps the hold.
 # poll       The blocking child the runner executes; never run it in a
 #            conversational turn. It prints one JSON object per line for each
-#            deliverable answer, `{"key","answer","label","close","at"}` with the
-#            bare task id as key, and exits 0. With nothing deliverable it blocks
+#            deliverable answer, `{"key","card","answer","label","close","at"}` with the
+#            bare task id as key and its board card as card, and exits 0. With nothing deliverable it blocks
 #            in `sign-off-axi wait` for up to 600 seconds, rests when still
 #            nothing is deliverable, and exits 75 with no output, the runner's
 #            clean empty wait, so `relisten` polls again.
@@ -45,6 +45,16 @@
 #            line matches several rows), so only a transient skip or failure leaves
 #            an answer undelivered; a migrated-hold scan that cannot read its graph,
 #            or an ambiguous configured-prefix match, is transient.
+#
+# Read mark: the runner announces each captured result to this home's handler (Main,
+# or the lead in a secondmate home), who concludes it with `bin/fm-procevent.sh
+# handled signoff <sequence>`. That is the pickup of the note carrying the owner's
+# answer, so each poll round runs `sign-off-axi feedback <card> <board.json> --read`
+# for every card in a handled captured result, on the board `sign-off-axi status`
+# names. It reads the captured results, not `ack`, because the runner runs `answers`
+# and `ack` from the Firstmate checkout's own adapter. A card is marked once per
+# result; sign-off's NOT_FOUND counts as done, and a sign-off-axi older than 0.6.1
+# (no feedback command) skips with one log line.
 #
 # An answer is deliverable only when its key carries this home's tag, its bare
 # task id is one this home still holds for the captain (`fm-captain-hold.sh
@@ -91,10 +101,14 @@ export FM_HOME
 # downstream tools inherit its account rather than an ambient default login.
 # shellcheck source=account-pool/bin/fm-pool-claude-env.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/account-pool/bin/fm-pool-claude-env.sh"
+# shellcheck source=signoff/bin/fm-signoff-feedback-lib.sh
+. "$SCRIPT_DIR/fm-signoff-feedback-lib.sh"
 if [ -f "$FM_HOME/config/account-pool" ]; then fm_pool_claude_env || exit 1; fi
 
 SOURCE_ID=signoff
 DELIVERED="$STATE/signoff-delivered"
+# <card>\t<result sequence> for each card marked Read.
+READ="$STATE/signoff-read-marked"
 # How long a round rests when nothing is deliverable after a wait (no board yet,
 # nothing waiting, or the tool failing), so an idle home does not spin.
 IDLE_REST=30
@@ -165,7 +179,7 @@ deliverable() {
     | jq -c --arg prefix "$prefix" '
         to_entries[] | select(.key | startswith($prefix))
         | (.key[($prefix | length):]) as $rest
-        | {key: ($rest | sub("-[^-]*$"; "")), stamp: ($rest | sub("^.*-"; "")), answer: (.value.answer // ""), label: (.value.label // ""), close: (.value.close // ""), at: (.value.at // "")}' 2>/dev/null \
+        | {key: ($rest | sub("-[^-]*$"; "")), card: .key, stamp: ($rest | sub("^.*-"; "")), answer: (.value.answer // ""), label: (.value.label // ""), close: (.value.close // ""), at: (.value.at // "")}' 2>/dev/null \
     | while IFS= read -r line ; do
         key=$(jq -r '.key' <<<"$line")
         stamp=$(jq -r '.stamp' <<<"$line")
@@ -179,12 +193,37 @@ deliverable() {
       done
 }
 
+# Mark Read each card in a captured result the handler concluded (see the header).
+mark_read() {
+  local result seq card rc board='' old=0
+  for result in "$(fm_procevent_inbox_dir "$STATE")/$SOURCE_ID".*.result; do
+    seq=$(fm_procevent_result_sequence "$result")
+    fm_procevent_is_handled "$STATE" "$SOURCE_ID" "$seq" || continue
+    while IFS= read -r card; do
+      [ ! -f "$READ" ] || ! grep -qxF "$card"$'\t'"$seq" "$READ" || continue
+      [ -n "$board" ] || board=$(signoff status --json 2>/dev/null | jq -r '.board // empty' 2>/dev/null)
+      [ -n "$board" ] || return 0
+      rc=0
+      fm_signoff_feedback "$card" "$board" --read || rc=$?
+      case $rc in
+        0) ;;
+        3) old=1 ;;
+        *) continue ;;
+      esac
+      printf '%s\t%s\n' "$card" "$seq" >> "$READ"
+    done < <(jq -r '.card // empty' "$result" 2>/dev/null)
+  done
+  [ "$old" -eq 0 ] || printf 'sign-off-axi has no feedback command (needs 0.6.1+); answered cards were not marked Read\n' >&2
+}
+
 cmd_poll() {
   local found
   [ $# -eq 0 ] || usage
+  mark_read
   found=$(deliverable)
   if [ -z "$found" ]; then
     signoff wait --json --timeout "$WAIT_SECS" >/dev/null 2>&1
+    mark_read
     found=$(deliverable)
     [ -n "$found" ] || sleep "$IDLE_REST"
   fi
