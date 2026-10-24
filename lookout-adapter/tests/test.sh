@@ -23,6 +23,7 @@ cat > "$t/home/fixture/users/user-017/dashboard/board.json" <<J
 {"homes":[{"id":"alpha","name":"Alpha"}],"tickets":[{"id":"alpha/a-one","project":"alpha-app"}],
  "cards":[{"id":"alpha/a-one","home":"alpha","title":"First lane\n... (truncated)","stage":"ci","state":"waiting","since":$((now-100)),"started":$((now-900)),"pr":"https://github.com/o/r/pull/1","wait":"CI"},
           {"id":"alpha/a-two","home":"alpha","title":"Second","stage":"building","state":"blocked","since":$((now-50)),"started":null,"pr":null,"wait":null},
+          {"id":"alpha/finished","home":"alpha","title":"Awaiting merge","stage":"merge","state":"finished","since":$now,"pr":null},
           {"id":"alpha/backlog-item","home":"alpha","title":"Ready item","stage":"queued","state":"queued","since":$now,"pr":null},
           {"id":"ghost/x","home":"ghost","title":"Unknown home","stage":"queued","state":"queued","since":$now,"pr":null}],
  "flow":{"lanes":[{"home":"alpha","task":"a-one","display_title":"Merged one","pr":"https://github.com/o/r/pull/1","times":{"merged":$((now-7200)),"dispatched":$((now-9000))}},
@@ -37,7 +38,7 @@ assert 'SECRET' not in raw, 'a .meta secret reached the document'
 assert d['schema'] == 'lookout.fleet.v1'
 h = d['hosts'][0]; assert h['mem_pct'] == 60.0 and h['gate'] == {'state': 'closed', 'limit_pct': 40} and h['jobs'][0] == {'kind': 'emulator', 'running': 1, 'limit': 2}, h
 assert [x['supervision']['state'] for x in d['homes']] == ['ok', 'stale'], d['homes']
-assert [l['stage'] for l in d['lanes']] == ['review', 'working'] and [l['stuck'] for l in d['lanes']] == [False, True], d['lanes']
+assert [l['stage'] for l in d['lanes']] == ['review', 'working', 'done'] and [l['stuck'] for l in d['lanes']] == [False, True, False], d['lanes']  # a finished lane holds no worker
 assert d['lanes'][0]['title'] == 'First lane' and d['lanes'][0]['project'] == 'alpha-app' and d['lanes'][0]['waiting_on'] == 'CI'
 w = d['workers']; assert len(w) == 2 and w[0]['account'] == 'pa_fixture' and w[0]['agent'] == 'claude' and w[1]['state'] == 'exited', w
 assert {(q['account'], q['window']) for q in d['quota']} == {('Codex', 'week'), ('acct-b', '5h'), ('acct-b', 'week')}
@@ -48,9 +49,12 @@ if [ -n "${LOOKOUT_DIR:-}" ] && command -v node >/dev/null; then
   node --input-type=module -e "import { validateFleet } from '$LOOKOUT_DIR/lib/contract.js'; import fs from 'node:fs'; const p = validateFleet(JSON.parse(fs.readFileSync('$out', 'utf8'))); if (p.length) { console.error(p.join('\n')); process.exit(1) }"
   echo "contract: valid"
 else echo "contract: skipped (set LOOKOUT_DIR to a lookout clone)"; fi
-"$here/lookout-firstmate" --home "$t/home" --no-build --proc "$t/proc" --serve --port 0 > "$t/serve.log" & srv=$!
+"$here/lookout-firstmate" --home "$t/home" --no-build --proc "$t/proc" --serve --port 0 --every 1 > "$t/serve.log" & srv=$!
 for _ in $(seq 50); do grep -q serving "$t/serve.log" && break; sleep 0.1; done
 url="$(sed 's/.*serving //' "$t/serve.log")"
-curl -fsS "$url" | python3 -c 'import json,sys; assert json.load(sys.stdin)["name"] == "Firstmate fleet"'
+first="$(curl -fsS "$url")"
+python3 -c 'import json,sys; assert json.loads(sys.argv[1])["name"] == "Firstmate fleet"' "$first"
+rm "$t/home/fixture/users/user-017/dashboard/data.json"; sleep 2.5  # the rebuild fails now: the last good snapshot is still served, at once, unchanged
+[ "$(curl -fsS -m 2 "$url")" = "$first" ]
 [ "$(curl -s -o /dev/null -w '%{http_code}' "${url%fleet.json}nope")" = 404 ]
 echo "lookout-firstmate: PASS"
