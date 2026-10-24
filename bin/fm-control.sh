@@ -198,8 +198,12 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 . "$SCRIPT_DIR/fm-worker-account-lib.sh"
 # Account-pool hook (firstmate-addons/account-pool): a no-op when the add-on is absent.
 _fm_ap=${FM_ADDONS_DIR:-${FM_HOME:-$SCRIPT_DIR/..}/projects/firstmate-addons}/account-pool/bin/fm-account-pool-lib.sh
-# shellcheck source=/dev/null
-{ [ -r "$_fm_ap" ] && . "$_fm_ap"; } || fm_account_hook() { :; }
+if [ -r "$_fm_ap" ]; then
+  # shellcheck source=/dev/null
+  . "$_fm_ap" || { printf 'error: the account-pool add-on at %s failed to load; fix or remove it\n' "$_fm_ap" >&2; exit 1; }
+else
+  fm_account_hook() { :; }
+fi
 # shellcheck source=bin/fm-exclude-tools-lib.sh
 . "$SCRIPT_DIR/fm-exclude-tools-lib.sh"
 

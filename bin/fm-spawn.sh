@@ -717,8 +717,12 @@ fm_backlog_directory_present "$STATE" "state directory" || {
 . "$SCRIPT_DIR/fm-worker-account-lib.sh"
 # Account-pool hook (firstmate-addons/account-pool): a no-op when the add-on is absent.
 _fm_ap=${FM_ADDONS_DIR:-${FM_HOME:-$SCRIPT_DIR/..}/projects/firstmate-addons}/account-pool/bin/fm-account-pool-lib.sh
-# shellcheck source=/dev/null
-{ [ -r "$_fm_ap" ] && . "$_fm_ap"; } || fm_account_hook() { :; }
+if [ -r "$_fm_ap" ]; then
+  # shellcheck source=/dev/null
+  . "$_fm_ap" || { printf 'error: the account-pool add-on at %s failed to load; fix or remove it\n' "$_fm_ap" >&2; exit 1; }
+else
+  fm_account_hook() { :; }
+fi
 # Fail closed before any fleet mutation: a no-mistakes gate agent must never spawn
 # a direct report (see bin/fm-gate-refuse-lib.sh).
 fm_refuse_if_gate_agent
@@ -2702,10 +2706,9 @@ fi
 RAW_COMMAND=
 [ "$RAW_LAUNCH" = 0 ] || RAW_COMMAND=$ARG3
 WORKER_ACCOUNT=$(fm_worker_account_select "$HARNESS" "$CONFIG" "$MODEL" "${PI_BIN:-$HARNESS}" "$RAW_COMMAND") || exit 1
-WORKER_ACCOUNT_DECLARED=${WORKER_ACCOUNT%%$'\t'*}
-WORKER_ACCOUNT_ROOT=${WORKER_ACCOUNT#*$'\t'}
-WORKER_ACCOUNT_PROVIDER=${WORKER_ACCOUNT_ROOT#*$'\t'}
-WORKER_ACCOUNT_ROOT=${WORKER_ACCOUNT_ROOT%%$'\t'*}
+WORKER_ACCOUNT_DECLARED=$(fm_worker_account_tuple_field "$WORKER_ACCOUNT" 1)
+WORKER_ACCOUNT_ROOT=$(fm_worker_account_tuple_field "$WORKER_ACCOUNT" 2)
+WORKER_ACCOUNT_PROVIDER=$(fm_worker_account_tuple_field "$WORKER_ACCOUNT" 3)
 if [ -n "$WORKER_ACCOUNT" ] && [ "$HARNESS" = claude ]; then
   if [ -n "$WORKER_ACCOUNT_ROOT" ]; then
     export CLAUDE_CONFIG_DIR=$WORKER_ACCOUNT_ROOT
