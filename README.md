@@ -117,6 +117,7 @@ bash merge-on-green/tests/merge-on-green.test.sh
 bash merge-on-green/tests/no-old-receipt-path.test.sh
 bash merge-card/tests/merge-card-e2e.sh
 bash owner-rules/tests/owner-rules-gate.test.sh
+bash owner-rules/tests/design-flag.test.sh
 bash owner-rules/tests/no-lavish.test.sh
 bash nm-drain/tests/nm-drain.test.sh
 bash owner-guard/tests/owner-guard.test.sh

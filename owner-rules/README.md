@@ -24,6 +24,7 @@ A refusal exits 1 before `fm-brief.sh` writes `data/<id>/brief.md`, with a one-l
   unaffected. A marker whose lib is missing stops the scaffold. Needs the brief-inherit seam.
 - `install.sh [--dry-run] <fm-home>` writes `config/owner-rules` and makes `config/merge-gate` run the merge gate below first, then the
   home's previous gate (moved to `config/merge-gate.pre-owner-rules`); `uninstall.sh` removes the marker and gives the gate back.
+- Design flag: a backlog body line `design: required` or `design: none`. `required` adds `Design discovery: required` to the brief; a design-like line with any other value is refused (`owner-rules: design: must be required or none (backlog item for <id>)`); no line on design-sounding work only prints a stderr note. Nothing blocks at merge time. Test: `tests/design-flag.test.sh [<firstmate-checkout>]` (the checkout adds the real `fm-brief.sh` journey).
 - Test: `tests/owner-rules.test.sh <firstmate-checkout>` drives the checkout's real `fm-brief.sh`.
 - Done-done proof: `FM_TEST_FORK=<firstmate-checkout> done-done run owner-rules-hierarchy` records the real brief journey and hierarchy report.
 

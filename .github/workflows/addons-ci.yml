@@ -185,6 +185,8 @@ jobs:
       # Fixture home, stub gh and receipts; no merge runs.
       - name: Owner-rules gate test
         run: bash owner-rules/tests/owner-rules-gate.test.sh
+      - name: Owner-rules design flag test
+        run: bash owner-rules/tests/design-flag.test.sh
       - name: Pipeline route switch test
         run: bash pipeline-quota-failover/tests/switch-route.test.sh
       - name: Owner ask real-board journey

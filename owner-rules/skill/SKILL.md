@@ -65,6 +65,25 @@ owner-rules: no checks-lint PASS for $src at $3; run FM_HOME=$FM_HOME <XDG_DATA_
 
 Fix: run that command (it logs the row), then merge again.
 
+## Design discovery: say `design: required` or `design: none`
+
+Design discovery goes through first-draft, and the lead decides per task whether a lane needs it. Put one body line on the lane's backlog item: `design: required` or `design: none`. Nothing blocks a lane on this; no line means not required.
+
+- Always `required`: a bigger redesign, a new screen, a landing page, a new prototype or mock.
+- Normally `none`: a copy fix, a CSS bug fix, a spacing or colour-token fix, a behaviour bug, a dependency bump. A scout that only investigates design is `none` too.
+
+When it is `required`, the brief gets the exact line `Design discovery: required` under "Home brief additions". For a late change, append that exact line to `data/<id>/brief.md` and steer the worker with the mid-task-ask rule.
+
+If the item has no `design:` line but its title or body says redesign, landing page, new screen, mock-up, prototype or first draft, the brief prints one stderr note and still succeeds; add the line and brief again if you want it recorded.
+
+Refusal at brief time, for a design-like line (`design`, `desing`, `designs`, `design-discovery`) whose value is not exactly `required` or `none`, or for two such lines (`$id` is the task id):
+
+```
+owner-rules: design: must be required or none (backlog item for $id)
+```
+
+Fix: make the item's line exactly `design: required` or `design: none`, then brief again.
+
 ## Install
 
 No add-on installs skills, so link this folder into the home's skills by hand:
