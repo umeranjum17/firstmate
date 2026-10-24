@@ -37,7 +37,7 @@ One line per add-on, with how it wires in. `<home>` is your home folder for the 
 - `merge-card` — runs the merge gate and posts one evidence card per merge to the sign-off board. Wire in: config shims, see Install.
 - `merge-on-green` — merges a PR you allowed to auto-merge once its checks are green and its proof receipt passes. Wire in: `merge-on-green/install.sh <home>`.
 - `nm-drain` — updates the shared pipeline service through a planned drain, never over live runs. Wire in: `nm-drain/install.sh <home>`.
-- `owner-rules` - enforces owner asks and risk reasons at brief creation, plus [Lavish refusals for secondmate notes and merge-card posts](owner-rules/README.md#lavish-refusal-secondmate-notes-and-merge-card-posts).
+- `owner-rules` - enforces owner asks, backlog hierarchy and risk reasons at brief creation, plus [Lavish refusals for secondmate notes and merge-card posts](owner-rules/README.md#lavish-refusal-secondmate-notes-and-merge-card-posts).
   Wire in: `owner-rules/install.sh <home>`; brief checks need the brief-inherit seam.
 - `pane-titles` — gives worker and lead panes a stable readable terminal title and matching Herdr tab label. Wire in: `pane-titles/install.sh <home>`; remove: `pane-titles/uninstall.sh <home>`.
 - `owner-guard` — refuses commits, pushes and PR merges that add the owner's private details, and scans public repos for them once a day. Wire in: `owner-guard/install.sh <home>` and `owner-guard/install-scan.sh`; remove with `owner-guard/uninstall.sh <home>`. Installation reversal covers both hook guards and the daily scan.

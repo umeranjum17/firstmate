@@ -2,13 +2,13 @@
 name: firstmate-addons-owner-rules
 description: >-
   Use before writing a lane brief or merging a lane, and when a brief or merge is refused with an "owner-rules:" line.
-  States the two owner rules (every lane serves an owner ask; no-mistakes only for listed risks) and the one-step fix for each refusal.
+  States the brief-time owner, hierarchy and risk rules and the one-step fix for each refusal.
 user-invocable: false
 ---
 
 # Owner rules
 
-Two owner rules are enforced by the fleet, not by prose. A refusal prints one `owner-rules:` line; fix it as below.
+Brief-time owner, hierarchy and risk rules are enforced by the fleet, not by prose. A refusal prints one `owner-rules:` line; fix it as below.
 
 ## Rule 00: every lane names the owner ask it serves
 
@@ -21,6 +21,21 @@ owner-rules: no owner ask: name the [captain-ask] item or the MainNNN order this
 ```
 
 Fix: retitle the item `[captain-ask] ...` or add the `MainNNN` order to its body, then brief again.
+
+## Rule 02: every backlog item belongs under an owner ask
+
+Every non-scout lane item whose title does not start `[captain-ask]` needs one `parent:` body line naming an existing backlog item, or the exact value `upkeep` for true upkeep.
+The named item may be an epic or a ticket under an epic; owner ask items are epic roots.
+Secondmate charters and scouts are exempt from this hierarchy check.
+
+Refusal at brief time (`$id` is the task id):
+
+```
+owner-rules: no valid parent: add parent: <backlog item id> or parent: upkeep to the backlog item for $id
+```
+
+Fix: add `parent: <backlog item id>` or `parent: upkeep` to the item's body, then brief again.
+Run `bin/fm-owner-rules-tree.sh <backlog-file>` to inspect parent chains and invalid parent references.
 
 ## Rule 13: direct-PR plus a done-done check is the default route
 
