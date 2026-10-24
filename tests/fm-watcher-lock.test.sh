@@ -246,6 +246,87 @@ test_live_stalled_watch_lock_is_replaced_past_hard_bound() {
   pass "live watcher lock with a beacon past the hard bound is replaced, under it is still refused"
 }
 
+# Drive the real watcher and arm in a private home, including a stopped holder
+# blocked on a TERM-resistant check child. Never signal a discovered real home.
+test_rearm_proves_resumed_supervision() (
+  local dir state fakebin oldarm='' holder='' sleeper='' arm='' unrelated='' i id status
+  dir=$(make_case rearm-proves-resume)
+  state="$dir/state"
+  fakebin="$dir/fakebin"
+  trap 'for id in "$sleeper" "$holder" "$oldarm" "$arm" "$unrelated"; do
+    [ -z "$id" ] || kill -KILL "$id" 2>/dev/null || true
+  done; wait 2>/dev/null || true' EXIT
+  export FM_HOME="$dir" FM_STATE_OVERRIDE="$state"
+  export FM_POLL=1 FM_SIGNAL_GRACE=1 FM_GUARD_GRACE=300
+  export FM_CHECK_INTERVAL=0 FM_HEARTBEAT=999999
+  unset FM_ARM_CONFIRM_TIMEOUT
+  export FM_WATCHER_STALL_BOUND=3
+  sleep 300 &
+  unrelated=$!
+  cat > "$state/hung.check.sh" <<'SH'
+#!/usr/bin/env bash
+# A sampler-style child owns a separate session, so the normal check-group
+# cleanup cannot accidentally satisfy the descendant-retirement assertion.
+python3 - "$FM_HOME/child.pid" <<'PYTHON'
+import subprocess
+import sys
+child = subprocess.Popen([sys.executable, "-c", """
+import os, signal, sys, time
+signal.signal(signal.SIGTERM, signal.SIG_IGN)
+with open(sys.argv[1], "w") as out:
+    out.write(str(os.getpid()))
+time.sleep(300)
+""", sys.argv[1]], start_new_session=True)
+child.wait()
+PYTHON
+SH
+  chmod 0700 "$state/hung.check.sh"
+  "$ROOT/bin/fm-check-register.sh" hung >/dev/null || fail "register hung check"
+  PATH="$fakebin:$PATH" "$WATCH_ARM" > "$dir/old-arm.out" 2>&1 &
+  oldarm=$!
+  for ((i=0; i<150; i++)); do
+    [ ! -s "$dir/child.pid" ] || break
+    sleep 0.1
+  done
+  sleeper=$(cat "$dir/child.pid") || fail "real watcher never entered hung check"
+  holder=$(cat "$state/.watch.lock/pid") || fail "hung watcher lacks lock"
+  kill -STOP "$holder" "$sleeper" || fail "could not stop private holder and child"
+  touch -t 200001010000 "$state/.last-watcher-beat"
+  # The replacement must supervise five task checks before announcing started.
+  "$ROOT/bin/fm-check-unregister.sh" hung >/dev/null || fail "retire hung check"
+  for id in one two three four five; do
+    # shellcheck disable=SC2016 # The check expands its private home at runtime.
+    printf '#!/usr/bin/env bash\nprintf "%%s\\n" %s >> "$FM_HOME/scanned"\n' "$id" > "$state/$id.check.sh"
+    chmod 0700 "$state/$id.check.sh"
+    "$ROOT/bin/fm-check-register.sh" "$id" >/dev/null || fail "register task $id"
+  done
+  # A handling successor is the existing continuation that resumes scans after
+  # the recovery wake, rather than delivering the same downtime wake again.
+  PATH="$fakebin:$PATH" FM_WATCH_HANDLING_SUCCESSOR=1 "$WATCH_ARM" > "$dir/new-arm.out" 2>&1 &
+  arm=$!
+  for ((i=0; i<250; i++)); do
+    grep -q 'watcher: started' "$dir/new-arm.out" && break
+    is_live_non_zombie "$arm" || break
+    sleep 0.1
+  done
+  status=
+  is_live_non_zombie "$holder" && status+="; holder survived"
+  is_live_non_zombie "$sleeper" && status+="; hung child survived"
+  is_live_non_zombie "$unrelated" || status+="; unrelated process was signalled"
+  grep -q 'watcher: started' "$dir/new-arm.out" || status+="; replacement not confirmed: $(cat "$dir/new-arm.out")"
+  for id in one two three four five; do
+    grep -qx "$id" "$dir/scanned" 2>/dev/null || status+="; started before supervising task $id"
+  done
+  FM_HOME="$dir" FM_STATE_OVERRIDE="$state" bash -c '. "$1"; fm_watcher_healthy "$2" "$3" 300 "$4"' _ "$LIB" "$state" "$WATCH" "$dir" \
+    || status+="; replacement lacks fresh identity-bound heartbeat"
+  [ -z "$status" ] || fail "$status"
+  # A new task event must still leave the watcher through its public arm path.
+  printf 'done: Umer task completed\n' > "$state/one.status"
+  wait_for_exit "$arm" 100 || fail "replacement did not surface the resumed task"
+  grep -q '^signal:.*one' "$dir/new-arm.out" || fail "resumed task wake missing"
+  pass "re-arm removes hung holder and child, protects unrelated process, and supervises five tasks before confirmation"
+)
+
 test_guard_warnings() {
   # The guard's two operator-visible states, with resilient substrings instead of
   # four copy-coupled tests:
@@ -1629,6 +1710,7 @@ test_msys_pid_identity_uses_proc() {
   pass "MSYS process identity uses compatible /proc fields"
 }
 
+test_rearm_proves_resumed_supervision || exit 1
 test_wait_deadline_reaps_a_stopped_child
 test_singleton_start
 test_pid_identity_is_locale_invariant

@@ -2915,27 +2915,78 @@ fi
 # cannot reset it with `trap - TERM`. Never use a name or pattern match.
 # Succeeds only once the holder has exited within the bounded waits.
 evict_stalled_holder() {
-  local pid=$1 i=0 identity
+  local pid=$1 i=0 identity table descendants child child_identity current signal survivors
+  local children=() identities=()
   fm_watcher_lock_matches_pid "$STATE" "$WATCH_PATH" "$pid" "$FM_HOME" || return 1
   identity=$FM_WATCHER_MATCHED_IDENTITY
+  # Snapshot descendants before TERM can orphan a blocked sampler/check child.
+  # Keep each process identity: neither reparenting nor PID reuse grants scope.
+  table=$(ps -A -o pid= -o ppid=) || return 1
+  descendants=$(printf '%s\n' "$table" | awk -v root="$pid" '
+    { parent[$1] = $2 }
+    END {
+      for (pid in parent) {
+        p = parent[pid]; depth = 0
+        while (p != "" && p != "0" && p != "1" && depth++ < 64) {
+          if (p == root) { print pid; break }
+          p = parent[p]
+        }
+      }
+    }')
+  for child in $descendants; do
+    child_identity=$(fm_pid_identity "$child" 2>/dev/null) || continue
+    children+=("$child")
+    identities+=("$child_identity")
+  done
+  fm_watcher_lock_matches_pid "$STATE" "$WATCH_PATH" "$pid" "$FM_HOME" || return 1
+  [ "$FM_WATCHER_MATCHED_IDENTITY" = "$identity" ] || return 1
   kill -TERM "$pid" 2>/dev/null || return 1
   while [ "$i" -lt 50 ] && fm_pid_alive "$pid"; do
     sleep 0.1
     i=$((i + 1))
   done
-  fm_pid_alive "$pid" || return 0
-  [ "$(cat "$WATCH_LOCK/pid" 2>/dev/null)" = "$pid" ] || return 1
-  fm_watcher_lock_matches_pid "$STATE" "$WATCH_PATH" "$pid" "$FM_HOME" || return 1
-  [ "$FM_WATCHER_MATCHED_IDENTITY" = "$identity" ] || return 1
-  [ "$(fm_path_age "$BEAT")" -ge "$WATCHER_STALL_BOUND" ] || return 1
-  # TERM-ignoring stalled holders require escalation after the grace and identity checks.
-  kill -KILL "$pid" || return 1
-  i=0
-  while [ "$i" -lt 50 ] && fm_pid_alive "$pid"; do
-    sleep 0.1
-    i=$((i + 1))
+  if fm_pid_alive "$pid"; then
+    [ "$(cat "$WATCH_LOCK/pid" 2>/dev/null)" = "$pid" ] || return 1
+    fm_watcher_lock_matches_pid "$STATE" "$WATCH_PATH" "$pid" "$FM_HOME" || return 1
+    [ "$FM_WATCHER_MATCHED_IDENTITY" = "$identity" ] || return 1
+    [ "$(fm_path_age "$BEAT")" -ge "$WATCHER_STALL_BOUND" ] || return 1
+    kill -KILL "$pid" || return 1
+  fi
+  # Reap only snapshotted descendants whose identities still match, including
+  # children that survived their holder's EXIT trap or forced termination.
+  for signal in TERM KILL; do
+    for ((i=0; i<${#children[@]}; i++)); do
+      child=${children[i]}
+      fm_pid_alive "$child" || continue
+      current=$(fm_pid_identity "$child" 2>/dev/null) || {
+        case "$(ps -o stat= -p "$child" 2>/dev/null | tr -d ' ')" in
+          Z*) continue ;; # Exited but not yet reaped by its parent.
+        esac
+        fm_pid_alive "$child" && return 1
+        continue
+      }
+      [ "$current" = "${identities[i]}" ] || continue
+      kill -"$signal" "$child" 2>/dev/null || true
+    done
+    for ((i=0; i<50; i++)); do
+      survivors=0
+      fm_pid_alive "$pid" && survivors=1
+      for ((child=0; child<${#children[@]}; child++)); do
+        fm_pid_alive "${children[child]}" || continue
+        current=$(fm_pid_identity "${children[child]}" 2>/dev/null) || {
+          case "$(ps -o stat= -p "${children[child]}" 2>/dev/null | tr -d ' ')" in
+            Z*) continue ;;
+          esac
+          fm_pid_alive "${children[child]}" && return 1
+          continue
+        }
+        [ "$current" != "${identities[child]}" ] || survivors=1
+      done
+      [ "$survivors" -ne 0 ] || return 0
+      sleep 0.1
+    done
   done
-  ! fm_pid_alive "$pid"
+  return 1
 }
 
 EVICTED_PID=
@@ -3091,6 +3142,7 @@ watcher_stop_signals
 # ${BASHPID:-$$} from this same main shell). Read directly, never via a command
 # substitution, so it matches the stored holder pid for the self-eviction check.
 WATCHER_PID=${BASHPID:-$$}
+rm -f "$STATE/.last-watcher-beat" || exit 1
 printf '%s\n' "$FM_HOME" > "$WATCH_LOCK/fm-home" || true
 printf '%s\n' "$WATCH_PATH" > "$WATCH_LOCK/watcher-path" || true
 # shellcheck disable=SC2034 # Consumed by wake() in the separately linted transition owner.
@@ -3348,10 +3400,6 @@ while :; do
   host_memory_surface_queued
   if declare -F fm_model_outage_tick >/dev/null; then fm_model_outage_tick || triage_log "model-error observation failed"; fi
   own_queue_resurface || { echo "watcher: own wake-queue observation failed" >&2; exit 1; }
-
-  # Liveness beacon for fm-guard.sh: a fresh mtime here means a watcher is
-  # alive. Supervision scripts warn when this goes stale with tasks in flight.
-  touch "$STATE/.last-watcher-beat"
 
   # Opt-in fleet activity ledger (docs/fleet-ledger.md): pick up newly appended
   # status lines before this cycle can exit on a wake. Off costs one file test.
@@ -3874,6 +3922,12 @@ EOF
       triage_log "absorbed heartbeat (no captain-relevant change)"
     fi
   fi
+
+  # Confirm liveness only after a complete supervision scan. In particular a
+  # replacement must not inherit its predecessor's beacon or announce recovery
+  # while its task checks are still blocked. Actionable wakes exit above and
+  # are confirmed by the arm's delivery path instead.
+  touch "$STATE/.last-watcher-beat" || exit 1
 
   # Terminal wait: a bounded native-event wait for push-capable homes (herdr),
   # else the blind poll sleep. See event_wait_or_sleep.

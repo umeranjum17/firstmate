@@ -23,7 +23,9 @@
 # This script forks the watcher as a tracked child, then VERIFIES the outcome
 # before it settles in. It confirms a watcher process is genuinely alive AND the
 # liveness beacon (state/.last-watcher-beat) is fresh within FM_GUARD_GRACE (the
-# single source of truth, shared with fm-watch.sh and fm-guard.sh), and prints
+# single source of truth, shared with fm-watch.sh and fm-guard.sh). A new
+# watcher expires the predecessor beacon and beats after its task scan, so
+# confirmation proves resumed supervision, then this script prints
 # exactly one unambiguous status line:
 #   watcher: started pid=<N> (beacon fresh)              - it launched one and confirmed it
 #   watcher: attached pid=<N> (beacon <age>s)            - a live+fresh successor holds the lock;
@@ -672,6 +674,14 @@ child_out=$(mktemp "$STATE/.watch-arm-output.XXXXXX") || {
 # date(1) exposes whole seconds. Keep the configured confirmation budget from
 # collapsing when startup begins just before the next second boundary.
 deadline=$(( $(date +%s) + CONFIRM_TIMEOUT + 1 ))
+# Stalled-holder recovery can spend three five-second retirement waits before
+# normal startup. Budget those only for this home's identity-proven stalled
+# holder; an unrelated lock never earns extra time or signalling authority.
+stalled_pid=$(cat "$WATCH_LOCK/pid" 2>/dev/null || true)
+if [ "$(fm_path_age "$BEAT")" -ge "$STALL_BOUND" ] \
+  && fm_watcher_lock_matches_pid "$STATE" "$WATCH" "$stalled_pid" "$FM_HOME"; then
+  deadline=$((deadline + 15))
+fi
 if [ -n "${FM_WATCH_PREDECESSOR_ARM_PID:-}" ]; then
   FM_WATCH_HANDLING_SUCCESSOR=1 "$WATCH" >"$child_out" &
 else

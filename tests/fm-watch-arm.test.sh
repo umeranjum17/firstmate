@@ -54,14 +54,18 @@ start_seed_watcher() {  # <state> <fakebin> <watch-out> [poll-seconds]
     FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out" &
   SEED_PID=$!
   i=0
-  while [ "$i" -lt 60 ]; do
+  # Initial supervision can include a large pending-reply scan. A lock alone
+  # no longer proves readiness: wait for the scan-complete beacon, bounded by
+  # the same 60-second ceiling used by this suite's pending-reply journey.
+  while [ "$i" -lt 600 ]; do
     [ "$(cat "$state/.watch.lock/pid" 2>/dev/null || true)" = "$SEED_PID" ] \
       && [ -e "$state/.last-watcher-beat" ] && break
     sleep 0.1
     i=$((i + 1))
   done
   [ "$(cat "$state/.watch.lock/pid" 2>/dev/null || true)" = "$SEED_PID" ] \
-    || fail "seed watcher did not take the lock"
+    || fail "seed watcher did not take the lock: $(cat "$out")"
+  [ -e "$state/.last-watcher-beat" ] || fail "seed watcher did not complete its first supervision scan"
 }
 
 # Attach a real arm to the live cycle.
@@ -258,10 +262,14 @@ test_pending_reply_scan_does_not_starve_ordinary_wake() {
       rec=$(fm_pending_reply_path "$state" "$corr")
       fm_pending_reply_set "$rec" parent_status "$status" || exit 1
       fm_pending_reply_set "$rec" escalated_epoch 1 || exit 1
+      fm_pending_reply_set "$rec" phase escalated || exit 1
       fm_pending_reply_write_delivery_confirmation "$state" "$corr" attempted 1 || exit 1
     done
   ' _ "$ROOT/bin/fm-marker-lib.sh" "$ROOT/bin/fm-pending-reply-lib.sh" "$state" "$state/umer.status" "$dir/home" \
     || fail "could not create undelivered escalated pending replies"
+  # This is existing history for the pending-reply scan, not the new ordinary
+  # wake below. Let the seed complete a real scan before the arm attaches.
+  prime_status_seen "$state" "$state/umer.status" || fail "could not prime existing pending-reply history"
   start_seed_watcher "$state" "$fakebin" "$out"
   start_attached_arm "$state" "$fakebin" "$armout" 1
 
@@ -675,15 +683,16 @@ test_slow_rearm_recovery_is_still_surfaced() {
   wait "$first_arm" 2>/dev/null || true
   append_wake "$state" check startup-network 'check: startup-network before a slow re-arm'
 
-  # Removing the dead watcher's beacon makes the delay start exactly when the
-  # re-armed watcher publishes its own, so its startup and the arm's confirmation
-  # stay at full speed and only the work after confirmation is slowed.
+  # Delay only the replacement's recovery scan, after its lock identity is
+  # published. A recovery wake exits before a scan-complete beacon, so the
+  # predecessor's beacon must not control whether this delay actually runs.
   rm -f "$state/.last-watcher-beat"
   for tool in mktemp readlink; do
     real=$(command -v "$tool") || fail "no $tool to delay"
     cat > "$fakebin/$tool" <<SH
 #!/bin/sh
-[ -e "$state/.last-watcher-beat" ] && sleep 0.6
+holder=\$(cat "$state/.watch.lock/pid" 2>/dev/null)
+[ "\$holder" != "$watcher_pid" ] && [ -s "$state/.watch.lock/pid-identity" ] && sleep 0.6
 exec "$real" "\$@"
 SH
     chmod +x "$fakebin/$tool"

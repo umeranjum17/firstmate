@@ -661,6 +661,13 @@ tests/fm-claude-stop-autoarm.test.sh
 tests/fm-turnend-guard.test.sh
 ```
 
+### Stalled-holder recovery
+
+On 2026-10-24, GNU Bash 5.3.15 on Linux exercised the real arm and watcher through `bash tests/fm-watcher-lock.test.sh` in a private test home.
+The `re-arm removes hung holder and child, protects unrelated process, and supervises five tasks before confirmation` case stops a live holder and its TERM-resistant check child, ages the beacon past the hard bound, and re-arms through the existing handling-successor path.
+It requires both stalled processes to exit, the unrelated process to survive, all five task checks to run before `watcher: started`, an identity-bound fresh beacon, and a later task event to reach the arm's actionable output.
+The arm and watcher checks are shared across harnesses and runtime backends; this proof exercises their process boundary without starting any vendor harness or runtime server.
+
 ## Supervision host
 
 This pre-flip evidence supports [supervision-host.md](../supervision-host.md)'s Claude engine, away-wake path, and failure direction; its no-file baseline describes the earlier opt-in release, not the current Claude default.
