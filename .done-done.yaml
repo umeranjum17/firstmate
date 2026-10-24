@@ -34,6 +34,8 @@ journeys:
     command: bash lookout-adapter/run-proof.sh
   lookout-service-dry:
     command: bash lookout-adapter/run-service-proof.sh
+  wait-timers-identity:
+    command: bash wait-timers/run-proof.sh
   core:
     command: bash fleet-dashboard/run-core-proof.sh
     core: true
