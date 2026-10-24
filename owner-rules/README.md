@@ -6,7 +6,8 @@ Two owner rules enforced when a lane's brief is created, not left as prose. Slic
    id equals the task id in `data/backlog.md`) has a title starting `[captain-ask]`, or its title or body
    names a `MainNNN` order.
 2. **Risk reason.** A ship lane in `--mode no-mistakes` needs one body line `risk: <reason>` with reason
-   one of `release`, `security`, `migration`, `large-change`, `shared-protocol`. Otherwise use direct-PR plus a
+   one of `release`, `security`, `migration`, `large-change`, `shared-protocol`, `fork-repo` (any PR to the
+   Firstmate fork, whose required check "PR must be raised via no-mistakes" demands it). Otherwise use direct-PR plus a
    done-done check. Scouts are exempt; secondmate charters are exempt from both rules.
 
 A refusal exits 1 before `fm-brief.sh` writes `data/<id>/brief.md`, with a one-line reason on stderr.

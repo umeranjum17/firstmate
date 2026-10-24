@@ -24,15 +24,15 @@ Fix: retitle the item `[captain-ask] ...` or add the `MainNNN` order to its body
 
 ## Rule 13: direct-PR plus a done-done check is the default route
 
-`--mode no-mistakes` is only for an npm/store release, sign-in/keys/payment/security code, a data migration, a large change (new subsystem or about 400+ changed lines), or shared protocol/crypto. Everything else ships direct-PR, and the real user journey is checked (the done-done check) with its evidence on the sign-off Evidence tab.
+`--mode no-mistakes` is only for an npm/store release, sign-in/keys/payment/security code, a data migration, a large change (new subsystem or about 400+ changed lines), shared protocol/crypto, or any PR to the Firstmate fork (umeranjum17/firstmate), whose required check "PR must be raised via no-mistakes" demands it. Everything else ships direct-PR, and the real user journey is checked (the done-done check) with its evidence on the sign-off Evidence tab.
 
 Refusal at brief time for `--mode no-mistakes`:
 
 ```
-owner-rules: mode no-mistakes needs one listed risk reason (release, security, migration, large-change, shared-protocol) in the backlog item for $id; use direct-PR plus a done-done check
+owner-rules: mode no-mistakes needs one listed risk reason (release, security, migration, large-change, shared-protocol, fork-repo) in the backlog item for $id; use direct-PR plus a done-done check
 ```
 
-Fix: if the lane truly is one of those, add exactly one body line `risk: <reason>` to the item (reason is one of the five listed). Otherwise brief with `--mode direct-PR`.
+Fix: if the lane truly is one of those, add exactly one body line `risk: <reason>` to the item (reason is one of the six listed). Otherwise brief with `--mode direct-PR`.
 
 Refusal at merge time (`$what` is the PR URL, or `local merge <head>` with no PR):
 

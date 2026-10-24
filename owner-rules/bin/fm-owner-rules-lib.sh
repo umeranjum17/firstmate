@@ -20,9 +20,9 @@ fm_owner_rules_check() {
     exit 1
   fi
   [ "$kind" = ship ] && [ "$mode" = no-mistakes ] || return 0
-  risks=$(printf '%s\n' "$entry" | tail -n +2 | grep -Ec '^[[:space:]]*risk:[[:space:]]*(release|security|migration|large-change|shared-protocol)[[:space:]]*$') || true
+  risks=$(printf '%s\n' "$entry" | tail -n +2 | grep -Ec '^[[:space:]]*risk:[[:space:]]*(release|security|migration|large-change|shared-protocol|fork-repo)[[:space:]]*$') || true
   if [ "$risks" -ne 1 ]; then
-    echo "owner-rules: mode no-mistakes needs one listed risk reason (release, security, migration, large-change, shared-protocol) in the backlog item for $id; use direct-PR plus a done-done check" >&2
+    echo "owner-rules: mode no-mistakes needs one listed risk reason (release, security, migration, large-change, shared-protocol, fork-repo) in the backlog item for $id; use direct-PR plus a done-done check" >&2
     exit 1
   fi
 }
