@@ -64,7 +64,8 @@
 # Insights also invokes fm-model-stats.sh and fm-skill-stats.sh (read-only, 10 s timeout each,
 # outside the flow reader's 180 s deadline); their script headers name their sources.
 #   data/captain-asks.tsv           Waiting on you: Main's fleet-wide headerless
-#                                   id<TAB>since-epoch<TAB>text<TAB>url[<TAB>yn|pick|approval]; each row with an id and
+#                                   id<TAB>since-epoch<TAB>text<TAB>url[<TAB>yn|pick|approval] or, as Main writes it now,
+#                                   ...<TAB>url<TAB>options (A|B)<TAB>default<TAB>why; each row with an id and
 #                                   text is an ask (an optional type column, when yn|pick|approval, overrides
 #                                   the wording; empty or unknown falls back to it; a bad time or duplicate id
 #                                   shows as a record needing correction); blank rows and rows without an id or text
@@ -493,7 +494,7 @@ try:
         if not line.strip(): continue
         if len(fields) < 3 or not fields[0].strip() or not fields[2].strip():  # no id or no text: not an ask
             notes.append(('data/captain-asks.tsv', f'row {n} skipped: no id or text')); continue
-        valid = len(fields) in (4, 5) and fields[0].strip() and fields[2].strip() and re.fullmatch(r'[0-9]{1,10}', fields[1]) and fields[0] not in ask_ids
+        valid = len(fields) >= 4 and fields[0].strip() and fields[2].strip() and re.fullmatch(r'[0-9]{1,10}', fields[1]) and fields[0] not in ask_ids
         if valid: ask_ids.add(fields[0])
         epoch = int(fields[1]) if valid else None
         age = None if epoch is None or epoch > int(NOW_TS) else int(NOW_TS) - epoch
@@ -2009,7 +2010,8 @@ board = dict(
     parked=PARKED, cards=cards, tickets=tickets, tickets_unread=bl_unread, flow=flow, flow_error=flow_error,
     models=models, models_error=models_error,
     skills=skills, skills_error=skills_error,
-    asks=[dict(id=f[0], text=f[2], url=f[3] if len(f) > 3 else '', type=f[4] if len(f) == 5 else None, age=a) for f, a in asks] if asks_known else None,
+    asks=[dict(id=f[0], text=f[2], url=f[3] if len(f) > 3 else '', type=f[4] if len(f) == 5 else None, age=a, options=[o for o in f[4].split('|') if o] if len(f) > 5 else [],
+               default=f[5] if len(f) > 5 else '', why=f[6] if len(f) > 6 else '') for f, a in asks] if asks_known else None,
     landed=LANDED, cycle_p50=cycles[(len(cycles) - 1) // 2] if len(cycles) >= 5 else None, cycle_n=len(cycles))
 scrub(board)
 with open(os.path.join(OUT, 'board.json'), 'w', encoding='utf-8') as fh:
