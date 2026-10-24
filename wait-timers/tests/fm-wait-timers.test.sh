@@ -120,6 +120,46 @@ IFS=$'\t' read -r _sig _since _owner parent _key _misses < "$dir/state/.waiting-
 cycle
 [ "$(grep -c 'level=main' "$dir/events")" -eq 1 ] || fail 'Main-owned escalation repeated on a later poll'
 pass 'a Main-owned overdue wait escalates once to Main without paging the captain'
+# Every wait carries a stable identity (home, task, generation, source key); a
+# resolution closes only the wait it names, and escalations print that source.
+dir=$(make_case identity)
+mkdir -p "$dir/home/fixture/users/user-010" "$dir/tmp" "$dir/config"
+printf 'kind=ship\nbackend=tmux\nwindow=fake:1\n' > "$dir/state/lane.meta"
+# No [at=] stamp on either decision, and an older unrelated decision (old-ask).
+printf 'needs-decision [key=old-ask]: unrelated product choice\nblocked [key=cur-wait]: current dependency\n' > "$dir/state/lane.status"
+prime_status_seen "$dir/state" "$dir/state/lane.status"
+arm_episode "$dir"
+IFS=$'\t' read -r sig since _owner _parent key _misses < "$dir/state/.waiting-timers/lane"
+case "$key" in
+  waiting-timer-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]-lane-g[0-9]*-cur-wait) ;;
+  *) fail "wait identity is not home/task/generation/key: $key" ;;
+esac
+printf '%s\t%s\t0\t0\t%s\t0\n' "$sig" "$((since - 900))" "$key" > "$dir/state/.waiting-timers/lane"
+cycle
+grep -F "id=$key source=[blocked [key=cur-wait]: current dependency]" "$dir/events" >/dev/null || fail 'escalation did not print the exact unresolved source'
+printf 'resolved [key=cur-wait]: dependency arrived\nworking: resumed\n' >> "$dir/state/lane.status"
+cycle
+cycle
+[ -e "$dir/state/.waiting-timers/lane" ] || fail 'a later working line closed the unrelated open decision'
+IFS=$'\t' read -r _sig _since _owner _parent key2 _misses < "$dir/state/.waiting-timers/lane"
+case "$key2" in
+  waiting-timer-*-lane-g[0-9]*-old-ask) ;;
+  *) fail "unrelated decision did not become the named open wait: $key2" ;;
+esac
+[ "$key2" != "$key" ] || fail 'a changed wait kept the old identity'
+printf 'resolved [key=old-ask]: decided\n' >> "$dir/state/lane.status"
+for _ in 1 2 3; do [ -e "$dir/state/.waiting-timers/lane" ] || break; cycle; done
+[ ! -e "$dir/state/.waiting-timers/lane" ] || fail 'resolving the last decision left the wait open'
+printf 'blocked: waiting on an unkeyed thing\n' >> "$dir/state/lane.status"
+cycle
+cycle
+IFS=$'\t' read -r _sig _since _owner _parent key3 _misses < "$dir/state/.waiting-timers/lane"
+case "$key3" in
+  waiting-timer-*-lane-g[0-9]*) ;;
+  *) fail "unkeyed wait has no stable identity: $key3" ;;
+esac
+case "$key3" in *"$$"*) fail "unkeyed identity carries a process id: $key3" ;; esac
+pass 'waits carry home/task/generation/key identity, name the unresolved source, and keep unrelated decisions open'
 [ "${FM_WAIT_TIMERS_MAIN_ESCALATION_ONLY:-0}" != 1 ] || exit 0
 
 # Native blocked wins over a working log and survives unrelated status churn.

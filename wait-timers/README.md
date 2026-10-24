@@ -55,7 +55,14 @@ the add-on is absent.
   rechecks at the pause cadence instead, never the owner-alert threshold.
 - Episode record: one tab-separated line per lane at
   `state/.waiting-timers/<task>` holding signature, first-observed time,
-  owner-delivery time, parent-report flag, report key, and miss count.
+  owner-delivery time, parent-report flag, report key, and miss count. The
+  report key is the wait's identity,
+  `waiting-timer-<home>-<task>-g<generation>-<source key>`: home is a short
+  hash of the Firstmate home, generation is the arming second, and the source
+  is the open decision key (or the pause key, `herdr-blocked`, `unkeyed`).
+  Owner and escalation lines print `id=<key> source=[<declaration>]`, so the
+  exact unresolved source is named; a resolution closes only the wait it
+  names. The `waiting-timer-` prefix is unchanged for the fork's reserved-key fold.
 - Parent lines: `blocked [key=...]: waiting-timer-overdue: ...` on
   escalation, `resolved [key=...]: waiting-timer-cleared: ...` when the wait
   ends. A top-level wait with no parent escalates as a wake to the top level

@@ -12,6 +12,8 @@
 # the same pause re-arms nothing. A paused wait rechecks at the
 # FM_PAUSE_RESURFACE_SECS cadence, never the owner-alert threshold. Parent
 # reports use the existing local/remote parent channel, never a captain alert.
+# An episode key is waiting-timer-<home>-<task>-g<generation>-<source key>, so a
+# resolution names exactly one wait and every report prints its unresolved source.
 # A waiting-timer-* key belongs to this library; it resolves that report when
 # the episode ends. Main has no parent: its overdue wait gets one escalation wake
 # to Main itself, and any human escalation beyond that is judgment.
@@ -28,6 +30,16 @@ fm_wait_timer_save() {  # <record> <signature> <since> <owner> <parent> <key> <m
   local file=$1 temp="${1%/*}/.${1##*/}.tmp.$$"
   shift
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$@" > "$temp" && mv "$temp" "$file"
+}
+
+# Stable episode identity: home, task, generation (the arming second) and the
+# source key, so a resolution matches only the wait it names and an unrelated
+# open decision or a re-armed episode never shares a key.
+fm_wait_timer_key() {  # <task> <generation> <source-key>
+  local home src
+  home=$(printf '%s' "$FM_HOME" | hash_pane) || return 1
+  src=$(printf '%s' "${3:-unkeyed}" | tr -c 'A-Za-z0-9._-' '_')
+  printf 'waiting-timer-%s-%s-g%s-%s' "${home:0:8}" "$1" "$2" "${src:0:48}"
 }
 
 fm_wait_timer_report() {  # <status-line>
@@ -63,7 +75,7 @@ fm_wait_timer_push_delivered() {  # <task> <window>
     fi
   fi
   mkdir -p "$STATE/.waiting-timers" || return 1
-  fm_wait_timer_save "$record" "$signature" "$now" "$now" 0 "waiting-timer-$1-$now-$$-$RANDOM" 0
+  fm_wait_timer_save "$record" "$signature" "$now" "$now" 0 "$(fm_wait_timer_key "$1" "$now" herdr-blocked)" 0
 }
 
 fm_wait_timers_tick() {
@@ -71,7 +83,7 @@ fm_wait_timers_tick() {
   local paused_alert=${FM_PAUSE_RESURFACE_SECS:-$FM_PAUSE_RESURFACE_SECS_DEFAULT}
   local meta task backend window session native sessions='|' blocked='|' unknown='|' rows actor=Main
   local dir="$STATE/.waiting-timers" now record declaration verb signature old since owner parent key misses age reason until bound rc
-  local pause_key threshold dkey
+  local pause_key threshold dkey src source
   for native in "$alert" "$escalate"; do
     case "$native" in ''|*[!0-9]*|0* ) echo "waiting timers: thresholds must be positive decimal seconds" >&2; return 1 ;; esac
     [ "${#native}" -le 9 ] || { echo "waiting timers: threshold exceeds nine digits" >&2; return 1; }
@@ -170,7 +182,10 @@ EOF
       declaration=''
     fi
     record="$dir/$task"
-    old=''; since=$now; owner=0; parent=0; misses=0; key="waiting-timer-$task-$now-$$-$RANDOM"
+    src=$dkey
+    if [ -z "$src" ] && status_is_paused "$declaration"; then src=$(_fm_decision_key "$declaration") || src=default; fi
+    [ "$declaration" != herdr-blocked ] || src=herdr-blocked
+    old=''; since=$now; owner=0; parent=0; misses=0; key=$(fm_wait_timer_key "$task" "$now" "$src") || return 1
     if [ -e "$record" ] || [ -L "$record" ]; then
       [ -f "$record" ] && [ ! -L "$record" ] || { echo "waiting timers: invalid episode $record" >&2; return 1; }
       IFS=$'\t' read -r old since owner parent key misses < "$record" || return 1
@@ -208,7 +223,7 @@ EOF
       fi
       rm -f "$record" || return 1
       [ -n "$declaration" ] || continue
-      since=$now; owner=0; parent=0; misses=0; key="waiting-timer-$task-$now-$$-$RANDOM"
+      since=$now; owner=0; parent=0; misses=0; key=$(fm_wait_timer_key "$task" "$now" "$src") || return 1
       mkdir -p "$dir" || return 1
       fm_wait_timer_save "$record" "$signature" "$since" "$owner" "$parent" "$key" "$misses" || return 1
     elif [ "$misses" -ne 0 ]; then
@@ -223,10 +238,12 @@ EOF
     # A declared pause is an expected wait, so its owner recheck rides the
     # FM_PAUSE_RESURFACE_SECS cadence (the same bound the stale path uses),
     # never the blocked/decision owner-alert threshold.
+    # Every report prints the exact unresolved source, not just the episode.
+    source=$(printf '%s' "$declaration" | tr '\t\n' '  ' | cut -c1-160)
     threshold=$alert
     status_is_paused "$declaration" && threshold=$paused_alert
     if [ "$age" -ge "$threshold" ] && [ "$owner" -eq 0 ]; then
-      reason="check: waiting-state $task ($verb, observed ${age}s, level=owner; $actor must recheck and unblock)"
+      reason="check: waiting-state $task ($verb, observed ${age}s, level=owner; $actor must recheck and unblock) id=$key source=[$source]"
       if ! fm_wake_queued_keys check | grep -Fx "$key-owner" >/dev/null; then
         fm_wake_append check "$key-owner" "$reason" || return 1
       fi
@@ -240,7 +257,7 @@ EOF
     fi
     if ! status_is_paused "$declaration" && [ "$owner" -gt 1 ] && [ "$((now - owner))" -ge "$((escalate - alert))" ] && [ "$parent" -eq 0 ]; then
       if [ -e "$FM_HOME/.fm-secondmate-home" ] || [ -L "$FM_HOME/.fm-secondmate-home" ]; then
-        fm_wait_timer_report "blocked [key=$key]: waiting-timer-overdue: $task ($verb, observed ${age}s); owning lead has not cleared the wait; Main must unblock or steer the lead" || continue
+        fm_wait_timer_report "blocked [key=$key]: waiting-timer-overdue: $task ($verb, observed ${age}s); owning lead has not cleared the wait; Main must unblock or steer the lead; source=[$source]" || continue
         parent=1
         fm_wait_timer_save "$record" "$signature" "$since" "$owner" "$parent" "$key" "$misses" || return 1
       else
@@ -248,7 +265,7 @@ EOF
         # classifies by, so it must read "check:" like the kind this row is
         # queued under: a prefix outside that taxonomy classifies as no wake at
         # all, and the escalation then reaches nobody.
-        reason="check: waiting-state $task ($verb, observed ${age}s, level=main; Main must unblock it now)"
+        reason="check: waiting-state $task ($verb, observed ${age}s, level=main; Main must unblock it now) id=$key source=[$source]"
         fm_wake_append check "$key-escalation" "$reason" || return 1
         parent=1
         fm_wait_timer_save "$record" "$signature" "$since" "$owner" "$parent" "$key" "$misses" || return 1
