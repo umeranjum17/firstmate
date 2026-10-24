@@ -102,6 +102,7 @@ check() {
   [ -n "${FM_HOME:-}" ] || { echo "merge-card: FM_HOME is not set, so done-done did not run"; return; }
   local id=$1 wt=$2 head=$3 pr=$4 src out='' rc=0 verdict signoff=''
   local record=$FM_HOME/data/$id/merge-card.json dd_v='' args body reason
+  local signoff_board=${signoff_board:-$FM_HOME/data/$id/merge-card-media/signoff-board.json}
   src=$pr
   [ "$pr" != - ] || src=$FM_HOME/data/$id/checks.md
   if [ "$wt" = - ] || [ ! -d "$wt" ]; then
@@ -152,7 +153,10 @@ check() {
          esac ;;
     esac
     # A done-done verify run at this exact head brings its own sign-off message and captures.
-    signoff=$(cd "$wt" && done-done signoff --json 2>/dev/null | jq -r 'select(.kind == "evidence") | .file // empty')
+    # Its board is named, never found from the work copy: with the post opt-in done-done would
+    # otherwise file into the nearest .sign-off/ board and dirty the project clone.
+    mkdir -p "${signoff_board%/*}" 2>/dev/null
+    signoff=$(cd "$wt" && done-done signoff --board "$signoff_board" --json 2>/dev/null | jq -r 'select(.kind == "evidence") | .file // empty')
     { [ -n "$signoff" ] && [ "$(jq -r .run.commit "$signoff" 2>/dev/null)" = "$head" ]; } || signoff=''
   fi
   printf '%s' "$out" | jq -e 'type == "object"' >/dev/null 2>&1 || out=$(jq -n --arg e "$out" 'if $e == "" then {} else {error: $e} end')
@@ -249,6 +253,13 @@ post() {
   [ -n "$board" ] && [ $# -eq 4 ] || die "usage: merge-card post --board <board.json> [--claim-id <id>] [--judge <route>] <task-id> <worktree|-> <head|-> <pr-url|->"
   [ -n "${FM_HOME:-}" ] || die "FM_HOME is not set"
   id=$1 wt=$2 head=$3 pr=$4 record=$FM_HOME/data/$1/merge-card.json
+  case $board in /*) ;; *) board=$PWD/$board ;; esac
+  # The cards live on the board and in the home's data folder, never in the project clone. A board
+  # left in the work copy by an earlier run is reported and left alone.
+  if [ -d "$wt/.sign-off" ]; then
+    echo "merge-card: $wt/.sign-off is a stray board in the work copy; left as it is, nothing is posted to it (remove it by hand)"
+  fi
+  local signoff_board=$board
   if [ "$head" = - ] && [ "$pr" != - ]; then
     head=$(gh pr view "$pr" --json headRefOid --jq .headRefOid 2>&1) && [ -n "$head" ] || die "cannot resolve the head of $pr: ${head:-empty answer from gh}"
   fi
