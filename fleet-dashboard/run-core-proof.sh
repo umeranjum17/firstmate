@@ -69,6 +69,9 @@ seed() {
   The captain asked on 23 Oct for "ticket names that are never cut short on the fleet board" (23 Oct, Main77). Names and descriptions come from the whole backlog item, not the cut list view. More words follow here so that the list view cuts this body. More words follow here so that the list view cuts this body. More words follow here so that the list view cuts this body. The description ends here.
 EOF
   printf 'npm-2fa\t%s\tLink the alpha npm package to GitHub?\thttps://www.npmjs.com/package/alpha/access\n' "$((now - 900))" > "$home/data/captain-asks.tsv"
+  # two more as Main writes them now: ...<TAB>url<TAB>options<TAB>default<TAB>why
+  printf 'pick-home\t%s\tPick the home screen layout: A Cards or B List?\t\tA|B|Later\tA\tBoth layouts are drawn; the lead waits on your pick.\n' "$((now - 1800))" >> "$home/data/captain-asks.tsv"
+  printf 'ok-release\t%s\tApprove the alpha 0.2.0 release?\thttps://example.invalid/alpha/0.2.0\tYes|No\tYes\tCI is green and the notes are written.\n' "$((now - 7200))" >> "$home/data/captain-asks.tsv"
   lane m-build ship "working [at=$((now - 600))]: building the main thing"
   # m-ci's completion receipt and the done-done verdict on its merge card: the ticket page's Proof.
   printf '{"schema":1,"task":"m-ci","head":"abc1234def5678","verdict":"PASS","at":%s}\n' "$((now - 300))" > "$home/state/m-ci.run-receipt.json"
@@ -234,7 +237,8 @@ jq -e '([.tickets[] | {(.task): .state}] | add) as $s | ([.tickets[] | {(.task):
   and $t["m-ready"].priority == 1 and $t["m-ready"].release == "next" and $t["m-ready"].project == "beta-app" and $t["m-build"].release == "v0.2.0" and $t["m-ci"].release == "later"
   and $t["m-ask"].asked and $t["m-ask"].title == "Choose the layout for the new screen" and $t["m-ask"].priority == 0
   and ([.cards[] | select(.task == "m-ask")][0].title == "Choose the layout for the new screen")
-  and $t["m-shipped"].pr == "https://github.com/acme/alpha/pull/4" and all(.tickets[]; .state != "captain") and (.asks | length) == 1' \
+  and $t["m-shipped"].pr == "https://github.com/acme/alpha/pull/4" and all(.tickets[]; .state != "captain") and (.asks | length) == 3 and all(.asks[]; .age != null)
+  and ([.asks[] | select(.id == "pick-home")][0] | .options == ["A", "B", "Later"] and .default == "A" and (.why | startswith("Both layouts")))' \
   "$home/state/dashboard/board.json" >/dev/null || { echo "run-core-proof: tickets mapping wrong: $(jq -c '.tickets' "$home/state/dashboard/board.json")" >&2; exit 1; }
 # tasks-axi list cuts a long name and body; the ticket carries the whole of both (from show --full, then cached), the
 # ask's Main message, and a lane's proof: its completion receipt and the done-done verdict on its merge card.
@@ -312,6 +316,41 @@ done
 # The computer's sidebar foot names the board's reader (config/owner-name) and when the board was read, in UTC.
 grep -qF 'Umer' "$DONE_DONE_EVIDENCE_ROOT/tickets-1280.txt" && grep -qE 'Board read [0-9]{2}:[0-9]{2} UTC' "$DONE_DONE_EVIDENCE_ROOT/tickets-1280.txt" \
   || { echo "run-core-proof: the sidebar foot lacks the reader or the board's read time" >&2; exit 1; }
+# Needs you leads with how many questions wait. Search (/) groups what matches: the ask's ticket and its lane by title.
+for w in 390 1280; do
+  grep -qF 'Questions waiting on you' "$DONE_DONE_EVIDENCE_ROOT/needs-$w.txt" || { echo "run-core-proof: Needs you at $w lacks its hero" >&2; exit 1; }
+  shot "search-$w" "?search-$w#/tickets" "$w" 'Your asks done'
+  chrome-devtools-axi eval "(() => { dispatchEvent(new KeyboardEvent('keydown', { key: '/' })); setTimeout(() => { const i = document.querySelector('.pal input'); i.value = 'layout'; i.dispatchEvent(new Event('input', { bubbles: true })) }, 200); return 1 })()" >/dev/null
+  sleep 1
+  chrome-devtools-axi eval 'document.querySelector(".pal").innerText' >"$DONE_DONE_EVIDENCE_ROOT/search-$w.txt"
+  chrome-devtools-axi screenshot "$DONE_DONE_EVIDENCE_ROOT/search-$w.png" >/dev/null
+  for want in Tickets Lanes 'Choose the layout for the new screen'; do
+    grep -qF -- "$want" "$DONE_DONE_EVIDENCE_ROOT/search-$w.txt" || { echo "run-core-proof: search at $w lacks '$want': $(cat "$DONE_DONE_EVIDENCE_ROOT/search-$w.txt")" >&2; exit 1; }
+  done
+done
+# A question opens on its own page; J, the right arrow and a swipe move through the list in its order and type filter,
+# the position reads "n of N", and the ends stop: the next arrow is off on the last question.
+pos() { chrome-devtools-axi eval 'document.querySelector(".ask .pos").textContent + "|" + document.querySelector(".ask h2").textContent + "|" + document.querySelector("[aria-label=\"Next question\"]").disabled' | sed -n 's/^result: //p' | tr -d '\042\134'; }  # drop the quotes and escapes around the result
+key() { chrome-devtools-axi eval "dispatchEvent(new KeyboardEvent('keydown', { key: '$1' }))" >/dev/null; sleep 0.4; }
+for w in 390 1280; do
+  shot "ask-$w" "?ask-$w#/needs" "$w" 'Questions waiting on you'
+  chrome-devtools-axi eval 'document.querySelector(".trow[role=button]").click()' >/dev/null; sleep 0.5
+  [ "$(pos)" = '1 of 3|Link the alpha npm package to GitHub?|false' ] || { echo "run-core-proof: the first question at $w reads $(pos)" >&2; exit 1; }
+  key j; [ "$(pos)" = '2 of 3|Pick the home screen layout: A Cards or B List?|false' ] || { echo "run-core-proof: J at $w reads $(pos)" >&2; exit 1; }
+  if [ "$w" = 390 ]; then  # a swipe left on a phone
+    chrome-devtools-axi eval '(() => { const a = document.querySelector(".ask"), t = x => [new Touch({ identifier: 1, target: a, clientX: x, clientY: 400 })]
+      a.dispatchEvent(new TouchEvent("touchstart", { changedTouches: t(300), bubbles: true })); a.dispatchEvent(new TouchEvent("touchend", { changedTouches: t(120), bubbles: true })); return 1 })()' >/dev/null; sleep 0.4
+  else key ArrowRight; fi
+  [ "$(pos)" = '3 of 3|Approve the alpha 0.2.0 release?|true' ] || { echo "run-core-proof: the last question at $w reads $(pos)" >&2; exit 1; }
+  chrome-devtools-axi eval 'document.querySelector(".ask").innerText' >"$DONE_DONE_EVIDENCE_ROOT/ask-$w.txt"
+  chrome-devtools-axi screenshot "$DONE_DONE_EVIDENCE_ROOT/ask-$w.png" >/dev/null
+  key j; [ "$(pos)" = '3 of 3|Approve the alpha 0.2.0 release?|true' ] || { echo "run-core-proof: J past the end at $w reads $(pos)" >&2; exit 1; }
+  for want in 'Why it is asked' 'CI is green' 'Yes · suggested' 'Answer where it was asked' 'Asked 2h'; do
+    grep -qF -- "$want" "$DONE_DONE_EVIDENCE_ROOT/ask-$w.txt" || { echo "run-core-proof: the question page at $w lacks '$want'" >&2; exit 1; }
+  done
+done
+shot ask-filter-1280 '?ask-f#/needs?atype=pick&ask=pick-home' 1280 'Pick the home screen layout'
+[ "$(pos)" = '1 of 1|Pick the home screen layout: A Cards or B List?|true' ] || { echo "run-core-proof: the type filter's question reads $(pos)" >&2; exit 1; }
 # Release lanes: a project's lowest named release is its Next release (alpha v0.2.0), a literal next stays Next
 # (beta), a later named release is After, and no release line is Later; done work is not in a lane.
 cols() { chrome-devtools-axi eval '(() => { document.querySelectorAll(".lane .all").forEach(b => b.textContent === "See all" && b.click()); return 1 })()' >/dev/null; sleep 0.5
@@ -399,8 +438,11 @@ steps = {
         "Open Time in stage on Metrics at 390px and 1280px, then tap the bottleneck row",
         "Open the ticket with a long name at 390px and 1280px, and the m-ci ticket with its proof",
         "Open the Flow card on Metrics at 390px and 1280px: GitHub's merges beside the recorded ones",
+        "Open Needs you on a phone (390px) and a computer (1280px): how many questions wait, then one row per question with its type, age and Open link",
+        "Open Search with / on a phone (390px) and a computer (1280px) and type layout",
+        "Open the first question on Needs you on a phone and a computer, move to the next with J, then with a swipe (phone) or the right arrow (computer), and try past the last; open a question under the Pick type filter",
     ],
-    "result": "The Board lists m-stuck, m-ask, m-ci and m-build with their titles and states; the Stuck tab holds only stuck lanes, the Waiting tab only the waiting lane, and a home with four open lanes against a cap of three reads 4 / 3; Insights shows Why work waits now with the Blocked, Lead reply and Held groups; Tickets puts each backlog item in its column with its priority chip and release, the captain-held item On hold, and only the one ask under Waiting on captain; a ticket page shows its description, the captain's words with their day, and the lane's activity; Overview names the source of every figure, and each page's end clears the tab bar at 390px; the sidebar and the phone dock no longer offer a Ship tab; a post without the owner's board token is refused, the board's cookie lets the page send a comment with no pasted secret, the comment reaches Main's inbox and shows in the ticket thread as sent with Main's pickup and reply under it, and a comment on a lead's ticket reaches that lead's endpoint through fm-send and shows the lead's pickup and its own answer; By release puts alpha's v0.2.0 and beta's next item under Next release, the v0.3.0 item under After and items with no release under Later, and the v0.2.0 filter leaves only its item; the PR + CI stage opens the Board filtered to that stage with a removable Stage chip, and To land opens it filtered to To merge; a failing flow reader shows its own error on Insights; the Metrics Memory card reads 32 GB free of 64 GB and 8.0% pressure, not the 45% spike; Time in stage draws the four open lanes, names Building the bottleneck and its row opens the Building Board; a ticket whose name and body the backlog list cuts shows both whole, with its ask's day and Main message, and the m-ci ticket page shows Receipt PASS · done-done pass · abc1234; the Flow card shows GitHub 2 today, the average before today and that the records hold 0 of 3 of GitHub's earlier merges in 1 repository, with GitHub's count marked on each day of the Landed chart",
+    "result": "The Board lists m-stuck, m-ask, m-ci and m-build with their titles and states; the Stuck tab holds only stuck lanes, the Waiting tab only the waiting lane, and a home with four open lanes against a cap of three reads 4 / 3; Insights shows Why work waits now with the Blocked, Lead reply and Held groups; Tickets puts each backlog item in its column with its priority chip and release, the captain-held item On hold, and only the one ask under Waiting on captain; a ticket page shows its description, the captain's words with their day, and the lane's activity; Overview names the source of every figure, and each page's end clears the tab bar at 390px; the sidebar and the phone dock no longer offer a Ship tab; a post without the owner's board token is refused, the board's cookie lets the page send a comment with no pasted secret, the comment reaches Main's inbox and shows in the ticket thread as sent with Main's pickup and reply under it, and a comment on a lead's ticket reaches that lead's endpoint through fm-send and shows the lead's pickup and its own answer; By release puts alpha's v0.2.0 and beta's next item under Next release, the v0.3.0 item under After and items with no release under Later, and the v0.2.0 filter leaves only its item; the PR + CI stage opens the Board filtered to that stage with a removable Stage chip, and To land opens it filtered to To merge; a failing flow reader shows its own error on Insights; the Metrics Memory card reads 32 GB free of 64 GB and 8.0% pressure, not the 45% spike; Time in stage draws the four open lanes, names Building the bottleneck and its row opens the Building Board; a ticket whose name and body the backlog list cuts shows both whole, with its ask's day and Main message, and the m-ci ticket page shows Receipt PASS · done-done pass · abc1234; the Flow card shows GitHub 2 today, the average before today and that the records hold 0 of 3 of GitHub's earlier merges in 1 repository, with GitHub's count marked on each day of the Landed chart; Needs you shows how many questions wait and one row per question with its type, its age and an Open link to answer it where it was asked; Search opens (a full-screen sheet on a phone, a panel over the page on a computer) with a rounded search field above the matching tickets and lanes in their own groups, each row with its icon and priority chip, and finds the ask's ticket and lane by the word layout; a question opens on its own page with its type, when it was asked, why it is asked and its answers with the suggested one, and prev/next moves through the list in its order with the position (1 of 3, 2 of 3, 3 of 3) in the header, the next arrow off on the last question, and under a type filter only that type (1 of 1)",
 }
 with open(sys.argv[1], "w") as f:
     json.dump(steps, f, indent=2, ensure_ascii=False)
