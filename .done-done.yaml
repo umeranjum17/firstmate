@@ -8,6 +8,8 @@ journeys:
     command: bash limit-prompt-move/tests/limit-prompt-move-e2e.sh > "$DONE_DONE_EVIDENCE_ROOT/${RUN_ID}.log" 2>&1
   quota-failover-screen-match:
     command: bash quota-failover/run-proof.sh
+  quota-failover-live-route:
+    command: bash quota-failover/run-live-proof.sh
   pipeline-route:
     command: bash pipeline-quota-failover/run-proof.sh
   fleet-dashboard-wait-reasons:

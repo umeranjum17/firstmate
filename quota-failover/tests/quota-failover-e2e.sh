@@ -167,7 +167,8 @@ is "pass2: every route is back in dispatch" \
 
 # Pool workers, each stopped with the limit on its screen.
 printf 'state=/pool\n' >"$home/config/account-pool"
-mkdir -p "$home/state/profiles/c1" "$home/state/profiles/c2"
+mkdir -p "$home/state/profiles/c1" "$home/state/profiles/c2" "$home/state/profiles/go1" "$home/state/profiles/cx1" \
+  "$home/state/profiles/go9" "$home/state/profiles/c3" "$home/state/profiles/deadpool"
 pool() { # <id> <harness> <model> <account> [generation]
   printf 'endpoint_task_id=%s\nharness=%s\nmodel=%s\nkind=crewmate\nspawn_gen=%s\naccount=%s\n' \
     "$1" "$2" "$3" "${5:-s0.$1}" "$4" >"$home/state/$1.meta"
@@ -177,6 +178,8 @@ pool a1 claude claude-opus-4-8 c1
 pool d1 claude claude-opus-4-8 c2
 pool g1 opencode opencode-go/mimo-v2.6-flash go1
 pool x1 codex gpt-5.5-codex cx1
+# The pool's "ambient" id for a tool it does not pool: nothing to move or rest, so it takes the route move.
+pool y1 codex gpt-5.5-codex ambient
 pooll=$home/state/pool.log wake=$home/state/quota-failover.wake
 
 run
@@ -192,6 +195,8 @@ has "pass3: with no next account the existing route move still happens" "$ctl" \
 count "pass3: OpenCode Go never moves accounts or routes" "$ctl" '^g1 ' 0
 count "pass3: Codex never moves accounts or routes" "$ctl" '^x1 ' 0
 is "pass3: Go and Codex accounts rested" "$(sort "$pooll" | paste -sd, -)" "rest cx1,rest go1"
+has "pass3: a worker on an account the pool does not name takes the route move" "$ctl" \
+  '^y1 relaunch --harness opencode --model opencode-go/deepseek-v4.1-flash '
 has "pass3: the Go wake names the account and the manual command" "$wake" \
   'g1 stopped on opencode opencode-go/mimo-v2.6-flash account go1 .*bin/fm-control.sh g1 relaunch --account <id>$'
 is "pass3: an account limit leaves the route in dispatch" "$(jq -c . "$dead")" '[]'

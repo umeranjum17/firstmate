@@ -30,8 +30,8 @@
 # QUOTA_FAILOVER_RETEST_SECS (default 1800) and puts its profiles back at the
 # end of their list when it answers; the filter reads the file on disk, so
 # hand edits survive while it is out.
-# A stopped task on a pool account (account= in its meta and a usable
-# config/account-pool) hit that account's limit, so its route stays in
+# A stopped task on a pool account (account= in its meta that a usable
+# config/account-pool names) hit that account's limit, so its route stays in
 # dispatch: neither its screen nor the account's own one-line test can take
 # the route out for everyone else. Its limit is read on the account's own
 # profile folder, the folder the pool command names for that account, not on
@@ -107,12 +107,16 @@ auto_move() { # <harness> <model>
 
 # pool_account_folder <id>: the profile folder the pool command names for one
 # account, or nothing when it will not say (then the test asks the ambient
-# login, as before). The folder path is the only thing read; nothing inside it
-# is opened and no credential is printed.
+# login, as before). Non-zero when the pool answers that the account is not
+# one of its own (such as the "ambient" id a Claude pool gives a codex or pi
+# launch): that task has no account to move or rest, so it takes the route
+# move. A pool that times out still counts as the task's pool. The folder path
+# is the only thing read; nothing inside it is opened and no credential is printed.
 pool_account_folder() {
   local out folder
   [ -n "${1:-}" ] || return 0
-  out=$(timeout "${QUOTA_FAILOVER_POOL_SECONDS:-30}" "${pool%%$'\t'*}" status "$1" --json --state "${pool#*$'\t'}" 2>/dev/null) || return 0
+  out=$(timeout "${QUOTA_FAILOVER_POOL_SECONDS:-30}" "${pool%%$'\t'*}" status "$1" --json --state "${pool#*$'\t'}" 2>/dev/null) ||
+    { [ $? = 124 ]; return; }
   folder=$(printf '%s' "$out" | jq -r 'if (.folder | type) == "string" then .folder else empty end' 2>/dev/null) || return 0
   case "$folder" in /*) ;; *) return 0 ;; esac
   [ -d "$folder" ] || return 0
@@ -396,7 +400,7 @@ for meta in "$STATE"/*.meta; do
   acct=$(fm_meta_get "$meta" account)
   acct_folder=''
   [ -z "$acct" ] || pool=$(fm_account_pool_config "$FM_HOME/config" 2>/dev/null)
-  [ -n "$pool" ] && acct_folder=$(pool_account_folder "$acct")
+  [ -z "$pool" ] || acct_folder=$(pool_account_folder "$acct") || pool=''
   [ -f "$DISPATCH" ] && { IFS=$'\t' read -r pinned declared; mapfile -t cands; } \
     < <(jq -r --arg h "$h" --arg m "$m" "$CANDIDATES_JQ" "$DISPATCH" 2>/dev/null)
   prov=$(provider "$h" "$m" "${declared:-}")

@@ -45,7 +45,7 @@ One line per add-on, with how it wires in. `<home>` is your home folder for the 
 - `pipeline-literal-delete` — gives pipeline agents the safe recursive-delete rule in their own instructions. Wire in: `pipeline-literal-delete/install.sh`.
 - `pipeline-quota-failover` — moves pipeline model calls to the next model in the chain on a quota error, and pins the pipeline route (the OpenRouter DeepSeek floor route the no-mistakes config holds). Wire in: `pipeline-quota-failover/install.sh`.
 - `limit-prompt-move` — a Claude worker or lead sitting on Claude's usage-limit menu ("What do you want to do? 1. Stop and wait ...") is interrupted and relaunched on another pool account through `fm-control`, every 5 minutes, never choosing a menu option. Wire in: `limit-prompt-move/install.sh --all <main home>`.
-- `quota-failover` — relaunches stalled workers onto a live route and rests dead routes until they answer again; moves an idle worker off a pool account at or below 15% before it hits the limit; with an account pool, its Claude route tests run on the pool's pick, never the default login. Wire in: a watcher check you add, see Install.
+- `quota-failover` — relaunches stalled workers onto a live route or the next pool account and rests dead routes until they answer again; moves an idle worker off a pool account at or below 15% before it hits the limit; with an account pool, its Claude route tests run on the pool's pick, never the default login. Wire in: `quota-failover/install.sh --all <home>` (the home and every active local secondmate home it lists).
 - `status-wait-check` — refuses `blocked` status text that describes a wait and directs the worker to `paused:`; the fork's `bin/fm-secondmate-report.sh` must call it before appending status (thin hook documented in the add-on README).
 - `receipts` — publishes one PASS or FAIL completion receipt per task for guarded landing checks. Dormant copy: the fork still runs its own.
 - `route-change` — one command moves worker dispatch, the pipeline gate and team-lead pins to one route together. Wire in: `route-change/install.sh`.
@@ -72,19 +72,16 @@ codex-guard/install.sh
 FM_HOME="$FM_HOME" fleet-stall/install.sh
 FM_HOME="$FM_HOME" owner-guard/install-scan.sh
 FM_HOME="$FM_HOME" zai-quota-check/install.sh
+quota-failover/install.sh --all "$FM_HOME"   # also each active local secondmate home in data/secondmates.md
 ```
 
 `route-change` must come after `pipeline-quota-failover` from the same clone (the loop's order). To route GLM calls through the queue, set `.providers.zai.baseUrl` to `http://127.0.0.1:8787/api/coding/paas/v4` in `~/.pi/agent/models.json`; new pi sessions pick it up. `git-identity` prints a note until the fork's launch-env hook is merged — until then lanes stay unguarded.
 
 The delete, kill and read guards put their Claude hook in `~/.claude` and in every Claude account folder listed in the account pool's registry (`~/.muxr/plans/accounts-v1.json`), since a worker started with `CLAUDE_CONFIG_DIR` reads only that folder's settings: rerun them after adding an account.
 
-Three add-ons wire in by hand:
+Two add-ons wire in by hand:
 
 ```sh
-# quota-failover, as a watcher check in your home:
-printf '%s\n' "<this-clone>/quota-failover/check.sh \$FM_HOME" > "$FM_HOME/state/quota-failover-watch.check.sh" \
-  && chmod 700 "$FM_HOME/state/quota-failover-watch.check.sh" && "$FM_HOME/bin/fm-check-register.sh" quota-failover-watch
-
 # merge-card, one shim per home (needs done-done on PATH; see its Details section):
 printf '#!/bin/sh\nexec <this-clone>/merge-card/merge-card gate "$@"\n' > "$FM_HOME/config/merge-gate"
 printf '#!/bin/sh\nexec <this-clone>/merge-card/merge-card post --board <board.json> "$@"\n' > "$FM_HOME/config/post-merge"
@@ -111,6 +108,7 @@ bash pipeline-quota-failover/tests/pi-quota-failover-route.test.sh
 bash pipeline-literal-delete/tests/pipeline-literal-delete.test.sh
 bash quota-failover/tests/quota-failover-e2e.sh
 bash limit-prompt-move/tests/limit-prompt-move-e2e.sh
+FM_TEST_FORK=<fork checkout> bash quota-failover/tests/install.test.sh
 bash glm-queue/tests/glm-queue.test.sh
 bash route-change/tests/route-change-e2e.sh
 bash merge-on-green/tests/merge-on-green.test.sh
@@ -262,7 +260,7 @@ A route that sits only in rules whose models all contain `opus` moves only to an
 A remote task is detected and logged, never switched.
 A route whose screen shows a limit, or that answers its pinned one-line test with a limit or 429/5xx error, is out until it answers that test again: its profile objects are dropped from `config/crew-dispatch.json` (a rule left with no profiles goes with them; the schema never changes) into `state/quota-failover-dead.json`, so a new dispatch cannot rank it, and every pass re-tests it after `QUOTA_FAILOVER_RETEST_SECS` (default 1800) to put the profiles back at the end of their list when it answers.
 The filter reads the dispatch file on disk, so hand edits survive while a route is out, but a dropped profile cannot be re-added by hand until it answers again.
-A stopped task on a pool account (`account=` in its meta and a usable `config/account-pool`) hit that account's limit, not its route's, so its route stays in dispatch (a route-scoped verdict, its pinned probe, still takes it out as above):
+A stopped task on a pool account (`account=` in its meta that the pool command in a usable `config/account-pool` names as its own) hit that account's limit, not its route's, so its route stays in dispatch (a route-scoped verdict, its pinned probe, still takes it out as above). An account the pool does not name, such as the `ambient` id a Claude pool gives a Codex or Pi launch, has nothing to move or rest, so that task takes the route move:
 
 - When the task's tool may change accounts automatically (the list below), it runs `bin/fm-control.sh <task> relaunch --account next` (which rests the account) with a note naming the old account and why. No human, no switch to write. Only when that fails, for example with no next account ready, does the route move above run.
 - `$FM_HOME/config/account-pool-autorelaunch-off` (content ignored) puts the human back in the loop for that home.
@@ -274,6 +272,8 @@ Every decision is one line in `state/quota-failover.log`.
 A worker left with no live route also gets one failed line on the home's parent channel; nothing else is sent there.
 
 It needs `quota-axi`, `jq`, `flock` and the harness command of each dispatch route on `PATH`.
+
+`quota-failover/install.sh [--dry-run] [--all] [--list] <fm-home>` copies the watcher (with the parked-homes reader and the account-pool Claude environment it sources beside it) to `~/.local/share/fm-quota-failover`, points the home's `state/quota-failover-watch.check.sh` at it through an exec shim (a different check there is backed up first) and registers it. `--all` does the same for every active home: the given home and each local secondmate home its `data/secondmates.md` lists, minus the ones `config/parked-homes` parks; a remote home is skipped and named, and a home that cannot register fails the run. `--list` prints the homes it would reach. `quota-failover/uninstall.sh [--all] <fm-home>` retires the check from the same homes.
 `QUOTA_FAILOVER_MAX_AGE` (default `10m`) is the oldest quota reading it trusts.
 
 Test: `quota-failover/tests/quota-failover-e2e.sh` drives the real script end to end against a fixture home (stub firstmate libs in its `bin/`, stub `quota-axi` and `opencode` on `PATH`): a lead on a route that answers every one-line test with a provider 429, and a screen-stopped worker on a second dead route ranked first in the dispatch rules. It asserts both move to the live candidate, the dead routes are passed over and dropped from `crew-dispatch.json`, and a second pass with the routes answering again restores them and moves nothing. Five more passes add pool workers: with the switch file present a Claude worker moves to the next account with no route move, a Claude worker with no next account takes the route move, and OpenCode's Go-tier and Codex workers only rest and wake; with the file gone a Claude worker only rests and wakes, once across two passes and again when the same account stops a new incarnation, and a pool rest that fails still wakes the home, once; a pool worker wedged with a clean screen loses its route to the pinned probe's verdict, and the stop's changed label re-fires nothing.

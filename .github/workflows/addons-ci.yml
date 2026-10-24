@@ -101,6 +101,12 @@ jobs:
       # Quota JSON fixtures and a private repeat-state file: nothing real is touched.
       - name: Z.AI quota check test
         run: bash zai-quota-check/tests/zai-quota-check-e2e.sh
+      # The real watcher against a fixture home with stub harness CLIs, then its installer against throwaway homes
+      # with the cloned fork's check registration: nothing real is touched.
+      - name: Quota failover tests
+        run: |
+          bash quota-failover/tests/quota-failover-e2e.sh
+          FM_TEST_FORK="$RUNNER_TEMP/firstmate" bash quota-failover/tests/install.test.sh
       # Quota JSON fixtures, a throwaway home and HOME, and a stub register: nothing real is touched.
       - name: Claude quota check test
         run: bash claude-quota/tests/claude-quota.test.sh
