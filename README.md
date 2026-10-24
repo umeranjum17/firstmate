@@ -10,6 +10,7 @@ Where this is going: [VISION.md](VISION.md).
 
 One line per add-on, with how it wires in. `<home>` is your home folder for the fleet manager — the one with `bin/` and `state/` in it.
 
+- `account-pool` — new workers start on the pool account with the most room (`config/account-pool`), and `relaunch --account <id|next>` moves a running worker to another account with no key or token in the launch. Wire in: hook lines in the fork's `bin/fm-spawn.sh` and `bin/fm-control.sh`; check with `account-pool/install.sh <home>`; see `account-pool/README.md`.
 - `alerts` — groups tasks stopped by a provider outage into one alert per scan. Dormant copy: the fork still runs its own.
 - `bearings-board` — runs the Bearings board from the Firstmate checkout as a thin wrapper, with no copied upstream code. Wire in: `bearings-board/install.sh <home>`.
 - `ask-default` — owns owner-only ask authoring (`python3 ask-default/bin/fm-captain-ask.py --help`; after merge, `install <home>` wires the config shim) and an unanswered ask falls back to its pre-declared safe default instead of blocking the home. Needs a fork hook (FORK-EXIT.md).
