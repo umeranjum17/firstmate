@@ -15,7 +15,7 @@ SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 DEST=${XDG_DATA_HOME:-$HOME/.local/share}/fm-quota-failover
 ID=quota-failover-watch
 # The sibling add-on libs the watcher sources by its own path, copied beside it in the same layout.
-LIBS="parked-homes/bin/fm-parked-homes-lib.sh account-pool/bin/fm-pool-claude-env.sh"
+LIBS="parked-homes/bin/fm-parked-homes-lib.sh account-pool/bin/fm-account-pool-lib.sh account-pool/bin/fm-pool-claude-env.sh"
 
 # homes: "<name><TAB><dir>" for <fm-home> and, with --all, each active local secondmate home it lists.
 homes() {

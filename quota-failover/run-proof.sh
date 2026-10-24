@@ -17,10 +17,9 @@ FM_QUOTA_ROW_JQ='def quota_lane($harness; $model): ""; def quota_row($snapshot; 
 fm_quota_json_valid() { jq -e '.schemaVersion == 5 and (.providers | type) == "array"' >/dev/null 2>&1; }
 fm_quota_single_provider_for_harness() { return 1; }
 fm_parent_channel_report() { :; }
-fm_account_pool_config() { return 1; }
-fm_account_pool_rest() { :; }
+fm_run_timed() { shift; "$@"; }
 LIB
-for lib in fm-backend.sh fm-busy-lib.sh fm-quota-axi-lib.sh fm-parent-channel-lib.sh fm-account-pool-lib.sh; do ln -s fm-stub-lib.sh "$home/bin/$lib"; done
+for lib in fm-backend.sh fm-busy-lib.sh fm-quota-axi-lib.sh fm-parent-channel-lib.sh; do ln -s fm-stub-lib.sh "$home/bin/$lib"; done
 cat >"$home/bin/fm-control.sh" <<'CONTROL'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >>"$FM_HOME/state/control.log"
