@@ -28,6 +28,8 @@ jobs:
           FM_TEST_FORK="$RUNNER_TEMP/firstmate" bash wait-timers/tests/wait-timers-hook-e2e.sh
       - name: Receipts hook journeys
         run: FM_TEST_FORK="$RUNNER_TEMP/firstmate" bash receipts/tests/receipts-hook-e2e.sh
+      - name: Lead-wake hook journeys
+        run: FM_TEST_FORK="$RUNNER_TEMP/firstmate" bash lead-wake/tests/lead-wake-e2e.sh
       # An add-on script is a shell script under a top-level add-on directory,
       # either one level down (`merge-card/merge-card`, `fleet-dashboard/fm-dashboard.sh`)
       # or two levels down in its `bin/` and `tests/` subdirectories

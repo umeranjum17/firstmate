@@ -6,7 +6,8 @@
 # an emptied ready set withdraws the queued row; a stalled lead's drain ring names
 # the frozen row and its acknowledgement. The caller supplies the watcher's own
 # STATE, SCRIPT_DIR, HEARTBEAT, age_of, triage_log, wake, fm_wake_append,
-# crew_is_provably_working and the wake-lib lock helpers; nothing of Kun's is copied.
+# crew_is_provably_working, the wake-lib lock helpers and the ring's inbox and
+# backend helpers; only the drain-ring body repeats Kun's, around the fork's text.
 # Public names match the fork's, so the current fork keeps working with this loaded.
 
 READY_WORK_RESURFACE_SECS=${FM_READY_WORK_RESURFACE_SECS:-1800}
@@ -130,6 +131,28 @@ ready_work_waits_idle() {
 record_ready_work_surfaced() {
   local now; fm_epoch_seconds_to now
   printf '%s\t%s\n' "$now" "$READY_WORK_IDS" > "$STATE/.ready-work-surfaced"
+}
+
+# The stalled-lead drain ring, redefined over Kun's because this file loads after it:
+# the steer names the frozen row and its acknowledgement, since a mate told only to
+# drain presented the row, cut WAKE_ACK_REQUIRED off its output and left it queued.
+# Kun's call passes <task> <window>; the row is then the oldest actionable one in the
+# mate's home queue, the one the stall tick read. A queue already drained needs no ring.
+secondmate_ring_to_drain() {  # <task> <window> [<seq>]
+  local task=$1 w=$2 seq=${3:-} rec backend delivery_id home
+  if [ -z "$seq" ]; then
+    home=$(fm_meta_get "$STATE/$task.meta" home)
+    seq=$(secondmate_oldest_queue_row "$home/state/.wake-queue" | cut -f2)
+    [ -n "$seq" ] || return 0
+  fi
+  backend=$(window_backend "$w")
+  delivery_id=$(LC_ALL=C od -An -v -tx1 -N 8 /dev/urandom 2>/dev/null | tr -d ' \n') || return 1
+  case "$delivery_id" in ''|*[!0-9a-f]*) return 1 ;; esac
+  [ "${#delivery_id}" -eq 16 ] || return 1
+  rec=$(fm_task_inbox_write "$STATE" "$task" \
+    "${FM_FROMFIRST_MARK}delivery=${delivery_id} Wake row $seq is still queued in this home. Run bin/fm-wake-drain.sh and read its whole output, handle what it presents, then run the exact WAKE_ACK_REQUIRED command it prints, which is what removes the row. Then resume idle supervision." \
+    fire-and-forget) || return 1
+  fm_task_inbox_ring "$backend" "$w" "$rec" "$(window_label "$w")"
 }
 
 # The watcher's single call, once per base HEARTBEAT (no idle backoff).

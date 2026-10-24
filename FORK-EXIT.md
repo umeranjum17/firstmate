@@ -73,7 +73,7 @@ against the files, not against this table. PRs at the top until they are resolve
 
 | Feature | Commits / PRs | Key files | Exit path | Status |
 |---|---|---|---|---|
-| Lead-wake fleet policy (lane floor, idle lead, stalled ring, ready-work) | afd00e42, bd86f55b, 0ef3188b ([9](https://github.com/umeranjum17/firstmate/pull/9)), 49d4ea80, d4881b01 ([7](https://github.com/umeranjum17/firstmate/pull/7)), a7d3b2cc ([8](https://github.com/umeranjum17/firstmate/pull/8)), c66d9594 ([81](https://github.com/umeranjum17/firstmate/pull/81)) | `bin/fm-watch.sh`, `bin/fm-wake-lib.sh` | add-on (watch-side policy seam); never offer upstream as a "fix" | on fork |
+| Lead-wake fleet policy (lane floor, idle lead, stalled ring, ready-work) | afd00e42, bd86f55b, 0ef3188b ([9](https://github.com/umeranjum17/firstmate/pull/9)), 49d4ea80, d4881b01 ([7](https://github.com/umeranjum17/firstmate/pull/7)), a7d3b2cc ([8](https://github.com/umeranjum17/firstmate/pull/8)), c66d9594 ([81](https://github.com/umeranjum17/firstmate/pull/81)) | `bin/fm-watch.sh`, `bin/fm-wake-lib.sh` | add-on (watch-side policy seam); never offer upstream as a "fix" | dormant copy - add-on `lead-wake` holds the whole feature and its tests; the fork step replaces the call sites |
 | Worker account pooling at spawn + raw-launch refusal | aa56a40c ([72](https://github.com/umeranjum17/firstmate/pull/72)), 46e2273b ([76](https://github.com/umeranjum17/firstmate/pull/76)) | `bin/fm-account-pool-lib.sh`, `bin/fm-worker-account-lib.sh`, `bin/fm-spawn.sh` | add-on if fm-control gains an account hook, else offer to Kun only with the owner's approval | on fork |
 | Shared worker-brief inheritance | e2071b0a | brief builder hunks | add-on (brief seam) | on fork |
 
