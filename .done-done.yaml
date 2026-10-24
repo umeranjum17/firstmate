@@ -8,6 +8,8 @@ journeys:
     command: bash fleet-pulse/tests/chat-tsv.test.sh > "$DONE_DONE_EVIDENCE_ROOT/${RUN_ID}.log" 2>&1
   limit-prompt-move:
     command: bash limit-prompt-move/tests/limit-prompt-move-e2e.sh > "$DONE_DONE_EVIDENCE_ROOT/${RUN_ID}.log" 2>&1
+  limit-prompt-move-live:
+    command: bash limit-prompt-move/run-live-proof.sh
   quota-failover-screen-match:
     command: bash quota-failover/run-proof.sh
   quota-failover-live-route:
