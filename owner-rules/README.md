@@ -1,24 +1,31 @@
 # owner-rules
 
-Two owner rules enforced when a lane's brief is created, not left as prose. Slices 1 and 2 of 3 are below; slice 3 is the leads skill.
+Three brief-time rules are enforced when a lane's brief is created, not left as prose. The merge gate and publication check are described below.
 
 1. **Owner ask.** A lane (ship or scout) must serve a named owner ask: its backlog item (the entry whose
    id equals the task id in `data/backlog.md`) has a title starting `[captain-ask]`, or its title or body
    names a `MainNNN` order.
-2. **Risk reason.** A ship lane in `--mode no-mistakes` needs one body line `risk: <reason>` with reason
+2. **Hierarchy.** Every non-scout lane item whose title does not start `[captain-ask]` needs a body line
+   `parent: <backlog item id>` naming an item in the same backlog, or `parent: upkeep` for true upkeep.
+   Owner asks are epic roots; scout lanes and secondmate charters are exempt from this rule.
+   `bin/fm-owner-rules-tree.sh <backlog-file>` prints each parent chain and lists items with absent,
+   missing, or cyclic parents.
+3. **Risk reason.** A ship lane in `--mode no-mistakes` needs one body line `risk: <reason>` with reason
    one of `release`, `security`, `migration`, `large-change`, `shared-protocol`, `fork-repo` (any PR to the
    Firstmate fork, whose required check "PR must be raised via no-mistakes" demands it). Otherwise use direct-PR plus a
-   done-done check. Scouts are exempt; secondmate charters are exempt from both rules.
+   done-done check. Scouts are exempt; secondmate charters are exempt from the brief-time rules.
 
 A refusal exits 1 before `fm-brief.sh` writes `data/<id>/brief.md`, with a one-line reason on stderr.
 
 - `bin/fm-owner-rules-lib.sh` - `fm_owner_rules_check <data> <id> <mode> <kind>`.
+- `bin/fm-owner-rules-tree.sh <backlog-file>` - read-only hierarchy report for every backlog item.
 - Seam: `brief-inherit`'s `fm_brief_inherit_shared` (already called by the fork's `fm-brief.sh`) calls it when
   `config/owner-rules` exists. Without that file the check is a no-op, so an unmodified upstream Firstmate is
   unaffected. A marker whose lib is missing stops the scaffold. Needs the brief-inherit seam.
 - `install.sh [--dry-run] <fm-home>` writes `config/owner-rules` and makes `config/merge-gate` run the merge gate below first, then the
   home's previous gate (moved to `config/merge-gate.pre-owner-rules`); `uninstall.sh` removes the marker and gives the gate back.
 - Test: `tests/owner-rules.test.sh <firstmate-checkout>` drives the checkout's real `fm-brief.sh`.
+- Done-done proof: `FM_TEST_FORK=<firstmate-checkout> done-done run owner-rules-hierarchy` records the real brief journey and hierarchy report.
 
 ## Merge gate (slice 2)
 
