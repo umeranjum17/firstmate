@@ -17,7 +17,7 @@ One line per add-on, with how it wires in. `<home>` is your home folder for the 
 - `backlog-lock-reclaim` — reclaims a 0-byte `<home>/data/backlog.md.lock` left by a dead tasks-axi writer, once it is older than 60 s and no process has it open; until then every backlog write fails LOCKED. Wire in: `backlog-lock-reclaim/install.sh <home>`.
 - `claude-accounts` — one quota view of every signed-in Claude account (5-hour and 7-day left), shown on the dashboard and written for dispatch; new Claude workers start on the account with the most runway. Wire in: `claude-accounts/install.sh <home>` plus the reader on a timer; see `claude-accounts/README.md`.
 - `claude-model-guard` — keeps agent runs off Fable (Sonnet is allowed): the fable alias resolves to Haiku, full Fable ids are refused. Wire in: `claude-model-guard/install.sh`.
-- `claude-quota` — alarms when the shared Claude plan burns ahead of its 5-hour or weekly window. Wire in: `claude-quota/install.sh <home>`.
+- `claude-quota` — alarms when the whole Claude account pool (every `claude-accounts` account together) will run dry before its soonest 5-hour or weekly reset. Wire in: `claude-quota/install.sh <home>`.
 - `codex-guard` — runs the delete, kill and read guards before every Codex shell command; Codex workers start with hooks off, so Codex's own shell environment carries it. Wire in: `codex-guard/install.sh` after the guards; remove: `codex-guard/uninstall.sh`.
 - `delete-guard` — stops any agent from recursively deleting `/` or a home folder; a block alerts you and is final. Wire in: `delete-guard/install.sh <home>`.
 - `fleet-contract-check` — runs each real cross-repo call (dispatch-resolve, owner-guard, checks-lint) in a throwaway HOME and names the caller that breaks. Nothing to install: run `fleet-contract-check/fleet-contract-check`.
@@ -406,20 +406,18 @@ Test: `zai-quota-check/tests/zai-quota-check-e2e.sh` drives the real check in th
 
 ### claude-quota
 
-`claude-quota/claude-quota.check.sh` is a shippable version of a proven state check: it alerts you when the shared Claude plan burns ahead of time.
-The 5 h rule is unchanged: the 5 h window under 35% with more than 60 min to its reset alerts, and again on each 10% step while it holds.
-The week rule wakes once when the week is at or below 40% of the week left, with the action: no new Opus build workers, leads move build work to the other live models, and the home's lead reports to the operator.
-That wake carries the week's burn rate over the last 1-5 h.
-Fix over the state copy: the burn rate alone no longer wakes.
-Opus (effort medium) may take build work while the week is above 40% left, but the state copy woke with a "no new Opus workers" rate alarm on every 10% step of the 5 h window or the week, none needing action.
-It reads `quota-axi --json` at most once per 10 min.
-`$0 <quota-json-file>` is the test mode: it reads the file, and `CQ_MARK` and `CQ_HIST` name the repeat-state and history files (default fresh temp files).
+`claude-quota/claude-quota.check.sh` alerts you when the Claude account pool as a whole burns ahead of time.
+It reads every pool account from the `claude-accounts` reader's `state/claude-accounts.json`, so one low account is no alarm: new lanes and relaunches move to another account.
+For each window (5 h, week) it adds up the accounts' percent left, takes the pool's burn rate over the last 1-5 h of its own history (counted from after the last reset), and wakes when that sum runs out before the soonest reset among the accounts, again on each 10% step of the pool's mean left.
+The wake names each account's share, the burn and the account that resets first, with the action: new lanes pick the pool account with the most runway; relaunch --account next on a limit; never usage credits.
+A reading file that is missing, older than 30 min, or with any account unread prints a diagnostic on stderr and gives no verdict, so it never wakes falsely; the watcher drops stderr, so run the check by hand to see it.
+It reads at most once per 10 min.
+`$0 <claude-accounts-json-file>` is the test mode: it reads the file, and `CQ_MARK` and `CQ_HIST` name the repeat-state and history files (default fresh temp files).
 
 Install with `claude-quota/install.sh [--dry-run] <main-fm-home>`: it copies the check to `${XDG_DATA_HOME:-~/.local/share}/fm-claude-quota/`, backs up a replaced `state/claude-quota.check.sh` as `<file>.bak-claude-quota-<epoch>`, writes that path as an exec shim (mode 700), and re-registers the `claude-quota` check with `bin/fm-check-register.sh`; idempotent.
 The live repeat state stays at `~/firstmate/state/.claude-quota.last`, the file the state copy used.
 
-Test: `claude-quota/tests/claude-quota.test.sh` replays a recorded day's readings through the real check: the week readings that woke it, then readings from the check's history, with made-up 5 h readings and a week tail at or under 40% left, since no log keeps those.
-It wakes only on the 5 h rule and the first reading at or below 40% of the week left: 41% left stays quiet, 40% left wakes once, and 39% left right after does not wake again.
+Test: `claude-quota/tests/claude-quota.test.sh` drives the real check over sample pool readings: one account low and the others fine gives no wake; all accounts together short of the soonest reset give one wake with the action text and no other route, the same step stays quiet and the next step wakes again; an account with no reading, an hour-old file or no file gives a stderr diagnostic and no wake; live mode reads the home's file and holds a second read inside 10 min.
 It then drives `install.sh` against a throwaway home, as `--dry-run` and as a real install and rerun.
 
 ### fleet-stall
