@@ -21,6 +21,8 @@ cp "$FM_HOME/.tasks.toml" "$work/parked/.tasks.toml"
  tasks-axi add upkeep 'Umer maintenance' --repo alpha --priority 2 --body 'parent: upkeep' >/dev/null
  tasks-axi add held 'Umer paused item' --repo alpha --priority 1 --body 'parent: missing' >/dev/null
  tasks-axi hold held --reason 'Umer parked this item' --kind parked >/dev/null
+ tasks-axi add voice 'Umer voice practice' --repo ownvoice --priority 2 >/dev/null
+ tasks-axi add take 'Umer takes' --repo takeone --priority 2 >/dev/null
  tasks-axi add child 'Umer settings' --repo alpha --priority 0 --body $'release: next\nparent: parent' >/dev/null)
 sed -i "/^- \[x\] parent /s/$(date +%F)/2000-01-01/g" "$FM_HOME/data/backlog.md"
 (cd "$work/parked"; tasks-axi add parent 'Umer paused project' --repo beta --priority 2 >/dev/null)
@@ -31,20 +33,26 @@ source_before=$(sha256sum "$FM_HOME/data/backlog.md" "$work/parked/data/backlog.
 bash "$root/tickets-sync/install.sh" --dry-run
 test ! -d "$XDG_DATA_HOME/fm-tickets-sync"
 bash "$root/tickets-sync/install.sh"
-env -u FM_HOME "$FM_HOME/state/tickets-sync.check.sh"
+printf 'not an image' > "$XDG_DATA_HOME/fm-tickets-sync/fleet-dashboard/fm-dashboard/icons/takeone.png"
+env -u FM_HOME "$FM_HOME/state/tickets-sync.check.sh" | tee "$work/first.out"
+grep -q "^tickets-sync: alpha-app icon skipped (no local image)" "$work/first.out"
+grep -q "^tickets-sync: takeone icon skipped (not a readable png image)" "$work/first.out"
 ticket_id() { printf 'fm-%s\n' "$(printf '%s' "$1" | sha256sum | cut -c1-32)"; }
 child=$(ticket_id main/child) parent=$(ticket_id main/parent) parked=$(ticket_id parked/parent)
 sign-off-axi ticket "$work/board.json" --json > "$work/first.json" || { cat "$work/first.json"; exit 1; }
-jq -e '.tickets | length == 10 and all(.[]; (.title | length) <= 160)'  "$work/first.json"
+jq -e '.tickets | length == 14 and all(.[]; (.title | length) <= 160)'  "$work/first.json"
 jq -e --arg id "$child" --arg parent "$parent" '.tickets[] | select(.id == $id) | .parent == $parent and .priority == "P0" and .asked == true and (.title | contains("next"))' "$work/first.json"
 jq -e --arg id "$parked" '.tickets[] | select(.id == $id) | .hold == true' "$work/first.json"
 jq -e --arg id "$(ticket_id main/held)" '[.tickets[] | select(.id == $id and .hold == true)] | length == 1' "$work/first.json"
 jq -e --arg root "$parent" --arg upkeep "$(ticket_id main/upkeep)" '.tickets | any(.[]; .id == $root and .asked and (.parent // "") == "") and all(.[]; .asked or .id == $upkeep or (.title | startswith("Upkeep")))' "$work/first.json"
 jq -e --arg held "$(ticket_id main/held)" '.tickets as $all | $all[] | select(.id == $held) | .project == "alpha-app" and (.parent as $p | any($all[]; .id == $p and (.title | startswith("Needs a parent"))))' "$work/first.json"
-before=$(sha256sum "$work/board.tickets.jsonl")
+sign-off-axi project "$work/board.json" --json | jq -e '[.projects[] | .name] == ["ownvoice"] and .projects[0].icon.sha256 == "'"$(sha256sum "$root/fleet-dashboard/fm-dashboard/icons/ownvoice.png" | cut -d" " -f1)"'"'
+cmp "$root/fleet-dashboard/fm-dashboard/icons/ownvoice.png" "$work/icons/ownvoice.png"
+test ! -e "$work/icons/takeone.png"
+before=$(sha256sum "$work/board.tickets.jsonl" "$work/board.projects.jsonl")
 mv "$FM_HOME/state/tickets-sync"/published-*.json "$FM_HOME/state/tickets-sync/ledger-before-restart"
 "$FM_HOME/state/tickets-sync.check.sh"
-test "$before" = "$(sha256sum "$work/board.tickets.jsonl")"
+test "$before" = "$(sha256sum "$work/board.tickets.jsonl" "$work/board.projects.jsonl")"
 test "$source_before" = "$(sha256sum "$FM_HOME/data/backlog.md" "$work/parked/data/backlog.md")"
 (cd "$FM_HOME"; tasks-axi 'done' child --pr https://github.com/example/alpha/pull/1 >/dev/null)
 "$FM_HOME/state/tickets-sync.check.sh"
