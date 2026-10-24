@@ -2928,6 +2928,7 @@ evict_stalled_holder() {
   fm_watcher_lock_matches_pid "$STATE" "$WATCH_PATH" "$pid" "$FM_HOME" || return 1
   [ "$FM_WATCHER_MATCHED_IDENTITY" = "$identity" ] || return 1
   [ "$(fm_path_age "$BEAT")" -ge "$WATCHER_STALL_BOUND" ] || return 1
+  # TERM-ignoring stalled holders require escalation after the grace and identity checks.
   kill -KILL "$pid" || return 1
   i=0
   while [ "$i" -lt 50 ] && fm_pid_alive "$pid"; do
