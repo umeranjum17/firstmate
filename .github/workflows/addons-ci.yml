@@ -123,6 +123,9 @@ jobs:
           bash limit-prompt-move/tests/limit-prompt-move-e2e.sh --installed
       - name: Fleet stall check test
         run: bash fleet-stall/tests/fleet-stall-e2e.sh
+      # Fixture home and real fixture processes with a canary key value: nothing real is touched or signalled.
+      - name: Key-in-env check test
+        run: bash key-in-env-check/tests/key-in-env-check-e2e.sh
       # Fixture Main and lead homes with stub fm-tasks-axi.sh and fm-crew-state.sh: lane slots and dry.
       - name: Home flow check test
         run: bash fleet-flow/tests/fm-flow-check.test.sh
