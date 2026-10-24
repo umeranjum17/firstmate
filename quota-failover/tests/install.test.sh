@@ -50,7 +50,7 @@ done
 is "alpha's hand-made check is backed up" "$(cat "$A"/state/quota-failover-watch.check.sh.bak-*)" "hand-made check"
 printf 'quota-failover: w1 stopped\n' >"$A/state/quota-failover.wake"
 is "alpha's shim runs the installed check on alpha" "$("$A/state/quota-failover-watch.check.sh")" "quota-failover: w1 stopped"
-for lib in parked-homes/bin/fm-parked-homes-lib.sh account-pool/bin/fm-pool-claude-env.sh; do
+for lib in parked-homes/bin/fm-parked-homes-lib.sh account-pool/bin/fm-account-pool-lib.sh account-pool/bin/fm-pool-claude-env.sh; do
   is "the installed watcher finds $lib at its own relative path" \
     "$(cmp "$SRC/$lib" "$XDG_DATA_HOME/fm-quota-failover/quota-failover/../$lib" && echo same)" same
 done
