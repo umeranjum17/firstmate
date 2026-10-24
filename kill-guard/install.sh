@@ -25,6 +25,7 @@ put() {
 
 HOOK="node '$DEST/guard.mjs' --caller \$PPID"
 put "$DEST/guard.mjs" "$SRC/guard.mjs"
+[ "$DRY" -eq 1 ] || [ -d "$DEST/state" ] || mkdir -m 700 "$DEST/state" # private Main-approval audit, retained across updates
 for a in pi-extension.ts opencode-plugin.js; do sed "s|__GUARD__|$DEST/guard.mjs|" "$SRC/$a" > "$TMP/$a"; done
 if [ -d "$HOME/.pi/agent" ]; then put "$HOME/.pi/agent/extensions/fm-kill-guard.ts" "$TMP/pi-extension.ts"; else echo "skipped: pi (not installed)"; fi
 if [ -d "$HOME/.config/opencode" ]; then put "$HOME/.config/opencode/plugins/fm-kill-guard.js" "$TMP/opencode-plugin.js"; else echo "skipped: opencode (not installed)"; fi

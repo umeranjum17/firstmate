@@ -1,11 +1,62 @@
-// Fleet kill guard, the rule every adapter calls. A kill, pkill or killall may signal only the caller's own descendants,
-// never PID 1, the systemd user manager or the herdr server, and never a target it cannot resolve. A reparented target inside the caller's non-home git worktree is also owned. A block is final,
+// Fleet kill guard, the rule every adapter calls. Literal PID kills require task ownership or verified primary Main.
+// Protected services, interactive shells and name/pattern kills are always refused. Reparented processes in the caller's non-home worktree are owned. A block is final,
 // except a kill whose PID the shell sets ($pid, $!, %1, $(...)): that one asks for the literal PID.
-import { existsSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
-import { basename, isAbsolute, relative, sep } from "node:path";
+import { appendFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { basename, dirname, isAbsolute, relative, sep } from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { userInfo } from "node:os";
 
+const ACCOUNT_HOME = userInfo().homedir; // OS account record, never HOME/FM_HOME
+const MAIN_HOME = `${ACCOUNT_HOME}/firstmate`;
+const AUDIT = `${dirname(fileURLToPath(import.meta.url))}/state/main-kills.jsonl`;
+const under = (root, path) => path === root || path.startsWith(`${root}/`);
+const statOf = (pid) => readFileSync(`/proc/${pid}/stat`, "utf8").split(/\) /).at(-1).trim().split(/\s+/);
+function processOf(pid) {
+	const stat = statOf(pid);
+	if (!/^\d+$/.test(stat[19]) || !/^\d+$/.test(stat[1])) throw new Error(`PID ${pid} has unreadable identity`);
+	const argv = readFileSync(`/proc/${pid}/cmdline`, "utf8").split("\0").filter(Boolean);
+	const comm = readFileSync(`/proc/${pid}/comm`, "utf8").trim();
+	let cwd = null;
+	try { cwd = realpathSync(`/proc/${pid}/cwd`); } catch {}
+	if (stat[19] !== statOf(pid)[19]) throw new Error(`PID ${pid} changed identity`);
+	return { pid, ppid: +stat[1], starttime: stat[19], state: stat[0], tty: stat[4], argv, comm, cwd };
+}
+function primaryMain(caller, table) {
+	try {
+		const lock = `${MAIN_HOME}/state/.lock`;
+		if (!lstatSync(lock).isFile() || lstatSync(lock).isSymbolicLink()) return false;
+		const value = readFileSync(lock, "utf8").trim();
+		if (!/^[1-9]\d*$/.test(value)) return false;
+		const anchor = table.get(+value);
+		if (!anchor || !/^(claude|codex|pi|pi-signed|omp|opencode|grok|kimi|cursor-agent)$/.test(anchor.comm) || !anchor.cwd || !under(realpathSync(MAIN_HOME), anchor.cwd) || !anchor.argv.length || /[ZX]/.test(anchor.state)) return false;
+		const seen = new Set(); let reachedCaller = false;
+		for (let p = table.get(process.pid); p && !seen.has(p.pid); p = table.get(p.ppid)) {
+			seen.add(p.pid); reachedCaller ||= p.pid === caller;
+			if (/^(claude|codex|pi|pi-signed|omp|opencode|grok|kimi|cursor-agent)$/.test(p.comm) && (!p.cwd || !under(realpathSync(MAIN_HOME), p.cwd))) return false;
+			if (!reachedCaller) continue; // --caller alone is never authority
+			if (p.pid === anchor.pid) return statOf(p.pid)[19] === anchor.starttime;
+		}
+	} catch {} // missing/stale lock or uncertain ancestry keeps the ordinary ownership rule
+	return false;
+}
+function fleetPath(path) {
+	try {
+		const resolved = realpathSync(path);
+		return under(realpathSync(MAIN_HOME), resolved) || /^\.treehouse\/[^/]+\/(?:[^/]+\/)?firstmate[^/]*(?:\/|$)/.test(relative(ACCOUNT_HOME, resolved)) ||
+			/^\.local\/(?:share|bin)\/fm-[^/]+(?:\/|$)/.test(relative(ACCOUNT_HOME, resolved));
+	} catch { return false; }
+}
+function fleetOwned(p) {
+	if ([p.cwd, ...p.argv.filter(isAbsolute)].filter(Boolean).some(fleetPath)) return true;
+	try { // Registered project worktrees share their repository with the primary home's projects.
+		const common = execFileSync("git", ["-C", p.cwd, "rev-parse", "--path-format=absolute", "--git-common-dir"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+		return under(realpathSync(`${MAIN_HOME}/projects`), realpathSync(common));
+	} catch { return false; }
+}
+// Never retain prompts, credentials, URLs or arbitrary argument values in the audit.
+const safeArg = (arg) => /^(?:--?[a-zA-Z][a-zA-Z-]*|-?[0-9]+|node|python3?|sleep|bash|sh|kill|server|daemon|stuck|cleanup|worker|watcher|sampler|preview|fleet|test|Umer)$/.test(arg) || (isAbsolute(arg) && fleetPath(arg)) ? arg : "[redacted]";
+const safeCommand = (text) => text.split(/\s+/).map(safeArg).join(" ");
 const MODELLED = { kill: "lL", pkill: "f", killall: "" }; // options the guard reads; any other option refuses
 const DEVICE_RECORD = ".fm-kill-guard-device-pids.json";
 const worktreeRoot = (caller) => {
@@ -103,9 +154,7 @@ function procTable() {
 	const table = new Map();
 	for (const d of readdirSync("/proc").filter((d) => /^\d+$/.test(d))) {
 		try {
-			const stat = readFileSync(`/proc/${d}/stat`, "utf8");
-			const ppid = +stat.slice(stat.lastIndexOf(")") + 2).split(" ")[1];
-			table.set(+d, { pid: +d, ppid, comm: readFileSync(`/proc/${d}/comm`, "utf8").trim(), argv: readFileSync(`/proc/${d}/cmdline`, "utf8").split("\0").filter(Boolean) });
+			table.set(+d, processOf(+d));
 		} catch (e) { if (existsSync(`/proc/${d}`)) throw e; } // exited while listed
 	}
 	return table;
@@ -125,18 +174,26 @@ function inCallerWorktree(target, caller) {
 }
 
 // Why a process may not be signalled, or null when the caller started it.
-function reasonFor(p, own, caller) {
+function reasonFor(p, own, caller, procs, text) {
 	if (p.missing) return `PID ${p.pid} (no such process)`;
 	if (p.pid === 1) return "PID 1 (init)";
 	if (p.comm === "systemd" && p.argv.includes("--user")) return `PID ${p.pid} (the systemd user manager)`;
-	if (p.comm === "herdr" && p.argv.includes("server")) return `PID ${p.pid} (the herdr server)`;
-	let cwd;
-	try { cwd = realpathSync(`/proc/${p.pid}/cwd`); } catch { return `PID ${p.pid} (${p.comm}), whose cwd cannot be read`; }
-	return own.has(p.pid) || inCallerWorktree(cwd, caller) ? null : `PID ${p.pid} (${p.comm}), which this task did not start`;
+	if ([p.comm, ...p.argv].some((a) => /(?:^|\/)herdr(?:\/|(?:\.[cm]?js)?$)/.test(a)) && p.argv.includes("server")) return `PID ${p.pid} (the herdr server)`;
+	const names = [p.comm, ...p.argv.map((a) => basename(a))];
+	if (names.some((n) => /^(sshd|sshd-session|sshd-auth|tailscaled)$/.test(n)) ||
+		(p.argv.some((a) => /(?:^|\/)no-mistakes(?:-axi)?(?:\/|\.[cm]?js$|$)/.test(a)) && p.argv.some((a) => /^(daemon|serve)$/.test(a))) ||
+		(/^(bash|zsh|fish|sh|dash|ksh)$/.test(p.comm) && (p.argv[0]?.startsWith("-") || p.argv.some((a) => /^-[a-zA-Z]*[il][a-zA-Z]*$/.test(a)) || (p.tty !== "0" && !p.argv.includes("-c"))))) return `PID ${p.pid} (protected service or interactive shell)`;
+	if (!p.cwd) return `PID ${p.pid} (${p.comm}), whose cwd cannot be read`;
+	if (procs.main && (own.has(p.pid) || inCallerWorktree(p.cwd, caller) || fleetOwned(p))) {
+		procs.approvals.push({ ...p, reason: text });
+		return null;
+	}
+	return own.has(p.pid) || inCallerWorktree(p.cwd, caller) ? null : `PID ${p.pid} (${p.comm}), which this task did not start`;
 }
 
 // The block for one kill, pkill or killall, or null when every process it would signal is the caller's own.
 function judge(name, args, text, caller, procs) {
+	if (name !== "kill") return `"${text}" cannot be resolved to processes: name/pattern kills are forbidden`;
 	const flags = [], ops = [];
 	let signalled = false;
 	for (let i = 0; i < args.length; i++) {
@@ -173,7 +230,7 @@ function judge(name, args, text, caller, procs) {
 	for (const p of procs().values()) kids.set(p.ppid, [...(kids.get(p.ppid) ?? []), p.pid]);
 	const own = new Set(), todo = [caller];
 	while (todo.length) for (const c of kids.get(todo.pop()) ?? []) if (!own.has(c)) { own.add(c); todo.push(c); }
-	const reason = hits.map((p) => reasonFor(p, own, caller)).find(Boolean);
+	const reason = hits.map((p) => reasonFor(p, own, caller, procs, text)).find(Boolean);
 	if (reason) return `"${text}" aims at ${reason}`;
 	return shellSet === undefined ? null : { retry: `"${text}": the shell sets its target (${shellSet})` };
 }
@@ -264,14 +321,29 @@ function blockedBy(command, caller, procs) {
 
 // Returns the block message, or null to allow. caller is the process whose descendants may be signalled: in-process
 // adapters leave it at this process, the Claude hook passes the agent's pid. Unreadable /proc refuses.
-export function guard(command, { caller = process.pid } = {}) {
+export function guard(command, { caller = process.pid, reason = process.env.FM_KILL_REASON } = {}) {
 	let table, target;
+	const procs = () => {
+		if (!table) { table = procTable(); procs.main = primaryMain(caller, table); }
+		return table;
+	};
+	procs.approvals = [];
 	try {
-		target = typeof command === "string" ? blockedBy(command, caller, () => (table ??= procTable())) : "no command string was given";
+		target = typeof command === "string" ? blockedBy(command, caller, procs) : "no command string was given";
 	} catch (e) {
-		target = `"${command}" cannot be checked: /proc was unreadable (${e.message})`;
+		target = `"${command}" cannot be checked: process data was unreadable (${e.message})`;
 	}
-	if (target === null) return null;
+	if (target === null) {
+		try {
+			for (const p of procs.approvals) if (statOf(p.pid)[19] !== p.starttime) throw new Error(`PID ${p.pid} changed identity before approval`);
+			if (procs.approvals.length) {
+				const rows = procs.approvals.map((p) => JSON.stringify({ pid: p.pid, starttime: p.starttime, cmdline: p.argv.map(safeArg), cwd: p.cwd, caller, reason: safeCommand(reason || p.reason) }) + "\n").join("");
+				mkdirSync(dirname(AUDIT), { recursive: true, mode: 0o700 });
+				appendFileSync(AUDIT, rows, { mode: 0o600 });
+			}
+			return null;
+		} catch (e) { target = `Main allowance could not be recorded or identity changed (${e.message})`; }
+	}
 	if (target.retry) return `The fleet kill guard cannot check ${target.retry}. This is not a final block: print the PID (echo it, or jobs -l for a job number), then run kill again with the literal number; the guard allows it when this task started that process.`;
 	return `BLOCKED by the fleet kill guard: ${target}. Kill only process IDs you started yourself in this task; never PID 1, the systemd user manager, the herdr server, or a process found by name or pattern that you did not start. This block is final: do not retry it, reword it, or work around it. If another process is in your way, write \`blocked:\` naming it and stop.`;
 }
@@ -289,6 +361,7 @@ if (entry === realpathSync(fileURLToPath(import.meta.url))) {
 	}
 	let command;
 	try { command = JSON.parse(readFileSync(0, "utf8"))?.tool_input?.command; } catch {}
-	const reason = guard(command, { caller });
+	const reasonAt = process.argv.indexOf("--reason");
+	const reason = guard(command, { caller, reason: reasonAt < 0 ? undefined : process.argv[reasonAt + 1] });
 	if (reason !== null) { process.stderr.write(reason + "\n"); process.exit(2); }
 }

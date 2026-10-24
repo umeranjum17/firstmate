@@ -13,6 +13,11 @@ jq -n --arg f "$T/pool1" '{accounts: [{provider: "claude", folder: $f}, {provide
 fail=0; ok() { echo "ok: $*"; }; no() { echo "FAIL: $*"; fail=1; }
 inst() { env HOME="$T/home" XDG_DATA_HOME="$T/home/fixture/users/user-004/share" "$ADDON/install.sh"; }
 
+if [ "${1:-}" = --guard-only ]; then # no installer: exercise the rule and CLI from a disposable copy
+  mkdir -p "$T/home/fixture/users/user-004/share/fm-kill-guard"
+  cp "$ADDON/guard.mjs" "$T/home/fixture/users/user-004/share/fm-kill-guard/guard.mjs"
+  HOOK="node '$T/home/fixture/users/user-004/share/fm-kill-guard/guard.mjs' --caller \$PPID"
+else
 inst >/dev/null && inst > "$T/re.out" && [ "$(grep -c '^unchanged: ' "$T/re.out")" -eq 5 ] && ok "reinstall changes nothing" || no "reinstall not idempotent"
 jq -e '.theme == "dark" and ([.hooks.PreToolUse[].hooks[].command] | any(contains("fm-kill-guard")))' "$T/pool1/settings.json" >/dev/null && ok "pool account settings get the hook" || no "pool account settings"
 jq -e '([.hooks.PreToolUse[].hooks[].command] | index("other-hook") == 0) and .env.KEEP == "1"' "$T/home/fixture/users/user-001/settings.json" >/dev/null && ok "claude settings merged" || no "claude settings merge"
@@ -30,6 +35,8 @@ if command -v pi >/dev/null; then # the real compiled pi, normal HOME: rpc mode 
   timeout 60 pi -ne -e "$T/home/fixture/users/user-007/agent/extensions/fm-kill-guard.ts" --mode rpc </dev/null >/dev/null 2>"$T/pi.err" && ok "installed pi loads the extension" || no "pi: $(head -c 300 "$T/pi.err")"
 else echo "skip: pi not on PATH"; fi
 HOOK=$(jq -r '.hooks.PreToolUse[].hooks[] | select(.command | contains("fm-kill-guard")) | .command' "$T/home/fixture/users/user-001/settings.json")
+
+fi
 
 fake() {
   printf '#!/bin/bash\nsleep 300; true\n' > "$T/bin/$1"; chmod +x "$T/bin/$1"
@@ -52,7 +59,7 @@ block "$$" "sh -c 'kill -KILL 1'" 'PID 1 (init)'
 block "$$" 'ionice -c3 kill 1' 'PID 1 (init)'
 block "$$" "kill $SYSD" 'the systemd user manager'
 block "$$" "kill $HERDR" 'the herdr server'
-block "$$" 'pkill herd' 'the herdr server'
+block "$$" 'pkill herd' 'name/pattern kills are forbidden'
 block "$$" "pkill 'h[[:lower:]]rdr'" 'cannot be resolved'
 block "$$" 'killall /usr/bin/herdr' 'cannot be resolved'
 block "$$" 'kill -9 -1' 'cannot be resolved'
@@ -136,6 +143,9 @@ hook "$$" 'kill 1'; sh -c "$HOOK" < "$T/in.json" 2>"$T/err" && rc=0 || rc=$?
 ln -s "$T/home/fixture/users/user-004/share" "$T/link"; jq -n '{tool_input:{command:"kill -9 1"}}' | node "$T/link/fm-kill-guard/guard.mjs" --caller "$$" 2> "$T/err" && rc=0 || rc=$?
 [ "$rc" -eq 2 ] && [[ "$(cat "$T/err")" == *"PID 1 (init)"* ]] && ok "symlinked install blocks kill -9 1" || no "symlinked install allowed kill -9 1"
 
+if [ "${1:-}" = --guard-only ]; then
+  [ "$fail" -eq 0 ] && { echo "kill-guard rule/CLI journey: all passed"; exit 0; } || exit 1
+fi
 un() { env HOME="$T/home" XDG_DATA_HOME="$T/home/fixture/users/user-004/share" "$ADDON/uninstall.sh" "$@"; }
 G=$T/home/fixture/users/user-004/share/fm-kill-guard; mkdir -p "$G/disabled"; cp "$T/home/fixture/users/user-007/agent/extensions/fm-kill-guard.ts" "$G/disabled/"
 cp "$T/home/fixture/users/user-001/settings.json" "$T/before.json"; un --dry-run >/dev/null
