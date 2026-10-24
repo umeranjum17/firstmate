@@ -35,6 +35,8 @@ cat > "$home/data/backlog.md" <<'BL'
   risk: release
 - [ ] bad-risk - [captain-ask] Not listed (repo: sample) (kind: ship)
   risk: because
+- [ ] fork-pr - [captain-ask] A fork change (repo: sample) (kind: ship)
+  risk: fork-repo
 ## Done
 - [x] with-ask-longer - Main9 something
 BL
@@ -45,7 +47,7 @@ brief() {
   printf '%s%src=%s\n' "$out" "${out:+$'\n'}" "$rc"
 }
 ASK='owner-rules: no owner ask: name the [captain-ask] item or the MainNNN order this lane serves (add it to the backlog item for no-ask)'
-RISK='owner-rules: mode no-mistakes needs one listed risk reason (release, security, migration, large-change, shared-protocol) in the backlog item for with-ask; use direct-PR plus a done-done check'
+RISK='owner-rules: mode no-mistakes needs one listed risk reason (release, security, migration, large-change, shared-protocol, fork-repo) in the backlog item for with-ask; use direct-PR plus a done-done check'
 
 # not installed: no check, even for an entry with no owner ask
 is "not installed: no-ask lane is briefed" "$(brief no-ask --mode direct-PR | tail -1)" "rc=0"
@@ -67,6 +69,8 @@ is "pass: [captain-ask] title, direct-PR" "$(brief with-ask --mode direct-PR)" "
 [ -s "$home/data/with-ask/brief.md" ] && ok "pass wrote the brief" || no "pass wrote no brief"
 is "pass: MainNNN in the body" "$(brief with-main --mode direct-PR)" "rc=0"
 is "pass: no-mistakes with one listed risk" "$(brief risky --mode no-mistakes)" "rc=0"
+is "pass: no-mistakes with risk: fork-repo" "$(brief fork-pr --mode no-mistakes)" "rc=0"
+[ -s "$home/data/fork-pr/brief.md" ] && ok "fork-repo pass wrote the brief" || no "fork-repo pass wrote no brief"
 is "pass: scout is exempt from the risk rule" "$(brief with-ask-longer --scout)" "rc=0"
 is "pass: prefix id does not match a longer id" "$(brief with-ask --scout | tail -1)" "rc=1"
 FM_HOME=$home FM_ADDONS_DIR=$addons FM_SECONDMATE_CHARTER=x bash "$FM/bin/fm-brief.sh" sm --secondmate --no-projects >/dev/null 2>&1 \
