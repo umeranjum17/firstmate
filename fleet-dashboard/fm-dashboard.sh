@@ -198,8 +198,8 @@ MAX_AGE = int(MAX_AGE)
 PAGE = os.path.join(DIR, 'index.html')
 ROUTES = {'/backlog': 'backlog', '/measure': 'measure', '/data.json': 'data', '/board.json': 'board'}
 # The app's own files: one optional folder level, no hidden names, no other types.
-STATIC = re.compile(r'/((?:[\w-]+/)?[\w-][\w.-]*\.(js|css|svg|woff2))')
-TYPES = {'js': 'text/javascript; charset=utf-8', 'css': 'text/css; charset=utf-8', 'svg': 'image/svg+xml', 'woff2': 'font/woff2',
+STATIC = re.compile(r'/((?:[\w-]+/)?[\w-][\w.-]*\.(js|css|svg|png|woff2))')
+TYPES = {'js': 'text/javascript; charset=utf-8', 'css': 'text/css; charset=utf-8', 'svg': 'image/svg+xml', 'png': 'image/png', 'woff2': 'font/woff2',
          'html': 'text/html; charset=utf-8', 'json': 'application/json'}
 PAGE_CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:"
 APP_CSP = "default-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; frame-ancestors 'none'"
@@ -245,7 +245,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if self.command != 'HEAD': self.wfile.write(body)
 
     def file(self, path, ext, csp=PAGE_CSP):  # answered by version: 304 when the client already has it; text gzipped when asked
-        gz = ext != 'woff2' and 'gzip' in (self.headers.get('Accept-Encoding') or '')
+        gz = ext not in ('woff2', 'png') and 'gzip' in (self.headers.get('Accept-Encoding') or '')
         try:
             with open(path, 'rb') as fh:
                 st = os.fstat(fh.fileno())
@@ -1785,6 +1785,13 @@ for h in ACTIVE:
                 if not isinstance(e, dict) or not isinstance(e.get('ts'), int): continue
                 if e.get('event') == 'task.dispatched' and isinstance(e.get('task'), str): disp.setdefault((h, e['task']), []).append(e)
     except OSError: pass  # a home without the ledger has no dispatch history
+# A backlog's repo tag names the home's clone (muxr's is projects/pockit); the project is the repository its origin names.
+def repo_name(h, repo, REPO_NAMES={}):
+    if (h, repo) not in REPO_NAMES:
+        try: m = h not in remote_hosts and re.search(r'\[remote "origin"\][^\[]*?\burl\s*=\s*\S*?([\w.-]+?)(?:\.git)?/?\s*$', open(os.path.join(home_dir[h], 'projects', repo, '.git', 'config'), encoding='utf-8', errors='replace').read(), re.M)
+        except OSError: m = None
+        REPO_NAMES[(h, repo)] = m.group(1) if m else repo
+    return REPO_NAMES[(h, repo)]
 def dispatch(h, task, at=float('inf')):
     return max((e for e in reversed(disp.get((h, task), [])) if e['ts'] <= at), key=lambda e: e['ts'], default={})
 VERBS = {'working': 'Working', 'resolved': 'Cleared', 'paused': 'Waiting', 'blocked': 'Blocked', 'needs-decision': 'Needs a decision',
@@ -1881,7 +1888,7 @@ def ticket(h, r):
     body, cut, _ = (r.get('body') or '').partition(CUT)  # a body show --full could not fill is cut: its last line may be partial
     rel = RELEASE.search(body[:body.rfind('\n') + 1] if cut else body)
     ask = ASKED.search(body)
-    return dict(id=f"{h}/{r['id']}", home=h, task=r['id'], project=None if r.get('repo') in (None, '', '-') else r['repo'],
+    return dict(id=f"{h}/{r['id']}", home=h, task=r['id'], project=None if r.get('repo') in (None, '', '-') else repo_name(h, r['repo']),
                 title=plain(r['title']),
                 asked='captain-ask' in (tags.group() if tags else ''), priority=int(r['priority']) if str(r.get('priority')).isdigit() else None,
                 release=rel.group(1) if rel else 'later', state=st, pr=c.get('pr') or merged_pr or (link.group() if link else None),
@@ -1995,7 +2002,7 @@ board = dict(
     models=models, models_error=models_error,
     skills=skills, skills_error=skills_error,
     asks=[dict(id=f[0], text=f[2], url=f[3] if len(f) > 3 else '', type=f[4] if len(f) == 5 else None, age=a) for f, a in asks] if asks_known else None,
-    landed=LANDED, cycle_p50=cycles[(len(cycles) - 1) // 2] if len(cycles) >= 5 else None)
+    landed=LANDED, cycle_p50=cycles[(len(cycles) - 1) // 2] if len(cycles) >= 5 else None, cycle_n=len(cycles))
 scrub(board)
 with open(os.path.join(OUT, 'board.json'), 'w', encoding='utf-8') as fh:
     json.dump(board, fh, ensure_ascii=False, allow_nan=False, separators=(',', ':'))

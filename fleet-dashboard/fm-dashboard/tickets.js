@@ -1,11 +1,11 @@
-// Tickets: every backlog item across the homes on one Jira-like board - To do, In progress, In review, Waiting on
-// captain, Done, On hold - filtered by project and release, or the open items in release lanes (Next release, After,
-// Later); a phone shows one column at a time. Waiting on captain is the ask list
-// and nothing else, so its count is the Needs you count everywhere. A card opens the ticket page: its description, the
-// captain's words it serves, its fields and its thread: the captain's comments with the lead's answers and, for a live
-// lane, the lane's status lines.
-import { html, useState, useEffect, useRef, now, dur, hm, prNum, toCol, hc, hname, I, IC, ASK_TAG, askType, askOrder } from './ui.js'
+// Tickets, in the owner-approved look: Your asks or System, a hero that counts what is done with one square per ticket
+// (its legend picks the list: Moving, To do, On hold or Done), the list sorted by priority with each row's project icon,
+// P0-P3 chip, how far its lane has got and its age; By release lays the open items in Next release, After and Later.
+// On a computer a By project list sits beside it. A row opens the ticket page: its description, the captain's words it
+// serves, its fields and its thread: the captain's comments with the lead's answers and, for a live lane, its status lines.
+import { html, useState, useEffect, useRef, now, dur, hm, prNum, hc, hname, I, IC } from './ui.js'
 import { squash, Entry } from './board.js'
+import { Tile, Chip, Row, LIC } from './look.js'
 
 export const IC_TICKET = html`<path d="M2.5 4.5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v2a1.5 1.5 0 0 0 0 3v2a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1v-2a1.5 1.5 0 0 0 0-3zM10 5.5v1M10 9.5v1"/>`
 const IC_RELEASE = html`<path d="M8 2.5l5.5 5.5L8 13.5 2.5 8z"/>`
@@ -29,18 +29,6 @@ function laneOf(ts) {
   return t => { const r = rel(t); return r === 'after' || r === 'later' ? r : r === first[t.project || 'none'] ? 'next' : 'after' }
 }
 const relRank = r => ({ next: 0, after: 2, later: 3 })[r] ?? 1
-
-const open = (go, id) => e => { if (e.type === 'click' || e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go({ ticket: id }) } }
-function Ticket({ d, t, go }) {
-  const n = prNum(t.pr)
-  return html`<article class="card tk" role="button" tabindex="0" onClick=${open(go, t.id)} onKeyDown=${e => e.target === e.currentTarget && open(go, t.id)(e)}>
-    <div class="r1"><span class="id">${t.project || 'No project'}</span><span class="num age" title="Last update">${ago(t.updated)}</span>
-      <span class="sq" style=${{ '--c': hc(d, t.home) }} title=${`Owner: ${hname(d, t.home)}`}></span></div>
-    <h3>${t.title}</h3>
-    <div class="r3">${t.priority != null ? html`<span class=${'pill prio p' + t.priority} title=${PRIO[t.priority] || ''}>P${t.priority}</span>` : ''}
-      ${t.asked ? html`<span class="pill asked">Your ask</span>` : ''}<span class="pill" title="Target release">${I(IC_RELEASE, 11)}${cap(t.release)}</span>
-      ${n ? html`<a class="pill pr" href=${t.pr} target="_blank" rel="noreferrer" onClick=${e => e.stopPropagation()}>${I(IC.pr, 12)}${n}</a>` : ''}</div></article>`
-}
 
 // A comment goes to the ticket's lead as a steer. The server takes it only from a device that opened the owner's
 // sign-off board link at this address, whose cookie this page never sees.
@@ -85,39 +73,56 @@ function TicketPage({ d, t, go }) {
         : html`<p class="empty">No status lines yet: the thread starts when a lane works on it.</p>`}
     </div></aside>`
 }
-const Ask = ({ a }) => html`<article class="card tk ask"><div class="r1"><span class="id">${ASK_TAG[askType(a.text, a.type)]}</span>${a.age != null ? html`<span class="num age">${dur(a.age)}</span>` : ''}</div>
-  <h3>${a.text}</h3>${a.url ? html`<div class="r3"><a class="pill" href=${a.url} target="_blank" rel="noreferrer">Open</a></div>` : ''}</article>`
-
-function Col({ d, s, name, xs, asks, n, go }) {
-  const [all, setAll] = useState(false)
-  return html`<section class=${'col tkc' + (s === 'captain' ? ' you' : '')}><header class="ch"><b>${name}</b><span class="n num">${n}</span></header>
-    ${asks ? asks.map(a => html`<${Ask} key=${a.id} a=${a}/>`) : (all ? xs : xs.slice(0, CAP)).map(t => html`<${Ticket} key=${t.id} d=${d} t=${t} go=${go}/>`)}
-    ${!asks && xs.length > CAP && !all ? html`<button class="more" onClick=${() => setAll(true)}>${xs.length - CAP} more</button>` : ''}
-    ${n === '?' ? html`<p class="empty">The ask list could not be read</p>` : !n ? html`<p class="empty">Nothing here</p>` : ''}</section>`
+// How far a ticket's lane has got, from Queued to Landed; a ticket with no lane takes its state.
+const STEP = { queued: 0, building: 17, review: 33, test: 50, ci: 67, merge: 83, landed: 100 }
+const pct = (d, t) => t.state === 'done' ? 100 : (c => c ? STEP[c.stage] : { todo: 0, hold: 0, progress: 17, review: t.pr ? 67 : 33 }[t.state])(d.cards.find(x => x.id === t.id))
+const SHOW = { done: ['Done', t => t.state === 'done', 'd'], moving: ['Moving', t => t.state === 'progress' || t.state === 'review', 'm'], todo: ['To do', t => t.state === 'todo', ''], hold: ['On hold', t => t.state === 'hold', 'h'] }
+const weekDone = (ts, back) => ts.filter(t => t.state === 'done' && (s => s >= back * 604800 && s < (back + 1) * 604800)(now() - at(t.updated))).length
+export const proj = (d, t) => t.project || hname(d, t.home)  // a ticket with no project line shows and filters under its lead's home
+const mine = (d, all, r) => all.filter(t => (r.kind === 'system') !== !!t.asked && (!r.project.length || r.project.includes(proj(d, t))) && (!r.release.length || r.release.includes(rel(t))))
+export const ticketsHead = (d, r) => { const ts = mine(d, d.tickets || [], r), k = f => ts.filter(f).length
+  return { h: r.kind === 'system' ? 'Where the system work stands' : 'Where your asks stand', sub: `${k(SHOW.done[1])} done, ${k(SHOW.moving[1])} moving, ${k(SHOW.todo[1])} not started, ${k(SHOW.hold[1])} on hold · ${ts.length} tickets` } }
+export const KindSeg = ({ d, r, go, counts }) => html`<div class="kseg" role="group" aria-label="Whose work">${[['', 'Your asks', t => t.asked], ['system', 'System', t => !t.asked]].map(([v, n, f]) =>
+  html`<button aria-pressed=${(r.kind || '') === v} onClick=${() => go({ kind: v, ticket: null })}>${n}${counts ? html`<small class="num">${(d.tickets || []).filter(f).length}</small>` : ''}</button>`)}</div>`
+function Hero({ ts, r, go, aside }) {
+  const ord = { done: 0, review: 1, progress: 1, todo: 2, hold: 3 }, wk = weekDone(ts, 0), before = weekDone(ts, 1)
+  const body = html`<div class="h"><div class="sp"><label>${r.kind === 'system' ? 'System work done' : 'Your asks done'}</label><div class="big num">${ts.filter(SHOW.done[1]).length}<small>of ${ts.length}</small></div></div>
+      <div class="hside"><span class="delta num"><i>▲</i>${wk} this week</span>${before ? `${before} the week before` : 'none the week before'}</div></div>
+    <div class="dots" aria-label=${`${ts.length} tickets, one square each`}>${[...ts].sort((a, b) => ord[a.state] - ord[b.state]).map(t => html`<i class=${Object.values(SHOW).find(([, f]) => f(t))?.[2] || ''}></i>`)}</div>
+    <div class="legend" role="group" aria-label="Show in the list">${Object.entries(SHOW).map(([k, [n, f, c]]) => html`<button aria-pressed=${!r.by && (r.show || 'moving') === k} onClick=${() => go({ show: k === 'moving' ? '' : k, by: '' })}><i class=${c}></i>${n} <b class="num">${ts.filter(f).length}</b></button>`)}</div>`
+  return aside ? html`<section class="soft hero hwide"><div>${body}</div><div class="side2">${aside}</div></section>` : html`<section class="soft hero">${body}</section>`
+}
+function List({ d, s, name, xs, go, wide, r, cap = wide ? 6 : 3 }) {
+  const [all, setAll] = useState(false), more = xs.length > cap && html`<button class="all" onClick=${() => setAll(!all)}>${all ? 'Show fewer' : 'See all'}</button>`
+  const rows = html`<div class="grp">${(all ? xs : xs.slice(0, cap)).map(t => html`<${Row} key=${t.id} onClick=${() => go({ ticket: t.id })} tile=${html`<${Tile} d=${d} name=${t.project || t.home}/>`} chip=${html`<${Chip} p=${t.priority}/>`}
+    title=${t.title} value=${`${pct(d, t)}%`} pct=${pct(d, t)} note=${ago(t.updated)} two=${wide} cur=${r.ticket === t.id}/>`)}${!xs.length ? html`<p class="empty">Nothing here</p>` : ''}</div>`
+  return wide ? html`<section class="soft lane" data-lane=${s}><div class="lhd"><h2>${name}</h2><small class="num">${xs.length}</small>${more}</div>${rows}</section>`
+    : html`<div class="lane" data-lane=${s}><div class="lh"><h2>${name}</h2><small class="num">${xs.length}</small>${more}</div><div class="soft">${rows}</div></div>`
+}
+function ByProject({ d, ts, go }) {
+  const ps = Object.entries(ts.reduce((m, t) => ((m[proj(d, t)] ||= []).push(t), m), {})).map(([p, xs]) => [p, xs.length, xs.filter(t => t.state === 'done').length]).sort((a, b) => (b[1] - b[2]) - (a[1] - a[2]) || b[1] - a[1])
+  return html`<section class="soft"><div class="lhd"><h2>By project</h2><small class="num">${ps.length}</small></div><div class="grp">${ps.slice(0, 8).map(([p, n, k]) =>
+    html`<${Row} key=${p} onClick=${() => go({ project: [p] })} tile=${html`<${Tile} d=${d} name=${p}/>`} title=${p} value=${`${k} of ${n}`} pct=${Math.round(100 * k / n)} note=${`${Math.round(100 * k / n)}%`}/>`)}</div></section>`
+}
+const Tiles = ({ d }) => html`<div class="stats"><a class="soft stat" href="#/needs">${I(LIC.q, 20)}<span>Waiting on you</span><b class="num">${d.asks == null ? '?' : d.asks.length}<small>${d.asks?.length === 1 ? 'question' : 'questions'}</small></b></a>
+  <div class="soft stat" title=${`The median, over ${d.cycle_n ?? 'the'} recorded merges, of each one's time from the task's last dispatch to the merge`}>${I(LIC.glass, 20)}<span>Typical start to landed</span><b class="num">${d.cycle_p50 == null ? '–' : dur(d.cycle_p50)}</b></div></div>`
+// The filters, in one sheet: project, release and whether the list goes by state or by release.
+export function TicketFilter({ d, r, go, label }) {
+  const all = d.tickets || [], [open, setOpen] = useState(false), n = r.project.length + r.release.length + !!r.by
+  const opts = (k, vs) => vs.map(([v, name, c]) => html`<button class="opt" aria-pressed=${k === 'by' ? r.by === v : r[k].includes(v)} onClick=${() => go({ [k]: k === 'by' ? v : r[k].includes(v) ? r[k].filter(x => x !== v) : [...r[k], v] })}><span class="ck">${(k === 'by' ? r.by === v : r[k].includes(v)) ? I(IC.check, 11) : ''}</span><span class="lt">${name}</span>${c != null ? html`<small class="num">${c}</small>` : ''}</button>`)
+  return html`<div class="anchor"><button class=${label ? 'btn' : 'ib'} aria-expanded=${open} aria-label="Filters" onClick=${() => setOpen(!open)}>${I(IC.filter, label ? 16 : 20)}${label}${n ? html`<b>${n}</b>` : ''}</button>
+    ${open && html`<div class="scrim" onClick=${() => setOpen(false)}></div><div class="pop"><div class="pop-h">List</div>${opts('by', [['', 'By state'], ['release', 'By release']])}
+      <div class="pop-h">Release</div>${opts('release', [...new Set(all.map(rel))].sort((a, b) => relRank(a) - relRank(b) || nat(a, b)).map(v => [v, cap(v), all.filter(t => rel(t) === v).length]))}
+      <div class="pop-h">Project</div>${opts('project', [...new Set(all.map(t => proj(d, t)))].sort().map(p => [p, p, all.filter(t => proj(d, t) === p).length]))}</div>`}</div>`
 }
 
 export function Tickets({ d, r, go, wide }) {
-  const all = d.tickets || [], unread = d.tickets_unread || [], lane = laneOf(all.filter(t => t.state !== 'done'))
-  const ts = all.filter(t => (!r.project.length || r.project.includes(t.project || 'none')) && (!r.release.length || r.release.includes(rel(t))))
-  const projects = [...new Set(all.map(t => t.project || 'none'))].sort((a, b) => (a === 'none') - (b === 'none') || a.localeCompare(b))
-  const releases = [...new Set(all.map(rel))].sort((a, b) => relRank(a) - relRank(b) || nat(a, b))
-  const cols = r.by ? LANES.map(([s, name]) => { const xs = order(s, ts.filter(t => t.state !== 'done' && lane(t) === s)); return { s, name, xs, n: xs.length } })
-    : COLS.map(([s, name]) => { const xs = s === 'captain' ? [] : order(s, ts.filter(t => t.state === s)), asks = s === 'captain' ? askOrder(d.asks || []) : null
-      return { s, name, xs, asks, n: !asks ? xs.length : d.asks == null ? '?' : asks.length } })
+  const all = d.tickets || [], unread = d.tickets_unread || [], lane = laneOf(all.filter(t => t.state !== 'done')), ts = mine(d, all, r), show = SHOW[r.show] ? r.show : 'moving'
+  const lists = r.by ? LANES.map(([s, name]) => [s, name, order(s, ts.filter(t => t.state !== 'done' && lane(t) === s))]) : [[show, SHOW[show][0], order(show, ts.filter(SHOW[show][1]))]]
   const page = r.ticket && all.find(t => t.id === r.ticket)
-  const start = r.by ? 0 : COLS.findIndex(([s]) => s === 'captain'), [i, setI] = useState(start), ref = useRef()
-  useEffect(() => { setI(start); if (!wide) toCol(ref.current, start) }, [wide, r.by])
-  useEffect(() => { if (!wide) document.querySelector('.mseg [aria-selected=true]')?.scrollIntoView({ inline: 'center', block: 'nearest' }) }, [i, wide])
-  const jump = k => { setI(k); toCol(ref.current, k, 'smooth') }
-  const onScroll = () => { const el = ref.current; if (el) { const k = Math.round(el.scrollLeft / el.clientWidth); if (k !== i) setI(k) } }
-  return html`<div class="tks">
-    <div class="seg tkp" role="group" aria-label="Project">${[['', 'All projects', all.length], ...projects.map(p => [p, p === 'none' ? 'No project' : p, all.filter(t => (t.project || 'none') === p).length])]
-      .map(([v, n, k]) => html`<button aria-pressed=${v ? r.project.length === 1 && r.project[0] === v : !r.project.length} onClick=${() => go({ project: v ? [v] : [] })}>${n}<small class="num">${k}</small></button>`)}</div>
-    <div class="seg tkp"><span class="seg" role="group" aria-label="Columns">${[['', 'By state'], ['release', 'By release']].map(([v, n]) =>
-      html`<button aria-pressed=${r.by === v} onClick=${() => go({ by: v })}>${n}</button>`)}</span><span class="seg" role="group" aria-label="Release">${[['', 'All releases', all.length], ...releases.map(v => [v, cap(v), all.filter(t => rel(t) === v).length])]
-      .map(([v, n, k]) => html`<button aria-pressed=${v ? r.release.length === 1 && r.release[0] === v : !r.release.length} onClick=${() => go({ release: v ? [v] : [] })}>${n}<small class="num">${k}</small></button>`)}</span></div>
-    ${unread.length ? html`<p class="sum"><span class="bad">Backlog not read: ${unread.map(h => hname(d, h)).join(', ')}</span></p>` : ''}
-    ${wide ? '' : html`<div class="mseg" role="tablist">${cols.map((c, k) => html`<button role="tab" aria-selected=${i === k} onClick=${() => jump(k)}>${c.name}<small class="num">${c.n}</small></button>`)}</div>`}
-    <div class=${wide ? 'tkb' : 'mcols'} ref=${ref} onScroll=${wide ? null : onScroll}>${cols.map(c => html`<${Col} key=${c.s} d=${d} go=${go} ...${c}/>`)}</div>
+  const body = lists.map(([s, name, xs]) => html`<${List} key=${s} d=${d} s=${s} name=${name} xs=${xs} go=${go} wide=${wide} r=${r}/>`)
+  return html`<div class=${'tks' + (wide ? ' wide' : '')}>${unread.length ? html`<p class="sum"><span class="bad">Backlog not read: ${unread.map(h => hname(d, h)).join(', ')}</span></p>` : ''}
+    ${wide ? html`<${Hero} ts=${ts} r=${r} go=${go} aside=${html`<${Tiles} d=${d}/>`}/><div class="kgrid"><div class="k8" style="display:flex;flex-direction:column;gap:16px">${body}</div><div class="k4"><${ByProject} d=${d} ts=${ts} go=${go}/></div></div>`
+      : html`<${KindSeg} d=${d} r=${r} go=${go} counts/><div style="margin-top:16px"><${Hero} ts=${ts} r=${r} go=${go}/></div>${body}<${Tiles} d=${d}/>`}
     ${page ? html`<${TicketPage} d=${d} t=${page} go=${go}/>` : ''}</div>`
 }
