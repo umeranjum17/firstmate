@@ -1148,6 +1148,14 @@ PR_URL=$(grep '^pr=' "$META" | tail -1 | cut -d= -f2- || true)
 # tasktmp is recorded by fm-spawn for tasks that set up a per-task temp root
 # (/tmp/fm-<id>/); absent for tasks spawned before that change, so tolerate empty.
 TASK_TMP=$(grep '^tasktmp=' "$META" | cut -d= -f2- || true)
+# state/<id>.scratch lists the extra scratch directories the task registered
+# through bin/fm-scratch.sh, which owns the record and its path-shape guard.
+TASK_SCRATCH=()
+if [ "$TEARDOWN_META_KIND" != secondmate ]; then
+  while IFS= read -r scratch_dir; do
+    [ -n "$scratch_dir" ] && TASK_SCRATCH+=("$scratch_dir")
+  done < <("$SCRIPT_DIR/fm-scratch.sh" list "$ID" 2>&2)
+fi
 BUSY_GEN=$(fm_meta_get "$META" busy_gen)
 if [ -z "$BUSY_GEN" ]; then
   BUSY_GEN=$(cat "$STATE/$ID.busy-gen" 2>/dev/null || true)
@@ -3769,7 +3777,7 @@ fi
 # close is confirmed, before any branch deletion or copy return. Otherwise
 # killing the pane shell steals focus before the close can snapshot it.
 if [ "$KIND" != secondmate ]; then
-  reap_task_worktree_processes worktree "$WT" "$TASK_TMP"
+  reap_task_worktree_processes worktree "$WT" "$TASK_TMP" ${TASK_SCRATCH[@]+"${TASK_SCRATCH[@]}"}
 fi
 
 # Fix 3 (see script header): sweep remote job workers abandoned by an already
@@ -3874,6 +3882,26 @@ fm_backend_clear_transition "$BACKEND" "$STATE" "$T" || true
 # Remove the per-task temp root (/tmp/fm-<id>/, incl. its gotmp/) recorded by spawn.
 # Read before the state-file rm below; empty (pre-fix tasks without tasktmp=) is a no-op.
 [ -n "$TASK_TMP" ] && rm -rf "$TASK_TMP"
+# Reap exactly the scratch directories the task registered, by literal path and
+# only now that the landed-work test and endpoint close have passed. Evidence
+# lives under data/<id>/ and state/, which validate_removal_target never lets
+# through; a refused or failed path is reported and its record kept.
+teardown_reap_registered_scratch() {
+  local dir kept=0
+  for dir in ${TASK_SCRATCH[@]+"${TASK_SCRATCH[@]}"}; do
+    case "$dir" in
+      "$STATE"|"$STATE"/*|"$DATA"|"$DATA"/*) kept=1; echo "warning: not reaping registered scratch directory $dir for $ID: it is inside this home's state or data" >&2; continue ;;
+    esac
+    if safe_rm_rf "$dir" "registered scratch"; then
+      echo "teardown: reaped registered scratch directory $dir for $ID" >&2
+    else
+      kept=1
+      echo "warning: registered scratch directory $dir for $ID was not removed" >&2
+    fi
+  done
+  [ "$kept" = 1 ] || rm -f "$STATE/$ID.scratch"
+}
+teardown_reap_registered_scratch
 # Retire only this Firstmate home's launch namespace. Its never-reused per-spawn
 # files leave the equal task-id namespace of every other home untouched.
 teardown_launch_home_token() {

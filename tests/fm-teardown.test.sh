@@ -3870,6 +3870,95 @@ land_shippable_commit() {
   git -C "$case_dir/project" fetch -q origin
 }
 
+# Retro 4: task scratch directories and detached proof processes outlived their
+# tasks. A task registers its scratch through bin/fm-scratch.sh; teardown reaps
+# exactly those literal paths (and processes working inside them) once landing
+# is proven, even though the session that created them is long gone.
+test_registered_scratch_is_reaped_after_launching_session_is_gone() {
+  local case_dir rc pid scratch sibling
+  case_dir=$(make_case registered-scratch-reap)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  scratch="$case_dir/scratch/proof-run"
+  sibling="$case_dir/scratch/proof-run-other"
+  mkdir -p "$scratch/deep" "$sibling" "$case_dir/data/task-x1"
+  printf 'x\n' > "$scratch/deep/file"
+  printf 'keep\n' > "$sibling/file"
+  printf 'evidence\n' > "$case_dir/data/task-x1/report.md"
+
+  FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$case_dir/state" \
+    "$ROOT/bin/fm-scratch.sh" register task-x1 "$scratch" > /dev/null \
+    || fail "registered-scratch-reap: register refused a plain scratch directory"
+  # The launching session is gone: a detached proof process outlives the
+  # subshell that started it, parented to init, with its cwd in the scratch dir.
+  ( cd "$scratch/deep" && setsid sleep 301 < /dev/null > /dev/null 2>&1 & )
+  sleep 0.5
+  pid=$(pgrep -f '^sleep 301$' -n -u "$(id -u)" 2>/dev/null || true)
+  [ -n "$pid" ] && [ "$(readlink "/proc/$pid/cwd" 2>/dev/null)" = "$scratch/deep" ] \
+    || { [ -n "$pid" ] && kill -KILL "$pid" 2>/dev/null; fail "registered-scratch-reap: setup process did not start in the scratch dir"; }
+
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+
+  if kill -0 "$pid" 2>/dev/null; then
+    kill -KILL "$pid" 2>/dev/null || true
+    fail "registered-scratch-reap: detached process in registered scratch survived teardown"
+  fi
+  expect_code 0 "$rc" "registered-scratch-reap: teardown should succeed: $(cat "$case_dir/stderr")"
+  [ ! -e "$scratch" ] || fail "registered-scratch-reap: registered scratch directory survived teardown"
+  [ -f "$sibling/file" ] || fail "registered-scratch-reap: an unregistered sibling directory was reaped"
+  [ -f "$case_dir/data/task-x1/report.md" ] || fail "registered-scratch-reap: task evidence was reaped"
+  [ ! -e "$case_dir/state/task-x1.scratch" ] || fail "registered-scratch-reap: teardown left the scratch record"
+  pass "teardown reaps exactly the registered scratch directories and their detached processes, keeping evidence and unregistered siblings"
+}
+
+test_registered_scratch_survives_a_refused_teardown() {
+  local case_dir rc scratch
+  case_dir=$(make_case registered-scratch-refused)
+  write_meta "$case_dir" local-only ship
+  wt_commit "$case_dir" "unpushed work"
+  scratch="$case_dir/scratch/proof-run"
+  mkdir -p "$scratch"
+  FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$case_dir/state" \
+    "$ROOT/bin/fm-scratch.sh" register task-x1 "$scratch" > /dev/null \
+    || fail "registered-scratch-refused: register refused a plain scratch directory"
+
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+
+  expect_code 1 "$rc" "registered-scratch-refused: unlanded work must still refuse"
+  [ -d "$scratch" ] && [ -f "$case_dir/state/task-x1.scratch" ] \
+    || fail "registered-scratch-refused: a refused teardown reaped the scratch or its record"
+  pass "a refused teardown leaves registered scratch and its record in place"
+}
+
+test_scratch_register_and_reap_refuse_unsafe_paths() {
+  local case_dir rc
+  case_dir=$(make_case scratch-unsafe-paths)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  mkdir -p "$case_dir/scratch/real" "$case_dir/home-like"
+  ln -s "$case_dir/scratch/real" "$case_dir/scratch/link"
+  for bad in "relative/dir" "$case_dir/scratch/*" "$case_dir/scratch/link" "$case_dir/scratch/real/../real" "$HOME" "/" "/tmp/does-not-exist-$$"; do
+    if FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$case_dir/state" \
+        "$ROOT/bin/fm-scratch.sh" register task-x1 "$bad" > /dev/null 2>&1; then
+      fail "scratch-unsafe-paths: register accepted $bad"
+    fi
+  done
+  # A hand-written record cannot widen a delete: the unsafe lines are skipped and
+  # the one safe line is still reaped.
+  printf '%s\n' "$case_dir/scratch/*" "$HOME" "$case_dir/scratch/link" "$case_dir/scratch/real" \
+    > "$case_dir/state/task-x1.scratch"
+
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+
+  expect_code 0 "$rc" "scratch-unsafe-paths: teardown should succeed: $(cat "$case_dir/stderr")"
+  [ ! -e "$case_dir/scratch/real" ] || fail "scratch-unsafe-paths: the safe recorded directory was not reaped"
+  [ -d "$HOME" ] || fail "scratch-unsafe-paths: HOME was touched"
+  pass "unsafe scratch paths are refused at registration and skipped at reap"
+}
+
 # Cleanup keeps the task's no-mistakes pipeline spend in this home's records
 # (bin/fm-pipeline-spend.sh) while the task branch that attributes its runs and
 # the task record still exist, then removes both as before.
@@ -5242,6 +5331,9 @@ test_another_branchs_parked_run_is_never_touched
 test_own_autonomous_run_is_left_alone
 test_leaked_worktree_process_is_reaped
 test_leaked_tasktmp_process_is_reaped
+test_registered_scratch_is_reaped_after_launching_session_is_gone
+test_registered_scratch_survives_a_refused_teardown
+test_scratch_register_and_reap_refuse_unsafe_paths
 test_lsof_absent_reaps_tmux_process_group
 test_lsof_error_refuses_before_removal
 test_reused_pid_identity_is_not_force_killed
