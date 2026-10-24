@@ -4,7 +4,8 @@ import { render } from './vendor/preact-htm-3.1.1.js'
 import { html, useState, useEffect, useRef, now, dur, hm, ACTIVE, STAGES, SNAME, STATES, stuck, state, sid, total, hc, hname, mname, sorted, filterCards, I, IC, StageIcon, Av, ASK_TAG, askType, askOrder } from './ui.js'
 import { TABS, inTab, byStage, stagesOf, Board, MobileKanban, Detail } from './board.js'
 import { Insights } from './insights.js'
-import { Tickets, IC_TICKET } from './tickets.js'
+import { Tickets, IC_TICKET, ticketsHead, KindSeg, TicketFilter, proj } from './tickets.js'
+import { Tile } from './look.js'
 const IC_CHART = html`<path d="M2.5 13.5h11M4.5 11V8.5M8 11V4.5M11.5 11V7"/>`
 const IC_METRICS = html`<path d="M8 2.5a5.5 5.5 0 1 0 5.5 5.5H8z"/><path d="M10 1.8a4.6 4.6 0 0 1 4.2 4.2H10z"/>`
 
@@ -76,7 +77,8 @@ function parseHash() {
   const p = new URLSearchParams(q || ''), list = k => (p.get(k) || '').split(',').filter(Boolean)
   return { view: VIEWS.includes(path) ? path : 'tickets', tab: TABS.some(([t]) => t === p.get('tab')) ? p.get('tab') : 'active',
     rows: p.get('rows') === 'home' ? 'home' : '', home: list('home'), model: list('model'), state: list('state'), stage: list('stage').filter(s => STAGES.includes(s)),
-    project: list('project'), release: list('release'), by: p.get('by') === 'release' ? 'release' : '', card: p.get('card'), ticket: p.get('ticket') }
+    project: list('project'), release: list('release'), by: p.get('by') === 'release' ? 'release' : '', card: p.get('card'), ticket: p.get('ticket'),
+    kind: p.get('kind') === 'system' ? 'system' : '', show: ['todo', 'hold', 'done'].includes(p.get('show')) ? p.get('show') : '' }
 }
 // An old /overview link lands on the app and opens the native Overview, its address now hash-based.
 function initialRoute() {
@@ -90,6 +92,7 @@ function toHash(r) {
   if (r.rows) p.set('rows', r.rows)
   for (const k of ['home', 'model', 'state', 'stage', 'project', 'release']) if (r[k].length) p.set(k, r[k].join(','))
   if (r.by) p.set('by', r.by)
+  if (r.kind) p.set('kind', r.kind); if (r.show) p.set('show', r.show)
   if (r.card) p.set('card', r.card)
   if (r.ticket) p.set('ticket', r.ticket)
   return `#/${r.view}${p.size ? '?' + p.toString().replace(/%2C/g, ',').replace(/%2F/g, '/') : ''}`
@@ -390,16 +393,16 @@ function App() {
   const count = t => t === 'all' ? null : total(d, d.cards.filter(c => inTab(t, c)).length, t)
   const shown = cards.filter(c => inTab(r.tab, c))
   const list = (byStage(r.tab) ? stagesOf(r.tab, r.stage) : [r.tab]).flatMap(s => sorted(shown.filter(c => c.stage === s)))
-  const title = NAV.find(([v]) => v === r.view)[2]
+  const title = NAV.find(([v]) => v === r.view)[2], head = r.view === 'tickets' ? ticketsHead(d, r) : { h: title }
   const overlays = html`${r.card && html`<${Detail} d=${d} id=${r.card} go=${go} list=${list}/>`}
     ${pal && html`<${Palette} d=${d} go=${go} close=${() => setPal(false)} toggleTheme=${toggleTheme}/>`}${keys && html`<${Shortcuts} close=${() => setKeys(false)}/>`}`
   const body = r.view === 'tickets' ? html`<${Tickets} d=${d} r=${r} go=${go} wide=${wide}/>` : r.view === 'overview' ? html`<${Overview} d=${d} od=${ov} go=${go}/>` : r.view === 'insights' ? html`<${Insights} d=${d}/>` : r.view === 'needs' ? html`<${Needs} d=${d}/>` : null
   if (!wide) return html`<div class="phone">
-    <header class="top">${LABEL()}<div class="tr"><h1>${title}</h1><div class="caps">${r.view === 'board' ? html`<${Filters} d=${d} r=${r} go=${go}/>` : ''}<button class="ib" onClick=${toggleTheme} aria-label="Light or dark theme">${I(themeIcon(), 20)}</button></div></div></header>
-    <div class="sum"><${Live} d=${d} st=${st} refresh=${refresh}/></div>
+    <header class="top">${LABEL()}<div class="tr"><h1>${title}</h1><div class="caps">${r.view === 'board' ? html`<${Filters} d=${d} r=${r} go=${go}/>` : r.view === 'tickets' ? html`<${TicketFilter} d=${d} r=${r} go=${go}/>` : ''}<button class="ib" onClick=${toggleTheme} aria-label="Light or dark theme">${I(themeIcon(), 20)}</button></div></div></header>
+    ${r.view !== 'tickets' ? html`<div class="sum"><${Live} d=${d} st=${st} refresh=${refresh}/></div>` : ''}
     ${r.view === 'board' ? html`<div class="sum"><b>${asks == null ? 'Ask list unreadable' : asks ? `${asks} need${asks > 1 ? '' : 's'} you` : 'Nothing needs you'}</b> · <span>${total(d, open.length)} in flight</span> · <span class=${stk.length ? 'bad' : ''}>${total(d, stk.length)} stuck</span> · <span>${today} landed today</span></div>
       <div class="seg">${TABS.map(([t, n]) => html`<button aria-pressed=${r.tab === t} onClick=${() => go({ tab: t })}>${n === 'Landed today' ? 'Landed' : n}${count(t) != null ? html`<small class="num">${count(t)}</small>` : ''}</button>`)}</div>
-      <${Chips} d=${d} r=${r} go=${go}/><${MobileKanban} d=${d} cards=${shown} r=${r} open=${opencard}/>` : body}
+      <${Chips} d=${d} r=${r} go=${go}/><${MobileKanban} d=${d} cards=${shown} r=${r} open=${opencard}/>` : html`<div class=${r.view === 'tickets' ? 'ph' : ''}>${body}</div>`}
     <div class="dock"><nav aria-label="Views">${NAV.map(([v, ic, n]) =>
       html`<a href=${'#/' + v} aria-label=${n} aria-current=${r.view === v ? 'page' : null}>${I(ic, 20)}<span>${n}</span>${v === 'needs' && asks && r.view !== v ? html`<span class="badge">${asks}</span>` : ''}</a>`)}</nav>
       <button onClick=${() => setPal(true)} aria-label="Search">${I(IC.search, 24)}</button></div>${overlays}</div>`
@@ -408,14 +411,17 @@ function App() {
       ${LABEL()}<button class="dsearch" onClick=${() => setPal(true)} title="Search (⌘K)">${I(IC.search)}Search<kbd>⌘K</kbd></button>
       ${NAV.map(([v, ic, n]) => html`<a class="nav" href=${'#/' + v} aria-current=${r.view === v && !(v === 'board' && r.home.length) ? 'page' : null} onClick=${v === 'board' ? () => go({ view: 'board', home: [] }) : null}>${I(ic)}${n}
         ${v === 'needs' ? (asks ? html`<span class="badge">${asks}</span>` : html`<span class="n num">${asks ?? '?'}</span>`) : v === 'tickets' ? html`<span class="n num">${(d.tickets || []).filter(t => t.state !== 'done').length}</span>` : v === 'board' ? html`<span class="n num">${total(d, open.length)}</span>` : ''}</a>`)}
-      <div class="sec">Homes</div>
+      ${r.view === 'tickets' ? html`<div class="sec">Projects</div>${Object.entries((d.tickets || []).filter(t => t.state !== 'done' && (r.kind === 'system') !== !!t.asked).reduce((m, t) => (m[proj(d, t)] = (m[proj(d, t)] || 0) + 1, m), {}))
+        .sort((x, y) => y[1] - x[1]).slice(0, 8).map(([p, n]) => html`<button class="nav home-nav" aria-pressed=${r.project.length === 1 && r.project[0] === p} onClick=${() => go({ project: r.project[0] === p ? [] : [p] })}>
+          <${Tile} d=${d} name=${p} small/><span class="home-name">${p}</span><span class="n num">${n}</span></button>`)}` : html`<div class="sec">Homes</div>
       ${d.homes.map(h => { const cs = open.filter(c => c.home === h.id)
         return html`<button class="nav home-nav" aria-label=${h.name} title=${h.name} aria-current=${r.view === 'board' && r.home.length === 1 && r.home[0] === h.id ? 'page' : null} onClick=${() => go({ view: 'board', home: [h.id], card: null })}>
-          <span class="sq" style=${{ '--c': hc(d, h.id) }}></span><span class="home-name">${h.name}</span><span class="home-short" aria-hidden="true">${Array.from(h.name).slice(0, 4).join('')}</span>${cs.some(stuck) ? html`<span class="dot" title="Stuck lanes"></span>` : ''}<span class="n num">${h.known ? cs.length : '?'}</span></button>` })}
+          <${Tile} d=${d} name=${h.id} small/><span class="home-name">${h.name}</span><span class="home-short" aria-hidden="true">${Array.from(h.name).slice(0, 4).join('')}</span>${cs.some(stuck) ? html`<span class="dot" title="Stuck lanes"></span>` : ''}<span class="n num">${h.known ? cs.length : '?'}</span></button>` })}`}
       <div class="foot"><${Live} d=${d} st=${st} refresh=${refresh}/><span class="sp"></span><button class="ib" onClick=${toggleTheme} aria-label="Light or dark theme">${I(themeIcon())}</button></div>
     </nav>
     <main class="main">
-      <header class="hd"><div class="tx">${LABEL(html`<em>› ${title}</em>`)}<h1>${title}</h1></div>
+      <header class="hd"><div class="tx">${LABEL(html`<em>› ${title}</em>`)}<h1>${head.h}</h1>${head.sub ? html`<p>${head.sub}</p>` : ''}</div>
+        ${r.view === 'tickets' ? html`<${KindSeg} d=${d} r=${r} go=${go}/><${TicketFilter} d=${d} r=${r} go=${go} label="Filters"/>` : ''}
         ${r.view === 'board' ? html`${TABS.map(([t, n]) => html`<button class="tab" aria-pressed=${r.tab === t} onClick=${() => go({ tab: t })}>${n}${count(t) != null ? html`<small class="num">${count(t)}</small>` : ''}</button>`)}
           <span class="sp"></span>
           <div class="kpi num"><a href="#/needs">Needs you <b>${asks ?? '?'}</b></a><button class=${stk.length ? 'bad' : ''} onClick=${() => go({ tab: 'active', state: ['blocked', 'decision'], stage: [], card: null })}>Stuck <b>${total(d, stk.length)}</b></button>

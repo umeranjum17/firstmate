@@ -19,7 +19,7 @@ srv_pid=
 cleanup() {
   CHROME_DEVTOOLS_AXI_SESSION=$session chrome-devtools-axi stop >/dev/null 2>&1 || true
   env -u TMUX TMUX_TMPDIR="$home/tmux" tmux kill-server 2>/dev/null || true
-  [ -z "$srv_pid" ] || kill "$srv_pid" 2>/dev/null || true
+  [ -z "$srv_pid" ] || { pkill -P "$srv_pid"; kill "$srv_pid"; } 2>/dev/null || true  # the server is the backgrounded shell's child
   rm -rf -- "$home"
 }
 trap cleanup EXIT
@@ -70,6 +70,7 @@ EOF
   # m-ci's completion receipt and the done-done verdict on its merge card: the ticket page's Proof.
   printf '{"schema":1,"task":"m-ci","head":"abc1234def5678","verdict":"PASS","at":%s}\n' "$((now - 300))" > "$home/state/m-ci.run-receipt.json"
   mkdir -p "$home/data/m-ci" && printf '{"head":"abc1234def5678","verdict":"pass"}\n' > "$home/data/m-ci/merge-card.json"
+  mkdir -p "$home/projects/beta/.git" && printf '[remote "origin"]\n\turl = git@github.com:acme/beta-app.git\n' > "$home/projects/beta/.git/config"  # its clone's origin names the project
   lane m-ci ship "paused [at=$((now - 1200))]: waiting for CI checks https://github.com/acme/alpha/pull/9"
   lane m-stuck ship "blocked [at=$((now - 7200))]: cannot reach the build server"
   lane m-ask ship "needs-decision [at=$((now - 3600))] [key=scope]: which layout"
@@ -163,13 +164,14 @@ for w in 390 1280; do
   shot "board-stuck-$w" '#/board?tab=stuck' "$w" m-stuck
   shot "board-waiting-$w" '#/board?tab=waiting' "$w" m-ci
   shot "board-homes-$w" '#/board?rows=home' "$w" m-stuck
-  shot "tickets-$w" '#/tickets' "$w" 'Link the alpha npm package'
+  shot "tickets-$w" '#/tickets' "$w" 'Your asks done'
+  shot "needs-$w" '#/needs' "$w" 'Link the alpha npm package'
 done
-# A phone opens on Waiting on captain; its In progress column holds the ticket cards.
-shot tickets-390 '#/tickets' 390 'Link the alpha npm package'
-chrome-devtools-axi eval 'document.querySelectorAll(".mseg button")[1].click()' >/dev/null
+# A phone opens on the hero and the Moving list; the hero's legend switches the list, here to To do.
+shot tickets-390 '#/tickets' 390 'Your asks done'
+chrome-devtools-axi eval '[...document.querySelectorAll(".legend button")].find(b => b.textContent.startsWith("To do")).click()' >/dev/null
 sleep 1
-chrome-devtools-axi screenshot "$DONE_DONE_EVIDENCE_ROOT/tickets-progress-390.png" >/dev/null
+chrome-devtools-axi screenshot "$DONE_DONE_EVIDENCE_ROOT/tickets-todo-390.png" >/dev/null
 # Overview names the records behind every figure; at 390 the end of each page clears the floating tab bar.
 for w in 390 1280; do shot "overview-$w" '#/overview' "$w" 'Lifecycle'; done
 for want in "Source: Needs you: Main's ask list" "Source: each home's lane records" "each home's backlog and its done archive" "Source: quota-axi cache, read-only"; do
@@ -204,7 +206,7 @@ chrome-devtools-axi screenshot "$DONE_DONE_EVIDENCE_ROOT/memory-390.png" >/dev/n
 grep -qF '8.0%' "$DONE_DONE_EVIDENCE_ROOT/memory-card.txt" && grep -qF 'Free of 64 GB' "$DONE_DONE_EVIDENCE_ROOT/memory-card.txt" && ! grep -qF '45%' "$DONE_DONE_EVIDENCE_ROOT/memory-card.txt" \
   || { echo "run-core-proof: the Metrics memory card is not the gate's reading: $(cat "$DONE_DONE_EVIDENCE_ROOT/memory-card.txt")" >&2; exit 1; }
 for v in overview insights tickets; do
-  shot "end-$v-390" "#/$v" 390 "$( [ "$v" = insights ] && echo 'Why work waits' || echo Live )"
+  shot "end-$v-390" "#/$v" 390 "$( case $v in insights) echo 'Why work waits' ;; tickets) echo 'Your asks done' ;; *) echo Live ;; esac )"
   chrome-devtools-axi eval '(() => { scrollTo(0, 1e6); document.querySelectorAll(".ins, .mcols > .tkc").forEach(e => e.scrollTop = 1e6); return 1 })()' >/dev/null
   sleep 1
   chrome-devtools-axi screenshot "$DONE_DONE_EVIDENCE_ROOT/end-$v-390.png" >/dev/null
@@ -212,19 +214,19 @@ done
 # The new Tickets screen in the dark theme too: the stored theme applies on the next full load (a new query string).
 chrome-devtools-axi eval 'localStorage.setItem("fm-theme", "dark")' >/dev/null
 for w in 390 1280; do
-  shot "tickets-dark-$w" "?dark-$w#/tickets" "$w" 'Link the alpha npm package'
+  shot "tickets-dark-$w" "?dark-$w#/tickets" "$w" 'Your asks done'
   shot "ticket-page-dark-$w" "?dark-page-$w#/tickets?ticket=main/m-ask" "$w" 'Serves your ask'
 done
 chrome-devtools-axi eval 'localStorage.removeItem("fm-theme")' >/dev/null
 # The app opens on Tickets, and the phone's pill nav has one button per view, each named; the current one shows its name.
-shot landing-390 '?landing' 390 'Waiting on captain'
+shot landing-390 '?landing' 390 'Your asks done'
 chrome-devtools-axi eval 'JSON.stringify([...document.querySelectorAll(".dock a")].map(a => a.getAttribute("aria-label") + (a.getAttribute("aria-current") ? " (current)" : "")))' >"$DONE_DONE_EVIDENCE_ROOT/landing-dock.txt"
 for want in 'Tickets (current)' 'Needs you' Board Metrics Insights; do grep -qF -- "$want" "$DONE_DONE_EVIDENCE_ROOT/landing-dock.txt" || { echo "run-core-proof: the phone pill nav lacks '$want'" >&2; exit 1; }; done
 grep -qF 'Fleet dashboard' "$DONE_DONE_EVIDENCE_ROOT/landing-390.txt" || { echo "run-core-proof: the landing page lacks the Fleet dashboard label" >&2; exit 1; }
 # Tickets: the backlog mapped to board columns, and only the ask list waits on the captain; a Board card drops tags and Main refs too.
 jq -e '([.tickets[] | {(.task): .state}] | add) as $s | ([.tickets[] | {(.task): .}] | add) as $t
   | $s["m-build"] == "progress" and $s["m-ci"] == "review" and $s["m-held"] == "hold" and $s["m-ready"] == "todo" and $s["m-shipped"] == "done"
-  and $t["m-ready"].priority == 1 and $t["m-ready"].release == "next" and $t["m-ready"].project == "beta" and $t["m-build"].release == "v0.2.0" and $t["m-ci"].release == "later"
+  and $t["m-ready"].priority == 1 and $t["m-ready"].release == "next" and $t["m-ready"].project == "beta-app" and $t["m-build"].release == "v0.2.0" and $t["m-ci"].release == "later"
   and $t["m-ask"].asked and $t["m-ask"].title == "Choose the layout for the new screen" and $t["m-ask"].priority == 0
   and ([.cards[] | select(.task == "m-ask")][0].title == "Choose the layout for the new screen")
   and $t["m-shipped"].pr == "https://github.com/acme/alpha/pull/4" and all(.tickets[]; .state != "captain") and (.asks | length) == 1' \
@@ -296,19 +298,25 @@ for w in 390 1280; do
   done
 done
 for w in 390 1280; do
-  for want in "Waiting on captain" "Link the alpha npm package to GitHub?" "Your ask" P0; do
+  for want in "Waiting on you" "Your asks" "Choose the layout for the new screen" P0; do
     grep -qF -- "$want" "$DONE_DONE_EVIDENCE_ROOT/tickets-$w.txt" || { echo "run-core-proof: Tickets at $w lacks '$want'" >&2; exit 1; }
   done
+  grep -qF -- "Link the alpha npm package to GitHub?" "$DONE_DONE_EVIDENCE_ROOT/needs-$w.txt" || { echo "run-core-proof: Needs you at $w lacks the ask" >&2; exit 1; }
 done
 # Release lanes: a project's lowest named release is its Next release (alpha v0.2.0), a literal next stays Next
 # (beta), a later named release is After, and no release line is Later; done work is not in a lane.
-cols() { chrome-devtools-axi eval 'JSON.stringify([...document.querySelectorAll(".tkc")].map(c => [c.querySelector(".ch b").textContent, ...[...c.querySelectorAll("h3")].map(h => h.textContent).sort()]))' \
+cols() { chrome-devtools-axi eval '(() => { document.querySelectorAll(".lane .all").forEach(b => b.textContent === "See all" && b.click()); return 1 })()' >/dev/null; sleep 0.5
+  chrome-devtools-axi eval 'JSON.stringify([...document.querySelectorAll(".lane")].map(c => [c.querySelector("h2").textContent, ...[...c.querySelectorAll("h3")].map(h => h.textContent).sort()]))' \
   | sed -n 's/^result: //p' | jq -c 'fromjson | if type == "string" then fromjson else . end'; }
-for w in 390 1280; do shot "tickets-release-$w" '#/tickets?by=release' "$w" 'Next release'; done
-want='[["Next release","Build the main thing","Start the ready thing"],["After","After the ready thing"],["Later","Choose the layout for the new screen","Get the layout pull request through CI","Keep the ask list on top","Publish the release from the build server","Wait for the captain'"'"'s call"]]'
-[ "$(cols)" = "$want" ] || { echo "run-core-proof: release lanes wrong: $(cols)" >&2; exit 1; }
-shot tickets-release-filter-1280 '#/tickets?release=v0.2.0' 1280 'Build the main thing'
-[ "$(cols | jq -c '[.[] | select(.[0] != "Waiting on captain") | .[1:][]]')" = '["Build the main thing"]' ] || { echo "run-core-proof: the v0.2.0 filter shows $(cols)" >&2; exit 1; }
+# Your asks and System split the tickets; the ask m-ask is the one ticket under Your asks.
+for w in 390 1280; do shot "tickets-release-$w" '#/tickets?by=release&kind=system' "$w" 'Next release'
+  want='[["Next release","Build the main thing","Start the ready thing"],["After","After the ready thing"],["Later","Get the layout pull request through CI","Keep the ask list on top","Publish the release from the build server","Wait for the captain'"'"'s call"]]'
+  [ "$(cols)" = "$want" ] || { echo "run-core-proof: release lanes at $w wrong: $(cols)" >&2; exit 1; }
+  shot "tickets-release-asks-$w" '#/tickets?by=release' "$w" 'Next release'
+  [ "$(cols)" = '[["Next release"],["After"],["Later","Choose the layout for the new screen"]]' ] || { echo "run-core-proof: the ask's release lane at $w wrong: $(cols)" >&2; exit 1; }
+done
+shot tickets-release-filter-1280 '#/tickets?release=v0.2.0&kind=system' 1280 'Build the main thing'
+[ "$(cols | jq -c '[.[] | .[1:][]]')" = '["Build the main thing"]' ] || { echo "run-core-proof: the v0.2.0 filter shows $(cols)" >&2; exit 1; }
 # The Metrics lifecycle rail opens the Board filtered to that stage, and To land to To merge.
 for w in 390 1280; do
   shot "rail-$w" '#/overview' "$w" Lifecycle
