@@ -95,6 +95,7 @@
 #                                   answer its line carrying corr=<comment id> in state/<lead>.status; Main's pickup is
 #                                   the note in state/inbox/handled, its answer fm-inbox.sh receipts --all-replies
 #   config/owner-board              the owner's sign-off board.json; its <board>.token lets a comment in (serve only)
+#   config/owner-name               the name the sidebar shows as the board's reader (else the home's git user.name)
 #   resolved markdown backlog + configured archive    Out: closed per local day; missing backlog or unsupported backend is unknown, absent archive is empty
 #   ~/.cache/quota-axi/quotas.json  schema-3 quota cache, read-only; no collector runs during builds
 # Machine and devices, each probe read-only with a 5 s timeout:
@@ -420,6 +421,13 @@ try:
 except OSError: pass  # no parked homes
 ACTIVE = sorted(set(home_dir) - parked, key=lambda h: (h != 'main', h))
 PARKED = sorted(set(home_dir) & parked)
+
+# The board's reader, named in the sidebar: config/owner-name, else the home's git user.name.
+try: OWNER = open(os.path.join(HOME, 'config/owner-name'), encoding='utf-8').read().strip()
+except OSError: OWNER = ''
+if not OWNER:
+    try: OWNER = subprocess.run(['git', '-C', HOME, 'config', 'user.name'], capture_output=True, text=True, timeout=5).stdout.strip().title()
+    except (OSError, subprocess.SubprocessError): OWNER = ''
 
 lane_default = 4
 try: lane_default = int(open(os.path.join(HOME, 'config/lane-target')).read().split()[0])
@@ -1995,7 +2003,7 @@ def scrub(node):
     elif isinstance(node, list):
         for value in node: scrub(value)
 board = dict(
-    schema='fm-dashboard-board.v1', generated=int(NOW_TS), stages=[dict(id=s, name=n) for s, n in STAGES],
+    schema='fm-dashboard-board.v1', generated=int(NOW_TS), owner=OWNER or None, stages=[dict(id=s, name=n) for s, n in STAGES],
     homes=[dict(id=h, name=hname(h), plan=plan(h), open=sum(c['home'] == h and c['stage'] not in ('queued', 'landed') for c in cards), ready=len(bl(h, 'ready')) if backlog.get(h) is not None else None,
                 known=h not in lane_err) for h in ACTIVE],
     parked=PARKED, cards=cards, tickets=tickets, tickets_unread=bl_unread, flow=flow, flow_error=flow_error,
