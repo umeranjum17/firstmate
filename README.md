@@ -22,6 +22,7 @@ One line per add-on, with how it wires in. `<home>` is your home folder for the 
 - `delete-guard` — stops any agent from recursively deleting `/` or a home folder; a block alerts you and is final. Wire in: `delete-guard/install.sh <home>`.
 - `fleet-contract-check` — runs each real cross-repo call (dispatch-resolve, owner-guard, checks-lint) in a throwaway HOME and names the caller that breaks. Nothing to install: run `fleet-contract-check/fleet-contract-check`.
 - `fleet-dashboard` — the read-only fleet dashboard: board, charts, kanban, insights, ship view. Served through the fork shim (FORK-EXIT.md).
+- `lookout-adapter` — prints or serves this fleet as the JSON document Lookout reads (`lookout-firstmate`): hosts, homes, lanes, workers, quota, merges, history and devices from the fleet dashboard builder's output; read-only, no secrets.
 - `tickets-sync` - reads registered backlogs into sign-off Tickets; see [setup and limits](tickets-sync/README.md).
 - `fleet-flow` — reads fleet lifecycle, queue and bottleneck JSON; installs the home flow check for task slots. Wire in: `fleet-flow/install.sh`.
 - `fleet-stall` — alerts you when a team lead idles with ready work, or workers sit stuck waiting on their team lead. Wire in: `FM_HOME=<home> fleet-stall/install.sh`.
