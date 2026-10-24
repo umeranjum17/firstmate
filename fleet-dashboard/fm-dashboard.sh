@@ -131,6 +131,8 @@
 # HEAD for / and /index.html (the JavaScript app), its files under bin/fm-dashboard/,
 # /board.json, /overview (the same app shell; the app opens its own native Overview in
 # place of the old page), /backlog, /measure and /data.json; every other path is 404.
+# The app's files are read fresh on each request, the server's own code is not: once this script changes on disk (a
+# merge landed in the checkout it runs from), serve stops with status 75 so its supervisor starts the new code.
 # Its one write is POST /comment ({ticket, text} as JSON, 1-1000 characters, a ticket on the current board): it
 # needs the owner's sign-off board token, the <board>.token beside the board.json that config/owner-board names, read
 # on each comment. A device carries it once the owner opened the board's access link on it: the board's
@@ -344,11 +346,23 @@ def refresh():  # rebuild on age, not on requests, so an idle phone never opens 
             if last_error: time.sleep(MAX_AGE)  # a failing build retries once a minute
         time.sleep(1)  # one stat a second; a page is replaced within a second of turning MAX_AGE
 
+CODE = os.stat(SCRIPT).st_mtime_ns
+stale = threading.Event()
+def watch():  # a changed script means new code this process does not run (PNG icons 404ed for a day this way)
+    while not stale.wait(2):
+        try:
+            if os.stat(SCRIPT).st_mtime_ns != CODE: stale.set()
+        except OSError: pass
+    print('fm-dashboard.sh changed on disk; stopping so the supervisor starts the new code', file=sys.stderr, flush=True)
+    srv.shutdown()
+
 threading.Thread(target=refresh, daemon=True).start()
 srv = http.server.ThreadingHTTPServer((BIND, int(PORT)), Handler)
+threading.Thread(target=watch, daemon=True).start()
 print(f'serving http://{BIND}:{srv.server_address[1]}/', flush=True)
 try: srv.serve_forever()
 except KeyboardInterrupt: pass
+sys.exit(75 if stale.is_set() else 0)
 PY
     ;;
   -h|--help) sed -n '2,/^[^#]/s/^# \{0,1\}//p' "$0"; exit 0 ;;

@@ -1031,11 +1031,31 @@ PY
   pass "CI failures stay stuck unless captain-held, and releasing the hold restores the count"
 }
 
+# A merge that changes the script leaves a running server on old code (it served no PNG icons for a day): serve stops
+# with 75 once its script changes on disk, so its supervisor starts the new code.
+test_serve_stops_when_its_code_changes() {
+  local home pid url rc=0
+  home=$(make_home restarted)
+  mkdir -p "$home/dash" && cp "$DASH" "$home/dash/fm-dashboard.sh" && cp -r "$ROOT/bin/fm-dashboard" "$home/dash/"
+  PATH="$home/stubs:$PATH" FM_HOME="$home" HOME="$home" FM_BIN="$ROOT/bin" FM_DEVICE_LOCK_DIR="$home/locks" bash "$home/dash/fm-dashboard.sh" serve --port 0 > "$home/serve.out" 2> "$home/serve.err" &
+  pid=$!; SERVE_PID=$pid
+  for _ in $(seq 1 100); do url=$(sed -n 's/^serving //p' "$home/serve.out"); [ -n "$url" ] && break; sleep 0.1; done
+  [ -n "$url" ] || fail "serve never reported its address: $(cat "$home/serve.err")"
+  sleep 3; kill -0 "$pid" 2>/dev/null || fail "serve stopped with its script unchanged: $(cat "$home/serve.err")"
+  touch -d '+1 minute' "$home/dash/fm-dashboard.sh"
+  for _ in $(seq 1 100); do kill -0 "$pid" 2>/dev/null || break; sleep 0.1; done
+  kill -0 "$pid" 2>/dev/null && fail "serve kept running on old code after its script changed"
+  wait "$pid" || rc=$?; SERVE_PID=
+  [ "$rc" = 75 ] && grep -qF 'changed on disk' "$home/serve.err" || fail "serve stopped with $rc, not 75: $(cat "$home/serve.err")"
+  pass "serve stops with 75 once its script changes on disk, so its supervisor starts the new code"
+}
+
 if [ "${1:-}" = ci-stuck ]; then test_ci_failures_remain_stuck_in_metrics; exit; fi
 if [ "${1:-}" = board ]; then test_board_json_feeds_the_app; exit; fi
 if [ "${1:-}" = review ]; then test_board_json_feeds_the_app; test_serve_answers_each_page_and_remembers_the_grouping; exit; fi
 
 test_ci_failures_remain_stuck_in_metrics
+test_serve_stops_when_its_code_changes
 test_unavailable_readings_and_concurrent_caches
 test_new_lane_and_unwritten_archive_stay_exact
 test_incomplete_lanes_and_moved_filings

@@ -26,7 +26,7 @@
   color-scheme:dark
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%}
+html,body{height:100%}html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 body{background:var(--bg);color:var(--ink);font:400 14px/20px Inter,system-ui,sans-serif;font-feature-settings:'cv01','ss03';-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
 button,input{font:inherit;color:inherit;background:none;border:0}
 button,[role=button],a{cursor:pointer}
@@ -236,7 +236,7 @@ a.pill:hover{background:var(--hover)}
 :root[data-theme=dark] .dock a[aria-current=page]{background:var(--tile)}
 .dock a[aria-current=page] span{display:inline}
 .dock a .badge{display:block;position:absolute;top:8px;right:8px;margin:0;min-width:0;width:8px;height:8px;padding:0;font-size:0;box-shadow:0 0 0 2px var(--card)}
-.dock>button{width:56px;height:56px;border-radius:28px;background:var(--acc);color:var(--on-acc);display:grid;place-items:center;box-shadow:var(--float)}
+.dock>button{flex:none;width:56px;height:56px;border-radius:28px;background:var(--acc);color:var(--on-acc);display:grid;place-items:center;box-shadow:var(--float)}
 /* --- tablet layout --- */
 @media (max-width:1279px){
   .hd{flex-wrap:wrap;height:auto;min-height:44px;padding-top:8px;padding-bottom:8px;row-gap:8px}
@@ -560,3 +560,22 @@ button.ov-arow:hover{background:var(--hover)}.ov-arow.ov-abn{background:var(--ra
 .tch{flex:none;height:20px;padding:0 8px;border-radius:6px;background:var(--tile);color:var(--ink-2);font-size:11px;line-height:20px;font-weight:650;white-space:nowrap}
 .rx .m{display:flex;align-items:center;gap:8px;height:20px;font-size:12px;line-height:20px;color:var(--ink-3)}
 .rx .m a{margin-left:auto;color:var(--ink);font-weight:600}
+/* --- touch: on a phone (up to 759 px) and on any touch screen, every control takes a 44 px tap; small text controls
+   keep their look and grow an invisible 44 px target; a touch tablet keeps the computer layout with 44 px rows --- */
+@media (max-width:759px),(pointer:coarse){
+  .ib,.tk-say .send{width:44px;height:44px;border-radius:22px}
+  .dock a{width:44px}
+  .kseg button,.legend button,.all,.rx .m a,.crumbs a,.seg button,.chip button{position:relative}
+  .kseg button::after,.legend button::after,.all::after,.rx .m a::after,.crumbs a::after,.seg button::after,.chip button::after{content:'';position:absolute;left:50%;top:50%;width:max(100%,44px);height:max(100%,44px);transform:translate(-50%,-50%)}
+  .tk-say textarea{height:44px;padding:10px 0}
+  .opt{height:44px}
+}
+/* under 400 px the labelled pill leaves the search button no room: the current view keeps its highlight, the page title names it */
+@media (max-width:399px){.dock a[aria-current=page]{width:44px}.dock a[aria-current=page] span{display:none}}
+@media (min-width:760px) and (pointer:coarse){
+  .nav,.dsearch,.btn{height:44px}
+}
+@media (min-width:760px) and (max-width:1023px) and (pointer:coarse){
+  .app{grid-template-columns:76px 1fr}
+  .side .nav,.side .dsearch,.side .me i{width:44px;height:44px}
+}
