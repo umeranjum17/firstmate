@@ -7,6 +7,10 @@
 # and keyed-answer intake on a markdown-backed home: a hold raises its card with the
 # right title, reason and close, a dated deferral raises none, and the reserved
 # reconcile answer is refused for good, acked once, and leaves the hold open.
+# Section A also follows the feedback trail: an answered card is marked Read once
+# its captured result is handled (Main or the lead picked up the note), never
+# before; NOT_FOUND counts as done and a sign-off-axi without the feedback
+# command skips with one log line.
 set -u
 
 # The Firstmate checkout owns tests/lib.sh; FM_CODE_ROOT names that checkout.
@@ -33,7 +37,7 @@ FAKEBIN="$TMP_ROOT/fake-bin"
 FM_HOME_DIR="$TMP_ROOT/fmhome"
 mkdir -p "$FAKEBIN" "$FM_HOME_DIR/state"
 export SIGNOFF_BOARD="$TMP_ROOT/board.json" HOLD_FILE="$TMP_ROOT/hold" \
-  INTAKE_LOG="$TMP_ROOT/intake.log" INTAKE_RC="$TMP_ROOT/intake.rc"
+  INTAKE_LOG="$TMP_ROOT/intake.log" INTAKE_RC="$TMP_ROOT/intake.rc" FEEDBACK_LOG="$TMP_ROOT/feedback.log"
 printf '{}\n' > "$SIGNOFF_BOARD"
 printf '0' > "$INTAKE_RC"
 
@@ -79,6 +83,15 @@ case "${1-}" in
     ;;
   answers) jq -c 'with_entries(select(.value.answer != null))' "$SIGNOFF_BOARD" ;;
   wait) exit 0 ;;
+  status) jq -n --arg b "$SIGNOFF_BOARD" '{board: $b, status: "not running"}' ;;
+  # feedback as sign-off-axi 0.6.1 answers it, or as an older one (old) that lacks it.
+  feedback)
+    printf '%s\n' "$*" >> "$FEEDBACK_LOG"
+    case ${FEEDBACK_MODE:-ok} in
+      old) printf 'error: "Unknown command: feedback"\ncode: VALIDATION_ERROR\n'; exit 2 ;;
+      notfound) printf 'error: "nothing was sent on %s yet"\ncode: NOT_FOUND\n' "$2"; exit 1 ;;
+    esac
+    echo 'shows: Read' ;;
   *) exit 2 ;;
 esac
 SH
@@ -117,6 +130,14 @@ answer_card() {  # <key> <answer> <at>
 
 delivered() { cat "$FM_HOME_DIR/state/signoff-delivered" 2>/dev/null || true; }
 
+# picked_up <task-id>: the handler concludes the latest captured result carrying that task's answer.
+picked_up() {
+  local result
+  result=$(grep -lF "\"key\":\"$1\"" "$FM_HOME_DIR/state/procevent-inbox"/signoff.*.result | sort -t. -k2 -n | tail -n 1)
+  result=${result%.result}
+  runner handled signoff "${result##*.}" >/dev/null || fail "the handler could not conclude the result for $1"
+}
+
 runner register signoff signoff -- "$ADAPTER" poll >/dev/null 2>&1 \
   || fail "could not register the sign-off source for the runner"
 hold_as '2026-10-12T10:00:00Z#0'
@@ -130,7 +151,7 @@ author() {
     --already 'The release checks passed.' --option 'Yes=Publishing continues after you sign in.' \
     --option 'No=The release stays unpublished.' --recommend Yes --reason 'The release checks passed.' --default No
 }
-for ask_id in T1 T2 T3; do author "$FM_HOME_DIR" "$ask_id"; done
+for ask_id in T1 T2 T3 T4; do author "$FM_HOME_DIR" "$ask_id"; done
 adapter raise T1 'Ship T1' 'needs a call' release >/dev/null 2>&1 || fail "first hold raised no card"
 first=$(jq -r 'keys[0]' "$SIGNOFF_BOARD")
 answer_card "$first" 'use the cheap plan' '2026-10-12T10:05:00Z'
@@ -180,6 +201,38 @@ delivered | grep -qF "T3" || fail "a permanently skipped answer was not recorded
 [ -z "$(adapter poll 2>/dev/null)" ] || fail "a permanently skipped answer was offered again"
 printf '0' > "$INTAKE_RC"
 pass "a batch whose every skip is permanent is acknowledged and not offered again"
+
+[ -z "$(cat "$FEEDBACK_LOG" 2>/dev/null)" ] || fail "a card was marked Read before its note was picked up: $(cat "$FEEDBACK_LOG")"
+picked_up T2
+hold_as '2026-10-12T14:00:00Z#0'
+adapter raise T4 'Ship T4' 'needs a call' "done" >/dev/null 2>&1 || fail "hold T4 raised no card"
+key4=$(jq -r --arg a "$key" --arg b "$key3" 'keys[] | select(. != $a and . != $b)' "$SIGNOFF_BOARD")
+answer_card "$key4" 'go ahead' '2026-10-12T14:05:00Z'
+out=$(adapter poll 2>/dev/null) || fail "poll did not offer the next answer"
+[ "$(jq -r .card <<<"$out")" = "$key4" ] || fail "poll did not carry the board card: $out"
+[ "$(cat "$FEEDBACK_LOG")" = "feedback $key $SIGNOFF_BOARD --read" ] \
+  || fail "the picked-up card was not marked Read on the board, or another was: $(cat "$FEEDBACK_LOG")"
+adapter poll >/dev/null 2>&1
+[ "$(wc -l < "$FEEDBACK_LOG")" = 1 ] || fail "a card was marked Read twice: $(cat "$FEEDBACK_LOG")"
+pass "an answered card is marked Read on its board once the handler picks up its note, once, and never before"
+
+picked_up T3
+out=$(FEEDBACK_MODE=notfound adapter poll 2>"$TMP_ROOT/poll.err") || fail "NOT_FOUND broke the poll"
+[ "$(jq -r .answer <<<"$out")" = 'go ahead' ] || fail "NOT_FOUND kept the poll from offering the answer: $out"
+[ ! -s "$TMP_ROOT/poll.err" ] || fail "NOT_FOUND was reported: $(cat "$TMP_ROOT/poll.err")"
+adapter poll >/dev/null 2>&1
+[ "$(grep -c -- "feedback $key3 " "$FEEDBACK_LOG")" = 1 ] || fail "a NOT_FOUND card was asked again: $(cat "$FEEDBACK_LOG")"
+pass "sign-off's NOT_FOUND counts as done and leaves the poll undisturbed"
+
+runner start signoff >/dev/null 2>&1
+delivered | grep -qF "T4" || fail "the T4 answer was not acknowledged"
+picked_up T4
+out=$(FEEDBACK_MODE=old adapter poll 2>&1 >/dev/null) || true
+[ "$(grep -c 'no feedback command' <<<"$out")" = 1 ] || fail "an older sign-off-axi did not skip with one log line: $out"
+out=$(FEEDBACK_MODE=old adapter poll 2>&1 >/dev/null) || true
+[ -z "$out" ] && [ "$(grep -c -- "feedback $key4 " "$FEEDBACK_LOG")" = 1 ] \
+  || fail "an older sign-off-axi was asked again or logged again: $out"
+pass "a sign-off-axi without the feedback command skips with one log line and the poll goes on"
 
 TASKS_AXI_BIN=$(command -v tasks-axi 2>/dev/null || :)
 

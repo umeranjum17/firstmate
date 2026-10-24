@@ -35,6 +35,12 @@
 #     filers: the newest valid proof stays and the rest are archived, never deleted.
 #     A PR whose Checks block says `screen: none` gets a text-only Evidence card when its
 #     task folder has a sealed clean done-done receipt; the same key makes repeated posts no-ops.
+#     Feedback trail: for a PR, each sign-off card the task's brief ($FM_HOME/data/<task-id>/brief.md)
+#     or the PR body names on a line `sign-off cards: <key>[, <key>...]` is marked acted on, with
+#     `sign-off-axi feedback <key> <board.json> --acted --link <pr-url>` (or `--reply "<text>"` when a
+#     line `sign-off reply: <text>` gives the lead's outcome), once per card and PR, whatever happens to
+#     the evidence card. NOT_FOUND (nothing sent on the card) is done; a sign-off-axi older than 0.6.1
+#     skips with one line; any other failure is printed and the post goes on.
 #   merge-card screen-none <task-id> <pr-url|->, merge-card receipt <task-id> <head>
 #     Exit 0 when the merge declares `screen: none`, or when the task folder holds a sealed clean
 #     done-done run at <head>, there or in done-done's own evidence root (the card's passed-test receipt). Used by owner-rules' merge gate.
@@ -77,6 +83,8 @@ resolve_evidence() {
 
 # shellcheck source=account-pool/bin/fm-pool-claude-env.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/account-pool/bin/fm-pool-claude-env.sh"
+# shellcheck source=signoff/bin/fm-signoff-feedback-lib.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/signoff/bin/fm-signoff-feedback-lib.sh"
 
 # The executable selects before capturing judge JSON, keeping diagnostics out of it.
 pool_env_run() {
@@ -215,6 +223,23 @@ file_card() {
   case $sweep in *"archived 0 card"*) ;; *) printf '%s\n' "$sweep" ;; esac
 }
 
+# mark_acted <board> <task-id> <pr-url>: the feedback trail step in the header.
+mark_acted() {
+  local board=$1 id=$2 pr=$3 text reply card rc old=0 marked=$FM_HOME/data/$2/signoff-acted
+  text=$({ cat -- "$FM_HOME/data/$id/brief.md" 2>/dev/null; gh pr view "$pr" --json body --jq .body 2>/dev/null; })
+  reply=$(printf '%s\n' "$text" | sed -n 's/^[[:space:]]*sign-off reply:[[:space:]]*//p' | head -n 1)
+  while IFS= read -r card; do
+    ! grep -qxF "$card"$'\t'"$pr" "$marked" 2>/dev/null || continue
+    rc=0
+    if [ -n "$reply" ]; then fm_signoff_feedback "$card" "$board" --reply "${reply:0:500}" --link "$pr" || rc=$?
+    else fm_signoff_feedback "$card" "$board" --acted --link "$pr" || rc=$?; fi
+    case $rc in 0) ;; 3) old=1 ;; *) continue ;; esac
+    mkdir -p "${marked%/*}" && printf '%s\t%s\n' "$card" "$pr" >> "$marked"
+  done < <(printf '%s\n' "$text" | sed -n 's/^[[:space:]]*sign-off cards\{0,1\}:[[:space:]]*//p' |
+    tr -s ',` ' '\n' | grep -E '^[A-Za-z0-9._-]{1,128}$' | sort -u)
+  [ "$old" -eq 0 ] || echo "merge-card: sign-off-axi has no feedback command (needs 0.6.1+), so the PR's cards were not marked acted on"
+}
+
 post() {
   local board='' id wt head pr record key link title about kind media run receipt=null media_dir out rc n=0 f verdict claim
   local claim_id=() judge=()
@@ -235,6 +260,7 @@ post() {
     key=merge-$head link=$head
   fi
   key=${key:0:128}
+  [ "$pr" = - ] || mark_acted "$board" "$id" "$pr"
   # One card per PR: the first card takes the PR's key; a new head archives (dismisses) the live
   # card and posts its own under that key plus a head suffix, because sign-off-axi takes evidence
   # one post at a time and refuses a changed message under a key it already holds. The same head,

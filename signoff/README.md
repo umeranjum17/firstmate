@@ -21,6 +21,10 @@ does all three. The hook slice has to exec this adapter with the fork's argv
 (`poll`, `answers`, `ack`, `raise`) and keep the `ack` step. The full table and
 the decision are in the seam record kept with the evidence.
 
+## Feedback trail: Read
+
+Each `poll` round marks Read, with `sign-off-axi feedback <card> <board.json> --read` on the board `sign-off-axi status` names, every card in a captured result that this home's handler (Main, or the lead in a secondmate home) has concluded with `bin/fm-procevent.sh handled signoff <sequence>`: that is the pickup of the note carrying the owner's answer. It reads the captured results because the runner runs `answers` and `ack` from the Firstmate checkout's own adapter. A card is marked once per result (`state/signoff-read-marked`); NOT_FOUND counts as done and a sign-off-axi older than 0.6.1 skips with one log line. Like the rest of this adapter it runs only where this adapter's `poll` is the registered one. The merge side (Acted or Replied with the PR link) is in `merge-card post`.
+
 ## Firstmate owner engagement route
 
 `engage-route/bin/fm-engage-route.sh dispatch <board.json>` forwards each open Go deeper request only to the Firstmate task named by its filer, or to an explicit `config/engage-owners` binding.
