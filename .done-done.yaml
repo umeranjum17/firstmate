@@ -33,6 +33,8 @@ journeys:
     core: true
   merge-card-real-board:
     command: bash merge-card/tests/real-board.test.sh > "$DONE_DONE_EVIDENCE_ROOT/${RUN_ID}.log" 2>&1
+  merge-card-clean-clone:
+    command: bash merge-card/run-clean-clone-proof.sh > "$DONE_DONE_EVIDENCE_ROOT/${RUN_ID}.log" 2>&1
   merge-card-retitle:
     command: bash merge-card/run-retitle-proof.sh > "$DONE_DONE_EVIDENCE_ROOT/${RUN_ID}.log" 2>&1
   fleet-contract-check:

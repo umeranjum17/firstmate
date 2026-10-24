@@ -54,7 +54,15 @@ printf '%s\n' "$*" >>"$DD_LOG"
 case $1 in
   --version) case $MODE in older) echo 0.3.0 ;; *) echo 0.3.1 ;; esac; exit 0 ;;
 esac
-[ "${1:-}" = check ] || exit 0 # signoff: this checkout has no run record
+if [ "${1:-}" = signoff ]; then # no run record; with SIGNOFF_POSTS (the post opt-in) it files into --board, else the nearest .sign-off/ board
+  [ -n "${SIGNOFF_POSTS:-}" ] || exit 0
+  b=$PWD/.sign-off/decisions.json
+  while [ $# -gt 0 ]; do [ "$1" = --board ] && b=$2; shift; done
+  mkdir -p "${b%/*}" && { [ -f "$b" ] || echo '{"items":[]}' >"$b"; }
+  jq '.items += [{key:"dd-evidence-run"}]' "$b" >"$b.tmp" && mv "$b.tmp" "$b"
+  exit 0
+fi
+[ "${1:-}" = check ] || exit 0
 if [ "${2:-}" = --help ]; then
   echo "usage: done-done check --from <file | - | PR URL> [--claim-id <id>] [--judge]"
   case $MODE in newer | liar) echo "  --citation-base <dir>  resolve relative evidence names from <dir>" ;; esac
@@ -567,6 +575,26 @@ is "feedback: a refused card is marked on the next post" "$(wc -l <"$FB_LOG")" 4
 printf 'sign-off reply: The trail shows on every card.\n' >>"$home/data/fb/brief.md"
 fb_post 249 >/dev/null
 is "feedback: a reply line replies with the PR link" "$(head -n 1 "$FB_LOG")" "feedback design-two $work/board-fb.json --reply The trail shows on every card. --link https://github.com/o/r/pull/249"
+
+# A merge never dirties the project clone: with done-done's post opt-in on, the work copy is a real git
+# clone and the posts still land on the board and in the home's data folder, so git status stays clean.
+# A board left in the clone by an earlier run is reported on every post and never deleted.
+clone=$work/clone
+git init -q "$clone" && git -C "$clone" -c user.name=t -c user.email=t@t commit -q --allow-empty -m init
+checks clean shot.png && cp "$shot" "$home/data/clean/shot.png"
+export SIGNOFF_POSTS=1
+post_clone() { PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board-clean.json" clean "$clone" "$head_c" - 2>&1; }
+SO_CAPTURE=$work/card-clean post_clone >/dev/null
+is "clean clone: git status is clean after a post" "$(git -C "$clone" status --porcelain)" ""
+is "clean clone: no .sign-off was made in it" "$(ls -A "$clone")" ".git"
+is "clean clone: the card is on the board" "$(jq -r '[.items[].key | select(startswith("merge-"))] | length' "$work/board-clean.json")" 1
+is "clean clone: done-done's own card went to the board" "$(jq -r '[.items[].key | select(. == "dd-evidence-run")] | length' "$work/board-clean.json")" 1
+mkdir "$clone/.sign-off" && echo '{"items":[]}' >"$clone/.sign-off/decisions.json"
+SO_CAPTURE=$work/card-clean post_clone >"$work/stray.out"; post_clone >>"$work/stray.out"
+is "stray board: reported on each post" "$(grep -c 'stray board in the work copy' "$work/stray.out")" 2
+is "stray board: never deleted" "$(cat "$clone/.sign-off/decisions.json")" '{"items":[]}'
+is "stray board: nothing posted to it" "$(jq '.items | length' "$clone/.sign-off/decisions.json")" 0
+unset SIGNOFF_POSTS
 
 # No run anywhere posted, or even asked for, a report card.
 if grep -q -- '--kind report' "$SO_LOG"; then
