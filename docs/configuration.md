@@ -1077,6 +1077,7 @@ Pins are not inherited into secondmate homes: a local secondmate agent launches 
 A remote secondmate is launched on its host from its own home's configuration, so create the file in that remote home.
 
 [`bin/fm-worker-account-lib.sh`](../bin/fm-worker-account-lib.sh) owns parsing, the sign-in check, and the full list of credentials a Claude launch unsets; [runtime backend verification](verification/runtime-backends.md#worker-account-pin-sign-in-check) records the check against the real runners.
+The worker account pool (`config/account-pool` and `relaunch --account`) is owned by the firstmate-addons `account-pool` add-on, not this fork.
 
 ## Lavish server address (config/lavish-axi-host)
 
