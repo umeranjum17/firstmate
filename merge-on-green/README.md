@@ -21,7 +21,7 @@ block itself (filing the proof gap stays with the lead). Then it runs, in this o
    bypassed.
 
 Any refusal or FAIL prints one wake line naming the task, the PR URL and the first refusal reason,
-so the lead acts; the refusal is remembered per task+head+reason+receipt state in
+so the lead acts (the line ends with the routing: the lead merges through `bin/fm-pr-merge.sh` once it clears, and only a genuine hold — owner review, red CI, missing proof, security, destructive — goes to Main); the refusal is remembered per task+head+reason+receipt state in
 `<home>/data/fm-merge-on-green/<task>.refused` (never in `state/`), and repeats stay silent until
 `pr_head`, the run receipt or the reason changes. An evidence gate or the merge this check itself kills
 on its timeout wakes truthfully once per task+head+reason like a refusal, records no merge attempt, and

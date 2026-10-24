@@ -74,6 +74,7 @@ out=$(mog)
 check "b: exactly one line" "$(printf '%s\n' "$out" | wc -l)" 1
 has "b: names the task and URL" "$out" "NOT merging t2 https://github.com/ex/r/pull/2"
 has "b: first refusal reason" "$out" "checks-lint: FAIL: evidence: not proven: no verify skill ran"
+has "b: gate refusal says lead merges, genuine holds to Main" "$out" "merge through bin/fm-pr-merge.sh; only a genuine hold"
 check "b: no merge call" "$([ -e "$STUB_DIR/merge-calls" ] && echo called || echo never)" never
 rm "$STUB_DIR/lint-fail" "$FM/state/t2.meta" "$FM/state/t2.run-receipt.json"
 
@@ -102,6 +103,7 @@ touch "$STUB_DIR/merge-refuse"
 out=$(mog)
 check "e: refusal -> one line" "$(printf '%s\n' "$out" | wc -l)" 1
 has "e: refusal reason named" "$out" "required check ci is red"
+has "e: lead merges, only genuine holds go to Main" "$out" "merge through bin/fm-pr-merge.sh; only a genuine hold"
 check "e: refusal recorded the attempted head" "$(cat "$FM/data/fm-merge-on-green/t4.head")" "$H2"
 check "e: refused head silent on rerun" "$(mog)" ""
 check "e: no second merge attempt" "$(wc -l < "$STUB_DIR/merge-calls")" 2

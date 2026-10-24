@@ -55,12 +55,16 @@ first_reason() { # first non-empty line of a command's output, trimmed to keep t
   printf '%s' "$r"
 }
 
+# Every "NOT merging" wake line ends with this routing: a green lead-owned PR is the lead's to merge
+# (standing authority), not a card for Main; only a genuine hold goes up.
+LEAD_NOTE='lead: clear it and merge through bin/fm-pr-merge.sh; only a genuine hold (owner review, red CI, missing proof, security, destructive) goes to Main'
+
 timed_out() { [ "$1" = 124 ] || [ "$1" = 137 ]; }
 
 refuse() { # <reason> <receipt-stamp>: the wake line prints once per task+head+reason+receipt state,
   # remembered like the merge path in <task>.refused; silent while all three hold.
   [ "$(cat "$DATA/$task.refused" 2>/dev/null)" = "$(printf '%s\n%s\n%s\n' "$pr_head" "$1" "$2")" ] && return 0
-  echo "merge-on-green: NOT merging $task $pr: $1"
+  echo "merge-on-green: NOT merging $task $pr: $1; $LEAD_NOTE"
   mkdir -p "$DATA" 2>/dev/null
   printf '%s\n%s\n%s\n' "$pr_head" "$1" "$2" > "$DATA/$task.refused" 2>/dev/null || :
 }
@@ -143,8 +147,8 @@ for m in "$STATE"/*.meta; do
   # doubles as the merge's bound, so the whole remaining window is available to it.
   mbudget=$(( START + ${FM_CHECK_TIMEOUT:-30} - $(date +%s) - 1 ))
   [ "$mbudget" -ge "$BUDGET" ] || exit 0
-  mkdir -p "$DATA" || { echo "merge-on-green: NOT merging $task $pr: cannot write $DATA"; continue; }
-  printf '%s\n' "$pr_head" > "$DATA/$task.head" || { echo "merge-on-green: NOT merging $task $pr: cannot write $DATA/$task.head"; continue; }
+  mkdir -p "$DATA" || { echo "merge-on-green: NOT merging $task $pr: cannot write $DATA; $LEAD_NOTE"; continue; }
+  printf '%s\n' "$pr_head" > "$DATA/$task.head" || { echo "merge-on-green: NOT merging $task $pr: cannot write $DATA/$task.head; $LEAD_NOTE"; continue; }
   merge_out=$(FM_HOME="$FMH" timeout "$mbudget" "$FMH/bin/fm-pr-merge.sh" "$task" "$pr" 2>&1); merge_rc=$?
   if timed_out "$merge_rc"; then
     rm -f "$DATA/$task.head" 2>/dev/null || :
@@ -158,6 +162,6 @@ for m in "$STATE"/*.meta; do
     [ ! -e "$FMH/config/fleet-ledger" ] \
       || "$FMH/bin/fm-fleet-ledger.sh" appended "$FMH/config" "$STATE/$task.status" >/dev/null 2>&1 || :
   else
-    echo "merge-on-green: NOT merging $task $pr: fm-pr-merge refused: $(first_reason "$merge_out" "$merge_rc")"
+    echo "merge-on-green: NOT merging $task $pr: fm-pr-merge refused: $(first_reason "$merge_out" "$merge_rc"); $LEAD_NOTE"
   fi
 done
