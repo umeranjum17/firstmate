@@ -3,9 +3,9 @@
 // P0-P3 chip, how far its lane has got and its age; By release lays the open items in Next release, After and Later.
 // On a computer a By project list sits beside it. A row opens the ticket page: its description, the captain's words it
 // serves, its fields and its thread: the captain's comments with the lead's answers and, for a live lane, its status lines.
-import { html, useState, useEffect, useRef, now, dur, hm, prNum, hc, hname, I, IC } from './ui.js'
-import { squash, Entry } from './board.js'
-import { Tile, Chip, Row, LIC } from './look.js'
+import { html, useState, useEffect, useRef, now, dur, hm, prNum, hc, hname, I, IC, STAGES, ACTIVE, SNAME, state, plain } from './ui.js'
+import { squash, stageTimes } from './board.js'
+import { Tile, Chip, Row, LIC, PRIO, LABEL } from './look.js'
 
 export const IC_TICKET = html`<path d="M2.5 4.5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v2a1.5 1.5 0 0 0 0 3v2a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1v-2a1.5 1.5 0 0 0 0-3zM10 5.5v1M10 9.5v1"/>`
 const IC_RELEASE = html`<path d="M8 2.5l5.5 5.5L8 13.5 2.5 8z"/>`
@@ -15,7 +15,6 @@ const CAP = 30
 const at = u => typeof u === 'number' ? u : u ? Date.parse(`${u}T12:00:00`) / 1000 : 0
 const ago = u => typeof u === 'number' ? dur(now() - u) : u ? (k => k < 1 ? 'today' : `${k}d`)(Math.round((new Date().setHours(12, 0, 0, 0) / 1000 - at(u)) / 86400)) : ''
 const order = (s, ts) => [...ts].sort(s === 'done' ? (a, b) => at(b.updated) - at(a.updated) : (a, b) => (a.priority ?? 9) - (b.priority ?? 9) || at(b.updated) - at(a.updated))
-const PRIO = ['Urgent', 'High', 'Medium', 'Low']
 // Release lanes: a project's open items by target release. Next, After and Later are their own lanes; of a project's
 // named releases (v0.2.0, muxr 0.2.10) the lowest version is its Next release unless it already has items marked next.
 const LANES = [['next', 'Next release'], ['after', 'After'], ['later', 'Later']]
@@ -44,34 +43,61 @@ function Comment({ t, onSent }) {
       onSent({ at: Math.floor(Date.now() / 1000), text: text.trim(), to: a.to }); setText(''); setNote('')
     } catch (err) { setNote(`Not sent: ${err.message || err}`) } finally { setBusy(false) }
   }
-  return html`<form class="tk-say" onSubmit=${send}><textarea aria-label="Comment" placeholder=${t.home === 'main' ? 'Comment to Main…' : `Comment to the ${t.home} lead…`} maxlength="1000" rows="2" value=${text} onInput=${e => setText(e.target.value)}></textarea>
-    <div class="row"><small role="status">${note || 'Goes to the owning lead as a steer'}</small><span class="sp"></span><button class="btn" type="submit" disabled=${busy || !text.trim()}>Send</button></div></form>`
+  return html`<form class="tk-say" onSubmit=${send}><textarea aria-label="Comment" placeholder=${t.home === 'main' ? 'Comment to Main' : `Comment to the ${t.home} lead`} maxlength="1000" rows="1" value=${text} onInput=${e => setText(e.target.value)}></textarea>
+    <button class="send" type="submit" aria-label="Send" disabled=${busy || !text.trim()}>${I(LIC.send, 16)}</button></form><p class="note" role="status">${note || 'It reaches the owning lead as a steer.'}</p>`
 }
 const lead = (d, h) => h === 'main' ? 'Main' : `${hname(d, h)} lead`
-function TicketPage({ d, t, go }) {
-  const c = d.cards.find(x => x.id === t.id), n = prNum(t.pr), close = () => go({ ticket: null }), ref = useRef(), [sent, setSent] = useState([])
+// The seven stages a lane passes, each with the time it spent there.
+const STEPN = { queued: 'Queued', building: 'Build', review: 'Review', test: 'Test', ci: 'CI', merge: 'Merge', landed: 'Landed' }
+function Steps({ c }) {
+  const cur = STAGES.indexOf(c.stage), spent = stageTimes({ building: c.started, ...c.reached }, ACTIVE.indexOf(c.stage), c.stage === 'landed')
+  return html`<div class="tsteps">${STAGES.map((s, i) => html`<div class=${i < cur || c.stage === 'landed' ? 'done' : i === cur ? 'cur' : ''}><i></i><span>${STEPN[s]}</span>
+    <span class="num">${spent[i - 1] > 0 ? dur(spent[i - 1]) : ''}</span></div>`)}</div>`
+}
+// The ticket page: the reference's project page on a phone (a hero with the ticket's progress, three tiles, the
+// captain's words, then the thread as cards), Margin's job page on a computer (how far it has got stage by
+// stage, what happened as a timeline, the comment bar, and the fields with the captain's words beside).
+function TicketPage({ d, t, go, wide }) {
+  const c = d.cards.find(x => x.id === t.id), n = prNum(t.pr), close = () => go({ ticket: null }), ref = useRef(), [sent, setSent] = useState([]), [all, setAll] = useState(false), [open, setOpen] = useState(false)
   // a comment shows at once; the build's copy replaces it on the next refresh
   const said = [...(t.comments || []), ...sent.filter(x => !(t.comments || []).some(y => y.text === x.text))]
   useEffect(() => { ref.current?.focus(); const f = e => e.key === 'Escape' && close(); addEventListener('keydown', f); return () => removeEventListener('keydown', f) }, [t.id])
-  const P = (k, v) => v ? html`<dt>${k}</dt><dd>${v}</dd>` : ''
-  return html`<div class="scrim dim" onClick=${close}></div><aside class="peek" role="dialog" aria-label=${t.title} tabindex="-1" ref=${ref}>
-    <div class="bar"><span>${COLS.find(([s]) => s === t.state)[1]}</span><span class="sp"></span><button class="ib" onClick=${close} aria-label="Close">${I(IC.x)}</button></div>
-    <div class="body"><div class="id">${t.project || 'No project'}</div><h2>${t.title}</h2>${t.desc ? html`<p class="why tk-desc">${t.desc}</p>` : ''}
-      ${t.ask ? html`<blockquote class="tk-ask"><small>Serves your ask${t.ask.day ? ` of ${t.ask.day}` : ''}${t.ask.ref ? ` · ${t.ask.ref}` : ''}</small>“${t.ask.words}”</blockquote>` : ''}
-      <dl class="props">${P('Priority', t.priority != null && html`<span class=${'pill prio p' + t.priority}>P${t.priority}</span>${PRIO[t.priority] || ''}`)}
-        ${P('Release', html`${I(IC_RELEASE, 12)}${cap(t.release)}`)}
-        ${P('Owner', html`<span class="pill"><span class="sq" style=${{ '--c': hc(d, t.home) }}></span>${hname(d, t.home)}</span>`)}
-        ${P('Pull request', n && html`<a class="pill pr" href=${t.pr} target="_blank" rel="noreferrer">${I(IC.pr, 12)}#${n}</a>`)}
-        ${P('Proof', t.proof && html`<span class=${'num ' + (t.proof.receipt === 'FAIL' || t.proof.check && t.proof.check !== 'pass' ? 'bad' : '')}>${[t.proof.receipt && `Receipt ${t.proof.receipt}`,
-          t.proof.check && `done-done ${t.proof.check}`, t.proof.head].filter(Boolean).join(' · ')}</span>${t.proof.at ? html`<small>${hm(t.proof.at)}</small>` : ''}`)}
-        ${P('Last update', html`<span class="num">${ago(t.updated)}</span>${typeof t.updated === 'number' ? html`<small>${hm(t.updated)}</small>` : ''}`)}</dl>
-      <div class="h4">Activity</div><${Comment} t=${t} onSent=${x => setSent([...sent, x])}/>${c?.history.length || said.length ? html`<ul class="act">${[...said.flatMap(x => [{ ...x, mine: true }, ...(x.picked ? [{ at: x.picked, by: x.to, text: 'Picked up your comment', answer: true }] : []),
-          ...(x.replies || []).map(y => ({ ...y, at: y.at || x.at, answer: true }))]), ...squash(c?.history || [])]
-        .sort((a, b) => (b.at || 0) - (a.at || 0)).map(x => x.answer ? html`<li class="mine"><b class="ok"></b><div><div class="h"><strong>${lead(d, x.by)}</strong><span class="sp"></span><span class="num">${hm(x.at)}</span></div><p>${x.text}</p></div></li>`
-          : x.mine ? html`<li class="mine"><b class=${x.error ? 'bad' : 'ok'}></b><div><div class="h"><strong>You</strong><span class="sp"></span><span class="num">${hm(x.at)}</span></div>
-          <p>${x.text}</p><small>${x.error ? `Not delivered: ${x.error}` : x.to === 'main' ? 'Sent to Main' : `Sent to the ${lead(d, x.to)} as a steer`}</small></div></li>` : html`<${Entry} x=${x}/>`)}</ul>`
-        : html`<p class="empty">No status lines yet: the thread starts when a lane works on it.</p>`}
-    </div></aside>`
+  const p = pct(d, t), live = c && t.state !== 'done', wait = live && state(c)?.[0], col = COLS.find(([s]) => s === t.state)[1]
+  // the thread, newest first: the captain's comments with their pickup and answers, then the lane's status lines
+  const items = [...said.flatMap(x => [{ at: x.at, who: 'You', text: x.text, tone: x.error ? 'bad' : 'ok', note: x.error ? `Not delivered: ${x.error}` : x.to === 'main' ? 'Sent to Main' : `Sent to the ${lead(d, x.to)} as a steer` },
+    ...(x.picked ? [{ at: x.picked, who: lead(d, x.to), text: 'Picked up your comment', tone: 'ok' }] : []), ...(x.replies || []).map(y => ({ at: y.at || x.at, who: lead(d, y.by), text: y.text, tone: 'ok' }))]),
+    ...squash(c?.history || []).map(x => ({ at: x.at, who: x.n > 1 ? `${x.verb} ${x.n}×` : x.verb, text: plain(x.text) || x.verb, tone: x.tone }))].sort((a, b) => (b.at || 0) - (a.at || 0))
+  const card = x => html`<div class=${'soft tcard ' + (x.tone || '')}><div class="h">${x.who}<small class="num">${hm(x.at)}</small></div><p>${x.text}</p>${x.note ? html`<small>${x.note}</small>` : ''}</div>`
+  const more = k => items.length > k ? html`<button class="all" onClick=${() => setAll(!all)}>${all ? 'Show fewer' : 'See all'}</button>` : ''
+  const empty = html`<p class="empty">No status lines yet: the thread starts when a lane works on it.</p>`
+  const said1 = t.ask && html`${I(LIC.user, 16)}Your words${t.ask.day ? ` · ${t.ask.day}` : ''}${t.ask.ref ? ` · ${t.ask.ref}` : ''}`
+  const rows = [[LIC.bolt, 'Priority', html`<${Chip} p=${t.priority}/>${t.priority != null ? PRIO[t.priority] : 'Not set'}`], [IC.board, 'Project', html`<${Tile} d=${d} name=${proj(d, t)} small/>${proj(d, t)}`],
+    [LIC.user, 'Lead', lead(d, t.home)], [IC_RELEASE, 'Release', cap(t.release)],
+    [LIC.check, 'Proof', t.proof && html`<span class=${'num ' + (t.proof.receipt === 'FAIL' || t.proof.check && t.proof.check !== 'pass' ? 'bad' : '')}>${[t.proof.receipt && `Receipt ${t.proof.receipt}`,
+      t.proof.check && `done-done ${t.proof.check}`, t.proof.head].filter(Boolean).join(' · ')}</span>`],
+    [LIC.glass, 'Updated', html`<span class="num">${ago(t.updated)}</span>${typeof t.updated === 'number' ? html`<small>${hm(t.updated)}</small>` : ''}`]]
+  const fields = html`<section class="soft">${rows.map(([ic, k, v]) => v ? html`<div class="kv"><span>${I(ic, 16)}${k}</span><b>${v}</b></div>` : '')}
+    ${t.ask ? html`<div class="noted"><small>${said1}</small>“${t.ask.words}”</div>` : ''}</section>`
+  // a long description shows its first lines, as the reference does; a tap reads the rest
+  const desc = cls => t.desc ? html`<p class=${cls + (open ? ' open' : '')} title=${open ? '' : 'Show all'} onClick=${() => setOpen(!open)}>${t.desc}</p>` : ''
+  const say = html`<${Comment} t=${t} onSent=${x => setSent([...sent, x])}/>`
+  if (wide) return html`<aside class="tpage wide" role="dialog" aria-label=${t.title} tabindex="-1" ref=${ref}>
+    <div class="crumbs">${LABEL()}<span>›</span><a onClick=${close}>Tickets</a><span>›</span><${Tile} d=${d} name=${proj(d, t)} small/>${proj(d, t)}</div>
+    <div class="dhd"><div><h1>${t.title}</h1>${desc('clamp')}</div>${n ? html`<a class="gbtn" href=${t.pr} target="_blank" rel="noreferrer">${I(IC.pr, 16)}Pull request #${n}</a>` : ''}</div>
+    <div class="tgrid"><div><section class="soft"><div class="lhd"><h2>How far it has got</h2><span class="all num">${p}%</span></div>
+        <div class="pad">${c && c.stage !== 'queued' ? html`<${Steps} c=${c}/>` : html`<div class="pb"><span class="bar"><i style=${{ width: `${p}%` }}></i></span></div>`}
+        <p class="note">${live ? `Its lane: ${SNAME[c.stage]}${wait ? ` · ${wait}` : ''}` : col + (t.state === 'todo' ? ', no lane yet' : '')}</p></div></section>
+      <section class="soft"><div class="lhd"><h2>What happened</h2>${items.length ? html`<small class="num">${items.length}</small>` : ''}${items.length > 5 ? more(5) : items.length ? html`<span class="all quiet">Newest last</span>` : ''}</div>
+        ${!items.length ? empty : all ? html`<div class="pad">${items.map(card)}</div>` : html`<ol class="tl">${items.slice(0, 5).reverse().map(x => html`<li class=${x.tone || ''}><small class="num">${hm(x.at)}</small><b>${x.who}</b><p>${x.text}</p></li>`)}</ol>`}</section>
+      ${say}</div><div>${fields}</div></div></aside>`
+  return html`<aside class="tpage" role="dialog" aria-label=${t.title} tabindex="-1" ref=${ref}>
+    <div class="tbar"><button class="ib" onClick=${close} aria-label="Close">${I(LIC.back, 20)}</button><b>${proj(d, t)}</b>${n ? html`<a class="ib" href=${t.pr} target="_blank" rel="noreferrer" aria-label="Pull request">${I(IC.pr, 20)}</a>` : html`<span class="ib ghost"></span>`}</div>
+    <section class="soft hero"><h2>${t.title}</h2>${desc('tk-desc clamp')}
+      <div class="pb"><span class="bar"><i style=${{ width: `${p}%` }}></i></span><small class="num">${p}%</small></div><div class="st">${live ? html`${SNAME[c.stage]}${wait ? html` · <em>${wait}</em>` : ''}` : col}</div></section>
+    <div class="tiles3"><div class="soft"><span>${t.priority != null ? PRIO[t.priority] : 'No priority'}</span><b><${Chip} p=${t.priority}/></b></div>
+      <div class="soft"><span>Project</span><b><${Tile} d=${d} name=${proj(d, t)} small/><em>${proj(d, t)}</em></b></div><div class="soft"><span>Last update</span><b class="num">${ago(t.updated)}</b></div></div>
+    ${t.ask ? html`<section class="soft words"><label>${said1}</label><q>${t.ask.words}</q></section>` : ''}
+    <div class="lh"><h2>Activity</h2>${items.length ? html`<small class="num">${items.length}</small>` : ''}${more(3)}</div>${items.length ? (all ? items : items.slice(0, 3)).map(card) : empty}${say}</aside>`
 }
 // How far a ticket's lane has got, from Queued to Landed; a ticket with no lane takes its state.
 const STEP = { queued: 0, building: 17, review: 33, test: 50, ci: 67, merge: 83, landed: 100 }
@@ -124,5 +150,5 @@ export function Tickets({ d, r, go, wide }) {
   return html`<div class=${'tks' + (wide ? ' wide' : '')}>${unread.length ? html`<p class="sum"><span class="bad">Backlog not read: ${unread.map(h => hname(d, h)).join(', ')}</span></p>` : ''}
     ${wide ? html`<${Hero} ts=${ts} r=${r} go=${go} aside=${html`<${Tiles} d=${d}/>`}/><div class="kgrid"><div class="k8" style="display:flex;flex-direction:column;gap:16px">${body}</div><div class="k4"><${ByProject} d=${d} ts=${ts} go=${go}/></div></div>`
       : html`<${KindSeg} d=${d} r=${r} go=${go} counts/><div style="margin-top:16px"><${Hero} ts=${ts} r=${r} go=${go}/></div>${body}<${Tiles} d=${d}/>`}
-    ${page ? html`<${TicketPage} d=${d} t=${page} go=${go}/>` : ''}</div>`
+    ${page ? html`<${TicketPage} d=${d} t=${page} go=${go} wide=${wide}/>` : ''}</div>`
 }

@@ -6,7 +6,9 @@
 # The seed is the only home read: no real fleet, no credentials, no live writes.
 # FM_BIN names the Firstmate bin/ whose helper scripts the build runs (default: ~/firstmate/bin); the
 # queue reasons come from this checkout's fleet-flow reader, which the build reaches through FM_ADDONS_DIR.
-set -euo pipefail
+set -Eeuo pipefail
+# A browser step that times out stops the run under set -e; name it so a failed run says where.
+trap 'echo "run-core-proof: stopped at line $LINENO: $BASH_COMMAND" >&2' ERR
 : "${DONE_DONE_EVIDENCE_ROOT:?}"
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/.." && pwd)
@@ -38,6 +40,7 @@ seed() {
   mkdir -p "$home"/{data,state,config,stubs,locks,proc/pressure} "$bin"
   printf '3\n' > "$home/config/lane-target"
   printf 'main 3\n' > "$home/config/lane-caps"  # four open Main lanes against a cap of three: over the cap
+  printf 'Umer\n' > "$home/config/owner-name"  # the board's reader, named in the sidebar's foot
   cat > "$home/data/backlog.md" <<EOF
 ## In flight
 - [ ] m-build - Build the main thing (repo: alpha) (kind: ship) (since $today)
@@ -139,6 +142,8 @@ done
 [ -n "$url" ] || { cat "$home/serve.log" >&2; exit 1; }
 
 export CHROME_DEVTOOLS_AXI_SESSION=$session
+# a new session can start with its one blank tab unselected, and open then has no page to drive
+chrome-devtools-axi selectpage 1 >/dev/null 2>&1 || true
 chrome-devtools-axi open "$url#/board" >/dev/null
 chrome-devtools-axi resize 390 844 >/dev/null
 chrome-devtools-axi wait "m-stuck" >/dev/null
@@ -215,7 +220,7 @@ done
 chrome-devtools-axi eval 'localStorage.setItem("fm-theme", "dark")' >/dev/null
 for w in 390 1280; do
   shot "tickets-dark-$w" "?dark-$w#/tickets" "$w" 'Your asks done'
-  shot "ticket-page-dark-$w" "?dark-page-$w#/tickets?ticket=main/m-ask" "$w" 'Serves your ask'
+  shot "ticket-page-dark-$w" "?dark-page-$w#/tickets?ticket=main/m-ask" "$w" 'Your words'
 done
 chrome-devtools-axi eval 'localStorage.removeItem("fm-theme")' >/dev/null
 # The app opens on Tickets, and the phone's pill nav has one button per view, each named; the current one shows its name.
@@ -240,11 +245,12 @@ jq -e '(.tickets[] | select(.task == "m-long")) as $t
   and ([.tickets[] | select(.task == "m-ci")][0].proof == {"receipt": "PASS", "head": "abc1234", "at": '"$(jq '.at' "$home/state/m-ci.run-receipt.json")"', "check": "pass"})' \
   "$home/state/dashboard/board.json" >/dev/null || { echo "run-core-proof: whole names, ask refs or proof wrong: $(jq -c '[.tickets[] | select(.task == "m-long" or .task == "m-ci") | {title, desc, ask, proof}]' "$home/state/dashboard/board.json")" >&2; exit 1; }
 [ "$(jq length "$home/state/dashboard/full-text.json")" = 1 ] || { echo "run-core-proof: full-text cache does not hold exactly the one cut item" >&2; exit 1; }
-for w in 390 1280; do shot "ticket-long-$w" "#/tickets?ticket=main/m-long" "$w" 'reads to its very end'; shot "ticket-proof-$w" "#/tickets?ticket=main/m-ci" "$w" 'Receipt PASS'; done
-grep -qF 'Receipt PASS · done-done pass · abc1234' "$DONE_DONE_EVIDENCE_ROOT/ticket-proof-390.txt" && grep -qF 'Main77' "$DONE_DONE_EVIDENCE_ROOT/ticket-long-390.txt" \
+for w in 390 1280; do shot "ticket-long-$w" "#/tickets?ticket=main/m-long" "$w" 'reads to its very end'; done
+shot ticket-proof-1280 '#/tickets?ticket=main/m-ci' 1280 'Receipt PASS'  # the fields card is the computer's; a phone has the three tiles
+grep -qF 'Receipt PASS · done-done pass · abc1234' "$DONE_DONE_EVIDENCE_ROOT/ticket-proof-1280.txt" && grep -qF 'Main77' "$DONE_DONE_EVIDENCE_ROOT/ticket-long-390.txt" \
   || { echo "run-core-proof: the ticket page lacks the proof line or the ask's Main message" >&2; exit 1; }
 # The ticket page: the description without bookkeeping, the captain's words it serves, and the lane's status lines.
-for w in 390 1280; do shot "ticket-page-$w" '#/tickets?ticket=main/m-ask' "$w" 'Serves your ask'; done
+for w in 390 1280; do shot "ticket-page-$w" '#/tickets?ticket=main/m-ask' "$w" 'Your words'; done
 shot ticket-held-390 '#/tickets?ticket=main/m-held' 390 'Main decides: wait for the new layout.'
 # A comment needs the owner's sign-off board token, which the board's sign-off-<port> cookie carries: none, a wrong one
 # or a form post is refused, an unknown ticket too. With the board's cookie in the browser, as opening the board's link
@@ -293,7 +299,7 @@ jq -e '(.tickets[] | select(.task == "m-ask")) as $t | $t.ask == {"words": "Show
   and ([.tickets[] | select(.task == "m-held")][0] | .desc == "Main decides: wait for the new layout." and .ask.day == "22 Oct")' \
   "$home/state/dashboard/board.json" >/dev/null || { echo "run-core-proof: ticket page fields wrong: $(jq -c '.tickets[] | select(.task == "m-ask")' "$home/state/dashboard/board.json")" >&2; exit 1; }
 for w in 390 1280; do
-  for want in "Serves your ask of 22 Oct" "Two layouts are drawn" "Needs a decision" "Owner"; do
+  for want in "Your words · 22 Oct · Main42" "Two layouts are drawn" "Main decides" $([ "$w" = 390 ] || echo Lead); do
     grep -qF -- "$want" "$DONE_DONE_EVIDENCE_ROOT/ticket-page-$w.txt" || { echo "run-core-proof: ticket page at $w lacks '$want'" >&2; exit 1; }
   done
 done
@@ -303,6 +309,9 @@ for w in 390 1280; do
   done
   grep -qF -- "Link the alpha npm package to GitHub?" "$DONE_DONE_EVIDENCE_ROOT/needs-$w.txt" || { echo "run-core-proof: Needs you at $w lacks the ask" >&2; exit 1; }
 done
+# The computer's sidebar foot names the board's reader (config/owner-name) and when the board was read, in UTC.
+grep -qF 'Umer' "$DONE_DONE_EVIDENCE_ROOT/tickets-1280.txt" && grep -qE 'Board read [0-9]{2}:[0-9]{2} UTC' "$DONE_DONE_EVIDENCE_ROOT/tickets-1280.txt" \
+  || { echo "run-core-proof: the sidebar foot lacks the reader or the board's read time" >&2; exit 1; }
 # Release lanes: a project's lowest named release is its Next release (alpha v0.2.0), a literal next stays Next
 # (beta), a later named release is After, and no release line is Later; done work is not in a lane.
 cols() { chrome-devtools-axi eval '(() => { document.querySelectorAll(".lane .all").forEach(b => b.textContent === "See all" && b.click()); return 1 })()' >/dev/null; sleep 0.5
