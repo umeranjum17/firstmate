@@ -148,6 +148,8 @@ jobs:
       # Throwaway XDG_DATA_HOME: the installer and check touch nothing real.
       - name: Task priority test
         run: bash task-priority/tests/task-priority.test.sh
+      - name: Tickets sync real-board journey
+        run: npm install --global sign-off-axi && FM_TEST_FORK="$RUNNER_TEMP/firstmate" bash tickets-sync/tests/sync.test.sh
       # Stub Firstmate checkout and a fixture home: no real board, hook or launcher is touched.
       - name: Bearings board test
         run: bash bearings-board/tests/bearings-board.test.sh
