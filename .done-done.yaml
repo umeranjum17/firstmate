@@ -16,6 +16,8 @@ journeys:
     command: bash pipeline-quota-failover/run-live-proof.sh
   fleet-dashboard-wait-reasons:
     command: bash fleet-dashboard/run-proof.sh
+  claude-quota-pool:
+    command: bash claude-quota/tests/claude-quota.test.sh > "$DONE_DONE_EVIDENCE_ROOT/${RUN_ID}.log" 2>&1
   claude-accounts-quota:
     command: bash claude-accounts/run-proof.sh
   claude-accounts-pick:
