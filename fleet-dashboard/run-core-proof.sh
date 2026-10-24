@@ -216,9 +216,11 @@ for w in 390 1280; do
   shot "ticket-page-dark-$w" "?dark-page-$w#/tickets?ticket=main/m-ask" "$w" 'Serves your ask'
 done
 chrome-devtools-axi eval 'localStorage.removeItem("fm-theme")' >/dev/null
-# The app opens on Tickets, and the phone dock names each view under its icon.
+# The app opens on Tickets, and the phone's pill nav has one button per view, each named; the current one shows its name.
 shot landing-390 '?landing' 390 'Waiting on captain'
-for want in Tickets Board Metrics Insights 'Needs you'; do grep -qF -- "$want" "$DONE_DONE_EVIDENCE_ROOT/landing-390.txt" || { echo "run-core-proof: the landing page or dock lacks '$want'" >&2; exit 1; }; done
+chrome-devtools-axi eval 'JSON.stringify([...document.querySelectorAll(".dock a")].map(a => a.getAttribute("aria-label") + (a.getAttribute("aria-current") ? " (current)" : "")))' >"$DONE_DONE_EVIDENCE_ROOT/landing-dock.txt"
+for want in 'Tickets (current)' 'Needs you' Board Metrics Insights; do grep -qF -- "$want" "$DONE_DONE_EVIDENCE_ROOT/landing-dock.txt" || { echo "run-core-proof: the phone pill nav lacks '$want'" >&2; exit 1; }; done
+grep -qF 'Fleet dashboard' "$DONE_DONE_EVIDENCE_ROOT/landing-390.txt" || { echo "run-core-proof: the landing page lacks the Fleet dashboard label" >&2; exit 1; }
 # Tickets: the backlog mapped to board columns, and only the ask list waits on the captain; a Board card drops tags and Main refs too.
 jq -e '([.tickets[] | {(.task): .state}] | add) as $s | ([.tickets[] | {(.task): .}] | add) as $t
   | $s["m-build"] == "progress" and $s["m-ci"] == "review" and $s["m-held"] == "hold" and $s["m-ready"] == "todo" and $s["m-shipped"] == "done"

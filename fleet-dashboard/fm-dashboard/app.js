@@ -6,6 +6,12 @@ import { TABS, inTab, byStage, stagesOf, Board, MobileKanban, Detail } from './b
 import { Insights } from './insights.js'
 import { Tickets, IC_TICKET } from './tickets.js'
 const IC_CHART = html`<path d="M2.5 13.5h11M4.5 11V8.5M8 11V4.5M11.5 11V7"/>`
+const IC_METRICS = html`<path d="M8 2.5a5.5 5.5 0 1 0 5.5 5.5H8z"/><path d="M10 1.8a4.6 4.6 0 0 1 4.2 4.2H10z"/>`
+
+// the views, in nav order, for the phone's pill nav and the desktop sidebar; the epics view slots in as one more entry
+const NAV = [['tickets', IC_TICKET, 'Tickets'], ['needs', IC.inbox, 'Needs you'], ['board', IC.board, 'Board'], ['overview', IC_METRICS, 'Metrics'], ['insights', IC_CHART, 'Insights']]
+// the one label every view carries, so each screen names the dashboard it belongs to
+const LABEL = (extra = '') => html`<span class="dash"><i>F</i>Fleet dashboard${extra}</span>`
 
 const POLL_MS = 10000, STALE_S = 15 * 60, WIDE = '(min-width: 760px)'
 
@@ -377,34 +383,31 @@ function App() {
   const toggleTheme = () => { const t = root.dataset.theme === 'dark' ? 'light' : 'dark'; root.dataset.theme = t; setTheme(t); try { localStorage.setItem('fm-theme', t) } catch {} }
   useKeys(r, go, setPal, setKeys, toggleTheme, pal, keys)
   const d = st.data
-  useEffect(() => { document.title = d?.asks?.length ? `(${d.asks.length}) Fleet` : 'Fleet' }, [d])
+  useEffect(() => { document.title = d?.asks?.length ? `(${d.asks.length}) Fleet dashboard` : 'Fleet dashboard' }, [d])
   if (!d) return html`<div class="none" style="height:100vh">${st.err ? `Cannot load the fleet: ${st.err}` : ''}</div>`
   const cards = filterCards(d, r), open = d.cards.filter(c => ACTIVE.includes(c.stage)), stk = open.filter(stuck)
   const asks = d.asks?.length, today = total(d, d.landed.at(-1), 'landed'), opencard = id => go({ card: id })
   const count = t => t === 'all' ? null : total(d, d.cards.filter(c => inTab(t, c)).length, t)
   const shown = cards.filter(c => inTab(r.tab, c))
   const list = (byStage(r.tab) ? stagesOf(r.tab, r.stage) : [r.tab]).flatMap(s => sorted(shown.filter(c => c.stage === s)))
-  const title = { board: 'Board', tickets: 'Tickets', overview: 'Metrics', insights: 'Insights', needs: 'Needs you' }[r.view]
+  const title = NAV.find(([v]) => v === r.view)[2]
   const overlays = html`${r.card && html`<${Detail} d=${d} id=${r.card} go=${go} list=${list}/>`}
     ${pal && html`<${Palette} d=${d} go=${go} close=${() => setPal(false)} toggleTheme=${toggleTheme}/>`}${keys && html`<${Shortcuts} close=${() => setKeys(false)}/>`}`
   const body = r.view === 'tickets' ? html`<${Tickets} d=${d} r=${r} go=${go} wide=${wide}/>` : r.view === 'overview' ? html`<${Overview} d=${d} od=${ov} go=${go}/>` : r.view === 'insights' ? html`<${Insights} d=${d}/>` : r.view === 'needs' ? html`<${Needs} d=${d}/>` : null
   if (!wide) return html`<div class="phone">
-    <div class="top"><h1>${title}</h1><div class="caps">${r.view === 'board' ? html`<${Filters} d=${d} r=${r} go=${go}/>` : ''}<button class="ib" onClick=${toggleTheme} aria-label="Light or dark theme">${I(themeIcon(), 18)}</button></div></div>
+    <header class="top">${LABEL()}<div class="tr"><h1>${title}</h1><div class="caps">${r.view === 'board' ? html`<${Filters} d=${d} r=${r} go=${go}/>` : ''}<button class="ib" onClick=${toggleTheme} aria-label="Light or dark theme">${I(themeIcon(), 20)}</button></div></div></header>
     <div class="sum"><${Live} d=${d} st=${st} refresh=${refresh}/></div>
     ${r.view === 'board' ? html`<div class="sum"><b>${asks == null ? 'Ask list unreadable' : asks ? `${asks} need${asks > 1 ? '' : 's'} you` : 'Nothing needs you'}</b> · <span>${total(d, open.length)} in flight</span> · <span class=${stk.length ? 'bad' : ''}>${total(d, stk.length)} stuck</span> · <span>${today} landed today</span></div>
       <div class="seg">${TABS.map(([t, n]) => html`<button aria-pressed=${r.tab === t} onClick=${() => go({ tab: t })}>${n === 'Landed today' ? 'Landed' : n}${count(t) != null ? html`<small class="num">${count(t)}</small>` : ''}</button>`)}</div>
       <${Chips} d=${d} r=${r} go=${go}/><${MobileKanban} d=${d} cards=${shown} r=${r} open=${opencard}/>` : body}
-    <div class="dock"><nav>${[['tickets', IC_TICKET, 'Tickets'], ['board', IC.board, 'Board'], ['overview', IC.display, 'Metrics'], ['insights', IC_CHART, 'Insights'], ['needs', IC.inbox, 'Needs you']].map(([v, ic, n]) =>
-      html`<a href=${'#/' + v} aria-current=${r.view === v ? 'page' : null}>${I(ic, 20)}<span>${n}</span>${v === 'needs' && asks ? html`<span class="badge">${asks}</span>` : ''}</a>`)}</nav>
-      <button onClick=${() => setPal(true)} aria-label="Search">${I(IC.search, 20)}</button></div>${overlays}</div>`
+    <div class="dock"><nav aria-label="Views">${NAV.map(([v, ic, n]) =>
+      html`<a href=${'#/' + v} aria-label=${n} aria-current=${r.view === v ? 'page' : null}>${I(ic, 20)}<span>${n}</span>${v === 'needs' && asks && r.view !== v ? html`<span class="badge">${asks}</span>` : ''}</a>`)}</nav>
+      <button onClick=${() => setPal(true)} aria-label="Search">${I(IC.search, 24)}</button></div>${overlays}</div>`
   return html`<div class="app">
     <nav class="side">
-      <div class="ws"><span class="logo">F</span><b>Fleet</b><span class="sp"></span><button class="ib" onClick=${() => setPal(true)} aria-label="Search" title="Search (⌘K)">${I(IC.search)}</button></div>
-      <a class="nav" href="#/tickets" aria-current=${r.view === 'tickets' ? 'page' : null}>${I(IC_TICKET)}Tickets<span class="n num">${(d.tickets || []).filter(t => t.state !== 'done').length}</span></a>
-      <a class="nav" href="#/needs" aria-current=${r.view === 'needs' ? 'page' : null}>${I(IC.inbox)}Needs you${asks ? html`<span class="badge">${asks}</span>` : html`<span class="n num">${asks ?? '?'}</span>`}</a>
-      <a class="nav" href="#/board" aria-current=${r.view === 'board' && !r.home.length ? 'page' : null} onClick=${() => go({ view: 'board', home: [] })}>${I(IC.board)}Board<span class="n num">${total(d, open.length)}</span></a>
-      <a class="nav" href="#/overview" aria-current=${r.view === 'overview' ? 'page' : null}>${I(IC.display)}Metrics</a>
-      <a class="nav" href="#/insights" aria-current=${r.view === 'insights' ? 'page' : null}>${I(IC_CHART)}Insights</a>
+      ${LABEL()}<button class="dsearch" onClick=${() => setPal(true)} title="Search (⌘K)">${I(IC.search)}Search<kbd>⌘K</kbd></button>
+      ${NAV.map(([v, ic, n]) => html`<a class="nav" href=${'#/' + v} aria-current=${r.view === v && !(v === 'board' && r.home.length) ? 'page' : null} onClick=${v === 'board' ? () => go({ view: 'board', home: [] }) : null}>${I(ic)}${n}
+        ${v === 'needs' ? (asks ? html`<span class="badge">${asks}</span>` : html`<span class="n num">${asks ?? '?'}</span>`) : v === 'tickets' ? html`<span class="n num">${(d.tickets || []).filter(t => t.state !== 'done').length}</span>` : v === 'board' ? html`<span class="n num">${total(d, open.length)}</span>` : ''}</a>`)}
       <div class="sec">Homes</div>
       ${d.homes.map(h => { const cs = open.filter(c => c.home === h.id)
         return html`<button class="nav home-nav" aria-label=${h.name} title=${h.name} aria-current=${r.view === 'board' && r.home.length === 1 && r.home[0] === h.id ? 'page' : null} onClick=${() => go({ view: 'board', home: [h.id], card: null })}>
@@ -412,7 +415,7 @@ function App() {
       <div class="foot"><${Live} d=${d} st=${st} refresh=${refresh}/><span class="sp"></span><button class="ib" onClick=${toggleTheme} aria-label="Light or dark theme">${I(themeIcon())}</button></div>
     </nav>
     <main class="main">
-      <header class="hd"><h1>${title}</h1>
+      <header class="hd"><div class="tx">${LABEL(html`<em>› ${title}</em>`)}<h1>${title}</h1></div>
         ${r.view === 'board' ? html`${TABS.map(([t, n]) => html`<button class="tab" aria-pressed=${r.tab === t} onClick=${() => go({ tab: t })}>${n}${count(t) != null ? html`<small class="num">${count(t)}</small>` : ''}</button>`)}
           <span class="sp"></span>
           <div class="kpi num"><a href="#/needs">Needs you <b>${asks ?? '?'}</b></a><button class=${stk.length ? 'bad' : ''} onClick=${() => go({ tab: 'active', state: ['blocked', 'decision'], stage: [], card: null })}>Stuck <b>${total(d, stk.length)}</b></button>
