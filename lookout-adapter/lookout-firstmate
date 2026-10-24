@@ -2,14 +2,15 @@
 """lookout-firstmate - print or serve this fleet as Lookout's lookout.fleet.v1 document (read-only).
 
   lookout-firstmate [--home DIR] [--no-build]            print the JSON
-  lookout-firstmate --serve [--port N] [--bind ADDR]     serve it at /fleet.json (Lookout's --adapter URL)
+  lookout-firstmate --serve [--port N] [--bind ADDR]     serve it at /fleet.json (Lookout's --adapter URL), the last good
+                                                         snapshot at once, rebuilt in the background every --every seconds
 
 The data is the fleet dashboard builder's own output (fleet-dashboard/fm-dashboard.sh build), reused as is: state/dashboard/
 data.json and board.json under FM_HOME. A build older than 2 minutes is rebuilt first (it writes only under state/dashboard)
 unless --no-build. Homes, their state files and every other source are only read; only whitelisted fields are copied, so no
 key, token or account secret reaches the document. FM_HOME defaults to the current directory's Firstmate home.
 """
-import json, os, re, socket, subprocess, sys, time, argparse
+import json, os, re, socket, subprocess, sys, threading, time, argparse
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -113,7 +114,7 @@ def build_fleet(home, build=True, proc='/proc'):
     for c in board.get('cards', []):
         if c['home'] not in known or c['id'] in cards or c['stage'] == 'queued':  # a ready backlog item holds no lane
             continue
-        lane = {'id': c['id'], 'home': c['home'], 'title': c['title'].split('\n')[0], 'project': projects.get(c['id']) or c['home'], 'stage': STAGES.get(c['stage'], 'queued'),
+        lane = {'id': c['id'], 'home': c['home'], 'title': c['title'].split('\n')[0], 'project': projects.get(c['id']) or c['home'], 'stage': 'done' if c['state'] == 'finished' else STAGES.get(c['stage'], 'queued'),
                 'stuck': c['state'] == 'blocked', 'started_at': iso(c.get('started') or c['since']), 'updated_at': iso(c['since'])}
         if c.get('pr'):
             lane['pr_url'] = c['pr']
@@ -153,6 +154,8 @@ def main(argv):
     p.add_argument('--serve', action='store_true')
     p.add_argument('--port', type=int, default=4391)
     p.add_argument('--bind', default='127.0.0.1')
+    p.add_argument('--every', type=int, default=30)
+    p.add_argument('--cold-wait', type=int, default=120)
     a = p.parse_args(argv)
     make = lambda: build_fleet(a.home, not a.no_build, a.proc)
     if not a.serve:
@@ -160,20 +163,39 @@ def main(argv):
         print()
         return 0
 
+    snap = {}  # the last good document; a failed rebuild keeps it, and its own generated_at tells the page how old it is
+
+    def refresh():
+        try:
+            snap['doc'] = json.dumps(make())
+            snap.pop('err', None)
+        except Exception as e:  # the cause is shown only while there is no snapshot to serve
+            snap['err'] = str(e)
+
+    def keep_fresh():
+        while True:
+            refresh()
+            time.sleep(a.every)
+
     class H(BaseHTTPRequestHandler):
         def do_GET(self):
-            try:
-                code, body = 200, json.dumps(make()) if self.path in ('/', '/fleet.json') else None
-                if body is None:
-                    code, body = 404, json.dumps({'error': 'not found'})
-            except Exception as e:  # the cause reaches Lookout, which shows it as the source error
-                code, body = 502, json.dumps({'error': str(e)})
+            if self.path not in ('/', '/fleet.json'):
+                code, body = 404, json.dumps({'error': 'not found'})
+            elif 'doc' in snap:
+                code, body = 200, snap['doc']
+            else:  # cold start: wait for the first build
+                for _ in range(a.cold_wait * 10):
+                    if 'doc' in snap or 'err' in snap:
+                        break
+                    time.sleep(0.1)
+                code, body = (200, snap['doc']) if 'doc' in snap else (502, json.dumps({'error': snap.get('err', 'the first build is still running')}))
             self.send_response(code)
             self.send_header('content-type', 'application/json')
             self.end_headers()
             self.wfile.write(body.encode())
         log_message = lambda *x: None
 
+    threading.Thread(target=keep_fresh, daemon=True).start()
     srv = ThreadingHTTPServer((a.bind, a.port), H)
     print(f'lookout-firstmate serving http://{a.bind}:{srv.server_port}/fleet.json', flush=True)
     srv.serve_forever()
