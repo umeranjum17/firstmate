@@ -5799,9 +5799,9 @@ if [ -n "$WORKER_ACCOUNT" ]; then
   case "$HARNESS" in
   claude)
     if [ -n "$WORKER_ACCOUNT_ROOT" ]; then
-      LAUNCH="$(fm_worker_account_claude_shed) CLAUDE_CONFIG_DIR=$(shell_quote "$WORKER_ACCOUNT_ROOT") $LAUNCH"
+      LAUNCH="$(fm_worker_account_claude_shed "$FM_WORKER_ACCOUNT_CLAUDE_SHED") CLAUDE_CONFIG_DIR=$(shell_quote "$WORKER_ACCOUNT_ROOT") $LAUNCH"
     else
-      LAUNCH="$(fm_worker_account_claude_shed) -u CLAUDE_CONFIG_DIR $LAUNCH"
+      LAUNCH="$(fm_worker_account_claude_shed "$FM_WORKER_ACCOUNT_CLAUDE_SHED") -u CLAUDE_CONFIG_DIR $LAUNCH"
     fi
     ;;
   pi | pi-signed)

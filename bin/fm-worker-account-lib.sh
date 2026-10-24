@@ -280,14 +280,16 @@ fm_worker_account_select() {
   printf '%s\t%s\t%s\n' "$declared" "$root" "$provider"
 }
 
-# fm_worker_account_claude_shed
-# Prints the `env` launch prefix that unsets the environment credentials Claude
-# ranks above a pinned root's stored login. The caller appends the root
-# assignment, or -u CLAUDE_CONFIG_DIR for the ordinary account.
+# fm_worker_account_claude_shed <names>
+# Prints the `env` launch prefix that unsets the space-separated environment
+# credentials in <names> - the credentials Claude ranks above the selected
+# root's stored login. The caller passes the pin's FM_WORKER_ACCOUNT_CLAUDE_SHED
+# list or a pool pick's own unset list, and appends the root assignment (or
+# -u CLAUDE_CONFIG_DIR for the ordinary account).
 fm_worker_account_claude_shed() {
-  local var prefix=env
-  for var in $FM_WORKER_ACCOUNT_CLAUDE_SHED; do
-    prefix="$prefix -u $var"
+  local name prefix=env
+  for name in $1; do
+    prefix="$prefix -u $name"
   done
   printf '%s\n' "$prefix"
 }
