@@ -23,9 +23,9 @@
 # This script forks the watcher as a tracked child, then VERIFIES the outcome
 # before it settles in. It confirms a watcher process is genuinely alive AND the
 # liveness beacon (state/.last-watcher-beat) is fresh within FM_GUARD_GRACE (the
-# single source of truth, shared with fm-watch.sh and fm-guard.sh). A new
-# watcher expires the predecessor beacon and beats after its task scan, so
-# confirmation proves resumed supervision, then this script prints
+# single source of truth, shared with fm-watch.sh and fm-guard.sh). Beacon
+# publication follows docs/turnend-guard.md "Guard grace and the poll cadence".
+# After confirmation this script prints
 # exactly one unambiguous status line:
 #   watcher: started pid=<N> (beacon fresh)              - it launched one and confirmed it
 #   watcher: attached pid=<N> (beacon <age>s)            - a live+fresh successor holds the lock;

@@ -242,6 +242,11 @@ fm_watcher_stall_bound() {
   printf '%s\n' "${FM_WATCHER_STALL_BOUND:-$((grace * 3))}"
 }
 
+# Shared startup budget in seconds: platform startup allowance (10, or 30 on
+# MSYS) plus signal grace and one timeout plus rounding second per check file.
+# FM_ARM_CONFIRM_TIMEOUT replaces that scan allowance; a verified stalled live
+# holder adds 15 seconds even with the override, so eviction can finish before
+# a caller declares failure. Adapter callers add their own transport margin.
 fm_watcher_confirmation_budget() {
   local state=$1 watch_path=$2 home=$3 budget check pid
   case "${OSTYPE:-}" in

@@ -195,7 +195,9 @@
 # starts in its place, printing "watcher: replaced stalled pid <N> (...)". A
 # holder that survives the five-second TERM grace is re-verified as the same
 # stalled lock holder before KILL; an unproved or surviving holder keeps the
-# refusal and the nonzero exit.
+# refusal and the nonzero exit. The replacement safeguards, including recorded
+# child retirement and missing-beacon handling, are owned by
+# docs/turnend-guard.md "Guard grace and the poll cadence".
 # Once per poll the watcher also checks that its home (when it existed at
 # start), its state directory, and its own bin directory still exist; when one
 # is gone it logs "watcher: exiting - <what> no longer exists: <path>" to stderr
@@ -318,10 +320,9 @@ fi
 # turn-ended signature, annotation staleness checks, and guarded bookkeeping writes.
 
 POLL=${FM_POLL:-15}                   # seconds between cycles
-# The liveness beacon is touched once per cycle, immediately before the
-# terminal wait below (event_wait_or_sleep) as well as at the top of the next
-# one, so a healthy cycle's beacon can legitimately age up to POLL seconds
-# between touches. fm_poll_derived_grace (bin/fm-wake-lib.sh, already sourced
+# Beacon publication and scan timing are owned by docs/turnend-guard.md
+# "Guard grace and the poll cadence".
+# fm_poll_derived_grace (bin/fm-wake-lib.sh, already sourced
 # transitively above) is the single owner of the max(300, poll+60)
 # derivation - see docs/turnend-guard.md "Guard grace and the poll cadence".
 # This recomputes the library default above now that the real configured
@@ -2972,7 +2973,8 @@ watcher_record_children() {
 # is never touched. After a five-second TERM grace, recheck the lock, original
 # identity, and stalled beacon before KILL: Bash can inherit ignored TERM and
 # cannot reset it with `trap - TERM`. Never use a name or pattern match.
-# Succeeds only once the holder has exited within the bounded waits.
+# Succeeds only once the holder and identity-matched descendants are retired
+# within the bounded waits; the steal mutex excludes concurrent reclamation.
 evict_stalled_holder() {
   local status
   fm_lock_try_acquire_steal_mutex "$WATCH_LOCK.steal" || return 1
