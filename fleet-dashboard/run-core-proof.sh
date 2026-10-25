@@ -35,7 +35,9 @@ lane() {  # <task> <kind> <status line>...
 }
 
 seed() {
-  local now today held_day
+  local now today held_day ask_title
+  ask_title="Choose the layout for the new screen"
+  [ "${README_HERO_ONLY:-0}" != 1 ] || ask_title="Choose phone layout"
   now=$(date +%s) today=$(date +%F) held_day=$(date -d '7 days ago' +%F)
   mkdir -p "$home"/{data,state,config,stubs,locks,proc/pressure} "$bin"
   printf '3\n' > "$home/config/lane-target"
@@ -47,7 +49,7 @@ seed() {
   release: v0.2.0
 - [ ] m-ci - Get the layout pull request through CI (repo: alpha) (kind: ship) (since $today)
 - [ ] m-stuck - Publish the release from the build server (repo: alpha) (kind: ship) (since $today)
-- [ ] m-ask - [captain-ask] Choose the layout for the new screen (Main42) (repo: alpha) (kind: ship) (priority: 0) (since $today)
+- [ ] m-ask - [captain-ask] $ask_title (Main42) (repo: alpha) (kind: ship) (priority: 0) (since $today)
   Captain hold set: 2026-10-20T08:00:00Z
   type: captain-ask: "Show the new screen in the layout a phone reads first" (22 Oct, Main42). Two layouts are drawn; the lead picks one.
 
@@ -147,11 +149,36 @@ done
 export CHROME_DEVTOOLS_AXI_SESSION=$session
 # a new session can start with its one blank tab unselected, and open then has no page to drive
 chrome-devtools-axi selectpage 1 >/dev/null 2>&1 || true
+if [ "${README_HERO_ONLY:-0}" != 1 ]; then
 chrome-devtools-axi open "$url#/board" >/dev/null
 chrome-devtools-axi resize 390 844 >/dev/null
 chrome-devtools-axi wait "m-stuck" >/dev/null
 chrome-devtools-axi eval 'JSON.stringify({ viewport: innerWidth, text: document.body.innerText })' >"$DONE_DONE_EVIDENCE_ROOT/board.txt"
 chrome-devtools-axi screenshot "$DONE_DONE_EVIDENCE_ROOT/board-390.png" >/dev/null
+fi
+# A README capture uses this same seeded real dashboard, without the unrelated interaction suite.
+if [ "${README_HERO_ONLY:-0}" = 1 ]; then
+  chrome-devtools-axi open "$url#/tickets" >/dev/null
+  for theme in light dark; do
+    chrome-devtools-axi eval "localStorage.setItem('fm-theme', '$theme')" >/dev/null
+    for width in 390 1280; do
+      chrome-devtools-axi resize "$width" 844 >/dev/null
+      chrome-devtools-axi open "$url?readme-$theme-$width#/tickets" >/dev/null
+      chrome-devtools-axi wait 'Your asks done' >/dev/null
+      chrome-devtools-axi eval 'JSON.stringify({width:innerWidth,text:document.body.innerText,theme:localStorage.getItem("fm-theme")})' >"$DONE_DONE_EVIDENCE_ROOT/hero-$width-$theme.txt"
+      chrome-devtools-axi screenshot "$DONE_DONE_EVIDENCE_ROOT/hero-$width-$theme.png" >/dev/null
+    done
+  done
+  python3 - "$DONE_DONE_EVIDENCE_ROOT/steps.json" "$(git -C "$root" rev-parse HEAD)" <<'PYHERO'
+import json, sys
+with open(sys.argv[1], 'w') as out:
+    json.dump({'target': {'version': sys.argv[2]},
+               'start': 'A disposable synthetic fleet served by this checkout of the real dashboard.',
+               'steps': ['Open the Tickets page.', 'Select light and dark themes at 390 and 1280 widths.', 'Capture the real dashboard and its text.'],
+               'result': 'The dashboard shows the demo fleet ticket queue in both themes and widths; no personal fleet data was read.'}, out, indent=2)
+PYHERO
+  exit 0
+fi
 # The Ship tab is gone: no link, dock button or palette entry leads to it.
 for w in 390 1280; do
   chrome-devtools-axi resize "$w" 900 >/dev/null
