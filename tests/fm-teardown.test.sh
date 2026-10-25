@@ -3912,6 +3912,89 @@ test_registered_scratch_is_reaped_after_launching_session_is_gone() {
   pass "teardown reaps exactly the registered scratch directories and their detached processes, keeping evidence and unregistered siblings"
 }
 
+test_registered_scratch_cleanup_paths() {
+  local route failure case_dir home state data task scratch pid rc test_path
+  for route in direct child; do
+    for failure in none removal protected no-lsof; do
+      case_dir=$(make_case "scratch-$route-$failure")
+      if [ "$route" = child ]; then
+        write_meta "$case_dir" local-only secondmate
+        configure_secondmate_with_tmux_children "$case_dir"
+        home="$case_dir/secondmate-home"
+        state="$home/state"; data="$home/data"; task=child-a
+      else
+        write_meta "$case_dir" local-only ship
+        seed_backlog_in_flight "$case_dir"
+        home="$case_dir"; state="$case_dir/state"; data="$case_dir/data"; task=task-x1
+      fi
+      scratch="$case_dir/scratch/proof"
+      [ "$failure" != protected ] || scratch="$data/proof"
+      mkdir -p "$scratch"
+      printf 'proof bytes\n' > "$scratch/file"
+      FM_HOME="$home" FM_STATE_OVERRIDE="$state" \
+        "$ROOT/bin/fm-scratch.sh" register "$task" "$scratch" >/dev/null \
+        || fail "scratch-$route-$failure: registration failed"
+      pid=
+      if [ "$failure" = none ] || [ "$failure" = no-lsof ]; then
+        setsid bash -c 'cd "$1"; exec sleep 307' _ "$scratch" &
+        pid=$!
+        sleep 0.5
+        kill -0 "$pid" 2>/dev/null || fail "scratch-$route-$failure: proof process did not start"
+      fi
+      if [ "$failure" = removal ]; then
+        cat > "$case_dir/fakebin/rm" <<'SH'
+#!/usr/bin/env bash
+for arg in "$@"; do
+  [ "$arg" != "$FM_BLOCKED_SCRATCH" ] || exit 1
+done
+exec "$FM_REAL_RM" "$@"
+SH
+        chmod +x "$case_dir/fakebin/rm"
+      fi
+      test_path=$PATH
+      [ "$failure" != no-lsof ] || test_path=$(make_path_without_lsof "$case_dir")
+      rc=0
+      FM_BLOCKED_SCRATCH="$scratch" FM_REAL_RM="$(command -v rm)" \
+        FM_TEARDOWN_TEST_PATH="$test_path" \
+        run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+      if [ "$failure" = none ]; then
+        if kill -0 "$pid" 2>/dev/null; then
+          kill -KILL "$pid" 2>/dev/null || true
+          wait "$pid" 2>/dev/null || true
+          fail "scratch-$route: detached process survived"
+        fi
+        wait "$pid" 2>/dev/null || true
+        expect_code 0 "$rc" "scratch-$route: cleanup failed: $(cat "$case_dir/stderr")"
+        assert_absent "$scratch" "scratch-$route: scratch survived"
+        assert_absent "$state/$task.scratch" "scratch-$route: registry survived"
+      else
+        if [ -n "$pid" ]; then
+          if ! kill -0 "$pid" 2>/dev/null; then
+            wait "$pid" 2>/dev/null || true
+            fail "scratch-$route-$failure: unverified proof process was killed"
+          fi
+          kill -KILL "$pid" 2>/dev/null || true
+          wait "$pid" 2>/dev/null || true
+        fi
+        expect_code 1 "$rc" "scratch-$route-$failure: cleanup should refuse"
+        assert_present "$scratch/file" "scratch-$route-$failure: scratch was removed"
+        assert_present "$state/$task.scratch" "scratch-$route-$failure: registry was removed"
+        assert_present "$state/$task.meta" "scratch-$route-$failure: retry record was removed"
+        assert_absent "$state/$task.backlog-close" "scratch-$route-$failure: pending close could erase retry record"
+        assert_present "$case_dir/state/task-x1.meta" "scratch-$route-$failure: parent record was removed"
+        if [ "$failure" = removal ] || [ "$failure" = no-lsof ]; then
+          [ "$failure" != removal ] || rm "$case_dir/fakebin/rm"
+          rc=0
+          run_teardown "$case_dir" --force > "$case_dir/retry.stdout" 2> "$case_dir/retry.stderr" || rc=$?
+          expect_code 0 "$rc" "scratch-$route-$failure: retry failed: $(cat "$case_dir/retry.stderr")"
+          assert_absent "$scratch" "scratch-$route-$failure: retry left scratch"
+        fi
+      fi
+    done
+  done
+  pass "direct and descendant scratch cleanup reap detached proofs and retain retry records on every refusal"
+}
+
 test_registered_scratch_survives_a_refused_teardown() {
   local case_dir rc scratch
   case_dir=$(make_case registered-scratch-refused)
@@ -5332,6 +5415,7 @@ test_own_autonomous_run_is_left_alone
 test_leaked_worktree_process_is_reaped
 test_leaked_tasktmp_process_is_reaped
 test_registered_scratch_is_reaped_after_launching_session_is_gone
+test_registered_scratch_cleanup_paths
 test_registered_scratch_survives_a_refused_teardown
 test_scratch_register_and_reap_refuse_unsafe_paths
 test_lsof_absent_reaps_tmux_process_group
