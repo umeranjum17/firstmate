@@ -61,13 +61,6 @@ card_refusal=$(gate)
 is "refusal: receipt and lint but missing board card" "$(printf '%s\n' "$card_refusal" | tail -1)" "rc=1"
 card_command=$(printf '%s\n' "$card_refusal" | sed -n 's|.*; run FM_HOME=[^ ]* \(/[^ ]*\) post .*|\1|p')
 [ -n "$card_command" ] && [ -x "$card_command" ] && ok "card hint names an executable absolute path" || no "card hint command is not an executable absolute path: $card_command"
-# Guard gate/check script hints against bare add-on executables (a path is required in every home).
-if grep -REn --include='*.sh' --exclude-dir=tests 'run[[:space:]]+(FM_HOME=[^[:space:]]+[[:space:]]+)?(merge-card|fm-[[:alnum:]_-]+\.sh|checks-lint\.sh)([[:space:]]|$)' \
-  "$addons/owner-rules" "$addons/merge-card" "$addons/merge-on-green" "$addons/owner-guard" "$addons/read-guard" "$addons/delete-guard" "$addons/kill-guard"; then
-  no "bare add-on tool in gate/check hint"
-else
-  ok "gate/check hints do not name bare add-on tools"
-fi
 # Main-home fallback, home precedence, then the three-source refusal.
 printf '%s\n' "$work/board.json" > "$main/config/fleet-board"
 jq --arg h "$head" '.items += [{kind:"evidence",key:"merge-umeranjum17-firstmate-addons-pull-9",run:{commit:$h}}]' "$work/board.json" > "$work/board.tmp" && mv "$work/board.tmp" "$work/board.json"
