@@ -68,8 +68,16 @@ fm-model-pool pick --json   # request JSON on stdin
 fm-model-pool next --json   # prior selection + typed limit on stdin
 ```
 
-Request fields (`v:1`): `purpose` (`work`), `pool_config` (absolute path to `config/account-pool`), optional `model`, `capabilities`, `deadline` (unix seconds for the whole attempt chain), and `attempted` (account/route ids already tried).
+Request fields (`v:1`): `purpose` (`work`), optional `pool_config` (absolute path to `config/account-pool`), optional `model`, `capabilities`, `deadline` (unix seconds for the whole attempt chain), and `attempted` (account/route ids already tried).
+When `pool_config` is omitted (as learn-from-mistakes does for `account_picker`), the helper defaults to `$FM_HOME/config/account-pool` if that file is readable, else `$HOME/firstmate/config/account-pool` — the same order as `pipeline-quota-failover/switch.sh`. An explicit `pool_config` still wins; with no readable default the helper refuses as before.
 `next` also needs `selection` (prior answer) and `cause` (`quota`, `rate_limit`, `unavailable`, `timeout`).
+
+learn-from-mistakes account_picker (global lfm config argv, never shell text):
+
+```yaml
+account_picker:
+  - /absolute/path/to/firstmate-addons/account-pool/bin/fm-model-pool
+```
 
 For ordinary work it picks the eligible Claude account with the greatest minimum runway (min of 5h and 7d) above the **eligibility floor** (`FM_MODEL_POOL_FLOOR`, defaulting to `FM_ACCOUNT_POOL_REST_FLOOR`, **15%**).
 That is deliberately not the worker **launch admission** floor (`FM_CLAUDE_ACCOUNTS_LOW`, **5%**) used by `claude-accounts-pick` at spawn.

@@ -68,6 +68,21 @@ parse_pool_config() {
   printf '%s\t%s\n' "$command" "$state"
 }
 
+# When the request omits pool_config (lfm account_picker does), use the same default
+# order as pipeline-quota-failover/switch.sh: $FM_HOME/config/account-pool when that
+# file is readable, else $HOME/firstmate/config/account-pool.
+default_pool_config() {
+  if [ -n "${FM_HOME:-}" ] && [ -f "$FM_HOME/config/account-pool" ] && [ -r "$FM_HOME/config/account-pool" ]; then
+    printf '%s\n' "$FM_HOME/config/account-pool"
+    return 0
+  fi
+  if [ -f "$HOME/firstmate/config/account-pool" ] && [ -r "$HOME/firstmate/config/account-pool" ]; then
+    printf '%s\n' "$HOME/firstmate/config/account-pool"
+    return 0
+  fi
+  return 1
+}
+
 deadline_ok() {
   local dl=$1
   [ -z "$dl" ] || [ "$dl" = null ] && return 0
@@ -238,8 +253,19 @@ for a in "$@"; do case "$a" in --json) json=1 ;; esac; done
 
 req=$(read_req)
 cfg_path=$(jq -r '.pool_config // empty' <<<"$req")
-[ -n "$cfg_path" ] || die "pool_config is required (absolute path to config/account-pool)"
+if [ -z "$cfg_path" ]; then
+  cfg_path=$(default_pool_config) || die "pool_config is required (absolute path to config/account-pool)"
+fi
+# parse_pool_config may die with JSON on stdout; keep that on the caller's stdout
+# (a plain cfg=$(...) under set -e would swallow the refusal body).
+set +e
 cfg=$(parse_pool_config "$cfg_path")
+parse_rc=$?
+set -e
+if [ "$parse_rc" -ne 0 ]; then
+  printf '%s\n' "$cfg"
+  exit "$parse_rc"
+fi
 command=${cfg%%$'\t'*}
 state=${cfg#*$'\t'}
 purpose=$(jq -r '.purpose // "work"' <<<"$req")
