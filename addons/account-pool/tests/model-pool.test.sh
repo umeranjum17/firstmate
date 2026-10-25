@@ -9,7 +9,7 @@ helper=$addons/account-pool/bin/fm-model-pool
 pool=$addons/claude-accounts/bin/claude-accounts-pick
 w=$(mktemp -d "${TMPDIR:-/tmp}/model-pool-test.XXXXXX") || exit 1
 trap 'rm -rf -- "$w"' EXIT
-mkdir -p "$w/home/fixture/users/user-017" "$w/home/fixture/users/user-010" "$w/a" "$w/b" "$w/c" "$w/pool" "$w/bin" "$w/log"
+mkdir -p "$w/home/config" "$w/home/fixture/users/user-017" "$w/home/fixture/users/user-010" "$w/a" "$w/b" "$w/c" "$w/pool" "$w/bin" "$w/log"
 fails=0
 is() { if [ "$2" = "$3" ]; then echo "ok - $1"; else echo "not ok - $1: got [$2], want [$3]"; fails=$((fails + 1)); fi; }
 
@@ -27,7 +27,7 @@ for name in claude codex cursor opencode pi; do
   chmod +x "$w/bin/$name"
 done
 
-printf 'state=%s\ncommand=%s\n' "$w/pool" "$w/bin/pool-cmd" >"$w/home/fixture/users/user-010/account-pool"
+printf 'state=%s\ncommand=%s\n' "$w/pool" "$w/bin/pool-cmd" >"$w/home/config/account-pool"
 cat >"$w/registry.json" <<R
 {"version":1,"accounts":[
  {"id":"pa_umer_a","provider":"claude","name":"Umer A","folder":"$w/a"},
@@ -60,7 +60,7 @@ run() { # verb json -> sets out/rc; network blocked via empty SSL and no net hel
     "$helper" "$verb" --json 2>"$w/err"); rc=$?
 }
 
-cfg=$w/home/fixture/users/user-010/account-pool
+cfg=$w/home/config/account-pool
 base=$(jq -nc --arg p "$cfg" '{v:1,purpose:"work",pool_config:$p,capabilities:["text"],attempted:[]}')
 
 # A=70 B=40: pick A (greatest runway above 15% eligibility floor).
