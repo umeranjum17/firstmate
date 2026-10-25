@@ -167,7 +167,7 @@ jobs:
       - name: Task priority test
         run: bash task-priority/tests/task-priority.test.sh
       - name: Tickets sync real-board journey
-        run: command -v identify >/dev/null || sudo apt-get install -y --no-install-recommends imagemagick; npm install --global sign-off-axi && bash tickets-sync/tests/sync.test.sh
+        run: command -v identify >/dev/null || sudo apt-get install -y --no-install-recommends imagemagick; npm install --global sign-off-axi@0.6.9 && bash tickets-sync/tests/sync.test.sh
       # Stub Firstmate checkout and a fixture home: no real board, hook or launcher is touched.
       - name: Bearings board test
         run: bash bearings-board/tests/bearings-board.test.sh
@@ -218,7 +218,7 @@ jobs:
         run: bash pipeline-quota-failover/tests/switch-route.test.sh
       - name: Owner ask real-board journey
         run: |
-          npm install --global sign-off-axi
+          npm install --global sign-off-axi@0.6.9
           bash owner-rules/tests/no-lavish.test.sh
           bash ask-default/tests-owner-ask.test.sh
           bash signoff/tests/fm-procevent-signoff.test.sh
