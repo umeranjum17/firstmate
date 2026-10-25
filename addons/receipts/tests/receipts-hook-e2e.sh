@@ -130,7 +130,7 @@ hook_run() {  # <name> <pr-url> <want-candidate>
   printf '#!/usr/bin/env bash\nexit 0\n' > "$hd/guardroot/bin/fm-guard.sh"
   printf '#!/usr/bin/env bash\ncase " $* " in *" --json isDraft "*) echo "{\\"isDraft\\":false}" ;; *headRefOid*) echo %s ;; esac\n' "$sha" > "$hd/fakebin/gh"
   chmod +x "$hd/guardroot/bin/fm-guard.sh" "$hd/fakebin/gh"
-  FM_ROOT_OVERRIDE=$hd/guardroot FM_HOME=$hd/home FM_ADDONS_DIR=$hd/addons GATE_LOG=$hd/gate PATH=$hd/fakebin:$PATH \
+  FM_ROOT_OVERRIDE=$hd/guardroot FM_HOME=$hd/home FM_STATE_OVERRIDE=$hd/home/fixture/users/user-017 FM_ADDONS_DIR=$hd/addons GATE_LOG=$hd/gate PATH=$hd/fakebin:$PATH \
     "$d/fork/bin/fm-pr-check.sh" task-a "$2" >"$hd/out" 2>"$hd/err" \
     || { echo "FAIL: fm-pr-check with add-on hook ($1): $(cat "$hd/err")" >&2; exit 1; }
   got=$(cat "$hd/gate")

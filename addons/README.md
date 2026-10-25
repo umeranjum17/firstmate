@@ -2,12 +2,12 @@
 
 <h1><picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/media/logo-dark.svg">
-  <img src="docs/media/logo-light.svg" width="40" height="40" align="top" alt="firstmate-addons logo">
-</picture> firstmate-addons</h1>
+  <img src="docs/media/logo-light.svg" width="40" height="40" align="top" alt="Firstmate add-ons logo">
+</picture> Firstmate add-ons</h1>
 
 **Keep your coding-agent fleet moving through stalled tasks, depleted quota, and destructive commands.**
 
-Independent add-ons for developers running a fleet on their own machine.
+Independent add-ons for developers running a fleet on their own machine. They live in this repository's `addons/` directory.
 
 [Quick start](#quick-start) · [Add-on reference](docs/addons-reference.md) · [Roadmap](VISION.md)
 
@@ -16,10 +16,10 @@ Independent add-ons for developers running a fleet on their own machine.
 ## Quick start
 
 Install the memory gate so heavy jobs wait for free RAM instead of wedging the machine.
-From a clone of this repository:
+From the repository root:
 
 ```sh
-bash host-memory/install.sh
+bash addons/host-memory/install.sh
 ```
 
 That copies the gate into your user data directory and registers a systemd user timer for heavy-job adoption.
@@ -27,7 +27,7 @@ Preview without writing by adding `--dry-run` after the script name.
 Git and Bash are required; the install uses a systemd user service.
 [Setup details and other add-ons](docs/addons-reference.md#install).
 
-## Why firstmate-addons
+## Why the add-ons
 
 | When you manage it by hand | With the matching add-on |
 | --- | --- |
@@ -41,34 +41,34 @@ Choose the job you need first; the reference lists the full catalog and dependen
 
 ## Choose your job
 
-Run these from the clone.
+Run these from the repository root.
 For home-specific installers, export `FM_HOME` pointing to your existing Firstmate home: the directory containing its `bin/`, `config/`, and `state/`.
 Each job names one starting add-on.
 
 **Protect the machine** — [Memory gate](host-memory/install.sh); also delete, kill, and read guards.
 
 ```sh
-bash host-memory/install.sh
+bash addons/host-memory/install.sh
 ```
 
 **Keep work moving** — [Stall alerts](docs/addons-reference.md#fleet-stall); also quota recovery and account routing.
 
 ```sh
-bash fleet-stall/install.sh
+bash addons/fleet-stall/install.sh
 ```
 
 **Ship checked work** — [Merge-on-green](docs/addons-reference.md#merge-on-green); also merge cards and identity checks.
 
 ```sh
 bash \
-  merge-on-green/install.sh \
+  addons/merge-on-green/install.sh \
   "$FM_HOME"
 ```
 
 **Understand the fleet** — [Flow check](fleet-flow/install.sh); also dashboard, metrics, and ticket sync.
 
 ```sh
-bash fleet-flow/install.sh
+bash addons/fleet-flow/install.sh
 ```
 
 These are entry points, not install-all bundles.
@@ -83,7 +83,7 @@ The [Lookout Overview hero journey](docs/capture-lookout-hero.sh) captures phone
 
 ## Setup and limits
 
-Install from the GitHub clone; there is no install-all command.
+Install from the GitHub clone; add-on installers are under `addons/`, and there is no install-all command.
 Some add-ons need fork-side hooks or remain dormant copies; check [FORK-EXIT.md](FORK-EXIT.md) before choosing one.
 Installers can change hooks, configuration, or user services; read the selected add-on's setup before applying it.
 

@@ -1,4 +1,4 @@
-# firstmate-addons
+# Firstmate add-ons
 
 Add-ons for running a fleet of coding agents on one machine: small, independent fixes for the gaps a busy fleet hits — runaway deletes, burned provider quota, stalled tasks, merges nobody watches. Every add-on installs and removes on its own; take only the ones you need.
 
@@ -67,7 +67,7 @@ Every change still on the fork that is not upstream yet, with its exit path and 
 There is no install-all script yet. The shortest real install for the add-ons that work on an unmodified install of the host tool is this loop, run from a clone of this repo (any installer accepts `--dry-run` first to print what it would change and write nothing):
 
 ```sh
-git clone https://github.com/umeranjum17/firstmate-addons && cd firstmate-addons
+git clone https://github.com/umeranjum17/juggernaut && cd juggernaut/addons
 export FM_HOME=~/firstmate    # your home folder for the fleet manager
 for d in pipeline-literal-delete pipeline-quota-failover host-memory fleet-flow glm-queue route-change claude-model-guard; do "$d/install.sh"; done
 for d in delete-guard claude-quota merge-on-green git-identity nm-drain owner-guard pane-titles; do "$d/install.sh" "$FM_HOME"; done

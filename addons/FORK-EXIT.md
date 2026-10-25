@@ -5,7 +5,7 @@ Every change on `umeranjum17/firstmate` main since merge-base `0397cb2b`
 with its exit path and status. The rule behind the list: **the next core gap goes in an
 add-on when it can; a fork patch only when it cannot — and it joins this list the same day.**
 
-Exit paths: **add-on** `<dir>` (move to firstmate-addons) · **offer to Kun** (upstream fix,
+Exit paths: **add-on** `<dir>` (lives under this repository's `addons/` directory) · **offer to Kun** (upstream fix,
 only with the owner's approval) · **stays** (thin hook or fork-only policy, nothing to move).
 Statuses: **on fork** · **moved to** add-on + fork shim · **dormant copy** (add-on holds a
 verbatim copy; the fork still runs its own) · **done** · **dropped** (add-on removed; the fork
