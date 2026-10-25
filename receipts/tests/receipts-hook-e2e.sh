@@ -69,7 +69,43 @@ bound PASS "$h" "$pr2"; ! gate || { echo "FAIL: other PR refuses" >&2; exit 1; }
 bound PASS "$h" ""; ! gate || { echo "FAIL: unbound receipt refuses" >&2; exit 1; }
 rm "$st/t.run-receipt.json"; echo "evidence card: PASS $h $pr1" > "$st/t.evidence-card"
 ! gate || { echo "FAIL: card without receipt refuses" >&2; exit 1; }
-rm "$st/t.evidence-card"; printf 'mode=direct-PR\nspawn_gen=1\nreceipt_required=1\n' > "$st/t.meta"
+rm "$st/t.evidence-card"
+
+# Next PR of a lane: when meta pr= is merge-notified (fm-pr-merge's proof) and the
+# receipt names a different open PR of the same repo, accept; keep every other
+# mismatch refused (other repo, closed, or no merge marker).
+umask 077
+printf '%s\n' 'fm-pr-poll-merge-notified-v1' 'github' 'github.com' 'o/r' '1' > "$st/t.pr-poll-merge-notified"
+chmod 0600 "$st/t.pr-poll-merge-notified"
+mkdir -p "$d/fakebin"
+# gh api graphql --jq emits the filtered lines; stub prints those for number=2 open.
+cat > "$d/fakebin/gh" <<'GH'
+#!/usr/bin/env bash
+num=
+prev=
+for a in "$@"; do
+  case "$prev" in
+    -F) case "$a" in number=*) num=${a#number=} ;; esac ;;
+  esac
+  case "$a" in number=*) num=${a#number=} ;; esac
+  prev=$a
+done
+case "$num" in
+  2) printf 'state=OPEN\nmerged=false\n' ;;
+  3) printf 'state=CLOSED\nmerged=false\n' ;;
+  *) printf 'state=MERGED\nmerged=true\n' ;;
+esac
+GH
+chmod +x "$d/fakebin/gh"
+PATH="$d/fakebin:$PATH"
+bound PASS "$h" "$pr2"; gate || { echo "FAIL: next PR of lane after merged meta accepts" >&2; exit 1; }
+pr_other=https://github.com/o/other/pull/2
+bound PASS "$h" "$pr_other"; ! gate || { echo "FAIL: next PR of other repo refuses" >&2; exit 1; }
+pr_closed=https://github.com/o/r/pull/3
+bound PASS "$h" "$pr_closed"; ! gate || { echo "FAIL: closed next PR refuses" >&2; exit 1; }
+rm -f "$st/t.pr-poll-merge-notified"
+bound PASS "$h" "$pr2"; ! gate || { echo "FAIL: next PR without merge marker refuses" >&2; exit 1; }
+printf 'mode=direct-PR\nspawn_gen=1\nreceipt_required=1\n' > "$st/t.meta"
 
 # PR candidate hook: the policy through the real fork fm_dod_pr_outside_origin, then the
 # real fork bin/fm-pr-check.sh driven with the add-on's own library (gate stubbed to log
@@ -112,4 +148,4 @@ hook_run same-repo https://github.com/o/r/pull/4 ""
     if declare -F "$fn" >/dev/null; then exit 1; fi
   done ) \
   || { echo "FAIL: absent add-on must be a no-op" >&2; exit 1; }
-echo "ok: done-acceptance, local-delivery and both PR-merge suites pass with add-on loaded; the PR candidate hook prints PR_HEAD only outside the origin through the real fm-pr-check.sh; absent add-on loads no hooks"
+echo "ok: done-acceptance, local-delivery and both PR-merge suites pass with add-on loaded; next PR of a lane after a merge-notified meta accepts when that PR is open in the same repo; the PR candidate hook prints PR_HEAD only outside the origin through the real fm-pr-check.sh; absent add-on loads no hooks"

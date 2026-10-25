@@ -14,13 +14,54 @@
 # Older records need no absent receipt, but ANY present receipt must validate:
 # explicit FAIL, malformed, stale incarnation/head and empty proof all refuse.
 # Once the merge path has recorded pr=, the receipt must name that same pull
-# request (its URL carries the repository); only the receipt file counts, a
-# posted evidence card or PR comment is never a substitute.
+# request (its URL carries the repository), except when that bound PR has
+# already merged - proven by its recorded merge notification, matching
+# bin/fm-pr-merge.sh - and the receipt names a different open PR of the same
+# repository (the lane's next PR). Only the receipt file counts; a posted
+# evidence card or PR comment is never a substitute.
 # This is evidence supplied by the worker, not a replacement for forge checks,
 # no-mistakes validation or merge authority. Both landing entrypoints consume
 # the same gate against the exact head they will submit to the merge command.
+
+# 0 when <receipt-pr> is the lane's next PR after a verifiably merged meta pr=:
+# same forge identity (provider/host/path), a different number, meta pr merge-
+# notified, and a live forge read showing the receipt PR open and unmerged.
+# Runs in a subshell so the caller's FM_PR_* identity is unchanged.
+fm_receipts_next_pr_of_lane_ok() {  # <state> <id> <meta-pr> <receipt-pr>
+  local state=$1 id=$2 meta_pr=$3 receipt_pr=$4
+  [ -n "$meta_pr" ] && [ -n "$receipt_pr" ] && [ "$meta_pr" != "$receipt_pr" ] || return 1
+  (
+    m_provider='' m_host='' m_path='' m_number='' state_lc=''
+    fm_pr_url_parse "$meta_pr" || exit 1
+    m_provider=$FM_PR_PROVIDER
+    m_host=$FM_PR_HOST
+    m_path=$FM_PR_PATH
+    m_number=$FM_PR_NUMBER
+    fm_pr_poll_merge_already_notified "$state" "$id" \
+      "$m_provider" "$m_host" "$m_path" "$m_number" || exit 1
+    fm_pr_url_parse "$receipt_pr" || exit 1
+    [ "$FM_PR_PROVIDER" = "$m_provider" ] \
+      && [ "$FM_PR_HOST" = "$m_host" ] \
+      && [ "$FM_PR_PATH" = "$m_path" ] \
+      && [ "$FM_PR_NUMBER" != "$m_number" ] || exit 1
+    case "$FM_PR_PROVIDER" in
+      github) fm_pr_github_read_record "$FM_PR_OWNER" "$FM_PR_REPO" "$FM_PR_NUMBER" || exit 1 ;;
+      gitlab) fm_pr_gitlab_read_record "$FM_PR_HOST" "$FM_PR_PATH" "$FM_PR_NUMBER" || exit 1 ;;
+      forgejo) fm_pr_forgejo_read_record "$FM_PR_HOST" "$FM_PR_PATH" "$FM_PR_NUMBER" || exit 1 ;;
+      gerrit) fm_pr_gerrit_read_record "$FM_PR_HOST" "$FM_PR_NUMBER" || exit 1 ;;
+      *) exit 1 ;;
+    esac
+    [ "$FM_PR_RECORD_MERGED" = false ] || exit 1
+    state_lc=$(printf '%s' "$FM_PR_RECORD_STATE" | tr '[:upper:]' '[:lower:]')
+    case "$state_lc" in
+      open|opened) exit 0 ;;
+      *) exit 1 ;;
+    esac
+  )
+}
+
 fm_dod_receipt_accept() {  # <state> <id> <meta> <candidate-head>
-  local state=$1 id=$2 meta=$3 head=$4 receipt required mode gen count pr
+  local state=$1 id=$2 meta=$3 head=$4 receipt required mode gen count pr receipt_pr
   [ -n "$state" ] && [ -n "$id" ] && [ -f "$meta" ] || return 0
   receipt="$state/$id.run-receipt.json"
   required=$(fm_dod_meta_value "$meta" receipt_required)
@@ -38,13 +79,17 @@ fm_dod_receipt_accept() {  # <state> <id> <meta> <candidate-head>
   gen=$(fm_dod_meta_value "$meta" spawn_gen)
   pr=$(fm_dod_meta_value "$meta" pr)
   if fm_pr_head_valid "$head" && [ -f "$receipt" ] && [ ! -L "$receipt" ] && command -v jq >/dev/null 2>&1 \
-    && jq -se --arg task "$id" --arg mode "$mode" --arg gen "$gen" --arg head "$head" --arg pr "$pr" '
+    && jq -se --arg task "$id" --arg mode "$mode" --arg gen "$gen" --arg head "$head" '
       length == 1 and (.[0] | .schema == 1 and .task == $task and .mode == $mode and
-      .spawn_gen == $gen and .head == $head and ($pr == "" or .pr == $pr) and .verdict == "PASS" and
+      .spawn_gen == $gen and .head == $head and .verdict == "PASS" and
       (.evidence | type == "string" and test("[^[:space:]]")) and
       (.at | type == "number" and . > 0))
     ' "$receipt" >/dev/null 2>&1; then
-    return 0
+    receipt_pr=$(jq -r 'if type == "object" and (.pr | type == "string") then .pr else empty end' "$receipt" 2>/dev/null || true)
+    if [ -z "$pr" ] || [ "$receipt_pr" = "$pr" ] \
+      || fm_receipts_next_pr_of_lane_ok "$state" "$id" "$pr" "$receipt_pr"; then
+      return 0
+    fi
   fi
   echo "completion receipt refused for $id: FAIL, mismatched candidate/incarnation, malformed or absent evidence"
   return 1
