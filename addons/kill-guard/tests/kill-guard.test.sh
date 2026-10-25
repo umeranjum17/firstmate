@@ -105,10 +105,11 @@ printf '#!/bin/sh\n[ "$1" = -s ] && shift 2; [ "$1" = shell ] && shift; exec sh 
   && [ "$(cat "/proc/$OWN/comm" 2>/dev/null)" = sleep ] && ok "own start records a running device process" || no "own start"
 PATH="$T/bin:$PATH" allow "$DEVICE_CALLER" "adb -s fixture-device-001 shell kill ${OWN:-0}"
 descends_from_test() { p=$1; while [ "$p" -gt 1 ]; do p=$(awk '{print $4}' "/proc/$p/stat" 2>/dev/null) || return 1; [ "$p" = "$$" ] && return 0; done; return 1; }
-detached "$ADDON"; REPARENTED=$DET; PIDS+=("$REPARENTED")
+detached "$T/worktree"; REPARENTED=$DET; PIDS+=("$REPARENTED")
 ! descends_from_test "$REPARENTED" && ok "detached process was reparented" || no "detached process remains in caller's tree"
-allow "$$" "kill $REPARENTED"
-caller_in "$T/worktree"; block "$CALLER_PID" "kill $REPARENTED" 'which this task did not start'
+caller_in "$T/worktree"
+allow "$CALLER_PID" "kill $REPARENTED"
+caller_in "$T/worktree/a"; block "$CALLER_PID" "kill $REPARENTED" 'which this task did not start'
 caller_in "$T/home"; block "$CALLER_PID" "kill $REPARENTED" 'which this task did not start'
 caller_in "$T/home-shaped"; block "$CALLER_PID" "kill $REPARENTED" 'which this task did not start'
 detached "$T/worktree/a-other"; PREFIX_TARGET=$DET; PIDS+=("$PREFIX_TARGET")
