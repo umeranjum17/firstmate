@@ -8,7 +8,7 @@ helper=$addons/account-pool/bin/fm-model-pool
 pool=$addons/claude-accounts/bin/claude-accounts-pick
 w=$(mktemp -d "${TMPDIR:-/tmp}/quota-axi-pool-test.XXXXXX") || exit 1
 trap 'rm -rf -- "$w"' EXIT
-mkdir -p "$w/home/fixture/users/user-017" "$w/home/fixture/users/user-010" "$w/a" "$w/b" "$w/pool" "$w/bin" "$w/log"
+mkdir -p "$w/home/config" "$w/home/state" "$w/a" "$w/b" "$w/pool" "$w/bin" "$w/log"
 fails=0
 is() { if [ "$2" = "$3" ]; then echo "ok - $1"; else echo "not ok - $1: got [$2], want [$3]"; fails=$((fails + 1)); fi; }
 pct() { jq -r '[.providers[]|select(.provider=="claude")|.quotaSemantics.effectiveAvailability[0].effectivePercentRemaining]|first' <<<"$1"; }
@@ -32,7 +32,7 @@ chmod +x "$w/bin/pool-cmd"
 for name in claude codex cursor opencode pi; do
   printf '#!/bin/sh\necho blocked:%s >&2; exit 97\n' "$name" >"$w/bin/$name"; chmod +x "$w/bin/$name"
 done
-printf 'state=%s\ncommand=%s\n' "$w/pool" "$w/bin/pool-cmd" >"$w/home/fixture/users/user-010/account-pool"
+printf 'state=%s\ncommand=%s\n' "$w/pool" "$w/bin/pool-cmd" >"$w/home/config/account-pool"
 cat >"$w/registry.json" <<R
 {"version":1,"accounts":[
  {"id":"pa_umer_a","provider":"claude","name":"Umer A","folder":"$w/a"},
@@ -46,7 +46,7 @@ reading() {
       {id:$a,name:"Umer A",folder:$fa,five_hour:{left:$h1},seven_day:{left:$d1},read_at:$at,problem:null},
       {id:$b,name:"Umer B",folder:$fb,five_hour:{left:$h2},seven_day:{left:$d2},read_at:$at,problem:null}]}' \
     >"$w/pool/claude-accounts.json"
-  cp "$w/pool/claude-accounts.json" "$w/home/fixture/users/user-017/claude-accounts.json"
+  cp "$w/pool/claude-accounts.json" "$w/home/state/claude-accounts.json"
 }
 run_json() {
   out=$(env -i PATH="$w/bin:/usr/bin:/bin" HOME="$w" TMPDIR="$w" FM_HOME="$w/home" \
@@ -62,7 +62,7 @@ is "exit 0" "$rc" 0
 is "Claude row A=70 not ambient 11" "$(pct "$out")" 70
 is "pool id A" "$(pid "$out")" pa_umer_a
 is "codex passthrough" "$(jq -r '[.providers[]|select(.provider=="codex")|.quotaSemantics.effectiveAvailability[0].effectivePercentRemaining]|first' <<<"$out")" 50
-pick=$(printf '%s' "$(jq -nc --arg p "$w/home/fixture/users/user-010/account-pool" '{v:1,purpose:"work",pool_config:$p,capabilities:["text"],attempted:[]}')" \
+pick=$(printf '%s' "$(jq -nc --arg p "$w/home/config/account-pool" '{v:1,purpose:"work",pool_config:$p,capabilities:["text"],attempted:[]}')" \
   | env -i PATH="$w/bin:/usr/bin:/bin" HOME="$w" TMPDIR="$w" FM_HOME="$w/home" \
     FM_CLAUDE_ACCOUNTS_REGISTRY="$w/registry.json" FM_MODEL_POOL_FLOOR=15 \
     FM_ACCOUNT_POOL_REST_FLOOR=15 FM_CLAUDE_ACCOUNTS_FRESH=999999 "$helper" pick --json 2>/dev/null)
@@ -70,10 +70,10 @@ is "fm-model-pool picks A" "$(jq -r .id <<<"$pick")" pa_umer_a
 run_json '["pa_umer_a"]'
 is "after A attempted, Claude row B=40" "$(pct "$out")" 40
 is "pool id B" "$(pid "$out")" pa_umer_b
-rm -f "$w/home/fixture/users/user-010/account-pool"
+rm -f "$w/home/config/account-pool"
 run_json '[]'
 is "no pool ambient 11" "$(pct "$out")" 11
-printf 'state=%s\ncommand=%s\n' "$w/pool" "$w/bin/pool-cmd" >"$w/home/fixture/users/user-010/account-pool"
+printf 'state=%s\ncommand=%s\n' "$w/pool" "$w/bin/pool-cmd" >"$w/home/config/account-pool"
 reading 10 10 5 5
 run_json '[]'
 is "under floor Claude unknown" "$(jq -r '[.providers[]|select(.provider=="claude")|.quotaSemantics.status]|first' <<<"$out")" unknown
