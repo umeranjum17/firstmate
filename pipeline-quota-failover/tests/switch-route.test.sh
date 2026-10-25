@@ -46,6 +46,18 @@ cat >"$stub/pi" <<'STUB'
 printf '%s\n' 'PONG'
 STUB
 chmod +x "$stub/pi"
+
+# Codex refuses a fresh non-git working directory unless the repository check
+# is explicitly skipped. Keep the probe behavior in the stub so this test never
+# calls a real model or inspects a real Codex login.
+cat >"$stub/codex" <<'STUB'
+#!/usr/bin/env bash
+case " $* " in
+  *' --skip-git-repo-check '*) printf '%s\n' 'PONG' ;;
+  *) echo 'Not inside a trusted directory and --skip-git-repo-check was not specified' >&2; exit 1 ;;
+esac
+STUB
+chmod +x "$stub/codex"
 PATH="$stub:$PATH"
 
 # 1. A dry run prints the planned edit and writes nothing.
@@ -78,6 +90,13 @@ is "the switch after the failure exits 0" "$rc" "0"
 out=$("$script" --restore-latest --config "$config" 2>&1); rc=$?
 is "restore exits 0" "$rc" "0"
 if cmp -s "$config" "$work/config.orig"; then ok "restore brought the original config back"; else no "restore did not bring the original config back"; fi
+
+# 5. Codex's probe runs from a fresh non-git directory and must opt out of the
+# repository trust check, while still switching only the requested route.
+out=$("$script" --config "$config" --agent codex --model gpt-6.1-sol 2>&1); rc=$?
+is "Codex probe exits 0 with the repository check skipped" "$rc" "0"
+file_has "the Codex agent key is set" "$config" '^agent: codex$'
+file_has "the Codex model key is set" "$config" '^    model: gpt-6.1-sol$'
 
 echo
 if [ "$fails" = 0 ]; then echo "all tests passed"; else echo "$fails test(s) failed"; exit 1; fi
