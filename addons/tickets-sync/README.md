@@ -1,9 +1,9 @@
 # Tickets sync
 
 Run `FM_HOME=<fleet-home> bash tickets-sync/install.sh` from merged main to register the existing watcher's poll; `--dry-run` writes nothing.
-Requires Python 3.11+, gh-axi, tasks-axi, sign-off-axi and Firstmate's backlog libraries; the board comes from `config/fleet-board`.
+Requires Python 3.11+, gh-axi, tasks-axi, sign-off-axi 0.6.9+ and Firstmate's backlog libraries; the board comes from `config/fleet-board`.
 Backlogs stay read-only: archive headings are normalized in retained copies under `state/tickets-sync/` before tasks-axi reads them.
-Open work and seven days of completed work are backfilled by stable home/item hashes; lane status and linked GitHub PR state supply queued (0), building (30), review/CI (65), merging (90), and done (100) progress.
+Open work and seven days of completed work are backfilled by stable home/item hashes; lane status and linked GitHub PR state supply queued (0), building (30), review/CI (65), merging (90), and done (100) progress, plus the matching `--stage` word and `--last-event-at` from the newest status `[at=]` stamp or backlog created/closed day (omitted when unknown).
 Parked homes and held items stay On hold; completion clears hold.
 Confirmed `parent: <item id>` wins even for captain-tagged work.
 Unparented captain asks are roots, titled with their stored quote or plain recorded title; other work joins a unique same-project ask sharing a specific brief phrase, or the single fleet-wide `Not from your asks (fleet upkeep)` root.

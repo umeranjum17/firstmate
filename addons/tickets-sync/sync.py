@@ -27,7 +27,7 @@ def run(args, env=None, cwd=None, missing=False):
     return '{}' if r.returncode else r.stdout
 
 def rows(args, env, cwd=None):
-    text = run(args + ['--limit', '100000', '--fields', 'held,hold_kind,closed,priority,body,links'], env, cwd)
+    text = run(args + ['--limit', '100000', '--fields', 'held,hold_kind,closed,created,priority,body,links'], env, cwd)
     result = toon_rows(text)
     if result is None or re.search(r'count: \d+ of (?!0\b)\d+ total', text) and len(result) >= 100000:
         raise RuntimeError('tasks-axi returned an unreadable or capped task list')
@@ -120,7 +120,7 @@ def sync():
             digest = hashlib.sha256(json.dumps(desired, sort_keys=True).encode()).hexdigest()
             old = existing.get(tid, {})
             # Board wins over ledger: a prior digest can drift after a partial write.
-            matched = all((old.get('prs', []) == ([v] if v else []) if k == 'pr' else old.get(k, '') == (v == 'yes' if k in ('hold', 'asked') else v)) for k, v in desired.items())
+            matched = all((old.get('prs', []) == ([v] if v else []) if k == 'pr' else old.get('last_event_at', '') == v if k == 'last-event-at' else old.get(k, '') == (v == 'yes' if k in ('hold', 'asked') else v)) for k, v in desired.items())
             if matched:
                 if ledger.get(tid) != digest: ledger[tid] = digest; save(ledger_file, ledger)
                 return
@@ -130,6 +130,7 @@ def sync():
             updated = dict(old)
             for key, value in desired.items():
                 if key == 'pr': updated['prs'] = [value] if value else []
+                elif key == 'last-event-at': updated['last_event_at'] = int(value)
                 elif key in ('hold', 'asked'): updated[key] = value == 'yes'
                 else: updated[key] = value
             existing[tid] = updated
@@ -210,10 +211,10 @@ def sync():
                     m = re.search(r'^\s*' + key + r':\s*(.+)$', body, re.M | re.I)
                     return m[1].strip() if m else ''
                 held = name in parked or r.get('held') == 'yes' or r.get('hold_kind') == 'parked'
-                progress, done, pr = lane_progress(source, item, r, prs, run)
+                progress, done, pr, stage, event = lane_progress(source, item, r, prs, run)
                 save(pr_file, prs)
                 done = done or f'{name}/{item}' in closures or existing.get(tid, {}).get('state') == 'done'
-                if done: progress = 100
+                if done: progress, stage = 100, 'done'
                 parent = ancestry[item]
                 root_ask = item in asks
                 title = request_title(r, root_ask)
@@ -230,6 +231,9 @@ def sync():
                     required.add(parent); ids.append(parent)
                 parent_id = ticket_id(name, parent) if parent in tasks else '' if root_ask else upkeep_id
                 desired = dict(title=title, progress=0 if item in parents else progress, state='' if item in parents else 'done' if done else 'on hold' if held else 'queued' if progress == 0 else 'in progress', pr=pr, release=(field('release') or 'later')[:40], parent=parent_id, priority=f"P{r['priority']}" if str(r.get('priority')) in ('0', '1', '2', '3') else '', project=project, hold='yes' if held and not done else 'no', asked='yes' if root_ask else 'no')
+                if item not in parents:
+                    desired['stage'] = stage
+                    if event is not None: desired['last-event-at'] = event
                 publish(tid, desired)
         save(cursor, {})
         if changed: print(f'tickets-sync: {len(homes)} homes read; {changed} tickets changed')

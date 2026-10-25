@@ -91,16 +91,16 @@ sign-off-axi project "$work/board.json" --json | jq -e '[.projects[] | .name | a
 sign-off-axi project "$work/board.json" --json | jq -e '[.projects[] | .name] == ["ownvoice"] and .projects[0].icon.sha256 == "'"$(sha256sum "$root/fleet-dashboard/fm-dashboard/icons/ownvoice.png" | cut -d" " -f1)"'"'
 cmp "$root/fleet-dashboard/fm-dashboard/icons/ownvoice.png" "$work/icons/ownvoice.png"
 test ! -e "$work/icons/takeone.png"
-sign-off-axi ticket "$work/board.json" --id "$(ticket_id main/long)" --json | jq -e '.ticket.progress == 30 and .ticket.state == "in progress"'
+sign-off-axi ticket "$work/board.json" --id "$(ticket_id main/long)" --json | jq -e '.ticket.progress == 30 and .ticket.state == "in progress" and .ticket.stage == "building" and .ticket.last_event_at == 1700000050'
 printf 'working [key=nm-umer-ci] [at=1700000100]: checking CI\n' >> "$FM_HOME/state/long.status"
 "$FM_HOME/state/tickets-sync.check.sh"
-sign-off-axi ticket "$work/board.json" --id "$(ticket_id main/long)" --json | jq -e '.ticket.progress == 65'
+sign-off-axi ticket "$work/board.json" --id "$(ticket_id main/long)" --json | jq -e '.ticket.progress == 65 and .ticket.stage == "review" and .ticket.last_event_at == 1700000100'
 printf 'done [at=1700000200]: ready to merge\n' >> "$FM_HOME/state/long.status"
 "$FM_HOME/state/tickets-sync.check.sh"
-sign-off-axi ticket "$work/board.json" --id "$(ticket_id main/long)" --json | jq -e '.ticket.progress == 90'
+sign-off-axi ticket "$work/board.json" --id "$(ticket_id main/long)" --json | jq -e '.ticket.progress == 90 and .ticket.stage == "merging" and .ticket.last_event_at == 1700000200'
 printf 'cancelled [at=1700000300]: Umer cancelled this task\n' >> "$FM_HOME/state/long.status"
 "$FM_HOME/state/tickets-sync.check.sh"
-sign-off-axi ticket "$work/board.json" --id "$(ticket_id main/long)" --json | jq -e '.ticket.progress == 100 and .ticket.state == "done"'
+sign-off-axi ticket "$work/board.json" --id "$(ticket_id main/long)" --json | jq -e '.ticket.progress == 100 and .ticket.state == "done" and .ticket.stage == "done" and .ticket.last_event_at == 1700000300'
 FM_HOME="$FM_HOME" python3 "$XDG_DATA_HOME/fm-tickets-sync/tickets-sync/sync.py" --close main/held --reason superseded --reconcile
 sign-off-axi ticket "$work/board.json" --id "$(ticket_id main/held)" --json | jq -e '.ticket.progress == 100 and .ticket.hold == false'
 before=$(sha256sum "$work/board.tickets.jsonl" "$work/board.projects.jsonl")
