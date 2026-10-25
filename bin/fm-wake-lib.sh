@@ -126,6 +126,80 @@ fm_path_age() {
   echo $(( now - m ))
 }
 
+fm_watcher_child_identity() {
+  local pid=$1 proc_root=${FM_PROC_ROOT_OVERRIDE:-/proc} stat_line identity
+  local -a fields
+  if [ -r "$proc_root/$pid/stat" ]; then
+    read -r stat_line < "$proc_root/$pid/stat" 2>/dev/null || return 1
+    read -r -a fields <<< "${stat_line##*)}"
+    [ "${#fields[@]}" -ge 20 ] || return 1
+    printf 'starttime=%s\n' "${fields[19]}"
+  else
+    identity=$(LC_ALL=C ps -p "$pid" -o lstart= 2>/dev/null) || return 1
+    [ -n "$identity" ] || return 1
+    printf '%s\n' "$identity"
+  fi
+}
+
+fm_watcher_process_zombie() {
+  local pid=$1 proc_root=${FM_PROC_ROOT_OVERRIDE:-/proc} stat_line
+  if [ -r "$proc_root/$pid/stat" ]; then
+    stat_line=$(cat "$proc_root/$pid/stat" 2>/dev/null) || return 1
+    case "${stat_line##*)}" in ' Z '*) return 0 ;; esac
+  else
+    case "$(ps -o stat= -p "$pid" 2>/dev/null | tr -d ' ')" in Z*) return 0 ;; esac
+  fi
+  return 1
+}
+
+fm_watcher_child_identities_retired() {
+  local records=$1 root=${2:-} pid identity current
+  [ -z "$root" ] || ! fm_pid_alive "$root" || return 1
+  while IFS="$(printf '\t')" read -r pid identity; do
+    [ -n "$pid" ] && [ -n "$identity" ] || continue
+    fm_pid_alive "$pid" || continue
+    fm_watcher_process_zombie "$pid" && continue
+    current=$(fm_watcher_child_identity "$pid" 2>/dev/null) || return 1
+    [ "$current" != "$identity" ] || return 1
+  done <<< "$records"
+}
+
+fm_watcher_recorded_children_retired() {
+  local ledger=$1 records
+  [ -s "$ledger" ] || return 0
+  records=$(cat "$ledger") || return 1
+  fm_watcher_child_identities_retired "$records"
+}
+
+fm_watcher_retire_child_identities() {
+  local records=$1 root=${2:-} pid identity current signal i
+  for signal in TERM KILL; do
+    while IFS="$(printf '\t')" read -r pid identity; do
+      [ -n "$pid" ] && [ -n "$identity" ] || continue
+      fm_pid_alive "$pid" || continue
+      fm_watcher_process_zombie "$pid" && continue
+      current=$(fm_watcher_child_identity "$pid" 2>/dev/null) || return 1
+      [ "$current" = "$identity" ] || continue
+      kill -"$signal" "$pid" 2>/dev/null || true
+    done <<< "$records"
+    for ((i=0; i<50; i++)); do
+      fm_watcher_child_identities_retired "$records" "$root" && return 0
+      sleep 0.1
+    done
+  done
+  return 1
+}
+
+fm_watcher_retire_recorded_children() {
+  local lockdir=$1 records
+  [ -s "$lockdir/children" ] || return 0
+  [ "$(cat "$lockdir/fm-home" 2>/dev/null)" = "$FM_HOME" ] || return 1
+  [ "$(cat "$lockdir/watcher-path" 2>/dev/null)" = "$FM_WAKE_LIB_DIR/fm-watch.sh" ] || return 1
+  [ -s "$lockdir/pid-identity" ] || return 1
+  records=$(cat "$lockdir/children") || return 1
+  fm_watcher_retire_child_identities "$records"
+}
+
 fm_watcher_progress_age() {
   local state=$1
   if [ -e "$state/.last-watcher-beat" ]; then
@@ -647,7 +721,14 @@ fm_lock_try_create() {
 }
 
 fm_lock_remove_path() {
-  local lockdir=$1 ownerdir
+  local lockdir=$1 ownerdir current
+  if [ "$lockdir" = "$STATE/.watch.lock" ]; then
+    if [ -e "$lockdir.steal" ] || [ -L "$lockdir.steal" ]; then
+      fm_current_pid current || return 1
+      [ "$(cat "$lockdir.steal/pid" 2>/dev/null)" = "$current" ] || return 1
+    fi
+    fm_watcher_recorded_children_retired "$lockdir/children" || return 1
+  fi
   if [ -L "$lockdir" ]; then
     ownerdir=$(fm_lock_link_owner "$lockdir" 2>/dev/null || true)
     rm -f "$lockdir" 2>/dev/null || return 1
@@ -1278,6 +1359,14 @@ fm_lock_try_acquire() {
   fi
 
   if [ "$lockdir" = "$STATE/.watch.lock" ] \
+    && ! fm_watcher_retire_recorded_children "$lockdir"; then
+    fm_lock_release "$steal"
+    FM_LOCK_HELD_PID=$cur
+    FM_LOCK_OWNER_DIR=
+    return 1
+  fi
+
+  if [ "$lockdir" = "$STATE/.watch.lock" ] \
     && ! _fm_recovery_marker_publish "$STATE/.watcher-down" downtime; then
     fm_lock_release "$steal"
     FM_LOCK_HELD_PID=$cur
@@ -1411,6 +1500,10 @@ fm_lock_acquire_wait_bounded() {
 
 fm_lock_release() {
   local lockdir=$1 pid current ownerdir
+  if [ "$lockdir" = "$STATE/.watch.lock" ] \
+    && fm_lock_claim_blocked_by_steal "$lockdir"; then
+    return 0
+  fi
   fm_current_pid current || return 1
   if [ -L "$lockdir" ]; then
     ownerdir=$(fm_lock_link_owner "$lockdir" 2>/dev/null || true)

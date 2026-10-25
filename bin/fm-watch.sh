@@ -2922,20 +2922,6 @@ watcher_process_table() {
   fi
 }
 
-watcher_child_identity() {
-  local pid=$1 proc_root=${FM_PROC_ROOT_OVERRIDE:-/proc} stat_line identity
-  local -a fields
-  if [ -r "$proc_root/$pid/stat" ]; then
-    read -r stat_line < "$proc_root/$pid/stat" 2>/dev/null || return 1
-    read -r -a fields <<< "${stat_line##*)}"
-    [ "${#fields[@]}" -ge 20 ] || return 1
-    printf 'starttime=%s\n' "${fields[19]}"
-  else
-    identity=$(LC_ALL=C ps -p "$pid" -o lstart= 2>/dev/null) || return 1
-    [ -n "$identity" ] || return 1
-    printf '%s\n' "$identity"
-  fi
-}
 
 watcher_descendants() {
   local root=$1 excluded=${2:-0} table
@@ -2963,12 +2949,12 @@ watcher_record_children() {
     descendants=$(watcher_descendants "$root" "$recorder") || return 1
     {
       for child in $descendants; do
-        child_identity=$(watcher_child_identity "$child" 2>/dev/null) || continue
+        child_identity=$(fm_watcher_child_identity "$child" 2>/dev/null) || continue
         printf '%s\t%s\n' "$child" "$child_identity"
       done
       while IFS="$(printf '\t')" read -r child child_identity; do
         fm_pid_alive "$child" || continue
-        current=$(watcher_child_identity "$child" 2>/dev/null) || continue
+        current=$(fm_watcher_child_identity "$child" 2>/dev/null) || continue
         [ "$current" = "$child_identity" ] || continue
         printf '%s\t%s\n' "$child" "$child_identity"
       done < "$ledger"
@@ -2978,16 +2964,6 @@ watcher_record_children() {
   done
 }
 
-watcher_process_zombie() {
-  local pid=$1 proc_root=${FM_PROC_ROOT_OVERRIDE:-/proc} stat_line
-  if [ -r "$proc_root/$pid/stat" ]; then
-    stat_line=$(cat "$proc_root/$pid/stat" 2>/dev/null) || return 1
-    case "${stat_line##*)}" in ' Z '*) return 0 ;; esac
-  else
-    case "$(ps -o stat= -p "$pid" 2>/dev/null | tr -d ' ')" in Z*) return 0 ;; esac
-  fi
-  return 1
-}
 
 # evict_stalled_holder <pid>: retire a live lock holder whose beacon stalled past
 # WATCHER_STALL_BOUND. The pid is signalled only while it still proves the
@@ -2998,21 +2974,24 @@ watcher_process_zombie() {
 # cannot reset it with `trap - TERM`. Never use a name or pattern match.
 # Succeeds only once the holder has exited within the bounded waits.
 evict_stalled_holder() {
-  local pid=$1 i=0 identity descendants child child_identity current signal survivors recorded
-  local children=() identities=()
+  local status
+  fm_lock_try_acquire_steal_mutex "$WATCH_LOCK.steal" || return 1
+  evict_stalled_holder_locked "$1"
+  status=$?
+  fm_lock_release "$WATCH_LOCK.steal"
+  return "$status"
+}
+
+evict_stalled_holder_locked() {
+  local pid=$1 i=0 identity descendants child child_identity recorded line
   fm_watcher_lock_matches_pid "$STATE" "$WATCH_PATH" "$pid" "$FM_HOME" || return 1
   identity=$FM_WATCHER_MATCHED_IDENTITY
   descendants=$(watcher_descendants "$pid") || return 1
   recorded=$(awk '!seen[$0]++' "$WATCH_LOCK/children" 2>/dev/null || true)
-  while IFS="$(printf '\t')" read -r child child_identity; do
-    [ -n "$child" ] && [ -n "$child_identity" ] || continue
-    children+=("$child")
-    identities+=("$child_identity")
-  done <<< "$recorded"
   for child in $descendants; do
-    child_identity=$(watcher_child_identity "$child" 2>/dev/null) || continue
-    children+=("$child")
-    identities+=("$child_identity")
+    child_identity=$(fm_watcher_child_identity "$child" 2>/dev/null) || continue
+    printf -v line '%s\t%s' "$child" "$child_identity"
+    recorded="$recorded"$'\n'"$line"
   done
   fm_watcher_lock_matches_pid "$STATE" "$WATCH_PATH" "$pid" "$FM_HOME" || return 1
   [ "$FM_WATCHER_MATCHED_IDENTITY" = "$identity" ] || return 1
@@ -3028,37 +3007,7 @@ evict_stalled_holder() {
     [ "$(fm_watcher_progress_age "$STATE")" -ge "$WATCHER_STALL_BOUND" ] || return 1
     kill -KILL "$pid" || return 1
   fi
-  # Reap only snapshotted descendants whose identities still match, including
-  # children that survived their holder's EXIT trap or forced termination.
-  for signal in TERM KILL; do
-    for ((i=0; i<${#children[@]}; i++)); do
-      child=${children[i]}
-      fm_pid_alive "$child" || continue
-      watcher_process_zombie "$child" && continue
-      current=$(watcher_child_identity "$child" 2>/dev/null) || {
-        fm_pid_alive "$child" && return 1
-        continue
-      }
-      [ "$current" = "${identities[i]}" ] || continue
-      kill -"$signal" "$child" 2>/dev/null || true
-    done
-    for ((i=0; i<50; i++)); do
-      survivors=0
-      fm_pid_alive "$pid" && survivors=1
-      for ((child=0; child<${#children[@]}; child++)); do
-        fm_pid_alive "${children[child]}" || continue
-        watcher_process_zombie "${children[child]}" && continue
-        current=$(watcher_child_identity "${children[child]}" 2>/dev/null) || {
-          fm_pid_alive "${children[child]}" && return 1
-          continue
-        }
-        [ "$current" != "${identities[child]}" ] || survivors=1
-      done
-      [ "$survivors" -ne 0 ] || return 0
-      sleep 0.1
-    done
-  done
-  return 1
+  fm_watcher_retire_child_identities "$recorded" "$pid"
 }
 
 EVICTED_PID=
