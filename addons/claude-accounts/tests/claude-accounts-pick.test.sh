@@ -7,13 +7,13 @@ here=$(cd "$(dirname "$0")" && pwd) || exit 1
 addons=$(cd "$here/../.." && pwd) || exit 1
 w=$(mktemp -d "${TMPDIR:-/tmp}/claude-accounts-pick-test.XXXXXX") || exit 1
 trap 'rm -rf -- "$w"' EXIT
-mkdir -p "$w/home/fixture/users/user-017" "$w/home/fixture/users/user-010" "$w/bin" "$w/a1" "$w/a2" "$w/pool" "$w/other"
+mkdir -p "$w/home/config" "$w/home/state" "$w/bin" "$w/a1" "$w/a2" "$w/pool" "$w/other"
 cat > "$w/registry.json" <<R
 {"version":1,"accounts":[
  {"id":"pa_536c925c8580938938","provider":"claude","name":"One","folder":"$w/a1"},
  {"id":"pa_2f1d0a9b7c3e5d4a61","provider":"claude","name":"Two","folder":"$w/a2"}]}
 R
-printf 'state=%s\ncommand=%s\n' "$w/pool" "$addons/claude-accounts/bin/claude-accounts-pick" > "$w/home/fixture/users/user-010/account-pool"
+printf 'state=%s\ncommand=%s\n' "$w/pool" "$addons/claude-accounts/bin/claude-accounts-pick" > "$w/home/config/account-pool"
 # The stub reads "<5h left> <7d left>" for each account folder from a1.q / a2.q.
 cat > "$w/bin/quota-axi" <<'S'
 #!/usr/bin/env bash
@@ -28,7 +28,7 @@ pick() { # [tool] [want]: sets out and rc from the pool pick
   rm -f "$w/pool/account-assignments.json" # Independent election for each existing case.
   # shellcheck disable=SC2016
   out=$(env -i PATH="$w/bin:$PATH" HOME="$w" TMPDIR="$w" QDIR="$w" FM_HOME="$w/home" FM_CLAUDE_ACCOUNTS_REGISTRY="$w/registry.json" \
-    FM_CLAUDE_ACCOUNTS_FRESH=0 CODEX_HOME="$w/other" bash -c 'fm_run_timed() { shift; "$@"; }; . "$1/account-pool/bin/fm-account-pool-lib.sh"; shift; fm_account_pool_select "$@"' _ "$addons" "${1:-claude}" "$w/home/fixture/users/user-010" "${2:-}" 2>&1); rc=$?
+    FM_CLAUDE_ACCOUNTS_FRESH=0 CODEX_HOME="$w/other" bash -c 'fm_run_timed() { shift; "$@"; }; . "$1/account-pool/bin/fm-account-pool-lib.sh"; shift; fm_account_pool_select "$@"' _ "$addons" "${1:-claude}" "$w/home/config" "${2:-}" 2>&1); rc=$?
 }
 q() { echo "$2" > "$w/$1.q"; }
 
@@ -79,7 +79,7 @@ reading() { # age_s five1 seven1 five2 seven2 [problem2]: the pool's own last go
     > "$w/pool/claude-accounts.json"
 }
 cmd_nohome() { env -i PATH="$w/bin:$PATH" HOME="$w" TMPDIR="$w" QDIR="$w" FM_CLAUDE_ACCOUNTS_REGISTRY="$w/registry.json" FM_CLAUDE_ACCOUNTS_FRESH=0 FM_ACCOUNT_POOL_ASSIGNMENT_SECONDS="${FM_ACCOUNT_POOL_ASSIGNMENT_SECONDS:-300}" "$pool" "$@" 2>&1; }
-rm -f "$w/home/fixture/users/user-017/claude-accounts.json"
+rm -f "$w/home/state/claude-accounts.json"
 reading 600 90 95 99 1
 out=$(cmd_nohome pick claude --json --state "$w/pool"); rc=$?
 is "FM_HOME unset: the pick answers from the pool's own reading" "$rc|$(jq -r '[.id, .read.source] | join(" ")' <<<"$out")" "0|$A1 reading"
@@ -101,13 +101,13 @@ out=$(cmd_nohome pick claude --json --state "$w/pool"); rc=$?
 is "no reading at all still answers: the roster alone is enough" "$rc|$(jq -r '[.ok, .read.source, (.set.CLAUDE_CONFIG_DIR | startswith("/"))] | join(" ")' <<<"$out")" "0|true none true"
 
 # install wires config/account-pool, is idempotent, refuses a different file; uninstall removes only its own.
-rm -f "$w/home/fixture/users/user-010/account-pool"
-"$addons/claude-accounts/install.sh" "$w/home" >/dev/null; is "install writes the chooser into config/account-pool" "$(sed -n 1p "$w/home/fixture/users/user-010/account-pool")" "command=$addons/claude-accounts/bin/claude-accounts-pick"
+rm -f "$w/home/config/account-pool"
+"$addons/claude-accounts/install.sh" "$w/home" >/dev/null; is "install writes the chooser into config/account-pool" "$(sed -n 1p "$w/home/config/account-pool")" "command=$addons/claude-accounts/bin/claude-accounts-pick"
 "$addons/claude-accounts/install.sh" "$w/home" >/dev/null; is "install twice is a no-op" "$?" 0
-"$addons/claude-accounts/uninstall.sh" "$w/home" >/dev/null; is "uninstall removes it" "$([ -e "$w/home/fixture/users/user-010/account-pool" ] && echo kept || echo gone)" gone
-printf 'state=/x\ncommand=/bin/other\n' > "$w/home/fixture/users/user-010/account-pool"
+"$addons/claude-accounts/uninstall.sh" "$w/home" >/dev/null; is "uninstall removes it" "$([ -e "$w/home/config/account-pool" ] && echo kept || echo gone)" gone
+printf 'state=/x\ncommand=/bin/other\n' > "$w/home/config/account-pool"
 "$addons/claude-accounts/install.sh" "$w/home" >/dev/null 2>&1; is "install refuses another pool file" "$?" 1
-"$addons/claude-accounts/uninstall.sh" "$w/home" >/dev/null 2>&1; is "uninstall leaves another pool file" "$?|$(grep -c other "$w/home/fixture/users/user-010/account-pool")" "1|1"
+"$addons/claude-accounts/uninstall.sh" "$w/home" >/dev/null 2>&1; is "uninstall leaves another pool file" "$?|$(grep -c other "$w/home/config/account-pool")" "1|1"
 
 # Repeated selections through the public pool contract must balance, not elect the same winner.
 mkdir -p "$w/a3" "$w/c1" "$w/c2"
