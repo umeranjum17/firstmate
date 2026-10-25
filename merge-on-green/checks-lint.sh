@@ -6,7 +6,14 @@ set -u
 SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 case "$1" in https://*) source=$1 ;; *) source=$(cd "$(dirname "$1")" && printf '%s/%s\n' "$PWD" "$(basename "$1")") ;; esac
 evidence=$(cd "$(dirname "$2")" && printf '%s/%s\n' "$PWD" "$(basename "$2")")
-LEGACY=${FM_LEGACY_CHECKS_LINT:-${FM_MAIN_HOME:-$HOME/firstmate}/config/fm-checks-lint.sh}
+# Prefer the add-on's lint (lane/meta task identity); FM_LEGACY_CHECKS_LINT overrides.
+if [ -n "${FM_LEGACY_CHECKS_LINT:-}" ]; then
+  LEGACY=$FM_LEGACY_CHECKS_LINT
+elif [ -x "$SRC/fm-checks-lint.sh" ]; then
+  LEGACY=$SRC/fm-checks-lint.sh
+else
+  LEGACY=${FM_MAIN_HOME:-$HOME/firstmate}/config/fm-checks-lint.sh
+fi
 DD_HOME=$FM_HOME/data/done-done-lint
 DD=(npx --yes --quiet --package=done-done-axi@0.6.4 done-done)
 if [ -n "${FM_DONE_DONE_BIN:-}" ]; then DD=("$FM_DONE_DONE_BIN"); fi
@@ -24,8 +31,44 @@ cp "$SRC/.done-done.yaml" "$d/.done-done.yaml"
 repo=$(printf '%s' "$source" | sed -nE 's#https://github\.com/[^/]+/([^/]+)/pull/.*#\1#p')
 skills=${FM_HOME}/projects/${repo}/.agents/skills
 if [ -d "$skills" ]; then mkdir -p "$d/.agents" && ln -s "$skills" "$d/.agents/skills"; fi
+
+# Frame-reuse identity is the lane (meta pr= or data/<task>), not the PR branch tip.
+lane_task=
+if [[ "$source" == https://* ]]; then
+  for meta in "$FM_HOME"/state/*.meta; do
+    [ -f "$meta" ] || continue
+    grep -Fxq "pr=$source" "$meta" || continue
+    lane_task=${meta##*/}; lane_task=${lane_task%.meta}
+    break
+  done
+fi
+if [ -z "$lane_task" ]; then
+  case "$evidence" in
+    "$FM_HOME"/data/*)
+      rest=${evidence#"$FM_HOME"/data/}
+      case "$rest" in ''|*/*) ;; *) lane_task=$rest ;; esac
+      ;;
+  esac
+fi
+lint_path=$PATH
+if [ -n "$lane_task" ] && real_gh=$(command -v gh 2>/dev/null); then
+  mkdir -p "$d/bin"
+  cat > "$d/bin/gh" <<'GHEOF'
+#!/usr/bin/env bash
+if [ "${1:-}" = pr ] && [ "${2:-}" = view ]; then
+  out=$("$FM_CHECKS_REAL_GH" "$@") || { ec=$?; printf '%s' "$out"; exit "$ec"; }
+  printf '%s' "$out" | python3 -c 'import json,os,sys; p=json.load(sys.stdin); p["headRefName"]=os.environ["FM_CHECKS_LANE_TASK"]; json.dump(p, sys.stdout)'
+  exit 0
+fi
+exec "$FM_CHECKS_REAL_GH" "$@"
+GHEOF
+  chmod +x "$d/bin/gh"
+  export FM_CHECKS_REAL_GH=$real_gh FM_CHECKS_LANE_TASK=$lane_task
+  lint_path=$d/bin:$PATH
+fi
+
 set +e
-out=$(cd "$d" && DONE_DONE_HOME="$DD_HOME" "${DD[@]}" lint "$source" "$evidence" 2>&1)
+out=$(cd "$d" && PATH="$lint_path" DONE_DONE_HOME="$DD_HOME" "${DD[@]}" lint "$source" "$evidence" 2>&1)
 rc=$?
 row=$(tail -n 1 "$DD_HOME/lint.log" 2>/dev/null || true)
 logged_src=$(printf '%s' "$row" | cut -f2)
