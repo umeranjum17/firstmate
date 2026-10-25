@@ -465,6 +465,10 @@ DESCENDANT_TASK_HOMES=()
 DESCENDANT_TREEHOUSE_LOCK_PATHS=()
 teardown_release_locks() {
   local status=$? i
+  if [ "$META_LOCK_HELD" = 1 ] \
+     && { [ -e "$STATE/$ID.scratch" ] || [ -L "$STATE/$ID.scratch" ]; }; then
+    fm_backlog_close_marker_clear "$STATE" "$ID" || status=1
+  fi
   if declare -F teardown_release_herdr_locks >/dev/null 2>&1; then
     teardown_release_herdr_locks || true
   fi
@@ -3805,10 +3809,7 @@ fi
 # killing the pane shell steals focus before the close can snapshot it.
 if [ "$KIND" != secondmate ]; then
   reap_task_worktree_processes worktree "$WT" "$TASK_TMP" || exit 1
-  teardown_reap_registered_scratch "$FM_HOME" "$STATE" "$DATA" "$ID" || {
-    fm_backlog_close_marker_clear "$STATE" "$ID" || exit 1
-    exit 1
-  }
+  teardown_reap_registered_scratch "$FM_HOME" "$STATE" "$DATA" "$ID" || exit 1
 fi
 
 # Fix 3 (see script header): sweep remote job workers abandoned by an already
