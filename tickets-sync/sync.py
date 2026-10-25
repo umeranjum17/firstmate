@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Read-only tasks-axi backfill and incremental publication via sign-off-axi ticket."""
+import argparse
 import datetime as dt
 import fcntl
 import hashlib
@@ -16,6 +17,7 @@ import xml.etree.ElementTree as xml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'fleet-dashboard'))
 from task_rows import toon_rows, plain
+from lane import progress as lane_progress
 
 def run(args, env=None, cwd=None, missing=False):
     r = sp.run(args, env=env, cwd=cwd, text=True, capture_output=True, timeout=60)
@@ -64,11 +66,18 @@ def ticket_id(home, item):
     return "fm-" + hashlib.sha256(f"{home}/{item}".encode()).hexdigest()[:32]
 
 def sync():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--audit', action='store_true')
+    parser.add_argument('--reconcile', action='store_true', help='read every home without the watcher time budget')
+    parser.add_argument('--close', metavar='HOME/ITEM', help='record an authorized cancellation or supersession on the board only')
+    parser.add_argument('--reason', choices=['superseded', 'cancelled'])
+    options = parser.parse_args()
+    if bool(options.close) != bool(options.reason): parser.error('--close and --reason are required together')
     started = time.monotonic()
     home = Path(os.environ['FM_HOME']).resolve()
     board = Path((home / 'config/fleet-board').read_text().strip())
     if not board.is_absolute(): board = home / board
-    if sys.argv[1:] == ['--audit']: print(run(['sign-off-axi', 'ticket', str(board), '--json'])); return
+    if options.audit: print(run(['sign-off-axi', 'ticket', str(board), '--json'])); return
     state = home / 'state/tickets-sync'
     state.mkdir(parents=True, exist_ok=True)
     with (state / 'lock').open('w') as lock:
@@ -76,6 +85,10 @@ def sync():
         (state / '.tasks.toml').write_text('[markdown]\narchive="unused-archive.md"\n')
         ledger_file = state / ('published-' + hashlib.sha256(str(board).encode()).hexdigest()[:12] + '.json')
         ledger = json.loads(ledger_file.read_text()) if ledger_file.exists() else {}
+        pr_file = state / 'prs.json'
+        prs = json.loads(pr_file.read_text()) if pr_file.exists() else {}
+        closures_file = state / 'closures.json'
+        closures = json.loads(closures_file.read_text()) if closures_file.exists() else {}
         homes = {'main': home}
         registry = home / 'data/secondmates.md'
         for line in registry.read_text().splitlines() if registry.exists() else []:
@@ -86,9 +99,10 @@ def sync():
         parked = {l.split('#')[0].strip() for l in parked_file.read_text().splitlines()} if parked_file.exists() else set()
         cutoff = (dt.date.today() - dt.timedelta(days=7)).isoformat()
         cursor = state / 'cursor.json'
-        resume = json.loads(cursor.read_text()) if cursor.exists() else {}
+        resume = json.loads(cursor.read_text()) if cursor.exists() and not options.reconcile else {}
         ordered = list(homes.items())
         if resume.get('home') in homes: ordered = ordered[list(homes).index(resume['home']):]
+        existing = {t['id']: t for t in json.loads(run(['sign-off-axi', 'ticket', str(board), '--json']))['tickets']}
         changed = gaps = 0
         registry = {p['name'].lower(): p.get('icon', {}).get('sha256') for p in json.loads(run(['sign-off-axi', 'project', str(board), '--json'])).get('projects', [])}
         skip_file = state / 'icons-skipped.json'
@@ -100,12 +114,16 @@ def sync():
             nonlocal changed
             digest = hashlib.sha256(json.dumps(desired, sort_keys=True).encode()).hexdigest()
             if ledger.get(tid) == digest: return
-            old = json.loads(run(['sign-off-axi', 'ticket', str(board), '--id', tid, '--json'], missing=True)).get('ticket', {}) if tid not in ledger else {}
-            if not all(old.get(k, '') == (v == 'yes' if k in ('hold', 'asked') else v) for k, v in desired.items()):
+            old = existing.get(tid, {})
+            if not all((old.get('prs', []) == ([v] if v else []) if k == 'pr' else old.get(k, '') == (v == 'yes' if k in ('hold', 'asked') else v)) for k, v in desired.items()):
                 args = ['sign-off-axi', 'ticket', str(board), '--id', tid]
                 for key, value in desired.items(): args += ['--' + key, str(value)]
                 run(args); changed += 1
             ledger[tid] = digest; save(ledger_file, ledger)
+        if options.close:
+            name, sep, item = options.close.partition('/')
+            if name not in homes or not sep or not item: raise RuntimeError('--close requires a registered HOME/ITEM')
+
         for name, source in ordered:
             env = {k: v for k, v in os.environ.items() if k not in ('FM_DATA_OVERRIDE', 'FM_ROOT_OVERRIDE', 'TASKS_AXI_FILE', 'TASKS_AXI_BACKEND')}
             env['FM_HOME'] = str(source)
@@ -123,18 +141,23 @@ def sync():
                 archive_copy.write_text(re.sub(r'^## Archived[^\n]*$', '## Done', archive.read_text(), flags=re.M))
             archived = rows(['tasks-axi', 'list', '--state', 'done', '--backend', 'markdown', '--file', str(archive_copy)], env, state) if archive.exists() else []
             tasks = {r['id']: r for r in archived + tasks}
+            if options.close and name == options.close.partition('/')[0]:
+                if options.close.partition('/')[2] not in tasks: raise RuntimeError('--close item not found: ' + options.close)
+                closures[options.close] = options.reason
+                save(closures_file, closures)
             ids = list(tasks)
+            parents = {m[1].strip() for r in tasks.values() if (m := re.search(r'^\s*parent:\s*(.+)$', r.get('body', ''), re.M))}
             if resume.get('home') == name and resume.get('task') in tasks: ids = ids[ids.index(resume['task']):]
             projects = {}
             required = set(resume.get('required', [])) if resume.get('home') == name else set()
             for item in ids:
                 r = tasks[item]
-                if time.monotonic() - started > 20:
+                if not options.reconcile and time.monotonic() - started > 20:
                     save(cursor, dict(home=name, task=item, required=list(required)))
                     print(f'tickets-sync: backfill continuing on next watcher check; {changed} changed')
                     return
                 tid = ticket_id(name, r['id'])
-                if r['state'] == 'done' and r.get('closed', '-') < cutoff and tid not in ledger and item not in required: continue
+                if r['state'] == 'done' and r.get('closed', '-') < cutoff and tid not in ledger and tid not in existing and item not in required: continue
                 if '\n... (truncated, ' in r['title'] + r.get('body', ''):
                     full = run(reader + ['show', r['id'], '--full'], env) if r not in archived else run(['tasks-axi', 'show', r['id'], '--full', '--file', str(archive_copy)], env, state)
                     for key, value in re.findall(r'^  (title|body): (.*)$', full, re.M): r[key] = json.loads(value) if value.startswith('"') else value
@@ -143,9 +166,11 @@ def sync():
                     m = re.search(r'^\s*' + key + r':\s*(.+)$', body, re.M | re.I)
                     return m[1].strip() if m else ''
                 held = name in parked or r.get('held') == 'yes' or r.get('hold_kind') == 'parked'
-                done = r['state'] == 'done'
-                progress = 100 if done else 0 if held or r['state'] == 'queued' else 17
-                label = 'Done' if done else 'On hold' if held else 'To do' if r['state'] == 'queued' else 'In progress'
+                progress, done, pr = lane_progress(source, item, r, prs, run)
+                save(pr_file, prs)
+                done = done or f'{name}/{item}' in closures or existing.get(tid, {}).get('state') == 'done'
+                if done: progress = 100
+                label = 'Done' if done else 'On hold' if held else 'To do' if progress == 0 else 'In progress'
                 links = re.findall(r'https?://[^\s,\]\)]+', r.get('links', '') + '\n' + r['title'] + '\n' + body)
                 size = lambda text: len(text.encode('utf-16-le')) // 2
                 epic = '[captain-ask]' in r['title']
@@ -176,7 +201,7 @@ def sync():
                     group = 'Upkeep' if upkeep else 'Needs a parent'
                     parent = ':' + group + ':' + project
                     publish(ticket_id(name, parent), dict(title=group + ' · ' + project, progress=0, project=project, hold='yes' if name in parked else 'no', asked='no' if upkeep else 'yes'))
-                desired = dict(title=title, progress=progress, parent=ticket_id(name, parent) if parent else '', priority=f"P{r['priority']}" if str(r.get('priority')) in ('0', '1', '2', '3') else '', project=project, hold='yes' if held and not done else 'no', asked='no' if upkeep else 'yes')
+                desired = dict(title=title, progress=progress, state='' if item in parents else 'done' if done else 'on hold' if held else 'queued' if progress == 0 else 'in progress', pr=pr, parent=ticket_id(name, parent) if parent else '', priority=f"P{r['priority']}" if str(r.get('priority')) in ('0', '1', '2', '3') else '', project=project, hold='yes' if held and not done else 'no', asked='no' if upkeep else 'yes')
                 publish(tid, desired)
         save(cursor, {})
         if changed: print(f'tickets-sync: {len(homes)} homes read; {changed} tickets changed; {gaps} links exceed the public title limit')
