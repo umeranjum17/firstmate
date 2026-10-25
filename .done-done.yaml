@@ -59,6 +59,8 @@ journeys:
     command: bash account-pool/run-tool-proof.sh
   pool-helper:
     command: bash account-pool/run-model-pool-proof.sh
+  quota-axi-pool:
+    command: bash quota-axi-pool/run-proof.sh
   guards-pool-accounts:
     command: bash read-guard/run-pool-proof.sh
   codex-guard-live:
