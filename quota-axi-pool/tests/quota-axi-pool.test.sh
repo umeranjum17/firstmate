@@ -79,6 +79,56 @@ run_json '[]'
 is "under floor Claude unknown" "$(jq -r '[.providers[]|select(.provider=="claude")|.quotaSemantics.status]|first' <<<"$out")" unknown
 ver=$(env -i PATH="$w/bin:/usr/bin:/bin" HOME="$w" FM_QUOTA_AXI_REAL="$w/bin/quota-axi-real" "$wrap" --version 2>/dev/null) || true
 is "version passthrough" "$ver" "quota-axi 0.1.54 (stub)"
+
+# Install/uninstall: temp HOME only; fake upstream symlink; never touch real ~/.local/bin.
+inst=$addons/quota-axi-pool/install.sh
+uninst=$addons/quota-axi-pool/uninstall.sh
+ih=$(mktemp -d "${TMPDIR:-/tmp}/quota-axi-pool-install.XXXXXX") || exit 1
+mkdir -p "$ih/.local/bin" "$ih/real"
+printf '#!/bin/sh\nprintf upstream-ok\n' >"$ih/real/quota-axi"
+chmod +x "$ih/real/quota-axi"
+ln -s "$ih/real/quota-axi" "$ih/.local/bin/quota-axi"
+orig_target=$(readlink -- "$ih/.local/bin/quota-axi")
+orig_resolved=$(readlink -f "$ih/.local/bin/quota-axi")
+# Refuse when no upstream (empty HOME bin, no PATH hit).
+empty=$(mktemp -d "${TMPDIR:-/tmp}/quota-axi-pool-empty.XXXXXX") || exit 1
+mkdir -p "$empty/.local/bin"
+refuse_rc=0
+env -i PATH="$empty/.local/bin:/usr/bin:/bin" HOME="$empty" XDG_DATA_HOME="$empty/.local/share" \
+  bash "$inst" >"$empty/out" 2>"$empty/err" || refuse_rc=$?
+is "refuse install without upstream exit nonzero" "$refuse_rc" 1
+is "refuse left link absent" "$( [ -e "$empty/.local/bin/quota-axi" ] && echo yes || echo no )" no
+is "refuse wrote no share dir" "$( [ -d "$empty/.local/share/fm-quota-axi-pool" ] && echo yes || echo no )" no
+grep -q 'no upstream quota-axi found' "$empty/err" && echo "ok - refuse message" || { echo "not ok - refuse message"; fails=$((fails + 1)); }
+# Install over existing foreign symlink: record resolved upstream + original link target.
+inst_rc=0
+env -i PATH="$ih/.local/bin:/usr/bin:/bin" HOME="$ih" XDG_DATA_HOME="$ih/.local/share" \
+  bash "$inst" >"$ih/install.out" 2>"$ih/install.err" || inst_rc=$?
+is "install over foreign link exit 0" "$inst_rc" 0
+is "upstream recorded resolved" "$(head -n 1 "$ih/.local/share/fm-quota-axi-pool/upstream")" "$orig_resolved"
+is "link-target recorded original" "$(head -n 1 "$ih/.local/share/fm-quota-axi-pool/link-target")" "$orig_target"
+is "link now our wrapper" "$(readlink -f "$ih/.local/bin/quota-axi")" \
+  "$(readlink -f "$ih/.local/share/fm-quota-axi-pool/quota-axi-pool")"
+# Idempotent re-install keeps recorded upstream.
+saved_up=$(head -n 1 "$ih/.local/share/fm-quota-axi-pool/upstream")
+saved_lt=$(head -n 1 "$ih/.local/share/fm-quota-axi-pool/link-target")
+env -i PATH="$ih/.local/bin:/usr/bin:/bin" HOME="$ih" XDG_DATA_HOME="$ih/.local/share" \
+  bash "$inst" >"$ih/reinstall.out" 2>"$ih/reinstall.err" || inst_rc=$?
+is "reinstall exit 0" "$inst_rc" 0
+is "reinstall kept upstream" "$(head -n 1 "$ih/.local/share/fm-quota-axi-pool/upstream")" "$saved_up"
+is "reinstall kept link-target" "$(head -n 1 "$ih/.local/share/fm-quota-axi-pool/link-target")" "$saved_lt"
+# Wrapper finds recorded upstream (no FM_QUOTA_AXI_REAL).
+wrap_out=$(env -i PATH="$ih/.local/bin:/usr/bin:/bin" HOME="$ih" XDG_DATA_HOME="$ih/.local/share" \
+  quota-axi 2>"$ih/wrap.err") || true
+is "wrapper runs recorded upstream" "$wrap_out" upstream-ok
+# Uninstall restores original link.
+env -i PATH="$ih/.local/bin:/usr/bin:/bin" HOME="$ih" XDG_DATA_HOME="$ih/.local/share" \
+  bash "$uninst" >"$ih/uninstall.out" 2>"$ih/uninstall.err" || true
+is "uninstall restored link target" "$(readlink -- "$ih/.local/bin/quota-axi")" "$orig_target"
+is "uninstall restored resolved" "$(readlink -f "$ih/.local/bin/quota-axi")" "$orig_resolved"
+is "uninstall removed share dir" "$( [ -d "$ih/.local/share/fm-quota-axi-pool" ] && echo yes || echo no )" no
+rm -rf -- "$ih" "$empty"
+
 [ "$fails" -eq 0 ] || { echo "FAIL: $fails assertions"; exit 1; }
-echo "PASS: quota-axi-pool forced-limit journey"
+echo "PASS: quota-axi-pool forced-limit and install journeys"
 exit 0
