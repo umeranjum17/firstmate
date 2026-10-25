@@ -11,7 +11,9 @@ Every run it scans same-user processes under `/proc`, read-only:
 - **Attributes each hit** to a home and task: the process's cwd (or its nearest ancestor's) is matched against every home's `state/*.meta` `worktree=` record (homes: `~/firstmate` and `~/.treehouse/*/*/firstmate`); no match prints `unknown`.
 - **Names the parent still exporting it:** the parent chain is walked to the topmost ancestor that holds the same variable.
 
-Output: `state/key-in-env.incidents` (rewritten each run, empty when clean), one TSV line per process: `pid  home  task  variables  topmost-parent(pid)`. One wake line on stdout when the set of hits changes (de-duplicated through `state/.key-in-env.last`; silent when clean or unchanged). The Incidents view can read the file directly.
+Output: `state/key-in-env.incidents` (rewritten each run, empty when clean), one TSV line per process: `pid  home  task  variables  topmost-parent(pid)`. The check wakes once when a finding first appears, when a new key variable name appears, or when the process count grows by more than 25% since the last alert. It stays quiet for an unchanged finding and resets the active finding after a clean scan. Its private `state/.key-in-env.alerted.json` stores only the last alerted count, variable names, and provider auth status. The Incidents view can read the file directly.
+
+When an `OPENROUTER_API_KEY` is present, the check makes a read-only `GET /api/v1/key` request to OpenRouter with a three-second timeout. An HTTP 401 or 403 adds `key revoked` to the alert. The request's credential value is read transiently from `/proc` and is never logged or written; other providers are not probed.
 
 It never kills, signals or changes anything.
 

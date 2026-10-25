@@ -4,6 +4,8 @@ journeys:
     command: bash owner-rules/run-hierarchy-proof.sh
   owner-rules-publication:
     command: bash owner-rules/run-proof.sh
+  key-in-env-alert-once:
+    command: bash key-in-env-check/run-proof.sh
   fleet-pulse-chat-tsv-refresh:
     command: bash fleet-pulse/tests/chat-tsv.test.sh > "$DONE_DONE_EVIDENCE_ROOT/${RUN_ID}.log" 2>&1
   limit-prompt-move:
