@@ -166,6 +166,29 @@ fm_watcher_stall_bound() {
   printf '%s\n' "${FM_WATCHER_STALL_BOUND:-$((grace * 3))}"
 }
 
+fm_watcher_confirmation_budget() {
+  local state=$1 watch_path=$2 home=$3 budget check pid
+  case "${OSTYPE:-}" in
+    msys*|mingw*|cygwin*) budget=30 ;;
+    *) budget=10 ;;
+  esac
+  if [ -n "${FM_ARM_CONFIRM_TIMEOUT:-}" ]; then
+    budget=$FM_ARM_CONFIRM_TIMEOUT
+  else
+    budget=$((budget + ${FM_SIGNAL_GRACE:-30}))
+    for check in "$state"/*.check.sh; do
+      [ -e "$check" ] || continue
+      budget=$((budget + ${FM_CHECK_TIMEOUT:-30} + 1))
+    done
+  fi
+  pid=$(cat "$state/.watch.lock/pid" 2>/dev/null || true)
+  if [ "$(fm_watcher_progress_age "$state")" -ge "$(fm_watcher_stall_bound)" ] \
+    && fm_watcher_lock_matches_pid "$state" "$watch_path" "$pid" "$home"; then
+    budget=$((budget + 15))
+  fi
+  printf '%s\n' "$budget"
+}
+
 # fm_watcher_lock_unheld <state>
 # True when the watcher lock or its symlinked owner directory is absent, or when
 # the existing lock records no pid at all. Any non-empty pid remains held here;
