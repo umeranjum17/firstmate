@@ -15,7 +15,7 @@
 #     gate, check and post all take `--judge <route>`: it reaches `done-done check --judge <route>`
 #     for that call alone, so a lane whose configured judge route is rate limited can name another
 #     one instead of waiting on the fallback. Without it done-done checks with its own configured
-#     judge, as before.
+#     judge when the Claude pool has room; otherwise try Sol then Command Code DeepSeek.
 #   merge-card post --board <board.json> [--claim-id <id>] [--judge <route>] <task-id> <worktree|-> <head|-> <pr-url|->
 #     Install as $FM_HOME/config/post-merge. --claim-id names the done-done claim to check (passed to
 #     `done-done check --claim-id`, and the check is re-run); without it done-done picks its own. Posts one evidence card per merge (one live card per PR: a new head posts its card and archives the old one), and
@@ -48,9 +48,9 @@
 # The done-done check runs as the pool's claude account when the home has one
 # (config/account-pool): the check's env carries that account's profile folder in
 # CLAUDE_CONFIG_DIR and the pool's login variables unset, so the judge never answers on
-# the default login. Failed reads use a last good pick or report that no judge ran.
+# the default login. A fresh pick is required; a dry pool uses non-Claude judges.
 # Needs done-done on PATH (0.3.1+ cites the task folder's evidence itself; an older one is
-# still covered), sign-off-axi, jq and gh.
+# still covered), sign-off-axi, jq and gh. Dry-pool fallback also needs Python 3 with PyYAML and pi.
 set -u
 
 die() { echo "merge-card: $*" >&2; exit 1; }
@@ -90,7 +90,51 @@ resolve_evidence() {
 pool_env_run() {
   local wt=$1
   shift
-  ( cd "$wt" && "$@" )
+  if [ "${fallback:-0}" != 1 ]; then
+    ( cd "$wt" && "$@" )
+    return $?
+  fi
+  # Scope the copied config and its cleanup to this check, including interrupts.
+  (
+    local config model quota='' output='' rc=2 provider remaining models=''
+    config=$(mktemp -d) || return 2
+    trap 'rm -rf -- "$config"' EXIT
+    if command -v quota-axi >/dev/null; then
+      quota=$(quota-axi --no-credential-refresh 2>/dev/null) || quota=''
+    fi
+    models=$(pi --list-models 2>/dev/null) || models=''
+    for model in openai-codex/gpt-6.1-sol commandcode/deepseek/deepseek-v4.1-flash; do
+      provider=codex
+      if [[ $model == commandcode/* ]]; then
+        provider=commandcode
+        grep -Eq '^commandcode[[:space:]]+deepseek/deepseek-v4[.]1-flash[[:space:]]' <<<"$models" || continue
+      fi
+      remaining=$(awk -F, -v p="$provider" '$1 ~ "^[[:space:]]*" p "$" && $2 == "all_models" {print $3; exit}' <<<"$quota")
+      if [[ $remaining =~ ^[0-9]+([.][0-9]+)?$ ]] && awk "BEGIN {exit !($remaining <= 0)}"; then
+        continue
+      fi
+      # PyYAML preserves every existing setting while overriding only this call's judge.
+      python3 - "${DONE_DONE_HOME:-$HOME/.done-done}/config.yaml" "$config/config.yaml" "$model" <<'CONFIG' || return 2
+import os, sys, yaml
+source, target, model = sys.argv[1:]
+with open(source) if os.path.exists(source) else open(os.devnull) as f:
+    cfg = yaml.safe_load(f) or {}
+cfg['judge'] = {**cfg.get('judge', {}), 'route': 'answerer:pi', 'model': model}
+cfg['judge'].pop('fallback_route', None)
+with open(target, 'w') as f:
+    yaml.safe_dump(cfg, f)
+CONFIG
+      rc=0
+      output=$(cd "$wt" && DONE_DONE_HOME="$config" "$@" --judge answerer:pi 2>&1) || rc=$?
+      # A proof failure or inconclusive verdict is final; only quota/auth moves routes.
+      if [ "$rc" != 2 ] || ! grep -qiE '429|rate.?limit|quota|usage limit|insufficient.*credit|auth|sign.?in|log.?in|401|403' <<<"$output"; then
+        printf '%s\n' "$output"
+        return "$rc"
+      fi
+    done
+    printf '%s\n' "${output:-No non-Claude judge has room or a listed model; Claude was not started}"
+    return "$rc"
+  )
 }
 
 # check [--claim-id <id>] [--judge <route>] <task-id> <worktree|-> <head|-> <pr-url|->: run done-done, save and print the verdict.
@@ -101,7 +145,7 @@ check() {
   [ $# -eq 4 ] || { echo "usage: merge-card check [--claim-id <id>] [--judge <route>] <task-id> <worktree|-> <head|-> <pr-url|->"; return; }
   [ -n "${FM_HOME:-}" ] || { echo "merge-card: FM_HOME is not set, so done-done did not run"; return; }
   local id=$1 wt=$2 head=$3 pr=$4 src out='' rc=0 verdict signoff=''
-  local record=$FM_HOME/data/$id/merge-card.json dd_v='' args body reason
+  local record=$FM_HOME/data/$id/merge-card.json dd_v='' args body reason fallback=0
   local signoff_board=${signoff_board:-$FM_HOME/data/$id/merge-card-media/signoff-board.json}
   src=$pr
   [ "$pr" != - ] || src=$FM_HOME/data/$id/checks.md
@@ -114,12 +158,12 @@ check() {
     # an older one rejects the flag and resolves against its cwd, so probe once (offline, cheap)
     # and, on the older one, hand it the Checks block with its names already resolved, on stdin.
     dd_v=$(done-done --version 2>/dev/null | head -n 1)
-    # The judge is a claude caller: it takes its account from the pool pick, so a
-    # rate-limited default login cannot answer for the merge.
-    if ! fm_pool_claude_env; then
-      rc=2
-      out='pool: no usable account; judge was not started'
-    elif done-done check --help 2>&1 | grep -q -- '--citation-base' ||
+    # Explicit non-Claude judges must never depend on Claude pool capacity.
+    case ${judge[1]:-claude-code} in
+      claude-code|answerer:claude|answerer:claude-code)
+        FM_POOL_REQUIRE_FRESH=1 fm_pool_claude_env || fallback=1 ;;
+    esac
+    if done-done check --help 2>&1 | grep -q -- '--citation-base' ||
        version_at_least "$dd_v" 0.3.1; then
       out=$(pool_env_run "$wt" done-done check --from "$src" --json --citation-base "$FM_HOME/data/$id" "${judge[@]}" "${claim_id[@]}" 2>&1) || rc=$?
     else

@@ -68,6 +68,13 @@ if [ "${2:-}" = --help ]; then
   case $MODE in newer | liar) echo "  --citation-base <dir>  resolve relative evidence names from <dir>" ;; esac
   exit 0
 fi
+if [ -n "${ROUTE_LOG:-}" ]; then
+  model=$(python3 -c 'import os,yaml; print(yaml.safe_load(open(os.environ["DONE_DONE_HOME"]+"/config.yaml"))["judge"]["model"])')
+  echo "$model" >>"$ROUTE_LOG"
+  if [ "${SOL_LIMIT:-0}" = 1 ] && [ "$model" = openai-codex/gpt-6.1-sol ]; then
+    echo '{"error":"429 quota exhausted"}'; exit 2
+  fi
+fi
 src='' base='' flag=0
 while [ $# -gt 0 ]; do
   case $1 in
@@ -189,6 +196,20 @@ fi
 STUB
 chmod +x "$work/bin/done-done" "$work/bin/sign-off-axi" "$work/bin/gh" "$work/bin/pool-claude"
 
+# Offline routing fixtures: no installed quota reader or model CLI is invoked.
+cat >"$work/bin/pi" <<'STUB'
+#!/usr/bin/env bash
+echo 'commandcode deepseek/deepseek-v4.1-flash 262K'
+STUB
+cat >"$work/bin/quota-axi" <<'STUB'
+#!/usr/bin/env bash
+printf '  codex,all_models,%s,unknown\n' "${CODEX_ROOM:-10}"
+STUB
+chmod +x "$work/bin/pi" "$work/bin/quota-axi"
+export DONE_DONE_HOME=$work/dd-config
+mkdir -p "$DONE_DONE_HOME"
+printf 'judge:\n  route: claude-code\n  model: claude-haiku-5-5\n' >"$DONE_DONE_HOME/config.yaml"
+
 head_c=e2ehead0000000000000000000000000000000000
 : >"$work/so.log"
 export SO_LOG=$work/so.log
@@ -243,8 +264,8 @@ if grep -q -- '--judge' "$DD_LOG"; then no "judge: none passed without the flag"
 : >"$DD_LOG"
 SO_CAPTURE=$work/card-judge
 export SO_CAPTURE
-PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board-judge.json" --judge minimax:key newer "$wt" "$head_c" - >/dev/null 2>&1
-if grep -q -- '^check .* --judge minimax:key' "$DD_LOG"; then ok "judge: post passes the route to done-done check"; else no "judge: post passes the route to done-done check: $(cat "$DD_LOG")"; fi
+POOL_FAIL=1 PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board-judge.json" --judge answerer:pi newer "$wt" "$head_c" - >/dev/null 2>&1
+if grep -q -- '^check .* --judge answerer:pi' "$DD_LOG"; then ok "judge: post passes the route to done-done check"; else no "judge: post passes the route to done-done check: $(cat "$DD_LOG")"; fi
 holds "judge: card still posts with a named route" "$work/card-judge/card.json"
 # gate --judge: the gate's own check carries the route too, so the merge gate judges the
 # proof with the route the caller named rather than the configured one.
@@ -278,16 +299,33 @@ rm -f "$home/config/account-pool"
 : >"$DD_POOL_LOG"
 PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" check nopool "$wt" "$head_c" - >/dev/null 2>&1
 is "no pool: the pool is not asked" "$(wc -c <"$DD_POOL_LOG")" 0
-is "no pool: the judge never starts" "$(wc -c <"$DD_ENV_LOG")" 0
+is "no pool: fallback judge starts" "$(wc -l <"$DD_ENV_LOG" | tr -d ' ')" 1
 printf 'command=%s\nstate=%s\n' "$work/bin/pool-claude" "$work/pool" >"$home/config/account-pool"
 POOL_FAIL=1 PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" check pool "$wt" "$head_c" - >"$work/fallback.log" 2>&1
-is "reader failure: last good folder reaches judge" "$(cut -d' ' -f1 "$DD_ENV_LOG" | tail -n 1)" "dir=$POOL_FOLDER"
-grep -q 'last good pick age' "$work/fallback.log" && ok "fallback reports age" || no "fallback reports age"
+is "reader failure: judge runs despite cached pick" "$(jq -r .verdict "$home/data/pool/merge-card.json")" pass
+grep -q 'cached accounts will not be used' "$work/fallback.log" && ok "fallback reports age" || no "fallback reports age"
 rm -f "$home/state/claude-tool-pick.json"
 : >"$DD_ENV_LOG"
 POOL_FAIL=1 PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" check pool "$wt" "$head_c" - >"$work/no-cache.log" 2>&1
-is "reader failure without cache: judge never starts" "$(wc -c <"$DD_ENV_LOG")" 0
+is "reader failure without cache: judge starts" "$(wc -l <"$DD_ENV_LOG" | tr -d ' ')" 1
 grep -q 'quota reader unavailable' "$work/no-cache.log" && ok "failure reports cause" || no "failure reports cause"
+
+# A caller's explicit non-Claude route ignores even a dry pool.
+: >"$DD_POOL_LOG"
+: >"$DD_LOG"
+POOL_FAIL=1 PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" check --judge answerer:pi pool "$wt" "$head_c" - >/dev/null 2>&1
+is "explicit non-Claude: no pool pick" "$(wc -c <"$DD_POOL_LOG")" 0
+is "explicit non-Claude: judge passes" "$(jq -r .verdict "$home/data/pool/merge-card.json")" pass
+export ROUTE_LOG=$work/routes.log
+: >"$ROUTE_LOG"
+POOL_FAIL=1 SOL_LIMIT=1 PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" check pool "$wt" "$head_c" - >"$work/routes.out" 2>&1
+is "dry pool: Sol quota failure moves to Goat" "$(paste -sd, "$ROUTE_LOG")" 'openai-codex/gpt-6.1-sol,commandcode/deepseek/deepseek-v4.1-flash'
+is "dry pool: fallback verdict passes" "$(jq -r .verdict "$home/data/pool/merge-card.json")" pass
+: >"$ROUTE_LOG"
+POOL_FAIL=1 CODEX_ROOM=0 PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" check pool "$wt" "$head_c" - >/dev/null 2>&1
+is "quota output: empty Codex skips to Goat" "$(cat "$ROUTE_LOG")" commandcode/deepseek/deepseek-v4.1-flash
+is "per-call config: global model unchanged" "$(python3 -c 'import os,yaml; print(yaml.safe_load(open(os.environ["DONE_DONE_HOME"]+"/config.yaml"))["judge"]["model"])')" claude-haiku-5-5
+unset ROUTE_LOG
 
 # A 0.3.0 done-done on PR 24's shape: the PR body names the PNG bare, the file
 # is in the task folder, the flag is never passed, and merge-card hands done-done
@@ -306,6 +344,23 @@ is "older: card kind" "$(jq -r .kind "$work/card-older/card.json")" evidence
 is "older: card title is the claim" "$(jq -r .title "$work/card-older/card.json")" "a stopped worker moves to the next live route"
 is "older: card media" "$(jq -c .media "$work/card-older/card.json")" '["1.png"]'
 if [ -f "$work/card-older/1.png" ] && cmp -s "$work/card-older/1.png" "$shot"; then ok "older: card media resolves to the retained PNG"; else no "older: card media is not the retained PNG"; fi
+
+# A caller's explicit non-Claude route ignores even a dry pool.
+: >"$DD_POOL_LOG"
+: >"$DD_LOG"
+POOL_FAIL=1 PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" check --judge answerer:pi pool "$wt" "$head_c" - >/dev/null 2>&1
+is "explicit non-Claude: no pool pick" "$(wc -c <"$DD_POOL_LOG")" 0
+is "explicit non-Claude: judge passes" "$(jq -r .verdict "$home/data/pool/merge-card.json")" pass
+export ROUTE_LOG=$work/routes.log
+: >"$ROUTE_LOG"
+POOL_FAIL=1 SOL_LIMIT=1 PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" check pool "$wt" "$head_c" - >"$work/routes.out" 2>&1
+is "dry pool: Sol quota failure moves to Goat" "$(paste -sd, "$ROUTE_LOG")" 'openai-codex/gpt-6.1-sol,commandcode/deepseek/deepseek-v4.1-flash'
+is "dry pool: fallback verdict passes" "$(jq -r .verdict "$home/data/pool/merge-card.json")" pass
+: >"$ROUTE_LOG"
+POOL_FAIL=1 CODEX_ROOM=0 PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" check pool "$wt" "$head_c" - >/dev/null 2>&1
+is "quota output: empty Codex skips to Goat" "$(cat "$ROUTE_LOG")" commandcode/deepseek/deepseek-v4.1-flash
+is "per-call config: global model unchanged" "$(python3 -c 'import os,yaml; print(yaml.safe_load(open(os.environ["DONE_DONE_HOME"]+"/config.yaml"))["judge"]["model"])')" claude-haiku-5-5
+unset ROUTE_LOG
 
 # A 0.3.0 done-done with an absolute name, kept as it is, and a bare name the task
 # folder lacks, reported missing at its resolved path.

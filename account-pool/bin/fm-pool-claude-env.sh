@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Source before a tool that can spawn Claude. Cache only folder paths and variable
 # names, never credentials. A configured pool failure never uses the default login.
+# FM_POOL_REQUIRE_FRESH=1 refuses cached picks for callers requiring current capacity.
 fm_pool_claude_env() {
   local home=${FM_HOME:?set FM_HOME} command=byokit-accounts state='' line out='' reason='' cache folder var age
   local -a shed=()
@@ -14,6 +15,10 @@ fm_pool_claude_env() {
   if [ ! -d "$folder" ] || ! jq -e '.ok == true and (.set.CLAUDE_CONFIG_DIR | type == "string" and startswith("/")) and
     ((.unset // []) | type == "array" and all(.[]; type == "string" and test("^[A-Za-z_][A-Za-z0-9_]*$")))' <<<"$out" >/dev/null 2>&1; then
     reason=${reason:-invalid pool answer}
+    if [ "${FM_POOL_REQUIRE_FRESH:-0}" = 1 ]; then
+      echo "pool: fresh pick failed ($reason); cached accounts will not be used" >&2
+      return 1
+    fi
     out=$(cat "$cache" 2>/dev/null) || out=''
     age=$(jq -r 'now - .saved_at | floor' <<<"$out" 2>/dev/null) || age=unknown
     echo "pool: pick failed ($reason); last good pick age ${age}s" >&2

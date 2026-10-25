@@ -1,5 +1,7 @@
 app: firstmate-addons
 journeys:
+  merge-card-pool-fallback:
+    command: bash merge-card/run-proof.sh
   owner-rules-hierarchy:
     command: bash owner-rules/run-hierarchy-proof.sh
   owner-rules-publication:
