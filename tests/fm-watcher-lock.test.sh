@@ -375,6 +375,34 @@ SH
   pass "delayed re-arm removes hung holder and orphaned child, protects unrelated process, and supervises five tasks before confirmation ($mode)"
 )
 
+# Reproduce a descendant exiting between its liveness and identity reads.
+test_child_retirement_continues_after_descendant_exits() (
+  local dir first='' second='' records pid
+  dir=$(make_case child-retirement-exit-race)
+  export FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state"
+  . "$LIB"
+  trap 'for pid in "$first" "$second"; do
+    [ -z "$pid" ] || kill -KILL "$pid" 2>/dev/null || true
+  done; wait 2>/dev/null || true' EXIT
+  sleep 300 &
+  first=$!
+  sleep 300 &
+  second=$!
+  records=$(printf '%s\t%s\n' "$first" "$(fm_watcher_child_identity "$first")" \
+    "$second" "$(fm_watcher_child_identity "$second")")
+  fm_watcher_process_zombie() {
+    if [ "$1" = "$first" ]; then
+      kill -KILL "$first" 2>/dev/null || true
+      wait "$first" 2>/dev/null || true
+    fi
+    return 1
+  }
+  fm_watcher_retire_child_identities "$records" \
+    || fail "an exited descendant prevented remaining child retirement"
+  is_live_non_zombie "$second" && fail "remaining recorded child survived retirement"
+  pass "child retirement continues when an earlier descendant exits during identity lookup"
+)
+
 test_first_scan_confirmation_budget() (
   local mode=$1 dir state fakebin arm='' holder='' i status
   dir=$(make_case "first-scan-budget-$mode")
@@ -1801,6 +1829,7 @@ test_msys_pid_identity_uses_proc() {
   pass "MSYS process identity uses compatible /proc fields"
 }
 
+test_child_retirement_continues_after_descendant_exits || exit 1
 test_rearm_proves_resumed_supervision beacon &
 proof_beacon=$!
 test_rearm_proves_resumed_supervision no-beacon &

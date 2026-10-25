@@ -178,7 +178,9 @@ fm_watcher_retire_child_identities() {
       [ -n "$pid" ] && [ -n "$identity" ] || continue
       fm_pid_alive "$pid" || continue
       fm_watcher_process_zombie "$pid" && continue
-      current=$(fm_watcher_child_identity "$pid" 2>/dev/null) || return 1
+      # A descendant can exit after the liveness read. Keep retiring the
+      # remaining identities; the completion check still verifies them all.
+      current=$(fm_watcher_child_identity "$pid" 2>/dev/null) || continue
       [ "$current" = "$identity" ] || continue
       kill -"$signal" "$pid" 2>/dev/null || true
     done <<< "$records"
@@ -1500,7 +1502,7 @@ fm_lock_acquire_wait_bounded() {
 
 fm_lock_release() {
   local lockdir=$1 pid current ownerdir
-  if [ "$lockdir" = "$STATE/.watch.lock" ] \
+  if [ -n "${STATE:-}" ] && [ "$lockdir" = "$STATE/.watch.lock" ] \
     && fm_lock_claim_blocked_by_steal "$lockdir"; then
     return 0
   fi
