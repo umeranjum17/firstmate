@@ -131,6 +131,38 @@ run pick "$past"
 is "past deadline refuses" "$rc" 2
 is "deadline reason" "$(jq -r .reason <<<"$out")" "overall deadline passed"
 
+# Default pool_config (lfm account_picker omits it): three cases.
+# 1) FM_HOME/config/account-pool when readable.
+nopool=$(jq -nc '{v:1,purpose:"work",capabilities:["text"],attempted:[]}')
+reading 70 70 40 40
+run pick "$nopool"
+is "no pool_config uses FM_HOME default" "$(jq -r .id <<<"$out")" pa_umer_a
+is "no pool_config pick ok" "$(jq -r .ok <<<"$out")" true
+
+# 2) Explicit pool_config still wins over the FM_HOME default (relative state=
+# would never come from the good FM_HOME file; using it proves the request path).
+mkdir -p "$w/explicit"
+printf 'state=not-absolute\ncommand=%s\n' "$w/bin/pool-cmd" >"$w/explicit/account-pool"
+explicit=$(jq -nc --arg p "$w/explicit/account-pool" '{v:1,purpose:"work",pool_config:$p,capabilities:["text"],attempted:[]}')
+run pick "$explicit"
+is "explicit pool_config wins over FM_HOME default" "$rc" 1
+is "explicit config is what was parsed" "$(jq -r .reason <<<"$out")" \
+  "config/account-pool must name absolute state="
+
+# 3) No pool_config and no readable default file keeps today's refusal.
+run_nodefault() {
+  local verb=$1 json=$2
+  out=$(printf '%s' "$json" | env -i PATH="$w/bin:/usr/bin:/bin" HOME="$w/emptyhome" TMPDIR="$w" \
+    FM_MODEL_POOL_FLOOR=15 FM_ACCOUNT_POOL_REST_FLOOR=15 FM_CLAUDE_ACCOUNTS_LOW=5 \
+    FM_CLAUDE_ACCOUNTS_FRESH=999999 \
+    "$helper" "$verb" --json 2>"$w/err"); rc=$?
+}
+mkdir -p "$w/emptyhome"
+run_nodefault pick "$nopool"
+is "no pool_config and no default refuses" "$rc" 1
+is "no-default refusal reason" "$(jq -r .reason <<<"$out")" \
+  "pool_config is required (absolute path to config/account-pool)"
+
 # No real model CLI invoked.
 is "no model CLI runs" "$(grep -c 'real model CLI blocked' "$w/err" || true)" 0
 is "pool-cmd was used" "$(test -s "$w/log/pool-cmd.log" && echo yes || echo no)" yes

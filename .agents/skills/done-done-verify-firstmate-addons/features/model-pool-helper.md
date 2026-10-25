@@ -12,4 +12,4 @@ Fixture registry accounts Umer A/B, synthetic quota readings, and a recording st
 ## Capture
 
 Keep `result.log` and `steps.json` under `$DONE_DONE_EVIDENCE_ROOT` (screen: none).
-Assertions: A wins at 70% over B at 40%; A quota limit yields B; all Claude under the 15% eligibility floor reaches Sol then Goat then Cursor; credits-enabled accounts are refused and logged; a past deadline refuses; attempted ids are not repeated.
+Assertions: A wins at 70% over B at 40%; A quota limit yields B; all Claude under the 15% eligibility floor reaches Sol then Goat then Cursor; credits-enabled accounts are refused and logged; a past deadline refuses; attempted ids are not repeated; omitted `pool_config` uses `$FM_HOME/config/account-pool` when readable; an explicit `pool_config` still wins; omitted `pool_config` with no default file refuses.
