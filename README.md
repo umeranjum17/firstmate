@@ -52,16 +52,35 @@ Choose the job you need first; the reference lists the full catalog and dependen
 
 Run these from the clone.
 For home-specific installers, export `FM_HOME` pointing to your existing Firstmate home: the directory containing its `bin/`, `config/`, and `state/`.
-Each row shows one starting add-on for that job.
+Each job names one starting add-on.
 
-| Job | Start here | Install line |
-| --- | --- | --- |
-| Protect the machine | [Memory gate](host-memory/install.sh); also delete, kill, and read guards | `bash host-memory/install.sh` |
-| Keep work moving | [Stall alerts](docs/addons-reference.md#fleet-stall); also quota recovery and account routing | `bash fleet-stall/install.sh` |
-| Ship checked work | [Merge-on-green](docs/addons-reference.md#merge-on-green); also merge cards and identity checks | `bash merge-on-green/install.sh "$FM_HOME"` |
-| Understand the fleet | [Flow check](fleet-flow/install.sh); also dashboard, metrics, and ticket sync | `bash fleet-flow/install.sh` |
+**Protect the machine** — [Memory gate](host-memory/install.sh); also delete, kill, and read guards.
 
-These rows are entry points, not install-all bundles.
+```sh
+bash host-memory/install.sh
+```
+
+**Keep work moving** — [Stall alerts](docs/addons-reference.md#fleet-stall); also quota recovery and account routing.
+
+```sh
+bash fleet-stall/install.sh
+```
+
+**Ship checked work** — [Merge-on-green](docs/addons-reference.md#merge-on-green); also merge cards and identity checks.
+
+```sh
+bash \
+  merge-on-green/install.sh \
+  "$FM_HOME"
+```
+
+**Understand the fleet** — [Flow check](fleet-flow/install.sh); also dashboard, metrics, and ticket sync.
+
+```sh
+bash fleet-flow/install.sh
+```
+
+These are entry points, not install-all bundles.
 Preview an install by putting `--dry-run` immediately after the script name.
 The [reference](docs/addons-reference.md) covers hooks, platform requirements, removal, and the additional add-ons in each job.
 
