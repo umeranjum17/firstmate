@@ -5,7 +5,7 @@ set -u
 here=$(cd "$(dirname "$0")" && pwd) || exit 1
 w=$(mktemp -d "${TMPDIR:-/tmp}/claude-accounts-timer-test.XXXXXX") || exit 1
 trap 'rm -rf -- "$w"' EXIT
-mkdir -p "$w/home/fixture/users/user-017" "$w/fm" "$w/bin" "$w/a1"
+mkdir -p "$w/home/state" "$w/fm" "$w/bin" "$w/a1"
 printf '#!/bin/sh\necho "$*" >> "%s/systemctl.log"\n' "$w" > "$w/bin/systemctl"
 printf '#!/bin/sh\necho "{\\"providers\\":[{\\"windows\\":[{\\"id\\":\\"five_hour\\",\\"percentRemaining\\":50},{\\"id\\":\\"seven_day\\",\\"percentRemaining\\":60}]}]}"\n' > "$w/bin/quota-axi"
 chmod +x "$w/bin/systemctl" "$w/bin/quota-axi"
@@ -23,7 +23,7 @@ fm-claude-accounts-quota.timer
 claude-accounts-quota.sh"
 is "every 5 minutes, for this home" "$(grep -c 'OnUnitActiveSec=5min' "$units/fm-claude-accounts-quota.timer")|$(grep -c "Environment=FM_HOME=$w/fm" "$units/fm-claude-accounts-quota.service")" "1|1"
 is "the timer is enabled now" "$(tail -1 "$w/systemctl.log")" "--user enable --now fm-claude-accounts-quota.timer"
-is "the unit's command writes the card file" "$(env -i PATH="$w/bin:$PATH" HOME="$w/home" FM_HOME="$w/home" FM_CLAUDE_ACCOUNTS_REGISTRY="$w/registry.json" "$w/data/fm-claude-accounts/claude-accounts-quota.sh" >/dev/null 2>&1; jq -r '.accounts[0] | "\(.five_hour.left)/\(.seven_day.left)"' "$w/home/fixture/users/user-017/claude-accounts.json")" "50/60"
+is "the unit's command writes the card file" "$(env -i PATH="$w/bin:$PATH" HOME="$w/home" FM_HOME="$w/home" FM_CLAUDE_ACCOUNTS_REGISTRY="$w/registry.json" "$w/data/fm-claude-accounts/claude-accounts-quota.sh" >/dev/null 2>&1; jq -r '.accounts[0] | "\(.five_hour.left)/\(.seven_day.left)"' "$w/home/state/claude-accounts.json")" "50/60"
 : > "$w/systemctl.log"
 is "a rerun changes nothing" "$(t "$here/../install-timer.sh" "$w/fm")|$(wc -c < "$w/systemctl.log")" "unchanged: fm-claude-accounts-quota.timer|0"
 t "$here/../uninstall-timer.sh" >/dev/null

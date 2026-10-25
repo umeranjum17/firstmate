@@ -6,7 +6,7 @@ set -u
 here=$(cd "$(dirname "$0")" && pwd) || exit 1
 w=$(mktemp -d "${TMPDIR:-/tmp}/claude-accounts-test.XXXXXX") || exit 1
 trap 'rm -rf -- "$w"' EXIT
-mkdir -p "$w/home/fixture/users/user-017" "$w/bin" "$w/a1" "$w/a2" "$w/a3"
+mkdir -p "$w/home/state" "$w/bin" "$w/a1" "$w/a2" "$w/a3"
 cat > "$w/registry.json" <<R
 {"version":1,"accounts":[
  {"id":"found-codex","provider":"codex","name":"","folder":"$w/codex"},
@@ -31,7 +31,7 @@ chmod +x "$w/bin/quota-axi"
 fails=0
 is() { if [ "$2" = "$3" ]; then echo "ok - $1"; else echo "not ok - $1: got [$2], want [$3]"; fails=$((fails + 1)); fi; }
 run() { out=$(env -i QDIR="$w" PATH="$w/bin:$PATH" HOME="$w" TMPDIR="$w" FM_HOME="$w/home" FM_ACCOUNTS_PROVIDER="${PROVIDER:-claude}" FM_CLAUDE_ACCOUNTS_REGISTRY="${REG:-$w/registry.json}" bash "$here/../bin/claude-accounts-quota.sh" "$@" 2>&1); rc=$?; }
-f=$w/home/fixture/users/user-017/claude-accounts.json
+f=$w/home/state/claude-accounts.json
 
 run --print
 is "two good accounts and one failing: still exit 0" "$rc" 0
@@ -53,15 +53,15 @@ is "every account failing: exit non-zero, cause recorded" "$rc|$(jq -r '.account
 REG=$w/missing.json run
 is "missing registry: named error" "$rc|${out%%:*}" "1|error"
 
-mkdir -p "$w/home/fixture/users/user-017/claude-accounts-rested"
-printf '%s\n' "$(($(date +%s) + 3600))" > "$w/home/fixture/users/user-017/claude-accounts-rested/found-claude"
+mkdir -p "$w/home/state/claude-accounts-rested"
+printf '%s\n' "$(($(date +%s) + 3600))" > "$w/home/state/claude-accounts-rested/found-claude"
 run
 is "quota view exposes an active rest for the dashboard" "$(jq -r '.accounts[0].rested_until > now' "$f")" true
 touch "$w/full"; run
 is "100/100 headroom is never displayed as rested" "$(jq -r 'all(.accounts[]; .rested_until == null)' "$f")" true
 mv "$w/full" "$w/full-used"
 PROVIDER=codex run --print
-is "Codex reads only its roster and normalizes its weekly window" "$rc|$(jq -r '.accounts[] | "\(.id) \(.five_hour.left)/\(.seven_day.left)"' "$w/home/fixture/users/user-017/codex-accounts.json")" "0|found-codex 60/10"
+is "Codex reads only its roster and normalizes its weekly window" "$rc|$(jq -r '.accounts[] | "\(.id) \(.five_hour.left)/\(.seven_day.left)"' "$w/home/state/codex-accounts.json")" "0|found-codex 60/10"
 
 [ "$fails" -eq 0 ] || { echo "$fails failed"; exit 1; }
 echo "all passed"
