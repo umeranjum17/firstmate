@@ -3,6 +3,7 @@
 # PID identity stability + watch-arm liveness + guard warnings. These are
 # safety-critical process invariants (a race bug may not reproduce through an
 # e2e), so they stay as focused real-process units.
+# shellcheck disable=SC2030,SC2031 # Test subshells intentionally isolate exported fixture settings.
 set -u
 
 # shellcheck source=tests/wake-helpers.sh
@@ -380,6 +381,7 @@ test_child_retirement_continues_after_descendant_exits() (
   local dir first='' second='' records pid
   dir=$(make_case child-retirement-exit-race)
   export FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state"
+  # shellcheck source=/dev/null
   . "$LIB"
   trap 'for pid in "$first" "$second"; do
     [ -z "$pid" ] || kill -KILL "$pid" 2>/dev/null || true
@@ -390,6 +392,7 @@ test_child_retirement_continues_after_descendant_exits() (
   second=$!
   records=$(printf '%s\t%s\n' "$first" "$(fm_watcher_child_identity "$first")" \
     "$second" "$(fm_watcher_child_identity "$second")")
+  # shellcheck disable=SC2329 # Called by the imported child-retirement helper.
   fm_watcher_process_zombie() {
     if [ "$1" = "$first" ]; then
       kill -KILL "$first" 2>/dev/null || true
@@ -415,7 +418,11 @@ test_first_scan_confirmation_budget() (
     wait 2>/dev/null || true' EXIT
   if [ "$mode" = check ]; then
     export FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=0
-    printf '#!/usr/bin/env bash\nsleep 20\ntouch "$FM_HOME/scanned"\n' > "$state/slow.check.sh"
+    cat > "$state/slow.check.sh" <<'SH'
+#!/usr/bin/env bash
+sleep 20
+touch "$FM_HOME/scanned"
+SH
     chmod 0700 "$state/slow.check.sh"
     "$ROOT/bin/fm-check-register.sh" slow >/dev/null || fail "register slow check"
   else
@@ -434,13 +441,15 @@ test_first_scan_confirmation_budget() (
     sleep 0.1
   done
   if [ "$mode" = check ]; then
-    [ -e "$dir/scanned" ] && grep -q '^watcher: started' "$dir/arm.out" \
-      || fail "slow first scan was not confirmed: $(cat "$dir/arm.out")"
+    if [ ! -e "$dir/scanned" ] || ! grep -q '^watcher: started' "$dir/arm.out"; then
+      fail "slow first scan was not confirmed: $(cat "$dir/arm.out")"
+    fi
   else
     wait_for_exit "$arm" 100
     status=$?
-    [ "$status" -eq 0 ] && grep -q '^signal:' "$dir/arm.out" \
-      || fail "default signal grace exceeded startup budget: $(cat "$dir/arm.out")"
+    if [ "$status" -ne 0 ] || ! grep -q '^signal:' "$dir/arm.out"; then
+      fail "default signal grace exceeded startup budget: $(cat "$dir/arm.out")"
+    fi
   fi
   ! grep -q '^watcher: FAILED' "$dir/arm.out" || fail "first scan failed: $(cat "$dir/arm.out")"
   pass "first scan confirmation budgets $mode work"

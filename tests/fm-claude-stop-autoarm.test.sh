@@ -556,7 +556,6 @@ test_handling_successor_waits_for_real_slow_scan() (
   mkdir -p "$dir/fakebin"
   printf '#!/usr/bin/env bash\nexit 0\n' > "$dir/fakebin/tmux"
   chmod +x "$dir/fakebin/tmux"
-  export PATH="$dir/fakebin:$PATH"
   cat > "$dir/bin/fm-watch-arm.sh" <<SH
 #!/usr/bin/env bash
 if [ -n "\${FM_WATCH_PREDECESSOR_ARM_PID:-}" ]; then
@@ -574,7 +573,7 @@ SH
   printf 'pending:downtime:slow.1.aaa\n' > "$dir/state/.watcher-down"
   chmod 600 "$dir/state/.watcher-down"
   printf '%s\t1\tcheck\tseed\tcheck: seed recovery\n' "$(date +%s)" > "$dir/state/.wake-queue"
-  out=$(run_autoarm "$dir" 2>/dev/null); status=$?
+  out=$(PATH="$dir/fakebin:$PATH" run_autoarm "$dir" 2>/dev/null); status=$?
   expect_code 2 "$status" "a slow real handling successor must preserve the recovery wake: $out"
   assert_contains "$out" 'check: rearm-resurface' "the foreground recovery wake must reach Claude"
   assert_not_contains "$out" 'did not confirm a live watcher' "the hook must wait for the complete successor scan"

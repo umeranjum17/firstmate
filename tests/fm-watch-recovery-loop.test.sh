@@ -253,13 +253,18 @@ test_adapter_waits_for_slow_supervision_scan() (
   export FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state"
   export FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_TIMEOUT=45 FM_CHECK_INTERVAL=0 FM_HEARTBEAT=999999
   unset FM_OMP_ARM_READY_TIMEOUT_MS FM_PI_ARM_READY_TIMEOUT_MS FM_OPENCODE_ARM_READY_TIMEOUT_MS FM_ARM_CONFIRM_TIMEOUT FM_SUPERVISION_HOST_READY_TIMEOUT
-  printf '#!/usr/bin/env bash\nsleep %s\ntouch "$FM_HOME/scanned"\n' "$delay" > "$home/state/slow.check.sh"
+  {
+    printf '#!/usr/bin/env bash\nsleep %s\n' "$delay"
+    cat <<'SH'
+touch "$FM_HOME/scanned"
+SH
+  } > "$home/state/slow.check.sh"
   chmod 0700 "$home/state/slow.check.sh"
   "$ROOT/bin/fm-check-register.sh" slow >/dev/null || fail "register slow adapter check"
   printf 'pending:downtime:adapter.1.aaa\n' > "$home/state/.watcher-down"
   chmod 600 "$home/state/.watcher-down"
   printf '%s\t1\tcheck\tseed\tcheck: adapter recovery\n' "$(date +%s)" > "$home/state/.wake-queue"
-  PLUGIN="$plugin" MODE="$mode" PATH="$fakebin:$PATH" bash -c 'case "$1" in omp*) name=omp ;; opencode*) name=opencode ;; *) name=$1 ;; esac; exec -a "$name" node --input-type=module' _ "$mode" <<'JS'
+  PLUGIN="$plugin" MODE="$mode" PATH="$fakebin:$PATH" bash -c 'case "$1" in omp*) name=omp ;; opencode*) name=opencode ;; *) name=$1 ;; esac; exec -a "$name" node --input-type=module' _ "$mode" <<'JS' || fail "$mode aborted a legitimate slow supervision scan"
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 const home = process.env.FM_HOME;
@@ -288,7 +293,6 @@ const pid = Number(readFileSync(`${home}/state/.watch.lock/pid`, "utf8").trim())
 process.kill(pid, 0);
 process.exit(0);
 JS
-  [ "$?" -eq 0 ] || fail "$mode aborted a legitimate slow supervision scan"
   pass "$mode waits for a slow real supervision scan before recovery delivery"
 )
 
