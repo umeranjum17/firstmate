@@ -14,6 +14,9 @@ journeys:
     command: bash key-in-env-check/run-proof.sh
   fleet-pulse-chat-tsv-refresh:
     command: bash fleet-pulse/tests/chat-tsv.test.sh > "$DONE_DONE_EVIDENCE_ROOT/${RUN_ID}.log" 2>&1
+  fleet-pulse-newest-retro:
+    command: bash fleet-pulse/run-proof.sh
+
   limit-prompt-move:
     command: bash limit-prompt-move/tests/limit-prompt-move-e2e.sh > "$DONE_DONE_EVIDENCE_ROOT/${RUN_ID}.log" 2>&1
   limit-prompt-move-live:
