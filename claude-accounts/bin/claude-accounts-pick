@@ -24,8 +24,10 @@
 # account rested, every known runway under the low mark, or no registry account with an existing folder.
 # `status <id> --json` names the tool and folder of one account. `rest <id> --json` requires a quota
 # window at/below FM_ACCOUNT_POOL_REST_FLOOR (15%) and lasts until it resets; launch prompts cannot rest it.
-# A 100/100 reading invalidates a legacy rest. `unrest <id>` returns an account. A rested
-# account is never replaced by a paid fallback: with every account rested the pick refuses.
+# A recovered reading (no problem, at least one window present, every present window left == 100)
+# invalidates a legacy rest; Claude still needs both windows at 100, Codex with null five_hour
+# clears on seven_day 100 alone. `unrest <id>` returns an account. A rested account is never
+# replaced by a paid fallback: with every account rested the pick refuses.
 # Env: FM_HOME (the home whose state holds the reading; optional - --state alone is enough),
 # FM_CLAUDE_ACCOUNTS_REGISTRY, FM_CLAUDE_ACCOUNTS_FRESH (seconds a reading is reused, 120).
 # State must be supplied through --state or FM_HOME, and holds account-assignments.json (no secrets).
@@ -126,7 +128,9 @@ state=${state:-${FM_HOME:+$FM_HOME/state}}
 rested_dir=$state/$tool-accounts-rested
 rested_ids=$(for f in "$rested_dir"/*; do
   [ -f "$f" ] || continue
-  if jq -e --arg id "${f##*/}" 'any(.accounts[]?; .id == $id and .problem == null and .five_hour.left == 100 and .seven_day.left == 100)' <<<"$reading" >/dev/null; then
+  # Recovered: no problem, ≥1 window present, every present window fully restored (Codex omits five_hour).
+  if jq -e --arg id "${f##*/}" 'any(.accounts[]?; .id == $id and .problem == null
+      and ([.five_hour, .seven_day] | map(select(. != null)) | length > 0 and all(.left == 100)))' <<<"$reading" >/dev/null; then
     printf '0\n' >"$f" || fail "cannot expire the recovered account rest"
   fi
   expiry=$(cat "$f") || fail "cannot read account rest"

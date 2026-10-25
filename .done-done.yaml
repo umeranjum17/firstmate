@@ -37,6 +37,8 @@ journeys:
     command: bash claude-accounts/run-proof.sh
   claude-accounts-pick:
     command: bash claude-accounts/run-proof-pick.sh
+  claude-accounts-codex-rest:
+    command: bash claude-accounts/run-proof-codex-rest.sh
   claude-accounts-timer:
     command: bash claude-accounts/run-proof-timer.sh
   receipts-pr-candidate:
