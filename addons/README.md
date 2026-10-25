@@ -9,15 +9,6 @@
 
 Independent add-ons for developers running a fleet on their own machine.
 
-<picture>
-  <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="docs/media/hero-phone-dark.webp">
-  <source media="(max-width: 600px)" srcset="docs/media/hero-phone-light.webp">
-  <source media="(prefers-color-scheme: dark)" srcset="docs/media/hero-dark.webp">
-  <img src="docs/media/hero-light.webp" width="880" alt="Lookout Overview of a live fleet: lanes in use, merge rate, stuck lanes, and host load.">
-</picture>
-
-Lookout Overview of the live fleet (real lane history and merges).
-
 [Quick start](#quick-start) · [Add-on reference](docs/addons-reference.md) · [Roadmap](VISION.md)
 
 </div>

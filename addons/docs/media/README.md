@@ -2,9 +2,7 @@
 
 `logo-light.svg` and `logo-dark.svg` are themed wordmark marks from first-draft-axi (authorized stand-ins; self-score below the design bar).
 
-`social-preview.png` is the 1280×640 GitHub social card candidate from first-draft-axi (authorized stand-in; labeled below the 9 bar in the PR). Upload under repository Settings → General → Social preview.
-
-`hero-light.webp`, `hero-dark.webp`, `hero-phone-light.webp`, and `hero-phone-dark.webp` are real Lookout Overview captures of a live fleet through lookout-adapter (not Sample fleet).
+The social-preview and Lookout hero image candidates are not included in this checkout.
 
 Reproduce the captures with:
 
