@@ -159,4 +159,6 @@ run "$addons" fake-spawn.sh --relaunch --account next; run1 "a direct relaunch -
 CFG=$w/empty run "$addons" fake-spawn.sh --relaunch --account pa_named; has "a direct relaunch --account with no pool refuses, never the ambient login" "no account pool for claude workers"
 TEST_HARNESS=opencode run "$addons" fake-spawn.sh --relaunch --account pa_named; has "  ... and on a harness with no pool tool" "no account pool for opencode workers"
 run "$w/empty" fake-control.sh relaunch --account next; run1 "absent: --account stays the caller's own argument" "1|error: unexpected argument '--account'"
+# Shared model-pool helper (JSON pick/next) forced-limit journey; same add-on tree.
+if bash "$addons/account-pool/tests/model-pool.test.sh"; then echo "ok - model-pool forced-limit"; else echo "not ok - model-pool forced-limit"; fails=$((fails + 1)); fi
 [ "$fails" -eq 0 ]

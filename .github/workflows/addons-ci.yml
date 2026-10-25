@@ -168,6 +168,9 @@ jobs:
       # Stub byokit-accounts and a throwaway config: nothing real is touched.
       - name: Account pool test
         run: bash account-pool/tests/account-pool.test.sh
+      # Fixture registry and readings only: no network, no login copy, no real model CLI.
+      - name: Model pool helper test
+        run: bash account-pool/tests/model-pool.test.sh
       # Fixture muxr registry and a stub quota-axi: nothing real is touched.
       - name: Claude accounts test
         run: bash claude-accounts/tests/claude-accounts.test.sh
