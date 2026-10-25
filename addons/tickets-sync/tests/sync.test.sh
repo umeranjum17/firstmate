@@ -140,3 +140,34 @@ sign-off-axi ticket "$work/board.json" --id "$(ticket_id main/refresh)" --json |
 "$FM_HOME/state/tickets-sync.check.sh"
 sign-off-axi ticket "$work/board.json" --id "$(ticket_id main/refresh)" --json | jq -e --arg parent "$(ticket_id main/other)" '.ticket.parent == $parent'
 echo 'PASS: full-body parent beyond list truncation and source revision refresh'
+
+# The lifecycle writer records what a merge, a dispatch or a cleanup knows at the
+# moment it happens; a repeated step appends nothing, and an unknown ticket is a no-op.
+WRITER="$XDG_DATA_HOME/fm-tickets-sync/tickets-sync/ticket.py"
+FM_HOME="$FM_HOME" python3 "$WRITER" refresh --stage merging --pr https://github.com/example/alpha/pull/999 --release v9
+sign-off-axi ticket "$work/board.json" --id "$(ticket_id main/refresh)" --json | jq -e '.ticket.stage == "merging" and .ticket.prs == ["https://github.com/example/alpha/pull/999"] and .ticket.release == "v9"'
+before=$(sha256sum "$work/board.tickets.jsonl")
+FM_HOME="$FM_HOME" python3 "$WRITER" refresh --stage merging --pr https://github.com/example/alpha/pull/999 --release v9
+FM_HOME="$FM_HOME" python3 "$WRITER" never-published --stage building
+FM_HOME="$work/no-board" python3 "$WRITER" refresh --stage building
+test "$before" = "$(sha256sum "$work/board.tickets.jsonl")"
+FM_HOME="$FM_HOME" python3 "$WRITER" refresh --state "done"
+sign-off-axi ticket "$work/board.json" --id "$(ticket_id main/refresh)" --json | jq -e '.ticket.state == "done" and .ticket.progress == 100'
+echo 'PASS: the lifecycle writer corrects an existing ticket only where it differs'
+
+# The stale check names the ticket its own work contradicts and the board row no
+# home's work accounts for, writes nothing, and falls silent on a settled board.
+# The board can lag the work: this ticket still says in progress after its item closed.
+sign-off-axi ticket "$work/board.json" --id "$(ticket_id main/inferred)" --state "in progress" >/dev/null
+before=$(sha256sum "$work/board.tickets.jsonl")
+out=$("$FM_HOME/state/tickets-stale.check.sh")
+# ...and the fixture still holds the surplus row its earlier grouping history left behind.
+grep -q 'Umer telescope focus regression' <<<"$out"
+grep -q "no home's work accounts for it" <<<"$out"
+test "$before" = "$(sha256sum "$work/board.tickets.jsonl")"
+# The fixture's leftover row from its earlier grouping history is the surplus row the
+# check is for; closing it and settling the rest leaves the board true and silent.
+sign-off-axi ticket "$work/board.json" --id fm-history-fixture --state "done" >/dev/null
+"$FM_HOME/state/tickets-sync.check.sh" >/dev/null
+test -z "$("$FM_HOME/state/tickets-stale.check.sh")"
+echo 'PASS: the stale check flags a contradicting and an orphaned ticket, writes nothing, and silences a settled board'

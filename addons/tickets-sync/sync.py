@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Read-only tasks-axi backfill and incremental publication via sign-off-axi ticket."""
+"""Read-only tasks-axi backfill and incremental publication via sign-off-axi ticket.
+
+--check reads without writing and prints one line per ticket whose board state
+disagrees with its PR and backlog item, plus every board ticket no home's work
+accounts for; the watcher check whose stdout wakes Main runs it.
+"""
 import argparse
 import datetime as dt
 import fcntl
@@ -69,6 +74,7 @@ def ticket_id(home, item):
 def sync():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--audit', action='store_true')
+    parser.add_argument('--check', action='store_true', help='print board tickets that disagree with their work; write nothing')
     parser.add_argument('--reconcile', action='store_true', help='read every home without the watcher time budget')
     parser.add_argument('--close', metavar='HOME/ITEM', help='record an authorized cancellation or supersession on the board only')
     parser.add_argument('--reason', choices=['superseded', 'cancelled'])
@@ -115,8 +121,16 @@ def sync():
         tried = set()
         def save(path, value):
             temp = path.with_suffix('.tmp'); temp.write_text(json.dumps(value)); temp.replace(path)
+        seen = set()
         def publish(tid, desired):
             nonlocal changed
+            seen.add(tid)
+            if options.check:
+                # A leaf's state is the one its PR and backlog item derive; a grouping row's is its own.
+                if 'stage' in desired and (existing.get(tid, {}).get('state') or '') != desired['state']:
+                    board_state = existing.get(tid, {}).get('state') or 'no state'
+                    print(f"tickets-check: {desired['title'][:70]} ticket says {board_state}, its PR and backlog item say {desired['state'] or 'no state'}")
+                return
             digest = hashlib.sha256(json.dumps(desired, sort_keys=True).encode()).hexdigest()
             old = existing.get(tid, {})
             # Board wins over ledger: a prior digest can drift after a partial write.
@@ -220,7 +234,7 @@ def sync():
                 title = request_title(r, root_ask)
                 if len(title) > 160: title = title[:159].rstrip() + '…'
                 project = r['_project']
-                if project and project not in tried:
+                if project and project not in tried and not options.check:  # --check writes no board project
                     tried.add(project); reason = register_icon(board, project, registry)
                     if reason != skipped.get(project):
                         skipped.pop(project, None) if reason is None else skipped.__setitem__(project, reason)
@@ -235,6 +249,11 @@ def sync():
                     desired['stage'] = stage
                     if event is not None: desired['last-event-at'] = event
                 publish(tid, desired)
+        if options.check:
+            for tid, old in existing.items():
+                if tid.startswith('fm-') and tid not in seen and (old.get('state') or '') != 'done':
+                    print(f"tickets-check: {str(old.get('title'))[:70]} ticket says {old.get('state') or 'no state'}, but no home's work accounts for it")
+            return
         save(cursor, {})
         if changed: print(f'tickets-sync: {len(homes)} homes read; {changed} tickets changed')
 

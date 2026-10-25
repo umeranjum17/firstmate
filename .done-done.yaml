@@ -6,3 +6,5 @@ journeys:
     command: bash journeys/receipt-candidate-hook.sh
   tickets-stage-publish:
     command: bash addons/tickets-sync/run-stage-proof.sh
+  fleet-dashboard-core:
+    command: bash addons/fleet-dashboard/run-core-proof.sh
