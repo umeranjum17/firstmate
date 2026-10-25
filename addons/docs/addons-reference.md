@@ -116,6 +116,7 @@ FM_TEST_FORK=<fork checkout> bash quota-failover/tests/install.test.sh
 bash glm-queue/tests/glm-queue.test.sh
 bash route-change/tests/route-change-e2e.sh
 bash merge-on-green/tests/merge-on-green.test.sh
+bash merge-on-green/tests/no-old-receipt-path.test.sh
 bash merge-card/tests/merge-card-e2e.sh
 bash owner-rules/tests/owner-rules-gate.test.sh
 bash owner-rules/tests/design-flag.test.sh
