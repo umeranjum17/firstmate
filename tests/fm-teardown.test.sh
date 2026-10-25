@@ -3927,11 +3927,11 @@ test_registered_scratch_cleanup_paths() {
         write_meta "$case_dir" local-only secondmate
         configure_secondmate_with_tmux_children "$case_dir"
         home="$case_dir/secondmate-home"
-        state="$home/state"; data="$home/data"; task=child-a
+        state="$home/state"; data="$home/data"; task="child-a"
       else
         write_meta "$case_dir" local-only ship
         seed_backlog_in_flight "$case_dir"
-        home="$ROOT"; state="$case_dir/state"; data="$case_dir/data"; task=task-x1
+        home="$ROOT"; state="$case_dir/state"; data="$case_dir/data"; task="task-x1"
       fi
       scratch="$case_dir/scratch/proof"
       mkdir -p "$scratch"
@@ -3949,7 +3949,7 @@ test_registered_scratch_cleanup_paths() {
       pid=
       if [ "$failure" = none ] || [ "$failure" = no-lsof ] \
          || [ "$failure" = worktree-scan ] || [ "$failure" = scratch-scan ]; then
-        setsid bash -c 'cd "$1"; exec sleep 307' _ "$scratch" &
+        setsid bash -c "cd \"\$1\"; exec sleep 307" _ "$scratch" &
         pid=$!
         sleep 0.5
         kill -0 "$pid" 2>/dev/null || fail "scratch-$route-$failure: proof process did not start"
@@ -4054,16 +4054,16 @@ test_retained_task_data_processes_are_reaped() {
       if [ "$route" = child ]; then
         write_meta "$case_dir" local-only secondmate
         configure_secondmate_with_tmux_children "$case_dir"
-        data="$case_dir/secondmate-home/data"; task=child-a
+        data="$case_dir/secondmate-home/data"; task="child-a"
       else
         write_meta "$case_dir" local-only ship
         seed_backlog_in_flight "$case_dir"
-        data="$case_dir/data"; task=task-x1
+        data="$case_dir/data"; task="task-x1"
       fi
       mkdir -p "$data/$task/proof"
       printf 'retain evidence\n' > "$data/$task/proof/result"
       printf 'retain sibling\n' > "$data/sibling-evidence"
-      setsid bash -c 'cd "$1"; exec sleep 311' _ "$data/$task/proof" &
+      setsid bash -c "cd \"\$1\"; exec sleep 311" _ "$data/$task/proof" &
       pid=$!
       sleep 0.5
       test_path=$PATH
@@ -4109,7 +4109,7 @@ test_hard_interruption_preserves_scratch_ownership_on_replay() {
     FM_STATE_OVERRIDE="$case_dir/state" "$ROOT/bin/fm-scratch.sh" register task-x1 "$scratch" >/dev/null \
       || fail "hard-interruption: scratch registration failed"
   fi
-  setsid bash -c 'cd "$1"; exec sleep 309' _ "$scratch" &
+  setsid bash -c "cd \"\$1\"; exec sleep 309" _ "$scratch" &
   pid=$!
   sleep 0.5
   cat > "$case_dir/fakebin/lsof" <<'SH'
