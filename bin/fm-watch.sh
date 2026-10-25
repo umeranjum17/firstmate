@@ -2922,6 +2922,62 @@ watcher_process_table() {
   fi
 }
 
+watcher_child_identity() {
+  local pid=$1 proc_root=${FM_PROC_ROOT_OVERRIDE:-/proc} stat_line identity
+  local -a fields
+  if [ -r "$proc_root/$pid/stat" ]; then
+    read -r stat_line < "$proc_root/$pid/stat" 2>/dev/null || return 1
+    read -r -a fields <<< "${stat_line##*)}"
+    [ "${#fields[@]}" -ge 20 ] || return 1
+    printf 'starttime=%s\n' "${fields[19]}"
+  else
+    identity=$(LC_ALL=C ps -p "$pid" -o lstart= 2>/dev/null) || return 1
+    [ -n "$identity" ] || return 1
+    printf '%s\n' "$identity"
+  fi
+}
+
+watcher_descendants() {
+  local root=$1 excluded=${2:-0} table
+  table=$(watcher_process_table) || return 1
+  printf '%s\n' "$table" | awk -v root="$root" -v excluded="$excluded" '
+    { parent[$1] = $2 }
+    END {
+      for (pid in parent) {
+        p = pid; depth = 0
+        while (p != "" && p != "0" && p != "1" && depth++ < 64) {
+          if (p == excluded) break
+          p = parent[p]
+          if (p == root) { print pid; break }
+        }
+      }
+    }'
+}
+
+watcher_record_children() {
+  local root=$1 identity=$2 ledger=$3 recorder child child_identity current descendants
+  trap - EXIT HUP INT TERM
+  fm_current_pid recorder || return 1
+  while fm_watcher_lock_matches_pid "$STATE" "$WATCH_PATH" "$root" "$FM_HOME" \
+    && [ "$FM_WATCHER_MATCHED_IDENTITY" = "$identity" ]; do
+    descendants=$(watcher_descendants "$root" "$recorder") || return 1
+    {
+      for child in $descendants; do
+        child_identity=$(watcher_child_identity "$child" 2>/dev/null) || continue
+        printf '%s\t%s\n' "$child" "$child_identity"
+      done
+      while IFS="$(printf '\t')" read -r child child_identity; do
+        fm_pid_alive "$child" || continue
+        current=$(watcher_child_identity "$child" 2>/dev/null) || continue
+        [ "$current" = "$child_identity" ] || continue
+        printf '%s\t%s\n' "$child" "$child_identity"
+      done < "$ledger"
+    } | awk '!seen[$0]++' > "$ledger.next" || return 1
+    mv -f "$ledger.next" "$ledger" || return 1
+    sleep 1
+  done
+}
+
 watcher_process_zombie() {
   local pid=$1 proc_root=${FM_PROC_ROOT_OVERRIDE:-/proc} stat_line
   if [ -r "$proc_root/$pid/stat" ]; then
@@ -2942,26 +2998,19 @@ watcher_process_zombie() {
 # cannot reset it with `trap - TERM`. Never use a name or pattern match.
 # Succeeds only once the holder has exited within the bounded waits.
 evict_stalled_holder() {
-  local pid=$1 i=0 identity table descendants child child_identity current signal survivors
+  local pid=$1 i=0 identity descendants child child_identity current signal survivors recorded
   local children=() identities=()
   fm_watcher_lock_matches_pid "$STATE" "$WATCH_PATH" "$pid" "$FM_HOME" || return 1
   identity=$FM_WATCHER_MATCHED_IDENTITY
-  # Snapshot descendants before TERM can orphan a blocked sampler/check child.
-  # Keep each process identity: neither reparenting nor PID reuse grants scope.
-  table=$(watcher_process_table) || return 1
-  descendants=$(printf '%s\n' "$table" | awk -v root="$pid" '
-    { parent[$1] = $2 }
-    END {
-      for (pid in parent) {
-        p = parent[pid]; depth = 0
-        while (p != "" && p != "0" && p != "1" && depth++ < 64) {
-          if (p == root) { print pid; break }
-          p = parent[p]
-        }
-      }
-    }')
+  descendants=$(watcher_descendants "$pid") || return 1
+  recorded=$(awk '!seen[$0]++' "$WATCH_LOCK/children" 2>/dev/null || true)
+  while IFS="$(printf '\t')" read -r child child_identity; do
+    [ -n "$child" ] && [ -n "$child_identity" ] || continue
+    children+=("$child")
+    identities+=("$child_identity")
+  done <<< "$recorded"
   for child in $descendants; do
-    child_identity=$(fm_pid_identity "$child" 2>/dev/null) || continue
+    child_identity=$(watcher_child_identity "$child" 2>/dev/null) || continue
     children+=("$child")
     identities+=("$child_identity")
   done
@@ -2985,8 +3034,8 @@ evict_stalled_holder() {
     for ((i=0; i<${#children[@]}; i++)); do
       child=${children[i]}
       fm_pid_alive "$child" || continue
-      current=$(fm_pid_identity "$child" 2>/dev/null) || {
-        watcher_process_zombie "$child" && continue
+      watcher_process_zombie "$child" && continue
+      current=$(watcher_child_identity "$child" 2>/dev/null) || {
         fm_pid_alive "$child" && return 1
         continue
       }
@@ -2998,8 +3047,8 @@ evict_stalled_holder() {
       fm_pid_alive "$pid" && survivors=1
       for ((child=0; child<${#children[@]}; child++)); do
         fm_pid_alive "${children[child]}" || continue
-        current=$(fm_pid_identity "${children[child]}" 2>/dev/null) || {
-          watcher_process_zombie "${children[child]}" && continue
+        watcher_process_zombie "${children[child]}" && continue
+        current=$(watcher_child_identity "${children[child]}" 2>/dev/null) || {
           fm_pid_alive "${children[child]}" && return 1
           continue
         }
@@ -3129,8 +3178,14 @@ pr_poll_publish_release() {
   PR_POLL_PUBLISH_LOCK=
 }
 
+WATCH_CHILD_RECORDER_PID=
 watcher_cleanup() {
   local cleanup_status=0 owns_lock=0 transition=release-lock
+  if [ -n "$WATCH_CHILD_RECORDER_PID" ]; then
+    kill -TERM "$WATCH_CHILD_RECORDER_PID" 2>/dev/null || true
+    wait "$WATCH_CHILD_RECORDER_PID" 2>/dev/null || true
+    WATCH_CHILD_RECORDER_PID=
+  fi
   pr_poll_publish_release || cleanup_status=1
   pr_poll_control_release || cleanup_status=1
   if [ "$(cat "$WATCH_LOCK/pid" 2>/dev/null || true)" = "${WATCHER_PID:-}" ]; then
@@ -3166,6 +3221,10 @@ printf '%s\n' "$WATCH_PATH" > "$WATCH_LOCK/watcher-path" || true
 FM_WATCH_DELIVERY_PID=$WATCHER_PID
 FM_WATCH_DELIVERY_IDENTITY=$(fm_pid_identity "$WATCHER_PID" 2>/dev/null || true)
 printf '%s\n' "$FM_WATCH_DELIVERY_IDENTITY" > "$WATCH_LOCK/pid-identity" 2>/dev/null || true
+WATCH_OWNER_DIR=$(fm_lock_link_owner "$WATCH_LOCK") || exit 1
+: > "$WATCH_OWNER_DIR/children" || exit 1
+watcher_record_children "$WATCHER_PID" "$FM_WATCH_DELIVERY_IDENTITY" "$WATCH_OWNER_DIR/children" </dev/null >/dev/null 2>&1 &
+WATCH_CHILD_RECORDER_PID=$!
 if declare -F fm_memory_sampler_ensure >/dev/null; then fm_memory_sampler_ensure || triage_log "host memory sampler failed to start"; fi
 
 [ -e "$STATE/.last-heartbeat" ] || touch "$STATE/.last-heartbeat"

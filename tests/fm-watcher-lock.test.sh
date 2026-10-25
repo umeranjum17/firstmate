@@ -194,7 +194,7 @@ test_live_stalled_watch_lock_is_replaced_past_hard_bound() {
   # a beacon stale past the hard bound evicts that holder (identity-verified
   # TERM) and the arm starts in its place - the deadlock where every re-arm
   # died against a live-but-stalled watcher while nothing polled the home.
-  local dir state fakebin out err status holder identity pid i lock_pid
+  local dir state fakebin out err status holder identity pid i lock_pid unrelated
   dir=$(make_case live-stalled-lock)
   state="$dir/state"
   fakebin="$dir/fakebin"
@@ -208,6 +208,9 @@ test_live_stalled_watch_lock_is_replaced_past_hard_bound() {
   printf '%s\n' "$dir" > "$state/.watch.lock/fm-home"
   printf '%s\n' "$WATCH" > "$state/.watch.lock/watcher-path"
   printf '%s\n' "$identity" > "$state/.watch.lock/pid-identity"
+  sleep 300 &
+  unrelated=$!
+  printf '%s\tstarttime=not-the-recorded-process\n' "$unrelated" > "$state/.watch.lock/children"
   # Beacon decades old: past the grace, but a bound beyond it -> still refused.
   touch -t 200001010000 "$state/.last-watcher-beat"
   status=0
@@ -229,6 +232,9 @@ test_live_stalled_watch_lock_is_replaced_past_hard_bound() {
   is_live_non_zombie "$pid" || fail "replacement watcher did not stay alive: $(cat "$err")"
   [ "$lock_pid" = "$pid" ] || fail "replacement watcher did not take the lock (holder=$lock_pid)"
   is_live_non_zombie "$holder" && fail "stalled holder survived the eviction"
+  is_live_non_zombie "$unrelated" || fail "recovery signalled a retained PID with a different start identity"
+  kill "$unrelated" 2>/dev/null || true
+  wait "$unrelated" 2>/dev/null || true
   # The lock pid is written inside fm_lock_try_acquire; the replacement message
   # is echoed just after, so poll for the message rather than grep once and race
   # the acquire/echo gap.
@@ -249,7 +255,7 @@ test_live_stalled_watch_lock_is_replaced_past_hard_bound() {
 # Drive the real watcher and arm in a private home, including a stopped holder
 # blocked on a TERM-resistant check child. Never signal a discovered real home.
 test_rearm_proves_resumed_supervision() (
-  local dir state fakebin oldarm='' holder='' sleeper='' arm='' unrelated='' i id status
+  local dir state fakebin oldarm='' holder='' sleeper='' arm='' unrelated='' parent='' i id status age bound
   local mode=${1:-beacon}
   dir=$(make_case "rearm-proves-resume-$mode")
   state="$dir/state"
@@ -260,31 +266,50 @@ test_rearm_proves_resumed_supervision() (
   export FM_HOME="$dir" FM_STATE_OVERRIDE="$state"
   export FM_POLL=1 FM_SIGNAL_GRACE=1 FM_GUARD_GRACE=300
   export FM_CHECK_INTERVAL=0 FM_HEARTBEAT=999999
-  unset FM_ARM_CONFIRM_TIMEOUT
-  export FM_WATCHER_STALL_BOUND=3
-  sleep 300 &
+  unset FM_ARM_CONFIRM_TIMEOUT FM_WATCHER_STALL_BOUND FM_WATCHER_STALE_GRACE FM_CHECK_TIMEOUT
+  bound=$(bash -c '. "$1"; fm_watcher_stall_bound' _ "$LIB")
+  [ "$bound" -eq 900 ] || fail "proof requires the normal 900-second stall bound"
+  sleep 1800 &
   unrelated=$!
-  cat > "$state/hung.check.sh" <<'SH'
+  cat > "$dir/hung.source" <<'SH'
 #!/usr/bin/env bash
 # A sampler-style child owns a separate session, so the normal check-group
 # cleanup cannot accidentally satisfy the descendant-retirement assertion.
-python3 - "$FM_HOME/child.pid" <<'PYTHON'
+python3 - "$FM_HOME/child.pid" "$FM_HOME/parent.pid" <<'PYTHON'
+import os
 import subprocess
 import sys
+with open(sys.argv[2], "w") as out:
+    out.write(str(os.getpid()))
 child = subprocess.Popen([sys.executable, "-c", """
 import os, signal, sys, time
 signal.signal(signal.SIGTERM, signal.SIG_IGN)
 with open(sys.argv[1], "w") as out:
     out.write(str(os.getpid()))
-time.sleep(300)
+time.sleep(1800)
 """, sys.argv[1]], start_new_session=True)
 child.wait()
 PYTHON
 SH
+  if [ "$mode" = beacon ]; then
+    PATH="$fakebin:$PATH" "$WATCH" > "$dir/old-arm.out" 2>&1 &
+    oldarm=$!
+    for ((i=0; i<150; i++)); do
+      [ ! -e "$state/.last-watcher-beat" ] || break
+      sleep 0.1
+    done
+    [ -e "$state/.last-watcher-beat" ] || fail "seed watcher did not finish a healthy scan"
+    kill -STOP "$oldarm" || fail "could not pause the private seed watcher"
+  fi
+  cp "$dir/hung.source" "$state/hung.check.sh"
   chmod 0700 "$state/hung.check.sh"
   "$ROOT/bin/fm-check-register.sh" hung >/dev/null || fail "register hung check"
-  PATH="$fakebin:$PATH" "$WATCH_ARM" > "$dir/old-arm.out" 2>&1 &
-  oldarm=$!
+  if [ "$mode" = no-beacon ]; then
+    PATH="$fakebin:$PATH" "$WATCH" > "$dir/old-arm.out" 2>&1 &
+    oldarm=$!
+  else
+    kill -CONT "$oldarm" || fail "could not continue the private seed watcher"
+  fi
   for ((i=0; i<150; i++)); do
     [ ! -s "$dir/child.pid" ] || break
     sleep 0.1
@@ -292,16 +317,28 @@ SH
   sleeper=$(cat "$dir/child.pid") || fail "real watcher never entered hung check"
   holder=$(cat "$state/.watch.lock/pid") || fail "hung watcher lacks lock"
   kill -STOP "$holder" "$sleeper" || fail "could not stop private holder and child"
+  parent=$(cat "$dir/parent.pid") || fail "hung child lacks its original parent"
+  [ "$mode" != no-beacon ] || [ ! -e "$state/.last-watcher-beat" ] \
+    || fail "hung first scan published readiness"
+  for ((i=0; i<450; i++)); do
+    is_live_non_zombie "$parent" || break
+    sleep 0.1
+  done
+  is_live_non_zombie "$parent" && fail "the real 30-second check timeout did not retire the intermediary"
+  is_live_non_zombie "$sleeper" || fail "detached child did not survive timeout and reparenting"
+  grep -q "^$sleeper$(printf '\t')" "$state/.watch.lock/children" \
+    || fail "the holder did not retain the detached child's pre-timeout identity"
+  while :; do
+    age=$(bash -c '. "$1"; fm_watcher_progress_age "$2"' _ "$LIB" "$state")
+    [ "$age" -lt "$bound" ] || break
+    sleep 1
+  done
   if [ "$mode" = no-beacon ]; then
-    [ ! -e "$state/.last-watcher-beat" ] || fail "hung first scan published readiness"
-    touch -t 200001010000 "$state/.watch.lock/pid"
     cat > "$fakebin/ps" <<'SH'
 #!/usr/bin/env bash
 exit 1
 SH
     chmod +x "$fakebin/ps"
-  else
-    touch -t 200001010000 "$state/.last-watcher-beat"
   fi
   # The replacement must supervise five task checks before announcing started.
   "$ROOT/bin/fm-check-unregister.sh" hung >/dev/null || fail "retire hung check"
@@ -335,7 +372,7 @@ SH
   printf 'done: Umer task completed\n' > "$state/one.status"
   wait_for_exit "$arm" 100 || fail "replacement did not surface the resumed task"
   grep -q '^signal:.*one' "$dir/new-arm.out" || fail "resumed task wake missing"
-  pass "re-arm removes hung holder and child, protects unrelated process, and supervises five tasks before confirmation"
+  pass "delayed re-arm removes hung holder and orphaned child, protects unrelated process, and supervises five tasks before confirmation ($mode)"
 )
 
 test_first_scan_confirmation_budget() (
@@ -1764,8 +1801,12 @@ test_msys_pid_identity_uses_proc() {
   pass "MSYS process identity uses compatible /proc fields"
 }
 
-test_rearm_proves_resumed_supervision beacon || exit 1
-test_rearm_proves_resumed_supervision no-beacon || exit 1
+test_rearm_proves_resumed_supervision beacon &
+proof_beacon=$!
+test_rearm_proves_resumed_supervision no-beacon &
+proof_no_beacon=$!
+wait "$proof_beacon" || exit 1
+wait "$proof_no_beacon" || exit 1
 test_first_scan_confirmation_budget signal
 test_first_scan_confirmation_budget check
 test_wait_deadline_reaps_a_stopped_child
