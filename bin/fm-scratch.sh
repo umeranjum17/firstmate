@@ -12,21 +12,22 @@
 # least two components deep, and neither $HOME, an ancestor of $HOME, nor a
 # direct child of $HOME. register refuses anything else; list drops anything
 # else with a warning, so a hand-edited record cannot widen a delete.
-# bin/fm-teardown.sh owns the remaining guards (firstmate home, repo, state and
-# data are never reaped) and the removal itself.
+# The firstmate home, repository, state and data directories, their ancestors
+# and descendants are ineligible. bin/fm-teardown.sh owns the removal itself.
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
 STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
+DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 
 # shellcheck source=bin/fm-pr-lib.sh
 . "$SCRIPT_DIR/fm-pr-lib.sh"
 
 # Print the refusal reason and fail when <dir> is not a safe scratch directory.
 scratch_path_refusal() {
-  local dir=$1 home parent
+  local dir=$1 home parent protected root
   case "$dir" in
     /*) ;;
     *) echo "not an absolute path" >&2; return 1 ;;
@@ -37,6 +38,17 @@ scratch_path_refusal() {
   esac
   [ -d "$dir" ] && [ ! -L "$dir" ] || { echo "not a real directory" >&2; return 1; }
   [ -O "$dir" ] || { echo "not owned by this user" >&2; return 1; }
+  dir=$(cd "$dir" && pwd -P) || return 1
+  for root in "$FM_HOME" "$FM_ROOT" "$STATE" "$DATA"; do
+    [ -d "$root" ] || continue
+    protected=$(cd "$root" && pwd -P) || return 1
+    case "$dir/" in
+      "$protected/"*) echo "is inside a protected home, repository, state or data directory" >&2; return 1 ;;
+    esac
+    case "$protected/" in
+      "$dir/"*) echo "is an ancestor of a protected home, repository, state or data directory" >&2; return 1 ;;
+    esac
+  done
   parent=${dir%/*}
   [ -n "$parent" ] || { echo "too shallow" >&2; return 1; }
   home=$(cd "$HOME" 2>/dev/null && pwd -P) || home=${HOME%/}

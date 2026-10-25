@@ -3317,7 +3317,7 @@ teardown_reap_registered_scratch() {
   scratch=()
   while IFS= read -r dir; do
     [ -z "$dir" ] || scratch+=("$dir")
-  done < <(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-scratch.sh" list "$ID")
+  done < <(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" "$SCRIPT_DIR/fm-scratch.sh" list "$ID")
   if [ "${#scratch[@]}" -gt 0 ]; then
     if ! command -v lsof >/dev/null 2>&1; then
       echo "REFUSED: lsof is required to verify detached processes in registered scratch for $ID; preserving scratch and task records for retry" >&2

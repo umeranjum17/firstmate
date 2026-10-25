@@ -3921,7 +3921,7 @@ test_registered_scratch_is_reaped_after_launching_session_is_gone() {
 test_registered_scratch_cleanup_paths() {
   local route failure case_dir home state data task scratch pid rc test_path
   for route in direct child; do
-    for failure in none removal protected no-lsof worktree-scan scratch-scan; do
+    for failure in none removal no-lsof worktree-scan scratch-scan; do
       case_dir=$(make_case "scratch-$route-$failure")
       if [ "$route" = child ]; then
         write_meta "$case_dir" local-only secondmate
@@ -3931,13 +3931,12 @@ test_registered_scratch_cleanup_paths() {
       else
         write_meta "$case_dir" local-only ship
         seed_backlog_in_flight "$case_dir"
-        home="$case_dir"; state="$case_dir/state"; data="$case_dir/data"; task=task-x1
+        home="$ROOT"; state="$case_dir/state"; data="$case_dir/data"; task=task-x1
       fi
       scratch="$case_dir/scratch/proof"
-      [ "$failure" != protected ] || scratch="$data/proof"
       mkdir -p "$scratch"
       printf 'proof bytes\n' > "$scratch/file"
-      FM_HOME="$home" FM_STATE_OVERRIDE="$state" \
+      FM_HOME="$home" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" \
         "$ROOT/bin/fm-scratch.sh" register "$task" "$scratch" >/dev/null \
         || fail "scratch-$route-$failure: registration failed"
       pid=
@@ -4021,6 +4020,95 @@ SH
     done
   done
   pass "direct and descendant scratch cleanup reap detached proofs and retain retry records on every refusal"
+}
+
+test_hard_interruption_preserves_scratch_ownership_on_replay() {
+  local case_dir scratch pid cleanup_pid rc mode
+  case_dir=$(make_case scratch-hard-interruption)
+  write_meta "$case_dir" local-only ship
+  seed_backlog_in_flight "$case_dir"
+  scratch="$case_dir/scratch/proof"
+  mkdir -p "$scratch"
+  FM_STATE_OVERRIDE="$case_dir/state" "$ROOT/bin/fm-scratch.sh" register task-x1 "$scratch" >/dev/null \
+    || fail "hard-interruption: scratch registration failed"
+  setsid bash -c 'cd "$1"; exec sleep 309' _ "$scratch" &
+  pid=$!
+  sleep 0.5
+  cat > "$case_dir/fakebin/lsof" <<'SH'
+#!/usr/bin/env bash
+kill -KILL "$FM_TEARDOWN_KILL_PID"
+exit 1
+SH
+  chmod +x "$case_dir/fakebin/lsof"
+  FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$case_dir/state" \
+    FM_DATA_OVERRIDE="$case_dir/data" FM_CONFIG_OVERRIDE="$case_dir/config" \
+    PATH="$case_dir/fakebin:$PATH" \
+    bash -c 'export FM_TEARDOWN_KILL_PID=$$; exec "$@"' _ "$TEARDOWN" task-x1 --force \
+    > "$case_dir/stdout" 2> "$case_dir/stderr" &
+  cleanup_pid=$!
+  rc=0
+  wait "$cleanup_pid" 2>/dev/null || rc=$?
+  expect_code 137 "$rc" "hard-interruption: cleanup was not killed during scan"
+  assert_present "$case_dir/state/task-x1.backlog-close" "hard-interruption: no pending close was written"
+  for mode in close retain; do
+    rc=0
+    bash -c '
+      . "$1/bin/fm-backlog-transition-lib.sh"
+      if [ "$3" = retain ]; then
+        gen=$(sed -n "s/^spawn_gen=//p" "$2/state/task-x1.meta")
+        fm_backlog_close_marker_write "$2/state" task-x1 "$2/data" "$gen" --retain --note "local main" || exit 2
+      fi
+      fm_backlog_close_marker_replay "$2/state" "$2/state/task-x1.backlog-close" "$2/data"
+    ' _ "$ROOT" "$case_dir" "$mode" || rc=$?
+    expect_code 1 "$rc" "hard-interruption: $mode replay should wait for scratch cleanup"
+    assert_present "$case_dir/state/task-x1.meta" "hard-interruption: $mode replay erased ownership"
+    assert_present "$case_dir/state/task-x1.scratch" "hard-interruption: $mode replay erased scratch registry"
+    assert_present "$scratch" "hard-interruption: $mode replay erased scratch"
+    assert_equals in_flight "$(backlog_row_state "$case_dir")" "hard-interruption: replay closed backlog"
+  done
+  if ! kill -0 "$pid" 2>/dev/null; then
+    wait "$pid" 2>/dev/null || true
+    fail "hard-interruption: proof did not survive setup"
+  fi
+  rm "$case_dir/fakebin/lsof"
+  rc=0
+  run_teardown "$case_dir" --force > "$case_dir/retry.stdout" 2> "$case_dir/retry.stderr" || rc=$?
+  if kill -0 "$pid" 2>/dev/null; then
+    kill -KILL "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+    fail "hard-interruption: proof survived retry"
+  fi
+  wait "$pid" 2>/dev/null || true
+  expect_code 0 "$rc" "hard-interruption: retry failed: $(cat "$case_dir/retry.stderr")"
+  assert_absent "$scratch" "hard-interruption: retry left scratch"
+  assert_absent "$case_dir/state/task-x1.meta" "hard-interruption: retry left task record"
+  pass "hard interruption preserves scratch ownership across close and retain replay until retry reaps proofs"
+}
+
+test_scratch_registration_excludes_retained_material() {
+  local case_dir home state data dir rc
+  case_dir=$(make_case scratch-protected-material)
+  write_meta "$case_dir" local-only ship
+  home="$case_dir/home"; state="$case_dir/state"; data="$case_dir/data"
+  mkdir -p "$home/sub" "$data/task-x1/proof" "$case_dir/scratch/proof"
+  printf 'keep\n' > "$data/task-x1/proof/file"
+  ln -s "$data" "$case_dir/evidence-alias"
+  for dir in "$home" "$home/sub" "$state" "$data" "$data/task-x1/proof" \
+      "$case_dir" "$ROOT" "$ROOT/bin" "$case_dir/evidence-alias/task-x1/proof"; do
+    if FM_HOME="$home" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" \
+        "$ROOT/bin/fm-scratch.sh" register task-x1 "$dir" >/dev/null 2>&1; then
+      fail "protected-material: registered $dir"
+    fi
+  done
+  assert_absent "$state/task-x1.scratch" "protected-material: refusals created registry"
+  printf '%s\n' "$data/task-x1/proof" "$case_dir/scratch/proof" > "$state/task-x1.scratch"
+  rc=0
+  FM_HOME="$home" FM_DATA_OVERRIDE="$data" \
+    run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "protected-material: legacy registry blocked cleanup: $(cat "$case_dir/stderr")"
+  assert_present "$data/task-x1/proof/file" "protected-material: retained evidence was reaped"
+  assert_absent "$case_dir/scratch/proof" "protected-material: disposable scratch survived"
+  pass "registration and legacy listing exclude protected material, including canonical aliases"
 }
 
 test_registered_scratch_survives_a_refused_teardown() {
@@ -5449,6 +5537,8 @@ test_own_autonomous_run_is_left_alone
 test_leaked_worktree_process_is_reaped
 test_leaked_tasktmp_process_is_reaped
 test_registered_scratch_is_reaped_after_launching_session_is_gone
+test_hard_interruption_preserves_scratch_ownership_on_replay
+test_scratch_registration_excludes_retained_material
 test_registered_scratch_cleanup_paths
 test_registered_scratch_survives_a_refused_teardown
 test_scratch_register_and_reap_refuse_unsafe_paths
