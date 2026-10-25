@@ -1167,8 +1167,8 @@ fm_backlog_close_marker_replay() {  # <state-dir> <marker-path> <authorized-data
       FM_BACKLOG_CLOSE_REPLAY_RESULT=stale
       return 0
     fi
-    if [ -e "$state/$id.scratch" ] || [ -L "$state/$id.scratch" ]; then
-      FM_BACKLOG_TRANSITION_ERROR="registered scratch cleanup remains outstanding for $id; rerun teardown before replaying its backlog close"
+    if [ -e "$state/$id.scratch" ] || [ -L "$state/$id.scratch" ] || [ -d "$data/$id" ]; then
+      FM_BACKLOG_TRANSITION_ERROR="task scratch or retained-data process cleanup remains outstanding for $id; rerun teardown before replaying its backlog close"
       return 1
     fi
     fm_backlog_close_marker_mark_cleanup_incomplete "$state" "$marker" "$id" "$data" \

@@ -466,7 +466,7 @@ DESCENDANT_TREEHOUSE_LOCK_PATHS=()
 teardown_release_locks() {
   local status=$? i
   if [ "$META_LOCK_HELD" = 1 ] \
-     && { [ -e "$STATE/$ID.scratch" ] || [ -L "$STATE/$ID.scratch" ]; }; then
+     && { [ -e "$STATE/$ID.scratch" ] || [ -L "$STATE/$ID.scratch" ] || [ -d "${DATA:-$FM_HOME/data}/$ID" ]; }; then
     fm_backlog_close_marker_clear "$STATE" "$ID" || status=1
   fi
   if declare -F teardown_release_herdr_locks >/dev/null 2>&1; then
@@ -3312,18 +3312,23 @@ endpoint_close_refusal() {  # <subject> <backend> <target> <honors-force>
 }
 
 teardown_reap_registered_scratch() {
-  local FM_HOME=$1 STATE=$2 DATA=$3 ID=$4 dir kept=0
-  local -a scratch
+  local FM_HOME=$1 STATE=$2 DATA=$3 ID=$4 dir listing kept=0
+  local -a scratch roots
   scratch=()
+  listing=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" "$SCRIPT_DIR/fm-scratch.sh" list "$ID") || return 1
   while IFS= read -r dir; do
     [ -z "$dir" ] || scratch+=("$dir")
-  done < <(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" "$SCRIPT_DIR/fm-scratch.sh" list "$ID")
-  if [ "${#scratch[@]}" -gt 0 ]; then
+  done <<EOF
+$listing
+EOF
+  roots=(${scratch[@]+"${scratch[@]}"})
+  [ ! -d "$DATA/$ID" ] || roots+=("$DATA/$ID")
+  if [ "${#roots[@]}" -gt 0 ]; then
     if ! command -v lsof >/dev/null 2>&1; then
-      echo "REFUSED: lsof is required to verify detached processes in registered scratch for $ID; preserving scratch and task records for retry" >&2
+      echo "REFUSED: lsof is required to verify detached processes in task scratch and retained data for $ID; preserving scratch and task records for retry" >&2
       return 1
     fi
-    reap_task_worktree_processes "registered scratch" "${scratch[@]}" || return 1
+    reap_task_worktree_processes "task scratch and retained data" "${roots[@]}" || return 1
   fi
   for dir in ${scratch[@]+"${scratch[@]}"}; do
     case "$dir" in

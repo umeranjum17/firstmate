@@ -27,7 +27,7 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 
 # Print the refusal reason and fail when <dir> is not a safe scratch directory.
 scratch_path_refusal() {
-  local dir=$1 home parent protected root
+  local dir=$1 home parent protected root ancestor
   case "$dir" in
     /*) ;;
     *) echo "not an absolute path" >&2; return 1 ;;
@@ -36,12 +36,23 @@ scratch_path_refusal() {
     *[*?[]*|*']'*|*$'\n'*|*//*|*/|*/./*|*/.|*/../*|*/..)
       echo "contains a glob character, newline, empty or dot component" >&2; return 1 ;;
   esac
-  [ -d "$dir" ] && [ ! -L "$dir" ] || { echo "not a real directory" >&2; return 1; }
+  [ ! -L "$dir" ] || { echo "not a real directory" >&2; return 1; }
+  ancestor=$dir
+  while :; do
+    if [ -d "$ancestor" ] && [ ! -x "$ancestor" ]; then
+      echo "cannot search $ancestor" >&2; return 2
+    fi
+    [ "$ancestor" != / ] || break
+    ancestor=${ancestor%/*}
+    [ -n "$ancestor" ] || ancestor=/
+  done
+  [ -e "$dir" ] || return 3
+  [ -d "$dir" ] || { echo "not a real directory" >&2; return 1; }
   [ -O "$dir" ] || { echo "not owned by this user" >&2; return 1; }
-  dir=$(cd "$dir" && pwd -P) || return 1
+  dir=$(cd "$dir" && pwd -P) || return 2
   for root in "$FM_HOME" "$FM_ROOT" "$STATE" "$DATA"; do
     [ -d "$root" ] || continue
-    protected=$(cd "$root" && pwd -P) || return 1
+    protected=$(cd "$root" && pwd -P) || return 2
     case "$dir/" in
       "$protected/"*) echo "is inside a protected home, repository, state or data directory" >&2; return 1 ;;
     esac
@@ -51,7 +62,7 @@ scratch_path_refusal() {
   done
   parent=${dir%/*}
   [ -n "$parent" ] || { echo "too shallow" >&2; return 1; }
-  home=$(cd "$HOME" 2>/dev/null && pwd -P) || home=${HOME%/}
+  home=$(cd "$HOME" 2>/dev/null && pwd -P) || return 2
   case "$home/" in
     "$dir"/*) echo "is HOME or an ancestor of HOME" >&2; return 1 ;;
   esac
@@ -85,16 +96,27 @@ case "$CMD" in
     ;;
   list)
     [ "$#" -eq 2 ] || usage
+    [ -d "$STATE" ] && [ -r "$STATE" ] && [ -x "$STATE" ] || {
+      echo "error: scratch state directory cannot be inspected" >&2; exit 1;
+    }
     [ -f "$RECORD" ] && [ ! -L "$RECORD" ] || exit 0
+    [ -r "$RECORD" ] || { echo "error: scratch record cannot be read" >&2; exit 1; }
+    recorded=$(cat -- "$RECORD") || { echo "error: scratch record could not be read completely" >&2; exit 1; }
     while IFS= read -r DIR || [ -n "$DIR" ]; do
       [ -n "$DIR" ] || continue
-      [ -e "$DIR" ] || [ -L "$DIR" ] || continue
       if reason=$(scratch_path_refusal "$DIR" 2>&1); then
         printf '%s\n' "$DIR"
       else
-        echo "warning: skipping recorded scratch directory $DIR for $ID: $reason" >&2
+        rc=$?
+        case "$rc" in
+          1) echo "warning: skipping recorded scratch directory $DIR for $ID: $reason" >&2 ;;
+          3) ;;
+          *) echo "error: cannot inspect recorded scratch directory $DIR for $ID: $reason" >&2; exit 1 ;;
+        esac
       fi
-    done < "$RECORD"
+    done <<EOF
+$recorded
+EOF
     ;;
   *) usage ;;
 esac
