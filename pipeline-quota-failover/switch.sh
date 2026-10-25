@@ -175,7 +175,7 @@ case $agent in
     fi
     ;;
   codex)
-    if ! out=$(cd "$tmp" && codex exec --model "$model" "Reply with exactly: PONG" 2>&1); then
+    if ! out=$(cd "$tmp" && codex exec --skip-git-repo-check --model "$model" "Reply with exactly: PONG" 2>&1); then
       die "codex failed on $model: $(printf '%s' "$out" | tail -n 3 | head -c 400)"
     fi
     ;;
