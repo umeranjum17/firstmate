@@ -186,6 +186,9 @@ jobs:
       # Fake GitHub responses and isolated homes; no real PRs are changed.
       - name: Checks lint parity test
         run: bash merge-on-green/tests/checks-lint-parity.test.sh
+      # Same-lane follow-up may reuse its own frames; cross-task reuse still fails.
+      - name: Checks lint lane-task identity test
+        run: bash merge-on-green/tests/checks-lint-lane-task.test.sh
 
       - name: No old receipt path test
         run: bash merge-on-green/tests/no-old-receipt-path.test.sh

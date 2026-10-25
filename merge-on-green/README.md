@@ -38,7 +38,7 @@ merge.
 
 ## Install
 
-`merge-on-green/install.sh [--dry-run] <fm-home>` copies `merge-on-green.sh`, `checks-lint.sh` and its `.done-done.yaml` to
+`merge-on-green/install.sh [--dry-run] <fm-home>` copies `merge-on-green.sh`, `checks-lint.sh`, `fm-checks-lint.sh` and its `.done-done.yaml` to
 `${XDG_DATA_HOME:-~/.local/share}/fm-merge-on-green/`, writes the shim
 `state/merge-on-green.check.sh` (mode 0700), and registers it with `bin/fm-check-register.sh`.
 It is idempotent; `--dry-run` prints the steps and writes nothing. Run it once per home; the lead
