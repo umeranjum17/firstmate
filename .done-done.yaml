@@ -8,3 +8,5 @@ journeys:
     command: bash addons/tickets-sync/run-stage-proof.sh
   fleet-dashboard-core:
     command: bash addons/fleet-dashboard/run-core-proof.sh
+  tickets-writeback:
+    command: bash journeys/tickets-writeback.sh
