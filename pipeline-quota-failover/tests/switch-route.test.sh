@@ -13,9 +13,11 @@ script=$here/../switch.sh
 route=claude-bridge/claude-haiku-5-5
 
 work=$(mktemp -d) || exit 1
-trap 'rm -rf "$work"' EXIT
+trap 'rm -rf -- "$work"' EXIT
 stub=$work/bin
 mkdir -p "$stub"
+# Isolate from any live account-pool so default --agent/--model stay the pinned route.
+export PI_QUOTA_FAILOVER_ACCOUNT_POOL=
 
 fails=0
 ok() { printf 'ok - %s\n' "$1"; }

@@ -2,7 +2,7 @@
 
 ## User outcome
 
-The pipeline runs one route, Claude Haiku through claude-bridge on the subscription accounts: a Claude limit on one account moves the call to the next account on the same route, nothing paid is ever called, and a call pinned to a model outside the chain lands on that route instead of the pinned model.
+With a pool, `fm-model-pool` pick/next chooses the Claude account (A=70% before B=40%) or Sol → Goat → Cursor auto when every Claude account is under the eligibility floor; without a pool the chain stays Claude Haiku through claude-bridge. A limit moves inside the same call and never falls back to the default login.
 
 ## Drive
 

@@ -32,8 +32,9 @@
 #   PI_QUOTA_FAILOVER_REAL_PI  absolute path to the real pi binary
 #   PI_QUOTA_FAILOVER_CHAIN    space-separated ordered model chain
 #   PI_QUOTA_FAILOVER_ACCOUNT_POOL  a firstmate config/account-pool file (default ~/firstmate/config/account-pool when it
-#                              exists; empty turns it off): a claude-bridge/* call runs on the pool's Claude pick, and a
-#                              Claude limit rests that account and runs the same route on the next pick
+#                              exists; empty turns it off): route and account come from fm-model-pool pick/next (Claude
+#                              above the eligibility floor, else Sol then Goat then Cursor auto); a limit calls next
+#   PI_QUOTA_FAILOVER_MODEL_POOL  absolute path to fm-model-pool (default: sibling account-pool/bin/fm-model-pool)
 #   PI_QUOTA_FAILOVER_PRINT_CHAIN  non-empty: print the chain and exit (route-change reads it)
 #   PI_QUOTA_FAILOVER_LOG      log file (default ~/.local/state/pi-quota-failover.log)
 #   PI_QUOTA_FAILOVER_GATE     host-memory gate run before each call (default ~/firstmate/config/fm-mem-gate.sh
@@ -149,28 +150,75 @@ credit_empty() {
   probe_out=$(printf 'ok' | timeout "${PI_QUOTA_FAILOVER_PROBE_SECS:-60}" "$real_pi" "${ext_args[@]}" --model "$1" --mode json --no-session 2>&1) || true
   grep -oE '"errorMessage":"(\\.|[^"])*"' <<<"$probe_out" | grep -qiE "$QUOTA_RE"
 }
-# Claude subscription accounts: claude-bridge runs Claude Code with the CLAUDE_CONFIG_DIR it inherits, so a bridge
-# call runs on the account the pool picks, exactly as a pool worker does. pool_use exports the pick and sheds the
-# credential variables the pool names; non-zero with the pool's reason in detail when it has no Claude account.
+# Route and Claude account come from fm-model-pool (pick/next), not a local byokit pick/rest client.
+# Folder paths and unset names only; never credentials. Without a pool file the static chain runs as before.
 pool_file=${PI_QUOTA_FAILOVER_ACCOUNT_POOL-$HOME/firstmate/config/account-pool}
-pool_cmd='' pool_state='' pool_id=''
-if [ -n "$pool_file" ] && [ -f "$pool_file" ]; then
-  pool_cmd=$(sed -n 's/^command=//p' "$pool_file" | tail -n 1)
-  pool_cmd=${pool_cmd:-byokit-accounts}
-  pool_state=$(sed -n 's/^state=//p' "$pool_file" | tail -n 1)
+pool_helper=${PI_QUOTA_FAILOVER_MODEL_POOL:-}
+pool_sel='' pool_id='' pool_model='' pool_attempted='[]' pool_mode=0
+if [ -z "$pool_helper" ]; then
+  for cand in \
+    "$(cd "$(dirname "$0")/.." 2>/dev/null && pwd)/account-pool/bin/fm-model-pool" \
+    "${FM_ADDONS_DIR:+$FM_ADDONS_DIR/account-pool/bin/fm-model-pool}" \
+    "${FM_HOME:+$FM_HOME/projects/firstmate-addons/account-pool/bin/fm-model-pool}"; do
+    [ -n "${cand:-}" ] && [ -x "$cand" ] && { pool_helper=$cand; break; }
+  done
 fi
-pool_use() {
-  local out folder v
-  out=$(timeout 120 "$pool_cmd" pick claude --json --state "$pool_state" 2>/dev/null)
-  folder=$(jq -r 'select(.ok == true) | .set.CLAUDE_CONFIG_DIR // empty' <<<"$out" 2>/dev/null)
-  if [ -z "$folder" ] || [ ! -d "$folder" ]; then
-    detail="the account pool has no Claude account left: $(jq -r '.reason // "no answer"' <<<"$out" 2>/dev/null)"
+if [ -n "$pool_file" ] && [ -f "$pool_file" ] && [ -n "$pool_helper" ] && [ -x "$pool_helper" ]; then
+  pool_mode=1
+fi
+# pool_apply <selection-json>: export set/, shed unset/, and set pool_model for pi.
+pool_apply() {
+  local sel=$1 folder v provider model
+  pool_sel=$sel
+  pool_id=$(jq -r '.selection_id // .id // empty' <<<"$sel")
+  provider=$(jq -r '.provider // empty' <<<"$sel")
+  model=$(jq -r '.model // empty' <<<"$sel")
+  for v in $(jq -r '.unset[]?' <<<"$sel"); do [[ $v =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] && unset "$v"; done
+  folder=$(jq -r '.set.CLAUDE_CONFIG_DIR // empty' <<<"$sel")
+  if [ -n "$folder" ]; then
+    [ -d "$folder" ] || { detail="fm-model-pool named a missing folder for $pool_id"; return 1; }
+    export CLAUDE_CONFIG_DIR=$folder
+  else
+    unset CLAUDE_CONFIG_DIR 2>/dev/null || true
+  fi
+  case $provider in
+    claude)
+      case $model in
+        '' ) pool_model=claude-bridge/claude-haiku-5-5 ;;
+        */*) pool_model=$model ;;
+        *) pool_model=claude-bridge/$model ;;
+      esac
+      ;;
+    *) pool_model=$model ;;
+  esac
+  [ -n "$pool_model" ] || { detail="fm-model-pool selection $pool_id has no model"; return 1; }
+  log_line "fm-model-pool selection id=$pool_id provider=$provider model=$pool_model"
+}
+pool_pick() {
+  local req out
+  req=$(jq -nc --arg p "$pool_file" '{v:1,purpose:"work",pool_config:$p,capabilities:["text"],attempted:[]}')
+  out=$(printf '%s' "$req" | timeout 120 "$pool_helper" pick --json 2>/dev/null) || out=''
+  if ! jq -e '.ok == true' <<<"$out" >/dev/null 2>&1; then
+    detail="fm-model-pool pick refused: $(jq -r '.reason // "no answer"' <<<"${out:-}" 2>/dev/null)"
     return 1
   fi
-  for v in $(jq -r '.unset[]?' <<<"$out"); do [[ $v =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] && unset "$v"; done
-  export CLAUDE_CONFIG_DIR=$folder
-  pool_id=$(jq -r '.id' <<<"$out")
-  log_line "claude-bridge runs on pool account $pool_id"
+  pool_attempted='[]'
+  pool_apply "$out"
+}
+pool_next() {
+  local cause=${1:-quota} req out id
+  [ -n "$pool_sel" ] || return 1
+  id=$(jq -r '.selection_id // .id // empty' <<<"$pool_sel")
+  [ -n "$id" ] || return 1
+  pool_attempted=$(jq -c --arg id "$id" '. + [$id]' <<<"$pool_attempted")
+  req=$(jq -nc --arg p "$pool_file" --argjson s "$pool_sel" --argjson a "$pool_attempted" --arg c "$cause" \
+    '{v:1,purpose:"work",pool_config:$p,capabilities:["text"],selection:$s,cause:$c,attempted:$a}')
+  out=$(printf '%s' "$req" | timeout 120 "$pool_helper" next --json 2>/dev/null) || out=''
+  if ! jq -e '.ok == true' <<<"$out" >/dev/null 2>&1; then
+    detail="fm-model-pool next refused: $(jq -r '.reason // "no answer"' <<<"${out:-}" 2>/dev/null)"
+    return 1
+  fi
+  pool_apply "$out"
 }
 idle_secs=${PI_QUOTA_FAILOVER_IDLE_SECS:-120}
 bridge_idle_secs=${PI_QUOTA_FAILOVER_BRIDGE_IDLE_SECS:-300}
@@ -379,37 +427,46 @@ else
 fi
 live=()
 detail="every chain model hit a quota error in the last ${dead_secs}s"
-pool_ok=1
-if [ -n "$pool_cmd" ] && [[ " ${order[*]}" = *" claude-bridge/"* ]]; then pool_use || pool_ok=0; fi
-for m in "${order[@]}"; do
-  age=$(dead_age "$m")
-  if [ "$pool_ok" = 0 ] && [[ $m = claude-bridge/* ]]; then
-    # With every pool account rested a bridge call never falls back to the default login or paid usage.
-    log_line "model=$m skipped: $detail"
-  elif [ -n "$age" ] && [ "$age" -lt "$dead_secs" ]; then
-    # A marker dated in the future (clock step) shows the time left until it expires, never a negative age.
-    if [ "$age" -ge 0 ]; then when="${age}s ago"; else when="dated in the future, $((dead_secs - age))s until it expires"; fi
-    log_line "model=$m skipped: quota error $when (skip window ${dead_secs}s)"
-  elif quota_exhausted "$m"; then
-    mark_dead "$m"
-    detail="quota-axi reports $m exhausted_now"
-    log_line "model=$m skipped: quota-axi reports exhausted_now"
-  elif [ ${#live[@]} -eq 0 ] && credit_empty "$m"; then
-    mark_dead "$m"
-    detail="credit probe found no balance on $m"
-    log_line "pulse: model=$m skipped: credit probe found no balance"
-  else
-    live+=("$m")
+if [ "$pool_mode" = 1 ]; then
+  # Helper owns account and Sol/Goat/Cursor fallovers; the static chain is not the route list.
+  if ! pool_pick; then
+    log_line "quota exhausted: $detail"
+    exit 1
   fi
-done
-if [ ${#live[@]} -gt 0 ] && [ "${live[0]}" != "$requested" ]; then
-  mapfile -t args < <(rewrite_model "${live[0]}" "${args[@]}" | drop_session)
+  order=("$pool_model")
+  mapfile -t args < <(rewrite_model "$pool_model" "${args[@]}" | drop_session)
+else
+  for m in "${order[@]}"; do
+    age=$(dead_age "$m")
+    if [ -n "$age" ] && [ "$age" -lt "$dead_secs" ]; then
+      if [ "$age" -ge 0 ]; then when="${age}s ago"; else when="dated in the future, $((dead_secs - age))s until it expires"; fi
+      log_line "model=$m skipped: quota error $when (skip window ${dead_secs}s)"
+    elif quota_exhausted "$m"; then
+      mark_dead "$m"
+      detail="quota-axi reports $m exhausted_now"
+      log_line "model=$m skipped: quota-axi reports exhausted_now"
+    elif [ ${#live[@]} -eq 0 ] && credit_empty "$m"; then
+      mark_dead "$m"
+      detail="credit probe found no balance on $m"
+      log_line "pulse: model=$m skipped: credit probe found no balance"
+    else
+      live+=("$m")
+    fi
+  done
+  if [ ${#live[@]} -gt 0 ] && [ "${live[0]}" != "$requested" ]; then
+    mapfile -t args < <(rewrite_model "${live[0]}" "${args[@]}" | drop_session)
+  fi
+  order=("${live[@]}")
 fi
-order=("${live[@]}")
 any_stall=0
 stall_retries_used=0
-for ((attempt = 0; attempt < ${#order[@]}; attempt++)); do
-  model=${order[$attempt]}
+for ((attempt = 0; ; attempt++)); do
+  if [ "$pool_mode" = 1 ]; then
+    [ -n "${pool_model:-}" ] || break
+  else
+    [ "$attempt" -lt "${#order[@]}" ] || break
+  fi
+  model=${order[$attempt]:-$pool_model}
   idle_limit=$(idle_for "$model")
   t0=$(date +%s%3N)
   run_watched "${args[@]}"
@@ -432,48 +489,45 @@ for ((attempt = 0; attempt < ${#order[@]}; attempt++)); do
     fi
   fi
   if [ "$quota" = 0 ] && [ "$stall" = 0 ] && [ "$rfail" = 0 ]; then
-    # Only a real answer clears the route's marker; a kill, a timeout or any other failure keeps it.
     if [ "$rc" = 0 ] && [ -z "$(error_text 0)" ]; then
       rm -f "$(marker "$model")"
       log_line "model=$model answered in $((t1 - t0))ms ($(stat -c %s "$out_file") bytes)"
     fi
-    # Not a quota failure: hand the pipeline exactly what real pi produced.
     cat "$out_file"
     cat "$err_file" >&2
     exit "$rc"
   fi
-  # A Claude limit on a pool account is that account's: rest it and run the same route on the next pick. Each rest
-  # takes one account off the pick, so this ends when the pool has none left. The pool, not a route marker, decides
-  # which account the next call runs on, so an account limit never marks the route dead for every account.
-  if [ "$quota" = 1 ] && [ -n "$pool_id" ] && [[ $model = claude-bridge/* ]]; then
-    old=$pool_id quota=2
-    why=$(timeout 60 "$pool_cmd" rest "$old" --json --state "$pool_state" 2>&1 >/dev/null) ||
-      log_line "the pool did not rest account $old: ${why:-no answer}"
-    if pool_use && [ "$pool_id" != "$old" ]; then
-      log_line "model=$model quota-error on account $old in $((t1 - t0))ms ($detail); same route on account $pool_id"
-      mapfile -t args < <(printf '%s\n' "${args[@]}" | drop_session)
-      attempt=$((attempt - 1))
+  # Helper next rests the limited account (or advances Sol/Goat/Cursor) and never marks the whole Claude route dead.
+  if [ "$quota" = 1 ] && [ "$pool_mode" = 1 ]; then
+    old=$pool_id old_model=$model
+    if pool_next quota; then
+      log_line "model=$old_model quota-error on account $old in $((t1 - t0))ms ($detail); next id=$pool_id model=$pool_model"
+      mapfile -t args < <(rewrite_model "$pool_model" "${args[@]}" | drop_session)
+      order=("$pool_model")
+      attempt=-1
       continue
     fi
-    pool_id=''
+    log_line "model=$model quota-error in $((t1 - t0))ms ($detail); $detail"
+    break
   fi
-  # Only a real quota error marks the route dead; a stall moves on for this call alone.
   if [ "$quota" != 0 ]; then
-    [ "$quota" = 2 ] || mark_dead "$model"
+    mark_dead "$model"
     kind="quota-error"
   elif [ "$rfail" = 1 ]; then
     kind="route-failure"
   else
     kind="stalled"
   fi
-  # Retry a stalled final route up to the configured count; quota errors never retry.
-  if [ "$kind" = stalled ] && [ $((attempt + 1)) -ge ${#order[@]} ] && [ "$stall_retries_used" -lt "$stall_retries" ]; then
+  if [ "$kind" = stalled ] && { [ "$pool_mode" = 1 ] || [ $((attempt + 1)) -ge ${#order[@]} ]; } && [ "$stall_retries_used" -lt "$stall_retries" ]; then
     stall_retries_used=$((stall_retries_used + 1))
     log_line "model=$model stalled in $((t1 - t0))ms (no output for ${idle_limit}s); retrying it ($stall_retries_used/$stall_retries)"
     attempt=$((attempt - 1))
     continue
   fi
-  if [ $((attempt + 1)) -lt ${#order[@]} ]; then
+  if [ "$pool_mode" = 1 ]; then
+    log_line "model=$model $kind in $((t1 - t0))ms ($detail); no fm-model-pool next for a stall/route-failure"
+    break
+  elif [ $((attempt + 1)) -lt ${#order[@]} ]; then
     next=${order[$((attempt + 1))]}
     log_line "model=$model $kind in $((t1 - t0))ms ($detail); moving to $next"
     mapfile -t args < <(rewrite_model "$next" "${args[@]}" | drop_session)
