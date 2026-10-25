@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # run-proof-codex-rest.sh: prove a stale Codex rest clears when the reading has null
-# five_hour and seven_day left == 100. Copies the live pool Codex reading and rested
-# list into a temp --state dir (never edits the live rest file), then runs pick.
-# Requires a pool state with codex-accounts.json and codex-accounts-rested/<id> (set
-# POOL_STATE, or FM_HOME with config/account-pool state=). Screen: none.
+# five_hour and seven_day.left >= FM_ACCOUNT_POOL_REST_FLOOR (default 15). Copies the
+# live pool Codex reading and rested list into a temp --state dir (never edits the live
+# rest file), then runs pick. Requires a pool state with codex-accounts.json and
+# codex-accounts-rested/<id> (set POOL_STATE, or FM_HOME with config/account-pool
+# state=). Screen: none.
 set -euo pipefail
 repo=$(cd "$(dirname "$0")/.." && pwd)
 evidence=${DONE_DONE_EVIDENCE_ROOT:?}
@@ -84,9 +85,11 @@ printf '%s\n' "$out" >"$evidence/codex-pick.json"
 
 ok=$(jq -r '.ok // false' <<<"$out" 2>/dev/null || echo false)
 id=$(jq -r '.id // empty' <<<"$out" 2>/dev/null || true)
-recovered=$(jq -r '.accounts[]? | select(.problem == null
-  and ([.five_hour, .seven_day] | map(select(. != null)) | length > 0 and all(.left == 100)))
-  | .id' "$work/state/codex-accounts.json")
+floor=${FM_ACCOUNT_POOL_REST_FLOOR:-15}
+recovered=$(jq -r --argjson floor "$floor" '.accounts[]? | select(.problem == null and (
+  if .five_hour == null and .seven_day != null then .seven_day.left >= $floor
+  else ([.five_hour, .seven_day] | map(select(. != null)) | length > 0 and all(.left == 100))
+  end)) | .id' "$work/state/codex-accounts.json")
 for rid in $recovered; do
   [ -f "$work/state/codex-accounts-rested/$rid" ] || continue
   exp=$(tr -d '\n' <"$work/state/codex-accounts-rested/$rid")
@@ -115,8 +118,8 @@ echo "live_rest_cmp=identical" >>"$evidence/codex-rest-after.txt"
 echo "run-proof-codex-rest: pick ok id=$id; rest cleared in temp state; live rest untouched" | tee "$evidence/summary.txt"
 cat "$evidence/codex-rest-before.txt" "$evidence/codex-rest-after.txt"
 cat >"$evidence/steps.json" <<J
-{"target":{"version":"claude-accounts-pick Codex rest recovery"},
- "start":"a copy of the live pool Codex reading (null five_hour, seven_day 100) and a future-dated rest file under a temp --state dir",
- "steps":["copy live codex-accounts.json and codex-accounts-rested into a disposable state dir","run claude-accounts-pick.test.sh including the null-five_hour cases","run pick codex --json --state <temp> and confirm rest expiry is 0 for recovered accounts","cmp live rested files to the pre-pick snapshot"],
+{"target":{"version":"claude-accounts-pick Codex weekly-window rest recovery"},
+ "start":"a copy of the live pool Codex reading (null five_hour, seven_day at/above rest floor) and a future-dated rest file under a temp --state dir",
+ "steps":["copy live codex-accounts.json and codex-accounts-rested into a disposable state dir","run claude-accounts-pick.test.sh including weekly-only quota window rest cases","run pick codex --json --state <temp> and confirm workers get a pick after rest expiry is 0 for recovered accounts","cmp live rested files to the pre-pick snapshot"],
  "result":"pick ok id=$id; temp rest cleared; live rest untouched; fixture test passed"}
 J

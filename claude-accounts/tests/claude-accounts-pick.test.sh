@@ -140,22 +140,29 @@ jq -n --argjson now "$(date +%s)" '{generated_at:$now,accounts:[
   {id:"c2",five_hour:{left:25},seven_day:{left:25}}]}' > "$w/pool/codex-accounts.json"
 for ((i=0; i<4; i++)); do cmd_nohome pick codex --json --state "$w/pool" | jq -r .id; done > "$w/picks"
 is "Codex balances independently, with its own roster and headroom" "$(sort "$w/picks" | uniq -c | awk '{print $1}' | paste -sd:)" "3:1"
-# Codex omits five_hour: a full seven_day reading must clear a stale rest; a partial one must not.
+# Codex omits five_hour: weekly left at/above the rest floor clears a stale rest; below keeps it.
 mkdir -p "$w/pool/codex-accounts-rested"
 jq -n --argjson now "$(date +%s)" '{generated_at:$now,accounts:[
-  {id:"c1",five_hour:null,seven_day:{left:100},problem:null},
-  {id:"c2",five_hour:null,seven_day:{left:50},problem:null}]}' > "$w/pool/codex-accounts.json"
+  {id:"c1",five_hour:null,seven_day:{left:99},problem:null},
+  {id:"c2",five_hour:null,seven_day:{left:10},problem:null}]}' > "$w/pool/codex-accounts.json"
 printf '%s\n' "$(($(date +%s) + 18000))" > "$w/pool/codex-accounts-rested/c1"
 printf '%s\n' "$(($(date +%s) + 18000))" > "$w/pool/codex-accounts-rested/c2"
 rm -f "$w/pool/account-assignments.json"
 out=$(cmd_nohome pick codex --json --state "$w/pool"); rc=$?
-is "Codex null five_hour at 100 clears rest and picks" "$rc|$(jq -r .id <<<"$out")|$(cat "$w/pool/codex-accounts-rested/c1")" "0|c1|0"
-is "Codex window below 100 keeps the rest" "$(tr -d '\n' < "$w/pool/codex-accounts-rested/c2" | awk '{print ($1 > 0)}')" 1
+is "Codex weekly-only at 99 clears rest and picks" "$rc|$(jq -r .id <<<"$out")|$(cat "$w/pool/codex-accounts-rested/c1")" "0|c1|0"
+is "Codex weekly-only at 10 keeps the rest" "$(tr -d '\n' < "$w/pool/codex-accounts-rested/c2" | awk '{print ($1 > 0)}')" 1
+# Claude with a five_hour window still needs every present window at 100 to clear rest.
+mkdir -p "$w/pool/claude-accounts-rested"
+printf '%s\n' "$(($(date +%s) + 18000))" > "$w/pool/claude-accounts-rested/$A1"
+reading 0 80 100 100 100
+rm -f "$w/pool/account-assignments.json"
+out=$(cmd_nohome pick claude --json --state "$w/pool"); rc=$?
+is "Claude five_hour 80 keeps the rest" "$rc|$(jq -r .id <<<"$out")|$(tr -d '\n' < "$w/pool/claude-accounts-rested/$A1" | awk '{print ($1 > 0)}')" "0|$A2|1"
 # restore balanced Codex reading for concurrent cases below
 jq -n --argjson now "$(date +%s)" '{generated_at:$now,accounts:[
   {id:"c1",five_hour:{left:75},seven_day:{left:75}},
   {id:"c2",five_hour:{left:25},seven_day:{left:25}}]}' > "$w/pool/codex-accounts.json"
-rm -f "$w/pool/codex-accounts-rested/c1" "$w/pool/codex-accounts-rested/c2" "$w/pool/account-assignments.json"
+rm -f "$w/pool/codex-accounts-rested/c1" "$w/pool/codex-accounts-rested/c2" "$w/pool/claude-accounts-rested/$A1" "$w/pool/account-assignments.json"
 rm -f "$w/pool/account-assignments.json"
 mkdir "$w/concurrent"
 for ((i=0; i<12; i++)); do cmd_nohome pick codex --json --state "$w/pool" > "$w/concurrent/$i" & done
