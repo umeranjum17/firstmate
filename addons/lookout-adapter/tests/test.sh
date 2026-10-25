@@ -5,12 +5,12 @@
 set -eu
 here="$(cd "$(dirname "$0")/.." && pwd)"
 t="$(mktemp -d)"; trap 'kill "${srv:-}" 2>/dev/null || true; rm -rf -- "$t"' EXIT
-mkdir -p "$t/home/fixture/users/user-017/dashboard" "$t/home/fixture/users/user-012" "$t/main2/state" "$t/proc"
+mkdir -p "$t/home/state/dashboard" "$t/home/data" "$t/main2/state" "$t/proc"
 now=1792852545
 printf 'MemTotal: 1000 kB\nMemAvailable: 400 kB\n' > "$t/proc/meminfo"; echo '0.50 0.4 0.3 1/2 3' > "$t/proc/loadavg"
-echo "- alpha - Owns alpha. (home: $t/main2; scope: x)" > "$t/home/fixture/users/user-012/secondmates.md"
+echo "- alpha - Owns alpha. (home: $t/main2; scope: x)" > "$t/home/data/secondmates.md"
 printf 'model=claude-sonnet-5-5\nharness=claude\naccount=pa_fixture\napi_key=SECRET-VALUE-123\n' > "$t/main2/state/a-one.meta"
-cat > "$t/home/fixture/users/user-017/dashboard/data.json" <<J
+cat > "$t/home/state/dashboard/data.json" <<J
 {"cutoff":$now,"build_time":"2026-10-24T18:35:45+04:00","machine":{"pressure":50},"machine_limits":{"memory_pressure":40,"emulators":2,"gradle":2},
  "metrics":{"emulators":{"value":1},"gradle_builds":{"value":0}},
  "homes":[{"home":"main","plan":4,"lead_state":"","summary_generated_epoch":$((now-60))},{"home":"alpha","plan":2,"lead_state":"Lead is working","summary_generated_epoch":$((now-2000))}],
@@ -19,7 +19,7 @@ cat > "$t/home/fixture/users/user-017/dashboard/data.json" <<J
  "claude_accounts":[{"name":"acct-b","five_hour":{"left":59,"resets_at":"2026-10-24T18:30:00+00:00"},"seven_day":{"left":15,"resets_at":"2026-10-29T07:00:00+00:00"}}],
  "lane_history":[{"at":$((now-3600)),"lanes":5,"stuck":1}],"devices":[{"name":"Phone X1","tone":"ok","holder":null},{"name":"Emulator e1","tone":"ok","holder":"alpha"}]}
 J
-cat > "$t/home/fixture/users/user-017/dashboard/board.json" <<J
+cat > "$t/home/state/dashboard/board.json" <<J
 {"homes":[{"id":"alpha","name":"Alpha"}],"tickets":[{"id":"alpha/a-one","project":"alpha-app"}],
  "cards":[{"id":"alpha/a-one","home":"alpha","title":"First lane\n... (truncated)","stage":"ci","state":"waiting","since":$((now-100)),"started":$((now-900)),"pr":"https://github.com/o/r/pull/1","wait":"CI"},
           {"id":"alpha/a-two","home":"alpha","title":"Second","stage":"building","state":"blocked","since":$((now-50)),"started":null,"pr":null,"wait":null},
@@ -54,7 +54,7 @@ for _ in $(seq 50); do grep -q serving "$t/serve.log" && break; sleep 0.1; done
 url="$(sed 's/.*serving //' "$t/serve.log")"
 first="$(curl -fsS "$url")"
 python3 -c 'import json,sys; assert json.loads(sys.argv[1])["name"] == "Firstmate fleet"' "$first"
-rm "$t/home/fixture/users/user-017/dashboard/data.json"; sleep 2.5  # the rebuild fails now: the last good snapshot is still served, at once, unchanged
+rm "$t/home/state/dashboard/data.json"; sleep 2.5  # the rebuild fails now: the last good snapshot is still served, at once, unchanged
 [ "$(curl -fsS -m 2 "$url")" = "$first" ]
 [ "$(curl -s -o /dev/null -w '%{http_code}' "${url%fleet.json}nope")" = 404 ]
 echo "lookout-firstmate: PASS"

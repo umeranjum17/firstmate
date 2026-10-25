@@ -9,8 +9,9 @@ set -u
 here=$(cd "$(dirname "$0")" && pwd) || exit 1
 work=$(mktemp -d) || exit 1
 trap 'rm -rf "$work"' EXIT
-home=$work/home S=$work/home/fixture/users/user-017
-mkdir -p "$S" "$home/config" "$home/bin"
+home=$work/home
+S=$home/state
+mkdir -p "$S" "$home/config" "$home/bin" "$home/state"
 fails=0
 is() { if [ "$2" = "$3" ]; then echo "ok - $1"; else echo "not ok - $1: got [$2], want [$3]"; fails=$((fails + 1)); fi; }
 
@@ -58,7 +59,7 @@ task codex-worker ship codex pa_codex
 task quoting-worker ship claude pa_quote
 printf '❯ \n  ? for shortcuts\n' >>"$S/quoting-worker.screen"
 
-"$pass" "$home"
+FM_HOME=$home "$pass" "$home"
 is "only the two panes on the menu are moved, interrupt first, never another verb" "$(sed 's/ --note-file .*//' "$S/control.log")" \
 "muxr-lead interrupt
 muxr-lead relaunch --account pa_most_room
@@ -74,12 +75,12 @@ is "each move is one log line" "$(grep -c 'moved off' "$S/limit-prompt-move.log"
 : >"$S/control.log"
 cp "$here/weekly-limit-menu.screen" "$S/notes-worker.screen"
 sed -i 's/^spawn_gen=s2$/spawn_gen=s1/' "$S/notes-worker.meta"
-"$pass" "$home"
+FM_HOME=$home "$pass" "$home"
 is "one attempt per incarnation: a second pass on the same generation moves nothing" "$(cat "$S/control.log")" ""
 
 task stuck-worker ship claude pa_full
 touch "$S/stuck-worker.relaunch-fails"
-"$pass" "$home"
+FM_HOME=$home "$pass" "$home"
 is "a failed relaunch leaves a blocked status line naming fm-control's error" "$(sed 's/\[at=[0-9]*\]/[at=N]/' "$S/stuck-worker.status")" \
   "blocked [key=limit-prompt-move] [at=N]: limit-prompt-move: sat on Claude's usage-limit menu; interrupted, but relaunch --account next failed: error: the pool cannot start a claude worker"
 

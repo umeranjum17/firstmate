@@ -2,6 +2,7 @@
 # E2E: fleet-contract-check passes on working callers and names the caller that breaks.
 # Fixture fork home with stub callers and a throwaway HOME: nothing real is touched.
 set -euo pipefail
+unset FM_MAIN_HOME FM_HOME
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)
 d=$(mktemp -d)
 trap 'rm -rf -- "$d"' EXIT
