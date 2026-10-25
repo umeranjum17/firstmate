@@ -55,10 +55,10 @@ for role in review test fix; do
   rc=$?
   set -e
   answer=$(grep -o "${marker}[^\"\\\\]*" <<<"$out" | head -n 1) || true
-  move=$(grep -o 'quota-error on account [^ ]* .*same route on account [^ ]*' "$evidence/wrapper.log" | tail -n 1 | sed 's/ in [0-9]*ms (.*);/;/')
+  move=$(grep -oE 'quota-error on account [^ ]* .*next id=[^ ]*' "$evidence/wrapper.log" | tail -n 1 | sed 's/ in [0-9]*ms (.*);/;/')
   printf '%s: exit %s; %s; answer: %s\n' "$role" "$rc" "${move:-no account move}" "${answer:-none}" | tee -a "$evidence/roles.txt"
   n=$((n + 1))
-  [ "$rc" = 0 ] && [ -n "$answer" ] && [ "$(grep -c "quota-error on account .*same route on account" "$evidence/wrapper.log")" = "$n" ] ||
+  [ "$rc" = 0 ] && [ -n "$answer" ] && [ "$(grep -cE 'quota-error on account .*next id=' "$evidence/wrapper.log")" = "$n" ] ||
     fails=$((fails + 1))
 done
 sed -i "s|$HOME|~|g" "$evidence"/*.txt "$evidence/wrapper.log"

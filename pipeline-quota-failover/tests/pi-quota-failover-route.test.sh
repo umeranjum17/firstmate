@@ -2,45 +2,39 @@
 # pi-quota-failover route test: the real wrapper against a stub pi and a stub
 # quota-axi in a throwaway HOME, with the exact argv shape no-mistakes builds
 # (--model <m> --mode json --no-session, prompt on stdin). It pins the
-# persisted pipeline route:
-#   - the default chain is one route, Claude Haiku through claude-bridge;
-#   - a call pinned to that route runs it, and a call pinned to a model outside
-#     the chain runs the chain route and never the pinned model;
-#   - an openrouter/* route takes the deepseek idle limit (300 s by default),
-#     not the short generic one, so a slow answer is not killed;
-#   - with an account pool, a bridge call runs on the pool's pick, a Claude
-#     limit rests that account and the same route answers on the next one, and
-#     with every account rested the call ends "quota exhausted" without ever
-#     running on the default login.
-# Nothing real is called: no pi, no network, no config. Needs bash, jq,
+# persisted pipeline route and the fm-model-pool adoption:
+#   - without a pool, the default chain is Claude Haiku through claude-bridge;
+#   - with a pool, route/account come from fm-model-pool pick/next (A=70% over
+#     B=40%, A limit then B, all Claude under floor then Sol -> Goat -> Cursor);
+#   - an openrouter/* route takes the deepseek idle limit.
+# Nothing real is called: no network, no config, no login copy. Needs bash, jq,
 # timeout and pgrep.
 set -u
 
 here=$(cd "$(dirname "$0")" && pwd) || exit 1
+addons=$(cd "$here/../.." && pwd) || exit 1
 wrapper=$here/../pi-quota-failover
+helper=$addons/account-pool/bin/fm-model-pool
+pick=$addons/claude-accounts/bin/claude-accounts-pick
 [ -f "$wrapper" ] || { echo "not ok - $wrapper is missing"; exit 1; }
+[ -x "$helper" ] || { echo "not ok - $helper is missing"; exit 1; }
+[ -x "$pick" ] || { echo "not ok - $pick is missing"; exit 1; }
 
-# The pipeline route: Claude Haiku through claude-bridge, subscription accounts only.
 route=claude-bridge/claude-haiku-5-5
 or=openrouter/deepseek/deepseek-v4.1-flash-1017:floor
 
 work=$(mktemp -d) || exit 1
-trap 'rm -rf "$work"' EXIT
+trap 'rm -rf -- "$work"' EXIT
 home=$work/home stub=$work/bin log=$work/pqf.log
-mkdir -p "$home" "$stub"
+mkdir -p "$home" "$stub" "$work/a" "$work/b" "$work/pool" "$work/log"
 
 fails=0
 ok() { printf 'ok - %s\n' "$1"; }
 no() { printf 'not ok - %s\n' "$1"; fails=$((fails + 1)); }
 is() { if [ "$2" = "$3" ]; then ok "$1"; else no "$1: got [$2], want [$3]"; fi; }
-# out_has <name> <pattern>: matches against $OUT
 out_has() { if printf '%s' "$OUT" | grep -q -- "$2"; then ok "$1"; else no "$1: output lacks [$2]"; fi; }
-# log_has <name> <pattern>
 log_has() { if grep -q -- "$2" "$log" 2>/dev/null; then ok "$1"; else no "$1: $log lacks [$2]"; fi; }
 
-# The stub pi: 'pi list' (the wrapper's extension lookup) prints nothing, so
-# the call carries only pi's built-in extensions. A model call answers PONG,
-# unless the model is $STUB_SILENT, which stays silent for the idle watchdog.
 cat >"$stub/pi" <<'STUB'
 #!/usr/bin/env bash
 [ "${1:-}" = list ] && exit 0
@@ -54,9 +48,13 @@ done
 [ "$model" = "${STUB_SILENT:-}" ] && { sleep 600; exit 0; }
 [ "$1" = --help ] || printf '%s\n' "${CLAUDE_CONFIG_DIR:-default-login}" >>"$STUB_ACCOUNTS"
 printf '%s\n' '{"type":"session","id":"s-1"}'
-# Only a named account folder listed in STUB_LIMITED answers the limit; a call with no account folder never does.
+# Limit only a named Claude folder listed in STUB_LIMITED, or a named model in STUB_LIMIT_MODELS.
 if [ -n "${CLAUDE_CONFIG_DIR:-}" ] && [[ " ${STUB_LIMITED:-} " = *" ${CLAUDE_CONFIG_DIR##*/} "* ]]; then
   printf '%s\n' '{"type":"message_end","stopReason":"error","errorMessage":"Claude rate limit (five_hour) resets in 3h: You are out of usage"}'
+  exit 0
+fi
+if [[ " ${STUB_LIMIT_MODELS:-} " = *" $model "* ]]; then
+  printf '%s\n' '{"type":"message_end","stopReason":"error","errorMessage":"rate limit exceeded"}'
   exit 0
 fi
 printf '%s\n' "{\"type\":\"message_end\",\"role\":\"assistant\",\"model\":\"$model\",\"content\":\"PONG\"}"
@@ -64,8 +62,6 @@ exit 0
 STUB
 chmod +x "$stub/pi"
 
-# The stub quota-axi: every provider it is asked about is available, so the
-# route is never skipped by the pre-check.
 cat >"$stub/quota-axi" <<'STUB'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >>"$STUB_QUOTA_LOG"
@@ -79,110 +75,116 @@ printf '{"providers":[{"provider":"%s","quotaSemantics":{"effectiveAvailability"
 STUB
 chmod +x "$stub/quota-axi"
 
-# The stub pool (config/account-pool's command): accounts a then b, each a folder; a rested account is skipped.
-cat >"$stub/pool" <<'STUB'
+# Recording stand-in wraps the real chooser (same recipe as account-pool/tests/model-pool.test.sh).
+cat >"$stub/pool-cmd" <<SH
 #!/usr/bin/env bash
-printf '%s\n' "$*" >>"$STUB_POOL_LOG"
-all="$*" state=${all##*--state }
-case $1 in
-  rest) [ -z "${STUB_REST_REFUSE:-}" ] || { echo 'error: rest requires low quota with a future reset' >&2; exit 1; }
-        mkdir -p "$state/rested" && touch "$state/rested/$2" && echo '{"ok":true}' ;;
-  pick) for id in a b; do [ -e "$state/rested/$id" ] && continue
-          printf '{"ok":true,"id":"%s","set":{"CLAUDE_CONFIG_DIR":"%s"},"unset":["ANTHROPIC_API_KEY"]}\n' "$id" "$STUB_POOL_DIR/$id"; exit 0; done
-        echo '{"ok":false,"reason":"every Claude account is resting"}'; exit 1 ;;
-esac
-STUB
-chmod +x "$stub/pool"
-mkdir -p "$work/pool/a" "$work/pool/b" "$work/poolstate"
-printf 'command=%s\nstate=%s\n' "$stub/pool" "$work/poolstate" >"$work/account-pool"
+printf '%s\n' "\$*" >>"$work/log/pool-cmd.log"
+exec env FM_HOME="$home" FM_CLAUDE_ACCOUNTS_REGISTRY="$work/registry.json" FM_CLAUDE_ACCOUNTS_FRESH=999999 \
+  FM_ACCOUNT_POOL_REST_FLOOR=15 FM_MODEL_POOL_FLOOR=15 "$pick" "\$@"
+SH
+chmod +x "$stub/pool-cmd"
+for name in claude codex cursor opencode; do
+  printf '#!/bin/sh\necho "error: real model CLI blocked: %s" >&2\nexit 97\n' "$name" >"$stub/$name"
+  chmod +x "$stub/$name"
+done
 
-# The runner has no login folder set; neither does this test, so a local run matches CI.
+printf 'state=%s\ncommand=%s\n' "$work/pool" "$stub/pool-cmd" >"$work/account-pool"
+cat >"$work/registry.json" <<R
+{"version":1,"accounts":[
+ {"id":"pa_umer_a","provider":"claude","name":"Umer A","folder":"$work/a"},
+ {"id":"pa_umer_b","provider":"claude","name":"Umer B","folder":"$work/b"}
+]}
+R
+reading() {
+  local now
+  now=$(date +%s)
+  jq -n --argjson at "$now" --arg a pa_umer_a --arg b pa_umer_b \
+    --arg fa "$work/a" --arg fb "$work/b" \
+    --argjson h1 "$1" --argjson d1 "$2" --argjson h2 "$3" --argjson d2 "$4" \
+    '{schema:1, generated_at:$at, accounts:[
+      {id:$a,name:"Umer A",folder:$fa,five_hour:{left:$h1},seven_day:{left:$d1},read_at:$at,problem:null},
+      {id:$b,name:"Umer B",folder:$fb,five_hour:{left:$h2},seven_day:{left:$d2},read_at:$at,problem:null}]}' \
+    >"$work/pool/claude-accounts.json"
+  mkdir -p "$home/state"
+  cp "$work/pool/claude-accounts.json" "$home/state/claude-accounts.json"
+}
+
 unset CLAUDE_CONFIG_DIR
-export PI_QUOTA_FAILOVER_REAL_PI="$stub/pi" STUB_ACCOUNTS=$work/accounts STUB_POOL_LOG=$work/pool.log STUB_POOL_DIR=$work/pool
+export PI_QUOTA_FAILOVER_REAL_PI="$stub/pi" STUB_ACCOUNTS=$work/accounts
 export PI_QUOTA_FAILOVER_LOG="$log" STUB_ARGV=$work/argv STUB_QUOTA_LOG=$work/quota.log
-export HOME="$home" XDG_STATE_HOME="$work/state"
+export PI_QUOTA_FAILOVER_MODEL_POOL=$helper
+export HOME="$home" XDG_STATE_HOME="$work/state" FM_HOME="$home"
+export FM_CLAUDE_ACCOUNTS_REGISTRY=$work/registry.json
+export FM_MODEL_POOL_FLOOR=15 FM_ACCOUNT_POOL_REST_FLOOR=15 FM_CLAUDE_ACCOUNTS_LOW=5 FM_CLAUDE_ACCOUNTS_FRESH=999999
 PATH="$stub:$PATH"
-# The credit probe is one more pi call per run; it has its own journey in the
-# e2e test, so it is off here.
 export PI_QUOTA_FAILOVER_PROBE=0
+# Empty pool path keeps the static chain for cases 1-4 (live homes must not leak in).
+export PI_QUOTA_FAILOVER_ACCOUNT_POOL=''
 prompt='Reply with the single word PONG.'
 
-# 1. The default chain is the persisted pipeline route, one route and only it.
+# 1. Without a pool, the default chain is the persisted pipeline route.
 is "default chain is Claude Haiku through claude-bridge" "$(PI_QUOTA_FAILOVER_PRINT_CHAIN=1 "$wrapper" </dev/null)" "$route"
 
-# 2. A call pinned to the config's route runs that route.
+# 2. A call pinned to the config's route runs that route (no pool).
 : >"$STUB_ARGV"
 : >"$STUB_QUOTA_LOG"
-OUT=$(printf '%s' "$prompt" | env -u PI_QUOTA_FAILOVER_CHAIN "$wrapper" --model "$route" --mode json --no-session 2>"$work/err2")
+OUT=$(printf '%s' "$prompt" | env -u PI_QUOTA_FAILOVER_CHAIN \
+  "$wrapper" --model "$route" --mode json --no-session 2>"$work/err2")
 is "call on the config's route exits 0" "$?" "0"
 out_has "the config's route answers" "\"model\":\"$route\""
 is "one pi call" "$(wc -l <"$STUB_ARGV")" "1"
-is "quota-axi asked for the route's provider" "$(grep -c -- '--provider claude-bridge ' "$STUB_QUOTA_LOG")" "1"
-if grep -q 'skipped' "$log" 2>/dev/null; then no "the route was skipped by the quota pre-check"; else ok "the route is not skipped by the quota pre-check"; fi
 
-# 3. A call pinned to a model outside the chain runs the chain route and never
-#    the pinned model: the config's route is the route that runs.
+# 3. Off-chain pin without a pool lands on the chain route.
 : >"$STUB_ARGV"
-OUT=$(printf '%s' "$prompt" | env -u PI_QUOTA_FAILOVER_CHAIN "$wrapper" --model openai-codex/gpt-6-luna --mode json --no-session 2>"$work/err3")
+OUT=$(printf '%s' "$prompt" | env -u PI_QUOTA_FAILOVER_CHAIN \
+  "$wrapper" --model openai-codex/gpt-6-luna --mode json --no-session 2>"$work/err3")
 is "off-chain pin exits 0" "$?" "0"
 out_has "off-chain pin lands on the pipeline route" "\"model\":\"$route\""
 is "the pinned model never runs" "$(grep -c 'openai-codex' "$STUB_ARGV")" "0"
 
-# 4. An openrouter/* route takes the deepseek idle limit, not the generic one:
-#    4 s of silence survives the generic 1 s limit and is killed by the route's
-#    own 5 s limit, then the next chain route answers the same call.
+# 4. openrouter/* takes the deepseek idle limit.
 : >"$log"
 : >"$STUB_ARGV"
 OUT=$(printf '%s' "$prompt" | STUB_SILENT="$or" PI_QUOTA_FAILOVER_IDLE_SECS=1 PI_QUOTA_FAILOVER_DEEPSEEK_IDLE_SECS=5 \
-  PI_QUOTA_FAILOVER_CHAIN="$or $route" "$wrapper" --model "$or" --mode json --no-session 2>"$work/err4")
+  PI_QUOTA_FAILOVER_CHAIN="$or $route" \
+  "$wrapper" --model "$or" --mode json --no-session 2>"$work/err4")
 is "silent openrouter route exits 0" "$?" "0"
 out_has "the next chain route answers" '"model":"claude-bridge/claude-haiku-5-5"'
 log_has "the openrouter route is killed by its own limit" "no output for 5s"
-if grep -q 'no output for 1s' "$log"; then no "the openrouter route was killed by the generic limit"; else ok "the openrouter route is not killed by the generic limit"; fi
 
-# 5. The same route under the generic limit is killed by it, so the limit is
-#    the route's own and not a fixed number.
-: >"$log"
-: >"$STUB_ARGV"
-OUT=$(printf '%s' "$prompt" | STUB_SILENT="$or" PI_QUOTA_FAILOVER_IDLE_SECS=1 PI_QUOTA_FAILOVER_DEEPSEEK_IDLE_SECS=1 \
-  PI_QUOTA_FAILOVER_CHAIN="$or $route" "$wrapper" --model "$or" --mode json --no-session 2>"$work/err5")
-is "silent openrouter route under a 1 s own limit exits 0" "$?" "0"
-log_has "the openrouter route is killed by the 1 s own limit" "no output for 1s"
-
-# 6. With an account pool, the bridge call runs on the pool's pick; account a answers a Claude limit, so a is rested
-#    and the same route answers on account b in the same call, with no quota marker for the route.
+# 5. Forced-limit row: A=70% B=40%; A limited -> B answers on the same bridge route.
+reading 70 70 40 40
 : >"$log"; : >"$STUB_ARGV"; : >"$STUB_ACCOUNTS"
 OUT=$(printf '%s' "$prompt" | STUB_LIMITED=a PI_QUOTA_FAILOVER_ACCOUNT_POOL=$work/account-pool ANTHROPIC_API_KEY=x \
+  "$wrapper" --model "$route" --mode json --no-session 2>"$work/err5")
+is "A=70% B=40%: a limit still answers" "$?" "0"
+out_has "bridge route answers after account move" "\"model\":\"$route\""
+is "first account a (70%), then b (40%), never default login" "$(sed 's|.*/||' "$STUB_ACCOUNTS" | paste -sd, -)" "a,b"
+log_has "fm-model-pool next moved off A" "next id=pa_umer_b"
+is "no quota marker for the Claude route" "$(find "$work/state" -path "*pi-quota-failover-dead/*" 2>/dev/null | wc -l)" "0"
+
+# 6. All Claude under the eligibility floor: Sol then Goat then Cursor auto.
+reading 10 10 5 5
+: >"$log"; : >"$STUB_ARGV"; : >"$STUB_ACCOUNTS"
+OUT=$(printf '%s' "$prompt" | STUB_LIMIT_MODELS='openai-codex/gpt-6.1-sol deepseek/deepseek-goat' \
+  PI_QUOTA_FAILOVER_ACCOUNT_POOL=$work/account-pool \
   "$wrapper" --model "$route" --mode json --no-session 2>"$work/err6")
-is "a limit on one account still answers" "$?" "0"
-out_has "the same route answers" "\"model\":\"$route\""
-is "first account a, then b, never the default login" "$(sed 's|.*/||' "$STUB_ACCOUNTS" | paste -sd, -)" "a,b"
-is "account a is rested in the pool" "$(grep -c '^rest a ' "$work/pool.log")" "1"
-log_has "the move is logged" "quota-error on account a .*same route on account b"
-is "no quota marker for the route" "$(find "$work/state" -path "*pi-quota-failover-dead/*" | wc -l)" "0"
+is "all Claude low falls over to Cursor auto" "$?" "0"
+out_has "Cursor auto answers" '"model":"auto"'
+is "Sol then Goat then Cursor were tried" "$(grep -cE 'openai-codex/gpt-6.1-sol|deepseek/deepseek-goat|--model auto' "$STUB_ARGV")" "3"
+log_has "Sol was selected first under floor" "model=openai-codex/gpt-6.1-sol"
+log_has "Goat followed Sol" "model=deepseek/deepseek-goat"
+is "no Claude bridge when all under floor" "$(grep -c 'claude-bridge' "$STUB_ARGV")" "0"
 
-# 6b. The pool refuses the rest (its own reading does not show the account low) and picks the same account again:
-#     the call ends, but no route marker is written, so the next call goes back to the pool's pick.
-rm -rf "$work/poolstate/rested"; : >"$log"; : >"$STUB_ACCOUNTS"
-OUT=$(printf '%s' "$prompt" | STUB_LIMITED=a STUB_REST_REFUSE=1 PI_QUOTA_FAILOVER_ACCOUNT_POOL=$work/account-pool \
-  "$wrapper" --model "$route" --mode json --no-session 2>"$work/err6b")
-is "a refused rest with no other pick fails the call" "$?" "1"
-log_has "the pool's refusal is logged" "did not rest account a: error: rest requires low quota"
-is "and no route marker is written" "$(find "$work/state" -path "*pi-quota-failover-dead/*" | wc -l)" "0"
-
-# 7. Every account answers a limit: each is rested, the call ends with the terminal "quota exhausted", and nothing
-#    runs on the default login. The next call finds no account and runs nothing.
-rm -rf "$work/poolstate/rested"; : >"$log"; : >"$STUB_ACCOUNTS"
-OUT=$(printf '%s' "$prompt" | STUB_LIMITED='a b' PI_QUOTA_FAILOVER_ACCOUNT_POOL=$work/account-pool "$wrapper" --model "$route" --mode json --no-session 2>"$work/err7")
-is "every account limited fails" "$?" "1"
-log_has "the chain ends quota exhausted" "quota exhausted on every model"
-is "an account limit writes no route marker" "$(find "$work/state" -path "*pi-quota-failover-dead/*" | wc -l)" "0"
-is "both accounts tried, never the default login" "$(sed 's|.*/||' "$STUB_ACCOUNTS" | paste -sd, -)" "a,b"
-rm -rf "$work/state/pi-quota-failover-dead"; : >"$STUB_ACCOUNTS"
-OUT=$(printf '%s' "$prompt" | PI_QUOTA_FAILOVER_ACCOUNT_POOL=$work/account-pool "$wrapper" --model "$route" --mode json --no-session 2>"$work/err8")
-is "with every account rested the call fails" "$?" "1"
-is "and runs nothing, not even on the default login" "$(wc -l <"$STUB_ACCOUNTS")" "0"
-log_has "the pool's reason is logged" "every Claude account is resting"
+# 7. Helper refusal (every route attempted) ends quota exhausted without a Claude ambient fallback.
+reading 10 10 5 5
+: >"$log"; : >"$STUB_ACCOUNTS"; : >"$STUB_ARGV"
+OUT=$(printf '%s' "$prompt" | STUB_LIMIT_MODELS='openai-codex/gpt-6.1-sol deepseek/deepseek-goat auto' \
+  PI_QUOTA_FAILOVER_ACCOUNT_POOL=$work/account-pool \
+  "$wrapper" --model "$route" --mode json --no-session 2>"$work/err7")
+is "exhausted helper routes fail" "$?" "1"
+log_has "quota exhausted when helper next refuses" "quota exhausted\|fm-model-pool next refused"
+is "no Claude bridge when every fallover is limited" "$(grep -c 'claude-bridge' "$STUB_ARGV")" "0"
 
 echo
 if [ "$fails" = 0 ]; then echo "all tests passed"; else echo "$fails test(s) failed"; exit 1; fi

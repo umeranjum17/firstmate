@@ -4,9 +4,9 @@ Drop-in pi wrapper for the no-mistakes pipeline agent. It runs the real pi and m
 
 ## Pipeline route
 
-The default chain is one route, `claude-bridge/claude-haiku-5-5`: Claude Haiku through claude-bridge on the Claude subscription accounts, with no paid fallback. A call pinned to a model outside the chain does not run that model, it runs the chain. `PI_QUOTA_FAILOVER_CHAIN` overrides the chain, and `PI_QUOTA_FAILOVER_PRINT_CHAIN=1` prints it: the chain is the fleet's one route list, and `route-change` reads it from here.
+Without an account pool the default chain is one route, `claude-bridge/claude-haiku-5-5`: Claude Haiku through claude-bridge. A call pinned to a model outside the chain does not run that model, it runs the chain. `PI_QUOTA_FAILOVER_CHAIN` overrides the chain, and `PI_QUOTA_FAILOVER_PRINT_CHAIN=1` prints it: the chain is the fleet's one route list, and `route-change` reads it from here.
 
-With an account pool (`PI_QUOTA_FAILOVER_ACCOUNT_POOL`, default `~/firstmate/config/account-pool` when it exists), each `claude-bridge/*` call runs on the pool's Claude pick (its `CLAUDE_CONFIG_DIR`, the credential variables it names shed), the account a pool worker would get. A Claude limit asks the pool to rest that account and runs the same route on the next pick in the same call; the pool, not a route marker, decides the next account, so an account limit never marks the route dead. With every account resting the call runs nothing, not even on the default login, and ends with the terminal `quota exhausted` line.
+With an account pool (`PI_QUOTA_FAILOVER_ACCOUNT_POOL`, default `~/firstmate/config/account-pool` when it exists), the route comes from `fm-model-pool` pick/next (see `account-pool/README.md`): the eligible Claude account with the greatest runway above the 15% eligibility floor runs as `claude-bridge/claude-haiku-5-5` on that account's folder (credential variables shed). A limit calls `next`, which rests that account when the pool allows and advances; when every Claude account is under the floor the helper order is Codex Sol, then DeepSeek Goat, then Cursor auto. An account limit never marks the whole Claude route dead. When the helper refuses, the call ends with the terminal `quota exhausted` line and never falls back to the default login.
 
 An `openrouter/*` route takes the deepseek idle limit (`PI_QUOTA_FAILOVER_DEEPSEEK_IDLE_SECS`, default 300), not the generic one (default 120), because the floor route answers on the same clock as direct DeepSeek.
 
@@ -25,7 +25,7 @@ An answer that is not parseable JSON is treated as not exhausted, without a log 
 
 ## Moving the pipeline agent and route
 
-`switch.sh` moves the no-mistakes pipeline agent, and every pipeline step with it, to one accepted agent and one model. It edits only two keys by name (`agent`, `agent_config.<agent>.model`), leaves every other key, value and comment alone, writes a timestamped backup first and keeps the backup's version when the model does not answer PONG. `--dry-run` prints the planned edit and writes nothing, `--restore-latest` puts the last backup back, and the default model is the pipeline route `claude-bridge/claude-haiku-5-5`.
+`switch.sh` moves the no-mistakes pipeline agent, and every pipeline step with it, to one accepted agent and one model. It edits only two keys by name (`agent`, `agent_config.<agent>.model`), leaves every other key, value and comment alone, writes a timestamped backup first and keeps the backup's version when the model does not answer PONG. With neither `--agent` nor `--model`, it asks `fm-model-pool` pick for the route (same floors and Sol/Goat/Cursor order) and maps the harness onto an accepted agent; explicit flags keep a pin. `--dry-run` prints the planned edit and writes nothing; `--restore-latest` puts the last backup back. Never hand-edit the live config except through this script.
 
 ## Idle watchdog
 

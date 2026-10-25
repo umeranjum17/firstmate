@@ -23,8 +23,9 @@ run() { # <name> <command...>: capture the command's output and its exit code
   set -e
 }
 
-# The chain the pipeline runs: one route, Claude Haiku through claude-bridge on the subscription accounts.
-PI_QUOTA_FAILOVER_PRINT_CHAIN=1 pipeline-quota-failover/pi-quota-failover >"$evidence/chain.txt" 2>&1
+# The chain the pipeline prints without a pool (pool picking off so a live home does not leak in).
+PI_QUOTA_FAILOVER_PRINT_CHAIN=1 PI_QUOTA_FAILOVER_ACCOUNT_POOL='' \
+  pipeline-quota-failover/pi-quota-failover >"$evidence/chain.txt" 2>&1
 
 # The live config's route, read-only: the agent and the model it names for the
 # pipeline. Only those two values are printed; no key is read, copied or shown.
@@ -74,8 +75,12 @@ fail=0
 for exit_file in "$evidence"/*.exit; do
   [ "$(cat "$exit_file")" = 0 ] || fail=1
 done
+cat >"$evidence/steps.json" <<'JSON'
+{"target":{"version":"pipeline-quota-failover fm-model-pool route"},"start":"stub pi and quota-axi, real fm-model-pool, fixture Umer A/B; no login copy, no network","steps":["forced-limit A=70% over B=40% then next yields B","all Claude under floor falls over Sol then Goat then Cursor auto","switch.sh backup and PONG probe"],"result":"wrapper takes route from fm-model-pool; never default-login Claude fallback"}
+JSON
 if [ "$fail" != 0 ]; then
   echo "run-proof: a capture failed; see $evidence" >&2
   exit 1
 fi
 echo "run-proof: the route captures are in $evidence"
+printf 'PASS: pipeline route fm-model-pool proof\n'

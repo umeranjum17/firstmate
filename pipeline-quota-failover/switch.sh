@@ -2,7 +2,8 @@
 # switch.sh - move the no-mistakes pipeline agent, and therefore every pipeline
 # step including review, to one accepted agent and one model.
 #
-# Usage: switch.sh [--dry-run] [--restore-latest] [--config <path>] [--agent <name>] [--model <provider/model>]
+# Usage: switch.sh [--dry-run] [--restore-latest] [--config <path>] [--pool-config <path>]
+#                  [--agent <name>] [--model <provider/model>]
 #
 # The pipeline's agent is global: every step (intent, rebase, review, test,
 # document, lint, push, PR, CI) runs the configured `agent`. This edits only
@@ -13,13 +14,13 @@
 # written next to the config first. A real request on the model must answer
 # before the edit is kept; otherwise the backup is restored.
 #
-# --agent defaults to pi because pi is one of the agents no-mistakes accepts as
-# a gate agent for a repository with AGENTS.md/CLAUDE.md (codex, claude, pi,
-# acp:omp). --model defaults to the cheap OpenRouter DeepSeek route.
+# With neither --agent nor --model, the route comes from fm-model-pool pick
+# (Claude above the eligibility floor, else Sol then Goat then Cursor auto).
+# Explicit --agent/--model keep the old pin. Never hand-edit the live config.
 #
 # The no-mistakes daemon re-reads its config per run, so no daemon restart is
 # needed for this edit. No config value is ever printed; only key names and the
-# route are.
+# route are. Folder paths and unset names only; never credentials or login files.
 set -u
 
 die() { echo "switch.sh: $*" >&2; exit 1; }
@@ -27,21 +28,61 @@ die() { echo "switch.sh: $*" >&2; exit 1; }
 dry=0
 restore=0
 config=${NM_CONFIG:-${HOME:?}/.no-mistakes/config.yaml}
+# Empty PI_QUOTA_FAILOVER_ACCOUNT_POOL turns pool picking off (use - not :- so empty sticks).
+if [ -n "${PI_QUOTA_FAILOVER_ACCOUNT_POOL+x}" ]; then
+  pool_config=$PI_QUOTA_FAILOVER_ACCOUNT_POOL
+elif [ -n "${FM_HOME:-}" ]; then
+  pool_config=$FM_HOME/config/account-pool
+else
+  pool_config=$HOME/firstmate/config/account-pool
+fi
 agent=pi
 model=claude-bridge/claude-haiku-5-5
+agent_set=0
+model_set=0
 while [ $# -gt 0 ]; do
   case $1 in
     --dry-run) dry=1 ;;
     --restore-latest) restore=1 ;;
     --config) config=$2; shift ;;
-    --agent) agent=$2; shift ;;
-    --model) model=$2; shift ;;
-    *) die "unknown argument: $1 (use --dry-run, --restore-latest, --config <path>, --agent <name>, --model <provider/model>)" ;;
+    --pool-config) pool_config=$2; shift ;;
+    --agent) agent=$2; agent_set=1; shift ;;
+    --model) model=$2; model_set=1; shift ;;
+    *) die "unknown argument: $1 (use --dry-run, --restore-latest, --config <path>, --pool-config <path>, --agent <name>, --model <provider/model>)" ;;
   esac
   shift
 done
 
 [ -f "$config" ] || die "no no-mistakes config at $config"
+
+# Resolve fm-model-pool and map a pick onto agent + model when the caller did not pin either.
+model_pool=${PI_QUOTA_FAILOVER_MODEL_POOL:-}
+if [ -z "$model_pool" ]; then
+  for cand in \
+    "$(cd "$(dirname "$0")/.." 2>/dev/null && pwd)/account-pool/bin/fm-model-pool" \
+    "${FM_ADDONS_DIR:+$FM_ADDONS_DIR/account-pool/bin/fm-model-pool}" \
+    "${FM_HOME:+$FM_HOME/projects/firstmate-addons/account-pool/bin/fm-model-pool}"; do
+    [ -n "${cand:-}" ] && [ -x "$cand" ] && { model_pool=$cand; break; }
+  done
+fi
+pool_sel=''
+if [ "$agent_set" = 0 ] && [ "$model_set" = 0 ] && [ -n "$pool_config" ] && [ -f "$pool_config" ] && [ -n "$model_pool" ]; then
+  req=$(jq -nc --arg p "$pool_config" '{v:1,purpose:"work",pool_config:$p,capabilities:["text"],attempted:[]}')
+  pool_sel=$(printf '%s' "$req" | timeout 120 "$model_pool" pick --json 2>/dev/null) || pool_sel=''
+  jq -e '.ok == true' <<<"$pool_sel" >/dev/null 2>&1 || die "fm-model-pool pick refused: $(jq -r '.reason // "no answer"' <<<"${pool_sel:-}" 2>/dev/null)"
+  harness=$(jq -r '.harness // empty' <<<"$pool_sel")
+  m=$(jq -r '.model // empty' <<<"$pool_sel")
+  case $harness in
+    claude)
+      agent=pi
+      case $m in '' ) model=claude-bridge/claude-haiku-5-5 ;; */*) model=$m ;; *) model=claude-bridge/$m ;; esac
+      ;;
+    codex) agent=codex; model=$m ;;
+    opencode|cursor) agent=pi; model=$m ;;
+    *) die "fm-model-pool returned unsupported harness=$harness" ;;
+  esac
+  echo "fm-model-pool pick id=$(jq -r '.selection_id // .id' <<<"$pool_sel") -> agent=$agent model=$model"
+fi
 
 if [ "$restore" = 1 ]; then
   latest=$(find "$(dirname "$config")" -maxdepth 1 -name "$(basename "$config").bak-pipeline-opencode-*" -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n 1 | cut -d' ' -f2-)
@@ -163,24 +204,34 @@ if [ "$dry" = 1 ]; then
 fi
 
 echo "testing $agent on $model"
+# Apply the pick's folder and shed list for the probe only (paths and names, never credentials).
+probe_env=(env)
+if [ -n "$pool_sel" ]; then
+  folder=$(jq -r '.set.CLAUDE_CONFIG_DIR // empty' <<<"$pool_sel")
+  [ -n "$folder" ] && probe_env+=(CLAUDE_CONFIG_DIR="$folder")
+  while IFS= read -r v; do
+    [[ $v =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+    probe_env+=(-u "$v")
+  done < <(jq -r '.unset[]?' <<<"$pool_sel")
+fi
 case $agent in
   pi)
-    if ! out=$(cd "$tmp" && pi -p --no-session --model "$model" "Reply with exactly: PONG" 2>&1); then
+    if ! out=$(cd "$tmp" && "${probe_env[@]}" pi -p --no-session --model "$model" "Reply with exactly: PONG" 2>&1); then
       die "pi failed on $model: $(printf '%s' "$out" | tail -n 3 | head -c 400)"
     fi
     ;;
   claude)
-    if ! out=$(cd "$tmp" && claude -p --model "$model" "Reply with exactly: PONG" 2>&1); then
+    if ! out=$(cd "$tmp" && "${probe_env[@]}" claude -p --model "$model" "Reply with exactly: PONG" 2>&1); then
       die "claude failed on $model: $(printf '%s' "$out" | tail -n 3 | head -c 400)"
     fi
     ;;
   codex)
-    if ! out=$(cd "$tmp" && codex exec --skip-git-repo-check --model "$model" "Reply with exactly: PONG" 2>&1); then
+    if ! out=$(cd "$tmp" && "${probe_env[@]}" codex exec --skip-git-repo-check --model "$model" "Reply with exactly: PONG" 2>&1); then
       die "codex failed on $model: $(printf '%s' "$out" | tail -n 3 | head -c 400)"
     fi
     ;;
   acp:omp)
-    if ! out=$(cd "$tmp" && omp -p --model "$model" "Reply with exactly: PONG" 2>&1); then
+    if ! out=$(cd "$tmp" && "${probe_env[@]}" omp -p --model "$model" "Reply with exactly: PONG" 2>&1); then
       die "omp failed on $model: $(printf '%s' "$out" | tail -n 3 | head -c 400)"
     fi
     ;;
