@@ -126,6 +126,15 @@ fm_path_age() {
   echo $(( now - m ))
 }
 
+fm_watcher_progress_age() {
+  local state=$1
+  if [ -e "$state/.last-watcher-beat" ]; then
+    fm_path_age "$state/.last-watcher-beat"
+  else
+    fm_path_age "$state/.watch.lock/pid"
+  fi
+}
+
 # fm_poll_derived_grace [poll-seconds]
 # Default guard-grace derivation: max(300, poll + 60). A watcher touches its
 # liveness beacon once per poll cycle, so a fixed 300s grace stops correctly

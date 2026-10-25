@@ -250,7 +250,8 @@ test_live_stalled_watch_lock_is_replaced_past_hard_bound() {
 # blocked on a TERM-resistant check child. Never signal a discovered real home.
 test_rearm_proves_resumed_supervision() (
   local dir state fakebin oldarm='' holder='' sleeper='' arm='' unrelated='' i id status
-  dir=$(make_case rearm-proves-resume)
+  local mode=${1:-beacon}
+  dir=$(make_case "rearm-proves-resume-$mode")
   state="$dir/state"
   fakebin="$dir/fakebin"
   trap 'for id in "$sleeper" "$holder" "$oldarm" "$arm" "$unrelated"; do
@@ -291,7 +292,17 @@ SH
   sleeper=$(cat "$dir/child.pid") || fail "real watcher never entered hung check"
   holder=$(cat "$state/.watch.lock/pid") || fail "hung watcher lacks lock"
   kill -STOP "$holder" "$sleeper" || fail "could not stop private holder and child"
-  touch -t 200001010000 "$state/.last-watcher-beat"
+  if [ "$mode" = no-beacon ]; then
+    [ ! -e "$state/.last-watcher-beat" ] || fail "hung first scan published readiness"
+    touch -t 200001010000 "$state/.watch.lock/pid"
+    cat > "$fakebin/ps" <<'SH'
+#!/usr/bin/env bash
+exit 1
+SH
+    chmod +x "$fakebin/ps"
+  else
+    touch -t 200001010000 "$state/.last-watcher-beat"
+  fi
   # The replacement must supervise five task checks before announcing started.
   "$ROOT/bin/fm-check-unregister.sh" hung >/dev/null || fail "retire hung check"
   for id in one two three four five; do
@@ -325,6 +336,49 @@ SH
   wait_for_exit "$arm" 100 || fail "replacement did not surface the resumed task"
   grep -q '^signal:.*one' "$dir/new-arm.out" || fail "resumed task wake missing"
   pass "re-arm removes hung holder and child, protects unrelated process, and supervises five tasks before confirmation"
+)
+
+test_first_scan_confirmation_budget() (
+  local mode=$1 dir state fakebin arm='' holder='' i status
+  dir=$(make_case "first-scan-budget-$mode")
+  state="$dir/state"
+  fakebin="$dir/fakebin"
+  export FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_HEARTBEAT=999999
+  unset FM_ARM_CONFIRM_TIMEOUT FM_SIGNAL_GRACE
+  trap '[ -z "$holder" ] || kill -KILL "$holder" 2>/dev/null || true
+    [ -z "$arm" ] || kill -KILL "$arm" 2>/dev/null || true
+    wait 2>/dev/null || true' EXIT
+  if [ "$mode" = check ]; then
+    export FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=0
+    printf '#!/usr/bin/env bash\nsleep 20\ntouch "$FM_HOME/scanned"\n' > "$state/slow.check.sh"
+    chmod 0700 "$state/slow.check.sh"
+    "$ROOT/bin/fm-check-register.sh" slow >/dev/null || fail "register slow check"
+  else
+    printf 'done: first scan event\n' > "$state/task.status"
+  fi
+  PATH="$fakebin:$PATH" "$WATCH_ARM" > "$dir/arm.out" 2>&1 &
+  arm=$!
+  for ((i=0; i<600; i++)); do
+    holder=$(cat "$state/.watch.lock/pid" 2>/dev/null || true)
+    if [ "$mode" = check ]; then
+      grep -q '^watcher: started' "$dir/arm.out" && break
+    else
+      grep -q '^signal:' "$dir/arm.out" && break
+    fi
+    is_live_non_zombie "$arm" || break
+    sleep 0.1
+  done
+  if [ "$mode" = check ]; then
+    [ -e "$dir/scanned" ] && grep -q '^watcher: started' "$dir/arm.out" \
+      || fail "slow first scan was not confirmed: $(cat "$dir/arm.out")"
+  else
+    wait_for_exit "$arm" 100
+    status=$?
+    [ "$status" -eq 0 ] && grep -q '^signal:' "$dir/arm.out" \
+      || fail "default signal grace exceeded startup budget: $(cat "$dir/arm.out")"
+  fi
+  ! grep -q '^watcher: FAILED' "$dir/arm.out" || fail "first scan failed: $(cat "$dir/arm.out")"
+  pass "first scan confirmation budgets $mode work"
 )
 
 test_guard_warnings() {
@@ -1710,7 +1764,10 @@ test_msys_pid_identity_uses_proc() {
   pass "MSYS process identity uses compatible /proc fields"
 }
 
-test_rearm_proves_resumed_supervision || exit 1
+test_rearm_proves_resumed_supervision beacon || exit 1
+test_rearm_proves_resumed_supervision no-beacon || exit 1
+test_first_scan_confirmation_budget signal
+test_first_scan_confirmation_budget check
 test_wait_deadline_reaps_a_stopped_child
 test_singleton_start
 test_pid_identity_is_locale_invariant

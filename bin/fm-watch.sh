@@ -2906,6 +2906,33 @@ if ! fm_procevent_launch_confirm_seconds >/dev/null; then
   exit 1
 fi
 
+watcher_process_table() {
+  local proc_root=${FM_PROC_ROOT_OVERRIDE:-/proc} stat_path stat_line pid
+  local -a fields
+  if [ -r "$proc_root/$$/stat" ]; then
+    for stat_path in "$proc_root"/[0-9]*/stat; do
+      read -r stat_line < "$stat_path" 2>/dev/null || continue
+      read -r -a fields <<< "${stat_line##*)}"
+      [ "${#fields[@]}" -ge 2 ] || continue
+      pid=${stat_path%/stat}
+      printf '%s %s\n' "${pid##*/}" "${fields[1]}"
+    done
+  else
+    ps -A -o pid= -o ppid=
+  fi
+}
+
+watcher_process_zombie() {
+  local pid=$1 proc_root=${FM_PROC_ROOT_OVERRIDE:-/proc} stat_line
+  if [ -r "$proc_root/$pid/stat" ]; then
+    stat_line=$(cat "$proc_root/$pid/stat" 2>/dev/null) || return 1
+    case "${stat_line##*)}" in ' Z '*) return 0 ;; esac
+  else
+    case "$(ps -o stat= -p "$pid" 2>/dev/null | tr -d ' ')" in Z*) return 0 ;; esac
+  fi
+  return 1
+}
+
 # evict_stalled_holder <pid>: retire a live lock holder whose beacon stalled past
 # WATCHER_STALL_BOUND. The pid is signalled only while it still proves the
 # lock's own recorded identity (fm_watcher_lock_matches_pid: this home, this
@@ -2921,7 +2948,7 @@ evict_stalled_holder() {
   identity=$FM_WATCHER_MATCHED_IDENTITY
   # Snapshot descendants before TERM can orphan a blocked sampler/check child.
   # Keep each process identity: neither reparenting nor PID reuse grants scope.
-  table=$(ps -A -o pid= -o ppid=) || return 1
+  table=$(watcher_process_table) || return 1
   descendants=$(printf '%s\n' "$table" | awk -v root="$pid" '
     { parent[$1] = $2 }
     END {
@@ -2949,7 +2976,7 @@ evict_stalled_holder() {
     [ "$(cat "$WATCH_LOCK/pid" 2>/dev/null)" = "$pid" ] || return 1
     fm_watcher_lock_matches_pid "$STATE" "$WATCH_PATH" "$pid" "$FM_HOME" || return 1
     [ "$FM_WATCHER_MATCHED_IDENTITY" = "$identity" ] || return 1
-    [ "$(fm_path_age "$BEAT")" -ge "$WATCHER_STALL_BOUND" ] || return 1
+    [ "$(fm_watcher_progress_age "$STATE")" -ge "$WATCHER_STALL_BOUND" ] || return 1
     kill -KILL "$pid" || return 1
   fi
   # Reap only snapshotted descendants whose identities still match, including
@@ -2959,9 +2986,7 @@ evict_stalled_holder() {
       child=${children[i]}
       fm_pid_alive "$child" || continue
       current=$(fm_pid_identity "$child" 2>/dev/null) || {
-        case "$(ps -o stat= -p "$child" 2>/dev/null | tr -d ' ')" in
-          Z*) continue ;; # Exited but not yet reaped by its parent.
-        esac
+        watcher_process_zombie "$child" && continue
         fm_pid_alive "$child" && return 1
         continue
       }
@@ -2974,9 +2999,7 @@ evict_stalled_holder() {
       for ((child=0; child<${#children[@]}; child++)); do
         fm_pid_alive "${children[child]}" || continue
         current=$(fm_pid_identity "${children[child]}" 2>/dev/null) || {
-          case "$(ps -o stat= -p "${children[child]}" 2>/dev/null | tr -d ' ')" in
-            Z*) continue ;;
-          esac
+          watcher_process_zombie "${children[child]}" && continue
           fm_pid_alive "${children[child]}" && return 1
           continue
         }
@@ -2991,26 +3014,20 @@ evict_stalled_holder() {
 
 EVICTED_PID=
 EVICTED_BEAT_AGE=
-BEAT="$STATE/.last-watcher-beat"
 while ! fm_lock_try_acquire "$WATCH_LOCK"; do
   if [ -n "${FM_LOCK_HELD_PID:-}" ]; then
-    if [ -e "$BEAT" ]; then
-      beat_age=$(fm_path_age "$BEAT")
-      if [ "$beat_age" -ge "$WATCHER_STALE_GRACE" ]; then
-        # One eviction per arm: the retry re-reads the lock and beacon, so a
-        # holder that exited leaves a dead-pid lock the normal reclaim takes,
-        # and a rival arm that won first reads as a fresh running watcher.
-        if [ -z "$EVICTED_PID" ] && [ "$beat_age" -ge "$WATCHER_STALL_BOUND" ] \
-          && evict_stalled_holder "$FM_LOCK_HELD_PID"; then
-          EVICTED_PID=$FM_LOCK_HELD_PID
-          EVICTED_BEAT_AGE=$beat_age
-          continue
-        fi
-        echo "watcher: lock held by live pid $FM_LOCK_HELD_PID but heartbeat is stale for ${beat_age}s (>${WATCHER_STALE_GRACE}s); inspect or stop that watcher before re-arming." >&2
-        exit 1
+    beat_age=$(fm_watcher_progress_age "$STATE")
+    if [ "$beat_age" -ge "$WATCHER_STALE_GRACE" ]; then
+      # One eviction per arm: the retry re-reads the lock and beacon, so a
+      # holder that exited leaves a dead-pid lock the normal reclaim takes,
+      # and a rival arm that won first reads as a fresh running watcher.
+      if [ -z "$EVICTED_PID" ] && [ "$beat_age" -ge "$WATCHER_STALL_BOUND" ] \
+        && evict_stalled_holder "$FM_LOCK_HELD_PID"; then
+        EVICTED_PID=$FM_LOCK_HELD_PID
+        EVICTED_BEAT_AGE=$beat_age
+        continue
       fi
-    elif [ "$(fm_path_age "$WATCH_LOCK")" -ge "$WATCHER_STALE_GRACE" ]; then
-      echo "watcher: lock held by live pid $FM_LOCK_HELD_PID but no heartbeat exists; inspect or stop that watcher before re-arming." >&2
+      echo "watcher: lock held by live pid $FM_LOCK_HELD_PID but heartbeat is stale for ${beat_age}s (>${WATCHER_STALE_GRACE}s); inspect or stop that watcher before re-arming." >&2
       exit 1
     fi
     echo "watcher: already running pid $FM_LOCK_HELD_PID"

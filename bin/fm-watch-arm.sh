@@ -136,7 +136,19 @@ case "${OSTYPE:-}" in
   msys*|mingw*|cygwin*) ARM_CONFIRM_DEFAULT=30 ;;
   *) ARM_CONFIRM_DEFAULT=10 ;;
 esac
-CONFIRM_TIMEOUT=${FM_ARM_CONFIRM_TIMEOUT:-$ARM_CONFIRM_DEFAULT}
+confirmation_timeout() {
+  local budget=$ARM_CONFIRM_DEFAULT check
+  if [ -n "${FM_ARM_CONFIRM_TIMEOUT:-}" ]; then
+    printf '%s\n' "$FM_ARM_CONFIRM_TIMEOUT"
+    return
+  fi
+  budget=$((budget + ${FM_SIGNAL_GRACE:-30}))
+  for check in "$STATE"/*.check.sh; do
+    [ -e "$check" ] || continue
+    budget=$((budget + ${FM_CHECK_TIMEOUT:-30} + 1))
+  done
+  printf '%s\n' "$budget"
+}
 # Poll interval while attached to an existing healthy watcher.
 ATTACH_POLL=${FM_ARM_ATTACH_POLL:-0.5}
 # The beacon age at which the watcher's own re-arm evicts a live holder; an
@@ -326,7 +338,7 @@ wait_for_healthy_successor() {
   local deadline
   # date(1) exposes whole seconds. Add one rounding second so a timeout of one
   # second cannot collapse to a few milliseconds when called near a boundary.
-  deadline=$(( $(date +%s) + CONFIRM_TIMEOUT + 1 ))
+  deadline=$(( $(date +%s) + $(confirmation_timeout) + 1 ))
   while :; do
     healthy_watcher && return 0
     [ "$(date +%s)" -ge "$deadline" ] && return 1
@@ -673,12 +685,12 @@ child_out=$(mktemp "$STATE/.watch-arm-output.XXXXXX") || {
 }
 # date(1) exposes whole seconds. Keep the configured confirmation budget from
 # collapsing when startup begins just before the next second boundary.
-deadline=$(( $(date +%s) + CONFIRM_TIMEOUT + 1 ))
+deadline=$(( $(date +%s) + $(confirmation_timeout) + 1 ))
 # Stalled-holder recovery can spend three five-second retirement waits before
 # normal startup. Budget those only for this home's identity-proven stalled
 # holder; an unrelated lock never earns extra time or signalling authority.
 stalled_pid=$(cat "$WATCH_LOCK/pid" 2>/dev/null || true)
-if [ "$(fm_path_age "$BEAT")" -ge "$STALL_BOUND" ] \
+if [ "$(fm_watcher_progress_age "$STATE")" -ge "$STALL_BOUND" ] \
   && fm_watcher_lock_matches_pid "$STATE" "$WATCH" "$stalled_pid" "$FM_HOME"; then
   deadline=$((deadline + 15))
 fi
