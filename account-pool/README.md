@@ -58,6 +58,35 @@ One refusal can land after the stop: the launch owner (`fm-spawn --relaunch`) pi
 A home pin still wins: with a pin file for that runner, `--account` refuses rather than being silently ignored.
 The replacement records the selected account as `account=`, exactly as a spawn-time pick does.
 
+## Shared model helper (`bin/fm-model-pool`)
+
+Model-calling tools use this JSON CLI instead of caching a one-shot Claude env pick.
+It sits on the same `config/account-pool` and pool command as worker launches; it is not a daemon or a second login store.
+
+```text
+fm-model-pool pick --json   # request JSON on stdin
+fm-model-pool next --json   # prior selection + typed limit on stdin
+```
+
+Request fields (`v:1`): `purpose` (`work`), `pool_config` (absolute path to `config/account-pool`), optional `model`, `capabilities`, `deadline` (unix seconds for the whole attempt chain), and `attempted` (account/route ids already tried).
+`next` also needs `selection` (prior answer) and `cause` (`quota`, `rate_limit`, `unavailable`, `timeout`).
+
+For ordinary work it picks the eligible Claude account with the greatest minimum runway (min of 5h and 7d) above the **eligibility floor** (`FM_MODEL_POOL_FLOOR`, defaulting to `FM_ACCOUNT_POOL_REST_FLOOR`, **15%**).
+That is deliberately not the worker **launch admission** floor (`FM_CLAUDE_ACCOUNTS_LOW`, **5%**) used by `claude-accounts-pick` at spawn.
+Answers name both floors under `floor.eligibility` and `floor.launch_admission`.
+A registry account whose record enables `usage_credits`, `extra_usage`, or `overage` (or the same under `billing`) is refused; the check is logged; credentials are never printed or stored.
+When every Claude account is under the eligibility floor, normal-work ordering is Codex Sol (`openai-codex/gpt-6.1-sol`), then DeepSeek Goat (`deepseek/deepseek-goat`), then Cursor auto (`auto`), skipping any id already in `attempted`.
+`next` rests a pool account after a quota/rate limit when the pool command allows it; a failed rest still excludes that id locally so A/B/A cannot loop.
+
+### Node / Python consumption
+
+Node: `execFile`/`spawn` the helper with an argv array, write the request JSON to stdin, apply an execution timeout and a small stdout cap, `JSON.parse` the answer, build a fresh child `env` from `set`, and delete each validated `unset` name.
+Python: the same with `subprocess.run([...], input=json.dumps(req), capture_output=True, timeout=...)`, `json.loads`, and an explicit child `env` dict.
+Neither evaluates shell text, mutates global process env, copies login files, nor keeps a separate account cache.
+On a structured quota/limit error, call `next` with the prior selection and the growing `attempted` set under the same overall `deadline`.
+
 ## Test
 
-`bash account-pool/tests/account-pool.test.sh` drives the hook lines in their fork call-site form, a stub `byokit-accounts` and a synthetic pane through every case above, and checks that the add-on absent leaves each line a no-op. `bash account-pool/run-tool-proof.sh` (done-done journey `pool-tool-account`) proves a tool started on the pool's pick inherits the picked folder.
+`bash account-pool/tests/account-pool.test.sh` drives the hook lines in their fork call-site form, a stub `byokit-accounts` and a synthetic pane through every case above, and checks that the add-on absent leaves each line a no-op; it also runs `tests/model-pool.test.sh` (forced-limit A/B, fallovers, credits refusal, deadline).
+`bash account-pool/run-tool-proof.sh` (done-done journey `pool-tool-account`) proves a tool started on the pool's pick inherits the picked folder.
+`bash account-pool/run-model-pool-proof.sh` (done-done journey `pool-helper`) seals the forced-limit helper proof with `steps.json` (screen: none).

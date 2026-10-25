@@ -5,10 +5,15 @@
 # variable names to unset (names only). Smooth weighted round robin picks the largest assignment
 # deficit (runway share * next assignment number - recent count) within each provider's best tier.
 # Assignments expire after FM_ACCOUNT_POOL_ASSIGNMENT_SECONDS (default 300); flock serializes picks.
-# Runway is min(5h, 7d left). An account under FM_CLAUDE_ACCOUNTS_LOW percent (default 5)
-# is skipped, so new workers go to the other account when one runs low. A running worker is never moved:
-# the pick only happens at launch. Claude and Codex use their own registry roster and quota reading;
-# Codex keeps its ambient folder only when no Codex registry accounts exist. Pi remains ambient.
+# Runway is min(5h, 7d left). Two floors, stated explicitly (not the same number):
+# - Launch admission: FM_CLAUDE_ACCOUNTS_LOW (default 5%). An account under that percent is skipped
+#   for new worker launches, so new workers go to the other account when one runs low.
+# - Verified rest / tool eligibility: FM_ACCOUNT_POOL_REST_FLOOR (default 15%). `rest` and
+#   account-pool/bin/fm-model-pool use that higher floor so tools rotate off an account earlier than
+#   spawn admission would. Do not silently treat 5% and 15% as one policy.
+# A running worker is never moved: the pick only happens at launch. Claude and Codex use their own
+# registry roster and quota reading; Codex keeps its ambient folder only when no Codex registry
+# accounts exist. Pi remains ambient.
 # A quota-reader failure never refuses a launch. The roster comes from the registry (id, name, folder);
 # the reading is whatever the last good run left on disk, in <home>/state or in the pool state folder,
 # whichever is newer. A reading older than FM_CLAUDE_ACCOUNTS_STALE_MAX (3600 s) still counts by its 7-day

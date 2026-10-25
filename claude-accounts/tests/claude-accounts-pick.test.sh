@@ -148,5 +148,10 @@ is "concurrent launches share the counter without lost assignments" "$(jq -r .id
 out=$(FM_ACCOUNT_POOL_ASSIGNMENT_SECONDS=0 cmd_nohome pick codex --json --state "$w/pool")
 is "expired assignments reset the winner to the most headroom" "$(jq -r .id <<<"$out")" c1
 
+# Floor wording: launch admission (5%) stays distinct from verified-rest / fm-model-pool eligibility (15%).
+is "launch admission default stays 5" "${FM_CLAUDE_ACCOUNTS_LOW:-5}" 5
+is "rest/eligibility floor default stays 15" "${FM_ACCOUNT_POOL_REST_FLOOR:-15}" 15
+is "fm-model-pool exists for tool rotation above the rest floor" "$([ -x "$addons/account-pool/bin/fm-model-pool" ] && echo yes)" yes
+
 [ "$fails" -eq 0 ] || { echo "$fails failed"; exit 1; }
 echo "all passed"

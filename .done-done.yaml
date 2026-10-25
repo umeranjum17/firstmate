@@ -51,6 +51,8 @@ journeys:
     command: bash fleet-contract-check/run-proof.sh
   pool-tool-account:
     command: bash account-pool/run-tool-proof.sh
+  pool-helper:
+    command: bash account-pool/run-model-pool-proof.sh
   guards-pool-accounts:
     command: bash read-guard/run-pool-proof.sh
   codex-guard-live:
