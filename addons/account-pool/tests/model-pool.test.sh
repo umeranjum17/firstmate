@@ -9,7 +9,7 @@ helper=$addons/account-pool/bin/fm-model-pool
 pool=$addons/claude-accounts/bin/claude-accounts-pick
 w=$(mktemp -d "${TMPDIR:-/tmp}/model-pool-test.XXXXXX") || exit 1
 trap 'rm -rf -- "$w"' EXIT
-mkdir -p "$w/home/config" "$w/home/fixture/users/user-017" "$w/home/fixture/users/user-010" "$w/a" "$w/b" "$w/c" "$w/pool" "$w/bin" "$w/log"
+mkdir -p "$w/home/state" "$w/home/config" "$w/a" "$w/b" "$w/c" "$w/pool" "$w/bin" "$w/log"
 fails=0
 is() { if [ "$2" = "$3" ]; then echo "ok - $1"; else echo "not ok - $1: got [$2], want [$3]"; fails=$((fails + 1)); fi; }
 
@@ -48,7 +48,7 @@ reading() { # fiveA sevenA fiveB sevenB [fiveC sevenC]
       {id:$b,name:"Umer B",folder:$fb,five_hour:{left:$h2},seven_day:{left:$d2},read_at:$at,problem:null},
       {id:$c,name:"Credits",folder:$fc,five_hour:{left:$h3},seven_day:{left:$d3},read_at:$at,problem:null}]}' \
     >"$w/pool/claude-accounts.json"
-  cp "$w/pool/claude-accounts.json" "$w/home/fixture/users/user-017/claude-accounts.json"
+  cp "$w/pool/claude-accounts.json" "$w/home/state/claude-accounts.json"
 }
 
 run() { # verb json -> sets out/rc; network blocked via empty SSL and no net helpers needed (local only)
@@ -111,7 +111,7 @@ now=$(date +%s)
 jq -n --argjson at "$now" --arg c pa_credits --arg fc "$w/c" \
   '{schema:1,generated_at:$at,accounts:[{id:$c,name:"Credits",folder:$fc,five_hour:{left:100},seven_day:{left:100},read_at:$at,problem:null}]}' \
   >"$w/pool/claude-accounts.json"
-cp "$w/pool/claude-accounts.json" "$w/home/fixture/users/user-017/claude-accounts.json"
+cp "$w/pool/claude-accounts.json" "$w/home/state/claude-accounts.json"
 : >"$w/err"
 run pick "$base"
 is "only credits-enabled Claude falls to Sol" "$(jq -r .id <<<"$out")" "route:openai-codex/gpt-6.1-sol"

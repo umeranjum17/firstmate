@@ -9,7 +9,7 @@ DRAIN="$ROOT/bin/fm-wake-drain.sh"
 
 cycle() {
   local rc=0 seq gen
-  env HOME="$dir/home" XDG_CONFIG_HOME="$dir/home/fixture/users/user-010" TMPDIR="$dir/tmp" \
+  env HOME="$dir/home" XDG_CONFIG_HOME="$dir/home/config" TMPDIR="$dir/tmp" \
     PATH="$dir/fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" \
     FM_CONFIG_OVERRIDE="$dir/config" FM_POLL=1 FM_SIGNAL_GRACE=1 \
     FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_HOME_SUMMARY_INTERVAL=999999 \
@@ -50,7 +50,7 @@ arm_episode() {  # <dir>
 if [ "${FM_WAIT_TIMERS_MAIN_ESCALATION_ONLY:-0}" != 1 ]; then
 for verb in blocked needs-decision; do
   dir=$(make_case "$verb")
-  mkdir -p "$dir/home/fixture/users/user-010" "$dir/tmp" "$dir/config" "$dir/parent/state"
+  mkdir -p "$dir/home/config" "$dir/tmp" "$dir/config" "$dir/parent/state"
   printf 'lead\n' > "$dir/.fm-secondmate-home"
   printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$dir/parent" > "$dir/.fm-secondmate-parent"
   channel="$dir/parent/state/lead.status"
@@ -98,7 +98,7 @@ fi
 
 # A Main-owned wait has no parent channel, so its escalation is one wake to Main.
 dir=$(make_case main-escalation)
-mkdir -p "$dir/home/fixture/users/user-010" "$dir/tmp" "$dir/config"
+mkdir -p "$dir/home/config" "$dir/tmp" "$dir/config"
 printf 'kind=ship\nbackend=tmux\nwindow=fake:1\n' > "$dir/state/lane.meta"
 printf 'blocked [at=%s] [key=wait]: external condition until 2099-01-01T00:00Z\n' "$(date +%s)" > "$dir/state/lane.status"
 prime_status_seen "$dir/state" "$dir/state/lane.status"
@@ -123,7 +123,7 @@ pass 'a Main-owned overdue wait escalates once to Main without paging the captai
 # Every wait carries a stable identity (home, task, generation, source key); a
 # resolution closes only the wait it names, and escalations print that source.
 dir=$(make_case identity)
-mkdir -p "$dir/home/fixture/users/user-010" "$dir/tmp" "$dir/config"
+mkdir -p "$dir/home/config" "$dir/tmp" "$dir/config"
 printf 'kind=ship\nbackend=tmux\nwindow=fake:1\n' > "$dir/state/lane.meta"
 # No [at=] stamp on either decision, and an older unrelated decision (old-ask).
 printf 'needs-decision [key=old-ask]: unrelated product choice\nblocked [key=cur-wait]: current dependency\n' > "$dir/state/lane.status"
@@ -164,7 +164,7 @@ pass 'waits carry home/task/generation/key identity, name the unresolved source,
 
 # Native blocked wins over a working log and survives unrelated status churn.
 dir=$(make_case herdr)
-mkdir -p "$dir/home/fixture/users/user-010" "$dir/tmp" "$dir/config"
+mkdir -p "$dir/home/config" "$dir/tmp" "$dir/config"
 printf 'kind=secondmate\nharness=opencode\nbackend=herdr\nwindow=fixture:w1:p1\n' > "$dir/state/lane.meta"
 printf 'working: running\n' > "$dir/state/lane.status"
 printf 'blocked\n' > "$dir/native"
@@ -268,7 +268,7 @@ grep -q 'agent list for fixture failed (code 124, deadline 1s); its lanes are un
 pass 'stalled native lookup marks only its lanes unknown and keeps the watcher monitoring the rest'
 
 dir=$(make_case flicker)
-mkdir -p "$dir/home/fixture/users/user-010" "$dir/tmp" "$dir/config"
+mkdir -p "$dir/home/config" "$dir/tmp" "$dir/config"
 printf 'kind=ship\nharness=opencode\nbackend=herdr\nwindow=fixture:w1:p1\n' > "$dir/state/lane.meta"
 printf 'working: running\n' > "$dir/state/lane.status"
 printf 'blocked\n' > "$dir/native"
@@ -298,7 +298,7 @@ cycle
 pass 'a blocked/working flicker keeps the original blocked observation time'
 
 dir=$(make_case push-owner)
-mkdir -p "$dir/home/fixture/users/user-010" "$dir/tmp" "$dir/config"
+mkdir -p "$dir/home/config" "$dir/tmp" "$dir/config"
 printf 'kind=ship\nharness=opencode\nbackend=herdr\nwindow=fixture:w1:p1\n' > "$dir/state/lane.meta"
 printf 'working: running\n' > "$dir/state/lane.status"
 printf 'blocked\n' > "$dir/native"
@@ -337,7 +337,7 @@ pass 'an immediate native push wake is the episode owner delivery, with no dupli
 # A due wait alert defers to a same-cycle signal: the signal scan runs first,
 # and the deferred alert still surfaces on the next quiet cycle (retro fix 4).
 dir=$(make_case signals-first)
-mkdir -p "$dir/home/fixture/users/user-010" "$dir/tmp" "$dir/config"
+mkdir -p "$dir/home/config" "$dir/tmp" "$dir/config"
 printf 'kind=ship\nbackend=tmux\nwindow=fake:1\n' > "$dir/state/lane-a.meta"
 printf 'blocked [at=%s] [key=wait]: external condition until 2099-01-01T00:00Z\n' "$(date +%s)" > "$dir/state/lane-a.status"
 printf 'kind=ship\nbackend=tmux\nwindow=fake:2\n' > "$dir/state/lane-b.meta"
@@ -359,7 +359,7 @@ pass 'a due wait alert defers to a same-cycle signal and still surfaces next cyc
 # A declared pause rechecks at the pause cadence, never the owner-alert
 # threshold, and its episode survives pause-prose churn on the same key.
 dir=$(make_case paused-recheck)
-mkdir -p "$dir/home/fixture/users/user-010" "$dir/tmp" "$dir/config"
+mkdir -p "$dir/home/config" "$dir/tmp" "$dir/config"
 printf 'kind=ship\nbackend=tmux\nwindow=fake:1\n' > "$dir/state/lane.meta"
 printf 'paused: waiting on the pipeline run\n' > "$dir/state/lane.status"
 prime_status_seen "$dir/state" "$dir/state/lane.status"

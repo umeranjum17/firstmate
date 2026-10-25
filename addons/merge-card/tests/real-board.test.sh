@@ -9,7 +9,7 @@ here=$(cd "$(dirname "$0")" && pwd) || exit 1
 command -v sign-off-axi >/dev/null || { echo "skip - sign-off-axi is not on PATH"; exit 0; }
 work=$(mktemp -d /var/tmp/merge-card-real.XXXXXX) || exit 1
 trap 'rm -rf "$work"' EXIT
-mkdir -p "$work/bin" "$work/home/fixture/users/user-012/t" "$work/board"
+mkdir -p "$work/bin" "$work/home/data/t" "$work/board"
 cat > "$work/bin/gh" <<'STUB'
 #!/usr/bin/env bash
 case " $* " in *" --jq .headRefOid "*) printf '%s\n' "$GH_HEAD"; exit 0 ;; esac
@@ -23,9 +23,9 @@ pr=https://github.com/o/r/pull/12
 fails=0
 is() { if [ "$2" = "$3" ]; then echo "ok - $1"; else echo "not ok - $1: got [$2], want [$3]"; fails=$((fails + 1)); fi; }
 post_at() { # post_at <run-id> <head>: a sealed clean run at the head, then the real post
-  mkdir -p "$work/home/fixture/users/user-012/t/.done-done/runs"
-  jq -n --arg id "$1" --arg c "$2" '{schema:1,run_id:$id,commit:$c,dirty:false,exit:0,files:[{path:"a.log"}]}' > "$work/home/fixture/users/user-012/t/.done-done/runs/$1.json"
-  jq -n '{verdict:"pass",check:{claim:"a user sees one card",evidence:["x.png"]}}' > "$work/home/fixture/users/user-012/t/merge-card.json"
+  mkdir -p "$work/home/data/t/.done-done/runs"
+  jq -n --arg id "$1" --arg c "$2" '{schema:1,run_id:$id,commit:$c,dirty:false,exit:0,files:[{path:"a.log"}]}' > "$work/home/data/t/.done-done/runs/$1.json"
+  jq -n '{verdict:"pass",check:{claim:"a user sees one card",evidence:["x.png"]}}' > "$work/home/data/t/merge-card.json"
   "$here/../merge-card" post --board "$board" t - "$2" "$pr" 2>&1
 }
 h1=$(printf 'a%.0s' $(seq 40)) h2=$(printf 'b%.0s' $(seq 40))
@@ -57,8 +57,8 @@ is "sweep: a rerun archives nothing" "$("$here/../one-card-per-pr" --apply "$boa
 # A merge hook passes head `-` for a PR: the screen: none card still finds the run sealed at the PR head.
 h3=$(printf 'c%.0s' $(seq 40))
 pr=https://github.com/o/r/pull/13
-mkdir -p "$work/home/fixture/users/user-012/t/.done-done/runs"
-jq -n --arg c "$h3" '{schema:1,run_id:"20261022T000000Z-hookdash01",commit:$c,dirty:false,exit:0,files:[{path:"a.log"}]}' > "$work/home/fixture/users/user-012/t/.done-done/runs/20261022T000000Z-hookdash01.json"
+mkdir -p "$work/home/data/t/.done-done/runs"
+jq -n --arg c "$h3" '{schema:1,run_id:"20261022T000000Z-hookdash01",commit:$c,dirty:false,exit:0,files:[{path:"a.log"}]}' > "$work/home/data/t/.done-done/runs/20261022T000000Z-hookdash01.json"
 out=$(GH_HEAD=$h3 "$here/../merge-card" post --board "$board" t - - "$pr" 2>&1) || { echo "$out"; fails=$((fails + 1)); }
 is "hook head dash: the PR's card carries the run sealed at its head" "$(sign-off-axi list "$board" --json --full | jq -r '.decisions[] | select(.key == "merge-o-r-pull-13") | .evidence.run_id')" 20261022T000000Z-hookdash01
 [ "$fails" -eq 0 ] && echo "real-board: all assertions held" || { echo "real-board: $fails failed"; exit 1; }

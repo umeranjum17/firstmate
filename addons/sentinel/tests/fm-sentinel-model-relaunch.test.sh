@@ -3,8 +3,8 @@ set -eu
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 d=$(mktemp -d)
 trap 'rm -rf -- "$d"' EXIT
-mkdir -p "$d/home/fixture/users/user-017" "$d/home/fixture/users/user-009" "$d/stubs"
-cat >"$d/home/fixture/users/user-009/fm-backend.sh" <<'SH'
+mkdir -p "$d/home/state" "$d/home/bin" "$d/stubs"
+cat >"$d/home/bin/fm-backend.sh" <<'SH'
 fm_backend_source() { return 0; }
 fm_backend_of_meta() { sed -n 's/^backend=//p' "$1"; }
 fm_meta_get() { sed -n "s/^$2=//p" "$1" | head -n 1; }
@@ -19,27 +19,27 @@ fm_backend_herdr_cli() {
   fi
 }
 SH
-cat >"$d/home/fixture/users/user-009/fm-gate-refuse-lib.sh" <<'SH'
+cat >"$d/home/bin/fm-gate-refuse-lib.sh" <<'SH'
 fm_refuse_if_gate_agent() { return 0; }
 SH
-cat >"$d/home/fixture/users/user-009/fm-wake-lib.sh" <<'SH'
+cat >"$d/home/bin/fm-wake-lib.sh" <<'SH'
 fm_lock_try_acquire() { return 0; }
 fm_lock_release() { :; }
 SH
-: >"$d/home/fixture/users/user-009/fm-supervision-lib.sh"
-: >"$d/home/fixture/users/user-009/fm-operational-input.sh"
-: >"$d/home/fixture/users/user-009/fm-classify-lib.sh"
+: >"$d/home/bin/fm-supervision-lib.sh"
+: >"$d/home/bin/fm-operational-input.sh"
+: >"$d/home/bin/fm-classify-lib.sh"
 for cmd in fm-control.sh fm-secondmate-restart.sh; do
-  cat >"$d/home/fixture/users/user-009/$cmd" <<'SH'
+  cat >"$d/home/bin/$cmd" <<'SH'
 #!/usr/bin/env bash
 printf '%s %s %s\n' "$FM_HOME" "$(basename "$0")" "$*" >> "$RELAUNCH_LOG"
 [ "${1:-}" != bad ]
 SH
-  chmod +x "$d/home/fixture/users/user-009/$cmd"
+  chmod +x "$d/home/bin/$cmd"
 done
 for row in 'match:match' 'mismatch:mismatch' 'unmodeled:mismatch'; do
   IFS=: read -r id pane <<<"$row"
-  cat >"$d/home/fixture/users/user-017/$id.meta" <<EOF
+  cat >"$d/home/state/$id.meta" <<EOF
 harness=claude
 model=claude-sonnet-5-5
 kind=scout
@@ -47,14 +47,14 @@ backend=herdr
 herdr_session=default
 herdr_pane_id=$pane
 EOF
-  [ "$id" != unmodeled ] || sed -i '/^model=/d' "$d/home/fixture/users/user-017/$id.meta"
+  [ "$id" != unmodeled ] || sed -i '/^model=/d' "$d/home/state/$id.meta"
 done
 : > "$d/relaunch.log"
 OUT=$(PATH="$PATH" RELAUNCH_LOG="$d/relaunch.log" FM_HOME="$d/home" FM_SENTINEL_MODEL_EVENT=fixture-event \
   "$ROOT/sentinel/bin/fm-sentinel.sh" model-reconcile 2>&1) || :
 printf '%s\n' "$OUT" | grep -q '^unmodeled: stored model missing; model restore refused$'
 [ "$(wc -l < "$d/relaunch.log")" -eq 1 ]
-rm "$d/home/fixture/users/user-017/unmodeled.meta"
+rm "$d/home/state/unmodeled.meta"
 grep -q "$d/home fm-control.sh mismatch relaunch --model claude-sonnet-5-5" "$d/relaunch.log"
 PATH="$PATH" RELAUNCH_LOG="$d/relaunch.log" FM_HOME="$d/home" FM_SENTINEL_MODEL_EVENT=fixture-event \
   "$ROOT/sentinel/bin/fm-sentinel.sh" model-reconcile
@@ -63,7 +63,7 @@ printf 'PASS: main-home mismatch relaunches once per event\n'
 
 for home in lead-a lead-b parked; do
   mkdir -p "$d/$home/state"
-  cp -a "$d/home/fixture/users/user-009" "$d/$home/"
+  cp -a "$d/home/bin" "$d/$home/"
 done
 for row in 'lead-a:bad:failing' 'lead-b:good:mismatch' 'parked:parked-worker:mismatch'; do
   IFS=: read -r home id pane <<<"$row"
@@ -77,10 +77,10 @@ herdr_pane_id=$pane
 EOF
 done
 printf -- '- lead-a - Lead (home: %s; scope: work)\n- lead-b - Lead (home: %s; scope: work)\n- parked - Lead (home: %s; scope: work)\n- missing - Lead (home: %s; scope: work)\n' \
-  "$d/lead-a" "$d/lead-b" "$d/parked" "$d/missing" >"$d/home/fixture/users/user-013"
-mkdir -p "$d/home/fixture/users/user-012" "$d/home/fixture/users/user-010"
-mv "$d/home/fixture/users/user-013" "$d/home/fixture/users/user-012/secondmates.md"
-printf 'parked\n' >"$d/home/fixture/users/user-010/parked-homes"
+  "$d/lead-a" "$d/lead-b" "$d/parked" "$d/missing" >"$d/home/data-secondmates.md"
+mkdir -p "$d/home/data" "$d/home/config"
+mv "$d/home/data-secondmates.md" "$d/home/data/secondmates.md"
+printf 'parked\n' >"$d/home/config/parked-homes"
 if PATH="$PATH" RELAUNCH_LOG="$d/relaunch.log" FM_HOME="$d/home" FM_SENTINEL_MODEL_EVENT=lead-event \
   "$ROOT/sentinel/bin/fm-sentinel.sh" lead-model-reconcile; then
   echo 'expected failing lead relaunch to report failure' >&2; exit 1

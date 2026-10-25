@@ -11,7 +11,7 @@ evidence=${DONE_DONE_EVIDENCE_ROOT:?}
 FM_BIN=${FM_BIN:?set FM_BIN to a Firstmate checkout bin/}
 work=$(mktemp -d)
 trap 'rm -rf -- "$work"' EXIT
-mkdir -p "$evidence" "$work/home/fixture/users/user-010" "$work/home/fixture/users/user-017" "$work/cwd"
+mkdir -p "$evidence" "$work/home/config" "$work/home/state" "$work/cwd"
 export FM_HOME=$work/home SCRIPT_DIR=$FM_BIN
 bash "$repo/claude-accounts/install.sh" "$FM_HOME" >/dev/null
 summary() { # label: both accounts' windows from the file the reader wrote

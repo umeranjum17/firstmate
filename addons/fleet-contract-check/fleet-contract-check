@@ -15,7 +15,7 @@ trap 'rm -rf -- "$d"' EXIT
 mkdir -p "$d/home" "$d/fm/config" "$d/fm/data" "$d/fm/state" "$d/ev" "$d/stub" || exit 2
 
 # One throwaway environment for every caller; the real HOME and FM_HOME are never touched.
-sandbox() { HOME=$d/home FM_HOME=$d/fm FM_MAIN_HOME=$MAIN XDG_DATA_HOME=$d/home/fixture/users/user-004/share TMPDIR=$d "$@"; }
+sandbox() { HOME=$d/home FM_HOME=$d/fm FM_MAIN_HOME=$MAIN XDG_DATA_HOME=$d/home/.local/share TMPDIR=$d "$@"; }
 
 # fm-dispatch-resolve.sh validates the live rules before any network call; a stub curl keeps it offline.
 check_dispatch_resolve() {

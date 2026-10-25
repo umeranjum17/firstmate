@@ -10,7 +10,7 @@ evidence=${DONE_DONE_EVIDENCE_ROOT:?}
 tmp=$(mktemp -d)
 sock=lpm-live-$$
 trap 'tmux -L "$sock" kill-server 2>/dev/null || true; rm -rf -- "$tmp"' EXIT
-home=$tmp/home S=$tmp/home/fixture/users/user-017
+home=$tmp/home S=$tmp/home/state
 mkdir -p "$S" "$home/config" "$home/bin" "$tmp/pool/pa_most_room"
 export TMUX_SOCK=$sock FM_HOME=$home
 printf '#!/bin/sh\n' >"$home/bin/fm-check-register.sh"; chmod +x "$home/bin/fm-check-register.sh"

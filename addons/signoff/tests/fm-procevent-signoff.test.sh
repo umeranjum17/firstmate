@@ -242,7 +242,7 @@ beads_probe() {
   local base="$TMP_ROOT/beads-probe"
   mkdir -p "$base/home" && git init -q "$base/graph" || return 1
   (cd "$base/graph" && bd init) >/dev/null 2>&1 || return 1
-  printf 'backend = "beads"\n[beads]\npath = "%s/graph/.beads"\nbinary = "bd"\nprefix = "fm"\n' "$base" > "$base/home/fixture/users/user-008"
+  printf 'backend = "beads"\n[beads]\npath = "%s/graph/.beads"\nbinary = "bd"\nprefix = "fm"\n' "$base" > "$base/home/.tasks.toml"
   (cd "$base/home" && tasks-axi list) >/dev/null 2>&1
 }
 

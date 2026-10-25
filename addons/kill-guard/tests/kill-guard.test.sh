@@ -6,21 +6,21 @@ ADDON=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 T=$(mktemp -d); PIDS=()
 cleanup() { for p in "${PIDS[@]}"; do pkill -P "$p" 2>/dev/null || true; kill "$p" 2>/dev/null || true; done; rm -rf -- "$T"; }
 trap cleanup EXIT
-mkdir -p "$T/home/fixture/users/user-001" "$T/home/fixture/users/user-007/agent" "$T/home/fixture/users/user-003/opencode" "$T/bin"
-echo '{"env":{"KEEP":"1"},"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"other-hook"}]}]}}' > "$T/home/fixture/users/user-001/settings.json"
-mkdir -p "$T/pool1" "$T/home/fixture/users/user-005/plans"; echo '{"theme":"dark"}' > "$T/pool1/settings.json" # a pool account's CLAUDE_CONFIG_DIR
-jq -n --arg f "$T/pool1" '{accounts: [{provider: "claude", folder: $f}, {provider: "codex", folder: "/nonexistent"}]}' > "$T/home/fixture/users/user-005/plans/accounts-v1.json"
+mkdir -p "$T/home/.claude" "$T/home/.pi/agent" "$T/home/.config/opencode" "$T/bin"
+echo '{"env":{"KEEP":"1"},"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"other-hook"}]}]}}' > "$T/home/.claude/settings.json"
+mkdir -p "$T/pool1" "$T/home/.muxr/plans"; echo '{"theme":"dark"}' > "$T/pool1/settings.json" # a pool account's CLAUDE_CONFIG_DIR
+jq -n --arg f "$T/pool1" '{accounts: [{provider: "claude", folder: $f}, {provider: "codex", folder: "/nonexistent"}]}' > "$T/home/.muxr/plans/accounts-v1.json"
 fail=0; ok() { echo "ok: $*"; }; no() { echo "FAIL: $*"; fail=1; }
-inst() { env HOME="$T/home" XDG_DATA_HOME="$T/home/fixture/users/user-004/share" "$ADDON/install.sh"; }
+inst() { env HOME="$T/home" XDG_DATA_HOME="$T/home/.local/share" "$ADDON/install.sh"; }
 
 if [ "${1:-}" = --guard-only ]; then # no installer: exercise the rule and CLI from a disposable copy
-  mkdir -p "$T/home/fixture/users/user-004/share/fm-kill-guard"
-  cp "$ADDON/guard.mjs" "$T/home/fixture/users/user-004/share/fm-kill-guard/guard.mjs"
-  HOOK="node '$T/home/fixture/users/user-004/share/fm-kill-guard/guard.mjs' --caller \$PPID"
+  mkdir -p "$T/home/.local/share/fm-kill-guard"
+  cp "$ADDON/guard.mjs" "$T/home/.local/share/fm-kill-guard/guard.mjs"
+  HOOK="node '$T/home/.local/share/fm-kill-guard/guard.mjs' --caller \$PPID"
 else
 inst >/dev/null && inst > "$T/re.out" && [ "$(grep -c '^unchanged: ' "$T/re.out")" -eq 5 ] && ok "reinstall changes nothing" || no "reinstall not idempotent"
 jq -e '.theme == "dark" and ([.hooks.PreToolUse[].hooks[].command] | any(contains("fm-kill-guard")))' "$T/pool1/settings.json" >/dev/null && ok "pool account settings get the hook" || no "pool account settings"
-jq -e '([.hooks.PreToolUse[].hooks[].command] | index("other-hook") == 0) and .env.KEEP == "1"' "$T/home/fixture/users/user-001/settings.json" >/dev/null && ok "claude settings merged" || no "claude settings merge"
+jq -e '([.hooks.PreToolUse[].hooks[].command] | index("other-hook") == 0) and .env.KEEP == "1"' "$T/home/.claude/settings.json" >/dev/null && ok "claude settings merged" || no "claude settings merge"
 
 cat > "$T/adapters.mjs" <<'EOF'
 process.argv[1] = "/$bunfs/root/pi"; // the compiled pi binary's entry path, which is not on disk
@@ -28,13 +28,13 @@ const file = process.argv[2], hooks = {}, pi = file.endsWith(".ts"), mod = await
 if (pi) { mod.default({ on: (n, h) => (hooks[n] = h) }); console.log((await hooks.tool_call({ toolName: "bash", input: { command: "kill 1" } })).reason); }
 else { Object.assign(hooks, await mod.FmKillGuard({})); await hooks["tool.execute.before"]({ tool: "bash" }, { args: { command: "kill 1" } }).catch((e) => console.log(e.message)); }
 EOF
-for a in "pi:$T/home/fixture/users/user-007/agent/extensions/fm-kill-guard.ts" "opencode:$T/home/fixture/users/user-003/opencode/plugins/fm-kill-guard.js"; do
+for a in "pi:$T/home/.pi/agent/extensions/fm-kill-guard.ts" "opencode:$T/home/.config/opencode/plugins/fm-kill-guard.js"; do
   out=$(node "$T/adapters.mjs" "${a#*:}" 2>/dev/null || true); [[ "$out" == *"PID 1 (init)"* ]] && ok "${a%%:*} adapter blocks kill 1" || no "${a%%:*} adapter: $out"
 done
 if command -v pi >/dev/null; then # the real compiled pi, normal HOME: rpc mode loads extensions and exits at stdin EOF
-  timeout 60 pi -ne -e "$T/home/fixture/users/user-007/agent/extensions/fm-kill-guard.ts" --mode rpc </dev/null >/dev/null 2>"$T/pi.err" && ok "installed pi loads the extension" || no "pi: $(head -c 300 "$T/pi.err")"
+  timeout 60 pi -ne -e "$T/home/.pi/agent/extensions/fm-kill-guard.ts" --mode rpc </dev/null >/dev/null 2>"$T/pi.err" && ok "installed pi loads the extension" || no "pi: $(head -c 300 "$T/pi.err")"
 else echo "skip: pi not on PATH"; fi
-HOOK=$(jq -r '.hooks.PreToolUse[].hooks[] | select(.command | contains("fm-kill-guard")) | .command' "$T/home/fixture/users/user-001/settings.json")
+HOOK=$(jq -r '.hooks.PreToolUse[].hooks[] | select(.command | contains("fm-kill-guard")) | .command' "$T/home/.claude/settings.json")
 
 fi
 
@@ -48,7 +48,7 @@ sleep 300 & C=$!; (cd "$T" && exec sleep 300) & S=$!; PIDS+=("$C" "$S")
 
 hook() {
   jq -n --arg c "$2" '{tool_input:{command:$c}}' > "$T/in.json"
-  if err=$(HOME="$T/home" node "$T/home/fixture/users/user-004/share/fm-kill-guard/guard.mjs" --caller "$1" < "$T/in.json" 2>&1 >/dev/null); then rc=0; else rc=$?; fi
+  if err=$(HOME="$T/home" node "$T/home/.local/share/fm-kill-guard/guard.mjs" --caller "$1" < "$T/in.json" 2>&1 >/dev/null); then rc=0; else rc=$?; fi
 }
 block() { hook "$1" "$2"; [ "$rc" -eq 2 ] && [[ "$err" == *"BLOCKED by the fleet kill guard"* && "$err" == *"$3"* ]] && ok "blocked: $2" || no "not blocked: $2 (rc=$rc) $err"; }
 allow() { hook "$1" "$2"; [ "$rc" -eq 0 ] && ok "allowed: $2" || no "blocked: $2 ($err)"; }
@@ -101,7 +101,7 @@ PATH="$T/bin:$PATH" hook "$DEVICE_CALLER" 'adb -s fixture-device-001 shell sh -c
 [ "$rc" -eq 2 ] && ok "refused spoofed command text" || no "spoofed command text: $err"
 # own start through an adb that, like the real one, joins its shell arguments for the device shell (here the host).
 printf '#!/bin/sh\n[ "$1" = -s ] && shift 2; [ "$1" = shell ] && shift; exec sh -c "$*"\n' > "$T/bin/adb"
-(cd "$T/worktree" && PATH="$T/bin:$PATH" timeout 10 node "$T/home/fixture/users/user-004/share/fm-kill-guard/guard.mjs" own start fixture-device-001 -- sleep 300) && OWN=$(jq '.[-1].pid' "$T/worktree/.fm-kill-guard-device-pids.json") && PIDS+=("$OWN") \
+(cd "$T/worktree" && PATH="$T/bin:$PATH" timeout 10 node "$T/home/.local/share/fm-kill-guard/guard.mjs" own start fixture-device-001 -- sleep 300) && OWN=$(jq '.[-1].pid' "$T/worktree/.fm-kill-guard-device-pids.json") && PIDS+=("$OWN") \
   && [ "$(cat "/proc/$OWN/comm" 2>/dev/null)" = sleep ] && ok "own start records a running device process" || no "own start"
 PATH="$T/bin:$PATH" allow "$DEVICE_CALLER" "adb -s fixture-device-001 shell kill ${OWN:-0}"
 descends_from_test() { p=$1; while [ "$p" -gt 1 ]; do p=$(awk '{print $4}' "/proc/$p/stat" 2>/dev/null) || return 1; [ "$p" = "$$" ] && return 0; done; return 1; }
@@ -136,24 +136,24 @@ allow "$$" 'git commit -m "guard: kill 1; pkill herdr stay refused"'
 allow "$$" $'gh pr create --title t --body "$(cat <<\'EOF\'\nRefuses `kill 1` and $(kill 1)\nEOF\n)"'
 allow "$$" $'cat > stop.sh <<\'EOF\'\nkill 1\nEOF'
 
-printf 'not json' | node "$T/home/fixture/users/user-004/share/fm-kill-guard/guard.mjs" --caller "$$" 2> "$T/err" && rc=0 || rc=$?
+printf 'not json' | node "$T/home/.local/share/fm-kill-guard/guard.mjs" --caller "$$" 2> "$T/err" && rc=0 || rc=$?
 [ "$rc" -eq 2 ] && [[ "$(cat "$T/err")" == *"BLOCKED by the fleet kill guard"* ]] && ok "unparseable hook input blocks" || no "unparseable hook input allowed"
 
 hook "$$" 'kill 1'; sh -c "$HOOK" < "$T/in.json" 2>"$T/err" && rc=0 || rc=$?
 [ "$rc" -eq 2 ] && [[ "$(cat "$T/err")" == *"PID 1 (init)"* ]] && ok "installed hook blocks kill 1" || no "installed hook did not block kill 1"
-ln -s "$T/home/fixture/users/user-004/share" "$T/link"; jq -n '{tool_input:{command:"kill -9 1"}}' | node "$T/link/fm-kill-guard/guard.mjs" --caller "$$" 2> "$T/err" && rc=0 || rc=$?
+ln -s "$T/home/.local/share" "$T/link"; jq -n '{tool_input:{command:"kill -9 1"}}' | node "$T/link/fm-kill-guard/guard.mjs" --caller "$$" 2> "$T/err" && rc=0 || rc=$?
 [ "$rc" -eq 2 ] && [[ "$(cat "$T/err")" == *"PID 1 (init)"* ]] && ok "symlinked install blocks kill -9 1" || no "symlinked install allowed kill -9 1"
 
 if [ "${1:-}" = --guard-only ]; then
   [ "$fail" -eq 0 ] && { echo "kill-guard rule/CLI journey: all passed"; exit 0; } || exit 1
 fi
-un() { env HOME="$T/home" XDG_DATA_HOME="$T/home/fixture/users/user-004/share" "$ADDON/uninstall.sh" "$@"; }
-G=$T/home/fixture/users/user-004/share/fm-kill-guard; mkdir -p "$G/disabled"; cp "$T/home/fixture/users/user-007/agent/extensions/fm-kill-guard.ts" "$G/disabled/"
-cp "$T/home/fixture/users/user-001/settings.json" "$T/before.json"; un --dry-run >/dev/null
-cmp -s "$T/before.json" "$T/home/fixture/users/user-001/settings.json" && [ -e "$G/guard.mjs" ] && [ -e "$G/disabled/fm-kill-guard.ts" ] && ok "uninstall --dry-run writes nothing" || no "uninstall --dry-run wrote"
-un >/dev/null && set -- "$T"/home/fixture/users/user-001/settings.json.bak-kill-guard-* && jq -e '[.hooks.PreToolUse[].hooks[].command] == ["other-hook"] and .env.KEEP == "1"' "$T/home/fixture/users/user-001/settings.json" >/dev/null &&
+un() { env HOME="$T/home" XDG_DATA_HOME="$T/home/.local/share" "$ADDON/uninstall.sh" "$@"; }
+G=$T/home/.local/share/fm-kill-guard; mkdir -p "$G/disabled"; cp "$T/home/.pi/agent/extensions/fm-kill-guard.ts" "$G/disabled/"
+cp "$T/home/.claude/settings.json" "$T/before.json"; un --dry-run >/dev/null
+cmp -s "$T/before.json" "$T/home/.claude/settings.json" && [ -e "$G/guard.mjs" ] && [ -e "$G/disabled/fm-kill-guard.ts" ] && ok "uninstall --dry-run writes nothing" || no "uninstall --dry-run wrote"
+un >/dev/null && set -- "$T"/home/fixture/users/user-001/settings.json.bak-kill-guard-* && jq -e '[.hooks.PreToolUse[].hooks[].command] == ["other-hook"] and .env.KEEP == "1"' "$T/home/.claude/settings.json" >/dev/null &&
   cmp -s "$T/before.json" "${!#}" && ok "uninstall drops only the kill-guard hook, with a backup" || no "uninstall settings"
-[ ! -e "$G" ] && [ ! -e "$T/home/fixture/users/user-007/agent/extensions/fm-kill-guard.ts" ] && [ ! -e "$T/home/fixture/users/user-003/opencode/plugins/fm-kill-guard.js" ] && ok "uninstall removes the rule and adapters" || no "uninstall left files"
+[ ! -e "$G" ] && [ ! -e "$T/home/.pi/agent/extensions/fm-kill-guard.ts" ] && [ ! -e "$T/home/.config/opencode/plugins/fm-kill-guard.js" ] && ok "uninstall removes the rule and adapters" || no "uninstall left files"
 jq -e '.theme == "dark" and (has("hooks") | not)' "$T/pool1/settings.json" >/dev/null && ok "uninstall drops the pool account hook" || no "pool account uninstall"
 [ -z "$(un)" ] && ok "uninstall again changes nothing" || no "uninstall not idempotent"
 

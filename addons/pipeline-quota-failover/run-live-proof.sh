@@ -11,7 +11,7 @@ evidence=${DONE_DONE_EVIDENCE_ROOT:?}
 real_pi=${PI_QUOTA_FAILOVER_REAL_PI:-$(command -v pi)}
 work=$(mktemp -d)
 trap 'rm -rf -- "$work"' EXIT
-mkdir -p "$evidence" "$work/home/fixture/users/user-017" "$work/pool" "$work/cwd"
+mkdir -p "$evidence" "$work/home/state" "$work/pool" "$work/cwd"
 pick="$repo/claude-accounts/bin/claude-accounts-pick"
 printf 'command=%s\nstate=%s\n' "$pick" "$work/pool" >"$work/account-pool"
 # The controlled limit, as a real one looks to the pool: the first account a role's call lands on answers
@@ -42,7 +42,7 @@ fails=0 n=0
 for role in review test fix; do
   rm -rf "$work/pool/claude-accounts-rested" # each role starts with every account back, so each shows the move
   : >"$work/limited"
-  jq --argjson now "$(date +%s)" '.generated_at = $now | .accounts[].read_at = $now' "$work/home/fixture/users/user-017/claude-accounts.json" >"$READING"
+  jq --argjson now "$(date +%s)" '.generated_at = $now | .accounts[].read_at = $now' "$work/home/state/claude-accounts.json" >"$READING"
   case $role in
     review) prompt='You are the review step of a code pipeline. Review this one-line change: "- x = 1\n+ x = 2". Reply with exactly one line that starts with REVIEW-OK.' ;;
     test) prompt='You are the test step of a code pipeline. The tests printed "3 passed". Reply with exactly one line that starts with TEST-OK.' ;;

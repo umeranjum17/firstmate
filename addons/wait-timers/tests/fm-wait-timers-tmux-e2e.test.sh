@@ -23,7 +23,7 @@ trap cleanup EXIT
 mkdir -p "$world"/{state,data,config,home,tmp,fakebin,parent/state}
 printf '#!/usr/bin/env bash\nexec %q -L %q "$@"\n' "$TMUX_BIN" "$sock" > "$world/fakebin/tmux"
 chmod +x "$world/fakebin/tmux"
-export HOME="$world/home" XDG_CONFIG_HOME="$world/home/fixture/users/user-010" TMPDIR="$world/tmp"
+export HOME="$world/home" XDG_CONFIG_HOME="$world/home/config" TMPDIR="$world/tmp"
 export PATH="$world/fakebin:$PATH" FM_HOME="$world" FM_STATE_OVERRIDE="$world/state" FM_DATA_OVERRIDE="$world/data" FM_CONFIG_OVERRIDE="$world/config"
 export FM_ROOT_OVERRIDE="$world" FM_TMUX_SESSION=firstmate FM_SESSION=firstmate
 printf 'tmux\n' > "$world/config/backend"

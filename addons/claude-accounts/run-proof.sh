@@ -11,7 +11,7 @@ export FM_BIN=${FM_BIN:?set FM_BIN to a Firstmate checkout bin/}
 work=$(mktemp -d)
 pid=
 trap '[ -z "$pid" ] || kill "$pid" 2>/dev/null; rm -rf -- "$work"' EXIT
-mkdir -p "$evidence" "$work/home/fixture/users/user-017"
+mkdir -p "$evidence" "$work/home/state"
 export FM_HOME=$work/home
 
 bash "$repo/claude-accounts/tests/claude-accounts.test.sh" >"$evidence/test.txt" 2>&1

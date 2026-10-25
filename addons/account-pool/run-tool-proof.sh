@@ -5,7 +5,7 @@ repo=$(cd "$(dirname "$0")/.." && pwd)
 evidence=${DONE_DONE_EVIDENCE_ROOT:?}
 work=$(mktemp -d /var/tmp/pool-tool-proof.XXXXXX)
 trap 'rm -rf "$work"' EXIT
-mkdir -p "$work/home/fixture/users/user-010" "$work/profile" "$work/bin" "$work/dd"
+mkdir -p "$work/home/config" "$work/profile" "$work/bin" "$work/dd"
 export FM_HOME=$work/home DONE_DONE_HOME=$work/dd POOL_PROFILE=$work/profile
 export POOL_JUDGE_LOG=$evidence/judge-env.txt
 cat >"$work/bin/pick" <<'SH'

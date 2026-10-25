@@ -6,7 +6,7 @@ repo=$(cd "$(dirname "$0")/.." && pwd)
 evidence=${DONE_DONE_EVIDENCE_ROOT:?run under done-done}
 work=$(mktemp -d)
 trap 'rm -rf -- "$work"' EXIT
-mkdir -p "$work/bin" "$work/home/fixture/users/user-010" "$work/home/fixture/users/user-012/Umer" "$work/config" "$work/wt"
+mkdir -p "$work/bin" "$work/home/config" "$work/home/data/Umer" "$work/config" "$work/wt"
 export FM_HOME=$work/home DONE_DONE_HOME=$work/config
 export PATH="$work/bin:$PATH"
 cat >"$work/bin/pool" <<'POOL'

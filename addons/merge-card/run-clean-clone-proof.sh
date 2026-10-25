@@ -9,17 +9,17 @@ command -v jq >/dev/null || { echo 'jq is required' >&2; exit 1; }
 here=$(cd "$(dirname "$0")" && pwd)
 w=$DONE_DONE_EVIDENCE_ROOT/clean-clone
 rm -rf -- "$w"
-mkdir -p "$w/bin" "$w/home/fixture/users/user-012/demo" "$w/home/fixture/users/user-010"
+mkdir -p "$w/bin" "$w/home/data/demo" "$w/home/config"
 git init -q "$w/clone" && git -C "$w/clone" -c user.name=Umer -c user.email=umer@example.com commit -q --allow-empty -m init
 head=$(git -C "$w/clone" rev-parse HEAD)
-python3 -I - "$w/home/fixture/users/user-012/demo/shot.png" <<'PY'
+python3 -I - "$w/home/data/demo/shot.png" <<'PY'
 import struct, sys, zlib
 w, h = 320, 200
 rows = b"".join(b"\x00" + bytes((x * 255 // w, y * 255 // h, (x ^ y) & 255)[i % 3] for x in range(w) for i in range(3)) for y in range(h))
 chunk = lambda t, d: struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib.crc32(t + d))
 open(sys.argv[1], "wb").write(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b""))
 PY
-printf '## Checks\n\noutcome: A merge leaves the project clone clean\nrepro: n/a\nproof: no verify skill\nevidence: shot.png\n' >"$w/home/fixture/users/user-012/demo/checks.md"
+printf '## Checks\n\noutcome: A merge leaves the project clone clean\nrepro: n/a\nproof: no verify skill\nevidence: shot.png\n' >"$w/home/data/demo/checks.md"
 # done-done stub: passes the check; `signoff` files into --board, else the nearest .sign-off/ board (the post opt-in).
 cat >"$w/bin/done-done" <<'STUB'
 #!/usr/bin/env bash
@@ -43,7 +43,7 @@ cat >"$w/bin/pool-claude" <<'STUB'
 #!/usr/bin/env bash
 jq -n --arg f "$POOL_FOLDER" '{ok: true, id: "acct1", set: {CLAUDE_CONFIG_DIR: $f}, unset: ["ANTHROPIC_API_KEY"]}'
 STUB
-printf 'command=%s\nstate=%s\n' "$w/bin/pool-claude" "$w/pool" >"$w/home/fixture/users/user-010/account-pool"
+printf 'command=%s\nstate=%s\n' "$w/bin/pool-claude" "$w/pool" >"$w/home/config/account-pool"
 chmod +x "$w/bin/done-done" "$w/bin/pool-claude"
 export POOL_FOLDER=$w/pool/profile
 export PATH="$w/bin:$PATH" FM_HOME="$w/home"

@@ -119,18 +119,18 @@ cand() { fm_receipts_pr_candidate "$w" "$1" direct-PR "$st/t.meta" "$2"; }
 cand https://github.com/o/other/pull/4 "$sha" >/dev/null || { echo "FAIL: hook must exit 0" >&2; exit 1; }
 hook_run() {  # <name> <pr-url> <want-candidate>
   local hd=$d/hook-$1 got
-  mkdir -p "$hd/home/fixture/users/user-017" "$hd/home/fixture/users/user-012" "$hd/home/fixture/users/user-010" "$hd/wt" "$hd/addons/receipts/bin" "$hd/fakebin" "$hd/guardroot/bin"
+  mkdir -p "$hd/home/state" "$hd/home/data" "$hd/home/config" "$hd/wt" "$hd/addons/receipts/bin" "$hd/fakebin" "$hd/guardroot/bin"
   git -C "$hd/wt" init -q; git -C "$hd/wt" -c user.name=t -c user.email=t@t commit -q --allow-empty -m init
   git -C "$hd/wt" remote add origin https://github.com/o/r.git
   git -C "$hd/wt" update-ref refs/remotes/origin/main "$(git -C "$hd/wt" rev-parse HEAD)"
-  printf 'window=fm:t\nendpoint_task_id=task-a\nworktree=%s\nproject=%s\nkind=ship\nmode=direct-PR\n' "$hd/wt" "$hd/project" > "$hd/home/fixture/users/user-017/task-a.meta"
+  printf 'window=fm:t\nendpoint_task_id=task-a\nworktree=%s\nproject=%s\nkind=ship\nmode=direct-PR\n' "$hd/wt" "$hd/project" > "$hd/home/state/task-a.meta"
   { cat "$addons/receipts/bin/fm-receipts-lib.sh"
     # shellcheck disable=SC2016 # stub body expands when the gate runs
     echo 'fm_receipts_accept_done() { printf "%s" "${7:-}" > "$GATE_LOG"; }'; } > "$hd/addons/receipts/bin/fm-receipts-lib.sh"
   printf '#!/usr/bin/env bash\nexit 0\n' > "$hd/guardroot/bin/fm-guard.sh"
   printf '#!/usr/bin/env bash\ncase " $* " in *" --json isDraft "*) echo "{\\"isDraft\\":false}" ;; *headRefOid*) echo %s ;; esac\n' "$sha" > "$hd/fakebin/gh"
   chmod +x "$hd/guardroot/bin/fm-guard.sh" "$hd/fakebin/gh"
-  FM_ROOT_OVERRIDE=$hd/guardroot FM_HOME=$hd/home FM_STATE_OVERRIDE=$hd/home/fixture/users/user-017 FM_ADDONS_DIR=$hd/addons GATE_LOG=$hd/gate PATH=$hd/fakebin:$PATH \
+  FM_ROOT_OVERRIDE=$hd/guardroot FM_HOME=$hd/home FM_STATE_OVERRIDE=$hd/home/state FM_ADDONS_DIR=$hd/addons GATE_LOG=$hd/gate PATH=$hd/fakebin:$PATH \
     "$d/fork/bin/fm-pr-check.sh" task-a "$2" >"$hd/out" 2>"$hd/err" \
     || { echo "FAIL: fm-pr-check with add-on hook ($1): $(cat "$hd/err")" >&2; exit 1; }
   got=$(cat "$hd/gate")
