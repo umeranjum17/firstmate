@@ -171,6 +171,9 @@ jobs:
       # Fixture registry and readings only: no network, no login copy, no real model CLI.
       - name: Model pool helper test
         run: bash account-pool/tests/model-pool.test.sh
+      # Fixture pool readings and stub upstream quota-axi: Claude row follows fm-model-pool.
+      - name: Quota-axi pool test
+        run: bash quota-axi-pool/tests/quota-axi-pool.test.sh
       # Fixture muxr registry and a stub quota-axi: nothing real is touched.
       - name: Claude accounts test
         run: bash claude-accounts/tests/claude-accounts.test.sh
