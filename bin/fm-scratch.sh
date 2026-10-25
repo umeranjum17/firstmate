@@ -10,8 +10,9 @@
 # A path is accepted only when it is absolute, free of glob characters and
 # "."/".." components, a real directory (not a symlink), owned by this user, at
 # least two components deep, and neither $HOME, an ancestor of $HOME, nor a
-# direct child of $HOME. register refuses anything else; list drops anything
-# else with a warning, so a hand-edited record cannot widen a delete.
+# direct child of $HOME. register refuses anything else; list warns and skips
+# unsafe paths and silently skips missing paths. Inspection or record-read
+# failures fail the whole listing so teardown cannot act on a partial result.
 # The firstmate home, repository, state and data directories, their ancestors
 # and descendants are ineligible. bin/fm-teardown.sh owns the removal itself.
 set -u

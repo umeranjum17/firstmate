@@ -46,6 +46,9 @@
 # that record before destructive cleanup, so it never publishes or acts on a close
 # replay would reject. The validator pins the data path to this home's configured
 # root before any recovery mutation, then re-runs exactly that close.
+# While matching task metadata still exists, a scratch registry (including a
+# symlink) or data/<id>/ directory blocks replay before metadata removal: rerun
+# teardown to finish process and scratch cleanup instead of losing ownership.
 # `tasks-axi done` on an already-closed task backfills links
 # without moving the close date, so replay is idempotent. Spawn needs no marker:
 # it publishes the meta first, so a crash
