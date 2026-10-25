@@ -2,6 +2,10 @@ app: firstmate-addons
 journeys:
   merge-card-pool-fallback:
     command: bash merge-card/run-proof.sh
+  readme-hero:
+    command: bash docs/capture-lookout-hero.sh
+  readme-render:
+    command: bash docs/run-proof.sh
   owner-rules-hierarchy:
     command: bash owner-rules/run-hierarchy-proof.sh
   owner-rules-publication:
