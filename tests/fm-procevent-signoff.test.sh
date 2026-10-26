@@ -25,9 +25,7 @@ mkdir -p "$ROOTCOPY"
 cp -R "$ROOT/bin" "$ROOTCOPY/bin"
 
 FAKEBIN="$TMP_ROOT/fakebin"
-# This suite tests this repository's own bin/fm-procevent-signoff.sh, so it pins the add-on directory to an
-# empty one: fm-captain-hold.sh prefers the signoff add-on when the lookup finds one, and this checkout now
-# ships that add-on. The add-on copy has its own suite under addons/signoff/tests/.
+# Subject is this repo's own adapter: fm-captain-hold prefers the signoff add-on, which this checkout ships.
 FM_ADDONS_DIR="$TMP_ROOT/no-addons"
 mkdir -p "$FM_ADDONS_DIR"
 export FM_ADDONS_DIR
