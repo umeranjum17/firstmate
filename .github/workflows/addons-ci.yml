@@ -144,6 +144,10 @@ jobs:
       - name: Model gate test
         run: bash model-gate/tests/model-gate.test.sh
       # Fixture origin, shared clone, lane worktree and a throwaway HOME and home: nothing real is touched.
+      # Throwaway home, HOME and XDG paths, and the fixture's own git configuration: the two add-on pairs
+      # that share a hook file install three times over and must settle instead of refusing.
+      - name: Install-all re-install journey
+        run: bash tests/install-all.test.sh
       - name: Git identity test
         run: bash git-identity/tests/git-identity.test.sh
       # Fixture origin, clone, lane worktree and a throwaway HOME, home and patterns file: nothing real is touched.

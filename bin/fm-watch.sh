@@ -259,9 +259,13 @@ WATCH_HOME_EXISTED=0
 . "$SCRIPT_DIR/fm-busy-lib.sh"
 # shellcheck source=bin/fm-watch-progress-lib.sh
 . "$SCRIPT_DIR/fm-watch-progress-lib.sh"
+# Where this checkout's add-ons live (in-repo addons/ first, then the pre-fold clone).
+# shellcheck source=bin/fm-addons-dir-lib.sh
+. "$SCRIPT_DIR/fm-addons-dir-lib.sh"
 # Optional alerts add-on: defines fm_model_outage_tick.
+_fm_alerts_lib=$(fm_addon_path "$FM_HOME" alerts/bin/fm-model-outage-lib.sh)
 # shellcheck source=/dev/null
-[ ! -r "${FM_ADDONS_DIR:-$FM_HOME/projects/firstmate-addons}/alerts/bin/fm-model-outage-lib.sh" ] || . "${FM_ADDONS_DIR:-$FM_HOME/projects/firstmate-addons}/alerts/bin/fm-model-outage-lib.sh"
+[ ! -r "$_fm_alerts_lib" ] || . "$_fm_alerts_lib"
 # Parked-home reader (firstmate-addons/parked-homes): the shared predicate
 # every parked-home guard in the watcher calls. The shim answers not parked
 # when the add-on is absent (stock behavior).
@@ -286,10 +290,11 @@ WATCH_HOME_EXISTED=0
 # supervision recovers a positively dead or missing mate through the identical
 # guarded path. The watcher contributes only the cadence, the relaunch bound,
 # and wake emission (secondmate_liveness_tick below).
+_fm_wait_timers_lib=$(fm_addon_path "$FM_HOME" wait-timers/bin/fm-wait-timers-lib.sh)
 # shellcheck source=/dev/null # Analyzed separately as a canonical lint root.
 . "$SCRIPT_DIR/fm-secondmate-liveness-lib.sh"
 # shellcheck source=/dev/null # Canonical lint root with its own parent-channel graph.
-[ ! -r "${FM_ADDONS_DIR:-$FM_HOME/projects/firstmate-addons}/wait-timers/bin/fm-wait-timers-lib.sh" ] || . "${FM_ADDONS_DIR:-$FM_HOME/projects/firstmate-addons}/wait-timers/bin/fm-wait-timers-lib.sh"
+[ ! -r "$_fm_wait_timers_lib" ] || . "$_fm_wait_timers_lib"
 
 WATCH_LOCK="$STATE/.watch.lock"
 WATCH_PATH="$SCRIPT_DIR/fm-watch.sh"
@@ -1176,7 +1181,7 @@ EOF
 # budget. The per-mate liveness lock serializes this tick against a concurrent
 # session-start sweep, so neither side can kill or re-probe an endpoint the
 # other is mid-relaunch on.
-fm_host_memory_lib="${FM_ADDONS_DIR:-$FM_HOME/projects/firstmate-addons}/host-memory/bin/fm-host-memory-lib.sh"
+fm_host_memory_lib=$(fm_addon_path "$FM_HOME" host-memory/bin/fm-host-memory-lib.sh)
 # shellcheck disable=SC1090,SC1091 # The optional add-on source is installed outside this repository.
 if [ -f "$fm_host_memory_lib" ]; then . "$fm_host_memory_lib"; fi
 
@@ -2794,11 +2799,12 @@ record_ready_work_surfaced() {
   printf '%s\t%s\n' "$now" "$READY_WORK_IDS" > "$STATE/.ready-work-surfaced"
 }
 
-# Thin hook for the firstmate-addons ask-default add-on, which owns every
+# Thin hook for the ask-default add-on, which owns every
 # decision: for each ask it recorded that has not been defaulted yet, run
 # `ask-default decide` and let it apply the ask's safe default when the captain
 # is unreachable and the ask's clock has run out. Located like the other add-on
-# shims (FM_ADDONS_DIR, default $FM_HOME/projects/firstmate-addons); with the
+# shims (FM_ADDONS_DIR, else the in-repo addons/, else the pre-fold clone at
+# $FM_HOME/projects/firstmate-addons); with the
 # add-on absent this returns at once, writing nothing, and the loop is unchanged.
 # Runs once per CHECK_INTERVAL. The probe reads the away record: the captain is
 # reachable unless an away record (never quiet mode's) exists. Held, waiting, and
@@ -2806,7 +2812,7 @@ record_ready_work_surfaced() {
 # Sets ASK_DEFAULT_REASON and returns 0 when at least one ask was just defaulted.
 ask_default_tick() {
   local tool rec id out rc ids='' probe
-  tool="${FM_ADDONS_DIR:-$FM_HOME/projects/firstmate-addons}/ask-default/ask-default"
+  tool=$(fm_addon_path "$FM_HOME" ask-default/ask-default)
   [ -x "$tool" ] || return 1
   [ "$(age_of "$STATE/.last-ask-default-check")" -ge "$CHECK_INTERVAL" ] || return 1
   touch "$STATE/.last-ask-default-check"

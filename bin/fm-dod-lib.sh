@@ -119,6 +119,8 @@
 # It takes the same optional trailing forge argument, because the rule that keeps
 # a worker off a remote is exactly the rule that changes when the forge does.
 
+# shellcheck source=bin/fm-addons-dir-lib.sh
+. "$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-addons-dir-lib.sh"
 # shellcheck source=bin/fm-pr-lib.sh
 . "$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-pr-lib.sh"
 # shellcheck source=bin/fm-classify-lib.sh
@@ -131,11 +133,12 @@
 . "$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-timeout-lib.sh"
 
 # Optional merge-card add-on: defines fm_dod_merge_gate and fm_merge_post_hook.
+_fm_dod_addons=$(fm_addons_dir "${FM_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}")
 # shellcheck source=/dev/null
-[ ! -r "${FM_ADDONS_DIR:-${FM_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/projects/firstmate-addons}/merge-card/bin/fm-merge-hooks-lib.sh" ] || . "${FM_ADDONS_DIR:-${FM_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/projects/firstmate-addons}/merge-card/bin/fm-merge-hooks-lib.sh"
+[ ! -r "$_fm_dod_addons/merge-card/bin/fm-merge-hooks-lib.sh" ] || . "$_fm_dod_addons/merge-card/bin/fm-merge-hooks-lib.sh"
 # Optional receipts add-on: defines fm_dod_receipt_accept and the fm_receipts_* helpers.
 # shellcheck source=/dev/null
-[ ! -r "${FM_ADDONS_DIR:-${FM_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/projects/firstmate-addons}/receipts/bin/fm-receipts-lib.sh" ] || . "${FM_ADDONS_DIR:-${FM_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/projects/firstmate-addons}/receipts/bin/fm-receipts-lib.sh"
+[ ! -r "$_fm_dod_addons/receipts/bin/fm-receipts-lib.sh" ] || . "$_fm_dod_addons/receipts/bin/fm-receipts-lib.sh"
 
 fm_brief_worker_role() {  # <state-dir> <task-id> <code-root>
   local state=$1 task_id=$2 root=$3

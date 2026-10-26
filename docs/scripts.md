@@ -100,6 +100,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-procevent-when.sh`   | Fire a trust-bound deterministic action at most once when its registered condition holds, then wake with the outcome |
 | `fm-procevent-signoff.sh` | Bring sign-off board answers to captain holds as keyed answers, and raise a board card for each new hold once a home arms it (the signoff add-on raises it instead when installed) |
 | `fm-gate-refuse-lib.sh`  | Shared gate-context lifecycle boundary for real and lab homes                      |
+| `fm-addons-dir-lib.sh`   | Single owner of add-on resolution: `FM_ADDONS_DIR`, else the in-repo `addons/`, else the pre-fold `projects/firstmate-addons` clone |
 | `fm-watch-arm.sh`        | Verified home-scoped watcher arm wrapper with loud cycle endings and bounded lifecycle ledger |
 | `fm-watch-checkpoint.sh` | Run one bounded foreground watcher checkpoint for Codex-style supervision            |
 | `fm-watch.sh`            | Singleton-safe watcher: absorb benign wakes, detect stalled local-secondmate wake queues, hand recorded asks to the ask-default add-on when installed, and exit on actionable ones |

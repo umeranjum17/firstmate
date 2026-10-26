@@ -51,7 +51,7 @@ Each job names one starting add-on.
 bash addons/host-memory/install.sh
 ```
 
-Every add-on with an installer at once, from `addons/`: `bash install-all.sh [--dry-run] "$FM_HOME"`.
+Every add-on with an installer at once, from `addons/`: `bash install-all.sh [--dry-run] "$FM_HOME"`; running it again over the same home succeeds and changes nothing.
 The [reference](docs/addons-reference.md#install) owns that entry point.
 
 **Keep work moving** — [Stall alerts](docs/addons-reference.md#fleet-stall); also quota recovery and account routing.

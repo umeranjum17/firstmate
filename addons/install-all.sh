@@ -7,10 +7,11 @@
 # the argument shape it documents, and names the add-ons that have no installer instead of inventing one. An add-on
 # without an installer is a dormant copy, a fork-hook seam, or a hand-wired one, and its setup lives in its own README.
 # --dry-run reaches every installer that supports it; one that does not is printed as a would-run line and not run.
-# Nothing here writes the home's files itself, so a rerun is a rerun of each installer's idempotent install. Two add-ons
-# share one home file (`git-identity` and `pane-titles` own `config/launch-env-hook`; `owner-rules` and `owner-guard` own
-# `config/merge-gate`), and the one that chains the other is installed last: an installer that refuses to re-chain a
-# foreign hook says so and this script names it, rather than pretending the rerun was clean.
+# Nothing here writes the home's files itself, so a rerun is a rerun of each installer's idempotent install, and a rerun
+# that lands the same wiring exits 0. Two add-ons share one home file (`git-identity` and `pane-titles` own
+# `config/launch-env-hook`; `owner-rules` and `owner-guard` own `config/merge-gate`), so each of them keeps a chain that
+# already runs it instead of refusing the other side's re-chain; an installer that still refuses says so here by name,
+# rather than this script pretending the rerun was clean.
 set -uo pipefail
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 
@@ -148,7 +149,7 @@ printf '\n== no installer to run (setup lives in the add-on):'
 missing=0
 for dir in "$here"/*/; do
   name=$(basename "$dir")
-  case $name in docs | .agents | .github) continue ;; esac
+  case $name in docs | .agents | .github | tests) continue ;; esac
   [ -f "$dir/install.sh" ] && continue
   printf ' %s' "$name"
   missing=$((missing + 1))
