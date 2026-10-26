@@ -6,7 +6,7 @@
 # old path must not exec a shell.
 set -u
 _jg_alias_dir=$(dirname "${BASH_SOURCE[0]}")
-_jg_alias_new="$_jg_alias_dir/jg-secondmate-restart.sh"
+_jg_alias_new="$_jg_alias_dir/jg-squad-lead-restart.sh"
 if [ "${BASH_SOURCE[0]}" != "$0" ]; then
   . "$_jg_alias_new"
 else
