@@ -2,6 +2,8 @@
 # The add-on lookup chain in bin/fm-addons-dir-lib.sh: FM_ADDONS_DIR, then the in-repo addons/, then
 # the pre-fold clone at <home>/projects/firstmate-addons. A live home has to keep working before,
 # during and after the move, so both orders are proved through a real consumer, not just resolved.
+# shellcheck disable=SC2030,SC2031 # Every case resolves the add-ons directory inside a deliberate subshell, so the
+# caller's own environment (and any ambient FM_ADDONS_DIR) stays clean between cases.
 set -eu
 
 # shellcheck source=tests/lib.sh
