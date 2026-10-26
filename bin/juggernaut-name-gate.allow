@@ -435,3 +435,5 @@ bin/fm-pin-lib.sh  # alias for bin/jg-pin-lib.sh; called by live homes, panes an
 bin/fm-tool-wiring.sh  # alias for bin/jg-tool-wiring.sh; called by live homes, panes and per-lane records
 addons/quota-axi-pool/tests/quota-axi-pool-recursion.test.sh  # inline FM_ alias (slice S4); deleted by slice S10
 tests/jg-tool-wiring.test.sh  # inline FM_ alias (slice S4); deleted by slice S10
+bin/fm-ci-required.sh  # alias for bin/jg-ci-required.sh; called by live homes, panes and per-lane records
+bin/fm-ci-scope.sh  # alias for bin/jg-ci-scope.sh; called by live homes, panes and per-lane records

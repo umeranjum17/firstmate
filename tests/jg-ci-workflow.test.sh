@@ -177,17 +177,18 @@ puts [interpolate.call(concurrency.fetch("group")),
 # Print, one per line in workflow order, the jobs whose job-level `if`
 # resolves true under one simulated event and fork variable setting; an unset
 # repository variable reads as the empty string, as GitHub documents.
-jobs_running_under() {  # <event> <JG_CI_SKIP_PUSH> <JG_CI_SKIP_MACOS>
+jobs_running_under() {  # <event> <JG_CI_SKIP_PUSH> <JG_CI_SKIP_MACOS> <behavior>
   ruby -ryaml -e "$EXPRESSION_RUBY" -e '
 context = {
   "github.event_name" => ARGV[1],
   "vars.JG_CI_SKIP_PUSH" => ARGV[2],
   "vars.JG_CI_SKIP_MACOS" => ARGV[3],
+  "needs.invariants.outputs.behavior" => ARGV[4],
 }
 YAML.load_file(ARGV[0]).fetch("jobs").each do |name, job|
   puts name if Expression.condition(job["if"], context)
 end
-' "$CI_WORKFLOW" "$1" "$2" "$3"
+' "$CI_WORKFLOW" "$1" "$2" "$3" "$4"
 }
 
 job_timeout() {
@@ -199,8 +200,8 @@ puts YAML.load_file(ARGV[0]).fetch("jobs").fetch(ARGV[1]).fetch("timeout-minutes
 # Tier membership is the executable inventory of the timeout policy: a new job
 # must join a tier, and a job-level value outside these tiers is exactly the
 # one-off number the policy removed.
-FAST_TIER_JOBS='test-coverage invariants tests-timing-aggregate'
-NORMAL_TIER_JOBS='lint tests-portable-parallel-1 tests-portable-parallel-2 tests-portable-serial macos-stock-bash'
+FAST_TIER_JOBS='invariants'
+NORMAL_TIER_JOBS='lint required tests-portable-parallel-1 tests-portable-parallel-2 tests-portable-serial macos-stock-bash'
 HEAVY_TIER_JOBS='tests-herdr'
 
 # Print the one timeout every listed job shares; fail on any disagreement.
@@ -349,64 +350,122 @@ puts steps[index].fetch("timeout-minutes", "none")
 # events, JG_CI_SKIP_PUSH=1 empties only the push run, and JG_CI_SKIP_MACOS=1
 # removes only the macOS job. A "-" in the table means the variable is unset.
 test_fork_skip_variables_are_opt_in() {
-  local all event skip_push skip_macos expected want actual
+  local all event skip_push skip_macos behavior expected want actual
   all=$(workflow_jobs) || fail "could not list ci.yml jobs"
   printf '%s\n' "$all" | grep -qx macos-stock-bash \
     || fail "the macOS job is missing from ci.yml, so the table below would prove nothing"
-  while read -r event skip_push skip_macos expected; do
+  while read -r event skip_push skip_macos behavior expected; do
     [ "$skip_push" != - ] || skip_push=
     [ "$skip_macos" != - ] || skip_macos=
+    [ "$behavior" != - ] || behavior=
     case $expected in
       all) want=$all ;;
       none) want= ;;
       all-but-macos) want=$(printf '%s\n' "$all" | grep -vx macos-stock-bash) ;;
+      invariants-only) want=$(printf '%s\n' "$all" | grep -vx -e lint -e tests-portable-parallel-1 -e tests-portable-parallel-2 -e tests-portable-serial -e tests-herdr -e macos-stock-bash) ;;
       *) fail "unknown expectation $expected" ;;
     esac
-    actual=$(jobs_running_under "$event" "$skip_push" "$skip_macos") \
-      || fail "could not resolve the job conditions for $event JG_CI_SKIP_PUSH=$skip_push JG_CI_SKIP_MACOS=$skip_macos"
+    actual=$(jobs_running_under "$event" "$skip_push" "$skip_macos" "$behavior") \
+      || fail "could not resolve the job conditions for $event JG_CI_SKIP_PUSH=$skip_push JG_CI_SKIP_MACOS=$skip_macos behavior=$behavior"
     [ "$actual" = "$want" ] \
-      || fail "$event with JG_CI_SKIP_PUSH=$skip_push JG_CI_SKIP_MACOS=$skip_macos must run $expected jobs"$'\n'"ran: $(printf '%s' "$actual" | tr '\n' ' ')"$'\n'"wanted: $(printf '%s' "$want" | tr '\n' ' ')"
+      || fail "$event with JG_CI_SKIP_PUSH=$skip_push JG_CI_SKIP_MACOS=$skip_macos behavior=$behavior must run $expected jobs"$'\n'"ran: $(printf '%s' "$actual" | tr '\n' ' ')"$'\n'"wanted: $(printf '%s' "$want" | tr '\n' ' ')"
   done <<'TABLE'
-push         - - all
-pull_request - - all
-push         1 - none
-pull_request 1 - all
-pull_request - 1 all-but-macos
-push         - 1 all-but-macos
+push         - - true all
+pull_request - - true all
+push         1 - true none
+pull_request 1 - true all
+pull_request - 1 true all-but-macos
+push         - 1 true all-but-macos
+pull_request - - false invariants-only
+pull_request - 1 false invariants-only
 TABLE
   pass "the fork skip variables change nothing unless set, and each skips only its own run or job"
 }
 
 # Print true or false: whether one job's job-level `if` resolves true under
 # one simulated event, fork variable setting, and outcome of its needed jobs.
-job_runs_under() {  # <job> <event> <JG_CI_SKIP_PUSH> <JG_CI_SKIP_MACOS> <needs status>
+job_runs_under() {  # <job> <event> <JG_CI_SKIP_PUSH> <JG_CI_SKIP_MACOS> <needs status> <behavior>
   ruby -ryaml -e "$EXPRESSION_RUBY" -e '
 context = {
   "github.event_name" => ARGV[2],
   "vars.JG_CI_SKIP_PUSH" => ARGV[3],
   "vars.JG_CI_SKIP_MACOS" => ARGV[4],
   "needs.status" => ARGV[5],
+  "needs.invariants.outputs.behavior" => ARGV[6],
 }
 puts Expression.condition(YAML.load_file(ARGV[0]).fetch("jobs").fetch(ARGV[1])["if"], context)
 ' "$CI_WORKFLOW" "$@"
 }
 
-# The aggregate must keep running after a failed lane so its timing summary
-# still lands, while the push skip still removes it from a skipped push run.
-test_timing_aggregate_still_runs_after_a_failed_lane() {
+# The gate must keep running after a failed lane so its verdict and timing
+# evidence still land, while the push skip still removes it from a skipped run.
+test_required_check_still_runs_after_a_failed_lane() {
   local event skip_push expected actual
   while read -r event skip_push expected; do
     [ "$skip_push" != - ] || skip_push=
-    actual=$(job_runs_under tests-timing-aggregate "$event" "$skip_push" '' failure) \
-      || fail "could not resolve the aggregate condition for $event JG_CI_SKIP_PUSH=$skip_push"
+    actual=$(job_runs_under required "$event" "$skip_push" '' failure true) \
+      || fail "could not resolve the gate condition for $event JG_CI_SKIP_PUSH=$skip_push"
     [ "$actual" = "$expected" ] \
-      || fail "after a failed lane, the aggregate on $event with JG_CI_SKIP_PUSH=$skip_push must resolve $expected, got $actual"
+      || fail "after a failed lane, the gate on $event with JG_CI_SKIP_PUSH=$skip_push must resolve $expected, got $actual"
   done <<'TABLE'
 pull_request - true
 push         - true
 push         1 false
 TABLE
-  pass "the timing aggregate still runs after a failed lane unless the push run is skipped"
+  pass "the gate still reports after a failed lane unless the push run is skipped"
+}
+
+# The gate must refuse a lane a behavior change needed but that never ran.
+test_required_check_refuses_a_lane_the_change_needed() {
+  local needs
+  needs='{"invariants":{"result":"success"},"lint":{"result":"success"},"tests-portable-parallel-1":{"result":"success"},"tests-portable-parallel-2":{"result":"success"},"tests-portable-serial":{"result":"success"},"tests-herdr":{"result":"success"},"macos-stock-bash":{"result":"success"}}'
+  JG_CI_NEEDS="$needs" JG_CI_BEHAVIOR=true "$ROOT/bin/jg-ci-required.sh" >/dev/null \
+    || fail "the gate refused a behavior change whose every lane passed"
+  needs='{"invariants":{"result":"success"},"lint":{"result":"success"},"tests-portable-parallel-1":{"result":"success"},"tests-portable-parallel-2":{"result":"success"},"tests-portable-serial":{"result":"skipped"},"tests-herdr":{"result":"success"},"macos-stock-bash":{"result":"success"}}'
+  JG_CI_NEEDS="$needs" JG_CI_BEHAVIOR=true "$ROOT/bin/jg-ci-required.sh" >/dev/null 2>&1 \
+    && fail "the gate passed a behavior change whose serial lane never ran"
+  needs='{"invariants":{"result":"failure"},"lint":{"result":"skipped"},"tests-portable-parallel-1":{"result":"skipped"},"tests-portable-parallel-2":{"result":"skipped"},"tests-portable-serial":{"result":"skipped"},"tests-herdr":{"result":"skipped"},"macos-stock-bash":{"result":"skipped"}}'
+  JG_CI_NEEDS="$needs" JG_CI_BEHAVIOR='' "$ROOT/bin/jg-ci-required.sh" >/dev/null 2>&1 \
+    && fail "the gate passed a run whose scope job failed"
+  needs='{"invariants":{"result":"success"},"lint":{"result":"skipped"},"tests-portable-parallel-1":{"result":"skipped"},"tests-portable-parallel-2":{"result":"skipped"},"tests-portable-serial":{"result":"skipped"},"tests-herdr":{"result":"skipped"},"macos-stock-bash":{"result":"skipped"}}'
+  JG_CI_NEEDS="$needs" JG_CI_BEHAVIOR=false "$ROOT/bin/jg-ci-required.sh" >/dev/null \
+    || fail "the gate refused a documentation change that deliberately skipped every behavior lane"
+  needs='{"invariants":{"result":"success"},"lint":{"result":"success"},"tests-portable-parallel-1":{"result":"success"},"tests-portable-parallel-2":{"result":"success"},"tests-portable-serial":{"result":"success"},"tests-herdr":{"result":"success"},"macos-stock-bash":{"result":"skipped"}}'
+  JG_CI_NEEDS="$needs" JG_CI_BEHAVIOR=true "$ROOT/bin/jg-ci-required.sh" >/dev/null 2>&1 \
+    && fail "the gate passed a behavior change whose macOS lane was skipped without the fork opt-out"
+  JG_CI_NEEDS="$needs" JG_CI_BEHAVIOR=true JG_CI_SKIP_MACOS=1 "$ROOT/bin/jg-ci-required.sh" >/dev/null \
+    || fail "the gate refused the fork's own macOS opt-out"
+  JG_CI_NEEDS='{}' JG_CI_BEHAVIOR=true "$ROOT/bin/jg-ci-required.sh" >/dev/null 2>&1 \
+    && fail "the gate passed a run that reported no lane results at all"
+  pass "the required check refuses a lane the change needed and accepts a documented skip"
+}
+
+# The path scope: a documentation change may run only the scope job, and every
+# executable path must still ask for the whole suite.
+test_path_scope_keeps_every_executable_change_on_the_full_suite() {
+  local cheap
+  cheap=$(printf '%s\n' README.md docs/brand/hero.png LICENSE CONTRIBUTING.md)
+  [ "$(printf '%s\n' "$cheap" | "$ROOT/bin/jg-ci-scope.sh")" = behavior=false ] \
+    || fail "a documentation and asset change must skip the behavior lanes"
+  [ "$(printf '' | "$ROOT/bin/jg-ci-scope.sh")" = behavior=true ] || fail "an empty change list must need the full suite"
+  [ "$("$ROOT/bin/jg-ci-scope.sh" --full)" = behavior=true ] \
+    || fail "an unscoped main push must need the full suite"
+  while IFS= read -r paths; do
+    [ -n "$paths" ] || continue
+    [ "$(printf '%s\n' "$paths" | "$ROOT/bin/jg-ci-scope.sh")" = behavior=true ] \
+      || fail "$paths can change executable behavior but the classifier called it cheap"
+  done <<'LIST'
+bin/jg-watch.sh
+tests/jg-ci-workflow.test.sh
+AGENTS.md
+.agents/skills/afk/SKILL.md
+.github/workflows/ci.yml
+docs/examples/crew-dispatch.json
+docs/supervision-protocols/builds.md
+addons/owner-guard/owner-guard
+README.md bin/jg-watch.sh
+LIST
+  pass "the path scope keeps every executable change on the full suite and scopes documentation only"
 }
 
 test_ci_matrices_match_executable_partitions() {
@@ -444,7 +503,9 @@ test_pr_pushes_supersede_within_one_pr
 test_separate_prs_do_not_cancel_each_other
 test_main_pushes_are_never_cancelled
 test_fork_skip_variables_are_opt_in
-test_timing_aggregate_still_runs_after_a_failed_lane
+test_required_check_still_runs_after_a_failed_lane
+test_required_check_refuses_a_lane_the_change_needed
+test_path_scope_keeps_every_executable_change_on_the_full_suite
 test_every_job_has_a_finite_timeout
 test_every_job_belongs_to_exactly_one_timeout_tier
 test_fast_tier_shares_one_short_tripwire
