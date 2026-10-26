@@ -72,6 +72,15 @@
 #          quota-axi is required for the agent-owned dispatch-profile array
 #          procedure in AGENTS.md section 4 and
 #          .agents/skills/quota-array-dispatch/SKILL.md.
+#          done-done and sign-off-axi are the published proof and decision tools;
+#          each install line is the exact build its toolchain.versions row names,
+#          never a git install, and that row is their floor too. The locked
+#          mutable path also wires them through bin/fm-tool-wiring.sh: the skill
+#          the package ships, the done-done brief include as one managed block,
+#          and config/merge-gate when the home has none. Sign-off arming stays per
+#          home and is never done there; the first wiring prints one line naming
+#          bin/fm-procevent-signoff.sh arm, so the user is told instead of
+#          remembering it.
 #          On a primary home, the locked mutable path materializes the visible
 #          default config/startup-memory-budget=7500 when absent. It never
 #          guesses at malformed or unsafe existing files, and secondmate homes
@@ -880,7 +889,7 @@ missing_tool_diagnostic() {
 # fm_backend_required_tools (bin/fm-backend.sh). So a herdr/zellij/cmux home is
 # never told tmux is missing, and only orca drops treehouse. A backend value with
 # no verified dependency set is reported before the universal checks continue.
-COMMON_TOOLS="node git gh no-mistakes gh-axi chrome-devtools-axi tasks-axi quota-axi learn-from-mistakes"
+COMMON_TOOLS="node git gh no-mistakes gh-axi chrome-devtools-axi tasks-axi quota-axi learn-from-mistakes done-done sign-off-axi"
 BACKEND=$(fm_backend_name)
 BACKEND_VALID=1
 if ! BACKEND_TOOLS=$(fm_backend_required_tools "$BACKEND"); then
@@ -903,6 +912,11 @@ GH_AXI_MIN=$(fm_pin_version gh-axi) || GH_AXI_MIN=0.0.0
 LEARN_FROM_MISTAKES_AXI_MIN=$(fm_pin_version learn-from-mistakes) || LEARN_FROM_MISTAKES_AXI_MIN=0.0.0
 LAVISH_AXI_MIN=$(fm_pin_version lavish-axi) || LAVISH_AXI_MIN=0.0.0
 LAVISH_AXI_BOARD_MIN=0.1.77
+# The proof and decision tools Juggernaut publishes install at the exact build
+# their toolchain.versions rows name, and that row is their floor too, so one bump
+# moves installation, detection and this diagnostic together.
+DONE_DONE_AXI_MIN=$(fm_pin_version done-done) || DONE_DONE_AXI_MIN=0.0.0
+SIGN_OFF_AXI_MIN=$(fm_pin_version sign-off-axi) || SIGN_OFF_AXI_MIN=0.0.0
 
 treehouse_supports_lease() {
   treehouse get --help 2>&1 | grep -Eq '(^|[^[:alnum:]_-])--lease([^[:alnum:]_-]|$)'
@@ -1372,6 +1386,24 @@ startup_memory_budget_setup() {
   fi
 }
 
+# An install is not wiring: the proof and decision tools also need the skill
+# their package ships, the brief include, and the merge gate.
+# bin/fm-tool-wiring.sh owns each write and is idempotent, so this runs on every
+# locked session - a home that already has its tool installed gets wired - and
+# prints nothing once a home is complete. A successful first wiring prints what
+# it wrote, including sign-off's one-line arming reminder; arming itself stays
+# per home and is never done here.
+companion_tool_wiring() {
+  local tool out
+  for tool in done-done sign-off; do
+    if out=$("$SCRIPT_DIR/fm-tool-wiring.sh" "$tool" 2>&1); then
+      [ -z "$out" ] || printf '%s\n' "$out"
+      continue
+    fi
+    echo "BOOTSTRAP_INFO: $tool wiring not applied: ${out:-unknown error}"
+  done
+}
+
 if [ "${1:-}" = "lavish-compatible" ]; then
   tool_version_at_least lavish-axi "$LAVISH_AXI_BOARD_MIN"
   exit
@@ -1413,6 +1445,10 @@ if [ "${1:-}" = "install" ]; then
     cmd=${cmd%%  #*}
     echo "installing $t: $cmd"
     eval "$cmd" || { echo "error: installing $t failed: $cmd" >&2; exit 1; }
+    case $t in
+      done-done) "$SCRIPT_DIR/fm-tool-wiring.sh" done-done || exit 1 ;;
+      sign-off-axi) "$SCRIPT_DIR/fm-tool-wiring.sh" sign-off || exit 1 ;;
+    esac
   done
   exit 0
 fi
@@ -1461,6 +1497,7 @@ if [ "${FM_BOOTSTRAP_DETECT_ONLY:-0}" != 1 ] && local_phase; then
     fi
   fi
   startup_memory_budget_setup
+  companion_tool_wiring
   if backlog_record_reconcile; then
     :
   else
@@ -1499,6 +1536,12 @@ detect_local_tools() {
   fi
   if command -v learn-from-mistakes >/dev/null 2>&1 && ! tool_version_at_least learn-from-mistakes "$LEARN_FROM_MISTAKES_AXI_MIN"; then
     echo "MISSING: learn-from-mistakes (install: $(install_cmd learn-from-mistakes))"
+  fi
+  if command -v done-done >/dev/null 2>&1 && ! tool_version_at_least done-done "$DONE_DONE_AXI_MIN"; then
+    echo "MISSING: done-done (install: $(install_cmd done-done))"
+  fi
+  if command -v sign-off-axi >/dev/null 2>&1 && ! tool_version_at_least sign-off-axi "$SIGN_OFF_AXI_MIN"; then
+    echo "MISSING: sign-off-axi (install: $(install_cmd sign-off-axi))"
   fi
   if ! tool_version_at_least lavish-axi "$LAVISH_AXI_BOARD_MIN"; then
     echo "PRESENTATION_UNAVAILABLE: lavish-axi (requires >=$LAVISH_AXI_BOARD_MIN; install: $(install_cmd lavish-axi)) - nonvisual work may proceed with plain-text decisions and reports; install or upgrade before using Lavish"
