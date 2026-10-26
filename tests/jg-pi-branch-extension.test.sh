@@ -1453,7 +1453,7 @@ if ([...nativeTools.keys()].sort().join(",") !== "jg_branch_outcomes,jg_branch_p
 for (const tool of mainTools) {
   if (nativeTools.get(tool.name)?.execute !== tool.execute) throw new Error("native controls lost the original guards");
 }
-if ([...messageTypes].sort().join(",") !== "juggernaut-sessionstart-nudge,jg-branch-merge,jg-branch-process") throw new Error("operational message allowlist changed");
+if ([...messageTypes].sort().join(",") !== "jg-branch-merge,jg-branch-process,juggernaut-sessionstart-nudge") throw new Error("operational message allowlist changed");
 const processed = nativeTools.get("jg_branch_processed");
 if (!processed) throw new Error("main did not receive its acknowledgement tool");
 const routineAck = await processed.execute("ack-routine", { through: routineSeq }, undefined, undefined, {});
