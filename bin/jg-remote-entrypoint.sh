@@ -29,7 +29,7 @@
 # then skips or stops the cancelled job instead of running it to completion for
 # nobody.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
+[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -eu
 
 PROTOCOL=1

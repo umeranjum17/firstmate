@@ -65,7 +65,7 @@
 # project genuinely needs it. Whoever removes the directory restores the owner
 # write bit first.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
+[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 unset CDPATH
 

@@ -11,7 +11,7 @@
 #
 # Source this file; it defines functions only.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
+[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 # jg_hold_reason_encode <reason>: print the storable form, no trailing newline.
 jg_hold_reason_encode() {

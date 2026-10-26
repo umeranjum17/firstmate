@@ -49,7 +49,7 @@
 #   fmx_meta_link_clear <meta> - remove the X-request link entirely
 # Callers must have JG_HOME set before calling fmx_load_config.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
+[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 _JG_X_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if ! command -v jg_backlog_atomic_transition >/dev/null 2>&1; then

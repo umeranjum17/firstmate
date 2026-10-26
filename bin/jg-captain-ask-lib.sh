@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Shared fork guard for captain asks; callers supply tasks_axi, SCRIPT_DIR, and fail.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
+[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 captain_ask_row() {  # <id>; sets CAPTAIN_ASK_SHOW to the row's show output when it is a [captain-ask] item
   local title
   CAPTAIN_ASK_SHOW=''

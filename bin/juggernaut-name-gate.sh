@@ -35,7 +35,7 @@
 # This gate's own path and its allow file are allow-listed because they define
 # the strings they search for; they are the two files that must keep them.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
+[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -eu
 
 BASE_PATTERN='first[ -]?mate|second ?mate|crewmate|fm[-_]'

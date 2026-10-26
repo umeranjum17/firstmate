@@ -18,7 +18,7 @@
 # duplicating it, so the two consumers cannot drift apart.
 # shellcheck source=bin/jg-tmux-lib.sh
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/../jg-compat.sh"
+[ ! -r "$(dirname "${BASH_SOURCE[0]}")/../jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/../jg-compat.sh"
 . "$JG_BACKEND_LIB_DIR/jg-tmux-lib.sh"
 # shellcheck source=bin/jg-session-lock-lib.sh
 . "$JG_BACKEND_LIB_DIR/jg-session-lock-lib.sh"

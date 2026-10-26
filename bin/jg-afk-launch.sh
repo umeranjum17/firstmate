@@ -110,7 +110,7 @@
 # JG_TEST_HARNESS pins the primary harness this launch path judges, through
 # jg_supervision_host_primary (bin/jg-supervision-engine-lib.sh owns the seam).
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
+[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 JG_AFK_LAUNCH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

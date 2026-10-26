@@ -97,7 +97,7 @@
 # bin/jg-remote-job-reap-orphans.sh uses it to reap workers that were already
 # orphaned that way.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
+[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 JG_REMOTE_JOB_LABEL=dev.juggernaut.remote-job
 JG_REMOTE_JOB_MAX_BYTES=${JG_REMOTE_JOB_MAX_BYTES:-1048576}

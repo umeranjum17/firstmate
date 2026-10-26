@@ -34,7 +34,7 @@
 # supplied for a mutation, it must name that calling actor. Exit codes: 0 ok,
 # 1 check-miss, 2 usage, 6 refused (other actor holds or actor mismatch).
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
+[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

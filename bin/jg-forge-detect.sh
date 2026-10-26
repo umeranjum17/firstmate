@@ -21,7 +21,7 @@
 # than told.
 # Usage: jg-forge-detect.sh <clone-dir>
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
+[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -eu
 
 DIR=${1:?usage: jg-forge-detect.sh <clone-dir>}

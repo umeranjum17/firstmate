@@ -148,7 +148,7 @@
 #   JG_CONTROL_LAUNCH_WAIT       dead->alive wait after a relaunch (90)
 #   JG_CONTROL_EXIT_RETRIES      Enter retries for the exit command (3)
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
+[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

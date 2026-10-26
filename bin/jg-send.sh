@@ -212,7 +212,7 @@
 # (used by the away-mode daemon, which only needs "submitted"), and the --key
 # path do not pay it.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
+[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -eu
 
 JG_SEND_ORIGINAL_ARGS=("$@")

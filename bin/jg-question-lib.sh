@@ -12,7 +12,7 @@
 # The board is read through sign-off-axi's own `list --json`, never a private
 # copy of it, so this file stays a reader and posts nothing itself.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
+[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 # Print the board file to read, or nothing to let sign-off-axi walk its default.
 # An explicit SIGN_OFF_HOME is authoritative: a home that names a board must

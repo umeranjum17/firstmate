@@ -6,7 +6,7 @@
 # `$(basename -- <path>)` would: POSIX component rules, and the command
 # substitution's removal of trailing newlines.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
+[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 jg_dirname_to() {  # <output-variable> <path>
   local jg_path=$2

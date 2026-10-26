@@ -14,7 +14,7 @@
 # in bin/jg-supervise-daemon.sh, so its unit tests (tests/jg-daemon.test.sh)
 # keep exercising the same names after the daemon sources this file.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
+[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 # Default supervisor pane target/backend when nothing is configured or detected.
 # "juggernaut:0" is a tmux session:window name, so the bare fallback (nothing

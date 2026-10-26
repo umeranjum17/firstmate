@@ -20,7 +20,7 @@
 # Turn-end touches follow a successful generation-bound apply; events
 # rejected as stale emit no notification.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
+[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -eu
 case "${1:-}" in
   -h|--help)

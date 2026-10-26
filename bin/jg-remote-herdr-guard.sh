@@ -37,7 +37,7 @@
 # release wait in tenths of a second. Every decision prints one line to
 # stdout, which launchd routes to the agent's log.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
+[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 SCRIPT_SELF=${BASH_SOURCE[0]}

@@ -43,7 +43,7 @@
 # real condition, so the budget is enforced rather than assumed: a timed-out
 # poll reports one line naming the budget instead of leaving the check silent.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
+[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 export LC_ALL=C
 

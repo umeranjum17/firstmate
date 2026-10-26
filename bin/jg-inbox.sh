@@ -102,7 +102,7 @@
 # reads, because the voice agent must be able to answer without record free text
 # ever reaching a model.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
+[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -euo pipefail
 
 # A non-interactive `ssh host jg-inbox.sh ...` does NOT get a login shell, so it

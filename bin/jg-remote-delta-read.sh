@@ -26,7 +26,7 @@
 # that preemption as distinct exit 76. The bin/jg-remote-job-lib.sh header owns
 # that contract.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
+[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -eu
 
 JG_HOME=${JG_HOME:?JG_HOME is required}

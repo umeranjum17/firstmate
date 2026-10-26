@@ -2,7 +2,7 @@
 # Progress add-on for jg-watch.sh. The watcher supplies its state, timers and
 # classification helpers; jg-busy-lib.sh supplies worker-generation identity.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
+[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 # Observe native activity, execution status and turn events independently of
 # screen churn. Declared waits stay with their existing wait/escalation owner.

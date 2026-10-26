@@ -52,7 +52,7 @@
 # All successful data commands print exactly one value and no diagnostics.
 # A non-match exits 1 silently. Invalid use exits 2. Bash 3.2 compatible.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
+[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 JG_OPERATIONAL_MARK=$'\xE2\x81\xA3'
 JG_OPERATIONAL_PREFIX="${JG_OPERATIONAL_MARK}JUGGERNAUT_OP: "

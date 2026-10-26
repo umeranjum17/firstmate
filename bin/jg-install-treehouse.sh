@@ -11,7 +11,7 @@
 #
 # Pins Treehouse v2.0.1, the version exercised by the local real-Herdr suite.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
+[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -eu
 
 JG_TREEHOUSE_CI_VERSION=2.0.1

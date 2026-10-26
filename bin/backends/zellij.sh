@@ -105,7 +105,7 @@
 # jg_backend_required_tools only when zellij is the resolved backend; this
 # adapter also gates them again before spawning.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/../jg-compat.sh"
+[ ! -r "$(dirname "${BASH_SOURCE[0]}")/../jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/../jg-compat.sh"
 
 # JG_HOME fallback: every real caller already sets JG_HOME as a global before
 # sourcing jg-backend.sh (which sources this file); this exists only so this

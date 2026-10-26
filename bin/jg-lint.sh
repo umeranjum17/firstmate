@@ -113,7 +113,7 @@
 #   jg-lint.sh --list-files            print the file set that would be linted
 #   jg-lint.sh --help                  print this usage
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
+[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 REQUIRED_SHELLCHECK=0.11.0

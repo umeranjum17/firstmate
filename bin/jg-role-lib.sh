@@ -62,7 +62,7 @@
 # malformed-input reason), JG_ROLE_PUB_TARGET, JG_ROLE_PUB_AUTHORITY,
 # JG_ROLE_PUB_DENIAL.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
+[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 # jg_role_file <config-dir>
 jg_role_file() {

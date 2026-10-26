@@ -47,7 +47,7 @@
 # jg-check-register.sh so the existing watcher slow-check cadence invokes the
 # daily gate.  `disarm` removes the shim, trust binding, and report record.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
+[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 export LC_ALL=C
 

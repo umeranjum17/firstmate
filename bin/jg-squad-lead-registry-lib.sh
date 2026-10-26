@@ -10,7 +10,7 @@
 # and semicolons, so field boundaries are anchored to the suffix markers rather
 # than to the first incidental punctuation.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
+[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 SQUAD_LEAD_REGISTRY_ID=
 SQUAD_LEAD_REGISTRY_SUMMARY=

@@ -16,7 +16,7 @@
 # Diagnostics print to stderr prefixed by ${JG_LOCK_LOG_PREFIX:-jg-lock} so each
 # caller's output stays recognizable.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
+[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 jg_lock_log() {
   echo "${JG_LOCK_LOG_PREFIX:-jg-lock}: $*" >&2

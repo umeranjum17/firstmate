@@ -57,7 +57,7 @@
 # that dies just past the healthy threshold cannot restart without bound
 # either. jg-on's ensure path restarts a worker that gave up.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
+[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 # A non-numeric override falls back to the default rather than crashing the

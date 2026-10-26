@@ -26,7 +26,7 @@
 # receives <verb> <note> before the append and owns the wait rules. Its output is shown and a nonzero
 # exit refuses the report with exit 2; an absent add-on is a no-op.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
+[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -eu
 
 CALLER_JG_HOME=${JG_HOME:-}

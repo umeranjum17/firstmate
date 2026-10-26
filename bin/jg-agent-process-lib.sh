@@ -13,7 +13,7 @@
 # names below, and tests/jg-tmux-agent-liveness.test.sh plus
 # tests/jg-harness-liveness-drift-live-e2e.test.sh keep them honest.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
+[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 _JG_AGENT_PROCESS_LIB_DIR=${BASH_SOURCE[0]%/*}
 [ "$_JG_AGENT_PROCESS_LIB_DIR" != "${BASH_SOURCE[0]}" ] || _JG_AGENT_PROCESS_LIB_DIR=.

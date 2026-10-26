@@ -44,7 +44,7 @@
 # of its worktree instead of a status file, so callers run it only at the moment
 # they would otherwise escalate.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
+[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 # Directory of this library, used to locate the sibling jg-crew-state.sh reader.
 # Resolved at source time from BASH_SOURCE so it works whether sourced by a
