@@ -100,7 +100,8 @@ for width in 390 1280; do
     done
     [ "$ok" = yes ] || fail "$REPO at $SHA did not render the README with the @$OWN_HANDLE badge at ${width}w $theme (anchor/body/image/no-error/title/theme: ${flags:-no answer from the page})"
 
-    chrome-devtools-axi eval "() => { const a = document.querySelector('a[href=\"$OWN_LINK\"]'); a.scrollIntoView({ block: 'center', behavior: 'instant' }); return 1; }" >/dev/null
+    # Park the badge row about a third of the way down, so the screen around it is whole.
+    chrome-devtools-axi eval "() => { const a = document.querySelector('a[href=\"$OWN_LINK\"]'); const r = a.getBoundingClientRect(); window.scrollBy({ top: r.top - window.innerHeight * 0.35, behavior: 'instant' }); return 1; }" >/dev/null
     sleep 1
     geo=$(chrome-devtools-axi eval "() => { const a = document.querySelector('a[href=\"$OWN_LINK\"]'); const r = a.getBoundingClientRect(); const row = a.closest('p, li') || a.parentElement || a; const q = row.getBoundingClientRect(); const prev = row.previousElementSibling; let head_top = -1; if (prev && /^H[1-6]$/.test(prev.tagName)) { const hq = prev.getBoundingClientRect(); if (q.y - hq.bottom < 24) head_top = Math.round(hq.y); } return [window.innerWidth, window.innerHeight, Math.round(r.x), Math.round(r.y), Math.round(r.width), Math.round(r.height), r.top >= 0 && r.bottom <= window.innerHeight ? 1 : 0, Math.round(q.x), Math.round(q.y), Math.round(q.width), Math.round(q.height), head_top].join(','); }" 2>/dev/null | sed -n 's/^result: //p' | tr -cd '0-9,')
     geometry=${geo//,/ }
