@@ -27,6 +27,15 @@ DRAIN="$ROOT/bin/fm-wake-drain.sh"
 
 TMP_ROOT=$(fm_test_tmproot fm-watch-triage-tests)
 
+# This suite asserts the watcher's stock behaviour, so it pins the add-on directory
+# to an empty one: the deferred add-on lookup prefers this checkout's own addons/,
+# and a suite that let an installed-in-the-repo add-on decide its assertions would
+# stop testing the watcher. The resolution chain itself is covered by
+# tests/fm-addons-dir.test.sh and the dashboard/flow/stats shim suites.
+FM_ADDONS_DIR="$TMP_ROOT/no-addons"
+mkdir -p "$FM_ADDONS_DIR"
+export FM_ADDONS_DIR
+
 # A drain whose acknowledgement is missing is re-presented for a few attempts -
 # a loaded machine can hold the queue lock or settle the stopped watcher's
 # downtime marker past one presentation - and every missed attempt prints its
