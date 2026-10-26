@@ -32,9 +32,9 @@ You can run one coding agent easily. But the moment you want three missions runn
 
 | The tab-juggler | The Juggernaut |
 |---|---|
-| Three missions, three terminals. You are the router, the memory, and the status board. | One liaison. The Overwatch dispatches the squad, each operator in its own worktree, and reports plain objectives secured. |
+| Three missions, three terminals. You are the router, the memory, and the status board. | One liaison. The Overwatch dispatches the squad, each operator in its own clean copy of the repository, and reports plain objectives secured. |
 
-Juggernaut flips the model. You talk to a single agent — the **Overwatch** — and it runs the squad for you: spawning autonomous operators in a visible session backend, giving each a clean git worktree, supervising them to the objective, and handing you finished PRs, approved local merges, or standalone recon reports.
+Juggernaut flips the model. You talk to a single agent — the **Overwatch** — and it runs the squad for you: spawning autonomous operators in a visible session backend, giving each a clean copy of the repository, supervising them to the objective, and handing you finished PRs, approved local merges, or standalone recon reports.
 
 For larger fleets, you can opt in to persistent secondmates: second mates that are still ordinary direct reports, but run from their own isolated Juggernaut homes on this machine or another SSH-reachable host.
 
@@ -95,7 +95,7 @@ An **Operator** does one mission in an isolated work copy. It returns a pull req
 Every mission follows the same delivery path:
 
 1. **Brief** - the objective, the boundary, and the agreed finish line.
-2. **Isolated work copy** - a clean git worktree, so parallel work never collides.
+2. **Isolated work copy** - a clean copy of the repository, so parallel work never collides.
 3. **Validation** - the project's own checks, proof from the real product, and a judge for any claim of "done".
 4. **Pull request** - the change, its evidence, and a checks block that cites both.
 5. **Merge** - only inside the authority you gave that project.
