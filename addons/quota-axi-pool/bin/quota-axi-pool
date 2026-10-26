@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # PATH wrapper: with FM_HOME/config/account-pool, --json Claude row uses fm-model-pool's
 # claude-accounts reading (same pick/floors/credits refusal). Else exec upstream.
-# Env: FM_QUOTA_AXI_REAL, FM_MODEL_POOL, FM_QUOTA_AXI_POOL_UPSTREAM, FM_QUOTA_AXI_POOL_ATTEMPTED.
+# Env: FM_QUOTA_AXI_REAL, FM_MODEL_POOL, FM_QUOTA_AXI_POOL_UPSTREAM, FM_QUOTA_AXI_POOL_ATTEMPTED,
+#      FM_QUOTA_AXI_POOL_DEPTH (set by this wrapper for the call it delegates; above 0 means go upstream).
 set -euo pipefail
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 addons=$(cd "$here/../.." && pwd)
@@ -28,10 +29,18 @@ find_upstream() {
 want_json=0 passthru=0
 for a in "$@"; do case "$a" in --json) want_json=1 ;; --version|-v|-V|--help|-h) passthru=1 ;; esac; done
 upstream=$(find_upstream) || { echo "quota-axi-pool: upstream quota-axi not found (set FM_QUOTA_AXI_REAL)" >&2; exit 127; }
+# Recursion guard: this wrapper answers to the name `quota-axi`, and the tool it delegates to (the
+# account pick) reads quota by running `quota-axi`. One trip through the pool per call is the point;
+# a call that already is one goes straight to the upstream, so a caller that asks the wrapper - the
+# Claude accounts reader, an older installed copy, anything else - gets a reading instead of a loop.
+depth=${FM_QUOTA_AXI_POOL_DEPTH:-0}
+case "$depth" in '' | *[!0-9]*) depth=0 ;; esac
 pool_config=${FM_HOME:+$FM_HOME/config/account-pool}
-if [ "$passthru" = 1 ] || [ -z "${FM_HOME:-}" ] || [ ! -f "${pool_config:-}" ] || [ ! -x "$model_pool" ]; then
+if [ "$passthru" = 1 ] || [ -z "${FM_HOME:-}" ] || [ ! -f "${pool_config:-}" ] || [ ! -x "$model_pool" ] || [ "$depth" -gt 0 ]; then
   exec "$upstream" "$@"
 fi
+FM_QUOTA_AXI_POOL_DEPTH=$((depth + 1))
+export FM_QUOTA_AXI_POOL_DEPTH
 
 attempted=${FM_QUOTA_AXI_POOL_ATTEMPTED:-[]}
 case "$attempted" in \[*\]) ;; *) attempted='[]' ;; esac

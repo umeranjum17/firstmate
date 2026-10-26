@@ -210,6 +210,9 @@ make_toolchain() {
   fakebin=$(fm_fakebin "$dir")
   fm_fake_exit0 "$fakebin" node chrome-devtools-axi pi-signed
   fm_fake_version_tool "$fakebin" lavish-axi FM_FAKE_LAVISH_AXI_VERSION 0.1.80
+  fm_fake_version_tool "$fakebin" learn-from-mistakes FM_FAKE_LEARN_FROM_MISTAKES_AXI_VERSION 0.2.0
+  fm_fake_version_tool "$fakebin" done-done FM_FAKE_DONE_DONE_AXI_VERSION 0.6.17
+  fm_fake_version_tool "$fakebin" sign-off-axi FM_FAKE_SIGN_OFF_AXI_VERSION 0.7.0
   cat > "$fakebin/gh-axi" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --version ]; then
@@ -352,12 +355,14 @@ add_sm_home() {
   } > "$w/home/state/$id.meta"
 }
 
-# make_parked_addon <w> <parked-id>...: a synthetic parked-homes add-on
-# checkout at the in-repo shim's documented resolution path
-# ($FM_HOME/projects/firstmate-addons/parked-homes/bin). It implements the
-# hook contract the shim sources - the refuse and skip predicates answered from
-# $FM_HOME/config/parked-homes - so the sweep's parked guard is exercised
-# through the real sourcing boundary, not a stubbed function.
+# make_parked_addon <w> <parked-id>...: a parked-homes add-on checkout at the
+# in-repo shim's documented resolution path
+# ($FM_HOME/projects/firstmate-addons/parked-homes/bin), answered from
+# $FM_HOME/config/parked-homes. The add-on's own reader is linked in rather
+# than imitated: it is the single owner of every predicate and of the per-action
+# skip wording, so a hand-written copy only drifts away from it. One parked
+# home is named by several producers in one bootstrap run, and the assertion
+# below counts one producer's line only.
 make_parked_addon() {
   local w=$1 id
   local dir="$w/home/projects/firstmate-addons/parked-homes/bin"
@@ -366,21 +371,7 @@ make_parked_addon() {
   for id in "${@:2}"; do
     printf '%s\n' "$id" >> "$w/home/config/parked-homes"
   done
-  cat > "$dir/fm-parked-homes-lib.sh" <<'SH'
-fm_parked_home() {
-  [ -f "${FM_HOME:?}/config/parked-homes" ] && grep -Fxq "${1:?}" "$FM_HOME/config/parked-homes"
-}
-fm_parked_refuse_meta() {
-  if fm_parked_home "${2:?}"; then
-    printf 'error: refused for %s: its home is parked (config/parked-homes)\n' "$2" >&2
-    return 1
-  fi
-}
-fm_parked_skip_meta() {
-  fm_parked_home "${2:?}" || return 1
-  printf 'SECONDMATE_LIVENESS: secondmate %s: skipped: its home is parked (config/parked-homes)\n' "$2"
-}
-SH
+  ln -s "$ROOT/addons/parked-homes/bin/fm-parked-homes-lib.sh" "$dir/fm-parked-homes-lib.sh"
 }
 
 run_bootstrap() {  # <fakebin> <home> <pane-cmd> <call-log> [extra env...] -> stdout
