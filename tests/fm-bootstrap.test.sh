@@ -39,6 +39,8 @@ export FM_FAKE_GH_AXI_VERSION=${FM_FAKE_GH_AXI_VERSION:-$(fm_pin_version gh-axi)
 export FM_FAKE_QUOTA_AXI_VERSION=${FM_FAKE_QUOTA_AXI_VERSION:-$(fm_pin_version quota-axi)}
 export FM_FAKE_LAVISH_AXI_VERSION=${FM_FAKE_LAVISH_AXI_VERSION:-$(fm_pin_version lavish-axi)}
 export FM_FAKE_LEARN_FROM_MISTAKES_AXI_VERSION=${FM_FAKE_LEARN_FROM_MISTAKES_AXI_VERSION:-$(fm_pin_version learn-from-mistakes)}
+export FM_FAKE_DONE_DONE_AXI_VERSION=${FM_FAKE_DONE_DONE_AXI_VERSION:-$(fm_pin_version done-done)}
+export FM_FAKE_SIGN_OFF_AXI_VERSION=${FM_FAKE_SIGN_OFF_AXI_VERSION:-$(fm_pin_version sign-off-axi)}
 MISS_TASKS_AXI="MISSING: tasks-axi (install: npm install -g $(fm_pin_npm tasks-axi))"
 MISS_QUOTA_AXI="MISSING: quota-axi (install: npm install -g $(fm_pin_npm quota-axi))"
 MISS_GH_AXI="MISSING: gh-axi (install: npm install -g $(fm_pin_npm gh-axi) && gh-axi setup hooks)"
@@ -70,6 +72,8 @@ SH
   chmod +x "$fakebin/systemctl"
   fm_fake_version_tool "$fakebin" lavish-axi FM_FAKE_LAVISH_AXI_VERSION "$FM_FAKE_LAVISH_AXI_VERSION"
   fm_fake_version_tool "$fakebin" learn-from-mistakes FM_FAKE_LEARN_FROM_MISTAKES_AXI_VERSION "$FM_FAKE_LEARN_FROM_MISTAKES_AXI_VERSION"
+  fm_fake_version_tool "$fakebin" done-done FM_FAKE_DONE_DONE_AXI_VERSION "$FM_FAKE_DONE_DONE_AXI_VERSION"
+  fm_fake_version_tool "$fakebin" sign-off-axi FM_FAKE_SIGN_OFF_AXI_VERSION "$FM_FAKE_SIGN_OFF_AXI_VERSION"
   cat > "$fakebin/gh-axi" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --version ]; then
