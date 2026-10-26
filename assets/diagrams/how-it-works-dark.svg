@@ -56,14 +56,19 @@
   <path class="dash" d="M872 195 L900 195" marker-end="url(#arrow)"/>
   <text class="tag" x="22" y="338" text-anchor="start">Squad Leads</text>
   <text class="tag" x="22" y="470" text-anchor="start">Operators</text>
-  <path class="accentline" d="M650 238 L650 262 M316 262 L984 262 M316 262 L316 292 M650 262 L650 292 M984 262 L984 292" marker-end="url(#arrow-accent)"/>
+  <path class="accentline" d="M650 238 L650 262 M316 262 L984 262"/>
+  <path class="accentline" d="M316 262 L316 292" marker-end="url(#arrow-accent)"/>
+  <path class="accentline" d="M650 262 L650 292" marker-end="url(#arrow-accent)"/>
+  <path class="accentline" d="M984 262 L984 292" marker-end="url(#arrow-accent)"/>
   <rect class="group" x="158" y="292" width="316" height="232" rx="18"/>
   <rect class="box" x="171" y="300" width="290" height="100" rx="14"/>
   <text class="lead" x="316" y="328" text-anchor="middle">Squad Lead</text>
   <text class="chipsub" x="316" y="348" text-anchor="middle">One project or domain.</text>
   <text class="chipsub" x="316" y="364" text-anchor="middle">Keeps the context.</text>
   <text class="chipsub" x="316" y="380" text-anchor="middle">Owns its Operators.</text>
-  <path class="line" d="M316 400 L316 418 M238 418 L394 418 M238 418 L238 430 M394 418 L394 430" marker-end="url(#arrow)"/>
+  <path class="line" d="M316 400 L316 418 M238 418 L394 418"/>
+  <path class="line" d="M238 418 L238 430" marker-end="url(#arrow)"/>
+  <path class="line" d="M394 418 L394 430" marker-end="url(#arrow)"/>
   <rect class="box" x="167" y="428" width="142" height="84" rx="14"/>
   <text class="op" x="238" y="456" text-anchor="middle">Operator</text>
   <text class="chipsub" x="238" y="476" text-anchor="middle">One mission.</text>
@@ -78,7 +83,9 @@
   <text class="chipsub" x="650" y="348" text-anchor="middle">One project or domain.</text>
   <text class="chipsub" x="650" y="364" text-anchor="middle">Keeps the context.</text>
   <text class="chipsub" x="650" y="380" text-anchor="middle">Owns its Operators.</text>
-  <path class="line" d="M650 400 L650 418 M572 418 L728 418 M572 418 L572 430 M728 418 L728 430" marker-end="url(#arrow)"/>
+  <path class="line" d="M650 400 L650 418 M572 418 L728 418"/>
+  <path class="line" d="M572 418 L572 430" marker-end="url(#arrow)"/>
+  <path class="line" d="M728 418 L728 430" marker-end="url(#arrow)"/>
   <rect class="box" x="501" y="428" width="142" height="84" rx="14"/>
   <text class="op" x="572" y="456" text-anchor="middle">Operator</text>
   <text class="chipsub" x="572" y="476" text-anchor="middle">One mission.</text>
@@ -93,7 +100,9 @@
   <text class="chipsub" x="984" y="348" text-anchor="middle">One project or domain.</text>
   <text class="chipsub" x="984" y="364" text-anchor="middle">Keeps the context.</text>
   <text class="chipsub" x="984" y="380" text-anchor="middle">Owns its Operators.</text>
-  <path class="line" d="M984 400 L984 418 M906 418 L1062 418 M906 418 L906 430 M1062 418 L1062 430" marker-end="url(#arrow)"/>
+  <path class="line" d="M984 400 L984 418 M906 418 L1062 418"/>
+  <path class="line" d="M906 418 L906 430" marker-end="url(#arrow)"/>
+  <path class="line" d="M1062 418 L1062 430" marker-end="url(#arrow)"/>
   <rect class="box" x="835" y="428" width="142" height="84" rx="14"/>
   <text class="op" x="906" y="456" text-anchor="middle">Operator</text>
   <text class="chipsub" x="906" y="476" text-anchor="middle">One mission.</text>

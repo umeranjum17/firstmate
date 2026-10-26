@@ -70,7 +70,7 @@
   <text class="lead" x="195" y="498" text-anchor="middle">Operators</text>
   <text class="chipsub" x="195" y="518" text-anchor="middle">One mission each.</text>
   <text class="chipsub" x="195" y="537" text-anchor="middle">Isolated work copy.</text>
-  <text class="chipsub" x="195" y="556" text-anchor="middle">Recon reports only.</text>
+  <text class="chipsub" x="195" y="556" text-anchor="middle">A Recon mission returns a report.</text>
   <path class="accentline" d="M195 569 L195 591" marker-end="url(#arrow-accent)"/>
   <text class="tag" x="20" y="617" text-anchor="start">Work</text>
   <rect class="chip" x="20" y="627" width="350" height="52" rx="10"/>
