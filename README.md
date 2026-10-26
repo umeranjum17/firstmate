@@ -13,7 +13,7 @@
   <a href="#how-it-works">HOW IT WORKS</a> ·
   <a href="#quick-start">QUICK START</a> ·
   <a href="#built-in-skills">SKILLS</a> ·
-  <a href="#proof-and-decision-tools">TOOLS</a> ·
+  <a href="#tools">TOOLS</a> ·
   <a href="#documentation">DOCS</a>
 </p>
 
@@ -32,9 +32,9 @@ You can run one coding agent easily. But the moment you want three missions runn
 
 | The tab-juggler | The Juggernaut |
 |---|---|
-| Three missions, three terminals. You are the router, the memory, and the status board. | One liaison. The Overwatch dispatches the squad, each operator in its own worktree, and reports plain objectives secured. |
+| Three missions, three terminals. You are the router, the memory, and the status board. | One liaison. The Overwatch dispatches the squad, each operator in its own clean copy of the repository, and reports plain objectives secured. |
 
-Juggernaut flips the model. You talk to a single agent — the **Overwatch** — and it runs the squad for you: spawning autonomous operators in a visible session backend, giving each a clean git worktree, supervising them to the objective, and handing you finished PRs, approved local merges, or standalone recon reports.
+Juggernaut flips the model. You talk to a single agent — the **Overwatch** — and it runs the squad for you: spawning autonomous operators in a visible session backend, giving each a clean copy of the repository, supervising them to the objective, and handing you finished PRs, approved local merges, or standalone recon reports.
 
 For larger fleets, you can opt in to persistent Squad Leads: operators that are still ordinary direct reports, but run from their own isolated Juggernaut homes on this machine or another SSH-reachable host.
 
@@ -49,14 +49,14 @@ An agent distro is a portable directory of instructions, skills, tooling, polici
 ### Command
 
 - **One liaison** — you talk only to the Overwatch; it dispatches, supervises, escalates only real decisions, and reports plain objectives secured.
-- **A visible squad** — every operator works in its own tmux window or Herdr tab, or in an experimental Zellij, cmux, or Orca terminal you can watch or type into; the Overwatch reconciles.
+- **A visible squad** — every operator works in its own tmux window or Herdr tab, or in an experimental Zellij, cmux, or worker-runtime terminal you can watch or type into; the Overwatch reconciles.
 - **Explicit project modes** — each project ships via `no-mistakes`, `direct-PR`, or `local-only`, with optional `+yolo` merge autonomy, a `branch=<prefix>` override for the default `fm/` ship-branch prefix, and a `forge=gerrit` binding that publishes a Gerrit change instead of a pull request.
 
 ### Mission
 
 - **Two mission shapes** — ship missions deliver authorized changes; recon missions leave standalone findings when the intake contract warrants separate research.
-- **Disposable worktrees** — each mission runs in a clean [treehouse](https://github.com/kunchenguid/treehouse) git worktree, or an Orca-managed worktree when `backend=orca`, so parallel work on one repo never collides.
-- **Event-driven, zero-token supervision** — a bash watcher sleeps on the fleet and wakes the Overwatch only when something needs you; verified harnesses also get a turn-end backstop.
+- **Isolated work copies** — each mission runs in its own clean copy of the repository, so parallel work on one repo never collides.
+- **Event-driven, zero-token supervision** — a monitor sleeps on the fleet and wakes the Overwatch only when something needs you; verified harnesses also get a turn-end backstop.
 - **Restart-proof** — all state lives on disk and in the active session backend; the next session reconciles after a restart, and ordinary supervision recovers confirmed-dead operators.
 
 ### Boundaries
@@ -77,18 +77,34 @@ Full detail on every feature lives in [docs/architecture.md](docs/architecture.m
 
 <p align="center">
   <picture>
-    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="assets/flow-mobile-dark.png">
-    <source media="(max-width: 600px)" srcset="assets/flow-mobile-light.png">
-    <source media="(prefers-color-scheme: dark)" srcset="assets/flow-dark.png">
-    <img src="assets/flow-light.png" alt="Juggernaut mission flow: the Captain talks to the Overwatch, which dispatches operators into isolated worktrees and brings back PRs, merges, or recon reports." width="100%">
+    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="assets/diagrams/how-it-works-mobile-dark.svg">
+    <source media="(max-width: 600px)" srcset="assets/diagrams/how-it-works-mobile-light.svg">
+    <source media="(prefers-color-scheme: dark)" srcset="assets/diagrams/how-it-works-dark.svg">
+    <img src="assets/diagrams/how-it-works-light.svg" width="100%" alt="The chain of command: Captain to Overwatch to Squad Leads to Operators to Work to Outcomes. Each Squad Lead owns its Operators, and Squad Leads are optional for small fleets.">
   </picture>
 </p>
 
-You chat with the Overwatch. It routes each request to an operator in its own session endpoint and git worktree, supervises the squad with a zero-token event-driven watcher, and brings you finished PRs, approved local merges, or recon reports.
+You are the **Captain**. You choose the objective and make the calls that matter.
 
-Optional Squad Leads extend this to persistent local or remote squad homes; dispatch profiles steer which harness handles which mission; Relay lets the same squad answer public mentions.
+**Overwatch** is your one point of contact. It reads your projects, turns a request into a brief, picks the squad, and keeps the watch. Supervision is event-driven: Overwatch sleeps on the fleet and wakes only when a lane needs you, finishes, or stalls, so ordinary work costs no supervision tokens.
 
-Full architecture — supervision, worktrees, Squad Leads, project modes, Relay, fleet sync, and self-update — is in [docs/architecture.md](docs/architecture.md).
+A **Squad Lead** is a persistent Operator with its own home and charter. It holds the context for one project or one part of the fleet, so the next mission does not restart from zero. Squad Leads are optional: a small fleet runs with Overwatch and Operators directly.
+
+An **Operator** does one mission in an isolated work copy. It returns a pull request, an approved local merge, or a report with findings. **Recon** is the findings-only shape: it ends with findings, not a change.
+
+Every mission follows the same delivery path:
+
+1. **Brief** - the objective, the boundary, and the agreed finish line.
+2. **Isolated work copy** - a clean copy of the repository, so parallel work never collides.
+3. **Validation** - the project's own checks, proof from the real product, and a judge for any claim of "done".
+4. **Pull request** - the change, its evidence, and a checks block that cites both.
+5. **Merge** - only inside the authority you gave that project.
+
+The **review board** carries decisions, evidence, and proof back to you. Your answer returns to the Operator that asked, so the mission continues without a pasted transcript. A verified result is an **objective secured**. The mission is complete only when its agreed finish line is met.
+
+Squad Leads can also run as persistent homes, local or remote. Dispatch settings decide which tool handles which mission, and Relay lets the same squad answer public mentions.
+
+Full architecture - supervision, isolated work copies, Squad Leads, project modes, Relay, fleet sync, and self-update - is in [docs/architecture.md](docs/architecture.md).
 
 <p align="center"><img src="assets/brand/rule-ember.svg" width="72" alt=""></p>
 
@@ -168,7 +184,7 @@ Pi's `/supervision-model` command pins a cheaper model and a shallower reasoning
 
 ### More backends
 
-Setup guides for tmux (the default) and every other supported backend (herdr, zellij, Orca, cmux) are linked in [Documentation](#documentation) below.
+Setup guides for tmux (the default) and every other supported runtime are linked in [Documentation](#documentation) below.
 
 <p align="center"><img src="assets/brand/rule-ember.svg" width="72" alt=""></p>
 
@@ -200,16 +216,14 @@ Juggernaut's skills live in two separate places with different audiences:
 
 <p align="center"><img src="assets/brand/rule-ember.svg" width="72" alt=""></p>
 
-## Proof and decision tools
+## Tools
 
-Three companion tools fit Juggernaut without changing it, and each also works with no Juggernaut at all. Each hook below does nothing until its tool is installed; your first session installs done-done and sign-off for you.
+The squad ships with a small toolbelt. Every tool works on its own, and every hook into Juggernaut is optional. The board and the fleet dashboard are part of Juggernaut; the rest are separate packages. Each hook below does nothing until its tool is installed; your first session installs done-done and sign-off for you.
 
-- **[done-done](https://github.com/umeranjum17/done-done-axi)** — proof that "done" is real.
-- **[sign-off](https://github.com/umeranjum17/sign-off)** — answer decisions with one click.
-- **[learn-from-mistakes](https://github.com/umeranjum17/learn-from-mistakes)** — stop repeated mistakes.
+Every screen below is a real capture from the tool's own current or most recent build, at desktop and phone width, in light and dark. The projects, names, and work shown are demo data. A terminal screen is the tool's own output.
 
 <details>
-<summary><strong>Install the three tools</strong></summary>
+<summary><strong>Install the extra tool and turn on the hooks</strong></summary>
 
 ```sh
 # done-done and sign-off: installed, wired, and kept up to date by the first session
@@ -226,6 +240,133 @@ npx skills add umeranjum17/learn-from-mistakes --skill lfm-retro
 **learn-from-mistakes** needs no Juggernaut hook. Point it at the records your fleet already keeps, such as a defect log or failed pipeline steps, and it counts the causes that keep coming back and proposes changes that cite the real records.
 
 </details>
+
+### The review board: answer on the go
+
+Sign-off collects the questions, designs, reports, and proof that need a person, and saves each answer for the agent that asked.
+
+<p align="center">
+  <picture>
+    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="assets/tools/sign-off/board-390-dark.png">
+    <source media="(max-width: 600px)" srcset="assets/tools/sign-off/board-390-light.png">
+    <source media="(prefers-color-scheme: dark)" srcset="assets/tools/sign-off/board-1280-dark.png">
+    <img src="assets/tools/sign-off/board-1280-light.png" width="880" alt="The sign-off board's Today view: one question up next, three more waiting, and two proofs filed today">
+  </picture>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="assets/tools/sign-off/evidence-390-dark.png">
+    <source media="(max-width: 600px)" srcset="assets/tools/sign-off/evidence-390-light.png">
+    <source media="(prefers-color-scheme: dark)" srcset="assets/tools/sign-off/evidence-1280-dark.png">
+    <img src="assets/tools/sign-off/evidence-1280-light.png" width="880" alt="The sign-off evidence view: a real screen at phone width, with Pass, Needs work, and Add a comment">
+  </picture>
+</p>
+
+### The fleet dashboard: see the whole board
+
+The built-in dashboard reads the fleet read-only and shows what is moving, what waits on you, and what the work is proving. It needs no separate install.
+
+<p align="center">
+  <picture>
+    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="assets/tools/fleet-dashboard/dashboard-390-dark.png">
+    <source media="(max-width: 600px)" srcset="assets/tools/fleet-dashboard/dashboard-390-light.png">
+    <source media="(prefers-color-scheme: dark)" srcset="assets/tools/fleet-dashboard/dashboard-1280-dark.png">
+    <img src="assets/tools/fleet-dashboard/dashboard-1280-light.png" width="880" alt="The fleet dashboard's Tickets view: work moving, questions waiting on the Captain, and the path from start to landed">
+  </picture>
+</p>
+
+### The toolbelt
+
+| Tool | What it does and how to install it |
+| --- | --- |
+| **done-done** | Drives the real product, has a fresh judge check the capture, and writes a receipt tied to the commit.<br>`npm install -g done-done-axi@0.6.18` |
+| **sign-off** | Collects questions, designs, reports, and proof on one board; the answer is saved for the agent.<br>`npm install -g sign-off-axi@0.7.0 (0.8.0 once sign-off PR 303 releases)` |
+| **learn-from-mistakes** | Finds the causes that keep coming back in your records, with counts, evidence, and fixes that cite the record.<br>`npm i -g learn-from-mistakes-axi@0.10.0` |
+| **first-draft** | Makes several HTML design directions, lets you compare them at desktop and phone width, and keeps the one you pick.<br>`npm install -g first-draft-axi@0.3.0` |
+| **TakeOne** | Turns a raw screen recording into a framed, paced demo video on your machine.<br>`npm install -g --allow-remote=all https://github.com/umeranjum17/takeone/releases/latest/download/takeone.tgz (0.2.1)` |
+| **quota-axi** | Reports the quota windows your local agents can use, in one read, without routing or recommending anything.<br>`npx -y quota-axi@0.1.67` |
+| **BYOKit** | Gives your app the parts it needs to use a person's own AI plan and devices: sign-in, pairing, voice, usage.<br>`npm install @byokit/accounts@0.34.0 @byokit/realtime@0.3.3` |
+| **Lookout** | A read-only fleet dashboard: which agents need you, what limits capacity, and why work is waiting.<br>`npx -y lookout-axi@0.1.0 serve` |
+
+<p align="center">
+  <picture>
+    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="assets/tools/done-done/390-dark.png">
+    <source media="(max-width: 600px)" srcset="assets/tools/done-done/390-light.png">
+    <source media="(prefers-color-scheme: dark)" srcset="assets/tools/done-done/1280-dark.png">
+    <img src="assets/tools/done-done/1280-light.png" width="880" alt="done-done: A real done-done run, a passing judge, and a receipt">
+  </picture>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="assets/tools/sign-off/board-390-dark.png">
+    <source media="(max-width: 600px)" srcset="assets/tools/sign-off/board-390-light.png">
+    <source media="(prefers-color-scheme: dark)" srcset="assets/tools/sign-off/board-1280-dark.png">
+    <img src="assets/tools/sign-off/board-1280-light.png" width="880" alt="sign-off: The sign-off Today board">
+  </picture>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="assets/tools/learn-from-mistakes/390-dark.png">
+    <source media="(max-width: 600px)" srcset="assets/tools/learn-from-mistakes/390-light.png">
+    <source media="(prefers-color-scheme: dark)" srcset="assets/tools/learn-from-mistakes/1280-dark.png">
+    <img src="assets/tools/learn-from-mistakes/1280-light.png" width="880" alt="learn-from-mistakes: A real retro report excerpt with repeated causes and counts">
+  </picture>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="assets/tools/first-draft/studio-390-dark.png">
+    <source media="(max-width: 600px)" srcset="assets/tools/first-draft/studio-390-light.png">
+    <source media="(prefers-color-scheme: dark)" srcset="assets/tools/first-draft/studio-1280-dark.png">
+    <img src="assets/tools/first-draft/studio-1280-light.png" width="880" alt="first-draft: The first-draft Studio with two options and a comment">
+  </picture>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="assets/tools/takeone/390-dark.png">
+    <source media="(max-width: 600px)" srcset="assets/tools/takeone/390-light.png">
+    <source media="(prefers-color-scheme: dark)" srcset="assets/tools/takeone/1280-dark.png">
+    <img src="assets/tools/takeone/1280-light.png" width="880" alt="TakeOne: TakeOne doctor reporting the recorder, planner, and renderer">
+  </picture>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="assets/tools/quota-axi/390-dark.png">
+    <source media="(max-width: 600px)" srcset="assets/tools/quota-axi/390-light.png">
+    <source media="(prefers-color-scheme: dark)" srcset="assets/tools/quota-axi/1280-dark.png">
+    <img src="assets/tools/quota-axi/1280-light.png" width="880" alt="quota-axi: One quota-axi read showing several providers and their windows">
+  </picture>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="assets/tools/byokit/voice-390-dark.png">
+    <source media="(max-width: 600px)" srcset="assets/tools/byokit/voice-390-light.png">
+    <source media="(prefers-color-scheme: dark)" srcset="assets/tools/byokit/voice-1280-dark.png">
+    <img src="assets/tools/byokit/voice-1280-light.png" width="880" alt="BYOKit: The BYOKit offline voice example after a turn">
+  </picture>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="assets/tools/lookout/overview-390-dark.png">
+    <source media="(max-width: 600px)" srcset="assets/tools/lookout/overview-390-light.png">
+    <source media="(prefers-color-scheme: dark)" srcset="assets/tools/lookout/overview-1280-dark.png">
+    <img src="assets/tools/lookout/overview-1280-light.png" width="880" alt="Lookout: Lookout Overview of the bundled sample fleet">
+  </picture>
+</p>
+
+Install lines are copied from each project's published README and pinned to the version published on 26 October 2026; sign-off stays on 0.7.0 until its 0.8.0 release (PR 303) ships. The done-done screen is the project's 0.6.12 transcript, the learn-from-mistakes screen is a 0.9.0 report, and the first-draft screen is 0.3.0-dev release evidence; the install pins are the current published versions. A clean-home install proof for every row is still owed, so treat an install line as the project's documented command, not as a claim that this page ran it end to end.
+
+Two notes on what the screens show:
+
+- The BYOKit screen is the **offline example** (`BYOKIT_EXAMPLE_FAKE=1`): a stand-in sign-in and a stand-in voice peer, with nothing leaving the machine. It is not a live provider connection.
+- The done-done screen is a real proof transcript, including the judge's model (DeepSeek v4.1 Flash). Paths are shortened; nothing was re-judged for this page.
 
 <p align="center"><img src="assets/brand/rule-ember.svg" width="72" alt=""></p>
 
