@@ -49,14 +49,14 @@ An agent distro is a portable directory of instructions, skills, tooling, polici
 ### Command
 
 - **One liaison** — you talk only to the Overwatch; it dispatches, supervises, escalates only real decisions, and reports plain objectives secured.
-- **A visible squad** — every operator works in its own tmux window or Herdr tab, or in an experimental Zellij, cmux, or Orca terminal you can watch or type into; the Overwatch reconciles.
+- **A visible squad** — every operator works in its own tmux window or Herdr tab, or in an experimental Zellij, cmux, or worker-runtime terminal you can watch or type into; the Overwatch reconciles.
 - **Explicit project modes** — each project ships via `no-mistakes`, `direct-PR`, or `local-only`, with optional `+yolo` merge autonomy, a `branch=<prefix>` override for the default `fm/` ship-branch prefix, and a `forge=gerrit` binding that publishes a Gerrit change instead of a pull request.
 
 ### Mission
 
 - **Two mission shapes** — ship missions deliver authorized changes; recon missions leave standalone findings when the intake contract warrants separate research.
-- **Disposable worktrees** — each mission runs in a clean [treehouse](https://github.com/kunchenguid/treehouse) git worktree, or an Orca-managed worktree when `backend=orca`, so parallel work on one repo never collides.
-- **Event-driven, zero-token supervision** — a bash watcher sleeps on the fleet and wakes the Overwatch only when something needs you; verified harnesses also get a turn-end backstop.
+- **Isolated work copies** — each mission runs in its own clean copy of the repository, so parallel work on one repo never collides.
+- **Event-driven, zero-token supervision** — a monitor sleeps on the fleet and wakes the Overwatch only when something needs you; verified harnesses also get a turn-end backstop.
 - **Restart-proof** — all state lives on disk and in the active session backend; the next session reconciles after a restart, and ordinary supervision recovers confirmed-dead operators.
 
 ### Boundaries
@@ -77,8 +77,10 @@ Full detail on every feature lives in [docs/architecture.md](docs/architecture.m
 
 <p align="center">
   <picture>
+    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="assets/diagrams/how-it-works-mobile-dark.svg">
+    <source media="(max-width: 600px)" srcset="assets/diagrams/how-it-works-mobile-light.svg">
     <source media="(prefers-color-scheme: dark)" srcset="assets/diagrams/how-it-works-dark.svg">
-    <img src="assets/diagrams/how-it-works-light.svg" width="100%" alt="Captain to Overwatch to Squad Leads to Operators, with supervision, the delivery path and the review board">
+    <img src="assets/diagrams/how-it-works-light.svg" width="100%" alt="The chain of command: Captain to Overwatch to Squad Leads to Operators to Work to Outcomes. Each Squad Lead owns its Operators, and Squad Leads are optional for small fleets.">
   </picture>
 </p>
 
@@ -178,7 +180,7 @@ Pi's `/supervision-model` command pins a cheaper model and a shallower reasoning
 
 ### More backends
 
-Setup guides for tmux (the default) and every other supported backend (herdr, zellij, Orca, cmux) are linked in [Documentation](#documentation) below.
+Setup guides for tmux (the default) and every other supported runtime are linked in [Documentation](#documentation) below.
 
 <p align="center"><img src="assets/brand/rule-ember.svg" width="72" alt=""></p>
 
