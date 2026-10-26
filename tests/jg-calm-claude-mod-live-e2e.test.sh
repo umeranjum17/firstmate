@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
 # Opt-in credentialed live regression for the Claude Code Calm mod
-# (.claude/mods/firstmate-calm) in a real Claude Code TUI under tmux, mirroring the
+# (.claude/mods/juggernaut-calm) in a real Claude Code TUI under tmux, mirroring the
 # Pi interactive case in tests/jg-calm-pi-extension.test.sh. It proves, against the
 # installed Claude Code and the shipped project auto-load path (.claude/skills):
 #   1. With CLAUDE_CODE_ENABLE_FUNCTION_HOOKS unset, the mod is a complete no-op even
 #      with the per-home preference already on: no hooks module loads, /calm is not a
 #      command, the stock working row shows, and tool rows draw as stock.
 #   2. With the flag on, the sailboat replaces the working row and moves, tool rows and
-#      a record-backed operational doorbell (the carrier Firstmate types into Claude
+#      a record-backed operational doorbell (the carrier Juggernaut types into Claude
 #      Code, which strips U+2063 from submitted prompts) draw at zero height, /calm
 #      restores them and persists off, /calm hides them again and persists on, all
 #      without a Calm output row in the transcript.
 #   3. `claude --continue` restores the transcript with those rows still hidden.
 #   4. With Calm off, the supervision notes draw from a store bin/jg-branch-outcome.sh
 #      writes: the session-start replay, new sailboat and anchor lines, and the latch
-#      note, each drawn behind the plugin's `fm:` label rather than `firstmate-calm:`,
+#      note, each drawn behind the plugin's `fm:` label rather than `juggernaut-calm:`,
 #      without moving a store marker or reaching the model, and a resume shows each
 #      anchor once.
 # The project and JG_HOME are isolated; Claude keeps using its existing managed
@@ -27,7 +27,7 @@ set -u
 
 jg_live_gate opt-in JG_CLAUDE_CALM_LIVE_E2E claude tmux
 
-MOD="$ROOT/.claude/mods/firstmate-calm"
+MOD="$ROOT/.claude/mods/juggernaut-calm"
 OPERATIONAL_INPUT="$ROOT/bin/jg-operational-input.sh"
 CLAUDE_VERSION=$(claude --version 2>/dev/null || true)
 [ -n "$CLAUDE_VERSION" ] || fail "claude is installed but reports no version"
@@ -56,7 +56,7 @@ cleanup() {
 trap cleanup EXIT
 
 mkdir -p "$PROJECT/.claude/skills" "$JG_HOME_DIR/config"
-ln -s "$MOD" "$PROJECT/.claude/skills/firstmate-calm"
+ln -s "$MOD" "$PROJECT/.claude/skills/juggernaut-calm"
 printf 'alpha\nbeta\ngamma\n' >"$PROJECT/notes.txt"
 printf 'on\n' >"$JG_HOME_DIR/config/calm"
 
@@ -158,7 +158,7 @@ command_listed() {  # <command>
   while [ "$i" -lt 40 ]; do
     shot=$(screen)
     case "$shot" in
-      *"Toggle Firstmate's Calm"*) listed=1; break ;;
+      *"Toggle Juggernaut's Calm"*) listed=1; break ;;
     esac
     sleep 0.1
     i=$((i + 1))
@@ -319,10 +319,10 @@ case "$on_settled" in
     ;;
 esac
 
-# Claude Code strips U+2063 from submitted prompts, so Firstmate types a plain doorbell
+# Claude Code strips U+2063 from submitted prompts, so Juggernaut types a plain doorbell
 # naming a record that holds the envelope; that doorbell row draws at zero height while
 # the answer stays visible. The answer token lives only in the record.
-DOORBELL_TEXT='Firstmate operational input waiting'
+DOORBELL_TEXT='Juggernaut operational input waiting'
 operational=$(printf 'signal: %s/state/probe.status changed. Reply with exactly OPERATIONAL_PROCESSED and nothing else.' "$LAB" \
   | JG_HOME="$JG_HOME_DIR" "$OPERATIONAL_INPUT" record watcher) \
   || fail "could not publish the operational probe record"
@@ -334,7 +334,7 @@ send "$operational"
 sleep 1
 enter
 # A long line typed in one burst can leave Claude Code's first Enter inside its paste
-# handling; like Firstmate's own submit primitive, retry Enter only, never retype.
+# handling; like Juggernaut's own submit primitive, retry Enter only, never retype.
 i=0
 while [ "$i" -lt 4 ]; do
   sleep 2
@@ -469,9 +469,9 @@ case "$notes_screen" in
     printf '%s\n' "$notes_screen" >&2
     fail "a processed captain outcome or a silent routine outcome drew a supervision note"
     ;;
-  *'firstmate-calm:'*)
+  *'juggernaut-calm:'*)
     printf '%s\n' "$notes_screen" >&2
-    fail "a supervision note drew behind the old firstmate-calm label"
+    fail "a supervision note drew behind the old juggernaut-calm label"
     ;;
 esac
 [ "$(cat "$STATE_DIR/.branch-outcomes-cursor")" = 2 ] || fail "the supervision notes moved the store's read cursor"

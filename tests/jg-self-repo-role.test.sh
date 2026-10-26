@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Behavior tests for the firstmate-repository publication boundary
+# Behavior tests for the juggernaut-repository publication boundary
 # (bin/jg-role-lib.sh, bin/jg-role.sh, and its consumers).
 #
 # Every home runs as a user/operator by default: a ship task whose project is
-# firstmate's own repository may carry a publishing contract (no-mistakes or
+# juggernaut's own repository may carry a publishing contract (no-mistakes or
 # direct-PR) only under an explicit grant - the maintainer scope written by
-# the operator into config/firstmate-role, or a bounded per-task
+# the operator into config/juggernaut-role, or a bounded per-task
 # --upstream-consent recorded in the delivery contract. Role is never inferred
-# from remotes, credentials, or repository ownership. In a secondmate home the
+# from remotes, credentials, or repository ownership. In a squad_lead home the
 # grant is honored only when the inheritance receipt matches the exact bytes
 # the parent published; the receipt guards supported propagation, not forged
 # local records. local-only publishes nothing and never reaches the
@@ -45,14 +45,14 @@ ORIGIN_URL=$(git -C "$ROOT" remote get-url upstream 2>/dev/null) \
   || ORIGIN_URL=
 
 # make_role_home <name> [<role-file-content>]: a bare home whose only contents
-# are config/ (optionally holding firstmate-role) plus the state/ and data/
+# are config/ (optionally holding juggernaut-role) plus the state/ and data/
 # dirs the other consumers expect. Echoes the home path.
 make_role_home() {
   local name=$1 content=${2-} home
   home="$TMP_ROOT/$name"
   mkdir -p "$home/config" "$home/state" "$home/data"
   if [ $# -ge 2 ]; then
-    printf '%s\n' "$content" > "$home/config/firstmate-role"
+    printf '%s\n' "$content" > "$home/config/juggernaut-role"
   fi
   printf '%s\n' "$home"
 }
@@ -63,7 +63,7 @@ git_commit() {
     commit -q --allow-empty -m "$2" || fail "could not commit in $1"
 }
 
-# make_lineage_root <name> <origin-url> - a fixture firstmate code root with
+# make_lineage_root <name> <origin-url> - a fixture juggernaut code root with
 # two commits and the given origin. Echoes its path.
 make_lineage_root() {
   local root="$TMP_ROOT/$1"
@@ -142,17 +142,17 @@ test_report_fails_closed_on_unsafe_input() {
 
   home=$(make_role_home report-symlink)
   printf 'maintainer github.com/a/b\n' > "$TMP_ROOT/report-symlink-target"
-  ln -s "$TMP_ROOT/report-symlink-target" "$home/config/firstmate-role"
+  ln -s "$TMP_ROOT/report-symlink-target" "$home/config/juggernaut-role"
   out=$(run_role "$home" report)
   assert_contains "$out" "jg-role: user" "a symlinked role file must resolve to user"
   assert_contains "$out" "must not be a symlink" "a symlinked role file must report the narrow problem"
 
-  home=$(make_role_home report-two-directives "$(printf 'maintainer github.com/kunchenguid/firstmate\n# trailing\nuser')")
+  home=$(make_role_home report-two-directives "$(printf 'maintainer github.com/kunchenguid/juggernaut\n# trailing\nuser')")
   out=$(run_role "$home" report)
   assert_contains "$out" "jg-role: user" "a later directive must make the whole file malformed, not be ignored"
   assert_contains "$out" "exactly one directive line" "a second directive must name the narrow problem"
 
-  home=$(make_role_home report-two-scopes 'maintainer github.com/kunchenguid/firstmate github.com/other/firstmate')
+  home=$(make_role_home report-two-scopes 'maintainer github.com/kunchenguid/juggernaut github.com/other/juggernaut')
   out=$(run_role "$home" report)
   assert_contains "$out" "jg-role: user" "a maintainer directive naming two scopes must resolve to user"
   assert_contains "$out" "exactly one repository scope" "a multi-scope directive must name the narrow problem"
@@ -165,10 +165,10 @@ test_check_user_home_refused_on_self_repo() {
   local home out rc
   home=$(make_role_home check-user)
   out=$(run_role "$home" check "$ROOT"); rc=$?
-  expect_code 1 "$rc" "a user/operator home must be refused a publishing contract on firstmate itself"
+  expect_code 1 "$rc" "a user/operator home must be refused a publishing contract on juggernaut itself"
   assert_contains "$out" "user/operator" "the refusal must name the role"
   assert_contains "$out" "no publication authority" "the refusal must name the missing grant"
-  pass "jg-role.sh check: the default user/operator home cannot publish to firstmate upstream"
+  pass "jg-role.sh check: the default user/operator home cannot publish to juggernaut upstream"
 }
 
 test_check_foreign_project_passes_through() {
@@ -209,20 +209,20 @@ test_check_wrong_scope_and_remote_presence_do_not_authorize() {
   # A maintainer grant for a different repository is no authority here, even
   # though the project's own remote IS the real upstream: role is never
   # inferred from the remote itself.
-  home=$(make_role_home check-other 'maintainer github.com/other/firstmate')
+  home=$(make_role_home check-other 'maintainer github.com/other/juggernaut')
   out=$(run_role "$home" check "$ROOT"); rc=$?
   expect_code 1 "$rc" "a non-matching maintainer scope must be refused"
   assert_contains "$out" "no publication authority for $PUB_TARGET" \
     "the refusal must name the target the grant did not cover"
 
   # A second clone of the same upstream (shared history, different git dir)
-  # is still firstmate's repository: the boundary follows lineage, not the
+  # is still juggernaut's repository: the boundary follows lineage, not the
   # checkout path.
   home=$(make_role_home check-clone)
   clone=$(clone_with_origin "$ROOT" second-clone "$ORIGIN_URL")
   out=$(run_role "$home" check "$clone"); rc=$?
   expect_code 1 "$rc" "a second clone of the same upstream must still be gated"
-  assert_contains "$out" "user/operator" "a second clone must be treated as firstmate's own repository"
+  assert_contains "$out" "user/operator" "a second clone must be treated as juggernaut's own repository"
   pass "jg-role.sh check: scope mismatch and mere upstream remote presence never authorize"
 }
 
@@ -232,67 +232,67 @@ test_check_wrong_scope_and_remote_presence_do_not_authorize() {
 # checkout's own remotes.
 test_check_equivalent_remote_spellings_are_one_repo() {
   local root clone url user_home maint_home out rc n=0
-  root=$(make_lineage_root spelling-root https://github.com/kunchenguid/firstmate)
+  root=$(make_lineage_root spelling-root https://github.com/kunchenguid/juggernaut)
   user_home=$(make_role_home spelling-user)
-  maint_home=$(make_role_home spelling-maint 'maintainer github.com/kunchenguid/firstmate')
-  for url in https://github.com/kunchenguid/firstmate.git/ \
-    https://github.com/kunchenguid/firstmate/ \
-    git@github.com:kunchenguid/firstmate.git/; do
+  maint_home=$(make_role_home spelling-maint 'maintainer github.com/kunchenguid/juggernaut')
+  for url in https://github.com/kunchenguid/juggernaut.git/ \
+    https://github.com/kunchenguid/juggernaut/ \
+    git@github.com:kunchenguid/juggernaut.git/; do
     n=$((n + 1))
     clone=$(clone_with_origin "$root" "spelling-clone-$n" "$url")
     out=$(check_as "$root" "$user_home" "$clone"); rc=$?
-    expect_code 1 "$rc" "a clone of $url must be gated as firstmate (got: $out)"
+    expect_code 1 "$rc" "a clone of $url must be gated as juggernaut (got: $out)"
     out=$(check_as "$root" "$maint_home" "$clone"); rc=$?
     expect_code 0 "$rc" "the maintainer scope must cover a clone of $url (got: $out)"
   done
   pass "jg-role.sh check: equivalent remote spellings resolve to one publication target"
 }
 
-# Firstmate run from a fork, dispatching to a separate clone of the parent:
-# their origins and git dirs differ, but they share firstmate's root commit,
+# Juggernaut run from a fork, dispatching to a separate clone of the parent:
+# their origins and git dirs differ, but they share juggernaut's root commit,
 # so the task still meets the role/consent gate. A fork's maintainer scope
 # does not cover the parent; one-task consent for the parent does.
 test_check_fork_lineage_reaches_the_gate() {
   local fork parent user_home fork_home out rc
-  fork=$(make_lineage_root fork-root https://github.com/someone/firstmate-fork)
-  parent=$(clone_with_origin "$fork" parent-clone https://github.com/kunchenguid/firstmate)
+  fork=$(make_lineage_root fork-root https://github.com/someone/juggernaut-fork)
+  parent=$(clone_with_origin "$fork" parent-clone https://github.com/kunchenguid/juggernaut)
   user_home=$(make_role_home fork-user)
   out=$(check_as "$fork" "$user_home" "$parent"); rc=$?
   expect_code 1 "$rc" "a parent clone dispatched from a fork code root must be gated (got: $out)"
-  assert_contains "$out" "no publication authority for github.com/kunchenguid/firstmate" \
+  assert_contains "$out" "no publication authority for github.com/kunchenguid/juggernaut" \
     "the refusal must name the parent publication target"
 
-  fork_home=$(make_role_home fork-maint 'maintainer github.com/someone/firstmate-fork')
+  fork_home=$(make_role_home fork-maint 'maintainer github.com/someone/juggernaut-fork')
   out=$(check_as "$fork" "$fork_home" "$parent"); rc=$?
   expect_code 1 "$rc" "a fork maintainer scope must not cover the parent (got: $out)"
 
-  out=$(check_as "$fork" "$user_home" "$parent" upstream-consent github.com/kunchenguid/firstmate); rc=$?
+  out=$(check_as "$fork" "$user_home" "$parent" upstream-consent github.com/kunchenguid/juggernaut); rc=$?
   expect_code 0 "$rc" "one-task consent for the parent must authorize (got: $out)"
 
   git init -q "$TMP_ROOT/fork-unrelated" || fail "could not initialize unrelated fixture"
   git_commit "$TMP_ROOT/fork-unrelated" unrelated
-  git -C "$TMP_ROOT/fork-unrelated" remote add origin https://github.com/kunchenguid/firstmate
+  git -C "$TMP_ROOT/fork-unrelated" remote add origin https://github.com/kunchenguid/juggernaut
   out=$(check_as "$fork" "$user_home" "$TMP_ROOT/fork-unrelated"); rc=$?
-  expect_code 2 "$rc" "an unrelated history is not firstmate even with a firstmate remote (got: $out)"
-  pass "jg-role.sh check: repository lineage, not remotes, identifies firstmate across forks"
+  expect_code 2 "$rc" "an unrelated history is not juggernaut even with a juggernaut remote (got: $out)"
+  pass "jg-role.sh check: repository lineage, not remotes, identifies juggernaut across forks"
 }
 
-# Lineage that cannot be determined refuses, and a firstmate-lineage project
+# Lineage that cannot be determined refuses, and a juggernaut-lineage project
 # with no determinable publication target is refused even under consent.
 test_check_undeterminable_lineage_and_target_refuse() {
   local root shallow bare home out rc
-  root=$(make_lineage_root undet-root https://github.com/kunchenguid/firstmate)
+  root=$(make_lineage_root undet-root https://github.com/kunchenguid/juggernaut)
   home=$(make_role_home undet-user)
   shallow="$TMP_ROOT/undet-shallow"
   git clone -q --depth 1 "file://$root" "$shallow" || fail "could not make a shallow clone"
-  git -C "$shallow" remote set-url origin https://github.com/kunchenguid/firstmate
-  out=$(check_as "$root" "$home" "$shallow" upstream-consent github.com/kunchenguid/firstmate); rc=$?
+  git -C "$shallow" remote set-url origin https://github.com/kunchenguid/juggernaut
+  out=$(check_as "$root" "$home" "$shallow" upstream-consent github.com/kunchenguid/juggernaut); rc=$?
   expect_code 1 "$rc" "a shallow clone sharing no root commit must be refused (got: $out)"
   assert_contains "$out" "cannot determine whether" "the refusal must name undeterminable lineage"
 
-  bare=$(clone_with_origin "$root" undet-no-remote https://github.com/kunchenguid/firstmate)
+  bare=$(clone_with_origin "$root" undet-no-remote https://github.com/kunchenguid/juggernaut)
   git -C "$bare" remote remove origin
-  out=$(check_as "$root" "$home" "$bare" upstream-consent github.com/kunchenguid/firstmate); rc=$?
+  out=$(check_as "$root" "$home" "$bare" upstream-consent github.com/kunchenguid/juggernaut); rc=$?
   expect_code 1 "$rc" "consent must not authorize an undeterminable publication target (got: $out)"
   assert_contains "$out" "no publication target can be determined" "the refusal must name the missing target"
   pass "jg-role.sh check: undeterminable lineage or publication target refuses"
@@ -316,44 +316,44 @@ test_check_task_consent_authorizes_one_task() {
   pass "jg-role.sh check: recorded one-task consent authorizes its named repository only"
 }
 
-# --- secondmate homes: receipt-proven grants only ---------------------------
+# --- squad_lead homes: receipt-proven grants only ---------------------------
 
-# In a secondmate home (its .jg-secondmate-home marker) a role file without a
+# In a squad_lead home (its .jg-squad-lead-home marker) a role file without a
 # propagation receipt resolves to user.
-test_secondmate_cannot_self_grant() {
+test_squad_lead_cannot_self_grant() {
   local home out rc
   home=$(make_role_home sm-selfgrant "maintainer ${PUB_TARGET:-github.com/a/b}")
-  : > "$home/.jg-secondmate-home"
+  : > "$home/.jg-squad-lead-home"
   out=$(run_role "$home" report)
-  assert_contains "$out" "jg-role: user" "a self-planted role file must not grant a secondmate anything"
+  assert_contains "$out" "jg-role: user" "a self-planted role file must not grant a squad_lead anything"
   assert_contains "$out" "no propagation receipt" "the report must name the missing receipt"
   if [ -n "$PUB_TARGET" ]; then
     out=$(run_role "$home" check "$ROOT"); rc=$?
-    expect_code 1 "$rc" "a self-granted secondmate must be refused at the gate"
+    expect_code 1 "$rc" "a self-granted squad_lead must be refused at the gate"
   fi
-  pass "secondmate home: a role file without an inheritance receipt grants nothing"
+  pass "squad_lead home: a role file without an inheritance receipt grants nothing"
 }
 
 # The real propagation path (jg-config-inherit-lib.sh) both carries the file
 # and writes the exact-byte receipt; the resolved role then reads as
 # inherited, revocation mirrors the parent's removal, and any local edit
 # invalidates the proof.
-test_secondmate_inheritance_receipt_lifecycle() {
+test_squad_lead_inheritance_receipt_lifecycle() {
   local src dst_config sm_home out rc receipt
   src="$TMP_ROOT/inherit-src-config"
   dst_config="$TMP_ROOT/inherit-sm/config"
   sm_home="$TMP_ROOT/inherit-sm"
   mkdir -p "$src" "$dst_config" "$sm_home/state" "$sm_home/data"
-  : > "$sm_home/.jg-secondmate-home"
-  receipt="$dst_config/.jg-inherit-firstmate-role.generation"
+  : > "$sm_home/.jg-squad-lead-home"
+  receipt="$dst_config/.jg-inherit-juggernaut-role.generation"
 
-  printf 'maintainer %s\n' "${PUB_TARGET:-github.com/kunchenguid/firstmate}" > "$src/firstmate-role"
-  JG_ADDONS_DIR="$TMP_ROOT/no-addons" JG_INHERITABLE_CONFIG=firstmate-role propagate_inheritable_config "$src" "$dst_config" \
-    || fail "local propagation of firstmate-role failed"
-  assert_present "$dst_config/firstmate-role" "propagation did not copy the role file"
+  printf 'maintainer %s\n' "${PUB_TARGET:-github.com/kunchenguid/juggernaut}" > "$src/juggernaut-role"
+  JG_ADDONS_DIR="$TMP_ROOT/no-addons" JG_INHERITABLE_CONFIG=juggernaut-role propagate_inheritable_config "$src" "$dst_config" \
+    || fail "local propagation of juggernaut-role failed"
+  assert_present "$dst_config/juggernaut-role" "propagation did not copy the role file"
   assert_present "$receipt" "propagation did not commit the role receipt"
   out=$(run_role "$sm_home" report)
-  assert_equals "jg-role: maintainer ${PUB_TARGET:-github.com/kunchenguid/firstmate} (inherited)" "$out" \
+  assert_equals "jg-role: maintainer ${PUB_TARGET:-github.com/kunchenguid/juggernaut} (inherited)" "$out" \
     "a receipt-proven inherited grant must resolve to maintainer"
   if [ -n "$PUB_TARGET" ]; then
     out=$(run_role "$sm_home" check "$ROOT"); rc=$?
@@ -361,7 +361,7 @@ test_secondmate_inheritance_receipt_lifecycle() {
   fi
 
   # Local drift after propagation invalidates the exact-byte proof.
-  printf 'maintainer github.com/evil/scope\n' > "$dst_config/firstmate-role"
+  printf 'maintainer github.com/evil/scope\n' > "$dst_config/juggernaut-role"
   out=$(run_role "$sm_home" report)
   assert_contains "$out" "jg-role: user" "a locally edited inherited grant must die"
   assert_contains "$out" "unverified inherited grant" "a diverged grant must name the unverified state"
@@ -372,11 +372,11 @@ test_secondmate_inheritance_receipt_lifecycle() {
   # how an inherited file with a second directive parses: it is malformed as
   # a whole even when its receipt matches the exact bytes.
   gen=$(sed -n '1p' "$receipt")
-  printf 'maintainer %s\nuser\n' "${PUB_TARGET:-github.com/kunchenguid/firstmate}" > "$dst_config/firstmate-role"
+  printf 'maintainer %s\nuser\n' "${PUB_TARGET:-github.com/kunchenguid/juggernaut}" > "$dst_config/juggernaut-role"
   {
     printf '%s\n' "$((gen + 1))"
-    wc -c <"$dst_config/firstmate-role" | tr -d '[:space:]' | awk '{printf "%s\n", $1}'
-    jg_role_sha256_stdin <"$dst_config/firstmate-role"
+    wc -c <"$dst_config/juggernaut-role" | tr -d '[:space:]' | awk '{printf "%s\n", $1}'
+    jg_role_sha256_stdin <"$dst_config/juggernaut-role"
     printf 'put\n'
   } > "$receipt"
   out=$(run_role "$sm_home" report)
@@ -385,11 +385,11 @@ test_secondmate_inheritance_receipt_lifecycle() {
 
   # Revocation: the parent's role file disappears, so propagation removes the
   # destination file and records the absence in the receipt.
-  printf 'maintainer %s\n' "${PUB_TARGET:-github.com/kunchenguid/firstmate}" > "$dst_config/firstmate-role"
-  rm "$src/firstmate-role"
-  JG_ADDONS_DIR="$TMP_ROOT/no-addons" JG_INHERITABLE_CONFIG=firstmate-role propagate_inheritable_config "$src" "$dst_config" \
-    || fail "revocation propagation of firstmate-role failed"
-  assert_absent "$dst_config/firstmate-role" "revocation did not remove the inherited role file"
+  printf 'maintainer %s\n' "${PUB_TARGET:-github.com/kunchenguid/juggernaut}" > "$dst_config/juggernaut-role"
+  rm "$src/juggernaut-role"
+  JG_ADDONS_DIR="$TMP_ROOT/no-addons" JG_INHERITABLE_CONFIG=juggernaut-role propagate_inheritable_config "$src" "$dst_config" \
+    || fail "revocation propagation of juggernaut-role failed"
+  assert_absent "$dst_config/juggernaut-role" "revocation did not remove the inherited role file"
   assert_present "$receipt" "revocation dropped the receipt that proves absence"
   [ "$(sed -n '4p' "$receipt")" = absent ] || fail "revocation did not record an absent receipt"
   out=$(run_role "$sm_home" report)
@@ -397,54 +397,54 @@ test_secondmate_inheritance_receipt_lifecycle() {
 
   # Once revoked, a role file planted locally still has only the absent
   # receipt to its name and grants nothing.
-  printf 'maintainer %s\n' "${PUB_TARGET:-github.com/kunchenguid/firstmate}" > "$dst_config/firstmate-role"
+  printf 'maintainer %s\n' "${PUB_TARGET:-github.com/kunchenguid/juggernaut}" > "$dst_config/juggernaut-role"
   out=$(run_role "$sm_home" report)
   assert_contains "$out" "jg-role: user" "a post-revocation self-plant must grant nothing"
   assert_contains "$out" "unverified inherited grant" "a self-plant after revocation must be named unverified"
-  pass "secondmate home: inherited grants need a matching receipt; receipt-less and revoked grants are dead"
+  pass "squad_lead home: inherited grants need a matching receipt; receipt-less and revoked grants are dead"
 }
 
 # The parent publishes its resolved role, not its raw file: a primary role
 # file the primary's own resolver rejects (symlinked or malformed) propagates
 # as revocation, never as a copied grant.
-test_secondmate_inherits_only_resolved_primary_role() {
+test_squad_lead_inherits_only_resolved_primary_role() {
   local src dst_config sm_home out receipt scope bad
-  scope=${PUB_TARGET:-github.com/kunchenguid/firstmate}
+  scope=${PUB_TARGET:-github.com/kunchenguid/juggernaut}
   src="$TMP_ROOT/resolved-src-home/config"
   sm_home="$TMP_ROOT/resolved-sm"
   dst_config="$sm_home/config"
   mkdir -p "$src" "$dst_config" "$sm_home/state" "$sm_home/data"
-  : > "$sm_home/.jg-secondmate-home"
-  receipt="$dst_config/.jg-inherit-firstmate-role.generation"
+  : > "$sm_home/.jg-squad-lead-home"
+  receipt="$dst_config/.jg-inherit-juggernaut-role.generation"
 
   for bad in symlink two-directives; do
-    rm -f "$src/firstmate-role"
-    printf '# operator note\nmaintainer %s\n' "$scope" > "$src/firstmate-role"
-    JG_ADDONS_DIR="$TMP_ROOT/no-addons" JG_INHERITABLE_CONFIG=firstmate-role propagate_inheritable_config "$src" "$dst_config" \
+    rm -f "$src/juggernaut-role"
+    printf '# operator note\nmaintainer %s\n' "$scope" > "$src/juggernaut-role"
+    JG_ADDONS_DIR="$TMP_ROOT/no-addons" JG_INHERITABLE_CONFIG=juggernaut-role propagate_inheritable_config "$src" "$dst_config" \
       || fail "propagation of a valid primary grant failed"
     out=$(run_role "$sm_home" report)
     assert_equals "jg-role: maintainer $scope (inherited)" "$out" "a valid primary grant must be inherited"
 
-    rm -f "$src/firstmate-role"
+    rm -f "$src/juggernaut-role"
     case $bad in
     symlink)
       printf 'maintainer %s\n' "$scope" > "$TMP_ROOT/resolved-symlink-target"
-      ln -s "$TMP_ROOT/resolved-symlink-target" "$src/firstmate-role"
+      ln -s "$TMP_ROOT/resolved-symlink-target" "$src/juggernaut-role"
       ;;
     two-directives)
-      printf 'maintainer %s\nuser\n' "$scope" > "$src/firstmate-role"
+      printf 'maintainer %s\nuser\n' "$scope" > "$src/juggernaut-role"
       ;;
     esac
     out=$(JG_HOME="$TMP_ROOT/resolved-src-home" JG_CONFIG_OVERRIDE="$src" "$ROLE" report 2>&1)
     assert_contains "$out" "jg-role: user" "the $bad primary role file must resolve to user on the primary"
-    JG_INHERITABLE_CONFIG=firstmate-role propagate_inheritable_config "$src" "$dst_config" \
+    JG_INHERITABLE_CONFIG=juggernaut-role propagate_inheritable_config "$src" "$dst_config" \
       || fail "propagation of a rejected $bad primary role failed"
-    assert_absent "$dst_config/firstmate-role" "a rejected $bad primary role must not be copied downstream"
+    assert_absent "$dst_config/juggernaut-role" "a rejected $bad primary role must not be copied downstream"
     [ "$(sed -n '4p' "$receipt")" = absent ] || fail "a rejected $bad primary role must record an absent receipt"
     out=$(run_role "$sm_home" report)
-    assert_equals "jg-role: user (inherited)" "$out" "a rejected $bad primary role must revoke the secondmate grant"
+    assert_equals "jg-role: user (inherited)" "$out" "a rejected $bad primary role must revoke the squad_lead grant"
   done
-  pass "secondmate home: a primary role its own resolver rejects propagates as revocation"
+  pass "squad_lead home: a primary role its own resolver rejects propagates as revocation"
 }
 
 # --- delivery contract rendering --------------------------------------------
@@ -453,8 +453,8 @@ test_dod_block_renders_and_bounds_consent() {
   local out rc
   # shellcheck source=/dev/null
   . "$ROOT/bin/jg-dod-lib.sh"
-  out=$(jg_dod_block direct-PR consent-id fm/consent-id none '' github.com/kunchenguid/firstmate)
-  assert_contains "$out" "Delivery contract: mode=direct-PR upstream-consent=github.com/kunchenguid/firstmate" \
+  out=$(jg_dod_block direct-PR consent-id fm/consent-id none '' github.com/kunchenguid/juggernaut)
+  assert_contains "$out" "Delivery contract: mode=direct-PR upstream-consent=github.com/kunchenguid/juggernaut" \
     "a publishing contract must render the recorded consent token"
   out=$(jg_dod_block direct-PR noconsent-id fm/noconsent-id)
   assert_not_contains "$out" "upstream-consent" "a contract without consent must not render the token"
@@ -486,9 +486,9 @@ test_brief_consent_flag_bounds() {
   assert_contains "$out" "local-only" "a local-only consent refusal must name the mode"
 
   out=$(JG_HOME="$home" JG_CONFIG_OVERRIDE="$home/config" JG_DATA_OVERRIDE="$home/data" \
-    "$BRIEF" brief-consent-ok some-proj --mode direct-PR --upstream-consent GitHub.COM/KunChenGuid/FirstMate 2>&1); rc=$?
+    "$BRIEF" brief-consent-ok some-proj --mode direct-PR --upstream-consent GitHub.COM/KunChenGuid/Juggernaut 2>&1); rc=$?
   expect_code 0 "$rc" "a valid consent must scaffold (got: $out)"
-  assert_grep "upstream-consent=github.com/kunchenguid/firstmate" "$brief" \
+  assert_grep "upstream-consent=github.com/kunchenguid/juggernaut" "$brief" \
     "the scaffolded brief must carry the normalized consent token"
   pass "jg-brief.sh: --upstream-consent validates, scopes to ship tasks, and renders normalized"
 }
@@ -498,7 +498,7 @@ test_brief_self_repo_pre_gate() {
   home=$(make_role_home brief-selfrepo)
   out=$(JG_HOME="$home" JG_CONFIG_OVERRIDE="$home/config" JG_DATA_OVERRIDE="$home/data" \
     "$BRIEF" brief-selfrefuse some-proj --mode direct-PR --project "$ROOT" 2>&1); rc=$?
-  expect_code 1 "$rc" "a user home must be refused a publishing brief for firstmate itself"
+  expect_code 1 "$rc" "a user home must be refused a publishing brief for juggernaut itself"
   assert_contains "$out" "user/operator" "the refusal must name the role"
   assert_contains "$out" "no publication authority" "the refusal must name the missing grant"
 
@@ -534,7 +534,7 @@ write_ship_brief() {  # <home> <id> [<contract-extras>]
   local home=$1 id=$2 extras=${3:-}
   mkdir -p "$home/data/$id"
   {
-    printf 'You are a crewmate.\n\n# Task\n## Captain'\''s intent\nExercise the role gate.\n\n## Firstmate spec\nVerify the boundary.\n\n# Definition of done\n'
+    printf 'You are a operator.\n\n# Task\n## Captain'\''s intent\nExercise the role gate.\n\n## Juggernaut spec\nVerify the boundary.\n\n# Definition of done\n'
     printf 'Delivery contract: mode=no-mistakes%s\nShip branch: fm/%s\n' "$extras" "$id"
   } > "$home/data/$id/brief.md"
 }
@@ -555,7 +555,7 @@ test_spawn_gate_on_self_repo() {
   home=$(make_role_home spawn-user)
   write_ship_brief "$home" spawn-self-a1
   out=$(run_spawn "$home" spawn-self-a1 "$ROOT" claude --mode no-mistakes --yolo off); rc=$?
-  [ "$rc" -ne 0 ] || fail "a user home must not launch a publishing task on firstmate itself"
+  [ "$rc" -ne 0 ] || fail "a user home must not launch a publishing task on juggernaut itself"
   assert_contains "$out" "spawn refused for spawn-self-a1" "the refusal must name the task"
   assert_contains "$out" "user/operator" "the refusal must name the role"
   assert_absent "$home/state/spawn-self-a1.meta" "a refused spawn must write no task metadata"
@@ -634,7 +634,7 @@ test_promote_gate_on_self_repo() {
   meta="$home/state/promote-r1.meta"
   printf 'window=jg-promote-r1\nkind=scout\nproject=%s\nworktree=/tmp/wt\n' "$ROOT" > "$meta"
   mkdir -p "$home/data/promote-r1"
-  printf 'You are a crewmate.\n\n# Task\n## Captain'\''s intent\nInvestigate a firstmate bug.\n\n## Firstmate spec\nReport findings.\n' \
+  printf 'You are a operator.\n\n# Task\n## Captain'\''s intent\nInvestigate a juggernaut bug.\n\n## Juggernaut spec\nReport findings.\n' \
     > "$home/data/promote-r1/brief.md"
 
   out=$(JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
@@ -658,17 +658,17 @@ test_promote_gate_on_self_repo() {
   pass "jg-promote.sh: the self-repository gate governs promotion identically to spawn"
 }
 
-test_secondmate_spawn_refuses_consent_flag() {
+test_squad_lead_spawn_refuses_consent_flag() {
   local home out
   home=$(make_role_home spawn-sm)
   mkdir -p "$home/data/spawn-sm-c1"
-  printf 'You are a secondmate.\n' > "$home/data/spawn-sm-c1/brief.md"
+  printf 'You are a squad_lead.\n' > "$home/data/spawn-sm-c1/brief.md"
   rc=0
-  out=$(run_spawn "$home" spawn-sm-c1 "$home" --secondmate --mode no-mistakes --yolo off \
+  out=$(run_spawn "$home" spawn-sm-c1 "$home" --squad-lead --mode no-mistakes --yolo off \
     --upstream-consent github.com/a/b 2>&1) || rc=$?
-  [ "$rc" -ne 0 ] || fail "a secondmate charter must refuse a consent flag"
-  assert_contains "$out" "applies only to ship spawns" "a secondmate charter must refuse a consent flag"
-  pass "jg-spawn.sh: --upstream-consent is refused on secondmate charters"
+  [ "$rc" -ne 0 ] || fail "a squad_lead charter must refuse a consent flag"
+  assert_contains "$out" "applies only to ship spawns" "a squad_lead charter must refuse a consent flag"
+  pass "jg-spawn.sh: --upstream-consent is refused on squad_lead charters"
 }
 
 # --- run --------------------------------------------------------------------
@@ -683,15 +683,15 @@ test_check_equivalent_remote_spellings_are_one_repo
 test_check_fork_lineage_reaches_the_gate
 test_check_undeterminable_lineage_and_target_refuse
 test_check_task_consent_authorizes_one_task
-test_secondmate_cannot_self_grant
-test_secondmate_inheritance_receipt_lifecycle
-test_secondmate_inherits_only_resolved_primary_role
+test_squad_lead_cannot_self_grant
+test_squad_lead_inheritance_receipt_lifecycle
+test_squad_lead_inherits_only_resolved_primary_role
 test_dod_block_renders_and_bounds_consent
 test_brief_consent_flag_bounds
 test_brief_self_repo_pre_gate
 test_spawn_gate_on_self_repo
 test_spawn_consent_agreement
 test_promote_gate_on_self_repo
-test_secondmate_spawn_refuses_consent_flag
+test_squad_lead_spawn_refuses_consent_flag
 
 echo "# all jg-self-repo-role tests passed"

@@ -8,7 +8,7 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
   export "$_jg_new=$_jg_val"
 done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
-# Install or update the drain CLI for this user, register its watcher check in one firstmate home, and retire the
+# Install or update the drain CLI for this user, register its watcher check in one juggernaut home, and retire the
 # three checks it replaces (nm-quiet, nm-update, nm-upgrade). Idempotent. Usage: install.sh [--dry-run] <jg-home>
 # The check id sorts first so a check that wakes every sweep (a wake ends the sweep) cannot starve the drain.
 set -euo pipefail

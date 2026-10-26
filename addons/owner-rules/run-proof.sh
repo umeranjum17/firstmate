@@ -8,19 +8,19 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
   export "$_jg_new=$_jg_val"
 done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
-# Real publication capture for done-done. Requires JG_PROOF_FORK=<Firstmate checkout>.
+# Real publication capture for done-done. Requires JG_PROOF_FORK=<Juggernaut checkout>.
 # Scratch is isolated and retained; no server, model, live board, or deletion here.
 set -euo pipefail
 repo=$(cd "$(dirname "$0")/.." && pwd)
 evidence=${DONE_DONE_EVIDENCE_ROOT:?run through done-done}
-fork=${JG_PROOF_FORK:?set JG_PROOF_FORK to a Firstmate checkout}
+fork=${JG_PROOF_FORK:?set JG_PROOF_FORK to a Juggernaut checkout}
 head=$(git -C "$repo" rev-parse HEAD)
 work=$(mktemp -d /var/tmp/owner-rules-live.XXXXXX)
 export HOME=$work/user XDG_DATA_HOME=$work/data XDG_CONFIG_HOME=$work/config XDG_CACHE_HOME=$work/cache
 export TMPDIR=$work/tmp SIGN_OFF_HOME=$work/board JG_HOME=$work/home JG_ADDONS_DIR=$repo
 mkdir -p "$HOME" "$TMPDIR" "$SIGN_OFF_HOME" "$JG_HOME/config" "$work/parent/state" "$JG_HOME/data/umer/.done-done/runs"
-printf 'umer\n' > "$JG_HOME/.jg-secondmate-home"
-printf 'schema=jg-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$work/parent" > "$JG_HOME/.jg-secondmate-parent"
+printf 'umer\n' > "$JG_HOME/.jg-squad-lead-home"
+printf 'schema=jg-squad-lead-parent.v1\nroute=local\nparent_home=%s\n' "$work/parent" > "$JG_HOME/.jg-squad-lead-parent"
 bash "$repo/owner-rules/install.sh" "$JG_HOME" >/dev/null
 board=$SIGN_OFF_HOME/decisions.json
 printf '{"schema":2,"items":[]}\n' > "$board"
@@ -44,10 +44,10 @@ post() {
 {
   printf 'Candidate commit: %s\n' "$head"
   printf 'sign-off-axi version: '; sign-off-axi --version
-  record 2 'A secondmate Lavish link is refused before append.' bash "$fork/bin/jg-secondmate-report.sh" 'done' abcdef0123456789 'http://review.example:4387/session/umer'
+  record 2 'A squad_lead Lavish link is refused before append.' bash "$fork/bin/jg-squad-lead-report.sh" 'done' abcdef0123456789 'http://review.example:4387/session/umer'
   [ ! -e "$work/parent/state/umer.status" ]
-  echo 'Refused secondmate note wrote no status file.'
-  record 0 'A secondmate sign-off link is accepted.' bash "$fork/bin/jg-secondmate-report.sh" 'done' abcdef0123456789 'http://review.example:4388/board/umer'
+  echo 'Refused squad_lead note wrote no status file.'
+  record 0 'A squad_lead sign-off link is accepted.' bash "$fork/bin/jg-squad-lead-report.sh" 'done' abcdef0123456789 'http://review.example:4388/board/umer'
   cat "$work/parent/state/umer.status"
   grep -qF 'http://review.example:4388/board/umer' "$work/parent/state/umer.status"
   post 'See http://review.example:4387/session/umer' 1 'A merge-card Lavish link is refused before posting.'
@@ -61,4 +61,4 @@ post() {
   echo 'The real sign-off writer holds exactly one clean card.'
 } > "$evidence/publication.txt" 2>&1
 cat "$evidence/publication.txt"
-jq -n --arg version "$head" '{target:{version:$version},start:"An isolated secondmate home has owner-rules enabled and a private empty sign-off board.",steps:["Send a Lavish link through the real secondmate report helper and inspect the refusal and absent status file.","Send a sign-off link through that helper and read the appended status.","Post a Lavish link and a CLI mention through merge-card and compare the unchanged board.","Post a clean sign-off link through merge-card and inspect the single card with sign-off-axi list."],result:"Secondmate notes and merge-card posts refuse Lavish content and point to the sign-off board; clean sign-off links pass both real publishing commands."}' > "$evidence/steps.json"
+jq -n --arg version "$head" '{target:{version:$version},start:"An isolated squad_lead home has owner-rules enabled and a private empty sign-off board.",steps:["Send a Lavish link through the real squad_lead report helper and inspect the refusal and absent status file.","Send a sign-off link through that helper and read the appended status.","Post a Lavish link and a CLI mention through merge-card and compare the unchanged board.","Post a clean sign-off link through merge-card and inspect the single card with sign-off-axi list."],result:"SquadLead notes and merge-card posts refuse Lavish content and point to the sign-off board; clean sign-off links pass both real publishing commands."}' > "$evidence/steps.json"

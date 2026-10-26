@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
-# jg-lint.sh - the single owner of firstmate's lint definition.
+# jg-lint.sh - the single owner of juggernaut's lint definition.
 #
 # Runs its file set with ShellCheck's default severity, extended analysis,
 # ambient configuration disabled, and one exact ShellCheck version. CI selects
@@ -479,7 +479,7 @@ jg_lint_run_workflows() {
 }
 
 # Backend adapters belong behind tasks-axi. Keep direct Beads CLI invocations
-# out of firstmate's core scripts so every configured backend follows the same
+# out of juggernaut's core scripts so every configured backend follows the same
 # lifecycle path.
 jg_lint_run_backend_purity() {
   local findings path canonical

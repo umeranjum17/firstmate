@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
-# Hand already-identified, in-scope backlog items off from the main firstmate
-# backlog to a secondmate's own home backlog. Use this when a secondmate is
+# Hand already-identified, in-scope backlog items off from the main juggernaut
+# backlog to a squad_lead's own home backlog. Use this when a squad_lead is
 # created (or whenever an existing queued item should become its domain's work)
-# so the secondmate owns its queue from day one instead of the item staying
+# so the squad_lead owns its queue from day one instead of the item staying
 # stranded in the main backlog.
 #
-# Scope-matching is firstmate's JUDGMENT: you pass the task-id keys you have
-# already judged in-scope for the secondmate. This script performs only the
+# Scope-matching is juggernaut's JUDGMENT: you pass the task-id keys you have
+# already judged in-scope for the squad_lead. This script performs only the
 # fleet-level validation that the backlog backend cannot know, then DELEGATES
 # the actual item move to `tasks-axi mv`, the single owner of the backlog
 # format. Delegating the move is the durability end-state: it removes the awk
@@ -17,15 +17,15 @@
 # of bug fixed in PR #401 was exactly that drift).
 #
 # What this script still owns (never delegated):
-#   - resolving the secondmate home from data/secondmates.md;
-#   - proving the destination is a genuine seeded secondmate home
-#     (.jg-secondmate-home marker, AGENTS.md + bin/), never a project clone, the
-#     active home, or the firstmate repo;
+#   - resolving the squad_lead home from data/squad_leads.md;
+#   - proving the destination is a genuine seeded squad_lead home
+#     (.jg-squad-lead-home marker, AGENTS.md + bin/), never a project clone, the
+#     active home, or the juggernaut repo;
 #   - moving only `## Queued` items, refusing `## In flight` and historical
 #     `## Done` records, which must stay with their home for pruning or
 #     archiving;
 #   - the multi-key classification and idempotent per-key reporting: a key
-#     already present in the secondmate backlog is reported and skipped, and if
+#     already present in the squad_lead backlog is reported and skipped, and if
 #     any key matches neither backlog nothing is moved;
 #   - warning, after a successful move, when a moved key still owes a public
 #     relay reply bound to main/<key>, or when this home has an open public loop
@@ -45,7 +45,7 @@
 # it orphaned, because tasks-axi treats only two-or-more-space lines as body.
 # The move needs compatible `tasks-axi` on PATH, including atomic multi-ID `mv`
 # support. Bootstrap requires a compatible build fleet-wide, so this works
-# everywhere; the `config/backlog-backend=manual` knob only governs firstmate's
+# everywhere; the `config/backlog-backend=manual` knob only governs juggernaut's
 # own hand-editing of its own backlog, not this validated helper. Idempotent:
 # re-running converges. Atomic: on any move failure nothing moves.
 # Every move names its markdown backlog files explicitly and pins
@@ -78,7 +78,7 @@
 # or undeletable stale marker is reported and ignored by later resumes and
 # handoffs, so wake-state cleanup neither suppresses a new wake nor fails a
 # completed remote handoff.
-# Usage: jg-backlog-handoff.sh <secondmate-id> <item-key>...
+# Usage: jg-backlog-handoff.sh <squad-lead-id> <item-key>...
 #        jg-backlog-handoff.sh --resume-pending
 set -eu
 
@@ -87,12 +87,12 @@ JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
 DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
 STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
-REG="$DATA/secondmates.md"
+REG="$DATA/squad_leads.md"
 MAIN_BACKLOG="$DATA/backlog.md"
 # shellcheck source=bin/jg-tasks-axi-lib.sh disable=SC1091
 . "$SCRIPT_DIR/jg-tasks-axi-lib.sh"
-# shellcheck source=bin/jg-secondmate-registry-lib.sh
-. "$SCRIPT_DIR/jg-secondmate-registry-lib.sh"
+# shellcheck source=bin/jg-squad-lead-registry-lib.sh
+. "$SCRIPT_DIR/jg-squad-lead-registry-lib.sh"
 # shellcheck source=bin/jg-wake-lib.sh
 . "$SCRIPT_DIR/jg-wake-lib.sh"
 # shellcheck source=bin/jg-public-followup-lib.sh
@@ -133,27 +133,27 @@ if [ "${1:-}" = --resume-pending ]; then
   shift
 else
   [ "$#" -ge 2 ] || {
-    echo "usage: jg-backlog-handoff.sh <secondmate-id> <item-key>..." >&2
+    echo "usage: jg-backlog-handoff.sh <squad-lead-id> <item-key>..." >&2
     exit 1
   }
   ID=$1
   case "$ID" in '' | *[!A-Za-z0-9._-]*)
-    echo "error: unsafe secondmate id: $ID" >&2
+    echo "error: unsafe squad_lead id: $ID" >&2
     exit 1
     ;;
   esac
   shift
 fi
 
-secondmate_home() {
+squad_lead_home() {
   local id=$1 home
   [ -f "$REG" ] || {
-    echo "error: no secondmate registry at $REG" >&2
+    echo "error: no squad_lead registry at $REG" >&2
     return 1
   }
-  home=$(secondmate_registry_field "$REG" "$id" home || true)
+  home=$(squad_lead_registry_field "$REG" "$id" home || true)
   [ -n "$home" ] || {
-    echo "error: secondmate $id has no home in $REG" >&2
+    echo "error: squad_lead $id has no home in $REG" >&2
     return 1
   }
   printf '%s\n' "$home"
@@ -173,7 +173,7 @@ path_is_ancestor_of() {
 resolved_existing_dir() {
   local path=$1
   [ -d "$path" ] || {
-    echo "error: firstmate home does not exist or is not a directory: $path" >&2
+    echo "error: juggernaut home does not exist or is not a directory: $path" >&2
     return 1
   }
   cd "$path" && pwd -P
@@ -184,81 +184,81 @@ validate_operational_dirs() {
   for name in data state config projects; do
     dir="$abs_home/$name"
     if [ -L "$dir" ] && [ ! -e "$dir" ]; then
-      echo "error: secondmate $name directory must resolve inside the secondmate home: $dir" >&2
+      echo "error: squad_lead $name directory must resolve inside the squad_lead home: $dir" >&2
       return 1
     fi
     if [ -d "$dir" ]; then
       abs_dir=$(cd "$dir" && pwd -P)
     elif [ -e "$dir" ]; then
-      echo "error: secondmate $name path is not a directory: $dir" >&2
+      echo "error: squad_lead $name path is not a directory: $dir" >&2
       return 1
     else
       abs_dir="$abs_home/$name"
     fi
     if ! path_is_ancestor_of "$abs_home" "$abs_dir"; then
-      echo "error: secondmate $name directory must resolve inside the secondmate home: $dir" >&2
+      echo "error: squad_lead $name directory must resolve inside the squad_lead home: $dir" >&2
       return 1
     fi
     if [ "$abs_dir" = "$abs_active_home" ] || path_is_ancestor_of "$abs_active_home" "$abs_dir"; then
-      echo "error: secondmate $name directory cannot be inside the active firstmate home: $dir" >&2
+      echo "error: squad_lead $name directory cannot be inside the active juggernaut home: $dir" >&2
       return 1
     fi
     if [ "$abs_dir" = "$abs_root" ] || path_is_ancestor_of "$abs_root" "$abs_dir"; then
-      echo "error: secondmate $name directory cannot be inside the firstmate repo: $dir" >&2
+      echo "error: squad_lead $name directory cannot be inside the juggernaut repo: $dir" >&2
       return 1
     fi
   done
 }
 
-validate_secondmate_home() {
+validate_squad_lead_home() {
   local id=$1 home=$2 abs_home abs_active_home abs_root marker_id
   abs_home=$(resolved_existing_dir "$home") || return 1
   abs_active_home=$(resolved_existing_dir "$JG_HOME")
   abs_root=$(resolved_existing_dir "$JG_ROOT")
   if [ "$abs_home" = "/" ]; then
-    echo "error: secondmate home cannot be the filesystem root: $home" >&2
+    echo "error: squad_lead home cannot be the filesystem root: $home" >&2
     return 1
   fi
   if [ "$abs_home" = "$abs_active_home" ]; then
-    echo "error: secondmate home cannot be the active firstmate home: $home" >&2
+    echo "error: squad_lead home cannot be the active juggernaut home: $home" >&2
     return 1
   fi
   if [ "$abs_home" = "$abs_root" ]; then
-    echo "error: secondmate home cannot be the firstmate repo: $home" >&2
+    echo "error: squad_lead home cannot be the juggernaut repo: $home" >&2
     return 1
   fi
   if path_is_ancestor_of "$abs_active_home" "$abs_home"; then
-    echo "error: secondmate home cannot be inside the active firstmate home: $home" >&2
+    echo "error: squad_lead home cannot be inside the active juggernaut home: $home" >&2
     return 1
   fi
   if path_is_ancestor_of "$abs_root" "$abs_home"; then
-    echo "error: secondmate home cannot be inside the firstmate repo: $home" >&2
+    echo "error: squad_lead home cannot be inside the juggernaut repo: $home" >&2
     return 1
   fi
   if path_is_ancestor_of "$abs_home" "$abs_active_home"; then
-    echo "error: secondmate home cannot be an ancestor of the active firstmate home: $home" >&2
+    echo "error: squad_lead home cannot be an ancestor of the active juggernaut home: $home" >&2
     return 1
   fi
   if path_is_ancestor_of "$abs_home" "$abs_root"; then
-    echo "error: secondmate home cannot be an ancestor of the firstmate repo: $home" >&2
+    echo "error: squad_lead home cannot be an ancestor of the juggernaut repo: $home" >&2
     return 1
   fi
   validate_operational_dirs "$abs_home" "$abs_active_home" "$abs_root" || return 1
-  if [ ! -f "$abs_home/.jg-secondmate-home" ]; then
-    echo "error: firstmate home $home is not a seeded secondmate home" >&2
+  if [ ! -f "$abs_home/.jg-squad-lead-home" ]; then
+    echo "error: juggernaut home $home is not a seeded squad_lead home" >&2
     return 1
   fi
-  marker_id=$(cat "$abs_home/.jg-secondmate-home" 2>/dev/null || true)
+  marker_id=$(cat "$abs_home/.jg-squad-lead-home" 2>/dev/null || true)
   if [ "$marker_id" != "$id" ]; then
-    echo "error: firstmate home $home is marked for secondmate ${marker_id:-unknown}, expected $id" >&2
+    echo "error: juggernaut home $home is marked for squad_lead ${marker_id:-unknown}, expected $id" >&2
     return 1
   fi
   if [ ! -f "$abs_home/AGENTS.md" ]; then
-    echo "error: $home is not a firstmate home (missing AGENTS.md)" >&2
+    echo "error: $home is not a juggernaut home (missing AGENTS.md)" >&2
     return 1
   fi
   if [ ! -d "$abs_home/bin" ]; then
-    echo "error: $home is not a firstmate home (missing bin/)" >&2
+    echo "error: $home is not a juggernaut home (missing bin/)" >&2
     return 1
   fi
   printf '%s\n' "$abs_home"
@@ -328,12 +328,12 @@ seed_backlog_scaffold() { # <path>
 
 # A public commitment made through the relay binds its work by home AND id, so an
 # item that leaves this home takes that binding out of sync: reconciliation would
-# still look for main/<key> while the work now lives in the secondmate's home.
+# still look for main/<key> while the work now lives in the squad_lead's home.
 # The move itself stays safe and is never blocked - rebinding is a relay-side
 # decision the caller owns - but this is the one moment the staleness is
 # detectable, so report it loudly instead of letting the promise go quiet.
 # A home that never opted into the relay pays one presence check per key here.
-warn_stale_public_commitments() { # <secondmate-id> <moved-key>...
+warn_stale_public_commitments() { # <squad-lead-id> <moved-key>...
   local id=$1 key out rc
   shift
   for key in "$@"; do
@@ -341,11 +341,11 @@ warn_stale_public_commitments() { # <secondmate-id> <moved-key>...
     out=$("$SCRIPT_DIR/jg-public-followup.sh" guard-work main "$key" 2>/dev/null) || rc=$?
     [ "$rc" -ne 0 ] || continue
     [ -z "$out" ] || printf '%s\n' "$out" >&2
-    printf 'warning: %s still owes a public reply bound to main/%s; rebind it to secondmate:%s (bin/jg-tasks-axi.sh public-followup bind-work, then bin/jg-public-followup.sh register <obligation-id> --relation <relation-id> --work-home secondmate:%s --work-id %s --generation <n>) or the promised reply will be reconciled against work this home no longer owns.\n' \
+    printf 'warning: %s still owes a public reply bound to main/%s; rebind it to squad_lead:%s (bin/jg-tasks-axi.sh public-followup bind-work, then bin/jg-public-followup.sh register <obligation-id> --relation <relation-id> --work-home squad_lead:%s --work-id %s --generation <n>) or the promised reply will be reconciled against work this home no longer owns.\n' \
       "$key" "$key" "$id" "$id" "$key" >&2
   done
   if jg_pf_relay_active "$JG_HOME" && jg_pf_has_delivered_open_loops "$STATE"; then
-    printf 'warning: this home has an open public loop with nothing owed; routing work to secondmate:%s does not close it. Hand it on with bin/jg-public-followup.sh rechain or close it with retire --reason.\n' \
+    printf 'warning: this home has an open public loop with nothing owed; routing work to squad_lead:%s does not close it. Hand it on with bin/jg-public-followup.sh rechain or close it with retire --reason.\n' \
       "$id" >&2
   fi
   # Reporting never changes the handoff's own success: the move already landed.
@@ -369,7 +369,7 @@ receiver_wake_batch_id() { # <item-key>...
   printf '%s' "${digest:0:16}"
 }
 
-receiver_wake_state_write() { # <secondmate-id> <state>
+receiver_wake_state_write() { # <squad-lead-id> <state>
   local id=$1 value=$2 marker="$STATE/.backlog-handoff-$1.wake-pending" tmp
   case "$id" in '' | *[!A-Za-z0-9._-]*) return 1 ;; esac
   case "$value" in
@@ -389,7 +389,7 @@ receiver_wake_state_write() { # <secondmate-id> <state>
   fi
 }
 
-receiver_wake_mark() { # <secondmate-id> <prepared|pending> [batch-id]
+receiver_wake_mark() { # <squad-lead-id> <prepared|pending> [batch-id]
   local id=$1 wake_phase=$2 batch=${3:-} marker="$STATE/.backlog-handoff-$1.wake-pending" value corr rec
   local wake_state
   case "$wake_phase" in prepared | pending) ;; *) return 1 ;; esac
@@ -425,15 +425,15 @@ receiver_wake_mark() { # <secondmate-id> <prepared|pending> [batch-id]
   fi
 }
 
-receiver_wake_mark_pending() { # <secondmate-id>
+receiver_wake_mark_pending() { # <squad-lead-id>
   receiver_wake_mark "$1" pending
 }
 
-receiver_wake_mark_prepared() { # <secondmate-id> <batch-id>
+receiver_wake_mark_prepared() { # <squad-lead-id> <batch-id>
   receiver_wake_mark "$1" prepared "$2"
 }
 
-receiver_wake_discard_prepared() { # <secondmate-id>
+receiver_wake_discard_prepared() { # <squad-lead-id>
   local id=$1 marker="$STATE/.backlog-handoff-$1.wake-pending" value corr
   [ -f "$marker" ] && [ ! -L "$marker" ] || return 1
   value=$(cat "$marker" 2>/dev/null || true)
@@ -448,7 +448,7 @@ receiver_wake_discard_prepared() { # <secondmate-id>
   rm -f -- "$marker"
 }
 
-receiver_wake_promote_prepared() { # <secondmate-id> <batch-id>
+receiver_wake_promote_prepared() { # <squad-lead-id> <batch-id>
   local id=$1 batch=$2 marker="$STATE/.backlog-handoff-$1.wake-pending" value corr
   [ -f "$marker" ] && [ ! -L "$marker" ] || return 1
   value=$(cat "$marker" 2>/dev/null || true)
@@ -463,7 +463,7 @@ receiver_wake_promote_prepared() { # <secondmate-id> <batch-id>
   receiver_wake_state_write "$id" "pending:$corr"
 }
 
-receiver_wake_discard_pending() { # <secondmate-id>
+receiver_wake_discard_pending() { # <squad-lead-id>
   local id=$1 marker="$STATE/.backlog-handoff-$1.wake-pending" value corr
   [ -f "$marker" ] && [ ! -L "$marker" ] || return 1
   value=$(cat "$marker" 2>/dev/null || true)
@@ -478,7 +478,7 @@ receiver_wake_discard_pending() { # <secondmate-id>
   rm -f -- "$marker"
 }
 
-receiver_wake_pending_valid() { # <secondmate-id>
+receiver_wake_pending_valid() { # <squad-lead-id>
   local id=$1 marker="$STATE/.backlog-handoff-$1.wake-pending" value corr rec delivered
   [ -f "$marker" ] && [ ! -L "$marker" ] || return 1
   value=$(cat "$marker" 2>/dev/null || true)
@@ -492,7 +492,7 @@ receiver_wake_pending_valid() { # <secondmate-id>
   jg_pending_reply_corr_reusable "$STATE" "$corr" "$id"
 }
 
-receiver_wake_pending_delivered_valid() { # <secondmate-id>
+receiver_wake_pending_delivered_valid() { # <squad-lead-id>
   local id=$1 marker="$STATE/.backlog-handoff-$1.wake-pending" value corr rec
   [ -f "$marker" ] && [ ! -L "$marker" ] || return 1
   value=$(cat "$marker" 2>/dev/null || true)
@@ -504,7 +504,7 @@ receiver_wake_pending_delivered_valid() { # <secondmate-id>
     [ -n "$(jg_pending_reply_get "$rec" delivered_epoch)" ]
 }
 
-receiver_wake_confirmed_valid() { # <secondmate-id>
+receiver_wake_confirmed_valid() { # <squad-lead-id>
   local id=$1 marker="$STATE/.backlog-handoff-$1.wake-pending" value corr rec
   [ -f "$marker" ] && [ ! -L "$marker" ] || return 1
   value=$(cat "$marker" 2>/dev/null || true)
@@ -517,22 +517,22 @@ receiver_wake_confirmed_valid() { # <secondmate-id>
     [ -n "$(jg_pending_reply_get "$rec" delivered_epoch)" ]
 }
 
-receiver_wake_drop_marker() { # <secondmate-id> <reason>
+receiver_wake_drop_marker() { # <squad-lead-id> <reason>
   local id=$1 reason=$2 marker="$STATE/.backlog-handoff-$1.wake-pending"
   printf 'receiver wake state: DROPPED marker=%s\n' "$marker"
   if [ -e "$marker" ] || [ -L "$marker" ]; then
     if rm -f -- "$marker"; then
-      printf 'warning: best-effort receiver wake for secondmate %s was dropped; removed stale wake marker %s because %s\n' "$id" "$marker" "$reason" >&2
+      printf 'warning: best-effort receiver wake for squad_lead %s was dropped; removed stale wake marker %s because %s\n' "$id" "$marker" "$reason" >&2
     else
-      printf 'warning: best-effort receiver wake for secondmate %s was dropped; stale wake marker remains at %s because %s\n' "$id" "$marker" "$reason" >&2
+      printf 'warning: best-effort receiver wake for squad_lead %s was dropped; stale wake marker remains at %s because %s\n' "$id" "$marker" "$reason" >&2
     fi
   else
-    printf 'warning: best-effort receiver wake for secondmate %s was dropped; no wake marker remains at %s because %s\n' "$id" "$marker" "$reason" >&2
+    printf 'warning: best-effort receiver wake for squad_lead %s was dropped; no wake marker remains at %s because %s\n' "$id" "$marker" "$reason" >&2
   fi
   return 0
 }
 
-receiver_wake_clear_confirmed() { # <secondmate-id>
+receiver_wake_clear_confirmed() { # <squad-lead-id>
   local id=$1 marker="$STATE/.backlog-handoff-$1.wake-pending"
   RECEIVER_WAKE_IGNORE_ID=
   [ -e "$marker" ] || [ -L "$marker" ] || return 0
@@ -552,14 +552,14 @@ receiver_wake_clear_confirmed() { # <secondmate-id>
   fi
 }
 
-wake_secondmate_receiver() { # <secondmate-id> <correlation-id>
+wake_squad_lead_receiver() { # <squad-lead-id> <correlation-id>
   local id=$1 corr=$2 meta="$STATE/$1.meta" out rc=0
   if [ ! -f "$meta" ] || [ -L "$meta" ]; then
-    printf 'error: handed off work to secondmate %s, but no live receiver endpoint is recorded; the destination backlog is durable and the receiver was not woken\n' "$id" >&2
+    printf 'error: handed off work to squad_lead %s, but no live receiver endpoint is recorded; the destination backlog is durable and the receiver was not woken\n' "$id" >&2
     return 1
   fi
-  [ "$(grep '^kind=' "$meta" | cut -d= -f2-)" = secondmate ] || {
-    printf 'error: secondmate %s has non-secondmate endpoint metadata; backlog is durable but the receiver was not woken\n' "$id" >&2
+  [ "$(grep '^kind=' "$meta" | cut -d= -f2-)" = squad_lead ] || {
+    printf 'error: squad_lead %s has non-squad-lead endpoint metadata; backlog is durable but the receiver was not woken\n' "$id" >&2
     return 1
   }
   out=$(JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" JG_ROOT_OVERRIDE="$JG_ROOT" \
@@ -567,24 +567,24 @@ wake_secondmate_receiver() { # <secondmate-id> <correlation-id>
     "$SCRIPT_DIR/jg-send.sh" "$id" "$RECEIVER_WAKE_MESSAGE" 2>&1) || rc=$?
   if [ "$rc" -ne 0 ]; then
     [ -z "$out" ] || printf '%s\n' "$out" >&2
-    printf 'error: backlog delivery to secondmate %s succeeded, but its receiver wake failed; retry a tracked remote wake with --resume-pending or a later new handoff, and retry a local wake by rerunning its handoff\n' "$id" >&2
+    printf 'error: backlog delivery to squad_lead %s succeeded, but its receiver wake failed; retry a tracked remote wake with --resume-pending or a later new handoff, and retry a local wake by rerunning its handoff\n' "$id" >&2
     return 1
   fi
   [ -z "$out" ] || printf '%s\n' "$out"
 }
 
-wake_pending_secondmate_receiver() { # <secondmate-id> [retain-confirmed]
+wake_pending_squad_lead_receiver() { # <squad-lead-id> [retain-confirmed]
   local id=$1 retain=${2:-0} marker="$STATE/.backlog-handoff-$1.wake-pending" value corr rec delivered
   [ -e "$marker" ] || [ -L "$marker" ] || return 0
   if [ ! -f "$marker" ] || [ -L "$marker" ]; then
-    printf 'error: receiver wake state for secondmate %s is unsafe or invalid\n' "$id" >&2
+    printf 'error: receiver wake state for squad_lead %s is unsafe or invalid\n' "$id" >&2
     return 1
   fi
   value=$(cat "$marker" 2>/dev/null || true)
   case "$value" in
   confirmed | confirmed:*) return 0 ;;
   prepared | prepared:*)
-    printf 'error: receiver wake for secondmate %s was prepared before its backlog became durable\n' "$id" >&2
+    printf 'error: receiver wake for squad_lead %s was prepared before its backlog became durable\n' "$id" >&2
     return 1
     ;;
   pending)
@@ -593,7 +593,7 @@ wake_pending_secondmate_receiver() { # <secondmate-id> [retain-confirmed]
     ;;
   esac
   case "$value" in pending:*) corr=${value#pending:} ;; *)
-    printf 'error: receiver wake state for secondmate %s is unsafe or invalid\n' "$id" >&2
+    printf 'error: receiver wake state for squad_lead %s is unsafe or invalid\n' "$id" >&2
     return 1
     ;;
   esac
@@ -604,19 +604,19 @@ wake_pending_secondmate_receiver() { # <secondmate-id> [retain-confirmed]
   delivered=$(jg_pending_reply_get "$rec" delivered_epoch)
   if [ -z "$delivered" ]; then
     jg_pending_reply_corr_reusable "$STATE" "$corr" "$id" || {
-      printf 'error: receiver wake delivery for secondmate %s is unresolved; refusing to resend correlation %s\n' "$id" "$corr" >&2
+      printf 'error: receiver wake delivery for squad_lead %s is unresolved; refusing to resend correlation %s\n' "$id" "$corr" >&2
       return 1
     }
-    wake_secondmate_receiver "$id" "$corr" || return 1
+    wake_squad_lead_receiver "$id" "$corr" || return 1
   fi
   if [ "$retain" = 1 ]; then
     receiver_wake_state_write "$id" "confirmed:$corr" || {
-      printf 'error: receiver wake for secondmate %s was confirmed, but confirmed state could not be recorded\n' "$id" >&2
+      printf 'error: receiver wake for squad_lead %s was confirmed, but confirmed state could not be recorded\n' "$id" >&2
       return 1
     }
   else
     rm -f -- "$marker" || {
-      printf 'error: receiver wake for secondmate %s was confirmed, but pending state could not be cleared\n' "$id" >&2
+      printf 'error: receiver wake for squad_lead %s was confirmed, but pending state could not be cleared\n' "$id" >&2
       return 1
     }
   fi
@@ -626,7 +626,7 @@ outbox_item_count() { # <path>
   awk '/^- \[[ x]\] / { count++ } END { print count + 0 }' "$1"
 }
 
-remote_deliver_outbox() { # <secondmate-id> <outbox-path>
+remote_deliver_outbox() { # <squad-lead-id> <outbox-path>
   local id=$1 outbox=$2 remote_rel receive_out snapshot bytes hash generation counter counter_tmp current marker wake_rc=0 wake_state=pending
   [ -f "$outbox" ] && [ ! -L "$outbox" ] || {
     echo "error: pending outbox is unavailable or unsafe: $outbox" >&2
@@ -715,7 +715,7 @@ remote_deliver_outbox() { # <secondmate-id> <outbox-path>
     }
   fi
   if [ "$wake_rc" -eq 0 ]; then
-    wake_pending_secondmate_receiver "$id" 1 || wake_rc=$?
+    wake_pending_squad_lead_receiver "$id" 1 || wake_rc=$?
   fi
   rm -f -- "$outbox" || {
     echo "error: remote backlog is durable at $id, but local outbox cleanup failed: $outbox" >&2
@@ -760,7 +760,7 @@ remove_interrupted_source_duplicates() { # <outbox> <keys...>
   done
 }
 
-remote_handoff() { # <secondmate-id> <keys...>
+remote_handoff() { # <squad-lead-id> <keys...>
   local id=$1 outbox section main_section out_section key mv_out
   local -a requested to_move already missing in_flight done_items not_queued
   shift
@@ -770,7 +770,7 @@ remote_handoff() { # <secondmate-id> <keys...>
   validate_backlog_file "remote handoff outbox" "$outbox" || return 1
   if [ ! -e "$outbox" ] && [ ! -L "$outbox" ]; then
     receiver_wake_clear_confirmed "$id" || {
-      echo "error: stale receiver wake state for secondmate $id could not be cleared" >&2
+      echo "error: stale receiver wake state for squad_lead $id could not be cleared" >&2
       return 1
     }
   fi
@@ -823,7 +823,7 @@ remote_handoff() { # <secondmate-id> <keys...>
   if [ "${#to_move[@]}" -gt 0 ] && [ -f "$outbox" ] &&
     [ "$(outbox_item_count "$outbox")" -gt 0 ]; then
     remote_deliver_outbox "$id" "$outbox" || {
-      echo "error: previous remote handoff for secondmate $id could not be completed; nothing new was staged" >&2
+      echo "error: previous remote handoff for squad_lead $id could not be completed; nothing new was staged" >&2
       return 1
     }
   fi
@@ -840,12 +840,12 @@ remote_handoff() { # <secondmate-id> <keys...>
   # deleting only duplicates that tasks-axi itself confirms are dependency-safe.
   remove_interrupted_source_duplicates "$outbox" "${requested[@]}" || return 1
   remote_deliver_outbox "$id" "$outbox" || return 1
-  echo "handed off ${#requested[@]} item(s) to remote secondmate $id: ${requested[*]}"
+  echo "handed off ${#requested[@]} item(s) to remote squad_lead $id: ${requested[*]}"
   [ "${#already[@]}" -eq 0 ] || echo "  already staged (recovered): ${already[*]}"
   warn_stale_public_commitments "$id" "${requested[@]}"
 }
 
-with_remote_route_locks() { # <secondmate-id> <function> <args...>
+with_remote_route_locks() { # <squad-lead-id> <function> <args...>
   local id=$1 operation=$2 rc
   shift 2
   case "$id" in '' | *[!A-Za-z0-9._-]*)
@@ -853,10 +853,10 @@ with_remote_route_locks() { # <secondmate-id> <function> <args...>
     return 1
     ;;
   esac
-  ACTIVE_REGISTRY_LOCK=$(secondmate_registry_lock_path "$STATE")
+  ACTIVE_REGISTRY_LOCK=$(squad_lead_registry_lock_path "$STATE")
   jg_lock_acquire_wait "$ACTIVE_REGISTRY_LOCK"
-  if [ "$(secondmate_registry_field "$REG" "$id" remote 2>/dev/null || true)" != 1 ]; then
-    echo "error: pending outbox has no matching remote secondmate route: $id" >&2
+  if [ "$(squad_lead_registry_field "$REG" "$id" remote 2>/dev/null || true)" != 1 ]; then
+    echo "error: pending outbox has no matching remote squad_lead route: $id" >&2
     release_remote_locks
     return 1
   fi
@@ -867,7 +867,7 @@ with_remote_route_locks() { # <secondmate-id> <function> <args...>
   return "$rc"
 }
 
-resume_remote_outbox() { # <secondmate-id> <outbox-path>
+resume_remote_outbox() { # <squad-lead-id> <outbox-path>
   local id=$1 outbox=$2
   [ -e "$outbox" ] || [ -L "$outbox" ] || return 0
   if [ ! -f "$outbox" ] || [ -L "$outbox" ]; then
@@ -894,12 +894,12 @@ resume_pending_outboxes() {
   return "$failed"
 }
 
-resume_remote_wake() { # <secondmate-id>
+resume_remote_wake() { # <squad-lead-id>
   local id=$1
   [ -e "$DATA/handoff/$id.outbox.md" ] || [ -L "$DATA/handoff/$id.outbox.md" ] || {
     receiver_wake_clear_confirmed "$id"
     receiver_wake_pending_valid "$id" || return 0
-    wake_pending_secondmate_receiver "$id"
+    wake_pending_squad_lead_receiver "$id"
   }
 }
 
@@ -917,7 +917,7 @@ resume_pending_wakes() {
       continue
       ;;
     esac
-    [ "$(secondmate_registry_field "$REG" "$id" remote 2>/dev/null || true)" = 1 ] || continue
+    [ "$(squad_lead_registry_field "$REG" "$id" remote 2>/dev/null || true)" = 1 ] || continue
     with_remote_route_locks "$id" resume_remote_wake "$id" || failed=1
   done
   return "$failed"
@@ -930,9 +930,9 @@ if [ "$RESUME_PENDING" -eq 1 ]; then
   exit "$FAILED"
 fi
 
-ACTIVE_REGISTRY_LOCK=$(secondmate_registry_lock_path "$STATE")
+ACTIVE_REGISTRY_LOCK=$(squad_lead_registry_lock_path "$STATE")
 jg_lock_acquire_wait "$ACTIVE_REGISTRY_LOCK"
-REMOTE=$(secondmate_registry_field "$REG" "$ID" remote 2>/dev/null || true)
+REMOTE=$(squad_lead_registry_field "$REG" "$ID" remote 2>/dev/null || true)
 if [ "$REMOTE" = 1 ]; then
   ACTIVE_HANDOFF_LOCK="$STATE/.backlog-handoff-$ID.lock"
   jg_lock_acquire_wait "$ACTIVE_HANDOFF_LOCK"
@@ -945,15 +945,15 @@ jg_lock_acquire_wait "$ACTIVE_HANDOFF_LOCK"
 jg_lock_release "$ACTIVE_REGISTRY_LOCK"
 ACTIVE_REGISTRY_LOCK=
 
-RAW_HOME=$(secondmate_home "$ID") || exit 1
+RAW_HOME=$(squad_lead_home "$ID") || exit 1
 [ -n "$RAW_HOME" ] || {
-  echo "error: secondmate $ID has no home in $REG" >&2
+  echo "error: squad_lead $ID has no home in $REG" >&2
   exit 1
 }
-SUB_HOME=$(validate_secondmate_home "$ID" "$RAW_HOME") || exit 1
+SUB_HOME=$(validate_squad_lead_home "$ID" "$RAW_HOME") || exit 1
 SUB_BACKLOG="$SUB_HOME/data/backlog.md"
 validate_backlog_file "main backlog" "$MAIN_BACKLOG" || exit 1
-validate_backlog_file "secondmate backlog" "$SUB_BACKLOG" || exit 1
+validate_backlog_file "squad_lead backlog" "$SUB_BACKLOG" || exit 1
 
 # Classify every key before changing anything: move-from-main, already-in-sub, or
 # missing. Abort with no changes if any key matches neither backlog.
@@ -1010,12 +1010,12 @@ if [ "${#TO_MOVE[@]}" -eq 0 ]; then
   case "$(cat "$WAKE_PENDING_MARKER" 2>/dev/null || true)" in
   prepared:*:"$REQUESTED_BATCH") receiver_wake_promote_prepared "$ID" "$REQUESTED_BATCH" || exit 1 ;;
   prepared:*)
-    echo "error: a prepared receiver wake for secondmate $ID belongs to a different routed batch; retry that original handoff before handling ${ALREADY[*]}" >&2
+    echo "error: a prepared receiver wake for squad_lead $ID belongs to a different routed batch; retry that original handoff before handling ${ALREADY[*]}" >&2
     exit 1
     ;;
   esac
   echo "nothing to move: ${ALREADY[*]:-no keys} already present in $SUB_BACKLOG"
-  wake_pending_secondmate_receiver "$ID" || exit 1
+  wake_pending_squad_lead_receiver "$ID" || exit 1
   exit 0
 fi
 
@@ -1042,26 +1042,26 @@ if [ -e "$WAKE_PENDING_MARKER" ] || [ -L "$WAKE_PENDING_MARKER" ]; then
   case "$(cat "$WAKE_PENDING_MARKER" 2>/dev/null || true)" in
   prepared:*:"$REQUESTED_BATCH") receiver_wake_discard_prepared "$ID" || exit 1 ;;
   prepared:*)
-    echo "error: a prepared receiver wake for secondmate $ID belongs to a different routed batch; retry that original handoff before moving ${TO_MOVE[*]}" >&2
+    echo "error: a prepared receiver wake for squad_lead $ID belongs to a different routed batch; retry that original handoff before moving ${TO_MOVE[*]}" >&2
     exit 1
     ;;
   *)
-    wake_pending_secondmate_receiver "$ID" || {
-      echo "error: previous receiver wake for secondmate $ID is unresolved; nothing new was moved" >&2
+    wake_pending_squad_lead_receiver "$ID" || {
+      echo "error: previous receiver wake for squad_lead $ID is unresolved; nothing new was moved" >&2
       exit 1
     }
     ;;
   esac
 fi
 receiver_wake_mark_prepared "$ID" "$REQUESTED_BATCH" || {
-  echo "error: receiver wake state for secondmate $ID could not be recorded; nothing was moved" >&2
+  echo "error: receiver wake state for squad_lead $ID could not be recorded; nothing was moved" >&2
   exit 1
 }
 
-# Seed the destination with firstmate's standard three-section scaffold when it
+# Seed the destination with juggernaut's standard three-section scaffold when it
 # does not exist yet, so the moved item lands under the right section. (Left to
 # create the file itself, tasks-axi mv writes its own `# Backlog` title format,
-# which is not firstmate's home-backlog convention.)
+# which is not juggernaut's home-backlog convention.)
 mkdir -p "$SUB_HOME/data"
 SUB_CREATED=0
 if [ ! -f "$SUB_BACKLOG" ]; then
@@ -1092,10 +1092,10 @@ fi
 echo "handed off ${#TO_MOVE[@]} item(s) to $ID: ${TO_MOVE[*]}"
 echo "  into $SUB_BACKLOG"
 receiver_wake_promote_prepared "$ID" "$REQUESTED_BATCH" || {
-  echo "error: handed off work to secondmate $ID, but durable receiver wake state could not be recorded" >&2
+  echo "error: handed off work to squad_lead $ID, but durable receiver wake state could not be recorded" >&2
   exit 1
 }
-wake_pending_secondmate_receiver "$ID" || exit 1
+wake_pending_squad_lead_receiver "$ID" || exit 1
 if [ "${#ALREADY[@]}" -gt 0 ]; then
   echo "  already present (skipped): ${ALREADY[*]}"
 fi

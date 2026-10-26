@@ -38,7 +38,7 @@ START_NEAR_MISS='Captain quote: Run `bin/jg-session-start.sh` now, exactly once,
 jg_operational_input_encode watcher "CURRENT_AHOY_WATCHER_BODY" CURRENT_WATCHER \
   || fail "could not construct current Ahoy watcher fixture"
 QUOTED_CURRENT="Captain quote: $CURRENT_WATCHER"
-ASCII_ONLY='FIRSTMATE_OP: v1 watcher: captain-authored text'
+ASCII_ONLY='JUGGERNAUT_OP: v1 watcher: captain-authored text'
 
 capture() {
   "$TMUX" -L "$SOCKET" capture-pane -p -t "$SESSION" -S -600 2>/dev/null || true

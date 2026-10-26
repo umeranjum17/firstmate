@@ -21,16 +21,16 @@ borrow() {  # <suite> <function>...: define the named harness functions from a f
   for n; do eval "$(sed -n "/^$n() *{/,/^}/p" "$suite")"; done
 }
 borrow jg-watch-triage.test.sh ack_stopped_cycle watch_bg wait_poll_cycle reap file_mtime
-borrow jg-wake-queue.test.sh secondmate_stall_watch_leg stall_watch_beat_epoch stall_watch_has_wake \
-  stall_watch_record_met install_secondmate_alive_tmux install_secondmate_stall_date
+borrow jg-wake-queue.test.sh squad_lead_stall_watch_leg stall_watch_beat_epoch stall_watch_has_wake \
+  stall_watch_record_met install_squad_lead_alive_tmux install_squad_lead_stall_date
 # shellcheck disable=SC2034 # WATCH and TMP_ROOT are read by the borrowed fork harness.
 WATCH="$ROOT/bin/jg-watch.sh" DRAIN="$ROOT/bin/jg-wake-drain.sh" TASKS="$ROOT/bin/jg-tasks-axi.sh" TMP_ROOT=$(jg_test_tmproot jg-lead-wake-tests)
 WORKING='state: working · source: run-step · validating (running)'
 RING_TEXT=${RING_TEXT:-Wake row 7 is still queued in this home. Run bin/jg-wake-drain.sh and read its whole output, handle what it presents, then run the exact WAKE_ACK_REQUIRED command it prints, which is what removes the row. Then resume idle supervision.}
 
-newhome() {  # <name>: a fresh secondmate home; sets dir state fakebin out
+newhome() {  # <name>: a fresh squad_lead home; sets dir state fakebin out
   dir=$(make_case "$1"); state=$dir/state; fakebin=$dir/fakebin; out=$dir/watch.out
-  mkdir -p "$dir/data" "$dir/config"; printf '%s\n' "$1" > "$dir/.jg-secondmate-home"
+  mkdir -p "$dir/data" "$dir/config"; printf '%s\n' "$1" > "$dir/.jg-squad-lead-home"
 }
 tasks() { JG_HOME="$dir" "$TASKS" "$@" >/dev/null || fail "fixture: tasks $*"; }
 ack() { ack_stopped_cycle "$state" >/dev/null || fail "could not acknowledge the cycle"; }
@@ -83,9 +83,9 @@ test_idle_lead() {
   pass "an idle lead with ready work is woken once per ready set, and never while a worker is working"
 }
 test_lane_floor() {
-  local spare='kind=secondmate\nmode=secondmate\n' want flow lanes
+  local spare='kind=squad_lead\nmode=squad_lead\n' want flow lanes
   newhome sm-lane-floor
-  # Four panes stay open; the two spare endpoints are secondmates, which are not lanes.
+  # Four panes stay open; the two spare endpoints are squad_leads, which are not lanes.
   lanes=(JG_FAKE_TMUX_WINDOWS="$(printf 'jg-busyone\njg-busytwo\njg-busythree\njg-busyfour')" JG_FAKE_CREW_STATE="$WORKING")
   tasks add alpha-one "first ready item"
   printf '4\n' > "$dir/config/lane-target"
@@ -169,19 +169,19 @@ test_full_idle() {
 # leg <child-queue-the-ring-drains> <leg> <mode> [arg...]: one stall-watch leg at the fake clock.
 leg() {
   PATH="$fakebin:$PATH" JG_FAKE_NOW_FILE="$dir/now" JG_HOME="$dir" JG_ROOT_OVERRIDE="$ROOT" JG_STATE_OVERRIDE="$state" \
-    JG_FAKE_TMUX_SENT="$dir/sent" JG_FAKE_CHILD_WAKE_QUEUE=$1 JG_SECONDMATE_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
-    JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 secondmate_stall_watch_leg "$dir" "${@:2}"
+    JG_FAKE_TMUX_SENT="$dir/sent" JG_FAKE_CHILD_WAKE_QUEUE=$1 JG_SQUAD_LEAD_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
+    JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 squad_lead_stall_watch_leg "$dir" "${@:2}"
 }
 # A proven-idle mate with a frozen row is rung once; the steer names the row and its ack.
 test_drain_ring() {
   local sub inbox_rec steer
-  dir=$(make_case secondmate-drain-ring); state=$dir/state; sub=$dir/secondmate; fakebin=$dir/fakebin
+  dir=$(make_case squad-lead-drain-ring); state=$dir/state; sub=$dir/squad_lead; fakebin=$dir/fakebin
   mkdir -p "$sub/state"
-  printf 'mate\n' > "$sub/.jg-secondmate-home"
-  printf 'window=firstmate:jg-mate\nkind=secondmate\nharness=claude\nbackend=tmux\nhome=%s\n' "$sub" > "$state/mate.meta"
+  printf 'mate\n' > "$sub/.jg-squad-lead-home"
+  printf 'window=juggernaut:jg-mate\nkind=squad_lead\nharness=claude\nbackend=tmux\nhome=%s\n' "$sub" > "$state/mate.meta"
   printf '100\t7\tcheck\trouted\tcheck: routed row\n' > "$sub/state/.wake-queue"
-  install_secondmate_alive_tmux "$fakebin"
-  install_secondmate_stall_date "$fakebin"
+  install_squad_lead_alive_tmux "$fakebin"
+  install_squad_lead_stall_date "$fakebin"
   "$ROOT/bin/jg-busy-event.sh" arm "$state" mate >/dev/null || fail "could not arm the mate's busy contract"
   "$ROOT/bin/jg-busy-event.sh" apply "$state" mate idle --current-gen --source claude-hook --event stop >/dev/null \
     || fail "could not mark the mate idle"
@@ -189,7 +189,7 @@ test_drain_ring() {
   leg '' first progress mate "$(printf '1000\t100-7')"
   printf '1002\n' > "$dir/now"
   leg "$sub/state/.wake-queue" ring drained mate "$sub/state/.wake-queue"
-  ! grep -F 'secondmate wake-loop stalled' "$dir/watch-ring.out" >/dev/null || fail "a rung idle mate still alarmed"
+  ! grep -F 'squad_lead wake-loop stalled' "$dir/watch-ring.out" >/dev/null || fail "a rung idle mate still alarmed"
   [ "$(grep -c -F '[ENTER]' "$dir/sent" 2>/dev/null || true)" = 1 ] || fail "the idle mate was not rung exactly once"
   for inbox_rec in "$state/mate.inbox/"*.msg; do break; done
   [ -f "$inbox_rec" ] || fail "the ring wrote no drain steer"

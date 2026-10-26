@@ -1,10 +1,10 @@
 # supervisor-guard
 
-The supervisor-work guard: a PreToolUse hook that stops a firstmate supervisor
+The supervisor-work guard: a PreToolUse hook that stops a juggernaut supervisor
 session from doing a worker's job. It refuses to drive a crew-owned
 `no-mistakes axi run` or `respond`, to sleep or poll inside a turn, and (for a
-secondmate lead) to type into a worker's pane. The add-on owns this logic. Upstream
-Kun's Firstmate has no such guard.
+squad lead lead) to type into a worker's pane. The add-on owns this logic. Upstream
+Kun's Juggernaut has no such guard.
 
 ## Layout
 
@@ -23,7 +23,7 @@ Kun's Firstmate has no such guard.
 - `tests/jg-supervisor-work-guard.test.sh` — installs into a throwaway HOME, runs
   the installed hook against a fixture home and a linked worktree, then uninstalls.
 
-## Dependencies on the Firstmate checkout
+## Dependencies on the Juggernaut checkout
 
 The add-on reads two files from the home's checkout and copies neither:
 `bin/jg-primary-scope-lib.sh` (the scope predicate) and

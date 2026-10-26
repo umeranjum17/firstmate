@@ -219,7 +219,7 @@ if jq -e '(.about | length) > 500 or (.run.outcome | length) > 1000' "$from" >/d
 rm -rf "$SO_CAPTURE"
 cp -r "$(dirname "$from")" "$SO_CAPTURE"
 if [ -f "$board" ]; then
-  jq --slurpfile c "$from" '.items += [($c[0] + {type:"evidence",filer:"firstmate-merge",dismissed:false})]' "$board" > "$board.tmp"
+  jq --slurpfile c "$from" '.items += [($c[0] + {type:"evidence",filer:"juggernaut-merge",dismissed:false})]' "$board" > "$board.tmp"
   mv "$board.tmp" "$board"
 fi
 STUB
@@ -422,7 +422,7 @@ is "receipt: card carries the clean run" "$(jq -c .run "$work/card-receipt/card.
 # A sealed clean run in done-done's own evidence root (a throwaway DONE_DONE_HOME, the real done-done) is accepted
 # for its head with no task folder run; one at another head is refused.
 if command -v done-done >/dev/null; then
-  git init -q "$home" # JG_HOME is a Firstmate checkout; done-done answers from inside a repo
+  git init -q "$home" # JG_HOME is a Juggernaut checkout; done-done answers from inside a repo
   mkdir -p "$work/ddhome/evidence/app/.done-done/runs"
   jq -n --arg c "$head_c" '{schema:1, run_id:"20261020T000000Z-default0001", commit:$c, dirty:false, exit:0, files:[{path:"x/shot.png"}]}' \
     >"$work/ddhome/evidence/app/.done-done/runs/20261020T000000Z-default0001.json"
@@ -585,7 +585,7 @@ if [ -e "$work/card-nosupport2" ]; then no "no run to redirect to: no card poste
 
 # A dismissed card stays archived and the new card goes up beside it; an identical live card remains deduped.
 key=merge-$head_c
-jq -n --arg k "$key" '{schema:1,answers_only:false,items:[{key:$k,type:"evidence",kind:"evidence",filer:"firstmate-merge",dismissed:true,title:"dismissed placeholder"}]}' > "$work/board.json"
+jq -n --arg k "$key" '{schema:1,answers_only:false,items:[{key:$k,type:"evidence",kind:"evidence",filer:"juggernaut-merge",dismissed:true,title:"dismissed placeholder"}]}' > "$work/board.json"
 MODE=newer DD_LOG=$work/args.log SO_CAPTURE=$work/card-dismissed
 export MODE DD_LOG SO_CAPTURE
 checks dismissed shot.png && cp "$shot" "$home/data/dismissed/shot.png"

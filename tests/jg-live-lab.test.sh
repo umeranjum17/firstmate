@@ -85,19 +85,19 @@ make_lab() {
     echo "tmux_dir=$tmux_dir"
   } > "$root/.jg-live-lab"
 
-  lab_tmux "$root" new-session -d -s firstmate -n lab -c "$root" 'exec sleep 600'
+  lab_tmux "$root" new-session -d -s juggernaut -n lab -c "$root" 'exec sleep 600'
   record_pid "$root" "$(lab_tmux "$root" display-message -p '#{pid}')"
-  lab_tmux "$root" new-window -d -t firstmate: -n main -c "$home" "printf 'LABREADY-$NONCE\n'; exec sleep 600"
-  lab_tmux "$root" new-window -d -t firstmate: -n "jg-$MATE_ID" -c "$root/mate" 'exec sleep 600'
-  lab_tmux "$root" new-window -d -t firstmate: -n "jg-$WORKER_ID" -c "$root" 'exec sleep 600'
-  jg_write_meta "$home/state/$MATE_ID.meta" "window=firstmate:jg-$MATE_ID" "tasktmp=/tmp/jg-$MATE_ID"
-  jg_write_meta "$home/state/$WORKER_ID.meta" "window=firstmate:jg-$WORKER_ID" "worktree=$home/projects/notes" "kind=secondmate" "tasktmp=/tmp/jg-$WORKER_ID"
+  lab_tmux "$root" new-window -d -t juggernaut: -n main -c "$home" "printf 'LABREADY-$NONCE\n'; exec sleep 600"
+  lab_tmux "$root" new-window -d -t juggernaut: -n "jg-$MATE_ID" -c "$root/mate" 'exec sleep 600'
+  lab_tmux "$root" new-window -d -t juggernaut: -n "jg-$WORKER_ID" -c "$root" 'exec sleep 600'
+  jg_write_meta "$home/state/$MATE_ID.meta" "window=juggernaut:jg-$MATE_ID" "tasktmp=/tmp/jg-$MATE_ID"
+  jg_write_meta "$home/state/$WORKER_ID.meta" "window=juggernaut:jg-$WORKER_ID" "worktree=$home/projects/notes" "kind=squad_lead" "tasktmp=/tmp/jg-$WORKER_ID"
   mkdir -p "$home/projects/notes"
   printf 'paused [at=1]: waiting on gate file %s to exist\n' "$home/data/$WORKER_ID/gate" > "$home/state/$WORKER_ID.status"
 
-  lock_pid=$(lab_tmux "$root" display-message -p -t firstmate:=main '#{pane_pid}')
+  lock_pid=$(lab_tmux "$root" display-message -p -t juggernaut:=main '#{pane_pid}')
   printf '%s\n' "$lock_pid" > "$home/state/.lock"
-  printf '%s\n' "$(lab_tmux "$root" display-message -p -t "firstmate:=jg-$MATE_ID" '#{pane_pid}')" > "$root/mate/state/.lock"
+  printf '%s\n' "$(lab_tmux "$root" display-message -p -t "juggernaut:=jg-$MATE_ID" '#{pane_pid}')" > "$root/mate/state/.lock"
   start_watcher "$home"
   printf 'host\t%s\tx\n' "$(start_sleeper)" > "$home/state/.supervision-host"
   printf '%s\n' \
@@ -173,7 +173,7 @@ printf '999999\n' > "$CH/state/.lock"
 run_check "$C"
 expect_code 1 "$CHECK_RC" "a dead session lock is not ready"
 assert_contains "$CHECK_OUT" "fail primary: the lab session lock names no live process" "primary names the dead lock"
-lab_tmux "$C" display-message -p -t firstmate:=main '#{pane_pid}' > "$CH/state/.lock"
+lab_tmux "$C" display-message -p -t juggernaut:=main '#{pane_pid}' > "$CH/state/.lock"
 pass "primary fails when session start never took the lab lock"
 
 # primary: a lab home that is a linked worktree is not the genuine primary
@@ -182,14 +182,14 @@ WT_CASE="$TMP_ROOT/wtcase"
 jg_git_worktree "$WT_CASE/project" "$WT_CASE/wt" lab-wt
 cp "$C/.jg-live-lab" "$WT_CASE/.jg-live-lab"
 set_record "$WT_CASE" home "$WT_CASE/wt"
-lab_tmux "$C" new-window -d -t firstmate: -n wtmain -c "$WT_CASE/wt" 'exec sleep 600'
-lab_tmux "$C" kill-window -t firstmate:=main
-lab_tmux "$C" rename-window -t firstmate:=wtmain main
+lab_tmux "$C" new-window -d -t juggernaut: -n wtmain -c "$WT_CASE/wt" 'exec sleep 600'
+lab_tmux "$C" kill-window -t juggernaut:=main
+lab_tmux "$C" rename-window -t juggernaut:=wtmain main
 run_check "$WT_CASE"
 assert_contains "$CHECK_OUT" "fail primary: the lab home is not a primary checkout" "primary refuses a linked-worktree home"
-lab_tmux "$C" kill-window -t firstmate:=main
-lab_tmux "$C" new-window -d -t firstmate: -n main -c "$CH" "printf 'LABREADY-$NONCE\n'; exec sleep 600"
-lab_tmux "$C" display-message -p -t firstmate:=main '#{pane_pid}' > "$CH/state/.lock"
+lab_tmux "$C" kill-window -t juggernaut:=main
+lab_tmux "$C" new-window -d -t juggernaut: -n main -c "$CH" "printf 'LABREADY-$NONCE\n'; exec sleep 600"
+lab_tmux "$C" display-message -p -t juggernaut:=main '#{pane_pid}' > "$CH/state/.lock"
 pass "primary fails when the primary runs in a linked worktree instead of the lab's primary checkout"
 
 # probe: the nonce reply proves the model is accepted and a turn completed.
@@ -244,14 +244,14 @@ pass "watcher fails on a stale beacon"
 
 # mate: its own window, targeted exactly. A missing window must not resolve to
 # another one (tmux falls back to the current window for an unknown name).
-lab_tmux "$C" kill-window -t "firstmate:=jg-$MATE_ID"
+lab_tmux "$C" kill-window -t "juggernaut:=jg-$MATE_ID"
 run_check "$C"
 assert_contains "$CHECK_OUT" "fail mate: the $MATE_ID window is not running" "mate names its missing window"
-lab_tmux "$C" new-window -d -t firstmate: -n "jg-$MATE_ID" -c "$C/mate" 'exec sleep 600'
+lab_tmux "$C" new-window -d -t juggernaut: -n "jg-$MATE_ID" -c "$C/mate" 'exec sleep 600'
 rm -f "$C/mate/state/.lock"
 run_check "$C"
 assert_contains "$CHECK_OUT" "fail mate: the mate holds no session lock yet" "mate needs its own session lock"
-lab_tmux "$C" display-message -p -t "firstmate:=jg-$MATE_ID" '#{pane_pid}' > "$C/mate/state/.lock"
+lab_tmux "$C" display-message -p -t "juggernaut:=jg-$MATE_ID" '#{pane_pid}' > "$C/mate/state/.lock"
 pass "mate fails when its window is gone or it never reached its charter"
 
 # Opt-out readiness must observe the mate's inherited material and its real
@@ -335,7 +335,7 @@ pass "down refuses anything up did not build"
 
 C_HASH=$(printf '%s' "$CH" | shasum -a 256 | awk '{print $1}')
 OTHER_ID="labt$$-other"
-jg_write_meta "$CH/state/$OTHER_ID.meta" "window=firstmate:jg-$OTHER_ID" "tasktmp=/tmp/jg-$OTHER_ID"
+jg_write_meta "$CH/state/$OTHER_ID.meta" "window=juggernaut:jg-$OTHER_ID" "tasktmp=/tmp/jg-$OTHER_ID"
 mkdir -p "/tmp/jg-$WORKER_ID/gotmp" "/tmp/jg-$MATE_ID" "/tmp/jg-$WORKER_ID+$C_HASH" "/tmp/jg-$OTHER_ID+$C_HASH" "/tmp/jg-$OTHER_ID"
 # An outsider opening a lab path is not owned by the lab.
 printf 'sleep 600\n' > "$C/stray.sh"
@@ -628,7 +628,7 @@ cp -R "$UPSRC" "$WORKSRC"
 cat > "$WORKSRC/bin/jg-brief.sh" <<'SH'
 #!/usr/bin/env bash
 mkdir -p "$JG_HOME/data/$1"
-printf '{TASK}\n{FIRSTMATE_SPEC}\n' > "$JG_HOME/data/$1/brief.md"
+printf '{TASK}\n{JUGGERNAUT_SPEC}\n' > "$JG_HOME/data/$1/brief.md"
 SH
 # The task-priority add-on refuses an add without --priority, as it does on a
 # real install; the lab worker's add must carry one or spawn never runs.
@@ -642,17 +642,17 @@ SH
 cat > "$WORKSRC/bin/jg-spawn.sh" <<'SH'
 #!/usr/bin/env bash
 id=$1
-tmux new-window -d -t firstmate: -n "jg-$id" -c "$JG_HOME" 'exec sleep 45 >/dev/null 2>&1' || exit 1
+tmux new-window -d -t juggernaut: -n "jg-$id" -c "$JG_HOME" 'exec sleep 45 >/dev/null 2>&1' || exit 1
 # A missing =name can silently resolve to the current window: verify the name.
 for (( n=0; n<30; n++ )); do
-  if tmux list-windows -t firstmate -F '#{window_name}' | grep -Fxq "jg-$id"; then
-    pid=$(tmux display-message -p -t "firstmate:=jg-$id" '#{pane_pid}')
+  if tmux list-windows -t juggernaut -F '#{window_name}' | grep -Fxq "jg-$id"; then
+    pid=$(tmux display-message -p -t "juggernaut:=jg-$id" '#{pane_pid}')
     [ -z "$pid" ] || break
   fi
   sleep 0.1
 done
 [ -n "${pid:-}" ] || exit 1
-printf 'window=firstmate:jg-%s\n' "$id" > "$JG_HOME/state/$id.meta"
+printf 'window=juggernaut:jg-%s\n' "$id" > "$JG_HOME/state/$id.meta"
 printf 'working [at=1]: setting up\n' > "$JG_HOME/state/$id.status"
 SH
 chmod +x "$WORKSRC/bin/"{jg-brief,jg-tasks-axi,jg-spawn}.sh
@@ -681,7 +681,7 @@ pass "up launches primary after worker status without weakening final parked rea
 cat > "$WORKSRC/bin/jg-spawn.sh" <<'SH'
 #!/usr/bin/env bash
 id=$1
-printf 'window=firstmate:jg-%s\n' "$id" > "$JG_HOME/state/$id.meta"
+printf 'window=juggernaut:jg-%s\n' "$id" > "$JG_HOME/state/$id.meta"
 printf 'working [at=1]: setting up\n' > "$JG_HOME/state/$id.status"
 SH
 git -C "$WORKSRC" add bin/jg-spawn.sh

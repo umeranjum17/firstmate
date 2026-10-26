@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
-# jg-control-lib.sh - the ONE executable owner of firstmate's agent lifecycle
+# jg-control-lib.sh - the ONE executable owner of juggernaut's agent lifecycle
 # CONTROL-PLANE mechanics.
 #
 # Data plane vs control plane (captain-approved root architecture, 2026-07-13).
 # bin/jg-send.sh is the DATA plane: conversational text for the agent to read,
-# always routing-marked for a kind=secondmate target so the reply comes back
+# always routing-marked for a kind=squad_lead target so the reply comes back
 # through the status path. That marking is exactly right for a message and
 # exactly wrong for a lifecycle command: a marked "/quit" arrives as ordinary
-# chat ("[jg-from-firstmate] /quit") that the agent reasons ABOUT instead of
+# chat ("[jg-from-juggernaut] /quit") that the agent reasons ABOUT instead of
 # executing. bin/jg-control.sh is the CONTROL plane: allowlisted lifecycle
 # verbs addressed to an exact task id, with the per-harness mechanics owned
 # here rather than improvised per harness in agent prose.
@@ -107,8 +107,8 @@ jg_control_harness_family() {  # <recorded-harness>
 }
 
 # Which task kinds an adapter is verified to run. muse, gemini, rovo, agy, and devin
-# are crewmate/scout adapters only: none has a primary supervision protocol,
-# and bin/jg-spawn.sh refuses a --secondmate launch on any of them. The control
+# are operator/scout adapters only: none has a primary supervision protocol,
+# and bin/jg-spawn.sh refuses a --squad-lead launch on any of them. The control
 # plane asks this BEFORE it stops anything, so an incompatible relaunch target is
 # refused while the current agent is still running rather than after it has
 # been stopped.
@@ -116,7 +116,7 @@ jg_control_harness_supports_kind() {  # <harness> <kind>
   local harness=${1-} kind=${2-}
   jg_control_harness_supported "$harness" || return 1
   case "$harness" in
-    muse|gemini|rovo|agy|devin) [ "$kind" != secondmate ] || return 1 ;;
+    muse|gemini|rovo|agy|devin) [ "$kind" != squad_lead ] || return 1 ;;
   esac
   return 0
 }
@@ -246,7 +246,7 @@ jg_control_exit_command() {  # <harness>
 # then applies only reports carrying the session identity it bound. A
 # replacement agent started fresh in that same pane reports a NEW session, so
 # its state reports are ignored and the pane stays frozen at whatever the
-# previous agent last reported: a working crewmate reads idle until its task
+# previous agent last reported: a working operator reads idle until its task
 # ends (reproduced and fixed live 2026-09-21, herdr 0.9.1; the read that
 # supplies the reference is
 # bin/backends/herdr.sh's jg_backend_herdr_pane_agent_session_ref).
@@ -369,18 +369,18 @@ jg_control_endpoint_absence_verdict() {  # <backend> <target>
 # changes harness (or re-arms the same one with a fresh busy generation) can
 # clear the previous incarnation's wiring instead of leaving a stale hook
 # pointing at a retired generation. Prints zero or more absolute paths, one per
-# line: worktree-resident hook files and firstmate-owned state tokens only,
+# line: worktree-resident hook files and juggernaut-owned state tokens only,
 # never a harness's own managed config.
 jg_control_harness_wiring_paths() {  # <harness> <worktree> <state-dir> <id> [kind]
   local harness=${1-} wt=${2-} state=${3-} id=${4-} kind=${5-}
   [ -n "$wt" ] && [ -n "$state" ] && [ -n "$id" ] || return 1
   case "$harness" in
-    # A secondmate's .claude/settings.local.json belongs to the captain.
-    # Retire only the firstmate-owned settings file the launch passes to
+    # A squad_lead's .claude/settings.local.json belongs to the captain.
+    # Retire only the juggernaut-owned settings file the launch passes to
     # --settings and the Stop pointer that carries the same busy generation.
-    # A crewmate's hook file is the worktree settings.local.json.
+    # A operator's hook file is the worktree settings.local.json.
     claude)
-      if [ "$kind" = secondmate ]; then
+      if [ "$kind" = squad_lead ]; then
         printf '%s\n' "$state/$id.claude-settings.json"
         printf '%s\n' "$wt/.jg-busy-stop"
       else
@@ -400,14 +400,14 @@ jg_control_harness_wiring_paths() {  # <harness> <worktree> <state-dir> <id> [ki
       ;;
     muse)
       # muse installs no hook: its busy source is its own session event log,
-      # bound to the pane by these two firstmate-owned sidecars. A relaunch
+      # bound to the pane by these two juggernaut-owned sidecars. A relaunch
       # ONTO muse rewrites them, but a relaunch AWAY from muse must retire them
       # so no retired incarnation's session binding outlives the agent.
       printf '%s\n' "$state/$id.muse-session"
       printf '%s\n' "$state/$id.muse-session-current"
       ;;
     cursor) printf '%s\n' "$state/$id.cursor-session" ;;
-    # gemini's busy-state and turn-end hooks live in a firstmate-owned
+    # gemini's busy-state and turn-end hooks live in a juggernaut-owned
     # settings file the launch reaches through GEMINI_CLI_SYSTEM_SETTINGS_PATH,
     # so retiring that one file retires the whole incarnation's wiring. Nothing
     # is written into the worktree, whose own .gemini/settings.json belongs to
@@ -417,7 +417,7 @@ jg_control_harness_wiring_paths() {  # <harness> <worktree> <state-dir> <id> [ki
   esac
 }
 
-# The firstmate-owned global turn-end registry entry a harness mints per task.
+# The juggernaut-owned global turn-end registry entry a harness mints per task.
 # grok and kimi are the two adapters whose turn-end hook is global and gated by
 # a private token file; every other adapter's wiring is fully covered by
 # jg_control_harness_wiring_paths. Prints the registry path or nothing.

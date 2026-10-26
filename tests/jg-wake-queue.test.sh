@@ -97,7 +97,7 @@ test_signal_grace_rescan_queues_one_row() {
   status_file="$state/task.status"
   # The grace re-scan exists so a crew's own follow-up write (its turn-end hook,
   # seconds after the status write) is reported once instead of costing two
-  # firstmate turns. One coalesced event must therefore append exactly ONE
+  # juggernaut turns. One coalesced event must therefore append exactly ONE
   # durable row; a batch that names the file twice writes the same lane event
   # into the queue more than once, which is what inflates its depth.
   printf 'blocked: first\n' > "$status_file"
@@ -273,12 +273,12 @@ test_drain_dedupes_obvious_duplicates() {
 # wake. The poll ceiling only bounds a hang.
 foreign_stall_watch_leg() {  # <dir> <leg> <now> [observation]
   local dir=$1 leg=$2 now=$3 observation=${4-} marker stall pid i=0
-  marker="$dir/state/.secondmate-wake-progress-mate"
-  stall="$dir/state/.secondmate-wake-stall-mate"
+  marker="$dir/state/.squad-lead-wake-progress-mate"
+  stall="$dir/state/.squad-lead-wake-stall-mate"
   printf '%s\n' "$now" > "$dir/now"
   PATH="$dir/fakebin:$PATH" JG_FAKE_NOW_FILE="$dir/now" JG_HOME="$dir" JG_ROOT_OVERRIDE="$ROOT" \
-    JG_STATE_OVERRIDE="$dir/state" JG_FAKE_TMUX_WINDOW='firstmate:jg-mate' \
-    JG_SECONDMATE_WAKE_STALL_SECS=1 JG_SECONDMATE_LIVENESS_SECS=99999999 \
+    JG_STATE_OVERRIDE="$dir/state" JG_FAKE_TMUX_WINDOW='juggernaut:jg-mate' \
+    JG_SQUAD_LEAD_WAKE_STALL_SECS=1 JG_SQUAD_LEAD_LIVENESS_SECS=99999999 \
     JG_POLL=1 JG_SIGNAL_GRACE=0 \
     JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
     "$WATCH" > "$dir/watch-$leg.out" 2> "$dir/watch-$leg.err" &
@@ -306,15 +306,15 @@ foreign_stall_watch_leg() {  # <dir> <leg> <now> [observation]
   fi
 }
 
-test_secondmate_foreign_queue_stall_tracks_progress_and_alerts_once() {
+test_squad_lead_foreign_queue_stall_tracks_progress_and_alerts_once() {
   local dir state sub fakebin out row_before row_after stall_count real_date
-  dir=$(make_case secondmate-foreign-stall)
+  dir=$(make_case squad-lead-foreign-stall)
   state="$dir/state"
-  sub="$dir/secondmate"
+  sub="$dir/squad_lead"
   mkdir -p "$sub/state" "$sub/data" "$sub/bin"
-  printf '# Firstmate\n' > "$sub/AGENTS.md"
-  printf 'mate\n' > "$sub/.jg-secondmate-home"
-  printf 'window=firstmate:jg-mate\nkind=secondmate\nharness=claude\nbackend=tmux\nhome=%s\n' \
+  printf '# Juggernaut\n' > "$sub/AGENTS.md"
+  printf 'mate\n' > "$sub/.jg-squad-lead-home"
+  printf 'window=juggernaut:jg-mate\nkind=squad_lead\nharness=claude\nbackend=tmux\nhome=%s\n' \
     "$sub" > "$state/mate.meta"
   fakebin="$dir/fakebin"
   real_date=$(command -v date)
@@ -350,9 +350,9 @@ SH
   cp "$sub/state/.wake-queue" "$row_before"
   out="$dir/watch-stalled.out"
   foreign_stall_watch_leg "$dir" stalled 1004
-  grep -F 'check: secondmate wake-loop stalled: mate=mate row=8 idle=2s' "$out" >/dev/null \
+  grep -F 'check: squad_lead wake-loop stalled: mate=mate row=8 idle=2s' "$out" >/dev/null \
     || fail "a foreign queue with no progress did not alert: $(cat "$out")"
-  stall_count=$(grep -c 'secondmate-wake-loop-mate-' "$state/.wake-queue" || true)
+  stall_count=$(grep -c 'squad-lead-wake-loop-mate-' "$state/.wake-queue" || true)
   [ "$stall_count" -eq 1 ] || fail "the stalled episode did not publish exactly one parent notification"
   cmp -s "$row_before" "$sub/state/.wake-queue" \
     || fail "foreign queue row changed during read-only stall detection"
@@ -373,11 +373,11 @@ SH
   # If that new drain position then genuinely stops advancing, it is a new
   # no-progress episode and must remain visible rather than being muted forever.
   foreign_stall_watch_leg "$dir" refrozen 1012
-  grep -F 'check: secondmate wake-loop stalled: mate=mate row=9 idle=2s' "$dir/watch-refrozen.out" >/dev/null \
+  grep -F 'check: squad_lead wake-loop stalled: mate=mate row=9 idle=2s' "$dir/watch-refrozen.out" >/dev/null \
     || fail "a genuine later no-progress episode was hidden after earlier progress"
-  stall_count=$(grep -c 'secondmate-wake-loop-mate-' "$state/.wake-queue" || true)
+  stall_count=$(grep -c 'squad-lead-wake-loop-mate-' "$state/.wake-queue" || true)
   [ "$stall_count" -eq 1 ] || fail "the later no-progress episode did not publish exactly one notification"
-  pass "foreign secondmate queue alerts once per no-progress episode without age-only or cascade noise"
+  pass "foreign squad_lead queue alerts once per no-progress episode without age-only or cascade noise"
 }
 
 # Stall-tick legs wait on the watcher's own record, never on a wall-clock
@@ -437,7 +437,7 @@ stall_watch_record_met() { # <mode> <marker> <want> <progress> <progress-start> 
   esac
 }
 
-secondmate_stall_watch_leg() { # <dir> <leg> <mode> [arg...]
+squad_lead_stall_watch_leg() { # <dir> <leg> <mode> [arg...]
   local dir=$1 leg=$2 mode=$3
   shift 3
   local out="$dir/watch-$leg.out" err="$dir/watch-$leg.err"
@@ -449,31 +449,31 @@ secondmate_stall_watch_leg() { # <dir> <leg> <mode> [arg...]
     alert|reject|tick)
       ;;
     cleared)
-      marker="$dir/state/.secondmate-wake-progress-mate"
+      marker="$dir/state/.squad-lead-wake-progress-mate"
       printf 'unobserved\n' > "$marker"
       ;;
     progress)
-      marker="$dir/state/.secondmate-wake-progress-$1"
+      marker="$dir/state/.squad-lead-wake-progress-$1"
       want=$2
       ;;
     defer)
-      marker="$dir/state/.secondmate-wake-progress-$1"
+      marker="$dir/state/.squad-lead-wake-progress-$1"
       row_key=$2
-      bound=${JG_SECONDMATE_WAKE_STALL_SECS:-1}
+      bound=${JG_SQUAD_LEAD_WAKE_STALL_SECS:-1}
       [ "${3:-0}" -le "$bound" ] || bound=$3
       ;;
     ring)
-      marker="$dir/state/.secondmate-wake-ring-$1"
+      marker="$dir/state/.squad-lead-wake-ring-$1"
       want=$2
-      progress="$dir/state/.secondmate-wake-progress-$1"
+      progress="$dir/state/.squad-lead-wake-progress-$1"
       ;;
     stall-file)
-      marker="$dir/state/.secondmate-wake-stall-$1"
+      marker="$dir/state/.squad-lead-wake-stall-$1"
       want=$2
       ;;
     drained)
       marker=$2
-      progress="$dir/state/.secondmate-wake-progress-$1"
+      progress="$dir/state/.squad-lead-wake-progress-$1"
       ;;
     *)
       fail "unknown stall watch mode: $mode"
@@ -484,31 +484,31 @@ secondmate_stall_watch_leg() { # <dir> <leg> <mode> [arg...]
   # These legs pin wake-loop stall behavior only. A large cadence alone does
   # not suppress the first endpoint tick when its marker is absent; seed it so
   # every watcher launch and restart leaves the fixture endpoints untouched.
-  touch "$dir/state/.secondmate-liveness-tick"
-  JG_SECONDMATE_LIVENESS_SECS=99999999 "$WATCH" >"$out" 2>"$err" &
+  touch "$dir/state/.squad-lead-liveness-tick"
+  JG_SQUAD_LEAD_LIVENESS_SECS=99999999 "$WATCH" >"$out" 2>"$err" &
   pid=$!
   case "$mode" in
     alert)
       while [ "$i" -lt "$limit" ]; do
         if ! is_live_non_zombie "$pid"; then
           wait_for_exit "$pid" 50 || true
-          if grep -F 'secondmate wake-loop stalled' "$out" >/dev/null 2>&1; then
+          if grep -F 'squad_lead wake-loop stalled' "$out" >/dev/null 2>&1; then
             return 0
           fi
-          JG_SECONDMATE_LIVENESS_SECS=99999999 "$WATCH" >>"$out" 2>>"$err" &
+          JG_SQUAD_LEAD_LIVENESS_SECS=99999999 "$WATCH" >>"$out" 2>>"$err" &
           pid=$!
         fi
         sleep 0.1
         i=$((i + 1))
       done
       wait_for_exit "$pid" 50 || true
-      grep -F 'secondmate wake-loop stalled' "$out" >/dev/null \
+      grep -F 'squad_lead wake-loop stalled' "$out" >/dev/null \
         || fail "watcher leg $leg did not alert: $(cat "$out" 2>/dev/null) $(cat "$err" 2>/dev/null)"
       return 0
       ;;
     reject)
       wait_for_exit "$pid" "$limit" || true
-      grep -F 'watcher: secondmate wake-loop observation failed' "$err" >/dev/null \
+      grep -F 'watcher: squad_lead wake-loop observation failed' "$err" >/dev/null \
         || fail "watcher leg $leg did not refuse the stall marker path: $(cat "$out" 2>/dev/null) $(cat "$err" 2>/dev/null)"
       return 0
       ;;
@@ -554,7 +554,7 @@ secondmate_stall_watch_leg() { # <dir> <leg> <mode> [arg...]
             fi
           fi
         fi
-        if grep -F 'secondmate wake-loop stalled' "$out" >/dev/null 2>&1; then
+        if grep -F 'squad_lead wake-loop stalled' "$out" >/dev/null 2>&1; then
           fail "watcher leg $leg alerted during a deferred busy turn: $(cat "$out")"
         fi
         ;;
@@ -578,7 +578,7 @@ secondmate_stall_watch_leg() { # <dir> <leg> <mode> [arg...]
           ;;
         defer)
           if [ "$observed_at" -gt 0 ] && stall_watch_has_wake "$out" \
-            && ! grep -F 'secondmate wake-loop stalled' "$out" >/dev/null 2>&1; then
+            && ! grep -F 'squad_lead wake-loop stalled' "$out" >/dev/null 2>&1; then
             mtime=$(stall_watch_beat_epoch "$beat")
             [ "$mtime" -ge $((observed_at + bound)) ] && met=1
           fi
@@ -591,7 +591,7 @@ secondmate_stall_watch_leg() { # <dir> <leg> <mode> [arg...]
         break
       fi
       rm -f "$beat"
-      JG_SECONDMATE_LIVENESS_SECS=99999999 "$WATCH" >>"$out" 2>>"$err" &
+      JG_SQUAD_LEAD_LIVENESS_SECS=99999999 "$WATCH" >>"$out" 2>>"$err" &
       pid=$!
       first=0
       mark=0
@@ -607,14 +607,14 @@ secondmate_stall_watch_leg() { # <dir> <leg> <mode> [arg...]
   wait_for_exit "$pid" "$limit" || true
 }
 
-test_secondmate_declared_pause_rows_do_not_feed_stall_escalation() {
+test_squad_lead_declared_pause_rows_do_not_feed_stall_escalation() {
   local dir state sub fakebin real_date
-  dir=$(make_case secondmate-declared-pause-queue)
+  dir=$(make_case squad-lead-declared-pause-queue)
   state="$dir/state"
-  sub="$dir/secondmate"
+  sub="$dir/squad_lead"
   mkdir -p "$sub/state"
-  printf 'mate\n' > "$sub/.jg-secondmate-home"
-  printf 'window=firstmate:jg-mate\nkind=secondmate\nhome=%s\n' "$sub" > "$state/mate.meta"
+  printf 'mate\n' > "$sub/.jg-squad-lead-home"
+  printf 'window=juggernaut:jg-mate\nkind=squad_lead\nhome=%s\n' "$sub" > "$state/mate.meta"
   fakebin="$dir/fakebin"
   real_date=$(command -v date)
   cat > "$fakebin/date" <<SH
@@ -632,21 +632,21 @@ SH
 EOF
   printf '1000\n' > "$dir/now"
   PATH="$fakebin:$PATH" JG_FAKE_NOW_FILE="$dir/now" JG_HOME="$dir" JG_ROOT_OVERRIDE="$ROOT" \
-    JG_STATE_OVERRIDE="$state" JG_FAKE_TMUX_WINDOW='firstmate:jg-mate' \
-    JG_SECONDMATE_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
+    JG_STATE_OVERRIDE="$state" JG_FAKE_TMUX_WINDOW='juggernaut:jg-mate' \
+    JG_SQUAD_LEAD_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
     JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
-    secondmate_stall_watch_leg "$dir" "first" cleared
+    squad_lead_stall_watch_leg "$dir" "first" cleared
   printf '5000\n' > "$dir/now"
   PATH="$fakebin:$PATH" JG_FAKE_NOW_FILE="$dir/now" JG_HOME="$dir" JG_ROOT_OVERRIDE="$ROOT" \
-    JG_STATE_OVERRIDE="$state" JG_FAKE_TMUX_WINDOW='firstmate:jg-mate' \
-    JG_SECONDMATE_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
+    JG_STATE_OVERRIDE="$state" JG_FAKE_TMUX_WINDOW='juggernaut:jg-mate' \
+    JG_SQUAD_LEAD_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
     JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
-    secondmate_stall_watch_leg "$dir" "second" cleared
+    squad_lead_stall_watch_leg "$dir" "second" cleared
   [ ! -s "$state/.wake-queue" ] \
-    || fail "declared external-wait rows fed the secondmate wake-loop escalation"
-  ! grep -F 'secondmate wake-loop stalled' "$dir/watch-first.out" "$dir/watch-second.out" >/dev/null \
+    || fail "declared external-wait rows fed the squad_lead wake-loop escalation"
+  ! grep -F 'squad_lead wake-loop stalled' "$dir/watch-first.out" "$dir/watch-second.out" >/dev/null \
     || fail "a declared external wait was mislabeled as a stalled wake loop"
-  pass "declared external-wait pause rows do not feed secondmate wake-loop escalation"
+  pass "declared external-wait pause rows do not feed squad_lead wake-loop escalation"
 }
 
 # A retired mate reprovisioned under the same task id gets a fresh home, so its
@@ -655,14 +655,14 @@ EOF
 # different queue generations, not the continuation of the previous generation's
 # no-progress interval: inheriting that interval fires a wake-loop stall against
 # a queue the mate has only just created.
-test_secondmate_reprovisioned_queue_starts_a_fresh_interval() {
+test_squad_lead_reprovisioned_queue_starts_a_fresh_interval() {
   local dir state sub fakebin real_date
-  dir=$(make_case secondmate-reprovisioned-queue)
+  dir=$(make_case squad-lead-reprovisioned-queue)
   state="$dir/state"
-  sub="$dir/secondmate"
+  sub="$dir/squad_lead"
   mkdir -p "$sub/state"
-  printf 'mate\n' > "$sub/.jg-secondmate-home"
-  printf 'window=firstmate:jg-mate\nkind=secondmate\nharness=claude\nbackend=tmux\nhome=%s\n' \
+  printf 'mate\n' > "$sub/.jg-squad-lead-home"
+  printf 'window=juggernaut:jg-mate\nkind=squad_lead\nharness=claude\nbackend=tmux\nhome=%s\n' \
     "$sub" > "$state/mate.meta"
   fakebin="$dir/fakebin"
   real_date=$(command -v date)
@@ -680,10 +680,10 @@ SH
   printf '1000\n' > "$dir/now"
   printf '100\t9\tcheck\told\tcheck: retired generation row\n' > "$sub/state/.wake-queue"
   PATH="$fakebin:$PATH" JG_FAKE_NOW_FILE="$dir/now" JG_HOME="$dir" JG_ROOT_OVERRIDE="$ROOT" \
-    JG_STATE_OVERRIDE="$state" JG_FAKE_TMUX_WINDOW='firstmate:jg-mate' \
-    JG_SECONDMATE_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
+    JG_STATE_OVERRIDE="$state" JG_FAKE_TMUX_WINDOW='juggernaut:jg-mate' \
+    JG_SQUAD_LEAD_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
     JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
-    secondmate_stall_watch_leg "$dir" "old" progress mate "$(printf '1000\t100-9')"
+    squad_lead_stall_watch_leg "$dir" "old" progress mate "$(printf '1000\t100-9')"
   [ ! -s "$state/.wake-queue" ] || fail "the first observation of the retired generation alerted"
 
   # Reprovisioning under the same task id restarts the sequence on 9 again, long
@@ -692,21 +692,21 @@ SH
   printf '1010\n' > "$dir/now"
   printf '200\t9\tcheck\tregen\tcheck: reprovisioned row\n' > "$sub/state/.wake-queue"
   PATH="$fakebin:$PATH" JG_FAKE_NOW_FILE="$dir/now" JG_HOME="$dir" JG_ROOT_OVERRIDE="$ROOT" \
-    JG_STATE_OVERRIDE="$state" JG_FAKE_TMUX_WINDOW='firstmate:jg-mate' \
-    JG_SECONDMATE_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
+    JG_STATE_OVERRIDE="$state" JG_FAKE_TMUX_WINDOW='juggernaut:jg-mate' \
+    JG_SQUAD_LEAD_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
     JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
-    secondmate_stall_watch_leg "$dir" "regen" progress mate "$(printf '1010\t200-9')"
+    squad_lead_stall_watch_leg "$dir" "regen" progress mate "$(printf '1010\t200-9')"
   [ ! -s "$state/.wake-queue" ] \
     || fail "a reprovisioned queue generation inherited the retired generation's idle interval and alerted"
 
   # The restarted generation still earns its own honest no-progress episode.
   printf '1012\n' > "$dir/now"
   PATH="$fakebin:$PATH" JG_FAKE_NOW_FILE="$dir/now" JG_HOME="$dir" JG_ROOT_OVERRIDE="$ROOT" \
-    JG_STATE_OVERRIDE="$state" JG_FAKE_TMUX_WINDOW='firstmate:jg-mate' \
-    JG_SECONDMATE_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
+    JG_STATE_OVERRIDE="$state" JG_FAKE_TMUX_WINDOW='juggernaut:jg-mate' \
+    JG_SQUAD_LEAD_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
     JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
-    secondmate_stall_watch_leg "$dir" "regen-frozen" alert
-  grep -F 'check: secondmate wake-loop stalled: mate=mate row=9 idle=2s' "$dir/watch-regen-frozen.out" >/dev/null \
+    squad_lead_stall_watch_leg "$dir" "regen-frozen" alert
+  grep -F 'check: squad_lead wake-loop stalled: mate=mate row=9 idle=2s' "$dir/watch-regen-frozen.out" >/dev/null \
     || fail "a frozen reprovisioned queue generation was hidden: $(cat "$dir/watch-regen-frozen.out")"
   pass "a reprovisioned queue generation starts a fresh no-progress interval"
 }
@@ -717,14 +717,14 @@ SH
 # (ages 63s, 75s, 70s) all landed here. The active-turn gate must DEFER that
 # escalation, not cancel it: the same frozen queue still has to surface once the
 # turn ends.
-test_secondmate_active_turn_defers_stall_until_the_turn_ends() {
+test_squad_lead_active_turn_defers_stall_until_the_turn_ends() {
   local dir state sub fakebin stall_count row_epoch
-  dir=$(make_case secondmate-active-turn)
+  dir=$(make_case squad-lead-active-turn)
   state="$dir/state"
-  sub="$dir/secondmate"
+  sub="$dir/squad_lead"
   mkdir -p "$sub/state"
-  printf 'mate\n' > "$sub/.jg-secondmate-home"
-  printf 'window=firstmate:jg-mate\nkind=secondmate\nharness=claude\nbackend=tmux\nhome=%s\n' \
+  printf 'mate\n' > "$sub/.jg-squad-lead-home"
+  printf 'window=juggernaut:jg-mate\nkind=squad_lead\nharness=claude\nbackend=tmux\nhome=%s\n' \
     "$sub" > "$state/mate.meta"
   row_epoch=$(( $(date +%s) - 10 ))
   printf '%s\t7\tcheck\trouted\tcheck: routed row\n' "$row_epoch" \
@@ -733,7 +733,7 @@ test_secondmate_active_turn_defers_stall_until_the_turn_ends() {
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
 case "${1:-}" in
-  list-windows) printf '%s\n' 'firstmate:jg-mate' ;;
+  list-windows) printf '%s\n' 'juggernaut:jg-mate' ;;
   capture-pane) printf 'working\n' ;;
   display-message) printf '0\n' ;;
   *) exit 0 ;;
@@ -744,10 +744,10 @@ SH
     || fail "could not arm the mate's busy contract"
 
   PATH="$fakebin:$PATH" JG_HOME="$dir" JG_ROOT_OVERRIDE="$ROOT" \
-    JG_STATE_OVERRIDE="$state" JG_SECONDMATE_WAKE_STALL_SECS=1 JG_POLL=1 \
+    JG_STATE_OVERRIDE="$state" JG_SQUAD_LEAD_WAKE_STALL_SECS=1 JG_POLL=1 \
     JG_SIGNAL_GRACE=0 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
-    secondmate_stall_watch_leg "$dir" "busy" defer mate "$row_epoch-7"
-  ! grep -F 'secondmate wake-loop stalled' "$dir/watch-busy.out" >/dev/null \
+    squad_lead_stall_watch_leg "$dir" "busy" defer mate "$row_epoch-7"
+  ! grep -F 'squad_lead wake-loop stalled' "$dir/watch-busy.out" >/dev/null \
     || fail "a mate inside an active turn was escalated as a stalled wake loop: $(cat "$dir/watch-busy.out")"
   [ ! -s "$state/.wake-queue" ] \
     || fail "a mate inside an active turn published a durable stall notification"
@@ -756,14 +756,14 @@ SH
     --source claude-hook --event stop >/dev/null \
     || fail "could not end the mate's turn"
   PATH="$fakebin:$PATH" JG_HOME="$dir" JG_ROOT_OVERRIDE="$ROOT" \
-    JG_STATE_OVERRIDE="$state" JG_SECONDMATE_WAKE_STALL_SECS=1 JG_POLL=1 \
+    JG_STATE_OVERRIDE="$state" JG_SQUAD_LEAD_WAKE_STALL_SECS=1 JG_POLL=1 \
     JG_SIGNAL_GRACE=0 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
-    secondmate_stall_watch_leg "$dir" "idle" alert
-  grep -F 'check: secondmate wake-loop stalled: mate=mate row=7' "$dir/watch-idle.out" >/dev/null \
+    squad_lead_stall_watch_leg "$dir" "idle" alert
+  grep -F 'check: squad_lead wake-loop stalled: mate=mate row=7' "$dir/watch-idle.out" >/dev/null \
     || fail "the same frozen queue stayed hidden after the turn ended: $(cat "$dir/watch-idle.out")"
-  stall_count=$(grep -c 'secondmate-wake-loop-mate-' "$state/.wake-queue" || true)
+  stall_count=$(grep -c 'squad-lead-wake-loop-mate-' "$state/.wake-queue" || true)
   [ "$stall_count" -eq 1 ] || fail "the deferred episode did not publish exactly one notification"
-  pass "an active turn defers the secondmate stall escalation without cancelling it"
+  pass "an active turn defers the squad_lead stall escalation without cancelling it"
 }
 
 # A mate's turns end in its own home, so this home never holds a turn-ended mark
@@ -777,16 +777,16 @@ SH
 # Scope, so this case is not read as more coverage than it is: the fixture arms
 # the busy contract by hand through jg-busy-event.sh and backdates the launch
 # record afterwards. That isolates the launch-aging defect this case pins.
-# A real --secondmate spawn of claude, opencode, pi, or omp arms the same
+# A real --squad-lead spawn of claude, opencode, pi, or omp arms the same
 # contract itself; tests/jg-busy-adapter-wiring.test.sh owns that path.
-test_secondmate_long_lived_mate_mid_turn_is_not_a_stall() {
+test_squad_lead_long_lived_mate_mid_turn_is_not_a_stall() {
   local dir state sub fakebin stall_count row_epoch
-  dir=$(make_case secondmate-long-lived-active-turn)
+  dir=$(make_case squad-lead-long-lived-active-turn)
   state="$dir/state"
-  sub="$dir/secondmate"
+  sub="$dir/squad_lead"
   mkdir -p "$sub/state"
-  printf 'mate\n' > "$sub/.jg-secondmate-home"
-  printf 'window=firstmate:jg-mate\nkind=secondmate\nharness=claude\nbackend=tmux\nhome=%s\n' \
+  printf 'mate\n' > "$sub/.jg-squad-lead-home"
+  printf 'window=juggernaut:jg-mate\nkind=squad_lead\nharness=claude\nbackend=tmux\nhome=%s\n' \
     "$sub" > "$state/mate.meta"
   row_epoch=$(( $(date +%s) - 10 ))
   printf '%s\t7\tcheck\trouted\tcheck: routed row\n' "$row_epoch" \
@@ -795,7 +795,7 @@ test_secondmate_long_lived_mate_mid_turn_is_not_a_stall() {
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
 case "${1:-}" in
-  list-windows) printf '%s\n' 'firstmate:jg-mate' ;;
+  list-windows) printf '%s\n' 'juggernaut:jg-mate' ;;
   capture-pane) printf 'working\n' ;;
   display-message) printf '0\n' ;;
   *) exit 0 ;;
@@ -809,10 +809,10 @@ SH
   touch -t 202001010000 "$state/mate.meta"
 
   PATH="$fakebin:$PATH" JG_HOME="$dir" JG_ROOT_OVERRIDE="$ROOT" \
-    JG_STATE_OVERRIDE="$state" JG_SECONDMATE_WAKE_STALL_SECS=1 JG_POLL=1 \
+    JG_STATE_OVERRIDE="$state" JG_SQUAD_LEAD_WAKE_STALL_SECS=1 JG_POLL=1 \
     JG_SIGNAL_GRACE=0 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
-    secondmate_stall_watch_leg "$dir" "busy" defer mate "$row_epoch-7" 3
-  ! grep -F 'secondmate wake-loop stalled' "$dir/watch-busy.out" >/dev/null \
+    squad_lead_stall_watch_leg "$dir" "busy" defer mate "$row_epoch-7" 3
+  ! grep -F 'squad_lead wake-loop stalled' "$dir/watch-busy.out" >/dev/null \
     || fail "a long-lived mate inside an active turn was escalated as a stalled wake loop: $(cat "$dir/watch-busy.out")"
   [ ! -s "$state/.wake-queue" ] \
     || fail "a long-lived mate inside an active turn published a durable stall notification"
@@ -820,12 +820,12 @@ SH
   # Still busy, but the queue has now been frozen past the busy bound: a turn
   # that never ends cannot hide a frozen wake loop forever.
   PATH="$fakebin:$PATH" JG_HOME="$dir" JG_ROOT_OVERRIDE="$ROOT" \
-    JG_STATE_OVERRIDE="$state" JG_SECONDMATE_WAKE_STALL_SECS=1 JG_BUSY_TURN_MAX_SECS=3 \
+    JG_STATE_OVERRIDE="$state" JG_SQUAD_LEAD_WAKE_STALL_SECS=1 JG_BUSY_TURN_MAX_SECS=3 \
     JG_POLL=1 JG_SIGNAL_GRACE=0 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
-    secondmate_stall_watch_leg "$dir" "over" alert
-  grep -F 'check: secondmate wake-loop stalled: mate=mate row=7' "$dir/watch-over.out" >/dev/null \
+    squad_lead_stall_watch_leg "$dir" "over" alert
+  grep -F 'check: squad_lead wake-loop stalled: mate=mate row=7' "$dir/watch-over.out" >/dev/null \
     || fail "a mate busy past the bound hid its frozen queue: $(cat "$dir/watch-over.out")"
-  stall_count=$(grep -c 'secondmate-wake-loop-mate-' "$state/.wake-queue" || true)
+  stall_count=$(grep -c 'squad-lead-wake-loop-mate-' "$state/.wake-queue" || true)
   [ "$stall_count" -eq 1 ] || fail "the over-bound episode did not publish exactly one notification"
   pass "a long-lived mate mid-turn is not a stall, but a queue frozen past the busy bound still alarms"
 }
@@ -834,7 +834,7 @@ SH
 # session:window makes the pane look missing, which is the leftover-row tests'
 # ring-unsafe path and must keep the parent alarm. These cases print jg-mate
 # and a claude foreground command so a proven-idle mate can actually be rung.
-install_secondmate_alive_tmux() {  # <fakebin>
+install_squad_lead_alive_tmux() {  # <fakebin>
   local fakebin=$1
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
@@ -870,7 +870,7 @@ SH
   chmod +x "$fakebin/tmux"
 }
 
-install_secondmate_stall_date() {  # <fakebin>
+install_squad_lead_stall_date() {  # <fakebin>
   local fakebin=$1 real_date
   real_date=$(command -v date)
   cat > "$fakebin/date" <<SH
@@ -887,19 +887,19 @@ SH
 # A proven-idle, ring-safe mate with a leftover foreign row is rung so its
 # own home can drain. The parent alarm stays silent when that ring actually
 # empties the child's queue.
-test_secondmate_proven_idle_ring_lets_the_child_drain() {
+test_squad_lead_proven_idle_ring_lets_the_child_drain() {
   local dir state sub fakebin inbox_body inbox_rec steer
-  dir=$(make_case secondmate-proven-idle-drain)
+  dir=$(make_case squad-lead-proven-idle-drain)
   state="$dir/state"
-  sub="$dir/secondmate"
+  sub="$dir/squad_lead"
   fakebin="$dir/fakebin"
   mkdir -p "$sub/state"
-  printf 'mate\n' > "$sub/.jg-secondmate-home"
-  printf 'window=firstmate:jg-mate\nkind=secondmate\nharness=claude\nbackend=tmux\nhome=%s\n' \
+  printf 'mate\n' > "$sub/.jg-squad-lead-home"
+  printf 'window=juggernaut:jg-mate\nkind=squad_lead\nharness=claude\nbackend=tmux\nhome=%s\n' \
     "$sub" > "$state/mate.meta"
   printf '100\t7\tcheck\trouted\tcheck: routed row\n' > "$sub/state/.wake-queue"
-  install_secondmate_alive_tmux "$fakebin"
-  install_secondmate_stall_date "$fakebin"
+  install_squad_lead_alive_tmux "$fakebin"
+  install_squad_lead_stall_date "$fakebin"
   "$ROOT/bin/jg-busy-event.sh" arm "$state" mate >/dev/null \
     || fail "could not arm the mate's busy contract"
   "$ROOT/bin/jg-busy-event.sh" apply "$state" mate idle --current-gen \
@@ -909,9 +909,9 @@ test_secondmate_proven_idle_ring_lets_the_child_drain() {
   printf '1000\n' > "$dir/now"
   PATH="$fakebin:$PATH" JG_FAKE_NOW_FILE="$dir/now" JG_HOME="$dir" JG_ROOT_OVERRIDE="$ROOT" \
     JG_STATE_OVERRIDE="$state" JG_FAKE_TMUX_SENT="$dir/sent" \
-    JG_SECONDMATE_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
+    JG_SQUAD_LEAD_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
     JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
-    secondmate_stall_watch_leg "$dir" "first" progress mate "$(printf '1000\t100-7')"
+    squad_lead_stall_watch_leg "$dir" "first" progress mate "$(printf '1000\t100-7')"
   [ ! -s "$state/.wake-queue" ] || fail "the first observation of a leftover row produced an alert"
   [ ! -s "$dir/sent" ] || fail "a proven-idle mate was rung before the stall interval"
 
@@ -919,10 +919,10 @@ test_secondmate_proven_idle_ring_lets_the_child_drain() {
   PATH="$fakebin:$PATH" JG_FAKE_NOW_FILE="$dir/now" JG_HOME="$dir" JG_ROOT_OVERRIDE="$ROOT" \
     JG_STATE_OVERRIDE="$state" JG_FAKE_TMUX_SENT="$dir/sent" \
     JG_FAKE_CHILD_WAKE_QUEUE="$sub/state/.wake-queue" \
-    JG_SECONDMATE_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
+    JG_SQUAD_LEAD_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
     JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
-    secondmate_stall_watch_leg "$dir" "ring" drained mate "$sub/state/.wake-queue"
-  ! grep -F 'secondmate wake-loop stalled' "$dir/watch-ring.out" >/dev/null \
+    squad_lead_stall_watch_leg "$dir" "ring" drained mate "$sub/state/.wake-queue"
+  ! grep -F 'squad_lead wake-loop stalled' "$dir/watch-ring.out" >/dev/null \
     || fail "a proven-idle mate that drained after the ring still alarmed: $(cat "$dir/watch-ring.out")"
   [ ! -s "$state/.wake-queue" ] \
     || fail "a proven-idle child-first ring published a parent stall notification"
@@ -934,8 +934,8 @@ test_secondmate_proven_idle_ring_lets_the_child_drain() {
   sed '/^--$/q' "$inbox_rec" | grep -Fx 'delivery=fire-and-forget' >/dev/null \
     || fail "the child-first ring did not write a fire-and-forget drain steer"
   inbox_body=$(sed '1,/^--$/d' "$inbox_rec")
-  [ "$(printf '%s' "$inbox_body" | "$ROOT/bin/jg-operational-input.sh" kind)" = from-firstmate ] \
-    || fail "the child-first drain steer lacks the from-firstmate marker, so the mate would read it as captain intervention: $inbox_body"
+  [ "$(printf '%s' "$inbox_body" | "$ROOT/bin/jg-operational-input.sh" kind)" = from-juggernaut ] \
+    || fail "the child-first drain steer lacks the from-juggernaut marker, so the mate would read it as captain intervention: $inbox_body"
   steer=$(printf '%s' "$inbox_body" | "$ROOT/bin/jg-operational-input.sh" body)
   [[ $steer =~ ^delivery=[0-9a-f]{16}\ (.*)$ ]] \
     || fail "the child-first drain steer does not carry a fire-and-forget delivery id: $steer"
@@ -951,19 +951,19 @@ test_secondmate_proven_idle_ring_lets_the_child_drain() {
 # its cleanup, as it does for every other pane read.
 test_term_stops_a_watcher_blocked_in_the_drain_ring_idle_capture() {
   local dir state sub fakebin fifo out pid holder i rc orphan
-  dir=$(make_case secondmate-ring-blocked-capture)
+  dir=$(make_case squad-lead-ring-blocked-capture)
   state="$dir/state"
-  sub="$dir/secondmate"
+  sub="$dir/squad_lead"
   fakebin="$dir/fakebin"
   fifo="$dir/pane.fifo"
   out="$dir/watch-blocked.out"
   mkdir -p "$sub/state"
-  printf 'mate\n' > "$sub/.jg-secondmate-home"
-  printf 'window=firstmate:jg-mate\nkind=secondmate\nharness=claude\nbackend=tmux\nhome=%s\n' \
+  printf 'mate\n' > "$sub/.jg-squad-lead-home"
+  printf 'window=juggernaut:jg-mate\nkind=squad_lead\nharness=claude\nbackend=tmux\nhome=%s\n' \
     "$sub" > "$state/mate.meta"
   printf '100\t7\tcheck\trouted\tcheck: routed row\n' > "$sub/state/.wake-queue"
-  install_secondmate_alive_tmux "$fakebin"
-  install_secondmate_stall_date "$fakebin"
+  install_squad_lead_alive_tmux "$fakebin"
+  install_squad_lead_stall_date "$fakebin"
   "$ROOT/bin/jg-busy-event.sh" arm "$state" mate >/dev/null \
     || fail "could not arm the mate's busy contract"
   "$ROOT/bin/jg-busy-event.sh" apply "$state" mate idle --current-gen \
@@ -973,9 +973,9 @@ test_term_stops_a_watcher_blocked_in_the_drain_ring_idle_capture() {
   printf '1000\n' > "$dir/now"
   PATH="$fakebin:$PATH" JG_FAKE_NOW_FILE="$dir/now" JG_HOME="$dir" JG_ROOT_OVERRIDE="$ROOT" \
     JG_STATE_OVERRIDE="$state" JG_FAKE_TMUX_SENT="$dir/sent" \
-    JG_SECONDMATE_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
+    JG_SQUAD_LEAD_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
     JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
-    secondmate_stall_watch_leg "$dir" "first" progress mate "$(printf '1000\t100-7')"
+    squad_lead_stall_watch_leg "$dir" "first" progress mate "$(printf '1000\t100-7')"
 
   # The active-turn read returns, then the idle-proof read blocks on a FIFO
   # whose write end the holder keeps open without writing.
@@ -996,11 +996,11 @@ SH
   holder=$!
 
   printf '1002\n' > "$dir/now"
-  touch "$state/.secondmate-liveness-tick"
+  touch "$state/.squad-lead-liveness-tick"
   PATH="$fakebin:$PATH" JG_FAKE_NOW_FILE="$dir/now" JG_HOME="$dir" JG_ROOT_OVERRIDE="$ROOT" \
     JG_STATE_OVERRIDE="$state" JG_FAKE_TMUX_SENT="$dir/sent" \
     JG_FAKE_TMUX_CAPTURE="$fifo" JG_FAKE_CAPTURE_COUNT="$dir/captures" \
-    JG_SECONDMATE_WAKE_STALL_SECS=1 JG_SECONDMATE_LIVENESS_SECS=99999999 \
+    JG_SQUAD_LEAD_WAKE_STALL_SECS=1 JG_SQUAD_LEAD_LIVENESS_SECS=99999999 \
     JG_POLL=1 JG_SIGNAL_GRACE=0 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
     "$WATCH" > "$out" 2>&1 &
   pid=$!
@@ -1033,57 +1033,57 @@ SH
 # Busy and unknown panes are never typed into. Busy still defers inside the
 # active-turn bound. Unknown keeps the parent alarm. Empty inbox is not idle
 # proof, so the unknown fixture starts with no instruction records.
-test_secondmate_busy_and_unknown_panes_are_not_rung() {
+test_squad_lead_busy_and_unknown_panes_are_not_rung() {
   local dir state sub fakebin
-  dir=$(make_case secondmate-busy-unknown-no-ring)
+  dir=$(make_case squad-lead-busy-unknown-no-ring)
   state="$dir/state"
-  sub="$dir/secondmate"
+  sub="$dir/squad_lead"
   fakebin="$dir/fakebin"
   mkdir -p "$sub/state"
-  printf 'mate\n' > "$sub/.jg-secondmate-home"
-  printf 'window=firstmate:jg-mate\nkind=secondmate\nharness=claude\nbackend=tmux\nhome=%s\n' \
+  printf 'mate\n' > "$sub/.jg-squad-lead-home"
+  printf 'window=juggernaut:jg-mate\nkind=squad_lead\nharness=claude\nbackend=tmux\nhome=%s\n' \
     "$sub" > "$state/mate.meta"
   printf '100\t7\tcheck\trouted\tcheck: routed row\n' > "$sub/state/.wake-queue"
-  install_secondmate_alive_tmux "$fakebin"
-  install_secondmate_stall_date "$fakebin"
+  install_squad_lead_alive_tmux "$fakebin"
+  install_squad_lead_stall_date "$fakebin"
 
   "$ROOT/bin/jg-busy-event.sh" arm "$state" mate >/dev/null \
     || fail "could not arm the mate's busy contract"
   printf '1000\n' > "$dir/now"
   PATH="$fakebin:$PATH" JG_FAKE_NOW_FILE="$dir/now" JG_HOME="$dir" JG_ROOT_OVERRIDE="$ROOT" \
     JG_STATE_OVERRIDE="$state" JG_FAKE_TMUX_SENT="$dir/sent-busy" \
-    JG_SECONDMATE_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
+    JG_SQUAD_LEAD_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
     JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
-    secondmate_stall_watch_leg "$dir" "busy-first" progress mate "$(printf '1000\t100-7')"
+    squad_lead_stall_watch_leg "$dir" "busy-first" progress mate "$(printf '1000\t100-7')"
   printf '1002\n' > "$dir/now"
   PATH="$fakebin:$PATH" JG_FAKE_NOW_FILE="$dir/now" JG_HOME="$dir" JG_ROOT_OVERRIDE="$ROOT" \
     JG_STATE_OVERRIDE="$state" JG_FAKE_TMUX_SENT="$dir/sent-busy" \
-    JG_SECONDMATE_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
+    JG_SQUAD_LEAD_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
     JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
-    secondmate_stall_watch_leg "$dir" "busy" tick
-  ! grep -F 'secondmate wake-loop stalled' "$dir/watch-busy.out" >/dev/null \
+    squad_lead_stall_watch_leg "$dir" "busy" tick
+  ! grep -F 'squad_lead wake-loop stalled' "$dir/watch-busy.out" >/dev/null \
     || fail "a busy mate was escalated as a stalled wake loop: $(cat "$dir/watch-busy.out")"
   [ ! -s "$state/.wake-queue" ] || fail "a busy mate published a durable stall notification"
   [ ! -e "$dir/sent-busy" ] || fail "a busy mate was rung"
   [ ! -e "$state/mate.inbox" ] || fail "a busy mate received a drain steer"
 
-  rm -f "$state/.secondmate-wake-progress-mate" "$state/.secondmate-wake-stall-mate" \
-    "$state/.secondmate-wake-ring-mate"
-  rm -rf "$state/.secondmate-wake-stall-receipts" "$state/mate.busy-state" "$state/mate.busy-gen"
+  rm -f "$state/.squad-lead-wake-progress-mate" "$state/.squad-lead-wake-stall-mate" \
+    "$state/.squad-lead-wake-ring-mate"
+  rm -rf "$state/.squad-lead-wake-stall-receipts" "$state/mate.busy-state" "$state/mate.busy-gen"
   : > "$dir/sent-unknown"
   printf '1000\n' > "$dir/now"
   PATH="$fakebin:$PATH" JG_FAKE_NOW_FILE="$dir/now" JG_HOME="$dir" JG_ROOT_OVERRIDE="$ROOT" \
     JG_STATE_OVERRIDE="$state" JG_FAKE_TMUX_SENT="$dir/sent-unknown" \
-    JG_SECONDMATE_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
+    JG_SQUAD_LEAD_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
     JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
-    secondmate_stall_watch_leg "$dir" "unknown-first" progress mate "$(printf '1000\t100-7')"
+    squad_lead_stall_watch_leg "$dir" "unknown-first" progress mate "$(printf '1000\t100-7')"
   printf '1002\n' > "$dir/now"
   PATH="$fakebin:$PATH" JG_FAKE_NOW_FILE="$dir/now" JG_HOME="$dir" JG_ROOT_OVERRIDE="$ROOT" \
     JG_STATE_OVERRIDE="$state" JG_FAKE_TMUX_SENT="$dir/sent-unknown" \
-    JG_SECONDMATE_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
+    JG_SQUAD_LEAD_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
     JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
-    secondmate_stall_watch_leg "$dir" "unknown" alert
-  grep -F 'check: secondmate wake-loop stalled: mate=mate row=7 idle=2s' "$dir/watch-unknown.out" >/dev/null \
+    squad_lead_stall_watch_leg "$dir" "unknown" alert
+  grep -F 'check: squad_lead wake-loop stalled: mate=mate row=7 idle=2s' "$dir/watch-unknown.out" >/dev/null \
     || fail "an unknown pane did not keep the parent alarm: $(cat "$dir/watch-unknown.out")"
   [ ! -s "$dir/sent-unknown" ] || fail "an unknown pane was rung: $(cat "$dir/sent-unknown")"
   [ ! -e "$state/mate.inbox" ] || fail "an unknown pane received a drain steer"
@@ -1092,21 +1092,21 @@ test_secondmate_busy_and_unknown_panes_are_not_rung() {
 
 # After a proven-idle ring, the same leftover row is a genuine stall if the
 # child home does not drain it. The second stall interval must still surface.
-test_secondmate_genuine_stall_after_idle_ring_still_alarms() {
+test_squad_lead_genuine_stall_after_idle_ring_still_alarms() {
   local dir state sub fakebin row_before stall_count
-  dir=$(make_case secondmate-genuine-stall-after-ring)
+  dir=$(make_case squad-lead-genuine-stall-after-ring)
   state="$dir/state"
-  sub="$dir/secondmate"
+  sub="$dir/squad_lead"
   fakebin="$dir/fakebin"
   mkdir -p "$sub/state"
-  printf 'mate\n' > "$sub/.jg-secondmate-home"
-  printf 'window=firstmate:jg-mate\nkind=secondmate\nharness=claude\nbackend=tmux\nhome=%s\n' \
+  printf 'mate\n' > "$sub/.jg-squad-lead-home"
+  printf 'window=juggernaut:jg-mate\nkind=squad_lead\nharness=claude\nbackend=tmux\nhome=%s\n' \
     "$sub" > "$state/mate.meta"
   printf '100\t7\tcheck\trouted\tcheck: routed row\n' > "$sub/state/.wake-queue"
   row_before="$dir/foreign-before"
   cp "$sub/state/.wake-queue" "$row_before"
-  install_secondmate_alive_tmux "$fakebin"
-  install_secondmate_stall_date "$fakebin"
+  install_squad_lead_alive_tmux "$fakebin"
+  install_squad_lead_stall_date "$fakebin"
   "$ROOT/bin/jg-busy-event.sh" arm "$state" mate >/dev/null \
     || fail "could not arm the mate's busy contract"
   "$ROOT/bin/jg-busy-event.sh" apply "$state" mate idle --current-gen \
@@ -1116,22 +1116,22 @@ test_secondmate_genuine_stall_after_idle_ring_still_alarms() {
   printf '1000\n' > "$dir/now"
   PATH="$fakebin:$PATH" JG_FAKE_NOW_FILE="$dir/now" JG_HOME="$dir" JG_ROOT_OVERRIDE="$ROOT" \
     JG_STATE_OVERRIDE="$state" JG_FAKE_TMUX_SENT="$dir/sent" \
-    JG_SECONDMATE_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
+    JG_SQUAD_LEAD_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
     JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
-    secondmate_stall_watch_leg "$dir" "first" progress mate "$(printf '1000\t100-7')"
+    squad_lead_stall_watch_leg "$dir" "first" progress mate "$(printf '1000\t100-7')"
 
   printf '1002\n' > "$dir/now"
   PATH="$fakebin:$PATH" JG_FAKE_NOW_FILE="$dir/now" JG_HOME="$dir" JG_ROOT_OVERRIDE="$ROOT" \
     JG_STATE_OVERRIDE="$state" JG_FAKE_TMUX_SENT="$dir/sent" \
-    JG_SECONDMATE_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
+    JG_SQUAD_LEAD_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
     JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
-    secondmate_stall_watch_leg "$dir" "ring" ring mate 100-7
-  ! grep -F 'secondmate wake-loop stalled' "$dir/watch-ring.out" >/dev/null \
+    squad_lead_stall_watch_leg "$dir" "ring" ring mate 100-7
+  ! grep -F 'squad_lead wake-loop stalled' "$dir/watch-ring.out" >/dev/null \
     || fail "the first proven-idle ring published a parent alarm: $(cat "$dir/watch-ring.out")"
   [ ! -s "$state/.wake-queue" ] || fail "the first proven-idle ring published a durable stall"
   grep -F '[ENTER]' "$dir/sent" >/dev/null \
     || fail "the genuine-stall fixture never rang the child"
-  [ "$(cat "$state/.secondmate-wake-ring-mate" 2>/dev/null || true)" = "100-7" ] \
+  [ "$(cat "$state/.squad-lead-wake-ring-mate" 2>/dev/null || true)" = "100-7" ] \
     || fail "the successful ring did not record the frozen row"
   cmp -s "$row_before" "$sub/state/.wake-queue" \
     || fail "the unread ring rewrote the foreign queue"
@@ -1139,42 +1139,42 @@ test_secondmate_genuine_stall_after_idle_ring_still_alarms() {
   printf '1004\n' > "$dir/now"
   PATH="$fakebin:$PATH" JG_FAKE_NOW_FILE="$dir/now" JG_HOME="$dir" JG_ROOT_OVERRIDE="$ROOT" \
     JG_STATE_OVERRIDE="$state" JG_FAKE_TMUX_SENT="$dir/sent" \
-    JG_SECONDMATE_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
+    JG_SQUAD_LEAD_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
     JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
-    secondmate_stall_watch_leg "$dir" "stall" alert
-  grep -F 'check: secondmate wake-loop stalled: mate=mate row=7 idle=2s' "$dir/watch-stall.out" >/dev/null \
+    squad_lead_stall_watch_leg "$dir" "stall" alert
+  grep -F 'check: squad_lead wake-loop stalled: mate=mate row=7 idle=2s' "$dir/watch-stall.out" >/dev/null \
     || fail "a leftover row that survived the idle ring stayed hidden: $(cat "$dir/watch-stall.out")"
-  stall_count=$(grep -c 'secondmate-wake-loop-mate-' "$state/.wake-queue" || true)
+  stall_count=$(grep -c 'squad-lead-wake-loop-mate-' "$state/.wake-queue" || true)
   [ "$stall_count" -eq 1 ] || fail "the genuine stall after a ring did not publish exactly one notification"
   cmp -s "$row_before" "$sub/state/.wake-queue" \
     || fail "the parent alarm path rewrote the foreign queue"
   pass "a leftover row that survives a proven-idle ring still surfaces as a genuine stall"
 }
 
-# A real Pi secondmate spawn carries the same pi-ext busy record a Pi worker
+# A real Pi squad_lead spawn carries the same pi-ext busy record a Pi worker
 # does, so a lead its extension reports idle is rung for a stalled queue rather
 # than escalated to the parent on the first interval. Its turn ends stay in its
 # own home: the extension never touches this home's turn-ended marker.
-test_spawned_idle_pi_secondmate_is_rung_once() {
+test_spawned_idle_pi_squad_lead_is_rung_once() {
   local dir state sub fakebin spawnbin out ext inbox_count steer
-  dir=$(make_case secondmate-pi-idle-ring)
+  dir=$(make_case squad-lead-pi-idle-ring)
   state="$dir/state"
-  # The spawn refuses a secondmate home inside the launching home.
-  sub="$dir.secondmate"
+  # The spawn refuses a squad_lead home inside the launching home.
+  sub="$dir.squad_lead"
   fakebin="$dir/fakebin"
   jg_test_spawn_home "$dir"
-  printf 'pi\n' > "$dir/config/secondmate-harness"
+  printf 'pi\n' > "$dir/config/squad-lead-harness"
   mkdir -p "$sub/state" "$sub/data" "$sub/bin"
-  printf '# Firstmate\n' > "$sub/AGENTS.md"
-  printf 'mate\n' > "$sub/.jg-secondmate-home"
+  printf '# Juggernaut\n' > "$sub/AGENTS.md"
+  printf 'mate\n' > "$sub/.jg-squad-lead-home"
   printf 'charter for mate\n' > "$sub/data/charter.md"
   printf '%s\n' 'projects/' 'state/' 'data/' 'config/' > "$sub/.gitignore"
   git -C "$sub" init -q -b main
   spawnbin=$(make_spawn_fakebin "$dir/spawn" pi)
-  out=$(jg_test_run_spawn "$dir" "$sub" "$spawnbin" mate "$sub" --secondmate) \
-    || fail "pi secondmate spawn failed: $out"
+  out=$(jg_test_run_spawn "$dir" "$sub" "$spawnbin" mate "$sub" --squad-lead) \
+    || fail "pi squad_lead spawn failed: $out"
   ext="$state/mate.pi-ext.ts"
-  [ -f "$ext" ] || fail "a pi secondmate spawn wrote no busy-state extension, so its idle lead has no trusted verdict: $out"
+  [ -f "$ext" ] || fail "a pi squad_lead spawn wrote no busy-state extension, so its idle lead has no trusted verdict: $out"
   out=$(EXT_PATH="$ext" node --input-type=module 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
 const mod = await import(pathToFileURL(process.env.EXT_PATH).href);
@@ -1187,32 +1187,32 @@ await handlers["agent_settled"]({}, ctx);
 await handlers["turn_end"]?.({}, ctx);
 await new Promise((resolve) => setTimeout(resolve, 200));
 EOF
-) || fail "could not drive the pi secondmate extension: $out"
+) || fail "could not drive the pi squad_lead extension: $out"
   [ ! -e "$state/mate.turn-ended" ] \
-    || fail "a pi secondmate turn end touched the parent's turn-ended marker, which wakes the parent every lead turn"
+    || fail "a pi squad_lead turn end touched the parent's turn-ended marker, which wakes the parent every lead turn"
 
   printf '100\t7\tcheck\trouted\tcheck: routed row\n' > "$sub/state/.wake-queue"
-  install_secondmate_alive_tmux "$fakebin"
-  install_secondmate_stall_date "$fakebin"
+  install_squad_lead_alive_tmux "$fakebin"
+  install_squad_lead_stall_date "$fakebin"
   printf '1000\n' > "$dir/now"
   PATH="$fakebin:$PATH" JG_FAKE_NOW_FILE="$dir/now" JG_HOME="$dir" JG_ROOT_OVERRIDE="$ROOT" \
     JG_STATE_OVERRIDE="$state" JG_FAKE_TMUX_SENT="$dir/sent" \
-    JG_SECONDMATE_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
+    JG_SQUAD_LEAD_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
     JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
-    secondmate_stall_watch_leg "$dir" "first" progress mate "$(printf '1000\t100-7')"
+    squad_lead_stall_watch_leg "$dir" "first" progress mate "$(printf '1000\t100-7')"
   printf '1002\n' > "$dir/now"
   PATH="$fakebin:$PATH" JG_FAKE_NOW_FILE="$dir/now" JG_HOME="$dir" JG_ROOT_OVERRIDE="$ROOT" \
     JG_STATE_OVERRIDE="$state" JG_FAKE_TMUX_SENT="$dir/sent" \
-    JG_SECONDMATE_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
+    JG_SQUAD_LEAD_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
     JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
-    secondmate_stall_watch_leg "$dir" "ring" ring mate 100-7
-  ! grep -F 'secondmate wake-loop stalled' "$dir/watch-first.out" "$dir/watch-ring.out" >/dev/null \
-    || fail "an idle pi secondmate was escalated instead of rung: $(cat "$dir/watch-ring.out")"
-  [ ! -s "$state/.wake-queue" ] || fail "an idle pi secondmate's first stall interval raised a parent wake"
+    squad_lead_stall_watch_leg "$dir" "ring" ring mate 100-7
+  ! grep -F 'squad_lead wake-loop stalled' "$dir/watch-first.out" "$dir/watch-ring.out" >/dev/null \
+    || fail "an idle pi squad_lead was escalated instead of rung: $(cat "$dir/watch-ring.out")"
+  [ ! -s "$state/.wake-queue" ] || fail "an idle pi squad_lead's first stall interval raised a parent wake"
   [ "$(grep -c -F '[ENTER]' "$dir/sent" 2>/dev/null || true)" = 1 ] \
-    || fail "an idle pi secondmate was not rung exactly once: $(cat "$dir/sent" 2>/dev/null)"
+    || fail "an idle pi squad_lead was not rung exactly once: $(cat "$dir/sent" 2>/dev/null)"
   inbox_count=$(find "$state/mate.inbox" -maxdepth 1 -name '*.msg' 2>/dev/null | wc -l | tr -d ' ')
-  [ "$inbox_count" = 1 ] || fail "an idle pi secondmate ring wrote $inbox_count drain steers, want 1"
+  [ "$inbox_count" = 1 ] || fail "an idle pi squad_lead ring wrote $inbox_count drain steers, want 1"
   # A lead told only to drain presented the row, cut WAKE_ACK_REQUIRED off its
   # output, and left the row queued, so the ring names the row and the ack.
   steer=$(sed '1,/^--$/d' "$state/mate.inbox/"*.msg)
@@ -1231,16 +1231,16 @@ EOF
     || fail "could not grant the frozen row to the lead's branch"
   PATH="$fakebin:$PATH" JG_FAKE_NOW_FILE="$dir/now" JG_HOME="$dir" JG_ROOT_OVERRIDE="$ROOT" \
     JG_STATE_OVERRIDE="$state" JG_FAKE_TMUX_SENT="$dir/sent" \
-    JG_SECONDMATE_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
+    JG_SQUAD_LEAD_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
     JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
-    secondmate_stall_watch_leg "$dir" "branch-first" progress mate "$(printf '1002\t100-8')"
+    squad_lead_stall_watch_leg "$dir" "branch-first" progress mate "$(printf '1002\t100-8')"
   printf '1004\n' > "$dir/now"
   PATH="$fakebin:$PATH" JG_FAKE_NOW_FILE="$dir/now" JG_HOME="$dir" JG_ROOT_OVERRIDE="$ROOT" \
     JG_STATE_OVERRIDE="$state" JG_FAKE_TMUX_SENT="$dir/sent" \
-    JG_SECONDMATE_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
+    JG_SQUAD_LEAD_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
     JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
-    secondmate_stall_watch_leg "$dir" "branch" tick
-  ! grep -F 'secondmate wake-loop stalled' "$dir/watch-branch.out" >/dev/null \
+    squad_lead_stall_watch_leg "$dir" "branch" tick
+  ! grep -F 'squad_lead wake-loop stalled' "$dir/watch-branch.out" >/dev/null \
     || fail "a row held by the lead's live branch grant was escalated: $(cat "$dir/watch-branch.out")"
   [ "$(grep -c -F '[ENTER]' "$dir/sent" 2>/dev/null || true)" = 1 ] \
     || fail "a row held by the lead's live branch grant rang the lead's main conversation: $(cat "$dir/sent")"
@@ -1254,43 +1254,43 @@ EOF
   printf '100\t9\tcheck\trouted\tcheck: unrecorded row\n' > "$sub/state/.wake-queue"
   PATH="$fakebin:$PATH" JG_FAKE_NOW_FILE="$dir/now" JG_HOME="$dir" JG_ROOT_OVERRIDE="$ROOT" \
     JG_STATE_OVERRIDE="$state" JG_FAKE_TMUX_SENT="$dir/sent" \
-    JG_SECONDMATE_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
+    JG_SQUAD_LEAD_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
     JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
-    secondmate_stall_watch_leg "$dir" "unrecorded-first" progress mate "$(printf '1004\t100-9')"
+    squad_lead_stall_watch_leg "$dir" "unrecorded-first" progress mate "$(printf '1004\t100-9')"
   printf '1006\n' > "$dir/now"
   PATH="$fakebin:$PATH" JG_FAKE_NOW_FILE="$dir/now" JG_HOME="$dir" JG_ROOT_OVERRIDE="$ROOT" \
     JG_STATE_OVERRIDE="$state" JG_FAKE_TMUX_SENT="$dir/sent" \
-    JG_SECONDMATE_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
+    JG_SQUAD_LEAD_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
     JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
-    secondmate_stall_watch_leg "$dir" "unrecorded" alert
-  grep -F 'check: secondmate wake-loop stalled: mate=mate row=9 idle=2s' "$dir/watch-unrecorded.out" >/dev/null \
+    squad_lead_stall_watch_leg "$dir" "unrecorded" alert
+  grep -F 'check: squad_lead wake-loop stalled: mate=mate row=9 idle=2s' "$dir/watch-unrecorded.out" >/dev/null \
     || fail "a pi lead with no busy record did not keep the parent alarm: $(cat "$dir/watch-unrecorded.out")"
   [ "$(grep -c -F '[ENTER]' "$dir/sent" 2>/dev/null || true)" = 1 ] \
     || fail "a pi lead with no busy record was rung: $(cat "$dir/sent")"
   pass "an idle pi lead is rung once to drain and acknowledge its row; a branch-held row and a lead with no busy record are not rung"
 }
 
-test_secondmate_stall_marker_rejects_symlink() {
+test_squad_lead_stall_marker_rejects_symlink() {
   local dir state sub fakebin marker outside expected epoch
-  dir=$(make_case secondmate-stall-marker-symlink)
+  dir=$(make_case squad-lead-stall-marker-symlink)
   state="$dir/state"
-  sub="$dir/secondmate"
+  sub="$dir/squad_lead"
   mkdir -p "$sub/state"
-  printf 'mate\n' > "$sub/.jg-secondmate-home"
-  printf 'window=firstmate:jg-mate\nkind=secondmate\nhome=%s\n' "$sub" > "$state/mate.meta"
+  printf 'mate\n' > "$sub/.jg-squad-lead-home"
+  printf 'window=juggernaut:jg-mate\nkind=squad_lead\nhome=%s\n' "$sub" > "$state/mate.meta"
   epoch=$(( $(date +%s) - 10 ))
   printf '%s\t7\tcheck\trouted\tcheck: routed row\n' "$epoch" > "$sub/state/.wake-queue"
   outside="$dir/outside"
   expected='must remain unchanged'
   printf '%s\n' "$expected" > "$outside"
-  marker="$state/.secondmate-wake-stall-mate"
-  printf '%s\t%s-7\n' "$(( $(date +%s) - 2 ))" "$epoch" > "$state/.secondmate-wake-progress-mate"
+  marker="$state/.squad-lead-wake-stall-mate"
+  printf '%s\t%s-7\n' "$(( $(date +%s) - 2 ))" "$epoch" > "$state/.squad-lead-wake-progress-mate"
   ln -s "$outside" "$marker"
   fakebin="$dir/fakebin"
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
 case "${1:-}" in
-  list-windows) printf '%s\n' 'firstmate:jg-mate' ;;
+  list-windows) printf '%s\n' 'juggernaut:jg-mate' ;;
   capture-pane) : ;;
   display-message) printf '0\n' ;;
   *) exit 0 ;;
@@ -1299,31 +1299,31 @@ SH
   chmod +x "$fakebin/tmux"
 
   PATH="$fakebin:$PATH" JG_HOME="$dir" JG_ROOT_OVERRIDE="$ROOT" \
-    JG_STATE_OVERRIDE="$state" JG_SECONDMATE_WAKE_STALL_SECS=1 JG_POLL=1 \
+    JG_STATE_OVERRIDE="$state" JG_SQUAD_LEAD_WAKE_STALL_SECS=1 JG_POLL=1 \
     JG_SIGNAL_GRACE=0 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
-    secondmate_stall_watch_leg "$dir" "once" reject
+    squad_lead_stall_watch_leg "$dir" "once" reject
   [ "$(cat "$outside")" = "$expected" ] || fail "stall marker write followed an unsafe symlink"
   [ -L "$marker" ] || fail "stall marker write replaced rather than rejected an unsafe path"
   [ ! -s "$state/.wake-queue" ] || fail "unsafe stall marker path still published a parent notification"
-  pass "secondmate stall markers reject symlinks without touching their targets"
+  pass "squad_lead stall markers reject symlinks without touching their targets"
 }
 
 test_acknowledged_stall_publication_survives_pre_marker_crash() {
   local dir state sub fakebin out epoch row_before
-  dir=$(make_case secondmate-stall-crash)
+  dir=$(make_case squad-lead-stall-crash)
   state="$dir/state"
-  sub="$dir/secondmate"
+  sub="$dir/squad_lead"
   mkdir -p "$sub/state" "$sub/data"
-  printf 'mate\n' > "$sub/.jg-secondmate-home"
-  printf 'window=firstmate:jg-mate\nkind=secondmate\nharness=claude\nbackend=tmux\nhome=%s\n' \
+  printf 'mate\n' > "$sub/.jg-squad-lead-home"
+  printf 'window=juggernaut:jg-mate\nkind=squad_lead\nharness=claude\nbackend=tmux\nhome=%s\n' \
     "$sub" > "$state/mate.meta"
   epoch=$(( $(date +%s) - 10 ))
   printf '%s\t7\tcheck\trouted\tcheck: routed row\n' "$epoch" > "$sub/state/.wake-queue"
   row_before="$dir/foreign-before"
   cp "$sub/state/.wake-queue" "$row_before"
-  printf '%s\t%s-7\n' "$(( $(date +%s) - 2 ))" "$epoch" > "$state/.secondmate-wake-progress-mate"
-  append_wake "$state" check "secondmate-wake-loop-mate-$epoch-7" \
-    "check: secondmate wake-loop stalled: mate=mate row=7 idle=2s" \
+  printf '%s\t%s-7\n' "$(( $(date +%s) - 2 ))" "$epoch" > "$state/.squad-lead-wake-progress-mate"
+  append_wake "$state" check "squad-lead-wake-loop-mate-$epoch-7" \
+    "check: squad_lead wake-loop stalled: mate=mate row=7 idle=2s" \
     || fail "could not seed the pre-marker crash publication"
   JG_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/drain.out" 2> "$dir/drain.err" \
     || fail "pre-marker crash publication could not be drained"
@@ -1333,12 +1333,12 @@ test_acknowledged_stall_publication_survives_pre_marker_crash() {
   fakebin="$dir/fakebin"
   out="$dir/watch-once.out"
   PATH="$fakebin:$PATH" JG_HOME="$dir" JG_ROOT_OVERRIDE="$ROOT" \
-    JG_STATE_OVERRIDE="$state" JG_FAKE_TMUX_WINDOW='firstmate:jg-mate' \
+    JG_STATE_OVERRIDE="$state" JG_FAKE_TMUX_WINDOW='juggernaut:jg-mate' \
     JG_FAKE_TMUX_LOG="$dir/tmux.log" JG_FAKE_TMUX_CAPTURE="$dir/fake-tmux/pane.txt" \
-    JG_SECONDMATE_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
+    JG_SQUAD_LEAD_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
     JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
-    secondmate_stall_watch_leg "$dir" "once" stall-file mate "$epoch-7"
-  ! grep -F 'secondmate wake-loop stalled' "$out" >/dev/null \
+    squad_lead_stall_watch_leg "$dir" "once" stall-file mate "$epoch-7"
+  ! grep -F 'squad_lead wake-loop stalled' "$out" >/dev/null \
     || fail "an acknowledged publication was duplicated after the pre-marker crash state"
   [ ! -s "$state/.wake-queue" ] \
     || fail "the replacement watcher re-published an acknowledged stall notification"
@@ -1349,23 +1349,23 @@ test_acknowledged_stall_publication_survives_pre_marker_crash() {
 
 test_empty_prefix_mate_preserves_other_mate_receipt() {
   local dir state empty stalled fakebin epoch row_before round
-  dir=$(make_case secondmate-prefix-receipt)
+  dir=$(make_case squad-lead-prefix-receipt)
   state="$dir/state"
   empty="$dir/ios"
   stalled="$dir/ios-ui"
   mkdir -p "$empty/state" "$stalled/state"
-  printf 'ios\n' > "$empty/.jg-secondmate-home"
-  printf 'ios-ui\n' > "$stalled/.jg-secondmate-home"
-  printf 'window=firstmate:jg-ios\nkind=secondmate\nhome=%s\n' "$empty" > "$state/ios.meta"
-  printf 'window=firstmate:jg-ios-ui\nkind=secondmate\nhome=%s\n' "$stalled" > "$state/ios-ui.meta"
+  printf 'ios\n' > "$empty/.jg-squad-lead-home"
+  printf 'ios-ui\n' > "$stalled/.jg-squad-lead-home"
+  printf 'window=juggernaut:jg-ios\nkind=squad_lead\nhome=%s\n' "$empty" > "$state/ios.meta"
+  printf 'window=juggernaut:jg-ios-ui\nkind=squad_lead\nhome=%s\n' "$stalled" > "$state/ios-ui.meta"
   : > "$empty/state/.wake-queue"
   epoch=$(( $(date +%s) - 10 ))
   printf '%s\t9\tcheck\trouted\tcheck: routed row\n' "$epoch" > "$stalled/state/.wake-queue"
   row_before="$dir/foreign-before"
   cp "$stalled/state/.wake-queue" "$row_before"
-  printf '%s\t%s-9\n' "$(( $(date +%s) - 2 ))" "$epoch" > "$state/.secondmate-wake-progress-ios-ui"
-  append_wake "$state" check "secondmate-wake-loop-ios-ui-$epoch-9" \
-    "check: secondmate wake-loop stalled: mate=ios-ui row=9 idle=2s" \
+  printf '%s\t%s-9\n' "$(( $(date +%s) - 2 ))" "$epoch" > "$state/.squad-lead-wake-progress-ios-ui"
+  append_wake "$state" check "squad-lead-wake-loop-ios-ui-$epoch-9" \
+    "check: squad_lead wake-loop stalled: mate=ios-ui row=9 idle=2s" \
     || fail "could not seed the ios-ui stall publication"
   JG_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/drain.out" 2> "$dir/drain.err" \
     || fail "ios-ui stall publication could not be drained"
@@ -1375,18 +1375,18 @@ test_empty_prefix_mate_preserves_other_mate_receipt() {
   fakebin="$dir/fakebin"
   round=1
   while [ "$round" -le 2 ]; do
-    printf 'seed\n' > "$state/.secondmate-wake-progress-ios"
+    printf 'seed\n' > "$state/.squad-lead-wake-progress-ios"
     PATH="$fakebin:$PATH" JG_HOME="$dir" JG_ROOT_OVERRIDE="$ROOT" \
       JG_STATE_OVERRIDE="$state" JG_FAKE_TMUX_WINDOW='' \
       JG_FAKE_TMUX_LOG="$dir/tmux.log" JG_FAKE_TMUX_CAPTURE="$dir/fake-tmux/pane.txt" \
-      JG_SECONDMATE_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
+      JG_SQUAD_LEAD_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
       JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
-      secondmate_stall_watch_leg "$dir" "$round" tick
-    [ ! -e "$state/.secondmate-wake-progress-ios" ] \
+      squad_lead_stall_watch_leg "$dir" "$round" tick
+    [ ! -e "$state/.squad-lead-wake-progress-ios" ] \
       || fail "empty ios queue was not observed on round $round"
-    [ -f "$state/.secondmate-wake-stall-ios-ui" ] && [ ! -L "$state/.secondmate-wake-stall-ios-ui" ] \
+    [ -f "$state/.squad-lead-wake-stall-ios-ui" ] && [ ! -L "$state/.squad-lead-wake-stall-ios-ui" ] \
       || fail "ios-ui stall marker was not recorded on round $round"
-    ! grep -F 'secondmate wake-loop stalled' "$dir/watch-$round.out" >/dev/null \
+    ! grep -F 'squad_lead wake-loop stalled' "$dir/watch-$round.out" >/dev/null \
       || fail "empty ios queue erased ios-ui idempotency on checkpoint $round"
     round=$((round + 1))
   done
@@ -1674,19 +1674,19 @@ test_main_drain_excludes_rows_already_granted_to_branch() {
 
 # The away posture lets a branch grant name a check-kind row, so the branch
 # ack must close the same publish-before-receipt crash window the main ack
-# does: consuming a secondmate-wake-loop row commits its stall receipt under
+# does: consuming a squad-lead-wake-loop row commits its stall receipt under
 # exactly the granted sequences, keeping a later stall tick from re-alerting a
 # consumed notification.
-test_branch_ack_commits_secondmate_stall_receipts() {
+test_branch_ack_commits_squad_lead_stall_receipts() {
   local dir state epoch sequence generation receipt
-  dir=$(make_case secondmate-branch-stall)
+  dir=$(make_case squad-lead-branch-stall)
   state="$dir/state"
   epoch=$(( $(date +%s) - 10 ))
-  append_wake "$state" check "secondmate-wake-loop-mate-$epoch-7" \
-    "check: secondmate wake-loop stalled: mate=mate row=7 idle=2s" \
+  append_wake "$state" check "squad-lead-wake-loop-mate-$epoch-7" \
+    "check: squad_lead wake-loop stalled: mate=mate row=7 idle=2s" \
     || fail "could not seed the stall publication"
-  append_wake "$state" check "secondmate-wake-loop-mate-$epoch-9" \
-    "check: secondmate wake-loop stalled: mate=mate row=9 idle=3s" \
+  append_wake "$state" check "squad-lead-wake-loop-mate-$epoch-9" \
+    "check: squad_lead wake-loop stalled: mate=mate row=9 idle=3s" \
     || fail "could not seed the ungranted stall publication"
 
   JG_STATE_OVERRIDE="$state" "$GRANT" activate "$$" branch-stall \
@@ -1703,13 +1703,13 @@ test_branch_ack_commits_secondmate_stall_receipts() {
     --ack-through "$sequence" --recovery-generation "$generation" \
     || fail "branch acknowledgement failed"
 
-  receipt="$state/.secondmate-wake-stall-receipts/mate/$epoch-7"
+  receipt="$state/.squad-lead-wake-stall-receipts/mate/$epoch-7"
   [ "$(cat "$receipt" 2>/dev/null || true)" = "$epoch-7" ] \
     || fail "branch acknowledgement did not commit the consumed stall row's receipt"
-  receipt="$state/.secondmate-wake-stall-receipts/mate/$epoch-9"
+  receipt="$state/.squad-lead-wake-stall-receipts/mate/$epoch-9"
   [ ! -e "$receipt" ] \
     || fail "branch acknowledgement committed a stall receipt for a row outside its grant"
-  pass "a branch-actor acknowledgement commits secondmate stall receipts for exactly its granted rows"
+  pass "a branch-actor acknowledgement commits squad_lead stall receipts for exactly its granted rows"
 }
 
 # The pending-warning condition and what a drain can actually present must name
@@ -3153,38 +3153,38 @@ test_drain_rotates_orphaned_scratch() {
   pass "drain rotates scratch files an interrupted drain left under the queue lock"
 }
 
-# --- secondmate endpoint liveness tick ---------------------------------------
-# bin/jg-watch.sh's secondmate_liveness_tick drives the shared
-# bin/jg-secondmate-liveness-lib.sh probe+relaunch machinery during ordinary
+# --- squad_lead endpoint liveness tick ---------------------------------------
+# bin/jg-watch.sh's squad_lead_liveness_tick drives the shared
+# bin/jg-squad-lead-liveness-lib.sh probe+relaunch machinery during ordinary
 # supervision: only a positively dead or missing recorded endpoint relaunches
-# (through the same guarded jg-spawn.sh --secondmate path the session-start
+# (through the same guarded jg-spawn.sh --squad-lead path the session-start
 # sweep uses), every relaunch emits exactly one `check` wake plus a durable
 # ledger line, inconclusive verdicts are triage-only, an unreachable remote
 # route is preserved, and the attempt bound parks a mate that keeps dying.
 
-# make_secondmate_liveness_case <name>: a watcher case dir carrying one local
-# secondmate whose tmux fixture answers the backend's agent-state probe AND the
+# make_squad_lead_liveness_case <name>: a watcher case dir carrying one local
+# squad_lead whose tmux fixture answers the backend's agent-state probe AND the
 # guarded spawn's window lifecycle (kill-window, a window id from new-window).
 # JG_FAKE_TMUX_CURRENT_COMMAND selects the pane's foreground command per leg;
 # JG_FAKE_WINDOW_GONE=1 makes the session inventory omit jg-sm1 (missing);
 # after a logged new-window the probe reads alive, matching a real respawn.
-make_secondmate_liveness_case() {
+make_squad_lead_liveness_case() {
   local name=$1 dir fakebin home
   dir="$TMP_ROOT/$name"
   fakebin="$dir/fakebin"
   # The mate home must sit OUTSIDE the watcher's JG_HOME: jg-spawn.sh refuses
-  # a secondmate home nested inside the active home that would supervise it.
+  # a squad_lead home nested inside the active home that would supervise it.
   home="$TMP_ROOT/$name-mate"
   mkdir -p "$dir/state" "$dir/config" "$dir/data" "$fakebin" \
     "$home/bin" "$home/data" "$home/state" "$home/config" "$home/projects"
-  # A secondmate home is a git checkout: the AI-trailer strip hook refuses a
+  # A squad_lead home is a git checkout: the AI-trailer strip hook refuses a
   # launch whose worktree is not git.
   git init -q -b main "$home"
-  printf 'sm1\n' > "$home/.jg-secondmate-home"
-  printf '# Firstmate\n' > "$home/AGENTS.md"
+  printf 'sm1\n' > "$home/.jg-squad-lead-home"
+  printf '# Juggernaut\n' > "$home/AGENTS.md"
   printf 'charter\n' > "$home/data/charter.md"
   printf 'codex\n' > "$dir/config/crew-harness"
-  printf 'window=firstmate:jg-sm1\nkind=secondmate\nharness=claude\nbackend=tmux\nhome=%s\n' \
+  printf 'window=juggernaut:jg-sm1\nkind=squad_lead\nharness=claude\nbackend=tmux\nhome=%s\n' \
     "$home" > "$dir/state/sm1.meta"
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
@@ -3240,7 +3240,7 @@ run_liveness_leg() {
   env PATH="$dir/fakebin:$PATH" JG_HOME="$dir" JG_ROOT_OVERRIDE="$ROOT" \
     JG_STATE_OVERRIDE="$dir/state" JG_CREW_STATE_BIN="$dir/fakebin/jg-crew-state.sh" \
     TMUX='' JG_BACKEND=tmux \
-    JG_TMUX_CALL_LOG="$dir/tmux.log" JG_SECONDMATE_LIVENESS_SECS=1 \
+    JG_TMUX_CALL_LOG="$dir/tmux.log" JG_SQUAD_LEAD_LIVENESS_SECS=1 \
     JG_POLL=1 JG_SIGNAL_GRACE=0 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
     "$@" "$WATCH" > "$dir/watch-$tag.out" 2> "$dir/watch-$tag.err" &
   LIVENESS_PID=$!
@@ -3254,7 +3254,7 @@ kill_liveness_leg() {
 
 # drain_liveness_wakes <dir>: replay the case's durable queue through the real
 # drain and post the acknowledgement it names - the same handling boundary a
-# firstmate applies to a surfaced wake. A leg after an unacked wake would exit
+# juggernaut applies to a surfaced wake. A leg after an unacked wake would exit
 # on check: rearm-resurface instead of exercising the tick it is testing.
 drain_liveness_wakes() {
   local dir=$1 state="$1/state" seq gen
@@ -3266,108 +3266,108 @@ drain_liveness_wakes() {
     > /dev/null 2>&1 || true
 }
 
-test_secondmate_liveness_tick_relaunches_dead_endpoint_once() {
+test_squad_lead_liveness_tick_relaunches_dead_endpoint_once() {
   local dir state pid out ledger
-  dir=$(make_secondmate_liveness_case liveness-dead)
+  dir=$(make_squad_lead_liveness_case liveness-dead)
   state="$dir/state"
 
   run_liveness_leg "$dir" dead JG_FAKE_TMUX_CURRENT_COMMAND=zsh; pid=$LIVENESS_PID
   wait_for_exit "$pid" 300 || fail "the watcher did not exit on its auto-relaunch wake"
   out="$dir/watch-dead.out"
-  grep -F 'check: secondmate sm1 auto-relaunched after confirmed agent absence on existing endpoint (backend=tmux)' "$out" >/dev/null \
-    || fail "a confirmed-dead secondmate was not auto-relaunched: $(cat "$out" "$dir/watch-dead.err")"
-  [ "$(grep -c 'check: secondmate sm1 auto-relaunched' "$out")" -eq 1 ] \
+  grep -F 'check: squad_lead sm1 auto-relaunched after confirmed agent absence on existing endpoint (backend=tmux)' "$out" >/dev/null \
+    || fail "a confirmed-dead squad_lead was not auto-relaunched: $(cat "$out" "$dir/watch-dead.err")"
+  [ "$(grep -c 'check: squad_lead sm1 auto-relaunched' "$out")" -eq 1 ] \
     || fail "an auto-relaunch did not produce exactly one captain-facing line: $(cat "$out")"
   assert_contains "$(cat "$dir/tmux.log")" "kill-window" \
     "the confirmed-dead endpoint must be killed before relaunch"
   assert_contains "$(cat "$dir/tmux.log")" "new-window" \
-    "the dead secondmate was not relaunched"
-  ledger="$state/.secondmate-relaunch-sm1"
+    "the dead squad_lead was not relaunched"
+  ledger="$state/.squad-lead-relaunch-sm1"
   [ -f "$ledger" ] || fail "the durable relaunch ledger was not written"
   [ "$(awk -F '\t' '$2 == "attempt"' "$ledger" | wc -l | tr -d ' ')" -eq 1 ] \
     || fail "the ledger did not record exactly one attempt: $(cat "$ledger")"
   [ "$(awk -F '\t' '$2 == "relaunched"' "$ledger" | wc -l | tr -d ' ')" -eq 1 ] \
     || fail "the ledger did not record the relaunched outcome: $(cat "$ledger")"
-  [ "$(grep -c 'secondmate-relaunch-sm1-' "$state/.wake-queue")" -eq 1 ] \
+  [ "$(grep -c 'squad-lead-relaunch-sm1-' "$state/.wake-queue")" -eq 1 ] \
     || fail "the durable auto-relaunch wake row was not queued exactly once: $(cat "$state/.wake-queue")"
-  [ -e "$state/.secondmate-liveness-tick" ] \
+  [ -e "$state/.squad-lead-liveness-tick" ] \
     || fail "the liveness cadence marker was not stamped"
 
   # A restarted watcher sees the relaunched endpoint alive and stays quiet -
   # the durable row remains for the drain and no second notification fires.
   drain_liveness_wakes "$dir"
-  rm -f "$state/.secondmate-liveness-tick"
+  rm -f "$state/.squad-lead-liveness-tick"
   run_liveness_leg "$dir" dead-idle JG_FAKE_TMUX_CURRENT_COMMAND=zsh; pid=$LIVENESS_PID
   sleep 4
   is_live_non_zombie "$pid" \
-    || fail "the watcher exited against an alive relaunched secondmate: $(cat "$dir/watch-dead-idle.out" "$dir/watch-dead-idle.err")"
+    || fail "the watcher exited against an alive relaunched squad_lead: $(cat "$dir/watch-dead-idle.out" "$dir/watch-dead-idle.err")"
   kill_liveness_leg "$pid"
-  [ "$(grep -c 'secondmate-relaunch-sm1' "$state/.wake-queue" 2>/dev/null || true)" -eq 0 ] \
+  [ "$(grep -c 'squad-lead-relaunch-sm1' "$state/.wake-queue" 2>/dev/null || true)" -eq 0 ] \
     || fail "a live post-relaunch probe produced a second wake: $(cat "$state/.wake-queue")"
-  pass "watch liveness: a dead secondmate is relaunched once, ledgered, and quiet afterwards"
+  pass "watch liveness: a dead squad_lead is relaunched once, ledgered, and quiet afterwards"
 }
 
-test_secondmate_liveness_tick_relaunches_missing_endpoint() {
+test_squad_lead_liveness_tick_relaunches_missing_endpoint() {
   local dir state pid out
-  dir=$(make_secondmate_liveness_case liveness-missing)
+  dir=$(make_squad_lead_liveness_case liveness-missing)
   state="$dir/state"
 
   run_liveness_leg "$dir" missing JG_FAKE_WINDOW_GONE=1; pid=$LIVENESS_PID
   wait_for_exit "$pid" 300 || fail "the watcher did not exit on its auto-relaunch wake"
   out="$dir/watch-missing.out"
-  grep -F 'check: secondmate sm1 auto-relaunched after recorded endpoint confidently missing (backend=tmux)' "$out" >/dev/null \
-    || fail "a missing secondmate endpoint was not auto-relaunched: $(cat "$out" "$dir/watch-missing.err")"
+  grep -F 'check: squad_lead sm1 auto-relaunched after recorded endpoint confidently missing (backend=tmux)' "$out" >/dev/null \
+    || fail "a missing squad_lead endpoint was not auto-relaunched: $(cat "$out" "$dir/watch-missing.err")"
   assert_contains "$(cat "$dir/tmux.log")" "new-window" \
-    "the missing secondmate endpoint was not relaunched"
+    "the missing squad_lead endpoint was not relaunched"
   assert_not_contains "$(cat "$dir/tmux.log")" "kill-window" \
     "an absent window must not take the destructive pre-kill path"
-  pass "watch liveness: a missing secondmate endpoint is relaunched without a pre-kill"
+  pass "watch liveness: a missing squad_lead endpoint is relaunched without a pre-kill"
 }
 
-test_secondmate_liveness_tick_relaunches_every_dead_mate_before_waking() {
+test_squad_lead_liveness_tick_relaunches_every_dead_mate_before_waking() {
   local dir state pid out home id
-  dir=$(make_secondmate_liveness_case liveness-several)
+  dir=$(make_squad_lead_liveness_case liveness-several)
   state="$dir/state"
   home="$TMP_ROOT/liveness-several-mate2"
   mkdir -p "$home/bin" "$home/data" "$home/state" "$home/config" "$home/projects"
   git init -q -b main "$home"
-  printf 'sm2\n' > "$home/.jg-secondmate-home"
-  printf '# Firstmate\n' > "$home/AGENTS.md"
+  printf 'sm2\n' > "$home/.jg-squad-lead-home"
+  printf '# Juggernaut\n' > "$home/AGENTS.md"
   printf 'charter\n' > "$home/data/charter.md"
-  printf 'window=firstmate:jg-sm2\nkind=secondmate\nharness=claude\nbackend=tmux\nhome=%s\n' \
+  printf 'window=juggernaut:jg-sm2\nkind=squad_lead\nharness=claude\nbackend=tmux\nhome=%s\n' \
     "$home" > "$state/sm2.meta"
 
   run_liveness_leg "$dir" several JG_FAKE_WINDOW_GONE=1; pid=$LIVENESS_PID
   wait_for_exit "$pid" 300 || fail "the watcher did not exit on its auto-relaunch wake"
   out="$dir/watch-several.out"
-  [ "$(grep -c 'check: secondmate sm[12] auto-relaunched' "$out")" -eq 1 ] \
+  [ "$(grep -c 'check: squad_lead sm[12] auto-relaunched' "$out")" -eq 1 ] \
     || fail "one liveness tick did not wake exactly once: $(cat "$out" "$dir/watch-several.err")"
   [ "$(grep -c 'new-window' "$dir/tmux.log")" -eq 2 ] \
     || fail "the tick did not relaunch every dead mate before waking: $(cat "$dir/tmux.log")"
   for id in sm1 sm2; do
-    [ "$(awk -F '\t' '$2 == "relaunched"' "$state/.secondmate-relaunch-$id" 2>/dev/null | wc -l | tr -d ' ')" -eq 1 ] \
-      || fail "$id's relaunch was not ledgered: $(cat "$state/.secondmate-relaunch-$id" 2>/dev/null)"
-    [ "$(grep -c "secondmate-relaunch-$id-" "$state/.wake-queue")" -eq 1 ] \
+    [ "$(awk -F '\t' '$2 == "relaunched"' "$state/.squad-lead-relaunch-$id" 2>/dev/null | wc -l | tr -d ' ')" -eq 1 ] \
+      || fail "$id's relaunch was not ledgered: $(cat "$state/.squad-lead-relaunch-$id" 2>/dev/null)"
+    [ "$(grep -c "squad-lead-relaunch-$id-" "$state/.wake-queue")" -eq 1 ] \
       || fail "$id's relaunch did not queue its own check row: $(cat "$state/.wake-queue")"
   done
   pass "watch liveness: one tick relaunches every dead mate, queues a row each, and wakes once"
 }
 
-test_secondmate_liveness_tick_leaves_alive_and_inconclusive_untouched() {
+test_squad_lead_liveness_tick_leaves_alive_and_inconclusive_untouched() {
   local dir state pid
-  dir=$(make_secondmate_liveness_case liveness-quiet)
+  dir=$(make_squad_lead_liveness_case liveness-quiet)
   state="$dir/state"
 
   # A live endpoint probes every cadence and never acts.
   run_liveness_leg "$dir" alive JG_FAKE_TMUX_CURRENT_COMMAND=claude; pid=$LIVENESS_PID
   sleep 4
   is_live_non_zombie "$pid" \
-    || fail "the watcher exited against an alive secondmate: $(cat "$dir/watch-alive.out" "$dir/watch-alive.err")"
+    || fail "the watcher exited against an alive squad_lead: $(cat "$dir/watch-alive.out" "$dir/watch-alive.err")"
   kill_liveness_leg "$pid"
-  [ ! -s "$dir/tmux.log" ] || fail "an alive secondmate was touched: $(cat "$dir/tmux.log")"
-  [ ! -s "$state/.wake-queue" ] || fail "an alive secondmate queued a wake: $(cat "$state/.wake-queue")"
-  [ ! -e "$state/.secondmate-relaunch-sm1" ] || fail "an alive secondmate was ledgered"
-  [ -e "$state/.secondmate-liveness-tick" ] || fail "the liveness tick did not stamp its cadence marker"
+  [ ! -s "$dir/tmux.log" ] || fail "an alive squad_lead was touched: $(cat "$dir/tmux.log")"
+  [ ! -s "$state/.wake-queue" ] || fail "an alive squad_lead queued a wake: $(cat "$state/.wake-queue")"
+  [ ! -e "$state/.squad-lead-relaunch-sm1" ] || fail "an alive squad_lead was ledgered"
+  [ -e "$state/.squad-lead-liveness-tick" ] || fail "the liveness tick did not stamp its cadence marker"
 
   # An ambiguous existing process is evidence of nothing; it is triage-only
   # and never a relaunch. Drain the killed leg's downtime marker first so the
@@ -3376,47 +3376,47 @@ test_secondmate_liveness_tick_leaves_alive_and_inconclusive_untouched() {
   run_liveness_leg "$dir" ambiguous JG_FAKE_TMUX_CURRENT_COMMAND=node; pid=$LIVENESS_PID
   sleep 4
   is_live_non_zombie "$pid" \
-    || fail "the watcher exited against an ambiguous secondmate endpoint: $(cat "$dir/watch-ambiguous.out" "$dir/watch-ambiguous.err")"
+    || fail "the watcher exited against an ambiguous squad_lead endpoint: $(cat "$dir/watch-ambiguous.out" "$dir/watch-ambiguous.err")"
   kill_liveness_leg "$pid"
   [ ! -s "$dir/tmux.log" ] || fail "an ambiguous endpoint was killed or relaunched: $(cat "$dir/tmux.log")"
   [ ! -s "$state/.wake-queue" ] || fail "an ambiguous endpoint queued a wake: $(cat "$state/.wake-queue")"
-  grep -F 'secondmate sm1 liveness: existing endpoint has ambiguous agent process (backend=tmux)' \
+  grep -F 'squad_lead sm1 liveness: existing endpoint has ambiguous agent process (backend=tmux)' \
     "$state/.watch-triage.log" >/dev/null \
     || fail "the ambiguous probe did not land in the triage log: $(cat "$state/.watch-triage.log" 2>/dev/null)"
   pass "watch liveness: alive and ambiguous endpoints are probed, logged, and never touched"
 }
 
-test_secondmate_liveness_tick_cadence_gates_the_probe() {
+test_squad_lead_liveness_tick_cadence_gates_the_probe() {
   local dir state pid
-  dir=$(make_secondmate_liveness_case liveness-cadence)
+  dir=$(make_squad_lead_liveness_case liveness-cadence)
   state="$dir/state"
 
   # A fresh cadence marker holds the probe even over a dead endpoint.
-  touch "$state/.secondmate-liveness-tick"
-  run_liveness_leg "$dir" gated JG_SECONDMATE_LIVENESS_SECS=99999999 JG_FAKE_TMUX_CURRENT_COMMAND=zsh; pid=$LIVENESS_PID
+  touch "$state/.squad-lead-liveness-tick"
+  run_liveness_leg "$dir" gated JG_SQUAD_LEAD_LIVENESS_SECS=99999999 JG_FAKE_TMUX_CURRENT_COMMAND=zsh; pid=$LIVENESS_PID
   sleep 4
   is_live_non_zombie "$pid" \
     || fail "the watcher woke inside the liveness cadence: $(cat "$dir/watch-gated.out" "$dir/watch-gated.err")"
   kill_liveness_leg "$pid"
   [ ! -s "$dir/tmux.log" ] || fail "a gated tick probed the endpoint: $(cat "$dir/tmux.log")"
   [ ! -s "$state/.wake-queue" ] || fail "a gated tick queued a wake"
-  [ ! -e "$state/.secondmate-relaunch-sm1" ] || fail "a gated tick ledgered an attempt"
+  [ ! -e "$state/.squad-lead-relaunch-sm1" ] || fail "a gated tick ledgered an attempt"
 
   # Once the cadence lapses the same dead endpoint is recovered on the next poll.
   drain_liveness_wakes "$dir"
-  rm -f "$state/.secondmate-liveness-tick"
+  rm -f "$state/.squad-lead-liveness-tick"
   run_liveness_leg "$dir" ungated JG_FAKE_TMUX_CURRENT_COMMAND=zsh; pid=$LIVENESS_PID
   wait_for_exit "$pid" 300 || fail "the lapsed-cadence watcher did not auto-relaunch"
-  grep -F 'check: secondmate sm1 auto-relaunched' "$dir/watch-ungated.out" >/dev/null \
-    || fail "the lapsed cadence did not recover the dead secondmate: $(cat "$dir/watch-ungated.out")"
+  grep -F 'check: squad_lead sm1 auto-relaunched' "$dir/watch-ungated.out" >/dev/null \
+    || fail "the lapsed cadence did not recover the dead squad_lead: $(cat "$dir/watch-ungated.out")"
   pass "watch liveness: the cadence marker gates probing and survives across legs"
 }
 
-test_secondmate_liveness_tick_attempt_bound_parks_then_rearm_on_alive() {
+test_squad_lead_liveness_tick_attempt_bound_parks_then_rearm_on_alive() {
   local dir state pid ledger now
-  dir=$(make_secondmate_liveness_case liveness-bound)
+  dir=$(make_squad_lead_liveness_case liveness-bound)
   state="$dir/state"
-  ledger="$state/.secondmate-relaunch-sm1"
+  ledger="$state/.squad-lead-relaunch-sm1"
 
   # Three ledgered attempts inside the window meet the default bound; the next
   # dead probe parks the mate behind the bound marker and escalates once.
@@ -3424,85 +3424,85 @@ test_secondmate_liveness_tick_attempt_bound_parks_then_rearm_on_alive() {
   printf '%s\tattempt\n%s\tattempt\n%s\tattempt\n' "$now" "$now" "$now" > "$ledger"
   run_liveness_leg "$dir" bound JG_FAKE_TMUX_CURRENT_COMMAND=zsh; pid=$LIVENESS_PID
   wait_for_exit "$pid" 300 || fail "the watcher did not exit on its bound wake"
-  grep -F 'check: secondmate sm1 auto-relaunch paused after 3 attempts in 3600s' "$dir/watch-bound.out" >/dev/null \
+  grep -F 'check: squad_lead sm1 auto-relaunch paused after 3 attempts in 3600s' "$dir/watch-bound.out" >/dev/null \
     || fail "a mate past its relaunch bound was not escalated once: $(cat "$dir/watch-bound.out" "$dir/watch-bound.err")"
-  [ -e "$state/.secondmate-relaunch-bound-sm1" ] || fail "the bound marker was not written"
+  [ -e "$state/.squad-lead-relaunch-bound-sm1" ] || fail "the bound marker was not written"
   [ ! -s "$dir/tmux.log" ] || fail "a parked mate was relaunched anyway: $(cat "$dir/tmux.log")"
   [ "$(awk -F '\t' '$2 == "attempt"' "$ledger" | wc -l | tr -d ' ')" -eq 3 ] \
     || fail "a parked probe ledgered another attempt: $(cat "$ledger")"
-  [ "$(grep -c 'secondmate-relaunch-bound-sm1' "$state/.wake-queue")" -eq 1 ] \
+  [ "$(grep -c 'squad-lead-relaunch-bound-sm1' "$state/.wake-queue")" -eq 1 ] \
     || fail "the bound wake was not queued exactly once"
 
   # While the marker stands, further dead probes are silent - no repeat wake.
   drain_liveness_wakes "$dir"
-  rm -f "$state/.secondmate-liveness-tick"
+  rm -f "$state/.squad-lead-liveness-tick"
   run_liveness_leg "$dir" parked JG_FAKE_TMUX_CURRENT_COMMAND=zsh; pid=$LIVENESS_PID
   sleep 4
   is_live_non_zombie "$pid" \
     || fail "the watcher re-escalated a parked mate: $(cat "$dir/watch-parked.out" "$dir/watch-parked.err")"
   kill_liveness_leg "$pid"
-  [ "$(grep -c 'secondmate-relaunch' "$state/.wake-queue" 2>/dev/null || true)" -eq 0 ] \
+  [ "$(grep -c 'squad-lead-relaunch' "$state/.wake-queue" 2>/dev/null || true)" -eq 0 ] \
     || fail "a parked mate produced a second wake: $(cat "$state/.wake-queue")"
   [ ! -s "$dir/tmux.log" ] || fail "a parked mate was relaunched: $(cat "$dir/tmux.log")"
 
   # A live probe rearms the guarantee: the marker clears and the mate can be
   # auto-relaunched again on a later death.
   drain_liveness_wakes "$dir"
-  rm -f "$state/.secondmate-liveness-tick"
+  rm -f "$state/.squad-lead-liveness-tick"
   run_liveness_leg "$dir" rearm JG_FAKE_TMUX_CURRENT_COMMAND=claude; pid=$LIVENESS_PID
   sleep 4
   is_live_non_zombie "$pid" \
     || fail "the watcher exited against a live rearmed mate: $(cat "$dir/watch-rearm.out" "$dir/watch-rearm.err")"
   kill_liveness_leg "$pid"
-  [ ! -e "$state/.secondmate-relaunch-bound-sm1" ] \
+  [ ! -e "$state/.squad-lead-relaunch-bound-sm1" ] \
     || fail "a live probe did not clear the bound marker"
   [ "$(awk -F '\t' '$2 == "rearmed"' "$ledger" | wc -l | tr -d ' ')" -eq 1 ] \
     || fail "the live rearm was not ledgered exactly once: $(cat "$ledger")"
   drain_liveness_wakes "$dir"
-  rm -f "$state/.secondmate-liveness-tick"
+  rm -f "$state/.squad-lead-liveness-tick"
   # The three seeded attempts still sit inside the window, yet the rearm
   # restores the full default budget: the next death relaunches, not re-parks.
   run_liveness_leg "$dir" rearmed-dead JG_FAKE_TMUX_CURRENT_COMMAND=zsh JG_FAKE_WINDOW_GONE=1; pid=$LIVENESS_PID
   wait_for_exit "$pid" 300 || fail "a rearmed mate was not auto-relaunched on its next death"
-  grep -F 'check: secondmate sm1 auto-relaunched' "$dir/watch-rearmed-dead.out" >/dev/null \
+  grep -F 'check: squad_lead sm1 auto-relaunched' "$dir/watch-rearmed-dead.out" >/dev/null \
     || fail "the rearmed mate's relaunch did not wake: $(cat "$dir/watch-rearmed-dead.out" "$dir/watch-rearmed-dead.err")"
-  [ ! -e "$state/.secondmate-relaunch-bound-sm1" ] \
+  [ ! -e "$state/.squad-lead-relaunch-bound-sm1" ] \
     || fail "a rearmed mate was re-parked on its pre-rearm attempts"
   [ "$(awk -F '\t' '$2 == "attempt"' "$ledger" | wc -l | tr -d ' ')" -eq 4 ] \
     || fail "the ledger did not keep its pre-rearm history plus the new attempt: $(cat "$ledger")"
   pass "watch liveness: the attempt bound parks a flapping mate once and a live probe rearms a full budget"
 }
 
-test_secondmate_liveness_tick_relaunch_failure_reports_once() {
+test_squad_lead_liveness_tick_relaunch_failure_reports_once() {
   local dir state pid ledger
-  dir=$(make_secondmate_liveness_case liveness-failure)
+  dir=$(make_squad_lead_liveness_case liveness-failure)
   state="$dir/state"
-  ledger="$state/.secondmate-relaunch-sm1"
+  ledger="$state/.squad-lead-relaunch-sm1"
 
   run_liveness_leg "$dir" failed JG_FAKE_TMUX_CURRENT_COMMAND=zsh JG_TEST_FAIL_NEW_WINDOW=1; pid=$LIVENESS_PID
   wait_for_exit "$pid" 300 || fail "the watcher did not exit on its relaunch-failure wake"
-  grep -F 'check: secondmate sm1 auto-relaunch failed after confirmed agent absence on existing endpoint:' \
+  grep -F 'check: squad_lead sm1 auto-relaunch failed after confirmed agent absence on existing endpoint:' \
     "$dir/watch-failed.out" >/dev/null \
     || fail "a failed auto-relaunch did not wake with its cause: $(cat "$dir/watch-failed.out" "$dir/watch-failed.err")"
   [ "$(awk -F '\t' '$2 == "attempt"' "$ledger" | wc -l | tr -d ' ')" -eq 1 ] \
     || fail "the ledger did not record the failed attempt: $(cat "$ledger" 2>/dev/null)"
   [ "$(awk -F '\t' '$2 == "failed"' "$ledger" | wc -l | tr -d ' ')" -eq 1 ] \
     || fail "the ledger did not record the failed outcome: $(cat "$ledger")"
-  [ "$(grep -c 'secondmate-relaunch-failed-sm1-' "$state/.wake-queue")" -eq 1 ] \
+  [ "$(grep -c 'squad-lead-relaunch-failed-sm1-' "$state/.wake-queue")" -eq 1 ] \
     || fail "the failure wake was not queued exactly once: $(cat "$state/.wake-queue")"
   pass "watch liveness: a failed auto-relaunch wakes once with its cause and is ledgered"
 }
 
-test_secondmate_liveness_tick_fails_closed_on_ledger_errors() {
+test_squad_lead_liveness_tick_fails_closed_on_ledger_errors() {
   local dir state pid ledger mode rc
   if [ "$(id -u)" -eq 0 ]; then
     pass "watch liveness: ledger permission errors skipped (root ignores file modes)"
     return 0
   fi
   for mode in 444 000; do
-    dir=$(make_secondmate_liveness_case "liveness-ledger-$mode")
+    dir=$(make_squad_lead_liveness_case "liveness-ledger-$mode")
     state="$dir/state"
-    ledger="$state/.secondmate-relaunch-sm1"
+    ledger="$state/.squad-lead-relaunch-sm1"
     : > "$ledger"
     chmod "$mode" "$ledger"
     run_liveness_leg "$dir" ledger JG_FAKE_TMUX_CURRENT_COMMAND=zsh; pid=$LIVENESS_PID
@@ -3510,63 +3510,63 @@ test_secondmate_liveness_tick_fails_closed_on_ledger_errors() {
     wait_for_exit "$pid" 300 || rc=$?
     chmod 644 "$ledger"
     [ "$rc" -eq 1 ] || fail "a mode-$mode relaunch ledger did not fail the watcher (rc=$rc): $(cat "$dir/watch-ledger.out" "$dir/watch-ledger.err")"
-    grep -F 'secondmate liveness check failed' "$dir/watch-ledger.err" >/dev/null \
+    grep -F 'squad_lead liveness check failed' "$dir/watch-ledger.err" >/dev/null \
       || fail "a mode-$mode ledger failure was not reported: $(cat "$dir/watch-ledger.err")"
     [ ! -s "$dir/tmux.log" ] \
       || fail "a mode-$mode relaunch ledger still killed or spawned: $(cat "$dir/tmux.log")"
     [ ! -s "$ledger" ] || fail "a mode-$mode ledger gained rows: $(cat "$ledger")"
-    ! grep -F 'secondmate-relaunch' "$state/.wake-queue" >/dev/null 2>&1 \
+    ! grep -F 'squad-lead-relaunch' "$state/.wake-queue" >/dev/null 2>&1 \
       || fail "a mode-$mode ledger failure queued a relaunch wake: $(cat "$state/.wake-queue")"
   done
   pass "watch liveness: an unwritable or unreadable relaunch ledger refuses to kill or spawn"
 }
 
-test_secondmate_liveness_tick_error_keeps_scanning_and_wakes() {
+test_squad_lead_liveness_tick_error_keeps_scanning_and_wakes() {
   local dir state pid out home rc
   if [ "$(id -u)" -eq 0 ]; then
     pass "watch liveness: mid-tick ledger error skipped (root ignores file modes)"
     return 0
   fi
-  dir=$(make_secondmate_liveness_case liveness-mid-error)
+  dir=$(make_squad_lead_liveness_case liveness-mid-error)
   state="$dir/state"
   home="$TMP_ROOT/liveness-mid-error-mate2"
   mkdir -p "$home/bin" "$home/data" "$home/state" "$home/config" "$home/projects"
   git init -q -b main "$home"
-  printf 'sm2\n' > "$home/.jg-secondmate-home"
-  printf '# Firstmate\n' > "$home/AGENTS.md"
+  printf 'sm2\n' > "$home/.jg-squad-lead-home"
+  printf '# Juggernaut\n' > "$home/AGENTS.md"
   printf 'charter\n' > "$home/data/charter.md"
-  printf 'window=firstmate:jg-sm2\nkind=secondmate\nharness=claude\nbackend=tmux\nhome=%s\n' \
+  printf 'window=juggernaut:jg-sm2\nkind=squad_lead\nharness=claude\nbackend=tmux\nhome=%s\n' \
     "$home" > "$state/sm2.meta"
-  : > "$state/.secondmate-relaunch-sm1"
-  chmod 000 "$state/.secondmate-relaunch-sm1"
+  : > "$state/.squad-lead-relaunch-sm1"
+  chmod 000 "$state/.squad-lead-relaunch-sm1"
 
   # sm1 errors first; the tick must still recover sm2 and surface its wake.
   run_liveness_leg "$dir" mid-error JG_FAKE_WINDOW_GONE=1; pid=$LIVENESS_PID
   rc=0
   wait_for_exit "$pid" 300 || rc=$?
-  chmod 644 "$state/.secondmate-relaunch-sm1"
+  chmod 644 "$state/.squad-lead-relaunch-sm1"
   out="$dir/watch-mid-error.out"
   [ "$rc" -eq 0 ] || fail "a per-mate ledger error discarded the tick's pending wake (rc=$rc): $(cat "$out" "$dir/watch-mid-error.err")"
-  grep -F 'check: secondmate sm2 auto-relaunched' "$out" >/dev/null \
+  grep -F 'check: squad_lead sm2 auto-relaunched' "$out" >/dev/null \
     || fail "a mate after the ledger error was not recovered and surfaced: $(cat "$out" "$dir/watch-mid-error.err")"
-  grep -F 'watcher: secondmate sm1 liveness: relaunch ledger is unreadable' "$dir/watch-mid-error.err" >/dev/null \
+  grep -F 'watcher: squad_lead sm1 liveness: relaunch ledger is unreadable' "$dir/watch-mid-error.err" >/dev/null \
     || fail "the per-mate ledger error was not reported: $(cat "$dir/watch-mid-error.err")"
   [ "$(grep -c 'new-window' "$dir/tmux.log")" -eq 1 ] \
     || fail "exactly the healthy mate should have been relaunched: $(cat "$dir/tmux.log")"
-  [ ! -s "$state/.secondmate-relaunch-sm1" ] \
-    || fail "the errored mate gained ledger rows: $(cat "$state/.secondmate-relaunch-sm1")"
-  [ "$(grep -c 'secondmate-relaunch-sm2-' "$state/.wake-queue")" -eq 1 ] \
+  [ ! -s "$state/.squad-lead-relaunch-sm1" ] \
+    || fail "the errored mate gained ledger rows: $(cat "$state/.squad-lead-relaunch-sm1")"
+  [ "$(grep -c 'squad-lead-relaunch-sm2-' "$state/.wake-queue")" -eq 1 ] \
     || fail "the healthy mate's relaunch row was not queued: $(cat "$state/.wake-queue")"
   pass "watch liveness: a per-mate error keeps scanning, recovers later mates, and still wakes"
 }
 
-test_secondmate_liveness_tick_unqueued_outcome_is_an_error_not_a_wake() {
+test_squad_lead_liveness_tick_unqueued_outcome_is_an_error_not_a_wake() {
   local dir state pid rc
   if [ "$(id -u)" -eq 0 ]; then
     pass "watch liveness: unqueued-outcome check skipped (root ignores file modes)"
     return 0
   fi
-  dir=$(make_secondmate_liveness_case liveness-unqueued)
+  dir=$(make_squad_lead_liveness_case liveness-unqueued)
   state="$dir/state"
   : > "$state/.wake-queue"
   chmod 444 "$state/.wake-queue"
@@ -3576,35 +3576,35 @@ test_secondmate_liveness_tick_unqueued_outcome_is_an_error_not_a_wake() {
   chmod 644 "$state/.wake-queue"
   [ "$rc" -eq 1 ] \
     || fail "an outcome whose check row was never queued did not fail the watcher (rc=$rc): $(cat "$dir/watch-unqueued.out" "$dir/watch-unqueued.err")"
-  ! grep -F 'check: secondmate sm1 auto-relaunched' "$dir/watch-unqueued.out" >/dev/null \
+  ! grep -F 'check: squad_lead sm1 auto-relaunched' "$dir/watch-unqueued.out" >/dev/null \
     || fail "an unqueued outcome was printed as a delivered wake: $(cat "$dir/watch-unqueued.out")"
-  grep -F 'watcher: secondmate sm1 liveness: check wake row could not be queued' "$dir/watch-unqueued.err" >/dev/null \
+  grep -F 'watcher: squad_lead sm1 liveness: check wake row could not be queued' "$dir/watch-unqueued.err" >/dev/null \
     || fail "the unqueued outcome was not reported as an error: $(cat "$dir/watch-unqueued.err")"
   pass "watch liveness: an outcome that could not be queued surfaces as an error, not a wake"
 }
 
-test_secondmate_liveness_tick_skips_mate_whose_lock_is_held() {
+test_squad_lead_liveness_tick_skips_mate_whose_lock_is_held() {
   local dir state pid holder
-  dir=$(make_secondmate_liveness_case liveness-locked)
+  dir=$(make_squad_lead_liveness_case liveness-locked)
   state="$dir/state"
 
   # A concurrent liveness episode (e.g. the session-start sweep) holds the
   # per-mate lock; this tick must skip the mate entirely rather than probe a
   # moving target.
   ( STATE="$state" bash -c '. "$1" && jg_lock_acquire_wait "$2" && sleep 30' \
-      _ "$ROOT/bin/jg-wake-lib.sh" "$state/.secondmate-liveness-sm1.lock" ) &
+      _ "$ROOT/bin/jg-wake-lib.sh" "$state/.squad-lead-liveness-sm1.lock" ) &
   holder=$!
   local i=0
-  while [ ! -d "$state/.secondmate-liveness-sm1.lock" ] && [ "$i" -lt 100 ]; do
+  while [ ! -d "$state/.squad-lead-liveness-sm1.lock" ] && [ "$i" -lt 100 ]; do
     sleep 0.05
     i=$((i + 1))
   done
-  [ -d "$state/.secondmate-liveness-sm1.lock" ] || fail "the fixture never acquired the liveness lock"
+  [ -d "$state/.squad-lead-liveness-sm1.lock" ] || fail "the fixture never acquired the liveness lock"
 
   run_liveness_leg "$dir" locked JG_FAKE_TMUX_CURRENT_COMMAND=zsh; pid=$LIVENESS_PID
   sleep 4
   is_live_non_zombie "$pid" \
-    || fail "the watcher exited against a locked secondmate: $(cat "$dir/watch-locked.out" "$dir/watch-locked.err")"
+    || fail "the watcher exited against a locked squad_lead: $(cat "$dir/watch-locked.out" "$dir/watch-locked.err")"
   kill_liveness_leg "$pid"
   kill "$holder" 2>/dev/null || true
   wait "$holder" 2>/dev/null || true
@@ -3613,14 +3613,14 @@ test_secondmate_liveness_tick_skips_mate_whose_lock_is_held() {
   pass "watch liveness: a mate mid-episode under the shared liveness lock is skipped entirely"
 }
 
-test_secondmate_liveness_tick_preserves_unreachable_remote() {
+test_squad_lead_liveness_tick_preserves_unreachable_remote() {
   local dir state
-  dir=$(make_secondmate_liveness_case liveness-remote-down)
+  dir=$(make_squad_lead_liveness_case liveness-remote-down)
   state="$dir/state"
   rm -f "$state/sm1.meta"
   cat > "$state/rsm1.meta" <<EOF
 window=remote:rsm1
-kind=secondmate
+kind=squad_lead
 harness=claude
 remote_host=lab-host
 remote_backend=herdr
@@ -3628,7 +3628,7 @@ remote_herdr_session=jg-remote
 remote_target=jg-remote:w1:p1
 home=/remote/rsm1-home
 EOF
-  cat > "$dir/data/secondmates.md" <<EOF
+  cat > "$dir/data/squad_leads.md" <<EOF
 - rsm1 - Remote mate (host: lab-host; root: /remote/root; home: /remote/rsm1-home; scope: remote work; projects: alpha; added 2026-01-01)
 EOF
   cp "$state/rsm1.meta" "$dir/rsm1.meta.before"
@@ -3643,17 +3643,17 @@ SH
   run_liveness_leg "$dir" unreachable JG_SSH_BIN="$dir/fakebin/ssh" JG_FAKE_SSH_LOG="$dir/ssh.log"; pid=$LIVENESS_PID
   sleep 4
   is_live_non_zombie "$pid" \
-    || fail "the watcher exited against an unreachable remote secondmate: $(cat "$dir/watch-unreachable.out" "$dir/watch-unreachable.err")"
+    || fail "the watcher exited against an unreachable remote squad_lead: $(cat "$dir/watch-unreachable.out" "$dir/watch-unreachable.err")"
   kill_liveness_leg "$pid"
   [ -s "$dir/ssh.log" ] || fail "the remote endpoint was never probed"
   cmp -s "$dir/rsm1.meta.before" "$state/rsm1.meta" \
     || fail "an unreachable remote probe changed the route metadata"
-  assert_grep '- rsm1 ' "$dir/data/secondmates.md" "an unreachable probe changed the registry route"
+  assert_grep '- rsm1 ' "$dir/data/squad_leads.md" "an unreachable probe changed the registry route"
   [ ! -s "$state/.wake-queue" ] || fail "an unreachable remote probe queued a wake"
-  [ ! -e "$state/.secondmate-relaunch-rsm1" ] \
+  [ ! -e "$state/.squad-lead-relaunch-rsm1" ] \
     || fail "an unreachable remote probe ledgered a relaunch attempt"
   [ ! -s "$dir/tmux.log" ] || fail "an unreachable remote probe touched a local endpoint"
-  pass "watch liveness: an unreachable remote secondmate is probed, preserved, and never failed over"
+  pass "watch liveness: an unreachable remote squad_lead is probed, preserved, and never failed over"
 }
 
 test_self_held_lock_reclaims_instead_of_deadlocking
@@ -3661,17 +3661,17 @@ test_subshell_lock_ownership_without_bashpid
 test_bounded_lock_handoff_after_contention
 test_live_presentation_holder_is_deadlined_without_weakening_ack
 test_malformed_presentation_lock_reports_acquire_failure
-test_secondmate_foreign_queue_stall_tracks_progress_and_alerts_once
-test_secondmate_declared_pause_rows_do_not_feed_stall_escalation
-test_secondmate_reprovisioned_queue_starts_a_fresh_interval
-test_secondmate_active_turn_defers_stall_until_the_turn_ends
-test_secondmate_long_lived_mate_mid_turn_is_not_a_stall
-test_secondmate_proven_idle_ring_lets_the_child_drain
+test_squad_lead_foreign_queue_stall_tracks_progress_and_alerts_once
+test_squad_lead_declared_pause_rows_do_not_feed_stall_escalation
+test_squad_lead_reprovisioned_queue_starts_a_fresh_interval
+test_squad_lead_active_turn_defers_stall_until_the_turn_ends
+test_squad_lead_long_lived_mate_mid_turn_is_not_a_stall
+test_squad_lead_proven_idle_ring_lets_the_child_drain
 test_term_stops_a_watcher_blocked_in_the_drain_ring_idle_capture
-test_secondmate_busy_and_unknown_panes_are_not_rung
-test_secondmate_genuine_stall_after_idle_ring_still_alarms
-test_spawned_idle_pi_secondmate_is_rung_once
-test_secondmate_stall_marker_rejects_symlink
+test_squad_lead_busy_and_unknown_panes_are_not_rung
+test_squad_lead_genuine_stall_after_idle_ring_still_alarms
+test_spawned_idle_pi_squad_lead_is_rung_once
+test_squad_lead_stall_marker_rejects_symlink
 test_acknowledged_stall_publication_survives_pre_marker_crash
 test_empty_prefix_mate_preserves_other_mate_receipt
 test_self_announced_append_guards
@@ -3694,7 +3694,7 @@ test_enrichment_preserves_all_unread_lines_and_status_file_failures
 test_slow_annotation_does_not_block_append_and_deleted_file_fails_open
 test_branch_actor_scoped_ack_never_swallows_a_main_owned_row
 test_main_drain_excludes_rows_already_granted_to_branch
-test_branch_ack_commits_secondmate_stall_receipts
+test_branch_ack_commits_squad_lead_stall_receipts
 test_main_is_never_told_to_drain_rows_only_the_branch_owns
 test_uncountable_queue_still_raises_the_pending_alarm
 test_unconsumable_rows_are_retired_instead_of_wedging_the_queue
@@ -3714,15 +3714,15 @@ test_recovery_ack_failure_is_reported
 test_interruption_before_and_after_raw_commit
 test_wake_queue_prune_task
 test_drain_rotates_orphaned_scratch
-test_secondmate_liveness_tick_relaunches_dead_endpoint_once
-test_secondmate_liveness_tick_relaunches_missing_endpoint
-test_secondmate_liveness_tick_relaunches_every_dead_mate_before_waking
-test_secondmate_liveness_tick_leaves_alive_and_inconclusive_untouched
-test_secondmate_liveness_tick_cadence_gates_the_probe
-test_secondmate_liveness_tick_attempt_bound_parks_then_rearm_on_alive
-test_secondmate_liveness_tick_relaunch_failure_reports_once
-test_secondmate_liveness_tick_fails_closed_on_ledger_errors
-test_secondmate_liveness_tick_error_keeps_scanning_and_wakes
-test_secondmate_liveness_tick_unqueued_outcome_is_an_error_not_a_wake
-test_secondmate_liveness_tick_skips_mate_whose_lock_is_held
-test_secondmate_liveness_tick_preserves_unreachable_remote
+test_squad_lead_liveness_tick_relaunches_dead_endpoint_once
+test_squad_lead_liveness_tick_relaunches_missing_endpoint
+test_squad_lead_liveness_tick_relaunches_every_dead_mate_before_waking
+test_squad_lead_liveness_tick_leaves_alive_and_inconclusive_untouched
+test_squad_lead_liveness_tick_cadence_gates_the_probe
+test_squad_lead_liveness_tick_attempt_bound_parks_then_rearm_on_alive
+test_squad_lead_liveness_tick_relaunch_failure_reports_once
+test_squad_lead_liveness_tick_fails_closed_on_ledger_errors
+test_squad_lead_liveness_tick_error_keeps_scanning_and_wakes
+test_squad_lead_liveness_tick_unqueued_outcome_is_an_error_not_a_wake
+test_squad_lead_liveness_tick_skips_mate_whose_lock_is_held
+test_squad_lead_liveness_tick_preserves_unreachable_remote

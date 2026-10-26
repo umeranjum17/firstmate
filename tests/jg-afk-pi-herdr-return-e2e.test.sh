@@ -60,7 +60,7 @@ trap cleanup EXIT
 "$LAB_HELPER" provision "$SESSION"
 
 mkdir -p "$HOME_DIR"/{state,data,config,projects} "$PROJECT" "$PI_DIR" "$FAKEBIN"
-printf '# Synthetic isolated Firstmate primary\n' > "$PROJECT/AGENTS.md"
+printf '# Synthetic isolated Juggernaut primary\n' > "$PROJECT/AGENTS.md"
 
 # A task-local extension grants session-only trust, captures exact submitted
 # input bytes through Pi's `input` hook and marks them handled, so no provider,
@@ -197,7 +197,7 @@ pass "real Pi primary: the away posture is recorded with no daemon launched"
 sleep 0.5
 composer=$(PATH="$FAKEBIN:$ORIGINAL_PATH" HERDR_SESSION="$SESSION" jg_backend_composer_state herdr "$PRIMARY_TARGET")
 [ "$composer" = pending ] || fail "real Pi draft did not classify pending (got $composer)"
-CHILD_CMD=$(printf "printf 'blocked [key=synthetic-dependency]: firstmate can refresh the synthetic token\\n' >> %q; exec sleep 120" "$STATE/repair-task.status")
+CHILD_CMD=$(printf "printf 'blocked [key=synthetic-dependency]: juggernaut can refresh the synthetic token\\n' >> %q; exec sleep 120" "$STATE/repair-task.status")
 "$LAB_HELPER" run "$SESSION" pane run "$CHILD_PANE" "$CHILD_CMD" >/dev/null
 for _ in $(seq 1 40); do grep -q 'synthetic-dependency' "$STATE/repair-task.status" 2>/dev/null && break; sleep 0.1; done
 assert_blocker_open 'after the child declared it'
@@ -247,7 +247,7 @@ RETURN_OUT=$(PATH="$FAKEBIN:$ORIGINAL_PATH" HERDR_SESSION="$SESSION" JG_ROOT_OVE
 RETURN_RC=$?
 set -e
 [ "$RETURN_RC" -eq 3 ] || fail "return catch-up did not gate the still-live blocker (rc=$RETURN_RC): $RETURN_OUT"
-assert_contains "$RETURN_OUT" 'firstmate-actionable blocker: repair-task [key=synthetic-dependency]' "return gate did not assign remediation"
+assert_contains "$RETURN_OUT" 'juggernaut-actionable blocker: repair-task [key=synthetic-dependency]' "return gate did not assign remediation"
 assert_contains "$RETURN_OUT" '=== Return brief (away ' "the return did not render the brief"
 assert_contains "$RETURN_OUT" 'Supervisor health:' "the brief did not lead with supervisor health"
 [ ! -f "$STATE/.afk-contract" ] || fail "the return did not archive the away-posture record"
@@ -259,7 +259,7 @@ printf '%s' "$BEARINGS_OUT" | jq -e '
   and (.gates | any(.id == "(return-catchup)" and .reason == "away-return catch-up"))
   and ([.decisions_open[].id] | index("(return-catchup)") | not)' >/dev/null \
   || fail "Bearings did not surface the catch-up posture as content: $BEARINGS_OUT"
-pass "real unmarked Pi return renders the brief, opens catch-up, and reports that posture through Bearings while the blocker stays Firstmate's to remediate"
+pass "real unmarked Pi return renders the brief, opens catch-up, and reports that posture through Bearings while the blocker stays Juggernaut's to remediate"
 
 printf 'resolved [key=synthetic-dependency]: refreshed the synthetic token and resumed the task\n' >> "$STATE/repair-task.status"
 PATH="$FAKEBIN:$ORIGINAL_PATH" HERDR_SESSION="$SESSION" JG_ROOT_OVERRIDE="$PROJECT" JG_HOME="$HOME_DIR" JG_STATE_OVERRIDE="$STATE" \

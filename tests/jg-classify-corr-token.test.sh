@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # tests/jg-classify-corr-token.test.sh - a status line may carry the correlation
-# token bin/jg-pending-reply-lib.sh embeds in a marked request and a secondmate
+# token bin/jg-pending-reply-lib.sh embeds in a marked request and a squad_lead
 # echoes back (bin/jg-brief.sh), between the verb and the rest of the line. Every
 # verb-driven classification must read straight through that token, in BOTH
 # directions: a verb parse that keeps the token glued on matches no arm of the
@@ -8,7 +8,7 @@
 # decision the captain is owed never reaches him.
 #
 # The parse is deliberately strict, and these tests defend that strictness as
-# hard as they defend the fix: only the exact token a firstmate library writes is
+# hard as they defend the fix: only the exact token a juggernaut library writes is
 # read through. Prose, a malformed or wrong-length token, and an arbitrary
 # name=value word all keep their extra words and therefore stay non-transitions.
 #
@@ -25,7 +25,7 @@ set -u
 . "$ROOT/bin/jg-classify-lib.sh"
 
 DRAIN="$ROOT/bin/jg-wake-drain.sh"
-REPORT="$ROOT/bin/jg-secondmate-report.sh"
+REPORT="$ROOT/bin/jg-squad-lead-report.sh"
 
 TMP_ROOT=$(jg_test_tmproot jg-classify-corr-token-tests)
 
@@ -95,7 +95,7 @@ test_token_is_read_through_in_every_position_it_is_written_in() {
 
   # Before the key, after the key, with no key at all, twice on one line (a
   # recovery turn re-embedding), and in the bracketed shape the optional
-  # bin/jg-secondmate-report.sh helper writes. Every one is a real observed shape.
+  # bin/jg-squad-lead-report.sh helper writes. Every one is a real observed shape.
   printf 'needs-decision corr=%s [key=before]: token ahead of the key\n' "$CORR" > "$state/t1.status"
   printf 'needs-decision [key=after] corr=%s: token behind the key\n' "$CORR" > "$state/t2.status"
   printf 'blocked corr=%s: token and no key at all\n' "$CORR" > "$state/t3.status"
@@ -510,16 +510,16 @@ test_the_real_writers_produce_tokens_this_library_reads() {
     i=$((i + 1))
   done
 
-  # Writer 2: the optional secondmate report helper, whose bracketed shape must
+  # Writer 2: the optional squad_lead report helper, whose bracketed shape must
   # be read through just as completely. Drive the real script from a seeded
   # mate home so it resolves the parent channel itself.
   local parent mate
   parent="$dir"
   mate="$dir/mate"
   mkdir -p "$mate/state"
-  printf 'pinned\n' > "$mate/.jg-secondmate-home"
-  cat > "$mate/.jg-secondmate-parent" <<EOF
-schema=jg-secondmate-parent.v1
+  printf 'pinned\n' > "$mate/.jg-squad-lead-home"
+  cat > "$mate/.jg-squad-lead-parent" <<EOF
+schema=jg-squad-lead-parent.v1
 route=local
 parent_home=$parent
 EOF

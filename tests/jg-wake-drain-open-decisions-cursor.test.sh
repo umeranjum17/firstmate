@@ -349,7 +349,7 @@ test_previous_fold_cache_is_refolded_under_current_semantics() {
 
 test_terminal_supersession_reaches_cached_drains() {
   local dir state status cursor out kind terminal expected closing ident size span pass_number
-  for kind in scout ship secondmate; do
+  for kind in scout ship squad_lead; do
     for terminal in 'done' failed; do
       dir=$(make_case "terminal-$kind-$terminal")
       state="$dir/state"; status="$state/task.status"; cursor="$state/.task.open-decisions-cursor"; out="$dir/drain.out"
@@ -359,7 +359,7 @@ test_terminal_supersession_reaches_cached_drains() {
       assert_contains "$(cat "$out")" 'task [key=access] blocked: waiting' "initial blocker must surface"
       printf '%s: report saved\nnote: cleanup complete\n' "$terminal" >> "$status"
       expected=''; closing=$terminal
-      if [ "$kind" = secondmate ]; then expected=$'access\tblocked\twaiting'; closing=blocked; fi
+      if [ "$kind" = squad_lead ]; then expected=$'access\tblocked\twaiting'; closing=blocked; fi
       for pass_number in 1 2; do
         if [ "$pass_number" = 2 ]; then
           ident=$(sed -n 's/^ident=//p' "$cursor")
@@ -367,8 +367,8 @@ test_terminal_supersession_reaches_cached_drains() {
           printf 'version=5\noffset=%s\nident=%s\naccess\tblocked\twaiting' "$size" "$ident" > "$cursor"
         fi
         JG_STATE_OVERRIDE="$state" "$DRAIN" > "$out" 2> "$dir/drain.err" || fail "$kind terminal drain failed"
-        if [ "$kind" = secondmate ]; then
-          assert_contains "$(cat "$out")" 'task [key=access] blocked: waiting' "secondmate blocker must survive $terminal and cache migration"
+        if [ "$kind" = squad_lead ]; then
+          assert_contains "$(cat "$out")" 'task [key=access] blocked: waiting' "squad_lead blocker must survive $terminal and cache migration"
         else
           assert_not_contains "$(cat "$out")" 'OPEN DECISIONS' "$kind pre-terminal blocker resurfaced after $terminal or cache migration"
         fi
@@ -377,8 +377,8 @@ test_terminal_supersession_reaches_cached_drains() {
           || fail "$kind whole-file, incremental, and key-history reads disagree with terminal supersession"
       done
       span=$(bash -c '. "$1"; status_span_first_actionable "$2" 0' _ "$ROOT/bin/jg-classify-lib.sh" "$status")
-      if [ "$kind" = secondmate ]; then
-        assert_contains "$span" 'blocked [key=access]: waiting' "secondmate opening must remain actionable"
+      if [ "$kind" = squad_lead ]; then
+        assert_contains "$span" 'blocked [key=access]: waiting' "squad_lead opening must remain actionable"
       else
         assert_not_contains "$span" 'waiting' "$kind superseded opening remained actionable in a captured span"
       fi
@@ -398,9 +398,9 @@ test_kind_changes_invalidate_folded_decisions() {
   local dir state status kind expected
   dir=$(make_case cursor-kind-change); state="$dir/state"; status="$state/task.status"
   printf 'blocked [key=access]: waiting\ndone: report saved\nnote: cleanup complete\n' > "$status"
-  for kind in unknown ship secondmate scout; do
+  for kind in unknown ship squad_lead scout; do
     [ "$kind" = unknown ] || printf 'kind=%s\n' "$kind" >> "$state/task.meta"
-    case "$kind" in unknown|secondmate) expected=$'access\tblocked\twaiting' ;; *) expected='' ;; esac
+    case "$kind" in unknown|squad_lead) expected=$'access\tblocked\twaiting' ;; *) expected='' ;; esac
     bash -c '. "$1"; [ "$(status_open_decisions_incremental "$2")" = "$3" ] && [ "$(status_open_decisions "$2")" = "$3" ]' \
       _ "$ROOT/bin/jg-classify-lib.sh" "$status" "$expected" \
       || fail "cached decisions did not follow the current $kind metadata without a status append"

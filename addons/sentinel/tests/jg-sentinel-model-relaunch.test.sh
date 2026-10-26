@@ -38,7 +38,7 @@ SH
 : >"$d/home/bin/jg-supervision-lib.sh"
 : >"$d/home/bin/jg-operational-input.sh"
 : >"$d/home/bin/jg-classify-lib.sh"
-for cmd in jg-control.sh jg-secondmate-restart.sh; do
+for cmd in jg-control.sh jg-squad-lead-restart.sh; do
   cat >"$d/home/bin/$cmd" <<'SH'
 #!/usr/bin/env bash
 printf '%s %s %s\n' "$JG_HOME" "$(basename "$0")" "$*" >> "$RELAUNCH_LOG"
@@ -86,9 +86,9 @@ herdr_pane_id=$pane
 EOF
 done
 printf -- '- lead-a - Lead (home: %s; scope: work)\n- lead-b - Lead (home: %s; scope: work)\n- parked - Lead (home: %s; scope: work)\n- missing - Lead (home: %s; scope: work)\n' \
-  "$d/lead-a" "$d/lead-b" "$d/parked" "$d/missing" >"$d/home/data-secondmates.md"
+  "$d/lead-a" "$d/lead-b" "$d/parked" "$d/missing" >"$d/home/data-squad-leads.md"
 mkdir -p "$d/home/data" "$d/home/config"
-mv "$d/home/data-secondmates.md" "$d/home/data/secondmates.md"
+mv "$d/home/data-squad-leads.md" "$d/home/data/squad_leads.md"
 printf 'parked\n' >"$d/home/config/parked-homes"
 if PATH="$PATH" RELAUNCH_LOG="$d/relaunch.log" JG_HOME="$d/home" JG_SENTINEL_MODEL_EVENT=lead-event \
   "$ROOT/sentinel/bin/jg-sentinel.sh" lead-model-reconcile; then

@@ -70,14 +70,14 @@ parse_pool_config() {
 
 # When the request omits pool_config (lfm account_picker does), use the same default
 # order as pipeline-quota-failover/switch.sh: $JG_HOME/config/account-pool when that
-# file is readable, else $HOME/firstmate/config/account-pool.
+# file is readable, else $HOME/juggernaut/config/account-pool.
 default_pool_config() {
   if [ -n "${JG_HOME:-}" ] && [ -f "$JG_HOME/config/account-pool" ] && [ -r "$JG_HOME/config/account-pool" ]; then
     printf '%s\n' "$JG_HOME/config/account-pool"
     return 0
   fi
-  if [ -f "$HOME/firstmate/config/account-pool" ] && [ -r "$HOME/firstmate/config/account-pool" ]; then
-    printf '%s\n' "$HOME/firstmate/config/account-pool"
+  if [ -f "$HOME/juggernaut/config/account-pool" ] && [ -r "$HOME/juggernaut/config/account-pool" ]; then
+    printf '%s\n' "$HOME/juggernaut/config/account-pool"
     return 0
   fi
   return 1

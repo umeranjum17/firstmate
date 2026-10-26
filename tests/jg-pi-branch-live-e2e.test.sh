@@ -201,7 +201,7 @@ if (!(offerFailure instanceof Error)) {
 // must fail fast. The rejected settlement proves ownership returned to the
 // watcher, and this consumed main delivery proves the watcher kept the wake.
 const fallback = mainUserMessages[0].content;
-if (!fallback.includes("FIRSTMATE WATCHER WAKE: signal: live-sdk probe")) {
+if (!fallback.includes("JUGGERNAUT WATCHER WAKE: signal: live-sdk probe")) {
   throw new Error(`watcher-owned fallback lost the wake reason: ${fallback}`);
 }
 if (!existsSync(`${home}/state/.branch-session`)) {
@@ -242,7 +242,7 @@ if (!(pinFailure instanceof Error) ||
   throw new Error(`the rejected real-SDK settlement did not name the unusable pin: ${String(pinFailure)}`);
 }
 const pinFallback = mainUserMessages[1].content;
-if (!pinFallback.includes("FIRSTMATE WATCHER WAKE: signal: live pin probe")) {
+if (!pinFallback.includes("JUGGERNAUT WATCHER WAKE: signal: live pin probe")) {
   throw new Error(`pinned watcher-owned fallback lost the wake reason: ${pinFallback}`);
 }
 const confirmations = readFileSync(process.env.JG_LIVE_WATCH_LOG, "utf8")
@@ -389,7 +389,7 @@ if (!(offerFailure instanceof Error) ||
   throw new Error(`real-SDK provider-error settlement lost the normally settled 429 turn: ${String(offerFailure)}`);
 }
 const fallback = mainUserMessages[0].content;
-if (!fallback.includes("FIRSTMATE WATCHER WAKE: signal: c1 429 probe")) {
+if (!fallback.includes("JUGGERNAUT WATCHER WAKE: signal: c1 429 probe")) {
   throw new Error(`real-SDK watcher-owned fallback lost the 429 wake: ${fallback}`);
 }
 if (mainUserMessages[0].options.deliverAs !== "followUp") {

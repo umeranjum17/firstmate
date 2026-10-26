@@ -9,9 +9,9 @@ set -u
 # shellcheck source=tests/lib.sh
 # shellcheck disable=SC1091
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
-# shellcheck source=bin/jg-secondmate-registry-lib.sh
+# shellcheck source=bin/jg-squad-lead-registry-lib.sh
 # shellcheck disable=SC1091
-. "$ROOT/bin/jg-secondmate-registry-lib.sh"
+. "$ROOT/bin/jg-squad-lead-registry-lib.sh"
 # shellcheck source=bin/jg-tasks-axi-lib.sh
 # shellcheck disable=SC1091
 . "$ROOT/bin/jg-tasks-axi-lib.sh"
@@ -63,7 +63,7 @@ JSON
   exit 0
 fi
 cat <<'JSON'
-[{"number":9,"title":"Ship the thing","url":"https://github.com/kunchenguid/firstmate/pull/9","headRefName":"fm/ship-task","reviewDecision":"APPROVED","mergeable":"MERGEABLE","statusCheckRollup":[{"conclusion":"SUCCESS","status":"COMPLETED"}]}]
+[{"number":9,"title":"Ship the thing","url":"https://github.com/kunchenguid/juggernaut/pull/9","headRefName":"fm/ship-task","reviewDecision":"APPROVED","mergeable":"MERGEABLE","statusCheckRollup":[{"conclusion":"SUCCESS","status":"COMPLETED"}]}]
 JSON
 SH
   cat > "$fb/gh-axi" <<'SH'
@@ -100,106 +100,106 @@ record_claude_state() {  # <state-dir> <id> <busy|idle>
 }
 
 fixture_mate_home() {  # <parent-home>
-  printf '%s/%s-secondmate-home\n' "$TMP_ROOT" "$(basename "$1")"
+  printf '%s/%s-squad-lead-home\n' "$TMP_ROOT" "$(basename "$1")"
 }
 
 # Standard fixture: a ship task with a recorded PR, a scout task with a report, a
-# secondmate with a MASKED open decision (needs-decision then a later unrelated
+# squad_lead with a MASKED open decision (needs-decision then a later unrelated
 # done), and a backlog with a superseded queued item.
 write_fixture() {  # <home>
   local home=$1 mate
   mate=$(fixture_mate_home "$home")
   mkdir -p "$home/projects/ship-wt" "$home/data/scout-x" "$mate/data" "$mate/state" "$mate/config" "$mate/projects" "$mate/bin"
-  printf '# Firstmate fixture\n' > "$mate/AGENTS.md"
-  printf 'mate\n' > "$mate/.jg-secondmate-home"
-  printf -- '- mate - fixture domain (home: %s; scope: fixture work; projects: firstmate; added 2026-07-11)\n' \
-    "$mate" > "$home/data/secondmates.md"
+  printf '# Juggernaut fixture\n' > "$mate/AGENTS.md"
+  printf 'mate\n' > "$mate/.jg-squad-lead-home"
+  printf -- '- mate - fixture domain (home: %s; scope: fixture work; projects: juggernaut; added 2026-07-11)\n' \
+    "$mate" > "$home/data/squad_leads.md"
   cat > "$home/data/backlog.md" <<EOF
 ## In flight
-- [ ] ship-task - Ship the thing (repo: firstmate) (kind: ship) (since 2026-07-11)
-- [ ] scout-x - Investigate the thing data/scout-x/report.md (repo: firstmate) (kind: scout) (since 2026-07-11)
+- [ ] ship-task - Ship the thing (repo: juggernaut) (kind: ship) (since 2026-07-11)
+- [ ] scout-x - Investigate the thing data/scout-x/report.md (repo: juggernaut) (kind: scout) (since 2026-07-11)
 
 ## Queued
-- [ ] live-gate - Real queued work blocked-by: ship-task (repo: firstmate) (kind: ship)
-- [ ] dead-gate - Old conditional work (repo: firstmate) (kind: scout)
+- [ ] live-gate - Real queued work blocked-by: ship-task (repo: juggernaut) (kind: ship)
+- [ ] dead-gate - Old conditional work (repo: juggernaut) (kind: scout)
   NOT REQUIRED - superseded 2026-07-11; kept as reference only.
 
 ## Done
-- [x] done-a - Landed thing https://github.com/kunchenguid/firstmate/pull/7 (repo: firstmate) (kind: ship) (merged 2026-07-10)
+- [x] done-a - Landed thing https://github.com/kunchenguid/juggernaut/pull/7 (repo: juggernaut) (kind: ship) (merged 2026-07-10)
 EOF
   printf '# Scout X\n' > "$home/data/scout-x/report.md"
   jg_write_meta "$home/state/ship-task.meta" \
-    "window=firstmate:jg-ship-task" \
+    "window=juggernaut:jg-ship-task" \
     "worktree=$home/projects/ship-wt" \
-    "project=firstmate" \
+    "project=juggernaut" \
     "harness=claude" \
     "kind=ship" \
     "mode=no-mistakes" \
-    "pr=https://github.com/kunchenguid/firstmate/pull/9"
+    "pr=https://github.com/kunchenguid/juggernaut/pull/9"
   record_claude_state "$home/state" ship-task busy
   printf 'working: building the thing\n' > "$home/state/ship-task.status"
   jg_write_meta "$home/state/scout-x.meta" \
-    "window=firstmate:jg-scout-x" \
+    "window=juggernaut:jg-scout-x" \
     "worktree=$home/projects/ship-wt" \
-    "project=firstmate" \
+    "project=juggernaut" \
     "harness=claude" \
     "kind=scout" \
     "mode=scout"
   record_claude_state "$home/state" scout-x idle
   printf 'done: report ready\n' > "$home/state/scout-x.status"
   jg_write_meta "$home/state/mate.meta" \
-    "window=firstmate:jg-mate" \
+    "window=juggernaut:jg-mate" \
     "worktree=$mate" \
     "project=$mate" \
     "harness=codex" \
-    "kind=secondmate" \
-    "mode=secondmate" \
+    "kind=squad_lead" \
+    "mode=squad_lead" \
     "home=$mate" \
-    "projects=firstmate"
+    "projects=juggernaut"
   printf 'needs-decision [key=race]: pick subscribe order\n' > "$home/state/mate.status"
   printf 'done: an unrelated subtask finished\n' >> "$home/state/mate.status"
   jg_write_meta "$home/state/external-wait.meta" \
-    "window=firstmate:jg-external-wait" \
+    "window=juggernaut:jg-external-wait" \
     "worktree=$home/projects/ship-wt" \
-    "project=firstmate" \
+    "project=juggernaut" \
     "harness=claude" \
     "kind=ship" \
     "mode=no-mistakes"
   record_claude_state "$home/state" external-wait idle
   printf 'paused: declared external-wait for upstream release\n' > "$home/state/external-wait.status"
-  # The secondmate's OWN home backlog records a merge it managed. This lands in the
-  # secondmate home, never the main backlog, so landed-work views only see it via the
+  # The squad_lead's OWN home backlog records a merge it managed. This lands in the
+  # squad_lead home, never the main backlog, so landed-work views only see it via the
   # bounded cross-home Done roll-up.
   cat > "$mate/data/backlog.md" <<'EOF'
 ## In flight
-- [ ] mate - Decide subscription order (repo: firstmate) (kind: ship) (since 2026-07-11)
+- [ ] mate - Decide subscription order (repo: juggernaut) (kind: ship) (since 2026-07-11)
 
 ## Queued
-- [ ] mate-decision-race - Choose subscription order (repo: firstmate) (kind: captain) (hold: captain choice pending) (hold-kind: captain)
+- [ ] mate-decision-race - Choose subscription order (repo: juggernaut) (kind: captain) (hold: captain choice pending) (hold-kind: captain)
 
 ## Done
-- [x] mate-landed - Secondmate-managed fix https://github.com/kunchenguid/firstmate/pull/50 (repo: firstmate) (kind: ship) (merged 2026-07-11)
+- [x] mate-landed - SquadLead-managed fix https://github.com/kunchenguid/juggernaut/pull/50 (repo: juggernaut) (kind: ship) (merged 2026-07-11)
 EOF
   mkdir -p "$mate/projects/mate"
   jg_write_meta "$mate/state/mate.meta" \
-    "window=firstmate:jg-mate" "worktree=$mate/projects/mate" "project=firstmate" \
+    "window=juggernaut:jg-mate" "worktree=$mate/projects/mate" "project=juggernaut" \
     "harness=claude" "kind=ship" "mode=no-mistakes"
   record_claude_state "$mate/state" mate idle
   printf 'needs-decision [key=race]: pick subscribe order\n' > "$mate/state/mate.status"
 }
 
-refresh_local_secondmate_ledgers() {  # <parent-home>
+refresh_local_squad_lead_ledgers() {  # <parent-home>
   local parent=$1 registry line mate refresh_path=$PATH
-  registry="$parent/data/secondmates.md"
+  registry="$parent/data/squad_leads.md"
   [ -f "$registry" ] && [ -r "$registry" ] || return 0
   # Once this fixture's fake backend exists, ledger production must use it too;
   # otherwise child state depends on whether the CI host has a live tmux server.
   [ ! -x "$parent/fakebin/tmux" ] || refresh_path="$parent/fakebin:$refresh_path"
   while IFS= read -r line || [ -n "$line" ]; do
-    secondmate_registry_parse_line "$line" || continue
-    [ "$SECONDMATE_REGISTRY_REMOTE" -eq 0 ] || continue
-    mate=$SECONDMATE_REGISTRY_HOME
-    [ -f "$mate/.jg-secondmate-home" ] && [ -f "$mate/AGENTS.md" ] \
+    squad_lead_registry_parse_line "$line" || continue
+    [ "$SQUAD_LEAD_REGISTRY_REMOTE" -eq 0 ] || continue
+    mate=$SQUAD_LEAD_REGISTRY_HOME
+    [ -f "$mate/.jg-squad-lead-home" ] && [ -f "$mate/AGENTS.md" ] \
       && [ -d "$mate/bin" ] && [ -d "$mate/data" ] && [ -d "$mate/state" ] || continue
     PATH="$refresh_path" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$mate" \
       JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z JG_SNAPSHOT_NOW_EPOCH=1783792800 \
@@ -210,8 +210,8 @@ refresh_local_secondmate_ledgers() {  # <parent-home>
 run() {  # <home> <fakebin> <args...>
   local home=$1 fakebin=$2; shift 2
   case " $* " in
-    *" --all-landed "*) PATH="$fakebin:$PATH" JG_SNAPSHOT_SECONDMATE_LANDED_PER_HOME=0 refresh_local_secondmate_ledgers "$home" ;;
-    *) PATH="$fakebin:$PATH" refresh_local_secondmate_ledgers "$home" ;;
+    *" --all-landed "*) PATH="$fakebin:$PATH" JG_SNAPSHOT_SQUAD_LEAD_LANDED_PER_HOME=0 refresh_local_squad_lead_ledgers "$home" ;;
+    *) PATH="$fakebin:$PATH" refresh_local_squad_lead_ledgers "$home" ;;
   esac
   PATH="$fakebin:$PATH" JG_HOME="$home" JG_BEARINGS_NOW=2026-07-11T18:00:00Z NET_LOG="$home/net.log" "$BEARINGS" "$@"
 }
@@ -228,7 +228,7 @@ write_remote_home_summary() {  # <remote-home> <generated-epoch>
   local home=$1 epoch=$2
   mkdir -p "$home/state"
   jq -n --arg home "$home" --argjson epoch "$epoch" '{
-    schema:"jg-secondmate-home-summary.v1",
+    schema:"jg-squad-lead-home-summary.v1",
     hold_classifier_schema:"jg-captain-hold-buckets.v1",
     generated:"2026-09-01T22:00:00Z",generated_epoch:$epoch,home:$home,
     valid:true,reason:null,invalidity:{kind:null,ids:[]},state:"captain_decision",
@@ -238,8 +238,8 @@ write_remote_home_summary() {  # <remote-home> <generated-epoch>
       {id:"remote-aged",key:"remote-aged",verb:"captain-hold",summary:"Remote aged hold",reason:"choose a route",hold_until:null,hold_bucket:"aged",hold_age_days:40,source:"backlog"}
     ],holds:[],
     queued:[
-      {id:"remote-parked",title:"Remote parked hold",blocked_by:null,blocked_by_ids:[],unresolved_blocker_ids:[],blocked_reason:null,hold_reason:"parked",hold_kind:"captain",hold_until:null,hold_bucket:"live",hold_age_days:null,captain_actionable:true,repo:"firstmate",kind:"captain"},
-      {id:"remote-aged",title:"Remote aged hold",blocked_by:null,blocked_by_ids:[],unresolved_blocker_ids:[],blocked_reason:null,hold_reason:"choose a route",hold_kind:"captain",hold_until:null,hold_bucket:"aged",hold_age_days:40,captain_actionable:false,repo:"firstmate",kind:"captain"}
+      {id:"remote-parked",title:"Remote parked hold",blocked_by:null,blocked_by_ids:[],unresolved_blocker_ids:[],blocked_reason:null,hold_reason:"parked",hold_kind:"captain",hold_until:null,hold_bucket:"live",hold_age_days:null,captain_actionable:true,repo:"juggernaut",kind:"captain"},
+      {id:"remote-aged",title:"Remote aged hold",blocked_by:null,blocked_by_ids:[],unresolved_blocker_ids:[],blocked_reason:null,hold_reason:"choose a route",hold_kind:"captain",hold_until:null,hold_bucket:"aged",hold_age_days:40,captain_actionable:false,repo:"juggernaut",kind:"captain"}
     ],landed:[],endpoints:[],
     counts:{active_children:0,decisions_open:2,holds:0,queued:2,landed:0,endpoints:0},omitted:[]
   }' > "$home/state/home-summary.json"
@@ -249,7 +249,7 @@ make_remote_ledger_fleet() {  # <parent-home> <count>
   local parent=$1 count=$2 i id remote_home
   mkdir -p "$parent/data" "$parent/state" "$parent/config" "$parent/projects"
   : > "$parent/data/backlog.md"
-  : > "$parent/data/secondmates.md"
+  : > "$parent/data/squad_leads.md"
   i=1
   while [ "$i" -le "$count" ]; do
     id="ledger-$i"
@@ -257,9 +257,9 @@ make_remote_ledger_fleet() {  # <parent-home> <count>
     mkdir -p "$remote_home/state"
     remote_home=$(cd "$remote_home" && pwd -P)
     printf -- '- %s - ledger fixture (host: host-%s; root: /remote/root; home: %s; scope: fixture; projects: sample; added 2026-09-01)\n' \
-      "$id" "$i" "$remote_home" >> "$parent/data/secondmates.md"
+      "$id" "$i" "$remote_home" >> "$parent/data/squad_leads.md"
     jg_write_meta "$parent/state/$id.meta" \
-      "kind=secondmate" "mode=secondmate" "harness=pi" \
+      "kind=squad_lead" "mode=squad_lead" "harness=pi" \
       "remote_host=host-$i" "remote_root=/remote/root" "home=$remote_home"
     write_remote_home_summary "$remote_home" 1000
     i=$((i + 1))
@@ -330,14 +330,14 @@ run_remote_ledger_bearings() {  # <parent-home> <fakebin> <epoch>
 # End-to-end Domain Alpha regression fixture.
 # The parent event claims Phase 7 started, while the registered home has no child
 # metadata, every sample-rollout item is Done, and only an external legal hold remains.
-write_domain_alpha_fixture() {  # <parent-home> <secondmate-home>
+write_domain_alpha_fixture() {  # <parent-home> <squad-lead-home>
   local home=$1 mate=$2 i
   mkdir -p "$mate/state" "$mate/data" "$mate/config" "$mate/projects" "$mate/bin"
-  printf '# Firstmate fixture\n' > "$mate/AGENTS.md"
-  printf 'domain-alpha\n' > "$mate/.jg-secondmate-home"
+  printf '# Juggernaut fixture\n' > "$mate/AGENTS.md"
+  printf 'domain-alpha\n' > "$mate/.jg-squad-lead-home"
   printf -- '- domain-alpha - sample rollout (home: %s; scope: sample rollout and legal release; projects: sample; added 2026-07-13)\n' \
-    "$mate" > "$home/data/secondmates.md"
-  jg_write_secondmate_meta "$home/state/domain-alpha.meta" "$mate" "firstmate:jg-domain-alpha" sample
+    "$mate" > "$home/data/squad_leads.md"
+  jg_write_squad_lead_meta "$home/state/domain-alpha.meta" "$mate" "juggernaut:jg-domain-alpha" sample
   printf 'working [key=phase7]: Phase 7 started\n' > "$home/state/domain-alpha.status"
   cat > "$mate/data/backlog.md" <<'EOF'
 ## In flight
@@ -353,7 +353,7 @@ EOF
       "$i" "$i" "$i" >> "$mate/data/backlog.md"
     i=$((i + 1))
   done
-  refresh_local_secondmate_ledgers "$home"
+  refresh_local_squad_lead_ledgers "$home"
 }
 
 # This is the Domain Alpha failure shape exactly: the structured home says Phase 7 is Done
@@ -367,7 +367,7 @@ test_domain_alpha_stale_parent_event_does_not_become_current_work() {
   json=$(FAKE_GH_FAIL=1 run "$home" "$fakebin" --json)
   printf '%s' "$json" | jq -e '
     (.in_flight | any(.[]; .id == "domain-alpha") | not)
-      and (.secondmates | any(.[];
+      and (.squad_leads | any(.[];
         .id == "domain-alpha"
           and .state == "externally_held"
           and .provenance == "structured-home"
@@ -380,7 +380,7 @@ test_domain_alpha_stale_parent_event_does_not_become_current_work() {
     JG_SNAPSHOT_NOW_EPOCH=1783792800 JG_SNAPSHOT_TERMINAL_LINES=2 JG_SNAPSHOT_TERMINAL_BYTES=64 \
     NET_LOG="$home/net.log" FAKE_GH_FAIL=1 "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
-    .secondmate_current.records[] | select(.id == "domain-alpha")
+    .squad_lead_current.records[] | select(.id == "domain-alpha")
     | .provenance.selected == "structured-home"
       and .freshness.status == "fresh"
       and .parent_event.age_seconds == null
@@ -429,14 +429,14 @@ SH
     JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z JG_SNAPSHOT_NOW_EPOCH=1783792800 \
     "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
-    .secondmate_current.records[] | select(.id == "domain-alpha")
+    .squad_lead_current.records[] | select(.id == "domain-alpha")
     | .provenance.selected == "structured-home"
       and .parent_event.activity_scan.available == true
-  ' >/dev/null || fail "GNU stat fixture corrupted the authoritative secondmate summary: $canonical"
+  ' >/dev/null || fail "GNU stat fixture corrupted the authoritative squad_lead summary: $canonical"
   assert_contains "$(cat "$stat_log")" '-c %a' "GNU registry mode must use stat -c"
   assert_contains "$(cat "$stat_log")" '-c %Y' "GNU status-observation mtime must use stat -c"
   printf '%s' "$canonical" | jq -e '
-    .secondmate_current.records[] | select(.id == "domain-alpha")
+    .squad_lead_current.records[] | select(.id == "domain-alpha")
     | .parent_event.age_seconds == null and (.parent_event | has("emitted_at_epoch") | not)
   ' >/dev/null || fail "legacy event acquired an age from GNU stat"
   assert_contains "$(cat "$stat_log")" '-c %s' "GNU parent-event size must use stat -c"
@@ -462,7 +462,7 @@ test_parent_activity_evidence_is_bounded_and_disclosed() {
     JG_SNAPSHOT_PARENT_ACTIVITY_LINES=4 JG_SNAPSHOT_PARENT_ACTIVITY_BYTES=4096 \
     JG_SNAPSHOT_PARENT_ACTIVITIES=2 "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
-    .secondmate_current.records[] | select(.id == "domain-alpha")
+    .squad_lead_current.records[] | select(.id == "domain-alpha")
     | .parent_event.activity_scan.available == true
       and .parent_event.activity_scan.input_truncated == true
       and .parent_event.activity_scan.retained_truncated == true
@@ -474,7 +474,7 @@ test_parent_activity_evidence_is_bounded_and_disclosed() {
   json=$(JG_SNAPSHOT_PARENT_ACTIVITY_LINES=4 JG_SNAPSHOT_PARENT_ACTIVITY_BYTES=4096 \
     JG_SNAPSHOT_PARENT_ACTIVITIES=2 run "$home" "$fakebin" --json)
   printf '%s' "$json" | jq -e '
-    .omitted | any(.surface == "secondmate parent activity evidence truncated for 1 record(s)")
+    .omitted | any(.surface == "squad_lead parent activity evidence truncated for 1 record(s)")
   ' >/dev/null || fail "bearings did not disclose bounded parent activity evidence: $json"
   pass "parent activity evidence is bounded and disclosed"
 }
@@ -495,21 +495,21 @@ test_active_child_overrides_old_parent_event() {
 - [x] phase7 - Sample rollout Phase 7 (repo: sample) (kind: ship) (done 2026-07-12)
 EOF
   jg_write_meta "$mate/state/phase8.meta" \
-    "window=firstmate:jg-phase8" "worktree=$mate/projects/phase8" "project=sample" \
+    "window=juggernaut:jg-phase8" "worktree=$mate/projects/phase8" "project=sample" \
     "harness=codex" "kind=ship" "mode=no-mistakes"
   printf 'working [key=phase8]: implementing Phase 8 parity\nneeds-decision [key=release]: choose release A or B\n' \
     > "$mate/state/phase8.status"
   fakebin=$(make_fakebin "$home")
   json=$(run "$home" "$fakebin" --json)
   printf '%s' "$json" | jq -e '
-    (.secondmates | any(.[]; .id == "domain-alpha" and .state != "captain_decision"
+    (.squad_leads | any(.[]; .id == "domain-alpha" and .state != "captain_decision"
       and (.doing | contains("release A or B") | not)))
       and (.decisions_open | any(.owner == "domain-alpha") | not)
   ' >/dev/null || fail "status-only child decision leaked into Bearings: $json"
   canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
     "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
-    .secondmate_current.records[] | select(.id == "domain-alpha") | .endpoints[] | select(.id == "phase8")
+    .squad_lead_current.records[] | select(.id == "domain-alpha") | .endpoints[] | select(.id == "phase8")
     | .endpoint.status == "unknown"
       and .endpoint.exists == true
       and .endpoint.freshness == "fresh"
@@ -535,14 +535,14 @@ test_structured_child_decision_reaches_captains_call() {
 - [x] phase7 - Sample rollout Phase 7 (repo: sample) (kind: ship) (done 2026-07-12)
 EOF
   jg_write_meta "$mate/state/phase8.meta" \
-    "window=firstmate:jg-phase8" "worktree=$mate/projects/phase8" "project=sample" \
+    "window=juggernaut:jg-phase8" "worktree=$mate/projects/phase8" "project=sample" \
     "harness=claude" "kind=ship" "mode=no-mistakes"
   record_claude_state "$mate/state" phase8 idle
   printf 'needs-decision [key=release]: choose release A or B\n' > "$mate/state/phase8.status"
   fakebin=$(make_fakebin "$home")
   json=$(run "$home" "$fakebin" --json)
   printf '%s' "$json" | jq -e '
-    (.secondmates | any(.[]; .id == "domain-alpha" and .state == "captain_decision"))
+    (.squad_leads | any(.[]; .id == "domain-alpha" and .state == "captain_decision"))
       and (.decisions_open | any(.[]; .id == "domain-alpha/phase8-decision-release"
         and .key == "phase8-decision-release" and .verb == "captain-hold"))
       and (.in_flight | any(.[]; .id == "domain-alpha") | not)
@@ -550,11 +550,11 @@ EOF
   pass "a structured child captain hold reaches Captain's Call"
 }
 
-make_valid_secondmate_home() {  # <id> <home>
+make_valid_squad_lead_home() {  # <id> <home>
   local id=$1 home=$2
   mkdir -p "$home/state" "$home/data" "$home/config" "$home/projects" "$home/bin"
-  printf '# Firstmate fixture\n' > "$home/AGENTS.md"
-  printf '%s\n' "$id" > "$home/.jg-secondmate-home"
+  printf '# Juggernaut fixture\n' > "$home/AGENTS.md"
+  printf '%s\n' "$id" > "$home/.jg-squad-lead-home"
   cat > "$home/data/backlog.md" <<'EOF'
 ## In flight
 
@@ -564,98 +564,98 @@ make_valid_secondmate_home() {  # <id> <home>
 EOF
 }
 
-append_secondmate_registry() {  # <parent> <id> <home>
+append_squad_lead_registry() {  # <parent> <id> <home>
   printf -- '- %s - fixture domain (home: %s; scope: fixture; projects: sample; added 2026-07-13)\n' \
-    "$2" "$3" >> "$1/data/secondmates.md"
+    "$2" "$3" >> "$1/data/squad_leads.md"
 }
 
-append_landed_row() {  # <secondmate-home> <id> <title> <date>
-  printf -- '- [x] %s - %s (repo: firstmate) (kind: ship) (merged %s)\n' \
+append_landed_row() {  # <squad-lead-home> <id> <title> <date>
+  printf -- '- [x] %s - %s (repo: juggernaut) (kind: ship) (merged %s)\n' \
     "$2" "$3" "$4" >> "$1/data/backlog.md"
 }
 
-make_landed_secondmate() {  # <parent> <id>
+make_landed_squad_lead() {  # <parent> <id>
   local parent=$1 id=$2 mate
   mate="$TMP_ROOT/$(basename "$parent")-$id-home"
-  make_valid_secondmate_home "$id" "$mate"
-  append_secondmate_registry "$parent" "$id" "$mate"
+  make_valid_squad_lead_home "$id" "$mate"
+  append_squad_lead_registry "$parent" "$id" "$mate"
   printf '%s\n' "$mate"
 }
 
-write_parent_secondmate_event() {  # <parent> <id> <home> <note>
-  jg_write_secondmate_meta "$1/state/$2.meta" "$3" "firstmate:jg-$2" sample
+write_parent_squad_lead_event() {  # <parent> <id> <home> <note>
+  jg_write_squad_lead_meta "$1/state/$2.meta" "$3" "juggernaut:jg-$2" sample
   printf 'working [key=%s]: %s\n' "$2" "$4" > "$1/state/$2.status"
 }
 
-test_bad_secondmate_homes_never_revive_parent_work() {
+test_bad_squad_lead_homes_never_revive_parent_work() {
   local home fakebin missing invalid unreadable malformed unknown_child wt json
   home=$(make_home bad-homes)
-  : > "$home/data/secondmates.md"
+  : > "$home/data/squad_leads.md"
   missing="$TMP_ROOT/missing-home"
   invalid="$TMP_ROOT/invalid-home"
   unreadable="$TMP_ROOT/unreadable-home"
   malformed="$TMP_ROOT/malformed-home"
   unknown_child="$TMP_ROOT/unknown-child-home"
 
-  append_secondmate_registry "$home" missing "$missing"
+  append_squad_lead_registry "$home" missing "$missing"
 
-  make_valid_secondmate_home invalid "$invalid"
-  printf 'someone-else\n' > "$invalid/.jg-secondmate-home"
-  append_secondmate_registry "$home" invalid "$invalid"
-  write_parent_secondmate_event "$home" invalid "$invalid" "old invalid work"
+  make_valid_squad_lead_home invalid "$invalid"
+  printf 'someone-else\n' > "$invalid/.jg-squad-lead-home"
+  append_squad_lead_registry "$home" invalid "$invalid"
+  write_parent_squad_lead_event "$home" invalid "$invalid" "old invalid work"
 
-  make_valid_secondmate_home unreadable "$unreadable"
+  make_valid_squad_lead_home unreadable "$unreadable"
   chmod 000 "$unreadable/data"
-  append_secondmate_registry "$home" unreadable "$unreadable"
-  write_parent_secondmate_event "$home" unreadable "$unreadable" "old unreadable work"
+  append_squad_lead_registry "$home" unreadable "$unreadable"
+  write_parent_squad_lead_event "$home" unreadable "$unreadable" "old unreadable work"
 
-  make_valid_secondmate_home malformed "$malformed"
+  make_valid_squad_lead_home malformed "$malformed"
   printf '## In flight\nthis current row is not structured\n' > "$malformed/data/backlog.md"
-  append_secondmate_registry "$home" malformed "$malformed"
-  write_parent_secondmate_event "$home" malformed "$malformed" "old malformed work"
+  append_squad_lead_registry "$home" malformed "$malformed"
+  write_parent_squad_lead_event "$home" malformed "$malformed" "old malformed work"
 
-  make_valid_secondmate_home unknown-child "$unknown_child"
+  make_valid_squad_lead_home unknown-child "$unknown_child"
   wt="$unknown_child/projects/slow"
   jg_git_init_commit "$wt"
   git -C "$wt" checkout -q -b fm/slow
   printf '## In flight\n- [ ] slow - Slow child (repo: sample) (kind: ship) (since 2026-07-13)\n\n## Queued\n\n## Done\n' > "$unknown_child/data/backlog.md"
   jg_write_meta "$unknown_child/state/slow.meta" \
-    "window=firstmate:jg-slow" "worktree=$wt" "project=sample" \
+    "window=juggernaut:jg-slow" "worktree=$wt" "project=sample" \
     "harness=codex" "kind=ship" "mode=no-mistakes"
-  append_secondmate_registry "$home" unknown-child "$unknown_child"
-  write_parent_secondmate_event "$home" unknown-child "$unknown_child" "old unknown work"
+  append_squad_lead_registry "$home" unknown-child "$unknown_child"
+  write_parent_squad_lead_event "$home" unknown-child "$unknown_child" "old unknown work"
 
   fakebin=$(make_fakebin "$home")
   json=$(run "$home" "$fakebin" --json)
   chmod 700 "$unreadable/data"
   printf '%s' "$json" | jq -e '
-    (.secondmates | length) == 5
-      and all(.secondmates[]; .state == "unknown")
+    (.squad_leads | length) == 5
+      and all(.squad_leads[]; .state == "unknown")
       and (.in_flight | map(.id) | all(. != "invalid" and . != "unreadable" and . != "malformed" and . != "unknown-child"))
-      and (.secondmates | any(.[]; .id == "missing" and .provenance == "unknown"
+      and (.squad_leads | any(.[]; .id == "missing" and .provenance == "unknown"
         and .freshness == "unknown" and (.reason | contains("invalid home"))))
-      and ([.secondmates[] | select(.id == "invalid" or .id == "unreadable" or .id == "malformed")]
+      and ([.squad_leads[] | select(.id == "invalid" or .id == "unreadable" or .id == "malformed")]
         | all(.provenance == "parent-event-fallback" and .freshness == "historical-event"))
-      and (.secondmates | any(.[]; .id == "unknown-child" and .provenance == "structured-home"
+      and (.squad_leads | any(.[]; .id == "unknown-child" and .provenance == "structured-home"
         and .freshness == "fresh"))
-      and (.secondmates | any(.[]; .id == "invalid" and (.reason | contains("marked for"))))
-      and (.secondmates | any(.[]; .id == "unreadable" and (.reason | test("invalid home|unreadable"))))
-      and (.secondmates | any(.[]; .id == "malformed" and (.reason | contains("unstructured current backlog row"))))
-      and (.secondmates | any(.[]; .id == "unknown-child" and (.reason | contains("child current state unavailable"))))
-      and ([.secondmate_reconcile[].id] == ["malformed", "unknown-child"])
-      and (.secondmate_reconcile[0].kind == "unstructured_current")
-      and (.secondmate_reconcile[1].kind == "child_current_unavailable")
+      and (.squad_leads | any(.[]; .id == "invalid" and (.reason | contains("marked for"))))
+      and (.squad_leads | any(.[]; .id == "unreadable" and (.reason | test("invalid home|unreadable"))))
+      and (.squad_leads | any(.[]; .id == "malformed" and (.reason | contains("unstructured current backlog row"))))
+      and (.squad_leads | any(.[]; .id == "unknown-child" and (.reason | contains("child current state unavailable"))))
+      and ([.squad_lead_reconcile[].id] == ["malformed", "unknown-child"])
+      and (.squad_lead_reconcile[0].kind == "unstructured_current")
+      and (.squad_lead_reconcile[1].kind == "child_current_unavailable")
   ' >/dev/null || fail "bad home outcomes revived stale work or lacked provenance: $json"
   pass "missing, invalid, unreadable, malformed, and unavailable-child homes stay explicit unknowns"
 }
 
-test_oversized_secondmate_summary_stays_strict_unknown() {
+test_oversized_squad_lead_summary_stays_strict_unknown() {
   local home mate fakebin json i
   home=$(make_home oversized-home)
-  mate="$TMP_ROOT/oversized-secondmate-home"
-  make_valid_secondmate_home oversized "$mate"
-  append_secondmate_registry "$home" oversized "$mate"
-  jg_write_secondmate_meta "$home/state/oversized.meta" "$mate" "firstmate:jg-oversized" sample
+  mate="$TMP_ROOT/oversized-squad-lead-home"
+  make_valid_squad_lead_home oversized "$mate"
+  append_squad_lead_registry "$home" oversized "$mate"
+  jg_write_squad_lead_meta "$home/state/oversized.meta" "$mate" "juggernaut:jg-oversized" sample
   printf 'working [key=old]: stale parent activity\n' > "$home/state/oversized.status"
   cat > "$mate/data/backlog.md" <<'EOF'
 ## In flight
@@ -671,9 +671,9 @@ EOF
     i=$((i + 1))
   done
   fakebin=$(make_fakebin "$home")
-  json=$(JG_SNAPSHOT_SECONDMATE_MAX_BYTES=512 run "$home" "$fakebin" --json)
+  json=$(JG_SNAPSHOT_SQUAD_LEAD_MAX_BYTES=512 run "$home" "$fakebin" --json)
   printf '%s' "$json" | jq -e '
-    (.secondmates | any(.id == "oversized" and .state == "unknown"
+    (.squad_leads | any(.id == "oversized" and .state == "unknown"
       and .provenance == "parent-event-fallback"
       and (.reason | contains("exceeded byte limit"))))
       and (.in_flight | any(.id == "oversized") | not)
@@ -683,14 +683,14 @@ EOF
   pass "oversized ledgers stay strict unknown"
 }
 
-test_secondmate_and_child_bounds_are_disclosed() {
+test_squad_lead_and_child_bounds_are_disclosed() {
   local home fakebin id mate child json expanded canonical i
-  home=$(make_home secondmate-bounds)
-  : > "$home/data/secondmates.md"
+  home=$(make_home squad-lead-bounds)
+  : > "$home/data/squad_leads.md"
   for id in a b c; do
     mate="$TMP_ROOT/bounds-$id"
-    make_valid_secondmate_home "$id" "$mate"
-    append_secondmate_registry "$home" "$id" "$mate"
+    make_valid_squad_lead_home "$id" "$mate"
+    append_squad_lead_registry "$home" "$id" "$mate"
   done
   mate="$TMP_ROOT/bounds-a"
   : > "$mate/data/backlog.md"
@@ -701,7 +701,7 @@ test_secondmate_and_child_bounds_are_disclosed() {
     mkdir -p "$mate/projects/$child"
     printf -- '- [ ] %s - Active %s (repo: sample) (kind: ship) (since 2026-07-13)\n' "$child" "$child" >> "$mate/data/backlog.md"
     jg_write_meta "$mate/state/$child.meta" \
-      "window=firstmate:jg-$child" "worktree=$mate/projects/$child" "project=sample" \
+      "window=juggernaut:jg-$child" "worktree=$mate/projects/$child" "project=sample" \
       "harness=claude" "kind=ship" "mode=no-mistakes"
     record_claude_state "$mate/state" "$child" busy
     printf 'working [key=%s]: active child %s\n' "$child" "$i" > "$mate/state/$child.status"
@@ -709,50 +709,50 @@ test_secondmate_and_child_bounds_are_disclosed() {
   done
   printf '\n## Queued\n\n## Done\n' >> "$mate/data/backlog.md"
   fakebin=$(make_fakebin "$home")
-  PATH="$fakebin:$PATH" JG_SNAPSHOT_SECONDMATE_CHILDREN=2 refresh_local_secondmate_ledgers "$home"
+  PATH="$fakebin:$PATH" JG_SNAPSHOT_SQUAD_LEAD_CHILDREN=2 refresh_local_squad_lead_ledgers "$home"
   canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
-    JG_SNAPSHOT_SECONDMATES=2 JG_SNAPSHOT_SECONDMATE_CHILDREN=2 "$ROOT/bin/jg-fleet-snapshot.sh" --json)
+    JG_SNAPSHOT_SQUAD_LEADS=2 JG_SNAPSHOT_SQUAD_LEAD_CHILDREN=2 "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
-    .secondmate_current.total_registered == 3
-      and .secondmate_current.shown == 2
-      and .secondmate_current.truncated == 1
-      and (.secondmate_current.records[] | select(.id == "a")
+    .squad_lead_current.total_registered == 3
+      and .squad_lead_current.shown == 2
+      and .squad_lead_current.truncated == 1
+      and (.squad_lead_current.records[] | select(.id == "a")
         | .counts.active_children == 3 and (.active_children | length) == 2
           and (.omitted | any(.surface == "active_children" and .count == 1)))
-      and (.secondmate_current.records | any(.id == "b" and .current.state == "no_active_work"))
-  ' >/dev/null || fail "canonical secondmate or child bounds were not enforced: $canonical"
-  json=$(JG_SNAPSHOT_SECONDMATES=2 JG_SNAPSHOT_SECONDMATE_CHILDREN=2 JG_BEARINGS_SECONDMATES=1 \
+      and (.squad_lead_current.records | any(.id == "b" and .current.state == "no_active_work"))
+  ' >/dev/null || fail "canonical squad_lead or child bounds were not enforced: $canonical"
+  json=$(JG_SNAPSHOT_SQUAD_LEADS=2 JG_SNAPSHOT_SQUAD_LEAD_CHILDREN=2 JG_BEARINGS_SQUAD_LEADS=1 \
     run "$home" "$fakebin" --json)
   printf '%s' "$json" | jq -e '
-    (.secondmates | length) == 1
+    (.squad_leads | length) == 1
       and ([.in_flight[].id] | sort) == ["a/child-1", "a/child-2"]
-      and ([.omitted[].surface] | any(test("secondmate a active children omitted by snapshot bound: 1")))
-      and ([.omitted[].surface] | any(test("secondmates showing 1 of 2")))
-      and ([.omitted[].surface] | any(test("registered secondmates omitted by snapshot bound: 1")))
-  ' >/dev/null || fail "bearings secondmate or child bound was not disclosed: $json"
-  expanded=$(JG_SNAPSHOT_SECONDMATE_CHILDREN=2 JG_BEARINGS_SECONDMATES=1 \
-    run "$home" "$fakebin" --json --all-secondmates)
+      and ([.omitted[].surface] | any(test("squad_lead a active children omitted by snapshot bound: 1")))
+      and ([.omitted[].surface] | any(test("squad_leads showing 1 of 2")))
+      and ([.omitted[].surface] | any(test("registered squad_leads omitted by snapshot bound: 1")))
+  ' >/dev/null || fail "bearings squad_lead or child bound was not disclosed: $json"
+  expanded=$(JG_SNAPSHOT_SQUAD_LEAD_CHILDREN=2 JG_BEARINGS_SQUAD_LEADS=1 \
+    run "$home" "$fakebin" --json --all-squad-leads)
   printf '%s' "$expanded" | jq -e '
-    (.secondmates | length) == 3
-      and ([.omitted[].surface] | any(test("secondmates showing|registered secondmates omitted")) | not)
-  ' >/dev/null || fail "--all-secondmates did not expand the canonical and bearings bounds: $expanded"
-  pass "secondmate and per-home child counts are bounded, disclosed, and explicitly expandable"
+    (.squad_leads | length) == 3
+      and ([.omitted[].surface] | any(test("squad_leads showing|registered squad_leads omitted")) | not)
+  ' >/dev/null || fail "--all-squad-leads did not expand the canonical and bearings bounds: $expanded"
+  pass "squad_lead and per-home child counts are bounded, disclosed, and explicitly expandable"
 }
 
 test_parent_decision_is_untrusted_contradiction_only() {
   local home mate fakebin canonical json
   home=$(make_home parent-decision-only)
   mate="$TMP_ROOT/parent-decision-only-home"
-  make_valid_secondmate_home authority "$mate"
-  append_secondmate_registry "$home" authority "$mate"
-  jg_write_secondmate_meta "$home/state/authority.meta" "$mate" "firstmate:jg-authority" sample
+  make_valid_squad_lead_home authority "$mate"
+  append_squad_lead_registry "$home" authority "$mate"
+  jg_write_squad_lead_meta "$home/state/authority.meta" "$mate" "juggernaut:jg-authority" sample
   printf 'needs-decision [key=stale]: old parent question\n' > "$home/state/authority.status"
   fakebin=$(make_fakebin "$home")
-  refresh_local_secondmate_ledgers "$home"
+  refresh_local_squad_lead_ledgers "$home"
   canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
     "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
-    .secondmate_current.records[] | select(.id == "authority")
+    .squad_lead_current.records[] | select(.id == "authority")
     | .current.state == "no_active_work"
       and .decisions_open == []
       and .contradiction == true
@@ -760,7 +760,7 @@ test_parent_decision_is_untrusted_contradiction_only() {
   ' >/dev/null || fail "parent decision crossed structured-home authority boundary: $canonical"
   json=$(run "$home" "$fakebin" --json)
   printf '%s' "$json" | jq -e '
-    (.secondmates | any(.[]; .id == "authority" and .state == "no_active_work" and .contradiction == true))
+    (.squad_leads | any(.[]; .id == "authority" and .state == "no_active_work" and .contradiction == true))
       and (.decisions_open | any(.[]; .id == "authority") | not)
   ' >/dev/null || fail "bearings promoted a stale parent decision: $json"
   pass "parent decisions remain untrusted contradiction evidence"
@@ -772,15 +772,15 @@ test_parent_evidence_reconciles_by_verb_and_key() {
   hold="$TMP_ROOT/keyed-parent-hold-home"
   blocked="$TMP_ROOT/keyed-parent-blocked-home"
   decision="$TMP_ROOT/keyed-parent-decision-home"
-  make_valid_secondmate_home hold "$hold"
-  make_valid_secondmate_home blocked "$blocked"
-  make_valid_secondmate_home decision "$decision"
-  append_secondmate_registry "$home" hold "$hold"
-  append_secondmate_registry "$home" blocked "$blocked"
-  append_secondmate_registry "$home" decision "$decision"
-  jg_write_secondmate_meta "$home/state/hold.meta" "$hold" "firstmate:jg-hold" sample
-  jg_write_secondmate_meta "$home/state/blocked.meta" "$blocked" "firstmate:jg-blocked" sample
-  jg_write_secondmate_meta "$home/state/decision.meta" "$decision" "firstmate:jg-decision" sample
+  make_valid_squad_lead_home hold "$hold"
+  make_valid_squad_lead_home blocked "$blocked"
+  make_valid_squad_lead_home decision "$decision"
+  append_squad_lead_registry "$home" hold "$hold"
+  append_squad_lead_registry "$home" blocked "$blocked"
+  append_squad_lead_registry "$home" decision "$decision"
+  jg_write_squad_lead_meta "$home/state/hold.meta" "$hold" "juggernaut:jg-hold" sample
+  jg_write_squad_lead_meta "$home/state/blocked.meta" "$blocked" "juggernaut:jg-blocked" sample
+  jg_write_squad_lead_meta "$home/state/decision.meta" "$decision" "juggernaut:jg-decision" sample
   printf 'working [key=stale-work]: old work still running\n' > "$home/state/hold.status"
   printf 'paused [key=legal-release]: waiting for legal release\n' >> "$home/state/hold.status"
   printf 'paused: legacy pause without an identity\n' >> "$home/state/hold.status"
@@ -815,16 +815,16 @@ EOF
 ## Done
 EOF
   jg_write_meta "$decision/state/$child.meta" \
-    "window=firstmate:jg-$child" "worktree=$decision/projects/$child" "project=sample" \
+    "window=juggernaut:jg-$child" "worktree=$decision/projects/$child" "project=sample" \
     "harness=claude" "kind=ship" "mode=no-mistakes"
   record_claude_state "$decision/state" "$child" idle
   printf 'needs-decision [key=live-route]: choose the current route\n' > "$decision/state/$child.status"
   fakebin=$(make_fakebin "$home")
-  refresh_local_secondmate_ledgers "$home"
+  refresh_local_squad_lead_ledgers "$home"
   canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
     "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
-    (.secondmate_current.records[] | select(.id == "hold")
+    (.squad_lead_current.records[] | select(.id == "hold")
       | .current.state == "externally_held"
         and .contradiction == true
         and .terminal_evidence.captured == false
@@ -834,14 +834,14 @@ EOF
           | any(.verb == "paused" and .key == "default" and .verdict == "inconclusive" and .matched == null))
         and (.parent_event.reconciliation.activities
           | any(.verb == "working" and .key == "stale-work" and .verdict == "contradicts")))
-      and (.secondmate_current.records[] | select(.id == "blocked")
+      and (.squad_lead_current.records[] | select(.id == "blocked")
         | .current.state == "externally_held"
           and .contradiction == false
           and (.parent_event.reconciliation.decisions
             | any(.verb == "blocked" and .key == "vendor-release" and .verdict == "corroborates"))
           and (.parent_event.reconciliation.decisions
             | any(.verb == "blocked" and .key == "default" and .verdict == "inconclusive" and .matched == null)))
-      and (.secondmate_current.records[] | select(.id == "decision")
+      and (.squad_lead_current.records[] | select(.id == "decision")
         | .current.state == "captain_decision"
           and .contradiction == true
           and .terminal_evidence.captured == false
@@ -857,8 +857,8 @@ test_nonprogressing_child_states_are_explicit() {
   local home mate fakebin canonical
   home=$(make_home child-state-classification)
   mate="$TMP_ROOT/child-state-classification-home"
-  make_valid_secondmate_home states "$mate"
-  append_secondmate_registry "$home" states "$mate"
+  make_valid_squad_lead_home states "$mate"
+  append_squad_lead_registry "$home" states "$mate"
   mkdir -p "$mate/projects/parked" "$mate/projects/done" "$mate/projects/failed"
   cat > "$mate/data/backlog.md" <<'EOF'
 ## In flight
@@ -869,16 +869,16 @@ test_nonprogressing_child_states_are_explicit() {
 ## Done
 EOF
   jg_write_meta "$mate/state/parked.meta" \
-    "window=firstmate:jg-parked" "worktree=$mate/projects/parked" "project=sample" \
+    "window=juggernaut:jg-parked" "worktree=$mate/projects/parked" "project=sample" \
     "harness=claude" "kind=ship" "mode=no-mistakes"
   record_claude_state "$mate/state" parked idle
   printf 'needs-decision [key=parked]: choose a route\n' > "$mate/state/parked.status"
   fakebin=$(make_fakebin "$home")
-  refresh_local_secondmate_ledgers "$home"
+  refresh_local_squad_lead_ledgers "$home"
   canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
     "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
-    .secondmate_current.records[] | select(.id == "states")
+    .squad_lead_current.records[] | select(.id == "states")
     | .current.state == "captain_decision"
       and .active_children == []
       and (.holds | any(.id == "parked" and .source == "child-state"))
@@ -890,11 +890,11 @@ EOF
 
 ## Done
 EOF
-  refresh_local_secondmate_ledgers "$home"
+  refresh_local_squad_lead_ledgers "$home"
   canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
     "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
-    .secondmate_current.records[] | select(.id == "states")
+    .squad_lead_current.records[] | select(.id == "states")
     | .current.state == "captain_decision"
       and (.current.reason | contains("live child state has no in-flight backlog item"))
       and (.current.reason | contains("parked=parked"))
@@ -913,21 +913,21 @@ EOF
 ## Done
 EOF
   jg_write_meta "$mate/state/done.meta" \
-    "window=firstmate:jg-done" "worktree=$mate/projects/done" "project=sample" \
+    "window=juggernaut:jg-done" "worktree=$mate/projects/done" "project=sample" \
     "harness=claude" "kind=ship" "mode=no-mistakes"
   jg_write_meta "$mate/state/failed.meta" \
-    "window=firstmate:jg-failed" "worktree=$mate/projects/failed" "project=sample" \
+    "window=juggernaut:jg-failed" "worktree=$mate/projects/failed" "project=sample" \
     "harness=claude" "kind=ship" "mode=no-mistakes"
   record_claude_state "$mate/state" "done" idle
   record_claude_state "$mate/state" failed idle
   printf 'done: complete\n' > "$mate/state/done.status"
   printf 'failed: stopped\n' > "$mate/state/failed.status"
   rm "$mate/state/parked.meta" "$mate/state/parked.status"
-  refresh_local_secondmate_ledgers "$home"
+  refresh_local_squad_lead_ledgers "$home"
   canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
     "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
-    .secondmate_current.records[] | select(.id == "states")
+    .squad_lead_current.records[] | select(.id == "states")
     | .current.state == "no_active_work"
       and (.current.reason | contains("terminal child state"))
       and (.current.reason | contains("done=done"))
@@ -943,39 +943,39 @@ test_registry_unavailability_and_bounds_are_explicit() {
   local home fakebin json canonical id mate boundary
   home=$(make_home registry-unavailable)
   mate="$TMP_ROOT/registry-hidden"
-  make_valid_secondmate_home hidden "$mate"
-  printf -- '- hidden - fixture (home: %s; scope: fixture; projects: sample; added 2026-07-11)\n' "$mate" > "$home/data/secondmates.md"
-  jg_write_secondmate_meta "$home/state/hidden.meta" "$mate" "firstmate:jg-hidden" sample
-  chmod 000 "$home/data/secondmates.md"
+  make_valid_squad_lead_home hidden "$mate"
+  printf -- '- hidden - fixture (home: %s; scope: fixture; projects: sample; added 2026-07-11)\n' "$mate" > "$home/data/squad_leads.md"
+  jg_write_squad_lead_meta "$home/state/hidden.meta" "$mate" "juggernaut:jg-hidden" sample
+  chmod 000 "$home/data/squad_leads.md"
   fakebin=$(make_fakebin "$home")
   canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
     "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   json=$(run "$home" "$fakebin" --json)
-  chmod 600 "$home/data/secondmates.md"
+  chmod 600 "$home/data/squad_leads.md"
   printf '%s' "$canonical" | jq -e '
-    .secondmate_current.registry.complete == false
-      and (.secondmate_current.records[] | select(.id == "hidden")
+    .squad_lead_current.registry.complete == false
+      and (.squad_lead_current.records[] | select(.id == "hidden")
         | .registered == null
           and (.current.reason | contains("registration is unknown")))
   ' >/dev/null || fail "unavailable registry produced false unregistered provenance: $canonical"
   printf '%s' "$json" | jq -e '
-    (.secondmates | any(.[]; .id == "(registry)" and .state == "unknown"
+    (.squad_leads | any(.[]; .id == "(registry)" and .state == "unknown"
       and .provenance == "registered-table" and .freshness == "unavailable"))
-      and (.omitted | any(.surface | contains("secondmate registry unavailable")))
+      and (.omitted | any(.surface | contains("squad_lead registry unavailable")))
   ' >/dev/null || fail "unreadable registry disappeared from bearings: $json"
   home=$(make_home registry-bounds)
-  : > "$home/data/secondmates.md"
+  : > "$home/data/squad_leads.md"
   for id in one two three; do
     mate="$TMP_ROOT/registry-$id"
-    make_valid_secondmate_home "$id" "$mate"
-    append_secondmate_registry "$home" "$id" "$mate"
+    make_valid_squad_lead_home "$id" "$mate"
+    append_squad_lead_registry "$home" "$id" "$mate"
   done
   fakebin=$(make_fakebin "$home")
-  refresh_local_secondmate_ledgers "$home"
+  refresh_local_squad_lead_ledgers "$home"
   canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
     JG_SNAPSHOT_REGISTRY_RECORDS=2 "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
-    .secondmate_current.registry
+    .squad_lead_current.registry
     | .available == true and .provenance == "registered-table"
       and .freshness.status == "fresh" and .records_truncated == true
       and .records_in_window == 3 and (.records | length) == 2
@@ -984,7 +984,7 @@ test_registry_unavailability_and_bounds_are_explicit() {
   canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
     JG_SNAPSHOT_REGISTRY_LINES=2 "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
-    .secondmate_current.registry
+    .squad_lead_current.registry
     | .input_truncated == true and .records_truncated == false
       and .lines_in_window == 2 and (.records | length) == 2
       and .reasons == ["line_limit"]
@@ -992,32 +992,32 @@ test_registry_unavailability_and_bounds_are_explicit() {
   canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
     JG_SNAPSHOT_REGISTRY_BYTES=100 "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
-    .secondmate_current.registry
+    .squad_lead_current.registry
     | .input_truncated == true and (.reasons | index("byte_limit") != null)
       and .records_in_window < 3
   ' >/dev/null || fail "registry byte bound was not enforced or disclosed: $canonical"
-  boundary=$(LC_ALL=C head -n 1 "$home/data/secondmates.md" | wc -c | tr -d ' ')
+  boundary=$(LC_ALL=C head -n 1 "$home/data/squad_leads.md" | wc -c | tr -d ' ')
   canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
     JG_SNAPSHOT_REGISTRY_BYTES="$((boundary - 1))" "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
-    .secondmate_current.registry
+    .squad_lead_current.registry
     | .input_truncated == true and .complete == false
       and (.reasons | index("byte_limit") != null)
   ' >/dev/null || fail "registry newline byte boundary hid truncation: $canonical"
   json=$(JG_SNAPSHOT_REGISTRY_RECORDS=2 run "$home" "$fakebin" --json)
   printf '%s' "$json" | jq -e '
-    .omitted | any(.surface == "secondmate registry records omitted by bounded read")
+    .omitted | any(.surface == "squad_lead registry records omitted by bounded read")
   ' >/dev/null || fail "bearings omitted registry truncation disclosure: $json"
   mate="$TMP_ROOT/registry-z-hidden"
-  make_valid_secondmate_home z-hidden "$mate"
-  append_secondmate_registry "$home" z-hidden "$mate"
-  jg_write_secondmate_meta "$home/state/z-hidden.meta" "$mate" "firstmate:jg-z-hidden" sample
-  refresh_local_secondmate_ledgers "$home"
+  make_valid_squad_lead_home z-hidden "$mate"
+  append_squad_lead_registry "$home" z-hidden "$mate"
+  jg_write_squad_lead_meta "$home/state/z-hidden.meta" "$mate" "juggernaut:jg-z-hidden" sample
+  refresh_local_squad_lead_ledgers "$home"
   canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
     JG_SNAPSHOT_REGISTRY_RECORDS=3 "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
-    .secondmate_current.registry.complete == false
-      and (.secondmate_current.records[] | select(.id == "z-hidden")
+    .squad_lead_current.registry.complete == false
+      and (.squad_lead_current.records[] | select(.id == "z-hidden")
         | .registered == null
           and (.current.reason | contains("registration is unknown")))
   ' >/dev/null || fail "truncated registry produced false unregistered provenance: $canonical"
@@ -1054,7 +1054,7 @@ test_default_is_bounded_and_local_only() {
   local home fakebin toon json backlog
   home=$(make_home bounded); write_fixture "$home"
   backlog="$home/data/backlog.md"
-  awk '{if ($0 ~ /^- \[ \] ship-task /) sub(/ \(repo: firstmate\)/, ""); print}' \
+  awk '{if ($0 ~ /^- \[ \] ship-task /) sub(/ \(repo: juggernaut\)/, ""); print}' \
     "$backlog" > "$backlog.tmp" && mv "$backlog.tmp" "$backlog"
   fakebin=$(make_fakebin "$home"); : > "$home/net.log"
   toon=$(run "$home" "$fakebin")
@@ -1072,7 +1072,7 @@ test_default_is_bounded_and_local_only() {
   # Valid JSON, correct schema.
   printf '%s' "$json" | jq -e '
     .schema == "jg-bearings.v1"
-      and (.in_flight | any(.id == "ship-task" and .repo == "firstmate"))
+      and (.in_flight | any(.id == "ship-task" and .repo == "juggernaut"))
   ' >/dev/null || fail "json schema or main Underway repository wrong: $json"
   pass "default output is bounded, local-only, and marks omitted surfaces"
 }
@@ -1161,15 +1161,15 @@ test_collapsed_captain_call_deferral_and_landed() {
 ## In flight
 
 ## Queued
-- [ ] work-gate - Captain-gated ship work (repo: firstmate) (kind: ship) (hold: captain go needed) (hold-kind: captain)
-- [ ] later-call - Deferred captain call (repo: firstmate) (kind: captain) (hold: revisit with the captain) (hold-kind: captain) (hold-until: 2026-08-01)
-- [ ] due-call - Due captain call (repo: firstmate) (kind: captain) (hold: overdue captain choice) (hold-kind: captain) (hold-until: 2026-07-11)
-- [ ] parked-call - Prose-parked captain call (repo: firstmate) (kind: ship) (hold: DEFERRED by captain revisit later) (hold-kind: captain)
-- [ ] external-gate - Externally held work (repo: firstmate) (kind: ship) (hold: upstream release pending) (hold-kind: external)
+- [ ] work-gate - Captain-gated ship work (repo: juggernaut) (kind: ship) (hold: captain go needed) (hold-kind: captain)
+- [ ] later-call - Deferred captain call (repo: juggernaut) (kind: captain) (hold: revisit with the captain) (hold-kind: captain) (hold-until: 2026-08-01)
+- [ ] due-call - Due captain call (repo: juggernaut) (kind: captain) (hold: overdue captain choice) (hold-kind: captain) (hold-until: 2026-07-11)
+- [ ] parked-call - Prose-parked captain call (repo: juggernaut) (kind: ship) (hold: DEFERRED by captain revisit later) (hold-kind: captain)
+- [ ] external-gate - Externally held work (repo: juggernaut) (kind: ship) (hold: upstream release pending) (hold-kind: external)
 
 ## Done
-- [x] answered-call - Answered captain question (repo: firstmate) (kind: captain) (done 2026-07-10) (hold: captain choice pending) (hold-kind: captain)
-- [x] shipped-work - Ordinary landed work (repo: firstmate) (kind: ship) (merged 2026-07-10)
+- [x] answered-call - Answered captain question (repo: juggernaut) (kind: captain) (done 2026-07-10) (hold: captain choice pending) (hold-kind: captain)
+- [x] shipped-work - Ordinary landed work (repo: juggernaut) (kind: ship) (merged 2026-07-10)
 EOF
   fakebin=$(make_fakebin "$home")
   json=$(run "$home" "$fakebin" --json)
@@ -1200,23 +1200,23 @@ test_undated_hold_phrasing_and_aging_projection() {
   home=$(make_home undated-aging-proj)
   mate=$(fixture_mate_home "$home")
   mkdir -p "$home/data" "$mate/data" "$mate/state" "$mate/config" "$mate/projects" "$mate/bin"
-  printf '# Firstmate fixture\n' > "$mate/AGENTS.md"
-  printf 'aging-mate\n' > "$mate/.jg-secondmate-home"
-  printf -- '- aging-mate - hold aging fixture (home: %s; scope: captain holds; projects: firstmate; added 2026-07-11)\n' \
-    "$mate" > "$home/data/secondmates.md"
+  printf '# Juggernaut fixture\n' > "$mate/AGENTS.md"
+  printf 'aging-mate\n' > "$mate/.jg-squad-lead-home"
+  printf -- '- aging-mate - hold aging fixture (home: %s; scope: captain holds; projects: juggernaut; added 2026-07-11)\n' \
+    "$mate" > "$home/data/squad_leads.md"
   jg_write_meta "$home/state/aging-mate.meta" \
-    "kind=secondmate" "mode=secondmate" "harness=pi" "home=$mate" "projects=firstmate"
+    "kind=squad_lead" "mode=squad_lead" "harness=pi" "home=$mate" "projects=juggernaut"
   cat > "$mate/data/backlog.md" <<'EOF'
 ## In flight
 
 ## Queued
-- [ ] mate-parked - Remote parked call (repo: firstmate) (kind: captain) (hold: parked) (hold-kind: captain)
-- [ ] mate-blocked-parked - Remote blocked parked call blocked-by: missing-remote-blocker (repo: firstmate) (kind: captain) (hold: parked) (hold-kind: captain)
-- [ ] mate-future-parked - Remote parked call for later (repo: firstmate) (kind: captain) (hold: parked) (hold-kind: captain) (hold-until: 2026-08-01)
-- [ ] mate-due-parked - Remote parked call now due (repo: firstmate) (kind: captain) (hold: parked) (hold-kind: captain) (hold-until: 2026-07-11)
-- [ ] mate-due-not-required - Remote moot call now due (repo: firstmate) (kind: captain) (hold: choose a remote route) (hold-kind: captain) (hold-until: 2026-07-11)
+- [ ] mate-parked - Remote parked call (repo: juggernaut) (kind: captain) (hold: parked) (hold-kind: captain)
+- [ ] mate-blocked-parked - Remote blocked parked call blocked-by: missing-remote-blocker (repo: juggernaut) (kind: captain) (hold: parked) (hold-kind: captain)
+- [ ] mate-future-parked - Remote parked call for later (repo: juggernaut) (kind: captain) (hold: parked) (hold-kind: captain) (hold-until: 2026-08-01)
+- [ ] mate-due-parked - Remote parked call now due (repo: juggernaut) (kind: captain) (hold: parked) (hold-kind: captain) (hold-until: 2026-07-11)
+- [ ] mate-due-not-required - Remote moot call now due (repo: juggernaut) (kind: captain) (hold: choose a remote route) (hold-kind: captain) (hold-until: 2026-07-11)
   NOT REQUIRED - the remote decision is moot.
-- [ ] mate-aged - Remote aged call (repo: firstmate) (kind: captain) (since 2026-06-01) (hold: choose a remote route) (hold-kind: captain)
+- [ ] mate-aged - Remote aged call (repo: juggernaut) (kind: captain) (since 2026-06-01) (hold: choose a remote route) (hold-kind: captain)
   Captain hold set: 2026-06-01T00:00:00Z
 
 ## Done
@@ -1225,29 +1225,29 @@ EOF
 ## In flight
 
 ## Queued
-- [ ] parked-hold - Parked style call (repo: firstmate) (kind: ship) (since 2026-07-10) (hold: not urgent) (hold-kind: captain)
-- [ ] blocked-parked - Blocked parked call blocked-by: missing-blocker (repo: firstmate) (kind: captain) (hold: parked) (hold-kind: captain)
-- [ ] future-parked - Parked style call for later (repo: firstmate) (kind: captain) (hold: parked) (hold-kind: captain) (hold-until: 2026-08-01)
-- [ ] due-parked - Parked style call now due (repo: firstmate) (kind: captain) (hold: parked) (hold-kind: captain) (hold-until: 2026-07-11)
-- [ ] due-superseded - Superseded call now due (repo: firstmate) (kind: captain) (hold: SUPERSEDED) (hold-kind: captain) (hold-until: 2026-07-11)
-- [ ] aged-call - Aged genuine call (repo: firstmate) (kind: captain) (since 2026-06-01) (hold: choose a sample route) (hold-kind: captain)
+- [ ] parked-hold - Parked style call (repo: juggernaut) (kind: ship) (since 2026-07-10) (hold: not urgent) (hold-kind: captain)
+- [ ] blocked-parked - Blocked parked call blocked-by: missing-blocker (repo: juggernaut) (kind: captain) (hold: parked) (hold-kind: captain)
+- [ ] future-parked - Parked style call for later (repo: juggernaut) (kind: captain) (hold: parked) (hold-kind: captain) (hold-until: 2026-08-01)
+- [ ] due-parked - Parked style call now due (repo: juggernaut) (kind: captain) (hold: parked) (hold-kind: captain) (hold-until: 2026-07-11)
+- [ ] due-superseded - Superseded call now due (repo: juggernaut) (kind: captain) (hold: SUPERSEDED) (hold-kind: captain) (hold-until: 2026-07-11)
+- [ ] aged-call - Aged genuine call (repo: juggernaut) (kind: captain) (since 2026-06-01) (hold: choose a sample route) (hold-kind: captain)
   Captain hold set: 2026-06-01T00:00:00Z
-- [ ] recent-call - Recent genuine call (repo: firstmate) (kind: captain) (since 2026-07-10) (hold: choose a sample route) (hold-kind: captain)
+- [ ] recent-call - Recent genuine call (repo: juggernaut) (kind: captain) (since 2026-07-10) (hold: choose a sample route) (hold-kind: captain)
   Captain hold set: 2026-07-10T00:00:00Z
-- [ ] contextual-call - Context is not a deferral (repo: firstmate) (kind: captain) (since 2026-07-10) (hold: choose whether to pursue this queued opportunity) (hold-kind: captain)
+- [ ] contextual-call - Context is not a deferral (repo: juggernaut) (kind: captain) (since 2026-07-10) (hold: choose whether to pursue this queued opportunity) (hold-kind: captain)
   Captain hold set: 2026-07-10T00:00:00Z
   This is not urgent context, but the captain decision is current.
-- [ ] contextual-not-urgent - Leading context is not a deferral (repo: firstmate) (kind: captain) (since 2026-07-10) (hold: not urgent but choose the route now) (hold-kind: captain)
+- [ ] contextual-not-urgent - Leading context is not a deferral (repo: juggernaut) (kind: captain) (since 2026-07-10) (hold: not urgent but choose the route now) (hold-kind: captain)
   Captain hold set: 2026-07-10T00:00:00Z
-- [ ] contextual-comma - Comma context is not a deferral (repo: firstmate) (kind: captain) (since 2026-07-10) (hold: not urgent, choose the launch route now) (hold-kind: captain)
+- [ ] contextual-comma - Comma context is not a deferral (repo: juggernaut) (kind: captain) (since 2026-07-10) (hold: not urgent, choose the launch route now) (hold-kind: captain)
   Captain hold set: 2026-07-10T00:00:00Z
-- [ ] metadata-context - Metadata-like context is not a deferral (repo: firstmate) (kind: captain) (since 2026-07-10) (hold: not urgent, priority: decide P1 or P2) (hold-kind: captain)
+- [ ] metadata-context - Metadata-like context is not a deferral (repo: juggernaut) (kind: captain) (since 2026-07-10) (hold: not urgent, priority: decide P1 or P2) (hold-kind: captain)
   Captain hold set: 2026-07-10T00:00:00Z
-- [ ] contextual-opportunity - Leading opportunity is not a deferral (repo: firstmate) (kind: captain) (since 2026-07-10) (hold: queued opportunity: choose whether to proceed) (hold-kind: captain)
+- [ ] contextual-opportunity - Leading opportunity is not a deferral (repo: juggernaut) (kind: captain) (since 2026-07-10) (hold: queued opportunity: choose whether to proceed) (hold-kind: captain)
   Captain hold set: 2026-07-10T00:00:00Z
-- [ ] contextual-gated - Leading gate is not a deferral (repo: firstmate) (kind: captain) (since 2026-07-10) (hold: captain-gated decision needs current approval) (hold-kind: captain)
+- [ ] contextual-gated - Leading gate is not a deferral (repo: juggernaut) (kind: captain) (since 2026-07-10) (hold: captain-gated decision needs current approval) (hold-kind: captain)
   Captain hold set: 2026-07-10T00:00:00Z
-- [ ] reheld-current-call - Re-held genuine call (repo: firstmate) (kind: captain) (since 2026-06-01) (hold: choose a current sample route) (hold-kind: captain)
+- [ ] reheld-current-call - Re-held genuine call (repo: juggernaut) (kind: captain) (since 2026-06-01) (hold: choose a current sample route) (hold-kind: captain)
   Captain hold set: 2026-07-10T00:00:00Z
   Current decision prose lists route north or route south.
   Resolution recorded by jg-captain-hold.
@@ -1255,7 +1255,7 @@ EOF
   Resolution mode: released
   Captain decision:
   Not urgent at the time of the previous call.
-- [ ] legacy-old-hold - Legacy unstamped hold (repo: firstmate) (kind: ship) (since 2026-06-01) (hold: choose a sample route) (hold-kind: captain)
+- [ ] legacy-old-hold - Legacy unstamped hold (repo: juggernaut) (kind: ship) (since 2026-06-01) (hold: choose a sample route) (hold-kind: captain)
 
 ## Done
 EOF
@@ -1347,7 +1347,7 @@ test_blocked_deferred_hold_has_concrete_disclosure() {
 ## In flight
 
 ## Queued
-- [ ] only-blocked-parked - Blocked parked call blocked-by: missing-blocker (repo: firstmate) (kind: captain) (hold: parked) (hold-kind: captain) (hold-until: 2026-07-11)
+- [ ] only-blocked-parked - Blocked parked call blocked-by: missing-blocker (repo: juggernaut) (kind: captain) (hold: parked) (hold-kind: captain) (hold-until: 2026-07-11)
 
 ## Done
 EOF
@@ -1373,11 +1373,11 @@ test_revealed_deferred_holds_show_their_deferral_reason() {
 ## In flight
 
 ## Queued
-- [ ] reveal-blocked - Blocked parked call blocked-by: missing-blocker-1234567890123456789012345678901234567890 (repo: firstmate) (kind: captain) (hold: parked) (hold-kind: captain)
-- [ ] reveal-future - 1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890 (repo: firstmate) (kind: captain) (hold: parked) (hold-kind: captain) (hold-until: 2026-12-01)
-- [ ] reveal-aged - Aged undated call (repo: firstmate) (kind: captain) (since 2026-06-01) (hold: choose a route) (hold-kind: captain)
+- [ ] reveal-blocked - Blocked parked call blocked-by: missing-blocker-1234567890123456789012345678901234567890 (repo: juggernaut) (kind: captain) (hold: parked) (hold-kind: captain)
+- [ ] reveal-future - 1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890 (repo: juggernaut) (kind: captain) (hold: parked) (hold-kind: captain) (hold-until: 2026-12-01)
+- [ ] reveal-aged - Aged undated call (repo: juggernaut) (kind: captain) (since 2026-06-01) (hold: choose a route) (hold-kind: captain)
   Captain hold set: 2026-06-01T00:00:00Z
-- [ ] reveal-live - 123456789012345678901234567890123456789012345678901234567890 (repo: firstmate) (kind: captain) (hold: choose A) (hold-kind: captain)
+- [ ] reveal-live - 123456789012345678901234567890123456789012345678901234567890 (repo: juggernaut) (kind: captain) (hold: choose A) (hold-kind: captain)
 
 ## Done
 EOF
@@ -1429,21 +1429,21 @@ test_include_prs_maps_custom_branch_prefix_to_task() {
   local home fakebin json
   home=$(make_home custom-prefix); write_fixture "$home"
   jg_write_meta "$home/state/ship-task.meta" \
-    "window=firstmate:jg-ship-task" \
+    "window=juggernaut:jg-ship-task" \
     "worktree=$home/projects/ship-wt" \
-    "project=firstmate" \
+    "project=juggernaut" \
     "harness=claude" \
     "kind=ship" \
     "mode=no-mistakes" \
     "branch=fix/ship-task" \
-    "pr=https://github.com/kunchenguid/firstmate/pull/9"
+    "pr=https://github.com/kunchenguid/juggernaut/pull/9"
   fakebin=$(make_fakebin "$home"); : > "$home/net.log"
   cat > "$fakebin/gh" <<'SH'
 #!/usr/bin/env bash
 echo "gh $*" >> "$NET_LOG"
 if [ "${FAKE_GH_FAIL:-0}" = 1 ]; then exit 1; fi
 cat <<'JSON'
-[{"number":9,"title":"Ship the thing","url":"https://github.com/kunchenguid/firstmate/pull/9","headRefName":"fix/ship-task","reviewDecision":"APPROVED","mergeable":"MERGEABLE","statusCheckRollup":[{"conclusion":"SUCCESS","status":"COMPLETED"}]}]
+[{"number":9,"title":"Ship the thing","url":"https://github.com/kunchenguid/juggernaut/pull/9","headRefName":"fix/ship-task","reviewDecision":"APPROVED","mergeable":"MERGEABLE","statusCheckRollup":[{"conclusion":"SUCCESS","status":"COMPLETED"}]}]
 JSON
 SH
   chmod +x "$fakebin/gh"
@@ -1504,7 +1504,7 @@ write_large_fixture() {  # <home> <count>
     printf -- '- [ ] gate-%s - Gate %s blocked-by: task-%s (repo: repo-%s) (kind: ship)\n' "$i" "$i" "$i" "$i" >> "$home/data/backlog.md"
     printf -- '- [ ] decision-%s - Decision %s (repo: repo-%s) (kind: captain) (hold: captain choice pending) (hold-kind: captain)\n' "$i" "$i" "$i" >> "$home/data/backlog.md"
     jg_write_meta "$home/state/$id.meta" \
-      "window=firstmate:jg-$id" \
+      "window=juggernaut:jg-$id" \
       "worktree=$home/projects/$id" \
       "project=repo-$i" \
       "harness=codex" \
@@ -1619,9 +1619,9 @@ test_completed_scout_report_not_pending() {
   fakebin=$(make_fakebin "$home")
   mkdir -p "$home/projects/lav-wt" "$home/data/lavish-103"
   jg_write_meta "$home/state/lavish-103.meta" \
-    "window=firstmate:jg-lavish-103" \
+    "window=juggernaut:jg-lavish-103" \
     "worktree=$home/projects/lav-wt" \
-    "project=firstmate" \
+    "project=juggernaut" \
     "harness=codex" \
     "kind=scout" \
     "mode=scout"
@@ -1636,10 +1636,10 @@ test_completed_scout_report_not_pending() {
   pass "a completed scout with decision-like report prose is a pointer, not pending"
 }
 
-# Recently Landed must include merges a secondmate managed. Those completion records
-# live in the secondmate home's OWN backlog, not the main one, so the projection must
+# Recently Landed must include merges a squad_lead managed. Those completion records
+# live in the squad_lead home's OWN backlog, not the main one, so the projection must
 # roll them up. Local, deterministic, no GitHub call.
-test_landed_includes_secondmate_home_merges() {
+test_landed_includes_squad_lead_home_merges() {
   local home fakebin json
   home=$(make_home mate-landed); write_fixture "$home"
   fakebin=$(make_fakebin "$home"); : > "$home/net.log"
@@ -1647,10 +1647,10 @@ test_landed_includes_secondmate_home_merges() {
   printf '%s' "$json" | jq -e '
     (.landed | any(.[]; .id == "mate-landed" and (.artifact | test("/pull/50"))))
       and (.landed | any(.[]; .id == "done-a"))
-  ' >/dev/null || fail "landed must merge secondmate-home Done with main-home Done: $json"
+  ' >/dev/null || fail "landed must merge squad-lead-home Done with main-home Done: $json"
   # Still zero network on this default path.
   [ ! -s "$home/net.log" ] || fail "landed roll-up must make no gh/gh-axi call, got: $(cat "$home/net.log")"
-  pass "landed includes secondmate-managed merges alongside main-home merges"
+  pass "landed includes squad-lead-managed merges alongside main-home merges"
 }
 
 # Recently Landed accepts only the artifact owned by a row's task kind and
@@ -1670,7 +1670,7 @@ test_landed_accepts_only_kind_owned_delivery_artifacts() {
 
   "$TASKS_AXI_BIN" add answered-question \
     "Decide whether https://github.com/o/r/pull/7 may merge" --kind ship \
-    --repo firstmate --file "$main_backlog" >/dev/null \
+    --repo juggernaut --file "$main_backlog" >/dev/null \
     || fail "could not create the answered captain question"
   run_captain "$home" "$fakebin" hold answered-question \
     --reason "captain route choice pending" >/dev/null \
@@ -1690,7 +1690,7 @@ test_landed_accepts_only_kind_owned_delivery_artifacts() {
     || fail "could not close the local-only captain question"
 
   "$TASKS_AXI_BIN" add legacy-local-question "Choose local main" \
-    --repo firstmate --file "$main_backlog" >/dev/null \
+    --repo juggernaut --file "$main_backlog" >/dev/null \
     || fail "could not create the legacy kindless captain question"
   run_captain "$home" "$fakebin" hold legacy-local-question \
     --reason "captain legacy local route pending" >/dev/null \
@@ -1705,31 +1705,31 @@ test_landed_accepts_only_kind_owned_delivery_artifacts() {
   printf '# Keyword scout\n' > "$home/$keyword_report"
   printf '# Shipping scout\n' > "$home/$shipping_report"
   "$TASKS_AXI_BIN" add keyword-scout "SCOUT parser keywords" --kind scout \
-    --repo firstmate --start --file "$main_backlog" >/dev/null \
+    --repo juggernaut --start --file "$main_backlog" >/dev/null \
     || fail "could not create the canonical keyword scout"
   "$TASKS_AXI_BIN" 'done' keyword-scout --report "$keyword_report" \
     --file "$main_backlog" >/dev/null \
     || fail "could not complete the canonical keyword scout"
   "$TASKS_AXI_BIN" add keyword-local "SHIP keyword local main" --kind ship \
-    --repo firstmate --start --file "$main_backlog" >/dev/null \
+    --repo juggernaut --start --file "$main_backlog" >/dev/null \
     || fail "could not create the canonical keyword local delivery"
   "$TASKS_AXI_BIN" 'done' keyword-local --note "local main" \
     --file "$main_backlog" >/dev/null \
     || fail "could not complete the canonical keyword local delivery"
   "$TASKS_AXI_BIN" add noted-local "Land the local-only change" --kind ship \
-    --repo firstmate --start --file "$main_backlog" >/dev/null \
+    --repo juggernaut --start --file "$main_backlog" >/dev/null \
     || fail "could not create the recorded-note local delivery"
   "$TASKS_AXI_BIN" 'done' noted-local --note "local main" \
     --file "$main_backlog" >/dev/null \
     || fail "could not complete the recorded-note local delivery"
   "$TASKS_AXI_BIN" add legacy-noted-local "Complete the legacy work" \
-    --repo firstmate --start --file "$main_backlog" >/dev/null \
+    --repo juggernaut --start --file "$main_backlog" >/dev/null \
     || fail "could not create the kindless local delivery"
   "$TASKS_AXI_BIN" 'done' legacy-noted-local --note "local main" \
     --file "$main_backlog" >/dev/null \
     || fail "could not complete the kindless local delivery"
   "$TASKS_AXI_BIN" add shipping-scout "SHIPPING parser boundary" --kind scout \
-    --repo firstmate --start --file "$main_backlog" >/dev/null \
+    --repo juggernaut --start --file "$main_backlog" >/dev/null \
     || fail "could not create the longer-word scout"
   "$TASKS_AXI_BIN" 'done' shipping-scout --report "$shipping_report" \
     --file "$main_backlog" >/dev/null \
@@ -1740,11 +1740,11 @@ test_landed_accepts_only_kind_owned_delivery_artifacts() {
   mkdir -p "$home/data/reported-scout"
   printf '# Reported scout\n' > "$home/$report_path"
   cat >> "$main_backlog" <<EOF
-- [x] done-pr-nondelivery - Closed without merge https://github.com/o/r/pull/5 (repo: firstmate) (kind: ship) (done 2026-07-12)
-- [x] scout-pr-no-report - Scout without report https://github.com/o/r/pull/6 (repo: firstmate) (kind: scout) (merged 2026-07-12)
-- [x] ship-reported-path - Ship naming data/ship-reported-path/report.md (repo: firstmate) (kind: ship) (reported 2026-07-12)
-- [x] reported-scout - Report with $report_pr context $report_path (repo: firstmate) (kind: scout) (reported 2026-07-12)
-- [x] local-delivery - Local with https://github.com/o/r/pull/9 context local main (repo: firstmate) (kind: ship) (done 2026-07-12)
+- [x] done-pr-nondelivery - Closed without merge https://github.com/o/r/pull/5 (repo: juggernaut) (kind: ship) (done 2026-07-12)
+- [x] scout-pr-no-report - Scout without report https://github.com/o/r/pull/6 (repo: juggernaut) (kind: scout) (merged 2026-07-12)
+- [x] ship-reported-path - Ship naming data/ship-reported-path/report.md (repo: juggernaut) (kind: ship) (reported 2026-07-12)
+- [x] reported-scout - Report with $report_pr context $report_path (repo: juggernaut) (kind: scout) (reported 2026-07-12)
+- [x] local-delivery - Local with https://github.com/o/r/pull/9 context local main (repo: juggernaut) (kind: ship) (done 2026-07-12)
 EOF
 
   : > "$home/net.log"
@@ -1880,7 +1880,7 @@ test_landed_preserves_kindless_v1_summary_reports() {
     json=$(run_remote_ledger_bearings "$parent" "$fakebin" "$epoch") \
       || fail "kindless v1 summary bearings failed"
     printf '%s' "$json" | jq -e --arg freshness "$freshness" '
-      (.secondmates | any(.id == "ledger-1" and .freshness == $freshness))
+      (.squad_leads | any(.id == "ledger-1" and .freshness == $freshness))
       and (.landed | map({id,artifact,owner}) | sort_by(.id)) == [
         {id:"legacy-local",artifact:"local main",owner:"ledger-1"},
         {id:"legacy-pr",artifact:"https://github.com/o/r/pull/1",owner:"ledger-1"},
@@ -1896,12 +1896,12 @@ test_landed_preserves_kindless_v1_summary_reports() {
 test_landed_default_balances_dominant_and_sparse_homes() {
   local home dominant sparse_a sparse_b sparse_c fakebin json i actual expected
   home=$(make_home landed-balanced-default)
-  : > "$home/data/secondmates.md"
+  : > "$home/data/squad_leads.md"
   printf '## Done\n' > "$home/data/backlog.md"
-  dominant=$(make_landed_secondmate "$home" dominant)
-  sparse_a=$(make_landed_secondmate "$home" sparse-a)
-  sparse_b=$(make_landed_secondmate "$home" sparse-b)
-  sparse_c=$(make_landed_secondmate "$home" sparse-c)
+  dominant=$(make_landed_squad_lead "$home" dominant)
+  sparse_a=$(make_landed_squad_lead "$home" sparse-a)
+  sparse_b=$(make_landed_squad_lead "$home" sparse-b)
+  sparse_c=$(make_landed_squad_lead "$home" sparse-c)
   i=1
   while [ "$i" -le 12 ]; do
     append_landed_row "$dominant" "$(printf 'dominant-landed-%02d' "$i")" \
@@ -1939,10 +1939,10 @@ sparse-a/sparse-a-landed-02'
 test_landed_default_refills_capacity_after_sparse_homes_exhaust() {
   local home dominant sparse fakebin json actual expected i
   home=$(make_home landed-sparse-refill)
-  : > "$home/data/secondmates.md"
+  : > "$home/data/squad_leads.md"
   printf '## Done\n' > "$home/data/backlog.md"
-  dominant=$(make_landed_secondmate "$home" dominant)
-  sparse=$(make_landed_secondmate "$home" sparse)
+  dominant=$(make_landed_squad_lead "$home" dominant)
+  sparse=$(make_landed_squad_lead "$home" sparse)
   i=1
   while [ "$i" -le 5 ]; do
     append_landed_row "$dominant" "$(printf 'dominant-landed-%02d' "$i")" \
@@ -1966,12 +1966,12 @@ dominant/dominant-landed-05'
 test_landed_default_uses_deterministic_home_order_when_homes_exceed_cap() {
   local home mate fakebin json actual expected i id
   home=$(make_home landed-home-order)
-  : > "$home/data/secondmates.md"
+  : > "$home/data/squad_leads.md"
   printf '## Done\n' > "$home/data/backlog.md"
   i=1
   while [ "$i" -le 8 ]; do
     id=$(printf 'home-%02d' "$i")
-    mate=$(make_landed_secondmate "$home" "$id")
+    mate=$(make_landed_squad_lead "$home" "$id")
     append_landed_row "$mate" "$id-landed-01" "$id landed 01" 2026-07-10
     i=$((i + 1))
   done
@@ -1994,10 +1994,10 @@ home-06/home-06-landed-01'
 test_landed_default_preserves_internal_order_for_ties() {
   local home tie_a tie_b fakebin json actual expected
   home=$(make_home landed-ties)
-  : > "$home/data/secondmates.md"
+  : > "$home/data/squad_leads.md"
   printf '## Done\n' > "$home/data/backlog.md"
-  tie_a=$(make_landed_secondmate "$home" tie-a)
-  tie_b=$(make_landed_secondmate "$home" tie-b)
+  tie_a=$(make_landed_squad_lead "$home" tie-a)
+  tie_b=$(make_landed_squad_lead "$home" tie-b)
   append_landed_row "$tie_b" tie-b-a "Tie B A" 2026-07-10
   append_landed_row "$tie_b" tie-b-z "Tie B Z" 2026-07-10
   append_landed_row "$tie_a" tie-a-a "Tie A A" 2026-07-10
@@ -2016,7 +2016,7 @@ tie-b/tie-b-a'
 test_landed_default_handles_no_landed_items() {
   local home fakebin json
   home=$(make_home landed-empty)
-  : > "$home/data/secondmates.md"
+  : > "$home/data/squad_leads.md"
   printf '## Done\n' > "$home/data/backlog.md"
   fakebin=$(make_fakebin "$home")
   json=$(run "$home" "$fakebin" --json)
@@ -2030,10 +2030,10 @@ test_landed_default_handles_no_landed_items() {
 test_all_landed_keeps_complete_global_order() {
   local home alpha beta fakebin json actual expected
   home=$(make_home landed-all-order)
-  : > "$home/data/secondmates.md"
+  : > "$home/data/squad_leads.md"
   printf '## Done\n' > "$home/data/backlog.md"
-  alpha=$(make_landed_secondmate "$home" alpha)
-  beta=$(make_landed_secondmate "$home" beta)
+  alpha=$(make_landed_squad_lead "$home" alpha)
+  beta=$(make_landed_squad_lead "$home" beta)
   append_landed_row "$alpha" alpha-old "Alpha old" 2026-07-01
   append_landed_row "$alpha" alpha-new "Alpha new" 2026-07-09
   append_landed_row "$beta" beta-new "Beta new" 2026-07-10
@@ -2062,12 +2062,12 @@ test_landed_bounded_and_disclosed() {
   mate=$(fixture_mate_home "$home")
   {
     printf '## In flight\n'
-    printf '%s\n\n' '- [ ] mate - Decide subscription order (repo: firstmate) (kind: ship) (since 2026-07-11)'
+    printf '%s\n\n' '- [ ] mate - Decide subscription order (repo: juggernaut) (kind: ship) (since 2026-07-11)'
     printf '## Done\n'
   } > "$mate/data/backlog.md"
   i=1
   while [ "$i" -le 12 ]; do
-    printf -- '- [x] mate-landed-%02d - Secondmate fix %02d (repo: firstmate) (kind: ship) (merged 2026-06-%02d)\n' \
+    printf -- '- [x] mate-landed-%02d - SquadLead fix %02d (repo: juggernaut) (kind: ship) (merged 2026-06-%02d)\n' \
       "$i" "$i" "$((13 - i))" >> "$mate/data/backlog.md"
     i=$((i + 1))
   done
@@ -2103,7 +2103,7 @@ $(printf 'mate-landed-%02d' "$i")"
 test_live_blocker_is_not_charted_queue_work() {
   local home fakebin json
   home=$(make_home live-blocker); write_fixture "$home"
-  printf 'blocked [key=synthetic-dependency]: firstmate can refresh the synthetic token\n' > "$home/state/ship-task.status"
+  printf 'blocked [key=synthetic-dependency]: juggernaut can refresh the synthetic token\n' > "$home/state/ship-task.status"
   record_claude_state "$home/state" ship-task idle
   fakebin=$(make_fakebin "$home")
   json=$(run "$home" "$fakebin" --json)
@@ -2119,7 +2119,7 @@ test_live_blocker_is_not_charted_queue_work() {
 # anti-leak guard: action-free highlights - a working task, a completed scout,
 # queued/gated items, landed work - must never surface as an open decision, so they
 # cannot leak into Captain's Call. The standard fixture has exactly one genuine open
-# decision (the secondmate's structured captain hold).
+# decision (the squad_lead's structured captain hold).
 test_captains_call_anti_leak() {
   local home fakebin json canonical
   home=$(make_home anti-leak); write_fixture "$home"
@@ -2128,7 +2128,7 @@ test_captains_call_anti_leak() {
   canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   jq -n -e --argjson bearings "$json" --argjson canonical "$canonical" '
     ([$bearings.decisions_open[].id] == ["mate/mate-decision-race"])
-      and ($canonical.secondmate_current.records[] | select(.id == "mate")
+      and ($canonical.squad_lead_current.records[] | select(.id == "mate")
         | (.decisions_open | any(.source == "status"))
           and (.decisions_open | any(.source == "backlog")))
       and ([$bearings.decisions_open[].id] | index("ship-task") | not)
@@ -2148,10 +2148,10 @@ test_captains_call_anti_leak() {
 test_main_orphan_in_flight_is_disclosed_not_invented() {
   local home fakebin json canonical
   home=$(make_home main-orphan)
-  : > "$home/data/secondmates.md"
+  : > "$home/data/squad_leads.md"
   cat > "$home/data/backlog.md" <<'EOF'
 ## In flight
-- [ ] only-orphan - Structured in flight without meta (repo: firstmate) (kind: ship) (since 2026-07-11)
+- [ ] only-orphan - Structured in flight without meta (repo: juggernaut) (kind: ship) (since 2026-07-11)
 
 ## Queued
 
@@ -2182,23 +2182,23 @@ EOF
 test_main_unstructured_current_is_disclosed_with_structured_sibling() {
   local home fakebin json canonical
   home=$(make_home main-unstructured)
-  : > "$home/data/secondmates.md"
+  : > "$home/data/squad_leads.md"
   mkdir -p "$home/projects/structured-ship"
   cat > "$home/data/backlog.md" <<'EOF'
 ## In flight
 this current row is not structured
-- [ ] structured-ship - Visible structured sibling (repo: firstmate) (kind: ship) (since 2026-07-11)
+- [ ] structured-ship - Visible structured sibling (repo: juggernaut) (kind: ship) (since 2026-07-11)
 
 ## Queued
 another free-form note without checkbox
-- [ ] structured-queued - Structured queued (repo: firstmate) (kind: ship)
+- [ ] structured-queued - Structured queued (repo: juggernaut) (kind: ship)
 
 ## Done
 EOF
   jg_write_meta "$home/state/structured-ship.meta" \
-    "window=firstmate:jg-structured-ship" \
+    "window=juggernaut:jg-structured-ship" \
     "worktree=$home/projects/structured-ship" \
-    "project=firstmate" \
+    "project=juggernaut" \
     "harness=codex" \
     "kind=ship" \
     "mode=no-mistakes"
@@ -2227,22 +2227,22 @@ EOF
 test_main_orphan_counterfactual_meta_clears_inventory_warning() {
   local home fakebin json_before json_after
   home=$(make_home main-orphan-counterfactual)
-  : > "$home/data/secondmates.md"
+  : > "$home/data/squad_leads.md"
   mkdir -p "$home/projects/orphan-ship"
   cat > "$home/data/backlog.md" <<'EOF'
 ## In flight
-- [ ] orphan-ship - Gains meta in counterfactual (repo: firstmate) (kind: ship) (since 2026-07-11)
-- [ ] visible-ship - Already live (repo: firstmate) (kind: ship) (since 2026-07-11)
+- [ ] orphan-ship - Gains meta in counterfactual (repo: juggernaut) (kind: ship) (since 2026-07-11)
+- [ ] visible-ship - Already live (repo: juggernaut) (kind: ship) (since 2026-07-11)
 
 ## Queued
-- [ ] queued-ship - Ordinary queue (repo: firstmate) (kind: ship)
+- [ ] queued-ship - Ordinary queue (repo: juggernaut) (kind: ship)
 
 ## Done
 EOF
   jg_write_meta "$home/state/visible-ship.meta" \
-    "window=firstmate:jg-visible-ship" \
+    "window=juggernaut:jg-visible-ship" \
     "worktree=$home/projects/orphan-ship" \
-    "project=firstmate" \
+    "project=juggernaut" \
     "harness=codex" \
     "kind=ship" \
     "mode=no-mistakes"
@@ -2257,9 +2257,9 @@ EOF
       and ([.gates[].id] | index("queued-ship") != null)
   ' >/dev/null || fail "pre-meta orphan fixture failed: $json_before"
   jg_write_meta "$home/state/orphan-ship.meta" \
-    "window=firstmate:jg-orphan-ship" \
+    "window=juggernaut:jg-orphan-ship" \
     "worktree=$home/projects/orphan-ship" \
-    "project=firstmate" \
+    "project=juggernaut" \
     "harness=codex" \
     "kind=ship" \
     "mode=no-mistakes"
@@ -2281,7 +2281,7 @@ seed_working_child() {  # <mate-home> <id> <doing> [repo]
   printf -- '- [ ] %s - %s%s (kind: ship) (since 2026-07-13)\n' \
     "$id" "$doing" "$repo_field" >> "$mate/data/backlog.md"
   jg_write_meta "$mate/state/$id.meta" \
-    "window=firstmate:jg-$id" "worktree=$mate/projects/$id" "project=sample" \
+    "window=juggernaut:jg-$id" "worktree=$mate/projects/$id" "project=sample" \
     "harness=claude" "kind=ship" "mode=no-mistakes"
   record_claude_state "$mate/state" "$id" busy
   printf 'working: %s\n' "$doing" > "$mate/state/$id.status"
@@ -2291,9 +2291,9 @@ test_working_captain_holds_keep_their_bucket_surfaces() {
   local home mate fakebin id summary json expanded
   home=$(make_home working-hold-buckets)
   mate="$TMP_ROOT/working-hold-buckets-mate"
-  : > "$home/data/secondmates.md"
-  make_valid_secondmate_home working-mate "$mate"
-  append_secondmate_registry "$home" working-mate "$mate"
+  : > "$home/data/squad_leads.md"
+  make_valid_squad_lead_home working-mate "$mate"
+  append_squad_lead_registry "$home" working-mate "$mate"
 
   for home in "$home" "$mate"; do
     cat > "$home/data/backlog.md" <<'EOF'
@@ -2316,7 +2316,7 @@ EOF
     for id in working-live working-live-two working-blocked working-dated working-aged; do
       mkdir -p "$home/projects/$id"
       jg_write_meta "$home/state/$id.meta" \
-        "window=firstmate:jg-$id" "worktree=$home/projects/$id" "project=sample" \
+        "window=juggernaut:jg-$id" "worktree=$home/projects/$id" "project=sample" \
         "harness=claude" "kind=ship" "mode=no-mistakes"
       record_claude_state "$home/state" "$id" busy
       printf 'working: active held work\n' > "$home/state/$id.status"
@@ -2326,15 +2326,15 @@ EOF
   fakebin=$(make_fakebin "$home")
 
   summary=$(PATH="$fakebin:$PATH" JG_HOME="$mate" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
-    JG_SNAPSHOT_SECONDMATE_DECISIONS=1 \
-    "$ROOT/bin/jg-fleet-snapshot.sh" --secondmate-home-summary)
+    JG_SNAPSHOT_SQUAD_LEAD_DECISIONS=1 \
+    "$ROOT/bin/jg-fleet-snapshot.sh" --squad-lead-home-summary)
   printf '%s' "$summary" | jq -e '
     ([.decisions_open[].id] == ["working-live"])
       and ([.queued[].id] | contains(["working-live", "working-live-two", "working-blocked", "working-dated", "working-aged"]))
       and ([.queued[] | select(.hold_bucket != null)] | length) == 5
-  ' >/dev/null || fail "working captain holds were filtered from the secondmate summary: $summary"
+  ' >/dev/null || fail "working captain holds were filtered from the squad_lead summary: $summary"
 
-  json=$(JG_SNAPSHOT_SECONDMATE_DECISIONS=1 run "$home" "$fakebin" --json)
+  json=$(JG_SNAPSHOT_SQUAD_LEAD_DECISIONS=1 run "$home" "$fakebin" --json)
   printf '%s' "$json" | jq -e '
     ([.in_flight[].id] | contains([
       "working-live", "working-live-two", "working-blocked", "working-dated", "working-aged",
@@ -2357,7 +2357,7 @@ EOF
       and ([.gates[] | select(.id == "working-aged" and .owner == "working-mate")] | length) == 1
   ' >/dev/null || fail "working captain holds did not surface in Underway and exactly one default decision bucket: $json"
 
-  expanded=$(JG_SNAPSHOT_SECONDMATE_DECISIONS=1 run "$home" "$fakebin" --json --all-decisions --all-queued)
+  expanded=$(JG_SNAPSHOT_SQUAD_LEAD_DECISIONS=1 run "$home" "$fakebin" --json --all-decisions --all-queued)
   printf '%s' "$expanded" | jq -e '
     ([.in_flight[].id] | contains([
       "working-live", "working-live-two", "working-blocked", "working-dated", "working-aged",
@@ -2376,16 +2376,16 @@ EOF
       and ([.gates[] | select(.id == "working-live" or .id == "working-live-two" or .id == "working-blocked"
           or .id == "working-dated" or .id == "working-aged")] | length) == 0
   ' >/dev/null || fail "--all-decisions did not keep working holds Underway and reveal each gate-free: $expanded"
-  pass "working captain holds retain main and secondmate bucket surfaces"
+  pass "working captain holds retain main and squad_lead bucket surfaces"
 }
 
 test_active_children_project_independent_of_home_captain_hold() {
   local home mate fakebin json
   home=$(make_home underway-hold-parent)
-  : > "$home/data/secondmates.md"
+  : > "$home/data/squad_leads.md"
   mate="$TMP_ROOT/underway-hold-home"
-  make_valid_secondmate_home busy-hold "$mate"
-  append_secondmate_registry "$home" busy-hold "$mate"
+  make_valid_squad_lead_home busy-hold "$mate"
+  append_squad_lead_registry "$home" busy-hold "$mate"
   fakebin=$(make_fakebin "$home")
 
   cat > "$mate/data/backlog.md" <<'EOF'
@@ -2408,7 +2408,7 @@ EOF
       and ([.in_flight[] | select(.id == "busy-hold")] | length) == 0
       and ([.decisions_open[] | select(.id == "busy-hold/release-call"
         and .verb == "captain-hold")] | length) == 1
-      and (.secondmates | any(.id == "busy-hold" and .state == "captain_decision"))
+      and (.squad_leads | any(.id == "busy-hold" and .state == "captain_decision"))
   ' >/dev/null || fail "a captain hold hid active children from Underway: $json"
 
   cat > "$mate/data/backlog.md" <<'EOF'
@@ -2425,7 +2425,7 @@ EOF
   printf '%s' "$json" | jq -e '
     ([.in_flight[] | select(.id | startswith("busy-hold/"))] | length) == 0
       and ([.decisions_open[] | select(.id == "busy-hold/release-call")] | length) == 1
-      and (.secondmates | any(.id == "busy-hold" and .state == "captain_decision"))
+      and (.squad_leads | any(.id == "busy-hold" and .state == "captain_decision"))
   ' >/dev/null || fail "a hold-only home invented Underway rows: $json"
 
   cat > "$mate/data/backlog.md" <<'EOF'
@@ -2443,7 +2443,7 @@ EOF
   printf '%s' "$json" | jq -e '
     ([.in_flight[].id] | sort) == ["busy-hold/child-a", "busy-hold/child-b"]
       and ([.decisions_open[] | select(.owner == "busy-hold")] | length) == 0
-      and (.secondmates | any(.id == "busy-hold" and .state == "active_child_work"))
+      and (.squad_leads | any(.id == "busy-hold" and .state == "active_child_work"))
   ' >/dev/null || fail "active-children-only Underway projection changed: $json"
   pass "active children reach Underway independently of a home captain hold"
 }
@@ -2484,7 +2484,7 @@ test_nameless_legacy_summary_uses_its_durable_identifier() {
 test_newest_filed_gates_are_selected_before_snapshot_bounds() {
   local home mate fakebin json i
   home=$(make_home newest-before-bounds)
-  : > "$home/data/secondmates.md"
+  : > "$home/data/squad_leads.md"
   printf '## In flight\n\n## Queued\n' > "$home/data/backlog.md"
   i=1
   while [ "$i" -le 20 ]; do
@@ -2502,9 +2502,9 @@ test_newest_filed_gates_are_selected_before_snapshot_bounds() {
   ' >/dev/null || fail "the bearings gate bound dropped the newest filed row: $json"
 
   mate="$TMP_ROOT/newest-before-bounds-mate"
-  make_valid_secondmate_home bounded-mate "$mate"
+  make_valid_squad_lead_home bounded-mate "$mate"
   : > "$home/data/backlog.md"
-  append_secondmate_registry "$home" bounded-mate "$mate"
+  append_squad_lead_registry "$home" bounded-mate "$mate"
   cat > "$mate/data/backlog.md" <<'EOF'
 ## In flight
 
@@ -2515,7 +2515,7 @@ test_newest_filed_gates_are_selected_before_snapshot_bounds() {
 
 ## Done
 EOF
-  json=$(JG_SNAPSHOT_SECONDMATE_QUEUED=2 run "$home" "$fakebin" --json)
+  json=$(JG_SNAPSHOT_SQUAD_LEAD_QUEUED=2 run "$home" "$fakebin" --json)
   printf '%s' "$json" | jq -e '
     [.gates[].id] == ["mate-eligible"]
       and (.decisions_open | any(.id == "bounded-mate/mate-call-one"))
@@ -2530,24 +2530,24 @@ EOF
 test_underway_and_gate_rows_carry_the_durable_name_and_filed_date() {
   local home mate fakebin json
   home=$(make_home durable-name-filed)
-  : > "$home/data/secondmates.md"
+  : > "$home/data/squad_leads.md"
   mate="$TMP_ROOT/durable-name-home"
-  make_valid_secondmate_home named-mate "$mate"
-  append_secondmate_registry "$home" named-mate "$mate"
+  make_valid_squad_lead_home named-mate "$mate"
+  append_squad_lead_registry "$home" named-mate "$mate"
   mkdir -p "$home/projects/main-wt"
   cat > "$home/data/backlog.md" <<'EOF'
 ## In flight
-- [ ] main-ship - Rename the fleet board rows (repo: firstmate) (kind: ship) (since 2026-07-09)
+- [ ] main-ship - Rename the fleet board rows (repo: juggernaut) (kind: ship) (since 2026-07-09)
 
 ## Queued
-- [ ] newer-gate - Filed later (repo: firstmate) (kind: ship) (since 2026-07-10)
-- [ ] older-gate - Filed earlier (repo: firstmate) (kind: ship) (since 2026-07-01)
-- [ ] undated-gate - Filed before dates were recorded (repo: firstmate) (kind: ship)
+- [ ] newer-gate - Filed later (repo: juggernaut) (kind: ship) (since 2026-07-10)
+- [ ] older-gate - Filed earlier (repo: juggernaut) (kind: ship) (since 2026-07-01)
+- [ ] undated-gate - Filed before dates were recorded (repo: juggernaut) (kind: ship)
 
 ## Done
 EOF
   jg_write_meta "$home/state/main-ship.meta" \
-    "window=firstmate:jg-main-ship" "worktree=$home/projects/main-wt" "project=firstmate" \
+    "window=juggernaut:jg-main-ship" "worktree=$home/projects/main-wt" "project=juggernaut" \
     "harness=claude" "kind=ship" "mode=no-mistakes"
   record_claude_state "$home/state" main-ship busy
   printf 'working: no-mistakes review round 2\n' > "$home/state/main-ship.status"
@@ -2558,7 +2558,7 @@ EOF
   printf '\n## Queued\n\n## Done\n' >> "$mate/data/backlog.md"
   mkdir -p "$mate/projects/mate-child"
   jg_write_meta "$mate/state/mate-child.meta" \
-    "window=firstmate:jg-mate-child" "worktree=$mate/projects/mate-child" "project=sample" \
+    "window=juggernaut:jg-mate-child" "worktree=$mate/projects/mate-child" "project=sample" \
     "harness=claude" "kind=ship" "mode=no-mistakes"
   record_claude_state "$mate/state" mate-child busy
   printf 'working: waiting on the pipeline\n' > "$mate/state/mate-child.status"
@@ -2581,22 +2581,22 @@ EOF
   pass "Underway rows carry the durable task name and gates carry their filed date"
 }
 
-test_mixed_secondmate_roles_partial_state_and_captain_readiness() {
+test_mixed_squad_lead_roles_partial_state_and_captain_readiness() {
   local home fakebin hibit wheel sshhip ha canonical json
   home=$(make_home mixed-domain-regressions)
-  : > "$home/data/secondmates.md"
+  : > "$home/data/squad_leads.md"
   hibit="$TMP_ROOT/mixed-hibit-home"
   wheel="$TMP_ROOT/mixed-wheel-home"
   sshhip="$TMP_ROOT/mixed-sshhip-home"
   ha="$TMP_ROOT/mixed-ha-home"
-  make_valid_secondmate_home hibit "$hibit"
-  make_valid_secondmate_home wheel "$wheel"
-  make_valid_secondmate_home sshhip "$sshhip"
-  make_valid_secondmate_home home-assistant "$ha"
-  append_secondmate_registry "$home" hibit "$hibit"
-  append_secondmate_registry "$home" wheel "$wheel"
-  append_secondmate_registry "$home" sshhip "$sshhip"
-  append_secondmate_registry "$home" home-assistant "$ha"
+  make_valid_squad_lead_home hibit "$hibit"
+  make_valid_squad_lead_home wheel "$wheel"
+  make_valid_squad_lead_home sshhip "$sshhip"
+  make_valid_squad_lead_home home-assistant "$ha"
+  append_squad_lead_registry "$home" hibit "$hibit"
+  append_squad_lead_registry "$home" wheel "$wheel"
+  append_squad_lead_registry "$home" sshhip "$sshhip"
+  append_squad_lead_registry "$home" home-assistant "$ha"
 
   mkdir -p "$hibit/projects/worker" "$wheel/projects/worker" "$sshhip/projects/child" "$ha/projects/prep"
   cat > "$hibit/data/backlog.md" <<'EOF'
@@ -2609,7 +2609,7 @@ test_mixed_secondmate_roles_partial_state_and_captain_readiness() {
 ## Done
 EOF
   jg_write_meta "$hibit/state/hibit-worker.meta" \
-    "window=firstmate:jg-hibit-worker" "worktree=$hibit/projects/worker" "project=hibit" \
+    "window=juggernaut:jg-hibit-worker" "worktree=$hibit/projects/worker" "project=hibit" \
     "harness=claude" "kind=ship" "mode=no-mistakes"
   record_claude_state "$hibit/state" hibit-worker busy
   printf 'working: finalizing progress\n' > "$hibit/state/hibit-worker.status"
@@ -2624,7 +2624,7 @@ EOF
 ## Done
 EOF
   jg_write_meta "$wheel/state/wheel-worker.meta" \
-    "window=firstmate:jg-wheel-worker" "worktree=$wheel/projects/worker" "project=wheelhouse" \
+    "window=juggernaut:jg-wheel-worker" "worktree=$wheel/projects/worker" "project=wheelhouse" \
     "harness=claude" "kind=ship" "mode=no-mistakes"
   record_claude_state "$wheel/state" wheel-worker busy
   printf 'working: active validation\n' > "$wheel/state/wheel-worker.status"
@@ -2640,7 +2640,7 @@ EOF
 - [x] prior-release - Prior release (repo: sshhip) (kind: ship) (done 2026-07-21)
 EOF
   jg_write_meta "$sshhip/state/unreadable-child.meta" \
-    "window=firstmate:dead-sshhip-child" "worktree=$sshhip/projects/child" "project=sshhip" \
+    "window=juggernaut:dead-sshhip-child" "worktree=$sshhip/projects/child" "project=sshhip" \
     "harness=codex" "kind=ship" "mode=no-mistakes"
 
   cat > "$ha/data/backlog.md" <<'EOF'
@@ -2654,26 +2654,26 @@ EOF
 ## Done
 EOF
   jg_write_meta "$ha/state/prep.meta" \
-    "window=firstmate:jg-prep" "worktree=$ha/projects/prep" "project=home-assistant" \
+    "window=juggernaut:jg-prep" "worktree=$ha/projects/prep" "project=home-assistant" \
     "harness=claude" "kind=ship" "mode=no-mistakes"
   record_claude_state "$ha/state" prep busy
   printf 'working: preparing canary\n' > "$ha/state/prep.status"
 
   fakebin=$(make_fakebin "$home")
-  refresh_local_secondmate_ledgers "$home"
+  refresh_local_squad_lead_ledgers "$home"
   canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
     "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
-    (.secondmate_current.records[] | select(.id == "hibit")
+    (.squad_lead_current.records[] | select(.id == "hibit")
       | .current.state == "active_child_work"
         and [.active_children[].id] == ["hibit-worker"]
         and ([.endpoints[].id] | index("dogfood-program") | not))
-      and (.secondmate_current.records[] | select(.id == "wheel")
+      and (.squad_lead_current.records[] | select(.id == "wheel")
         | .current.state == "active_child_work"
           and [.active_children[].id] == ["wheel-worker"]
           and [.queued[].id] == ["production-observation"]
           and [.holds[].id] == ["production-observation"])
-      and (.secondmate_current.records[] | select(.id == "sshhip")
+      and (.squad_lead_current.records[] | select(.id == "sshhip")
         | .current.state == "unknown"
           and (.current.reason | contains("child current state unavailable: unreadable-child"))
           and .provenance.selected == "structured-home"
@@ -2690,10 +2690,10 @@ EOF
           and .counts.queued == 1
           and .counts.landed == 1
           and .counts.endpoints == 1)
-      and (.secondmate_landed.partial | length) == 1
-      and (.secondmate_landed.partial[0] | endswith("/mixed-sshhip-home"))
-      and (.secondmate_landed.unreadable | length) == 0
-      and (.secondmate_current.records[] | select(.id == "home-assistant")
+      and (.squad_lead_landed.partial | length) == 1
+      and (.squad_lead_landed.partial[0] | endswith("/mixed-sshhip-home"))
+      and (.squad_lead_landed.unreadable | length) == 0
+      and (.squad_lead_current.records[] | select(.id == "home-assistant")
         | .current.state == "active_child_work"
           and .decisions_open == []
           and [.active_children[].id] == ["prep"]
@@ -2711,7 +2711,7 @@ EOF
         and .reason == "documented no live worker"))
       and (.gates | any(.id == "captain-run" and .owner == "home-assistant"
         and .blocked_by == "prep,security"))
-      and (.secondmates | any(.id == "sshhip" and .state == "unknown"
+      and (.squad_leads | any(.id == "sshhip" and .state == "unknown"
         and (.reason | contains("unreadable-child"))))
   ' >/dev/null || fail "end-to-end mixed-domain projection was wrong: $json"
 
@@ -2719,11 +2719,11 @@ EOF
 - [ ] ordinary-orphan - Unowned release task (repo: sshhip) (kind: ship)' \
     "$sshhip/data/backlog.md" > "$sshhip/data/backlog.next"
   mv "$sshhip/data/backlog.next" "$sshhip/data/backlog.md"
-  refresh_local_secondmate_ledgers "$home"
+  refresh_local_squad_lead_ledgers "$home"
   canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
     "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
-    .secondmate_current.records[] | select(.id == "sshhip")
+    .squad_lead_current.records[] | select(.id == "sshhip")
     | .current.state == "unknown"
       and (.current.reason | contains("in-flight backlog item has no child metadata: ordinary-orphan"))
       and .provenance.selected == "structured-home"
@@ -2740,11 +2740,11 @@ EOF
 
   sed '/unreadable-child/d' "$sshhip/data/backlog.md" > "$sshhip/data/backlog.next"
   mv "$sshhip/data/backlog.next" "$sshhip/data/backlog.md"
-  refresh_local_secondmate_ledgers "$home"
+  refresh_local_squad_lead_ledgers "$home"
   canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
     "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
-    .secondmate_current.records[] | select(.id == "sshhip")
+    .squad_lead_current.records[] | select(.id == "sshhip")
     | .current.state == "unknown"
       and (.current.reason | contains("live child state has no in-flight backlog item: unreadable-child=unknown"))
       and .provenance.selected == "structured-home"
@@ -2761,28 +2761,28 @@ EOF
   mv "$sshhip/data/backlog.next" "$sshhip/data/backlog.md"
 
   jg_write_meta "$wheel/state/production-observation.meta" \
-    "window=firstmate:jg-production-observation" "worktree=$wheel/projects/worker" "project=wheelhouse" \
+    "window=juggernaut:jg-production-observation" "worktree=$wheel/projects/worker" "project=wheelhouse" \
     "harness=claude" "kind=scout" "mode=scout"
   record_claude_state "$wheel/state" production-observation idle
   printf 'paused: observation is deliberately held\n' > "$wheel/state/production-observation.status"
-  refresh_local_secondmate_ledgers "$home"
+  refresh_local_squad_lead_ledgers "$home"
   canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
     "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
-    .secondmate_current.records[] | select(.id == "wheel")
+    .squad_lead_current.records[] | select(.id == "wheel")
     | ([.queued[] | select(.id == "production-observation")] | length) == 1
       and ([.holds[] | select(.id == "production-observation")] | length) == 1
       and ([.endpoints[] | select(.id == "production-observation")] | length) == 1
   ' >/dev/null || fail "held metadata plus a real child duplicated or discarded the record: $canonical"
 
   jg_write_meta "$sshhip/state/unreadable-child.meta" \
-    "window=firstmate:jg-unreadable-child" "worktree=$sshhip/projects/child" "project=sshhip" \
+    "window=juggernaut:jg-unreadable-child" "worktree=$sshhip/projects/child" "project=sshhip" \
     "harness=claude" "kind=ship" "mode=no-mistakes"
   record_claude_state "$sshhip/state" unreadable-child busy
   printf 'working: app store submission restored\n' > "$sshhip/state/unreadable-child.status"
   json=$(run "$home" "$fakebin" --json)
   printf '%s' "$json" | jq -e '
-    (.secondmates | any(.id == "sshhip" and .state == "captain_decision" and .reason == "-"))
+    (.squad_leads | any(.id == "sshhip" and .state == "captain_decision" and .reason == "-"))
       and ([.decisions_open[] | select(.id == "sshhip/reviewer-decision")] | length) == 1
   ' >/dev/null || fail "restoring the SSHHIP child did not clear only its narrow warning: $json"
 
@@ -2829,11 +2829,11 @@ EOF
 
   sed 's/(kind: program)/(kind: mystery)/' "$hibit/data/backlog.md" > "$hibit/data/backlog.next"
   mv "$hibit/data/backlog.next" "$hibit/data/backlog.md"
-  refresh_local_secondmate_ledgers "$home"
+  refresh_local_squad_lead_ledgers "$home"
   canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
     "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
-    .secondmate_current.records[] | select(.id == "hibit")
+    .squad_lead_current.records[] | select(.id == "hibit")
     | .current.state == "active_child_work"
       and (.current.reason | contains("in-flight backlog item has no child metadata: dogfood-program"))
       and .provenance.selected == "structured-home"
@@ -2842,31 +2842,31 @@ EOF
       and [.active_children[].id] == ["hibit-worker"]
       and [.endpoints[].id] == ["hibit-worker"]
   ' >/dev/null || fail "an unrecognized worker kind hid the home's live work: $canonical"
-  pass "mixed secondmate roles, partial state, and captain readiness project independently"
+  pass "mixed squad_lead roles, partial state, and captain readiness project independently"
 }
 
-test_main_captain_readiness_matches_secondmate_projection() {
+test_main_captain_readiness_matches_squad_lead_projection() {
   local home fakebin json
   home=$(make_home main-captain-readiness)
-  : > "$home/data/secondmates.md"
+  : > "$home/data/squad_leads.md"
   mkdir -p "$home/projects/prep" "$home/projects/observation"
   cat > "$home/data/backlog.md" <<'EOF'
 ## In flight
-- [ ] observation - Held observation (repo: firstmate) (kind: scout) (hold: watch production) (hold-kind: external)
-- [ ] prep - Prepare canary (repo: firstmate) (kind: ship)
+- [ ] observation - Held observation (repo: juggernaut) (kind: scout) (hold: watch production) (hold-kind: external)
+- [ ] prep - Prepare canary (repo: juggernaut) (kind: ship)
 
 ## Queued
-- [ ] review - Security review (repo: firstmate) (kind: ship)
-- [ ] captain-run - Run captain canary blocked-by: prep blocked-by: review (repo: firstmate) (kind: captain) (hold: captain runs canary) (hold-kind: captain)
+- [ ] review - Security review (repo: juggernaut) (kind: ship)
+- [ ] captain-run - Run captain canary blocked-by: prep blocked-by: review (repo: juggernaut) (kind: captain) (hold: captain runs canary) (hold-kind: captain)
 
 ## Done
 EOF
   jg_write_meta "$home/state/prep.meta" \
-    "window=firstmate:jg-prep" "worktree=$home/projects/prep" "project=firstmate" \
+    "window=juggernaut:jg-prep" "worktree=$home/projects/prep" "project=juggernaut" \
     "harness=codex" "kind=ship" "mode=no-mistakes"
   printf 'working: preparing main canary\n' > "$home/state/prep.status"
   jg_write_meta "$home/state/observation.meta" \
-    "window=firstmate:jg-observation" "worktree=$home/projects/observation" "project=firstmate" \
+    "window=juggernaut:jg-observation" "worktree=$home/projects/observation" "project=juggernaut" \
     "harness=codex" "kind=scout" "mode=scout"
   printf 'paused: observation is deliberately held\n' > "$home/state/observation.status"
   fakebin=$(make_fakebin "$home")
@@ -2883,11 +2883,11 @@ EOF
 ## In flight
 
 ## Queued
-- [ ] review - Security review (repo: firstmate) (kind: ship)
-- [ ] captain-run - Run captain canary blocked-by: prep blocked-by: review (repo: firstmate) (kind: captain) (hold: captain runs canary) (hold-kind: captain)
+- [ ] review - Security review (repo: juggernaut) (kind: ship)
+- [ ] captain-run - Run captain canary blocked-by: prep blocked-by: review (repo: juggernaut) (kind: captain) (hold: captain runs canary) (hold-kind: captain)
 
 ## Done
-- [x] prep - Prepare canary (repo: firstmate) (kind: ship) (done 2026-07-22)
+- [x] prep - Prepare canary (repo: juggernaut) (kind: ship) (done 2026-07-22)
 EOF
   rm "$home/state/prep.meta" "$home/state/prep.status" \
     "$home/state/observation.meta" "$home/state/observation.status"
@@ -2901,18 +2901,18 @@ EOF
 ## In flight
 
 ## Queued
-- [ ] captain-run - Run captain canary blocked-by: prep blocked-by: review (repo: firstmate) (kind: captain) (hold: captain runs canary) (hold-kind: captain)
+- [ ] captain-run - Run captain canary blocked-by: prep blocked-by: review (repo: juggernaut) (kind: captain) (hold: captain runs canary) (hold-kind: captain)
 
 ## Done
-- [x] prep - Prepare canary (repo: firstmate) (kind: ship) (done 2026-07-22)
-- [x] review - Security review (repo: firstmate) (kind: ship) (done 2026-07-22)
+- [x] prep - Prepare canary (repo: juggernaut) (kind: ship) (done 2026-07-22)
+- [x] review - Security review (repo: juggernaut) (kind: ship) (done 2026-07-22)
 EOF
   json=$(run "$home" "$fakebin" --json)
   printf '%s' "$json" | jq -e '
     ([.decisions_open[] | select(.id == "captain-run")] | length) == 1
       and (.gates | any(.id == "captain-run") | not)
   ' >/dev/null || fail "main zero-blocker captain action was not projected exactly once: $json"
-  pass "main and secondmate captain actionability use the same blocker readiness"
+  pass "main and squad_lead captain actionability use the same blocker readiness"
 }
 
 test_task_teardown_during_metadata_capture_does_not_abort_snapshot() {
@@ -2922,16 +2922,16 @@ test_task_teardown_during_metadata_capture_does_not_abort_snapshot() {
   real_cp=$(command -v cp)
   cat > "$home/data/backlog.md" <<'EOF'
 ## In flight
-- [ ] a-hold - Stable local worker (repo: firstmate) (kind: ship)
+- [ ] a-hold - Stable local worker (repo: juggernaut) (kind: ship)
 
 ## Queued
 
 ## Done
 EOF
   jg_write_meta "$home/state/a-hold.meta" \
-    "window=fixture:a-hold" "project=firstmate" "harness=claude" "kind=ship" "mode=no-mistakes"
+    "window=fixture:a-hold" "project=juggernaut" "harness=claude" "kind=ship" "mode=no-mistakes"
   jg_write_meta "$home/state/z-gone.meta" \
-    "window=fixture:z-gone" "project=firstmate" "harness=claude" "kind=ship" "mode=no-mistakes"
+    "window=fixture:z-gone" "project=juggernaut" "harness=claude" "kind=ship" "mode=no-mistakes"
   printf 'working: stable fixture\n' > "$home/state/a-hold.status"
   cat > "$fakebin/cp" <<'SH'
 #!/usr/bin/env bash
@@ -2981,14 +2981,14 @@ test_current_state_uses_captured_status_observation() {
   mkdir -p "$worktree"
   cat > "$home/data/backlog.md" <<'EOF'
 ## In flight
-- [ ] captured-status - Captured status fixture (repo: firstmate) (kind: ship)
+- [ ] captured-status - Captured status fixture (repo: juggernaut) (kind: ship)
 
 ## Queued
 
 ## Done
 EOF
   jg_write_meta "$home/state/captured-status.meta" \
-    "window=fixture:captured-status" "worktree=$worktree" "project=firstmate" \
+    "window=fixture:captured-status" "worktree=$worktree" "project=juggernaut" \
     "harness=claude" "kind=ship" "mode=no-mistakes" "spawn_gen=stable-generation"
   printf 'working: captured state\n' > "$home/state/captured-status.status"
   record_claude_state "$home/state" captured-status idle
@@ -3030,14 +3030,14 @@ test_relaunched_task_does_not_inherit_reused_endpoint_state() {
   fakebin=$(make_fakebin "$home")
   cat > "$home/data/backlog.md" <<'EOF'
 ## In flight
-- [ ] generation-race - Generation identity fixture (repo: firstmate) (kind: ship)
+- [ ] generation-race - Generation identity fixture (repo: juggernaut) (kind: ship)
 
 ## Queued
 
 ## Done
 EOF
   jg_write_meta "$home/state/generation-race.meta" \
-    "window=fixture:jg-generation-race" "worktree=$worktree" "project=firstmate" \
+    "window=fixture:jg-generation-race" "worktree=$worktree" "project=juggernaut" \
     "harness=claude" "kind=ship" "mode=no-mistakes" "spawn_gen=old-generation"
   printf 'working: old generation\n' > "$home/state/generation-race.status"
   cat > "$fakebin/tmux" <<'SH'
@@ -3048,14 +3048,14 @@ if [ "${1:-}" = display-message ]; then
     cat > "$tmp" <<EOF
 window=fixture:jg-generation-race
 worktree=$RACE_WORKTREE
-project=firstmate
+project=juggernaut
 harness=claude
 kind=ship
 mode=no-mistakes
 spawn_gen=new-generation
 EOF
     mv "$tmp" "$RACE_META"
-    printf 'needs-decision[replacement]: replacement-only decision https://github.com/acme/firstmate/pull/999\n' > "$RACE_STATUS"
+    printf 'needs-decision[replacement]: replacement-only decision https://github.com/acme/juggernaut/pull/999\n' > "$RACE_STATUS"
     mkdir -p "$(dirname "$RACE_REPORT")"
     printf 'replacement-only report\n' > "$RACE_REPORT"
   fi
@@ -3113,20 +3113,20 @@ SH
     printf '## In flight\n'
     i=1
     while [ "$i" -le 5 ]; do
-      printf -- '- [ ] local-%s - Synthetic local worker %s (repo: firstmate) (kind: ship)\n' "$i" "$i"
+      printf -- '- [ ] local-%s - Synthetic local worker %s (repo: juggernaut) (kind: ship)\n' "$i" "$i"
       i=$((i + 1))
     done
     printf '\n## Queued\n\n## Done\n'
     i=1
     while [ "$i" -le 300 ]; do
-      printf -- '- [x] history-%s - Historical completed item %s https://github.com/acme/firstmate/pull/%s (repo: firstmate) (kind: ship) (done 2026-01-01)\n' "$i" "$i" "$i"
+      printf -- '- [x] history-%s - Historical completed item %s https://github.com/acme/juggernaut/pull/%s (repo: juggernaut) (kind: ship) (done 2026-01-01)\n' "$i" "$i" "$i"
       i=$((i + 1))
     done
   } > "$home/data/backlog.md"
   i=1
   while [ "$i" -le 5 ]; do
     jg_write_meta "$home/state/local-$i.meta" \
-      "window=fixture:local-$i" "worktree=$worktree" "project=firstmate" \
+      "window=fixture:local-$i" "worktree=$worktree" "project=juggernaut" \
       "harness=claude" "kind=ship" "mode=no-mistakes"
     printf 'working: synthetic fixture\n' > "$home/state/local-$i.status"
     i=$((i + 1))
@@ -3194,8 +3194,8 @@ test_remote_ledgers_share_one_concurrent_budget_and_fall_back_to_cache() {
   [ "$(wc -l < "$parent/ledger-calls.log" | tr -d ' ')" -eq 5 ] \
     || fail "a healthy snapshot did not issue exactly one remote file read per home"
   printf '%s' "$json" | jq -e '
-    (.secondmates | length) == 5
-      and all(.secondmates[]; .freshness == "fresh" and .age_seconds == 100)
+    (.squad_leads | length) == 5
+      and all(.squad_leads[]; .freshness == "fresh" and .age_seconds == 100)
       and (.decisions_open | any(.id == "ledger-1/remote-parked" and .owner == "ledger-1"))
       and (.gates | all(.id != "remote-parked"))
       and (.gates | any(.id == "remote-aged" and .owner == "ledger-1" and (.reason | startswith("held 40d"))))
@@ -3218,7 +3218,7 @@ test_remote_ledgers_share_one_concurrent_budget_and_fall_back_to_cache() {
 ## Queued
 
 ## Done
-- [x] remote-approved - Captain-approved delivery $approved_pr (repo: firstmate) (kind: ship) (hold-kind: captain) (merged 2026-09-03)
+- [x] remote-approved - Captain-approved delivery $approved_pr (repo: juggernaut) (kind: ship) (hold-kind: captain) (merged 2026-09-03)
 EOF
   write_remote_home_summary "$remote_home" 1000
   tmp="$cache_file.tmp"
@@ -3229,9 +3229,9 @@ EOF
     "$remote_home/state/home-summary.json" > "$tmp" && mv "$tmp" "$remote_home/state/home-summary.json"
   json=$(run_remote_ledger_bearings "$parent" "$fakebin" 1100)
   printf '%s' "$json" | jq -e '
-    (.secondmates | any(.id == "ledger-1" and .state == "unknown"
+    (.squad_leads | any(.id == "ledger-1" and .state == "unknown"
       and .provenance == "unknown" and (.reason | contains("no valid cached copy"))))
-      and (.omitted | any(.surface == "secondmate home(s) with unreadable structured state: 1"))
+      and (.omitted | any(.surface == "squad_lead home(s) with unreadable structured state: 1"))
   ' >/dev/null || fail "a hold-bearing pre-classifier live and cached summary was not invalidated and disclosed: $json"
 
   tmp="$cache_file.tmp"
@@ -3241,15 +3241,15 @@ EOF
     "$remote_home/state/home-summary.json" > "$tmp" && mv "$tmp" "$remote_home/state/home-summary.json"
   json=$(run_remote_ledger_bearings "$parent" "$fakebin" 1100)
   printf '%s' "$json" | jq -e '
-    (.secondmates | any(.id == "ledger-1" and .state == "unknown"
+    (.squad_leads | any(.id == "ledger-1" and .state == "unknown"
       and .provenance == "unknown" and (.reason | contains("no valid cached copy"))))
-      and (.omitted | any(.surface == "secondmate home(s) with unreadable structured state: 1"))
+      and (.omitted | any(.surface == "squad_lead home(s) with unreadable structured state: 1"))
   ' >/dev/null || fail "an empty pre-classifier live and cached summary was not invalidated and disclosed: $json"
 
   write_remote_home_summary "$remote_home" 1000
   json=$(run_remote_ledger_bearings "$parent" "$fakebin" 1100)
   printf '%s' "$json" | jq -e '
-    (.secondmates | any(.id == "ledger-1" and .freshness == "fresh"))
+    (.squad_leads | any(.id == "ledger-1" and .freshness == "fresh"))
       and (.decisions_open | any(.id == "ledger-1/remote-parked" and .owner == "ledger-1"))
       and (.gates | any(.id == "remote-aged" and .owner == "ledger-1"))
   ' >/dev/null || fail "a refreshed current-schema summary did not restore bucketed remote holds: $json"
@@ -3260,8 +3260,8 @@ EOF
   : > "$parent/ledger-calls.log"
   json=$(run_remote_ledger_bearings "$parent" "$fakebin" 1100)
   printf '%s' "$json" | jq -e '
-    ([.secondmates[] | select(.id == "ledger-1" and .freshness == "cached" and .age_seconds == 100)] | length) == 1
-      and ([.secondmates[] | select(.id != "ledger-1" and .freshness == "fresh")] | length) == 4
+    ([.squad_leads[] | select(.id == "ledger-1" and .freshness == "cached" and .age_seconds == 100)] | length) == 1
+      and ([.squad_leads[] | select(.id != "ledger-1" and .freshness == "fresh")] | length) == 4
   ' >/dev/null || fail "a multi-document live ledger bypassed the valid cache: $json"
   [ "$(wc -l < "$parent/ledger-calls.log" | tr -d ' ')" -eq 5 ] \
     || fail "rejecting a multi-document live ledger added remote reads"
@@ -3271,8 +3271,8 @@ EOF
   : > "$parent/ledger-calls.log"
   json=$(run_remote_ledger_bearings "$parent" "$fakebin" 1100)
   printf '%s' "$json" | jq -e '
-    ([.secondmates[] | select(.id == "ledger-1" and .freshness == "cached")] | length) == 1
-      and ([.secondmates[] | select(.id != "ledger-1" and .freshness == "fresh")] | length) == 4
+    ([.squad_leads[] | select(.id == "ledger-1" and .freshness == "cached")] | length) == 1
+      and ([.squad_leads[] | select(.id != "ledger-1" and .freshness == "fresh")] | length) == 4
   ' >/dev/null || fail "an unbounded primary ledger stream consumed the shared collector budget: $json"
   [ "$(wc -l < "$parent/ledger-calls.log" | tr -d ' ')" -eq 5 ] \
     || fail "bounding one faulty primary ledger added remote reads"
@@ -3291,8 +3291,8 @@ EOF
   [ -f "$parent/ledger-active/overlap-proved" ] \
     || fail "five wedged remote reads never overlapped within the shared fifteen-second budget"
   printf '%s' "$json" | jq -e '
-    (.secondmates | length) == 5
-      and all(.secondmates[]; .freshness == "cached" and .age_seconds == 1000
+    (.squad_leads | length) == 5
+      and all(.squad_leads[]; .freshness == "cached" and .age_seconds == 1000
         and .provenance == "structured-home-cache")
       and ([.omitted[] | select(.surface | contains("served from cached home ledger"))] | length) == 5
   ' >/dev/null || fail "wedged homes did not use and disclose age-labeled cache rows: $json"
@@ -3319,10 +3319,10 @@ EOF
   : > "$parent/ledger-pids.log"
   json=$(run_remote_ledger_bearings "$parent" "$fakebin" 2000)
   printf '%s' "$json" | jq -e '
-    ([.secondmates[] | select(.freshness == "fresh" and .age_seconds == 10)] | length) == 4
-      and ([.secondmates[] | select(.id == "ledger-1" and .freshness == "cached"
+    ([.squad_leads[] | select(.freshness == "fresh" and .age_seconds == 10)] | length) == 4
+      and ([.squad_leads[] | select(.id == "ledger-1" and .freshness == "cached"
         and .age_seconds == 1000 and .provenance == "structured-home-cache")] | length) == 1
-      and ([.omitted[] | select(.surface == "secondmate ledger-1 served from cached home ledger")] | length) == 1
+      and ([.omitted[] | select(.surface == "squad_lead ledger-1 served from cached home ledger")] | length) == 1
   ' >/dev/null || fail "one slow home prevented four fresh rows or hid its cache disclosure: $json"
   [ "$(wc -l < "$parent/ledger-calls.log" | tr -d ' ')" -eq 5 ] \
     || fail "the mixed-speed snapshot made more than one remote read per ledger home"
@@ -3341,11 +3341,11 @@ test_a_remote_home_without_any_ledger_is_explicitly_unreadable_without_remote_co
 
   json=$(run_remote_ledger_bearings "$parent" "$fakebin" 1100)
   printf '%s' "$json" | jq -e '
-    (.secondmates | length) == 1
-      and .secondmates[0].state == "unknown"
-      and .secondmates[0].provenance == "unknown"
-      and (.secondmates[0].reason | contains("home ledger is missing, unreadable, or invalid"))
-      and (.omitted | any(.surface == "secondmate home(s) with unreadable structured state: 1"))
+    (.squad_leads | length) == 1
+      and .squad_leads[0].state == "unknown"
+      and .squad_leads[0].provenance == "unknown"
+      and (.squad_leads[0].reason | contains("home ledger is missing, unreadable, or invalid"))
+      and (.omitted | any(.surface == "squad_lead home(s) with unreadable structured state: 1"))
   ' >/dev/null || fail "a no-ledger remote home was not explicitly disclosed as unreadable: $json"
   [ "$(wc -l < "$parent/ledger-calls.log" | tr -d ' ')" -eq 1 ] \
     || fail "a no-ledger remote home issued more than its single ledger read"
@@ -3365,9 +3365,9 @@ test_gnu_stat_uses_file_formats_without_bsd_fallback_pollution
 test_parent_activity_evidence_is_bounded_and_disclosed
 test_active_child_overrides_old_parent_event
 test_structured_child_decision_reaches_captains_call
-test_bad_secondmate_homes_never_revive_parent_work
-test_oversized_secondmate_summary_stays_strict_unknown
-test_secondmate_and_child_bounds_are_disclosed
+test_bad_squad_lead_homes_never_revive_parent_work
+test_oversized_squad_lead_summary_stays_strict_unknown
+test_squad_lead_and_child_bounds_are_disclosed
 test_parent_decision_is_untrusted_contradiction_only
 test_parent_evidence_reconciles_by_verb_and_key
 test_nonprogressing_child_states_are_explicit
@@ -3375,7 +3375,7 @@ test_registry_unavailability_and_bounds_are_explicit
 test_current_landed_baseline_is_repeatable_and_prior_report_independent
 test_default_is_bounded_and_local_only
 test_toon_json_parity
-test_landed_includes_secondmate_home_merges
+test_landed_includes_squad_lead_home_merges
 test_landed_accepts_only_kind_owned_delivery_artifacts
 test_kind_fallback_matches_tasks_axi_word_boundaries
 test_landed_preserves_kindless_v1_summary_reports
@@ -3396,8 +3396,8 @@ test_active_children_project_independent_of_home_captain_hold
 test_nameless_legacy_summary_uses_its_durable_identifier
 test_newest_filed_gates_are_selected_before_snapshot_bounds
 test_underway_and_gate_rows_carry_the_durable_name_and_filed_date
-test_mixed_secondmate_roles_partial_state_and_captain_readiness
-test_main_captain_readiness_matches_secondmate_projection
+test_mixed_squad_lead_roles_partial_state_and_captain_readiness
+test_main_captain_readiness_matches_squad_lead_projection
 test_completed_scout_report_not_pending
 test_open_decision_surfaces_end_to_end
 test_report_pointers_surface

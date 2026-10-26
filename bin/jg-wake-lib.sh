@@ -504,7 +504,7 @@ jg_afk_daemon_owns_supervision() {
 # default: missing, empty, unreadable, or unrecognized content, and the
 # legacy bare-epoch-timestamp content written before mode existed, all read
 # as "away". Only an exact first-line "quiet" ever reads as "quiet" -
-# kunchenguid/firstmate#2356's standing captain-present quiet mode, entered
+# kunchenguid/juggernaut#2356's standing captain-present quiet mode, entered
 # only through /quiet and exited only through an explicit /quiet off
 # (AGENTS.md section 8's away-mode stub).
 jg_afk_mode() {
@@ -1549,7 +1549,7 @@ jg_meta_lock_path() {
 # as opposed to jg_meta_lock_path, which guards one task's record.
 #
 # A per-task lock cannot protect a task that does not exist yet. Forced
-# secondmate teardown enumerates a home's task set, locks what it found, and
+# squad_lead teardown enumerates a home's task set, locks what it found, and
 # then re-enumerates while removing; a fresh spawn publishing a record inside
 # that window is invisible to the first enumeration and visible to the second,
 # so it gets destructively processed while never lifecycle-locked (reproduced
@@ -1566,36 +1566,36 @@ jg_task_set_lock_path() {  # <state-dir>
   printf '%s/.task-set.lock\n' "$state"
 }
 
-# The top-most firstmate home reachable from this one on THIS machine, used as
+# The top-most juggernaut home reachable from this one on THIS machine, used as
 # the single anchor every local home agrees on for machine-local shared state.
 #
 # A local parent binding is followed upward. A remote parent binding terminates
 # the walk at the current home, which is the correct answer rather than an
 # error: the parent lives on another machine, so its filesystem can neither hold
 # nor be observed by a lock taken here, and a remote-seeded home is itself the
-# top of the local tree that jg_local_firstmate_state_dirs below enumerates
+# top of the local tree that jg_local_juggernaut_state_dirs below enumerates
 # (that walk already skips remote registry entries for the same reason).
 # Refusing a remote binding instead made every operation anchored here fail
-# closed inside a remote secondmate home and its local descendants.
+# closed inside a remote squad_lead home and its local descendants.
 #
 # Everything else still fails closed: an unreadable or malformed binding, an
 # unreachable local parent, a cycle, and a chain deeper than the bound.
-jg_firstmate_root_home() {
+jg_juggernaut_root_home() {
   local home=${1:-$JG_HOME} marker parent seen="|" depth=0
   home=$(CDPATH='' cd -- "$home" 2>/dev/null && pwd -P) || return 1
-  while [ -e "$home/.jg-secondmate-parent" ] || [ -L "$home/.jg-secondmate-parent" ]; do
-    marker="$home/.jg-secondmate-parent"
-    if ! command -v jg_secondmate_parent_record_parse >/dev/null 2>&1; then
-      # shellcheck source=bin/jg-secondmate-parent-lib.sh
-      . "$JG_WAKE_LIB_DIR/jg-secondmate-parent-lib.sh"
+  while [ -e "$home/.jg-squad-lead-parent" ] || [ -L "$home/.jg-squad-lead-parent" ]; do
+    marker="$home/.jg-squad-lead-parent"
+    if ! command -v jg_squad_lead_parent_record_parse >/dev/null 2>&1; then
+      # shellcheck source=bin/jg-squad-lead-parent-lib.sh
+      . "$JG_WAKE_LIB_DIR/jg-squad-lead-parent-lib.sh"
     fi
-    jg_secondmate_parent_record_parse "$marker" || return 1
-    case "$JG_SECONDMATE_PARENT_ROUTE" in
+    jg_squad_lead_parent_record_parse "$marker" || return 1
+    case "$JG_SQUAD_LEAD_PARENT_ROUTE" in
       local) ;;
       remote) break ;;
       *) return 1 ;;
     esac
-    parent=$(CDPATH='' cd -- "$JG_SECONDMATE_PARENT_HOME" 2>/dev/null && pwd -P) || return 1
+    parent=$(CDPATH='' cd -- "$JG_SQUAD_LEAD_PARENT_HOME" 2>/dev/null && pwd -P) || return 1
     case "$seen" in *"|$parent|"*) return 1 ;; esac
     seen="$seen$home|"
     home=$parent
@@ -1605,30 +1605,30 @@ jg_firstmate_root_home() {
   printf '%s\n' "$home"
 }
 
-# Every Firstmate state directory on THIS machine whose task records can share a
+# Every Juggernaut state directory on THIS machine whose task records can share a
 # machine-local resource with <first-state>: <first-state> itself, then the local
-# root home and each local secondmate home registered below it, walked through
-# every data/secondmates.md breadth-first. Remote registry entries are skipped,
+# root home and each local squad_lead home registered below it, walked through
+# every data/squad_leads.md breadth-first. Remote registry entries are skipped,
 # because their workers run on another machine.
 #
-# Sets JG_LOCAL_FIRSTMATE_STATES to that list, <first-state> first and without
+# Sets JG_LOCAL_JUGGERNAUT_STATES to that list, <first-state> first and without
 # duplicates however each directory is spelled. Returns 1 with
-# JG_LOCAL_FIRSTMATE_ERROR naming what could not be proved - an unresolvable
+# JG_LOCAL_JUGGERNAUT_ERROR naming what could not be proved - an unresolvable
 # root, an unsafe or malformed registry, or an unavailable registered local
 # home - so a caller refuses rather than treating an unreadable home as one
-# with no tasks. Requires bin/jg-secondmate-registry-lib.sh to be sourced first.
-# shellcheck disable=SC2034 # JG_LOCAL_FIRSTMATE_ERROR is read by callers.
-jg_local_firstmate_state_dirs() {  # <first-state>
+# with no tasks. Requires bin/jg-squad-lead-registry-lib.sh to be sourced first.
+# shellcheck disable=SC2034 # JG_LOCAL_JUGGERNAUT_ERROR is read by callers.
+jg_local_juggernaut_state_dirs() {  # <first-state>
   local first=$1 root home reg line child known existing i=0
   local -a homes
-  JG_LOCAL_FIRSTMATE_STATES=("$first")
-  JG_LOCAL_FIRSTMATE_ERROR=
-  if ! command -v secondmate_registry_parse_line >/dev/null 2>&1; then
-    # shellcheck source=bin/jg-secondmate-registry-lib.sh
-    . "$JG_WAKE_LIB_DIR/jg-secondmate-registry-lib.sh"
+  JG_LOCAL_JUGGERNAUT_STATES=("$first")
+  JG_LOCAL_JUGGERNAUT_ERROR=
+  if ! command -v squad_lead_registry_parse_line >/dev/null 2>&1; then
+    # shellcheck source=bin/jg-squad-lead-registry-lib.sh
+    . "$JG_WAKE_LIB_DIR/jg-squad-lead-registry-lib.sh"
   fi
-  root=$(jg_firstmate_root_home "$JG_HOME") || {
-    JG_LOCAL_FIRSTMATE_ERROR="cannot resolve the root Firstmate home"
+  root=$(jg_juggernaut_root_home "$JG_HOME") || {
+    JG_LOCAL_JUGGERNAUT_ERROR="cannot resolve the root Juggernaut home"
     return 1
   }
   homes=("$root")
@@ -1636,29 +1636,29 @@ jg_local_firstmate_state_dirs() {  # <first-state>
     home=${homes[$i]}
     i=$((i + 1))
     known=0
-    for existing in "${JG_LOCAL_FIRSTMATE_STATES[@]}"; do
+    for existing in "${JG_LOCAL_JUGGERNAUT_STATES[@]}"; do
       if [ "$existing" = "$home/state" ] || [ "$existing" -ef "$home/state" ]; then
         known=1
       fi
     done
-    [ "$known" = 1 ] || JG_LOCAL_FIRSTMATE_STATES+=("$home/state")
-    reg="$home/data/secondmates.md"
+    [ "$known" = 1 ] || JG_LOCAL_JUGGERNAUT_STATES+=("$home/state")
+    reg="$home/data/squad_leads.md"
     [ ! -e "$reg" ] && [ ! -L "$reg" ] && continue
     [ -f "$reg" ] && [ ! -L "$reg" ] || {
-      JG_LOCAL_FIRSTMATE_ERROR="local Firstmate registry is unsafe at $reg"
+      JG_LOCAL_JUGGERNAUT_ERROR="local Juggernaut registry is unsafe at $reg"
       return 1
     }
     while IFS= read -r line || [ -n "$line" ]; do
       case "$line" in
         "- "*)
-          secondmate_registry_parse_line "$line" || {
-            JG_LOCAL_FIRSTMATE_ERROR="malformed local Firstmate registry entry in $reg"
+          squad_lead_registry_parse_line "$line" || {
+            JG_LOCAL_JUGGERNAUT_ERROR="malformed local Juggernaut registry entry in $reg"
             return 1
           }
-          [ "$SECONDMATE_REGISTRY_REMOTE" -eq 0 ] || continue
-          child=$([ -d "$SECONDMATE_REGISTRY_HOME" ] &&
-            CDPATH='' cd -- "$SECONDMATE_REGISTRY_HOME" 2>/dev/null && pwd -P) || {
-            JG_LOCAL_FIRSTMATE_ERROR="registered local Firstmate home is unavailable: $SECONDMATE_REGISTRY_HOME"
+          [ "$SQUAD_LEAD_REGISTRY_REMOTE" -eq 0 ] || continue
+          child=$([ -d "$SQUAD_LEAD_REGISTRY_HOME" ] &&
+            CDPATH='' cd -- "$SQUAD_LEAD_REGISTRY_HOME" 2>/dev/null && pwd -P) || {
+            JG_LOCAL_JUGGERNAUT_ERROR="registered local Juggernaut home is unavailable: $SQUAD_LEAD_REGISTRY_HOME"
             return 1
           }
           known=0
@@ -1677,7 +1677,7 @@ jg_local_firstmate_state_dirs() {  # <first-state>
 # fresh spawn evaluates under it on every backend.
 #
 # It is anchored in the local root home's state directory so that every home on
-# this machine that can reach the same pool - the root, and each secondmate home
+# this machine that can reach the same pool - the root, and each squad_lead home
 # below it, including a remote-seeded home and its own local descendants -
 # derives the identical path. Its identity is the project's resolved origin, so
 # separate clones of one origin share a single lock; an origin-less local-only
@@ -1685,7 +1685,7 @@ jg_local_firstmate_state_dirs() {  # <first-state>
 jg_treehouse_project_lock_path() {  # <project-dir>
   local project=$1 root origin identity hash top
   [ -d "$project" ] || return 1
-  root=$(jg_firstmate_root_home "$JG_HOME") || return 1
+  root=$(jg_juggernaut_root_home "$JG_HOME") || return 1
   origin=$(git -C "$project" remote get-url origin 2>/dev/null || true)
   if [ -n "$origin" ]; then
     case "$origin" in
@@ -1725,19 +1725,19 @@ jg_treehouse_pool_slot() {  # <project-dir> <worktree>
 #
 # Treehouse can record ownership durably: `treehouse get --lease --lease-holder`
 # reserves a slot under a label until `treehouse return --if-lease-holder`
-# releases it, and Firstmate uses exactly that for secondmate homes
-# (bin/jg-home-seed.sh). Crewmate spawns do not take that path: they acquire
+# releases it, and Juggernaut uses exactly that for squad_lead homes
+# (bin/jg-home-seed.sh). Operator spawns do not take that path: they acquire
 # their slot through the interactive pane-driven `treehouse get`, whose state
 # entry is a live process lease (owner_pid plus owner_started_at, and `treehouse
 # status` reports in-use from the processes actually running under the path).
 # That answers "is anything running here", never "which task owns this", and it
 # is released by the very event that makes a task record stale - the worker
 # exiting - so a slot whose lease has lapsed reads identical whether it is still
-# this task's or has since been handed to another one. Firstmate therefore keeps
+# this task's or has since been handed to another one. Juggernaut therefore keeps
 # its own claim on top: one file naming the task that took the slot, written by
 # bin/jg-spawn.sh under the same project lock that allocates the slot and
 # released by bin/jg-teardown.sh when the slot goes back to the pool. Moving
-# crewmate spawns onto the durable lease is separate follow-up work.
+# operator spawns onto the durable lease is separate follow-up work.
 #
 # The claim lives at <pool>/<slot>/.jg-slot-owner - a sibling of the repo
 # checkout rather than a file inside it - so claiming a slot can never dirty the
@@ -1824,10 +1824,10 @@ jg_canonical_existing_dir() {  # <path>
   ( CDPATH='' cd -- "$1" 2>/dev/null && pwd -P )
 }
 
-# Which other task record, in any local Firstmate home, still names <slot> as
+# Which other task record, in any local Juggernaut home, still names <slot> as
 # its worktree= or home=. Returns 0 with JG_SLOT_RECORD_OWNER_ID and
 # JG_SLOT_RECORD_OWNER_FIELD set when one does, 1 when none does, and 2 when the
-# local homes cannot be enumerated (reason in JG_LOCAL_FIRSTMATE_ERROR). <self-meta> is skipped by
+# local homes cannot be enumerated (reason in JG_LOCAL_JUGGERNAUT_ERROR). <self-meta> is skipped by
 # identity and name, so the same record reached through a differently resolved
 # state dir is still itself while a differently named hardlink is another task.
 # Callers source bin/jg-backend.sh for jg_meta_get.
@@ -1837,8 +1837,8 @@ jg_slot_record_owner() {  # <slot> <first-state> [self-meta]
   JG_SLOT_RECORD_OWNER_ID=
   JG_SLOT_RECORD_OWNER_FIELD=
   slot=$(jg_canonical_existing_dir "$slot") || return 1
-  jg_local_firstmate_state_dirs "$2" || return 2
-  for state_dir in "${JG_LOCAL_FIRSTMATE_STATES[@]}"; do
+  jg_local_juggernaut_state_dirs "$2" || return 2
+  for state_dir in "${JG_LOCAL_JUGGERNAUT_STATES[@]}"; do
     for other in "$state_dir"/*.meta; do
       [ -f "$other" ] && [ ! -L "$other" ] || continue
       [ -n "$self" ] && [ "${other##*/}" = "${self##*/}" ] && [ "$other" -ef "$self" ] && continue
@@ -2427,16 +2427,16 @@ jg_wake_withdraw() {
   return "$status"
 }
 
-jg_wake_secondmate_progress_marker_write() { # <task> <observed-at> <oldest-row-key>
+jg_wake_squad_lead_progress_marker_write() { # <task> <observed-at> <oldest-row-key>
   local task=$1 observed_at=$2 oldest_row_key=$3 marker tmp
   case "$task" in ''|*[!A-Za-z0-9._-]*) return 1 ;; esac
   case "$observed_at" in ''|*[!0-9]*) return 1 ;; esac
   case "$oldest_row_key" in ''|*[!0-9-]*) return 1 ;; esac
-  marker="$STATE/.secondmate-wake-progress-$task"
+  marker="$STATE/.squad-lead-wake-progress-$task"
   if [ -e "$marker" ] || [ -L "$marker" ]; then
     [ -f "$marker" ] && [ ! -L "$marker" ] || return 1
   fi
-  tmp=$(mktemp "$STATE/.secondmate-wake-progress.XXXXXX") || return 1
+  tmp=$(mktemp "$STATE/.squad-lead-wake-progress.XXXXXX") || return 1
   if ! printf '%s\t%s\n' "$observed_at" "$oldest_row_key" > "$tmp" || ! chmod 0600 "$tmp" \
     || ! _jg_atomic_replace "$tmp" "$marker"; then
     rm -f -- "$tmp"
@@ -2444,15 +2444,15 @@ jg_wake_secondmate_progress_marker_write() { # <task> <observed-at> <oldest-row-
   fi
 }
 
-jg_wake_secondmate_ring_marker_write() { # <task> <row-key>
+jg_wake_squad_lead_ring_marker_write() { # <task> <row-key>
   local task=$1 row_key=$2 marker tmp
   case "$task" in ''|*[!A-Za-z0-9._-]*) return 1 ;; esac
   case "$row_key" in ''|*[!0-9-]*) return 1 ;; esac
-  marker="$STATE/.secondmate-wake-ring-$task"
+  marker="$STATE/.squad-lead-wake-ring-$task"
   if [ -e "$marker" ] || [ -L "$marker" ]; then
     [ -f "$marker" ] && [ ! -L "$marker" ] || return 1
   fi
-  tmp=$(mktemp "$STATE/.secondmate-wake-ring.XXXXXX") || return 1
+  tmp=$(mktemp "$STATE/.squad-lead-wake-ring.XXXXXX") || return 1
   if ! printf '%s\n' "$row_key" > "$tmp" || ! chmod 0600 "$tmp" \
     || ! _jg_atomic_replace "$tmp" "$marker"; then
     rm -f -- "$tmp"
@@ -2460,15 +2460,15 @@ jg_wake_secondmate_ring_marker_write() { # <task> <row-key>
   fi
 }
 
-jg_wake_secondmate_stall_marker_write() { # <task> <row-key>
+jg_wake_squad_lead_stall_marker_write() { # <task> <row-key>
   local task=$1 row_key=$2 marker tmp
   case "$task" in ''|*[!A-Za-z0-9._-]*) return 1 ;; esac
   case "$row_key" in ''|*[!0-9-]*) return 1 ;; esac
-  marker="$STATE/.secondmate-wake-stall-$task"
+  marker="$STATE/.squad-lead-wake-stall-$task"
   if [ -e "$marker" ] || [ -L "$marker" ]; then
     [ -f "$marker" ] && [ ! -L "$marker" ] || return 1
   fi
-  tmp=$(mktemp "$STATE/.secondmate-wake-stall.XXXXXX") || return 1
+  tmp=$(mktemp "$STATE/.squad-lead-wake-stall.XXXXXX") || return 1
   if ! printf '%s\n' "$row_key" > "$tmp" || ! chmod 0600 "$tmp" \
     || ! _jg_atomic_replace "$tmp" "$marker"; then
     rm -f -- "$tmp"
@@ -2476,11 +2476,11 @@ jg_wake_secondmate_stall_marker_write() { # <task> <row-key>
   fi
 }
 
-jg_wake_secondmate_stall_receipt_write() { # <task> <row-key>
+jg_wake_squad_lead_stall_receipt_write() { # <task> <row-key>
   local task=$1 row_key=$2 root task_dir receipt tmp
   case "$task" in ''|*[!A-Za-z0-9._-]*) return 1 ;; esac
   case "$row_key" in ''|*[!0-9-]*) return 1 ;; esac
-  root="$STATE/.secondmate-wake-stall-receipts"
+  root="$STATE/.squad-lead-wake-stall-receipts"
   task_dir="$root/$task"
   if [ -e "$root" ] || [ -L "$root" ]; then
     [ -d "$root" ] && [ ! -L "$root" ] || return 1
@@ -2504,24 +2504,24 @@ jg_wake_secondmate_stall_receipt_write() { # <task> <row-key>
   fi
 }
 
-jg_wake_commit_secondmate_stall_receipts_through() { # <cutoff> [<rows-file>]
+jg_wake_commit_squad_lead_stall_receipts_through() { # <cutoff> [<rows-file>]
   local cutoff=$1 rows=${2:-} key seq rest epoch task row_key
   while IFS= read -r key; do
     seq=${key##*-}
     rest=${key%-*}
     epoch=${rest##*-}
-    task=${rest#secondmate-wake-loop-}
+    task=${rest#squad-lead-wake-loop-}
     task=${task%-"$epoch"}
     case "$seq" in ''|*[!0-9]*) return 1 ;; esac
     case "$epoch" in ''|*[!0-9]*) return 1 ;; esac
     case "$task" in ''|*[!A-Za-z0-9._-]*) return 1 ;; esac
     row_key="$epoch-$seq"
-    jg_wake_secondmate_stall_receipt_write "$task" "$row_key" || return 1
+    jg_wake_squad_lead_stall_receipt_write "$task" "$row_key" || return 1
   done < <(awk -F '\t' -v cutoff="$cutoff" -v rows="$rows" '
     BEGIN { if (rows != "") while ((getline line < rows) > 0) owned[line]=1 }
     NF >= 5 && $2 ~ /^[0-9]+$/ && $2 <= cutoff \
       && (rows == "" || ($2 in owned)) && $3 == "check" \
-      && $4 ~ /^secondmate-wake-loop-[A-Za-z0-9._-]+-[0-9]+-[0-9]+$/ { print $4 }
+      && $4 ~ /^squad-lead-wake-loop-[A-Za-z0-9._-]+-[0-9]+-[0-9]+$/ { print $4 }
   ' "$JG_WAKE_QUEUE" 2>/dev/null)
 }
 
@@ -3018,7 +3018,7 @@ jg_wake_print_annotations() {  # <deduped-raw-rows> [<presentation-snapshot>]
     path="$STATE/$status_key"
     # A turn-ended-only (historical) row's annotation would show unread status
     # lines even when those bytes are fully covered by the seen marker - already
-    # surfaced to firstmate or deliberately absorbed by the signal triage.
+    # surfaced to juggernaut or deliberately absorbed by the signal triage.
     # Presenting such an already-announced line again makes a bare turn-end look
     # like fresh progress, so skip the annotation when the status file's
     # signature still matches its marker (a proven replay). Any uncertainty -

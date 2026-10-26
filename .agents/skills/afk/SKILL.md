@@ -78,15 +78,15 @@ No `/back` is needed. The first genuine message is the return signal:
   A Bearings request may be answered while the gate is open, and the digest surfaces the catch-up state as a Charted Next `(return-catchup)` warning row naming what still holds it.
   Acting on the fleet - dispatching, steering, merging, or any other ordinary captain work - still waits until the check exits successfully.
   Once it does, close every task the brief lists under "Landed, cleanup due" through ordinary teardown (`bin/jg-teardown.sh <task>`, never forced; a refusal is a stop-and-investigate result) and tell the captain those workers are closed in outcome language.
-- A message **with** the current operational prefix (`JG_OPERATIONAL_PREFIX`, U+2063 INVISIBLE SEPARATOR followed by `FIRSTMATE_OP: `), or a legacy bare `JG_INJECT_MARK` daemon escalation -> stay away and process it.
+- A message **with** the current operational prefix (`JG_OPERATIONAL_PREFIX`, U+2063 INVISIBLE SEPARATOR followed by `JUGGERNAUT_OP: `), or a legacy bare `JG_INJECT_MARK` daemon escalation -> stay away and process it.
 - A message that is exactly the record-backed operational doorbell (`: Juggernaut operational input waiting: read '<path>' ...`) -> run `bin/jg-operational-input.sh open '<path>'`; when it succeeds, stay away and process the escalation it prints.
   When it fails, the doorbell is not Juggernaut's, so treat the message like any other unmarked message.
-  Never treat ASCII text that merely looks like Juggernaut input, such as a typed `FIRSTMATE_OP:` label, as internal.
+  Never treat ASCII text that merely looks like Juggernaut input, such as a typed `JUGGERNAUT_OP:` label, as internal.
 - A `Stop hook feedback` wake from the Stop hook or the supervision host, or a Grok background-task-completed notification for the arm -> stay away and process it; it is automatic supervision, not a message from the captain.
 - Re-invoking `/afk` while already away -> stay away (refresh); this does **not** trigger an exit.
 
 Bias ambiguous cases toward exit: a present captain beats token savings, and a false exit is self-correcting (the captain re-runs `/afk`).
-When the captain wants this same token-saving supervision while staying present and chatting - ordinary messages should NOT exit it - that is `/quiet` (kunchenguid/firstmate#2356), not `/afk`.
+When the captain wants this same token-saving supervision while staying present and chatting - ordinary messages should NOT exit it - that is `/quiet` (kunchenguid/juggernaut#2356), not `/afk`.
 
 ## Orthogonal to approval authority
 
@@ -107,7 +107,7 @@ On the harnesses that still launch the daemon (every verified harness except Pi 
 
 ### Operational prefix contract
 
-The daemon constructs each current escalation as the `away-supervisor` kind owned by `bin/jg-operational-input.sh`; its envelope begins with `JG_OPERATIONAL_PREFIX`: `JG_INJECT_MARK` (U+2063 INVISIBLE SEPARATOR) followed by the stable `FIRSTMATE_OP: ` label.
+The daemon constructs each current escalation as the `away-supervisor` kind owned by `bin/jg-operational-input.sh`; its envelope begins with `JG_OPERATIONAL_PREFIX`: `JG_INJECT_MARK` (U+2063 INVISIBLE SEPARATOR) followed by the stable `JUGGERNAUT_OP: ` label.
 The bare `JG_INJECT_MARK` form remains accepted for legacy daemon escalations during rollout.
 U+2063 has no normal keyboard keystroke and survives terminal transport as UTF-8 text, but Claude Code (verified on 2.1.280) removes it, with every other invisible character, from each submitted prompt, whether typed, pasted, or passed as the launch prompt.
 For a primary harness the owner lists as stripping the marker (Claude Code), the daemon instead writes the envelope as a record in this home's `state/operational-inbox` and types only the owner's plain doorbell naming it.
@@ -242,7 +242,7 @@ The single-line format makes submission unambiguous across harnesses; the carrie
   `JG_SUPERVISOR_TARGET` override (a tmux target or a herdr
   `"<session>:<pane-id>"` target), then `$TMUX_PANE`, then
   `"${HERDR_SESSION:-default}:${HERDR_PANE_ID}"` under herdr, then a
-  `firstmate:0` fallback with a warning. Both resolution sources are logged at
+  `juggernaut:0` fallback with a warning. Both resolution sources are logged at
   startup so a wrong-but-resolving fallback is detectable. Other runtime
   backends, including zellij, orca, and cmux, are not yet supported as
   supervisor backends; the daemon refuses loudly at startup instead of

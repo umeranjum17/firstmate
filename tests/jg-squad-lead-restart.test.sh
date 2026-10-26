@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# bin/jg-secondmate-restart.sh: persist-then-restart, and the honest fallback.
+# bin/jg-squad-lead-restart.sh: persist-then-restart, and the honest fallback.
 #
 # What these pin, all through the real commands (real jg-send, real durable
 # steering inbox, real parent-owned reply expectation, real jg-control
@@ -27,10 +27,10 @@ set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-RESTART="$ROOT/bin/jg-secondmate-restart.sh"
+RESTART="$ROOT/bin/jg-squad-lead-restart.sh"
 
 jg_git_identity fmtest fmtest@example.com
-TMP_ROOT=$(jg_test_tmproot jg-secondmate-restart)
+TMP_ROOT=$(jg_test_tmproot jg-squad-lead-restart)
 mkdir -p "$TMP_ROOT"
 TMP_ROOT=$(cd "$TMP_ROOT" && pwd -P)
 trap 'rm -rf -- "$TMP_ROOT"' EXIT
@@ -77,8 +77,8 @@ case "${1:-}" in
           fi
           printf 'zsh' > "$D/command.$target"
           ;;
-        *'encode launch-brief'* | *'Firstmate operational input waiting: read'*) cat "$D/becomes" > "$D/command.$target" ;;
-        ': Firstmate instruction waiting: list '*)
+        *'encode launch-brief'* | *'Juggernaut operational input waiting: read'*) cat "$D/becomes" > "$D/command.$target" ;;
+        ': Juggernaut instruction waiting: list '*)
           printf 'doorbell\n' >> "$D/rings"
           if [ -x "$D/on-doorbell" ]; then
             "$D/on-doorbell" "$payload"
@@ -147,7 +147,7 @@ SH
 new_case() {
   local dir="$TMP_ROOT/$1-$RANDOM"
   mkdir -p "$dir/home/state" "$dir/home/data" "$dir/home/config" "$dir/fake"
-  printf 'claude\n' > "$dir/home/config/secondmate-harness"
+  printf 'claude\n' > "$dir/home/config/squad-lead-harness"
   : > "$dir/fake/literal"
   : > "$dir/fake/keys"
   : > "$dir/fake/rings"
@@ -158,14 +158,14 @@ new_case() {
 }
 
 # add_local_mate <case-dir> <id> [harness] [backend-line]
-# A live LOCAL second mate: a real git worktree for its home, plus the durable
+# A live LOCAL squad lead: a real git worktree for its home, plus the durable
 # record this home keeps for it.
 add_local_mate() {
   local dir=$1 id=$2 harness=${3:-claude} backend=${4:-}
   local home="$dir/home" smhome="$dir/$id-home"
   jg_git_worktree "$dir/$id-repo" "$smhome" "sm-$id"
   mkdir -p "$smhome/state" "$smhome/data" "$smhome/bin" "$home/data/$id"
-  printf '%s\n' "$id" > "$smhome/.jg-secondmate-home"
+  printf '%s\n' "$id" > "$smhome/.jg-squad-lead-home"
   printf '# agents\n' > "$smhome/AGENTS.md"
   printf '# charter\n' > "$home/data/$id/brief.md"
   {
@@ -174,8 +174,8 @@ add_local_mate() {
     echo "worktree=$smhome"
     echo "project=$smhome"
     echo "harness=$harness"
-    echo "kind=secondmate"
-    echo "mode=secondmate"
+    echo "kind=squad_lead"
+    echo "mode=squad_lead"
     echo "yolo=off"
     echo "model=default"
     echo "effort=default"
@@ -187,8 +187,8 @@ add_local_mate() {
 }
 
 # add_repo_backed_mate <case-dir> <id> [harness] [backend-line]
-# Like add_local_mate, but the world is the one /updatefirstmate actually runs
-# against: a bare origin, a firstmate repo clone on its default branch, and the
+# Like add_local_mate, but the world is the one /updatejuggernaut actually runs
+# against: a bare origin, a juggernaut repo clone on its default branch, and the
 # mate's home as a DETACHED worktree of that repo already sitting on origin's tip.
 # That "already current" home is the shape the old classifier skipped entirely.
 add_repo_backed_mate() {  # <case-dir> <id> [harness] [backend]
@@ -202,12 +202,12 @@ add_repo_backed_mate() {  # <case-dir> <id> [harness] [backend]
     printf '# agents\n' > "$dir/seed/AGENTS.md"
     printf 'echo a\n' > "$dir/seed/bin/tool.sh"
     printf 's1\n' > "$dir/seed/.agents/skills/note.md"
-    # The operational dirs a live home carries are gitignored in a real firstmate
+    # The operational dirs a live home carries are gitignored in a real juggernaut
     # checkout; without that the home would read as dirty and be skipped.
-    printf '/data/\n/state/\n/config/\n/projects/\n/.no-mistakes/\n.jg-secondmate-home\n' \
+    printf '/data/\n/state/\n/config/\n/projects/\n/.no-mistakes/\n.jg-squad-lead-home\n' \
       > "$dir/seed/.gitignore"
     git -C "$dir/seed" add -A
-    git -C "$dir/seed" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm c1
+    git -C "$dir/seed" -c user.name='Juggernaut Tests' -c user.email='tests@example.invalid' commit -qm c1
     git -C "$dir/seed" push -q origin main
     git clone -q "$dir/origin.git" "$repo"
     git -C "$repo" remote set-head origin main >/dev/null 2>&1 || true
@@ -215,7 +215,7 @@ add_repo_backed_mate() {  # <case-dir> <id> [harness] [backend]
   fi
   git -C "$repo" worktree add -q --detach "$smhome" main
   mkdir -p "$smhome/state" "$smhome/data" "$home/data/$id"
-  printf '%s\n' "$id" > "$smhome/.jg-secondmate-home"
+  printf '%s\n' "$id" > "$smhome/.jg-squad-lead-home"
   printf '# charter\n' > "$home/data/$id/brief.md"
   {
     echo "window=fmses:jg-$id"
@@ -223,8 +223,8 @@ add_repo_backed_mate() {  # <case-dir> <id> [harness] [backend]
     echo "worktree=$smhome"
     echo "project=$smhome"
     echo "harness=$harness"
-    echo "kind=secondmate"
-    echo "mode=secondmate"
+    echo "kind=squad_lead"
+    echo "mode=squad_lead"
     echo "yolo=off"
     echo "model=default"
     echo "effort=default"
@@ -235,7 +235,7 @@ add_repo_backed_mate() {  # <case-dir> <id> [harness] [backend]
   printf '%s' "$smhome" > "$dir/fake/cwd"
 }
 
-# run_update_in_case <case-dir>: the real /updatefirstmate mechanics over that world.
+# run_update_in_case <case-dir>: the real /updatejuggernaut mechanics over that world.
 run_update_in_case() {
   local dir=$1
   env PATH="$dir/fakebin:$PATH" JG_FAKE_DIR="$dir/fake" \
@@ -254,8 +254,8 @@ arm_answer() {
 run_restart() {  # <case-dir> <args...>
   local dir=$1; shift
   env PATH="$dir/fakebin:$PATH" JG_HOME="$dir/home" JG_FAKE_DIR="$dir/fake" \
-    JG_SPAWN_NO_GUARD=1 JG_SECONDMATE_PERSIST_POLL=1 \
-    JG_SECONDMATE_PERSIST_WAIT="${JG_TEST_PERSIST_WAIT:-30}" \
+    JG_SPAWN_NO_GUARD=1 JG_SQUAD_LEAD_PERSIST_POLL=1 \
+    JG_SQUAD_LEAD_PERSIST_WAIT="${JG_TEST_PERSIST_WAIT:-30}" \
     JG_CONTROL_POLL=0.01 JG_CONTROL_EXIT_WAIT=0.05 JG_CONTROL_LAUNCH_WAIT=0.05 \
     JG_SSH_BIN="${JG_TEST_SSH_BIN:-ssh}" \
     "$RESTART" "$@" 2>&1
@@ -307,7 +307,7 @@ test_persist_precedes_restart() {
   assert_contains "$out" "summary: 1 of 1 restarted, 0 nudged, 0 unreached" "the summary should report the reload"
   # The pane transcript orders the two phases: the instruction doorbell first,
   # the harness exit command only after it.
-  doorbell_line=$(grep -n '^: Firstmate instruction waiting: ' "$dir/fake/literal" | head -1 | cut -d: -f1)
+  doorbell_line=$(grep -n '^: Juggernaut instruction waiting: ' "$dir/fake/literal" | head -1 | cut -d: -f1)
   exit_line=$(grep -n '^/exit$' "$dir/fake/literal" | head -1 | cut -d: -f1)
   [ -n "$doorbell_line" ] || fail "the persist request never reached the mate"
   [ -n "$exit_line" ] || fail "the mate was never stopped, so it was not restarted"
@@ -416,9 +416,9 @@ test_refused_restart_falls_back_without_claiming_a_reload() {
   dir=$(new_case refused)
   add_local_mate "$dir" sm1
   arm_answer "$dir" sm1
-  # muse is a crewmate-only adapter, so the control plane refuses a secondmate
+  # muse is a operator-only adapter, so the control plane refuses a squad_lead
   # relaunch onto it BEFORE stopping anything.
-  printf 'muse\n' > "$dir/home/config/secondmate-harness"
+  printf 'muse\n' > "$dir/home/config/squad-lead-harness"
   before=$(cat "$dir/fake/command")
 
   out=$(run_restart "$dir" sm1); rc=$?
@@ -449,8 +449,8 @@ setup_remote_case() {  # <case-dir> <id> <ssh-mode>
     echo "worktree=$dir/$id-home"
     echo "project=$dir/$id-home"
     echo "harness=claude"
-    echo "kind=secondmate"
-    echo "mode=secondmate"
+    echo "kind=squad_lead"
+    echo "mode=squad_lead"
     echo "yolo=off"
     echo "model=default"
     echo "effort=default"
@@ -460,7 +460,7 @@ setup_remote_case() {  # <case-dir> <id> <ssh-mode>
     echo "remote_target=jg-remote:2ndmate-$id"
   } > "$dir/home/state/$id.meta"
   printf -- '- %s - remote domain (host: remote-mac; root: /srv/fm; home: /srv/%s; scope: things; projects: p; added 2026-09-03)\n' \
-    "$id" "$id" > "$dir/home/data/secondmates.md"
+    "$id" "$id" > "$dir/home/data/squad_leads.md"
   cat > "$fb/fake-ssh" <<'SH'
 #!/usr/bin/env bash
 set -u
@@ -497,7 +497,7 @@ case "${rargs[1]:-}" in
     esac
     printf 'relaunched %s harness=%s from=claude model=%s effort=%s backend=herdr endpoint=jg-remote:2ndmate-%s worktree=/srv/fm\n' \
       "${rargs[2]}" "${rargs[3]}" "${rargs[4]}" "${rargs[5]}" "${rargs[2]}"
-    printf 'schema=jg-remote-secondmate-control.v1\n'
+    printf 'schema=jg-remote-squad-lead-control.v1\n'
     printf 'backend=herdr\n'
     printf 'target=jg-remote:2ndmate-%s\n' "${rargs[2]}"
     printf 'herdr_session=jg-remote\n'
@@ -521,10 +521,10 @@ test_remote_mate_restarts_over_the_transport_hop() {
   setup_remote_case "$dir" sm2 ok
   export JG_FAKE_ANSWER_STATUS="$dir/home/state/sm2.status"
   # The parent's own pin is what the replacement must run on; the remote home's
-  # copy of config/secondmate-harness is a different home's file.
-  printf 'pi global-model medium\n' > "$dir/home/config/secondmate-harness"
-  mkdir -p "$dir/home/config/secondmates/sm2"
-  printf 'codex big-model high\n' > "$dir/home/config/secondmates/sm2/harness"
+  # copy of config/squad-lead-harness is a different home's file.
+  printf 'pi global-model medium\n' > "$dir/home/config/squad-lead-harness"
+  mkdir -p "$dir/home/config/squad_leads/sm2"
+  printf 'codex big-model high\n' > "$dir/home/config/squad_leads/sm2/harness"
 
   out=$(run_restart "$dir" jg-sm2); rc=$?
   unset JG_FAKE_ANSWER_STATUS
@@ -532,13 +532,13 @@ test_remote_mate_restarts_over_the_transport_hop() {
   expect_code 0 "$rc" "a remote mate should restart over its transport hop"$'\n'"$out"
   assert_contains "$out" "restarted: sm2 on remote-mac (codex)" \
     "a remote restart should be reported with its host and the parent's pinned runtime"
-  relaunch_line=$(grep '^jg-remote-secondmate-control.sh relaunch' "$dir/ssh.log" | head -1)
+  relaunch_line=$(grep '^jg-remote-squad-lead-control.sh relaunch' "$dir/ssh.log" | head -1)
   [ -n "$relaunch_line" ] || fail "no relaunch crossed the transport hop"$'\n'"$(cat "$dir/ssh.log")"
-  [ "$relaunch_line" = "jg-remote-secondmate-control.sh relaunch sm2 codex big-model high" ] \
+  [ "$relaunch_line" = "jg-remote-squad-lead-control.sh relaunch sm2 codex big-model high" ] \
     || fail "the host-local relaunch did not carry the parent's resolved profile: $relaunch_line"
   # The persist request crossed the SAME hop before the restart did.
-  [ "$(grep -n '^jg-remote-secondmate-control.sh send' "$dir/ssh.log" | head -1 | cut -d: -f1)" \
-     -lt "$(grep -n '^jg-remote-secondmate-control.sh relaunch' "$dir/ssh.log" | head -1 | cut -d: -f1)" ] \
+  [ "$(grep -n '^jg-remote-squad-lead-control.sh send' "$dir/ssh.log" | head -1 | cut -d: -f1)" \
+     -lt "$(grep -n '^jg-remote-squad-lead-control.sh relaunch' "$dir/ssh.log" | head -1 | cut -d: -f1)" ] \
     || fail "the remote mate was restarted before it was asked to persist"$'\n'"$(cat "$dir/ssh.log")"
   pass "T6 a remote mate restarts through the host-local control plane over the jg-on hop"
 }
@@ -564,7 +564,7 @@ test_local_restart_uses_the_home_pin_and_reports_what_ran() {
   dir=$(new_case pin)
   add_local_mate "$dir" sm1
   arm_answer "$dir" sm1
-  printf 'codex\n' > "$dir/home/config/secondmate-harness"
+  printf 'codex\n' > "$dir/home/config/squad-lead-harness"
   printf 'codex' > "$dir/fake/becomes"
 
   out=$(run_restart "$dir" sm1); rc=$?
@@ -582,7 +582,7 @@ test_native_ultra_restart_keeps_local_and_remote_profiles() {
   dir=$(new_case native-local)
   add_local_mate "$dir" sm1
   arm_answer "$dir" sm1
-  printf 'pi codex-native/gpt-6-astra ultra\n' > "$dir/home/config/secondmate-harness"
+  printf 'pi codex-native/gpt-6-astra ultra\n' > "$dir/home/config/squad-lead-harness"
   printf 'pi' > "$dir/fake/becomes"
   printf '#!/usr/bin/env bash\nprintf "Options: --tui-mode\\n"\n' > "$dir/fakebin/pi"
   chmod +x "$dir/fakebin/pi"
@@ -595,12 +595,12 @@ test_native_ultra_restart_keeps_local_and_remote_profiles() {
   dir=$(new_case native-remote)
   setup_remote_case "$dir" sm2 ok
   export JG_FAKE_ANSWER_STATUS="$dir/home/state/sm2.status"
-  printf 'pi-signed codex-native/gpt-6-astra ultra\n' > "$dir/home/config/secondmate-harness"
+  printf 'pi-signed codex-native/gpt-6-astra ultra\n' > "$dir/home/config/squad-lead-harness"
   out=$(run_restart "$dir" sm2); rc=$?
   unset JG_FAKE_ANSWER_STATUS
   expect_code 0 "$rc" "native remote restart failed: $out"
-  relaunch_line=$(grep '^jg-remote-secondmate-control.sh relaunch' "$dir/ssh.log" | head -1)
-  [ "$relaunch_line" = "jg-remote-secondmate-control.sh relaunch sm2 pi-signed codex-native/gpt-6-astra ultra" ] \
+  relaunch_line=$(grep '^jg-remote-squad-lead-control.sh relaunch' "$dir/ssh.log" | head -1)
+  [ "$relaunch_line" = "jg-remote-squad-lead-control.sh relaunch sm2 pi-signed codex-native/gpt-6-astra ultra" ] \
     || fail "remote restart dropped native profile: $relaunch_line"
   pass "native Ultra survives local restart and the remote restart transport"
 }
@@ -651,9 +651,9 @@ test_persist_waits_are_polled_together() {
 
   expect_code 3 "$rc" "the unanswered mate should fall back after the confirmed mate restarts"$'\n'"$out"
   exit_line=$(grep -n '^/exit$' "$dir/fake/literal" | head -1 | cut -d: -f1)
-  nudge_line=$(grep -n '^: Firstmate instruction waiting: ' "$dir/fake/literal" | tail -1 | cut -d: -f1)
+  nudge_line=$(grep -n '^: Juggernaut instruction waiting: ' "$dir/fake/literal" | tail -1 | cut -d: -f1)
   [ -n "$exit_line" ] && [ -n "$nudge_line" ] && [ "$exit_line" -lt "$nudge_line" ] \
-    || fail "the first mate's timeout held the confirmed second mate behind it: $out"
+    || fail "the overwatch's timeout held the confirmed squad lead behind it: $out"
   pass "T10 pending persist answers are polled as one fleet"
 }
 
@@ -667,7 +667,7 @@ test_answered_mate_waits_for_an_empty_composer() {
   # the turn that wrote its answer; jg-control would refuse its exit then.
   printf '3' > "$dir/fake/unknown-reads"
 
-  out=$(JG_SECONDMATE_IDLE_WAIT=30 run_restart "$dir" sm1); rc=$?
+  out=$(JG_SQUAD_LEAD_IDLE_WAIT=30 run_restart "$dir" sm1); rc=$?
 
   expect_code 0 "$rc" "a mate whose composer reads empty within the bound should restart"$'\n'"$out"
   assert_contains "$out" "restarted: sm1" "the mate was not restarted once its composer read empty"
@@ -679,7 +679,7 @@ test_answered_mate_waits_for_an_empty_composer() {
   arm_answer "$dir" sm1
   printf '100000' > "$dir/fake/unknown-reads"
 
-  out=$(JG_SECONDMATE_IDLE_WAIT=2 run_restart "$dir" sm1); rc=$?
+  out=$(JG_SQUAD_LEAD_IDLE_WAIT=2 run_restart "$dir" sm1); rc=$?
 
   expect_code 3 "$rc" "a mate still busy at the bound must not be reported as restarted"$'\n'"$out"
   assert_contains "$out" "nudged: sm1:" "a mate still busy at the bound must get the re-read message"
@@ -716,7 +716,7 @@ test_relaunches_do_not_block_persist_polling() {
   setup_remote_case "$dir" sm1 slow-relaunch
   add_local_mate "$dir" sm2
   printf -- '- sm2 - local domain (home: %s; scope: things; projects: p; added 2026-09-03)\n' \
-    "$dir/sm2-home" >> "$dir/home/data/secondmates.md"
+    "$dir/sm2-home" >> "$dir/home/data/squad_leads.md"
   export JG_FAKE_ANSWER_STATUS="$dir/home/state/sm1.status"
   arm_answer "$dir" sm2
 
@@ -725,10 +725,10 @@ test_relaunches_do_not_block_persist_polling() {
 
   expect_code 0 "$rc" "both confirmed mates should restart independently"$'\n'"$out"
   assert_present "$dir/fake/local-relaunch-during-remote" \
-    "the slow first relaunch blocked lifecycle progress for the second mate"
+    "the slow first relaunch blocked lifecycle progress for the squad lead"
   assert_contains "$out" "summary: 2 of 2 restarted, 0 nudged, 0 unreached" \
     "parallel relaunches were not both accounted for"
-  assert_grep 'jg-remote-secondmate-control.sh relaunch sm1 claude default default' "$dir/ssh.log" \
+  assert_grep 'jg-remote-squad-lead-control.sh relaunch sm1 claude default default' "$dir/ssh.log" \
     "an absent remote model and effort pin were not expressed as explicit defaults"
   pass "T12 relaunch waits do not block fleet persistence polling"
 }
@@ -747,7 +747,7 @@ test_unpublished_worker_result_is_accounted_for() {
   result_dir=
   i=0
   while [ "$i" -lt 200 ]; do
-    result_dir=$(find "$dir/home/state" -maxdepth 1 -type d -name '.secondmate-restart.*' -print -quit)
+    result_dir=$(find "$dir/home/state" -maxdepth 1 -type d -name '.squad-lead-restart.*' -print -quit)
     [ -e "$dir/fake/remote-relaunch-start" ] && [ -n "$result_dir" ] && break
     /bin/sleep 0.01
     i=$((i + 1))
@@ -786,7 +786,7 @@ test_result_published_while_reaping_is_honored() {
 if [ -e "$JG_FAKE_DIR/remote-relaunch-start" ] && [ ! -e "$JG_FAKE_DIR/result-race-injected" ]; then
   result=$(find "$JG_HOME/state" -maxdepth 2 -name '0.result' -print -quit)
   if [ -z "$result" ]; then
-    result_dir=$(find "$JG_HOME/state" -maxdepth 1 -type d -name '.secondmate-restart.*' -print -quit)
+    result_dir=$(find "$JG_HOME/state" -maxdepth 1 -type d -name '.squad-lead-restart.*' -print -quit)
     if [ -n "$result_dir" ]; then
       printf 'restarted: sm1 on remote-mac (claude)\n' > "$result_dir/0.result"
       : > "$JG_FAKE_DIR/result-race-injected"
@@ -826,15 +826,15 @@ test_already_current_mate_restarts_end_to_end() {
 
   out=$(run_update_in_case "$dir")
 
-  assert_contains "$out" "secondmate sm1: already current" \
+  assert_contains "$out" "squad_lead sm1: already current" \
     "the fixture must model a home that needs no advance"
-  restart_line=$(printf '%s\n' "$out" | grep '^restart-secondmates:')
+  restart_line=$(printf '%s\n' "$out" | grep '^restart-squad-leads:')
   assert_contains "$restart_line" "jg-sm1" \
-    "an already-current live second mate must still be named for restart"
-  assert_contains "$out" "nudge-secondmates: none" \
+    "an already-current live squad lead must still be named for restart"
+  assert_contains "$out" "nudge-squad-leads: none" \
     "a mate named for restart must not also be steered"
 
-  ids=${restart_line#restart-secondmates: }
+  ids=${restart_line#restart-squad-leads: }
   # shellcheck disable=SC2086
   out=$(run_restart "$dir" $ids); rc=$?
 
@@ -843,7 +843,7 @@ test_already_current_mate_restarts_end_to_end() {
   assert_contains "$out" "summary: 1 of 1 restarted, 0 nudged, 0 unreached" \
     "the pass must report the reload it performed"
   # Persist strictly before replace, read off the pane transcript.
-  doorbell_line=$(grep -n '^: Firstmate instruction waiting: ' "$dir/fake/literal" | head -1 | cut -d: -f1)
+  doorbell_line=$(grep -n '^: Juggernaut instruction waiting: ' "$dir/fake/literal" | head -1 | cut -d: -f1)
   exit_line=$(grep -n '^/exit$' "$dir/fake/literal" | head -1 | cut -d: -f1)
   [ -n "$doorbell_line" ] || fail "the persist request never reached the already-current mate"
   [ -n "$exit_line" ] || fail "the already-current mate was never stopped, so it was not restarted"
@@ -872,10 +872,10 @@ test_already_current_unprovable_mate_stays_on_the_nudge_path() {
 
   out=$(run_update_in_case "$dir")
 
-  assert_contains "$out" "secondmate sm1: already current" \
+  assert_contains "$out" "squad_lead sm1: already current" \
     "the fixture must model a home that needs no advance"
-  restart_line=$(printf '%s\n' "$out" | grep '^restart-secondmates:')
-  nudge_line=$(printf '%s\n' "$out" | grep '^nudge-secondmates:')
+  restart_line=$(printf '%s\n' "$out" | grep '^restart-squad-leads:')
+  nudge_line=$(printf '%s\n' "$out" | grep '^nudge-squad-leads:')
   assert_not_contains "$restart_line" "sm1" \
     "a mate whose restart cannot be proven must stay out of the restart set"
   assert_contains "$nudge_line" "jg-sm1" \
@@ -913,4 +913,4 @@ test_result_published_while_reaping_is_honored
 test_already_current_mate_restarts_end_to_end
 test_already_current_unprovable_mate_stays_on_the_nudge_path
 
-echo "# all jg-secondmate-restart tests passed"
+echo "# all jg-squad-lead-restart tests passed"

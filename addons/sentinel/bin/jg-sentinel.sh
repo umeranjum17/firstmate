@@ -10,7 +10,7 @@ done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # jg-sentinel.sh - recovery that runs OUTSIDE the agent runtime.
 #
-# Every Firstmate watcher, Stop-hook arm, and away daemon runs inside the Herdr
+# Every Juggernaut watcher, Stop-hook arm, and away daemon runs inside the Herdr
 # server's process tree, so when the server is killed (an out-of-memory kill of
 # its service unit, for example) they all die with it. Herdr restarts and
 # resumes the agent sessions it recorded, but nothing re-arms supervision: a
@@ -60,10 +60,10 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 #     lane whose agent reads busy is mid-turn and is left alone.
 #   - An agent state other than alive, dead, or missing is not settled yet (a
 #     server still resuming its sessions): the lane is left for the next pass.
-#   - A secondmate whose agent is alive gets one recovery order through
+#   - A squad_lead whose agent is alive gets one recovery order through
 #     bin/jg-send.sh, telling it to run bin/jg-session-start.sh, which resumes
 #     its own lanes, and end its turn so its supervision re-arms. A dead
-#     secondmate is left to the watcher's secondmate liveness relaunch; a
+#     squad_lead is left to the watcher's squad_lead liveness relaunch; a
 #     remote one is skipped.
 #   - A ship or scout whose current state (bin/jg-crew-state.sh) is not done or
 #     failed is relaunched in its recorded worktree through bin/jg-control.sh,
@@ -112,7 +112,7 @@ esac
 [ -n "${JG_HOME:-}" ] || { echo "jg-sentinel: JG_HOME must be set explicitly" >&2; exit 2; }
 JG_HOME=$(cd "$JG_HOME" 2>/dev/null && pwd -P) || { echo "jg-sentinel: JG_HOME is not a directory" >&2; exit 2; }
 export JG_HOME
-# Upstream Firstmate scripts and libraries run from the home's checkout; this
+# Upstream Juggernaut scripts and libraries run from the home's checkout; this
 # add-on copy carries only the sentinel itself.
 BIN="$JG_HOME/bin"
 STATE="$JG_HOME/state"
@@ -135,7 +135,7 @@ if [ "$CMD" = unit ]; then
   }
   cat <<EOF
 [Unit]
-Description=Firstmate sentinel for ${JG_HOME//%/%%} (recovers supervision after an agent-runtime restart)
+Description=Juggernaut sentinel for ${JG_HOME//%/%%} (recovers supervision after an agent-runtime restart)
 
 [Service]
 Environment=$(unit_quote "JG_HOME=$JG_HOME")
@@ -249,7 +249,7 @@ lane_waiting() {  # <id> <kind> <crew-state>
 }
 
 # Send <text> once per lane state, keyed in state/<id>.restart-nudged; the key
-# is also a secondmate order's delivery id (jg-send takes one only for those).
+# is also a squad_lead order's delivery id (jg-send takes one only for those).
 nudge_once() {  # <id> <meta> <done-message> <text>
   local rec="$STATE/$1.restart-nudged" key ff=()
   key=$(delivery_id "$(cat "$STATE/$1.busy-state" 2>/dev/null)|$(jg_meta_get "$2" spawn_gen)|$(wc -l <"$STATE/$1.status" 2>/dev/null)")
@@ -257,7 +257,7 @@ nudge_once() {  # <id> <meta> <done-message> <text>
     say "$1: already nudged in this state; left alone"
     return 0
   fi
-  [ "$(jg_meta_get "$2" kind)" != secondmate ] || ff=(--fire-and-forget "$key")
+  [ "$(jg_meta_get "$2" kind)" != squad_lead ] || ff=(--fire-and-forget "$key")
   act "$1" "$3" "$BIN/jg-send.sh" "$1" ${ff[@]+"${ff[@]}"} "$4" || return 1
   [ "$DRY_RUN" = 1 ] || printf '%s\n' "$key" >"$rec"
 }
@@ -288,7 +288,7 @@ reconcile() {  # <episode>
     [ "$(jg_backend_of_meta "$meta")" = herdr ] || continue
     [ -z "$(jg_meta_get "$meta" remote_host)" ] || { say "$id: skipped (remote)"; continue; }
     kind=$(jg_meta_get "$meta" kind)
-    case "$kind" in ship|scout|secondmate) ;; *) continue ;; esac
+    case "$kind" in ship|scout|squad_lead) ;; *) continue ;; esac
     target=$(jg_backend_target_of_meta "$meta")
     [ "${target%%:*}" = "$SESSION" ] || continue
     acted=0
@@ -306,9 +306,9 @@ reconcile() {  # <episode>
       say "$id: stopped on purpose; left alone"
       continue
     fi
-    if [ "$kind" = secondmate ]; then
+    if [ "$kind" = squad_lead ]; then
       if [ "$agent" != alive ]; then
-        say "$id: secondmate agent $agent; left to the watcher's secondmate liveness relaunch"
+        say "$id: squad_lead agent $agent; left to the watcher's squad_lead liveness relaunch"
         continue
       fi
       [ "$acted" -eq 0 ] || { say "$id: acted since the restart; left alone"; continue; }
@@ -451,7 +451,7 @@ relaunch_lead_model_mismatches() {
       say "$lead: lead model reconciliation failed"
       rc=1
     fi
-  done < <(grep -E '^[[:space:]]*-[[:space:]]' "$JG_HOME/data/secondmates.md" 2>/dev/null || true)
+  done < <(grep -E '^[[:space:]]*-[[:space:]]' "$JG_HOME/data/squad_leads.md" 2>/dev/null || true)
   return "$rc"
 }
 
@@ -484,8 +484,8 @@ relaunch_model_mismatches() {
     marker="$STATE/$id.model-relaunch"
     [ "$(cat "$marker" 2>/dev/null)" = "$event" ] && continue
     printf '%s\n' "$event" >"$marker"
-    if [ "$kind" = secondmate ]; then
-      act "$id" "Claude model missing; guarded lead restart requested" "$BIN/jg-secondmate-restart.sh" "$id" || rc=1
+    if [ "$kind" = squad_lead ]; then
+      act "$id" "Claude model missing; guarded lead restart requested" "$BIN/jg-squad-lead-restart.sh" "$id" || rc=1
     else
       act "$id" "Claude model missing; guarded worker relaunch requested" "$BIN/jg-control.sh" "$id" relaunch --model "$model" || rc=1
     fi

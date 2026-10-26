@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # tests/jg-backend-herdr-respawn-idem-e2e.test.sh - isolated real-herdr
-# regression test for firstmate-restart idempotency against herdr's
+# regression test for juggernaut-restart idempotency against herdr's
 # restored-layout husks (docs/herdr-backend.md "Known gaps" / "ID stability
 # across a server restart").
 #
@@ -66,9 +66,9 @@ jg_backend_source herdr || fail "jg_backend_source herdr failed"
 
 jg_backend_herdr_version_check || fail "version_check failed against the real installed herdr"
 
-# --- 1. spawn two real task tabs (crewmate-shaped and secondmate-shaped) ----
+# --- 1. spawn two real task tabs (operator-shaped and squad-lead-shaped) ----
 # jg_backend_herdr_create_task is the ONE function both bin/jg-spawn.sh's
-# ordinary crewmate/scout path and its --secondmate path call, so exercising
+# ordinary operator/scout path and its --squad-lead path call, so exercising
 # it directly here covers both paths identically - already proven distinct
 # only in JG_HOME-shadowing (tests/jg-backend-herdr-workspace-per-home-e2e.test.sh),
 # never in this duplicate-guard logic, which has no home-specific branching.
@@ -83,25 +83,25 @@ WSID=${CONTAINER#*:}
 
 CREW_LABEL="jg-respawn-crew1"
 CREW_IDS=$(jg_backend_herdr_create_task "$CONTAINER" "$CREW_LABEL" "$PROJ_CWD" "$SEEDED_TAB_ID") \
-  || fail "initial crewmate-shaped task creation failed"
+  || fail "initial operator-shaped task creation failed"
 read -r CREW_TAB_ID CREW_PANE_ID <<EOF
 $CREW_IDS
 EOF
 if [ -z "$CREW_TAB_ID" ] || [ -z "$CREW_PANE_ID" ]; then
-  fail "initial crewmate-shaped task did not return tab/pane ids"
+  fail "initial operator-shaped task did not return tab/pane ids"
 fi
 
 SM_LABEL="jg-respawn-sm1"
 SM_IDS=$(jg_backend_herdr_create_task "$CONTAINER" "$SM_LABEL" "$PROJ_CWD") \
-  || fail "initial secondmate-shaped task creation failed"
+  || fail "initial squad-lead-shaped task creation failed"
 read -r SM_TAB_ID SM_PANE_ID <<EOF
 $SM_IDS
 EOF
 if [ -z "$SM_TAB_ID" ] || [ -z "$SM_PANE_ID" ]; then
-  fail "initial secondmate-shaped task did not return tab/pane ids"
+  fail "initial squad-lead-shaped task did not return tab/pane ids"
 fi
 
-pass "repro setup: two real jg-<id> task tabs exist (crewmate-shaped and secondmate-shaped), neither with a registered agent"
+pass "repro setup: two real jg-<id> task tabs exist (operator-shaped and squad-lead-shaped), neither with a registered agent"
 
 # --- 2. a REAL herdr session restart - the actual root cause -----------------
 # `session stop` + fresh `herdr server` for the SAME named session: verified
@@ -116,7 +116,7 @@ sleep 0.5
 jg_backend_herdr_server_ensure "$SESSION" || fail "the isolated session's server did not come back up after the restart"
 
 if ! herdr pane get "$CREW_PANE_ID" --session "$SESSION" >/dev/null 2>&1; then
-  fail "repro setup is wrong: the crewmate-shaped pane should survive a session restart alive (docs/herdr-backend.md 'ID stability'), but it is gone"
+  fail "repro setup is wrong: the operator-shaped pane should survive a session restart alive (docs/herdr-backend.md 'ID stability'), but it is gone"
 fi
 if herdr agent get "$CREW_PANE_ID" --session "$SESSION" >/dev/null 2>&1; then
   fail "repro setup is wrong: the restored pane should have NO registered agent (agent_not_found expected)"
@@ -126,32 +126,32 @@ pass "repro confirmed: after a real session restart, both task panes survive ali
 # --- 3. BEFORE the fix this would refuse; now it closes-and-replaces -------
 
 RESPAWN_CREW_IDS=$(jg_backend_herdr_create_task "$CONTAINER" "$CREW_LABEL" "$PROJ_CWD") \
-  || fail "REGRESSION: create_task refused to respawn into the crewmate-shaped husk instead of closing-and-replacing it - this is the exact 2026-07-03 incident (manual pane close required)"
+  || fail "REGRESSION: create_task refused to respawn into the operator-shaped husk instead of closing-and-replacing it - this is the exact 2026-07-03 incident (manual pane close required)"
 read -r NEW_CREW_TAB_ID NEW_CREW_PANE_ID <<EOF
 $RESPAWN_CREW_IDS
 EOF
 if [ -z "$NEW_CREW_TAB_ID" ] || [ -z "$NEW_CREW_PANE_ID" ]; then
-  fail "husk respawn (crewmate-shaped) did not return new tab/pane ids"
+  fail "husk respawn (operator-shaped) did not return new tab/pane ids"
 fi
-[ "$NEW_CREW_PANE_ID" != "$CREW_PANE_ID" ] || fail "husk respawn (crewmate-shaped) returned the SAME pane id - nothing was actually replaced"
+[ "$NEW_CREW_PANE_ID" != "$CREW_PANE_ID" ] || fail "husk respawn (operator-shaped) returned the SAME pane id - nothing was actually replaced"
 if herdr pane get "$CREW_PANE_ID" --session "$SESSION" >/dev/null 2>&1; then
-  fail "REGRESSION: the old crewmate-shaped husk pane should have been closed by close-and-replace, but it still exists"
+  fail "REGRESSION: the old operator-shaped husk pane should have been closed by close-and-replace, but it still exists"
 fi
-pass "fixed: create_task closes and replaces the crewmate-shaped restored husk instead of refusing - no manual pane close needed"
+pass "fixed: create_task closes and replaces the operator-shaped restored husk instead of refusing - no manual pane close needed"
 
 RESPAWN_SM_IDS=$(jg_backend_herdr_create_task "$CONTAINER" "$SM_LABEL" "$PROJ_CWD") \
-  || fail "REGRESSION: create_task refused to respawn into the secondmate-shaped husk instead of closing-and-replacing it"
+  || fail "REGRESSION: create_task refused to respawn into the squad-lead-shaped husk instead of closing-and-replacing it"
 read -r NEW_SM_TAB_ID NEW_SM_PANE_ID <<EOF
 $RESPAWN_SM_IDS
 EOF
 if [ -z "$NEW_SM_TAB_ID" ] || [ -z "$NEW_SM_PANE_ID" ]; then
-  fail "husk respawn (secondmate-shaped) did not return new tab/pane ids"
+  fail "husk respawn (squad-lead-shaped) did not return new tab/pane ids"
 fi
-[ "$NEW_SM_PANE_ID" != "$SM_PANE_ID" ] || fail "husk respawn (secondmate-shaped) returned the SAME pane id - nothing was actually replaced"
+[ "$NEW_SM_PANE_ID" != "$SM_PANE_ID" ] || fail "husk respawn (squad-lead-shaped) returned the SAME pane id - nothing was actually replaced"
 if herdr pane get "$SM_PANE_ID" --session "$SESSION" >/dev/null 2>&1; then
-  fail "REGRESSION: the old secondmate-shaped husk pane should have been closed by close-and-replace, but it still exists"
+  fail "REGRESSION: the old squad-lead-shaped husk pane should have been closed by close-and-replace, but it still exists"
 fi
-pass "fixed: create_task closes and replaces the secondmate-shaped restored husk instead of refusing - same fix, same function, both spawn shapes"
+pass "fixed: create_task closes and replaces the squad-lead-shaped restored husk instead of refusing - same fix, same function, both spawn shapes"
 
 WS_TABS=$(herdr tab list --workspace "$WSID" --session "$SESSION" 2>&1)
 WS_COUNT=$(printf '%s' "$WS_TABS" | jq -r '.result.tabs? // [] | length')
@@ -165,7 +165,7 @@ pass "fixed: the workspace holds exactly the 2 replacement tabs after both respa
 # that actually has something registered in it.
 
 herdr pane report-agent "$NEW_CREW_PANE_ID" --source jg-respawn-e2e --agent jg-respawn-live-agent --state idle --session "$SESSION" >/dev/null 2>&1 \
-  || fail "could not register a live agent on the respawned crewmate-shaped pane"
+  || fail "could not register a live agent on the respawned operator-shaped pane"
 
 if jg_backend_herdr_create_task "$CONTAINER" "$CREW_LABEL" "$PROJ_CWD" >/dev/null 2>&1; then
   fail "REGRESSION: create_task should refuse a same-labeled tab whose pane hosts a genuinely live registered agent"

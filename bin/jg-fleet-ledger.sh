@@ -40,7 +40,7 @@
 # appended captures only that task, so a worker's status line is recorded as
 # soon as the worker writes it; the byte offset keeps the per-poll capture from
 # recording it again. Its arguments name the home, because a worker has no
-# firstmate environment: the flag lives in <config> and the state directory is
+# juggernaut environment: the flag lives in <config> and the state directory is
 # the status file's directory.
 # pr_ready, merged, and cleaned_up first capture their own task, so its status
 # records precede them. cleaned_up then deletes the task's offset, because teardown

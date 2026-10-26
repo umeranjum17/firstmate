@@ -10,8 +10,8 @@ done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # End-to-end: a pooled-style lane worktree whose shared clone .git/config carries a stray identity
 # (t <t@e.c>), launched the way the fork's jg-spawn runs config/launch-env-hook, against a throwaway HOME and home.
-# With JG_ROOT set to a firstmate checkout, the lane also gets that checkout's AI-trailer hooks dir layered on top,
-# as a real spawn does. Usage: [JG_ROOT=<firstmate>] git-identity/tests/git-identity.test.sh
+# With JG_ROOT set to a juggernaut checkout, the lane also gets that checkout's AI-trailer hooks dir layered on top,
+# as a real spawn does. Usage: [JG_ROOT=<juggernaut>] git-identity/tests/git-identity.test.sh
 set -euo pipefail
 SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 d=$(mktemp -d)

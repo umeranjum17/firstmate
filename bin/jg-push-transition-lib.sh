@@ -19,7 +19,7 @@ JG_PUSH_TRANSITION_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$JG_PUSH_TRANSITION_LIB_DIR/jg-transition-lib.sh"
 # Optional wait-timers add-on.
 # shellcheck source=/dev/null
-[ ! -r "${JG_ADDONS_DIR:-${JG_HOME:-$JG_PUSH_TRANSITION_LIB_DIR/..}/projects/firstmate-addons}/wait-timers/bin/jg-wait-timers-lib.sh" ] || . "${JG_ADDONS_DIR:-${JG_HOME:-$JG_PUSH_TRANSITION_LIB_DIR/..}/projects/firstmate-addons}/wait-timers/bin/jg-wait-timers-lib.sh"
+[ ! -r "${JG_ADDONS_DIR:-${JG_HOME:-$JG_PUSH_TRANSITION_LIB_DIR/..}/projects/juggernaut-addons}/wait-timers/bin/jg-wait-timers-lib.sh" ] || . "${JG_ADDONS_DIR:-${JG_HOME:-$JG_PUSH_TRANSITION_LIB_DIR/..}/projects/juggernaut-addons}/wait-timers/bin/jg-wait-timers-lib.sh"
 
 TRIAGE_LOG="$STATE/.watch-triage.log"
 TRIAGE_LOG_MAX_BYTES=${JG_WATCH_TRIAGE_LOG_MAX_BYTES:-262144}

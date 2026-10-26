@@ -105,4 +105,4 @@ proof (one hit repo, one clean repo, made-up patterns only).
 
 ## Placeholders
 
-Replace a refused detail with `you@example.com`, `~/firstmate`, `/home/you`.
+Replace a refused detail with `you@example.com`, `~/juggernaut`, `/home/you`.

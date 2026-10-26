@@ -9,7 +9,7 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
 done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Runs the moved jg-dashboard behavior suite against this add-on's dashboard.
-# Takes a Firstmate checkout (argument or JG_FIRSTMATE_DIR; with neither, a
+# Takes a Juggernaut checkout (argument or JG_JUGGERNAUT_DIR; with neither, a
 # fresh clone), clones it into a scratch tree, swaps in this add-on's
 # jg-dashboard.sh, its jg-dashboard/ app and the moved test, runs the test
 # there and exits with its status.
@@ -18,7 +18,7 @@ set -eu
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ADDON=$(dirname "$HERE")
 
-FORK=${1:-${JG_FIRSTMATE_DIR:-https://github.com/umeranjum17/firstmate}}
+FORK=${1:-${JG_JUGGERNAUT_DIR:-https://github.com/umeranjum17/juggernaut}}
 case "$FORK" in
   *://*) ;;
   *) FORK="file://$(cd "$FORK" && pwd)" ;;
@@ -26,7 +26,7 @@ esac
 
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/jg-dashboard-fork-suite.XXXXXX") || exit 1
 trap 'rm -rf "$TMP"' EXIT
-TREE="$TMP/firstmate"
+TREE="$TMP/juggernaut"
 
 git clone --depth 1 --quiet "$FORK" "$TREE"
 

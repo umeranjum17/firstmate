@@ -1,16 +1,16 @@
 # shellcheck shell=bash
-# Native W3C trace-context propagation for firstmate spawns (default-off).
+# Native W3C trace-context propagation for juggernaut spawns (default-off).
 #
-# When enabled, firstmate resolves one W3C `traceparent` carrier for a task,
+# When enabled, juggernaut resolves one W3C `traceparent` carrier for a task,
 # injects it into the agent's pane shell as the TRACEPARENT environment variable
 # before launch (bin/jg-spawn.sh, alongside GOTMPDIR, so it reaches every spawn
-# backend and every harness for ship, scout, and secondmate spawns), and records
+# backend and every harness for ship, scout, and squad_lead spawns), and records
 # the identical value as `traceparent=` in state/<id>.meta. Because the injected
 # carrier and the recorded carrier are the same string, an observer that reads
 # the metadata sees exactly the identity the child received - no collector,
 # storage, UI, or vendor coupling.
 #
-# TRACEPARENT here is a firstmate CONVENTION that carries a W3C-formatted
+# TRACEPARENT here is a juggernaut CONVENTION that carries a W3C-formatted
 # traceparent value in the process environment. W3C Trace Context standardizes
 # the `traceparent` HTTP header, not an environment variable, and OpenTelemetry
 # SDKs do NOT read TRACEPARENT from the environment automatically. A downstream
@@ -53,13 +53,13 @@
 #   cannot reactivate a stale on decision. Every spawn reads only that frozen
 #   on/off value, so later config and environment edits take effect only after a
 #   new home session starts.
-#   At launch, the primary propagates config/trace-context into the secondmate
+#   At launch, the primary propagates config/trace-context into the squad_lead
 #   home (JG_INHERITABLE_CONFIG in bin/jg-config-inherit-lib.sh) and passes its
 #   frozen on/off decision into the new process as a non-empty JG_TRACE_CONTEXT
-#   value in the launch prefix (bin/jg-spawn.sh). The Secondmate freezes that
+#   value in the launch prefix (bin/jg-spawn.sh). The SquadLead freezes that
 #   inherited decision when its own home session starts.
-#   A REMOTE secondmate route resolves here too, in the PARENT process that owns
-#   that task's meta: jg-spawn's spawn_remote_secondmate resolves the carrier,
+#   A REMOTE squad_lead route resolves here too, in the PARENT process that owns
+#   that task's meta: jg-spawn's spawn_remote_squad_lead resolves the carrier,
 #   hands it to the configured host through jg-spawn's --traceparent, and records
 #   the carrier the remote endpoint reports back. Only the pane export moves
 #   hosts; identity, enablement, and the per-task boundary do not.
@@ -68,7 +68,7 @@
 # with the trace id and span id never all-zero (W3C rejects both). New roots use
 # RANDOM ids from /dev/urandom. The root's `01` (sampled) flag records a
 # sampling DECISION that downstream parent-based samplers honor; it does not
-# guarantee any collector stores a span, and firstmate emits no spans itself.
+# guarantee any collector stores a span, and juggernaut emits no spans itself.
 #
 # Security / trust boundary. This feature adds no OTEL_* variables, no
 # tracestate, no arbitrary environment injection, and no configurable or
@@ -79,7 +79,7 @@
 # the spawn. Carrier-delivery failure also omits telemetry and continues when the
 # backend clears its input; if the backend reports that partial input could not be
 # cleared, jg-spawn refuses to append the launch command. Every carrier this lib
-# yields is either a firstmate-MINTED random root that reads no prompt, path,
+# yields is either a juggernaut-MINTED random root that reads no prompt, path,
 # task prose, credential, or arbitrary environment key, or the same task's
 # previously recorded carrier reused verbatim from its own meta. Ambient
 # TRACEPARENT is never read, so no caller-controlled bytes enter a new carrier.

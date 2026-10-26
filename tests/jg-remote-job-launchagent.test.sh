@@ -109,11 +109,11 @@ start_worker() {
 case "${1:-}" in
   print)
     case "${2:-}" in
-      gui/*/dev.firstmate.remote-job)
+      gui/*/dev.juggernaut.remote-job)
         [ -f "$JG_TEST_LOADED" ] || exit 113
         printf 'path = %s\nprogram = %s\n' "$JG_TEST_PLIST" "$JG_TEST_WORKER"
         if pid=$(tracked_pid); then printf '\tpid = %s\n' "$pid"; fi
-        printf 'label = dev.firstmate.remote-job\n'
+        printf 'label = dev.juggernaut.remote-job\n'
         ;;
       gui/[0-9]*) exit 0 ;;
       *) exit 113 ;;
@@ -154,7 +154,7 @@ export JG_TEST_WORKER="$REMOTE_ROOT/bin/jg-remote-job-worker.sh"
 export JG_TEST_WORKER_LOG="$TMP_ROOT/worker.log" JG_TEST_STATE="$STATE_ROOT"
 export JG_TEST_LOADED="$TMP_ROOT/launchagent.loaded" JG_TEST_TRACKED="$TMP_ROOT/launchagent.pid"
 export JG_TEST_REMOVING="$TMP_ROOT/launchagent.removing"
-export JG_TEST_PLIST="$ACCOUNT_HOME/Library/LaunchAgents/dev.firstmate.remote-job.plist"
+export JG_TEST_PLIST="$ACCOUNT_HOME/Library/LaunchAgents/dev.juggernaut.remote-job.plist"
 export JG_TEST_SWEEP_GATE="$SWEEP_GATE"
 export JG_REMOTE_JOB_STATE_ROOT="$STATE_ROOT" JG_REMOTE_JOB_PLATFORM_OVERRIDE=Darwin
 # shellcheck source=bin/jg-remote-job-lib.sh
@@ -224,7 +224,7 @@ wait "$PROBE_WAITER" || fail 'replacement did not become ready after ownership p
 [ "$(jg_remote_job_read_single_line "$STATE_ROOT/worker.ready" 64)" = "$(lock_owner)" ] \
   || fail 'replacement readiness did not identify its recorded lock owner'
 rm -f "$JG_TEST_OWNER_GATE" "$JG_TEST_OWNER_GATE.observed" "$JG_TEST_OWNER_GATE.release"
-launchctl bootout "gui/$(id -u)/dev.firstmate.remote-job" || fail 'could not stop the replacement'
+launchctl bootout "gui/$(id -u)/dev.juggernaut.remote-job" || fail 'could not stop the replacement'
 pass 'a stale-code crash heartbeat cannot count as replacement readiness'
 
 # --- a slow sequence-claim sweep must not trigger a LaunchAgent reload -------
@@ -269,7 +269,7 @@ pass 'a slow sequence-claim sweep keeps readiness fresh and cannot trigger a Lau
 
 # --- concurrent callers cannot bootout-war a fresh asynchronous spawn ----------
 
-launchctl bootout "gui/$(id -u)/dev.firstmate.remote-job" || fail 'the stub launchd did not unload the agent'
+launchctl bootout "gui/$(id -u)/dev.juggernaut.remote-job" || fail 'the stub launchd did not unload the agent'
 ! kill -0 "$SWEEP_PID" 2>/dev/null || fail 'bootout did not stop the tracked worker'
 : > "$LAUNCH_LOG"
 CALLERS=()
@@ -365,9 +365,9 @@ plant_dead_repair_lock() {
 
 # Caller A reloads the agent and dies before its asynchronous spawn publishes
 # the worker lock or identity. Caller B must let that spawn finish starting.
-launchctl bootout "gui/$(id -u)/dev.firstmate.remote-job" || fail 'the stub launchd did not unload the agent'
+launchctl bootout "gui/$(id -u)/dev.juggernaut.remote-job" || fail 'the stub launchd did not unload the agent'
 launchctl bootstrap "gui/$(id -u)" "$JG_TEST_PLIST" || fail 'the stub launchd did not load the agent'
-JG_TEST_SPAWN_DELAY=3 launchctl kickstart -k "gui/$(id -u)/dev.firstmate.remote-job" \
+JG_TEST_SPAWN_DELAY=3 launchctl kickstart -k "gui/$(id -u)/dev.juggernaut.remote-job" \
   || fail 'the stub launchd did not kickstart the agent'
 plant_dead_repair_lock || fail 'could not plant the dead caller repair lock'
 SPAWN_PID=$(tracked)

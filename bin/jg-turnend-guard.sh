@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
-# Turn-end guard for any firstmate PRIMARY session: the main home OR a
-# secondmate's own home. A secondmate runs its own primary firstmate session and
+# Turn-end guard for any juggernaut PRIMARY session: the main home OR a
+# squad_lead's own home. A squad_lead runs its own primary juggernaut session and
 # is guarded exactly like the main primary; only child crew/scout worktrees are
 # exempt (see the scoping block below and docs/turnend-guard.md).
 #
@@ -26,12 +26,12 @@
 #
 # Ships with TRACKED harness hook files at the repo root, so this file is
 # checked out into every worktree of this repo: the primary checkout, every
-# secondmate home (treehouse-leased or git-cloned), and any crewmate/scout task
-# worktree spawned to work on firstmate itself (the recursive "firstmate
-# improving itself" case). A secondmate home runs its OWN primary firstmate
+# squad_lead home (treehouse-leased or git-cloned), and any operator/scout task
+# worktree spawned to work on juggernaut itself (the recursive "juggernaut
+# improving itself" case). A squad_lead home runs its OWN primary juggernaut
 # session, so it must be guarded like the main primary; only child crew/scout
 # worktrees are exempt. It must therefore scope itself at runtime to a real
-# primary checkout - the main home or a genuinely marked secondmate home - and
+# primary checkout - the main home or a genuinely marked squad_lead home - and
 # stay a silent, fast no-op inside child task worktrees.
 #
 # Away mode (state/.afk): the away-mode daemon owns supervision and runs the
@@ -117,7 +117,7 @@ for arg in "$@"; do
   esac
 done
 
-# A Claude secondmate's home carries .jg-busy-stop (bin/jg-spawn.sh), and this
+# A Claude squad_lead's home carries .jg-busy-stop (bin/jg-spawn.sh), and this
 # guard is then the only Stop writer of the parent home's busy record for that
 # gen: every exit records the Stop's outcome, busy when exit 2 blocks it into a
 # continuation and idle otherwise. Claude runs Stop hooks in parallel, so a
@@ -186,17 +186,17 @@ if [ "$CLAUDE_MODE" -eq 0 ] && [ "$STOP_HOOK_ACTIVE" = "true" ]; then
 fi
 
 # --- scope precisely to a PRIMARY checkout ----------------------------------
-# A genuinely-marked secondmate home runs its OWN primary firstmate session, so
+# A genuinely-marked squad_lead home runs its OWN primary juggernaut session, so
 # force-INCLUDE it as a guarded primary whether treehouse leased it as a linked
 # worktree (git-dir != git-common-dir) or it is a git-cloned plain checkout. This
-# mirrors the cd-guard's intent that a secondmate's own session is a guarded
+# mirrors the cd-guard's intent that a squad_lead's own session is a guarded
 # primary. Only an UNMARKED checkout (or one with an invalid marker) falls
-# through to the linked-worktree exemption: firstmate hands out crewmate/scout
+# through to the linked-worktree exemption: juggernaut hands out operator/scout
 # task worktrees as genuine linked `git worktree`s (bin/jg-spawn.sh aborts
 # otherwise), whose git-dir lives under the parent repo's .git/worktrees/<name>
 # and differs from the common (shared) git-dir, while a main, non-worktree
 # checkout has the two equal. Child worktrees never carry the gitignored marker,
-# so this exempts them while guarding every real secondmate home.
+# so this exempts them while guarding every real squad_lead home.
 jg_primary_scope_matches "$JG_ROOT" "$STATE" || exit 0
 
 # --- the question rule ------------------------------------------------------
@@ -319,7 +319,7 @@ block_stop() {
 # Report the ownership conflict as a diagnostic and let this turn end safely;
 # the owning session remains responsible for restoring the watcher.
 if [ "$CLAUDE_MODE" -eq 1 ] && jg_session_lock_foreign_owner_live "$STATE"; then
-  printf '{"systemMessage":"FIRSTMATE SUPERVISION IS OWNED BY ANOTHER LIVE SESSION: this read-only session cannot and should not arm or repair the watcher (lock owner pid %s). Allowing this turn to end safely; the owning session must restore supervision."}\n' \
+  printf '{"systemMessage":"JUGGERNAUT SUPERVISION IS OWNED BY ANOTHER LIVE SESSION: this read-only session cannot and should not arm or repair the watcher (lock owner pid %s). Allowing this turn to end safely; the owning session must restore supervision."}\n' \
     "$JG_SESSION_LOCK_FOREIGN_OWNER_PID"
   exit 0
 fi
@@ -577,7 +577,7 @@ if [ "$terminal_status" -eq 0 ]; then
   else
     NEED_DESC="X-mode relay polling active"
   fi
-  printf '{"systemMessage":"FIRSTMATE SUPERVISION IS GENUINELY DOWN: %s, the Stop-owned auto-arm exhausted its bounded retries and one failure notice, no watcher or automatic continuation exists, and the block budget is exhausted. Keep this session attended and diagnose the automatic Stop-hook and watcher startup before relying on unattended supervision."}\n' "$NEED_DESC"
+  printf '{"systemMessage":"JUGGERNAUT SUPERVISION IS GENUINELY DOWN: %s, the Stop-owned auto-arm exhausted its bounded retries and one failure notice, no watcher or automatic continuation exists, and the block budget is exhausted. Keep this session attended and diagnose the automatic Stop-hook and watcher startup before relying on unattended supervision."}\n' "$NEED_DESC"
   exit 0
 fi
 [ "$terminal_status" -eq 2 ] && exit 0

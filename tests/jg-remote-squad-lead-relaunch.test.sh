@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# tests/jg-remote-secondmate-relaunch.test.sh - regression coverage for
-# bin/jg-remote-secondmate-relaunch.sh: the parent-side tool an operator runs
-# to move a remote secondmate onto a new harness, model, or effort.
+# tests/jg-remote-squad-lead-relaunch.test.sh - regression coverage for
+# bin/jg-remote-squad-lead-relaunch.sh: the parent-side tool an operator runs
+# to move a remote squad_lead onto a new harness, model, or effort.
 #
 # Reproduces the observed defect: running
-# bin/jg-on.sh <id> jg-remote-secondmate-control.sh relaunch <id> <harness>
+# bin/jg-on.sh <id> jg-remote-squad-lead-control.sh relaunch <id> <harness>
 # <model> <effort> relaunches the agent on its host, but that host-local verb
 # can only rewrite its own endpoint record. The parent's own state/<id>.meta
 # kept naming the runtime the mate used to run. The wrapper drives the same
@@ -12,7 +12,7 @@
 # identity the host confirmed.
 #
 # The remote transport is faked at the SSH boundary, exactly as the other
-# remote-secondmate suites fake it, rather than exercising a real host.
+# remote-squad-lead suites fake it, rather than exercising a real host.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -22,13 +22,13 @@ set -u
 
 command -v perl >/dev/null 2>&1 || { echo "skip: perl not found"; exit 0; }
 
-TMP=$(jg_test_tmproot jg-remote-secondmate-relaunch)
+TMP=$(jg_test_tmproot jg-remote-squad-lead-relaunch)
 HOME_DIR="$TMP/home"
 FAKEBIN=$(jg_fakebin "$TMP/fake")
 mkdir -p "$HOME_DIR/data" "$HOME_DIR/state" "$HOME_DIR/config"
 
 printf -- '- ios - iOS delivery (host: remote-mac; root: /srv/fm; home: /srv/jg-home; scope: iOS; projects: alpha; added 2026-08-01)\n' \
-  > "$HOME_DIR/data/secondmates.md"
+  > "$HOME_DIR/data/squad_leads.md"
 
 reset_meta() {
   jg_write_meta "$HOME_DIR/state/ios.meta" \
@@ -37,8 +37,8 @@ reset_meta() {
     "worktree=/srv/jg-home" \
     "project=/srv/fm" \
     "harness=pi" \
-    "kind=secondmate" \
-    "mode=secondmate" \
+    "kind=squad_lead" \
+    "mode=squad_lead" \
     "yolo=off" \
     "model=openai-codex/gpt-5.6-sol" \
     "effort=medium" \
@@ -70,11 +70,11 @@ command_fields=$(perl -MMIME::Base64=decode_base64 -e '
 IFS=$'\t' read -r cmd action id harness model effort <<EOF
 $command_fields
 EOF
-[ "$cmd" = jg-remote-secondmate-control.sh ] || exit 93
+[ "$cmd" = jg-remote-squad-lead-control.sh ] || exit 93
 [ "$action" = relaunch ] || exit 94
 case "$JG_FAKE_RELAUNCH_MODE" in
   refuse)
-    printf 'error: unverified remote secondmate harness: %s\n' "$harness" >&2
+    printf 'error: unverified remote squad_lead harness: %s\n' "$harness" >&2
     exit 1
     ;;
   confirm-other)
@@ -85,7 +85,7 @@ case "$JG_FAKE_RELAUNCH_MODE" in
 esac
 printf 'relaunched %s harness=%s from=pi model=%s effort=%s backend=herdr endpoint=jg-remote:w1:p1 worktree=/srv/jg-home\n' \
   "$id" "$harness" "$model" "$effort"
-printf 'schema=jg-remote-secondmate-control.v1\n'
+printf 'schema=jg-remote-squad-lead-control.v1\n'
 printf 'backend=herdr\n'
 printf 'target=jg-remote:w1:p1\n'
 printf 'herdr_session=jg-remote\n'
@@ -98,7 +98,7 @@ chmod +x "$FAKEBIN/fake-ssh"
 run_relaunch() {  # <args...>
   env JG_HOME="$HOME_DIR" JG_SSH_BIN="$FAKEBIN/fake-ssh" \
     JG_FAKE_RELAUNCH_MODE="${JG_FAKE_RELAUNCH_MODE:-}" \
-    "$ROOT/bin/jg-remote-secondmate-relaunch.sh" "$@" 2>&1
+    "$ROOT/bin/jg-remote-squad-lead-relaunch.sh" "$@" 2>&1
 }
 
 # --- a successful relaunch republishes the parent's own route record --------
@@ -144,25 +144,25 @@ JG_FAKE_RELAUNCH_MODE=refuse
 OUT=$(run_relaunch ios notaharness - -); RC=$?
 unset JG_FAKE_RELAUNCH_MODE
 [ "$RC" -ne 0 ] || fail "a refused host relaunch must not be reported as successful"
-assert_contains "$OUT" "unverified remote secondmate harness" \
+assert_contains "$OUT" "unverified remote squad_lead harness" \
   "the refusal reason should reach the caller"
 cmp -s "$TMP/ios-before-refusal.meta" "$HOME_DIR/state/ios.meta" \
   || fail "a refused relaunch must not touch the parent's record"
 pass "a refused remote relaunch leaves the parent's record untouched"
 
-# --- a local (non-remote) secondmate is refused, not silently mishandled ----
+# --- a local (non-remote) squad_lead is refused, not silently mishandled ----
 jg_write_meta "$HOME_DIR/state/local1.meta" \
-  "window=firstmate:jg-local1" "endpoint_task_id=local1" \
+  "window=juggernaut:jg-local1" "endpoint_task_id=local1" \
   "worktree=/srv/local1" "project=/srv/local1" "harness=codex" \
-  "kind=secondmate" "mode=secondmate" "yolo=off" "home=/srv/local1"
+  "kind=squad_lead" "mode=squad_lead" "yolo=off" "home=/srv/local1"
 OUT=$(run_relaunch local1 claude - -); RC=$?
-[ "$RC" -ne 0 ] || fail "a local secondmate must not be accepted by the remote relaunch tool"
-assert_contains "$OUT" "not a remotely placed secondmate" \
+[ "$RC" -ne 0 ] || fail "a local squad_lead must not be accepted by the remote relaunch tool"
+assert_contains "$OUT" "not a remotely placed squad_lead" \
   "the refusal should explain the tool this task needs instead"
-pass "a local secondmate is refused by the remote relaunch tool"
+pass "a local squad_lead is refused by the remote relaunch tool"
 
 # --- a relaunch keeps an already-armed PR poll authenticating ---------------
-# jg-pr-check.sh now refuses to arm a poll on a kind=secondmate record, but a
+# jg-pr-check.sh now refuses to arm a poll on a kind=squad_lead record, but a
 # record armed before that refusal can still carry the block until the
 # watcher retires it. jg-pr-check.sh wrote pr= (and, when a forge head was
 # readable, pr_head=) as the LAST lines of the record, and

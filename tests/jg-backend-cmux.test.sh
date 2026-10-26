@@ -120,16 +120,16 @@ cmux_expected_root_hash() {  # <root>
 
 cmux_expected_home_label() {  # [home] [root]
   local home=${1:-$ROOT} root=${2:-$ROOT} marker id prefix
-  marker="$home/.jg-secondmate-home"
+  marker="$home/.jg-squad-lead-home"
   if [ -f "$marker" ]; then
     id=$(tr -d '[:space:]' < "$marker" 2>/dev/null)
     if [ -n "$id" ]; then
       prefix="2ndmate-$id"
     else
-      prefix="firstmate"
+      prefix="juggernaut"
     fi
   else
-    prefix="firstmate"
+    prefix="juggernaut"
   fi
   printf '%s-%s' "$prefix" "$(cmux_expected_root_hash "$root")"
 }
@@ -272,7 +272,7 @@ test_normalize_key() {
     [ "$(jg_backend_cmux_normalize_key Esc)" = escape ] || { echo "Esc failed" >&2; exit 1; }
     [ "$(jg_backend_cmux_normalize_key C-c)" = ctrl-c ] || { echo "C-c failed" >&2; exit 1; }
     [ "$(jg_backend_cmux_normalize_key ctrl+c)" = ctrl-c ] || { echo "ctrl+c failed" >&2; exit 1; }
-  ) || fail "jg_backend_cmux_normalize_key did not map firstmate's key vocabulary to cmux's verified names"
+  ) || fail "jg_backend_cmux_normalize_key did not map juggernaut's key vocabulary to cmux's verified names"
   pass "jg_backend_cmux_normalize_key: Enter/Escape/C-c map to cmux's verified enter/escape/ctrl-c"
 }
 
@@ -282,17 +282,17 @@ test_scoped_title_uses_primary_home_label() {
   expected=$(cmux_expected_scoped_title jg-task1 "$dir")
   out=$( JG_HOME="$dir" bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_scoped_title jg-task1' "$ROOT" )
   [ "$out" = "$expected" ] || fail "primary scoped title should be $expected, got '$out'"
-  pass "jg_backend_cmux_scoped_title: scopes a primary task title with firstmate plus root hash"
+  pass "jg_backend_cmux_scoped_title: scopes a primary task title with juggernaut plus root hash"
 }
 
-test_scoped_title_uses_secondmate_home_label() {
+test_scoped_title_uses_squad_lead_home_label() {
   local dir out expected
-  dir="$TMP_ROOT/scoped-title-secondmate"; mkdir -p "$dir"
-  printf 'sm-one\n' > "$dir/.jg-secondmate-home"
+  dir="$TMP_ROOT/scoped-title-squad-lead"; mkdir -p "$dir"
+  printf 'sm-one\n' > "$dir/.jg-squad-lead-home"
   expected=$(cmux_expected_scoped_title jg-task1 "$dir")
   out=$( JG_HOME="$dir" bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_scoped_title jg-task1' "$ROOT" )
-  [ "$out" = "$expected" ] || fail "secondmate scoped title should be $expected, got '$out'"
-  pass "jg_backend_cmux_scoped_title: scopes a secondmate task title with the home marker plus root hash"
+  [ "$out" = "$expected" ] || fail "squad_lead scoped title should be $expected, got '$out'"
+  pass "jg_backend_cmux_scoped_title: scopes a squad_lead task title with the home marker plus root hash"
 }
 
 test_scoped_title_changes_with_root_path() {
@@ -1086,18 +1086,18 @@ test_list_live_filters_by_title_prefix() {
   pass "jg_backend_cmux_list_live: lists only this home's scoped task workspaces using plain jg-<id> labels"
 }
 
-# --- jg-spawn.sh: --secondmate refuses backend=cmux --------------------------
+# --- jg-spawn.sh: --squad-lead refuses backend=cmux --------------------------
 
-test_secondmate_spawn_refuses_cmux_backend() {
+test_squad_lead_spawn_refuses_cmux_backend() {
   local dir state data config projects out status
-  dir="$TMP_ROOT/secondmate-refuse"; state="$dir/state"; data="$dir/data"; config="$dir/config"; projects="$dir/projects"
+  dir="$TMP_ROOT/squad-lead-refuse"; state="$dir/state"; data="$dir/data"; config="$dir/config"; projects="$dir/projects"
   mkdir -p "$state" "$data" "$config" "$projects"
   out=$( JG_STATE_OVERRIDE="$state" JG_DATA_OVERRIDE="$data" JG_CONFIG_OVERRIDE="$config" JG_PROJECTS_OVERRIDE="$projects" \
-    "$ROOT/bin/jg-spawn.sh" sm-cmux-test --secondmate --backend cmux 2>&1 )
+    "$ROOT/bin/jg-spawn.sh" sm-cmux-test --squad-lead --backend cmux 2>&1 )
   status=$?
-  [ "$status" -ne 0 ] || fail "jg-spawn.sh should refuse a --secondmate spawn with --backend cmux"
-  assert_contains "$out" "does not support --secondmate" "jg-spawn.sh did not report the cmux secondmate refusal"
-  pass "jg-spawn.sh: refuses backend=cmux for --secondmate spawns (mirrors Orca's refusal; no secondmate launch design exists yet)"
+  [ "$status" -ne 0 ] || fail "jg-spawn.sh should refuse a --squad-lead spawn with --backend cmux"
+  assert_contains "$out" "does not support --squad-lead" "jg-spawn.sh did not report the cmux squad_lead refusal"
+  pass "jg-spawn.sh: refuses backend=cmux for --squad-lead spawns (mirrors Orca's refusal; no squad_lead launch design exists yet)"
 }
 
 # shellcheck source=/dev/null
@@ -1115,7 +1115,7 @@ test_cli_exports_password_only_when_configured
 test_parse_target
 test_normalize_key
 test_scoped_title_uses_primary_home_label
-test_scoped_title_uses_secondmate_home_label
+test_scoped_title_uses_squad_lead_home_label
 test_scoped_title_changes_with_root_path
 test_dispatch_routes_cmux_backend
 test_dispatch_busy_state_unknown_for_cmux
@@ -1163,4 +1163,4 @@ test_kill_adds_sibling_when_last_in_window
 test_kill_is_best_effort_when_close_workspace_fails
 test_kill_recovers_stale_target_by_label
 test_list_live_filters_by_title_prefix
-test_secondmate_spawn_refuses_cmux_backend
+test_squad_lead_spawn_refuses_cmux_backend

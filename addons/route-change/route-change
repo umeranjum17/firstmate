@@ -22,7 +22,7 @@
 #       any other list gets a pi profile for it.
 #     - the gate: agent and agent_config.pi.model in the no-mistakes config,
 #       edited by key name; no value other than route names is printed.
-#     - lead pins: config/secondmate-harness and config/secondmates/*/harness,
+#     - lead pins: config/squad-lead-harness and config/squad_leads/*/harness,
 #       except pins on Claude or Opus, which are not routes.
 #  4. One real request (a one-word prompt through pi on the route, as the gate
 #     calls it). When it fails every backup is restored and the cause printed.
@@ -41,7 +41,7 @@ die() { echo "route-change: $*" >&2; exit 1; }
 dry=0
 [ "${1:-}" = --dry-run ] && { dry=1; shift; }
 [ $# -eq 2 ] || die "usage: route-change [--dry-run] <jg-home> <route>"
-[ -d "$1/config" ] && [ -d "$1/state" ] || die "$1 is not a firstmate home (no config/ or state/)"
+[ -d "$1/config" ] && [ -d "$1/state" ] || die "$1 is not a juggernaut home (no config/ or state/)"
 JG_HOME=$(cd "$1" && pwd) route=$2
 CONFIG=$JG_HOME/config STATE=$JG_HOME/state
 DISPATCH=$CONFIG/crew-dispatch.json
@@ -150,7 +150,7 @@ if ! cmp -s "$NM" "$tmp/gate"; then
 fi
 
 n=0
-for pin in "$CONFIG/secondmate-harness" "$CONFIG"/secondmates/*/harness; do
+for pin in "$CONFIG/squad-lead-harness" "$CONFIG"/squad_leads/*/harness; do
   [ -f "$pin" ] || continue
   line=$(grep -m1 -vE '^[[:space:]]*(#|$)' "$pin") || continue
   read -r h m e _ <<<"$line"

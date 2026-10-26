@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Tests for the secondmate-vs-crewmate harness split, the optional model/effort
-# tokens config/secondmate-harness carries alongside the harness, and the
-# primary->secondmate inherited local-material propagation.
+# Tests for the squad-lead-vs-operator harness split, the optional model/effort
+# tokens config/squad-lead-harness carries alongside the harness, and the
+# primary->squad_lead inherited local-material propagation.
 #
 # Three capabilities are under test:
-#   A) Harness split. config/secondmate-harness sets the harness the PRIMARY uses
-#      to launch SECONDMATE agents, independent of config/crew-harness (the
-#      crewmate harness). jg-harness.sh secondmate resolves the fallback chain
-#      config/secondmate-harness -> config/crew-harness -> own; an absent or
-#      "default" secondmate-harness behaves exactly as the crew harness did before
-#      this knob existed (full backward-compat). jg-spawn.sh resolves a secondmate
+#   A) Harness split. config/squad-lead-harness sets the harness the PRIMARY uses
+#      to launch SQUAD_LEAD agents, independent of config/crew-harness (the
+#      operator harness). jg-harness.sh squad_lead resolves the fallback chain
+#      config/squad-lead-harness -> config/crew-harness -> own; an absent or
+#      "default" squad-lead-harness behaves exactly as the crew harness did before
+#      this knob existed (full backward-compat). jg-spawn.sh resolves a squad_lead
 #      launch through that mode, durably (every respawn re-resolves), while an
 #      explicit per-spawn harness arg still wins.
 #   B) Inheritance. The primary pushes a declared, extensible set of LOCAL
@@ -17,7 +17,7 @@
 #      config/backlog-backend, config/backend, config/herdr-presentation-spaces,
 #      config/startup-memory-budget, config/trace-context, and
 #      config/supervision-host-off -
-#      down into each secondmate home's config/, so the secondmate's OWN crewmates,
+#      down into each squad_lead home's config/, so the squad_lead's OWN operators,
 #      dispatch profiles, backlog backend, runtime-backend default, Herdr
 #      presentation choice, startup-memory budget, and trace context inherit the
 #      primary's settings. For config/herdr-presentation-spaces, an absent
@@ -25,20 +25,20 @@
 #      unconfigured default, so the generic absence mirror converges that item
 #      without deciding its release-dependent floor.
 #      It is primary-authoritative
-#      (re-pushed at secondmate spawn, on the bootstrap secondmate sweep, and by
+#      (re-pushed at squad_lead spawn, on the bootstrap squad_lead sweep, and by
 #      config push).
-#      config/secondmate-harness is deliberately NOT inherited (secondmates do
-#      not spawn secondmates). After a successful push that changes allowlisted
+#      config/squad-lead-harness is deliberately NOT inherited (squad_leads do
+#      not spawn squad_leads). After a successful push that changes allowlisted
 #      config under an already-running home, a literal-content reread instruction
-#      is written to the secondmate home and only its pointer is sent via the
-#      routed secondmate path (exact destination bytes, no summaries); unchanged
+#      is written to the squad_lead home and only its pointer is sent via the
+#      routed squad_lead path (exact destination bytes, no summaries); unchanged
 #      config sends nothing unless a previous send failure is pending.
 
-#   C) Model/effort pin. config/secondmate-harness may carry optional model and
+#   C) Model/effort pin. config/squad-lead-harness may carry optional model and
 #      effort tokens after the harness ("<harness> [<model>] [<effort>]"), read by
-#      jg-harness.sh secondmate-model / secondmate-effort. A bare harness-only
+#      jg-harness.sh squad-lead-model / squad-lead-effort. A bare harness-only
 #      line (today's format) yields empty model/effort - full backward-compat.
-#      jg-spawn.sh populates MODEL/EFFORT from those tokens for a --secondmate
+#      jg-spawn.sh populates MODEL/EFFORT from those tokens for a --squad-lead
 #      spawn only when the harness also resolves from that file, so the pin is
 #      durable across every respawn while explicit per-spawn harness/model/effort
 #      flags still win.
@@ -61,12 +61,12 @@ unset CLAUDECODE PI_CODING_AGENT JG_PI_HARNESS GROK_AGENT CURSOR_AGENT CURSOR_IN
 
 BASE_PATH=${JG_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
 jg_git_identity fmtest fmtest@example.com
-TMP_ROOT=$(jg_test_tmproot jg-secondmate-harness)
+TMP_ROOT=$(jg_test_tmproot jg-squad-lead-harness)
 mkdir -p "$TMP_ROOT/no-addons"
 export JG_BACKEND=tmux
 
 # Every claude launch pre-registers workspace trust for the directory it starts
-# in, and for a secondmate that directory is the home (bin/jg-claude-trust.sh).
+# in, and for a squad_lead that directory is the home (bin/jg-claude-trust.sh).
 # Several cases here resolve claude, so every spawn below pins a throwaway HOME
 # with an empty CLAUDE_CONFIG_DIR and puts node on the spawn's PATH; without the
 # first, this suite would write the developer's real ~/.claude.json.
@@ -80,13 +80,13 @@ BLIND_BIN=$(jg_fakebin "$TMP_ROOT/blind-ancestry")
 jg_fake_blind_ancestry "$BLIND_BIN"
 
 # ===========================================================================
-# A) jg-harness.sh secondmate resolution + fallback (deterministic detect_own)
+# A) jg-harness.sh squad_lead resolution + fallback (deterministic detect_own)
 # ===========================================================================
 # detect_own is pinned to claude via CLAUDECODE=1 over a blinded ancestry walk so
-# the "fall through to own" cases are reproducible on any host harness. Each row sets crew-harness / secondmate-harness in a
+# the "fall through to own" cases are reproducible on any host harness. Each row sets crew-harness / squad-lead-harness in a
 # fresh config dir (a literal '-' means leave the file absent) and asserts BOTH
-# the secondmate resolution AND that crew resolution is unchanged (backward-compat).
-#   <label>^<crew-harness>^<secondmate-harness>^<expect-secondmate>^<expect-crew>
+# the squad_lead resolution AND that crew resolution is unchanged (backward-compat).
+#   <label>^<crew-harness>^<squad-lead-harness>^<expect-squad-lead>^<expect-crew>
 test_harness_resolution() {
   local label crew sm exp_sm exp_crew case_dir cfg got_sm got_crew n
   n=0
@@ -97,22 +97,22 @@ test_harness_resolution() {
     cfg="$case_dir/config"
     mkdir -p "$cfg"
     [ "$crew" = "-" ] || printf '%s\n' "$crew" > "$cfg/crew-harness"
-    [ "$sm" = "-" ] || printf '%s\n' "$sm" > "$cfg/secondmate-harness"
-    got_sm=$(PATH="$BLIND_BIN:$BASE_PATH" CLAUDECODE=1 JG_CONFIG_OVERRIDE="$cfg" "$ROOT/bin/jg-harness.sh" secondmate)
+    [ "$sm" = "-" ] || printf '%s\n' "$sm" > "$cfg/squad-lead-harness"
+    got_sm=$(PATH="$BLIND_BIN:$BASE_PATH" CLAUDECODE=1 JG_CONFIG_OVERRIDE="$cfg" "$ROOT/bin/jg-harness.sh" squad_lead)
     got_crew=$(PATH="$BLIND_BIN:$BASE_PATH" CLAUDECODE=1 JG_CONFIG_OVERRIDE="$cfg" "$ROOT/bin/jg-harness.sh" crew)
-    [ "$got_sm" = "$exp_sm" ] || fail "$label: secondmate resolved '$got_sm', expected '$exp_sm'"
+    [ "$got_sm" = "$exp_sm" ] || fail "$label: squad_lead resolved '$got_sm', expected '$exp_sm'"
     [ "$got_crew" = "$exp_crew" ] || fail "$label: crew resolved '$got_crew', expected '$exp_crew'"
   done <<'ROWS'
 both absent -> own (backward-compat)^-^-^claude^claude
-crew set, secondmate absent -> crew (backward-compat)^codex^-^codex^codex
-crew set, secondmate set -> secondmate wins, crew untouched^codex^grok^grok^codex
-crew absent, secondmate set -> secondmate value, crew own^-^grok^grok^claude
-signed Pi wrapper remains a distinct secondmate value^codex^pi-signed^pi-signed^codex
-secondmate=default defers to crew^codex^default^codex^codex
-crew=default resolves to own, secondmate follows^default^-^claude^claude
-secondmate=default with crew absent -> own^-^default^claude^claude
+crew set, squad_lead absent -> crew (backward-compat)^codex^-^codex^codex
+crew set, squad_lead set -> squad_lead wins, crew untouched^codex^grok^grok^codex
+crew absent, squad_lead set -> squad_lead value, crew own^-^grok^grok^claude
+signed Pi wrapper remains a distinct squad_lead value^codex^pi-signed^pi-signed^codex
+squad_lead=default defers to crew^codex^default^codex^codex
+crew=default resolves to own, squad_lead follows^default^-^claude^claude
+squad_lead=default with crew absent -> own^-^default^claude^claude
 ROWS
-  pass "A1 jg-harness.sh secondmate resolves the fallback chain; crew mode unchanged"
+  pass "A1 jg-harness.sh squad_lead resolves the fallback chain; crew mode unchanged"
 }
 
 test_cursor_marker_detection() {
@@ -137,15 +137,15 @@ SH
 }
 
 # ===========================================================================
-# C) jg-harness.sh secondmate-model / secondmate-effort token resolution
+# C) jg-harness.sh squad-lead-model / squad-lead-effort token resolution
 # ===========================================================================
-# config/secondmate-harness holds "<harness> [<model>] [<effort>]" on one line.
+# config/squad-lead-harness holds "<harness> [<model>] [<effort>]" on one line.
 # A bare harness (today's format) must yield empty model/effort - the
 # backward-compat requirement. The file-line field uses \n for an embedded
 # newline (expanded via printf '%b') so a row can express a multi-line file; the
 # literal token ABSENT skips creating the file entirely.
 #   <label>^<file-line-or-ABSENT>^<expect-harness>^<expect-model>^<expect-effort>
-test_secondmate_model_effort_tokens() {
+test_squad_lead_model_effort_tokens() {
   local label line exp_harness exp_model exp_effort case_dir cfg got_h got_m got_e n
   n=0
   while IFS='^' read -r label line exp_harness exp_model exp_effort; do
@@ -154,10 +154,10 @@ test_secondmate_model_effort_tokens() {
     case_dir="$TMP_ROOT/tokens-$n"
     cfg="$case_dir/config"
     mkdir -p "$cfg"
-    [ "$line" = ABSENT ] || printf '%b\n' "$line" > "$cfg/secondmate-harness"
-    got_h=$(PATH="$BLIND_BIN:$BASE_PATH" CLAUDECODE=1 JG_CONFIG_OVERRIDE="$cfg" "$ROOT/bin/jg-harness.sh" secondmate)
-    got_m=$(PATH="$BLIND_BIN:$BASE_PATH" CLAUDECODE=1 JG_CONFIG_OVERRIDE="$cfg" "$ROOT/bin/jg-harness.sh" secondmate-model)
-    got_e=$(PATH="$BLIND_BIN:$BASE_PATH" CLAUDECODE=1 JG_CONFIG_OVERRIDE="$cfg" "$ROOT/bin/jg-harness.sh" secondmate-effort)
+    [ "$line" = ABSENT ] || printf '%b\n' "$line" > "$cfg/squad-lead-harness"
+    got_h=$(PATH="$BLIND_BIN:$BASE_PATH" CLAUDECODE=1 JG_CONFIG_OVERRIDE="$cfg" "$ROOT/bin/jg-harness.sh" squad_lead)
+    got_m=$(PATH="$BLIND_BIN:$BASE_PATH" CLAUDECODE=1 JG_CONFIG_OVERRIDE="$cfg" "$ROOT/bin/jg-harness.sh" squad-lead-model)
+    got_e=$(PATH="$BLIND_BIN:$BASE_PATH" CLAUDECODE=1 JG_CONFIG_OVERRIDE="$cfg" "$ROOT/bin/jg-harness.sh" squad-lead-effort)
     [ "$got_h" = "$exp_harness" ] || fail "$label: harness resolved '$got_h', expected '$exp_harness'"
     [ "$got_m" = "$exp_model" ] || fail "$label: model resolved '$got_m', expected '$exp_model'"
     [ "$got_e" = "$exp_effort" ] || fail "$label: effort resolved '$got_e', expected '$exp_effort'"
@@ -171,7 +171,7 @@ default harness token -> falls back to crew, empty model/effort^default^claude^^
 extra whitespace between tokens is tolerated^grok   grok-4    xhigh^grok^grok-4^xhigh
 leading/trailing blank lines and a comment are skipped^# a comment\n\nclaude opus low\n^claude^opus^low
 ROWS
-  pass "C1 jg-harness.sh secondmate-model/secondmate-effort resolve the optional tokens; bare harness stays empty (backward-compat)"
+  pass "C1 jg-harness.sh squad-lead-model/squad-lead-effort resolve the optional tokens; bare harness stays empty (backward-compat)"
 }
 
 # ===========================================================================
@@ -395,8 +395,8 @@ test_propagate_lib() {
   [ -d "$dest/crew-harness" ] || fail "failed absence mirror removed the wrong path"
   rm -rf "$dest/crew-harness"
 
-  # 5. secondmate-harness is never inherited; backend still is
-  printf 'grok\n' > "$src/secondmate-harness"
+  # 5. squad-lead-harness is never inherited; backend still is
+  printf 'grok\n' > "$src/squad-lead-harness"
   printf '{"default":{"harness":"codex"}}\n' > "$src/crew-dispatch.json"
   printf 'codex\n' > "$src/crew-harness"
   printf 'manual\n' > "$src/backlog-backend"
@@ -404,7 +404,7 @@ test_propagate_lib() {
   rm -rf "$d/home2"
   mkdir -p "$d/home2/config" "$d/home2/state"
   propagate_inheritable_config "$src" "$d/home2/config"
-  [ -e "$d/home2/config/secondmate-harness" ] && fail "secondmate-harness was inherited (must not be)"
+  [ -e "$d/home2/config/squad-lead-harness" ] && fail "squad-lead-harness was inherited (must not be)"
   [ "$(cat "$d/home2/config/crew-dispatch.json")" = '{"default":{"harness":"codex"}}' ] || fail "crew-dispatch.json not propagated alongside"
   [ "$(cat "$d/home2/config/crew-harness")" = codex ] || fail "crew-harness not propagated alongside"
   [ "$(cat "$d/home2/config/backlog-backend")" = manual ] || fail "backlog-backend not propagated alongside"
@@ -412,7 +412,7 @@ test_propagate_lib() {
 
   # 5b. the supervision-host opt-out is inherited and primary-authoritative,
   # while each home's engine line stays its own: the primary's off reaches the
-  # secondmate and the real gate reads that home as off on a Claude primary
+  # squad_lead and the real gate reads that home as off on a Claude primary
   # despite its own engine line; clearing the primary's off converges it back on.
   printf 'claude sonnet\n' > "$src/supervision-host"
   printf 'default haiku\n' > "$d/home2/config/supervision-host"
@@ -420,15 +420,15 @@ test_propagate_lib() {
   propagate_inheritable_config "$src" "$d/home2/config"
   [ -f "$d/home2/config/supervision-host-off" ] || fail "a primary's supervision-host-off was not inherited"
   if bash "$ROOT/bin/jg-supervision-engine-lib.sh" enabled "$d/home2/config" claude; then
-    fail "a secondmate that inherited the primary's opt-out still runs the supervision host"
+    fail "a squad_lead that inherited the primary's opt-out still runs the supervision host"
   fi
   rm -f "$src/supervision-host-off"
   propagate_inheritable_config "$src" "$d/home2/config"
   [ -e "$d/home2/config/supervision-host-off" ] && fail "clearing the primary's supervision-host-off was not mirrored downstream"
   bash "$ROOT/bin/jg-supervision-engine-lib.sh" enabled "$d/home2/config" claude \
-    || fail "a secondmate did not converge back on once the primary cleared its opt-out"
+    || fail "a squad_lead did not converge back on once the primary cleared its opt-out"
   [ "$(cat "$d/home2/config/supervision-host" 2>/dev/null)" = 'default haiku' ] \
-    || fail "a secondmate's own supervision-host engine line was changed by convergence"
+    || fail "a squad_lead's own supervision-host engine line was changed by convergence"
   rm -f "$src/supervision-host"
 
   # 6. nothing to propagate -> destination dir is never created (a true no-op)
@@ -461,7 +461,7 @@ test_propagate_lib() {
 }
 
 # ===========================================================================
-# B/A integration: a secondmate spawn resolves the secondmate harness and
+# B/A integration: a squad_lead spawn resolves the squad_lead harness and
 # propagates the crew harness into the home's config.
 # ===========================================================================
 
@@ -482,25 +482,25 @@ SH
   printf '%s\n' "$fakebin"
 }
 
-# A minimal seeded secondmate home (validate_firstmate_home_for_spawn needs the
+# A minimal seeded squad_lead home (validate_juggernaut_home_for_spawn needs the
 # seed marker, AGENTS.md, bin/, and a charter to launch). config/ is intentionally
 # left absent so the spawn's propagation is what creates it.
 make_seeded_home() {
   local home=$1 id=$2
   mkdir -p "$home/bin" "$home/data"
-  printf '# Firstmate\n' > "$home/AGENTS.md"
-  printf '%s\n' "$id" > "$home/.jg-secondmate-home"
+  printf '# Juggernaut\n' > "$home/AGENTS.md"
+  printf '%s\n' "$id" > "$home/.jg-squad-lead-home"
   printf 'charter\n' > "$home/data/charter.md"
   printf '%s\n' 'projects/' 'state/' 'data/' 'config/' '.no-mistakes/' > "$home/.gitignore"
   git -C "$home" init -q -b main
 }
 
-# spawn_secondmate <world> <id> <home> [explicit-harness]
-# Runs jg-spawn.sh in secondmate mode. JG_ROOT is the real repo (so jg-harness.sh
+# spawn_squad_lead <world> <id> <home> [explicit-harness]
+# Runs jg-spawn.sh in squad_lead mode. JG_ROOT is the real repo (so jg-harness.sh
 # resolves), the primary config dir is <world>/home/config, and CLAUDECODE over a
 # blinded ancestry walk pins detect_own. stderr is discarded (the local-HEAD ff sync harmlessly skips a
 # non-worktree home). Inspect <world>/home/state/<id>.meta and <home>/config after.
-spawn_secondmate() {
+spawn_squad_lead() {
   local world=$1 id=$2 home=$3 harness=${4:-} fakebin
   mkdir -p "$world/home/state" "$world/home/data"
   fakebin=$(make_noop_tmux "$world/tmux-$id")
@@ -508,7 +508,7 @@ spawn_secondmate() {
   # arg list explicitly so the optional harness is omitted cleanly.
   local spawn_args=("$id" "$home")
   [ -n "$harness" ] && spawn_args+=("$harness")
-  spawn_args+=(--secondmate)
+  spawn_args+=(--squad-lead)
   PATH="$fakebin:$BLIND_BIN:$BASE_PATH" TMUX='' CLAUDECODE=1 \
     JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$world/home" HOME="$world/home/user-home" CLAUDE_CONFIG_DIR='' \
     JG_STATE_OVERRIDE="$world/home/state" JG_DATA_OVERRIDE="$world/home/data" \
@@ -519,8 +519,8 @@ spawn_secondmate() {
 
 meta_harness() { grep '^harness=' "$1" 2>/dev/null | tail -1 | cut -d= -f2-; }
 
-# Split active: crew-harness=claude + secondmate-harness=codex. The secondmate
-# AGENT launches on codex; its own crewmates inherit claude; secondmate-harness
+# Split active: crew-harness=claude + squad-lead-harness=codex. The squad_lead
+# AGENT launches on codex; its own operators inherit claude; squad-lead-harness
 # does not flow into the home.
 test_spawn_split_and_inherit() {
   local w sm meta
@@ -529,18 +529,18 @@ test_spawn_split_and_inherit() {
   mkdir -p "$w/home/config"
   printf '{"default":{"harness":"claude","model":"haiku","effort":"low"}}\n' > "$w/home/config/crew-dispatch.json"
   printf 'claude\n' > "$w/home/config/crew-harness"
-  printf 'codex\n' > "$w/home/config/secondmate-harness"
+  printf 'codex\n' > "$w/home/config/squad-lead-harness"
   printf 'manual\n' > "$w/home/config/backlog-backend"
   printf 'zellij\n' > "$w/home/config/backend"
   : > "$w/home/config/supervision-host-off"
   make_seeded_home "$sm" sm
 
-  spawn_secondmate "$w" sm "$sm"
+  spawn_squad_lead "$w" sm "$sm"
 
   meta="$w/home/state/sm.meta"
   [ -f "$meta" ] || fail "split: no meta written"
   [ "$(meta_harness "$meta")" = codex ] \
-    || fail "split: secondmate launched on '$(meta_harness "$meta")', expected codex"
+    || fail "split: squad_lead launched on '$(meta_harness "$meta")', expected codex"
   [ "$(cat "$sm/config/crew-harness" 2>/dev/null)" = claude ] \
     || fail "split: home crew-harness not inherited as claude (got '$(cat "$sm/config/crew-harness" 2>/dev/null)')"
   [ "$(cat "$sm/config/crew-dispatch.json" 2>/dev/null)" = '{"default":{"harness":"claude","model":"haiku","effort":"low"}}' ] \
@@ -549,17 +549,17 @@ test_spawn_split_and_inherit() {
     || fail "split: home backlog-backend not inherited as manual"
   [ "$(cat "$sm/config/backend" 2>/dev/null)" = zellij ] \
     || fail "split: home backend not inherited as zellij"
-  [ -e "$sm/config/secondmate-harness" ] \
-    && fail "split: secondmate-harness leaked into the secondmate home"
+  [ -e "$sm/config/squad-lead-harness" ] \
+    && fail "split: squad-lead-harness leaked into the squad_lead home"
   [ -f "$sm/config/supervision-host-off" ] \
     || fail "split: home supervision-host-off not inherited"
   if bash "$ROOT/bin/jg-supervision-engine-lib.sh" enabled "$sm/config" claude; then
-    fail "split: a secondmate spawned under an opted-out primary still runs the supervision host"
+    fail "split: a squad_lead spawned under an opted-out primary still runs the supervision host"
   fi
-  pass "B2 spawn: secondmate runs the secondmate harness; its home inherits declared config"
+  pass "B2 spawn: squad_lead runs the squad_lead harness; its home inherits declared config"
 }
 
-# Backward-compat: secondmate-harness absent -> the secondmate launches on the
+# Backward-compat: squad-lead-harness absent -> the squad_lead launches on the
 # crew harness, exactly as before this knob existed, and that crew value is the
 # one inherited.
 test_spawn_backward_compat_crew_fallback() {
@@ -570,17 +570,17 @@ test_spawn_backward_compat_crew_fallback() {
   printf 'codex\n' > "$w/home/config/crew-harness"
   make_seeded_home "$sm" sm
 
-  spawn_secondmate "$w" sm "$sm"
+  spawn_squad_lead "$w" sm "$sm"
 
   meta="$w/home/state/sm.meta"
   [ "$(meta_harness "$meta")" = codex ] \
-    || fail "compat: secondmate launched on '$(meta_harness "$meta")', expected the crew harness codex"
+    || fail "compat: squad_lead launched on '$(meta_harness "$meta")', expected the crew harness codex"
   [ "$(cat "$sm/config/crew-harness" 2>/dev/null)" = codex ] \
     || fail "compat: home crew-harness not inherited as codex"
-  pass "B3 spawn: an absent secondmate-harness falls back to the crew harness (backward-compat)"
+  pass "B3 spawn: an absent squad-lead-harness falls back to the crew harness (backward-compat)"
 }
 
-# Bare backward-compat: no config at all. The secondmate falls through to its own
+# Bare backward-compat: no config at all. The squad_lead falls through to its own
 # harness (claude here), and with no inheritable file the home is left untouched -
 # no config/ side effects.
 test_spawn_bare_backward_compat() {
@@ -589,41 +589,41 @@ test_spawn_bare_backward_compat() {
   sm="$w/sm"
   make_seeded_home "$sm" sm
 
-  spawn_secondmate "$w" sm "$sm"
+  spawn_squad_lead "$w" sm "$sm"
 
   meta="$w/home/state/sm.meta"
   [ "$(meta_harness "$meta")" = claude ] \
-    || fail "bare: secondmate launched on '$(meta_harness "$meta")', expected own harness claude"
+    || fail "bare: squad_lead launched on '$(meta_harness "$meta")', expected own harness claude"
   [ -e "$sm/config/crew-dispatch.json" ] && fail "bare: an unset primary still created a home crew-dispatch.json"
   [ -e "$sm/config/crew-harness" ] && fail "bare: an unset primary still created a home crew-harness"
   pass "B4 spawn: no config at all -> own harness and no propagation side effects"
 }
 
-# An explicit per-spawn harness arg wins over config/secondmate-harness.
+# An explicit per-spawn harness arg wins over config/squad-lead-harness.
 test_spawn_explicit_harness_wins() {
   local w sm meta
   w="$TMP_ROOT/spawn-explicit"
   sm="$w/sm"
   mkdir -p "$w/home/config"
-  printf 'codex\n' > "$w/home/config/secondmate-harness"
+  printf 'codex\n' > "$w/home/config/squad-lead-harness"
   make_seeded_home "$sm" sm
 
-  spawn_secondmate "$w" sm "$sm" claude
+  spawn_squad_lead "$w" sm "$sm" claude
 
   meta="$w/home/state/sm.meta"
   [ "$(meta_harness "$meta")" = claude ] \
     || fail "explicit: launched on '$(meta_harness "$meta")', expected explicit claude over config codex"
-  pass "B5 spawn: an explicit per-spawn harness arg overrides config/secondmate-harness"
+  pass "B5 spawn: an explicit per-spawn harness arg overrides config/squad-lead-harness"
 }
 
-# The unverified-adapter guard holds on the resolved secondmate path: an unknown
-# config/secondmate-harness aborts the spawn (no meta written) and names the source.
-test_spawn_unverified_secondmate_harness_refused() {
+# The unverified-adapter guard holds on the resolved squad_lead path: an unknown
+# config/squad-lead-harness aborts the spawn (no meta written) and names the source.
+test_spawn_unverified_squad_lead_harness_refused() {
   local w sm fakebin err rc
   w="$TMP_ROOT/spawn-unverified"
   sm="$w/sm"
   mkdir -p "$w/home/config" "$w/home/state"
-  printf 'bogus\n' > "$w/home/config/secondmate-harness"
+  printf 'bogus\n' > "$w/home/config/squad-lead-harness"
   make_seeded_home "$sm" sm
   fakebin=$(make_noop_tmux "$w/tmux")
   err="$w/spawn.err"
@@ -633,24 +633,24 @@ test_spawn_unverified_secondmate_harness_refused() {
     JG_STATE_OVERRIDE="$w/home/state" JG_DATA_OVERRIDE="$w/home/data" \
     JG_PROJECTS_OVERRIDE="$w/home/projects" JG_CONFIG_OVERRIDE="$w/home/config" \
     JG_SPAWN_NO_GUARD=1 \
-    "$ROOT/bin/jg-spawn.sh" sm "$sm" --secondmate >/dev/null 2>"$err" || rc=$?
+    "$ROOT/bin/jg-spawn.sh" sm "$sm" --squad-lead >/dev/null 2>"$err" || rc=$?
 
   [ "$rc" -ne 0 ] || fail "unverified: spawn should have failed"
   assert_contains "$(cat "$err")" "no launch template for harness 'bogus'" \
     "unverified: error names the rejected harness"
-  assert_contains "$(cat "$err")" "config/secondmate-harness" \
-    "unverified: error names the secondmate-harness source"
+  assert_contains "$(cat "$err")" "config/squad-lead-harness" \
+    "unverified: error names the squad-lead-harness source"
   [ -e "$w/home/state/sm.meta" ] && fail "unverified: a meta was written despite the abort"
-  pass "B6 spawn: an unverified resolved secondmate harness is refused (guard intact)"
+  pass "B6 spawn: an unverified resolved squad_lead harness is refused (guard intact)"
 }
 
-test_spawn_cursor_secondmate_launches_with_its_primary_contract() {
+test_spawn_cursor_squad_lead_launches_with_its_primary_contract() {
   local w sm fakebin launchlog launch meta rc
-  w="$TMP_ROOT/spawn-cursor-secondmate"
+  w="$TMP_ROOT/spawn-cursor-squad-lead"
   sm="$w/sm"
   launchlog="$w/launch.log"
   mkdir -p "$w/home/config" "$w/home/state" "$w/home/data" "$w/home/projects"
-  printf 'cursor\n' > "$w/home/config/secondmate-harness"
+  printf 'cursor\n' > "$w/home/config/squad-lead-harness"
   make_seeded_home "$sm" sm
   fakebin=$(make_launch_capturing_tmux "$w/tmux")
   : > "$launchlog"
@@ -660,28 +660,28 @@ test_spawn_cursor_secondmate_launches_with_its_primary_contract() {
     JG_STATE_OVERRIDE="$w/home/state" JG_DATA_OVERRIDE="$w/home/data" \
     JG_PROJECTS_OVERRIDE="$w/home/projects" JG_CONFIG_OVERRIDE="$w/home/config" \
     JG_SPAWN_NO_GUARD=1 JG_FAKE_LAUNCH_LOG="$launchlog" JG_FAKE_PANE_PATH="$sm" \
-    "$ROOT/bin/jg-spawn.sh" sm "$sm" --secondmate >/dev/null 2>&1 || rc=$?
+    "$ROOT/bin/jg-spawn.sh" sm "$sm" --squad-lead >/dev/null 2>&1 || rc=$?
 
   [ "$rc" -eq 0 ] || {
     echo "skip: cursor executable not resolvable in this environment, so the launch could not be built"
     return
   }
   meta="$w/home/state/sm.meta"
-  [ "$(meta_field "$meta" harness)" = cursor ] || fail "a cursor secondmate must record its own harness"
-  [ "$(meta_field "$meta" kind)" = secondmate ] || fail "a cursor secondmate must record kind=secondmate"
+  [ "$(meta_field "$meta" harness)" = cursor ] || fail "a cursor squad_lead must record its own harness"
+  [ "$(meta_field "$meta" kind)" = squad_lead ] || fail "a cursor squad_lead must record kind=squad_lead"
   launch=$(cat "$launchlog")
   assert_contains "$launch" "--trust" \
-    "a cursor secondmate must launch with --trust, or none of its project hooks load and its home has no supervision at all"
+    "a cursor squad_lead must launch with --trust, or none of its project hooks load and its home has no supervision at all"
   assert_contains "$launch" "--workspace" \
-    "a cursor secondmate must be pinned to its own home as the workspace"
+    "a cursor squad_lead must be pinned to its own home as the workspace"
   assert_contains "$launch" "JG_SUPERVISION_MODEL=autoarm" \
     "cursor's stop-hook park runs the watcher only between turns, so its home must inherit the autoarm model"
-  pass "Cursor is accepted for secondmates and launches with the contract its park needs"
+  pass "Cursor is accepted for squad_leads and launches with the contract its park needs"
 }
 
 # ===========================================================================
-# C integration: config/secondmate-harness's optional model/effort tokens thread
-# into the secondmate launch command and meta, durably and without a new file.
+# C integration: config/squad-lead-harness's optional model/effort tokens thread
+# into the squad_lead launch command and meta, durably and without a new file.
 # ===========================================================================
 
 meta_field() { grep "^$2=" "$1" 2>/dev/null | tail -1 | cut -d= -f2-; }
@@ -691,7 +691,7 @@ meta_field() { grep "^$2=" "$1" 2>/dev/null | tail -1 | cut -d= -f2-; }
 # capture technique in jg-spawn-dispatch-profile.test.sh so the constructed
 # launch command (not just meta) can be asserted on. Also answers the
 # `#{pane_current_path}` probe from JG_FAKE_PANE_PATH so this same stub works
-# for a crew/scout (non-secondmate) spawn's treehouse-worktree wait loop.
+# for a crew/scout (non-squad-lead) spawn's treehouse-worktree wait loop.
 make_launch_capturing_tmux() {
   local dir=$1 fakebin="$1/fakebin"
   mkdir -p "$fakebin"
@@ -702,7 +702,7 @@ case "$*" in
   *"#{pane_current_path}"*) printf '%s\n' "${JG_FAKE_PANE_PATH:-}"; exit 0 ;;
 esac
 case "${1:-}" in
-  display-message) printf 'firstmate\n'; exit 0 ;;
+  display-message) printf 'juggernaut\n'; exit 0 ;;
   list-windows) exit 0 ;;
   has-session|new-session|new-window|kill-window) exit 0 ;;
   send-keys)
@@ -732,7 +732,7 @@ SH
   printf '%s\n' "$fakebin"
 }
 
-# The --add-dir grant a Claude secondmate launch carries between its
+# The --add-dir grant a Claude squad_lead launch carries between its
 # permission flag and --settings: only the PARENT home's state/<id>.inbox,
 # real-path resolved the way the spawn's claude_add_dirs_flag resolves it.
 # Prints a trailing space so callers can drop it straight into an expected
@@ -743,17 +743,17 @@ sm_claude_add_dir() {  # <world> <id>
   printf "%s " "--add-dir '$real/$2.inbox'"
 }
 
-# The parent-state settings file a Claude secondmate launch passes to --settings.
+# The parent-state settings file a Claude squad_lead launch passes to --settings.
 sm_claude_settings() {  # <world> <id>
   local real
   real=$(cd "$1/home/state" && pwd -P)
   printf '%s' "$real/$2.claude-settings.json"
 }
 
-# spawn_secondmate_capture <world> <id> <home> <launchlog> [extra jg-spawn.sh args...]
-# Same shape as spawn_secondmate but captures the launch command into <launchlog>
+# spawn_squad_lead_capture <world> <id> <home> <launchlog> [extra jg-spawn.sh args...]
+# Same shape as spawn_squad_lead but captures the launch command into <launchlog>
 # and does not discard stderr, so callers can assert on both.
-spawn_secondmate_capture() {
+spawn_squad_lead_capture() {
   local world=$1 id=$2 home=$3 launchlog=$4 fakebin
   shift 4
   mkdir -p "$world/home/state" "$world/home/data"
@@ -764,7 +764,7 @@ spawn_secondmate_capture() {
     JG_STATE_OVERRIDE="$world/home/state" JG_DATA_OVERRIDE="$world/home/data" \
     JG_PROJECTS_OVERRIDE="$world/home/projects" JG_CONFIG_OVERRIDE="$world/home/config" \
     JG_SPAWN_NO_GUARD=1 JG_FAKE_LAUNCH_LOG="$launchlog" \
-    "$ROOT/bin/jg-spawn.sh" "$id" "$home" "$@" --secondmate
+    "$ROOT/bin/jg-spawn.sh" "$id" "$home" "$@" --squad-lead
 }
 
 test_spawn_backend_precedence_over_inherited_config() {
@@ -776,7 +776,7 @@ test_spawn_backend_precedence_over_inherited_config() {
   printf 'herdr\n' > "$w/home/config/backend"
   make_seeded_home "$sm" sm
 
-  out=$(JG_BACKEND=tmux spawn_secondmate_capture \
+  out=$(JG_BACKEND=tmux spawn_squad_lead_capture \
     "$w" sm "$sm" "$launchlog" 2>&1); status=$?
   expect_code 0 "$status" \
     "JG_BACKEND=tmux should beat inherited config/backend=herdr"$'\n'"$out"
@@ -798,7 +798,7 @@ test_spawn_explicit_backend_precedence_over_env_and_inherited_config() {
   printf 'herdr\n' > "$w/home/config/backend"
   make_seeded_home "$sm" sm
 
-  out=$(JG_BACKEND=zellij spawn_secondmate_capture \
+  out=$(JG_BACKEND=zellij spawn_squad_lead_capture \
     "$w" sm "$sm" "$launchlog" --backend tmux 2>&1); status=$?
   expect_code 0 "$status" \
     "explicit --backend tmux should beat JG_BACKEND=zellij and inherited config/backend=herdr"$'\n'"$out"
@@ -811,7 +811,7 @@ test_spawn_explicit_backend_precedence_over_env_and_inherited_config() {
   pass "B5c spawn: explicit --backend wins over JG_BACKEND and inherited config/backend"
 }
 
-# A bare "<harness>" secondmate-harness file (today's format) must launch with
+# A bare "<harness>" squad-lead-harness file (today's format) must launch with
 # NO --model/--effort flag at all, and meta must keep recording model=default,
 # effort=default - the core backward-compat requirement of the new format.
 test_spawn_bare_harness_no_model_effort_flag() {
@@ -820,35 +820,35 @@ test_spawn_bare_harness_no_model_effort_flag() {
   sm="$w/sm"
   launchlog="$w/launch.log"
   mkdir -p "$w/home/config"
-  printf 'claude\n' > "$w/home/config/secondmate-harness"
+  printf 'claude\n' > "$w/home/config/squad-lead-harness"
   make_seeded_home "$sm" sm
 
-  out=$(spawn_secondmate_capture "$w" sm "$sm" "$launchlog" 2>&1); status=$?
-  expect_code 0 "$status" "bare-harness secondmate spawn should succeed"
+  out=$(spawn_squad_lead_capture "$w" sm "$sm" "$launchlog" 2>&1); status=$?
+  expect_code 0 "$status" "bare-harness squad_lead spawn should succeed"
 
   meta="$w/home/state/sm.meta"
   [ "$(meta_field "$meta" model)" = default ] || fail "bare-tokens: meta model not default (got '$(meta_field "$meta" model)')"
   [ "$(meta_field "$meta" effort)" = default ] || fail "bare-tokens: meta effort not default (got '$(meta_field "$meta" effort)')"
   launch=$(cat "$launchlog")
   assert_contains "$launch" "CLAUDE_CODE_SEND_FEEDBACK=0 claude" \
-    "bare-tokens: Claude secondmate launch did not disable feedback drafts"
+    "bare-tokens: Claude squad_lead launch did not disable feedback drafts"
   assert_not_contains "$launch" "--model" "bare-tokens: launch must not carry a --model flag"
   assert_not_contains "$launch" "--effort" "bare-tokens: launch must not carry an --effort flag"
-  pass "C2 spawn: a bare harness-only secondmate-harness file launches with no model/effort flag (backward-compat)"
+  pass "C2 spawn: a bare harness-only squad-lead-harness file launches with no model/effort flag (backward-compat)"
 }
 
-# "<harness> <model>" durably threads --model into the secondmate launch and
+# "<harness> <model>" durably threads --model into the squad_lead launch and
 # records it in meta, with no --effort flag (no effort token supplied).
-test_spawn_secondmate_harness_model_token() {
+test_spawn_squad_lead_harness_model_token() {
   local w sm meta launchlog launch
   w="$TMP_ROOT/spawn-model-token"
   sm="$w/sm"
   launchlog="$w/launch.log"
   mkdir -p "$w/home/config"
-  printf 'claude opus\n' > "$w/home/config/secondmate-harness"
+  printf 'claude opus\n' > "$w/home/config/squad-lead-harness"
   make_seeded_home "$sm" sm
 
-  spawn_secondmate_capture "$w" sm "$sm" "$launchlog" >/dev/null 2>&1
+  spawn_squad_lead_capture "$w" sm "$sm" "$launchlog" >/dev/null 2>&1
 
   meta="$w/home/state/sm.meta"
   [ "$(meta_field "$meta" harness)" = claude ] || fail "model-token: meta harness not claude"
@@ -861,20 +861,20 @@ test_spawn_secondmate_harness_model_token() {
     "$(sm_claude_settings "$w" sm)" >/dev/null \
     || fail "model-token: the --settings file did not carry the session keys and busy hooks"
   assert_not_contains "$launch" "--effort" "model-token: launch must not carry an --effort flag"
-  pass "C3 spawn: config/secondmate-harness's model token threads --model into the launch and meta"
+  pass "C3 spawn: config/squad-lead-harness's model token threads --model into the launch and meta"
 }
 
 # "<harness> <model> <effort>" threads both flags into the launch and meta.
-test_spawn_secondmate_harness_model_and_effort_tokens() {
+test_spawn_squad_lead_harness_model_and_effort_tokens() {
   local w sm meta launchlog launch
   w="$TMP_ROOT/spawn-model-effort-tokens"
   sm="$w/sm"
   launchlog="$w/launch.log"
   mkdir -p "$w/home/config"
-  printf 'claude opus high\n' > "$w/home/config/secondmate-harness"
+  printf 'claude opus high\n' > "$w/home/config/squad-lead-harness"
   make_seeded_home "$sm" sm
 
-  spawn_secondmate_capture "$w" sm "$sm" "$launchlog" >/dev/null 2>&1
+  spawn_squad_lead_capture "$w" sm "$sm" "$launchlog" >/dev/null 2>&1
 
   meta="$w/home/state/sm.meta"
   [ "$(meta_field "$meta" model)" = opus ] || fail "model-effort-tokens: meta model not opus"
@@ -882,20 +882,20 @@ test_spawn_secondmate_harness_model_and_effort_tokens() {
   launch=$(cat "$launchlog")
   assert_contains "$launch" "claude --dangerously-skip-permissions $(sm_claude_add_dir "$w" sm)--settings '$(sm_claude_settings "$w" sm)' --model 'opus' --effort 'high'" \
     "model-effort-tokens: launch did not carry both --model opus and --effort high"
-  pass "C4 spawn: config/secondmate-harness's model+effort tokens thread into the launch and meta"
+  pass "C4 spawn: config/squad-lead-harness's model+effort tokens thread into the launch and meta"
 }
 
 # Precedence: an explicit per-spawn --model overrides the file's model token.
-test_spawn_explicit_model_overrides_secondmate_harness_token() {
+test_spawn_explicit_model_overrides_squad_lead_harness_token() {
   local w sm meta launchlog launch
   w="$TMP_ROOT/spawn-explicit-model"
   sm="$w/sm"
   launchlog="$w/launch.log"
   mkdir -p "$w/home/config"
-  printf 'claude opus high\n' > "$w/home/config/secondmate-harness"
+  printf 'claude opus high\n' > "$w/home/config/squad-lead-harness"
   make_seeded_home "$sm" sm
 
-  spawn_secondmate_capture "$w" sm "$sm" "$launchlog" --model sonnet >/dev/null 2>&1
+  spawn_squad_lead_capture "$w" sm "$sm" "$launchlog" --model sonnet >/dev/null 2>&1
 
   meta="$w/home/state/sm.meta"
   [ "$(meta_field "$meta" model)" = sonnet ] \
@@ -904,20 +904,20 @@ test_spawn_explicit_model_overrides_secondmate_harness_token() {
   launch=$(cat "$launchlog")
   assert_contains "$launch" "--model 'sonnet'" "explicit-model: launch did not use the explicit --model"
   assert_not_contains "$launch" "--model 'opus'" "explicit-model: launch leaked the file's model token"
-  pass "C5 spawn: an explicit --model overrides config/secondmate-harness's model token; the file's effort token still applies"
+  pass "C5 spawn: an explicit --model overrides config/squad-lead-harness's model token; the file's effort token still applies"
 }
 
 # Precedence: an explicit per-spawn --effort overrides the file's effort token.
-test_spawn_explicit_effort_overrides_secondmate_harness_token() {
+test_spawn_explicit_effort_overrides_squad_lead_harness_token() {
   local w sm meta launchlog launch
   w="$TMP_ROOT/spawn-explicit-effort"
   sm="$w/sm"
   launchlog="$w/launch.log"
   mkdir -p "$w/home/config"
-  printf 'claude opus high\n' > "$w/home/config/secondmate-harness"
+  printf 'claude opus high\n' > "$w/home/config/squad-lead-harness"
   make_seeded_home "$sm" sm
 
-  spawn_secondmate_capture "$w" sm "$sm" "$launchlog" --effort low >/dev/null 2>&1
+  spawn_squad_lead_capture "$w" sm "$sm" "$launchlog" --effort low >/dev/null 2>&1
 
   meta="$w/home/state/sm.meta"
   [ "$(meta_field "$meta" model)" = opus ] || fail "explicit-effort: file's model token should still apply"
@@ -926,19 +926,19 @@ test_spawn_explicit_effort_overrides_secondmate_harness_token() {
   launch=$(cat "$launchlog")
   assert_contains "$launch" "--effort 'low'" "explicit-effort: launch did not use the explicit --effort"
   assert_not_contains "$launch" "--effort 'high'" "explicit-effort: launch leaked the file's effort token"
-  pass "C6 spawn: an explicit --effort overrides config/secondmate-harness's effort token; the file's model token still applies"
+  pass "C6 spawn: an explicit --effort overrides config/squad-lead-harness's effort token; the file's model token still applies"
 }
 
-test_spawn_explicit_harness_does_not_inherit_secondmate_harness_tokens() {
+test_spawn_explicit_harness_does_not_inherit_squad_lead_harness_tokens() {
   local w sm meta launchlog launch
   w="$TMP_ROOT/spawn-explicit-harness-no-tokens"
   sm="$w/sm"
   launchlog="$w/launch.log"
   mkdir -p "$w/home/config"
-  printf 'claude opus high\n' > "$w/home/config/secondmate-harness"
+  printf 'claude opus high\n' > "$w/home/config/squad-lead-harness"
   make_seeded_home "$sm" sm
 
-  spawn_secondmate_capture "$w" sm "$sm" "$launchlog" --harness codex >/dev/null 2>&1
+  spawn_squad_lead_capture "$w" sm "$sm" "$launchlog" --harness codex >/dev/null 2>&1
 
   meta="$w/home/state/sm.meta"
   [ "$(meta_field "$meta" harness)" = codex ] || fail "explicit-harness-no-tokens: meta harness not codex"
@@ -959,10 +959,10 @@ test_spawn_explicit_harness_uses_explicit_profile_axes() {
   sm="$w/sm"
   launchlog="$w/launch.log"
   mkdir -p "$w/home/config"
-  printf 'claude opus high\n' > "$w/home/config/secondmate-harness"
+  printf 'claude opus high\n' > "$w/home/config/squad-lead-harness"
   make_seeded_home "$sm" sm
 
-  spawn_secondmate_capture "$w" sm "$sm" "$launchlog" --harness codex --model gpt-5.5 --effort xhigh >/dev/null 2>&1
+  spawn_squad_lead_capture "$w" sm "$sm" "$launchlog" --harness codex --model gpt-5.5 --effort xhigh >/dev/null 2>&1
 
   meta="$w/home/state/sm.meta"
   [ "$(meta_field "$meta" harness)" = codex ] || fail "explicit-harness-explicit-axes: meta harness not codex"
@@ -980,17 +980,17 @@ test_spawn_explicit_harness_uses_explicit_profile_axes() {
   pass "C8 spawn: an explicit --harness still honors explicit model/effort flags"
 }
 
-test_spawned_secondmate_uses_its_harness_supervision_model() {
+test_spawned_squad_lead_uses_its_harness_supervision_model() {
   local harness expected w sm launchlog launch fakebin out
   for harness in codex claude; do
     w="$TMP_ROOT/spawn-supervision-model-$harness"
     sm="$w/sm"
     launchlog="$w/launch.log"
     mkdir -p "$w/home/config"
-    printf '%s\n' "$harness" > "$w/home/config/secondmate-harness"
+    printf '%s\n' "$harness" > "$w/home/config/squad-lead-harness"
     make_seeded_home "$sm" sm
-    spawn_secondmate_capture "$w" sm "$sm" "$launchlog" >/dev/null 2>&1
-    jg_write_meta "$sm/state/task.meta" "window=firstmate:jg-task" "kind=ship"
+    spawn_squad_lead_capture "$w" sm "$sm" "$launchlog" >/dev/null 2>&1
+    jg_write_meta "$sm/state/task.meta" "window=juggernaut:jg-task" "kind=ship"
     touch "$sm/state/.last-watcher-beat"
     fakebin="$w/tmux-sm/fakebin"
     # Point the guard at the fixture home, not at whatever checkout this suite
@@ -1008,20 +1008,20 @@ SH
       codex)
         expected='WATCHER DOWN - SUPERVISION IS OFF'
         assert_contains "$out" "$expected" \
-          "Codex secondmate inherited Claude auto-arm despite its persistent watcher model"
+          "Codex squad_lead inherited Claude auto-arm despite its persistent watcher model"
         ;;
       claude)
         [ -z "$out" ] \
-          || fail "Claude secondmate with a fresh beacon should use auto-arm supervision, got: $out"
+          || fail "Claude squad_lead with a fresh beacon should use auto-arm supervision, got: $out"
         ;;
     esac
   done
-  pass "C9 spawn: secondmate launch pins supervision to its own harness"
+  pass "C9 spawn: squad_lead launch pins supervision to its own harness"
 }
 
-# The harness fallback chain (secondmate-harness -> crew-harness -> own) still
+# The harness fallback chain (squad-lead-harness -> crew-harness -> own) still
 # resolves correctly with no model/effort tokens anywhere in the chain, and a
-# crew/scout (non-secondmate) launch is entirely unaffected by this feature: no
+# crew/scout (non-squad-lead) launch is entirely unaffected by this feature: no
 # model/effort is invented for it even though its own project has no profile set.
 test_spawn_fallback_chain_and_crew_scout_unaffected() {
   local w sm meta home proj wt fakebin launchlog id launch
@@ -1032,17 +1032,17 @@ test_spawn_fallback_chain_and_crew_scout_unaffected() {
   printf 'codex\n' > "$w/home/config/crew-harness"
   make_seeded_home "$sm" sm
 
-  spawn_secondmate_capture "$w" sm "$sm" "$launchlog" >/dev/null 2>&1
+  spawn_squad_lead_capture "$w" sm "$sm" "$launchlog" >/dev/null 2>&1
 
   meta="$w/home/state/sm.meta"
   [ "$(meta_field "$meta" harness)" = codex ] \
-    || fail "fallback: secondmate harness did not fall back to crew-harness codex"
+    || fail "fallback: squad_lead harness did not fall back to crew-harness codex"
   [ "$(meta_field "$meta" model)" = default ] || fail "fallback: meta model should stay default with no tokens anywhere"
   [ "$(meta_field "$meta" effort)" = default ] || fail "fallback: meta effort should stay default with no tokens anywhere"
 
-  # Crew/scout launch: same crew-harness config, no --secondmate. Must resolve
+  # Crew/scout launch: same crew-harness config, no --squad-lead. Must resolve
   # the crew harness and record no model/effort - this codepath must never read
-  # config/secondmate-harness's tokens at all.
+  # config/squad-lead-harness's tokens at all.
   id="crew-unaffected-z1"
   home="$w/home"
   proj="$w/crew-project"
@@ -1055,8 +1055,8 @@ test_spawn_fallback_chain_and_crew_scout_unaffected() {
 ## Captain's intent
 Exercise an ordinary crew launch.
 
-## Firstmate spec
-Verify secondmate harness settings do not affect it.
+## Juggernaut spec
+Verify squad_lead harness settings do not affect it.
 EOF
   : > "$launchlog"
   PATH="$fakebin:$BASE_PATH" TMUX="fake,1,0" CLAUDECODE=1 \
@@ -1082,9 +1082,9 @@ EOF
 # status).
 # ===========================================================================
 
-# A PRIMARY firstmate repo on main with one commit + a home dir, mirroring the
+# A PRIMARY juggernaut repo on main with one commit + a home dir, mirroring the
 # real gitignore (config/crew-harness ignored, so a propagated value never dirties
-# the secondmate worktree on a later sweep). Echoes the world dir.
+# the squad_lead worktree on a later sweep). Echoes the world dir.
 new_world() {
   local name=$1 dispatch_ignore=${2:-yes} w
   w="$TMP_ROOT/$name"
@@ -1094,7 +1094,7 @@ new_world() {
   {
     printf 'projects/\nstate/\ndata/\n.no-mistakes/\n'
     [ "$dispatch_ignore" = no ] || printf 'config/crew-dispatch.json\n'
-    printf 'config/crew-harness\nconfig/secondmate-harness\nconfig/backlog-backend\n'
+    printf 'config/crew-harness\nconfig/squad-lead-harness\nconfig/backlog-backend\n'
     printf 'config/backend\nconfig/herdr-presentation-spaces\nconfig/startup-memory-budget\n'
     printf 'config/claude-permission-mode\n'
   } > "$w/main/.gitignore"
@@ -1119,15 +1119,15 @@ record_live_watcher_fixture() {
   touch "$home/state/.last-watcher-beat"
 }
 
-# A live secondmate home as a DETACHED worktree of the primary at <commit>, with
-# its seed marker and a live kind=secondmate meta.
+# A live squad_lead home as a DETACHED worktree of the primary at <commit>, with
+# its seed marker and a live kind=squad_lead meta.
 add_sm_worktree() {
   local w=$1 id=$2 commit=$3
   git -C "$w/main" worktree add -q --detach "$w/$id" "$commit"
-  printf '%s\n' "$id" > "$w/$id/.jg-secondmate-home"
+  printf '%s\n' "$id" > "$w/$id/.jg-squad-lead-home"
   {
-    printf 'window=firstmate:jg-%s\n' "$id"
-    printf 'kind=secondmate\n'
+    printf 'window=juggernaut:jg-%s\n' "$id"
+    printf 'kind=squad_lead\n'
     printf 'home=%s/%s\n' "$w" "$id"
   } > "$w/home/state/$id.meta"
 }
@@ -1340,20 +1340,20 @@ assert_no_reread_retry_stages() {
 
 # The sweep pushes the primary's declared inherited config into a live home,
 # re-converges it when the primary changes it, and mirrors absence when the
-# primary clears it - all while never inheriting secondmate-harness.
+# primary clears it - all while never inheriting squad-lead-harness.
 test_bootstrap_sweep_propagates_and_reconverges() {
   local w c1
   w=$(new_world boot-prop)
   c1=$(git -C "$w/main" rev-parse HEAD)
   add_sm_worktree "$w" sm "$c1"
 
-  # Initial push: primary crew-harness=codex, secondmate-harness=grok (must NOT flow).
+  # Initial push: primary crew-harness=codex, squad-lead-harness=grok (must NOT flow).
   printf '{"default":{"harness":"codex"}}\n' > "$w/home/config/crew-dispatch.json"
   printf 'codex\n' > "$w/home/config/crew-harness"
   printf 'manual\n' > "$w/home/config/backlog-backend"
   printf 'tmux\n' > "$w/home/config/backend"
   : > "$w/home/config/trace-context"
-  printf 'grok\n' > "$w/home/config/secondmate-harness"
+  printf 'grok\n' > "$w/home/config/squad-lead-harness"
   run_bootstrap "$w" >/dev/null
   [ "$(cat "$w/sm/config/crew-harness" 2>/dev/null)" = codex ] \
     || fail "sweep: crew-harness not pushed into the live home"
@@ -1365,8 +1365,8 @@ test_bootstrap_sweep_propagates_and_reconverges() {
     || fail "sweep: backend not pushed into the live home"
   [ ! -e "$w/sm/config/trace-context" ] \
     || fail "sweep: trace-context changed a legacy live home before relaunch"
-  [ -e "$w/sm/config/secondmate-harness" ] \
-    && fail "sweep: secondmate-harness was inherited (must not be)"
+  [ -e "$w/sm/config/squad-lead-harness" ] \
+    && fail "sweep: squad-lead-harness was inherited (must not be)"
 
   # Re-converge: primary changes inherited config values; the home follows on the next sweep.
   printf '{"default":{"harness":"claude"}}\n' > "$w/home/config/crew-dispatch.json"
@@ -1395,7 +1395,7 @@ test_bootstrap_sweep_propagates_and_reconverges() {
     && fail "sweep: home backlog-backend not removed after the primary cleared it"
   [ -e "$w/sm/config/backend" ] \
     && fail "sweep: home backend not removed after the primary cleared it"
-  pass "B7 bootstrap sweep pushes, re-converges, and mirrors absence; never inherits secondmate-harness"
+  pass "B7 bootstrap sweep pushes, re-converges, and mirrors absence; never inherits squad-lead-harness"
 }
 
 # Convergence is independent of the tracked-files fast-forward: a home already
@@ -1438,7 +1438,7 @@ test_bootstrap_sweep_defers_dispatch_on_stale_unignored_home() {
   printf 'manual\n' > "$w/home/config/backlog-backend"
   out=$(run_bootstrap "$w")
 
-  assert_contains "$out" "SECONDMATE_SYNC: secondmate sm: skipped: diverged from" \
+  assert_contains "$out" "SQUAD_LEAD_SYNC: squad_lead sm: skipped: diverged from" \
     "stale dispatch: expected fast-forward skip"
   [ ! -e "$w/sm/config/crew-dispatch.json" ] \
     || fail "stale dispatch: crew-dispatch.json was copied before the home ignored it"
@@ -1481,31 +1481,31 @@ test_bootstrap_sweep_materializes_and_inherits_memory_default() {
 }
 
 # config/backend: present and absent primary state converges exactly.
-# config/claude-permission-mode=auto reaches a Claude SECONDMATE launch too: the
-# same template swap as a crewmate, with model/effort untouched.
-test_spawn_secondmate_claude_permission_mode_auto() {
+# config/claude-permission-mode=auto reaches a Claude SQUAD_LEAD launch too: the
+# same template swap as a operator, with model/effort untouched.
+test_spawn_squad_lead_claude_permission_mode_auto() {
   local w sm meta launchlog launch out status
   w="$TMP_ROOT/spawn-claude-permmode"
   sm="$w/sm"
   launchlog="$w/launch.log"
   mkdir -p "$w/home/config"
-  printf 'claude opus\n' > "$w/home/config/secondmate-harness"
+  printf 'claude opus\n' > "$w/home/config/squad-lead-harness"
   printf 'auto\n' > "$w/home/config/claude-permission-mode"
   make_seeded_home "$sm" sm
 
-  out=$(spawn_secondmate_capture "$w" sm "$sm" "$launchlog" 2>&1); status=$?
-  expect_code 0 "$status" "claude secondmate spawn under claude-permission-mode=auto should succeed"
+  out=$(spawn_squad_lead_capture "$w" sm "$sm" "$launchlog" 2>&1); status=$?
+  expect_code 0 "$status" "claude squad_lead spawn under claude-permission-mode=auto should succeed"
 
   meta="$w/home/state/sm.meta"
   [ "$(meta_field "$meta" harness)" = claude ] || fail "permmode: meta harness not claude"
   launch=$(cat "$launchlog")
   assert_contains "$launch" "claude --permission-mode auto $(sm_claude_add_dir "$w" sm)--settings '$(sm_claude_settings "$w" sm)' --model 'opus'" \
-    "permmode: secondmate launch did not swap the permission flag while keeping --model"
-  assert_not_contains "$launch" "--dangerously-skip-permissions" "permmode: secondmate launch must not request bypass mode"
-  pass "C2b spawn: config/claude-permission-mode=auto reaches a Claude secondmate launch"
+    "permmode: squad_lead launch did not swap the permission flag while keeping --model"
+  assert_not_contains "$launch" "--dangerously-skip-permissions" "permmode: squad_lead launch must not request bypass mode"
+  pass "C2b spawn: config/claude-permission-mode=auto reaches a Claude squad_lead launch"
 }
 
-# A second mate's steering inbox lives in the PARENT home's
+# A squad lead's steering inbox lives in the PARENT home's
 # state/<id>.inbox - outside the mate's own working directory - so an
 # auto-mode Claude Code (2.1.257+) parks on its one-time "Allow reads outside
 # the working directories?" question the first time the mate file-tool reads
@@ -1513,14 +1513,14 @@ test_spawn_secondmate_claude_permission_mode_auto() {
 # the same read even under bypass. Drive the real emitted launch through a
 # claude stub that models that working-directory gate, under both permission
 # modes: the parent inbox must resolve inside the pane cwd or an --add-dir.
-test_spawn_secondmate_claude_grants_parent_inbox_dir() {
+test_spawn_squad_lead_claude_grants_parent_inbox_dir() {
   local w sm launchlog launch reqs fakebin out status eval_out eval_rc
   for mode in auto bypass; do
     w="$TMP_ROOT/spawn-claude-adddir-$mode"
     sm="$w/sm"
     launchlog="$w/launch.log"
     mkdir -p "$w/home/config" "$w/home/state" "$w/home/data"
-    printf 'claude\n' > "$w/home/config/secondmate-harness"
+    printf 'claude\n' > "$w/home/config/squad-lead-harness"
     printf '%s\n' "$mode" > "$w/home/config/claude-permission-mode"
     make_seeded_home "$sm" sm
 
@@ -1533,10 +1533,10 @@ test_spawn_secondmate_claude_grants_parent_inbox_dir() {
         JG_STATE_OVERRIDE="$w/home/state" JG_DATA_OVERRIDE="$w/home/data" \
         JG_PROJECTS_OVERRIDE="$w/home/projects" JG_CONFIG_OVERRIDE="$w/home/config" \
         JG_SPAWN_NO_GUARD=1 JG_FAKE_LAUNCH_LOG="$launchlog" \
-        "$ROOT/bin/jg-spawn.sh" sm "$sm" --secondmate 2>&1
+        "$ROOT/bin/jg-spawn.sh" sm "$sm" --squad-lead 2>&1
     )
     status=$?
-    expect_code 0 "$status" "claude secondmate spawn under $mode should succeed"$'\n'"$out"
+    expect_code 0 "$status" "claude squad_lead spawn under $mode should succeed"$'\n'"$out"
     launch=$(cat "$launchlog")
 
     reqs="$w/channel-requirements.txt"
@@ -1544,9 +1544,9 @@ test_spawn_secondmate_claude_grants_parent_inbox_dir() {
     eval_out=$(jg_eval_launch "$launch" "$sm" "$fakebin" "JG_FAKE_CLAUDE_REQUIREMENTS=$reqs" 2>&1)
     eval_rc=$?
     [ "$eval_rc" -eq 0 ] \
-      || fail "claude secondmate launch under $mode would hit the outside-read gate on its parent inbox"$'\n'"$eval_out"
+      || fail "claude squad_lead launch under $mode would hit the outside-read gate on its parent inbox"$'\n'"$eval_out"
   done
-  pass "claude secondmate launches cover the parent-home steering inbox in auto and bypass modes"
+  pass "claude squad_lead launches cover the parent-home steering inbox in auto and bypass modes"
 }
 
 # The file is a captain-wide safety preference, so it inherits like
@@ -1609,7 +1609,7 @@ test_backend_inheritance_present_and_absent() {
 # config/herdr-presentation-spaces has an unconfigured default, so this item's
 # convergence is asserted through the preference the spawn gate actually reads
 # in the destination home, not through file presence alone: mirroring the primary's
-# absence must converge a secondmate to the same unconfigured default rather
+# absence must converge a squad_lead to the same unconfigured default rather
 # than turning its projection off. The Herdr version floor that decides what
 # that default resolves to is a property of the running release, not of
 # inheritance, so it is pinned in tests/jg-backend-herdr.test.sh instead.
@@ -1635,29 +1635,29 @@ test_presentation_inheritance_default_on_and_opt_out() {
   [ -e "$w/sm/config/herdr-presentation-spaces" ] \
     && fail "primary default must not write an opt-out downstream"
   verdict=$(sm_presentation_verdict "$w/sm/config")
-  [ "$verdict" = on ] || fail "primary default left the secondmate projection $verdict"
+  [ "$verdict" = on ] || fail "primary default left the squad_lead projection $verdict"
 
   mkdir -p "$w/sm/config"
   printf 'off\n' > "$w/sm/config/herdr-presentation-spaces"
   out=$(run_config_push "$w" 2>"$err"); status=$?
   expect_code 0 "$status" "presentation reconverge push should succeed"
   assert_contains "$out" "herdr-presentation-spaces: pushed - mirrored primary absence" \
-    "a local secondmate opt-out should reconverge on the primary default"
+    "a local squad_lead opt-out should reconverge on the primary default"
   verdict=$(sm_presentation_verdict "$w/sm/config")
-  [ "$verdict" = on ] || fail "primary default did not reconverge a locally opted-out secondmate ($verdict)"
+  [ "$verdict" = on ] || fail "primary default did not reconverge a locally opted-out squad_lead ($verdict)"
 
   printf 'off\n' > "$w/home/config/herdr-presentation-spaces"
   out=$(run_config_push "$w" 2>"$err"); status=$?
   expect_code 0 "$status" "presentation opt-out push should succeed"
   assert_contains "$out" "herdr-presentation-spaces: pushed" "explicit opt-out should report pushed"
   verdict=$(sm_presentation_verdict "$w/sm/config")
-  [ "$verdict" = off ] || fail "explicit primary opt-out left the secondmate projection $verdict"
+  [ "$verdict" = off ] || fail "explicit primary opt-out left the squad_lead projection $verdict"
 
   : > "$w/home/config/herdr-presentation-spaces"
   out=$(run_config_push "$w" 2>"$err"); status=$?
   expect_code 0 "$status" "presentation legacy opt-in push should succeed"
   verdict=$(sm_presentation_verdict "$w/sm/config")
-  [ "$verdict" = on ] || fail "a legacy primary opt-in file left the secondmate projection $verdict"
+  [ "$verdict" = on ] || fail "a legacy primary opt-in file left the squad_lead projection $verdict"
   pass "B12c presentation inheritance: the primary default converges on, and only an explicit opt-out propagates off"
 }
 
@@ -1670,7 +1670,7 @@ test_bootstrap_sweep_surfaces_config_propagation_failure() {
 
   out=$(run_bootstrap "$w")
 
-  fail_line=$(printf '%s\n' "$out" | grep '^SECONDMATE_SYNC: secondmate sm: skipped: inheritance failed' || true)
+  fail_line=$(printf '%s\n' "$out" | grep '^SQUAD_LEAD_SYNC: squad_lead sm: skipped: inheritance failed' || true)
   [ -n "$fail_line" ] || fail "bootstrap did not surface inheritance propagation failure (got: $out)"
   [ -d "$w/sm/config/crew-harness" ] || fail "failed propagation removed the wrong path"
   pass "B11 bootstrap sweep surfaces config propagation failures"
@@ -1686,7 +1686,7 @@ test_bootstrap_rereads_after_partial_propagation() {
   log="$w/boot-prop-partial.tmux.log"
 
   out=$(run_bootstrap "$w" "$log")
-  assert_contains "$out" "SECONDMATE_SYNC: secondmate sm: skipped: inheritance failed" \
+  assert_contains "$out" "SQUAD_LEAD_SYNC: squad_lead sm: skipped: inheritance failed" \
     "partial bootstrap propagation did not remain diagnostic"
   [ "$(cat "$w/sm/config/crew-dispatch.json")" = '{"default":{"harness":"codex"}}' ] \
     || fail "partial bootstrap propagation did not retain the completed config write"
@@ -1704,7 +1704,7 @@ test_config_push_propagates_reports_without_ff_or_nudge() {
   c1=$(git -C "$w/main" rev-parse HEAD)
   add_sm_worktree "$w" sm "$c1"
   sm_real=$(cd "$w/sm" && pwd -P)
-  printf -- '- sm - config push target (home: %s; scope: config; projects: alpha; added 2026-06-30)\n' "$sm_real" > "$w/home/data/secondmates.md"
+  printf -- '- sm - config push target (home: %s; scope: config; projects: alpha; added 2026-06-30)\n' "$sm_real" > "$w/home/data/squad_leads.md"
   tmp="$w/home/state/sm.meta.tmp"
   grep -v '^home=' "$w/home/state/sm.meta" > "$tmp"
   mv "$tmp" "$w/home/state/sm.meta"
@@ -1725,10 +1725,10 @@ test_config_push_propagates_reports_without_ff_or_nudge() {
   out=$(run_config_push "$w" "$log" 2>"$err"); status=$?
 
   expect_code 0 "$status" "config push should succeed"
-  assert_contains "$out" "config-push: $w/home -> live secondmate homes" \
+  assert_contains "$out" "config-push: $w/home -> live squad_lead homes" \
     "config push lacked the header"
-  assert_contains "$out" "secondmate sm ($sm_real):" \
-    "config push did not discover the live secondmate through registry fallback"
+  assert_contains "$out" "squad_lead sm ($sm_real):" \
+    "config push did not discover the live squad_lead through registry fallback"
   assert_contains "$out" "crew-dispatch.json: pushed" \
     "config push did not report crew-dispatch as pushed"
   assert_contains "$out" "crew-harness: pushed" \
@@ -1740,10 +1740,10 @@ test_config_push_propagates_reports_without_ff_or_nudge() {
   assert_contains "$out" "trace-context: unchanged" \
     "live config push must report trace-context as session-scoped and unchanged"
   [ ! -e "$w/sm/config/trace-context" ] \
-    || fail "live config push retroactively enabled trace context in a legacy secondmate home"
+    || fail "live config push retroactively enabled trace context in a legacy squad_lead home"
   assert_contains "$out" "config-reread: sent" \
     "config push with changed config must send a literal reread instruction"
-  assert_not_contains "$out" "NUDGE_SECONDMATES" \
+  assert_not_contains "$out" "NUDGE_SQUAD_LEADS" \
     "config push must not use the AGENTS.md instruction-surface nudge channel"
   [ "$(git -C "$w/sm" rev-parse HEAD)" = "$old_head" ] \
     || fail "config push fast-forwarded tracked files"
@@ -1752,8 +1752,8 @@ test_config_push_propagates_reports_without_ff_or_nudge() {
   assert_contains "$(cat "$instruction")" $'-----BEGIN config/backend-----\ntmux\n-----END config/backend-----' \
     "config-push reread must include exact backend bytes"
   [ ! -s "$err" ] || fail "clean config push wrote unexpected stderr: $(cat "$err")"
-  assert_contains "$(inbox_stream "$w/home/state" sm)" "[jg-from-firstmate]" \
-    "config reread must use the marked routed secondmate path"
+  assert_contains "$(inbox_stream "$w/home/state" sm)" "[jg-from-juggernaut]" \
+    "config reread must use the marked routed squad_lead path"
 
   : > "$log"
   out2=$(run_config_push "$w" "$log" 2>"$err"); status=$?
@@ -1788,11 +1788,11 @@ test_config_push_reports_skips_dirty_and_invalid_home() {
   grep -v '^config/crew-dispatch.json$' "$w/stale/.gitignore" > "$tmp"
   mv "$tmp" "$w/stale/.gitignore"
 
-  bad_home="$w/not-secondmate"
+  bad_home="$w/not-squad-lead"
   mkdir -p "$bad_home"
   {
-    printf 'window=firstmate:jg-bad\n'
-    printf 'kind=secondmate\n'
+    printf 'window=juggernaut:jg-bad\n'
+    printf 'kind=squad_lead\n'
     printf 'home=%s\n' "$bad_home"
   } > "$w/home/state/bad.meta"
 
@@ -1803,16 +1803,16 @@ test_config_push_reports_skips_dirty_and_invalid_home() {
   out=$(run_config_push "$w" 2>"$err"); status=$?
 
   expect_code 0 "$status" "warnings-only config push should exit zero"
-  assert_contains "$out" "secondmate dirty ($dirty_real):" \
+  assert_contains "$out" "squad_lead dirty ($dirty_real):" \
     "config push did not report dirty home"
   assert_contains "$out" "home: dirty working tree - local-material push continuing" \
     "config push did not surface dirty state"
-  assert_contains "$out" "secondmate stale ($stale_real):" \
+  assert_contains "$out" "squad_lead stale ($stale_real):" \
     "config push did not report stale home"
   assert_contains "$out" "crew-dispatch.json: skipped - destination does not allow inherited item" \
     "config push did not report non-allowing item skip"
-  assert_contains "$out" "secondmate bad ($bad_home): skipped - unsafe home: not a seeded secondmate home" \
-    "config push did not report invalid secondmate home"
+  assert_contains "$out" "squad_lead bad ($bad_home): skipped - unsafe home: not a seeded squad_lead home" \
+    "config push did not report invalid squad_lead home"
   err_text=$(cat "$err")
   assert_contains "$err_text" "jg-config-inherit: warning: skipped crew-dispatch.json" \
     "config push did not inherit the lib's skip stderr warning"
@@ -1832,7 +1832,7 @@ test_config_push_exits_nonzero_on_copy_error() {
   out=$(run_config_push "$w" 2>"$err"); status=$?
 
   expect_code 1 "$status" "copy-error config push should exit non-zero"
-  assert_contains "$out" "secondmate sm ($sm_real):" \
+  assert_contains "$out" "squad_lead sm ($sm_real):" \
     "config push error output missed the home"
   assert_contains "$out" "crew-harness: error - failed to copy" \
     "config push did not report the per-item copy error"
@@ -1878,9 +1878,9 @@ shared_captain_header_for_tests() {
   cat <<'EOF'
 # Shared captain preferences
 
-This file is main-authoritative in the main firstmate home.
-In secondmate homes it is read-only in secondmate homes and must not be edited there.
-Route new captain-preference discoveries to the main firstmate through marked status or a document pointer.
+This file is main-authoritative in the main juggernaut home.
+In squad_lead homes it is read-only in squad_lead homes and must not be edited there.
+Route new captain-preference discoveries to the main juggernaut through marked status or a document pointer.
 EOF
 }
 
@@ -1984,11 +1984,11 @@ test_config_reread_per_home_changed_sets_and_exact_bytes() {
   assert_not_contains "$(cat "$instr_b")" $'pi\n' \
     "beta instruction must not leak alpha-only stale harness bytes as a standalone scalar block incorrectly"
 
-  # Routed send used the from-firstmate marker and carried only the pointer,
+  # Routed send used the from-juggernaut marker and carried only the pointer,
   # read from alpha's durable steer records (the typed channel now carries only
   # the constant doorbell, which never inlines message content).
   pointer="CONFIG_REREAD: $(reread_instruction_path "$w/alpha")"
-  assert_contains "$(inbox_stream "$w/home/state" alpha)" "[jg-from-firstmate]" "reread send must be marked"
+  assert_contains "$(inbox_stream "$w/home/state" alpha)" "[jg-from-juggernaut]" "reread send must be marked"
   assert_contains "$(inbox_stream "$w/home/state" alpha)" "$pointer" "reread send must point to the durable instruction file"
   assert_not_contains "$(inbox_stream "$w/home/state" alpha)" '"harness": "grok"' "sent message must not inline multiline JSON"
   assert_not_contains "$(inbox_stream "$w/home/state" alpha)" "Default worker" "sent message must not summarize"
@@ -2073,7 +2073,7 @@ test_config_reread_isolation_and_absent_and_send_failure() {
     JG_HOME="$w/home" JG_ROOT_OVERRIDE="$w/main" JG_SEND_SETTLE=0 \
     "$ROOT/bin/jg-config-push.sh" 2>"$err"); status=$?
   expect_code 1 "$status" "send failure should make config-push exit non-zero"
-  assert_contains "$out" "CONFIG_REREAD: secondmate" "send failure diagnostic missing"
+  assert_contains "$out" "CONFIG_REREAD: squad_lead" "send failure diagnostic missing"
   assert_contains "$out" "send failed" "send failure must say send failed"
   assert_not_contains "$out" "config-reread: sent" \
     "must not claim reread landed when send failed"
@@ -2145,7 +2145,7 @@ SH
   out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$w/home" JG_ROOT_OVERRIDE="$w/main" \
     JG_SEND_SETTLE=0 "$ROOT/bin/jg-config-push.sh" 2>&1); status=$?
   expect_code 1 "$status" "publication failure should remain diagnostic"
-  assert_contains "$out" "CONFIG_REREAD: secondmate" "publication failure diagnostic missing"
+  assert_contains "$out" "CONFIG_REREAD: squad_lead" "publication failure diagnostic missing"
   assert_not_contains "$out" "config-reread: sent" \
     "publication failure must not claim reread delivery"
   [ "$(cat "$w/alpha/config/crew-harness")" = codex ] \
@@ -2436,7 +2436,7 @@ SH
   out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$w/home" JG_ROOT_OVERRIDE="$w/main" \
     JG_SEND_SETTLE=0 jg_config_send_reread_nudge sm "$w/sm" "$report" 2>&1); status=$?
   expect_code 1 "$status" "mixed delivery failure should remain diagnostic"
-  assert_contains "$out" "CONFIG_REREAD: secondmate sm: send failed" \
+  assert_contains "$out" "CONFIG_REREAD: squad_lead sm: send failed" \
     "mixed delivery failure diagnostic missing"
   count=0
   for path in "$state_real"/.jg-inherited-config-reread.*; do
@@ -2483,7 +2483,7 @@ SH
     JG_SEND_SETTLE=0 JG_FAKE_TMUX_LOG="$log" \
     jg_config_send_reread_nudge sm "$w/sm" "$report" 2>&1); status=$?
   expect_code 1 "$status" "an older failed generation should remain diagnostic"
-  assert_contains "$out" "CONFIG_REREAD: secondmate sm: send failed" \
+  assert_contains "$out" "CONFIG_REREAD: squad_lead sm: send failed" \
     "older generation failure diagnostic missing"
   assert_not_contains "$(cat "$log" 2>/dev/null || true)" ".0001-new" \
     "newer generation was delivered after an older failure"
@@ -2586,8 +2586,8 @@ test_config_reread_bootstrap_path_and_spawn_flexibility() {
   [ "$(cat "$w/sm/config/crew-harness")" = codex ] || fail "bootstrap did not push harness"
   instr=$(reread_instruction_path "$w/sm") || fail "bootstrap reread instruction missing"
   assert_present "$instr" "bootstrap must write a config reread instruction when config changed"
-  assert_contains "$(inbox_stream "$w/home/state" sm)" "[jg-from-firstmate]" \
-    "bootstrap config reread must use routed secondmate send"
+  assert_contains "$(inbox_stream "$w/home/state" sm)" "[jg-from-juggernaut]" \
+    "bootstrap config reread must use routed squad_lead send"
   assert_contains "$(cat "$instr")" \
     $'-----BEGIN config/crew-harness-----\ncodex\n-----END config/crew-harness-----' \
     "bootstrap instruction must carry exact post-write harness bytes"
@@ -2596,7 +2596,7 @@ test_config_reread_bootstrap_path_and_spawn_flexibility() {
   # (defaults/rules only - never harden spawn against deliberate choice).
   w=$(new_world config-reread-spawn-flex)
   printf 'codex\n' > "$w/home/config/crew-harness"
-  printf 'codex\n' > "$w/home/config/secondmate-harness"
+  printf 'codex\n' > "$w/home/config/squad-lead-harness"
   sm="$w/sm-flex"
   make_seeded_home "$sm" sm-flex
   mkdir -p "$sm/state"
@@ -2608,7 +2608,7 @@ test_config_reread_bootstrap_path_and_spawn_flexibility() {
   jg_config_reread_mark_pending "$stale" "$stale.pending" \
     || fail "could not create spawn stale reread marker"
   launchlog="$w/spawn-flex.launch.log"
-  spawn_secondmate_capture "$w" sm-flex "$sm" "$launchlog" --harness pi >/dev/null 2>&1
+  spawn_squad_lead_capture "$w" sm-flex "$sm" "$launchlog" --harness pi >/dev/null 2>&1
   assert_no_reread_pending "$sm"
   assert_no_reread_instructions "$sm"
   launch=$(cat "$launchlog")
@@ -2660,9 +2660,9 @@ SH
     JG_SEND_SETTLE=0 JG_FAKE_TMUX_LOG="$log" \
     "$ROOT/bin/jg-bootstrap.sh" >/dev/null 2>&1
   assert_contains "$(cat "$log")" "spawn" \
-    "bootstrap did not respawn the dead secondmate"
+    "bootstrap did not respawn the dead squad_lead"
   assert_not_contains "$(cat "$log")" "send-keys" \
-    "bootstrap nudged a secondmate before its respawn completed"
+    "bootstrap nudged a squad_lead before its respawn completed"
   assert_present "$stale" "bootstrap removed the stale generation before relaunch handling"
   assert_present "$stale.pending" "bootstrap removed the stale marker before relaunch handling"
   jg_config_reread_discard_pending "$w/sm" || fail "could not clean respawn test generation"
@@ -2711,9 +2711,9 @@ SH
     JG_STATE_OVERRIDE="$w/home/state" JG_DATA_OVERRIDE="$w/home/data" \
     JG_PROJECTS_OVERRIDE="$w/home/projects" JG_CONFIG_OVERRIDE="$w/home/config" \
     JG_SPAWN_NO_GUARD=1 JG_FAKE_LAUNCH_LOG="$launchlog" \
-    "$ROOT/bin/jg-spawn.sh" sm "$sm" --secondmate 2>&1); status=$?
+    "$ROOT/bin/jg-spawn.sh" sm "$sm" --squad-lead 2>&1); status=$?
   expect_code 0 "$status" "spawn should remain available after reread cleanup failure"
-  assert_contains "$out" "CONFIG_REREAD: secondmate sm: quarantined pre-relaunch generations" \
+  assert_contains "$out" "CONFIG_REREAD: squad_lead sm: quarantined pre-relaunch generations" \
     "spawn cleanup failure did not emit a CONFIG_REREAD quarantine diagnostic"
   assert_no_reread_pending "$sm"
   assert_no_reread_instructions "$sm"
@@ -2744,7 +2744,7 @@ SH
 
 test_harness_resolution
 test_cursor_marker_detection
-test_secondmate_model_effort_tokens
+test_squad_lead_model_effort_tokens
 test_pi_signed_detection_and_session_lock_identity
 test_dash_leading_process_names_are_basename_operands
 test_propagate_lib
@@ -2752,26 +2752,26 @@ test_spawn_split_and_inherit
 test_spawn_backward_compat_crew_fallback
 test_spawn_bare_backward_compat
 test_spawn_explicit_harness_wins
-test_spawn_unverified_secondmate_harness_refused
-test_spawn_cursor_secondmate_launches_with_its_primary_contract
+test_spawn_unverified_squad_lead_harness_refused
+test_spawn_cursor_squad_lead_launches_with_its_primary_contract
 test_spawn_backend_precedence_over_inherited_config
 test_spawn_explicit_backend_precedence_over_env_and_inherited_config
 test_spawn_bare_harness_no_model_effort_flag
-test_spawn_secondmate_harness_model_token
-test_spawn_secondmate_harness_model_and_effort_tokens
-test_spawn_explicit_model_overrides_secondmate_harness_token
-test_spawn_explicit_effort_overrides_secondmate_harness_token
-test_spawn_explicit_harness_does_not_inherit_secondmate_harness_tokens
+test_spawn_squad_lead_harness_model_token
+test_spawn_squad_lead_harness_model_and_effort_tokens
+test_spawn_explicit_model_overrides_squad_lead_harness_token
+test_spawn_explicit_effort_overrides_squad_lead_harness_token
+test_spawn_explicit_harness_does_not_inherit_squad_lead_harness_tokens
 test_spawn_explicit_harness_uses_explicit_profile_axes
-test_spawned_secondmate_uses_its_harness_supervision_model
+test_spawned_squad_lead_uses_its_harness_supervision_model
 test_spawn_fallback_chain_and_crew_scout_unaffected
 test_bootstrap_sweep_propagates_and_reconverges
 test_bootstrap_sweep_propagates_when_tracked_current
 test_bootstrap_sweep_defers_dispatch_on_stale_unignored_home
 test_bootstrap_sweep_materializes_and_inherits_memory_default
 test_backend_inheritance_present_and_absent
-test_spawn_secondmate_claude_permission_mode_auto
-test_spawn_secondmate_claude_grants_parent_inbox_dir
+test_spawn_squad_lead_claude_permission_mode_auto
+test_spawn_squad_lead_claude_grants_parent_inbox_dir
 test_claude_permission_mode_inheritance_present_and_absent
 test_presentation_inheritance_default_on_and_opt_out
 test_bootstrap_sweep_surfaces_config_propagation_failure
@@ -2795,4 +2795,4 @@ test_bootstrap_respawns_before_config_reread
 test_spawn_quarantines_pending_rereads_on_cleanup_failure
 test_bootstrap_detect_only_does_not_create_state
 
-echo "# all jg-secondmate-harness tests passed"
+echo "# all jg-squad-lead-harness tests passed"

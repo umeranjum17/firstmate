@@ -18,7 +18,7 @@
 #               scripts and any drift a home was already carrying.
 #
 # The invariant is single-host: a home's backlog and its records live together,
-# so a persistent secondmate keeps its own books through its own copies of these
+# so a persistent squad_lead keeps its own books through its own copies of these
 # scripts. A parent's view of a mate lagging is a freshness question and is
 # deliberately not asserted here.
 set -u
@@ -86,7 +86,7 @@ EOF
 ## Captain's intent
 Exercise backlog dispatch for $id.
 
-## Firstmate spec
+## Juggernaut spec
 Verify the atomic backlog transition.
 
 # Definition of done
@@ -97,7 +97,7 @@ EOF
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
 case "$*" in *"#{pane_current_path}"*) printf '%s\n' "${JG_FAKE_PANE_PATH:-}"; exit 0 ;; esac
-case "${1:-}" in display-message) printf 'firstmate\n'; exit 0 ;; esac
+case "${1:-}" in display-message) printf 'juggernaut\n'; exit 0 ;; esac
 exit 0
 SH
   chmod +x "$fakebin/tmux"
@@ -448,7 +448,7 @@ break_launch_delivery() {  # <case-dir>
 #!/usr/bin/env bash
 case "$*" in *"#{pane_current_path}"*) printf '%s\n' "${JG_FAKE_PANE_PATH:-}"; exit 0 ;; esac
 case "${1:-}" in
-  display-message) printf 'firstmate\n'; exit 0 ;;
+  display-message) printf 'juggernaut\n'; exit 0 ;;
   send-keys) exit 1 ;;
 esac
 exit 0
@@ -500,7 +500,7 @@ case "\$*" in
   *"#{cursor_y}"*) printf '1\\n'; exit 0 ;;
 esac
 case "\${1:-}" in
-  display-message) printf 'firstmate\\n'; exit 0 ;;
+  display-message) printf 'juggernaut\\n'; exit 0 ;;
   capture-pane)
     if [ ! -f "$case_dir/kimi-interrupted" ]; then
       : > "$case_dir/kimi-interrupted"
@@ -583,7 +583,7 @@ write_task_meta() {  # <case-dir> <id> <kind> <mode> [extra-line...]
   local case_dir=$1 id=$2 kind=$3 mode=$4
   shift 4
   jg_write_meta "$(home_of "$case_dir")/state/$id.meta" \
-    "window=firstmate:jg-$id" \
+    "window=juggernaut:jg-$id" \
     "endpoint_task_id=$id" \
     "worktree=$case_dir/absent-worktree" \
     "project=$case_dir/absent-project" \
@@ -917,7 +917,7 @@ case "\$*" in
   *treehouse\\ get*) : > "$case_dir/local-copy-requested" ;;
   *"#{pane_current_path}"*) printf '%s\n' "\${JG_FAKE_PANE_PATH:-}"; exit 0 ;;
 esac
-case "\${1:-}" in display-message) printf 'firstmate\n'; exit 0 ;; esac
+case "\${1:-}" in display-message) printf 'juggernaut\n'; exit 0 ;; esac
 exit 0
 SH
   chmod +x "$case_dir/fakebin/tmux"
@@ -952,7 +952,7 @@ case "\$*" in
   *treehouse\\ get*) : > "$case_dir/local-copy-requested" ;;
   *"#{pane_current_path}"*) printf '%s\n' "\${JG_FAKE_PANE_PATH:-}"; exit 0 ;;
 esac
-case "\${1:-}" in display-message) printf 'firstmate\n'; exit 0 ;; esac
+case "\${1:-}" in display-message) printf 'juggernaut\n'; exit 0 ;; esac
 exit 0
 SH
   chmod +x "$case_dir/fakebin/tmux"
@@ -987,7 +987,7 @@ case "\$*" in
   *treehouse\\ get*) : > "$case_dir/local-copy-requested" ;;
   *"#{pane_current_path}"*) printf '%s\n' "\${JG_FAKE_PANE_PATH:-}"; exit 0 ;;
 esac
-case "\${1:-}" in display-message) printf 'firstmate\n'; exit 0 ;; esac
+case "\${1:-}" in display-message) printf 'juggernaut\n'; exit 0 ;; esac
 exit 0
 SH
   chmod +x "$case_dir/fakebin/tmux"
@@ -1022,7 +1022,7 @@ case "\$*" in
   *treehouse\\ get*) : > "$case_dir/local-copy-requested" ;;
   *"#{pane_current_path}"*) printf '%s\n' "\${JG_FAKE_PANE_PATH:-}"; exit 0 ;;
 esac
-case "\${1:-}" in display-message) printf 'firstmate\n'; exit 0 ;; esac
+case "\${1:-}" in display-message) printf 'juggernaut\n'; exit 0 ;; esac
 exit 0
 SH
   chmod +x "$case_dir/fakebin/tmux"
@@ -2646,7 +2646,7 @@ test_bootstrap_stops_when_data_disappears_before_reconciliation() {
 }
 
 test_bootstrap_addressing_exemptions_remain_nonfatal() {
-  local manual_case no_backlog_case secondmate_case secondmate_id out
+  local manual_case no_backlog_case squad_lead_case squad_lead_id out
   manual_case=$(make_home bootstrap-manual-exempt)
   printf '%s\n' manual > "$(home_of "$manual_case")/config/backlog-backend"
   mv "$(home_of "$manual_case")/data" "$manual_case/manual-data"
@@ -2658,16 +2658,16 @@ test_bootstrap_addressing_exemptions_remain_nonfatal() {
   out=$(run_bootstrap "$no_backlog_case") \
     || fail "no-backlog bootstrap exemption became fatal: $out"
 
-  secondmate_id=atomic-bootstrap-secondmate-exempt-b11
-  secondmate_case=$(make_home bootstrap-secondmate-exempt)
-  write_task_meta "$secondmate_case" "$secondmate_id" secondmate '' \
-    "spawn_gen=spawn-secondmate-exempt"
-  mv "$(home_of "$secondmate_case")/data" "$secondmate_case/secondmate-data"
-  out=$(run_bootstrap "$secondmate_case") \
-    || fail "secondmate bootstrap exemption became fatal: $out"
-  assert_present "$(home_of "$secondmate_case")/state/$secondmate_id.meta" \
-    "secondmate bootstrap exemption removed the persistent agent record"
-  pass "bootstrap preserves secondmate, manual, and absent-backlog exemptions"
+  squad_lead_id=atomic-bootstrap-squad-lead-exempt-b11
+  squad_lead_case=$(make_home bootstrap-squad-lead-exempt)
+  write_task_meta "$squad_lead_case" "$squad_lead_id" squad_lead '' \
+    "spawn_gen=spawn-squad-lead-exempt"
+  mv "$(home_of "$squad_lead_case")/data" "$squad_lead_case/squad-lead-data"
+  out=$(run_bootstrap "$squad_lead_case") \
+    || fail "squad_lead bootstrap exemption became fatal: $out"
+  assert_present "$(home_of "$squad_lead_case")/state/$squad_lead_id.meta" \
+    "squad_lead bootstrap exemption removed the persistent agent record"
+  pass "bootstrap preserves squad_lead, manual, and absent-backlog exemptions"
 }
 
 test_recovery_leaves_a_captain_held_item_alone() {
@@ -2685,7 +2685,7 @@ test_recovery_leaves_a_captain_held_item_alone() {
   pass "session start leaves a captain-held item where the captain put it"
 }
 
-# --- backend selection and secondmate scope ---------------------------------
+# --- backend selection and squad_lead scope ---------------------------------
 
 test_no_backlog_teardown_refuses_a_symlinked_task_record_at_entry() {
   local case_dir home id target target_dir foreign_worktree out rc=0
@@ -2699,7 +2699,7 @@ test_no_backlog_teardown_refuses_a_symlinked_task_record_at_entry() {
   target="$target_dir/$id.meta"
   mkdir -p "$target_dir"
   jg_write_meta "$target" \
-    "window=firstmate:jg-$id" "endpoint_task_id=$id" \
+    "window=juggernaut:jg-$id" "endpoint_task_id=$id" \
     "worktree=$foreign_worktree" "project=$case_dir/foreign-project" \
     "harness=claude" "kind=ship" "mode=local-only" "yolo=off"
   ln -s "$target" "$home/state/$id.meta"
@@ -2729,7 +2729,7 @@ test_teardown_rechecks_record_parent_after_lock_acquisition() {
   foreign_worktree="$case_dir/foreign-worktree"
   mkdir -p "$foreign_state" "$foreign_worktree"
   jg_write_meta "$foreign_state/$id.meta" \
-    "window=firstmate:jg-$id" "endpoint_task_id=$id" \
+    "window=juggernaut:jg-$id" "endpoint_task_id=$id" \
     "worktree=$foreign_worktree" "project=$case_dir/foreign-project" \
     "harness=claude" "kind=ship" "mode=local-only" "yolo=off"
   track_teardown_resource_actions "$case_dir"
@@ -2770,7 +2770,7 @@ test_teardown_refuses_a_symlinked_state_directory_at_entry() {
   external_state="$case_dir/external-state"
   mv "$home/state" "$external_state"
   jg_write_meta "$external_state/$id.meta" \
-    "window=firstmate:jg-$id" "endpoint_task_id=$id" \
+    "window=juggernaut:jg-$id" "endpoint_task_id=$id" \
     "worktree=$case_dir/foreign-worktree" "project=$case_dir/foreign-project" \
     "harness=claude" "kind=ship" "mode=local-only" "yolo=off"
   ln -s "$external_state" "$home/state"
@@ -2908,7 +2908,7 @@ test_configured_adapter_refuses_a_data_directory_outside_the_home() {
 test_dispatch_and_completion_are_structural() {
   local case_dir home id meta out pr
   id=jg-structural-b15
-  pr=https://github.com/example/firstmate/pull/15
+  pr=https://github.com/example/juggernaut/pull/15
   case_dir=$(make_home structural "$id")
   home=$(home_of "$case_dir")
   add_item "$case_dir" "$id"
@@ -2999,14 +2999,14 @@ test_manual_backend_home_dispatches_and_completes_without_touching_the_backlog()
   pass "a manual-backlog home dispatches and completes without a hard failure"
 }
 
-test_a_secondmate_home_keeps_its_own_books() {
+test_a_squad_lead_home_keeps_its_own_books() {
   local case_dir id out
   id=atomic-mate-b13
   case_dir=$(make_home mate-own-books "$id")
-  # The mate's home is a firstmate home in its own right; the invariant is
+  # The mate's home is a juggernaut home in its own right; the invariant is
   # single-host, so its own dispatch and completion keep its own two records
   # paired with no parent involved.
-  printf '%s\n' mate-h1 > "$(home_of "$case_dir")/.jg-secondmate-home"
+  printf '%s\n' mate-h1 > "$(home_of "$case_dir")/.jg-squad-lead-home"
   add_item "$case_dir" "$id"
 
   out=$(run_ship_spawn "$case_dir" "$id") || fail "mate-home spawn failed: $out"
@@ -3018,28 +3018,28 @@ test_a_secondmate_home_keeps_its_own_books() {
   out=$(run_teardown "$case_dir" "$id") || fail "mate-home teardown failed: $out"
   [ "$(row_state "$case_dir" "$id")" = "done" ] \
     || fail "a mate's own completion left its item at $(row_state "$case_dir" "$id")"
-  pass "a secondmate home keeps its own books paired through dispatch and completion"
+  pass "a squad_lead home keeps its own books paired through dispatch and completion"
 }
 
-test_a_persistent_secondmate_is_never_a_backlog_item() {
+test_a_persistent_squad_lead_is_never_a_backlog_item() {
   local case_dir id out mate
   id=atomic-mate-b14
   case_dir=$(make_home mate-not-an-item)
   mate="$case_dir/mate-home"
   mkdir -p "$mate/bin" "$mate/data"
-  printf '# Firstmate\n' > "$mate/AGENTS.md"
-  printf '%s\n' "$id" > "$mate/.jg-secondmate-home"
+  printf '# Juggernaut\n' > "$mate/AGENTS.md"
+  printf '%s\n' "$id" > "$mate/.jg-squad-lead-home"
   printf 'charter for %s\n' "$id" > "$mate/data/charter.md"
   printf '%s\n' 'projects/' 'state/' 'data/' 'config/' '.no-mistakes/' > "$mate/.gitignore"
   git -C "$mate" init -q -b main
 
   # No backlog item exists for the mate, and none should be required: agents are
   # not work items. The dispatch must succeed anyway.
-  out=$(run_spawn "$case_dir" "$id" "$mate" --secondmate) \
-    || fail "secondmate spawn failed: $out"
-  assert_contains "$out" "spawned $id" "secondmate spawn did not report success"
-  assert_present "$(home_of "$case_dir")/state/$id.meta" "secondmate spawn published no record"
-  pass "dispatching a persistent secondmate needs no backlog item"
+  out=$(run_spawn "$case_dir" "$id" "$mate" --squad-lead) \
+    || fail "squad_lead spawn failed: $out"
+  assert_contains "$out" "spawned $id" "squad_lead spawn did not report success"
+  assert_present "$(home_of "$case_dir")/state/$id.meta" "squad_lead spawn published no record"
+  pass "dispatching a persistent squad_lead needs no backlog item"
 }
 
 test_backend_resolution_preserves_config_errors
@@ -3140,5 +3140,5 @@ test_dispatch_and_completion_are_structural
 test_refused_teardown_leaves_the_item_live
 test_environment_selected_adapter_is_not_forced_to_markdown
 test_manual_backend_home_dispatches_and_completes_without_touching_the_backlog
-test_a_secondmate_home_keeps_its_own_books
-test_a_persistent_secondmate_is_never_a_backlog_item
+test_a_squad_lead_home_keeps_its_own_books
+test_a_persistent_squad_lead_is_never_a_backlog_item

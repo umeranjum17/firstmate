@@ -33,7 +33,7 @@ matrix_case A04 allow 'bin/jg-watch-checkpoint.sh --seconds 180'
 matrix_case A05 allow 'exec bin/jg-watch-checkpoint.sh --seconds 180'
 matrix_case A06 allow "$ROOT/bin/jg-watch-checkpoint.sh --seconds 180"
 matrix_case A07 allow "cd '$ROOT'; exec bin/jg-watch-arm.sh"
-matrix_case A08 allow "cd '../firstmate'; bin/jg-watch-checkpoint.sh --seconds 180"
+matrix_case A08 allow "cd '../juggernaut'; bin/jg-watch-checkpoint.sh --seconds 180"
 matrix_case A09 allow "export JG_HOME='$ROOT'; bin/jg-watch-checkpoint.sh --seconds 180"
 matrix_case A10 allow 'source config/x-mode.env; bin/jg-watch-checkpoint.sh --seconds 180'
 matrix_case A11 allow "source 'config/x-mode.env'; bin/jg-watch-checkpoint.sh --seconds 180"
@@ -112,11 +112,11 @@ matrix_case D43 deny 'bin/jg-watch-arm.sh* &'
 matrix_case D44 deny "pattern='jg-watch'; pkill -f \"\$pattern\""
 matrix_case D45 deny "p=\$(pgrep -f '/bin/jg-watch.sh'); q=\$p; kill \$q"
 matrix_case D46 deny '$JG_HOME/bin/jg-watch-arm.sh &'
-matrix_case D47 deny '$HOME/firstmate/bin/jg-watch-arm.sh | cat'
-matrix_case D48 deny '~/firstmate/bin/jg-watch-arm.sh &'
+matrix_case D47 deny '$HOME/juggernaut/bin/jg-watch-arm.sh | cat'
+matrix_case D48 deny '~/juggernaut/bin/jg-watch-arm.sh &'
 matrix_case D49 deny 'bin/jg-watch.sh'
 matrix_case D50 deny '$JG_HOME/bin/jg-watch.sh'
-matrix_case D51 deny '~/firstmate/bin/jg-watch.sh --restart'
+matrix_case D51 deny '~/juggernaut/bin/jg-watch.sh --restart'
 matrix_case D52 deny "bin/jg-\$'\x77'atch-arm.sh &"
 matrix_case D53 deny 'bin/jg-$"watch"-arm.sh &'
 matrix_case D54 deny 'bin/jg-watch-$"arm".sh &'
@@ -138,7 +138,7 @@ matrix_case E03 allow 'bin/jg-watch-arm.sh # output > file &'
 matrix_case E04 allow $'# setup comment with jg-watch.sh; && >\nsource "config/x-mode.env"\nbin/jg-watch-checkpoint.sh --seconds 180'
 matrix_case E05 deny "JG_HOME=$ROOT bin/jg-watch-checkpoint.sh --seconds 180"
 matrix_case E06 deny "env JG_HOME=$ROOT bin/jg-watch-arm.sh"
-matrix_case E07 deny "source '/tmp/not-firstmate/config/x-mode.env'; bin/jg-watch-checkpoint.sh --seconds 180"
+matrix_case E07 deny "source '/tmp/not-juggernaut/config/x-mode.env'; bin/jg-watch-checkpoint.sh --seconds 180"
 matrix_case E08 deny "bash -lc 'bin/jg-watch-checkpoint.sh --seconds 180'"
 matrix_case E09 deny '(bin/jg-watch-checkpoint.sh --seconds 180)'
 matrix_case E10 deny "eval 'bin/jg-watch-arm.sh &'"
@@ -147,7 +147,7 @@ matrix_case E12 allow 'bash -lc "$WATCHER_COMMAND" # jg-watch-arm.sh'
 matrix_case E13 allow "printf '%s\\n' 'argument has ; and jg-watch-arm.sh and &&'"
 matrix_case E14 allow '$JG_HOME/bin/jg-teardown.sh &'
 matrix_case E15 allow '$JG_HOME/bin/jg-watch-arm.sh'
-matrix_case E16 allow '~/firstmate/bin/jg-watch-checkpoint.sh --seconds 180'
+matrix_case E16 allow '~/juggernaut/bin/jg-watch-checkpoint.sh --seconds 180'
 matrix_case E17 allow 'for f in 1; do echo jg-watch; done'
 
 MATRIX_TMP=$(mktemp -d "${TMPDIR:-/tmp}/jg-arm-policy-matrix.XXXXXX")
@@ -238,7 +238,7 @@ test_direct_policy_contract() {
   assert_policy direct-parameter-export allow 'export JG_HOME=${HOME}; bin/jg-watch-checkpoint.sh --seconds 180'
   assert_policy direct-expanded-arm-blessed allow '$JG_HOME/bin/jg-watch-arm.sh'
   assert_policy direct-expanded-arm-background $'deny\twatcher-background' '$JG_HOME/bin/jg-watch-arm.sh &'
-  assert_policy direct-expanded-arm-pipeline $'deny\twatcher-pipeline' '$HOME/firstmate/bin/jg-watch-arm.sh | cat'
+  assert_policy direct-expanded-arm-pipeline $'deny\twatcher-pipeline' '$HOME/juggernaut/bin/jg-watch-arm.sh | cat'
   assert_policy direct-watch-not-blessed $'deny\twatcher-direct' 'bin/jg-watch.sh'
   assert_policy direct-watch-expanded $'deny\twatcher-direct' '$JG_HOME/bin/jg-watch.sh'
   assert_policy direct-watch-safe-shape $'deny\twatcher-direct' 'cd /tmp; bin/jg-watch.sh'

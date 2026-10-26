@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 const ev = process.env.DONE_DONE_EVIDENCE_ROOT; assert(ev, 'DONE_DONE_EVIDENCE_ROOT required');
-const temp = fs.mkdtempSync(join(tmpdir(), 'kill-live-')), home = join(temp, 'account'), main = join(home, 'firstmate'), copy = join(temp, 'kill-guard');
+const temp = fs.mkdtempSync(join(tmpdir(), 'kill-live-')), home = join(temp, 'account'), main = join(home, 'juggernaut'), copy = join(temp, 'kill-guard');
 const dirs = [main, join(home, 'worker'), join(home, 'lead')], agents = [], children = [], log = text => fs.appendFileSync(join(ev, 'journey.txt'), text + '\n');
 for (const dir of [...dirs, copy, join(main, 'state'), join(main, 'data'), join(main, 'bin'), join(main, 'projects/demo'), join(temp, 'no-mistakes')]) fs.mkdirSync(dir, { recursive: true });
 for (const dir of dirs) execFileSync('git', ['init', '-q', dir], { env: { ...process.env, HOME: home, XDG_CONFIG_HOME: home } });

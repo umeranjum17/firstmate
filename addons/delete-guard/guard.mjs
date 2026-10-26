@@ -176,7 +176,7 @@ export function guard(command, { cwd = process.cwd(), runtime = "unknown" } = {}
 	const target = blockedDelete(String(command ?? ""));
 	if (target === null) return null;
 	const env = process.env;
-	// The true home: the firstmate home holding cwd (the lane the command ran in, even when an inbox or JG_HOME from
+	// The true home: the juggernaut home holding cwd (the lane the command ran in, even when an inbox or JG_HOME from
 	// elsewhere is inherited), else the task's inbox, else JG_HOME.
 	let home = "";
 	for (let d = resolve(cwd); !home && d !== "/"; d = dirname(d)) if (existsSync(`${d}/bin/jg-wake-lib.sh`) && existsSync(`${d}/state`)) home = d;

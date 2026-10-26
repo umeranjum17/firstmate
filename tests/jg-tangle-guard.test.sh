@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Behavior tests for the worktree-tangle guards.
 #
-# Firstmate is a treehouse-pooled git repo of itself: linked worktrees and
-# secondmate homes all sit at a detached HEAD on the default branch, while the
+# Juggernaut is a treehouse-pooled git repo of itself: linked worktrees and
+# squad_lead homes all sit at a detached HEAD on the default branch, while the
 # PRIMARY checkout (JG_ROOT) is a normal checkout on a real branch. The "tangle"
-# is a crewmate branching/committing in the primary instead of its own worktree,
+# is a operator branching/committing in the primary instead of its own worktree,
 # stranding the primary on a feature branch. Two guards cover it:
 #   GUARD 1 (prevention) - the brief asserts isolation before its branch step, and
 #            jg-spawn refuses to launch unless the resolved worktree is isolated.
@@ -53,7 +53,7 @@ test_lib_classification() {
   done <<'ROWS'
 on the default branch is healthy|default||
 on a feature branch is the tangle|feature|fm/readme-restructure-d3|fm/readme-restructure-d3
-detached HEAD on default is healthy (worktrees, secondmate homes)|detached||
+detached HEAD on default is healthy (worktrees, squad_lead homes)|detached||
 ROWS
   # A non-git directory is not a tangle and must not error.
   out=$(jg_primary_tangle_branch "$TMP_ROOT" || true)
@@ -123,7 +123,7 @@ test_bootstrap_line() {
 # --- GUARD 1a: brief isolation assertion ------------------------------------
 
 # The generated ship brief must carry the isolation assertion AHEAD of the
-# `git checkout -b` step, so the crewmate verifies its worktree before branching.
+# `git checkout -b` step, so the operator verifies its worktree before branching.
 test_brief_assertion_precedes_branch() {
   local home brief iso br
   home="$TMP_ROOT/brief-home"
@@ -218,7 +218,7 @@ test_spawn_isolation_abort() {
 #     are disabled so the jg-<id> name survives treehouse cd'ing into the worktree;
 #   - the treehouse-get send-keys and the worktree wait loop target that stable
 #     window id, never the (possibly-renamed) name - a lost name would let
-#     display-message fall back to the active client's window and misread firstmate's
+#     display-message fall back to the active client's window and misread juggernaut's
 #     OWN pane as the worktree, tangling a hook into the primary checkout.
 make_spawn_record_fakebin() {
   local dir=$1 fakebin
@@ -231,7 +231,7 @@ case "$*" in
   *"#{pane_current_path}"*) printf '%s\n' "${JG_FAKE_PANE_PATH:-}"; exit 0 ;;
 esac
 case "${1:-}" in
-  display-message) printf 'firstmate\n'; exit 0 ;;
+  display-message) printf 'juggernaut\n'; exit 0 ;;
   new-window) printf '%s\n' "@spawnwid"; exit 0 ;;
   list-windows) exit 0 ;;
   has-session|new-session|send-keys|set-window-option) exit 0 ;;
@@ -267,9 +267,9 @@ test_spawn_tmux_window_construction() {
   assert_contains "$out" "spawned rec-win-gg7" "recording spawn did not report success"
 
   # Bug 1 fix: append-form window creation (trailing colon on the session target).
-  assert_grep "new-window -dP -F #{window_id} -t firstmate: -n jg-rec-win-gg7" "$rec" \
+  assert_grep "new-window -dP -F #{window_id} -t juggernaut: -n jg-rec-win-gg7" "$rec" \
     "new-window must append at the session (trailing colon) and capture the window id"
-  assert_no_grep "new-window -dP -F #{window_id} -t firstmate -n" "$rec" \
+  assert_no_grep "new-window -dP -F #{window_id} -t juggernaut -n" "$rec" \
     "new-window must not target the bare session name (collides under base-index 1)"
 
   # Bug 2 fix (a): pin the window name against automatic-rename / allow-rename.

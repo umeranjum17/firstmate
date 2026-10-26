@@ -11,12 +11,12 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # run-proof.sh: the Claude accounts proof for done-done. Runs the real reader against the real muxr
 # registry (folder paths go to quota-axi; nothing inside a login folder is opened) into a throwaway
 # home, serves the real dashboard from that home and captures the Overview at phone width with
-# `done-done look`, plus the fixture test. JG_BIN names a Firstmate checkout's bin/ (the dashboard's helpers).
+# `done-done look`, plus the fixture test. JG_BIN names a Juggernaut checkout's bin/ (the dashboard's helpers).
 # The captured reading keeps account names and percentages only, never a folder.
 set -euo pipefail
 repo=$(cd "$(dirname "$0")/.." && pwd)
 evidence=${DONE_DONE_EVIDENCE_ROOT:?}
-export JG_BIN=${JG_BIN:?set JG_BIN to a Firstmate checkout bin/}
+export JG_BIN=${JG_BIN:?set JG_BIN to a Juggernaut checkout bin/}
 work=$(mktemp -d)
 pid=
 trap '[ -z "$pid" ] || kill "$pid" 2>/dev/null; rm -rf -- "$work"' EXIT

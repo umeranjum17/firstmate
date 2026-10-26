@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Behavior tests for the verified Rovo CLI crewmate/scout adapter.
+# Behavior tests for the verified Rovo CLI operator/scout adapter.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -62,7 +62,7 @@ case "$*" in
   *"#{cursor_y}"*) fake_cursor_y; exit 0 ;;
 esac
 case "${1:-}" in
-  display-message) printf 'firstmate\n'; exit 0 ;;
+  display-message) printf 'juggernaut\n'; exit 0 ;;
   list-windows) exit 0 ;;
   has-session|new-session|new-window|kill-window) exit 0 ;;
   send-keys)
@@ -146,7 +146,7 @@ make_spawn_case() {
 ## Captain's intent
 Exercise Rovo dispatch.
 
-## Firstmate spec
+## Juggernaut spec
 Verify launch and delivery behavior.
 EOF
   printf 'rovo\n' > "$home/config/crew-harness"
@@ -343,21 +343,21 @@ test_rovo_missing_binary_refuses_before_pane_creation() {
   pass "jg-spawn: missing rovo executable refuses before pane creation"
 }
 
-test_rovo_secondmate_is_refused() {
+test_rovo_squad_lead_is_refused() {
   local id rec out rc
-  id="rovo-secondmate-z5-$$"
-  rec=$(make_spawn_case secondmate-refuse "$id")
+  id="rovo-squad-lead-z5-$$"
+  rec=$(make_spawn_case squad-lead-refuse "$id")
   read_spawn_record "$rec"
   rc=0
   out=$(HOME="$HOME_DIR" JG_ROOT_OVERRIDE='' JG_HOME="$HOME_DIR" \
     JG_STATE_OVERRIDE="$HOME_DIR/state" JG_DATA_OVERRIDE="$HOME_DIR/data" \
     JG_PROJECTS_OVERRIDE="$HOME_DIR/projects" JG_CONFIG_OVERRIDE="$HOME_DIR/config" \
     JG_SPAWN_NO_GUARD=1 PATH="$FAKEBIN_DIR:$BASE_PATH" \
-    "$SPAWN" "$id" --secondmate rovo 2>&1) || rc=$?
-  [ "$rc" -ne 0 ] || fail "a rovo secondmate spawn should be refused"
-  assert_contains "$out" "rovo is a verified crewmate/scout adapter only" \
-    "rovo secondmate refusal lacked its concrete reason"
-  pass "jg-spawn: rovo cannot be launched as a secondmate"
+    "$SPAWN" "$id" --squad-lead rovo 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail "a rovo squad_lead spawn should be refused"
+  assert_contains "$out" "rovo is a verified operator/scout adapter only" \
+    "rovo squad_lead refusal lacked its concrete reason"
+  pass "jg-spawn: rovo cannot be launched as a squad_lead"
 }
 
 test_rovo_detection_precedence_and_ancestry() {
@@ -426,8 +426,8 @@ test_rovo_control_lib_table() {
   [ "$(jg_control_harness_family rovo-anything)" = rovo ] || fail "rovo harness family prefix match failed"
   jg_control_harness_supports_kind rovo ship || fail "rovo should support ship tasks"
   jg_control_harness_supports_kind rovo scout || fail "rovo should support scout tasks"
-  if jg_control_harness_supports_kind rovo secondmate; then
-    fail "rovo should never support secondmate tasks"
+  if jg_control_harness_supports_kind rovo squad_lead; then
+    fail "rovo should never support squad_lead tasks"
   fi
   pass "jg-control-lib: rovo's lifecycle table matches its verified facts"
 }
@@ -480,7 +480,7 @@ test_rovo_effort_high_sets_config_override
 test_rovo_readiness_gate_precedes_pointer
 test_rovo_unconfirmed_delivery_fails_loudly
 test_rovo_missing_binary_refuses_before_pane_creation
-test_rovo_secondmate_is_refused
+test_rovo_squad_lead_is_refused
 test_rovo_detection_precedence_and_ancestry
 test_rovo_control_lib_table
 test_rovo_busy_regex_isolated

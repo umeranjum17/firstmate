@@ -1,6 +1,6 @@
 # tmux runtime backend
 
-tmux is Juggernaut's verified reference runtime backend and the fully supported baseline for secondmate homes.
+tmux is Juggernaut's verified reference runtime backend and the fully supported baseline for squad lead homes.
 [`configuration.md`](configuration.md#runtime-backend-configbackend--jg_backend) owns shared backend selection and metadata semantics.
 
 ## Setup
@@ -19,15 +19,15 @@ No provisioning is required before the first task.
 For the best visible experience, launch the primary harness inside a tmux session:
 
 ```sh
-tmux new -s firstmate
+tmux new -s juggernaut
 ```
 
 Crew tasks become windows in that session.
 `tmux display-message -p '#S'` prints its name.
-If the primary harness runs outside tmux, Juggernaut creates or reuses a detached session named `firstmate`:
+If the primary harness runs outside tmux, Juggernaut creates or reuses a detached session named `juggernaut`:
 
 ```sh
-tmux attach -t firstmate
+tmux attach -t juggernaut
 ```
 
 Each task window is named `jg-<id>`.
@@ -65,7 +65,7 @@ omp is anchored to the exact `omp` identity for the same reason, so `ompd` and `
 AGY and Devin are anchored to the exact `agy` and `devin` identities for the same reason, so unrelated names containing either fragment remain ambiguous.
 Cursor is identified from its exact `cursor-agent` identity or versioned install tree in the foreground process path or structured argv[0]; a bare `node` or unrelated `agent` remains ambiguous.
 
-The CI-enforced portable regression and opt-in real-harness drift guard follow the split owned by `.agents/skills/firstmate-coding-guidelines/SKILL.md`.
+The CI-enforced portable regression and opt-in real-harness drift guard follow the split owned by `.agents/skills/juggernaut-coding-guidelines/SKILL.md`.
 Run the real-harness guard after any harness upgrade and before trusting refreshed evidence.
 
 ### Composer, busy state, and delivery
@@ -101,7 +101,7 @@ Without that baseline, an `unknown` verdict is preserved untouched, so a busy-lo
 
 ## Limits and regression entry points
 
-- tmux is the reference path and supports secondmate homes.
+- tmux is the reference path and supports squad lead homes.
 
 ```sh
 tests/jg-backend-tmux-smoke.test.sh

@@ -11,7 +11,7 @@ metadata:
 
 # quiet
 
-Quiet supervision mode (kunchenguid/firstmate#2356): the same token-saving
+Quiet supervision mode (kunchenguid/juggernaut#2356): the same token-saving
 daemon tradeoff as `/afk`, made explicit for a captain who is staying,
 watching the session, and does not want to exit the mode just by chatting.
 

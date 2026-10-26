@@ -68,7 +68,7 @@ test_apply_current_gen_reset() {
     || fail "apply unknown failed"
   out=$(jg_busy_classify tmux w1 pi t1 "$state")
   [ "$out" = "unknown jg-recovery" ] || fail "expected 'unknown jg-recovery', got '$out'"
-  pass "firstmate-owned interrupt and recovery events bind to the current gen"
+  pass "juggernaut-owned interrupt and recovery events bind to the current gen"
 }
 
 test_apply_unarmed_refused() {

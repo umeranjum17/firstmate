@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Turn on the owner rules in one firstmate home: write config/owner-rules, which brief-inherit's
+# Turn on the owner rules in one juggernaut home: write config/owner-rules, which brief-inherit's
 # brief seam reads, and make config/merge-gate run bin/jg-owner-rules-gate.sh first, then the home's
 # previous gate (moved aside to config/merge-gate.pre-owner-rules; uninstall moves it back). Idempotent.
 # Usage: install.sh [--dry-run] <jg-home>

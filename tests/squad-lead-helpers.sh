@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# tests/secondmate-helpers.sh - shared fixtures and mocks for the secondmate
-# suites (jg-secondmate-lifecycle-e2e and jg-secondmate-safety).
+# tests/squad-lead-helpers.sh - shared fixtures and mocks for the squad_lead
+# suites (jg-squad-lead-lifecycle-e2e and jg-squad-lead-safety).
 #
-# These mocks encode secondmate-lifecycle behavior (fake tmux that logs window
+# These mocks encode squad-lead-lifecycle behavior (fake tmux that logs window
 # ops, fake treehouse that leases/returns homes, fake no-mistakes that records
 # init/doctor), so they live here rather than in the generic tests/lib.sh. The
 # generic git/identity/meta primitives come from lib.sh, which this file pulls in.
@@ -73,7 +73,7 @@ EOF
   display-message)
     case "$*" in
       *'#{cursor_y}'*) printf '0\n' ;;
-      *) printf 'firstmate\n' ;;
+      *) printf 'juggernaut\n' ;;
     esac
     exit 0
     ;;
@@ -174,19 +174,19 @@ SH
   printf '%s\n' "$fakebin"
 }
 
-# Make a directory look like a minimal firstmate home (AGENTS.md + bin/).
-mark_firstmate_home() {
+# Make a directory look like a minimal juggernaut home (AGENTS.md + bin/).
+mark_juggernaut_home() {
   local home=$1
   mkdir -p "$home/bin"
-  printf '# Firstmate\n' > "$home/AGENTS.md"
+  printf '# Juggernaut\n' > "$home/AGENTS.md"
 }
 
-# A firstmate home that is also a real git repo (so it can host detached
+# A juggernaut home that is also a real git repo (so it can host detached
 # worktrees for teardown/lease tests).
-make_firstmate_git_root() {
+make_juggernaut_git_root() {
   local home=$1
   mkdir -p "$home/bin"
-  printf '# Firstmate\n' > "$home/AGENTS.md"
+  printf '# Juggernaut\n' > "$home/AGENTS.md"
   cat > "$home/bin/jg-guard.sh" <<'SH'
 #!/usr/bin/env bash
 exit 0
@@ -194,23 +194,23 @@ SH
   chmod +x "$home/bin/jg-guard.sh"
   git -C "$home" init -q
   git -C "$home" add AGENTS.md bin/jg-guard.sh
-  git -C "$home" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm initial
+  git -C "$home" -c user.name='Juggernaut Tests' -c user.email='tests@example.invalid' commit -qm initial
 }
 
-# Scaffold a filled secondmate charter brief under <home>/data/<id>/brief.md.
+# Scaffold a filled squad_lead charter brief under <home>/data/<id>/brief.md.
 # Args: home id charter [project...]
-scaffold_secondmate_charter() {
+scaffold_squad_lead_charter() {
   local home=$1 id=$2 charter=$3
   shift 3
-  JG_HOME="$home" JG_SECONDMATE_CHARTER="$charter" "$ROOT/bin/jg-brief.sh" "$id" --secondmate "$@" >/dev/null
+  JG_HOME="$home" JG_SQUAD_LEAD_CHARTER="$charter" "$ROOT/bin/jg-brief.sh" "$id" --squad-lead "$@" >/dev/null
 }
 
-# Make a directory look like a genuine seeded secondmate home (for handoff tests).
-seed_secondmate_home_marker() {
+# Make a directory look like a genuine seeded squad_lead home (for handoff tests).
+seed_squad_lead_home_marker() {
   local home=$1 id=$2
-  mark_firstmate_home "$home"
+  mark_juggernaut_home "$home"
   mkdir -p "$home/data"
-  printf '%s\n' "$id" > "$home/.jg-secondmate-home"
+  printf '%s\n' "$id" > "$home/.jg-squad-lead-home"
 }
 
 # Wait up to <limit> 0.1s ticks while <pid> stays alive. Returns 1 if it dies.

@@ -5,7 +5,7 @@
 #
 # ONE OWNER for the landed selector. Recently Landed is assembled from two
 # separate jq programs - bin/jg-bearings-snapshot.sh projects this home's own
-# Done rows, and bin/jg-fleet-snapshot.sh projects each secondmate home's Done
+# Done rows, and bin/jg-fleet-snapshot.sh projects each squad_lead home's Done
 # rows into the roll-up that the same section merges in. Both answer the one
 # question "is this closed row a delivery the captain should see", so the rule
 # lives here and neither program restates it.
@@ -33,7 +33,7 @@
 # hold-kind captain.
 # That preserves kindless rows closed before artifact-aware selection without
 # admitting answered captain calls or explicit reportless scouts.
-# Already-selected v1 secondmate landed rows may omit kind. For those rows,
+# Already-selected v1 squad_lead landed rows may omit kind. For those rows,
 # landed_artifact preserves a report_path with a reported completion; this
 # display compatibility does not admit kindless reports from raw backlog rows.
 # tests/jg-bearings-snapshot.test.sh covers both fresh and cached v1 summaries.

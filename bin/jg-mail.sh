@@ -5,7 +5,7 @@
 #
 # Reads inbound mail over IMAP and sends mail over SMTP on demand. This is an
 # ordinary mail client surface, not an escalation of authority: every surfaced
-# message is a notification firstmate reads before deciding, and firstmate still
+# message is a notification juggernaut reads before deciding, and juggernaut still
 # applies its own judgment exactly as it would for a TUI message (including
 # return/away and other rules).
 #
@@ -16,7 +16,7 @@
 #                        Send one message. A "-" body reads plain text from
 #                        stdin.
 #   poll                 Surface UNSEEN mail this home has not yet woken as a
-#                        `check` wake so firstmate answers it concisely. IMAP
+#                        `check` wake so juggernaut answers it concisely. IMAP
 #                        \Seen mail never wakes a poll, no message is ever
 #                        marked read (BODY.PEEK), and every surfaced message
 #                        is keyed by its immutable IMAP UID so expunge
@@ -61,7 +61,7 @@
 #
 # IMAP/SMTP work is delegated to bin/jg-mail.py (imaplib/smtplib, implicit TLS
 # on 993/465). STARTTLS and port 587 are not supported. BODY.PEEK is used on
-# read/poll so mail is never marked seen before firstmate actually answers it.
+# read/poll so mail is never marked seen before juggernaut actually answers it.
 
 set -euo pipefail
 
@@ -573,7 +573,7 @@ mail_poll() {
       # after the append is healed above without re-waking.
       # Reaching the per-poll wake cap stops the loop: the remaining unseen
       # mail stays out of the cursor and surfaces on the next poll, so a flood
-      # bounds the durable wake queue instead of flooding firstmate.
+      # bounds the durable wake queue instead of flooding juggernaut.
       if [ "$woke" -ge "$MAIL_MAX_WAKES" ]; then
         echo "jg-mail: per-poll wake cap ($MAIL_MAX_WAKES) reached; remaining mail surfaces on the next poll" >&2
         break

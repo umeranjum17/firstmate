@@ -37,7 +37,7 @@ printf '%s\n' "$SNAPSHOT" | jq -r '
     elif $t.endpoint.exists then "present"
     else "absent" end;
   def endpoint_of($t):
-    if $t.kind == "secondmate" then "\(endpoint_exists($t)) / \($t.endpoint.agent_alive)"
+    if $t.kind == "squad_lead" then "\(endpoint_exists($t)) / \($t.endpoint.agent_alive)"
     else endpoint_exists($t) end;
   def artifact($t):
     if $t.pr.url != null then $t.pr.url
@@ -50,7 +50,7 @@ printf '%s\n' "$SNAPSHOT" | jq -r '
     elif $t.paths.worktree.path != null then $t.paths.worktree.path + " (absent)"
     else "-" end;
   def action_of($t):
-    if $t.kind == "secondmate" then "\($t.actions.send) - \($t.actions.watch)"
+    if $t.kind == "squad_lead" then "\($t.actions.send) - \($t.actions.watch)"
     else $t.actions.watch end;
   def task_row($t):
     "| \($t.id) | \($t.current_state.state) / \($t.current_state.source) | \($t.kind) | \(dash($t.backlog.repo // $t.project)) | \($t.backend) | \(endpoint_of($t)) | \(artifact($t)) | \(path_of($t)) | \(action_of($t)) |";
@@ -93,6 +93,6 @@ printf '%s\n' "$SNAPSHOT" | jq -r '
     (.backlog.records[] | select(.state == "done") | backlog_row(.))
    end),
   "",
-  "## Secondmates",
-  .secondmate_guidance.note
+  "## SquadLeads",
+  .squad_lead_guidance.note
 '

@@ -44,15 +44,15 @@ The enabled binding points only at that content-addressed home-local copy, so tw
 
 ## Package manifest
 
-The package root contains one `firstmate-extension.json` document with exactly these fields:
+The package root contains one `juggernaut-extension.json` document with exactly these fields:
 
 ```json
 {
-  "schema": "firstmate.extension-manifest.v1",
+  "schema": "juggernaut.extension-manifest.v1",
   "id": "org.example.review-feed",
   "version": "1.2.3",
   "host_protocols": [1],
-  "entrypoint": "bin/firstmate-extension",
+  "entrypoint": "bin/juggernaut-extension",
   "capabilities": [
     {
       "name": "process-event-adapter",
@@ -77,7 +77,7 @@ The other facts are honest consent records rather than an operating-system netwo
 ## Enabled binding
 
 `bind` generates the binding, so operators never hand-author hashes or duplicate machine-generated package state.
-The mode-`0600` document has schema `firstmate.extension-binding.v1` and exactly these fields:
+The mode-`0600` document has schema `juggernaut.extension-binding.v1` and exactly these fields:
 
 - `extension_id` and `extension_version` match the manifest.
 - `source` records the canonical local-directory source path for inspection or reinstall.
@@ -120,7 +120,7 @@ The request has exactly these fields:
 
 ```json
 {
-  "schema": "firstmate.extension-handshake-request.v1",
+  "schema": "juggernaut.extension-handshake-request.v1",
   "request_id": "sha256:<64 lowercase hex>",
   "host_protocols": [1],
   "extension_id": "org.example.review-feed",
@@ -135,7 +135,7 @@ The request has exactly these fields:
 ```
 
 The response has exactly `schema`, `request_id`, `extension_id`, `extension_version`, `host_protocol`, `capability`, `capability_version`, and `adapter_names`.
-Its schema is `firstmate.extension-handshake-response.v1`.
+Its schema is `juggernaut.extension-handshake-response.v1`.
 Every identity must match the request and enabled binding exactly, including the request id and enabled adapter-name subset.
 There is no wildcard, optimistic fallback, or silent downgrade.
 
@@ -145,7 +145,7 @@ After a successful handshake, the host runs the same entrypoint with verb `invok
 
 ```json
 {
-  "schema": "firstmate.extension-request.v1",
+  "schema": "juggernaut.extension-request.v1",
   "request_id": "sha256:<64 lowercase hex>",
   "host_protocol": 1,
   "extension_id": "org.example.review-feed",
@@ -163,7 +163,7 @@ After a successful handshake, the host runs the same entrypoint with verb `invok
 ```
 
 The response has exactly `schema`, `request_id`, `ok`, `result`, and `error`.
-Its schema is `firstmate.extension-response.v1`, and its request id must match exactly.
+Its schema is `juggernaut.extension-response.v1`, and its request id must match exactly.
 A successful response has `ok=true`, one operation-specific result object, and `error=null`.
 A failed response has `ok=false`, `result=null`, and an error with exactly `code`, `retryable`, and a bounded `diagnostic`.
 Allowed error codes are `invalid-request`, `incompatible`, `conflict`, `unavailable`, and `internal`.
@@ -189,7 +189,7 @@ Before an external result can be captured, core applies the same boundary checks
 These external-only checks refuse before a staging or capture write when a post-registration link, ownership, mode, or canonical-path substitution is detected, while the legacy four-argument built-in capture path retains its existing behavior.
 For `result.terminal` and `result.silent`, the live core runner passes the host an internal one-shot handoff that pins the exact active claim, inbox, and result identities before the host reads a regular mode-`0600` result and sends only bounded UTF-8 content.
 Public lifecycle entry, environment, paths, and caller-supplied descriptors cannot create that handoff or authorize capture; runner claim release and dead-owner reconciliation remove its pending or consumed reservation state from the claim's recorded, revalidated state root.
-A source failure becomes a small host-produced `firstmate.process-event-extension-error.v1` result, so missing packages, invalid responses, crashes, nonzero exits, and timeouts become actionable evidence rather than silent fallback.
+A source failure becomes a small host-produced `juggernaut.process-event-extension-error.v1` result, so missing packages, invalid responses, crashes, nonzero exits, and timeouts become actionable evidence rather than silent fallback.
 Unknown or malformed terminal and silent responses take the safe false path.
 
 External registration stores the extension id and version, capability version, package digest, binding digest, source configuration reference, and a fresh random registration token beside the adapter and source id.
@@ -219,7 +219,7 @@ The host runs in the Juggernaut home that owns the source, never in a task worke
 Claude, Codex, OpenCode, Pi, pi-signed, Grok, Kimi, Cursor, Muse, and Rovo therefore expose no package-loading surface for this capability.
 The result reaches every supported primary through the existing bounded `check` wake path, including the unknown-protocol fallback used where no specialized primary continuation exists.
 The tmux, Herdr, Zellij, Orca, and cmux session providers are not consulted because a process-event source has no task endpoint.
-Remote and local secondmate homes bind and install independently, and the primary never executes a missing remote-home package locally. `remote-bind` carries one canonical `firstmate.extension-package-transfer.v1` JSON envelope over the existing bounded `jg-on` stdin/stdout job. Its hashed manifest pins the extension id, version, complete package-tree digest, entry count, total bytes, and byte-sorted entries. Entries are limited to normalized relative directories at mode 0755 and single regular files at mode 0644 or 0755, each with an exact size and SHA-256 payload digest. The receiver accepts at most 128 entries, 256 KiB per file, 512 KiB of package bytes, and 900,000 serialized bytes; it rejects malformed or truncated JSON, duplicate keys or paths, collisions, absolute or traversing names, links and special files, noncanonical modes, hash or size mismatches, and duplicate transfer identities.
+Remote and local squad lead homes bind and install independently, and the primary never executes a missing remote-home package locally. `remote-bind` carries one canonical `juggernaut.extension-package-transfer.v1` JSON envelope over the existing bounded `jg-on` stdin/stdout job. Its hashed manifest pins the extension id, version, complete package-tree digest, entry count, total bytes, and byte-sorted entries. Entries are limited to normalized relative directories at mode 0755 and single regular files at mode 0644 or 0755, each with an exact size and SHA-256 payload digest. The receiver accepts at most 128 entries, 256 KiB per file, 512 KiB of package bytes, and 900,000 serialized bytes; it rejects malformed or truncated JSON, duplicate keys or paths, collisions, absolute or traversing names, links and special files, noncanonical modes, hash or size mismatches, and duplicate transfer identities.
 
 The receiver creates the package in a private temporary directory below `data/extensions/staging`, validates ownership, permissions, the package manifest, executable, and complete reconstructed tree, then atomically publishes the transfer before the normal bind handshake and binding publication.
 A failed bind moves the exact transfer identity into `data/extensions/retired-staging` without enabling it.
@@ -227,7 +227,7 @@ A failed bind moves the exact transfer identity into `data/extensions/retired-st
 It refuses missing, ambiguous, drifted, mismatched, in-use, or unrelated state before moving the enabled binding into the staged identity and reversibly moving that exact unit into `data/extensions/retired-staging`.
 If the process stops between those two moves, a retry resumes only when the retained binding and staged receipt, version directory, package, transfer digest, and binding digest still form that one exact retirement identity; altered or coexisting partial state is refused.
 The transfer contains package bytes and declarative metadata only: it carries no environment, credentials, cookies, tokens, destinations, or caller-selected command text and creates no generic file-transfer surface.
-Bindings and credentials are deliberately absent from the inherited secondmate configuration allowlist.
+Bindings and credentials are deliberately absent from the inherited squad lead configuration allowlist.
 
 ## Runnable example
 

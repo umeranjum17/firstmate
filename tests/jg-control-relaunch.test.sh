@@ -83,7 +83,7 @@ case "${1:-}" in
           printf 'zsh' > "$D/command"
           [ -z "${JG_FAKE_EXIT_TRANSPORT_FAIL_AFTER_STOP:-}" ] || exit 1
           ;;
-        *'encode launch-brief'* | *'Firstmate operational input waiting: read'*)
+        *'encode launch-brief'* | *'Juggernaut operational input waiting: read'*)
           cat "$D/becomes" > "$D/command"
           [ -z "${JG_FAKE_LAUNCH_TRANSPORT_FAIL_AFTER_START:-}" ] || exit 1
           ;;
@@ -217,7 +217,7 @@ add_ship_task() {
 ## Captain's intent
 Exercise relaunch behavior for $id.
 
-## Firstmate spec
+## Juggernaut spec
 Preserve the task while replacing its agent process.
 EOF
   {
@@ -396,7 +396,7 @@ test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint() {
     || fail "the transaction journal should end complete"
   assert_grep "/exit" "$dir/fake/literal" "the previous agent should have been exited"
   assert_grep "cd -- '$dir/wt'" "$dir/fake/keys" "the replacement launch must enter the recorded worktree"
-  assert_grep "Firstmate operational input waiting: read" "$dir/fake/literal" "the replacement should have been launched"
+  assert_grep "Juggernaut operational input waiting: read" "$dir/fake/literal" "the replacement should have been launched"
   pass "jg-control relaunch: a same-harness relaunch replaces the agent in the same endpoint and worktree"
 }
 
@@ -465,12 +465,12 @@ test_relaunch_from_linked_home_preserves_recorded_worktree() {
   local dir out rc head fetch_head
   dir=$(new_case linked-home rl42)
   add_ship_task "$dir" rl42 claude
-  git -C "$dir/proj" worktree add --quiet --detach "$dir/secondmate" HEAD
-  sed "s|^project=.*|project=$dir/secondmate|" "$dir/home/state/rl42.meta" > "$dir/linked.meta"
+  git -C "$dir/proj" worktree add --quiet --detach "$dir/squad_lead" HEAD
+  sed "s|^project=.*|project=$dir/squad_lead|" "$dir/home/state/rl42.meta" > "$dir/linked.meta"
   mv "$dir/linked.meta" "$dir/home/state/rl42.meta"
   printf 'committed task work\n' > "$dir/wt/task.txt"
   git -C "$dir/wt" add task.txt
-  git -C "$dir/wt" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm task-work
+  git -C "$dir/wt" -c user.name='Juggernaut Tests' -c user.email='tests@example.invalid' commit -qm task-work
   head=$(git -C "$dir/wt" rev-parse HEAD)
   printf 'unfinished task work\n' >> "$dir/wt/task.txt"
   fetch_head=$(git -C "$dir/wt" rev-parse --git-path FETCH_HEAD)
@@ -492,7 +492,7 @@ test_relaunch_from_linked_home_preserves_recorded_worktree() {
   fi
   expect_code 0 "$rc" "a linked spawning home should relaunch its recorded copy"$'\n'"$out"
   [ "$(meta_field "$dir" rl42 worktree)" = "$dir/wt" ] || fail "relaunch replaced the recorded copy"
-  [ "$(meta_field "$dir" rl42 project)" = "$dir/secondmate" ] || fail "relaunch replaced the linked spawning home"
+  [ "$(meta_field "$dir" rl42 project)" = "$dir/squad_lead" ] || fail "relaunch replaced the linked spawning home"
   [ "$(git -C "$dir/wt" rev-parse HEAD)" = "$head" ] || fail "relaunch reset committed task work"
   assert_grep 'unfinished task work' "$dir/wt/task.txt" "relaunch discarded unfinished task work"
   [ ! -e "$fetch_head" ] || fail "relaunch fetched instead of preserving the recorded copy"
@@ -658,15 +658,15 @@ test_relaunch_appends_the_progress_note_to_the_instructions() {
   launch_brief="$dir/home/data/rl2/launch-brief.md"
   first_line=$(sed -n '1p' "$launch_brief")
   [ "$first_line" = '# Current worker role contract' ] ||
-    fail "a Firstmate-worktree relaunch did not establish the crewmate identity first"
+    fail "a Juggernaut-worktree relaunch did not establish the operator identity first"
   role_line=$(grep -n '^# Current worker role contract$' "$launch_brief" | cut -d: -f1)
   task_line=$(grep -n '^# Task$' "$launch_brief" | head -1 | cut -d: -f1)
   [ "$role_line" -lt "$task_line" ] || fail "the relaunched worker identity followed its task content"
   assert_grep "$dir/home/state/rl2.inbox" "$launch_brief" \
-    "the Firstmate-worktree relaunch omitted the worker's exact steering inbox"
+    "the Juggernaut-worktree relaunch omitted the worker's exact steering inbox"
   assert_grep 'do not reject it as another home' "$launch_brief" \
-    "the Firstmate-worktree relaunch did not distinguish its inbox from cross-home state"
-  pass "jg-control relaunch: progress and the Firstmate-worktree worker identity reach the replacement"
+    "the Juggernaut-worktree relaunch did not distinguish its inbox from cross-home state"
+  pass "jg-control relaunch: progress and the Juggernaut-worktree worker identity reach the replacement"
 }
 
 test_relaunch_closes_a_claude_startup_gate_unanswered() {
@@ -779,15 +779,15 @@ test_relaunch_explicit_default_model_relaunches_a_record_without_a_model() {
   pass "jg-control relaunch: an explicit --model default relaunches a record without a stored model"
 }
 
-test_relaunch_refuses_a_secondmate_missing_stored_model() {
+test_relaunch_refuses_a_squad_lead_missing_stored_model() {
   local dir home out rc
   dir=$(new_case smmissingmodel sm8)
   home="$dir/home"
-  mkdir -p "$home/data/sm8" "$home/config/secondmates/sm8"
-  printf '# secondmate brief\n' > "$home/data/sm8/brief.md"
+  mkdir -p "$home/data/sm8" "$home/config/squad_leads/sm8"
+  printf '# squad_lead brief\n' > "$home/data/sm8/brief.md"
   jg_git_worktree "$dir/proj" "$dir/smhome" sm-branch
   mkdir -p "$dir/smhome/state" "$dir/smhome/data" "$dir/smhome/bin"
-  printf 'sm8\n' > "$dir/smhome/.jg-secondmate-home"
+  printf 'sm8\n' > "$dir/smhome/.jg-squad-lead-home"
   printf '# agents\n' > "$dir/smhome/AGENTS.md"
   {
     echo "window=fmses:jg-sm8"
@@ -795,8 +795,8 @@ test_relaunch_refuses_a_secondmate_missing_stored_model() {
     echo "worktree=$dir/smhome"
     echo "project=$dir/smhome"
     echo "harness=claude"
-    echo "kind=secondmate"
-    echo "mode=secondmate"
+    echo "kind=squad_lead"
+    echo "mode=squad_lead"
     echo "yolo=off"
     echo "effort=default"
     echo "home=$dir/smhome"
@@ -804,10 +804,10 @@ test_relaunch_refuses_a_secondmate_missing_stored_model() {
   printf '%s\n' "jg-sm8" > "$dir/fake/windows"
   printf '%s' "$dir/smhome" > "$dir/fake/cwd"
   out=$(run_control "$dir" sm8 relaunch --harness claude); rc=$?
-  expect_code 1 "$rc" "a secondmate relaunch without its stored model should refuse"$'\n'"$out"
+  expect_code 1 "$rc" "a squad_lead relaunch without its stored model should refuse"$'\n'"$out"
   assert_contains "$out" "no stored model for claude" "the refusal should name the missing model"
-  [ "$(cat "$dir/fake/command")" = claude ] || fail "a missing-model secondmate refusal must not stop the current agent"
-  pass "jg-control relaunch: a secondmate without a stored model refuses before stopping"
+  [ "$(cat "$dir/fake/command")" = claude ] || fail "a missing-model squad_lead refusal must not stop the current agent"
+  pass "jg-control relaunch: a squad_lead without a stored model refuses before stopping"
 }
 
 test_relaunch_requires_a_note_for_a_ship_task() {
@@ -1114,7 +1114,7 @@ test_wiring_removal_failure_refuses_before_replacement_arm() {
   assert_contains "$out" "could not retire claude wiring" \
     "the failure should identify prior wiring cleanup"
   [ -e "$hook" ] || fail "the fixture should retain the undeletable prior hook"
-  assert_no_grep "Firstmate operational input waiting: read" "$dir/fake/literal" \
+  assert_no_grep "Juggernaut operational input waiting: read" "$dir/fake/literal" \
     "replacement launch must not be armed after wiring cleanup fails"
   [ "$(journal_field "$dir" rl29 phase)" = failed:launching ] \
     || fail "the transaction should record the partial launch failure"
@@ -1144,18 +1144,18 @@ test_turnend_auth_paths_are_owned_by_the_control_adapter() {
   pass "jg-control-lib: one owner resolves each harness's turn-end registry entry, and refuses a malformed token"
 }
 
-test_secondmate_relaunch_picks_up_the_configured_harness_pin() {
+test_squad_lead_relaunch_picks_up_the_configured_harness_pin() {
   local dir home out rc
   dir=$(new_case smpin sm3)
   home="$dir/home"
-  mkdir -p "$home/config/secondmates/sm3"
-  printf 'pi global-model medium\n' > "$home/config/secondmate-harness"
-  printf 'codex some-model high\n' > "$home/config/secondmates/sm3/harness"
+  mkdir -p "$home/config/squad_leads/sm3"
+  printf 'pi global-model medium\n' > "$home/config/squad-lead-harness"
+  printf 'codex some-model high\n' > "$home/config/squad_leads/sm3/harness"
   mkdir -p "$home/data/sm3"
-  printf '# secondmate brief\n' > "$home/data/sm3/brief.md"
+  printf '# squad_lead brief\n' > "$home/data/sm3/brief.md"
   jg_git_worktree "$dir/proj" "$dir/smhome" sm-branch
   mkdir -p "$dir/smhome/state" "$dir/smhome/data" "$dir/smhome/bin"
-  printf 'sm3\n' > "$dir/smhome/.jg-secondmate-home"
+  printf 'sm3\n' > "$dir/smhome/.jg-squad-lead-home"
   printf '# agents\n' > "$dir/smhome/AGENTS.md"
   {
     echo "window=fmses:jg-sm3"
@@ -1163,8 +1163,8 @@ test_secondmate_relaunch_picks_up_the_configured_harness_pin() {
     echo "worktree=$dir/smhome"
     echo "project=$dir/smhome"
     echo "harness=claude"
-    echo "kind=secondmate"
-    echo "mode=secondmate"
+    echo "kind=squad_lead"
+    echo "mode=squad_lead"
     echo "yolo=off"
     echo "model=default"
     echo "effort=default"
@@ -1173,46 +1173,46 @@ test_secondmate_relaunch_picks_up_the_configured_harness_pin() {
   printf '%s\n' "jg-sm3" > "$dir/fake/windows"
   printf '%s' "$dir/smhome" > "$dir/fake/cwd"
   printf 'codex' > "$dir/fake/becomes"
-  printf 'codex some-model impossible\n' > "$home/config/secondmates/sm3/harness"
+  printf 'codex some-model impossible\n' > "$home/config/squad_leads/sm3/harness"
   out=$(run_control "$dir" sm3 relaunch); rc=$?
   [ "$rc" -ne 0 ] || fail "a malformed per-mate pin must refuse relaunch"
-  assert_contains "$out" "$home/config/secondmates/sm3/harness" "malformed pin must name its file"
+  assert_contains "$out" "$home/config/squad_leads/sm3/harness" "malformed pin must name its file"
   assert_not_contains "$(cat "$dir/fake/literal")" '/exit' "invalid pin must refuse before stopping the agent"
-  printf 'codex some-model high\n' > "$home/config/secondmates/sm3/harness"
+  printf 'codex some-model high\n' > "$home/config/squad_leads/sm3/harness"
   out=$(run_control "$dir" sm3 relaunch); rc=$?
-  expect_code 0 "$rc" "a configured secondmate harness should relaunch"$'\n'"$out"
+  expect_code 0 "$rc" "a configured squad_lead harness should relaunch"$'\n'"$out"
   [ "$(journal_field "$dir" sm3 to_harness)" = codex ] \
-    || fail "a secondmate relaunch should pick up the configured harness pin, got '$(journal_field "$dir" sm3 to_harness)'"
+    || fail "a squad_lead relaunch should pick up the configured harness pin, got '$(journal_field "$dir" sm3 to_harness)'"
   [ "$(journal_field "$dir" sm3 to_model)" = some-model ] \
     || fail "the configured model token should come with the pin"
   [ "$(journal_field "$dir" sm3 to_effort)" = high ] \
     || fail "the configured effort token should come with the pin"
   assert_not_contains "$out" "not a verified harness" "codex is a verified harness"
-  printf 'omp some-model high\n' > "$home/config/secondmates/sm3/harness"
-  out=$(JG_HOME="$home" "$ROOT/bin/jg-harness.sh" secondmate sm3 2>&1); rc=$?
+  printf 'omp some-model high\n' > "$home/config/squad_leads/sm3/harness"
+  out=$(JG_HOME="$home" "$ROOT/bin/jg-harness.sh" squad_lead sm3 2>&1); rc=$?
   expect_code 0 "$rc" "an omp per-mate pin should resolve"$'\n'"$out"
   [ "$out" = omp ] \
     || fail "an omp per-mate pin should resolve to omp, got '$out'"
-  [ "$(JG_HOME="$home" "$ROOT/bin/jg-harness.sh" secondmate-model sm3)" = some-model ] \
+  [ "$(JG_HOME="$home" "$ROOT/bin/jg-harness.sh" squad-lead-model sm3)" = some-model ] \
     || fail "the configured model token should come with the omp pin"
-  [ "$(JG_HOME="$home" "$ROOT/bin/jg-harness.sh" secondmate-effort sm3)" = high ] \
+  [ "$(JG_HOME="$home" "$ROOT/bin/jg-harness.sh" squad-lead-effort sm3)" = high ] \
     || fail "the configured effort token should come with the omp pin"
-  assert_not_contains "$out" "unverified secondmate harness" "omp is a verified secondmate harness"
-  pass "jg-control relaunch: a secondmate relaunch re-resolves its durable configured harness pin"
+  assert_not_contains "$out" "unverified squad_lead harness" "omp is a verified squad_lead harness"
+  pass "jg-control relaunch: a squad_lead relaunch re-resolves its durable configured harness pin"
 }
 
-test_secondmate_relaunch_keeps_a_dotted_mate_pin_through_relaunch() {
+test_squad_lead_relaunch_keeps_a_dotted_mate_pin_through_relaunch() {
   local dir home out rc id=sm.dotted
   dir=$(new_case smdotted "$id")
   home="$dir/home"
-  mkdir -p "$home/config/secondmates/$id"
-  printf 'pi global-model medium\n' > "$home/config/secondmate-harness"
-  printf 'codex some-model high\n' > "$home/config/secondmates/$id/harness"
+  mkdir -p "$home/config/squad_leads/$id"
+  printf 'pi global-model medium\n' > "$home/config/squad-lead-harness"
+  printf 'codex some-model high\n' > "$home/config/squad_leads/$id/harness"
   mkdir -p "$home/data/$id"
-  printf '# secondmate brief\n' > "$home/data/$id/brief.md"
+  printf '# squad_lead brief\n' > "$home/data/$id/brief.md"
   jg_git_worktree "$dir/proj" "$dir/smhome" sm-branch
   mkdir -p "$dir/smhome/state" "$dir/smhome/data" "$dir/smhome/bin"
-  printf '%s\n' "$id" > "$dir/smhome/.jg-secondmate-home"
+  printf '%s\n' "$id" > "$dir/smhome/.jg-squad-lead-home"
   printf '# agents\n' > "$dir/smhome/AGENTS.md"
   {
     echo "window=fmses:jg-$id"
@@ -1220,8 +1220,8 @@ test_secondmate_relaunch_keeps_a_dotted_mate_pin_through_relaunch() {
     echo "worktree=$dir/smhome"
     echo "project=$dir/smhome"
     echo "harness=claude"
-    echo "kind=secondmate"
-    echo "mode=secondmate"
+    echo "kind=squad_lead"
+    echo "mode=squad_lead"
     echo "yolo=off"
     echo "model=default"
     echo "effort=default"
@@ -1231,27 +1231,27 @@ test_secondmate_relaunch_keeps_a_dotted_mate_pin_through_relaunch() {
   printf '%s' "$dir/smhome" > "$dir/fake/cwd"
   printf 'codex' > "$dir/fake/becomes"
   out=$(run_control "$dir" "$id" relaunch); rc=$?
-  expect_code 0 "$rc" "a dotted secondmate id should relaunch"$'\n'"$out"
+  expect_code 0 "$rc" "a dotted squad_lead id should relaunch"$'\n'"$out"
   [ "$(journal_field "$dir" "$id" to_harness)" = codex ] \
     || fail "a dotted mate relaunch should pick up the configured harness pin, got '$(journal_field "$dir" "$id" to_harness)'"
   [ "$(journal_field "$dir" "$id" to_model)" = some-model ] \
     || fail "the configured model token should come with the dotted pin"
   [ "$(journal_field "$dir" "$id" to_effort)" = high ] \
     || fail "the configured effort token should come with the dotted pin"
-  assert_not_contains "$out" "invalid secondmate id" "a legal dotted mate id must not be refused"
+  assert_not_contains "$out" "invalid squad_lead id" "a legal dotted mate id must not be refused"
   pass "jg-control relaunch: a dotted mate id keeps its configured profile through relaunch"
 }
 
-test_secondmate_claude_relaunch_keeps_local_settings() {
+test_squad_lead_claude_relaunch_keeps_local_settings() {
   local dir home prior settings out rc
   dir=$(new_case smlocal sml)
   home="$dir/home"
   mkdir -p "$home/config" "$home/data/sml"
-  printf 'codex\n' > "$home/config/secondmate-harness"
-  printf '# secondmate brief\n' > "$home/data/sml/brief.md"
+  printf 'codex\n' > "$home/config/squad-lead-harness"
+  printf '# squad_lead brief\n' > "$home/data/sml/brief.md"
   jg_git_worktree "$dir/proj" "$dir/smhome" sm-local-branch
   mkdir -p "$dir/smhome/state" "$dir/smhome/data" "$dir/smhome/bin" "$dir/smhome/.claude"
-  printf 'sml\n' > "$dir/smhome/.jg-secondmate-home"
+  printf 'sml\n' > "$dir/smhome/.jg-squad-lead-home"
   printf '# agents\n' > "$dir/smhome/AGENTS.md"
   prior='{"permissions":{"allow":["Bash(echo hi)"]}}'
   printf '%s\n' "$prior" > "$dir/smhome/.claude/settings.local.json"
@@ -1263,8 +1263,8 @@ test_secondmate_claude_relaunch_keeps_local_settings() {
     echo "worktree=$dir/smhome"
     echo "project=$dir/smhome"
     echo "harness=claude"
-    echo "kind=secondmate"
-    echo "mode=secondmate"
+    echo "kind=squad_lead"
+    echo "mode=squad_lead"
     echo "yolo=off"
     echo "model=default"
     echo "effort=default"
@@ -1274,7 +1274,7 @@ test_secondmate_claude_relaunch_keeps_local_settings() {
   printf '%s' "$dir/smhome" > "$dir/fake/cwd"
   printf 'codex' > "$dir/fake/becomes"
   out=$(run_control "$dir" sml relaunch); rc=$?
-  expect_code 0 "$rc" "a claude secondmate relaunch should retire wiring without touching local settings"$'\n'"$out"
+  expect_code 0 "$rc" "a claude squad_lead relaunch should retire wiring without touching local settings"$'\n'"$out"
   settings="$dir/smhome/.claude/settings.local.json"
   [ "$(cat "$settings")" = "$prior" ] \
     || fail "relaunch rewrote the mate home's settings.local.json"
@@ -1282,19 +1282,19 @@ test_secondmate_claude_relaunch_keeps_local_settings() {
     || fail "relaunch left the retired claude settings file in place"
   [ ! -e "$dir/smhome/.jg-busy-stop" ] \
     || fail "relaunch left the retired Stop pointer in the mate home"
-  pass "jg-control relaunch: a claude secondmate keeps settings.local.json and retires the state settings file and the Stop pointer"
+  pass "jg-control relaunch: a claude squad_lead keeps settings.local.json and retires the state settings file and the Stop pointer"
 }
 
-test_secondmate_relaunch_ignores_invalid_configured_effort_before_stop() {
+test_squad_lead_relaunch_ignores_invalid_configured_effort_before_stop() {
   local dir home out rc
   dir=$(new_case invalid-effort sm6)
   home="$dir/home"
   mkdir -p "$home/config" "$home/data/sm6"
-  printf 'codex some-model impossible\n' > "$home/config/secondmate-harness"
-  printf '# secondmate brief\n' > "$home/data/sm6/brief.md"
+  printf 'codex some-model impossible\n' > "$home/config/squad-lead-harness"
+  printf '# squad_lead brief\n' > "$home/data/sm6/brief.md"
   jg_git_worktree "$dir/proj" "$dir/smhome" sm-branch
   mkdir -p "$dir/smhome/state" "$dir/smhome/data" "$dir/smhome/bin"
-  printf 'sm6\n' > "$dir/smhome/.jg-secondmate-home"
+  printf 'sm6\n' > "$dir/smhome/.jg-squad-lead-home"
   printf '# agents\n' > "$dir/smhome/AGENTS.md"
   {
     echo "window=fmses:jg-sm6"
@@ -1302,8 +1302,8 @@ test_secondmate_relaunch_ignores_invalid_configured_effort_before_stop() {
     echo "worktree=$dir/smhome"
     echo "project=$dir/smhome"
     echo "harness=claude"
-    echo "kind=secondmate"
-    echo "mode=secondmate"
+    echo "kind=squad_lead"
+    echo "mode=squad_lead"
     echo "yolo=off"
     echo "model=default"
     echo "effort=default"
@@ -1315,27 +1315,27 @@ test_secondmate_relaunch_ignores_invalid_configured_effort_before_stop() {
   out=$(run_control "$dir" sm6 relaunch); rc=$?
   expect_code 0 "$rc" "an invalid configured effort should be ignored before stop"$'\n'"$out"
   assert_contains "$out" "effort token 'impossible'" \
-    "relaunch should surface the same warning as a normal secondmate spawn"
+    "relaunch should surface the same warning as a normal squad_lead spawn"
   [ "$(journal_field "$dir" sm6 to_effort)" = default ] \
     || fail "invalid configured effort should normalize to default"
   pass "jg-control relaunch: invalid configured effort is ignored before stop"
 }
 
-# muse is a verified adapter, but only for crewmates and scouts: it has no
-# primary supervision protocol, so bin/jg-spawn.sh refuses it for a secondmate.
+# muse is a verified adapter, but only for operators and scouts: it has no
+# primary supervision protocol, so bin/jg-spawn.sh refuses it for a squad_lead.
 # That refusal alone is not enough here, because the launch owner is reached
-# only AFTER the running agent has been stopped - a secondmate would be left
+# only AFTER the running agent has been stopped - a squad_lead would be left
 # with no agent at all. The control plane asks the same capability question
 # before it touches anything, so the refusal lands while the agent is still up.
-test_secondmate_relaunch_onto_a_crewmate_only_adapter_refuses_before_stop() {
+test_squad_lead_relaunch_onto_a_operator_only_adapter_refuses_before_stop() {
   local dir home out rc
   dir=$(new_case smkind sm7)
   home="$dir/home"
   mkdir -p "$home/config" "$home/data/sm7"
-  printf '# secondmate brief\n' > "$home/data/sm7/brief.md"
+  printf '# squad_lead brief\n' > "$home/data/sm7/brief.md"
   jg_git_worktree "$dir/proj" "$dir/smhome" sm-branch
   mkdir -p "$dir/smhome/state" "$dir/smhome/data" "$dir/smhome/bin"
-  printf 'sm7\n' > "$dir/smhome/.jg-secondmate-home"
+  printf 'sm7\n' > "$dir/smhome/.jg-squad-lead-home"
   printf '# agents\n' > "$dir/smhome/AGENTS.md"
   {
     echo "window=fmses:jg-sm7"
@@ -1343,8 +1343,8 @@ test_secondmate_relaunch_onto_a_crewmate_only_adapter_refuses_before_stop() {
     echo "worktree=$dir/smhome"
     echo "project=$dir/smhome"
     echo "harness=claude"
-    echo "kind=secondmate"
-    echo "mode=secondmate"
+    echo "kind=squad_lead"
+    echo "mode=squad_lead"
     echo "yolo=off"
     echo "model=default"
     echo "effort=default"
@@ -1353,8 +1353,8 @@ test_secondmate_relaunch_onto_a_crewmate_only_adapter_refuses_before_stop() {
   printf '%s\n' "jg-sm7" > "$dir/fake/windows"
   printf '%s' "$dir/smhome" > "$dir/fake/cwd"
   out=$(run_control "$dir" sm7 relaunch --harness muse); rc=$?
-  expect_code 1 "$rc" "a crewmate-only adapter should refuse a secondmate relaunch"
-  assert_contains "$out" "not verified to run a secondmate task" \
+  expect_code 1 "$rc" "a operator-only adapter should refuse a squad_lead relaunch"
+  assert_contains "$out" "not verified to run a squad_lead task" \
     "the refusal should name the kind the adapter cannot run"
   [ "$(cat "$dir/fake/command")" = claude ] \
     || fail "the refusal must land before the running agent is stopped"
@@ -1363,17 +1363,17 @@ test_secondmate_relaunch_onto_a_crewmate_only_adapter_refuses_before_stop() {
   pass "jg-control relaunch: an adapter unverified for this task kind refuses before the agent is stopped"
 }
 
-test_explicit_secondmate_harness_ignores_configured_profile_axes() {
+test_explicit_squad_lead_harness_ignores_configured_profile_axes() {
   local dir home out rc
   dir=$(new_case smexplicit sm4)
   home="$dir/home"
   mkdir -p "$home/config"
-  printf 'claude opus high\n' > "$home/config/secondmate-harness"
+  printf 'claude opus high\n' > "$home/config/squad-lead-harness"
   mkdir -p "$home/data/sm4"
-  printf '# secondmate brief\n' > "$home/data/sm4/brief.md"
+  printf '# squad_lead brief\n' > "$home/data/sm4/brief.md"
   jg_git_worktree "$dir/proj" "$dir/smhome" sm-branch
   mkdir -p "$dir/smhome/state" "$dir/smhome/data" "$dir/smhome/bin"
-  printf 'sm4\n' > "$dir/smhome/.jg-secondmate-home"
+  printf 'sm4\n' > "$dir/smhome/.jg-squad-lead-home"
   printf '# agents\n' > "$dir/smhome/AGENTS.md"
   {
     echo "window=fmses:jg-sm4"
@@ -1381,8 +1381,8 @@ test_explicit_secondmate_harness_ignores_configured_profile_axes() {
     echo "worktree=$dir/smhome"
     echo "project=$dir/smhome"
     echo "harness=claude"
-    echo "kind=secondmate"
-    echo "mode=secondmate"
+    echo "kind=squad_lead"
+    echo "mode=squad_lead"
     echo "yolo=off"
     echo "model=opus"
     echo "effort=high"
@@ -1392,12 +1392,12 @@ test_explicit_secondmate_harness_ignores_configured_profile_axes() {
   printf '%s' "$dir/smhome" > "$dir/fake/cwd"
   printf 'codex' > "$dir/fake/becomes"
   out=$(run_control "$dir" sm4 relaunch --harness codex); rc=$?
-  expect_code 0 "$rc" "an explicit secondmate harness should relaunch"$'\n'"$out"
+  expect_code 0 "$rc" "an explicit squad_lead harness should relaunch"$'\n'"$out"
   [ "$(meta_field "$dir" sm4 model)" = default ] \
-    || fail "an explicit secondmate harness must not inherit the configured model"
+    || fail "an explicit squad_lead harness must not inherit the configured model"
   [ "$(meta_field "$dir" sm4 effort)" = default ] \
-    || fail "an explicit secondmate harness must not inherit the configured effort"
-  pass "jg-control relaunch: explicit secondmate harness resets unnamed profile axes"
+    || fail "an explicit squad_lead harness must not inherit the configured effort"
+  pass "jg-control relaunch: explicit squad_lead harness resets unnamed profile axes"
 }
 
 test_ship_relaunch_ignores_the_crew_harness_config() {
@@ -1454,10 +1454,10 @@ test_promoted_scout_relaunch_receives_the_current_delivery_contract() {
     dir=$(new_case "promoted-scout-$mode" "$id")
     home="$dir/home"
     jg_git_worktree "$dir/proj" "$dir/wt" "task-$id"
-    JG_HOME="$home" "$BRIEF" "$id" firstmate --scout >/dev/null \
+    JG_HOME="$home" "$BRIEF" "$id" juggernaut --scout >/dev/null \
       || fail "$mode: could not scaffold the scout brief"
     brief="$home/data/$id/brief.md"
-    sed 's/{TASK}/Fix the promotion relaunch contract./; s/{FIRSTMATE_SPEC}/Preserve the current delivery mode./' \
+    sed 's/{TASK}/Fix the promotion relaunch contract./; s/{JUGGERNAUT_SPEC}/Preserve the current delivery mode./' \
       "$brief" > "$brief.filled"
     mv "$brief.filled" "$brief"
     {
@@ -1494,7 +1494,7 @@ test_promoted_scout_relaunch_receives_the_current_delivery_contract() {
       direct-PR)
         rule="1. Never push to the default branch (push only your \`fm/$id\` branch). Never merge a PR." ;;
       local-only)
-        rule="1. Never push to any remote and never open a PR. Work only on your \`fm/$id\` branch; firstmate handles the merge into local \`main\`." ;;
+        rule="1. Never push to any remote and never open a PR. Work only on your \`fm/$id\` branch; juggernaut handles the merge into local \`main\`." ;;
       *)
         rule='1. Never push to the default branch. Never merge a PR.' ;;
     esac
@@ -1538,7 +1538,7 @@ test_prefixed_prior_harness_wiring_is_still_retired() {
 }
 
 # muse installs no hook; its busy source is its own session event log, bound to
-# the pane by two firstmate-owned sidecars. Relaunching AWAY from muse must
+# the pane by two juggernaut-owned sidecars. Relaunching AWAY from muse must
 # retire that binding, or a retired incarnation's session pin outlives the agent
 # that produced it.
 test_muse_session_binding_is_retired_on_a_harness_switch() {
@@ -1787,17 +1787,17 @@ test_journal_records_the_checkpoint_it_proved() {
   pass "jg-control relaunch: the checkpoint records the exact unlanded work it preserved"
 }
 
-# --- secondmate child-work safety -------------------------------------------
+# --- squad_lead child-work safety -------------------------------------------
 
-test_secondmate_relaunch_checkpoints_child_work_and_spares_the_charter() {
+test_squad_lead_relaunch_checkpoints_child_work_and_spares_the_charter() {
   local dir home out rc
   dir=$(new_case sm sm1)
   home="$dir/home"
   mkdir -p "$home/config"
-  printf 'claude\n' > "$home/config/secondmate-harness"
+  printf 'claude\n' > "$home/config/squad-lead-harness"
   jg_git_worktree "$dir/proj" "$dir/smhome" sm-branch
   mkdir -p "$dir/smhome/state" "$dir/smhome/data" "$dir/smhome/bin"
-  printf 'sm1\n' > "$dir/smhome/.jg-secondmate-home"
+  printf 'sm1\n' > "$dir/smhome/.jg-squad-lead-home"
   printf '# charter\n' > "$dir/smhome/data/charter.md"
   printf '# agents\n' > "$dir/smhome/AGENTS.md"
   printf 'window=x:jg-c1\n' > "$dir/smhome/state/c1.meta"
@@ -1808,8 +1808,8 @@ test_secondmate_relaunch_checkpoints_child_work_and_spares_the_charter() {
     echo "worktree=$dir/smhome"
     echo "project=$dir/smhome"
     echo "harness=claude"
-    echo "kind=secondmate"
-    echo "mode=secondmate"
+    echo "kind=squad_lead"
+    echo "mode=squad_lead"
     echo "yolo=off"
     echo "model=default"
     echo "effort=default"
@@ -1818,66 +1818,66 @@ test_secondmate_relaunch_checkpoints_child_work_and_spares_the_charter() {
   } > "$home/state/sm1.meta"
   printf '%s\n' "jg-sm1" > "$dir/fake/windows"
   printf '%s' "$dir/smhome" > "$dir/fake/cwd"
-  # No --note: a secondmate reconciles its own home's records at startup, so
+  # No --note: a squad_lead reconciles its own home's records at startup, so
   # the note is optional there.
   out=$(run_control "$dir" sm1 relaunch); rc=$?
-  expect_code 0 "$rc" "a checkpointed secondmate should relaunch"$'\n'"$out"
+  expect_code 0 "$rc" "a checkpointed squad_lead should relaunch"$'\n'"$out"
   [ "$(journal_field "$dir" sm1 children)" = 2 ] \
-    || fail "the checkpoint must account for the secondmate's child work, got '$(journal_field "$dir" sm1 children)'"
-  assert_not_contains "$out" "requires --note" "a secondmate relaunch must not demand a progress note"
+    || fail "the checkpoint must account for the squad_lead's child work, got '$(journal_field "$dir" sm1 children)'"
+  assert_not_contains "$out" "requires --note" "a squad_lead relaunch must not demand a progress note"
   [ "$(cat "$dir/smhome/data/charter.md")" = "# charter" ] \
-    || fail "a secondmate's standing charter must never be rewritten by a relaunch"
+    || fail "a squad_lead's standing charter must never be rewritten by a relaunch"
   assert_present "$dir/smhome/state/c1.meta" "child records must survive the relaunch"
   assert_present "$dir/smhome/state/c2.meta" "child records must survive the relaunch"
-  pass "jg-control relaunch: a secondmate's child work is accounted for and its charter is left alone"
+  pass "jg-control relaunch: a squad_lead's child work is accounted for and its charter is left alone"
 }
 
-test_secondmate_relaunch_refuses_an_unmarked_home() {
+test_squad_lead_relaunch_refuses_an_unmarked_home() {
   local dir home out rc
   dir=$(new_case smbad sm2)
   home="$dir/home"
   mkdir -p "$home/config"
-  printf 'claude\n' > "$home/config/secondmate-harness"
+  printf 'claude\n' > "$home/config/squad-lead-harness"
   jg_git_worktree "$dir/proj" "$dir/smhome" sm-branch
   mkdir -p "$dir/smhome/state"
-  printf 'someone-else\n' > "$dir/smhome/.jg-secondmate-home"
+  printf 'someone-else\n' > "$dir/smhome/.jg-squad-lead-home"
   {
     echo "window=fmses:jg-sm2"
     echo "endpoint_task_id=sm2"
     echo "worktree=$dir/smhome"
     echo "project=$dir/smhome"
     echo "harness=claude"
-    echo "kind=secondmate"
-    echo "mode=secondmate"
+    echo "kind=squad_lead"
+    echo "mode=squad_lead"
     echo "yolo=off"
     echo "model=default"
   } > "$home/state/sm2.meta"
   printf '%s\n' "jg-sm2" > "$dir/fake/windows"
   out=$(run_control "$dir" sm2 relaunch); rc=$?
-  expect_code 1 "$rc" "a home marked for another secondmate should refuse"
-  assert_contains "$out" "not marked as its own seeded secondmate home" \
+  expect_code 1 "$rc" "a home marked for another squad_lead should refuse"
+  assert_contains "$out" "not marked as its own seeded squad_lead home" \
     "the refusal should name the identity mismatch"
   [ "$(cat "$dir/fake/command")" = claude ] || fail "a refused relaunch must not stop the agent"
-  pass "jg-control relaunch: a secondmate home that is not this secondmate's is refused"
+  pass "jg-control relaunch: a squad_lead home that is not this squad_lead's is refused"
 }
 
-test_secondmate_checkpoint_refuses_unreadable_child_state() {
+test_squad_lead_checkpoint_refuses_unreadable_child_state() {
   local dir home out rc
   dir=$(new_case smchildren sm5)
   home="$dir/home"
   mkdir -p "$home/config"
-  printf 'claude\n' > "$home/config/secondmate-harness"
+  printf 'claude\n' > "$home/config/squad-lead-harness"
   jg_git_worktree "$dir/proj" "$dir/smhome" sm-branch
   mkdir -p "$dir/smhome/state/bad.meta"
-  printf 'sm5\n' > "$dir/smhome/.jg-secondmate-home"
+  printf 'sm5\n' > "$dir/smhome/.jg-squad-lead-home"
   {
     echo "window=fmses:jg-sm5"
     echo "endpoint_task_id=sm5"
     echo "worktree=$dir/smhome"
     echo "project=$dir/smhome"
     echo "harness=claude"
-    echo "kind=secondmate"
-    echo "mode=secondmate"
+    echo "kind=squad_lead"
+    echo "mode=squad_lead"
     echo "yolo=off"
     echo "model=default"
     echo "home=$dir/smhome"
@@ -1887,7 +1887,7 @@ test_secondmate_checkpoint_refuses_unreadable_child_state() {
   out=$(run_control "$dir" sm5 relaunch); rc=$?
   expect_code 1 "$rc" "a non-readable child record should refuse"
   assert_contains "$out" "not a readable regular file" "the refusal should name the unreadable child record"
-  [ "$(cat "$dir/fake/command")" = claude ] || fail "child record failure must not stop the secondmate"
+  [ "$(cat "$dir/fake/command")" = claude ] || fail "child record failure must not stop the squad_lead"
   pass "jg-control relaunch: unreadable child records fail checkpoint"
   if [ "$(id -u)" = 0 ]; then
     pass "jg-control relaunch: unlistable state check skipped as root (mode 000 does not restrict root)"
@@ -1901,19 +1901,19 @@ test_secondmate_checkpoint_refuses_unreadable_child_state() {
   expect_code 1 "$rc" "an unlistable state directory should refuse"
   assert_contains "$out" "no readable state directory" \
     "the refusal should name the unlistable home state directory"
-  [ "$(cat "$dir/fake/command")" = claude ] || fail "unlistable child state must not stop the secondmate"
+  [ "$(cat "$dir/fake/command")" = claude ] || fail "unlistable child state must not stop the squad_lead"
   pass "jg-control relaunch: unlistable state fails checkpoint"
 }
 
-test_secondmate_checkpoint_ignores_a_vanished_scratch_find_walk() {
+test_squad_lead_checkpoint_ignores_a_vanished_scratch_find_walk() {
   local dir home out rc real_find
   dir=$(new_case smfindrace sm6)
   home="$dir/home"
   mkdir -p "$home/config"
-  printf 'claude\n' > "$home/config/secondmate-harness"
+  printf 'claude\n' > "$home/config/squad-lead-harness"
   jg_git_worktree "$dir/proj" "$dir/smhome" sm-branch
   mkdir -p "$dir/smhome/state" "$dir/smhome/data" "$dir/smhome/bin"
-  printf 'sm6\n' > "$dir/smhome/.jg-secondmate-home"
+  printf 'sm6\n' > "$dir/smhome/.jg-squad-lead-home"
   printf '# charter\n' > "$dir/smhome/data/charter.md"
   printf '# agents\n' > "$dir/smhome/AGENTS.md"
   printf 'window=x:jg-c1\n' > "$dir/smhome/state/c1.meta"
@@ -1927,8 +1927,8 @@ test_secondmate_checkpoint_ignores_a_vanished_scratch_find_walk() {
     echo "worktree=$dir/smhome"
     echo "project=$dir/smhome"
     echo "harness=claude"
-    echo "kind=secondmate"
-    echo "mode=secondmate"
+    echo "kind=squad_lead"
+    echo "mode=squad_lead"
     echo "yolo=off"
     echo "model=default"
     echo "effort=default"
@@ -2173,15 +2173,15 @@ test_spawn_relaunch_refuses_a_missing_stored_model() {
   pass "jg-spawn --relaunch: missing stored model refuses instead of using the default"
 }
 
-test_spawn_relaunch_refuses_a_secondmate_missing_stored_model() {
+test_spawn_relaunch_refuses_a_squad_lead_missing_stored_model() {
   local dir home out rc
   dir=$(new_case spsmmissingmodel sm9)
   home="$dir/home"
-  mkdir -p "$home/data/sm9" "$home/config/secondmates/sm9"
-  printf '# secondmate brief\n' > "$home/data/sm9/brief.md"
+  mkdir -p "$home/data/sm9" "$home/config/squad_leads/sm9"
+  printf '# squad_lead brief\n' > "$home/data/sm9/brief.md"
   jg_git_worktree "$dir/proj" "$dir/smhome" sm-branch9
   mkdir -p "$dir/smhome/state" "$dir/smhome/data" "$dir/smhome/bin"
-  printf 'sm9\n' > "$dir/smhome/.jg-secondmate-home"
+  printf 'sm9\n' > "$dir/smhome/.jg-squad-lead-home"
   printf '# agents\n' > "$dir/smhome/AGENTS.md"
   {
     echo "window=fmses:jg-sm9"
@@ -2189,8 +2189,8 @@ test_spawn_relaunch_refuses_a_secondmate_missing_stored_model() {
     echo "worktree=$dir/smhome"
     echo "project=$dir/smhome"
     echo "harness=claude"
-    echo "kind=secondmate"
-    echo "mode=secondmate"
+    echo "kind=squad_lead"
+    echo "mode=squad_lead"
     echo "yolo=off"
     echo "effort=default"
     echo "home=$dir/smhome"
@@ -2198,17 +2198,17 @@ test_spawn_relaunch_refuses_a_secondmate_missing_stored_model() {
   printf 'zsh' > "$dir/fake/command"
   printf '%s' "$dir/smhome" > "$dir/fake/cwd"
   out=$(run_spawn "$dir" sm9 --relaunch); rc=$?
-  expect_code 1 "$rc" "a direct secondmate relaunch without its stored model should refuse"$'\n'"$out"
+  expect_code 1 "$rc" "a direct squad_lead relaunch without its stored model should refuse"$'\n'"$out"
   assert_contains "$out" "no stored model for claude" "the refusal should name the missing model"
-  [ -z "$(cat "$dir/fake/keys")" ] || fail "a missing-model secondmate refusal must not send launch commands"
-  pass "jg-spawn --relaunch: a secondmate without a stored model refuses instead of using the default"
+  [ -z "$(cat "$dir/fake/keys")" ] || fail "a missing-model squad_lead refusal must not send launch commands"
+  pass "jg-spawn --relaunch: a squad_lead without a stored model refuses instead of using the default"
 }
 
-test_spawn_relaunch_refuses_a_secondmate_record_with_a_remote_host_missing_model_locally() {
+test_spawn_relaunch_refuses_a_squad_lead_record_with_a_remote_host_missing_model_locally() {
   local dir home out rc
   dir=$(new_case spremotesmmissing rsm1)
   home="$dir/home"
-  printf -- '- rsm1 - rsm1 delivery (host: host-rsm; root: /remote/root; home: /remote/home; scope: test work; projects: alpha; added 2026-08-02)\n' > "$home/data/secondmates.md"
+  printf -- '- rsm1 - rsm1 delivery (host: host-rsm; root: /remote/root; home: /remote/home; scope: test work; projects: alpha; added 2026-08-02)\n' > "$home/data/squad_leads.md"
   jg_git_worktree "$dir/proj" "$dir/smhome" sm-branch-rsm1
   {
     echo "window=fmses:jg-rsm1"
@@ -2217,8 +2217,8 @@ test_spawn_relaunch_refuses_a_secondmate_record_with_a_remote_host_missing_model
     echo "worktree=$dir/smhome"
     echo "project=$dir/smhome"
     echo "harness=claude"
-    echo "kind=secondmate"
-    echo "mode=secondmate"
+    echo "kind=squad_lead"
+    echo "mode=squad_lead"
     echo "yolo=off"
     echo "effort=default"
     echo "home=/remote/home"
@@ -2226,9 +2226,9 @@ test_spawn_relaunch_refuses_a_secondmate_record_with_a_remote_host_missing_model
   printf 'zsh' > "$dir/fake/command"
   printf '%s' "$dir/smhome" > "$dir/fake/cwd"
   out=$(run_spawn "$dir" rsm1 --relaunch); rc=$?
-  expect_code 1 "$rc" "a remote secondmate relaunch without its stored model should refuse"$'\n'"$out"
+  expect_code 1 "$rc" "a remote squad_lead relaunch without its stored model should refuse"$'\n'"$out"
   assert_contains "$out" "no stored model for claude" "the refusal should name the missing model"
-  pass "jg-spawn --relaunch: a secondmate record carrying a remote host refuses locally when its stored model is missing"
+  pass "jg-spawn --relaunch: a squad_lead record carrying a remote host refuses locally when its stored model is missing"
 }
 
 test_spawn_relaunch_refuses_an_unrecorded_task() {
@@ -2437,7 +2437,7 @@ case "${1:-} ${2:-}" in
       ". '"*"'") staged=${payload#". '"}; staged=${staged%"'"}; [ ! -f "$staged" ] || payload=$(cat "$staged") ;;
     esac
     case "$payload" in
-      *'encode launch-brief'* | *'Firstmate operational input waiting: read'*)
+      *'encode launch-brief'* | *'Juggernaut operational input waiting: read'*)
         printf '%s\n' "$payload" > "$D/launched-command"
         : > "$D/herdr-agent-live" ;;
     esac
@@ -2497,7 +2497,7 @@ add_herdr_ship_task() {  # <case-dir> <id> [session] [surviving-pane]
 ## Captain's intent
 Exercise a herdr reclaim safely.
 
-## Firstmate spec
+## Juggernaut spec
 Keep the recorded endpoint when it outlives its server.
 EOF
   {
@@ -2750,21 +2750,21 @@ test_herdr_rebind_failure_from_a_plain_shell_names_the_real_cause() {
   pass "reclaim: a rebind refused from a plain shell reports the real cause, not a fabricated session mismatch"
 }
 
-test_herdr_reclaim_of_a_secondmate_names_its_own_owner() {
+test_herdr_reclaim_of_a_squad_lead_names_its_own_owner() {
   local dir out rc
-  herdr_case_or_skip gone-herdr-secondmate rl76 fmlab '%none' || {
+  herdr_case_or_skip gone-herdr-squad-lead rl76 fmlab '%none' || {
     echo "skip - herdr reclaim needs jq (the herdr adapter parses JSON with it)"
     return 0
   }
   dir=$HERDR_CASE_DIR
-  printf '%s\n' "kind=secondmate" "home=$dir/wt" >> "$dir/home/state/rl76.meta"
+  printf '%s\n' "kind=squad_lead" "home=$dir/wt" >> "$dir/home/state/rl76.meta"
 
   out=$(run_spawn "$dir" rl76 --relaunch --harness claude); rc=$?
-  expect_code 1 "$rc" "a secondmate reclaim belongs to the secondmate respawn path"
-  assert_contains "$out" "--secondmate" "the refusal should name the path that owns this recovery"
+  expect_code 1 "$rc" "a squad_lead reclaim belongs to the squad_lead respawn path"
+  assert_contains "$out" "--squad-lead" "the refusal should name the path that owns this recovery"
   assert_not_contains "$(cat "$dir/fake/herdr-log")" "tab create" \
     "the refusal must happen before any endpoint is created"
-  pass "reclaim: a herdr secondmate whose endpoint is gone is sent to its own respawn owner"
+  pass "reclaim: a herdr squad_lead whose endpoint is gone is sent to its own respawn owner"
 }
 
 test_relaunch_reverifies_an_already_in_flight_item_instead_of_rewriting_it() {
@@ -2876,9 +2876,9 @@ test_relaunch_refuses_missing_stored_model_before_stopping
 test_relaunch_refuses_missing_stored_model_for_any_harness
 test_relaunch_keeps_a_recorded_default_model_without_refusing
 test_relaunch_explicit_default_model_relaunches_a_record_without_a_model
-test_relaunch_refuses_a_secondmate_missing_stored_model
-test_spawn_relaunch_refuses_a_secondmate_missing_stored_model
-test_spawn_relaunch_refuses_a_secondmate_record_with_a_remote_host_missing_model_locally
+test_relaunch_refuses_a_squad_lead_missing_stored_model
+test_spawn_relaunch_refuses_a_squad_lead_missing_stored_model
+test_spawn_relaunch_refuses_a_squad_lead_record_with_a_remote_host_missing_model_locally
 test_relaunch_refuses_a_copy_another_task_records
 test_relaunch_under_memory_pressure_refuses_before_stop
 test_relaunch_closes_a_claude_startup_gate_unanswered
@@ -2897,12 +2897,12 @@ test_relaunch_onto_an_unverified_harness_is_refused
 test_prior_harness_turnend_registry_entry_is_cleared
 test_wiring_removal_failure_refuses_before_replacement_arm
 test_turnend_auth_paths_are_owned_by_the_control_adapter
-test_secondmate_relaunch_picks_up_the_configured_harness_pin
-test_secondmate_relaunch_keeps_a_dotted_mate_pin_through_relaunch
-test_secondmate_claude_relaunch_keeps_local_settings
-test_secondmate_relaunch_ignores_invalid_configured_effort_before_stop
-test_secondmate_relaunch_onto_a_crewmate_only_adapter_refuses_before_stop
-test_explicit_secondmate_harness_ignores_configured_profile_axes
+test_squad_lead_relaunch_picks_up_the_configured_harness_pin
+test_squad_lead_relaunch_keeps_a_dotted_mate_pin_through_relaunch
+test_squad_lead_claude_relaunch_keeps_local_settings
+test_squad_lead_relaunch_ignores_invalid_configured_effort_before_stop
+test_squad_lead_relaunch_onto_a_operator_only_adapter_refuses_before_stop
+test_explicit_squad_lead_harness_ignores_configured_profile_axes
 test_ship_relaunch_ignores_the_crew_harness_config
 test_spawn_relaunch_without_a_harness_reuses_the_recorded_one
 test_spawn_relaunch_of_promoted_scout_uses_the_recorded_branch
@@ -2921,10 +2921,10 @@ test_stop_transport_failure_reconciles_a_dead_agent
 test_complete_journal_failure_rolls_back_from_durable_phase
 test_prepublication_abort_retires_replacement_wiring_and_busy_state
 test_journal_records_the_checkpoint_it_proved
-test_secondmate_relaunch_checkpoints_child_work_and_spares_the_charter
-test_secondmate_relaunch_refuses_an_unmarked_home
-test_secondmate_checkpoint_refuses_unreadable_child_state
-test_secondmate_checkpoint_ignores_a_vanished_scratch_find_walk
+test_squad_lead_relaunch_checkpoints_child_work_and_spares_the_charter
+test_squad_lead_relaunch_refuses_an_unmarked_home
+test_squad_lead_checkpoint_refuses_unreadable_child_state
+test_squad_lead_checkpoint_ignores_a_vanished_scratch_find_walk
 test_concurrent_relaunch_is_refused
 test_direct_spawn_relaunch_participates_in_the_lifecycle_lock
 test_promotion_participates_in_the_lifecycle_lock_before_metadata_resolution
@@ -2946,7 +2946,7 @@ test_herdr_exit_reports_already_stopped_when_the_pane_outlived_its_server
 test_herdr_rebind_stays_in_the_recorded_session
 test_herdr_reclaim_refuses_an_agent_that_came_back
 test_herdr_reclaim_keeps_the_task_whole
-test_herdr_reclaim_of_a_secondmate_names_its_own_owner
+test_herdr_reclaim_of_a_squad_lead_names_its_own_owner
 test_herdr_rebind_failure_from_a_plain_shell_names_the_real_cause
 test_relaunch_reverifies_an_already_in_flight_item_instead_of_rewriting_it
 test_relaunch_moves_a_drifted_item_back_in_flight

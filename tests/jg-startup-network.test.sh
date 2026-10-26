@@ -32,7 +32,7 @@ JG_TEST_CLEANUP_DIRS+=("$TMP_ROOT")
 trap jg_test_cleanup EXIT
 
 # new_world <name>: an JG_HOME plus a fake code root whose bin/ is a real
-# firstmate bin/ except for jg-bootstrap.sh, which is replaced by a scriptable
+# juggernaut bin/ except for jg-bootstrap.sh, which is replaced by a scriptable
 # stand-in. The stage's contract is about WHEN and WHETHER the network half runs
 # and how its result is published; bin/jg-bootstrap.sh's own behavior is owned by
 # tests/jg-bootstrap.test.sh, so pinning it here would duplicate that owner and
@@ -379,7 +379,7 @@ EOF
   pass "jg-startup-network: an actionable state=done report still queues a wake"
 }
 
-test_deferred_invalid_secondmate_markers_queue_durable_findings() {
+test_deferred_invalid_squad_lead_markers_queue_durable_findings() {
   local kind rec home root log target report err seq generation
   for kind in malformed symlink; do
     rec=$(new_world "deferred-invalid-marker-$kind")
@@ -388,15 +388,15 @@ $rec
 EOF
     printf '%s\n' $$ > "$home/state/.lock"
     if [ "$kind" = malformed ]; then
-      printf '../other-home\n' > "$home/.jg-secondmate-home"
+      printf '../other-home\n' > "$home/.jg-squad-lead-home"
     else
       target="$TMP_ROOT/deferred-invalid-marker-$kind/marker-target"
       printf 'mate\n' > "$target"
-      ln -s "$target" "$home/.jg-secondmate-home"
+      ln -s "$target" "$home/.jg-squad-lead-home"
     fi
 
     JG_FAKE_BOOTSTRAP_LOG="$log" run_stage "$home" "$root" run --locked 1
-    assert_grep $'check\tinactive-reconcile-diagnostic:invalid-secondmate-home\t' "$home/state/.wake-queue" \
+    assert_grep $'check\tinactive-reconcile-diagnostic:invalid-squad-lead-home\t' "$home/state/.wake-queue" \
       "$kind marker finding was swallowed by the deferred startup stage"
     report=$(run_stage "$home" "$root" report)
     assert_contains "$report" "(silent - no problems found)" \
@@ -410,10 +410,10 @@ EOF
       || fail "$kind marker wake did not issue a durable acknowledgement"
     JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" "$DRAIN" \
       --ack-through "$seq" --recovery-generation "$generation" >/dev/null
-    assert_no_grep 'inactive-reconcile-diagnostic:invalid-secondmate-home' "$home/state/.wake-queue" \
+    assert_no_grep 'inactive-reconcile-diagnostic:invalid-squad-lead-home' "$home/state/.wake-queue" \
       "$kind marker wake could not be acknowledged"
   done
-  pass "jg-startup-network: deferred invalid secondmate markers produce durable wakes"
+  pass "jg-startup-network: deferred invalid squad_lead markers produce durable wakes"
 }
 
 # The worker outlives the command that launched it. If another session took the
@@ -489,7 +489,7 @@ EOF
   report=$(run_stage "$home" "$root" report)
   assert_contains "$report" "NETWORK_CHECKS: the deferred check worker stopped before publishing" \
     "an abandoned run still read as in progress: $report"
-  assert_contains "$report" "dead-secondmate relaunch" \
+  assert_contains "$report" "dead-squad-lead relaunch" \
     "the abandoned run did not name the checks that never completed"
 
   # A record older than the whole aggregate bound is abandoned even when its pid
@@ -514,7 +514,7 @@ test_locked_start_is_not_satisfied_by_an_inflight_probe() {
 $rec
 EOF
   printf '%s\n' $$ > "$home/state/.lock"
-  printf '../other-home\n' > "$home/.jg-secondmate-home"
+  printf '../other-home\n' > "$home/.jg-squad-lead-home"
 
   JG_FAKE_BOOTSTRAP_LOG="$log" JG_FAKE_BOOTSTRAP_SLEEP=6 \
     run_stage "$home" "$root" start --locked 0 --harvest-pid $$
@@ -531,7 +531,7 @@ EOF
     || fail "the locked request never published"
   assert_grep 'network=only detect_only=0' "$log" \
     "the in-flight probe-only worker suppressed the locked sweeps"
-  assert_grep $'check\tinactive-reconcile-diagnostic:invalid-secondmate-home\t' "$home/state/.wake-queue" \
+  assert_grep $'check\tinactive-reconcile-diagnostic:invalid-squad-lead-home\t' "$home/state/.wake-queue" \
     "the in-flight probe-only worker suppressed the locked inactive scan"
   pass "jg-startup-network: locked requests supersede in-flight probe-only workers"
 }
@@ -741,14 +741,14 @@ EOF
 
   JG_STARTUP_NETWORK_TIMEOUT=1 JG_SESSION_START_TIMEOUT=2 \
     JG_FAKE_BOOTSTRAP_LOG="$log" JG_FAKE_BOOTSTRAP_SLEEP=20 \
-    JG_FAKE_TIMING_PHASE=secondmate-liveness JG_FAKE_TIMING_DETAIL='mate-a@host-one' \
+    JG_FAKE_TIMING_PHASE=squad-lead-liveness JG_FAKE_TIMING_DETAIL='mate-a@host-one' \
     run_stage "$home" "$root" run --locked 1
 
   [ "$(sed -n 's/^state=//p' "$home/state/.startup-network.status")" = timeout ] \
     || fail "the bounded run did not record itself as timed out"
   report_out=$(run_stage "$home" "$root" report)
   assert_contains "$report_out" "hit the 1s bound" "the bound stopped being reported"
-  assert_contains "$report_out" "secondmate-liveness mate-a@host-one" \
+  assert_contains "$report_out" "squad-lead-liveness mate-a@host-one" \
     "a timed-out run discarded the partial timings its sweeps had already recorded"
   pass "jg-startup-network: a timed-out run still publishes the partial timings it recorded"
 }
@@ -765,7 +765,7 @@ $rec
 EOF
   printf '%s\n' $$ > "$home/state/.lock"
 
-  JG_FAKE_BOOTSTRAP_LOG="$log" JG_FAKE_TIMING_PHASE=secondmate-sync \
+  JG_FAKE_BOOTSTRAP_LOG="$log" JG_FAKE_TIMING_PHASE=squad-lead-sync \
     JG_FAKE_TIMING_DETAIL="ssh -i /key host	v1	forged	0	9999
 GITHUB_TOKEN=ghp_supersecretvalue" \
     run_stage "$home" "$root" run --locked 1
@@ -784,7 +784,7 @@ GITHUB_TOKEN=ghp_supersecretvalue" \
 
   # The step itself is still measured - only its untrustworthy label is refused,
   # so a sweep that mislabels itself still shows up as time spent.
-  assert_grep 'secondmate-sync' "$home/state/.startup-network.timings" \
+  assert_grep 'squad-lead-sync' "$home/state/.startup-network.timings" \
     "refusing the label also discarded the measurement"
 
   report_out=$(run_stage "$home" "$root" report)
@@ -866,7 +866,7 @@ test_a_claimant_crash_after_publish_still_queues_the_wake
 test_a_report_publication_failure_is_failed_and_still_wakes
 test_a_successful_result_never_queues_a_wake
 test_an_actionable_successful_result_still_queues_a_wake
-test_deferred_invalid_secondmate_markers_queue_durable_findings
+test_deferred_invalid_squad_lead_markers_queue_durable_findings
 test_mutating_sweeps_are_refused_when_the_lock_changed_hands
 test_the_stage_bound_is_reported_not_swallowed
 test_an_abandoned_run_reads_as_needing_a_rerun

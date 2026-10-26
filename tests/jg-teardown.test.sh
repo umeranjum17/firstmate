@@ -64,8 +64,8 @@
 #   (z2) ship + nested clone, no --force                     -> REFUSE, bytes unchanged
 #   (z3) return leaves residue                               -> lost-slot warning, cleanup, exit 4
 #   (z3b) residue, then a later step refuses                 -> lost-slot warning still printed
-#   (z3c) forced secondmate + child scout nested clone       -> child copy returns clean
-#   (z3d) forced secondmate + child return leaves residue    -> warning, retirement completes, exit 4
+#   (z3c) forced squad_lead + child scout nested clone       -> child copy returns clean
+#   (z3d) forced squad_lead + child return leaves residue    -> warning, retirement completes, exit 4
 #   (z3e) return removes the copy                            -> cannot-verify warning, exit 4
 #   (z4) scout + ignored file                                -> ignored file survives
 set -u
@@ -85,10 +85,10 @@ REAL_LSOF_FOR_TEST=$(command -v lsof)
 export REAL_LSOF_FOR_TEST
 
 # Build a fresh sandbox for one test case. Sets up:
-#   $CASE/state/        - firstmate state dir (with a fresh watcher beacon)
+#   $CASE/state/        - juggernaut state dir (with a fresh watcher beacon)
 #   $CASE/fakebin/      - mocks for treehouse, tmux (PATH-prepended by caller)
 #   $CASE/origin.git/   - bare upstream repo (so the project clone has origin)
-#   $CASE/project/      - clone of origin; acts as the firstmate project dir
+#   $CASE/project/      - clone of origin; acts as the juggernaut project dir
 #   $CASE/wt/           - a worktree of the project (the task worktree)
 # Echoes the case dir.
 make_case() {
@@ -199,7 +199,7 @@ SH
   # Clone as the project; give it a `main` branch and an origin/HEAD.
   git clone -q "$case_dir/origin.git" "$case_dir/project"
   git -C "$case_dir/project" remote set-head origin main 2>/dev/null || true
-  # Add a worktree on a fresh task branch; that branch is where the crewmate commits.
+  # Add a worktree on a fresh task branch; that branch is where the operator commits.
   git -C "$case_dir/project" worktree add -q -b fm/task-x1 "$case_dir/wt" main
 
   # Fresh watcher beacon so jg-guard stays quiet.
@@ -213,7 +213,7 @@ write_meta() {
   local case_dir=$1 mode=$2 kind=$3
   local wt=${4:-$case_dir/wt}
   jg_write_meta "$case_dir/state/task-x1.meta" \
-    "window=firstmate:jg-task-x1" \
+    "window=juggernaut:jg-task-x1" \
     "endpoint_task_id=task-x1" \
     "worktree=$wt" \
     "project=$case_dir/project" \
@@ -720,7 +720,7 @@ test_local_only_fork_remote_allows() {
   [ "$(cat "$case_dir/state/.branch-outcome-index-ready")" = 1 ] \
     || fail "fork-allow: post-teardown branch report did not publish its ready sequence"
   jq -e --arg id task-x1 '
-    .schema == "jg-secondmate-home-summary.v1"
+    .schema == "jg-squad-lead-home-summary.v1"
     and all(.endpoints[]; .id != $id)
   ' "$case_dir/state/home-summary.json" >/dev/null \
     || fail "successful task teardown did not publish the task's removal from the home summary ledger"
@@ -1683,18 +1683,18 @@ SH
   pass "a dirty return is reported even when a later teardown step refuses"
 }
 
-test_forced_secondmate_child_scout_nested_clone_returns_clean() {
+test_forced_squad_lead_child_scout_nested_clone_returns_clean() {
   local case_dir home child_wt rc
-  case_dir=$(make_case secondmate-child-nested-clean)
-  write_meta "$case_dir" local-only secondmate
-  home="$case_dir/secondmate-home"
+  case_dir=$(make_case squad-lead-child-nested-clean)
+  write_meta "$case_dir" local-only squad_lead
+  home="$case_dir/squad-lead-home"
   mkdir -p "$home/state" "$home/data" "$home/config" "$home/projects"
-  printf '%s\n' task-x1 > "$home/.jg-secondmate-home"
+  printf '%s\n' task-x1 > "$home/.jg-squad-lead-home"
   printf '%s\n' "home=$home" >> "$case_dir/state/task-x1.meta"
   child_wt="$case_dir/child-scout-wt"
   git -C "$case_dir/project" worktree add -q -b fm/child-scout "$child_wt" main
   jg_write_meta "$home/state/child-scout.meta" \
-    "window=firstmate:jg-child-scout" \
+    "window=juggernaut:jg-child-scout" \
     "endpoint_task_id=child-scout" \
     "worktree=$child_wt" \
     "project=$case_dir/project" \
@@ -1706,14 +1706,14 @@ test_forced_secondmate_child_scout_nested_clone_returns_clean() {
   rc=0
   run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
-  expect_code 0 "$rc" "secondmate-child-nested-clean: forced secondmate teardown should succeed"
+  expect_code 0 "$rc" "squad-lead-child-nested-clean: forced squad_lead teardown should succeed"
   [ -z "$(git -C "$child_wt" status --porcelain --untracked-files=all)" ] \
-    || fail "secondmate-child-nested-clean: untracked entries remain: $(git -C "$child_wt" status --porcelain --untracked-files=all)"
-  assert_absent "$child_wt/scratch-clone" "secondmate-child-nested-clean: nested clone survived return"
-  assert_absent "$child_wt/scratch.txt" "secondmate-child-nested-clean: scratch file survived return"
+    || fail "squad-lead-child-nested-clean: untracked entries remain: $(git -C "$child_wt" status --porcelain --untracked-files=all)"
+  assert_absent "$child_wt/scratch-clone" "squad-lead-child-nested-clean: nested clone survived return"
+  assert_absent "$child_wt/scratch.txt" "squad-lead-child-nested-clean: scratch file survived return"
   assert_no_grep "lost this slot" "$case_dir/stderr" \
-    "secondmate-child-nested-clean: a clean child return was reported as a lost slot"
-  pass "a forced secondmate teardown returns a child scout copy with a nested clone clean"
+    "squad-lead-child-nested-clean: a clean child return was reported as a lost slot"
+  pass "a forced squad_lead teardown returns a child scout copy with a nested clone clean"
 }
 
 # Return succeeds but leaves no readable worktree behind to verify.
@@ -1730,16 +1730,16 @@ SH
   chmod +x "$case_dir/fakebin/treehouse"
 }
 
-# The remote host runs exactly this forced secondmate teardown for
-# `jg-remote-secondmate-control.sh retire --force`; the local side finishes the
+# The remote host runs exactly this forced squad_lead teardown for
+# `jg-remote-squad-lead-control.sh retire --force`; the local side finishes the
 # route, record, and reply-source cleanup when it exits 0 or 4 (lost slot).
-test_forced_secondmate_dirty_child_return_warns_and_completes() {
+test_forced_squad_lead_dirty_child_return_warns_and_completes() {
   local case_dir home child_wt rc
-  case_dir=$(make_case secondmate-child-dirty-return)
-  write_meta "$case_dir" local-only secondmate
-  home="$case_dir/secondmate-home"
+  case_dir=$(make_case squad-lead-child-dirty-return)
+  write_meta "$case_dir" local-only squad_lead
+  home="$case_dir/squad-lead-home"
   mkdir -p "$home/state" "$home/data" "$home/config" "$home/projects"
-  printf '%s\n' task-x1 > "$home/.jg-secondmate-home"
+  printf '%s\n' task-x1 > "$home/.jg-squad-lead-home"
   printf '%s\n' "home=$home" >> "$case_dir/state/task-x1.meta"
   child_wt="$case_dir/pool/6/repo"
   mkdir -p "$case_dir/pool/6"
@@ -1747,7 +1747,7 @@ test_forced_secondmate_dirty_child_return_warns_and_completes() {
   printf '{"worktrees":[{"name":"6","path":"%s"}]}\n' "$child_wt" \
     > "$case_dir/pool/treehouse-state.json"
   jg_write_meta "$home/state/child-scout.meta" \
-    "window=firstmate:jg-child-scout" \
+    "window=juggernaut:jg-child-scout" \
     "endpoint_task_id=child-scout" \
     "worktree=$child_wt" \
     "project=$case_dir/project" \
@@ -1758,14 +1758,14 @@ test_forced_secondmate_dirty_child_return_warns_and_completes() {
   rc=0
   run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
-  expect_code 4 "$rc" "secondmate-child-dirty-return: a lost child slot should exit 4 after retirement"
+  expect_code 4 "$rc" "squad-lead-child-dirty-return: a lost child slot should exit 4 after retirement"
   assert_grep "lost this slot" "$case_dir/stderr" \
-    "secondmate-child-dirty-return: no lost-slot warning for the dirty child return"
+    "squad-lead-child-dirty-return: no lost-slot warning for the dirty child return"
   assert_grep "left-behind-clone" "$case_dir/stderr" \
-    "secondmate-child-dirty-return: warning did not name the remaining path"
-  assert_absent "$case_dir/state/task-x1.meta" "secondmate-child-dirty-return: task record was not removed"
-  assert_absent "$home" "secondmate-child-dirty-return: secondmate home was not removed"
-  pass "a forced secondmate teardown warns about a dirty child return and still completes"
+    "squad-lead-child-dirty-return: warning did not name the remaining path"
+  assert_absent "$case_dir/state/task-x1.meta" "squad-lead-child-dirty-return: task record was not removed"
+  assert_absent "$home" "squad-lead-child-dirty-return: squad_lead home was not removed"
+  pass "a forced squad_lead teardown warns about a dirty child return and still completes"
 }
 
 test_return_that_removes_copy_warns_cannot_verify() {
@@ -1841,7 +1841,7 @@ test_gh_error_and_content_absent_refuses() {
 write_legacy_meta() {
   local case_dir=$1 mode=$2 kind=$3
   jg_write_meta "$case_dir/state/task-x1.meta" \
-    "window=firstmate:jg-task-x1" \
+    "window=juggernaut:jg-task-x1" \
     "endpoint_task_id=task-x1" \
     "worktree=$case_dir/wt" \
     "project=$case_dir/project" \
@@ -2630,34 +2630,34 @@ test_local_only_force_overrides_unpushed() {
   pass "local-only worktree with unpushed work is torn down under --force (escape hatch)"
 }
 
-# Mark the case's home as a secondmate home bound to a parent: teardown and
+# Mark the case's home as a squad_lead home bound to a parent: teardown and
 # jg-pr-check run with JG_HOME="$case_dir/home" so the parent-channel
 # publishers resolve that binding while the task state stays in $case_dir/state.
-configure_secondmate_home() {  # <case-dir> <local|remote> [<parent-home>]
+configure_squad_lead_home() {  # <case-dir> <local|remote> [<parent-home>]
   local case_dir=$1 route=$2 parent=${3:-} home="$1/home"
   mkdir -p "$home"
-  printf 'mate-x\n' > "$home/.jg-secondmate-home"
+  printf 'mate-x\n' > "$home/.jg-squad-lead-home"
   {
-    printf 'schema=jg-secondmate-parent.v1\nroute=%s\n' "$route"
+    printf 'schema=jg-squad-lead-parent.v1\nroute=%s\n' "$route"
     [ "$route" != local ] || printf 'parent_home=%s\n' "$parent"
-  } > "$home/.jg-secondmate-parent"
+  } > "$home/.jg-squad-lead-parent"
   if [ "$route" = local ]; then
     # A local parent registers the mate; teardown resolves that registration.
     mkdir -p "$parent/state" "$parent/data"
-    jg_write_secondmate_meta "$parent/state/mate-x.meta" "$home"
+    jg_write_squad_lead_meta "$parent/state/mate-x.meta" "$home"
     printf -- '- mate-x - fixture scope (home: %s; scope: fixture; projects: alpha; added 2026-07-14)\n' \
-      "$home" > "$parent/data/secondmates.md"
+      "$home" > "$parent/data/squad_leads.md"
   fi
 }
 
-# Registering a PR inside a secondmate home publishes the child's ready line
+# Registering a PR inside a squad_lead home publishes the child's ready line
 # with the canonical URL on the parent channel from jg-pr-check itself, once;
 # a main home publishes nothing.
-test_secondmate_pr_registration_publishes_ready_line() {
+test_squad_lead_pr_registration_publishes_ready_line() {
   local case_dir pr_head channel url
   url=https://github.com/example/repo/pull/7
   case_dir=$(make_case mate-pr-ready)
-  configure_secondmate_home "$case_dir" local "$case_dir/parent"
+  configure_squad_lead_home "$case_dir" local "$case_dir/parent"
   mkdir -p "$case_dir/parent/state"
   channel="$case_dir/parent/state/mate-x.status"
   write_meta "$case_dir" no-mistakes ship
@@ -2689,18 +2689,18 @@ test_secondmate_pr_registration_publishes_ready_line() {
   ! grep -q '^actionable:' "$case_dir/pr-check.err" \
     || fail "main-pr-ready: a main home reported a channel problem"
   [ ! -e "$case_dir/state/parent-replies.status" ] || fail "main-pr-ready: a main home wrote a parent reply"
-  pass "jg-pr-check publishes the PR-ready line on a secondmate's parent channel once"
+  pass "jg-pr-check publishes the PR-ready line on a squad_lead's parent channel once"
 }
 
-# Tearing a child down inside a secondmate home delivers the child's final
+# Tearing a child down inside a squad_lead home delivers the child's final
 # ledger line to the parent before the record goes, and refuses (retaining
 # every record) while the parent channel cannot be written; a rerun after the
 # repair delivers and completes.
-test_secondmate_home_teardown_delivers_final_line_or_refuses() {
+test_squad_lead_home_teardown_delivers_final_line_or_refuses() {
   local case_dir rc channel wt_head err seq generation
 
   case_dir=$(make_case mate-teardown-delivers)
-  configure_secondmate_home "$case_dir" local "$case_dir/parent"
+  configure_squad_lead_home "$case_dir" local "$case_dir/parent"
   mkdir -p "$case_dir/parent/state"
   channel="$case_dir/parent/state/mate-x.status"
   write_meta "$case_dir" local-only ship
@@ -2719,7 +2719,7 @@ test_secondmate_home_teardown_delivers_final_line_or_refuses() {
   [ ! -e "$case_dir/state/task-x1.meta" ] || fail "mate-teardown-delivers: teardown left the task record"
 
   case_dir=$(make_case mate-teardown-refuses)
-  configure_secondmate_home "$case_dir" local "$case_dir/parent"
+  configure_squad_lead_home "$case_dir" local "$case_dir/parent"
   # The channel path is occupied by a directory, so no line can be appended.
   mkdir -p "$case_dir/parent/state/mate-x.status"
   channel="$case_dir/parent/state/mate-x.status"
@@ -2760,7 +2760,7 @@ test_secondmate_home_teardown_delivers_final_line_or_refuses() {
   sed -E 's/ \[at=[0-9]+\]//' "$channel" | grep -Eq '^done \[key=child-outcome-task-x1-done-[0-9a-f]{8}\]: child task-x1 done: PR https://github.com/example/repo/pull/9 checks green' \
     || fail "mate-teardown-refuses: the rerun did not deliver the final line"
   [ ! -e "$case_dir/state/task-x1.meta" ] || fail "mate-teardown-refuses: rerun left the task record"
-  pass "a secondmate home's teardown delivers the child's final line or refuses until it can"
+  pass "a squad_lead home's teardown delivers the child's final line or refuses until it can"
 }
 
 test_teardown_missing_busy_sidecar_completes() {
@@ -3047,7 +3047,7 @@ test_herdr_flat_teardown_preflight_refuses_before_changes() {
 
 # The Herdr presentation-lock namespace is named per OS account. These cases
 # act as a fixture account uid (via an `id -u` shim) so they never touch the
-# real account's namespace or the old shared /tmp/firstmate-herdr-presentation,
+# real account's namespace or the old shared /tmp/juggernaut-herdr-presentation,
 # and every directory the fixture account resolves is really owned by the
 # running account, i.e. by another uid from the fixture account's view.
 # JG_FAKE_NS_STAT names one path whose owner and mode the `stat` shim reports
@@ -3126,8 +3126,8 @@ test_herdr_teardown_presentation_lock_namespace_is_per_account() {
   local fake_uid own_ns legacy legacy_before legacy_after own_before case_dir rc lock linux_arms=0
   fake_uid=$(herdr_lock_ns_fake_uid)
   [ "$fake_uid" != "$(id -u)" ] || fail "herdr-lock-ns: fixture account uid collides with the running account"
-  own_ns="/tmp/firstmate-herdr-presentation-$fake_uid"
-  legacy=/tmp/firstmate-herdr-presentation
+  own_ns="/tmp/juggernaut-herdr-presentation-$fake_uid"
+  legacy=/tmp/juggernaut-herdr-presentation
   [ ! -e "$own_ns" ] && [ ! -L "$own_ns" ] \
     || fail "herdr-lock-ns: fixture namespace $own_ns already exists; refusing to reuse it"
   printf '%s\n' "$own_ns" >> "$JG_TEST_CLEANUP_REGISTRY"
@@ -3185,10 +3185,10 @@ test_herdr_teardown_presentation_lock_namespace_is_per_account() {
   fi
 }
 
-configure_secondmate_with_herdr_child() {  # <case-dir>
-  local case_dir=$1 home="$1/secondmate-home"
+configure_squad_lead_with_herdr_child() {  # <case-dir>
+  local case_dir=$1 home="$1/squad-lead-home"
   mkdir -p "$home/state" "$home/data" "$home/config" "$home/projects"
-  printf '%s\n' task-x1 > "$home/.jg-secondmate-home"
+  printf '%s\n' task-x1 > "$home/.jg-squad-lead-home"
   printf '%s\n' "home=$home" >> "$case_dir/state/task-x1.meta"
   jg_write_meta "$home/state/child-herdr.meta" \
     "window=childsession:wC:p1" \
@@ -3235,12 +3235,12 @@ SH
   chmod +x "$case_dir/fakebin/herdr"
 }
 
-test_forced_secondmate_herdr_child_preflight_refuses_before_changes() {
+test_forced_squad_lead_herdr_child_preflight_refuses_before_changes() {
   local case_dir home log closed rc thlog
   case_dir=$(make_case herdr-child-preflight)
-  write_meta "$case_dir" local-only secondmate
-  configure_secondmate_with_herdr_child "$case_dir"
-  home="$case_dir/secondmate-home"
+  write_meta "$case_dir" local-only squad_lead
+  configure_squad_lead_with_herdr_child "$case_dir"
+  home="$case_dir/squad-lead-home"
   log="$case_dir/herdr.log"; closed="$case_dir/closed"; thlog="$case_dir/treehouse.log"
   : > "$log"; : > "$thlog"
   cat > "$case_dir/fakebin/treehouse" <<SH
@@ -3257,24 +3257,24 @@ SH
   [ -e "$case_dir/state/task-x1.meta" ] || fail "herdr-child-preflight: refusal erased the parent record"
   [ -e "$home/state/child-herdr.meta" ] || fail "herdr-child-preflight: refusal erased the child record"
   [ -e "$home/state/child-herdr.status" ] || fail "herdr-child-preflight: refusal erased child status"
-  [ -d "$home" ] || fail "herdr-child-preflight: refusal removed the secondmate home"
+  [ -d "$home" ] || fail "herdr-child-preflight: refusal removed the squad_lead home"
   [ ! -s "$thlog" ] || fail "herdr-child-preflight: refusal returned work before child preflight"
   [ ! -e "$closed" ] || fail "herdr-child-preflight: refusal attempted a child close"
   assert_grep "nothing was changed" "$case_dir/stderr" \
     "herdr-child-preflight: refusal did not explain its non-mutating boundary"
-  pass "forced secondmate teardown preflights every Herdr child before cleanup mutation"
+  pass "forced squad_lead teardown preflights every Herdr child before cleanup mutation"
 }
 
-configure_secondmate_with_tmux_children() {  # <case-dir>
-  local case_dir=$1 home="$1/secondmate-home" child child_wt
+configure_squad_lead_with_tmux_children() {  # <case-dir>
+  local case_dir=$1 home="$1/squad-lead-home" child child_wt
   mkdir -p "$home/state" "$home/data" "$home/config" "$home/projects"
-  printf '%s\n' task-x1 > "$home/.jg-secondmate-home"
+  printf '%s\n' task-x1 > "$home/.jg-squad-lead-home"
   printf '%s\n' "home=$home" >> "$case_dir/state/task-x1.meta"
   for child in child-a child-b; do
     child_wt="$case_dir/$child-wt"
     git -C "$case_dir/project" worktree add -q -b "fm/$child" "$child_wt" main
     jg_write_meta "$home/state/$child.meta" \
-      "window=firstmate:jg-$child" \
+      "window=juggernaut:jg-$child" \
       "endpoint_task_id=$child" \
       "worktree=$child_wt" \
       "project=$case_dir/project" \
@@ -3284,12 +3284,12 @@ configure_secondmate_with_tmux_children() {  # <case-dir>
   done
 }
 
-test_forced_secondmate_teardown_holds_descendant_lifecycle_locks() {
+test_forced_squad_lead_teardown_holds_descendant_lifecycle_locks() {
   local case_dir home lock ready release holder_pid rc waited=0 child
   case_dir=$(make_case descendant-locks)
-  write_meta "$case_dir" local-only secondmate
-  configure_secondmate_with_tmux_children "$case_dir"
-  home="$case_dir/secondmate-home"
+  write_meta "$case_dir" local-only squad_lead
+  configure_squad_lead_with_tmux_children "$case_dir"
+  home="$case_dir/squad-lead-home"
   : > "$case_dir/kill.log"
   : > "$case_dir/treehouse.log"
   cat > "$case_dir/fakebin/tmux" <<SH
@@ -3355,15 +3355,15 @@ SH
     || fail "descendant-locks: uncontended retry retained retired task state"
   [ -s "$case_dir/kill.log" ] && [ -s "$case_dir/treehouse.log" ] \
     || fail "descendant-locks: uncontended retry did not perform endpoint and worktree cleanup"
-  pass "forced secondmate teardown holds every descendant lifecycle and metadata lock"
+  pass "forced squad_lead teardown holds every descendant lifecycle and metadata lock"
 }
 
-test_forced_secondmate_herdr_child_retains_records_when_close_unconfirmed() {
+test_forced_squad_lead_herdr_child_retains_records_when_close_unconfirmed() {
   local case_dir home log closed rc
   case_dir=$(make_case herdr-child-unconfirmed-close)
-  write_meta "$case_dir" local-only secondmate
-  configure_secondmate_with_herdr_child "$case_dir"
-  home="$case_dir/secondmate-home"
+  write_meta "$case_dir" local-only squad_lead
+  configure_squad_lead_with_herdr_child "$case_dir"
+  home="$case_dir/squad-lead-home"
   log="$case_dir/herdr.log"; closed="$case_dir/closed"; : > "$log"
   rc=0
   JG_FAKE_HERDR_LOG="$log" JG_FAKE_HERDR_CLOSED="$closed" JG_FAKE_HERDR_PRESENCE_UNKNOWN=1 \
@@ -3373,25 +3373,25 @@ test_forced_secondmate_herdr_child_retains_records_when_close_unconfirmed() {
   [ -e "$home/state/child-herdr.meta" ] || fail "herdr-child-unconfirmed-close: ambiguous close erased child metadata"
   [ -e "$home/state/child-herdr.status" ] || fail "herdr-child-unconfirmed-close: ambiguous close erased child status"
   [ -e "$case_dir/state/task-x1.meta" ] || fail "herdr-child-unconfirmed-close: failed child cleanup erased parent metadata"
-  [ -d "$home" ] || fail "herdr-child-unconfirmed-close: failed child cleanup removed the secondmate home"
+  [ -d "$home" ] || fail "herdr-child-unconfirmed-close: failed child cleanup removed the squad_lead home"
   assert_grep "retaining that child's durable identity records" "$case_dir/stderr" \
     "herdr-child-unconfirmed-close: refusal did not explain child record retention"
-  pass "forced secondmate teardown retains Herdr child identity until exact pane disappearance"
+  pass "forced squad_lead teardown retains Herdr child identity until exact pane disappearance"
 }
 
-configure_nested_secondmate_with_herdr_grandchild() {  # <case-dir>
-  local case_dir=$1 home="$1/secondmate-home" nested_home="$1/secondmate-home/nested-home"
+configure_nested_squad_lead_with_herdr_grandchild() {  # <case-dir>
+  local case_dir=$1 home="$1/squad-lead-home" nested_home="$1/squad-lead-home/nested-home"
   mkdir -p "$home/state" "$home/data" "$home/config" "$home/projects"
   mkdir -p "$nested_home/state" "$nested_home/data" "$nested_home/config" "$nested_home/projects"
-  printf '%s\n' task-x1 > "$home/.jg-secondmate-home"
-  printf '%s\n' nested-sm > "$nested_home/.jg-secondmate-home"
+  printf '%s\n' task-x1 > "$home/.jg-squad-lead-home"
+  printf '%s\n' nested-sm > "$nested_home/.jg-squad-lead-home"
   printf '%s\n' "home=$home" >> "$case_dir/state/task-x1.meta"
   jg_write_meta "$home/state/nested-sm.meta" \
-    "window=firstmate:jg-nested-sm" \
+    "window=juggernaut:jg-nested-sm" \
     "endpoint_task_id=nested-sm" \
     "worktree=$case_dir/wt" \
     "project=$case_dir/project" \
-    "kind=secondmate" \
+    "kind=squad_lead" \
     "mode=local-only" \
     "home=$nested_home"
   jg_write_meta "$nested_home/state/grandchild-herdr.meta" \
@@ -3430,12 +3430,12 @@ SH
   chmod +x "$case_dir/fakebin/herdr"
 }
 
-test_forced_teardown_retains_nested_secondmate_home_when_grandchild_close_unconfirmed() {
+test_forced_teardown_retains_nested_squad_lead_home_when_grandchild_close_unconfirmed() {
   local case_dir home nested_home log closed rc
   case_dir=$(make_case herdr-grandchild-unconfirmed-close)
-  write_meta "$case_dir" local-only secondmate
-  configure_nested_secondmate_with_herdr_grandchild "$case_dir"
-  home="$case_dir/secondmate-home"; nested_home="$home/nested-home"
+  write_meta "$case_dir" local-only squad_lead
+  configure_nested_squad_lead_with_herdr_grandchild "$case_dir"
+  home="$case_dir/squad-lead-home"; nested_home="$home/nested-home"
   log="$case_dir/herdr.log"; closed="$case_dir/closed"; : > "$log"
   rc=0
   JG_FAKE_HERDR_LOG="$log" JG_FAKE_HERDR_CLOSED="$closed" \
@@ -3445,16 +3445,16 @@ test_forced_teardown_retains_nested_secondmate_home_when_grandchild_close_unconf
   [ -e "$closed" ] \
     || fail "herdr-grandchild-unconfirmed-close: fixture did not attempt the grandchild close"
   [ -d "$nested_home" ] \
-    || fail "herdr-grandchild-unconfirmed-close: the recursive failure still removed the nested secondmate home"
+    || fail "herdr-grandchild-unconfirmed-close: the recursive failure still removed the nested squad_lead home"
   [ -e "$nested_home/state/grandchild-herdr.meta" ] \
     || fail "herdr-grandchild-unconfirmed-close: ambiguous close erased the grandchild's metadata"
   [ -e "$nested_home/state/grandchild-herdr.status" ] \
     || fail "herdr-grandchild-unconfirmed-close: ambiguous close erased the grandchild's status record"
   [ -e "$home/state/nested-sm.meta" ] \
-    || fail "herdr-grandchild-unconfirmed-close: the recursive failure erased the nested secondmate's own record"
+    || fail "herdr-grandchild-unconfirmed-close: the recursive failure erased the nested squad_lead's own record"
   [ -e "$case_dir/state/task-x1.meta" ] \
-    || fail "herdr-grandchild-unconfirmed-close: the recursive failure erased the top-level secondmate's record"
-  pass "forced teardown retains a nested secondmate home and its grandchild's Herdr identity when the grandchild close is unconfirmed"
+    || fail "herdr-grandchild-unconfirmed-close: the recursive failure erased the top-level squad_lead's record"
+  pass "forced teardown retains a nested squad_lead home and its grandchild's Herdr identity when the grandchild close is unconfirmed"
 }
 
 configure_herdr_projection_teardown_case() {  # <case-dir>
@@ -3482,7 +3482,7 @@ case "${1:-} ${2:-}" in
     elif [ -e "${JG_FAKE_HERDR_CLOSED:?}" ]; then
       printf '%s\n' '{"result":{"workspaces":[{"workspace_id":"w2","active_tab_id":"w2:t2","label":"2ndmate-bravo","focused":false},{"workspace_id":"w3","active_tab_id":"w3:t1","label":"2ndmate-alpha","focused":true}]}}'
     else
-      printf '%s\n' '{"result":{"workspaces":[{"workspace_id":"w1","active_tab_id":"w1:t2","label":"firstmate/task-x1 · p:AbCdEfGhIjKlMnOpQrStUv","focused":false},{"workspace_id":"w2","active_tab_id":"w2:t2","label":"2ndmate-bravo","focused":true},{"workspace_id":"w3","active_tab_id":"w3:t1","label":"2ndmate-alpha","focused":false}]}}'
+      printf '%s\n' '{"result":{"workspaces":[{"workspace_id":"w1","active_tab_id":"w1:t2","label":"juggernaut/task-x1 · p:AbCdEfGhIjKlMnOpQrStUv","focused":false},{"workspace_id":"w2","active_tab_id":"w2:t2","label":"2ndmate-bravo","focused":true},{"workspace_id":"w3","active_tab_id":"w3:t1","label":"2ndmate-alpha","focused":false}]}}'
     fi
     ;;
   "tab list")
@@ -3664,7 +3664,7 @@ test_teardown_retains_journal_bound_to_another_pane() {
   # recorded may still name a live quarantined space; only the sweep may judge it.
   printf '%s\n' 'version=2' 'task_id=task-x1' 'projection_id=AbCdEfGhIjKlMnOpQrStUv' \
     "home=$case_dir" 'session=fmtest' 'workspace_id=w1' 'tab_id=w1:t2' 'pane_id=w1:p9' \
-    'parent_workspace_id=w0' 'parent_label=firstmate' \
+    'parent_workspace_id=w0' 'parent_label=juggernaut' \
     'workspace_label=└ task-x1 · p:AbCdEfGhIjKlMnOpQrStUv' 'task_label=jg-task-x1' \
     > "$case_dir/state/task-x1.herdr-presentation"
 
@@ -3708,11 +3708,11 @@ case "${1:-} ${2:-}" in
     if [ "${JG_FAKE_HERDR_WS_MALFORMED:-0}" = 1 ]; then
       # A non-object entry before a live token-bearing workspace: the token query
       # is ambiguous, so teardown must treat it as unknown and keep the journal.
-      printf '%s\n' '{"result":{"workspaces":[42,{"workspace_id":"w1","active_tab_id":"w1:t2","label":"firstmate/task-x1 · p:AbCdEfGhIjKlMnOpQrStUv","focused":false}]}}'
+      printf '%s\n' '{"result":{"workspaces":[42,{"workspace_id":"w1","active_tab_id":"w1:t2","label":"juggernaut/task-x1 · p:AbCdEfGhIjKlMnOpQrStUv","focused":false}]}}'
     elif [ "${JG_FAKE_HERDR_WS_COLLAPSED:-0}" = 1 ]; then
       printf '%s\n' '{"result":{"workspaces":[{"workspace_id":"w2","active_tab_id":"w2:t2","label":"2ndmate-bravo","focused":true}]}}'
     else
-      printf '%s\n' '{"result":{"workspaces":[{"workspace_id":"w1","active_tab_id":"w1:t2","label":"firstmate/task-x1 · p:AbCdEfGhIjKlMnOpQrStUv","focused":false},{"workspace_id":"w2","active_tab_id":"w2:t2","label":"2ndmate-bravo","focused":true}]}}'
+      printf '%s\n' '{"result":{"workspaces":[{"workspace_id":"w1","active_tab_id":"w1:t2","label":"juggernaut/task-x1 · p:AbCdEfGhIjKlMnOpQrStUv","focused":false},{"workspace_id":"w2","active_tab_id":"w2:t2","label":"2ndmate-bravo","focused":true}]}}'
     fi
     ;;
   "status --json")
@@ -3924,9 +3924,9 @@ test_registered_scratch_cleanup_paths() {
     for failure in none removal no-lsof worktree-scan scratch-scan list-search list-parent list-read; do
       case_dir=$(make_case "scratch-$route-$failure")
       if [ "$route" = child ]; then
-        write_meta "$case_dir" local-only secondmate
-        configure_secondmate_with_tmux_children "$case_dir"
-        home="$case_dir/secondmate-home"
+        write_meta "$case_dir" local-only squad_lead
+        configure_squad_lead_with_tmux_children "$case_dir"
+        home="$case_dir/squad-lead-home"
         state="$home/state"; data="$home/data"; task="child-a"
       else
         write_meta "$case_dir" local-only ship
@@ -4052,9 +4052,9 @@ test_retained_task_data_processes_are_reaped() {
     for failure in none no-lsof; do
       case_dir=$(make_case "retained-data-$route-$failure")
       if [ "$route" = child ]; then
-        write_meta "$case_dir" local-only secondmate
-        configure_secondmate_with_tmux_children "$case_dir"
-        data="$case_dir/secondmate-home/data"; task="child-a"
+        write_meta "$case_dir" local-only squad_lead
+        configure_squad_lead_with_tmux_children "$case_dir"
+        data="$case_dir/squad-lead-home/data"; task="child-a"
       else
         write_meta "$case_dir" local-only ship
         seed_backlog_in_flight "$case_dir"
@@ -4076,7 +4076,7 @@ test_retained_task_data_processes_are_reaped() {
         expect_code 1 "$rc" "retained-data: missing scanner should refuse"
         assert_present "$case_dir/state/task-x1.meta" "retained-data: lost parent retry record"
         if [ "$route" = child ]; then
-          assert_present "$case_dir/secondmate-home/state/$task.meta" "retained-data: lost child retry record"
+          assert_present "$case_dir/squad-lead-home/state/$task.meta" "retained-data: lost child retry record"
         fi
         rc=0
         run_teardown "$case_dir" --force > "$case_dir/retry.stdout" 2> "$case_dir/retry.stderr" || rc=$?
@@ -5429,20 +5429,20 @@ test_missing_adapter_sibling_refuses_before_cleanup() {
 test_forced_child_missing_adapter_sibling_refuses_before_cleanup() {
   local case_dir home rc
   case_dir=$(make_case missing-child-adapter-sibling)
-  write_meta "$case_dir" local-only secondmate
-  configure_secondmate_with_herdr_child "$case_dir"
-  home="$case_dir/secondmate-home"
+  write_meta "$case_dir" local-only squad_lead
+  configure_squad_lead_with_herdr_child "$case_dir"
+  home="$case_dir/squad-lead-home"
   prepare_teardown_source_copy "$case_dir"
   rm -f "$case_dir/test-root/bin/jg-transition-lib.sh"
   rc=0
   run_copied_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   assert_source_refusal_preserved_state "$case_dir" "missing-child-source" "required herdr source"
   [ -e "$home/state/child-herdr.meta" ] || fail "missing-child-source: the refusal erased the child record"
-  [ -d "$home" ] || fail "missing-child-source: the refusal removed the secondmate home"
+  [ -d "$home" ] || fail "missing-child-source: the refusal removed the squad_lead home"
   pass "a forced descendant with a missing adapter sibling refuses before cleanup"
 }
 
-test_forced_secondmate_own_missing_adapter_sibling_refuses_before_child_cleanup() {
+test_forced_squad_lead_own_missing_adapter_sibling_refuses_before_child_cleanup() {
   local case_dir home rc
   case_dir=$(make_case missing-own-adapter-sibling)
   jg_write_meta "$case_dir/state/task-x1.meta" \
@@ -5450,16 +5450,16 @@ test_forced_secondmate_own_missing_adapter_sibling_refuses_before_child_cleanup(
     "endpoint_task_id=task-x1" \
     "worktree=$case_dir/wt" \
     "project=$case_dir/project" \
-    "kind=secondmate" \
+    "kind=squad_lead" \
     "mode=local-only" \
     "backend=zellij" \
     "zellij_session=zs" \
     "zellij_tab_id=1" \
     "zellij_pane_id=3" \
     "spawn_gen=teardown-test-task-x1"
-  home="$case_dir/secondmate-home"
+  home="$case_dir/squad-lead-home"
   mkdir -p "$home/state" "$home/data" "$home/config" "$home/projects"
-  printf '%s\n' task-x1 > "$home/.jg-secondmate-home"
+  printf '%s\n' task-x1 > "$home/.jg-squad-lead-home"
   printf '%s\n' "home=$home" >> "$case_dir/state/task-x1.meta"
   jg_write_meta "$home/state/child-tmux.meta" \
     "window=childsession:jg-child-tmux" \
@@ -5483,11 +5483,11 @@ SH
   assert_source_refusal_preserved_state "$case_dir" "missing-own-source" "required zellij source"
   [ -e "$home/state/child-tmux.meta" ] || fail "missing-own-source: the refusal erased the child record"
   [ -e "$home/state/child-tmux.status" ] || fail "missing-own-source: the refusal erased the child status"
-  [ -d "$home" ] || fail "missing-own-source: the refusal removed the secondmate home"
+  [ -d "$home" ] || fail "missing-own-source: the refusal removed the squad_lead home"
   if grep -q "kill" "$case_dir/tmux.log"; then
     fail "missing-own-source: the refusal killed the child endpoint: $(cat "$case_dir/tmux.log")"
   fi
-  pass "a forced secondmate with a missing own adapter sibling refuses before child cleanup"
+  pass "a forced squad_lead with a missing own adapter sibling refuses before child cleanup"
 }
 
 test_retained_sources_still_reach_the_ordinary_refusal() {
@@ -5511,7 +5511,7 @@ test_missing_startup_source_refuses_before_cleanup
 test_unreadable_startup_source_refuses_before_cleanup
 test_missing_adapter_sibling_refuses_before_cleanup
 test_forced_child_missing_adapter_sibling_refuses_before_cleanup
-test_forced_secondmate_own_missing_adapter_sibling_refuses_before_child_cleanup
+test_forced_squad_lead_own_missing_adapter_sibling_refuses_before_child_cleanup
 test_retained_sources_still_reach_the_ordinary_refusal
 test_local_only_fork_remote_allows
 test_teardown_closes_the_backlog_item_itself
@@ -5522,18 +5522,18 @@ test_local_only_merged_to_local_main_allows
 test_pushed_branch_needs_forge_merge_proof
 test_no_mistakes_truly_unpushed_refuses
 test_local_only_force_overrides_unpushed
-test_secondmate_pr_registration_publishes_ready_line
-test_secondmate_home_teardown_delivers_final_line_or_refuses
+test_squad_lead_pr_registration_publishes_ready_line
+test_squad_lead_home_teardown_delivers_final_line_or_refuses
 test_teardown_missing_busy_sidecar_completes
 test_herdr_teardown_clears_escalation_marker
 test_herdr_flat_teardown_refuses_orphaning_records_then_retry_completes
 test_herdr_flat_teardown_refuses_records_on_unparseable_presence
 test_herdr_flat_teardown_preflight_refuses_before_changes
 test_herdr_teardown_presentation_lock_namespace_is_per_account
-test_forced_secondmate_herdr_child_preflight_refuses_before_changes
-test_forced_secondmate_teardown_holds_descendant_lifecycle_locks
-test_forced_secondmate_herdr_child_retains_records_when_close_unconfirmed
-test_forced_teardown_retains_nested_secondmate_home_when_grandchild_close_unconfirmed
+test_forced_squad_lead_herdr_child_preflight_refuses_before_changes
+test_forced_squad_lead_teardown_holds_descendant_lifecycle_locks
+test_forced_squad_lead_herdr_child_retains_records_when_close_unconfirmed
+test_forced_teardown_retains_nested_squad_lead_home_when_grandchild_close_unconfirmed
 test_herdr_projection_teardown_retires_journal_only_after_confirmed_close
 test_herdr_projection_teardown_retains_journal_when_close_unconfirmed
 test_herdr_projection_teardown_surfaces_restore_failure_without_blocking_cleanup
@@ -5566,8 +5566,8 @@ test_scout_nested_clone_returns_with_no_untracked_entries
 test_ship_nested_clone_is_refused_and_bytes_stay
 test_dirty_return_warns_which_slot_was_lost
 test_dirty_return_warns_even_when_a_later_step_refuses
-test_forced_secondmate_child_scout_nested_clone_returns_clean
-test_forced_secondmate_dirty_child_return_warns_and_completes
+test_forced_squad_lead_child_scout_nested_clone_returns_clean
+test_forced_squad_lead_dirty_child_return_warns_and_completes
 test_return_that_removes_copy_warns_cannot_verify
 test_scout_ignored_files_survive_scratch_clean
 test_gh_error_and_content_absent_refuses

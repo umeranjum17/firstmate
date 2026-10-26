@@ -124,7 +124,7 @@ jg_afk_flag_write() {  # <state-dir> [mode]
   # on disk via jg_afk_mode - which itself falls back to "away" when nothing
   # is on disk yet, so a genuinely fresh unspecified entry still defaults
   # away. This is what keeps a refresh from silently flipping a captain's
-  # quiet mode back to away underneath them (kunchenguid/firstmate#2356).
+  # quiet mode back to away underneath them (kunchenguid/juggernaut#2356).
   case "$requested_mode" in
     away|quiet) mode=$requested_mode ;;
     *) mode=$(jg_afk_mode "$state") ;;

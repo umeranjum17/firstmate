@@ -8,7 +8,7 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
   export "$_jg_new=$_jg_val"
 done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
-# Install or update the claude-quota check for this user and point one firstmate home's state/claude-quota.check.sh
+# Install or update the claude-quota check for this user and point one juggernaut home's state/claude-quota.check.sh
 # at it through an exec shim, backing up a replaced check first, then re-register it. Idempotent.
 # Usage: install.sh [--dry-run] <jg-home>
 set -euo pipefail

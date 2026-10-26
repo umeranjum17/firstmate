@@ -119,7 +119,7 @@ make_guard_home() {  # <dir>
   local dir=$1
   mkdir -p "$dir/bin" "$dir/state"
   : > "$dir/AGENTS.md"
-  printf 'rule-test-home\n' > "$dir/.jg-secondmate-home"
+  printf 'rule-test-home\n' > "$dir/.jg-squad-lead-home"
 }
 
 reply_payload() {  # <dir> <reply text>

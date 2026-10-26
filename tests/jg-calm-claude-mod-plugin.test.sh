@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# The Claude Code Calm mod (.claude/mods/firstmate-calm) under the real installed
+# The Claude Code Calm mod (.claude/mods/juggernaut-calm) under the real installed
 # Claude Code: `claude plugin validate --strict` on the physical folder and on the
-# `.claude/skills/firstmate-calm` path the project auto-loads it from, then its own
+# `.claude/skills/juggernaut-calm` path the project auto-loads it from, then its own
 # `claude plugin test` suites (tests/*.test.ts inside the mod), which run the hooks
 # module in the engine's own host against a mocked clock, environment, file system,
 # and drawing surface. No model turn is submitted and no credential is spent, so the
@@ -17,8 +17,8 @@ set -u
 
 jg_live_gate default-on JG_CLAUDE_CALM_PLUGIN_TEST claude
 
-MOD="$ROOT/.claude/mods/firstmate-calm"
-AUTOLOAD_PATH="$ROOT/.claude/skills/firstmate-calm"
+MOD="$ROOT/.claude/mods/juggernaut-calm"
+AUTOLOAD_PATH="$ROOT/.claude/skills/juggernaut-calm"
 CLAUDE_VERSION=$(claude --version 2>/dev/null || true)
 [ -n "$CLAUDE_VERSION" ] || fail "claude is installed but reports no version"
 TMP_ROOT=$(jg_test_tmproot jg-calm-claude-mod-plugin)

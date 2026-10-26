@@ -79,7 +79,7 @@ jg_wait_timer_push_delivered() {  # <task> <window>
       jg_wait_timer_save "$record" "$signature" "$since" "$now" "$parent" "$key" 0
       return
     fi
-    if [ "$parent" -eq 1 ] && [ -e "$JG_HOME/.jg-secondmate-home" ]; then
+    if [ "$parent" -eq 1 ] && [ -e "$JG_HOME/.jg-squad-lead-home" ]; then
       jg_wait_timer_report "resolved [key=$key]: waiting-timer-cleared: $1 changed state" || return 0
     fi
   fi
@@ -99,7 +99,7 @@ jg_wait_timers_tick() {
   done
   [ "$escalate" -gt "$alert" ] || { echo "waiting timers: escalation must be later than owner alert" >&2; return 1; }
   now=$(date +%s) || return 1
-  [ ! -e "$JG_HOME/.jg-secondmate-home" ] || actor='owning lead'
+  [ ! -e "$JG_HOME/.jg-squad-lead-home" ] || actor='owning lead'
   # One bounded native read per recorded session, not one per lane. A session whose
   # read fails is unknown for this poll: its lanes keep their episodes untouched
   # while every other lane is still monitored.
@@ -152,7 +152,7 @@ EOF
     [ ! -L "$record" ] || { echo "waiting timers: symlink episode $record" >&2; return 1; }
     [ ! -f "$STATE/$task.meta" ] || continue
     IFS=$'\t' read -r old since owner parent key misses < "$record" || return 1
-    if [ "$parent" = 1 ] && [ -e "$JG_HOME/.jg-secondmate-home" ]; then
+    if [ "$parent" = 1 ] && [ -e "$JG_HOME/.jg-squad-lead-home" ]; then
       jg_wait_timer_report "resolved [key=$key]: waiting-timer-cleared: $task removed" || continue
     fi
     rm -f "$record" || return 1
@@ -227,7 +227,7 @@ EOF
       continue
     fi
     if [ -z "$declaration" ] || [ "$old" != "$signature" ]; then
-      if [ "$parent" -eq 1 ] && [ -e "$JG_HOME/.jg-secondmate-home" ]; then
+      if [ "$parent" -eq 1 ] && [ -e "$JG_HOME/.jg-squad-lead-home" ]; then
         jg_wait_timer_report "resolved [key=$key]: waiting-timer-cleared: $task changed state" || continue
       fi
       rm -f "$record" || return 1
@@ -265,7 +265,7 @@ EOF
       wake "$reason"
     fi
     if ! status_is_paused "$declaration" && [ "$owner" -gt 1 ] && [ "$((now - owner))" -ge "$((escalate - alert))" ] && [ "$parent" -eq 0 ]; then
-      if [ -e "$JG_HOME/.jg-secondmate-home" ] || [ -L "$JG_HOME/.jg-secondmate-home" ]; then
+      if [ -e "$JG_HOME/.jg-squad-lead-home" ] || [ -L "$JG_HOME/.jg-squad-lead-home" ]; then
         jg_wait_timer_report "blocked [key=$key]: waiting-timer-overdue: $task ($verb, observed ${age}s); owning lead has not cleared the wait; Main must unblock or steer the lead; source=[$source]" || continue
         parent=1
         jg_wait_timer_save "$record" "$signature" "$since" "$owner" "$parent" "$key" "$misses" || return 1

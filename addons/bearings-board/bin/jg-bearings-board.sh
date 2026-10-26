@@ -8,13 +8,13 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
   export "$_jg_new=$_jg_val"
 done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
-# jg-bearings-board.sh - runs the Bearings board from the Firstmate checkout, unchanged.
+# jg-bearings-board.sh - runs the Bearings board from the Juggernaut checkout, unchanged.
 #
 # Commands:
 #   build <data.json> [args...]   run the checkout's build with every argument
 #   path [args...]                run the checkout's path with every argument
 #
-# JG_CODE_ROOT names the Firstmate checkout (defaults to JG_HOME). Nothing is copied
+# JG_CODE_ROOT names the Juggernaut checkout (defaults to JG_HOME). Nothing is copied
 # from the checkout: its own bin/jg-bearings-board.sh does the work and receives every
 # argument. The exec sets JG_BEARINGS_BOARD_WRAPPER so a checkout wired back to this
 # wrapper fails instead of recursing. install.sh wires this wrapper into a home;
@@ -31,7 +31,7 @@ usage() {
 checkout_board() {
   local root="${JG_CODE_ROOT:-${JG_HOME:-}}"
   [ -z "${JG_BEARINGS_BOARD_WRAPPER:-}" ] || fail "the checkout's bin/jg-bearings-board.sh is this wrapper: refusing to recurse"
-  [ -n "$root" ] || fail "set JG_CODE_ROOT to the Firstmate checkout"
+  [ -n "$root" ] || fail "set JG_CODE_ROOT to the Juggernaut checkout"
   [ -x "$root/bin/jg-bearings-board.sh" ] || fail "no bin/jg-bearings-board.sh under $root"
   printf '%s/bin/jg-bearings-board.sh\n' "$root"
 }

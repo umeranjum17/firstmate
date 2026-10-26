@@ -61,7 +61,7 @@ API_KEY = os.environ.get("QWEN_API_KEY", "local")
 
 # The real repository the comprehension, long-file, and patch tasks read.
 # Read-only: nothing in this harness ever writes inside it.
-REPO = Path(os.environ.get("QWEN_BENCH_REPO", "~/firstmate")).expanduser().resolve()
+REPO = Path(os.environ.get("QWEN_BENCH_REPO", "~/juggernaut")).expanduser().resolve()
 
 READ_CHARS_PER_CALL = 40_000
 SEARCH_MATCH_LIMIT = 60
@@ -488,7 +488,7 @@ def _t_patch():
     return {
         "kind": "patch",
         "prompt": (
-            "The isolated copy of the firstmate repository at {sandbox} has a broken "
+            "The isolated copy of the juggernaut repository at {sandbox} has a broken "
             "unit test. Run nothing; instead read the code and fix the defect so the "
             "behavior matches what the code's own documentation says the policy table "
             "must do. The test to satisfy is {sandbox}/tests/jg-transition-lib.test.sh. "
@@ -674,7 +674,7 @@ PREFILL_FILLERS = [
     "the watcher polls the session endpoint and records each observed transition",
     "a durable queue keeps every wake until the handling turn acknowledges it",
     "the backend adapter normalises status names before policy runs over them",
-    "each check script prints one line only when firstmate should be woken",
+    "each check script prints one line only when juggernaut should be woken",
 ]
 
 

@@ -87,7 +87,7 @@ refuse() { # refuse <hook> <hits>: final refusal listing file:line hits only.
   {
     printf 'owner-guard: %s refused: %s added line(s) match protected owner details:\n' "$1" "$n"
     printf '%s\n' "$2"
-    printf 'fix: replace each detail with a placeholder (you@example.com, ~/firstmate, /home/you) and retry. This refusal is final: there is no bypass.\n'
+    printf 'fix: replace each detail with a placeholder (you@example.com, ~/juggernaut, /home/you) and retry. This refusal is final: there is no bypass.\n'
   } >&2
   exit 1
 }

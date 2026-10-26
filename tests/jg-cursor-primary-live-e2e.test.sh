@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Opt-in live guard for Cursor Agent CLI as a firstmate PRIMARY.
+# Opt-in live guard for Cursor Agent CLI as a juggernaut PRIMARY.
 #
 # The Cursor primary integration rests on facts only the real cursor-agent can
 # answer: that its `stop` hook is awaited so a park can hold the turn boundary,
@@ -16,7 +16,7 @@
 # every Cursor upgrade and before trusting refreshed per-harness evidence in
 # docs/verification/supervision.md and docs/verification/runtime-backends.md.
 #
-# Isolation: a throwaway firstmate home under a temp dir, a private tmux socket,
+# Isolation: a throwaway juggernaut home under a temp dir, a private tmux socket,
 # and a Cursor workspace Cursor has never seen. It never touches the fleet's tmux
 # server, never writes a user-scope or global hook, and never runs against a live
 # home. Cursor still records its own per-project transcript under
@@ -138,7 +138,7 @@ pass "cursor primary: sessionStart additional_context reaches model context befo
 
 # The turn that just ended must have parked, armed a watcher, and delivered a
 # real wake as one follow-up carrying the operational watcher kind.
-wait_for_pane "FIRSTMATE_OP: v1 watcher:" 300 "a watcher wake delivered as a stop-hook follow-up"
+wait_for_pane "JUGGERNAUT_OP: v1 watcher:" 300 "a watcher wake delivered as a stop-hook follow-up"
 pass "cursor primary: the stop-hook park delivers a real watcher wake as one follow-up"
 
 wait_for_file "$HOME_DIR/state/.cursor-park-owner" 60 "the park ownership record"

@@ -11,12 +11,12 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Model-outage scan behaviour over fixture lanes: the real jg_model_outage_tick
 # from this add-on, with backend liveness, the lane verdict and the wake sink
 # faked; busy-gen and the pane capture are the real on-disk contract.
-# JG_TEST_FORK names a read-only Firstmate checkout whose bin/ holds the sibling
+# JG_TEST_FORK names a read-only Juggernaut checkout whose bin/ holds the sibling
 # libraries; the watcher itself is never run.
 # shellcheck disable=SC2031 # the case bodies run inside run_scans' subshell, where FAKE_LIVENESS is set
 set -euo pipefail
 addons=$(cd "$(dirname "$0")/../.." && pwd)
-: "${JG_TEST_FORK:?set JG_TEST_FORK to a Firstmate checkout}"
+: "${JG_TEST_FORK:?set JG_TEST_FORK to a Juggernaut checkout}"
 d=$(mktemp -d)
 cleanup() {
   rc=$?

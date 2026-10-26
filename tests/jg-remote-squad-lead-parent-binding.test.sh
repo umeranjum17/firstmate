@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# tests/jg-remote-secondmate-parent-binding.test.sh - regression coverage for the
+# tests/jg-remote-squad-lead-parent-binding.test.sh - regression coverage for the
 # jg-remote-sm-cleanup-parent-binding-s1 scout report: finished-worker cleanup
 # inside a REMOTE second-mate home refused forever with "cannot resolve the
 # primary home ... durable parent binding", because the remote launch hands the
 # child the remote code checkout as its parent home (bin/jg-spawn.sh's sole
 # writer of JG_PUBLIC_FOLLOWUP_PRIMARY_HOME receives JG_HOME=$JG_ROOT from
-# bin/jg-remote-secondmate-control.sh's host-local launch), and that path can
+# bin/jg-remote-squad-lead-control.sh's host-local launch), and that path can
 # never carry the parent's real state or registry.
 #
 # The fix (report section 7, captain-approved same-machine scope): a durable
-# .jg-secondmate-parent record, written once at seeding next to the
-# .jg-secondmate-home identity marker, names this home's route to its parent as
+# .jg-squad-lead-parent record, written once at seeding next to the
+# .jg-squad-lead-home identity marker, names this home's route to its parent as
 # "local" or "remote". bin/jg-teardown.sh's cleanup gate reads it and treats a
 # remote parent as OUT OF SCOPE (never refuses purely for being cross-machine,
 # since the whole promised-public-reply subsystem is same-filesystem by
@@ -20,8 +20,8 @@
 # shell mask into this home's binding before.
 #
 # This drives the REAL remote route (jg-remote-home-seed.sh -> jg-on.sh ->
-# jg-remote-entrypoint.sh -> the host-local jg-remote-secondmate-control.sh ->
-# the real bin/jg-spawn.sh --secondmate) across the repo's own deterministic SSH
+# jg-remote-entrypoint.sh -> the host-local jg-remote-squad-lead-control.sh ->
+# the real bin/jg-spawn.sh --squad-lead) across the repo's own deterministic SSH
 # boundary and Herdr fixture, then runs the real bin/jg-teardown.sh for a
 # finished child worker inside the produced remote home - never source-text
 # matching.
@@ -76,7 +76,7 @@ cat > "$PUBLISH_FAKEBIN/mv" <<'SH'
 #!/usr/bin/env bash
 destination=${!#}
 case "$destination" in
-  */.jg-secondmate-home)
+  */.jg-squad-lead-home)
     touch "$JG_TEST_PUBLISH_ENTERED"
     while [ ! -f "$JG_TEST_PUBLISH_RELEASE" ]; do sleep 0.02; done
     ;;
@@ -100,15 +100,15 @@ while [ ! -f "$PUBLISH_ENTERED" ]; do
   [ "$publish_wait" -le 250 ] || fail "remote provisioning never reached its completion marker"
   sleep 0.02
 done
-cmp -s "$PUBLISH_HOME/.jg-secondmate-parent" <(
-  printf 'schema=jg-secondmate-parent.v1\nroute=remote\nparent_host=publish-host\n'
+cmp -s "$PUBLISH_HOME/.jg-squad-lead-parent" <(
+  printf 'schema=jg-squad-lead-parent.v1\nroute=remote\nparent_host=publish-host\n'
 ) || fail "remote provisioning exposed completion before publishing the durable parent record"
-assert_absent "$PUBLISH_HOME/.jg-secondmate-home" \
+assert_absent "$PUBLISH_HOME/.jg-squad-lead-home" \
   "the remote identity marker must remain absent until durable parent publication completes"
 touch "$PUBLISH_RELEASE"
 wait "$PUBLISH_PID" || fail "remote provisioning failed after publishing durable state"
 PUBLISH_PID=
-assert_present "$PUBLISH_HOME/.jg-secondmate-home" \
+assert_present "$PUBLISH_HOME/.jg-squad-lead-home" \
   "remote provisioning must publish its identity marker as the completion point"
 pass "remote provisioning publishes durable parent state before its completion marker"
 
@@ -124,7 +124,7 @@ git -C "$REMOTE_ROOT" config user.email test@example.com
 git -C "$REMOTE_ROOT" config user.name Test
 git -C "$REMOTE_ROOT" add .
 git -C "$REMOTE_ROOT" commit -qm 'remote fixture root'
-REMOTE_ORIGIN="$TMP_ROOT/firstmate-origin.git"
+REMOTE_ORIGIN="$TMP_ROOT/juggernaut-origin.git"
 git init -q --bare "$REMOTE_ORIGIN"
 git -C "$REMOTE_ROOT" remote add origin "file://$REMOTE_ORIGIN"
 git -C "$REMOTE_ROOT" push -q -u origin main
@@ -141,7 +141,7 @@ git -C "$PARENT/projects/alpha" remote add origin "file://$TMP_ROOT/alpha.git"
 git -C "$PARENT/projects/alpha" push -q -u origin main
 git --git-dir="$TMP_ROOT/alpha.git" symbolic-ref HEAD refs/heads/main
 printf -- '- alpha [direct-PR] - alpha project (added 2026-08-04)\n' > "$PARENT/data/projects.md"
-printf 'codex\n' > "$PARENT/config/secondmate-harness"
+printf 'codex\n' > "$PARENT/config/squad-lead-harness"
 printf 'tmux\n' > "$PARENT/config/backend"
 
 # The primary home is the X-mode / relay home: the captain's real activation.
@@ -175,7 +175,7 @@ if [ "$command_name" = jg-remote-doctor.sh ]; then
   printf 'ok: remote second-mate readiness confirmed on this host\n'
   exit 0
 fi
-if [ "$command_name" = jg-remote-secondmate-control.sh ] \
+if [ "$command_name" = jg-remote-squad-lead-control.sh ] \
    && [ "$_command_action" = launch ] \
    && [ -n "${JG_TEST_PUBLICATION_TARGET:-}" ]; then
   out=$("$JG_FAKE_REMOTE_ENTRYPOINT" "$@")
@@ -204,20 +204,20 @@ remote_env() {
   "$@"
 }
 
-JG_SECONDMATE_CHARTER='Own iOS delivery on the build Mac.' \
-  JG_SECONDMATE_SCOPE='iOS implementation and Xcode validation' \
+JG_SQUAD_LEAD_CHARTER='Own iOS delivery on the build Mac.' \
+  JG_SQUAD_LEAD_SCOPE='iOS implementation and Xcode validation' \
   remote_env "$ROOT/bin/jg-remote-home-seed.sh" ios remote-mac "$REMOTE_ROOT" "$REMOTE_HOME" alpha \
-  >/dev/null || fail "real remote secondmate seeding failed"
+  >/dev/null || fail "real remote squad_lead seeding failed"
 
 # --- the durable record itself: the fundamental part of the fix -------------
-assert_present "$REMOTE_HOME/.jg-secondmate-parent" \
+assert_present "$REMOTE_HOME/.jg-squad-lead-parent" \
   "real remote provisioning must write a durable parent record"
-cmp -s "$REMOTE_HOME/.jg-secondmate-parent" <(
-  printf 'schema=jg-secondmate-parent.v1\nroute=remote\nparent_host=remote-mac\n'
+cmp -s "$REMOTE_HOME/.jg-squad-lead-parent" <(
+  printf 'schema=jg-squad-lead-parent.v1\nroute=remote\nparent_host=remote-mac\n'
 ) || fail "real remote provisioning must write the exact durable remote parent record"
 
-remote_env "$ROOT/bin/jg-spawn.sh" ios --secondmate >/dev/null \
-  || fail "real remote secondmate launch failed"
+remote_env "$ROOT/bin/jg-spawn.sh" ios --squad-lead >/dev/null \
+  || fail "real remote squad_lead launch failed"
 
 STAGED_LAUNCH=$(sed -n "s/^pane send-text [^ ]* \\. '\([^']*\)' --session [^ ]*\$/\1/p" "$HERDR_LOG" | tail -1)
 [ -n "$STAGED_LAUNCH" ] && [ -f "$STAGED_LAUNCH" ] \
@@ -231,7 +231,7 @@ case "$DELIVERED" in
   *) fail "test setup drifted: expected the remote code root to be delivered as the (wrong) parent binding, got: $DELIVERED" ;;
 esac
 
-# --- a finished child worker inside the remote secondmate home --------------
+# --- a finished child worker inside the remote squad_lead home --------------
 CHILD_WT="$REMOTE_HOME/projects/alpha"
 mkdir -p "$REMOTE_HOME/state"
 # This regression exercises remote-parent binding, not backlog mutation. Keep
@@ -240,7 +240,7 @@ mkdir -p "$REMOTE_HOME/state"
 printf '%s\n' manual > "$REMOTE_HOME/config/backlog-backend"
 write_child_meta() {
   jg_write_meta "$REMOTE_HOME/state/work-child.meta" \
-    "window=firstmate:jg-work-child" "endpoint_task_id=work-child" \
+    "window=juggernaut:jg-work-child" "endpoint_task_id=work-child" \
     "worktree=$CHILD_WT" "project=$CHILD_WT" "harness=codex" "kind=ship" \
     "mode=local-only" "yolo=off"
 }
@@ -263,7 +263,7 @@ run_child_teardown() { # <extra env assignments...>
 
 # Case B-equivalent: the delivered (wrong) binding points at the remote code
 # root, and that root itself carries an X-mode .env - a plausible real-world
-# state (a captain who also runs Firstmate directly on the build Mac). Before
+# state (a captain who also runs Juggernaut directly on the build Mac). Before
 # the fix this refused; the durable record now makes it out of scope.
 printf 'FMX_PAIRING_TOKEN=remote-host-token\n' > "$REMOTE_ROOT/.env"
 run_child_teardown JG_PUBLIC_FOLLOWUP_PRIMARY_HOME="$DELIVERED"
@@ -272,7 +272,7 @@ rm -f "$REMOTE_ROOT/.env"
   || fail "a remote-routed child must allow cleanup when only the remote code root looks relay-active (rc=$CHILD_TEARDOWN_RC): $CHILD_TEARDOWN_OUT"
 assert_not_contains "$CHILD_TEARDOWN_OUT" "cannot resolve the primary home" \
   "a cross-machine parent must never be reported as an unresolved binding"
-pass "a remote secondmate's finished worker cleans up when the remote code root's own .env looked relay-active"
+pass "a remote squad_lead's finished worker cleans up when the remote code root's own .env looked relay-active"
 
 # Case C-equivalent: FMX_PAIRING_TOKEN exported directly in the process
 # environment, simulating the remote host's own login-shell export reaching the
@@ -285,13 +285,13 @@ run_child_teardown JG_PUBLIC_FOLLOWUP_PRIMARY_HOME="$DELIVERED" FMX_PAIRING_TOKE
   || fail "a remote-routed child must allow cleanup when only an ambient exported token looks relay-active (rc=$CHILD_TEARDOWN_RC): $CHILD_TEARDOWN_OUT"
 assert_not_contains "$CHILD_TEARDOWN_OUT" "cannot resolve the primary home" \
   "an ambient exported token from the remote host's own shell must never bind this child"
-pass "a remote secondmate's finished worker cleans up when only an ambient exported token looked relay-active"
+pass "a remote squad_lead's finished worker cleans up when only an ambient exported token looked relay-active"
 
 # Baseline: no signal anywhere. Must keep succeeding exactly as before the fix.
 run_child_teardown
 [ "$CHILD_TEARDOWN_RC" -eq 0 ] \
   || fail "a remote-routed child with no relay signal anywhere must allow cleanup (rc=$CHILD_TEARDOWN_RC): $CHILD_TEARDOWN_OUT"
-pass "a remote secondmate's finished worker cleans up with no relay signal anywhere"
+pass "a remote squad_lead's finished worker cleans up with no relay signal anywhere"
 
 # Protection-preserved case: THIS home's own .env file (not the process
 # environment, not the remote code root) carries a real token. That is a
@@ -301,12 +301,12 @@ printf 'FMX_PAIRING_TOKEN=child-own-token\n' > "$REMOTE_HOME/.env"
 run_child_teardown
 rm -f "$REMOTE_HOME/.env"
 [ "$CHILD_TEARDOWN_RC" -ne 0 ] \
-  || fail "a remote secondmate's own committed .env token must still refuse cleanup, got rc=0: $CHILD_TEARDOWN_OUT"
+  || fail "a remote squad_lead's own committed .env token must still refuse cleanup, got rc=0: $CHILD_TEARDOWN_OUT"
 assert_contains "$CHILD_TEARDOWN_OUT" "cannot resolve the primary home" \
   "a genuine same-filesystem token on this home must remain an actionable refusal"
 assert_present "$REMOTE_HOME/state/work-child.meta" \
   "a genuine refusal must preserve the child work metadata"
-pass "a remote secondmate's own committed relay token still refuses cleanup"
+pass "a remote squad_lead's own committed relay token still refuses cleanup"
 
 FOREIGN_META="$TMP_ROOT/foreign-ios.meta"
 LOCAL_META="$PARENT/state/ios.meta"
@@ -315,15 +315,15 @@ rm -f "$LOCAL_META"
 PUBLICATION_RC=0
 PUBLICATION_OUT=$(JG_TEST_PUBLICATION_TARGET="$LOCAL_META" \
   JG_TEST_PUBLICATION_FOREIGN="$FOREIGN_META" \
-  remote_env "$ROOT/bin/jg-spawn.sh" ios --secondmate 2>&1) || PUBLICATION_RC=$?
+  remote_env "$ROOT/bin/jg-spawn.sh" ios --squad-lead 2>&1) || PUBLICATION_RC=$?
 [ "$PUBLICATION_RC" -ne 0 ] \
-  || fail "remote secondmate publication accepted a target resolving outside its home"
+  || fail "remote squad_lead publication accepted a target resolving outside its home"
 assert_contains "$PUBLICATION_OUT" "task record could not be published" \
-  "remote secondmate publication did not report its record-boundary refusal"
+  "remote squad_lead publication did not report its record-boundary refusal"
 cmp -s "$FOREIGN_META" <(printf 'foreign sentinel\n') \
-  || fail "remote secondmate publication wrote through the foreign target"
+  || fail "remote squad_lead publication wrote through the foreign target"
 [ -L "$LOCAL_META" ] \
-  || fail "remote secondmate publication replaced the refused target boundary"
-pass "remote secondmate publication refuses targets outside its home"
+  || fail "remote squad_lead publication replaced the refused target boundary"
+pass "remote squad_lead publication refuses targets outside its home"
 
 echo "ALL TESTS PASSED"

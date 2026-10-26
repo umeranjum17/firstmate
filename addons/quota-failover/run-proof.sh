@@ -50,7 +50,7 @@ chmod +x "$home/bin/jg-control.sh" "$home/bin/jg-crew-state.sh" "$stub/quota-axi
 cat >"$home/config/crew-dispatch.json" <<'DISPATCH'
 {"rules":[],"default":[{"harness":"claude","model":"claude-haiku-5-5"}]}
 DISPATCH
-printf 'endpoint_task_id=cw\nharness=claude\nmodel=claude-haiku-5-5\nkind=crewmate\nspawn_gen=s0.cw\n' >"$home/state/cw.meta"
+printf 'endpoint_task_id=cw\nharness=claude\nmodel=claude-haiku-5-5\nkind=operator\nspawn_gen=s0.cw\n' >"$home/state/cw.meta"
 printf 'quota exhausted' >"$home/state/cw.screen"
 : >"$home/state/quota-failover.log"
 export PATH="$stub:$PATH" QUOTA_FAILOVER_TEST_SECS=1 QUOTA_FAILOVER_PROBE_SECS=0 QUOTA_FAILOVER_RETEST_SECS=0 QUOTA_FAILOVER_STALL_SECS=0

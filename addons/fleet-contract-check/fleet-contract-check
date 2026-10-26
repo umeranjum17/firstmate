@@ -3,12 +3,12 @@
 #
 #   fleet-contract-check [caller...]     callers: dispatch-resolve owner-guard checks-lint limit-prompt-move (default: all)
 #
-# Reads only: the fork's bin/ and config/ (JG_MAIN_HOME, default $JG_HOME or ~/firstmate) and this repo's add-ons.
+# Reads only: the fork's bin/ and config/ (JG_MAIN_HOME, default $JG_HOME or ~/juggernaut) and this repo's add-ons.
 # Prints `ok <caller>` or `FAIL <caller>: <cause>` per caller; exits 1 when any caller fails, 2 on a usage error.
 set -u
 
 SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
-MAIN=${JG_MAIN_HOME:-${JG_HOME:-$HOME/firstmate}}
+MAIN=${JG_MAIN_HOME:-${JG_HOME:-$HOME/juggernaut}}
 ADDONS=${JG_ADDONS_DIR:-$SRC}
 d=$(mktemp -d) || exit 2
 trap 'rm -rf -- "$d"' EXIT

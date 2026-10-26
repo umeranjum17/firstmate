@@ -65,7 +65,7 @@ case "$CONTAINER" in
   *) fail "container_ensure returned an unexpected shape: $CONTAINER" ;;
 esac
 [ -n "$SEEDED_TAB_ID" ] || fail "the first container_ensure in a brand-new isolated session must CREATE the workspace and report its seeded default tab id"
-pass "real herdr: container_ensure starts the isolated session's server, creates the firstmate workspace ($CONTAINER), and reports its seeded default tab id ($SEEDED_TAB_ID)"
+pass "real herdr: container_ensure starts the isolated session's server, creates the juggernaut workspace ($CONTAINER), and reports its seeded default tab id ($SEEDED_TAB_ID)"
 
 # --- client selection: the real status shape the selection reads ------------
 # bin/backends/herdr.sh "client selection" steps around a client the running
@@ -89,7 +89,7 @@ CONTAINER2=${CONTAINER2_RAW%%$'\t'*}
 SEEDED_TAB_ID2=${CONTAINER2_RAW#*$'\t'}
 [ "$CONTAINER2" = "$CONTAINER" ] || fail "container_ensure is not idempotent: '$CONTAINER' vs '$CONTAINER2'"
 [ -z "$SEEDED_TAB_ID2" ] || fail "an ADOPTED (reused) workspace must report an EMPTY seeded default tab id, got '$SEEDED_TAB_ID2'"
-pass "real herdr: container_ensure is idempotent (reuses/adopts the existing firstmate workspace, reports no seeded default tab on adoption)"
+pass "real herdr: container_ensure is idempotent (reuses/adopts the existing juggernaut workspace, reports no seeded default tab on adoption)"
 
 # --- create_task + duplicate refusal + default-tab prune ---------------------
 
@@ -181,7 +181,7 @@ printf '%s' "$HUSK_WS_TABS" | jq -e --arg t "$NEW_HUSK_TAB_ID" '.result.tabs[] |
 pass "real herdr: create_task closes and replaces a same-labeled tab whose pane hosts no registered agent (the restored-husk shape), leaving the workspace intact"
 jg_backend_herdr_kill "$SESSION:$NEW_HUSK_PANE_ID"
 
-# --- workspace-per-home: a secondmate-shaped home gets its OWN space --------
+# --- workspace-per-home: a squad-lead-shaped home gets its OWN space --------
 # (docs/herdr-backend.md "Task container shape", AGENTS.md task
 # herdr-sm-spaces-k4). Reuses this suite's own isolated $SESSION - a SECOND,
 # distinct workspace inside the SAME session, never a second session. Placed
@@ -190,48 +190,48 @@ jg_backend_herdr_kill "$SESSION:$NEW_HUSK_PANE_ID"
 # possibly-emptied-and-auto-closed primary workspace.
 
 SM_SCRATCH=$(mktemp -d "${TMPDIR:-/tmp}/jg-herdr-smoke-sm.XXXXXX")
-SM_HOME="$SM_SCRATCH/secondmate-home"
+SM_HOME="$SM_SCRATCH/squad-lead-home"
 mkdir -p "$SM_HOME"
-printf 'smoketest-sm1\n' > "$SM_HOME/.jg-secondmate-home"
+printf 'smoketest-sm1\n' > "$SM_HOME/.jg-squad-lead-home"
 
-SM_CONTAINER_RAW=$(JG_HOME="$SM_HOME" jg_backend_herdr_container_ensure /tmp) || fail "secondmate-shaped container_ensure failed"
+SM_CONTAINER_RAW=$(JG_HOME="$SM_HOME" jg_backend_herdr_container_ensure /tmp) || fail "squad-lead-shaped container_ensure failed"
 SM_CONTAINER=${SM_CONTAINER_RAW%%$'\t'*}
 SM_SEEDED_TAB_ID=${SM_CONTAINER_RAW#*$'\t'}
 case "$SM_CONTAINER" in
   "$SESSION":w*) : ;;
-  *) fail "secondmate container_ensure returned an unexpected shape: $SM_CONTAINER" ;;
+  *) fail "squad_lead container_ensure returned an unexpected shape: $SM_CONTAINER" ;;
 esac
-[ "$SM_CONTAINER" != "$CONTAINER" ] || fail "a secondmate-shaped home must get a DIFFERENT workspace than the primary's, got the same: $SM_CONTAINER"
-[ -n "$SM_SEEDED_TAB_ID" ] || fail "the secondmate-shaped home's container_ensure must CREATE its own workspace and report its seeded default tab id"
-pass "real herdr: a secondmate-shaped home (.jg-secondmate-home) gets its OWN herdr workspace, distinct from the primary's, in the SAME session"
+[ "$SM_CONTAINER" != "$CONTAINER" ] || fail "a squad-lead-shaped home must get a DIFFERENT workspace than the primary's, got the same: $SM_CONTAINER"
+[ -n "$SM_SEEDED_TAB_ID" ] || fail "the squad-lead-shaped home's container_ensure must CREATE its own workspace and report its seeded default tab id"
+pass "real herdr: a squad-lead-shaped home (.jg-squad-lead-home) gets its OWN herdr workspace, distinct from the primary's, in the SAME session"
 
 SM_WSID=${SM_CONTAINER#*:}
 SM_LABEL_REAL=$(herdr workspace list --session "$SESSION" 2>&1 | jq -r --arg id "$SM_WSID" '.result.workspaces[]? | select(.workspace_id == $id) | .label')
-[ "$SM_LABEL_REAL" = "2ndmate-smoketest-sm1" ] || fail "the secondmate workspace's real herdr label should be 2ndmate-smoketest-sm1, got '$SM_LABEL_REAL'"
-pass "real herdr: the secondmate-shaped home's workspace is labeled 2ndmate-<secondmate-id> in herdr itself"
+[ "$SM_LABEL_REAL" = "2ndmate-smoketest-sm1" ] || fail "the squad_lead workspace's real herdr label should be 2ndmate-smoketest-sm1, got '$SM_LABEL_REAL'"
+pass "real herdr: the squad-lead-shaped home's workspace is labeled 2ndmate-<squad-lead-id> in herdr itself"
 
 SM_TASK_LABEL="jg-smtask1"
-SM_TASK_IDS=$(JG_HOME="$SM_HOME" jg_backend_herdr_create_task "$SM_CONTAINER" "$SM_TASK_LABEL" /tmp "$SM_SEEDED_TAB_ID") || fail "secondmate create_task failed"
+SM_TASK_IDS=$(JG_HOME="$SM_HOME" jg_backend_herdr_create_task "$SM_CONTAINER" "$SM_TASK_LABEL" /tmp "$SM_SEEDED_TAB_ID") || fail "squad_lead create_task failed"
 read -r SM_TAB_ID SM_PANE_ID <<EOF
 $SM_TASK_IDS
 EOF
 if [ -z "$SM_TAB_ID" ] || [ -z "$SM_PANE_ID" ]; then
-  fail "secondmate create_task did not return tab/pane ids"
+  fail "squad_lead create_task did not return tab/pane ids"
 fi
-pass "real herdr: a task spawned into the secondmate-shaped home lands as a tab inside the secondmate's OWN workspace"
+pass "real herdr: a task spawned into the squad-lead-shaped home lands as a tab inside the squad_lead's OWN workspace"
 
 # list_live for each home must never see the OTHER home's task.
 PRIMARY_LIVE=$(jg_backend_herdr_list_live "$SESSION")
 case "$PRIMARY_LIVE" in
-  *"$SM_TASK_LABEL"*) fail "the primary home's list_live must not see a secondmate-shaped home's task"$'\n'"$PRIMARY_LIVE" ;;
+  *"$SM_TASK_LABEL"*) fail "the primary home's list_live must not see a squad-lead-shaped home's task"$'\n'"$PRIMARY_LIVE" ;;
 esac
 SM_LIVE=$(JG_HOME="$SM_HOME" jg_backend_herdr_list_live "$SESSION")
 case "$SM_LIVE" in
   *"$SM_TASK_LABEL"*) : ;;
-  *) fail "the secondmate-shaped home's list_live did not see its own task"$'\n'"$SM_LIVE" ;;
+  *) fail "the squad-lead-shaped home's list_live did not see its own task"$'\n'"$SM_LIVE" ;;
 esac
 case "$SM_LIVE" in
-  *"$LABEL"*) fail "the secondmate-shaped home's list_live must not see the primary's task ($LABEL)"$'\n'"$SM_LIVE" ;;
+  *"$LABEL"*) fail "the squad-lead-shaped home's list_live must not see the primary's task ($LABEL)"$'\n'"$SM_LIVE" ;;
 esac
 pass "real herdr: list_live stays scoped to each home's own workspace - neither home sees the other's tasks"
 
@@ -247,15 +247,15 @@ sleep 0.5
 jg_backend_herdr_server_ensure "$SESSION" || fail "the isolated session's server did not come back up after the stop"
 
 POST_LIST=$(herdr workspace list --session "$SESSION" 2>&1)
-POST_PRIMARY_ID=$(printf '%s' "$POST_LIST" | jq -r '.result.workspaces[]? | select(.label == "firstmate") | .workspace_id')
+POST_PRIMARY_ID=$(printf '%s' "$POST_LIST" | jq -r '.result.workspaces[]? | select(.label == "juggernaut") | .workspace_id')
 POST_SM_ID=$(printf '%s' "$POST_LIST" | jq -r --arg l "2ndmate-smoketest-sm1" '.result.workspaces[]? | select(.label == $l) | .workspace_id')
 [ "$POST_PRIMARY_ID" = "${CONTAINER#*:}" ] || fail "the primary workspace id did not survive the restart: before=${CONTAINER#*:} after=$POST_PRIMARY_ID"
-[ "$POST_SM_ID" = "$SM_WSID" ] || fail "the secondmate workspace id did not survive the restart: before=$SM_WSID after=$POST_SM_ID"
+[ "$POST_SM_ID" = "$SM_WSID" ] || fail "the squad_lead workspace id did not survive the restart: before=$SM_WSID after=$POST_SM_ID"
 
 POST_PANE=$(herdr pane get "$PANE_ID" --session "$SESSION" 2>/dev/null | jq -r '.result.pane.pane_id // empty')
 [ "$POST_PANE" = "$PANE_ID" ] || fail "the primary task's pane id did not survive the restart: before=$PANE_ID after=$POST_PANE"
 POST_SM_PANE=$(herdr pane get "$SM_PANE_ID" --session "$SESSION" 2>/dev/null | jq -r '.result.pane.pane_id // empty')
-[ "$POST_SM_PANE" = "$SM_PANE_ID" ] || fail "the secondmate task's pane id did not survive the restart: before=$SM_PANE_ID after=$POST_SM_PANE"
+[ "$POST_SM_PANE" = "$SM_PANE_ID" ] || fail "the squad_lead task's pane id did not survive the restart: before=$SM_PANE_ID after=$POST_SM_PANE"
 pass "real herdr: BOTH workspace ids/labels AND both tasks' pane ids survive a session stop + fresh server restart (multi-workspace shape)"
 
 jg_backend_herdr_kill "$SESSION:$SM_PANE_ID"
@@ -340,7 +340,7 @@ pass "real herdr: kill removes the pane and is idempotent/best-effort"
 
 # --- list_live (label-based recovery discovery) ------------------------------
 
-# Real firstmate spawns always re-run container_ensure immediately before
+# Real juggernaut spawns always re-run container_ensure immediately before
 # create_task (bin/jg-spawn.sh), never reusing a container reference from an
 # earlier spawn. This test must do the same: the kill above closed the only
 # remaining tab in $CONTAINER's workspace, and closing a workspace's last tab

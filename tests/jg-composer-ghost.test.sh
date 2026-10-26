@@ -15,7 +15,7 @@
 #      pending, while still treating real (normal/bright) text as pending.
 #   3. The tmux reader structurally scans every row of a multi-row composer.
 #   4. The human/LLM-facing capture path (jg-peek.sh) stays PLAIN - no escape codes
-#      ever reach firstmate's context.
+#      ever reach juggernaut's context.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -171,8 +171,8 @@ test_strip_ghost_keeps_muse_composer_colors() {
     || fail "muse's idle composer glyph was stripped as ghost text: '$out'"
   # The submitted-prompt row carries a background colour too; an SGR 48 payload
   # must not be luminance-tested as if it were the foreground.
-  out=$(printf '\033[38;2;90;160;255m\033[48;2;38;56;84m\xe2\x9f\xa9 \033[38;2;204;211;219mhello from firstmate\033[39m\n' | jg_tmux_strip_ghost)
-  [ "$out" = "$(printf '%s hello from firstmate' "$glyph")" ] \
+  out=$(printf '\033[38;2;90;160;255m\033[48;2;38;56;84m\xe2\x9f\xa9 \033[38;2;204;211;219mhello from juggernaut\033[39m\n' | jg_tmux_strip_ghost)
+  [ "$out" = "$(printf '%s hello from juggernaut' "$glyph")" ] \
     || fail "muse's typed text or background-coloured glyph row was stripped: '$out'"
   # The restored prompt muse puts back into the composer after an Escape
   # interrupt is real bright text and must stay visible as pending input.
@@ -663,7 +663,7 @@ test_peek_output_is_escape_free() {
   fb=$(make_fake_tmux "$dir")
   capture="$dir/styled.txt"
   # A pane full of styling, including dim ghost text. The plain peek path must
-  # surface NONE of these escape codes into firstmate's context.
+  # surface NONE of these escape codes into juggernaut's context.
   printf 'normal output line\n\xe2\x9d\xaf \033[2mpredicted next prompt\033[0m\n' > "$capture"
   # Empty JG_HOME so jg-guard.sh finds no in-flight task and stays silent.
   home="$dir/home"; mkdir -p "$home/state"
@@ -678,7 +678,7 @@ test_peek_output_is_escape_free() {
     *"predicted next prompt"*) : ;;
     *) fail "jg-peek dropped pane content (expected the ghost text body as plain text)" ;;
   esac
-  pass "jg-peek output is escape-free (no raw -e bytes reach firstmate context)"
+  pass "jg-peek output is escape-free (no raw -e bytes reach juggernaut context)"
 }
 
 test_strip_ghost_drops_dim_keeps_normal

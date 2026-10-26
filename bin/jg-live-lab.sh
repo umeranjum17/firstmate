@@ -4,7 +4,7 @@
 # jg-live-lab.sh - stand up, check, drive, and tear down one disposable live
 # supervision lab: a real lab main session on Claude or Pi, with the
 # supervision host (Claude) or branch (Pi) wired as a real home runs it,
-# optionally a real seeded local second mate and a real gated worker.
+# optionally a real seeded local squad lead and a real gated worker.
 #
 # Usage:
 #   jg-live-lab.sh up --harness claude|pi [--mate] [--worker]
@@ -41,7 +41,7 @@
 #                    committed tree <ref> of <source> (default: HEAD of the
 #                    checkout this script runs from) checked out as a genuine
 #                    primary checkout, with JG_HOME at its root.
-#   config/          backend tmux, Claude crews and second mates, and
+#   config/          backend tmux, Claude crews and squad leads, and
 #                    supervision-host <line> (default claude claude-haiku-5-5
 #                    on Claude, absent on Pi; none leaves the file absent;
 #                    off writes the inherited supervision-host-off opt-out
@@ -75,7 +75,7 @@
 #                    that a fixed id would share with other labs and tasks.
 #   mate/            --mate: bin/jg-home-seed.sh <mate-id> <lab-root>/mate
 #                    --no-projects (an explicit path cloned from the git lab
-#                    home), launched by bin/jg-spawn.sh --secondmate.
+#                    home), launched by bin/jg-spawn.sh --squad-lead.
 #   worker           --worker: a lab project notes with a lab-private origin
 #                    (local-only +yolo), a scaffolded brief, a backlog item, and
 #                    a real bin/jg-spawn.sh worker that parks on
@@ -209,7 +209,7 @@ window_id() {
   esac
   window=$(sed -n 's/^window=//p' "$LAB/state/$name.meta" 2>/dev/null)
   [ -z "$window" ] || name=${window#*:}
-  lab_tmux list-windows -t firstmate -F "#{window_name}$(printf '\t')#{window_id}" 2>/dev/null \
+  lab_tmux list-windows -t juggernaut -F "#{window_name}$(printf '\t')#{window_id}" 2>/dev/null \
     | awk -F '\t' -v n="$name" '$1 == n { print $2; exit }'
 }
 
@@ -408,7 +408,7 @@ make_notes_project() {
   mkdir -p "$seed/notes" "$seed/tests"
   git init -q -b main "$seed"
   cat > "$seed/notes/__init__.py" <<'PY'
-"""A tiny notes library used by the firstmate live lab."""
+"""A tiny notes library used by the juggernaut live lab."""
 
 NOTES = []
 
@@ -464,7 +464,7 @@ spawn_worker() {
 import os, sys
 path = sys.argv[1]
 text = open(path, encoding="utf-8").read()
-text = text.replace("{TASK}", os.environ["TASK_TEXT"], 1).replace("{FIRSTMATE_SPEC}", os.environ["SPEC_TEXT"], 1)
+text = text.replace("{TASK}", os.environ["TASK_TEXT"], 1).replace("{JUGGERNAUT_SPEC}", os.environ["SPEC_TEXT"], 1)
 open(path, "w", encoding="utf-8").write(text)
 PY
   (cd "$LAB" && lab_run JG_HOME="$LAB" "$LAB/bin/jg-tasks-axi.sh" add "$WORKER_ID" "lab gated worker" --kind ship --repo notes --priority 2) >/dev/null || return 1
@@ -473,11 +473,11 @@ PY
 }
 
 spawn_mate() {
-  local charter='Provide an idle live-validation lab second mate. When explicitly steered for a synthetic test, report only honest local lab outcomes; do not claim external PR activity, merge, or retire yourself.'
-  (cd "$LAB" && lab_run JG_HOME="$LAB" JG_SECONDMATE_CHARTER="$charter" \
-    JG_SECONDMATE_SCOPE='second-mate live validation synthetic status relay' \
+  local charter='Provide an idle live-validation lab squad lead. When explicitly steered for a synthetic test, report only honest local lab outcomes; do not claim external PR activity, merge, or retire yourself.'
+  (cd "$LAB" && lab_run JG_HOME="$LAB" JG_SQUAD_LEAD_CHARTER="$charter" \
+    JG_SQUAD_LEAD_SCOPE='second-mate live validation synthetic status relay' \
     "$LAB/bin/jg-home-seed.sh" "$MATE_ID" "$ROOT/mate" --no-projects) || return 1
-  (cd "$LAB" && lab_run JG_HOME="$LAB" "$LAB/bin/jg-spawn.sh" "$MATE_ID" --secondmate)
+  (cd "$LAB" && lab_run JG_HOME="$LAB" "$LAB/bin/jg-spawn.sh" "$MATE_ID" --squad-lead)
 }
 
 cmd_up() {
@@ -558,7 +558,7 @@ cmd_up() {
   wire_treehouse_root "$LAB"
   printf 'tmux\n' > "$LAB/config/backend"
   printf 'claude\n' > "$LAB/config/crew-harness"
-  printf 'claude claude-haiku-5-5 low\n' > "$LAB/config/secondmate-harness"
+  printf 'claude claude-haiku-5-5 low\n' > "$LAB/config/squad-lead-harness"
   printf 'auto\n' > "$LAB/config/claude-permission-mode"
   case "$host_line" in
     none) ;;
@@ -569,11 +569,11 @@ cmd_up() {
 
   TMUX_DIR=$("$LAB_HOME_HELPER" tmux-dir "$LAB") || die "cannot create the private tmux directory"
   echo "tmux_dir=$TMUX_DIR" >> "$ROOT/$RECORD_NAME"
-  lab_run tmux -f /dev/null new-session -d -s firstmate -n lab -x 220 -y 60 -c "$ROOT" || die "cannot start the lab tmux server"
+  lab_run tmux -f /dev/null new-session -d -s juggernaut -n lab -x 220 -y 60 -c "$ROOT" || die "cannot start the lab tmux server"
   record_launch_pid "$(lab_tmux display-message -p '#{pid}')"
 
   if [ "$mate" = yes ]; then
-    spawn_mate || die "cannot seed and launch the second mate"
+    spawn_mate || die "cannot seed and launch the squad lead"
     record_launch_pid "$(window_field mate '#{pane_pid}')"
   fi
   if [ "$worker" = yes ]; then
@@ -599,7 +599,7 @@ cmd_up() {
   else
     primary=(pi --approve --session-dir "$ROOT/pi-sessions" --model "$model" --thinking "$effort")
   fi
-  lab_tmux new-window -d -t firstmate: -n main -c "$LAB" \
+  lab_tmux new-window -d -t juggernaut: -n main -c "$LAB" \
     env JG_HOME="$LAB" CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false "${primary[@]}" \
     || die "cannot launch the lab primary"
   lab_tmux set-option -w -t "$(window_id main)" remain-on-exit on >/dev/null

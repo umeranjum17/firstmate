@@ -4,7 +4,7 @@
 # jg-lease-lib.sh - the per-task supervision lease contract (one owner).
 #
 # WHY. A supervision branch (docs/pi-supervision-branch.md) is a second LLM
-# actor beside MAIN (the captain's chat) in one firstmate home - on Pi, a
+# actor beside MAIN (the captain's chat) in one juggernaut home - on Pi, a
 # persistent conversation inside the same pi process; beside another primary,
 # a headless engine session run by the supervision host
 # (docs/supervision-host.md) - and nothing in this contract assumes the two
@@ -20,7 +20,7 @@
 #   - Lease file: $STATE/.lease-<task>, one line "<actor>\t<pid>\t<epoch>".
 #     Written atomically (temp + ln for claim, temp + mv for a same-actor
 #     refresh), with inspection and mutation serialized by the home-local
-#     lease-command lock; leases never coordinate across firstmate homes.
+#     lease-command lock; leases never coordinate across juggernaut homes.
 #   - Actors: exactly "main" and "branch". The current actor is
 #     $JG_SUPERVISION_ACTOR when set, else "main". The branch's shell gets
 #     JG_SUPERVISION_ACTOR=branch injected deterministically by the process
@@ -67,7 +67,7 @@
 #     home that never runs a branch is unchanged byte for byte.
 #   - Role partition (jg_lease_forbid_branch): actions MAIN alone owns -
 #     merging a PR, landing local-only work, spawning workers, answering a
-#     decision, retiring a secondmate - refuse the branch actor outright,
+#     decision, retiring a squad_lead - refuse the branch actor outright,
 #     lease or no lease, while the home is attended. While a confirmed,
 #     readable, live away record exists (bin/jg-afk-contract.sh validate and
 #     mode, never quiet mode's record, whose captain is present; docs/pi-
@@ -80,7 +80,7 @@
 #     relocation grants nothing beyond what main could do attended: it only
 #     changes which actor may reach the guarded script's own gate. An action
 #     that has no record-side gate of its own - landing local-only work or
-#     retiring a secondmate - is never relocated and keeps refusing the branch
+#     retiring a squad_lead - is never relocated and keeps refusing the branch
 #     in both postures. An archived, absent, unconfirmed, or unreadable record
 #     is absence: the
 #     attended refusal, byte for byte. The record is validated immediately

@@ -43,7 +43,7 @@ if [ -n "${PI_QUOTA_FAILOVER_ACCOUNT_POOL+x}" ]; then
 elif [ -n "${JG_HOME:-}" ]; then
   pool_config=$JG_HOME/config/account-pool
 else
-  pool_config=$HOME/firstmate/config/account-pool
+  pool_config=$HOME/juggernaut/config/account-pool
 fi
 agent=pi
 model=claude-bridge/claude-haiku-5-5
@@ -70,7 +70,7 @@ if [ -z "$model_pool" ]; then
   for cand in \
     "$(cd "$(dirname "$0")/.." 2>/dev/null && pwd)/account-pool/bin/jg-model-pool" \
     "${JG_ADDONS_DIR:+$JG_ADDONS_DIR/account-pool/bin/jg-model-pool}" \
-    "${JG_HOME:+$JG_HOME/projects/firstmate-addons/account-pool/bin/jg-model-pool}"; do
+    "${JG_HOME:+$JG_HOME/projects/juggernaut-addons/account-pool/bin/jg-model-pool}"; do
     [ -n "${cand:-}" ] && [ -x "$cand" ] && { model_pool=$cand; break; }
   done
 fi

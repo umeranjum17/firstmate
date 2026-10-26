@@ -209,7 +209,7 @@ fi
 # bare idle shell, so its emptying-close plan always takes the focus-preserving
 # pane-death route. The reported defect lives on the other branch: a doomed pane
 # whose shell holds a PERSISTENT child (a gitstatusd, a zsh-async worker,
-# direnv, or anything a crewmate backgrounded) fails the lone-idle-shell proof
+# direnv, or anything a operator backgrounded) fails the lone-idle-shell proof
 # permanently, and the plan falls back to the plain explicit close.
 # The geometry puts the doomed workspace AFTER the anchor so the plan performs
 # no repositioning at all, and puts a spacer immediately to its right so the

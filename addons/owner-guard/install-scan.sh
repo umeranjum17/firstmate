@@ -14,13 +14,13 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # (mode 700, the old file kept as .bak-owner-guard-scan-<stamp> when it
 # differs), and register the check with the home's bin/jg-check-register.sh.
 # Idempotent. Usage: install-scan.sh [--dry-run] [<home>] (the home defaults
-# to JG_HOME, else JG_MAIN_HOME, else ~/firstmate)
+# to JG_HOME, else JG_MAIN_HOME, else ~/juggernaut)
 set -euo pipefail
 dry=0 uninstall=0
 if [ "${1:-}" = --dry-run ]; then dry=1; shift; fi
 if [ "${1:-}" = --uninstall ]; then uninstall=1; shift; fi
 [ "$#" -le 1 ] || { echo 'usage: install-scan.sh [--dry-run] [--uninstall] [<home>]' >&2; exit 2; }
-FMH=${1:-${JG_HOME:-${JG_MAIN_HOME:-$HOME/firstmate}}}
+FMH=${1:-${JG_HOME:-${JG_MAIN_HOME:-$HOME/juggernaut}}}
 src=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/scan-check
 dest=${XDG_DATA_HOME:-$HOME/.local/share}/jg-owner-guard-scan/scan-check
 check=$FMH/state/owner-details-scan.check.sh

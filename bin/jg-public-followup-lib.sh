@@ -2,10 +2,10 @@
 # jg-public-followup-lib.sh - shared gating and private-transport helpers for the
 # deterministic public-followup consumer.
 #
-# Firstmate promises a public final reply when a myfirstmate relay mention (X or
+# Juggernaut promises a public final reply when a myjuggernaut relay mention (X or
 # Discord) asks for work. `tasks-axi public-followup` is the sole owner of that
 # typed obligation and its state machine; state/x-context/ is the sole owner of
-# the private full request context. This library owns Firstmate's activation
+# the private full request context. This library owns Juggernaut's activation
 # gate, private per-home transport paths, retained-loop state and locking
 # helpers, follow-up window classification, and deterministic terminal-event
 # identity.
@@ -15,7 +15,7 @@
 # set -u / set -e safe.
 #
 # GATE ORDER - the acceptance criterion for relay-disabled homes:
-#   1. jg_pf_relay_active <home>     the authoritative myfirstmate activation
+#   1. jg_pf_relay_active <home>     the authoritative myjuggernaut activation
 #                                    contract, a non-empty FMX_PAIRING_TOKEN in
 #                                    <home>/.env. There is no second flag. When
 #                                    <home>/.env is absent this is a single
@@ -34,7 +34,7 @@
 # public-followup commands):
 #   registry/<obligation-id>   registration record: the bounded private binding
 #                              (obligation, relation, work ref and canonical
-#                              secondmate path, generation, platform,
+#                              squad_lead path, generation, platform,
 #                              request id)
 #                              plus the loop fields that survive delivery (state,
 #                              delivered_at, followup_expires_at,
@@ -98,7 +98,7 @@ JG_PF_EVENT_BYTES_MAX=${JG_PF_EVENT_BYTES_MAX:-8192}
 
 # --- gate 1: the authoritative relay activation contract --------------------
 
-# jg_pf_relay_active <home>: 0 when this home has opted into the myfirstmate
+# jg_pf_relay_active <home>: 0 when this home has opted into the myjuggernaut
 # relay, 1 otherwise. Identical contract to bootstrap's X-mode activation - a
 # non-empty FMX_PAIRING_TOKEN in <home>/.env - so no second activation flag
 # exists to drift. FMX_PAIRING_TOKEN in the environment wins, matching
@@ -173,13 +173,13 @@ jg_pf_slug_valid() {
 }
 
 # jg_pf_home_id_valid <home_id>: tasks-axi accepts "main" or
-# "secondmate:<stable-id>" as a work_ref home. Validate the same shape here so a
+# "squad_lead:<stable-id>" as a work_ref home. Validate the same shape here so a
 # malformed source home is refused before it reaches a filename or a CLI call.
 jg_pf_home_id_valid() {
   local v=$1
   case "$v" in
     main) return 0 ;;
-    secondmate:*) jg_pf_slug_valid "${v#secondmate:}" ;;
+    squad_lead:*) jg_pf_slug_valid "${v#squad_lead:}" ;;
     *) return 1 ;;
   esac
 }
@@ -584,7 +584,7 @@ JG_PF_SURFACED_BASENAME=surfaced
 
 # jg_pf_events_signature <state>: a stable digest of the pending event id set.
 # The relay poll compares it against the surfaced record so an unconsumed event
-# wakes firstmate once per new event, not once per poll cycle.
+# wakes juggernaut once per new event, not once per poll cycle.
 jg_pf_events_signature() {
   local dir entry pending_names=
   dir=$(jg_pf_events_dir "$1")

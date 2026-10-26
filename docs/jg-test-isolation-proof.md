@@ -165,10 +165,10 @@ That its duration landed within 3% of the two clean runs is evidence the elevate
 These durations are not comparable with the six-member run above: that measurement was taken on a different machine state, and the gap is far larger than two short scripts can account for, so it is not evidence about the two new members.
 For the same reason the 1.72x four-worker figure recorded above is left as a statement about that measurement rather than restated as current.
 
-### secondmate: admitted
+### squad lead: admitted
 
 - Date: 2026-09-03
-- Command: `bin/jg-test-isolation-proof.sh --pool secondmate --jobs 4`
+- Command: `bin/jg-test-isolation-proof.sh --pool squad lead --jobs 4`
 - Result: two consecutive runs, 21 candidates, 0 failures.
 
 | Run | Summary |
@@ -177,7 +177,7 @@ For the same reason the 1.72x four-worker figure recorded above is left as a sta
 | 2 | `JG_ISOLATION_SUMMARY total=21 failed=0 concurrency=4 duration_ms=571247` |
 
 An earlier proof on 2026-09-03 refused this family on `tests/jg-backlog-handoff.test.sh`, failing two runs of three with `Task "pre-move-crash" not found in this backlog`.
-The cause was in the case's crash injection, not in shared secondmate state.
+The cause was in the case's crash injection, not in shared squad lead state.
 Its fake `tasks-axi` killed the handoff and then slept a fixed second before delegating to the real binary, expecting to be torn down during that pause.
 Nothing tore it down: the fake outlives the process it kills, so on a host slow enough for the case's next assertions to take longer than a second, the orphan woke up and completed the very move the case requires left undone, which then made the recovery step fail.
 Direct observation of the source and destination backlogs during the injected crash showed exactly that, the item moving one second after the crash while the case was still asserting.
@@ -238,7 +238,7 @@ Curated `--family`, `--lane`, and `--all` selections remain serial unless the ca
 
 | family | scripts | `--jobs 1` | `--jobs 4` | speedup | recovered |
 |---|---:|---:|---:|---:|---:|
-| `secondmate` | 21 | 1233.1s | 453.4s | 2.72x | 779.7s |
+| `squad lead` | 21 | 1233.1s | 453.4s | 2.72x | 779.7s |
 | `session-bootstrap` | 11 | 756.4s | 286.4s | 2.64x | 470.0s |
 | `standalone` | 28 | 724.6s | 261.1s | 2.78x | 463.5s |
 | total | 60 | 2714.1s | 1000.9s | 2.71x | 1713.2s (28.6 min) |

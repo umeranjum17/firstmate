@@ -1,4 +1,4 @@
-// Firstmate's Calm-only animated working presentation for Pi.
+// Juggernaut's Calm-only animated working presentation for Pi.
 //
 // Calm replaces Pi's stock working row with a tiny SSHHIP-derived boat while one
 // logical agent run is active. The sprite geometry, bounce track, two animation

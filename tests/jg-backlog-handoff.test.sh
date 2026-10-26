@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # tests/jg-backlog-handoff.test.sh - full item-block handoff (header + indented body).
 #
-# The happy single-line path and broad safety refusals live in the secondmate
+# The happy single-line path and broad safety refusals live in the squad_lead
 # lifecycle and safety suites. This file owns focused delegated-handoff
 # regressions: the multi-line body contract and registry home parsing edge cases.
 set -u
 
-# shellcheck source=tests/secondmate-helpers.sh disable=SC1091
-. "$(dirname "${BASH_SOURCE[0]}")/secondmate-helpers.sh"
+# shellcheck source=tests/squad-lead-helpers.sh disable=SC1091
+. "$(dirname "${BASH_SOURCE[0]}")/squad-lead-helpers.sh"
 
 # The move is delegated to `tasks-axi mv`, so this suite exercises the real
 # binary. Skip cleanly when it is absent (matching the backend smoke suites).
@@ -16,7 +16,7 @@ command -v tasks-axi >/dev/null 2>&1 || { echo "skip: tasks-axi not found (requi
 TMP_ROOT=$(jg_test_tmproot jg-backlog-handoff)
 HANDOFF_FAKEBIN=$(make_fake_tmux "$TMP_ROOT/default-fake")
 export PATH="$HANDOFF_FAKEBIN:$PATH"
-export JG_FAKE_TMUX_WINDOW='firstmate:jg-design'
+export JG_FAKE_TMUX_WINDOW='juggernaut:jg-design'
 export JG_FAKE_TMUX_LOG="$TMP_ROOT/default-tmux.log"
 export JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/default-fake/pane.txt"
 export JG_SEND_SETTLE=0 JG_SEND_SLEEP=0 JG_SEND_RETRIES=1
@@ -24,14 +24,14 @@ export JG_SEND_SETTLE=0 JG_SEND_SLEEP=0 JG_SEND_RETRIES=1
 setup_homes() {
   local home=$1 subhome=$2 id=${3:-design}
   mkdir -p "$home/data" "$home/state"
-  seed_secondmate_home_marker "$subhome" "$id"
+  seed_squad_lead_home_marker "$subhome" "$id"
   local sub_abs
   sub_abs=$(cd "$subhome" && pwd -P)
   printf -- '- %s - feature work (home: %s; scope: feature work; projects: alpha; added 2026-07-09)\n' \
-    "$id" "$sub_abs" > "$home/data/secondmates.md"
+    "$id" "$sub_abs" > "$home/data/squad_leads.md"
   cat > "$home/state/$id.meta" <<EOF
-window=firstmate:jg-$id
-kind=secondmate
+window=juggernaut:jg-$id
+kind=squad_lead
 harness=claude
 backend=tmux
 home=$sub_abs
@@ -53,7 +53,7 @@ inbox_record_count() { # <state-dir> <task-id>
 }
 
 doorbell_count() { # <backend-log>
-  grep -cF 'Firstmate instruction waiting:' "$1" 2>/dev/null || true
+  grep -cF 'Juggernaut instruction waiting:' "$1" 2>/dev/null || true
 }
 
 # A live local receiver gets the routed-work instruction through its durable
@@ -63,8 +63,8 @@ test_handoff_wakes_live_local_receiver() {
   setup_homes "$home" "$sub"
   mkdir -p "$sub/state" "$sub/data"
   cat > "$home/state/design.meta" <<EOF
-window=firstmate:jg-design
-kind=secondmate
+window=juggernaut:jg-design
+kind=squad_lead
 harness=claude
 backend=tmux
 home=$sub
@@ -80,7 +80,7 @@ EOF
   fakebin=$(make_fake_tmux "$TMP_ROOT/live-wake-fake")
   out="$TMP_ROOT/live-wake.out"
   JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" PATH="$fakebin:$PATH" \
-    JG_FAKE_TMUX_WINDOW='firstmate:jg-design' \
+    JG_FAKE_TMUX_WINDOW='juggernaut:jg-design' \
     JG_FAKE_TMUX_LOG="$TMP_ROOT/live-wake-tmux.log" \
     JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/live-wake-fake/pane.txt" \
     JG_SEND_SETTLE=0 JG_SEND_SLEEP=0 JG_SEND_RETRIES=1 \
@@ -97,7 +97,7 @@ EOF
   [ "$(doorbell_count "$TMP_ROOT/live-wake-tmux.log")" -eq 1 ] \
     || fail "handoff did not ring exactly one constant receiver doorbell"
   JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" PATH="$fakebin:$PATH" \
-    JG_FAKE_TMUX_WINDOW='firstmate:jg-design' \
+    JG_FAKE_TMUX_WINDOW='juggernaut:jg-design' \
     JG_FAKE_TMUX_LOG="$TMP_ROOT/live-wake-tmux.log" \
     JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/live-wake-fake/pane.txt" \
     JG_SEND_SETTLE=0 JG_SEND_SLEEP=0 JG_SEND_RETRIES=1 \
@@ -132,8 +132,8 @@ EOF
     "missing endpoint was recorded as an attempted delivery"
 
   cat > "$home/state/design.meta" <<EOF
-window=firstmate:jg-design
-kind=secondmate
+window=juggernaut:jg-design
+kind=squad_lead
 harness=claude
 backend=tmux
 home=$sub
@@ -171,7 +171,7 @@ SH
   chmod +x "$rejectbin/tmux"
 
   out=$(PATH="$rejectbin:$basebin:$PATH" JG_BASE_TMUX="$basebin/tmux" \
-    JG_HOME="$home" JG_FAKE_TMUX_WINDOW='firstmate:jg-design' \
+    JG_HOME="$home" JG_FAKE_TMUX_WINDOW='juggernaut:jg-design' \
     JG_FAKE_TMUX_LOG="$TMP_ROOT/known-fail-tmux.log" \
     JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/known-fail-fake/pane.txt" \
     "$ROOT/bin/jg-backlog-handoff.sh" design known-fail 2>&1) || rc=$?
@@ -223,7 +223,7 @@ SH
   PATH="$blockbin:$basebin:$PATH" JG_BASE_TMUX="$basebin/tmux" JG_HOME="$home" \
     JG_RECONCILE_RACE_ENTERED="$TMP_ROOT/reconcile-race.entered" \
     JG_RECONCILE_RACE_RELEASE="$TMP_ROOT/reconcile-race.release" \
-    JG_FAKE_TMUX_WINDOW='firstmate:jg-design' \
+    JG_FAKE_TMUX_WINDOW='juggernaut:jg-design' \
     JG_FAKE_TMUX_LOG="$TMP_ROOT/reconcile-race-tmux.log" \
     JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/reconcile-race-fake/pane.txt" \
     "$ROOT/bin/jg-backlog-handoff.sh" design reconcile-race \
@@ -559,7 +559,7 @@ EOF
   cat > "$blockbin/tmux" <<'SH'
 #!/usr/bin/env bash
 case "$*" in
-  *"Firstmate instruction waiting:"*)
+  *"Juggernaut instruction waiting:"*)
     if mkdir "$JG_BLOCK_WAKE_ONCE" 2>/dev/null; then
       touch "$JG_BLOCK_WAKE_ENTERED"
       while [ ! -f "$JG_BLOCK_WAKE_RELEASE" ]; do sleep 0.02; done
@@ -574,7 +574,7 @@ SH
     JG_BLOCK_WAKE_ONCE="$TMP_ROOT/concurrent.once" \
     JG_BLOCK_WAKE_ENTERED="$TMP_ROOT/concurrent.entered" \
     JG_BLOCK_WAKE_RELEASE="$TMP_ROOT/concurrent.release" \
-    JG_FAKE_TMUX_WINDOW='firstmate:jg-design' \
+    JG_FAKE_TMUX_WINDOW='juggernaut:jg-design' \
     JG_FAKE_TMUX_LOG="$TMP_ROOT/concurrent-tmux.log" \
     JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/concurrent-fake/pane.txt" \
     "$ROOT/bin/jg-backlog-handoff.sh" design concurrent-a > "$TMP_ROOT/concurrent-a.out" 2>&1 &
@@ -596,7 +596,7 @@ EOF
     JG_BLOCK_WAKE_ONCE="$TMP_ROOT/concurrent.once" \
     JG_BLOCK_WAKE_ENTERED="$TMP_ROOT/concurrent.entered" \
     JG_BLOCK_WAKE_RELEASE="$TMP_ROOT/concurrent.release" \
-    JG_FAKE_TMUX_WINDOW='firstmate:jg-design' \
+    JG_FAKE_TMUX_WINDOW='juggernaut:jg-design' \
     JG_FAKE_TMUX_LOG="$TMP_ROOT/concurrent-tmux.log" \
     JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/concurrent-fake/pane.txt" \
     "$ROOT/bin/jg-backlog-handoff.sh" design concurrent-b > "$TMP_ROOT/concurrent-b.out" 2>&1 &
@@ -633,7 +633,7 @@ EOF
   cat > "$blockbin/tmux" <<'SH'
 #!/usr/bin/env bash
 case "$*" in
-  *"Firstmate instruction waiting:"*)
+  *"Juggernaut instruction waiting:"*)
     touch "$JG_BLOCK_WAKE_ENTERED"
     while [ ! -f "$JG_BLOCK_WAKE_RELEASE" ]; do sleep 0.02; done
     ;;
@@ -644,7 +644,7 @@ SH
   PATH="$blockbin:$basebin:$PATH" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     JG_BASE_TMUX="$basebin/tmux" JG_BLOCK_WAKE_ENTERED="$TMP_ROOT/teardown-race.entered" \
     JG_BLOCK_WAKE_RELEASE="$TMP_ROOT/teardown-race.release" \
-    JG_FAKE_TMUX_WINDOW='firstmate:jg-design' \
+    JG_FAKE_TMUX_WINDOW='juggernaut:jg-design' \
     JG_FAKE_TMUX_LOG="$TMP_ROOT/teardown-race-tmux.log" \
     JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/teardown-race-fake/pane.txt" \
     "$ROOT/bin/jg-backlog-handoff.sh" design teardown-race > "$TMP_ROOT/teardown-race-handoff.out" 2>&1 &
@@ -657,7 +657,7 @@ SH
     sleep 0.02
   done
   PATH="$basebin:$PATH" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
-    JG_FAKE_TMUX_WINDOW='firstmate:jg-design' \
+    JG_FAKE_TMUX_WINDOW='juggernaut:jg-design' \
     JG_FAKE_TMUX_LOG="$TMP_ROOT/teardown-race-tmux.log" \
     JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/teardown-race-fake/pane.txt" \
     "$ROOT/bin/jg-teardown.sh" design --force > "$TMP_ROOT/teardown-race-teardown.out" 2>&1 &
@@ -708,7 +708,7 @@ SH
   set +e
   PATH="$rm_bin:$fakebin:$PATH" JG_REAL_RM="$real_rm" JG_FAIL_HOME="$fail_home" \
     JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
-    JG_FAKE_TMUX_WINDOW='firstmate:jg-design' \
+    JG_FAKE_TMUX_WINDOW='juggernaut:jg-design' \
     JG_FAKE_TMUX_LOG="$TMP_ROOT/teardown-home-fail-tmux.log" \
     JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/teardown-home-fail-fake/pane.txt" \
     "$ROOT/bin/jg-teardown.sh" design --force > "$TMP_ROOT/teardown-home-fail.out" 2>&1
@@ -722,10 +722,10 @@ SH
   cmp -s "$rec_before" "$rec" \
     || fail "failed home removal changed the pending wake correlation"
   assert_present "$home/state/design.meta" "failed teardown removed route metadata"
-  assert_grep '- design ' "$home/data/secondmates.md" "failed teardown removed the registry route"
+  assert_grep '- design ' "$home/data/squad_leads.md" "failed teardown removed the registry route"
 
   PATH="$fakebin:$PATH" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
-    JG_FAKE_TMUX_WINDOW='firstmate:jg-design' \
+    JG_FAKE_TMUX_WINDOW='juggernaut:jg-design' \
     JG_FAKE_TMUX_LOG="$TMP_ROOT/teardown-home-fail-tmux.log" \
     JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/teardown-home-fail-fake/pane.txt" \
     "$ROOT/bin/jg-teardown.sh" design --force > "$TMP_ROOT/teardown-home-retry.out" 2>&1 \
@@ -733,7 +733,7 @@ SH
   assert_absent "$sub" "teardown retry left the receiver home"
   assert_absent "$marker" "teardown retry left the pending wake marker"
   assert_absent "$rec" "teardown retry left the pending wake correlation"
-  assert_no_grep '- design ' "$home/data/secondmates.md" "teardown retry left the registry route"
+  assert_no_grep '- design ' "$home/data/squad_leads.md" "teardown retry left the registry route"
   pass "failed local home removal preserves its wake and a retry retires both"
 }
 
@@ -801,7 +801,7 @@ seed_public_commitment() {
 }
 
 # A public promise binds its work by home AND id. Handing that work to a
-# secondmate leaves the binding naming a home that no longer owns it, which used
+# squad_lead leaves the binding naming a home that no longer owns it, which used
 # to go unnoticed until the promised reply was never delivered. The move itself
 # stays safe; the staleness must be reported at the moment it is created.
 test_handoff_warns_when_a_moved_item_still_owes_a_public_reply() {
@@ -822,14 +822,14 @@ EOF
   out=$(JG_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design promised-item plain-item 2>&1) || rc=$?
   [ "$rc" -eq 0 ] || fail "handoff must still succeed while reporting the stale binding: $out"
   assert_contains "$out" "handed off 2 item(s)" "the move itself must still be reported"
-  assert_grep 'promised-item' "$sub/data/backlog.md" "the promised item did not reach the secondmate backlog"
+  assert_grep 'promised-item' "$sub/data/backlog.md" "the promised item did not reach the squad_lead backlog"
   assert_contains "$out" "promised-item still owes a public reply bound to main/promised-item" \
     "the stale public-commitment binding was not reported"
   # The report must come from a genuinely unresolved commitment, not from a state
   # the guard merely could not verify.
   assert_contains "$out" "public commitment pf-handoff is still" \
     "the report did not carry the unresolved commitment the guard actually found"
-  assert_contains "$out" "--work-home secondmate:design" \
+  assert_contains "$out" "--work-home squad_lead:design" \
     "the report did not name the rebinding that keeps the promise reachable"
   case "$out" in
     *"plain-item still owes"*) fail "an item with no public commitment must not be reported" ;;
@@ -856,7 +856,7 @@ EOF
   case "$out" in
     *"public reply"*) fail "a relay-free home must not mention public commitments: $out" ;;
   esac
-  assert_grep 'quiet-item' "$sub/data/backlog.md" "the item did not reach the secondmate backlog"
+  assert_grep 'quiet-item' "$sub/data/backlog.md" "the item did not reach the squad_lead backlog"
   pass "handoff says nothing about public commitments in a relay-free home"
 }
 
@@ -1097,7 +1097,7 @@ EOF
   [ "$main_after" = "$(cat "$home/data/backlog.md")" ] \
     || fail "idempotent re-run mutated the main backlog"
   [ "$dest_after" = "$(cat "$sub/data/backlog.md")" ] \
-    || fail "idempotent re-run mutated the secondmate backlog"
+    || fail "idempotent re-run mutated the squad_lead backlog"
 
   local count
   count=$(grep -cF -- '- [ ] idem-item - multi-line for re-run (repo: alpha)' "$sub/data/backlog.md")
@@ -1130,7 +1130,7 @@ EOF
 EOF
   cat > "$sub/data/backlog.md" <<'EOF'
 ## Queued
-- [ ] resident-item - remains in the secondmate backlog (repo: alpha)
+- [ ] resident-item - remains in the squad_lead backlog (repo: alpha)
   resident body
 EOF
 
@@ -1150,7 +1150,7 @@ EOF
   cmp -s "$source_before" "$home/data/backlog.md" \
     || fail "noncanonical-continuation refusal changed the main backlog"
   cmp -s "$destination_before" "$sub/data/backlog.md" \
-    || fail "noncanonical-continuation refusal changed the secondmate backlog"
+    || fail "noncanonical-continuation refusal changed the squad_lead backlog"
 
   pass "noncanonical one-space and tab continuations refuse without changes"
 }
@@ -1163,14 +1163,14 @@ test_indented_heading_is_not_section_boundary() {
 
   cat > "$home/data/backlog.md" <<'EOF'
 ## Queued
-- [ ] ha-codex-fast-default-4e - harness default work (repo: firstmate)
-  Context for the secondmate.
+- [ ] ha-codex-fast-default-4e - harness default work (repo: juggernaut)
+  Context for the squad_lead.
   ## Intent
   Deliver the full spec, not the title alone.
   ## Acceptance
   - body survives handoff
   - ## headings inside body stay body
-- [ ] next-item - after the trap (repo: firstmate)
+- [ ] next-item - after the trap (repo: juggernaut)
 EOF
 
   local expected_block
@@ -1269,7 +1269,7 @@ EOF
   [ "$main_after" = "$(cat "$home/data/backlog.md")" ] \
     || fail "idempotent re-run mutated the main backlog"
   [ "$dest_after" = "$(cat "$sub/data/backlog.md")" ] \
-    || fail "idempotent re-run mutated the secondmate backlog"
+    || fail "idempotent re-run mutated the squad_lead backlog"
   local count
   count=$(grep -cF -- '  Second paragraph after a blank.' "$sub/data/backlog.md")
   [ "$count" -eq 1 ] || fail "idempotent re-run duplicated a post-blank paragraph (count=$count)"
@@ -1289,7 +1289,7 @@ test_registry_home_with_pre_home_parentheses() {
   sub_abs=$(cd "$sub" && pwd -P)
   # Prose parentheses before (home: ...) and punctuation inside scope match the live registry shape.
   printf -- '- %s - issue triage (id is legacy) (home: %s; scope: issue triage (child); semicolon is meaningful; projects: alpha; added 2026-07-09)\n' \
-    "$id" "$sub_abs" > "$home/data/secondmates.md"
+    "$id" "$sub_abs" > "$home/data/squad_leads.md"
   JG_HOME="$home" "$ROOT/bin/jg-home-seed.sh" validate >/dev/null \
     || fail "home-seed validation rejected punctuation-bearing registry fields"
 
@@ -1319,10 +1319,10 @@ test_registry_home_missing_field_fails_cleanly() {
   local sub="$TMP_ROOT/reg-nohome-sub"
   local id=no-home-mate
   mkdir -p "$home/data" "$home/state"
-  seed_secondmate_home_marker "$sub" "$id"
+  seed_squad_lead_home_marker "$sub" "$id"
   # Registered, but no structured (home: ...) field at all.
   printf -- '- %s - charter only (scope prose mentions home: /tmp/ignored-path)\n' \
-    "$id" > "$home/data/secondmates.md"
+    "$id" > "$home/data/squad_leads.md"
 
   cat > "$home/data/backlog.md" <<'EOF'
 ## Queued
@@ -1339,7 +1339,7 @@ EOF
   assert_grep 'orphan-item' "$home/data/backlog.md" \
     "source backlog was mutated despite missing home"
   [ ! -f "$sub/data/backlog.md" ] || ! grep -q 'orphan-item' "$sub/data/backlog.md" 2>/dev/null \
-    || fail "item appeared in secondmate backlog despite missing home"
+    || fail "item appeared in squad_lead backlog despite missing home"
 
   pass "registry entry without (home: ...) fails cleanly with has no home"
 }
@@ -1362,7 +1362,7 @@ EOF
 
   out=$(cd "$decoy" && JG_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design decoy-item 2>&1) \
     || fail "handoff from a cwd with a beads .tasks.toml failed: $out"
-  assert_grep 'decoy-item' "$sub/data/backlog.md" "item did not reach the secondmate backlog"
+  assert_grep 'decoy-item' "$sub/data/backlog.md" "item did not reach the squad_lead backlog"
   assert_no_grep 'decoy-item' "$home/data/backlog.md" "item stayed in the main backlog"
   assert_grep 'decoy-keep' "$home/data/backlog.md" "unrelated item was disturbed"
   pass "a cwd .tasks.toml for another backend does not redirect a markdown handoff"

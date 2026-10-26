@@ -5,8 +5,8 @@
 # tests/jg-task-delivery.test.sh; this file covers only what forgejo adds: it
 # binds in any token order, keeps +yolo (unlike gerrit), is refused on
 # local-only like every forge, and the plain (no --forge/--raw) output stays
-# exactly two words, because tests/jg-secondmate-safety.test.sh and
-# tests/jg-secondmate-lifecycle-e2e.test.sh assert that shape with strict
+# exactly two words, because tests/jg-squad-lead-safety.test.sh and
+# tests/jg-squad-lead-lifecycle-e2e.test.sh assert that shape with strict
 # string equality.
 set -u
 

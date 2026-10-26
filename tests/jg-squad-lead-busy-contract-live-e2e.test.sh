@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Live guard for the secondmate busy contract (live-harness-optin family).
+# Live guard for the squad_lead busy contract (live-harness-optin family).
 #
 # The active-turn gate reads a busy verdict from the parent home's semantic
 # record and from the tmux pane. A fake pane can only confirm the command
-# this tree already built. This guard runs bin/jg-spawn.sh --secondmate
+# this tree already built. This guard runs bin/jg-spawn.sh --squad-lead
 # against a private tmux server.
 #
 # The pane command during spawn is a sleeper, so the launch brief is never
@@ -14,21 +14,21 @@
 # disconfirming launches: they stay unarmed and gain no parent turn-end.
 # An absent binary is reported and skipped. A run that checks nothing fails.
 #
-# Refresh docs/verification/runtime-backends.md ("Secondmate busy contract")
+# Refresh docs/verification/runtime-backends.md ("SquadLead busy contract")
 # from this guard after a harness upgrade.
 set -u
 
 # shellcheck source=tests/fixtures.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 
-jg_live_gate default-on JG_SECONDMATE_BUSY_LIVE tmux
+jg_live_gate default-on JG_SQUAD_LEAD_BUSY_LIVE tmux
 
 # shellcheck source=bin/jg-busy-lib.sh
 . "$ROOT/bin/jg-busy-lib.sh"
 
 REAL_TMUX=$(command -v tmux)
 SOCKET="jg-sm-busy-$$"
-LAB=$(mktemp -d "${TMPDIR:-/tmp}/jg-secondmate-busy-live.XXXXXX")
+LAB=$(mktemp -d "${TMPDIR:-/tmp}/jg-squad-lead-busy-live.XXXXXX")
 CHECKED=0
 SKIPPED=
 
@@ -85,8 +85,8 @@ SH
 seed_home() {  # <home> <id>
   local home=$1 id=$2
   mkdir -p "$home/bin" "$home/data" "$home/state" "$home/config" "$home/projects"
-  printf '# Firstmate\n' > "$home/AGENTS.md"
-  printf '%s\n' "$id" > "$home/.jg-secondmate-home"
+  printf '# Juggernaut\n' > "$home/AGENTS.md"
+  printf '%s\n' "$id" > "$home/.jg-squad-lead-home"
   printf 'charter\n' > "$home/data/charter.md"
   if [ -d "$ROOT/.pi/extensions" ]; then
     mkdir -p "$home/.pi"
@@ -108,18 +108,18 @@ spawn_mate() {  # <case> <id> <harness> <sleeper-dir> <shim-dir>
     JG_SPAWN_NO_GUARD=1 \
     env -u TMUX -u TMUX_PANE \
     PATH="$sleeper:$shim:$PATH" \
-    "$ROOT/bin/jg-spawn.sh" "$id" "$sm" "$harness" --secondmate
+    "$ROOT/bin/jg-spawn.sh" "$id" "$sm" "$harness" --squad-lead
 }
 
 # Start the real binary with no positional brief and no keystrokes.
 # Returns 0 when the pane is still alive after the wait.
 real_harness_stays_up() {  # <harness> <version> <case> <id> <bin>
   local harness=$1 version=$2 case_dir=$3 id=$4 bin=$5
-  local sm="$case_dir/sm" state="$case_dir/primary/state" target="firstmate:live-$harness"
+  local sm="$case_dir/sm" state="$case_dir/primary/state" target="juggernaut:live-$harness"
   local pane_dead="" i=0 tail
   case "$harness" in
     pi|pi-signed)
-      "$REAL_TMUX" -L "$SOCKET" new-window -d -t firstmate: -n "live-$harness" -c "$sm" -- \
+      "$REAL_TMUX" -L "$SOCKET" new-window -d -t juggernaut: -n "live-$harness" -c "$sm" -- \
         "$bin" \
         -e "$sm/.pi/extensions/jg-primary-turnend-guard.ts" \
         -e "$sm/.pi/extensions/jg-primary-pi-watch.ts" \
@@ -127,18 +127,18 @@ real_harness_stays_up() {  # <harness> <version> <case> <id> <bin>
         || fail "$harness $version: could not start the real binary"
       ;;
     omp)
-      "$REAL_TMUX" -L "$SOCKET" new-window -d -t firstmate: -n "live-$harness" -c "$sm" -- \
+      "$REAL_TMUX" -L "$SOCKET" new-window -d -t juggernaut: -n "live-$harness" -c "$sm" -- \
         env -u CLAUDECODE -u PI_CODING_AGENT JG_OMP_HARNESS=omp OMP_SKIP_SETUP=1 \
         "$bin" --auto-approve --cwd "$sm" -e "$state/$id.omp-ext.ts" \
         || fail "$harness $version: could not start the real binary"
       ;;
     opencode)
-      "$REAL_TMUX" -L "$SOCKET" new-window -d -t firstmate: -n "live-$harness" -c "$sm" -- \
+      "$REAL_TMUX" -L "$SOCKET" new-window -d -t juggernaut: -n "live-$harness" -c "$sm" -- \
         env OPENCODE_CONFIG_CONTENT='{"permission":{"*":"allow"}}' "$bin" \
         || fail "$harness $version: could not start the real binary"
       ;;
     claude)
-      "$REAL_TMUX" -L "$SOCKET" new-window -d -t firstmate: -n "live-$harness" -c "$sm" -- \
+      "$REAL_TMUX" -L "$SOCKET" new-window -d -t juggernaut: -n "live-$harness" -c "$sm" -- \
         "$bin" --settings "$state/$id.claude-settings.json" \
         || fail "$harness $version: could not start the real binary"
       ;;
@@ -167,7 +167,7 @@ check_harness() {  # <harness>
   local harness=$1 bin version id case_dir state out armed=0
   if ! bin=$(resolve_bin "$harness"); then
     SKIPPED="$SKIPPED $harness"
-    note "skip: $harness is not installed on this machine, so its secondmate busy contract is unverified here"
+    note "skip: $harness is not installed on this machine, so its squad_lead busy contract is unverified here"
     return 0
   fi
   version=$("$bin" --version 2>/dev/null | head -1 | tr -d '\r') || version=
@@ -177,23 +177,23 @@ check_harness() {  # <harness>
   install_sleeper "$case_dir/sleeper" "$harness" "$bin"
   install_tmux_shim "$case_dir/shim"
   out=$(spawn_mate "$case_dir" "$id" "$harness" "$case_dir/sleeper" "$case_dir/shim" 2>&1) \
-    || fail "$harness $version: secondmate spawn failed: $out"
+    || fail "$harness $version: squad_lead spawn failed: $out"
   state="$case_dir/primary/state"
   case "$harness" in
     claude|opencode|pi|pi-signed|omp) armed=1 ;;
   esac
   if [ "$armed" -eq 1 ]; then
-    [ -f "$state/$id.busy-state" ] || fail "$harness $version: real tmux secondmate spawn did not arm the busy contract"
-    out=$(jg_busy_classify tmux "firstmate:jg-$id" "$harness" "$id" "$state" 'working on the charter')
+    [ -f "$state/$id.busy-state" ] || fail "$harness $version: real tmux squad_lead spawn did not arm the busy contract"
+    out=$(jg_busy_classify tmux "juggernaut:jg-$id" "$harness" "$id" "$state" 'working on the charter')
     [ "$out" = "busy jg-spawn" ] || fail "$harness $version: a mid-turn tail classified '$out', not busy jg-spawn"
     [ ! -e "$state/$id.turn-ended" ] || fail "$harness $version: spawn touched the parent's turn-ended marker"
     real_harness_stays_up "$harness" "$version" "$case_dir" "$id" "$bin"
-    pass "$harness $version: a tmux secondmate spawn arms a busy verdict the active-turn gate can see"
+    pass "$harness $version: a tmux squad_lead spawn arms a busy verdict the active-turn gate can see"
   else
-    [ ! -e "$state/$id.busy-gen" ] || fail "$harness $version: an unarmed secondmate spawn wrote a busy generation"
-    [ ! -e "$state/$id.turn-ended" ] || fail "$harness $version: an unarmed secondmate spawn touched the parent's turn-ended marker"
+    [ ! -e "$state/$id.busy-gen" ] || fail "$harness $version: an unarmed squad_lead spawn wrote a busy generation"
+    [ ! -e "$state/$id.turn-ended" ] || fail "$harness $version: an unarmed squad_lead spawn touched the parent's turn-ended marker"
     [ ! -e "$state/$id.grok-turnend-token" ] || fail "$harness $version: spawn installed a parent grok turn-end token"
-    pass "$harness $version: secondmate spawn stays unarmed and does not emit a parent turn-end"
+    pass "$harness $version: squad_lead spawn stays unarmed and does not emit a parent turn-end"
   fi
   CHECKED=$((CHECKED + 1))
 }
@@ -202,6 +202,6 @@ for harness in claude opencode pi pi-signed omp grok codex; do
   check_harness "$harness"
 done
 
-[ "$CHECKED" -gt 0 ] || fail "secondmate busy contract live guard checked nothing (skipped:${SKIPPED:- none})"
+[ "$CHECKED" -gt 0 ] || fail "squad_lead busy contract live guard checked nothing (skipped:${SKIPPED:- none})"
 note "checked $CHECKED harness(es); absent:${SKIPPED:- none}"
-pass "secondmate busy contract live guard checked every installed harness"
+pass "squad_lead busy contract live guard checked every installed harness"

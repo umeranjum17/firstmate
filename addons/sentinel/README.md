@@ -58,7 +58,7 @@ not in this slice yet; they follow in a second slice.
 
 ## Requirements: fork-only hook points
 
-The sentinel targets the Firstmate checkout the homes run today (the fork). It
+The sentinel targets the Juggernaut checkout the homes run today (the fork). It
 depends on two hook points that unmodified Kun does not provide:
 
 - `jg-control.sh exit` writes `state/<id>.exit`. The stopped-on-purpose guard

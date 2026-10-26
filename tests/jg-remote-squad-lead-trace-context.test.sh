@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# tests/jg-remote-secondmate-trace-context.test.sh - trace-context regressions for
-# the REMOTE second mate route, over the deterministic generic SSH boundary.
+# tests/jg-remote-squad-lead-trace-context.test.sh - trace-context regressions for
+# the REMOTE squad lead route, over the deterministic generic SSH boundary.
 #
 # The local spawn path's coverage lives in tests/jg-trace-context-spawn.test.sh.
-# A remote second mate never reaches that path: bin/jg-spawn.sh routes it through
-# spawn_remote_secondmate, which hands the launch to the remote host. These
+# A remote squad lead never reaches that path: bin/jg-spawn.sh routes it through
+# spawn_remote_squad_lead, which hands the launch to the remote host. These
 # assertions drive the real chain - parent jg-spawn -> jg-on -> the real remote
-# entrypoint -> jg-remote-secondmate-control -> the remote host's own jg-spawn -
+# entrypoint -> jg-remote-squad-lead-control -> the remote host's own jg-spawn -
 # against a fake herdr CLI, so the carrier the remote pane receives is observable.
 # See docs/verification/trace-context.md for the maintained coverage inventory.
 set -u
@@ -59,7 +59,7 @@ case "\${1:-}" in
   list-windows)
     [ -f "\$state" ] || exit 0
     name=\$(cut -d'|' -f1 "\$state")
-    case "\$*" in *'#{session_name}:#{window_name}'*) printf 'firstmate:%s\n' "\$name" ;; *) printf '%s\n' "\$name" ;; esac
+    case "\$*" in *'#{session_name}:#{window_name}'*) printf 'juggernaut:%s\n' "\$name" ;; *) printf '%s\n' "\$name" ;; esac
     exit 0
     ;;
   new-window)
@@ -77,7 +77,7 @@ case "\${1:-}" in
       *'#{pane_current_path}'*) cut -d'|' -f2- "\$state" ;;
       *'#{pane_current_command}'*) printf 'codex\n' ;;
       *'#{cursor_y}'*) printf '0\n' ;;
-      *'#S'*) printf 'firstmate\n' ;;
+      *'#S'*) printf 'juggernaut\n' ;;
       *) printf '%%1\n' ;;
     esac
     exit 0
@@ -120,7 +120,7 @@ exec "$JG_FAKE_REMOTE_ENTRYPOINT" "$@"
 SH
 chmod +x "$FAKEBIN/fake-ssh"
 
-printf 'codex\n' > "$PARENT/config/secondmate-harness"
+printf 'codex\n' > "$PARENT/config/squad-lead-harness"
 printf 'tmux\n' > "$PARENT/config/backend"
 printf 'codex\n' > "$PARENT/config/crew-harness"
 printf '## In flight\n\n## Queued\n\n## Done\n' > "$PARENT/data/backlog.md"
@@ -164,16 +164,16 @@ remote_launch_snapshot() {
 meta_traceparent() { sed -n 's/^traceparent=//p' "$1"; }
 
 # Provision and register the remote route from the captain-facing primary.
-JG_SECONDMATE_CHARTER='Own iOS delivery on the build Mac.' \
-  JG_SECONDMATE_SCOPE='iOS implementation and Xcode validation' \
+JG_SQUAD_LEAD_CHARTER='Own iOS delivery on the build Mac.' \
+  JG_SQUAD_LEAD_SCOPE='iOS implementation and Xcode validation' \
   remote_env "$ROOT/bin/jg-remote-home-seed.sh" ios remote-mac "$REMOTE_ROOT" "$REMOTE_HOME" --no-projects >/dev/null \
   || fail "remote seed did not provision the traced route"
 
 # --- disabled: the remote route must stay byte-identically untraced ----------
 freeze_parent_session
 : > "$HERDR_LOG"
-remote_env "$ROOT/bin/jg-spawn.sh" ios --secondmate >/dev/null 2>&1 \
-  || fail "default-off remote secondmate spawn failed"
+remote_env "$ROOT/bin/jg-spawn.sh" ios --squad-lead >/dev/null 2>&1 \
+  || fail "default-off remote squad_lead spawn failed"
 assert_present "$PARENT/state/ios.meta" "default-off remote spawn published no parent metadata"
 ! grep -q '^traceparent=' "$PARENT/state/ios.meta" \
   || fail "default-off remote spawn must not record a traceparent= line"
@@ -185,15 +185,15 @@ assert_present "$PARENT/state/ios.meta" "default-off remote spawn published no p
   || fail "default-off remote spawn must deliver JG_TRACE_CONTEXT=off (got '$(remote_launch_snapshot)')"
 assert_absent "$REMOTE_HOME/config/trace-context" "default-off remote spawn inherited an enablement flag"
 grep -q 'export GOTMPDIR=' "$HERDR_LOG" || fail "the remote spawn should still run (GOTMPDIR is always exported)"
-pass "disabled: a remote-routed second mate records and receives no carrier and stays enabled-off end to end"
+pass "disabled: a remote-routed squad lead records and receives no carrier and stays enabled-off end to end"
 
 # --- enabled: one carrier is recorded by the parent and received remotely ----
 : > "$PARENT/config/trace-context"
 freeze_parent_session
 reset_remote_herdr_fixture "$HERDR_STATE"   # the previous endpoint is gone; this is an ordinary relaunch
 : > "$HERDR_LOG"
-remote_env "$ROOT/bin/jg-spawn.sh" ios --secondmate >/dev/null 2>&1 \
-  || fail "enabled remote secondmate spawn failed"
+remote_env "$ROOT/bin/jg-spawn.sh" ios --squad-lead >/dev/null 2>&1 \
+  || fail "enabled remote squad_lead spawn failed"
 
 PARENT_TP=$(meta_traceparent "$PARENT/state/ios.meta")
 REMOTE_TP=$(meta_traceparent "$REMOTE_HOME/state/parent-route/ios.meta")
@@ -219,35 +219,35 @@ LAUNCH_LINE=$(grep -n "^pane send-text [^ ]* \\. '.*' --session " "$HERDR_LOG" |
   || fail "the remote TRACEPARENT export must ride the GOTMPDIR pre-launch site (gotmp=$GOTMP_LINE tp=$TP_LINE)"
 [ "$TP_LINE" -lt "$LAUNCH_LINE" ] \
   || fail "the remote TRACEPARENT export must be sent before the launch command (tp=$TP_LINE launch=$LAUNCH_LINE)"
-pass "enabled: a remote-routed second mate receives one carrier in its pane, identical to the parent's recorded identity, before launch"
+pass "enabled: a remote-routed squad lead receives one carrier in its pane, identical to the parent's recorded identity, before launch"
 
 # --- relaunch stability on the remote path ----------------------------------
 reset_remote_herdr_fixture "$HERDR_STATE"
 : > "$HERDR_LOG"
-remote_env "$ROOT/bin/jg-spawn.sh" ios --secondmate >/dev/null 2>&1 \
-  || fail "enabled remote secondmate relaunch failed"
+remote_env "$ROOT/bin/jg-spawn.sh" ios --squad-lead >/dev/null 2>&1 \
+  || fail "enabled remote squad_lead relaunch failed"
 RELAUNCH_TP=$(meta_traceparent "$PARENT/state/ios.meta")
 RELAUNCH_INJECTED=$(remote_injected_traceparent)
 [ "$RELAUNCH_TP" = "$PARENT_TP" ] \
   || fail "a remote relaunch must keep the task's recorded carrier (first='$PARENT_TP' relaunch='$RELAUNCH_TP')"
 [ "$RELAUNCH_INJECTED" = "$PARENT_TP" ] \
   || fail "a remote relaunch must re-export the original carrier (first='$PARENT_TP' injected='$RELAUNCH_INJECTED')"
-pass "relaunch: a remote-routed second mate keeps one stable identity across restarts"
+pass "relaunch: a remote-routed squad lead keeps one stable identity across restarts"
 
 # --- per-task boundary: ambient carriers are never adopted or shared ---------
 # A persistent supervisor exports its own launch-time TRACEPARENT for its whole
 # life. A second remote route resolved from that same environment must root its
 # own trace rather than chain onto it or onto the first route.
 AMBIENT='00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab-bbbbbbbbbbbbbbbb-01'
-JG_SECONDMATE_CHARTER='Own the second build Mac.' \
-  JG_SECONDMATE_SCOPE='second remote domain' \
+JG_SQUAD_LEAD_CHARTER='Own the second build Mac.' \
+  JG_SQUAD_LEAD_SCOPE='second remote domain' \
   TRACEPARENT="$AMBIENT" \
   remote_env "$ROOT/bin/jg-remote-home-seed.sh" ios2 remote-mac "$REMOTE_ROOT" "$SECOND_HOME" --no-projects >/dev/null \
   || fail "second remote seed failed"
 reset_remote_herdr_fixture "$HERDR_STATE"
 : > "$HERDR_LOG"
-TRACEPARENT="$AMBIENT" remote_env "$ROOT/bin/jg-spawn.sh" ios2 --secondmate >/dev/null 2>&1 \
-  || fail "second remote secondmate spawn failed"
+TRACEPARENT="$AMBIENT" remote_env "$ROOT/bin/jg-spawn.sh" ios2 --squad-lead >/dev/null 2>&1 \
+  || fail "second remote squad_lead spawn failed"
 SECOND_TP=$(meta_traceparent "$PARENT/state/ios2.meta")
 jg_trace_context_valid "$SECOND_TP" \
   || fail "the second remote route must record a valid carrier (got '$SECOND_TP')"
@@ -257,7 +257,7 @@ jg_trace_context_valid "$SECOND_TP" \
   || fail "two remote routes must root distinct traces (first='$PARENT_TP' second='$SECOND_TP')"
 [ "$(remote_injected_traceparent)" = "$SECOND_TP" ] \
   || fail "the second remote route's pane must receive its own recorded carrier"
-pass "boundary: each remote-routed second mate roots its own trace and never adopts the spawning environment's carrier"
+pass "boundary: each remote-routed squad lead roots its own trace and never adopts the spawning environment's carrier"
 
 # --- the enablement flag is one allowlist, shared by both remote ends --------
 # config/trace-context reaches the remote home only because the sender and the
@@ -277,15 +277,15 @@ JG_HOME="$PROTOCOL_HOME" "$REMOTE_ROOT/bin/jg-remote-inherit.sh" \
   || fail "the remote inherit receiver refused a declared inheritable item"
 assert_present "$PROTOCOL_HOME/config/trace-context" "the accepted inherited enablement flag was not published"
 if JG_HOME="$PROTOCOL_HOME" "$REMOTE_ROOT/bin/jg-remote-inherit.sh" \
-  put config/secondmate-harness "$FLAG_BYTES" "$FLAG_HASH" 1 < "$TMP_ROOT/flag-payload" >/dev/null 2>&1; then
+  put config/squad-lead-harness "$FLAG_BYTES" "$FLAG_HASH" 1 < "$TMP_ROOT/flag-payload" >/dev/null 2>&1; then
   fail "the remote inherit receiver accepted an item outside the declared set"
 fi
-assert_absent "$PROTOCOL_HOME/config/secondmate-harness" "a non-inheritable item was published remotely"
+assert_absent "$PROTOCOL_HOME/config/squad-lead-harness" "a non-inheritable item was published remotely"
 pass "allowlist: the remote receiver accepts exactly the declared inherited-material set, including the enablement flag"
 
 # --- the delivery flag is the only caller-supplied path to a pane export -----
 # A remote host receives the carrier as an argument rather than resolving it, so
-# that argument is refused unless it is a secondmate launch carrying a strictly
+# that argument is refused unless it is a squad_lead launch carrying a strictly
 # valid W3C value. Nothing else may reach `export TRACEPARENT=`.
 FLAG_HOME="$TMP_ROOT/flag-home"
 mkdir -p "$FLAG_HOME/state" "$FLAG_HOME/data" "$FLAG_HOME/config" "$FLAG_HOME/projects" "$TMP_ROOT/flag-proj"
@@ -299,18 +299,18 @@ try_flag() { # <expect-substring> <message> [extra args...]
   fi
   assert_contains "$out" "$expect" "$message"
 }
-try_flag 'applies only to --secondmate spawns' \
+try_flag 'applies only to --squad-lead spawns' \
   "a ship spawn must refuse a caller-supplied carrier" \
   --mode no-mistakes --yolo off --traceparent "$VALID"
 try_flag 'not a valid W3C traceparent' \
   "a shell-metacharacter carrier must be refused before any pane export" \
-  --secondmate --traceparent 'bogus; rm -rf /'
+  --squad-lead --traceparent 'bogus; rm -rf /'
 try_flag 'not a valid W3C traceparent' \
   "an all-zero trace id must be refused as W3C-invalid" \
-  --secondmate --traceparent '00-00000000000000000000000000000000-bbbbbbbbbbbbbbbb-01'
+  --squad-lead --traceparent '00-00000000000000000000000000000000-bbbbbbbbbbbbbbbb-01'
 try_flag 'requires a non-empty value' \
   "an empty carrier must be refused rather than silently ignored" \
-  --secondmate --traceparent=
-pass "delivery: a parent-supplied carrier is accepted only for a secondmate launch and only as a strict W3C value"
+  --squad-lead --traceparent=
+pass "delivery: a parent-supplied carrier is accepted only for a squad_lead launch and only as a strict W3C value"
 
 echo "ALL TESTS PASSED"

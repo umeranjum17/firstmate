@@ -21,7 +21,7 @@
 #       sidecar, advance seq under the lock, atomically replace the record.
 #       Adapter wiring passes the exact --gen embedded at arm time, so a
 #       hook that outlives its incarnation fails closed here. The legacy
-#       Claude jg-send --key Escape path (jg-interrupt) and firstmate recovery
+#       Claude jg-send --key Escape path (jg-interrupt) and juggernaut recovery
 #       paths (jg-recovery) may pass --current-gen to bind to the incarnation
 #       armed right now.
 #

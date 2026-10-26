@@ -169,7 +169,7 @@ grep -aFq 'resume your' "$TRANSCRIPT" \
   || fail "real rovo did not print its resume hint after /exit"
 pass "real rovo exits cleanly on /exit"
 
-# --- allowedExternalPaths: prove the standard crewmate flow's brief-read and
+# --- allowedExternalPaths: prove the standard operator flow's brief-read and
 # status/report-write against real files OUTSIDE the worktree, mirroring
 # jg-spawn.sh's rovo_config_override_flag grant, and that the same access is
 # blocked by default (AGENTS.md jg-rovo-external-paths finding). rovo's

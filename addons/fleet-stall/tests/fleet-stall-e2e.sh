@@ -15,7 +15,7 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # the fixture until the last case, so the zero-busy guard stays out of the way
 # before it. A worker on its own
 # local CI and two workers on their own emulator runs, all behind example home
-# paths, no longer count; "waiting on firstmate for the decision" and
+# paths, no longer count; "waiting on juggernaut for the decision" and
 # "awaiting main instruction" still do.
 # FLEET_STALL_BIN runs another copy of the check against the same fixture.
 # Needs bash and python3 on PATH; no real home, herdr or lead is touched.
@@ -39,15 +39,15 @@ echo window=default:w4:p1 > "$JG_STALL_ROOT/state/writeboost.meta"
 
 old=$(($(date +%s) - 3000))
 lane() { # lane <home-number> <task> <last status line>: a live lane paused >45m
-  local d=$JG_STALL_BASE/$1/firstmate/state
+  local d=$JG_STALL_BASE/$1/juggernaut/state
   mkdir -p "$d"
   : > "$d/$2.meta"
   printf '%s\n' "$3" > "$d/$2.status"
   touch -d "@$old" "$d/$2.status"
 }
-lane 8 rd-local-ci "paused [at=1792181100]: local CI (./ci.sh) on my candidate running; resumes when it exits; evidence=/home/you/.treehouse/fleet/8/firstmate/data/rd-local-ci/ci.log"
-lane 4 ov-f6a-real-writer-proof "paused [at=1792177868]: own run: rebuild then one queued emulator-5630 lock hold (JG_DEVICE_WAIT=10800) for preflight+full live Go writer legs; /home/you/.treehouse/fleet/4/firstmate/data/ov-f6a-real-writer-proof/status/queued.status"
-lane 4 ov-live-writer-proof-1015 "paused [at=1792179350]: APK rebuilt at 31bce97; chunk a (Go connect+workspace pick, one real draft, ov-pm-12) queued on emulator-5630 lock (3h wait); completes at status/go-legs.status chunk a rc. Evidence: /home/you/.treehouse/fleet/4/firstmate/data/ov-live-writer-proof-1015/status/go-legs.status"
+lane 8 rd-local-ci "paused [at=1792181100]: local CI (./ci.sh) on my candidate running; resumes when it exits; evidence=/home/you/.treehouse/fleet/8/juggernaut/data/rd-local-ci/ci.log"
+lane 4 ov-f6a-real-writer-proof "paused [at=1792177868]: own run: rebuild then one queued emulator-5630 lock hold (JG_DEVICE_WAIT=10800) for preflight+full live Go writer legs; /home/you/.treehouse/fleet/4/juggernaut/data/ov-f6a-real-writer-proof/status/queued.status"
+lane 4 ov-live-writer-proof-1015 "paused [at=1792179350]: APK rebuilt at 31bce97; chunk a (Go connect+workspace pick, one real draft, ov-pm-12) queued on emulator-5630 lock (3h wait); completes at status/go-legs.status chunk a rc. Evidence: /home/you/.treehouse/fleet/4/juggernaut/data/ov-live-writer-proof-1015/status/go-legs.status"
 
 fails=0
 ok() { printf 'ok - %s\n' "$1"; }
@@ -58,9 +58,9 @@ run() { # homes the check names, e.g. "muxr(1) writeboost(1)"; the 45 min mark i
   "$bin" | sed -n 's/^fleet-stall: .*>45m: \(.*\) - send a go order$/\1/p'
 }
 
-is "workers waiting on their own runs behind firstmate paths do not count" "$(run)" ""
+is "workers waiting on their own runs behind juggernaut paths do not count" "$(run)" ""
 
-lane 8 rd-decision "paused [at=1792181200]: waiting on firstmate for the decision"
+lane 8 rd-decision "paused [at=1792181200]: waiting on juggernaut for the decision"
 lane 4 ov-instruction "paused [at=1792181300] [key=ov-next]: awaiting main instruction"
 is "lead waits still count, path-only matches still do not" "$(run)" "muxr(1) writeboost(1)"
 
@@ -80,7 +80,7 @@ if [ -e "$JG_STALL_ROOT/working/$1" ]; then echo "state: working · source: run-
 EOF
 chmod +x "$JG_STALL_ROOT/bin/"*.sh
 lane 8 own-run "paused [at=$(date +%s)]: own run: no-mistakes fix round executing on fm/own-run"
-echo kind=ship > "$JG_STALL_BASE/8/firstmate/state/own-run.meta"
+echo kind=ship > "$JG_STALL_BASE/8/juggernaut/state/own-run.meta"
 : > "$JG_STALL_ROOT/working/own-run"
 rm -f "$JG_STALL_ROOT/state/.fleet-stall.last"
 is "a paused own-run lane keeps muxr out of the zero-busy guard" "$("$bin" | grep -c 'muxr(0-busy' || true)" 0

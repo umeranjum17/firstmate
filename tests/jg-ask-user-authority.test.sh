@@ -8,7 +8,7 @@ set -u
 BRIEF="$ROOT/bin/jg-brief.sh"
 TMP_ROOT=$(jg_test_tmproot jg-ask-user-authority)
 
-test_primary_and_secondmate_instruction_generation() {
+test_primary_and_squad_lead_instruction_generation() {
   local home ship charter
   home="$TMP_ROOT/home"
   mkdir -p "$home/data"
@@ -18,7 +18,7 @@ test_primary_and_secondmate_instruction_generation() {
   ship="$home/data/authority-worker/brief.md"
   assert_grep 'ask-user findings are never yours to answer' "$ship" \
     "generated implementation brief lets the worker own an ask-user decision"
-  assert_grep "Firstmate applies \`ask-user-authority\` and obtains any required captain decision" "$ship" \
+  assert_grep "Juggernaut applies \`ask-user-authority\` and obtains any required captain decision" "$ship" \
     "generated implementation brief bypasses the primary authority owner"
   # shellcheck disable=SC2016 # Backticks are literal generated Markdown.
   assert_grep 'NEVER pass `--yes` (or `-y`) to `no-mistakes axi run` or `no-mistakes axi respond`' "$ship" \
@@ -28,15 +28,15 @@ test_primary_and_secondmate_instruction_generation() {
   assert_no_grep 'the captain, not you, owns the ask-user decisions' "$ship" \
     "generated implementation brief retained conflicting captain-only wording"
 
-  JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" JG_SECONDMATE_CHARTER='Handle sample work.' \
-    "$BRIEF" authority-mate --secondmate --no-projects >/dev/null 2>&1
+  JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" JG_SQUAD_LEAD_CHARTER='Handle sample work.' \
+    "$BRIEF" authority-mate --squad-lead --no-projects >/dev/null 2>&1
   charter="$home/data/authority-mate/brief.md"
   # shellcheck disable=SC2016 # Backticks are literal generated Markdown.
   assert_grep 'The local `AGENTS.md` is your job description' "$charter" \
-    "generated secondmate charter does not load the tracked authority boundary"
+    "generated squad_lead charter does not load the tracked authority boundary"
   assert_no_grep 'continuous frame-by-frame monitoring' "$charter" \
-    "generated secondmate charter duplicated the detailed authority procedure"
-  pass "primary workers and secondmates receive the authority rule through generated instructions"
+    "generated squad_lead charter duplicated the detailed authority procedure"
+  pass "primary workers and squad_leads receive the authority rule through generated instructions"
 }
 
-test_primary_and_secondmate_instruction_generation
+test_primary_and_squad_lead_instruction_generation

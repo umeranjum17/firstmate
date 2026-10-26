@@ -438,7 +438,7 @@ Captain: Nor this tilde-fenced one.
 
     Captain: An indented example is not the ask either.
 	[captain] Nor a tab-indented one.
-Keep this Firstmate constraint out of captain intent.')
+Keep this Juggernaut constraint out of captain intent.')
   assert_equals "" "$words" "fenced or indented Captain lines were extracted as authorized intent"
 
   words=$(jg_brief_marked_captain_words '```
@@ -511,7 +511,7 @@ test_promotion_keeps_the_recorded_base_branch() {
 ## Captain's intent
 Fix the hub bug.
 
-## Firstmate spec
+## Juggernaut spec
 Reproduce it first.
 
 # Setup
@@ -567,12 +567,12 @@ test_promotion_keeps_the_recorded_base_branch
 test_worker_role_names_skill_and_fallback_file() {
   local role_file path
   role_file="$TMP_ROOT/worker-role.txt"
-  path="$ROOT/.agents/skills/firstmate-coding-guidelines/SKILL.md"
-  [ -f "$path" ] || fail "Firstmate skill file is missing at $path"
+  path="$ROOT/.agents/skills/juggernaut-coding-guidelines/SKILL.md"
+  [ -f "$path" ] || fail "Juggernaut skill file is missing at $path"
   jg_brief_worker_role "$TMP_ROOT/state" upstream-4751 "$ROOT" >"$role_file"
-  assert_grep "\`CONTRIBUTING.md\` and \`firstmate-coding-guidelines\` for Firstmate changes" "$role_file" \
+  assert_grep "\`CONTRIBUTING.md\` and \`juggernaut-coding-guidelines\` for Juggernaut changes" "$role_file" \
     "worker role did not name the skill"
-  assert_grep "If the \`firstmate-coding-guidelines\` skill name does not resolve in this session, read \`$path\` instead." "$role_file" \
+  assert_grep "If the \`juggernaut-coding-guidelines\` skill name does not resolve in this session, read \`$path\` instead." "$role_file" \
     "worker role did not name the skill file as the fallback"
   assert_no_grep "Skill tool cannot resolve" "$role_file" \
     "worker role claims the Skill tool never resolves the skill"

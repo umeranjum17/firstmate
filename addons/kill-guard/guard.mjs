@@ -12,7 +12,7 @@ for (const [_jgOld, _jgVal] of Object.entries(process.env))
     process.env[`JG_${_jgOld.slice(3)}`] = _jgVal;
 
 const ACCOUNT_HOME = userInfo().homedir; // OS account record, never HOME/JG_HOME
-const MAIN_HOME = `${ACCOUNT_HOME}/firstmate`;
+const MAIN_HOME = `${ACCOUNT_HOME}/juggernaut`;
 const AUDIT = `${dirname(fileURLToPath(import.meta.url))}/state/main-kills.jsonl`;
 const under = (root, path) => path === root || path.startsWith(`${root}/`);
 const statOf = (pid) => readFileSync(`/proc/${pid}/stat`, "utf8").split(/\) /).at(-1).trim().split(/\s+/);
@@ -47,7 +47,7 @@ function primaryMain(caller, table) {
 function fleetPath(path) {
 	try {
 		const resolved = realpathSync(path);
-		return under(realpathSync(MAIN_HOME), resolved) || /^\.treehouse\/[^/]+\/(?:[^/]+\/)?firstmate[^/]*(?:\/|$)/.test(relative(ACCOUNT_HOME, resolved)) ||
+		return under(realpathSync(MAIN_HOME), resolved) || /^\.treehouse\/[^/]+\/(?:[^/]+\/)?juggernaut[^/]*(?:\/|$)/.test(relative(ACCOUNT_HOME, resolved)) ||
 			/^\.local\/(?:share|bin)\/jg-[^/]+(?:\/|$)/.test(relative(ACCOUNT_HOME, resolved));
 	} catch { return false; }
 }

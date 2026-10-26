@@ -46,7 +46,7 @@ the add-on loaded, then checks the helpers, the PR candidate hook through the re
 ## Provenance: byte-identical to the fork
 
 Every moved file was compared byte for byte against its fork source at
-`umeranjum17/firstmate@0689b4b9d9ab3594f846cfe07c400edfa58244bf` at move time;
+`umeranjum17/juggernaut@0689b4b9d9ab3594f846cfe07c400edfa58244bf` at move time;
 the mode is `100755` on both sides:
 
 | moved file | fork source | sha256 |

@@ -11,7 +11,7 @@ for (const [_jgOld, _jgVal] of Object.entries(process.env))
     process.env[`JG_${_jgOld.slice(3)}`] = _jgVal;
 const original = Object.fromEntries(['readFileSync', 'realpathSync', 'readdirSync', 'lstatSync', 'appendFileSync', 'mkdirSync', 'existsSync'].map(k => [k, fs[k]]));
 const temp = fs.mkdtempSync(join(tmpdir(), 'kill-main-'));
-const account = userInfo().homedir, home = `${account}/firstmate`, audit = join(temp, 'audit.jsonl');
+const account = userInfo().homedir, home = `${account}/juggernaut`, audit = join(temp, 'audit.jsonl');
 Object.assign(process.env, { HOME: join(temp, 'home'), XDG_CONFIG_HOME: join(temp, 'config'), TMPDIR: temp });
 fs.mkdirSync(process.env.HOME);
 let lock = '4001', fake = true, reused = false, logFailure = false, symlinkLock = false;
@@ -52,7 +52,7 @@ try {
   let rows = fs.readFileSync(audit, 'utf8').trim().split('\n').map(JSON.parse);
   assert.deepEqual([rows[0].pid, rows[0].starttime, rows[0].caller], [5001, '12345', process.pid]);
   assert(!JSON.stringify(rows).includes('private')); assert.equal(rows[0].cwd, `${home}/projects/demo`);
-  for (const cwd of [`${account}/.treehouse/firstmate-abc/4/firstmate`, `${account}/.treehouse/addons-abc/3/firstmate-addons`, `${account}/.local/share/jg-preview`]) {
+  for (const cwd of [`${account}/.treehouse/juggernaut-abc/4/juggernaut`, `${account}/.treehouse/addons-abc/3/juggernaut-addons`, `${account}/.local/share/jg-preview`]) {
     put(5001, 'sleep', cwd); allow('kill 5001');
   }
   put(5001, 'node', '/outside', 1, ['node', `${home}/bin/watch.mjs`, '--token=private']); allow('kill 5001');
@@ -78,7 +78,7 @@ try {
   // Even a worker launched below Main must not inherit its fleet allowance.
   procs.get(4002).ppid = 4001; deny('kill 5001'); deny('kill 5001', { caller: 4001 });
   put(5002, 'sleep', '/outside', 4002); allow('kill 5002', { caller: 4002 });
-  put(4002, 'claude', `${account}/.treehouse/firstmate-abc/4/firstmate`, 4001); deny('kill 5001');
+  put(4002, 'claude', `${account}/.treehouse/juggernaut-abc/4/juggernaut`, 4001); deny('kill 5001');
   put(process.pid, 'node', home, 4001); lock = '999999'; deny('kill 5001');
   lock = null; deny('kill 5001'); lock = '4001';
   symlinkLock = true; deny('kill 5001'); symlinkLock = false;

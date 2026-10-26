@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Behavior tests for the bin/jg-flow.sh shim: it execs the
-# firstmate-addons fleet-flow reader with JG_BIN pointing at this
+# juggernaut-addons fleet-flow reader with JG_BIN pointing at this
 # fork's bin/, and fails clearly when the add-ons checkout is absent.
 set -u
 
@@ -42,9 +42,9 @@ JG_ADDONS_DIR="$TMP_ROOT/nowhere" "$SHIM" --json >"$TMP_ROOT/out-missing/stdout"
 [ "$status" -eq 1 ] || fail "shim exit was $status, want 1"
 grep -q "JG_ADDONS_DIR" "$TMP_ROOT/out-missing/stderr" || fail "missing-checkout stderr never names JG_ADDONS_DIR: $(cat "$TMP_ROOT/out-missing/stderr")"
 
-# With JG_ADDONS_DIR unset, the shim defaults to $JG_HOME/projects/firstmate-addons.
-mkdir -p "$TMP_ROOT/fakehome/projects/firstmate-addons/fleet-flow/bin"
-cp "$addons/fleet-flow/bin/jg-flow.sh" "$TMP_ROOT/fakehome/projects/firstmate-addons/fleet-flow/bin/jg-flow.sh"
+# With JG_ADDONS_DIR unset, the shim defaults to $JG_HOME/projects/juggernaut-addons.
+mkdir -p "$TMP_ROOT/fakehome/projects/juggernaut-addons/fleet-flow/bin"
+cp "$addons/fleet-flow/bin/jg-flow.sh" "$TMP_ROOT/fakehome/projects/juggernaut-addons/fleet-flow/bin/jg-flow.sh"
 mkdir -p "$TMP_ROOT/out-default"
 env -u JG_ADDONS_DIR FAKE_OUT="$TMP_ROOT/out-default" JG_HOME="$TMP_ROOT/fakehome" "$SHIM" --json >"$TMP_ROOT/out-default/stdout" 2>"$TMP_ROOT/out-default/stderr"
 [ "$(cat "$TMP_ROOT/out-default/args")" = "--json" ] || fail "default-dir add-on got wrong args: $(cat "$TMP_ROOT/out-default/args")"

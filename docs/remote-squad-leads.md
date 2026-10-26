@@ -1,9 +1,9 @@
-# Remote second mates
+# Remote squad leads
 
-This page covers how to set up, provision, run, and retire a second mate whose Juggernaut home lives on another host.
-It is for operators who run a remote second mate and for anyone checking its transport and safety behavior.
+This page covers how to set up, provision, run, and retire a squad lead whose Juggernaut home lives on another host.
+It is for operators who run a remote squad lead and for anyone checking its transport and safety behavior.
 
-Remote second mates place a whole persistent Juggernaut home on another SSH-reachable host.
+Remote squad leads place a whole persistent Juggernaut home on another SSH-reachable host.
 The primary still owns routing and supervision, while the remote home owns its own projects, backlog, and workers.
 Juggernaut does not support placing an individual worker remotely or failing a remote route over to a local replacement.
 
@@ -14,7 +14,7 @@ Juggernaut does not support placing an individual worker remotely or failing a r
 | Prepare the primary and the remote host | [Prerequisites](#prerequisites) and [non-interactive tool contract](#non-interactive-tool-contract) |
 | Check whether a host is ready, or repair it | [Readiness, repair, and the human steps](#readiness-repair-and-the-human-steps) |
 | Create the route and the remote home | [Provision a route](#provision-a-route) |
-| Launch, recover, message, and read a remote second mate | [Normal operation](#normal-operation) |
+| Launch, recover, message, and read a remote squad lead | [Normal operation](#normal-operation) |
 | Move queued work to the remote home | [Backlog handoff](#backlog-handoff) |
 | Push configuration, relaunch, update, or retire | [Sync, update, and retirement](#sync-update-and-retirement) |
 | Run the tests or a real-host smoke test | [Verification](#verification) |
@@ -25,11 +25,11 @@ The remote second-mate agent itself always runs on the [Herdr backend](herdr-bac
 Every path that provisions or launches one refuses a host that is not ready for it.
 
 - `jg-remote` is reserved for remote fleet work and must not be used for personal work.
-- The user's interactive Herdr session remains `default` and is not a remote-secondmate prerequisite.
+- The user's interactive Herdr session remains `default` and is not a remote-squad-lead prerequisite.
 - Herdr's remote-session server belongs to the host's own GUI login session rather than to the SSH connection.
   As a result, the agent's endpoint survives every disconnection the primary's supervision depends on.
-- Local second mates are unaffected and keep their ordinary backend and session selection.
-  So do the workers a remote second mate supervises inside its own home.
+- Local squad leads are unaffected and keep their ordinary backend and session selection.
+  So do the workers a remote squad lead supervises inside its own home.
 
 ## Prerequisites
 
@@ -53,7 +53,7 @@ Its [script header](../bin/jg-on.sh) owns the keepalive defaults and environment
 
 ```sh
 mkdir -p ~/.local/bin
-ln -s /absolute/path/to/firstmate/bin/jg-remote-entrypoint.sh ~/.local/bin/jg-remote-entrypoint.sh
+ln -s /absolute/path/to/juggernaut/bin/jg-remote-entrypoint.sh ~/.local/bin/jg-remote-entrypoint.sh
 ```
 
 The entrypoint accepts encoded argv for genuine executable `bin/jg-*.sh` files only.
@@ -78,7 +78,7 @@ Each such command takes these steps:
 3. It waits for its result.
 4. It relays stdout, stderr, and the exit status separately.
 
-On macOS the worker is `dev.firstmate.remote-job`, an Aqua-scoped LaunchAgent at `~/Library/LaunchAgents/dev.firstmate.remote-job.plist` with logs under `~/Library/Logs/`.
+On macOS the worker is `dev.juggernaut.remote-job`, an Aqua-scoped LaunchAgent at `~/Library/LaunchAgents/dev.juggernaut.remote-job.plist` with logs under `~/Library/Logs/`.
 After that bootstrap, every non-doctor `jg-on.sh` target runs through that worker in the remote account's GUI session.
 It never runs in the SSH process or a Herdr pane.
 Linux uses the same queue and worker protocol without the Aqua-session requirement.
@@ -92,7 +92,7 @@ A verified lock owner running stale code or no longer tracked by launchd is stop
 If readiness remains stale while a verified current, launchd-tracked lock owner is alive, the command fails with `remote-job: ready heartbeat stale while verified worker lock owner is alive` rather than reloading that worker merely for the stale heartbeat.
 The repair invariant is implemented in [`jg_remote_job_repair_launchagent`](../bin/jg-remote-job-lib.sh); heartbeat ownership and cadence are documented in the worker header above.
 
-The independent heartbeat and live-owner check build on [Diabl0570's contribution](https://github.com/kunchenguid/firstmate/pull/6217), alongside [gearhead924's supervisor-multiplication work](https://github.com/kunchenguid/firstmate/pull/5851), addressing [remote reply reliability](https://github.com/kunchenguid/firstmate/issues/2921).
+The independent heartbeat and live-owner check build on [Diabl0570's contribution](https://github.com/kunchenguid/juggernaut/pull/6217), alongside [gearhead924's supervisor-multiplication work](https://github.com/kunchenguid/juggernaut/pull/5851), addressing [remote reply reliability](https://github.com/kunchenguid/juggernaut/issues/2921).
 
 ### Job lanes and preemption
 
@@ -128,7 +128,7 @@ It never touches a worker whose checkout still exists.
 ### What the remote account must provide
 
 - The remote account must provide the required toolchain, the selected worker runtime, the selected session backend, and credentials that work on that host.
-- A [worker account pin](configuration.md#worker-account-pin-configclaude-account-configpi-account) for the second mate or its workers lives in the remote home's own configuration on that host.
+- A [worker account pin](configuration.md#worker-account-pin-configclaude-account-configpi-account) for the squad lead or its workers lives in the remote home's own configuration on that host.
 - The origin URL named for each project must be reachable from the remote account, because projects are cloned on that host rather than copied from the primary.
 
 ## Non-interactive tool contract
@@ -214,14 +214,14 @@ chmod +x ~/.local/bin/tasks-axi
 
 ## Readiness, repair, and the human steps
 
-`bin/jg-remote-doctor.sh` is the single owner of what "ready for a remote second mate" means.
+`bin/jg-remote-doctor.sh` is the single owner of what "ready for a remote squad lead" means.
 
 ### Check a host
 
 Check any host against it directly:
 
 ```sh
-bin/jg-on.sh <secondmate-id|ssh-alias> jg-remote-doctor.sh
+bin/jg-on.sh <squad-lead-id|ssh-alias> jg-remote-doctor.sh
 ```
 
 That run is read-only.
@@ -248,13 +248,13 @@ The script's own header owns the full line protocol.
 `--fix` repairs only the automatable gaps and is safe to rerun:
 
 ```sh
-bin/jg-on.sh <secondmate-id|ssh-alias> jg-remote-doctor.sh --fix
+bin/jg-on.sh <squad-lead-id|ssh-alias> jg-remote-doctor.sh --fix
 ```
 
 Over the plain SSH doctor bootstrap, it writes and reloads two Juggernaut-owned launch agents on macOS:
 
-- `dev.firstmate.remote-job`.
-- `dev.firstmate.herdr.jg-remote`.
+- `dev.juggernaut.remote-job`.
+- `dev.juggernaut.herdr.jg-remote`.
 
 Both are scoped with `LimitLoadToSessionType=Aqua` and bootstrapped in `gui/<uid>`.
 
@@ -299,8 +299,8 @@ The guard's header owns the decision table, and [`bin/jg-remote-herdr-owner-lib.
 Its limits:
 
 - It never installs packages or overwrites a non-Juggernaut file at a reserved wrapper path.
-- The dedicated Herdr launch agent owns only the remote-secondmate `jg-remote` server.
-  It does not inspect, rewrite, start, stop, or require the user's interactive `default` session or its `dev.firstmate.herdr` launch agent.
+- The dedicated Herdr launch agent owns only the remote-squad-lead `jg-remote` server.
+  It does not inspect, rewrite, start, stop, or require the user's interactive `default` session or its `dev.juggernaut.herdr` launch agent.
 - It re-derives every check from the host afterwards, so what it prints is the state after the repair rather than the intent of one.
 
 ### Steps only a person can take
@@ -325,7 +325,7 @@ A file at `~/.local/bin/jg-remote-entrypoint.sh` that is not Juggernaut's own sy
 
 ## Provision a route
 
-1. Create and fill the normal secondmate charter first.
+1. Create and fill the normal squad lead charter first.
 2. Then run:
 
 ```sh
@@ -335,7 +335,7 @@ bin/jg-remote-home-seed.sh <id> <ssh-alias> <remote-root> <remote-home> {<projec
 | Argument | Meaning |
 | --- | --- |
 | `<remote-root>` | The remote Juggernaut code clone that supplies tracked scripts. |
-| `<remote-home>` | A separate absolute path for the persistent secondmate home that must not overlap the code root. |
+| `<remote-home>` | A separate absolute path for the persistent squad lead home that must not overlap the code root. |
 
 ### Project origins
 
@@ -371,14 +371,14 @@ So each of these projects is refused rather than provisioned:
 
 The seed takes these steps:
 
-1. It records `host:`, `root:`, and `home:` in `data/secondmates.md`.
+1. It records `host:`, `root:`, and `home:` in `data/squad leads.md`.
 2. It gates the host on readiness.
 3. It sends a bounded manifest.
 4. It lets the remote host clone its own Juggernaut home and project origins.
 
 It does not copy project trees or the primary process environment.
 In the primary home, its durable registration effects are limited to that route and the charter brief under `data/<id>`.
-Launch records are created only when the secondmate is launched.
+Launch records are created only when the squad lead is launched.
 
 ### The seed's readiness gate
 
@@ -400,14 +400,14 @@ SSH exit 255 preserves the route, because remote completion is unknown and must 
 
 ### The parent record
 
-Seeding also writes a durable `.jg-secondmate-parent` record next to the home's `.jg-secondmate-home` identity marker.
+Seeding also writes a durable `.jg-squad-lead-parent` record next to the home's `.jg-squad-lead-home` identity marker.
 That record names this home's route to its parent as `local` or `remote`.
 The promised-public-reply subsystem is same-filesystem by construction, so a remote route can never carry a delegated public-reply promise.
 `bin/jg-teardown.sh`'s cleanup gate reads this record to treat a remote parent as out of scope rather than an unresolved binding.
 
 ### Local and remote routes together
 
-Local secondmates keep the existing route form and need no migration.
+Local squad leads keep the existing route form and need no migration.
 A fleet may contain local and remote routes together.
 Use `bin/jg-home-seed.sh validate` to validate either form.
 
@@ -415,20 +415,20 @@ Use `bin/jg-home-seed.sh validate` to validate either form.
 
 ### Launch or recover
 
-Launch or recover the remote second mate with the same command used for a local route:
+Launch or recover the remote squad lead with the same command used for a local route:
 
 ```sh
-bin/jg-spawn.sh <id> --secondmate
+bin/jg-spawn.sh <id> --squad-lead
 ```
 
 The primary then takes these steps:
 
-1. It resolves the verified secondmate harness and optional model and effort.
+1. It resolves the verified squad lead harness and optional model and effort.
 2. It runs the same readiness gate the seed runs.
 3. It transfers the inherited-material allowlist.
 4. It asks the remote host to launch on Herdr in `jg-remote`.
 
-All remote secondmates on one host share `jg-remote` and retain separate `2ndmate-<id>` workspaces inside it.
+All remote squad leads on one host share `jg-remote` and retain separate `2ndmate-<id>` workspaces inside it.
 
 ### Refused and unsupported launches
 
@@ -436,15 +436,15 @@ All remote secondmates on one host share `jg-remote` and retain separate `2ndmat
 - An existing remote endpoint recorded in another Herdr session, including `default`, is classified as unverified and left untouched.
   Launch, liveness recovery, control, and retirement refuse it until an operator explicitly migrates it, instead of attempting a live cutover.
 - A launch after a host has drifted out of readiness fails with the doctor's own gap text instead of leaving a half-created endpoint.
-- Raw launch commands are not accepted for remote secondmates.
-- Backends that already refuse secondmate launch, currently Orca and cmux, remain unsupported on the remote host.
+- Raw launch commands are not accepted for remote squad leads.
+- Backends that already refuse squad lead launch, currently Orca and cmux, remain unsupported on the remote host.
 
 ### Liveness recovery
 
-Startup liveness recovery relaunches a dead or missing remote second mate through this same command.
+Startup liveness recovery relaunches a dead or missing remote squad lead through this same command.
 So recovery passes the same readiness gate rather than a weaker one.
 
-The watcher's liveness tick applies the identical rule during ordinary supervision through the shared `bin/jg-secondmate-liveness-lib.sh`:
+The watcher's liveness tick applies the identical rule during ordinary supervision through the shared `bin/jg-squad-lead-liveness-lib.sh`:
 
 - The remote endpoint is probed read-only once per cadence.
 - Only a positive `dead` or `missing` reply relaunches through that command.
@@ -460,7 +460,7 @@ The Bearings inventory-reconcile hook therefore handles these markerless routes 
 - It revalidates the sampled host at delivery.
 - It refuses a route that changed hosts.
 
-[`jg-secondmate-reconcile.sh`](../bin/jg-secondmate-reconcile.sh) owns the exact cooldown, identity, and reporting contract.
+[`jg-squad-lead-reconcile.sh`](../bin/jg-squad-lead-reconcile.sh) owns the exact cooldown, identity, and reporting contract.
 
 ### Send a routed request
 
@@ -501,14 +501,14 @@ A fire-and-forget record, such as a reconcile ask, gets its single retry ring on
 
 ### Remote reads
 
-`jg-peek.sh` and `jg-crew-state.sh` route remote-secondmate reads to the endpoint's host instead of consulting local worktree or backend state.
+`jg-peek.sh` and `jg-crew-state.sh` route remote-squad-lead reads to the endpoint's host instead of consulting local worktree or backend state.
 An unreachable or unreadable remote read is unknown, not evidence that the endpoint is dead.
 
 ### Replies and the parent channel
 
 Marked requests keep the existing correlation contract.
 The remote charter appends replies to `state/parent-replies.status` in the remote home.
-The remote home's own outcome publishers append there too, through the channel contract in `bin/jg-parent-channel-lib.sh` ([secondmate-parent-channel.md](secondmate-parent-channel.md)).
+The remote home's own outcome publishers append there too, through the channel contract in `bin/jg-parent-channel-lib.sh` ([squad-lead-parent-channel.md](squad-lead-parent-channel.md)).
 The remote charter also names its steering inbox as `state/parent-route/<id>.inbox` in the remote home.
 That inbox is the record surface the routed transport writes to, so a steer never lands on a parent-home path the remote host cannot reach.
 
@@ -605,7 +605,7 @@ Semantic callers preserve the route or pending request:
 - An operation that is not idempotent requires same-host reconciliation rather than a blind resend.
 - An unconfirmed steer may be retried only through the correlation-preserving command described above.
 
-An unavailable remote home is projected as unknown and is never replaced by a local second mate.
+An unavailable remote home is projected as unknown and is never replaced by a local squad lead.
 
 ## Backlog handoff
 
@@ -622,7 +622,7 @@ For a remote route, the handoff takes these steps:
 3. `jg-backlog-receive.sh` atomically ingests every destination-absent key (a key the remote backlog does not already hold) under the remote backlog's own lock.
 
 The [`bin/jg-backlog-handoff.sh`](../bin/jg-backlog-handoff.sh) header owns remote outbox release after receipt and stable wake-correlation retry behavior.
-Bootstrap retries pending outboxes and wakes, and emits `SECONDMATE_HANDOFF:` only when an outbox remains.
+Bootstrap retries pending outboxes and wakes, and emits `SQUAD LEAD_HANDOFF:` only when an outbox remains.
 There is no two-phase journal and no additional tasks-axi release requirement.
 
 ## Sync, update, and retirement
@@ -632,34 +632,34 @@ There is no two-phase journal and no additional tasks-axi release requirement.
 Locked startup convergence and `bin/jg-config-push.sh` transfer only the declared inherited-material allowlist.
 Changed live routes receive a marked instruction to re-read the transferred files.
 The primary records that remote nudge before delivery and retries it during locked startup convergence after a failed send.
-Local secondmates retain their generation-specific local pointer contract.
+Local squad leads retain their generation-specific local pointer contract.
 Remote transfers do not copy those primary-local instruction paths.
 
-### Relaunch a live remote second mate
+### Relaunch a live remote squad lead
 
-A live remote second mate is restarted with `relaunch`, which runs the ordinary [control plane](agent-control.md) on that host.
+A live remote squad lead is restarted with `relaunch`, which runs the ordinary [control plane](agent-control.md) on that host.
 The endpoint record there was written by a host-local launch and carries no remote placement.
 So the transaction, its checkpoint, and its postconditions are the local ones.
 
 The primary passes `<harness> <model|default|-> <effort|default|->` explicitly, using `default` when an axis has no parent pin.
-It passes them explicitly because neither the global `config/secondmate-harness` nor the per-mate `config/secondmates/<id>/harness` pin is inherited into a second mate's home, and any such file on that host belongs to a different home.
+It passes them explicitly because neither the global `config/squad-lead-harness` nor the per-mate `config/squad leads/<id>/harness` pin is inherited into a squad lead's home, and any such file on that host belongs to a different home.
 Letting the far side re-resolve it would silently move the mate onto another runtime.
 SSH exit 255 leaves completion unknown and the route preserved, exactly as every other verb here.
-Move a live remote second mate onto a newly pinned harness, model, or effort with [`bin/jg-remote-secondmate-relaunch.sh`](../bin/jg-remote-secondmate-relaunch.sh) rather than calling `relaunch` through `jg-on.sh` directly: the host-local relaunch it drives can only rewrite the host's own endpoint record, so this wrapper reads the confirmed identity back from that record afterward and republishes the primary's own route metadata to match, the same way launch already records a fresh route.
+Move a live remote squad lead onto a newly pinned harness, model, or effort with [`bin/jg-remote-squad-lead-relaunch.sh`](../bin/jg-remote-squad-lead-relaunch.sh) rather than calling `relaunch` through `jg-on.sh` directly: the host-local relaunch it drives can only rewrite the host's own endpoint record, so this wrapper reads the confirmed identity back from that record afterward and republishes the primary's own route metadata to match, the same way launch already records a fresh route.
 
 ### Juggernaut code convergence
 
 Session start and every remote launch converge the persistent remote home on the primary's own default-branch commit rather than on the Juggernaut copy that host keeps.
-The [`secondmate-provisioning` skill](../.agents/skills/secondmate-provisioning/SKILL.md) owns the guarded convergence contract, including the distinct `/updatefirstmate` behavior, and [`bin/jg-remote-secondmate-control.sh`](../bin/jg-remote-secondmate-control.sh) owns the commit-import mechanics.
+The [`squad-lead-provisioning` skill](../.agents/skills/squad-lead-provisioning/SKILL.md) owns the guarded convergence contract, including the distinct `/updatejuggernaut` behavior, and [`bin/jg-remote-squad-lead-control.sh`](../bin/jg-remote-squad-lead-control.sh) owns the commit-import mechanics.
 Neither session start nor launch moves the host's own Juggernaut copy.
 An unsafe or unavailable target is reported and left untouched.
 A completed sync reports which watched instruction paths its advance changed.
 The primary needs that fact because it cannot diff a checkout it cannot read.
 It uses the fact to decide whether the running remote agent must be replaced to actually reload.
 
-### Retire a remote second mate
+### Retire a remote squad lead
 
-Retire a remote second mate with the normal guarded command:
+Retire a remote squad lead with the normal guarded command:
 
 ```sh
 bin/jg-teardown.sh <id>
@@ -672,15 +672,15 @@ It refuses while any of these holds:
 - The primary has an unfinished backlog outbox.
 - A routed reply remains unresolved.
 
-It closes only the retiring secondmate's panes or `2ndmate-<id>` workspace in `jg-remote`.
-It never stops the shared session or removes a sibling secondmate's workspace or panes.
+It closes only the retiring squad lead's panes or `2ndmate-<id>` workspace in `jg-remote`.
+It never stops the shared session or removes a sibling squad lead's workspace or panes.
 SSH exit 255 preserves both the route and local records because completion is unknown.
-`--force` remains the explicit discard path and requires the same captain authority as local secondmate discard.
+`--force` remains the explicit discard path and requires the same captain authority as local squad lead discard.
 
 No generic remote delete or write surface exists:
 
 - Remote writes are confined to inherited allowlist files and backlog handoff scratch files.
-- Remote home removal is reachable only through guarded secondmate retirement.
+- Remote home removal is reachable only through guarded squad lead retirement.
 
 ## Verification
 
@@ -703,7 +703,7 @@ The portable tests run with these commands:
 ```sh
 bin/jg-test-run.sh tests/jg-on.test.sh
 bin/jg-test-run.sh tests/jg-send-remote-delivery.test.sh
-bin/jg-test-run.sh tests/jg-secondmate-reconcile.test.sh
+bin/jg-test-run.sh tests/jg-squad-lead-reconcile.test.sh
 bin/jg-test-run.sh tests/jg-peek-remote.test.sh
 bin/jg-test-run.sh tests/jg-crew-state.test.sh
 bin/jg-test-run.sh tests/jg-remote-job.test.sh
@@ -714,11 +714,11 @@ bin/jg-test-run.sh tests/jg-remote-transport-lanes.test.sh
 bin/jg-test-run.sh tests/jg-remote-doctor.test.sh
 bin/jg-test-run.sh tests/jg-remote-herdr-guard.test.sh
 bin/jg-test-run.sh tests/jg-project-origin.test.sh
-bin/jg-test-run.sh tests/jg-secondmate-sync.test.sh
+bin/jg-test-run.sh tests/jg-squad-lead-sync.test.sh
 bin/jg-test-run.sh tests/jg-remote-reply.test.sh
 bin/jg-test-run.sh tests/jg-remote-backlog-handoff.test.sh
-bin/jg-test-run.sh tests/jg-remote-secondmate-lifecycle-e2e.test.sh
-bin/jg-test-run.sh tests/jg-remote-secondmate-trace-context.test.sh
+bin/jg-test-run.sh tests/jg-remote-squad-lead-lifecycle-e2e.test.sh
+bin/jg-test-run.sh tests/jg-remote-squad-lead-trace-context.test.sh
 ```
 
 ### What the portable tests cannot prove
@@ -740,8 +740,8 @@ Do not run doctor `--fix`, signal a process, change the queue or readiness times
 Run this Bash sampling loop on that Mac; it only reads service and process records and the existing state files:
 
 ```bash
-label=dev.firstmate.remote-job
-state="$HOME/.firstmate/remote-job"
+label=dev.juggernaut.remote-job
+state="$HOME/.juggernaut/remote-job"
 for ((sample=0; sample<=120; sample++)); do
   date -u '+%Y-%m-%dT%H:%M:%SZ'
   service=$(launchctl print "gui/$(id -u)/$label") || break
@@ -771,7 +771,7 @@ For a real-host smoke test:
 
 1. Provision a disposable remote account and project.
 2. Run the doctor and its repair against that account.
-3. Launch the second mate.
+3. Launch the squad lead.
 4. Send one marked request.
 5. Verify its correlated reply and structured fleet projection.
 6. Simulate an unreachable host to confirm unknown-without-failover behavior.

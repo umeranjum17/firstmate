@@ -14,7 +14,7 @@
 #
 # It also pins the clone-root guard: a plain directory under projects/ resolves,
 # through git's upward repository discovery, to the ENCLOSING repository - in a
-# firstmate home, the firstmate checkout itself - so it must be skipped by name
+# juggernaut home, the juggernaut checkout itself - so it must be skipped by name
 # with the enclosing repo left untouched, in both the whole-fleet and
 # single-project forms, while a symlinked clone dir still syncs.
 #
@@ -97,7 +97,7 @@ run_sync() {
 }
 
 # build_enclosing_home <name>: an JG_HOME that is itself nested inside another git
-# repository - firstmate's own layout, where projects/ sits inside the firstmate
+# repository - juggernaut's own layout, where projects/ sits inside the juggernaut
 # checkout. The enclosing repo is a clean clone of a bare origin that is one commit
 # ahead, so a sync that walked git discovery UP out of projects/<dir> would find a
 # fast-forward available and visibly take it. Echoes the enclosing repo, which is
@@ -522,7 +522,7 @@ test_bootstrap_relays_recovered_and_stuck() {
   advance_origin "$home" rec-clone C1
   git -C "$rec" checkout --detach --quiet
 
-  # Full bootstrap: no state/ dir -> secondmate sync no-ops; no .env -> X mode off.
+  # Full bootstrap: no state/ dir -> squad_lead sync no-ops; no .env -> X mode off.
   # We only assert the fleet-sync relay lines; other detect lines are irrelevant.
   out=$(JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" "$ROOT/bin/jg-bootstrap.sh" 2>/dev/null)
 
@@ -649,7 +649,7 @@ test_transient_packed_refs_lock_self_clears() {
 # 0-byte .git/index.lock (the takeone shape), after which `git merge --ff-only`
 # fails forever on "Unable to create ...index.lock: File exists". The shared
 # jg-ff-lib.sh helper clears it ONLY when provably stale and retries once - the
-# same proof and path the secondmate sync already uses - so the clone catches up.
+# same proof and path the squad_lead sync already uses - so the clone catches up.
 test_orphaned_stale_index_lock_recovers() {
   local home fakebin clone out err
   home=$(new_home)

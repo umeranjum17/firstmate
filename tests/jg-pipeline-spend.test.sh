@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Behavior tests for bin/jg-pipeline-spend.sh: a task's no-mistakes pipeline
-# spend reaches Firstmate's own records, attributed to the task, through the
+# spend reaches Juggernaut's own records, attributed to the task, through the
 # script's public record command, reading back the ledger line it writes. Each
 # enabled case seeds a real SQLite state database shaped like no-mistakes' own
 # (repos, runs, agent_invocations) under
@@ -22,7 +22,7 @@ SPAWN_EPOCH=$((BRANCH_EPOCH + 5000))
 BRANCH_ISO=$(TZ=UTC0 date -d "@$BRANCH_EPOCH" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null \
   || TZ=UTC0 date -r "$BRANCH_EPOCH" +%Y-%m-%dT%H:%M:%SZ)
 
-# make_case <name>: echo a case dir holding a Firstmate home (home/state,
+# make_case <name>: echo a case dir holding a Juggernaut home (home/state,
 # home/data), a project clone, a task copy (wt) on branch fm/task created at
 # BRANCH_EPOCH, the task's meta, an empty NM_HOME (nm), and a fake
 # no-mistakes whose `axi` prints `repo: $FAKE_NM_REPO`, or the CLI's
@@ -34,7 +34,7 @@ make_case() {
   jg_git_init_commit "$d/project"
   GIT_COMMITTER_DATE="@$BRANCH_EPOCH +0000" git -C "$d/project" worktree add -q -b fm/task "$d/wt"
   jg_write_meta "$d/home/state/task.meta" \
-    "window=firstmate:jg-task" \
+    "window=juggernaut:jg-task" \
     "endpoint_task_id=task" \
     "worktree=$d/wt" \
     "project=$d/project" \
@@ -332,17 +332,17 @@ test_refusals() {
   spend "$d" record missing >/dev/null 2>&1; rc=$?
   set -e
   expect_code 1 "$rc" 'a task with no record'
-  jg_write_meta "$d/home/state/mate.meta" "kind=secondmate" "worktree=$d/wt"
+  jg_write_meta "$d/home/state/mate.meta" "kind=squad_lead" "worktree=$d/wt"
   set +e
   spend "$d" record mate >/dev/null 2>&1; rc=$?
   set -e
-  expect_code 1 "$rc" 'a secondmate'
+  expect_code 1 "$rc" 'a squad_lead'
   assert_absent "$d/home/data/pipeline-spend.jsonl" 'a refused record wrote the ledger'
   set +e
   spend "$d" record ../task >/dev/null 2>&1; rc=$?
   set -e
   expect_code 2 "$rc" 'an unsafe task id'
-  pass 'missing tasks, secondmates, and unsafe ids are refused'
+  pass 'missing tasks, squad_leads, and unsafe ids are refused'
 }
 
 test_known_spend_including_failed_and_cancelled_is_attributed_to_the_task

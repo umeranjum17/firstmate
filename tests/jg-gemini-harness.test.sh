@@ -14,8 +14,8 @@
 #      MainThread on modern Node/Linux, so ancestry does NOT reach it and the
 #      marker is the only detection path. The comm-name arm is pinned for a
 #      future natively-named binary.
-#   4. Gemini is a crewmate/scout adapter only: it has no primary supervision
-#      protocol, so its control mechanics are verified while a secondmate launch
+#   4. Gemini is a operator/scout adapter only: it has no primary supervision
+#      protocol, so its control mechanics are verified while a squad_lead launch
 #      on it is refused.
 set -u
 
@@ -243,21 +243,21 @@ test_gemini_control_mechanics_are_the_verified_ones() {
   pass "jg-control-lib.sh: gemini carries its verified interrupt and exit mechanics"
 }
 
-test_gemini_is_crewmate_and_scout_only() {
+test_gemini_is_operator_and_scout_only() {
   jg_control_harness_supports_kind gemini ship \
     || fail "gemini must be verified for ship work"
   jg_control_harness_supports_kind gemini scout \
     || fail "gemini must be verified for scout work"
-  ! jg_control_harness_supports_kind gemini secondmate \
-    || fail "gemini has no primary supervision protocol and must be refused for secondmates"
-  pass "jg-control-lib.sh: gemini is a crewmate/scout adapter only"
+  ! jg_control_harness_supports_kind gemini squad_lead \
+    || fail "gemini has no primary supervision protocol and must be refused for squad_leads"
+  pass "jg-control-lib.sh: gemini is a operator/scout adapter only"
 }
 
 test_gemini_wiring_stays_outside_the_worktree() {
   local out
   out=$(jg_control_harness_wiring_paths gemini /wt /state task-1)
   [ "$out" = "/state/task-1.gemini-settings.json" ] \
-    || fail "gemini's per-task wiring is its firstmate-owned settings file, got '$out'"
+    || fail "gemini's per-task wiring is its juggernaut-owned settings file, got '$out'"
   case "$out" in
     /wt/*) fail "gemini must never claim a path inside the worktree: '$out'" ;;
   esac
@@ -272,5 +272,5 @@ test_gemini_node_bundle_is_not_ancestry_detectable
 test_gemini_process_identity_reads_the_script_argument
 test_gemini_process_identity_preserves_whitespace_in_script_path
 test_gemini_control_mechanics_are_the_verified_ones
-test_gemini_is_crewmate_and_scout_only
+test_gemini_is_operator_and_scout_only
 test_gemini_wiring_stays_outside_the_worktree

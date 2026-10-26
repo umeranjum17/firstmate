@@ -24,7 +24,7 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 #            the keyed-answer intake (bin/jg-captain-hold.sh bind), and register
 #            the `signoff` source with bin/jg-procevent.sh. Nothing here runs
 #            until a home arms it, so an unarmed home behaves exactly as before.
-#            Arming is per home; secondmate homes arm themselves.
+#            Arming is per home; squad_lead homes arm themselves.
 # retire     Opt out: retire the registration and drop the binding.
 # raise      Called by `jg-captain-hold.sh hold` after a hold is recorded. While
 #            enabled it raises one board card keyed by this home's tag, the task
@@ -56,12 +56,12 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 #            or an ambiguous configured-prefix match, is transient.
 #
 # Read mark: the runner announces each captured result to this home's handler (Main,
-# or the lead in a secondmate home), who concludes it with `bin/jg-procevent.sh
+# or the lead in a squad_lead home), who concludes it with `bin/jg-procevent.sh
 # handled signoff <sequence>`. That is the pickup of the note carrying the owner's
 # answer, so each poll round runs `sign-off-axi feedback <card> <board.json> --read`
 # for every card in a handled captured result, on the board `sign-off-axi status`
 # names. It reads the captured results, not `ack`, because the runner runs `answers`
-# and `ack` from the Firstmate checkout's own adapter. A card is marked once per
+# and `ack` from the Juggernaut checkout's own adapter. A card is marked once per
 # result; sign-off's NOT_FOUND counts as done, and a sign-off-axi older than 0.6.1
 # (no feedback command) skips with one log line.
 #
@@ -72,7 +72,7 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # poll ran is still found on the next round, and an answer on an earlier card
 # never resolves a re-held task. An answer the intake fails on, or skips for a transient reason, stays
 # deliverable and is offered again on the next round. Answers on the same board from other
-# agents are never read as Firstmate's. What an answer DOES is owned by the
+# agents are never read as Juggernaut's. What an answer DOES is owned by the
 # keyed-answer intake in bin/jg-captain-hold.sh; this adapter maps nothing and
 # closes nothing.
 #
@@ -90,12 +90,12 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 set -u
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-# The Firstmate checkout owns the runner, the keyed-answer intake and the libraries.
+# The Juggernaut checkout owns the runner, the keyed-answer intake and the libraries.
 # JG_CODE_ROOT defaults to JG_HOME, the checkout a home runs from (as in the sentinel wrapper).
 CODE_ROOT="${JG_CODE_ROOT:-${JG_HOME:-}}"
 BIN="$CODE_ROOT/bin"
 if [ -z "$CODE_ROOT" ] || [ ! -f "$BIN/jg-procevent-lib.sh" ]; then
-  echo "jg-procevent-signoff: no Firstmate checkout with bin/jg-procevent-lib.sh; set JG_CODE_ROOT" >&2
+  echo "jg-procevent-signoff: no Juggernaut checkout with bin/jg-procevent-lib.sh; set JG_CODE_ROOT" >&2
   exit 2
 fi
 JG_HOME="${JG_HOME:-$CODE_ROOT}"

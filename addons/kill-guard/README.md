@@ -6,14 +6,14 @@ Workers and leads retain the ordinary ownership rule.
 PID 1, the systemd user manager, herdr server, no-mistakes daemon, sshd, tailscaled and interactive shells remain protected for every caller, including their parent.
 All `pkill` and `killall` commands are refused; use a literal PID.
 
-Main approval requires the guard's actual process ancestry to reach the supplied caller and the live harness PID recorded in `~/firstmate/state/.lock`.
+Main approval requires the guard's actual process ancestry to reach the supplied caller and the live harness PID recorded in `~/juggernaut/state/.lock`.
 The account home comes from the OS account record, ignoring `HOME`, `JG_HOME` and other environment overrides.
-The lock holder's resolved working directory must be under `~/firstmate`; a different harness in that ancestry outside the primary home disqualifies the allowance.
+The lock holder's resolved working directory must be under `~/juggernaut`; a different harness in that ancestry outside the primary home disqualifies the allowance.
 A missing, malformed, symlinked, dead or uncertain lock never grants it.
 Environment variables and `--caller` alone cannot select Main.
 The lock is same-user writable: this is a cooperative hook preventing accidental kills, not a security boundary against hostile programs running as that user.
 
-Fleet ownership uses resolved cwd or absolute command-line paths under the primary home, `~/.treehouse/<pool>[/<slot>]/firstmate*`, or `~/.local/{share,bin}/jg-*` add-on tools.
+Fleet ownership uses resolved cwd or absolute command-line paths under the primary home, `~/.treehouse/<pool>[/<slot>]/juggernaut*`, or `~/.local/{share,bin}/jg-*` add-on tools.
 Project worktrees also qualify when their resolved Git common directory is under the primary home's `projects/`.
 Symlinks resolve before comparison and directory boundaries matter.
 Process start time is read before and after identity collection, and checked again before Main approval.

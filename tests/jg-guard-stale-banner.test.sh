@@ -18,7 +18,7 @@ make_guard_case() {
   home="$dir/home"
   root="$dir/root"
   mkdir -p "$home/state" "$home/config" "$root"
-  jg_write_meta "$home/state/task.meta" "window=firstmate:jg-task" "kind=ship"
+  jg_write_meta "$home/state/task.meta" "window=juggernaut:jg-task" "kind=ship"
   printf '%s\n' "$dir"
 }
 
@@ -206,7 +206,7 @@ test_first_stale_call_prints_full_banner() {
 }
 
 test_full_banner_names_quiet_mode_when_active() {
-  # kunchenguid/firstmate#2356: the banner's repair line must not misdirect a
+  # kunchenguid/juggernaut#2356: the banner's repair line must not misdirect a
   # captain in quiet mode to /afk - jg-guard.sh threads the flag's declared
   # mode through to jg-supervision-instructions.sh's --afk-mode.
   local dir home out
@@ -823,7 +823,7 @@ test_extension_handoff_keeps_queued_wake_warning() {
   pid=$!
   record_pi_extension_session "$dir" "$pid" || fail "could not record the Pi extension session"
   touch "$home/state/.last-watcher-beat"
-  printf '%s\n' "1700000000	1	signal	task	signal: crewmate needs a decision" > "$home/state/.wake-queue"
+  printf '%s\n' "1700000000	1	signal	task	signal: operator needs a decision" > "$home/state/.wake-queue"
   out=$(run_guard_case_extension "$dir")
   kill "$pid" 2>/dev/null || true
   wait "$pid" 2>/dev/null || true
@@ -850,7 +850,7 @@ test_branch_actor_is_not_told_to_drain_queued_wakes() {
   record_pi_extension_session "$dir" "$pid" || fail "could not record the Pi extension session"
   touch "$home/state/.last-watcher-beat"
   printf '%s\n' \
-    "1700000000	7	stale	firstmate:jg-task	stale: firstmate:jg-task (idle 378s, possible wedge)" \
+    "1700000000	7	stale	juggernaut:jg-task	stale: juggernaut:jg-task (idle 378s, possible wedge)" \
     "1700000001	8	check	merge-poll	check: merge-poll: merged" > "$home/state/.wake-queue"
   printf '7\n' > "$home/state/.branch-eligible-rows"
   out=$(run_guard_case_extension_as_branch "$dir")

@@ -17,7 +17,7 @@
 #            the keyed-answer intake (bin/jg-captain-hold.sh bind), and register
 #            the `signoff` source with bin/jg-procevent.sh. Nothing here runs
 #            until a home arms it, so an unarmed home behaves exactly as before.
-#            Arming is per home; secondmate homes arm themselves.
+#            Arming is per home; squad_lead homes arm themselves.
 # retire     Opt out: retire the registration and drop the binding.
 # raise      Called by `jg-captain-hold.sh hold` after a hold is recorded. While
 #            enabled it raises one board card keyed by this home's tag, the task
@@ -54,7 +54,7 @@
 # poll ran is still found on the next round, and an answer on an earlier card
 # never resolves a re-held task. An answer the intake fails on, or skips for a transient reason, stays
 # deliverable and is offered again on the next round. Answers on the same board from other
-# agents are never read as Firstmate's. What an answer DOES is owned by the
+# agents are never read as Juggernaut's. What an answer DOES is owned by the
 # keyed-answer intake in bin/jg-captain-hold.sh; this adapter maps nothing and
 # closes nothing.
 #

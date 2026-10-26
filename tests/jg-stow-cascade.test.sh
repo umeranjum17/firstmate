@@ -42,7 +42,7 @@ case "$command" in
   jg-startup-memory-budget.sh)
     cat "$JG_FAKE_REMOTE_BUDGET"
     ;;
-  jg-remote-secondmate-control.sh)
+  jg-remote-squad-lead-control.sh)
     printf '%s\n' "${JG_FAKE_REMOTE_AGENT_STATE:-alive}"
     ;;
   *) exit 91 ;;
@@ -68,13 +68,13 @@ exit 0
 SH
 chmod +x "$FAKEBIN/tmux"
 
-# new_home <name> [budget] -> path to a seeded local secondmate home.
+# new_home <name> [budget] -> path to a seeded local squad_lead home.
 new_home() {
   local name=$1 budget=${2:-10} home
   home="$TMP_ROOT/homes/$name"
   mkdir -p "$home/config" "$home/data" "$home/state" "$home/bin" "$home/projects"
-  printf '%s\n' "$name" > "$home/.jg-secondmate-home"
-  printf '%s\n' '# secondmate instructions' > "$home/AGENTS.md"
+  printf '%s\n' "$name" > "$home/.jg-squad-lead-home"
+  printf '%s\n' '# squad_lead instructions' > "$home/AGENTS.md"
   printf '%s\n' "$budget" > "$home/config/startup-memory-budget"
   printf '%s\n' "$home"
 }
@@ -109,9 +109,9 @@ run_cascade() { # <primary-home> [env assignments...]
     "$CASCADE"
 }
 
-# stanza <output> <id>: the block of key=value lines for one secondmate.
+# stanza <output> <id>: the block of key=value lines for one squad_lead.
 stanza() {
-  printf '%s\n' "$1" | awk -v id="secondmate=$2" '
+  printf '%s\n' "$1" | awk -v id="squad_lead=$2" '
     $0 == id { inside = 1 }
     inside && $0 == "" { inside = 0 }
     inside { print }
@@ -135,7 +135,7 @@ test_budget_is_enforced_per_home_and_never_summed() {
   {
     local_record over-budget "$a"
     local_record within-budget "$b"
-  } > "$primary/data/secondmates.md"
+  } > "$primary/data/squad_leads.md"
 
   set +e
   out=$(run_cascade "$primary")
@@ -155,8 +155,8 @@ test_budget_is_enforced_per_home_and_never_summed() {
     || fail "the over-budget home was not classified against its own allowance"
   [ "$(value_in "$sb" budget_status)" = within-budget ] \
     || fail "a within-budget home was penalized for another home's memory"
-  [ "$(value_in "$sa" role)" = secondmate ] \
-    || fail "per-home accounting did not run in the secondmate home"
+  [ "$(value_in "$sa" role)" = squad_lead ] \
+    || fail "per-home accounting did not run in the squad_lead home"
   pass "each home is accounted against its own allowance instead of a fleet total"
 }
 
@@ -170,33 +170,33 @@ test_every_registered_home_is_enumerated_exactly_once() {
     local_record enum-a "$a"
     local_record enum-b "$b"
     local_record enum-c "$c"
-  } > "$primary/data/secondmates.md"
+  } > "$primary/data/squad_leads.md"
   # Two live endpoint records naming the same home must not multiply its stanza:
   # the registry, not the endpoint inventory, is the enumeration source.
-  jg_write_secondmate_meta "$primary/state/enum-a.meta" "$a"
-  jg_write_secondmate_meta "$primary/state/enum-a-stale.meta" "$a"
+  jg_write_squad_lead_meta "$primary/state/enum-a.meta" "$a"
+  jg_write_squad_lead_meta "$primary/state/enum-a-stale.meta" "$a"
 
   set +e
   out=$(run_cascade "$primary")
   set -e
-  count=$(printf '%s\n' "$out" | grep -c '^secondmate=')
+  count=$(printf '%s\n' "$out" | grep -c '^squad_lead=')
   [ "$count" -eq 3 ] || fail "expected one stanza per registered home, got $count"
-  [ "$(printf '%s\n' "$out" | grep -c '^secondmate=enum-a$')" -eq 1 ] \
+  [ "$(printf '%s\n' "$out" | grep -c '^squad_lead=enum-a$')" -eq 1 ] \
     || fail "a home with two endpoint records was enumerated more than once"
-  [ "$(printf '%s\n' "$out" | sed -n 's/^secondmates=//p')" = 3 ] \
+  [ "$(printf '%s\n' "$out" | sed -n 's/^squad_leads=//p')" = 3 ] \
     || fail "the cascade total did not match the registered homes"
 
   dup=$(new_primary enumerate-dup)
   {
     local_record enum-a "$a"
     local_record enum-other "$a"
-  } > "$dup/data/secondmates.md"
+  } > "$dup/data/squad_leads.md"
   set +e
   out=$(run_cascade "$dup" 2>&1)
   rc=$?
   set -e
   expect_code 1 "$rc" "a registry that double-counts a home should refuse the cascade"
-  assert_contains "$out" 'duplicate secondmate home assignment' \
+  assert_contains "$out" 'duplicate squad_lead home assignment' \
     "the double-counted home was not named"
   pass "the cascade emits one stanza per registered home and refuses a double-counted registry"
 }
@@ -211,10 +211,10 @@ test_transport_routes_by_placement_and_liveness() {
     local_record live-local "$live"
     local_record idle-local "$idle"
     remote_record remote-live remote-mac "$TMP_ROOT/remote-root" "$remote"
-  } > "$primary/data/secondmates.md"
-  jg_write_secondmate_meta "$primary/state/live-local.meta" "$live" 'firstmate:jg-live-local' alpha claude
-  jg_write_secondmate_meta "$primary/state/remote-live.meta" "$remote" 'jg-remote:jg-remote-live' alpha claude
-  printf 'role=secondmate\neffective_budget_tokens=7500\ntotal_estimated_tokens=100\nbudget_status=within-budget\n' \
+  } > "$primary/data/squad_leads.md"
+  jg_write_squad_lead_meta "$primary/state/live-local.meta" "$live" 'juggernaut:jg-live-local' alpha claude
+  jg_write_squad_lead_meta "$primary/state/remote-live.meta" "$remote" 'jg-remote:jg-remote-live' alpha claude
+  printf 'role=squad_lead\neffective_budget_tokens=7500\ntotal_estimated_tokens=100\nbudget_status=within-budget\n' \
     > "$TMP_ROOT/remote-budget.txt"
 
   set +e
@@ -257,7 +257,7 @@ test_receipt_facts_are_complete_and_show_before_and_after() {
   home=$(new_home receipt-home 20)
   printf '%s\n' 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' > "$home/data/captain.md"
   printf '%s\n' 'bbbbbb' > "$home/data/learnings.md"
-  local_record receipt-home "$home" > "$primary/data/secondmates.md"
+  local_record receipt-home "$home" > "$primary/data/squad_leads.md"
 
   set +e
   before=$(run_cascade "$primary")
@@ -298,9 +298,9 @@ test_a_slow_remote_is_bounded_and_the_rest_still_report() {
   {
     remote_record bounded-remote remote-mac "$TMP_ROOT/remote-root" "$remote"
     local_record bounded-local "$home"
-  } > "$primary/data/secondmates.md"
-  jg_write_secondmate_meta "$primary/state/bounded-remote.meta" "$remote" 'jg-remote:jg-bounded-remote'
-  printf 'role=secondmate\n' > "$TMP_ROOT/remote-budget.txt"
+  } > "$primary/data/squad_leads.md"
+  jg_write_squad_lead_meta "$primary/state/bounded-remote.meta" "$remote" 'jg-remote:jg-bounded-remote'
+  printf 'role=squad_lead\n' > "$TMP_ROOT/remote-budget.txt"
 
   started=$(date +%s)
   set +e
@@ -339,27 +339,27 @@ test_a_slow_remote_is_bounded_and_the_rest_still_report() {
   pass "one slow or unreachable home is bounded and every other home still reports"
 }
 
-test_no_cascade_without_secondmates_or_from_a_secondmate_home() {
-  local primary secondmate out rc
+test_no_cascade_without_squad_leads_or_from_a_squad_lead_home() {
+  local primary squad_lead out rc
   primary=$(new_primary quiet)
   set +e
   out=$(run_cascade "$primary")
   rc=$?
   set -e
-  expect_code 0 "$rc" "a home with no registered secondmates should be a clean no-op"
-  assert_contains "$out" 'secondmates=0' "an empty cascade did not say so"
-  assert_not_contains "$out" 'secondmate=' "an empty cascade invented a home"
+  expect_code 0 "$rc" "a home with no registered squad_leads should be a clean no-op"
+  assert_contains "$out" 'squad_leads=0' "an empty cascade did not say so"
+  assert_not_contains "$out" 'squad_lead=' "an empty cascade invented a home"
 
-  secondmate=$(new_home quiet-secondmate)
-  local_record quiet-secondmate "$secondmate" > "$secondmate/data/secondmates.md"
+  squad_lead=$(new_home quiet-squad-lead)
+  local_record quiet-squad-lead "$squad_lead" > "$squad_lead/data/squad_leads.md"
   set +e
-  out=$(run_cascade "$secondmate")
+  out=$(run_cascade "$squad_lead")
   rc=$?
   set -e
-  expect_code 0 "$rc" "a secondmate home should not fail its own stow"
-  assert_contains "$out" 'role=secondmate' "a secondmate home was not recognized"
-  assert_contains "$out" 'secondmates=0' "a secondmate home cascaded to its own registry"
-  pass "the cascade stays silent with no secondmates and never runs from a secondmate home"
+  expect_code 0 "$rc" "a squad_lead home should not fail its own stow"
+  assert_contains "$out" 'role=squad_lead' "a squad_lead home was not recognized"
+  assert_contains "$out" 'squad_leads=0' "a squad_lead home cascaded to its own registry"
+  pass "the cascade stays silent with no squad_leads and never runs from a squad_lead home"
 }
 
 test_budget_is_enforced_per_home_and_never_summed
@@ -367,4 +367,4 @@ test_every_registered_home_is_enumerated_exactly_once
 test_transport_routes_by_placement_and_liveness
 test_receipt_facts_are_complete_and_show_before_and_after
 test_a_slow_remote_is_bounded_and_the_rest_still_report
-test_no_cascade_without_secondmates_or_from_a_secondmate_home
+test_no_cascade_without_squad_leads_or_from_a_squad_lead_home

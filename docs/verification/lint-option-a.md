@@ -6,7 +6,7 @@ The 2026-09-05 lint-cost audit measured the seven roots from the missed-reply in
 bin/jg-brief.sh
 bin/jg-parent-channel-lib.sh
 bin/jg-pending-reply-lib.sh
-bin/jg-secondmate-report.sh
+bin/jg-squad-lead-report.sh
 tests/jg-brief.test.sh
 tests/jg-classify-corr-token.test.sh
 tests/jg-pending-reply.test.sh
@@ -35,7 +35,7 @@ roots=(
   bin/jg-brief.sh
   bin/jg-parent-channel-lib.sh
   bin/jg-pending-reply-lib.sh
-  bin/jg-secondmate-report.sh
+  bin/jg-squad-lead-report.sh
   tests/jg-brief.test.sh
   tests/jg-classify-corr-token.test.sh
   tests/jg-pending-reply.test.sh

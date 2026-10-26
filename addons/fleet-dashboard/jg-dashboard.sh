@@ -82,12 +82,12 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 #   <home>/state/home-summary.json  local lead state; summaries older than 15 minutes are silent
 #                                   (bin/jg-home-summary-refresh.sh); Main's fresh endpoint view
 #                                   and Herdr inventory inform local liveness; remote leads use the existing route-keyed JG_SNAPSHOT_CACHE_DIR cache
-#   data/secondmates.md             registered homes: "- <name> - ... (home: <dir>; ...)"
+#   data/squad_leads.md             registered homes: "- <name> - ... (home: <dir>; ...)"
 #   config/parked-homes             home ids the captain parked, one per line (# comments)
 #   <home>/state/*.meta + *.status  lanes: every ship/scout record, in one state by its last
 #                                   status verb and [at=] time (building, validating or waiting on
 #                                   CI, waiting on a decision, blocked, waiting on something
-#                                   else, finished not landed); a secondmate record is a lead.
+#                                   else, finished not landed); a squad_lead record is a lead.
 #                                   Without a captain hold, blocked/failed stay blocked even when
 #                                   their text names CI; only paused validation/no-mistakes/CI/checks/
 #                                   pipeline waits are validating (tests/jg-dashboard.test.sh ci-stuck)
@@ -134,7 +134,7 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 #   jg-dashboard.sh [build]
 #   jg-dashboard.sh serve [--bind ADDR] [--port N]
 # build (the default) writes $JG_HOME/state/dashboard/ and prints the index page path.
-# JG_BIN names the Firstmate bin/ holding the helper scripts this build runs (jg-tasks-axi.sh,
+# JG_BIN names the Juggernaut bin/ holding the helper scripts this build runs (jg-tasks-axi.sh,
 # jg-flow.sh, ...); unset, it defaults to this script's own directory.
 # serve runs a small web server (python3 stdlib, IPv4) that answers GET or
 # HEAD for / and /index.html (the JavaScript app), its files under bin/jg-dashboard/,
@@ -150,7 +150,7 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # the answer in the thread, and appends the attempt and its result to state/dashboard/comments.jsonl. The build shows
 # each comment in its ticket's thread with the lead's pickup (the steer moved to handled/ in state/<lead>.inbox, or
 # Main's note in state/inbox/handled) and answer: the lead's status line carrying corr=<comment id> on its channel
-# (state/<lead>.status: the lead runs "$JG_HOME/bin/jg-secondmate-report.sh" note <comment id> <answer> with its own
+# (state/<lead>.status: the lead runs "$JG_HOME/bin/jg-squad-lead-report.sh" note <comment id> <answer> with its own
 # JG_HOME), or Main's jg-inbox.sh reply.
 # Overview and Board are one app and one navigation; the old generated Overview page is no
 # longer reachable through the app. The app's
@@ -174,11 +174,11 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# The directory holding the Firstmate helper scripts this build runs. It defaults
+# The directory holding the Juggernaut helper scripts this build runs. It defaults
 # to this script's own directory (the fork's bin/), so a fork copy needs nothing;
-# else JG_BIN names the Firstmate bin/ when this script runs from another repo.
+# else JG_BIN names the Juggernaut bin/ when this script runs from another repo.
 if [ -n "${JG_BIN+x}" ]; then
-  [ -d "$JG_BIN" ] && [ -f "$JG_BIN/jg-tasks-axi.sh" ] || { echo "jg-dashboard: JG_BIN is not a Firstmate bin directory (no jg-tasks-axi.sh): $JG_BIN" >&2; exit 1; }
+  [ -d "$JG_BIN" ] && [ -f "$JG_BIN/jg-tasks-axi.sh" ] || { echo "jg-dashboard: JG_BIN is not a Juggernaut bin directory (no jg-tasks-axi.sh): $JG_BIN" >&2; exit 1; }
 else
   JG_BIN="$SCRIPT_DIR"
 fi
@@ -326,7 +326,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if t['home'] == 'main':
             cmd = ['jg-inbox.sh', 'note', '--request-id', f'dash-{cid}', '--json', '--', msg + 'Answer the captain in the ticket thread: bin/jg-inbox.sh reply <this note id> "<your answer in plain words>"']
         else:
-            cmd = ['jg-send.sh', t['home'], '--fire-and-forget', cid, msg + f'Answer the captain in the ticket thread by running this as is (your JG_HOME already names your own home): "$JG_HOME/bin/jg-secondmate-report.sh" note {cid} "<your answer in plain words>"']
+            cmd = ['jg-send.sh', t['home'], '--fire-and-forget', cid, msg + f'Answer the captain in the ticket thread by running this as is (your JG_HOME already names your own home): "$JG_HOME/bin/jg-squad-lead-report.sh" note {cid} "<your answer in plain words>"']
         note = None
         try:
             r = subprocess.run(['bash', os.path.join(BIN, cmd[0]), *cmd[1:]], env=dict(os.environ, JG_HOME=HOME), capture_output=True, text=True, timeout=60)
@@ -432,7 +432,7 @@ def probe(cmd, ok=(0,), timeout=5, env=None, cwd=None):
 home_dir = {'main': HOME}
 remote_hosts = {}
 try:
-    for l in open(os.path.join(HOME, 'data/secondmates.md'), encoding='utf-8', errors='replace'):
+    for l in open(os.path.join(HOME, 'data/squad_leads.md'), encoding='utf-8', errors='replace'):
         m = re.match(r'- (\S+) - ', l)
         f = re.match(r'.*\((?:host:[^;]*;\s*root:[^;]*;\s*)?home: ([^;]*);', l)
         if m and f:
@@ -473,12 +473,12 @@ SUMMARY_MAX_AGE = 900  # a home republishes at least every 5 minutes
 def summary(h):
     if h in remote_hosts:
         key = hashlib.sha256(f'{h}\n{remote_hosts[h]}\n{home_dir[h]}\n'.encode()).hexdigest()
-        p = os.path.join(os.environ.get('JG_SNAPSHOT_CACHE_DIR', os.path.join(HOME, 'state/secondmate-summary-cache')), key + '.json')
+        p = os.path.join(os.environ.get('JG_SNAPSHOT_CACHE_DIR', os.path.join(HOME, 'state/squad-lead-summary-cache')), key + '.json')
     else: p = os.path.join(home_dir[h], 'state/home-summary.json')
     try:
         if os.path.getsize(p) > 262144: raise ValueError('summary larger than 256 KB')
         s = json.load(open(p, encoding='utf-8'))
-        if not isinstance(s, dict) or s.get('schema') != 'jg-secondmate-home-summary.v1': raise ValueError('unexpected summary schema')
+        if not isinstance(s, dict) or s.get('schema') != 'jg-squad-lead-home-summary.v1': raise ValueError('unexpected summary schema')
         if (str(s.get('home')) != home_dir[h] if h in remote_hosts else os.path.realpath(str(s.get('home'))) != os.path.realpath(home_dir[h])): raise ValueError('summary names another home')
         if h in remote_hosts and s.get('hold_classifier_schema') != 'jg-captain-hold-buckets.v1': raise ValueError('unexpected summary classifier')
         if not isinstance(s.get('generated_epoch'), int): raise ValueError('summary has no time')
@@ -501,7 +501,7 @@ def lead_word(h):
     if age < 0: return ('State unknown', 'bad')
     if age > SUMMARY_MAX_AGE: return (f'Silent {dur(age)}', 'bad')
     if h not in remote_hosts:
-        pane = next((m.get('herdr_pane_id') for task, m in metas.get('main', []) if task == h and m.get('kind') == 'secondmate'), None)
+        pane = next((m.get('herdr_pane_id') for task, m in metas.get('main', []) if task == h and m.get('kind') == 'squad_lead'), None)
         current = agents is not None and pane and any(a.get('pane_id') == pane for a in agents)
         endpoint = endpoints.get(h, {})
         if not current:
@@ -892,7 +892,7 @@ pane_role = {}
 for h, ms in metas.items():
     for task, m in ms:
         if m.get('herdr_pane_id'):
-            pane_role[m['herdr_pane_id']] = ('lead', task, task) if m.get('kind') == 'secondmate' else ('worker', h, task)
+            pane_role[m['herdr_pane_id']] = ('lead', task, task) if m.get('kind') == 'squad_lead' else ('worker', h, task)
 ROLES = [('lead', 'leads'), ('main', 'Main'), ('worker', 'workers'), ('other', 'other')]
 agent_rows = []  # (role, home, name, status)
 for a in agents or []:

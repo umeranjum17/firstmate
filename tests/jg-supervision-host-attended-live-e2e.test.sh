@@ -120,7 +120,7 @@ make_lab() {  # <name> [host-ref]
   printf 'project=demo2\nwindow=jg-demo2\nharness=claude\n' > "$fm/state/demo2.meta"
   : > "$fm/state/demo2.status"
   printf -- '- labremote - lab stand-in for a remote home (host: lab-remote; root: %s; home: %s; scope: lab only; projects: none; added 2026-09-27)\n' \
-    "$fm" "$remote" > "$fm/data/secondmates.md"
+    "$fm" "$remote" > "$fm/data/squad_leads.md"
   : > "$remote/state/parent-replies.status"
   # An unreachable tmux: the watcher reads no endpoint, so the only wakes are
   # the events this guard appends.
@@ -167,7 +167,7 @@ rewakes_since() {  # <lab> <epoch>
   [ -n "$t" ] || return 0
   jq -r --argjson since "$2" '
     select(.type == "queue-operation" and .operation == "enqueue")
-    | select((.content // "" | tostring) | contains("firstmate watcher wake"))
+    | select((.content // "" | tostring) | contains("juggernaut watcher wake"))
     | (.timestamp | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601) as $at
     | select($at >= $since) | $at' "$t" 2>/dev/null
 }
@@ -261,7 +261,7 @@ claude_ready_state() {  # <socket> <target> -> diagnostic state; success when re
 start_primary() {  # <lab>
   local lab=$1 sock screen i started prompt readiness=unknown last_seen=none
   sock="$SOCKET-$(basename "$lab")"
-  prompt='This is an isolated Firstmate test lab, not a real fleet. Reply with exactly READY now and use no tools. Later, whenever a "Stop hook feedback" message wakes you, do exactly this and nothing else: run `bin/jg-wake-drain.sh` once with the Bash tool, then run the exact `bin/jg-wake-drain.sh --ack-through ...` command that its WAKE_ACK_REQUIRED line prints, then reply with exactly ACKED. Never run any other command, never run bin/jg-watch-arm.sh, and never use any other tool.'
+  prompt='This is an isolated Juggernaut test lab, not a real fleet. Reply with exactly READY now and use no tools. Later, whenever a "Stop hook feedback" message wakes you, do exactly this and nothing else: run `bin/jg-wake-drain.sh` once with the Bash tool, then run the exact `bin/jg-wake-drain.sh --ack-through ...` command that its WAKE_ACK_REQUIRED line prints, then reply with exactly ACKED. Never run any other command, never run bin/jg-watch-arm.sh, and never use any other tool.'
   started=$(date +%s)
   tmux -L "$sock" new-session -d -s primary -x 220 -y 50 -c "$lab/fm" \
     "sh -c '. \"$lab/env\"; printf \"%s\\n\" \"\$\$\" > state/.lock; exec claude --model $MODEL --effort low --dangerously-skip-permissions'" \

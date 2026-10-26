@@ -12,7 +12,7 @@ Start with the directory layout, then use the setting reference for the behavior
 | Worker permissions, accounts, or environment | [Claude permission mode](#claude-permission-mode-configclaude-permission-mode), [worker account pin](#worker-account-pin-configclaude-account-configpi-account), [model allow-lists](#model-allow-lists-configmodel-allow-listjson), [worker tool exclusions](#worker-tool-exclusions-configcrew-exclude-tools), [worker launch environment](#worker-launch-environment-configlaunch-env-allowlist), and [launch environment hook](#launch-environment-hook-configlaunch-env-hook) |
 | Backlog, preferences, and memory | [Backlog backend](#backlog-backend-taskstoml--configbacklog-backend), [captain preferences](#captain-preferences-datacaptainmd--datacaptain-sharedmd), [external memory tiers](#external-memory-tiers-memory-layering-section), [startup memory budget](#startup-memory-budget-configstartup-memory-budget), and [host memory guard](#host-memory-guard-confighost-memory) |
 | Supervision and presentation | [Pi supervision branch](#pi-supervision-branch), [supervision host](#supervision-host-configsupervision-host), and [Calm preference](#calm-preference-configcalm) |
-| Persistent secondmates | [Secondmate routes](#secondmate-routes-datasecondmatesmd) |
+| Persistent squad leads | [Squad Lead routes](#squad-lead-routes-datasquad leadsmd) |
 | Per-run overrides and tuning | [Environment variables](#environment-variables) |
 
 ## JG_HOME
@@ -75,7 +75,7 @@ Each effective `JG_HOME` contains private operational directories.
 
 `data/` holds durable private fleet records:
 
-- Project and secondmate registries.
+- Project and squad lead registries.
 - Captain preferences and optional shared captain preferences.
 - Learnings, backlog, briefs, scout reports, and the optional per-task no-mistakes pipeline-spend ledger.
 - Explicitly installed content-addressed extension packages under `data/extensions/packages/`.
@@ -86,19 +86,19 @@ Each effective `JG_HOME` contains private operational directories.
 - Watcher and wake-queue coordination, away-mode state, and generated Relay artifacts.
 - Inactive terminal-outcome receipts under `state/terminal-outcomes/`.
 - Enabled extension working namespaces under `state/extensions/`.
-- Parent-side remote ledger copies under `state/secondmate-summary-cache/`.
+- Parent-side remote ledger copies under `state/squad-lead-summary-cache/`.
 - One-shot Bearings reconcile requests under `state/reconcile-notify/`.
-- Private secondmate config-reread generations with their retry and quarantine state.
+- Private squad lead config-reread generations with their retry and quarantine state.
 - Per-task steering-inbox records under `state/<id>.inbox/` (`bin/jg-task-inbox-lib.sh`).
 - Per-task scratch-directory records under `state/<id>.scratch` ([`bin/jg-scratch.sh`](../bin/jg-scratch.sh) owns registration and validation; [`bin/jg-teardown.sh`](../bin/jg-teardown.sh) owns cleanup).
-- Parent-owned secondmate pending-reply records under `state/pending-replies/` (`bin/jg-pending-reply-lib.sh`).
+- Parent-owned squad lead pending-reply records under `state/pending-replies/` (`bin/jg-pending-reply-lib.sh`).
 - [Host memory guard records](#host-memory-guard-confighost-memory).
 
 `config/` holds local gitignored operating choices, including explicit extension bindings under `config/extensions.d/`.
 
 `projects/` holds local project clones.
 Juggernaut reads these clones, but changes them only through the narrow guarded and concrete captain-approved exceptions in `AGENTS.md`.
-Untracked files and directories whose names begin with `scratchpad` are also gitignored, so temporary scratch does not make porcelain-based secondmate sync guards treat a home as dirty.
+Untracked files and directories whose names begin with `scratchpad` are also gitignored, so temporary scratch does not make porcelain-based squad lead sync guards treat a home as dirty.
 
 ### Format and lifecycle references
 
@@ -108,7 +108,7 @@ Untracked files and directories whose names begin with `scratchpad` are also git
 
 - The producing PR and Relay helpers own the fields they append, [`bin/jg-classify-lib.sh`](../bin/jg-classify-lib.sh) owns status-event vocabulary, optional emission-time syntax, and legacy unknown-time handling, and `bin/jg-crew-state.sh` owns current-state reconciliation.
 
-- The [`bin/jg-fleet-snapshot.sh` header](../bin/jg-fleet-snapshot.sh) owns the snapshot's event-time and age fields, including secondmate parent-event projections.
+- The [`bin/jg-fleet-snapshot.sh` header](../bin/jg-fleet-snapshot.sh) owns the snapshot's event-time and age fields, including squad lead parent-event projections.
 
 - Wake, watcher, away-mode, and Relay-specific state mechanics remain with their named scripts and reference sections rather than being duplicated into one exhaustive state tree here.
 
@@ -122,7 +122,7 @@ Untracked files and directories whose names begin with `scratchpad` are also git
 
 - `AGENTS.md` retains the run-once and read-once operator rules, lock-refusal safety, installation consent, and direct-report recovery boundaries because those facts apply at every session start.
 
-- Ordinary dead-direct-report recovery is owned by `stuck-crewmate-recovery`, while persistent-secondmate recovery is owned by `secondmate-provisioning`.
+- Ordinary dead-direct-report recovery is owned by `stuck-operator-recovery`, while persistent-squad-lead recovery is owned by `squad-lead-provisioning`.
 
 ## Orchestrator behavior (AGENTS.md)
 
@@ -159,19 +159,19 @@ The Pi extension reloads this preference on every Pi `session_start`, including 
 
 The Claude Code mod reloads it on every `session.start`, including same-process session replacement.
 It also loads the preference lazily before any row that can draw ahead of that event, including during `claude --continue` restoration.
-This preference is local to each Juggernaut home and is not part of secondmate inherited configuration.
+This preference is local to each Juggernaut home and is not part of squad lead inherited configuration.
 
 ## Model allow-lists (config/model-allow-list.json)
 
 A home can limit any provider to a list of allowed models, so an off-list pick is refused instead of launched.
 The list is one JSON file, `config/model-allow-list.json`, one key per provider: `{"codex": ["gpt-5.6-sol"], "ollama-cloud": ["deepseek-v4.1-flash"]}`.
-It is the same file the `firstmate-addons` `model-gate` reads, so a home that already limits Ollama keeps that limit here too.
+It is the same file the `juggernaut-addons` `model-gate` reads, so a home that already limits Ollama keeps that limit here too.
 A provider the file does not name is not limited, so the file only ever constrains a limit the captain wrote down.
 The key is the segment before the `/` of a qualified model id (`openai-codex`, `ollama-cloud`), and the harness name for a bare model id, which is how the harnesses that take one name their family (`claude`, `codex`, `cursor`).
 A `<provider>/` prefix is stripped before matching, and a model matches a listed entry when it is that entry or a pinned tag of it, so a listed `deepseek-v4.1-flash` also allows `deepseek-v4.1-flash:1017`.
 A provider named with no models refuses every model of that provider.
 
-`bin/jg-spawn.sh` refuses an off-list model on every launch, before any endpoint, local copy, or task record exists, whichever source the model came from: a `--model` flag, a dispatch profile, or a `config/crew-harness` and `config/secondmate-harness` token.
+`bin/jg-spawn.sh` refuses an off-list model on every launch, before any endpoint, local copy, or task record exists, whichever source the model came from: a `--model` flag, a dispatch profile, or a `config/crew-harness` and `config/squad-lead-harness` token.
 An account-pool route is refused by the `model-gate` add-on against the same file.
 Every refusal is one line naming the provider, the model, the models it allows, and the command that allows it, and since a model can still start outside the launch gate, the fleet check reports any such model once, reading the launches this home actually made.
 
@@ -181,7 +181,7 @@ bin/jg-model-allowlist.sh allow codex gpt-5.6-sol      # allow models for one pr
 bin/jg-model-allowlist.sh check codex gpt-5.6-sol      # one pick, exit 0 allowed, 1 refused
 ```
 
-The list is local to each home and not inherited by secondmates, so a secondmate home that should enforce the same limit keeps its own copy.
+The list is local to each home and not inherited by squad leads, so a squad lead home that should enforce the same limit keeps its own copy.
 
 ## Pi supervision branch
 
@@ -320,7 +320,7 @@ Cancelling the model picker cancels the whole command and changes neither choice
 Cancelling only the effort picker keeps the standing effort choice and still applies the model pick from the same run.
 The command's closing message reports both choices as they will take effect.
 
-Both choices are local to each Juggernaut home and are not part of secondmate inherited configuration, the same as the Calm preference; a secondmate home pins its own supervision model and effort with its own `/supervision-model`.
+Both choices are local to each Juggernaut home and are not part of squad lead inherited configuration, the same as the Calm preference; a squad lead home pins its own supervision model and effort with its own `/supervision-model`.
 
 ## Supervision host (config/supervision-host)
 
@@ -357,8 +357,8 @@ It takes no wake, so every wake reaches main as it would without the host.
 Each away-posture wake includes a line naming the problem.
 The running host reads both files at every wake, so an engine change or an opt-out takes effect at the next wake without a restart.
 
-The opt-out is inherited into secondmate homes: a primary that opts out also opts its secondmates out, and clearing it restores each mate's own host setting at its next spawn or convergence.
-The primary-authoritative propagation contract, including removal of a mate's local opt-out when the primary has none, is owned by [`secondmate-provisioning`](../.agents/skills/secondmate-provisioning/SKILL.md).
+The opt-out is inherited into squad lead homes: a primary that opts out also opts its squad leads out, and clearing it restores each mate's own host setting at its next spawn or convergence.
+The primary-authoritative propagation contract, including removal of a mate's local opt-out when the primary has none, is owned by [`squad-lead-provisioning`](../.agents/skills/squad-lead-provisioning/SKILL.md).
 `config/supervision-host` is local to each home and not inherited, because each home's engine and model are its own choice.
 While the home runs the host, main's lease-checked commands also take the per-task lease lock, so a claim by the host's engine cannot race a mutation main already started (`bin/jg-lease-lib.sh`).
 
@@ -398,7 +398,7 @@ Any other configured adapter is addressed by that root alone, because `--file` w
 
 ### Exemptions and refusal conditions
 
-The gate does not apply to persistent secondmates, manual-backend homes, or markdown homes without a backlog file.
+The gate does not apply to persistent squad leads, manual-backend homes, or markdown homes without a backlog file.
 Those retain their existing persistent-agent, manual, or ad-hoc lifecycle behavior.
 Configured non-markdown adapters remain active without that file.
 Migrated-hold resolution on a beads home reads its graph path, binary, and prefix from the root `.tasks.toml` `[beads]` section only, and refuses (rc=2) when the beads backend is selected elsewhere (a `TASKS_AXI_BACKEND` override or user-level config) with no root-level `[beads]` section.
@@ -408,7 +408,7 @@ An unreadable backend configuration can refuse lifecycle work before the no-back
 
 ### Handoffs between homes
 
-Secondmate handoffs bypass that routine-backend choice: `jg-backlog-handoff.sh` keeps only its own fleet-level validation and delegates the item move to `tasks-axi mv`; its [script header](../bin/jg-backlog-handoff.sh) owns route-specific wake outcomes and remote outbox release.
+Squad Lead handoffs bypass that routine-backend choice: `jg-backlog-handoff.sh` keeps only its own fleet-level validation and delegates the item move to `tasks-axi mv`; its [script header](../bin/jg-backlog-handoff.sh) owns route-specific wake outcomes and remote outbox release.
 It moves in-scope `## Queued` items only and refuses `## In flight` and historical `## Done` records, which stay with their home for pruning or archiving.
 
 Handoff item bodies must use at least two leading spaces, and the helper refuses a selected item with a single-space or tab-indented continuation rather than risk orphaning it.
@@ -467,16 +467,16 @@ See [`docs/cmux-backend.md`](cmux-backend.md#runtime-detection) for why cmux can
 Auto-detected Herdr stays silent like tmux, while auto-detected cmux prints a stderr notice naming `config/backend` and `--backend tmux` because cmux remains experimental.
 Zellij and Orca are never auto-detected; select them by putting the name in a local `config/backend` file, by exporting `JG_BACKEND=<name>`, or by telling the Overwatch in chat.
 
-### Accepted backends and secondmate limits
+### Accepted backends and squad lead limits
 
 Any value other than `tmux`, `herdr`, `zellij`, `orca`, or `cmux` is rejected until another adapter is implemented and verified.
-`jg-spawn.sh` accepts `tmux`, `herdr`, `zellij`, `orca`, and `cmux` for ship and scout tasks; `backend=orca` and `backend=cmux` both still refuse `--secondmate` until secondmate launch semantics are designed for each.
+`jg-spawn.sh` accepts `tmux`, `herdr`, `zellij`, `orca`, and `cmux` for ship and scout tasks; `backend=orca` and `backend=cmux` both still refuse `--squad-lead` until squad lead launch semantics are designed for each.
 
 `codex-app` is not an accepted runtime backend yet; [`docs/codex-app-backend.md`](codex-app-backend.md) owns the Codex App boundary.
 
 ### Liveness classification
 
-The session-start secondmate liveness sweep and the watcher's secondmate liveness tick use the recovery-grade `jg_backend_agent_state` classifier where verified.
+The session-start squad lead liveness sweep and the watcher's squad lead liveness tick use the recovery-grade `jg_backend_agent_state` classifier where verified.
 The comment above that function in `bin/jg-backend.sh` is the single owner of its detailed state contract and recovery authorization.
 
 The compatibility helper `jg_backend_agent_alive` continues to collapse those detailed results to `alive`, `dead`, or `unknown` for older callers.
@@ -512,7 +512,7 @@ A selector containing `:` is passed through as an explicit backend endpoint esca
 Otherwise an exact task id matching `state/<id>.meta` wins before the legacy `jg-<id>` label fallback, so task ids that themselves start with `jg-` route to their own metadata instead of being stripped.
 A metadata-routed selector returns the recorded backend target (`terminal=` for Orca, otherwise `window=`), and matching explicit targets can still recover the recorded backend when metadata contains the same endpoint.
 
-Only metadata-routed task selectors carry secondmate-marker and Codex-harness context; explicit endpoint escape hatches do not.
+Only metadata-routed task selectors carry squad-lead-marker and Codex-harness context; explicit endpoint escape hatches do not.
 These rules are the single owner of the task-selector vocabulary.
 Backend guides and other documents refer here instead of restating the resolution order.
 
@@ -525,19 +525,19 @@ Legacy tmux metadata remains cleanup-compatible when its exact window name is `j
 
 ### Herdr homes and presentation
 
-`JG_HOME` determines Herdr's home label: the primary home uses `firstmate`, and a secondmate home marked by `.jg-secondmate-home` uses `2ndmate-<secondmate-id>`.
+`JG_HOME` determines Herdr's home label: the primary home uses `juggernaut`, and a squad lead home marked by `.jg-squad-lead-home` uses `2ndmate-<squad-lead-id>`.
 [`herdr-backend.md`](herdr-backend.md#watching-and-task-containers) owns launcher-bound workspace placement, the label-only fallback, collision handling, and recovery behavior.
 
 The local `config/herdr-presentation-spaces` file instead opts a home out of, or explicitly in to, Herdr's default-on disposable single-task visual projection; [Presentation spaces](herdr-backend.md#presentation-spaces) owns its accepted values, default, Herdr version floor, migration, behavior, safety limits, recovery contract, and narrow locked session-start cleanup of exact restored idle-shell children.
-The setting is inherited into secondmate homes under the primary-authoritative contract owned by [`secondmate-provisioning`](../.agents/skills/secondmate-provisioning/SKILL.md).
+The setting is inherited into squad lead homes under the primary-authoritative contract owned by [`squad-lead-provisioning`](../.agents/skills/squad-lead-provisioning/SKILL.md).
 
 For normal herdr operations, `HERDR_SESSION` selects the named session, but destructive test cleanup must not rely on `HERDR_SESSION` alone.
 Use the explicit guarded cleanup path described in [`docs/herdr-backend.md`](herdr-backend.md) instead of `herdr server stop`.
 
 ### Zellij sessions
 
-For normal zellij operations, `JG_ZELLIJ_SESSION` selects the named session and defaults to `firstmate`.
-Zellij has no per-home workspace split: primary and secondmate tasks share that one session, and visible tab titles are scoped by the active `JG_HOME` readable label plus a short hash of the resolved `JG_ROOT` path as `jg-<home-label>-<id>`.
+For normal zellij operations, `JG_ZELLIJ_SESSION` selects the named session and defaults to `juggernaut`.
+Zellij has no per-home workspace split: primary and squad lead tasks share that one session, and visible tab titles are scoped by the active `JG_HOME` readable label plus a short hash of the resolved `JG_ROOT` path as `jg-<home-label>-<id>`.
 
 Use the guarded cleanup path described in [`docs/zellij-backend.md`](zellij-backend.md) instead of `kill-all-sessions` or `delete-all-sessions`.
 
@@ -547,7 +547,7 @@ cmux has no session layer at all - one workspace per task, in whatever cmux wind
 The caller-facing label remains `jg-<id>`, but the actual cmux workspace title is scoped by the active `JG_HOME` readable label plus a short hash of the resolved `JG_ROOT` path as `jg-<home-label>-<id>`.
 
 Test cleanup must use the guarded path in [`docs/cmux-backend.md`](cmux-backend.md#current-operation-and-safety), never enumerate-and-close every workspace.
-`config/backend` is inherited into secondmate homes under the primary-authoritative contract owned by [`secondmate-provisioning`](../.agents/skills/secondmate-provisioning/SKILL.md).
+`config/backend` is inherited into squad lead homes under the primary-authoritative contract owned by [`squad-lead-provisioning`](../.agents/skills/squad-lead-provisioning/SKILL.md).
 
 ## Away-mode supervisor backend (JG_SUPERVISOR_BACKEND / JG_SUPERVISOR_TARGET)
 
@@ -558,7 +558,7 @@ Set `JG_SUPERVISOR_BACKEND=tmux|herdr` and `JG_SUPERVISOR_TARGET=<target>` to ov
 Without overrides, backend detection uses `$TMUX_PANE` first, then `HERDR_ENV=1` with `HERDR_PANE_ID`, then falls back to `tmux`.
 
 That keeps a tmux pane nested inside herdr on the tmux transport, matching the runtime backend's innermost-first rule.
-Target detection uses `JG_SUPERVISOR_TARGET`, then `$TMUX_PANE`, then `"${HERDR_SESSION:-default}:${HERDR_PANE_ID}"` under herdr, then the legacy `firstmate:0` tmux fallback with a warning.
+Target detection uses `JG_SUPERVISOR_TARGET`, then `$TMUX_PANE`, then `"${HERDR_SESSION:-default}:${HERDR_PANE_ID}"` under herdr, then the legacy `juggernaut:0` tmux fallback with a warning.
 
 Selecting any other supervisor backend, including `zellij`, `orca`, or `cmux`, refuses at daemon startup instead of trying tmux injection primitives against a non-tmux pane.
 
@@ -587,10 +587,10 @@ The optional local, gitignored `config/trace-context` presence flag enables defa
 `JG_TRACE_CONTEXT` overrides the file: `1`/`on`/`true`/`yes` enables, any other non-empty value disables, and unset or empty defers to the file.
 Each locked home session resolves those inputs once, and all spawns from that home use the frozen decision until a new session starts.
 
-### Secondmate propagation
+### Squad Lead propagation
 
-When launching a Secondmate, the primary copies the presence flag into its home and passes the primary session's frozen decision as a non-empty `JG_TRACE_CONTEXT=on|off` override for the Secondmate's own session start.
-A Secondmate on a remote route is covered the same way: the primary resolves and records that task's carrier, and the configured host exports it and receives the same enablement snapshot.
+When launching a Squad Lead, the primary copies the presence flag into its home and passes the primary session's frozen decision as a non-empty `JG_TRACE_CONTEXT=on|off` override for the Squad Lead's own session start.
+A Squad Lead on a remote route is covered the same way: the primary resolves and records that task's carrier, and the configured host exports it and receives the same enablement snapshot.
 
 The presence flag is session-scoped enablement, so it transfers at launch and is left unchanged by live convergence into a running home.
 See [`trace-context.md`](trace-context.md) for carrier semantics, supported routes, the manual fleet-restart requirement, the session boundary, and safety limits; `bin/jg-trace-context-lib.sh`'s header owns the exact mechanics, and [`verification/trace-context.md`](verification/trace-context.md) records repeatable evidence.
@@ -599,11 +599,11 @@ See [`trace-context.md`](trace-context.md) for carrier semantics, supported rout
 
 See [`fleet-ledger.md`](fleet-ledger.md) for the opt-in setup, record contract, and limits.
 
-## Juggernaut role (config/firstmate-role)
+## Juggernaut role (config/juggernaut-role)
 
-The optional local, gitignored `config/firstmate-role` declares this home's relationship to the Juggernaut repository itself.
-Every home defaults to **user/operator** with no Juggernaut-upstream publication authority: ordinary project work and `/updatefirstmate` pulls are unaffected, but without an explicit grant no ship task on the Juggernaut repository may carry a publishing contract.
-For the agent's local diagnosis, workaround, and draft-only response to a Juggernaut bug, see [`firstmate-self-repo`](../.agents/skills/firstmate-self-repo/SKILL.md#when-a-juggernaut-bug-surfaces-in-ordinary-use).
+The optional local, gitignored `config/juggernaut-role` declares this home's relationship to the Juggernaut repository itself.
+Every home defaults to **user/operator** with no Juggernaut-upstream publication authority: ordinary project work and `/updatejuggernaut` pulls are unaffected, but without an explicit grant no ship task on the Juggernaut repository may carry a publishing contract.
+For the agent's local diagnosis, workaround, and draft-only response to a Juggernaut bug, see [`juggernaut-self-repo`](../.agents/skills/juggernaut-self-repo/SKILL.md#when-a-juggernaut-bug-surfaces-in-ordinary-use).
 
 The file holds exactly one directive line, with blank lines and `#` comment lines ignored:
 
@@ -615,7 +615,7 @@ The file holds exactly one directive line, with blank lines and `#` comment line
 A scope names the publication target repository (where a pull request lands), normalized to lowercase for comparison, not a push destination.
 A fork maintainer contributing to the parent repository uses per-task consent rather than a second standing scope.
 Write the primary home's file by hand; Juggernaut never grants itself a role, and the file never travels through git.
-Supported secondmate propagation writes or removes the inherited copy as described below.
+Supported squad lead propagation writes or removes the inherited copy as described below.
 A malformed, unreadable, or symlinked file - including one with a second directive anywhere - resolves to user/operator; the role fails closed rather than guessing.
 
 Authority is also available for one task at a time: `--upstream-consent <host>/<owner>/<repo>` on `bin/jg-brief.sh`, `bin/jg-spawn.sh`, and `bin/jg-promote.sh` records the captain's explicit approval in the task's delivery contract and metadata without changing the home's role.
@@ -625,8 +625,8 @@ Role is never inferred from GitHub identity, forge permissions, remotes, reposit
 `bin/jg-role-lib.sh` owns the fail-closed parser, self-repository detection, and the gate that `bin/jg-brief.sh`, `bin/jg-spawn.sh`, and `bin/jg-promote.sh` apply.
 The publication target is selected from the first configured remote in the order `upstream`, `github`, `origin`; see `bin/jg-role-lib.sh` for URL and local-path normalization.
 A task's project counts as the Juggernaut repository when it shares the code root's lineage - the same git common dir, or a root commit of the code root's history, which every fork, the parent, and any clone of either share - computed offline; undeterminable lineage (for example a shallow clone sharing no root commit) and an undeterminable publication target are refused, even under task consent.
-Secondmate homes inherit the primary's resolved role, never its raw file: a primary file that resolves to user for any reason propagates as revocation.
-In a secondmate home the file is honored only while the inheritance receipt `config/.jg-inherit-firstmate-role.generation` proves the exact bytes the primary last published (`bin/jg-config-inherit-lib.sh`); a role file with no matching receipt or a stale grant authorizes nothing.
+Squad Lead homes inherit the primary's resolved role, never its raw file: a primary file that resolves to user for any reason propagates as revocation.
+In a squad lead home the file is honored only while the inheritance receipt `config/.jg-inherit-juggernaut-role.generation` proves the exact bytes the primary last published (`bin/jg-config-inherit-lib.sh`); a role file with no matching receipt or a stale grant authorizes nothing.
 The receipt prevents accidental publication through supported paths; it proves consistency, not provenance, and is not a security boundary against a process that deliberately forges local records.
 
 ## Waiting worker spends no turns (config/wait-no-turns)
@@ -634,7 +634,7 @@ The receipt prevents accidental publication through supported paths; it proves c
 The optional local, gitignored `config/wait-no-turns` presence flag opts this home into keeping a waiting worker from spending turns until it is answered.
 With it present, ship and scout briefs gain the `# Waiting` section and the foreground no-mistakes drive text, every brief's inbox section keeps the natural-checkpoint check and adds that a waiting worker does not poll or list its inbox because a waiting instruction rings, a pending-reply recovery waits while that mate has its own open decision or blocker, and a fire-and-forget steer whose doorbell did not land gets one later ring.
 With the file absent, generated briefs omit the waiting section and the no-poll inbox line, the drive text backgrounds the call, recovery sends during an open decision, and a fire-and-forget steer is not owed a retry ring.
-The flag is a home-local preference and is not inherited by secondmate homes.
+The flag is a home-local preference and is not inherited by squad lead homes.
 
 ## No-mistakes pipeline spend (config/pipeline-spend)
 
@@ -655,7 +655,7 @@ It stays opt-in because the other two proofs read a verdict the harness itself v
 An invalid value fails closed and surfaces the wake.
 The bound is required rather than cosmetic because churn and pane staleness read the same pane.
 
-The flag is a home-local supervision-noise preference and is not inherited by secondmate homes, which run their own crew mix.
+The flag is a home-local supervision-noise preference and is not inherited by squad lead homes, which run their own crew mix.
 [`architecture.md`](architecture.md) owns the triage contract and `bin/jg-watch.sh`'s `signal_turnend_panes_churned` owns the exact evidence and fail-closed boundaries.
 
 ## Parked-gate wait deferral (config/wedge-defer-parked-gate)
@@ -669,7 +669,7 @@ It stays opt-in because the other evidence is the worker's own declaration about
 
 With the flag absent the wedge timer spends no parked-gate fold or additional current-state read, writes no parked-gate wait record, and keeps the unchanged escalation schedule, reasons, and `demand-deep-inspection` wording.
 The independent validation-execution check remains active regardless of this flag; [`architecture.md`](architecture.md#event-driven-supervision) owns that check.
-The flag is a home-local supervision-noise preference and is not inherited by secondmate homes, which supervise their own crew and own that trade separately.
+The flag is a home-local supervision-noise preference and is not inherited by squad lead homes, which supervise their own crew and own that trade separately.
 
 [`architecture.md`](architecture.md) owns the wait-evidence contract and which records may take the ladder away; `bin/jg-watch.sh`'s `wedge_wait_evidence` owns the exact derivation and its fail-closed boundaries.
 
@@ -681,7 +681,7 @@ The [Test instructions in `.no-mistakes.yaml`](../.no-mistakes.yaml) own the per
 Changing these settings does not delete previously published evidence.
 
 The worktree's `.no-mistakes/` stays local and CI rejects tracked entries under that path.
-The [`firstmate-coding-guidelines` skill](../.agents/skills/firstmate-coding-guidelines/SKILL.md#no-mistakes-test-configuration) owns why `commands.test` stays absent and targeted validation belongs to the evidence path.
+The [`juggernaut-coding-guidelines` skill](../.agents/skills/juggernaut-coding-guidelines/SKILL.md#no-mistakes-test-configuration) owns why `commands.test` stays absent and targeted validation belongs to the evidence path.
 
 `commands.test` executes code, so no-mistakes honors it only from the default-branch copy of `.no-mistakes.yaml`; a pushed branch cannot change what the gate runs.
 See [CONTRIBUTING.md](../CONTRIBUTING.md) for the Juggernaut-specific local test policy and entry points.
@@ -690,11 +690,11 @@ Portable shard evidence and coverage rules are in [jg-test-portable-shards.md](j
 
 ## Captain Preferences (data/captain.md / data/captain-shared.md)
 
-Domain-local preferences for one captain's fleet live locally in each home's `data/captain.md`; it is gitignored and printed in the session-start context digest after `data/projects.md` and optional `data/secondmates.md`.
+Domain-local preferences for one captain's fleet live locally in each home's `data/captain.md`; it is gitignored and printed in the session-start context digest after `data/projects.md` and optional `data/squad leads.md`.
 Before changing it, inspect the current file and curate the matching bullet in place under the internal [`stow` skill's](../.agents/skills/stow/SKILL.md) tiering and archive contract; add a new bullet only for a genuinely new durable preference.
 
-Shared captain preferences that apply across secondmate domains live only in the primary home's optional `data/captain-shared.md`.
-`secondmate-provisioning` owns its propagation contract, including the required header, read-only secondmate copies, quarantine diagnostics, and the rollout rule that existing homes trim `data/captain.md` by hand after first propagation rather than deleting private content automatically.
+Shared captain preferences that apply across squad lead domains live only in the primary home's optional `data/captain-shared.md`.
+`squad-lead-provisioning` owns its propagation contract, including the required header, read-only squad lead copies, quarantine diagnostics, and the rollout rule that existing homes trim `data/captain.md` by hand after first propagation rather than deleting private content automatically.
 
 ## Operational learnings (data/learnings.md)
 
@@ -706,7 +706,7 @@ There is no shared learnings file by captain decision.
 ## External memory tiers (Memory layering section)
 
 A home may declare memory stores outside Juggernaut, such as MCP-served knowledge stores, as authoritative for named classes of knowledge.
-The declaration lives in a `Memory layering` heading inside `data/captain.md`, or inside the primary home's `data/captain-shared.md` when every secondmate home should inherit it; a local `data/captain.md` declaration wins for that home when both exist.
+The declaration lives in a `Memory layering` heading inside `data/captain.md`, or inside the primary home's `data/captain-shared.md` when every squad lead home should inherit it; a local `data/captain.md` declaration wins for that home when both exist.
 No declaration means Juggernaut's local files under `data/` are the only memory owners, which is the default.
 
 Each declared tier states, in plain prose or a table:
@@ -732,8 +732,8 @@ The locked mutable bootstrap path materializes its visible default of `7500` est
 
 ### Set and validate the budget
 
-To select another allowance, replace the primary home's file with one valid positive value in the exact format below; the next locked bootstrap convergence or `bin/jg-config-push.sh` propagates it to registered secondmates.
-A secondmate does not create an independent default and instead receives the primary value through the inherited-local-material contract in [`secondmate-provisioning`](../.agents/skills/secondmate-provisioning/SKILL.md).
+To select another allowance, replace the primary home's file with one valid positive value in the exact format below; the next locked bootstrap convergence or `bin/jg-config-push.sh` propagates it to registered squad leads.
+A squad lead does not create an independent default and instead receives the primary value through the inherited-local-material contract in [`squad-lead-provisioning`](../.agents/skills/squad-lead-provisioning/SKILL.md).
 
 The file must be one positive base-10 integer followed by exactly one newline in a regular, single-linked file beneath a non-symlinked `config/` directory.
 Malformed, multi-line, symlinked, hardlinked, special, or otherwise unsafe values are rejected rather than treated as a default.
@@ -743,8 +743,8 @@ Malformed, multi-line, symlinked, hardlinked, special, or otherwise unsafe value
 Use `bin/jg-startup-memory-budget.sh read` to validate and print the effective value, or `bin/jg-startup-memory-budget.sh report` to account for the three files.
 The stable local estimate is `ceil(UTF-8 bytes / 3)` per file, a conservative portable approximation rather than a provider-exact tokenizer.
 
-An inherited `data/captain-shared.md` counts in a secondmate's total but remains primary-owned and read-only there.
-The internal [`/stow` skill](../.agents/skills/stow/SKILL.md) owns curation and its automatic secondmate cascade, which accounts every home against this same per-home allowance separately rather than against a fleet total.
+An inherited `data/captain-shared.md` counts in a squad lead's total but remains primary-owned and read-only there.
+The internal [`/stow` skill](../.agents/skills/stow/SKILL.md) owns curation and its automatic squad lead cascade, which accounts every home against this same per-home allowance separately rather than against a fleet total.
 
 The helper's header owns exact parsing, publication, and report output mechanics.
 
@@ -756,9 +756,9 @@ Registering it is a reason to watch on the same terms as the [watched-tool check
 Use `bin/jg-startup-growth-check.sh disarm` to remove the check and its local report record.
 
 The check evaluates at most once per day and stays silent when nothing meaningful changed.
-A due evaluation uses file metadata and byte sizes before any content inspection: it asks `bin/jg-startup-memory-budget.sh report` for the budget verdict over `data/captain.md`, `data/captain-shared.md`, and `data/learnings.md`, watches the `data/projects.md` and `data/secondmates.md` that session start also prints in full for growth without entering that budget total, and separately watches the tracked startup/instruction owner files described by the script header.
-`bin/jg-startup-memory-budget.sh` remains the sole owner of the budget total and its verdict, so the check never re-derives either: when that owner annotates an overrun caused by the primary-owned `data/captain-shared.md` alone, a secondmate home is not woken about an overrun it cannot act on.
-A secondmate home is likewise not notified about per-file growth of that same primary-owned `data/captain-shared.md`, which it receives read-only; the growth is still observed and recorded, and a primary home reports it normally.
+A due evaluation uses file metadata and byte sizes before any content inspection: it asks `bin/jg-startup-memory-budget.sh report` for the budget verdict over `data/captain.md`, `data/captain-shared.md`, and `data/learnings.md`, watches the `data/projects.md` and `data/squad leads.md` that session start also prints in full for growth without entering that budget total, and separately watches the tracked startup/instruction owner files described by the script header.
+`bin/jg-startup-memory-budget.sh` remains the sole owner of the budget total and its verdict, so the check never re-derives either: when that owner annotates an overrun caused by the primary-owned `data/captain-shared.md` alone, a squad lead home is not woken about an overrun it cannot act on.
+A squad lead home is likewise not notified about per-file growth of that same primary-owned `data/captain-shared.md`, which it receives read-only; the growth is still observed and recorded, and a primary home reports it normally.
 Those tracked bytes are code and instruction-surface size, not prompt-memory cost.
 The check does not run session-start, bootstrap, network checks, model calls, repository refreshes, `/stow`, or full preference/learnings rereads.
 
@@ -798,7 +798,7 @@ These controls reduce risk but cannot guarantee avoidance of an out-of-memory ki
   After successful alert output, the watcher records that row's identity so its unacknowledged alert cannot immediately close the handling successor; later reminders use the [local queue backstop](watcher-continuity.md#durable-queue-and-turn-end-backstop), and only post-handling acknowledgement retires the row.
   Interrupt delivery runs independently of subsequent samples and appends its completion result to the interrupt log.
   A WAIT or OK sample ends the episode, so a later ALERT wakes Main and attempts its interrupt again.
-- Local secondmate liveness recovery checks admission before consuming its retry budget or removing a dead endpoint, so memory deferral leaves recovery eligible when pressure eases.
+- Local squad lead liveness recovery checks admission before consuming its retry budget or removing a dead endpoint, so memory deferral leaves recovery eligible when pressure eases.
   Memory deferral and a no-longer-relaunchable endpoint keep the watcher polling rather than failing supervision.
 
 `config/host-memory` is optional and read only when passed with `--config`, which the add-on sampler, `bin/jg-spawn.sh`, and `bin/jg-control.sh relaunch` always do; otherwise the helper uses its defaults.
@@ -816,7 +816,7 @@ An invalid line is refused with its line number, so a typo never silently loosen
 For fixture testing, `JG_HOST_MEMORY_PROC` selects the proc root and `JG_HOST_MEMORY_CGROUP_ROOT` selects the cgroup root; production defaults are `/proc` and `/sys/fs/cgroup`.
 Without readable host pressure and available memory, or without `python3`, the guard reads unknown and admits work without recording a sample, because it cannot measure the host.
 The guard's header owns consumer attribution, sample format, and exact output.
-`tests/jg-jev-mem-guard.test.sh` pins app.slice-only judgment, fast-spike waiting, sampling, home-qualified ownership, remote-record exclusion, and once-per-episode dispatch with re-arming after a WAIT; `tests/jg-control-relaunch.test.sh` and `tests/jg-secondmate-liveness.test.sh` pin admission before agent stop and recovery-budget consumption.
+`tests/jg-jev-mem-guard.test.sh` pins app.slice-only judgment, fast-spike waiting, sampling, home-qualified ownership, remote-record exclusion, and once-per-episode dispatch with re-arming after a WAIT; `tests/jg-control-relaunch.test.sh` and `tests/jg-squad-lead-liveness.test.sh` pin admission before agent stop and recovery-budget consumption.
 
 ## Stow pass horizon (config/stow-pass-horizon)
 
@@ -826,28 +826,28 @@ Without it a `/stow` pass decays memory entries on their wall-clock horizons alo
 With it, an entry is also stale after 10 passes (`aging`) or 3 passes (`perishable`) that evaluated it without reinforcing it, whichever horizon it reaches first.
 Opt in for a home that stows often enough that entries never sit unreinforced for a wall-clock horizon, so memory only grows against the startup-memory budget above; a home that stows rarely already exceeds its date horizon on a single pass and gains nothing.
 
-The flag is per home and is not inherited by secondmate homes, because stow cadence is a property of the home doing the stowing.
+The flag is per home and is not inherited by squad lead homes, because stow cadence is a property of the home doing the stowing.
 Only the file's presence is read, so its contents are ignored; remove it to return to the default contract on the next pass.
 
 The skill text owns the marker spelling, the tick order, and the reinforcement rule.
 
-## Secondmate routes (data/secondmates.md)
+## Squad Lead routes (data/squad leads.md)
 
-Persistent secondmate routes live locally in `data/secondmates.md`.
-The concise single-line route contract is owned by the [`secondmate-provisioning` skill](../.agents/skills/secondmate-provisioning/SKILL.md#routing-table), including the parser-compatible fields, one-sentence summary requirement, `home:` pointer to the seeded charter, and limit on extra registry prose.
+Persistent squad lead routes live locally in `data/squad leads.md`.
+The concise single-line route contract is owned by the [`squad-lead-provisioning` skill](../.agents/skills/squad-lead-provisioning/SKILL.md#routing-table), including the parser-compatible fields, one-sentence summary requirement, `home:` pointer to the seeded charter, and limit on extra registry prose.
 
 ### Remote routes and validation
 
-A remote route adds `host:` and `root:` before the existing fields and places the whole secondmate home on that SSH host; it does not make ordinary workers remotely placeable.
-[`remote-secondmates.md`](remote-secondmates.md) owns current remote setup, operation, and safety behavior.
+A remote route adds `host:` and `root:` before the existing fields and places the whole squad lead home on that SSH host; it does not make ordinary workers remotely placeable.
+[`remote-squad-leads.md`](remote-squad-leads.md) owns current remote setup, operation, and safety behavior.
 
 Use `jg-home-seed.sh validate` to check the complete operational registry contract documented by the command itself.
-The main first mate routes by reading those scopes with judgment; the project list is provisioning data, not exclusive ownership.
+The main overwatch routes by reading those scopes with judgment; the project list is provisioning data, not exclusive ownership.
 
 ### Provision a local home
 
-Use `jg-home-seed.sh <id> - {<project>...|--no-projects}` to lease a fresh local Juggernaut worktree for the secondmate home.
-For remote provisioning, including supplied project origins, follow [Remote second mates](remote-secondmates.md#provision-a-route).
+Use `jg-home-seed.sh <id> - {<project>...|--no-projects}` to lease a fresh local Juggernaut worktree for the squad lead home.
+For remote provisioning, including supplied project origins, follow [Remote squad leads](remote-squad-leads.md#provision-a-route).
 
 Use the deliberate `--no-projects` signal only for a Juggernaut repo domain that needs no separate project clones.
 It cannot be combined with a project list, and omitting both still fails loudly.
@@ -855,49 +855,49 @@ It cannot be combined with a project list, and omitting both still fails loudly.
 A project-less seed requires no existing project clones or `data/projects.md` entries in the home, so it refuses a populated-home conversion without changing that home.
 A preexisting project-bearing charter is also refused until it is re-scaffolded with `--no-projects` or removed.
 
-The lease is held under the secondmate id until explicit retirement or seed rollback returns it, so normal restarts do not free or recycle the home.
+The lease is held under the squad lead id until explicit retirement or seed rollback returns it, so normal restarts do not free or recycle the home.
 Teardown of a leased home fails closed if `treehouse return` cannot release the lease; plain-clone homes with no treehouse pool slot are removed directly.
 
 ### Project modes and backlog handoff
 
-Secondmate routes cover `no-mistakes` and `direct-PR` projects; `local-only` projects remain main Juggernaut work.
-For `no-mistakes` projects, seeding initializes only projects newly cloned into a secondmate home and refuses to mutate a preexisting clone that is not already initialized.
+Squad Lead routes cover `no-mistakes` and `direct-PR` projects; `local-only` projects remain main Juggernaut work.
+For `no-mistakes` projects, seeding initializes only projects newly cloned into a squad lead home and refuses to mutate a preexisting clone that is not already initialized.
 
-After creating a secondmate, move existing main-backlog queued items that you have judged in-scope with `jg-backlog-handoff.sh <secondmate-id> <item-key>...`; it refuses In flight, Done, or non-secondmate homes, and its [script header](../bin/jg-backlog-handoff.sh) owns route-specific wake outcomes and retries.
-Set `JG_SECONDMATE_CHARTER` to seed from inline charter text when no filled charter brief exists; set `JG_SECONDMATE_SCOPE` when the routing scope should differ from the charter text.
+After creating a squad lead, move existing main-backlog queued items that you have judged in-scope with `jg-backlog-handoff.sh <squad-lead-id> <item-key>...`; it refuses In flight, Done, or non-squad-lead homes, and its [script header](../bin/jg-backlog-handoff.sh) owns route-specific wake outcomes and retries.
+Set `JG_SQUAD LEAD_CHARTER` to seed from inline charter text when no filled charter brief exists; set `JG_SQUAD LEAD_SCOPE` when the routing scope should differ from the charter text.
 
-The seeded home's `data/charter.md` owns the standard secondmate lifecycle and escalation contract; the route file points to it through the existing `home:` field instead of adding another pointer.
+The seeded home's `data/charter.md` owns the standard squad lead lifecycle and escalation contract; the route file points to it through the existing `home:` field instead of adding another pointer.
 
 ### Identity markers and upgrades
 
-Each seed writes an `.jg-secondmate-home` identity marker at the home root, alongside a durable `.jg-secondmate-parent` record of the home's route to its parent (see "Provision a route" in [`docs/remote-secondmates.md`](remote-secondmates.md)).
+Each seed writes an `.jg-squad-lead-home` identity marker at the home root, alongside a durable `.jg-squad-lead-parent` record of the home's route to its parent (see "Provision a route" in [`docs/remote-squad-leads.md`](remote-squad-leads.md)).
 The tracked root `.gitignore` ignores both markers, so validation can read them without making a freshly seeded home appear dirty to porcelain-based safety checks.
 
 This does not relax protection for any other untracked file.
 An existing linked-worktree home that predates this rule advances through its marker-only state during its next bootstrap or spawn local sync, after which Git ignores the marker normally.
 
-A local standalone-clone home cannot receive a primary-local commit through that no-fetch sync, so it receives the rule through `/updatefirstmate`'s origin refresh instead.
+A local standalone-clone home cannot receive a primary-local commit through that no-fetch sync, so it receives the rule through `/updatejuggernaut`'s origin refresh instead.
 
 ## Harness support
 
-claude, codex, opencode, pi, pi-signed, grok, kimi, cursor, and omp are empirically verified for operator and secondmate launches; gemini is verified for operator and scout launches only, and [README requirements](../README.md#requirements) own the set supported for the primary session.
+claude, codex, opencode, pi, pi-signed, grok, kimi, cursor, and omp are empirically verified for operator and squad lead launches; gemini is verified for operator and scout launches only, and [README requirements](../README.md#requirements) own the set supported for the primary session.
 
 ### Harness restrictions and credentials
 
 `jg-spawn.sh` refuses kimi on cmux and Orca at preflight, because answering Kimi's folder-trust dialog needs a verified viewport-only capture those backends lack; [its adapter reference](../.agents/skills/harness-adapters/references/harness/kimi.md#readiness-gated-start) owns the trust-dialog handling.
-A cursor secondmate or primary runs the tracked project-scope `.cursor/hooks.json` in its own home and must be launched with `--trust`, or no project hook loads; [`docs/supervision-protocols/cursor.md`](supervision-protocols/cursor.md) owns its supervision protocol.
+A cursor squad lead or primary runs the tracked project-scope `.cursor/hooks.json` in its own home and must be launched with `--trust`, or no project hook loads; [`docs/supervision-protocols/cursor.md`](supervision-protocols/cursor.md) owns its supervision protocol.
 
 Cursor typed-submit confirmation is verified on tmux and Herdr only.
 On Zellij, cmux, and Orca a typed-plane Cursor send (a harness-native invocation or an explicit backend target; ordinary text steers ride the durable inbox and exit 0 at enqueue) lands, but `jg-send` reports delivery unconfirmed and exits non-zero because their shared submit core does not consult the busy footer; [runtime backend verification](verification/runtime-backends.md#cursor-agent-cli) owns the evidence and transcript-state boundary.
 
-muse is verified for operator and scout launches ONLY, and `jg-spawn.sh` refuses it for a secondmate, because muse ships no usable hook surface for a primary session's turn-end supervision; [`docs/verification/muse.md`](verification/muse.md) owns that evidence.
+muse is verified for operator and scout launches ONLY, and `jg-spawn.sh` refuses it for a squad lead, because muse ships no usable hook surface for a primary session's turn-end supervision; [`docs/verification/muse.md`](verification/muse.md) owns that evidence.
 muse also needs a worker-reachable credential before spawning, and the portable fleet path is the `<config>/muse/auth.json` credential stored by `muse login`, because a caller-only `META_API_KEY` does not cross a long-lived backend daemon.
 
-gemini is likewise refused for secondmates because it has no primary supervision protocol; [its adapter reference](../.agents/skills/harness-adapters/references/harness/gemini.md) owns the credential precondition, canonical-launch wiring, and raw-launch limitations.
-rovo is likewise verified for operator and scout launches ONLY, refused for a secondmate for the same reason - no turn-end hook and no primary supervision protocol; [`docs/verification/rovo.md`](verification/rovo.md) owns that evidence, including the OAuth token's silent background refresh from a stored refresh token and both tmux and herdr pane liveness (herdr placement is verified live, with a Herdr-side agent-detection gap left open for recovery classification).
+gemini is likewise refused for squad leads because it has no primary supervision protocol; [its adapter reference](../.agents/skills/harness-adapters/references/harness/gemini.md) owns the credential precondition, canonical-launch wiring, and raw-launch limitations.
+rovo is likewise verified for operator and scout launches ONLY, refused for a squad lead for the same reason - no turn-end hook and no primary supervision protocol; [`docs/verification/rovo.md`](verification/rovo.md) owns that evidence, including the OAuth token's silent background refresh from a stored refresh token and both tmux and herdr pane liveness (herdr placement is verified live, with a Herdr-side agent-detection gap left open for recovery classification).
 
-agy is likewise verified for operator and scout launches ONLY, refused for a secondmate for the same reason - no hook surface and no primary supervision protocol; [`docs/verification/agy.md`](verification/agy.md) owns that evidence, including the spawn-time worktree trust pre-registration through `bin/jg-agy-trust.sh` and Herdr's native agy pane recognition.
-devin is verified for operator and scout launches only; a secondmate is refused because Devin has no verified primary supervision protocol.
+agy is likewise verified for operator and scout launches ONLY, refused for a squad lead for the same reason - no hook surface and no primary supervision protocol; [`docs/verification/agy.md`](verification/agy.md) owns that evidence, including the spawn-time worktree trust pre-registration through `bin/jg-agy-trust.sh` and Herdr's native agy pane recognition.
+devin is verified for operator and scout launches only; a squad lead is refused because Devin has no verified primary supervision protocol.
 
 Its private worker config disables Claude Code imports (including the captain's hooks) and, unless the home sets `config/keep-ai-trailers` (see "Commit attribution"), Devin commit attribution without editing user or project config; [`jg-devin-config.sh`](../bin/jg-devin-config.sh) owns these enforced settings and [Devin verification](verification/devin.md) owns the live evidence and observed model availability.
 
@@ -927,20 +927,20 @@ When pi-signed is selected, Juggernaut preserves `JG_PI_HARNESS=pi-signed` and r
 Plain Pi launches set `JG_PI_HARNESS=pi`, so a signed primary's environment cannot relabel a plain Pi worker.
 When it is absent or contains `default`, operators mirror the Juggernaut's own harness.
 
-### Choose the secondmate harness
+### Choose the squad lead harness
 
-`config/secondmate-harness` is a separate local, gitignored file containing the adapter the primary uses to launch secondmate agents, optionally followed by model and effort tokens on the same line.
+`config/squad-lead-harness` is a separate local, gitignored file containing the adapter the primary uses to launch squad lead agents, optionally followed by model and effort tokens on the same line.
 The first non-empty, non-comment line is parsed as `<harness> [<model>] [<effort>]`.
 
 A bare `<harness>` preserves the previous behavior: harness only, with no model or effort launch flag.
-When the harness token is absent or `default`, secondmate launch falls back through `config/crew-harness` and then the primary's own harness, and no model or effort is read from that file.
+When the harness token is absent or `default`, squad lead launch falls back through `config/crew-harness` and then the primary's own harness, and no model or effort is read from that file.
 
-For an individual registered secondmate, the primary may keep a complete pin in `config/secondmates/<id>/harness`, beside the global file and never inside the secondmate's home.
-Its first non-empty, non-comment line must contain exactly `<harness> <model> <effort>`, with a verified secondmate harness, a concrete model, and a supported effort (`low`, `medium`, `high`, `xhigh`, `max`, or native `ultra`).
+For an individual registered squad lead, the primary may keep a complete pin in `config/squad leads/<id>/harness`, beside the global file and never inside the squad lead's home.
+Its first non-empty, non-comment line must contain exactly `<harness> <model> <effort>`, with a verified squad lead harness, a concrete model, and a supported effort (`low`, `medium`, `high`, `xhigh`, `max`, or native `ultra`).
 An empty, unreadable, or malformed per-mate pin is an error naming that file, never permission to use the global default.
-For example, `config/secondmates/design/harness` containing `claude claude-opus-5-5 high` keeps that lead's profile independent of the global setting.
+For example, `config/squad leads/design/harness` containing `claude claude-opus-5-5 high` keeps that lead's profile independent of the global setting.
 
-`jg-harness.sh secondmate <id>`, `secondmate-model <id>`, and `secondmate-effort <id>` are the single resolver: per-mate pin, then the unchanged global file, then the existing static harness fallback.
+`jg-harness.sh squad lead <id>`, `squad-lead-model <id>`, and `squad-lead-effort <id>` are the single resolver: per-mate pin, then the unchanged global file, then the existing static harness fallback.
 Without an id these commands retain their global behavior; `config/crew-harness` remains a bare adapter-name file.
 Launch, update restart, and automatic recovery use the mate's id, including remote routes whose profile is resolved on the parent before transmission.
 Changing a pin affects the next spawn or control-plane relaunch; the relaunch profile rules are owned by [`docs/agent-control.md`](agent-control.md#transactional-relaunch).
@@ -948,15 +948,15 @@ Changing a pin affects the next spawn or control-plane relaunch; the relaunch pr
 ### Per-launch overrides and inherited defaults
 
 An explicit harness argument to `jg-spawn.sh` still overrides the resolved harness profile for that spawn only.
-An explicit `--model` or `--effort` overrides the matching token from the resolved secondmate profile (per-mate pin or global file); for a local route, an explicit harness or raw launch command starts with clean model and effort defaults unless those flags are also passed.
+An explicit `--model` or `--effort` overrides the matching token from the resolved squad lead profile (per-mate pin or global file); for a local route, an explicit harness or raw launch command starts with clean model and effort defaults unless those flags are also passed.
 
-Remote secondmate routes accept verified harness adapters only and reject raw launch commands.
+Remote squad lead routes accept verified harness adapters only and reject raw launch commands.
 When `config/crew-dispatch.json` exists, operator and scout spawns require an explicit resolved harness instead of automatically falling back to `config/crew-harness`.
 
-The inherited-local-material contract is owned by [`secondmate-provisioning`](../.agents/skills/secondmate-provisioning/SKILL.md); its harness-relevant consequence is that a secondmate's own operators use the primary's dispatch profiles and static harness value.
+The inherited-local-material contract is owned by [`squad-lead-provisioning`](../.agents/skills/squad-lead-provisioning/SKILL.md); its harness-relevant consequence is that a squad lead's own operators use the primary's dispatch profiles and static harness value.
 Those inherited values are defaults and rules only; `jg-spawn` still permits a consciously chosen explicit runtime outside the config.
 
-`config/secondmate-harness` and `config/secondmates/<id>/harness` pins are not inherited because secondmates do not launch secondmates.
+`config/squad-lead-harness` and `config/squad leads/<id>/harness` pins are not inherited because squad leads do not launch squad leads.
 
 ### Installed hooks and launch details
 
@@ -967,12 +967,12 @@ Kimi continues to use the captain's normal Kimi home, including the existing con
 The Kimi installer requires an existing regular non-symlink `~/.kimi-code/config.toml`, `python3` with `tomllib`, and `jq`; it validates but never serializes the captain's TOML and refuses before writing when the config is missing, malformed, or surprising or when either tool requirement is unavailable.
 
 Its `remove` action excises only the marker-delimited Juggernaut region and removes Juggernaut's hook files.
-For Pi and pi-signed secondmate launches, `jg-spawn.sh` starts the selected executable with `-e` pointed at the secondmate home's own tracked `.pi/extensions/jg-primary-pi-watch.ts` and `.pi/extensions/jg-primary-turnend-guard.ts`, both already present from the secondmate home's git worktree, plus the parent home's `state/<id>.pi-ext.ts` busy extension.
-Pi-family secondmates can start unattended in Juggernaut-seeded homes without accepting project trust manually; [`jg-spawn.sh --help`](../bin/jg-spawn.sh) owns the capability requirement, session-only approval scope, and older-version fallback, with [regression evidence](verification/runtime-backends.md#pi-seeded-secondmate-project-trust).
+For Pi and pi-signed squad lead launches, `jg-spawn.sh` starts the selected executable with `-e` pointed at the squad lead home's own tracked `.pi/extensions/jg-primary-pi-watch.ts` and `.pi/extensions/jg-primary-turnend-guard.ts`, both already present from the squad lead home's git worktree, plus the parent home's `state/<id>.pi-ext.ts` busy extension.
+Pi-family squad leads can start unattended in Juggernaut-seeded homes without accepting project trust manually; [`jg-spawn.sh --help`](../bin/jg-spawn.sh) owns the capability requirement, session-only approval scope, and older-version fallback, with [regression evidence](verification/runtime-backends.md#pi-seeded-squad-lead-project-trust).
 
-For omp secondmate launches, `jg-spawn.sh` names only the parent home's `state/<id>.omp-ext.ts` busy extension with `-e`: omp auto-discovers the home's tracked `.omp/extensions/` with no trust gate, and naming a discovered file with `-e` as well loads it twice; every omp launch also carries the tracked `.omp/jg-worker-overlay.yml` posture overlay through `--config`, which [`jg-spawn.sh --help`](../bin/jg-spawn.sh) owns.
+For omp squad lead launches, `jg-spawn.sh` names only the parent home's `state/<id>.omp-ext.ts` busy extension with `-e`: omp auto-discovers the home's tracked `.omp/extensions/` with no trust gate, and naming a discovered file with `-e` as well loads it twice; every omp launch also carries the tracked `.omp/jg-worker-overlay.yml` posture overlay through `--config`, which [`jg-spawn.sh --help`](../bin/jg-spawn.sh) owns.
 
-For a Claude secondmate, `jg-spawn.sh` writes the busy hooks into the parent home's `state/<id>.claude-settings.json` and passes that file as Claude Code's one `--settings` value.
+For a Claude squad lead, `jg-spawn.sh` writes the busy hooks into the parent home's `state/<id>.claude-settings.json` and passes that file as Claude Code's one `--settings` value.
 The same file carries `feedbackDrafts` and, unless `config/keep-ai-trailers` is present, the attribution policy every other Claude launch puts in its inline `--settings` JSON.
 Claude Code applies `--settings` for that session and does not write the file into the mate home.
 A key the file sets overrides the same key in user, project, and local settings.
@@ -983,7 +983,7 @@ The CLI reference documents the one file-or-JSON flag, the settings page documen
 
 ## Claude permission mode (config/claude-permission-mode)
 
-The optional local, gitignored `config/claude-permission-mode` selects the permission flag for every Claude worker launch: operators, scouts, Claude secondmates, and control-plane relaunches.
+The optional local, gitignored `config/claude-permission-mode` selects the permission flag for every Claude worker launch: operators, scouts, Claude squad leads, and control-plane relaunches.
 
 ### Accepted values and refusals
 
@@ -999,7 +999,7 @@ Auto is Claude Code's classifier-reviewed permission mode, for a captain who ref
 Only the permission flag changes between the two modes.
 The environment prefix, session settings, model, effort flags, and the task-channel `--add-dir` grant below stay the same in both.
 
-Every Claude launch, in both modes, also passes `--add-dir` for exactly this task's Juggernaut channel directories, resolved to real paths: a secondmate gets the parent home's `state/<id>.inbox` it reads its steers from; a ship or scout worker gets this home's `state/operational-inbox` (its launch record), `state/<id>.inbox` (its steers), `data/<id>` (its brief and report), and the code root's `.agents/skills`.
+Every Claude launch, in both modes, also passes `--add-dir` for exactly this task's Juggernaut channel directories, resolved to real paths: a squad lead gets the parent home's `state/<id>.inbox` it reads its steers from; a ship or scout worker gets this home's `state/operational-inbox` (its launch record), `state/<id>.inbox` (its steers), `data/<id>` (its brief and report), and the code root's `.agents/skills`.
 The grant exists because Claude Code path-checks the Read/Glob/Grep file tools against cwd plus `--add-dir`, and since 2.1.257 the first outside read in `auto` mode parks the pane on a one-time interactive question, while a "Block" answer there writes `permissions.blockReadsOutsideWorkingDirectories` into user settings and then refuses the same reads under bypass too.
 It never covers the whole `state/` or anything wider.
 
@@ -1010,7 +1010,7 @@ The diagnostic names the accepted values; Juggernaut never falls back to a permi
 ### When changes apply and inheritance
 
 `bin/jg-spawn.sh` reads the file on every spawn and relaunch, so a change takes effect at the next launch without a restart.
-The file is a captain-wide safety preference, so it is inherited into secondmate homes under the [`secondmate-provisioning`](../.agents/skills/secondmate-provisioning/SKILL.md) inherited-local-material contract; a secondmate's own Claude operators then launch on the same posture.
+The file is a captain-wide safety preference, so it is inherited into squad lead homes under the [`squad-lead-provisioning`](../.agents/skills/squad-lead-provisioning/SKILL.md) inherited-local-material contract; a squad lead's own Claude operators then launch on the same posture.
 
 The [Claude adapter reference](../.agents/skills/harness-adapters/references/harness/claude.md) records the permission-mode observations and the distinct startup dialogs.
 
@@ -1023,8 +1023,8 @@ With no file, or a file with no entries, every launch on every runtime is unchan
 Create the file with one tool name per line, such as `mcp__<server>__<tool>` for an MCP tool.
 Blank lines and lines beginning with `#` are allowed, and surrounding whitespace on a line is trimmed; a trailing comment on an entry line is not allowed.
 The file is read from this home's own configuration directory on every launch, so a change reaches the next worker or relaunch without a restart.
-It is not in the inherited configuration set, so no other home, including a secondmate home, receives it; create the file in each home that wants it.
-It does not apply to a secondmate's own agent, which neither reads nor refuses on it.
+It is not in the inherited configuration set, so no other home, including a squad lead home, receives it; create the file in each home that wants it.
+It does not apply to a squad lead's own agent, which neither reads nor refuses on it.
 
 ### Runtime support
 
@@ -1078,7 +1078,7 @@ An unqualified model, an undeclared provider, or a raw Pi launch command, which 
 
 ### Launch scope and sign-in checks
 
-When a file is present, every launch of that runner from this home uses it: ships, scouts, local secondmate agents, raw Claude launch commands, and relaunches.
+When a file is present, every launch of that runner from this home uses it: ships, scouts, local squad lead agents, raw Claude launch commands, and relaunches.
 A raw Claude launch command refuses if its leading assignments set `CLAUDE_CONFIG_DIR` or a credential that a pinned launch unsets, such as `ANTHROPIC_API_KEY`.
 The assignment would override the pin.
 The refusal names the variable; remove that assignment from the raw command, or change or remove `config/claude-account`.
@@ -1096,16 +1096,16 @@ A home that authenticates Claude through environment credentials on purpose shou
 A malformed file, a root that is not a readable directory, or a signed-out account refuses the launch and names the file to fix; Juggernaut never falls back to the ambient account and never changes a global login or copies a credential.
 The spawn prints the pin as `account=` (plus `account_provider=` for Pi) and records the same fields in the task record, so the session-start digest shows which account each worker launched on.
 
-Pins are not inherited into secondmate homes: a local secondmate agent launches on the launching home's pin, while the secondmate's own workers read the secondmate home's files.
-A remote secondmate is launched on its host from its own home's configuration, so create the file in that remote home.
+Pins are not inherited into squad lead homes: a local squad lead agent launches on the launching home's pin, while the squad lead's own workers read the squad lead home's files.
+A remote squad lead is launched on its host from its own home's configuration, so create the file in that remote home.
 
 [`bin/jg-worker-account-lib.sh`](../bin/jg-worker-account-lib.sh) owns parsing, the sign-in check, and the full list of credentials a Claude launch unsets; [runtime backend verification](verification/runtime-backends.md#worker-account-pin-sign-in-check) records the check against the real runners.
-The worker account pool (`config/account-pool` and `relaunch --account`) is owned by the firstmate-addons `account-pool` add-on, not this fork.
+The worker account pool (`config/account-pool` and `relaunch --account`) is owned by the juggernaut-addons `account-pool` add-on, not this fork.
 
 ## Lavish server address (config/lavish-axi-host)
 
 The optional local, gitignored `config/lavish-axi-host` contains one non-empty address without whitespace for the per-machine Lavish server.
-`jg-spawn.sh` exports that address into every new worker and relaunch for opening boards, and the file is inherited into secondmate homes through the primary-authoritative configuration contract.
+`jg-spawn.sh` exports that address into every new worker and relaunch for opening boards, and the file is inherited into squad lead homes through the primary-authoritative configuration contract.
 
 Once a board exists, the process-event adapter derives the polling address from that board's own saved Lavish session instead; its header owns the lookup contract.
 When the file is absent, worker launches do not add a board address and retain the existing ambient-environment behavior.
@@ -1116,11 +1116,11 @@ The address selects the existing shared server; it does not authorize starting o
 ## Lane floor (config/lane-target)
 
 The optional local, gitignored `config/lane-target` holds one positive integer: the number of open lanes this home keeps working while ready backlog work exists.
-It is primary-authoritative inherited configuration, so one value in the main home reaches every secondmate home through [`jg_config_inherit_items`](../bin/jg-config-inherit-lib.sh).
+It is primary-authoritative inherited configuration, so one value in the main home reaches every squad lead home through [`jg_config_inherit_items`](../bin/jg-config-inherit-lib.sh).
 
-An open lane is a `state/<task>.meta` whose `kind` is `ship` or `scout`; a secondmate endpoint's own meta is not a lane of that home.
+An open lane is a `state/<task>.meta` whose `kind` is `ship` or `scout`; a squad lead endpoint's own meta is not a lane of that home.
 
-In a secondmate home, a scan whose home sits below the floor with `jg-tasks-axi.sh ready` work raises one check wake naming the open and target counts and the first ready ids, re-raised while the condition holds every `JG_READY_WORK_RESURFACE_SECS` (1800 by default).
+In a squad lead home, a scan whose home sits below the floor with `jg-tasks-axi.sh ready` work raises one check wake naming the open and target counts and the first ready ids, re-raised while the condition holds every `JG_READY_WORK_RESURFACE_SECS` (1800 by default).
 Ready intake uses the base heartbeat interval independently of idle-heartbeat backoff and runs before an away heartbeat can end the cycle; held and future-dated work stays excluded by the backlog's ready query.
 When the ready set empties on a successful read - every named item since held or in flight - the check withdraws the queued ready-work row, so a notification whose condition no longer holds stops being presented instead of repeating until an acknowledgement that may never come, and it re-raises from scratch only when the condition holds again.
 That empty observation keeps the resurface record, so a transient empty set cannot reset the `JG_READY_WORK_RESURFACE_SECS` window and replay the identical set inside it.
@@ -1131,27 +1131,27 @@ The floor is a floor, not a cap: it never asks a home to stop working above its 
 
 ## Launch environment hook (config/launch-env-hook)
 
-The optional local, gitignored `config/launch-env-hook` is an executable that adds environment to every local launch: ship, scout, secondmate, and relaunch.
+The optional local, gitignored `config/launch-env-hook` is an executable that adds environment to every local launch: ship, scout, squad lead, and relaunch.
 When the file exists and is executable, the pane runs `config/launch-env-hook <out-file>` from the launch directory (the worktree for ship and scout) right before the worker starts, then sources `<out-file>`, which must hold one plain `export` statement.
 It runs before the AI-trailer step in "Commit attribution", so `GIT_CONFIG_*` entries it appends after the inherited `GIT_CONFIG_COUNT` come before the trailer `core.hooksPath` entry.
 A nonzero exit, or an export the pane shell cannot source, stops the launch before the worker runs; an absent file changes nothing, and a present but non-executable file prints a warning at spawn and the launch proceeds without it.
-The hook's content is home-local policy, for example the firstmate-addons `git-identity` add-on, which pins a lane's git identity and pre-push identity check; [`jg-spawn.sh --help`](../bin/jg-spawn.sh) owns the invocation mechanics.
+The hook's content is home-local policy, for example the juggernaut-addons `git-identity` add-on, which pins a lane's git identity and pre-push identity check; [`jg-spawn.sh --help`](../bin/jg-spawn.sh) owns the invocation mechanics.
 
 ## Home brief include (config/brief-include.md)
 
 The optional local, gitignored `config/brief-include.md` carries standing worker instructions that one captain wants on every ship and scout brief, so private brief content needs no edit to a tracked file.
 When the file exists, `bin/jg-brief.sh` appends its text verbatim as the scaffold's last section, `# Home brief additions`, which defers to every other section of the brief, including the ship contract a later scout promotion appends below it.
 An absent or blank file changes nothing, while a present path that is not a readable regular file, or text carrying its own `Delivery contract: mode=` line, stops the scaffold before anything is written.
-The text is static and never executed or expanded; secondmate charters never take it, and the file is local to each home rather than part of secondmate inherited configuration.
+The text is static and never executed or expanded; squad lead charters never take it, and the file is local to each home rather than part of squad lead inherited configuration.
 `bin/jg-brief.sh`'s header owns the placement rule and its safety argument.
 
 ## Worker launch environment (config/launch-env-allowlist)
 
-The optional local, gitignored `config/launch-env-allowlist` limits the ambient environment passed to newly launched workers, scouts, and secondmates, including relaunches.
+The optional local, gitignored `config/launch-env-allowlist` limits the ambient environment passed to newly launched workers, scouts, and squad leads, including relaunches.
 With no file, ambient inheritance remains unfiltered: selected harness markers are cleared, while the provider, long-lived terminal daemon, and shell initialization determine which other variables reach the worker.
 
 Do not assume every worker inherits the invoking Juggernaut process's current environment.
-The file is inherited into secondmate homes through the [primary-authoritative configuration contract](../.agents/skills/secondmate-provisioning/SKILL.md).
+The file is inherited into squad lead homes through the [primary-authoritative configuration contract](../.agents/skills/squad-lead-provisioning/SKILL.md).
 
 Changes apply to subsequent launches; existing processes keep their environment.
 
@@ -1209,8 +1209,8 @@ Regression coverage executes emitted launch commands with synthetic nonsecret va
 
 ### Compact adviser setting
 
-Every operator, scout, and secondmate Juggernaut launches starts with `COMPACT_ADVISER_DISABLE=1` in its environment, on a fresh spawn and on a relaunch alike, so an unattended session never activates the compact adviser.
-This guarantee also covers raw launch commands, remote secondmates, and launches filtered by `config/launch-env-allowlist`; it does not depend on the destination environment already containing the variable.
+Every operator, scout, and squad lead Juggernaut launches starts with `COMPACT_ADVISER_DISABLE=1` in its environment, on a fresh spawn and on a relaunch alike, so an unattended session never activates the compact adviser.
+This guarantee also covers raw launch commands, remote squad leads, and launches filtered by `config/launch-env-allowlist`; it does not depend on the destination environment already containing the variable.
 
 Juggernaut provides no configuration or flag to change this value.
 This applies only to agents Juggernaut launches; the captain's own primary Juggernaut session is never given the variable.
@@ -1219,7 +1219,7 @@ This applies only to agents Juggernaut launches; the captain's own primary Jugge
 
 ### Git editor setting
 
-Every operator, scout, and secondmate Juggernaut launches starts with `GIT_EDITOR=true` and `GIT_SEQUENCE_EDITOR=true` in its environment, on a fresh spawn and on a relaunch alike, so git never opens an interactive editor in an unattended worker pane.
+Every operator, scout, and squad lead Juggernaut launches starts with `GIT_EDITOR=true` and `GIT_SEQUENCE_EDITOR=true` in its environment, on a fresh spawn and on a relaunch alike, so git never opens an interactive editor in an unattended worker pane.
 This guarantee also covers raw launch commands and launches filtered by `config/launch-env-allowlist`; it does not depend on the destination environment already containing either variable.
 [`jg-spawn.sh --help`](../bin/jg-spawn.sh) owns the delivery mechanics, with focused regression coverage in [`tests/jg-spawn-compact-adviser-disable.test.sh`](../tests/jg-spawn-compact-adviser-disable.test.sh).
 
@@ -1232,14 +1232,14 @@ When the flag is present, Claude launches omit those attribution-off settings, D
 `bin/jg-git-strip-ai-trailers.sh` owns the identities, the install, and chaining the hooks of whichever repository git is running in, including when `git -c core.hooksPath` supplies the pane's hook override, so a project hook such as husky still runs when stripping is enabled.
 A repository whose config sets `core.hooksPath` to the empty string runs no project hook, as in plain git; if the wrapper otherwise cannot resolve that repository's hooks directory, the git operation fails rather than silently skipping a project hook such as a pre-push guard.
 When stripping is enabled, the hooks directory is read-only, so a hook manager run inside a fleet pane (lefthook's npm postinstall, `pre-commit install`) fails instead of displacing the strip; install a project's hooks from outside the pane, where the wrappers chain them.
-The flag is a home-wide attribution choice, so it is inherited into secondmate homes under the [`secondmate-provisioning`](../.agents/skills/secondmate-provisioning/SKILL.md) inherited-local-material contract and a secondmate's own workers keep AI trailers too.
+The flag is a home-wide attribution choice, so it is inherited into squad lead homes under the [`squad-lead-provisioning`](../.agents/skills/squad-lead-provisioning/SKILL.md) inherited-local-material contract and a squad lead's own workers keep AI trailers too.
 Per-machine Cursor `cli-config.json` attribution-off is not this contract: it does not travel with Juggernaut, defaults back to on when unset, and only feeds the CLI's request to the server, so it suppresses the trailer rather than preventing it.
 
 ## Project capacity (config/project-capacity)
 
 The optional local, gitignored `config/project-capacity` tells Juggernaut how many workers a project can run at once on this machine, for a project whose machine-local resource - a heavy test suite, a local editor stack, a device - only serves a few workers at a time.
 Without it, dispatch stays uncapped as `AGENTS.md` section 7 describes, and a surplus worker is launched only to spend full-context turns waiting for the resource.
-The file lives in the machine's root Juggernaut home, so every local secondmate home reads the same limit, and it holds one line per project:
+The file lives in the machine's root Juggernaut home, so every local squad lead home reads the same limit, and it holds one line per project:
 
 ```text
 # heavy suite serves two workers
@@ -1250,7 +1250,7 @@ The name is the project's registered name, which is its clone directory name and
 A line that is only `#`, or that begins with `#` followed by whitespace, is a comment, as is a `#` line whose last field is not an integer.
 A project name may begin with `#` when that `#` is written immediately against the rest of the name and the line ends with the project's capacity.
 A name that is `#`, or that begins with `#` and a space, cannot be declared, because that line is a comment.
-A place is held by every ship or scout on that project in the root home or any local secondmate home registered under it, including one working in a separate clone of the same origin, until its ready PR is recorded or it is cleaned up; a local-only ship or a scout holds its place until cleanup.
+A place is held by every ship or scout on that project in the root home or any local squad lead home registered under it, including one working in a separate clone of the same origin, until its ready PR is recorded or it is cleaned up; a local-only ship or a scout holds its place until cleanup.
 The declaration is matched by the spawning clone's directory name, so clones of the same origin share the cap only when they use that same directory name.
 A clone of that origin under a different directory name finds no declaration and is not capped, though its workers are still counted as holders for a same-origin clone that is capped.
 When every place is held, `bin/jg-spawn.sh` launches nothing, creates no record, leaves the backlog item queued, prints one `deferred:` line naming the holders, and exits 75, so Juggernaut dispatches the item again once a place frees.
@@ -1268,7 +1268,7 @@ Juggernaut resolves the rule's profile object or array under `AGENTS.md` section
 
 - When the file exists, `jg-spawn.sh` enforces that contract by refusing operator and scout spawns that lack an explicit harness (`--harness`, a positional adapter, or a raw launch command).
 - Batch spawns satisfy the same requirement with a shared `--harness`.
-- Secondmate spawns are exempt and still resolve through the per-mate pin or the global `config/secondmate-harness`, including the resolved model and effort tokens.
+- Squad Lead spawns are exempt and still resolve through the per-mate pin or the global `config/squad-lead-harness`, including the resolved model and effort tokens.
 
 **Contract owners**
 
@@ -1286,7 +1286,7 @@ This section is the single owner of the canonical schema and its per-field seman
       "use": [
         { "harness": "<adapter>", "model": "<optional model>", "effort": "<low|medium|high|xhigh|max|ultra, optional>", "provider": "<optional quota-axi provider>", "floor": { "scope": "<quota-axi scope>", "min_percent": 50 } }
       ],
-      "why": "<optional rationale that helps firstmate choose>"
+      "why": "<optional rationale that helps juggernaut choose>"
     }
   ],
   "default": [
@@ -1347,10 +1347,10 @@ This single-provider table is separate from the frozen legacy mapping used by `j
 - `ultra` is native-only: the model-aware validation contract and launch mapping are owned by `bin/jg-harness.sh validate-native-effort` and `bin/jg-spawn.sh` respectively.
 - Codex `max` is valid when the profile selects `gpt-5.6-luna`, whose installed catalog entry supports that reasoning level.
 - An omitted model or effort means the selected harness uses its own default for that axis.
-- Juggernaut's OpenCode ship, scout, secondmate, and relaunch commands pre-approve tool permissions and external-directory access, including steering inboxes outside the worktree and unrelated scratch paths such as `/tmp`; the grant is not a task-path allowlist or a worktree isolation boundary.
+- Juggernaut's OpenCode ship, scout, squad lead, and relaunch commands pre-approve tool permissions and external-directory access, including steering inboxes outside the worktree and unrelated scratch paths such as `/tmp`; the grant is not a task-path allowlist or a worktree isolation boundary.
   This per-launch permission policy is retained with or without model and effort selections; `bin/jg-spawn.sh`'s `launch_template()` owns the exact configuration, and `tests/jg-spawn-dispatch-profile.test.sh` covers its generated launches.
 - OpenCode receives the effort as its default `build` agent's `variant`, keyed to the resolved model, inside the `OPENCODE_CONFIG_CONTENT` JSON its launch already writes (the per-model reasoning-effort field of the config schema, verified on opencode 1.18.32); with no model resolved, the effort is recorded in task metadata but omitted from the launch.
-- A Juggernaut OpenCode launch with a model from a provider other than `opencode` gets its own session store, `firstmate-<12-hex home token>-<task id>.db`, inside OpenCode's data directory, so concurrent workers stop locking one shared `opencode.db`.
+- A Juggernaut OpenCode launch with a model from a provider other than `opencode` gets its own session store, `juggernaut-<12-hex home token>-<task id>.db`, inside OpenCode's data directory, so concurrent workers stop locking one shared `opencode.db`.
   A relaunch of the same task in the same home reopens that store.
   An `opencode-go/*` launch also gets that store when OpenCode's `auth.json` in its data directory carries an `opencode-go` entry, because that provider's key lives in the file rather than in the shared store, so the fresh store bills the Go key instead of the console account.
   Without that entry, an `opencode-go` launch, an `opencode` console-account launch, and any launch with no model keep the shared store, because their account credentials live there.
@@ -1373,7 +1373,7 @@ See [`docs/examples/crew-dispatch.json`](examples/crew-dispatch.json) for a star
 
 **Inheritance**
 
-Secondmate homes inherit this file from the primary, so a secondmate's own operators apply the same dispatch profile behavior.
+Squad Lead homes inherit this file from the primary, so a squad lead's own operators apply the same dispatch profile behavior.
 
 ## Typed dispatch resolution (.env TYPESAFE_API_KEY)
 
@@ -1407,7 +1407,7 @@ The scaffold's standard setup, rules, and definition-of-done text is the same in
 
 The optional local, gitignored `config/dispatch-never-send` keeps values you name from ever leaving the machine in a resolver request.
 It has no default entries, and an absent file changes nothing.
-Like `config/crew-dispatch.json`, it is inherited into secondmate homes, so a secondmate's resolver withholds the same values.
+Like `config/crew-dispatch.json`, it is inherited into squad lead homes, so a squad lead's resolver withholds the same values.
 
 Each non-blank line not beginning with `#` is one literal value, matched case-insensitively.
 Every entry is trimmed of surrounding whitespace, and any run of whitespace, in the entry or in the checked text, counts as one space, so a value the brief wraps across lines still matches.
@@ -1569,26 +1569,26 @@ On that signature only, `jg-fleet-sync.sh` retries the fetch with a bounded wait
 
 It never removes a live lock, leaves any other failure shape untouched, and prints every wait, retry, and removal to stderr plus a one-line `recovered:` summary to stdout on success so that this session-start relay still surfaces the recovery.
 
-**Secondmate sync at startup**
+**Squad Lead sync at startup**
 
 The same deferred network stage performs guarded tracked-file sync and propagates declared inherited local material into each validated live home under that sequencing contract.
 Local routes use direct guarded filesystem operations, while remote routes delegate sync and allowlisted transfer through their configured SSH host without probing any unconfigured fleet.
 A tracked-file fast-forward that fails on the home's own orphaned `index.lock` signature is retried once after the shared lock-staleness proof clears the lock, while an unproven lock or any other failure keeps the skip.
 
-- It emits `SECONDMATE_SYNC:` only when a home was skipped for an actionable sync reason, inheritance failed, or a divergent shared captain-preference copy was quarantined.
+- It emits `SQUAD LEAD_SYNC:` only when a home was skipped for an actionable sync reason, inheritance failed, or a divergent shared captain-preference copy was quarantined.
 - When a running home advances and its loaded instruction surface (`AGENTS.md`, `bin/`, or `.agents/skills/`) changed, bootstrap sends the re-read nudge itself through the stable `jg-<id>` selector and reports the exact completed send as `BOOTSTRAP_INFO:`.
-- If that send fails, bootstrap keeps an idempotent retry marker and emits `NUDGE_SECONDMATES:` with the failure reason.
-- The same bootstrap run emits `SECONDMATE_LIVENESS:` only when a registered secondmate is skipped or its relaunch fails; already-live and successfully relaunched secondmates are handled silently.
+- If that send fails, bootstrap keeps an idempotent retry marker and emits `NUDGE_SQUAD LEADS:` with the failure reason.
+- The same bootstrap run emits `SQUAD LEAD_LIVENESS:` only when a registered squad lead is skipped or its relaunch fails; already-live and successfully relaunched squad leads are handled silently.
 
 **Push inherited configuration during a session**
 
 For a mid-session inherited local-material edit where tracked-file sync is not needed, run `bin/jg-config-push.sh`.
-It uses the same live secondmate discovery and propagation helper as bootstrap; its [help](../bin/jg-config-push.sh) owns reporting and exit semantics, and [`jg_config_inherit_items`](../bin/jg-config-inherit-lib.sh) declares the inherited items.
+It uses the same live squad lead discovery and propagation helper as bootstrap; its [help](../bin/jg-config-push.sh) owns reporting and exit semantics, and [`jg_config_inherit_items`](../bin/jg-config-inherit-lib.sh) declares the inherited items.
 
-- When an allowlisted config item changes for an already-running local home, it sends the literal-content reread pointer described in [`secondmate-provisioning`](../.agents/skills/secondmate-provisioning/SKILL.md); unchanged allowlisted config sends no pointer unless a previous delivery is pending.
+- When an allowlisted config item changes for an already-running local home, it sends the literal-content reread pointer described in [`squad-lead-provisioning`](../.agents/skills/squad-lead-provisioning/SKILL.md); unchanged allowlisted config sends no pointer unless a previous delivery is pending.
 - A changed remote home instead receives one durably recorded marked re-read instruction after the allowlisted bytes have transferred because primary-local generation paths are not meaningful on another host.
-- The locked bootstrap inheritance pass uses the same placement-specific behavior; see `secondmate-provisioning` for the single contract owner.
-- That live discovery starts from `state/*.meta` records with `kind=secondmate`; `data/secondmates.md` only backfills `home=` for older or incomplete meta records.
+- The locked bootstrap inheritance pass uses the same placement-specific behavior; see `squad-lead-provisioning` for the single contract owner.
+- That live discovery starts from `state/*.meta` records with `kind=squad lead`; `data/squad leads.md` only backfills `home=` for older or incomplete meta records.
 - Skipped items, such as a destination checkout that does not yet gitignore the item, are visible warnings but not hard failures.
 
 ## Forge selection (data/projects.md forge= token)
@@ -1665,7 +1665,7 @@ Arm the check once per home with `bin/jg-tool-update-check.sh arm`.
 - The check prints nothing when everything is current, and `state/.tool-updates` records the findings the last report was made from so the same pending update is reported once instead of on every poll.
 - A changed or returning condition is reported again.
 - Adding, removing, or changing a watched tool is an edit to this file and needs no code change or re-arming.
-- This file is not inherited by secondmate homes, so each home watches the tools it actually depends on.
+- This file is not inherited by squad lead homes, so each home watches the tools it actually depends on.
 
 **Probe timing and limits**
 
@@ -1730,7 +1730,7 @@ A fail-closed poll that already queued a wake, and a timeout, always print so th
 ## Relay (.env)
 
 Relay lets a Juggernaut instance answer public mentions and act on normal reversible mention requests through Juggernaut's normal lifecycle.
-It covers both public surfaces the relay supports: `@myfirstmate` mentions on X, and mentions of the myfirstmate bot in a Discord server where it is installed.
+It covers both public surfaces the relay supports: `@myjuggernaut` mentions on X, and mentions of the myjuggernaut bot in a Discord server where it is installed.
 
 Both surfaces are the same opt-in and the same machinery - one pairing token, one relay poll, and one reply path - so everything below applies to Discord mentions unless a line names a platform explicitly.
 
@@ -1744,18 +1744,18 @@ The relay uses owner-only routing: a mention delivered to a home is from that ho
 
 **Endpoint and environment overrides**
 
-`FMX_RELAY_URL` is optional and defaults to `https://myfirstmate.io`, mainly for developers pointing at a local relay.
+`FMX_RELAY_URL` is optional and defaults to `https://myjuggernaut.io`, mainly for developers pointing at a local relay.
 For direct client invocations, environment values override `.env`; bootstrap activation still keys off `.env` presence so watcher artifacts are explicit local opt-in state.
 
 `FMX_ENV_FILE` can point direct poll/reply client invocations at another `.env`-style file, but it does not change bootstrap activation.
 
 To turn it on:
 
-1. Sign in at [myfirstmate.io](https://myfirstmate.io) with X or Discord.
-2. For the Discord surface, use the dashboard's install link to add the myfirstmate bot to a server you administer; the X surface needs no install step.
+1. Sign in at [myjuggernaut.io](https://myjuggernaut.io) with X or Discord.
+2. For the Discord surface, use the dashboard's install link to add the myjuggernaut bot to a server you administer; the X surface needs no install step.
 
 3. Copy the pairing token from the dashboard into this Juggernaut home's gitignored `.env` as `FMX_PAIRING_TOKEN=<token>`.
-4. Start a new Juggernaut session so bootstrap picks the token up, then mention `@myfirstmate` on X or mention the bot in a server where it is installed.
+4. Start a new Juggernaut session so bootstrap picks the token up, then mention `@myjuggernaut` on X or mention the bot in a server where it is installed.
 
 The dashboard owns account creation, identity linking, bot installation, and token issuance; this document owns only what the local Juggernaut home does with the token once it is in `.env`.
 
@@ -1852,10 +1852,10 @@ This is what keeps a delayed request-id follow-up on the original platform's bud
 **Link tasks and handle missing context**
 
 The link lives in the current home's `state/<task-id>.meta`.
-Work routed to a secondmate has no record here, so `bin/jg-x-link.sh` refuses to link it.
-When possible, the refusal names the registered secondmate home containing the task.
+Work routed to a squad lead has no record here, so `bin/jg-x-link.sh` refuses to link it.
+When possible, the refusal names the registered squad lead home containing the task.
 
-It also points to `bin/jg-public-followup.sh register ... --work-home secondmate:<id>`.
+It also points to `bin/jg-public-followup.sh register ... --work-home squad lead:<id>`.
 This promised-final path is the only follow-up mechanism that binds work in another home.
 `bin/jg-x-link.sh` uses the same order when recording a fresh link's context and requires `jq`.
 Its request-context lookup is best-effort.
@@ -1969,7 +1969,7 @@ Work routed elsewhere reports a typed terminal result with `bin/jg-public-follow
 
 **Clear legacy links in remote homes**
 
-When that work lives in a REMOTE secondmate home, delivery clears its bound legacy link after validating the public receipt, while retirement clears the link before closing the loop, and both clears run over that route's SSH transport.
+When that work lives in a REMOTE squad lead home, delivery clears its bound legacy link after validating the public receipt, while retirement clears the link before closing the loop, and both clears run over that route's SSH transport.
 Readable remote state proving that no link exists succeeds without a write.
 A present link is cleared only when its Relay request identity matches the registration and the state is writable.
 Any of these conditions retains the loop for reconciliation:
@@ -1987,10 +1987,10 @@ When bound work ends failed or parked, its typed failed result remains deliverab
 
 **Collect results across machines**
 
-Work bound to a REMOTE secondmate home reports across a machine boundary, where no local path reaches the owning home.
+Work bound to a REMOTE squad lead home reports across a machine boundary, where no local path reaches the owning home.
 
 - `bin/jg-public-followup.sh brief` therefore prints that worker the route's own code root and home with `--stage-in`, so the typed result is staged in `outbox/` in the home where the work actually runs rather than written to a path that only exists on the owning machine.
-- The owning home collects staged results for open registrations over the same SSH route it reaches that secondmate on, because that transport only runs in the outbound direction: `consume` pulls them into its own `events/` and then reconciles them exactly as it reconciles a local report.
+- The owning home collects staged results for open registrations over the same SSH route it reaches that squad lead on, because that transport only runs in the outbound direction: `consume` pulls them into its own `events/` and then reconciles them exactly as it reconciles a local report.
 - Non-open registrations owe no result, so `consume` skips them without contacting their routes; an open registration whose reachable route has nothing staged remains pending without an error.
 - Collection is non-destructive until the result is durably held, and the staged copy is retired only afterwards, so a dropped connection can never lose a terminal result.
 - For an open registration, a work home that cannot be reached is named in `consume`'s output and keeps the promise open; it is never reported as an empty inbox.
@@ -2061,28 +2061,28 @@ The shipped `file-signal` package is a complete neutral example.
 Copy it to a persistent directory outside every Git project or task copy, then bind and verify it:
 
 ```sh
-mkdir -p "$HOME/.local/share/firstmate-packages"
+mkdir -p "$HOME/.local/share/juggernaut-packages"
 cp -R docs/examples/process-event-extension \
-  "$HOME/.local/share/firstmate-packages/file-signal"
+  "$HOME/.local/share/juggernaut-packages/file-signal"
 bin/jg-extension.sh bind \
-  "$HOME/.local/share/firstmate-packages/file-signal" \
+  "$HOME/.local/share/juggernaut-packages/file-signal" \
   --adapter file-signal \
   --trust-same-user-code \
   --consent artifact-references
 bin/jg-extension.sh list
-bin/jg-extension.sh inspect org.firstmate.example.file-signal
-bin/jg-extension.sh verify org.firstmate.example.file-signal
+bin/jg-extension.sh inspect org.juggernaut.example.file-signal
+bin/jg-extension.sh verify org.juggernaut.example.file-signal
 ```
 
 Use an absent destination for the copy so the source identity remains inspectable and reproducible.
-For a non-default home, set `JG_HOME=<that-home>` on every command; local and remote secondmate homes bind the package independently, and bindings are not inherited.
+For a non-default home, set `JG_HOME=<that-home>` on every command; local and remote squad lead homes bind the package independently, and bindings are not inherited.
 
-**Bind on a remote secondmate**
+**Bind on a remote squad lead**
 
-For a configured remote secondmate, keep the package at the controller and transfer it through the authenticated `jg-on` route:
+For a configured remote squad lead, keep the package at the controller and transfer it through the authenticated `jg-on` route:
 
 ```sh
-bin/jg-extension.sh remote-bind <secondmate-id> \
+bin/jg-extension.sh remote-bind <squad-lead-id> \
   /absolute/controller/path/to/file-signal \
   --adapter file-signal \
   --trust-same-user-code \
@@ -2090,11 +2090,11 @@ bin/jg-extension.sh remote-bind <secondmate-id> \
 ```
 
 The command serializes only the validated extension package, stages it below the addressed remote home's fixed extension staging root, binds it there, and prints transfer and binding digests.
-Registration uses `bin/jg-on.sh <secondmate-id> jg-procevent.sh ...`.
+Registration uses `bin/jg-on.sh <squad-lead-id> jg-procevent.sh ...`.
 
 **Retire a binding**
 
-After retiring every registration with its printed owner token and handling every captured result, retire the enabled remote binding and its exact staged transfer together with `bin/jg-on.sh <secondmate-id> jg-extension.sh retire-transfer <extension-id> --if-transfer-digest <transfer-digest> --if-binding-digest <binding-digest>`.
+After retiring every registration with its printed owner token and handling every captured result, retire the enabled remote binding and its exact staged transfer together with `bin/jg-on.sh <squad-lead-id> jg-extension.sh retire-transfer <extension-id> --if-transfer-digest <transfer-digest> --if-binding-digest <binding-digest>`.
 For a direct local binding, use `bin/jg-extension.sh retire-binding <extension-id> --if-binding-digest <binding-digest>` after the same process-event retirement and handling steps.
 
 Both commands retain the retired identity reversibly and leave unrelated bindings and content-addressed installed packages unchanged.
@@ -2206,15 +2206,15 @@ The (condition, action) spec is stored privately under `state/when/` and hash-bo
 A repo update that fast-forwards an in-repo action's bytes in place would otherwise desync every already-armed watch's trust binding with no tampering involved; `bin/jg-procevent-when.sh rebind-all` re-hashes and republishes the binding for every registered watch whose action lives under `JG_ROOT`, including one already polling, so it keeps firing across such an update instead of being refused on its next fire.
 
 Every failure path - a mutated spec or action executable, a condition error past its budget, an expired deadline, a failed action, or an earlier fire whose outcome was never captured - produces a terminal captured outcome that wakes Juggernaut rather than a silent retry, and a durable single-fire marker claimed before the action makes restarts and re-polls unable to fire it twice.
-The adapter automates only the exact deterministic subset: anything needing judgment, and anything destructive, irreversible, or security-sensitive, keeps the ordinary check-fires-then-firstmate-decides flow, and the adapter's header and `--help` own its commands, flags, and outcome document.
+The adapter automates only the exact deterministic subset: anything needing judgment, and anything destructive, irreversible, or security-sensitive, keeps the ordinary check-fires-then-juggernaut-decides flow, and the adapter's header and `--help` own its commands, flags, and outcome document.
 
 **Sign-off board answers and hold cards**
 
 The `signoff` adapter (`bin/jg-procevent-signoff.sh`) connects captain holds to a [sign-off](https://github.com/umeranjum17/sign-off) decision board, and it does nothing until a home runs its `arm` command.
 Armed, it binds itself to the keyed-answer intake above and registers one source whose child waits in `sign-off-axi wait` without waking Juggernaut.
-Arming is per home: a secondmate home arms itself, and a hold recorded in a home that is not armed raises no card.
+Arming is per home: a squad lead home arms itself, and a hold recorded in a home that is not armed raises no card.
 An answer saved on the board for a task this home still holds for the captain is captured, woken as an ordinary `check` wake, and fed to `bin/jg-captain-hold.sh answers`, so the person never copies the answer across by hand.
-While armed, `bin/jg-captain-hold.sh hold` also raises a board card for that hold; when the firstmate-addons `signoff` add-on is installed (under `JG_ADDONS_DIR`, else `projects/firstmate-addons`), the card goes through that add-on's script instead of this adapter, and the card rules below describe this adapter. Its title is the reason's last `?` sentence, or its first sentence when it has no `?`, with leading `[tag]`, `Captain hold:`, `Captain:` and `Say yes or no:` prefixes dropped, cut to 12 words and ending in one `?` (built from the task title only when nothing remains); its why is the whole reason followed by `Answer yes or no. The hold stays open until you answer.`, the reason cut so the whole why stays within 200 characters; its outcomes are yes or no. A card that cannot be raised makes `hold` exit non-zero with the sign-off-axi error on stderr while the hold stays recorded; a task held again whose card is already answered reuses that card, a task held again with a changed question keeps its existing card and exits zero, and a dated deferral gets no card.
+While armed, `bin/jg-captain-hold.sh hold` also raises a board card for that hold; when the juggernaut-addons `signoff` add-on is installed (under `JG_ADDONS_DIR`, else `projects/juggernaut-addons`), the card goes through that add-on's script instead of this adapter, and the card rules below describe this adapter. Its title is the reason's last `?` sentence, or its first sentence when it has no `?`, with leading `[tag]`, `Captain hold:`, `Captain:` and `Say yes or no:` prefixes dropped, cut to 12 words and ending in one `?` (built from the task title only when nothing remains); its why is the whole reason followed by `Answer yes or no. The hold stays open until you answer.`, the reason cut so the whole why stays within 200 characters; its outcomes are yes or no. A card that cannot be raised makes `hold` exit non-zero with the sign-off-axi error on stderr while the hold stays recorded; a task held again whose card is already answered reuses that card, a task held again with a changed question keeps its existing card and exits zero, and a dated deferral gets no card.
 Each hold occurrence gets its own card, so a task held again after an answered card gets a new live one.
 The adapter needs `sign-off-axi` on PATH: `arm` refuses without it, and the card attempt prints an install hint.
 Board keys carry a digest of this home's `JG_HOME` and the hold's stamp, so the machine's one shared board never delivers another home's answer or an earlier card's answer to this one.
@@ -2234,7 +2234,7 @@ This section is the single owner of the runner's operating contract.
 - A durable handled acknowledgement stops future source re-announcement, while a record already queued remains under the durable queue's authority until the ordinary drain's sequence-bound post-handling acknowledgement consumes it.
 - By default, a runner releases its claim after one poll; an adapter that opts into `relisten` keeps that runner and claim across empty waits and captured results, adopting a replacement registration only when the registered command is unchanged and the claim still belongs to it.
   A failed relisten check releases the claim; the runner never refreshes its own home lease.
-  The `bin/jg-procevent.sh` header owns the exact seam, and [remote secondmates](remote-secondmates.md#how-remote-lines-are-mirrored) owns the reply listener's behavior.
+  The `bin/jg-procevent.sh` header owns the exact seam, and [remote squad leads](remote-squad-leads.md#how-remote-lines-are-mirrored) owns the reply listener's behavior.
 
 **Reconcile sources**
 
@@ -2300,8 +2300,8 @@ The built-in `bin/jg-procevent-<adapter>.sh self-announcing` command declares an
 | Exit 0 | The adapter declares that every result its autohandle fully applies is announced through its own durable downstream channel; the runner applies first, then publishes a `check` wake only for results still unhandled. |
 | Any other response | Keep strict publish-before-apply ordering; autohandle runs only after this capture's own wake was successfully appended to the durable queue. |
 
-The remote-secondmate reply adapter declares itself self-announcing: a captured reply reaches its local status mirror and settles its correlated pending-reply expectation without any handler step, the mirrored status bytes are the single wake for one remote note through the same signal classification a local secondmate's append gets, and only a capture the adapter could not fully apply is published as a `check` wake, whose adapter handling remains idempotent.
-The [remote-secondmate channel contract](remote-secondmates.md#normal-operation) owns replay suppression and its bounded upgrade exception; a replay that adds no mirror bytes stays quiet.
+The remote-squad-lead reply adapter declares itself self-announcing: a captured reply reaches its local status mirror and settles its correlated pending-reply expectation without any handler step, the mirrored status bytes are the single wake for one remote note through the same signal classification a local squad lead's append gets, and only a capture the adapter could not fully apply is published as a `check` wake, whose adapter handling remains idempotent.
+The [remote-squad-lead channel contract](remote-squad-leads.md#normal-operation) owns replay suppression and its bounded upgrade exception; a replay that adds no mirror bytes stays quiet.
 
 **Feed keyed captain answers**
 
@@ -2323,7 +2323,7 @@ Some built-in sources carry the captain's answer to a captain-held task, and wha
 
 Ownership is machine-wide per canonical source, because separate homes can share one underlying source store.
 
-- Claims live under `$XDG_STATE_HOME/firstmate/procevent-claims` (override with `JG_PROCEVENT_CLAIM_ROOT`).
+- Claims live under `$XDG_STATE_HOME/juggernaut/procevent-claims` (override with `JG_PROCEVENT_CLAIM_ROOT`).
 - Each claim binds its caller-reported home and runner PID to a process identity, unique claim generation, exact registration-file generation, and resolved state-root identity.
 - Registration, acquisition, replacement, retirement, and generation-bound release are serialized at one machine-wide boundary per source.
 - A live identity-matched owner is never displaced, and release removes only the exact generation the caller acquired.
@@ -2391,9 +2391,9 @@ Making any of them a precondition is what leaves a provably dead runner owning i
 - Identity and process-group verification cannot be made atomic with signalling in portable shell: the reaper signals only a target it has verified as the recorded generation, but PID and group reuse remain possible in the narrow interval between verification and the signal.
 - Launch pacing is the primary host-wedge protection; watchdog cleanup is a backstop.
 
-**Retire a secondmate home**
+**Retire a squad lead home**
 
-- Supported secondmate retirement preflights each target home's bounded `sweep-home` command before destructive teardown, snapshots its registrations outside the target, then runs the sweep at that home's final deletion or return boundary.
+- Supported squad lead retirement preflights each target home's bounded `sweep-home` command before destructive teardown, snapshots its registrations outside the target, then runs the sweep at that home's final deletion or return boundary.
 - If deletion or return fails, teardown restores those registrations and reconciles them before returning the refusal.
 - If restoration or rearming also fails, teardown returns a distinct status and reports the retained registration backup path for manual recovery instead of hiding the retired waits.
 - The sweep retires local registrations and machine-wide claims whose recorded state-root identity matches that home's resolved state root through the same identity-checked, generation-bound retirement path, and leaves foreign-home claims untouched.
@@ -2556,11 +2556,11 @@ JG_PROC_ROOT_OVERRIDE=   # alternate /proc root for Linux process-identity reads
 JG_BACKEND=             # optional runtime backend override for new spawns; tmux/herdr/zellij/orca/cmux support ship/scout spawns, codex-app is not accepted
 JG_TRACE_CONTEXT=       # optional trace-context override; see "Trace context propagation"
 JG_TASK_ID=             # internal task-worker marker jg-spawn.sh exports into ship and scout panes, never set by hand; bin/jg-test-run.sh refuses to execute in the repository primary checkout while it is set
-JG_TASK_INBOX=          # internal: absolute path of the task's steering inbox (state/<id>.inbox) that jg-spawn.sh exports into every ship, scout, and secondmate launch, never set by hand; the steering doorbell names "$JG_TASK_INBOX"
+JG_TASK_INBOX=          # internal: absolute path of the task's steering inbox (state/<id>.inbox) that jg-spawn.sh exports into every ship, scout, and squad lead launch, never set by hand; the steering doorbell names "$JG_TASK_INBOX"
 HERDR_SESSION=default  # herdr-only: named session for normal backend ops; not enough for destructive cleanup (docs/herdr-backend.md)
 JG_BACKEND_HERDR_SUBMIT_POLLS=6  # herdr-only: agent-state samples spread across each Enter attempt's budget when confirming a submit (docs/herdr-backend.md "Current transport behavior")
 JG_BACKEND_HERDR_SUBMIT_MIN_SLEEP=0.6  # herdr-only: minimum per-Enter confirmation budget before polling agent-state after an idle baseline
-JG_ZELLIJ_SESSION=firstmate  # zellij-only: named session for normal backend ops and test isolation (docs/zellij-backend.md)
+JG_ZELLIJ_SESSION=juggernaut  # zellij-only: named session for normal backend ops and test isolation (docs/zellij-backend.md)
 CMUX_SOCKET_PASSWORD=   # cmux-only: socket password fallback when config/cmux-socket-password is absent (docs/cmux-backend.md)
 JG_SESSION_START_STATUS_TAIL=5   # state/*.status lines printed per task in the session-start digest; each line is capped by bin/jg-line-cap-lib.sh
 JG_SESSION_START_QUEUED_LIMIT=20   # plain queued backlog rows in the session-start digest; in-flight, held, and blocked rows are never bounded and done rows are never listed
@@ -2580,7 +2580,7 @@ JG_HOME_SUMMARY_FAILURE_REPORT=2   # recorded publication failures since the led
 JG_SNAPSHOT_CREW_STATE_TIMEOUT=10   # seconds bounding each local per-task current-state read inside bin/jg-fleet-snapshot.sh; remote endpoint liveness is not probed on the snapshot path
 JG_SNAPSHOT_LOCAL_READ_CONCURRENCY=8   # maximum local tasks whose current-state and endpoint observations are collected concurrently during snapshot composition
 JG_SNAPSHOT_BUDGET=5                # one total seconds budget for all concurrent remote home-ledger reads
-JG_SNAPSHOT_CACHE_DIR=$JG_HOME/state/secondmate-summary-cache   # private parent-side cache of successfully fetched remote home ledgers
+JG_SNAPSHOT_CACHE_DIR=$JG_HOME/state/squad-lead-summary-cache   # private parent-side cache of successfully fetched remote home ledgers
 JG_SNAPSHOT_UNDATED_HOLD_AGE_DAYS=14  # floored elapsed-day threshold at which an undated captain hold (no hold-until; age from its UTC hold-set timestamp, falling back to since for legacy unstamped holds) is projected as a Charted Next gate instead of a live Captain's Call; 0 applies once the computed age is non-negative
 JG_RECONCILE_REQUEST_MAX_BYTES=1048576   # maximum captured Bearings or fleet snapshot accepted for durable reconcile-notify request publication
 JG_HEARTBEAT=600        # base seconds between heartbeat scans; no-change heartbeats are absorbed while idle
@@ -2600,7 +2600,7 @@ JG_TOOL_UPDATE_PROBE_SECS=5   # 1..30 seconds allowed for one version or git pro
 JG_TOOL_UPDATE_BUDGET_SECS=20   # 1..120 seconds allowed for a whole watched-tool sweep; cut to fit JG_CHECK_TIMEOUT, and the cut is reported
 JG_TOOL_UPDATE_NOW=     # test override for the watched-tool sweep clock; the sweep budget still uses real time
 JG_PROCEVENT_MAX_OUTPUT_BYTES=1048576   # bound on one captured process-to-event result
-JG_PROCEVENT_CLAIM_ROOT=                # machine-wide source claim root; default $XDG_STATE_HOME/firstmate/procevent-claims
+JG_PROCEVENT_CLAIM_ROOT=                # machine-wide source claim root; default $XDG_STATE_HOME/juggernaut/procevent-claims
 JG_PROCEVENT_OWNER_LEASE_SECONDS=600    # how long a source runner keeps going with no activity in its owning home; 1..86400
 JG_PROCEVENT_OWNER_CHECK_SECONDS=15     # a runner guard's detection interval, read twice per interval; 1..3600
 JG_PROCEVENT_LAUNCH_FLOOR_SECONDS=1     # minimum interval between launches of one registration generation's source command; 1..3600
@@ -2620,7 +2620,7 @@ JG_IMAP_PORT=993   # mail-plane IMAP server port
 JG_SMTP_HOST=      # mail-plane SMTP server hostname
 JG_SMTP_PORT=465   # mail-plane SMTP server port
 FMX_PAIRING_TOKEN=      # Relay pairing token; .env opt-in authorizes replies and eligible lifecycle actions
-FMX_RELAY_URL=https://myfirstmate.io   # optional Relay endpoint override, mainly for local relay development
+FMX_RELAY_URL=https://myjuggernaut.io   # optional Relay endpoint override, mainly for local relay development
 FMX_ENV_FILE=           # optional alternate .env file for direct Relay client invocations; bootstrap still checks $JG_HOME/.env
 FMX_DRY_RUN=            # truthy previews Relay replies and dismissals to state/x-outbox/ without posting or requiring a token
 FMX_X_REPLY_MAX_CHARS=280   # X reply per-message split budget; values below 50 clamp to 50
@@ -2660,17 +2660,17 @@ JG_CLASSIFY_PAUSED_VERB=paused     # leading declared-wait status verb; bin/jg-c
 JG_STALE_ESCALATE_SECS=240         # no-activity seconds before a provably-working stale pane escalates (docs/architecture.md owns activity absorption and validation-execution rechecks), unless that pane's own worker declared a wait that has not elapsed, or, where config/wedge-defer-parked-gate arms it, that pane's crew is parked at a validation gate awaiting the supervisor's decision on it that the crew raised under that run's key and nobody has answered yet, either of which takes the JG_PAUSE_RESURFACE_SECS recheck below instead; stale panes whose crew is not provably working surface immediately unless admitted directly to the declared-wait cadence, while a live idle declared wait still surfaces once before that cadence bounds repeats; at that same escalation moment a recovery-grade agent-state probe (docs/architecture.md owns that dead-record contract) reports a pane whose endpoint is proven `dead` or `missing` once and stops re-escalating it while it stays that way
 JG_BUSY_TURN_MAX_SECS=3600         # maximum age without activity (busy_turn_over_age in bin/jg-watch.sh owns marker selection), before the same wedge escalation used for a provably-working non-busy stale takes over; inspection-only, never an automatic interrupt or restart; a declared external wait, an attended verified captain-held transfer, or - where config/wedge-defer-parked-gate arms it - a validation gate of the crew's own awaiting the supervisor's still-unanswered decision takes the JG_PAUSE_RESURFACE_SECS recheck below instead
 JG_PAUSE_RESURFACE_SECS=14400      # four hours between bounded rechecks of a declared external wait or verified captain-held transfer, and between repeated new-hash stale alarms for an ordinary crew task with an open backlog captain call; a structured until time can make an external-wait recheck occur sooner but cannot extend this bound; this includes a live idle pane after its first inconclusive stale wake, a provably-working pane whose own unelapsed declared wait or, where config/wedge-defer-parked-gate arms it, unanswered supervisor-owed validation gate defers its JG_STALE_ESCALATE_SECS escalation, and a live busy pane past JG_BUSY_TURN_MAX_SECS, while the away-mode daemon uses the same setting and ages its window against the crew's own latest status line rather than pane busy state; a captain-held transfer is never rechecked while the away-posture record exists, while an armed validation gate awaiting the supervisor's decision keeps this recheck in either posture; an idle `paused:` claim contradicted by a parked run the worker never escalated wakes once per run state instead of taking this cadence (docs/architecture.md owns the contract)
-JG_SECONDMATE_WAKE_STALL_SECS=180  # no-progress interval for foreign secondmate queues (docs/architecture.md) and local queue reminders (docs/watcher-continuity.md "Durable queue and turn-end backstop"); zero or invalid values use 180
+JG_SQUAD LEAD_WAKE_STALL_SECS=180  # no-progress interval for foreign squad lead queues (docs/architecture.md) and local queue reminders (docs/watcher-continuity.md "Durable queue and turn-end backstop"); zero or invalid values use 180
 JG_HOST_MEMORY_SECS=10          # independent sampler cadence; see Host memory guard above
 JG_HOST_MEMORY_PROC=             # fixture proc root; see Host memory guard above
 JG_HOST_MEMORY_CGROUP_ROOT=      # fixture cgroup root; see Host memory guard above
-JG_SECONDMATE_LIVENESS_SECS=60   # seconds between watcher probes of each registered secondmate's recorded endpoint through bin/jg-secondmate-liveness-lib.sh, which relaunches only a positively `dead` or `missing` endpoint through the ordinary guarded jg-spawn.sh --secondmate path and emits exactly one check wake per relaunch; zero or invalid values use 60
-JG_SECONDMATE_LIVENESS_TIMEOUT=120   # seconds allowed separately for a watcher-driven relaunch's per-home lock wait and its spawn execution; a lock-wait timeout skips recovery without touching the endpoint or recording an attempt; zero or invalid values use 120
-JG_SECONDMATE_LIVENESS_MAX_ATTEMPTS=3   # automatic relaunch attempts allowed per mate inside the window before the watcher parks auto-relaunch behind state/.secondmate-relaunch-bound-<id> and escalates once; a later live probe clears the marker and restores the full attempt budget (the ledger keeps its history behind a `rearmed` row); zero or invalid values use 3
-JG_SECONDMATE_LIVENESS_WINDOW_SECS=3600   # relaunch-bound window; bin/jg-secondmate-liveness-lib.sh owns ledger counting, including failures before admission; zero or invalid values use 3600
+JG_SQUAD LEAD_LIVENESS_SECS=60   # seconds between watcher probes of each registered squad lead's recorded endpoint through bin/jg-squad-lead-liveness-lib.sh, which relaunches only a positively `dead` or `missing` endpoint through the ordinary guarded jg-spawn.sh --squad-lead path and emits exactly one check wake per relaunch; zero or invalid values use 60
+JG_SQUAD LEAD_LIVENESS_TIMEOUT=120   # seconds allowed separately for a watcher-driven relaunch's per-home lock wait and its spawn execution; a lock-wait timeout skips recovery without touching the endpoint or recording an attempt; zero or invalid values use 120
+JG_SQUAD LEAD_LIVENESS_MAX_ATTEMPTS=3   # automatic relaunch attempts allowed per mate inside the window before the watcher parks auto-relaunch behind state/.squad-lead-relaunch-bound-<id> and escalates once; a later live probe clears the marker and restores the full attempt budget (the ledger keeps its history behind a `rearmed` row); zero or invalid values use 3
+JG_SQUAD LEAD_LIVENESS_WINDOW_SECS=3600   # relaunch-bound window; bin/jg-squad-lead-liveness-lib.sh owns ledger counting, including failures before admission; zero or invalid values use 3600
 JG_WEDGE_DEMAND_INSPECT_COUNT=3    # consecutive provably-working stale escalations on the same unchanged pane before demand-deep-inspection is added
 JG_WORKTREE_WRITE_PRUNE='.git node_modules .venv venv __pycache__ .mypy_cache .pytest_cache .ruff_cache .tox target dist build .next .cache vendor'   # directory names the wedge detector's task-worktree write probe skips; the default keeps .git out so a supervisor's own read-only git command can never look like crew progress; set it to the empty string to prune nothing, which widens the probe to the whole depth-bounded tree rather than disabling it
-JG_WORKTREE_WRITE_MAXDEPTH=6       # depth that same probe walks below the recorded worktree; it runs only at the moment a wedge escalation would otherwise fire, never on every poll; no probe knob applies to a secondmate, whose recorded worktree is a provisioned home the probe skips entirely
+JG_WORKTREE_WRITE_MAXDEPTH=6       # depth that same probe walks below the recorded worktree; it runs only at the moment a wedge escalation would otherwise fire, never on every poll; no probe knob applies to a squad lead, whose recorded worktree is a provisioned home the probe skips entirely
 JG_WORKTREE_WRITE_TIMEOUT=10       # wall-clock seconds that one walk may take, so a worktree on a hung mount cannot stall the watcher poll that started it; hitting the bound reads as no write evidence, which leaves the escalation schedule exactly as it was; a value that is not a positive integer falls back to the default
 JG_WATCH_TRIAGE_LOG_MAX_BYTES=262144   # size cap for the watcher's absorbed-wake debug log
 JG_FLEET_SYNC_BOOTSTRAP_TIMEOUT=     # optional seconds allowed for bootstrap's best-effort clone refresh; unset/blank defaults to max(20, 5 + 3 * origin-backed-project-count)
@@ -2682,7 +2682,7 @@ JG_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=   # legacy alias for JG_TREEHOUSE_RETURN
 JG_FLEET_SYNC_PACKED_REFS_LOCK_RETRIES=3        # fetch retries after jg-fleet-sync.sh hits the orphaned .git/packed-refs.lock signature
 JG_FLEET_SYNC_PACKED_REFS_LOCK_RETRY_WAIT_SECS=1 # seconds jg-fleet-sync.sh waits before each of those retries
 JG_FLEET_SYNC_PACKED_REFS_LOCK_AGE_SECS=30       # min mtime age before jg-fleet-sync.sh treats a leftover packed-refs.lock as provably stale
-JG_FF_STALE_INDEX_LOCK_AGE_SECS=30       # min mtime age before the secondmate tracked-file fast-forward treats a leftover index.lock as provably stale
+JG_FF_STALE_INDEX_LOCK_AGE_SECS=30       # min mtime age before the squad lead tracked-file fast-forward treats a leftover index.lock as provably stale
 JG_LEASE_COMMAND_LOCK_MAX_AGE_SECS=300   # max seconds a live .jg-lease-command.lock holder may serialize lease commands before bin/jg-lease-lib.sh reclaims it; a holder inside the bound is never preempted and an unreadable age keeps the ordinary wait; non-numeric or zero values use 300
 JG_BUSY_REGEX=          # optional override for rendered delivery guards and Grok's isolated task-state fallback; converted worker state ignores it
 JG_COMPOSER_IDLE_RE=    # optional fleet-wide idle-placeholder regex override (bin/jg-composer-lib.sh); a match alone does not prove emptiness because shape-specific position and ANSI de-emphasis safety gates still apply

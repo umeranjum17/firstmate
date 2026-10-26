@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
-# jg-pending-reply-lib.sh - parent-owned secondmate missed-report guards.
+# jg-pending-reply-lib.sh - parent-owned squad_lead missed-report guards.
 #
-# When the main firstmate delivers a reply-bearing marked from-firstmate request
-# to a secondmate, this library records a durable parent-owned pending-reply
+# When the main juggernaut delivers a reply-bearing marked from-juggernaut request
+# to a squad_lead, this library records a durable parent-owned pending-reply
 # expectation BEFORE delivery, embeds a privacy-safe correlation id in the
 # outbound message, and later resolves that expectation only from a correlated
 # line in the asked task's own parent status log, or a document it points to -
 # never from transport success, chat content, unrelated status activity, or
 # another task's line that echoes or quotes the token.
 #
-# Safety property (captain direction 2026-07-22): a secondmate agent may ignore
+# Safety property (captain direction 2026-07-22): a squad_lead agent may ignore
 # the marker and answer only in its visible conversation. The parent must notice
 # the missing correlated report without scraping that conversation, send exactly
 # one automatic recovery request asking for a repost through the parent channel
@@ -32,7 +32,7 @@
 # Each record is a key=value file owned by this library. Schema:
 #   schema=jg-pending-reply.v1
 #   corr_id=                privacy-safe correlation token
-#   task_id=                secondmate task id in the parent home
+#   task_id=                squad_lead task id in the parent home
 #   parent_home=            absolute parent JG_HOME
 #   parent_status=          absolute path of parent state/<task_id>.status
 #   parent_status_scan_signature=
@@ -65,7 +65,7 @@
 #                           lifecycle note below); empty until then
 #   resolved_epoch=
 #   resolved_via=           status | document | helper | empty
-#   wrong_home_hits=        count of corr sightings under the secondmate home
+#   wrong_home_hits=        count of corr sightings under the squad_lead home
 #   wrong_home_first_sighting= encoded path:line identity of the first sighting
 #   wrong_home_sightings=   comma-separated encoded path:line identities
 #   wrong_home_scan_signature=
@@ -108,7 +108,7 @@
 # (bin/jg-backlog-handoff.sh's receiver wake) stayed refused forever once the
 # watcher escalated between the lost transport and the next resume.
 #
-# Sourced by bin/jg-send.sh, bin/jg-watch.sh, bin/jg-secondmate-report.sh, and
+# Sourced by bin/jg-send.sh, bin/jg-watch.sh, bin/jg-squad-lead-report.sh, and
 # tests. No side effects on source. set -u / set -e safe.
 #
 # Tunables (env):
@@ -138,7 +138,7 @@ _JG_PENDING_REPLY_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd 2>/dev/n
 # bin/jg-wake-lib.sh's single directed expansion below; a second directive
 # here would re-expand the same transitive graph.
 . "$_JG_PENDING_REPLY_LIB_DIR/jg-classify-lib.sh"
-# Parked-home gate (firstmate-addons/parked-homes); the shim answers "not parked" without the add-on.
+# Parked-home gate (juggernaut-addons/parked-homes); the shim answers "not parked" without the add-on.
 # shellcheck source=bin/jg-parked-homes-lib.sh
 . "$_JG_PENDING_REPLY_LIB_DIR/jg-parked-homes-lib.sh"
 
@@ -297,7 +297,7 @@ jg_pending_reply_set() {  # <record-path> <key> <value>
   mv -f "$tmp" "$rec"
 }
 
-# Embed or replace a correlation token after the from-firstmate marker.
+# Embed or replace a correlation token after the from-juggernaut marker.
 # Idempotent for the same corr; replaces a different leading corr token.
 # Result is assigned to <result-var>.
 # Trailing newlines in the request body are preserved: never strip via bare
@@ -306,7 +306,7 @@ jg_pending_reply_embed_corr() {  # <message> <corr_id> <result-var>
   local message=$1 corr=$2 result_var=$3 body token marked existing
   [ -n "$result_var" ] || return 2
   token=$(jg_pending_reply_corr_token "$corr")
-  jg_message_mark_from_firstmate "$message" marked
+  jg_message_mark_from_juggernaut "$message" marked
   body=${marked#"$JG_FROMFIRST_MARK"}
   # Strip a leading corr=<16hex> plus following blanks (space/tab only).
   existing=${body:0:21}
@@ -647,7 +647,7 @@ jg_pending_reply_resolve_via_of_line() {  # <line>
     *data/*report*|*report.md*|*document*|*pointer*)
       printf 'document'
       ;;
-    *via-helper*|*jg-secondmate-report*)
+    *via-helper*|*jg-squad-lead-report*)
       printf 'helper'
       ;;
     *)
@@ -805,12 +805,12 @@ jg_pending_reply_fallback_idle_eligible() {  # <record-path>
 }
 
 # jg_pending_reply_backend_observation: one busy/idle observation of a
-# SECONDMATE endpoint, without ever reading its conversation.
+# SQUAD_LEAD endpoint, without ever reading its conversation.
 #
 # Deliberately NOT the semantic busy-state contract (bin/jg-busy-lib.sh).
-# That contract covers ordinary task workers, whose turn lifecycle firstmate
-# wires at spawn; a secondmate is wired only on Pi, for the wake-stall ring,
-# because an idle secondmate pane is healthy and it runs no supervised turn
+# That contract covers ordinary task workers, whose turn lifecycle juggernaut
+# wires at spawn; a squad_lead is wired only on Pi, for the wake-stall ring,
+# because an idle squad_lead pane is healthy and it runs no supervised turn
 # sequence of its own. This
 # observation exists only to notice a busy-then-idle transition around one
 # delivered request, so it is a delivery-confirmation signal in the same
@@ -876,7 +876,7 @@ jg_pending_reply_mark_turn_completed() {  # <state-dir> <corr_id> [which: reques
 
 # --- remote reply-channel freshness -----------------------------------------
 #
-# A LOCAL secondmate appends its report straight into the parent's
+# A LOCAL squad_lead appends its report straight into the parent's
 # state/<id>.status, so an absent correlated line there is immediate evidence
 # that no report was written. A REMOTE mate's reports reach that same file only
 # through the asynchronous mirror in bin/jg-procevent-remote-reply.sh, so the
@@ -923,7 +923,7 @@ jg_pending_reply_remote_channel_epoch() {  # <state-dir> <task_id>
   printf '%s' "$epoch"
 }
 
-# 0 when <task_id> is a secondmate whose reports cross a machine boundary.
+# 0 when <task_id> is a squad_lead whose reports cross a machine boundary.
 jg_pending_reply_target_is_remote() {  # <state-dir> <task_id>
   local meta="$1/$2.meta"
   [ -f "$meta" ] || return 1
@@ -1360,10 +1360,10 @@ _jg_pending_reply_maybe_escalate_locked() {  # <state-dir> <corr_id>
   return 0
 }
 
-# Detect a correlated report written under the secondmate home (wrong home)
+# Detect a correlated report written under the squad_lead home (wrong home)
 # without treating it as acknowledgement. A remote route's
 # parent-replies.status is its parent channel, not a stranded self-home file.
-jg_pending_reply_detect_wrong_home() {  # <state-dir> <corr_id> <secondmate-home>
+jg_pending_reply_detect_wrong_home() {  # <state-dir> <corr_id> <squad-lead-home>
   local state=$1 corr=$2 sm_home=$3
   local rec delivered hits first sightings snapshot previous status_file line line_no sighting_base sighting_id phase changed=0
   local remote_parent_channel=0
@@ -1429,7 +1429,7 @@ jg_pending_reply_detect_wrong_home() {  # <state-dir> <corr_id> <secondmate-home
 # Restatement-copy a same-basename self-home corr= line onto the parent channel.
 # Only $sm_home/state/<task_id>.status is copied; arbitrary child status files
 # stay evidence, not acknowledgement.
-jg_pending_reply_restatement_copy_same_basename() {  # <state-dir> <corr_id> <secondmate-home>
+jg_pending_reply_restatement_copy_same_basename() {  # <state-dir> <corr_id> <squad-lead-home>
   local state=$1 corr=$2 sm_home=$3
   local rec task_id parent_status stranded line
   rec=$(jg_pending_reply_path "$state" "$corr")
@@ -1452,9 +1452,9 @@ jg_pending_reply_restatement_copy_same_basename() {  # <state-dir> <corr_id> <se
 }
 
 # One reconciliation tick for a single record: resolve, observe, recover, escalate.
-# busy_state is busy|idle|unknown for the secondmate endpoint.
-# secondmate_home may be empty when unknown.
-jg_pending_reply_tick_one() {  # <state-dir> <corr_id> <busy_state> [secondmate-home]
+# busy_state is busy|idle|unknown for the squad_lead endpoint.
+# squad_lead_home may be empty when unknown.
+jg_pending_reply_tick_one() {  # <state-dir> <corr_id> <busy_state> [squad-lead-home]
   local state=$1 corr=$2 busy_state=$3 sm_home=${4-}
   local rec phase delivered
   rec=$(jg_pending_reply_path "$state" "$corr")
@@ -1551,8 +1551,8 @@ _jg_pending_reply_select_needing_work() {  # <record-path>...
 }
 
 # Scan every pending record for this parent state. Safe to call every poll.
-# Never scrapes secondmate conversation; uses only parent status, backend busy
-# state, and optional secondmate-home wrong-home path checks. Records are
+# Never scrapes squad_lead conversation; uses only parent status, backend busy
+# state, and optional squad-lead-home wrong-home path checks. Records are
 # selected in one pass first (_jg_pending_reply_select_needing_work), so a
 # settled record costs no lock and no fork, and the per-record path below runs,
 # unchanged, only for the records that selection returns.
@@ -1588,7 +1588,7 @@ jg_pending_reply_tick() {  # <state-dir>
       jg_pending_reply_close_escalation "$state" "$corr" || true
       continue
     fi
-    # Parked-home guard (firstmate-addons/parked-homes): a parked home gets no
+    # Parked-home guard (juggernaut-addons/parked-homes): a parked home gets no
     # recovery resend and no missed-report escalation - the request keeps its
     # record and stays as-is. No-op without the add-on checkout.
     jg_parked_skip_meta "$state/${task_id}.meta" "$task_id" pending-reply && continue
@@ -1668,7 +1668,7 @@ jg_pending_reply_tick() {  # <state-dir>
         if [ "$found" = 0 ]; then
           if [ -n "$remote_host" ]; then
             observation=$("$_JG_PENDING_REPLY_LIB_DIR/jg-on.sh" "$task_id" \
-              jg-remote-secondmate-control.sh observe "$task_id" < /dev/null 2>/dev/null || printf 'unknown')
+              jg-remote-squad-lead-control.sh observe "$task_id" < /dev/null 2>/dev/null || printf 'unknown')
             case "$observation" in busy|idle|fallback-idle|unknown) ;; *) observation=unknown ;; esac
           else
             observation=$(jg_pending_reply_backend_observation "$backend" "$target" "$label" "$harness")

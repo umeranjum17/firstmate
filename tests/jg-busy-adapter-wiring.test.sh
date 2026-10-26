@@ -370,7 +370,7 @@ test_gemini_hooks_semantic_lifecycle() {
     jq -e ".hooks[\"$ev\"]" "$settings" >/dev/null || fail "gemini hook settings lack $ev"
   done
   # The worktree's own .gemini/settings.json is the PROJECT's committed file;
-  # firstmate must never write it, or a project's configuration is clobbered.
+  # juggernaut must never write it, or a project's configuration is clobbered.
   assert_absent "$WT_DIR/.gemini/settings.json" \
     "gemini spawn must not write the project's own .gemini/settings.json"
 
@@ -432,19 +432,19 @@ test_raw_gemini_launch_has_no_semantic_wiring() {
   pass "raw gemini launch remains unwired and classifies unknown"
 }
 
-test_gemini_is_refused_as_a_secondmate() {
+test_gemini_is_refused_as_a_squad_lead() {
   local rec id=busy-gm-3 out
-  rec=$(make_spawn_case gemini-secondmate gemini "$id")
+  rec=$(make_spawn_case gemini-squad-lead gemini "$id")
   read_case_record "$rec"
-  # A secondmate spawn carries no delivery contract, so this one deliberately
+  # A squad_lead spawn carries no delivery contract, so this one deliberately
   # bypasses run_spawn's ship-only --mode/--yolo arguments.
   out=$(GROK_HOME="$HOME_DIR/grok-home" \
-    jg_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" --secondmate "$id" gemini) && {
-    fail "a gemini secondmate must be refused, it has no primary supervision protocol: $out"
+    jg_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" --squad-lead "$id" gemini) && {
+    fail "a gemini squad_lead must be refused, it has no primary supervision protocol: $out"
   }
-  assert_contains "$out" 'crewmate/scout adapter only' \
-    "refusing a gemini secondmate must name the crewmate/scout boundary: $out"
-  pass "gemini is refused as a secondmate because it has no primary supervision protocol"
+  assert_contains "$out" 'operator/scout adapter only' \
+    "refusing a gemini squad_lead must name the operator/scout boundary: $out"
+  pass "gemini is refused as a squad_lead because it has no primary supervision protocol"
 }
 
 test_kimi_and_grok_install_no_unverified_wiring() {
@@ -462,21 +462,21 @@ test_kimi_and_grok_install_no_unverified_wiring() {
   pass "kimi and grok install no unverified semantic wiring and classify through their own gates"
 }
 
-# A --secondmate launch used to skip the busy arm entirely, so a tmux-backed
+# A --squad-lead launch used to skip the busy arm entirely, so a tmux-backed
 # mate's active-turn gate could never see busy. These cases run the real
 # spawn, drive the generated wiring, and check the stall gate against that
 # record. Parent turn-ended markers stay off this path.
-seed_secondmate_home() { # <home> <id> [home Stop guard]
+seed_squad_lead_home() { # <home> <id> [home Stop guard]
   local home=$1 id=$2 guard=${3:-$ROOT/bin/jg-turnend-guard.sh}
   mkdir -p "$home/bin" "$home/data" "$home/state" "$home/config" "$home/projects"
   cp "$guard" "$home/bin/jg-turnend-guard.sh"
-  printf '# Firstmate\n' > "$home/AGENTS.md"
-  printf '%s\n' "$id" > "$home/.jg-secondmate-home"
+  printf '# Juggernaut\n' > "$home/AGENTS.md"
+  printf '%s\n' "$id" > "$home/.jg-squad-lead-home"
   printf 'charter\n' > "$home/data/charter.md"
   jg_git_init_commit "$home"
 }
 
-spawn_secondmate_harness() { # <case-dir> <id> <harness> [extra fake tools...]
+spawn_squad_lead_harness() { # <case-dir> <id> <harness> [extra fake tools...]
   local case_dir=$1 id=$2 harness=$3 primary sm fakebin
   shift 3
   primary="$case_dir/primary"
@@ -484,17 +484,17 @@ spawn_secondmate_harness() { # <case-dir> <id> <harness> [extra fake tools...]
   mkdir -p "$case_dir"
   fakebin=$(make_spawn_fakebin "$case_dir/fake" "$harness" "$@")
   jg_test_spawn_home "$primary" "$harness"
-  seed_secondmate_home "$sm" "$id" "${SECONDMATE_HOME_GUARD:-}"
-  if [ -n "${SECONDMATE_LOCAL_SETTINGS:-}" ]; then
+  seed_squad_lead_home "$sm" "$id" "${SQUAD_LEAD_HOME_GUARD:-}"
+  if [ -n "${SQUAD_LEAD_LOCAL_SETTINGS:-}" ]; then
     mkdir -p "$sm/.claude"
-    cp "$SECONDMATE_LOCAL_SETTINGS" "$sm/.claude/settings.local.json"
+    cp "$SQUAD_LEAD_LOCAL_SETTINGS" "$sm/.claude/settings.local.json"
   fi
   : > "$case_dir/launch.log"
   JG_BACKEND=tmux JG_FAKE_LAUNCH_LOG="$case_dir/launch.log" \
-    jg_test_run_spawn "$primary" "$sm" "$fakebin" "$id" "$sm" "$harness" --secondmate
+    jg_test_run_spawn "$primary" "$sm" "$fakebin" "$id" "$sm" "$harness" --squad-lead
 }
 
-secondmate_stall_watch() { # <primary> <id> <out> [seconds]
+squad_lead_stall_watch() { # <primary> <id> <out> [seconds]
   local primary=$1 id=$2 out=$3 seconds=${4:-4} state window fakebin
   state="$primary/state"
   window=$(grep '^window=' "$state/$id.meta" | cut -d= -f2-)
@@ -541,67 +541,67 @@ SH
   chmod +x "$fakebin/tmux"
   PATH="$fakebin:$PATH" JG_HOME="$primary" JG_ROOT_OVERRIDE="$ROOT" \
     JG_STATE_OVERRIDE="$state" JG_BACKEND=tmux \
-    JG_SECONDMATE_WAKE_STALL_SECS=1 JG_POLL=1 \
+    JG_SQUAD_LEAD_WAKE_STALL_SECS=1 JG_POLL=1 \
     JG_SIGNAL_GRACE=0 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
     "$ROOT/bin/jg-watch-checkpoint.sh" --seconds "$seconds" \
     > "$out" 2>"$out.err" || true
 }
 
-test_secondmate_claude_spawn_arms_busy_for_the_stall_gate() {
+test_squad_lead_claude_spawn_arms_busy_for_the_stall_gate() {
   local case_dir id=sm-claude primary sm state settings launch out
   case_dir="$TMP_ROOT/sm-claude"
   primary="$case_dir/primary"
   sm="$case_dir/sm"
-  out=$(spawn_secondmate_harness "$case_dir" "$id" claude) \
-    || fail "claude secondmate spawn failed: $out"
+  out=$(spawn_squad_lead_harness "$case_dir" "$id" claude) \
+    || fail "claude squad_lead spawn failed: $out"
   state="$primary/state"
   settings="$state/$id.claude-settings.json"
   launch=$(cat "$case_dir/launch.log")
-  assert_present "$state/$id.busy-state" "claude secondmate spawn did not arm the busy contract"
-  assert_present "$settings" "claude secondmate spawn did not write hook settings"
+  assert_present "$state/$id.busy-state" "claude squad_lead spawn did not arm the busy contract"
+  assert_present "$settings" "claude squad_lead spawn did not write hook settings"
   assert_contains "$launch" "--settings '$settings'" \
-    "claude secondmate launch did not pass the state settings file"
+    "claude squad_lead launch did not pass the state settings file"
   [ ! -e "$sm/.claude/settings.local.json" ] \
-    || fail "claude secondmate spawn wrote the home's settings.local.json"
+    || fail "claude squad_lead spawn wrote the home's settings.local.json"
   out=$(classify claude "$id" "$state")
-  [ "$out" = "busy jg-spawn" ] || fail "seeded secondmate must classify busy jg-spawn, got '$out'"
-  out=$(jg_busy_classify tmux "firstmate:jg-$id" claude "$id" "$state" 'working on the charter')
+  [ "$out" = "busy jg-spawn" ] || fail "seeded squad_lead must classify busy jg-spawn, got '$out'"
+  out=$(jg_busy_classify tmux "juggernaut:jg-$id" claude "$id" "$state" 'working on the charter')
   [ "$out" = "busy jg-spawn" ] || fail "a non-empty tail without a record used to stay unknown; got '$out'"
 
   printf '%s\t7\tcheck\trouted\tcheck: routed row\n' "$(( $(date +%s) - 10 ))" \
     > "$sm/state/.wake-queue"
-  secondmate_stall_watch "$primary" "$id" "$case_dir/watch-busy.out"
-  grep -F 'secondmate wake-loop stalled' "$case_dir/watch-busy.out" >/dev/null \
-    && fail "a secondmate inside an armed turn was escalated as a stalled wake loop: $(cat "$case_dir/watch-busy.out")"
+  squad_lead_stall_watch "$primary" "$id" "$case_dir/watch-busy.out"
+  grep -F 'squad_lead wake-loop stalled' "$case_dir/watch-busy.out" >/dev/null \
+    && fail "a squad_lead inside an armed turn was escalated as a stalled wake loop: $(cat "$case_dir/watch-busy.out")"
   [ ! -s "$state/.wake-queue" ] \
-    || fail "a secondmate inside an armed turn published a durable stall notification"
+    || fail "a squad_lead inside an armed turn published a durable stall notification"
 
   rm -f "$state/$id.turn-ended"
-  fire_secondmate_stop "$sm" parallel "$settings" || fail "secondmate Stop was blocked with nothing to supervise"
-  [ ! -e "$state/$id.turn-ended" ] || fail "a secondmate Stop touched the parent's turn-ended marker"
+  fire_squad_lead_stop "$sm" parallel "$settings" || fail "squad_lead Stop was blocked with nothing to supervise"
+  [ ! -e "$state/$id.turn-ended" ] || fail "a squad_lead Stop touched the parent's turn-ended marker"
   out=$(classify claude "$id" "$state")
-  [ "$out" = "idle claude-hook" ] || fail "secondmate Stop must classify idle claude-hook, got '$out'"
+  [ "$out" = "idle claude-hook" ] || fail "squad_lead Stop must classify idle claude-hook, got '$out'"
 
-  assert_present "$state/.secondmate-wake-progress-$id" \
+  assert_present "$state/.squad-lead-wake-progress-$id" \
     "the stall gate never observed the frozen queue while the mate was busy"
   # The busy checkpoint writes the progress marker on its first poll and then
   # leaves it alone. A poll that lands at the end of that window would still
   # be inside the one-second threshold when the idle checkpoint starts, so
   # wait out the threshold before asking the same frozen row to surface.
   sleep 2
-  secondmate_stall_watch "$primary" "$id" "$case_dir/watch-idle.out" 8
-  grep -F "check: secondmate wake-loop stalled: mate=$id row=7" "$case_dir/watch-idle.out" >/dev/null \
-    || fail "the same frozen queue stayed hidden after the secondmate turn ended: $(cat "$case_dir/watch-idle.out")"
-  pass "a claude secondmate spawn arms the busy contract the stall gate can see, and Stop does not wake the parent"
+  squad_lead_stall_watch "$primary" "$id" "$case_dir/watch-idle.out" 8
+  grep -F "check: squad_lead wake-loop stalled: mate=$id row=7" "$case_dir/watch-idle.out" >/dev/null \
+    || fail "the same frozen queue stayed hidden after the squad_lead turn ended: $(cat "$case_dir/watch-idle.out")"
+  pass "a claude squad_lead spawn arms the busy contract the stall gate can see, and Stop does not wake the parent"
 }
 
-run_secondmate_stop_guard() { # <sm-home>
+run_squad_lead_stop_guard() { # <sm-home>
   printf '{"stop_hook_active":false,"session_id":"sm-guard"}' \
     | CLAUDECODE=1 JG_ROOT_OVERRIDE="$1" JG_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 \
       bash "$ROOT/bin/jg-turnend-guard.sh" --claude >/dev/null 2>&1
 }
 
-run_secondmate_local_stop_hooks() { # <settings-file>
+run_squad_lead_local_stop_hooks() { # <settings-file>
   local cmd
   jq -r '.hooks.Stop[]?.hooks[]?.command' "$1" \
     | while IFS= read -r cmd; do sh -c "$cmd" </dev/null; done
@@ -610,20 +610,20 @@ run_secondmate_local_stop_hooks() { # <settings-file>
 # Claude runs the --settings Stop hooks beside the home's tracked Stop
 # guard, in parallel, so their order is not fixed. Fire one Stop event in the
 # given order and return the guard's status.
-fire_secondmate_stop() { # <sm-home> <guard-first|guard-last|parallel> <settings>
+fire_squad_lead_stop() { # <sm-home> <guard-first|guard-last|parallel> <settings>
   local sm=$1 settings=$3 status
   case "$2" in
     guard-first)
-      run_secondmate_stop_guard "$sm"; status=$?
-      run_secondmate_local_stop_hooks "$settings"
+      run_squad_lead_stop_guard "$sm"; status=$?
+      run_squad_lead_local_stop_hooks "$settings"
       ;;
     guard-last)
-      run_secondmate_local_stop_hooks "$settings"
-      run_secondmate_stop_guard "$sm"; status=$?
+      run_squad_lead_local_stop_hooks "$settings"
+      run_squad_lead_stop_guard "$sm"; status=$?
       ;;
     parallel)
-      run_secondmate_local_stop_hooks "$settings" &
-      run_secondmate_stop_guard "$sm"; status=$?
+      run_squad_lead_local_stop_hooks "$settings" &
+      run_squad_lead_stop_guard "$sm"; status=$?
       wait
       ;;
   esac
@@ -634,24 +634,24 @@ fire_secondmate_stop() { # <sm-home> <guard-first|guard-last|parallel> <settings
 # fires no UserPromptSubmit. It is the mate's only Stop writer, so a blocked
 # Stop records busy and an allowed Stop records idle for the same gen, whatever
 # order Claude runs the Stop hooks in.
-test_secondmate_claude_stop_guard_owns_the_stop_verdict() {
+test_squad_lead_claude_stop_guard_owns_the_stop_verdict() {
   local case_dir id=sm-claude-guard primary sm state settings out status order gen
   case_dir="$TMP_ROOT/sm-claude-guard"
   primary="$case_dir/primary"
   sm="$case_dir/sm"
-  out=$(spawn_secondmate_harness "$case_dir" "$id" claude) \
-    || fail "claude secondmate spawn failed: $out"
+  out=$(spawn_squad_lead_harness "$case_dir" "$id" claude) \
+    || fail "claude squad_lead spawn failed: $out"
   state="$primary/state"
   settings="$state/$id.claude-settings.json"
   gen=$(cat "$state/$id.busy-gen")
   git -C "$sm" status --porcelain | grep -F '.jg-busy-stop' >/dev/null \
-    && fail "the secondmate Stop pointer is not excluded from the home's git status"
+    && fail "the squad_lead Stop pointer is not excluded from the home's git status"
 
   : > "$sm/state/child.meta"
   for order in guard-first guard-last parallel; do
-    run_claude_hook "$settings" UserPromptSubmit || fail "secondmate UserPromptSubmit hook failed"
-    fire_secondmate_stop "$sm" "$order" "$settings"; status=$?
-    expect_code 2 "$status" "the secondmate guard must block a blind Stop with a task in flight ($order)"
+    run_claude_hook "$settings" UserPromptSubmit || fail "squad_lead UserPromptSubmit hook failed"
+    fire_squad_lead_stop "$sm" "$order" "$settings"; status=$?
+    expect_code 2 "$status" "the squad_lead guard must block a blind Stop with a task in flight ($order)"
     out=$(classify claude "$id" "$state")
     [ "$out" = "busy claude-hook" ] \
       || fail "a blocked Stop must leave the continuation busy ($order), got '$out'"
@@ -660,38 +660,38 @@ test_secondmate_claude_stop_guard_owns_the_stop_verdict() {
   done
   printf '%s\t7\tcheck\trouted\tcheck: routed row\n' "$(( $(date +%s) - 10 ))" \
     > "$sm/state/.wake-queue"
-  secondmate_stall_watch "$primary" "$id" "$case_dir/watch-blocked.out"
-  grep -F 'secondmate wake-loop stalled' "$case_dir/watch-blocked.out" >/dev/null \
-    && fail "a secondmate inside a guard-forced continuation was escalated as stalled: $(cat "$case_dir/watch-blocked.out")"
+  squad_lead_stall_watch "$primary" "$id" "$case_dir/watch-blocked.out"
+  grep -F 'squad_lead wake-loop stalled' "$case_dir/watch-blocked.out" >/dev/null \
+    && fail "a squad_lead inside a guard-forced continuation was escalated as stalled: $(cat "$case_dir/watch-blocked.out")"
 
   rm -f "$sm/state/child.meta"
   for order in guard-first guard-last parallel; do
-    run_claude_hook "$settings" UserPromptSubmit || fail "secondmate UserPromptSubmit hook failed"
-    fire_secondmate_stop "$sm" "$order" "$settings"; status=$?
-    expect_code 0 "$status" "the secondmate guard must allow a Stop with nothing to supervise ($order)"
+    run_claude_hook "$settings" UserPromptSubmit || fail "squad_lead UserPromptSubmit hook failed"
+    fire_squad_lead_stop "$sm" "$order" "$settings"; status=$?
+    expect_code 0 "$status" "the squad_lead guard must allow a Stop with nothing to supervise ($order)"
     out=$(classify claude "$id" "$state")
     [ "$out" = "idle claude-hook" ] || fail "an allowed Stop must record idle ($order), got '$out'"
   done
   sleep 2
-  secondmate_stall_watch "$primary" "$id" "$case_dir/watch-allowed.out" 8
-  grep -F "check: secondmate wake-loop stalled: mate=$id row=7" "$case_dir/watch-allowed.out" >/dev/null \
+  squad_lead_stall_watch "$primary" "$id" "$case_dir/watch-allowed.out" 8
+  grep -F "check: squad_lead wake-loop stalled: mate=$id row=7" "$case_dir/watch-allowed.out" >/dev/null \
     || fail "the frozen queue stayed hidden after an allowed Stop: $(cat "$case_dir/watch-allowed.out")"
 
   # An allowed Stop hands the home to the asyncRewake auto-arm. Claude 2.1.278
   # fires UserPromptSubmit for that wake (docs/verification/runtime-backends.md),
   # so the mate's own hook must reopen busy for the spawn's gen.
-  run_claude_hook "$settings" UserPromptSubmit || fail "secondmate rewake UserPromptSubmit hook failed"
+  run_claude_hook "$settings" UserPromptSubmit || fail "squad_lead rewake UserPromptSubmit hook failed"
   out=$(classify claude "$id" "$state")
   [ "$out" = "busy claude-hook" ] || fail "a rewake turn after an allowed Stop must classify busy, got '$out'"
   grep -F "gen=$gen " "$state/$id.busy-state" >/dev/null \
     || fail "a rewake turn must write the spawn's gen: $(cat "$state/$id.busy-state")"
-  pass "a claude secondmate's Stop guard records busy on a blocked Stop and idle on an allowed one, in any hook order, and a rewake turn reopens busy"
+  pass "a claude squad_lead's Stop guard records busy on a blocked Stop and idle on an allowed one, in any hook order, and a rewake turn reopens busy"
 }
 
 # A leased home can lag the parent. Its older Stop guard never reads
 # .jg-busy-stop, so the launch keeps the ordinary Stop idle hook, or an idle
 # mate would read busy until SessionEnd.
-test_secondmate_claude_older_home_guard_keeps_the_stop_idle_hook() {
+test_squad_lead_claude_older_home_guard_keeps_the_stop_idle_hook() {
   local case_dir id=sm-claude-old primary sm state settings out old_guard
   case_dir="$TMP_ROOT/sm-claude-old"
   primary="$case_dir/primary"
@@ -699,24 +699,24 @@ test_secondmate_claude_older_home_guard_keeps_the_stop_idle_hook() {
   old_guard="$case_dir/old-guard.sh"
   mkdir -p "$case_dir"
   printf '#!/usr/bin/env bash\nexit 0\n' > "$old_guard"
-  out=$(SECONDMATE_HOME_GUARD="$old_guard" spawn_secondmate_harness "$case_dir" "$id" claude) \
-    || fail "claude secondmate spawn failed: $out"
+  out=$(SQUAD_LEAD_HOME_GUARD="$old_guard" spawn_squad_lead_harness "$case_dir" "$id" claude) \
+    || fail "claude squad_lead spawn failed: $out"
   state="$primary/state"
   settings="$state/$id.claude-settings.json"
 
-  run_claude_hook "$settings" UserPromptSubmit || fail "secondmate UserPromptSubmit hook failed"
+  run_claude_hook "$settings" UserPromptSubmit || fail "squad_lead UserPromptSubmit hook failed"
   out=$(classify claude "$id" "$state")
   [ "$out" = "busy claude-hook" ] || fail "UserPromptSubmit must open busy, got '$out'"
   rm -f "$state/$id.turn-ended"
-  run_claude_hook "$settings" Stop || fail "secondmate Stop hook command failed"
+  run_claude_hook "$settings" Stop || fail "squad_lead Stop hook command failed"
   out=$(classify claude "$id" "$state")
   [ "$out" = "idle claude-hook" ] \
     || fail "an older home guard cannot close the turn, so the Stop hook must record idle, got '$out'"
-  [ ! -e "$state/$id.turn-ended" ] || fail "a secondmate Stop touched the parent's turn-ended marker"
-  pass "a claude secondmate whose home guard predates .jg-busy-stop keeps the Stop idle hook"
+  [ ! -e "$state/$id.turn-ended" ] || fail "a squad_lead Stop touched the parent's turn-ended marker"
+  pass "a claude squad_lead whose home guard predates .jg-busy-stop keeps the Stop idle hook"
 }
 
-test_secondmate_claude_spawn_leaves_local_settings_untouched() {
+test_squad_lead_claude_spawn_leaves_local_settings_untouched() {
   local case_dir id=sm-claude-local primary sm state prior out
   case_dir="$TMP_ROOT/sm-claude-local"
   primary="$case_dir/primary"
@@ -724,60 +724,60 @@ test_secondmate_claude_spawn_leaves_local_settings_untouched() {
   prior="$case_dir/local.json"
   mkdir -p "$case_dir"
   printf '%s\n' '{"permissions":{"allow":["Bash(echo hi)"]}}' > "$prior"
-  out=$(SECONDMATE_LOCAL_SETTINGS="$prior" spawn_secondmate_harness "$case_dir" "$id" claude) \
-    || fail "claude secondmate spawn failed: $out"
+  out=$(SQUAD_LEAD_LOCAL_SETTINGS="$prior" spawn_squad_lead_harness "$case_dir" "$id" claude) \
+    || fail "claude squad_lead spawn failed: $out"
   state="$primary/state"
   cmp -s "$prior" "$sm/.claude/settings.local.json" \
-    || fail "claude secondmate spawn rewrote settings.local.json"
+    || fail "claude squad_lead spawn rewrote settings.local.json"
   jq -e '.hooks.UserPromptSubmit and .feedbackDrafts == "off"' \
     "$state/$id.claude-settings.json" >/dev/null \
     || fail "busy hooks were not written to the state settings file"
-  pass "a claude secondmate spawn leaves an existing settings.local.json untouched"
+  pass "a claude squad_lead spawn leaves an existing settings.local.json untouched"
 }
 
-test_secondmate_pi_extension_reports_busy_without_a_parent_turnend() {
+test_squad_lead_pi_extension_reports_busy_without_a_parent_turnend() {
   local case_dir id=sm-pi primary state ext launch out
   case_dir="$TMP_ROOT/sm-pi"
   primary="$case_dir/primary"
-  out=$(spawn_secondmate_harness "$case_dir" "$id" pi) \
-    || fail "pi secondmate spawn failed: $out"
+  out=$(spawn_squad_lead_harness "$case_dir" "$id" pi) \
+    || fail "pi squad_lead spawn failed: $out"
   state="$primary/state"
   ext="$state/$id.pi-ext.ts"
   launch=$(cat "$case_dir/launch.log")
-  assert_present "$ext" "pi secondmate spawn did not write the busy extension"
-  assert_contains "$launch" "$ext" "pi secondmate launch did not load the busy extension"
-  assert_contains "$launch" "jg-primary-turnend-guard.ts" "pi secondmate launch dropped its turn-end extension"
-  assert_contains "$launch" "jg-primary-pi-watch.ts" "pi secondmate launch dropped its watch extension"
+  assert_present "$ext" "pi squad_lead spawn did not write the busy extension"
+  assert_contains "$launch" "$ext" "pi squad_lead launch did not load the busy extension"
+  assert_contains "$launch" "jg-primary-turnend-guard.ts" "pi squad_lead launch dropped its turn-end extension"
+  assert_contains "$launch" "jg-primary-pi-watch.ts" "pi squad_lead launch dropped its watch extension"
   out=$(classify pi "$id" "$state")
-  [ "$out" = "busy jg-spawn" ] || fail "pi secondmate seed must be busy jg-spawn, got '$out'"
+  [ "$out" = "busy jg-spawn" ] || fail "pi squad_lead seed must be busy jg-spawn, got '$out'"
   rm -f "$state/$id.turn-ended"
-  out=$(drive_pi_ext "$ext" turn-end) || fail "pi secondmate turn_end drive failed: $out"
-  [ ! -e "$state/$id.turn-ended" ] || fail "pi secondmate turn_end touched the parent's turn-ended marker"
-  out=$(drive_pi_ext "$ext" settle-idle) || fail "pi secondmate settle drive failed: $out"
+  out=$(drive_pi_ext "$ext" turn-end) || fail "pi squad_lead turn_end drive failed: $out"
+  [ ! -e "$state/$id.turn-ended" ] || fail "pi squad_lead turn_end touched the parent's turn-ended marker"
+  out=$(drive_pi_ext "$ext" settle-idle) || fail "pi squad_lead settle drive failed: $out"
   out=$(classify pi "$id" "$state")
-  [ "$out" = "idle pi-ext" ] || fail "pi secondmate settle must classify idle pi-ext, got '$out'"
-  pass "a pi secondmate loads the busy extension beside its primary extensions and does not emit a parent turn-end"
+  [ "$out" = "idle pi-ext" ] || fail "pi squad_lead settle must classify idle pi-ext, got '$out'"
+  pass "a pi squad_lead loads the busy extension beside its primary extensions and does not emit a parent turn-end"
 }
 
-test_secondmate_omp_extension_reports_busy_without_a_parent_turnend() {
+test_squad_lead_omp_extension_reports_busy_without_a_parent_turnend() {
   local case_dir id=sm-omp primary state ext launch out
   case_dir="$TMP_ROOT/sm-omp"
   primary="$case_dir/primary"
-  out=$(spawn_secondmate_harness "$case_dir" "$id" omp) \
-    || fail "omp secondmate spawn failed: $out"
+  out=$(spawn_squad_lead_harness "$case_dir" "$id" omp) \
+    || fail "omp squad_lead spawn failed: $out"
   state="$primary/state"
   ext="$state/$id.omp-ext.ts"
   launch=$(cat "$case_dir/launch.log")
-  assert_present "$ext" "omp secondmate spawn did not write the busy extension"
-  assert_contains "$launch" "$ext" "omp secondmate launch did not name the busy extension"
-  assert_contains "$launch" "--cwd" "omp secondmate launch dropped its cwd pin"
+  assert_present "$ext" "omp squad_lead spawn did not write the busy extension"
+  assert_contains "$launch" "$ext" "omp squad_lead launch did not name the busy extension"
+  assert_contains "$launch" "--cwd" "omp squad_lead launch dropped its cwd pin"
   out=$(classify omp "$id" "$state")
-  [ "$out" = "busy jg-spawn" ] || fail "omp secondmate seed must be busy jg-spawn, got '$out'"
+  [ "$out" = "busy jg-spawn" ] || fail "omp squad_lead seed must be busy jg-spawn, got '$out'"
   rm -f "$state/$id.turn-ended"
-  out=$(drive_pi_ext "$ext" turn-end) || fail "omp secondmate turn_end drive failed: $out"
-  [ ! -e "$state/$id.turn-ended" ] || fail "omp secondmate turn_end touched the parent's turn-ended marker"
+  out=$(drive_pi_ext "$ext" turn-end) || fail "omp squad_lead turn_end drive failed: $out"
+  [ ! -e "$state/$id.turn-ended" ] || fail "omp squad_lead turn_end touched the parent's turn-ended marker"
   out=$(classify omp "$id" "$state")
-  [ "$out" = "busy jg-spawn" ] || fail "omp secondmate turn_end must stay a notification, got '$out'"
+  [ "$out" = "busy jg-spawn" ] || fail "omp squad_lead turn_end must stay a notification, got '$out'"
   # drive_pi_ext has no agent_end mode. Fire the omp handler through node.
   EXT_PATH="$ext" node --input-type=module <<'EOF'
 import { pathToFileURL } from "node:url";
@@ -787,115 +787,115 @@ mod.default({ on: (name, fn) => { handlers[name] = fn; } });
 await handlers["agent_end"]({ willContinue: false }, {});
 EOF
   out=$(classify omp "$id" "$state")
-  [ "$out" = "idle omp-ext" ] || fail "omp secondmate agent_end must classify idle omp-ext, got '$out'"
-  pass "an omp secondmate names only the out-of-home busy extension and does not emit a parent turn-end"
+  [ "$out" = "idle omp-ext" ] || fail "omp squad_lead agent_end must classify idle omp-ext, got '$out'"
+  pass "an omp squad_lead names only the out-of-home busy extension and does not emit a parent turn-end"
 }
 
-test_secondmate_opencode_plugin_closes_without_a_parent_turnend() {
+test_squad_lead_opencode_plugin_closes_without_a_parent_turnend() {
   local case_dir id=sm-oc primary sm state plugin out
   case_dir="$TMP_ROOT/sm-oc"
   primary="$case_dir/primary"
   sm="$case_dir/sm"
-  out=$(spawn_secondmate_harness "$case_dir" "$id" opencode) \
-    || fail "opencode secondmate spawn failed: $out"
+  out=$(spawn_squad_lead_harness "$case_dir" "$id" opencode) \
+    || fail "opencode squad_lead spawn failed: $out"
   state="$primary/state"
   plugin="$sm/.opencode/plugins/jg-busy-state.js"
-  assert_present "$plugin" "opencode secondmate spawn did not write the busy plugin"
+  assert_present "$plugin" "opencode squad_lead spawn did not write the busy plugin"
   out=$(classify opencode "$id" "$state")
-  [ "$out" = "busy jg-spawn" ] || fail "opencode secondmate seed must be busy jg-spawn, got '$out'"
+  [ "$out" = "busy jg-spawn" ] || fail "opencode squad_lead seed must be busy jg-spawn, got '$out'"
   rm -f "$state/$id.turn-ended"
   out=$(drive_oc_plugin "$plugin" "$(oc_status ses_main busy)" "$(oc_idle ses_main)") \
-    || fail "opencode secondmate idle drive failed: $out"
-  [ ! -e "$state/$id.turn-ended" ] || fail "opencode secondmate session.idle touched the parent's turn-ended marker"
+    || fail "opencode squad_lead idle drive failed: $out"
+  [ ! -e "$state/$id.turn-ended" ] || fail "opencode squad_lead session.idle touched the parent's turn-ended marker"
   out=$(classify opencode "$id" "$state")
-  [ "$out" = "idle opencode-plugin" ] || fail "opencode secondmate idle must classify idle, got '$out'"
-  pass "an opencode secondmate plugin closes the parent busy record without a parent turn-end"
+  [ "$out" = "idle opencode-plugin" ] || fail "opencode squad_lead idle must classify idle, got '$out'"
+  pass "an opencode squad_lead plugin closes the parent busy record without a parent turn-end"
 }
 
 # A raw launch command carries none of the launch-template flags (--settings,
-# -e) that load the secondmate wiring, so a record armed for it would never be
+# -e) that load the squad_lead wiring, so a record armed for it would never be
 # updated by the launched command.
-test_raw_secondmate_launch_writes_no_busy_wiring() {
+test_raw_squad_lead_launch_writes_no_busy_wiring() {
   local harness raw case_dir id state sm out launch
   for harness in claude pi pi-signed omp; do
     case_dir="$TMP_ROOT/sm-raw-$harness"
     id="sm-raw-$harness"
     raw="$harness --jg-raw-flag"
-    out=$(spawn_secondmate_harness "$case_dir" "$id" "$raw" "$harness") \
-      || fail "raw $harness secondmate spawn must still succeed: $out"
+    out=$(spawn_squad_lead_harness "$case_dir" "$id" "$raw" "$harness") \
+      || fail "raw $harness squad_lead spawn must still succeed: $out"
     state="$case_dir/primary/state"
     sm="$case_dir/sm"
     launch=$(cat "$case_dir/launch.log")
-    assert_contains "$launch" "$raw" "raw $harness secondmate did not launch the raw command"
-    assert_absent "$state/$id.busy-gen" "raw $harness secondmate armed a busy generation"
-    assert_absent "$state/$id.busy-state" "raw $harness secondmate seeded a busy record"
-    assert_absent "$state/$id.claude-settings.json" "raw $harness secondmate wrote Claude hook settings"
-    assert_absent "$sm/.jg-busy-stop" "raw $harness secondmate wrote the Stop pointer"
-    assert_absent "$sm/.claude/settings.local.json" "raw $harness secondmate wrote the home's settings.local.json"
-    assert_absent "$state/$id.pi-ext.ts" "raw $harness secondmate wrote the Pi busy extension"
-    assert_absent "$state/$id.omp-ext.ts" "raw $harness secondmate wrote the omp busy extension"
+    assert_contains "$launch" "$raw" "raw $harness squad_lead did not launch the raw command"
+    assert_absent "$state/$id.busy-gen" "raw $harness squad_lead armed a busy generation"
+    assert_absent "$state/$id.busy-state" "raw $harness squad_lead seeded a busy record"
+    assert_absent "$state/$id.claude-settings.json" "raw $harness squad_lead wrote Claude hook settings"
+    assert_absent "$sm/.jg-busy-stop" "raw $harness squad_lead wrote the Stop pointer"
+    assert_absent "$sm/.claude/settings.local.json" "raw $harness squad_lead wrote the home's settings.local.json"
+    assert_absent "$state/$id.pi-ext.ts" "raw $harness squad_lead wrote the Pi busy extension"
+    assert_absent "$state/$id.omp-ext.ts" "raw $harness squad_lead wrote the omp busy extension"
     out=$(classify "$harness" "$id" "$state")
-    [ "$out" = "unknown missing" ] || fail "raw $harness secondmate must classify unknown missing, got '$out'"
+    [ "$out" = "unknown missing" ] || fail "raw $harness squad_lead must classify unknown missing, got '$out'"
   done
 
   case_dir="$TMP_ROOT/sm-raw-over-armed"
   id='sm-raw-over-armed'
-  out=$(spawn_secondmate_harness "$case_dir" "$id" claude) \
-    || fail "canonical claude secondmate spawn failed: $out"
+  out=$(spawn_squad_lead_harness "$case_dir" "$id" claude) \
+    || fail "canonical claude squad_lead spawn failed: $out"
   state="$case_dir/primary/state"
   sm="$case_dir/sm"
-  assert_present "$state/$id.busy-gen" "canonical claude secondmate spawn did not arm a busy generation"
-  assert_present "$sm/.jg-busy-stop" "canonical claude secondmate spawn did not write the Stop pointer"
+  assert_present "$state/$id.busy-gen" "canonical claude squad_lead spawn did not arm a busy generation"
+  assert_present "$sm/.jg-busy-stop" "canonical claude squad_lead spawn did not write the Stop pointer"
   : > "$case_dir/launch.log"
   out=$(JG_BACKEND=tmux JG_FAKE_LAUNCH_LOG="$case_dir/launch.log" \
-    jg_test_run_spawn "$case_dir/primary" "$sm" "$case_dir/fake/fakebin" "$id" "$sm" 'claude --jg-raw-flag' --secondmate) \
-    || fail "raw claude respawn over an armed secondmate must succeed: $out"
+    jg_test_run_spawn "$case_dir/primary" "$sm" "$case_dir/fake/fakebin" "$id" "$sm" 'claude --jg-raw-flag' --squad-lead) \
+    || fail "raw claude respawn over an armed squad_lead must succeed: $out"
   assert_contains "$(cat "$case_dir/launch.log")" 'claude --jg-raw-flag' "raw respawn did not launch the raw command"
   assert_absent "$state/$id.busy-gen" "raw respawn kept the earlier busy generation"
   assert_absent "$state/$id.busy-state" "raw respawn kept the earlier busy record"
   assert_absent "$sm/.jg-busy-stop" "raw respawn kept the earlier Stop pointer"
   out=$(classify claude "$id" "$state")
-  [ "$out" = "unknown missing" ] || fail "raw respawn over an armed secondmate must classify unknown missing, got '$out'"
-  pass "a raw claude, pi, pi-signed, or omp secondmate launch writes no busy wiring and classifies unknown"
+  [ "$out" = "unknown missing" ] || fail "raw respawn over an armed squad_lead must classify unknown missing, got '$out'"
+  pass "a raw claude, pi, pi-signed, or omp squad_lead launch writes no busy wiring and classifies unknown"
 }
 
-test_secondmate_codex_and_grok_do_not_arm_a_parent_turnend() {
+test_squad_lead_codex_and_grok_do_not_arm_a_parent_turnend() {
   local case_dir id state launch out sm
   case_dir="$TMP_ROOT/sm-codex"
   id='sm-codex'
-  out=$(spawn_secondmate_harness "$case_dir" "$id" codex) \
-    || fail "codex secondmate spawn failed: $out"
+  out=$(spawn_squad_lead_harness "$case_dir" "$id" codex) \
+    || fail "codex squad_lead spawn failed: $out"
   state="$case_dir/primary/state"
   launch=$(cat "$case_dir/launch.log")
-  assert_absent "$state/$id.busy-gen" "codex secondmate must not arm a busy contract with no verified source"
-  assert_not_contains "$launch" "turn-ended" "codex secondmate launch referenced a parent turn-ended signal"
-  assert_not_contains "$launch" "notify=" "codex secondmate launch included the parent turn-end notify hook"
+  assert_absent "$state/$id.busy-gen" "codex squad_lead must not arm a busy contract with no verified source"
+  assert_not_contains "$launch" "turn-ended" "codex squad_lead launch referenced a parent turn-ended signal"
+  assert_not_contains "$launch" "notify=" "codex squad_lead launch included the parent turn-end notify hook"
   out=$(classify codex "$id" "$state")
-  [ "$out" = "unknown codex-unverified" ] || fail "codex secondmate must stay unknown, got '$out'"
+  [ "$out" = "unknown codex-unverified" ] || fail "codex squad_lead must stay unknown, got '$out'"
 
   case_dir="$TMP_ROOT/sm-grok"
   id='sm-grok'
   sm="$case_dir/sm"
-  out=$(GROK_HOME="$case_dir/grok-home" spawn_secondmate_harness "$case_dir" "$id" grok) \
-    || fail "grok secondmate spawn failed: $out"
+  out=$(GROK_HOME="$case_dir/grok-home" spawn_squad_lead_harness "$case_dir" "$id" grok) \
+    || fail "grok squad_lead spawn failed: $out"
   state="$case_dir/primary/state"
-  assert_absent "$state/$id.busy-gen" "grok secondmate must keep its rendered-tail fallback instead of an armed record"
-  assert_absent "$sm/.jg-grok-turnend" "grok secondmate spawn installed a parent turn-end pointer"
-  assert_absent "$state/$id.grok-turnend-token" "grok secondmate spawn installed a parent turn-end token"
-  out=$(jg_busy_classify tmux "firstmate:jg-$id" grok "$id" "$state" 'Ctrl+c:cancel')
-  [ "$out" = "busy grok-regex" ] || fail "grok secondmate must still classify from its tail, got '$out'"
-  pass "codex and grok secondmates stay on their existing verdicts and do not emit a parent turn-end"
+  assert_absent "$state/$id.busy-gen" "grok squad_lead must keep its rendered-tail fallback instead of an armed record"
+  assert_absent "$sm/.jg-grok-turnend" "grok squad_lead spawn installed a parent turn-end pointer"
+  assert_absent "$state/$id.grok-turnend-token" "grok squad_lead spawn installed a parent turn-end token"
+  out=$(jg_busy_classify tmux "juggernaut:jg-$id" grok "$id" "$state" 'Ctrl+c:cancel')
+  [ "$out" = "busy grok-regex" ] || fail "grok squad_lead must still classify from its tail, got '$out'"
+  pass "codex and grok squad_leads stay on their existing verdicts and do not emit a parent turn-end"
 }
 
-test_secondmate_claude_spawn_arms_busy_for_the_stall_gate
-test_raw_secondmate_launch_writes_no_busy_wiring
-test_secondmate_claude_stop_guard_owns_the_stop_verdict
-test_secondmate_claude_older_home_guard_keeps_the_stop_idle_hook
-test_secondmate_claude_spawn_leaves_local_settings_untouched
-test_secondmate_pi_extension_reports_busy_without_a_parent_turnend
-test_secondmate_omp_extension_reports_busy_without_a_parent_turnend
-test_secondmate_opencode_plugin_closes_without_a_parent_turnend
-test_secondmate_codex_and_grok_do_not_arm_a_parent_turnend
+test_squad_lead_claude_spawn_arms_busy_for_the_stall_gate
+test_raw_squad_lead_launch_writes_no_busy_wiring
+test_squad_lead_claude_stop_guard_owns_the_stop_verdict
+test_squad_lead_claude_older_home_guard_keeps_the_stop_idle_hook
+test_squad_lead_claude_spawn_leaves_local_settings_untouched
+test_squad_lead_pi_extension_reports_busy_without_a_parent_turnend
+test_squad_lead_omp_extension_reports_busy_without_a_parent_turnend
+test_squad_lead_opencode_plugin_closes_without_a_parent_turnend
+test_squad_lead_codex_and_grok_do_not_arm_a_parent_turnend
 test_pi_extension_semantic_lifecycle
 test_pi_extension_serializes_settle_before_next_start
 test_pi_extension_stale_ctx_settles_unknown
@@ -907,7 +907,7 @@ test_claude_hooks_stale_incarnation_harmless
 test_gemini_hooks_semantic_lifecycle
 test_gemini_hooks_stale_incarnation_harmless
 test_raw_gemini_launch_has_no_semantic_wiring
-test_gemini_is_refused_as_a_secondmate
+test_gemini_is_refused_as_a_squad_lead
 test_codex_unverified_until_a_semantic_source_exists
 
 echo "all jg-busy-adapter-wiring tests passed"

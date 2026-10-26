@@ -1,6 +1,6 @@
 # Local Qwen coding workhorse
 
-This is home-local operator reference for the Qwen EXL3 server running on this machine's RTX 3090, not a portable firstmate guarantee.
+This is home-local operator reference for the Qwen EXL3 server running on this machine's RTX 3090, not a portable juggernaut guarantee.
 It records the current launch, the Pi provider entry, how to select reasoning effort, the measured speed and coding-quality evidence, what was tried and rejected, the safe concurrency ceiling, the rollback procedure, and what this model should and should not be trusted with.
 The deployment itself was qualified by the earlier EXL3 migration; this page only records what changed afterwards.
 Raw per-run evidence, prior-state backups, and the tuning chronology live under `~/models/qwen/tuning/20260921T132112Z/`, which is outside this repository.

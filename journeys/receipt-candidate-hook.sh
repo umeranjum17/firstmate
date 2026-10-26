@@ -70,8 +70,8 @@ gate-candidate=[$SHA]" "pr=$URL pr_head=$SHA" yes ""
   run addon-returns-other other 1 "hook consulted" "" no "error: receipts add-on hook jg_receipts_pr_candidate returned a candidate other than the verified pull request head; no receipt candidate was chosen"
 } 2>&1 | tee "$OUT/receipt-hook-transcript.txt"
 cat > "$OUT/steps.json" <<'J'
-{"target":{"version":"firstmate bin/jg-pr-check.sh at this commit"},
- "start":"a disposable firstmate home with one direct-PR task and a verified forge head",
+{"target":{"version":"juggernaut bin/jg-pr-check.sh at this commit"},
+ "start":"a disposable juggernaut home with one direct-PR task and a verified forge head",
  "steps":["run jg-pr-check.sh with no receipts add-on installed","run jg-pr-check.sh with an add-on whose hook returns the verified PR head","run jg-pr-check.sh with an add-on whose hook returns a different head"],
  "result":"no add-on registers the PR as before; the matching add-on candidate is accepted and passed to the gate; the other value is refused with the hook named, nothing recorded or armed"}
 J

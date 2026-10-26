@@ -210,9 +210,9 @@ pass "an empty session is started inside the launch agent"
 
 # --- an Aqua-born owner is left alone ----------------------------------------
 
-hold XPC_SERVICE_NAME=dev.firstmate.herdr.jg-remote
+hold XPC_SERVICE_NAME=dev.juggernaut.herdr.jg-remote
 LAUNCHD_PID=$HOLDER_PID
-hold XPC_SERVICE_NAME=dev.firstmate.herdr.jg-remote
+hold XPC_SERVICE_NAME=dev.juggernaut.herdr.jg-remote
 BACKGROUND_PID=$HOLDER_PID
 hold XPC_SERVICE_NAME=0
 XPC_ZERO_PID=$HOLDER_PID
@@ -230,7 +230,7 @@ sleep 0.3
 
 new_case running
 printf '%s\n' "$LAUNCHD_PID" > "$CASE_OWNER"
-load_job gui dev.firstmate.herdr.jg-remote "$LAUNCHD_PID"
+load_job gui dev.juggernaut.herdr.jg-remote "$LAUNCHD_PID"
 guard
 expect_code 0 "$GUARD_RC" "the guard did not exit 0 for a gui-domain launchd owner"
 assert_not_started "the guard started a second server over a gui-domain launchd owner"
@@ -240,7 +240,7 @@ assert_contains "$GUARD_OUT" "pid $LAUNCHD_PID born in the Aqua login session (l
 
 new_case running
 printf '%s\n' "$WORKER_PID" > "$CASE_OWNER"
-load_job gui dev.firstmate.remote-job
+load_job gui dev.juggernaut.remote-job
 guard
 expect_code 0 "$GUARD_RC" "the guard did not exit 0 for the gui-domain worker owner"
 assert_not_started "the guard started a second server over a gui-domain worker owner"
@@ -253,8 +253,8 @@ pass "launchd and worker markers require gui-domain launchctl proof"
 
 new_case running
 printf '%s\n' "$BACKGROUND_PID" > "$CASE_OWNER"
-load_job gui dev.firstmate.herdr.jg-remote
-load_job user dev.firstmate.herdr.jg-remote
+load_job gui dev.juggernaut.herdr.jg-remote
+load_job user dev.juggernaut.herdr.jg-remote
 guard
 expect_code 0 "$GUARD_RC" "the guard failed to take over a label also loaded in the user domain"
 assert_stop_before_start

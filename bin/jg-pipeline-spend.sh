@@ -2,7 +2,7 @@
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-pipeline-spend.sh - attribute a task's no-mistakes pipeline spend to the
-# task and keep it in Firstmate's own records.
+# task and keep it in Juggernaut's own records.
 #
 # Usage:
 #   jg-pipeline-spend.sh record <task-id>
@@ -19,7 +19,7 @@
 # private and gitignored with the rest of data/.
 # Exit status: 0 when a record was recorded or already present, its source is
 # unavailable, or recording is disabled; 1 when the task record is missing,
-# names a secondmate, or the record could not be built or written; 2 for bad usage.
+# names a squad_lead, or the record could not be built or written; 2 for bad usage.
 #
 # Source. no-mistakes keeps each agent invocation's token usage only in its
 # local state database, one agent_invocations row per invocation; its
@@ -116,7 +116,7 @@ META="$STATE/$ID.meta"
 meta_value() {  # <key>
   grep "^$1=" "$META" 2>/dev/null | tail -1 | cut -d= -f2- || true
 }
-[ "$(meta_value kind)" != secondmate ] || fail "$ID is a secondmate, not a task"
+[ "$(meta_value kind)" != squad_lead ] || fail "$ID is a squad_lead, not a task"
 command -v python3 >/dev/null 2>&1 || fail "python3 is required to read no-mistakes' state database"
 
 WT=$(meta_value worktree)

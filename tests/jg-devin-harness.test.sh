@@ -34,7 +34,7 @@ pass "Devin native identity; anchored liveness"
 [ "$(jg_control_exit_command devin)" = /quit ] || fail 'wrong exit command'
 jg_control_harness_supports_kind devin ship || fail 'ship refused'
 jg_control_harness_supports_kind devin scout || fail 'scout refused'
-! jg_control_harness_supports_kind devin secondmate || fail 'secondmate accepted'
+! jg_control_harness_supports_kind devin squad_lead || fail 'squad_lead accepted'
 pass "worker-only resolution and lifecycle capabilities"
 
 [ "$(jg_composer_classify_content 1 '❭ Ask Devin to build features, fix bugs, or work on your code' "$JG_COMPOSER_IDLE_RE_DEFAULT" sensitive '' 1 0)" = empty ] || fail 'idle placeholder not empty'
@@ -122,7 +122,7 @@ case "$launch" in *--effort*|*--thinking*) fail 'independent effort reached Devi
 assert_grep 'effort=xhigh' "$home/state/devin-worker.meta" 'effort not recorded'
 assert_present "$home/state/devin-worker.devin-config.json" 'spawn did not wire hooks'
 [ "$(jg_busy_classify tmux fake:w devin devin-worker "$home/state")" = 'busy jg-spawn' ] || fail 'launch not armed'
-if out=$(jg_test_run_spawn "$home" "$wt" "$fakebin" devin-sm "$proj" --secondmate --harness devin 2>&1)
-then fail 'Devin secondmate launch accepted'; fi
-assert_contains "$out" 'crewmate/scout adapter only' 'wrong secondmate refusal'
+if out=$(jg_test_run_spawn "$home" "$wt" "$fakebin" devin-sm "$proj" --squad-lead --harness devin 2>&1)
+then fail 'Devin squad_lead launch accepted'; fi
+assert_contains "$out" 'operator/scout adapter only' 'wrong squad_lead refusal'
 pass "scout launch carries Fusion, autonomy, typed brief and hooks; effort recorded only"

@@ -44,7 +44,7 @@
 #       launchd  XPC_SERVICE_NAME=<label>, with launchctl proving that job is
 #                the owner in gui/<uid> or is loaded only in that domain
 #       worker   JG_REMOTE_JOB_ACTIVE=1, with launchctl proving that
-#                dev.firstmate.remote-job is loaded only in gui/<uid>
+#                dev.juggernaut.remote-job is loaded only in gui/<uid>
 #       unknown  none of the above; XPC_SERVICE_NAME alone, including value 0,
 #                does not prove an Aqua birth
 #   jg_remote_herdr_birth_is_aqua <birth>
@@ -140,7 +140,7 @@ jg_remote_herdr_owner_birth() { # <pid>
   fi
   if printf '%s\n' "$env" | grep -q -E '^JG_REMOTE_JOB_ACTIVE=1$' \
     && [ -n "$uid" ] \
-    && jg_remote_herdr_gui_job_is_exclusive "$uid" dev.firstmate.remote-job; then
+    && jg_remote_herdr_gui_job_is_exclusive "$uid" dev.juggernaut.remote-job; then
     printf 'worker\n'
     return 0
   fi

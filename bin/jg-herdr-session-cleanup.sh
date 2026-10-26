@@ -5,7 +5,7 @@
 #
 # Usage: jg-herdr-session-cleanup.sh
 #
-# The caller must already own this Firstmate home's session lock. This script is
+# The caller must already own this Juggernaut home's session lock. This script is
 # home-local and considers only the current named Herdr session and ordinary
 # state/*.herdr-presentation journals in the effective JG_HOME. Each candidate
 # is additionally serialized by the existing state/.spawn-<task>.lock and the

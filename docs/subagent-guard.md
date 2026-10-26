@@ -136,8 +136,8 @@ It costs one line and removes the failure mode where a rename or a rollback sile
 The shipped hook fires only in a genuine Juggernaut primary home, using the shared predicate `jg_primary_scope_matches` from `bin/jg-primary-scope-lib.sh`.
 This is the same predicate `bin/jg-sessionstart-nudge.sh` and `bin/jg-turnend-guard.sh` use, so the three tracked primary-scoped hooks cannot drift apart.
 
-A home is in scope when it has `AGENTS.md`, a `bin/` directory, an existing state directory, and either a plain checkout where git-dir equals git-common-dir or a valid `.jg-secondmate-home` marker.
-A marked secondmate home is in scope on purpose: it operates its own fleet and must dispatch through it for the same durability reasons.
+A home is in scope when it has `AGENTS.md`, a `bin/` directory, an existing state directory, and either a plain checkout where git-dir equals git-common-dir or a valid `.jg-squad-lead-home` marker.
+A marked squad lead home is in scope on purpose: it operates its own fleet and must dispatch through it for the same durability reasons.
 
 An operator's disposable task worktree is a linked git worktree, which is the shape `bin/jg-spawn.sh` always hands out, so it is out of scope.
 An operator using delegation tools inside its own task worktree is legitimate and stays allowed.
@@ -235,7 +235,7 @@ The integration surface of each was inspected and each is structurally wireable 
   The same change applies. A parallel evaluation reports that Pi exposes no delegation tool at all, which would make it not applicable, but that was not verified here.
 
 None of the three is wired in this change because none of the three binaries is installed on the host where this work was done, so the exact tool-name tokens could not be confirmed and the wiring could not be validated against the real harness.
-This repo's rule in the `firstmate-coding-guidelines` skill is that a harness hook must be validated in a scratch project before it is trusted, and `arm-pretool-check.md` records the concrete cost of guessing: a Grok hook whose `command` string is even slightly wrong fails to launch the hook at all.
+This repo's rule in the `juggernaut-coding-guidelines` skill is that a harness hook must be validated in a scratch project before it is trusted, and `arm-pretool-check.md` records the concrete cost of guessing: a Grok hook whose `command` string is even slightly wrong fails to launch the hook at all.
 Wiring an unvalidated matcher would trade a known gap for an unknown breakage.
 
 The bounded follow-up for each is identical to the Codex procedure above.
@@ -318,7 +318,7 @@ Claude reported:
 ```text
 I attempted the Workflow tool call as requested. It was blocked by a PreToolUse hook in this repo:
 
-> [subagent-dispatch] the firstmate primary dispatches through the fleet, not the harness's own
+> [subagent-dispatch] the juggernaut primary dispatches through the fleet, not the harness's own
 > delegation tools... (blocked tool: Workflow). Launch the session with JG_ALLOW_SUBAGENT=1 for a
 > deliberate exception.
 ```
@@ -354,7 +354,7 @@ The live consequence is confirmed by the shipped-guard result above: Claude hono
 ## Automated validation
 
 `tests/jg-subagent-pretool-check.test.sh` owns the acceptance matrix and is registered in the `pure-contract-unit` family in `bin/jg-test-run.sh`.
-It covers the tracked Claude settings boundary that forbids a `permissions` key; the match-all Claude hook registration; denial of every work-creating delegation tool by shape; denial of twelve hypothetical future tool names that appear on no list; the observe-or-stop, plan-only, and MCP exclusions; the exactness of the plan-only exclusion against six near-miss names a substring or shorter-stem widening would release; the scout-present and scout-absent message variants; the escape hatch including its fail-closed values; inertness in a linked task worktree and in a non-Juggernaut repo; in-scope enforcement for a marked secondmate home; both stdin transports; the empty-stdout requirement; fail-open transport behavior; and the preserved `Bash` seatbelts and `Stop` guard.
+It covers the tracked Claude settings boundary that forbids a `permissions` key; the match-all Claude hook registration; denial of every work-creating delegation tool by shape; denial of twelve hypothetical future tool names that appear on no list; the observe-or-stop, plan-only, and MCP exclusions; the exactness of the plan-only exclusion against six near-miss names a substring or shorter-stem widening would release; the scout-present and scout-absent message variants; the escape hatch including its fail-closed values; inertness in a linked task worktree and in a non-Juggernaut repo; in-scope enforcement for a marked squad lead home; both stdin transports; the empty-stdout requirement; fail-open transport behavior; and the preserved `Bash` seatbelts and `Stop` guard.
 
 Run:
 

@@ -22,8 +22,8 @@ if [ -n "${JG_TASK_ID:-}" ]; then
 else
   home=${JG_HOME:-$(pwd -P)}
   name=''
-  if [ -r "$home/data/secondmates.md" ]; then
-    name=$(awk -v home="$home" 'index($0, "(home: " home ";") { print $2; exit }' "$home/data/secondmates.md")
+  if [ -r "$home/data/squad_leads.md" ]; then
+    name=$(awk -v home="$home" 'index($0, "(home: " home ";") { print $2; exit }' "$home/data/squad_leads.md")
   fi
   [ -n "$name" ] || name=$(basename "$home")
   name=${name//[-_]/ }

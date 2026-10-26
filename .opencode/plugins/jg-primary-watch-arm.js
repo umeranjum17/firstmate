@@ -2,7 +2,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { encodeFirstmateOperationalInput } from "./lib/jg-operational-input.js";
+import { encodeJuggernautOperationalInput } from "./lib/jg-operational-input.js";
 // jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves here
 for (const [_jgOld, _jgVal] of Object.entries(process.env))
   if (_jgOld.startsWith("FM_") && process.env[`JG_${_jgOld.slice(3)}`] === undefined)
@@ -19,7 +19,7 @@ for (const [_jgOld, _jgVal] of Object.entries(process.env))
 // line as soon as it is verified, so readiness and the handling handoff work
 // as they do for the arm, with a longer readiness budget for the host's own
 // startup. On a home that does not run the host nothing below changes.
-const COORDINATOR_KEY = "__firstmateOpenCodeWatchArm";
+const COORDINATOR_KEY = "__juggernautOpenCodeWatchArm";
 const WAKE_LINE = /^(signal:|stale:|check:|heartbeat($|:))/;
 const HOST_LINE = /^supervision-host:/;
 const ARM_RETIRE_TIMEOUT_MS = positiveInteger("JG_WATCH_ARM_RETIRE_TIMEOUT_MS", 1000);
@@ -121,8 +121,8 @@ function effectivePaths(root) {
 // bin/jg-primary-scope-lib.sh's jg_primary_root_matches is the single owner of
 // the primary-home predicate (the turn-end guard and session-start nudge decide
 // with the same one), so this plugin can never disagree with them again. It
-// force-includes a linked treehouse-leased secondmate home carrying a valid
-// .jg-secondmate-home marker, which a bare git-dir==common-dir test rejects.
+// force-includes a linked treehouse-leased squad_lead home carrying a valid
+// .jg-squad-lead-home marker, which a bare git-dir==common-dir test rejects.
 function isPrimaryRoot(root) {
   if (!root) return false;
   const result = spawnSync(
@@ -281,7 +281,7 @@ function observeArmOutput(hostMode, stdout, stderr, settleReadiness) {
 }
 
 async function sendPrompt(paths, client, sessionID, text) {
-  const encoded = await encodeFirstmateOperationalInput(paths.root, "watcher", text);
+  const encoded = await encodeJuggernautOperationalInput(paths.root, "watcher", text);
   await client.session.promptAsync({
     path: { id: sessionID },
     body: {

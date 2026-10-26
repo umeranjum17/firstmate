@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Behavior tests for Cursor Agent CLI as a firstmate PRIMARY
+# Behavior tests for Cursor Agent CLI as a juggernaut PRIMARY
 # (docs/turnend-guard.md, docs/sessionstart-nudge.md,
 # docs/supervision-protocols/cursor.md).
 #
@@ -706,8 +706,8 @@ test_park_inert_in_child_worktree() {
   : > "$child/state/task1.meta"
   write_arm_fixture "$child" actionable
   out=$(run_park "$child")
-  [ -z "$out" ] || fail "a crewmate worktree must stay outside primary scope: $out"
-  pass "cursor park: inert inside a child crewmate worktree"
+  [ -z "$out" ] || fail "a operator worktree must stay outside primary scope: $out"
+  pass "cursor park: inert inside a child operator worktree"
 }
 
 test_park_ignores_malformed_payload() {
@@ -728,7 +728,7 @@ install_digest_fixture() {  # <dir>
   cat > "$1/bin/jg-session-start.sh" <<'SH'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "$JG_HOME/state/digest-args"
-printf 'FIRSTMATE DIGEST "quoted" line\nsecond line\n'
+printf 'JUGGERNAUT DIGEST "quoted" line\nsecond line\n'
 SH
   chmod +x "$1/bin/jg-session-start.sh"
 }
@@ -739,7 +739,7 @@ test_sessionstart_emits_additional_context() {
   install_digest_fixture "$dir"
   out=$(run_session "$dir" sessionStart startup)
   ctx=$(printf '%s' "$out" | jq -r '.additional_context // empty' 2>/dev/null)
-  case "$ctx" in *'FIRSTMATE DIGEST "quoted" line'*) ;; *) fail "the digest must reach model context verbatim, got: $out" ;; esac
+  case "$ctx" in *'JUGGERNAUT DIGEST "quoted" line'*) ;; *) fail "the digest must reach model context verbatim, got: $out" ;; esac
   case "$ctx" in *'second line'*) ;; *) fail "the digest was truncated at the first line: $ctx" ;; esac
   grep -q -- '--source startup' "$dir/state/digest-args" \
     || fail "the adapter must supply --source itself; Cursor's payload has no source field"
@@ -758,7 +758,7 @@ test_sessionstart_silent_in_child_worktree() {
   out=$(printf '{"hook_event_name":"sessionStart","cursor_version":"x"}' \
     | JG_HOME="$child" bash "$child/bin/jg-sessionstart-cursor.sh" --source startup 2>/dev/null)
   [ -z "$out" ] || fail "a child worktree must never take the helm: $out"
-  pass "jg-sessionstart-cursor: silent inside a child crewmate worktree"
+  pass "jg-sessionstart-cursor: silent inside a child operator worktree"
 }
 
 # --- registration ------------------------------------------------------------
@@ -766,7 +766,7 @@ test_sessionstart_silent_in_child_worktree() {
 test_tracked_registration_covers_the_primary_events() {
   local reg
   reg="$ROOT/.cursor/hooks.json"
-  [ -f "$reg" ] || fail "firstmate must ship a tracked project-scope .cursor/hooks.json"
+  [ -f "$reg" ] || fail "juggernaut must ship a tracked project-scope .cursor/hooks.json"
   jq -e '.hooks.stop and .hooks.sessionStart and .hooks.preToolUse' "$reg" >/dev/null 2>&1 \
     || fail "the registration must cover stop, sessionStart, and preToolUse"
   jq -e '.hooks | has("preCompact") | not' "$reg" >/dev/null 2>&1 \
@@ -779,7 +779,7 @@ test_tracked_registration_covers_the_primary_events() {
 }
 
 # The two bounds must nest, and the only honest way to prove it is to run the
-# adapter at Cursor's own registered limit with its DEFAULT ceiling: firstmate's
+# adapter at Cursor's own registered limit with its DEFAULT ceiling: juggernaut's
 # bound must already have stopped the loop by then, so Cursor's hard ceiling is
 # never what silently ends supervision.
 test_default_ceiling_bites_before_the_registered_loop_limit() {
@@ -792,7 +792,7 @@ test_default_ceiling_bites_before_the_registered_loop_limit() {
   out=$(run_park "$dir" "$((limit - 1))")
   [ -z "$out" ] || fail "at Cursor's own limit the adapter must already be quiet from its own bound, got: $out"
   [ ! -e "$dir/state/arm-ran" ] || fail "the adapter armed past its own default ceiling"
-  pass "cursor bounds nest: firstmate's default ceiling stops the loop before Cursor's loop_limit does"
+  pass "cursor bounds nest: juggernaut's default ceiling stops the loop before Cursor's loop_limit does"
 }
 
 test_turnend_guard_stands_down_on_cursor_payload

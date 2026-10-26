@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# PreToolUse hook for the supervisor-work guard. It stops a firstmate SUPERVISOR
+# PreToolUse hook for the supervisor-work guard. It stops a juggernaut SUPERVISOR
 # session from doing a worker's job: driving a crew-owned no-mistakes run,
-# sleeping inside a turn, or (a secondmate lead) typing into a pane.
+# sleeping inside a turn, or (a squad_lead lead) typing into a pane.
 # install.sh copies this file, the policy and the decider into one data dir and
-# writes that dir's ./home file, the Firstmate home the hook is registered for.
+# writes that dir's ./home file, the Juggernaut home the hook is registered for.
 # The scope predicate and the shell lexer come from that home's checkout.
 # Fails open: anything unknown is an allow, and a missing piece says so on stderr.
 set -u
@@ -41,7 +41,7 @@ done < "$DEST/home"
 jg_primary_scope_matches "$FMH" "$FMH/state" || exit 0
 
 ARGS=()
-jg_root_is_secondmate_home "$FMH" && ARGS+=(--secondmate)
+jg_root_is_squad_lead_home "$FMH" && ARGS+=(--squad-lead)
 VERDICT=$(node "$DEST/jg-supervisor-work-decide.mjs" --lexer "$FMH/bin/jg-arm-command-policy.mjs" \
   "${ARGS[@]+"${ARGS[@]}"}" --command "$CMD" 2>/dev/null) \
   || { echo "jg-supervisor-work: policy could not run, allowing" >&2; exit 0; }

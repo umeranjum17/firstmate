@@ -2,7 +2,7 @@
 # Shared "supervision missing" predicate.
 # Usage: . bin/jg-supervision-lib.sh
 #
-# Reports whether a firstmate home needs supervision (jg_supervision_status
+# Reports whether a juggernaut home needs supervision (jg_supervision_status
 # below is the single owner of that condition set), and whether its watcher has
 # a fresh liveness beacon (state/.last-watcher-beat, touched every poll cycle,
 # within the grace window).

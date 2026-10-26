@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
-# launchd exec target for the Firstmate-owned dev.firstmate.herdr.jg-remote
+# launchd exec target for the Juggernaut-owned dev.juggernaut.herdr.jg-remote
 # launch agent: make the Aqua login session own the jg-remote Herdr server.
 #
 # Usage:
@@ -32,8 +32,8 @@
 #                                          reconnecting SSH attach can start
 #                                          another foreign server
 #   the foreign server does not release the socket in time -> exit 1
-# A takeover closes every pane in that session; the parent firstmate's
-# secondmate liveness sweep relaunches its mates into the Aqua-born server.
+# A takeover closes every pane in that session; the parent juggernaut's
+# squad_lead liveness sweep relaunches its mates into the Aqua-born server.
 # bin/jg-remote-herdr-owner-lib.sh owns the owner discovery and the birth
 # markers; JG_REMOTE_HERDR_GUARD_STOP_WAIT_TENTHS (default 50) bounds the
 # release wait in tenths of a second. Every decision prints one line to

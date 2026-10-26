@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install or update the supervisor-work guard for this user and one firstmate home.
+# Install or update the supervisor-work guard for this user and one juggernaut home.
 # Idempotent: rerun it to update. Usage: install.sh [--dry-run] <jg-home>
 # Copies the three guard files to ${XDG_DATA_HOME:-$HOME/.local/share}/jg-supervisor-guard,
 # records the home, and merges one PreToolUse Bash hook into ~/.claude/settings.json.

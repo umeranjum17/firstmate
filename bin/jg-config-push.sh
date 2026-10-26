@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
-# Push declared inherited local material to live secondmate homes.
+# Push declared inherited local material to live squad_lead homes.
 # Usage: jg-config-push.sh [--help]
 #
 # Mid-session convergence for inherited local material such as
 # config/crew-dispatch.json, config/backend, or data/captain-shared.md updates.
-# This discovers live secondmate homes from state/*.meta, backfills
-# home= from data/secondmates.md for older meta records, and reuses the same
+# This discovers live squad_lead homes from state/*.meta, backfills
+# home= from data/squad_leads.md for older meta records, and reuses the same
 # propagation machinery as bootstrap, but deliberately does not
 # fast-forward tracked files.
 # After a successful per-home propagation that changes any allowlisted config/*
@@ -22,8 +22,8 @@ usage() {
   cat <<'EOF'
 Usage: jg-config-push.sh [--help]
 
-Push the primary firstmate home's declared inherited local material into each
-live secondmate home.
+Push the primary juggernaut home's declared inherited local material into each
+live squad_lead home.
 
 This is local-material-only:
   - does not fast-forward tracked files
@@ -34,13 +34,13 @@ This is local-material-only:
     skipped, or error
   - exits non-zero for real propagation errors or reread-send failures
 
-Live homes come from state/*.meta records with kind=secondmate.
-data/secondmates.md is only a fallback for missing home= fields in older or
+Live homes come from state/*.meta records with kind=squad_lead.
+data/squad_leads.md is only a fallback for missing home= fields in older or
 incomplete meta records.
 
-Environment overrides follow the rest of firstmate:
-  JG_HOME            active firstmate home
-  JG_ROOT_OVERRIDE  firstmate repo root
+Environment overrides follow the rest of juggernaut:
+  JG_HOME            active juggernaut home
+  JG_ROOT_OVERRIDE  juggernaut repo root
   JG_STATE_OVERRIDE state dir
   JG_DATA_OVERRIDE  data dir
   JG_CONFIG_OVERRIDE config dir
@@ -66,7 +66,7 @@ JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
 CONFIG="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"
 STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
 DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
-SECONDMATES_MD="$DATA/secondmates.md"
+SQUAD_LEADS_MD="$DATA/squad_leads.md"
 
 "$SCRIPT_DIR/jg-guard.sh" || true
 
@@ -78,9 +78,9 @@ SECONDMATES_MD="$DATA/secondmates.md"
 . "$SCRIPT_DIR/jg-wake-lib.sh"
 # shellcheck source=bin/jg-config-inherit-lib.sh
 . "$SCRIPT_DIR/jg-config-inherit-lib.sh"
-# shellcheck source=bin/jg-secondmate-nudge-lib.sh
-. "$SCRIPT_DIR/jg-secondmate-nudge-lib.sh"
-# Parked-home guard (firstmate-addons/parked-homes): a parked home gets no
+# shellcheck source=bin/jg-squad-lead-nudge-lib.sh
+. "$SCRIPT_DIR/jg-squad-lead-nudge-lib.sh"
+# Parked-home guard (juggernaut-addons/parked-homes): a parked home gets no
 # config push. The shim answers not parked when the add-on is absent (stock behavior).
 # shellcheck source=bin/jg-parked-homes-lib.sh
 . "$SCRIPT_DIR/jg-parked-homes-lib.sh"
@@ -109,29 +109,29 @@ cleanup() {
 }
 trap cleanup EXIT
 
-live_secondmate_meta_records "$STATE" "$SECONDMATES_MD" > "$records"
+live_squad_lead_meta_records "$STATE" "$SQUAD_LEADS_MD" > "$records"
 if [ ! -s "$records" ]; then
-  echo "config-push: no live secondmate homes found"
+  echo "config-push: no live squad_lead homes found"
   exit 0
 fi
 
-echo "config-push: $JG_HOME -> live secondmate homes"
+echo "config-push: $JG_HOME -> live squad_lead homes"
 
 seen_homes=""
 errors=0
 while IFS='|' read -r id home _window meta; do
   [ -n "$id" ] || continue
   if [ -z "$home" ]; then
-    printf 'secondmate %s: skipped - no home= in %s and no registry home\n' "$id" "$meta"
+    printf 'squad_lead %s: skipped - no home= in %s and no registry home\n' "$id" "$meta"
     continue
   fi
-  # Parked-home guard (firstmate-addons/parked-homes): a parked home gets no
+  # Parked-home guard (juggernaut-addons/parked-homes): a parked home gets no
   # config push and no reread nudge. One line names the skip. No-op without
   # the add-on checkout.
   jg_parked_skip_meta "$meta" "$id" config-push && continue
   remote_host=$(jg_meta_get "$meta" remote_host)
   if [ -n "$remote_host" ]; then
-    printf 'secondmate %s (%s:%s):\n' "$id" "$remote_host" "$home"
+    printf 'squad_lead %s (%s:%s):\n' "$id" "$remote_host" "$home"
     remote_lock=$(jg_remote_inherit_transaction_lock_path "$STATE" "$id" 2>/dev/null || true)
     if [ -z "$remote_lock" ] || ! jg_lock_acquire_wait "$remote_lock"; then
       echo "  config-reread: transaction lock failed"
@@ -145,10 +145,10 @@ while IFS='|' read -r id home _window meta; do
       jg_lock_release "$remote_lock" || true
       continue
     fi
-    remote_marker=$(jg_secondmate_nudge_marker_path "$STATE" "$id" 2>/dev/null || true)
+    remote_marker=$(jg_squad_lead_nudge_marker_path "$STATE" "$id" 2>/dev/null || true)
     remote_pending=0
     if [ -f "$remote_marker" ] && [ "$(jg_meta_get "$remote_marker" remote)" = 1 ]; then remote_pending=1; fi
-    if ! jg_secondmate_nudge_write "$STATE" "$id" "$home" "" remote \
+    if ! jg_squad_lead_nudge_write "$STATE" "$id" "$home" "" remote \
       "$JG_REMOTE_SECOND_MATE_NUDGE_MESSAGE" 1; then
       echo "  config-reread: retry marker failed"
       errors=1
@@ -180,20 +180,20 @@ while IFS='|' read -r id home _window meta; do
     jg_lock_release "$remote_lock" || true
     continue
   fi
-  if ! validate_secondmate_home "$id" "$home"; then
-    printf 'secondmate %s (%s): skipped - unsafe home: %s\n' "$id" "$home" "$VALIDATION_ERROR"
+  if ! validate_squad_lead_home "$id" "$home"; then
+    printf 'squad_lead %s (%s): skipped - unsafe home: %s\n' "$id" "$home" "$VALIDATION_ERROR"
     continue
   fi
   home_real="$VALIDATED_HOME"
   case " $seen_homes " in
     *" $home_real "*)
-      printf 'secondmate %s (%s): skipped - already processed for another live meta\n' "$id" "$home_real"
+      printf 'squad_lead %s (%s): skipped - already processed for another live meta\n' "$id" "$home_real"
       continue
       ;;
   esac
   seen_homes="$seen_homes $home_real"
 
-  printf 'secondmate %s (%s):\n' "$id" "$home_real"
+  printf 'squad_lead %s (%s):\n' "$id" "$home_real"
   dirty=$(dirty_status "$home_real" yes || true)
   if [ -n "$dirty" ]; then
     echo "  home: dirty working tree - local-material push continuing"
@@ -232,7 +232,7 @@ while IFS='|' read -r id home _window meta; do
   }
   reports="$reports $report"
   if JG_CONFIG_INHERIT_REPORT="$report" JG_CONFIG_INHERIT_LIVE=1 \
-    propagate_secondmate_inheritance "$JG_HOME" "$home_real" "$CONFIG" "$DATA"; then
+    propagate_squad_lead_inheritance "$JG_HOME" "$home_real" "$CONFIG" "$DATA"; then
     :
   else
     errors=1

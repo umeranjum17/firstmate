@@ -4,8 +4,8 @@
 # Watcher liveness and worktree-tangle guard, called by supervision scripts, by
 # jg-wake-drain.sh after it empties queued wakes, and by jg-session-start.sh in
 # read-only advisory mode whenever session-lock ownership was not verified.
-# First, always warn if the firstmate primary checkout (JG_ROOT) is on a named
-# non-default branch, because that means firstmate-on-itself work landed in the
+# First, always warn if the juggernaut primary checkout (JG_ROOT) is on a named
+# non-default branch, because that means juggernaut-on-itself work landed in the
 # primary instead of an isolated worktree.
 # Then, if the home needs supervision (bin/jg-supervision-lib.sh owns that
 # condition set) and that supervision is not healthy, prints a loud, clearly
@@ -148,11 +148,11 @@ jg_guard_clear_stale_banner() {
 }
 
 # Worktree-tangle alarm, checked FIRST and independent of in-flight tasks: the
-# firstmate PRIMARY checkout (JG_ROOT) must stay on its default branch. If a
-# crewmate's branch/commits landed here instead of in its own isolated worktree,
+# juggernaut PRIMARY checkout (JG_ROOT) must stay on its default branch. If a
+# operator's branch/commits landed here instead of in its own isolated worktree,
 # the primary is stranded on a feature branch - surface it loudly on the very next
 # fleet action, the same way the watcher-down banner does. Scoped to the primary
-# only: detached HEAD (linked worktrees, secondmate homes) never trips this.
+# only: detached HEAD (linked worktrees, squad_lead homes) never trips this.
 tangle_branch=$(jg_primary_tangle_branch "$JG_ROOT" || true)
 if [ -n "$tangle_branch" ]; then
   tangle_default=$(jg_default_branch "$JG_ROOT" 2>/dev/null || echo main)
@@ -161,7 +161,7 @@ if [ -n "$tangle_branch" ]; then
     printf '●%s\n' "$trule"
     printf '●  WORKTREE TANGLE - PRIMARY CHECKOUT IS ON A FEATURE BRANCH\n'
     printf "●  %s is on '%s', not its default branch '%s'.\n" "$JG_ROOT" "$tangle_branch" "$tangle_default"
-    printf '●  A crewmate likely branched/committed in the primary instead of its own worktree.\n'
+    printf '●  A operator likely branched/committed in the primary instead of its own worktree.\n'
     printf "●  The work is SAFE on the '%s' ref.\n" "$tangle_branch"
     if [ "$READ_ONLY" -eq 1 ]; then
       printf '●  This read-only session must leave restore work to a session with verified fleet-lock ownership.\n'

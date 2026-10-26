@@ -11,7 +11,7 @@ The skill tree rooted at [`.agents/skills/harness-adapters/SKILL.md`](../../.age
 | Verified | 2026-09-10 |
 | Binary | `/home/andpod/.local/bin/agy`, an ELF 64-bit Go-compiled single executable |
 | Platform | Linux x64 (Arch, kernel 7.2.3) |
-| Backend | Herdr, in an isolated non-`default` lab session (`jg-lab-firstmate-agy-ad-*` via `bin/jg-herdr-lab.sh`); the live `default` session was unchanged throughout |
+| Backend | Herdr, in an isolated non-`default` lab session (`jg-lab-juggernaut-agy-ad-*` via `bin/jg-herdr-lab.sh`); the live `default` session was unchanged throughout |
 
 Every command below ran inside the disposable Juggernaut task worktree or the named Herdr lab session.
 No captain fleet state was touched.
@@ -46,7 +46,7 @@ A first launch in a fresh worktree shows this dialog:
 ```
 Accessing workspace:
 
-/home/andpod/.treehouse/firstmate-7bab20/1/firstmate/agy-probe-tmp
+/home/andpod/.treehouse/juggernaut-7bab20/1/juggernaut/agy-probe-tmp
 
 Do you trust the contents of this project?
 
@@ -127,7 +127,7 @@ Sending `/quit` plus Enter exited the process; the pane closed under the `exec` 
 ## Backend liveness: Herdr recognizes agy, tmux names it
 
 ```
-$ herdr agent get w2:p1 --session jg-lab-firstmate-agy-ad-1599574-8823
+$ herdr agent get w2:p1 --session jg-lab-juggernaut-agy-ad-1599574-8823
 {"result":{"agent":{"agent":"agy","agent_status":"idle",...,"agent_session":{"agent":"agy","kind":"id","source":"herdr:antigravity_cli",...}}}}
 ```
 
@@ -158,7 +158,7 @@ No automatic quota failover was exercised or claimed; every handoff above was an
 The unauthenticated failure mode was never observed; this host's agy runs signed in, so any auth prompt is a fail-loud credential blocker, not a handled dialog.
 No slash-skill invocation form was verified, so skill invocation stays natural language.
 `--continue` and `--conversation` resume were never exercised; recovery uses deterministic relaunch from the brief on disk.
-No primary or secondmate behavior was built or tested, and none is claimed.
+No primary or squad lead behavior was built or tested, and none is claimed.
 
 ## Refreshing this record
 

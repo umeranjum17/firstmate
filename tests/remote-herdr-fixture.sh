@@ -2,8 +2,8 @@
 # tests/remote-herdr-fixture.sh - the stateful herdr CLI fixture the remote
 # second-mate suites install on their fake remote host.
 #
-# A remote second mate always launches on the Herdr backend
-# (docs/remote-secondmates.md), so a remote-route test needs a herdr CLI on the
+# A remote squad lead always launches on the Herdr backend
+# (docs/remote-squad-leads.md), so a remote-route test needs a herdr CLI on the
 # remote code root's own bin directory. This fixture models the workspace, tab,
 # pane, and agent facts bin/backends/herdr.sh actually reads, backed by a JSON
 # state file mutated with real jq, using the same verified herdr behaviors as

@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# tests/jg-secondmate-liveness.test.sh - the session-start secondmate liveness
+# tests/jg-squad-lead-liveness.test.sh - the session-start squad_lead liveness
 # guarantee owned by bin/jg-backend.sh's detailed jg_backend_agent_state and
-# bin/jg-bootstrap.sh's secondmate_liveness_sweep that acts on it.
+# bin/jg-bootstrap.sh's squad_lead_liveness_sweep that acts on it.
 #
 # The gap under test (AGENTS.md "Session start"; evidence 2026-07-07): a
-# secondmate agent that has exited leaves its backend endpoint alive as a bare
+# squad_lead agent that has exited leaves its backend endpoint alive as a bare
 # shell. jg_backend_target_exists only checks pane PRESENCE, so it reports
 # that shell "alive"; recovery only respawns endpoints reported dead, and the
-# watcher deliberately exempts secondmates from stale-pane detection (an idle
-# secondmate pane is healthy by design). A dead-shell secondmate was therefore
+# watcher deliberately exempts squad_leads from stale-pane detection (an idle
+# squad_lead pane is healthy by design). A dead-shell squad_lead was therefore
 # invisible to every existing check and sat dead indefinitely.
 #
 # The guarantees under test:
@@ -19,17 +19,17 @@
 #   - The Herdr classifier preserves the proven husk mapping while separating a
 #     missing pane from an existing agent-less pane.
 #   - jg_backend_agent_alive preserves the older three-state compatibility view.
-#   - bin/jg-bootstrap.sh's secondmate_liveness_sweep recovers only dead or
+#   - bin/jg-bootstrap.sh's squad_lead_liveness_sweep recovers only dead or
 #     missing endpoints, keeps successful recovery and already-live results
 #     silent by default, and reports ambiguous and unreadable targets distinctly.
-#   - The sweep converges: once a secondmate reads alive, a later run never
+#   - The sweep converges: once a squad_lead reads alive, a later run never
 #     re-touches it (idempotent by construction, not by remembering what it
 #     already did).
 #   - The sweep is skipped entirely under JG_BOOTSTRAP_DETECT_ONLY=1 (the
 #     read-only session path), matching the other mutating sweeps.
-#   - The sweep is naturally scoped to the primary: with no kind=secondmate
-#     meta present (a secondmate's own state/ never holds one, since
-#     secondmates never spawn secondmates), it is a silent no-op.
+#   - The sweep is naturally scoped to the primary: with no kind=squad_lead
+#     meta present (a squad_lead's own state/ never holds one, since
+#     squad_leads never spawn squad_leads), it is a silent no-op.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -38,7 +38,7 @@ set -u
 BASE_PATH=${JG_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
 jg_git_identity fmtest fmtest@example.com
 
-TMP_ROOT=$(jg_test_tmproot jg-secondmate-liveness)
+TMP_ROOT=$(jg_test_tmproot jg-squad-lead-liveness)
 
 # --- unit level: jg_backend_tmux_agent_state --------------------------------
 
@@ -200,10 +200,10 @@ test_agent_state_dispatcher_and_compatibility() {
   pass "jg_backend_agent_state: routes tmux/Herdr and keeps Zellij unverified"
 }
 
-# --- sweep level: bin/jg-bootstrap.sh's secondmate_liveness_sweep -----------
+# --- sweep level: bin/jg-bootstrap.sh's squad_lead_liveness_sweep -----------
 
 # make_toolchain <dir>: the fixed set of stubs bin/jg-bootstrap.sh's read-only
-# diagnostics need to stay quiet (mirrors tests/jg-secondmate-sync.test.sh's
+# diagnostics need to stay quiet (mirrors tests/jg-squad-lead-sync.test.sh's
 # make_fake_toolchain), MINUS tmux - callers add their own controllable tmux.
 make_toolchain() {
   local dir=$1 fakebin
@@ -313,11 +313,11 @@ SH
   printf '%s\n' "$fakebin"
 }
 
-# new_world <name>: a scratch firstmate HOME (state/, watcher beacon, pinned
-# harness) with no kind=secondmate meta yet. JG_ROOT is left to resolve
+# new_world <name>: a scratch juggernaut HOME (state/, watcher beacon, pinned
+# harness) with no kind=squad_lead meta yet. JG_ROOT is left to resolve
 # naturally to the real checkout under test ($ROOT), exactly as production
 # always has it - this sweep's own jg-spawn.sh invocation resolves the
-# secondmate harness through $JG_ROOT/bin/jg-harness.sh, which only exists in
+# squad_lead harness through $JG_ROOT/bin/jg-harness.sh, which only exists in
 # the real tree. The harness is pinned because ambient own-harness detection is
 # environment-dependent: interactive harness sessions expose markers or parent
 # process names, while a plain pipeline shell can fall through to "unknown",
@@ -331,7 +331,7 @@ new_world() {
   printf '%s\n' "$w"
 }
 
-# add_sm_home <w> <id> <window>: a plain (non-git) secondmate home - the
+# add_sm_home <w> <id> <window>: a plain (non-git) squad_lead home - the
 # probe/respawn machinery under test never requires the home to be a real
 # worktree; a non-git home just makes the unrelated fast-forward sweep log a
 # harmless "not a git repo" skip.
@@ -339,14 +339,14 @@ add_sm_home() {
   local w=$1 id=$2 window=$3 harness=${4:-claude}
   local home="$w/$id"
   mkdir -p "$home/bin" "$home/data" "$home/state" "$home/config" "$home/projects"
-  printf '%s\n' "$id" > "$home/.jg-secondmate-home"
-  printf '# Firstmate\n' > "$home/AGENTS.md"
+  printf '%s\n' "$id" > "$home/.jg-squad-lead-home"
+  printf '# Juggernaut\n' > "$home/AGENTS.md"
   printf 'charter\n' > "$home/data/charter.md"
   printf '%s\n' 'projects/' 'state/' 'data/' 'config/' '.no-mistakes/' > "$home/.gitignore"
   git -C "$home" init -q -b main
   {
     printf 'window=%s\n' "$window"
-    printf 'kind=secondmate\n'
+    printf 'kind=squad_lead\n'
     printf 'harness=%s\n' "$harness"
     printf 'home=%s\n' "$home"
   } > "$w/home/state/$id.meta"
@@ -354,13 +354,13 @@ add_sm_home() {
 
 # make_parked_addon <w> <parked-id>...: a synthetic parked-homes add-on
 # checkout at the in-repo shim's documented resolution path
-# ($JG_HOME/projects/firstmate-addons/parked-homes/bin). It implements the
+# ($JG_HOME/projects/juggernaut-addons/parked-homes/bin). It implements the
 # hook contract the shim sources - the refuse and skip predicates answered from
 # $JG_HOME/config/parked-homes - so the sweep's parked guard is exercised
 # through the real sourcing boundary, not a stubbed function.
 make_parked_addon() {
   local w=$1 id
-  local dir="$w/home/projects/firstmate-addons/parked-homes/bin"
+  local dir="$w/home/projects/juggernaut-addons/parked-homes/bin"
   mkdir -p "$dir" "$w/home/config"
   : > "$w/home/config/parked-homes"
   for id in "${@:2}"; do
@@ -378,7 +378,7 @@ jg_parked_refuse_meta() {
 }
 jg_parked_skip_meta() {
   jg_parked_home "${2:?}" || return 1
-  printf 'SECONDMATE_LIVENESS: secondmate %s: skipped: its home is parked (config/parked-homes)\n' "$2"
+  printf 'SQUAD_LEAD_LIVENESS: squad_lead %s: skipped: its home is parked (config/parked-homes)\n' "$2"
 }
 SH
 }
@@ -390,55 +390,55 @@ run_bootstrap() {  # <fakebin> <home> <pane-cmd> <call-log> [extra env...] -> st
     env "$@" "$ROOT/bin/jg-bootstrap.sh" 2>&1
 }
 
-test_sweep_respawns_confirmed_dead_secondmate() {
+test_sweep_respawns_confirmed_dead_squad_lead() {
   local w fb tmuxfb log out
   w=$(new_world sweep-dead)
-  add_sm_home "$w" sm1 firstmate:jg-sm1
+  add_sm_home "$w" sm1 juggernaut:jg-sm1
   fb=$(make_toolchain "$w"); tmuxfb=$(make_liveness_tmux "$w")
   log="$w/calls.log"; : > "$log"
 
   out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" zsh "$log")
 
-  assert_not_contains "$out" "SECONDMATE_LIVENESS: secondmate sm1: respawned" \
-    "a successfully respawned secondmate should be handled silently"
-  assert_contains "$(cat "$log")" "kill-window -t =firstmate:=jg-sm1" \
+  assert_not_contains "$out" "SQUAD_LEAD_LIVENESS: squad_lead sm1: respawned" \
+    "a successfully respawned squad_lead should be handled silently"
+  assert_contains "$(cat "$log")" "kill-window -t =juggernaut:=jg-sm1" \
     "the stale endpoint must be killed before respawn (tmux refuses a same-named window over a live one)"
   assert_contains "$(cat "$log")" "new-window" \
-    "a confirmed-dead secondmate should actually be relaunched"
-  assert_grep 'relaunched' "$w/home/state/.secondmate-relaunch-sm1" \
+    "a confirmed-dead squad_lead should actually be relaunched"
+  assert_grep 'relaunched' "$w/home/state/.squad-lead-relaunch-sm1" \
     "the shared library did not leave the durable per-mate relaunch record"
-  pass "sweep: a confirmed-dead secondmate endpoint is killed and respawned"
+  pass "sweep: a confirmed-dead squad_lead endpoint is killed and respawned"
 }
 
-test_sweep_skips_parked_secondmate_without_touching_its_endpoint() {
+test_sweep_skips_parked_squad_lead_without_touching_its_endpoint() {
   local w fb tmuxfb log out
   w=$(new_world sweep-parked)
-  add_sm_home "$w" sm1 firstmate:jg-sm1
-  add_sm_home "$w" sm2 firstmate:jg-sm2
+  add_sm_home "$w" sm1 juggernaut:jg-sm1
+  add_sm_home "$w" sm2 juggernaut:jg-sm2
   make_parked_addon "$w" sm1
   fb=$(make_toolchain "$w"); tmuxfb=$(make_liveness_tmux "$w")
   log="$w/calls.log"; : > "$log"
 
   out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" missing "$log")
 
-  [ "$(grep -cF 'secondmate sm1: skipped: its home is parked (config/parked-homes)' <<<"$out")" -eq 1 ] \
-    || fail "a parked secondmate should get exactly one skip line: $out"
+  [ "$(grep -cF 'squad_lead sm1: skipped: its home is parked (config/parked-homes)' <<<"$out")" -eq 1 ] \
+    || fail "a parked squad_lead should get exactly one skip line: $out"
   grep -q 'jg-sm1' "$log" \
     && fail "the sweep touched a parked home's endpoint: $(cat "$log")"
-  [ ! -e "$w/home/state/.secondmate-relaunch-sm1" ] \
+  [ ! -e "$w/home/state/.squad-lead-relaunch-sm1" ] \
     || fail "a parked home consumed relaunch budget"
   assert_contains "$(cat "$log")" 'new-window' \
     "the unparked sibling must still relaunch"
-  assert_grep 'relaunched' "$w/home/state/.secondmate-relaunch-sm2" \
+  assert_grep 'relaunched' "$w/home/state/.squad-lead-relaunch-sm2" \
     "the unparked sibling should complete its relaunch"
-  pass "sweep: a parked secondmate is skipped untouched while siblings relaunch"
+  pass "sweep: a parked squad_lead is skipped untouched while siblings relaunch"
 }
 
-test_sweep_serializes_distinct_secondmate_relaunches() {
+test_sweep_serializes_distinct_squad_lead_relaunches() {
   local w fb tmuxfb log out id
   w=$(new_world sweep-concurrent-relaunch)
-  add_sm_home "$w" sm1 firstmate:jg-sm1
-  add_sm_home "$w" sm2 firstmate:jg-sm2
+  add_sm_home "$w" sm1 juggernaut:jg-sm1
+  add_sm_home "$w" sm2 juggernaut:jg-sm2
   fb=$(make_toolchain "$w"); tmuxfb=$(make_liveness_tmux "$w")
   log="$w/calls.log"; : > "$log"
 
@@ -446,21 +446,21 @@ test_sweep_serializes_distinct_secondmate_relaunches() {
   # A parallel sweep races the second spawn into that lock and loses it.
   out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" missing "$log" JG_TEST_NEW_WINDOW_PAUSE=2)
 
-  assert_not_contains "$out" 'SECONDMATE_LIVENESS: secondmate sm' \
+  assert_not_contains "$out" 'SQUAD_LEAD_LIVENESS: squad_lead sm' \
     "both distinct mates should relaunch without task-set contention"
   for id in sm1 sm2; do
-    assert_grep 'relaunched' "$w/home/state/.secondmate-relaunch-$id" \
+    assert_grep 'relaunched' "$w/home/state/.squad-lead-relaunch-$id" \
       "$id did not complete its relaunch"
   done
   [ "$(grep -c '^new-window ' "$log")" -eq 2 ] \
     || fail "both mates should reach a fresh spawn: $(cat "$log")"
-  pass "sweep: distinct secondmate relaunches serialize across the task-set lock"
+  pass "sweep: distinct squad_lead relaunches serialize across the task-set lock"
 }
 
 test_sweep_skips_mate_whose_liveness_lock_is_held() {
   local w fb tmuxfb log out holder i=0
   w=$(new_world sweep-lock-held)
-  add_sm_home "$w" sm1 firstmate:jg-sm1
+  add_sm_home "$w" sm1 juggernaut:jg-sm1
   fb=$(make_toolchain "$w"); tmuxfb=$(make_liveness_tmux "$w")
   log="$w/calls.log"; : > "$log"
 
@@ -468,17 +468,17 @@ test_sweep_skips_mate_whose_liveness_lock_is_held() {
   # the sweep must skip rather than probe or relaunch a moving target.
   ( STATE="$w/home/state" bash -c \
       '. "$1" && jg_lock_acquire_wait "$2" && sleep 30' \
-      _ "$ROOT/bin/jg-wake-lib.sh" "$w/home/state/.secondmate-liveness-sm1.lock" ) &
+      _ "$ROOT/bin/jg-wake-lib.sh" "$w/home/state/.squad-lead-liveness-sm1.lock" ) &
   holder=$!
-  while [ ! -d "$w/home/state/.secondmate-liveness-sm1.lock" ] && [ "$i" -lt 100 ]; do
+  while [ ! -d "$w/home/state/.squad-lead-liveness-sm1.lock" ] && [ "$i" -lt 100 ]; do
     sleep 0.05
     i=$((i + 1))
   done
-  [ -d "$w/home/state/.secondmate-liveness-sm1.lock" ] || fail "the fixture never acquired the liveness lock"
+  [ -d "$w/home/state/.squad-lead-liveness-sm1.lock" ] || fail "the fixture never acquired the liveness lock"
 
   out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" zsh "$log")
 
-  assert_contains "$out" "SECONDMATE_LIVENESS: secondmate sm1: skipped: another liveness check is already in progress" \
+  assert_contains "$out" "SQUAD_LEAD_LIVENESS: squad_lead sm1: skipped: another liveness check is already in progress" \
     "a mate under an active liveness lock should be skipped, not probed"
   [ ! -s "$log" ] || fail "a locked mate must never be killed or respawned: $(cat "$log")"
   kill "$holder" 2>/dev/null || true
@@ -489,10 +489,10 @@ test_sweep_skips_mate_whose_liveness_lock_is_held() {
 test_relaunch_waits_for_other_mates_relaunch_lock() {
   local w fb tmuxfb log out holder i=0 lock
   w=$(new_world sweep-relaunch-lock-held)
-  add_sm_home "$w" sm1 firstmate:jg-sm1
+  add_sm_home "$w" sm1 juggernaut:jg-sm1
   fb=$(make_toolchain "$w"); tmuxfb=$(make_liveness_tmux "$w")
   log="$w/calls.log"; : > "$log"
-  lock="$w/home/state/.secondmate-relaunch.lock"
+  lock="$w/home/state/.squad-lead-relaunch.lock"
 
   ( STATE="$w/home/state" bash -c \
       '. "$1" && jg_lock_try_acquire "$2" && trap '\''jg_lock_release "$2"'\'' EXIT && sleep 5' \
@@ -507,10 +507,10 @@ test_relaunch_waits_for_other_mates_relaunch_lock() {
   out=$(PATH="$tmuxfb:$fb:$BASE_PATH" JG_HOME="$w/home" JG_BACKEND=tmux \
     JG_ROOT="$ROOT" JG_TEST_PANE_CMD=zsh JG_TMUX_CALL_LOG="$log" \
     STATE="$w/home/state" bash -c '
-      . "$1/bin/jg-secondmate-liveness-lib.sh"
-      jg_secondmate_liveness_probe "$2" sm1 poll
+      . "$1/bin/jg-squad-lead-liveness-lib.sh"
+      jg_squad_lead_liveness_probe "$2" sm1 poll
       rc=0
-      jg_secondmate_liveness_relaunch "$2" sm1 1 || rc=$?
+      jg_squad_lead_liveness_relaunch "$2" sm1 1 || rc=$?
       printf "rc=%s status=%s reason=%s\n" "$rc" "$JG_SM_LIVE_STATUS" "$JG_SM_LIVE_REASON"
     ' _ "$ROOT" "$w/home/state/sm1.meta")
   kill "$holder" 2>/dev/null || true
@@ -518,9 +518,9 @@ test_relaunch_waits_for_other_mates_relaunch_lock() {
 
   assert_contains "$out" "rc=1 status=skipped" \
     "a relaunch blocked on another mate must return a skipped failure"
-  assert_contains "$out" "another secondmate relaunch still owns the per-home relaunch lock after 1s" \
+  assert_contains "$out" "another squad_lead relaunch still owns the per-home relaunch lock after 1s" \
     "a liveness relaunch must bound its lock wait by the spawn timeout"
-  [ ! -e "$w/home/state/.secondmate-relaunch-sm1" ] \
+  [ ! -e "$w/home/state/.squad-lead-relaunch-sm1" ] \
     || fail "a relaunch blocked on another mate was counted as an attempt"
   [ ! -s "$log" ] || fail "a blocked relaunch touched the endpoint: $(cat "$log")"
   pass "relaunch: the spawn timeout bounds the lock wait before touching the endpoint"
@@ -535,17 +535,17 @@ test_sweep_refuses_relaunch_on_ledger_errors() {
   for mode in 200 444; do
     case "$mode" in 200) word=unreadable ;; *) word=unwritable ;; esac
     w=$(new_world "sweep-ledger-$mode")
-    add_sm_home "$w" sm1 firstmate:jg-sm1
+    add_sm_home "$w" sm1 juggernaut:jg-sm1
     fb=$(make_toolchain "$w"); tmuxfb=$(make_liveness_tmux "$w")
     log="$w/calls.log"; : > "$log"
-    ledger="$w/home/state/.secondmate-relaunch-sm1"
+    ledger="$w/home/state/.squad-lead-relaunch-sm1"
     : > "$ledger"
     chmod "$mode" "$ledger"
 
     out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" zsh "$log")
     chmod 644 "$ledger"
 
-    assert_contains "$out" "SECONDMATE_LIVENESS: secondmate sm1: skipped: relaunch ledger $ledger is $word" \
+    assert_contains "$out" "SQUAD_LEAD_LIVENESS: squad_lead sm1: skipped: relaunch ledger $ledger is $word" \
       "a mode-$mode relaunch ledger should skip the relaunch with its reason"
     [ ! -s "$log" ] || fail "a mode-$mode relaunch ledger still killed or spawned: $(cat "$log")"
     [ ! -s "$ledger" ] || fail "a mode-$mode ledger gained rows: $(cat "$ledger")"
@@ -553,74 +553,74 @@ test_sweep_refuses_relaunch_on_ledger_errors() {
   pass "sweep: an unreadable or unwritable relaunch ledger refuses to kill or spawn"
 }
 
-test_sweep_leaves_alive_secondmate_untouched() {
+test_sweep_leaves_alive_squad_lead_untouched() {
   local w fb tmuxfb log out
   w=$(new_world sweep-alive)
-  add_sm_home "$w" sm1 firstmate:jg-sm1
+  add_sm_home "$w" sm1 juggernaut:jg-sm1
   fb=$(make_toolchain "$w"); tmuxfb=$(make_liveness_tmux "$w")
   log="$w/calls.log"; : > "$log"
 
   out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" claude "$log")
 
-  assert_not_contains "$out" "SECONDMATE_LIVENESS: secondmate sm1: already-live" \
-    "an already-live secondmate should be handled silently"
-  [ ! -s "$log" ] || fail "an already-live secondmate must never be killed or respawned: $(cat "$log")"
+  assert_not_contains "$out" "SQUAD_LEAD_LIVENESS: squad_lead sm1: already-live" \
+    "an already-live squad_lead should be handled silently"
+  [ ! -s "$log" ] || fail "an already-live squad_lead must never be killed or respawned: $(cat "$log")"
 
   out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" claude "$log" JG_BOOTSTRAP_VERBOSE_FACTS=1)
-  assert_contains "$out" "BOOTSTRAP_INFO: secondmate sm1 already live (backend=tmux)" \
+  assert_contains "$out" "BOOTSTRAP_INFO: squad_lead sm1 already live (backend=tmux)" \
     "verbose diagnostics should identify the already-live outcome"
-  [ ! -s "$log" ] || fail "verbose reporting must not touch an already-live secondmate: $(cat "$log")"
-  pass "sweep: an already-live secondmate is untouched and distinguishable in verbose diagnostics"
+  [ ! -s "$log" ] || fail "verbose reporting must not touch an already-live squad_lead: $(cat "$log")"
+  pass "sweep: an already-live squad_lead is untouched and distinguishable in verbose diagnostics"
 }
 
-test_sweep_respawns_authoritatively_missing_pi_secondmate() {
+test_sweep_respawns_authoritatively_missing_pi_squad_lead() {
   local w fb tmuxfb log out
   w=$(new_world sweep-missing-pi)
-  add_sm_home "$w" sm1 firstmate:jg-sm1 pi
+  add_sm_home "$w" sm1 juggernaut:jg-sm1 pi
   fb=$(make_toolchain "$w"); tmuxfb=$(make_liveness_tmux "$w")
   log="$w/calls.log"; : > "$log"
 
   out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" missing "$log")
 
-  assert_not_contains "$out" "SECONDMATE_LIVENESS:" "a successful missing-window recovery should stay silent by default"
-  assert_contains "$(cat "$log")" "new-window" "an authoritatively missing Pi secondmate should be relaunched"
+  assert_not_contains "$out" "SQUAD_LEAD_LIVENESS:" "a successful missing-window recovery should stay silent by default"
+  assert_contains "$(cat "$log")" "new-window" "an authoritatively missing Pi squad_lead should be relaunched"
   assert_not_contains "$(cat "$log")" "kill-window" "an absent window should not need a destructive pre-kill"
-  pass "sweep: an authoritatively missing Pi secondmate window is relaunched"
+  pass "sweep: an authoritatively missing Pi squad_lead window is relaunched"
 }
 
-test_sweep_respawns_authoritatively_missing_pi_signed_secondmate() {
+test_sweep_respawns_authoritatively_missing_pi_signed_squad_lead() {
   local w fb tmuxfb log out
   w=$(new_world sweep-missing-pi-signed)
-  printf 'pi global-model medium\n' > "$w/home/config/secondmate-harness"
-  mkdir -p "$w/home/config/secondmates/sm1"
-  printf 'pi-signed some-model high\n' > "$w/home/config/secondmates/sm1/harness"
-  add_sm_home "$w" sm1 firstmate:jg-sm1 pi-signed
+  printf 'pi global-model medium\n' > "$w/home/config/squad-lead-harness"
+  mkdir -p "$w/home/config/squad_leads/sm1"
+  printf 'pi-signed some-model high\n' > "$w/home/config/squad_leads/sm1/harness"
+  add_sm_home "$w" sm1 juggernaut:jg-sm1 pi-signed
   fb=$(make_toolchain "$w"); tmuxfb=$(make_liveness_tmux "$w")
   log="$w/calls.log"; : > "$log"
 
   out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" missing "$log")
 
   assert_not_contains "$out" "unverified for recovery" \
-    "a recorded pi-signed secondmate should be verified for recovery"
+    "a recorded pi-signed squad_lead should be verified for recovery"
   assert_contains "$(cat "$log")" "new-window" \
-    "an authoritatively missing pi-signed secondmate should be relaunched"
+    "an authoritatively missing pi-signed squad_lead should be relaunched"
   assert_not_contains "$(cat "$log")" "kill-window" \
     "an absent pi-signed window should not need a destructive pre-kill"
   assert_contains "$(cat "$w/home/state/sm1.meta")" "model=some-model" "recovery must preserve the per-mate model"
   assert_contains "$(cat "$w/home/state/sm1.meta")" "effort=high" "recovery must preserve the per-mate effort"
-  pass "sweep: an authoritatively missing pi-signed secondmate window is relaunched on its own pin"
+  pass "sweep: an authoritatively missing pi-signed squad_lead window is relaunched on its own pin"
 }
 
 test_sweep_never_acts_on_ambiguous_existing_process() {
   local w fb tmuxfb log out
   w=$(new_world sweep-ambiguous)
-  add_sm_home "$w" sm1 firstmate:jg-sm1 pi
+  add_sm_home "$w" sm1 juggernaut:jg-sm1 pi
   fb=$(make_toolchain "$w"); tmuxfb=$(make_liveness_tmux "$w")
   log="$w/calls.log"; : > "$log"
 
   out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" node "$log")
 
-  assert_contains "$out" "SECONDMATE_LIVENESS: secondmate sm1: skipped: existing endpoint has ambiguous agent process" \
+  assert_contains "$out" "SQUAD_LEAD_LIVENESS: squad_lead sm1: skipped: existing endpoint has ambiguous agent process" \
     "an existing Pi-shaped node process should be reported as ambiguous"
   [ ! -s "$log" ] || fail "an ambiguous existing process must never trigger kill or relaunch: $(cat "$log")"
   pass "sweep: an existing ambiguous Pi process prevents duplicate recovery"
@@ -629,13 +629,13 @@ test_sweep_never_acts_on_ambiguous_existing_process() {
 test_sweep_never_acts_on_transient_unreadability() {
   local w fb tmuxfb log out
   w=$(new_world sweep-unreadable)
-  add_sm_home "$w" sm1 firstmate:jg-sm1 pi
+  add_sm_home "$w" sm1 juggernaut:jg-sm1 pi
   fb=$(make_toolchain "$w"); tmuxfb=$(make_liveness_tmux "$w")
   log="$w/calls.log"; : > "$log"
 
   out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" unreadable "$log")
 
-  assert_contains "$out" "SECONDMATE_LIVENESS: secondmate sm1: skipped: endpoint probe unreadable" \
+  assert_contains "$out" "SQUAD_LEAD_LIVENESS: squad_lead sm1: skipped: endpoint probe unreadable" \
     "a transiently unreadable target should be distinguished from an absent one"
   [ ! -s "$log" ] || fail "an unreadable target must never trigger kill or relaunch: $(cat "$log")"
   pass "sweep: transient target unreadability never licenses recovery"
@@ -644,13 +644,13 @@ test_sweep_never_acts_on_transient_unreadability() {
 test_sweep_reports_missing_endpoint_relaunch_failure() {
   local w fb tmuxfb log out
   w=$(new_world sweep-missing-failure)
-  add_sm_home "$w" sm1 firstmate:jg-sm1 pi
+  add_sm_home "$w" sm1 juggernaut:jg-sm1 pi
   fb=$(make_toolchain "$w"); tmuxfb=$(make_liveness_tmux "$w")
   log="$w/calls.log"; : > "$log"
 
   out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" missing "$log" JG_TEST_FAIL_NEW_WINDOW=1)
 
-  assert_contains "$out" "SECONDMATE_LIVENESS: secondmate sm1: respawn failed after recorded endpoint confidently missing" \
+  assert_contains "$out" "SQUAD_LEAD_LIVENESS: squad_lead sm1: respawn failed after recorded endpoint confidently missing" \
     "a failed missing-endpoint relaunch should retain its authorizing cause"
   pass "sweep: failed relaunch diagnostics distinguish a confidently missing endpoint"
 }
@@ -658,13 +658,13 @@ test_sweep_reports_missing_endpoint_relaunch_failure() {
 test_sweep_never_acts_on_unverified_harness_dead_reading() {
   local w fb tmuxfb log out
   w=$(new_world sweep-unverified-harness)
-  add_sm_home "$w" sm1 firstmate:jg-sm1 custom-agent
+  add_sm_home "$w" sm1 juggernaut:jg-sm1 custom-agent
   fb=$(make_toolchain "$w"); tmuxfb=$(make_liveness_tmux "$w")
   log="$w/calls.log"; : > "$log"
 
   out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" zsh "$log")
 
-  assert_contains "$out" "SECONDMATE_LIVENESS: secondmate sm1: skipped: recorded harness 'custom-agent' is unverified for recovery" \
+  assert_contains "$out" "SQUAD_LEAD_LIVENESS: squad_lead sm1: skipped: recorded harness 'custom-agent' is unverified for recovery" \
     "an unverified harness should not let a dead endpoint become actionable"
   [ ! -s "$log" ] || fail "an unverified harness must never trigger kill or relaunch: $(cat "$log")"
   pass "sweep: an unverified harness blocks recovery with a concrete diagnostic"
@@ -673,28 +673,28 @@ test_sweep_never_acts_on_unverified_harness_dead_reading() {
 test_sweep_converges_no_retouch_once_alive() {
   local w fb tmuxfb log out1 out2
   w=$(new_world sweep-idempotent)
-  add_sm_home "$w" sm1 firstmate:jg-sm1
+  add_sm_home "$w" sm1 juggernaut:jg-sm1
   fb=$(make_toolchain "$w"); tmuxfb=$(make_liveness_tmux "$w")
   log="$w/calls.log"; : > "$log"
 
   # Round 1: dead -> respawned silently (kill + new-window logged).
   out1=$(run_bootstrap "$tmuxfb:$fb" "$w/home" zsh "$log")
-  assert_not_contains "$out1" "SECONDMATE_LIVENESS: secondmate sm1: respawned" "round 1 should handle the successful respawn silently"
+  assert_not_contains "$out1" "SQUAD_LEAD_LIVENESS: squad_lead sm1: respawned" "round 1 should handle the successful respawn silently"
   [ -s "$log" ] || fail "round 1 should have logged the kill+respawn window operations"
 
-  # Round 2: the (now-respawned) secondmate is genuinely alive - a second
+  # Round 2: the (now-respawned) squad_lead is genuinely alive - a second
   # sweep must converge to a pure no-op, not respawn again.
   : > "$log"
   out2=$(run_bootstrap "$tmuxfb:$fb" "$w/home" claude "$log")
-  assert_not_contains "$out2" "SECONDMATE_LIVENESS: secondmate sm1: already-live" "round 2 should handle the already-live secondmate silently"
-  [ ! -s "$log" ] || fail "round 2 must not re-kill or re-respawn an already-live secondmate: $(cat "$log")"
-  pass "sweep: idempotent by construction - a live secondmate is never re-touched on a later run"
+  assert_not_contains "$out2" "SQUAD_LEAD_LIVENESS: squad_lead sm1: already-live" "round 2 should handle the already-live squad_lead silently"
+  [ ! -s "$log" ] || fail "round 2 must not re-kill or re-respawn an already-live squad_lead: $(cat "$log")"
+  pass "sweep: idempotent by construction - a live squad_lead is never re-touched on a later run"
 }
 
 test_sweep_skipped_under_detect_only() {
   local w fb tmuxfb log out
   w=$(new_world sweep-detect-only)
-  add_sm_home "$w" sm1 firstmate:jg-sm1
+  add_sm_home "$w" sm1 juggernaut:jg-sm1
   mkdir -p "$w/home/config"
   printf 'codex\n' > "$w/home/config/crew-harness"
   fb=$(make_toolchain "$w"); tmuxfb=$(make_liveness_tmux "$w")
@@ -704,39 +704,39 @@ test_sweep_skipped_under_detect_only() {
 
   assert_not_contains "$out" "CREW_HARNESS_OVERRIDE:" \
     "detect-only should keep routine harness facts silent"
-  assert_not_contains "$out" "SECONDMATE_LIVENESS:" \
+  assert_not_contains "$out" "SQUAD_LEAD_LIVENESS:" \
     "the read-only detect-only path must never run the mutating liveness sweep"
   [ ! -s "$log" ] || fail "detect-only must never touch any endpoint: $(cat "$log")"
   pass "sweep: skipped entirely under JG_BOOTSTRAP_DETECT_ONLY=1, exactly like the other mutating sweeps"
 }
 
-test_sweep_noop_with_no_secondmate_meta() {
+test_sweep_noop_with_no_squad_lead_meta() {
   local w fb tmuxfb log out
-  w=$(new_world sweep-no-secondmates)
+  w=$(new_world sweep-no-squad-leads)
   # No add_sm_home call: this state/ dir looks exactly like what a
-  # secondmate's OWN home always has (secondmates never spawn secondmates),
+  # squad_lead's OWN home always has (squad_leads never spawn squad_leads),
   # proving the sweep's primary-only scoping falls out naturally.
   fb=$(make_toolchain "$w"); tmuxfb=$(make_liveness_tmux "$w")
   log="$w/calls.log"; : > "$log"
 
   out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" zsh "$log")
 
-  assert_not_contains "$out" "SECONDMATE_LIVENESS:" \
-    "with no kind=secondmate meta present, the sweep must print nothing"
-  [ ! -s "$log" ] || fail "with no secondmate meta, no endpoint should ever be touched: $(cat "$log")"
-  pass "sweep: a silent no-op with no kind=secondmate meta present (a secondmate home's own natural scoping)"
+  assert_not_contains "$out" "SQUAD_LEAD_LIVENESS:" \
+    "with no kind=squad_lead meta present, the sweep must print nothing"
+  [ ! -s "$log" ] || fail "with no squad_lead meta, no endpoint should ever be touched: $(cat "$log")"
+  pass "sweep: a silent no-op with no kind=squad_lead meta present (a squad_lead home's own natural scoping)"
 }
 
 # --- library level: the watcher's poll-mode remote probe ---------------------
-# bin/jg-secondmate-liveness-lib.sh's `poll` mode is the read-only probe the
+# bin/jg-squad-lead-liveness-lib.sh's `poll` mode is the read-only probe the
 # watcher tick runs per cadence: exactly one remote `state` call, `dead` and
 # `missing` alone authorize relaunch, and transport failure (ssh exit 255) is
 # never evidence of death. Full-mode remote readiness repair and route
 # revalidation remain the startup sweep's own behavior, covered by the sweep
-# tests above and tests/jg-remote-secondmate-lifecycle-e2e.test.sh.
+# tests above and tests/jg-remote-squad-lead-lifecycle-e2e.test.sh.
 
 # make_remote_probe_world <name>: a parent home carrying one remote-route
-# secondmate meta plus a fake ssh that logs every call and answers with
+# squad_lead meta plus a fake ssh that logs every call and answers with
 # JG_FAKE_REMOTE_REPLY on JG_FAKE_REMOTE_RC.
 make_remote_probe_world() {
   local name=$1 w fakebin
@@ -745,7 +745,7 @@ make_remote_probe_world() {
   mkdir -p "$w/home/state" "$w/home/data" "$w/home/config"
   cat > "$w/home/state/rsm1.meta" <<EOF
 window=remote:rsm1
-kind=secondmate
+kind=squad_lead
 harness=claude
 remote_host=lab-host
 remote_backend=herdr
@@ -753,7 +753,7 @@ remote_herdr_session=jg-remote
 remote_target=jg-remote:w1:p1
 home=/remote/rsm1-home
 EOF
-  cat > "$w/home/data/secondmates.md" <<EOF
+  cat > "$w/home/data/squad_leads.md" <<EOF
 - rsm1 - Remote mate (host: lab-host; root: /remote/root; home: /remote/rsm1-home; scope: remote work; projects: alpha; added 2026-01-01)
 EOF
   cat > "$fakebin/ssh" <<'SH'
@@ -773,8 +773,8 @@ probe_remote() {
   env STATE="$w/home/state" JG_HOME="$w/home" JG_DATA_OVERRIDE="$w/home/data" \
     JG_SSH_BIN="$w/fakebin/ssh" JG_FAKE_SSH_LOG="$w/ssh.log" "$@" \
     bash -c '
-      . "$0/bin/jg-secondmate-liveness-lib.sh"
-      jg_secondmate_liveness_probe "$1" rsm1 "$2"
+      . "$0/bin/jg-squad-lead-liveness-lib.sh"
+      jg_squad_lead_liveness_probe "$1" rsm1 "$2"
       printf "%s|%s|%s|%s|%s|%s\n" \
         "$JG_SM_LIVE_STATUS" "$JG_SM_LIVE_STATE" "$JG_SM_LIVE_KILL" \
         "$JG_SM_LIVE_CAUSE" "$JG_SM_LIVE_WHERE" "$JG_SM_LIVE_REASON"
@@ -837,7 +837,7 @@ test_memory_admission_defers_recovery() {
   mkdir -p "$w/code"
   ln -s "$ROOT/bin" "$w/code/bin"
   cp "$ROOT/AGENTS.md" "$ROOT/.gitignore" "$w/code/"
-  add_sm_home "$w" sm1 firstmate:jg-sm1
+  add_sm_home "$w" sm1 juggernaut:jg-sm1
   fb=$(make_toolchain "$w"); tmuxfb=$(make_liveness_tmux "$w")
   log="$w/calls.log"; : > "$log"
   mkdir -p "$w/proc/pressure"
@@ -849,14 +849,14 @@ test_memory_admission_defers_recovery() {
     out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" zsh "$log" JG_ROOT_OVERRIDE="$w/code" JG_HOST_MEMORY_PROC="$w/proc" JG_HOST_MEMORY_CGROUP_ROOT="$w/cgroup")
     assert_contains "$out" 'memory admission deferred:' "memory pressure defers liveness recovery"
     [ ! -s "$log" ] || fail "memory deferral removed the endpoint: $(cat "$log")"
-    [ ! -e "$w/home/state/.secondmate-relaunch-sm1" ] || fail "memory deferral consumed retry budget"
+    [ ! -e "$w/home/state/.squad-lead-relaunch-sm1" ] || fail "memory deferral consumed retry budget"
   done
   printf 'some avg10=2 avg60=0 avg300=0 total=1\n' > "$w/proc/pressure/memory"
   printf 'some avg10=2 avg60=0 avg300=0 total=1\n' > "$w/cgroup/user.slice/user-$(id -u).slice/user@$(id -u).service/app.slice/memory.pressure"
   out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" zsh "$log" JG_ROOT_OVERRIDE="$w/code" JG_HOST_MEMORY_PROC="$w/proc" JG_HOST_MEMORY_CGROUP_ROOT="$w/cgroup")
   assert_contains "$(cat "$log")" new-window "recovery resumes once memory eases: $out"
-  assert_grep relaunched "$w/home/state/.secondmate-relaunch-sm1" "successful recovery is ledgered"
-  [ "$(grep -c $'\tattempt$' "$w/home/state/.secondmate-relaunch-sm1")" -eq 1 ] || fail "only the actual launch should consume an attempt"
+  assert_grep relaunched "$w/home/state/.squad-lead-relaunch-sm1" "successful recovery is ledgered"
+  [ "$(grep -c $'\tattempt$' "$w/home/state/.squad-lead-relaunch-sm1")" -eq 1 ] || fail "only the actual launch should consume an attempt"
   printf 'wait_pressure=nan\n' > "$w/home/config/host-memory"
   for i in 1 2 3; do
     out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" zsh "$log" JG_ROOT_OVERRIDE="$w/code" JG_HOST_MEMORY_PROC="$w/proc" JG_HOST_MEMORY_CGROUP_ROOT="$w/cgroup")
@@ -865,7 +865,7 @@ test_memory_admission_defers_recovery() {
   out=$(PATH="$tmuxfb:$fb:$BASE_PATH" JG_HOME="$w/home" JG_ROOT_OVERRIDE="$w/code" \
     JG_TEST_PANE_CMD=zsh JG_TMUX_CALL_LOG="$log" TMUX='' JG_BACKEND=tmux \
     JG_HOST_MEMORY_PROC="$w/proc" JG_HOST_MEMORY_CGROUP_ROOT="$w/cgroup" \
-    JG_SECONDMATE_LIVENESS_SECS=1 JG_SECONDMATE_LIVENESS_MAX_ATTEMPTS=4 JG_POLL=1 JG_SIGNAL_GRACE=0 \
+    JG_SQUAD_LEAD_LIVENESS_SECS=1 JG_SQUAD_LEAD_LIVENESS_MAX_ATTEMPTS=4 JG_POLL=1 JG_SIGNAL_GRACE=0 \
     "$ROOT/bin/jg-watch.sh" 2>&1)
   assert_contains "$out" 'auto-relaunch paused after 4 attempts' "non-memory failures still consume the retry budget"
   pass "memory deferrals preserve the endpoint and liveness retry budget"
@@ -877,23 +877,23 @@ if [ "${1:-}" = memory-admission ]; then
 fi
 
 test_memory_admission_defers_recovery
-test_sweep_respawns_confirmed_dead_secondmate
-test_sweep_skips_parked_secondmate_without_touching_its_endpoint
-test_sweep_serializes_distinct_secondmate_relaunches
-test_sweep_leaves_alive_secondmate_untouched
-test_sweep_respawns_authoritatively_missing_pi_secondmate
-test_sweep_respawns_authoritatively_missing_pi_signed_secondmate
+test_sweep_respawns_confirmed_dead_squad_lead
+test_sweep_skips_parked_squad_lead_without_touching_its_endpoint
+test_sweep_serializes_distinct_squad_lead_relaunches
+test_sweep_leaves_alive_squad_lead_untouched
+test_sweep_respawns_authoritatively_missing_pi_squad_lead
+test_sweep_respawns_authoritatively_missing_pi_signed_squad_lead
 test_sweep_never_acts_on_ambiguous_existing_process
 test_sweep_never_acts_on_transient_unreadability
 test_sweep_reports_missing_endpoint_relaunch_failure
 test_sweep_never_acts_on_unverified_harness_dead_reading
 test_sweep_converges_no_retouch_once_alive
 test_sweep_skipped_under_detect_only
-test_sweep_noop_with_no_secondmate_meta
+test_sweep_noop_with_no_squad_lead_meta
 test_sweep_skips_mate_whose_liveness_lock_is_held
 test_relaunch_waits_for_other_mates_relaunch_lock
 test_sweep_refuses_relaunch_on_ledger_errors
 test_remote_poll_probe_maps_states
 test_remote_poll_probe_unreachable_preserves_route
 
-echo "# all jg-secondmate-liveness tests passed"
+echo "# all jg-squad-lead-liveness tests passed"

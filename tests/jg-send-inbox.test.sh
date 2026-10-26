@@ -18,14 +18,14 @@
 #      fire-and-forget record whose ring did not land is owed one retry ring.
 #   6. Carve-outs keep the typed plane: a leading "/" (any harness), a leading
 #      "$" to codex, an explicit backend target, and the --key path.
-#   7. A marked secondmate steer carries its marker + corr token in the record
+#   7. A marked squad_lead steer carries its marker + corr token in the record
 #      body, and the pending-reply expectation is marked delivered at enqueue.
 #   8. Pending-reply bookkeeping failure after enqueue never reports a
 #      retryable send failure that could duplicate the durable instruction.
 #   9. An unwritable inbox is a real local failure: nonzero exit, nothing
 #      typed, and a just-created pending-reply expectation is discarded.
 #  10. An empty or whitespace-only text steer is refused before anything is
-#      marked, recorded, or typed - on the marked secondmate path that means
+#      marked, recorded, or typed - on the marked squad_lead path that means
 #      no marker-only record and no pending-reply expectation.
 # Every case below that passes a literal `$...` message quotes it on purpose
 # (the point is sending an unexpanded `$` line), so SC2016 is disabled.
@@ -131,7 +131,7 @@ test_text_steer_rides_inbox() {
   body=$(record_body _ "$rec")
   [ "$body" = "please rebase onto main" ] || fail "the recorded body differs: $body"
   typed=$(cat "$dir/send.log")
-  assert_contains "$typed" "Firstmate instruction waiting: list \"\$JG_TASK_INBOX\"/*.msg in your 't1.inbox' steering inbox" \
+  assert_contains "$typed" "Juggernaut instruction waiting: list \"\$JG_TASK_INBOX\"/*.msg in your 't1.inbox' steering inbox" \
     "the doorbell should direct the worker to drain the inbox"
   case "$typed" in
   *"please rebase onto main"*) fail "the payload must never be typed:"$'\n'"$typed" ;;
@@ -148,7 +148,7 @@ test_deep_home_doorbell_stays_short() {
   run_send "$shallow" "$shallow/send.err" -- t1 "please continue" || fail "the shallow-home send failed"
   shallow_typed=$(cat "$shallow/send.log")
   deep="$TMP_ROOT/deep-home"
-  home="$deep/one/two/three/four/five/six/seven/eight-secondmate-homes-nest-under-long-worktree-paths"
+  home="$deep/one/two/three/four/five/six/seven/eight-squad-lead-homes-nest-under-long-worktree-paths"
   mkdir -p "$home/state"
   make_stubs "$deep" >/dev/null
   jg_write_meta "$home/state/t1.meta" "window=sess:jg-t1" "kind=ship" "harness=claude"
@@ -204,7 +204,7 @@ test_resend_enqueues_new_sequence() {
   run_send "$dir" "$err" -- t1 "check the CI result" || fail "second send failed"
   [ -f "$dir/home/state/t1.inbox/001.msg" ] && [ -f "$dir/home/state/t1.inbox/002.msg" ] ||
     fail "a re-send should enqueue a new sequence:"$'\n'"$(ls "$dir/home/state/t1.inbox")"
-  doorbells=$(grep -cF 'Firstmate instruction waiting' "$dir/send.log" || true)
+  doorbells=$(grep -cF 'Juggernaut instruction waiting' "$dir/send.log" || true)
   [ "$doorbells" = 1 ] || fail "each send rings once (the log is truncated per send), got $doorbells"
   typed=$(cat "$dir/send.log")
   assert_contains "$typed" "numeric order" \
@@ -252,9 +252,9 @@ test_fire_and_forget_unlanded_ring_owes_one_retry() {
   mkdir -p "$dir/home/config"
   : > "$dir/home/config/wait-no-turns"
   err="$dir/send.err"
-  # The stub lists only window jg-t1, so the secondmate takes it over.
+  # The stub lists only window jg-t1, so the squad_lead takes it over.
   rm -f "$dir/home/state/t1.meta"
-  jg_write_secondmate_meta "$dir/home/state/domain.meta" "$dir/home" "sess:jg-t1" alpha claude
+  jg_write_squad_lead_meta "$dir/home/state/domain.meta" "$dir/home" "sess:jg-t1" alpha claude
   run_send "$dir" "$err" JG_FAKE_TMUX_COMPOSER=pending -- \
     jg-domain --fire-and-forget 0123456789abcdef "reconcile your books"; rc=$?
   expect_code 0 "$rc" "a skipped fire-and-forget ring is still a sent steer"
@@ -283,7 +283,7 @@ test_fire_and_forget_retry_stays_off_without_the_flag() {
   err="$dir/send.err"
   [ ! -e "$dir/home/config/wait-no-turns" ]
   rm -f "$dir/home/state/t1.meta"
-  jg_write_secondmate_meta "$dir/home/state/domain.meta" "$dir/home" "sess:jg-t1" alpha claude
+  jg_write_squad_lead_meta "$dir/home/state/domain.meta" "$dir/home" "sess:jg-t1" alpha claude
   run_send "$dir" "$err" JG_FAKE_TMUX_COMPOSER=pending -- \
     jg-domain --fire-and-forget 0123456789abcdef "reconcile your books"; rc=$?
   expect_code 0 "$rc" "a skipped fire-and-forget ring is still a sent steer"
@@ -341,17 +341,17 @@ test_key_path_never_touches_inbox() {
   pass "jg-send planes: the --key lifecycle path never touches the inbox"
 }
 
-test_secondmate_marker_and_enqueue_delivery() {
+test_squad_lead_marker_and_enqueue_delivery() {
   local dir err body corr pr_rec delivered
-  dir=$(setup_case secondmate)
+  dir=$(setup_case squad_lead)
   err="$dir/send.err"
-  jg_write_secondmate_meta "$dir/home/state/domain.meta" "$dir/home" "sess:jg-domain"
+  jg_write_squad_lead_meta "$dir/home/state/domain.meta" "$dir/home" "sess:jg-domain"
   run_send "$dir" "$err" -- jg-domain "please summarize fleet health" ||
-    fail "a secondmate steer should succeed"
+    fail "a squad_lead steer should succeed"
   body=$(record_body _ "$dir/home/state/domain.inbox/001.msg")
   case "$body" in
   "$JG_FROMFIRST_MARK"corr=*) : ;;
-  *) fail "the recorded body lost the from-firstmate marker/corr framing:"$'\n'"$body" ;;
+  *) fail "the recorded body lost the from-juggernaut marker/corr framing:"$'\n'"$body" ;;
   esac
   corr=$(printf '%s' "$body" | grep -oE 'corr=[a-f0-9]{16}' | head -1 | cut -d= -f2)
   [ -n "$corr" ] || fail "no corr token in the recorded body"
@@ -362,14 +362,14 @@ test_secondmate_marker_and_enqueue_delivery() {
   case "$(cat "$dir/send.log")" in
   *"summarize fleet health"*) fail "the marked payload was typed" ;;
   esac
-  pass "jg-send inbox: a secondmate steer records marker+corr in the body and is delivered at enqueue"
+  pass "jg-send inbox: a squad_lead steer records marker+corr in the body and is delivered at enqueue"
 }
 
 test_post_enqueue_bookkeeping_failure_is_not_retryable() {
   local dir err rc rec body
   dir=$(setup_case bookkeeping-failure)
   err="$dir/send.err"
-  jg_write_secondmate_meta "$dir/home/state/domain.meta" "$dir/home" "sess:jg-domain"
+  jg_write_squad_lead_meta "$dir/home/state/domain.meta" "$dir/home" "sess:jg-domain"
   cat >"$dir/fakebin/mv" <<'SH'
 #!/usr/bin/env bash
 set -u
@@ -400,7 +400,7 @@ SH
   body=$(record_body _ "$rec")
   case "$body" in
   "$JG_FROMFIRST_MARK"corr=*) : ;;
-  *) fail "bookkeeping failure test lost the secondmate marker: $body" ;;
+  *) fail "bookkeeping failure test lost the squad_lead marker: $body" ;;
   esac
   assert_contains "$(cat "$err")" "reply-tracking-degraded" \
     "lost bookkeeping should surface as its own distinct degraded condition"
@@ -448,7 +448,7 @@ test_unwritable_inbox_fails_loudly() {
   local dir err rc
   dir=$(setup_case unwritable)
   err="$dir/send.err"
-  jg_write_secondmate_meta "$dir/home/state/domain.meta" "$dir/home" "sess:jg-domain"
+  jg_write_squad_lead_meta "$dir/home/state/domain.meta" "$dir/home" "sess:jg-domain"
   : >"$dir/home/state/domain.inbox" # a FILE where the inbox dir must go
   run_send "$dir" "$err" -- jg-domain "this cannot be recorded"
   rc=$?
@@ -463,15 +463,15 @@ test_unwritable_inbox_fails_loudly() {
 
 test_empty_message_refused() {
   local dir err rc
-  # The lived defect: an empty marked secondmate steer used to deliver a
+  # The lived defect: an empty marked squad_lead steer used to deliver a
   # marker+corr record with no body and mint a pending-reply expectation the
   # parent could never see resolved.
   dir=$(setup_case empty-marked)
   err="$dir/send.err"
-  jg_write_secondmate_meta "$dir/home/state/domain.meta" "$dir/home" "sess:jg-domain"
+  jg_write_squad_lead_meta "$dir/home/state/domain.meta" "$dir/home" "sess:jg-domain"
   run_send "$dir" "$err" -- jg-domain
   rc=$?
-  [ "$rc" -ne 0 ] || fail "an empty secondmate steer should refuse"
+  [ "$rc" -ne 0 ] || fail "an empty squad_lead steer should refuse"
   assert_contains "$(cat "$err")" "nonempty message" \
     "the empty-message refusal should be explicit"
   [ ! -d "$dir/home/state/domain.inbox" ] || fail "an empty steer still wrote an inbox record"
@@ -517,7 +517,7 @@ test_fire_and_forget_retry_stays_off_without_the_flag
 test_harness_invocations_stay_typed
 test_explicit_target_stays_typed
 test_key_path_never_touches_inbox
-test_secondmate_marker_and_enqueue_delivery
+test_squad_lead_marker_and_enqueue_delivery
 test_post_enqueue_bookkeeping_failure_is_not_retryable
 test_meta_lock_contention_fails_bounded
 test_unwritable_inbox_fails_loudly

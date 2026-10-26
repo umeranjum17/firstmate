@@ -279,7 +279,7 @@ SH
 write_task_meta() {
   local dir=$1 id=${2:-task-a}
   jg_write_meta "$dir/home/state/$id.meta" \
-    "window=firstmate:jg-$id" \
+    "window=juggernaut:jg-$id" \
     "endpoint_task_id=$id" \
     "worktree=$dir/wt" \
     "project=$dir/project" \
@@ -687,49 +687,49 @@ test_draft_pull_request_is_not_armed() {
   pass "arming refuses a draft pull request, naming it, and arms a ready or unreadable one"
 }
 
-# A secondmate is a persistent worker, not a delivery lane: it never owns a
+# A squad_lead is a persistent worker, not a delivery lane: it never owns a
 # pull request of its own. A URL relayed onto its status channel belongs to a
 # task in the mate's own home, which arms its own watch, so arming one here is
 # refused before anything is recorded - a poll on the mate would otherwise mark
 # the merge notified and queue the mate itself for teardown as landed work.
-test_secondmate_record_refuses_a_pr_watch() {
+test_squad_lead_record_refuses_a_pr_watch() {
   local dir rc
-  dir=$(make_case secondmate-refuses-watch)
+  dir=$(make_case squad-lead-refuses-watch)
   jg_write_meta "$dir/home/state/domain.meta" \
     'window=session:jg-domain' \
-    "worktree=$dir/secondmate-home" \
+    "worktree=$dir/squad-lead-home" \
     "project=$dir/project" \
-    'kind=secondmate' \
-    'mode=secondmate' \
+    'kind=squad_lead' \
+    'mode=squad_lead' \
     'backend=tmux' \
-    "home=$dir/secondmate-home"
-  mkdir -p "$dir/secondmate-home"
+    "home=$dir/squad-lead-home"
+  mkdir -p "$dir/squad-lead-home"
   cp "$dir/home/state/domain.meta" "$dir/meta.before"
   set +e
   run_check_entry "$dir" domain https://github.com/o/r/pull/9 \
     > "$dir/stdout" 2> "$dir/stderr"; rc=$?
   set -e
-  [ "$rc" -ne 0 ] || fail "a merge watch was armed on a secondmate record"
-  grep -qi 'secondmate' "$dir/stderr" || fail "the refusal did not name the record's kind"
+  [ "$rc" -ne 0 ] || fail "a merge watch was armed on a squad_lead record"
+  grep -qi 'squad_lead' "$dir/stderr" || fail "the refusal did not name the record's kind"
   grep -qF 'https://github.com/o/r/pull/9' "$dir/stderr" \
     || fail "the refusal did not name the pull request it refused"
   cmp -s "$dir/meta.before" "$dir/home/state/domain.meta" \
-    || fail "the refusal changed secondmate metadata"
-  [ ! -e "$dir/home/state/domain.check.sh" ] || fail "the refusal armed a poll on a secondmate"
-  [ ! -e "$dir/home/state/domain.pr-poll" ] || fail "the refusal wrote a poll sidecar on a secondmate"
+    || fail "the refusal changed squad_lead metadata"
+  [ ! -e "$dir/home/state/domain.check.sh" ] || fail "the refusal armed a poll on a squad_lead"
+  [ ! -e "$dir/home/state/domain.pr-poll" ] || fail "the refusal wrote a poll sidecar on a squad_lead"
   [ ! -s "$dir/gh.log" ] || fail "the refusal reached the forge"
   [ ! -s "$dir/guard.log" ] || fail "the refusal reached the guard"
-  pass "jg-pr-check refuses to record a PR or arm a merge watch on a secondmate record"
+  pass "jg-pr-check refuses to record a PR or arm a merge watch on a squad_lead record"
 }
 
-test_retired_secondmate_merge_poll_keeps_signal_wake() {
+test_retired_squad_lead_merge_poll_keeps_signal_wake() {
   local dir rc
-  dir=$(make_case secondmate-merge-poll-signal)
+  dir=$(make_case squad-lead-merge-poll-signal)
   write_task_meta "$dir"
   JG_TEST_GH_HEAD=0123456789abcdef0123456789abcdef01234567 \
     run_check_entry "$dir" task-a https://github.com/o/r/pull/12 >/dev/null 2>"$dir/stderr" \
-    || fail "could not arm the merge poll before the record became a secondmate: $(cat "$dir/stderr")"
-  sed 's/^kind=ship$/kind=secondmate/' "$dir/home/state/task-a.meta" > "$dir/meta.tmp"
+    || fail "could not arm the merge poll before the record became a squad_lead: $(cat "$dir/stderr")"
+  sed 's/^kind=ship$/kind=squad_lead/' "$dir/home/state/task-a.meta" > "$dir/meta.tmp"
   mv "$dir/meta.tmp" "$dir/home/state/task-a.meta"
   printf 'done: handoff ready\n' > "$dir/home/state/task-a.status"
   set +e
@@ -738,9 +738,9 @@ test_retired_secondmate_merge_poll_keeps_signal_wake() {
   set -e
   [ "$rc" -eq 0 ] || fail "watcher did not exit on the signal: $(cat "$dir/watch.err")"
   grep -Fq 'signal:' "$dir/watch.out" || fail "the signal wake lost its reason: $(cat "$dir/watch.out")"
-  grep -Fq 'merged' "$dir/watch.out" && fail "a retired secondmate merge poll rewrote the signal wake: $(cat "$dir/watch.out")"
+  grep -Fq 'merged' "$dir/watch.out" && fail "a retired squad_lead merge poll rewrote the signal wake: $(cat "$dir/watch.out")"
   assert_poll_absent "$dir/home/state" task-a
-  pass "a retired secondmate merge poll in a signal cycle leaves the signal wake text intact"
+  pass "a retired squad_lead merge poll in a signal cycle leaves the signal wake text intact"
 }
 
 # With no forge-reported head (gh cannot supply one), the named head is the
@@ -767,7 +767,7 @@ test_direct_pr_unpushed_commit_refuses_registration() {
   local dir pushed later
   dir=$(make_case direct-pr-unpushed)
   jg_write_meta "$dir/home/state/task-a.meta" \
-    "window=firstmate:jg-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
+    "window=juggernaut:jg-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
     "project=$dir/project" "kind=ship" "mode=direct-PR"
   pushed=$(git -C "$dir/wt" rev-parse HEAD)
   git -C "$dir/wt" commit -q --allow-empty -m 'fix only in the copy'
@@ -788,7 +788,7 @@ test_fork_head_without_tracking_ref_registers() {
   local dir sha
   dir=$(make_case fork-head-no-tracking)
   jg_write_meta "$dir/home/state/task-a.meta" \
-    "window=firstmate:jg-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
+    "window=juggernaut:jg-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
     "project=$dir/project" "kind=ship" "mode=direct-PR"
   git -C "$dir/wt" commit -q --allow-empty -m 'pushed to the fork, no tracking ref'
   sha=$(git -C "$dir/wt" rev-parse HEAD)
@@ -820,7 +820,7 @@ test_receipt_candidate_hook() {
       fi
     } > "$addons/receipts/bin/jg-receipts-lib.sh"
     jg_write_meta "$dir/home/state/task-a.meta" \
-      "window=firstmate:jg-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
+      "window=juggernaut:jg-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
       "project=$dir/project" "kind=ship" "mode=direct-PR"
     JG_ADDONS_DIR="$addons" JG_TEST_CANDIDATE_OUT="$dir/candidate" JG_TEST_HOOK_ARGS="$dir/hook-args" \
       JG_TEST_GH_HEAD=$sha run_check_entry "$dir" task-a https://github.com/o/r/pull/4 \
@@ -842,7 +842,7 @@ test_receipt_candidate_hook_failure_refuses() {
   mkdir -p "$dir/addons/receipts/bin"
   printf '%s\n' 'jg_receipts_pr_candidate() { return 3; }' > "$dir/addons/receipts/bin/jg-receipts-lib.sh"
   jg_write_meta "$dir/home/state/task-a.meta" \
-    "window=firstmate:jg-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
+    "window=juggernaut:jg-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
     "project=$dir/project" "kind=ship" "mode=direct-PR"
   if JG_ADDONS_DIR="$dir/addons" JG_TEST_GH_HEAD=0123456789abcdef0123456789abcdef01234567 \
     run_check_entry "$dir" task-a https://github.com/o/r/pull/4 > "$dir/stdout" 2> "$dir/stderr"; then
@@ -860,7 +860,7 @@ test_receipt_candidate_hook_junk_output_refuses() {
   mkdir -p "$dir/addons/receipts/bin"
   printf '%s\n' 'jg_receipts_pr_candidate() { printf "not a sha"; }' > "$dir/addons/receipts/bin/jg-receipts-lib.sh"
   jg_write_meta "$dir/home/state/task-a.meta" \
-    "window=firstmate:jg-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
+    "window=juggernaut:jg-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
     "project=$dir/project" "kind=ship" "mode=direct-PR"
   if JG_ADDONS_DIR="$dir/addons" JG_TEST_GH_HEAD=0123456789abcdef0123456789abcdef01234567 \
     run_check_entry "$dir" task-a https://github.com/o/r/pull/4 > "$dir/stdout" 2> "$dir/stderr"; then
@@ -882,7 +882,7 @@ test_receipt_candidate_hook_empty_output_passes_on_non_github() {
     printf '%s\n' 'jg_receipts_pr_candidate() { return 0; }'
   } > "$dir/addons/receipts/bin/jg-receipts-lib.sh"
   jg_write_meta "$dir/home/state/task-a.meta" \
-    "window=firstmate:jg-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
+    "window=juggernaut:jg-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
     "project=$dir/project" "kind=ship" "mode=direct-PR"
   JG_ADDONS_DIR="$dir/addons" JG_TEST_CANDIDATE_OUT="$dir/candidate" \
     run_check_entry "$dir" task-a https://gitlab.example/group/project/-/merge_requests/7 > "$dir/stdout" 2> "$dir/stderr" \
@@ -899,7 +899,7 @@ test_receipt_candidate_hook_older_head_refuses() {
   mkdir -p "$dir/addons/receipts/bin"
   printf '%s\n' 'jg_receipts_pr_candidate() { printf "%s" fedcba9876543210fedcba9876543210fedcba98; }' > "$dir/addons/receipts/bin/jg-receipts-lib.sh"
   jg_write_meta "$dir/home/state/task-a.meta" \
-    "window=firstmate:jg-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
+    "window=juggernaut:jg-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
     "project=$dir/project" "kind=ship" "mode=direct-PR"
   if JG_ADDONS_DIR="$dir/addons" JG_TEST_GH_HEAD=0123456789abcdef0123456789abcdef01234567 \
     run_check_entry "$dir" task-a https://github.com/o/r/pull/4 > "$dir/stdout" 2> "$dir/stderr"; then
@@ -917,7 +917,7 @@ test_receipt_candidate_hook_skipped_when_gate_ignores_candidate() {
   mkdir -p "$dir/addons/receipts/bin"
   printf '%s\n' 'jg_receipts_pr_candidate() { return 3; }' > "$dir/addons/receipts/bin/jg-receipts-lib.sh"
   jg_write_meta "$dir/home/state/task-a.meta" \
-    "window=firstmate:jg-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
+    "window=juggernaut:jg-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
     "project=$dir/project" "kind=ship" "mode=no-mistakes"
   JG_ADDONS_DIR="$dir/addons" JG_TEST_GH_HEAD=0123456789abcdef0123456789abcdef01234567 \
     run_check_entry "$dir" task-a https://github.com/o/r/pull/4 > "$dir/stdout" 2> "$dir/stderr" \
@@ -1017,7 +1017,7 @@ SH
   for id in _noncanonical aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; do
     dir=$(make_case "legacy-teardown-${id:0:12}")
     jg_write_meta "$dir/home/state/$id.meta" \
-      "window=firstmate:jg-$id" \
+      "window=juggernaut:jg-$id" \
       "endpoint_task_id=$id" \
       "worktree=$dir/wt" \
       "project=$dir/project" \
@@ -1640,7 +1640,7 @@ test_teardown_removes_poll_artifacts() {
   dir=$(make_case teardown-cleanup)
   fakebin="$dir/fakebin"
   jg_write_meta "$dir/home/state/task-a.meta" \
-    'window=firstmate:jg-task-a' \
+    'window=juggernaut:jg-task-a' \
     'endpoint_task_id=task-a' \
     "worktree=$dir/missing-worktree" \
     "project=$dir/project" \
@@ -1668,7 +1668,7 @@ SH
   dir=$(make_case teardown-retirement-receipt)
   fakebin="$dir/fakebin"
   jg_write_meta "$dir/home/state/task-a.meta" \
-    'window=firstmate:jg-task-a' \
+    'window=juggernaut:jg-task-a' \
     'endpoint_task_id=task-a' \
     "worktree=$dir/missing-worktree" \
     "project=$dir/project" \
@@ -1697,7 +1697,7 @@ SH
     dir=$(make_case "teardown-final-directory-${artifact//./-}")
     fakebin="$dir/fakebin"
     jg_write_meta "$dir/home/state/task-a.meta" \
-      'window=firstmate:jg-task-a' \
+      'window=juggernaut:jg-task-a' \
       'endpoint_task_id=task-a' \
       "worktree=$dir/missing-worktree" \
       "project=$dir/project" \
@@ -1763,7 +1763,7 @@ gerrit.example
 group/apps/console
 4201" ] || fail "published Gerrit sidecar bytes were not exact"
 
-  # Only an exact MERGED status wakes firstmate. Every other reading, including
+  # Only an exact MERGED status wakes juggernaut. Every other reading, including
   # an abandoned change, a lowercase spelling, and a changed format, stays
   # silent rather than reporting a merge.
   for value in NEW ABANDONED merged Merged MERGED_LATER '' not-a-status; do
@@ -1919,7 +1919,7 @@ test_gerrit_arming_records_no_patch_set_revision() {
   [ "$rc" -ne 0 ] || fail "the merge path accepted a Gerrit change"
   case "$out" in
     *"does not submit a Gerrit change"*) ;;
-    *) fail "the Gerrit merge refusal did not say firstmate does not submit" ;;
+    *) fail "the Gerrit merge refusal did not say juggernaut does not submit" ;;
   esac
   [ ! -e "$state/task-rev.merge-authority" ] || fail "a refused Gerrit merge recorded merge authority"
 
@@ -2130,7 +2130,7 @@ test_gerrit_nm_ready_gate_requires_recovered_custody() {
   squash=$(git -C "$dir/wt" commit-tree "$(git -C "$dir/wt" rev-parse 'HEAD^{tree}')" -p "$base" -m squashed)
   [ "$stamped" != "$fixed" ] || fail "the fixture's stamped head did not diverge from the pipeline head"
 
-  # The done gate itself, as crew-state and the secondmate ledger call it.
+  # The done gate itself, as crew-state and the squad_lead ledger call it.
   set +e
   out=$(JG_TEST_GERRIT_REVISION=$squash JG_TEST_NM_PIPELINE_HEAD=$fixed \
     JG_TEST_GERRIT_AXI_LOG="$dir/gerrit-axi.log" PATH="$dir/fakebin:$BASE_PATH" \
@@ -2319,7 +2319,7 @@ gitlab.example
 group/subgroup/project
 7" ] || fail "published GitLab sidecar bytes were not exact"
 
-  # Only an exact merged state wakes firstmate. Every other reading, including
+  # Only an exact merged state wakes juggernaut. Every other reading, including
   # an unreadable merge request and a changed output format, stays silent.
   for value in opened closed locked '' not-a-state MERGED merged-but-not; do
     out=$(JG_TEST_GLAB_STATE="$value" run_poll "$dir")
@@ -2572,11 +2572,11 @@ test_merged_poll_reregistration_after_notification_is_absorbed() {
 # the one reply channel, so no second watch path exists for the captain's case.
 # The poll's own durable row still lands here, because the mate that owns the
 # task still has to act on it.
-seed_secondmate_home() {  # <dir> [<route>]
+seed_squad_lead_home() {  # <dir> [<route>]
   local dir=$1 route=${2:-remote}
-  printf '%s\n' mate-x > "$dir/home/.jg-secondmate-home"
-  printf 'schema=jg-secondmate-parent.v1\nroute=%s\n' "$route" \
-    > "$dir/home/.jg-secondmate-parent"
+  printf '%s\n' mate-x > "$dir/home/.jg-squad-lead-home"
+  printf 'schema=jg-squad-lead-parent.v1\nroute=%s\n' "$route" \
+    > "$dir/home/.jg-squad-lead-parent"
 }
 
 test_merged_poll_retries_a_failed_upward_report() {
@@ -2585,7 +2585,7 @@ test_merged_poll_retries_a_failed_upward_report() {
   dir=$(make_case merged-poll-upward-retry)
   state="$dir/home/state"
   replies="$state/parent-replies.status"
-  printf '%s\n' mate-x > "$dir/home/.jg-secondmate-home"
+  printf '%s\n' mate-x > "$dir/home/.jg-squad-lead-home"
   write_poll_meta "$state" task-a "$url"
   seed_canonical_poll "$dir" task-a "$url"
   add_stop_custom_check "$dir"
@@ -2603,8 +2603,8 @@ test_merged_poll_retries_a_failed_upward_report() {
   [ ! -e "$replies" ] \
     || fail "merged-poll-upward-retry: failed report wrote a parent reply"
 
-  printf 'schema=jg-secondmate-parent.v1\nroute=remote\n' \
-    > "$dir/home/.jg-secondmate-parent"
+  printf 'schema=jg-squad-lead-parent.v1\nroute=remote\n' \
+    > "$dir/home/.jg-squad-lead-parent"
   rm -f "$state/.last-check"
   set +e
   JG_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" \
@@ -2638,7 +2638,7 @@ test_self_merge_and_poll_publish_one_outcome() {
   dir=$(make_case merge-outcome-committed)
   state="$dir/home/state"
   replies="$state/parent-replies.status"
-  seed_secondmate_home "$dir"
+  seed_squad_lead_home "$dir"
   write_task_meta "$dir" task-a
   run_check_entry "$dir" task-a "$url" >/dev/null 2>"$dir/seed.err" \
     || fail "merge-outcome-committed: could not arm merge poll"
@@ -2710,13 +2710,13 @@ SH
   pass "staged self-merge and poll interleavings are never silent"
 }
 
-test_merged_poll_reports_upward_from_a_secondmate_home_once() {
+test_merged_poll_reports_upward_from_a_squad_lead_home_once() {
   local dir state rc replies url
   url=https://github.com/o/r/pull/1
   dir=$(make_case merged-poll-upward)
   state="$dir/home/state"
   replies="$state/parent-replies.status"
-  seed_secondmate_home "$dir"
+  seed_squad_lead_home "$dir"
   write_poll_meta "$state" task-a "$url"
   seed_canonical_poll "$dir" task-a "$url"
   add_stop_custom_check "$dir"
@@ -2747,7 +2747,7 @@ test_merged_poll_reports_upward_from_a_secondmate_home_once() {
   [ "$rc" -eq 0 ] || fail "merged-poll-upward: second watcher cycle failed: $(cat "$dir/watch-2.err")"
   [ "$(grep -c -F "$url" "$replies")" -eq 1 ] \
     || fail "merged-poll-upward: an absorbed duplicate detection reported the merge again"
-  pass "a merge detected by the poll is reported upward from a secondmate home exactly once"
+  pass "a merge detected by the poll is reported upward from a squad_lead home exactly once"
 }
 
 test_different_merged_pr_for_same_task_is_not_absorbed() {
@@ -2793,32 +2793,32 @@ test_different_merged_pr_for_same_task_is_not_absorbed() {
   pass "a different merged PR for the same task gets its own first notification"
 }
 
-# A secondmate is a persistent worker, never landed work: a merge poll armed
+# A squad_lead is a persistent worker, never landed work: a merge poll armed
 # on its record (bin/jg-pr-check.sh refuses new ones) is residue carrying a
 # relayed child's pr=. When that residue reads merged the watcher retires the
 # poll silently - no merge outcome, no notified marker, no wake that could put
 # the mate itself up for teardown - and leaves every lifecycle artifact whole.
-test_persistent_secondmate_retirement_is_poll_only() {
+test_persistent_squad_lead_retirement_is_poll_only() {
   local dir state meta_before status_before registry_before endpoint_before rc
-  dir=$(make_case merged-retirement-secondmate)
+  dir=$(make_case merged-retirement-squad-lead)
   state="$dir/home/state"
   jg_write_meta "$state/domain.meta" \
     'window=session:jg-domain' \
-    "worktree=$dir/secondmate-home" \
+    "worktree=$dir/squad-lead-home" \
     "project=$dir/project" \
-    'kind=secondmate' \
-    'mode=secondmate' \
+    'kind=squad_lead' \
+    'mode=squad_lead' \
     'backend=tmux' \
-    "home=$dir/secondmate-home" \
+    "home=$dir/squad-lead-home" \
     'pr=https://github.com/o/r/pull/2' \
     'pr_head=0123456789abcdef0123456789abcdef01234567'
-  mkdir -p "$dir/secondmate-home"
+  mkdir -p "$dir/squad-lead-home"
   printf 'working: persistent endpoint remains healthy\n' > "$state/domain.status"
-  printf -- '- domain | scope: test | home: %s\n' "$dir/secondmate-home" > "$dir/home/data/secondmates.md"
+  printf -- '- domain | scope: test | home: %s\n' "$dir/squad-lead-home" > "$dir/home/data/squad_leads.md"
   printf 'endpoint-alive\n' > "$dir/endpoint-sentinel"
   meta_before=$(shasum -a 256 "$state/domain.meta")
   status_before=$(shasum -a 256 "$state/domain.status")
-  registry_before=$(shasum -a 256 "$dir/home/data/secondmates.md")
+  registry_before=$(shasum -a 256 "$dir/home/data/squad_leads.md")
   endpoint_before=$(shasum -a 256 "$dir/endpoint-sentinel")
   seed_canonical_poll "$dir" domain https://github.com/o/r/pull/2
   add_stop_custom_check "$dir"
@@ -2827,24 +2827,24 @@ test_persistent_secondmate_retirement_is_poll_only() {
   JG_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch.out" 2> "$dir/watch.err"
   rc=$?
   set -e
-  [ "$rc" -eq 0 ] || fail "persistent secondmate merged watcher failed: $(cat "$dir/watch.err")"
+  [ "$rc" -eq 0 ] || fail "persistent squad_lead merged watcher failed: $(cat "$dir/watch.err")"
   case "$(cat "$dir/watch.out")" in
     check:*z-stop.check.sh:*stop-cycle) ;;
-    *) fail "a secondmate's merged poll woke the watcher instead of retiring silently: $(cat "$dir/watch.out")" ;;
+    *) fail "a squad_lead's merged poll woke the watcher instead of retiring silently: $(cat "$dir/watch.out")" ;;
   esac
   assert_poll_absent "$state" domain
   [ ! -e "$state/domain.pr-poll-merge-notified" ] \
-    || fail "a secondmate's retired poll recorded a merge notification"
+    || fail "a squad_lead's retired poll recorded a merge notification"
   ! grep -F 'merged-domain-' "$state/.wake-queue" >/dev/null 2>&1 \
-    || fail "a secondmate's merged poll queued a landed-work wake"
+    || fail "a squad_lead's merged poll queued a landed-work wake"
   ! grep -F 'domain.check.sh' "$state/.wake-queue" >/dev/null 2>&1 \
-    || fail "a secondmate's merged poll queued a check wake"
-  [ "$(shasum -a 256 "$state/domain.meta")" = "$meta_before" ] || fail "retirement changed secondmate metadata"
-  [ "$(shasum -a 256 "$state/domain.status")" = "$status_before" ] || fail "retirement changed secondmate status"
-  [ "$(shasum -a 256 "$dir/home/data/secondmates.md")" = "$registry_before" ] || fail "retirement changed secondmate registry"
-  [ "$(shasum -a 256 "$dir/endpoint-sentinel")" = "$endpoint_before" ] || fail "retirement changed secondmate endpoint evidence"
-  [ -d "$dir/secondmate-home" ] || fail "retirement removed the persistent secondmate home"
-  pass "a merged poll on a persistent secondmate retires silently: no outcome, marker, or wake, and every lifecycle artifact preserved"
+    || fail "a squad_lead's merged poll queued a check wake"
+  [ "$(shasum -a 256 "$state/domain.meta")" = "$meta_before" ] || fail "retirement changed squad_lead metadata"
+  [ "$(shasum -a 256 "$state/domain.status")" = "$status_before" ] || fail "retirement changed squad_lead status"
+  [ "$(shasum -a 256 "$dir/home/data/squad_leads.md")" = "$registry_before" ] || fail "retirement changed squad_lead registry"
+  [ "$(shasum -a 256 "$dir/endpoint-sentinel")" = "$endpoint_before" ] || fail "retirement changed squad_lead endpoint evidence"
+  [ -d "$dir/squad-lead-home" ] || fail "retirement removed the persistent squad_lead home"
+  pass "a merged poll on a persistent squad_lead retires silently: no outcome, marker, or wake, and every lifecycle artifact preserved"
 }
 
 test_retirement_crash_recovery() {
@@ -3358,7 +3358,7 @@ test_teardown_cannot_race_authority_consumption() {
   dir=$(make_case merge-authority-teardown-race)
   state="$dir/home/state"
   jg_write_meta "$state/task-a.meta" \
-    'window=firstmate:jg-task-a' \
+    'window=juggernaut:jg-task-a' \
     'endpoint_task_id=task-a' \
     "worktree=$dir/wt" \
     "project=$dir/project" \
@@ -3412,7 +3412,7 @@ test_authority_retirement_preserves_replacement() {
     || fail "replacement: could not arm the original poll"
   queue_merge "$dir" "$url_a"
   # The replacement runs inside the watcher, whose environment names the real
-  # firstmate root, so restore the fixture root every other arming here uses.
+  # juggernaut root, so restore the fixture root every other arming here uses.
   cat > "$dir/replace-authority.sh" <<SH
 #!/usr/bin/env bash
 export JG_ROOT_OVERRIDE="$dir/root" JG_TEST_GUARD_LOG="$dir/guard.log"
@@ -3812,9 +3812,9 @@ test_authority_persistence_refuses_rebound_metadata
 test_authority_persists_before_control_unlock
 test_teardown_cannot_race_authority_consumption
 test_authority_retirement_preserves_replacement
-test_merged_poll_reports_upward_from_a_secondmate_home_once
+test_merged_poll_reports_upward_from_a_squad_lead_home_once
 test_different_merged_pr_for_same_task_is_not_absorbed
-test_persistent_secondmate_retirement_is_poll_only
+test_persistent_squad_lead_retirement_is_poll_only
 test_retirement_crash_recovery
 test_external_merge_transition_retires_only_terminal_poll
 test_retirement_refuses_replacement_and_nonterminal_results
@@ -3822,8 +3822,8 @@ test_retirement_queue_failure_and_receipt_tampering
 test_gitlab_merged_poll_retires
 test_invalid_entrypoints_have_zero_side_effects
 test_draft_pull_request_is_not_armed
-test_secondmate_record_refuses_a_pr_watch
-test_retired_secondmate_merge_poll_keeps_signal_wake
+test_squad_lead_record_refuses_a_pr_watch
+test_retired_squad_lead_merge_poll_keeps_signal_wake
 test_unpushed_named_head_refuses_registration
 test_direct_pr_unpushed_commit_refuses_registration
 test_fork_head_without_tracking_ref_registers

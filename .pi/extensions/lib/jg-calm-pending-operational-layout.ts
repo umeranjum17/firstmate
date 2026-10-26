@@ -1,7 +1,7 @@
 // Verified against Pi 0.87.1 (docs/calm-mode-feasibility.md), which draws queued
 // "Steering:"/"Follow-up:" rows, their spacer, and the dequeue hint in
 // InteractiveMode.updatePendingMessagesDisplay from InteractiveMode.getAllQueuedMessages.
-// A Firstmate notification sent while a turn runs waits there before it is ever a chat row,
+// A Juggernaut notification sent while a turn runs waits there before it is ever a chat row,
 // so ./jg-calm-operational-user-layout.ts never sees it. This adapter filters only what that
 // one listing reads; the queue Pi delivers from and persists is untouched.
 //
@@ -16,7 +16,7 @@
 // prototype, so they cannot be probed at install. Each session is checked on its first
 // queued-listing draw while Calm is on, before any row is hidden. A session missing any of them
 // gets no queued-row hiding at all and one warning; its rows and Escape stay stock.
-// See https://github.com/kunchenguid/firstmate/issues/1588.
+// See https://github.com/kunchenguid/juggernaut/issues/1588.
 //
 // Pi 0.87.1 stops its run loop once a restore is followed by an abort (Escape, or navigating
 // the session tree during a run), so a queue that still holds messages when the aborted run
@@ -28,7 +28,7 @@
 // it neither counts toward that turn nor announces one.
 import * as PiCodingAgent from "@earendil-works/pi-coding-agent";
 import { calmPresentationHides } from "./jg-calm-visibility.ts";
-import { isFirstmateOperationalPresentationText } from "./jg-operational-input.ts";
+import { isJuggernautOperationalPresentationText } from "./jg-operational-input.ts";
 
 type QueuedMessages = {
   steering: string[];
@@ -88,14 +88,14 @@ export const CALM_QUEUE_RETENTION_SESSION_METHODS = [
 
 // Generic by design: no notification text, marker, kind, path, or identifier.
 export const CALM_QUEUED_ROWS_UNSUPPORTED_WARNING =
-  "Firstmate Calm: this Pi session cannot keep queued messages across Escape, so queued Firstmate rows stay visible.";
+  "Juggernaut Calm: this Pi session cannot keep queued messages across Escape, so queued Juggernaut rows stay visible.";
 export const CALM_SUPERVISION_CONTINUES_NOTICE =
-  "Firstmate supervision continues in a new turn.";
+  "Juggernaut supervision continues in a new turn.";
 
 // Keep the introduction-version symbol stable so a compatible upgrade cannot
 // double-patch a live process.
 const CALM_PENDING_OPERATIONAL_LAYOUT_PATCH = Symbol.for(
-  "firstmate:calm-pending-operational-layout:pi-0.87.1",
+  "juggernaut:calm-pending-operational-layout:pi-0.87.1",
 );
 
 function settle(queued: unknown): void {
@@ -110,13 +110,13 @@ export function installCalmPendingOperationalLayout(): void {
   const installed = registry[CALM_PENDING_OPERATIONAL_LAYOUT_PATCH];
   if (installed) {
     installed.hidesOperationalInput = hidesOperationalInput;
-    installed.isOperationalInput = isFirstmateOperationalPresentationText;
+    installed.isOperationalInput = isJuggernautOperationalPresentationText;
     return;
   }
 
   const InteractiveMode = PiCodingAgent.InteractiveMode;
   if (typeof InteractiveMode !== "function") {
-    throw new Error("Firstmate Calm requires Pi InteractiveMode");
+    throw new Error("Juggernaut Calm requires Pi InteractiveMode");
   }
   const prototype = InteractiveMode.prototype as unknown as InteractiveModePendingPrototype;
   const originalGetAllQueuedMessages = prototype.getAllQueuedMessages;
@@ -130,7 +130,7 @@ export function installCalmPendingOperationalLayout(): void {
     ["restoreQueuedMessagesToEditor", originalRestoreQueuedMessagesToEditor],
   ] as const) {
     if (typeof method !== "function") {
-      throw new Error(`Firstmate Calm requires Pi InteractiveMode.${name}`);
+      throw new Error(`Juggernaut Calm requires Pi InteractiveMode.${name}`);
     }
   }
 
@@ -138,7 +138,7 @@ export function installCalmPendingOperationalLayout(): void {
   let lastHost: PendingRowsHost | undefined;
   const patch: CalmPendingOperationalLayoutPatch = {
     hidesOperationalInput,
-    isOperationalInput: isFirstmateOperationalPresentationText,
+    isOperationalInput: isJuggernautOperationalPresentationText,
     refresh: () => lastHost?.updatePendingMessagesDisplay(),
   };
 

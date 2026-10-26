@@ -13,14 +13,14 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 #                one on the old address. The old unit's files are never edited, so the swap is undone by --rollback.
 #   --dry-run    print every step and the unit; change nothing.
 #   --rollback   stop and remove the new unit, start the old one again (with --dry-run: print only).
-# Settings (environment): LOOKOUT_DIR (required: the lookout clone, until lookout-axi is published), JG_HOME (default ~/firstmate),
+# Settings (environment): LOOKOUT_DIR (required: the lookout clone, until lookout-axi is published), JG_HOME (default ~/juggernaut),
 # PORT (the old dashboard's port, default 4390), BIND (default: this host's tailnet address), SPARE_PORT (default 4395).
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 mode=apply dry=no
 for arg in "$@"; do case $arg in --dry-run) dry=yes ;; --rollback) mode=rollback ;; *) echo "usage: install.sh [--dry-run] [--rollback]" >&2; exit 2 ;; esac; done
 [ "$dry" = no ] || { [ "$mode" = rollback ] && mode=rollback-dry || mode=dry; }
-JG_HOME=${JG_HOME:-$HOME/firstmate} PORT=${PORT:-4390} SPARE_PORT=${SPARE_PORT:-4395}
+JG_HOME=${JG_HOME:-$HOME/juggernaut} PORT=${PORT:-4390} SPARE_PORT=${SPARE_PORT:-4395}
 OLD=jg-dashboard.service NEW=jg-dashboard-lookout.service
 unit_dir=${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user
 BIND=${BIND:-$(tailscale ip -4 | head -1)}
@@ -28,7 +28,7 @@ run() { echo "+ $*"; case $mode in *dry) ;; *) "$@" ;; esac; }
 unit() {
   cat <<U
 [Unit]
-Description=Firstmate fleet dashboard: Lookout on the adapter (tailnet only)
+Description=Juggernaut fleet dashboard: Lookout on the adapter (tailnet only)
 After=tailscaled.service network-online.target
 
 [Service]

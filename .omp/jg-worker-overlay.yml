@@ -1,5 +1,5 @@
-# Firstmate worker posture for omp (Oh My Pi), passed as `--config` on every
-# Firstmate-launched omp session (crewmate, scout, and secondmate alike) by
+# Juggernaut worker posture for omp (Oh My Pi), passed as `--config` on every
+# Juggernaut-launched omp session (operator, scout, and squad_lead alike) by
 # bin/jg-spawn.sh, whose header owns why the launch carries it. It is the omp
 # analogue of the Pi adapter's `--tui-mode regular` pin: a per-launch overlay,
 # never a write to the captain's own ~/.omp/agent/config.yml, which stays

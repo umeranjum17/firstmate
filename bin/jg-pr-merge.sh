@@ -220,15 +220,15 @@ PR_NUMBER=$JG_PR_NUMBER
 # glab resolves the instance from the project URL passed to -R, so the host is
 # rebuilt from the parsed identity rather than read from any ambient default.
 PROJECT_URL="https://$JG_PR_HOST/$JG_PR_PATH"
-# Firstmate never submits a Gerrit change, even though gerrit-axi can, so the
+# Juggernaut never submits a Gerrit change, even though gerrit-axi can, so the
 # refusal is stated rather than left as a silently absent provider branch.
 # Submitting a Gerrit change means first recording a Code-Review+2, which is a
 # positive attributed claim that a named human approved the change, read by
-# colleagues and by any audit of the repository. Firstmate must not manufacture
+# colleagues and by any audit of the repository. Juggernaut must not manufacture
 # one. The server permitting self-approval is what makes this a policy boundary
 # rather than a capability limit, so it is enforced here rather than assumed.
 if [ "$PROVIDER" = gerrit ]; then
-  echo "error: firstmate does not submit a Gerrit change: submitting requires an attributed human approval it must not manufacture, so a human submits the change on the server" >&2
+  echo "error: juggernaut does not submit a Gerrit change: submitting requires an attributed human approval it must not manufacture, so a human submits the change on the server" >&2
   exit 2
 fi
 shift 2
@@ -1814,7 +1814,7 @@ jg_merge_outcome_report "$JG_HOME" "$STATE" "$ID" "$URL" self \
 case "$outcome_rc" in
   0) ;;
   3)
-    printf 'actionable: merged %s but could not report it upward: this home has no readable secondmate identity or parent binding (.jg-secondmate-home, .jg-secondmate-parent)\n' \
+    printf 'actionable: merged %s but could not report it upward: this home has no readable squad_lead identity or parent binding (.jg-squad-lead-home, .jg-squad-lead-parent)\n' \
       "$URL" >&2
     ;;
   *)

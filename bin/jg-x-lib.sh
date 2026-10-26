@@ -3,7 +3,7 @@
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Shared config resolution for the X-mode connector client (jg-x-poll.sh and
 # jg-x-reply.sh). X mode is opt-in: a user drops a non-empty FMX_PAIRING_TOKEN
-# into the firstmate home's .env. FMX_ENV_FILE can point direct client calls at
+# into the juggernaut home's .env. FMX_ENV_FILE can point direct client calls at
 # another .env-style file, but bootstrap activation still checks $JG_HOME/.env.
 # Until then polling is a hard no-op; replies can still run in FMX_DRY_RUN
 # preview mode without a token.
@@ -249,7 +249,7 @@ fmx_load_config() {
   else
     FMX_RELAY=$(fmx_env_get FMX_RELAY_URL "$env_file")
   fi
-  [ -n "$FMX_RELAY" ] || FMX_RELAY="https://myfirstmate.io"
+  [ -n "$FMX_RELAY" ] || FMX_RELAY="https://myjuggernaut.io"
   FMX_RELAY=${FMX_RELAY%/}
   if [ -n "${FMX_DRY_RUN+x}" ]; then
     dry=${FMX_DRY_RUN-}
@@ -385,7 +385,7 @@ fmx_request_relay_context() {
 # --- durable per-request reply-context registry (state/x-context/<rid>.json) ---
 #
 # A single x_request per task collides across concurrent public requests routed
-# through one persistent secondmate: linking request B onto a task overwrites
+# through one persistent squad_lead: linking request B onto a task overwrites
 # request A's recorded platform/budget, so A's later follow-up loses its context.
 # And the inbox payload is drained right after the acknowledgement, so a delayed
 # request-id follow-up has no local platform source at all. This registry is the
@@ -998,7 +998,7 @@ fmx_meta_link_clear() {
   fi
   lock=$(jg_meta_lock_path "$meta") || return 1
   if [ "$expected_set" -eq 1 ]; then
-    # A guarded clear runs unattended over the secondmate transport, so it must
+    # A guarded clear runs unattended over the squad_lead transport, so it must
     # refuse rather than wedge. The parent's writability can flip between the
     # check above and lock creation, and the ordinary unbounded wait would then
     # retry forever instead of returning the reconciliation refusal this guard

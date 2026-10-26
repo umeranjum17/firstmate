@@ -31,13 +31,13 @@
 # Knobs (environment):
 #   PI_QUOTA_FAILOVER_REAL_PI  absolute path to the real pi binary
 #   PI_QUOTA_FAILOVER_CHAIN    space-separated ordered model chain
-#   PI_QUOTA_FAILOVER_ACCOUNT_POOL  a firstmate config/account-pool file (default ~/firstmate/config/account-pool when it
+#   PI_QUOTA_FAILOVER_ACCOUNT_POOL  a juggernaut config/account-pool file (default ~/juggernaut/config/account-pool when it
 #                              exists; empty turns it off): route and account come from jg-model-pool pick/next (Claude
 #                              above the eligibility floor, else Sol then Goat then Cursor auto); a limit calls next
 #   PI_QUOTA_FAILOVER_MODEL_POOL  absolute path to jg-model-pool (default: sibling account-pool/bin/jg-model-pool)
 #   PI_QUOTA_FAILOVER_PRINT_CHAIN  non-empty: print the chain and exit (route-change reads it)
 #   PI_QUOTA_FAILOVER_LOG      log file (default ~/.local/state/pi-quota-failover.log)
-#   PI_QUOTA_FAILOVER_GATE     host-memory gate run before each call (default ~/firstmate/config/jg-mem-gate.sh
+#   PI_QUOTA_FAILOVER_GATE     host-memory gate run before each call (default ~/juggernaut/config/jg-mem-gate.sh
 #                              when executable; empty disables it)
 #   PI_QUOTA_FAILOVER_GATE_SECS  longest gate wait before pi starts anyway (default 600)
 #   PI_QUOTA_FAILOVER_DEAD_SECS  how long a quota error keeps a chain model skipped (default 3600)
@@ -152,14 +152,14 @@ credit_empty() {
 }
 # Route and Claude account come from jg-model-pool (pick/next), not a local byokit pick/rest client.
 # Folder paths and unset names only; never credentials. Without a pool file the static chain runs as before.
-pool_file=${PI_QUOTA_FAILOVER_ACCOUNT_POOL-$HOME/firstmate/config/account-pool}
+pool_file=${PI_QUOTA_FAILOVER_ACCOUNT_POOL-$HOME/juggernaut/config/account-pool}
 pool_helper=${PI_QUOTA_FAILOVER_MODEL_POOL:-}
 pool_sel='' pool_id='' pool_model='' pool_attempted='[]' pool_mode=0
 if [ -z "$pool_helper" ]; then
   for cand in \
     "$(cd "$(dirname "$0")/.." 2>/dev/null && pwd)/account-pool/bin/jg-model-pool" \
     "${JG_ADDONS_DIR:+$JG_ADDONS_DIR/account-pool/bin/jg-model-pool}" \
-    "${JG_HOME:+$JG_HOME/projects/firstmate-addons/account-pool/bin/jg-model-pool}"; do
+    "${JG_HOME:+$JG_HOME/projects/juggernaut-addons/account-pool/bin/jg-model-pool}"; do
     [ -n "${cand:-}" ] && [ -x "$cand" ] && { pool_helper=$cand; break; }
   done
 fi
@@ -237,7 +237,7 @@ stall_retries=${PI_QUOTA_FAILOVER_STALL_RETRIES:-3}
 # Host-memory gate (speed-report B3: model calls under heavy host load crash): every pipeline model call goes
 # through this wrapper, so wait here until the host has room. The gate given no command only waits; pi keeps its
 # normal priority and no memory cap. The wait is bounded so it never eats the whole step timeout.
-gate=${PI_QUOTA_FAILOVER_GATE-$HOME/firstmate/config/jg-mem-gate.sh}
+gate=${PI_QUOTA_FAILOVER_GATE-$HOME/juggernaut/config/jg-mem-gate.sh}
 gate_secs=${PI_QUOTA_FAILOVER_GATE_SECS:-600}
 if [ -n "$gate" ] && [ -x "$gate" ]; then
   timeout "$gate_secs" "$gate" </dev/null >&2 || log_line "memory gate still waiting after ${gate_secs}s; starting pi anyway"

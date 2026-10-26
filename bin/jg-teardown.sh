@@ -2,10 +2,10 @@
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Tear down a finished task: return the treehouse worktree, release the Orca
-# worktree, or retire a secondmate home; kill the recorded runtime endpoint,
+# worktree, or retire a squad_lead home; kill the recorded runtime endpoint,
 # clear volatile state, and transition this home's backlog item for ship and
-# scout tasks before reporting success (a secondmate teardown transitions none,
-# since secondmates are not backlog items), then refresh/prune the project's
+# scout tasks before reporting success (a squad_lead teardown transitions none,
+# since squad_leads are not backlog items), then refresh/prune the project's
 # clone for PR-based ship tasks.
 # An endpoint whose close could not do its job REFUSES before any record naming
 # it is removed: those records are the only thing that names what survived, so
@@ -83,7 +83,7 @@
 # Uncommitted changes are never landed; dirty refusals distinguish untracked-only
 # leftovers from tracked edits and list at most ten non-exempt untracked paths.
 # local-only projects additionally accept work merged into the local default
-# branch (firstmate performs that merge after configured approval) as a fallback
+# branch (juggernaut performs that merge after configured approval) as a fallback
 # for the common case where there is no remote at all.
 # Scout tasks (kind=scout in meta) carve out of that check: their worktree is
 # declared scratch and the report at data/<task-id>/report.md is the work
@@ -93,7 +93,7 @@
 # Treehouse's return resets with `git clean -fd`, which never deletes a nested
 # git repository, so the pool slot stays dirty and later checkouts skip it.
 # Before that return, teardown runs `git clean -ffdq` in the copy, and a forced
-# secondmate teardown does the same in each child copy it returns.
+# squad_lead teardown does the same in each child copy it returns.
 # The second -f removes nested repositories, and -x stays off so ignored files remain.
 # A ship teardown without --force does not run that clean: it refuses untracked
 # entries, except those under the .claude/ allowance, so a nested repository
@@ -104,7 +104,7 @@
 # what remains. Teardown then finishes every cleanup step, reports the lost slot
 # instead of a clean return, and exits 4. Exit 4 means only "cleaned up, but a
 # returned pool slot was lost"; refusals and errors exit 1, and an invalid
-# request exits 2. A local retirement of a remote secondmate whose remote run
+# request exits 2. A local retirement of a remote squad_lead whose remote run
 # exits 4 still completes locally, forwards only the remote lost-slot warning
 # to stderr, and then exits 4.
 # Before destructive cleanup, teardown validates task check artifacts as
@@ -129,7 +129,7 @@
 # name a slot a DIFFERENT live task now holds. Cleanup kills every process under
 # that path and hard-resets it before returning it, so before the first cleanup
 # step teardown verifies record exclusivity: no OTHER task record in this home or
-# any locally registered Firstmate home may name the same live path in its
+# any locally registered Juggernaut home may name the same live path in its
 # worktree= or home=. One live path with two task records is the reuse collision
 # itself, whichever record is stale, and teardown refuses with nothing changed.
 # The durable Treehouse lease is the only ownership store; this record scan is
@@ -140,13 +140,13 @@
 # state: the same worker remains the owner after changing directory, so cwd can
 # never veto teardown of that exact recorded endpoint.
 # The scan and destructive return hold a project-identity lock in the local root
-# Firstmate home's state directory, as resolved by bin/jg-wake-lib.sh's
-# jg_firstmate_root_home; a home seeded from another machine is its own local
+# Juggernaut home's state directory, as resolved by bin/jg-wake-lib.sh's
+# jg_juggernaut_root_home; a home seeded from another machine is its own local
 # root, since a lock on this filesystem cannot be held or observed across that
 # boundary. Fresh Treehouse spawns for that project in
-# every local Firstmate home hold the same lock from before slot allocation
+# every local Juggernaut home hold the same lock from before slot allocation
 # through metadata publication, closing the publication
-# gap; forced secondmate teardown takes it and runs the same checks for every
+# gap; forced squad_lead teardown takes it and runs the same checks for every
 # descendant Treehouse slot before touching any child.
 # These refusals are not relaxed by --force: --force authorizes discarding THIS
 # task's unlanded work, never another task's live work. Nothing of this task's
@@ -164,8 +164,8 @@
 # Projected closes share the presentation-order lock, refuse to close the
 # captain's active tab, and restore the exact response-derived pre-close tab
 # if Herdr's last-pane cleanup focuses an unrelated neighboring workspace.
-# Secondmates (kind=secondmate in meta) are retired explicitly. Normal
-# teardown refuses while their home has in-flight crewmate meta files; --force
+# SquadLeads (kind=squad_lead in meta) are retired explicitly. Normal
+# teardown refuses while their home has in-flight operator meta files; --force
 # is the approved discard path that prevalidates child removal targets, locks each
 # descendant home's task set before enumeration, and holds those locks through
 # child cleanup. Contention refuses the complete forced teardown before child
@@ -173,7 +173,7 @@
 # that mate's backlog-handoff lock under the registry lock. Pending handoff wake
 # state is retired with the home, and local removal failure restores that state
 # before preserving the route for retry. After a successful local or remote
-# secondmate retirement, every parent pending-reply record for that id (resolved
+# squad_lead retirement, every parent pending-reply record for that id (resolved
 # leftovers included) and its delivery confirmation is removed so retired mates
 # cannot leave durable reply expectations behind. Non-forced retirement refuses
 # while any of those records is still unresolved. Teardown then discards child
@@ -183,7 +183,7 @@
 # leased home and state in place instead of hiding a still-held lease.
 # Usage: jg-teardown.sh <task-id> [--force] [--legacy-record]
 #   --force skips ordinary-task dirty and landed-work checks, skips scout report
-#   checks, and discards secondmate child work for kind=secondmate. Only use it
+#   checks, and discards squad_lead child work for kind=squad_lead. Only use it
 #   when the captain has explicitly said to discard the work.
 #   --legacy-record accepts a task record that predates the spawn_gen field:
 #   teardown then proceeds only when the recorded endpoint is confirmed dead or
@@ -288,7 +288,7 @@
 #     scratch and data/<id>/; descendant cleanup supplies registered scratch
 #     and data/<id>/. Registered paths are validated by bin/jg-scratch.sh
 #     before their processes are reaped and the directories removed.
-#     Direct cleanup retains data/<id>/ evidence; retiring a secondmate removes
+#     Direct cleanup retains data/<id>/ evidence; retiring a squad_lead removes
 #     its home after child cleanup. Scratch or retained-data roots require lsof;
 #     failed inspection, scanning or scratch removal preserves task ownership
 #     for a teardown retry. Idempotent: nothing left to find is a silent no-op.
@@ -300,7 +300,7 @@
 #     log in a pruned no-mistakes gate worktree). bin/jg-remote-job-reap-orphans.sh
 #     owns that sweep and its safety rule; it never touches a worker whose code
 #     root still exists, so the account's healthy LaunchAgent worker and every
-#     live remote secondmate worker are out of scope. Best effort: a sweep
+#     live remote squad_lead worker are out of scope. Best effort: a sweep
 #     failure never blocks this teardown.
 # After Fix 1 and Fix 2, when config/pipeline-spend opts this home in, a ship
 # task whose local copy this teardown owns has its no-mistakes pipeline spend
@@ -316,9 +316,9 @@ JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
 STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
 DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
 CONFIG="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"
-SECONDMATE_REG="$DATA/secondmates.md"
-SUB_HOME_MARKER=".jg-secondmate-home"
-SUB_HOME_PARENT_MARKER=".jg-secondmate-parent"
+SQUAD_LEAD_REG="$DATA/squad_leads.md"
+SUB_HOME_MARKER=".jg-squad-lead-home"
+SUB_HOME_PARENT_MARKER=".jg-squad-lead-parent"
 # A missing `.` target is not a teardown result. Stock Bash 3.2 can abort it
 # into an EXIT trap whose status is 0, and a newer Bash can print the
 # diagnostic and continue into cleanup. Refuse by name before sourcing.
@@ -350,8 +350,8 @@ for _teardown_source in \
   jg-public-followup-lib.sh \
   jg-x-lib.sh \
   jg-env-lib.sh \
-  jg-secondmate-registry-lib.sh \
-  jg-secondmate-parent-lib.sh \
+  jg-squad-lead-registry-lib.sh \
+  jg-squad-lead-parent-lib.sh \
   jg-pending-reply-lib.sh \
   jg-operational-input.sh \
   jg-marker-lib.sh \
@@ -386,10 +386,10 @@ unset _teardown_source
 . "$SCRIPT_DIR/jg-dod-lib.sh"
 # shellcheck source=bin/jg-public-followup-lib.sh
 . "$SCRIPT_DIR/jg-public-followup-lib.sh"
-# shellcheck source=bin/jg-secondmate-registry-lib.sh
-. "$SCRIPT_DIR/jg-secondmate-registry-lib.sh"
-# shellcheck source=bin/jg-secondmate-parent-lib.sh
-. "$SCRIPT_DIR/jg-secondmate-parent-lib.sh"
+# shellcheck source=bin/jg-squad-lead-registry-lib.sh
+. "$SCRIPT_DIR/jg-squad-lead-registry-lib.sh"
+# shellcheck source=bin/jg-squad-lead-parent-lib.sh
+. "$SCRIPT_DIR/jg-squad-lead-parent-lib.sh"
 # shellcheck source=bin/jg-pending-reply-lib.sh
 . "$SCRIPT_DIR/jg-pending-reply-lib.sh"
 # shellcheck source=bin/jg-nm-run-lib.sh
@@ -446,7 +446,7 @@ if [ -f "$META" ] && [ ! -L "$META" ]; then
   [ -n "$TEARDOWN_LOCK_BACKEND" ] || TEARDOWN_LOCK_BACKEND=tmux
   TEARDOWN_LOCK_WT=$(jg_meta_get "$META" worktree)
   TEARDOWN_LOCK_PROJECT=$(jg_meta_get "$META" project)
-  if [ "$TEARDOWN_LOCK_KIND" != secondmate ] \
+  if [ "$TEARDOWN_LOCK_KIND" != squad_lead ] \
      && [ "$TEARDOWN_LOCK_BACKEND" != orca ] \
      && jg_treehouse_pool_slot "$TEARDOWN_LOCK_PROJECT" "$TEARDOWN_LOCK_WT"; then
     TREEHOUSE_SLOT_LOCK_REQUIRED=1
@@ -540,19 +540,19 @@ jg_backlog_record_present "$META" "task record" "$STATE" || {
 }
 TEARDOWN_META_KIND=$(jg_meta_get "$META" kind)
 [ -n "$TEARDOWN_META_KIND" ] || TEARDOWN_META_KIND=ship
-# Retiring a persistent secondmate is main's alone in both postures; the kind
+# Retiring a persistent squad_lead is main's alone in both postures; the kind
 # is read under the metadata lock (role partition: bin/jg-lease-lib.sh).
-[ "$TEARDOWN_META_KIND" != secondmate ] || jg_lease_forbid_branch "secondmate retirement (jg-teardown)"
-# A secondmate's endpoint-liveness episodes (bin/jg-secondmate-liveness-lib.sh)
+[ "$TEARDOWN_META_KIND" != squad_lead ] || jg_lease_forbid_branch "squad_lead retirement (jg-teardown)"
+# A squad_lead's endpoint-liveness episodes (bin/jg-squad-lead-liveness-lib.sh)
 # serialize on this lock; retirement holds it to the end so no probe or relaunch
 # can act on the route mid-teardown, and its relaunch ledger and park marker are
 # removed with the route instead of surviving for a reused id.
-if [ "$TEARDOWN_META_KIND" = secondmate ]; then
-  jg_lock_try_acquire "$STATE/.secondmate-liveness-$ID.lock" || {
-    echo "error: a secondmate liveness check is in progress for $ID; nothing was changed - retry teardown" >&2
+if [ "$TEARDOWN_META_KIND" = squad_lead ]; then
+  jg_lock_try_acquire "$STATE/.squad-lead-liveness-$ID.lock" || {
+    echo "error: a squad_lead liveness check is in progress for $ID; nothing was changed - retry teardown" >&2
     exit 1
   }
-  SM_LIVENESS_LOCK="$STATE/.secondmate-liveness-$ID.lock"
+  SM_LIVENESS_LOCK="$STATE/.squad-lead-liveness-$ID.lock"
 fi
 TEARDOWN_CLEANUP_RECOVERY=$(jg_meta_get "$META" cleanup_recovery)
 TEARDOWN_META_SPAWN_GEN=
@@ -689,7 +689,7 @@ handoff_wake_retire_validate() {
   HANDOFF_WAKE_RETIRE_CORR=
   [ -e "$marker" ] || [ -L "$marker" ] || return 0
   [ -f "$marker" ] && [ ! -L "$marker" ] || {
-    echo "REFUSED: receiver wake state for secondmate $ID is unsafe" >&2
+    echo "REFUSED: receiver wake state for squad_lead $ID is unsafe" >&2
     return 1
   }
   value=$(cat "$marker" 2>/dev/null || true)
@@ -699,19 +699,19 @@ handoff_wake_retire_validate() {
       corr=${value#prepared:}
       corr=${corr%%:*}
       printf '%s' "$value" | grep -Eq '^prepared:[a-f0-9]{16}:[a-f0-9]{16}$' || {
-        echo "REFUSED: receiver wake state for secondmate $ID is invalid" >&2
+        echo "REFUSED: receiver wake state for squad_lead $ID is invalid" >&2
         return 1
       }
       ;;
     pending:*|confirmed:*)
       corr=${value#*:}
       printf '%s' "$corr" | grep -Eq '^[a-f0-9]{16}$' || {
-        echo "REFUSED: receiver wake state for secondmate $ID is invalid" >&2
+        echo "REFUSED: receiver wake state for squad_lead $ID is invalid" >&2
         return 1
       }
       ;;
     *)
-      echo "REFUSED: receiver wake state for secondmate $ID is invalid" >&2
+      echo "REFUSED: receiver wake state for squad_lead $ID is invalid" >&2
       return 1
       ;;
   esac
@@ -720,14 +720,14 @@ handoff_wake_retire_validate() {
     if [ -e "$rec" ] || [ -L "$rec" ]; then
       [ -f "$rec" ] && [ ! -L "$rec" ] \
         && [ "$(jg_pending_reply_get "$rec" task_id)" = "$ID" ] || {
-        echo "REFUSED: receiver wake correlation for secondmate $ID is unsafe or belongs to another task" >&2
+        echo "REFUSED: receiver wake correlation for squad_lead $ID is unsafe or belongs to another task" >&2
         return 1
       }
     fi
     confirmation=$(jg_pending_reply_delivery_confirmation_path "$STATE" "$corr")
     if [ -e "$confirmation" ] || [ -L "$confirmation" ]; then
       [ -f "$confirmation" ] && [ ! -L "$confirmation" ] || {
-        echo "REFUSED: receiver wake delivery state for secondmate $ID is unsafe" >&2
+        echo "REFUSED: receiver wake delivery state for squad_lead $ID is unsafe" >&2
         return 1
       }
     fi
@@ -807,28 +807,28 @@ handoff_wake_retire_stage_recover() {
   local home=$1 stage="$STATE/.backlog-handoff-$ID.wake-retiring" corr
   [ -e "$stage" ] || [ -L "$stage" ] || return 0
   [ -d "$stage" ] && [ ! -L "$stage" ] || {
-    echo "REFUSED: receiver wake retirement state for secondmate $ID is unsafe" >&2
+    echo "REFUSED: receiver wake retirement state for squad_lead $ID is unsafe" >&2
     return 1
   }
   if [ ! -e "$stage/corr" ] && [ ! -L "$stage/corr" ]; then
     rmdir -- "$stage" 2>/dev/null && return 0
-    echo "REFUSED: receiver wake retirement state for secondmate $ID is incomplete" >&2
+    echo "REFUSED: receiver wake retirement state for squad_lead $ID is incomplete" >&2
     return 1
   fi
   [ -f "$stage/corr" ] && [ ! -L "$stage/corr" ] || {
-    echo "REFUSED: receiver wake retirement state for secondmate $ID is unsafe" >&2
+    echo "REFUSED: receiver wake retirement state for squad_lead $ID is unsafe" >&2
     return 1
   }
   corr=$(cat "$stage/corr" 2>/dev/null || true)
   [ -z "$corr" ] || printf '%s' "$corr" | grep -Eq '^[a-f0-9]{16}$' || {
-    echo "REFUSED: receiver wake retirement correlation for secondmate $ID is invalid" >&2
+    echo "REFUSED: receiver wake retirement correlation for squad_lead $ID is invalid" >&2
     return 1
   }
   local staged
   for staged in "$stage/marker" "$stage/record" "$stage/confirmation"; do
     [ ! -e "$staged" ] && [ ! -L "$staged" ] && continue
     [ -f "$staged" ] && [ ! -L "$staged" ] || {
-      echo "REFUSED: receiver wake retirement state for secondmate $ID is unsafe" >&2
+      echo "REFUSED: receiver wake retirement state for squad_lead $ID is unsafe" >&2
       return 1
     }
   done
@@ -892,7 +892,7 @@ remote_teardown_locks_release() {
   fi
 }
 
-# Validate $STATE/pending-replies for local and remote secondmate retirement:
+# Validate $STATE/pending-replies for local and remote squad_lead retirement:
 # refuse a symlinked directory, any non-regular entry, and any entry whose
 # basename is not a 16-hex correlation id or whose corr_id disagrees with that
 # basename; pin the realpath so later cleanup cannot follow a swapped link
@@ -968,7 +968,7 @@ remote_recovery_paths_validate() {
 }
 
 # Remove every parent pending-reply record for $ID, plus its delivery
-# confirmation when present. Shared by local and remote secondmate retirement
+# confirmation when present. Shared by local and remote squad_lead retirement
 # after the home/route is safely gone.
 pending_replies_cleanup_for_task() {
   local pending_dir=$1 expected_real=${2-} rec base corr task_id
@@ -997,9 +997,9 @@ remote_pending_replies_cleanup() {
   pending_replies_cleanup_for_task "$STATE/pending-replies" "$PENDING_REPLIES_DIR_REAL"
 }
 
-# Refuse non-forced secondmate retirement while any parent pending-reply for
+# Refuse non-forced squad_lead retirement while any parent pending-reply for
 # this id is still unresolved (local and remote share the gate).
-secondmate_unresolved_pending_replies_refuse() {
+squad_lead_unresolved_pending_replies_refuse() {
   local rec task_id phase
   [ -d "$STATE/pending-replies" ] || return 0
   for rec in "$STATE/pending-replies"/*; do
@@ -1008,7 +1008,7 @@ secondmate_unresolved_pending_replies_refuse() {
     [ "$task_id" = "$ID" ] || continue
     phase=$(jg_meta_get "$rec" phase)
     [ "$phase" = resolved ] || {
-      echo "REFUSED: secondmate $ID still has an unresolved routed reply" >&2
+      echo "REFUSED: squad_lead $ID still has an unresolved routed reply" >&2
       return 1
     }
   done
@@ -1025,40 +1025,40 @@ remote_outbox_cleanup() {
   )
 }
 
-remote_secondmate_teardown() {
+remote_squad_lead_teardown() {
   local remote_host remote_root remote_home kind route_host route_root route_home out rc tmp
   remote_host=$(jg_meta_get "$META" remote_host)
   [ -n "$remote_host" ] || return 3
   kind=$(jg_meta_get "$META" kind)
-  [ "$kind" = secondmate ] || { echo "REFUSED: remote placement metadata is valid only for a secondmate" >&2; return 1; }
+  [ "$kind" = squad_lead ] || { echo "REFUSED: remote placement metadata is valid only for a squad_lead" >&2; return 1; }
   remote_root=$(jg_meta_get "$META" remote_root)
   remote_home=$(jg_meta_get "$META" home)
-  [ -n "$remote_root" ] && [ -n "$remote_home" ] || { echo "REFUSED: remote secondmate metadata is incomplete" >&2; return 1; }
-  secondmate_registry_line_for_id "$SECONDMATE_REG" "$ID" || { echo "REFUSED: remote secondmate route is missing or ambiguous" >&2; return 1; }
-  [ "$SECONDMATE_REGISTRY_REMOTE" -eq 1 ] || { echo "REFUSED: secondmate registry route is not remote" >&2; return 1; }
-  route_host=$SECONDMATE_REGISTRY_HOST
-  route_root=$SECONDMATE_REGISTRY_ROOT
-  route_home=$SECONDMATE_REGISTRY_HOME
+  [ -n "$remote_root" ] && [ -n "$remote_home" ] || { echo "REFUSED: remote squad_lead metadata is incomplete" >&2; return 1; }
+  squad_lead_registry_line_for_id "$SQUAD_LEAD_REG" "$ID" || { echo "REFUSED: remote squad_lead route is missing or ambiguous" >&2; return 1; }
+  [ "$SQUAD_LEAD_REGISTRY_REMOTE" -eq 1 ] || { echo "REFUSED: squad_lead registry route is not remote" >&2; return 1; }
+  route_host=$SQUAD_LEAD_REGISTRY_HOST
+  route_root=$SQUAD_LEAD_REGISTRY_ROOT
+  route_home=$SQUAD_LEAD_REGISTRY_HOME
   [ "$route_host" = "$remote_host" ] && [ "$route_root" = "$remote_root" ] && [ "$route_home" = "$remote_home" ] \
-    || { echo "REFUSED: remote secondmate metadata does not match its registry route" >&2; return 1; }
+    || { echo "REFUSED: remote squad_lead metadata does not match its registry route" >&2; return 1; }
   handoff_wake_retire_validate || return 1
   remote_recovery_paths_validate initial || return 1
   if [ "$FORCE" != --force ] && [ "$REMOTE_OUTBOX_PRESENT" -eq 1 ]; then
-    echo "REFUSED: remote secondmate $ID still has a pending backlog outbox; deliver it or explicitly discard with --force" >&2
+    echo "REFUSED: remote squad_lead $ID still has a pending backlog outbox; deliver it or explicitly discard with --force" >&2
     return 1
   fi
   if [ "$FORCE" != --force ]; then
-    secondmate_unresolved_pending_replies_refuse || return 1
+    squad_lead_unresolved_pending_replies_refuse || return 1
   fi
   "$SCRIPT_DIR/jg-procevent-remote-reply.sh" retire-quiesce-locked "$ID" "$FORCE" >/dev/null 2>&1 || {
-    echo "REFUSED: remote secondmate $ID still has an unhandled captured reply" >&2
+    echo "REFUSED: remote squad_lead $ID still has an unhandled captured reply" >&2
     return 1
   }
   "$JG_ROOT/bin/jg-guard.sh" || true
   if [ "$FORCE" = --force ]; then
-    if out=$("$SCRIPT_DIR/jg-on.sh" "$ID" jg-remote-secondmate-control.sh retire "$ID" --force < /dev/null 2>&1); then rc=0; else rc=$?; fi
+    if out=$("$SCRIPT_DIR/jg-on.sh" "$ID" jg-remote-squad-lead-control.sh retire "$ID" --force < /dev/null 2>&1); then rc=0; else rc=$?; fi
   else
-    if out=$("$SCRIPT_DIR/jg-on.sh" "$ID" jg-remote-secondmate-control.sh retire "$ID" < /dev/null 2>&1); then rc=0; else rc=$?; fi
+    if out=$("$SCRIPT_DIR/jg-on.sh" "$ID" jg-remote-squad-lead-control.sh retire "$ID" < /dev/null 2>&1); then rc=0; else rc=$?; fi
   fi
   if [ "$rc" -ne 0 ] && [ "$rc" -ne "$TEARDOWN_LOST_SLOT_EXIT" ]; then
     [ -z "$out" ] || printf '%s\n' "$out" >&2
@@ -1087,40 +1087,40 @@ remote_secondmate_teardown() {
     || { echo "error: remote pending-reply cleanup failed; preserving the local route for retry" >&2; return 1; }
   handoff_wake_retire \
     || { echo "error: remote receiver wake cleanup failed; preserving the local route for retry" >&2; return 1; }
-  tmp="$SECONDMATE_REG.tmp.$$"
-  grep -vE "^- $ID( |$)" "$SECONDMATE_REG" > "$tmp" || true
-  mv -f -- "$tmp" "$SECONDMATE_REG"
+  tmp="$SQUAD_LEAD_REG.tmp.$$"
+  grep -vE "^- $ID( |$)" "$SQUAD_LEAD_REG" > "$tmp" || true
+  mv -f -- "$tmp" "$SQUAD_LEAD_REG"
   [ ! -e "$CONFIG/fleet-ledger" ] || JG_HOME=$JG_HOME JG_STATE_OVERRIDE=$STATE JG_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/jg-fleet-ledger.sh" cleaned_up "$ID" || true
   status_retire_presentation_task "$STATE" "$ID" || return 1
   jg_backlog_atomic_transition remove "$STATE/$ID.meta" "task record" "$STATE" || return 1
   rm -f -- "$STATE/$ID.turn-ended" "$STATE/$ID.progress" \
     "$(jg_wake_signal_seen_path "$STATE" "$STATE/$ID.turn-ended")" \
-    "$STATE/.secondmate-relaunch-$ID" "$STATE/.secondmate-relaunch-bound-$ID"
+    "$STATE/.squad-lead-relaunch-$ID" "$STATE/.squad-lead-relaunch-bound-$ID"
   printf 'teardown %s complete (remote %s:%s)\n' "$ID" "$remote_host" "$remote_home"
   return "$rc"
 }
 
-remote_secondmate_teardown_locked() {
+remote_squad_lead_teardown_locked() {
   local rc
   [ -n "$(jg_meta_get "$META" remote_host)" ] || return 3
-  REMOTE_REGISTRY_LOCK=$(secondmate_registry_lock_path "$STATE")
+  REMOTE_REGISTRY_LOCK=$(squad_lead_registry_lock_path "$STATE")
   jg_lock_acquire_wait "$REMOTE_REGISTRY_LOCK" || return 1
   REMOTE_HANDOFF_LOCK="$STATE/.backlog-handoff-$ID.lock"
   jg_lock_acquire_wait "$REMOTE_HANDOFF_LOCK" || {
     remote_teardown_locks_release
     return 1
   }
-  REMOTE_REPLY_LIFECYCLE_LOCK=$(secondmate_reply_lifecycle_lock_path "$STATE" "$ID")
+  REMOTE_REPLY_LIFECYCLE_LOCK=$(squad_lead_reply_lifecycle_lock_path "$STATE" "$ID")
   jg_lock_acquire_wait "$REMOTE_REPLY_LIFECYCLE_LOCK" || {
     remote_teardown_locks_release
     return 1
   }
-  if remote_secondmate_teardown; then rc=0; else rc=$?; fi
+  if remote_squad_lead_teardown; then rc=0; else rc=$?; fi
   remote_teardown_locks_release
   return "$rc"
 }
 
-if remote_secondmate_teardown_locked; then
+if remote_squad_lead_teardown_locked; then
   remote_teardown_rc=0
 else
   remote_teardown_rc=$?
@@ -1151,7 +1151,7 @@ else
 fi
 # The recorded backend, including every sibling its adapter sources, has to
 # be readable before the first destructive step. --force does not override
-# this. A forced descendant is proved in validate_firstmate_home_children_removal.
+# this. A forced descendant is proved in validate_juggernaut_home_children_removal.
 teardown_require_backend_prerequisites "$BACKEND" "$ID" || exit 1
 if [ "${JG_TEARDOWN_GUARD_DONE:-0}" != 1 ]; then
   "$JG_ROOT/bin/jg-guard.sh" || true
@@ -1172,7 +1172,7 @@ CLEANUP_RECOVERY=$TEARDOWN_CLEANUP_RECOVERY
 KIND=$TEARDOWN_META_KIND
 TEARDOWN_POOL_SLOT_LOST=0
 EXPECTED_TREEHOUSE_PROJECT_LOCK=
-if [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ] \
+if [ "$KIND" != squad_lead ] && [ "$BACKEND" != orca ] \
    && jg_treehouse_pool_slot "$PROJ" "$WT"; then
   EXPECTED_TREEHOUSE_PROJECT_LOCK=$(jg_treehouse_project_lock_path "$PROJ") || {
     echo "REFUSED: cannot resolve the shared Treehouse project lock for ${PROJ:-<missing>}; nothing was changed" >&2
@@ -1236,18 +1236,18 @@ public_followup_canonical_home() {
 }
 public_followup_resolve_primary_home() {
   local parent=$1 child=$2 id=$3 parent_meta registry meta_home
-  jg_pf_home_id_valid "secondmate:$id" || return 1
+  jg_pf_home_id_valid "squad_lead:$id" || return 1
   parent=$(public_followup_canonical_home "$parent") || return 1
   child=$(public_followup_canonical_home "$child") || return 1
   [ "$parent" != "$child" ] || return 1
   parent_meta="$parent/state/$id.meta"
   [ -f "$parent_meta" ] && [ ! -L "$parent_meta" ] || return 1
-  [ "$(jg_meta_get "$parent_meta" kind)" = secondmate ] || return 1
+  [ "$(jg_meta_get "$parent_meta" kind)" = squad_lead ] || return 1
   meta_home=$(jg_meta_get "$parent_meta" home)
   meta_home=$(CDPATH='' cd -- "$meta_home" 2>/dev/null && pwd -P) || return 1
   [ "$meta_home" = "$child" ] || return 1
-  registry="$parent/data/secondmates.md"
-  secondmate_registry_validate_bindings "$registry" secondmate_registry_path_key "$id" "$child" || return 1
+  registry="$parent/data/squad_leads.md"
+  squad_lead_registry_validate_bindings "$registry" squad_lead_registry_path_key "$id" "$child" || return 1
   printf '%s\n' "$parent"
 }
 if [ -f "$JG_HOME/$SUB_HOME_MARKER" ]; then
@@ -1263,9 +1263,9 @@ if [ -f "$JG_HOME/$SUB_HOME_MARKER" ]; then
   PARENT_ROUTE_HOME=
   if [ -e "$PARENT_ROUTE_FILE" ] || [ -L "$PARENT_ROUTE_FILE" ]; then
     PARENT_ROUTE_RECORD=invalid
-    if jg_secondmate_parent_record_parse "$PARENT_ROUTE_FILE"; then
-      PARENT_ROUTE=$JG_SECONDMATE_PARENT_ROUTE
-      PARENT_ROUTE_HOME=$JG_SECONDMATE_PARENT_HOME
+    if jg_squad_lead_parent_record_parse "$PARENT_ROUTE_FILE"; then
+      PARENT_ROUTE=$JG_SQUAD_LEAD_PARENT_ROUTE
+      PARENT_ROUTE_HOME=$JG_SQUAD_LEAD_PARENT_HOME
       PARENT_ROUTE_RECORD=valid
     fi
   fi
@@ -1306,8 +1306,8 @@ if [ -f "$JG_HOME/$SUB_HOME_MARKER" ]; then
       fi
     fi
     if [ "$PARENT_BINDINGS_MATCH" = 1 ] \
-      && jg_pf_home_id_valid "secondmate:$SECOND_MATE_ID"; then
-      PUBLIC_FOLLOWUP_WORK_HOME="secondmate:$SECOND_MATE_ID"
+      && jg_pf_home_id_valid "squad_lead:$SECOND_MATE_ID"; then
+      PUBLIC_FOLLOWUP_WORK_HOME="squad_lead:$SECOND_MATE_ID"
       if PUBLIC_FOLLOWUP_HOME=$(public_followup_resolve_primary_home \
           "$PRIMARY_HOME_CANDIDATE" "$JG_HOME" "$SECOND_MATE_ID"); then
         PUBLIC_FOLLOWUP_STATE="$PUBLIC_FOLLOWUP_HOME/state"
@@ -1334,8 +1334,8 @@ if [ -f "$JG_HOME/$SUB_HOME_MARKER" ]; then
     fi
     if [ "$PUBLIC_FOLLOWUP_PARENT_RELAY_ACTIVE" = 1 ]; then
       PUBLIC_FOLLOWUP_PARENT_UNRESOLVED=1
-      if jg_pf_home_id_valid "secondmate:$SECOND_MATE_ID"; then
-        PUBLIC_FOLLOWUP_WORK_HOME="secondmate:$SECOND_MATE_ID"
+      if jg_pf_home_id_valid "squad_lead:$SECOND_MATE_ID"; then
+        PUBLIC_FOLLOWUP_WORK_HOME="squad_lead:$SECOND_MATE_ID"
         if PUBLIC_FOLLOWUP_HOME=$(public_followup_resolve_primary_home \
             "$PRIMARY_HOME_CANDIDATE" "$JG_HOME" "$SECOND_MATE_ID"); then
           PUBLIC_FOLLOWUP_STATE="$PUBLIC_FOLLOWUP_HOME/state"
@@ -1354,8 +1354,8 @@ if [ -f "$JG_HOME/$SUB_HOME_MARKER" ]; then
       PUBLIC_FOLLOWUP_STATE=
     fi
   fi
-elif [ "$KIND" = secondmate ]; then
-  PUBLIC_FOLLOWUP_WORK_HOME="secondmate:$ID"
+elif [ "$KIND" = squad_lead ]; then
+  PUBLIC_FOLLOWUP_WORK_HOME="squad_lead:$ID"
   if [ "$FORCE" != "--force" ] && jg_pf_relay_active "$JG_HOME"; then
     PUBLIC_FOLLOWUP_RELAY_ACTIVE=1
   fi
@@ -1404,13 +1404,13 @@ require_orca_terminal() {
   printf '%s\n' "$terminal"
 }
 
-if [ "$BACKEND" = orca ] && [ "$KIND" != secondmate ]; then
+if [ "$BACKEND" = orca ] && [ "$KIND" != squad_lead ]; then
   ORCA_WORKTREE_ID=$(require_orca_worktree_id "$META") || exit 1
   T_ORCA=$(meta_value "$META" terminal)
   [ -z "$T_ORCA" ] || T=$T_ORCA
 fi
 
-# Where a harness's firstmate-owned global turn-end registry entry lives is
+# Where a harness's juggernaut-owned global turn-end registry entry lives is
 # owned by bin/jg-control-lib.sh, so teardown and the control plane's relaunch
 # retire the same artifact rather than each carrying its own copy of the path.
 remove_grok_turnend_auth() {
@@ -1756,7 +1756,7 @@ backlog_done_args() {
 # only where a human still owes the edit.
 backlog_refresh_reminder() {
   local backlog_display root backend=markdown
-  [ "$KIND" = secondmate ] && return 0
+  [ "$KIND" = squad_lead ] && return 0
   { [ "$CLEANUP_RECOVERY" = orca ] || [ "$CLEANUP_RECOVERY" = treehouse ]; } && return 0
   if root=$(jg_backlog_root "$DATA"); then
     backend=$(jg_tasks_axi_backend "$root") || return 2
@@ -2044,7 +2044,7 @@ validate_worktree_teardown_safety() {
   [ -d "$WT" ] || return 0
   [ "$FORCE" != "--force" ] || return 0
   case "$KIND" in
-    secondmate|scout) return 0 ;;
+    squad_lead|scout) return 0 ;;
   esac
 
   if ! dirty_raw=$(git -C "$WT" status --porcelain 2>/dev/null); then
@@ -2199,7 +2199,7 @@ task_status_is_run_not_found() {  # <status-error> <run-id>
 # Abort THIS task's own parked no-mistakes run before the worker that would
 # have answered its gate is removed, so no run is left orphaned holding a
 # fleet slot. Only KIND=ship drives a no-mistakes validation of its own
-# worktree (scouts and secondmates never do, mirroring bin/jg-crew-state.sh);
+# worktree (scouts and squad_leads never do, mirroring bin/jg-crew-state.sh);
 # a run not attributed to this exact branch+head is left completely alone.
 conclude_task_no_mistakes_run() {  # <worktree>
   local wt=$1 out run_id
@@ -2479,11 +2479,11 @@ require_orca_worktree_path_match_if_present() {
 }
 
 # The task's own live slot, canonicalized, or empty when this record has no slot
-# to release (a secondmate home, a record with no worktree=, or a path that is
+# to release (a squad_lead home, a record with no worktree=, or a path that is
 # already gone). Every slot-ownership check below is scoped to that value, so a
 # record with nothing live to return skips them rather than refusing.
 teardown_live_slot_path() {
-  [ "$KIND" != secondmate ] || return 1
+  [ "$KIND" != squad_lead ] || return 1
   jg_treehouse_pool_slot "$PROJ" "$WT" || return 1
   canonical_existing_dir "$WT"
 }
@@ -2495,7 +2495,7 @@ require_exclusive_worktree_slot_record() {
   case "$rc" in
     1) return 0 ;;
     2)
-      echo "REFUSED: $JG_LOCAL_FIRSTMATE_ERROR; nothing was changed" >&2
+      echo "REFUSED: $JG_LOCAL_JUGGERNAUT_ERROR; nothing was changed" >&2
       return 1
       ;;
   esac
@@ -2577,7 +2577,7 @@ teardown_owns_worktree() {
   [ "$TEARDOWN_SLOT_REASSIGNED" != 1 ]
 }
 
-firstmate_home_has_treehouse_slot() {
+juggernaut_home_has_treehouse_slot() {
   local home=$1
   worktree_registered_for_project "$JG_ROOT" "$home"
 }
@@ -2597,27 +2597,27 @@ validate_removal_target() {
     ''|/) echo "REFUSED: unsafe $label removal target $target" >&2; return 1 ;;
   esac
   if [ -n "$abs_home" ] && [ "$abs_target" = "$abs_home" ]; then
-    echo "REFUSED: unsafe $label removal target $target is the active firstmate home" >&2
+    echo "REFUSED: unsafe $label removal target $target is the active juggernaut home" >&2
     return 1
   fi
   if [ "$abs_target" = "$abs_root" ]; then
-    echo "REFUSED: unsafe $label removal target $target is the firstmate repo" >&2
+    echo "REFUSED: unsafe $label removal target $target is the juggernaut repo" >&2
     return 1
   fi
   if [ -n "$abs_home" ] && path_is_ancestor_of "$abs_target" "$abs_home"; then
-    echo "REFUSED: unsafe $label removal target $target is an ancestor of the active firstmate home" >&2
+    echo "REFUSED: unsafe $label removal target $target is an ancestor of the active juggernaut home" >&2
     return 1
   fi
   if path_is_ancestor_of "$abs_target" "$abs_root"; then
-    echo "REFUSED: unsafe $label removal target $target is an ancestor of the firstmate repo" >&2
+    echo "REFUSED: unsafe $label removal target $target is an ancestor of the juggernaut repo" >&2
     return 1
   fi
   if [ -n "$abs_home" ] && path_is_ancestor_of "$abs_home" "$abs_target"; then
-    echo "REFUSED: unsafe $label removal target $target is inside the active firstmate home" >&2
+    echo "REFUSED: unsafe $label removal target $target is inside the active juggernaut home" >&2
     return 1
   fi
   if path_is_ancestor_of "$abs_root" "$abs_target"; then
-    echo "REFUSED: unsafe $label removal target $target is inside the firstmate repo" >&2
+    echo "REFUSED: unsafe $label removal target $target is inside the juggernaut repo" >&2
     return 1
   fi
   printf '%s\n' "$abs_target"
@@ -2626,19 +2626,19 @@ validate_removal_target() {
 registered_descendant_home_for_removal() {
   local reg=$1 target=$2 line id registered_home registered_abs
   [ -f "$reg" ] || return 1
-  if ! secondmate_registry_validate_bindings "$reg" secondmate_registry_path_key; then
-    echo "REFUSED: $SECONDMATE_REGISTRY_ERROR" >&2
+  if ! squad_lead_registry_validate_bindings "$reg" squad_lead_registry_path_key; then
+    echo "REFUSED: $SQUAD_LEAD_REGISTRY_ERROR" >&2
     return 2
   fi
   while IFS= read -r line || [ -n "$line" ]; do
     case "$line" in
       "- "*)
-        secondmate_registry_parse_line "$line" || {
-          echo "REFUSED: malformed secondmate registry entry: $line" >&2
+        squad_lead_registry_parse_line "$line" || {
+          echo "REFUSED: malformed squad_lead registry entry: $line" >&2
           return 2
         }
-        id=$SECONDMATE_REGISTRY_ID
-        registered_home=$SECONDMATE_REGISTRY_HOME
+        id=$SQUAD_LEAD_REGISTRY_ID
+        registered_home=$SQUAD_LEAD_REGISTRY_HOME
         registered_abs=$(removal_target_abs_path "$registered_home" 2>/dev/null || true)
         [ -n "$registered_abs" ] || continue
         [ "$registered_abs" = "$target" ] && continue
@@ -2652,14 +2652,14 @@ registered_descendant_home_for_removal() {
   return 1
 }
 
-validate_firstmate_operational_dirs_for_removal() {
+validate_juggernaut_operational_dirs_for_removal() {
   local home=$1 label=$2 name dir abs_home abs_dir
   abs_home=$(removal_target_abs_path "$home")
   for name in data state config projects; do
     dir="$home/$name"
     [ -e "$dir" ] || [ -L "$dir" ] || continue
     if [ -L "$dir" ] && [ ! -e "$dir" ]; then
-      echo "REFUSED: unsafe $label $name directory $dir resolves outside the secondmate home" >&2
+      echo "REFUSED: unsafe $label $name directory $dir resolves outside the squad_lead home" >&2
       return 1
     fi
     if [ -d "$dir" ]; then
@@ -2671,7 +2671,7 @@ validate_firstmate_operational_dirs_for_removal() {
       abs_dir=
     fi
     if [ -z "$abs_dir" ] || ! path_is_ancestor_of "$abs_home" "$abs_dir"; then
-      echo "REFUSED: unsafe $label $name directory $dir resolves outside the secondmate home" >&2
+      echo "REFUSED: unsafe $label $name directory $dir resolves outside the squad_lead home" >&2
       return 1
     fi
   done
@@ -2684,13 +2684,13 @@ validate_child_worktree_for_removal() {
   abs_target=$(validate_removal_target "$target" "child worktree") || return 1
   if abs_home=$(cd "$JG_HOME" 2>/dev/null && pwd -P); then
     if path_is_ancestor_of "$abs_home" "$abs_target"; then
-      echo "REFUSED: unsafe child worktree removal target $target is inside the active firstmate home" >&2
+      echo "REFUSED: unsafe child worktree removal target $target is inside the active juggernaut home" >&2
       return 1
     fi
   fi
   abs_root=$(cd "$JG_ROOT" && pwd -P)
   if path_is_ancestor_of "$abs_root" "$abs_target"; then
-    echo "REFUSED: unsafe child worktree removal target $target is inside the firstmate repo" >&2
+    echo "REFUSED: unsafe child worktree removal target $target is inside the juggernaut repo" >&2
     return 1
   fi
   if ! worktree_registered_for_project "$project" "$target"; then
@@ -2712,43 +2712,43 @@ safe_rm_rf_child_worktree() {
   rm -rf -- "$target"
 }
 
-validate_firstmate_home_for_removal() {
+validate_juggernaut_home_for_removal() {
   local home=$1 label=$2 expected_id=${3:-} abs_home_path marker_id conflict child_id child_home
   [ -n "$home" ] || return 0
   [ -e "$home" ] || return 0
   abs_home_path=$(validate_removal_target "$home" "$label") || return 1
   if [ ! -f "$abs_home_path/$SUB_HOME_MARKER" ]; then
-    echo "REFUSED: unsafe $label removal target $home is not a seeded secondmate home" >&2
+    echo "REFUSED: unsafe $label removal target $home is not a seeded squad_lead home" >&2
     return 1
   fi
   if [ -n "$expected_id" ]; then
     marker_id=$(cat "$abs_home_path/$SUB_HOME_MARKER" 2>/dev/null || true)
     if [ "$marker_id" != "$expected_id" ]; then
-      echo "REFUSED: unsafe $label removal target $home is marked for secondmate ${marker_id:-unknown}, expected $expected_id" >&2
+      echo "REFUSED: unsafe $label removal target $home is marked for squad_lead ${marker_id:-unknown}, expected $expected_id" >&2
       return 1
     fi
-    if [ -e "$SECONDMATE_REG" ] || [ -L "$SECONDMATE_REG" ]; then
-      if ! secondmate_registry_validate_bindings "$SECONDMATE_REG" secondmate_registry_path_key "$expected_id" "$abs_home_path"; then
-        case "$SECONDMATE_REGISTRY_ERROR" in
-          overlapping\ secondmate\ home\ assignment:*)
-            echo "REFUSED: unsafe $label removal target $home contains registered secondmate home; $SECONDMATE_REGISTRY_ERROR" >&2
+    if [ -e "$SQUAD_LEAD_REG" ] || [ -L "$SQUAD_LEAD_REG" ]; then
+      if ! squad_lead_registry_validate_bindings "$SQUAD_LEAD_REG" squad_lead_registry_path_key "$expected_id" "$abs_home_path"; then
+        case "$SQUAD_LEAD_REGISTRY_ERROR" in
+          overlapping\ squad_lead\ home\ assignment:*)
+            echo "REFUSED: unsafe $label removal target $home contains registered squad_lead home; $SQUAD_LEAD_REGISTRY_ERROR" >&2
             ;;
-          *) echo "REFUSED: $SECONDMATE_REGISTRY_ERROR" >&2 ;;
+          *) echo "REFUSED: $SQUAD_LEAD_REGISTRY_ERROR" >&2 ;;
         esac
         return 1
       fi
     fi
   fi
-  validate_firstmate_operational_dirs_for_removal "$abs_home_path" "$label" || return 1
+  validate_juggernaut_operational_dirs_for_removal "$abs_home_path" "$label" || return 1
   conflict=
-  if conflict=$(registered_descendant_home_for_removal "$SECONDMATE_REG" "$abs_home_path"); then
+  if conflict=$(registered_descendant_home_for_removal "$SQUAD_LEAD_REG" "$abs_home_path"); then
     :
   else
     conflict_rc=$?
     [ "$conflict_rc" -eq 1 ] || return 1
   fi
   if [ -z "$conflict" ]; then
-    if conflict=$(registered_descendant_home_for_removal "$abs_home_path/data/secondmates.md" "$abs_home_path"); then
+    if conflict=$(registered_descendant_home_for_removal "$abs_home_path/data/squad_leads.md" "$abs_home_path"); then
       :
     else
       conflict_rc=$?
@@ -2759,35 +2759,35 @@ validate_firstmate_home_for_removal() {
     IFS=$'\t' read -r child_id child_home <<EOF
 $conflict
 EOF
-    echo "REFUSED: unsafe $label removal target $home contains registered secondmate home $child_home for $child_id" >&2
+    echo "REFUSED: unsafe $label removal target $home contains registered squad_lead home $child_home for $child_id" >&2
     return 1
   fi
   printf '%s\n' "$abs_home_path"
 }
 
-remove_firstmate_home() {
+remove_juggernaut_home() {
   local home=$1 label=$2 expected_id=${3:-} abs_home_path process_event_backup
   [ -n "$home" ] || return 0
   [ -e "$home" ] || return 0
-  abs_home_path=$(validate_firstmate_home_for_removal "$home" "$label" "$expected_id") || return 1
+  abs_home_path=$(validate_juggernaut_home_for_removal "$home" "$label" "$expected_id") || return 1
   [ -n "$abs_home_path" ] || return 0
-  process_event_backup=$(snapshot_firstmate_home_process_events "$abs_home_path" "$label") || return 1
-  if ! cleanup_firstmate_home_process_events "$abs_home_path" "$label"; then
-    restore_firstmate_home_process_events "$abs_home_path" "$label" "$process_event_backup" || return $?
+  process_event_backup=$(snapshot_juggernaut_home_process_events "$abs_home_path" "$label") || return 1
+  if ! cleanup_juggernaut_home_process_events "$abs_home_path" "$label"; then
+    restore_juggernaut_home_process_events "$abs_home_path" "$label" "$process_event_backup" || return $?
     return 1
   fi
-  # Read-only strip dirs sit at state/<id>.git-hooks, and a remote secondmate's
+  # Read-only strip dirs sit at state/<id>.git-hooks, and a remote squad_lead's
   # own one under state/parent-route/, so search the whole state tree.
   find "$abs_home_path/state" -type d -name '*.git-hooks' -exec chmod u+w {} + 2>/dev/null || true
-  if firstmate_home_has_treehouse_slot "$abs_home_path"; then
+  if juggernaut_home_has_treehouse_slot "$abs_home_path"; then
     command -v treehouse >/dev/null 2>&1 || {
       echo "error: treehouse command not found; cannot return $label $abs_home_path" >&2
-      restore_firstmate_home_process_events "$abs_home_path" "$label" "$process_event_backup" || return $?
+      restore_juggernaut_home_process_events "$abs_home_path" "$label" "$process_event_backup" || return $?
       return 1
     }
     teardown_treehouse_return "$abs_home_path" "$JG_ROOT" "$label" || {
       echo "error: treehouse return failed for $label $abs_home_path; lease may still be held" >&2
-      restore_firstmate_home_process_events "$abs_home_path" "$label" "$process_event_backup" || return $?
+      restore_juggernaut_home_process_events "$abs_home_path" "$label" "$process_event_backup" || return $?
       return 1
     }
     [ -z "$process_event_backup" ] || rm -rf -- "$process_event_backup"
@@ -2797,18 +2797,18 @@ remove_firstmate_home() {
     [ -z "$process_event_backup" ] || rm -rf -- "$process_event_backup"
     return 0
   fi
-  restore_firstmate_home_process_events "$abs_home_path" "$label" "$process_event_backup" || return $?
+  restore_juggernaut_home_process_events "$abs_home_path" "$label" "$process_event_backup" || return $?
   return 1
 }
 
-firstmate_home_has_process_events() {
+juggernaut_home_has_process_events() {
   local home=$1 path owner claim_root
   for path in "$home/state/procevent"/*.source "$home/state/procevent"/*.runner; do
     if [ -e "$path" ] || [ -L "$path" ]; then
       return 0
     fi
   done
-  claim_root=${JG_PROCEVENT_CLAIM_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/firstmate/procevent-claims}
+  claim_root=${JG_PROCEVENT_CLAIM_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/juggernaut/procevent-claims}
   for path in "$claim_root"/*.claim; do
     [ -f "$path" ] && [ ! -L "$path" ] || continue
     IFS= read -r owner < "$path" 2>/dev/null || continue
@@ -2817,9 +2817,9 @@ firstmate_home_has_process_events() {
   return 1
 }
 
-snapshot_firstmate_home_process_events() {
+snapshot_juggernaut_home_process_events() {
   local home=$1 label=$2 backup path
-  if ! firstmate_home_has_process_events "$home"; then
+  if ! juggernaut_home_has_process_events "$home"; then
     printf '\n'
     return 0
   fi
@@ -2838,7 +2838,7 @@ snapshot_firstmate_home_process_events() {
   printf '%s\n' "$backup"
 }
 
-restore_firstmate_home_process_events() {
+restore_juggernaut_home_process_events() {
   local home=$1 label=$2 backup=$3 reg source tmp runner
   [ -n "$backup" ] || return 0
   [ -d "$backup" ] && [ ! -L "$backup" ] || {
@@ -2881,9 +2881,9 @@ restore_firstmate_home_process_events() {
   rm -rf -- "$backup"
 }
 
-cleanup_firstmate_home_process_events() {
+cleanup_juggernaut_home_process_events() {
   local home=$1 label=$2 runner="$1/bin/jg-procevent.sh"
-  firstmate_home_has_process_events "$home" || return 0
+  juggernaut_home_has_process_events "$home" || return 0
   if [ ! -f "$runner" ] || [ -L "$runner" ] || [ ! -x "$runner" ]; then
     echo "REFUSED: $label $home has process-event state but no sweep-capable bin/jg-procevent.sh; restore the home script and rerun teardown" >&2
     return 1
@@ -2892,15 +2892,15 @@ cleanup_firstmate_home_process_events() {
     echo "REFUSED: process-event cleanup is incomplete for $label $home; preserving the home, lease, and retirement records for retry" >&2
     return 1
   fi
-  if firstmate_home_has_process_events "$home"; then
+  if juggernaut_home_has_process_events "$home"; then
     echo "REFUSED: process-event state remains for $label $home after its bounded sweep; preserving the home, lease, and retirement records for retry" >&2
     return 1
   fi
 }
 
-preflight_firstmate_home_process_events() {
+preflight_juggernaut_home_process_events() {
   local home=$1 label=$2 runner="$1/bin/jg-procevent.sh"
-  firstmate_home_has_process_events "$home" || return 0
+  juggernaut_home_has_process_events "$home" || return 0
   if [ ! -f "$runner" ] || [ -L "$runner" ] || [ ! -x "$runner" ]; then
     echo "REFUSED: $label $home has process-event state but no sweep-capable bin/jg-procevent.sh; restore the home script and rerun teardown" >&2
     return 1
@@ -2911,22 +2911,22 @@ preflight_firstmate_home_process_events() {
   fi
 }
 
-preflight_firstmate_home_process_event_tree() {
+preflight_juggernaut_home_process_event_tree() {
   local home=$1 label=$2 sub_state child_meta child_kind child_home child_wt child_id
   sub_state="$home/state"
   if [ -d "$sub_state" ]; then
     for child_meta in "$sub_state"/*.meta; do
       [ -e "$child_meta" ] || continue
       child_kind=$(meta_value "$child_meta" kind)
-      [ "$child_kind" = secondmate ] || continue
+      [ "$child_kind" = squad_lead ] || continue
       child_id=$(basename "$child_meta" .meta)
       child_wt=$(meta_value "$child_meta" worktree)
       child_home=$(meta_value "$child_meta" home)
       [ -n "$child_home" ] || child_home=$child_wt
-      preflight_firstmate_home_process_event_tree "$child_home" "child firstmate home for $child_id" || return 1
+      preflight_juggernaut_home_process_event_tree "$child_home" "child juggernaut home for $child_id" || return 1
     done
   fi
-  preflight_firstmate_home_process_events "$home" "$label"
+  preflight_juggernaut_home_process_events "$home" "$label"
 }
 
 collect_descendant_task_locks() {
@@ -2934,19 +2934,19 @@ collect_descendant_task_locks() {
   local -a child_ids
   sub_state="$home/state"
   if [ -L "$sub_state" ]; then
-    echo "REFUSED: secondmate home $home has a symbolic-link state path at $sub_state; forced teardown changed nothing" >&2
+    echo "REFUSED: squad_lead home $home has a symbolic-link state path at $sub_state; forced teardown changed nothing" >&2
     return 1
   fi
   if [ -e "$sub_state" ] && [ ! -d "$sub_state" ]; then
-    echo "REFUSED: secondmate home $home has a non-directory state path at $sub_state; forced teardown changed nothing" >&2
+    echo "REFUSED: squad_lead home $home has a non-directory state path at $sub_state; forced teardown changed nothing" >&2
     return 1
   fi
   if ! mkdir -p -- "$sub_state"; then
-    echo "REFUSED: secondmate home $home state directory could not be established at $sub_state; forced teardown changed nothing" >&2
+    echo "REFUSED: squad_lead home $home state directory could not be established at $sub_state; forced teardown changed nothing" >&2
     return 1
   fi
   if [ -L "$sub_state" ] || [ ! -d "$sub_state" ]; then
-    echo "REFUSED: secondmate home $home state path is not a safe directory at $sub_state; forced teardown changed nothing" >&2
+    echo "REFUSED: squad_lead home $home state path is not a safe directory at $sub_state; forced teardown changed nothing" >&2
     return 1
   fi
   # Freeze this home's task SET before reading it. Everything below locks the
@@ -2956,16 +2956,16 @@ collect_descendant_task_locks() {
   # jg_task_set_lock_path owns why). Taken per home, parent before child, and
   # held until this teardown exits.
   task_set_lock=$(jg_task_set_lock_path "$sub_state") || {
-    echo "REFUSED: secondmate home $home has an invalid task-set lock path; forced teardown changed nothing" >&2
+    echo "REFUSED: squad_lead home $home has an invalid task-set lock path; forced teardown changed nothing" >&2
     return 1
   }
   if ! jg_lock_try_acquire "$task_set_lock"; then
-    echo "REFUSED: secondmate home $home is publishing a task right now (task-set lock is held); forced teardown changed nothing" >&2
+    echo "REFUSED: squad_lead home $home is publishing a task right now (task-set lock is held); forced teardown changed nothing" >&2
     return 1
   fi
   if ! jg_lock_set_role "$task_set_lock" forced-teardown; then
     jg_lock_release "$task_set_lock" || true
-    echo "REFUSED: secondmate home $home could not record its task-set lock holder; forced teardown changed nothing" >&2
+    echo "REFUSED: squad_lead home $home could not record its task-set lock holder; forced teardown changed nothing" >&2
     return 1
   fi
   DESCENDANT_LOCK_PATHS+=("$task_set_lock")
@@ -2980,7 +2980,7 @@ collect_descendant_task_locks() {
     child_kind=$(meta_value "$child_meta" kind)
     [ -n "$child_kind" ] || child_kind=ship
     child_home=
-    if [ "$child_kind" = secondmate ]; then
+    if [ "$child_kind" = squad_lead ]; then
       child_wt=$(meta_value "$child_meta" worktree)
       child_home=$(meta_value "$child_meta" home)
       [ -n "$child_home" ] || child_home=$child_wt
@@ -2989,7 +2989,7 @@ collect_descendant_task_locks() {
     DESCENDANT_TASK_IDS+=("$child_id")
     DESCENDANT_TASK_KINDS+=("$child_kind")
     DESCENDANT_TASK_HOMES+=("$child_home")
-    [ "$child_kind" != secondmate ] \
+    [ "$child_kind" != squad_lead ] \
       || collect_descendant_task_locks "$child_home" \
       || return 1
   done < <(printf '%s\n' "${child_ids[@]}" | LC_ALL=C sort)
@@ -3039,7 +3039,7 @@ preflight_descendant_task_locks() {
       echo "REFUSED: descendant task $task_id changed kind while forced teardown acquired its locks; forced teardown changed nothing" >&2
       return 1
     }
-    if [ "$kind" = secondmate ]; then
+    if [ "$kind" = squad_lead ]; then
       child_wt=$(meta_value "$meta" worktree)
       child_home=$(meta_value "$meta" home)
       [ -n "$child_home" ] || child_home=$child_wt
@@ -3062,7 +3062,7 @@ preflight_descendant_treehouse_slots() {
     backend=$(jg_backend_of_meta "$meta")
     worktree=$(meta_value "$meta" worktree)
     project=$(meta_value "$meta" project)
-    if [ "$kind" = secondmate ] || [ "$backend" = orca ]; then
+    if [ "$kind" = squad_lead ] || [ "$backend" = orca ]; then
       continue
     fi
     if ! jg_treehouse_pool_slot "$project" "$worktree"; then
@@ -3095,7 +3095,7 @@ preflight_descendant_treehouse_slots() {
     backend=$(jg_backend_of_meta "$meta")
     worktree=$(meta_value "$meta" worktree)
     project=$(meta_value "$meta" project)
-    if [ "$kind" = secondmate ] || [ "$backend" = orca ]; then
+    if [ "$kind" = squad_lead ] || [ "$backend" = orca ]; then
       continue
     fi
     if ! jg_treehouse_pool_slot "$project" "$worktree"; then
@@ -3112,7 +3112,7 @@ preflight_descendant_treehouse_slots() {
   done
 }
 
-validate_firstmate_home_children_removal() {
+validate_juggernaut_home_children_removal() {
   local home=$1 sub_state child_meta child_id child_wt child_proj child_kind child_home child_backend child_orca_worktree_id
   sub_state="$home/state"
   [ -d "$sub_state" ] || return 0
@@ -3126,11 +3126,11 @@ validate_firstmate_home_children_removal() {
     [ -n "$child_kind" ] || child_kind=ship
     child_backend=$(jg_backend_of_meta "$child_meta")
     teardown_require_backend_prerequisites "$child_backend" "$child_id" || return 1
-    if [ "$child_kind" = secondmate ]; then
+    if [ "$child_kind" = squad_lead ]; then
       child_home=$(meta_value "$child_meta" home)
       [ -n "$child_home" ] || child_home=$child_wt
-      validate_firstmate_home_for_removal "$child_home" "child firstmate home" "$child_id" >/dev/null || return 1
-      validate_firstmate_home_children_removal "$child_home" || return 1
+      validate_juggernaut_home_for_removal "$child_home" "child juggernaut home" "$child_id" >/dev/null || return 1
+      validate_juggernaut_home_children_removal "$child_home" || return 1
     elif [ "$child_backend" = orca ]; then
       child_orca_worktree_id=$(require_orca_worktree_id "$child_meta") || return 1
       if [ -n "$child_wt" ] && [ -e "$child_wt" ]; then
@@ -3253,7 +3253,7 @@ $session	$lock_path"
   return 1
 }
 
-preflight_firstmate_home_herdr_children() {  # <home>
+preflight_juggernaut_home_herdr_children() {  # <home>
   local home=$1 sub_state child_meta child_id child_backend child_target child_kind child_home child_wt
   sub_state="$home/state"
   [ -d "$sub_state" ] || return 0
@@ -3268,11 +3268,11 @@ preflight_firstmate_home_herdr_children() {  # <home>
     fi
     child_kind=$(meta_value "$child_meta" kind)
     [ -n "$child_kind" ] || child_kind=ship
-    if [ "$child_kind" = secondmate ]; then
+    if [ "$child_kind" = squad_lead ]; then
       child_wt=$(meta_value "$child_meta" worktree)
       child_home=$(meta_value "$child_meta" home)
       [ -n "$child_home" ] || child_home=$child_wt
-      preflight_firstmate_home_herdr_children "$child_home" || return 1
+      preflight_juggernaut_home_herdr_children "$child_home" || return 1
     fi
   done
 }
@@ -3297,7 +3297,7 @@ preflight_firstmate_home_herdr_children() {  # <home>
 # the step immediately after it removes the Orca worktree through the same CLI
 # whose absence is the only thing that arm ever reports, so a forced continue
 # would die there having removed nothing while this message claimed otherwise.
-# The two forced secondmate child sites refuse because that path is only ever
+# The two forced squad_lead child sites refuse because that path is only ever
 # reached under --force, so honoring force would delete the refusal rather
 # than override it, and would contradict the adjacent Herdr child gate that
 # stops forced cleanup for this same hazard.
@@ -3355,7 +3355,7 @@ EOF
   rm -f "$STATE/$ID.scratch"
 }
 
-cleanup_firstmate_home_children() {
+cleanup_juggernaut_home_children() {
   local home=$1 sub_state child_meta child_id child_t child_wt child_proj child_kind child_home child_backend child_orca_worktree_id child_return_rc child_busy_gen child_owner_rc child_pool_slot
   sub_state="$home/state"
   [ -d "$sub_state" ] || return 0
@@ -3372,7 +3372,7 @@ cleanup_firstmate_home_children() {
     else
       child_t=$(jg_backend_target_of_meta "$child_meta")
     fi
-    if [ "$child_backend" = orca ] && [ "$child_kind" != secondmate ]; then
+    if [ "$child_backend" = orca ] && [ "$child_kind" != squad_lead ]; then
       child_orca_worktree_id=$(require_orca_worktree_id "$child_meta") || return 1
       if [ -n "$child_wt" ] && [ -e "$child_wt" ]; then
         validate_child_worktree_for_removal "$child_wt" "$child_proj" >/dev/null || return 1
@@ -3391,7 +3391,7 @@ cleanup_firstmate_home_children() {
           return 1
         fi
       elif [ "$child_backend" = zellij ]; then
-        # Zellij titles are scoped by the owning home tag, so forced secondmate
+        # Zellij titles are scoped by the owning home tag, so forced squad_lead
         # cleanup must verify child tabs as that child home, not the parent.
         ( unset JG_ROOT_OVERRIDE; JG_HOME=$home JG_ROOT=$home jg_backend_kill "$child_backend" "$child_t" "$(meta_value "$child_meta" zellij_tab_id)" "jg-$child_id" ) \
           || { endpoint_close_refusal "child $child_id" "$child_backend" "$child_t" 0; return 1; }
@@ -3400,18 +3400,18 @@ cleanup_firstmate_home_children() {
           || { endpoint_close_refusal "child $child_id" "$child_backend" "$child_t" 0; return 1; }
       fi
     fi
-    if [ "$child_kind" != secondmate ]; then
+    if [ "$child_kind" != squad_lead ]; then
       teardown_reap_registered_scratch "$home" "$sub_state" "$home/data" "$child_id" || {
         jg_backlog_close_marker_clear "$sub_state" "$child_id" || return 1
         return 1
       }
     fi
-    if [ "$child_kind" = secondmate ]; then
+    if [ "$child_kind" = squad_lead ]; then
       child_home=$(meta_value "$child_meta" home)
       [ -n "$child_home" ] || child_home=$child_wt
       if [ -n "$child_home" ] && [ -d "$child_home" ]; then
-        cleanup_firstmate_home_children "$child_home" || return $?
-        remove_firstmate_home "$child_home" "child firstmate home" "$child_id" || return $?
+        cleanup_juggernaut_home_children "$child_home" || return $?
+        remove_juggernaut_home "$child_home" "child juggernaut home" "$child_id" || return $?
       fi
     elif [ "$child_backend" = orca ]; then
       if [ -n "$child_wt" ] && [ -d "$child_wt" ]; then
@@ -3481,17 +3481,17 @@ cleanup_firstmate_home_children() {
   done
 }
 
-remove_secondmate_registry_entry() {
+remove_squad_lead_registry_entry() {
   local id=$1 tmp lock rc=0 acquired=0
-  [ -f "$SECONDMATE_REG" ] || return 0
-  lock=$(secondmate_registry_lock_path "$STATE")
+  [ -f "$SQUAD_LEAD_REG" ] || return 0
+  lock=$(squad_lead_registry_lock_path "$STATE")
   if [ "$LOCAL_REGISTRY_LOCK" != "$lock" ]; then
     jg_lock_acquire_wait "$lock" || return 1
     acquired=1
   fi
-  tmp="$SECONDMATE_REG.tmp.$$"
-  grep -vE "^- $id( |$)" "$SECONDMATE_REG" > "$tmp" || true
-  mv "$tmp" "$SECONDMATE_REG" || rc=$?
+  tmp="$SQUAD_LEAD_REG.tmp.$$"
+  grep -vE "^- $id( |$)" "$SQUAD_LEAD_REG" > "$tmp" || true
+  mv "$tmp" "$SQUAD_LEAD_REG" || rc=$?
   [ "$acquired" -eq 0 ] || jg_lock_release "$lock"
   return "$rc"
 }
@@ -3501,8 +3501,8 @@ require_owned_task_worktree_slot || exit 1
 
 validate_pr_poll_cleanup "$STATE" "$ID" || exit 1
 
-if [ "$KIND" = secondmate ]; then
-  LOCAL_REGISTRY_LOCK=$(secondmate_registry_lock_path "$STATE")
+if [ "$KIND" = squad_lead ]; then
+  LOCAL_REGISTRY_LOCK=$(squad_lead_registry_lock_path "$STATE")
   jg_lock_acquire_wait "$LOCAL_REGISTRY_LOCK" || exit 1
   LOCAL_HANDOFF_LOCK="$STATE/.backlog-handoff-$ID.lock"
   jg_lock_acquire_wait "$LOCAL_HANDOFF_LOCK" || exit 1
@@ -3510,45 +3510,45 @@ if [ "$KIND" = secondmate ]; then
   handoff_wake_retire_stage_recover "$HOME_PATH" || exit 1
   handoff_wake_retire_validate || exit 1
   pending_replies_recovery_validate initial || exit 1
-  validate_firstmate_home_for_removal "$HOME_PATH" "secondmate home" "$ID" >/dev/null || exit 1
+  validate_juggernaut_home_for_removal "$HOME_PATH" "squad_lead home" "$ID" >/dev/null || exit 1
   if [ "$FORCE" = "--force" ]; then
-    validate_firstmate_home_children_removal "$HOME_PATH" || exit 1
+    validate_juggernaut_home_children_removal "$HOME_PATH" || exit 1
     preflight_descendant_task_locks "$HOME_PATH" || exit 1
-    validate_firstmate_home_children_removal "$HOME_PATH" || exit 1
+    validate_juggernaut_home_children_removal "$HOME_PATH" || exit 1
     preflight_descendant_treehouse_slots || exit 1
     if [ "$BACKEND" = herdr ]; then
       teardown_herdr_preflight_target "$T" "$ID" || exit 1
     fi
-    preflight_firstmate_home_herdr_children "$HOME_PATH" || exit 1
+    preflight_juggernaut_home_herdr_children "$HOME_PATH" || exit 1
   fi
 fi
 
-if [ "$KIND" = secondmate ] && [ "$FORCE" != "--force" ]; then
+if [ "$KIND" = squad_lead ] && [ "$FORCE" != "--force" ]; then
   SUB_STATE="$HOME_PATH/state"
   if [ -d "$SUB_STATE" ]; then
     for child_meta in "$SUB_STATE"/*.meta; do
       [ -e "$child_meta" ] || continue
-      echo "REFUSED: secondmate $ID still has in-flight work in $SUB_STATE." >&2
+      echo "REFUSED: squad_lead $ID still has in-flight work in $SUB_STATE." >&2
       echo "Found $(basename "$child_meta"). Let that home finish or explicitly discard with --force." >&2
       exit 1
     done
   fi
-  secondmate_unresolved_pending_replies_refuse || exit 1
+  squad_lead_unresolved_pending_replies_refuse || exit 1
 fi
 
-if [ "$KIND" = secondmate ]; then
-  preflight_firstmate_home_process_event_tree "$HOME_PATH" "secondmate home" || exit 1
+if [ "$KIND" = squad_lead ]; then
+  preflight_juggernaut_home_process_event_tree "$HOME_PATH" "squad_lead home" || exit 1
 fi
 
-if [ "$KIND" = secondmate ] && [ "$FORCE" = "--force" ]; then
-  cleanup_firstmate_home_children "$HOME_PATH" || exit $?
+if [ "$KIND" = squad_lead ] && [ "$FORCE" = "--force" ]; then
+  cleanup_juggernaut_home_children "$HOME_PATH" || exit $?
 fi
 
 if [ "$KIND" = scout ] && [ "$FORCE" != "--force" ]; then
   REPORT="$DATA/$ID/report.md"
   if [ ! -f "$REPORT" ]; then
     echo "REFUSED: scout task $ID has no report at $REPORT." >&2
-    echo "The report is the work product. Have the crewmate write it, or use --force after explicit discard approval." >&2
+    echo "The report is the work product. Have the operator write it, or use --force after explicit discard approval." >&2
     exit 1
   fi
   if ! JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" JG_DATA_OVERRIDE="$DATA" \
@@ -3563,9 +3563,9 @@ fi
 # thread, and this cleanup removes the task records that make the promise
 # reconcilable. Refuse while this home still owes a public reply for exactly this
 # work. Both gates live in bin/jg-public-followup-lib.sh, so a home that never
-# opted into the myfirstmate relay runs one [ -f ] test and nothing else here.
+# opted into the myjuggernaut relay runs one [ -f ] test and nothing else here.
 if [ "$FORCE" != "--force" ] && [ "$PUBLIC_FOLLOWUP_PARENT_UNRESOLVED" = 1 ]; then
-  echo "REFUSED: cannot resolve the primary home for marked secondmate $SECOND_MATE_ID; refusing cleanup without its durable parent binding." >&2
+  echo "REFUSED: cannot resolve the primary home for marked squad_lead $SECOND_MATE_ID; refusing cleanup without its durable parent binding." >&2
   exit 1
 fi
 if [ "$FORCE" != "--force" ] \
@@ -3574,7 +3574,7 @@ if [ "$FORCE" != "--force" ] \
   && jg_pf_has_registrations "$PUBLIC_FOLLOWUP_STATE"; then
   if ! PUBLIC_FOLLOWUP_BLOCKING=$(JG_HOME="$PUBLIC_FOLLOWUP_HOME" JG_STATE_OVERRIDE="$PUBLIC_FOLLOWUP_STATE" \
       "$SCRIPT_DIR/jg-public-followup.sh" guard-work "$PUBLIC_FOLLOWUP_WORK_HOME" "$ID" 2>/dev/null); then
-    echo "REFUSED: task $ID still owes a public reply through the myfirstmate relay." >&2
+    echo "REFUSED: task $ID still owes a public reply through the myjuggernaut relay." >&2
     printf '%s\n' "$PUBLIC_FOLLOWUP_BLOCKING" >&2
     echo "Deliver it with bin/jg-public-followup.sh deliver <obligation-id>, waive it with bin/jg-tasks-axi.sh public-followup waive, or use --force after explicit discard approval." >&2
     exit 1
@@ -3597,7 +3597,7 @@ if [ -n "$X_REQUEST" ]; then
   echo "warning: task $ID still carries an unreconciled Relay request link ($X_REQUEST) on its task record." >&2
 fi
 
-if [ "$BACKEND" = orca ] && [ "$KIND" != scout ] && [ "$KIND" != secondmate ] && [ "$FORCE" != "--force" ]; then
+if [ "$BACKEND" = orca ] && [ "$KIND" != scout ] && [ "$KIND" != squad_lead ] && [ "$FORCE" != "--force" ]; then
   if ! inspectable_git_worktree "$WT"; then
     echo "REFUSED: Orca ship task $ID has no inspectable git worktree at ${WT:-<missing>}." >&2
     echo "Cannot verify dirty or unlanded work; restore the worktree path or get explicit OK to discard, then --force." >&2
@@ -3717,9 +3717,9 @@ fi
 
 # Every landed/discard-work refusal above has now passed (or --force skipped
 # them). Fix 1 (see script header) concludes a parked run before any endpoint
-# close. A secondmate home's lifecycle belongs to the dedicated removal
+# close. A squad_lead home's lifecycle belongs to the dedicated removal
 # machinery below, not to task-worktree cleanup.
-if [ "$KIND" != secondmate ]; then
+if [ "$KIND" != squad_lead ]; then
   conclude_task_no_mistakes_run "$WT"
 fi
 if [ "$KIND" = ship ] && teardown_owns_worktree && [ -e "$CONFIG/pipeline-spend" ]; then
@@ -3822,7 +3822,7 @@ fi
 # Fix 2 (see script header): reap descendants only after Herdr's exact pane
 # close is confirmed, before any branch deletion or copy return. Otherwise
 # killing the pane shell steals focus before the close can snapshot it.
-if [ "$KIND" != secondmate ]; then
+if [ "$KIND" != squad_lead ]; then
   reap_task_worktree_processes worktree "$WT" "$TASK_TMP" || exit 1
   teardown_reap_registered_scratch "$JG_HOME" "$STATE" "$DATA" "$ID" || exit 1
 fi
@@ -3832,7 +3832,7 @@ fi
 "$SCRIPT_DIR/jg-remote-job-reap-orphans.sh" >&2 || true
 
 # Best-effort: drop the local task branch so the shared repo does not accumulate refs.
-if [ "$BACKEND" = orca ] && [ "$KIND" != secondmate ]; then
+if [ "$BACKEND" = orca ] && [ "$KIND" != squad_lead ]; then
   if [ "$ORCA_PATH_MATCH_VERIFIED" != 1 ]; then
     require_orca_worktree_path_match_if_present "$ORCA_WORKTREE_ID" "$WT" || exit 1
     ORCA_PATH_MATCH_VERIFIED=1
@@ -3853,9 +3853,9 @@ if [ "$BACKEND" = orca ] && [ "$KIND" != secondmate ]; then
       || { endpoint_close_refusal "$ID" "$BACKEND" "$T" 0; exit 1; }
   fi
   jg_backend_remove_worktree "$BACKEND" "$ORCA_WORKTREE_ID"
-elif [ "$KIND" != secondmate ] && ! teardown_owns_worktree; then
+elif [ "$KIND" != squad_lead ] && ! teardown_owns_worktree; then
   :
-elif [ -d "$WT" ] && [ "$KIND" != secondmate ]; then
+elif [ -d "$WT" ] && [ "$KIND" != squad_lead ]; then
   branch=$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)
   if [ "$branch" != "HEAD" ]; then
     if git -C "$WT" checkout --detach -q 2>/dev/null; then
@@ -3870,7 +3870,7 @@ elif [ -d "$WT" ] && [ "$KIND" != secondmate ]; then
   # the project. teardown_treehouse_return tolerates transient and stale git locks
   # left by a killed crew process; see the script header for retry and stale-lock proof.
   post_lock_cleanup_check=
-  if [ "$FORCE" != "--force" ] && [ "$KIND" != scout ] && [ "$KIND" != secondmate ]; then
+  if [ "$FORCE" != "--force" ] && [ "$KIND" != scout ] && [ "$KIND" != squad_lead ]; then
     post_lock_cleanup_check=validate_worktree_teardown_safety
   fi
   if [ "$KIND" = scout ] || [ "$FORCE" = "--force" ]; then
@@ -3894,20 +3894,20 @@ if [ "$BACKEND" != herdr ] && [ "$BACKEND" != orca ] && [ "$TEARDOWN_WINDOWLESS"
   jg_backend_kill "$BACKEND" "$T" "$(meta_value "$META" zellij_tab_id)" "jg-$ID" \
     || endpoint_close_refusal "$ID" "$BACKEND" "$T" 1 || exit 1
 fi
-if [ "$KIND" != secondmate ]; then
+if [ "$KIND" != squad_lead ]; then
   if ! JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" JG_DATA_OVERRIDE="$DATA" \
       "$SCRIPT_DIR/jg-inactive-reconcile.sh" report "$ID"; then
     echo "error: $ID's final outcome has not reached the parent channel; retaining every durable task record so a rerun can retry the delivery" >&2
     exit 1
   fi
 fi
-if [ "$KIND" = secondmate ]; then
+if [ "$KIND" = squad_lead ]; then
   [ -n "$HOME_PATH" ] || HOME_PATH=$WT
   handoff_wake_retire_stage \
-    || { echo "error: receiver wake cleanup could not be staged; preserving the secondmate home and route" >&2; exit 1; }
+    || { echo "error: receiver wake cleanup could not be staged; preserving the squad_lead home and route" >&2; exit 1; }
   pending_replies_recovery_validate recheck \
-    || { echo "error: local pending-reply recovery paths changed; preserving the secondmate home and route" >&2; exit 1; }
-  if remove_firstmate_home "$HOME_PATH" "secondmate home" "$ID"; then
+    || { echo "error: local pending-reply recovery paths changed; preserving the squad_lead home and route" >&2; exit 1; }
+  if remove_juggernaut_home "$HOME_PATH" "squad_lead home" "$ID"; then
     :
   else
     rc=$?
@@ -3916,12 +3916,12 @@ if [ "$KIND" = secondmate ]; then
     exit "$rc"
   fi
   handoff_wake_retire_stage_commit \
-    || { echo "error: receiver wake cleanup failed; preserving the secondmate route for retry" >&2; exit 1; }
+    || { echo "error: receiver wake cleanup failed; preserving the squad_lead route for retry" >&2; exit 1; }
   if [ "$PENDING_REPLIES_DIR_PRESENT" -eq 1 ]; then
     pending_replies_cleanup_for_task "$STATE/pending-replies" "$PENDING_REPLIES_DIR_REAL" \
-      || { echo "error: local pending-reply cleanup failed; preserving the secondmate route for retry" >&2; exit 1; }
+      || { echo "error: local pending-reply cleanup failed; preserving the squad_lead route for retry" >&2; exit 1; }
   fi
-  remove_secondmate_registry_entry "$ID"
+  remove_squad_lead_registry_entry "$ID"
 fi
 remove_grok_turnend_auth "$STATE" "$ID" || exit 1
 remove_kimi_turnend_auth "$STATE" "$ID" || exit 1
@@ -3929,7 +3929,7 @@ jg_backend_clear_transition "$BACKEND" "$STATE" "$T" || true
 # Remove the per-task temp root (/tmp/jg-<id>/, incl. its gotmp/) recorded by spawn.
 # Read before the state-file rm below; empty (pre-fix tasks without tasktmp=) is a no-op.
 [ -n "$TASK_TMP" ] && rm -rf "$TASK_TMP"
-# Retire only this Firstmate home's launch namespace. Its never-reused per-spawn
+# Retire only this Juggernaut home's launch namespace. Its never-reused per-spawn
 # files leave the equal task-id namespace of every other home untouched.
 teardown_launch_home_token() {
   local home=$1 root hash
@@ -3985,7 +3985,7 @@ rm -f "$STATE/$ID.turn-ended" "$STATE/$ID.progress" \
   "$STATE/$ID.reconcile-nudged" "$STATE/$ID.restart-nudged" "$STATE/$ID.gemini-settings.json" \
   "$STATE/$ID.claude-settings.json" "$STATE/$ID.devin-config.json" \
   "$STATE/.$ID.branch-outcome-index" \
-  "$STATE/.secondmate-relaunch-$ID" "$STATE/.secondmate-relaunch-bound-$ID"
+  "$STATE/.squad-lead-relaunch-$ID" "$STATE/.squad-lead-relaunch-bound-$ID"
 # The steering inbox (bin/jg-task-inbox-lib.sh) is runtime state for the
 # retired endpoint; teardown only runs after landing is confirmed, so any
 # leftover unhandled steer here is moot rather than unlanded work.
@@ -4023,9 +4023,9 @@ if [ "$BACKLOG_CLOSED" = 1 ]; then
     fi
     exit 1
   fi
-elif [ "$KIND" = secondmate ] && [ ! -e "$STATE" ] && [ ! -L "$STATE" ]; then
+elif [ "$KIND" = squad_lead ] && [ ! -e "$STATE" ] && [ ! -L "$STATE" ]; then
   # A nested remote retirement can keep its route record inside the home being
-  # removed. remove_firstmate_home above already performed that physical
+  # removed. remove_juggernaut_home above already performed that physical
   # deletion; do not turn its confirmed absence into a false cleanup failure.
   :
 else
@@ -4042,15 +4042,15 @@ META_LOCK_HELD=0
 # receipt for it can be settled: bin/jg-inactive-reconcile.sh closes the ones the
 # delivery already receipted and removes the rest. Best effort - a failure here
 # leaves a record the next poll's own pass retires, and never blocks cleanup.
-if [ -d "$STATE" ] && [ "$KIND" != secondmate ]; then
+if [ -d "$STATE" ] && [ "$KIND" != squad_lead ]; then
   JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" JG_DATA_OVERRIDE="$DATA" \
     "$SCRIPT_DIR/jg-inactive-reconcile.sh" retire "$ID" || true
 fi
 rm -f "$STATE/$ID.models"
-if [ "$KIND" != scout ] && [ "$KIND" != secondmate ] && [ "$MODE" != local-only ]; then
+if [ "$KIND" != scout ] && [ "$KIND" != squad_lead ] && [ "$MODE" != local-only ]; then
   "$JG_ROOT/bin/jg-fleet-sync.sh" "$PROJ" || true
 fi
-# A secondmate retirement may remove the home containing an overridden control
+# A squad_lead retirement may remove the home containing an overridden control
 # state directory. Do not let the side-band refresh recreate that retired home.
 if [ -d "$STATE" ]; then
   "$SCRIPT_DIR/jg-home-summary-refresh.sh" --best-effort || true

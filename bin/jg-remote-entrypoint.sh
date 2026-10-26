@@ -6,7 +6,7 @@
 # Install this tracked file as jg-remote-entrypoint.sh on the remote account's
 # non-interactive SSH PATH. It accepts protocol metadata plus a base64-encoded
 # NUL argv stream, validates one genuine tracked executable in <root>/bin/jg-*.sh,
-# then stages it for the Firstmate-owned remote job worker. It never accepts a
+# then stages it for the Juggernaut-owned remote job worker. It never accepts a
 # shell command string.
 #
 # The readiness-owning jg-remote-doctor.sh runs in this plain SSH bootstrap so
@@ -123,7 +123,7 @@ ROOT=$(<"$TMP/root")
 HOME_PATH=$(<"$TMP/home")
 ROOT=$(jg_remote_job_canonical_existing_dir "$ROOT") || die "remote root is not a safe existing directory"
 HOME_PATH=$(jg_remote_job_canonical_home "$HOME_PATH") || die "remote home is not a safe directory"
-[ -f "$ROOT/AGENTS.md" ] && [ ! -L "$ROOT/AGENTS.md" ] || die "remote root is not a Firstmate checkout"
+[ -f "$ROOT/AGENTS.md" ] && [ ! -L "$ROOT/AGENTS.md" ] || die "remote root is not a Juggernaut checkout"
 [ -d "$ROOT/bin" ] && [ ! -L "$ROOT/bin" ] || die "remote root has no safe bin directory"
 if path_is_ancestor "$ROOT" "$HOME_PATH" || path_is_ancestor "$HOME_PATH" "$ROOT" || [ "$ROOT" = "$HOME_PATH" ]; then
   die "remote root and home must be separate, non-overlapping directories"
@@ -151,7 +151,7 @@ elif [ "$COMMAND" = jg-remote-doctor.sh ]; then
   [ "$ACTUAL_DOCTOR_SHA256" = "$DOCTOR_SHA256" ] \
     || die "required tool git is unavailable and the doctor does not match the trusted bootstrap identity"
 else
-  die "required tool git does not resolve on the remote operator PATH; install git there or put a wrapper for it in ~/.local/bin using the recipe in docs/remote-secondmates.md"
+  die "required tool git does not resolve on the remote operator PATH; install git there or put a wrapper for it in ~/.local/bin using the recipe in docs/remote-squad-leads.md"
 fi
 if [ "$COMMAND" = jg-remote-doctor.sh ]; then
   jg_remote_job_build_child_path "$ROOT" >/dev/null

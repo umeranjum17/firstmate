@@ -9,7 +9,7 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
 done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Install the quota-failover watcher for this user and register an exec shim to it as a home's quota-failover-watch
-# check (a different check is backed up first). --all: the home and each local, unparked home its data/secondmates.md
+# check (a different check is backed up first). --all: the home and each local, unparked home its data/squad_leads.md
 # lists (a remote one is named and skipped); --list prints those homes and writes nothing. Idempotent.
 # Usage: install.sh [--dry-run] [--all] [--list] <jg-home>
 set -euo pipefail
@@ -26,11 +26,11 @@ ID=quota-failover-watch
 # The sibling add-on libs the watcher sources by its own path, copied beside it in the same layout.
 LIBS="parked-homes/bin/jg-parked-homes-lib.sh account-pool/bin/jg-account-pool-lib.sh account-pool/bin/jg-pool-claude-env.sh"
 
-# homes: "<name><TAB><dir>" for <jg-home> and, with --all, each active local secondmate home it lists.
+# homes: "<name><TAB><dir>" for <jg-home> and, with --all, each active local squad_lead home it lists.
 homes() {
   local line name dir re='^- ([^[:space:]]+) - .*\((host:[^;]*;[[:space:]]*root:[^;]*;[[:space:]]*)?home: ([^;]*[^;[:space:]])[[:space:]]*;'
   printf 'main\t%s\n' "$FMH"
-  [ "$ALL" -eq 1 ] && [ -f "$FMH/data/secondmates.md" ] || return 0
+  [ "$ALL" -eq 1 ] && [ -f "$FMH/data/squad_leads.md" ] || return 0
   # shellcheck source=parked-homes/bin/jg-parked-homes-lib.sh
   . "$SRC/parked-homes/bin/jg-parked-homes-lib.sh"
   while IFS= read -r line; do
@@ -40,7 +40,7 @@ homes() {
     elif JG_HOME=$FMH jg_parked_home "$name"; then echo "skipped: $name: parked" >&2
     else printf '%s\t%s\n' "$name" "$dir"
     fi
-  done <"$FMH/data/secondmates.md"
+  done <"$FMH/data/squad_leads.md"
 }
 
 [ "$LIST" -eq 0 ] || { homes; exit 0; }

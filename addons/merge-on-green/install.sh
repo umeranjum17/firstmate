@@ -8,7 +8,7 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
   export "$_jg_new=$_jg_val"
 done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
-# Install or update the merge-on-green watcher check in one firstmate home. Idempotent.
+# Install or update the merge-on-green watcher check in one juggernaut home. Idempotent.
 # Usage: install.sh [--dry-run] <jg-home>
 set -euo pipefail
 DRY=0

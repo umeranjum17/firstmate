@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
-# jg-parent-channel-lib.sh - the one owner of a secondmate home's parent channel.
+# jg-parent-channel-lib.sh - the one owner of a squad_lead home's parent channel.
 #
-# WHY THIS EXISTS. A secondmate is a firstmate in its own home, and nobody reads
-# its chat: the captain and the main firstmate see only what is appended to the
+# WHY THIS EXISTS. A squad_lead is a juggernaut in its own home, and nobody reads
+# its chat: the captain and the main juggernaut see only what is appended to the
 # parent channel. A mate can satisfy AGENTS.md's address rule in local chat
 # while skipping the charter's return-channel instruction, so a PR-ready result,
 # finding, decision, blocker, or failure never reaches the parent.
@@ -25,22 +25,22 @@
 #   - bin/jg-merge-outcome-lib.sh    a merged PR
 #   - bin/jg-teardown.sh             the child's final ledger line, refusing to
 #                                    remove the child while it is undelivered
-#   - bin/jg-secondmate-report.sh     a marked request's correlated answer,
+#   - bin/jg-squad-lead-report.sh     a marked request's correlated answer,
 #                                    with this resolver choosing its destination
 # The mate's own appends are reserved for judgement (bin/jg-brief.sh charter).
-# docs/secondmate-parent-channel.md records the design and its coverage.
+# docs/squad-lead-parent-channel.md records the design and its coverage.
 #
 # THE CHANNEL. It is resolved from the home's own durable identity and parent
 # binding, never from a caller's choice:
-#   - the .jg-secondmate-home marker names the mate's id in its parent home;
-#   - the .jg-secondmate-parent record (bin/jg-secondmate-parent-lib.sh) names
+#   - the .jg-squad-lead-home marker names the mate's id in its parent home;
+#   - the .jg-squad-lead-parent record (bin/jg-squad-lead-parent-lib.sh) names
 #     the route: a local route reports into the parent home's
 #     state/<mate-id>.status, a remote route into this home's own
 #     state/parent-replies.status, which the parent's remote reply adapter
 #     mirrors line for line into that same parent file
-#     (docs/remote-secondmates.md).
+#     (docs/remote-squad-leads.md).
 # The parent watcher classifies lines there exactly as it classifies any
-# crewmate's status stream, so a captain-relevant line becomes a parent wake.
+# operator's status stream, so a captain-relevant line becomes a parent wake.
 #
 # Line syntax and retry equivalence are owned by jg-classify-lib.sh.
 # An existing destination must be a regular, non-symlinked file; a missing one
@@ -48,7 +48,7 @@
 #
 # Return codes, shared by every entry point that resolves the channel:
 #   0  resolved, or appended / already present
-#   1  this is a main home (no .jg-secondmate-home marker): nothing to report
+#   1  this is a main home (no .jg-squad-lead-home marker): nothing to report
 #   2  the identity marker exists but is unusable (symlink, NUL, bad id)
 #   3  the parent binding is missing or unreadable
 #   4  the append itself failed
@@ -58,8 +58,8 @@
 # Sourced by the publishers above and by tests. No side effects on source.
 
 _JG_PARENT_CHANNEL_LIB_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)"
-# shellcheck source=bin/jg-secondmate-parent-lib.sh
-. "$_JG_PARENT_CHANNEL_LIB_DIR/jg-secondmate-parent-lib.sh"
+# shellcheck source=bin/jg-squad-lead-parent-lib.sh
+. "$_JG_PARENT_CHANNEL_LIB_DIR/jg-squad-lead-parent-lib.sh"
 # shellcheck source=bin/jg-classify-lib.sh
 . "$_JG_PARENT_CHANNEL_LIB_DIR/jg-classify-lib.sh"
 
@@ -79,11 +79,11 @@ _jg_parent_channel_id_valid() {  # <id>
   esac
 }
 
-# The secondmate identity of <home>, printed, or non-zero for a main home (1)
+# The squad_lead identity of <home>, printed, or non-zero for a main home (1)
 # or an unusable identity marker (2).
 jg_parent_channel_home_id() {  # <home>
   local home=$1 marker id
-  marker="$home/.jg-secondmate-home"
+  marker="$home/.jg-squad-lead-home"
   if [ ! -e "$marker" ] && [ ! -L "$marker" ]; then
     return 1
   fi
@@ -104,15 +104,15 @@ jg_parent_channel_destination() {  # <home> <state>
   JG_PARENT_CHANNEL_ROUTE=
   id=$(jg_parent_channel_home_id "$home") || rc=$?
   [ "$rc" -eq 0 ] || return "$rc"
-  jg_secondmate_parent_record_parse "$home/.jg-secondmate-parent" || return 3
-  case "$JG_SECONDMATE_PARENT_ROUTE" in
+  jg_squad_lead_parent_record_parse "$home/.jg-squad-lead-parent" || return 3
+  case "$JG_SQUAD_LEAD_PARENT_ROUTE" in
     local)
-      [ -n "$JG_SECONDMATE_PARENT_HOME" ] || return 3
+      [ -n "$JG_SQUAD_LEAD_PARENT_HOME" ] || return 3
       # shellcheck disable=SC2034 # Output globals read by sourcing callers.
       JG_PARENT_CHANNEL_ID=$id
       # shellcheck disable=SC2034 # Output globals read by sourcing callers.
       JG_PARENT_CHANNEL_ROUTE=local
-      printf '%s/state/%s.status\n' "$JG_SECONDMATE_PARENT_HOME" "$id"
+      printf '%s/state/%s.status\n' "$JG_SQUAD_LEAD_PARENT_HOME" "$id"
       ;;
     remote)
       # shellcheck disable=SC2034 # Output globals read by sourcing callers.

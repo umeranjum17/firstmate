@@ -11,10 +11,10 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # The fork's real completion-receipt journey (tests/jg-dod-lib.test.sh publishes,
 # refuses and accepts receipts and lands locally) with acceptance and the
 # publisher served from the add-on through the step-B hook lines. Absent ->
-# the guarded lines are a no-op. JG_TEST_FORK names a read-only Firstmate checkout.
+# the guarded lines are a no-op. JG_TEST_FORK names a read-only Juggernaut checkout.
 set -euo pipefail
 addons=$(cd "$(dirname "$0")/../.." && pwd)
-: "${JG_TEST_FORK:?set JG_TEST_FORK to a Firstmate checkout}"
+: "${JG_TEST_FORK:?set JG_TEST_FORK to a Juggernaut checkout}"
 d=$(mktemp -d)
 cleanup() {
   rc=$?

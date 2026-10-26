@@ -32,7 +32,7 @@ import sys
 p = pathlib.Path('bin/jg-watch.sh')
 s = p.read_text()
 s = s.replace('. "$SCRIPT_DIR/jg-host-memory-sampler.sh"',
-    'if [ -f "${JG_ADDONS_DIR:-$JG_HOME/projects/firstmate-addons}/host-memory/bin/jg-host-memory-lib.sh" ]; then . "${JG_ADDONS_DIR:-$JG_HOME/projects/firstmate-addons}/host-memory/bin/jg-host-memory-lib.sh"; fi')
+    'if [ -f "${JG_ADDONS_DIR:-$JG_HOME/projects/juggernaut-addons}/host-memory/bin/jg-host-memory-lib.sh" ]; then . "${JG_ADDONS_DIR:-$JG_HOME/projects/juggernaut-addons}/host-memory/bin/jg-host-memory-lib.sh"; fi')
 s = s.replace('[ "$owns_lock" -ne 1 ] || jg_memory_sampler_stop',
     'if declare -F jg_memory_sampler_stop >/dev/null && [ "$owns_lock" -eq 1 ]; then jg_memory_sampler_stop; fi')
 for verb in ('start', 'restart'):
@@ -73,7 +73,7 @@ CHECK
   env PATH="$case/fakebin:$PATH" JG_HOME="$case" JG_ROOT_OVERRIDE="$ROOT" \
     JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/no-cgroup" \
     JG_POLL=1 JG_SIGNAL_GRACE=0 JG_CHECK_INTERVAL=1 JG_HEARTBEAT=999999 \
-    JG_SECONDMATE_LIVENESS_SECS=99999999 timeout 20 "$ROOT/bin/jg-watch.sh" > "$case/out" 2> "$case/err" || rc=$?
+    JG_SQUAD_LEAD_LIVENESS_SECS=99999999 timeout 20 "$ROOT/bin/jg-watch.sh" > "$case/out" 2> "$case/err" || rc=$?
   [ "$rc" -eq 0 ] || fail "$mode add-on watcher exited $rc: $(<"$case/err")"
   assert_contains "$(<"$case/out")" 'Umer check completed' "$mode add-on keeps ordinary watcher behavior"
   if [ "$mode" = present ]; then

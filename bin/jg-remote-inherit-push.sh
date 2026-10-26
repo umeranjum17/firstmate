@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
-# Push the declared inherited-material allowlist to one remote secondmate route.
-# Usage: jg-remote-inherit-push.sh <secondmate-id> <generation>
+# Push the declared inherited-material allowlist to one remote squad_lead route.
+# Usage: jg-remote-inherit-push.sh <squad-lead-id> <generation>
 #
 # The item set is derived from the ONE declared owner
 # (JG_INHERITABLE_CONFIG in bin/jg-config-inherit-lib.sh), the same declaration
@@ -19,8 +19,8 @@ JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
 CONFIG="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"
 DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
 
-# shellcheck source=bin/jg-secondmate-registry-lib.sh
-. "$SCRIPT_DIR/jg-secondmate-registry-lib.sh"
+# shellcheck source=bin/jg-squad-lead-registry-lib.sh
+. "$SCRIPT_DIR/jg-squad-lead-registry-lib.sh"
 # shellcheck source=bin/jg-config-inherit-lib.sh
 . "$SCRIPT_DIR/jg-config-inherit-lib.sh"
 
@@ -31,14 +31,14 @@ sha256_file() {
 file_link_count() {
   if [ "$(uname)" = Darwin ]; then /usr/bin/stat -f %l "$1" 2>/dev/null; else stat -c %h "$1" 2>/dev/null; fi
 }
-[ "$#" -eq 2 ] || { echo "usage: jg-remote-inherit-push.sh <secondmate-id> <generation>" >&2; exit 2; }
+[ "$#" -eq 2 ] || { echo "usage: jg-remote-inherit-push.sh <squad-lead-id> <generation>" >&2; exit 2; }
 ID=$1
 GENERATION=$2
-case "$ID" in ''|*[!A-Za-z0-9._-]*) die "invalid secondmate id: $ID" ;; esac
+case "$ID" in ''|*[!A-Za-z0-9._-]*) die "invalid squad_lead id: $ID" ;; esac
 case "$GENERATION" in ''|*[!0-9]*) die "generation must be a positive integer" ;; esac
 [ "${#GENERATION}" -le 18 ] && [ "$GENERATION" -ge 1 ] || die "generation is outside the supported range"
-REMOTE=$(secondmate_registry_field "$DATA/secondmates.md" "$ID" remote 2>/dev/null || true)
-[ "$REMOTE" = 1 ] || die "secondmate $ID is not a remote route"
+REMOTE=$(squad_lead_registry_field "$DATA/squad_leads.md" "$ID" remote 2>/dev/null || true)
+[ "$REMOTE" = 1 ] || die "squad_lead $ID is not a remote route"
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/jg-remote-inherit-push.XXXXXX") || die "cannot create inheritance staging directory"
 trap 'rm -rf -- "$TMP"' EXIT
 EMPTY="$TMP/empty"
@@ -59,8 +59,8 @@ while IFS= read -r rel; do
     esac
   fi
   case "$rel" in
-    config/firstmate-role)
-      source="$TMP/firstmate-role.resolved"
+    config/juggernaut-role)
+      source="$TMP/juggernaut-role.resolved"
       jg_role_inherit_payload "$JG_HOME" "$CONFIG" "$source" || die "cannot resolve the primary role"
       ;;
     config/*) source="$CONFIG/${rel#config/}" ;;

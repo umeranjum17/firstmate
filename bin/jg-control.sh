@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
-# jg-control.sh - the CONTROL PLANE for a firstmate-owned agent: allowlisted
+# jg-control.sh - the CONTROL PLANE for a juggernaut-owned agent: allowlisted
 # lifecycle verbs addressed to an exact task id.
 #
 # Usage: jg-control.sh <task-id> interrupt
@@ -12,7 +12,7 @@
 #
 # Why this exists, and how it differs from jg-send.sh. bin/jg-send.sh is the
 # DATA plane: conversational text for the agent to read, always routing-marked
-# for a kind=secondmate target so the reply returns through the status path.
+# for a kind=squad_lead target so the reply returns through the status path.
 # That marking is right for a message and wrong for a lifecycle command - a
 # marked "/quit" arrives as ordinary chat the agent reasons ABOUT instead of
 # executing. This script is the control plane: semantic process control with a
@@ -75,7 +75,7 @@
 #              An explicit `default` model or effort clears that
 #              axis for the replacement. A same-harness relaunch whose record
 #              has no stored model refuses unless a model is named or resolved
-#              from configuration. With no explicit axis, a secondmate
+#              from configuration. With no explicit axis, a squad_lead
 #              re-resolves its durable profile through jg-harness.sh with its
 #              id (per-mate pin or global fallback), exactly as any other
 #              respawn does, while a ship or scout keeps the exact adapter
@@ -91,7 +91,7 @@
 #              replacement runtime that cannot hide the listed tools.
 #              --note is required for a ship or scout, whose replacement
 #              inherits the local copy but none of the conversation; a
-#              secondmate reconciles its own home's records at startup, so its
+#              squad_lead reconciles its own home's records at startup, so its
 #              standing charter is never rewritten.
 #              Records a durable checkpoint and that note, exits the old agent,
 #              then delegates the launch to its single owner,
@@ -117,7 +117,7 @@
 # are all refused - a lifecycle command delivered to the wrong endpoint is far
 # worse than a loud refusal.
 #
-# A remotely placed secondmate is refused by name: its agent runs on another
+# A remotely placed squad_lead is refused by name: its agent runs on another
 # host, so no postcondition this plane verifies could be read for it here.
 #
 # Fail-closed boundaries:
@@ -166,11 +166,11 @@ esac
 # shellcheck source=bin/jg-gate-refuse-lib.sh
 . "$SCRIPT_DIR/jg-gate-refuse-lib.sh"
 # Fail closed before any fleet mutation: a no-mistakes gate agent must never
-# drive a crewmate's lifecycle (see bin/jg-gate-refuse-lib.sh).
+# drive a operator's lifecycle (see bin/jg-gate-refuse-lib.sh).
 jg_refuse_if_gate_agent
 
 if [ -z "${JG_HOME+x}" ] || [ -z "${JG_HOME:-}" ]; then
-  echo "error: JG_HOME is not set; jg-control refuses to resolve a task without an explicit firstmate home" >&2
+  echo "error: JG_HOME is not set; jg-control refuses to resolve a task without an explicit juggernaut home" >&2
   exit 1
 fi
 [ -d "$JG_HOME" ] || {
@@ -198,8 +198,8 @@ DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
 . "$SCRIPT_DIR/jg-wake-lib.sh"
 # shellcheck source=bin/jg-worker-account-lib.sh
 . "$SCRIPT_DIR/jg-worker-account-lib.sh"
-# Account-pool hook (firstmate-addons/account-pool): a no-op when the add-on is absent.
-_jg_ap=${JG_ADDONS_DIR:-${JG_HOME:-$SCRIPT_DIR/..}/projects/firstmate-addons}/account-pool/bin/jg-account-pool-lib.sh
+# Account-pool hook (juggernaut-addons/account-pool): a no-op when the add-on is absent.
+_jg_ap=${JG_ADDONS_DIR:-${JG_HOME:-$SCRIPT_DIR/..}/projects/juggernaut-addons}/account-pool/bin/jg-account-pool-lib.sh
 if [ -r "$_jg_ap" ]; then
   # shellcheck source=/dev/null
   . "$_jg_ap" || { printf 'error: the account-pool add-on at %s failed to load; fix or remove it\n' "$_jg_ap" >&2; exit 1; }
@@ -369,7 +369,7 @@ if [ ! -f "$META" ]; then
   die "no task '$ID' in $STATE (jg-control resolves an exact task id only)"
 fi
 
-# A remotely placed secondmate records its endpoint on ANOTHER host, so every
+# A remotely placed squad_lead records its endpoint on ANOTHER host, so every
 # postcondition this plane verifies - the agent-state classification, the busy
 # verdict, the endpoint's existence - would be read here for an endpoint that
 # does not live here. Endpoint validation already refuses such a record, since
@@ -379,7 +379,7 @@ fi
 # operator about a correctly configured remote route. Name the placement
 # instead, using the same `remote_host` signal bin/jg-send.sh routes on.
 if [ -n "$(jg_meta_get "$META" remote_host)" ]; then
-  die "task $ID is a remotely placed secondmate on $(jg_meta_get "$META" remote_host); its agent runs outside this home, so no lifecycle action here could verify that it interrupted, stopped, or came back. Drive its lifecycle on that host, and reconcile it through the secondmate recovery path rather than this plane"
+  die "task $ID is a remotely placed squad_lead on $(jg_meta_get "$META" remote_host); its agent runs outside this home, so no lifecycle action here could verify that it interrupted, stopped, or came back. Drive its lifecycle on that host, and reconcile it through the squad_lead recovery path rather than this plane"
 fi
 
 jg_backend_validate_task_endpoint "$META" "$ID" || exit 1
@@ -1031,21 +1031,21 @@ resolve_relaunch_profile() {
   CONFIG_HARNESS=
   CONFIG_MODEL=
   CONFIG_EFFORT=
-  if [ "$KIND" = secondmate ]; then
-    # A secondmate's harness, model, and effort are a durable configured pin
-    # that every respawn re-resolves (the secondmate-provisioning contract), so
+  if [ "$KIND" = squad_lead ]; then
+    # A squad_lead's harness, model, and effort are a durable configured pin
+    # that every respawn re-resolves (the squad-lead-provisioning contract), so
     # a relaunch with no explicit harness picks up a newly configured one
-    # instead of freezing whatever this incarnation happens to run. Crewmates
+    # instead of freezing whatever this incarnation happens to run. Operators
     # and scouts deliberately do NOT resolve config here: their harness comes
-    # from firstmate's own dispatch-profile judgment at intake, and silently
+    # from juggernaut's own dispatch-profile judgment at intake, and silently
     # re-resolving it would bypass that consultation.
-    CONFIG_HARNESS=$("$SCRIPT_DIR/jg-harness.sh" secondmate "$ID") || return 1
-    CONFIG_MODEL=$("$SCRIPT_DIR/jg-harness.sh" secondmate-model "$ID") || return 1
-    CONFIG_EFFORT=$("$SCRIPT_DIR/jg-harness.sh" secondmate-effort "$ID") || return 1
+    CONFIG_HARNESS=$("$SCRIPT_DIR/jg-harness.sh" squad_lead "$ID") || return 1
+    CONFIG_MODEL=$("$SCRIPT_DIR/jg-harness.sh" squad-lead-model "$ID") || return 1
+    CONFIG_EFFORT=$("$SCRIPT_DIR/jg-harness.sh" squad-lead-effort "$ID") || return 1
     case "$CONFIG_EFFORT" in
       ''|low|medium|high|xhigh|max|ultra) ;;
       *)
-        echo "warning: config/secondmate-harness effort token '$CONFIG_EFFORT' is not one of low, medium, high, xhigh, max, ultra; ignoring" >&2
+        echo "warning: config/squad-lead-harness effort token '$CONFIG_EFFORT' is not one of low, medium, high, xhigh, max, ultra; ignoring" >&2
         CONFIG_EFFORT=
         ;;
     esac
@@ -1056,7 +1056,7 @@ resolve_relaunch_profile() {
     TARGET_HARNESS=$NEW_HARNESS
   elif [ "$HARNESS_SET" = 0 ] && [ -n "$CONFIG_HARNESS" ]; then
     jg_control_harness_supported "$CONFIG_HARNESS" \
-      || die "the configured secondmate harness '$CONFIG_HARNESS' is not verified; jg-control refuses to relaunch onto an adapter with no verified control or launch mechanics"
+      || die "the configured squad_lead harness '$CONFIG_HARNESS' is not verified; jg-control refuses to relaunch onto an adapter with no verified control or launch mechanics"
     TARGET_HARNESS=$CONFIG_HARNESS
   else
     TARGET_HARNESS=$PRIOR_HARNESS
@@ -1104,8 +1104,8 @@ resolve_relaunch_profile() {
   jg_account_hook relaunch-pre "$TARGET_HARNESS" "${JG_CONFIG_OVERRIDE:-$JG_HOME/config}" "$account_model" "$(jg_meta_get "$META" account)" "$PRIOR_MODEL" "$ID" || return 1
   # Likewise config/crew-exclude-tools: a malformed file, or a replacement
   # runtime that cannot hide the listed tools, refuses here, before the old
-  # agent stops. Secondmate agents are not covered.
-  if [ "$KIND" != secondmate ]; then
+  # agent stops. SquadLead agents are not covered.
+  if [ "$KIND" != squad_lead ]; then
     jg_exclude_tools_check "$TARGET_HARNESS" 0 "${JG_CONFIG_OVERRIDE:-$JG_HOME/config}" >/dev/null || return 1
   fi
 }
@@ -1129,7 +1129,7 @@ safe_checkpoint() {
   if jg_slot_record_owner "$WT" "$STATE" "$META"; then
     die "task $ID's recorded worktree $WT is also recorded by task $JG_SLOT_RECORD_OWNER_ID as its $JG_SLOT_RECORD_OWNER_FIELD; refusing to relaunch two agents into one copy. Reconcile which record is stale (bin/jg-crew-state.sh $ID $JG_SLOT_RECORD_OWNER_ID)"
   elif [ $? -eq 2 ]; then
-    die "cannot prove task $ID's worktree $WT is free of other task records: $JG_LOCAL_FIRSTMATE_ERROR; refusing to relaunch"
+    die "cannot prove task $ID's worktree $WT is free of other task records: $JG_LOCAL_JUGGERNAUT_ERROR; refusing to relaunch"
   fi
   if head=$(git -C "$WT" rev-parse --verify HEAD 2>/dev/null); then
     :
@@ -1153,19 +1153,19 @@ safe_checkpoint() {
     dirty=no
   fi
   CHECKPOINT_LINES+=("worktree_head=$head" "worktree_dirty=$dirty")
-  if [ "$KIND" = secondmate ]; then
-    # A secondmate's own crewmates outlive its relaunch: they run in their own
-    # endpoints, and the relaunched secondmate reconciles them from its home's
+  if [ "$KIND" = squad_lead ]; then
+    # A squad_lead's own operators outlive its relaunch: they run in their own
+    # endpoints, and the relaunched squad_lead reconciles them from its home's
     # durable records at startup. The checkpoint proves those records are
     # readable BEFORE the agent stops, so a relaunch can never strand child
     # work behind an unreadable home.
-    marker=$(cat "$WT/.jg-secondmate-home" 2>/dev/null || true)
+    marker=$(cat "$WT/.jg-squad-lead-home" 2>/dev/null || true)
     [ "$marker" = "$ID" ] \
-      || die "task $ID's home $WT is not marked as its own seeded secondmate home (marker: ${marker:-none}); refusing to relaunch"
+      || die "task $ID's home $WT is not marked as its own seeded squad_lead home (marker: ${marker:-none}); refusing to relaunch"
     # Do not walk state/ with find(1): watcher scratch files can vanish
     # mid-scan and make find fail even when every child *.meta is readable.
     [ -d "$WT/state" ] && [ -r "$WT/state" ] && [ -x "$WT/state" ] \
-      || die "secondmate $ID's home has no readable state directory, so its child work cannot be accounted for; refusing to relaunch"
+      || die "squad_lead $ID's home has no readable state directory, so its child work cannot be accounted for; refusing to relaunch"
     children=0
     for child_meta in "$WT/state"/*.meta; do
       if [ ! -e "$child_meta" ] && [ ! -L "$child_meta" ]; then
@@ -1173,7 +1173,7 @@ safe_checkpoint() {
       fi
       if [ ! -f "$child_meta" ] || [ -L "$child_meta" ] \
          || ! cat "$child_meta" >/dev/null 2>&1; then
-        die "secondmate $ID's child record $child_meta is not a readable regular file; refusing to relaunch"
+        die "squad_lead $ID's child record $child_meta is not a readable regular file; refusing to relaunch"
       fi
       children=$((children + 1))
     done
@@ -1184,8 +1184,8 @@ safe_checkpoint() {
 # record_note: put the required progress note somewhere durable, and - for a
 # ship or scout, whose only record of the interrupted reasoning is the
 # conversation about to be discarded - into the instructions the replacement
-# actually reads. A secondmate's charter is a durable standing document and is
-# never rewritten: a secondmate reconciles its own home's records at startup,
+# actually reads. A squad_lead's charter is a durable standing document and is
+# never rewritten: a squad_lead reconciles its own home's records at startup,
 # so the note stays parent-side audit evidence.
 record_note() {
   local stamp
@@ -1229,8 +1229,8 @@ do_relaunch() {
       [ "$NOTE_SET" = 1 ] && [ -n "$NOTE" ] \
         || die "relaunch of a $KIND task requires --note (or --note-file): the replacement worker inherits the local copy but none of the conversation, so it must be told what happened"
       ;;
-    secondmate)
-      # The charter in the secondmate's own home is its instruction source and
+    squad_lead)
+      # The charter in the squad_lead's own home is its instruction source and
       # stays untouched.
       RELAUNCH_BRIEF=
       ;;
@@ -1338,7 +1338,7 @@ case "$VERB" in
     echo "$result $ID harness=$HARNESS backend=$BACKEND endpoint=$T worktree=$WT"
     ;;
   relaunch)
-    # Parked-home guard (firstmate-addons/parked-homes): a parked secondmate
+    # Parked-home guard (juggernaut-addons/parked-homes): a parked squad_lead
     # home gets no relaunch. The shim answers not parked when the add-on is absent.
     # shellcheck source=bin/jg-parked-homes-lib.sh
     . "$SCRIPT_DIR/jg-parked-homes-lib.sh"

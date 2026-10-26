@@ -229,7 +229,7 @@ assert_grep 'status: condition-error' "$RESULT" "the outcome records the conditi
 assert_grep 'cannot reach the service' "$RESULT" "the outcome carries the condition diagnostics"
 assert_absent "$CONDERRLOG" "an erroring condition never reaches the action"
 assert_absent "$H/state/when/when-conderr.fired" "no fire was claimed on an ambiguous condition"
-pass "a repeatedly erroring condition wakes firstmate instead of firing"
+pass "a repeatedly erroring condition wakes juggernaut instead of firing"
 
 # --- a deadline that passes wakes with never-true -----------------------------
 H="$TMP_ROOT/h-deadline"; new_home "$H"

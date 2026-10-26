@@ -3,7 +3,7 @@
 #
 # These tests pin the control plane's observable behavior hermetically - a
 # stubbed session provider, no real agent - through the executable interface
-# firstmate actually calls:
+# juggernaut actually calls:
 #   1. Adapter contract: every verified harness gets its own verified exit
 #      command and interrupt key, delivered as bytes to the endpoint.
 #   2. Backend capability: a backend that cannot deliver the harness's
@@ -14,8 +14,8 @@
 #   4. Verb allowlist: no arbitrary text, no raw keys, no resume.
 #   5. Lifecycle states: busy interrupts first, idle does not, already-stopped
 #      is idempotent success, and an agent that does not stop fails closed.
-#   6. Marker non-regression: a control command to a kind=secondmate task
-#      carries NO from-firstmate marker and opens no pending-reply expectation,
+#   6. Marker non-regression: a control command to a kind=squad_lead task
+#      carries NO from-juggernaut marker and opens no pending-reply expectation,
 #      while jg-send's marking of the same task is untouched.
 set -u
 
@@ -136,7 +136,7 @@ case "${1:-}" in
         fi
       fi
       case "$payload" in
-        *'encode launch-brief'* | *'Firstmate operational input waiting: read'*) cat "$D/becomes" > "$D/command" ;;
+        *'encode launch-brief'* | *'Juggernaut operational input waiting: read'*) cat "$D/becomes" > "$D/command" ;;
       esac
     else
       printf '%s\n' "$payload" >> "$D/keys"
@@ -552,9 +552,9 @@ test_interrupt_clear_key_decision() {
 
 # A verified adapter is not automatically verified for every task kind, and the
 # check has to sit on the pre-stop side of a relaunch: muse has no primary
-# supervision protocol, so bin/jg-spawn.sh refuses it for a secondmate, and
+# supervision protocol, so bin/jg-spawn.sh refuses it for a squad_lead, and
 # discovering that only after the running agent was stopped would strand the
-# secondmate with no agent at all.
+# squad_lead with no agent at all.
 test_harness_kind_capability() {
   local harness
   for harness in $VERIFIED_HARNESSES; do
@@ -563,11 +563,11 @@ test_harness_kind_capability() {
     jg_control_harness_supports_kind "$harness" scout \
       || fail "$harness should be able to run a scout task"
   done
-  jg_control_harness_supports_kind muse secondmate \
-    && fail "muse has no primary supervision protocol and must not claim a secondmate"
+  jg_control_harness_supports_kind muse squad_lead \
+    && fail "muse has no primary supervision protocol and must not claim a squad_lead"
   for harness in claude codex opencode pi pi-signed grok kimi omp; do
-    jg_control_harness_supports_kind "$harness" secondmate \
-      || fail "$harness should be able to run a secondmate"
+    jg_control_harness_supports_kind "$harness" squad_lead \
+      || fail "$harness should be able to run a squad_lead"
   done
   jg_control_harness_supports_kind someagent ship \
     && fail "an unverified harness must not claim any kind"
@@ -684,17 +684,17 @@ test_record_bound_to_another_task_is_refused() {
   pass "jg-control: a record whose endpoint identity names another task is refused"
 }
 
-# A remotely placed secondmate's agent runs on another host, so none of the
+# A remotely placed squad_lead's agent runs on another host, so none of the
 # postconditions this plane verifies could be read for it here. Endpoint
 # validation would refuse the record anyway - `window=remote:<id>` can never
 # match a local backend's shape - but it would blame malformed metadata for a
 # correctly configured route, so the placement is named instead. Every verb
 # refuses, and none of them reaches a local endpoint.
-test_remote_secondmate_is_refused_by_placement() {
+test_remote_squad_lead_is_refused_by_placement() {
   local dir out rc verb
   for verb in interrupt exit relaunch; do
     dir=$(new_case "remote-$verb")
-    add_task "$dir" t1 claude secondmate
+    add_task "$dir" t1 claude squad_lead
     alive_as "$dir" claude
     {
       grep -v '^window=' "$dir/home/state/t1.meta"
@@ -711,15 +711,15 @@ test_remote_secondmate_is_refused_by_placement() {
     else
       out=$(run_control "$dir" t1 "$verb"); rc=$?
     fi
-    expect_code 1 "$rc" "$verb on a remotely placed secondmate should refuse"
-    assert_contains "$out" "remotely placed secondmate on example.invalid" \
+    expect_code 1 "$rc" "$verb on a remotely placed squad_lead should refuse"
+    assert_contains "$out" "remotely placed squad_lead on example.invalid" \
       "the $verb refusal should name the remote placement, not blame the record"
     assert_not_contains "$out" "malformed" \
       "a correctly configured remote route must not be reported as malformed"
     [ -z "$(literals "$dir")" ] && [ -z "$(keys_sent "$dir")" ] \
-      || fail "$verb on a remote secondmate must reach no local endpoint"
+      || fail "$verb on a remote squad_lead must reach no local endpoint"
   done
-  pass "jg-control: a remotely placed secondmate is refused by placement, not by a metadata complaint"
+  pass "jg-control: a remotely placed squad_lead is refused by placement, not by a metadata complaint"
 }
 
 hold_lifecycle_lock() {  # <lock-path>
@@ -1119,48 +1119,48 @@ test_grok_idle_footer_does_not_confirm_cancellation() {
 
 # --- 6. marker non-regression -----------------------------------------------
 
-test_secondmate_control_command_carries_no_marker() {
+test_squad_lead_control_command_carries_no_marker() {
   local dir out rc typed home
   dir=$(new_case sm-marker)
   home="$dir/home"
-  add_task "$dir" domain claude secondmate
-  # A secondmate's worktree IS its home; give it the marker its records need.
-  printf '%s\n' domain > "$dir/wt-domain/.jg-secondmate-home"
+  add_task "$dir" domain claude squad_lead
+  # A squad_lead's worktree IS its home; give it the marker its records need.
+  printf '%s\n' domain > "$dir/wt-domain/.jg-squad-lead-home"
   alive_as "$dir" claude
   out=$(run_control "$dir" domain exit); rc=$?
-  expect_code 0 "$rc" "exiting a secondmate's agent should succeed"$'\n'"$out"
+  expect_code 0 "$rc" "exiting a squad_lead's agent should succeed"$'\n'"$out"
   typed=$(literals "$dir")
   [ "$typed" = "/exit" ] \
-    || fail "a secondmate control command must be the bare exit command, got: $typed"
+    || fail "a squad_lead control command must be the bare exit command, got: $typed"
   case "$typed" in
-    *"$JG_FROMFIRST_MARK"*) fail "a control command must never carry the from-firstmate marker" ;;
+    *"$JG_FROMFIRST_MARK"*) fail "a control command must never carry the from-juggernaut marker" ;;
   esac
   case "$typed" in
     *corr=*) fail "a control command must never carry a pending-reply correlation id" ;;
   esac
   [ -z "$(find "$home/state/pending-replies" -type f 2>/dev/null | head -n 1)" ] \
     || fail "a control command must not open a pending-reply expectation"
-  pass "jg-control: a lifecycle command to a secondmate is unmarked and opens no reply expectation"
+  pass "jg-control: a lifecycle command to a squad_lead is unmarked and opens no reply expectation"
 }
 
-test_jg_send_still_marks_the_same_secondmate_task() {
+test_jg_send_still_marks_the_same_squad_lead_task() {
   local dir log out rc
   dir=$(new_case sm-send)
-  add_task "$dir" domain claude secondmate
+  add_task "$dir" domain claude squad_lead
   log="$dir/fake/sendlog"
   : > "$log"
   out=$(env PATH="$dir/fakebin:$PATH" JG_HOME="$dir/home" JG_FAKE_DIR="$dir/fake" \
     JG_SEND_SETTLE=0 JG_ROOT_OVERRIDE="$dir/home" \
     "$SEND" domain "audit the build" 2>&1); rc=$?
-  expect_code 0 "$rc" "jg-send to a secondmate should still succeed"$'\n'"$out"
+  expect_code 0 "$rc" "jg-send to a squad_lead should still succeed"$'\n'"$out"
   # The marked steer rides jg-send's durable inbox plane; only the doorbell is
   # typed, so the marker is asserted on the recorded body.
   case "$(bash -c '. "$1"; jg_task_inbox_body "$2"' _ "$ROOT/bin/jg-task-inbox-lib.sh" \
     "$dir/home/state/domain.inbox/001.msg")" in
     "$JG_FROMFIRST_MARK"*) : ;;
-    *) fail "jg-send must still mark a kind=secondmate target: $(literals "$dir")" ;;
+    *) fail "jg-send must still mark a kind=squad_lead target: $(literals "$dir")" ;;
   esac
-  pass "jg-control's arrival leaves jg-send's from-firstmate marking untouched"
+  pass "jg-control's arrival leaves jg-send's from-juggernaut marking untouched"
 }
 
 # Only an adapter whose runtime records an exact per-pane agent session has a
@@ -1304,7 +1304,7 @@ test_window_label_is_refused_with_the_exact_id
 test_explicit_endpoint_is_refused
 test_unknown_task_is_refused
 test_record_bound_to_another_task_is_refused
-test_remote_secondmate_is_refused_by_placement
+test_remote_squad_lead_is_refused_by_placement
 test_interrupt_and_exit_lock_before_task_state_resolution
 test_verb_allowlist_is_closed
 test_resume_is_refused_with_its_reason
@@ -1326,5 +1326,5 @@ test_exit_accepts_agent_stopped_by_busy_interrupt
 test_agent_that_does_not_stop_fails_closed
 test_grok_interrupt_without_acknowledgement_reports_unconfirmed
 test_grok_idle_footer_does_not_confirm_cancellation
-test_secondmate_control_command_carries_no_marker
-test_jg_send_still_marks_the_same_secondmate_task
+test_squad_lead_control_command_carries_no_marker
+test_jg_send_still_marks_the_same_squad_lead_task

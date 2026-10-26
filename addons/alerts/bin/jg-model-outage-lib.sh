@@ -30,7 +30,7 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 _JG_MODEL_ERROR_DIR="${SCRIPT_DIR:-$JG_HOME/bin}"
 # shellcheck source=bin/jg-timeout-lib.sh
 . "$_JG_MODEL_ERROR_DIR/jg-timeout-lib.sh"
-# Parked-home reader (firstmate-addons/parked-homes): the watcher defines it;
+# Parked-home reader (juggernaut-addons/parked-homes): the watcher defines it;
 # without it nothing is ever parked.
 declare -F jg_parked_meta >/dev/null || jg_parked_meta() { return 1; }
 # The usage-limit banner pattern has one owner, bin/jg-composer-lib.sh; this
@@ -60,7 +60,7 @@ jg_model_outage_tick() {
     [ -f "$meta" ] && [ ! -L "$meta" ] || continue
     id=${meta##*/}; id=${id%.meta}
     jg_busy_token_valid "$id" || continue
-    # Parked-home guard (firstmate-addons/parked-homes): a parked home's lane
+    # Parked-home guard (juggernaut-addons/parked-homes): a parked home's lane
     # is never scanned and never alerts. No-op without the add-on checkout.
     if jg_parked_meta "$meta" "$id"; then continue; fi
     target=$(jg_backend_target_of_meta "$meta")

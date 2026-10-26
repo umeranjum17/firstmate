@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
-# jg-secondmate-reconcile.sh - ask a secondmate to reconcile its own books, at
+# jg-squad-lead-reconcile.sh - ask a squad_lead to reconcile its own books, at
 # most once per home per cooldown window.
 #
 # Usage:
-#   jg-secondmate-reconcile.sh request --snapshot <file>|-
-#   jg-secondmate-reconcile.sh process-requests
-#   jg-secondmate-reconcile.sh notify [--snapshot <file>|-]
-#   jg-secondmate-reconcile.sh nudged <mate-id>
+#   jg-squad-lead-reconcile.sh request --snapshot <file>|-
+#   jg-squad-lead-reconcile.sh process-requests
+#   jg-squad-lead-reconcile.sh notify [--snapshot <file>|-]
+#   jg-squad-lead-reconcile.sh nudged <mate-id>
 #
 # This is a BACKSTOP, not the primary mechanism. Dispatch and completion pair
 # the backlog row with the task's record inside the one script that moves the
@@ -17,7 +17,7 @@
 # see: a home that has not restarted since it drifted, or one still running
 # older code.
 #
-# A backlog-vs-metadata inventory mismatch inside a secondmate home
+# A backlog-vs-metadata inventory mismatch inside a squad_lead home
 # (orphan_in_flight, unowned_current, terminal_in_flight) no longer makes that
 # home unreadable: bin/jg-fleet-snapshot.sh keeps its decisions, queued, landed,
 # and live work and carries the mismatch for renderers. The books are still
@@ -61,8 +61,8 @@
 # jg-send under its final route lock, and before the cooldown commit so a retired
 # endpoint is never nudged or allowed to silence its replacement.
 #
-# A persistent REMOTE secondmate's parent-side metadata intentionally has no
-# spawn_gen (docs/remote-secondmates.md). Such a row is legitimate and markerless
+# A persistent REMOTE squad_lead's parent-side metadata intentionally has no
+# spawn_gen (docs/remote-squad-leads.md). Such a row is legitimate and markerless
 # by construction, not corrupt, so it uses its sampled remote_host as the separate
 # identity guard. The current metadata must still have no spawn_gen and must still
 # name that host. A row with neither identity fails loudly.
@@ -93,7 +93,7 @@ STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
 
 # shellcheck source=bin/jg-wake-lib.sh
 . "$SCRIPT_DIR/jg-wake-lib.sh"
-# Parked-home guard (firstmate-addons/parked-homes): a parked home is never
+# Parked-home guard (juggernaut-addons/parked-homes): a parked home is never
 # reconciled. The shim answers not parked when the add-on is absent (stock behavior).
 # shellcheck source=bin/jg-parked-homes-lib.sh
 . "$SCRIPT_DIR/jg-parked-homes-lib.sh"
@@ -102,10 +102,10 @@ STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
 JG_RECONCILE_COOLDOWN_SECONDS=${JG_RECONCILE_COOLDOWN_SECONDS:-14400}
 JG_RECONCILE_REQUEST_MAX_BYTES=${JG_RECONCILE_REQUEST_MAX_BYTES:-1048576}
 case "$JG_RECONCILE_COOLDOWN_SECONDS" in
-  ''|*[!0-9]*) echo "jg-secondmate-reconcile: JG_RECONCILE_COOLDOWN_SECONDS must be a whole number of seconds" >&2; exit 2 ;;
+  ''|*[!0-9]*) echo "jg-squad-lead-reconcile: JG_RECONCILE_COOLDOWN_SECONDS must be a whole number of seconds" >&2; exit 2 ;;
 esac
 case "$JG_RECONCILE_REQUEST_MAX_BYTES" in
-  ''|*[!0-9]*|0) echo "jg-secondmate-reconcile: JG_RECONCILE_REQUEST_MAX_BYTES must be a positive whole number" >&2; exit 2 ;;
+  ''|*[!0-9]*|0) echo "jg-squad-lead-reconcile: JG_RECONCILE_REQUEST_MAX_BYTES must be a positive whole number" >&2; exit 2 ;;
 esac
 
 REQUEST_DIR="$STATE/reconcile-notify"
@@ -128,10 +128,10 @@ trap 'release_active_locks; exit 130' INT TERM
 
 usage() {
   cat <<'EOF'
-usage: jg-secondmate-reconcile.sh request --snapshot <file>|-
-       jg-secondmate-reconcile.sh process-requests
-       jg-secondmate-reconcile.sh notify [--snapshot <file>|-]
-       jg-secondmate-reconcile.sh nudged <mate-id>
+usage: jg-squad-lead-reconcile.sh request --snapshot <file>|-
+       jg-squad-lead-reconcile.sh process-requests
+       jg-squad-lead-reconcile.sh notify [--snapshot <file>|-]
+       jg-squad-lead-reconcile.sh nudged <mate-id>
 
 request  accept exactly one captured snapshot and atomically publish at most
          one pending request per stable reconcile target id for later supervision
@@ -140,7 +140,7 @@ request  accept exactly one captured snapshot and atomically publish at most
 process-requests
          deliver and retire durable requests. Intended for the watcher loop;
          skipped or failed requests stay queued for a later pass.
-notify   ask every secondmate home whose backlog disagrees with its own task
+notify   ask every squad_lead home whose backlog disagrees with its own task
          metadata to reconcile it, at most once per home per cooldown window.
          Reads an jg-fleet-snapshot.v1 or jg-bearings.v1 document from
          --snapshot (or runs jg-fleet-snapshot.sh --json when omitted).
@@ -148,7 +148,7 @@ nudged   print the epoch second of the last reconcile nudge sent to <mate-id>.
 EOF
 }
 
-fail() { echo "jg-secondmate-reconcile: $*" >&2; exit 2; }
+fail() { echo "jg-squad-lead-reconcile: $*" >&2; exit 2; }
 
 nudge_path() {  # <mate-id>
   printf '%s/%s.reconcile-nudged\n' "$STATE" "$1"
@@ -170,7 +170,7 @@ meta_remote_host() {
 # Confirms the row's sampled identity still matches the mate's current
 # metadata. When a spawn generation was sampled, that generation alone is the
 # identity, exactly as before. When none was sampled - the only legitimate
-# case is a persistent remote secondmate, whose parent metadata never carries
+# case is a persistent remote squad_lead, whose parent metadata never carries
 # one - the sampled host substitutes, and the metadata must still carry no
 # spawn_gen of its own or the row's assumed identity model no longer holds.
 # Sets REVALIDATE_REASON to "no-identity" (nothing here can be safely
@@ -291,11 +291,11 @@ cmd_request() {
   fi
   if ! jq -e '
     if .schema == "jg-bearings.v1" then
-      any((.secondmate_reconcile // [])[];
+      any((.squad_lead_reconcile // [])[];
         .kind as $kind
         | ["orphan_in_flight","unowned_current","terminal_in_flight"] | index($kind))
     else
-      any((.secondmate_current.records // [])[];
+      any((.squad_lead_current.records // [])[];
         .reconcile_inventory as $inv
         | ["orphan_in_flight","unowned_current","terminal_in_flight"] | index($inv.kind))
     end
@@ -306,10 +306,10 @@ cmd_request() {
   fi
   targets=$(jq -c '
     [if .schema == "jg-bearings.v1" then
-       (.secondmate_reconcile // [])[]
+       (.squad_lead_reconcile // [])[]
        | {id,spawn_gen:(.spawn_gen // ""),host:(.host // ""),kind:(.kind // "")}
      else
-       (.secondmate_current.records // [])[]
+       (.squad_lead_current.records // [])[]
        | {id,spawn_gen:(.spawn_gen // ""),host:(.host // ""),kind:(.reconcile_inventory.kind // "")}
      end
      | select((.id | type) == "string" and (.id | test("^[A-Za-z0-9._-]+$")))
@@ -330,9 +330,9 @@ cmd_request() {
       || { rm -f -- "$tmp"; fail "cannot create a reconcile notify request"; }
     if ! jq -c --arg id "$id" --arg spawn_gen "$spawn_gen" --arg host "$host" '
       if .schema == "jg-bearings.v1" then
-        .secondmate_reconcile |= map(select(.id == $id and (.spawn_gen // "") == $spawn_gen and (.host // "") == $host))
+        .squad_lead_reconcile |= map(select(.id == $id and (.spawn_gen // "") == $spawn_gen and (.host // "") == $host))
       else
-        .secondmate_current.records |= map(select(.id == $id and (.spawn_gen // "") == $spawn_gen and (.host // "") == $host))
+        .squad_lead_current.records |= map(select(.id == $id and (.spawn_gen // "") == $spawn_gen and (.host // "") == $host))
       end
     ' "$tmp" > "$pending" || ! chmod 600 "$pending"; then
       rm -f -- "$tmp" "$pending"
@@ -387,7 +387,7 @@ cmd_process_requests() {
     esac
     rc=0
     JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" \
-      "$SCRIPT_DIR/jg-secondmate-reconcile.sh" notify --snapshot "$claimed" \
+      "$SCRIPT_DIR/jg-squad-lead-reconcile.sh" notify --snapshot "$claimed" \
       > "$output" 2>&1 || rc=$?
     if [ "$rc" -eq 0 ] \
       && ! grep -Eq '^(skipped|failed|sent-unrecorded):' "$output" 2>/dev/null; then
@@ -436,8 +436,8 @@ cmd_notify() {
 
   # Only a real inventory mismatch is a books problem the mate can fix; every
   # other invalidity is either unreadable state or nothing to reconcile.
-  # spawn_gen is empty only for a persistent remote secondmate, whose parent
-  # metadata never carries one (bin/jg-spawn.sh's spawn_remote_secondmate());
+  # spawn_gen is empty only for a persistent remote squad_lead, whose parent
+  # metadata never carries one (bin/jg-spawn.sh's spawn_remote_squad_lead());
   # host is its substitute identity there and is otherwise unused. Both are
   # still character-restricted so a malformed sample cannot masquerade as
   # either a live incarnation token or a live host.
@@ -451,10 +451,10 @@ cmd_notify() {
   row_sep=$(printf '\037')
   rows=$(printf '%s' "$snapshot" | jq -r --arg sep "$row_sep" '
     (if .schema == "jg-bearings.v1" then
-       (.secondmate_reconcile // [])[]
+       (.squad_lead_reconcile // [])[]
        | {id, spawn_gen:(.spawn_gen // ""), host:(.host // ""), kind:(.kind // ""), ids:(.ids // [])}
      else
-       (.secondmate_current.records // [])[]
+       (.squad_lead_current.records // [])[]
        | select(.reconcile_inventory != null)
        | {id, spawn_gen:(.spawn_gen // ""), host:(.host // ""), kind:(.reconcile_inventory.kind // ""), ids:(.reconcile_inventory.ids // [])}
      end)
@@ -469,7 +469,7 @@ cmd_notify() {
   local id sampled_spawn_gen sampled_host expected_remote_host kind path last age now delivered_at reconcile_lock control_lock meta meta_lock did send_rc
   while IFS=$'\037' read -r id sampled_spawn_gen sampled_host kind; do
     [ -n "${id:-}" ] || continue
-    # Parked-home guard (firstmate-addons/parked-homes): a parked home is
+    # Parked-home guard (juggernaut-addons/parked-homes): a parked home is
     # never reconciled - no ask, no cooldown. No-op without the add-on.
     jg_parked_skip_meta "$STATE/$id.meta" "$id" reconcile && continue
     path=$(nudge_path "$id")

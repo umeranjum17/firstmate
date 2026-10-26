@@ -10,7 +10,7 @@
 # state/<task>.inbox, and receives no brief at all: it must resolve the inbox
 # from the doorbell plus its own environment. A stub can only confirm the
 # assumption already written into the stub, so per
-# .agents/skills/firstmate-coding-guidelines this is proven against every
+# .agents/skills/juggernaut-coding-guidelines this is proven against every
 # INSTALLED verified harness: each is launched idle in an isolated tmux server,
 # steered through the REAL jg-send (durable record + doorbell), and must both
 # ACT on the instruction (create a named file) and ACKNOWLEDGE it (the mv into
@@ -147,7 +147,7 @@ check_harness_doorbell() {  # <name>
   [ "$ready_rc" -eq 0 ] || note "$name ($version): idle composer never classified empty; proceeding as production does (advisory check skips only on pending)"
   printf 'window=%s:%s\nkind=ship\nharness=%s\n' "$SESSION" "$win" "$name" > "$home/state/$task.meta"
   if ! JG_HOME="$home" JG_ROOT_OVERRIDE="$home" "$ROOT/bin/jg-send.sh" "$task" \
-    "Firstmate live check: run exactly this shell command now: touch $acted - then follow the mv instruction you were given for this message. Reply with one short line." \
+    "Juggernaut live check: run exactly this shell command now: touch $acted - then follow the mv instruction you were given for this message. Reply with one short line." \
     >/dev/null 2>&1; then
     FAILED=1
     printf 'not ok - %s (%s): jg-send refused the live steer\n' "$name" "$version" >&2

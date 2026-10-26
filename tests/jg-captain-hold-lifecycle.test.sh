@@ -209,7 +209,7 @@ run_shim() {  # <home> <command args...>
 write_origin_meta() {  # <home> <id> [kind]
   local home=$1 id=$2 kind=${3:-scout}
   jg_write_meta "$home/state/$id.meta" \
-    "window=firstmate:jg-$id" \
+    "window=juggernaut:jg-$id" \
     "worktree=$home/projects/missing-$id" \
     "project=$home/projects/sample" \
     "harness=codex" \
@@ -301,7 +301,7 @@ write_scout_with_attested_inventory() {  # <home> <scout-id> <keys>
   local home=$1 scout=$2 keys=$3
   mkdir -p "$home/data/$scout"
   jg_write_meta "$home/state/$scout.meta" \
-    "window=firstmate:jg-$scout" \
+    "window=juggernaut:jg-$scout" \
     "worktree=$home/projects/missing-$scout" \
     "project=$home/projects/sample" \
     "harness=codex" \
@@ -461,7 +461,7 @@ test_complete_accepts_a_migrated_inventory_on_beads() {
     "migrated from data/backlog.md id herald-retire-decision-github-delete on 2026-09-04" \
     >/dev/null 2>&1 || fail "could not record the migration marker note"
   jg_write_meta "$home/state/$scout.meta" \
-    "window=firstmate:jg-$scout" \
+    "window=juggernaut:jg-$scout" \
     "worktree=$home/projects/missing-$scout" \
     "project=$home/projects/sample" \
     "harness=codex" \
@@ -644,7 +644,7 @@ SH
   pass "captain-hold mutations address the beads backend without a markdown override"
 }
 
-# A hold raises its sign-off card through the firstmate-addons signoff script when
+# A hold raises its sign-off card through the juggernaut-addons signoff script when
 # installed, falling back to this repo's adapter otherwise, and only while armed.
 signoff_addon_stub() {  # <addons-dir>
   mkdir -p "$1/signoff/bin"
@@ -1407,7 +1407,7 @@ EOF
 }
 
 test_terminal_single_owner_status_decision_does_not_block_empty_inventory() {
-  local home id open secondmate
+  local home id open squad_lead
   home=$(make_home stale-terminal-decision)
   id=sample-terminal-review
   mkdir -p "$home/data/$id"
@@ -1436,29 +1436,29 @@ test_terminal_single_owner_status_decision_does_not_block_empty_inventory() {
   run_teardown "$home" "$id" >/dev/null 2> "$home/terminal-teardown.err" \
     || fail "terminal single-owner stale status decision blocked teardown: $(cat "$home/terminal-teardown.err")"
 
-  secondmate=sample-secondmate
-  write_origin_meta "$home" "$secondmate" secondmate
+  squad_lead=sample-squad-lead
+  write_origin_meta "$home" "$squad_lead" squad_lead
   printf 'blocked [key=route]: waiting\ndone: heartbeat complete\nnote: cleanup complete\n' \
-    > "$home/state/$secondmate.status"
-  if run_captain "$home" complete "$secondmate" --none \
-    > "$home/secondmate-terminal.out" 2> "$home/secondmate-terminal.err"; then
-    fail "secondmate terminal status decision was incorrectly cleared"
+    > "$home/state/$squad_lead.status"
+  if run_captain "$home" complete "$squad_lead" --none \
+    > "$home/squad-lead-terminal.out" 2> "$home/squad-lead-terminal.err"; then
+    fail "squad_lead terminal status decision was incorrectly cleared"
   fi
   pass "terminal single-owner stale status decisions do not block empty inventory"
 }
 
-test_secondmate_hold_stays_in_authoritative_home() {
+test_squad_lead_hold_stays_in_authoritative_home() {
   local parent mate fakebin origin json
   parent=$(make_home main-routing)
   mate="$TMP_ROOT/sample-mate-home"
   mkdir -p "$mate/data" "$mate/state" "$mate/config" "$mate/projects" "$mate/bin"
   jg_test_tasks_toml "$mate/.tasks.toml"
-  printf '# Synthetic secondmate home\n' > "$mate/AGENTS.md"
-  printf 'sample-mate\n' > "$mate/.jg-secondmate-home"
+  printf '# Synthetic squad_lead home\n' > "$mate/AGENTS.md"
+  printf 'sample-mate\n' > "$mate/.jg-squad-lead-home"
   # A seeded home always carries its parent binding; teardown delivers the
   # scout's final line through it before removing the record.
-  printf 'schema=jg-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$parent" \
-    > "$mate/.jg-secondmate-parent"
+  printf 'schema=jg-squad-lead-parent.v1\nroute=local\nparent_home=%s\n' "$parent" \
+    > "$mate/.jg-squad-lead-parent"
   cat > "$mate/data/backlog.md" <<'EOF'
 ## In flight
 
@@ -1470,52 +1470,52 @@ EOF
   jg_fake_exit0 "$fakebin" tmux treehouse no-mistakes gh gh-axi
   origin=sample-mate-review
   mkdir -p "$mate/data/$origin"
-  tasks_in "$mate" add "$origin" "Investigate secondmate sample" --kind scout --repo sample --start >/dev/null
+  tasks_in "$mate" add "$origin" "Investigate squad_lead sample" --kind scout --repo sample --start >/dev/null
   write_origin_meta "$mate" "$origin"
   printf 'done: report and visual review complete\n' > "$mate/state/$origin.status"
-  printf '# Sample secondmate review\n\nOne captain choice remains.\n' > "$mate/data/$origin/report.md"
+  printf '# Sample squad_lead review\n\nOne captain choice remains.\n' > "$mate/data/$origin/report.md"
   run_captain "$mate" hold sample-release-call --title "Choose the sample release" \
     --reason "captain release choice pending" --repo sample --origin "$origin" >/dev/null \
-    || fail "secondmate-owned hold creation failed"
+    || fail "squad-lead-owned hold creation failed"
   run_captain "$mate" complete "$origin" sample-release-call >/dev/null \
-    || fail "secondmate-owned completion failed"
+    || fail "squad-lead-owned completion failed"
   # The parent registers the mate before its children are ever torn down;
   # teardown resolves that registration to deliver the scout's final line.
   printf -- '- sample-mate - synthetic scope (home: %s; scope: sample reviews; projects: sample; added 2026-07-14)\n' \
-    "$mate" > "$parent/data/secondmates.md"
-  jg_write_secondmate_meta "$parent/state/sample-mate.meta" "$mate" \
-    "firstmate:jg-sample-mate" sample
+    "$mate" > "$parent/data/squad_leads.md"
+  jg_write_squad_lead_meta "$parent/state/sample-mate.meta" "$mate" \
+    "juggernaut:jg-sample-mate" sample
   run_teardown "$mate" "$origin" >/dev/null 2> "$mate/teardown.err" \
-    || fail "secondmate investigation teardown failed: $(cat "$mate/teardown.err")"
+    || fail "squad_lead investigation teardown failed: $(cat "$mate/teardown.err")"
   tasks_in "$mate" "done" "$origin" --report "data/$origin/report.md" --keep 0 >/dev/null
   grep -Eq "^done \\[key=child-outcome-$origin-done-[0-9a-f]{8}\\] \\[at=[0-9]+\\]: child $origin done: report and visual review complete mode=scout report=data/$origin/report.md$" \
     "$parent/state/sample-mate.status" \
     || fail "the scout's final line did not reach the parent at teardown"
 
-  json=$(run_bearings "$parent") || fail "parent Bearings could not read the secondmate captain call"
+  json=$(run_bearings "$parent") || fail "parent Bearings could not read the squad_lead captain call"
   printf '%s' "$json" | jq -e '
     .decisions_open | any(.owner == "sample-mate" and .verb == "captain-hold"
       and (.id | endswith("sample-release-call")))
-  ' >/dev/null || fail "secondmate captain call did not surface with authoritative owner: $json"
-  assert_no_grep "sample-release-call" "$parent/data/backlog.md" "secondmate call leaked into the main backlog"
-  assert_grep "sample-release-call" "$mate/data/backlog.md" "secondmate call left its authoritative backlog"
-  pass "main-home and secondmate-home captain calls remain correctly routed"
+  ' >/dev/null || fail "squad_lead captain call did not surface with authoritative owner: $json"
+  assert_no_grep "sample-release-call" "$parent/data/backlog.md" "squad_lead call leaked into the main backlog"
+  assert_grep "sample-release-call" "$mate/data/backlog.md" "squad_lead call left its authoritative backlog"
+  pass "main-home and squad-lead-home captain calls remain correctly routed"
 }
 
-# Inside a secondmate home a hold and its answer reach the parent channel from
+# Inside a squad_lead home a hold and its answer reach the parent channel from
 # the script itself, keyed per hold occurrence, so a re-held task opens and
 # closes a distinct parent decision and a retry never duplicates a line. A main
 # home publishes nothing anywhere.
-test_secondmate_home_publishes_holds_and_answers() {
+test_squad_lead_home_publishes_holds_and_answers() {
   local parent mate fakebin channel decision out
   parent=$(make_home parent-channel)
   mate="$TMP_ROOT/channel-mate-home"
   mkdir -p "$mate/data" "$mate/state" "$mate/config" "$mate/projects"
   jg_test_tasks_toml "$mate/.tasks.toml"
-  printf '# Synthetic secondmate home\n' > "$mate/AGENTS.md"
-  printf 'channel-mate\n' > "$mate/.jg-secondmate-home"
-  printf 'schema=jg-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$parent" \
-    > "$mate/.jg-secondmate-parent"
+  printf '# Synthetic squad_lead home\n' > "$mate/AGENTS.md"
+  printf 'channel-mate\n' > "$mate/.jg-squad-lead-home"
+  printf 'schema=jg-squad-lead-parent.v1\nroute=local\nparent_home=%s\n' "$parent" \
+    > "$mate/.jg-squad-lead-parent"
   cat > "$mate/data/backlog.md" <<'EOF'
 ## In flight
 
@@ -1590,15 +1590,15 @@ EOF
     --reason "main choice pending" --repo sample >/dev/null || fail "main hold failed"
   [ ! -e "$parent/state/parent-replies.status" ] || fail "a main home wrote a parent reply"
   assert_no_grep 'captain-hold-main-call' "$channel" "a main home's hold leaked onto a mate channel"
-  pass "a secondmate home publishes each hold occurrence and its answer on the parent channel"
+  pass "a squad_lead home publishes each hold occurrence and its answer on the parent channel"
 }
 
 test_reconcile_retry_after_completed_close_of_a_merged_captain_ask() {
   local parent mate evidence request out
   parent=$(make_home reconcile-ask-parent)
   mate=$(make_home reconcile-ask-mate)
-  printf 'reconcile-ask-mate\n' > "$mate/.jg-secondmate-home"
-  printf 'schema=jg-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$parent" > "$mate/.jg-secondmate-parent"
+  printf 'reconcile-ask-mate\n' > "$mate/.jg-squad-lead-home"
+  printf 'schema=jg-squad-lead-parent.v1\nroute=local\nparent_home=%s\n' "$parent" > "$mate/.jg-squad-lead-parent"
   evidence="$mate/reconcile-evidence.txt"
   request="$mate/state/reconcile-requests/reconcile-ask.request"
   tasks_in "$mate" add reconcile-ask "[captain-ask] Verify the merged ask" --kind ship --repo sample >/dev/null \
@@ -1625,13 +1625,13 @@ test_reconcile_retry_after_completed_close_of_a_merged_captain_ask() {
   [ ! -e "$request" ] || fail "the retry did not retire the published reconcile request"
 }
 
-test_secondmate_reconcile_publishes_before_request_retirement() {
+test_squad_lead_reconcile_publishes_before_request_retirement() {
   local parent mate channel evidence out show rc request
   parent=$(make_home reconcile-parent-channel)
   mate=$(make_home reconcile-channel-mate)
-  printf 'reconcile-channel-mate\n' > "$mate/.jg-secondmate-home"
-  printf 'schema=jg-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$parent" \
-    > "$mate/.jg-secondmate-parent"
+  printf 'reconcile-channel-mate\n' > "$mate/.jg-squad-lead-home"
+  printf 'schema=jg-squad-lead-parent.v1\nroute=local\nparent_home=%s\n' "$parent" \
+    > "$mate/.jg-squad-lead-parent"
   channel="$parent/state/reconcile-channel-mate.status"
   evidence="$mate/reconcile-evidence.txt"
 
@@ -1696,7 +1696,7 @@ test_secondmate_reconcile_publishes_before_request_retirement() {
   [ "$(grep -c 'resolved \[key=captain-hold-answer-channel-call-1\]: captain hold answer-channel-call: answered' \
     <(sed -E 's/ \[at=[0-9]+\]//' "$channel"))" -eq 1 ] \
     || fail "the normal-answer retry duplicated its parent resolution: $(cat "$channel")"
-  pass "secondmate resolutions publish before retiring durable retry triggers"
+  pass "squad_lead resolutions publish before retiring durable retry triggers"
 }
 
 # The one keyed-answer intake, fed through the real process-event runner by a
@@ -1820,7 +1820,7 @@ SH
     JG_PROCEVENT_CLAIM_ROOT="$home/procevent-claims" \
     "$ROOT/bin/jg-procevent.sh" start fixture-src >/dev/null 2>&1
   assert_absent "$home/state/procevent-inbox/fixture-src.1.handled" \
-    "feeding a captain answer retired the notification firstmate still needs"
+    "feeding a captain answer retired the notification juggernaut still needs"
   assert_present "$home/state/procevent-inbox/fixture-src.1.result" \
     "the fixture channel captured no result to feed"
 
@@ -2455,7 +2455,7 @@ test_legacy_identities_keep_working() {
 # collects a board is a supervised process, and while it was not running the
 # board went on presenting as armed. Everything between the captured result and
 # the closed task is asserted here end to end - capture, the wake that tells
-# firstmate to look, and the recorded answer - because each of those was intact
+# juggernaut to look, and the recorded answer - because each of those was intact
 # on its own while the chain as a whole delivered nothing.
 test_board_answer_reaches_the_keyed_answer_intake() {
   local home sid stub out queue show
@@ -2503,7 +2503,7 @@ SH
   assert_contains "$show" "north" "the board answer lost the captain's selection"
   assert_contains "$show" "the captured result $sid sequence 1" \
     "the recorded answer did not name the board result that carried it"
-  pass "a board answer reaches the keyed-answer intake and wakes firstmate"
+  pass "a board answer reaches the keyed-answer intake and wakes juggernaut"
 }
 
 # The intake is channel-agnostic, so chat must reach it the same way a captured
@@ -2651,7 +2651,7 @@ run_drain() {  # <home>
 # captain had never spoken. Both identities that can carry a captain call must
 # be caught - the collapsed one (the key IS the task id) and the legacy derived
 # one a pre-collapse origin minted - and the report must reach the drain, which
-# is where firstmate actually looks.
+# is where juggernaut actually looks.
 test_status_resolution_over_an_open_hold_is_signalled() {
   local home id out drain
   home=$(make_home divergence-signalled)
@@ -2973,7 +2973,7 @@ test_retained_row_artifacts_survive_captain_answers() {
   tasks_in "$home" add "$approved_id" "Ship the approved pull request $approved_pr" --kind ship \
     --repo sample --start >/dev/null || fail "could not create the approved merge fixture"
   jg_write_meta "$home/state/$approved_id.meta" \
-    "window=firstmate:jg-$approved_id" "endpoint_task_id=$approved_id" "worktree=$wt" \
+    "window=juggernaut:jg-$approved_id" "endpoint_task_id=$approved_id" "worktree=$wt" \
     "project=$repo" "harness=codex" "kind=ship" "mode=no-mistakes" \
     "pr=$approved_pr" "spawn_gen=fixture-$approved_id"
   printf 'done: PR %s merged\n' "$approved_pr" > "$home/state/$approved_id.status"
@@ -2995,12 +2995,12 @@ test_retained_row_artifacts_survive_captain_answers() {
   jg_git_worktree "$local_repo" "$local_wt" "fm/$local_id"
   printf 'landed locally\n' > "$local_wt/local.txt"
   git -C "$local_wt" add local.txt
-  git -C "$local_wt" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' \
+  git -C "$local_wt" -c user.name='Juggernaut Tests' -c user.email='tests@example.invalid' \
     commit -qm 'local delivery'
   tasks_in "$home" add "$local_id" "Land the approved local-only change" --kind ship \
     --repo sample --start >/dev/null || fail "could not create the released local fixture"
   jg_write_meta "$home/state/$local_id.meta" \
-    "window=firstmate:jg-$local_id" "endpoint_task_id=$local_id" "worktree=$local_wt" \
+    "window=juggernaut:jg-$local_id" "endpoint_task_id=$local_id" "worktree=$local_wt" \
     "project=$local_repo" "harness=codex" "kind=ship" "mode=local-only" \
     "spawn_gen=fixture-$local_id"
   printf 'done: local merge ready\n' > "$home/state/$local_id.status"
@@ -3145,7 +3145,7 @@ test_interrupted_cleanup_keeps_the_captain_call_recoverable() {
   tasks_in "$home" add "$id" "Investigate failed sample cleanup" --kind scout \
     --repo sample --start >/dev/null || fail "could not create the cleanup-failure fixture"
   jg_write_meta "$home/state/$id.meta" \
-    "window=firstmate:jg-$id" "worktree=$wt" "project=$home/projects/sample" \
+    "window=juggernaut:jg-$id" "worktree=$wt" "project=$home/projects/sample" \
     "harness=codex" "kind=scout" "mode=scout" "spawn_gen=fixture-$id"
   printf 'done: report complete\n' > "$home/state/$id.status"
   printf '# Failed cleanup\n\nThe captain call remains open.\n' > "$home/data/$id/report.md"
@@ -3203,7 +3203,7 @@ test_answer_before_cleanup_replay_preserves_the_retained_report() {
   tasks_in "$home" add "$id" "Investigate answer before cleanup replay" --kind scout \
     --repo sample --start >/dev/null || fail "could not create the answer-before-replay fixture"
   jg_write_meta "$home/state/$id.meta" \
-    "window=firstmate:jg-$id" "worktree=$wt" "project=$home/projects/sample" \
+    "window=juggernaut:jg-$id" "worktree=$wt" "project=$home/projects/sample" \
     "harness=codex" "kind=scout" "mode=scout" "spawn_gen=fixture-$id"
   printf 'done: report complete\n' > "$home/state/$id.status"
   printf '# Interrupted cleanup\n\nThe captain call remains open.\n' > "$home/data/$id/report.md"
@@ -3258,7 +3258,7 @@ test_answer_before_cleanup_replay_notes_a_retained_gerrit_change() {
   tasks_in "$home" add "$id" "Ship the held Gerrit change" --kind ship \
     --repo sample --start >/dev/null || fail "could not create the held Gerrit answer fixture"
   jg_write_meta "$home/state/$id.meta" \
-    "window=firstmate:jg-$id" "endpoint_task_id=$id" "worktree=$wt" \
+    "window=juggernaut:jg-$id" "endpoint_task_id=$id" "worktree=$wt" \
     "project=$repo" "harness=codex" "kind=ship" "mode=no-mistakes" \
     "pr=$gerrit_url" "spawn_gen=fixture-$id"
   printf 'done: change landed\n' > "$home/state/$id.status"
@@ -3311,7 +3311,7 @@ test_unusable_pending_close_record_names_its_reason() {
   tasks_in "$home" add "$id" "Investigate the unusable pending close" --kind scout \
     --repo sample --start >/dev/null || fail "could not create the unusable pending-close fixture"
   jg_write_meta "$home/state/$id.meta" \
-    "window=firstmate:jg-$id" "worktree=$wt" "project=$home/projects/sample" \
+    "window=juggernaut:jg-$id" "worktree=$wt" "project=$home/projects/sample" \
     "harness=codex" "kind=scout" "mode=scout" "spawn_gen=fixture-$id"
   printf 'done: report complete\n' > "$home/state/$id.status"
   printf '# Unusable pending close\n\nThe captain call remains open.\n' > "$home/data/$id/report.md"
@@ -3366,7 +3366,7 @@ EOF
     --repo sample --start --file "$data/backlog.md" >/dev/null) \
     || fail "could not create the relocated answer-before-replay fixture"
   jg_write_meta "$home/state/$id.meta" \
-    "window=firstmate:jg-$id" "worktree=$wt" "project=$home/projects/sample" \
+    "window=juggernaut:jg-$id" "worktree=$wt" "project=$home/projects/sample" \
     "harness=codex" "kind=scout" "mode=scout" "spawn_gen=fixture-$id"
   printf 'done: report complete\n' > "$home/state/$id.status"
   printf '# Relocated interrupted cleanup\n\nThe captain call remains open.\n' > "$data/$id/report.md"
@@ -3490,7 +3490,7 @@ test_teardown_retains_a_gerrit_captain_call_with_its_change_url() {
   tasks_in "$home" add "$id" "Ship the held Gerrit change" --kind ship \
     --repo sample --start >/dev/null || fail "could not create the held Gerrit fixture"
   jg_write_meta "$home/state/$id.meta" \
-    "window=firstmate:jg-$id" "endpoint_task_id=$id" "worktree=$wt" \
+    "window=juggernaut:jg-$id" "endpoint_task_id=$id" "worktree=$wt" \
     "project=$repo" "harness=codex" "kind=ship" "mode=no-mistakes" \
     "pr=$gerrit_url" "spawn_gen=fixture-$id"
   printf 'done: change landed\n' > "$home/state/$id.status"
@@ -3541,7 +3541,7 @@ test_merge_approval_releases_before_zero_done_retention() {
   tasks_in "$home" add "$id" "Ship zero-retention merge $pr" --kind ship \
     --repo sample --start >/dev/null || fail "could not create the zero-retention fixture"
   jg_write_meta "$home/state/$id.meta" \
-    "window=firstmate:jg-$id" "endpoint_task_id=$id" "worktree=$wt" \
+    "window=juggernaut:jg-$id" "endpoint_task_id=$id" "worktree=$wt" \
     "project=$repo" "harness=codex" "kind=ship" "mode=no-mistakes" \
     "pr=$pr" "spawn_gen=fixture-$id"
   printf 'done: merge ready\n' > "$home/state/$id.status"
@@ -3583,7 +3583,7 @@ test_pr_merge_entrypoint_refuses_a_captain_held_task() {
   tasks_in "$home" add "$pr_id" "Ship the held pull request" --kind ship \
     --repo sample --start >/dev/null || fail "could not create the held PR fixture"
   jg_write_meta "$home/state/$pr_id.meta" \
-    "window=firstmate:jg-$pr_id" "endpoint_task_id=$pr_id" "worktree=$wt" \
+    "window=juggernaut:jg-$pr_id" "endpoint_task_id=$pr_id" "worktree=$wt" \
     "project=$repo" "harness=codex" "kind=ship" "mode=no-mistakes" \
     "pr=$pr" "spawn_gen=fixture-$pr_id"
   run_captain "$home" hold "$pr_id" --reason "captain merge approval pending" >/dev/null \
@@ -3614,12 +3614,12 @@ test_local_merge_entrypoint_refuses_a_captain_held_task() {
   jg_git_worktree "$local_repo" "$local_wt" "fm/$local_id"
   printf 'held local delivery\n' > "$local_wt/local.txt"
   git -C "$local_wt" add local.txt
-  git -C "$local_wt" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' \
+  git -C "$local_wt" -c user.name='Juggernaut Tests' -c user.email='tests@example.invalid' \
     commit -qm 'held local delivery'
   tasks_in "$home" add "$local_id" "Ship the held local change" --kind ship \
     --repo sample --start >/dev/null || fail "could not create the held local fixture"
   jg_write_meta "$home/state/$local_id.meta" \
-    "window=firstmate:jg-$local_id" "endpoint_task_id=$local_id" "worktree=$local_wt" \
+    "window=juggernaut:jg-$local_id" "endpoint_task_id=$local_id" "worktree=$local_wt" \
     "project=$local_repo" "harness=codex" "kind=ship" "mode=local-only" \
     "spawn_gen=fixture-$local_id"
   run_captain "$home" hold "$local_id" --reason "captain local merge approval pending" \
@@ -3686,10 +3686,10 @@ test_local_merge_entrypoint_separates_an_unreadable_record_from_an_absent_one() 
   jg_git_worktree "$repo" "$wt" "fm/$id"
   printf 'untracked local delivery\n' > "$wt/local.txt"
   git -C "$wt" add local.txt
-  git -C "$wt" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' \
+  git -C "$wt" -c user.name='Juggernaut Tests' -c user.email='tests@example.invalid' \
     commit -qm 'untracked local delivery'
   jg_write_meta "$home/state/$id.meta" \
-    "window=firstmate:jg-$id" "endpoint_task_id=$id" "worktree=$wt" \
+    "window=juggernaut:jg-$id" "endpoint_task_id=$id" "worktree=$wt" \
     "project=$repo" "harness=codex" "kind=ship" "mode=local-only" \
     "spawn_gen=fixture-$id"
   before=$(git -C "$repo" rev-parse main)
@@ -3800,7 +3800,7 @@ test_merge_entrypoints_refuse_a_reused_task_incarnation() {
   tasks_in "$home" add "$id" "Ship the original pull request" --kind ship \
     --repo sample --start >/dev/null || fail "could not create the original PR task"
   jg_write_meta "$home/state/$id.meta" \
-    "window=firstmate:jg-$id" "endpoint_task_id=$id" "worktree=$old_wt" \
+    "window=juggernaut:jg-$id" "endpoint_task_id=$id" "worktree=$old_wt" \
     "project=$old_repo" "harness=codex" "kind=ship" "mode=no-mistakes" \
     "spawn_gen=original-$id"
   printf 'done: merge ready\n' > "$home/state/$id.status"
@@ -3855,7 +3855,7 @@ test_merge_entrypoints_refuse_a_reused_task_incarnation() {
   jg_git_worktree "$new_repo" "$new_wt" "fm/$id"
   tasks_in "$home" reopen "$id" >/dev/null || fail "could not reopen the reused PR task"
   jg_write_meta "$home/state/$id.meta" \
-    "window=firstmate:jg-$id" "endpoint_task_id=$id" "worktree=$new_wt" \
+    "window=juggernaut:jg-$id" "endpoint_task_id=$id" "worktree=$new_wt" \
     "project=$new_repo" "harness=codex" "kind=ship" "mode=no-mistakes" \
     "spawn_gen=replacement-$id"
   tasks_in "$home" start "$id" >/dev/null || fail "could not start the reused PR task"
@@ -3885,12 +3885,12 @@ test_merge_entrypoints_refuse_a_reused_task_incarnation() {
   jg_git_worktree "$local_old_repo" "$local_old_wt" "fm/$local_id"
   printf 'original local delivery\n' > "$local_old_wt/original.txt"
   git -C "$local_old_wt" add original.txt
-  git -C "$local_old_wt" -c user.name='Firstmate Tests' \
+  git -C "$local_old_wt" -c user.name='Juggernaut Tests' \
     -c user.email='tests@example.invalid' commit -qm 'original local delivery'
   tasks_in "$local_home" add "$local_id" "Ship the original local change" --kind ship \
     --repo sample --start >/dev/null || fail "could not create the original local task"
   jg_write_meta "$local_home/state/$local_id.meta" \
-    "window=firstmate:jg-$local_id" "endpoint_task_id=$local_id" \
+    "window=juggernaut:jg-$local_id" "endpoint_task_id=$local_id" \
     "worktree=$local_old_wt" "project=$local_old_repo" "harness=codex" \
     "kind=ship" "mode=local-only" "spawn_gen=original-$local_id"
   printf 'done: local merge ready\n' > "$local_home/state/$local_id.status"
@@ -3950,13 +3950,13 @@ test_merge_entrypoints_refuse_a_reused_task_incarnation() {
   jg_git_worktree "$local_new_repo" "$local_new_wt" "fm/$local_id"
   printf 'replacement local delivery\n' > "$local_new_wt/replacement.txt"
   git -C "$local_new_wt" add replacement.txt
-  git -C "$local_new_wt" -c user.name='Firstmate Tests' \
+  git -C "$local_new_wt" -c user.name='Juggernaut Tests' \
     -c user.email='tests@example.invalid' commit -qm 'replacement local delivery'
   before=$(git -C "$local_new_repo" rev-parse main)
   tasks_in "$local_home" reopen "$local_id" >/dev/null \
     || fail "could not reopen the reused local task"
   jg_write_meta "$local_home/state/$local_id.meta" \
-    "window=firstmate:jg-$local_id" "endpoint_task_id=$local_id" \
+    "window=juggernaut:jg-$local_id" "endpoint_task_id=$local_id" \
     "worktree=$local_new_wt" "project=$local_new_repo" "harness=codex" \
     "kind=ship" "mode=local-only" "spawn_gen=replacement-$local_id"
   tasks_in "$local_home" start "$local_id" >/dev/null \
@@ -3996,7 +3996,7 @@ test_merge_entrypoints_serialize_forced_teardown_before_task_reads() {
   tasks_in "$home" add "$id" "Ship the released pull request" --kind ship \
     --repo sample --start >/dev/null || fail "could not create the PR teardown-race fixture"
   jg_write_meta "$home/state/$id.meta" \
-    "window=firstmate:jg-$id" "endpoint_task_id=$id" "worktree=$wt" \
+    "window=juggernaut:jg-$id" "endpoint_task_id=$id" "worktree=$wt" \
     "project=$repo" "harness=codex" "kind=ship" "mode=no-mistakes" \
     "spawn_gen=fixture-$id"
   printf 'done: merge ready\n' > "$home/state/$id.status"
@@ -4068,12 +4068,12 @@ SH
   jg_git_worktree "$local_repo" "$local_wt" "fm/$local_id"
   printf 'serialized local delivery\n' > "$local_wt/local.txt"
   git -C "$local_wt" add local.txt
-  git -C "$local_wt" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' \
+  git -C "$local_wt" -c user.name='Juggernaut Tests' -c user.email='tests@example.invalid' \
     commit -qm 'serialized local delivery'
   tasks_in "$local_home" add "$local_id" "Ship the released local change" --kind ship \
     --repo sample --start >/dev/null || fail "could not create the local teardown-race fixture"
   jg_write_meta "$local_home/state/$local_id.meta" \
-    "window=firstmate:jg-$local_id" "endpoint_task_id=$local_id" "worktree=$local_wt" \
+    "window=juggernaut:jg-$local_id" "endpoint_task_id=$local_id" "worktree=$local_wt" \
     "project=$local_repo" "harness=codex" "kind=ship" "mode=local-only" \
     "spawn_gen=fixture-$local_id"
   printf 'done: local merge ready\n' > "$local_home/state/$local_id.status"
@@ -4163,7 +4163,7 @@ test_released_merge_passes_the_entrypoint_and_lands() {
   tasks_in "$home" add "$id" "Ship the approved pull request" --kind ship \
     --repo sample --start >/dev/null || fail "could not create the released merge fixture"
   jg_write_meta "$home/state/$id.meta" \
-    "window=firstmate:jg-$id" "endpoint_task_id=$id" "worktree=$wt" \
+    "window=juggernaut:jg-$id" "endpoint_task_id=$id" "worktree=$wt" \
     "project=$repo" "harness=codex" "kind=ship" "mode=no-mistakes" \
     "pr=$pr" "spawn_gen=fixture-$id"
   printf 'done: merge ready\n' > "$home/state/$id.status"
@@ -4200,7 +4200,7 @@ test_teardown_refuses_a_ship_when_the_captain_hold_cannot_be_read() {
   tasks_in "$home" add "$id" "Ship the sample change" --kind ship \
     --repo sample --start >/dev/null || fail "could not create the unreadable-hold fixture"
   jg_write_meta "$home/state/$id.meta" \
-    "window=firstmate:jg-$id" "worktree=$home/projects/missing-$id" \
+    "window=juggernaut:jg-$id" "worktree=$home/projects/missing-$id" \
     "project=$home/projects/sample" "harness=codex" "kind=ship" "mode=direct-PR" \
     "spawn_gen=fixture-$id"
   printf 'done: PR https://github.com/sample/sample/pull/7\n' > "$home/state/$id.status"
@@ -4857,9 +4857,9 @@ test_out_of_band_close_is_recordable
 test_visual_review_uses_shared_completion_owner
 test_none_inventory_and_resolved_prose_do_not_create_holds
 test_terminal_single_owner_status_decision_does_not_block_empty_inventory
-test_secondmate_hold_stays_in_authoritative_home
-test_secondmate_home_publishes_holds_and_answers
-test_secondmate_reconcile_publishes_before_request_retirement
+test_squad_lead_hold_stays_in_authoritative_home
+test_squad_lead_home_publishes_holds_and_answers
+test_squad_lead_reconcile_publishes_before_request_retirement
 test_reconcile_retry_after_completed_close_of_a_merged_captain_ask
 test_bound_channel_answers_close_at_answer_time
 test_reconcile_never_closes_through_the_keyed_answer_intake

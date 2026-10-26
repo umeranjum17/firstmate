@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
-# Host-local lifecycle control for the remote secondmate home selected by jg-on.
+# Host-local lifecycle control for the remote squad_lead home selected by jg-on.
 #
 # Usage:
-#   jg-remote-secondmate-control.sh launch <id> <harness> <model|-> <effort|-> herdr [traceparent]
-#   jg-remote-secondmate-control.sh relaunch <id> <harness> <model|default|-> <effort|default|->
-#   jg-remote-secondmate-control.sh state <id>
-#   jg-remote-secondmate-control.sh route <id>
-#   jg-remote-secondmate-control.sh send <id> <message> [fire-and-forget]
-#   jg-remote-secondmate-control.sh key <id> <key>
-#   jg-remote-secondmate-control.sh capture <id> [lines]
-#   jg-remote-secondmate-control.sh observe <id>
-#   jg-remote-secondmate-control.sh sync <id> [<parent-commit>]
-#   jg-remote-secondmate-control.sh update <id>
-#   jg-remote-secondmate-control.sh retire <id> [--force]
+#   jg-remote-squad-lead-control.sh launch <id> <harness> <model|-> <effort|-> herdr [traceparent]
+#   jg-remote-squad-lead-control.sh relaunch <id> <harness> <model|default|-> <effort|default|->
+#   jg-remote-squad-lead-control.sh state <id>
+#   jg-remote-squad-lead-control.sh route <id>
+#   jg-remote-squad-lead-control.sh send <id> <message> [fire-and-forget]
+#   jg-remote-squad-lead-control.sh key <id> <key>
+#   jg-remote-squad-lead-control.sh capture <id> [lines]
+#   jg-remote-squad-lead-control.sh observe <id>
+#   jg-remote-squad-lead-control.sh sync <id> [<parent-commit>]
+#   jg-remote-squad-lead-control.sh update <id>
+#   jg-remote-squad-lead-control.sh retire <id> [--force]
 #
 # Remote placement ends here, but the second-mate agent always runs on the
 # Herdr backend in the dedicated jg-remote session, so launch refuses any other
@@ -23,33 +23,33 @@
 # jg-spawn/jg-send/jg-teardown keep owning the local endpoint mechanics.
 # The home's own workers keep their ordinary backend selection.
 # bin/jg-remote-doctor.sh owns that host's readiness for Herdr.
-# docs/remote-secondmates.md owns why.
+# docs/remote-squad-leads.md owns why.
 #
 # With <parent-commit>, sync follows the PARENT PRIMARY's default-branch commit,
 # which the parent resolves on its own checkout and passes in, so a remote home
 # tracks the primary exactly like a local one instead of stopping at whatever
-# this host's Firstmate copy happens to hold. Omitting <parent-commit> targets
-# this host's own code-root HEAD instead, which is what /updatefirstmate wants
+# this host's Juggernaut copy happens to hold. Omitting <parent-commit> targets
+# this host's own code-root HEAD instead, which is what /updatejuggernaut wants
 # after it has refreshed that
 # code root from origin. Because this home is a standalone clone, the target
 # commit is imported here first and the fast-forward itself is the shared one in
 # bin/jg-ff-lib.sh, so the clean, ancestry, and branch guards have a single owner.
-# A private parent-route state directory stores only the remote secondmate
+# A private parent-route state directory stores only the remote squad_lead
 # agent's endpoint record; the home's own
-# state/*.meta remains reserved for workers the secondmate supervises.
-# Retirement closes only this secondmate's panes or workspace and never
-# stops jg-remote or removes a sibling secondmate's workspace or panes.
+# state/*.meta remains reserved for workers the squad_lead supervises.
+# Retirement closes only this squad_lead's panes or workspace and never
+# stops jg-remote or removes a sibling squad_lead's workspace or panes.
 #
 # Relaunch is not a second lifecycle implementation: it runs the ORDINARY local
 # control plane here, because from this host the mate is a plain local
-# secondmate. cmd_relaunch below owns why the parent must hand it the profile.
+# squad_lead. cmd_relaunch below owns why the parent must hand it the profile.
 # It ends by printing the same route block `route` prints, so a caller that
-# invoked it directly (rather than through bin/jg-remote-secondmate-relaunch.sh,
+# invoked it directly (rather than through bin/jg-remote-squad-lead-relaunch.sh,
 # which reads this block to keep the parent's own record in sync) still gets
 # the confirmed identity.
 #
 # The optional launch traceparent is the per-task W3C trace-context carrier the
-# PARENT home resolved for this secondmate; this host only delivers it to the
+# PARENT home resolved for this squad_lead; this host only delivers it to the
 # pane, and jg-spawn validates it (bin/jg-trace-context-lib.sh). Omitting it is
 # the default-off path. print_route echoes the carrier the endpoint actually
 # holds, including for an already-alive endpoint that was not relaunched, so the
@@ -74,17 +74,17 @@ REMOTE_HERDR_SESSION=jg-remote
 
 die() { printf 'error: %s\n' "$1" >&2; exit 1; }
 usage() { sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
-validate_id() { case "$1" in ''|*[!A-Za-z0-9._-]*) die "invalid secondmate id: $1" ;; esac; }
+validate_id() { case "$1" in ''|*[!A-Za-z0-9._-]*) die "invalid squad_lead id: $1" ;; esac; }
 
 validate_home() { # <id> [allow-absent]
   local id=$1 allow_absent=${2:-no} marker
   if [ ! -e "$TARGET_HOME" ] && [ ! -L "$TARGET_HOME" ] && [ "$allow_absent" = yes ]; then return 2; fi
-  [ -d "$TARGET_HOME" ] && [ ! -L "$TARGET_HOME" ] || die "remote secondmate home is unavailable or unsafe"
-  [ -f "$TARGET_HOME/.jg-secondmate-home" ] && [ ! -L "$TARGET_HOME/.jg-secondmate-home" ] \
-    || die "remote home is not a seeded secondmate home"
-  marker=$(cat "$TARGET_HOME/.jg-secondmate-home")
+  [ -d "$TARGET_HOME" ] && [ ! -L "$TARGET_HOME" ] || die "remote squad_lead home is unavailable or unsafe"
+  [ -f "$TARGET_HOME/.jg-squad-lead-home" ] && [ ! -L "$TARGET_HOME/.jg-squad-lead-home" ] \
+    || die "remote home is not a seeded squad_lead home"
+  marker=$(cat "$TARGET_HOME/.jg-squad-lead-home")
   [ "$marker" = "$id" ] || die "remote home belongs to $marker, not $id"
-  [ -f "$TARGET_HOME/AGENTS.md" ] && [ -d "$TARGET_HOME/bin" ] || die "remote home is not a Firstmate checkout"
+  [ -f "$TARGET_HOME/AGENTS.md" ] && [ -d "$TARGET_HOME/bin" ] || die "remote home is not a Juggernaut checkout"
 }
 
 meta_path() { printf '%s/%s.meta\n' "$CONTROL_STATE" "$1"; }
@@ -94,24 +94,24 @@ remote_endpoint_load() {
   REMOTE_ENDPOINT_ERROR=
   REMOTE_ENDPOINT_META=$(meta_path "$id")
   if ! jg_backend_validate_task_endpoint "$REMOTE_ENDPOINT_META" "$id" 2>/dev/null; then
-    REMOTE_ENDPOINT_ERROR="remote secondmate $id endpoint metadata is invalid; refusing access until it is explicitly migrated"
+    REMOTE_ENDPOINT_ERROR="remote squad_lead $id endpoint metadata is invalid; refusing access until it is explicitly migrated"
     return 1
   fi
   REMOTE_ENDPOINT_BACKEND=$JG_BACKEND_VALIDATED_BACKEND
   REMOTE_ENDPOINT_TARGET=$JG_BACKEND_VALIDATED_TARGET
   if [ "$REMOTE_ENDPOINT_BACKEND" != herdr ]; then
-    REMOTE_ENDPOINT_ERROR="remote secondmate $id endpoint is recorded on backend '$REMOTE_ENDPOINT_BACKEND', expected 'herdr'; refusing access until it is explicitly migrated"
+    REMOTE_ENDPOINT_ERROR="remote squad_lead $id endpoint is recorded on backend '$REMOTE_ENDPOINT_BACKEND', expected 'herdr'; refusing access until it is explicitly migrated"
     return 1
   fi
   herdr_session=$(jg_backend_meta_exact_value "$REMOTE_ENDPOINT_META" herdr_session 2>/dev/null || true)
   if [ "$herdr_session" != "$REMOTE_HERDR_SESSION" ]; then
-    REMOTE_ENDPOINT_ERROR="remote secondmate $id endpoint is recorded in Herdr session '${herdr_session:-missing}', expected '$REMOTE_HERDR_SESSION'; refusing access until it is explicitly migrated"
+    REMOTE_ENDPOINT_ERROR="remote squad_lead $id endpoint is recorded in Herdr session '${herdr_session:-missing}', expected '$REMOTE_HERDR_SESSION'; refusing access until it is explicitly migrated"
     return 1
   fi
   case "$REMOTE_ENDPOINT_TARGET" in
     "$REMOTE_HERDR_SESSION":?*) ;;
     *)
-      REMOTE_ENDPOINT_ERROR="remote secondmate $id endpoint target '$REMOTE_ENDPOINT_TARGET' is outside Herdr session '$REMOTE_HERDR_SESSION'; refusing access until it is explicitly migrated"
+      REMOTE_ENDPOINT_ERROR="remote squad_lead $id endpoint target '$REMOTE_ENDPOINT_TARGET' is outside Herdr session '$REMOTE_HERDR_SESSION'; refusing access until it is explicitly migrated"
       return 1
       ;;
   esac
@@ -140,7 +140,7 @@ print_route() { # <id>
   model=$(jg_meta_get "$REMOTE_ENDPOINT_META" model)
   effort=$(jg_meta_get "$REMOTE_ENDPOINT_META" effort)
   traceparent=$(jg_meta_get "$REMOTE_ENDPOINT_META" traceparent)
-  printf 'schema=jg-remote-secondmate-control.v1\n'
+  printf 'schema=jg-remote-squad-lead-control.v1\n'
   printf 'backend=%s\n' "$REMOTE_ENDPOINT_BACKEND"
   printf 'target=%s\n' "$REMOTE_ENDPOINT_TARGET"
   printf 'herdr_session=%s\n' "$REMOTE_HERDR_SESSION"
@@ -156,7 +156,7 @@ cmd_route() {
   validate_home "$id"
   meta=$(meta_path "$id")
   if [ ! -f "$meta" ] || [ -L "$meta" ]; then
-    die "remote secondmate has no endpoint metadata"
+    die "remote squad_lead has no endpoint metadata"
   fi
   print_route "$id"
 }
@@ -169,16 +169,16 @@ cmd_launch() {
   validate_home "$id"
   case "$harness" in
     claude|codex|opencode|pi|pi-signed|grok|kimi|cursor) ;;
-    *) die "unverified remote secondmate harness: $harness" ;;
+    *) die "unverified remote squad_lead harness: $harness" ;;
   esac
-  case "$effort" in -|low|medium|high|xhigh|max|ultra) ;; *) die "invalid remote secondmate effort: $effort" ;; esac
+  case "$effort" in -|low|medium|high|xhigh|max|ultra) ;; *) die "invalid remote squad_lead effort: $effort" ;; esac
   if [ "$effort" = ultra ]; then
     "$SCRIPT_DIR/jg-harness.sh" validate-native-effort "$harness" "$model" "$effort" || return 1
   fi
   # Herdr is required on this host, not merely preferred: its server belongs to
   # the GUI login session, so the endpoint survives every SSH disconnection that
   # a remote route depends on. bin/jg-remote-doctor.sh is the readiness owner.
-  case "$selected_backend" in herdr) ;; *) die "a remote secondmate runs only on the herdr backend, not '$selected_backend'" ;; esac
+  case "$selected_backend" in herdr) ;; *) die "a remote squad_lead runs only on the herdr backend, not '$selected_backend'" ;; esac
   mkdir -p "$CONTROL_STATE" "$CONTROL_DATA"
   meta=$(meta_path "$id")
   if [ -f "$meta" ]; then
@@ -200,18 +200,18 @@ cmd_launch() {
   # The parent owns both convergence legs before it asks for this launch: it
   # already fast-forwarded this home to ITS primary commit and pushed inherited
   # local material, so this spawn must not redo either against this host's own
-  # Firstmate copy, which would target the wrong checkout.
-  ARGS=("$id" "$TARGET_HOME" --secondmate --harness "$harness" --backend "$selected_backend")
+  # Juggernaut copy, which would target the wrong checkout.
+  ARGS=("$id" "$TARGET_HOME" --squad-lead --harness "$harness" --backend "$selected_backend")
   [ "$model" = - ] || ARGS+=(--model "$model")
   [ "$effort" = - ] || ARGS+=(--effort "$effort")
   [ -z "$traceparent" ] || ARGS+=(--traceparent "$traceparent")
   if ! out=$(HERDR_SESSION="$REMOTE_HERDR_SESSION" JG_HOME="$JG_ROOT" JG_ROOT_OVERRIDE="$JG_ROOT" \
     JG_STATE_OVERRIDE="$CONTROL_STATE" JG_DATA_OVERRIDE="$CONTROL_DATA" \
-    JG_CONFIG_OVERRIDE="$TARGET_HOME/config" JG_SKIP_SECONDMATE_INHERIT=1 \
-    JG_SKIP_SECONDMATE_SYNC=1 \
+    JG_CONFIG_OVERRIDE="$TARGET_HOME/config" JG_SKIP_SQUAD_LEAD_INHERIT=1 \
+    JG_SKIP_SQUAD_LEAD_SYNC=1 \
     "$SCRIPT_DIR/jg-spawn.sh" "${ARGS[@]}" 2>&1); then
     [ -z "$out" ] || printf '%s\n' "$out" >&2
-    die "remote host-local secondmate launch failed"
+    die "remote host-local squad_lead launch failed"
   fi
   [ -f "$meta" ] || die "remote launch returned without endpoint metadata"
   herdr_session=$(jg_meta_get "$meta" herdr_session)
@@ -222,14 +222,14 @@ cmd_launch() {
 
 # Restart the second-mate agent this host runs, by executing the ORDINARY local
 # control plane here. From this host's point of view the mate is a plain local
-# secondmate: its endpoint record under the private parent-route state directory
+# squad_lead: its endpoint record under the private parent-route state directory
 # was written by a host-local jg-spawn and carries no remote_host= field, so
 # bin/jg-control.sh's remote refusal never fires, and every checkpoint, journal,
 # rollback, and postcondition that plane owns applies unchanged. This verb is the
 # transport hop, not a second implementation.
 #
 # harness/model/effort come from the PARENT and are passed explicitly, because
-# config/secondmate-harness is deliberately not inherited into a secondmate home:
+# config/squad-lead-harness is deliberately not inherited into a squad_lead home:
 # the copy on this host is a different home's file, so letting the control plane
 # re-resolve it here would silently drift the mate onto another runtime. `default`
 # explicitly clears an absent parent pin; `-` remains its compatibility spelling.
@@ -241,10 +241,10 @@ cmd_relaunch() {
   validate_home "$id"
   case "$harness" in
     claude|codex|opencode|pi|pi-signed|grok|kimi|cursor) ;;
-    *) die "unverified remote secondmate harness: $harness" ;;
+    *) die "unverified remote squad_lead harness: $harness" ;;
   esac
-  case "$effort" in -|default|low|medium|high|xhigh|max|ultra) ;; *) die "invalid remote secondmate effort: $effort" ;; esac
-  case "$model" in *[[:space:]]*) die "invalid remote secondmate model: $model" ;; esac
+  case "$effort" in -|default|low|medium|high|xhigh|max|ultra) ;; *) die "invalid remote squad_lead effort: $effort" ;; esac
+  case "$model" in *[[:space:]]*) die "invalid remote squad_lead model: $model" ;; esac
   if [ "$effort" = ultra ]; then
     "$SCRIPT_DIR/jg-harness.sh" validate-native-effort "$harness" "$model" "$effort" || return 1
   fi
@@ -255,11 +255,11 @@ cmd_relaunch() {
   # The same launch-boundary facts cmd_launch establishes: the endpoint lives in
   # the dedicated jg-remote session, and the parent already owns both convergence
   # legs, so the host-local spawn must not re-sync or re-inherit against this
-  # host's own Firstmate copy.
+  # host's own Juggernaut copy.
   HERDR_SESSION="$REMOTE_HERDR_SESSION" JG_HOME="$JG_ROOT" JG_ROOT_OVERRIDE="$JG_ROOT" \
     JG_STATE_OVERRIDE="$CONTROL_STATE" JG_DATA_OVERRIDE="$CONTROL_DATA" \
-    JG_CONFIG_OVERRIDE="$TARGET_HOME/config" JG_SKIP_SECONDMATE_INHERIT=1 \
-    JG_SKIP_SECONDMATE_SYNC=1 \
+    JG_CONFIG_OVERRIDE="$TARGET_HOME/config" JG_SKIP_SQUAD_LEAD_INHERIT=1 \
+    JG_SKIP_SQUAD_LEAD_SYNC=1 \
     "$SCRIPT_DIR/jg-control.sh" "${control_args[@]}"
   # A parent tracking this route needs the identity the relaunch actually
   # produced, not the one it asked for, so it can republish its own record the
@@ -276,15 +276,15 @@ cmd_send() {
   [ -z "$delivery_mode" ] || [ "$delivery_mode" = fire-and-forget ] || die "invalid send delivery mode"
   validate_home "$id"
   meta=$(meta_path "$id")
-  meta_lock=$(jg_meta_lock_path "$meta") || die "remote secondmate metadata lock path is invalid"
+  meta_lock=$(jg_meta_lock_path "$meta") || die "remote squad_lead metadata lock path is invalid"
   jg_task_inbox_lock_acquire "$meta_lock" \
-    || die "remote secondmate endpoint metadata could not be locked for final delivery validation"
+    || die "remote squad_lead endpoint metadata could not be locked for final delivery validation"
   if ! remote_endpoint_load "$id"; then
     jg_lock_release "$meta_lock"
     die "$REMOTE_ENDPOINT_ERROR"
   fi
   # A remote steer is delivered by durable record, never by typing its payload
-  # into the pane: write it into this secondmate's host-local steering inbox,
+  # into the pane: write it into this squad_lead's host-local steering inbox,
   # then ring the constant self-describing doorbell into the recorded pane,
   # best-effort (bin/jg-task-inbox-lib.sh owns the record and doorbell). The
   # write is idempotent - re-running the same request after an ambiguous
@@ -307,7 +307,7 @@ cmd_send() {
   esac
   jg_task_inbox_ring "$REMOTE_ENDPOINT_BACKEND" "$REMOTE_ENDPOINT_TARGET" "$rec" "jg-$id" || ring_rc=$?
   case "$ring_rc" in
-    1) printf "notice: doorbell skipped (composer visibly holds pending text); the steer is durably recorded at %s. To ring now, submit the pending text with '%s key %s Enter' (or clear the composer); the next ring then lands.\n" "$rec" "jg-remote-secondmate-control.sh" "$id" >&2 ;;
+    1) printf "notice: doorbell skipped (composer visibly holds pending text); the steer is durably recorded at %s. To ring now, submit the pending text with '%s key %s Enter' (or clear the composer); the next ring then lands.\n" "$rec" "jg-remote-squad-lead-control.sh" "$id" >&2 ;;
     2) printf 'notice: doorbell did not reach %s; the steer is durably recorded at %s\n' "$REMOTE_ENDPOINT_TARGET" "$rec" >&2 ;;
     3) printf 'notice: doorbell not typed because the agent in %s has exited; the steer is durably recorded at %s for recovery\n' "$REMOTE_ENDPOINT_TARGET" "$rec" >&2 ;;
   esac
@@ -343,7 +343,7 @@ cmd_observe() {
 }
 
 # Make <commit> readable in this home's own object store without moving any other
-# checkout. Ordered by cost: already present, then this host's Firstmate copy (a
+# checkout. Ordered by cost: already present, then this host's Juggernaut copy (a
 # read-only fetch of that one commit, which never advances that copy's HEAD), then
 # the home's own origin for that one commit. No pack transport beyond those two.
 import_home_commit() { # <home> <commit>
@@ -373,7 +373,7 @@ cmd_sync() {
     commit=$(git -C "$JG_ROOT" rev-parse HEAD 2>/dev/null) || die "remote code root HEAD is unreadable"
   fi
   import_home_commit "$TARGET_HOME" "$commit" \
-    || die "remote home could not import $commit from this host's Firstmate copy or the home's origin; run /updatefirstmate to refresh this host's copy, or push that commit first"
+    || die "remote home could not import $commit from this host's Juggernaut copy or the home's origin; run /updatejuggernaut to refresh this host's copy, or push that commit first"
   # ff_target publishes its verdict in FF_STATUS, so it must run in THIS shell.
   report=$(mktemp "${TMPDIR:-/tmp}/jg-remote-sync.XXXXXX") || die "cannot stage the sync report"
   ff_target "$TARGET_HOME" "remote home" "$commit" yes yes "$id" "$TARGET_HOME/state" > "$report" 2>&1
@@ -387,7 +387,7 @@ cmd_sync() {
     # rather than as "nothing changed".
     updated) printf 'synced: %s instr=%s\n' "$commit" "$(printf '%s' "$FF_INSTR" | tr -d ' ')" ;;
     current) printf 'current: %s\n' "$commit" ;;
-    *) die "remote secondmate home sync skipped: ${out#remote home: skipped: }" ;;
+    *) die "remote squad_lead home sync skipped: ${out#remote home: skipped: }" ;;
   esac
 }
 
@@ -400,9 +400,9 @@ cmd_update() {
     [ -z "$update_out" ] || printf '%s\n' "$update_out" >&2
     die "remote code root update failed"
   fi
-  root_status=$(printf '%s\n' "$update_out" | grep '^firstmate:' | tail -1)
+  root_status=$(printf '%s\n' "$update_out" | grep '^juggernaut:' | tail -1)
   case "$root_status" in
-    'firstmate: updated '*|'firstmate: already current'*) ;;
+    'juggernaut: updated '*|'juggernaut: already current'*) ;;
     *)
       [ -z "$update_out" ] || printf '%s\n' "$update_out" >&2
       die "remote code root did not complete a safe origin update"

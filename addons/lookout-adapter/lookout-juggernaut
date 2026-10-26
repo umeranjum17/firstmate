@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""lookout-firstmate - print or serve this fleet as Lookout's lookout.fleet.v1 document (read-only).
+"""lookout-juggernaut - print or serve this fleet as Lookout's lookout.fleet.v1 document (read-only).
 
-  lookout-firstmate [--home DIR] [--no-build]            print the JSON
-  lookout-firstmate --serve [--port N] [--bind ADDR]     serve it at /fleet.json (Lookout's --adapter URL), the last good
+  lookout-juggernaut [--home DIR] [--no-build]            print the JSON
+  lookout-juggernaut --serve [--port N] [--bind ADDR]     serve it at /fleet.json (Lookout's --adapter URL), the last good
                                                          snapshot at once, rebuilt in the background every --every seconds
 
 The data is the fleet dashboard builder's own output (fleet-dashboard/jg-dashboard.sh build), reused as is: state/dashboard/
 data.json and board.json under JG_HOME. A build older than 2 minutes is rebuilt first (it writes only under state/dashboard)
 unless --no-build. Homes, their state files and every other source are only read; only whitelisted fields are copied, so no
-key, token or account secret reaches the document. JG_HOME defaults to the current directory's Firstmate home.
+key, token or account secret reaches the document. JG_HOME defaults to the current directory's Juggernaut home.
 """
 import json, os, re, socket, subprocess, sys, threading, time, argparse
 from datetime import datetime, timezone
@@ -43,10 +43,10 @@ def refresh(home, force_build):
 
 
 def home_dirs(home):
-    """Each registered home's directory, from data/secondmates.md; Main is this home."""
+    """Each registered home's directory, from data/squad_leads.md; Main is this home."""
     dirs = {'main': home}
     try:
-        for line in open(os.path.join(home, 'data/secondmates.md')):
+        for line in open(os.path.join(home, 'data/squad_leads.md')):
             m = re.match(r'- (\S+) - .*\(home: ([^;)]+)', line)
             if m:
                 dirs[m.group(1)] = m.group(2)
@@ -142,12 +142,12 @@ def build_fleet(home, build=True, proc='/proc'):
     history = [{'at': iso(s['at']), 'lanes': s['lanes'], 'stuck': s['stuck']} for s in data.get('lane_history', []) if now - s['at'] < 8 * 86400]
     devices = [{'id': re.sub(r'\W+', '-', d['name'].lower()).strip('-'), 'name': d['name'], 'kind': 'phone' if d['name'].startswith('Phone') else 'emulator', 'host': host['id'],
                 'state': 'busy' if d.get('holder') else 'free' if d.get('tone') == 'ok' else 'offline'} for d in data.get('devices', [])]
-    return {'schema': 'lookout.fleet.v1', 'generated_at': iso(time.time()), 'name': 'Firstmate fleet', 'hosts': [host], 'homes': homes, 'lanes': lanes, 'workers': workers,
+    return {'schema': 'lookout.fleet.v1', 'generated_at': iso(time.time()), 'name': 'Juggernaut fleet', 'hosts': [host], 'homes': homes, 'lanes': lanes, 'workers': workers,
             'quota': quota_docs(data, now), 'merges': merges, 'releases': [], 'incidents': [], 'history': history, 'devices': devices}
 
 
 def main(argv):
-    p = argparse.ArgumentParser(prog='lookout-firstmate')
+    p = argparse.ArgumentParser(prog='lookout-juggernaut')
     p.add_argument('--home', default=os.environ.get('JG_HOME') or os.getcwd())
     p.add_argument('--no-build', action='store_true')
     p.add_argument('--proc', default=os.environ.get('LOOKOUT_PROC', '/proc'))
@@ -197,7 +197,7 @@ def main(argv):
 
     threading.Thread(target=keep_fresh, daemon=True).start()
     srv = ThreadingHTTPServer((a.bind, a.port), H)
-    print(f'lookout-firstmate serving http://{a.bind}:{srv.server_port}/fleet.json', flush=True)
+    print(f'lookout-juggernaut serving http://{a.bind}:{srv.server_port}/fleet.json', flush=True)
     srv.serve_forever()
 
 

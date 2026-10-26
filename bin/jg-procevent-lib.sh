@@ -3,7 +3,7 @@
 # process-to-event runner.
 # Usage: . bin/jg-procevent-lib.sh   (requires jg-pr-lib.sh and jg-wake-lib.sh)
 #
-# The runner lets firstmate learn that a registered long-polling source produced
+# The runner lets juggernaut learn that a registered long-polling source produced
 # a result without holding that blocking process in its conversational turn. It
 # is domain-neutral: a thin adapter supplies source identity, the argv to run,
 # and how to classify a completed result. Everything else - ownership, durable
@@ -22,7 +22,7 @@
 # about the source side of the handoff. In particular the currently published
 # `lavish-axi poll` destructively clears feedback before returning it, so a
 # result lost between that clearing and this runner reading the process output
-# is unrecoverable. A Firstmate wrapper cannot close that window, and marking a
+# is unrecoverable. A Juggernaut wrapper cannot close that window, and marking a
 # result handled says nothing about whether a paired external effect performed
 # before that call actually completed: a crash between the effect and the
 # acknowledgement can still repeat the effect on replay. Never describe this
@@ -32,7 +32,7 @@
 # Machine-wide claim root. Homes can share one underlying source store, so the
 # "one owner per canonical source" rule cannot live inside a single home.
 jg_procevent_claim_root() {
-  printf '%s\n' "${JG_PROCEVENT_CLAIM_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/firstmate/procevent-claims}"
+  printf '%s\n' "${JG_PROCEVENT_CLAIM_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/juggernaut/procevent-claims}"
 }
 
 jg_procevent_registry_dir() { printf '%s\n' "$1/procevent"; }

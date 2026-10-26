@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install or update the Codex adapter for the fleet guards. Codex crewmates start with hooks off, so no hook reaches them;
+# Install or update the Codex adapter for the fleet guards. Codex operators start with hooks off, so no hook reaches them;
 # Codex's own shell_environment_policy instead sets BASH_ENV to bash-env.sh, which runs every installed delete, kill and
 # read guard before each agent command. Idempotent. Usage: install.sh [--dry-run]
 set -euo pipefail
@@ -9,7 +9,7 @@ DRY=0
 SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 DEST=${XDG_DATA_HOME:-$HOME/.local/share}/jg-codex-guard
 CONF=${CODEX_HOME:-$HOME/.codex}/config.toml
-BLOCK=$(printf '\n# jg-codex-guard: fleet guards before every Codex shell command (firstmate-addons codex-guard)\n[shell_environment_policy.set]\nBASH_ENV = "%s"' "$DEST/bash-env.sh")
+BLOCK=$(printf '\n# jg-codex-guard: fleet guards before every Codex shell command (juggernaut-addons codex-guard)\n[shell_environment_policy.set]\nBASH_ENV = "%s"' "$DEST/bash-env.sh")
 TMP=$(mktemp -d); trap 'rm -rf -- "$TMP"' EXIT
 [ -d "$(dirname "$CONF")" ] || { echo "skipped: codex (not installed)"; exit 0; }
 

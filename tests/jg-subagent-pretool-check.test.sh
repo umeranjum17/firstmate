@@ -179,7 +179,7 @@ test_escape_hatch_allows_deliberate_use() {
   pass "the single documented escape hatch releases the guard only on the exact opt-in value"
 }
 
-test_task_worktree_and_non_firstmate_repo_are_inert() {
+test_task_worktree_and_non_juggernaut_repo_are_inert() {
   local child="$TMP_ROOT/child" plain="$TMP_ROOT/plain" rc=0
   git -C "$PRIMARY" config user.name fixture
   git -C "$PRIMARY" config user.email fixture@example.test
@@ -192,7 +192,7 @@ test_task_worktree_and_non_firstmate_repo_are_inert() {
   : > "$ERR"
   JG_ROOT_OVERRIDE="$child" JG_HOME="$child" JG_STATE_OVERRIDE="$child/state" \
     "$CHECK" --claude --tool Agent > "$OUT" 2> "$ERR" || rc=$?
-  [ "$rc" -eq 0 ] || fail "a crewmate task worktree must be out of scope, got exit $rc: $(cat "$ERR")"
+  [ "$rc" -eq 0 ] || fail "a operator task worktree must be out of scope, got exit $rc: $(cat "$ERR")"
   [ ! -s "$OUT" ] || fail "task-worktree no-op wrote stdout: $(cat "$OUT")"
   [ ! -s "$ERR" ] || fail "task-worktree no-op wrote stderr: $(cat "$ERR")"
 
@@ -201,20 +201,20 @@ test_task_worktree_and_non_firstmate_repo_are_inert() {
   rc=0
   JG_ROOT_OVERRIDE="$plain" JG_HOME="$plain" JG_STATE_OVERRIDE="$plain/state" \
     "$CHECK" --claude --tool Agent > "$OUT" 2> "$ERR" || rc=$?
-  [ "$rc" -eq 0 ] || fail "a non-firstmate repo must be out of scope, got exit $rc"
-  pass "the guard is inert in a crewmate task worktree and in a non-firstmate repo"
+  [ "$rc" -eq 0 ] || fail "a non-juggernaut repo must be out of scope, got exit $rc"
+  pass "the guard is inert in a operator task worktree and in a non-juggernaut repo"
 }
 
-test_secondmate_home_is_in_scope() {
+test_squad_lead_home_is_in_scope() {
   local second="$TMP_ROOT/second" rc=0
   git -C "$PRIMARY" worktree add -q -b fixture-second "$second"
   mkdir -p "$second/bin" "$second/state"
   printf '# fixture\n' > "$second/AGENTS.md"
-  printf 'sm-fixture\n' > "$second/.jg-secondmate-home"
+  printf 'sm-fixture\n' > "$second/.jg-squad-lead-home"
   JG_ROOT_OVERRIDE="$second" JG_HOME="$second" JG_STATE_OVERRIDE="$second/state" \
     "$CHECK" --claude --tool Agent > "$OUT" 2> "$ERR" || rc=$?
-  [ "$rc" -eq 2 ] || fail "a marked secondmate home operates a fleet and must be guarded, got exit $rc"
-  pass "a marked secondmate home is guarded even though it is a linked worktree"
+  [ "$rc" -eq 2 ] || fail "a marked squad_lead home operates a fleet and must be guarded, got exit $rc"
+  pass "a marked squad_lead home is guarded even though it is a linked worktree"
 }
 
 test_stdin_transports_and_output_shapes() {
@@ -284,8 +284,8 @@ test_plan_only_exclusion_is_exact_name
 test_guard_never_classifies_mcp_tools
 test_deny_message_defers_to_intake_classification
 test_escape_hatch_allows_deliberate_use
-test_task_worktree_and_non_firstmate_repo_are_inert
-test_secondmate_home_is_in_scope
+test_task_worktree_and_non_juggernaut_repo_are_inert
+test_squad_lead_home_is_in_scope
 test_stdin_transports_and_output_shapes
 test_malformed_transport_fails_open
 test_missing_jq_stdin_transport_fails_open

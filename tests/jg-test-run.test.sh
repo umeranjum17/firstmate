@@ -4,7 +4,7 @@
 # markers, JSON artifacts, coverage guard, and aggregate exit status.
 #
 # These tests intentionally exercise the runner with fixtures, --list, and
-# focused scheduler checks, not the complete Firstmate suite.
+# focused scheduler checks, not the complete Juggernaut suite.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -106,7 +106,7 @@ init_changed_fixture_repo() {
     jg-harness-adapter-instructions-live-e2e.test.sh \
     jg-harness-adapter-references.test.sh \
     jg-backend-herdr-smoke.test.sh \
-    jg-secondmate-safety.test.sh \
+    jg-squad-lead-safety.test.sh \
     jg-session-start.test.sh \
     jg-afk-pi-herdr-return-e2e.test.sh \
     jg-backend.test.sh \
@@ -138,7 +138,7 @@ init_changed_fixture_repo() {
   : >"$repo/tests/shared-probe-fixture.sh"
   : >"$repo/tests/unread-thing.sh"
   printf '# shared-probe-fixture.sh\n' >>"$repo/tests/jg-pr-merge.test.sh"
-  printf '# shared-probe-fixture.sh\n' >>"$repo/tests/jg-secondmate-safety.test.sh"
+  printf '# shared-probe-fixture.sh\n' >>"$repo/tests/jg-squad-lead-safety.test.sh"
   # A nested fixture whose consuming suite names only the fixture directory,
   # the shape the tests/fixtures/<dir>/ arm is keyed for.
   mkdir -p "$repo/tests/fixtures/demo"
@@ -314,7 +314,7 @@ test_changed_dependency_selection_and_unmapped_failure() {
   printf '\n' >>"$repo/tests/lib.sh"
   listed=$(cd "$repo" && bin/jg-test-run.sh --list --changed --base HEAD)
   assert_contains "$listed" "tests/jg-pr-merge.test.sh" "shared helper selects pr-forge dependents"
-  assert_contains "$listed" "tests/jg-secondmate-safety.test.sh" "shared helper selects secondmate dependents"
+  assert_contains "$listed" "tests/jg-squad-lead-safety.test.sh" "shared helper selects squad_lead dependents"
   assert_contains "$listed" "tests/jg-bearings-snapshot.test.sh" "shared helper selects snapshot dependents"
   git -C "$repo" add tests/lib.sh
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm helper-change
@@ -322,7 +322,7 @@ test_changed_dependency_selection_and_unmapped_failure() {
   printf '\n' >>"$repo/tests/git-config-helpers.sh"
   listed=$(cd "$repo" && bin/jg-test-run.sh --list --changed --base HEAD)
   assert_contains "$listed" "tests/jg-pr-merge.test.sh" "git-config helper selects lib.sh dependents"
-  assert_contains "$listed" "tests/jg-secondmate-safety.test.sh" "git-config helper selects secondmate dependents"
+  assert_contains "$listed" "tests/jg-squad-lead-safety.test.sh" "git-config helper selects squad_lead dependents"
   assert_contains "$listed" "tests/jg-bearings-snapshot.test.sh" "git-config helper selects snapshot dependents"
   git -C "$repo" add tests/git-config-helpers.sh
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm git-config-helper-change
@@ -1396,8 +1396,8 @@ test_changed_shared_fixture_selects_its_readers() {
   listed=$(cd "$repo" && bin/jg-test-run.sh --list --changed --base HEAD)
   assert_contains "$listed" "tests/jg-pr-merge.test.sh" \
     "shared test fixture selects its pr-forge reader"
-  assert_contains "$listed" "tests/jg-secondmate-safety.test.sh" \
-    "shared test fixture selects its secondmate reader"
+  assert_contains "$listed" "tests/jg-squad-lead-safety.test.sh" \
+    "shared test fixture selects its squad_lead reader"
   case "$listed" in
     *jg-backend-orca.test.sh*)
       fail "shared test fixture selection widened past its readers: $listed" ;;

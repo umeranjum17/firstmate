@@ -16,7 +16,7 @@
 # Default container shape (D4, decided empirically - see
 # herdr-verification-p2.md "Task container shape", refined by
 # docs/herdr-backend.md "Default task container shape"): ONE herdr workspace PER
-# FIRSTMATE HOME (the primary, and each secondmate, gets its own), ONE herdr TAB
+# JUGGERNAUT HOME (the primary, and each squad_lead, gets its own), ONE herdr TAB
 # per task inside its home's workspace. The default-on presentation projection
 # creates a disposable workspace for a clean fresh task instead unless the home
 # opts out. That
@@ -67,8 +67,8 @@
 # global before sourcing jg-backend.sh (which sources this file), so this
 # never overrides a real invocation. It exists only so this file's own unit
 # tests, which source it directly without that preamble, resolve to a sane
-# default (the firstmate repo root - never a secondmate home, so
-# jg_backend_herdr_workspace_label falls through to "firstmate" exactly like
+# default (the juggernaut repo root - never a squad_lead home, so
+# jg_backend_herdr_workspace_label falls through to "juggernaut" exactly like
 # pre-P3 behavior when a test does not care about home-specific labeling).
 JG_BACKEND_HERDR_ROOT="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}/../.." && pwd)"
 JG_ROOT="${JG_ROOT_OVERRIDE:-${JG_ROOT:-$JG_BACKEND_HERDR_ROOT}}"
@@ -110,7 +110,7 @@ JG_BACKEND_HERDR_MIN_EVENTS_PROTOCOL=16
 # verifying the exact method and parameter schema.
 JG_BACKEND_HERDR_MIN_WORKSPACE_MOVE_PROTOCOL=16
 # The version floor for DEFAULT-ON presentation projection. Projection turns
-# every crewmate teardown into a workspace-emptying removal, and the focus-safe
+# every operator teardown into a workspace-emptying removal, and the focus-safe
 # removal plan can only avoid Herdr's focus-stealing explicit close while the
 # doomed pane holds a provably lone idle childless shell; a persistent child of
 # that shell (gitstatusd, a zsh-async worker, direnv) makes the plan fall back
@@ -128,7 +128,7 @@ JG_BACKEND_HERDR_MIN_PRESENTATION_PROTOCOL=19
 JG_BACKEND_HERDR_MIN_PRESENTATION_VERSION=0.8.0
 # One-warning-per-release dedupe marker prefix, under the state dir. The
 # projection decision is remade on every spawn, so an undeduplicated
-# below-floor warning would repeat on every crewmate; the key is the detected
+# below-floor warning would repeat on every operator; the key is the detected
 # release, so an upgrade or a downgrade is announced again.
 JG_BACKEND_HERDR_PRESENTATION_FLOOR_MARKER_PREFIX=".herdr-presentation-floor-"
 # Per-pane escalation dedupe marker prefix, under the state dir. One marker per
@@ -137,10 +137,10 @@ JG_BACKEND_HERDR_PRESENTATION_FLOOR_MARKER_PREFIX=".herdr-presentation-floor-"
 # ->blocked edge and a reconnect level-reconcile never re-delivers a still-
 # blocked pane. Mirrors bin/jg-watch.sh's .stale-<key> naming.
 JG_BACKEND_HERDR_ESCALATED_PREFIX=".herdr-escalated-"
-# .jg-secondmate-home is written by bin/jg-home-seed.sh (AGENTS.md section 6)
-# at a seeded secondmate home's root, containing exactly that secondmate's id.
-# The primary firstmate home never carries this marker.
-JG_BACKEND_HERDR_SECONDMATE_MARKER=".jg-secondmate-home"
+# .jg-squad-lead-home is written by bin/jg-home-seed.sh (AGENTS.md section 6)
+# at a seeded squad_lead home's root, containing exactly that squad_lead's id.
+# The primary juggernaut home never carries this marker.
+JG_BACKEND_HERDR_SQUAD_LEAD_MARKER=".jg-squad-lead-home"
 # The presentation projection is intentionally separate from the authoritative
 # task endpoint record.
 # A per-task journal lives under state/ as <id>.herdr-presentation.
@@ -346,21 +346,21 @@ jg_backend_herdr_presentation_enabled() {  # <config-dir> [<state-dir>]
   jg_backend_herdr_presentation_default_supported "$state_dir"
 }
 
-# jg_backend_herdr_workspace_label: the per-firstmate-HOME herdr workspace
+# jg_backend_herdr_workspace_label: the per-juggernaut-HOME herdr workspace
 # label (docs/herdr-backend.md "Default task container shape"). The PRIMARY home (no
-# secondmate marker) resolves to the constant "firstmate", byte-identical to
-# every pre-existing task's recorded label - no forced migration. A SECONDMATE
-# home resolves to "2ndmate-<secondmate-id>", so its tasks land in their own
+# squad_lead marker) resolves to the constant "juggernaut", byte-identical to
+# every pre-existing task's recorded label - no forced migration. A SQUAD_LEAD
+# home resolves to "2ndmate-<squad-lead-id>", so its tasks land in their own
 # workspace, obviously distinguishable from the primary's (and from every
-# other secondmate's) in herdr's spaces sidebar. Read fresh from JG_HOME on
+# other squad_lead's) in herdr's spaces sidebar. Read fresh from JG_HOME on
 # every call rather than cached at source time: JG_HOME is the home's own
 # durable identity, not env plumbing threaded through a call chain, so the
 # label is automatically stable across every respawn/recovery for the life of
-# that home. jg-spawn.sh briefly shadows JG_HOME to a secondmate's own home
-# when the PRIMARY spawns that secondmate (its own process's JG_HOME still
+# that home. jg-spawn.sh briefly shadows JG_HOME to a squad_lead's own home
+# when the PRIMARY spawns that squad_lead (its own process's JG_HOME still
 # names the primary at that point) - see jg-spawn.sh's herdr case arm.
 jg_backend_herdr_workspace_label() {
-  local marker="$JG_HOME/$JG_BACKEND_HERDR_SECONDMATE_MARKER" id
+  local marker="$JG_HOME/$JG_BACKEND_HERDR_SQUAD_LEAD_MARKER" id
   if [ -f "$marker" ]; then
     id=$(tr -d '[:space:]' < "$marker" 2>/dev/null)
     if [ -n "$id" ]; then
@@ -368,7 +368,7 @@ jg_backend_herdr_workspace_label() {
       return 0
     fi
   fi
-  printf 'firstmate'
+  printf 'juggernaut'
 }
 
 # jg_backend_herdr_cli: run `herdr <args...>` scoped to <session>, setting
@@ -448,7 +448,7 @@ jg_backend_herdr_cli() {  # <session> <herdr-subcommand-and-args...>
 # `herdr` on PATH, or the client already selected for that exact session. A
 # host can carry more than one herdr client (a self-updated copy in
 # ~/.local/bin next to a package-managed one), and the two PATH orders
-# Firstmate runs under (an interactive login shell, and the fixed remote-job
+# Juggernaut runs under (an interactive login shell, and the fixed remote-job
 # PATH that puts ~/.local/bin first - bin/jg-remote-job-lib.sh) can then resolve
 # DIFFERENT binaries. A client older than the running server is answered with
 # error code protocol_mismatch on operational commands (verified: herdr 0.8.2,
@@ -563,7 +563,7 @@ jg_backend_herdr_version_check() {
 
 # jg_backend_herdr_session: resolve which named herdr session this normal
 # spawn/op uses. HERDR_SESSION mirrors tmux's $TMUX ambient-selection for
-# adapter workspace/tab/pane operations: an operator (or firstmate's own
+# adapter workspace/tab/pane operations: an operator (or juggernaut's own
 # isolated test harness) sets it explicitly; absent means herdr's own
 # "default" session. Do not use HERDR_SESSION alone for destructive test
 # cleanup; tests/herdr-test-safety.sh documents and guards that path.
@@ -775,13 +775,13 @@ jg_backend_herdr_projection_journal_replace_endpoint() {  # <journal> <task-id> 
 
 # jg_backend_herdr_projection_concise_task_label: strip redundant owner
 # prefixes from a task id used only in the presentation workspace label.
-# Removes firstmate/, 2ndmate-<id>/, and a presentation-level jg- owner
+# Removes juggernaut/, 2ndmate-<id>/, and a presentation-level jg- owner
 # prefix when present. The ordinary task tab remains jg-<id> and is not
 # built by this helper.
 jg_backend_herdr_projection_concise_task_label() {  # <task-id>
   local task=$1
   case "$task" in
-    firstmate/*) task=${task#firstmate/} ;;
+    juggernaut/*) task=${task#juggernaut/} ;;
     2ndmate-*/*) task=${task#*/} ;;
   esac
   case "$task" in
@@ -799,9 +799,9 @@ jg_backend_herdr_projection_workspace_label() {  # <task-id> <projection-id>
 }
 
 # jg_backend_herdr_presentation_session_lock_path: one account-private lock
-# path per live named Herdr session/socket, shared across every Firstmate home
+# path per live named Herdr session/socket, shared across every Juggernaut home
 # of this OS account that uses that session.
-# The path is never under any one home's state/ and secondmates never write the
+# The path is never under any one home's state/ and squad_leads never write the
 # primary home. Returns non-zero when the named session's socket cannot be
 # resolved unambiguously.
 # The namespace directory is suffixed with this account's uid, so another OS
@@ -817,7 +817,7 @@ jg_backend_herdr_presentation_lock_namespace() {
   case "$uid" in
     ''|*[!0-9]*) return 1 ;;
   esac
-  printf '/tmp/firstmate-herdr-presentation-%s' "$uid"
+  printf '/tmp/juggernaut-herdr-presentation-%s' "$uid"
 }
 
 jg_backend_herdr_presentation_lock_namespace_mode() {
@@ -1161,7 +1161,7 @@ jg_backend_herdr_projection_close_pane_focus_preserving() {  # <session> <pane-i
 #   focused workspace's right neighbor otherwise (upstream issue #1621, fixed
 #   by PR #1912, commit a979916).
 # Both fixes first shipped in Herdr 0.8.0 (protocol 19), verified 2026-08-05.
-# Firstmate therefore removes a doomed non-focused workspace by ending its
+# Juggernaut therefore removes a doomed non-focused workspace by ending its
 # verified lone idle shell (the pane-death path), repositioning it behind the
 # focused workspace first when needed. Moving it to the end preserves every
 # other workspace's relative order, so no presentation ordering change
@@ -1494,7 +1494,7 @@ jg_backend_herdr_pane_idle_shell_sample() {  # <session> <pane-id>
 # returned by THIS projected create immediately after its owning parent's
 # contiguous child block and before the next parent.
 #
-# <parent-label> is the owning JG_HOME label (firstmate or 2ndmate-<id>).
+# <parent-label> is the owning JG_HOME label (juggernaut or 2ndmate-<id>).
 # Optional <parent-workspace-id> is that parent's EXACT id, which the caller
 # already resolved from the launching agent's own herdr identity. When given it
 # anchors the owning parent by id, so two workspaces sharing the home label no
@@ -1502,7 +1502,7 @@ jg_backend_herdr_pane_idle_shell_sample() {  # <session> <pane-id>
 # label exactly as before. With a unique label the two select the same
 # workspace, so ordering behavior is unchanged in the ordinary case.
 # New-format └ ... · p:<token> children and, for compatibility only, already
-# adjacent old-format firstmate/... or 2ndmate-<id>/... projections may extend
+# adjacent old-format juggernaut/... or 2ndmate-<id>/... projections may extend
 # the block read-only; they are never renamed or moved.
 #
 # This is presentation-only and always returns success.
@@ -1534,13 +1534,13 @@ jg_backend_herdr_projection_order_best_effort() {  # <session> <created-workspac
       end;
     def is_top_level_parent:
       (.label | type) == "string"
-      and ((.label == "firstmate") or (.label | test("^2ndmate-[^/]+$")));
+      and ((.label == "juggernaut") or (.label | test("^2ndmate-[^/]+$")));
     def is_new_child:
       (.label | type) == "string"
       and (.label | test("^└ .+ · p:[A-Za-z0-9_-]{22}$"));
     def is_legacy_child:
       (.label | type) == "string"
-      and (.label | test("^(firstmate|2ndmate-[^/]+)/.+ · p:[A-Za-z0-9_-]{22}$"));
+      and (.label | test("^(juggernaut|2ndmate-[^/]+)/.+ · p:[A-Za-z0-9_-]{22}$"));
     def is_legacy_child_for($owner):
       is_legacy_child and (.label | startswith($owner + "/"));
     def is_child_for($owner):
@@ -1704,7 +1704,7 @@ jg_backend_herdr_workspace_lineage_report_best_effort() {  # <session> <task-wor
   local session=$1 workspace=$2 parent=$3
   [ -n "$workspace" ] && [ -n "$parent" ] || return 0
   if jg_backend_herdr_cli "$session" workspace report-metadata "$workspace" \
-    --source firstmate --token "parent=$parent" --token kind=task >/dev/null 2>&1; then
+    --source juggernaut --token "parent=$parent" --token kind=task >/dev/null 2>&1; then
     return 0
   fi
   echo "warning: herdr presentation could not declare task workspace lineage for $workspace; it will render top-level" >&2
@@ -1757,7 +1757,7 @@ jg_backend_herdr_workspace_find_all() {  # <session>
   # NOTE: the jq variable is $want, NOT $label - `label` is a jq reserved
   # keyword (label/break), so declaring a jq variable named "label" is a
   # compile error that `2>/dev/null` would silently swallow, making this find
-  # ALWAYS return empty and every spawn mint a fresh "firstmate" workspace
+  # ALWAYS return empty and every spawn mint a fresh "juggernaut" workspace
   # (the workspace leak).
   printf '%s' "$list" | jq -r --arg want "$label" \
     '.result.workspaces[]? | select(.label == $want) | .workspace_id' 2>/dev/null
@@ -1779,11 +1779,11 @@ jg_backend_herdr_workspace_find() {  # <session>
 #
 # Herdr 0.7.5 injects HERDR_ENV=1, HERDR_PANE_ID, HERDR_SESSION,
 # HERDR_SOCKET_PATH, HERDR_TAB_ID, and HERDR_WORKSPACE_ID into every process it
-# manages a pane for (docs/verification/runtime-backends.md), and a firstmate
-# or secondmate agent's own tool calls inherit them. Older injection shapes are
+# manages a pane for (docs/verification/runtime-backends.md), and a juggernaut
+# or squad_lead agent's own tool calls inherit them. Older injection shapes are
 # unverified and cannot establish launcher ancestry without both pane and
 # socket identity. Workspace LABELS are mutable and herdr enforces no
-# uniqueness on them, so a label search cannot tell one `firstmate` workspace
+# uniqueness on them, so a label search cannot tell one `juggernaut` workspace
 # from another, and herdr's globally focused workspace is whatever the captain
 # happens to be looking at, not the launcher's.
 #
@@ -1914,8 +1914,8 @@ jg_backend_herdr_launcher_identity() {  # <session>
 # had just resolved. Herdr enforces no label uniqueness (docs/herdr-backend.md
 # "Label collisions") and derives an unlabeled workspace's DISPLAYED label from
 # its pane cwd's basename, so a captain launching herdr directly inside a
-# directory named "firstmate" produces a workspace that looks byte-identical,
-# by label alone, to firstmate's own auto-created container - one tab, label
+# directory named "juggernaut" produces a workspace that looks byte-identical,
+# by label alone, to juggernaut's own auto-created container - one tab, label
 # "1". workspace_find adopted that pre-existing (captain-owned, LIVE) workspace
 # by the label match, the heuristic matched too, and the very next spawn
 # closed the captain's own live pane 27ms after creating its task tab. The
@@ -2005,14 +2005,14 @@ jg_backend_herdr_workspace_prune_seeded_default_tab() {  # <session> <workspace_
 # depth and because it is a no-op in the already-safe case.
 #
 # <launcher-relationship> (3rd arg, default "launcher-home") says whether the
-# container being ensured belongs to the SAME firstmate home as the process
+# container being ensured belongs to the SAME juggernaut home as the process
 # calling this:
-#   launcher-home - a crewmate or scout for the caller's own home. When the
+#   launcher-home - a operator or scout for the caller's own home. When the
 #                   caller is itself running in a herdr pane, the worker MUST
 #                   land in that exact workspace
 #                   (jg_backend_herdr_launcher_identity), never in whichever
 #                   same-labeled workspace happens to sort first.
-#   other-home    - a --secondmate launch, which stands up a DIFFERENT home's
+#   other-home    - a --squad-lead launch, which stands up a DIFFERENT home's
 #                   own per-home workspace by design. The launcher's workspace
 #                   is deliberately not inherited here.
 # With no herdr ancestry at all there is no launcher workspace to inherit, so
@@ -2043,7 +2043,7 @@ jg_backend_herdr_workspace_ensure() {  # <session> <cwd> [<launcher-relationship
   matches=$(jg_backend_herdr_workspace_find_all "$session")
   count=$(printf '%s' "$matches" | grep -c '[^[:space:]]' || true)
   if [ "$count" -gt 1 ]; then
-    echo "error: ${count} herdr workspaces in session '$session' are labeled '$label' (${matches//$'\n'/ }) and this spawn has no herdr parent pane to identify which one is its own; rename or close the extras, or run firstmate inside the workspace its workers belong in" >&2
+    echo "error: ${count} herdr workspaces in session '$session' are labeled '$label' (${matches//$'\n'/ }) and this spawn has no herdr parent pane to identify which one is its own; rename or close the extras, or run juggernaut inside the workspace its workers belong in" >&2
     return 3
   fi
   wsid=${matches%%$'\n'*}
@@ -2056,7 +2056,7 @@ jg_backend_herdr_workspace_ensure() {  # <session> <cwd> [<launcher-relationship
   wsid=$(printf '%s' "$out" | jq -r '.result.workspace.workspace_id // empty' 2>/dev/null)
   [ -n "$wsid" ] || return 1
   JG_BACKEND_HERDR_WS_ID=$wsid
-  # Herdr seeds a new workspace with one auto-created default tab firstmate
+  # Herdr seeds a new workspace with one auto-created default tab juggernaut
   # never uses. It is NOT pruned here: at this instant it is the workspace's
   # ONLY tab, and closing a workspace's last tab deletes the workspace itself
   # (verified against the real herdr binary) - pruning here would destroy the
@@ -2631,9 +2631,9 @@ jg_backend_herdr_agent_alive() {  # <target>
 # panes) across a server restart, including a reboot, and a restored jg-<id>
 # task tab comes back a HUSK - a dead pane, or (today, and unconditionally
 # once a future `resume_agents_on_restore = false` config ships) a plain
-# agent-less shell sitting in the saved cwd, never the crewmate that used to
+# agent-less shell sitting in the saved cwd, never the operator that used to
 # be there. Before this fix, every fleet respawn after such a restart needed
-# the operator to manually close each husk pane first before firstmate could
+# the operator to manually close each husk pane first before juggernaut could
 # spawn into it again. jg_backend_herdr_tab_is_husk classifies the existing
 # tab's pane conservatively (dead or no-agent only; anything live or
 # ambiguous refuses exactly as before) and, when it is a confirmed husk,
@@ -2897,7 +2897,7 @@ jg_backend_herdr_projection_live_binding_matches() {  # <session> <token> <works
         and (.label | test("^└ .+ · p:[A-Za-z0-9_-]{22}$"));
       def is_legacy_child_for($owner):
         (.label | type) == "string"
-        and (.label | test("^(firstmate|2ndmate-[^/]+)/.+ · p:[A-Za-z0-9_-]{22}$"))
+        and (.label | test("^(juggernaut|2ndmate-[^/]+)/.+ · p:[A-Za-z0-9_-]{22}$"))
         and (.label | startswith($owner + "/"));
       (.result.workspaces // null) as $spaces
       | select(($spaces | type) == "array")
@@ -3276,8 +3276,8 @@ jg_backend_herdr_send_literal() {  # <target> <text>
   return "$rc"
 }
 
-# jg_backend_herdr_normalize_key: map firstmate's key vocabulary (Enter,
-# Escape, C-c, as used by jg-send.sh --key and stuck-crewmate-recovery) onto
+# jg_backend_herdr_normalize_key: map juggernaut's key vocabulary (Enter,
+# Escape, C-c, as used by jg-send.sh --key and stuck-operator-recovery) onto
 # herdr's `pane send-keys` names. Verified empirically: enter, escape/esc, and
 # both ctrl+c/C-c all work (case-insensitive on herdr's side, but normalize
 # explicitly rather than relying on that).
@@ -3373,7 +3373,7 @@ jg_backend_herdr_agent_identity_raw() {  # <session> <pane> -> <agent>\t<status>
 # jg_backend_herdr_pin_agent_name: best-effort pin of a pane's agent display
 # name to <name>. Herdr 0.9.1 assigns every agent a random call-sign at start
 # and fresh ones across a server restart, so jg-spawn.sh pins each worker's
-# agent to its task id (the secondmate id for a secondmate launch) once the
+# agent to its task id (the squad_lead id for a squad_lead launch) once the
 # spawn or relaunch has fully succeeded and the agent is live - a rename on
 # an agent-less pane fails agent_not_found, so this never runs at tab-create
 # time. The name arrives as metadata from the caller and is never parsed
@@ -3619,7 +3619,7 @@ jg_backend_herdr_composer_content() {  # <target> [diagnostics=0]
 # composer that was empty before the send, shows <text>.
 # Literal equality ignores whitespace, the same comparison zellij uses, so a
 # wrapped payload still matches. It also ignores U+2063, the invisible mark
-# that starts operational inputs and separates the from-firstmate label:
+# that starts operational inputs and separates the from-juggernaut label:
 # Claude's composer read-back on Herdr never shows it (verified live), and it
 # carries no instruction text of its own. A composer that holds only
 # `[Pasted text #N]` or `[Pasted text #N +M lines]` placeholders (the
@@ -4055,14 +4055,14 @@ EOF
 }
 
 # jg_backend_herdr_list_live: recovery/orphan discovery. Lists every tab whose
-# label looks like a firstmate task window (jg-<id>) in <session>'s, THIS
+# label looks like a juggernaut task window (jg-<id>) in <session>'s, THIS
 # HOME'S OWN workspace (jg_backend_herdr_workspace_label - never another
 # home's), by LABEL - never by trusting a stored pane id, since ids are not
 # guaranteed stable across every server lifecycle (see herdr-verification-p2.md
-# "ID stability"). A caller running as a given home (e.g. a secondmate
+# "ID stability"). A caller running as a given home (e.g. a squad_lead
 # recovering its own in-flight work) naturally scopes to that home's own
 # workspace because JG_HOME already names it - no glue needed, unlike the
-# primary-spawns-a-secondmate path in jg-spawn.sh. Read-only: a session/
+# primary-spawns-a-squad-lead path in jg-spawn.sh. Read-only: a session/
 # workspace that does not exist yet simply lists nothing. One
 # "<session>:<pane_id>\t<label>" line per live task tab.
 jg_backend_herdr_list_live() {  # <session>

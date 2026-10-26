@@ -94,7 +94,7 @@ new_task_endpoint() {  # <home> <task-id>
 }
 wake_payloads() { awk -F '\t' '{print $5}' "$1/state/.wake-queue" 2>/dev/null; }
 
-# The wake queue is a durable tab-separated record firstmate consumes:
+# The wake queue is a durable tab-separated record juggernaut consumes:
 # <epoch> <sequence> <kind> <key> <payload>. These read the rows reconcile
 # publishes for a source it stranded, keyed by that source and its claim
 # generation.
@@ -818,10 +818,10 @@ PATH="$MULTI_BIN:$PATH" LAVISH_AXI_HOST=arming.example LAVISH_AXI_PORT=24387 JG_
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$MULTI_ART" --for worker-1 \
   --agent-reply-file "$MULTI_ROOT/reply1" >/dev/null
 if PATH="$MULTI_BIN:$PATH" JG_HOME="$HMULTI" \
-  "$ROOT/bin/jg-procevent-lavish.sh" arm "$MULTI_ART" >/dev/null 2>"$MULTI_ROOT/firstmate-arm.err"; then
-  fail "firstmate arm replaced a worker-owned board"
+  "$ROOT/bin/jg-procevent-lavish.sh" arm "$MULTI_ART" >/dev/null 2>"$MULTI_ROOT/juggernaut-arm.err"; then
+  fail "juggernaut arm replaced a worker-owned board"
 fi
-assert_contains "$(cat "$MULTI_ROOT/firstmate-arm.err")" "owned by task worker-1" \
+assert_contains "$(cat "$MULTI_ROOT/juggernaut-arm.err")" "owned by task worker-1" \
   "second armer refusal did not name the worker owner"
 list_out=$(JG_HOME="$HMULTI" "$ROOT/bin/jg-procevent.sh" list)
 assert_contains "$list_out" "task:worker-1/listening" \
@@ -835,11 +835,11 @@ for _ in $(seq 1 100); do [ -f "$HMULTI/state/worker-1.inbox/001.msg" ] && break
 [ -f "$HMULTI/state/worker-1.inbox/001.msg" ] \
   || fail "worker-owned feedback did not reach the worker inbox"
 [ -z "$(wake_payloads "$HMULTI")" ] \
-  || fail "worker-owned feedback woke firstmate: $(wake_payloads "$HMULTI")"
+  || fail "worker-owned feedback woke juggernaut: $(wake_payloads "$HMULTI")"
 
 # An open nonterminal round keeps the board with worker-1 through every
 # retirement and registration path: the one source record cannot be retired out
-# from under that round, and while it stands neither firstmate nor a sibling
+# from under that round, and while it stands neither juggernaut nor a sibling
 # task can register over it or acknowledge worker-1's capture.
 open_retire_status=0
 PATH="$MULTI_BIN:$PATH" JG_HOME="$HMULTI" \
@@ -860,11 +860,11 @@ assert_contains "$(cat "$MULTI_ROOT/open-sibling.err")" "owned by task worker-1"
   "the sibling refusal over an open round did not name the worker owner"
 if PATH="$MULTI_BIN:$PATH" JG_HOME="$HMULTI" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$MULTI_ART" \
-  >/dev/null 2>"$MULTI_ROOT/open-firstmate.err"; then
-  fail "firstmate armed a board with an open worker-owned round"
+  >/dev/null 2>"$MULTI_ROOT/open-juggernaut.err"; then
+  fail "juggernaut armed a board with an open worker-owned round"
 fi
-assert_contains "$(cat "$MULTI_ROOT/open-firstmate.err")" "owned by task worker-1" \
-  "the firstmate refusal over an open round did not name the worker owner"
+assert_contains "$(cat "$MULTI_ROOT/open-juggernaut.err")" "owned by task worker-1" \
+  "the juggernaut refusal over an open round did not name the worker owner"
 [ ! -f "$HMULTI/state/procevent-inbox/$multi_id.1.handled" ] \
   || fail "a refused retire or registration acknowledged the owner's open round"
 [ ! -e "$HMULTI/state/worker-2.inbox" ] \
@@ -910,13 +910,13 @@ pass "worker board replies and recovered listeners derive their server from the 
 
 # The terminal round keeps the board with worker-1 until worker-1 acknowledges
 # it, so the one source record stays the only ownership evidence there is: while
-# it is open neither firstmate nor a sibling task can arm the board or consume
+# it is open neither juggernaut nor a sibling task can arm the board or consume
 # the round, and acknowledging it is what concludes and retires the board.
 [ -e "$HMULTI/state/procevent/$multi_id.source" ] \
   || fail "the terminal round released the worker's board before it was acknowledged"
 if PATH="$MULTI_BIN:$PATH" JG_HOME="$HMULTI" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$MULTI_ART" >/dev/null 2>"$MULTI_ROOT/terminal-arm.err"; then
-  fail "firstmate armed a worker-owned board whose terminal round was unacknowledged"
+  fail "juggernaut armed a worker-owned board whose terminal round was unacknowledged"
 fi
 assert_contains "$(cat "$MULTI_ROOT/terminal-arm.err")" "owned by task worker-1" \
   "the refusal over an open terminal round did not name the worker owner"
@@ -959,7 +959,7 @@ PATH="$MULTI_BIN:$PATH" pe "$HMULTI" reconcile >/dev/null 2>&1 || true
 [ "$(cat "$MULTI_ROOT/count")" = 3 ] \
   || fail "the concluded board was polled again: $(cat "$MULTI_ROOT/count") polls"
 [ -z "$(wake_payloads "$HMULTI")" ] \
-  || fail "worker-owned rounds produced a firstmate wake: $(wake_payloads "$HMULTI")"
+  || fail "worker-owned rounds produced a juggernaut wake: $(wake_payloads "$HMULTI")"
 pass "worker-owned Lavish rounds deliver to the worker, acknowledge on re-arm, and stop at session end"
 
 # --- end-user-aligned regression: a half-written capture does not wedge -----
@@ -1010,7 +1010,7 @@ HADOPT="$TMP_ROOT/hadopt"; new_home "$HADOPT"
 ADOPT_BIN=$(jg_fakebin "$TMP_ROOT/lavish-adopt-stub")
 cat > "$ADOPT_BIN/lavish-axi" <<'SH'
 #!/usr/bin/env bash
-printf 'session:\n  status: feedback\nprompts[1]{uid,prompt,selector,tag,text}:\n  "","for firstmate","","message",""\n'
+printf 'session:\n  status: feedback\nprompts[1]{uid,prompt,selector,tag,text}:\n  "","for juggernaut","","message",""\n'
 SH
 chmod +x "$ADOPT_BIN/lavish-axi"
 ADOPT_ART="$TMP_ROOT/adopt-board.html"
@@ -1022,11 +1022,11 @@ new_task_endpoint "$HADOPT" worker-5
 PATH="$ADOPT_BIN:$PATH" JG_HOME="$HADOPT" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$ADOPT_ART" >/dev/null
 wait_capture "$HADOPT" "$adopt_id" \
-  || fail "the firstmate fixture capture never landed"
+  || fail "the juggernaut fixture capture never landed"
 [ -f "$HADOPT/state/procevent-inbox/$adopt_id.1.result" ] \
-  || fail "the firstmate fixture capture never landed"
+  || fail "the juggernaut fixture capture never landed"
 [ ! -f "$HADOPT/state/procevent-inbox/$adopt_id.1.handled" ] \
-  || fail "the firstmate fixture capture was already acknowledged"
+  || fail "the juggernaut fixture capture was already acknowledged"
 PATH="$ADOPT_BIN:$PATH" JG_HOME="$HADOPT" \
   "$ROOT/bin/jg-procevent-lavish.sh" retire "$ADOPT_ART" >/dev/null
 if PATH="$ADOPT_BIN:$PATH" JG_HOME="$HADOPT" \
@@ -1034,7 +1034,7 @@ if PATH="$ADOPT_BIN:$PATH" JG_HOME="$HADOPT" \
   >/dev/null 2>"$TMP_ROOT/adopt-arm.err"; then
   fail "a worker armed a board carrying another owner's unacknowledged capture"
 fi
-assert_contains "$(cat "$TMP_ROOT/adopt-arm.err")" "firstmate" \
+assert_contains "$(cat "$TMP_ROOT/adopt-arm.err")" "juggernaut" \
   "the refusal did not name the owner the orphaned capture belongs to"
 [ ! -f "$HADOPT/state/procevent-inbox/$adopt_id.1.handled" ] \
   || fail "a refused arm still acknowledged another owner's capture"
@@ -1399,7 +1399,7 @@ pass "a board close carrying the captain's real answer is still announced"
 # The dogfood defect: a live board listener can answer with exactly
 #     error: Lavish Editor poll response was interrupted
 #     code: SERVER_ERROR
-# while the board's marks remain available. Firstmate registered raw poll output,
+# while the board's marks remain available. Juggernaut registered raw poll output,
 # so the generic runner captured that transient response and woke the whole fleet
 # over what is really an internal retry. Every scenario below runs through the
 # adapter's own arm command and the real runner, so registration, capture, and
@@ -1750,7 +1750,7 @@ pe "$HW" retire restart-cut-src >/dev/null \
 mv "$HW/state/.wake-queue" "$HW/state/.wake-queue.drained-unhandled"
 [ -z "$(wake_payloads "$HW")" ] || fail "the wake queue was not actually drained"
 
-# Simulate a replacement Firstmate session: reconcile runs cold, as it would on
+# Simulate a replacement Juggernaut session: reconcile runs cold, as it would on
 # a fresh process with no memory of the prior turn.
 out=$(pe "$HW" reconcile)
 assert_contains "$out" "published=1" \
@@ -2982,7 +2982,7 @@ fi
 SH
 chmod +x "$HOST_BIN/lavish-axi"
 # Re-reading the session makes its saved endpoint authoritative without a
-# Firstmate route record, even when the same artifact is subsequently reopened.
+# Juggernaut route record, even when the same artifact is subsequently reopened.
 for endpoint in '127.0.0.1:14387' 'board.example:24387' '[::1]:34387'; do
   lavish_session "$HOST_ART" "http://$endpoint/session/0123456789abcdef"
   : > "$HOST_SEEN"
@@ -4613,7 +4613,7 @@ tout_elapsed=$(cat "$TMP_ROOT/timeout-arm/elapsed")
   || fail "arm did not wait out the confirm window (${tout_elapsed}s)"
 pass "arm waits out the confirm window before reporting that the listener is not running"
 
-# Re-arming a firstmate-owned board publishes a new registration while the
+# Re-arming a juggernaut-owned board publishes a new registration while the
 # earlier generation's listener still holds the claim. When that listener still
 # holds it as the confirm window ends, it keeps serving the board, so arm must
 # say so instead of reporting failure, and must never claim this generation is

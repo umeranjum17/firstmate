@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Isolated real-Herdr E2E coverage for the default-on disposable single-task
 # presentation projection, its explicit opt-out, and its best-effort
-# owning-parent ordering across primary and secondmate homes.
+# owning-parent ordering across primary and squad_lead homes.
 # The test drives the real spawn and teardown scripts, a real Treehouse pool,
 # and the guarded named-session lab helper.
 set -u
@@ -406,7 +406,7 @@ make_project() {  # <dir>
   git -C "$dir" init -q
   printf '# Herdr projection E2E fixture\n' > "$dir/README.md"
   git -C "$dir" add README.md
-  git -C "$dir" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm initial
+  git -C "$dir" -c user.name='Juggernaut Tests' -c user.email='tests@example.invalid' commit -qm initial
   git clone --quiet --bare "$dir" "$dir.origin.git"
   git -C "$dir" remote add origin "file://$dir.origin.git"
 }
@@ -419,7 +419,7 @@ write_ship_brief() {  # <home> <id> [description]
 ## Captain's intent
 $description
 
-## Firstmate spec
+## Juggernaut spec
 Verify projected workspace behavior for $id.
 EOF
 }
@@ -453,10 +453,10 @@ finish_concurrent_expected_abort() {  # <id> <status> <stdout> <stderr>
   fi
 }
 
-spawn_secondmate_task() {
+spawn_squad_lead_task() {
   local id=$1 home=$2
   JG_GATE_REFUSE_BYPASS=1 JG_SPAWN_NO_GUARD=1 JG_HOME="$HOME_DIR" JG_ROOT_OVERRIDE="$ROOT" \
-    "$ROOT/bin/jg-spawn.sh" "$id" "$home" "sh -c 'while :; do sleep 60; done'" --secondmate --backend herdr
+    "$ROOT/bin/jg-spawn.sh" "$id" "$home" "sh -c 'while :; do sleep 60; done'" --squad-lead --backend herdr
 }
 
 teardown_task() {  # <id> <home>
@@ -555,14 +555,14 @@ write_ship_brief "$HOME_DIR" default-on 'Projection default-on fixture.'
 make_project "$PROJECT_DIR"
 make_project "$RECOVERY_PROJECT_DIR"
 
-# Keep one ordinary primary task live so the durable firstmate workspace is
+# Keep one ordinary primary task live so the durable juggernaut workspace is
 # first and remains present while disposable workers are projected around it.
 spawn_task anchor "$HOME_DIR" "$PROJECT_DIR" > "$TMP_ROOT/anchor.out" 2> "$TMP_ROOT/anchor.err" \
   || fail "opted-out anchor spawn failed: $(cat "$TMP_ROOT/anchor.err")"
 ANCHOR_META="$HOME_DIR/state/anchor.meta"
 remember_meta_worktree "$ANCHOR_META" >/dev/null
-FIRSTMATE_WSID=$(grep '^herdr_workspace_id=' "$ANCHOR_META" | cut -d= -f2-)
-[ -n "$FIRSTMATE_WSID" ] || fail "anchor metadata did not record the firstmate workspace"
+JUGGERNAUT_WSID=$(grep '^herdr_workspace_id=' "$ANCHOR_META" | cut -d= -f2-)
+[ -n "$JUGGERNAUT_WSID" ] || fail "anchor metadata did not record the juggernaut workspace"
 
 # The same task id and project run once opted out and once projected, so
 # Treehouse commands and metadata can be compared after normalizing endpoint
@@ -614,8 +614,8 @@ if [ "$FLOOR_VERDICT" = 0 ]; then
   [ -f "$DEFAULT_ON_JOURNAL" ] \
     || fail "an unconfigured home did not publish a presentation journal on supported herdr $FLOOR_VERSION"
   DEFAULT_ON_TOKEN=$(grep '^projection_id=' "$DEFAULT_ON_JOURNAL" | cut -d= -f2-)
-  [ -n "$DEFAULT_ON_WSID" ] && [ "$DEFAULT_ON_WSID" != "$FIRSTMATE_WSID" ] \
-    || fail "an unconfigured home reused the flat firstmate workspace instead of projecting"
+  [ -n "$DEFAULT_ON_WSID" ] && [ "$DEFAULT_ON_WSID" != "$JUGGERNAUT_WSID" ] \
+    || fail "an unconfigured home reused the flat juggernaut workspace instead of projecting"
   DEFAULT_ON_LABEL=$(lab workspace get "$DEFAULT_ON_WSID" | jq -r '.result.workspace.label // empty')
   [ "$DEFAULT_ON_LABEL" = "└ default-on · p:$DEFAULT_ON_TOKEN" ] \
     || fail "default-on projection used an unexpected workspace label: $DEFAULT_ON_LABEL"
@@ -623,8 +623,8 @@ if [ "$FLOOR_VERDICT" = 0 ]; then
 else
   [ ! -e "$DEFAULT_ON_JOURNAL" ] \
     || fail "an unconfigured home published a presentation journal on below-floor herdr $FLOOR_VERSION"
-  [ "$DEFAULT_ON_WSID" = "$FIRSTMATE_WSID" ] \
-    || fail "an unconfigured home did not land in the flat firstmate workspace on below-floor herdr $FLOOR_VERSION (got '${DEFAULT_ON_WSID:-<empty>}')"
+  [ "$DEFAULT_ON_WSID" = "$JUGGERNAUT_WSID" ] \
+    || fail "an unconfigured home did not land in the flat juggernaut workspace on below-floor herdr $FLOOR_VERSION (got '${DEFAULT_ON_WSID:-<empty>}')"
   grep -q "$FLOOR_VERSION" "$TMP_ROOT/default-on.err" \
     || fail "the below-floor fallback did not name herdr $FLOOR_VERSION: $(cat "$TMP_ROOT/default-on.err")"
   pass "real Herdr lab: a home that configured nothing falls back flat on below-floor herdr $FLOOR_VERSION with one naming warning"
@@ -639,18 +639,18 @@ fi
 : > "$MOVE_CALL_LOG"
 
 SECOND_ONE_OUT=$(lab workspace create --cwd "$PROJECT_DIR" --label 2ndmate-alpha --no-focus) \
-  || fail "could not create the first secondmate presentation fixture"
+  || fail "could not create the first squad_lead presentation fixture"
 SECOND_TWO_OUT=$(lab workspace create --cwd "$PROJECT_DIR" --label 2ndmate-bravo --focus) \
-  || fail "could not create the focused secondmate presentation fixture"
+  || fail "could not create the focused squad_lead presentation fixture"
 SECOND_ONE_WSID=$(printf '%s' "$SECOND_ONE_OUT" | jq -r '.result.workspace.workspace_id // empty')
 SECOND_TWO_WSID=$(printf '%s' "$SECOND_TWO_OUT" | jq -r '.result.workspace.workspace_id // empty')
 SECOND_TWO_TAB=$(printf '%s' "$SECOND_TWO_OUT" | jq -r '.result.tab.tab_id // empty')
 SECOND_TWO_PANE=$(printf '%s' "$SECOND_TWO_OUT" | jq -r '.result.root_pane.pane_id // empty')
 [ -n "$SECOND_ONE_WSID" ] && [ -n "$SECOND_TWO_WSID" ] && [ -n "$SECOND_TWO_TAB" ] && [ -n "$SECOND_TWO_PANE" ] \
-  || fail "secondmate presentation fixtures returned incomplete IDs"
+  || fail "squad_lead presentation fixtures returned incomplete IDs"
 SECOND_ORDER_BEFORE=$(printf '%s\n%s\n' "$SECOND_ONE_WSID" "$SECOND_TWO_WSID")
 CAPTAIN_FOCUS="$SECOND_TWO_WSID/$SECOND_TWO_TAB"
-assert_focus_is "$CAPTAIN_FOCUS" "focused secondmate fixture"
+assert_focus_is "$CAPTAIN_FOCUS" "focused squad_lead fixture"
 
 : > "$TREEHOUSE_CALL_LOG"
 # The historical presence-based opt-in was an empty file; it must still project,
@@ -689,7 +689,7 @@ printf '%s' "$PROJECTED_TABS" | jq -e --arg tab "$PROJECTED_TAB" \
 printf '%s' "$PROJECTED_PANES" | jq -e --arg pane "$PROJECTED_PANE" \
   '.result.panes[0].pane_id == $pane' >/dev/null 2>&1 \
   || fail "projected workspace's only pane was not the exact recorded task pane"
-SECOND_TWO_INFO=$(lab workspace get "$SECOND_TWO_WSID") || fail "focused secondmate disappeared during projected create"
+SECOND_TWO_INFO=$(lab workspace get "$SECOND_TWO_WSID") || fail "focused squad_lead disappeared during projected create"
 [ "$(printf '%s' "$SECOND_TWO_INFO" | jq -r '.result.workspace.focused')" = true ] \
   || fail "projected create or workspace.move stole focus from the captain's current space"
 pass "real Herdr lab: every projected create, task-tab create, seeded prune, and move preserves active workspace and tab"
@@ -756,8 +756,8 @@ grep -F "presentation focus lock unavailable; using the ordinary flat layout wit
 LOCK_CONTENTION_META="$HOME_DIR/state/lock-contended.meta"
 remember_meta_worktree "$LOCK_CONTENTION_META" >/dev/null
 LOCK_CONTENTION_WSID=$(grep '^herdr_workspace_id=' "$LOCK_CONTENTION_META" | cut -d= -f2-)
-[ "$LOCK_CONTENTION_WSID" = "$FIRSTMATE_WSID" ] \
-  || fail "bounded lock contention did not use the ordinary flat firstmate workspace"
+[ "$LOCK_CONTENTION_WSID" = "$JUGGERNAUT_WSID" ] \
+  || fail "bounded lock contention did not use the ordinary flat juggernaut workspace"
 [ ! -e "$HOME_DIR/state/lock-contended.herdr-presentation" ] \
   || fail "bounded lock contention published a projection journal"
 LOCK_CONTENTION_CALLS=$(sed -n "$((LOCK_CONTENTION_START + 1)),\$p" "$HERDR_CALL_LOG")
@@ -805,12 +805,12 @@ remember_meta_worktree "$ORDER_B_META" >/dev/null
 
 ORDER_LIST=$(lab workspace list) || fail "could not inspect concurrent presentation ordering"
 CREATED_LABELS=$(projection_labels_from_log "$PROJECTION_ORDER_START")
-EXPECTED_LABELS=$(printf 'firstmate\n%s\n%s\n2ndmate-alpha\n2ndmate-bravo' "$PROJECTED_LABEL" "$CREATED_LABELS")
+EXPECTED_LABELS=$(printf 'juggernaut\n%s\n%s\n2ndmate-alpha\n2ndmate-bravo' "$PROJECTED_LABEL" "$CREATED_LABELS")
 ACTUAL_LABELS=$(printf '%s' "$ORDER_LIST" | jq -r '.result.workspaces[].label')
-[ "$ACTUAL_LABELS" = "$EXPECTED_LABELS" ] || fail "workspace order was not firstmate, stable primary block, secondmates: $ACTUAL_LABELS"
+[ "$ACTUAL_LABELS" = "$EXPECTED_LABELS" ] || fail "workspace order was not juggernaut, stable primary block, squad_leads: $ACTUAL_LABELS"
 PRIMARY_IDS=$(printf '%s' "$ORDER_LIST" | jq -r '
   .result.workspaces[]
-  | select((.label | startswith("└ ")) or (.label | startswith("firstmate/")))
+  | select((.label | startswith("└ ")) or (.label | startswith("juggernaut/")))
   | .workspace_id
 ')
 MOVE_TARGETS=$(cut -f2 "$MOVE_CALL_LOG")
@@ -821,7 +821,7 @@ MOVE_INDEXES=$(cut -f3 "$MOVE_CALL_LOG")
   || fail "concurrent primary workers did not append stably to the contiguous block: $MOVE_INDEXES"
 SECOND_ORDER_AFTER=$(printf '%s' "$ORDER_LIST" | jq -r '.result.workspaces[] | select(.label | startswith("2ndmate-")) | .workspace_id')
 [ "$SECOND_ORDER_AFTER" = "$SECOND_ORDER_BEFORE" ] \
-  || fail "primary workspace ordering changed secondmate relative order"
+  || fail "primary workspace ordering changed squad_lead relative order"
 [ "$(lab workspace get "$SECOND_TWO_WSID" | jq -r '.result.workspace.focused')" = true ] \
   || fail "concurrent primary workspace ordering stole focus"
 assert_no_ordering_lifecycle_calls_since "$PROJECTION_ORDER_START" "successful presentation ordering"
@@ -922,7 +922,7 @@ if lab workspace get "$PROJECTED_WSID" >/dev/null 2>&1; then
   fail "closing the exact projected task pane did not remove its last-tab workspace"
 fi
 lab pane get "$SECOND_TWO_PANE" >/dev/null 2>&1 \
-  || fail "projected teardown affected the focused secondmate workspace"
+  || fail "projected teardown affected the focused squad_lead workspace"
 [ ! -e "$JOURNAL" ] || fail "confirmed projected teardown did not retire its presentation journal"
 pass "real Herdr lab: exact task-pane close removes the projected workspace with no unrestored wrong-focus interval"
 
@@ -962,13 +962,13 @@ for ROUND in 1 2 3; do
   assert_focus_is "$CAPTAIN_FOCUS" "focus wave $ROUND concurrent spawns"
   assert_raw_presentation_mutations_preserved_since "$WAVE_FOCUS_START" "focus wave $ROUND concurrent spawns"
   WAVE_LABELS=$(projection_labels_from_log "$WAVE_LOG_START")
-  WAVE_EXPECTED=$(printf 'firstmate\n%s\n2ndmate-alpha\n2ndmate-bravo' "$WAVE_LABELS")
-  WAVE_ACTUAL=$(lab workspace list | jq -r '.result.workspaces[] | select(.label == "firstmate" or (.label | startswith("└ ")) or (.label | startswith("2ndmate-"))) | .label')
+  WAVE_EXPECTED=$(printf 'juggernaut\n%s\n2ndmate-alpha\n2ndmate-bravo' "$WAVE_LABELS")
+  WAVE_ACTUAL=$(lab workspace list | jq -r '.result.workspaces[] | select(.label == "juggernaut" or (.label | startswith("└ ")) or (.label | startswith("2ndmate-"))) | .label')
   [ "$WAVE_ACTUAL" = "$WAVE_EXPECTED" ] \
     || fail "focus wave $ROUND lost stable contiguous ordering: $WAVE_ACTUAL"
   WAVE_SECOND_ORDER=$(lab workspace list | jq -r '.result.workspaces[] | select(.label | startswith("2ndmate-")) | .workspace_id')
   [ "$WAVE_SECOND_ORDER" = "$SECOND_ORDER_BEFORE" ] \
-    || fail "focus wave $ROUND changed secondmate relative order"
+    || fail "focus wave $ROUND changed squad_lead relative order"
 
   teardown_task "focus-$ROUND-a" "$HOME_DIR" > "$TMP_ROOT/focus-$ROUND-a-teardown.out" 2> "$TMP_ROOT/focus-$ROUND-a-teardown.err" &
   WAVE_A_TEARDOWN_PID=$!
@@ -980,23 +980,23 @@ for ROUND in 1 2 3; do
   finish_concurrent_teardown "focus-$ROUND-b" "$WAVE_B_TEARDOWN_STATUS" "$TMP_ROOT/focus-$ROUND-b-teardown.out" "$TMP_ROOT/focus-$ROUND-b-teardown.err"
   assert_focus_is "$CAPTAIN_FOCUS" "focus wave $ROUND concurrent teardowns"
   WAVE_REMAINING=$(lab workspace list | jq -r '.result.workspaces[].label')
-  [ "$WAVE_REMAINING" = $'firstmate\n2ndmate-alpha\n2ndmate-bravo' ] \
+  [ "$WAVE_REMAINING" = $'juggernaut\n2ndmate-alpha\n2ndmate-bravo' ] \
     || fail "focus wave $ROUND cleanup left a projected workspace behind: $WAVE_REMAINING"
 done
 pass "real Herdr lab: three repeated concurrent create/order/cleanup waves have zero active workspace or tab drift"
 
 # ------------------------------------------------------------------
-# Multi-home topology: real secondmate JG_HOME spawn paths, inheritance,
+# Multi-home topology: real squad_lead JG_HOME spawn paths, inheritance,
 # concurrent cross-home waves, and session-scoped lock contention.
 # ------------------------------------------------------------------
 SECOND_HOME_A="$TMP_ROOT/home-2ndmate-alpha"
 SECOND_HOME_B="$TMP_ROOT/home-2ndmate-bravo"
 mkdir -p "$SECOND_HOME_A/state" "$SECOND_HOME_A/config" "$SECOND_HOME_A/data" \
   "$SECOND_HOME_B/state" "$SECOND_HOME_B/config" "$SECOND_HOME_B/data"
-printf 'alpha\n' > "$SECOND_HOME_A/.jg-secondmate-home"
-printf 'bravo\n' > "$SECOND_HOME_B/.jg-secondmate-home"
+printf 'alpha\n' > "$SECOND_HOME_A/.jg-squad-lead-home"
+printf 'bravo\n' > "$SECOND_HOME_B/.jg-squad-lead-home"
 touch "$SECOND_HOME_A/state/.last-watcher-beat" "$SECOND_HOME_B/state/.last-watcher-beat"
-# Ensure the secondmate homes look like gitignored firstmate homes so inheritance
+# Ensure the squad_lead homes look like gitignored juggernaut homes so inheritance
 # may write config/herdr-presentation-spaces.
 git -C "$SECOND_HOME_A" init -q
 git -C "$SECOND_HOME_B" init -q
@@ -1005,50 +1005,50 @@ printf 'config/herdr-presentation-spaces\nconfig/crew-harness\nconfig/crew-dispa
 cp "$SECOND_HOME_A/.gitignore" "$SECOND_HOME_B/.gitignore"
 git -C "$SECOND_HOME_A" add .gitignore
 git -C "$SECOND_HOME_B" add .gitignore
-git -C "$SECOND_HOME_A" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm init
-git -C "$SECOND_HOME_B" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm init
+git -C "$SECOND_HOME_A" -c user.name='Juggernaut Tests' -c user.email='tests@example.invalid' commit -qm init
+git -C "$SECOND_HOME_B" -c user.name='Juggernaut Tests' -c user.email='tests@example.invalid' commit -qm init
 mkdir -p "$SECOND_HOME_A/bin"
-printf '# Firstmate secondmate fixture\n' > "$SECOND_HOME_A/AGENTS.md"
-printf 'Secondmate alpha charter.\n' > "$SECOND_HOME_A/data/charter.md"
+printf '# Juggernaut squad_lead fixture\n' > "$SECOND_HOME_A/AGENTS.md"
+printf 'SquadLead alpha charter.\n' > "$SECOND_HOME_A/data/charter.md"
 
-# Primary setting only; real inheritance must push it into both secondmate homes.
+# Primary setting only; real inheritance must push it into both squad_lead homes.
 [ -f "$HOME_DIR/config/herdr-presentation-spaces" ] \
   || fail "primary presentation setting disappeared before multi-home inheritance"
 [ ! -e "$SECOND_HOME_A/config/herdr-presentation-spaces" ] \
-  || fail "secondmate A unexpectedly had a local presentation setting before inheritance"
+  || fail "squad_lead A unexpectedly had a local presentation setting before inheritance"
 [ ! -e "$SECOND_HOME_B/config/herdr-presentation-spaces" ] \
-  || fail "secondmate B unexpectedly had a local presentation setting before inheritance"
+  || fail "squad_lead B unexpectedly had a local presentation setting before inheritance"
 SECOND_SPAWN_LOG_START=$(log_line_count)
-spawn_secondmate_task alpha "$SECOND_HOME_A" > "$TMP_ROOT/alpha.out" 2> "$TMP_ROOT/alpha.err" \
-  || fail "secondmate alpha spawn failed: $(cat "$TMP_ROOT/alpha.err")"
+spawn_squad_lead_task alpha "$SECOND_HOME_A" > "$TMP_ROOT/alpha.out" 2> "$TMP_ROOT/alpha.err" \
+  || fail "squad_lead alpha spawn failed: $(cat "$TMP_ROOT/alpha.err")"
 [ -f "$SECOND_HOME_A/config/herdr-presentation-spaces" ] \
-  || fail "secondmate spawn did not inherit the presentation setting"
+  || fail "squad_lead spawn did not inherit the presentation setting"
 [ ! -e "$HOME_DIR/state/alpha.herdr-presentation" ] \
-  || fail "secondmate spawn published a presentation journal"
+  || fail "squad_lead spawn published a presentation journal"
 SECOND_META="$HOME_DIR/state/alpha.meta"
-[ "$(grep '^kind=' "$SECOND_META" | cut -d= -f2-)" = secondmate ] \
-  || fail "secondmate spawn did not record kind=secondmate"
+[ "$(grep '^kind=' "$SECOND_META" | cut -d= -f2-)" = squad_lead ] \
+  || fail "squad_lead spawn did not record kind=squad_lead"
 SECOND_WSID=$(grep '^herdr_workspace_id=' "$SECOND_META" | cut -d= -f2-)
 SECOND_LABEL=$(lab workspace get "$SECOND_WSID" | jq -r '.result.workspace.label')
 [ "$SECOND_LABEL" = 2ndmate-alpha ] \
-  || fail "secondmate spawn did not use its flat parent workspace: $SECOND_LABEL"
+  || fail "squad_lead spawn did not use its flat parent workspace: $SECOND_LABEL"
 [ -z "$(projection_labels_from_log "$SECOND_SPAWN_LOG_START")" ] \
-  || fail "secondmate spawn created a corner projection workspace"
+  || fail "squad_lead spawn created a corner projection workspace"
 if sed -n "$((SECOND_SPAWN_LOG_START + 1)),\$p" "$HERDR_CALL_LOG" \
   | grep -E $'^(workspace\tmove|session\tlist)' >/dev/null 2>&1; then
-  fail "secondmate spawn attempted presentation ordering"
+  fail "squad_lead spawn attempted presentation ordering"
 fi
 # shellcheck source=/dev/null
 . "$ROOT/bin/jg-config-inherit-lib.sh"
 propagate_inheritable_config "$HOME_DIR/config" "$SECOND_HOME_A/config" \
-  || fail "inheritance into secondmate A failed"
+  || fail "inheritance into squad_lead A failed"
 propagate_inheritable_config "$HOME_DIR/config" "$SECOND_HOME_B/config" \
-  || fail "inheritance into secondmate B failed"
+  || fail "inheritance into squad_lead B failed"
 [ -f "$SECOND_HOME_A/config/herdr-presentation-spaces" ] \
-  || fail "primary presentation setting did not reach secondmate A"
+  || fail "primary presentation setting did not reach squad_lead A"
 [ -f "$SECOND_HOME_B/config/herdr-presentation-spaces" ] \
-  || fail "primary presentation setting did not reach secondmate B"
-pass "real Herdr lab: the primary presentation setting inherits into real secondmate homes"
+  || fail "primary presentation setting did not reach squad_lead B"
+pass "real Herdr lab: the primary presentation setting inherits into real squad_lead homes"
 
 # Keep the pre-existing 2ndmate-alpha/bravo workspaces as owning parents and captain focus.
 assert_focus_is "$CAPTAIN_FOCUS" "multi-home captain focus"
@@ -1058,10 +1058,10 @@ mkdir -p "$SECOND_HOME_A/data/a1" "$SECOND_HOME_A/data/a2" \
   "$HOME_DIR/data/p1" "$HOME_DIR/data/p2"
 write_ship_brief "$HOME_DIR" p1 'Primary multi-home fixture 1.'
 write_ship_brief "$HOME_DIR" p2 'Primary multi-home fixture 2.'
-write_ship_brief "$SECOND_HOME_A" a1 'Secondmate A fixture 1.'
-write_ship_brief "$SECOND_HOME_A" a2 'Secondmate A fixture 2.'
-write_ship_brief "$SECOND_HOME_B" b1 'Secondmate B fixture 1.'
-write_ship_brief "$SECOND_HOME_B" b2 'Secondmate B fixture 2.'
+write_ship_brief "$SECOND_HOME_A" a1 'SquadLead A fixture 1.'
+write_ship_brief "$SECOND_HOME_A" a2 'SquadLead A fixture 2.'
+write_ship_brief "$SECOND_HOME_B" b1 'SquadLead B fixture 1.'
+write_ship_brief "$SECOND_HOME_B" b2 'SquadLead B fixture 2.'
 
 MULTI_FOCUS_START=$(focus_audit_line_count)
 spawn_task p1 "$HOME_DIR" "$PROJECT_DIR" > "$TMP_ROOT/p1.out" 2> "$TMP_ROOT/p1.err" \
@@ -1069,13 +1069,13 @@ spawn_task p1 "$HOME_DIR" "$PROJECT_DIR" > "$TMP_ROOT/p1.out" 2> "$TMP_ROOT/p1.e
 spawn_task p2 "$HOME_DIR" "$PROJECT_DIR" > "$TMP_ROOT/p2.out" 2> "$TMP_ROOT/p2.err" \
   || fail "multi-home primary p2 failed: $(cat "$TMP_ROOT/p2.err")"
 spawn_task a1 "$SECOND_HOME_A" "$PROJECT_DIR" > "$TMP_ROOT/a1.out" 2> "$TMP_ROOT/a1.err" \
-  || fail "multi-home secondmate A a1 failed: $(cat "$TMP_ROOT/a1.err")"
+  || fail "multi-home squad_lead A a1 failed: $(cat "$TMP_ROOT/a1.err")"
 spawn_task a2 "$SECOND_HOME_A" "$PROJECT_DIR" > "$TMP_ROOT/a2.out" 2> "$TMP_ROOT/a2.err" \
-  || fail "multi-home secondmate A a2 failed: $(cat "$TMP_ROOT/a2.err")"
+  || fail "multi-home squad_lead A a2 failed: $(cat "$TMP_ROOT/a2.err")"
 spawn_task b1 "$SECOND_HOME_B" "$PROJECT_DIR" > "$TMP_ROOT/b1.out" 2> "$TMP_ROOT/b1.err" \
-  || fail "multi-home secondmate B b1 failed: $(cat "$TMP_ROOT/b1.err")"
+  || fail "multi-home squad_lead B b1 failed: $(cat "$TMP_ROOT/b1.err")"
 spawn_task b2 "$SECOND_HOME_B" "$PROJECT_DIR" > "$TMP_ROOT/b2.out" 2> "$TMP_ROOT/b2.err" \
-  || fail "multi-home secondmate B b2 failed: $(cat "$TMP_ROOT/b2.err")"
+  || fail "multi-home squad_lead B b2 failed: $(cat "$TMP_ROOT/b2.err")"
 for META_X in p1 p2 a1 a2 b1 b2; do
   case "$META_X" in
     p*) remember_meta_worktree "$HOME_DIR/state/$META_X.meta" >/dev/null ;;
@@ -1094,16 +1094,16 @@ B1_LABEL=$(lab workspace get "$(grep '^herdr_workspace_id=' "$SECOND_HOME_B/stat
 B2_LABEL=$(lab workspace get "$(grep '^herdr_workspace_id=' "$SECOND_HOME_B/state/b2.meta" | cut -d= -f2-)" | jq -r '.result.workspace.label')
 case "$P1_LABEL" in $'└ p1 · p:'*) ;; *) fail "primary p1 label wrong: $P1_LABEL" ;; esac
 case "$P2_LABEL" in $'└ p2 · p:'*) ;; *) fail "primary p2 label wrong: $P2_LABEL" ;; esac
-case "$A1_LABEL" in $'└ a1 · p:'*) ;; *) fail "secondmate A a1 label wrong: $A1_LABEL" ;; esac
-case "$A2_LABEL" in $'└ a2 · p:'*) ;; *) fail "secondmate A a2 label wrong: $A2_LABEL" ;; esac
-case "$B1_LABEL" in $'└ b1 · p:'*) ;; *) fail "secondmate B b1 label wrong: $B1_LABEL" ;; esac
-case "$B2_LABEL" in $'└ b2 · p:'*) ;; *) fail "secondmate B b2 label wrong: $B2_LABEL" ;; esac
+case "$A1_LABEL" in $'└ a1 · p:'*) ;; *) fail "squad_lead A a1 label wrong: $A1_LABEL" ;; esac
+case "$A2_LABEL" in $'└ a2 · p:'*) ;; *) fail "squad_lead A a2 label wrong: $A2_LABEL" ;; esac
+case "$B1_LABEL" in $'└ b1 · p:'*) ;; *) fail "squad_lead B b1 label wrong: $B1_LABEL" ;; esac
+case "$B2_LABEL" in $'└ b2 · p:'*) ;; *) fail "squad_lead B b2 label wrong: $B2_LABEL" ;; esac
 
 MULTI_LIST=$(lab workspace list) || fail "could not list multi-home topology"
 MULTI_LABELS=$(printf '%s' "$MULTI_LIST" | jq -r '
   .result.workspaces[]
   | select(
-      .label == "firstmate"
+      .label == "juggernaut"
       or .label == "2ndmate-alpha"
       or .label == "2ndmate-bravo"
       or (.label | startswith("└ "))
@@ -1111,12 +1111,12 @@ MULTI_LABELS=$(printf '%s' "$MULTI_LIST" | jq -r '
   | .label
 ')
 MULTI_EXPECTED=$(printf '%s\n' \
-  firstmate "$P1_LABEL" "$P2_LABEL" \
+  juggernaut "$P1_LABEL" "$P2_LABEL" \
   2ndmate-alpha "$A1_LABEL" "$A2_LABEL" \
   2ndmate-bravo "$B1_LABEL" "$B2_LABEL")
 [ "$MULTI_LABELS" = "$MULTI_EXPECTED" ] \
   || fail "multi-home topology was not owning-parent grouped: $MULTI_LABELS"
-pass "real Herdr lab: primary and two secondmate homes each own a top-level contiguous child block"
+pass "real Herdr lab: primary and two squad_lead homes each own a top-level contiguous child block"
 
 # Concurrent cross-home wave under the one session lock.
 mkdir -p "$HOME_DIR/data/pcw" "$SECOND_HOME_A/data/acw" "$SECOND_HOME_B/data/bcw"
@@ -1140,7 +1140,7 @@ assert_focus_is "$CAPTAIN_FOCUS" "cross-home concurrent wave"
 assert_raw_presentation_mutations_preserved_since "$WAVE_CROSS_FOCUS" "cross-home concurrent wave"
 CROSS_LIST=$(lab workspace list)
 printf '%s' "$CROSS_LIST" | jq -e '
-  ([.result.workspaces[].label] | index("firstmate")) as $fm
+  ([.result.workspaces[].label] | index("juggernaut")) as $fm
   | ([.result.workspaces[].label] | index("2ndmate-alpha")) as $a
   | ([.result.workspaces[].label] | index("2ndmate-bravo")) as $b
   | $fm != null and $a != null and $b != null
@@ -1149,7 +1149,7 @@ printf '%s' "$CROSS_LIST" | jq -e '
 PCW_LABEL=$(lab workspace get "$(grep '^herdr_workspace_id=' "$HOME_DIR/state/pcw.meta" | cut -d= -f2-)" | jq -r '.result.workspace.label')
 ACW_LABEL=$(lab workspace get "$(grep '^herdr_workspace_id=' "$SECOND_HOME_A/state/acw.meta" | cut -d= -f2-)" | jq -r '.result.workspace.label')
 BCW_LABEL=$(lab workspace get "$(grep '^herdr_workspace_id=' "$SECOND_HOME_B/state/bcw.meta" | cut -d= -f2-)" | jq -r '.result.workspace.label')
-case "$PCW_LABEL" in $'└ pcw · p:'*|firstmate) ;; *) fail "cross-home primary label wrong: $PCW_LABEL" ;; esac
+case "$PCW_LABEL" in $'└ pcw · p:'*|juggernaut) ;; *) fail "cross-home primary label wrong: $PCW_LABEL" ;; esac
 case "$ACW_LABEL" in $'└ acw · p:'*|2ndmate-alpha) ;; *) fail "cross-home A label wrong: $ACW_LABEL" ;; esac
 case "$BCW_LABEL" in $'└ bcw · p:'*|2ndmate-bravo) ;; *) fail "cross-home B label wrong: $BCW_LABEL" ;; esac
 pass "real Herdr lab: concurrent primary/A/B spawns preserve parent order and exact focus"
@@ -1186,13 +1186,13 @@ remember_meta_worktree "$SECOND_HOME_A/state/aflat.meta" >/dev/null
 AFLAT_WSID=$(grep '^herdr_workspace_id=' "$SECOND_HOME_A/state/aflat.meta" | cut -d= -f2-)
 AFLAT_LABEL=$(lab workspace get "$AFLAT_WSID" | jq -r '.result.workspace.label')
 [ "$AFLAT_LABEL" = 2ndmate-alpha ] \
-  || fail "cross-home lock contention did not use the ordinary secondmate home workspace: $AFLAT_LABEL"
+  || fail "cross-home lock contention did not use the ordinary squad_lead home workspace: $AFLAT_LABEL"
 [ ! -e "$SECOND_HOME_A/state/aflat.herdr-presentation" ] \
   || fail "cross-home lock contention published a projection journal"
 assert_focus_is "$CAPTAIN_FOCUS" "cross-home lock contention flat fallback"
 teardown_task aflat "$SECOND_HOME_A" > "$TMP_ROOT/aflat-teardown.out" 2> "$TMP_ROOT/aflat-teardown.err" \
   || fail "flat cross-home contention fixture teardown failed"
-pass "real Herdr lab: session lock contention from a secondmate home falls back flat with no journal"
+pass "real Herdr lab: session lock contention from a squad_lead home falls back flat with no journal"
 
 # Same-identity recovery replaces only one exact agent-free husk in its
 # original projected workspace. These full-session restarts also stop the
@@ -1290,7 +1290,7 @@ for RESTART_ID in jg-hibit-resume-r1 wheelhouse-healing-r1; do
 done
 pass "real Herdr lab: Hi Bit and Wheelhouse-style same-identity restarts reclaim one nested space with exact focus and idempotence"
 
-# A secondmate child binds and reclaims only inside its own home and parent.
+# A squad_lead child binds and reclaims only inside its own home and parent.
 CROSS_RESTART_ID=wheel-child-resume
 mkdir -p "$SECOND_HOME_A/data/$CROSS_RESTART_ID"
 write_ship_brief "$SECOND_HOME_A" "$CROSS_RESTART_ID" 'Cross-home restart fixture.'
@@ -1303,7 +1303,7 @@ CROSS_OLD_PANE=$(grep '^herdr_pane_id=' "$CROSS_RESTART_META" | cut -d= -f2-)
 CROSS_OLD_LABEL=$(lab workspace get "$CROSS_OLD_WSID" | jq -r '.result.workspace.label')
 CROSS_BOUND_HOME=$(grep '^home=' "$SECOND_HOME_A/state/$CROSS_RESTART_ID.herdr-presentation" | cut -d= -f2-)
 [ "$CROSS_BOUND_HOME" = "$(cd "$SECOND_HOME_A" && pwd -P)" ] \
-  || fail "cross-home restart journal did not bind the secondmate's exact home"
+  || fail "cross-home restart journal did not bind the squad_lead's exact home"
 [ ! -e "$HOME_DIR/state/$CROSS_RESTART_ID.herdr-presentation" ] \
   || fail "cross-home restart published a journal in the primary home"
 PATH="$HERDR_ORIGINAL_PATH" "$HERDR_LAB_HELPER" stop "$HERDR_LAB_SESSION" >/dev/null \
@@ -1316,14 +1316,14 @@ CROSS_NEW_WT=$(remember_meta_worktree "$CROSS_RESTART_META")
 CROSS_NEW_WSID=$(grep '^herdr_workspace_id=' "$CROSS_RESTART_META" | cut -d= -f2-)
 CROSS_NEW_PANE=$(grep '^herdr_pane_id=' "$CROSS_RESTART_META" | cut -d= -f2-)
 [ "$CROSS_NEW_WSID" = "$CROSS_OLD_WSID" ] && [ "$CROSS_NEW_PANE" != "$CROSS_OLD_PANE" ] \
-  || fail "cross-home reclaim did not replace one pane inside the same secondmate child workspace"
+  || fail "cross-home reclaim did not replace one pane inside the same squad_lead child workspace"
 [ "$(lab workspace get "$CROSS_NEW_WSID" | jq -r '.result.workspace.label')" = "$CROSS_OLD_LABEL" ] \
-  || fail "cross-home reclaim changed the secondmate child's presentation label"
+  || fail "cross-home reclaim changed the squad_lead child's presentation label"
 teardown_task "$CROSS_RESTART_ID" "$SECOND_HOME_A" > "$TMP_ROOT/cross-restart-teardown.out" 2> "$TMP_ROOT/cross-restart-teardown.err" \
   || fail "cross-home reclaimed teardown failed: $(cat "$TMP_ROOT/cross-restart-teardown.err")"
 "$REAL_TREEHOUSE" return --force "$CROSS_OLD_WT" >/dev/null 2>&1 || true
 "$REAL_TREEHOUSE" return --force "$CROSS_NEW_WT" >/dev/null 2>&1 || true
-pass "real Herdr lab: secondmate restart binding and reclaim stay isolated to the exact child home and parent"
+pass "real Herdr lab: squad_lead restart binding and reclaim stay isolated to the exact child home and parent"
 
 # Two homes recovering concurrently serialize on the named session lock and
 # each replace only their own exact husk.
@@ -1331,11 +1331,11 @@ PRIMARY_WAVE_ID=resume-wave-primary
 BRAVO_WAVE_ID=resume-wave-bravo
 mkdir -p "$HOME_DIR/data/$PRIMARY_WAVE_ID" "$SECOND_HOME_B/data/$BRAVO_WAVE_ID"
 write_ship_brief "$HOME_DIR" "$PRIMARY_WAVE_ID" 'Concurrent primary recovery fixture.'
-write_ship_brief "$SECOND_HOME_B" "$BRAVO_WAVE_ID" 'Concurrent secondmate recovery fixture.'
+write_ship_brief "$SECOND_HOME_B" "$BRAVO_WAVE_ID" 'Concurrent squad_lead recovery fixture.'
 spawn_task "$PRIMARY_WAVE_ID" "$HOME_DIR" "$RECOVERY_PROJECT_DIR" > "$TMP_ROOT/primary-wave-first.out" 2> "$TMP_ROOT/primary-wave-first.err" \
   || fail "primary recovery-wave fixture failed: $(cat "$TMP_ROOT/primary-wave-first.err")"
 spawn_task "$BRAVO_WAVE_ID" "$SECOND_HOME_B" "$RECOVERY_PROJECT_DIR" > "$TMP_ROOT/bravo-wave-first.out" 2> "$TMP_ROOT/bravo-wave-first.err" \
-  || fail "secondmate recovery-wave fixture failed: $(cat "$TMP_ROOT/bravo-wave-first.err")"
+  || fail "squad_lead recovery-wave fixture failed: $(cat "$TMP_ROOT/bravo-wave-first.err")"
 PRIMARY_WAVE_META="$HOME_DIR/state/$PRIMARY_WAVE_ID.meta"
 BRAVO_WAVE_META="$SECOND_HOME_B/state/$BRAVO_WAVE_ID.meta"
 PRIMARY_WAVE_OLD_WT=$(remember_meta_worktree "$PRIMARY_WAVE_META")
@@ -1354,7 +1354,7 @@ PRIMARY_WAVE_PID=$!
 spawn_task "$BRAVO_WAVE_ID" "$SECOND_HOME_B" "$RECOVERY_PROJECT_DIR" > "$TMP_ROOT/bravo-wave-resume.out" 2> "$TMP_ROOT/bravo-wave-resume.err" &
 BRAVO_WAVE_PID=$!
 wait "$PRIMARY_WAVE_PID" || fail "concurrent primary recovery failed: $(cat "$TMP_ROOT/primary-wave-resume.err")"
-wait "$BRAVO_WAVE_PID" || fail "concurrent secondmate recovery failed: $(cat "$TMP_ROOT/bravo-wave-resume.err")"
+wait "$BRAVO_WAVE_PID" || fail "concurrent squad_lead recovery failed: $(cat "$TMP_ROOT/bravo-wave-resume.err")"
 PRIMARY_WAVE_NEW_WT=$(remember_meta_worktree "$PRIMARY_WAVE_META")
 BRAVO_WAVE_NEW_WT=$(remember_meta_worktree "$BRAVO_WAVE_META")
 PRIMARY_WAVE_NEW_PANE=$(grep '^herdr_pane_id=' "$PRIMARY_WAVE_META" | cut -d= -f2-)
@@ -1373,7 +1373,7 @@ assert_focus_is "$CONCURRENT_RECOVERY_FOCUS" "concurrent cross-home recovery"
 teardown_task "$PRIMARY_WAVE_ID" "$HOME_DIR" > "$TMP_ROOT/primary-wave-teardown.out" 2> "$TMP_ROOT/primary-wave-teardown.err" \
   || fail "concurrent primary recovery teardown failed: $(cat "$TMP_ROOT/primary-wave-teardown.err")"
 teardown_task "$BRAVO_WAVE_ID" "$SECOND_HOME_B" > "$TMP_ROOT/bravo-wave-teardown.out" 2> "$TMP_ROOT/bravo-wave-teardown.err" \
-  || fail "concurrent secondmate recovery teardown failed: $(cat "$TMP_ROOT/bravo-wave-teardown.err")"
+  || fail "concurrent squad_lead recovery teardown failed: $(cat "$TMP_ROOT/bravo-wave-teardown.err")"
 "$REAL_TREEHOUSE" return --force "$PRIMARY_WAVE_OLD_WT" >/dev/null 2>&1 || true
 "$REAL_TREEHOUSE" return --force "$BRAVO_WAVE_OLD_WT" >/dev/null 2>&1 || true
 "$REAL_TREEHOUSE" return --force "$PRIMARY_WAVE_NEW_WT" >/dev/null 2>&1 || true
@@ -1507,24 +1507,24 @@ teardown_task "$LOCK_WAIT_ID" "$HOME_DIR" > "$TMP_ROOT/lock-wait-teardown.out" 2
 "$REAL_TREEHOUSE" return --force "$LOCK_WAIT_NEW_WT" >/dev/null 2>&1 || true
 pass "real Herdr lab: --herdr-resume-lock-wait waits out session lock contention instead of refusing"
 
-# Seed a legacy old-format primary projection and a flat secondmate tab; correction must not migrate them.
-LEGACY_OUT=$(lab workspace create --cwd "$PROJECT_DIR" --label "firstmate/legacy-seed · p:AbCdEfGhIjKlMnOpQrStUv" --no-focus) \
+# Seed a legacy old-format primary projection and a flat squad_lead tab; correction must not migrate them.
+LEGACY_OUT=$(lab workspace create --cwd "$PROJECT_DIR" --label "juggernaut/legacy-seed · p:AbCdEfGhIjKlMnOpQrStUv" --no-focus) \
   || fail "could not seed a legacy old-format presentation space"
 LEGACY_WSID=$(printf '%s' "$LEGACY_OUT" | jq -r '.result.workspace.workspace_id // empty')
 [ -n "$LEGACY_WSID" ] || fail "legacy seed returned no workspace id"
 FLAT_TAB_OUT=$(lab tab create --workspace "$(lab workspace list | jq -r '.result.workspaces[] | select(.label == "2ndmate-alpha") | .workspace_id' | head -1)" --cwd "$PROJECT_DIR" --label jg-flat-legacy-tab --no-focus) \
-  || fail "could not seed a flat secondmate child tab"
+  || fail "could not seed a flat squad_lead child tab"
 FLAT_TAB_ID=$(printf '%s' "$FLAT_TAB_OUT" | jq -r '.result.tab.tab_id // empty')
 mkdir -p "$HOME_DIR/data/post-legacy"
 write_ship_brief "$HOME_DIR" post-legacy 'Post-legacy primary child.'
 spawn_task post-legacy "$HOME_DIR" "$PROJECT_DIR" > "$TMP_ROOT/post-legacy.out" 2> "$TMP_ROOT/post-legacy.err" \
   || fail "post-legacy projected spawn failed: $(cat "$TMP_ROOT/post-legacy.err")"
 remember_meta_worktree "$HOME_DIR/state/post-legacy.meta" >/dev/null
-[ "$(lab workspace get "$LEGACY_WSID" | jq -r '.result.workspace.label')" = "firstmate/legacy-seed · p:AbCdEfGhIjKlMnOpQrStUv" ] \
+[ "$(lab workspace get "$LEGACY_WSID" | jq -r '.result.workspace.label')" = "juggernaut/legacy-seed · p:AbCdEfGhIjKlMnOpQrStUv" ] \
   || fail "correction renamed or moved the seeded legacy projection"
 lab tab get "$FLAT_TAB_ID" >/dev/null 2>&1 \
-  || fail "correction removed the seeded flat secondmate child tab"
-pass "real Herdr lab: legacy projection labels and flat secondmate tabs are left unmigrated"
+  || fail "correction removed the seeded flat squad_lead child tab"
+pass "real Herdr lab: legacy projection labels and flat squad_lead tabs are left unmigrated"
 
 # Teardown multi-home projected tasks by exact pane only.
 for META_HOME_PAIR in \
@@ -1558,7 +1558,7 @@ assert_no_projection_mutation_since "$START" "missing-token recovery"
 RENAMED_STATE="$TMP_ROOT/renamed-state"; mkdir -p "$RENAMED_STATE"
 RENAMED_TOKEN=$(jg_backend_herdr_projection_journal_create "$RENAMED_STATE" renamed1)
 RENAMED_JOURNAL=$(jg_backend_herdr_projection_journal_path "$RENAMED_STATE" renamed1)
-RENAMED_OUT=$(lab workspace create --cwd "$PROJECT_DIR" --label "firstmate/renamed1 · p:$RENAMED_TOKEN" --no-focus)
+RENAMED_OUT=$(lab workspace create --cwd "$PROJECT_DIR" --label "juggernaut/renamed1 · p:$RENAMED_TOKEN" --no-focus)
 RENAMED_WSID=$(printf '%s' "$RENAMED_OUT" | jq -r '.result.workspace.workspace_id')
 lab workspace rename "$RENAMED_WSID" renamed-without-token >/dev/null
 START=$(log_line_count)
@@ -1570,7 +1570,7 @@ lab workspace get "$RENAMED_WSID" >/dev/null 2>&1 || fail "renamed-token recover
 DUP_STATE="$TMP_ROOT/duplicate-state"; mkdir -p "$DUP_STATE"
 DUP_TOKEN=$(jg_backend_herdr_projection_journal_create "$DUP_STATE" duplicate1)
 DUP_JOURNAL=$(jg_backend_herdr_projection_journal_path "$DUP_STATE" duplicate1)
-DUP1=$(lab workspace create --cwd "$PROJECT_DIR" --label "firstmate/duplicate1 · p:$DUP_TOKEN" --no-focus)
+DUP1=$(lab workspace create --cwd "$PROJECT_DIR" --label "juggernaut/duplicate1 · p:$DUP_TOKEN" --no-focus)
 DUP2=$(lab workspace create --cwd "$PROJECT_DIR" --label "copy/duplicate1 · p:$DUP_TOKEN" --no-focus)
 DUP1_WSID=$(printf '%s' "$DUP1" | jq -r '.result.workspace.workspace_id')
 DUP2_WSID=$(printf '%s' "$DUP2" | jq -r '.result.workspace.workspace_id')

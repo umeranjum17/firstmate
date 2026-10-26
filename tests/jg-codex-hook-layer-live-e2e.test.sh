@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Live guard for the codex crewmate launch's hook posture.
+# Live guard for the codex operator launch's hook posture.
 #
 # The verdict here comes from the installed codex, not from a stub: a stub can
 # only confirm the assumption already written into it, and what this guard
-# protects is exactly a vendor-owned surface. Codex blocks a fresh crewmate
+# protects is exactly a vendor-owned surface. Codex blocks a fresh operator
 # launch on an unanswerable "Hooks need review" modal whenever the machine's
 # ~/.codex/hooks.json or a project's .codex/hooks.json carries a hook it has no
-# persisted trust for, so the crewmate launch disables codex's hook layer
+# persisted trust for, so the operator launch disables codex's hook layer
 # outright (bin/jg-spawn.sh's launch template owns the flag).
 #
 # The guard replays the REAL launch flags jg-spawn builds - captured from a
@@ -28,8 +28,8 @@ jg_live_gate default-on JG_CODEX_HOOK_LAYER_LIVE codex
 CODEX_VERSION=$(codex --version 2>&1)
 TMP_ROOT=$(jg_test_tmproot jg-codex-hook-layer-live)
 
-# capture_codex_launch <name> <extra jg-spawn args...>: spawns a codex crewmate
-# against a fake pane and echoes the literal launch command firstmate sent.
+# capture_codex_launch <name> <extra jg-spawn args...>: spawns a codex operator
+# against a fake pane and echoes the literal launch command juggernaut sent.
 capture_codex_launch() {
   local name=$1
   shift
@@ -47,7 +47,7 @@ capture_codex_launch() {
   : > "$launchlog"
   JG_FAKE_LAUNCH_LOG="$launchlog" \
     jg_test_run_spawn "$home" "$wt" "$fakebin" "$id" "$proj" "$@" >/dev/null 2>&1 ||
-    fail "codex $CODEX_VERSION: jg-spawn could not build a crewmate launch"
+    fail "codex $CODEX_VERSION: jg-spawn could not build a operator launch"
   cat "$launchlog"
 }
 
@@ -60,25 +60,25 @@ codex_global_flags() {
   printf '%s' "$flags"
 }
 
-test_installed_codex_disables_hooks_for_the_captured_crewmate_launch() {
+test_installed_codex_disables_hooks_for_the_captured_operator_launch() {
   local launch flags state
   launch=$(capture_codex_launch ship --mode no-mistakes --yolo off)
   flags=$(codex_global_flags "$launch")
 
-  # The whole point: every flag firstmate will launch with, handed to the real
+  # The whole point: every flag juggernaut will launch with, handed to the real
   # codex, must leave the hook layer off. `features list` reports the effective
   # state after those flags are applied and contacts no model.
   state=$(eval "codex $flags features list" 2>&1) ||
-    fail "codex $CODEX_VERSION rejected firstmate's crewmate launch flags: $state"
+    fail "codex $CODEX_VERSION rejected juggernaut's operator launch flags: $state"
   case "$state" in
     *"Unknown feature flag"*)
-      fail "codex $CODEX_VERSION no longer knows the hook feature firstmate disables: $state"
+      fail "codex $CODEX_VERSION no longer knows the hook feature juggernaut disables: $state"
       ;;
   esac
   printf '%s\n' "$state" | awk '$1 == "hooks" { print $NF }' | grep -qx false ||
-    fail "codex $CODEX_VERSION left hooks enabled for firstmate's crewmate launch flags, so a fresh launch can park on the hook-trust modal"
+    fail "codex $CODEX_VERSION left hooks enabled for juggernaut's operator launch flags, so a fresh launch can park on the hook-trust modal"
 
-  printf 'ok - codex %s runs a firstmate crewmate launch with its hook layer disabled\n' "$CODEX_VERSION"
+  printf 'ok - codex %s runs a juggernaut operator launch with its hook layer disabled\n' "$CODEX_VERSION"
 }
 
 test_installed_codex_still_reports_the_hook_feature() {
@@ -86,12 +86,12 @@ test_installed_codex_still_reports_the_hook_feature() {
   listing=$(codex features list 2>&1) ||
     fail "codex $CODEX_VERSION could not list its feature flags: $listing"
   printf '%s\n' "$listing" | awk '{ print $1 }' | grep -qx hooks ||
-    fail "codex $CODEX_VERSION no longer publishes a hook feature flag; firstmate's crewmate launch needs a new control"
+    fail "codex $CODEX_VERSION no longer publishes a hook feature flag; juggernaut's operator launch needs a new control"
 
-  printf 'ok - codex %s still publishes the hook feature flag firstmate disables\n' "$CODEX_VERSION"
+  printf 'ok - codex %s still publishes the hook feature flag juggernaut disables\n' "$CODEX_VERSION"
 }
 
 test_installed_codex_still_reports_the_hook_feature
-test_installed_codex_disables_hooks_for_the_captured_crewmate_launch
+test_installed_codex_disables_hooks_for_the_captured_operator_launch
 
 echo "# all jg-codex-hook-layer-live-e2e tests passed"

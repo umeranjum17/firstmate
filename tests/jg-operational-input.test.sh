@@ -32,7 +32,7 @@ test_current_generic_matrix() {
   local kind body encoded parsed stripped prefix_hex
   prefix_hex=$(printf '%s' "$JG_OPERATIONAL_PREFIX" | od -An -tx1 | tr -d ' \n')
   [ "$prefix_hex" = e281a346495253544d4154455f4f503a20 ] \
-    || fail "current operational prefix lost the landed U+2063 FIRSTMATE_OP bytes: $prefix_hex"
+    || fail "current operational prefix lost the landed U+2063 JUGGERNAUT_OP bytes: $prefix_hex"
 
   for kind in session-start watcher turn-end-guard away-supervisor launch-brief branch-outcome; do
     body="CURRENT_BODY_FOR_${kind}"
@@ -54,33 +54,33 @@ test_current_generic_matrix() {
   pass "operational input: every current generic envelope retains its exact structured kind"
 }
 
-test_current_from_firstmate_carrier() {
+test_current_from_juggernaut_carrier() {
   local encoded parsed separator
   separator=$(printf '\342\201\243')
-  jg_message_mark_from_firstmate "corr=0123456789abcdef inspect the report" encoded
-  [ "${encoded#"[jg-from-firstmate]$separator"}" != "$encoded" ] \
-    || fail "from-firstmate lost its live-charter-compatible leading carrier"
+  jg_message_mark_from_juggernaut "corr=0123456789abcdef inspect the report" encoded
+  [ "${encoded#"[jg-from-juggernaut]$separator"}" != "$encoded" ] \
+    || fail "from-juggernaut lost its live-charter-compatible leading carrier"
   jg_operational_input_kind "$encoded" parsed \
-    || fail "from-firstmate current carrier did not parse"
-  [ "$parsed" = from-firstmate ] \
-    || fail "from-firstmate current carrier became $parsed"
-  [ "$(classify_cli "$encoded")" = from-firstmate ] \
-    || fail "cross-language classifier lost from-firstmate"
-  pass "operational input: the established from-firstmate carrier remains structurally typed and byte-compatible"
+    || fail "from-juggernaut current carrier did not parse"
+  [ "$parsed" = from-juggernaut ] \
+    || fail "from-juggernaut current carrier became $parsed"
+  [ "$(classify_cli "$encoded")" = from-juggernaut ] \
+    || fail "cross-language classifier lost from-juggernaut"
+  pass "operational input: the established from-juggernaut carrier remains structurally typed and byte-compatible"
 }
 
 test_landed_untyped_prefix_is_explicitly_legacy() {
   local untyped parsed
   untyped="${JG_OPERATIONAL_PREFIX}body whose historical subtype is unknowable"
   jg_legacy_operational_input_kind "$untyped" parsed \
-    || fail "landed untyped FIRSTMATE_OP input was not retained"
+    || fail "landed untyped JUGGERNAUT_OP input was not retained"
   [ "$parsed" = legacy-operational ] \
-    || fail "landed untyped FIRSTMATE_OP input falsely became $parsed"
+    || fail "landed untyped JUGGERNAUT_OP input falsely became $parsed"
   ! jg_operational_input_kind "$untyped" parsed \
-    || fail "untyped FIRSTMATE_OP input passed the current typed parser"
+    || fail "untyped JUGGERNAUT_OP input passed the current typed parser"
   [ "$(classify_cli "$untyped")" = legacy-operational ] \
     || fail "CLI did not expose the untyped prefix as legacy-operational"
-  pass "operational input: untyped landed FIRSTMATE_OP transcripts are explicit legacy-operational input"
+  pass "operational input: untyped landed JUGGERNAUT_OP transcripts are explicit legacy-operational input"
 }
 
 test_isolated_legacy_matrix() {
@@ -118,14 +118,14 @@ test_genuine_near_misses_remain_unclassified() {
       || fail "CLI classified a genuine near miss: $fixture"
   done <<EOF
 Captain quote: ${JG_OPERATIONAL_PREFIX}v1 watcher
-FIRSTMATE_OP: v1 watcher
+JUGGERNAUT_OP: v1 watcher
 $marker arbitrary captain text
 Captain quote: $JG_LEGACY_SESSIONSTART
 ${JG_LEGACY_SESSIONSTART} Please explain this sentence.
-FIRSTMATE WATCHER WAKE: can you explain this phrase?
+JUGGERNAUT WATCHER WAKE: can you explain this phrase?
 TURN WOULD END BLIND - can you make this warning friendlier?
 Supervisor escalate (1 event(s)): is this wording clear?
-[jg-from-firstmate] inspect this visible label
+[jg-from-juggernaut] inspect this visible label
 EOF
   pass "operational input: quoted, ASCII-only, arbitrary-U+2063, altered-legacy, and label-only near misses stay genuine"
 }
@@ -135,8 +135,8 @@ test_cross_language_adapter_uses_the_owner() {
   encoded=$(JG_TEST_ROOT="$ROOT" HELPER="$ROOT/.opencode/plugins/lib/jg-operational-input.js" \
     node --input-type=module <<'JS'
 import { pathToFileURL } from "node:url";
-const { encodeFirstmateOperationalInput } = await import(pathToFileURL(process.env.HELPER).href);
-process.stdout.write(await encodeFirstmateOperationalInput(process.env.JG_TEST_ROOT, "watcher", "CROSS_LANGUAGE_BODY"));
+const { encodeJuggernautOperationalInput } = await import(pathToFileURL(process.env.HELPER).href);
+process.stdout.write(await encodeJuggernautOperationalInput(process.env.JG_TEST_ROOT, "watcher", "CROSS_LANGUAGE_BODY"));
 JS
   ) || fail "OpenCode cross-language adapter could not invoke the canonical owner"
   jg_operational_input_kind "$encoded" parsed \
@@ -208,11 +208,11 @@ test_record_backed_doorbell_carrier() {
     "$doorbell trailing" \
     " $doorbell" \
     "${doorbell:0:$prefix_len}" \
-    'FIRSTMATE_OP: v1 away-supervisor: typed by a human'; do
+    'JUGGERNAUT_OP: v1 away-supervisor: typed by a human'; do
     [ -z "$(printf '%s' "$stray" | "$OWNER" doorbell-kind)" ] \
       || fail "a malformed or unbacked doorbell was recognized: $stray"
   done
-  printf 'FIRSTMATE_OP: v1 away-supervisor: ascii only' >"$state/operational-inbox/2-ascii.msg"
+  printf 'JUGGERNAUT_OP: v1 away-supervisor: ascii only' >"$state/operational-inbox/2-ascii.msg"
   [ -z "$(printf '%s' "${JG_OPERATIONAL_DOORBELL_PREFIX}$state/operational-inbox/2-ascii.msg${JG_OPERATIONAL_DOORBELL_SUFFIX}" | "$OWNER" doorbell-kind)" ] \
     || fail "a record without the U+2063 envelope was recognized"
 
@@ -248,7 +248,7 @@ test_record_prune_outgrows_one_argument_list() {
 }
 
 test_current_generic_matrix
-test_current_from_firstmate_carrier
+test_current_from_juggernaut_carrier
 test_landed_untyped_prefix_is_explicitly_legacy
 test_isolated_legacy_matrix
 test_genuine_near_misses_remain_unclassified

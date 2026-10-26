@@ -11,7 +11,7 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Remove key-in-env-check's home shim, check registration, and installed script. Usage: uninstall.sh [--dry-run]
 set -euo pipefail
 DRY=0; [ "${1:-}" = --dry-run ] && { DRY=1; shift; }; [ "$#" -eq 0 ] || { echo 'usage: uninstall.sh [--dry-run]' >&2; exit 2; }
-JG_HOME=${JG_HOME:?set JG_HOME to the firstmate home}; DEST=${XDG_DATA_HOME:-$HOME/.local/share}/jg-key-in-env-check; f=$JG_HOME/state/key-in-env-check.check.sh
+JG_HOME=${JG_HOME:?set JG_HOME to the juggernaut home}; DEST=${XDG_DATA_HOME:-$HOME/.local/share}/jg-key-in-env-check; f=$JG_HOME/state/key-in-env-check.check.sh
 if [ -e "$f" ]; then
   [ -x "$JG_HOME/bin/jg-check-unregister.sh" ] || { echo "remove manually: $f" >&2; exit 1; }
   if [ "$DRY" -eq 1 ]; then echo "would run: $JG_HOME/bin/jg-check-unregister.sh key-in-env-check"; else env -u JG_STATE_OVERRIDE JG_HOME="$JG_HOME" "$JG_HOME/bin/jg-check-unregister.sh" key-in-env-check; fi

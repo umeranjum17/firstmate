@@ -8,7 +8,7 @@
 # allocation, the idempotent re-enqueue dedup, the handled/ acknowledgement,
 # the self-describing doorbell line, and the watcher's re-ring ladder policy.
 # bin/jg-send.sh writes and rings locally, the host-local remote steer leg
-# (bin/jg-remote-secondmate-control.sh cmd_send) writes idempotently and rings
+# (bin/jg-remote-squad-lead-control.sh cmd_send) writes idempotently and rings
 # on the remote host, bin/jg-watch.sh polls and re-rings, and the brief
 # scaffold (bin/jg-brief.sh) tells the worker how to read and acknowledge;
 # none of them restates the format.
@@ -22,7 +22,7 @@
 # absence of the worker's acknowledgement and re-rung on a bounded schedule.
 # A positively dead or missing endpoint bypasses that schedule without being
 # typed into, and its unhandled record surfaces through the ordinary stale wake
-# into stuck-crewmate-recovery.
+# into stuck-operator-recovery.
 #
 # Layout under <state-dir>:
 #   <task>.inbox/NNN.msg       one durable steer, numeric sequence, atomic rename
@@ -42,8 +42,8 @@
 #   delivery=fire-and-forget   present only when the re-ring ladder must ignore it
 #                              (it still gets one retry ring; see below)
 #   --
-#   <exact message text; newlines are legal; a marked secondmate request keeps
-#    its from-firstmate marker and corr token verbatim in this body>
+#   <exact message text; newlines are legal; a marked squad_lead request keeps
+#    its from-juggernaut marker and corr token verbatim in this body>
 #
 # Sequence numbers are never reused within a task: allocation scans both the
 # inbox root and handled/, so a message is processed at most once per worker
@@ -241,7 +241,7 @@ jg_task_inbox_write() {  # <state-dir> <task-id> <text> [delivery-mode]
 # the same enqueue again, and this dedup is what makes the re-run land on the
 # same record instead of a duplicate the worker would act on twice. Two
 # distinct logical requests never collapse in practice because a marked
-# secondmate request embeds a per-request correlation token in its body. The
+# squad_lead request embeds a per-request correlation token in its body. The
 # local plane keeps plain jg_task_inbox_write: its outcome is synchronous, so
 # a repeated identical local steer is a deliberate new instruction.
 jg_task_inbox_write_idempotent() {  # <state-dir> <task-id> <text> [delivery-mode]
@@ -333,7 +333,7 @@ jg_task_inbox_doorbell_line() {  # <record-path>
     ''|*[![:print:]]*) return 1 ;;
   esac
   quoted=$(printf '%s' "$name" | sed "s/'/'\\\\''/g")
-  printf ": Firstmate instruction waiting: list \"\$JG_TASK_INBOX\"/*.msg in your '%s' steering inbox, read and act on each in numeric order, then mv each into its handled/." \
+  printf ": Juggernaut instruction waiting: list \"\$JG_TASK_INBOX\"/*.msg in your '%s' steering inbox, read and act on each in numeric order, then mv each into its handled/." \
     "$quoted"
 }
 
@@ -547,7 +547,7 @@ EOF
 # Mark the current oldest as escalated after its stale wake is durably queued,
 # suppressing another wake on later polls. Wake-before-marker ordering favors
 # at-least-once recovery: a crash or marker failure can cause a rare duplicate;
-# stuck-crewmate-recovery owns the message from here.
+# stuck-operator-recovery owns the message from here.
 jg_task_inbox_record_escalated() {  # <state-dir> <task-id> <record-path>
   local dir
   dir=$(jg_task_inbox_dir "$1" "$2")

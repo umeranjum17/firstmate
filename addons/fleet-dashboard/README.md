@@ -1,7 +1,7 @@
 # fleet-dashboard
 
 The read-only fleet dashboard — server, builder and app — moved **verbatim** out
-of the Firstmate fork into this add-on repository. Nothing serves it from here
+of the Juggernaut fork into this add-on repository. Nothing serves it from here
 yet: the live dashboard keeps building and serving from the fork's
 `bin/jg-dashboard.sh`, and the fork-side shim that will exec into this directory
 lands in a later PR. Until that swap this directory is dormant. `jg-dashboard.sh`
@@ -19,7 +19,7 @@ fork described under Provenance.
 
 ## Tests
 
-Run the behavior suite with `fleet-dashboard/tests/run-fork-suite.sh [checkout]`: it copies a Firstmate checkout (the argument, `JG_FIRSTMATE_DIR`, or a fresh clone when neither is set) to a scratch tree, swaps in this directory's `jg-dashboard.sh` and `jg-dashboard/`, and runs the suite there.
+Run the behavior suite with `fleet-dashboard/tests/run-fork-suite.sh [checkout]`: it copies a Juggernaut checkout (the argument, `JG_JUGGERNAUT_DIR`, or a fresh clone when neither is set) to a scratch tree, swaps in this directory's `jg-dashboard.sh` and `jg-dashboard/`, and runs the suite there.
 `fleet-dashboard/tests/jg-dashboard-partial-backlog.test.sh` runs on its own and checks the lower-bound counts when a single home's backlog cannot be read.
 
 ## Frozen contract (unchanged)
@@ -68,7 +68,7 @@ metric's `source` in `data.json`) on hover and under its card, and the ticket co
 It takes the owner's sign-off board token: `config/owner-board` names the board's `board.json`, and its `<board>.token` is read on each comment.
 A device that opened the board's access link carries the board's `sign-off-<port>` cookie, and the browser sends it to the dashboard too when both are opened at the same address, so nothing is pasted (with no such config, comments are off).
 The comment goes to the owning lead with `jg-send.sh` (or to Main with `jg-inbox.sh note`) and asks for the answer in the thread:
-the lead runs `"$JG_HOME/bin/jg-secondmate-report.sh" note <comment id> <answer>`, Main `jg-inbox.sh reply <note id> <answer>`.
+the lead runs `"$JG_HOME/bin/jg-squad-lead-report.sh" note <comment id> <answer>`, Main `jg-inbox.sh reply <note id> <answer>`.
 The build shows each comment with its pickup (the steer or note moved to `handled/`) and answer (the lead's `corr=<comment id>` line on its channel, or Main's inbox reply).
 The Ship tab is removed, with its `ship/` files and the vendored three.js it alone used. The app takes the approved Tickets prototype's look: neutral greys and one accent in both themes (Insights included), Tickets as the landing view, Overview labelled Metrics, a phone dock that names each view, flat neutral Metrics cards, and Board cards whose names drop leading tags and Main refs as tickets do. Tickets filters by release as well as project and lays open items in release lanes (Next release, After, Later; `#/tickets?by=release`); each Metrics lifecycle stage and To land open the Board filtered to that stage (`#/board?stage=ci`, a removable Stage chip); a phone's column switcher scrolls sideways only, never the page. Every memory pressure figure (the Metrics Memory card, the generated pages, `data.json` and Insights) is the memory gate's own sustained reading, the lower of the 10 s and 60 s averages. Metrics shows Time in stage: each open lane at its time in its current stage, the median per stage, and the bottleneck (most lane-hours, lanes on hold left out); a row opens the stage-filtered Board. A ticket's name and description are whole even when `tasks-axi list` cuts them (filled from `show --full`, cached in `state/dashboard/full-text.json`), its ask names the Main message that carried it, and its page shows the lane's proof (completion receipt and done-done verdict). Metrics' Flow card shows GitHub's merges in the repositories the fleet recorded merges in beside the recorded ones, by local day, with the records' coverage (one read-only `gh pr list` per repository at most every 30 minutes, kept in `state/dashboard/forge.json`; `JG_DASHBOARD_FORGE=off` skips it).
 The fifth adds the stale-ticket count: `jg-dashboard.sh` derives `tickets_stale` from the backlog it already reads — open tickets (`state != done`) whose `updated` is more than a day old, the one-day rule counted once on the server — and `tickets.js` names it in the Tickets hero at both widths, so a board that has drifted says how far on the view the captain opens first.
@@ -121,8 +121,8 @@ Manual recipe if the harness is gone:
 
 ## For the fork shim lane
 
-`JG_BIN` names the directory holding the Firstmate helper scripts a build runs (`jg-tasks-axi.sh`, `jg-flow.sh`, ...); unset, it defaults to this script's own directory, so a fork copy is unaffected.
-Run from this repository it must point at the Firstmate `bin/`, which makes the later shim `JG_BIN=<firstmate>/bin exec <addons>/fleet-dashboard/jg-dashboard.sh "$@"`: a set `JG_BIN` without `jg-tasks-axi.sh` is refused.
+`JG_BIN` names the directory holding the Juggernaut helper scripts a build runs (`jg-tasks-axi.sh`, `jg-flow.sh`, ...); unset, it defaults to this script's own directory, so a fork copy is unaffected.
+Run from this repository it must point at the Juggernaut `bin/`, which makes the later shim `JG_BIN=<juggernaut>/bin exec <addons>/fleet-dashboard/jg-dashboard.sh "$@"`: a set `JG_BIN` without `jg-tasks-axi.sh` is refused.
 
 The shipped `jg-dashboard.service` runs
 `<jg-home>/bin/jg-dashboard.sh serve --bind "$(tailscale ip -4 |

@@ -1,6 +1,6 @@
 # bearings-board
 
-The Bearings board, run from the Firstmate checkout. This add-on is a thin wrapper: it copies no upstream code, so checkout updates reach it with no merge.
+The Bearings board, run from the Juggernaut checkout. This add-on is a thin wrapper: it copies no upstream code, so checkout updates reach it with no merge.
 
 - `bin/jg-bearings-board.sh build <data.json>` runs the checkout's own build with every argument it was given; `path` does the same for the checkout's path and prints the board path it reports. The checkout validates its own payload.
 - `JG_CODE_ROOT` (or `JG_HOME`) names the checkout.

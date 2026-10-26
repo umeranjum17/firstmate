@@ -3,8 +3,8 @@
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Stable PreToolUse transport for the cd-guard command policy.
 #
-# A stray persistent top-level `cd projects/<clone>` in the PRIMARY firstmate
-# shell silently relocates the shell, so a later firstmate-owned command (a
+# A stray persistent top-level `cd projects/<clone>` in the PRIMARY juggernaut
+# shell silently relocates the shell, so a later juggernaut-owned command (a
 # backlog write, an jg-* lifecycle call, tasks-axi) runs inside a project clone
 # instead of the home. This seatbelt denies such a command before it runs.
 # bin/jg-cd-command-policy.mjs is the sole owner of the block/allow decision; it
@@ -30,8 +30,8 @@
 #          deny object on stdout unless --claude was supplied.
 #   DENY, --cursor - exit 0 and Cursor's own decision object on stdout. Cursor
 #          reads the returned object rather than the exit status.
-#   INERT - not the real primary checkout (a crewmate/scout task worktree or a
-#           non-firstmate repo): exit 0 with no output, exactly like ALLOW.
+#   INERT - not the real primary checkout (a operator/scout task worktree or a
+#           non-juggernaut repo): exit 0 with no output, exactly like ALLOW.
 #   FAIL OPEN - malformed or empty stdin, missing jq for stdin transport,
 #               missing Node or policy owner, or an invalid policy response.
 #
@@ -53,8 +53,8 @@ Usage: jg-cd-pretool-check.sh [--command <cmd>] [--claude|--cursor]
 
 With no --command, reads a PreToolUse-style JSON payload on stdin (Grok
 toolInput.command, or Claude/Codex tool_input.command).
-Fires only in the real primary firstmate checkout; it is a silent no-op in a
-crewmate/scout task worktree or any non-firstmate repo.
+Fires only in the real primary juggernaut checkout; it is a silent no-op in a
+operator/scout task worktree or any non-juggernaut repo.
 Exits 0 to allow and 2 to deny a persistent top-level cwd change.
 The deny reason is written to stderr, with a Grok decision object on stdout
 unless --claude is supplied.
@@ -145,11 +145,11 @@ esac
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P) || exit 0
 JG_ROOT=${JG_ROOT_OVERRIDE:-$(CDPATH='' cd -- "$SCRIPT_DIR/.." 2>/dev/null && pwd -P)} || exit 0
 
-# Scope to a plain, non-worktree firstmate checkout, where git-dir equals
-# git-common-dir. A crewmate/scout task worktree - the shape bin/jg-spawn.sh
+# Scope to a plain, non-worktree juggernaut checkout, where git-dir equals
+# git-common-dir. A operator/scout task worktree - the shape bin/jg-spawn.sh
 # always hands out - is a linked git worktree where the two differ. This guard
-# does not inspect .jg-secondmate-home, so it applies in a git-cloned secondmate
-# home but remains inert when the secondmate home is itself a treehouse-leased
+# does not inspect .jg-squad-lead-home, so it applies in a git-cloned squad_lead
+# home but remains inert when the squad_lead home is itself a treehouse-leased
 # linked worktree. docs/cd-guard.md owns this scope; docs/turnend-guard.md owns
 # the turn-end guard's separate marker-aware scope. Any failure to confirm the
 # checkout is inert (exit 0), never a block, so a broken environment never

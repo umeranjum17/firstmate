@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# End to end: install into a throwaway HOME against a fixture home built from a Firstmate checkout's bin/, then drive the
+# End to end: install into a throwaway HOME against a fixture home built from a Juggernaut checkout's bin/, then drive the
 # installed check against real tasks-axi writers. A writer SIGKILLed between its lock open and its token write leaves a
 # 0-byte lock; once old the check reclaims it and the next write succeeds. A young 0-byte lock, a lock with a token, and
-# a lock a live writer still has open are each left alone. Usage: backlog-lock-reclaim-e2e.sh <firstmate-checkout> [git-ref]
+# a lock a live writer still has open are each left alone. Usage: backlog-lock-reclaim-e2e.sh <juggernaut-checkout> [git-ref]
 set -euo pipefail
 ADDON=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 TASKS_JS=$(readlink -f "$(command -v tasks-axi)") || { echo "FAIL: tasks-axi is not installed" >&2; exit 1; }

@@ -8,14 +8,14 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
   export "$_jg_new=$_jg_val"
 done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
-# Integration proof of the lead-wake seam. JG_TEST_FORK names a read-only Firstmate
+# Integration proof of the lead-wake seam. JG_TEST_FORK names a read-only Juggernaut
 # checkout; its bin/ and tests/ are copied privately and only the proposed step-B replacements
 # are applied to the copy (tests/stage-step-b.py). The real watcher then runs the fork's lead-wake cases (tests/jg-lead-wake.test.sh):
 # add-on present = the fork's lead-wake behavior, add-on absent = Kun's (no wake, no error).
 # Needs tasks-axi, bash, python3.
 set -euo pipefail
 addons=$(cd "$(dirname "$0")/../.." && pwd)
-: "${JG_TEST_FORK:?set JG_TEST_FORK to a Firstmate checkout}"
+: "${JG_TEST_FORK:?set JG_TEST_FORK to a Juggernaut checkout}"
 command -v tasks-axi >/dev/null || { echo "not ok - tasks-axi is required"; exit 1; }
 d=$(mktemp -d)
 cleanup() {
@@ -39,7 +39,7 @@ newhome() {  # <name>
   home=$d/$1; state=$home/state
   mkdir -p "$state" "$home/config" "$home/data"
   printf 'manual\n' > "$home/config/backlog-backend"
-  printf 'lead-1\n' > "$home/.jg-secondmate-home"
+  printf 'lead-1\n' > "$home/.jg-squad-lead-home"
 }
 # watch <addons-dir> <out> [wait-seconds]: run the real watcher; it exits on a wake.
 watch() {
@@ -47,7 +47,7 @@ watch() {
   rm -f "$state/.last-ready-work-check" "$state/.heartbeat-streak" "$state/.last-heartbeat"
   PATH="$d/fakebin:$PATH" JG_HOME="$home" JG_STATE_OVERRIDE="$state" JG_ADDONS_DIR="$1" \
     JG_CREW_STATE_BIN="$d/fakebin/jg-crew-state.sh" JG_POLL=1 JG_SIGNAL_GRACE=1 \
-    JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=1 JG_SECONDMATE_LIVENESS_SECS=99999999 \
+    JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=1 JG_SQUAD_LEAD_LIVENESS_SECS=99999999 \
     bash "$d/fork/bin/jg-watch.sh" > "$2" 2>"$2.err" &
   pid=$!
   while [ "$i" -lt "$limit" ] && kill -0 "$pid" 2>/dev/null; do sleep 0.1; i=$((i + 1)); done

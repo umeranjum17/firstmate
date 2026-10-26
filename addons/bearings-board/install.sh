@@ -8,7 +8,7 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
   export "$_jg_new=$_jg_val"
 done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
-# Wire the Bearings board wrapper into one Firstmate home: a launcher that runs the
+# Wire the Bearings board wrapper into one Juggernaut home: a launcher that runs the
 # checkout's board. A home hook at config/bearings-board-command
 # is pointed at the launcher only when it exists; otherwise install prints the command.
 # The hook keeps the file, mode and links it had: install saves its content beside it and

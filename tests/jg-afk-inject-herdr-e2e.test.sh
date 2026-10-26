@@ -122,11 +122,11 @@ done
 [ "$PANE_READY" = true ] || fail "the supervisor pane's shell did not become ready"
 
 # A second, independent live task tab in the same workspace, mirroring the tmux
-# e2e's fake jg-fake-c1 crewmate window - not required by scan_signals (which
+# e2e's fake jg-fake-c1 operator window - not required by scan_signals (which
 # only watches state/*.status mtimes, no window/pane dependency), but kept for
 # parity so this test's shape matches the tmux e2e's.
 FAKE_CREW_IDS=$(jg_backend_herdr_create_task "$CONTAINER" "jg-fake-c1" /tmp) \
-  || fail "could not create the fake crewmate scratch tab"
+  || fail "could not create the fake operator scratch tab"
 read -r _FAKE_TAB_ID FAKE_CREW_PANE_ID <<EOF
 $FAKE_CREW_IDS
 EOF

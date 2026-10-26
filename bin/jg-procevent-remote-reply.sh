@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
-# Remote-secondmate reply adapter for the generic process-event runner.
+# Remote-squad-lead reply adapter for the generic process-event runner.
 #
 # Usage:
-#   jg-procevent-remote-reply.sh arm <secondmate-id>
-#   jg-procevent-remote-reply.sh handle <secondmate-id> <sequence> <result-file>
+#   jg-procevent-remote-reply.sh arm <squad-lead-id>
+#   jg-procevent-remote-reply.sh handle <squad-lead-id> <sequence> <result-file>
 #   jg-procevent-remote-reply.sh autohandle <source-id> <sequence> <result-file>
 #   jg-procevent-remote-reply.sh classify <result-file>
 #   jg-procevent-remote-reply.sh terminal <result-file>
 #   jg-procevent-remote-reply.sh self-announcing
-#   jg-procevent-remote-reply.sh source-id <secondmate-id>
+#   jg-procevent-remote-reply.sh source-id <squad-lead-id>
 #   jg-procevent-remote-reply.sh relisten
-#   jg-procevent-remote-reply.sh retire <secondmate-id>
+#   jg-procevent-remote-reply.sh retire <squad-lead-id>
 #
 # `arm` registers one blocking, non-destructive delta source for the remote
 # home's state/parent-replies.status log. The process-event runner owns blocking,
@@ -27,7 +27,7 @@
 # and the runner stops. The runner does not refresh the owner lease.
 #
 # `autohandle` is the runner's own entry into that same `handle`: it takes the
-# canonical source id instead of the secondmate id and is called by the runner
+# canonical source id instead of the squad_lead id and is called by the runner
 # right after capture, so applying a reply never depends on a handler
 # remembering to run it. Ingesting a delta carries no judgement, so it belongs
 # in code.
@@ -36,18 +36,18 @@
 # runner: every byte autohandle applies lands in the parent's state/<id>.status
 # stream, whose ordinary signal-scan announcement is durable, so a fully
 # autohandled capture needs - and gets - no `check` wake of its own. One remote
-# note therefore produces exactly one firstmate wake, through the same signal
-# classification a local secondmate's own status append gets, and a replayed
+# note therefore produces exactly one juggernaut wake, through the same signal
+# classification a local squad_lead's own status append gets, and a replayed
 # capture whose source lines are already recorded adds no bytes and stays
 # completely quiet. Only a capture autohandle could NOT
 # fully apply is published as a `check` wake for the manual handler, and
 # running `handle` on that wake is idempotent.
 #
 # This channel is a status-stream MIRROR, not a correlated-reply channel. A local
-# secondmate appends its whole status stream straight into the parent's
+# squad_lead appends its whole status stream straight into the parent's
 # state/<id>.status, and every parent consumer - the open-decision fold, wake
 # classification, crew-state reconciliation, and pending-reply resolution - reads
-# that one stream. A remote secondmate must present the same model, so ingest
+# that one stream. A remote squad_lead must present the same model, so ingest
 # deduplicates content-bearing lines by normalized source identity, omits blank
 # separators, and leaves every semantic judgement to those same shared consumers.
 # Correlation is
@@ -93,8 +93,8 @@ DOCUMENT_LOCAL_FAILURE=2
 
 # shellcheck source=bin/jg-wake-lib.sh
 . "$SCRIPT_DIR/jg-wake-lib.sh"
-# shellcheck source=bin/jg-secondmate-registry-lib.sh
-. "$SCRIPT_DIR/jg-secondmate-registry-lib.sh"
+# shellcheck source=bin/jg-squad-lead-registry-lib.sh
+. "$SCRIPT_DIR/jg-squad-lead-registry-lib.sh"
 # shellcheck source=bin/jg-pending-reply-lib.sh
 . "$SCRIPT_DIR/jg-pending-reply-lib.sh"
 
@@ -120,7 +120,7 @@ empty_hash() {
 }
 
 validate_id() {
-  case "$1" in ''|*[!A-Za-z0-9._-]*) die "invalid secondmate id: $1" ;; esac
+  case "$1" in ''|*[!A-Za-z0-9._-]*) die "invalid squad_lead id: $1" ;; esac
 }
 
 source_id() {
@@ -264,8 +264,8 @@ classify_result() {
 
 remote_route_exists() {
   local id=$1 remote
-  remote=$(secondmate_registry_field "$DATA/secondmates.md" "$id" remote 2>/dev/null || true)
-  [ "$remote" = 1 ] || die "secondmate $id is not a configured remote route"
+  remote=$(squad_lead_registry_field "$DATA/squad_leads.md" "$id" remote 2>/dev/null || true)
+  [ "$remote" = 1 ] || die "squad_lead $id is not a configured remote route"
 }
 
 cmd_arm_locked() {
@@ -282,7 +282,7 @@ cmd_arm_locked() {
 cmd_arm() {
   local id=${1:-} lock
   validate_id "$id"
-  lock=$(secondmate_reply_lifecycle_lock_path "$STATE" "$id")
+  lock=$(squad_lead_reply_lifecycle_lock_path "$STATE" "$id")
   (
     jg_lock_acquire_wait "$lock" || die "cannot lock remote reply lifecycle for $id"
     trap 'jg_lock_release "$lock"' EXIT
@@ -428,7 +428,7 @@ fetch_document() { # <id> <remote-relative> <result-var>
     FETCH_DOC_REASON='pointer is not a confined data/*.md path'
     return 1
   fi
-  base="$DATA/remote-secondmates/$id"
+  base="$DATA/remote-squad-leads/$id"
   destination="$base/$rel"
   parent=$(dirname "$destination")
   mkdir -p "$parent" || return "$DOCUMENT_LOCAL_FAILURE"
@@ -448,14 +448,14 @@ fetch_document() { # <id> <remote-relative> <result-var>
   rm -f -- "$err"
   chmod 600 "$tmp" || { rm -f -- "$tmp"; return "$DOCUMENT_LOCAL_FAILURE"; }
   mv -f -- "$tmp" "$destination" || { rm -f -- "$tmp"; return "$DOCUMENT_LOCAL_FAILURE"; }
-  local_rel="data/remote-secondmates/$id/$rel"
+  local_rel="data/remote-squad-leads/$id/$rel"
   printf -v "$result_var" '%s' "$local_rel"
 }
 
 # The one adaptation a machine boundary forces on the mirrored bytes: NUL and
 # every other C0 control except tab and newline, plus DEL, become '?'. Printable
 # ASCII and every high byte pass through untouched, so ordinary UTF-8 notes
-# mirror exactly as a local secondmate would have written them. Newlines remain
+# mirror exactly as a local squad_lead would have written them. Newlines remain
 # framing rather than payload bytes, and blank separators are not carried into
 # the parent status stream.
 normalize_payload() { # <source> <destination>
@@ -716,7 +716,7 @@ cmd_autohandle() {
     *) die "not a remote reply source: $sid" ;;
   esac
   validate_id "$id"
-  [ "$(source_id "$id")" = "$sid" ] || die "source id does not identify one secondmate: $sid"
+  [ "$(source_id "$id")" = "$sid" ] || die "source id does not identify one squad_lead: $sid"
   cmd_handle "$id" "$seq" "$result" || rc=$?
   [ "$rc" -eq 3 ] && rc=0
   return "$rc"
@@ -725,7 +725,7 @@ cmd_autohandle() {
 cmd_handle() {
   local id=${1:-} lock
   validate_id "$id"
-  lock=$(secondmate_reply_lifecycle_lock_path "$STATE" "$id")
+  lock=$(squad_lead_reply_lifecycle_lock_path "$STATE" "$id")
   (
     jg_lock_acquire_wait "$lock" || die "cannot lock remote reply lifecycle for $id"
     trap 'jg_lock_release "$lock"' EXIT
@@ -804,7 +804,7 @@ cmd_retire_finalize_locked() {
 cmd_retire() {
   local id=${1:-} force=${2:-} lock
   validate_id "$id"
-  lock=$(secondmate_reply_lifecycle_lock_path "$STATE" "$id")
+  lock=$(squad_lead_reply_lifecycle_lock_path "$STATE" "$id")
   (
     jg_lock_acquire_wait "$lock" || die "cannot lock remote reply lifecycle for $id"
     trap 'jg_lock_release "$lock"' EXIT
@@ -815,7 +815,7 @@ cmd_retire() {
 
 require_parent_lifecycle_lock() {
   local id=$1 lock owner pid
-  lock=$(secondmate_reply_lifecycle_lock_path "$STATE" "$id")
+  lock=$(squad_lead_reply_lifecycle_lock_path "$STATE" "$id")
   if [ -L "$lock" ]; then
     owner=$(jg_lock_link_owner "$lock" 2>/dev/null || true)
     [ -n "$owner" ] || die "remote reply lifecycle lock ownership is invalid"

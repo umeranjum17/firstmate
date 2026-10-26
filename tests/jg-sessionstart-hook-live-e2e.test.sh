@@ -3,7 +3,7 @@
 # Cursor's source-free RUN-tier transport is covered with its stop-hook park by
 # tests/jg-cursor-primary-live-e2e.test.sh.
 #
-# Three facts in this area come from the vendor, not from Firstmate, so a stub
+# Three facts in this area come from the vendor, not from Juggernaut, so a stub
 # can only confirm the assumption already written into the stub:
 #
 #   (a) the harness tells the hook WHICH session open this is, well enough that
@@ -92,7 +92,7 @@ LIVE_NONCE=$(od -An -N12 -tx1 /dev/urandom | tr -d ' \n')
 
 # --- lab ---------------------------------------------------------------------
 #
-# A Firstmate-shaped checkout carrying the harness's own TRACKED registration,
+# A Juggernaut-shaped checkout carrying the harness's own TRACKED registration,
 # with the wrapper replaced by a recorder, so a registration that stops firing
 # fails this guard. The other hook scripts the tracked configs reference get
 # no-op stubs: only the session-open registration is under test here, and a
@@ -104,7 +104,7 @@ make_lab() {  # <harness> -> echoes lab dir
   git init -q -b main "$lab"
   git -C "$lab" config user.email fmtest@example.invalid
   git -C "$lab" config user.name fmtest
-  printf '# Firstmate lab\n' > "$lab/AGENTS.md"
+  printf '# Juggernaut lab\n' > "$lab/AGENTS.md"
   git -C "$lab" add -A >/dev/null 2>&1 || true
   git -C "$lab" commit -q -m init >/dev/null 2>&1 || true
 

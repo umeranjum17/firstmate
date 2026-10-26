@@ -9,7 +9,7 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
 done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # owner-rules design flag: the backlog "design: required|none" line, the brief record, the typo guard and the nudge.
-# Usage: owner-rules/tests/design-flag.test.sh [<firstmate-checkout>]
+# Usage: owner-rules/tests/design-flag.test.sh [<juggernaut-checkout>]
 # Sources the real lib against a fixture backlog. With a checkout that carries the brief-inherit seam, it also
 # drives the real jg-brief.sh and reads data/<id>/brief.md.
 set -u
@@ -97,7 +97,7 @@ if [ -n "$FM" ] && [ -x "$FM/bin/jg-brief.sh" ] && grep -q jg_brief_inherit_shar
   brief none; [ -s "$home/data/none/brief.md" ] && ! grep -q 'Design discovery' "$home/data/none/brief.md" && ok "brief.md has no line for none" || no "brief.md for none"
   brief typo && no "typo briefed" || { [ ! -e "$home/data/typo" ] && ok "typo writes no brief" || no "typo left data/typo"; }
 else
-  echo "skip - jg-brief.sh journey (no firstmate checkout given)"
+  echo "skip - jg-brief.sh journey (no juggernaut checkout given)"
 fi
 
 [ "$fails" -eq 0 ] && echo "PASS design-flag" || { echo "FAIL design-flag: $fails"; exit 1; }

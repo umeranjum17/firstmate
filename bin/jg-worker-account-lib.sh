@@ -21,13 +21,13 @@
 # that is CLAUDE_CONFIG_DIR unset, because Claude reads $CLAUDE_CONFIG_DIR/
 # .claude.json and keys its macOS Keychain entry to any CLAUDE_CONFIG_DIR that
 # is set, even $HOME/.claude; for Pi it is $HOME/.pi/agent. Any other value is
-# one absolute path to an existing readable, searchable directory. Firstmate
+# one absolute path to an existing readable, searchable directory. Juggernaut
 # never copies credentials or changes a global login.
 #
 # A Pi root can hold several provider identities, so config/pi-account names
 # the root on line 1 and the providers that home may spend on line 2,
 # separated by spaces. A pinned Pi launch must name its provider explicitly as
-# --model <provider>/<id>, and that provider must be declared; Firstmate never
+# --model <provider>/<id>, and that provider must be declared; Juggernaut never
 # guesses a provider for an unqualified model. The canonical launch also
 # passes --provider <that provider>, because without it Pi may resolve a
 # provider-prefixed model under another authenticated provider. A raw Pi
@@ -267,7 +267,7 @@ jg_worker_account_select() {
       return 1
     fi
     provider=$(jg_worker_account_pi_provider "$model") || {
-      echo "error: config/pi-account pins Pi workers to providers ($providers), so a Pi launch needs --model <provider>/<id> naming one of them; '${model:-none}' names no provider, and Firstmate does not guess one" >&2
+      echo "error: config/pi-account pins Pi workers to providers ($providers), so a Pi launch needs --model <provider>/<id> naming one of them; '${model:-none}' names no provider, and Juggernaut does not guess one" >&2
       return 1
     }
     case " $providers " in

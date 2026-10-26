@@ -6,7 +6,7 @@ It is the stable, documented hook for Juggernaut status; this page is its contra
 ## Turning it on and off
 
 Create the presence flag `config/fleet-ledger` in a Juggernaut home to turn the ledger on, and delete it to turn the ledger off.
-The flag is local, gitignored, per home, and not inherited by second mate homes, so each home that should publish a ledger needs its own flag.
+The flag is local, gitignored, per home, and not inherited by squad lead homes, so each home that should publish a ledger needs its own flag.
 While the flag is absent, each producer performs one file-existence test and nothing else: no process starts and nothing is written.
 
 ## The file
@@ -29,13 +29,13 @@ Readers must ignore members and events they do not recognize, so later versions 
 
 | Event              | Extra members                                  | Written when |
 | ------------------ | ---------------------------------------------- | ------------ |
-| `task.dispatched`  | `kind`, `project`, `harness`, `model`          | A new worker or second mate is launched. A relaunch of an existing task is not recorded. |
+| `task.dispatched`  | `kind`, `project`, `harness`, `model`          | A new worker or squad lead is launched. A relaunch of an existing task is not recorded. |
 | `task.status`      | `state`, `key`, `text`                         | A complete, nonblank line in the task's status log is captured. |
 | `task.pr_ready`    | `pr`                                           | Juggernaut records the task's PR as ready for review. |
 | `task.merged`      | `via` (`"pr"` or `"local"`), plus `pr` when `via` is `"pr"` | The task's PR merge is recorded, or its local-only branch landed. |
 | `task.cleaned_up`  | none                                           | The task's worker and local copy were removed. |
 
-`task.dispatched` members: `kind` is `ship`, `scout`, or `secondmate`; `project` is the project directory name, or `null` for a remote second mate; `harness` names the agent tool; `model` is the requested model, or `null` for the tool's default.
+`task.dispatched` members: `kind` is `ship`, `scout`, or `squad lead`; `project` is the project directory name, or `null` for a remote squad lead; `harness` names the agent tool; `model` is the requested model, or `null` for the tool's default.
 
 `task.pr_ready` members: `pr` is the PR's full URL.
 It is written each time Juggernaut records a PR for the task, so registering a replacement PR, or the same PR again, writes another record; recording the PR again as part of merging it writes none.
@@ -60,9 +60,9 @@ Example:
 - A worker using the current status command in its instructions records its line immediately after appending it, while the ledger is enabled.
   The supervision monitor's regular poll is the backstop: it records any line the immediate write missed, and does not record again a line that write already recorded.
   These lines still trail the status log by up to one poll interval, or until the monitor next runs when none is running:
-  - lines Juggernaut itself writes to a task's status log, such as a recorded answer, a failed launch, a relayed pending reply, or a second mate's report line;
+  - lines Juggernaut itself writes to a task's status log, such as a recorded answer, a failed launch, a relayed pending reply, or a squad lead's report line;
   - lines from workers whose instructions predate this, or that append without running the instruction's full command;
-  - lines a remote second mate reports, which reach this home through Juggernaut's relay;
+  - lines a remote squad lead reports, which reach this home through Juggernaut's relay;
   - lines written while the immediate record fails, for example when the ledger file cannot be written.
   Recording `task.pr_ready`, `task.merged`, or `task.cleaned_up` first records that task's pending status lines.
 - Captured status lines are delivered at least once unless a write fails or a crash loses unflushed records: an interrupted capture can repeat records, so a reader that must not double-count should tolerate duplicates.
@@ -76,8 +76,8 @@ Example:
 
 ## Reading lifecycle metrics
 
-The firstmate-addons fleet-flow add-on reads retained fleet records into lifecycle, queue-reason, and bottleneck metrics, with optional live capacity observations; this fork's `bin/jg-flow.sh` is a thin shim that execs the add-on's `fleet-flow/bin/jg-flow.sh` with `JG_BIN` pointing at this checkout's `bin/`, and the add-on reader's header owns usage, output interpretation, timestamp provenance, and uncertainty limits.
-The dashboard's Insights view consumes its output: the firstmate-addons fleet-dashboard add-on (reached through the `jg-dashboard.sh` shim) runs the reader at each build and embeds the result as the `flow` key of `board.json`.
+The juggernaut-addons fleet-flow add-on reads retained fleet records into lifecycle, queue-reason, and bottleneck metrics, with optional live capacity observations; this fork's `bin/jg-flow.sh` is a thin shim that execs the add-on's `fleet-flow/bin/jg-flow.sh` with `JG_BIN` pointing at this checkout's `bin/`, and the add-on reader's header owns usage, output interpretation, timestamp provenance, and uncertainty limits.
+The dashboard's Insights view consumes its output: the juggernaut-addons fleet-dashboard add-on (reached through the `jg-dashboard.sh` shim) runs the reader at each build and embeds the result as the `flow` key of `board.json`.
 The add-on's header owns that embedding and its scrubbing.
 The reader's CLI regression journey is the add-on's `fleet-flow/tests/jg-flow.test.sh`, run with `JG_BIN` naming this checkout's `bin/`; the shim's own behavior is covered by [`tests/jg-flow-shim.test.sh`](../tests/jg-flow-shim.test.sh).
 
@@ -85,11 +85,11 @@ The reader's CLI regression journey is the add-on's `fleet-flow/tests/jg-flow.te
 
 [`jg-task-outcome.sh`](../bin/jg-task-outcome.sh) appends one durable, append-only row per finished task to the home-local `data/metrics/task-outcomes.tsv`, whose header row and columns are `home`, `task`, `kind`, `project`, `models`, `started`, `ended`, `outcome`, and `pr`; give it the same trust as `state/`.
 `models` lists every launch of the task in order as `harness:model:effort`, joined by `;`, sourced from the `state/<id>.models` history that `jg-spawn.sh` starts on a fresh spawn and appends to on each relaunch, so a mid-task model switch is recorded rather than lost.
-`outcome` is `merged`, `closed`, `cancelled`, `scout`, or `failed`; a secondmate retirement is not a task and records nothing.
+`outcome` is `merged`, `closed`, `cancelled`, `scout`, or `failed`; a squad lead retirement is not a task and records nothing.
 The recorder runs best-effort from `bin/jg-teardown.sh` before the task's durable presentation is retired, and never blocks cleanup.
 
 [`jg-model-stats.sh`](../bin/jg-model-stats.sh) reads every local home's `task-outcomes.tsv` and the main home's sampled `lanes.tsv`/`prs.tsv` into `jg-model-stats.v1`: per model over 7- and 30-day windows, started, finished, merged, merge rate, time-to-merge P50/P75, first-pass rate, rework, revert, escape, cancelled/failed, and model switches, each with its sample size.
-The firstmate-addons fleet-stats add-on reader's header owns usage (`--json [--now <epoch>]`), attribution, and uncertainty limits.
+The juggernaut-addons fleet-stats add-on reader's header owns usage (`--json [--now <epoch>]`), attribution, and uncertainty limits.
 A task is attributed to the model of its final launch, and one that changed model mid-flight counts as a switch under that model.
 Every recorded outcome is authoritative; a sampled lane that predates the recorder is a disclosed fallback, and merge rate is computed over recorded outcomes only so a sampled row never fabricates a rate.
 First-pass, rework, revert and escape figures use the same recorded merged PRs as merge rate, since a sampled lane only proves the merges it observed and never the tasks that ended without one; the coverage line counts the sampled tasks they leave out.
@@ -100,7 +100,7 @@ The dashboard's Insights view embeds the reader as the `models` key of `board.js
 [`jg-skill-stats.sh`](../bin/jg-skill-stats.sh) reads the main home's private `data/metrics/skills.tsv` (`day`, `home`, `skill`, `reads`) into `jg-skill-stats.v1`: per skill over 7- and 30-day windows, its read count and the number of homes it was read in, plus a per-home breakdown and, for each window the file's coverage spans, the known skills that had no reads in it.
 Known skill names come from each local home's `skills/` and `.agents/skills/` directories; a missing file or directory contributes nothing rather than failing.
 A registered remote home's reads are not readable locally and are disclosed; while one is registered the reader makes no zero-read claim, since a skill it never saw locally may still have been read there.
-The firstmate-addons fleet-stats add-on reader's header owns usage (`--json [--now <epoch>]`), window arithmetic, and uncertainty limits; the dashboard embeds it as the `skills` key of `board.json`, and its regression journeys are the add-on's `fleet-stats` tests.
+The juggernaut-addons fleet-stats add-on reader's header owns usage (`--json [--now <epoch>]`), window arithmetic, and uncertainty limits; the dashboard embeds it as the `skills` key of `board.json`, and its regression journeys are the add-on's `fleet-stats` tests.
 
 ## Not included
 

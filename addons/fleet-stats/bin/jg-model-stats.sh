@@ -12,7 +12,7 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Usage: JG_HOME=<home> jg-model-stats.sh --json [--now <unix-seconds>]
 #
 # Read-only: it writes nothing and never touches an endpoint. It reads this home,
-# then every locally registered home found through each home's data/secondmates.md,
+# then every locally registered home found through each home's data/squad_leads.md,
 # from three durable sources: data/metrics/task-outcomes.tsv (the authoritative
 # record bin/jg-task-outcome.sh writes per task end, never sampled), the older
 # sampled data/metrics/lanes.tsv (used only for tasks the outcomes file predates,

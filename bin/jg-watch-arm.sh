@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
-# Safe, home-scoped (re-)arm of the firstmate watcher, with honest verification.
+# Safe, home-scoped (re-)arm of the juggernaut watcher, with honest verification.
 #
 # The watcher (bin/jg-watch.sh) blocks until it has an actionable wake to
 # surface, then prints one reason line and exits. While state/.afk exists the
 # daemon owns triage and the watcher exits on every wake for the daemon to
 # classify. Reliability depends on arming through a mechanism that SURVIVES the
-# call and NOTIFIES on exit, so firstmate must run this script as the harness's
+# call and NOTIFIES on exit, so juggernaut must run this script as the harness's
 # own tracked background task (e.g. run_in_background), or - for a Claude
 # primary - inside the Stop asyncRewake hook's foreground process tree
 # (bin/jg-claude-stop-autoarm.sh), where the harness owns the process group and
@@ -69,8 +69,8 @@
 # wins the singleton while the duplicate child stands down. It
 # resolves and signals exactly that pid, so it can never touch another home's
 # watcher. NEVER `pkill -f
-# bin/jg-watch.sh`: that pattern matches every firstmate home's watcher
-# (secondmate homes run the same script) and would kill siblings.
+# bin/jg-watch.sh`: that pattern matches every juggernaut home's watcher
+# (squad_lead homes run the same script) and would kill siblings.
 #
 # --take-over <arm-pid>: own the cycle that arm <arm-pid> owns, for an owner
 # that left a successor cycle running through main's turn and now parks again
@@ -620,7 +620,7 @@ fi
 # Start a watcher as a tracked child and confirm it before settling in. The child
 # stays our child for its whole life: we wait on it, so killing this arm (the
 # harness-tracked task) tears the watcher down too, and the watcher's eventual
-# wake exit propagates out so the harness re-notifies firstmate.
+# wake exit propagates out so the harness re-notifies juggernaut.
 child=
 child_out=
 cleanup_child() {

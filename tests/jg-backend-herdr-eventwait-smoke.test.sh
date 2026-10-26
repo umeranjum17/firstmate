@@ -70,7 +70,7 @@ EOF
 [ -n "$PANE_ID" ] || fail "create_task did not return a pane id"
 TARGET="$SESSION:$PANE_ID"
 
-# scratch firstmate state so window_to_task and the wake queue resolve
+# scratch juggernaut state so window_to_task and the wake queue resolve
 SCRATCH=$(mktemp -d "${TMPDIR:-/tmp}/jg-evwait.XXXXXX")
 STATE="$SCRATCH/state"; mkdir -p "$STATE"
 cat > "$STATE/evwait1.meta" <<EOF

@@ -68,7 +68,7 @@ cp "$ROOT/.opencode/plugins/jg-primary-watch-arm.js" "$JG_HOME/.opencode/plugins
 cp "$ROOT/.opencode/plugins/lib/jg-operational-input.js" "$JG_HOME/.opencode/plugins/lib/"
 printf '{"type":"module"}\n' > "$JG_HOME/.opencode/plugins/package.json"
 printf 'manual\n' > "$JG_HOME/config/backlog-backend"
-printf 'lead\n' > "$JG_HOME/.jg-secondmate-home"
+printf 'lead\n' > "$JG_HOME/.jg-squad-lead-home"
 printf '# Isolated verification agent\nNo real fleet work. Only after an actual WATCHER FIRED message: run bin/jg-wake-drain.sh | tee -a data/drain.txt, execute its printed WAKE_ACK_REQUIRED command, then cp state/.wake-queue.seq state/lead-handled. Never manually arm monitoring. Reply briefly.\n' > "$JG_HOME/AGENTS.md"
 git -C "$JG_HOME" init -q
 for id in lanea laneb; do
@@ -107,7 +107,7 @@ prompt='For this initial turn only: run printf ready > state/lead-ready, then re
 printf 'printf "%%s\\n" "$$" > %q; JG_POLL=2 JG_SIGNAL_GRACE=0 JG_HEARTBEAT=99999 OPENCODE_DISABLE_PROJECT_CONFIG=1 OPENCODE_CONFIG=%q OPENCODE_DISABLE_AUTOUPDATE=1 exec opencode --model opencode/big-pickle --prompt %q\n' "$JG_HOME/state/.lock" "$JG_HOME/opencode.json" "$prompt" > "$JG_HOME/launch.sh"
 lab pane run "$pane" "bash '$JG_HOME/launch.sh'" >/dev/null
 for ((i=0;i<180;i++)); do [ -s "$JG_HOME/state/lead-handled" ] && break; sleep 1; done
-[ "$i" -lt 180 ] || fail "OpenCode $VERSION: second mate did not receive the automatic outage wake"
+[ "$i" -lt 180 ] || fail "OpenCode $VERSION: squad lead did not receive the automatic outage wake"
 elapsed=$(( $(date +%s) - failure_at ))
 [ "$elapsed" -lt 300 ] || fail "outage delivery took ${elapsed}s"
 printf 'outage delivered and handled in %ss\n' "$elapsed" > "$E/latency.txt"
@@ -126,9 +126,9 @@ for ((i=0;i<180;i++)); do
   [[ "$after" =~ ^[0-9]+$ ]] && [ "$after" -gt "$before" ] && grep -q 'lanea.status' "$JG_HOME/state/.watch-deliveries.log" && break
   sleep 1
 done
-[ "$i" -lt 180 ] || fail 'second mate did not wake for its own worker'
+[ "$i" -lt 180 ] || fail 'squad lead did not wake for its own worker'
 cp "$JG_HOME/state/.last-watcher-beat" "$E/second-beacon"
 sleep 4
 [ "$JG_HOME/state/.last-watcher-beat" -nt "$E/second-beacon" ] || fail 'beacon stopped after the second turn'
 lab pane read "$pane" --source visible > "$E/lead-final.txt"
-echo "PASS OpenCode $VERSION: grouped hosted outage delivered automatically; second mate keeps monitoring across turns"
+echo "PASS OpenCode $VERSION: grouped hosted outage delivered automatically; squad lead keeps monitoring across turns"

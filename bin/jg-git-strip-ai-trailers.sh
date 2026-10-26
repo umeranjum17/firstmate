@@ -41,7 +41,7 @@
 # Co-Authored-By trailer at the tooling layer AFTER the worker types a clean
 # message, so the typed message is not the commit object.
 # A prior per-machine ~/.cursor/cli-config.json attribution-off is not durable:
-# it does not travel with Firstmate, it defaults back to on when unset, and it
+# it does not travel with Juggernaut, it defaults back to on when unset, and it
 # only feeds the CLI's request to the server - the trailer text is emitted by
 # the model, so the setting suppresses rather than prevents it. Verified live
 # on cursor-agent 2026.09.15 with attribution on: the trailer is already in

@@ -8,7 +8,7 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
   export "$_jg_new=$_jg_val"
 done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
-# Live proof on the real product: the installed codex, launched the way jg-spawn launches a crewmate (hooks disabled, so
+# Live proof on the real product: the installed codex, launched the way jg-spawn launches a operator (hooks disabled, so
 # it runs embedded), runs agent commands through this checkout's guards and adapter, installed into a temporary data
 # folder and passed with -c. Commands get a fixture HOME with planted files only; the real login is never read.
 # Spends one short Codex turn on the signed-in default account. Output: $DONE_DONE_EVIDENCE_ROOT/codex-guard-live/.
@@ -45,5 +45,5 @@ ok() { echo "ok: $*"; }; no() { echo "FAIL: $*"; }
   grep -A1 -E "bash -lc 'kill [0-9]+'" "$OUT/codex-exec.txt" | grep -q succeeded && ok "kill of the task's own timer ran" || no "own timer kill"
 } > "$OUT/result.txt"
 cat "$OUT/result.txt"
-jq -n --arg v "$(cat "$OUT/codex.txt")" --arg r "$(cat "$OUT/result.txt")" '{target: {version: $v}, start: "this checkout'"'"'s delete, kill and read guards and codex-guard installed in a temporary data folder; a fixture HOME with an empty jg-probe folder and a planted pipeline config", steps: ["launch the installed codex exec the way jg-spawn launches a crewmate (--disable hooks), BASH_ENV from the temporary install", "ask the agent to start and stop its own timer, show the planted config, check PID 1, and delete ~/jg-probe", "run the delete guard watcher check on the fixture home"], result: $r}' > "$DONE_DONE_EVIDENCE_ROOT/steps.json"
+jq -n --arg v "$(cat "$OUT/codex.txt")" --arg r "$(cat "$OUT/result.txt")" '{target: {version: $v}, start: "this checkout'"'"'s delete, kill and read guards and codex-guard installed in a temporary data folder; a fixture HOME with an empty jg-probe folder and a planted pipeline config", steps: ["launch the installed codex exec the way jg-spawn launches a operator (--disable hooks), BASH_ENV from the temporary install", "ask the agent to start and stop its own timer, show the planted config, check PID 1, and delete ~/jg-probe", "run the delete guard watcher check on the fixture home"], result: $r}' > "$DONE_DONE_EVIDENCE_ROOT/steps.json"
 ! grep -q '^FAIL' "$OUT/result.txt"

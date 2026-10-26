@@ -215,7 +215,7 @@ pass "a bound hit stops a captain hold loudly instead of being read as a missing
 # The teardown gate reaches a row read through the same resolver, so the bound
 # hit has to survive the command substitution that carries the resolved id.
 jg_write_meta "$CAPTAIN/state/wedged-origin.meta" \
-  'window=firstmate:jg-wedged-origin' \
+  'window=juggernaut:jg-wedged-origin' \
   'worktree=/nonexistent/wedged-origin' \
   'project=alpha' \
   'harness=claude' \
@@ -334,7 +334,7 @@ binary = "bd"
 TOML
 printf '# Backlog\n' > "$MIG/data/backlog.md"
 jg_write_meta "$MIG/state/wedged-origin.meta" \
-  'window=firstmate:jg-wedged-origin' \
+  'window=juggernaut:jg-wedged-origin' \
   'worktree=/nonexistent/wedged-origin' \
   'project=alpha' \
   'harness=claude' \
@@ -399,7 +399,7 @@ jg_fake_version_tool "$E2E_FAKEBIN" no-mistakes JG_FAKE_NO_MISTAKES_VERSION \
 printf '# Backlog\n' > "$E2E_HOME/data/backlog.md"
 # One owned record, so the reconcile sweep actually reads the wedged backend.
 jg_write_meta "$E2E_HOME/state/wedged-task.meta" \
-  'window=firstmate:jg-wedged-task' \
+  'window=juggernaut:jg-wedged-task' \
   'worktree=/nonexistent/wedged-task' \
   'project=alpha' \
   'harness=claude' \

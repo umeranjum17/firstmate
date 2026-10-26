@@ -62,7 +62,7 @@ case "$GENERATION" in ''|*[!0-9]*) die "generation must be a positive integer" ;
 [ "${#GENERATION}" -le 18 ] && [ "$GENERATION" -ge 1 ] || die "generation is outside the supported range"
 HOME_REAL=$(CDPATH='' cd -- "$JG_HOME" 2>/dev/null && pwd -P) || die "JG_HOME is unavailable"
 PARENT="$HOME_REAL/$(dirname "$REL")"
-# The captain accepts this config/data parent TOCTOU within Firstmate's single-user trust boundary.
+# The captain accepts this config/data parent TOCTOU within Juggernaut's single-user trust boundary.
 [ ! -L "$PARENT" ] || die "inherited destination parent is a symlink"
 mkdir -p "$PARENT" || die "cannot create inherited destination parent"
 PARENT_REAL=$(CDPATH='' cd -- "$PARENT" && pwd -P)

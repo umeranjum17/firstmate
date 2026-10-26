@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
-# jg-send from-firstmate marker for secondmate targets.
+# jg-send from-juggernaut marker for squad_lead targets.
 #
-# A secondmate is itself a firstmate, so a request relayed to it lands in its own
-# chat - which the main firstmate never reads (the only channel back is the terse
-# status file). jg-send therefore prepends a from-firstmate marker
+# A squad_lead is itself a juggernaut, so a request relayed to it lands in its own
+# chat - which the main juggernaut never reads (the only channel back is the terse
+# status file). jg-send therefore prepends a from-juggernaut marker
 # (bin/jg-marker-lib.sh) when, and only when, the resolved target is a task
-# selector whose meta records kind=secondmate, so the secondmate can recognize
+# selector whose meta records kind=squad_lead, so the squad_lead can recognize
 # the request and route its reply via the status path. The marker now travels
 # inside the durable inbox record's body (the payload is never typed; only the
 # doorbell is). These tests pin that behavior hermetically (stubbed tmux, no
 # real agent):
-#   1. Exact-id and stable-label kind=secondmate selectors prepend the marker
+#   1. Exact-id and stable-label kind=squad_lead selectors prepend the marker
 #      to the recorded steer, never to the typed doorbell.
-#   2. Exact-id and stable-label ordinary crewmate selectors stay unmarked.
+#   2. Exact-id and stable-label ordinary operator selectors stay unmarked.
 #   3. Explicit endpoints stay unmarked and typed, with or without local meta.
 #   4. The --key path never carries the marker and never enqueues a record.
 #   5. Direct captain text stays unmarked, and already-marked text is idempotent.
@@ -100,22 +100,22 @@ record_body() {  # <record-path>
   bash -c '. "$1"; jg_task_inbox_body "$2"' _ "$ROOT/bin/jg-task-inbox-lib.sh" "$1"
 }
 
-test_secondmate_target_is_marked() {
+test_squad_lead_target_is_marked() {
   local dir fb log home rc got corr
   dir="$TMP_ROOT/sm"; mkdir -p "$dir"
   fb=$(make_stubs "$dir"); log="$dir/send.log"
   home=$(setup_home sm)
-  jg_write_secondmate_meta "$home/state/domain.meta" "$home" "sess:jg-domain"
+  jg_write_squad_lead_meta "$home/state/domain.meta" "$home" "sess:jg-domain"
   run_send "$fb" "$home" "$log" "jg-domain" "audit the build"; rc=$?
-  expect_code 0 "$rc" "send to a secondmate target should succeed"
+  expect_code 0 "$rc" "send to a squad_lead target should succeed"
   got=$(record_body "$home/state/domain.inbox/001.msg")
   case "$got" in
     "$JG_FROMFIRST_MARK"corr=[a-f0-9][a-f0-9]*) : ;;
-    *) fail "secondmate send: the recorded steer should be marker+corr+text"$'\n'"--- bytes ---"$'\n'"$(printf '%s' "$got" | od -An -c)" ;;
+    *) fail "squad_lead send: the recorded steer should be marker+corr+text"$'\n'"--- bytes ---"$'\n'"$(printf '%s' "$got" | od -An -c)" ;;
   esac
   case "$got" in
     *audit\ the\ build) : ;;
-    *) fail "secondmate send lost the request body"$'\n'"$got" ;;
+    *) fail "squad_lead send lost the request body"$'\n'"$got" ;;
   esac
   case "$(cat "$log")" in
     *"$JG_FROMFIRST_MARK"*) fail "the marker must ride the record, never the typed doorbell" ;;
@@ -124,22 +124,22 @@ test_secondmate_target_is_marked() {
   . "$ROOT/bin/jg-pending-reply-lib.sh"
   corr=$(jg_pending_reply_extract_corr "$got")
   [ -f "$(jg_pending_reply_path "$home/state" "$corr")" ] \
-    || fail "marked secondmate send should create a parent pending-reply record"
-  pass "jg-send: a kind=secondmate target gets the from-firstmate marker and corr prepended"
+    || fail "marked squad_lead send should create a parent pending-reply record"
+  pass "jg-send: a kind=squad_lead target gets the from-juggernaut marker and corr prepended"
 }
 
-test_exact_secondmate_task_id_is_marked() {
+test_exact_squad_lead_task_id_is_marked() {
   local dir fb log home rc got already_marked corr
   dir="$TMP_ROOT/sm-exact"; mkdir -p "$dir"
   fb=$(make_stubs "$dir"); log="$dir/send.log"
   home=$(setup_home sm-exact)
-  jg_write_secondmate_meta "$home/state/domain.meta" "$home" "sess:jg-domain"
+  jg_write_squad_lead_meta "$home/state/domain.meta" "$home" "sess:jg-domain"
   run_send "$fb" "$home" "$log" "domain" "audit the build"; rc=$?
-  expect_code 0 "$rc" "send to an exact secondmate task id should succeed"
+  expect_code 0 "$rc" "send to an exact squad_lead task id should succeed"
   got=$(record_body "$home/state/domain.inbox/001.msg")
   case "$got" in
     "$JG_FROMFIRST_MARK"corr=[a-f0-9]*) : ;;
-    *) fail "exact secondmate send: the recorded steer should be marker+corr+text"$'\n'"--- bytes ---"$'\n'"$(printf '%s' "$got" | od -An -c)" ;;
+    *) fail "exact squad_lead send: the recorded steer should be marker+corr+text"$'\n'"--- bytes ---"$'\n'"$(printf '%s' "$got" | od -An -c)" ;;
   esac
   # shellcheck source=/dev/null
   . "$ROOT/bin/jg-pending-reply-lib.sh"
@@ -151,12 +151,12 @@ test_exact_secondmate_task_id_is_marked() {
   got=$(record_body "$home/state/domain.inbox/002.msg")
   case "$got" in
     "${JG_FROMFIRST_MARK}corr=${corr} already routed") : ;;
-    *) fail "exact secondmate send altered already-correlated content"$'\n'"--- bytes ---"$'\n'"$(printf '%s' "$got" | od -An -tx1)" ;;
+    *) fail "exact squad_lead send altered already-correlated content"$'\n'"--- bytes ---"$'\n'"$(printf '%s' "$got" | od -An -tx1)" ;;
   esac
-  pass "jg-send: an exact kind=secondmate task id is marked with corr exactly once"
+  pass "jg-send: an exact kind=squad_lead task id is marked with corr exactly once"
 }
 
-test_crewmate_target_is_not_marked() {
+test_operator_target_is_not_marked() {
   local dir fb log home rc got
   dir="$TMP_ROOT/crew"; mkdir -p "$dir"
   fb=$(make_stubs "$dir"); log="$dir/send.log"
@@ -165,15 +165,15 @@ test_crewmate_target_is_not_marked() {
     "window=sess:jg-build" "worktree=$home/wt" "project=$home/p" \
     "harness=echo" "kind=ship" "mode=no-mistakes" "yolo=off"
   run_send "$fb" "$home" "$log" "jg-build" "fix the test"; rc=$?
-  expect_code 0 "$rc" "send to a stable-label crewmate target should succeed"
+  expect_code 0 "$rc" "send to a stable-label operator target should succeed"
   got=$(record_body "$home/state/build.inbox/001.msg")
   [ "$got" = "fix the test" ] \
-    || fail "stable-label crewmate send: expected bare recorded text, got marker or other"$'\n'"--- bytes ---"$'\n'"$(printf '%s' "$got" | od -An -c)"
+    || fail "stable-label operator send: expected bare recorded text, got marker or other"$'\n'"--- bytes ---"$'\n'"$(printf '%s' "$got" | od -An -c)"
   run_send "$fb" "$home" "$log" "build" "fix the exact test"; rc=$?
-  expect_code 0 "$rc" "send to an exact-id crewmate target should succeed"
+  expect_code 0 "$rc" "send to an exact-id operator target should succeed"
   got=$(record_body "$home/state/build.inbox/002.msg")
   [ "$got" = "fix the exact test" ] \
-    || fail "exact-id crewmate send: expected bare recorded text, got marker or other"$'\n'"--- bytes ---"$'\n'"$(printf '%s' "$got" | od -An -c)"
+    || fail "exact-id operator send: expected bare recorded text, got marker or other"$'\n'"--- bytes ---"$'\n'"$(printf '%s' "$got" | od -An -c)"
   pass "jg-send: exact-id and stable-label kind=ship selectors are sent unmarked"
 }
 
@@ -182,9 +182,9 @@ test_explicit_window_is_not_marked() {
   dir="$TMP_ROOT/explicit"; mkdir -p "$dir"
   fb=$(make_stubs "$dir"); log="$dir/send.log"
   home=$(setup_home explicit)
-  # An explicit endpoint is not a task selector, so even matching secondmate
+  # An explicit endpoint is not a task selector, so even matching squad_lead
   # metadata must not make jg-send guess the caller's intent and mark it.
-  jg_write_secondmate_meta "$home/state/win.meta" "$home" "other:win"
+  jg_write_squad_lead_meta "$home/state/win.meta" "$home" "other:win"
   run_send "$fb" "$home" "$log" "other:win" "ping"; rc=$?
   expect_code 0 "$rc" "send to an explicit window with matching meta should succeed"
   got=$(cat "$log")
@@ -205,9 +205,9 @@ test_key_path_is_not_marked() {
   dir="$TMP_ROOT/key"; mkdir -p "$dir"
   fb=$(make_stubs "$dir"); log="$dir/send.log"
   home=$(setup_home key)
-  jg_write_secondmate_meta "$home/state/domain.meta" "$home" "sess:jg-domain"
+  jg_write_squad_lead_meta "$home/state/domain.meta" "$home" "sess:jg-domain"
   run_send "$fb" "$home" "$log" "jg-domain" --key Escape; rc=$?
-  expect_code 0 "$rc" "--key send to a secondmate should succeed"
+  expect_code 0 "$rc" "--key send to a squad_lead should succeed"
   [ ! -s "$log" ] \
     || fail "--key path logged a literal send (marker leaked into a keypress)"$'\n'"--- bytes ---"$'\n'"$(od -An -c "$log")"
   [ ! -d "$home/state/domain.inbox" ] \
@@ -218,31 +218,31 @@ test_key_path_is_not_marked() {
 test_marker_is_label_plus_invisible_separator() {
   local separator hex
   separator=$(printf '\342\201\243')
-  [ "$JG_FROMFIRST_MARK" = "[jg-from-firstmate]$separator" ] \
+  [ "$JG_FROMFIRST_MARK" = "[jg-from-juggernaut]$separator" ] \
     || fail "marker is not the expected label + U+2063 sequence"$'\n'"--- bytes ---"$'\n'"$(printf '%s' "$JG_FROMFIRST_MARK" | od -An -tx1)"
   hex=$(printf '%s' "$JG_FROMFIRST_MARK" | od -An -tx1 | tr -d ' \n')
   case "$hex" in
     *e281a3) : ;;
     *) fail "marker does not end in UTF-8 U+2063 bytes e2 81 a3; bytes were: $hex" ;;
   esac
-  jg_message_from_firstmate "${JG_FROMFIRST_MARK}do the work" \
+  jg_message_from_juggernaut "${JG_FROMFIRST_MARK}do the work" \
     || fail "detector should recognize a marked message"
-  jg_message_from_firstmate "do the work" \
+  jg_message_from_juggernaut "do the work" \
     && fail "direct captain input must remain unmarked"
-  jg_message_from_firstmate "[jg-from-firstmate]do the work" \
+  jg_message_from_juggernaut "[jg-from-juggernaut]do the work" \
     && fail "detector must reject the label without U+2063"
-  pass "jg-send: the marker is '[jg-from-firstmate]' + terminal-safe U+2063, while direct captain text stays unmarked"
+  pass "jg-send: the marker is '[jg-from-juggernaut]' + terminal-safe U+2063, while direct captain text stays unmarked"
 }
 
 test_marker_transformation_is_idempotent() {
   local once twice
-  jg_message_mark_from_firstmate "do the work" once
-  jg_message_mark_from_firstmate "$once" twice
+  jg_message_mark_from_juggernaut "do the work" once
+  jg_message_mark_from_juggernaut "$once" twice
   [ "$once" = "$twice" ] \
     || fail "already-marked content was double-prefixed"$'\n'"--- once ---"$'\n'"$(printf '%s' "$once" | od -An -tx1)"$'\n'"--- twice ---"$'\n'"$(printf '%s' "$twice" | od -An -tx1)"
   [ "$once" = "${JG_FROMFIRST_MARK}do the work" ] \
     || fail "marker transformation did not prefix bare content exactly once"
-  pass "jg-marker: from-firstmate transformation is idempotent"
+  pass "jg-marker: from-juggernaut transformation is idempotent"
 }
 
 test_marked_send_preserves_trailing_newlines() {
@@ -250,7 +250,7 @@ test_marked_send_preserves_trailing_newlines() {
   dir="$TMP_ROOT/sm-trailing-newlines"; mkdir -p "$dir"
   fb=$(make_stubs "$dir"); log="$dir/send.log"
   home=$(setup_home sm-trailing-newlines)
-  jg_write_secondmate_meta "$home/state/domain.meta" "$home" "sess:jg-domain"
+  jg_write_squad_lead_meta "$home/state/domain.meta" "$home" "sess:jg-domain"
   payload=$'audit the build\n\n'
   run_send "$fb" "$home" "$log" "domain" "$payload"; rc=$?
   expect_code 0 "$rc" "marked send with trailing newlines should succeed"
@@ -265,12 +265,12 @@ test_marked_send_preserves_trailing_newlines() {
   record_body "$home/state/domain.inbox/001.msg" > "$actual"
   cmp -s "$expected" "$actual" \
     || fail "the marked record did not preserve trailing newline bytes exactly"
-  pass "jg-send: marked secondmate payload preserves trailing newline bytes in its record"
+  pass "jg-send: marked squad_lead payload preserves trailing newline bytes in its record"
 }
 
-test_secondmate_target_is_marked
-test_exact_secondmate_task_id_is_marked
-test_crewmate_target_is_not_marked
+test_squad_lead_target_is_marked
+test_exact_squad_lead_task_id_is_marked
+test_operator_target_is_not_marked
 test_explicit_window_is_not_marked
 test_key_path_is_not_marked
 test_marker_is_label_plus_invisible_separator

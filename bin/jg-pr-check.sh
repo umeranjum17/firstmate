@@ -66,14 +66,14 @@ if [ ! -f "$META" ] || [ -L "$META" ] || [ "$(jg_pr_file_link_count "$META")" !=
   exit 1
 fi
 
-# A secondmate is a persistent worker, not a delivery lane: it never owns a
+# A squad_lead is a persistent worker, not a delivery lane: it never owns a
 # pull request of its own. A URL reported on its routed status channel belongs
 # to a task inside the mate's own home, which records and watches it there;
 # arming a merge watch here would queue the mate itself for teardown as landed
 # work once that pull request merges.
 KIND=$(grep '^kind=' "$META" | tail -1 | cut -d= -f2- || true)
-if [ "$KIND" = secondmate ]; then
-  echo "error: $ID is a secondmate, not a delivery lane - $URL was reported on its status channel but belongs to a task in the mate's own home, which arms its own merge watch" >&2
+if [ "$KIND" = squad_lead ]; then
+  echo "error: $ID is a squad_lead, not a delivery lane - $URL was reported on its status channel but belongs to a task in the mate's own home, which arms its own merge watch" >&2
   exit 1
 fi
 
@@ -141,7 +141,7 @@ fi
 
 # pr_head is recorded only when the forge's CLI can supply it. gh exposes the
 # head commit as a selectable field; plain glab exposes it only inside its JSON
-# output, which would need a JSON processor firstmate does not require, and
+# output, which would need a JSON processor juggernaut does not require, and
 # tea's single-PR view ignores field selection entirely, so neither a GitLab
 # nor a Forgejo task records a pr_head here, and neither does a Gerrit task: a
 # Gerrit revision names one patch set, every amend or rebase is a new patch set,
@@ -276,7 +276,7 @@ if command -v jq >/dev/null 2>&1; then
 else
   printf 'contributions: jq unavailable; coverage is unconfirmed\n' >&2
 fi
-# In a secondmate home the registration itself is a captain-facing fact:
+# In a squad_lead home the registration itself is a captain-facing fact:
 # publish the child's PR-ready line with the canonical URL just recorded, so it
 # reaches the parent whether or not the mate model appends anything
 # (bin/jg-parent-channel-lib.sh). A main home has no channel and this is a

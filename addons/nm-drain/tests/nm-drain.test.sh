@@ -8,7 +8,7 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
   export "$_jg_new=$_jg_val"
 done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
-# End-to-end: drive nm-drain.sh and install.sh against a throwaway firstmate home, HOME and state DB, with a fake
+# End-to-end: drive nm-drain.sh and install.sh against a throwaway juggernaut home, HOME and state DB, with a fake
 # no-mistakes first on PATH that records every call and fails on --force. Usage: nm-drain/tests/nm-drain.test.sh
 set -euo pipefail
 SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)

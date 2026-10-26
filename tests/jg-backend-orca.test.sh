@@ -22,7 +22,7 @@ write_spawn_brief() {  # <data-dir> <id>
 ## Captain's intent
 Exercise Orca dispatch.
 
-## Firstmate spec
+## Juggernaut spec
 Verify the Orca lifecycle behavior under test.
 EOF
 }
@@ -241,7 +241,7 @@ test_composer_state_popup_placeholder_fill_is_pending() {
 test_composer_state_bare_shell_prompt_is_unknown() {
   local out
   orca_case composer-bare-shell
-  printf '{"ok":true,"result":{"terminal":{"tail":["some earlier output","kunchen@mac firstmate $ "]}}}\n' > "$RESP/1.out"
+  printf '{"ok":true,"result":{"terminal":{"tail":["some earlier output","kunchen@mac juggernaut $ "]}}}\n' > "$RESP/1.out"
   out=$( PATH="$FB:$PATH" JG_ORCA_LOG="$LOG" JG_ORCA_RESPONSES="$RESP" \
     bash -c '. "$0/bin/backends/orca.sh"; jg_backend_orca_composer_state term-123' "$ROOT" )
   [ "$out" = unknown ] || fail "a bare dead-shell prompt (no bordered composer row) must read unknown, got '$out'"
@@ -571,31 +571,31 @@ test_spawn_writes_orca_metadata_and_launches_harness() {
   pass "jg-spawn.sh --backend orca: reuses implicit terminal, records metadata, launches harness"
 }
 
-test_spawn_refuses_orca_secondmate_before_home_mutation() {
+test_spawn_refuses_orca_squad_lead_before_home_mutation() {
   local home subhome data state config id out status
   id="orcasmz1"
-  home="$TMP_ROOT/secondmate-refusal-home"
-  subhome="$TMP_ROOT/secondmate-refusal-subhome"
+  home="$TMP_ROOT/squad-lead-refusal-home"
+  subhome="$TMP_ROOT/squad-lead-refusal-subhome"
   data="$home/data"
   state="$home/state"
   config="$home/config"
   mkdir -p "$data" "$state" "$config" "$subhome/bin" "$subhome/data" "$subhome/state" "$subhome/projects"
-  printf '%s\n' "$id" > "$subhome/.jg-secondmate-home"
-  printf 'firstmate\n' > "$subhome/AGENTS.md"
+  printf '%s\n' "$id" > "$subhome/.jg-squad-lead-home"
+  printf 'juggernaut\n' > "$subhome/AGENTS.md"
   printf 'claude\n' > "$config/crew-harness"
   touch "$state/.last-watcher-beat"
   set +e
   out=$( JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" JG_STATE_OVERRIDE="$state" JG_DATA_OVERRIDE="$data" JG_CONFIG_OVERRIDE="$config" \
     JG_PROJECTS_OVERRIDE="$home/projects" JG_SPAWN_NO_GUARD=1 \
-    "$ROOT/bin/jg-spawn.sh" "$id" "$subhome" claude --backend orca --secondmate 2>&1 )
+    "$ROOT/bin/jg-spawn.sh" "$id" "$subhome" claude --backend orca --squad-lead 2>&1 )
   status=$?
   set +e
-  [ "$status" -ne 0 ] || fail "backend=orca --secondmate should be refused"
-  assert_contains "$out" "backend=orca does not support --secondmate spawns yet" \
-    "orca secondmate refusal should happen at backend selection"
+  [ "$status" -ne 0 ] || fail "backend=orca --squad-lead should be refused"
+  assert_contains "$out" "backend=orca does not support --squad-lead spawns yet" \
+    "orca squad_lead refusal should happen at backend selection"
   assert_absent "$subhome/config/crew-harness" \
-    "orca secondmate refusal should not propagate inherited local material into the secondmate home"
-  pass "jg-spawn.sh --backend orca --secondmate: refuses before secondmate-home mutation"
+    "orca squad_lead refusal should not propagate inherited local material into the squad_lead home"
+  pass "jg-spawn.sh --backend orca --squad-lead: refuses before squad-lead-home mutation"
 }
 
 test_spawn_refuses_orca_when_runtime_not_ready() {
@@ -795,7 +795,7 @@ test_peek_send_and_crew_state_route_through_orca_meta() {
   [ "$body" = "hello orca" ] || fail "Orca task inbox did not preserve the send body, got '$body'"
   assert_not_contains "$(cat "$LOG")" $'--text\x1fhello orca\x1f' \
     "send typed the payload instead of recording it"
-  assert_contains "$(cat "$LOG")" $'orca\x1f''terminal'$'\x1f''send'$'\x1f''--terminal'$'\x1f''term-io'$'\x1f''--text'$'\x1f'': Firstmate instruction waiting:' \
+  assert_contains "$(cat "$LOG")" $'orca\x1f''terminal'$'\x1f''send'$'\x1f''--terminal'$'\x1f''term-io'$'\x1f''--text'$'\x1f'': Juggernaut instruction waiting:' \
     "send did not ring the inbox doorbell through the recorded Orca terminal"
   assert_contains "$(cat "$LOG")" $'orca\x1f''terminal'$'\x1f''send'$'\x1f''--terminal'$'\x1f''term-io'$'\x1f''--text'$'\x1f\x1f''--enter'$'\x1f''--json' \
     "send did not submit the doorbell through the recorded Orca terminal"
@@ -1215,28 +1215,28 @@ test_teardown_refuses_orca_worktree_without_terminal_handle() {
   pass "jg-teardown.sh backend=orca: refuses incomplete worktree-only endpoint metadata before runtime dispatch"
 }
 
-test_secondmate_force_teardown_removes_orca_child_via_orca() {
+test_squad_lead_force_teardown_removes_orca_child_via_orca() {
   local home subhome childproj childwt child_id neutral out rc
   home="$TMP_ROOT/orca-child-parent"
-  subhome="$TMP_ROOT/orca-child-secondmate"
+  subhome="$TMP_ROOT/orca-child-squad-lead"
   childproj="$subhome/projects/alpha"
   childwt="$TMP_ROOT/orca-child-worktree"
   child_id="orcachildz6"
   mkdir -p "$home/state" "$home/data" "$subhome/state" "$subhome/projects"
-  printf 'domain\n' > "$subhome/.jg-secondmate-home"
+  printf 'domain\n' > "$subhome/.jg-squad-lead-home"
   jg_git_worktree "$childproj" "$childwt" "fm/$child_id"
   jg_write_meta "$home/state/domain.meta" \
-    "window=firstmate:jg-domain" "worktree=$subhome" "project=$subhome" \
-    "harness=echo" "kind=secondmate" "mode=secondmate" "yolo=off" \
+    "window=juggernaut:jg-domain" "worktree=$subhome" "project=$subhome" \
+    "harness=echo" "kind=squad_lead" "mode=squad_lead" "yolo=off" \
     "home=$subhome" "projects=alpha"
   printf '%s\n' "- domain - Orca child cleanup (home: $subhome; scope: orca cleanup; projects: alpha; added 2026-07-03)" \
-    > "$home/data/secondmates.md"
+    > "$home/data/squad_leads.md"
   jg_write_meta "$subhome/state/$child_id.meta" \
     "window=jg-$child_id" "endpoint_task_id=$child_id" \
     "terminal=term-child-cleanup" "worktree=$childwt" "project=$childproj" \
     "harness=claude" "kind=ship" "mode=no-mistakes" "yolo=off" \
     "backend=orca" "orca_worktree_id=wt-child-cleanup::/orca/wt-child-cleanup"
-  orca_case secondmate-child-cleanup
+  orca_case squad-lead-child-cleanup
   printf '{"ok":true,"result":{"worktree":{"id":"wt-child-cleanup::/orca/wt-child-cleanup","path":"%s"}}}\n' "$childwt" > "$RESP/1.out"
   printf '{"ok":true,"result":{"worktree":{"id":"wt-child-cleanup::/orca/wt-child-cleanup","path":"%s"}}}\n' "$childwt" > "$RESP/2.out"
   printf '{"ok":true,"result":{}}\n' > "$RESP/3.out"
@@ -1248,7 +1248,7 @@ test_secondmate_force_teardown_removes_orca_child_via_orca() {
     JG_ROOT_OVERRIDE="$neutral" JG_HOME="$home" "$ROOT/bin/jg-teardown.sh" domain --force 2>&1 )
   rc=$?
   set -e
-  expect_code 0 "$rc" "forced secondmate teardown should remove Orca child work through Orca"$'\n'"$out"
+  expect_code 0 "$rc" "forced squad_lead teardown should remove Orca child work through Orca"$'\n'"$out"
   assert_contains "$(cat "$LOG")" $'orca\x1f''terminal'$'\x1f''close'$'\x1f''--terminal'$'\x1f''term-child-cleanup'$'\x1f''--json' \
     "child cleanup did not close the recorded Orca terminal"
   assert_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''rm'$'\x1f''--worktree'$'\x1f''id:wt-child-cleanup::/orca/wt-child-cleanup'$'\x1f''--force'$'\x1f''--json' \
@@ -1256,33 +1256,33 @@ test_secondmate_force_teardown_removes_orca_child_via_orca() {
   assert_not_contains "$(cat "$LOG")" $'orca\x1f''terminal'$'\x1f''close'$'\x1f''--terminal'$'\x1f'"jg-$child_id" \
     "child cleanup closed the stable alias instead of the Orca terminal"
   assert_absent "$home/state/domain.meta" "parent metadata should be removed after forced teardown"
-  pass "jg-teardown.sh --force: removes Orca secondmate children through Orca"
+  pass "jg-teardown.sh --force: removes Orca squad_lead children through Orca"
 }
 
-test_secondmate_force_teardown_refuses_orca_child_id_path_mismatch() {
+test_squad_lead_force_teardown_refuses_orca_child_id_path_mismatch() {
   local home subhome childproj childwt other_wt child_id neutral out rc
   home="$TMP_ROOT/orca-child-mismatch-parent"
-  subhome="$TMP_ROOT/orca-child-mismatch-secondmate"
+  subhome="$TMP_ROOT/orca-child-mismatch-squad-lead"
   childproj="$subhome/projects/alpha"
   childwt="$TMP_ROOT/orca-child-mismatch-worktree"
   other_wt="$TMP_ROOT/orca-child-mismatch-other-worktree"
   child_id="orcachildmismatchz1"
   mkdir -p "$home/state" "$home/data" "$subhome/state" "$subhome/projects"
-  printf 'domain\n' > "$subhome/.jg-secondmate-home"
+  printf 'domain\n' > "$subhome/.jg-squad-lead-home"
   jg_git_worktree "$childproj" "$childwt" "fm/$child_id"
   git -C "$childproj" worktree add --quiet -b "fm/$child_id-other" "$other_wt"
   jg_write_meta "$home/state/domain.meta" \
-    "window=firstmate:jg-domain" "worktree=$subhome" "project=$subhome" \
-    "harness=echo" "kind=secondmate" "mode=secondmate" "yolo=off" \
+    "window=juggernaut:jg-domain" "worktree=$subhome" "project=$subhome" \
+    "harness=echo" "kind=squad_lead" "mode=squad_lead" "yolo=off" \
     "home=$subhome" "projects=alpha"
   printf '%s\n' "- domain - Orca child cleanup (home: $subhome; scope: orca cleanup; projects: alpha; added 2026-07-03)" \
-    > "$home/data/secondmates.md"
+    > "$home/data/squad_leads.md"
   jg_write_meta "$subhome/state/$child_id.meta" \
     "window=jg-$child_id" "endpoint_task_id=$child_id" \
     "terminal=term-child-mismatch" "worktree=$childwt" "project=$childproj" \
     "harness=claude" "kind=ship" "mode=no-mistakes" "yolo=off" \
     "backend=orca" "orca_worktree_id=wt-child-mismatch::/orca/wt-child-mismatch"
-  orca_case secondmate-child-mismatch
+  orca_case squad-lead-child-mismatch
   printf '{"ok":true,"result":{"worktree":{"id":"wt-child-mismatch::/orca/wt-child-mismatch","path":"%s"}}}\n' "$other_wt" > "$RESP/1.out"
   add_tmux_fake "$FB"
   neutral=$(neutral_jg_root "$CASE_DIR/neutral")
@@ -1291,39 +1291,39 @@ test_secondmate_force_teardown_refuses_orca_child_id_path_mismatch() {
     JG_ROOT_OVERRIDE="$neutral" JG_HOME="$home" "$ROOT/bin/jg-teardown.sh" domain --force 2>&1 )
   rc=$?
   set -e
-  [ "$rc" -ne 0 ] || fail "forced secondmate teardown should refuse mismatched Orca child id/path"
+  [ "$rc" -ne 0 ] || fail "forced squad_lead teardown should refuse mismatched Orca child id/path"
   assert_contains "$out" "not inspected worktree" \
     "mismatched Orca child worktree path refusal should name the mismatch"
   assert_not_contains "$(cat "$LOG")" $'orca\x1f''terminal'$'\x1f''close' \
     "refused mismatched Orca child cleanup should not close terminals"
   assert_not_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''rm' \
     "refused mismatched Orca child cleanup should not remove worktrees"
-  assert_present "$home/state/domain.meta" "refused forced secondmate teardown should preserve parent metadata"
+  assert_present "$home/state/domain.meta" "refused forced squad_lead teardown should preserve parent metadata"
   pass "jg-teardown.sh --force: refuses Orca child id/path mismatches"
 }
 
-test_secondmate_force_teardown_refuses_partial_orca_child() {
+test_squad_lead_force_teardown_refuses_partial_orca_child() {
   local home subhome childproj childwt child_id neutral out rc
   home="$TMP_ROOT/orca-partial-child-parent"
-  subhome="$TMP_ROOT/orca-partial-child-secondmate"
+  subhome="$TMP_ROOT/orca-partial-child-squad-lead"
   childproj="$subhome/projects/alpha"
   childwt="$TMP_ROOT/orca-partial-child-worktree"
   child_id="orcapartialz9"
   mkdir -p "$home/state" "$home/data" "$subhome/state" "$subhome/projects"
-  printf 'domain\n' > "$subhome/.jg-secondmate-home"
+  printf 'domain\n' > "$subhome/.jg-squad-lead-home"
   jg_git_worktree "$childproj" "$childwt" "fm/$child_id"
   jg_write_meta "$home/state/domain.meta" \
-    "window=firstmate:jg-domain" "worktree=$subhome" "project=$subhome" \
-    "harness=echo" "kind=secondmate" "mode=secondmate" "yolo=off" \
+    "window=juggernaut:jg-domain" "worktree=$subhome" "project=$subhome" \
+    "harness=echo" "kind=squad_lead" "mode=squad_lead" "yolo=off" \
     "home=$subhome" "projects=alpha"
   printf '%s\n' "- domain - Orca partial child cleanup (home: $subhome; scope: orca cleanup; projects: alpha; added 2026-07-03)" \
-    > "$home/data/secondmates.md"
+    > "$home/data/squad_leads.md"
   jg_write_meta "$subhome/state/$child_id.meta" \
     "window=jg-$child_id" "endpoint_task_id=$child_id" \
     "worktree=$childwt" "project=$childproj" \
     "harness=claude" "kind=ship" "mode=no-mistakes" "yolo=off" \
     "backend=orca" "orca_worktree_id=wt-partial-child::/orca/wt-partial-child"
-  orca_case secondmate-partial-child-cleanup
+  orca_case squad-lead-partial-child-cleanup
   add_tmux_fake "$FB"
   neutral=$(neutral_jg_root "$CASE_DIR/neutral")
   set +e
@@ -1331,12 +1331,12 @@ test_secondmate_force_teardown_refuses_partial_orca_child() {
     JG_ROOT_OVERRIDE="$neutral" JG_HOME="$home" "$ROOT/bin/jg-teardown.sh" domain --force 2>&1 )
   rc=$?
   set -e
-  [ "$rc" -ne 0 ] || fail "forced secondmate teardown accepted a child with no terminal identity"
+  [ "$rc" -ne 0 ] || fail "forced squad_lead teardown accepted a child with no terminal identity"
   assert_contains "$out" "missing terminal" "partial child refusal did not explain the incomplete endpoint"
   [ ! -s "$LOG" ] || fail "partial child refusal dispatched to Orca or tmux"
   assert_present "$home/state/domain.meta" "partial child refusal removed parent metadata"
   assert_present "$subhome/state/$child_id.meta" "partial child refusal removed child metadata"
-  pass "jg-teardown.sh --force: refuses partial Orca secondmate children before runtime dispatch"
+  pass "jg-teardown.sh --force: refuses partial Orca squad_lead children before runtime dispatch"
 }
 
 test_dispatcher_sources_orca_and_routes_primitives() {
@@ -1378,7 +1378,7 @@ test_worktree_and_terminal_helpers_parse_json
 test_worktree_create_removes_worktree_when_path_missing
 test_spawn_preserves_orca_metadata_when_pathless_worktree_cleanup_fails
 test_spawn_writes_orca_metadata_and_launches_harness
-test_spawn_refuses_orca_secondmate_before_home_mutation
+test_spawn_refuses_orca_squad_lead_before_home_mutation
 test_spawn_refuses_orca_when_runtime_not_ready
 test_spawn_refuses_orca_nonisolated_worktree
 test_spawn_removes_orca_worktree_when_terminal_create_fails
@@ -1398,6 +1398,6 @@ test_ship_teardown_refuses_orca_unresolvable_worktree_id
 test_ship_teardown_refuses_orca_id_path_mismatch
 test_teardown_refuses_orca_missing_worktree_id
 test_teardown_refuses_orca_worktree_without_terminal_handle
-test_secondmate_force_teardown_removes_orca_child_via_orca
-test_secondmate_force_teardown_refuses_orca_child_id_path_mismatch
-test_secondmate_force_teardown_refuses_partial_orca_child
+test_squad_lead_force_teardown_removes_orca_child_via_orca
+test_squad_lead_force_teardown_refuses_orca_child_id_path_mismatch
+test_squad_lead_force_teardown_refuses_partial_orca_child

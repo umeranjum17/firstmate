@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Parity guard for firstmate's shell-lint definition.
+# Parity guard for juggernaut's shell-lint definition.
 #
 # bin/jg-lint.sh is the single owner invoked by CI
 # (.github/workflows/ci.yml) and by the pre-push gate (.no-mistakes.yaml
@@ -1171,9 +1171,9 @@ SH
 
   for invocation in \
     'bd update jg-example --status in_progress' \
-    'BD_ACTOR=firstmate bd update jg-example --status closed' \
+    'BD_ACTOR=juggernaut bd update jg-example --status closed' \
     'env bd close jg-example' \
-    'env -i BD_ACTOR=firstmate bd close jg-example' \
+    'env -i BD_ACTOR=juggernaut bd close jg-example' \
     'env -u BD_ACTOR bd close jg-example' \
     'env -- bd close jg-example' \
     '/usr/local/bin/bd close jg-example' \
@@ -1194,7 +1194,7 @@ SH
     assert_contains "$out" "direct Beads CLI invocation bypasses tasks-axi" \
       "lint did not identify the backend-boundary violation: $invocation"
   done
-  pass "jg-lint.sh rejects direct Beads CLI invocations in firstmate core"
+  pass "jg-lint.sh rejects direct Beads CLI invocations in juggernaut core"
 }
 
 test_rejects_direct_beads_cli_in_explicit_core_path() {

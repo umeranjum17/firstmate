@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Parent-owned secondmate pending-reply guards (bin/jg-pending-reply-lib.sh).
+# Parent-owned squad_lead pending-reply guards (bin/jg-pending-reply-lib.sh).
 #
 # Reproduces the missed-report experience: a marked request is delivered, the
 # target turn completes, and no correlated parent report arrives. The parent
@@ -18,9 +18,9 @@
 #   7. Restart/compaction preserves the expectation and exact parent destination
 #   8. Wrong-home reports are detected but do not silently acknowledge
 #   9. Direct unmarked captain input creates no expectation
-#  10. jg-send secondmate path embeds corr and creates durable pending records
+#  10. jg-send squad_lead path embeds corr and creates durable pending records
 #  11. Backend busy/idle observation works through the shared busy abstraction
-#      used by Pi/Claude secondmate backends (no conversation scrape)
+#      used by Pi/Claude squad_lead backends (no conversation scrape)
 #  12. A remote mate's repost waits for its asynchronous reply mirror to be read
 #      past the turn, so a mirrored reply is never nagged and a real miss still
 #      gets its one repost
@@ -46,7 +46,7 @@ set -u
 . "$ROOT/bin/jg-pending-reply-lib.sh"
 
 SEND="$ROOT/bin/jg-send.sh"
-REPORT="$ROOT/bin/jg-secondmate-report.sh"
+REPORT="$ROOT/bin/jg-squad-lead-report.sh"
 TMP_ROOT=$(jg_test_tmproot jg-pending-reply)
 
 export JG_PENDING_REPLY_GRACE_SECS=0
@@ -98,14 +98,14 @@ setup_parent() {  # <name> -> home
   printf '%s\n' "$home"
 }
 
-# Seed a local secondmate home bound to <parent> with identity <id>.
+# Seed a local squad_lead home bound to <parent> with identity <id>.
 bind_local_mate() {  # <parent-home> <id> -> mate-home
   local parent=$1 id=$2 mate
   mate="$TMP_ROOT/${id}-home-$RANDOM"
   mkdir -p "$mate/state"
-  printf '%s\n' "$id" > "$mate/.jg-secondmate-home"
-  cat > "$mate/.jg-secondmate-parent" <<EOF
-schema=jg-secondmate-parent.v1
+  printf '%s\n' "$id" > "$mate/.jg-squad-lead-home"
+  cat > "$mate/.jg-squad-lead-parent" <<EOF
+schema=jg-squad-lead-parent.v1
 route=local
 parent_home=$parent
 EOF
@@ -872,7 +872,7 @@ test_undelivered_records_are_scan_immutable() {
     rec=$(jg_pending_reply_path "$state" "$corr")
     printf 'done [corr=%s]: arrived too early\n' "$corr" > "$state/hibit.status"
     printf 'done [corr=%s]: wrong home too early\n' "$corr" > "$sm_home/state/hibit.status"
-    jg_write_secondmate_meta "$state/hibit.meta" "$sm_home" "sess:jg-hibit"
+    jg_write_squad_lead_meta "$state/hibit.meta" "$sm_home" "sess:jg-hibit"
     before=$(cat "$rec")
     if jg_pending_reply_try_resolve "$state" "$corr"; then
       fail "undelivered expectation must not resolve"
@@ -1137,7 +1137,7 @@ test_wrong_home_detected_not_acknowledged() {
   export JG_PENDING_REPLY_NOW=8000
   corr=$(jg_pending_reply_create "$home" "$state" "hibit" "report to parent")
   jg_pending_reply_mark_delivered "$state" "$corr"
-  # Historical incident shape: report written under the secondmate home.
+  # Historical incident shape: report written under the squad_lead home.
   printf 'done [corr=%s]: stranded in self-home\n' "$corr" > "$sm_home/state/hibit.status"
   jg_pending_reply_detect_wrong_home "$state" "$corr" "$sm_home" \
     || fail "wrong-home detect should succeed"
@@ -1170,31 +1170,31 @@ test_unmarked_captain_input_creates_no_expectation() {
   dir="$TMP_ROOT/unmarked"; mkdir -p "$dir"
   fb=$(make_stubs "$dir"); log="$dir/send.log"
   home=$(setup_parent unmarked)
-  # Crewmate target stays unmarked and creates no pending-reply record.
+  # Operator target stays unmarked and creates no pending-reply record.
   jg_write_meta "$home/state/build.meta" \
     "window=sess:jg-build" "worktree=$home/wt" "project=$home/p" \
     "harness=echo" "kind=ship" "mode=no-mistakes" "yolo=off"
   run_send "$fb" "$home" "$log" "build" "captain says hello"; rc=$?
-  expect_code 0 "$rc" "unmarked crewmate send should succeed"
+  expect_code 0 "$rc" "unmarked operator send should succeed"
   [ "$(latest_record_body "$home" build)" = "captain says hello" ] \
-    || fail "crewmate steer should be recorded unmarked"$'\n'"$(latest_record_body "$home" build | od -An -c)"
+    || fail "operator steer should be recorded unmarked"$'\n'"$(latest_record_body "$home" build | od -An -c)"
   pending_count=$(find "$home/state/pending-replies" -type f 2>/dev/null | wc -l | tr -d ' ')
   [ "$pending_count" = 0 ] || fail "unmarked input must create no pending-reply records (got $pending_count)"
   pass "direct unmarked captain input creates no expectation"
 }
 
-test_jg_send_marked_secondmate_creates_pending_and_embeds_corr() {
+test_jg_send_marked_squad_lead_creates_pending_and_embeds_corr() {
   local dir fb log home rc got corr rec
   dir="$TMP_ROOT/send-pending"; mkdir -p "$dir"
   fb=$(make_stubs "$dir"); log="$dir/send.log"
   home=$(setup_parent send-pending)
-  jg_write_secondmate_meta "$home/state/hibit.meta" "$home/sm" "sess:jg-hibit"
+  jg_write_squad_lead_meta "$home/state/hibit.meta" "$home/sm" "sess:jg-hibit"
   run_send "$fb" "$home" "$log" "hibit" "audit the build"; rc=$?
-  expect_code 0 "$rc" "secondmate send should succeed"
+  expect_code 0 "$rc" "squad_lead send should succeed"
   got=$(latest_record_body "$home" hibit)
   case "$got" in
     "$JG_FROMFIRST_MARK"corr=*) : ;;
-    *) fail "secondmate steer record must embed marker+corr"$'\n'"$(printf '%s' "$got" | od -An -c)" ;;
+    *) fail "squad_lead steer record must embed marker+corr"$'\n'"$(printf '%s' "$got" | od -An -c)" ;;
   esac
   corr=$(jg_pending_reply_extract_corr "$got")
   [ "${#corr}" -eq 16 ] || fail "corr id should be 16 hex chars, got '$corr'"
@@ -1205,8 +1205,8 @@ test_jg_send_marked_secondmate_creates_pending_and_embeds_corr() {
   [ -n "$(jg_pending_reply_get "$rec" delivered_epoch)" ] \
     || fail "delivered_epoch must be set after successful send"
   [ "$(jg_pending_reply_get "$rec" task_id)" = hibit ] \
-    || fail "task_id must match secondmate id"
-  pass "jg-send marked secondmate path creates pending and embeds corr"
+    || fail "task_id must match squad_lead id"
+  pass "jg-send marked squad_lead path creates pending and embeds corr"
 }
 
 test_document_pointer_resolves() {
@@ -1288,7 +1288,7 @@ test_helper_blocked_wait_hook_default_path() {
   home=$(setup_parent wait-hook-default)
   state="$home/state"
   sm_home=$(bind_local_mate "$home" hibit)
-  hook="$sm_home/projects/firstmate-addons/status-wait-check/status-wait-check"
+  hook="$sm_home/projects/juggernaut-addons/status-wait-check/status-wait-check"
   mkdir -p "$(dirname "$hook")"
   cat > "$hook" <<'EOF'
 #!/usr/bin/env bash
@@ -1314,7 +1314,7 @@ test_busy_idle_observation_via_backend_abstraction() {
   export JG_PENDING_REPLY_NOW=9200
   corr=$(jg_pending_reply_create "$home" "$state" "hibit" "backend turn")
   jg_pending_reply_mark_delivered "$state" "$corr"
-  # Simulates Pi/Claude secondmate busy_state from jg_backend_busy_state without
+  # Simulates Pi/Claude squad_lead busy_state from jg_backend_busy_state without
   # reading conversation text (herdr native idle/busy or tmux unknown fallback).
   jg_pending_reply_observe_busy "$state" "$corr" unknown
   [ -z "$(jg_pending_reply_get "$(jg_pending_reply_path "$state" "$corr")" request_turn_completed_epoch)" ] \
@@ -1341,7 +1341,7 @@ test_unknown_backend_state_uses_capture_fallback() {
       export JG_PENDING_REPLY_NOW=10000
       corr=$(jg_pending_reply_create "$home" "$state" "hibit" "$backend fallback")
       jg_pending_reply_mark_delivered "$state" "$corr"
-      jg_write_secondmate_meta "$state/hibit.meta" "$sm_home" "session:jg-hibit" alpha pi
+      jg_write_squad_lead_meta "$state/hibit.meta" "$sm_home" "session:jg-hibit" alpha pi
       [ "$backend" = tmux ] || printf 'backend=%s\n' "$backend" >> "$state/hibit.meta"
       jg_backend_busy_state() { printf 'unknown'; }
       jg_backend_capture() { printf '%s' "$JG_PENDING_TEST_CAPTURE"; }
@@ -1399,7 +1399,7 @@ test_kimi_capture_fallback_uses_recorded_harness() (
   export JG_PENDING_REPLY_NOW=10020
   corr=$(jg_pending_reply_create "$home" "$state" hibit "kimi fallback")
   jg_pending_reply_mark_delivered "$state" "$corr"
-  jg_write_secondmate_meta "$state/hibit.meta" "$sm_home" "session:jg-hibit" alpha kimi
+  jg_write_squad_lead_meta "$state/hibit.meta" "$sm_home" "session:jg-hibit" alpha kimi
   jg_backend_busy_state() { printf 'unknown'; }
   jg_backend_capture() { printf '%s' "$JG_PENDING_KIMI_CAPTURE"; }
   export JG_PENDING_KIMI_CAPTURE=' 🌑 · Tip: ask Kimi to schedule tasks, e.g. "remind me at 5pm"'
@@ -1415,7 +1415,7 @@ test_kimi_capture_fallback_uses_recorded_harness() (
   [ "$(jg_pending_reply_get "$rec" turn_seen_busy)" = 1 ] \
     || fail "recorded Kimi spinner was not observed as busy"
   [ "$(phase_of "$state" "$corr")" = awaiting_report ] \
-    || fail "working Kimi secondmate entered recovery"
+    || fail "working Kimi squad_lead entered recovery"
   pass "pending replies scope Kimi capture fallback by recorded harness"
 )
 
@@ -1445,9 +1445,9 @@ test_tick_skips_terminal_and_reuses_target_observation() {
     jg_pending_reply_set "$rec" phase escalated || fail "escalated fixture should transition"
     mkdir -p "$home/escalated/state"
     printf 'done [corr=%s]: wrong home\n' "$escalated" > "$home/escalated/state/child.status"
-    jg_write_secondmate_meta "$state/hibit.meta" "$home/hibit" "sess:jg-hibit"
-    jg_write_secondmate_meta "$state/resolved.meta" "$home/resolved" "sess:jg-resolved"
-    jg_write_secondmate_meta "$state/escalated.meta" "$home/escalated" "sess:jg-escalated"
+    jg_write_squad_lead_meta "$state/hibit.meta" "$home/hibit" "sess:jg-hibit"
+    jg_write_squad_lead_meta "$state/resolved.meta" "$home/resolved" "sess:jg-resolved"
+    jg_write_squad_lead_meta "$state/escalated.meta" "$home/escalated" "sess:jg-escalated"
     # Runtime overrides called indirectly by the pending-reply tick.
     # shellcheck disable=SC2329
     jg_backend_busy_state() {
@@ -1584,8 +1584,8 @@ test_correlations_reuse_only_for_matching_open_task() {
   fb=$(make_stubs "$dir"); log="$dir/send.log"
   home=$(setup_parent corr-reuse)
   state="$home/state"
-  jg_write_secondmate_meta "$state/domain.meta" "$home/domain" "sess:jg-domain"
-  jg_write_secondmate_meta "$state/other.meta" "$home/other" "sess:jg-other"
+  jg_write_squad_lead_meta "$state/domain.meta" "$home/domain" "sess:jg-domain"
+  jg_write_squad_lead_meta "$state/other.meta" "$home/other" "sess:jg-other"
   run_send "$fb" "$home" "$log" domain "first request" || fail "first marked send failed"
   got=$(latest_record_body "$home" domain)
   corr1=$(jg_pending_reply_extract_corr "$got")
@@ -1638,7 +1638,7 @@ test_tick_end_to_end_missed_then_escalate() {
 
   corr=$(jg_pending_reply_create "$home" "$state" "hibit" "e2e miss")
   jg_pending_reply_mark_delivered "$state" "$corr"
-  jg_write_secondmate_meta "$state/hibit.meta" "$sm_home" "sess:jg-hibit"
+  jg_write_squad_lead_meta "$state/hibit.meta" "$sm_home" "sess:jg-hibit"
   # Override backend busy via direct tick_one (backend may be unknown in hermetic home).
   jg_pending_reply_tick_one "$state" "$corr" busy "$sm_home"
   jg_pending_reply_tick_one "$state" "$corr" idle "$sm_home"
@@ -1675,7 +1675,7 @@ test_remote_repost_waits_for_the_reply_channel() {
   export JG_PENDING_REPLY_SEND_HOOK=remote_repost_hook
 
   jg_write_meta "$state/ios.meta" \
-    "window=jg-remote:w1:p1" "harness=claude" "kind=secondmate" "mode=secondmate" \
+    "window=jg-remote:w1:p1" "harness=claude" "kind=squad_lead" "mode=squad_lead" \
     "remote_host=remote-mac" "remote_root=/remote/root" "remote_backend=herdr"
   corr=$(jg_pending_reply_create "$home" "$state" "ios" "status of the iOS build")
   jg_pending_reply_mark_delivered "$state" "$corr"
@@ -1733,7 +1733,7 @@ test_mirrored_remote_reply_never_triggers_a_repost() {
   export JG_PENDING_REPLY_SEND_HOOK=mirrored_reply_hook
 
   jg_write_meta "$state/ios.meta" \
-    "window=jg-remote:w1:p1" "harness=claude" "kind=secondmate" "mode=secondmate" \
+    "window=jg-remote:w1:p1" "harness=claude" "kind=squad_lead" "mode=squad_lead" \
     "remote_host=remote-mac" "remote_root=/remote/root" "remote_backend=herdr"
   corr=$(jg_pending_reply_create "$home" "$state" "ios" "did the build go green")
   jg_pending_reply_mark_delivered "$state" "$corr"
@@ -1808,7 +1808,7 @@ test_same_basename_self_home_corr_resolves_on_tick() {
     || fail "publication retry of a recovered reply should succeed"
   cmp -s "$sm_home/state/mate.status" "$parent_status" \
     || fail "recovery and retries must preserve the legacy reply bytes without duplicates"
-  jg_write_secondmate_meta "$state/mate.meta" "$sm_home"
+  jg_write_squad_lead_meta "$state/mate.meta" "$sm_home"
   fb=$(make_stubs "$home")
   out=$(PATH="$fb:$PATH" JG_HOME="$home" "$ROOT/bin/jg-fleet-snapshot.sh" --json) \
     || fail "snapshot of the recovered reply should succeed"
@@ -1817,9 +1817,9 @@ test_same_basename_self_home_corr_resolves_on_tick() {
     | has("age_seconds") and .age_seconds == null
   ' >/dev/null || fail "recovered legacy reply must retain an unknown age"
   printf '%s' "$out" | jq -e '
-    .secondmate_current.records[] | select(.id == "mate") | .parent_event
+    .squad_lead_current.records[] | select(.id == "mate") | .parent_event
     | has("age_seconds") and .age_seconds == null
-  ' >/dev/null || fail "secondmate summary must retain the recovered reply's unknown age"
+  ' >/dev/null || fail "squad_lead summary must retain the recovered reply's unknown age"
   jg_parent_channel_report "$sm_home" "$sm_home/state" 'done: new report' \
     || fail "new publication should succeed"
   status_line_at_epoch "$(tail -1 "$parent_status")" >/dev/null \
@@ -1849,7 +1849,7 @@ test_same_basename_reply_resolves_after_recovery_failure() {
     || fail "fixture should reach recovery_failed"
   rec=$(jg_pending_reply_path "$state" "$corr")
   parent_status=$(jg_pending_reply_get "$rec" parent_status)
-  jg_write_secondmate_meta "$state/mate.meta" "$sm_home"
+  jg_write_squad_lead_meta "$state/mate.meta" "$sm_home"
   printf 'done [corr=%s] [at=11000]: answer landed after recovery failure\n' "$corr" \
     > "$sm_home/state/mate.status"
 
@@ -1958,9 +1958,9 @@ test_remote_parent_replies_is_not_wrong_home() {
   state="$home/state"
   sm_home="$TMP_ROOT/remote-replies-home-$RANDOM"
   mkdir -p "$sm_home/state"
-  printf '%s\n' mate > "$sm_home/.jg-secondmate-home"
-  cat > "$sm_home/.jg-secondmate-parent" <<EOF
-schema=jg-secondmate-parent.v1
+  printf '%s\n' mate > "$sm_home/.jg-squad-lead-home"
+  cat > "$sm_home/.jg-squad-lead-parent" <<EOF
+schema=jg-squad-lead-parent.v1
 route=remote
 parent_host=remote.example
 EOF
@@ -2101,7 +2101,7 @@ test_same_kind_escalation_reopens_after_operator_close() {
     log="$dir/send.log"
     home=$(setup_parent same-kind)
     state="$home/state"
-    jg_write_secondmate_meta "$state/mate.meta" "$home/sm" "sess:jg-mate"
+    jg_write_squad_lead_meta "$state/mate.meta" "$home/sm" "sess:jg-mate"
     export JG_PENDING_REPLY_NOW=10000
     corr=$(jg_pending_reply_create "$home" "$state" mate "wake after lost transport")
     status="$state/mate.status"
@@ -2195,7 +2195,7 @@ test_another_mates_echo_cannot_resolve
 test_restart_preserves_expectation_and_parent_destination
 test_wrong_home_detected_not_acknowledged
 test_unmarked_captain_input_creates_no_expectation
-test_jg_send_marked_secondmate_creates_pending_and_embeds_corr
+test_jg_send_marked_squad_lead_creates_pending_and_embeds_corr
 test_document_pointer_resolves
 test_helper_report_resolves
 test_helper_blocked_wait_hook_is_optional

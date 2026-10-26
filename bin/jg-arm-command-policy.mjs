@@ -5,7 +5,7 @@
 // It recognizes executed command positions without evaluating, expanding,
 // sourcing, or running any byte of the submitted command.
 //
-// This file is the sole owner of firstmate's shell command classification.
+// This file is the sole owner of juggernaut's shell command classification.
 // The tokenizer and command-position analysis (Lexer, splitProgram,
 // commandPosition) are exported so the sibling cd-guard policy
 // (bin/jg-cd-command-policy.mjs) reuses the same proven parser instead of
@@ -23,7 +23,7 @@ const REASONS = {
   "watcher-redirection": "a protected watcher command must not use shell redirection",
   "watcher-bundled": "a protected watcher command must be the sole final command after approved setup nodes",
   "watcher-nested": "a protected watcher command must not run through a wrapper, substitution, or compound command",
-  "broad-watcher-kill": "a broad process kill targeting the firstmate watcher is forbidden",
+  "broad-watcher-kill": "a broad process kill targeting the juggernaut watcher is forbidden",
   "unclassifiable-protected-command": "unsupported or malformed shell syntax contains a protected watcher command",
   "watcher-direct": "bin/jg-watch.sh must not be run directly; arm the watcher with bin/jg-watch-arm.sh or run bin/jg-watch-checkpoint.sh instead",
 };

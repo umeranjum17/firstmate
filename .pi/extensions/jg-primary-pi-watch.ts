@@ -1,4 +1,4 @@
-// Firstmate primary watcher bridge for Pi.
+// Juggernaut primary watcher bridge for Pi.
 //
 // Session-generation ownership (stated once here):
 // Pi emits session_shutdown for ordinary same-process replacements (/new, /resume,
@@ -43,7 +43,7 @@ import { fileURLToPath } from "node:url";
 import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
 import { Box, Container, Text, type Component } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
-import { registerFirstmateTool } from "./lib/jg-native-contract.ts";
+import { registerJuggernautTool } from "./lib/jg-native-contract.ts";
 import {
   afkPostureRecordPresent,
   branchOfferForWake,
@@ -53,9 +53,9 @@ import {
 import {
   type CalmPresentationState,
   calmTranscriptClassIsVisible,
-  FIRSTMATE_CALM_PRESENTATION_EVENT,
+  JUGGERNAUT_CALM_PRESENTATION_EVENT,
 } from "./lib/jg-calm-visibility.ts";
-import { encodeFirstmateOperationalInput } from "./lib/jg-operational-input.ts";
+import { encodeJuggernautOperationalInput } from "./lib/jg-operational-input.ts";
 import { runCommandAsync } from "./lib/jg-async-exec.ts";
 // jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves here
 for (const [_jgOld, _jgVal] of Object.entries(process.env))
@@ -199,10 +199,10 @@ type ReplacementCoordinator = {
   deliveries: Map<string, ActionableDeliveryClaim>;
 };
 type ReplacementCoordinatorGlobal = typeof globalThis & {
-  __firstmatePiWatchReplacements?: Map<string, ReplacementCoordinator>;
+  __juggernautPiWatchReplacements?: Map<string, ReplacementCoordinator>;
 };
 const replacementCoordinatorGlobal = globalThis as ReplacementCoordinatorGlobal;
-const replacementCoordinators = replacementCoordinatorGlobal.__firstmatePiWatchReplacements ??= new Map<string, ReplacementCoordinator>();
+const replacementCoordinators = replacementCoordinatorGlobal.__juggernautPiWatchReplacements ??= new Map<string, ReplacementCoordinator>();
 function replacementCoordinatorFor(handoff: string): ReplacementCoordinator {
   const existing = replacementCoordinators.get(handoff);
   if (existing) return existing;
@@ -631,7 +631,7 @@ export default function (pi: ExtensionAPI) {
     active: false,
     stockExportRendering: false,
   };
-  pi.events?.on?.(FIRSTMATE_CALM_PRESENTATION_EVENT, (data) => {
+  pi.events?.on?.(JUGGERNAUT_CALM_PRESENTATION_EVENT, (data) => {
     const next = data as Partial<CalmPresentationState>;
     calmPresentation = {
       active: next.active === true,
@@ -649,9 +649,9 @@ export default function (pi: ExtensionAPI) {
     pending?: PendingActionableClose,
   ): Promise<boolean> {
     if (!generationIsLive(owner)) return false;
-    const content = encodeFirstmateOperationalInput(
+    const content = encodeJuggernautOperationalInput(
       "watcher",
-      `FIRSTMATE WATCHER WAKE: ${message}\n\nRun bin/jg-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.`,
+      `JUGGERNAUT WATCHER WAKE: ${message}\n\nRun bin/jg-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.`,
     );
     if (pending) owner.unconsumedWakes.set(pending.token, { content, pending });
     try {
@@ -1097,7 +1097,7 @@ export default function (pi: ExtensionAPI) {
   function startArm(owner: SessionGeneration, predecessorArmPid = ""): ArmResult {
     if (!generationIsLive(owner)) return { ok: false, message: shuttingDownMessage };
     const ownership = lockOwnership();
-    if (ownership === "other") return { ok: false, message: "watcher: read-only - session lock is held by another firstmate session" };
+    if (ownership === "other") return { ok: false, message: "watcher: read-only - session lock is held by another juggernaut session" };
     if (ownership === "missing") {
       return {
         ok: false,
@@ -1281,16 +1281,16 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.registerCommand?.("jg-watch-arm-pi", {
-    description: "Arm firstmate watcher supervision through the Pi extension instead of foreground bash.",
+    description: "Arm juggernaut watcher supervision through the Pi extension instead of foreground bash.",
     handler: async (_args, ctx) => {
       const result = activateOwnedWatch(generation);
       ctx.ui.notify(result.message, result.ok ? "info" : "warning");
     },
   });
 
-  registerFirstmateTool(pi, {
+  registerJuggernautTool(pi, {
     name: "jg_watch_arm_pi",
-    label: "Arm firstmate watcher",
+    label: "Arm juggernaut watcher",
     description: "Start the first required Pi watcher cycle, or repair one only after a notification says the cycle is missing, failed, or unhealthy. Do not call after ordinary work or ordinary notifications; the Pi extension re-arms automatically. Never run bin/jg-watch-arm.sh through bash.",
     promptSnippet: "Start the first required Pi watcher cycle or repair a cycle reported missing, failed, or unhealthy; ordinary re-arming is automatic.",
     promptGuidelines: [

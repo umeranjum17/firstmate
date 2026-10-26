@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # tests/jg-project-origin.test.sh - which project origins seeding accepts.
 #
-# Firstmate supplies a project's origin instead of discovering it from a local
+# Juggernaut supplies a project's origin instead of discovering it from a local
 # clone, and the receiving host re-validates whatever reached it, so this
 # validator is the boundary that keeps a supplied value from reaching git as an
 # executable transport or as a stray option. The ext:: case is exercised against
@@ -27,7 +27,7 @@ refuses() {
 jg_git_init_commit "$TMP_ROOT/source"
 git clone --quiet --bare "$TMP_ROOT/source" "$TMP_ROOT/source.git"
 
-# Firstmate is a shared template, so acceptance is decided by structure alone.
+# Juggernaut is a shared template, so acceptance is decided by structure alone.
 # No host, domain, or forge is privileged: this matrix deliberately leads with
 # non-GitHub forges and hosts nobody else has heard of, and every one of them
 # must pass for the same structural reason GitHub does.
@@ -47,8 +47,8 @@ accepts 'git@192.168.1.10:/srv/git/app.git'
 accepts 'ssh://git@[2001:db8::1]:22/srv/git/app.git'
 accepts '[2001:db8::1]:/srv/git/app.git'
 accepts 'git@[2001:db8::1]:/srv/git/app.git'
-accepts 'https://github.com/kunchenguid/firstmate.git'
-accepts 'git@github.com:kunchenguid/firstmate.git'
+accepts 'https://github.com/kunchenguid/juggernaut.git'
+accepts 'git@github.com:kunchenguid/juggernaut.git'
 accepts "file://$TMP_ROOT/source.git"
 accepts "$TMP_ROOT/source.git"
 

@@ -28,13 +28,13 @@
 # only captain rows are exposed, with counts for the other actors and unmeasured homes. It never infers
 # decisions from report or visual-review prose or reimplements snapshot semantics.
 # Underway (in_flight) projects every main live worker plus every active child
-# from every readable secondmate ledger, independently of that home's
+# from every readable squad_lead ledger, independently of that home's
 # bearings_state. Each row's name is the durable task title when nonblank and
 # its durable task id otherwise, so renderers always receive a task-identifying
 # label instead of having to substitute run status. A home classified
 # captain_decision because it has an open
 # captain hold still contributes each working child as its own Underway row;
-# the home row on secondmates[] keeps the decision and gate classification.
+# the home row on squad_leads[] keeps the decision and gate classification.
 # Captain-hold placement follows the canonical snapshot's hold_bucket and
 # nothing else; this wrapper never inspects hold reason or body prose. The
 # buckets are total and mutually exclusive, so every captain hold appears in
@@ -66,10 +66,10 @@
 # answer there is to run the return first. bin/jg-afk-return.sh owns the gate.
 #
 # The landed section merges this home's Done with the canonical snapshot's
-# secondmate_landed roll-up (jg-fleet-snapshot.sh), so merges a secondmate managed -
+# squad_lead_landed roll-up (jg-fleet-snapshot.sh), so merges a squad_lead managed -
 # recorded in ITS OWN backlog, never the main one - are visible. It stays bounded by
 # a per-home cap and an overall cap, with omitted[] disclosure of both and of any
-# secondmate home whose backlog was unreadable; no live GitHub call is involved.
+# squad_lead home whose backlog was unreadable; no live GitHub call is involved.
 # The default landed baseline is balanced across homes: each home keeps its internal
 # newest-first ordering, homes iterate in deterministic id order, sparse homes do not
 # waste capacity, and --all-landed switches back to the complete global newest-first
@@ -82,7 +82,7 @@
 #   --fields <list>  opt in to dropped surfaces: bodies,paths,actions,endpoints
 #   --all-in-flight  include every in-flight task
 #   --all-decisions  include every open decision and captain hold in the bounded snapshot
-#   --all-secondmates include every aggregated secondmate record
+#   --all-squad-leads include every aggregated squad_lead record
 #   --all-landed     include every landed record from every home (default: bounded)
 #   --all-reports    include the full scout-report inventory (default: relevant only)
 #   --all-queued     include every queued gate present in the bounded snapshot
@@ -109,7 +109,7 @@ JG_BEARINGS_LANDED=${JG_BEARINGS_LANDED:-6}
 JG_BEARINGS_LANDED_PER_HOME=${JG_BEARINGS_LANDED_PER_HOME:-$JG_BEARINGS_LANDED}
 JG_BEARINGS_IN_FLIGHT=${JG_BEARINGS_IN_FLIGHT:-20}
 JG_BEARINGS_DECISIONS=${JG_BEARINGS_DECISIONS:-20}
-JG_BEARINGS_SECONDMATES=${JG_BEARINGS_SECONDMATES:-20}
+JG_BEARINGS_SQUAD_LEADS=${JG_BEARINGS_SQUAD_LEADS:-20}
 JG_BEARINGS_GATES=${JG_BEARINGS_GATES:-20}
 JG_BEARINGS_REPORTS=${JG_BEARINGS_REPORTS:-20}
 JG_BEARINGS_RECORDED_PRS=${JG_BEARINGS_RECORDED_PRS:-20}
@@ -125,7 +125,7 @@ validate_bound JG_BEARINGS_LANDED "$JG_BEARINGS_LANDED"
 validate_bound JG_BEARINGS_LANDED_PER_HOME "$JG_BEARINGS_LANDED_PER_HOME"
 validate_bound JG_BEARINGS_IN_FLIGHT "$JG_BEARINGS_IN_FLIGHT"
 validate_bound JG_BEARINGS_DECISIONS "$JG_BEARINGS_DECISIONS"
-validate_bound JG_BEARINGS_SECONDMATES "$JG_BEARINGS_SECONDMATES"
+validate_bound JG_BEARINGS_SQUAD_LEADS "$JG_BEARINGS_SQUAD_LEADS"
 validate_bound JG_BEARINGS_GATES "$JG_BEARINGS_GATES"
 validate_bound JG_BEARINGS_REPORTS "$JG_BEARINGS_REPORTS"
 validate_bound JG_BEARINGS_RECORDED_PRS "$JG_BEARINGS_RECORDED_PRS"
@@ -137,7 +137,7 @@ usage() {
   cat <<'EOF'
 usage: jg-bearings-snapshot.sh [--json] [--include-prs] [--fields <list>]
                                [--all-in-flight] [--all-decisions]
-                               [--all-secondmates] [--all-landed]
+                               [--all-squad-leads] [--all-landed]
                                [--all-reports] [--all-queued]
                                [--all-recorded-prs] [--all-unhealthy]
                                [--all-pr-repos]
@@ -148,26 +148,26 @@ remote homes under one shared snapshot budget and may refresh the parent-side ca
 --include-prs additionally performs live GitHub discovery and checks.
 
 Default fields: schema, home, generated, prs, in_flight{id,kind,state,repo,name,doing},
-  secondmates{id,state,doing,provenance,freshness,age_seconds,contradiction,reason},
-  secondmate_reconcile{id,spawn_gen,host,kind,ids},
+  squad_leads{id,state,doing,provenance,freshness,age_seconds,contradiction,reason},
+  squad_lead_reconcile{id,spawn_gen,host,kind,ids},
   decisions_open{id,key,verb,summary,owner}, landed{id,what,artifact,owner},
   gates{id,title,blocked_by,reason,owner,filed}, reports{id,path}, recorded_prs{id,url},
   unhealthy_endpoints{...} (only when non-empty), omitted{surface,reveal}.
 Default gates are selected newest filed first before their bound; undated gates
   retain input order after dated gates.
-landed merges this home's Done with registered secondmate homes' Done, bounded by
+landed merges this home's Done with registered squad_lead homes' Done, bounded by
   a per-home cap (JG_BEARINGS_LANDED_PER_HOME) and an overall cap (JG_BEARINGS_LANDED),
   with omitted[] disclosure. Default selection is balanced across deterministic home
   order while preserving each home's internal newest-first order; sparse homes do
   not waste capacity. --all-landed reveals the full global newest-first set.
-For every registered secondmate, readable structured facts from its own home are
+For every registered squad_lead, readable structured facts from its own home are
   authoritative, including independently trustworthy surfaces from a partial summary.
   Parent events and bounded terminal reads are labeled fallback or contradiction
   evidence and never become current work. The provenance and freshness fields
   distinguish live and cached ledgers; a home without either is explicitly unreadable.
 Opt-in surfaces: --fields bodies|paths|actions|endpoints, --all-in-flight,
   --all-decisions (all open decisions and captain holds in the bounded snapshot),
-  --all-secondmates, --all-landed, --all-reports, --all-queued, --all-recorded-prs,
+  --all-squad-leads, --all-landed, --all-reports, --all-queued, --all-recorded-prs,
   --all-unhealthy, --all-pr-repos, --include-prs (adds candidate_prs).
 Raise JG_BEARINGS_PR_LIMIT to expand per-repository open-PR results.
 EOF
@@ -179,7 +179,7 @@ ALL_REPORTS=0
 ALL_QUEUED=0
 ALL_IN_FLIGHT=0
 ALL_DECISIONS=0
-ALL_SECONDMATES=0
+ALL_SQUAD_LEADS=0
 ALL_LANDED=0
 ALL_RECORDED_PRS=0
 ALL_UNHEALTHY=0
@@ -193,7 +193,7 @@ while [ $# -gt 0 ]; do
     --all-queued) ALL_QUEUED=1 ;;
     --all-in-flight) ALL_IN_FLIGHT=1 ;;
     --all-decisions) ALL_DECISIONS=1 ;;
-    --all-secondmates) ALL_SECONDMATES=1 ;;
+    --all-squad-leads) ALL_SQUAD_LEADS=1 ;;
     --all-landed) ALL_LANDED=1 ;;
     --all-recorded-prs) ALL_RECORDED_PRS=1 ;;
     --all-unhealthy) ALL_UNHEALTHY=1 ;;
@@ -233,11 +233,11 @@ if [ "$GUARD_RC" -eq 4 ]; then
 fi
 
 NOW=${JG_BEARINGS_NOW:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}
-if [ "$ALL_LANDED" = 1 ] || [ "$ALL_SECONDMATES" = 1 ]; then
+if [ "$ALL_LANDED" = 1 ] || [ "$ALL_SQUAD_LEADS" = 1 ]; then
   if [ "$ALL_LANDED" = 1 ]; then
-    SNAP=$(JG_SNAPSHOT_NOW="$NOW" JG_SNAPSHOT_SECONDMATES=0 JG_SNAPSHOT_SECONDMATE_LANDED_PER_HOME=0 "$FLEET" --json) || exit $?
+    SNAP=$(JG_SNAPSHOT_NOW="$NOW" JG_SNAPSHOT_SQUAD_LEADS=0 JG_SNAPSHOT_SQUAD_LEAD_LANDED_PER_HOME=0 "$FLEET" --json) || exit $?
   else
-    SNAP=$(JG_SNAPSHOT_NOW="$NOW" JG_SNAPSHOT_SECONDMATES=0 "$FLEET" --json) || exit $?
+    SNAP=$(JG_SNAPSHOT_NOW="$NOW" JG_SNAPSHOT_SQUAD_LEADS=0 "$FLEET" --json) || exit $?
   fi
 else
   SNAP=$(JG_SNAPSHOT_NOW="$NOW" "$FLEET" --json) || exit $?
@@ -285,7 +285,7 @@ EOF
       s=$(repo_slug "$u"); [ -n "$s" ] || continue
       case " $repos " in *" $s "*) : ;; *) repos="$repos $s" ;; esac
     done <<EOF
-$(printf '%s' "$SNAP" | jq -r '.tasks[] | select(.kind != "secondmate") | .paths.worktree.path // empty')
+$(printf '%s' "$SNAP" | jq -r '.tasks[] | select(.kind != "squad_lead") | .paths.worktree.path // empty')
 EOF
 
     for repo in $repos; do PR_REPOS_TOTAL=$((PR_REPOS_TOTAL + 1)); done
@@ -363,7 +363,7 @@ MODEL=$(printf '%s' "$SNAP" | jq \
   --argjson landed_per_home_n "$JG_BEARINGS_LANDED_PER_HOME" \
   --argjson in_flight_n "$JG_BEARINGS_IN_FLIGHT" \
   --argjson decisions_n "$JG_BEARINGS_DECISIONS" \
-  --argjson secondmates_n "$JG_BEARINGS_SECONDMATES" \
+  --argjson squad_leads_n "$JG_BEARINGS_SQUAD_LEADS" \
   --argjson gates_n "$JG_BEARINGS_GATES" \
   --argjson reports_n "$JG_BEARINGS_REPORTS" \
   --argjson recorded_prs_n "$JG_BEARINGS_RECORDED_PRS" \
@@ -371,7 +371,7 @@ MODEL=$(printf '%s' "$SNAP" | jq \
   --argjson include_prs "$INCLUDE_PRS" \
   --argjson all_in_flight "$ALL_IN_FLIGHT" \
   --argjson all_decisions "$ALL_DECISIONS" \
-  --argjson all_secondmates "$ALL_SECONDMATES" \
+  --argjson all_squad_leads "$ALL_SQUAD_LEADS" \
   --argjson all_landed "$ALL_LANDED" \
   --argjson all_reports "$ALL_REPORTS" \
   --argjson all_queued "$ALL_QUEUED" \
@@ -448,7 +448,7 @@ MODEL=$(printf '%s' "$SNAP" | jq \
   | ([ .backlog.records[] | select(landed_record)
        | {id, title, kind, hold_kind, pr_url, report_path, local_note, completion,
           home:"(main)", home_id:"(main)"} ]) as $main_done
-  | ((.secondmate_landed.records) // []) as $mate_done
+  | ((.squad_lead_landed.records) // []) as $mate_done
   | ($main_done + $mate_done) as $all_landed_rows
   | ([ $all_landed_rows | group_by(.home_id)[]
        | sort_by([(.completion.date // ""), .id]) | reverse
@@ -458,16 +458,16 @@ MODEL=$(printf '%s' "$SNAP" | jq \
   | ($per_home_capped | sort_by([(.completion.date // ""), .id]) | reverse) as $landed_sorted
   | (if $all_landed == 1 then $landed_sorted else ($per_home_groups | round_robin_landed($landed_n)) end) as $done
   | ($done | map(.id)) as $done_ids
-  | ([.tasks[] | select(.kind != "secondmate") | .id]) as $live_ids
-  | ([.tasks[] | select(.kind != "secondmate" and .current_state.state == "working") | .id]) as $working_ids
+  | ([.tasks[] | select(.kind != "squad_lead") | .id]) as $live_ids
+  | ([.tasks[] | select(.kind != "squad_lead" and .current_state.state == "working") | .id]) as $working_ids
   | ($live_ids + $done_ids) as $rel_ids
   | ([ .tasks[]
        | select(.endpoint.exists == false or .endpoint.agent_alive == "dead")
        | {id, backend, target:(.endpoint.target // "-"), exists:.endpoint.exists, agent:.endpoint.agent_alive} ]
-     + [ (.secondmate_current.records // [])[] as $m | $m.endpoints[]?
+     + [ (.squad_lead_current.records // [])[] as $m | $m.endpoints[]?
          | select(.endpoint.exists == false or .endpoint.agent_alive == "dead")
-         | {id:($m.id + "/" + .id),backend:"secondmate-home",target:(.endpoint.target // "-"),exists:.endpoint.exists,agent:.endpoint.agent_alive} ]) as $unhealthy_all
-  | ([ (.secondmate_current.records // [])[]
+         | {id:($m.id + "/" + .id),backend:"squad-lead-home",target:(.endpoint.target // "-"),exists:.endpoint.exists,agent:.endpoint.agent_alive} ]) as $unhealthy_all
+  | ([ (.squad_lead_current.records // [])[]
        | ([.decisions_open[]? | select(.source == "backlog" and .verb == "captain-hold"
             and live_captain_call)]) as $captain_holds
        | ([.holds[]? | select(.source == "backlog")]) as $backlog_holds
@@ -481,14 +481,14 @@ MODEL=$(printf '%s' "$SNAP" | jq \
                elif ($backlog_holds | length) > 0 then "externally_held"
                else "unknown" end
              else .current.state end)
-         } ]) as $secondmate_views
-  | ([ if .secondmate_current.registry.available == false then
-         {id:"(registry)",state:"unknown",doing:(.secondmate_current.registry.reason // "Registered secondmate table unavailable"),
-          provenance:(.secondmate_current.registry.provenance // "registered-table"),
-          freshness:(.secondmate_current.registry.freshness.status // "unavailable"),
-          age_seconds:null,contradiction:false,reason:(.secondmate_current.registry.reason // "Registered secondmate table unavailable")}
+         } ]) as $squad_lead_views
+  | ([ if .squad_lead_current.registry.available == false then
+         {id:"(registry)",state:"unknown",doing:(.squad_lead_current.registry.reason // "Registered squad_lead table unavailable"),
+          provenance:(.squad_lead_current.registry.provenance // "registered-table"),
+          freshness:(.squad_lead_current.registry.freshness.status // "unavailable"),
+          age_seconds:null,contradiction:false,reason:(.squad_lead_current.registry.reason // "Registered squad_lead table unavailable")}
        else empty end ]
-     + [ $secondmate_views[]
+     + [ $squad_lead_views[]
        | {id,state:.bearings_state,
           doing:((if .bearings_state == "active_child_work" then
                     ([.active_children[] | .id + ": " + (.doing // .state)] | join("; "))
@@ -501,9 +501,9 @@ MODEL=$(printf '%s' "$SNAP" | jq \
           provenance:(if .provenance.summary_source == "remote-ledger-cache" then "structured-home-cache"
                       else .provenance.selected end),freshness:.freshness.status,
           age_seconds:.freshness.age_seconds,contradiction:(.contradiction // false),
-          reason:(.current.reason // "-")} ]) as $secondmates_all
+          reason:(.current.reason // "-")} ]) as $squad_leads_all
   | ([ .tasks[]
-       | select(.kind != "secondmate")
+       | select(.kind != "squad_lead")
        | select(.backlog.current_role != "program")
        | select(.backlog.current_role != "held" or .current_state.state == "working")
        | {id, kind,
@@ -514,10 +514,10 @@ MODEL=$(printf '%s' "$SNAP" | jq \
         doing: ((.current_state.detail // "") as $d
                 | (if $d != "" then $d else (.hints.last_event_text // "") end) | trunc(90))
       } ]
-     + [ $secondmate_views[] as $m
+     + [ $squad_lead_views[] as $m
          | $m.active_children[]?
          | {id:($m.id + "/" + .id),
-            kind:(.kind // "secondmate"),
+            kind:(.kind // "squad_lead"),
             state:(.state // "working"),
             repo:(.repo // null),
             name:((.name // "") as $name
@@ -530,7 +530,7 @@ MODEL=$(printf '%s' "$SNAP" | jq \
          | select(($all_decisions == 1) or live_captain_call)
          | {id,key:.id,verb:"captain-hold",
             summary:hold_summary(.title; .hold_reason),owner:"(main)"} ]
-     + [ (.secondmate_current.records // [])[] as $m
+     + [ (.squad_lead_current.records // [])[] as $m
          | ([ $m.decisions_open[]?
               | select(.source == "backlog" and .verb == "captain-hold")
               | select(($all_decisions == 1) or live_captain_call)
@@ -550,7 +550,7 @@ MODEL=$(printf '%s' "$SNAP" | jq \
   | ([ .backlog.records[]
          | . as $record
          | select(.structured and projected_deferred_hold) ]
-     + [ (.secondmate_current.records // [])[] | .queued[]?
+     + [ (.squad_lead_current.records // [])[] | .queued[]?
          | select(.hold_kind == "captain" and projected_deferred_hold) ]
      | length) as $decisions_marked_deferred
   | (if ($return_catchup.pending // false) then
@@ -582,7 +582,7 @@ MODEL=$(printf '%s' "$SNAP" | jq \
          | select(.captain_actionable != true)
          | select((.hold_bucket == null) or ($all_decisions == 0))
          | as_gate("(main)") ]
-     + [ (.secondmate_current.records // [])[] as $m
+     + [ (.squad_lead_current.records // [])[] as $m
          | select($m.provenance.selected == "structured-home")
          | $m.queued[]?
          | select(.captain_actionable != true)
@@ -592,7 +592,7 @@ MODEL=$(printf '%s' "$SNAP" | jq \
        | . as $r
        | select(($all_reports == 1) or (($rel_ids | index($r.id)) != null))
        | {id, path} ]) as $reports_all
-  | ([ .tasks[] | select(.kind != "secondmate" and .pr.url != null and .pr.source == "meta") | {id, url:.pr.url} ]) as $recorded_prs_all
+  | ([ .tasks[] | select(.kind != "squad_lead" and .pr.url != null and .pr.source == "meta") | {id, url:.pr.url} ]) as $recorded_prs_all
   | def filed_epoch:
       (.filed // null) as $filed
       | if ($filed | type) != "string" then null
@@ -611,7 +611,7 @@ MODEL=$(printf '%s' "$SNAP" | jq \
       prs: $prs,
       contributions:(
         ([$snap.contributions + {owner:"(main)"}]
-          + [($snap.secondmate_current.records // [])[] as $m | if $m.contributions == null then null else $m.contributions + {owner:$m.id} end])
+          + [($snap.squad_lead_current.records // [])[] as $m | if $m.contributions == null then null else $m.contributions + {owner:$m.id} end])
         | map(if . != null and .owner != "(main)" and .known > 0 and (.valid_until // 0) < ($now | fromdateiso8601)
               then .complete=false | .proven_clear=false | .checked=0 | .captain=[]
                 | .unmeasured=(.unmeasured // 0)
@@ -622,14 +622,14 @@ MODEL=$(printf '%s' "$SNAP" | jq \
            checked:([$measured[].checked] | add // 0),
            counts:{captain:([$measured[].counts.captain] | add // 0),fleet:([$measured[].counts.fleet] | add // 0),
                    maintainer:([$measured[].counts.maintainer] | add // 0),nobody:([$measured[].counts.nobody] | add // 0)},
-           complete:(all($homes[]; . != null and .complete) and ($snap.secondmate_current.truncated // 0) == 0
-                     and $snap.secondmate_current.registry.available != false
-                     and $snap.secondmate_current.registry.input_truncated != true
-                     and $snap.secondmate_current.registry.records_truncated != true),
-           proven_clear:(all($homes[]; . != null and .proven_clear) and ($snap.secondmate_current.truncated // 0) == 0
-                     and $snap.secondmate_current.registry.available != false
-                     and $snap.secondmate_current.registry.input_truncated != true
-                     and $snap.secondmate_current.registry.records_truncated != true),
+           complete:(all($homes[]; . != null and .complete) and ($snap.squad_lead_current.truncated // 0) == 0
+                     and $snap.squad_lead_current.registry.available != false
+                     and $snap.squad_lead_current.registry.input_truncated != true
+                     and $snap.squad_lead_current.registry.records_truncated != true),
+           proven_clear:(all($homes[]; . != null and .proven_clear) and ($snap.squad_lead_current.truncated // 0) == 0
+                     and $snap.squad_lead_current.registry.available != false
+                     and $snap.squad_lead_current.registry.input_truncated != true
+                     and $snap.squad_lead_current.registry.records_truncated != true),
            unmeasured_homes:([$homes[] | select(. == null)] | length),
            unreadable_records:([$measured[].unreadable_records] | add // 0),
            unmeasured:([$measured[].unmeasured] | add // 0),
@@ -638,8 +638,8 @@ MODEL=$(printf '%s' "$SNAP" | jq \
            captain_omitted:([$measured[].captain_omitted] | add // 0),
            captain:[$measured[] as $h | $h.captain[]? | . + {owner:$h.owner}]}),
       in_flight: (if $all_in_flight == 1 then $in_flight_all else $in_flight_all[:$in_flight_n] end),
-      secondmates: (if $all_secondmates == 1 then $secondmates_all else $secondmates_all[:$secondmates_n] end),
-      secondmate_reconcile: [ (.secondmate_current.records // [])[]
+      squad_leads: (if $all_squad_leads == 1 then $squad_leads_all else $squad_leads_all[:$squad_leads_n] end),
+      squad_lead_reconcile: [ (.squad_lead_current.records // [])[]
         | select(.reconcile_inventory != null)
         | {id, spawn_gen:(.spawn_gen // null), host:(.host // null), kind:(.reconcile_inventory.kind // null), ids:((.reconcile_inventory.ids // []) | map(select(type == "string")) | sort)} ],
       decisions_open: (if $all_decisions == 1 then $decisions_all else $decisions_all[:$decisions_n] end),
@@ -665,28 +665,28 @@ MODEL=$(printf '%s' "$SNAP" | jq \
         (if $f_actions then empty else {surface:"watch/steer actions", reveal:"--fields actions"} end),
         (if $f_endpoints then empty else {surface:"healthy endpoint detail", reveal:"--fields endpoints"} end),
         (if $all_reports == 1 then empty else {surface:"full scout-report inventory", reveal:"--all-reports"} end),
-        (if $all_landed == 0 and ($per_home_capped | length) > ($done | length) then {surface:("landed showing \($done | length) of \($per_home_capped | length)" + (($done | map(.home_id) | unique | map(select(. != "(main)")) | length) as $k | if $k > 0 then " (incl. \($k) secondmate home(s))" else "" end)), reveal:"--all-landed"} else empty end),
+        (if $all_landed == 0 and ($per_home_capped | length) > ($done | length) then {surface:("landed showing \($done | length) of \($per_home_capped | length)" + (($done | map(.home_id) | unique | map(select(. != "(main)")) | length) as $k | if $k > 0 then " (incl. \($k) squad_lead home(s))" else "" end)), reveal:"--all-landed"} else empty end),
         (if $all_landed == 0 and $home_cap_dropped > 0 then {surface:("landed per-home capped at \($landed_per_home_n) for \($home_cap_dropped) home(s)"), reveal:"--all-landed"} else empty end),
-        (if (($snap.secondmate_landed.unreadable // []) | length) > 0 then {surface:("secondmate home(s) with unreadable structured state: \(($snap.secondmate_landed.unreadable // []) | length)"), reveal:"inspect the listed secondmate home ledgers"} else empty end),
-        (if $all_landed == 0 and (($snap.secondmate_landed.truncated // []) | length) > 0 then {surface:("secondmate home Done capped at the snapshot layer for \(($snap.secondmate_landed.truncated // []) | length) home(s)"), reveal:"--all-landed"} else empty end),
+        (if (($snap.squad_lead_landed.unreadable // []) | length) > 0 then {surface:("squad_lead home(s) with unreadable structured state: \(($snap.squad_lead_landed.unreadable // []) | length)"), reveal:"inspect the listed squad_lead home ledgers"} else empty end),
+        (if $all_landed == 0 and (($snap.squad_lead_landed.truncated // []) | length) > 0 then {surface:("squad_lead home Done capped at the snapshot layer for \(($snap.squad_lead_landed.truncated // []) | length) home(s)"), reveal:"--all-landed"} else empty end),
         ((($snap.main_inventory.orphan_in_flight // []) | length) as $n
          | if $n > 0 then {surface:("main in-flight backlog item(s) have no child metadata: \($n)"), reveal:"inspect main data/backlog.md In flight vs state/*.meta"} else empty end),
         ((($snap.main_inventory.unstructured_current_count // 0)) as $n
          | if $n > 0 then {surface:("main unstructured current backlog row(s): \($n)"), reveal:"inspect main data/backlog.md In flight and Queued free-form rows"} else empty end),
         (if $all_in_flight == 0 and ($in_flight_all | length) > $in_flight_n then {surface:("in_flight showing \($in_flight_n) of \($in_flight_all | length)"), reveal:"--all-in-flight"} else empty end),
-        (($snap.secondmate_current.records // [])[] as $m
+        (($snap.squad_lead_current.records // [])[] as $m
          | ([($m.omitted // [])[] | select(.surface == "active_children") | .count] | add // 0) as $n
-         | if $n > 0 then {surface:("secondmate " + $m.id + " active children omitted by snapshot bound: \($n)"), reveal:"raise JG_SNAPSHOT_SECONDMATE_CHILDREN"} else empty end),
-        (if $all_secondmates == 0 and ($secondmates_all | length) > $secondmates_n then {surface:("secondmates showing \($secondmates_n) of \($secondmates_all | length)"), reveal:"--all-secondmates"} else empty end),
-        (if (($snap.secondmate_current.truncated // 0) > 0) then {surface:("registered secondmates omitted by snapshot bound: \($snap.secondmate_current.truncated)"), reveal:"raise JG_SNAPSHOT_SECONDMATES"} else empty end),
-        (if $snap.secondmate_current.registry.input_truncated == true then {surface:"secondmate registry input truncated by bounded read", reveal:"raise JG_SNAPSHOT_REGISTRY_LINES or JG_SNAPSHOT_REGISTRY_BYTES"} else empty end),
-        (if $snap.secondmate_current.registry.records_truncated == true then {surface:"secondmate registry records omitted by bounded read", reveal:"raise JG_SNAPSHOT_REGISTRY_RECORDS"} else empty end),
-        (if $snap.secondmate_current.registry.available == false then {surface:("secondmate registry unavailable: " + ($snap.secondmate_current.registry.reason // "read failed")), reveal:"inspect data/secondmates.md"} else empty end),
-        (($snap.secondmate_current.records // [])[]
+         | if $n > 0 then {surface:("squad_lead " + $m.id + " active children omitted by snapshot bound: \($n)"), reveal:"raise JG_SNAPSHOT_SQUAD_LEAD_CHILDREN"} else empty end),
+        (if $all_squad_leads == 0 and ($squad_leads_all | length) > $squad_leads_n then {surface:("squad_leads showing \($squad_leads_n) of \($squad_leads_all | length)"), reveal:"--all-squad-leads"} else empty end),
+        (if (($snap.squad_lead_current.truncated // 0) > 0) then {surface:("registered squad_leads omitted by snapshot bound: \($snap.squad_lead_current.truncated)"), reveal:"raise JG_SNAPSHOT_SQUAD_LEADS"} else empty end),
+        (if $snap.squad_lead_current.registry.input_truncated == true then {surface:"squad_lead registry input truncated by bounded read", reveal:"raise JG_SNAPSHOT_REGISTRY_LINES or JG_SNAPSHOT_REGISTRY_BYTES"} else empty end),
+        (if $snap.squad_lead_current.registry.records_truncated == true then {surface:"squad_lead registry records omitted by bounded read", reveal:"raise JG_SNAPSHOT_REGISTRY_RECORDS"} else empty end),
+        (if $snap.squad_lead_current.registry.available == false then {surface:("squad_lead registry unavailable: " + ($snap.squad_lead_current.registry.reason // "read failed")), reveal:"inspect data/squad_leads.md"} else empty end),
+        (($snap.squad_lead_current.records // [])[]
          | select(.provenance.summary_source == "remote-ledger-cache")
-         | {surface:("secondmate " + .id + " served from cached home ledger"),reveal:"inspect the home ledger publication and remote route"}),
-        (([($snap.secondmate_current.records // [])[] | select(.parent_event.activity_scan.input_truncated == true or .parent_event.activity_scan.retained_truncated == true)] | length) as $n | if $n > 0 then {surface:("secondmate parent activity evidence truncated for \($n) record(s)"), reveal:"raise JG_SNAPSHOT_PARENT_ACTIVITY_LINES, JG_SNAPSHOT_PARENT_ACTIVITY_BYTES, or JG_SNAPSHOT_PARENT_ACTIVITIES"} else empty end),
-        (([($snap.secondmate_current.records // [])[] | select(.parent_event.activity_scan.available == false)] | length) as $n | if $n > 0 then {surface:("secondmate parent activity evidence unavailable for \($n) record(s)"), reveal:"inspect the parent status logs"} else empty end),
+         | {surface:("squad_lead " + .id + " served from cached home ledger"),reveal:"inspect the home ledger publication and remote route"}),
+        (([($snap.squad_lead_current.records // [])[] | select(.parent_event.activity_scan.input_truncated == true or .parent_event.activity_scan.retained_truncated == true)] | length) as $n | if $n > 0 then {surface:("squad_lead parent activity evidence truncated for \($n) record(s)"), reveal:"raise JG_SNAPSHOT_PARENT_ACTIVITY_LINES, JG_SNAPSHOT_PARENT_ACTIVITY_BYTES, or JG_SNAPSHOT_PARENT_ACTIVITIES"} else empty end),
+        (([($snap.squad_lead_current.records // [])[] | select(.parent_event.activity_scan.available == false)] | length) as $n | if $n > 0 then {surface:("squad_lead parent activity evidence unavailable for \($n) record(s)"), reveal:"inspect the parent status logs"} else empty end),
         (if $all_decisions == 0 and ($decisions_all | length) > $decisions_n then {surface:("decisions_open showing \($decisions_n) of \($decisions_all | length)"), reveal:"--all-decisions"} else empty end),
         (if $all_decisions == 0 and $decisions_marked_deferred > 0 then {surface:("captain holds bucketed blocked, dated, or aged: \($decisions_marked_deferred)"), reveal:"--all-decisions"} else empty end),
         (if $all_queued == 0 and ($gates_all | length) > $gates_n then {surface:("gates showing \($gates_n) of \($gates_all | length)"), reveal:"--all-queued"} else empty end),

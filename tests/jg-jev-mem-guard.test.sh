@@ -13,7 +13,7 @@ WATCH="$ROOT/bin/jg-watch.sh"
 DRAIN="$ROOT/bin/jg-wake-drain.sh"
 TMP_ROOT=$(jg_test_tmproot jg-mem-guard)
 export JG_HOST_MEMORY_CGROUP_ROOT="$TMP_ROOT/no-cgroup"
-export JG_ADDONS_DIR="${JG_ADDONS_DIR:-${JG_HOME:-$ROOT}/projects/firstmate-addons}"
+export JG_ADDONS_DIR="${JG_ADDONS_DIR:-${JG_HOME:-$ROOT}/projects/juggernaut-addons}"
 APP_SLICE="user.slice/user-$(id -u).slice/user@$(id -u).service/app.slice"
 
 # fake_host <proc> <available-gb> <pressure (both 10 s and 60 s averages)> [swap-used-gb]
@@ -39,12 +39,12 @@ fake_pid() {
 
 # A home with one ship task, one lead, and processes owned by the task (by
 # working directory and a path-qualified JG_TASK_ID), by the lead,
-# and by nothing Firstmate records.
+# and by nothing Juggernaut records.
 make_fleet() {
   local case=$1
   mkdir -p "$case/state" "$case/wt/sub" "$case/mate/state"
   jg_write_meta "$case/state/big-build.meta" kind=ship "worktree=$case/wt"
-  jg_write_meta "$case/state/sm1.meta" kind=secondmate "home=$case/mate"
+  jg_write_meta "$case/state/sm1.meta" kind=squad_lead "home=$case/mate"
   fake_pid "$case/proc" 101 node 9 "$case/wt/sub"
   fake_pid "$case/proc" 102 java 5 "$case/wt" big-build
   fake_pid "$case/proc" 103 claude 2 "$case/mate"
@@ -88,7 +88,7 @@ watch_leg() {
   local case=$1 tag=$2
   env PATH="$case/fakebin:$PATH" JG_HOME="$case" JG_ROOT_OVERRIDE="$ROOT" JG_STATE_OVERRIDE="${5:-$case/state}" \
     JG_CREW_STATE_BIN="$case/fakebin/jg-crew-state.sh" JG_FAKE_CREW_STATE='state: working · source: run-step · fixture build' TMUX='' JG_BACKEND=tmux \
-    JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" JG_HOST_MEMORY_SECS="${3:-1}" JG_SECONDMATE_LIVENESS_SECS="${4:-99999999}" \
+    JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" JG_HOST_MEMORY_SECS="${3:-1}" JG_SQUAD_LEAD_LIVENESS_SECS="${4:-99999999}" \
     JG_POLL=1 JG_SIGNAL_GRACE=0 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
     "$WATCH" > "$case/watch-$tag.out" 2> "$case/watch-$tag.err" &
   LEG_PID=$!
@@ -122,7 +122,7 @@ wait_interrupt() {
 
 prepare_control_task() {
   local case=$1
-  jg_write_meta "$case/state/big-build.meta" kind=ship harness=pi window=firstmate:jg-big-build "worktree=$case/wt" "project=$case/wt"
+  jg_write_meta "$case/state/big-build.meta" kind=ship harness=pi window=juggernaut:jg-big-build "worktree=$case/wt" "project=$case/wt"
   cat > "$case/fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
 case "$1" in
@@ -152,7 +152,7 @@ test_watcher_wakes_once_per_alert_episode() {
   [ "$(grep -c $'\tcheck\thost-memory\t' "$case/state/.wake-queue")" -eq 1 ] \
     || fail "the alert was not queued durably exactly once: $(cat "$case/state/.wake-queue")"
   [ -s "$case/state/host-memory.tsv" ] || fail "the watcher did not record the sample"
-  assert_contains "$(cat "$case/keys")" 'send-keys -t firstmate:jg-big-build Escape' "the watcher uses the public control plane to interrupt"
+  assert_contains "$(cat "$case/keys")" 'send-keys -t juggernaut:jg-big-build Escape' "the watcher uses the public control plane to interrupt"
   [ "$(wc -l < "$case/keys")" -eq 1 ] || fail "one interrupt key expected"
   assert_contains "$(cat "$case/state/host-memory-interrupts.tsv")" 'automatically interrupted task big-build' "the interrupt outcome is durable"
   assert_contains "$out" 'automatic interrupt attempted: task big-build' "Main receives the interrupt reason and task"
@@ -322,16 +322,16 @@ test_homes_without_ordinary_tasks() {
   fake_pid "$case/proc" 104 claude 10 "$case/mate"
   fake_pid "$case/proc" 105 java 15 "$TMP_ROOT/unowned-a"
   fake_pid "$case/proc" 106 node 14 "$TMP_ROOT/unowned-b"
-  for mode in missing empty secondmate remote; do
+  for mode in missing empty squad_lead remote; do
     case "$mode" in
       empty) mkdir -p "$case/state" ;;
-      secondmate) jg_write_meta "$case/state/sm1.meta" kind=secondmate "home=$case/mate" ;;
-      remote) jg_write_meta "$case/state/sm1.meta" kind=secondmate remote_host=other "home=$case/mate" ;;
+      squad_lead) jg_write_meta "$case/state/sm1.meta" kind=squad_lead "home=$case/mate" ;;
+      remote) jg_write_meta "$case/state/sm1.meta" kind=squad_lead remote_host=other "home=$case/mate" ;;
     esac
     out=$(JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --state-dir "$case" "$case/state" --state-dir "$case/mate" "$case/mate/state" --owned-top-task "$case/state")
     assert_contains "$out" 'lead main 18.0 GB in 2 processes' "$mode home aggregates supervisors into the top three"
-    if [ "$mode" = secondmate ]; then
-      assert_equals sm1 "${out##*$'\t'}" "secondmate-only state retains parent-owned control"
+    if [ "$mode" = squad_lead ]; then
+      assert_equals sm1 "${out##*$'\t'}" "squad-lead-only state retains parent-owned control"
       out=$(JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --state-dir "$case/mate" "$case/mate/state" --state-dir "$case" "$case/state" --owned-top-task "$case/mate/state")
       assert_contains "$out" 'largest: lead sm1 20.0 GB in 2 processes, lead main 18.0 GB in 2 processes' "empty child state preserves the parent owner"
       assert_equals '' "${out##*$'\t'}" "child fallback cannot authorize parent-owned control"
@@ -349,9 +349,9 @@ test_remote_records_do_not_own_local_processes() {
   home=$case/main wt=$case/pool/build
   mkdir -p "$home/state" "$wt/sub"
   jg_write_meta "$home/state/big-build.meta" kind=ship "worktree=$wt"
-  jg_write_meta "$home/state/a-remote.meta" kind=secondmate remote_host=other "home=$wt"
+  jg_write_meta "$home/state/a-remote.meta" kind=squad_lead remote_host=other "home=$wt"
   jg_write_meta "$home/state/b-remote.meta" kind=ship remote_host=other "worktree=$wt"
-  jg_write_meta "$home/state/c-remote.meta" kind=secondmate remote_host=other "home=$home"
+  jg_write_meta "$home/state/c-remote.meta" kind=squad_lead remote_host=other "home=$home"
   fake_host "$case/proc" 5 41
   fake_pid "$case/proc" 101 node 9 "$wt/sub"
   fake_pid "$case/proc" 102 java 5 "$wt" big-build
@@ -371,7 +371,7 @@ test_overridden_state_ownership() {
   mv "$case/state" "$state"
   jg_test_track_watcher_state "$state"
   mkdir -p "$case/data" "$case/mate/wt"
-  printf -- '- sm1 - mate (home: %s; scope: test; projects: demo; added 2026-01-01)\n' "$case/mate" > "$case/data/secondmates.md"
+  printf -- '- sm1 - mate (home: %s; scope: test; projects: demo; added 2026-01-01)\n' "$case/mate" > "$case/data/squad_leads.md"
   jg_write_meta "$case/mate/state/big-build.meta" kind=ship "worktree=$case/mate/wt"
   fake_pid "$case/proc" 110 node 20 "$case/mate/wt" big-build
   fake_host "$case/proc" 5 41
@@ -380,7 +380,7 @@ test_overridden_state_ownership() {
   wait_for_exit "$LEG_PID" 100 || fail "the overridden-state alert did not wake"
   out=$(cat "$case/watch-foreign-override.out")
   assert_contains "$out" 'foreign pid 108 25.0 GB' "a sibling home remains an unowned consumer"
-  assert_contains "$out" 'task big-build (sm1) 20.0 GB' "the sampler passes the registered secondmate home identity"
+  assert_contains "$out" 'task big-build (sm1) 20.0 GB' "the sampler passes the registered squad_lead home identity"
   assert_contains "$out" 'automatic interrupt skipped' "the foreign matching ID does not authorize control"
   [ ! -s "$case/keys" ] || fail "an overridden state caused the foreign process to interrupt a local task"
   rm -r "$case/proc/108"
@@ -436,8 +436,8 @@ test_benign_liveness_outcomes() {
   make_fleet "$case"
   prepare_control_task "$case"
   mkdir -p "$case/config"
-  printf 'pi\n' > "$case/config/secondmate-harness"
-  jg_write_meta "$case/state/sm1.meta" kind=secondmate harness=pi window=firstmate:jg-sm1 "home=$case/mate"
+  printf 'pi\n' > "$case/config/squad-lead-harness"
+  jg_write_meta "$case/state/sm1.meta" kind=squad_lead harness=pi window=juggernaut:jg-sm1 "home=$case/mate"
   fake_host "$case/proc" 30 25
   # Publish the alert after the watcher's queue scan but before its recovery
   # check acquires the queue lock: a late memory row must keep its own reason.
@@ -462,7 +462,7 @@ SH
   pid=$LEG_PID
   wait_rows "$case/state/host-memory.tsv" 3
   is_live_non_zombie "$pid" || fail "memory deferral exited the watcher: $(cat "$case/watch-wait.err")"
-  [ ! -e "$case/state/.secondmate-relaunch-sm1" ] || fail "a memory deferral consumed the retry budget"
+  [ ! -e "$case/state/.squad-lead-relaunch-sm1" ] || fail "a memory deferral consumed the retry budget"
   : > "$case/publish-alert"
   wait_for_exit "$pid" 150 || fail "ALERT did not wake while recovery was deferred"
   wait_interrupt "$case/state"
@@ -470,8 +470,8 @@ SH
 
   case=$(make_case endpoint-changed)
   mkdir -p "$case/config" "$case/mate/state"
-  printf 'pi\n' > "$case/config/secondmate-harness"
-  jg_write_meta "$case/state/sm1.meta" kind=secondmate harness=pi window=firstmate:jg-sm1 "home=$case/mate"
+  printf 'pi\n' > "$case/config/squad-lead-harness"
+  jg_write_meta "$case/state/sm1.meta" kind=squad_lead harness=pi window=juggernaut:jg-sm1 "home=$case/mate"
   fake_host "$case/proc" 40 2
   cat > "$case/fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
@@ -505,14 +505,14 @@ test_default_home_interrupt() {
   fake_host "$case/proc" 5 41
   env -u JG_HOME PATH="$case/fakebin:$PATH" JG_ROOT_OVERRIDE="$case" JG_STATE_OVERRIDE="$state" \
     TMUX='' JG_BACKEND=tmux JG_POLL=1 JG_SIGNAL_GRACE=0 JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" \
-    JG_SECONDMATE_LIVENESS_SECS=99999999 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
+    JG_SQUAD_LEAD_LIVENESS_SECS=99999999 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
     "$WATCH" > "$case/default.out" 2> "$case/default.err" &
   LEG_PID=$!
   jg_test_track_watcher_state "$state"
   wait_for_exit "$LEG_PID" 100 || fail "default-home watcher did not deliver its memory wake"
   wait_interrupt "$state"
   assert_contains "$(cat "$case/default.out")" 'automatic interrupt attempted: task big-build' "the resolved default home reaches control"
-  assert_contains "$(cat "$case/keys")" 'firstmate:jg-big-build Escape' "control resolves the selected state directory"
+  assert_contains "$(cat "$case/keys")" 'juggernaut:jg-big-build Escape' "control resolves the selected state directory"
   pass "default-home automatic interrupts preserve the selected state"
 }
 
@@ -736,8 +736,8 @@ test_spawn_memory_admission() {
   assert_contains "$(cat "$home/state/admission-refused")" $'\tnope-mem-z5\thost memory under pressure' \
     "the refusal is recorded for the queue views"
   [ ! -e "$home/state/nope-mem-z5.meta" ] || fail "a refused spawn created a task record"
-  out=$(env "${spawn_env[@]}" "$ROOT/bin/jg-spawn.sh" mate-mem-z6 / --secondmate --harness 'true worker' 2>&1)
-  assert_contains "$out" "task mate-mem-z6 stays queued" "a secondmate launch is refused too"
+  out=$(env "${spawn_env[@]}" "$ROOT/bin/jg-spawn.sh" mate-mem-z6 / --squad-lead --harness 'true worker' 2>&1)
+  assert_contains "$out" "task mate-mem-z6 stays queued" "a squad_lead launch is refused too"
   fake_host "$home/proc" 30 1
   out=$(env "${spawn_env[@]}" "$ROOT/bin/jg-spawn.sh" nope-mem-z5 projects/none --scout --harness 'true worker' 2>&1)
   assert_contains "$out" "has no brief" "a calm host lets the spawn through"
@@ -757,7 +757,7 @@ SH
   JG_HOME="$case" JG_STATE_OVERRIDE="$case/state" "$ROOT/bin/jg-check-register.sh" poll >/dev/null
   env -u JG_POLL PATH="$case/fakebin:$PATH" JG_HOME="$case" JG_ROOT_OVERRIDE="$ROOT" \
     TMUX='' JG_BACKEND=tmux JG_SIGNAL_GRACE=0 JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" JG_HOST_MEMORY_SECS=1 \
-    JG_CHECK_INTERVAL=1 JG_HEARTBEAT=999999 JG_SECONDMATE_LIVENESS_SECS=99999999 \
+    JG_CHECK_INTERVAL=1 JG_HEARTBEAT=999999 JG_SQUAD_LEAD_LIVENESS_SECS=99999999 \
     "$WATCH" > "$case/poll.out" 2> "$case/poll.err" &
   LEG_PID=$!
   while [ "$i" -lt 250 ]; do

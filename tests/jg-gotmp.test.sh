@@ -2,7 +2,7 @@
 # Behavior tests for per-task GOTMPDIR support (jg-gotmp).
 #
 # jg-spawn gives each task a temp root /tmp/jg-<id>/ with Go's build temp nested at
-# gotmp/, exports GOTMPDIR into the crewmate pane, and records tasktmp= in the task's
+# gotmp/, exports GOTMPDIR into the operator pane, and records tasktmp= in the task's
 # meta. jg-teardown reads tasktmp= and removes the whole root on cleanup.
 #
 # These tests exercise jg-teardown directly as a subprocess against a fake JG_HOME/JG_ROOT
@@ -93,8 +93,8 @@ SH
   ln -s "$ROOT/bin/jg-public-followup-lib.sh" "$fake/bin/jg-public-followup-lib.sh"
   ln -s "$ROOT/bin/jg-x-lib.sh" "$fake/bin/jg-x-lib.sh"
   ln -s "$ROOT/bin/jg-env-lib.sh" "$fake/bin/jg-env-lib.sh"
-  ln -s "$ROOT/bin/jg-secondmate-registry-lib.sh" "$fake/bin/jg-secondmate-registry-lib.sh"
-  ln -s "$ROOT/bin/jg-secondmate-parent-lib.sh" "$fake/bin/jg-secondmate-parent-lib.sh"
+  ln -s "$ROOT/bin/jg-squad-lead-registry-lib.sh" "$fake/bin/jg-squad-lead-registry-lib.sh"
+  ln -s "$ROOT/bin/jg-squad-lead-parent-lib.sh" "$fake/bin/jg-squad-lead-parent-lib.sh"
   # Receiver-wake retirement sources the pending-reply library, which in turn
   # requires the marker helper even for this ordinary-task teardown fixture.
   ln -s "$ROOT/bin/jg-pending-reply-lib.sh" "$fake/bin/jg-pending-reply-lib.sh"
@@ -204,8 +204,8 @@ SH
   ln -s "$ROOT/bin/jg-public-followup-lib.sh" "$fake/bin/jg-public-followup-lib.sh"
   ln -s "$ROOT/bin/jg-x-lib.sh" "$fake/bin/jg-x-lib.sh"
   ln -s "$ROOT/bin/jg-env-lib.sh" "$fake/bin/jg-env-lib.sh"
-  ln -s "$ROOT/bin/jg-secondmate-registry-lib.sh" "$fake/bin/jg-secondmate-registry-lib.sh"
-  ln -s "$ROOT/bin/jg-secondmate-parent-lib.sh" "$fake/bin/jg-secondmate-parent-lib.sh"
+  ln -s "$ROOT/bin/jg-squad-lead-registry-lib.sh" "$fake/bin/jg-squad-lead-registry-lib.sh"
+  ln -s "$ROOT/bin/jg-squad-lead-parent-lib.sh" "$fake/bin/jg-squad-lead-parent-lib.sh"
   ln -s "$ROOT/bin/jg-pending-reply-lib.sh" "$fake/bin/jg-pending-reply-lib.sh"
   ln -s "$ROOT/bin/jg-parked-homes-lib.sh" "$fake/bin/jg-parked-homes-lib.sh"
   ln -s "$ROOT/bin/jg-marker-lib.sh" "$fake/bin/jg-marker-lib.sh"

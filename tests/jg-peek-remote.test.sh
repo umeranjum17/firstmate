@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# jg-peek remote-secondmate capture routing.
+# jg-peek remote-squad-lead capture routing.
 #
-# A remote secondmate's pane lives on its own host. The old path resolved the
+# A remote squad_lead's pane lives on its own host. The old path resolved the
 # meta's "remote:<id>" window through the local backend adapters and handed it
 # to tmux, which failed with "can't find session: remote" - a healthy remote
 # mate misreported as an unreadable endpoint. These tests drive the real
@@ -48,14 +48,14 @@ setup_remote_home() {  # <name> -> echoes home dir with remote meta + registry
     "window=remote:rsm" \
     "endpoint_task_id=rsm" \
     "harness=claude" \
-    "kind=secondmate" \
-    "mode=secondmate" \
+    "kind=squad_lead" \
+    "mode=squad_lead" \
     "remote_host=remote-mac" \
     "remote_root=/remote/root" \
     "remote_backend=herdr" \
     "remote_herdr_session=jg-remote" \
     "remote_target=jg-remote:w1:p1"
-  cat > "$home/data/secondmates.md" <<EOF
+  cat > "$home/data/squad_leads.md" <<EOF
 - rsm - remote test domain (host: remote-mac; root: /remote/root; home: /remote/home; scope: remote testing; projects: alpha; added 2026-08-02)
 EOF
   printf '%s\n' "$home"

@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
-# Register and provision a whole secondmate home on an SSH-reachable host.
+# Register and provision a whole squad_lead home on an SSH-reachable host.
 #
 # Usage:
 #   jg-remote-home-seed.sh <id> <ssh-alias> <remote-root> <remote-home> {<project>[=<origin-url>]...|--no-projects}
 #
 # The SSH alias must already reach a host whose non-interactive PATH exposes the
 # fixed jg-remote-entrypoint.sh from <remote-root>. The command records the
-# remote host dimension in data/secondmates.md, gates the host on
+# remote host dimension in data/squad_leads.md, gates the host on
 # jg-remote-doctor.sh readiness before touching it, sends a bounded provisioning
-# manifest through jg-on.sh, and lets the remote host clone its own Firstmate
+# manifest through jg-on.sh, and lets the remote host clone its own Juggernaut
 # home and project origins. No project tree or secret environment is copied.
 #
-# Each project needs an origin the remote account can clone. Firstmate resolves
+# Each project needs an origin the remote account can clone. Juggernaut resolves
 # that origin and names it as <project>=<origin-url>, so seeding never requires
 # a clone of that project in this home; a bare <project> is accepted only when
 # this home already has projects/<project>, whose origin is then read instead.
@@ -33,13 +33,13 @@ JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
 DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
 PROJECTS="${JG_PROJECTS_OVERRIDE:-$JG_HOME/projects}"
 STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
-REG="$DATA/secondmates.md"
+REG="$DATA/squad_leads.md"
 MAX_MANIFEST_BYTES=1048576
 
-# shellcheck source=bin/jg-secondmate-registry-lib.sh
-. "$SCRIPT_DIR/jg-secondmate-registry-lib.sh"
-# shellcheck source=bin/jg-secondmate-charter-lib.sh
-. "$SCRIPT_DIR/jg-secondmate-charter-lib.sh"
+# shellcheck source=bin/jg-squad-lead-registry-lib.sh
+. "$SCRIPT_DIR/jg-squad-lead-registry-lib.sh"
+# shellcheck source=bin/jg-squad-lead-charter-lib.sh
+. "$SCRIPT_DIR/jg-squad-lead-charter-lib.sh"
 # shellcheck source=bin/jg-wake-lib.sh
 . "$SCRIPT_DIR/jg-wake-lib.sh"
 # shellcheck source=bin/jg-remote-readiness-lib.sh
@@ -70,7 +70,7 @@ HOST=$2
 REMOTE_ROOT=$3
 REMOTE_HOME=$4
 shift 4
-safe_id "$ID" || die "invalid secondmate id: $ID"
+safe_id "$ID" || die "invalid squad_lead id: $ID"
 case "$HOST" in ''|-*|*[!A-Za-z0-9._-]*) die "invalid SSH config alias: $HOST" ;; esac
 for path in "$REMOTE_ROOT" "$REMOTE_HOME"; do
   case "$path" in /*) ;; *) die "remote root and home must be absolute paths" ;; esac
@@ -108,20 +108,20 @@ else
 fi
 
 mkdir -p "$STATE" || die "cannot create parent state directory"
-REGISTRY_LOCK=$(secondmate_registry_lock_path "$STATE")
-jg_lock_acquire_wait "$REGISTRY_LOCK" || die "cannot lock the secondmate registry"
+REGISTRY_LOCK=$(squad_lead_registry_lock_path "$STATE")
+jg_lock_acquire_wait "$REGISTRY_LOCK" || die "cannot lock the squad_lead registry"
 REGISTRY_LOCK_HELD=1
 
 if [ -e "$REG" ] || [ -L "$REG" ]; then
-  [ -f "$REG" ] && [ ! -L "$REG" ] || die "secondmate registry is unavailable or unsafe: $REG"
-  secondmate_registry_validate_bindings "$REG" secondmate_registry_path_key \
-    || die "$SECONDMATE_REGISTRY_ERROR"
-  if secondmate_registry_line_for_id "$REG" "$ID"; then
-    [ "$SECONDMATE_REGISTRY_REMOTE" -eq 1 ] \
-      && [ "$SECONDMATE_REGISTRY_HOST" = "$HOST" ] \
-      && [ "$SECONDMATE_REGISTRY_ROOT" = "$REMOTE_ROOT" ] \
-      && [ "$SECONDMATE_REGISTRY_HOME" = "$REMOTE_HOME" ] \
-      || die "secondmate $ID is already registered to a different local or remote home"
+  [ -f "$REG" ] && [ ! -L "$REG" ] || die "squad_lead registry is unavailable or unsafe: $REG"
+  squad_lead_registry_validate_bindings "$REG" squad_lead_registry_path_key \
+    || die "$SQUAD_LEAD_REGISTRY_ERROR"
+  if squad_lead_registry_line_for_id "$REG" "$ID"; then
+    [ "$SQUAD_LEAD_REGISTRY_REMOTE" -eq 1 ] \
+      && [ "$SQUAD_LEAD_REGISTRY_HOST" = "$HOST" ] \
+      && [ "$SQUAD_LEAD_REGISTRY_ROOT" = "$REMOTE_ROOT" ] \
+      && [ "$SQUAD_LEAD_REGISTRY_HOME" = "$REMOTE_HOME" ] \
+      || die "squad_lead $ID is already registered to a different local or remote home"
   fi
 fi
 
@@ -129,17 +129,17 @@ mkdir -p "$DATA"
 BRIEF="$DATA/$ID/brief.md"
 BRIEF_CREATED=0
 if [ ! -f "$BRIEF" ]; then
-  [ -n "${JG_SECONDMATE_CHARTER:-}" ] || die "no filled charter at $BRIEF; set JG_SECONDMATE_CHARTER or scaffold one first"
+  [ -n "${JG_SQUAD_LEAD_CHARTER:-}" ] || die "no filled charter at $BRIEF; set JG_SQUAD_LEAD_CHARTER or scaffold one first"
   if [ "$NO_PROJECTS" -eq 1 ]; then
-    "$SCRIPT_DIR/jg-brief.sh" "$ID" --secondmate --no-projects >/dev/null
+    "$SCRIPT_DIR/jg-brief.sh" "$ID" --squad-lead --no-projects >/dev/null
   else
-    "$SCRIPT_DIR/jg-brief.sh" "$ID" --secondmate "${PROJECT_NAMES[@]}" >/dev/null
+    "$SCRIPT_DIR/jg-brief.sh" "$ID" --squad-lead "${PROJECT_NAMES[@]}" >/dev/null
   fi
   BRIEF_CREATED=1
 fi
 if grep -F '{TASK}' "$BRIEF" >/dev/null 2>&1; then
   [ "$BRIEF_CREATED" -eq 0 ] || rm -f -- "$BRIEF"
-  die "secondmate charter still contains {TASK}: $BRIEF"
+  die "squad_lead charter still contains {TASK}: $BRIEF"
 fi
 SUMMARY=$(registry_summary_for_brief "$BRIEF")
 SCOPE=$(registry_scope_for_brief "$BRIEF")
@@ -223,14 +223,14 @@ MANIFEST_BYTES=$(LC_ALL=C wc -c < "$TMP/manifest" | tr -d ' ')
   || die "remote provisioning manifest exceeds the $MAX_MANIFEST_BYTES-byte bound"
 
 TODAY=$(date +%F)
-REG_TMP="$TMP/secondmates.next"
+REG_TMP="$TMP/squad_leads.next"
 if [ -f "$REG" ]; then grep -vE "^- $ID( |$)" "$REG" > "$REG_TMP" || true; else : > "$REG_TMP"; fi
 printf -- '- %s - %s (host: %s; root: %s; home: %s; scope: %s; projects: %s; added %s)\n' \
   "$ID" "$SUMMARY" "$HOST" "$REMOTE_ROOT" "$REMOTE_HOME" "$SCOPE" "$PROJECTS_CSV" "$TODAY" >> "$REG_TMP"
 mv -f -- "$REG_TMP" "$REG"
-if ! secondmate_registry_validate_bindings "$REG" secondmate_registry_path_key "$ID" "$REMOTE_HOME"; then
+if ! squad_lead_registry_validate_bindings "$REG" squad_lead_registry_path_key "$ID" "$REMOTE_HOME"; then
   if [ "$REG_EXISTED" -eq 1 ]; then cp "$TMP/registry.before" "$REG"; else rm -f -- "$REG"; fi
-  die "$SECONDMATE_REGISTRY_ERROR"
+  die "$SQUAD_LEAD_REGISTRY_ERROR"
 fi
 
 restore_registry_and_brief() {

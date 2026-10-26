@@ -64,13 +64,13 @@ chmod +x "$FAKEBIN/tmux" "$FAKEBIN/no-mistakes"
 mkdir -p "$HOME_DIR/state" "$HOME_DIR/data" "$HOME_DIR/config" \
   "$HOME_DIR/projects/task" "$HOME_DIR/bin"
 HOME_DIR=$(cd "$HOME_DIR" && pwd -P)
-printf '# Seeded Firstmate home\n' > "$HOME_DIR/AGENTS.md"
-printf 'mate\n' > "$HOME_DIR/.jg-secondmate-home"
+printf '# Seeded Juggernaut home\n' > "$HOME_DIR/AGENTS.md"
+printf 'mate\n' > "$HOME_DIR/.jg-squad-lead-home"
 jg_git_init_commit "$HOME_DIR/projects/task"
 git -C "$HOME_DIR/projects/task" checkout -q -b fm/ledger-task
 cat > "$HOME_DIR/data/backlog.md" <<'EOF'
 ## In flight
-- [ ] ledger-task - Publish the home ledger (repo: firstmate) (kind: ship) (since 2026-08-28)
+- [ ] ledger-task - Publish the home ledger (repo: juggernaut) (kind: ship) (since 2026-08-28)
 
 ## Queued
 
@@ -79,7 +79,7 @@ EOF
 jg_write_meta "$HOME_DIR/state/ledger-task.meta" \
   "window=fmtest:jg-ledger-task" \
   "worktree=$HOME_DIR/projects/task" \
-  "project=firstmate" \
+  "project=juggernaut" \
   "harness=claude" \
   "kind=ship" \
   "mode=no-mistakes" \
@@ -108,7 +108,7 @@ run_producer() {  # <now> <epoch>
   PATH="$FAKEBIN:$PATH" \
     JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$HOME_DIR" \
     JG_SNAPSHOT_NOW="$1" JG_SNAPSHOT_NOW_EPOCH="$2" \
-    "$SNAPSHOT" --secondmate-home-summary
+    "$SNAPSHOT" --squad-lead-home-summary
 }
 
 wait_for_ledger_generation() {  # <generated> [tenths]
@@ -124,7 +124,7 @@ wait_for_ledger_generation() {  # <generated> [tenths]
 
 run_writer "$NOW_ONE" "$EPOCH_ONE" || fail "initial home-summary publication failed"
 jq -e --arg home "$HOME_DIR" --arg now "$NOW_ONE" --argjson epoch "$EPOCH_ONE" '
-  .schema == "jg-secondmate-home-summary.v1"
+  .schema == "jg-squad-lead-home-summary.v1"
   and .home == $home
   and .generated == $now
   and .generated_epoch == $epoch
@@ -153,7 +153,7 @@ wait "$WATCH_PID" >/dev/null 2>&1 || true
 WATCH_PID=
 
 run_producer "$NOW_TWO" "$EPOCH_TWO" > "$TMP_ROOT/fresh-summary.json" \
-  || fail "fresh secondmate-home-summary production failed"
+  || fail "fresh squad-lead-home-summary production failed"
 jq -S 'del(.generated, .generated_epoch)' "$HOME_DIR/state/home-summary.json" \
   > "$TMP_ROOT/published-normalized.json"
 jq -S 'del(.generated, .generated_epoch)' "$TMP_ROOT/fresh-summary.json" \
@@ -166,14 +166,14 @@ pass "watcher-carried status append publishes the real home summary"
 # publishable through every fleet snapshot mode and the real home-summary writer.
 mkdir -p "$LARGE_HOME/state" "$LARGE_HOME/data" "$LARGE_HOME/config" \
   "$LARGE_HOME/projects"
-printf '# Seeded Firstmate home\n' > "$LARGE_HOME/AGENTS.md"
-printf 'large\n' > "$LARGE_HOME/.jg-secondmate-home"
+printf '# Seeded Juggernaut home\n' > "$LARGE_HOME/AGENTS.md"
+printf 'large\n' > "$LARGE_HOME/.jg-squad-lead-home"
 large_id_suffix=$(printf 'i%.0s' $(seq 1 110))
 {
   printf '%s\n' '## In flight'
   i=1
   while [ "$i" -le 1200 ]; do
-    printf '%s\n' "- [ ] orphan-$i-$large_id_suffix - Missing metadata (repo: firstmate) (kind: ship)"
+    printf '%s\n' "- [ ] orphan-$i-$large_id_suffix - Missing metadata (repo: juggernaut) (kind: ship)"
     i=$((i + 1))
   done
   printf '%s\n' '' '## Queued' '' '## Done'
@@ -191,10 +191,10 @@ jq -e '.schema == "jg-fleet-snapshot.v1"
   || fail "large fleet snapshot did not preserve the orphan inventory"
 PATH="$FAKEBIN:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$LARGE_HOME" \
   JG_SNAPSHOT_NOW="$NOW_ONE" JG_SNAPSHOT_NOW_EPOCH="$EPOCH_ONE" \
-  "$SNAPSHOT" --secondmate-home-summary > "$TMP_ROOT/large-summary.json" \
-  || fail "secondmate home-summary mode failed for a large backlog"
-jq -e '.schema == "jg-secondmate-home-summary.v1"' "$TMP_ROOT/large-summary.json" \
-  >/dev/null || fail "large secondmate home-summary output was not valid"
+  "$SNAPSHOT" --squad-lead-home-summary > "$TMP_ROOT/large-summary.json" \
+  || fail "squad_lead home-summary mode failed for a large backlog"
+jq -e '.schema == "jg-squad-lead-home-summary.v1"' "$TMP_ROOT/large-summary.json" \
+  >/dev/null || fail "large squad_lead home-summary output was not valid"
 PATH="$FAKEBIN:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$LARGE_HOME" \
   JG_SNAPSHOT_NOW="$NOW_ONE" JG_SNAPSHOT_NOW_EPOCH="$EPOCH_ONE" \
   "$SNAPSHOT" --contribution-input > "$TMP_ROOT/large-contribution-input.json" \
@@ -205,9 +205,9 @@ jq -e '(.backlog.records | length) == 1200 and (.tasks | type) == "array"' \
 PATH="$FAKEBIN:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$LARGE_HOME" \
   JG_SNAPSHOT_NOW="$NOW_ONE" JG_SNAPSHOT_NOW_EPOCH="$EPOCH_ONE" \
   "$WRITER" || fail "home-summary writer failed for a large backlog"
-jq -e '.schema == "jg-secondmate-home-summary.v1"' \
+jq -e '.schema == "jg-squad-lead-home-summary.v1"' \
   "$LARGE_HOME/state/home-summary.json" >/dev/null \
-  || fail "large secondmate home-summary was not published"
+  || fail "large squad_lead home-summary was not published"
 pass "large backlog snapshots and home-summary publication stay within exec limits"
 
 mkdir -p "$STATELESS_HOME/data" "$STATELESS_HOME/config" \
@@ -227,13 +227,13 @@ pass "fleet snapshot transport does not require or mutate operational state"
 
 mkdir -p "$LARGE_CHILD_HOME/state" "$LARGE_CHILD_HOME/data" \
   "$LARGE_CHILD_HOME/config" "$LARGE_CHILD_HOME/projects" "$LARGE_CHILD_HOME/bin"
-printf '# Seeded Firstmate home\n' > "$LARGE_CHILD_HOME/AGENTS.md"
-printf 'large-child\n' > "$LARGE_CHILD_HOME/.jg-secondmate-home"
+printf '# Seeded Juggernaut home\n' > "$LARGE_CHILD_HOME/AGENTS.md"
+printf 'large-child\n' > "$LARGE_CHILD_HOME/.jg-squad-lead-home"
 {
   printf '%s\n' '## In flight'
   i=1
   while [ "$i" -le 600 ]; do
-    printf '%s\n' "- [ ] orphan-$i-$large_id_suffix - Missing metadata (repo: firstmate) (kind: ship)"
+    printf '%s\n' "- [ ] orphan-$i-$large_id_suffix - Missing metadata (repo: juggernaut) (kind: ship)"
     i=$((i + 1))
   done
   printf '%s\n' '' '## Queued' '' '## Done'
@@ -246,17 +246,17 @@ large_child_bytes=$(wc -c < "$LARGE_CHILD_HOME/state/home-summary.json")
   || fail "large child ledger did not cross only the per-argument limit: $large_child_bytes"
 mkdir -p "$LARGE_PARENT_HOME/state" "$LARGE_PARENT_HOME/data" \
   "$LARGE_PARENT_HOME/config" "$LARGE_PARENT_HOME/projects"
-printf -- '- large-child - fixture domain (home: %s; scope: fixture work; projects: firstmate; added 2026-08-28)\n' \
-  "$LARGE_CHILD_HOME" > "$LARGE_PARENT_HOME/data/secondmates.md"
+printf -- '- large-child - fixture domain (home: %s; scope: fixture work; projects: juggernaut; added 2026-08-28)\n' \
+  "$LARGE_CHILD_HOME" > "$LARGE_PARENT_HOME/data/squad_leads.md"
 printf '%s\n' '## In flight' '' '## Queued' '' '## Done' \
   > "$LARGE_PARENT_HOME/data/backlog.md"
-jg_write_secondmate_meta "$LARGE_PARENT_HOME/state/large-child.meta" \
-  "$LARGE_CHILD_HOME" "fmtest:jg-large-child" firstmate claude
+jg_write_squad_lead_meta "$LARGE_PARENT_HOME/state/large-child.meta" \
+  "$LARGE_CHILD_HOME" "fmtest:jg-large-child" juggernaut claude
 PATH="$FAKEBIN:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$LARGE_PARENT_HOME" \
   JG_SNAPSHOT_NOW="$NOW_ONE" JG_SNAPSHOT_NOW_EPOCH="$EPOCH_ONE" \
   "$SNAPSHOT" --json > "$TMP_ROOT/large-parent-snapshot.json" \
   || fail "parent fleet snapshot failed for a large child ledger"
-jq -e '.secondmate_current.records[0]
+jq -e '.squad_lead_current.records[0]
   | .provenance.summary_source == "local-ledger"
     and .invalidity.kind == "orphan_in_flight"
     and (.invalidity.ids | length) == 600' \
@@ -266,8 +266,8 @@ pass "parent snapshot consumes large child ledgers without argument transport"
 
 mkdir -p "$CADENCE_HOME/state" "$CADENCE_HOME/data" "$CADENCE_HOME/config" \
   "$CADENCE_HOME/projects"
-printf '# Seeded Firstmate home\n' > "$CADENCE_HOME/AGENTS.md"
-printf 'cadence\n' > "$CADENCE_HOME/.jg-secondmate-home"
+printf '# Seeded Juggernaut home\n' > "$CADENCE_HOME/AGENTS.md"
+printf 'cadence\n' > "$CADENCE_HOME/.jg-squad-lead-home"
 cat > "$CADENCE_HOME/data/backlog.md" <<'EOF'
 ## In flight
 
@@ -299,7 +299,7 @@ from pathlib import Path
 import sys
 path = Path(sys.argv[1])
 text = path.read_text()
-path.write_text(text.replace("## Queued\n\n## Done", "## Queued\n- [ ] cadence-task - Publish without a status signal (repo: firstmate) (kind: ship)\n\n## Done"))
+path.write_text(text.replace("## Queued\n\n## Done", "## Queued\n- [ ] cadence-task - Publish without a status signal (repo: juggernaut) (kind: ship)\n\n## Done"))
 PY
 i=0
 while ! jq -e 'any(.queued[]; .id == "cadence-task")' \
@@ -326,8 +326,8 @@ jq '.state = "no_active_work" | .active_children = [] | .holds = []
   "$HOME_DIR/state/home-summary.json" > "$HOME_DIR/state/home-summary.poisoned"
 mv -f "$HOME_DIR/state/home-summary.poisoned" "$HOME_DIR/state/home-summary.json"
 mkdir -p "$PARENT_HOME/state" "$PARENT_HOME/data" "$PARENT_HOME/config" "$PARENT_HOME/projects"
-printf -- '- mate - fixture domain (home: %s; scope: fixture work; projects: firstmate; added 2026-08-28)\n' \
-  "$HOME_DIR" > "$PARENT_HOME/data/secondmates.md"
+printf -- '- mate - fixture domain (home: %s; scope: fixture work; projects: juggernaut; added 2026-08-28)\n' \
+  "$HOME_DIR" > "$PARENT_HOME/data/squad_leads.md"
 cat > "$PARENT_HOME/data/backlog.md" <<'EOF'
 ## In flight
 
@@ -335,21 +335,21 @@ cat > "$PARENT_HOME/data/backlog.md" <<'EOF'
 
 ## Done
 EOF
-jg_write_secondmate_meta "$PARENT_HOME/state/mate.meta" "$HOME_DIR" \
-  "fmtest:jg-mate" firstmate claude
+jg_write_squad_lead_meta "$PARENT_HOME/state/mate.meta" "$HOME_DIR" \
+  "fmtest:jg-mate" juggernaut claude
 PATH="$FAKEBIN:$PATH" \
   JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$PARENT_HOME" \
   JG_SNAPSHOT_NOW="$NOW_TWO" JG_SNAPSHOT_NOW_EPOCH="$EPOCH_TWO" \
   "$SNAPSHOT" --json > "$TMP_ROOT/parent-snapshot.json" \
   || fail "parent fleet snapshot failed"
 jq -e '
-  .secondmate_current.records[0].provenance.selected == "structured-home"
-  and .secondmate_current.records[0].provenance.summary_source == "local-ledger"
-  and .secondmate_current.records[0].current.state == "no_active_work"
-  and (.secondmate_current.records[0].active_children | length) == 0
-  and (.secondmate_current.records[0].holds | length) == 0
+  .squad_lead_current.records[0].provenance.selected == "structured-home"
+  and .squad_lead_current.records[0].provenance.summary_source == "local-ledger"
+  and .squad_lead_current.records[0].current.state == "no_active_work"
+  and (.squad_lead_current.records[0].active_children | length) == 0
+  and (.squad_lead_current.records[0].holds | length) == 0
 ' "$TMP_ROOT/parent-snapshot.json" >/dev/null \
-  || fail "fleet snapshot did not consume the published local ledger: $(jq -c '.secondmate_current.records[0]' "$TMP_ROOT/parent-snapshot.json")"
+  || fail "fleet snapshot did not consume the published local ledger: $(jq -c '.squad_lead_current.records[0]' "$TMP_ROOT/parent-snapshot.json")"
 pass "fleet snapshot consumes the published local ledger by default"
 
 # Restore the established ledger, then stop a real writer while its real producer
@@ -628,12 +628,12 @@ pass "valid publication ignores an unavailable failure record"
 COST_HOME="$TMP_ROOT/cost-home"
 mkdir -p "$COST_HOME/state" "$COST_HOME/data" "$COST_HOME/config" \
   "$COST_HOME/projects/task"
-printf '# Seeded Firstmate home\n' > "$COST_HOME/AGENTS.md"
-printf 'cost\n' > "$COST_HOME/.jg-secondmate-home"
+printf '# Seeded Juggernaut home\n' > "$COST_HOME/AGENTS.md"
+printf 'cost\n' > "$COST_HOME/.jg-squad-lead-home"
 jg_git_init_commit "$COST_HOME/projects/task"
 cat > "$COST_HOME/data/backlog.md" <<'EOF'
 ## In flight
-- [ ] cost-task - Publish from an accumulated home (repo: firstmate) (kind: ship) (since 2026-08-28)
+- [ ] cost-task - Publish from an accumulated home (repo: juggernaut) (kind: ship) (since 2026-08-28)
 
 ## Queued
 
@@ -642,7 +642,7 @@ EOF
 jg_write_meta "$COST_HOME/state/cost-task.meta" \
   "window=fmtest:jg-cost-task" \
   "worktree=$COST_HOME/projects/task" \
-  "project=firstmate" \
+  "project=juggernaut" \
   "harness=claude" \
   "kind=ship" \
   "mode=no-mistakes" \
@@ -652,7 +652,7 @@ cost_busy_gen=$("$ROOT/bin/jg-busy-event.sh" arm "$COST_HOME/state" cost-task)
   --gen "$cost_busy_gen" --source claude-hook --event stop
 python3 - "$COST_HOME/state/cost-task.status" <<'PY'
 import sys
-note = ("the crewmate ran validation and reported checks on the branch "
+note = ("the operator ran validation and reported checks on the branch "
         "after review ") * 25
 with open(sys.argv[1], "w") as handle:
     for i in range(300):
@@ -666,7 +666,7 @@ PATH="$FAKEBIN:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$COST_HOME" \
 [ -f "$COST_HOME/state/home-summary.json" ] \
   || fail "an accumulated home did not publish within a 30-second deadline: $(cat "$COST_HOME/state/.home-summary-refresh.log" 2>/dev/null)"
 jq -e --arg home "$COST_HOME" '
-  .schema == "jg-secondmate-home-summary.v1"
+  .schema == "jg-squad-lead-home-summary.v1"
   and .home == $home
   and any(.decisions_open[]; .key == "cost-gate")
 ' "$COST_HOME/state/home-summary.json" >/dev/null \
@@ -674,7 +674,7 @@ jq -e --arg home "$COST_HOME" '
 pass "publication completes on a home carrying accumulated status history"
 
 # One unreachable home must not extend publication without limit. A remote
-# secondmate's current state is read over ssh, and ssh's own dead-peer detection
+# squad_lead's current state is read over ssh, and ssh's own dead-peer detection
 # deliberately never kills a slow-but-alive remote command, so nothing under the
 # producer bounds that read on its own. Point the transport at a stub that never
 # answers and require the producer to return anyway, reporting that home as
@@ -682,17 +682,17 @@ pass "publication completes on a home carrying accumulated status history"
 REMOTE_HOME="$TMP_ROOT/remote-home"
 mkdir -p "$REMOTE_HOME/state" "$REMOTE_HOME/data" "$REMOTE_HOME/config" \
   "$REMOTE_HOME/projects" "$TMP_ROOT/sshbin"
-printf '# Seeded Firstmate home\n' > "$REMOTE_HOME/AGENTS.md"
-printf 'remote\n' > "$REMOTE_HOME/.jg-secondmate-home"
+printf '# Seeded Juggernaut home\n' > "$REMOTE_HOME/AGENTS.md"
+printf 'remote\n' > "$REMOTE_HOME/.jg-squad-lead-home"
 cat > "$REMOTE_HOME/data/backlog.md" <<'EOF'
 ## In flight
-- [ ] rsm - Read remote current state (repo: firstmate) (kind: ship) (since 2026-08-28)
+- [ ] rsm - Read remote current state (repo: juggernaut) (kind: ship) (since 2026-08-28)
 
 ## Queued
 
 ## Done
 EOF
-cat > "$REMOTE_HOME/data/secondmates.md" <<'EOF'
+cat > "$REMOTE_HOME/data/squad_leads.md" <<'EOF'
 - rsm - remote test domain (host: remote-mac; root: /remote/root; home: /remote/home; scope: remote testing; projects: alpha; added 2026-08-02)
 EOF
 jg_write_meta "$REMOTE_HOME/state/rsm.meta" \
@@ -700,8 +700,8 @@ jg_write_meta "$REMOTE_HOME/state/rsm.meta" \
   "endpoint_task_id=rsm" \
   "worktree=/remote/home/never-locally-present" \
   "harness=claude" \
-  "kind=secondmate" \
-  "mode=secondmate" \
+  "kind=squad_lead" \
+  "mode=squad_lead" \
   "home=/remote/home" \
   "remote_host=remote-mac" \
   "remote_root=/remote/root" \
@@ -720,7 +720,7 @@ PATH="$FAKEBIN:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$REMOTE_HOME" \
   JG_SSH_BIN="$TMP_ROOT/sshbin/stalled-ssh" JG_TEST_SSH_CALLED="$TMP_ROOT/stalled-ssh.called" \
   JG_SNAPSHOT_NOW="$NOW_TWO" JG_SNAPSHOT_NOW_EPOCH="$EPOCH_TWO" \
   JG_SNAPSHOT_CREW_STATE_TIMEOUT=2 \
-  "$SNAPSHOT" --secondmate-home-summary > "$TMP_ROOT/stalled-summary.json" \
+  "$SNAPSHOT" --squad-lead-home-summary > "$TMP_ROOT/stalled-summary.json" \
   || fail "an unreachable remote home failed the whole producer"
 elapsed=$(( $(date +%s) - started ))
 [ "$elapsed" -lt 40 ] \
@@ -728,7 +728,7 @@ elapsed=$(( $(date +%s) - started ))
 [ ! -e "$TMP_ROOT/stalled-ssh.called" ] \
   || fail "the producer issued a remote per-task state probe"
 jq -e '
-  .schema == "jg-secondmate-home-summary.v1"
+  .schema == "jg-squad-lead-home-summary.v1"
   and .valid == false
   and .state == "unknown"
   and .invalidity.kind == "child_current_unavailable"
@@ -745,8 +745,8 @@ pass "producer skips remote per-task state probes"
 BEAT_HOME="$TMP_ROOT/beat-home"
 mkdir -p "$BEAT_HOME/state" "$BEAT_HOME/data" "$BEAT_HOME/config" \
   "$BEAT_HOME/projects"
-printf '# Seeded Firstmate home\n' > "$BEAT_HOME/AGENTS.md"
-printf 'beat\n' > "$BEAT_HOME/.jg-secondmate-home"
+printf '# Seeded Juggernaut home\n' > "$BEAT_HOME/AGENTS.md"
+printf 'beat\n' > "$BEAT_HOME/.jg-squad-lead-home"
 cat > "$BEAT_HOME/data/backlog.md" <<'EOF'
 ## In flight
 
@@ -812,12 +812,12 @@ pass "a stalled publication does not delay the watcher liveness beacon"
 RESTART_HOME="$TMP_ROOT/restart-home"
 mkdir -p "$RESTART_HOME/state" "$RESTART_HOME/data" "$RESTART_HOME/config" \
   "$RESTART_HOME/projects/task"
-printf '# Seeded Firstmate home\n' > "$RESTART_HOME/AGENTS.md"
-printf 'restart\n' > "$RESTART_HOME/.jg-secondmate-home"
+printf '# Seeded Juggernaut home\n' > "$RESTART_HOME/AGENTS.md"
+printf 'restart\n' > "$RESTART_HOME/.jg-squad-lead-home"
 jg_git_init_commit "$RESTART_HOME/projects/task"
 cat > "$RESTART_HOME/data/backlog.md" <<'EOF'
 ## In flight
-- [ ] restart-task - Preserve publication single flight (repo: firstmate) (kind: ship) (since 2026-08-28)
+- [ ] restart-task - Preserve publication single flight (repo: juggernaut) (kind: ship) (since 2026-08-28)
 
 ## Queued
 
@@ -826,7 +826,7 @@ EOF
 jg_write_meta "$RESTART_HOME/state/restart-task.meta" \
   "window=fmtest:jg-restart-task" \
   "worktree=$RESTART_HOME/projects/task" \
-  "project=firstmate" \
+  "project=juggernaut" \
   "harness=claude" \
   "kind=ship" \
   "mode=no-mistakes" \
@@ -940,8 +940,8 @@ pass "publication remains single-flight across watcher restart"
 REPORT_HOME="$TMP_ROOT/report-home"
 mkdir -p "$REPORT_HOME/state" "$REPORT_HOME/data" "$REPORT_HOME/config" \
   "$REPORT_HOME/projects"
-printf '# Seeded Firstmate home\n' > "$REPORT_HOME/AGENTS.md"
-printf 'report\n' > "$REPORT_HOME/.jg-secondmate-home"
+printf '# Seeded Juggernaut home\n' > "$REPORT_HOME/AGENTS.md"
+printf 'report\n' > "$REPORT_HOME/.jg-squad-lead-home"
 cat > "$REPORT_HOME/data/backlog.md" <<'EOF'
 ## In flight
 
@@ -964,8 +964,8 @@ run_bootstrap_detect() {
 COMPAT_HOME="$TMP_ROOT/compat-home"
 mkdir -p "$COMPAT_HOME/state" "$COMPAT_HOME/data" "$COMPAT_HOME/config" \
   "$COMPAT_HOME/projects"
-printf '# Seeded Firstmate home\n' > "$COMPAT_HOME/AGENTS.md"
-printf 'compat\n' > "$COMPAT_HOME/.jg-secondmate-home"
+printf '# Seeded Juggernaut home\n' > "$COMPAT_HOME/AGENTS.md"
+printf 'compat\n' > "$COMPAT_HOME/.jg-squad-lead-home"
 cat > "$COMPAT_HOME/data/backlog.md" <<'EOF'
 ## In flight
 
@@ -1010,8 +1010,8 @@ ORDER_HOME="$TMP_ROOT/order-home"
 ORDER_DATE_BIN="$TMP_ROOT/order-date-bin"
 mkdir -p "$ORDER_HOME/state" "$ORDER_HOME/data" "$ORDER_HOME/config" \
   "$ORDER_HOME/projects" "$ORDER_DATE_BIN"
-printf '# Seeded Firstmate home\n' > "$ORDER_HOME/AGENTS.md"
-printf 'order\n' > "$ORDER_HOME/.jg-secondmate-home"
+printf '# Seeded Juggernaut home\n' > "$ORDER_HOME/AGENTS.md"
+printf 'order\n' > "$ORDER_HOME/.jg-squad-lead-home"
 cat > "$ORDER_HOME/data/backlog.md" <<'EOF'
 ## In flight
 

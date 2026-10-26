@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # jg-remote-entrypoint.sh installs as a PATH symlink under ~/.local/bin
-# (docs/remote-secondmates.md). SCRIPT_DIR must resolve to the real bin/
+# (docs/remote-squad-leads.md). SCRIPT_DIR must resolve to the real bin/
 # directory so it can source its sibling jg-remote-job-lib.sh, not to the
 # symlink's own directory.
 set -u

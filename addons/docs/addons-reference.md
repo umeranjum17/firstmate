@@ -1,4 +1,4 @@
-# Firstmate add-ons
+# Juggernaut add-ons
 
 Add-ons for running a fleet of coding agents on one machine: small, independent fixes for the gaps a busy fleet hits — runaway deletes, burned provider quota, stalled tasks, merges nobody watches. Every add-on installs and removes on its own; take only the ones you need.
 
@@ -12,7 +12,7 @@ One line per add-on, with how it wires in. `<home>` is your home folder for the 
 
 - `account-pool` — new workers start on the pool account with the most room (`config/account-pool`), and `relaunch --account <id|next>` moves a running worker to another account with no key or token in the launch. Wire in: hook lines in the fork's `bin/jg-spawn.sh` and `bin/jg-control.sh`; check with `account-pool/install.sh <home>`; see `account-pool/README.md`.
 - `alerts` — groups tasks stopped by a provider outage into one alert per scan. Dormant copy: the fork still runs its own.
-- `bearings-board` — runs the Bearings board from the Firstmate checkout as a thin wrapper, with no copied upstream code. Wire in: `bearings-board/install.sh <home>`.
+- `bearings-board` — runs the Bearings board from the Juggernaut checkout as a thin wrapper, with no copied upstream code. Wire in: `bearings-board/install.sh <home>`.
 - `ask-default` — owns owner-only ask authoring (`python3 ask-default/bin/jg-captain-ask.py --help`; after merge, `install <home>` wires the config shim) and an unanswered ask falls back to its pre-declared safe default instead of blocking the home. Needs a fork hook (FORK-EXIT.md).
 - `backlog-lock-reclaim` — reclaims a 0-byte `<home>/data/backlog.md.lock` left by a dead tasks-axi writer, once it is older than 60 s and no process has it open; until then every backlog write fails LOCKED. Wire in: `backlog-lock-reclaim/install.sh <home>`.
 - `claude-accounts` — one quota view of every signed-in Claude account (5-hour and 7-day left), shown on the dashboard and written for dispatch; new Claude workers start on the account with the most runway. Wire in: `claude-accounts/install.sh <home>` plus the reader on a timer; see `claude-accounts/README.md`.
@@ -22,7 +22,7 @@ One line per add-on, with how it wires in. `<home>` is your home folder for the 
 - `delete-guard` — stops any agent from recursively deleting `/` or a home folder; a block alerts you and is final. Wire in: `delete-guard/install.sh <home>`.
 - `fleet-contract-check` — runs each real cross-repo call (dispatch-resolve, owner-guard, checks-lint) in a throwaway HOME and names the caller that breaks. Nothing to install: run `fleet-contract-check/fleet-contract-check`.
 - `fleet-dashboard` — the read-only fleet dashboard: board, charts, kanban, insights, ship view. Served through the fork shim (FORK-EXIT.md).
-- `lookout-adapter` — prints or serves this fleet as the JSON document Lookout reads (`lookout-firstmate`): hosts, homes, lanes, workers, quota, merges, history and devices from the fleet dashboard builder's output; read-only, no secrets.
+- `lookout-adapter` — prints or serves this fleet as the JSON document Lookout reads (`lookout-juggernaut`): hosts, homes, lanes, workers, quota, merges, history and devices from the fleet dashboard builder's output; read-only, no secrets.
 - `tickets-sync` - reads registered backlogs into sign-off Tickets; see [setup and limits](../tickets-sync/README.md).
 - `fleet-flow` — reads fleet lifecycle, queue and bottleneck JSON; installs the home flow check for task slots. Wire in: `fleet-flow/install.sh`.
 - `fleet-stall` — alerts you when a team lead idles with ready work, or workers sit stuck waiting on their team lead. Wire in: `JG_HOME=<home> fleet-stall/install.sh`.
@@ -36,11 +36,11 @@ One line per add-on, with how it wires in. `<home>` is your home folder for the 
 - `host-memory` — a gate that makes heavy jobs wait for host memory instead of crashing. Wire in: `host-memory/install.sh`.
 - `brief-inherit` — shared worker instructions (`config/brief-include-shared.md`) reach every home's briefs. Needs fork hooks (FORK-EXIT.md); step A only.
 - `local-qwen-tuning` — operator reference for the local Qwen model server: launch, tuning, limits, rollback. Reference only, nothing to install.
-- `lead-wake` — wakes a secondmate home that sits below its lane floor with ready backlog work, and withdraws the wake when the work is gone, and rings a stalled lead naming its frozen row. Needs fork hooks (FORK-EXIT.md).
+- `lead-wake` — wakes a squad lead home that sits below its lane floor with ready backlog work, and withdraws the wake when the work is gone, and rings a stalled lead naming its frozen row. Needs fork hooks (FORK-EXIT.md).
 - `merge-card` — runs the merge gate and posts one evidence card per merge to the sign-off board. Wire in: config shims, see Install.
 - `merge-on-green` — merges a PR you allowed to auto-merge once its checks are green and its proof receipt passes. Wire in: `merge-on-green/install.sh <home>`.
 - `nm-drain` — updates the shared pipeline service through a planned drain, never over live runs. Wire in: `nm-drain/install.sh <home>`.
-- `owner-rules` - enforces owner asks, backlog hierarchy and risk reasons at brief creation, plus [Lavish refusals for secondmate notes and merge-card posts](../owner-rules/README.md#lavish-refusal-secondmate-notes-and-merge-card-posts).
+- `owner-rules` - enforces owner asks, backlog hierarchy and risk reasons at brief creation, plus [Lavish refusals for squad lead notes and merge-card posts](../owner-rules/README.md#lavish-refusal-squad-lead-notes-and-merge-card-posts).
   Wire in: `owner-rules/install.sh <home>`; brief checks need the brief-inherit seam.
 - `pane-titles` — gives worker and lead panes a stable readable terminal title and matching Herdr tab label. Wire in: `pane-titles/install.sh <home>`; remove: `pane-titles/uninstall.sh <home>`.
 - `owner-guard` — refuses commits, pushes and PR merges that add the owner's private details, and scans public repos for them once a day. Wire in: `owner-guard/install.sh <home>` and `owner-guard/install-scan.sh`; remove with `owner-guard/uninstall.sh <home>`. Installation reversal covers both hook guards and the daily scan.
@@ -49,8 +49,8 @@ One line per add-on, with how it wires in. `<home>` is your home folder for the 
 - `pipeline-quota-failover` — moves pipeline model calls to the next model in the chain on a quota error, and pins the pipeline route (Claude Haiku through claude-bridge on the subscription accounts, rotated on a limit, no paid fallback). Wire in: `pipeline-quota-failover/install.sh`.
 - `limit-prompt-move` — a Claude worker or lead sitting on Claude's usage-limit menu ("What do you want to do? 1. Stop and wait ...") is interrupted and relaunched on another pool account through `jg-control`, every 5 minutes, never choosing a menu option. Wire in: `limit-prompt-move/install.sh --all <main home>`.
 - `quota-axi-pool` — PATH wrapper so dispatch's `quota-axi --json` Claude runway matches `jg-model-pool`'s account reading; upstream quota-axi unchanged. Wire in: `quota-axi-pool/install.sh`; see `quota-axi-pool/README.md`.
-- `quota-failover` — relaunches stalled workers onto a live route or the next pool account and rests dead routes until they answer again; moves an idle worker off a pool account at or below 15% before it hits the limit; with an account pool, its Claude route tests run on the pool's pick, never the default login. Wire in: `quota-failover/install.sh --all <home>` (the home and every active local secondmate home it lists).
-- `status-wait-check` — refuses `blocked` status text that describes a wait and directs the worker to `paused:`; the fork's `bin/jg-secondmate-report.sh` must call it before appending status (thin hook documented in the add-on README).
+- `quota-failover` — relaunches stalled workers onto a live route or the next pool account and rests dead routes until they answer again; moves an idle worker off a pool account at or below 15% before it hits the limit; with an account pool, its Claude route tests run on the pool's pick, never the default login. Wire in: `quota-failover/install.sh --all <home>` (the home and every active local squad lead home it lists).
+- `status-wait-check` — refuses `blocked` status text that describes a wait and directs the worker to `paused:`; the fork's `bin/jg-squad-lead-report.sh` must call it before appending status (thin hook documented in the add-on README).
 - `receipts` — publishes one PASS or FAIL completion receipt per task for guarded landing checks. Dormant copy: the fork still runs its own.
 - `route-change` — one command moves worker dispatch, the pipeline gate and team-lead pins to one route together. Wire in: `route-change/install.sh`.
 - `sentinel` — re-arms supervision after an agent-runtime restart killed every agent and watcher. Dormant copy: the fork still runs its own.
@@ -68,7 +68,7 @@ There is no install-all script yet. The shortest real install for the add-ons th
 
 ```sh
 git clone https://github.com/umeranjum17/juggernaut && cd juggernaut/addons
-export JG_HOME=~/firstmate    # your home folder for the fleet manager
+export JG_HOME=~/juggernaut    # your home folder for the fleet manager
 for d in pipeline-literal-delete pipeline-quota-failover host-memory fleet-flow glm-queue route-change claude-model-guard; do "$d/install.sh"; done
 for d in delete-guard claude-quota merge-on-green git-identity nm-drain owner-guard pane-titles; do "$d/install.sh" "$JG_HOME"; done
 read-guard/install.sh
@@ -76,7 +76,7 @@ codex-guard/install.sh
 JG_HOME="$JG_HOME" fleet-stall/install.sh
 JG_HOME="$JG_HOME" owner-guard/install-scan.sh
 JG_HOME="$JG_HOME" zai-quota-check/install.sh
-quota-failover/install.sh --all "$JG_HOME"   # also each active local secondmate home in data/secondmates.md
+quota-failover/install.sh --all "$JG_HOME"   # also each active local squad lead home in data/squad leads.md
 ```
 
 `route-change` must come after `pipeline-quota-failover` from the same clone (the loop's order). To route GLM calls through the queue, set `.providers.zai.baseUrl` to `http://127.0.0.1:8787/api/coding/paas/v4` in `~/.pi/agent/models.json`; new pi sessions pick it up. `git-identity` prints a note until the fork's launch-env hook is merged — until then lanes stay unguarded.
@@ -168,7 +168,7 @@ The dormant and fork-hook add-ons install nothing from this repo — removing th
 
 ### delete-guard
 
-No agent can recursively delete `/`, `/home`, a home folder or a folder directly in it, or a bare `.` `..` `*` or `$VAR` target, and an attempt on a real folder wakes the main firstmate.
+No agent can recursively delete `/`, `/home`, a home folder or a folder directly in it, or a bare `.` `..` `*` or `$VAR` target, and an attempt on a real folder wakes the main juggernaut.
 `delete-guard/guard.mjs` holds the one rule, and each runtime adapter hands it the shell command before it runs.
 A block is final: there is no allow-once, flag or environment override, and no agent, reviewer or pipeline gate can approve the delete.
 The one `$VAR` exception: when `d=$(mktemp ...)` with any options or template (plain `$NAME` or `${NAME}` expansions allowed; no command substitution, backticks, `;`, `&`, `|` or parentheses), or `d=$(mktemp ... || mktemp ...)` where every `||` alternative is a mktemp call, is its own statement (optionally after `export`, `local`, `readonly`, `typeset` or `declare` with only `-r`, `-x`, `-g`; never a `-n` nameref) and the last assignment to `d` in the same command, `rm -rf -- "$d"` runs (never for `HOME` or another shell or runtime variable). A literal-path assignment takes the same prefixes.
@@ -182,11 +182,11 @@ A second block by the same task (or, with no task, the same cwd) within 10 minut
 A heredoc body fed to a shell (`bash <<EOF`, `cat <<EOF | sh`) is checked as commands, and one fed to anything else (`python3`, `cat > file`) is data.
 Only the command string is checked, so a delete inside a script file the agent runs is not seen.
 Covered: Claude Code (workers, leads and the pipeline's Claude agent) by a `PreToolUse` Bash hook in `~/.claude/settings.json`, pi by `~/.pi/agent/extensions/jg-rm-guard.ts`, and OpenCode by `~/.config/opencode/plugins/jg-delete-guard.js`.
-Not covered: Codex, because Firstmate launches its crewmates and scouts with `--disable hooks` and a new `~/.codex/hooks.json` entry puts a hook-trust prompt in front of every Codex launch, and cursor-agent, grok, omp, kimi and gemini, which the fleet does not dispatch.
+Not covered: Codex, because Juggernaut launches its operators and scouts with `--disable hooks` and a new `~/.codex/hooks.json` entry puts a hook-trust prompt in front of every Codex launch, and cursor-agent, grok, omp, kimi and gemini, which the fleet does not dispatch.
 
 Install or update with `delete-guard/install.sh [--dry-run] <main-jg-home>`; it is idempotent, and `--dry-run` prints the changes and writes nothing.
 It backs up each file it changes as `<file>.bak-delete-guard-<epoch>`, copies the rule to `${XDG_DATA_HOME:-~/.local/share}/jg-delete-guard/`, writes the adapters, merges the Claude hook without dropping other settings, and registers the check in `<main-jg-home>`.
-Test: `delete-guard/tests/delete-guard.test.sh <firstmate-checkout> [ref]` installs into a throwaway HOME against a home built from that checkout's `bin/`, then drives the installed hook through every rule case and the log, check and repeat-wake journey, then replays the retained log (`delete-guard/tests/fixtures/`) one check sweep per row and asserts the only wake is the recorded real-folder block.
+Test: `delete-guard/tests/delete-guard.test.sh <juggernaut-checkout> [ref]` installs into a throwaway HOME against a home built from that checkout's `bin/`, then drives the installed hook through every rule case and the log, check and repeat-wake journey, then replays the retained log (`delete-guard/tests/fixtures/`) one check sweep per row and asserts the only wake is the recorded real-folder block.
 
 ### pipeline-literal-delete
 
@@ -197,7 +197,7 @@ The rule (`pipeline-literal-delete/rule.txt`): recursive deletes (`rm -r`, `rm -
 
 Surfaces: pi gets `~/.pi/agent/extensions/jg-literal-delete.ts`, which appends the rule to the system prompt of every pi session on `before_agent_start` (gate agents run with project context files disabled, but user extensions still load - the delete guard's own pi adapter proves it fires there).
 Claude gets a `SessionStart` hook in `~/.claude/settings.json` whose `additionalContext` carries the rule into every session, gate agents included.
-One install covers every firstmate home, because both surfaces live under the Unix user's home, not under any JG_HOME.
+One install covers every juggernaut home, because both surfaces live under the Unix user's home, not under any JG_HOME.
 
 Install or update with `pipeline-literal-delete/install.sh [--dry-run]`; it is idempotent and needs no jg-home argument (no watcher is registered).
 It backs up each file it changes as `<file>.bak-pipeline-literal-delete-<epoch>`, copies the rule to `${XDG_DATA_HOME:-~/.local/share}/jg-pipeline-literal-delete/`, writes the pi extension, and merges the Claude hook without dropping other settings.
@@ -283,10 +283,10 @@ A worker left with no live route also gets one failed line on the home's parent 
 
 It needs `quota-axi`, `jq`, `flock` and the harness command of each dispatch route on `PATH`.
 
-`quota-failover/install.sh [--dry-run] [--all] [--list] <jg-home>` copies the watcher (with the parked-homes reader and the account-pool Claude environment it sources beside it) to `~/.local/share/jg-quota-failover`, points the home's `state/quota-failover-watch.check.sh` at it through an exec shim (a different check there is backed up first) and registers it. `--all` does the same for every active home: the given home and each local secondmate home its `data/secondmates.md` lists, minus the ones `config/parked-homes` parks; a remote home is skipped and named, and a home that cannot register fails the run. `--list` prints the homes it would reach. `quota-failover/uninstall.sh [--all] <jg-home>` retires the check from the same homes.
+`quota-failover/install.sh [--dry-run] [--all] [--list] <jg-home>` copies the watcher (with the parked-homes reader and the account-pool Claude environment it sources beside it) to `~/.local/share/jg-quota-failover`, points the home's `state/quota-failover-watch.check.sh` at it through an exec shim (a different check there is backed up first) and registers it. `--all` does the same for every active home: the given home and each local squad lead home its `data/squad leads.md` lists, minus the ones `config/parked-homes` parks; a remote home is skipped and named, and a home that cannot register fails the run. `--list` prints the homes it would reach. `quota-failover/uninstall.sh [--all] <jg-home>` retires the check from the same homes.
 `QUOTA_FAILOVER_MAX_AGE` (default `10m`) is the oldest quota reading it trusts.
 
-Test: `quota-failover/tests/quota-failover-e2e.sh` drives the real script end to end against a fixture home (stub firstmate libs in its `bin/`, stub `quota-axi` and `opencode` on `PATH`): a lead on a route that answers every one-line test with a provider 429, and a screen-stopped worker on a second dead route ranked first in the dispatch rules. It asserts both move to the live candidate, the dead routes are passed over and dropped from `crew-dispatch.json`, and a second pass with the routes answering again restores them and moves nothing. Five more passes add pool workers: with the switch file present a Claude worker moves to the next account with no route move, a Claude worker with no next account takes the route move, and OpenCode's Go-tier and Codex workers only rest and wake; with the file gone a Claude worker only rests and wakes, once across two passes and again when the same account stops a new incarnation, and a pool rest that fails still wakes the home, once; a pool worker wedged with a clean screen loses its route to the pinned probe's verdict, and the stop's changed label re-fires nothing.
+Test: `quota-failover/tests/quota-failover-e2e.sh` drives the real script end to end against a fixture home (stub juggernaut libs in its `bin/`, stub `quota-axi` and `opencode` on `PATH`): a lead on a route that answers every one-line test with a provider 429, and a screen-stopped worker on a second dead route ranked first in the dispatch rules. It asserts both move to the live candidate, the dead routes are passed over and dropped from `crew-dispatch.json`, and a second pass with the routes answering again restores them and moves nothing. Five more passes add pool workers: with the switch file present a Claude worker moves to the next account with no route move, a Claude worker with no next account takes the route move, and OpenCode's Go-tier and Codex workers only rest and wake; with the file gone a Claude worker only rests and wakes, once across two passes and again when the same account stops a new incarnation, and a pool rest that fails still wakes the home, once; a pool worker wedged with a clean screen loses its route to the pinned probe's verdict, and the stop's changed label re-fires nothing.
 
 Install into one home as a watcher check, so it runs on the watcher's own cadence; `check.sh` prints any pending wake line and starts the pass detached (an install with the older `setsid -f .../quota-failover` line keeps working but never wakes, so re-run this):
 
@@ -301,7 +301,7 @@ Remove it with `$JG_HOME/bin/jg-check-unregister.sh quota-failover-watch`.
 The no-mistakes pipeline agent moves to the next allowed model the moment a provider answers a quota error, instead of retrying the same model 4 times and failing the run (speed-report row Q1: about 1,650 pipeline minutes a day).
 
 `pipeline-quota-failover/pi-quota-failover` is one bash wrapper installed as the pipeline's `pi` through `agent_path_override.pi`. It runs the real `pi`; when an attempt answers a quota error (pi reports provider errors inside its JSON stream and still exits 0, and no-mistakes' terminal list covers only seven exact quota phrasings, so real limit errors are retried up to 4 times on the same model), the wrapper starts the next model in the chain inside the same invocation: the chain is one route, `claude-bridge/claude-haiku-5-5` (Claude Haiku on the subscription accounts), so a call pinned to a model outside the chain runs that route and the pinned model never runs, and it is never Codex, Go, Muse, Opus, Sonnet, Fable or Step 5. With an account pool each bridge call runs on the pool's Claude pick, and a Claude limit rests that account and runs the same route on the next one; with every account resting nothing runs (see the add-on README). An `openrouter/*` route takes the deepseek idle limit (300 s, `PI_QUOTA_FAILOVER_DEEPSEEK_IDLE_SECS`), not the generic 120 s one, so a slow answer on the floor route is not killed; the list is read at call time, see the README. The requested model goes first when it is in the chain and its skip window does not hold it out, then the other chain models in chain order; a model pinned outside the chain does not run, and the chain runs in chain order instead. Before each route `quota-axi` can skip it as exhausted now, and a call silent for 120 s is killed and counts as a stall, not a quota failure; the details are in `pipeline-quota-failover/README.md`. A non-quota failure passes through byte-for-byte with its original exit code; a quota-limit error on any chain route counts as a quota error. A resumed `--session` is dropped on the failover attempt (fresh-session retry, the pipeline's own semantics after a provider switch). A quota error also leaves a marker (the model and the time) in `~/.local/state/pi-quota-failover-dead/`, and later calls skip that model for `PI_QUOTA_FAILOVER_DEAD_SECS` (default 3600) instead of waiting out pi's own retries on it again (13-16 min per call on a dead GLM); after the window the model is tried again, and an answer without a quota error clears its marker. When every chain model is quota-dead the wrapper fails once with a line containing "quota exhausted", which no-mistakes classifies as terminal, so the dead chain is never re-retried. Calls pinned to a model outside the chain (for example `axi run --model`) no longer pass through to that model: the chain runs instead, so a pinned call cannot bypass the failover. Each decision is one timed line in `~/.local/state/pi-quota-failover.log` and on the step's stderr.
-Because every pipeline model call passes through this wrapper, it is also where the host-memory gate sits (speed-report row B3: model calls under heavy host load crash): before each call it runs `~/firstmate/config/jg-mem-gate.sh` with no command, which only waits until the host has room, for at most `PI_QUOTA_FAILOVER_GATE_SECS` (default 600) before pi starts anyway, with pi keeping its normal priority and no memory cap (`PI_QUOTA_FAILOVER_GATE` names another gate, empty disables it).
+Because every pipeline model call passes through this wrapper, it is also where the host-memory gate sits (speed-report row B3: model calls under heavy host load crash): before each call it runs `~/juggernaut/config/jg-mem-gate.sh` with no command, which only waits until the host has room, for at most `PI_QUOTA_FAILOVER_GATE_SECS` (default 600) before pi starts anyway, with pi keeping its normal priority and no memory cap (`PI_QUOTA_FAILOVER_GATE` names another gate, empty disables it).
 
 The OpenRouter key that route needs lives only in the systemd user manager environment (imported with `systemctl --user import-environment`, never copied into a file). It survives a daemon restart but not a reboot or a manager restart: after either, re-import it from `~/.config/openrouter/api_key` before starting the daemon. Never print the key and never copy it into a file.
 
@@ -322,12 +322,12 @@ Otherwise it backs up each file it changes as `<file>.bak-route-change-<stamp>` 
 - `config/crew-dispatch.json`: in the default and every rule, the route leads the non-Claude profiles; Claude and Opus entries keep their place and an Opus-only rule is left alone.
   A list that already holds the route, as `<route>` or `<provider>/<route>` on any harness, moves that entry; any other list gets a pi profile for it.
 - the gate: `agent` and `agent_config.pi.model` in `~/.no-mistakes/config.yaml` (or `$NM_CONFIG`), edited by key name and checked so no other key changes; only route names are printed.
-- the lead pins `config/secondmate-harness` and `config/secondmates/*/harness`, except pins on Claude or Opus.
+- the lead pins `config/squad-lead-harness` and `config/squad leads/*/harness`, except pins on Claude or Opus.
 
 Then it sends one real request through pi on the route, the way the gate calls it; when that fails it restores every backup and prints the cause.
 `--dry-run` runs the quota check, prints the planned edits and writes nothing.
 Each switch is one line in `<jg-home>/state/route-change.log`, and it holds quota-failover's lock while it works.
-Secondmate homes get the new `crew-dispatch.json` through firstmate's config inheritance.
+Squad Lead homes get the new `crew-dispatch.json` through juggernaut's config inheritance.
 
 Install with `route-change/install.sh [--dry-run]` after `pipeline-quota-failover/install.sh` from the same checkout (the route list needs the wrapper's `PI_QUOTA_FAILOVER_PRINT_CHAIN`).
 Test: `route-change/tests/route-change-e2e.sh` runs the real script and the real wrapper against a fixture home and config with stub quota-axi and pi: an exhausted route is refused with nothing written, a good route moves every pin and keeps backups, and a failed real request restores every file.
@@ -351,7 +351,7 @@ An unanswered ask gets a safe, pre-declared default instead of blocking the home
 
 `ask-default` needs `bash`, `jq`, `flock`, and GNU coreutils (`timeout`, `date -d`) on `PATH`, plus `JG_HOME` set.
 
-The add-on decides; it does not wire itself in. A home discovers open asks and calls `decide` per ask from its own supervision loop, which is a thin hook in the firstmate fork, not in this repo.
+The add-on decides; it does not wire itself in. A home discovers open asks and calls `decide` per ask from its own supervision loop, which is a thin hook in the juggernaut fork, not in this repo.
 
 ### tailscale-resilience
 
@@ -370,7 +370,7 @@ One host watchdog for the two failures that quietly take a lane offline: the Tai
 
 It needs `bash`, `jq`, `tailscale` and `loginctl` on `PATH`, and one instance owns the state dir.
 
-Install it as a timer so the windows are fed at the fleet's scan cadence (60s matches a Firstmate scan):
+Install it as a timer so the windows are fed at the fleet's scan cadence (60s matches a Juggernaut scan):
 
 ```sh
 printf '%s\n' '[Unit]' 'Description=Tailscale and display resilience check' \
@@ -400,7 +400,7 @@ Test: `claude-model-guard/tests/claude-model-guard-e2e.sh` installs into a throw
 
 A yolo task's PR merges itself once the required checks are green, instead of waiting for the lead to notice and merge (about 21 minutes per change).
 
-`merge-on-green/merge-on-green.sh check <jg-home>` is the watcher check. For each `state/<task>.meta` with `yolo=on` and a recorded `pr=` and `pr_head=` whose resolved state (`bin/jg-crew-state.sh`) says checks green / PR ready, it skips silently when the meta says `merge=manual` or the evidence gate (`checks-lint.sh`, pinned to done-done-axi 0.6.17 with Firstmate's size rules, falling back to the legacy lint when unavailable, must print PASS) returns a not-proven PASS; otherwise it requires the run receipt to be a PASS for exactly the meta's `pr_head` and `spawn_gen`, and only then merges through `bin/jg-pr-merge.sh` — never `--auto`, never `gh merge` directly, and no refusal is ever bypassed, so jg-pr-merge's live green check, head pin and refusal rules stay in charge. One merge attempt per task per head, remembered in `<home>/data/jg-merge-on-green/<task>.head`; refusals are remembered per task+head+reason+receipt state in `<task>.refused` and repeat silently until the head, the receipt or the reason changes; a timeout kill wakes truthfully once per task+head+reason like a refusal, records no attempt and is retried next sweep, while a `jg-crew-state` timeout stays silent. A merge prints one wake line with the verified merged URL, so the lead runs the post-merge steps (install from main, teardown), and appends the normal `done [at=<epoch>]: merged <PR URL>` line to `state/<task>.status`, so the lead relays it. Every command is bounded with `timeout` (a third of `JG_CHECK_TIMEOUT`, floor 5 s): a gate starts only before 80% of the bound and a merge only when it fits inside the whole bound, so the watcher's kill can never cut a merge.
+`merge-on-green/merge-on-green.sh check <jg-home>` is the watcher check. For each `state/<task>.meta` with `yolo=on` and a recorded `pr=` and `pr_head=` whose resolved state (`bin/jg-crew-state.sh`) says checks green / PR ready, it skips silently when the meta says `merge=manual` or the evidence gate (`checks-lint.sh`, pinned to done-done-axi 0.6.17 with Juggernaut's size rules, falling back to the legacy lint when unavailable, must print PASS) returns a not-proven PASS; otherwise it requires the run receipt to be a PASS for exactly the meta's `pr_head` and `spawn_gen`, and only then merges through `bin/jg-pr-merge.sh` — never `--auto`, never `gh merge` directly, and no refusal is ever bypassed, so jg-pr-merge's live green check, head pin and refusal rules stay in charge. One merge attempt per task per head, remembered in `<home>/data/jg-merge-on-green/<task>.head`; refusals are remembered per task+head+reason+receipt state in `<task>.refused` and repeat silently until the head, the receipt or the reason changes; a timeout kill wakes truthfully once per task+head+reason like a refusal, records no attempt and is retried next sweep, while a `jg-crew-state` timeout stays silent. A merge prints one wake line with the verified merged URL, so the lead runs the post-merge steps (install from main, teardown), and appends the normal `done [at=<epoch>]: merged <PR URL>` line to `state/<task>.status`, so the lead relays it. Every command is bounded with `timeout` (a third of `JG_CHECK_TIMEOUT`, floor 5 s): a gate starts only before 80% of the bound and a merge only when it fits inside the whole bound, so the watcher's kill can never cut a merge.
 
 Install with `merge-on-green/install.sh [--dry-run] <jg-home>`; it copies the watcher, pinned done-done lint adapter and config to `${XDG_DATA_HOME:-~/.local/share}/jg-merge-on-green/`, writes the `state/merge-on-green.check.sh` shim, and registers the check with `bin/jg-check-register.sh`; it is idempotent and `--dry-run` writes nothing.
 Tests: `merge-on-green/tests/merge-on-green.test.sh` drives the check end to end against a fixture home with stub `jg-crew-state.sh`, `jg-pr-merge.sh` and lint, and `merge-on-green/tests/checks-lint-parity.test.sh` compares pinned done-done verdicts against the legacy verdict fixtures, covering the `merge=manual` and "not proven" skips, the merged status line, the skip and refusal cases, the per-head and per-refusal memory, the timeout contract, and `install.sh` in both `--dry-run` and real mode.
@@ -409,7 +409,7 @@ Tests: `merge-on-green/tests/merge-on-green.test.sh` drives the check end to end
 
 `zai-quota-check/zai-quota-check` is a shippable version of a proven state check: it alerts you when the GLM plan it watches burns ahead of time - the 5 h window under 30% with more than 45 min to its reset, or the week's used share more than 15 points ahead of the week's elapsed share, or the week under 20% - with the message naming the route moves that keep the pipeline's share. It reads `quota-axi --json` at most once per 10 min (the check cadence bounds it further) and repeats only when its repeat signature changes: on a 10% step of the 5 h window only while the 5 h condition holds, otherwise on a 10% step of the week alone. The fix over the state copy it shipped from: its `fp//10|wp//10` signature carried the 5 h step on every week-ahead wake and so woke about 10 times per 5 h window while the week-ahead condition stayed true all week. `$0 <quota-json-file>` is the test mode: it reads the file instead of `quota-axi`, and `ZAI_QUOTA_MARK` then names the repeat-state file (default a fresh temp file), so a fixture sequence can exercise the repeat logic with no live quota read.
 
-Install with `zai-quota-check/install.sh [--dry-run]` and `JG_HOME` set: it copies the check to `$JG_HOME/state/zai-quota.check.sh` (mode 700) and registers the zai-quota check with the home's `bin/jg-check-register.sh`; idempotent. Out of the box the live repeat state lives at `~/firstmate/state/.zai-quota.last`, the same file the state copy used, so the install replaces it in place with no re-wake.
+Install with `zai-quota-check/install.sh [--dry-run]` and `JG_HOME` set: it copies the check to `$JG_HOME/state/zai-quota.check.sh` (mode 700) and registers the zai-quota check with the home's `bin/jg-check-register.sh`; idempotent. Out of the box the live repeat state lives at `~/juggernaut/state/.zai-quota.last`, the same file the state copy used, so the install replaces it in place with no re-wake.
 
 Test: `zai-quota-check/tests/zai-quota-check-e2e.sh` drives the real check in the file-argument mode over fixture sequences: with the week-ahead condition true all week and the 5 h window above 30%, fp 90->80->...->40 wakes once (the old signature woke on every run); with the 5 h condition each 10% step wakes once (29, 19, 9); a week 50->40->30 step wakes once per step.
 
@@ -424,18 +424,18 @@ It reads at most once per 10 min.
 `$0 <claude-accounts-json-file>` is the test mode: it reads the file, and `CQ_MARK` and `CQ_HIST` name the repeat-state and history files (default fresh temp files).
 
 Install with `claude-quota/install.sh [--dry-run] <main-jg-home>`: it copies the check to `${XDG_DATA_HOME:-~/.local/share}/jg-claude-quota/`, backs up a replaced `state/claude-quota.check.sh` as `<file>.bak-claude-quota-<epoch>`, writes that path as an exec shim (mode 700), and re-registers the `claude-quota` check with `bin/jg-check-register.sh`; idempotent.
-The live repeat state stays at `~/firstmate/state/.claude-quota.last`, the file the state copy used.
+The live repeat state stays at `~/juggernaut/state/.claude-quota.last`, the file the state copy used.
 
 Test: `claude-quota/tests/claude-quota.test.sh` drives the real check over sample pool readings: one account low and the others fine gives no wake; all accounts together short of the soonest reset give one wake with the action text and no other route, the same step stays quiet and the next step wakes again; an account with no reading, an hour-old file or no file gives a stderr diagnostic and no wake; live mode reads the home's file and holds a second read inside 10 min.
 It then drives `install.sh` against a throwaway home, as `--dry-run` and as a real install and rerun.
 
 ### fleet-stall
 
-`fleet-stall/fleet-stall-check` is a shippable version of a proven state check: it alerts at most every 45 min when a home lead is idle while it has 0 busy lanes and ready work, or while live workers have sat more than 45 min in a `paused:` that waits on the lead; the missed-wake guard, fleet-pause marker, zero-busy guard, live-lane filter and `slot` exclusion are unchanged. Fix over the state copy: the paused-reason word list is matched against the reason text only, with absolute paths, URLs, `key=value` tokens (`evidence=...`) and `[at=...]`/`[key=...]` stamps removed first. Before it, a treehouse evidence path matched `firstmate`, so workers waiting on their own CI or emulator runs counted as waiting on the lead. `JG_STALL_ROOT` (the main home) and `JG_STALL_BASE` (the leads' homes) default to the live paths and exist for the fixture test.
+`fleet-stall/fleet-stall-check` is a shippable version of a proven state check: it alerts at most every 45 min when a home lead is idle while it has 0 busy lanes and ready work, or while live workers have sat more than 45 min in a `paused:` that waits on the lead; the missed-wake guard, fleet-pause marker, zero-busy guard, live-lane filter and `slot` exclusion are unchanged. Fix over the state copy: the paused-reason word list is matched against the reason text only, with absolute paths, URLs, `key=value` tokens (`evidence=...`) and `[at=...]`/`[key=...]` stamps removed first. Before it, a treehouse evidence path matched `juggernaut`, so workers waiting on their own CI or emulator runs counted as waiting on the lead. `JG_STALL_ROOT` (the main home) and `JG_STALL_BASE` (the leads' homes) default to the live paths and exist for the fixture test.
 
 Install with `fleet-stall/install.sh [--dry-run]` and `JG_HOME` set: it copies the check to `${XDG_DATA_HOME:-~/.local/share}/jg-fleet-stall/fleet-stall-check`, writes `$JG_HOME/state/fleet-stall.check.sh` as a shim that execs it (mode 700; a different old file is kept as `.bak-fleet-stall-<epoch>`) and registers the fleet-stall check with the home's `bin/jg-check-register.sh`; idempotent.
 
-Test: `fleet-stall/tests/fleet-stall-e2e.sh` runs the real check against a fixture fleet (the main home's lead records, two fixture homes, a stub herdr showing both leads idle): the false-stall lines no longer count, while `waiting on firstmate for the decision` and `awaiting main instruction` still do. `FLEET_STALL_BIN` runs another copy against the same fixture.
+Test: `fleet-stall/tests/fleet-stall-e2e.sh` runs the real check against a fixture fleet (the main home's lead records, two fixture homes, a stub herdr showing both leads idle): the false-stall lines no longer count, while `waiting on juggernaut for the decision` and `awaiting main instruction` still do. `FLEET_STALL_BIN` runs another copy against the same fixture.
 
 ### glm-queue
 
@@ -461,4 +461,4 @@ The no-mistakes pipeline commits and pushes from its own repositories with the g
 Install or update with `git-identity/install.sh [--dry-run] [--email <email>] [--name <name>] <jg-home>`: it copies the script to `${XDG_DATA_HOME:-~/.local/share}/jg-git-identity/`, writes `identity.gitconfig` there (a configured identity is kept unless a flag replaces it; default `you <you@example.com>`) and one read-only wrapper per client hook in `hooks/`, backs up a different `<jg-home>/config/launch-env-hook` as `<file>.bak-git-identity-<epoch>` and writes it as an exec shim (mode 700); idempotent, and `--dry-run` writes nothing. It says so when the home's `jg-spawn.sh` does not run `config/launch-env-hook` yet.
 
 Test: `git-identity/tests/git-identity.test.sh` builds a pooled-style lane (a shared clone whose `.git/config` holds `t <t@e.c>` and its own logging pre-push, a linked worktree, a bare origin carrying a forge-made squash commit), shows the leak without the add-on, then launches the lane the way `jg-spawn` runs the hook: task commits carry the configured identity, a push of a hand-made `t@e.c` commit is refused with the commit and the fix and reaches nothing, a clean push on the forge-made base passes and runs the repository's own pre-push with git's stdin, a push whose inspection fails (a `git log` error) is refused instead of let through, a fixture repository outside the clone keeps its identity and pushes freely, and `--email` changes what is pinned and allowed; it also drives `install.sh` as `--dry-run`, a real install with a backup and an idempotent rerun.
-With `JG_ROOT=<firstmate checkout>` the lane also gets that checkout's AI-trailer hooks dir layered on top, as a real spawn does.
+With `JG_ROOT=<juggernaut checkout>` the lane also gets that checkout's AI-trailer hooks dir layered on top, as a real spawn does.

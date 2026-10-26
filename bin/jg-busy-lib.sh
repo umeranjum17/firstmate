@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
-# jg-busy-lib.sh - the ONE owner of firstmate's semantic busy-state contract.
+# jg-busy-lib.sh - the ONE owner of juggernaut's semantic busy-state contract.
 #
 # Design source: the captain-approved semantic busy-state redesign
 # (2026-07-28): each harness adapter reports turn lifecycle through a
@@ -42,7 +42,7 @@
 #   codex-hook, codex-appserver  reserved: Codex, gated by
 #                    jg_busy_codex_semantic_source
 #   kimi-wire, kimi-hook  reserved: standalone Kimi, gated by jg_busy_kimi_verified
-# Firstmate-owned sources accepted for every converted adapter:
+# Juggernaut-owned sources accepted for every converted adapter:
 #   jg-spawn         the launch-brief turn seeded at spawn
 #   jg-interrupt     the legacy Claude jg-send --key Escape idle event, and the
 #                    unknown invalidation jg-control writes after a Devin interrupt
@@ -102,7 +102,7 @@
 # rendered-text busy fallbacks that survive the redesign, because none of their
 # structured lifecycles was credited-live-verified
 # in the approved audit (Rovo's clean ACP stopReason lives outside the TUI
-# path firstmate drives, see references/harness/rovo.md; agy 1.2.0 exposes no
+# path juggernaut drives, see references/harness/rovo.md; agy 1.2.0 exposes no
 # hook surface at all, see references/harness/agy.md); each is scoped to
 # its own harness= and can never classify another adapter. The delivery
 # guards in bin/jg-composer-lib.sh match rendered footers for submit
@@ -151,7 +151,7 @@ JG_BUSY_LIB_VERSION=v1
 # `Interrupt` because Kimi documents that `Stop` does not fire on interrupts.
 #
 # To open the gate: install Kimi, live-verify the chosen source brackets a
-# real turn on a firstmate-launched worker including the interrupt path,
+# real turn on a juggernaut-launched worker including the interrupt path,
 # record the version, exact commands, and observed output in
 # docs/verification/supervision.md, add the verified version string(s) here,
 # and land the wiring in jg-spawn behind this same gate in the same change.
@@ -177,8 +177,8 @@ jg_busy_codex_appserver_observable() {
 # jg_busy_codex_hooks_verified: the sanctioned intermediate - Codex's stable
 # hooks engine (UserPromptSubmit to open a turn, Stop and SessionEnd to close
 # it). Returns 0 only once those hooks are live-verified to fire for a
-# firstmate-launched worker. codex-cli 0.145.0 verdict (live, 2026-07-28):
-# NOT verified. Firstmate-written project hooks under <worktree>/.codex/
+# juggernaut-launched worker. codex-cli 0.145.0 verdict (live, 2026-07-28):
+# NOT verified. Juggernaut-written project hooks under <worktree>/.codex/
 # never fired in an interactive pane whose directory trust was granted, nor
 # under `codex exec`, in either case with --dangerously-bypass-hook-trust,
 # while global hooks fired in the same runs. Codex additionally exposes no
@@ -226,7 +226,7 @@ jg_busy_current_gen() {  # <state-dir> <id>
 
 # jg_busy_sources_for_harness: the semantic sources trusted to classify a
 # task recorded with <harness>. One line, space-separated, possibly empty.
-# The firstmate-owned sources are appended for every converted adapter.
+# The juggernaut-owned sources are appended for every converted adapter.
 # Grok and muse deliberately trust nothing: neither has a semantic WRITER, so
 # neither is armed, and both read their live source on demand in the classifier
 # (grok's rendered tail, muse's session log) rather than through a stored
@@ -936,7 +936,7 @@ jg_busy_agy_tail_busy() {
 # launch; this is the backstop for when that registration did not take effect.
 # Each dialog's own question text is paired with one of its own rendered
 # option/footer lines, both required together: the question text alone is
-# plausible self-referential prose a firstmate-repo worker could easily render
+# plausible self-referential prose a juggernaut-repo worker could easily render
 # on its own (jg-claude-trust.sh's header literally quotes both questions),
 # but the option/footer pairing only ever renders inside the real dialog.
 # jg_busy_claude_trust_dialog_tail: Claude's workspace-trust dialog alone

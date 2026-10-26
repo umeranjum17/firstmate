@@ -58,7 +58,7 @@ The Muse launch clears `CLAUDECODE`, `PI_CODING_AGENT`, `GROK_AGENT`, `JG_PI_HAR
 A two-turn session produced exactly two run brackets, the second closed by an Escape interrupt:
 
 ```
-9  {"kind":"run","run_id":"d352a097-...","event":{"kind":"started","prompt":"hello from firstmate"}}
+9  {"kind":"run","run_id":"d352a097-...","event":{"kind":"started","prompt":"hello from juggernaut"}}
 45 {"kind":"run","run_id":"d352a097-...","event":{"kind":"terminal","terminal":"completed","turn_duration_ms":8152}}
 49 {"kind":"run","run_id":"b50dac92-...","event":{"kind":"started","prompt":"second turn to interrupt"}}
 78 {"kind":"run","run_id":"b50dac92-...","event":{"kind":"terminal","terminal":"cancelled","reason":"cancelled during model step"}}
@@ -148,7 +148,7 @@ The `tui.foreign_context_notice_shown` flag in `settings.json` suppresses only t
 Captured with `tmux capture-pane -p -e`:
 
 ```
-^[[38;2;90;160;255m^[[48;2;38;56;84m⟩ ^[[38;2;204;211;219mhello from firstmate^[[39m
+^[[38;2;90;160;255m^[[48;2;38;56;84m⟩ ^[[38;2;204;211;219mhello from juggernaut^[[39m
 ^[[0m^[[38;2;90;160;255m⟩ ^[[39m
 ```
 

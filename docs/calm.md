@@ -157,10 +157,10 @@ How Calm handles that shared slot depends on whether Calm was already on when th
 - [`calm-mode-feasibility.md`](calm-mode-feasibility.md) owns the version-scoped renderer taxonomy, built-in override constraints, and empirical evidence.
 - [`configuration.md`](configuration.md#calm-preference-configcalm) owns the persisted preference file and resolution rules.
 - `.pi/extensions/lib/jg-calm-visibility.ts` owns the visibility policy.
-- `.claude/mods/firstmate-calm/lib/jg-calm-preservation.ts` owns the shared substantive mid-turn text rule, which Pi imports through its tracked symlink.
+- `.claude/mods/juggernaut-calm/lib/jg-calm-preservation.ts` owns the shared substantive mid-turn text rule, which Pi imports through its tracked symlink.
 - `.pi/extensions/lib/jg-calm-operational-user-layout.ts` owns the zero-height operational-user row adapter.
 - `.pi/extensions/lib/jg-calm-pending-operational-layout.ts` owns the queued-row adapter and its session capability check.
-- `.pi/extensions/lib/jg-calm-working-ship.ts` owns Pi's animated working presentation over the sprite geometry both harnesses share in `.claude/mods/firstmate-calm/lib/jg-calm-working-ship-sprite.ts`.
+- `.pi/extensions/lib/jg-calm-working-ship.ts` owns Pi's animated working presentation over the sprite geometry both harnesses share in `.claude/mods/juggernaut-calm/lib/jg-calm-working-ship-sprite.ts`.
 
 ### Pi regression entry points
 
@@ -176,9 +176,9 @@ JG_PI_LIVE_E2E=1 tests/jg-pi-primary-live-e2e.test.sh
 
 ### The Calm mod
 
-Calm on Claude Code is the mod under `.claude/mods/firstmate-calm`, whose plugin name is `fm`.
+Calm on Claude Code is the mod under `.claude/mods/juggernaut-calm`, whose plugin name is `fm`.
 The mod is a Claude Code plugin whose whole behavior lives in one function-hooks module.
-The trusted project auto-loads the mod through the `.claude/skills/firstmate-calm` entry (a symlink into `.claude/mods`), so no `--plugin-dir` or marketplace install is needed.
+The trusted project auto-loads the mod through the `.claude/skills/juggernaut-calm` entry (a symlink into `.claude/mods`), so no `--plugin-dir` or marketplace install is needed.
 
 ### Enabling function hooks
 
@@ -241,7 +241,7 @@ A home whose outcome store predates the copy gains one at its next locked sessio
 On later reads, if the copy skips sequence numbers since the last seen outcome, one line counts the missing outcomes.
 The display copy's row and byte bounds are owned by [`jg-branch-outcome.sh`](../bin/jg-branch-outcome.sh); older outcomes and oversized rows cannot always be displayed by the mod, while the outcome store and main's delivery remain authoritative.
 Claude Code keeps each note in the session as a display-only entry and restores it on `claude --continue`, so the mod remembers in its own plugin store how far each session has followed the outcomes, and a resumed session replays only outcomes it has not shown.
-Claude Code keys that store by plugin name, so a session that showed notes before the plugin was renamed from `firstmate-calm` to `fm` and is resumed afterwards replays its still-due notes once.
+Claude Code keys that store by plugin name, so a session that showed notes before the plugin was renamed from `juggernaut-calm` to `fm` and is resumed afterwards replays its still-due notes once.
 The mod only reads outcome and host state: the drain owns off-Pi read-cursor advancement, and main explicitly acknowledges captain outcomes as processed.
 Only a home that runs the supervision host has outcomes to show.
 
@@ -252,7 +252,7 @@ Tool rows, tool result blocks, and folded tool groups draw at zero height, so a 
 A user row draws at zero height when the canonical operational-input parser recognizes its text as one of these:
 
 - A Juggernaut session-start, watcher, turn-end guard, away-supervisor, launch-brief, or branch-outcome envelope.
-- A from-firstmate routed message.
+- A from-juggernaut routed message.
 - One of the narrow pre-protocol shapes kept for old transcripts.
 
 Other user rows, including near misses such as a quoted or ASCII-only marker, stay visible unless backed by an operational record as the next section describes.

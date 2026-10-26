@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
-# Link a spawned task to the X-mode mention that triggered it, so firstmate can
+# Link a spawned task to the X-mode mention that triggered it, so juggernaut can
 # post up to THREE completion follow-ups when the task lands (within a 7-day window).
 #
 # Usage: jg-x-link.sh <task-id> <request_id> [--carry-count <n> --carry-ts <epoch> [--carry-platform <x|discord>] [--carry-max <n>]]
@@ -16,7 +16,7 @@
 #
 # A fresh link always starts x_followups at 0 and uses the current time for
 # x_request_ts. --carry-count <n> and --carry-ts <epoch> are a required pair for
-# re-linking the SAME request onto a successor task (e.g. a stuck-crewmate
+# re-linking the SAME request onto a successor task (e.g. a stuck-operator
 # recovery that respawns under a new task id): the caller reads the prior task's
 # x_followups and x_request_ts before its meta goes away and passes both here,
 # so the new task does not get a fresh follow-up budget, a refreshed local
@@ -37,13 +37,13 @@
 #
 # THE LINK IS HOME-LOCAL BY CONSTRUCTION: it lives in this home's
 # state/<task-id>.meta, so it can only bind work this home owns. Work routed to a
-# secondmate lives in that secondmate's home and has no meta here, so a link is
+# squad_lead lives in that squad_lead's home and has no meta here, so a link is
 # impossible and the public promise would be silently orphaned. When the task has
 # no local meta, this refuses with the promised-final path (bin/jg-public-followup.sh
-# register --work-home secondmate:<id>) named, and names the secondmate home the
+# register --work-home squad_lead:<id>) named, and names the squad_lead home the
 # task was actually found in whenever a registered LOCAL route holds it.
 #
-# Both ids are relay/firstmate slugs that compose a filename, so they are guarded
+# Both ids are relay/juggernaut slugs that compose a filename, so they are guarded
 # against path traversal even though they come from trusted callers.
 set -u
 
@@ -58,8 +58,8 @@ DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
 . "$SCRIPT_DIR/jg-wake-lib.sh"
 # shellcheck source=bin/jg-pr-lib.sh
 . "$SCRIPT_DIR/jg-pr-lib.sh"
-# shellcheck source=bin/jg-secondmate-registry-lib.sh
-. "$SCRIPT_DIR/jg-secondmate-registry-lib.sh"
+# shellcheck source=bin/jg-squad-lead-registry-lib.sh
+. "$SCRIPT_DIR/jg-squad-lead-registry-lib.sh"
 
 usage() {
   echo "usage: jg-x-link.sh <task-id> <request_id> [--carry-count <n> --carry-ts <epoch> [--carry-platform <x|discord>] [--carry-max <n>]]" >&2
@@ -134,50 +134,50 @@ case "$RID" in
   ''|.*|*[!A-Za-z0-9._-]*) echo "jg-x-link: unsafe request_id: $RID" >&2; exit 2 ;;
 esac
 
-# Scan this home's registered secondmates for a task record with this id.
-# ROUTE_MATCHES gets every LOCAL secondmate whose seeded home actually holds
-# state/<id>.meta; ROUTE_REGISTERED is 1 whenever any secondmate is registered at
+# Scan this home's registered squad_leads for a task record with this id.
+# ROUTE_MATCHES gets every LOCAL squad_lead whose seeded home actually holds
+# state/<id>.meta; ROUTE_REGISTERED is 1 whenever any squad_lead is registered at
 # all, which covers remote routes whose homes cannot be inspected from here. A
 # home with no registry at all learns nothing new and keeps the plain error.
 ROUTE_MATCHES=
 ROUTE_REGISTERED=0
-scan_secondmate_routes() { # <task-id>
-  local id=$1 reg="$DATA/secondmates.md" line home marker
+scan_squad_lead_routes() { # <task-id>
+  local id=$1 reg="$DATA/squad_leads.md" line home marker
   [ -f "$reg" ] && [ ! -L "$reg" ] || return 0
   while IFS= read -r line || [ -n "$line" ]; do
     case "$line" in '- '*) ;; *) continue ;; esac
-    secondmate_registry_parse_line "$line" || continue
+    squad_lead_registry_parse_line "$line" || continue
     ROUTE_REGISTERED=1
-    [ "$SECONDMATE_REGISTRY_REMOTE" -eq 0 ] || continue
-    home=$SECONDMATE_REGISTRY_HOME
+    [ "$SQUAD_LEAD_REGISTRY_REMOTE" -eq 0 ] || continue
+    home=$SQUAD_LEAD_REGISTRY_HOME
     case "$home" in /*) ;; *) continue ;; esac
     home=$(CDPATH='' cd -- "$home" 2>/dev/null && pwd -P) || continue
-    [ -f "$home/.jg-secondmate-home" ] && [ ! -L "$home/.jg-secondmate-home" ] || continue
-    marker=$(sed -n '1p' "$home/.jg-secondmate-home" 2>/dev/null)
-    [ "$marker" = "$SECONDMATE_REGISTRY_ID" ] || continue
+    [ -f "$home/.jg-squad-lead-home" ] && [ ! -L "$home/.jg-squad-lead-home" ] || continue
+    marker=$(sed -n '1p' "$home/.jg-squad-lead-home" 2>/dev/null)
+    [ "$marker" = "$SQUAD_LEAD_REGISTRY_ID" ] || continue
     [ -f "$home/state/$id.meta" ] && [ ! -L "$home/state/$id.meta" ] || continue
-    ROUTE_MATCHES="${ROUTE_MATCHES:+$ROUTE_MATCHES }$SECONDMATE_REGISTRY_ID"
+    ROUTE_MATCHES="${ROUTE_MATCHES:+$ROUTE_MATCHES }$SQUAD_LEAD_REGISTRY_ID"
   done < "$reg"
 }
 
 META="$STATE/$ID.meta"
 if [ ! -f "$META" ]; then
   echo "jg-x-link: no such task: state/$ID.meta" >&2
-  scan_secondmate_routes "$ID"
+  scan_squad_lead_routes "$ID"
   if [ -n "$ROUTE_MATCHES" ]; then
-    printf 'jg-x-link: %s is a second mate task (found in: %s), so this home cannot link it - a link only binds work whose record lives here.\n' \
+    printf 'jg-x-link: %s is a squad lead task (found in: %s), so this home cannot link it - a link only binds work whose record lives here.\n' \
       "$ID" "$ROUTE_MATCHES" >&2
   elif [ "$ROUTE_REGISTERED" -eq 1 ]; then
-    printf 'jg-x-link: this home has registered second mates and no record of %s, so the work may be routed to one - a link only binds work whose record lives here.\n' \
+    printf 'jg-x-link: this home has registered squad leads and no record of %s, so the work may be routed to one - a link only binds work whose record lives here.\n' \
       "$ID" >&2
   fi
   if [ -n "$ROUTE_MATCHES" ] || [ "$ROUTE_REGISTERED" -eq 1 ]; then
     # One unambiguous match is worth naming exactly, so the pointer can be run
     # as printed instead of re-derived.
-    ROUTE_HOME_ARG='secondmate:<id>'
+    ROUTE_HOME_ARG='squad_lead:<id>'
     case "$ROUTE_MATCHES" in
       ''|*' '*) ;;
-      *) ROUTE_HOME_ARG="secondmate:$ROUTE_MATCHES" ;;
+      *) ROUTE_HOME_ARG="squad_lead:$ROUTE_MATCHES" ;;
     esac
     printf 'jg-x-link: bind the public promise through the promised-final path instead: bin/jg-tasks-axi.sh public-followup add + bind-work, then bin/jg-public-followup.sh register <obligation-id> --relation <relation-id> --work-home %s --work-id %s --generation <n>, and put the bin/jg-public-followup.sh brief <obligation-id> command into the routed worker instructions.\n' \
       "$ROUTE_HOME_ARG" "$ID" >&2

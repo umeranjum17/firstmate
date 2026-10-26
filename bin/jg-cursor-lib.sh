@@ -12,7 +12,7 @@
 # caller has to agree on the same narrowed rule or an unrelated `/opt/agent`,
 # an unrelated `agent` on PATH, or a path that merely contains an `agent/`
 # directory component silently classifies as this harness. That widening would
-# let firstmate launch an unrelated executable with Cursor flags.
+# let juggernaut launch an unrelated executable with Cursor flags.
 #
 # Two independent kinds of Cursor evidence are accepted, and either alone
 # carries a positive verdict, so no single vendor string is load-bearing:

@@ -2,8 +2,8 @@
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Pre-register Claude Code's workspace trust for the directory a claude spawn is
-# about to launch into - the isolated task worktree of a ship or scout crewmate,
-# or the seeded home of a secondmate - so the agent reaches its brief or charter
+# about to launch into - the isolated task worktree of a ship or scout operator,
+# or the seeded home of a squad_lead - so the agent reaches its brief or charter
 # instead of wedging on the trust dialog. In worktree mode it also carries
 # forward the external-CLAUDE.md-import approval, but only when the primary
 # checkout already holds standing consent for it - see the consent-gating
@@ -11,12 +11,12 @@
 # on rather than answered on the human's behalf.
 #
 # Usage: jg-claude-trust.sh <worktree> <project>
-#        jg-claude-trust.sh --secondmate-home <home> <id>
+#        jg-claude-trust.sh --squad-lead-home <home> <id>
 #        jg-claude-trust.sh --lab-home <home>
 #   <worktree>  the isolated task worktree this spawn launches into
 #   <project>   the primary checkout that worktree belongs to
-#   <home>      the seeded secondmate home this spawn launches into
-#   <id>        the secondmate id that home must already be marked for
+#   <home>      the seeded squad_lead home this spawn launches into
+#   <id>        the squad_lead id that home must already be marked for
 #   --lab-home  the disposable lab home bin/jg-live-lab.sh launches a lab
 #               primary in
 # Prints one line naming what it registered; refuses loudly on anything else.
@@ -26,20 +26,20 @@
 # NOT cover it: `claude --help` records that the dialog is skipped only in
 # non-interactive mode (-p, or a non-TTY stdout), and a spawned pane is
 # interactive. Every fresh task worktree therefore hits it, and so does every
-# secondmate home the operator has not opened by hand. The dialog renders
-# with the cursor on "No, exit" and firstmate's steering plane carries only
-# Enter, Escape and C-c with no arrow navigation, so firstmate cannot answer it
+# squad_lead home the operator has not opened by hand. The dialog renders
+# with the cursor on "No, exit" and juggernaut's steering plane carries only
+# Enter, Escape and C-c with no arrow navigation, so juggernaut cannot answer it
 # and must not try - pressing Enter would select exit. The agent wedges before
 # it ever reads the brief. Registering the trust before launch is the only
 # control that reaches an interactive pane. The same reasoning covers Claude
 # Code's separate "Allow external CLAUDE.md file imports?" dialog, which
-# `--setting-sources project,local` (firstmate PR 10's minimal worker tool
+# `--setting-sources project,local` (juggernaut PR 10's minimal worker tool
 # surface) stopped suppressing: it renders whenever a loaded CLAUDE.md chain
-# reaches outside the project tree - which every crewmate's does, through the
+# reaches outside the project tree - which every operator's does, through the
 # captain's own `~/.claude/CLAUDE.md` importing `~/.claude/RTK.md` - and it is
 # gated the same fail-closed way as trust: cursor on "No, disable", no arrow
-# navigation from firstmate's steering plane. Only worktree mode reaches this
-# second dialog's flags: a secondmate home has no separate "project" entry to
+# navigation from juggernaut's steering plane. Only worktree mode reaches this
+# second dialog's flags: a squad_lead home has no separate "project" entry to
 # carry consent forward from, so its registration stays trust-only.
 #
 # TWO PROJECT-CONFIG ENTRIES IN WORKTREE MODE, NOT ONE. Registering both flags
@@ -97,7 +97,7 @@
 # subdirectory of a worktree, a plain directory, and a home
 # directory are each refused. Refusal is a non-zero exit, never a warning and
 # never a silent skip. When <project> is itself a linked worktree (a
-# secondmate home spawned from, rather than as, the primary checkout),
+# squad_lead home spawned from, rather than as, the primary checkout),
 # refusing outright would wedge a relaunch that is otherwise perfectly valid:
 # its own common dir already IS the primary checkout's own git dir (git's
 # git-common-dir answer never changes by which worktree asks), so the
@@ -126,48 +126,48 @@
 # opt-in guard family (JG_*_LIVE_E2E=1) and record the result in
 # docs/verification/runtime-backends.md, rather than assuming the shape here.
 #
-# SECONDMATE-HOME MODE. A secondmate home is a whole firstmate instance rather
+# SQUAD_LEAD-HOME MODE. A squad_lead home is a whole juggernaut instance rather
 # than a task worktree, and bin/jg-home-seed.sh produces it in two shapes: a
-# leased treehouse worktree (linked) and a standalone clone of the firstmate
+# leased treehouse worktree (linked) and a standalone clone of the juggernaut
 # repo (a primary checkout). The worktree test above therefore cannot decide
 # this case at all - it refuses the standalone clone as a primary checkout,
-# which is why a claude secondmate in an explicit ~/jg-homes/<id> home met the
+# which is why a claude squad_lead in an explicit ~/jg-homes/<id> home met the
 # dialog with nothing registered. Git shape is not the evidence here; THE SEED
-# IS. The home must carry a .jg-secondmate-home marker that is a regular file
+# IS. The home must carry a .jg-squad-lead-home marker that is a regular file
 # this user owns, never a symlink, naming exactly the <id> passed; it must hold
-# the firstmate instance files AGENTS.md and bin/; and each of its data, state,
+# the juggernaut instance files AGENTS.md and bin/; and each of its data, state,
 # config and projects paths must resolve inside the home. That is the set
-# bin/jg-home-seed.sh writes and bin/jg-spawn.sh's validate_firstmate_home_for_spawn
-# re-checks before launch, so this accepts exactly the homes a secondmate spawn
+# bin/jg-home-seed.sh writes and bin/jg-spawn.sh's validate_juggernaut_home_for_spawn
+# re-checks before launch, so this accepts exactly the homes a squad_lead spawn
 # will launch into and nothing wider: a plain directory, a project checkout, an
-# ordinary firstmate checkout, a home marked for a different secondmate, and a
+# ordinary juggernaut checkout, a home marked for a different squad_lead, and a
 # home whose operational directory escapes it are each refused. An ABSENT
 # operational directory is accepted for the same reason the spawn accepts one -
 # a test stricter than the spawn's own would move the wedge from the dialog to
 # a refusal without making any unseeded directory less trusted.
 #
 # Home-level trust is broader than worktree trust, since the pane starts in the
-# home and the secondmate works across it, so it is granted on that seed
+# home and the squad_lead works across it, so it is granted on that seed
 # evidence alone and never on a caller's word about what a path is. It is
-# trust-only: a secondmate home has no separate primary-checkout "project"
+# trust-only: a squad_lead home has no separate primary-checkout "project"
 # argument to gate external-imports consent against, so the two import flags
 # are never written there.
 #
 # LAB-HOME MODE. A disposable lab primary (bin/jg-live-lab.sh) launches in a lab
-# home that is neither a task worktree nor a seeded secondmate home.
+# home that is neither a task worktree nor a seeded squad_lead home.
 # The evidence is structural: the home must carry bin/jg-lab-home.sh's marker
 # (a regular file this user owns, never a symlink, holding the token
 # bin/jg-gate-refuse-lib.sh owns), hold
 # AGENTS.md and bin/, and be a primary git checkout whose top level is exactly
 # the argument, because Claude Code keys the launch to that root. It is
-# trust-only for the same reason as a secondmate home, and bin/jg-live-lab.sh
+# trust-only for the same reason as a squad_lead home, and bin/jg-live-lab.sh
 # removes the entry again when it tears the lab down.
 #
 # Only the launching user's own store is written. In worktree mode: the
 # projects entries for the worktree path and the resolved canonical project
 # path in ${CLAUDE_CONFIG_DIR:-$HOME}/.claude.json, which must be a regular
 # file this uid owns; every unrelated key and project entry is preserved, and
-# both entries land in one atomic replacement. In secondmate-home and lab-home
+# both entries land in one atomic replacement. In squad-lead-home and lab-home
 # mode: the single projects entry for the registered home path, same store,
 # same atomic replacement. jg-spawn.sh forwards CLAUDE_CONFIG_DIR onto the
 # claude launch verbatim rather than resolving it, and the pane starts in the
@@ -192,7 +192,7 @@ unset CDPATH \
 
 usage() {
   echo "usage: jg-claude-trust.sh <worktree> <project>" >&2
-  echo "       jg-claude-trust.sh --secondmate-home <home> <id>" >&2
+  echo "       jg-claude-trust.sh --squad-lead-home <home> <id>" >&2
   echo "       jg-claude-trust.sh --lab-home <home>" >&2
   exit 2
 }
@@ -201,13 +201,13 @@ usage() {
 # names what the argument was expected to be so every shared refusal below reads
 # correctly in both modes.
 case "${1:-}" in
-  --secondmate-home)
+  --squad-lead-home)
     [ "$#" -eq 3 ] || usage
-    MODE=secondmate-home
+    MODE=squad-lead-home
     TARGET_ARG=$2
     SUB_ID=$3
     PROJ_ARG=
-    SCOPE_NOUN="secondmate home"
+    SCOPE_NOUN="squad_lead home"
     ;;
   --lab-home)
     [ "$#" -eq 2 ] || usage
@@ -368,7 +368,7 @@ if [ "$MODE" = worktree ]; then
   # The external-imports flags must land on the primary checkout - its own git
   # dir equals the common dir - because that is exactly the path Claude Code's
   # own git-root canonicalization collapses every linked worktree to. When
-  # <project> is itself a linked worktree (a secondmate home spawned from,
+  # <project> is itself a linked worktree (a squad_lead home spawned from,
   # rather than as, the primary checkout), refusing outright would wedge a
   # relaunch that is otherwise perfectly valid: PROJ_COMMON already IS that
   # primary checkout's own git dir (git's git-common-dir answer never changes
@@ -399,8 +399,8 @@ elif [ "$MODE" = lab-home ]; then
   if ! { [ -f "$LAB_MARKER" ] && [ -O "$LAB_MARKER" ] && jg_gate_lab_home "$TARGET_REAL"; }; then
     refuse "'$TARGET_REAL' carries no lab-home marker owned by this user, so it is not a disposable lab home"
   fi
-  [ -f "$TARGET_REAL/AGENTS.md" ] || refuse "'$TARGET_REAL' has no AGENTS.md, so it is not a firstmate home"
-  [ -d "$TARGET_REAL/bin" ] || refuse "'$TARGET_REAL' has no bin/, so it is not a firstmate home"
+  [ -f "$TARGET_REAL/AGENTS.md" ] || refuse "'$TARGET_REAL' has no AGENTS.md, so it is not a juggernaut home"
+  [ -d "$TARGET_REAL/bin" ] || refuse "'$TARGET_REAL' has no bin/, so it is not a juggernaut home"
   LAB_TOP=$(git -C "$TARGET_REAL" rev-parse --show-toplevel 2>/dev/null) || true
   [ -n "$LAB_TOP" ] && [ "$(real_dir "$LAB_TOP")" = "$TARGET_REAL" ] \
     || refuse "'$TARGET_REAL' is not the top level of a git checkout"
@@ -411,34 +411,34 @@ elif [ "$MODE" = lab-home ]; then
     || refuse "'$TARGET_REAL' is a linked worktree, not the primary checkout a lab primary launches in"
 else
   # The seed evidence, in the order that names the most useful reason first: the
-  # marker decides whether this is a secondmate home at all, the id decides
+  # marker decides whether this is a squad_lead home at all, the id decides
   # whose, and the instance files and operational directories decide whether it
   # is the shape bin/jg-home-seed.sh leaves behind. The marker is the token the
   # whole boundary rests on, so it is judged as a file rather than as a value: a
   # symlink is refused outright rather than followed, because a link is a way to
   # make some other file's bytes stand in for the seed, and a marker this user
   # does not own was planted by someone else.
-  [ -n "$SUB_ID" ] || refuse "no secondmate id was supplied, so '$TARGET_REAL' cannot be matched against its seed marker"
-  SUB_MARKER="$TARGET_REAL/.jg-secondmate-home"
-  [ ! -L "$SUB_MARKER" ] || refuse "'$SUB_MARKER' is a symlink; a seeded secondmate home carries the marker as a regular file"
-  [ -f "$SUB_MARKER" ] || refuse "'$TARGET_REAL' carries no .jg-secondmate-home marker, so it is not a seeded secondmate home"
+  [ -n "$SUB_ID" ] || refuse "no squad_lead id was supplied, so '$TARGET_REAL' cannot be matched against its seed marker"
+  SUB_MARKER="$TARGET_REAL/.jg-squad-lead-home"
+  [ ! -L "$SUB_MARKER" ] || refuse "'$SUB_MARKER' is a symlink; a seeded squad_lead home carries the marker as a regular file"
+  [ -f "$SUB_MARKER" ] || refuse "'$TARGET_REAL' carries no .jg-squad-lead-home marker, so it is not a seeded squad_lead home"
   [ -O "$SUB_MARKER" ] || refuse "'$SUB_MARKER' is not owned by this user"
   SUB_MARKER_ID=$(cat "$SUB_MARKER" 2>/dev/null) || true
-  [ "$SUB_MARKER_ID" = "$SUB_ID" ] || refuse "'$TARGET_REAL' is marked for secondmate '${SUB_MARKER_ID:-unknown}', not '$SUB_ID'"
-  [ -f "$TARGET_REAL/AGENTS.md" ] || refuse "'$TARGET_REAL' has no AGENTS.md, so it is not a firstmate home"
-  [ -d "$TARGET_REAL/bin" ] || refuse "'$TARGET_REAL' has no bin/, so it is not a firstmate home"
+  [ "$SUB_MARKER_ID" = "$SUB_ID" ] || refuse "'$TARGET_REAL' is marked for squad_lead '${SUB_MARKER_ID:-unknown}', not '$SUB_ID'"
+  [ -f "$TARGET_REAL/AGENTS.md" ] || refuse "'$TARGET_REAL' has no AGENTS.md, so it is not a juggernaut home"
+  [ -d "$TARGET_REAL/bin" ] || refuse "'$TARGET_REAL' has no bin/, so it is not a juggernaut home"
   for sub_dir_name in data state config projects; do
     sub_dir="$TARGET_REAL/$sub_dir_name"
     if [ -L "$sub_dir" ] && [ ! -e "$sub_dir" ]; then
       refuse "'$sub_dir' is a broken symlink, so this home's $sub_dir_name directory cannot be shown to stay inside it"
     fi
     [ -e "$sub_dir" ] || continue
-    [ -d "$sub_dir" ] || refuse "'$sub_dir' is not a directory, so '$TARGET_REAL' is not a seeded secondmate home"
+    [ -d "$sub_dir" ] || refuse "'$sub_dir' is not a directory, so '$TARGET_REAL' is not a seeded squad_lead home"
     sub_dir_real=$(real_dir "$sub_dir") || true
     [ -n "$sub_dir_real" ] || refuse "'$sub_dir' cannot be resolved"
     case "$sub_dir_real" in
       "$TARGET_REAL"/*) ;;
-      *) refuse "'$sub_dir' resolves to '$sub_dir_real', outside the home, so '$TARGET_REAL' is not a safe secondmate home" ;;
+      *) refuse "'$sub_dir' resolves to '$sub_dir_real', outside the home, so '$TARGET_REAL' is not a safe squad_lead home" ;;
     esac
   done
 fi
@@ -471,7 +471,7 @@ if [ -e "$STORE" ]; then
 fi
 
 # Read-modify-write, then read back and confirm. jg-spawn runs from a live
-# firstmate Claude Code session that writes this same file, so the store can move
+# juggernaut Claude Code session that writes this same file, so the store can move
 # under us in both directions and each needs its own answer.
 #
 # Losing the VENDOR's write is the serious one: this renames a whole
@@ -487,7 +487,7 @@ fi
 # lost, and this claims no more than that.
 #
 # Losing OUR entry is the mild one: a vendor rewrite that drops it only resurrects
-# the dialog this registration removes, which reaches firstmate as an ordinary
+# the dialog this registration removes, which reaches juggernaut as an ordinary
 # stale wake and a relaunch registers again. The readback catches it within these
 # attempts, and it must fail loudly rather than report a trust it did not leave.
 # ponytail: fingerprint-and-refuse, not a lock; flock is absent on macOS and
@@ -497,7 +497,7 @@ fi
 # entry in the same read-modify-write attempt, so a single rename either
 # records all of it or none of it - there is no state where the worktree entry
 # is fresh and the project entry stale, or the other way round. In
-# secondmate-home mode only the single home entry is written.
+# squad-lead-home mode only the single home entry is written.
 #
 # The two external-imports flags (worktree mode only) are gated separately
 # from the trust flag, because they are a CONSENT grant, not a pre-approval

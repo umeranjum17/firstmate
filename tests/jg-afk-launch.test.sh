@@ -367,7 +367,7 @@ unit_fresh_vs_refresh() {
 }
 
 # ---------------------------------------------------------------------------
-# UNIT 2a: away/quiet mode plumbing (kunchenguid/firstmate#2356). jg_afk_mode
+# UNIT 2a: away/quiet mode plumbing (kunchenguid/juggernaut#2356). jg_afk_mode
 # is the single owner of reading the mode; these pin its write side
 # (jg_afk_launch_flag_write / jg_afk_flag_write) against the exact double-
 # write risk a live entry hits - the launcher writes the flag, then the

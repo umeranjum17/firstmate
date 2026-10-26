@@ -1,7 +1,7 @@
 // Ordering and filtering for /supervision-model's bounded, searchable model
 // picker. docs/configuration.md owns its operator-facing behavior.
 //
-// This file holds only the choices Firstmate owns - which entries exist, in
+// This file holds only the choices Juggernaut owns - which entries exist, in
 // which order, and which survive a search query - so they stay testable
 // without a terminal. The picker's rendering, scrolling, key handling, and
 // branch-only component-choice rationale live beside pickBranchModel in

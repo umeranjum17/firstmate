@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Remove what install.sh added to one Firstmate home, and nothing else: the install
+# Remove what install.sh added to one Juggernaut home, and nothing else: the install
 # record and the launcher once nothing can still name it. The home hook gets its saved
 # content back in place, keeping its file, mode and links; a hook that was gone when
 # install ran, or that install never wrote and has since been edited, is left alone,

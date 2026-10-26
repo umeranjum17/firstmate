@@ -17,11 +17,11 @@ fork's `bin/` (`$SCRIPT_DIR`, else `$JG_PUSH_TRANSITION_LIB_DIR`, else
 
 - `bin/jg-watch.sh` and `bin/jg-push-transition-lib.sh`: replace the sourcing of
   the fork's `jg-wait-timers-lib.sh` with
-  `[ ! -r "${JG_ADDONS_DIR:-$JG_HOME/projects/firstmate-addons}/wait-timers/bin/jg-wait-timers-lib.sh" ] || . "${JG_ADDONS_DIR:-$JG_HOME/projects/firstmate-addons}/wait-timers/bin/jg-wait-timers-lib.sh"`.
+  `[ ! -r "${JG_ADDONS_DIR:-$JG_HOME/projects/juggernaut-addons}/wait-timers/bin/jg-wait-timers-lib.sh" ] || . "${JG_ADDONS_DIR:-$JG_HOME/projects/juggernaut-addons}/wait-timers/bin/jg-wait-timers-lib.sh"`.
 - Tick: `if declare -F jg_wait_timers_tick >/dev/null; then jg_wait_timers_tick || { echo "watcher: waiting-state timer check failed" >&2; exit 1; }; fi`.
 - Push: `if [ -n "$task" ] && declare -F jg_wait_timer_push_delivered >/dev/null; then jg_wait_timer_push_delivered "$task" "$window" || exit 1; fi`.
 
-`tests/wait-timers-hook-e2e.sh` (set `JG_TEST_FORK` to a Firstmate checkout)
+`tests/wait-timers-hook-e2e.sh` (set `JG_TEST_FORK` to a Juggernaut checkout)
 uses the fork's post-step-B hook lines unchanged, copies this add-on's moved
 `tests/jg-wait-timers.test.sh` journey into a private fork copy, and runs it with
 this library installed; it also checks that the optional hooks are no-ops when
@@ -58,7 +58,7 @@ the add-on is absent.
   owner-delivery time, parent-report flag, report key, and miss count. The
   report key is the wait's identity,
   `waiting-timer-<home>-<task>-g<generation>-<source key>`: home is a short
-  hash of the Firstmate home, generation is the arming second, and the source
+  hash of the Juggernaut home, generation is the arming second, and the source
   is the open decision key (or the pause key, `herdr-blocked`, `unkeyed`).
   Owner and escalation lines print `id=<key> source=[<declaration>]`, so the
   exact unresolved source is named; a resolution closes only the wait it

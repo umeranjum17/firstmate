@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Behavior tests for bin/jg-treehouse-protect.py, the pre-allocation lease step
-# that both spawn and secondmate seeding run before `treehouse get --lease`.
+# that both spawn and squad_lead seeding run before `treehouse get --lease`.
 #
 # A recorded task copy that Treehouse no longer tracks as usable (missing from
 # its state, marked destroying, or no longer a git worktree) must be skipped

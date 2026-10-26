@@ -17,11 +17,11 @@ command -v jq >/dev/null 2>&1 || { echo "skip: jq not found (the herdr adapter p
 command -v python3 >/dev/null 2>&1 || { echo "skip: python3 not found (plistlib parses the owned launch-agent contract)"; exit 0; }
 
 TMP_ROOT=$(jg_test_tmproot jg-remote-doctor)
-LABEL=dev.firstmate.herdr.jg-remote
-INTERACTIVE_LABEL=dev.firstmate.herdr
+LABEL=dev.juggernaut.herdr.jg-remote
+INTERACTIVE_LABEL=dev.juggernaut.herdr
 mkdir -p "$TMP_ROOT"
 TMP_ROOT=$(cd "$TMP_ROOT" && pwd -P)
-JOB_LABEL=dev.firstmate.remote-job
+JOB_LABEL=dev.juggernaut.remote-job
 CASE_N=0
 DOCTOR_WORKER_PID=
 HOLDER_PIDS=()
@@ -50,9 +50,9 @@ hold() { # <marker-env...> -> HOLDER_PID
   eval "exec ${HOLDER_FD}>\"\$fifo\""
   HOLDER_FD=$((HOLDER_FD + 1))
 }
-hold XPC_SERVICE_NAME=dev.firstmate.herdr.jg-remote
+hold XPC_SERVICE_NAME=dev.juggernaut.herdr.jg-remote
 AQUA_HOLDER_PID=$HOLDER_PID
-hold XPC_SERVICE_NAME=dev.firstmate.herdr.jg-remote
+hold XPC_SERVICE_NAME=dev.juggernaut.herdr.jg-remote
 BACKGROUND_HOLDER_PID=$HOLDER_PID
 hold XPC_SERVICE_NAME=0
 XPC_ZERO_HOLDER_PID=$HOLDER_PID
@@ -114,11 +114,11 @@ case "${1:-}" in
         [ -f "$JG_FAKE_STATE/user-loaded-$label" ] || exit 113
         cat "$JG_FAKE_STATE/user-loaded-$label"
         ;;
-      */dev.firstmate.herdr.jg-remote)
+      */dev.juggernaut.herdr.jg-remote)
         [ -f "$loaded" ] || exit 113
         cat "$loaded"
         ;;
-      */dev.firstmate.herdr)
+      */dev.juggernaut.herdr)
         [ -f "$JG_FAKE_STATE/interactive-loaded" ] || exit 113
         printf 'interactive default job\n'
         ;;
@@ -130,8 +130,8 @@ case "${1:-}" in
   bootout)
     [ ! -f "$JG_FAKE_STATE/bootout-fail" ] || { printf 'Boot-out failed: operation not permitted\n' >&2; exit 6; }
     case "$domain" in
-      */dev.firstmate.herdr.jg-remote) rm -f "$loaded" ;;
-      */dev.firstmate.herdr) rm -f "$JG_FAKE_STATE/interactive-loaded" ;;
+      */dev.juggernaut.herdr.jg-remote) rm -f "$loaded" ;;
+      */dev.juggernaut.herdr) rm -f "$JG_FAKE_STATE/interactive-loaded" ;;
       *) rm -f "$loaded" ;;
     esac
     exit 0
@@ -146,7 +146,7 @@ case "${1:-}" in
     loaded="$JG_FAKE_STATE/loaded-$label"
     [ ! -f "$loaded" ] || { printf 'Bootstrap failed: service already loaded\n' >&2; exit 5; }
     case "$label" in
-      dev.firstmate.remote-job)
+      dev.juggernaut.remote-job)
         cat > "$loaded" <<EOF
 path = $JG_FAKE_JOB_PLIST
 program = $JG_FAKE_JOB_WORKER
@@ -181,7 +181,7 @@ EOF
   kickstart)
     [ ! -f "$JG_FAKE_STATE/kickstart-fail" ] || { printf 'Kickstart failed: service unavailable\n' >&2; exit 6; }
     case "$label" in
-      dev.firstmate.remote-job) : ;;
+      dev.juggernaut.remote-job) : ;;
       *)
         # The real job execs the guard, which stops a foreign server and
         # becomes the Aqua-born owner; the fixture models that outcome.
@@ -350,7 +350,7 @@ EOF
 }
 
 # Parse the doctor's owned launch-agent plist and assert the login-shell
-# argv contract. The plist is Firstmate's output, so semantic structure is
+# argv contract. The plist is Juggernaut's output, so semantic structure is
 # in bounds; never match the XML source as a substring.
 plist_value() { # <plist> <key>
   python3 -c 'import plistlib,sys; value=plistlib.load(open(sys.argv[1], "rb"))[sys.argv[2]]; print(value)' "$1" "$2"
@@ -459,7 +459,7 @@ assert_present "$CASE_PLIST" "--fix reported success without writing the plist"
 assert_present "$CASE_JOB_PLIST" "--fix reported success without writing the remote job worker plist"
 assert_herdr_launch_agent_contract "$CASE_PLIST" "$CASE_BIN/herdr"
 [ "$(plist_value "$CASE_JOB_PLIST" Label)" = "$JOB_LABEL" ] \
-  || fail "the worker plist does not carry the Firstmate label"
+  || fail "the worker plist does not carry the Juggernaut label"
 [ "$(plist_value "$CASE_JOB_PLIST" LimitLoadToSessionType)" = Aqua ] \
   || fail "the worker plist is not Aqua-scoped"
 [ "$(plist_first_value "$CASE_JOB_PLIST" ProgramArguments)" = "$ROOT/bin/jg-remote-job-worker.sh" ] \
@@ -689,7 +689,7 @@ assert_not_contains "$DOCTOR_OUT" 'fix herdr-server=applied' "--fix claimed to h
 assert_contains "$DOCTOR_OUT" 'action: gui-session:' "the login-session gap came with no operator action"
 assert_contains "$DOCTOR_OUT" 'automatic login' "the login-session action did not name the operator step"
 assert_present "$CASE_PLIST" "--fix skipped the automatable launch-agent gap because a human gap existed"
-assert_contains "$DOCTOR_OUT" 'error: this host is not ready for a remote second mate' \
+assert_contains "$DOCTOR_OUT" 'error: this host is not ready for a remote squad lead' \
   "a remaining human gap did not fail the readiness verdict"
 assert_no_dangerous_calls "the doctor tried to create a login session by force"
 pass "human gaps are reported with their operator step and never claimed as fixed"
@@ -798,8 +798,8 @@ expect_code 0 "$DOCTOR_RC" "--fix did not create a wrapper for the discoverable 
 assert_contains "$DOCTOR_OUT" 'fix required-tasks-axi=applied:' "--fix did not report the owned wrapper"
 assert_contains "$DOCTOR_OUT" "required tasks-axi=$CASE_HOME/.local/bin/tasks-axi" \
   "the worker PATH did not resolve the generated wrapper"
-assert_grep '# Firstmate remote tool wrapper v1' "$CASE_HOME/.local/bin/tasks-axi" \
-  "the generated wrapper is not marked Firstmate-owned"
+assert_grep '# Juggernaut remote tool wrapper v1' "$CASE_HOME/.local/bin/tasks-axi" \
+  "the generated wrapper is not marked Juggernaut-owned"
 assert_grep "$MANAGER_BIN/tasks-axi" "$CASE_HOME/.local/bin/tasks-axi" \
   "the generated wrapper does not execute the discovered absolute target"
 assert_absent "$CASE_HOME/.local/bin/codex" "--fix wrapped an alternate harness when claude already satisfied readiness"
@@ -817,7 +817,7 @@ printf 'operator wrapper\n' > "$CASE_HOME/.local/bin/treehouse"
 doctor --fix
 expect_code 1 "$DOCTOR_RC" "--fix overwrote an operator-owned reserved wrapper"
 assert_contains "$DOCTOR_OUT" 'fix required-treehouse=failed:' \
-  "the non-Firstmate wrapper refusal was not reported"
+  "the non-Juggernaut wrapper refusal was not reported"
 [ "$(cat "$CASE_HOME/.local/bin/treehouse")" = 'operator wrapper' ] \
   || fail "--fix overwrote an operator-owned wrapper"
 pass "--fix creates only owned version-manager wrappers and never clobbers an operator file"
@@ -834,14 +834,14 @@ HOME="$CASE_HOME" JG_ROOT_OVERRIDE="$ROOT" JG_REMOTE_JOB_PLATFORM_OVERRIDE=Linux
   "$ROOT/bin/jg-remote-job-worker.sh" > "$CASE_STATE/worker.out" 2> "$CASE_STATE/worker.err" &
 DOCTOR_WORKER_PID=$!
 for _ in $(seq 1 100); do
-  [ -f "$CASE_HOME/.firstmate/remote-job/worker.ready" ] && break
+  [ -f "$CASE_HOME/.juggernaut/remote-job/worker.ready" ] && break
   sleep 0.05
 done
-assert_present "$CASE_HOME/.firstmate/remote-job/worker.ready" "the stale-identity fixture worker did not start"
-printf 'stale-worker-identity\n' > "$CASE_HOME/.firstmate/remote-job/worker.identity"
+assert_present "$CASE_HOME/.juggernaut/remote-job/worker.ready" "the stale-identity fixture worker did not start"
+printf 'stale-worker-identity\n' > "$CASE_HOME/.juggernaut/remote-job/worker.identity"
 doctor
 expect_code 1 "$DOCTOR_RC" "doctor accepted a live worker with stale code identity"
-assert_contains "$DOCTOR_OUT" 'check remote-job-worker=fixable: the running remote job worker does not match the current Firstmate code' \
+assert_contains "$DOCTOR_OUT" 'check remote-job-worker=fixable: the running remote job worker does not match the current Juggernaut code' \
   "doctor did not classify stale worker identity as fixable"
 assert_contains "$DOCTOR_OUT" 'check remote-job-probe=fixable: the remote job worker identity is stale' \
   "doctor probed through stale worker code"
@@ -851,7 +851,7 @@ assert_contains "$DOCTOR_OUT" 'fix remote-job-worker=applied:' "--fix did not re
 assert_contains "$DOCTOR_OUT" 'check remote-job-worker=ok:' "the refreshed worker was not confirmed ready"
 assert_contains "$DOCTOR_OUT" 'check remote-job-probe=ok: the remote job worker completed the required-tool probe' \
   "doctor did not probe tools through the refreshed worker"
-DOCTOR_WORKER_PID=$(cat "$CASE_HOME/.firstmate/remote-job/worker.pid")
+DOCTOR_WORKER_PID=$(cat "$CASE_HOME/.juggernaut/remote-job/worker.pid")
 kill -TERM "$DOCTOR_WORKER_PID"
 for _ in $(seq 1 100); do
   kill -0 "$DOCTOR_WORKER_PID" 2>/dev/null || break

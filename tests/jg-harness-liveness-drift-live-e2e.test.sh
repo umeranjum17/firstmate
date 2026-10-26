@@ -72,7 +72,7 @@ jg_backend_source tmux || fail "jg_backend_source tmux failed"
   || fail "could not start the private tmux server"
 
 # Kimi is not required to be on PATH; mirror bin/jg-spawn.sh's own resolution
-# order so this guard covers the same binary firstmate would actually launch.
+# order so this guard covers the same binary juggernaut would actually launch.
 resolve_harness_binary() {  # <harness>
   local harness=$1 candidate
   # cursor is resolved FIRST, before the generic PATH lookup, and only through
@@ -160,14 +160,14 @@ for harness in claude codex opencode pi pi-signed grok kimi cursor muse; do
   # to a retained foreign marker, so a harness is only protected where the walk
   # reaches it at comm strength. A harness that ships as a thin interpreter shim
   # spawning its native binary as a CHILD is args strength from the pane process
-  # and comm strength from below that child - which is where firstmate's own
+  # and comm strength from below that child - which is where juggernaut's own
   # detection actually runs, as a tool subprocess. Probing only the pane would
   # therefore pass on evidence the guarantee does not rest on, and would keep
   # passing if a release stopped spawning the native child at all.
   #
   # The vantage set is the UPWARD path from the deepest foreground descendant, not
   # every descendant in the subtree, because harness_ancestry only ever climbs: a
-  # sibling branch is a vantage firstmate's own detection can never occupy.
+  # sibling branch is a vantage juggernaut's own detection can never occupy.
   # Restricting the deepest descendant to the pane tty's foreground process group
   # keeps a process left running in the background out of the selection as well.
   #
@@ -205,7 +205,7 @@ for harness in claude codex opencode pi pi-signed grok kimi cursor muse; do
   drift_context="Observed process title '$title'; observed foreground process names [$comms]; observed ancestry verdicts [$(printf '%s' "$verdicts" | tr '\n' ';')]."
 
   [ -n "$verdicts" ] || fail \
-    "DETECTION DRIFT: $harness $version is running but the ancestry walk reports nothing from the pane process or any vantage below it, so firstmate cannot identify this session at all. $drift_context Teach bin/jg-harness.sh's harness_ancestry the name this release actually reports."
+    "DETECTION DRIFT: $harness $version is running but the ancestry walk reports nothing from the pane process or any vantage below it, so juggernaut cannot identify this session at all. $drift_context Teach bin/jg-harness.sh's harness_ancestry the name this release actually reports."
 
   SAW_COMM=0
   while read -r strength named; do

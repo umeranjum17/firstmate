@@ -88,7 +88,7 @@ test_gate_common_dir_is_silent() {
   git --git-dir="$bare" worktree add --quiet -b gate-test "$root" HEAD
   mkdir -p "$root/bin" "$root/state"
   : > "$root/AGENTS.md"
-  printf 'gate-test\n' > "$root/.jg-secondmate-home"
+  printf 'gate-test\n' > "$root/.jg-squad-lead-home"
   expect_silent_zero "gate common-dir nudge" env JG_GATE_REFUSE_BYPASS=0 \
     JG_ROOT_OVERRIDE="$root" JG_HOME="$root" "$NUDGE"
   pass "jg-sessionstart-nudge: .no-mistakes gate common-dir is silent"
@@ -103,16 +103,16 @@ test_unmarked_linked_worktree_is_silent() {
   pass "jg-sessionstart-nudge: an unmarked linked task worktree is silent"
 }
 
-test_linked_secondmate_primary_nudges() {
-  local base="$TMP_ROOT/secondmate-base" root="$TMP_ROOT/secondmate-home" out status=0
-  jg_git_worktree "$base" "$root" fm/sessionstart-secondmate
+test_linked_squad_lead_primary_nudges() {
+  local base="$TMP_ROOT/squad-lead-base" root="$TMP_ROOT/squad-lead-home" out status=0
+  jg_git_worktree "$base" "$root" fm/sessionstart-squad-lead
   mkdir -p "$root/bin" "$root/state"
   : > "$root/AGENTS.md"
-  printf 'sessionstart-sm\n' > "$root/.jg-secondmate-home"
+  printf 'sessionstart-sm\n' > "$root/.jg-squad-lead-home"
   out=$(run_nudge "$root") || status=$?
-  expect_code 0 "$status" "linked secondmate nudge"
-  [ "$out" = "$NUDGE_LINE" ] || fail "linked secondmate printed unexpected output: $out"
-  pass "jg-sessionstart-nudge: a marked linked secondmate home is a primary"
+  expect_code 0 "$status" "linked squad_lead nudge"
+  [ "$out" = "$NUDGE_LINE" ] || fail "linked squad_lead printed unexpected output: $out"
+  pass "jg-sessionstart-nudge: a marked linked squad_lead home is a primary"
 }
 
 test_missing_state_is_silent() {
@@ -131,7 +131,7 @@ test_owned_lock_is_silent() {
   pass "jg-sessionstart-nudge: a lock holder in process ancestry is already run"
 }
 
-# A firstmate running inside a PID namespace - a container, or `codex sandbox` -
+# A juggernaut running inside a PID namespace - a container, or `codex sandbox` -
 # holds its home lock from a harness that IS pid 1, so this hook must recognize
 # that owner. The old walk rejected a lock pid of 1 outright and stopped before
 # comparing pid 1, so the hook nudged a session that had already run.
@@ -250,7 +250,7 @@ test_run_startup_runs_the_full_digest() {
   assert_contains "$out" "lock acquired: harness pid" \
     "the portable startup fixture did not supply a real harness process"
   assert_not_contains "$out" "$REEMIT_BANNER" "startup was misrouted to a context re-emit"
-  assert_not_contains "$out" "FIRSTMATE_OP" "a run-tier open also emitted the nudge instruction"
+  assert_not_contains "$out" "JUGGERNAUT_OP" "a run-tier open also emitted the nudge instruction"
   assert_contains "$out" "NEXT STEP" "the run wrapper did not deliver a complete digest"
   pass "run wrapper: startup runs the full digest and never also nudges"
 }
@@ -269,7 +269,7 @@ test_run_clear_and_compact_reemit() {
     assert_contains "$out" "$REEMIT_BANNER$root" "$source did not re-emit the digest"
     assert_contains "$out" "are NOT repeated" "$source did not report the skipped startup sweeps"
     assert_contains "$out" "Queued wakes ARE still drained" "$source did not preserve the wake-queue drain"
-    assert_not_contains "$out" "FIRSTMATE_OP" "a $source open also emitted the nudge instruction"
+    assert_not_contains "$out" "JUGGERNAUT_OP" "a $source open also emitted the nudge instruction"
   done
   pass "run wrapper: clear and compact re-emit the digest without repeating startup sweeps"
 }
@@ -959,7 +959,7 @@ const content = result.message.content;
 if (!content.includes("PI_LARGE_DIGEST_PREFIX")) throw new Error("digest prefix was lost");
 if (!content.includes("PI SESSION-START DELIVERY TRUNCATED")) throw new Error("truncation marker was lost");
 if (content.includes("PI_LARGE_DIGEST_SUFFIX")) throw new Error("delivery exceeded its declared bound");
-if (!content.includes("FIRSTMATE_OP: v1 session-start:")) throw new Error("operational provenance was lost");
+if (!content.includes("JUGGERNAUT_OP: v1 session-start:")) throw new Error("operational provenance was lost");
 JS
   ) || status=$?
   expect_code 0 "$status" "Pi large session-start delivery"
@@ -993,7 +993,7 @@ test_run_reads_source_from_the_hook_payload() {
   status=0
   out=$(printf '{"source":"resume","cwd":"/nowhere"}' | run_hook "$root") || status=$?
   expect_code 0 "$status" "run wrapper payload resume"
-  assert_contains "$out" "FIRSTMATE_OP" "a resume hook payload did not delegate to the nudge"
+  assert_contains "$out" "JUGGERNAUT_OP" "a resume hook payload did not delegate to the nudge"
   assert_not_contains "$out" "SESSION START" "a resume hook payload still ran the digest"
   pass "run wrapper: the hook payload's source field drives routing with no explicit argument"
 }
@@ -1098,7 +1098,7 @@ test_genuine_primary_nudges
 test_gate_env_is_silent
 test_gate_common_dir_is_silent
 test_unmarked_linked_worktree_is_silent
-test_linked_secondmate_primary_nudges
+test_linked_squad_lead_primary_nudges
 test_missing_state_is_silent
 test_owned_lock_is_silent
 test_namespace_pid1_lock_holder_is_silent

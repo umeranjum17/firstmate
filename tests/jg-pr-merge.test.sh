@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests for bin/jg-pr-merge.sh: the one path firstmate uses to merge a task's
+# Tests for bin/jg-pr-merge.sh: the one path juggernaut uses to merge a task's
 # PR, which must record pr= and any available pr_head= into the task's meta so
 # jg-teardown.sh's landed-check has a PR reference to verify against, even on
 # repos with no PR CI where the usual "checks green" jg-pr-check.sh trigger
@@ -2626,7 +2626,7 @@ test_github_still_forwards_sha_arg() {
 # behavior through the real merge entrypoint.
 
 # make_home_case <name> [<route> [<parent-home>]]: a case dir whose home is a
-# secondmate home bound to a parent, or a plain main home when no route is
+# squad_lead home bound to a parent, or a plain main home when no route is
 # given. Echoes the case dir; the home is "$case_dir/home".
 make_home_case() {
   local name=$1 route=${2:-} parent=${3:-} case_dir home
@@ -2634,12 +2634,12 @@ make_home_case() {
   home="$case_dir/home"
   mkdir -p "$home" "$case_dir/wt"
   if [ -n "$route" ]; then
-    printf '%s\n' mate-x >"$home/.jg-secondmate-home"
+    printf '%s\n' mate-x >"$home/.jg-squad-lead-home"
     {
-      printf 'schema=jg-secondmate-parent.v1\n'
+      printf 'schema=jg-squad-lead-parent.v1\n'
       printf 'route=%s\n' "$route"
       [ "$route" != local ] || printf 'parent_home=%s\n' "$parent"
-    } >"$home/.jg-secondmate-parent"
+    } >"$home/.jg-squad-lead-parent"
   fi
   printf '%s\n' "$case_dir"
 }
@@ -2648,54 +2648,54 @@ parent_reply_lines() {  # <file> <url>
   grep -c -F "$2" "$1" 2>/dev/null || true
 }
 
-test_secondmate_merge_reports_upward_once() {
+test_squad_lead_merge_reports_upward_once() {
   local case_dir replies url
   url=https://github.com/example/repo/pull/61
-  case_dir=$(make_home_case secondmate-merge-reports remote)
+  case_dir=$(make_home_case squad-lead-merge-reports remote)
   add_gh_mocks "$case_dir" 5555555555555555555555555555555555555555
   : >"$case_dir/gh-axi.log"
   replies="$case_dir/state/parent-replies.status"
 
   JG_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
-    >"$case_dir/stdout" 2>"$case_dir/stderr" || fail "secondmate-merge-reports: merge failed"
+    >"$case_dir/stdout" 2>"$case_dir/stderr" || fail "squad-lead-merge-reports: merge failed"
 
   assert_grep "done [key=merged-task-x1]: merged task-x1 $url" <(sed -E 's/ \[at=[0-9]+\]//' "$replies") \
-    "secondmate-merge-reports: the landed PR was not reported upward"
+    "squad-lead-merge-reports: the landed PR was not reported upward"
   [ "$(grep -c 'merged-task-x1' "$replies")" -eq 1 ] \
-    || fail "secondmate-merge-reports: one merge produced more than one upward merge line"
+    || fail "squad-lead-merge-reports: one merge produced more than one upward merge line"
   # The merge path registers the PR first, and that registration publishes the
   # child's ready line on the same channel from jg-pr-check itself.
   assert_grep "done [key=child-pr-task-x1]: child task-x1 PR ready: $url" <(sed -E 's/ \[at=[0-9]+\]//' "$replies") \
-    "secondmate-merge-reports: the registration's ready line was not reported upward"
+    "squad-lead-merge-reports: the registration's ready line was not reported upward"
 
   # The same merge again: the forge accepts it in this fixture, so only the
   # at-most-once contract can keep the parent from being told twice.
   JG_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
-    >"$case_dir/stdout2" 2>"$case_dir/stderr2" || fail "secondmate-merge-reports: repeat merge failed"
+    >"$case_dir/stdout2" 2>"$case_dir/stderr2" || fail "squad-lead-merge-reports: repeat merge failed"
   [ "$(grep -c 'merged-task-x1' "$replies")" -eq 1 ] \
-    || fail "secondmate-merge-reports: a repeat merge of the same PR duplicated the upward line"
+    || fail "squad-lead-merge-reports: a repeat merge of the same PR duplicated the upward line"
   [ "$(parent_reply_lines "$replies" "$url")" -eq 2 ] \
-    || fail "secondmate-merge-reports: a repeat merge changed the upward lines: $(cat "$replies")"
-  pass "a merge a secondmate home performs itself is reported upward exactly once"
+    || fail "squad-lead-merge-reports: a repeat merge changed the upward lines: $(cat "$replies")"
+  pass "a merge a squad_lead home performs itself is reported upward exactly once"
 }
 
-test_secondmate_merge_reports_on_the_local_route() {
+test_squad_lead_merge_reports_on_the_local_route() {
   local case_dir parent_status url
   url=https://github.com/example/repo/pull/62
-  case_dir=$(make_home_case secondmate-merge-local local "$TMP_ROOT/secondmate-merge-local/parent")
-  mkdir -p "$TMP_ROOT/secondmate-merge-local/parent/state"
+  case_dir=$(make_home_case squad-lead-merge-local local "$TMP_ROOT/squad-lead-merge-local/parent")
+  mkdir -p "$TMP_ROOT/squad-lead-merge-local/parent/state"
   add_gh_mocks "$case_dir" 6666666666666666666666666666666666666666
   : >"$case_dir/gh-axi.log"
-  parent_status="$TMP_ROOT/secondmate-merge-local/parent/state/mate-x.status"
+  parent_status="$TMP_ROOT/squad-lead-merge-local/parent/state/mate-x.status"
 
   JG_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
-    >"$case_dir/stdout" 2>"$case_dir/stderr" || fail "secondmate-merge-local: merge failed"
+    >"$case_dir/stdout" 2>"$case_dir/stderr" || fail "squad-lead-merge-local: merge failed"
 
   assert_grep "done [key=merged-task-x1]: merged task-x1 $url" <(sed -E 's/ \[at=[0-9]+\]//' "$parent_status") \
-    "secondmate-merge-local: the landed PR did not reach the parent home's channel"
+    "squad-lead-merge-local: the landed PR did not reach the parent home's channel"
   [ ! -e "$case_dir/state/parent-replies.status" ] \
-    || fail "secondmate-merge-local: a local-route report also wrote the remote reply channel"
-  pass "a locally routed secondmate home reports the landed PR into its parent's own channel"
+    || fail "squad-lead-merge-local: a local-route report also wrote the remote reply channel"
+  pass "a locally routed squad_lead home reports the landed PR into its parent's own channel"
 }
 
 test_failed_merge_reports_nothing() {
@@ -2722,8 +2722,8 @@ test_gitlab_refusal_reports_nothing() {
   local case_dir rc
   case_dir=$(make_gitlab_case gitlab-refusal-silent state=merged)
   mkdir -p "$case_dir/home"
-  printf '%s\n' mate-x >"$case_dir/home/.jg-secondmate-home"
-  printf 'schema=jg-secondmate-parent.v1\nroute=remote\n' >"$case_dir/home/.jg-secondmate-parent"
+  printf '%s\n' mate-x >"$case_dir/home/.jg-squad-lead-home"
+  printf 'schema=jg-squad-lead-parent.v1\nroute=remote\n' >"$case_dir/home/.jg-squad-lead-parent"
 
   set +e
   JG_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$MR_URL" \
@@ -2743,8 +2743,8 @@ test_gitlab_merge_reports_upward() {
   local case_dir url
   case_dir=$(make_gitlab_case gitlab-merge-reports)
   mkdir -p "$case_dir/home"
-  printf '%s\n' mate-x >"$case_dir/home/.jg-secondmate-home"
-  printf 'schema=jg-secondmate-parent.v1\nroute=remote\n' >"$case_dir/home/.jg-secondmate-parent"
+  printf '%s\n' mate-x >"$case_dir/home/.jg-squad-lead-home"
+  printf 'schema=jg-squad-lead-parent.v1\nroute=remote\n' >"$case_dir/home/.jg-squad-lead-parent"
   url=$MR_URL
 
   JG_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
@@ -2898,15 +2898,15 @@ SH
   pass "an uncommitted marker retry preserves at least one durable outcome"
 }
 
-test_secondmate_without_parent_binding_is_loud() {
+test_squad_lead_without_parent_binding_is_loud() {
   local case_dir rc url
   url=https://github.com/example/repo/pull/65
-  case_dir=$(make_home_case unbound-secondmate)
+  case_dir=$(make_home_case unbound-squad-lead)
   add_gh_mocks "$case_dir" 8888888888888888888888888888888888888888
   : >"$case_dir/gh-axi.log"
-  # A secondmate identity with no parent binding: exactly the seeding gap that
+  # A squad_lead identity with no parent binding: exactly the seeding gap that
   # let three real merges land in silence.
-  printf '%s\n' mate-x >"$case_dir/home/.jg-secondmate-home"
+  printf '%s\n' mate-x >"$case_dir/home/.jg-squad-lead-home"
 
   set +e
   JG_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
@@ -2914,12 +2914,12 @@ test_secondmate_without_parent_binding_is_loud() {
   rc=$?
   set -e
 
-  expect_code 0 "$rc" "unbound-secondmate: the merge itself landed and must not be reported as failed"
+  expect_code 0 "$rc" "unbound-squad-lead: the merge itself landed and must not be reported as failed"
   assert_grep 'could not report it upward' "$case_dir/stderr" \
-    "unbound-secondmate: a merge that could not be reported upward said nothing about it"
+    "unbound-squad-lead: a merge that could not be reported upward said nothing about it"
   assert_absent "$case_dir/state/.wake-queue" \
-    "unbound-secondmate: a secondmate home fell back to the main-home record"
-  pass "a secondmate home that cannot report upward says so instead of merging in silence"
+    "unbound-squad-lead: a squad_lead home fell back to the main-home record"
+  pass "a squad_lead home that cannot report upward says so instead of merging in silence"
 }
 
 test_github_zero_exit_queue_required_refuses_with_exact_retry
@@ -4487,8 +4487,8 @@ test_allow_missing_refused_on_forgejo() {
 }
 
 test_gitlab_head_override_args_refuse_before_recording
-test_secondmate_merge_reports_upward_once
-test_secondmate_merge_reports_on_the_local_route
+test_squad_lead_merge_reports_upward_once
+test_squad_lead_merge_reports_on_the_local_route
 test_gitlab_merge_reports_upward
 test_queued_gitlab_merge_leaves_the_poll_armed
 test_failed_merge_reports_nothing
@@ -4497,7 +4497,7 @@ test_main_home_merge_leaves_a_durable_wake
 test_queued_github_merge_leaves_the_poll_armed
 test_distinct_merged_prs_keep_distinct_wakes
 test_uncommitted_marker_retry_is_never_silent
-test_secondmate_without_parent_binding_is_loud
+test_squad_lead_without_parent_binding_is_loud
 test_absent_backlog_still_merges
 test_unreadable_backlog_refuses_the_merge
 test_unreadable_backend_config_refuses_the_merge

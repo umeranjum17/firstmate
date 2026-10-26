@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 // Semantic policy for the cd-guard: does a shell command persistently change the
-// PRIMARY firstmate shell's own working directory?
+// PRIMARY juggernaut shell's own working directory?
 //
 // A stray persistent top-level `cd projects/<clone>` silently relocates the
-// primary shell, so the next firstmate-owned command (a backlog write, an
+// primary shell, so the next juggernaut-owned command (a backlog write, an
 // jg-* lifecycle call, tasks-axi) runs inside a project clone instead of the
 // home. This policy blocks exactly that class of command; the environmental
 // scoping to the real primary checkout lives in the bin/jg-cd-pretool-check.sh
 // transport, not here. See docs/cd-guard.md for the full contract.
 //
 // The shell tokenizer and command-position analysis are imported from
-// bin/jg-arm-command-policy.mjs, the sole owner of firstmate's shell
+// bin/jg-arm-command-policy.mjs, the sole owner of juggernaut's shell
 // classification, so this guard never duplicates shell lexing. This policy
 // never evaluates, expands, sources, or runs any byte of the submitted command;
 // it inspects lexical command positions only.
@@ -21,7 +21,7 @@ import { fileURLToPath } from "node:url";
 
 const REASONS = {
   "persistent-cd":
-    "a persistent top-level directory change in the primary firstmate checkout is blocked; it would move the shell out of the home so a later firstmate-owned command runs inside a project clone. Reach the target without moving the shell - use git -C <dir> or an absolute path on the command itself - or scope the cd to a subshell like (cd <dir> && ...).",
+    "a persistent top-level directory change in the primary juggernaut checkout is blocked; it would move the shell out of the home so a later juggernaut-owned command runs inside a project clone. Reach the target without moving the shell - use git -C <dir> or an absolute path on the command itself - or scope the cd to a subshell like (cd <dir> && ...).",
 };
 
 // Directory-changing builtins that mutate the calling shell's own cwd.

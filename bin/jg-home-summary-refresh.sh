@@ -6,8 +6,8 @@
 # Usage: jg-home-summary-refresh.sh [--best-effort]
 #
 # The published state/home-summary.json is the exact
-# `jg-fleet-snapshot.sh --secondmate-home-summary` document for this JG_HOME.
-# Its schema remains `jg-secondmate-home-summary.v1`, declares the current hold
+# `jg-fleet-snapshot.sh --squad-lead-home-summary` document for this JG_HOME.
+# Its schema remains `jg-squad-lead-home-summary.v1`, declares the current hold
 # classifier contract, and includes both the existing generated timestamp and
 # generated_epoch for freshness arithmetic.
 #
@@ -133,7 +133,7 @@ home_summary_refresh_once() {
     JG_DATA_OVERRIDE="$DATA" \
     JG_CONFIG_OVERRIDE="$CONFIG" \
     JG_PROJECTS_OVERRIDE="$PROJECTS" \
-    "$SCRIPT_DIR/jg-fleet-snapshot.sh" --secondmate-home-summary \
+    "$SCRIPT_DIR/jg-fleet-snapshot.sh" --squad-lead-home-summary \
       > "$HOME_SUMMARY_TMP" 2> "$HOME_SUMMARY_ERR_TMP"; then
     producer_rc=0
   else
@@ -152,7 +152,7 @@ home_summary_refresh_once() {
   rm -f -- "$HOME_SUMMARY_ERR_TMP"
   HOME_SUMMARY_ERR_TMP=
   if ! jq -e --arg home "$JG_HOME" '
-    .schema == "jg-secondmate-home-summary.v1"
+    .schema == "jg-squad-lead-home-summary.v1"
     and .hold_classifier_schema == "jg-captain-hold-buckets.v1"
     and .home == $home
     and (.generated | type) == "string"

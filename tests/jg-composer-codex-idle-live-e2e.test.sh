@@ -8,7 +8,7 @@
 # status footer beneath it. The shared classifier (bin/jg-composer-lib.sh)
 # must read those rows as furniture, not typed input, or every steering
 # doorbell into an idle codex pane is deferred as "pending text". Those rows
-# are vendor-rendered, so per .agents/skills/firstmate-coding-guidelines the
+# are vendor-rendered, so per .agents/skills/juggernaut-coding-guidelines the
 # byte fixture in tests/jg-composer-lib.test.sh is not enough on its own: this
 # guard launches the INSTALLED codex idle in an isolated tmux server, captures
 # its screen with styling preserved, and requires the classifier to reach

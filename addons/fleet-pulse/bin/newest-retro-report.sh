@@ -9,7 +9,7 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
 done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Print the newest data/*retro*/report.md across the main home and known sibling
-# firstmate homes (secondmates.md and ~/.treehouse/firstmate-*/*/firstmate), by
+# juggernaut homes (squad_leads.md and ~/.treehouse/juggernaut-*/*/juggernaut), by
 # mtime. No output when none exist. Usage: newest-retro-report.sh <main-home>
 set -euo pipefail
 
@@ -32,13 +32,13 @@ add_data() {
 }
 
 add_data "$main/data"
-if [ -f "$main/data/secondmates.md" ]; then
+if [ -f "$main/data/squad_leads.md" ]; then
   while IFS= read -r hp; do
     [ -n "$hp" ] && add_data "$hp/data"
-  done < <(sed -n 's/.*(home: \([^;]*\);.*/\1/p' "$main/data/secondmates.md")
+  done < <(sed -n 's/.*(home: \([^;]*\);.*/\1/p' "$main/data/squad_leads.md")
 fi
 if [ -d "$treehouse" ]; then
-  for hp in "$treehouse"/firstmate-*/*/firstmate; do
+  for hp in "$treehouse"/juggernaut-*/*/juggernaut; do
     [ -d "$hp" ] && add_data "$hp/data"
   done
 fi

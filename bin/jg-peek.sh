@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
-# Print the tail of a crewmate endpoint (bounded, for cheap diagnosis).
+# Print the tail of a operator endpoint (bounded, for cheap diagnosis).
 # Usage: jg-peek.sh <target> [lines=40]
 #   <target> may be an exact task id, a legacy jg-<id> task label resolved
 #   through this home's state/<id>.meta, or an explicit backend target.
-# A selector whose meta records remote_host= is a remote secondmate: its pane
+# A selector whose meta records remote_host= is a remote squad_lead: its pane
 # lives on that host, so the capture routes over jg-on.sh to the host-local
-# capture (jg-remote-secondmate-control.sh), clamped to that command's
+# capture (jg-remote-squad-lead-control.sh), clamped to that command's
 # 100-line cap. An unreachable host or unreadable endpoint fails loudly naming
 # the host; the local backend adapters are never asked to read a remote target.
 set -eu
@@ -33,7 +33,7 @@ if [ -n "$REMOTE_META" ] && [ -n "$(jg_meta_get "$REMOTE_META" remote_host)" ]; 
   case "$N" in ''|*[!0-9]*|0) N=40 ;; esac
   [ "$N" -le 100 ] || N=100
   if ! JG_HOME="$JG_HOME" "$SCRIPT_DIR/jg-on.sh" "$REMOTE_ID" \
-    jg-remote-secondmate-control.sh capture "$REMOTE_ID" "$N" < /dev/null; then
+    jg-remote-squad-lead-control.sh capture "$REMOTE_ID" "$N" < /dev/null; then
     echo "error: could not read the remote pane of $REMOTE_ID on $REMOTE_HOST (host unreachable or endpoint unreadable; the mate is not thereby dead)" >&2
     exit 1
   fi

@@ -4,7 +4,7 @@
 # data/jg-backend-design-d7 (report.md "Zellij Backend"). Mirrors
 # tests/jg-backend-herdr-smoke.test.sh's structure: every other suite fakes
 # the CLI, this one talks to a REAL zellij server - but ALWAYS on a private,
-# named, throwaway session (via JG_ZELLIJ_SESSION, never the real "firstmate"
+# named, throwaway session (via JG_ZELLIJ_SESSION, never the real "juggernaut"
 # session name), so it never touches a captain's real zellij usage. Skips
 # cleanly when zellij (or jq) is not installed, so CI/dev machines without
 # zellij are unaffected.

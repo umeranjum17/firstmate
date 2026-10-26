@@ -8,7 +8,7 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
   export "$_jg_new=$_jg_val"
 done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
-# Wrapper test: a stub Firstmate checkout stands in for the real board. Covers
+# Wrapper test: a stub Juggernaut checkout stands in for the real board. Covers
 # build and path passthrough, argument forwarding, the recursion guard, and install
 # and uninstall round trips including their failure paths, dry runs, hook cleanup,
 # and the hook's file, mode and links surviving that round trip.

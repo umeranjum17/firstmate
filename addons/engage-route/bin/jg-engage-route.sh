@@ -8,7 +8,7 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
   export "$_jg_new=$_jg_val"
 done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
-# Route durable sign-off Go deeper asks to the matching Firstmate task inbox.
+# Route durable sign-off Go deeper asks to the matching Juggernaut task inbox.
 set -euo pipefail
 
 JG_ROOT=${JG_ROOT_OVERRIDE:-${JG_HOME:?set JG_HOME}/}

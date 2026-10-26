@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
-# Blocking, non-destructive delta read for a remote secondmate append-only log.
+# Blocking, non-destructive delta read for a remote squad_lead append-only log.
 #
 # Usage:
 #   jg-remote-delta-read.sh <relative-log> <offset> <prefix-sha256> [wait-seconds]

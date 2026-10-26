@@ -1,38 +1,38 @@
 #!/usr/bin/env bash
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
-# Self-update a running firstmate and its secondmates to the latest origin.
+# Self-update a running juggernaut and its squad_leads to the latest origin.
 #
-# Mechanical half of the /updatefirstmate skill. Fast-forwards the running
-# firstmate repo's default branch from origin, then fast-forwards every
-# registered secondmate home. Local homes are treehouse worktrees or standalone
+# Mechanical half of the /updatejuggernaut skill. Fast-forwards the running
+# juggernaut repo's default branch from origin, then fast-forwards every
+# registered squad_lead home. Local homes are treehouse worktrees or standalone
 # clones; remote routes update their configured code root on that host and then
 # fast-forward the persistent home to that root. FAST-FORWARD ONLY, exactly like
 # jg-fleet-sync.sh: never force, never create a merge commit, never stash.
-# A secondmate divergence whose complete local tree result is already present at
+# A squad_lead divergence whose complete local tree result is already present at
 # the target is reconciled with reset --keep; every other unsafe target is
 # skipped and reported, with divergence recorded durably by jg-ff-lib.sh.
 # A tracked-files update never touches the gitignored operational
-# dirs (data/, state/, config/, projects/, .no-mistakes/), so a secondmate's
+# dirs (data/, state/, config/, projects/, .no-mistakes/), so a squad_lead's
 # in-flight work is never disrupted. Worktrees of this repo share one object
 # store, so a single fetch refreshes them all; standalone-clone homes are
-# fetched on their own. Secondmate homes are leased at a detached HEAD on the
+# fetched on their own. SquadLead homes are leased at a detached HEAD on the
 # default branch, so a fast-forward there advances HEAD only and never touches
 # any other worktree's checkout or the shared `main` branch.
 #
 # The fast-forward mechanics live in bin/jg-ff-lib.sh (base_mode "origin" here);
-# the same library drives local and remote parent-targeted secondmate sync, so
+# the same library drives local and remote parent-targeted squad_lead sync, so
 # there is one ff implementation, not several.
 #
-# It does NOT re-read AGENTS.md or nudge secondmates itself - those are LLM /
+# It does NOT re-read AGENTS.md or nudge squad_leads itself - those are LLM /
 # tmux actions the skill performs. The script's job is the safe git mechanics
 # plus a parseable summary telling the caller what to do next:
 #   - one status line per target (updated/already current/skipped)
-#   - reread-firstmate: yes|no    (did the running firstmate's instructions change)
-#   - restart-secondmates: jg-<id>...|none (every live secondmate this pass left
+#   - reread-juggernaut: yes|no    (did the running juggernaut's instructions change)
+#   - restart-squad-leads: jg-<id>...|none (every live squad_lead this pass left
 #     on origin's tip - advanced OR already there - whose recorded runtime can
 #     prove a restart)
-#   - nudge-secondmates: jg-<id>...|none   (the residual: live secondmates on
+#   - nudge-squad-leads: jg-<id>...|none   (the residual: live squad_leads on
 #     that same tip whose runtime CANNOT prove a restart, so the older re-read
 #     steer is all that is honest for them)
 #
@@ -51,7 +51,7 @@
 #     no action at all. A divergence remains in the durable reconciliation record
 #     that this or a later bootstrap/update pass surfaces.
 #   - its runtime cannot prove the old agent stopped and a replacement came up
-#     (bin/jg-secondmate-restart-lib.sh owns that test), so it falls to the
+#     (bin/jg-squad-lead-restart-lib.sh owns that test), so it falls to the
 #     honest re-read steer and is reported as a nudge, never as a reload.
 # A positively dead or missing endpoint has no agent to replace and is left to
 # the ordinary startup recovery.
@@ -60,7 +60,7 @@
 # the trust binding of any locally armed jg-procevent-when watch whose action
 # executable lives in the updated repo; left alone, the watch's next fire
 # would be wrongly refused. After each home's own update (primary and every
-# local secondmate), this script best-effort runs that home's own
+# local squad_lead), this script best-effort runs that home's own
 # jg-procevent-when.sh rebind-all to republish those bindings against the new
 # bytes; a failure there is swallowed rather than failing the update.
 #
@@ -71,11 +71,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
 STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
-SECONDMATES_MD="$JG_HOME/data/secondmates.md"
+SQUAD_LEADS_MD="$JG_HOME/data/squad_leads.md"
 # shellcheck source=bin/jg-ff-lib.sh
 . "$SCRIPT_DIR/jg-ff-lib.sh"
-# shellcheck source=bin/jg-secondmate-restart-lib.sh
-. "$SCRIPT_DIR/jg-secondmate-restart-lib.sh"
+# shellcheck source=bin/jg-squad-lead-restart-lib.sh
+. "$SCRIPT_DIR/jg-squad-lead-restart-lib.sh"
 
 "$SCRIPT_DIR/jg-guard.sh" || true
 
@@ -87,13 +87,13 @@ if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
 fi
 [ $# -eq 0 ] || { usage; exit 1; }
 
-# --- main firstmate repo ---------------------------------------------------
+# --- main juggernaut repo ---------------------------------------------------
 
-reread_firstmate="no"
-ff_target "$JG_ROOT" "firstmate" origin no no
+reread_juggernaut="no"
+ff_target "$JG_ROOT" "juggernaut" origin no no
 if [ "$FF_STATUS" = "updated" ]; then
   if [ -n "$FF_INSTR" ]; then
-    reread_firstmate="yes"
+    reread_juggernaut="yes"
   fi
   # A fast-forward changes bin/'s bytes out from under any locally armed
   # jg-procevent-when watch's trust binding, with no tampering involved; left
@@ -106,8 +106,8 @@ if [ "$FF_STATUS" = "updated" ]; then
   JG_HOME="$JG_HOME" JG_ROOT_OVERRIDE="$JG_ROOT" "$SCRIPT_DIR/jg-procevent-when.sh" rebind-all || true
 fi
 
-# --- secondmates -----------------------------------------------------------
-# Every live secondmate this pass leaves on origin's tip is restarted, whether it
+# --- squad_leads -----------------------------------------------------------
+# Every live squad_lead this pass leaves on origin's tip is restarted, whether it
 # advanced or was already there. The header above owns why the git diff does not
 # gate that, and which two conditions - a skipped home, an unprovable runtime -
 # are the only ways a live mate stays out of the restart set.
@@ -120,12 +120,12 @@ FF_SEEN_HOMES=""
 FF_RESTART_WINDOWS=""
 FF_STEER_WINDOWS=""
 
-secondmate_agent_may_be_alive() {  # <id>
+squad_lead_agent_may_be_alive() {  # <id>
   local id=$1 meta="$STATE/$1.meta" remote_host state=unreadable
   remote_host=$(jg_meta_get "$meta" remote_host)
   if [ -n "$remote_host" ]; then
     state=$("$SCRIPT_DIR/jg-on.sh" "$id" \
-      jg-remote-secondmate-control.sh state "$id" < /dev/null 2>/dev/null) || state=unreadable
+      jg-remote-squad-lead-control.sh state "$id" < /dev/null 2>/dev/null) || state=unreadable
   elif jg_backend_validate_task_endpoint "$meta" "$id" >/dev/null 2>&1; then
     state=$(jg_backend_agent_state "$JG_BACKEND_VALIDATED_BACKEND" \
       "$JG_BACKEND_VALIDATED_TARGET" 2>/dev/null) || state=unreadable
@@ -143,15 +143,15 @@ selector_claimed() {  # <selector>
   return 1
 }
 
-# Route one secondmate whose home this pass left on the target commit. Restart is
+# Route one squad_lead whose home this pass left on the target commit. Restart is
 # the outcome unless its runtime cannot prove one, in which case it keeps the
 # re-read steer and is reported as a nudge rather than as a reload. A stopped
 # endpoint has no agent to replace and is left to startup recovery.
-claim_settled_secondmate() {  # <id>
+claim_settled_squad_lead() {  # <id>
   local id=$1
   selector_claimed "jg-$id" && return 0
-  secondmate_agent_may_be_alive "$id" || return 0
-  if jg_secondmate_restart_capable "$STATE/$id.meta"; then
+  squad_lead_agent_may_be_alive "$id" || return 0
+  if jg_squad_lead_restart_capable "$STATE/$id.meta"; then
     FF_RESTART_WINDOWS="$FF_RESTART_WINDOWS jg-$id"
   else
     FF_STEER_WINDOWS="$FF_STEER_WINDOWS jg-$id"
@@ -160,45 +160,45 @@ claim_settled_secondmate() {  # <id>
 
 # bin/jg-ff-lib.sh calls this for each local home it left AT the base with a live
 # endpoint - status "updated" or "current" alike. A skipped home never gets here.
-jg_ff_after_secondmate_settled() {  # <id> <home> <window> <status> <instr>
+jg_ff_after_squad_lead_settled() {  # <id> <home> <window> <status> <instr>
   # Same bin/-changed-out-from-under-a-watch problem as the primary home
-  # above, for a local secondmate's own worktree; "current" means bin/ did
+  # above, for a local squad_lead's own worktree; "current" means bin/ did
   # not move there this pass, so there is nothing to rebind. Run the
-  # secondmate's OWN copy of the script, explicitly overriding JG_ROOT to its
+  # squad_lead's OWN copy of the script, explicitly overriding JG_ROOT to its
   # own worktree rather than letting an outer JG_ROOT_OVERRIDE (this process's
   # own, if the caller set one) leak into the child and misscope it.
   if [ "${4:-}" = "updated" ] && [ -x "$2/bin/jg-procevent-when.sh" ]; then
     JG_HOME="$2" JG_ROOT_OVERRIDE="$2" "$2/bin/jg-procevent-when.sh" rebind-all || true
   fi
-  claim_settled_secondmate "$1"
+  claim_settled_squad_lead "$1"
 }
 
-# Live direct reports first: state/<id>.meta with kind=secondmate carries the
+# Live direct reports first: state/<id>.meta with kind=squad_lead carries the
 # authoritative home= path.
-sweep_live_secondmate_metas "$STATE" origin yes
+sweep_live_squad_lead_metas "$STATE" origin yes
 
-# Registry backstop: a secondmate registered in data/secondmates.md but without
+# Registry backstop: a squad_lead registered in data/squad_leads.md but without
 # a live meta (e.g. between restarts) is still its persistent on-disk home.
-if [ -f "$SECONDMATES_MD" ]; then
+if [ -f "$SQUAD_LEADS_MD" ]; then
   while IFS= read -r line || [ -n "$line" ]; do
     case "$line" in
       "- "*) ;;
       *) continue ;;
     esac
-    if ! secondmate_registry_parse_line "$line"; then
-      echo "secondmate registry: skipped malformed entry: $line" >&2
+    if ! squad_lead_registry_parse_line "$line"; then
+      echo "squad_lead registry: skipped malformed entry: $line" >&2
       continue
     fi
-    id=$SECONDMATE_REGISTRY_ID
-    home=$SECONDMATE_REGISTRY_HOME
-    if [ "$SECONDMATE_REGISTRY_REMOTE" -eq 1 ]; then
-      if remote_out=$("$SCRIPT_DIR/jg-on.sh" "$id" jg-remote-secondmate-control.sh update "$id" < /dev/null 2>&1); then
+    id=$SQUAD_LEAD_REGISTRY_ID
+    home=$SQUAD_LEAD_REGISTRY_HOME
+    if [ "$SQUAD_LEAD_REGISTRY_REMOTE" -eq 1 ]; then
+      if remote_out=$("$SCRIPT_DIR/jg-on.sh" "$id" jg-remote-squad-lead-control.sh update "$id" < /dev/null 2>&1); then
         remote_result=$(printf '%s\n' "$remote_out" | tail -1)
         case "$remote_result" in
           synced:*)
             remote_detail=${remote_result#synced: }
             # The host reports its advance as "<commit> instr=<paths>"; a host
-            # whose Firstmate copy predates that suffix reports the commit alone.
+            # whose Juggernaut copy predates that suffix reports the commit alone.
             # The suffix is now reporting detail only: the routing below no longer
             # reads it, so an older host's silence can no longer downgrade a
             # restartable mate to a steer.
@@ -210,39 +210,39 @@ if [ -f "$SECONDMATES_MD" ]; then
               *) remote_instr=""; remote_commit=$remote_detail ;;
             esac
             if [ -n "$remote_instr" ]; then
-              echo "remote secondmate $id: updated on $SECONDMATE_REGISTRY_HOST ($remote_commit, instructions changed: $remote_instr)"
+              echo "remote squad_lead $id: updated on $SQUAD_LEAD_REGISTRY_HOST ($remote_commit, instructions changed: $remote_instr)"
             else
-              echo "remote secondmate $id: updated on $SECONDMATE_REGISTRY_HOST ($remote_commit)"
+              echo "remote squad_lead $id: updated on $SQUAD_LEAD_REGISTRY_HOST ($remote_commit)"
             fi
-            if [ -f "$STATE/$id.meta" ] && grep -qx 'kind=secondmate' "$STATE/$id.meta"; then
-              claim_settled_secondmate "$id"
+            if [ -f "$STATE/$id.meta" ] && grep -qx 'kind=squad_lead' "$STATE/$id.meta"; then
+              claim_settled_squad_lead "$id"
             fi
             ;;
           current:*)
-            echo "remote secondmate $id: already current on $SECONDMATE_REGISTRY_HOST (${remote_result#current: })"
+            echo "remote squad_lead $id: already current on $SQUAD_LEAD_REGISTRY_HOST (${remote_result#current: })"
             # Already on the target commit is a SUCCESSFUL update of that home,
             # so it earns the same restart as one that had to advance.
-            if [ -f "$STATE/$id.meta" ] && grep -qx 'kind=secondmate' "$STATE/$id.meta"; then
-              claim_settled_secondmate "$id"
+            if [ -f "$STATE/$id.meta" ] && grep -qx 'kind=squad_lead' "$STATE/$id.meta"; then
+              claim_settled_squad_lead "$id"
             fi
             ;;
-          *) echo "remote secondmate $id: skipped on $SECONDMATE_REGISTRY_HOST: malformed update result" >&2 ;;
+          *) echo "remote squad_lead $id: skipped on $SQUAD_LEAD_REGISTRY_HOST: malformed update result" >&2 ;;
         esac
       else
-        echo "remote secondmate $id: skipped on $SECONDMATE_REGISTRY_HOST: ${remote_out%%$'\n'*}" >&2
+        echo "remote squad_lead $id: skipped on $SQUAD_LEAD_REGISTRY_HOST: ${remote_out%%$'\n'*}" >&2
       fi
     else
-      process_secondmate "$id" "$home" "" origin yes
+      process_squad_lead "$id" "$home" "" origin yes
     fi
-  done < "$SECONDMATES_MD"
+  done < "$SQUAD_LEADS_MD"
 fi
 
 # --- caller action summary -------------------------------------------------
 
-# claim_settled_secondmate puts each live settled mate in exactly one set, so the
+# claim_settled_squad_lead puts each live settled mate in exactly one set, so the
 # two lines below are disjoint by construction: no mate is ever restarted and
 # then also steered about the instructions it just relaunched on.
 
-echo "reread-firstmate: $reread_firstmate"
-echo "restart-secondmates:${FF_RESTART_WINDOWS:- none}"
-echo "nudge-secondmates:${FF_STEER_WINDOWS:- none}"
+echo "reread-juggernaut: $reread_juggernaut"
+echo "restart-squad-leads:${FF_RESTART_WINDOWS:- none}"
+echo "nudge-squad-leads:${FF_STEER_WINDOWS:- none}"

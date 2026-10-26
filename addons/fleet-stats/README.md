@@ -36,7 +36,7 @@ copy the live flow runs today, except the lock-library line of
   by `bin/jg-teardown.sh` before the task's status and record are retired; a
   write failure never blocks or fails teardown, and the script itself only
   ever exits non-zero on a usage error, or with exit 2 when it cannot find its
-  lock library. It sources `jg-wake-lib.sh` from the Firstmate checkout for the
+  lock library. It sources `jg-wake-lib.sh` from the Juggernaut checkout for the
   file lock: `JG_BIN` when set, else `$JG_HOME/bin`. The library is not copied
   into this add-on; a missing file prints one error naming the path and exits 2.
 
@@ -74,7 +74,7 @@ copy the live flow runs today, except the lock-library line of
 ## Provenance: byte-identical to the fork
 
 Every moved file was compared byte for byte against its fork source at
-`umeranjum17/firstmate@0689b4b9d9ab3594f846cfe07c400edfa58244bf` at move time,
+`umeranjum17/juggernaut@0689b4b9d9ab3594f846cfe07c400edfa58244bf` at move time,
 keeping file modes (`100755` for the scripts, `100644` for the library, on
 both sides). The one deliberate exception is `fleet-stats/bin/jg-task-outcome.sh`:
 its lock-library source now resolves to `JG_BIN` or `$JG_HOME/bin` instead of a

@@ -87,7 +87,7 @@ wait_orphaned() { # <pid> <seconds>
 
 # --- a real worker fixture, launched exactly the way jg-on's Linux start does -
 
-# build_remote_root <dir>: a minimal but genuine Firstmate code root carrying
+# build_remote_root <dir>: a minimal but genuine Juggernaut code root carrying
 # the real worker and job library.
 build_remote_root() {
   local root=$1

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Send one narrowly scoped workspace.move request to a Herdr control socket.
 
-This helper is the wire transport for Firstmate's optional presentation-only
+This helper is the wire transport for Juggernaut's optional presentation-only
 workspace ordering. It accepts only an exact workspace id and a non-negative
 insert index, sends only the non-destructive ``workspace.move`` method, and
 prints the verified JSON response.

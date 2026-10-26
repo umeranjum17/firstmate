@@ -7,7 +7,7 @@
 # bin/jg-cd-pretool-check.sh is the stable transport: it scopes the guard to the
 # real primary checkout, then drives all five harness entry forms. This suite
 # proves the decision matrix, the harness-output shaping, the primary-checkout
-# scoping (including the deliberate secondmate-home difference from the turn-end
+# scoping (including the deliberate squad-lead-home difference from the turn-end
 # guard), the fail-open transport behavior, the prefilter fast path, the
 # end-to-end cwd-leak regression, and the per-harness wiring. No harness is
 # spawned; live per-harness evidence lives in docs/cd-guard.md.
@@ -22,7 +22,7 @@ TMP_ROOT=$(jg_test_tmproot jg-cd-pretool-check)
 # A primary-shaped checkout: plain (non-worktree) git repo, AGENTS.md, bin/ with
 # the transport plus both policy files (jg-cd-command-policy.mjs imports the
 # shared classifier from jg-arm-command-policy.mjs). This is what the transport's
-# scoping treats as the real primary firstmate checkout.
+# scoping treats as the real primary juggernaut checkout.
 install_cd_scripts() {
   local dir=$1
   mkdir -p "$dir/bin"
@@ -42,16 +42,16 @@ make_primary_fixture() {
   printf '%s\n' "$dir"
 }
 
-# Same shape as primary plus the .jg-secondmate-home marker: a secondmate's own
+# Same shape as primary plus the .jg-squad-lead-home marker: a squad_lead's own
 # primary session, which the cd-guard DOES guard (unlike the turn-end guard).
-make_secondmate_fixture() {
+make_squad_lead_fixture() {
   local dir=$1
   make_primary_fixture "$dir" >/dev/null
-  printf 'sm-cd-1\n' > "$dir/.jg-secondmate-home"
+  printf 'sm-cd-1\n' > "$dir/.jg-squad-lead-home"
   printf '%s\n' "$dir"
 }
 
-# A genuine linked git worktree - the shape bin/jg-spawn.sh hands crewmate/scout
+# A genuine linked git worktree - the shape bin/jg-spawn.sh hands operator/scout
 # tasks. git-dir and git-common-dir differ, so the guard must be inert.
 make_child_worktree_fixture() {
   local base=$1 dir=$2
@@ -206,13 +206,13 @@ test_full_acceptance_matrix() {
 
 # --- primary-checkout scoping ----------------------------------------------
 
-test_fires_in_secondmate_home() {
+test_fires_in_squad_lead_home() {
   local dir out rc
-  dir=$(make_secondmate_fixture "$TMP_ROOT/secondmate")
+  dir=$(make_squad_lead_fixture "$TMP_ROOT/squad_lead")
   out=$("$dir/bin/jg-cd-pretool-check.sh" --claude --command 'cd projects/foo' 2>&1); rc=$?
-  expect_code 2 "$rc" "cd-guard must fire in a secondmate's own primary session (unlike the turn-end guard)"
-  assert_contains "$out" '[persistent-cd]' "secondmate-home block must carry the reason code"
-  pass "cd-guard: fires in a secondmate home (its own primary session is a primary)"
+  expect_code 2 "$rc" "cd-guard must fire in a squad_lead's own primary session (unlike the turn-end guard)"
+  assert_contains "$out" '[persistent-cd]' "squad-lead-home block must carry the reason code"
+  pass "cd-guard: fires in a squad_lead home (its own primary session is a primary)"
 }
 
 test_inert_in_child_worktree() {
@@ -221,21 +221,21 @@ test_inert_in_child_worktree() {
   dir="$TMP_ROOT/child-wt"
   make_child_worktree_fixture "$base" "$dir" >/dev/null
   out=$("$dir/bin/jg-cd-pretool-check.sh" --claude --command 'cd projects/foo' 2>&1); rc=$?
-  expect_code 0 "$rc" "cd-guard must be inert in a crewmate/scout linked worktree"
+  expect_code 0 "$rc" "cd-guard must be inert in a operator/scout linked worktree"
   [ -z "$out" ] || fail "cd-guard produced output in a child worktree: $out"
-  pass "cd-guard: inert in a crewmate/scout task worktree (linked git worktree)"
+  pass "cd-guard: inert in a operator/scout task worktree (linked git worktree)"
 }
 
-test_inert_when_not_firstmate_repo() {
+test_inert_when_not_juggernaut_repo() {
   local dir out rc
-  dir="$TMP_ROOT/not-firstmate"
+  dir="$TMP_ROOT/not-juggernaut"
   git init -q "$dir"
   git -C "$dir" commit -q --allow-empty -m init
   install_cd_scripts "$dir"   # bin/ present but no AGENTS.md
   out=$("$dir/bin/jg-cd-pretool-check.sh" --claude --command 'cd projects/foo' 2>&1); rc=$?
-  expect_code 0 "$rc" "cd-guard must be inert without AGENTS.md (not a firstmate checkout)"
-  [ -z "$out" ] || fail "cd-guard produced output outside a firstmate checkout: $out"
-  pass "cd-guard: inert in a non-firstmate repo (no AGENTS.md)"
+  expect_code 0 "$rc" "cd-guard must be inert without AGENTS.md (not a juggernaut checkout)"
+  [ -z "$out" ] || fail "cd-guard produced output outside a juggernaut checkout: $out"
+  pass "cd-guard: inert in a non-juggernaut repo (no AGENTS.md)"
 }
 
 test_inert_when_not_a_git_repo() {
@@ -260,7 +260,7 @@ test_e2e_cwd_leak_regression() {
   printf '## In flight\n' > "$home/data/backlog.md"
 
   # Without the guard, the persistent primary shell's cwd leaks: a stray
-  # `cd projects/clone` makes the next firstmate-owned backlog write land in the
+  # `cd projects/clone` makes the next juggernaut-owned backlog write land in the
   # clone, and the home backlog is never updated.
   (
     cd "$home" || fail "cannot enter home"
@@ -386,9 +386,9 @@ test_scripts_are_shellcheck_clean() {
 }
 
 test_full_acceptance_matrix
-test_fires_in_secondmate_home
+test_fires_in_squad_lead_home
 test_inert_in_child_worktree
-test_inert_when_not_firstmate_repo
+test_inert_when_not_juggernaut_repo
 test_inert_when_not_a_git_repo
 test_e2e_cwd_leak_regression
 test_fail_open_empty_stdin

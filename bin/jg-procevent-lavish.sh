@@ -134,7 +134,7 @@
 #
 # LOSS LIMITATION, stated plainly. The published poll destructively clears
 # feedback before returning it. A result lost after that clearing and before the
-# runner reads the process output is unrecoverable, and no Firstmate wrapper can
+# runner reads the process output is unrecoverable, and no Juggernaut wrapper can
 # close that source-side handoff window. Never describe this path as
 # at-least-once, no-loss, or lossless. The only durability this proves is the
 # runner's own: output that reached the runner is stored before it is announced.

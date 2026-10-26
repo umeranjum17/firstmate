@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Semantic policy for the supervisor-work guard: is this shell command a
-// firstmate SUPERVISOR doing a WORKER's job, or polling inside a turn?
+// juggernaut SUPERVISOR doing a WORKER's job, or polling inside a turn?
 //
 // The written rules already forbid both. bin/jg-validation-supervision refuses
 // a supervisor to invoke `no-mistakes axi respond` for a crew-owned run, and
@@ -13,8 +13,8 @@
 // no-mistakes run, may sleep while its pipeline runs, and may drive its own
 // pane; refusing those in a worker would break the worker. The caller
 // (bin/jg-supervisor-work-pretool-check.sh) therefore scopes to a genuine
-// primary home first, and passes --secondmate for the one rule that applies only
-// to a secondmate lead.
+// primary home first, and passes --squad-lead for the one rule that applies only
+// to a squad_lead lead.
 //
 // This file is the single owner of every pattern here. The shell tokenizer and
 // command-position analysis are imported from bin/jg-arm-command-policy.mjs, so
@@ -22,7 +22,7 @@
 // of the submitted command.
 // See docs/supervisor-work-guard.md for the full contract and validation record.
 
-// The lexer module is bound at run time from the Firstmate checkout that owns it
+// The lexer module is bound at run time from the Juggernaut checkout that owns it
 // (see jg-supervisor-work-decide.mjs), so this file carries no path of its own.
 let shell = null;
 
@@ -32,11 +32,11 @@ export function bindLexer(api) {
 
 const REASONS = {
   "supervisor-no-mistakes-run":
-    "a firstmate supervisor never drives a crew-owned no-mistakes run: the worker that started the run owns it, reports progress itself, and answers its own findings. Read the worker's recorded status, or steer the worker with bin/jg-send.sh. (no-mistakes axi status stays allowed.)",
+    "a juggernaut supervisor never drives a crew-owned no-mistakes run: the worker that started the run owns it, reports progress itself, and answers its own findings. Read the worker's recorded status, or steer the worker with bin/jg-send.sh. (no-mistakes axi status stays allowed.)",
   "supervisor-poll-in-turn":
-    "a firstmate supervisor never sleeps or polls inside a turn: the watcher wakes this session when something changes, so a sleep only burns a turn and hides queued wakes. End the turn instead of waiting in it.",
+    "a juggernaut supervisor never sleeps or polls inside a turn: the watcher wakes this session when something changes, so a sleep only burns a turn and hides queued wakes. End the turn instead of waiting in it.",
   "supervisor-pane-typing":
-    "a secondmate lead steers its workers with bin/jg-send.sh and drives their lifecycle with bin/jg-control.sh, never by typing raw keys into a pane: a typed command is invisible to the task's durable inbox and unkillable by the watcher's own tools.",
+    "a squad_lead lead steers its workers with bin/jg-send.sh and drives their lifecycle with bin/jg-control.sh, never by typing raw keys into a pane: a typed command is invisible to the task's durable inbox and unkillable by the watcher's own tools.",
 };
 
 // Subcommands that hand the run to a supervisor session. `status` is read-only
@@ -114,7 +114,7 @@ function typedIntoPane(position) {
 // the whole command: a loop and its sleep are separate command positions.
 export function decision(command, options = {}) {
   const { Lexer, splitProgram, commandPosition } = shell;
-  const secondmate = Boolean(options.secondmate);
+  const squad_lead = Boolean(options.squad_lead);
   const scan = new Lexer(command).tokenize();
   // Fail open on shell syntax this tokenizer cannot lex. This guard's threat
   // model is a supervisor drifting into its worker's job, which is ordinary
@@ -131,7 +131,7 @@ export function decision(command, options = {}) {
     if (name === "no-mistakes" && ownedNoMistakesSubcommand(position)) {
       return deny("supervisor-no-mistakes-run");
     }
-    if (secondmate && typedIntoPane(position)) return deny("supervisor-pane-typing");
+    if (squad_lead && typedIntoPane(position)) return deny("supervisor-pane-typing");
   }
 
   // Second, because (b) is a property of the whole command: a loop and its sleep

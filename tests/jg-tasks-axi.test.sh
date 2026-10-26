@@ -47,7 +47,7 @@ make_split() {  # <name>; prints the case directory
   printf '%s\n' "$dir"
 }
 
-# Run the wrapper from the code root, as firstmate does.
+# Run the wrapper from the code root, as juggernaut does.
 wrapper_from_code() {  # <case-dir> <tasks-axi args...>
   local dir=$1
   shift

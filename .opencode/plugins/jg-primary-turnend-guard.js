@@ -1,9 +1,9 @@
 import { spawn } from "node:child_process";
 import { realpathSync } from "node:fs";
 import { resolve } from "node:path";
-import { encodeFirstmateOperationalInput } from "./lib/jg-operational-input.js";
+import { encodeJuggernautOperationalInput } from "./lib/jg-operational-input.js";
 
-const COORDINATOR_KEY = "__firstmateOpenCodeWatchArm";
+const COORDINATOR_KEY = "__juggernautOpenCodeWatchArm";
 
 let skipNextIdle = false;
 
@@ -75,7 +75,7 @@ export const FmPrimaryTurnendGuard = async ({ client, directory, worktree }) => 
       if (result.code !== 2) return;
 
       try {
-        const text = await encodeFirstmateOperationalInput(
+        const text = await encodeJuggernautOperationalInput(
           root,
           "turn-end-guard",
           "TURN WOULD END BLIND - supervision is off. " +

@@ -5,11 +5,11 @@
 #
 # Wraps bin/jg-watch.sh: runs it as a child, presents and classifies every
 # durable wake after an actionable close, acknowledges only after routing, and
-# either SELF-HANDLES the routine majority in bash (no firstmate turn) or
+# either SELF-HANDLES the routine majority in bash (no juggernaut turn) or
 # ESCALATES a batched, distilled digest to the supervisor pane on
 # captain-relevant events plus bounded declared-wait rechecks. This is the
 # token-efficient replacement for the prior always-inject daemon: routine
-# signal/stale/heartbeat wakes cost zero firstmate context; routing is owned by
+# signal/stale/heartbeat wakes cost zero juggernaut context; routing is owned by
 # .agents/skills/afk/SKILL.md (Classification policy).
 # Escalated events reach the LLM as one pre-read digest per
 # batch window. That digest is byte-bounded (see escalate_flush); when it cuts
@@ -19,7 +19,7 @@
 # PRESENCE-GATING (the /afk contract). The daemon is the away-mode engine: it
 # injects ONLY when the durable away-mode flag state/.afk is present. Invoking
 # the /afk skill sets that flag and starts this daemon; any real (unmarked)
-# user message clears it and firstmate resumes full responsiveness.
+# user message clears it and juggernaut resumes full responsiveness.
 # When afk is off, normal jg-watch.sh always-on triage is the active mechanism.
 # Any buffered daemon escalations that remain while afk is off survive in
 # state/.subsuper-escalations and are flushed on the next "while you were out"
@@ -33,7 +33,7 @@
 # (jg_operational_harness_needs_record, Claude Code) instead receives the
 # owner's record-backed doorbell: the envelope is written to this home's
 # state/operational-inbox and only a plain doorbell line naming it is typed.
-# Firstmate's contract: a message that starts with the current prefix, a
+# Juggernaut's contract: a message that starts with the current prefix, a
 # legacy bare-marker daemon escalation, or a doorbell whose record this home
 # holds (a verbatim pasted copy of a live doorbell included) is internal (stay
 # afk); any other message means the captain is back
@@ -52,7 +52,7 @@
 #     routine is escalated.
 #   - Bounded wedge latency: ordinary pane staleness without a declared wait escalates
 #     only after it has been idle for STALE_ESCALATE_SECS
-#     (configurable), rechecked once. A wedged crewmate is therefore detected
+#     (configurable), rechecked once. A wedged operator is therefore detected
 #     within STALE_ESCALATE_SECS + a tick, never lost. A declared wait - either a
 #     paused: external wait or a verified captain-held transfer, per
 #     jg-classify-lib.sh's combined predicate - instead gets its own longer
@@ -61,8 +61,8 @@
 #     ends that routing. A captain-held transfer is not rechecked at all while
 #     an away record (state/.afk-contract, never quiet mode's) exists: nobody
 #     is there to answer it, and the return brief lists it.
-#     Crewmates are autonomous, so a delayed stale response does not stall a
-#     healthy crewmate's own progress.
+#     Operators are autonomous, so a delayed stale response does not stall a
+#     healthy operator's own progress.
 #     Buffered escalation delivery also has a max-defer alarm: if a digest stays
 #     undelivered past JG_MAX_DEFER_SECS, the daemon retries a normal flush and
 #     writes state/.subsuper-inject-wedged and attempts a configurable active
@@ -84,14 +84,14 @@
 #                                   auto-discovered per backend - $TMUX_PANE
 #                                   under tmux, "<session>:<pane-id>" from
 #                                   $HERDR_PANE_ID under herdr - then
-#                                   firstmate:0 fallback). Accepts either a
+#                                   juggernaut:0 fallback). Accepts either a
 #                                   tmux target or a herdr "<session>:<pane-id>"
 #                                   target; which one it's read as is decided by
 #                                   JG_SUPERVISOR_BACKEND (below), independently.
 #          JG_SUPERVISOR_BACKEND    supervisor pane BACKEND (tmux|herdr;
 #                                   override; otherwise auto-discovered the same
 #                                   way bin/jg-backend.sh's jg_backend_detect
-#                                   resolves the runtime firstmate itself is
+#                                   resolves the runtime juggernaut itself is
 #                                   executing inside - $TMUX_PANE selects tmux,
 #                                   $HERDR_ENV=1 selects herdr - falling back to
 #                                   tmux). zellij, orca, and cmux are not yet
@@ -177,7 +177,7 @@ JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
 # shellcheck source=bin/jg-backend.sh
 . "$JG_DAEMON_DIR/jg-backend.sh"
 
-# Canonical construction and parsing for every Firstmate operational input.
+# Canonical construction and parsing for every Juggernaut operational input.
 # shellcheck source=bin/jg-operational-input.sh
 . "$JG_DAEMON_DIR/jg-operational-input.sh"
 
@@ -206,7 +206,7 @@ JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
 
 # --- tunables ---------------------------------------------------------------
 # Supervisor backends this daemon knows how to inject into today. zellij, orca,
-# and cmux are real backends elsewhere in firstmate (bin/jg-backend.sh) but this
+# and cmux are real backends elsewhere in juggernaut (bin/jg-backend.sh) but this
 # daemon has no verified composer/busy primitives wired up for them yet - see
 # docs/herdr-backend.md and AGENTS.md section 4's
 # harness-verification discipline. Selecting one refuses loudly at startup
@@ -246,7 +246,7 @@ LOG_MAX_BYTES_DEFAULT=1048576
 LOG_KEEP_LINES_DEFAULT=2000
 
 # --- presence-gating --------------------------------------------------------
-# bin/jg-operational-input.sh owns the U+2063 FIRSTMATE_OP bytes and typed
+# bin/jg-operational-input.sh owns the U+2063 JUGGERNAUT_OP bytes and typed
 # away-supervisor construction. The away-exit predicate intentionally retains
 # its landed leading-U+2063 compatibility behavior.
 AFK_FLAG_NAME=".afk"
@@ -281,7 +281,7 @@ afk_active() {  # <state>
 }
 
 # afk_enter / afk_exit: write/clear the away-mode flag. Called by the /afk
-# skill (enter) and by firstmate on user return (exit). Durable: a plain file,
+# skill (enter) and by juggernaut on user return (exit). Durable: a plain file,
 # so recovery (§5) re-enters afk if it is present after a restart.
 afk_enter() {  # <state>
   mkdir -p "$1"
@@ -292,7 +292,7 @@ afk_exit() {  # <state>
   rm -f "$1/$AFK_FLAG_NAME"
 }
 
-# should_exit_afk: encodes firstmate's afk-exit contract as a testable function.
+# should_exit_afk: encodes juggernaut's afk-exit contract as a testable function.
 #   away posture inactive   -> 1 (nothing to exit; the posture is the record
 #                              bin/jg-afk-contract.sh owns, or the legacy flag)
 #   message has marker, or is a doorbell for a record in this home
@@ -314,7 +314,7 @@ should_exit_afk() {  # <state> <message-text>
 
 # message_is_injection: 0 if the given message text starts with the sentinel
 # marker, or is a record-backed doorbell whose record sits in <state>'s own
-# operational inbox (a daemon escalation), 1 otherwise (a real user message). Firstmate's
+# operational inbox (a daemon escalation), 1 otherwise (a real user message). Juggernaut's
 # afk-exit contract uses this: a marker or backed doorbell stays afk; other
 # messages return the captain. Bias ambiguous cases toward exit (a false exit
 # is self-correcting).
@@ -330,7 +330,7 @@ message_is_injection() {  # <message-text> [state]
 }
 
 # strip_injection_marker: remove a current typed away envelope, the landed
-# untyped FIRSTMATE_OP prefix, or the legacy bare sentinel. Current grammar is
+# untyped JUGGERNAUT_OP prefix, or the legacy bare sentinel. Current grammar is
 # delegated to its owner rather than reimplemented here.
 strip_injection_marker() {  # <message-text>
   local msg=$1 body
@@ -368,7 +368,7 @@ _collapse_newlines() {  # <text>
 # Decision protocol: every classifier prints exactly one line on stdout of the
 # form "<action>|<distilled>" where action is "self" or "escalate". The distilled
 # field for "self" is informational (logged); for "escalate" it is the pre-read
-# summary firstmate would otherwise have to re-read.
+# summary juggernaut would otherwise have to re-read.
 
 classify_signal() {  # <reason-after-colon> <state>
   local reason=$1 state=$2 f last event record rest endpoint ident rc distilled="" rel="" seen_rel="" task sig marker
@@ -477,7 +477,7 @@ classify_stale() {  # <window> <state> [<span-record> <span-status>]
   printf 'self|transient stale (%s): %s' "$win" "${last:-no status}"
 }
 
-classify_check() {  # <full reason>  — check scripts print only when firstmate should wake
+classify_check() {  # <full reason>  — check scripts print only when juggernaut should wake
   printf 'escalate|%s' "$1"
 }
 
@@ -1026,7 +1026,7 @@ wedge_alarm_via_osascript() {  # <summary>
   command -v osascript >/dev/null 2>&1 || {
     log "wedge alarm: osascript not found; cannot post a macOS notification"; return 1; }
   wedge_alarm_run_bounded osascript osascript -e 'on run argv' \
-    -e 'display notification (item 1 of argv) with title "firstmate: away-mode escalations WEDGED" sound name "Basso"' \
+    -e 'display notification (item 1 of argv) with title "juggernaut: away-mode escalations WEDGED" sound name "Basso"' \
     -e 'end run' "$summary" >/dev/null 2>&1 && return 0
   log "wedge alarm: osascript notification failed"
   return 1
@@ -1044,7 +1044,7 @@ wedge_alarm_via_herdr() {  # <summary>
   esac
   command -v herdr >/dev/null 2>&1 || {
     log "wedge alarm: herdr not found; cannot post a herdr notification"; return 1; }
-  wedge_alarm_run_bounded herdr herdr notification show "firstmate: away-mode escalations WEDGED" \
+  wedge_alarm_run_bounded herdr herdr notification show "juggernaut: away-mode escalations WEDGED" \
     --body "$summary" --sound request >/dev/null 2>&1 && return 0
   log "wedge alarm: herdr notification failed"
   return 1
@@ -1118,7 +1118,7 @@ wedge_alarm_notify() {  # <summary> <marker>
 # max-defer (the supervisor pane is genuinely busy/wedged, the initial send
 # fails, or the submit's Enter is swallowed). The daemon must NEVER silently
 # wedge: this logs an ERROR naming the last delivery failure, drops a durable
-# marker firstmate/recovery can surface, flashes the tmux supervisor client's
+# marker juggernaut/recovery can surface, flashes the tmux supervisor client's
 # status line when applicable, and attempts a
 # configurable backend-independent active alert (wedge_alarm_notify). Nothing
 # is lost - the buffer and the
@@ -1422,7 +1422,7 @@ inject_msg() {  # <message> [state]
   local msg=$1 state target backend retries sleep_s verdict composer encoded bytes errf err='' body
   state="${2:-$(_state_root)}"
   # (1) Presence-gate: inject ONLY when afk is active. When afk is off, the
-  # daemon self-handles and stays quiet; firstmate drives the normal always-on
+  # daemon self-handles and stays quiet; juggernaut drives the normal always-on
   # watcher triage. Escalations buffer and survive for the next catch-up flush.
   INJECT_LAST_FAILURE=
   INJECT_SUBMIT_ATTEMPTED=0
@@ -1564,7 +1564,7 @@ handle_wake() {  # <reason> <state>
                 *) arg="${reason#signal: }" ;;
               esac
               decision=$(JG_STATUS_SPAN_ENDPOINT_FILE="$capture" classify_signal "$arg" "$state") ;;
-    stale:*" (unread firstmate instruction: stuck-busy "*|stale:*" (steering-inbox busy bookkeeping unwritable: "*)
+    stale:*" (unread juggernaut instruction: stuck-busy "*|stale:*" (steering-inbox busy bookkeeping unwritable: "*)
               decision="escalate|${reason#stale: }" ;;
     stale:*)  kind=stale; arg="${reason#stale: }"; stale_detail="${arg#"$arg"}"
               case "$arg" in *" ("*) stale_detail="${arg#*" ("}"; arg="${arg%% \(*}" ;; esac
@@ -1819,17 +1819,17 @@ jg_super_main() {
   # harness-verification discipline). This is the clear refusal the task calls
   # for, instead of a confusing "does not resolve to a tmux pane" error.
   if ! jg_backend_list_contains "$JG_SUPERVISOR_SUPPORTED_BACKENDS" "$BACKEND"; then
-    echo "error: away-mode daemon does not support supervisor backend '$BACKEND' yet (supported: $JG_SUPERVISOR_SUPPORTED_BACKENDS); set JG_SUPERVISOR_BACKEND=tmux|herdr and JG_SUPERVISOR_TARGET to run firstmate's own pane under a supported backend" >&2
+    echo "error: away-mode daemon does not support supervisor backend '$BACKEND' yet (supported: $JG_SUPERVISOR_SUPPORTED_BACKENDS); set JG_SUPERVISOR_BACKEND=tmux|herdr and JG_SUPERVISOR_TARGET to run juggernaut's own pane under a supported backend" >&2
     log "startup failed: unsupported supervisor backend '$BACKEND' (source=$backend_source)"
     jg_lock_release "$LOCK" 2>/dev/null || true
     rm -f "$PIDFILE" 2>/dev/null || true
     exit 1
   fi
 
-  # --- auto-discover the supervisor target (the pane running firstmate) -----
+  # --- auto-discover the supervisor target (the pane running juggernaut) -----
   # Priority: JG_SUPERVISOR_TARGET override > $TMUX_PANE (tmux; inherited from
-  # the pane that launched the daemon, normally firstmate's own) >
-  # $HERDR_PANE_ID (herdr, composed into "<session>:<pane-id>") > firstmate:0
+  # the pane that launched the daemon, normally juggernaut's own) >
+  # $HERDR_PANE_ID (herdr, composed into "<session>:<pane-id>") > juggernaut:0
   # fallback. Exporting the result into JG_SUPERVISOR_TARGET makes inject_msg
   # (which reads that env var) use the discovered pane without an extra global.
   local discovered target_source
@@ -1840,13 +1840,13 @@ jg_super_main() {
     elif [ "${HERDR_ENV:-}" = "1" ] && [ -n "${HERDR_PANE_ID:-}" ]; then
       target_source="HERDR_ENV(HERDR_PANE_ID)"
     else
-      target_source="FALLBACK(firstmate:0)"
+      target_source="FALLBACK(juggernaut:0)"
     fi
   fi
   if discovered=$(discover_supervisor_target); then
     : # resolved cleanly
   else
-    echo "warn: could not auto-discover supervisor pane (no JG_SUPERVISOR_TARGET, TMUX_PANE, or HERDR_ENV/HERDR_PANE_ID); falling back to '$discovered' — verify this is firstmate's pane" >&2
+    echo "warn: could not auto-discover supervisor pane (no JG_SUPERVISOR_TARGET, TMUX_PANE, or HERDR_ENV/HERDR_PANE_ID); falling back to '$discovered' — verify this is juggernaut's pane" >&2
   fi
   JG_SUPERVISOR_TARGET="$discovered"
   local TARGET="$JG_SUPERVISOR_TARGET"
@@ -1921,7 +1921,7 @@ jg_super_main() {
     # With the #29 watcher's enqueue-before-suppress, a wake is no longer
     # swallowed by running the watcher with no injection target. We still back
     # off while the pane is gone: self-handling needs no pane, but escalation
-    # has nowhere to go, and firstmate itself is the consumer of escalations.
+    # has nowhere to go, and juggernaut itself is the consumer of escalations.
     # Catch-up signals persist in state/*.status and flow on the next run, so
     # this delays rather than loses work.
     if ! jg_backend_target_exists "$BACKEND" "$TARGET"; then

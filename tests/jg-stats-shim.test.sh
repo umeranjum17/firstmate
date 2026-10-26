@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Behavior tests for the bin/jg-model-stats.sh and bin/jg-skill-stats.sh shims:
-# each execs its firstmate-addons fleet-stats reader with JG_BIN pointing at
+# each execs its juggernaut-addons fleet-stats reader with JG_BIN pointing at
 # this fork's bin/, and fails clearly when the add-ons checkout is absent.
 set -u
 
@@ -46,9 +46,9 @@ for reader in jg-model-stats jg-skill-stats; do
   grep -q "JG_ADDONS_DIR" "$out/stderr-missing" || fail "$reader missing-checkout stderr never names JG_ADDONS_DIR: $(cat "$out/stderr-missing")"
 done
 
-# With JG_ADDONS_DIR unset, the shims default to $JG_HOME/projects/firstmate-addons.
-mkdir -p "$TMP_ROOT/fakehome/projects/firstmate-addons"
-cp -R "$addons/fleet-stats" "$TMP_ROOT/fakehome/projects/firstmate-addons/"
+# With JG_ADDONS_DIR unset, the shims default to $JG_HOME/projects/juggernaut-addons.
+mkdir -p "$TMP_ROOT/fakehome/projects/juggernaut-addons"
+cp -R "$addons/fleet-stats" "$TMP_ROOT/fakehome/projects/juggernaut-addons/"
 mkdir -p "$TMP_ROOT/out-default"
 env -u JG_ADDONS_DIR FAKE_OUT="$TMP_ROOT/out-default" JG_HOME="$TMP_ROOT/fakehome" "$ROOT/bin/jg-skill-stats.sh" --json >"$TMP_ROOT/out-default/stdout" 2>"$TMP_ROOT/out-default/stderr"
 [ "$(cat "$TMP_ROOT/out-default/args")" = "--json" ] || fail "default-dir add-on got wrong args: $(cat "$TMP_ROOT/out-default/args")"

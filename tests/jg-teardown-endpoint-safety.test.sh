@@ -248,9 +248,9 @@ test_supported_backend_endpoint_records_validate() {
 
   id=tmux-task
   jg_write_meta "$dir/home/state/$id.meta" \
-    "window=firstmate:jg-$id" "worktree=$dir/worktree" "project=$dir/project"
+    "window=juggernaut:jg-$id" "worktree=$dir/worktree" "project=$dir/project"
   jg_backend_validate_task_endpoint "$dir/home/state/$id.meta" "$id" || fail "valid tmux endpoint refused"
-  [ "$JG_BACKEND_VALIDATED_BACKEND:$JG_BACKEND_VALIDATED_TARGET" = "tmux:firstmate:jg-$id" ] || fail "tmux endpoint validation returned wrong identity"
+  [ "$JG_BACKEND_VALIDATED_BACKEND:$JG_BACKEND_VALIDATED_TARGET" = "tmux:juggernaut:jg-$id" ] || fail "tmux endpoint validation returned wrong identity"
 
   id=tmux-spaced-session
   jg_write_meta "$dir/home/state/$id.meta" \
@@ -476,10 +476,10 @@ test_reused_pool_slot_refuses_before_touching_the_other_task() {
   # The reuse collision: the pool slot recorded for a finished task has already
   # been handed to another task, whose worker is live in it right now.
   jg_write_meta "$dir/home/state/$id.meta" \
-    "window=firstmate:jg-$id" "endpoint_task_id=$id" \
+    "window=juggernaut:jg-$id" "endpoint_task_id=$id" \
     "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
   jg_write_meta "$dir/home/state/$other.meta" \
-    "window=firstmate:jg-$other" "endpoint_task_id=$other" \
+    "window=juggernaut:jg-$other" "endpoint_task_id=$other" \
     "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
   # Staged in this shell, not a command substitution: a background child of a
   # $(...) subshell does not outlive it, and the point of this worker is to be
@@ -504,33 +504,33 @@ test_reused_pool_slot_refuses_before_touching_the_other_task() {
   kill "$worker" 2>/dev/null || true
   wait "$worker" 2>/dev/null || true
 
-  # The same collision recorded on a secondmate home field rather than a task
+  # The same collision recorded on a squad_lead home field rather than a task
   # worktree is the same slot, and refuses the same way.
   dir=$(make_case slot-reuse-home)
   mark_case_as_treehouse_pool "$dir"
   jg_write_meta "$dir/home/state/$id.meta" \
-    "window=firstmate:jg-$id" "endpoint_task_id=$id" \
+    "window=juggernaut:jg-$id" "endpoint_task_id=$id" \
     "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
   jg_write_meta "$dir/home/state/$other.meta" \
-    "window=firstmate:jg-$other" "endpoint_task_id=$other" \
+    "window=juggernaut:jg-$other" "endpoint_task_id=$other" \
     "worktree=$dir/worktree" "home=$dir/worktree" \
-    "project=$dir/project" "kind=secondmate"
+    "project=$dir/project" "kind=squad_lead"
   set +e
   run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr"
   rc=$?
   set -e
-  [ "$rc" -ne 0 ] || fail "teardown returned a pool slot a secondmate home record still holds"
-  assert_present "$dir/worktree/sentinel" "teardown reset a pool slot a secondmate home record still holds"
-  assert_present "$dir/home/state/$other.meta" "teardown removed the secondmate record"
+  [ "$rc" -ne 0 ] || fail "teardown returned a pool slot a squad_lead home record still holds"
+  assert_present "$dir/worktree/sentinel" "teardown reset a pool slot a squad_lead home record still holds"
+  assert_present "$dir/home/state/$other.meta" "teardown removed the squad_lead record"
   [ ! -s "$dir/runtime.log" ] \
-    || fail "teardown reached the runtime on a slot held by a secondmate home: $(cat "$dir/runtime.log")"
+    || fail "teardown reached the runtime on a slot held by a squad_lead home: $(cat "$dir/runtime.log")"
 
   # A second task record that is a hardlink of this one is still a second
   # claim on the slot, not this record reached through another spelling.
   dir=$(make_case slot-reuse-hardlink)
   mark_case_as_treehouse_pool "$dir"
   jg_write_meta "$dir/home/state/$id.meta" \
-    "window=firstmate:jg-$id" "endpoint_task_id=$id" \
+    "window=juggernaut:jg-$id" "endpoint_task_id=$id" \
     "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
   ln "$dir/home/state/$id.meta" "$dir/home/state/$other.meta"
   set +e
@@ -546,30 +546,30 @@ test_reused_pool_slot_refuses_before_touching_the_other_task() {
 }
 
 test_cross_home_pool_slot_collision_refuses() {
-  local dir id=stale-task other=secondmate-task second_home second_project rc
+  local dir id=stale-task other=squad-lead-task second_home second_project rc
   dir=$(make_case slot-reuse-cross-home)
   mark_case_as_treehouse_pool "$dir"
   printf 'fixture\n' > "$dir/project/tracked"
   git -C "$dir/project" add tracked
   git -C "$dir/project" -c user.name=test -c user.email=test@example.invalid commit -qm fixture
-  second_home="$dir/secondmate-home"
+  second_home="$dir/squad-lead-home"
   second_project="$second_home/projects/project"
   mkdir -p "$second_home/projects" "$second_home/state" "$second_home/data"
   git clone -q "$dir/project" "$second_project"
   printf '%s\n' "- mate - fixture (home: $second_home; scope: test; projects: project; added 2026-01-01)" \
-    > "$dir/home/data/secondmates.md"
+    > "$dir/home/data/squad_leads.md"
   jg_write_meta "$dir/home/state/$id.meta" \
-    "window=firstmate:jg-$id" "endpoint_task_id=$id" \
+    "window=juggernaut:jg-$id" "endpoint_task_id=$id" \
     "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
   jg_write_meta "$second_home/state/$other.meta" \
-    "window=firstmate:jg-$other" "endpoint_task_id=$other" \
+    "window=juggernaut:jg-$other" "endpoint_task_id=$other" \
     "worktree=$dir/worktree" "project=$second_project" "kind=scout"
 
   set +e
   run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr"
   rc=$?
   set -e
-  [ "$rc" -ne 0 ] || fail "teardown returned a pool slot held by another firstmate home"
+  [ "$rc" -ne 0 ] || fail "teardown returned a pool slot held by another juggernaut home"
   assert_present "$dir/home/state/$id.meta" "cross-home collision removed stale metadata"
   assert_present "$second_home/state/$other.meta" "cross-home collision removed live metadata"
   assert_present "$dir/worktree/sentinel" "cross-home collision reset the shared slot"
@@ -577,7 +577,7 @@ test_cross_home_pool_slot_collision_refuses() {
     || fail "cross-home collision reached the runtime: $(cat "$dir/runtime.log")"
   assert_contains "$(cat "$dir/stderr")" "$other" \
     "cross-home refusal should name the task holding the slot"
-  pass "jg-teardown: a pool slot held by another firstmate home is never returned"
+  pass "jg-teardown: a pool slot held by another juggernaut home is never returned"
 }
 
 test_sole_slot_record_still_tears_down() {
@@ -586,12 +586,12 @@ test_sole_slot_record_still_tears_down() {
   dir=$(make_case slot-sole)
   mark_case_as_treehouse_pool "$dir"
   jg_write_meta "$dir/home/state/$id.meta" \
-    "window=firstmate:jg-$id" "endpoint_task_id=$id" \
+    "window=juggernaut:jg-$id" "endpoint_task_id=$id" \
     "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
   # A neighbouring task on its OWN slot must not look like a collision.
   mkdir -p "$dir/other-worktree"
   jg_write_meta "$dir/home/state/neighbour.meta" \
-    "window=firstmate:jg-neighbour" "endpoint_task_id=neighbour" \
+    "window=juggernaut:jg-neighbour" "endpoint_task_id=neighbour" \
     "worktree=$dir/other-worktree" "project=$dir/project" "kind=scout"
   ( cd "$dir/other-worktree" && exec sleep 30 ) &
   worker=$!
@@ -629,13 +629,13 @@ exit 0
 SH
   chmod +x "$dir/fakebin/tmux"
   jg_write_meta "$dir/home/state/$id.meta" \
-    "window=firstmate:jg-$id" "endpoint_task_id=$id" \
+    "window=juggernaut:jg-$id" "endpoint_task_id=$id" \
     "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
 
   run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr" \
     || fail "teardown refused its recorded endpoint after it changed directory: $(cat "$dir/stderr")"
   assert_absent "$dir/home/state/$id.meta" "moved-endpoint teardown left the task record"
-  grep -Fq "tmux <kill-window> <-t> <=firstmate:=jg-$id>" "$dir/runtime.log" \
+  grep -Fq "tmux <kill-window> <-t> <=juggernaut:=jg-$id>" "$dir/runtime.log" \
     || fail "moved-endpoint teardown did not stop the exact recorded worker: $(cat "$dir/runtime.log")"
   grep -Fq "treehouse <return>" "$dir/runtime.log" \
     || fail "moved-endpoint teardown did not return its uncontested pool slot: $(cat "$dir/runtime.log")"
@@ -651,16 +651,16 @@ SH
 # machine and can neither hold nor observe a lock taken here.
 
 write_local_parent_record() {  # <home> <parent-home>
-  cat > "$1/.jg-secondmate-parent" <<REC
-schema=jg-secondmate-parent.v1
+  cat > "$1/.jg-squad-lead-parent" <<REC
+schema=jg-squad-lead-parent.v1
 route=local
 parent_home=$2
 REC
 }
 
 write_remote_parent_record() {  # <home>
-  cat > "$1/.jg-secondmate-parent" <<'REC'
-schema=jg-secondmate-parent.v1
+  cat > "$1/.jg-squad-lead-parent" <<'REC'
+schema=jg-squad-lead-parent.v1
 route=remote
 parent_host=machine-a
 REC
@@ -682,7 +682,7 @@ test_project_lock_anchors_at_the_local_root_across_home_layouts() {
   git -C "$dir/project" -c user.name=test -c user.email=test@example.invalid \
     commit --allow-empty -qm anchor-fixture
 
-  # Main-home layout: a root home and a local secondmate beneath it.
+  # Main-home layout: a root home and a local squad_lead beneath it.
   main_home="$dir/home"
   main_project="$main_home/projects/project"
   make_home "$main_home"
@@ -705,14 +705,14 @@ test_project_lock_anchors_at_the_local_root_across_home_layouts() {
   main_lock=$(resolve_project_lock "$main_home" "$main_project") \
     || fail "the root home could not resolve its project lock"
   mate_lock=$(resolve_project_lock "$local_mate" "$local_mate/projects/project") \
-    || fail "a local secondmate home could not resolve its project lock"
+    || fail "a local squad_lead home could not resolve its project lock"
   remote_lock=$(resolve_project_lock "$remote_mate" "$remote_mate/projects/project") \
-    || fail "a remote-seeded secondmate home could not resolve its project lock"
+    || fail "a remote-seeded squad_lead home could not resolve its project lock"
   child_lock=$(resolve_project_lock "$remote_child" "$remote_child/projects/project") \
     || fail "a local child of a remote-seeded home could not resolve its project lock"
 
   [ "$main_lock" = "$mate_lock" ] \
-    || fail "the root home and its local secondmate derived different project locks"
+    || fail "the root home and its local squad_lead derived different project locks"
   [ "$remote_lock" = "$child_lock" ] \
     || fail "a remote-seeded home and its local child derived different project locks"
   case "$remote_lock" in
@@ -728,15 +728,15 @@ test_project_lock_anchors_at_the_local_root_across_home_layouts() {
     || fail "an origin-less project shared the lock identity of an unrelated origin"
 
   # Everything other than a remote route still fails closed.
-  printf 'schema=jg-secondmate-parent.v1\nroute=sideways\n' \
-    > "$remote_child/.jg-secondmate-parent"
+  printf 'schema=jg-squad-lead-parent.v1\nroute=sideways\n' \
+    > "$remote_child/.jg-squad-lead-parent"
   set +e
   resolve_project_lock "$remote_child" "$remote_child/projects/project" >/dev/null 2>&1
   rc=$?
   set -e
   [ "$rc" -ne 0 ] || fail "an unsupported parent route resolved a project lock instead of refusing"
 
-  pass "Treehouse project locking anchors at the local root for main-home, local-secondmate, and remote-seeded layouts"
+  pass "Treehouse project locking anchors at the local root for main-home, local-squad-lead, and remote-seeded layouts"
 }
 
 test_remote_seeded_home_returns_its_uncontested_slot() {
@@ -745,7 +745,7 @@ test_remote_seeded_home_returns_its_uncontested_slot() {
   mark_case_as_treehouse_pool "$dir"
   write_remote_parent_record "$dir/home"
   jg_write_meta "$dir/home/state/$id.meta" \
-    "window=firstmate:jg-$id" "endpoint_task_id=$id" \
+    "window=juggernaut:jg-$id" "endpoint_task_id=$id" \
     "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
 
   set +e
@@ -768,7 +768,7 @@ test_remote_seeded_home_returns_its_uncontested_slot() {
       "$([ -e "$dir/worktree/sentinel" ] && printf present || printf removed)"
   fi
 
-  pass "jg-teardown: a remote-seeded secondmate home returns its own uncontested pool slot"
+  pass "jg-teardown: a remote-seeded squad_lead home returns its own uncontested pool slot"
 }
 
 test_remote_seeded_home_still_refuses_a_slot_its_child_holds() {
@@ -785,12 +785,12 @@ test_remote_seeded_home_still_refuses_a_slot_its_child_holds() {
   write_local_parent_record "$child_home" "$dir/home"
   git clone -q "$dir/project" "$child_project"
   printf '%s\n' "- mate - fixture (home: $child_home; scope: test; projects: project; added 2026-01-01)" \
-    > "$dir/home/data/secondmates.md"
+    > "$dir/home/data/squad_leads.md"
   jg_write_meta "$dir/home/state/$id.meta" \
-    "window=firstmate:jg-$id" "endpoint_task_id=$id" \
+    "window=juggernaut:jg-$id" "endpoint_task_id=$id" \
     "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
   jg_write_meta "$child_home/state/$other.meta" \
-    "window=firstmate:jg-$other" "endpoint_task_id=$other" \
+    "window=juggernaut:jg-$other" "endpoint_task_id=$other" \
     "worktree=$dir/worktree" "project=$child_project" "kind=scout"
 
   set +e
@@ -833,7 +833,7 @@ test_remote_layout_homes_serialize_on_one_project_lock() {
   write_local_parent_record "$child_home" "$dir/home"
   git clone -q "$dir/project" "$child_project"
   jg_write_meta "$dir/home/state/$id.meta" \
-    "window=firstmate:jg-$id" "endpoint_task_id=$id" \
+    "window=juggernaut:jg-$id" "endpoint_task_id=$id" \
     "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
 
   # The local child takes the lock its own home derives and stays alive holding
@@ -1095,26 +1095,26 @@ test_unreadable_close_read_refuses_while_a_definitive_absence_completes() {
   pass "jg-teardown: a close re-read that could not run refuses, while a definitively absent session or server still completes silently"
 }
 
-test_forced_secondmate_child_close_failure_still_refuses() {
+test_forced_squad_lead_child_close_failure_still_refuses() {
   local dir socket='dedicated.sock' session='child close failure' mate parent=mate-task child=child-task rc
   [ -n "$REAL_TMUX" ] || { echo "skip - tmux not installed"; return 0; }
-  dir=$(make_case secondmate-child-close-failure)
+  dir=$(make_case squad-lead-child-close-failure)
   mate="$dir/mate"
   mkdir -p "$mate/state" "$mate/data" "$mate/config"
-  printf '%s' "$parent" > "$mate/.jg-secondmate-home"
+  printf '%s' "$parent" > "$mate/.jg-squad-lead-home"
   ( cd "$dir" && env -u TMUX -u TMUX_PANE "$REAL_TMUX" -S "$socket" new-session -d -s "$session" -n control )
   ( cd "$dir" && env -u TMUX -u TMUX_PANE "$REAL_TMUX" -S "$socket" new-window -d -t "=$session:" -n "jg-$child" )
   write_close_failing_tmux_shim "$dir" "$socket" "$REAL_TMUX"
   jg_write_meta "$dir/home/state/$parent.meta" \
     "window=$session:jg-$parent" "endpoint_task_id=$parent" \
     "worktree=$mate" "project=$mate" "home=$mate" \
-    "kind=secondmate" "mode=secondmate" "harness=echo" "yolo=off" "projects=alpha"
+    "kind=squad_lead" "mode=squad_lead" "harness=echo" "yolo=off" "projects=alpha"
   jg_write_meta "$mate/state/$child.meta" \
     "window=$session:jg-$child" "endpoint_task_id=$child" \
     "worktree=$dir/nonexistent-worktree" "project=$dir/nonexistent-project" \
     "kind=ship" "harness=echo"
 
-  # Forced secondmate cleanup is the ONLY way into the child close path, so
+  # Forced squad_lead cleanup is the ONLY way into the child close path, so
   # --force cannot also be the way past it: honoring force here would delete
   # the refusal rather than override it, and discard a child home whose
   # endpoint is still live.
@@ -1125,22 +1125,22 @@ test_forced_secondmate_child_close_failure_still_refuses() {
     > "$dir/child.out" 2> "$dir/child.err"
   rc=$?
   set -e
-  [ "$rc" -ne 0 ] || fail "forced secondmate cleanup continued past a child close that failed: $(cat "$dir/child.err")"
+  [ "$rc" -ne 0 ] || fail "forced squad_lead cleanup continued past a child close that failed: $(cat "$dir/child.err")"
   assert_grep "child $child" "$dir/child.err" \
     "the refusal did not name the child whose endpoint could not be closed"
   assert_grep "could not be closed" "$dir/child.err" \
-    "forced secondmate cleanup swallowed the child close failure"
+    "forced squad_lead cleanup swallowed the child close failure"
   assert_no_grep "teardown $parent complete" "$dir/child.out" \
-    "forced secondmate cleanup reported a cleanup it stopped short of"
+    "forced squad_lead cleanup reported a cleanup it stopped short of"
   assert_present "$mate/state/$child.meta" \
-    "forced secondmate cleanup removed the record naming a child endpoint it could not close"
+    "forced squad_lead cleanup removed the record naming a child endpoint it could not close"
   assert_present "$dir/home/state/$parent.meta" \
-    "forced secondmate cleanup removed the secondmate's own record after refusing"
+    "forced squad_lead cleanup removed the squad_lead's own record after refusing"
   isolated_tmux_window_exists "$dir" "$socket" "$session" "jg-$child" \
     || fail "the surviving child endpoint disappeared, so this case no longer proves the hazard"
 
   ( cd "$dir" && env -u TMUX -u TMUX_PANE "$REAL_TMUX" -S "$socket" kill-server 2>/dev/null ) || true
-  pass "jg-teardown: forced secondmate cleanup still refuses on a child endpoint close that failed"
+  pass "jg-teardown: forced squad_lead cleanup still refuses on a child endpoint close that failed"
 }
 
 test_orca_close_failure_refuses_even_under_force() {
@@ -1248,7 +1248,7 @@ test_isolated_tmux_invalid_and_valid_cleanup
 test_failed_endpoint_close_refuses_before_removing_the_record
 test_forced_teardown_continues_past_a_close_it_could_not_make
 test_unreadable_close_read_refuses_while_a_definitive_absence_completes
-test_forced_secondmate_child_close_failure_still_refuses
+test_forced_squad_lead_child_close_failure_still_refuses
 test_orca_close_failure_refuses_even_under_force
 test_already_gone_endpoint_still_completes_without_a_refusal
 test_bare_relative_origin_shares_project_lock_with_clone

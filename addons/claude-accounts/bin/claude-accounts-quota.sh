@@ -18,7 +18,7 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 #        JG_ACCOUNTS_PROVIDER=claude|codex (default claude); writes <provider>-accounts.json.
 set -uo pipefail
 
-JG_HOME=${JG_HOME:?set JG_HOME to the Firstmate home}
+JG_HOME=${JG_HOME:?set JG_HOME to the Juggernaut home}
 REGISTRY=${JG_CLAUDE_ACCOUNTS_REGISTRY:-$HOME/.muxr/plans/accounts-v1.json}
 SECONDS_MAX=${JG_CLAUDE_ACCOUNTS_SECONDS:-60}
 PROVIDER=${JG_ACCOUNTS_PROVIDER:-claude}

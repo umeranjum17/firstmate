@@ -19,7 +19,7 @@
 # the legacy inputs noted below resolve them without a migration.
 # All backlog reads and mutations address the active home's configured data
 # directory the way bin/jg-backlog-transition-lib.sh does, which keeps main-home
-# and secondmate-home ownership aligned with the work that discovered the call.
+# and squad-lead-home ownership aligned with the work that discovered the call.
 #
 # Usage:
 #   jg-captain-hold.sh hold <task-id> --reason <reason> \
@@ -64,7 +64,7 @@
 # card.
 # When this home has armed the sign-off adapter, an undated `hold` also
 # raises a sign-off board card keyed by this home's tag, the task id and the hold
-# stamp; that adapter owns the card (the firstmate-addons signoff script when
+# stamp; that adapter owns the card (the juggernaut-addons signoff script when
 # it is installed, else bin/jg-procevent-signoff.sh),
 # and a card it cannot raise fails the command (the hold stays recorded).
 #
@@ -219,7 +219,7 @@
 # declined, answered, repaired) are recognized everywhere a record is read, so
 # nothing already closed needs rewriting.
 #
-# Parent channel: inside a secondmate home a task held for the captain, and its
+# Parent channel: inside a squad_lead home a task held for the captain, and its
 # answer, are captain-facing facts the moment they are recorded, so `hold`
 # publishes `needs-decision [key=captain-hold-<task>-<n>]` and `answer` (and
 # `answers`) the matching `resolved` line on the parent channel through
@@ -991,7 +991,7 @@ command_hold() {
       repo=${repo%/}
       repo=${repo##*/}
     fi
-    [ -n "$repo" ] || repo=firstmate
+    [ -n "$repo" ] || repo=juggernaut
     validate_one_line repo "$repo"
     [ -z "$origin" ] || body=$(printf 'Origin: %s' "$origin")
     # Optional task-priority add-on: a created task must carry --priority. No-op when not installed.
@@ -1048,7 +1048,7 @@ command_hold() {
     || fail "task $id lost its hold-set stamp while being held"
   publish_parent_hold "$id" "$occurrence" needs-decision "$reason"
   # Optional sign-off card, raised only while the sign-off adapter is armed here.
-  # The firstmate-addons signoff script is used when installed, else this repo's
+  # The juggernaut-addons signoff script is used when installed, else this repo's
   # bin/jg-procevent-signoff.sh. A created question closes on answer, held work is
   # released; a dated deferral gets no live card, and a card failure exits nonzero
   # (the hold stays recorded).
@@ -1056,7 +1056,7 @@ command_hold() {
     release_task_control_lock
     if [ -f "$STATE/procevent/signoff.source" ]; then
       signoff_script=$SCRIPT_DIR/jg-procevent-signoff.sh
-      addon_signoff=${JG_ADDONS_DIR:-$JG_HOME/projects/firstmate-addons}/signoff/bin/jg-procevent-signoff.sh
+      addon_signoff=${JG_ADDONS_DIR:-$JG_HOME/projects/juggernaut-addons}/signoff/bin/jg-procevent-signoff.sh
       [ ! -f "$addon_signoff" ] || signoff_script=$addon_signoff
       JG_HOME=$JG_HOME JG_CODE_ROOT=${JG_CODE_ROOT:-$SCRIPT_DIR/..} "$signoff_script" raise "$id" "$(show_field_value "$show" title)" "$reason" "$card_close" \
         || { printf 'error: task %s is held, but no sign-off card was raised for it\n' "$id" >&2; exit 1; }

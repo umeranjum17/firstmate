@@ -3,11 +3,11 @@
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # bin/jg-backend-hometag-lib.sh - shared per-installation home-tag derivation
 # for session-provider backends whose container has ONE namespace shared by
-# every firstmate home on the machine, with no native per-home split (cmux's
-# one app-global workspace list, zellij's one shared "firstmate" session's
+# every juggernaut home on the machine, with no native per-home split (cmux's
+# one app-global workspace list, zellij's one shared "juggernaut" session's
 # tab bar). Without a per-home discriminator embedded in the actual
-# title/name, two firstmate homes (two secondmates, a primary plus a
-# secondmate, or two independent primary installations) whose task ids
+# title/name, two juggernaut homes (two squad_leads, a primary plus a
+# squad_lead, or two independent primary installations) whose task ids
 # happen to collide can send/peek/close each other's tabs - the gap a
 # captain-directed no-mistakes review gate caught for cmux
 # (docs/cmux-backend.md) and this same tag mechanism was later ported to
@@ -15,32 +15,32 @@
 # tab titles").
 #
 # jg_backend_hometag() derives a short, stable tag: a readable prefix
-# ("firstmate" for the primary home, "2ndmate-<id>" for a secondmate home
-# carrying .jg-secondmate-home) plus a short hash of the resolved JG_ROOT
+# ("juggernaut" for the primary home, "2ndmate-<id>" for a squad_lead home
+# carrying .jg-squad-lead-home) plus a short hash of the resolved JG_ROOT
 # path, so distinct installations - including multiple primaries on one
 # machine - never collide even though they share one backend-global
 # namespace. Callers source this file AFTER resolving their own
 # JG_HOME/JG_ROOT fallbacks (both adapters already do this for their own
 # purposes before any other function runs).
 #
-# Moving/relocating a firstmate installation changes its JG_ROOT path and
+# Moving/relocating a juggernaut installation changes its JG_ROOT path and
 # therefore its tag; titles created under the old tag simply stop matching -
 # an accepted limitation, no worse than the existing fact that a task's
 # recorded absolute worktree path does not survive a move either.
 
-JG_BACKEND_HOMETAG_SECONDMATE_MARKER=".jg-secondmate-home"
+JG_BACKEND_HOMETAG_SQUAD_LEAD_MARKER=".jg-squad-lead-home"
 
 jg_backend_hometag() {
-  local marker="$JG_HOME/$JG_BACKEND_HOMETAG_SECONDMATE_MARKER" id prefix root hash
+  local marker="$JG_HOME/$JG_BACKEND_HOMETAG_SQUAD_LEAD_MARKER" id prefix root hash
   if [ -f "$marker" ]; then
     id=$(tr -d '[:space:]' < "$marker" 2>/dev/null)
     if [ -n "$id" ]; then
       prefix="2ndmate-$id"
     else
-      prefix="firstmate"
+      prefix="juggernaut"
     fi
   else
-    prefix="firstmate"
+    prefix="juggernaut"
   fi
   root=$(cd "$JG_ROOT" 2>/dev/null && pwd -P) || root=$JG_ROOT
   if command -v shasum >/dev/null 2>&1; then

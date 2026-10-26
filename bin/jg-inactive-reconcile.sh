@@ -11,7 +11,7 @@
 #
 # This is an adjunct to the existing watcher poll loop and session-start path,
 # not a watcher, daemon, PR poll, or forge client of its own.
-# In a secondmate home every `scan` invocation, which is every watcher poll,
+# In a squad_lead home every `scan` invocation, which is every watcher poll,
 # first runs the LEDGER-FIRST parent delivery: a direct child whose status
 # ledger ends in a whole `done:` or `failed:` line has stated its own outcome,
 # so that line is published on the parent channel at once through
@@ -28,7 +28,7 @@
 # A line still being appended (no trailing newline yet)
 # is left for the next poll. This is what keeps a mate's PR-ready, finding,
 # and failure outcomes from depending on the mate model appending them
-# (docs/secondmate-parent-channel.md). A main home has no parent channel and
+# (docs/squad-lead-parent-channel.md). A main home has no parent channel and
 # skips this path: its watcher already signals every child status line.
 # `report <task-id>` runs that same delivery for one child on behalf of a
 # caller that already holds the child's meta lock, which bin/jg-teardown.sh
@@ -50,20 +50,20 @@
 # an unbounded wait (for example a live-held wake-queue lock), so the clean
 # deadline path is not racing its own backstop.
 #
-# It considers only a direct ordinary crewmate whose newest meta, status, or
+# It considers only a direct ordinary operator whose newest meta, status, or
 # turn-ended mtime is older than that interval and whose last status is not
-# captain-held. In a secondmate home a child whose ledger already ends in a
+# captain-held. In a squad_lead home a child whose ledger already ends in a
 # terminal done or failed line belongs to the ledger-first path above and is
 # skipped here, so one outcome is never reported twice. It then uses
 # jg-crew-state.sh as the sole current-state source.
 # Only a done or failed state is suspicious enough to create a durable terminal
 # outcome record or wake the supervisor.
-# Working, paused, parked, blocked, unknown, persistent secondmates, and
+# Working, paused, parked, blocked, unknown, persistent squad_leads, and
 # captain-held work retain their existing supervision semantics.
 #
 # A terminal-outcomes/<fingerprint>.pending record remains until its upstream
 # receipt is durable.
-# In a secondmate home, that receipt is an idempotent parent-channel append
+# In a squad_lead home, that receipt is an idempotent parent-channel append
 # through bin/jg-parent-channel-lib.sh; the ledger-first path and the inactive
 # path share the same receipt store.
 # In a main home, a presentation-stage record is acknowledged by jg-wake-drain
@@ -360,7 +360,7 @@ pr_for_task() { # <meta> [preferred-line]
   clean_field "$value"
 }
 
-home_secondmate_id() {
+home_squad_lead_id() {
   jg_parent_channel_home_id "$JG_HOME"
 }
 
@@ -377,8 +377,8 @@ report_to_parent() { # <task> <state> <outcome-key> <fingerprint> <pr>
 # binding is named when it is the cause.
 notice_parent_report_failed() { # <record> <fingerprint> <payload>
   local record=$1 fingerprint=$2 payload=$3
-  if ! jg_secondmate_parent_record_parse "$JG_HOME/.jg-secondmate-parent"; then
-    payload="$payload (missing or unreadable parent binding .jg-secondmate-parent)"
+  if ! jg_squad_lead_parent_record_parse "$JG_HOME/.jg-squad-lead-parent"; then
+    payload="$payload (missing or unreadable parent binding .jg-squad-lead-parent)"
   fi
   queue_notice_once "$record" "inactive-reconcile:$fingerprint" "$payload" || true
 }
@@ -484,7 +484,7 @@ report_child_ledger_locked() { # <id> <meta>
 
 # Every direct child's ledger, under its meta lock. File reads, plus a local
 # git reachability check for a ship done: with no delivery record yet, so it
-# runs on every poll in a secondmate home; a delivery failure is already queued as a
+# runs on every poll in a squad_lead home; a delivery failure is already queued as a
 # notice and never fails the scan.
 ledger_pass() {
   local meta id lock
@@ -492,11 +492,11 @@ ledger_pass() {
     [ -f "$meta" ] || continue
     id=$(basename "$meta" .meta)
     valid_id "$id" || continue
-    [ "$(meta_field "$meta" kind)" != secondmate ] || continue
+    [ "$(meta_field "$meta" kind)" != squad_lead ] || continue
     lock=$(jg_meta_lock_path "$meta") || continue
     jg_lock_try_acquire "$lock" || continue
     if [ ! -f "$meta" ] || [ -L "$meta" ] \
-      || [ "$(meta_field "$meta" kind)" = secondmate ]; then
+      || [ "$(meta_field "$meta" kind)" = squad_lead ]; then
       jg_lock_release "$lock"
       continue
     fi
@@ -510,18 +510,18 @@ report_child() { # <id>
   local id=$1 meta rc=0
   mkdir -p "$STATE" "$OUTCOME_DIR" || return 1
   [ ! -L "$OUTCOME_DIR" ] || return 1
-  home_secondmate_id >/dev/null || { rc=$?; [ "$rc" -eq 1 ] && return 0; return 1; }
+  home_squad_lead_id >/dev/null || { rc=$?; [ "$rc" -eq 1 ] && return 0; return 1; }
   meta="$STATE/$id.meta"
   [ -f "$meta" ] && [ ! -L "$meta" ] || return 0
-  [ "$(meta_field "$meta" kind)" != secondmate ] || return 0
+  [ "$(meta_field "$meta" kind)" != squad_lead ] || return 0
   report_child_ledger_locked "$id" "$meta"
 }
 
-reconcile_direct_child_locked() { # <id> <meta> <secondmate-id-or-empty> <timeout>
+reconcile_direct_child_locked() { # <id> <meta> <squad-lead-id-or-empty> <timeout>
   local id=$1 meta=$2 self=${3:-} timeout=$4 status turn last age state_line state pr incarnation fingerprint outcome_key payload kind state_rc=0
   [ -f "$meta" ] && [ ! -L "$meta" ] || return 0
   kind=$(meta_field "$meta" kind)
-  [ "$kind" = secondmate ] && return 0
+  [ "$kind" = squad_lead ] && return 0
   status="$STATE/$id.status"
   turn="$STATE/$id.turn-ended"
   last=$(last_status_line "$status")
@@ -576,7 +576,7 @@ reconcile_direct_child_locked() { # <id> <meta> <secondmate-id-or-empty> <timeou
   queue_presentation "$RECORD_PENDING" "$fingerprint" "$payload" || true
 }
 
-reconcile_direct_child() { # <id> <meta> <secondmate-id-or-empty> <timeout>
+reconcile_direct_child() { # <id> <meta> <squad-lead-id-or-empty> <timeout>
   local id=$1 meta=$2 self=${3:-} timeout=$4 lock rc=0
   lock=$(jg_meta_lock_path "$meta") || return 1
   jg_lock_acquire_wait "$lock" || return 1
@@ -590,7 +590,7 @@ reconcile_direct_child() { # <id> <meta> <secondmate-id-or-empty> <timeout>
 # between the deadline computation and these checks; without the guaranteed
 # first visit, such a scan would return 3 having examined no child at all while
 # write_scan_marker had already advanced the cursor past the skipped child.
-scan_pass() { # <cursor> <after|through> <deadline> <secondmate-id-or-empty>
+scan_pass() { # <cursor> <after|through> <deadline> <squad-lead-id-or-empty>
   local cursor=$1 range=$2 deadline=$3 self=${4:-} meta id remaining rc first
   for meta in "$STATE"/*.meta; do
     [ -f "$meta" ] || continue
@@ -626,7 +626,7 @@ scan() {
   local startup=${1:-0} self='' cursor deadline rc=0 marker_rc=0
   mkdir -p "$STATE" "$OUTCOME_DIR" || return 1
   [ ! -L "$OUTCOME_DIR" ] || return 1
-  if self=$(home_secondmate_id); then
+  if self=$(home_squad_lead_id); then
     # The ledger-first delivery is per poll, not per cadence.
     ledger_pass
   else
@@ -643,8 +643,8 @@ scan() {
   valid_id "$cursor" || cursor=''
   write_scan_marker "$cursor" || return 1
   if [ -z "$self" ] && [ "$marker_rc" -ne 1 ]; then
-    publish_actionable "inactive-reconcile-diagnostic:invalid-secondmate-home" \
-      "inactive terminal outcomes remain unreconciled: invalid .jg-secondmate-home marker" || true
+    publish_actionable "inactive-reconcile-diagnostic:invalid-squad-lead-home" \
+      "inactive terminal outcomes remain unreconciled: invalid .jg-squad-lead-home marker" || true
     return 0
   fi
   deadline=$(( $(date +%s) + JG_INACTIVE_RECONCILE_BUDGET_SECS ))

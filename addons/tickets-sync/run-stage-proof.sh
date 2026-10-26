@@ -72,6 +72,6 @@ for theme in light dark; do
 done
 stat -c '%n %s' "$evidence"/tickets-390-*.png | tee "$evidence/shots.ls"
 jq -n --arg version "$ver" --arg url "$url" --argjson old "$old" \
-  '{target:{version:$version,board:$url},start:"A disposable Firstmate home has one in-flight leaf whose status stamp is eight hours old.",steps:["Install this checkout'\''s tickets-sync into a throwaway XDG and run the watcher check.","Confirm the ticket JSON carries stage building and last_event_at equal to the status stamp.","Serve the board with sign-off-axi and open the leaf ticket at 390px in light and dark."],result:"Each ticket capture shows the stage word building and a stuck Nh note for the Umer stuck telescope focus leaf."}' \
+  '{target:{version:$version,board:$url},start:"A disposable Juggernaut home has one in-flight leaf whose status stamp is eight hours old.",steps:["Install this checkout'\''s tickets-sync into a throwaway XDG and run the watcher check.","Confirm the ticket JSON carries stage building and last_event_at equal to the status stamp.","Serve the board with sign-off-axi and open the leaf ticket at 390px in light and dark."],result:"Each ticket capture shows the stage word building and a stuck Nh note for the Umer stuck telescope focus leaf."}' \
   > "$evidence/steps.json"
 printf 'PASS: tickets stage publish shows building and stuck on the real sign-off Tickets tab\n'

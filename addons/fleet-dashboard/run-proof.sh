@@ -9,8 +9,8 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
 done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Proof journey: render the real Insights "Why work waits now" card at 390px from real fleet data.
-# DASH_HOME is a Firstmate home to read; FLOW_JSON is a saved real `jg-flow.sh --json --capacity` run of it
-# (a saved run keeps the proof repeatable while the live records move); JG_BIN is a Firstmate bin/.
+# DASH_HOME is a Juggernaut home to read; FLOW_JSON is a saved real `jg-flow.sh --json --capacity` run of it
+# (a saved run keeps the proof repeatable while the live records move); JG_BIN is a Juggernaut bin/.
 set -euo pipefail
 : "${DASH_HOME:?}" "${FLOW_JSON:?}" "${JG_BIN:?}" "${DONE_DONE_EVIDENCE_ROOT:?}"
 here=$(cd "$(dirname "$0")" && pwd)

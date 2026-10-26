@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
-# jg-lab-home.sh - mint a disposable firstmate "lab" home.
+# jg-lab-home.sh - mint a disposable juggernaut "lab" home.
 #
 # A lab home is a throwaway JG_HOME that a no-mistakes GATE agent may drive
 # through the fleet lifecycle entrypoints: bin/jg-gate-refuse-lib.sh refuses

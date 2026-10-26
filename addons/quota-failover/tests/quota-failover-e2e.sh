@@ -44,7 +44,7 @@ is() { if [ "$2" = "$3" ]; then ok "$1"; else no "$1: got [$2], want [$3]"; fi; 
 has() { if grep -q -- "$3" "$2" 2>/dev/null; then ok "$1"; else no "$1: $2 lacks [$3]"; fi; }
 count() { local got; got=$(grep -c -- "$3" "$2" 2>/dev/null) || got=0; is "$1" "$got" "$4"; }
 
-# The fixture's firstmate surface: one stub lib (screens are state/<id>.screen,
+# The fixture's juggernaut surface: one stub lib (screens are state/<id>.screen,
 # an jg-control relaunch clears the task's screen and status), the two exec'd
 # scripts, and the CLI stubs.
 awk -v w="$work" '
@@ -136,12 +136,12 @@ cat >"$home/config/crew-dispatch.json" <<'JSON' || exit 1
  "default": [{"harness": "opencode", "model": "opencode-go/deepseek-v4.1-flash"}]}
 JSON
 
-# lead1 (a secondmate) sits on the 429 route with a clean screen: only the
+# lead1 (a squad_lead) sits on the 429 route with a clean screen: only the
 # pinned-route provider-error test can move it. w1 sits on the second dead
 # route with the usage-limit text on its screen.
-printf 'endpoint_task_id=lead1\nharness=opencode\nmodel=opencode-go/step-5-preview-free\nkind=secondmate\nspawn_gen=s0.lead1\n' \
+printf 'endpoint_task_id=lead1\nharness=opencode\nmodel=opencode-go/step-5-preview-free\nkind=squad_lead\nspawn_gen=s0.lead1\n' \
   >"$home/state/lead1.meta" || exit 1
-printf 'endpoint_task_id=w1\nharness=opencode\nmodel=openai-codex/gpt-5.6-luna\nkind=crewmate\nspawn_gen=s0.w1\n' \
+printf 'endpoint_task_id=w1\nharness=opencode\nmodel=openai-codex/gpt-5.6-luna\nkind=operator\nspawn_gen=s0.w1\n' \
   >"$home/state/w1.meta" || exit 1
 printf '%s\n' "You've hit your usage limit for your plan; try again in 3h" >"$home/state/w1.screen"
 
@@ -180,7 +180,7 @@ printf 'state=/pool\n' >"$home/config/account-pool"
 mkdir -p "$home/state/profiles/c1" "$home/state/profiles/c2" "$home/state/profiles/go1" "$home/state/profiles/cx1" \
   "$home/state/profiles/go9" "$home/state/profiles/c3" "$home/state/profiles/deadpool"
 pool() { # <id> <harness> <model> <account> [generation]
-  printf 'endpoint_task_id=%s\nharness=%s\nmodel=%s\nkind=crewmate\nspawn_gen=%s\naccount=%s\n' \
+  printf 'endpoint_task_id=%s\nharness=%s\nmodel=%s\nkind=operator\nspawn_gen=%s\naccount=%s\n' \
     "$1" "$2" "$3" "${5:-s0.$1}" "$4" >"$home/state/$1.meta"
   printf '%s\n' "You've hit your usage limit for your plan; try again in 3h" >"$home/state/$1.screen"
 }
@@ -246,7 +246,7 @@ count "pass5: the failed-rest wake stays at one line" "$wake" 'f1 stopped' 1
 # A pool worker wedged with a clean screen on the 429 route: only the
 # route-scoped pinned probe sees the outage, and it must still take the
 # route out of dispatch while the worker itself rests and wakes.
-printf 'endpoint_task_id=q1\nharness=opencode\nmodel=opencode-go/step-5-preview-free\nkind=crewmate\nspawn_gen=s0.q1\naccount=go9\n' \
+printf 'endpoint_task_id=q1\nharness=opencode\nmodel=opencode-go/step-5-preview-free\nkind=operator\nspawn_gen=s0.q1\naccount=go9\n' \
   >"$home/state/q1.meta"
 run
 
@@ -284,7 +284,7 @@ is "pass8: an account limit leaves the claude route in dispatch" \
 # Wrapper/file text is not Claude's limit banner and must not remove its route.
 printf '[]\n' >"$dead"
 printf '{"rules":[],"default":[{"harness":"claude","model":"claude-haiku-5-5"}]}\n' >"$disp"
-printf 'endpoint_task_id=cw\nharness=claude\nmodel=claude-haiku-5-5\nkind=crewmate\nspawn_gen=s0.cw\n' >"$home/state/cw.meta"
+printf 'endpoint_task_id=cw\nharness=claude\nmodel=claude-haiku-5-5\nkind=operator\nspawn_gen=s0.cw\n' >"$home/state/cw.meta"
 printf 'quota exhausted' >"$home/state/cw.screen"
 run
 is "pass9: wrapper text leaves Haiku dispatch intact" "$(jq -r '.default[0].model' "$disp")" claude-haiku-5-5
@@ -310,7 +310,7 @@ reading() { # <tool> <generated_at> <id 5h 7d>...
 reading claude "$now" "lowacct 90 3" "okacct 60 70"
 reading codex "$now" "lowcx 12 80"
 prelim() { # <id> <harness> <model> <account>
-  printf 'endpoint_task_id=%s\nharness=%s\nmodel=%s\nkind=crewmate\nspawn_gen=s0.%s\naccount=%s\n' "$1" "$2" "$3" "$1" "$4" >"$home/state/$1.meta"
+  printf 'endpoint_task_id=%s\nharness=%s\nmodel=%s\nkind=operator\nspawn_gen=s0.%s\naccount=%s\n' "$1" "$2" "$3" "$1" "$4" >"$home/state/$1.meta"
 }
 prelim p1 claude claude-opus-4-8 lowacct
 prelim p2 claude claude-opus-4-8 lowacct
@@ -337,7 +337,7 @@ has "pass13: a relaunch that fails after the swap reports the account it moved t
 # A Claude route test that names no account runs on the pool's pick; when the pick fails it
 # reuses the last good pick and never the default login.
 is "pass14: the route tests ran on the pool's pick" "$(tail -n 1 "$home/state/claude-probe.log")" "$home/state/profiles/pooled"
-printf 'endpoint_task_id=cz\nharness=claude\nmodel=claude-sonnet-test\nkind=crewmate\nspawn_gen=s0.cz\n' >"$home/state/cz.meta"
+printf 'endpoint_task_id=cz\nharness=claude\nmodel=claude-sonnet-test\nkind=operator\nspawn_gen=s0.cz\n' >"$home/state/cz.meta"
 printf "%s\n" "You've hit your usage limit for your plan; try again in 3h" >"$home/state/cz.screen"
 POOL_PICK_FAIL=1 run
 is "pass15: a failed pick reuses the last good pick" "$(tail -n 1 "$home/state/claude-probe.log")" "$home/state/profiles/pooled"

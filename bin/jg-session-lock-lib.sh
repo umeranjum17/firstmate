@@ -33,7 +33,7 @@ JG_HARNESS_RE='claude|codex|opencode|grok|kimi|^pi$|^pi-signed$|^omp$'
 
 # The same harnesses as exact executable names. Keep in sync with
 # JG_HARNESS_RE. Used only for the stricter path evidence below, where the
-# loose regex would also match ordinary firstmate paths such as
+# loose regex would also match ordinary juggernaut paths such as
 # bin/jg-claude-stop-autoarm.sh.
 JG_HARNESS_NAMES=(claude codex opencode grok kimi pi-signed pi omp)
 

@@ -1,7 +1,7 @@
 # shellcheck shell=bash disable=SC2034
 # jg-parked-homes-lib.sh - the shared parked-home reader. Source only.
 #
-# The captain parks a secondmate home by listing its home id, one per line, in
+# The captain parks a squad_lead home by listing its home id, one per line, in
 # the supervising home's config/parked-homes ('#' comments and blank lines
 # ignored). A parked home gets no message, steer, answer, nudge or relaunch,
 # and no config push. Every supervision producer gates on this one reader
@@ -21,9 +21,9 @@
 #                                      returns 0 when parked; returns 1 otherwise
 #
 # Home-id resolution (jg_parked_meta_id): a meta belongs to a parked home only
-# when its kind is secondmate. A local secondmate's home path carries
-# .jg-secondmate-home with the id; a remote secondmate's home lives on its
-# host, so the recorded task id stands in. Crewmate and lead lanes in this
+# when its kind is squad_lead. A local squad_lead's home path carries
+# .jg-squad-lead-home with the id; a remote squad_lead's home lives on its
+# host, so the recorded task id stands in. Operator and lead lanes in this
 # home are never parked, whatever their task id spells.
 
 jg_parked_homes_file() {
@@ -55,9 +55,9 @@ jg_parked_meta_id() {  # <meta-file> [task-id] -> home id on stdout
       home=*) home=${line#home=} ;;
     esac
   done < "$meta"
-  [ "$kind" = secondmate ] || return 1
-  if [ -n "$home" ] && [ -f "$home/.jg-secondmate-home" ] && [ ! -L "$home/.jg-secondmate-home" ]; then
-    id=$(tr -d '[:space:]' < "$home/.jg-secondmate-home" 2>/dev/null)
+  [ "$kind" = squad_lead ] || return 1
+  if [ -n "$home" ] && [ -f "$home/.jg-squad-lead-home" ] && [ ! -L "$home/.jg-squad-lead-home" ]; then
+    id=$(tr -d '[:space:]' < "$home/.jg-squad-lead-home" 2>/dev/null)
   fi
   [ -n "$id" ] || id=$task
   [ -n "$id" ] || return 1
@@ -85,10 +85,10 @@ jg_parked_skip_meta() {  # <meta> <task> <action>
   local meta=$1 task=$2 action=$3
   jg_parked_meta "$meta" "$task" || return 1
   case "$action" in
-    config-reread) echo "CONFIG_REREAD: secondmate $task: skipped - its home is parked (config/parked-homes)" ;;
-    sync) echo "SECONDMATE_SYNC: secondmate $task: skipped - its home is parked (config/parked-homes)" ;;
-    bootstrap-liveness) echo "SECONDMATE_LIVENESS: secondmate $task: skipped: its home is parked (config/parked-homes)" ;;
-    config-push) printf 'secondmate %s: skipped - its home is parked (config/parked-homes)\n' "$task" ;;
+    config-reread) echo "CONFIG_REREAD: squad_lead $task: skipped - its home is parked (config/parked-homes)" ;;
+    sync) echo "SQUAD_LEAD_SYNC: squad_lead $task: skipped - its home is parked (config/parked-homes)" ;;
+    bootstrap-liveness) echo "SQUAD_LEAD_LIVENESS: squad_lead $task: skipped: its home is parked (config/parked-homes)" ;;
+    config-push) printf 'squad_lead %s: skipped - its home is parked (config/parked-homes)\n' "$task" ;;
     model-outage|pending-reply|wake-doorbell) : ;;
     reconcile) printf 'skipped: %s parked\n' "$task" ;;
     restart) printf 'parked: %s: its home is parked (config/parked-homes); the restart pass skipped it\n' "$task" ;;

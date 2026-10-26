@@ -25,10 +25,10 @@ fi
 SH
 cat > "$TMP_ROOT/source/bin/jg-spawn.sh" <<'SH'
 #!/usr/bin/env bash
-tmux new-window -d -t firstmate: -n "jg-$1" -c "$JG_HOME/../mate" 'exec sleep 45' || exit 1
-pid=$(tmux display-message -p -t "firstmate:=jg-$1" '#{pane_pid}')
+tmux new-window -d -t juggernaut: -n "jg-$1" -c "$JG_HOME/../mate" 'exec sleep 45' || exit 1
+pid=$(tmux display-message -p -t "juggernaut:=jg-$1" '#{pane_pid}')
 printf '%s\n' "$pid" > "$JG_HOME/../mate/state/.lock"
-printf 'window=firstmate:jg-%s\n' "$1" > "$JG_HOME/state/$1.meta"
+printf 'window=juggernaut:jg-%s\n' "$1" > "$JG_HOME/state/$1.meta"
 SH
 cat > "$TMP_ROOT/fakebin/claude" <<'SH'
 #!/usr/bin/env bash
@@ -80,13 +80,13 @@ done
 cat > "$TMP_ROOT/source-worker/bin/jg-spawn.sh" <<'SH'
 #!/usr/bin/env bash
 # Stubbed worker launch: the same observable window, metadata, and parked
-# status as a real gated worker, without contacting a model. kind=secondmate
+# status as a real gated worker, without contacting a model. kind=squad_lead
 # is the suite's fixture convention (make_lab uses it too): it routes
 # crew-state to the status log instead of harness busy detection a sleep pane
 # cannot answer.
-tmux new-window -d -t firstmate: -n "jg-$1" -c "$2" 'exec sleep 45' || exit 1
-pid=$(tmux display-message -p -t "firstmate:=jg-$1" '#{pane_pid}')
-printf 'window=firstmate:jg-%s\nworktree=%s\nkind=secondmate\ntasktmp=/tmp/jg-%s\n' "$1" "$2" "$1" > "$JG_HOME/state/$1.meta"
+tmux new-window -d -t juggernaut: -n "jg-$1" -c "$2" 'exec sleep 45' || exit 1
+pid=$(tmux display-message -p -t "juggernaut:=jg-$1" '#{pane_pid}')
+printf 'window=juggernaut:jg-%s\nworktree=%s\nkind=squad_lead\ntasktmp=/tmp/jg-%s\n' "$1" "$2" "$1" > "$JG_HOME/state/$1.meta"
 printf 'paused [at=1]: waiting on gate file %s to exist\n' "$JG_HOME/data/$1/gate" > "$JG_HOME/state/$1.status"
 SH
 chmod +x "$TMP_ROOT/source-worker/bin/jg-spawn.sh"

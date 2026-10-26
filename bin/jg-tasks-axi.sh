@@ -6,7 +6,7 @@
 # Usage: jg-tasks-axi.sh [<tasks-axi command> [args...]]
 #        jg-tasks-axi.sh --help
 #
-# Every routine firstmate backlog read or mutation goes through this command
+# Every routine juggernaut backlog read or mutation goes through this command
 # rather than a bare `tasks-axi`; `jg-tasks-axi.sh <command> --help` prints
 # tasks-axi's own help. Arguments reach tasks-axi as given, apart from one
 # rewrite that keeps file arguments meaning what the caller meant: a relative

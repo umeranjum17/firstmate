@@ -8,7 +8,7 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
   export "$_jg_new=$_jg_val"
 done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
-# Retire the limit-prompt-move check from one firstmate home (its check and trust binding); with --all, from every
+# Retire the limit-prompt-move check from one juggernaut home (its check and trust binding); with --all, from every
 # active home install.sh --all reaches, and then remove the installed copy. Idempotent.
 # Usage: uninstall.sh [--all] <jg-home>
 set -euo pipefail

@@ -2,7 +2,7 @@
 
 `merge-card` remains the gate/check/post executable documented in the [add-on reference](../docs/addons-reference.md#merge-card).
 
-Homes with `config/owner-rules` use the [owner-rules publication check](../owner-rules/README.md#lavish-refusal-secondmate-notes-and-merge-card-posts) before posting or restoring a card.
+Homes with `config/owner-rules` use the [owner-rules publication check](../owner-rules/README.md#lavish-refusal-squad-lead-notes-and-merge-card-posts) before posting or restoring a card.
 Its existing config shims are unchanged.
 
 ## Naming the claim

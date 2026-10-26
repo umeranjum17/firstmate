@@ -534,7 +534,7 @@ codex_cell() {
 
 test_matrix_codex_idle_starfield_furniture() {
   # Real idle codex-cli 0.154.0 (gpt-6-astra, fast mode) captured byte-for-byte
-  # through Herdr (`pane read --format ansi`) from the first codex second mate:
+  # through Herdr (`pane read --format ansi`) from the first codex squad lead:
   # an animated braille "starfield" on the row above the bold `›`, on the `›`
   # row behind the SGR-2 dim `Ask Codex to do anything` placeholder, and on
   # the row below, then a bright model/path/title status footer. The cells are
@@ -722,10 +722,10 @@ test_matrix_pi_lead_turn_frame_and_extension_rows() {
   # the idle pair's plain top rule with pi's titled turn frame
   # (`── ⠧ Working ────`), which left the closing rule unpaired, so an idle
   # lead still showing that frame read `unknown` and jg-control exit and
-  # jg-secondmate-restart refused it with `not proven empty`.
+  # jg-squad-lead-restart refused it with `not proven empty`.
   local rule footer ext pi_idle pi_working none frame out
   rule='─────────────────────────────────────────────────────────────────────'
-  footer=$'~/.treehouse/firstmate-8bf1b0/1/firstmate (detached)\n↑439k ↓67k R40M CH99.9% 21.3%/1.0M (auto)  space-bunny-free • medium'
+  footer=$'~/.treehouse/juggernaut-8bf1b0/1/juggernaut (detached)\n↑439k ↓67k R40M CH99.9% 21.3%/1.0M (auto)  space-bunny-free • medium'
   ext=' ○ 🐴 ponytail: ⚡ FULL'
   pi_idle=$(printf 'pi\tidle'); pi_working=$(printf 'pi\tworking'); none=$(printf 'zsh\t')
 
@@ -769,7 +769,7 @@ test_matrix_pi_lead_beneath_extension_error_is_empty() {
   # footer, extension row - but it sits DIRECTLY UNDER a nine-line wrapped
   # extension error ("Check the active model/provider or set
   # llmModelOverride."), a much taller unclaimed region above the top rule
-  # than the one-row stderr notice the matrix above covers. jg-secondmate-restart
+  # than the one-row stderr notice the matrix above covers. jg-squad-lead-restart
   # reported this lead unreached with `composer state is 'unknown', not proven
   # empty`. The classifier already read this shape empty; the 'unknown' came
   # from the live herdr read (tests/jg-backend-herdr.test.sh covers that), so
@@ -789,7 +789,7 @@ tail+=$' loader and create duplicate ru. Check the active model/provider or\n'
 tail+=$' set llmModelOverride.\n'
 tail+=$'\n─────────────────────────────────────────────────────────────────────\n'
 tail+=$'\n─────────────────────────────────────────────────────────────────────\n'
-tail+=$'~/.treehouse/firstmate-8bf1b0/1/firstmate (detached)\n'
+tail+=$'~/.treehouse/juggernaut-8bf1b0/1/juggernaut (detached)\n'
 tail+=$'↑451k ↓76k R47M 22.5%/1.0M (auto)           space-bunny-free • medium\n'
 tail+=$' ○ 🐴 ponytail: ⚡ FULL'
 
@@ -830,7 +830,7 @@ test_matrix_pi_idle_pair_over_stale_working_registration() {
   pi_idle=$(printf 'pi\tidle'); pi_done=$(printf 'pi\tdone')
   pi_working=$(printf 'pi\tworking'); pi_blocked=$(printf 'pi\tblocked')
   none=$(printf 'zsh\t')
-  tail=$' : Firstmate instruction waiting: list "$JG_TASK_INBOX"/*.msg in your\n'
+  tail=$' : Juggernaut instruction waiting: list "$JG_TASK_INBOX"/*.msg in your\n'
   tail+=$' \'writeboost.inbox\' steering inbox, read and act on each in numeric order, then\n'
   tail+=$' mv each into its handled/.\n'
   tail+=$'\n'
@@ -842,7 +842,7 @@ test_matrix_pi_idle_pair_over_stale_working_registration() {
   tail+=$'─────────────────────────────────────────────────────────────────────────────────\n'
   tail+=$'\n'
   tail+=$'─────────────────────────────────────────────────────────────────────────────────\n'
-  tail+=$'~/.treehouse/firstmate-8bf1b0/4/firstmate (detached)\n'
+  tail+=$'~/.treehouse/juggernaut-8bf1b0/4/juggernaut (detached)\n'
   tail+=$'↑902k ↓99k R22M $5.013 (sub) 83.4%/272k (auto)  (openai-codex) gpt-6.1-sol • high\n'
   tail+=$' ○ 🐴 ponytail: ⚡ FULL\n'
   # The incident: the stale working registration over the idle pair.
@@ -984,7 +984,7 @@ test_matrix_pi_wave_art_and_notice_embedded_rule() {
   capture+=$'▁▁▂▂▃▃▃▄▄▄▄▄▄▃▃▃▂▂▂▁▁▁▁▁▁╲▁▁▁╱▁▁▁▁▁▂▂▃▃▃▄▄▄▄▄▃▃▂▂▂▁▁▁▁▁▁▂▂▂▃▃▃▄▄▄▄▄▄▃▃▃▂▂▂▁▁▁▁▁▁▂\n'
   capture+=$'▁▁▂▂▃▃▄▄▄▄▄▄▃▃▃▃▂▂▂▁▁▁▁▁▁╲▁▁▁╱▁▁▁▁▁▂▂▃▃▄▄▄▄▄▄▃▃▂▂▁▁▁▁▁▁▂▂▂▃▃▃▃▄▄▄▄▄▄▃▃▃▂▂▂▁▁▁▁▁▁▂\n'
   capture+=$'⚠️ Live session indexing failed: database is locked──────────────────────────────\n'
-  capture+=$'~/.treehouse/firstmate-8bf1b0/4/firstmate (detached)\n'
+  capture+=$'~/.treehouse/juggernaut-8bf1b0/4/juggernaut (detached)\n'
   capture+=$'↑2.0M ↓185k R58M CH99.9% $11.537 (sub) 59.3%/272k (auto)       gpt-6.1-sol • high\n'
   capture+=$'↑2.0M ↓185k R58M CH99.8% $11.554 (sub) 59.3%/272k (auto)       gpt-6.1-sol • high\n'
   # 1. The incident: idle/done pi on herdr (styled + identity) reads empty.
@@ -1060,7 +1060,7 @@ test_matrix_opencode_leftbar_signals() {
   # could neither relaunch nor exit a stuck OpenCode worker.
   local floor status_screen retry_screen retry_tail typed_status
   floor='  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀  '
-  status_screen=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/you/.treehouse/firstmate-cff959/3/71.6K (27%) · $0ctrl+p\n   firstmate                                                commands'
+  status_screen=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/you/.treehouse/juggernaut-cff959/3/71.6K (27%) · $0ctrl+p\n   juggernaut                                                commands'
   assert_screen "opencode 1.18.x idle status rows below the floor on herdr" empty "$CAPS_STYLED" "$status_screen"
   assert_screen "opencode 1.18.x idle status rows below the floor on zellij" empty "$CAPS_STYLED_NOID" "$status_screen"
   assert_screen "opencode 1.18.x idle status rows below the floor on cmux/orca" empty "$CAPS_PLAIN" "$status_screen"
@@ -1068,11 +1068,11 @@ test_matrix_opencode_leftbar_signals() {
   # `commands` hint (`tab agents ctrl+p commands`), not the two-space gap the
   # 1.18.x rows above show, so the same below-floor furniture reads empty.
   local bare_status_screen
-  bare_status_screen=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/you/.treehouse/firstmate-cff959/3/71.6K (27%) · $0ctrl+p\n   firstmate                                    tab agents ctrl+p commands'
+  bare_status_screen=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/you/.treehouse/juggernaut-cff959/3/71.6K (27%) · $0ctrl+p\n   juggernaut                                    tab agents ctrl+p commands'
   assert_screen "opencode 1.18.35 idle status rows below the floor on herdr" empty "$CAPS_STYLED" "$bare_status_screen"
   assert_screen "opencode 1.18.35 idle status rows below the floor on cmux/orca" empty "$CAPS_PLAIN" "$bare_status_screen"
   local busy_status_screen
-  busy_status_screen=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   ⬝⬝⬝⬝ esc interrupt\n   firstmate                                    tab agents ctrl+p commands'
+  busy_status_screen=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   ⬝⬝⬝⬝ esc interrupt\n   juggernaut                                    tab agents ctrl+p commands'
   assert_screen "opencode busy esc-interrupt row below the 1.18.35 floor stays unknown" unknown "$CAPS_STYLED" "$busy_status_screen"
   # Live 1.18.35 mid-generation: the busy hint and the cost/ctrl+p cell share
   # one row ending in `commands`, directly below the floor. It must refuse on
@@ -1090,7 +1090,7 @@ test_matrix_opencode_leftbar_signals() {
   assert_screen "opencode 1.18.x retry banner wrapped without its opening paren on herdr" empty "$CAPS_STYLED" "$retry_tail"
   # Typed text must survive the same furniture: the verdict comes from the
   # left-bar run above the floor, never from the status area below it.
-  typed_status=$'  ┃\n  ┃  Reply with OK.\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/you/.treehouse/firstmate-cff959/3/71.6K (27%) · $0ctrl+p\n   firstmate                                                commands'
+  typed_status=$'  ┃\n  ┃  Reply with OK.\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/you/.treehouse/juggernaut-cff959/3/71.6K (27%) · $0ctrl+p\n   juggernaut                                                commands'
   assert_screen "opencode typed draft above live status rows on herdr" pending "$CAPS_STYLED" "$typed_status"
   assert_screen "opencode typed draft above live status rows on zellij" pending "$CAPS_STYLED_NOID" "$typed_status"
   assert_screen "opencode typed draft above live status rows on plain backends" unknown "$CAPS_PLAIN" "$typed_status"
@@ -1118,11 +1118,11 @@ test_matrix_opencode_leftbar_signals() {
   # could neither relaunch nor exit. A draft above the same footer still reads
   # pending (never empty).
   local wrap_idle wrap_typed wrap_error
-  wrap_idle=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/you/.treehouse/firstmate-cff959/8/a-   22.1K (2%) · $ctrl+p\n   really-quite-long-opencode-project-directory-name   commands'
+  wrap_idle=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/you/.treehouse/juggernaut-cff959/8/a-   22.1K (2%) · $ctrl+p\n   really-quite-long-opencode-project-directory-name   commands'
   assert_screen "opencode 1.18.x wrapped status footer on herdr" empty "$CAPS_STYLED" "$wrap_idle"
   assert_screen "opencode 1.18.x wrapped status footer on zellij" empty "$CAPS_STYLED_NOID" "$wrap_idle"
   assert_screen "opencode 1.18.x wrapped status footer on cmux/orca" empty "$CAPS_PLAIN" "$wrap_idle"
-  wrap_typed=$'  ┃\n  ┃  Reply with OK.\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/you/.treehouse/firstmate-cff959/8/a-   22.1K (2%) · $ctrl+p\n   really-quite-long-opencode-project-directory-name   commands'
+  wrap_typed=$'  ┃\n  ┃  Reply with OK.\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/you/.treehouse/juggernaut-cff959/8/a-   22.1K (2%) · $ctrl+p\n   really-quite-long-opencode-project-directory-name   commands'
   assert_screen "opencode 1.18.x typed draft above wrapped status footer on herdr" pending "$CAPS_STYLED" "$wrap_typed"
   assert_screen "opencode 1.18.x typed draft above wrapped status footer on cmux/orca" unknown "$CAPS_PLAIN" "$wrap_typed"
   # Shape (b): an assistant error block (opencode draws it as a `┃`-left-border
@@ -1132,7 +1132,7 @@ test_matrix_opencode_leftbar_signals() {
   # furniture; the composer below is still empty. The real capture behind this
   # fixture carried the same box with a different message (an upstream-provider
   # error); the shape is byte-identical, the text is not load-bearing.
-  wrap_error=$'  ┃  run the check\n  ┃\n  ┃\n  ┃  Failed to execute statement\n  ┃\n     ▣  Build · DeepSeek V4.1 Flash\n  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/you/.treehouse/firstmate-cff959/8/a-   22.1K (2%) · $ctrl+p\n   really-quite-long-opencode-project-directory-name   commands'
+  wrap_error=$'  ┃  run the check\n  ┃\n  ┃\n  ┃  Failed to execute statement\n  ┃\n     ▣  Build · DeepSeek V4.1 Flash\n  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/you/.treehouse/juggernaut-cff959/8/a-   22.1K (2%) · $ctrl+p\n   really-quite-long-opencode-project-directory-name   commands'
   assert_screen "opencode 1.18.x assistant error block above empty composer on herdr" empty "$CAPS_STYLED" "$wrap_error"
   assert_screen "opencode 1.18.x assistant error block above empty composer on cmux/orca" empty "$CAPS_PLAIN" "$wrap_error"
   # Live 2026-10-09 THREE-row wrap (task jg-opencode-composer-err, driven in an
@@ -1141,10 +1141,10 @@ test_matrix_opencode_leftbar_signals() {
   # carrying the directory's middle fragment, and a bare trailing fragment
   # (`name`). The bare fragment is furniture only beside a real status row.
   local wrap3_idle wrap3_typed
-  wrap3_idle=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/you/.treehouse/firstmate-cff959/8/a-   22.1K (2%) · $ctrl+p\n   really-quite-long-opencode-project-dir-   commands\n   name'
+  wrap3_idle=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/you/.treehouse/juggernaut-cff959/8/a-   22.1K (2%) · $ctrl+p\n   really-quite-long-opencode-project-dir-   commands\n   name'
   assert_screen "opencode 1.18.x three-row wrapped status footer on herdr" empty "$CAPS_STYLED" "$wrap3_idle"
   assert_screen "opencode 1.18.x three-row wrapped status footer on cmux/orca" empty "$CAPS_PLAIN" "$wrap3_idle"
-  wrap3_typed=$'  ┃\n  ┃  Reply with OK.\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/you/.treehouse/firstmate-cff959/8/a-   22.1K (2%) · $ctrl+p\n   really-quite-long-opencode-project-dir-   commands\n   name'
+  wrap3_typed=$'  ┃\n  ┃  Reply with OK.\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/you/.treehouse/juggernaut-cff959/8/a-   22.1K (2%) · $ctrl+p\n   really-quite-long-opencode-project-dir-   commands\n   name'
   assert_screen "opencode 1.18.x typed draft above three-row wrapped status footer on herdr" pending "$CAPS_STYLED" "$wrap3_typed"
   assert_screen "opencode 1.18.x typed draft above three-row wrapped status footer on cmux/orca" unknown "$CAPS_PLAIN" "$wrap3_typed"
   # Live 2026-10-09 ZERO-USAGE wrap (task jg-opencode-composer-err, real
@@ -1154,13 +1154,13 @@ test_matrix_opencode_leftbar_signals() {
   # matches the full status pattern; the palette hint `ctrl+p` anchors it. A
   # busy row carrying `esc interrupt` in the same area must still refuse.
   local wrap0_idle wrap0_typed wrap0_busy
-  wrap0_idle=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/you/.treehouse/firstmate-cff959/8/relaunch-   tab ctrl+p\n   really-quite-long-opencode-project-directory-name   agents commands'
+  wrap0_idle=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/you/.treehouse/juggernaut-cff959/8/relaunch-   tab ctrl+p\n   really-quite-long-opencode-project-directory-name   agents commands'
   assert_screen "opencode 1.18.x zero-usage wrapped status footer on herdr" empty "$CAPS_STYLED" "$wrap0_idle"
   assert_screen "opencode 1.18.x zero-usage wrapped status footer on cmux/orca" empty "$CAPS_PLAIN" "$wrap0_idle"
-  wrap0_typed=$'  ┃\n  ┃  Reply with OK.\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/you/.treehouse/firstmate-cff959/8/relaunch-   tab ctrl+p\n   really-quite-long-opencode-project-directory-name   agents commands'
+  wrap0_typed=$'  ┃\n  ┃  Reply with OK.\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/you/.treehouse/juggernaut-cff959/8/relaunch-   tab ctrl+p\n   really-quite-long-opencode-project-directory-name   agents commands'
   assert_screen "opencode 1.18.x typed draft above zero-usage wrapped status footer on herdr" pending "$CAPS_STYLED" "$wrap0_typed"
   assert_screen "opencode 1.18.x typed draft above zero-usage wrapped status footer on cmux/orca" unknown "$CAPS_PLAIN" "$wrap0_typed"
-  wrap0_busy=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/you/.treehouse/firstmate-cff959/8/relaunch-   esc interrupt ctrl+p\n   really-quite-long-opencode-project-directory-name   agents commands'
+  wrap0_busy=$'  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/you/.treehouse/juggernaut-cff959/8/relaunch-   esc interrupt ctrl+p\n   really-quite-long-opencode-project-directory-name   agents commands'
   assert_screen "opencode 1.18.x busy row above zero-usage wrapped footer still refuses on herdr" unknown "$CAPS_STYLED" "$wrap0_busy"
   assert_screen "opencode 1.18.x busy row above zero-usage wrapped footer still refuses on cmux/orca" unknown "$CAPS_PLAIN" "$wrap0_busy"
   # Live 2026-10-09 UNANSWERED BUBBLE: a doorbell `┃` user bubble
@@ -1168,10 +1168,10 @@ test_matrix_opencode_leftbar_signals() {
   # path/usage/palette row and a bare `pockit` continuation. The bubble is
   # transcript furniture above the composer; the composer below is still empty.
   local unans_idle unans_typed
-  unans_idle=$'  ┃\n  ┃  : Firstmate instruction waiting: list "$JG_TASK_INBOX"/*.msg in your \'mx-\n  ┃  pm-9b.inbox\' steering inbox, read and act on each in numeric order, then\n  ┃  mv each into its handled/.\n  ┃\n\n  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/you/.treehouse/pockit-497a78/8/   538.6K (54%) · $1.0 ctrl+p commands\n   pockit'
+  unans_idle=$'  ┃\n  ┃  : Juggernaut instruction waiting: list "$JG_TASK_INBOX"/*.msg in your \'mx-\n  ┃  pm-9b.inbox\' steering inbox, read and act on each in numeric order, then\n  ┃  mv each into its handled/.\n  ┃\n\n  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/you/.treehouse/pockit-497a78/8/   538.6K (54%) · $1.0 ctrl+p commands\n   pockit'
   assert_screen "opencode 1.18.x unanswered bubble above empty composer on herdr" empty "$CAPS_STYLED" "$unans_idle"
   assert_screen "opencode 1.18.x unanswered bubble above empty composer on cmux/orca" empty "$CAPS_PLAIN" "$unans_idle"
-  unans_typed=$'  ┃\n  ┃  : Firstmate instruction waiting: list "$JG_TASK_INBOX"/*.msg in your \'mx-\n  ┃  pm-9b.inbox\' steering inbox, read and act on each in numeric order, then\n  ┃  mv each into its handled/.\n  ┃\n\n  ┃\n  ┃  Reply with OK.\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/you/.treehouse/pockit-497a78/8/   538.6K (54%) · $1.0 ctrl+p commands\n   pockit'
+  unans_typed=$'  ┃\n  ┃  : Juggernaut instruction waiting: list "$JG_TASK_INBOX"/*.msg in your \'mx-\n  ┃  pm-9b.inbox\' steering inbox, read and act on each in numeric order, then\n  ┃  mv each into its handled/.\n  ┃\n\n  ┃\n  ┃  Reply with OK.\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/you/.treehouse/pockit-497a78/8/   538.6K (54%) · $1.0 ctrl+p commands\n   pockit'
   assert_screen "opencode 1.18.x typed draft under unanswered bubble on herdr" pending "$CAPS_STYLED" "$unans_typed"
   assert_screen "opencode 1.18.x typed draft under unanswered bubble on cmux/orca" unknown "$CAPS_PLAIN" "$unans_typed"
   # Live 2026-10-10 (OpenCode 1.18.25 through Herdr, the jg-model-scorecard
@@ -1192,7 +1192,7 @@ test_matrix_opencode_leftbar_signals() {
   # (unwrapped), and typed text in the fragment's position keeps its shallow
   # two-space indent and stays pending.
   local v11825_wrap v11825_nowrap v11825_typed v11825_typed_wrap
-  v11825_wrap=$'  ┃\n     ▣  Build · DeepSeek V4.1 Flash (Ollama)\n  ┃\n  ┃\n  ┃                                                                  ~/.treehouse/firstmate-cff959/2/\n  ┃  Build · DeepSeek V4.1 Flash (Ollama) Ollama Cloud                       firstmate:fm/jg-model-scorecard\n'"$floor"$'\n   /home/you/.treehouse/firstmate-cff959/2/firstmate             87.1K (33%) · $0.33  ctrl+p commands    • OpenCode 1.18.25'
+  v11825_wrap=$'  ┃\n     ▣  Build · DeepSeek V4.1 Flash (Ollama)\n  ┃\n  ┃\n  ┃                                                                  ~/.treehouse/juggernaut-cff959/2/\n  ┃  Build · DeepSeek V4.1 Flash (Ollama) Ollama Cloud                       juggernaut:fm/jg-model-scorecard\n'"$floor"$'\n   /home/you/.treehouse/juggernaut-cff959/2/juggernaut             87.1K (33%) · $0.33  ctrl+p commands    • OpenCode 1.18.25'
   assert_screen "opencode 1.18.25 wrapped dir fragment above model row on herdr" empty "$CAPS_STYLED" "$v11825_wrap"
   assert_screen "opencode 1.18.25 wrapped dir fragment above model row on zellij" empty "$CAPS_STYLED_NOID" "$v11825_wrap"
   assert_screen "opencode 1.18.25 wrapped dir fragment above model row on cmux/orca" empty "$CAPS_PLAIN" "$v11825_wrap"
@@ -1204,7 +1204,7 @@ test_matrix_opencode_leftbar_signals() {
   v11825_typed=$'  ┃\n  ┃\n  ┃  Reply with OK.\n  ┃  Build · DeepSeek V4.1 Flash (Ollama) Ollama Cloud          ~/pockit:fm/jg-model-scorecard\n'"$floor"
   assert_screen "opencode typed row directly above the model row on herdr" pending "$CAPS_STYLED" "$v11825_typed"
   assert_screen "opencode typed row directly above the model row on plain backends" unknown "$CAPS_PLAIN" "$v11825_typed"
-  v11825_typed_wrap=$'  ┃\n  ┃  Reply with OK.\n  ┃\n  ┃                                                                  ~/.treehouse/firstmate-cff959/2/\n  ┃  Build · DeepSeek V4.1 Flash (Ollama) Ollama Cloud                       firstmate:fm/jg-model-scorecard\n'"$floor"
+  v11825_typed_wrap=$'  ┃\n  ┃  Reply with OK.\n  ┃\n  ┃                                                                  ~/.treehouse/juggernaut-cff959/2/\n  ┃  Build · DeepSeek V4.1 Flash (Ollama) Ollama Cloud                       juggernaut:fm/jg-model-scorecard\n'"$floor"
   assert_screen "opencode typed draft above the wrapped dir fragment on herdr" pending "$CAPS_STYLED" "$v11825_typed_wrap"
   assert_screen "opencode typed draft above the wrapped dir fragment on plain backends" unknown "$CAPS_PLAIN" "$v11825_typed_wrap"
   out=$(jg_composer_extract_selected_content "$CAPS_STYLED" "$v11825_typed_wrap")
@@ -1318,7 +1318,7 @@ test_matrix_grok_titled_bottom_border() {
 test_matrix_claude_titled_top_rule() {
   # A named Claude Code session draws its title into the composer's TOP rule
   # (issues #5601 and #5558; observed on herdr as
-  # `─── Firstmate operational input 1790546042 ─`). The strict separator
+  # `─── Juggernaut operational input 1790546042 ─`). The strict separator
   # predicate rejects that row, so the pair never opened, the closing rule
   # read as a lower unmatched separator, and a visibly empty composer read
   # `unknown` on every cursorless backend, refusing steers, exit, and relaunch.
@@ -1326,7 +1326,7 @@ test_matrix_claude_titled_top_rule() {
   local scrollback short nonascii flush blank
   claude_idle=$(printf 'claude\tidle')
   rule='────────────────────────────────────────────────────────────'
-  title=' Firstmate operational input 1790546042 '
+  title=' Juggernaut operational input 1790546042 '
   top="${rule}───${title}─"
   bottom="${rule}────────────────────────────────────────────"
   footer='  ⏵⏵ bypass permissions on (shift+tab to cycle)'
@@ -1354,10 +1354,10 @@ test_matrix_claude_titled_top_rule() {
   short="${rule}${title}─"$'\n❯'"$NBSP"$'\n'"$bottom"
   assert_screen "mismatched titled rule width" unknown "$CAPS_STYLED_NOID" "$short"
   # A non-ASCII title leaves residue and refuses rather than guessing width.
-  nonascii="${rule}─── ✳ Firstmate operational input 179054604 ─"$'\n❯'"$NBSP"$'\n'"$bottom"
+  nonascii="${rule}─── ✳ Juggernaut operational input 179054604 ─"$'\n❯'"$NBSP"$'\n'"$bottom"
   assert_screen "non-ASCII titled rule" unknown "$CAPS_STYLED_NOID" "$nonascii"
   # The rule must open with the strict separator's dash run.
-  flush=" Firstmate operational input 1790546042 ${rule}────"$'\n❯'"$NBSP"$'\n'"$bottom"
+  flush=" Juggernaut operational input 1790546042 ${rule}────"$'\n❯'"$NBSP"$'\n'"$bottom"
   assert_screen "title flush at the rule's start" unknown "$CAPS_STYLED_NOID" "$flush"
   # The strict blank-row posture is untouched: no glyph row, no proof.
   blank="$top"$'\n\n'"$bottom"

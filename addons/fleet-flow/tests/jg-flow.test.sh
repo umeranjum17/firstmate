@@ -9,13 +9,13 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
 done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Integration: query the real flow CLI over isolated durable fleet records.
-# Run it with JG_BIN pointing at a Firstmate checkout's bin/: the reader sources
+# Run it with JG_BIN pointing at a Juggernaut checkout's bin/: the reader sources
 # its helper libraries from there and the second block drives the fork's
 # model/skill statistics and outcome-recording readers, which did not move.
 set -eu
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 [ -n "${JG_BIN:-}" ] && [ -f "$JG_BIN/jg-classify-lib.sh" ] || {
-  echo "jg-flow test: set JG_BIN to a Firstmate checkout's bin/ (helper libraries live there)" >&2
+  echo "jg-flow test: set JG_BIN to a Juggernaut checkout's bin/ (helper libraries live there)" >&2
   exit 2
 }
 TMP=$(mktemp -d)
@@ -30,8 +30,8 @@ for h in (main, child):
     (h / 'state').mkdir(parents=True)
     (h / 'data').mkdir()
     (h / 'data/backlog.md').write_text('## Queued\n')
-(main / 'data/secondmates.md').write_text(f'- child - Worker (home: {child}; scope: app; projects: app)\n')
-(child / 'data/secondmates.md').write_text(f'- main - Parent (home: {main}; scope: fleet; projects: app)\n')
+(main / 'data/squad_leads.md').write_text(f'- child - Worker (home: {child}; scope: app; projects: app)\n')
+(child / 'data/squad_leads.md').write_text(f'- main - Parent (home: {main}; scope: fleet; projects: app)\n')
 # Exact rejected-key return from writeboost.status; key and timestamp remain unknown.
 (main / 'state/child.status').write_text('done [key=ov-rn-setup-polish corr=03b23bf8e7b2c26c]: PR 26 merged and verified - guarded merge read back state=MERGED at the exact checked head 2c7f3076 with all checks green; task cleaned up; per your words, production-phone replacement and live ChatGPT remain separately unapproved\n')
 (main / 'data/backlog.md').write_text('## Queued\n- [ ] next - Next blocked-by: prior\n'
@@ -81,8 +81,8 @@ grand = tmp / 'grand'
 (grand / 'state').mkdir(parents=True)
 (grand / 'data').mkdir()
 (grand / 'data/backlog.md').write_text('## Queued\n')
-(grand / 'data/secondmates.md').write_text(f'- main - Parent (home: {main}; scope: fleet; projects: app)\n')
-with open(child / 'data/secondmates.md', 'a') as f:
+(grand / 'data/squad_leads.md').write_text(f'- main - Parent (home: {main}; scope: fleet; projects: app)\n')
+with open(child / 'data/squad_leads.md', 'a') as f:
     f.write(f'- grand - Worker (home: {grand}; scope: app; projects: app)\n')
 (child / 'state/grand.status').write_text('done [at=70] [key=merged-gtask]: merged\n')
 with open(child / 'state/fleet-ledger.jsonl', 'a') as f:
@@ -246,7 +246,7 @@ assert wait['seconds'] is None and wait['since'] is None, 'unstamped pause stays
 with open(main / 'data/backlog.md', 'a') as f:
     f.write('## Queued\n- [ ] archive-ready - Archived prerequisite blocked-by: archived\n'
             '- [ ] multiple - Multiple dependencies blocked-by: archived blocked-by: prior\n')
-with open(main / 'data/secondmates.md', 'a') as f:
+with open(main / 'data/squad_leads.md', 'a') as f:
     f.write(f'- macbook - Remote (host: macbook; root: /remote/repo; home: {grand}; scope: app; projects: app)\n')
 before = files()
 coverage = json.loads(run())
@@ -386,7 +386,7 @@ m, mb = tmp / 'main', tmp / 'byokit'
 for h in (m, mb):
     (h / 'data/metrics').mkdir(parents=True, exist_ok=True)
     (h / 'state').mkdir(parents=True, exist_ok=True)
-(m / 'data/secondmates.md').write_text(f'- byokit - BYOKit (home: {mb}; scope: toolkit; projects: byokit)\n')
+(m / 'data/squad_leads.md').write_text(f'- byokit - BYOKit (home: {mb}; scope: toolkit; projects: byokit)\n')
 oh = 'home\ttask\tkind\tproject\tmodels\tstarted\tended\toutcome\tpr\n'
 (m / 'data/metrics/task-outcomes.tsv').write_text(oh +
     'main\tt1\tship\tacme\tclaude:claude-opus-5-5:medium\t%d\t%d\tmerged\thttps://github.com/acme/app/pull/1\n' % (now - 2*day, now - day) +
@@ -455,7 +455,7 @@ s, sb = tmp / 's', tmp / 'sb'
 for h in (s, sb):
     (h / 'data/metrics').mkdir(parents=True, exist_ok=True)
     (h / 'state').mkdir(parents=True, exist_ok=True)
-(s / 'data/secondmates.md').write_text(f'- byokit - BYOKit (home: {sb}; scope: toolkit; projects: byokit)\n'
+(s / 'data/squad_leads.md').write_text(f'- byokit - BYOKit (home: {sb}; scope: toolkit; projects: byokit)\n'
     '- distant - Remote (host: box; root: /srv; home: /srv/home; scope: x; projects: y)\n')
 for rel in ('skills', '.agents/skills'):
     for name in ('widget', 'gadget'):
@@ -537,10 +537,10 @@ met('rl-legacy', 'kind=ship', 'harness=claude', 'model=claude-opus-5-5', 'effort
 rec('rl-legacy')
 leg = row('rl-legacy')[0].split('\t')
 assert 'claude:claude-opus-5-5:xhigh' in leg[4] and leg[5] == '1700000300', 'fallback uses the record model and spawn_gen epoch'
-met('rl-secondmate', 'kind=secondmate', 'harness=pi', 'model=muse', 'effort=medium')
+met('rl-squad-lead', 'kind=squad_lead', 'harness=pi', 'model=muse', 'effort=medium')
 n0 = nrows()
-rec('rl-secondmate')
-assert nrows() == n0, 'a secondmate retirement appends nothing'
+rec('rl-squad-lead')
+assert nrows() == n0, 'a squad_lead retirement appends nothing'
 rec('rl-absent')
 assert nrows() == n0, 'a missing record appends nothing'
 head = outcomes.read_text().splitlines()

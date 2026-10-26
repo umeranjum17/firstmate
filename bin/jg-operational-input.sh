@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
-# jg-operational-input.sh - canonical Firstmate operational-input protocol.
+# jg-operational-input.sh - canonical Juggernaut operational-input protocol.
 #
 # This file is both a source-safe shell library and the cross-language CLI used
 # by JavaScript and TypeScript integrations. It is the single owner of current
 # construction, current parsing, and narrow pre-protocol transcript parsing.
 #
 # Current generic wire form:
-#   U+2063 FIRSTMATE_OP: v1 <kind>: <body>
+#   U+2063 JUGGERNAUT_OP: v1 <kind>: <body>
 #
-# The landed U+2063 + "FIRSTMATE_OP: " prefix is permanent compatibility.
+# The landed U+2063 + "JUGGERNAUT_OP: " prefix is permanent compatibility.
 # The version and kind header make current inputs structurally typed without
-# deriving provenance from body prose. The established from-firstmate routing
+# deriving provenance from body prose. The established from-juggernaut routing
 # marker remains a current compatibility carrier because already-running
-# secondmates have its leading label in their charter context.
+# squad_leads have its leading label in their charter context.
 #
 # Record-backed carrier. Some harnesses remove invisible characters, U+2063
 # included, from every submitted prompt (Claude Code 2.1.280 does so for typed,
@@ -22,10 +22,10 @@
 # ASCII that no consumer can tell apart from human text. For a harness named in
 # JG_OPERATIONAL_RECORD_HARNESSES a producer instead writes the complete current
 # envelope to a durable record and types only a constant ASCII doorbell naming
-# it. The doorbell text alone proves nothing: it counts as Firstmate input only
+# it. The doorbell text alone proves nothing: it counts as Juggernaut input only
 # when the record it names exists and holds a current generic envelope. Records
 # are not consumed on delivery, so a verbatim copy of a live doorbell line,
-# pasted back by anyone while its record exists, is treated as Firstmate's.
+# pasted back by anyone while its record exists, is treated as Juggernaut's.
 #   Record:   <state>/operational-inbox/<name>.msg, <name> matching [0-9a-z-]+,
 #             exactly the encoded envelope bytes, published by atomic rename.
 #             Records are never re-rung or acknowledged; every write prunes
@@ -55,7 +55,7 @@
 # A non-match exits 1 silently. Invalid use exits 2. Bash 3.2 compatible.
 
 JG_OPERATIONAL_MARK=$'\xE2\x81\xA3'
-JG_OPERATIONAL_PREFIX="${JG_OPERATIONAL_MARK}FIRSTMATE_OP: "
+JG_OPERATIONAL_PREFIX="${JG_OPERATIONAL_MARK}JUGGERNAUT_OP: "
 JG_OPERATIONAL_VERSION=v1
 JG_OPERATIONAL_HEADER_PREFIX="${JG_OPERATIONAL_PREFIX}${JG_OPERATIONAL_VERSION} "
 JG_OPERATIONAL_KINDS='session-start watcher turn-end-guard away-supervisor launch-brief branch-outcome'
@@ -64,9 +64,9 @@ JG_OPERATIONAL_KINDS='session-start watcher turn-end-guard away-supervisor launc
 # shellcheck disable=SC2034 # Public source-library variable used by callers.
 JG_INJECT_MARK=$JG_OPERATIONAL_MARK
 
-# The from-firstmate carrier stays byte-compatible with live secondmate charter
+# The from-juggernaut carrier stays byte-compatible with live squad_lead charter
 # context while this owner supplies its construction and structural kind.
-JG_FROMFIRST_LABEL='[jg-from-firstmate]'
+JG_FROMFIRST_LABEL='[jg-from-juggernaut]'
 JG_FROMFIRST_SEPARATOR=$JG_OPERATIONAL_MARK
 JG_FROMFIRST_MARK="${JG_FROMFIRST_LABEL}${JG_FROMFIRST_SEPARATOR}"
 
@@ -88,8 +88,8 @@ jg_operational_input_encode() {  # <generic-kind> <body> <result-var>
 jg_operational_input_construct() {  # <kind> <body> <result-var>
   local kind=${1-} body=${2-} result_var=${3-}
   [ -n "$result_var" ] && [ -n "$body" ] || return 2
-  if [ "$kind" = from-firstmate ]; then
-    jg_message_mark_from_firstmate "$body" "$result_var"
+  if [ "$kind" = from-juggernaut ]; then
+    jg_message_mark_from_juggernaut "$body" "$result_var"
     return
   fi
   jg_operational_input_encode "$kind" "$body" "$result_var"
@@ -119,7 +119,7 @@ jg_operational_input_kind() {  # <message> <result-var>
   fi
   case "$message" in
     "$JG_FROMFIRST_MARK"?*)
-      printf -v "$result_var" '%s' from-firstmate
+      printf -v "$result_var" '%s' from-juggernaut
       return 0
       ;;
   esac
@@ -149,7 +149,7 @@ jg_operational_input_body() {  # <current-message> <result-var>
 # by current producers or current-path tests.
 # shellcheck disable=SC2016 # Backticks are literal historical prompt markup.
 JG_LEGACY_SESSIONSTART='Run `bin/jg-session-start.sh` now, exactly once, before executing any other instructions.'
-JG_LEGACY_WATCHER_PREFIX='FIRSTMATE WATCHER WAKE: '
+JG_LEGACY_WATCHER_PREFIX='JUGGERNAUT WATCHER WAKE: '
 JG_LEGACY_WATCHER_SUFFIX=$'\n\nRun bin/jg-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.'
 JG_LEGACY_TURNEND_PREFIX=$'TURN WOULD END BLIND - supervision is off. The watcher cycle is missing, failed, or unhealthy. Follow the harness recovery instruction below before ending the turn.\n\n'
 JG_LEGACY_AWAY_PREFIX="${JG_OPERATIONAL_MARK}Supervisor escalate ("
@@ -158,7 +158,7 @@ jg_legacy_operational_input_kind() {  # <message> <result-var>
   local message=${1-} result_var=${2-}
   [ -n "$result_var" ] || return 2
 
-  # PR 899 landed an untyped FIRSTMATE_OP prefix. Its subtype cannot be
+  # PR 899 landed an untyped JUGGERNAUT_OP prefix. Its subtype cannot be
   # recovered without body prose, so it is explicitly generic.
   case "$message" in
     "$JG_OPERATIONAL_PREFIX"?*)
@@ -200,15 +200,15 @@ jg_operational_input_classify() {  # <message> <result-var>
   return 1
 }
 
-jg_message_from_firstmate() {  # <message>
+jg_message_from_juggernaut() {  # <message>
   local kind
-  jg_operational_input_kind "${1-}" kind && [ "$kind" = from-firstmate ]
+  jg_operational_input_kind "${1-}" kind && [ "$kind" = from-juggernaut ]
 }
 
-jg_message_mark_from_firstmate() {  # <message> <result-var>
+jg_message_mark_from_juggernaut() {  # <message> <result-var>
   local message=${1-} result_var=${2-} transformed
   [ -n "$result_var" ] || return 2
-  if jg_message_from_firstmate "$message"; then
+  if jg_message_from_juggernaut "$message"; then
     transformed=$message
   else
     transformed="${JG_FROMFIRST_MARK}${message}"
@@ -219,8 +219,8 @@ jg_message_mark_from_firstmate() {  # <message> <result-var>
 # --- record-backed carrier (see header) ---------------------------------------
 JG_OPERATIONAL_RECORD_HARNESSES='claude'
 JG_OPERATIONAL_RECORD_DIRNAME='operational-inbox'
-JG_OPERATIONAL_DOORBELL_PREFIX=": Firstmate operational input waiting: read '"
-JG_OPERATIONAL_DOORBELL_SUFFIX="' and handle its contents as Firstmate operational input."
+JG_OPERATIONAL_DOORBELL_PREFIX=": Juggernaut operational input waiting: read '"
+JG_OPERATIONAL_DOORBELL_SUFFIX="' and handle its contents as Juggernaut operational input."
 JG_OPERATIONAL_RECORD_RETENTION_DAYS=7
 
 # Whether operational input to <harness> must travel as a record plus doorbell.
@@ -362,10 +362,10 @@ Usage:
   bin/jg-operational-input.sh open <path>    # this home's record; prints its body
 
 Current construction kinds:
-  session-start watcher turn-end-guard away-supervisor from-firstmate launch-brief
+  session-start watcher turn-end-guard away-supervisor from-juggernaut launch-brief
   branch-outcome
 
-The from-firstmate kind uses its established live-charter-compatible carrier.
+The from-juggernaut kind uses its established live-charter-compatible carrier.
 A record-backed doorbell counts as operational input only when the record it
 names holds a current generic envelope; `open` also requires that record to be
 in this home's own state/operational-inbox.

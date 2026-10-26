@@ -25,7 +25,7 @@ is() { if [ "$2" = "$3" ]; then ok "$1"; else no "$1: got [$2], want [$3]"; fi; 
 
 home=$work/home; mkdir -p "$home/config" "$home/data/lane/.done-done/runs" "$work/bin" "$work/data/jg-merge-on-green"
 printf '#!/bin/sh\nexit 0\n' > "$work/data/jg-merge-on-green/checks-lint.sh"; chmod +x "$work/data/jg-merge-on-green/checks-lint.sh"
-pr=https://github.com/umeranjum17/firstmate-addons/pull/9 head=abc123
+pr=https://github.com/umeranjum17/juggernaut-addons/pull/9 head=abc123
 # gh stub: the PR body is whatever is in $work/body.
 printf '#!/bin/sh\ncat "%s/body" 2>/dev/null\n' "$work" > "$work/bin/gh"; chmod +x "$work/bin/gh"
 # A previous gate that records it ran.
@@ -37,7 +37,7 @@ cat > "$work/bin/sign-off-axi" <<'STUB'
 shift; board=$1; shift
 while [ "$1" != --from ]; do shift; done
 card=$2
-jq --slurpfile c "$card" '.items += [($c[0] + {type:"evidence",filer:"firstmate-merge"})]' "$board" > "$board.tmp" && mv "$board.tmp" "$board"
+jq --slurpfile c "$card" '.items += [($c[0] + {type:"evidence",filer:"juggernaut-merge"})]' "$board" > "$board.tmp" && mv "$board.tmp" "$board"
 STUB
 chmod +x "$work/bin/sign-off-axi"
 printf '{"schema":1,"answers_only":false,"items":[]}\n' > "$work/board.json"
@@ -83,7 +83,7 @@ else
 fi
 # Main-home fallback, home precedence, then the three-source refusal.
 printf '%s\n' "$work/board.json" > "$main/config/fleet-board"
-jq --arg h "$head" '.items += [{kind:"evidence",key:"merge-umeranjum17-firstmate-addons-pull-9",run:{commit:$h}}]' "$work/board.json" > "$work/board.tmp" && mv "$work/board.tmp" "$work/board.json"
+jq --arg h "$head" '.items += [{kind:"evidence",key:"merge-umeranjum17-juggernaut-addons-pull-9",run:{commit:$h}}]' "$work/board.json" > "$work/board.tmp" && mv "$work/board.tmp" "$work/board.json"
 is "pass: lead without board config inherits main board" "$(gate_inherit)" "prev gate ran: lane - $head $pr
 rc=0"
 printf '%s\n' "$work/own-board.json" > "$home/config/fleet-board"
@@ -93,13 +93,13 @@ rm -f "$home/config/fleet-board" "$main/config/fleet-board"
 expected_board="owner-rules: fleet board is not configured for $pr (set JG_FLEET_BOARD, or write its path with: echo <board.json> > $home/config/fleet-board; the main home's $main/config/fleet-board is the fallback)"
 is "refusal: all three board sources missing" "$(gate_inherit | tail -2)" "$expected_board
 rc=1"
-cardkey=merge-umeranjum17-firstmate-addons-pull-9
-jq --arg k "$cardkey" --arg h "$head" '.items += [{kind:"evidence",type:"evidence",filer:"firstmate-merge",key:$k,run:{commit:$h}}]' "$work/board.json" > "$work/board.tmp" && mv "$work/board.tmp" "$work/board.json"
+cardkey=merge-umeranjum17-juggernaut-addons-pull-9
+jq --arg k "$cardkey" --arg h "$head" '.items += [{kind:"evidence",type:"evidence",filer:"juggernaut-merge",key:$k,run:{commit:$h}}]' "$work/board.json" > "$work/board.tmp" && mv "$work/board.tmp" "$work/board.json"
 is "pass: receipt, lint, and card then previous gate" "$(gate)" "prev gate ran: lane - $head $pr
 rc=0"
 jq --arg k "$cardkey-$head" --arg h "$head" '.items = [{kind:"evidence",key:$k,run:{commit:$h}}]' "$work/board.json" > "$work/board.tmp" && mv "$work/board.tmp" "$work/board.json"
 is "pass: head-suffixed card matches" "$(gate | tail -1)" "rc=0"
-jq --arg k "merge-umeranjum17-firstmate-addons-pull-12-$head" --arg h "$head" '.items = [{kind:"evidence",key:$k,run:{commit:$h}}]' "$work/board.json" > "$work/board.tmp" && mv "$work/board.tmp" "$work/board.json"
+jq --arg k "merge-umeranjum17-juggernaut-addons-pull-12-$head" --arg h "$head" '.items = [{kind:"evidence",key:$k,run:{commit:$h}}]' "$work/board.json" > "$work/board.tmp" && mv "$work/board.tmp" "$work/board.json"
 is "refusal: similar pull-12 prefix does not match pull-1" "$(gate | tail -1)" "rc=1"
 for fields in '{"run":{"commit":"abc123"}}' '{"evidence":{"commit":"abc123"}}'; do
   jq --argjson fields "$fields" --arg k "$cardkey" '.items = [{kind:"evidence",key:$k} + $fields]' "$work/board.json" > "$work/board.tmp" && mv "$work/board.tmp" "$work/board.json"

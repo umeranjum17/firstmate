@@ -158,7 +158,7 @@ test_operational_foreign_and_unowned_input_is_dropped() {
   local home other
   home=$(make_home dropped)
   as_session "$home" '
-    printf "%s" "{\"hook_event_name\":\"UserPromptSubmit\",\"prompt\":\"\342\201\243FIRSTMATE_OP: v1 watcher: signal: demo.status\"}" \
+    printf "%s" "{\"hook_event_name\":\"UserPromptSubmit\",\"prompt\":\"\342\201\243JUGGERNAUT_OP: v1 watcher: signal: demo.status\"}" \
       | JG_ROOT_OVERRIDE="$PRIMARY_ROOT" "$MIRROR" hook claude
     printf "%s" "{\"hook_event_name\":\"UserPromptSubmit\",\"prompt\":\"from cursor\",\"cursor_version\":\"x\"}" \
       | JG_ROOT_OVERRIDE="$PRIMARY_ROOT" "$MIRROR" hook claude

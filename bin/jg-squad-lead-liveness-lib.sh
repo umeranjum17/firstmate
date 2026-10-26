@@ -2,13 +2,13 @@
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # shellcheck disable=SC2034 # Probe/relaunch output globals are read by sourcing callers.
-# jg-secondmate-liveness-lib.sh - shared persistent-secondmate endpoint liveness
+# jg-squad-lead-liveness-lib.sh - shared persistent-squad-lead endpoint liveness
 # probing and recovery. bin/jg-bootstrap.sh owns the session-start sweep and
 # bin/jg-watch.sh owns the ordinary-supervision poll tick; both drive this
 # library so classification handling and the guarded relaunch path stay
 # single-sourced here.
 #
-# A secondmate's recorded endpoint is the tmux window, herdr pane, or remote
+# A squad_lead's recorded endpoint is the tmux window, herdr pane, or remote
 # peer it runs in. Probing classifies that endpoint through the owning backend
 # adapter's jg_backend_agent_state (local) or the remote control script's
 # state verb (remote), which returns one of:
@@ -28,7 +28,7 @@
 # live one - and an unreachable remote host is never evidence of death, so a
 # remote route is never replaced by a local endpoint.
 #
-# Relaunch goes through `bin/jg-spawn.sh <id> --secondmate` with
+# Relaunch goes through `bin/jg-spawn.sh <id> --squad-lead` with
 # JG_SPAWN_NO_GUARD=1, the same guarded path every recovery uses. That path
 # re-resolves placement from the task's own metadata and registry route, so a
 # remote mate is relaunched on its recorded remote host through bin/jg-on.sh -
@@ -43,13 +43,13 @@
 #          check; repair still happens, but inside jg-spawn's launch gate only
 #          when a relaunch is actually authorized.
 #
-# Concurrency: jg_secondmate_liveness_lock serializes probe+kill+relaunch per
+# Concurrency: jg_squad_lead_liveness_lock serializes probe+kill+relaunch per
 # task across the bootstrap sweep and the watcher tick, so a concurrent
 # relaunch can never be observed mid-flight as a dead endpoint and killed.
 # A separate per-home lock serializes relaunches of different mates, since each
 # fresh spawn owns the same task-set lock. The watcher uses its spawn timeout
 # as the lock-wait bound; an untimed sweep defaults to 600 seconds.
-# The attempt ledger (.secondmate-relaunch-<id>, one line per attempt plus one
+# The attempt ledger (.squad-lead-relaunch-<id>, one line per attempt plus one
 # per outcome) is both the durable relaunch record and the input to the
 # watcher's relaunch bound; teardown removes it.
 
@@ -76,14 +76,14 @@ jg_sm_live_require_locks() {
   . "$JG_SM_LIVE_LIB_DIR/jg-wake-lib.sh"
 }
 
-jg_secondmate_liveness_lock() {  # <id>
+jg_squad_lead_liveness_lock() {  # <id>
   jg_sm_live_require_locks || return 1
-  jg_lock_try_acquire "$STATE/.secondmate-liveness-$1.lock"
+  jg_lock_try_acquire "$STATE/.squad-lead-liveness-$1.lock"
 }
 
-jg_secondmate_liveness_unlock() {  # <id>
+jg_squad_lead_liveness_unlock() {  # <id>
   jg_sm_live_require_locks || return 0
-  jg_lock_release "$STATE/.secondmate-liveness-$1.lock" 2>/dev/null || true
+  jg_lock_release "$STATE/.squad-lead-liveness-$1.lock" 2>/dev/null || true
 }
 
 jg_sm_live_first_line() {
@@ -94,8 +94,8 @@ jg_sm_live_first_line() {
 # `rearmed` row when a live probe lifts a parked mate. The whole file is the
 # durable per-mate relaunch record; recent_attempts below owns bound counting.
 # Fails when the row cannot be appended.
-jg_secondmate_liveness_ledger_add() {  # <id> <attempt|relaunched|failed|rearmed>
-  printf '%s\t%s\n' "$(date +%s)" "$2" 2>/dev/null >> "$STATE/.secondmate-relaunch-$1"
+jg_squad_lead_liveness_ledger_add() {  # <id> <attempt|relaunched|failed|rearmed>
+  printf '%s\t%s\n' "$(date +%s)" "$2" 2>/dev/null >> "$STATE/.squad-lead-relaunch-$1"
 }
 
 # Count `attempt` rows and `failed` rows not immediately preceded by an
@@ -103,9 +103,9 @@ jg_secondmate_liveness_ledger_add() {  # <id> <attempt|relaunched|failed|rearmed
 # This charges failures before admission without double-counting a failed
 # admitted launch; memory deferrals append neither row and consume no budget.
 # An absent ledger counts zero; an unreadable ledger fails rather than counting zero.
-jg_secondmate_liveness_recent_attempts() {  # <id> <window-secs>
+jg_squad_lead_liveness_recent_attempts() {  # <id> <window-secs>
   local id=$1 window=$2 now cutoff ledger
-  ledger="$STATE/.secondmate-relaunch-$id"
+  ledger="$STATE/.squad-lead-relaunch-$id"
   if [ ! -e "$ledger" ] && [ ! -L "$ledger" ]; then
     printf '0\n'
     return 0
@@ -119,9 +119,9 @@ jg_secondmate_liveness_recent_attempts() {  # <id> <window-secs>
     "$ledger" 2>/dev/null
 }
 
-# jg_secondmate_liveness_probe <meta> <id> <full|poll>
+# jg_squad_lead_liveness_probe <meta> <id> <full|poll>
 #
-# Read-only probe of one registered secondmate's recorded endpoint. Populates:
+# Read-only probe of one registered squad_lead's recorded endpoint. Populates:
 #
 #   JG_SM_LIVE_STATUS  silent | alive | relaunchable | skipped
 #   JG_SM_LIVE_STATE   the raw classifier/state word
@@ -133,11 +133,11 @@ jg_secondmate_liveness_recent_attempts() {  # <id> <window-secs>
 #   JG_SM_LIVE_LINE    verbose already-live line body, on alive
 #
 # `silent` means the meta records no endpoint at all - that shape is owned by
-# secondmate-provisioning recovery, not liveness.
+# squad-lead-provisioning recovery, not liveness.
 #
-# The caller must hold jg_secondmate_liveness_lock for <id> whenever a
+# The caller must hold jg_squad_lead_liveness_lock for <id> whenever a
 # relaunchable verdict could be acted on.
-jg_secondmate_liveness_probe() {  # <meta> <id> <full|poll>
+jg_squad_lead_liveness_probe() {  # <meta> <id> <full|poll>
   local meta=$1 id=$2 mode=$3
   JG_SM_LIVE_STATUS=skipped JG_SM_LIVE_STATE=unknown JG_SM_LIVE_KILL=0
   JG_SM_LIVE_CAUSE='' JG_SM_LIVE_WHERE='' JG_SM_LIVE_REASON='' JG_SM_LIVE_LINE=''
@@ -163,7 +163,7 @@ jg_secondmate_liveness_probe() {  # <meta> <id> <full|poll>
         return 0
       fi
     fi
-    if out=$("$JG_SM_LIVE_LIB_DIR/jg-on.sh" "$id" jg-remote-secondmate-control.sh state "$id" < /dev/null 2>/dev/null); then
+    if out=$("$JG_SM_LIVE_LIB_DIR/jg-on.sh" "$id" jg-remote-squad-lead-control.sh state "$id" < /dev/null 2>/dev/null); then
       remote_rc=0
     else
       remote_rc=$?
@@ -181,7 +181,7 @@ jg_secondmate_liveness_probe() {  # <meta> <id> <full|poll>
     case "$agent_state" in
       alive)
         if [ "$mode" = full ]; then
-          if route_out=$("$JG_SM_LIVE_LIB_DIR/jg-on.sh" "$id" jg-remote-secondmate-control.sh route "$id" < /dev/null 2>/dev/null); then
+          if route_out=$("$JG_SM_LIVE_LIB_DIR/jg-on.sh" "$id" jg-remote-squad-lead-control.sh route "$id" < /dev/null 2>/dev/null); then
             remote_rc=0
           else
             remote_rc=$?
@@ -201,7 +201,7 @@ jg_secondmate_liveness_probe() {  # <meta> <id> <full|poll>
           fi
         fi
         JG_SM_LIVE_STATUS=alive
-        JG_SM_LIVE_LINE="remote secondmate $id already live (host=$remote_host)"
+        JG_SM_LIVE_LINE="remote squad_lead $id already live (host=$remote_host)"
         ;;
       dead|missing)
         JG_SM_LIVE_STATUS=relaunchable
@@ -233,7 +233,7 @@ jg_secondmate_liveness_probe() {  # <meta> <id> <full|poll>
   case "$agent_state" in
     alive)
       JG_SM_LIVE_STATUS=alive
-      JG_SM_LIVE_LINE="secondmate $id already live (backend=$backend)"
+      JG_SM_LIVE_LINE="squad_lead $id already live (backend=$backend)"
       ;;
     dead|missing)
       JG_SM_LIVE_STATUS=relaunchable
@@ -261,23 +261,23 @@ jg_secondmate_liveness_probe() {  # <meta> <id> <full|poll>
   return 0
 }
 
-# jg_secondmate_relaunch_lock_acquire [wait-secs]
+# jg_squad_lead_relaunch_lock_acquire [wait-secs]
 # Mutex-only take of the per-home relaunch lock (no ledger, no kill), so
 # parallel supervisors serialize before a guarded spawn. Bounded wait,
 # default 600 seconds. Callers that already hold it (a relaunch that
 # pre-acquired below, with the child skipping its own take) must not call
 # this again: same-process re-acquire drops and recreates the hold.
-jg_secondmate_relaunch_lock_acquire() {  # [wait-secs]
+jg_squad_lead_relaunch_lock_acquire() {  # [wait-secs]
   jg_sm_live_require_locks || return 1
-  jg_lock_acquire_wait_bounded "$STATE/.secondmate-relaunch.lock" "${1:-600}"
+  jg_lock_acquire_wait_bounded "$STATE/.squad-lead-relaunch.lock" "${1:-600}"
 }
 
-# jg_secondmate_liveness_begin <meta> <id> [lock-wait-secs]
+# jg_squad_lead_liveness_begin <meta> <id> [lock-wait-secs]
 # Commit an authorized recovery attempt before removing a confirmed-dead
 # endpoint. Takes the per-home relaunch lock (bounded wait, default 600
 # seconds) so relaunches of different mates serialize; the lock is held across
-# the guarded spawn and released by jg_secondmate_liveness_relaunch after it
-# records the outcome. When JG_SECONDMATE_RELAUNCH_PREACQUIRED=1 the caller
+# the guarded spawn and released by jg_squad_lead_liveness_relaunch after it
+# records the outcome. When JG_SQUAD_LEAD_RELAUNCH_PREACQUIRED=1 the caller
 # already holds it across this recovery, so the take is skipped while the
 # ledger commit and the kill below still run. A lock owned by an
 # already-exited spawn child releases as a no-op with ordinary stale-owner
@@ -285,26 +285,26 @@ jg_secondmate_relaunch_lock_acquire() {  # [wait-secs]
 # leaves the endpoint untouched and sets JG_SM_LIVE_STATUS=skipped with
 # JG_SM_LIVE_REASON.
 # Caller holds the liveness lock.
-jg_secondmate_liveness_begin() {
+jg_squad_lead_liveness_begin() {
   local meta=$1 id=$2 wait_seconds=${3:-600} relaunch_lock
-  if ! jg_secondmate_liveness_recent_attempts "$id" 0 >/dev/null; then
+  if ! jg_squad_lead_liveness_recent_attempts "$id" 0 >/dev/null; then
     JG_SM_LIVE_STATUS=skipped
-    JG_SM_LIVE_REASON="relaunch ledger $STATE/.secondmate-relaunch-$id is unreadable; endpoint left $JG_SM_LIVE_STATE"
+    JG_SM_LIVE_REASON="relaunch ledger $STATE/.squad-lead-relaunch-$id is unreadable; endpoint left $JG_SM_LIVE_STATE"
     JG_SM_LIVE_RC=1
     return 1
   fi
   jg_sm_live_require_locks || return 1
-  relaunch_lock="$STATE/.secondmate-relaunch.lock"
-  if [ "${JG_SECONDMATE_RELAUNCH_PREACQUIRED:-0}" != 1 ] && ! jg_secondmate_relaunch_lock_acquire "$wait_seconds"; then
+  relaunch_lock="$STATE/.squad-lead-relaunch.lock"
+  if [ "${JG_SQUAD_LEAD_RELAUNCH_PREACQUIRED:-0}" != 1 ] && ! jg_squad_lead_relaunch_lock_acquire "$wait_seconds"; then
     JG_SM_LIVE_STATUS=skipped
-    JG_SM_LIVE_REASON="another secondmate relaunch still owns the per-home relaunch lock after ${wait_seconds}s; endpoint left $JG_SM_LIVE_STATE"
+    JG_SM_LIVE_REASON="another squad_lead relaunch still owns the per-home relaunch lock after ${wait_seconds}s; endpoint left $JG_SM_LIVE_STATE"
     JG_SM_LIVE_RC=1
     return 1
   fi
-  if ! jg_secondmate_liveness_ledger_add "$id" attempt; then
+  if ! jg_squad_lead_liveness_ledger_add "$id" attempt; then
     jg_lock_release "$relaunch_lock" || true
     JG_SM_LIVE_STATUS=skipped
-    JG_SM_LIVE_REASON="relaunch ledger $STATE/.secondmate-relaunch-$id is unwritable; endpoint left $JG_SM_LIVE_STATE"
+    JG_SM_LIVE_REASON="relaunch ledger $STATE/.squad-lead-relaunch-$id is unwritable; endpoint left $JG_SM_LIVE_STATE"
     JG_SM_LIVE_RC=1
     return 1
   fi
@@ -334,31 +334,31 @@ jg_secondmate_liveness_begin() {
 # a lock owned by an already-exited spawn child releases as a no-op.
 # Returns the spawn status in JG_SM_LIVE_RC and combined output in JG_SM_LIVE_OUT;
 # the caller owns reporting.
-jg_secondmate_liveness_relaunch() {  # <meta> <id> [timeout-secs]
+jg_squad_lead_liveness_relaunch() {  # <meta> <id> [timeout-secs]
   local meta=$1 id=$2 timeout=${3:-} recovery=1 preacquired=0 relaunch_lock rc=0 wait_seconds
   JG_SM_LIVE_OUT='' JG_SM_LIVE_RC=0
-  relaunch_lock="$STATE/.secondmate-relaunch.lock"
-  if ! JG_SM_LIVE_OUT=$("$JG_SM_LIVE_LIB_DIR/jg-harness.sh" secondmate "$id" 2>&1); then
+  relaunch_lock="$STATE/.squad-lead-relaunch.lock"
+  if ! JG_SM_LIVE_OUT=$("$JG_SM_LIVE_LIB_DIR/jg-harness.sh" squad_lead "$id" 2>&1); then
     JG_SM_LIVE_RC=1
     return 1
   fi
   if [ -n "$(jg_meta_get "$meta" remote_host)" ]; then
-    jg_secondmate_liveness_begin "$meta" "$id" "${timeout:-600}" || return 1
+    jg_squad_lead_liveness_begin "$meta" "$id" "${timeout:-600}" || return 1
     recovery=0
   else
     wait_seconds=${timeout:-600}
-    if ! jg_secondmate_relaunch_lock_acquire "$wait_seconds"; then
+    if ! jg_squad_lead_relaunch_lock_acquire "$wait_seconds"; then
       JG_SM_LIVE_STATUS=skipped
-      JG_SM_LIVE_REASON="another secondmate relaunch still owns the per-home relaunch lock after ${wait_seconds}s; endpoint left $JG_SM_LIVE_STATE"
+      JG_SM_LIVE_REASON="another squad_lead relaunch still owns the per-home relaunch lock after ${wait_seconds}s; endpoint left $JG_SM_LIVE_STATE"
       JG_SM_LIVE_RC=1
       return 1
     fi
     preacquired=1
   fi
   if [ -n "$timeout" ]; then
-    JG_SM_LIVE_OUT=$(JG_SPAWN_NO_GUARD=1 JG_SECONDMATE_LIVENESS_RECOVERY=$recovery JG_SECONDMATE_RELAUNCH_PREACQUIRED=$preacquired jg_run_timed "$timeout" "$JG_ROOT/bin/jg-spawn.sh" "$id" --secondmate 2>&1) || rc=$?
+    JG_SM_LIVE_OUT=$(JG_SPAWN_NO_GUARD=1 JG_SQUAD_LEAD_LIVENESS_RECOVERY=$recovery JG_SQUAD_LEAD_RELAUNCH_PREACQUIRED=$preacquired jg_run_timed "$timeout" "$JG_ROOT/bin/jg-spawn.sh" "$id" --squad-lead 2>&1) || rc=$?
   else
-    JG_SM_LIVE_OUT=$(JG_SPAWN_NO_GUARD=1 JG_SECONDMATE_LIVENESS_RECOVERY=$recovery JG_SECONDMATE_RELAUNCH_PREACQUIRED=$preacquired "$JG_ROOT/bin/jg-spawn.sh" "$id" --secondmate 2>&1) || rc=$?
+    JG_SM_LIVE_OUT=$(JG_SPAWN_NO_GUARD=1 JG_SQUAD_LEAD_LIVENESS_RECOVERY=$recovery JG_SQUAD_LEAD_RELAUNCH_PREACQUIRED=$preacquired "$JG_ROOT/bin/jg-spawn.sh" "$id" --squad-lead 2>&1) || rc=$?
   fi
   JG_SM_LIVE_RC=$rc
   case "$rc" in
@@ -379,9 +379,9 @@ jg_secondmate_liveness_relaunch() {  # <meta> <id> [timeout-secs]
       return "$rc" ;;
   esac
   if [ "$rc" -eq 0 ]; then
-    jg_secondmate_liveness_ledger_add "$id" relaunched || true
+    jg_squad_lead_liveness_ledger_add "$id" relaunched || true
   else
-    jg_secondmate_liveness_ledger_add "$id" failed || true
+    jg_squad_lead_liveness_ledger_add "$id" failed || true
   fi
   jg_lock_release "$relaunch_lock" || true
   return "$rc"

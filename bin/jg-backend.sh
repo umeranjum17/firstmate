@@ -2,7 +2,7 @@
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-backend.sh - runtime-backend selection, meta helpers, selector resolution,
-# and dispatch for firstmate's session-provider abstraction.
+# and dispatch for juggernaut's session-provider abstraction.
 #
 # Design: data/jg-backend-design-d7/report.md ("Backend Interface") and
 # data/jg-backend-design-d7/herdr-addendum.md ("Events as the core
@@ -12,7 +12,7 @@
 # (tmux) path stays byte-identical. P2 adds bin/backends/herdr.sh, a verified
 # spawn-capable backend with its own required CI lane, behind `--backend
 # herdr`/`JG_BACKEND=herdr`/`config/backend`, and behind runtime auto-detection
-# when firstmate itself is running inside herdr with no explicit backend setting;
+# when juggernaut itself is running inside herdr with no explicit backend setting;
 # see herdr-addendum.md and data/jg-backend-design-d7/herdr-verification-p2.md for
 # its empirical basis.
 # P3 adds bin/backends/zellij.sh, also EXPERIMENTAL and spawn-capable, behind
@@ -23,7 +23,7 @@
 # for its empirical basis. P4 makes Orca spawn-capable: Orca owns both the
 # task worktree and the terminal endpoint. P5 adds bin/backends/cmux.sh, also
 # EXPERIMENTAL and spawn-capable, behind `--backend cmux`/`JG_BACKEND=cmux`/
-# `config/backend`, and behind runtime auto-detection when firstmate itself is
+# `config/backend`, and behind runtime auto-detection when juggernaut itself is
 # running inside a cmux-spawned terminal (primary CMUX_WORKSPACE_ID marker, or
 # the documented macOS fallback signals when cmux's claude wrapper strips that
 # marker) with no explicit backend setting - unlike Orca, which stays
@@ -41,7 +41,7 @@
 #
 # Event-source framing (herdr-addendum "Events as the core abstraction"): a
 # backend's supervision surface is conceptually an EVENT SOURCE - it produces
-# task events (status-changed, went-stale, exited) that map onto firstmate's
+# task events (status-changed, went-stale, exited) that map onto juggernaut's
 # existing signal/stale/check/heartbeat wake vocabulary. The tmux adapter has
 # no native event push, so jg-watch.sh's poll loop over the pull primitives
 # below (capture, list-live, busy-state via regex) IS the default event-source
@@ -90,7 +90,7 @@ jg_backend_is_known() {  # <name>
   jg_backend_list_contains "$JG_BACKEND_KNOWN" "$1"
 }
 
-# jg_backend_detect: detect the runtime firstmate itself is CURRENTLY executing
+# jg_backend_detect: detect the runtime juggernaut itself is CURRENTLY executing
 # inside, from verified environment markers (mirrors bin/jg-harness.sh's
 # env-marker detection layer for harnesses). Prints the detected backend name
 # and returns 0, or returns 1 when nothing is detected. Nesting resolves
@@ -120,7 +120,7 @@ jg_backend_is_known() {  # <name>
 # cmux FALLBACK signals (docs/cmux-backend.md "Runtime auto-detection" owns
 # the empirical record): cmux's bundled `claude` PATH shim routes through
 # cmux-claude-wrapper, whose passthrough path unsets every CMUX_* variable
-# before exec'ing the real binary - so a claude-harness firstmate launched in
+# before exec'ing the real binary - so a claude-harness juggernaut launched in
 # a cmux tab can have NO CMUX_WORKSPACE_ID at all. When that primary marker is
 # absent (and only then), two macOS-only fallback signals are consulted:
 #   1. __CFBundleIdentifier == com.cmuxterm.app - LaunchServices' app-identity
@@ -293,8 +293,8 @@ jg_backend_validate_spawn() {  # <name>
   return 1
 }
 
-# jg_backend_required_tools: the backend-SPECIFIC CLI tools a firstmate home on
-# <backend> genuinely requires, beyond firstmate's universal toolchain (owned by
+# jg_backend_required_tools: the backend-SPECIFIC CLI tools a juggernaut home on
+# <backend> genuinely requires, beyond juggernaut's universal toolchain (owned by
 # docs/configuration.md "Toolchain" and bootstrap's COMMON list). This is the
 # single owner of the per-backend dependency delta, so bootstrap follows the
 # RESOLVED backend instead of demanding an inactive backend's tools. Each set is:
@@ -389,7 +389,7 @@ jg_backend_endpoint_atom_valid() {  # <value>
 
 # An Orca worktree id is the composite `<orca id>::<absolute worktree path>`
 # that Orca itself returns, so the `:` and `/` characters every real value
-# carries make the simple-atom check reject it. Firstmate hands the id back to
+# carries make the simple-atom check reject it. Juggernaut hands the id back to
 # Orca opaquely and resolves it through Orca before removing anything, so this
 # proves only the shape that can name one worktree: both halves of the first
 # `::` split present, and the path half absolute.
@@ -696,7 +696,7 @@ jg_backend_source() {  # <name>
 # jg_backend_resolve_selector: resolve a raw jg-send.sh/jg-peek.sh style
 # selector to a live session-provider target. Four forms, in order:
 #   target with ":"   used as-is (the escape hatch for a window/pane outside
-#                      this firstmate home) - backend-independent, a literal string.
+#                      this juggernaut home) - backend-independent, a literal string.
 #   exact task id      routed through <state-dir>/<id>.meta's backend target
 #                      (`window=` normally, `terminal=` for Orca) -
 #                      backend-independent, a stored value, NOT re-verified
@@ -726,7 +726,7 @@ jg_backend_resolve_selector() {  # <raw-target> <state-dir>
   fi
   case "$raw" in
     jg-*)
-      echo "error: no metadata for $raw in $state; pass session:window to target a window outside this firstmate home" >&2
+      echo "error: no metadata for $raw in $state; pass session:window to target a window outside this juggernaut home" >&2
       return 1
       ;;
     *)
@@ -971,7 +971,7 @@ jg_backend_target_exists() {  # <backend> <target> [expected-label]
       # already bound on the machine - it silently queries whatever server IS
       # running instead. jg_backend_herdr_cli appends the required --session
       # flag on top, so this check is correctly scoped even when the caller's
-      # own ambient session (e.g. the primary firstmate's default session) is
+      # own ambient session (e.g. the primary juggernaut's default session) is
       # a DIFFERENT one than the target's.
       jg_backend_herdr_cli "$session" pane get "$pane" >/dev/null 2>&1
       ;;
@@ -1011,8 +1011,8 @@ jg_backend_target_exists() {  # <backend> <target> [expected-label]
 # process table, so a registration Herdr kept over a shell-only pane reads
 # `dead` here (issue #4115) - then maps a positively stopped session server to
 # `missing` only in this recovery-grade view. Zellij remains unverified because
-# its secondmate ghost-tab and agent-process recovery path has not been
-# empirically validated. Orca and cmux do not support secondmate spawns.
+# its squad_lead ghost-tab and agent-process recovery path has not been
+# empirically validated. Orca and cmux do not support squad_lead spawns.
 jg_backend_agent_state() {  # <backend> <target> [<meta> <task-id>]
   local backend=$1 target=$2
   jg_backend_source "$backend" || { printf 'unverified'; return 0; }

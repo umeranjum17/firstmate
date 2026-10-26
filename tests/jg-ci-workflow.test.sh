@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Contract tests for .github/workflows/ci.yml's runner-spend safeguards.
 #
-# Origin: the 2026-09-12 GitHub Actions starvation incident. firstmate CI had no
+# Origin: the 2026-09-12 GitHub Actions starvation incident. juggernaut CI had no
 # concurrency deduplication, so every superseded PR head kept its full job
 # fan-out, and four jobs carried no timeout at all. These tests hold both
 # safeguards: PR runs supersede within one PR while main pushes are never

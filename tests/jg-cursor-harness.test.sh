@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # tests/jg-cursor-harness.test.sh - the portable regression for the Cursor
-# Agent CLI crewmate/scout adapter.
+# Agent CLI operator/scout adapter.
 #
 # Cursor's identity, liveness, and busy checks are HARNESS-DEPENDENT: their
 # verdicts come from what the vendor emits (a process name, an env marker, a
@@ -21,7 +21,7 @@
 #      both (tests/jg-harness-precedence.test.sh owns that boundary).
 #   4. The transcript fold brackets a turn: a trailing turn_ended is idle, a
 #      later role:user is busy, and an unresolvable binding is unknown.
-#   5. Cursor is a crewmate/scout adapter only and refuses a secondmate launch.
+#   5. Cursor is a operator/scout adapter only and refuses a squad_lead launch.
 set -u
 
 # shellcheck source=tests/lib.sh

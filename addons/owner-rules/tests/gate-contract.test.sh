@@ -30,7 +30,7 @@ chmod +x "$work/bin/gh"
 # Ask the installed CLI to write a normal evidence item, then overlay the same run shape merge-card posts.
 # Real sign-off-axi validates and writes the merge-card-shaped evidence contract to this private board.
 jq -n --arg k "$key" --arg c "$head" '{contract:1,schema:1,kind:"evidence",key:$k,title:"Contract proof",about:"Gate commit contract.",link:"https://github.com/owner/repo/pull/9",run:{run_id:"contract-run",commit:$c,outcome:"Contract proof",repro:"see the merge note",proof:"done-done run contract-run",evidence:"proof.png"}}' > "$work/card.json"
-sign-off-axi post "$board" --kind evidence --from "$work/card.json" --filer firstmate-merge
+sign-off-axi post "$board" --kind evidence --from "$work/card.json" --filer juggernaut-merge
 if ! jq -e --arg k "$key" --arg c "$head" 'any(.items[]; .key==$k and .kind=="evidence" and .evidence.commit==$c)' "$board" >/dev/null; then echo 'FAIL: sign-off-axi card lost merge-card run.commit'; exit 1; fi
 run_gate() {
   printf '{"schema":1,"exit":0,"dirty":false,"commit":"%s","files":["proof.png"],"run_id":"contract-run"}\n' "$1" > "$home/data/lane/.done-done/runs/run.json"

@@ -12,7 +12,7 @@
 # `check` runs the mail poll from this home (sourcing the same .env and using
 # the same inbox state as jg-mail.sh itself). It composes with the existing
 # watcher state-check contract instead of needing a schedule of its own: a
-# printed line becomes a `check:` wake so firstmate can drain durable
+# printed line becomes a `check:` wake so juggernaut can drain durable
 # `check: mail <uid>` rows the poll already queued.
 #
 # `arm` writes state/mail.check.sh and binds its bytes with
@@ -312,7 +312,7 @@ shim_backup() {
 ARM_BACKUP=
 
 # An unregistered shim is not inert: the watcher rejects it on every cycle and
-# wakes firstmate about unauthenticated state checks. So the one rule after a
+# wakes juggernaut about unauthenticated state checks. So the one rule after a
 # failed or interrupted arm is that the home never holds a shim without a
 # matching trust binding. The shim a working home had is put back and kept only
 # when it is still bound; otherwise the shim goes, so the home is plainly not

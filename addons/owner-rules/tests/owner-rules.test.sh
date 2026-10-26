@@ -8,8 +8,8 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
   export "$_jg_new=$_jg_val"
 done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
-# owner-rules e2e: the real jg-brief.sh of a firstmate checkout that carries the brief-inherit seam.
-# Usage: owner-rules/tests/owner-rules.test.sh <firstmate-checkout>
+# owner-rules e2e: the real jg-brief.sh of a juggernaut checkout that carries the brief-inherit seam.
+# Usage: owner-rules/tests/owner-rules.test.sh <juggernaut-checkout>
 # Proves a no-owner-ask refusal, a no-risk-reason refusal and a clean pass (brief written), plus the
 # exemptions and the no-op when the add-on is not installed.
 set -u
@@ -17,7 +17,7 @@ here=$(cd "$(dirname "$0")" && pwd) || exit 1
 addons=$(cd "$here/../.." && pwd) || exit 1
 FM=${1:-}
 [ -n "$FM" ] && [ -x "$FM/bin/jg-brief.sh" ] && grep -q jg_brief_inherit_shared "$FM/bin/jg-brief.sh" \
-  || { echo "usage: $0 <firstmate-checkout with the brief-inherit seam>" >&2; exit 1; }
+  || { echo "usage: $0 <juggernaut-checkout with the brief-inherit seam>" >&2; exit 1; }
 work=$(mktemp -d "${TMPDIR:-/tmp}/owner-rules-e2e.XXXXXX") || exit 1
 trap 'rm -rf -- "$work"' EXIT
 export HOME=$work/user XDG_DATA_HOME=$work/data
@@ -104,8 +104,8 @@ is "pass: no-mistakes with risk: fork-repo" "$(brief fork-pr --mode no-mistakes)
 [ -s "$home/data/fork-pr/brief.md" ] && ok "fork-repo pass wrote the brief" || no "fork-repo pass wrote no brief"
 is "pass: scout is exempt from the risk rule" "$(brief with-ask-longer --scout)" "rc=0"
 is "pass: prefix id does not match a longer id" "$(brief with-ask --scout | tail -1)" "rc=1"
-JG_HOME=$home JG_ADDONS_DIR=$addons JG_SECONDMATE_CHARTER=x bash "$FM/bin/jg-brief.sh" sm --secondmate --no-projects >/dev/null 2>&1 \
-  && ok "pass: secondmate charter is exempt" || no "secondmate charter refused"
+JG_HOME=$home JG_ADDONS_DIR=$addons JG_SQUAD_LEAD_CHARTER=x bash "$FM/bin/jg-brief.sh" sm --squad-lead --no-projects >/dev/null 2>&1 \
+  && ok "pass: squad_lead charter is exempt" || no "squad_lead charter refused"
 
 tree=$(bash "$addons/owner-rules/bin/jg-owner-rules-tree.sh" "$home/data/backlog.md")
 printf '%s\n' "$tree" | grep -qF 'with-main: with-main -> with-ask -> [epic root]' && ok "tree: prints epic parent chain" || no "tree: epic parent chain missing"

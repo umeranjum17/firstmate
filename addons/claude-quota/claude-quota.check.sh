@@ -17,7 +17,7 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Usage: $0 [claude-accounts-json-file] (file = test input; CQ_MARK and CQ_HIST then name the repeat-state and
 # history files, default fresh temp files).
 set -u
-JG_MAIN=${JG_MAIN_HOME:-$HOME/firstmate}
+JG_MAIN=${JG_MAIN_HOME:-$HOME/juggernaut}
 MARK=$JG_MAIN/state/.claude-quota.last
 HIST=$JG_MAIN/state/.claude-quota.hist
 SRC=$JG_MAIN/state/claude-accounts.json

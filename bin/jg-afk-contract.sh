@@ -33,7 +33,7 @@
 # gate, and never asks for a go.
 #
 # THE RECORD IS THE WORDS. The captain's away words are the whole mandate: they
-# are recorded verbatim, read back as plain sentences by firstmate after entry,
+# are recorded verbatim, read back as plain sentences by juggernaut after entry,
 # and acted on by the supervision session's own judgment at the
 # moment an event makes them relevant, through the guarded scripts and under the
 # standing authority it already has (bin/jg-branch-prompt.sh "Postures" owns the
@@ -377,7 +377,7 @@ jg_afk_contract_validate() {  # <path>
 # --- rendering --------------------------------------------------------------
 
 # The read-back is the record's content and nothing else: the words verbatim
-# beside the entry time, expected return, spend cap, and reach line. Firstmate's
+# beside the entry time, expected return, spend cap, and reach line. Juggernaut's
 # plain-sentence restatement is spoken in chat after entry, and the execution
 # rules live in bin/jg-branch-prompt.sh, so this render stays a faithful mirror
 # of the record for the captain at entry and for the away session on every wake.

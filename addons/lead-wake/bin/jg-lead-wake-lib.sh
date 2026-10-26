@@ -8,8 +8,8 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
   export "$_jg_new=$_jg_val"
 done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
-# Sourced by the Firstmate watcher once, just before its main loop. The lead-wake
-# policy: a secondmate home sitting below its lane floor (or with no worker
+# Sourced by the Juggernaut watcher once, just before its main loop. The lead-wake
+# policy: a squad_lead home sitting below its lane floor (or with no worker
 # provably working) while jg-tasks-axi.sh ready has dispatchable work raises one
 # `check: ready work waiting ...` wake, re-raised every JG_READY_WORK_RESURFACE_SECS;
 # an emptied ready set withdraws the queued row; a stalled lead's drain ring names
@@ -93,7 +93,7 @@ warn_invalid_lane_target_once() {
   triage_log "lane-target is not a positive integer; using the no-worker-working rule instead"
 }
 
-# 0 when this secondmate home has ready work and sits below its lane floor (or, without
+# 0 when this squad_lead home has ready work and sits below its lane floor (or, without
 # a usable target or at it, no worker is provably working). Sets READY_WORK_IDS/REASON.
 # A still-holding set re-raises after READY_WORK_RESURFACE_SECS, a new set at once; an
 # empty set on a good read withdraws the queued row but keeps the resurface record.
@@ -101,7 +101,7 @@ ready_work_waits_idle() {
   local meta task target open now surfaced surfaced_at surfaced_ids ready_out ready_rc
   READY_WORK_IDS=
   READY_WORK_REASON=
-  [ -f "$JG_HOME/.jg-secondmate-home" ] && [ ! -L "$JG_HOME/.jg-secondmate-home" ] || return 1
+  [ -f "$JG_HOME/.jg-squad-lead-home" ] && [ ! -L "$JG_HOME/.jg-squad-lead-home" ] || return 1
   ready_out=$(JG_HOME="$JG_HOME" "$SCRIPT_DIR/jg-tasks-axi.sh" ready 2>/dev/null)
   ready_rc=$?
   READY_WORK_IDS=$(printf '%s\n' "$ready_out" \
@@ -147,11 +147,11 @@ record_ready_work_surfaced() {
 # drain presented the row, cut WAKE_ACK_REQUIRED off its output and left it queued.
 # Kun's call passes <task> <window>; the row is then the oldest actionable one in the
 # mate's home queue, the one the stall tick read. A queue already drained needs no ring.
-secondmate_ring_to_drain() {  # <task> <window> [<seq>]
+squad_lead_ring_to_drain() {  # <task> <window> [<seq>]
   local task=$1 w=$2 seq=${3:-} rec backend delivery_id home
   if [ -z "$seq" ]; then
     home=$(jg_meta_get "$STATE/$task.meta" home)
-    seq=$(secondmate_oldest_queue_row "$home/state/.wake-queue" | cut -f2)
+    seq=$(squad_lead_oldest_queue_row "$home/state/.wake-queue" | cut -f2)
     [ -n "$seq" ] || return 0
   fi
   backend=$(window_backend "$w")

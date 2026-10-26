@@ -52,7 +52,7 @@ jg_git_identity fmtest fmtest@example.invalid
 
 # new_world <name>: a real, throwaway git repo on `main` (so the worktree-tangle
 # and default-branch checks behave exactly as they do against the real
-# firstmate repo) to use as JG_ROOT_OVERRIDE, plus an empty JG_HOME with
+# juggernaut repo) to use as JG_ROOT_OVERRIDE, plus an empty JG_HOME with
 # state/, data/, config/, and a fakebin. Echoes "<root-dir>|<home-dir>|<fakebin>".
 new_world() {
   local name=$1 w root home fakebin
@@ -158,7 +158,7 @@ case "${1:-}" in
     printf 'ready[%s]{id,state,kind,repo,title}:\n' "$ready_count"
     i=1
     while [ "$i" -le "$ready_count" ]; do
-      printf '  ready-%s,queued,ship,firstmate,Ready item %s\n' "$i" "$i"
+      printf '  ready-%s,queued,ship,juggernaut,Ready item %s\n' "$i" "$i"
       i=$((i + 1))
     done
     printf 'ready_public_followups: 0 delivery-ready obligations\n'
@@ -181,15 +181,15 @@ case "${1:-}" in
         ;;
       *'--state in_flight'*)
         task_header 1
-        printf '%s\n' '  compact-startup,in_flight,ship,firstmate,Compact startup digest,none,captain,captain choice pending'
+        printf '%s\n' '  compact-startup,in_flight,ship,juggernaut,Compact startup digest,none,captain,captain choice pending'
         ;;
       *'--state held'*)
         task_header 1
-        printf '%s\n' '  held-queued,queued,ship,firstmate,Held queued work,none,captain,captain choice pending'
+        printf '%s\n' '  held-queued,queued,ship,juggernaut,Held queued work,none,captain,captain choice pending'
         ;;
       *'--state queued'*'--blocked'*)
         task_header 1
-        printf '%s\n' '  blocked-followup,queued,scout,firstmate,Follow compact startup,compact-startup,"-","-"'
+        printf '%s\n' '  blocked-followup,queued,scout,juggernaut,Follow compact startup,compact-startup,"-","-"'
         ;;
       *)
         printf '%s\n' 'startup recovery must not request an unfiltered whole-backlog listing' >&2
@@ -320,11 +320,11 @@ SH
   chmod +x "$fakebin/tmux"
 }
 
-# make_fake_tmux_secondmate_recovery <fakebin>: a stateful tmux boundary
+# make_fake_tmux_squad_lead_recovery <fakebin>: a stateful tmux boundary
 # fixture for the real session-start -> bootstrap -> spawn path.
 # JG_FAKE_TMUX_MODE selects missing, ambiguous, unreadable, or shell; missing
 # reproduces real tmux's active-window fallback while inventory omits the mate.
-make_fake_tmux_secondmate_recovery() {
+make_fake_tmux_squad_lead_recovery() {
   local fakebin=$1
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
@@ -409,7 +409,7 @@ SH
   chmod +x "$fakebin/tmux"
 }
 
-make_fake_herdr_secondmate_recovery() {
+make_fake_herdr_squad_lead_recovery() {
   local fakebin=$1
   # The recovery kill now requires the shared named-session lock and an exact
   # focus snapshot. Keep a focused sibling tab so this test's husk close is
@@ -593,31 +593,31 @@ run_named_harness_session_start() {  # <harness> <home> <root> <path> [jg-sessio
     "$SESSION_START" "$@"
 }
 
-# prepare_session_start_secondmate <name>: a throwaway main home and Pi
-# secondmate home wired to the real spawn implementation through the fixture
+# prepare_session_start_squad_lead <name>: a throwaway main home and Pi
+# squad_lead home wired to the real spawn implementation through the fixture
 # root. Echoes root|home|fakebin|mate|log|spawned.
-prepare_session_start_secondmate() {
+prepare_session_start_squad_lead() {
   local name=$1 rec root home fakebin w mate log spawned id=$SESSION_START_SECOND_MATE_ID
   rec=$(new_world "$name")
   IFS='|' read -r root home fakebin <<EOF
 $rec
 EOF
   w=${root%/root}
-  mate="$w/secondmate-$id"
+  mate="$w/squad-lead-$id"
   log="$w/tmux.log"
   spawned="$w/tmux.spawned"
   mkdir -p "$mate/bin" "$mate/data" "$mate/state" "$mate/config" "$mate/projects"
-  printf '%s\n' "$id" > "$mate/.jg-secondmate-home"
-  printf '# Firstmate\n' > "$mate/AGENTS.md"
-  printf 'Second mate charter.\n' > "$mate/data/charter.md"
+  printf '%s\n' "$id" > "$mate/.jg-squad-lead-home"
+  printf '# Juggernaut\n' > "$mate/AGENTS.md"
+  printf 'Squad Lead charter.\n' > "$mate/data/charter.md"
   printf '%s\n' 'projects/' 'state/' 'data/' 'config/' '.no-mistakes/' > "$mate/.gitignore"
   git -C "$mate" init -q -b main
-  printf '%s\n' pi > "$home/config/secondmate-harness"
+  printf '%s\n' pi > "$home/config/squad-lead-harness"
   printf '%s\n' manual > "$home/config/backlog-backend"
   touch "$home/state/.last-watcher-beat"
   {
-    printf 'window=firstmate:jg-%s\n' "$id"
-    printf 'kind=secondmate\n'
+    printf 'window=juggernaut:jg-%s\n' "$id"
+    printf 'kind=squad_lead\n'
     printf 'harness=pi\n'
     printf 'home=%s\n' "$mate"
   } > "$home/state/$id.meta"
@@ -625,12 +625,12 @@ EOF
   make_fake_toolchain "$fakebin"
   make_fake_ps_claude "$fakebin"
   jg_fake_exit0 "$fakebin" pi
-  make_fake_tmux_secondmate_recovery "$fakebin"
+  make_fake_tmux_squad_lead_recovery "$fakebin"
   : > "$log"
   printf '%s|%s|%s|%s|%s|%s\n' "$root" "$home" "$fakebin" "$mate" "$log" "$spawned"
 }
 
-run_session_start_secondmate() {
+run_session_start_squad_lead() {
   local root=$1 home=$2 fakebin=$3 mate=$4 log=$5 spawned=$6 mode=$7
   TMUX='' JG_BACKEND=tmux JG_FAKE_TMUX_MODE="$mode" JG_FAKE_TMUX_LOG="$log" \
     JG_FAKE_TMUX_SPAWNED="$spawned" JG_FAKE_SECOND_MATE_HOME="$mate" \
@@ -639,29 +639,29 @@ run_session_start_secondmate() {
     run_session_start "$home" "$root" "$fakebin:$BASE_PATH"
 }
 
-prepare_session_start_herdr_secondmate() {
+prepare_session_start_herdr_squad_lead() {
   local name=$1 rec root home fakebin w mate log state id=$SESSION_START_HERDR_SECOND_MATE_ID
   rec=$(new_world "$name")
   IFS='|' read -r root home fakebin <<EOF
 $rec
 EOF
   w=${root%/root}
-  mate="$w/secondmate-$id"
+  mate="$w/squad-lead-$id"
   log="$w/herdr.log"
   state="$w/herdr.state"
   mkdir -p "$mate/bin" "$mate/data" "$mate/state" "$mate/config" "$mate/projects"
-  printf '%s\n' "$id" > "$mate/.jg-secondmate-home"
-  printf '# Firstmate\n' > "$mate/AGENTS.md"
-  printf 'Second mate charter.\n' > "$mate/data/charter.md"
+  printf '%s\n' "$id" > "$mate/.jg-squad-lead-home"
+  printf '# Juggernaut\n' > "$mate/AGENTS.md"
+  printf 'Squad Lead charter.\n' > "$mate/data/charter.md"
   printf '%s\n' 'projects/' 'state/' 'data/' 'config/' '.no-mistakes/' > "$mate/.gitignore"
   git -C "$mate" init -q -b main
   printf '%s\n' herdr > "$home/config/backend"
-  printf '%s\n' pi > "$home/config/secondmate-harness"
+  printf '%s\n' pi > "$home/config/squad-lead-harness"
   printf '%s\n' manual > "$home/config/backlog-backend"
   touch "$home/state/.last-watcher-beat"
   {
     printf 'window=default:p-old\n'
-    printf 'kind=secondmate\n'
+    printf 'kind=squad_lead\n'
     printf 'harness=pi\n'
     printf 'home=%s\n' "$mate"
     printf 'backend=herdr\n'
@@ -674,12 +674,12 @@ EOF
   make_fake_toolchain "$fakebin"
   make_fake_ps_claude "$fakebin"
   jg_fake_exit0 "$fakebin" pi
-  make_fake_herdr_secondmate_recovery "$fakebin"
+  make_fake_herdr_squad_lead_recovery "$fakebin"
   : > "$log"
   printf '%s|%s|%s|%s|%s|%s\n' "$root" "$home" "$fakebin" "$mate" "$log" "$state"
 }
 
-run_session_start_herdr_secondmate() {
+run_session_start_herdr_squad_lead() {
   local root=$1 home=$2 fakebin=$3 mate=$4 log=$5 state=$6
   JG_BACKEND=herdr JG_FAKE_HERDR_LOG="$log" JG_FAKE_HERDR_STATE="$state" \
     JG_FAKE_SECOND_MATE_ID="$SESSION_START_HERDR_SECOND_MATE_ID" \
@@ -782,33 +782,33 @@ EOF
 
   printf '%s\n' '- demo [no-mistakes] - a demo project (added 2026-07-01)' > "$home/data/projects.md"
   : > "$home/data/captain.md"
-  # secondmates.md, captain-shared.md, and learnings.md deliberately absent
+  # squad_leads.md, captain-shared.md, and learnings.md deliberately absent
 
   out=$(run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
 
   jq -e --arg home "$home" '
-    .schema == "jg-secondmate-home-summary.v1"
+    .schema == "jg-squad-lead-home-summary.v1"
     and .home == $home
     and (.generated_epoch | type) == "number"
   ' "$home/state/home-summary.json" >/dev/null \
     || fail "a locked session start did not publish the home summary ledger"
   assert_contains "$out" "data/projects.md" "digest did not label the projects.md section"
   assert_contains "$out" "- demo [no-mistakes] - a demo project (added 2026-07-01)" "digest did not print projects.md content"
-  assert_contains "$out" "jg-role: user (default)" "digest did not report the home's firstmate-repository role"
+  assert_contains "$out" "jg-role: user (default)" "digest did not report the home's juggernaut-repository role"
 
   assert_contains "$out" "data/captain.md" "digest did not label the captain.md section"
-  assert_contains "$out" "data/captain-shared.md (shared, main-authoritative, read-only in secondmate homes)" \
+  assert_contains "$out" "data/captain-shared.md (shared, main-authoritative, read-only in squad_lead homes)" \
     "digest did not label the shared captain section"
 
-  assert_contains "$out" "data/secondmates.md" "digest did not label the secondmates.md section"
+  assert_contains "$out" "data/squad_leads.md" "digest did not label the squad_leads.md section"
   assert_contains "$out" "data/learnings.md" "digest did not label the learnings.md section"
   assert_contains "$out" "data/owner-rules.md" "digest did not print the shared owner-rules surface"
 
-  # Exactly five context ABSENT markers (secondmates.md, captain-shared.md,
+  # Exactly five context ABSENT markers (squad_leads.md, captain-shared.md,
   # learnings.md, owner-rules.md; backlog.md is covered by its own test) - and
   # the present-but-empty captain.md must NOT print ABSENT.
   absent_count=$(printf '%s\n' "$out" | grep -c '^ABSENT$')
-  [ "$absent_count" -eq 5 ] || fail "expected 5 ABSENT markers (secondmates.md, captain-shared.md, learnings.md, owner-rules.md, backlog.md), got $absent_count: $out"
+  [ "$absent_count" -eq 5 ] || fail "expected 5 ABSENT markers (squad_leads.md, captain-shared.md, learnings.md, owner-rules.md, backlog.md), got $absent_count: $out"
 
   cap_section=$(printf '%s\n' "$out" | awk '/^data\/captain\.md$/{flag=1;next}/^data\//{flag=0}flag')
   assert_contains "$cap_section" "(present, empty)" "empty-but-present captain.md was not distinguished from ABSENT"
@@ -827,13 +827,13 @@ EOF
   make_fake_toolchain "$fakebin"
   make_fake_ps_claude "$fakebin"
 
-  # A live secondmate meta with a window pointed at nothing real - if the
-  # bootstrap sweep's secondmate_sync ran (a MUTATING step), it would try to
-  # fast-forward this "home" and/or report a SECONDMATE_SYNC/NUDGE_SECONDMATES
+  # A live squad_lead meta with a window pointed at nothing real - if the
+  # bootstrap sweep's squad_lead_sync ran (a MUTATING step), it would try to
+  # fast-forward this "home" and/or report a SQUAD_LEAD_SYNC/NUDGE_SQUAD_LEADS
   # line. Absence of any such line is this test's proof that
   # JG_BOOTSTRAP_DETECT_ONLY=1 actually suppressed the mutating sweep.
-  mkdir -p "$home/other-secondmate/state"
-  jg_write_secondmate_meta "$home/state/sm-x.meta" "$home/other-secondmate" "firstmate:jg-sm-x" alpha
+  mkdir -p "$home/other-squad-lead/state"
+  jg_write_squad_lead_meta "$home/state/sm-x.meta" "$home/other-squad-lead" "juggernaut:jg-sm-x" alpha
   append_wake "$home/state" signal sm-x "done: surfaced before refusal" || fail "seed wake failed"
   git -C "$root" checkout -q -B fm/read-only-tangle
 
@@ -848,7 +848,7 @@ EOF
 
   expect_code 0 "$status" "jg-session-start.sh must exit 0 even on a lock refusal"
   assert_contains "$out" "READ-ONLY SESSION" "read-only banner missing on lock refusal"
-  assert_contains "$out" "another live firstmate session holds the lock" "read-only banner did not surface jg-lock.sh's own error text"
+  assert_contains "$out" "another live juggernaut session holds the lock" "read-only banner did not surface jg-lock.sh's own error text"
   assert_contains "$out" "Skipping every mutating step" "read-only banner did not explain what was skipped"
   assert_contains "$out" "skipped (read-only session)" "wake-queue section did not report itself skipped"
   assert_contains "$out" "WATCHER DOWN - SUPERVISION IS OFF" "read-only guard did not surface watcher-liveness alarm"
@@ -866,11 +866,11 @@ EOF
   # deterministically regardless of what is installed on the test host).
   assert_contains "$out" "MISSING: tasks-axi (install:" "detect-only bootstrap diagnostics did not run on the read-only path"
 
-  # The mutating secondmate sweep must NOT have run: no SECONDMATE_SYNC/
-  # NUDGE_SECONDMATES line, and the sowed secondmate meta's target dir is
+  # The mutating squad_lead sweep must NOT have run: no SQUAD_LEAD_SYNC/
+  # NUDGE_SQUAD_LEADS line, and the sowed squad_lead meta's target dir is
   # untouched (jg-ff-lib would have tried to fast-forward it otherwise).
-  assert_not_contains "$out" "SECONDMATE_SYNC" "mutating secondmate sweep ran during a lock refusal"
-  assert_not_contains "$out" "NUDGE_SECONDMATES" "mutating secondmate sweep ran during a lock refusal"
+  assert_not_contains "$out" "SQUAD_LEAD_SYNC" "mutating squad_lead sweep ran during a lock refusal"
+  assert_not_contains "$out" "NUDGE_SQUAD_LEADS" "mutating squad_lead sweep ran during a lock refusal"
 
   # The rest of the digest (read-only-safe) still completed.
   assert_contains "$out" "FLEET STATE" "fleet-state digest section missing on the read-only path"
@@ -899,7 +899,7 @@ EOF
   assert_contains "$out" "READ-ONLY SESSION" "lock publication failure did not force a read-only session"
   assert_contains "$out" "FLEET LOCK OWNERSHIP WAS NOT VERIFIED" "lock publication failure was misreported as a live holder"
   assert_contains "$out" "lacks verified fleet-lock ownership" "lock publication failure did not explain why queued wakes remain untouched"
-  assert_not_contains "$out" "ANOTHER LIVE FIRSTMATE SESSION HOLDS THE FLEET LOCK" "lock publication failure falsely claimed a live lock holder"
+  assert_not_contains "$out" "ANOTHER LIVE JUGGERNAUT SESSION HOLDS THE FLEET LOCK" "lock publication failure falsely claimed a live lock holder"
   [ -s "$home/state/.wake-queue" ] || fail "lock publication failure allowed the wake queue to mutate"
 
   pass "session start stays read-only when lock ownership cannot be published"
@@ -1170,7 +1170,7 @@ EOF
   pass "status tail is bounded to the configured line count, with the full log path always printed"
 }
 
-# A crewmate writes its own status lines, so nothing upstream bounds their
+# A operator writes its own status lines, so nothing upstream bounds their
 # length: an observed one ran 865 characters. The tail is a wake-EVENT view
 # whose full log path is printed beside it, so a long line is cut, marked, and
 # left recoverable rather than allowed to scale the digest with fleet load.
@@ -1242,44 +1242,44 @@ EOF
   pass "orphan status logs are printed once with bounded tails"
 }
 
-# --- session-start secondmate recovery boundary -----------------------------
+# --- session-start squad_lead recovery boundary -----------------------------
 
-test_session_start_relaunches_missing_pi_secondmate() {
+test_session_start_relaunches_missing_pi_squad_lead() {
   local rec root home fakebin mate log spawned out first_calls second_calls
-  rec=$(prepare_session_start_secondmate secondmate-missing-pi)
+  rec=$(prepare_session_start_squad_lead squad-lead-missing-pi)
   IFS='|' read -r root home fakebin mate log spawned <<EOF
 $rec
 EOF
 
-  out=$(run_session_start_secondmate "$root" "$home" "$fakebin" "$mate" "$log" "$spawned" missing)
+  out=$(run_session_start_squad_lead "$root" "$home" "$fakebin" "$mate" "$log" "$spawned" missing)
 
   # The relaunch now runs off the blocking path, so the digest's own liveness
   # read may legitimately still show the pre-relaunch endpoint. What must NOT
   # happen is silence: the section names the relaunch as either done or not yet
   # confirmed.
   assert_contains "$out" "NETWORK CHECKS" "the digest lost its deferred network-check section"
-  assert_contains "$out" "dead-secondmate relaunch" \
-    "the digest never accounted for the dead-secondmate relaunch"
+  assert_contains "$out" "dead-squad-lead relaunch" \
+    "the digest never accounted for the dead-squad-lead relaunch"
 
   wait_for_network_stage "$home" "$root" \
     || fail "the deferred network stage never published: $(network_stage_report "$home" "$root")"
 
-  assert_not_contains "$(network_stage_report "$home" "$root")" "SECONDMATE_LIVENESS:" \
+  assert_not_contains "$(network_stage_report "$home" "$root")" "SQUAD_LEAD_LIVENESS:" \
     "successful missing-window recovery should stay non-actionable"
-  assert_contains "$(cat "$log")" "new-window" "the deferred stage did not relaunch the missing Pi secondmate"
+  assert_contains "$(cat "$log")" "new-window" "the deferred stage did not relaunch the missing Pi squad_lead"
   assert_not_contains "$(cat "$log")" "kill-window" "the deferred stage tried to kill an already-absent window"
   assert_grep 'harness=pi' "$home/state/$SESSION_START_SECOND_MATE_ID.meta" \
     "the real respawn path did not preserve the Pi harness: $(cat "$home/state/$SESSION_START_SECOND_MATE_ID.meta")"
 
   first_calls=$(grep -c 'new-window' "$log" || true)
   rm -f "$home/state/.lock"
-  run_session_start_secondmate "$root" "$home" "$fakebin" "$mate" "$log" "$spawned" missing >/dev/null
+  run_session_start_squad_lead "$root" "$home" "$fakebin" "$mate" "$log" "$spawned" missing >/dev/null
   wait_for_network_stage "$home" "$root" \
     || fail "the second pass's deferred network stage never published"
   second_calls=$(grep -c 'new-window' "$log" || true)
   [ "$first_calls" -eq 1 ] && [ "$second_calls" -eq 1 ] \
-    || fail "a second session-start pass duplicated the relaunched Pi secondmate: $(cat "$log")"
-  pass "session start: an absent recorded tmux window relaunches its Pi secondmate exactly once, off the blocking path"
+    || fail "a second session-start pass duplicated the relaunched Pi squad_lead: $(cat "$log")"
+  pass "session start: an absent recorded tmux window relaunches its Pi squad_lead exactly once, off the blocking path"
 }
 
 # The relaunch is the sharpest deferral: it mutates the very endpoint record the
@@ -1288,16 +1288,16 @@ EOF
 # on, and the report says the digest's records are now behind.
 test_deferred_relaunch_is_always_reported() {
   local rec root home fakebin mate log spawned report
-  rec=$(prepare_session_start_secondmate secondmate-relaunch-reported)
+  rec=$(prepare_session_start_squad_lead squad-lead-relaunch-reported)
   IFS='|' read -r root home fakebin mate log spawned <<EOF
 $rec
 EOF
 
-  run_session_start_secondmate "$root" "$home" "$fakebin" "$mate" "$log" "$spawned" missing >/dev/null
+  run_session_start_squad_lead "$root" "$home" "$fakebin" "$mate" "$log" "$spawned" missing >/dev/null
   wait_for_network_stage "$home" "$root" || fail "the deferred network stage never published"
 
   report=$(network_stage_report "$home" "$root")
-  assert_contains "$report" "secondmate $SESSION_START_SECOND_MATE_ID relaunched" \
+  assert_contains "$report" "squad_lead $SESSION_START_SECOND_MATE_ID relaunched" \
     "a relaunch performed after the digest was composed went unreported"
   assert_contains "$report" "re-read any record" \
     "the report did not tell the reader the digest's records are now behind"
@@ -1306,74 +1306,74 @@ EOF
 
 test_session_start_preserves_ambiguous_pi_process() {
   local rec root home fakebin mate log spawned out
-  rec=$(prepare_session_start_secondmate secondmate-ambiguous-pi)
+  rec=$(prepare_session_start_squad_lead squad-lead-ambiguous-pi)
   IFS='|' read -r root home fakebin mate log spawned <<EOF
 $rec
 EOF
 
-  out=$(run_session_start_secondmate "$root" "$home" "$fakebin" "$mate" "$log" "$spawned" ambiguous)
+  out=$(run_session_start_squad_lead "$root" "$home" "$fakebin" "$mate" "$log" "$spawned" ambiguous)
   wait_for_network_stage "$home" "$root" || fail "the deferred network stage never published"
 
   assert_contains "$(network_stage_report "$home" "$root")" \
-    "SECONDMATE_LIVENESS: secondmate $SESSION_START_SECOND_MATE_ID: skipped: existing endpoint has ambiguous agent process (backend=tmux)" \
+    "SQUAD_LEAD_LIVENESS: squad_lead $SESSION_START_SECOND_MATE_ID: skipped: existing endpoint has ambiguous agent process (backend=tmux)" \
     "session start did not distinguish an existing Pi-shaped process from a missing window"
   [ ! -s "$log" ] || fail "session start touched an ambiguous existing Pi process: $(cat "$log")"
-  assert_contains "$out" "endpoint: alive (backend=tmux window=firstmate:jg-$SESSION_START_SECOND_MATE_ID)" \
+  assert_contains "$out" "endpoint: alive (backend=tmux window=juggernaut:jg-$SESSION_START_SECOND_MATE_ID)" \
     "the later fleet read should still see the ambiguous endpoint"
   pass "session start: an existing ambiguous Pi process prevents duplicate recovery"
 }
 
 test_session_start_preserves_transiently_unreadable_tmux() {
   local rec root home fakebin mate log spawned out
-  rec=$(prepare_session_start_secondmate secondmate-unreadable-pi)
+  rec=$(prepare_session_start_squad_lead squad-lead-unreadable-pi)
   IFS='|' read -r root home fakebin mate log spawned <<EOF
 $rec
 EOF
 
-  out=$(run_session_start_secondmate "$root" "$home" "$fakebin" "$mate" "$log" "$spawned" unreadable)
+  out=$(run_session_start_squad_lead "$root" "$home" "$fakebin" "$mate" "$log" "$spawned" unreadable)
   wait_for_network_stage "$home" "$root" || fail "the deferred network stage never published"
 
   assert_contains "$(network_stage_report "$home" "$root")" \
-    "SECONDMATE_LIVENESS: secondmate $SESSION_START_SECOND_MATE_ID: skipped: endpoint probe unreadable (backend=tmux)" \
+    "SQUAD_LEAD_LIVENESS: squad_lead $SESSION_START_SECOND_MATE_ID: skipped: endpoint probe unreadable (backend=tmux)" \
     "session start did not distinguish transient unreadability from absence"
   [ ! -s "$log" ] || fail "session start touched a transiently unreadable target: $(cat "$log")"
-  assert_contains "$out" "endpoint: dead (backend=tmux window=firstmate:jg-$SESSION_START_SECOND_MATE_ID)" \
+  assert_contains "$out" "endpoint: dead (backend=tmux window=juggernaut:jg-$SESSION_START_SECOND_MATE_ID)" \
     "the later cheap presence read should preserve the visible offline symptom"
   pass "session start: transient tmux unreadability never licenses a relaunch"
 }
 
 test_session_start_preserves_proven_bare_shell_recovery() {
   local rec root home fakebin mate log spawned out
-  rec=$(prepare_session_start_secondmate secondmate-bare-shell)
+  rec=$(prepare_session_start_squad_lead squad-lead-bare-shell)
   IFS='|' read -r root home fakebin mate log spawned <<EOF
 $rec
 EOF
 
-  run_session_start_secondmate "$root" "$home" "$fakebin" "$mate" "$log" "$spawned" shell >/dev/null
+  run_session_start_squad_lead "$root" "$home" "$fakebin" "$mate" "$log" "$spawned" shell >/dev/null
   wait_for_network_stage "$home" "$root" || fail "the deferred network stage never published"
 
   out=$(network_stage_report "$home" "$root")
-  assert_not_contains "$out" "SECONDMATE_LIVENESS:" "successful bare-shell recovery should stay non-actionable"
-  assert_contains "$(cat "$log")" "kill-window -t =firstmate:=jg-$SESSION_START_SECOND_MATE_ID" \
+  assert_not_contains "$out" "SQUAD_LEAD_LIVENESS:" "successful bare-shell recovery should stay non-actionable"
+  assert_contains "$(cat "$log")" "kill-window -t =juggernaut:=jg-$SESSION_START_SECOND_MATE_ID" \
     "the proven bare-shell path did not remove its existing dead endpoint"
   assert_contains "$(cat "$log")" "new-window" "the proven bare-shell path did not relaunch"
   pass "session start: the proven bare-shell recovery path remains intact"
 }
 
-test_session_start_relaunches_herdr_husk_secondmate() {
+test_session_start_relaunches_herdr_husk_squad_lead() {
   local rec root home fakebin mate log state out
-  rec=$(prepare_session_start_herdr_secondmate secondmate-herdr-husk)
+  rec=$(prepare_session_start_herdr_squad_lead squad-lead-herdr-husk)
   IFS='|' read -r root home fakebin mate log state <<EOF
 $rec
 EOF
 
-  run_session_start_herdr_secondmate "$root" "$home" "$fakebin" "$mate" "$log" "$state" >/dev/null
+  run_session_start_herdr_squad_lead "$root" "$home" "$fakebin" "$mate" "$log" "$state" >/dev/null
   wait_for_network_stage "$home" "$root" || fail "the deferred network stage never published"
 
   out=$(network_stage_report "$home" "$root")
-  assert_not_contains "$out" "SECONDMATE_LIVENESS:" "successful Herdr husk recovery should stay non-actionable"
+  assert_not_contains "$out" "SQUAD_LEAD_LIVENESS:" "successful Herdr husk recovery should stay non-actionable"
   assert_contains "$(cat "$log")" "pane close p-old" "session start did not close the confirmed Herdr husk"
-  assert_contains "$(cat "$log")" "tab create" "session start did not relaunch the Herdr secondmate"
+  assert_contains "$(cat "$log")" "tab create" "session start did not relaunch the Herdr squad_lead"
   assert_grep 'herdr_pane_id=p-new' "$home/state/$SESSION_START_HERDR_SECOND_MATE_ID.meta" \
     "the real respawn path did not record the replacement Herdr pane"
   pass "session start: a confirmed Herdr husk is closed and relaunched"
@@ -1831,7 +1831,7 @@ SH
   chmod +x "$fakebin/no-mistakes" "$crew_state"
 
   jg_write_meta "$home/state/slow-child.meta" \
-    'window=firstmate:jg-slow-child' "worktree=$worktree" 'project=firstmate' \
+    'window=juggernaut:jg-slow-child' "worktree=$worktree" 'project=juggernaut' \
     'harness=pi' 'kind=scout' 'mode=no-mistakes' 'yolo=off' 'spawn_gen=slow-child.1'
   printf '%s\n' 'working: validating' > "$home/state/slow-child.status"
   : > "$home/state/slow-child.turn-ended"
@@ -1869,7 +1869,7 @@ SH
 # run and land afterwards.
 test_unreachable_network_never_blocks_the_digest() {
   local rec root home fakebin mate log spawned network_finished out started elapsed
-  rec=$(prepare_session_start_secondmate secondmate-slow-network)
+  rec=$(prepare_session_start_squad_lead squad-lead-slow-network)
   IFS='|' read -r root home fakebin mate log spawned <<EOF
 $rec
 EOF
@@ -1877,7 +1877,7 @@ EOF
   install_slow_gh "$fakebin" 12 "$network_finished"
 
   started=$(date +%s)
-  out=$(run_session_start_secondmate "$root" "$home" "$fakebin" "$mate" "$log" "$spawned" missing)
+  out=$(run_session_start_squad_lead "$root" "$home" "$fakebin" "$mate" "$log" "$spawned" missing)
   elapsed=$(( $(date +%s) - started ))
 
   [ ! -e "$network_finished" ] \
@@ -1885,7 +1885,7 @@ EOF
   assert_contains "$out" "SESSION START" "the digest did not complete"
   assert_contains "$out" "IN PROGRESS - the deferred network checks have not finished yet." \
     "the digest did not disclose that its network checks were still running"
-  assert_contains "$out" "NOT yet confirmed: GitHub authentication, dead-secondmate relaunch" \
+  assert_contains "$out" "NOT yet confirmed: GitHub authentication, dead-squad-lead relaunch" \
     "the digest did not name the checks it has not confirmed"
   assert_not_contains "$out" "NEEDS_GH_AUTH" \
     "the digest reported a GitHub-auth verdict it could not yet have"
@@ -1896,7 +1896,7 @@ EOF
   assert_contains "$(network_stage_report "$home" "$root")" "NEEDS_GH_AUTH" \
     "the deferred stage lost the GitHub-auth verdict it was deferring"
   assert_contains "$(cat "$log")" "new-window" \
-    "the deferred stage lost the dead-secondmate relaunch"
+    "the deferred stage lost the dead-squad-lead relaunch"
   pass "session start: an unreachable host delays a reported check, not the digest"
 }
 
@@ -1906,14 +1906,14 @@ EOF
 # claim can be set up directly instead of raced against digest composition.
 test_deferred_result_reaches_the_agent_when_the_digest_cannot_print_it() {
   local rec root home fakebin mate log spawned queue
-  rec=$(prepare_session_start_secondmate secondmate-wake-once)
+  rec=$(prepare_session_start_squad_lead squad-lead-wake-once)
   IFS='|' read -r root home fakebin mate log spawned <<EOF
 $rec
 EOF
   install_slow_gh "$fakebin" 8
   queue="$home/state/.wake-queue"
 
-  run_session_start_secondmate "$root" "$home" "$fakebin" "$mate" "$log" "$spawned" missing >/dev/null
+  run_session_start_squad_lead "$root" "$home" "$fakebin" "$mate" "$log" "$spawned" missing >/dev/null
   wait_for_network_stage "$home" "$root" 60 || fail "the deferred stage never finished"
   wait_for_network_wake "$home" 60 || fail "the deferred stage never settled wake delivery"
   assert_grep 'check	startup-network' "$queue" \
@@ -1991,23 +1991,23 @@ write_long_body_backlog() {
 # Backlog
 
 ## In flight
-- [ ] compact-startup - Compact startup digest (repo: firstmate) (kind: ship) (since 2026-07-15) (hold: captain choice pending) (hold-kind: captain)
+- [ ] compact-startup - Compact startup digest (repo: juggernaut) (kind: ship) (since 2026-07-15) (hold: captain choice pending) (hold-kind: captain)
   OVERSIZED-BODY-LINE current startup leaks task note bodies into the session digest.
   Another long body line that should not be printed after the fix.
 
 ## Queued
-- [ ] blocked-followup - Follow compact startup blocked-by: compact-startup - waits for implementation (repo: firstmate) (kind: scout) (since 2026-07-15)
+- [ ] blocked-followup - Follow compact startup blocked-by: compact-startup - waits for implementation (repo: juggernaut) (kind: scout) (since 2026-07-15)
   QUEUED-BODY-LINE this is another long multiline note.
-- [ ] held-queued - Held queued work (repo: firstmate) (kind: ship) (hold: captain choice pending) (hold-kind: captain)
+- [ ] held-queued - Held queued work (repo: juggernaut) (kind: ship) (hold: captain choice pending) (hold-kind: captain)
 EOF
   while [ "$i" -le 25 ]; do
-    printf -- '- [ ] plain-%s - Plain queued item %s (repo: firstmate) (kind: ship)\n' "$i" "$i" >> "$path"
+    printf -- '- [ ] plain-%s - Plain queued item %s (repo: juggernaut) (kind: ship)\n' "$i" "$i" >> "$path"
     i=$((i + 1))
   done
   cat >> "$path" <<'EOF'
 
 ## Done
-- [x] landed-earlier - DONE-ROW-LINE already landed and torn down (repo: firstmate) (kind: ship)
+- [x] landed-earlier - DONE-ROW-LINE already landed and torn down (repo: juggernaut) (kind: ship)
 EOF
 }
 
@@ -2021,8 +2021,8 @@ EOF
   make_fake_tasks_axi_compact "$fakebin"
   make_fake_ps_claude "$fakebin"
   write_long_body_backlog "$home/data/backlog.md"
-  mkdir -p "$home/projects/firstmate"
-  printf 'window=jg-sess:compact\nworktree=%s\nproject=firstmate\nkind=ship\n' "$home/projects/firstmate" \
+  mkdir -p "$home/projects/juggernaut"
+  printf 'window=jg-sess:compact\nworktree=%s\nproject=juggernaut\nkind=ship\n' "$home/projects/juggernaut" \
     > "$home/state/compact-startup.meta"
   log="$home/tasks-axi.log"
 
@@ -2033,19 +2033,19 @@ EOF
     "compatible tasks-axi backend did not render the compact backlog listing"
   assert_contains "$out" "tasks[1]{id,state,kind,repo,title,blocked_by,hold_kind,hold_reason}:" \
     "tasks-axi compact listing omitted the expected structured field header"
-  assert_contains "$out" "compact-startup,in_flight,ship,firstmate,Compact startup digest,none,captain,captain choice pending" \
+  assert_contains "$out" "compact-startup,in_flight,ship,juggernaut,Compact startup digest,none,captain,captain choice pending" \
     "tasks-axi compact listing omitted in-flight identity, state, or hold metadata"
-  assert_contains "$out" "held-queued,queued,ship,firstmate,Held queued work,none,captain,captain choice pending" \
+  assert_contains "$out" "held-queued,queued,ship,juggernaut,Held queued work,none,captain,captain choice pending" \
     "tasks-axi compact listing omitted a held row or its hold metadata"
-  assert_contains "$out" 'blocked-followup,queued,scout,firstmate,Follow compact startup,compact-startup,"-","-"' \
+  assert_contains "$out" 'blocked-followup,queued,scout,juggernaut,Follow compact startup,compact-startup,"-","-"' \
     "tasks-axi compact listing omitted blocked-by metadata"
-  assert_contains "$out" "ready-3,queued,ship,firstmate,Ready item 3" \
+  assert_contains "$out" "ready-3,queued,ship,juggernaut,Ready item 3" \
     "tasks-axi compact listing omitted a dispatchable queued row inside the bound"
   assert_not_contains "$out" "OVERSIZED-BODY-LINE" "tasks-axi compact digest leaked an in-flight task body"
   assert_not_contains "$out" "QUEUED-BODY-LINE" "tasks-axi compact digest leaked a queued task body"
   assert_not_contains "$out" "DONE-ROW-LINE" "tasks-axi compact digest listed a done row at startup"
   assert_contains "$out" "--- compact-startup ---" "in-flight meta identity disappeared from startup recovery digest"
-  assert_contains "$out" "worktree=$home/projects/firstmate" "in-flight recovery worktree identity disappeared from startup digest"
+  assert_contains "$out" "worktree=$home/projects/juggernaut" "in-flight recovery worktree identity disappeared from startup digest"
   assert_contains "$out" "Full task bodies remain available on demand: bin/jg-tasks-axi.sh show <id> --full" \
     "compact digest omitted the full-body lookup pointer"
   assert_contains "$out" "ready_public_followups: 0 delivery-ready obligations" \
@@ -2085,7 +2085,7 @@ EOF
   out=$(JG_FAKE_TASKS_AXI_READY=7 JG_SESSION_START_QUEUED_LIMIT=3 \
     run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
 
-  assert_contains "$out" "ready-3,queued,ship,firstmate,Ready item 3" \
+  assert_contains "$out" "ready-3,queued,ship,juggernaut,Ready item 3" \
     "the queued bound dropped a row inside its own limit"
   assert_not_contains "$out" "ready-4,queued" "the queued bound did not actually bound the ready listing"
   assert_contains "$out" "(shown 3 of 7 ready queued item(s))" \
@@ -2094,11 +2094,11 @@ EOF
     "the bounded queued listing did not disclose an exact remainder and how to see it"
 
   # The bound is for dispatchable work only: held and blocked rows stay whole.
-  assert_contains "$out" "held-queued,queued,ship,firstmate,Held queued work,none,captain,captain choice pending" \
+  assert_contains "$out" "held-queued,queued,ship,juggernaut,Held queued work,none,captain,captain choice pending" \
     "the queued bound swallowed a held row"
-  assert_contains "$out" 'blocked-followup,queued,scout,firstmate,Follow compact startup,compact-startup,"-","-"' \
+  assert_contains "$out" 'blocked-followup,queued,scout,juggernaut,Follow compact startup,compact-startup,"-","-"' \
     "the queued bound swallowed a blocked row"
-  assert_contains "$out" "compact-startup,in_flight,ship,firstmate,Compact startup digest,none,captain,captain choice pending" \
+  assert_contains "$out" "compact-startup,in_flight,ship,juggernaut,Compact startup digest,none,captain,captain choice pending" \
     "the queued bound swallowed an in-flight row"
 
   pass "the startup backlog bound cuts only dispatchable queued rows and discloses the remainder exactly"
@@ -2396,16 +2396,16 @@ $rec
 EOF
   make_fake_toolchain "$fakebin"
   make_fake_ps_claude "$fakebin"
-  mkdir -p "$home/other-secondmate/state"
-  jg_write_secondmate_meta "$home/state/sm-r.meta" "$home/other-secondmate" "firstmate:jg-sm-r" alpha
+  mkdir -p "$home/other-squad-lead/state"
+  jg_write_squad_lead_meta "$home/state/sm-r.meta" "$home/other-squad-lead" "juggernaut:jg-sm-r" alpha
   append_wake "$home/state" signal task-r "done: queued after startup" || fail "seed wake failed"
 
-  # A full startup reconciles the secondmate sweep and reports it.
+  # A full startup reconciles the squad_lead sweep and reports it.
   JG_FAKE_HARNESS_PID=$$ run_session_start "$home" "$root" "$fakebin:$BASE_PATH" >/dev/null
   wait_for_network_stage "$home" "$root" \
     || fail "the full startup fixture's deferred network stage never published"
   network_report=$(network_stage_report "$home" "$root")
-  assert_contains "$network_report" "SECONDMATE_LIVENESS" \
+  assert_contains "$network_report" "SQUAD_LEAD_LIVENESS" \
     "the full startup fixture did not exercise a mutating sweep"
 
   append_wake "$home/state" signal task-r "done: queued after the re-emit too" || fail "seed second wake failed"
@@ -2414,7 +2414,7 @@ EOF
     "$SESSION_START" --reemit)
 
   assert_contains "$reemit" "SESSION START (CONTEXT RE-EMIT) - $home" "--reemit did not label itself"
-  assert_not_contains "$reemit" "SECONDMATE_LIVENESS" "--reemit repeated a mutating sweep startup already ran"
+  assert_not_contains "$reemit" "SQUAD_LEAD_LIVENESS" "--reemit repeated a mutating sweep startup already ran"
   assert_contains "$reemit" "done: queued after the re-emit too" "--reemit did not drain the wake queue"
   [ -s "$home/state/.wake-queue" ] || fail "--reemit removed the wake before its handling acknowledgement"
   sequence=$(printf '%s\n' "$reemit" | sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through \([0-9][0-9]*\) --recovery-generation [A-Za-z0-9._-][A-Za-z0-9._-]*$/\1/p' | tail -1)
@@ -2440,7 +2440,7 @@ EOF
   make_fake_toolchain "$fakebin"
   make_fake_ps_harness "$fakebin" pi
   cat > "$root/AGENTS.md" <<'EOF'
-FIRSTMATE_TEST_INSTRUCTION=original
+JUGGERNAUT_TEST_INSTRUCTION=original
 Keep this original instruction.
 EOF
 
@@ -2459,7 +2459,7 @@ EOF
     || fail "a no-drift compact rewrote the true-start baseline"
 
   cat > "$root/AGENTS.md" <<'EOF'
-FIRSTMATE_TEST_INSTRUCTION=updated
+JUGGERNAUT_TEST_INSTRUCTION=updated
 The complete updated instruction must survive every stale rebuild.
 EOF
   resume_out=$(JG_FAKE_HARNESS=pi run_pi_session_start "$home" "$root" "$fakebin:$BASE_PATH" --source resume)
@@ -2471,7 +2471,7 @@ EOF
   compact_first=$(JG_FAKE_HARNESS=pi run_pi_session_start "$home" "$root" "$fakebin:$BASE_PATH" --reemit --source compact)
   assert_contains "$compact_first" "CURRENT AGENTS.md - INSTRUCTION REFRESH" \
     "a drifted Pi compact did not emit the replacement instructions"
-  assert_contains "$compact_first" "FIRSTMATE_TEST_INSTRUCTION=updated" \
+  assert_contains "$compact_first" "JUGGERNAUT_TEST_INSTRUCTION=updated" \
     "a drifted Pi compact did not emit the complete current AGENTS content"
   refresh_line=$(printf '%s\n' "$compact_first" | grep -n '^CURRENT AGENTS.md - INSTRUCTION REFRESH$' | head -1 | cut -d: -f1)
   bootstrap_line=$(printf '%s\n' "$compact_first" | grep -n '^BOOTSTRAP$' | head -1 | cut -d: -f1)
@@ -2481,7 +2481,7 @@ EOF
     || fail "a drifted compact rebased the original-session baseline"
 
   compact_second=$(JG_FAKE_HARNESS=pi run_pi_session_start "$home" "$root" "$fakebin:$BASE_PATH" --reemit --source compact)
-  assert_contains "$compact_second" "FIRSTMATE_TEST_INSTRUCTION=updated" \
+  assert_contains "$compact_second" "JUGGERNAUT_TEST_INSTRUCTION=updated" \
     "a second drifted compact suppressed the required replacement instructions"
   [ "$(cat "$home/state/.session-start-agents-baseline")" = "$baseline" ] \
     || fail "a repeated compact rebased the original-session baseline"
@@ -2500,14 +2500,14 @@ EOF
 
   rm -f "$home/state/.session-start-agents-baseline"
   compact_first=$(JG_FAKE_HARNESS=pi run_pi_session_start "$home" "$root" "$fakebin:$BASE_PATH" --reemit --source compact)
-  assert_contains "$compact_first" "FIRSTMATE_TEST_INSTRUCTION=updated" \
+  assert_contains "$compact_first" "JUGGERNAUT_TEST_INSTRUCTION=updated" \
     "a missing baseline did not trigger first-post-fix replacement instructions"
   assert_absent "$home/state/.session-start-agents-baseline" \
     "a rebuild fabricated a baseline instead of preserving true-start-only ownership"
 
   printf 'wrong-session\n%s\n' "$(hash_file_for_test "$root/AGENTS.md")" > "$home/state/.session-start-agents-baseline"
   compact_first=$(JG_FAKE_HARNESS=pi run_pi_session_start "$home" "$root" "$fakebin:$BASE_PATH" --reemit --source compact)
-  assert_contains "$compact_first" "FIRSTMATE_TEST_INSTRUCTION=updated" \
+  assert_contains "$compact_first" "JUGGERNAUT_TEST_INSTRUCTION=updated" \
     "a wrong-session baseline did not trigger replacement instructions"
   baseline_after=$(cat "$home/state/.session-start-agents-baseline")
   [ "$baseline_after" = "wrong-session
@@ -3024,7 +3024,7 @@ test_session_lock_concurrent_single_winner
 test_output_ordering_diagnostics_lead
 test_read_once_contract_is_stated_once_before_its_subject
 test_herdr_backend_diagnostics_follow_real_session_start
-test_session_start_relaunches_missing_pi_secondmate
+test_session_start_relaunches_missing_pi_squad_lead
 test_deferred_relaunch_is_always_reported
 test_inactive_reconcile_never_blocks_the_digest
 test_unreachable_network_never_blocks_the_digest
@@ -3034,7 +3034,7 @@ test_tasks_axi_compatibility_is_probed_once
 test_session_start_preserves_ambiguous_pi_process
 test_session_start_preserves_transiently_unreadable_tmux
 test_session_start_preserves_proven_bare_shell_recovery
-test_session_start_relaunches_herdr_husk_secondmate
+test_session_start_relaunches_herdr_husk_squad_lead
 test_status_tail_bounding
 test_status_tail_line_cap
 test_orphan_status_logs_are_printed

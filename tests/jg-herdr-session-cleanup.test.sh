@@ -92,7 +92,7 @@ fixture_workspaces() {
   title=$(cat "$FIXTURE_DIR/title")
   tabs=$(cat "$FIXTURE_DIR/tabs")
   panes=$(cat "$FIXTURE_DIR/panes")
-  printf '[{"workspace_id":"w1","label":"firstmate","focused":%s,"active_tab_id":"w1:t1","tab_count":1,"pane_count":1},' \
+  printf '[{"workspace_id":"w1","label":"juggernaut","focused":%s,"active_tab_id":"w1:t1","tab_count":1,"pane_count":1},' \
     "$( [ "$(cat "$FIXTURE_DIR/active-tab")" = w1:t1 ] && printf true || printf false )"
   fixture_workspace_json "$title" "$tabs" "$panes"
   if [ -e "$FIXTURE_DIR/duplicate-token" ]; then
@@ -135,11 +135,11 @@ jg_backend_herdr_cli() {
   if [ -e "$FIXTURE_DIR/closed" ]; then
     case "$first $second" in
       "pane get") printf '%s\n' '{"error":{"code":"pane_not_found"}}' >&2; return 1 ;;
-      "workspace list") printf '%s\n' '{"result":{"workspaces":[{"workspace_id":"w1","label":"firstmate","focused":true,"active_tab_id":"w1:t1","tab_count":1,"pane_count":1}]}}'; return 0 ;;
+      "workspace list") printf '%s\n' '{"result":{"workspaces":[{"workspace_id":"w1","label":"juggernaut","focused":true,"active_tab_id":"w1:t1","tab_count":1,"pane_count":1}]}}'; return 0 ;;
     esac
   fi
   if [ -e "$FIXTURE_DIR/race" ] && [ -e "$FIXTURE_DIR/snapshotted" ] && [ "$first $second" = "workspace list" ]; then
-    printf '%s\n' '{"result":{"workspaces":[{"workspace_id":"w1","label":"firstmate","focused":true,"active_tab_id":"w1:t1","tab_count":1,"pane_count":1},{"workspace_id":"w2","label":"renamed","focused":false,"active_tab_id":"w2:t1","tab_count":1,"pane_count":1}]}}'
+    printf '%s\n' '{"result":{"workspaces":[{"workspace_id":"w1","label":"juggernaut","focused":true,"active_tab_id":"w1:t1","tab_count":1,"pane_count":1},{"workspace_id":"w2","label":"renamed","focused":false,"active_tab_id":"w2:t1","tab_count":1,"pane_count":1}]}}'
     return 0
   fi
   title=$(cat "$FIXTURE_DIR/title")
@@ -210,7 +210,7 @@ write_v2() { # <home> <workspace> <tab> <pane>
     printf 'projection_id=%s\n' "$TOKEN"
     printf 'home=%s\n' "$home"
     printf 'session=test\nworkspace_id=%s\ntab_id=%s\npane_id=%s\n' "$workspace" "$tab" "$pane"
-    printf 'parent_workspace_id=w1\nparent_label=firstmate\nworkspace_label=%s\ntask_label=jg-%s\n' "$TITLE" "$ID"
+    printf 'parent_workspace_id=w1\nparent_label=juggernaut\nworkspace_label=%s\ntask_label=jg-%s\n' "$TITLE" "$ID"
   } > "$JG_STATE_OVERRIDE/$ID.herdr-presentation"
 }
 
@@ -315,7 +315,7 @@ JG_HOME="$INTEGRATION_ROOT/home" JG_ROOT_OVERRIDE="$INTEGRATION_ROOT" \
 : > "$TRACE"
 cat > "$INTEGRATION_ROOT/bin/jg-lock.sh" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' 'error: another live firstmate session holds the lock' >&2
+printf '%s\n' 'error: another live juggernaut session holds the lock' >&2
 exit 1
 SH
 chmod +x "$INTEGRATION_ROOT/bin/jg-lock.sh"

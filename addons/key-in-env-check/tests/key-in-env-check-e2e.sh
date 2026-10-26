@@ -35,9 +35,9 @@ canary=CANARY-$$-$RANDOM-sk-or-v1-deadbeef
 rotated=ROTATED-$$-$RANDOM-sk-or-v1-beefdead
 # Isolated HOME so the check reads only the fixture key file, never the real one.
 export HOME=$work/userhome
-mkdir -p "$HOME/.config/openrouter" "$work/pool/1/firstmate/state" "$work/wt-a" "$work/wt-b"
+mkdir -p "$HOME/.config/openrouter" "$work/pool/1/juggernaut/state" "$work/wt-a" "$work/wt-b"
 printf '%s\n' "$canary" >"$HOME/.config/openrouter/api_key"
-home=$work/pool/1/firstmate
+home=$work/pool/1/juggernaut
 printf 'worktree=%s\nendpoint_task_id=task-a\n' "$work/wt-a" > "$home/state/task-a.meta"
 export JG_HOME=$home JG_KEY_HOMES=$home
 

@@ -24,7 +24,7 @@ PROVIDERS = "OPENROUTER ANTHROPIC OPENAI MINIMAX GOOGLE GEMINI XAI MOONSHOT ZAI 
 DEFAULT = ["*_API_KEY", "*_API_TOKEN"] + [f"{p}_*{s}" for p in PROVIDERS for s in ("KEY", "TOKEN", "SECRET")]
 
 PROC = os.environ.get("JG_PROC", "/proc")
-HOME = os.environ.get("JG_HOME") or os.path.expanduser("~/firstmate")
+HOME = os.environ.get("JG_HOME") or os.path.expanduser("~/juggernaut")
 STATE = os.path.join(HOME, "state")
 OPENROUTER_KEY_FILE = os.path.join(os.path.expanduser("~"), ".config", "openrouter", "api_key")
 
@@ -96,8 +96,8 @@ def homes():
     dirs = os.environ.get("JG_KEY_HOMES")
     if dirs is None:
         base = os.path.expanduser("~/.treehouse")
-        dirs = ":".join([HOME, os.path.expanduser("~/firstmate")] + sorted(
-            os.path.join(base, a, b, "firstmate") for a in os.listdir(base) if os.path.isdir(os.path.join(base, a))
+        dirs = ":".join([HOME, os.path.expanduser("~/juggernaut")] + sorted(
+            os.path.join(base, a, b, "juggernaut") for a in os.listdir(base) if os.path.isdir(os.path.join(base, a))
             for b in os.listdir(os.path.join(base, a))))
     out = {}
     for d in dirs.split(":"):
@@ -110,7 +110,7 @@ def task_map(hs):
     m = []
     for real, d in hs.items():
         parts = real.split(os.sep)
-        label = "main" if real == os.path.realpath(os.path.expanduser("~/firstmate")) else "/".join(parts[-3:-1])
+        label = "main" if real == os.path.realpath(os.path.expanduser("~/juggernaut")) else "/".join(parts[-3:-1])
         m.append((real, label, "-"))
         sd = os.path.join(d, "state")
         for f in os.listdir(sd):

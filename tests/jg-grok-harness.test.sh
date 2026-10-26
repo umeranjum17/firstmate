@@ -67,7 +67,7 @@ EOF
   printf 'token=%s\n' "$token" > "$wt/.jg-grok-turnend"
   GROK_WORKSPACE_ROOT="$wt" bash "$hook"
   assert_present "$target" "registered grok pointer did not touch the task turn-end file"
-  pass "grok global hook requires a firstmate registry token"
+  pass "grok global hook requires a juggernaut registry token"
 }
 
 test_grok_teardown_removes_pointer_and_token() {

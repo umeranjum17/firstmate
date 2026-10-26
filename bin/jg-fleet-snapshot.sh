@@ -8,7 +8,7 @@
 # The command does not acquire the session lock, drain wakes, arm watchers,
 # mutate backlog state, or write reports. Its default ledger collector may
 # atomically refresh parent-side cached copies of remote home summaries under
-# state/secondmate-summary-cache; those observational cache writes are its only
+# state/squad-lead-summary-cache; those observational cache writes are its only
 # fleet-state mutation.
 #
 # Top-level fields:
@@ -54,7 +54,7 @@
 #     but mutable current-state, status, report, and endpoint evidence is discarded
 #     rather than attributed to the replacement generation.
 #     Local current_state is parsed from bin/jg-crew-state.sh <id> and preserves
-#     state, source, detail, and raw line separately. Remote secondmate rows use
+#     state, source, detail, and raw line separately. Remote squad_lead rows use
 #     an explicit unknown value because their endpoint liveness belongs to
 #     supervision rather than this snapshot path.
 #     paths.status_log.last_event is historical wake-event data only, never
@@ -67,18 +67,18 @@
 #     against current_state; hints.pending_decision and hints.blocked_event are
 #     booleans derived from that set.
 #     endpoint.exists is the cheap local backend endpoint-presence read.
-#     endpoint.agent_alive is populated for local secondmates only, where it is
-#     useful return-channel supervision data; remote secondmates use "unknown"
+#     endpoint.agent_alive is populated for local squad_leads only, where it is
+#     useful return-channel supervision data; remote squad_leads use "unknown"
 #     without a probe, and other tasks use "not_checked".
 #   scout_reports[]: present data/<id>/report.md pointers.
 #   main_inventory: {valid,reason,orphan_in_flight[],unstructured_current_count} -
-#     main-home current-inventory checks shared with secondmate_home_summary_json
+#     main-home current-inventory checks shared with squad_lead_home_summary_json
 #     (orphan structured in-flight ids with no state/<id>.meta, and unstructured
 #     current backlog rows). Does not invent live tasks; meta remains truth for
 #     workers. Bearings maps failures into omitted[] disclosure (and a Charted
 #     Next gate line) rather than silent empty Underway.
-#   secondmate_current: {records[],total,shown,truncated} - bounded current summaries
-#     for registered secondmates, selected from validated structured state inside
+#   squad_lead_current: {records[],total,shown,truncated} - bounded current summaries
+#     for registered squad_leads, selected from validated structured state inside
 #     each home with explicit provenance, freshness, endpoint evidence, and unknown
 #     failure reasons. Parent status and bounded terminal evidence are historical,
 #     untrusted supplements only and never override readable structured-home facts.
@@ -102,8 +102,8 @@
 #     schemas; a live ledger or cached copy missing either declaration or declaring
 #     an unsupported version is unavailable even when it contains no captain holds.
 #     These schemas also accept v1 summaries from older producers.
-#   secondmate_landed: {records[],truncated[],unreadable[],partial[]} - the
-#     compatibility landed-work roll-up derived from secondmate_current. Readable
+#   squad_lead_landed: {records[],truncated[],unreadable[],partial[]} - the
+#     compatibility landed-work roll-up derived from squad_lead_current. Readable
 #     structured homes are partial, not unreadable, when an unavailable child state
 #     or a backlog-vs-metadata inventory mismatch makes their summary incomplete;
 #     they retain independently trustworthy structured surfaces. An inventory
@@ -112,7 +112,7 @@
 #     Which closed rows a home contributes is bin/jg-landed-lib.sh's rule, shared
 #     with the bearings projection so one Recently Landed section has one owner.
 #   contributions: cached owned-contribution coverage; jg-contributions.sh owns it.
-#   secondmate_guidance: return-channel action note for renderers and bearings.
+#   squad_lead_guidance: return-channel action note for renderers and bearings.
 #
 # --contribution-input prints only the canonical backlog/tasks ownership pair,
 # without worker observations or cross-home collection, for the home-local poll.
@@ -154,15 +154,15 @@ esac
 
 # Cross-home bounds are explicit so one broken or unexpectedly large home cannot
 # hang or explode the parent snapshot.
-JG_SNAPSHOT_SECONDMATES=${JG_SNAPSHOT_SECONDMATES:-20}
+JG_SNAPSHOT_SQUAD_LEADS=${JG_SNAPSHOT_SQUAD_LEADS:-20}
 JG_SNAPSHOT_CREW_STATE_TIMEOUT=${JG_SNAPSHOT_CREW_STATE_TIMEOUT:-10}
 JG_SNAPSHOT_LOCAL_READ_CONCURRENCY=${JG_SNAPSHOT_LOCAL_READ_CONCURRENCY:-8}
 JG_SNAPSHOT_BUDGET=${JG_SNAPSHOT_BUDGET:-5}
-JG_SNAPSHOT_CACHE_DIR=${JG_SNAPSHOT_CACHE_DIR:-$STATE/secondmate-summary-cache}
-JG_SNAPSHOT_SECONDMATE_MAX_BYTES=${JG_SNAPSHOT_SECONDMATE_MAX_BYTES:-262144}
-JG_SNAPSHOT_SECONDMATE_CHILDREN=${JG_SNAPSHOT_SECONDMATE_CHILDREN:-20}
-JG_SNAPSHOT_SECONDMATE_QUEUED=${JG_SNAPSHOT_SECONDMATE_QUEUED:-20}
-JG_SNAPSHOT_SECONDMATE_DECISIONS=${JG_SNAPSHOT_SECONDMATE_DECISIONS:-20}
+JG_SNAPSHOT_CACHE_DIR=${JG_SNAPSHOT_CACHE_DIR:-$STATE/squad-lead-summary-cache}
+JG_SNAPSHOT_SQUAD_LEAD_MAX_BYTES=${JG_SNAPSHOT_SQUAD_LEAD_MAX_BYTES:-262144}
+JG_SNAPSHOT_SQUAD_LEAD_CHILDREN=${JG_SNAPSHOT_SQUAD_LEAD_CHILDREN:-20}
+JG_SNAPSHOT_SQUAD_LEAD_QUEUED=${JG_SNAPSHOT_SQUAD_LEAD_QUEUED:-20}
+JG_SNAPSHOT_SQUAD_LEAD_DECISIONS=${JG_SNAPSHOT_SQUAD_LEAD_DECISIONS:-20}
 JG_SNAPSHOT_TERMINAL_LINES=${JG_SNAPSHOT_TERMINAL_LINES:-8}
 JG_SNAPSHOT_TERMINAL_BYTES=${JG_SNAPSHOT_TERMINAL_BYTES:-4096}
 JG_SNAPSHOT_TERMINAL_TIMEOUT=${JG_SNAPSHOT_TERMINAL_TIMEOUT:-2}
@@ -182,19 +182,19 @@ validate_positive_bound() {  # <name> <value>
       ;;
   esac
 }
-case "$JG_SNAPSHOT_SECONDMATES" in
+case "$JG_SNAPSHOT_SQUAD_LEADS" in
   ''|*[!0-9]*)
-    echo "jg-fleet-snapshot: JG_SNAPSHOT_SECONDMATES must be a non-negative integer" >&2
+    echo "jg-fleet-snapshot: JG_SNAPSHOT_SQUAD_LEADS must be a non-negative integer" >&2
     exit 2
     ;;
 esac
 validate_positive_bound JG_SNAPSHOT_CREW_STATE_TIMEOUT "$JG_SNAPSHOT_CREW_STATE_TIMEOUT"
 validate_positive_bound JG_SNAPSHOT_LOCAL_READ_CONCURRENCY "$JG_SNAPSHOT_LOCAL_READ_CONCURRENCY"
 validate_positive_bound JG_SNAPSHOT_BUDGET "$JG_SNAPSHOT_BUDGET"
-validate_positive_bound JG_SNAPSHOT_SECONDMATE_MAX_BYTES "$JG_SNAPSHOT_SECONDMATE_MAX_BYTES"
-validate_positive_bound JG_SNAPSHOT_SECONDMATE_CHILDREN "$JG_SNAPSHOT_SECONDMATE_CHILDREN"
-validate_positive_bound JG_SNAPSHOT_SECONDMATE_QUEUED "$JG_SNAPSHOT_SECONDMATE_QUEUED"
-validate_positive_bound JG_SNAPSHOT_SECONDMATE_DECISIONS "$JG_SNAPSHOT_SECONDMATE_DECISIONS"
+validate_positive_bound JG_SNAPSHOT_SQUAD_LEAD_MAX_BYTES "$JG_SNAPSHOT_SQUAD_LEAD_MAX_BYTES"
+validate_positive_bound JG_SNAPSHOT_SQUAD_LEAD_CHILDREN "$JG_SNAPSHOT_SQUAD_LEAD_CHILDREN"
+validate_positive_bound JG_SNAPSHOT_SQUAD_LEAD_QUEUED "$JG_SNAPSHOT_SQUAD_LEAD_QUEUED"
+validate_positive_bound JG_SNAPSHOT_SQUAD_LEAD_DECISIONS "$JG_SNAPSHOT_SQUAD_LEAD_DECISIONS"
 validate_positive_bound JG_SNAPSHOT_TERMINAL_LINES "$JG_SNAPSHOT_TERMINAL_LINES"
 validate_positive_bound JG_SNAPSHOT_TERMINAL_BYTES "$JG_SNAPSHOT_TERMINAL_BYTES"
 validate_positive_bound JG_SNAPSHOT_TERMINAL_TIMEOUT "$JG_SNAPSHOT_TERMINAL_TIMEOUT"
@@ -222,7 +222,7 @@ esac
 . "$SCRIPT_DIR/jg-classify-lib.sh"
 # shellcheck source=bin/jg-ff-lib.sh
 # shellcheck disable=SC1091
-. "$SCRIPT_DIR/jg-ff-lib.sh"  # validate_secondmate_home: shared seeded-home boundary checks
+. "$SCRIPT_DIR/jg-ff-lib.sh"  # validate_squad_lead_home: shared seeded-home boundary checks
 # shellcheck source=bin/jg-timeout-lib.sh
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/jg-timeout-lib.sh"  # jg_run_timed: the shared hard bound
@@ -237,20 +237,20 @@ esac
 usage() {
   cat <<'EOF'
 usage: jg-fleet-snapshot.sh --json
-       jg-fleet-snapshot.sh --secondmate-home-summary
+       jg-fleet-snapshot.sh --squad-lead-home-summary
 
-Print a structured snapshot of the firstmate fleet.
+Print a structured snapshot of the juggernaut fleet.
 JSON is the stable machine-readable output contract. The default snapshot
 refreshes only its parent-side remote-summary cache as an observational side effect.
 
 --contribution-input emits the canonical local backlog/tasks ownership pair only,
 without worker observations or cross-home collection.
 
---secondmate-home-summary emits the bounded structured summary used after a
-validated registered-home handoff. It is local-only, skips nested secondmate
+--squad-lead-home-summary emits the bounded structured summary used after a
+validated registered-home handoff. It is local-only, skips nested squad_lead
 aggregation, includes generated_epoch for freshness arithmetic, and marks
 inventory contradictions or unavailable child state invalid.
-kind=secondmate meta records are not child inventory for unowned_current or
+kind=squad_lead meta records are not child inventory for unowned_current or
 terminal_in_flight; they never have backlog rows.
 Its invalidity object names the normalized failure kind and affected ids.
 Actionable tasks-axi captain holds appear as decisions_open and stay visible in
@@ -258,8 +258,8 @@ queued with hold_reason, hold_kind, hold_until,
 hold_bucket, hold_age_days, and plural blocker fields for downstream
 projections. A captain hold is actionable only when every blocker is Done, any
 hold-until date has arrived, and an undated hold remains below the aging threshold.
-Cross-home collection uses JG_SNAPSHOT_SECONDMATES (default 20, 0 lifts the
-count bound) and JG_SNAPSHOT_SECONDMATE_MAX_BYTES.
+Cross-home collection uses JG_SNAPSHOT_SQUAD_LEADS (default 20, 0 lifts the
+count bound) and JG_SNAPSHOT_SQUAD_LEAD_MAX_BYTES.
 Every sampled remote home's state/home-summary.json is fetched concurrently
 under one JG_SNAPSHOT_BUDGET (default 5 seconds), with a valid prior copy under
 JG_SNAPSHOT_CACHE_DIR used when the live read fails, is invalid, or consumes the
@@ -271,14 +271,14 @@ that home.
 Each local per-task current-state read is bounded by JG_SNAPSHOT_CREW_STATE_TIMEOUT
 (default 10 seconds); a read that hits the bound reports state unknown. Local task
 observations run concurrently, up to JG_SNAPSHOT_LOCAL_READ_CONCURRENCY (default 8).
-Remote secondmate endpoint liveness is not probed by this command.
+Remote squad_lead endpoint liveness is not probed by this command.
 Terminal contradiction evidence uses
 JG_SNAPSHOT_TERMINAL_LINES, JG_SNAPSHOT_TERMINAL_BYTES, and
 JG_SNAPSHOT_TERMINAL_TIMEOUT and never becomes canonical current state.
 Parent activity evidence uses JG_SNAPSHOT_PARENT_ACTIVITY_LINES,
 JG_SNAPSHOT_PARENT_ACTIVITY_BYTES, JG_SNAPSHOT_PARENT_ACTIVITIES, and
 JG_SNAPSHOT_PARENT_ACTIVITY_TIMEOUT, with truncation disclosed in the result.
-The registered secondmate table uses JG_SNAPSHOT_REGISTRY_LINES,
+The registered squad_lead table uses JG_SNAPSHOT_REGISTRY_LINES,
 JG_SNAPSHOT_REGISTRY_BYTES, JG_SNAPSHOT_REGISTRY_RECORDS, and
 JG_SNAPSHOT_REGISTRY_TIMEOUT, with unavailability and truncation disclosed.
 Every captain hold carries hold_bucket, decided only from structured fields and
@@ -293,7 +293,7 @@ EOF
 OUTPUT_MODE=json
 case "${1:---json}" in
   --json) ;;
-  --secondmate-home-summary) OUTPUT_MODE=secondmate-home-summary ;;
+  --squad-lead-home-summary) OUTPUT_MODE=squad-lead-home-summary ;;
   --contribution-input) OUTPUT_MODE=contribution-input ;;
   -h|--help) usage; exit 0 ;;
   *) usage >&2; exit 2 ;;
@@ -322,7 +322,7 @@ last_nonempty_line() {  # <file>
 }
 
 # A local crew-state read is bounded so one slow child cannot extend this
-# snapshot without limit. Remote secondmate endpoint liveness is never read here.
+# snapshot without limit. Remote squad_lead endpoint liveness is never read here.
 # A local read that hits the bound folds to state unknown.
 crew_state_json() {  # <id> [<captured-meta>] [<captured-status>]
   local id=$1 captured_meta=${2:-} captured_status=${3:-} raw rest state source detail sep
@@ -666,7 +666,7 @@ prefetch_task_observations() {  # <meta> <id>
       else
         endpoint_exists=false
       fi
-      if [ "$kind" = secondmate ]; then
+      if [ "$kind" = squad_lead ]; then
         agent_alive=$(jg_backend_agent_alive "$backend" "$target" 2>/dev/null || printf unknown)
       fi
     fi
@@ -813,13 +813,13 @@ task_json_lines() {
     #   - a TERMINAL done/failed state on a single-owner task (scout or ship), whose
     #     deliverable is its report or PR, so a COMPLETED scout surfaces only as a
     #     report POINTER, never as a reopened pending decision.
-    # Secondmates are excluded from lifecycle clearing: they are persistent and
+    # SquadLeads are excluded from lifecycle clearing: they are persistent and
     # multiplex many concerns onto one stream, so activity on one concern must
     # never clear another concern's keyed decision. A parked/blocked state, or a
     # non-authoritative status-log/none read on a still-live task, keeps the fold's
     # open decision surfacing.
     open_decisions_tsv=$(status_open_decisions "$status_log" "$kind")
-    if [ "$kind" != secondmate ] && \
+    if [ "$kind" != squad_lead ] && \
        { { { [ "$current_source" = run-step ] || [ "$current_source" = pane ]; } \
            && [ "$current_state" != parked ] && [ "$current_state" != blocked ]; } \
          || { [ "$current_state" = "done" ] || [ "$current_state" = "failed" ]; }; }; then
@@ -908,7 +908,7 @@ task_json_lines() {
           home:$home_path,
           report:$report
         },
-        secondmate_projects:($projects | if . == "" then [] else split(",") | map(gsub("^[[:space:]]+|[[:space:]]+$"; "")) | map(select(. != "")) end),
+        squad_lead_projects:($projects | if . == "" then [] else split(",") | map(gsub("^[[:space:]]+|[[:space:]]+$"; "")) | map(select(. != "")) end),
         current_state:($current_state + {observed_at:$observed_at,freshness:"fresh"}),
         endpoint:{target:($target | if . == "" then null else . end),exists:$endpoint_exists,agent_alive:$agent_alive,
           status:(if $endpoint_exists == false then "absent"
@@ -924,10 +924,10 @@ task_json_lines() {
           last_event_text:$last_event_raw
         },
         actions:(
-          if $kind == "secondmate" then
+          if $kind == "squad_lead" then
             {send:"bin/jg-send.sh jg-\($id) \u0027<request>\u0027",
-             watch:"read status/doc return channel; do not routinely jg-peek a secondmate for answers",
-             return_channel_note:"Secondmate answers come back through status/doc paths after a marked jg-send request."}
+             watch:"read status/doc return channel; do not routinely jg-peek a squad_lead for answers",
+             return_channel_note:"SquadLead answers come back through status/doc paths after a marked jg-send request."}
           else
             {watch:"bin/jg-peek.sh jg-\($id)",
              steer:"bin/jg-send.sh jg-\($id) \u0027<instruction>\u0027",
@@ -938,7 +938,7 @@ task_json_lines() {
 }
 
 # Main-home current-inventory validity: same orphan / unstructured-current checks
-# used by secondmate_home_summary_json, without inventing live task rows.
+# used by squad_lead_home_summary_json, without inventing live task rows.
 # Meta inventory remains the sole source of live workers; this object only
 # discloses backlog↔task inconsistency for renderers (Bearings omitted/gates).
 main_inventory_json() {  # <backlog-json-file> <tasks-json-file>
@@ -970,16 +970,16 @@ main_inventory_json() {  # <backlog-json-file> <tasks-json-file>
 # Project one home's canonical structured inventory into the bounded shape a
 # validated parent read needs.
 # This mode never reads parent events or terminal text and never aggregates
-# nested secondmates.
-secondmate_home_summary_json() {  # <backlog-json-file> <tasks-json-file>
+# nested squad_leads.
+squad_lead_home_summary_json() {  # <backlog-json-file> <tasks-json-file>
   jq -n \
     --arg generated "$SNAPSHOT_NOW" \
     --argjson generated_epoch "$SNAPSHOT_EPOCH" \
     --arg home "$JG_HOME" \
-    --argjson child_n "$JG_SNAPSHOT_SECONDMATE_CHILDREN" \
-    --argjson queued_n "$JG_SNAPSHOT_SECONDMATE_QUEUED" \
-    --argjson decisions_n "$JG_SNAPSHOT_SECONDMATE_DECISIONS" \
-    --argjson landed_n "$JG_SNAPSHOT_SECONDMATE_LANDED_PER_HOME" \
+    --argjson child_n "$JG_SNAPSHOT_SQUAD_LEAD_CHILDREN" \
+    --argjson queued_n "$JG_SNAPSHOT_SQUAD_LEAD_QUEUED" \
+    --argjson decisions_n "$JG_SNAPSHOT_SQUAD_LEAD_DECISIONS" \
+    --argjson landed_n "$JG_SNAPSHOT_SQUAD_LEAD_LANDED_PER_HOME" \
     --slurpfile backlog "$1" \
     --slurpfile tasks "$2" --slurpfile contributions "$CONTRIBUTIONS_JSON_FILE" "$JG_LANDED_JQ_DEFS"'
     ($backlog[0]) as $backlog
@@ -1026,12 +1026,12 @@ secondmate_home_summary_json() {  # <backlog-json-file> <tasks-json-file>
          | select(.requires_child_metadata)
          | select(.id as $id | [$tasks[].id] | index($id) | not) ]) as $orphan_in_flight
     | ([ $tasks[]
-         | select(.kind != "secondmate")
+         | select(.kind != "squad_lead")
          | select(.id as $id | [$owned_in_flight[].id] | index($id) | not)
          | {id,state:.current_state.state} ]) as $unowned_children
     | ([ $owned_in_flight[] as $work
          | $tasks[]
-         | select(.kind != "secondmate")
+         | select(.kind != "squad_lead")
          | select(.id == $work.id and (.current_state.state == "done" or .current_state.state == "failed"))
          | {id,state:.current_state.state} ]) as $terminal_in_flight
     | ([if $backlog.present != true then
@@ -1103,7 +1103,7 @@ secondmate_home_summary_json() {  # <backlog-json-file> <tasks-json-file>
        elif ($holds_all | length) > 0 then "externally_held"
        else "no_active_work" end) as $state
     | {
-        schema:"jg-secondmate-home-summary.v1",
+        schema:"jg-squad-lead-home-summary.v1",
         hold_classifier_schema:"jg-captain-hold-buckets.v1",
         contributions:$contributions[0],
         generated:$generated,
@@ -1154,12 +1154,12 @@ secondmate_home_summary_json() {  # <backlog-json-file> <tasks-json-file>
       }'
 }
 
-# Current registered-secondmate aggregation.
+# Current registered-squad-lead aggregation.
 # The validated home summary is canonical.
 # Parent status and bounded terminal capture remain untrusted supplemental evidence
 # with explicit provenance, and can only produce a contradiction or unknown fallback.
-JG_SNAPSHOT_SECONDMATE_LANDED_PER_HOME=${JG_SNAPSHOT_SECONDMATE_LANDED_PER_HOME:-10}
-case "$JG_SNAPSHOT_SECONDMATE_LANDED_PER_HOME" in ''|*[!0-9]*) JG_SNAPSHOT_SECONDMATE_LANDED_PER_HOME=10 ;; esac
+JG_SNAPSHOT_SQUAD_LEAD_LANDED_PER_HOME=${JG_SNAPSHOT_SQUAD_LEAD_LANDED_PER_HOME:-10}
+case "$JG_SNAPSHOT_SQUAD_LEAD_LANDED_PER_HOME" in ''|*[!0-9]*) JG_SNAPSHOT_SQUAD_LEAD_LANDED_PER_HOME=10 ;; esac
 
 # GNU stat treats -f as a filesystem-report command, so a BSD-first fallback can
 # pollute arithmetic input before failing. Select the platform syntax once.
@@ -1173,8 +1173,8 @@ else
   file_mode_octal() { stat -c '%a' "$1" 2>/dev/null || true; }
 fi
 
-registry_secondmates_json() {
-  local reg="$DATA/secondmates.md" out rc reason mode script parse_filter output_filter
+registry_squad_leads_json() {
+  local reg="$DATA/squad_leads.md" out rc reason mode script parse_filter output_filter
   if [ ! -f "$reg" ]; then
     jq -n --arg path "$reg" --arg observed "$SNAPSHOT_NOW" \
       '{present:false,available:true,complete:true,reason:null,provenance:"registered-table",path:$path,freshness:{status:"fresh",observed_at:$observed},records:[],input_truncated:false,records_truncated:false,reasons:[],lines_in_window:0,records_in_window:0}'
@@ -1183,7 +1183,7 @@ registry_secondmates_json() {
   mode=$(file_mode_octal "$reg")
   if [ -z "$mode" ] || [ $((8#$mode & 0444)) -eq 0 ]; then
     jq -n --arg path "$reg" --arg observed "$SNAPSHOT_NOW" \
-      --arg reason "registered secondmate table is unreadable" \
+      --arg reason "registered squad_lead table is unreadable" \
       '{present:true,available:false,complete:false,reason:$reason,provenance:"registered-table",path:$path,freshness:{status:"unavailable",observed_at:$observed},records:[],input_truncated:false,records_truncated:false,reasons:[$reason],lines_in_window:0,records_in_window:0}'
     return 0
   fi
@@ -1250,7 +1250,7 @@ BASH
            remote:$is_remote,registered:true,
            registry_error:(if $route == null or ($route.home | length) == 0 then "registry entry has no home" else null end)} ]
       | group_by(.id)
-      | map(if length > 1 then .[0] + {registry_error:"duplicate secondmate id in registry"} else .[0] end)
+      | map(if length > 1 then .[0] + {registry_error:"duplicate squad_lead id in registry"} else .[0] end)
 JQ
   )
   output_filter=$(cat <<'JQ'
@@ -1267,7 +1267,7 @@ JQ
 JQ
   )
   out=$(jg_run_timed "$JG_SNAPSHOT_REGISTRY_TIMEOUT" bash -c "$script" \
-    jg-secondmate-registry "$reg" "$JG_SNAPSHOT_REGISTRY_LINES" \
+    jg-squad-lead-registry "$reg" "$JG_SNAPSHOT_REGISTRY_LINES" \
     "$JG_SNAPSHOT_REGISTRY_BYTES" "$JG_SNAPSHOT_REGISTRY_RECORDS" "$reg" "$SNAPSHOT_NOW" \
     "$parse_filter" "$output_filter" 2>/dev/null)
   rc=$?
@@ -1277,8 +1277,8 @@ JQ
     printf '%s' "$out"
     return 0
   fi
-  [ "$rc" -eq 124 ] && reason="registered secondmate table read timed out" \
-    || reason="registered secondmate table is unreadable"
+  [ "$rc" -eq 124 ] && reason="registered squad_lead table read timed out" \
+    || reason="registered squad_lead table is unreadable"
   jq -n --arg path "$reg" --arg observed "$SNAPSHOT_NOW" --arg reason "$reason" \
     '{present:true,available:false,complete:false,reason:$reason,provenance:"registered-table",path:$path,freshness:{status:"unavailable",observed_at:$observed},records:[],input_truncated:false,records_truncated:false,reasons:[$reason],lines_in_window:0,records_in_window:0}'
 }
@@ -1297,7 +1297,7 @@ summary_file_read() {  # <file> <expected-home> <output-file>
   local file=$1 home=$2 output=$3 captured bytes rc
   [ -f "$file" ] && [ ! -L "$file" ] || return 1
   captured=$(umask 077; mktemp "$SNAPSHOT_COLLECT_DIR/.selected-summary.XXXXXX") || return 1
-  if ! LC_ALL=C head -c "$((JG_SNAPSHOT_SECONDMATE_MAX_BYTES + 1))" "$file" > "$captured"; then
+  if ! LC_ALL=C head -c "$((JG_SNAPSHOT_SQUAD_LEAD_MAX_BYTES + 1))" "$file" > "$captured"; then
     rm -f -- "$captured"
     return 1
   fi
@@ -1305,7 +1305,7 @@ summary_file_read() {  # <file> <expected-home> <output-file>
   case "$bytes" in
     ''|*[!0-9]*) rm -f -- "$captured"; return 1 ;;
   esac
-  if [ "$bytes" -gt "$JG_SNAPSHOT_SECONDMATE_MAX_BYTES" ] \
+  if [ "$bytes" -gt "$JG_SNAPSHOT_SQUAD_LEAD_MAX_BYTES" ] \
     || ! jq -e -s --arg home "$home" -f "$SNAPSHOT_SUMMARY_FILTER" "$captured" >/dev/null 2>&1; then
     rm -f -- "$captured"
     return 1
@@ -1326,7 +1326,7 @@ summary_file_oversized() {  # <file>
   [ -f "$1" ] && [ ! -L "$1" ] || return 1
   bytes=$(LC_ALL=C wc -c < "$1" | tr -d ' ')
   case "$bytes" in ''|*[!0-9]*) return 1 ;; esac
-  [ "$bytes" -gt "$JG_SNAPSHOT_SECONDMATE_MAX_BYTES" ]
+  [ "$bytes" -gt "$JG_SNAPSHOT_SQUAD_LEAD_MAX_BYTES" ]
 }
 
 snapshot_cache_prepare() {
@@ -1379,7 +1379,7 @@ prepare_remote_summary_collection() {  # <sampled-row-json-lines>
   SNAPSHOT_SUMMARY_FILTER="$SNAPSHOT_COLLECT_DIR/summary-filter.jq"
   cat > "$SNAPSHOT_SUMMARY_FILTER" <<'JQ'
 length == 1 and (.[0] |
-  .schema == "jg-secondmate-home-summary.v1"
+  .schema == "jg-squad-lead-home-summary.v1"
   and .hold_classifier_schema == "jg-captain-hold-buckets.v1"
   and .home == $home
   and (.generated | type) == "string"
@@ -1475,7 +1475,7 @@ BASH
   SNAPSHOT_COLLECTION_TIMED_OUT=0
   if jg_run_timed "$JG_SNAPSHOT_BUDGET" bash "$collector" \
       "$SCRIPT_DIR" "$manifest" "$SNAPSHOT_COLLECT_DIR" "$SNAPSHOT_SUMMARY_FILTER" \
-      "$JG_SNAPSHOT_SECONDMATE_MAX_BYTES"; then
+      "$JG_SNAPSHOT_SQUAD_LEAD_MAX_BYTES"; then
     :
   else
     rc=$?
@@ -1719,16 +1719,16 @@ parent_evidence_reconciliation_json() {  # <summary-json-file> <activities-json>
        inconclusive:any(($activity_results + $decision_results)[]; .verdict == "inconclusive")}'
 }
 
-secondmate_current_json() {  # <parent-tasks-json-file> <output-file>
+squad_lead_current_json() {  # <parent-tasks-json-file> <output-file>
   local tasks_file=$1 output_file=$2 registry_file union_file records_file rows total_registered total shown truncated
   local row id home host remote registered registry_error task sampled_spawn_gen status_file status_observation_file event_raw event_note event_age observed_epoch observed_age
   local activity_scan activities decisions reconciliation provenance freshness reason summary_file summary_sampled summary_valid summary_invalidity state terminal terminal_contradiction contradiction
   local summary_source summary_age summary_observed summary_freshness cache_path collection_status collection_slot summary_index=0
   local seen_homes=''
-  registry_file="$JSON_TRANSPORT_DIR/secondmate-registry.json"
-  union_file="$JSON_TRANSPORT_DIR/secondmate-union.json"
-  records_file="$JSON_TRANSPORT_DIR/secondmate-records.jsonl"
-  registry_secondmates_json > "$registry_file" || return 1
+  registry_file="$JSON_TRANSPORT_DIR/squad-lead-registry.json"
+  union_file="$JSON_TRANSPORT_DIR/squad-lead-union.json"
+  records_file="$JSON_TRANSPORT_DIR/squad-lead-records.jsonl"
+  registry_squad_leads_json > "$registry_file" || return 1
   jq -n --slurpfile registry "$registry_file" --slurpfile tasks "$tasks_file" '
     ($registry[0]) as $registry
     |
@@ -1738,19 +1738,19 @@ secondmate_current_json() {  # <parent-tasks-json-file> <output-file>
     | (($registered | map(.id)) // []) as $registered_ids
     | ([ $registered[] as $r
          | $r + {parent_task:([$tasks[] | select(.id == $r.id)][0] // null)} ]
-       + [ $tasks[] | select(.kind == "secondmate") as $t
+       + [ $tasks[] | select(.kind == "squad_lead") as $t
            | select(($registered_ids | index($t.id)) == null)
            | {id:$t.id,home:($t.paths.home.path // null),
               registered:(if $registry.complete == true then false else null end),
               registry_error:(if $registry.complete == true
-                              then "secondmate metadata is not registered"
-                              else "secondmate registration is unknown because the registry read is incomplete or unavailable" end),
+                              then "squad_lead metadata is not registered"
+                              else "squad_lead registration is unknown because the registry read is incomplete or unavailable" end),
               parent_task:$t} ])
     | sort_by(.id)
     | {registry:$registry,records:.}' > "$union_file" || return 1
   total_registered=$(jq '[.records[] | select(.registered)] | length' "$union_file")
   total=$(jq '.records | length' "$union_file")
-  rows=$(jq -c --argjson cap "$JG_SNAPSHOT_SECONDMATES" '(if $cap == 0 then .records else .records[:$cap] end)[]' "$union_file")
+  rows=$(jq -c --argjson cap "$JG_SNAPSHOT_SQUAD_LEADS" '(if $cap == 0 then .records else .records[:$cap] end)[]' "$union_file")
   shown=$(printf '%s\n' "$rows" | grep -c . || true)
   truncated=$((total - shown))
   : > "$records_file"
@@ -1790,7 +1790,7 @@ secondmate_current_json() {  # <parent-tasks-json-file> <output-file>
     printf '{}\n' > "$summary_file" || return 1
     summary_sampled=false
     summary_valid=false
-    if [ -z "$reason" ] && [ -z "$home" ]; then reason="no recorded secondmate home"; fi
+    if [ -z "$reason" ] && [ -z "$home" ]; then reason="no recorded squad_lead home"; fi
     if [ -z "$reason" ]; then
       case "$home" in
         /*) : ;;
@@ -1804,7 +1804,7 @@ secondmate_current_json() {  # <parent-tasks-json-file> <output-file>
           *" $host:$home "*) reason="invalid home: duplicate resolved remote route" ;;
           *) seen_homes="$seen_homes $host:$home" ;;
         esac
-      elif ! validate_secondmate_home "$id" "$home" 2>/dev/null; then
+      elif ! validate_squad_lead_home "$id" "$home" 2>/dev/null; then
         reason="invalid home: $VALIDATION_ERROR"
       else
         home=$VALIDATED_HOME
@@ -1942,7 +1942,7 @@ EOF
     "$records_file" > "$output_file"
 }
 
-secondmate_landed_from_current_json() {  # <secondmate-current-json-file> <output-file>
+squad_lead_landed_from_current_json() {  # <squad-lead-current-json-file> <output-file>
   jq -n --slurpfile current "$1" '
     ($current[0]) as $current
     |
@@ -2031,8 +2031,8 @@ BACKLOG_JSON_FILE="$JSON_TRANSPORT_DIR/backlog.json"
 TASKS_JSON_FILE="$JSON_TRANSPORT_DIR/tasks.json"
 MAIN_INVENTORY_JSON_FILE="$JSON_TRANSPORT_DIR/main-inventory.json"
 SCOUT_REPORTS_JSON_FILE="$JSON_TRANSPORT_DIR/scout-reports.json"
-SECONDMATE_CURRENT_JSON_FILE="$JSON_TRANSPORT_DIR/secondmate-current.json"
-SECONDMATE_LANDED_JSON_FILE="$JSON_TRANSPORT_DIR/secondmate-landed.json"
+SQUAD_LEAD_CURRENT_JSON_FILE="$JSON_TRANSPORT_DIR/squad-lead-current.json"
+SQUAD_LEAD_LANDED_JSON_FILE="$JSON_TRANSPORT_DIR/squad-lead-landed.json"
 printf '%s\n' "$TASKS_JSON" > "$TASKS_JSON_FILE" \
   || { echo "jg-fleet-snapshot: temporary task file write failed" >&2; exit 1; }
 
@@ -2045,9 +2045,9 @@ JG_CONTRIBUTIONS_NOW="$SNAPSHOT_NOW" "$SCRIPT_DIR/jg-contributions.sh" snapshot 
   "$JSON_TRANSPORT_DIR/contribution-input.json" > "$CONTRIBUTIONS_JSON_FILE" \
   || { echo "jg-fleet-snapshot: contribution coverage unavailable" >&2; exit 1; }
 
-if [ "$OUTPUT_MODE" = secondmate-home-summary ]; then
-  secondmate_home_summary_json "$BACKLOG_JSON_FILE" "$TASKS_JSON_FILE" \
-    || { echo "jg-fleet-snapshot: secondmate home summary failed" >&2; exit 1; }
+if [ "$OUTPUT_MODE" = squad-lead-home-summary ]; then
+  squad_lead_home_summary_json "$BACKLOG_JSON_FILE" "$TASKS_JSON_FILE" \
+    || { echo "jg-fleet-snapshot: squad_lead home summary failed" >&2; exit 1; }
   exit 0
 fi
 
@@ -2055,10 +2055,10 @@ scout_report_lines > "$SCOUT_REPORTS_JSON_FILE" \
   || { echo "jg-fleet-snapshot: scout report snapshot failed" >&2; exit 1; }
 main_inventory_json "$BACKLOG_JSON_FILE" "$TASKS_JSON_FILE" > "$MAIN_INVENTORY_JSON_FILE" \
   || { echo "jg-fleet-snapshot: main inventory summary failed" >&2; exit 1; }
-secondmate_current_json "$TASKS_JSON_FILE" "$SECONDMATE_CURRENT_JSON_FILE" \
-  || { echo "jg-fleet-snapshot: registered secondmate aggregation failed" >&2; exit 1; }
-secondmate_landed_from_current_json "$SECONDMATE_CURRENT_JSON_FILE" "$SECONDMATE_LANDED_JSON_FILE" \
-  || { echo "jg-fleet-snapshot: secondmate landed projection failed" >&2; exit 1; }
+squad_lead_current_json "$TASKS_JSON_FILE" "$SQUAD_LEAD_CURRENT_JSON_FILE" \
+  || { echo "jg-fleet-snapshot: registered squad_lead aggregation failed" >&2; exit 1; }
+squad_lead_landed_from_current_json "$SQUAD_LEAD_CURRENT_JSON_FILE" "$SQUAD_LEAD_LANDED_JSON_FILE" \
+  || { echo "jg-fleet-snapshot: squad_lead landed projection failed" >&2; exit 1; }
 
 jq -n \
   --arg generated "$SNAPSHOT_NOW" \
@@ -2073,14 +2073,14 @@ jq -n \
   --slurpfile main_inventory "$MAIN_INVENTORY_JSON_FILE" \
   --slurpfile contributions "$CONTRIBUTIONS_JSON_FILE" \
   --slurpfile scout_reports "$SCOUT_REPORTS_JSON_FILE" \
-  --slurpfile secondmate_current "$SECONDMATE_CURRENT_JSON_FILE" \
-  --slurpfile secondmate_landed "$SECONDMATE_LANDED_JSON_FILE" \
+  --slurpfile squad_lead_current "$SQUAD_LEAD_CURRENT_JSON_FILE" \
+  --slurpfile squad_lead_landed "$SQUAD_LEAD_LANDED_JSON_FILE" \
   '($backlog[0]) as $backlog
    | ($tasks[0]) as $tasks
    | ($main_inventory[0]) as $main_inventory
    | ($scout_reports[0]) as $scout_reports
-   | ($secondmate_current[0]) as $secondmate_current
-   | ($secondmate_landed[0]) as $secondmate_landed
+   | ($squad_lead_current[0]) as $squad_lead_current
+   | ($squad_lead_landed[0]) as $squad_lead_landed
    | def backlog_by_id($id): ($backlog.records[]? | select(.structured == true and .id == $id) | .) // null;
    def task_by_id($id): ($tasks[]? | select(.id == $id) | .) // null;
    def report_kind($id): (task_by_id($id).kind // backlog_by_id($id).kind // "scout");
@@ -2094,9 +2094,9 @@ jq -n \
      main_inventory:$main_inventory,
      contributions:$contributions[0],
      scout_reports:($scout_reports | map(. + {kind:report_kind(.id)})),
-     secondmate_current:$secondmate_current,
-     secondmate_landed:$secondmate_landed,
-     secondmate_guidance:{
-       note:"For kind=secondmate, bearings selects validated structured state from that registered home; parent events and bounded terminal evidence are fallback-only supplements and never current-state authority."
+     squad_lead_current:$squad_lead_current,
+     squad_lead_landed:$squad_lead_landed,
+     squad_lead_guidance:{
+       note:"For kind=squad_lead, bearings selects validated structured state from that registered home; parent events and bounded terminal evidence are fallback-only supplements and never current-state authority."
      }
    }'

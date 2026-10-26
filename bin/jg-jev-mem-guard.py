@@ -43,7 +43,7 @@ explicit home; an ID alone never establishes ownership, and unmatched processes
 are named by command and PID rather than interrupted.
 Home identity comes from each --state-dir HOME DIR pair, never DIR's parent.
 Explicit homes aggregate lead processes even without ordinary task records; a
-local secondmate's home remains owned by its parent-recorded secondmate task.
+local squad_lead's home remains owned by its parent-recorded squad_lead task.
 RSS includes shared pages per process, so these totals rank consumers rather than
 accounting for unique physical memory.
 Remote records (remote_host set) never contribute local task or home owners.
@@ -180,10 +180,10 @@ def owners(state_dirs):
     metas = [(d, f[:-5], read_meta(os.path.join(d, f)))
              for _, d in state_dirs if os.path.isdir(d) for f in sorted(os.listdir(d)) if f.endswith(".meta")]
     metas = [(d, tid, m) for d, tid, m in metas if not m.get("remote_host")]
-    lead_of = {os.path.realpath(m["home"]): tid for _, tid, m in metas if m.get("kind") == "secondmate" and m.get("home")}
+    lead_of = {os.path.realpath(m["home"]): tid for _, tid, m in metas if m.get("kind") == "squad_lead" and m.get("home")}
     paths, tasks = [], {}
     for d, tid, m in metas:
-        if m.get("kind") == "secondmate":
+        if m.get("kind") == "squad_lead":
             if m.get("home"):
                 owner = (os.path.realpath(d), tid, f"lead {tid}")
                 tasks.setdefault(tid, []).append(owner)

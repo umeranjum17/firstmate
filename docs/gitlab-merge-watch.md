@@ -174,7 +174,7 @@ $ echo $?
 A GitHub task is unaffected by a missing `glab`:
 
 ```
-$ PATH="$noglab" jg-pr-check.sh e6 https://github.com/kunchenguid/firstmate/pull/750
+$ PATH="$noglab" jg-pr-check.sh e6 https://github.com/kunchenguid/juggernaut/pull/750
 armed: state/e6.check.sh
 ```
 

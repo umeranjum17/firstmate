@@ -9,11 +9,11 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
 done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Core journey: the fleet dashboard shows live fleet state in a real browser at a phone width.
-# Seeds a throwaway Firstmate home (agent lanes, a landed task, queued and held tasks), serves this
+# Seeds a throwaway Juggernaut home (agent lanes, a landed task, queued and held tasks), serves this
 # checkout's dashboard against that seed, opens it in headless Chrome at 390px, and writes the Board
 # (lanes) and Insights (queue reasons) as text and screenshots to $DONE_DONE_EVIDENCE_ROOT.
 # The seed is the only home read: no real fleet, no credentials, no live writes.
-# JG_BIN names the Firstmate bin/ whose helper scripts the build runs (default: ~/firstmate/bin); the
+# JG_BIN names the Juggernaut bin/ whose helper scripts the build runs (default: ~/juggernaut/bin); the
 # queue reasons come from this checkout's fleet-flow reader, which the build reaches through JG_ADDONS_DIR.
 set -Eeuo pipefail
 # A browser step that times out stops the run under set -e; name it so a failed run says where.
@@ -21,7 +21,7 @@ trap 'echo "run-core-proof: stopped at line $LINENO: $BASH_COMMAND" >&2' ERR
 : "${DONE_DONE_EVIDENCE_ROOT:?}"
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/.." && pwd)
-JG_BIN=${JG_BIN:-$HOME/firstmate/bin}
+JG_BIN=${JG_BIN:-$HOME/juggernaut/bin}
 [ -f "$JG_BIN/jg-tasks-axi.sh" ] || { echo "run-core-proof: JG_BIN has no jg-tasks-axi.sh: $JG_BIN" >&2; exit 1; }
 home=$(mktemp -d)
 bin=$home/bin
@@ -121,17 +121,17 @@ PY
   printf 'MemTotal: 67108864 kB\nMemAvailable: 33554432 kB\n' > "$home/proc/meminfo"
   printf 'some avg10=45.00 avg60=8.00 avg300=3.00 total=0\n' > "$home/proc/pressure/memory"  # a 10 s spike the gate lets pass
   : > "$home/proc/locks"
-  # The Firstmate helpers the build runs, linked in.
+  # The Juggernaut helpers the build runs, linked in.
   for f in "$JG_BIN"/*; do ln -s "$f" "$bin/${f##*/}"; done
   # The owner's sign-off board token, and a lead home, alpha, whose steering endpoint is a window on a private tmux server.
   mkdir -p "$home/board" "$home/alpha/data" "$home/alpha/state" "$home/tmux"
   printf 'core-owner-token-%s\n' "$(od -An -N12 -tx1 /dev/urandom | tr -d ' \n')" > "$home/board/board.token"
   printf 'board/board.json\n' > "$home/config/owner-board"
   ln -s "$bin" "$home/alpha/bin"
-  printf 'alpha\n' > "$home/alpha/.jg-secondmate-home"
-  printf 'schema=jg-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$home" > "$home/alpha/.jg-secondmate-parent"
-  printf -- '- alpha - Owns the alpha screens. (home: %s/alpha; scope: alpha)\n' "$home" > "$home/data/secondmates.md"
-  printf 'kind=secondmate\nwindow=core:alpha\nbackend=tmux\n' > "$home/state/alpha.meta"
+  printf 'alpha\n' > "$home/alpha/.jg-squad-lead-home"
+  printf 'schema=jg-squad-lead-parent.v1\nroute=local\nparent_home=%s\n' "$home" > "$home/alpha/.jg-squad-lead-parent"
+  printf -- '- alpha - Owns the alpha screens. (home: %s/alpha; scope: alpha)\n' "$home" > "$home/data/squad_leads.md"
+  printf 'kind=squad_lead\nwindow=core:alpha\nbackend=tmux\n' > "$home/state/alpha.meta"
   printf '## In flight\n- [ ] t-lead - Keep the ask list on top (repo: alpha) (kind: ship) (priority: 1) (since %s)\n' "$today" > "$home/alpha/data/backlog.md"
   env -u TMUX TMUX_TMPDIR="$home/tmux" tmux new-session -d -s core -n alpha cat
 }
@@ -485,7 +485,7 @@ python3 - "$DONE_DONE_EVIDENCE_ROOT/steps.json" "$(git -C "$root" rev-parse --sh
 import json, sys
 steps = {
     "target": {"version": sys.argv[2]},
-    "start": "A seeded Firstmate home: four agent lanes, one landed task, three queued tasks, served by this checkout's dashboard",
+    "start": "A seeded Juggernaut home: four agent lanes, one landed task, three queued tasks, served by this checkout's dashboard",
     "steps": [
         "Open the fleet dashboard in headless Chrome at 390px",
         "Read the Board: each lane with its title and state",

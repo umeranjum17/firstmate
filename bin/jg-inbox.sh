@@ -6,11 +6,11 @@
 # Solves three DIFFERENT problems with three different mechanisms, because they
 # are not the same problem:
 #
-#   note    Queue an idea for firstmate while firstmate is mid-turn and cannot
+#   note    Queue an idea for juggernaut while juggernaut is mid-turn and cannot
 #           answer. Writes a durable record and appends ONE `check` wake, so the
-#           note survives a crash and is presented at firstmate's next drain.
+#           note survives a crash and is presented at juggernaut's next drain.
 #           `announce` may append that same wake for an already-saved note.
-#           These two are the only subcommands that touch firstmate's wake queue.
+#           These two are the only subcommands that touch juggernaut's wake queue.
 #   say     Same as `note`, but the body comes from spoken audio on stdin.
 #           Speech is an INPUT METHOD here, not an architecture: it transcribes
 #           and then takes exactly the `note` path.
@@ -18,7 +18,7 @@
 #           network and appends NO wake, so it never interrupts work and is safe
 #           to run in a loop.
 #   ask     Answer a side question with a one-shot model call that never touches
-#           firstmate, the backlog, or the wake queue. A side question is not
+#           juggernaut, the backlog, or the wake queue. A side question is not
 #           fleet work and must not become fleet work.
 #
 # Usage:
@@ -86,7 +86,7 @@
 # `note`, `announce`, `reply`, `receipts`, `ready`, `status`, `list` and `drain`
 # need NO configuration at all, because they make no model call. The voice
 # handover depends on `note`, so it keeps working in a home that has configured
-# nothing. `--json` / `receipts` / `ready` require python3, which a firstmate
+# nothing. `--json` / `receipts` / `ready` require python3, which a juggernaut
 # home already uses for other tools.
 #
 # Environment:
@@ -97,7 +97,7 @@
 # make no network call at all.
 #
 # `note` is also the queueing half of the spoken interface: when the voice agent
-# in bin/jg-voice-relay.py hands real work over to firstmate, it runs this
+# in bin/jg-voice-relay.py hands real work over to juggernaut, it runs this
 # subcommand rather than carrying a second queue of its own. Keep the `note`
 # contract stable for that caller. `status` is the HUMAN view of the records;
 # bin/jg_voice_records.py owns the scope-controlled machine view the voice agent
@@ -327,7 +327,7 @@ sys.stdout.write("\n")
 PY
 }
 
-# Append exactly one wake so firstmate picks the note up at its next drain.
+# Append exactly one wake so juggernaut picks the note up at its next drain.
 # Failure to wake is NOT allowed to lose the note: the record is already on
 # disk, so we report the wake failure and still exit non-zero loudly.
 #
@@ -337,7 +337,7 @@ PY
 # append - and without that exclusion both would read "not announced" and one
 # note would produce two wake rows.
 #
-# Returns 2 without waking when the note is no longer pending: firstmate has
+# Returns 2 without waking when the note is no longer pending: juggernaut has
 # already acknowledged it, so a wake would only spend a turn on an empty inbox.
 announce_note() {  # <id> <summary>
   local id=$1 summary=$2 lib="$JG_ROOT/bin/jg-wake-lib.sh" status=0
@@ -387,20 +387,20 @@ finish_note_result() {  # <outcome> <id> <request-id> <json> <strict-exit> <summ
     fi
     printf '  %s\n' "$summary"
     if [ "$announced" -eq 1 ]; then
-      printf '  firstmate will pick this up at its next check.\n'
+      printf '  juggernaut will pick this up at its next check.\n'
     elif [ "$acknowledged" -eq 1 ]; then
-      printf '  firstmate has already acknowledged this note.\n'
+      printf '  juggernaut has already acknowledged this note.\n'
     fi
   fi
   if [ "$announced" -eq 1 ] || [ "$acknowledged" -eq 1 ]; then
     return 0
   fi
   if [ "$strict" -eq 1 ]; then
-    printf 'jg-inbox: note %s is saved at %s but firstmate was NOT woken\n' \
+    printf 'jg-inbox: note %s is saved at %s but juggernaut was NOT woken\n' \
       "$id" "$path" >&2
     return 3
   fi
-  die "note $id is saved at $path but firstmate was NOT woken"
+  die "note $id is saved at $path but juggernaut was NOT woken"
 }
 
 claim_request_id() {  # <request-id> <note-id>  -> 0 claimed, 1 already exists
@@ -557,11 +557,11 @@ cmd_announce() {
   fi
   if [ "$json" -eq 1 ]; then
     emit_note_json created "$id" "" 1 0 "$path"
-    printf 'jg-inbox: note %s is saved at %s but firstmate was NOT woken\n' \
+    printf 'jg-inbox: note %s is saved at %s but juggernaut was NOT woken\n' \
       "$id" "$path" >&2
     return 3
   fi
-  die "note $id is saved at $path but firstmate was NOT woken"
+  die "note $id is saved at $path but juggernaut was NOT woken"
 }
 
 # Claim the next reply sequence. The caller holds REPLY_SEQ_LOCK across the
@@ -1049,10 +1049,10 @@ cmd_status() {
   local pending=0
   [ -d "$INBOX" ] && pending=$(find "$INBOX" -maxdepth 1 -name '*.note' 2>/dev/null | wc -l | tr -d ' ')
 
-  printf '=== firstmate status (read-only, no wake sent) ===\n'
+  printf '=== juggernaut status (read-only, no wake sent) ===\n'
   printf 'home     %s\n' "$JG_HOME"
   printf 'time     %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  printf 'inbox    %s note(s) waiting for firstmate\n' "$pending"
+  printf 'inbox    %s note(s) waiting for juggernaut\n' "$pending"
 
   if [ -f "$DATA/backlog.md" ]; then
     printf '\n--- in flight ---\n'

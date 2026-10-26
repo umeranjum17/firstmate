@@ -141,7 +141,7 @@ fi
 JG_AFK_LAUNCH_STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
 JG_AFK_LAUNCH_RECORD="$JG_AFK_LAUNCH_STATE/.afk-daemon-terminal"
 JG_AFK_LAUNCH_LOCK="$JG_AFK_LAUNCH_STATE/.afk-launch.lock"
-JG_AFK_LAUNCH_WS_LABEL="firstmate-afk-daemon"
+JG_AFK_LAUNCH_WS_LABEL="juggernaut-afk-daemon"
 
 # shellcheck source=bin/jg-backend.sh
 . "$JG_AFK_LAUNCH_DIR/jg-backend.sh"

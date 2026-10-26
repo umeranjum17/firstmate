@@ -2,9 +2,9 @@
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-public-followup.sh - the deterministic consumer and delivery owner for
-# public commitments made through the myfirstmate relay (X and Discord).
+# public commitments made through the myjuggernaut relay (X and Discord).
 #
-# THE PROBLEM THIS SOLVES: firstmate promises a public final reply, routes the
+# THE PROBLEM THIS SOLVES: juggernaut promises a public final reply, routes the
 # work out, and then the conversation compacts or the session restarts. Nothing
 # in memory survives, so the promise is only kept if reconciling it is a disk
 # operation. Every command here reads durable state and nothing else.
@@ -14,7 +14,7 @@
 #   state/x-context/            the private full request context (jg-x-lib.sh).
 #   bin/jg-x-reply.sh           posting to the relay, thread splitting, dry run.
 #   bin/jg-public-followup-lib.sh  the activation gate and private transport.
-#   bin/jg-on.sh                the SSH route to a REMOTE secondmate home, whose
+#   bin/jg-on.sh                the SSH route to a REMOTE squad_lead home, whose
 #                               state no local path can reach.
 #   bin/jg-public-followup-collect.sh  reading and retiring the typed terminal
 #                               results staged in a remote work home.
@@ -37,7 +37,7 @@
 #       call unconditionally.
 #
 #   jg-public-followup.sh register <obligation-id> --relation <relation-id>
-#         --work-home <main|secondmate:<id>> --work-id <task-id> --generation <n>
+#         --work-home <main|squad_lead:<id>> --work-id <task-id> --generation <n>
 #         [--platform <x|discord>] [--request <request-id>]
 #       Record the binding the relay path just created with `tasks-axi
 #       public-followup add` + `bind-work`. This is the event-driven
@@ -59,7 +59,7 @@
 #       placeholder followed by the format tasks-axi accepts. The same keys are
 #       repeated as --require-deliverable, so an emit that drops one is refused
 #       where it runs rather than quarantined here. For work
-#       bound to a REMOTE secondmate home, the command names that route's own
+#       bound to a REMOTE squad_lead home, the command names that route's own
 #       code root and home with --stage-in, because neither this checkout's path
 #       nor this home's path exists on the machine that worker runs on.
 #
@@ -74,7 +74,7 @@
 #       queues one wake for this home, which the relay poll raises
 #       (bin/jg-x-poll.sh). Silent when there is nothing to do. Duplicate events
 #       and restart replay are no-ops.
-#       An open loop bound to a REMOTE secondmate home is collected first: its
+#       An open loop bound to a REMOTE squad_lead home is collected first: its
 #       staged results are pulled over that route into this home's own inbox and
 #       reconciled identically. The staged copy is retired only after this home
 #       holds the result, so a dropped connection cannot lose one. A route that
@@ -117,7 +117,7 @@
 #       block: that work's reply already landed.
 #
 #   jg-public-followup.sh rechain <new-obligation-id> --from <delivered-id>
-#         --work-home <main|secondmate:<id>> --work-id <task-id>
+#         --work-home <main|squad_lead:<id>> --work-id <task-id>
 #         --expected <pr-merged|report-ready|local-main>
 #         [--deliverable-key <k>]...
 #       Hand a delivered public loop on to follow-on work against the same
@@ -134,7 +134,7 @@
 #       or missing obligation. --reason is required. --force never covers
 #       clearing the bound legacy X link: a loop whose link is still verifiably
 #       in place is retained for reconciliation either way. When the bound work
-#       lives in a REMOTE secondmate home, that clear runs over the route's SSH
+#       lives in a REMOTE squad_lead home, that clear runs over the route's SSH
 #       transport, and a remote that never confirms it is reported as unknown
 #       completion to reconcile on that host, not as a definite failure.
 #
@@ -153,8 +153,8 @@ DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
 
 # shellcheck source=bin/jg-public-followup-lib.sh
 . "$SCRIPT_DIR/jg-public-followup-lib.sh"
-# shellcheck source=bin/jg-secondmate-registry-lib.sh
-. "$SCRIPT_DIR/jg-secondmate-registry-lib.sh"
+# shellcheck source=bin/jg-squad-lead-registry-lib.sh
+. "$SCRIPT_DIR/jg-squad-lead-registry-lib.sh"
 
 RETRY_BACKOFF=${JG_PF_RETRY_BACKOFF_SECS:-900}
 case "$RETRY_BACKOFF" in ''|*[!0-9]*) RETRY_BACKOFF=900 ;; esac
@@ -223,7 +223,7 @@ require_tools() {
 
 # Every tasks-axi call addresses $JG_HOME/data, the home whose backlog owns the
 # obligation, through bin/jg-tasks-axi.sh. An inherited JG_DATA_OVERRIDE is
-# cleared because a caller such as a secondmate teardown names the parent home
+# cleared because a caller such as a squad_lead teardown names the parent home
 # in JG_HOME while its own data override is still in the environment.
 tx() { JG_HOME="$JG_HOME" JG_DATA_OVERRIDE='' "$SCRIPT_DIR/jg-tasks-axi.sh" "$@"; }
 
@@ -273,14 +273,14 @@ cmd_register() {
   done
 
   jg_pf_relay_active "$JG_HOME" \
-    || die "this home has not opted into the myfirstmate relay, so it cannot own a public commitment" 1
+    || die "this home has not opted into the myjuggernaut relay, so it cannot own a public commitment" 1
   require_tools
 
   jg_pf_slug_valid "$id"       || die "unsafe obligation id: $id"
   jg_pf_slug_valid "$relation" || die "unsafe relation id: $relation"
   jg_pf_slug_valid "$work_id"  || die "unsafe work id: $work_id"
   jg_pf_home_id_valid "$work_home" \
-    || die "work home must be 'main' or 'secondmate:<stable-id>', got '$work_home'"
+    || die "work home must be 'main' or 'squad_lead:<stable-id>', got '$work_home'"
   case "$generation" in
     ''|*[!0-9]*) die "generation must be a positive integer, got '$generation'" ;;
   esac
@@ -313,8 +313,8 @@ cmd_register() {
   fi
   work_home_path=
   case "$work_home" in
-    secondmate:*)
-      work_home_path=$(public_followup_secondmate_home "${work_home#secondmate:}" 2>/dev/null || true)
+    squad_lead:*)
+      work_home_path=$(public_followup_squad_lead_home "${work_home#squad_lead:}" 2>/dev/null || true)
       case "$work_home_path" in
         *$'\n'*|*$'\r'*) work_home_path= ;;
       esac
@@ -354,7 +354,7 @@ cmd_register() {
 
 # --- subcommand: brief ------------------------------------------------------
 
-# public_followup_route_kind <secondmate-id> <recorded-local-home>: print remote
+# public_followup_route_kind <squad-lead-id> <recorded-local-home>: print remote
 # or local only when the current route still proves which transport owns it.
 public_followup_route_kind() {
   local id=$1 recorded_home=$2 resolved
@@ -363,7 +363,7 @@ public_followup_route_kind() {
     return 0
   fi
   [ -n "$recorded_home" ] || return 1
-  resolved=$(public_followup_secondmate_home "$id" 2>/dev/null) || return 1
+  resolved=$(public_followup_squad_lead_home "$id" 2>/dev/null) || return 1
   [ "$resolved" = "$recorded_home" ] || return 1
   printf 'local\n'
 }
@@ -373,7 +373,7 @@ public_followup_route_kind() {
 brief_emit_target() {
   local work_home=$1 recorded_home=${2:-} sid kind root home configured_path
   case "$work_home" in
-    secondmate:*) sid=${work_home#secondmate:} ;;
+    squad_lead:*) sid=${work_home#squad_lead:} ;;
     *) printf '%s\n--home %s\n' "$JG_ROOT/bin/jg-public-followup-emit.sh" "$JG_HOME"; return 0 ;;
   esac
   kind=$(public_followup_route_kind "$sid" "$recorded_home") || return 1
@@ -381,8 +381,8 @@ brief_emit_target() {
     printf '%s\n--home %s\n' "$JG_ROOT/bin/jg-public-followup-emit.sh" "$JG_HOME"
     return 0
   fi
-  root=$(secondmate_registry_field "$DATA/secondmates.md" "$sid" root 2>/dev/null) || root=
-  home=$(secondmate_registry_field "$DATA/secondmates.md" "$sid" home 2>/dev/null) || home=
+  root=$(squad_lead_registry_field "$DATA/squad_leads.md" "$sid" root 2>/dev/null) || root=
+  home=$(squad_lead_registry_field "$DATA/squad_leads.md" "$sid" home 2>/dev/null) || home=
   case "$root" in /*) ;; *) return 1 ;; esac
   case "$home" in /*) ;; *) return 1 ;; esac
   case "$root$home" in *[!A-Za-z0-9/._+@:-]*) return 1 ;; esac
@@ -410,7 +410,7 @@ cmd_brief() {
   generation=$(jg_pf_registry_get "$STATE" "$id" generation)
 
   emit_target=$(brief_emit_target "$work_home" "$work_home_path") \
-    || die "the work home for '$id' is a remote route with no usable code root and home in data/secondmates.md; fix that record before briefing the bound worker" 1
+    || die "the work home for '$id' is a remote route with no usable code root and home in data/squad_leads.md; fix that record before briefing the bound worker" 1
   emit_script=$(printf '%s\n' "$emit_target" | sed -n '1p')
   emit_home_flag=$(printf '%s\n' "$emit_target" | sed -n '2p')
   # The closing paragraph has to match the destination the command above names,
@@ -601,7 +601,7 @@ EOF
 
 # collect_remote_staged_events: pull every typed terminal result a REMOTE work
 # home has staged for this home into this home's own inbox, so the ordinary
-# reconciliation below sees it. The route transport only runs main -> secondmate,
+# reconciliation below sees it. The route transport only runs main -> squad_lead,
 # so this is a pull; a worker on the other machine has no path back here.
 #
 # The current registry record is the route drained. A reassignment between
@@ -629,10 +629,10 @@ collect_remote_staged_events() {
       continue
     fi
     work_home=$(jg_pf_registry_get "$STATE" "$id" work_home)
-    case "$work_home" in secondmate:*) sid=${work_home#secondmate:} ;; *) continue ;; esac
+    case "$work_home" in squad_lead:*) sid=${work_home#squad_lead:} ;; *) continue ;; esac
     work_home_path=$(jg_pf_registry_get "$STATE" "$id" work_home_path)
     route_kind=$(public_followup_route_kind "$sid" "$work_home_path") || {
-      printf 'unreached %s: the work home route %s cannot be resolved; its terminal result stays retained for reconciliation; fix data/secondmates.md\n' \
+      printf 'unreached %s: the work home route %s cannot be resolved; its terminal result stays retained for reconciliation; fix data/squad_leads.md\n' \
         "$id" "$sid"
       rc=1
       continue
@@ -810,7 +810,7 @@ cmd_consume() {
     fi
   done
 
-  # A fresh event must be able to wake firstmate again, so drop the surfaced
+  # A fresh event must be able to wake juggernaut again, so drop the surfaced
   # signature once the inbox has been worked.
   rm -f -- "$(jg_pf_root "$STATE")/$JG_PF_SURFACED_BASENAME" 2>/dev/null || true
   return "$consume_rc"
@@ -963,13 +963,13 @@ public_followup_registration_valid() {
   case "$generation" in ''|*[!0-9]*) return 1 ;; esac
 }
 
-public_followup_secondmate_home() {
+public_followup_squad_lead_home() {
   local id=$1 include_absent=${2:-} meta_home registry_home home marker
-  jg_pf_home_id_valid "secondmate:$id" || return 1
+  jg_pf_home_id_valid "squad_lead:$id" || return 1
   meta_home=$(fmx_meta_get "$STATE/$id.meta" home)
   registry_home=
-  if [ -f "$DATA/secondmates.md" ] && [ ! -L "$DATA/secondmates.md" ]; then
-    registry_home=$(secondmate_registry_field "$DATA/secondmates.md" "$id" home || true)
+  if [ -f "$DATA/squad_leads.md" ] && [ ! -L "$DATA/squad_leads.md" ]; then
+    registry_home=$(squad_lead_registry_field "$DATA/squad_leads.md" "$id" home || true)
   fi
   if [ -n "$meta_home" ] && [ -n "$registry_home" ] && [ "$meta_home" != "$registry_home" ]; then
     return 2
@@ -983,13 +983,13 @@ public_followup_secondmate_home() {
     return 3
   fi
   home=$(CDPATH='' cd -- "$home" 2>/dev/null && pwd -P) || return 2
-  [ -f "$home/.jg-secondmate-home" ] && [ ! -L "$home/.jg-secondmate-home" ] || return 2
-  marker=$(sed -n '1p' "$home/.jg-secondmate-home" 2>/dev/null)
+  [ -f "$home/.jg-squad-lead-home" ] && [ ! -L "$home/.jg-squad-lead-home" ] || return 2
+  marker=$(sed -n '1p' "$home/.jg-squad-lead-home" 2>/dev/null)
   [ "$marker" = "$id" ] || return 2
   printf '%s\n' "$home"
 }
 
-# public_followup_route_is_remote <secondmate-id>: 0 when data/secondmates.md
+# public_followup_route_is_remote <squad-lead-id>: 0 when data/squad_leads.md
 # holds a genuine REMOTE route for that id. The registry is the route authority
 # here for the same reason jg-on.sh and jg-send.sh treat it as one: a remote home
 # has no local path, so nothing on this disk can answer the question. Resolving
@@ -997,14 +997,14 @@ public_followup_secondmate_home() {
 # empty work_home_path for a remote route) still resolves.
 public_followup_route_is_remote() {
   local id=$1 remote
-  jg_pf_home_id_valid "secondmate:$id" || return 1
-  [ -f "$DATA/secondmates.md" ] && [ ! -L "$DATA/secondmates.md" ] || return 1
-  remote=$(secondmate_registry_field "$DATA/secondmates.md" "$id" remote 2>/dev/null) || return 1
+  jg_pf_home_id_valid "squad_lead:$id" || return 1
+  [ -f "$DATA/squad_leads.md" ] && [ ! -L "$DATA/squad_leads.md" ] || return 1
+  remote=$(squad_lead_registry_field "$DATA/squad_leads.md" "$id" remote 2>/dev/null) || return 1
   [ "$remote" = 1 ]
 }
 
-# clear_public_followup_link_remote <secondmate-id> <work-id> <request-id>:
-# clear the bound legacy X link inside a REMOTE secondmate home over that route's transport,
+# clear_public_followup_link_remote <squad-lead-id> <work-id> <request-id>:
+# clear the bound legacy X link inside a REMOTE squad_lead home over that route's transport,
 # because the link lives in the remote home's state and no local path reaches it.
 # jg-on.sh returns ssh's status unchanged, so 255 is the established "delivered
 # but completion unknown" status this codebase already reconciles rather than
@@ -1036,19 +1036,19 @@ clear_public_followup_link() {
       home=$JG_HOME
       state=$STATE
       ;;
-    secondmate:*)
+    squad_lead:*)
       # A remote route is decided from the registry BEFORE any local path is
       # consulted: the recorded remote home path is meaningful only on its own
       # host, so a same-named local directory must never stand in for it.
-      if public_followup_route_is_remote "${work_home#secondmate:}"; then
-        clear_public_followup_link_remote "${work_home#secondmate:}" "$work_id" "$request_id"
+      if public_followup_route_is_remote "${work_home#squad_lead:}"; then
+        clear_public_followup_link_remote "${work_home#squad_lead:}" "$work_id" "$request_id"
         return $?
       fi
       work_home_path=$(jg_pf_registry_get "$STATE" "$id" work_home_path)
       case "$work_home_path" in /*) ;; *) return 1 ;; esac
       case "$work_home_path" in *$'\n'*|*$'\r'*) return 1 ;; esac
       rc=0
-      home=$(public_followup_secondmate_home "${work_home#secondmate:}" include-absent) || rc=$?
+      home=$(public_followup_squad_lead_home "${work_home#squad_lead:}" include-absent) || rc=$?
       if [ "$rc" -eq 3 ]; then
         [ "$home" = "$work_home_path" ] || return 1
         [ ! -e "$work_home_path" ] && [ ! -L "$work_home_path" ] || return 1
@@ -1100,7 +1100,7 @@ public_followup_legacy_link_status() {
     [ -n "$work_home" ] && [ -n "$work_id" ] || return 2
     case "$work_home" in
       main) home=$JG_HOME ;;
-      secondmate:*) home=$(public_followup_secondmate_home "${work_home#secondmate:}") || return 2 ;;
+      squad_lead:*) home=$(public_followup_squad_lead_home "${work_home#squad_lead:}") || return 2 ;;
       *) return 2 ;;
     esac
     meta="$home/state/$work_id.meta"
@@ -1175,7 +1175,7 @@ cmd_deliver() {
 
   jg_pf_slug_valid "$id" || die "unsafe obligation id: $id"
   jg_pf_relay_active "$JG_HOME" \
-    || die "this home has not opted into the myfirstmate relay, so it cannot post a public reply" 1
+    || die "this home has not opted into the myjuggernaut relay, so it cannot post a public reply" 1
   require_tools
 
   local payload delivery attempt request platform text tmp_text hash chunks rc receipt receipt_fields receipt_dry_run link_status link_rc
@@ -1427,13 +1427,13 @@ cmd_rechain() {
   done
 
   jg_pf_relay_active "$JG_HOME" \
-    || die "this home has not opted into the myfirstmate relay, so it cannot own a public commitment" 1
+    || die "this home has not opted into the myjuggernaut relay, so it cannot own a public commitment" 1
   require_tools
   jg_pf_slug_valid "$new_id" || die "unsafe obligation id: $new_id"
   jg_pf_slug_valid "$from" || die "unsafe source obligation id: $from"
   jg_pf_slug_valid "$work_id" || die "unsafe work id: $work_id"
   jg_pf_home_id_valid "$work_home" \
-    || die "work home must be 'main' or 'secondmate:<stable-id>', got '$work_home'"
+    || die "work home must be 'main' or 'squad_lead:<stable-id>', got '$work_home'"
   case "$expected" in
     pr-merged|report-ready|local-main) ;;
     *) die "--expected must be pr-merged, report-ready, or local-main, got '$expected'" ;;

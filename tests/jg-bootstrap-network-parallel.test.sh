@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Concurrent deferred-network secondmate probes must keep every per-mate
+# Concurrent deferred-network squad_lead probes must keep every per-mate
 # diagnostic complete, attributed, and fail-closed.
 #
-# The session-start network stage used to walk remote secondmates one after
+# The session-start network stage used to walk remote squad_leads one after
 # another. The public contract that must survive concurrency is not a particular
-# worker scheduler: it is that each mate still emits its own SECONDMATE_LIVENESS
-# / SECONDMATE_SYNC line, that those lines cannot splice into each other, and
+# worker scheduler: it is that each mate still emits its own SQUAD_LEAD_LIVENESS
+# / SQUAD_LEAD_SYNC line, that those lines cannot splice into each other, and
 # that a dirty or unreachable mate still refuses rather than proceeding. This
 # suite drives bin/jg-bootstrap.sh's network-only phase through JG_SSH_BIN, so
 # it exercises the same remote probe path a real session start uses.
@@ -69,7 +69,7 @@ item_rel=$(printf '%s\n' "$cmd" | sed -n '3p')
 slow=0
 case "$command_name" in
   jg-remote-doctor.sh) slow=1 ;;
-  jg-remote-secondmate-control.sh)
+  jg-remote-squad-lead-control.sh)
     case "$subcommand" in state|sync) slow=1 ;; esac
     ;;
 esac
@@ -97,7 +97,7 @@ case "$command_name" in
   jg-remote-doctor.sh)
     exit 0
     ;;
-  jg-remote-secondmate-control.sh)
+  jg-remote-squad-lead-control.sh)
     case "$subcommand" in
       state)
         printf 'alive\n'
@@ -114,7 +114,7 @@ case "$command_name" in
             exit 1
             ;;
           "${JG_FAKE_SSH_DIRTY_HOST:-host-charlie}")
-            printf 'remote secondmate checkout is dirty; sync skipped\n'
+            printf 'remote squad_lead checkout is dirty; sync skipped\n'
             exit 1
             ;;
         esac
@@ -211,16 +211,16 @@ SH
   charlie_home="$dir/remote/charlie/home"
   mkdir -p "$alpha_root" "$alpha_home" "$bravo_root" "$bravo_home" "$charlie_root" "$charlie_home"
 
-  : > "$home/data/secondmates.md"
-  write_remote_registry_line "$home/data/secondmates.md" alpha host-alpha "$alpha_root" "$alpha_home"
-  write_remote_registry_line "$home/data/secondmates.md" bravo host-bravo "$bravo_root" "$bravo_home"
-  write_remote_registry_line "$home/data/secondmates.md" charlie host-charlie "$charlie_root" "$charlie_home"
+  : > "$home/data/squad_leads.md"
+  write_remote_registry_line "$home/data/squad_leads.md" alpha host-alpha "$alpha_root" "$alpha_home"
+  write_remote_registry_line "$home/data/squad_leads.md" bravo host-bravo "$bravo_root" "$bravo_home"
+  write_remote_registry_line "$home/data/squad_leads.md" charlie host-charlie "$charlie_root" "$charlie_home"
 
-  jg_write_secondmate_meta "$home/state/alpha.meta" "$alpha_home"
+  jg_write_squad_lead_meta "$home/state/alpha.meta" "$alpha_home"
   printf 'remote_host=host-alpha\n' >> "$home/state/alpha.meta"
-  jg_write_secondmate_meta "$home/state/bravo.meta" "$bravo_home"
+  jg_write_squad_lead_meta "$home/state/bravo.meta" "$bravo_home"
   printf 'remote_host=host-bravo\n' >> "$home/state/bravo.meta"
-  jg_write_secondmate_meta "$home/state/charlie.meta" "$charlie_home"
+  jg_write_squad_lead_meta "$home/state/charlie.meta" "$charlie_home"
   printf 'remote_host=host-charlie\n' >> "$home/state/charlie.meta"
 
   jg_git_init_commit "$home/projects/alpha"
@@ -244,48 +244,48 @@ SH
   )
 
   assert_contains "$out" \
-    "SECONDMATE_LIVENESS: secondmate bravo: skipped: remote host unavailable or endpoint state unknown; route preserved on host-bravo" \
+    "SQUAD_LEAD_LIVENESS: squad_lead bravo: skipped: remote host unavailable or endpoint state unknown; route preserved on host-bravo" \
     "an unreachable mate must fail closed with its own liveness line"
   assert_contains "$out" \
-    "SECONDMATE_SYNC: secondmate bravo: skipped:" \
+    "SQUAD_LEAD_SYNC: squad_lead bravo: skipped:" \
     "an unreachable mate must also fail closed on convergence rather than disappearing"
   assert_contains "$out" \
-    "SECONDMATE_SYNC: secondmate charlie: skipped: remote tracked-file sync failed on host-charlie:" \
+    "SQUAD_LEAD_SYNC: squad_lead charlie: skipped: remote tracked-file sync failed on host-charlie:" \
     "a dirty remote mate must fail closed with its own sync line"
   assert_contains "$out" "dirty" \
     "the dirty mate's skip line must still name dirtiness"
 
-  n=$(printf '%s\n' "$out" | grep -c 'SECONDMATE_LIVENESS: secondmate bravo:' || true)
+  n=$(printf '%s\n' "$out" | grep -c 'SQUAD_LEAD_LIVENESS: squad_lead bravo:' || true)
   [ "$n" -eq 1 ] || fail "bravo liveness line was lost or duplicated (count=$n)"$'\n'"$out"
-  n=$(printf '%s\n' "$out" | grep -c 'SECONDMATE_SYNC: secondmate charlie:' || true)
+  n=$(printf '%s\n' "$out" | grep -c 'SQUAD_LEAD_SYNC: squad_lead charlie:' || true)
   [ "$n" -eq 1 ] || fail "charlie sync line was lost or duplicated (count=$n)"$'\n'"$out"
-  n=$(printf '%s\n' "$out" | sed -n 's/^SECONDMATE_SYNC: secondmate \([^:]*\):.*/\1/p' | tr '\n' ' ')
+  n=$(printf '%s\n' "$out" | sed -n 's/^SQUAD_LEAD_SYNC: squad_lead \([^:]*\):.*/\1/p' | tr '\n' ' ')
   [ "$n" = "alpha bravo bravo charlie " ] \
     || fail "sync diagnostics were lost, duplicated, or replayed outside spawn order: $n"$'\n'"$out"
 
   assert_not_contains "$out" \
-    "SECONDMATE_LIVENESS: secondmate alpha: skipped: remote host unavailable or endpoint state unknown" \
+    "SQUAD_LEAD_LIVENESS: squad_lead alpha: skipped: remote host unavailable or endpoint state unknown" \
     "a reachable mate must not inherit the unreachable mate's liveness skip"
   assert_contains "$out" \
-    "SECONDMATE_SYNC: secondmate alpha: skipped: remote tracked-file sync failed on host-alpha: synthetic tracked-file sync refusal for host-alpha" \
+    "SQUAD_LEAD_SYNC: squad_lead alpha: skipped: remote tracked-file sync failed on host-alpha: synthetic tracked-file sync refusal for host-alpha" \
     "the first worker's diagnostic must retain its own host and complete message"
   assert_not_contains "$out" \
-    "SECONDMATE_SYNC: secondmate alpha: skipped: remote tracked-file sync failed on host-alpha: remote secondmate checkout is dirty" \
+    "SQUAD_LEAD_SYNC: squad_lead alpha: skipped: remote tracked-file sync failed on host-alpha: remote squad_lead checkout is dirty" \
     "the first worker must not inherit the dirty mate's reason"
 
   while IFS= read -r line; do
     [ -n "$line" ] || continue
     case "$line" in
-      SECONDMATE_LIVENESS:\ secondmate\ [A-Za-z0-9._-]*:*|SECONDMATE_SYNC:\ secondmate\ [A-Za-z0-9._-]*:*) ;;
+      SQUAD_LEAD_LIVENESS:\ squad_lead\ [A-Za-z0-9._-]*:*|SQUAD_LEAD_SYNC:\ squad_lead\ [A-Za-z0-9._-]*:*) ;;
       *) fail "a per-mate line was interleave-corrupted: $line" ;;
     esac
     n=0
-    case "$line" in *" secondmate alpha:"*) n=$((n + 1)) ;; esac
-    case "$line" in *" secondmate bravo:"*) n=$((n + 1)) ;; esac
-    case "$line" in *" secondmate charlie:"*) n=$((n + 1)) ;; esac
+    case "$line" in *" squad_lead alpha:"*) n=$((n + 1)) ;; esac
+    case "$line" in *" squad_lead bravo:"*) n=$((n + 1)) ;; esac
+    case "$line" in *" squad_lead charlie:"*) n=$((n + 1)) ;; esac
     [ "$n" -le 1 ] || fail "a per-mate line named more than one mate: $line"
   done <<EOF
-$(printf '%s\n' "$out" | grep '^SECONDMATE_' || true)
+$(printf '%s\n' "$out" | grep '^SQUAD_LEAD_' || true)
 EOF
 
   doctor_overlap=$(starts_before_first_end "$log" 'jg-remote-doctor.sh')
@@ -297,24 +297,24 @@ EOF
       || fail "mktemp failure did not select sequential liveness fallback (starts before first doctor end=$doctor_overlap)"$'\n'"$(cat "$log")"
   fi
 
-  liveness_starts=$(grep -c '^START .* jg-remote-secondmate-control.sh state$' "$log" || true)
+  liveness_starts=$(grep -c '^START .* jg-remote-squad-lead-control.sh state$' "$log" || true)
   [ "$liveness_starts" -ge 2 ] \
     || fail "expected concurrent remote state probes, got $liveness_starts"$'\n'"$(cat "$log")"
 
   fetch_starts=$(grep -c '^START fleet-fetch ' "$log" || true)
   [ "$fetch_starts" -ge 1 ] \
-    || fail "clone refresh did not start a fetch to overlap with secondmate probes"$'\n'"$(cat "$log")"
+    || fail "clone refresh did not start a fetch to overlap with squad_lead probes"$'\n'"$(cat "$log")"
   awk '
     /^START fleet-fetch / { fleet = 1; if (remote) overlap = 1; next }
     /^END fleet-fetch / { fleet = 0; next }
     /^START host-/ { remote++; if (fleet) overlap = 1; next }
     /^END host-/ { remote-- }
     END { exit !overlap }
-  ' "$log" || fail "clone refresh did not overlap the secondmate sweeps"$'\n'"$(cat "$log")"
+  ' "$log" || fail "clone refresh did not overlap the squad_lead sweeps"$'\n'"$(cat "$log")"
 
   awk '
-    /END .* jg-remote-secondmate-control.sh state$/ { last_liveness = NR }
-    /START .* jg-remote-secondmate-control.sh sync$/ && !first_sync { first_sync = NR }
+    /END .* jg-remote-squad-lead-control.sh state$/ { last_liveness = NR }
+    /START .* jg-remote-squad-lead-control.sh sync$/ && !first_sync { first_sync = NR }
     END { exit !(last_liveness && first_sync && last_liveness < first_sync) }
   ' "$log" || fail "convergence began before all liveness probes finished"$'\n'"$(cat "$log")"
 
@@ -350,9 +350,9 @@ test_remote_inheritance_failure_names_its_own_error_not_an_unchanged_item() {
   sm_home="$dir/remote/sm/home"
   mkdir -p "$sm_root" "$sm_home"
 
-  : > "$home/data/secondmates.md"
-  write_remote_registry_line "$home/data/secondmates.md" sm host-sm "$sm_root" "$sm_home"
-  jg_write_secondmate_meta "$home/state/sm.meta" "$sm_home"
+  : > "$home/data/squad_leads.md"
+  write_remote_registry_line "$home/data/squad_leads.md" sm host-sm "$sm_root" "$sm_home"
+  jg_write_squad_lead_meta "$home/state/sm.meta" "$sm_home"
   printf 'remote_host=host-sm\n' >> "$home/state/sm.meta"
 
   jg_git_init_commit "$home/projects/alpha"
@@ -366,9 +366,9 @@ test_remote_inheritance_failure_names_its_own_error_not_an_unchanged_item() {
   cat > "$home/data/captain-shared.md" <<'EOF'
 # Shared captain preferences
 
-This file is main-authoritative in the main firstmate home.
-In secondmate homes it is read-only in secondmate homes.
-Route new captain-preference discoveries to the main firstmate through marked status or a document pointer.
+This file is main-authoritative in the main juggernaut home.
+In squad_lead homes it is read-only in squad_lead homes.
+Route new captain-preference discoveries to the main juggernaut through marked status or a document pointer.
 EOF
 
   out=$(
@@ -385,7 +385,7 @@ EOF
     "$ROOT/bin/jg-bootstrap.sh" 2>&1
   )
 
-  line=$(printf '%s\n' "$out" | grep '^SECONDMATE_SYNC: secondmate sm: skipped: remote inheritance failed on host-sm:' || true)
+  line=$(printf '%s\n' "$out" | grep '^SQUAD_LEAD_SYNC: squad_lead sm: skipped: remote inheritance failed on host-sm:' || true)
   [ -n "$line" ] || fail "expected a remote inheritance failure line: $out"
   case "$line" in
     *"shared captain preferences"*) ;;

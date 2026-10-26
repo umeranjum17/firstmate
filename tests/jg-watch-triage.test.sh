@@ -2,7 +2,7 @@
 # tests/jg-watch-triage.test.sh - the always-on wake triage built into
 # bin/jg-watch.sh and the shared classifier (bin/jg-classify-lib.sh). The watcher
 # now absorbs the benign majority of wakes in bash and exits ONLY on an actionable
-# wake, so firstmate's LLM re-arms once per actionable event instead of once per
+# wake, so juggernaut's LLM re-arms once per actionable event instead of once per
 # wake. These tests cover the classifier predicates as pure functions, then drive
 # a real jg-watch.sh subprocess to assert the behavioral contract:
 # provably-working no-verb wakes absorbed (no exit, no queue entry, suppressor
@@ -73,7 +73,7 @@ watch_bg() {  # <state> <fakebin> <out> [extra env assignments...]
   PATH="$fakebin:$PATH" JG_STATE_OVERRIDE="$state" JG_CREW_STATE_BIN="$fakebin/jg-crew-state.sh" \
     XDG_DATA_HOME="$state/.xdg-data" \
     JG_POLL=1 JG_SIGNAL_GRACE=1 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
-    JG_SECONDMATE_LIVENESS_SECS=99999999 "$@" "$WATCH" > "$out" &
+    JG_SQUAD_LEAD_LIVENESS_SECS=99999999 "$@" "$WATCH" > "$out" &
 }
 
 # Wait up to <limit> 0.1s ticks while <pid> stays alive; 0 if still alive, 1 if it died.
@@ -673,7 +673,7 @@ test_crew_worktree_written_since_classifier() {
   # A missing anchor cannot be compared against: no evidence.
   ! crew_worktree_written_since c "$state" "$state/absent-anchor" \
     || fail "a missing anchor reported write evidence"
-  # Only .git churn (what firstmate's own read-only git commands touch): pruned.
+  # Only .git churn (what juggernaut's own read-only git commands touch): pruned.
   printf 'pack\n' > "$wt/.git/objects/fresh"
   printf 'ref\n' > "$wt/.git/index"
   ! crew_worktree_written_since c "$state" "$anchor" \
@@ -685,19 +685,19 @@ test_crew_worktree_written_since_classifier() {
   # An empty id is never evidence.
   ! crew_worktree_written_since "" "$state" "$anchor" || fail "an empty id reported write evidence"
 
-  # A secondmate records a provisioned firstmate home, not a code tree, and such a
+  # A squad_lead records a provisioned juggernaut home, not a code tree, and such a
   # home supervises itself: its own watcher beacon, pane hashes, and heartbeats keep
   # its state/ churning whether or not the mate produced anything.
   mkdir -p "$home/state"
-  printf 'sm-classify-1\n' > "$home/.jg-secondmate-home"
+  printf 'sm-classify-1\n' > "$home/.jg-squad-lead-home"
   printf 'beat\n' > "$home/state/.last-watcher-beat"
-  printf 'window=remote:sm\nkind=secondmate\nworktree=%s\n' "$home" > "$state/sm.meta"
+  printf 'window=remote:sm\nkind=squad_lead\nworktree=%s\n' "$home" > "$state/sm.meta"
   ! crew_worktree_written_since sm "$state" "$anchor" \
-    || fail "a secondmate's own home supervision churn reported crew write evidence"
-  # The home marker alone is enough, even when the record does not say secondmate.
+    || fail "a squad_lead's own home supervision churn reported crew write evidence"
+  # The home marker alone is enough, even when the record does not say squad_lead.
   printf 'window=test:jg-sm2\nkind=ship\nworktree=%s\n' "$home" > "$state/sm2.meta"
   ! crew_worktree_written_since sm2 "$state" "$anchor" \
-    || fail "a marked firstmate home reported crew write evidence"
+    || fail "a marked juggernaut home reported crew write evidence"
   # But an ordinary worktree that merely holds a directory named state is real
   # work: only the home is excluded, never a source directory of that name.
   mkdir -p "$statedir_wt/state"
@@ -836,23 +836,23 @@ test_signal_crew_provably_working_classifier() {
   pass "signal_crew_provably_working: benign only when every referenced crew is provably working"
 }
 
-test_secondmate_status_routine_absorbed_routed_surfaced_classifier() {
+test_squad_lead_status_routine_absorbed_routed_surfaced_classifier() {
   local dir fakebin state line
-  dir=$(make_case secondmate-signal-classify); fakebin="$dir/fakebin"; state="$dir/state"
+  dir=$(make_case squad-lead-signal-classify); fakebin="$dir/fakebin"; state="$dir/state"
   export JG_CREW_STATE_BIN="$fakebin/jg-crew-state.sh"
   export JG_FAKE_CREW_STATE_sm='state: working · source: run-step · running'
-  printf 'kind=secondmate\n' > "$state/sm.meta"
+  printf 'kind=squad_lead\n' > "$state/sm.meta"
   # Unmarked routine progress from a PROVABLY working mate absorbs like any crew.
   printf 'working: step 2 of 5\npaused [at=1]: waiting on CI\n' > "$state/sm.status"
   signal_crew_provably_working "$state/sm.status" \
-    || fail "a working secondmate's routine working/paused progress was not absorbed"
+    || fail "a working squad_lead's routine working/paused progress was not absorbed"
   signal_crew_provably_working "$state/sm.turn-ended" \
-    || fail "a working secondmate's bare turn-end lost its ordinary absorb"
+    || fail "a working squad_lead's bare turn-end lost its ordinary absorb"
   # A terminal outcome surfaces even from a healthy mate: an unmarked resolved:
   # line self-closing a decision must still wake the primary.
   printf 'working: routine\nresolved: took A\n' > "$state/sm.status"
   ! signal_crew_provably_working "$state/sm.status" \
-    || fail "a healthy secondmate's unmarked resolved: line was absorbed as routine progress"
+    || fail "a healthy squad_lead's unmarked resolved: line was absorbed as routine progress"
   # Parent-directed content surfaces regardless of busy evidence: decisions,
   # blockers, terminal outcomes, notes, correlation-marked lines (both forms the
   # fleet writes), and any verb the classifier does not know.
@@ -863,22 +863,22 @@ test_secondmate_status_routine_absorbed_routed_surfaced_classifier() {
       'shrug: an unknown verb'; do
     printf 'working: routine\n%s\nworking: routine again\n' "$line" > "$state/sm.status"
     ! signal_crew_provably_working "$state/sm.status" \
-      || fail "a busy secondmate's '$line' was absorbed as routine progress"
+      || fail "a busy squad_lead's '$line' was absorbed as routine progress"
   done
   # Routine progress from a mate that is NOT provably working still surfaces.
   export JG_FAKE_CREW_STATE_sm='state: unknown · source: none · idle worker'
   printf 'working: step 3 of 5\n' > "$state/sm.status"
   ! signal_crew_provably_working "$state/sm.status" \
-    || fail "an unproven secondmate's routine progress was absorbed"
-  # An ordinary crewmate keeps the plain provably-working rule: the marker and
+    || fail "an unproven squad_lead's routine progress was absorbed"
+  # An ordinary operator keeps the plain provably-working rule: the marker and
   # verb read is keyed on recorded kind, not on task naming or content guessing.
   export JG_FAKE_CREW_STATE_crew='state: working · source: run-step · running'
   printf 'kind=ship\n' > "$state/crew.meta"
   printf 'working: progress\n' > "$state/crew.status"
   signal_crew_provably_working "$state/crew.status" \
-    || fail "the secondmate rule leaked onto an ordinary crewmate status"
+    || fail "the squad_lead rule leaked onto an ordinary operator status"
   unset JG_FAKE_CREW_STATE_sm JG_FAKE_CREW_STATE_crew
-  pass "a secondmate's unmarked routine progress absorbs when provably working; routed, terminal, note, marked, and unknown lines surface"
+  pass "a squad_lead's unmarked routine progress absorbs when provably working; routed, terminal, note, marked, and unknown lines surface"
 }
 
 # --- benign wakes are absorbed ONLY when the crew is provably working ---------
@@ -972,7 +972,7 @@ SH
   export JG_FAKE_CREW_STATE='state: unknown · source: none · no current-state source available'
   PATH="$fakebin:$PATH" JG_STATE_OVERRIDE="$state" JG_CREW_STATE_BIN="$fakebin/jg-crew-state.sh" \
     JG_POLL=1 JG_SIGNAL_GRACE=1 JG_CHECK_INTERVAL=300 JG_HEARTBEAT=999999 \
-    JG_SECONDMATE_LIVENESS_SECS=99999999 "$WATCH" > "$out" &
+    JG_SQUAD_LEAD_LIVENESS_SECS=99999999 "$WATCH" > "$out" &
   pid=$!
   wait_for_exit "$pid" 100 || { kill "$feeder" 2>/dev/null; fail "watcher did not exit on the signal stream"; }
   kill "$feeder" 2>/dev/null; wait "$feeder" 2>/dev/null || true
@@ -989,7 +989,7 @@ SH
 # --- bare turn-end, unverifiable harness: pane churn is the third proof --------
 # A harness whose semantic busy state has no verified source (codex) can never
 # report working, so the two proofs above are unreachable for it and EVERY worker
-# turn boundary woke firstmate. Pane content that changed since the previous poll
+# turn boundary woke juggernaut. Pane content that changed since the previous poll
 # is harness-independent positive evidence the crew is still executing - the same
 # liveness input the stale backbone already trusts - so a bare turn-end from a
 # churning pane is benign. The pane going quiet afterwards is still caught by that
@@ -1260,13 +1260,13 @@ test_turn_ended_trailing_newline_prior_hash_surfaced() {
   pass "a bare turn-end backed by a newline-terminated prior hash surfaces"
 }
 
-test_secondmate_turn_ended_churning_pane_surfaced() {
+test_squad_lead_turn_ended_churning_pane_surfaced() {
   local dir state fakebin out drain_out capture_file window key pid
-  dir=$(make_case secondmate-turn-ended-churning); state="$dir/state"; fakebin="$dir/fakebin"
+  dir=$(make_case squad-lead-turn-ended-churning); state="$dir/state"; fakebin="$dir/fakebin"
   out="$dir/watch.out"; drain_out="$dir/drain.out"; capture_file="$dir/pane.txt"
   window="test:jg-mate-churning"
   : > "$state/mate.turn-ended"
-  printf 'window=%s\nkind=secondmate\nharness=pi\n' "$window" > "$state/mate.meta"
+  printf 'window=%s\nkind=squad_lead\nharness=pi\n' "$window" > "$state/mate.meta"
   printf 'working on the next routed item' > "$capture_file"
   key=$(printf '%s' "$window" | tr ':/.' '___')
   printf '%s' "$(hash_text 'waiting for work')" > "$state/.hash-$key"
@@ -1275,18 +1275,18 @@ test_secondmate_turn_ended_churning_pane_surfaced() {
   PATH="$fakebin:$PATH" JG_FAKE_TMUX_WINDOW="$window" JG_FAKE_TMUX_CAPTURE="$capture_file" \
     JG_CONFIG_OVERRIDE="$(churn_config "$dir")" \
     JG_STATE_OVERRIDE="$state" JG_CREW_STATE_BIN="$fakebin/jg-crew-state.sh" JG_POLL=3 JG_SIGNAL_GRACE=1 \
-    JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 JG_SECONDMATE_LIVENESS_SECS=99999999 \
+    JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 JG_SQUAD_LEAD_LIVENESS_SECS=99999999 \
     "$WATCH" > "$out" &
   pid=$!
-  wait_for_exit "$pid" 100 || fail "watcher did not surface a churning secondmate turn-end"
+  wait_for_exit "$pid" 100 || fail "watcher did not surface a churning squad_lead turn-end"
   grep -F "signal: $state/mate.turn-ended" "$out" >/dev/null \
-    || fail "watcher did not print the surfaced churning secondmate turn-end"
+    || fail "watcher did not print the surfaced churning squad_lead turn-end"
   JG_STATE_OVERRIDE="$state" "$DRAIN" > "$drain_out" 2>/dev/null \
-    || fail "drain after the churning secondmate turn-end failed"
+    || fail "drain after the churning squad_lead turn-end failed"
   grep "$(printf '\tsignal\t')" "$drain_out" | grep -F "$state/mate.turn-ended" >/dev/null \
-    || fail "churning secondmate turn-end was not queued"
+    || fail "churning squad_lead turn-end was not queued"
   unset JG_FAKE_CREW_STATE
-  pass "a churning secondmate turn-end surfaces without a stale resurface path"
+  pass "a churning squad_lead turn-end surfaces without a stale resurface path"
 }
 
 test_turn_ended_colliding_window_key_surfaced() {
@@ -1729,72 +1729,72 @@ test_working_note_not_working_surfaced() {
   pass "a no-verb working: note whose crew is idle with no running pipeline is surfaced"
 }
 
-test_secondmate_status_note_surfaced_despite_busy_agent() {
+test_squad_lead_status_note_surfaced_despite_busy_agent() {
   local dir state fakebin out drain_out pid
-  dir=$(make_case secondmate-note-surfaced); state="$dir/state"; fakebin="$dir/fakebin"
+  dir=$(make_case squad-lead-note-surfaced); state="$dir/state"; fakebin="$dir/fakebin"
   out="$dir/watch.out"; drain_out="$dir/drain.out"
-  printf 'kind=secondmate\n' > "$state/mate.meta"
+  printf 'kind=squad_lead\n' > "$state/mate.meta"
   printf 'note: routed reply landed in the parent stream\n' > "$state/mate.status"
-  # Busy evidence that absorbs routine progress must not absorb a secondmate's
+  # Busy evidence that absorbs routine progress must not absorb a squad_lead's
   # parent-directed note: its status stream is the routed-reply channel.
   export JG_FAKE_CREW_STATE='state: working · source: run-step · running'
   JG_CONFIG_OVERRIDE="$(churn_config "$dir")" watch_bg "$state" "$fakebin" "$out"
   pid=$!
-  wait_for_exit "$pid" 100 || fail "watcher absorbed a busy secondmate's routed status note"
+  wait_for_exit "$pid" 100 || fail "watcher absorbed a busy squad_lead's routed status note"
   grep -F "signal: $state/mate.status" "$out" >/dev/null \
-    || fail "watcher did not print the surfaced secondmate note"
+    || fail "watcher did not print the surfaced squad_lead note"
   JG_STATE_OVERRIDE="$state" "$DRAIN" > "$drain_out" 2>/dev/null || fail "drain after the surfaced note failed"
   grep "$(printf '\tsignal\t')" "$drain_out" | grep -F "$state/mate.status" >/dev/null \
-    || fail "surfaced secondmate note was not queued"
-  pass "a secondmate's status note surfaces even while its own agent is busy"
+    || fail "surfaced squad_lead note was not queued"
+  pass "a squad_lead's status note surfaces even while its own agent is busy"
 }
 
-test_secondmate_routine_progress_absorbed_then_note_surfaced() {
+test_squad_lead_routine_progress_absorbed_then_note_surfaced() {
   local dir state fakebin out pid
-  dir=$(make_case secondmate-routine-absorbed); state="$dir/state"; fakebin="$dir/fakebin"
+  dir=$(make_case squad-lead-routine-absorbed); state="$dir/state"; fakebin="$dir/fakebin"
   out="$dir/watch.out"
-  printf 'kind=secondmate\n' > "$state/mate.meta"
+  printf 'kind=squad_lead\n' > "$state/mate.meta"
   printf 'working: step 2 of 5\n' > "$state/mate.status"
   # A provably working mate's unmarked routine progress is absorbed exactly like
-  # an ordinary crewmate's (no exit, no durable wake, suppressor advanced)...
+  # an ordinary operator's (no exit, no durable wake, suppressor advanced)...
   export JG_FAKE_CREW_STATE='state: working · source: run-step · running'
   watch_bg "$state" "$fakebin" "$out"
   pid=$!
   if ! wait_poll_cycle "$state" "$pid"; then
-    reap "$pid"; fail "watcher surfaced a busy secondmate's routine working: progress: $(cat "$out")"
+    reap "$pid"; fail "watcher surfaced a busy squad_lead's routine working: progress: $(cat "$out")"
   fi
-  [ ! -s "$out" ] || { reap "$pid"; fail "routine secondmate progress printed a wake reason: $(cat "$out")"; }
-  [ ! -s "$state/.wake-queue" ] || { reap "$pid"; fail "routine secondmate progress enqueued a durable wake"; }
-  [ -s "$state/.seen-mate_status" ] || { reap "$pid"; fail "absorbed secondmate progress did not advance its .seen-* suppressor"; }
+  [ ! -s "$out" ] || { reap "$pid"; fail "routine squad_lead progress printed a wake reason: $(cat "$out")"; }
+  [ ! -s "$state/.wake-queue" ] || { reap "$pid"; fail "routine squad_lead progress enqueued a durable wake"; }
+  [ -s "$state/.seen-mate_status" ] || { reap "$pid"; fail "absorbed squad_lead progress did not advance its .seen-* suppressor"; }
   # ...while a note: from the SAME still-busy mate surfaces on the next append.
   printf 'note: routed reply for the parent\n' >> "$state/mate.status"
-  wait_for_exit "$pid" 100 || fail "watcher absorbed a busy secondmate's note after absorbing its routine progress"
+  wait_for_exit "$pid" 100 || fail "watcher absorbed a busy squad_lead's note after absorbing its routine progress"
   grep -F "signal: $state/mate.status" "$out" >/dev/null \
-    || fail "watcher did not print the surfaced secondmate note"
+    || fail "watcher did not print the surfaced squad_lead note"
   grep -F "$state/mate.status" "$state/.wake-queue" >/dev/null \
-    || fail "surfaced secondmate note was not durably queued"
-  pass "a busy secondmate's routine working: is absorbed while its later note: still surfaces"
+    || fail "surfaced squad_lead note was not durably queued"
+  pass "a busy squad_lead's routine working: is absorbed while its later note: still surfaces"
 }
 
-test_secondmate_buried_block_wakes_despite_busy_agent() {
+test_squad_lead_buried_block_wakes_despite_busy_agent() {
   local dir state fakebin out suffix pid
   for suffix in '' 'note: unrelated progress' 'resolved [key=other]: unrelated answer'; do
-    dir=$(make_case "secondmate-buried-block-${#suffix}"); state="$dir/state"; fakebin="$dir/fakebin"
+    dir=$(make_case "squad-lead-buried-block-${#suffix}"); state="$dir/state"; fakebin="$dir/fakebin"
     out="$dir/watch.out"
-    printf 'kind=secondmate\n' > "$state/mate.meta"
+    printf 'kind=squad_lead\n' > "$state/mate.meta"
     printf 'blocked [key=access]: need release access\n%s\n' "$suffix" > "$state/mate.status"
-    [ "$(status_line_verb "$(status_current_line "$state/mate.status" secondmate)")" = blocked ] \
+    [ "$(status_line_verb "$(status_current_line "$state/mate.status" squad_lead)")" = blocked ] \
       || fail "unrelated '$suffix' hid an open blocker from current-state resolution"
     export JG_FAKE_CREW_STATE='state: working · source: pane · harness busy'
     watch_bg "$state" "$fakebin" "$out"
     pid=$!
-    wait_for_exit "$pid" 100 || fail "busy secondmate's blocker did not wake after '$suffix'"
+    wait_for_exit "$pid" 100 || fail "busy squad_lead's blocker did not wake after '$suffix'"
     grep -F "signal: $state/mate.status" "$out" >/dev/null \
-      || fail "busy secondmate's blocker was not surfaced"
+      || fail "busy squad_lead's blocker was not surfaced"
     grep -F "$state/mate.status" "$state/.wake-queue" >/dev/null \
-      || fail "busy secondmate's blocker was not durably queued"
+      || fail "busy squad_lead's blocker was not durably queued"
   done
-  pass "a secondmate blocker wakes despite busy evidence and later unrelated appends"
+  pass "a squad_lead blocker wakes despite busy evidence and later unrelated appends"
 }
 
 test_self_announced_close_does_not_rewake_but_next_note_does() {
@@ -1961,9 +1961,9 @@ test_self_announced_close_after_fold_still_surfaces_folded_worker_failure() {
   pass "a close after OPEN DECISIONS fold still surfaces a worker failure inside the folded span"
 }
 
-test_self_announced_close_after_fold_still_surfaces_folded_secondmate_lines() {
+test_self_announced_close_after_fold_still_surfaces_folded_squad_lead_lines() {
   local dir state fakebin out status_file pid rc lagging n=0
-  # A secondmate's note carries no captain verb, and a decision the mate
+  # A squad_lead's note carries no captain verb, and a decision the mate
   # raised and closed itself is never listed as open; the fold shows neither,
   # yet both are parent-directed content and must still wake.
   for lagging in 'note: vendor quote arrived, holding it for the parent' \
@@ -1971,7 +1971,7 @@ test_self_announced_close_after_fold_still_surfaces_folded_secondmate_lines() {
     n=$((n + 1))
     dir=$(make_case "self-close-folded-mate-$n"); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
     status_file="$state/mate.status"
-    printf 'kind=secondmate\n' > "$state/mate.meta"
+    printf 'kind=squad_lead\n' > "$state/mate.meta"
     printf 'needs-decision [key=budget]: approve spend?\n' > "$status_file"
     prime_status_seen "$state" "$status_file" || fail "could not prime the announced baseline"
     printf '%s\n' "$lagging" >> "$status_file"
@@ -1985,15 +1985,15 @@ test_self_announced_close_after_fold_still_surfaces_folded_secondmate_lines() {
       . "$1"
       jg_wake_status_append_self_announced "$2" "$3" "resolved [key=budget]: answered: approved"
     ' _ "$ROOT/bin/jg-wake-lib.sh" "$state" "$status_file" || rc=$?
-    [ "$rc" -eq 1 ] || fail "a close over folded secondmate lines was self-announced (rc=$rc): $lagging"
+    [ "$rc" -eq 1 ] || fail "a close over folded squad_lead lines was self-announced (rc=$rc): $lagging"
     export JG_FAKE_CREW_STATE='state: working · source: pane · harness busy'
     watch_bg "$state" "$fakebin" "$out"
     pid=$!
-    wait_for_exit "$pid" 100 || fail "the supervisor's close swallowed folded secondmate lines: $lagging"
+    wait_for_exit "$pid" 100 || fail "the supervisor's close swallowed folded squad_lead lines: $lagging"
     grep -F "signal: $status_file" "$out" >/dev/null \
-      || fail "folded secondmate lines did not surface as a signal: $(cat "$out")"
+      || fail "folded squad_lead lines did not surface as a signal: $(cat "$out")"
   done
-  pass "a close after OPEN DECISIONS fold still surfaces unlisted secondmate lines inside the folded span"
+  pass "a close after OPEN DECISIONS fold still surfaces unlisted squad_lead lines inside the folded span"
 }
 
 # --- actionable wakes are surfaced (queue + exit) ---------------------------
@@ -2157,7 +2157,7 @@ test_actionable_signal_survives_a_later_routine_append() {
   pass "a captain event hidden behind a later routine append is still surfaced (queue + exit)"
 }
 
-# A status log only grows: a remote second mate's mirrored parent channel passes a
+# A status log only grows: a remote squad lead's mirrored parent channel passes a
 # megabyte and thousands of keyed decisions. Deciding whether a newly appended
 # keyed decision is still open must cost the new span, not the log's lifetime.
 # Re-folding the whole log on every such signal made one poll take minutes on a
@@ -2377,7 +2377,7 @@ test_terminal_stale_surfaced() {
 
 # --- stale pane, STALE terminal status overridden by an active run: absorbed ---
 # Regression for the 2026-07 herdr false-surface incidents: a crew's own status
-# log gets no new entry once firstmate hands it to a no-mistakes validation
+# log gets no new entry once juggernaut hands it to a no-mistakes validation
 # (AGENTS.md's sparse status-reporting contract), so the log keeps showing its
 # pre-validation "done:" line as the LAST line for the run's entire (possibly
 # many-minutes) duration. stale_is_terminal alone has no run-step awareness and
@@ -2392,7 +2392,7 @@ test_stale_terminal_status_overridden_by_active_run() {
   window="test:jg-validating"
   printf 'no-mistakes axi run: validating...' > "$capture_file"
   printf 'window=%s\nkind=ship\n' "$window" > "$state/validating.meta"
-  # The crew reported done BEFORE firstmate triggered no-mistakes validation;
+  # The crew reported done BEFORE juggernaut triggered no-mistakes validation;
   # this line never gets superseded by a newer status-log entry while the
   # pipeline itself runs.
   printf 'done: implementation complete, ready to validate\n' > "$state/validating.status"
@@ -2875,7 +2875,7 @@ test_absorbed_replacement_wait_does_not_inherit_the_old_throttle() {
 
 # Run one watcher round against a parked-worker fixture, so a round differs only
 # in the pane contents the case just wrote. Armed the way jg-watch-arm.sh arms a
-# successor after firstmate handled a wake, because that is what a supervision
+# successor after juggernaut handled a wake, because that is what a supervision
 # turn actually does and it is the only arm that stays in the poll loop instead of
 # re-announcing the previous round's downtime - without it a round exits on
 # `check: rearm-resurface` before it ever reaches the stale path, and every
@@ -2982,7 +2982,7 @@ test_declared_wait_contradicted_by_parked_run_wakes_once() {
 # a decision is never silenced; first sight of each distinct stale hash therefore
 # reaches surface_nonterminal_stale. An idle parked pane still churns its hash (a
 # clock, a token counter), so every tick used to re-enter that first-sight path and
-# wake firstmate - the throttle was written by the very wake it should have
+# wake juggernaut - the throttle was written by the very wake it should have
 # prevented, and the hash-change path cleared it again before it was ever read.
 # The contract pinned here: the FIRST sight still surfaces, further sights inside
 # PAUSE_RESURFACE_SECS are absorbed, and the window's end still re-surfaces once,
@@ -3005,7 +3005,7 @@ test_live_declared_wait_churn_honors_the_resurface_throttle() {
     throttle="$state/.paused-resurfaced-$key"
 
     # First sight of a parked-but-live worker must still surface: the state is
-    # inconclusive and firstmate has to look at it.
+    # inconclusive and juggernaut has to look at it.
     text='parked, elapsed 1s'
     printf '%s' "$text" > "$capture_file"
     printf '%s' "$(hash_text "$text")" > "$state/.hash-$key"
@@ -3116,7 +3116,7 @@ test_live_paused_until_controls_recheck_time() {
 }
 
 # --- the wedge threshold consults the worker's own declared wait ------------
-# Upstream kunchenguid/firstmate#3909 and #2614: wedge_timer_check escalated on
+# Upstream kunchenguid/juggernaut#3909 and #2614: wedge_timer_check escalated on
 # elapsed idle time alone, without ever asking whether the worker had already
 # said why its pane was quiet. Nothing re-consulted that declaration once the
 # timer was running, so the ladder climbed for as long as the wait lasted and
@@ -3423,19 +3423,19 @@ test_wedge_threshold_recheck_names_the_captain_for_a_held_lane() {
 }
 
 # --- the wedge threshold reads the crew's own parked-gate state --------------
-# Upstream kunchenguid/firstmate#3055: a lane parked at a validation gate that is
+# Upstream kunchenguid/juggernaut#3055: a lane parked at a validation gate that is
 # waiting on a HUMAN is correctly quiet, but nothing in the status LINE says so -
 # the evidence is the pipeline's gate state, not anything the worker wrote. One
 # such lane reached 671 consecutive escalations on a single home. Neither landed
 # mitigation covers it: a declared `paused:` does nothing because a live ordinary
-# crewmate's absorb class never reads paused, and raising the threshold delays
+# operator's absorb class never reads paused, and raising the threshold delays
 # genuine wedge detection for every lane equally.
 #
 # The distinction that makes this safe is between the two gates the crew state
-# both reports as `parked`: one owed a HUMAN, and one owed the CREWMATE's own
-# answer. Only the first may go quiet - a crewmate that wedges before answering
+# both reports as `parked`: one owed a HUMAN, and one owed the OPERATOR's own
+# answer. Only the first may go quiet - a operator that wedges before answering
 # its own gate is exactly the failure this ladder exists to catch - so both
-# directions are pinned here, and the crewmate direction is written so that a
+# directions are pinned here, and the operator direction is written so that a
 # consumer which merely searched the verdict for the token would fail it.
 # The second half of that evidence - that the human was actually asked and has
 # not answered - is pinned in the test below this one.
@@ -3447,12 +3447,12 @@ test_wedge_threshold_defers_to_a_parked_gate_awaiting_a_human() {
   local human='state: parked · source: run-step · parked at awaiting_approval: 2 finding(s) · ask-user: authority decision · run: 01RUNGATE'
   # The same gate with no run component: nothing can tie a decision to it.
   local runless='state: parked · source: run-step · parked at awaiting_approval: 2 finding(s) · ask-user: authority decision'
-  # The same shape owed the crewmate itself. The gate name is free text carried
+  # The same shape owed the operator itself. The gate name is free text carried
   # out of the run payload, so this one spells the whole marker inside it: a
   # consumer that searched the verdict for those words instead of comparing a
   # whole component for equality would read this lane as human-owed and take its
   # ladder away.
-  local crewmate='state: parked · source: run-step · parked at fix_review (ask-user: authority decision follow-up): 2 finding(s) · run: 01RUNGATE'
+  local operator='state: parked · source: run-step · parked at fix_review (ask-user: authority decision follow-up): 2 finding(s) · run: 01RUNGATE'
 
   window="test:jg-wedge"; key=$(printf '%s' "$window" | tr ':/.' '___')
 
@@ -3481,12 +3481,12 @@ working: still parked at that gate'
     || fail "a gate awaiting a human was never rechecked at the threshold: $(cat "$out")"
   grep -F 'verified wait at a parked gate' "$out" >/dev/null \
     || fail "the parked-gate recheck did not name its evidence: $(cat "$out")"
-  grep -F "awaiting firstmate's ask-user decision" "$out" >/dev/null \
-    || fail "the parked-gate recheck did not name firstmate as the one the wait is on: $(cat "$out")"
-  grep -F "decide the gate's ask-user finding and relay the decision to the crewmate" "$out" >/dev/null \
+  grep -F "awaiting juggernaut's ask-user decision" "$out" >/dev/null \
+    || fail "the parked-gate recheck did not name juggernaut as the one the wait is on: $(cat "$out")"
+  grep -F "decide the gate's ask-user finding and relay the decision to the operator" "$out" >/dev/null \
     || fail "the parked-gate recheck did not name the action that clears the lane: $(cat "$out")"
   grep -F 'awaiting the captain' "$out" >/dev/null \
-    && fail "the parked-gate recheck named the captain for a decision firstmate owns: $(cat "$out")"
+    && fail "the parked-gate recheck named the captain for a decision juggernaut owns: $(cat "$out")"
   grep -F 'confirm the wait still holds' "$out" >/dev/null \
     && fail "a parked gate borrowed the external-wait action, which does not clear it: $(cat "$out")"
   grep -F 'possible wedge' "$out" >/dev/null \
@@ -3513,26 +3513,26 @@ working: still parked at that gate'
     || fail "a gate awaiting a human counted $(cat "$state/.wedge-escalations-$key") wedge escalation(s)"
 
   # The other direction, and the whole reason the distinction is drawn: a gate
-  # the crewmate itself must answer keeps the unchanged schedule, reason and
+  # the operator itself must answer keeps the unchanged schedule, reason and
   # demand-deep-inspection wording.
-  dir=$(wedge_threshold_fixture parked-gate-crewmate "$escalated" 2000)
+  dir=$(wedge_threshold_fixture parked-gate-operator "$escalated" 2000)
   arm_parked_gate "$dir"
   state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"; capture="$dir/pane.txt"
   n=1
   while [ "$n" -le 3 ]; do
-    wedge_threshold_round "$state" "$fakebin" "$out" "$capture" "$window" "$crewmate" exit \
-      || fail "a gate awaiting the crewmate stopped escalating at threshold $n: $(cat "$out")"
-    ack_stopped_cycle "$state" || fail "could not acknowledge crewmate-gate escalation $n"
+    wedge_threshold_round "$state" "$fakebin" "$out" "$capture" "$window" "$operator" exit \
+      || fail "a gate awaiting the operator stopped escalating at threshold $n: $(cat "$out")"
+    ack_stopped_cycle "$state" || fail "could not acknowledge operator-gate escalation $n"
     grep -F "possible wedge, escalation $n" "$out" >/dev/null \
-      || fail "a gate awaiting the crewmate did not reach escalation $n: $(cat "$out")"
+      || fail "a gate awaiting the operator did not reach escalation $n: $(cat "$out")"
     n=$((n + 1))
   done
   grep -F 'demand-deep-inspection: same pane has wedge-escalated 3 times in a row' "$out" >/dev/null \
-    || fail "a gate awaiting the crewmate lost the demand-deep-inspection wording: $(cat "$out")"
+    || fail "a gate awaiting the operator lost the demand-deep-inspection wording: $(cat "$out")"
   grep -F 'verified wait at a parked gate' "$out" >/dev/null \
-    && fail "a gate awaiting the crewmate was deferred as a wait on a human: $(cat "$out")"
+    && fail "a gate awaiting the operator was deferred as a wait on a human: $(cat "$out")"
 
-  # The wait is owed by firstmate, not the captain, so the captain-away silence
+  # The wait is owed by juggernaut, not the captain, so the captain-away silence
   # does not apply: under away posture the supervision branch is the actor
   # allowed to answer it, and it keeps the long recheck cadence throughout.
   dir=$(wedge_threshold_fixture parked-gate-away "$escalated" 2000)
@@ -3540,13 +3540,13 @@ working: still parked at that gate'
   state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"; capture="$dir/pane.txt"
   write_away_record "$state"
   wedge_threshold_round "$state" "$fakebin" "$out" "$capture" "$window" "$human" exit \
-    || fail "a parked gate owed firstmate's decision was silenced while the away-posture record existed: $(cat "$out")"
-  grep -F "awaiting firstmate's ask-user decision" "$out" >/dev/null \
-    || fail "the away-posture parked-gate recheck did not name firstmate: $(cat "$out")"
+    || fail "a parked gate owed juggernaut's decision was silenced while the away-posture record existed: $(cat "$out")"
+  grep -F "awaiting juggernaut's ask-user decision" "$out" >/dev/null \
+    || fail "the away-posture parked-gate recheck did not name juggernaut: $(cat "$out")"
   grep -F 'possible wedge' "$out" >/dev/null \
     && fail "an away-posture parked gate was reported as a possible wedge: $(cat "$out")"
   grep -F 'never rechecked while the away-posture record exists' "$state/.watch-triage.log" >/dev/null \
-    && fail "a parked gate owed firstmate took the captain-away silence: $(cat "$state/.watch-triage.log")"
+    && fail "a parked gate owed juggernaut took the captain-away silence: $(cat "$state/.watch-triage.log")"
   ack_stopped_cycle "$state" || fail "could not acknowledge the away-posture parked-gate recheck"
   queued=$(wedge_stale_wakes "$state" "$window")
   n=1
@@ -3589,7 +3589,7 @@ working: still parked at that gate'
   ack_stopped_cycle "$state" || fail "could not acknowledge the runless-gate escalation"
   grep -F 'possible wedge, escalation 1' "$out" >/dev/null \
     || fail "a runless human-owed gate did not take the unchanged ladder: $(cat "$out")"
-  pass "a gate awaiting firstmate's decision for its own run is rechecked on the long cadence in either posture, while a crewmate-owed gate, an unrelated open decision and a runless verdict keep the unchanged ladder"
+  pass "a gate awaiting juggernaut's decision for its own run is rechecked on the long cadence in either posture, while a operator-owed gate, an unrelated open decision and a runless verdict keep the unchanged ladder"
 }
 
 # --- an unconfigured home behaves exactly as it did before this evidence -----
@@ -3657,16 +3657,16 @@ working: still parked at that gate'
 # --- a parked human-owed gate also needs the human to still owe an answer ----
 # The gate's findings table says who the answer is owed BY. It does not say the
 # human was ever asked, and it does not stop saying `ask-user` once they answer:
-# the run stays parked, and the row stays in the table, until the CREWMATE relays
-# the decision with `axi respond`. So a lane that is quiet because the crewmate
+# the run stays parked, and the row stays in the table, until the OPERATOR relays
+# the decision with `axi respond`. So a lane that is quiet because the operator
 # wedged before relaying an answer it already has would read exactly like a lane
-# waiting on firstmate - and would lose the ladder for the one failure the
+# waiting on juggernaut - and would lose the ladder for the one failure the
 # ladder exists to catch.
 # The task's own decision fold is the record that closes that hole, because it is
 # written at ANSWER time rather than at relay time: `jg-send --resolve-key`
 # appends the closing `resolved` line the moment the decision is answered. An open
 # `needs-decision` therefore means the human was told and has not answered; its
-# absence means the outstanding move belongs to the crewmate, or that nobody was
+# absence means the outstanding move belongs to the operator, or that nobody was
 # ever told at all. Each of those keeps the unchanged schedule below.
 test_wedge_threshold_parked_gate_needs_an_unanswered_decision() {
   local dir state fakebin out capture window key n
@@ -3679,7 +3679,7 @@ test_wedge_threshold_parked_gate_needs_an_unanswered_decision() {
   # non-terminal route into the wedge timer as that one.
   dir=$(wedge_threshold_fixture parked-gate-decided \
     'needs-decision [key=nm-01RUNGATE-review]: the gate raised an authority question
-resolved [key=nm-01RUNGATE-review]: firstmate chose the second fix' 2000)
+resolved [key=nm-01RUNGATE-review]: juggernaut chose the second fix' 2000)
   arm_parked_gate "$dir"
   state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"; capture="$dir/pane.txt"
   n=1
@@ -3696,7 +3696,7 @@ resolved [key=nm-01RUNGATE-review]: firstmate chose the second fix' 2000)
   grep -F 'verified wait at a parked gate' "$out" >/dev/null \
     && fail "a gate whose decision was already answered was deferred as a wait on the captain: $(cat "$out")"
 
-  # Parked at a human-owed gate, quiet, and the crewmate never escalated it: no
+  # Parked at a human-owed gate, quiet, and the operator never escalated it: no
   # human has been told, so there is no wait to defer to.
   dir=$(wedge_threshold_fixture parked-gate-unescalated 'working: validation under way' 2000)
   arm_parked_gate "$dir"
@@ -4388,18 +4388,18 @@ test_reheld_captain_call_starts_its_own_resurface_window() {
 
 
 
-test_secondmate_paused_resurfaces_in_normal_mode() {
+test_squad_lead_paused_resurfaces_in_normal_mode() {
   local dir state fakebin out capture_file statusf window key pane_hash sig pid back
-  dir=$(make_case secondmate-paused-resurface); state="$dir/state"; fakebin="$dir/fakebin"
-  out="$dir/watch.out"; capture_file="$dir/pane.txt"; statusf="$state/secondmate-held.status"
-  window="test:jg-secondmate-held"
+  dir=$(make_case squad-lead-paused-resurface); state="$dir/state"; fakebin="$dir/fakebin"
+  out="$dir/watch.out"; capture_file="$dir/pane.txt"; statusf="$state/squad-lead-held.status"
+  window="test:jg-squad-lead-held"
   printf 'idle awaiting external\n' > "$capture_file"
-  printf 'window=%s\nkind=secondmate\n' "$window" > "$state/secondmate-held.meta"
+  printf 'window=%s\nkind=squad_lead\n' "$window" > "$state/squad-lead-held.meta"
   printf 'paused: awaiting the upstream release\nThe release window opens tomorrow.\n\n' > "$statusf"
   back=$(( $(date +%s) - 500 ))
   if [ "$(uname)" = Darwin ]; then touch -mt "$(date -r "$back" '+%Y%m%d%H%M.%S')" "$statusf"
   else touch -m -d "@$back" "$statusf"; fi
-  sig=$(seen_sig "$statusf"); printf '%s' "$sig" > "$state/.seen-secondmate-held_status"
+  sig=$(seen_sig "$statusf"); printf '%s' "$sig" > "$state/.seen-squad-lead-held_status"
   key=$(printf '%s' "$window" | tr '.:/' '___')
   pane_hash=$(hash_text "idle awaiting external")
   printf '%s' "$pane_hash" > "$state/.hash-$key"
@@ -4409,31 +4409,31 @@ test_secondmate_paused_resurfaces_in_normal_mode() {
     JG_STATE_OVERRIDE="$state" JG_CREW_STATE_BIN="$fakebin/jg-crew-state.sh" JG_PAUSE_RESURFACE_SECS=240 JG_POLL=1 JG_SIGNAL_GRACE=1 \
     JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 "$WATCH" > "$out" &
   pid=$!
-  wait_for_exit "$pid" 100 || fail "watcher did not re-surface a paused secondmate"
-  grep -F "stale: $window" "$out" >/dev/null || fail "paused secondmate did not emit a stale recheck"
-  grep -F "awaiting external" "$out" >/dev/null || fail "paused secondmate recheck omitted its external-wait reason"
-  grep -F "awaiting the captain" "$out" >/dev/null && fail "paused secondmate recheck named the captain instead of its external dependency"
-  grep -F "possible wedge" "$out" >/dev/null && fail "paused secondmate was mislabeled a wedge"
+  wait_for_exit "$pid" 100 || fail "watcher did not re-surface a paused squad_lead"
+  grep -F "stale: $window" "$out" >/dev/null || fail "paused squad_lead did not emit a stale recheck"
+  grep -F "awaiting external" "$out" >/dev/null || fail "paused squad_lead recheck omitted its external-wait reason"
+  grep -F "awaiting the captain" "$out" >/dev/null && fail "paused squad_lead recheck named the captain instead of its external dependency"
+  grep -F "possible wedge" "$out" >/dev/null && fail "paused squad_lead was mislabeled a wedge"
   unset JG_FAKE_CREW_STATE
-  pass "a declared paused secondmate re-surfaces on the bounded normal-mode cadence"
+  pass "a declared paused squad_lead re-surfaces on the bounded normal-mode cadence"
 }
 
 # A captain hold is the other declared wait, but unlike paused: it has no
 # current-state mapping, so a held mate reports `unknown` rather than `paused`.
 # The bounded re-surface must still reach it, or a mate's hold rots invisibly:
 # nothing else re-reads a quiet mate's endpoint.
-test_secondmate_captain_held_resurfaces_in_normal_mode() {
+test_squad_lead_captain_held_resurfaces_in_normal_mode() {
   local dir state fakebin out capture_file statusf window key pane_hash sig pid back
-  dir=$(make_case secondmate-held-resurface); state="$dir/state"; fakebin="$dir/fakebin"
-  out="$dir/watch.out"; capture_file="$dir/pane.txt"; statusf="$state/secondmate-hold.status"
-  window="test:jg-secondmate-hold"
+  dir=$(make_case squad-lead-held-resurface); state="$dir/state"; fakebin="$dir/fakebin"
+  out="$dir/watch.out"; capture_file="$dir/pane.txt"; statusf="$state/squad-lead-hold.status"
+  window="test:jg-squad-lead-hold"
   printf 'idle awaiting the captain\n' > "$capture_file"
-  printf 'window=%s\nkind=secondmate\n' "$window" > "$state/secondmate-hold.meta"
+  printf 'window=%s\nkind=squad_lead\n' "$window" > "$state/squad-lead-hold.meta"
   printf 'captain-held [key=route]: tracked by task-decision-route\n' > "$statusf"
   back=$(( $(date +%s) - 500 ))
   if [ "$(uname)" = Darwin ]; then touch -mt "$(date -r "$back" '+%Y%m%d%H%M.%S')" "$statusf"
   else touch -m -d "@$back" "$statusf"; fi
-  sig=$(seen_sig "$statusf"); printf '%s' "$sig" > "$state/.seen-secondmate-hold_status"
+  sig=$(seen_sig "$statusf"); printf '%s' "$sig" > "$state/.seen-squad-lead-hold_status"
   key=$(printf '%s' "$window" | tr '.:/' '___')
   pane_hash=$(hash_text "idle awaiting the captain")
   printf '%s' "$pane_hash" > "$state/.hash-$key"
@@ -4443,24 +4443,24 @@ test_secondmate_captain_held_resurfaces_in_normal_mode() {
     JG_STATE_OVERRIDE="$state" JG_CREW_STATE_BIN="$fakebin/jg-crew-state.sh" JG_PAUSE_RESURFACE_SECS=240 JG_POLL=1 JG_SIGNAL_GRACE=1 \
     JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 "$WATCH" > "$out" &
   pid=$!
-  wait_for_exit "$pid" 100 || fail "watcher did not re-surface a captain-held secondmate"
-  grep -F "stale: $window" "$out" >/dev/null || fail "captain-held secondmate did not emit a stale recheck"
-  grep -F "awaiting the captain" "$out" >/dev/null || fail "captain-held secondmate recheck did not name the captain as the blocker: $(cat "$out")"
-  grep -F "awaiting external" "$out" >/dev/null && fail "captain-held secondmate recheck claimed an external wait"
-  grep -F "possible wedge" "$out" >/dev/null && fail "captain-held secondmate was mislabeled a wedge"
+  wait_for_exit "$pid" 100 || fail "watcher did not re-surface a captain-held squad_lead"
+  grep -F "stale: $window" "$out" >/dev/null || fail "captain-held squad_lead did not emit a stale recheck"
+  grep -F "awaiting the captain" "$out" >/dev/null || fail "captain-held squad_lead recheck did not name the captain as the blocker: $(cat "$out")"
+  grep -F "awaiting external" "$out" >/dev/null && fail "captain-held squad_lead recheck claimed an external wait"
+  grep -F "possible wedge" "$out" >/dev/null && fail "captain-held squad_lead was mislabeled a wedge"
   unset JG_FAKE_CREW_STATE
-  pass "a captain-held secondmate re-surfaces on the bounded normal-mode cadence"
+  pass "a captain-held squad_lead re-surfaces on the bounded normal-mode cadence"
 }
 
-test_secondmate_nonpaused_stale_remains_suppressed() {
+test_squad_lead_nonpaused_stale_remains_suppressed() {
   local dir state fakebin out capture_file statusf window key pane_hash sig pid
-  dir=$(make_case secondmate-stale-suppressed); state="$dir/state"; fakebin="$dir/fakebin"
-  out="$dir/watch.out"; capture_file="$dir/pane.txt"; statusf="$state/secondmate-working.status"
-  window="test:jg-secondmate-working"
+  dir=$(make_case squad-lead-stale-suppressed); state="$dir/state"; fakebin="$dir/fakebin"
+  out="$dir/watch.out"; capture_file="$dir/pane.txt"; statusf="$state/squad-lead-working.status"
+  window="test:jg-squad-lead-working"
   printf 'idle while the parent supervises\n' > "$capture_file"
-  printf 'window=%s\nkind=secondmate\n' "$window" > "$state/secondmate-working.meta"
-  printf 'working: the parent supervises this secondmate\n' > "$statusf"
-  sig=$(seen_sig "$statusf"); printf '%s' "$sig" > "$state/.seen-secondmate-working_status"
+  printf 'window=%s\nkind=squad_lead\n' "$window" > "$state/squad-lead-working.meta"
+  printf 'working: the parent supervises this squad_lead\n' > "$statusf"
+  sig=$(seen_sig "$statusf"); printf '%s' "$sig" > "$state/.seen-squad-lead-working_status"
   key=$(printf '%s' "$window" | tr '.:/' '___')
   pane_hash=$(hash_text "idle while the parent supervises")
   printf '%s' "$pane_hash" > "$state/.hash-$key"
@@ -4469,20 +4469,20 @@ test_secondmate_nonpaused_stale_remains_suppressed() {
     JG_STATE_OVERRIDE="$state" JG_POLL=1 JG_SIGNAL_GRACE=1 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 "$WATCH" > "$out" &
   pid=$!
   if ! wait_poll_cycle "$state" "$pid"; then
-    reap "$pid"; fail "watcher surfaced an ordinary secondmate stale pane: $(cat "$out")"
+    reap "$pid"; fail "watcher surfaced an ordinary squad_lead stale pane: $(cat "$out")"
   fi
-  [ ! -s "$out" ] || { reap "$pid"; fail "ordinary secondmate stale pane printed a wake reason: $(cat "$out")"; }
+  [ ! -s "$out" ] || { reap "$pid"; fail "ordinary squad_lead stale pane printed a wake reason: $(cat "$out")"; }
   reap "$pid"
-  pass "a non-paused secondmate retains normal stale suppression"
+  pass "a non-paused squad_lead retains normal stale suppression"
 }
 
-test_secondmate_unpause_clears_pause_tracking() {
+test_squad_lead_unpause_clears_pause_tracking() {
   local dir state fakebin out statusf window key pid
-  dir=$(make_case secondmate-unpause-clears); state="$dir/state"; fakebin="$dir/fakebin"
-  out="$dir/watch.out"; statusf="$state/secondmate-resumed.status"; window="test:jg-secondmate-resumed"
-  printf 'window=%s\nkind=secondmate\n' "$window" > "$state/secondmate-resumed.meta"
+  dir=$(make_case squad-lead-unpause-clears); state="$dir/state"; fakebin="$dir/fakebin"
+  out="$dir/watch.out"; statusf="$state/squad-lead-resumed.status"; window="test:jg-squad-lead-resumed"
+  printf 'window=%s\nkind=squad_lead\n' "$window" > "$state/squad-lead-resumed.meta"
   printf 'working: upstream landed\n' > "$statusf"
-  printf '%s' "$(seen_sig "$statusf")" > "$state/.seen-secondmate-resumed_status"
+  printf '%s' "$(seen_sig "$statusf")" > "$state/.seen-squad-lead-resumed_status"
   key=${window//:/_}
   key=${key//\//_}
   key=${key//./_}
@@ -4494,12 +4494,12 @@ test_secondmate_unpause_clears_pause_tracking() {
   : > "$state/.wedge-escalations-$key"
   watch_bg "$state" "$fakebin" "$out"
   pid=$!
-  wait_poll_cycle "$state" "$pid" || fail "watcher exited while reconciling a resumed secondmate: $(cat "$out")"
-  [ ! -e "$state/.paused-$key" ] || { reap "$pid"; fail "resumed secondmate retained the pause marker"; }
-  [ ! -e "$state/.stale-$key" ] || { reap "$pid"; fail "resumed secondmate retained stale tracking"; }
-  [ ! -e "$state/.wedge-escalations-$key" ] || { reap "$pid"; fail "resumed secondmate retained wedge tracking"; }
+  wait_poll_cycle "$state" "$pid" || fail "watcher exited while reconciling a resumed squad_lead: $(cat "$out")"
+  [ ! -e "$state/.paused-$key" ] || { reap "$pid"; fail "resumed squad_lead retained the pause marker"; }
+  [ ! -e "$state/.stale-$key" ] || { reap "$pid"; fail "resumed squad_lead retained stale tracking"; }
+  [ ! -e "$state/.wedge-escalations-$key" ] || { reap "$pid"; fail "resumed squad_lead retained wedge tracking"; }
   reap "$pid"
-  pass "a resumed secondmate clears pause and stale tracking before stale exemption"
+  pass "a resumed squad_lead clears pause and stale tracking before stale exemption"
 }
 
 test_nonterminal_stale_pause_transitions_reclassify_unchanged_hash() {
@@ -5876,24 +5876,24 @@ test_write_deferral_resurfaces_on_the_bounded_cadence() {
   pass "a write deferral re-surfaces once on the bounded pause cadence, so a churning worktree cannot stay invisible"
 }
 
-# The worktree recorded for a secondmate is a provisioned firstmate home, and that
+# The worktree recorded for a squad_lead is a provisioned juggernaut home, and that
 # home runs its OWN supervision inside itself: its watcher beacon, pane hashes and
 # heartbeats keep state/ churning whether or not the mate produced anything. Reading
 # that as crew progress would quietly relax the kind-agnostic busy-turn backstop from
 # the escalation cadence to the hourly recheck for work that produced nothing, so the
 # probe must report no evidence and the unchanged schedule must still fire.
-test_secondmate_home_supervision_churn_is_not_write_evidence() {
+test_squad_lead_home_supervision_churn_is_not_write_evidence() {
   local dir state fakebin out drain_out capture_file window key sig pid home back
-  dir=$(make_case secondmate-home-churn); state="$dir/state"; fakebin="$dir/fakebin"
+  dir=$(make_case squad-lead-home-churn); state="$dir/state"; fakebin="$dir/fakebin"
   out="$dir/watch.out"; drain_out="$dir/drain.out"; capture_file="$dir/pane.txt"
   window="test:jg-mate"; home="$dir/mate-home"
   mkdir -p "$home/state"
-  printf 'sm-mate\n' > "$home/.jg-secondmate-home"
+  printf 'sm-mate\n' > "$home/.jg-squad-lead-home"
   printf 'Working... (12.3s)' > "$capture_file"
   printf 'window=%s\nkind=ship\nharness=pi\nworktree=%s\n' "$window" "$home" > "$state/mate.meta"
   record_pi_busy "$state" mate
   # An ordinary crew recording a provisioned mate home is the route that actually
-  # reaches the probe: a kind=secondmate window of its own is triaged only under a
+  # reaches the probe: a kind=squad_lead window of its own is triaged only under a
   # declared pause, and a declared pause takes the bounded recheck cadence instead of
   # the wedge timer. The home marker alone is what excludes the walk, so the exclusion
   # is what this asserts. A busy pane is bounded by its completed-turn age; no turn
@@ -5922,7 +5922,7 @@ test_secondmate_home_supervision_churn_is_not_write_evidence() {
   [ "$(cat "$state/.wedge-escalations-$key" 2>/dev/null || true)" = 1 ] || fail "the mate escalation was not counted"
   JG_STATE_OVERRIDE="$state" "$DRAIN" > "$drain_out" 2>/dev/null || fail "drain after the mate escalation failed"
   grep "$(printf '\tstale\t')" "$drain_out" | grep -F "$window" >/dev/null || fail "the mate escalation was not queued"
-  pass "a secondmate's own home supervision churn is not crew write evidence, so a pane recording that home keeps the unchanged escalation schedule"
+  pass "a squad_lead's own home supervision churn is not crew write evidence, so a pane recording that home keeps the unchanged escalation schedule"
 }
 
 # A write deferral is a bounded chain, not a permanent one: its .writing-since
@@ -6275,7 +6275,7 @@ test_procevent_marker_keys_are_injective() {
   pass "complete process-event queue keys map to distinct seen markers"
 }
 
-# The reason line is the headline firstmate reads before the payload. Every
+# The reason line is the headline juggernaut reads before the payload. Every
 # procevent:* key used to surface as "process-event result captured", which
 # presents a source that is collecting NOTHING as a healthy capture - the exact
 # shape of the incident these wakes exist to expose. These assertions read the
@@ -6321,7 +6321,7 @@ test_procevent_headlines_classify_queue_keys() {
 }
 
 # Delivery, not queue rows, is what proves a launch-failure episode reaches
-# firstmate. The watcher remembers every procevent key it has surfaced for
+# juggernaut. The watcher remembers every procevent key it has surfaced for
 # good, so reconcile keys each episode with a fresh suffix beyond the
 # registration identity: this test would fail if a second episode reused the
 # first one's key, because the watcher would keep polling and never wake.
@@ -6546,7 +6546,7 @@ test_heartbeat_no_change_absorbed() {
   pass "a heartbeat with no captain-relevant change is absorbed and backs off the cadence"
 }
 
-# A secondmate lead that went idle with dispatchable work had no trigger: an
+# A squad_lead lead that went idle with dispatchable work had no trigger: an
 # absorbed heartbeat never read the backlog (the 4 Oct overnight stall). The
 # heartbeat now wakes the lead once per new ready set, and stays absorbed for
 # the same set or while a worker is provably working.
@@ -6570,7 +6570,7 @@ test_heartbeat_wakes_an_idle_lead_with_ready_work() {
   dir=$(make_case heartbeat-ready-work); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
   drain_out="$dir/drain.out"
   tasks="$ROOT/bin/jg-tasks-axi.sh"
-  printf 'sm-ready-1\n' > "$dir/.jg-secondmate-home"
+  printf 'sm-ready-1\n' > "$dir/.jg-squad-lead-home"
   mkdir -p "$dir/data"
   JG_HOME="$dir" "$tasks" add beta-two "second ready item" >/dev/null || fail "fixture: could not queue beta-two"
   JG_HOME="$dir" "$tasks" add alpha-one "first ready item" >/dev/null || fail "fixture: could not queue alpha-one"
@@ -6615,7 +6615,7 @@ test_heartbeat_wakes_an_idle_lead_with_ready_work() {
   pass "an idle lead with ready work is woken once per ready set, and never while a worker is working"
 }
 
-# The ask-default hook (ask_default_tick): with the firstmate-addons add-on
+# The ask-default hook (ask_default_tick): with the juggernaut-addons add-on
 # installed, every ask it recorded and has not defaulted is decided on the check
 # cadence, a fresh default wakes once, and the probe reads the away record; with
 # the add-on absent the cycle writes and prints nothing new.
@@ -6710,7 +6710,7 @@ a4 probe=1" ] || fail "decide ran on the wrong asks or the away record read reac
 # going silent after one wake. The no-config case is
 # test_heartbeat_wakes_an_idle_lead_with_ready_work above.
 # The same four panes are open in every round; the two spare endpoints are
-# secondmates (kind=secondmate), which are not lanes of this home, so the round
+# squad_leads (kind=squad_lead), which are not lanes of this home, so the round
 # varies the lane count without ever orphaning a pane.
 # With no installed fleet-flow check this is today's meta-count floor; two extra
 # rounds exercise the fork hook that reads the add-on's counted column when the
@@ -6724,8 +6724,8 @@ test_heartbeat_lane_floor_wakes_with_free_lane_slots() {
   dir=$(make_case heartbeat-lane-floor); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
   tasks="$ROOT/bin/jg-tasks-axi.sh"
   windows="$(printf 'jg-busyone\njg-busytwo\njg-busythree\njg-busyfour')"
-  spare='kind=secondmate\nmode=secondmate\n'
-  printf 'sm-lane-floor\n' > "$dir/.jg-secondmate-home"
+  spare='kind=squad_lead\nmode=squad_lead\n'
+  printf 'sm-lane-floor\n' > "$dir/.jg-squad-lead-home"
   mkdir -p "$dir/data" "$dir/config"
   JG_HOME="$dir" "$tasks" add alpha-one "first ready item" >/dev/null || fail "fixture: could not queue alpha-one"
   printf '4\n' > "$dir/config/lane-target"
@@ -6842,7 +6842,7 @@ test_ready_work_check_absorbs_a_transient_empty_inside_the_window() {
   fi
   dir=$(make_case ready-work-transient-empty); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
   tasks="$ROOT/bin/jg-tasks-axi.sh"
-  printf 'sm-ready-empty\n' > "$dir/.jg-secondmate-home"
+  printf 'sm-ready-empty\n' > "$dir/.jg-squad-lead-home"
   mkdir -p "$dir/data" "$dir/config"
   printf '4\n' > "$dir/config/lane-target"
   JG_HOME="$dir" "$tasks" add alpha-one "first ready item" >/dev/null || fail "fixture: could not queue alpha-one"
@@ -6905,7 +6905,7 @@ test_ready_work_check_withdraws_a_stale_row_and_never_names_a_held_item() {
   dir=$(make_case ready-work-withdraw); state="$dir/state"; fakebin="$dir/fakebin"
   out="$dir/watch.out"; drain_out="$dir/drain.out"
   tasks="$ROOT/bin/jg-tasks-axi.sh"
-  printf 'sm-ready-withdraw\n' > "$dir/.jg-secondmate-home"
+  printf 'sm-ready-withdraw\n' > "$dir/.jg-squad-lead-home"
   mkdir -p "$dir/data" "$dir/config"
   printf '4\n' > "$dir/config/lane-target"
   JG_HOME="$dir" "$tasks" add alpha-one "first ready item" >/dev/null || fail "fixture: could not queue alpha-one"
@@ -6966,7 +6966,7 @@ test_heartbeat_full_lanes_with_no_worker_working_wake() {
   fi
   dir=$(make_case heartbeat-full-idle); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
   tasks="$ROOT/bin/jg-tasks-axi.sh"
-  printf 'sm-full-idle\n' > "$dir/.jg-secondmate-home"
+  printf 'sm-full-idle\n' > "$dir/.jg-squad-lead-home"
   mkdir -p "$dir/data" "$dir/config"
   JG_HOME="$dir" "$tasks" add alpha-one "first ready item" >/dev/null || fail "fixture: could not queue alpha-one"
   printf '4\n' > "$dir/config/lane-target"
@@ -7009,7 +7009,7 @@ test_heartbeat_backstop_surfaces_unsurfaced_status() {
   # A captain-relevant status whose .seen-* signature ALREADY matches (so the
   # per-poll signal scan stays quiet) but which was never surfaced (no
   # .hb-surfaced-* marker). This stands in for a per-wake-path miss; the heartbeat
-  # fleet-scan backstop must catch it and wake firstmate.
+  # fleet-scan backstop must catch it and wake juggernaut.
   printf 'done: PR https://example.test/pr/5\n' > "$state/miss.status"
   sig=$(seen_sig "$state/miss.status"); printf '%s' "$sig" > "$state/.seen-miss_status"
   PATH="$fakebin:$PATH" JG_STATE_OVERRIDE="$state" JG_POLL=1 JG_SIGNAL_GRACE=1 \
@@ -7160,16 +7160,16 @@ archive_away_record() {  # <state>
 
 test_captain_held_never_rechecked_while_away_record_exists() {
   local dir state fakebin out capture_file statusf window key pane_hash sig pid back
-  dir=$(make_case away-record-held-secondmate); state="$dir/state"; fakebin="$dir/fakebin"
-  out="$dir/watch.out"; capture_file="$dir/pane.txt"; statusf="$state/secondmate-hold.status"
-  window="test:jg-secondmate-hold"
+  dir=$(make_case away-record-held-squad-lead); state="$dir/state"; fakebin="$dir/fakebin"
+  out="$dir/watch.out"; capture_file="$dir/pane.txt"; statusf="$state/squad-lead-hold.status"
+  window="test:jg-squad-lead-hold"
   printf 'idle awaiting the captain\n' > "$capture_file"
-  printf 'window=%s\nkind=secondmate\n' "$window" > "$state/secondmate-hold.meta"
+  printf 'window=%s\nkind=squad_lead\n' "$window" > "$state/squad-lead-hold.meta"
   printf 'captain-held [key=route]: tracked by task-decision-route\n' > "$statusf"
   back=$(( $(date +%s) - 500 ))
   if [ "$(uname)" = Darwin ]; then touch -mt "$(date -r "$back" '+%Y%m%d%H%M.%S')" "$statusf"
   else touch -m -d "@$back" "$statusf"; fi
-  sig=$(seen_sig "$statusf"); printf '%s' "$sig" > "$state/.seen-secondmate-hold_status"
+  sig=$(seen_sig "$statusf"); printf '%s' "$sig" > "$state/.seen-squad-lead-hold_status"
   key=$(printf '%s' "$window" | tr '.:/' '___')
   pane_hash=$(hash_text "idle awaiting the captain")
   printf '%s' "$pane_hash" > "$state/.hash-$key"
@@ -7218,15 +7218,15 @@ write_quiet_record() {  # <state>
 test_captain_held_rechecked_under_a_quiet_record() {
   local dir state fakebin out capture_file statusf window key back pid
   dir=$(make_case quiet-record-held); state="$dir/state"; fakebin="$dir/fakebin"
-  out="$dir/watch.out"; capture_file="$dir/pane.txt"; statusf="$state/secondmate-hold.status"
-  window="test:jg-secondmate-hold"
+  out="$dir/watch.out"; capture_file="$dir/pane.txt"; statusf="$state/squad-lead-hold.status"
+  window="test:jg-squad-lead-hold"
   printf 'idle awaiting the captain\n' > "$capture_file"
-  printf 'window=%s\nkind=secondmate\n' "$window" > "$state/secondmate-hold.meta"
+  printf 'window=%s\nkind=squad_lead\n' "$window" > "$state/squad-lead-hold.meta"
   printf 'captain-held [key=route]: tracked by task-decision-route\n' > "$statusf"
   back=$(( $(date +%s) - 500 ))
   if [ "$(uname)" = Darwin ]; then touch -mt "$(date -r "$back" '+%Y%m%d%H%M.%S')" "$statusf"
   else touch -m -d "@$back" "$statusf"; fi
-  printf '%s' "$(seen_sig "$statusf")" > "$state/.seen-secondmate-hold_status"
+  printf '%s' "$(seen_sig "$statusf")" > "$state/.seen-squad-lead-hold_status"
   key=$(printf '%s' "$window" | tr '.:/' '___')
   printf '%s' "$(hash_text "idle awaiting the captain")" > "$state/.hash-$key"
   printf '1\n' > "$state/.count-$key"
@@ -7349,7 +7349,7 @@ paused_until_fixture() {  # <name> <until-epoch> <status-age-secs>
   window="test:jg-until"
   statusf="$state/until.status"
   printf 'idle, waiting for the reset\n' > "$dir/pane.txt"
-  printf 'window=%s\nkind=secondmate\n' "$window" > "$state/until.meta"
+  printf 'window=%s\nkind=squad_lead\n' "$window" > "$state/until.meta"
   printf 'paused: rate limit resets, until %s, then resuming\n' "$(iso_utc_at "$until")" > "$statusf"
   back=$(( $(date +%s) - age ))
   if [ "$(uname)" = Darwin ]; then touch -mt "$(date -r "$back" '+%Y%m%d%H%M.%S')" "$statusf"
@@ -7695,7 +7695,7 @@ test_own_queue_redelivers_without_churning_successors() {
   JG_STATE_OVERRIDE="$state" "$ROOT/bin/jg-wake-grant.sh" activate "$$" own-queue >/dev/null || fail "could not activate branch grant"
   JG_STATE_OVERRIDE="$state" "$ROOT/bin/jg-wake-grant.sh" publish own-queue 1 >/dev/null || fail "could not publish branch grant"
   printf '%s\t%s-1\n' "$((now - 10))" "$now" > "$state/.own-wake-progress"
-  watch_bg "$state" "$fakebin" "$out" env JG_HOME="$dir" JG_WATCH_HANDLING_SUCCESSOR=1 JG_SECONDMATE_WAKE_STALL_SECS=1
+  watch_bg "$state" "$fakebin" "$out" env JG_HOME="$dir" JG_WATCH_HANDLING_SUCCESSOR=1 JG_SQUAD_LEAD_WAKE_STALL_SECS=1
   pid=$!
   wait_poll_cycle "$state" "$pid" || { reap "$pid"; fail "a live branch grant was re-delivered to main"; }
   reap "$pid"
@@ -7703,7 +7703,7 @@ test_own_queue_redelivers_without_churning_successors() {
   rm -f "$state/.own-wake-progress"
   # A handling successor must first establish continuity, then re-deliver a
   # still-unacknowledged row after a bounded interval, without duplicating it.
-  watch_bg "$state" "$fakebin" "$out" env JG_HOME="$dir" JG_WATCH_HANDLING_SUCCESSOR=1 JG_SECONDMATE_WAKE_STALL_SECS=3
+  watch_bg "$state" "$fakebin" "$out" env JG_HOME="$dir" JG_WATCH_HANDLING_SUCCESSOR=1 JG_SQUAD_LEAD_WAKE_STALL_SECS=3
   pid=$!
   wait_poll_cycle "$state" "$pid" || { reap "$pid"; fail "a pending local wake churned the handling successor"; }
   wait_for_exit "$pid" 150 || { reap "$pid"; fail "an unhandled local wake never re-surfaced"; }
@@ -7711,12 +7711,12 @@ test_own_queue_redelivers_without_churning_successors() {
   [ "$(cat "$state/.wake-queue")" = "$original" ] || fail "re-delivery mutated or duplicated the pending row"
   # The persisted progress timer gives another successor room to run even
   # though the same queue row has not yet been acknowledged.
-  watch_bg "$state" "$fakebin" "$out" env JG_HOME="$dir" JG_WATCH_HANDLING_SUCCESSOR=1 JG_SECONDMATE_WAKE_STALL_SECS=30
+  watch_bg "$state" "$fakebin" "$out" env JG_HOME="$dir" JG_WATCH_HANDLING_SUCCESSOR=1 JG_SQUAD_LEAD_WAKE_STALL_SECS=30
   pid=$!
   wait_poll_cycle "$state" "$pid" || { reap "$pid"; fail "re-delivery immediately closed the next successor"; }
   reap "$pid"
   ack_stopped_cycle "$state" >/dev/null || fail "could not acknowledge the local wake"
-  watch_bg "$state" "$fakebin" "$out" env JG_HOME="$dir" JG_WATCH_HANDLING_SUCCESSOR=1 JG_SECONDMATE_WAKE_STALL_SECS=1
+  watch_bg "$state" "$fakebin" "$out" env JG_HOME="$dir" JG_WATCH_HANDLING_SUCCESSOR=1 JG_SQUAD_LEAD_WAKE_STALL_SECS=1
   pid=$!
   wait_poll_cycle "$state" "$pid" || { reap "$pid"; fail "an acknowledged wake was re-delivered"; }
   [ ! -s "$out" ] || fail "the empty local queue produced a wake"
@@ -7730,7 +7730,7 @@ test_own_queue_redelivers_without_churning_successors() {
   grep -F "$(printf 'signal\ttask.status\tneeds-decision:')" "$state/.wake-queue" >/dev/null \
     || fail "the decision signal lost its durable branch-exclusion marker"
   rm -f "$state/.own-wake-progress"
-  watch_bg "$state" "$fakebin" "$out" env JG_HOME="$dir" JG_WATCH_HANDLING_SUCCESSOR=1 JG_SECONDMATE_WAKE_STALL_SECS=3
+  watch_bg "$state" "$fakebin" "$out" env JG_HOME="$dir" JG_WATCH_HANDLING_SUCCESSOR=1 JG_SQUAD_LEAD_WAKE_STALL_SECS=3
   pid=$!
   wait_poll_cycle "$state" "$pid" || { reap "$pid"; fail "the decision immediately churned its handling successor"; }
   wait_for_exit "$pid" 150 || { reap "$pid"; fail "the unhandled decision never re-surfaced"; }
@@ -7768,7 +7768,7 @@ test_empty_write_prune_widens_the_probe
 test_empty_write_prune_from_the_environment_widens_the_probe
 test_worktree_write_probe_is_wall_clock_bounded
 test_signal_crew_provably_working_classifier
-test_secondmate_status_routine_absorbed_routed_surfaced_classifier
+test_squad_lead_status_routine_absorbed_routed_surfaced_classifier
 test_provably_working_signal_absorbed
 test_turn_ended_provably_working_absorbed
 test_turn_ended_not_working_surfaced
@@ -7780,7 +7780,7 @@ test_turn_ended_churn_existing_marker_absorbed
 test_turn_ended_still_pane_surfaced
 test_turn_ended_malformed_prior_hash_surfaced
 test_turn_ended_trailing_newline_prior_hash_surfaced
-test_secondmate_turn_ended_churning_pane_surfaced
+test_squad_lead_turn_ended_churning_pane_surfaced
 test_turn_ended_colliding_window_key_surfaced
 test_turn_ended_duplicate_endpoint_records_surfaced
 test_turn_ended_mixed_positive_evidence_batch_absorbed
@@ -7794,15 +7794,15 @@ test_turn_ended_oversized_churn_bound_surfaced
 test_turn_ended_invalid_churn_deadline_surfaced
 test_turn_ended_surfaced_batch_opens_no_partial_deadline
 test_working_note_not_working_surfaced
-test_secondmate_status_note_surfaced_despite_busy_agent
-test_secondmate_routine_progress_absorbed_then_note_surfaced
-test_secondmate_buried_block_wakes_despite_busy_agent
+test_squad_lead_status_note_surfaced_despite_busy_agent
+test_squad_lead_routine_progress_absorbed_then_note_surfaced
+test_squad_lead_buried_block_wakes_despite_busy_agent
 test_self_announced_close_does_not_rewake_but_next_note_does
 test_self_announced_close_after_open_decisions_fold_does_not_rewake
 test_folded_worker_decision_without_home_append_still_wakes
 test_separate_self_announced_answers_after_fold_wake_once
 test_self_announced_close_after_fold_still_surfaces_folded_worker_failure
-test_self_announced_close_after_fold_still_surfaces_folded_secondmate_lines
+test_self_announced_close_after_fold_still_surfaces_folded_squad_lead_lines
 test_actionable_signal_surfaced
 test_needs_decision_signal_payload_marked_for_branch_exclusion
 test_needs_decision_reconciliation_required_still_marked
@@ -7863,17 +7863,17 @@ test_open_captain_call_bounds_stale_churn
 test_stale_churn_without_a_captain_call_still_alarms
 test_failed_wake_append_does_not_arm_the_captain_hold_throttle
 test_reheld_captain_call_starts_its_own_resurface_window
-test_secondmate_paused_resurfaces_in_normal_mode
-test_secondmate_captain_held_resurfaces_in_normal_mode
-test_secondmate_nonpaused_stale_remains_suppressed
-test_secondmate_unpause_clears_pause_tracking
+test_squad_lead_paused_resurfaces_in_normal_mode
+test_squad_lead_captain_held_resurfaces_in_normal_mode
+test_squad_lead_nonpaused_stale_remains_suppressed
+test_squad_lead_unpause_clears_pause_tracking
 test_nonterminal_stale_pause_transitions_reclassify_unchanged_hash
 test_nonterminal_paused_rechecks_authoritative_state
 test_paused_authoritative_working_preserves_wedge_timer
 test_nonterminal_stale_repairs_missing_or_corrupt_timer
 test_wedge_escalation_deferred_while_worktree_is_written
 test_write_deferral_resurfaces_on_the_bounded_cadence
-test_secondmate_home_supervision_churn_is_not_write_evidence
+test_squad_lead_home_supervision_churn_is_not_write_evidence
 test_timer_repair_drops_a_finished_write_deferral_chain
 test_terminal_first_sight_drops_a_finished_write_deferral_chain
 test_triage_log_size_cap_accepts_spaced_wc_counts

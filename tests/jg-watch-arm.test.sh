@@ -635,9 +635,9 @@ test_rearm_resurfaces_durable_queue_and_remote_open_decision() {
   mkdir -p "$home/data"
 
   # This is the real remote parent-reply ingest boundary. It writes the remote
-  # secondmate's decision onto the parent status surface the shared fold owns.
+  # squad_lead's decision onto the parent status surface the shared fold owns.
   write_remote_delta "$result" \
-    'needs-decision [key=remote-signoff]: remote secondmate is held for captain sign-off'
+    'needs-decision [key=remote-signoff]: remote squad_lead is held for captain sign-off'
   JG_HOME="$home" JG_STATE_OVERRIDE="$state" JG_DATA_OVERRIDE="$home/data" \
     "$ROOT/bin/jg-procevent-remote-reply.sh" ingest ios "$result" >/dev/null \
     || fail "remote parent-reply ingest failed"
@@ -648,7 +648,7 @@ test_rearm_resurfaces_durable_queue_and_remote_open_decision() {
   JG_HOME="$home" JG_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/baseline-drain.out" \
     || fail "baseline drain failed"
   ack_wakes "$state" || fail "baseline handling acknowledgement failed"
-  grep -F 'remote secondmate is held for captain sign-off' "$dir/baseline-drain.out" >/dev/null \
+  grep -F 'remote squad_lead is held for captain sign-off' "$dir/baseline-drain.out" >/dev/null \
     || fail "baseline fold did not expose the remote decision"
   printf '%s' "$(status_signature "$state/ios.status")" > "$state/.seen-ios_status"
 
@@ -685,7 +685,7 @@ test_rearm_resurfaces_durable_queue_and_remote_open_decision() {
     || fail "remote-reply wake queued during downtime was not drained"
   grep "$(printf '\tcheck\tstartup-network\t')" "$drainout" >/dev/null \
     || fail "second durable wake queued during downtime was not drained"
-  grep -F 'ios [key=remote-signoff] needs-decision: remote secondmate is held for captain sign-off' "$drainout" >/dev/null \
+  grep -F 'ios [key=remote-signoff] needs-decision: remote squad_lead is held for captain sign-off' "$drainout" >/dev/null \
     || fail "remote parent-reply decision was not re-folded after watcher re-arm"
   ack_wakes "$state" || fail "recovery handling acknowledgement failed"
   [ ! -s "$state/.wake-queue" ] || fail "re-arm recovery acknowledgement left durable wakes behind"
@@ -708,7 +708,7 @@ test_rearm_resurfaces_durable_queue_and_remote_open_decision() {
   decision_successor=$ARM_PID
   JG_HOME="$home" JG_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/decision-only-drain.out" \
     2> "$dir/decision-only-drain.err" || fail "decision-only drain after re-arm recovery failed"
-  grep -F 'ios [key=remote-signoff] needs-decision: remote secondmate is held for captain sign-off' \
+  grep -F 'ios [key=remote-signoff] needs-decision: remote squad_lead is held for captain sign-off' \
     "$dir/decision-only-drain.out" >/dev/null \
     || fail "unchanged remote decision was not re-folded after a later down interval"
   sequence=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through \([0-9][0-9]*\) --recovery-generation [A-Za-z0-9._-][A-Za-z0-9._-]*$/\1/p' "$dir/decision-only-drain.err")
@@ -728,7 +728,7 @@ test_rearm_resurfaces_durable_queue_and_remote_open_decision() {
     || fail "successor did not re-surface the unacknowledged decision recovery"
   JG_HOME="$home" JG_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/replayed-decision-drain.out" \
     2> "$dir/replayed-decision-drain.err" || fail "replayed decision recovery drain failed"
-  grep -F 'ios [key=remote-signoff] needs-decision: remote secondmate is held for captain sign-off' \
+  grep -F 'ios [key=remote-signoff] needs-decision: remote squad_lead is held for captain sign-off' \
     "$dir/replayed-decision-drain.out" >/dev/null \
     || fail "interrupted decision recovery did not re-fold the open decision"
   sequence=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through \([0-9][0-9]*\) --recovery-generation [A-Za-z0-9._-][A-Za-z0-9._-]*$/\1/p' "$dir/replayed-decision-drain.err")
@@ -1431,7 +1431,7 @@ test_take_over_owns_a_fresh_cycle_and_keeps_queued_work_surfacing() {
 }
 
 # Pause just after handover releases its snapshot locks, then fail the old
-# watcher's secondmate tick write so it exits through cleanup before TERM lands.
+# watcher's squad_lead tick write so it exits through cleanup before TERM lands.
 # The ledger and recovery wake are public output contracts, not source probes.
 test_take_over_preserves_downtime_from_watcher_self_exit() {
   local dir home state fakebin owner watcher armout acknowledged real_rm real_touch status i
@@ -1442,10 +1442,10 @@ test_take_over_preserves_downtime_from_watcher_self_exit() {
   fakebin="$dir/fakebin"
   armout="$dir/arm.out"
   real_touch=$(command -v touch)
-  printf '#!/usr/bin/env bash\nif [ "$*" = "%s/.secondmate-liveness-tick" ] && [ -e "%s/fail-tick" ]; then exit 1; fi\nexec "%s" "$@"\n' \
+  printf '#!/usr/bin/env bash\nif [ "$*" = "%s/.squad-lead-liveness-tick" ] && [ -e "%s/fail-tick" ]; then exit 1; fi\nexec "%s" "$@"\n' \
     "$state" "$dir" "$real_touch" > "$fakebin/touch"
   chmod +x "$fakebin/touch"
-  JG_SECONDMATE_LIVENESS_SECS=1 start_rearm_arm "$home" "$state" "$fakebin" "$dir/owner.out" "$$"
+  JG_SQUAD_LEAD_LIVENESS_SECS=1 start_rearm_arm "$home" "$state" "$fakebin" "$dir/owner.out" "$$"
   owner=$ARM_PID
   watcher=$(cat "$state/.watch.lock/pid")
   append_wake "$state" signal take-over "signal: fixture handled by main"
@@ -1578,7 +1578,7 @@ test_arm_refuses_a_disposable_validation_checkout() {
   state="$dir/state"
   fakebin="$dir/fakebin"
   armout="$dir/arm.out"
-  link="$dir/.no-mistakes/worktrees/run-1/firstmate"
+  link="$dir/.no-mistakes/worktrees/run-1/juggernaut"
   mkdir -p "$home/data" "$(dirname "$link")"
   ln -s "$ROOT" "$link"
 
@@ -1901,7 +1901,7 @@ const mod = await import(pathToFileURL(process.env.PLUGIN).href);
 const client = { session: { promptAsync: async () => {} } };
 await mod.FmPrimaryWatchArm({ client, directory: process.env.WORKTREE, worktree: process.env.WORKTREE });
 writeFileSync(`${state}/.lock`, `${process.pid}\n`);
-const status = await globalThis.__firstmateOpenCodeWatchArm.ensureArmed("session-test", client);
+const status = await globalThis.__juggernautOpenCodeWatchArm.ensureArmed("session-test", client);
 if (expected === "no-arm") {
   if (status !== "not-needed") {
     console.error(`expected a not-needed decline, got ${status}`);

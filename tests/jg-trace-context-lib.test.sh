@@ -2,7 +2,7 @@
 # tests/jg-trace-context-lib.test.sh - unit tests for the native, default-off
 # W3C trace-context library (bin/jg-trace-context-lib.sh) plus structural checks
 # that bin/jg-spawn.sh wires it in at the pre-launch injection seam and that the
-# capability is inherited into secondmate homes. Pure functions, no backend and
+# capability is inherited into squad_lead homes. Pure functions, no backend and
 # no live spawn required.
 set -u
 
@@ -71,8 +71,8 @@ jg_trace_context_valid "$SECOND_TP" || fail "second mint must be a valid tracepa
 pass "every mint is an unrelated fresh root - one trace per task, no parent adoption"
 
 # --- minted-root shape --------------------------------------------------------
-# A firstmate-MINTED root is exactly the fixed 55-char W3C form with random ids
-# and no free-form field where firstmate could originate a prompt, path, or
+# A juggernaut-MINTED root is exactly the fixed 55-char W3C form with random ids
+# and no free-form field where juggernaut could originate a prompt, path, or
 # secret (that the lib reads no task prose is asserted separately below). With
 # no inherited-context path, every carrier the lib yields is either such a mint
 # or the same task's previously recorded carrier reused verbatim.
@@ -80,7 +80,7 @@ case "$ROOT_TP" in
   *[!0-9a-f-]*) fail "a minted traceparent must contain only hex and hyphens: $ROOT_TP" ;;
 esac
 [ "${#ROOT_TP}" -eq 55 ] || fail "a minted traceparent is exactly 55 chars, got ${#ROOT_TP}"
-pass "a minted root is the fixed 55-char W3C form (hex and hyphens only), so firstmate originates no free-form content in the carrier"
+pass "a minted root is the fixed 55-char W3C form (hex and hyphens only), so juggernaut originates no free-form content in the carrier"
 
 # --- enablement precedence ---------------------------------------------------
 
@@ -149,21 +149,21 @@ out=$(JG_TRACE_CONTEXT=on jg_trace_context_resolve "$CFG_OFF" "$NOMETA")
 jg_trace_context_valid "$out" || fail "enabled resolve must mint a valid traceparent: $out"
 pass "resolve mints a valid traceparent when enabled"
 
-# --- secondmate home-session boundary ---------------------------------------
-# jg-spawn launches every Secondmate with the primary session's non-empty frozen
-# JG_TRACE_CONTEXT decision. The Secondmate resolves it at its own session start.
+# --- squad_lead home-session boundary ---------------------------------------
+# jg-spawn launches every SquadLead with the primary session's non-empty frozen
+# JG_TRACE_CONTEXT decision. The SquadLead resolves it at its own session start.
 # Its own launch-time TRACEPARENT stays in its process environment for its whole
-# life, but that is the Secondmate's agent identity, never a parent: every task
+# life, but that is the SquadLead's agent identity, never a parent: every task
 # it spawns must root a fresh trace, or unrelated routed tasks would accumulate
-# into one ever-growing trace per Secondmate.
+# into one ever-growing trace per SquadLead.
 PRIMARY_TP='00-abcabcabcabcabcabcabcabcabcabcab-1212121212121212-01'
 saved_tp=${TRACEPARENT-__unset__}
 unset TRACEPARENT
 frozen_off=$(JG_TRACE_CONTEXT=off jg_trace_context_resolve "$CFG_ON" "$WORK/sm-frozen-off.meta")
-[ -z "$frozen_off" ] || fail "a Secondmate launched off must stay disabled even after the config file appears: $frozen_off"
+[ -z "$frozen_off" ] || fail "a SquadLead launched off must stay disabled even after the config file appears: $frozen_off"
 frozen_on=$(JG_TRACE_CONTEXT=on jg_trace_context_resolve "$CFG_OFF" "$WORK/sm-frozen-on.meta")
-jg_trace_context_valid "$frozen_on" || fail "a Secondmate launched on must stay enabled even while the config file is absent: $frozen_on"
-[ "${frozen_on:3:32}" != "${PRIMARY_TP:3:32}" ] || fail "an enabled Secondmate without an ambient carrier must start a new root"
+jg_trace_context_valid "$frozen_on" || fail "a SquadLead launched on must stay enabled even while the config file is absent: $frozen_on"
+[ "${frozen_on:3:32}" != "${PRIMARY_TP:3:32}" ] || fail "an enabled SquadLead without an ambient carrier must start a new root"
 routed_a=$(TRACEPARENT="$PRIMARY_TP" JG_TRACE_CONTEXT=on jg_trace_context_resolve "$CFG_ON" "$WORK/sm-routed-a.meta")
 routed_b=$(TRACEPARENT="$PRIMARY_TP" JG_TRACE_CONTEXT=on jg_trace_context_resolve "$CFG_ON" "$WORK/sm-routed-b.meta")
 jg_trace_context_valid "$routed_a" || fail "resolving under an ambient TRACEPARENT must still mint a valid carrier (a='$routed_a')"
@@ -173,7 +173,7 @@ jg_trace_context_valid "$routed_b" || fail "resolving under an ambient TRACEPARE
 [ "${routed_a:3:32}" != "${routed_b:3:32}" ] \
   || fail "two tasks resolved from one ambient environment must root distinct traces (a='$routed_a' b='$routed_b')"
 [ "$saved_tp" = "__unset__" ] || export TRACEPARENT="$saved_tp"
-pass "Secondmate home-session state stays off or on despite later file state; ambient TRACEPARENT is never adopted, so each routed task roots its own trace"
+pass "SquadLead home-session state stays off or on despite later file state; ambient TRACEPARENT is never adopted, so each routed task roots its own trace"
 
 # --- recovery: a recorded value is reused verbatim, disabled still omits -----
 
@@ -224,7 +224,7 @@ pass "the resolver has no sleep/timeout/command hang source and always returns s
 # --- harness/backend/kind independence (code only, comments stripped) ---------
 
 LIB_CODE=$(sed 's/#.*$//' "$ROOT/bin/jg-trace-context-lib.sh")
-for tok in harness backend tmux herdr zellij orca cmux claude codex opencode grok kind ship scout secondmate ; do
+for tok in harness backend tmux herdr zellij orca cmux claude codex opencode grok kind ship scout squad_lead ; do
   case "$LIB_CODE" in
     *"$tok"*) fail "trace-context lib code must be harness/backend/kind agnostic, but references '$tok'" ;;
   esac
@@ -240,14 +240,14 @@ for tok in brief prompt report status ; do
 done
 pass "the lib code never reads a brief, prompt, report, or status - it cannot leak content"
 
-# --- secondmate inheritance wires the nested chain ---------------------------
+# --- squad_lead inheritance wires the nested chain ---------------------------
 
 # shellcheck source=/dev/null
 . "$ROOT/bin/jg-config-inherit-lib.sh"
 case " $JG_INHERITABLE_CONFIG " in
   *" trace-context "*) : ;;
-  *) fail "config/trace-context must be in JG_INHERITABLE_CONFIG so secondmate homes stay traced" ;;
+  *) fail "config/trace-context must be in JG_INHERITABLE_CONFIG so squad_lead homes stay traced" ;;
 esac
-pass "config/trace-context is inherited into secondmate homes, keeping the nested chain enabled end to end"
+pass "config/trace-context is inherited into squad_lead homes, keeping the nested chain enabled end to end"
 
 echo "# jg-trace-context-lib.test.sh: all assertions passed"

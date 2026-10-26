@@ -29,7 +29,7 @@ jg_owner_rules_design() {
 
 jg_owner_rules_check() {
   local data=$1 id=$2 mode=$3 kind=$4 entry title risks parent exists
-  [ "$kind" != secondmate ] || return 0
+  [ "$kind" != squad_lead ] || return 0
   # Entry = the "- [.] <id> - <title>" line and its indented body, up to the next item or heading.
   entry=$(awk -v id="$id" '
     /^- \[.\] / { on = (substr($0, 7, length(id) + 1) == id " ") } /^## / { on = 0 } on' "$data/backlog.md" 2>/dev/null)

@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # Behavior tests for the no-mistakes GATE-agent fleet-lifecycle refusal.
 #
-# A confused no-mistakes gate agent runs inside a firstmate checkout, adopts the
+# A confused no-mistakes gate agent runs inside a juggernaut checkout, adopts the
 # captain identity from AGENTS.md, and reaches for jg-spawn/jg-send/jg-teardown.
-# bin/jg-gate-refuse-lib.sh is the firstmate capability-removal half: sourced at
+# bin/jg-gate-refuse-lib.sh is the juggernaut capability-removal half: sourced at
 # the top of those three entrypoints and called before any fleet mutation, it
 # fails closed on either of two independent signals:
 #   1. NO_MISTAKES_GATE set in the environment (the marker no-mistakes stamps);
 #   2. the current worktree's git-common-dir resolves under a no-mistakes gate
 #      repo (.../.no-mistakes/repos/*.git) - the unspoofable backstop, which
 #      still refuses even if the marker was tampered/unset.
-# A normal firstmate session (real primary, real crew worktree) has NEITHER
+# A normal juggernaut session (real primary, real crew worktree) has NEITHER
 # signal and is completely unaffected.
 #
 # The one authorized exception is a disposable LAB home: bin/jg-lab-home.sh
@@ -29,7 +29,7 @@
 # when it is itself executed inside the real no-mistakes gate (whose process has
 # NO_MISTAKES_GATE=1 and a gate-worktree cwd).
 #
-# Finally, assert firstmate's TRACKED .no-mistakes.yaml parses and sets
+# Finally, assert juggernaut's TRACKED .no-mistakes.yaml parses and sets
 # disable_project_settings: true (the trusted-only opt-out that neutralizes gate
 # agents' project instructions on the no-mistakes side).
 set -u
@@ -401,7 +401,7 @@ test_send_refuses_and_admits() {
     || fail "send: normal steer was not durably enqueued"
   assert_not_contains "$(cat "$log")" "literal=1 arg=hello captain" \
     "send: normal steer payload must not be typed"
-  assert_contains "$(cat "$log")" "target=sess:jg-lane-ok literal=1 arg=: Firstmate instruction waiting" \
+  assert_contains "$(cat "$log")" "target=sess:jg-lane-ok literal=1 arg=: Juggernaut instruction waiting" \
     "send: normal steer should ring the durable inbox doorbell"
   pass "jg-send: refuses on marker and gate-worktree backstop; a normal steer uses the inbox"
 }
@@ -448,7 +448,7 @@ SH
   git -C "$case_dir/wt" push -q origin fm/task-x1
   git -C "$case_dir/project" fetch -q origin
   jg_write_meta "$case_dir/state/task-x1.meta" \
-    "window=firstmate:jg-task-x1" "endpoint_task_id=task-x1" \
+    "window=juggernaut:jg-task-x1" "endpoint_task_id=task-x1" \
     "worktree=$case_dir/wt" "project=$case_dir/project" \
     "kind=ship" "mode=no-mistakes" "spawn_gen=spawn-gate-refuse-task-x1"
   touch "$case_dir/state/.last-watcher-beat"

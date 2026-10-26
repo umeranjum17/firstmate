@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Point one Firstmate home's config/account-pool at the claude-accounts chooser, so every new Claude worker
+# Point one Juggernaut home's config/account-pool at the claude-accounts chooser, so every new Claude worker
 # shares signed-in accounts in proportion to quota runway. Refuses to replace a different account-pool file.
 # Usage: install.sh <jg-home>          Undo: uninstall.sh <jg-home>
 set -euo pipefail

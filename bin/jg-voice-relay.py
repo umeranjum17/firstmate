@@ -3,13 +3,13 @@
 
 The captain talks into their laptop. The laptop captures audio and streams it
 over the SSH connection it already has to this desktop. This relay holds the
-Bedrock bidirectional session, answers the model's tool calls from firstmate's
+Bedrock bidirectional session, answers the model's tool calls from juggernaut's
 records, and streams the spoken reply back down the same connection. AWS
 credentials therefore stay on this desktop and never go near the laptop, which
 is the whole reason for the shape.
 
-The voice agent this relay runs is NOT firstmate. It stands in front of
-firstmate: it answers questions about the fleet from the records, and when the
+The voice agent this relay runs is NOT juggernaut. It stands in front of
+juggernaut: it answers questions about the fleet from the records, and when the
 captain asks for real work it says out loud that it is handing the request over
 and then queues it. It never claims to have done the work.
 
@@ -70,7 +70,7 @@ Options:
   --model <id>          Nova Sonic model id.         default from config
   --profile <name>      AWS profile.                 default from config
   --voice <id>          output voice.                default matthew
-  --home <dir>          firstmate home for records.  default $JG_HOME or this repo
+  --home <dir>          juggernaut home for records.  default $JG_HOME or this repo
   --scope <name>        override the read scope for this run.
   --tail-ms <int>       silence appended on talk end. default 400
   --turn-timeout <sec>  how long --self-test waits.   default 40
@@ -119,8 +119,8 @@ BYTES_PER_MS_IN = IN_RATE * 2 // 1000
 TAIL_MS = 400
 
 SYSTEM_PROMPT = (
-    "You are the captain's voice assistant. You are NOT the first mate, and you "
-    "must never claim to be. You stand in front of the first mate and you are "
+    "You are the captain's voice assistant. You are NOT the overwatch, and you "
+    "must never claim to be. You stand in front of the overwatch and you are "
     "the captain's spoken way of reaching it.\n"
     "\n"
     "When the captain asks how things are going, what is in flight, what is "
@@ -137,7 +137,7 @@ SYSTEM_PROMPT = (
     "When the captain asks for actual work, anything that would change code, "
     "open a pull request, investigate a bug, or start a job, you do not do it "
     "and you do not pretend to. Say out loud that you are handing it to the "
-    "first mate, then call hand_over_to_firstmate with the captain's request in "
+    "overwatch, then call hand_over_to_juggernaut with the captain's request in "
     "their own words. Then confirm it is queued. Never say you have done, "
     "started, fixed or built anything yourself.\n"
     "\n"
@@ -148,16 +148,16 @@ TOOLS = {"tools": [
     {"toolSpec": {
         "name": "get_fleet_status",
         "description": (
-            "Read the first mate's durable records: how many jobs are in "
+            "Read the overwatch's durable records: how many jobs are in "
             "flight, how many decisions are waiting on the captain, how many "
             "pull requests are open, and the names of a few of them."),
         "inputSchema": {"json": json.dumps(
             {"type": "object", "properties": {}, "required": []})},
     }},
     {"toolSpec": {
-        "name": "hand_over_to_firstmate",
+        "name": "hand_over_to_juggernaut",
         "description": (
-            "Hand a request for real work to the first mate, which will pick it "
+            "Hand a request for real work to the overwatch, which will pick it "
             "up at its next check. Use this for anything you cannot answer from "
             "the records. It queues the request and does not do the work."),
         "inputSchema": {"json": json.dumps({
@@ -507,8 +507,8 @@ class Session:
         # that went away on its own.
         self.closing = False
         # Which tools ran, in order. The handover boundary is the whole point of
-        # this relay, so "it called hand_over_to_firstmate and did not answer
-        # for firstmate" has to be evidence in the run record, not an inference
+        # this relay, so "it called hand_over_to_juggernaut and did not answer
+        # for juggernaut" has to be evidence in the run record, not an inference
         # from a count.
         self.tool_names = []
         self.ended = asyncio.Event()
@@ -841,7 +841,7 @@ class Session:
                 # would otherwise stop the relay reading the captain's audio.
                 result = await asyncio.to_thread(
                     records.fleet_status, self.home, self.scope)
-            elif name == "hand_over_to_firstmate":
+            elif name == "hand_over_to_juggernaut":
                 request = (arguments.get("request") or "").strip()
                 result = await asyncio.to_thread(
                     records.queue_request, request, self.home, self.root)

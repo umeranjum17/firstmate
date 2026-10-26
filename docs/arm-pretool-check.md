@@ -67,7 +67,7 @@ bin/jg-watch.sh              (watch; protected but never blessed)
 ```
 
 The relative form, the `<code-root>`-anchored absolute form, and any word ending in `/bin/<script>` all resolve to that identity.
-Suffix matching recognizes an expanded-path prefix statically, so `$JG_HOME/bin/jg-watch-arm.sh`, `$HOME/firstmate/bin/jg-watch-arm.sh`, and `~/firstmate/bin/jg-watch-arm.sh` are the arm identity.
+Suffix matching recognizes an expanded-path prefix statically, so `$JG_HOME/bin/jg-watch-arm.sh`, `$HOME/juggernaut/bin/jg-watch-arm.sh`, and `~/juggernaut/bin/jg-watch-arm.sh` are the arm identity.
 The classifier never expands the variable or tilde; it matches the literal bytes only.
 Static quote forms are cooked before the suffix match, so a command word split by ordinary quotes (`jg-"watch"-arm.sh`), ANSI-C quoting (`jg-$'\x77'atch-arm.sh`), or a bash locale string (`jg-$"watch"-arm.sh`) all resolve to the same identity; this reads the fixed literal bytes as the shell would cook them and never runs an expansion or a command.
 This covers statically-visible literal words in command position; opaque dynamic dataflow such as `bash -lc "$WHOLE_COMMAND"` remains out of scope.

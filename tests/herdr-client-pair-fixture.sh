@@ -3,7 +3,7 @@
 # that carries a stale client next to a compatible one.
 #
 # A self-updated ~/.local/bin copy next to a package-managed herdr is a real
-# host shape, and Firstmate's fixed remote-job PATH resolves ~/.local/bin first
+# host shape, and Juggernaut's fixed remote-job PATH resolves ~/.local/bin first
 # (bin/jg-remote-job-lib.sh). A client older than the running server answers
 # every command except `status` with error code protocol_mismatch on stderr
 # and exit 1 (verified: herdr 0.8.2, protocol 20, against a 0.9.0 server,

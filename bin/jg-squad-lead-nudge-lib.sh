@@ -1,17 +1,17 @@
 # shellcheck shell=bash disable=SC2034
-# Durable secondmate reread-nudge marker helpers. Source only.
+# Durable squad_lead reread-nudge marker helpers. Source only.
 #
 # Both local tracked-file convergence and remote inherited-material transfer
 # publish the same bounded record before delivery. A failed send leaves the
 # record for the locked bootstrap retry; a successful send removes it.
 
-JG_SECOND_MATE_NUDGE_MESSAGE='firstmate was updated to the latest - please re-read your AGENTS.md to pick up the new instructions.'
-JG_REMOTE_SECOND_MATE_NUDGE_MESSAGE='Firstmate instructions or inherited config changed on this host. Re-read AGENTS.md and the inherited config files before further work.'
+JG_SECOND_MATE_NUDGE_MESSAGE='juggernaut was updated to the latest - please re-read your AGENTS.md to pick up the new instructions.'
+JG_REMOTE_SECOND_MATE_NUDGE_MESSAGE='Juggernaut instructions or inherited config changed on this host. Re-read AGENTS.md and the inherited config files before further work.'
 
-jg_secondmate_nudge_marker_path() { # <state-dir> <id>
+jg_squad_lead_nudge_marker_path() { # <state-dir> <id>
   local state=$1 id=$2
   case "$id" in *[!/A-Za-z0-9._-]*|''|*/*) return 1 ;; esac
-  printf '%s/.secondmate-nudge-pending/%s.pending\n' "$state" "$id"
+  printf '%s/.squad-lead-nudge-pending/%s.pending\n' "$state" "$id"
 }
 
 jg_remote_inherit_transaction_lock_path() { # <state-dir> <id>
@@ -40,12 +40,12 @@ jg_remote_inherit_generation_next() { # <state-dir> <id>
   printf '%s\n' "$next"
 }
 
-jg_secondmate_nudge_write() { # <state> <id> <home> <commit> <instructions> <message> <remote:0|1>
+jg_squad_lead_nudge_write() { # <state> <id> <home> <commit> <instructions> <message> <remote:0|1>
   local state=$1 id=$2 home=$3 commit=$4 instructions=$5 message=$6 remote=$7
   local marker parent tmp
   case "$remote" in 0|1) ;; *) return 1 ;; esac
   case "$home$commit$instructions$message" in *$'\n'*|*$'\r'*) return 1 ;; esac
-  marker=$(jg_secondmate_nudge_marker_path "$state" "$id") || return 1
+  marker=$(jg_squad_lead_nudge_marker_path "$state" "$id") || return 1
   parent=${marker%/*}
   if [ -e "$parent" ] || [ -L "$parent" ]; then
     [ -d "$parent" ] && [ ! -L "$parent" ] || return 1

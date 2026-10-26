@@ -14,7 +14,7 @@
 # tmux/herdr/zellij do - there is just "the app" (one running GUI instance).
 # ONE cmux workspace PER TASK (mirrors tmux's one-window-per-task / zellij's
 # one-tab-per-task), with exactly one surface inside it. cmux has no session
-# layer, so workspace titles are scoped by firstmate home and installation
+# layer, so workspace titles are scoped by juggernaut home and installation
 # path inside this adapter.
 #
 # Target string shape: "<workspace_uuid>:<surface_uuid>" - both bare UUIDs
@@ -22,7 +22,7 @@
 # correct (mirrors herdr's/zellij's target-string convention).
 #
 # GUI-first, macOS-only (docs/cmux-backend.md "Setup"): explicit selection or
-# runtime auto-detection when firstmate itself is already running inside a
+# runtime auto-detection when juggernaut itself is already running inside a
 # cmux-spawned terminal (primary CMUX_WORKSPACE_ID marker, with documented
 # macOS fallback signals for wrapper-stripped claude). Unlike Orca, cmux is a
 # pure session provider (treehouse still owns the worktree) and Escape IS
@@ -83,12 +83,12 @@
 #      verified live (two workspaces, and two surfaces in one workspace, all
 #      created successfully sharing one title). The duplicate check below is
 #      ours, mirroring every other adapter, and uses home-scoped titles so a
-#      shared cmux app cannot cross-match another firstmate home's task.
+#      shared cmux app cannot cross-match another juggernaut home's task.
 #
 #   Unanticipated finding, load-bearing for this adapter: the control socket
 #   defaults to `socketControlMode=cmuxOnly`, which REJECTS any CLI process
 #   not spawned inside cmux itself ("Access denied - only processes started
-#   inside cmux can connect"). Since firstmate always drives cmux from an
+#   inside cmux can connect"). Since juggernaut always drives cmux from an
 #   external shell, `automation.socketControlMode` must be one of the three
 #   externally-viable modes (docs/cmux-backend.md "Setup" owns the full
 #   matrix, verified from cmux source): `automation` (RECOMMENDED - same-user
@@ -243,7 +243,7 @@ jg_backend_cmux_ping_state() {
 # matrix) plus the config/backend opt-out for a caller who only landed on
 # cmux via auto-detection.
 jg_backend_cmux_refuse_denied() {
-  echo "error: backend=cmux socket rejected the connection (automation.socketControlMode is cmuxOnly, the default, which never admits an external CLI like firstmate). In cmux Settings > Automation set Socket Control Mode to 'Automation mode' (recommended - same-user external clients, no password), or 'Password mode' plus config/cmux-socket-password/CMUX_SOCKET_PASSWORD, or 'Full open access' (NOT recommended - admits every local user) - see docs/cmux-backend.md 'Setup' - or set config/backend to tmux (or pass --backend tmux) if you did not mean to use cmux." >&2
+  echo "error: backend=cmux socket rejected the connection (automation.socketControlMode is cmuxOnly, the default, which never admits an external CLI like juggernaut). In cmux Settings > Automation set Socket Control Mode to 'Automation mode' (recommended - same-user external clients, no password), or 'Password mode' plus config/cmux-socket-password/CMUX_SOCKET_PASSWORD, or 'Full open access' (NOT recommended - admits every local user) - see docs/cmux-backend.md 'Setup' - or set config/backend to tmux (or pass --backend tmux) if you did not mean to use cmux." >&2
 }
 
 jg_backend_cmux_refuse_unauth() {
@@ -306,7 +306,7 @@ jg_backend_cmux_container_ensure() {
 
 # jg_backend_cmux_home_label: readable home prefix plus a short hash of the
 # resolved JG_ROOT path. cmux has one app-global workspace namespace, so the
-# path hash distinguishes every firstmate installation, including multiple
+# path hash distinguishes every juggernaut installation, including multiple
 # primary homes. Moving an installation changes this tag and old cmux titles
 # stop matching; task meta already records absolute worktree paths, so repo
 # relocation is already outside the supported recovery contract. Derivation
@@ -408,7 +408,7 @@ jg_backend_cmux_surface_exists() {  # <workspace_id> <surface_id>
 # jg_backend_cmux_target_ready: parse the target and verify it is live via
 # jg_backend_cmux_surface_exists (never read-screen - see that function's
 # header for the fresh-surface pitfall this avoids). When the caller knows
-# the owning firstmate task label, refresh stale workspace/surface ids by label.
+# the owning juggernaut task label, refresh stale workspace/surface ids by label.
 jg_backend_cmux_target_ready() {  # <target> [expected-label]
   local expected_label=${2:-} expected_title title wsid sfid
   jg_backend_cmux_parse_target "$1" || return 1
@@ -479,11 +479,11 @@ jg_backend_cmux_send_literal() {  # <target> <text> [expected-label]
   jg_backend_cmux_cli send --workspace "$JG_BACKEND_CMUX_WORKSPACE" --surface "$JG_BACKEND_CMUX_SURFACE" -- "$2" >/dev/null 2>&1
 }
 
-# jg_backend_cmux_normalize_key: map firstmate's key vocabulary (Enter,
+# jg_backend_cmux_normalize_key: map juggernaut's key vocabulary (Enter,
 # Escape, C-c) onto cmux's `send-key` names. Verified empirically: enter,
 # escape, and ctrl-c all work directly (lowercase, hyphenated). cmux's own
 # key vocabulary is genuinely richer (ctrl-d/ctrl-z/ctrl-\\, semantic aliases
-# sigint/sigtstp/sigquit - `TerminalSurface+Input.swift`), but firstmate's
+# sigint/sigtstp/sigquit - `TerminalSurface+Input.swift`), but juggernaut's
 # shared vocabulary across backends only needs these three today.
 jg_backend_cmux_normalize_key() {  # <key>
   case "$1" in
@@ -635,7 +635,7 @@ jg_backend_cmux_kill() {  # <target> [unused] [expected-label]
 }
 
 # jg_backend_cmux_list_live: recovery/orphan discovery. Lists every workspace
-# whose title is scoped to this firstmate home, by TITLE - never by trusting a
+# whose title is scoped to this juggernaut home, by TITLE - never by trusting a
 # stored uuid, since workspace ids do NOT survive an app relaunch (finding #5).
 # One "<workspace_id>:<surface_id>\t<jg-id>" line per live task workspace.
 # Read-only: an unreachable cmux simply lists nothing.

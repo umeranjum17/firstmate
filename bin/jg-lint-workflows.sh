@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
-# jg-lint-workflows.sh - owner of firstmate's GitHub workflow lint.
+# jg-lint-workflows.sh - owner of juggernaut's GitHub workflow lint.
 #
 # Runs pinned actionlint on every .github/workflows/*.{yml,yaml} so a malformed
 # workflow, including a self-broken ci.yml, fails in the local and no-mistakes

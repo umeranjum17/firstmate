@@ -194,7 +194,7 @@ The Guard Predicates section of [`turnend-guard.md`](turnend-guard.md#guard-pred
 
 The nudge payload has three parts:
 
-- It starts with U+2063 and the stable `FIRSTMATE_OP: ` label.
+- It starts with U+2063 and the stable `JUGGERNAUT_OP: ` label.
 - It carries the current `session-start` protocol kind.
 - It retains exactly ``Run `bin/jg-session-start.sh` now, exactly once, before executing any other instructions.`` as its body.
 
@@ -389,7 +389,7 @@ It proves the nudge wrapper's silence for these cases:
 - A missing state directory.
 - An already-owned lock.
 
-It also proves the nudge wrapper's exact U+2063 `FIRSTMATE_OP:`-prefixed, `session-start`-typed one-line output.
+It also proves the nudge wrapper's exact U+2063 `JUGGERNAUT_OP:`-prefixed, `session-start`-typed one-line output.
 
 It separately proves the run wrapper's silence for the gate environment and an unmarked linked worktree, including the internal Pi prerequisite's explicit silent stand-down.
 It proves the run wrapper creates a missing state directory on a fresh primary and delivers the full digest, while an unmarked linked worktree gets none.

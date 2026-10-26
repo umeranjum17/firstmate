@@ -22,7 +22,7 @@ cycle() {
     PATH="$dir/fakebin:$PATH" JG_HOME="$dir" JG_STATE_OVERRIDE="$dir/state" \
     JG_CONFIG_OVERRIDE="$dir/config" JG_POLL=1 JG_SIGNAL_GRACE=1 \
     JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 JG_HOME_SUMMARY_INTERVAL=999999 \
-    JG_SECONDMATE_LIVENESS_SECS=99999999 JG_BUSY_TURN_MAX_SECS=999999 \
+    JG_SQUAD_LEAD_LIVENESS_SECS=99999999 JG_BUSY_TURN_MAX_SECS=999999 \
     JG_STALE_ESCALATE_SECS=999999 JG_WAIT_ALERT_SECS=2 JG_WAIT_ESCALATE_SECS=4 \
     "$WATCH" > "$dir/out" 2> "$dir/err" &
   pid=$!
@@ -60,11 +60,11 @@ if [ "${JG_WAIT_TIMERS_MAIN_ESCALATION_ONLY:-0}" != 1 ]; then
 for verb in blocked needs-decision; do
   dir=$(make_case "$verb")
   mkdir -p "$dir/home/config" "$dir/tmp" "$dir/config" "$dir/parent/state"
-  printf 'lead\n' > "$dir/.jg-secondmate-home"
-  printf 'schema=jg-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$dir/parent" > "$dir/.jg-secondmate-parent"
+  printf 'lead\n' > "$dir/.jg-squad-lead-home"
+  printf 'schema=jg-squad-lead-parent.v1\nroute=local\nparent_home=%s\n' "$dir/parent" > "$dir/.jg-squad-lead-parent"
   channel="$dir/parent/state/lead.status"
   if [ "$verb" = needs-decision ]; then
-    printf 'schema=jg-secondmate-parent.v1\nroute=remote\nparent_host=fixture\n' > "$dir/.jg-secondmate-parent"
+    printf 'schema=jg-squad-lead-parent.v1\nroute=remote\nparent_host=fixture\n' > "$dir/.jg-squad-lead-parent"
     channel="$dir/state/parent-replies.status"
   fi
   printf 'kind=ship\nbackend=tmux\nwindow=fake:1\n' > "$dir/state/lane.meta"
@@ -174,7 +174,7 @@ pass 'waits carry home/task/generation/key identity, name the unresolved source,
 # Native blocked wins over a working log and survives unrelated status churn.
 dir=$(make_case herdr)
 mkdir -p "$dir/home/config" "$dir/tmp" "$dir/config"
-printf 'kind=secondmate\nharness=opencode\nbackend=herdr\nwindow=fixture:w1:p1\n' > "$dir/state/lane.meta"
+printf 'kind=squad_lead\nharness=opencode\nbackend=herdr\nwindow=fixture:w1:p1\n' > "$dir/state/lane.meta"
 printf 'working: running\n' > "$dir/state/lane.status"
 printf 'blocked\n' > "$dir/native"
 cat > "$dir/fakebin/herdr" <<'SH'
@@ -245,7 +245,7 @@ cycle
 grep -q 'waiting-state lane (blocked' "$dir/events" || fail 'Cursor declaration not monitored'
 pass 'Cursor ship ignores native polling and push blockers but retains declaration monitoring'
 unset JG_BACKEND_HERDR_EVENTS_FORCE JG_BACKEND_HERDR_EVENT_READER
-printf 'kind=secondmate\nharness=cursor\nbackend=herdr\nwindow=fixture:w1:p1\n' > "$dir/state/lane.meta"
+printf 'kind=squad_lead\nharness=cursor\nbackend=herdr\nwindow=fixture:w1:p1\n' > "$dir/state/lane.meta"
 
 cat > "$dir/fakebin/herdr" <<'SH'
 #!/usr/bin/env bash

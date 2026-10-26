@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# merge-card: every Firstmate merge runs done-done and posts one evidence card to a sign-off board.
+# merge-card: every Juggernaut merge runs done-done and posts one evidence card to a sign-off board.
 #
 #   merge-card gate [--judge <route>] <task-id> <worktree|-> <head|-> <pr-url|->
 #     Install as $JG_HOME/config/merge-gate. In the task's worktree it runs
@@ -299,7 +299,7 @@ gate() {
   # Row: <time> <src> <head> pass|fail <why>, one per jg-checks-lint.sh run.
   awk -F'\t' -v h="$3" '$3 == h && $4 == "pass" { f = 1 } END { exit !f }' "$JG_HOME/data/checks-gate.log" 2>/dev/null && return 0
   local lint=${JG_CHECKS_LINT:-${XDG_DATA_HOME:-$HOME/.local/share}/jg-merge-on-green/checks-lint.sh}
-  [ -x "$lint" ] || lint=${JG_MAIN_HOME:-$HOME/firstmate}/config/jg-checks-lint.sh
+  [ -x "$lint" ] || lint=${JG_MAIN_HOME:-$HOME/juggernaut}/config/jg-checks-lint.sh
   echo "merge refused: no checks-lint PASS row for head $3; log one with: JG_HOME=$JG_HOME $lint $4 $JG_HOME/data/$1"
   return 1
 }
@@ -343,7 +343,7 @@ file_card() {
     printf '%s\n' "$text" | bash "$checker" || return $?
   fi
   if [ -n "$restore" ]; then sign-off-axi restore "$card_key" "$1" || return $?
-  else sign-off-axi post "$1" --kind "$3" --from "$2" --filer firstmate-merge || return $?; fi
+  else sign-off-axi post "$1" --kind "$3" --from "$2" --filer juggernaut-merge || return $?; fi
   for k in $old_keys; do sign-off-axi dismiss "$k" "$1" >/dev/null || return $?; done
   # Other filers' cards for the same PR too: the newest valid proof stays, the rest are archived.
   sweep=$("$(dirname "${BASH_SOURCE[0]}")/one-card-per-pr" --apply "$1" 2>&1) || { printf '%s\n' "$sweep"; return 1; }

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
-# Firstmate watcher.
+# Juggernaut watcher.
 # Classifies supervision wakes in bash. In normal mode it absorbs benign wakes
 # and keeps blocking; it queues and exits only for actionable wakes.
 # The no-verb signal and stale path is absorb-only-on-positive-evidence: a wake
@@ -28,7 +28,7 @@
 #                          timer) regardless of what the status log says - an active
 #                          run-step or busy pane outranks even a captain-relevant log
 #                          line, since the crew's own log gets no new entry once
-#                          firstmate hands it to a no-mistakes validation. A declared
+#                          juggernaut hands it to a no-mistakes validation. A declared
 #                          external-wait pause or verified captain-held transfer is
 #                          absorbed instead with its own long re-surface cadence,
 #                          never as a wedge, and that recheck reason names which
@@ -84,7 +84,7 @@
 #                          agent, for human inspection only - never an automatic
 #                          interrupt, signal, or restart of the worker or its
 #                          tool process.
-#   stale: <window> (unread firstmate instruction: ...)
+#   stale: <window> (unread juggernaut instruction: ...)
 #                          the steering-inbox ladder spent its delivery-attempt
 #                          budget on an idle pane without an acknowledgement
 #   stale: <window> (pane vanished, state pruned: no task record owns it and
@@ -130,7 +130,7 @@
 #                          status, unless afk is active
 #   check: ready work waiting with free lane slots: (<open>/<target> open): <ids> - start the top ready item now, or record why it waits
 #   check: ready work waiting with no worker working: <ids> - start each or record why it waits
-#                          a secondmate home's base-cadence scan found dispatchable
+#                          a squad_lead home's base-cadence scan found dispatchable
 #                          queued work (jg-tasks-axi.sh ready) while the home sits
 #                          below its lane floor: with config/lane-target naming a
 #                          positive integer, fewer open lanes than that target;
@@ -140,7 +140,7 @@
 #                          new ready set and then every READY_WORK_RESURFACE_SECS;
 #                          intake uses HEARTBEAT's base interval, never its backoff
 #   check: ask-default safe default applied while the captain was unreachable: <ids> ...
-#                          the firstmate-addons ask-default add-on, when installed,
+#                          the juggernaut-addons ask-default add-on, when installed,
 #                          applied the recorded safe default of each named ask
 #                          (ask_default_tick owns the hook; the add-on owns the
 #                          decision and its applied.log record)
@@ -149,10 +149,10 @@
 #   check: inactive-outcome bounded poll-loop reconciliation found a suspicious
 #                          inactive terminal outcome that still lacks its durable
 #                          upstream receipt
-#   check: secondmate wake-loop stalled: mate=<id> row=<seq> idle=<seconds>s
+#   check: squad_lead wake-loop stalled: mate=<id> row=<seq> idle=<seconds>s
 #                          an actionable row in an endpoint-recorded local
-#                          secondmate home's durable wake queue did not advance
-#                          between observations for JG_SECONDMATE_WAKE_STALL_SECS
+#                          squad_lead home's durable wake queue did not advance
+#                          between observations for JG_SQUAD_LEAD_WAKE_STALL_SECS
 #                          while the mate was not in an active turn (a busy mate
 #                          is exempt only until the queue has been frozen for
 #                          BUSY_TURN_MAX_SECS); declared external-wait pause
@@ -166,23 +166,23 @@
 #                          inbox and a fresh child beacon are not idle proof;
 #                          the foreign queue itself stays read-only, and one
 #                          parent notification covers each no-progress episode
-#   check: secondmate <id> auto-relaunched after <cause> (<where>)
-#                          the liveness tick probed a registered secondmate's
+#   check: squad_lead <id> auto-relaunched after <cause> (<where>)
+#                          the liveness tick probed a registered squad_lead's
 #                          recorded endpoint, got the recovery-grade `dead` or
 #                          `missing` verdict, and relaunched it through the
-#                          same guarded jg-spawn.sh --secondmate path the
+#                          same guarded jg-spawn.sh --squad-lead path the
 #                          session-start sweep uses; one wake per relaunch, and
-#                          state/.secondmate-relaunch-<id> keeps the durable
-#                          per-mate count (bin/jg-secondmate-liveness-lib.sh)
-#   check: secondmate <id> auto-relaunch failed after <cause>: <detail>
+#                          state/.squad-lead-relaunch-<id> keeps the durable
+#                          per-mate count (bin/jg-squad-lead-liveness-lib.sh)
+#   check: squad_lead <id> auto-relaunch failed after <cause>: <detail>
 #                          the same verdict authorized recovery but the
 #                          relaunch itself failed; the attempt is ledgered and
 #                          counts toward the bound below
-#   check: secondmate <id> auto-relaunch paused after <n> attempts in <s>s; ...
+#   check: squad_lead <id> auto-relaunch paused after <n> attempts in <s>s; ...
 #                          a mate that kept dying exceeded its bounded relaunch
 #                          budget and is parked until a probe reads it live
-#                          again (JG_SECONDMATE_LIVENESS_MAX_ATTEMPTS and
-#                          JG_SECONDMATE_LIVENESS_WINDOW_SECS)
+#                          again (JG_SQUAD_LEAD_LIVENESS_MAX_ATTEMPTS and
+#                          JG_SQUAD_LEAD_LIVENESS_WINDOW_SECS)
 #   check: host memory ALERT: <summary>; largest: <owner> <size>, ...; <action>
 #                          durable sampler wake; docs/configuration.md "Host
 #                          memory guard" owns admission and alert behavior;
@@ -238,7 +238,7 @@ WATCH_HOME_EXISTED=0
 # The watcher still owns immediate delivery of its actionable poll result and
 # poll retirement.
 # This library is a canonical lint root in its own right, and it reaches the
-# wake queue, PR identity, and secondmate parent libraries. Keep it an analysis
+# wake queue, PR identity, and squad_lead parent libraries. Keep it an analysis
 # boundary here for the same reason as the transition and inbox owners above and
 # below: following its graph from this large runtime needlessly spends per-root
 # CI lint memory while adding no uncovered file.
@@ -252,9 +252,9 @@ WATCH_HOME_EXISTED=0
 . "$SCRIPT_DIR/jg-x-lib.sh"
 # shellcheck source=bin/jg-check-lib.sh
 . "$SCRIPT_DIR/jg-check-lib.sh"
-# Parent-owned secondmate missed-report guards: durable pending-reply
-# expectations created by jg-send on marked secondmate requests. The tick is
-# cheap when no records exist and never scrapes secondmate conversation.
+# Parent-owned squad_lead missed-report guards: durable pending-reply
+# expectations created by jg-send on marked squad_lead requests. The tick is
+# cheap when no records exist and never scrapes squad_lead conversation.
 # shellcheck source=bin/jg-pending-reply-lib.sh
 . "$SCRIPT_DIR/jg-pending-reply-lib.sh"
 # shellcheck source=bin/jg-busy-lib.sh
@@ -263,8 +263,8 @@ WATCH_HOME_EXISTED=0
 . "$SCRIPT_DIR/jg-watch-progress-lib.sh"
 # Optional alerts add-on: defines jg_model_outage_tick.
 # shellcheck source=/dev/null
-[ ! -r "${JG_ADDONS_DIR:-$JG_HOME/projects/firstmate-addons}/alerts/bin/jg-model-outage-lib.sh" ] || . "${JG_ADDONS_DIR:-$JG_HOME/projects/firstmate-addons}/alerts/bin/jg-model-outage-lib.sh"
-# Parked-home reader (firstmate-addons/parked-homes): the shared predicate
+[ ! -r "${JG_ADDONS_DIR:-$JG_HOME/projects/juggernaut-addons}/alerts/bin/jg-model-outage-lib.sh" ] || . "${JG_ADDONS_DIR:-$JG_HOME/projects/juggernaut-addons}/alerts/bin/jg-model-outage-lib.sh"
+# Parked-home reader (juggernaut-addons/parked-homes): the shared predicate
 # every parked-home guard in the watcher calls. The shim answers not parked
 # when the add-on is absent (stock behavior).
 # shellcheck source=bin/jg-parked-homes-lib.sh
@@ -283,15 +283,15 @@ WATCH_HOME_EXISTED=0
 # below).
 # shellcheck source=bin/jg-afk-contract.sh
 . "$SCRIPT_DIR/jg-afk-contract.sh"
-# Persistent-secondmate endpoint liveness: the shared probe/relaunch library is
+# Persistent-squad-lead endpoint liveness: the shared probe/relaunch library is
 # the same one bin/jg-bootstrap.sh's session-start sweep drives, so ordinary
 # supervision recovers a positively dead or missing mate through the identical
 # guarded path. The watcher contributes only the cadence, the relaunch bound,
-# and wake emission (secondmate_liveness_tick below).
+# and wake emission (squad_lead_liveness_tick below).
 # shellcheck source=/dev/null # Analyzed separately as a canonical lint root.
-. "$SCRIPT_DIR/jg-secondmate-liveness-lib.sh"
+. "$SCRIPT_DIR/jg-squad-lead-liveness-lib.sh"
 # shellcheck source=/dev/null # Canonical lint root with its own parent-channel graph.
-[ ! -r "${JG_ADDONS_DIR:-$JG_HOME/projects/firstmate-addons}/wait-timers/bin/jg-wait-timers-lib.sh" ] || . "${JG_ADDONS_DIR:-$JG_HOME/projects/firstmate-addons}/wait-timers/bin/jg-wait-timers-lib.sh"
+[ ! -r "${JG_ADDONS_DIR:-$JG_HOME/projects/juggernaut-addons}/wait-timers/bin/jg-wait-timers-lib.sh" ] || . "${JG_ADDONS_DIR:-$JG_HOME/projects/juggernaut-addons}/wait-timers/bin/jg-wait-timers-lib.sh"
 
 WATCH_LOCK="$STATE/.watch.lock"
 WATCH_PATH="$SCRIPT_DIR/jg-watch.sh"
@@ -365,7 +365,7 @@ TURNEND_CHURN_ABSORB_SECS=${JG_TURNEND_CHURN_ABSORB_SECS:-900}  # longest a task
 # remaining rendered-text fallback (Grok only).
 # Always-on wake triage: most wakes during a long crew validation are benign (a
 # working: note or turn-end while a pipeline runs, a no-change heartbeat). Rather
-# than wake firstmate's LLM for each, this watcher classifies every wake in bash
+# than wake juggernaut's LLM for each, this watcher classifies every wake in bash
 # and ABSORBS the benign majority - it advances the suppression marker, logs to a
 # debug log, and keeps blocking WITHOUT enqueuing or exiting. The no-verb signal
 # / stale path is absorb-only-on-positive-evidence. The shared proof is an actively
@@ -399,37 +399,37 @@ STALE_ESCALATE_SECS=${JG_STALE_ESCALATE_SECS:-240}  # idle secs before a provabl
 # any legitimate interval without observable progress, including silent long
 # tool calls, builds, or test runs.
 BUSY_TURN_MAX_SECS=${JG_BUSY_TURN_MAX_SECS:-3600}
-# A local secondmate's foreign queue is checked on every poll, but only after this
+# A local squad_lead's foreign queue is checked on every poll, but only after this
 # bounded interval with no drain progress can it produce a parent notification.
 # A healthy mate drains its queue between turns, not inside one, so this default
 # sits above a real turn; it is only the backstop behind the active-turn gate in
-# secondmate_wake_stall_tick, never a substitute for it.
-SECONDMATE_WAKE_STALL_SECS=${JG_SECONDMATE_WAKE_STALL_SECS:-}
-case "$SECONDMATE_WAKE_STALL_SECS" in ''|*[!0-9]*|0) SECONDMATE_WAKE_STALL_SECS=180 ;; esac
-# Secondmate ENDPOINT liveness (distinct from the wake-loop stall observation
+# squad_lead_wake_stall_tick, never a substitute for it.
+SQUAD_LEAD_WAKE_STALL_SECS=${JG_SQUAD_LEAD_WAKE_STALL_SECS:-}
+case "$SQUAD_LEAD_WAKE_STALL_SECS" in ''|*[!0-9]*|0) SQUAD_LEAD_WAKE_STALL_SECS=180 ;; esac
+# SquadLead ENDPOINT liveness (distinct from the wake-loop stall observation
 # above): on this cadence the watcher probes each registered mate's recorded
-# endpoint through jg-secondmate-liveness-lib.sh and relaunches only on the
+# endpoint through jg-squad-lead-liveness-lib.sh and relaunches only on the
 # same recovery-grade `dead` or `missing` verdicts the session-start sweep
 # uses. The cadence survives watcher restarts via a state marker's mtime, so a
 # relaunch wake cannot restart the probe into a tight loop.
-SECONDMATE_LIVENESS_SECS=${JG_SECONDMATE_LIVENESS_SECS:-}
-case "$SECONDMATE_LIVENESS_SECS" in ''|*[!0-9]*|0) SECONDMATE_LIVENESS_SECS=60 ;; esac
+SQUAD_LEAD_LIVENESS_SECS=${JG_SQUAD_LEAD_LIVENESS_SECS:-}
+case "$SQUAD_LEAD_LIVENESS_SECS" in ''|*[!0-9]*|0) SQUAD_LEAD_LIVENESS_SECS=60 ;; esac
 # Per-relaunch wall-clock bound, so a wedged spawn cannot stall the poll.
-SECONDMATE_LIVENESS_TIMEOUT=${JG_SECONDMATE_LIVENESS_TIMEOUT:-}
-case "$SECONDMATE_LIVENESS_TIMEOUT" in ''|*[!0-9]*|0) SECONDMATE_LIVENESS_TIMEOUT=120 ;; esac
+SQUAD_LEAD_LIVENESS_TIMEOUT=${JG_SQUAD_LEAD_LIVENESS_TIMEOUT:-}
+case "$SQUAD_LEAD_LIVENESS_TIMEOUT" in ''|*[!0-9]*|0) SQUAD_LEAD_LIVENESS_TIMEOUT=120 ;; esac
 # Relaunch bound: at most this many automatic attempts per window per mate,
 # counted from the durable attempt ledger the shared library appends to. A mate
 # that keeps dying past the bound wakes once and is parked until a probe reads
 # it alive again, so a flapping endpoint cannot relaunch forever unseen.
-SECONDMATE_LIVENESS_MAX_ATTEMPTS=${JG_SECONDMATE_LIVENESS_MAX_ATTEMPTS:-}
-case "$SECONDMATE_LIVENESS_MAX_ATTEMPTS" in ''|*[!0-9]*|0) SECONDMATE_LIVENESS_MAX_ATTEMPTS=3 ;; esac
-SECONDMATE_LIVENESS_WINDOW_SECS=${JG_SECONDMATE_LIVENESS_WINDOW_SECS:-}
-case "$SECONDMATE_LIVENESS_WINDOW_SECS" in ''|*[!0-9]*|0) SECONDMATE_LIVENESS_WINDOW_SECS=3600 ;; esac
+SQUAD_LEAD_LIVENESS_MAX_ATTEMPTS=${JG_SQUAD_LEAD_LIVENESS_MAX_ATTEMPTS:-}
+case "$SQUAD_LEAD_LIVENESS_MAX_ATTEMPTS" in ''|*[!0-9]*|0) SQUAD_LEAD_LIVENESS_MAX_ATTEMPTS=3 ;; esac
+SQUAD_LEAD_LIVENESS_WINDOW_SECS=${JG_SQUAD_LEAD_LIVENESS_WINDOW_SECS:-}
+case "$SQUAD_LEAD_LIVENESS_WINDOW_SECS" in ''|*[!0-9]*|0) SQUAD_LEAD_LIVENESS_WINDOW_SECS=3600 ;; esac
 # A crew that declared a pause is idling on a known external wait, so its stale
 # pane is absorbed rather than wedge-escalated.
 # A captain-held or paused crew whose agent has confidently exited uses the same
 # bounded cadence, while a live or ambiguously read agent surfaces on first sight
-# and is then held to that same cadence; a secondmate earns the cadence on its
+# and is then held to that same cadence; a squad_lead earns the cadence on its
 # declaration alone, because its endpoint liveness is deliberately never read
 # (pause_state_class owns that split).
 # These cases re-surface once for a recheck every PAUSE_RESURFACE_SECS - far
@@ -437,7 +437,7 @@ case "$SECONDMATE_LIVENESS_WINDOW_SECS" in ''|*[!0-9]*|0) SECONDMATE_LIVENESS_WI
 # invisibly - except an item held for the captain while the away-posture record
 # exists, which is never rechecked (away_record_present below).
 PAUSE_RESURFACE_SECS=${JG_PAUSE_RESURFACE_SECS:-$JG_PAUSE_RESURFACE_SECS_DEFAULT}
-# A secondmate home below its lane floor with ready work re-raises the same
+# A squad_lead home below its lane floor with ready work re-raises the same
 # condition on this cadence instead of going silent after one wake: the lead
 # either starts the work or records why it waits, and that answer must not need a
 # fresh incident to be repeated.
@@ -596,7 +596,7 @@ window_key() {  # <window>
 
 inbox_steer_escalate_unavailable() {  # <window> <task> <record>
   local w=$1 task=$2 rec=$3 reason
-  reason="stale: $w (unread firstmate instruction: $rec is unhandled and the worker's agent has exited or its endpoint is missing, so the doorbell was not typed; recover the worker)"
+  reason="stale: $w (unread juggernaut instruction: $rec is unhandled and the worker's agent has exited or its endpoint is missing, so the doorbell was not typed; recover the worker)"
   if [ ! -d "${rec%/*}" ] || [ ! -f "$rec" ]; then
     jg_task_inbox_due_action "$STATE" "$task" >/dev/null || true
     return 0
@@ -613,12 +613,12 @@ inbox_steer_escalate_unavailable() {  # <window> <task> <record>
 # bin/jg-task-inbox-lib.sh owns delivery, busy-deferral, retry, and escalation policy.
 # Endpoint and busy checks precede delivery so recovery never types into a busy,
 # dead, or missing worker; the ring helper protects pending composer text.
-# Normal retries keep the watcher blocking rather than waking firstmate.
-# Runs for secondmates too: their pane-staleness exemption is about quiet panes
+# Normal retries keep the watcher blocking rather than waking juggernaut.
+# Runs for squad_leads too: their pane-staleness exemption is about quiet panes
 # being healthy, while an unacknowledged instruction can still be a stuck steer.
 inbox_steer_check() {  # <window> <task>
   local w=$1 task=$2 action verb rec count tail40 reason='' ring_rc backend agent_state
-  # Parked-home guard (firstmate-addons/parked-homes): a parked home gets no
+  # Parked-home guard (juggernaut-addons/parked-homes): a parked home gets no
   # doorbell ring, re-ring or unread-instruction escalation. No-op without
   # the add-on checkout.
   jg_parked_skip_meta "$STATE/$task.meta" "$task" wake-doorbell && return 0
@@ -656,7 +656,7 @@ inbox_steer_check() {  # <window> <task>
       [ -f "$rec" ] || return 0
       reason="stale: $w (steering-inbox busy bookkeeping unwritable: ${rec%/*}/.busy-state cannot be written while $rec stays unhandled; inspect the inbox directory)"
     elif [ "$count" -ge "$(jg_task_inbox_busy_max)" ]; then
-      reason="stale: $w (unread firstmate instruction: stuck-busy after $count consecutive busy-deferred due doorbells; $rec stays unhandled and no doorbell was typed; inspect the worker)"
+      reason="stale: $w (unread juggernaut instruction: stuck-busy after $count consecutive busy-deferred due doorbells; $rec stays unhandled and no doorbell was typed; inspect the worker)"
     else
       return 0
     fi
@@ -697,7 +697,7 @@ inbox_steer_check() {  # <window> <task>
       triage_log "steer-inbox retry ring: $task ${rec##*/} result=$ring_rc${JG_TASK_INBOX_RING_REASON:+ reason=$JG_TASK_INBOX_RING_REASON}"
       ;;
     escalate)
-      reason=${reason:-"stale: $w (unread firstmate instruction: $rec still unhandled after $count doorbell delivery attempts with an idle pane; inspect the worker)"}
+      reason=${reason:-"stale: $w (unread juggernaut instruction: $rec still unhandled after $count doorbell delivery attempts with an idle pane; inspect the worker)"}
       if [ ! -d "${rec%/*}" ] || [ ! -f "$rec" ]; then
         jg_task_inbox_due_action "$STATE" "$task" >/dev/null || true
         return 0
@@ -751,7 +751,7 @@ inbox_steer_check() {  # <window> <task>
 # bounding the wake rate, which would have suppressed genuinely stopped workers.
 #
 # Every negative outcome returns 1, so absence of evidence surfaces exactly as
-# before: any batch that references a secondmate, an unresolvable task, a task
+# before: any batch that references a squad_lead, an unresolvable task, a task
 # with no uniquely attributable recorded endpoint, no previous hash to compare
 # against (nothing has been polled yet), a capture that fails or comes back empty,
 # an exhausted deferral bound, and of course an unchanged pane. Any .status file
@@ -836,7 +836,7 @@ signal_turnend_panes_churned() {  # <file> ...
     signal_indexes+=("$task_index")
   done
   for task_index in "${signal_indexes[@]}"; do
-    [ "${snapshot_kinds[$task_index]}" != secondmate ] || return 1
+    [ "${snapshot_kinds[$task_index]}" != squad_lead ] || return 1
   done
   for ((i = 0; i < ${#signal_tasks[@]}; i++)); do
     task=${signal_tasks[$i]}
@@ -927,14 +927,14 @@ recorded_windows() {
   done
 }
 
-# Print the oldest structurally valid ACTIONABLE row in a local secondmate's
+# Print the oldest structurally valid ACTIONABLE row in a local squad_lead's
 # foreign queue. A stale recheck that explicitly identifies itself as a declared
 # external-wait pause is not evidence that the mate's wake loop is stuck: the
 # pause cadence already owns that bounded visibility, and blocked waits remain
 # actionable because they do not carry this declaration. This is a read-only
 # observation: the receiving home owns acknowledgement and this parent never
 # changes the row or the foreign queue.
-secondmate_oldest_queue_row() {  # <queue-path>
+squad_lead_oldest_queue_row() {  # <queue-path>
   local queue=$1
   [ -f "$queue" ] && [ ! -L "$queue" ] || return 0
   awk -F '\t' '
@@ -971,7 +971,7 @@ secondmate_oldest_queue_row() {  # <queue-path>
 # sitting in the branch's live grant (jg_wake_branch_grant_live) is that turn in
 # progress, and the mate's main conversation cannot drain a granted row, so a
 # ring there could not move it.
-secondmate_in_active_turn() {  # <window> <idle> <home> <seq>
+squad_lead_in_active_turn() {  # <window> <idle> <home> <seq>
   local w=$1 idle=$2 grant="$3/state/.branch-eligible-rows" seq=$4 tail40
   [ "$idle" -lt "$BUSY_TURN_MAX_SECS" ] || return 1
   if [ ! -L "$grant" ] && grep -Fqx -- "$seq" "$grant" 2>/dev/null \
@@ -984,15 +984,15 @@ secondmate_in_active_turn() {  # <window> <idle> <home> <seq>
   window_is_busy "$w" "$tail40"
 }
 
-# Set SECONDMATE_BUSY_CLASS to the first token of the semantic busy
+# Set SQUAD_LEAD_BUSY_CLASS to the first token of the semantic busy
 # classification for <window>: busy, idle, unknown, or dead. Capture failure and
 # a missing window are unknown, never idle. Empty inbox and a fresh watcher
 # beacon are not consulted. Call it directly, never in $(...), so its pane
 # capture runs in the watcher's own shell.
-SECONDMATE_BUSY_CLASS=
-secondmate_busy_class() {  # <window>
+SQUAD_LEAD_BUSY_CLASS=
+squad_lead_busy_class() {  # <window>
   local w=$1 task meta tail40 verdict
-  SECONDMATE_BUSY_CLASS=unknown
+  SQUAD_LEAD_BUSY_CLASS=unknown
   task=$(window_to_task "$w" "$STATE")
   meta="$STATE/$task.meta"
   if [ -z "$w" ] || [ -z "$task" ] || [ ! -f "$meta" ]; then
@@ -1001,18 +1001,18 @@ secondmate_busy_class() {  # <window>
   watcher_capture "$(window_backend "$w")" "$w" 40 "$(window_label "$w")" || return 0
   tail40=$WATCHER_CAPTURE
   verdict=$(jg_busy_classify_meta "$meta" "$task" "$STATE" "$tail40")
-  SECONDMATE_BUSY_CLASS=${verdict%% *}
+  SQUAD_LEAD_BUSY_CLASS=${verdict%% *}
 }
 
 # 0 iff a child ring is authorized: exact idle, a live agent, and a composer
 # that is not proven pending. Busy, unknown, dead, missing, and pending
 # composer all refuse, so a Kimi or Claude pane without an exact idle
 # verdict is never typed into.
-secondmate_idle_ring_safe() {  # <window>
+squad_lead_idle_ring_safe() {  # <window>
   local w=$1 backend agent_state cstate
   [ -n "$w" ] || return 1
-  secondmate_busy_class "$w"
-  [ "$SECONDMATE_BUSY_CLASS" = idle ] || return 1
+  squad_lead_busy_class "$w"
+  [ "$SQUAD_LEAD_BUSY_CLASS" = idle ] || return 1
   backend=$(window_backend "$w")
   agent_state=$(jg_backend_agent_state "$backend" "$w" 2>/dev/null || true)
   [ "$agent_state" = alive ] || return 1
@@ -1022,8 +1022,8 @@ secondmate_idle_ring_safe() {  # <window>
 }
 
 # Write one fire-and-forget drain steer and ring the child's doorbell. The
-# steer carries the same from-firstmate fire-and-forget carrier jg-send uses
-# for a secondmate (marker, then delivery=<16-hex-id>, then the text), so the
+# steer carries the same from-juggernaut fire-and-forget carrier jg-send uses
+# for a squad_lead (marker, then delivery=<16-hex-id>, then the text), so the
 # mate reads it as a parent request that expects no reply, never as captain
 # intervention. The worker's ordinary wake-handling turn drains its own home's
 # wake queue; this parent never rewrites that foreign queue. The text names the
@@ -1031,7 +1031,7 @@ secondmate_idle_ring_safe() {  # <window>
 # on its WAKE_ACK_REQUIRED command, and a mate told only to drain has presented
 # the row, cut that line off its output, and left the row queued. 0 iff the ring
 # call returned 0.
-secondmate_ring_to_drain() {  # <task> <window> <seq>
+squad_lead_ring_to_drain() {  # <task> <window> <seq>
   local task=$1 w=$2 seq=$3 rec backend delivery_id
   backend=$(window_backend "$w")
   delivery_id=$(LC_ALL=C od -An -v -tx1 -N 8 /dev/urandom 2>/dev/null | tr -d ' \n') || return 1
@@ -1062,34 +1062,34 @@ secondmate_ring_to_drain() {  # <task> <window> <seq>
 # parent alarm. Empty inbox and a fresh child beacon are not idle proof.
 # Receipts close the append-before-marker crash window without changing the
 # foreign queue.
-secondmate_wake_stall_tick() {
-  local now=$(( $(date +%s) )) threshold=$SECONDMATE_WAKE_STALL_SECS
+squad_lead_wake_stall_tick() {
+  local now=$(( $(date +%s) )) threshold=$SQUAD_LEAD_WAKE_STALL_SECS
   local meta task kind remote_host home queue row epoch seq row_key marker progress_marker ring_marker progress observed_at observed_key
   local receipt receipt_dir notify_key queued idle reason episode_alerted already_rung w
-  # Endpoint metadata admits this queue-loop check; secondmate-liveness owns registered mates whose endpoint is missing or dead.
+  # Endpoint metadata admits this queue-loop check; squad-lead-liveness owns registered mates whose endpoint is missing or dead.
   for meta in "$STATE"/*.meta; do
     [ -e "$meta" ] || continue
     kind=$(jg_meta_get "$meta" kind)
-    [ "$kind" = secondmate ] || continue
+    [ "$kind" = squad_lead ] || continue
     remote_host=$(jg_meta_get "$meta" remote_host)
     [ -z "$remote_host" ] || continue
     task=${meta##*/}
     task=${task%.meta}
     case "$task" in ''|*[!A-Za-z0-9._-]*) continue ;; esac
-    # Parked-home guard (firstmate-addons/parked-homes): a parked home gets no
+    # Parked-home guard (juggernaut-addons/parked-homes): a parked home gets no
     # drain ring and no wake-loop-stalled check; its stale episode markers are
     # dropped so an unpark starts clean. No-op without the add-on checkout.
-    jg_parked_skip_meta "$meta" "$task" watch-wake-stall && { rm -f "$STATE/.secondmate-wake-stall-$task" "$STATE/.secondmate-wake-progress-$task" "$STATE/.secondmate-wake-ring-$task" 2>/dev/null || true; continue; }
+    jg_parked_skip_meta "$meta" "$task" watch-wake-stall && { rm -f "$STATE/.squad-lead-wake-stall-$task" "$STATE/.squad-lead-wake-progress-$task" "$STATE/.squad-lead-wake-ring-$task" 2>/dev/null || true; continue; }
     home=$(jg_meta_get "$meta" home)
     [ -n "$home" ] || continue
-    [ -f "$home/.jg-secondmate-home" ] && [ ! -L "$home/.jg-secondmate-home" ] || continue
-    [ "$(cat "$home/.jg-secondmate-home" 2>/dev/null || true)" = "$task" ] || continue
+    [ -f "$home/.jg-squad-lead-home" ] && [ ! -L "$home/.jg-squad-lead-home" ] || continue
+    [ "$(cat "$home/.jg-squad-lead-home" 2>/dev/null || true)" = "$task" ] || continue
     queue="$home/state/.wake-queue"
-    row=$(secondmate_oldest_queue_row "$queue")
-    marker="$STATE/.secondmate-wake-stall-$task"
-    progress_marker="$STATE/.secondmate-wake-progress-$task"
-    ring_marker="$STATE/.secondmate-wake-ring-$task"
-    receipt_dir="$STATE/.secondmate-wake-stall-receipts/$task"
+    row=$(squad_lead_oldest_queue_row "$queue")
+    marker="$STATE/.squad-lead-wake-stall-$task"
+    progress_marker="$STATE/.squad-lead-wake-progress-$task"
+    ring_marker="$STATE/.squad-lead-wake-ring-$task"
+    receipt_dir="$STATE/.squad-lead-wake-stall-receipts/$task"
     if [ -z "$row" ]; then
       rm -f "$marker" "$progress_marker" "$ring_marker"
       if [ -e "$receipt_dir" ] || [ -L "$receipt_dir" ]; then
@@ -1121,7 +1121,7 @@ EOF
     case "$observed_key" in ''|*[!0-9-]*) observed_key= ;; esac
     if [ -z "$observed_at" ] || [ -z "$observed_key" ] \
       || [ "$now" -lt "$observed_at" ] || [ "$row_key" != "$observed_key" ]; then
-      jg_wake_secondmate_progress_marker_write "$task" "$now" "$row_key" || return 1
+      jg_wake_squad_lead_progress_marker_write "$task" "$now" "$row_key" || return 1
       [ "$episode_alerted" -eq 0 ] || rm -f "$marker" || return 1
       rm -f "$ring_marker" || return 1
       continue
@@ -1130,40 +1130,40 @@ EOF
     idle=$((now - observed_at))
     [ "$idle" -ge "$threshold" ] || continue
     w=$(jg_backend_target_of_meta "$meta")
-    ! secondmate_in_active_turn "$w" "$idle" "$home" "$seq" || continue
+    ! squad_lead_in_active_turn "$w" "$idle" "$home" "$seq" || continue
     already_rung=0
     if [ -e "$ring_marker" ] || [ -L "$ring_marker" ]; then
       [ -f "$ring_marker" ] && [ ! -L "$ring_marker" ] || return 1
       [ "$(cat "$ring_marker" 2>/dev/null || true)" = "$row_key" ] && already_rung=1
     fi
-    if [ "$already_rung" -eq 0 ] && secondmate_idle_ring_safe "$w"; then
-      if secondmate_ring_to_drain "$task" "$w" "$seq"; then
-        jg_wake_secondmate_ring_marker_write "$task" "$row_key" || return 1
-        jg_wake_secondmate_progress_marker_write "$task" "$now" "$row_key" || return 1
+    if [ "$already_rung" -eq 0 ] && squad_lead_idle_ring_safe "$w"; then
+      if squad_lead_ring_to_drain "$task" "$w" "$seq"; then
+        jg_wake_squad_lead_ring_marker_write "$task" "$row_key" || return 1
+        jg_wake_squad_lead_progress_marker_write "$task" "$now" "$row_key" || return 1
         continue
       fi
     fi
     receipt="$receipt_dir/$row_key"
     if [ "$(cat "$receipt" 2>/dev/null || true)" = "$row_key" ]; then
-      jg_wake_secondmate_stall_marker_write "$task" "$row_key" || return 1
+      jg_wake_squad_lead_stall_marker_write "$task" "$row_key" || return 1
       continue
     fi
-    notify_key="secondmate-wake-loop-$task-$row_key"
-    reason="check: secondmate wake-loop stalled: mate=$task row=$seq idle=${idle}s"
+    notify_key="squad-lead-wake-loop-$task-$row_key"
+    reason="check: squad_lead wake-loop stalled: mate=$task row=$seq idle=${idle}s"
     queued=$(jg_wake_queued_keys check)
     if ! printf '%s\n' "$queued" | grep -Fx "$notify_key" >/dev/null 2>&1; then
       jg_wake_append check "$notify_key" "$reason" || return 1
     fi
-    jg_wake_secondmate_stall_receipt_write "$task" "$row_key" || return 1
-    jg_wake_secondmate_stall_marker_write "$task" "$row_key" || return 1
+    jg_wake_squad_lead_stall_receipt_write "$task" "$row_key" || return 1
+    jg_wake_squad_lead_stall_marker_write "$task" "$row_key" || return 1
     wake "$reason"
   done
   return 0
 }
 
-# The ordinary-supervision half of the secondmate liveness guarantee, paired
+# The ordinary-supervision half of the squad_lead liveness guarantee, paired
 # with bin/jg-bootstrap.sh's session-start sweep over the shared library in
-# bin/jg-secondmate-liveness-lib.sh (which owns the state contract, the remote
+# bin/jg-squad-lead-liveness-lib.sh (which owns the state contract, the remote
 # probe rules, the kill ordering, and the guarded relaunch). On a bounded
 # cadence each registered mate's recorded endpoint is probed once; only a
 # recovery-grade `dead` or `missing` verdict relaunches, every relaunch
@@ -1171,14 +1171,14 @@ EOF
 # other verdict lands only in the triage log. The tick finishes every mate's
 # bounded recovery before it wakes once on the first outcome; the drain
 # surfaces every queued row. A mate that keeps
-# dying is parked after SECONDMATE_LIVENESS_MAX_ATTEMPTS ledgered attempts
-# inside SECONDMATE_LIVENESS_WINDOW_SECS: the bound marker wakes once, further
+# dying is parked after SQUAD_LEAD_LIVENESS_MAX_ATTEMPTS ledgered attempts
+# inside SQUAD_LEAD_LIVENESS_WINDOW_SECS: the bound marker wakes once, further
 # probes stay silent, and a later live probe ledgers a `rearmed` row and clears
 # the marker so a manually recovered mate rejoins the guarantee with a full
 # budget. The per-mate liveness lock serializes this tick against a concurrent
 # session-start sweep, so neither side can kill or re-probe an endpoint the
 # other is mid-relaunch on.
-jg_host_memory_lib="${JG_ADDONS_DIR:-$JG_HOME/projects/firstmate-addons}/host-memory/bin/jg-host-memory-lib.sh"
+jg_host_memory_lib="${JG_ADDONS_DIR:-$JG_HOME/projects/juggernaut-addons}/host-memory/bin/jg-host-memory-lib.sh"
 # shellcheck disable=SC1090,SC1091 # The optional add-on source is installed outside this repository.
 if [ -f "$jg_host_memory_lib" ]; then . "$jg_host_memory_lib"; fi
 
@@ -1216,7 +1216,7 @@ host_memory_surface_queued() {
 # The ordinary arm owner delivers the reason, never a synthetic keyboard ring.
 own_queue_resurface() {
   local row epoch seq kind key reason now previous observed_at observed_key row_key idle
-  row=$(secondmate_oldest_queue_row "$JG_WAKE_QUEUE")
+  row=$(squad_lead_oldest_queue_row "$JG_WAKE_QUEUE")
   if [ -z "$row" ]; then
     rm -f "$STATE/.own-wake-progress"
     return 0
@@ -1235,8 +1235,8 @@ EOF
     return 0
   fi
   idle=$((now - observed_at))
-  [ "$idle" -ge "$SECONDMATE_WAKE_STALL_SECS" ] || return 0
-  secondmate_in_active_turn '' "$idle" "$JG_HOME" "$seq" && return 0
+  [ "$idle" -ge "$SQUAD_LEAD_WAKE_STALL_SECS" ] || return 0
+  squad_lead_in_active_turn '' "$idle" "$JG_HOME" "$seq" && return 0
   printf '%s\t%s\n' "$now" "$row_key" > "$STATE/.own-wake-progress" || return 1
   case "$kind:$reason" in
     signal:needs-decision:*) reason="signal:${reason#needs-decision:}" ;;
@@ -1244,65 +1244,65 @@ EOF
   wake "$reason"
 }
 
-secondmate_liveness_tick() {
-  local tick_marker="$STATE/.secondmate-liveness-tick"
-  [ "$(age_of "$tick_marker")" -ge "$SECONDMATE_LIVENESS_SECS" ] || return 0
+squad_lead_liveness_tick() {
+  local tick_marker="$STATE/.squad-lead-liveness-tick"
+  [ "$(age_of "$tick_marker")" -ge "$SQUAD_LEAD_LIVENESS_SECS" ] || return 0
   touch "$tick_marker" || return 1
   local now=$(( $(date +%s) )) meta id kind
   local bound_marker attempts notify_key reason queued err first_reason='' failed=0
   for meta in "$STATE"/*.meta; do
     [ -e "$meta" ] || continue
     kind=$(jg_meta_get "$meta" kind 2>/dev/null || true)
-    [ "$kind" = secondmate ] || continue
+    [ "$kind" = squad_lead ] || continue
     id=${meta##*/}
     id=${id%.meta}
     case "$id" in ''|*[!A-Za-z0-9._-]*) continue ;; esac
-    # Parked-home guard (firstmate-addons/parked-homes): a parked home gets no
+    # Parked-home guard (juggernaut-addons/parked-homes): a parked home gets no
     # liveness probe and no auto-relaunch - one triage line names the skip.
     # No-op without the add-on checkout.
-    jg_parked_skip_meta "$meta" "$id" watch-liveness && { triage_log "secondmate $id liveness skipped: its home is parked (config/parked-homes)"; continue; }
-    jg_secondmate_liveness_lock "$id" || continue
-    jg_secondmate_liveness_probe "$meta" "$id" poll
-    bound_marker="$STATE/.secondmate-relaunch-bound-$id"
+    jg_parked_skip_meta "$meta" "$id" watch-liveness && { triage_log "squad_lead $id liveness skipped: its home is parked (config/parked-homes)"; continue; }
+    jg_squad_lead_liveness_lock "$id" || continue
+    jg_squad_lead_liveness_probe "$meta" "$id" poll
+    bound_marker="$STATE/.squad-lead-relaunch-bound-$id"
     reason='' notify_key='' err=''
     case "$JG_SM_LIVE_STATUS" in
       relaunchable)
         if [ -e "$bound_marker" ] || [ -L "$bound_marker" ]; then
           :
-        elif ! attempts=$(jg_secondmate_liveness_recent_attempts "$id" "$SECONDMATE_LIVENESS_WINDOW_SECS"); then
+        elif ! attempts=$(jg_squad_lead_liveness_recent_attempts "$id" "$SQUAD_LEAD_LIVENESS_WINDOW_SECS"); then
           err="relaunch ledger is unreadable; endpoint left $JG_SM_LIVE_STATE"
-        elif [ "$attempts" -ge "$SECONDMATE_LIVENESS_MAX_ATTEMPTS" ]; then
+        elif [ "$attempts" -ge "$SQUAD_LEAD_LIVENESS_MAX_ATTEMPTS" ]; then
           if printf '%s\t%s\n' "$now" "$JG_SM_LIVE_STATE" > "$bound_marker"; then
-            reason="check: secondmate $id auto-relaunch paused after $SECONDMATE_LIVENESS_MAX_ATTEMPTS attempts in ${SECONDMATE_LIVENESS_WINDOW_SECS}s; endpoint still $JG_SM_LIVE_STATE - relaunch it manually or retire the route"
-            notify_key="secondmate-relaunch-bound-$id"
+            reason="check: squad_lead $id auto-relaunch paused after $SQUAD_LEAD_LIVENESS_MAX_ATTEMPTS attempts in ${SQUAD_LEAD_LIVENESS_WINDOW_SECS}s; endpoint still $JG_SM_LIVE_STATE - relaunch it manually or retire the route"
+            notify_key="squad-lead-relaunch-bound-$id"
           else
             err="relaunch park marker could not be written; endpoint left $JG_SM_LIVE_STATE"
           fi
-        elif jg_secondmate_liveness_relaunch "$meta" "$id" "$SECONDMATE_LIVENESS_TIMEOUT"; then
-          reason="check: secondmate $id auto-relaunched after $JG_SM_LIVE_CAUSE ($JG_SM_LIVE_WHERE)"
-          notify_key="secondmate-relaunch-$id-$now"
+        elif jg_squad_lead_liveness_relaunch "$meta" "$id" "$SQUAD_LEAD_LIVENESS_TIMEOUT"; then
+          reason="check: squad_lead $id auto-relaunched after $JG_SM_LIVE_CAUSE ($JG_SM_LIVE_WHERE)"
+          notify_key="squad-lead-relaunch-$id-$now"
         elif [ "$JG_SM_LIVE_STATUS" = deferred ]; then
-          triage_log "secondmate $id liveness deferred: $JG_SM_LIVE_REASON"
+          triage_log "squad_lead $id liveness deferred: $JG_SM_LIVE_REASON"
         elif [ "$JG_SM_LIVE_STATUS" = skipped ]; then
           err=$JG_SM_LIVE_REASON
         else
-          reason="check: secondmate $id auto-relaunch failed after $JG_SM_LIVE_CAUSE: $(jg_sm_live_first_line "$JG_SM_LIVE_OUT")"
-          notify_key="secondmate-relaunch-failed-$id-$now"
+          reason="check: squad_lead $id auto-relaunch failed after $JG_SM_LIVE_CAUSE: $(jg_sm_live_first_line "$JG_SM_LIVE_OUT")"
+          notify_key="squad-lead-relaunch-failed-$id-$now"
         fi
         ;;
       alive)
         if [ -e "$bound_marker" ] || [ -L "$bound_marker" ]; then
-          if ! jg_secondmate_liveness_ledger_add "$id" rearmed; then
+          if ! jg_squad_lead_liveness_ledger_add "$id" rearmed; then
             err="relaunch ledger is unwritable; auto-relaunch stays paused"
           elif ! rm -f "$bound_marker"; then
             err="relaunch park marker could not be cleared; auto-relaunch stays paused"
           else
-            triage_log "secondmate $id live again; auto-relaunch pause cleared"
+            triage_log "squad_lead $id live again; auto-relaunch pause cleared"
           fi
         fi
         ;;
       skipped)
-        triage_log "secondmate $id liveness: $JG_SM_LIVE_REASON"
+        triage_log "squad_lead $id liveness: $JG_SM_LIVE_REASON"
         ;;
     esac
     if [ -n "$reason" ]; then
@@ -1314,10 +1314,10 @@ secondmate_liveness_tick() {
         err="check wake row could not be queued: $reason"
       fi
     fi
-    jg_secondmate_liveness_unlock "$id"
+    jg_squad_lead_liveness_unlock "$id"
     if [ -n "$err" ]; then
-      echo "watcher: secondmate $id liveness: $err" >&2
-      triage_log "secondmate $id liveness error: $err" || true
+      echo "watcher: squad_lead $id liveness: $err" >&2
+      triage_log "squad_lead $id liveness error: $err" || true
       failed=1
     fi
   done
@@ -1396,7 +1396,7 @@ wedge_defer_writing() {  # <window> <since-file> <triage-label> <idle-age>
 #   <kind>       what the evidence IS, as the recheck names it.
 #   <subject>    WHO the wait is on, in the recheck's own words.
 #   <whom>       `captain` when that subject is the captain, `supervisor` when
-#                it is firstmate itself, `external` otherwise; this is what
+#                it is juggernaut itself, `external` otherwise; this is what
 #                applies the away-posture rule below, which only `captain` takes.
 #   <action>     the one thing that clears the lane.
 #   <age-record> the file whose mtime is when this wait started, or EMPTY when
@@ -1455,26 +1455,26 @@ wait_record() {  # <kind> <subject> <whom> <action> <age-record>
 # must still hold an open `needs-decision` record whose key is `nm-<run>-<step>`
 # for the run that verdict reports. The gate's table alone says only that the
 # answer is owed by a human; the open decision bound to that run is the positive
-# evidence that firstmate was actually told about THIS gate and has not answered
+# evidence that juggernaut was actually told about THIS gate and has not answered
 # yet, which is what makes the lane's quiet a wait rather than a suspected wedge.
 # An open decision under any other key - an unrelated question never closed - is
 # not that evidence, and neither is a verdict that names no run. The wait is owed
-# by firstmate, not the captain: ask-user findings are routed to firstmate, which
+# by juggernaut, not the captain: ask-user findings are routed to juggernaut, which
 # decides most of them itself, and one it escalates becomes a captain-held
 # transfer that the first record above already catches. So the away-posture
 # silence does not apply to it: under away posture the supervision branch is the
 # actor allowed to answer it, and it is rechecked on the long cadence throughout.
 # The two signals come apart in both directions, and the ladder is kept in each:
-#   - the decision was ANSWERED and the crewmate has not yet relayed it with
+#   - the decision was ANSWERED and the operator has not yet relayed it with
 #     `axi respond`: the gate is still reported parked and still carries the
 #     ask-user row, but `jg-send --resolve-key` wrote the closing `resolved` line
 #     at answer time, so the fold is empty and what is outstanding is the
-#     crewmate's OWN next move;
-#   - the crewmate parked at a human-owed gate and went quiet before escalating
+#     operator's OWN next move;
+#   - the operator parked at a human-owed gate and went quiet before escalating
 #     it at all: nobody was ever told, so there is no wait to defer to.
 # A `blocked` record does not count: a blocker is not an unanswered gate decision
-# and a different action clears it. A gate awaiting the CREWMATE's own answer is
-# deliberately NOT evidence either: a crewmate that goes quiet before answering
+# and a different action clears it. A gate awaiting the OPERATOR's own answer is
+# deliberately NOT evidence either: a operator that goes quiet before answering
 # its own gate is exactly the wedge this ladder exists to catch, so those keep
 # the unchanged schedule, reason and demand-deep-inspection wording.
 # Nothing here weakens detection for a pane with no wait at all - their
@@ -1508,8 +1508,8 @@ wedge_wait_evidence() {  # <task> -> one wait_record on stdout
   if status_has_open_needs_decision "$statusf" \
     && run=$(crew_gate_awaits_human_decision "$task") \
     && status_has_open_needs_decision "$statusf" "$run"; then
-    wait_record 'verified wait at a parked gate' "awaiting firstmate's ask-user decision" \
-      supervisor "decide the gate's ask-user finding and relay the decision to the crewmate" ''
+    wait_record 'verified wait at a parked gate' "awaiting juggernaut's ask-user decision" \
+      supervisor "decide the gate's ask-user finding and relay the decision to the operator" ''
     return 0
   fi
   return 1
@@ -1950,7 +1950,7 @@ clear_pause_tracking() {  # <window-key>
 # wedged one's.
 #
 # A window any meta references is never pruned here regardless of liveness:
-# the record's fate belongs to firstmate's record reconciliation, and its gone
+# the record's fate belongs to juggernaut's record reconciliation, and its gone
 # agent already has wedge_dead_record's bounded once-only report. The prune
 # removes every marker the key owns, including the sidecar itself, and emits
 # at most one final notice for that key.
@@ -2004,7 +2004,7 @@ phantom_pane_prune() {
 
 # Reconcile a declared pause or captain-held status with authoritative crew state.
 # After jg-crew-state has fallen back to stopped or unknown, paused classification is
-# recovered only for a confidently dead ordinary crew, or for a secondmate, whose
+# recovered only for a confidently dead ordinary crew, or for a squad_lead, whose
 # endpoint liveness this function deliberately never reads.
 pause_state_class() {  # <window> <task>
   local win=$1 task=$2 key last recheck_file class agent_alive kind
@@ -2021,7 +2021,7 @@ pause_state_class() {  # <window> <task>
   # far more common no-declaration path above still costs none.
   kind=$(window_kind "$win")
   if [ -e "$STATE/.paused-$key" ] && [ "$(age_of "$recheck_file")" -lt "$STALE_ESCALATE_SECS" ]; then
-    if [ "$kind" != secondmate ]; then
+    if [ "$kind" != squad_lead ]; then
       agent_alive=$(jg_backend_agent_alive "$(window_backend "$win")" "$win" 2>/dev/null) || agent_alive=unknown
       if [ "$agent_alive" != dead ]; then
         rm -f "$recheck_file"
@@ -2038,7 +2038,7 @@ pause_state_class() {  # <window> <task>
     printf 'working'
     return
   fi
-  if [ "$kind" != secondmate ]; then
+  if [ "$kind" != squad_lead ]; then
     agent_alive=$(jg_backend_agent_alive "$(window_backend "$win")" "$win" 2>/dev/null) || agent_alive=unknown
     if [ "$agent_alive" != dead ]; then
       rm -f "$recheck_file"
@@ -2049,7 +2049,7 @@ pause_state_class() {  # <window> <task>
   # Recover paused classification for a declared wait that authoritative crew state
   # could not name. Reaching here already proves the only two admissible cases: an
   # ordinary crew whose agent the gate above confirmed dead, so no live decision gate
-  # is being silenced, or a secondmate, whose endpoint liveness is deliberately never
+  # is being silenced, or a squad_lead, whose endpoint liveness is deliberately never
   # read and so cannot supply that confirmation. Without the mate case a mate's
   # status-declared `captain-held` transfer - which has no current-state mapping
   # and so arrives as `none` - would be silenced by every caller rather than taking
@@ -2066,7 +2066,7 @@ pause_state_class() {  # <window> <task>
 #
 # status_is_paused_or_captain_held reads the status LINE a worker wrote, which is
 # the only record when the worker itself is waiting. It is not the only record
-# there is: once firstmate hands work to the captain, the wait is written into the
+# there is: once juggernaut hands work to the captain, the wait is written into the
 # BACKLOG by bin/jg-captain-hold.sh, and the worker's last line stays whatever it
 # was - routinely `done` after a PR delivery, which no line predicate can
 # read as a wait. An alarm bounded only by the line therefore re-fires for the
@@ -2080,7 +2080,7 @@ pause_state_class() {  # <window> <task>
 #
 # The read costs one subprocess and runs only where the watcher is about to
 # alarm, so at most once per distinct stale hash per window, beside the crew-state
-# read the same paths already pay. The secondmate stale gate deliberately runs
+# read the same paths already pay. The squad_lead stale gate deliberately runs
 # before this bound and admits only status-declared waits: a backlog-only hold
 # whose mate still says `working:` or `done:` does not reach this read. Reaching
 # it would put backlog reads into windows deliberately skipped on ordinary polls.
@@ -2134,7 +2134,7 @@ stale_wait_record() {  # <window-key>
 }
 
 # Bound a due stale alarm for an ordinary crew task held for the captain.
-# Backlog-only secondmate holds are outside this guard because the earlier gate
+# Backlog-only squad_lead holds are outside this guard because the earlier gate
 # preserves their no-backlog-read hot path.
 # While the away-posture record exists the bound is absolute: an open captain
 # call is never rechecked, whatever the throttle says, because nobody is there
@@ -2148,7 +2148,7 @@ captain_call_stale_bound() {  # <window-key> <task>
   stale_wait_throttled "$key" "$STALE_WAIT_DECLARATION"
 }
 
-# Surface a stale pane no classifier could resolve, so firstmate inspects it: it
+# Surface a stale pane no classifier could resolve, so juggernaut inspects it: it
 # may have finished through an interactive menu that wrote no status, be waiting on
 # a decision, or be wedged. pause_state_class deliberately answers `none` for a
 # still-LIVE agent even under a declared wait, so a worker genuinely waiting on a
@@ -2159,13 +2159,13 @@ captain_call_stale_bound() {  # <window-key> <task>
 # cadence resurface_absorbed owns for the absorbed paths, throttled by this
 # window's own .paused-resurfaced-<key> marker: an idle parked pane still churns
 # its hash (a clock, a token counter), and each new hash re-enters this path, so
-# without that bound one wait re-alarms firstmate for its whole duration.
+# without that bound one wait re-alarms juggernaut for its whole duration.
 # The FIRST sight still wakes, keeping the inspect-an-inconclusive-state intent,
 # and the throttle is read BEFORE anything is queued and advanced only by a wake
 # that really fires - a throttle written by the wake it should have prevented, or
 # read after that wake was already appended, bounds nothing.
 # Both records of an ordinary crew wait bound it (see task_captain_call_open
-# above): the status line the worker declared, and the backlog hold firstmate
+# above): the status line the worker declared, and the backlog hold juggernaut
 # recorded once the captain took the work in hand.
 surface_nonterminal_stale() {  # <window> <hash>
   local win=$1 h=$2 key task last declared=1 bounded=1 throttled=1 until now
@@ -2234,13 +2234,13 @@ surface_nonterminal_stale() {  # <window> <hash>
 # A worker's `paused:` line is its own claim about its silence, and authoritative
 # crew state outranks it. A no-mistakes run parked at a gate holds
 # no pending drive call - the call returns at the gate - so an idle pane under
-# such a claim is a lane nothing will resume: either firstmate owes an ask-user
+# such a claim is a lane nothing will resume: either juggernaut owes an ask-user
 # decision or the worker owes its own gate answer, and its drive process may be
 # gone. Without this check the claim buys the declared-wait cadence (hours) after
 # one bare stale that names nothing, so the supervisor learns the truth only when
 # a human notices. A `working:` claim needs no such check: it never buys that
 # cadence, so the existing first-sight surface and wedge ladder already reach it. A gate the worker escalated as an open run-bound decision is
-# not contradicted: firstmate already holds it. Wakes ONCE per (status signature, crew-state line), naming the
+# not contradicted: juggernaut already holds it. Wakes ONCE per (status signature, crew-state line), naming the
 # task and the real state; a new status append or a new gate state may wake
 # again. The jg-crew-state.sh read is costly, so it is taken at most once per
 # STALE_ESCALATE_SECS per window unless the status log changed. A claim with no
@@ -2258,14 +2258,14 @@ declared_wait_contradiction() {  # <window> <task> <window-key>
   printf '%s' "$sig" > "$read_marker"
   state=$("$JG_CREW_STATE_BIN" "$task" 2>/dev/null) || true
   case "$state" in "state: parked · source: run-step · "?*) ;; *) return 0 ;; esac
-  # A gate the worker already escalated under its run-bound key is one firstmate
+  # A gate the worker already escalated under its run-bound key is one juggernaut
   # was told about; wedge_wait_evidence owns that verified wait.
   case "$state" in
     *" · run: "?*) status_has_open_needs_decision "$statusf" "${state##* · run: }" && return 0 ;;
   esac
   raised="$STATE/.truth-raised-$key"
   [ "$(cat "$raised" 2>/dev/null || true)" != "$sig $state" ] || return 0
-  reason="stale: $win (task $task says paused, but its run is ${state#state: parked · source: run-step · } - a parked gate holds no pending drive call, so nothing resumes this lane until firstmate decides or steers)"
+  reason="stale: $win (task $task says paused, but its run is ${state#state: parked · source: run-step · } - a parked gate holds no pending drive call, so nothing resumes this lane until juggernaut decides or steers)"
   jg_wake_append stale "$win" "$reason" || exit 1
   printf '%s' "$sig $state" > "$raised"
   wake "$reason"
@@ -2348,12 +2348,12 @@ signal_batch_merge() {  # <pre-grace-rows> <re-scan-rows>
   '
 }
 
-# Deliver a durably queued process-event result to firstmate. Publication is
+# Deliver a durably queued process-event result to juggernaut. Publication is
 # owned by bin/jg-procevent.sh - by the runner at capture time and by reconcile's
 # re-announcement - so this decides only whether a queued check record has been
 # surfaced yet, then reports it through the same actionable exit every other wake
 # uses. Without it a captured result sits on the queue until something else
-# happens to wake firstmate, which is exactly the missed delivery this repairs.
+# happens to wake juggernaut, which is exactly the missed delivery this repairs.
 # Dedup uses the same .seen-* discipline as scan_signals: the durable record is
 # always written before its marker, so nothing is suppressed before it is queued,
 # and re-announcement, drain-time deduplication, and the handled acknowledgement
@@ -2633,12 +2633,12 @@ EOF
 
 # Cheap heartbeat fleet-scan (the always-on twin of the daemon's catch-all). 0 if
 # any status log carries a captain-relevant event past the position already
-# surfaced to firstmate (.hb-surfaced-<task>). It walks every log rather than only
+# surfaced to juggernaut (.hb-surfaced-<task>). It walks every log rather than only
 # those whose LAST line looks captain-relevant, because the event this backstop
 # most needs to catch is precisely one a later routine append has already moved
 # past. Pure detect, no side effects: the caller enqueues first, then marks
 # surfaced. Because every captain-relevant signal/stale already marks itself
-# surfaced when it wakes firstmate, this normally finds nothing and the heartbeat
+# surfaced when it wakes juggernaut, this normally finds nothing and the heartbeat
 # is absorbed; it surfaces only an event the per-wake path absorbed by mistake -
 # the fail-safe backstop.
 heartbeat_scan_finds_actionable() {
@@ -2684,7 +2684,7 @@ lane_target_value() {
 }
 
 # Open lanes: every state/<task>.meta whose kind is ship (the default when a
-# meta omits it) or scout. A secondmate endpoint's own meta (kind=secondmate) is
+# meta omits it) or scout. A squad_lead endpoint's own meta (kind=squad_lead) is
 # not a lane of this home, so it never counts toward the floor.
 # Fork hook (thin layer over upstream): the fleet-flow add-on owns the rule that
 # a lane parked on a stale external wait stops counting toward the cap, so when
@@ -2723,7 +2723,7 @@ warn_invalid_lane_target_once() {
   triage_log "lane-target is not a positive integer; using the no-worker-working rule instead"
 }
 
-# Base-cadence idle-lead check: 0 when this is a secondmate home, its backlog has
+# Base-cadence idle-lead check: 0 when this is a squad_lead home, its backlog has
 # dispatchable queued work, and the home sits below its lane floor. With
 # config/lane-target naming a positive integer N, the floor is fewer than N open
 # lanes, and a home with working workers but free slots is exactly the 5 Oct
@@ -2741,7 +2741,7 @@ ready_work_waits_idle() {
   local meta task target open now surfaced surfaced_at surfaced_ids ready_out ready_rc
   READY_WORK_IDS=
   READY_WORK_REASON=
-  [ -f "$JG_HOME/.jg-secondmate-home" ] && [ ! -L "$JG_HOME/.jg-secondmate-home" ] || return 1
+  [ -f "$JG_HOME/.jg-squad-lead-home" ] && [ ! -L "$JG_HOME/.jg-squad-lead-home" ] || return 1
   ready_out=$(JG_HOME="$JG_HOME" "$SCRIPT_DIR/jg-tasks-axi.sh" ready 2>/dev/null)
   ready_rc=$?
   READY_WORK_IDS=$(printf '%s\n' "$ready_out" \
@@ -2796,11 +2796,11 @@ record_ready_work_surfaced() {
   printf '%s\t%s\n' "$now" "$READY_WORK_IDS" > "$STATE/.ready-work-surfaced"
 }
 
-# Thin hook for the firstmate-addons ask-default add-on, which owns every
+# Thin hook for the juggernaut-addons ask-default add-on, which owns every
 # decision: for each ask it recorded that has not been defaulted yet, run
 # `ask-default decide` and let it apply the ask's safe default when the captain
 # is unreachable and the ask's clock has run out. Located like the other add-on
-# shims (JG_ADDONS_DIR, default $JG_HOME/projects/firstmate-addons); with the
+# shims (JG_ADDONS_DIR, default $JG_HOME/projects/juggernaut-addons); with the
 # add-on absent this returns at once, writing nothing, and the loop is unchanged.
 # Runs once per CHECK_INTERVAL. The probe reads the away record: the captain is
 # reachable unless an away record (never quiet mode's) exists. Held, waiting, and
@@ -2808,7 +2808,7 @@ record_ready_work_surfaced() {
 # Sets ASK_DEFAULT_REASON and returns 0 when at least one ask was just defaulted.
 ask_default_tick() {
   local tool rec id out rc ids='' probe
-  tool="${JG_ADDONS_DIR:-$JG_HOME/projects/firstmate-addons}/ask-default/ask-default"
+  tool="${JG_ADDONS_DIR:-$JG_HOME/projects/juggernaut-addons}/ask-default/ask-default"
   [ -x "$tool" ] || return 1
   [ "$(age_of "$STATE/.last-ask-default-check")" -ge "$CHECK_INTERVAL" ] || return 1
   touch "$STATE/.last-ask-default-check"
@@ -2853,11 +2853,11 @@ event_wait_or_sleep() {
   while IFS= read -r w; do
     b=$(window_backend "$w")
     jg_backend_has_push "$b" || continue
-    # Secondmate endpoints are supervised via status writes, not pane/agent
-    # state (an idle or blocked secondmate agent pane is healthy by design), so
+    # SquadLead endpoints are supervised via status writes, not pane/agent
+    # state (an idle or blocked squad_lead agent pane is healthy by design), so
     # they are excluded from the fast escalation exactly as the stale loop skips
     # them.
-    [ "$(window_kind "$w")" = secondmate ] && continue
+    [ "$(window_kind "$w")" = squad_lead ] && continue
     session=${w%%:*}
     if [ -z "$first_backend" ]; then first_backend=$b; first_session=$session; fi
     # One socket connection covers one backend+session; a home normally has a
@@ -2929,7 +2929,7 @@ fi
 # is invisible - every cycle would exit early, no source would ever start, and
 # the whole home would sit disarmed while presenting as supervised. A watcher
 # that refuses to arm is loud through an existing, independent, proven path:
-# the liveness guard's WATCHER DOWN banner in firstmate's own session. The
+# the liveness guard's WATCHER DOWN banner in juggernaut's own session. The
 # message shape is reconcile's own, so the operator reads one refusal in both
 # places. The refusal goes to stdout because bin/jg-watch-arm.sh relays the
 # child's stdout and recognises `watcher: FAILED` as the typed failure line.
@@ -3138,12 +3138,12 @@ reconcile_requests_detached() {
       return 0
     fi
     if ! wait "$RECONCILE_REQUEST_PID" 2>/dev/null; then
-      triage_log "secondmate reconcile notify request deferred"
+      triage_log "squad_lead reconcile notify request deferred"
     fi
     RECONCILE_REQUEST_PID=
   fi
   JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" \
-    "$SCRIPT_DIR/jg-secondmate-reconcile.sh" process-requests </dev/null >/dev/null 2>&1 &
+    "$SCRIPT_DIR/jg-squad-lead-reconcile.sh" process-requests </dev/null >/dev/null 2>&1 &
   RECONCILE_REQUEST_PID=$!
 }
 
@@ -3279,7 +3279,7 @@ resurface_after_downtime() {
   wake "check: rearm-resurface"
 }
 
-# Slow per-task checks (firstmate writes these, e.g. a merged-PR poll).
+# Slow per-task checks (juggernaut writes these, e.g. a merged-PR poll).
 # Time-based via .last-check mtime so the cadence survives watcher restarts.
 # A due check runs on every cycle that reaches it, including a cycle whose
 # actionable signal wake is about to exit (see the signal branch): the signal
@@ -3360,15 +3360,15 @@ EOF
         fi
         reason="check: $c: $out"
         if [ "$is_pr_poll" -eq 1 ] && [ "$out" = merged ]; then
-          if [ "$(jg_meta_get "$STATE/$id.meta" kind)" = secondmate ]; then
-            # A merge poll armed on a secondmate is residue: the mate is a
+          if [ "$(jg_meta_get "$STATE/$id.meta" kind)" = squad_lead ]; then
+            # A merge poll armed on a squad_lead is residue: the mate is a
             # persistent worker, never landed work, and the merge it detected
             # belongs to a task in the mate's own home. Retire the poll with no
             # outcome and no wake; bin/jg-pr-check.sh refuses to arm another.
             retire_merged_pr_poll "$id"
             pr_poll_control_release || exit 1
             touch "$STATE/.last-check"
-            triage_log "retired a merge poll armed on secondmate $id without reporting an outcome"
+            triage_log "retired a merge poll armed on squad_lead $id without reporting an outcome"
             continue
           fi
           if ! jg_merge_authority_read "$STATE" "$id" \
@@ -3474,27 +3474,27 @@ while :; do
     reconcile_requests_detached
   fi
 
-  # Parent-owned secondmate pending-reply reconciliation: resolve correlated
+  # Parent-owned squad_lead pending-reply reconciliation: resolve correlated
   # parent reports, observe backend busy/idle turn completion, send one recovery
   # repost after grace, and escalate once if the recovery turn is also missed.
   # No conversation scraping; unresolved records are never silently expired.
   jg_pending_reply_tick "$STATE" || true
 
   # Endpoint liveness runs before queue observation: a positively dead or
-  # missing secondmate endpoint is relaunched here on a bounded cadence, which
+  # missing squad_lead endpoint is relaunched here on a bounded cadence, which
   # is also what unsticks that mate's foreign wake queue. The tick's single
   # wake exits the cycle like every other wake, so its marker is stamped before
   # any relaunch and the restarted watcher will not re-probe early.
-  secondmate_liveness_tick || {
-    echo "watcher: secondmate liveness check failed" >&2
+  squad_lead_liveness_tick || {
+    echo "watcher: squad_lead liveness check failed" >&2
     exit 1
   }
 
-  # A live secondmate endpoint does not prove that its own wake loop is alive.
+  # A live squad_lead endpoint does not prove that its own wake loop is alive.
   # Observe the foreign queue before the rest of this cycle so an aged row wakes
   # the parent without consuming or rewriting the receiving home's record.
-  secondmate_wake_stall_tick || {
-    echo "watcher: secondmate wake-loop observation failed" >&2
+  squad_lead_wake_stall_tick || {
+    echo "watcher: squad_lead wake-loop observation failed" >&2
     exit 1
   }
 
@@ -3527,13 +3527,13 @@ while :; do
   # signal-free cycle. A due check runs ahead of a signal wake (run_due_checks)
   # so its result queues in that same wake and a constant signal stream cannot
   # starve it - but still after the downtime resurface above, because a pending
-  # durable recovery outranks any new signal or check result. The secondmate
+  # durable recovery outranks any new signal or check result. The squad_lead
   # repair ticks above stay ahead of signals because they only
   # wake to relaunch a dead endpoint or unstick a foreign queue, never for noise.
   # On the first changed signal, linger one grace period and re-scan before
-  # classifying: a crewmate's final status write and the same turn's turn-end
+  # classifying: a operator's final status write and the same turn's turn-end
   # hook land seconds apart, and reporting them as separate actionable wakes
-  # costs a full firstmate turn each. The re-scan also picks up a newer
+  # costs a full juggernaut turn each. The re-scan also picks up a newer
   # signature for an already-pending file (last write wins below).
   signal_wake=
   pending=$(scan_signals)
@@ -3683,7 +3683,7 @@ EOF
 
   # The existing poll loop also owns the bounded inactive-outcome cadence.
   # This is mechanical and silent unless a durable terminal-outcome obligation
-  # was created, so quiet cycles never wake firstmate or consume model tokens.
+  # was created, so quiet cycles never wake juggernaut or consume model tokens.
   inactive_out=
   if inactive_out=$(JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" \
     "$SCRIPT_DIR/jg-inactive-reconcile.sh" scan 2>/dev/null); then
@@ -3695,14 +3695,14 @@ EOF
   fi
 
   # Layer 1 backbone: pane staleness. Two consecutive identical hashes with no busy
-  # signature means the crewmate finished, is waiting, or is wedged. Each distinct
+  # signature means the operator finished, is waiting, or is wedged. Each distinct
   # stale hash is surfaced, absorbed, or timed toward escalation once (.stale-*
   # remembers the hash already classified, or the declaration a busy pane's
   # crossed turn bound already handed to the away-mode daemon).
   while IFS= read -r w; do
     kind=$(window_kind "$w")
     task=$(window_to_task "$w" "$STATE")
-    # Steering-inbox loss detection runs before the secondmate stale
+    # Steering-inbox loss detection runs before the squad_lead stale
     # exemption below, because a mate's steers land in an inbox too.
     [ -z "$task" ] || inbox_steer_check "$w" "$task"
     key=$(window_key "$w")
@@ -3710,14 +3710,14 @@ EOF
     if ! status_is_paused_or_captain_held "$last" && [ -e "$STATE/.paused-$key" ]; then
       clear_pause_tracking "$key"
     fi
-    # An idle secondmate endpoint is healthy by design, so a mate is admitted to
+    # An idle squad_lead endpoint is healthy by design, so a mate is admitted to
     # the pane-stale path ONLY to serve a status-declared wait's bounded
     # re-surface. This gate reads the shared predicate rather than the pause verb
     # alone so it includes a declared `captain-held` status. A hold recorded only
     # in the backlog while the mate still says `working:` or `done:` is outside
     # this guard: reaching it would require backlog reads for windows this gate
     # deliberately skips, putting that read on the ordinary poll hot path.
-    if [ "$kind" = secondmate ] && ! status_is_paused_or_captain_held "$last"; then
+    if [ "$kind" = squad_lead ] && ! status_is_paused_or_captain_held "$last"; then
       continue
     fi
     backend=$(window_backend "$w")
@@ -3739,7 +3739,7 @@ EOF
     # reused below so a busy verdict is consistent within one cycle.
     if window_is_busy "$w" "$tail40"; then busy_now=0; else busy_now=1; fi
     if window_progress_absorbed "$w" "$task" "$key" "$h" "$prev" "$busy_now"; then continue; fi
-    if [ "$busy_now" -ne 0 ] && [ "$kind" != secondmate ] && [ -n "$task" ]; then
+    if [ "$busy_now" -ne 0 ] && [ "$kind" != squad_lead ] && [ -n "$task" ]; then
       declared_wait_contradiction "$w" "$task" "$key"
     fi
     if [ "$h" = "$prev" ]; then
@@ -3747,8 +3747,8 @@ EOF
       echo "$n" > "$cf"
       if [ "$n" -ge 2 ] && [ "$busy_now" -ne 0 ]; then
         # The pane is idle/stale at hash $h. Triage decides whether this wakes
-        # firstmate. Detection itself is unchanged from above.
-        if [ "$kind" = secondmate ]; then
+        # juggernaut. Detection itself is unchanged from above.
+        if [ "$kind" = squad_lead ]; then
           case "$(pause_state_class "$w" "$task")" in
             paused) handle_paused_stale "$w" "$task" "$h" ;;
             *)      clear_pause_tracking "$key" ;;
@@ -3768,7 +3768,7 @@ EOF
         elif stale_is_terminal "$w" "$STATE"; then
           # The log's latest status event is captain-relevant - but that alone is not
           # proof the crew is actually done: a crew's own status log gets no
-          # new entry once firstmate hands it to a no-mistakes validation
+          # new entry once juggernaut hands it to a no-mistakes validation
           # (AGENTS.md's sparse status-reporting contract), so the log can
           # keep showing a "done:"/needs-decision/blocked leftover from
           # BEFORE that validation started for the run's entire (possibly
@@ -3834,7 +3834,7 @@ EOF
           #     liveness evidence each kind of crew must supply), so absorb on the long
           #     PAUSE_RESURFACE_SECS cadence instead of wedge-escalating;
           #   - none: no running pipeline, no exact busy verdict, no admitted declared wait.
-          #     Surface immediately so firstmate inspects the inconclusive state
+          #     Surface immediately so juggernaut inspects the inconclusive state
           #     (it may be done via an interactive menu that wrote no done: status,
           #     waiting on a decision, or wedged) instead of leaving the finish to
           #     wait out the timer.
@@ -3973,7 +3973,7 @@ EOF
       # Backstop: a captain-relevant event the per-wake path absorbed by mistake.
       # Enqueue first, then record every status log surfaced through its end so the
       # next heartbeat does not re-fire it (enqueue-before-suppress preserved);
-      # this wake sends firstmate to the whole fleet, so every log is read.
+      # this wake sends juggernaut to the whole fleet, so every log is read.
       jg_wake_append heartbeat heartbeat heartbeat || exit 1
       touch "$STATE/.last-heartbeat"
       mark_all_captain_relevant_surfaced || true

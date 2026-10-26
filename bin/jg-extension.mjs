@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// Trusted external Firstmate extension binding host.
+// Trusted external Juggernaut extension binding host.
 //
 // Usage:
 //   jg-extension.mjs bind <package-root> --adapter <name> [--adapter <name> ...]
 //     --trust-same-user-code [--consent <fact> ...] [--timeout-ms <milliseconds>]
-//   jg-extension.sh remote-bind <secondmate-id> <package-root> [bind options]
+//   jg-extension.sh remote-bind <squad-lead-id> <package-root> [bind options]
 //   jg-extension.mjs retire-binding <extension-id>
 //     --if-binding-digest <sha256:digest>
 //   jg-extension.mjs retire-transfer <extension-id>
@@ -81,29 +81,29 @@ import { TextDecoder, promisify } from "node:util";
 const SELF = fileURLToPath(import.meta.url);
 const CODE_ROOT = path.dirname(path.dirname(SELF));
 const LAUNCH_BARRIER = path.join(CODE_ROOT, "bin", "jg-extension-launch-barrier.mjs");
-const MANIFEST_NAME = "firstmate-extension.json";
+const MANIFEST_NAME = "juggernaut-extension.json";
 const HOST_PROTOCOLS = [1];
 const PROCESS_EVENT_CAPABILITY = "process-event-adapter";
 const PROCESS_EVENT_VERSIONS = [1];
-const MANIFEST_SCHEMA = "firstmate.extension-manifest.v1";
-const BINDING_SCHEMA = "firstmate.extension-binding.v1";
-const HANDSHAKE_REQUEST_SCHEMA = "firstmate.extension-handshake-request.v1";
-const HANDSHAKE_RESPONSE_SCHEMA = "firstmate.extension-handshake-response.v1";
-const REQUEST_SCHEMA = "firstmate.extension-request.v1";
-const RESPONSE_SCHEMA = "firstmate.extension-response.v1";
+const MANIFEST_SCHEMA = "juggernaut.extension-manifest.v1";
+const BINDING_SCHEMA = "juggernaut.extension-binding.v1";
+const HANDSHAKE_REQUEST_SCHEMA = "juggernaut.extension-handshake-request.v1";
+const HANDSHAKE_RESPONSE_SCHEMA = "juggernaut.extension-handshake-response.v1";
+const REQUEST_SCHEMA = "juggernaut.extension-request.v1";
+const RESPONSE_SCHEMA = "juggernaut.extension-response.v1";
 const RESOLUTION_SCHEMA = "jg-extension-process-event-resolution.v1";
-const ERROR_EVIDENCE_SCHEMA = "firstmate.process-event-extension-error.v1";
-const INVOCATION_OWNER_SCHEMA = "firstmate.extension-invocation-owner.v1";
-const INVOCATION_READY_SCHEMA = "firstmate.extension-invocation-ready.v1";
-const INVOCATION_RELEASE_SCHEMA = "firstmate.extension-invocation-release.v1";
+const ERROR_EVIDENCE_SCHEMA = "juggernaut.process-event-extension-error.v1";
+const INVOCATION_OWNER_SCHEMA = "juggernaut.extension-invocation-owner.v1";
+const INVOCATION_READY_SCHEMA = "juggernaut.extension-invocation-ready.v1";
+const INVOCATION_RELEASE_SCHEMA = "juggernaut.extension-invocation-release.v1";
 const CAPTURE_RESERVATION_SCHEMA = "jg-procevent-capture-reservation.v1";
 const MAX_JSON_BYTES = 65536;
 const MAX_RESULT_BYTES = 32768;
 const MAX_STDERR_BYTES = 8192;
 const MAX_TREE_ENTRIES = 4096;
 const MAX_TREE_BYTES = 64 * 1024 * 1024;
-const TRANSFER_SCHEMA = "firstmate.extension-package-transfer.v1";
-const TRANSFER_MANIFEST_SCHEMA = "firstmate.extension-package-transfer-manifest.v1";
+const TRANSFER_SCHEMA = "juggernaut.extension-package-transfer.v1";
+const TRANSFER_MANIFEST_SCHEMA = "juggernaut.extension-package-transfer-manifest.v1";
 const MAX_TRANSFER_JSON_BYTES = 900000;
 const MAX_TRANSFER_ENTRIES = 128;
 const MAX_TRANSFER_FILE_BYTES = 256 * 1024;
@@ -386,7 +386,7 @@ function digestBytes(bytes) {
 
 function makeRequestId(seed = randomBytes(32)) {
   const bytes = Buffer.isBuffer(seed) ? seed : Buffer.from(seed, "utf8");
-  return digestBytes(Buffer.concat([Buffer.from("firstmate-extension-request-v1\0"), bytes]));
+  return digestBytes(Buffer.concat([Buffer.from("juggernaut-extension-request-v1\0"), bytes]));
 }
 
 function modeOf(info) {
@@ -411,7 +411,7 @@ async function activeHome() {
   const configured = process.env.JG_HOME || process.env.JG_ROOT_OVERRIDE || CODE_ROOT;
   const absolute = path.resolve(configured);
   const info = await maybeLstat(absolute);
-  if (!info || !info.isDirectory()) fail("home-invalid", `Firstmate home is not a directory: ${absolute}`);
+  if (!info || !info.isDirectory()) fail("home-invalid", `Juggernaut home is not a directory: ${absolute}`);
   return realpath(absolute);
 }
 
@@ -521,7 +521,7 @@ async function scanTree(root, { installed = false } = {}) {
 
   await walk(root, "");
   const hash = createHash("sha256");
-  hash.update("firstmate-package-tree-v1\0");
+  hash.update("juggernaut-package-tree-v1\0");
   for (const entry of entries) {
     hash.update(entry.type === "directory" ? "D\0" : "F\0");
     hash.update(entry.relative, "utf8");
@@ -624,7 +624,7 @@ async function validateSourceRoot(home, input) {
   if (!finalInfo || !finalInfo.isDirectory() || finalInfo.isSymbolicLink()) fail("package-missing", `package root is not a real directory: ${absolute}`);
   const canonical = await realpath(absolute);
   if (canonical !== absolute) fail("path-unsafe", `package root traverses a symbolic link: ${absolute}`);
-  if (isInside(home, canonical)) fail("path-unsafe", "package source must be outside the active Firstmate home");
+  if (isInside(home, canonical)) fail("path-unsafe", "package source must be outside the active Juggernaut home");
   if (await hasGitAncestor(canonical)) fail("path-unsafe", "package source must not be inside a Git project or task copy");
   return canonical;
 }
@@ -862,10 +862,10 @@ function childEnvironment(binding, statePath = "") {
     PATH: sanitizedPath(),
     LANG: "C",
     LC_ALL: "C",
-    FIRSTMATE_EXTENSION_ID: binding.extension_id,
-    FIRSTMATE_EXTENSION_VERSION: binding.extension_version,
+    JUGGERNAUT_EXTENSION_ID: binding.extension_id,
+    JUGGERNAUT_EXTENSION_VERSION: binding.extension_version,
   };
-  if (statePath) env.FIRSTMATE_EXTENSION_STATE = statePath;
+  if (statePath) env.JUGGERNAUT_EXTENSION_STATE = statePath;
   if (binding.consents.credential_store) {
     for (const name of ["HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "SSH_AUTH_SOCK"]) {
       if (process.env[name]) env[name] = process.env[name];
@@ -952,7 +952,7 @@ async function selfIdentity() {
     cachedSelfIdentity = `host-token:${makeRequestId()}`;
     // The private generation token gives recovery a direct PID-reuse check
     // without a process-table fork on every normal invocation.
-    process.title = `firstmate-extension-host ${cachedSelfIdentity}`;
+    process.title = `juggernaut-extension-host ${cachedSelfIdentity}`;
   }
   return cachedSelfIdentity;
 }
@@ -2526,18 +2526,18 @@ async function cmdProcessEvent(args) {
 }
 
 function usage() {
-  process.stderr.write(`Trusted external Firstmate extension binding host.
+  process.stderr.write(`Trusted external Juggernaut extension binding host.
 
 Usage:
   bin/jg-extension.mjs bind <package-root> --adapter <name> [--adapter <name> ...] --trust-same-user-code [--consent <fact> ...] [--timeout-ms <milliseconds>]
-  bin/jg-extension.sh remote-bind <secondmate-id> <package-root> --adapter <name> --trust-same-user-code [bind options]
+  bin/jg-extension.sh remote-bind <squad-lead-id> <package-root> --adapter <name> --trust-same-user-code [bind options]
   bin/jg-extension.mjs retire-binding <extension-id> --if-binding-digest <sha256:digest>
   bin/jg-extension.mjs retire-transfer <extension-id> --if-transfer-digest <sha256:digest> --if-binding-digest <sha256:digest>
   bin/jg-extension.mjs list
   bin/jg-extension.mjs inspect <extension-id>
   bin/jg-extension.mjs verify [extension-id]
 
-The manifest file is firstmate-extension.json. Supported consent facts are network, credential-store, task-metadata, and artifact-references. The host supports only process-event-adapter/1; see docs/extension-bindings.md for its manifest, binding, handshake, and invocation contracts.
+The manifest file is juggernaut-extension.json. Supported consent facts are network, credential-store, task-metadata, and artifact-references. The host supports only process-event-adapter/1; see docs/extension-bindings.md for its manifest, binding, handshake, and invocation contracts.
 `);
   process.exitCode = 2;
 }

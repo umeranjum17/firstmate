@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Live guard for jg-spawn's Pi seeded-secondmate --approve preflight.
+# Live guard for jg-spawn's Pi seeded-squad-lead --approve preflight.
 #
 # Reproduces the Pi "Trust project folder?" stall on a freshly seeded
-# secondmate-shaped home (tracked .pi/extensions + .jg-secondmate-home) under a
+# squad-lead-shaped home (tracked .pi/extensions + .jg-squad-lead-home) under a
 # disposable PI_CODING_AGENT_DIR, then proves the spawn-side --approve flag
 # clears that stall without rewriting the disposable trust store. An unseeded
 # path without --approve still prompts.
@@ -54,7 +54,7 @@ TRUST_BEFORE=$(cat "$PI_DIR/trust.json")
 seed_home() {  # <dir> <id>
   local dir=$1 id=$2
   mkdir -p "$dir/.pi/extensions" "$dir/data" "$dir/state" "$dir/config"
-  printf '%s\n' "$id" > "$dir/.jg-secondmate-home"
+  printf '%s\n' "$id" > "$dir/.jg-squad-lead-home"
   printf 'export default function () {}\n' > "$dir/.pi/extensions/jg-primary-turnend-guard.ts"
   printf 'export default function () {}\n' > "$dir/.pi/extensions/jg-primary-pi-watch.ts"
   printf '# test charter\n' > "$dir/data/charter.md"
@@ -90,7 +90,7 @@ fi
 "$REAL_TMUX" -L "$SOCKET" send-keys -t stall:w Escape >/dev/null 2>&1 || true
 "$REAL_TMUX" -L "$SOCKET" kill-session -t stall >/dev/null 2>&1 || true
 CHECKED=$((CHECKED + 1))
-pass "fresh seeded Pi secondmate-shaped home stalls on Trust project folder? without --approve"
+pass "fresh seeded Pi squad-lead-shaped home stalls on Trust project folder? without --approve"
 
 # --- 2. Same shape WITH --approve starts past the dialog; trust.json intact -
 SEED2="$LAB/seeded-approve"

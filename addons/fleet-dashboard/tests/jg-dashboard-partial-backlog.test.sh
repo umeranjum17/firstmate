@@ -17,12 +17,12 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # directory that holds it, so this builds a scratch copy of a fork tree's bin/
 # with this add-on's jg-dashboard.sh swapped in and drives the real script
 # there. Skipped when that tree or a required tool is absent. JG_FORK points at
-# the fork tree (default ~/firstmate).
+# the fork tree (default ~/juggernaut).
 set -u
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ADDON=$(dirname "$HERE")
-FORK=${JG_FORK:-$HOME/firstmate}
+FORK=${JG_FORK:-$HOME/juggernaut}
 command -v python3 >/dev/null 2>&1 || { echo "skip: python3 not found"; exit 0; }
 command -v jq >/dev/null 2>&1 || { echo "skip: jq not found"; exit 0; }
 command -v tasks-axi >/dev/null 2>&1 || { echo "skip: tasks-axi not found"; exit 0; }
@@ -71,7 +71,7 @@ make_fixture() {  # <root>
   local fix=$1 z=$1/mates/zephyrine today
   today=$(date +%F)
   mkdir -p "$fix/data" "$fix/state" "$fix/config" "$z/data" "$z/state" "$fix/stubs"
-  printf -- '- zephyrine - domain (home: %s; scope: work; projects: alpha; added 2026-07-11)\n' "$z" > "$fix/data/secondmates.md"
+  printf -- '- zephyrine - domain (home: %s; scope: work; projects: alpha; added 2026-07-11)\n' "$z" > "$fix/data/squad_leads.md"
   printf '3\n' > "$fix/config/lane-target"
   printf 'main 6\n' > "$fix/config/lane-caps"
   printf 'beta  # parked by the captain\n' > "$fix/config/parked-homes"

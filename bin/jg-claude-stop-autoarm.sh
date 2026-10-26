@@ -7,10 +7,10 @@
 # "asyncRewake": true and an explicit multi-hour timeout. Claude Code fires it
 # in the background on EVERY Stop of a Claude primary session, with no
 # deduplication across firings. It owns routine tokenless watcher continuity
-# for Claude primaries (main home and marked secondmate homes):
+# for Claude primaries (main home and marked squad_lead homes):
 #
 #   - Scope: only a genuine primary checkout (plain checkout or validly marked
-#     secondmate home) with AGENTS.md, bin/, and the effective state dir - the
+#     squad_lead home) with AGENTS.md, bin/, and the effective state dir - the
 #     exact jg-turnend-guard.sh scope. Child crew/scout worktrees stay inert.
 #   - Identity: only when THIS session holds state/.lock, as
 #     bin/jg-session-lock-lib.sh decides it: the recorded pid is a harness
@@ -334,7 +334,7 @@ handle_autoarm_signal() {
     exit 0
   fi
   if [ ! -e "$FAILURE_NOTICE" ]; then
-    printf 'firstmate watcher auto-arm INTERRUPTED by %s - the Stop-owned automatic supervision mechanism did not reach a terminal watcher outcome.\n' "$signal" >&2
+    printf 'juggernaut watcher auto-arm INTERRUPTED by %s - the Stop-owned automatic supervision mechanism did not reach a terminal watcher outcome.\n' "$signal" >&2
     printf 'Do not launch a manual background arm from this notice; investigate the automatic Stop hook and watcher startup before ending blind.\n' >&2
     autoarm_commit failed "$FAILURE_NOTICE" && exit 2
     exit 0
@@ -556,7 +556,7 @@ if [ "$ACTIONABLE" -eq 1 ]; then
     start_handling_successor "$CLOSED_ARM_PID" || true
   fi
   {
-    printf 'firstmate watcher wake - one supervision event needs a handling turn now.\n'
+    printf 'juggernaut watcher wake - one supervision event needs a handling turn now.\n'
     if [ "$HOST_MODE" -eq 1 ]; then
       [ -n "$OUT" ] && awk '/^supervision-host:/ { print; next } /^(signal:|stale:|check:|heartbeat)/ && shown++ < 8' "$OUT" 2>/dev/null
     else
@@ -584,7 +584,7 @@ if [ "$ACTIONABLE" -eq 1 ]; then
     && ! { jg_recovery_marker_snapshot "$STATE/.watcher-down" && [[ "$JG_RECOVERY_MARKER_TOKEN" == acked:* ]]; }; then
     REWAKE_FAILURE_COMMITTED=0
     if [ ! -e "$FAILURE_NOTICE" ]; then
-      printf 'firstmate watcher auto-arm FAILED - an actionable wake closed the cycle, but its rewake could not be committed: %s.\n' "$AUTOARM_REFUSAL" >&2
+      printf 'juggernaut watcher auto-arm FAILED - an actionable wake closed the cycle, but its rewake could not be committed: %s.\n' "$AUTOARM_REFUSAL" >&2
       autoarm_commit failed "$FAILURE_NOTICE" && REWAKE_FAILURE_COMMITTED=1
     else
       autoarm_commit failed-suppressed && REWAKE_FAILURE_COMMITTED=1
@@ -609,7 +609,7 @@ if [ ! -e "$FAILURE_NOTICE" ]; then
     exit 0
   fi
   {
-    printf 'firstmate watcher auto-arm FAILED - the Stop-owned automatic supervision mechanism is broken after %s bounded attempts, and no live watcher with a fresh beacon was verified.\n' "$attempt"
+    printf 'juggernaut watcher auto-arm FAILED - the Stop-owned automatic supervision mechanism is broken after %s bounded attempts, and no live watcher with a fresh beacon was verified.\n' "$attempt"
     [ -n "$OUT" ] && grep -E '^(watcher:|signal:|stale:|check:|heartbeat|supervision-host)' "$OUT" 2>/dev/null | head -8
     [ "$HOST_MODE" -eq 0 ] || printf 'The supervision host (docs/supervision-host.md) ran these cycles; its last one exited %s without a wake.\n' "$HOST_RC"
     printf 'Do not launch a manual background arm from this notice; investigate the automatic Stop hook and watcher startup before ending blind.\n'

@@ -682,7 +682,7 @@ const offer = dispatch("signal: task-9 done: PR https://example.com/pr/9 checks 
 if (!offer.accepted) throw new Error("branch did not accept the wake offer");
 await settle(() => (globalThis.__fmPrompts ?? []).length === 1, "branch wake prompt");
 const wakePrompt = globalThis.__fmPrompts[0];
-if (!wakePrompt.includes("FIRSTMATE SUPERVISION WAKE: signal: task-9 done")) {
+if (!wakePrompt.includes("JUGGERNAUT SUPERVISION WAKE: signal: task-9 done")) {
   throw new Error(`branch prompt lost the wake reason: ${wakePrompt}`);
 }
 if (mainUserMessages.length !== 0) throw new Error("accepted wake leaked to main as a user message");
@@ -830,17 +830,17 @@ outcomesTool.renderResult(legacyStockResult, { expanded: true, isPartial: false 
 if (legacyCall.children[1]?.text !== collapsedLegacyText) {
   throw new Error("legacy all-line stock capability changed expanded Calm-off output");
 }
-pi.events.emit("firstmate:calm-presentation", { active: true, stockExportRendering: false });
+pi.events.emit("juggernaut:calm-presentation", { active: true, stockExportRendering: false });
 const calmOnCall = outcomesTool.renderCall({}, renderTheme, renderContext);
 const calmOnResult = outcomesTool.renderResult(stockResult, { expanded: false, isPartial: false }, renderTheme, renderContext);
 if (calmOnCall.constructor.name !== "Container" || calmOnCall.render(100).length !== 0 || calmOnResult.constructor.name !== "Container" || calmOnResult.render(100).length !== 0) {
   throw new Error("jg_branch_outcomes remained visible while Calm was on");
 }
-pi.events.emit("firstmate:calm-presentation", { active: false, stockExportRendering: false });
+pi.events.emit("juggernaut:calm-presentation", { active: false, stockExportRendering: false });
 if (outcomesTool.renderCall({}, renderTheme, renderContext).constructor.name !== "Box" || outcomesTool.renderResult(stockResult, { expanded: false, isPartial: false }, renderTheme, renderContext).constructor.name !== "Container") {
   throw new Error("jg_branch_outcomes did not restore ordinary rendering when Calm was turned off");
 }
-pi.events.emit("firstmate:calm-presentation", { active: true, stockExportRendering: true });
+pi.events.emit("juggernaut:calm-presentation", { active: true, stockExportRendering: true });
 let exportCallFellBack = false;
 let exportResultFellBack = false;
 try {
@@ -1041,7 +1041,7 @@ const longRequests = [
   `${"middle context ".repeat(250)}${explicitRequest}${" middle context".repeat(250)}`,
   `${"tail context ".repeat(500)}${explicitRequest}`,
 ];
-const requestedPrompts = [...longRequests, "FIRSTMATE give me a fresh system-resource report."];
+const requestedPrompts = [...longRequests, "JUGGERNAUT give me a fresh system-resource report."];
 // Match Pi's real AgentSession.prompt ordering: before_agent_start receives
 // the expanded prompt before _runAgentPrompt appends its user message to the
 // SessionManager. Keeping entries stale at the hook boundary is the regression.
@@ -1066,7 +1066,7 @@ await fire("before_agent_start", { messageType: "user", prompt: unsolicitedPromp
 entries.push({ type: "message", message: { role: "user", content: unsolicitedPrompt } });
 await fire("agent_start", {}, mainCtx);
 await fire("agent_end", {}, mainCtx);
-const legacyOperational = "⁣FIRSTMATE_OP: give me a fresh system-resource report.";
+const legacyOperational = "⁣JUGGERNAUT_OP: give me a fresh system-resource report.";
 await fire("before_agent_start", { messageType: "user", prompt: legacyOperational }, mainCtx);
 entries.push({ type: "message", message: { role: "user", content: legacyOperational } });
 await fire("agent_start", {}, mainCtx);
@@ -1121,7 +1121,7 @@ for (const content of [unsolicitedPrompt, ...requestedPrompts]) {
   if (copies !== 1) throw new Error(`current captain prompt was mirrored ${copies} times instead of once`);
 }
 if (mirroredCaptainText.some((text) =>
-  text.includes("operational watcher injection") || text.includes("FIRSTMATE_OP: give me a fresh system-resource report")
+  text.includes("operational watcher injection") || text.includes("JUGGERNAUT_OP: give me a fresh system-resource report")
 )) {
   throw new Error("canonical current or legacy operational input entered captain mirror context");
 }
@@ -1445,7 +1445,7 @@ if (render("still unacknowledged") !== "") throw new Error("a tool continuation 
 // Only the sequence-bound acknowledgement closes it.
 const nativeTools = new Map();
 const messageTypes = new Set();
-bus.emit("firstmate:native-tools", {
+bus.emit("juggernaut:native-tools", {
   register: (tool) => nativeTools.set(tool.name, tool),
   allowMessageType: (type) => messageTypes.add(type),
 });
@@ -1453,7 +1453,7 @@ if ([...nativeTools.keys()].sort().join(",") !== "jg_branch_outcomes,jg_branch_p
 for (const tool of mainTools) {
   if (nativeTools.get(tool.name)?.execute !== tool.execute) throw new Error("native controls lost the original guards");
 }
-if ([...messageTypes].sort().join(",") !== "firstmate-sessionstart-nudge,jg-branch-merge,jg-branch-process") throw new Error("operational message allowlist changed");
+if ([...messageTypes].sort().join(",") !== "juggernaut-sessionstart-nudge,jg-branch-merge,jg-branch-process") throw new Error("operational message allowlist changed");
 const processed = nativeTools.get("jg_branch_processed");
 if (!processed) throw new Error("main did not receive its acknowledgement tool");
 const routineAck = await processed.execute("ack-routine", { through: routineSeq }, undefined, undefined, {});
@@ -2095,7 +2095,7 @@ if (nextTurnResult?.messages?.some((message) => message.customType === "jg-branc
 }
 const history = [
   { role: "user", content: "earlier captain request" },
-  { role: "assistant", content: "earlier firstmate reply" },
+  { role: "assistant", content: "earlier juggernaut reply" },
 ];
 aborted = false;
 const openedByCaptain = await fire("context", {
@@ -2163,7 +2163,7 @@ if (!awayOffer.accepted) throw new Error("the away wake was refused");
 await settle(() => (globalThis.__fmPrompts ?? []).length === 2, "away branch prompt");
 if (globalThis.__fmSessions.length !== 1) throw new Error("the away posture rebuilt the branch session");
 const awayPrompt = globalThis.__fmPrompts[1];
-const head = "FIRSTMATE SUPERVISION WAKE: signal: away wake\n\nHandle this per your operating procedure and finish with jg_branch_report.\n\nPOSTURE: AWAY. ";
+const head = "JUGGERNAUT SUPERVISION WAKE: signal: away wake\n\nHandle this per your operating procedure and finish with jg_branch_report.\n\nPOSTURE: AWAY. ";
 if (!awayPrompt.startsWith(head)) throw new Error(`the away wake lost its shape or its tail: ${awayPrompt}`);
 const readback = contract(["readback"]);
 if (!readback.endsWith("    merge task-d when green, then cut the prerelease\n    \n")) throw new Error(`the read-back lost the captain's words or their trailing blank line: ${JSON.stringify(readback)}`);
@@ -3156,7 +3156,7 @@ import { existsSync, readFileSync } from "node:fs";
 const entries = [
   { type: "message", message: { role: "user", content: `never merge task-7 without my word ${"h".repeat(5000)} old-history-tail` } },
   { type: "message", message: { role: "assistant", content: [{ type: "text", text: "aye, holding task-7" }, { type: "toolCall", id: "t1" }] } },
-  { type: "message", message: { role: "user", content: "⁣FIRSTMATE_OP: v1 watcher: operational injection" } },
+  { type: "message", message: { role: "user", content: "⁣JUGGERNAUT_OP: v1 watcher: operational injection" } },
   { type: "message", message: { role: "toolResult", content: "tool output stays in main" } },
   { type: "custom", message: { role: "custom", customType: "jg-branch-merge", content: "merged note" } },
   { type: "compaction", summary: "compacted" },
@@ -4948,12 +4948,12 @@ EOF
   pass "scopeForUnreadWake excludes every main-only class without vetoing eligible task-local rows, and writes the eligible snapshot"
 }
 
-# A second mate's status log is one shared channel for many independently keyed
+# A squad lead's status log is one shared channel for many independently keyed
 # decisions, so its signal rows are judged by the span presented since the last
 # drain (bounded by bin/jg-classify-lib.sh's own presentation-cursor writer),
-# not by every decision still open anywhere in that log. Single-task crewmate
+# not by every decision still open anywhere in that log. Single-task operator
 # logs keep their previous rule on both the Pi and the attended-host path.
-test_branch_dispatch_routes_secondmate_signal_by_new_span() {
+test_branch_dispatch_routes_squad_lead_signal_by_new_span() {
   local repo home out status
   repo="$TMP_ROOT/dispatch-span-root"
   home="$TMP_ROOT/dispatch-span-home"
@@ -4962,7 +4962,7 @@ test_branch_dispatch_routes_secondmate_signal_by_new_span() {
   cp "$ROOT/.pi/extensions/lib/jg-native-contract.ts" "$repo/.pi/extensions/lib/jg-native-contract.ts"
   cp "$ROOT/.pi/extensions/lib/jg-async-exec.ts" "$repo/.pi/extensions/lib/jg-async-exec.ts"
   cp "$ROOT/.pi/extensions/lib/jg-branch-model-picker.ts" "$repo/.pi/extensions/lib/jg-branch-model-picker.ts"
-  printf 'project=%s/projects/approved\nwindow=mate-window\nkind=secondmate\n' "$home" > "$home/state/mate.meta"
+  printf 'project=%s/projects/approved\nwindow=mate-window\nkind=squad_lead\n' "$home" > "$home/state/mate.meta"
   printf 'project=%s/projects/approved\nwindow=crew-window\nkind=ship\n' "$home" > "$home/state/crew.meta"
   LIB="$repo/.pi/extensions/lib/jg-branch-dispatch.ts" JG_HOME="$home" CLASSIFY_LIB="$ROOT/bin/jg-classify-lib.sh" \
     node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
@@ -5036,7 +5036,7 @@ rmSync(`${state}/.status-presentation-cursor`);
 if (verdicts().some(Boolean)) throw new Error("a missing presentation cursor did not fall back to the whole log");
 
 // A stale row stays a whole-log liveness check, and a co-queued signal row for
-// the same second mate keeps its own verdict in either order.
+// the same squad lead keeps its own verdict in either order.
 for (const [order, queue, signalSeq, staleSeq] of [
   ["stale first", "1\t1\tstale\tmate\tstale: mate\n1\t2\tsignal\tmate.status\tsignal: mate.status", "2", "1"],
   ["signal first", "1\t1\tsignal\tmate.status\tsignal: mate.status\n1\t2\tstale\tmate\tstale: mate", "1", "2"],
@@ -5046,22 +5046,22 @@ for (const [order, queue, signalSeq, staleSeq] of [
   for (const attendedHost of [false, true]) {
     const scope = scopeForUnreadWake(state, false, false, attendedHost);
     if (!scope.eligibleSeqs.includes(signalSeq) || scope.eligibleSeqs.includes(staleSeq)) {
-      throw new Error(`${order}: signal and stale rows for one second mate shared a verdict: ${JSON.stringify(scope)}`);
+      throw new Error(`${order}: signal and stale rows for one squad lead shared a verdict: ${JSON.stringify(scope)}`);
     }
   }
 }
 
-// Single-task crewmate logs are unchanged: Pi judges only the row payload, and
+// Single-task operator logs are unchanged: Pi judges only the row payload, and
 // the attended host keeps its whole-log rule.
 stage("crew", hold, "done: routine follow-up\n");
 const [crewPi, crewHost] = verdicts();
-if (!crewPi || crewHost) throw new Error(`crewmate signal routing changed: pi=${crewPi} host=${crewHost}`);
+if (!crewPi || crewHost) throw new Error(`operator signal routing changed: pi=${crewPi} host=${crewHost}`);
 process.exit(0);
 EOF
   status=$?
   out=$(cat "$TMP_ROOT/node-output")
   expect_code 0 "$status" "second-mate signal rows must be routed by their new span: $out"
-  pass "second-mate signal rows route by their new span while crewmate and stale routing stay unchanged"
+  pass "second-mate signal rows route by their new span while operator and stale routing stay unchanged"
 }
 
 # The model picker's bounded scrolling and its search ranking are Pi's own
@@ -5363,18 +5363,18 @@ for (const expanded of [false, true]) {
     throw new Error(`${expanded ? "expanded" : "collapsed"} Calm-off jg_branch_processed rendering differs from Pi stock`);
   }
 }
-pi.events.emit("firstmate:calm-presentation", { active: true, stockExportRendering: false });
+pi.events.emit("juggernaut:calm-presentation", { active: true, stockExportRendering: false });
 actualRow.invalidate();
 if (actualRow.render(100).length !== 0) {
   throw new Error("Calm-on ToolExecutionComponent row remained visible");
 }
-pi.events.emit("firstmate:calm-presentation", { active: false, stockExportRendering: false });
+pi.events.emit("juggernaut:calm-presentation", { active: false, stockExportRendering: false });
 actualRow.invalidate();
 if (JSON.stringify(actualRow.render(100)) !== JSON.stringify(stockRow.render(100))) {
   throw new Error("ToolExecutionComponent rendering did not restore after live toggle");
 }
 
-pi.events.emit("firstmate:calm-presentation", { active: true, stockExportRendering: true });
+pi.events.emit("juggernaut:calm-presentation", { active: true, stockExportRendering: true });
 const stockHtml = createToolHtmlRenderer({ getToolDefinition: () => stockDefinition, getToolRenderers: () => stockDefinition, theme, cwd: process.cwd() });
 const actualHtml = createToolHtmlRenderer({ getToolDefinition: () => actualDefinition, getToolRenderers: () => actualDefinition, theme, cwd: process.cwd() });
 const stockCall = stockHtml.renderCall("stock-html", "jg_branch_outcomes", args);
@@ -5969,7 +5969,7 @@ test_abbreviated_processing_request_points_to_full_outcome
 test_large_unprocessed_backlog_replays_in_batches
 test_undated_unprocessed_outcome_surfaces_and_stays_unprocessed
 test_branch_dispatch_classifies_main_only_rows_and_writes_the_eligible_snapshot
-test_branch_dispatch_routes_secondmate_signal_by_new_span
+test_branch_dispatch_routes_squad_lead_signal_by_new_span
 test_branch_cache_key_is_per_home_stable
 test_branch_default_on_heartbeat_afk_and_fallback
 test_away_record_parks_main_and_presents_after_archive

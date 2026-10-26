@@ -72,7 +72,7 @@ test_scratchpad2_does_not_dirty_porcelain() {
   git init -q "$repo"
   cp "$ROOT/.gitignore" "$repo/.gitignore"
   git -C "$repo" add .gitignore
-  git -C "$repo" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' \
+  git -C "$repo" -c user.name='Juggernaut Tests' -c user.email='tests@example.invalid' \
     commit -qm 'seed gitignore'
   mkdir -p "$repo/scratchpad2"
   printf 'notes\n' > "$repo/scratchpad2/notes.txt"

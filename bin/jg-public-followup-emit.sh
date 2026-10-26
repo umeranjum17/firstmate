@@ -6,7 +6,7 @@
 #
 # WHY THIS EXISTS: a public promise is kept by the home that owns the relay
 # consent and the thread binding. The home doing the work only has to report a
-# TYPED result. Firstmate must never recover the source home, work id, outcome,
+# TYPED result. Juggernaut must never recover the source home, work id, outcome,
 # or deliverables by parsing a free-form "done: ..." status sentence, so this
 # script is the structured channel that carries them.
 #
@@ -17,7 +17,7 @@
 # Usage:
 #   jg-public-followup-emit.sh (--home <owning-home> | --stage-in <work-home>) \
 #     --obligation <obligation-id> --relation <relation-id> \
-#     --source-home <main|secondmate:<id>> --work-id <task-id> \
+#     --source-home <main|squad_lead:<id>> --work-id <task-id> \
 #     --generation <n> --outcome <outcome-type> \
 #     [--deliverable <key>=<value>]... [--require-deliverable <key>]... \
 #     (--outcome-text <text> | --outcome-text-file <path> | --outcome-text -)
@@ -40,7 +40,7 @@
 #   --obligation <id>      tasks-axi public-followup obligation id.
 #   --relation <id>        The relation_id this work fulfills or contributes to.
 #   --source-home <id>     This worker's stable home identity, exactly as bound:
-#                          "main" or "secondmate:<stable-id>".
+#                          "main" or "squad_lead:<stable-id>".
 #   --work-id <id>         This worker's exact task id, exactly as bound.
 #   --generation <n>       The bound relation generation (integer >= 1).
 #   --outcome <type>       Typed outcome. With --home, an outcome that cannot
@@ -105,7 +105,7 @@ usage() {
   cat >&2 <<'EOF'
 usage: jg-public-followup-emit.sh (--home <owning-home> | --stage-in <work-home>)
          --obligation <id> --relation <id>
-         --source-home <main|secondmate:<id>> --work-id <id> --generation <n>
+         --source-home <main|squad_lead:<id>> --work-id <id> --generation <n>
          --outcome <type> [--deliverable <key>=<value>]...
          [--require-deliverable <key>]...
          (--outcome-text <text> | --outcome-text-file <path> | --outcome-text -)
@@ -204,7 +204,7 @@ jg_pf_slug_valid "$RELATION"   || die "unsafe relation id: $RELATION"
 jg_pf_slug_valid "$WORK_ID"    || die "unsafe work id: $WORK_ID"
 jg_pf_slug_valid "$OUTCOME"    || die "unsafe outcome type: $OUTCOME"
 jg_pf_home_id_valid "$SOURCE_HOME" \
-  || die "source home must be 'main' or 'secondmate:<stable-id>', got '$SOURCE_HOME'"
+  || die "source home must be 'main' or 'squad_lead:<stable-id>', got '$SOURCE_HOME'"
 case "$GENERATION" in
   ''|*[!0-9]*) die "generation must be a positive integer, got '$GENERATION'" ;;
 esac
@@ -232,19 +232,19 @@ esac
 [ -d "$HOME_DIR" ] && [ ! -L "$HOME_DIR" ] \
   || die "$HOME_FLAG must name an existing directory, got '$HOME_DIR'"
 # A staged event is only ever found again by the collecting home reading this
-# home's state tree, so a path that is not a firstmate home would swallow the
+# home's state tree, so a path that is not a juggernaut home would swallow the
 # result silently. Refuse it here instead.
 if [ "$HOME_MODE" = staging ]; then
   case "$SOURCE_HOME" in
-    secondmate:*) STAGING_HOME_ID=${SOURCE_HOME#secondmate:} ;;
-    *) die "--stage-in must name the secondmate firstmate home identified by --source-home" ;;
+    squad_lead:*) STAGING_HOME_ID=${SOURCE_HOME#squad_lead:} ;;
+    *) die "--stage-in must name the squad_lead juggernaut home identified by --source-home" ;;
   esac
   [ -d "$HOME_DIR/state" ] && [ ! -L "$HOME_DIR/state" ] \
-    && [ -f "$HOME_DIR/.jg-secondmate-home" ] && [ ! -L "$HOME_DIR/.jg-secondmate-home" ] \
-    || die "--stage-in must name the secondmate firstmate home identified by --source-home"
-  STAGING_HOME_MARKER=$(sed -n '1p' "$HOME_DIR/.jg-secondmate-home" 2>/dev/null) || STAGING_HOME_MARKER=
+    && [ -f "$HOME_DIR/.jg-squad-lead-home" ] && [ ! -L "$HOME_DIR/.jg-squad-lead-home" ] \
+    || die "--stage-in must name the squad_lead juggernaut home identified by --source-home"
+  STAGING_HOME_MARKER=$(sed -n '1p' "$HOME_DIR/.jg-squad-lead-home" 2>/dev/null) || STAGING_HOME_MARKER=
   [ "$STAGING_HOME_MARKER" = "$STAGING_HOME_ID" ] \
-    || die "--stage-in must name the secondmate firstmate home identified by --source-home"
+    || die "--stage-in must name the squad_lead juggernaut home identified by --source-home"
 fi
 
 STATE="$HOME_DIR/state"

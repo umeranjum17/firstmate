@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Turn the owner rules off in one firstmate home, giving config/merge-gate back to its previous gate.
+# Turn the owner rules off in one juggernaut home, giving config/merge-gate back to its previous gate.
 # Usage: uninstall.sh [--dry-run] <jg-home>
 set -euo pipefail
 DRY=0; [ "${1:-}" = --dry-run ] && { DRY=1; shift; }

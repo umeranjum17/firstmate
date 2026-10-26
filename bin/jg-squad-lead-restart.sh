@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
-# Restart second mates onto the current instruction surface and launch-time
+# Restart squad leads onto the current instruction surface and launch-time
 # wiring, persisting their open records first.
 #
-# Usage: jg-secondmate-restart.sh <secondmate-id>... [--help]
+# Usage: jg-squad-lead-restart.sh <squad-lead-id>... [--help]
 #
-# This is the executable half of /updatefirstmate's reload step. A running agent
+# This is the executable half of /updatejuggernaut's reload step. A running agent
 # holds AGENTS.md and every skill it has loaded frozen from launch, and no
 # verified harness offers a reload, so a re-read steer cannot replace either -
 # it appends a second copy of the mate's own job description with no defined
@@ -52,7 +52,7 @@
 # Placement changes the transport and nothing else. A local mate is restarted
 # with bin/jg-control.sh <id> relaunch, which republishes this home's own
 # metadata directly; a remote mate is restarted with
-# bin/jg-remote-secondmate-relaunch.sh, which runs that same command on its
+# bin/jg-remote-squad-lead-relaunch.sh, which runs that same command on its
 # host over bin/jg-on.sh and then republishes this primary's own route
 # metadata from the identity the host confirmed, since the host-local verb can
 # only rewrite its own endpoint record. The restart decision, the profile, the
@@ -68,9 +68,9 @@
 # capability on its own argv rather than trusting a caller's list.
 #
 # Environment knobs:
-#   JG_SECONDMATE_PERSIST_WAIT  seconds to wait for one mate's persist answer (900)
-#   JG_SECONDMATE_IDLE_WAIT     seconds after that answer to wait for its composer to read empty (600)
-#   JG_SECONDMATE_PERSIST_POLL  seconds between checks of the answer and the composer (5)
+#   JG_SQUAD_LEAD_PERSIST_WAIT  seconds to wait for one mate's persist answer (900)
+#   JG_SQUAD_LEAD_IDLE_WAIT     seconds after that answer to wait for its composer to read empty (600)
+#   JG_SQUAD_LEAD_PERSIST_POLL  seconds between checks of the answer and the composer (5)
 #
 # Exit status: 0 every named mate restarted; 3 at least one was nudged or left
 # unreached and every mate was still accounted for; 1 the input itself is
@@ -90,36 +90,36 @@ case "${1:-}" in
 esac
 
 if [ -z "${JG_HOME:-}" ]; then
-  echo "error: JG_HOME is not set; jg-secondmate-restart refuses to resolve second mates without an explicit firstmate home" >&2
+  echo "error: JG_HOME is not set; jg-squad-lead-restart refuses to resolve squad leads without an explicit juggernaut home" >&2
   exit 1
 fi
 [ -d "$JG_HOME" ] || { echo "error: JG_HOME '$JG_HOME' is not a directory" >&2; exit 1; }
 STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
-[ -d "$STATE" ] || { echo "error: state dir '$STATE' is missing; jg-secondmate-restart cannot resolve second mates for JG_HOME '$JG_HOME'" >&2; exit 1; }
+[ -d "$STATE" ] || { echo "error: state dir '$STATE' is missing; jg-squad-lead-restart cannot resolve squad leads for JG_HOME '$JG_HOME'" >&2; exit 1; }
 
-# shellcheck source=bin/jg-secondmate-restart-lib.sh
-. "$SCRIPT_DIR/jg-secondmate-restart-lib.sh"
-# shellcheck source=bin/jg-secondmate-nudge-lib.sh
-. "$SCRIPT_DIR/jg-secondmate-nudge-lib.sh"
+# shellcheck source=bin/jg-squad-lead-restart-lib.sh
+. "$SCRIPT_DIR/jg-squad-lead-restart-lib.sh"
+# shellcheck source=bin/jg-squad-lead-nudge-lib.sh
+. "$SCRIPT_DIR/jg-squad-lead-nudge-lib.sh"
 # shellcheck source=bin/jg-pending-reply-lib.sh
 . "$SCRIPT_DIR/jg-pending-reply-lib.sh"
 
-PERSIST_WAIT=${JG_SECONDMATE_PERSIST_WAIT:-900}
-IDLE_WAIT=${JG_SECONDMATE_IDLE_WAIT:-600}
-PERSIST_POLL=${JG_SECONDMATE_PERSIST_POLL:-5}
-case "$PERSIST_WAIT" in ''|*[!0-9]*) echo "error: JG_SECONDMATE_PERSIST_WAIT must be a non-negative integer: $PERSIST_WAIT" >&2; exit 2 ;; esac
-case "$IDLE_WAIT" in ''|*[!0-9]*) echo "error: JG_SECONDMATE_IDLE_WAIT must be a non-negative integer: $IDLE_WAIT" >&2; exit 2 ;; esac
-case "$PERSIST_POLL" in ''|*[!0-9]*|0) echo "error: JG_SECONDMATE_PERSIST_POLL must be a positive integer: $PERSIST_POLL" >&2; exit 2 ;; esac
+PERSIST_WAIT=${JG_SQUAD_LEAD_PERSIST_WAIT:-900}
+IDLE_WAIT=${JG_SQUAD_LEAD_IDLE_WAIT:-600}
+PERSIST_POLL=${JG_SQUAD_LEAD_PERSIST_POLL:-5}
+case "$PERSIST_WAIT" in ''|*[!0-9]*) echo "error: JG_SQUAD_LEAD_PERSIST_WAIT must be a non-negative integer: $PERSIST_WAIT" >&2; exit 2 ;; esac
+case "$IDLE_WAIT" in ''|*[!0-9]*) echo "error: JG_SQUAD_LEAD_IDLE_WAIT must be a non-negative integer: $IDLE_WAIT" >&2; exit 2 ;; esac
+case "$PERSIST_POLL" in ''|*[!0-9]*|0) echo "error: JG_SQUAD_LEAD_PERSIST_POLL must be a positive integer: $PERSIST_POLL" >&2; exit 2 ;; esac
 
 IDS=()
 for arg in "$@"; do
   case "$arg" in
     -*) echo "error: unexpected argument '$arg'" >&2; usage >&2; exit 2 ;;
   esac
-  # /updatefirstmate's action line names each mate by its jg-<id> selector; the
+  # /updatejuggernaut's action line names each mate by its jg-<id> selector; the
   # bare id is equally acceptable so a hand-run stays natural.
   id=${arg#jg-}
-  case "$id" in ''|*[!A-Za-z0-9._-]*) echo "error: invalid second mate id: $arg" >&2; exit 2 ;; esac
+  case "$id" in ''|*[!A-Za-z0-9._-]*) echo "error: invalid squad lead id: $arg" >&2; exit 2 ;; esac
   case " ${IDS[*]:-} " in
     *" $id "*) continue ;;
   esac
@@ -127,7 +127,7 @@ for arg in "$@"; do
 done
 [ "${#IDS[@]}" -gt 0 ] || { usage >&2; exit 2; }
 
-# Parked-home guard (firstmate-addons/parked-homes): a parked secondmate home
+# Parked-home guard (juggernaut-addons/parked-homes): a parked squad_lead home
 # gets no restart pass at all - no persist request, no relaunch, no nudge. One
 # line names each skip. The shim answers not parked when the add-on is absent.
 # shellcheck source=bin/jg-parked-homes-lib.sh
@@ -191,7 +191,7 @@ restart_mate() {  # <array-index>
   id=${IDS[$i]}
   if [ "${PLACEMENT[i]}" = remote ]; then
     restart_out=$(JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" \
-      "$SCRIPT_DIR/jg-remote-secondmate-relaunch.sh" \
+      "$SCRIPT_DIR/jg-remote-squad-lead-relaunch.sh" \
       "$id" "${HARNESS[i]}" "${MODEL[i]:-default}" "${EFFORT[i]:-default}" < /dev/null 2>&1)
     restart_rc=$?
   else
@@ -306,25 +306,25 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
   HARNESS[i]=""
   MODEL[i]=""
   EFFORT[i]=""
-  if ! jg_secondmate_restart_capable "$STATE/$id.meta"; then
-    REASON[i]=$JG_SECONDMATE_RESTART_REASON
+  if ! jg_squad_lead_restart_capable "$STATE/$id.meta"; then
+    REASON[i]=$JG_SQUAD_LEAD_RESTART_REASON
     i=$((i + 1))
     continue
   fi
-  PLACEMENT[i]=$JG_SECONDMATE_RESTART_PLACEMENT
-  HOST[i]=$JG_SECONDMATE_RESTART_HOST
-  HARNESS[i]=$JG_SECONDMATE_RESTART_HARNESS
+  PLACEMENT[i]=$JG_SQUAD_LEAD_RESTART_PLACEMENT
+  HOST[i]=$JG_SQUAD_LEAD_RESTART_HOST
+  HARNESS[i]=$JG_SQUAD_LEAD_RESTART_HARNESS
   if [ "${PLACEMENT[i]}" = remote ]; then
-    # A local relaunch re-resolves this home's durable secondmate pin on its own,
+    # A local relaunch re-resolves this home's durable squad_lead pin on its own,
     # which is the one owner of that resolution. A remote one cannot: it runs in
-    # a home whose config/secondmate-harness is deliberately NOT inherited, so
+    # a home whose config/squad-lead-harness is deliberately NOT inherited, so
     # the file on that host belongs to a different home and re-resolving there
     # would silently move the mate onto another runtime. Resolve the pin here and
     # pass it explicitly, so both placements land on the same decision.
-    if ! HARNESS[i]=$("$SCRIPT_DIR/jg-harness.sh" secondmate "$id") \
-      || ! MODEL[i]=$("$SCRIPT_DIR/jg-harness.sh" secondmate-model "$id") \
-      || ! EFFORT[i]=$("$SCRIPT_DIR/jg-harness.sh" secondmate-effort "$id"); then
-      REASON[i]="its configured secondmate profile is invalid; no restart was attempted"
+    if ! HARNESS[i]=$("$SCRIPT_DIR/jg-harness.sh" squad_lead "$id") \
+      || ! MODEL[i]=$("$SCRIPT_DIR/jg-harness.sh" squad-lead-model "$id") \
+      || ! EFFORT[i]=$("$SCRIPT_DIR/jg-harness.sh" squad-lead-effort "$id"); then
+      REASON[i]="its configured squad_lead profile is invalid; no restart was attempted"
       i=$((i + 1))
       continue
     fi
@@ -340,14 +340,14 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
   fi
 
   if ! corr=$(jg_pending_reply_create "$JG_HOME" "$STATE" "$id" \
-    "$JG_SECONDMATE_PERSIST_REQUEST"); then
+    "$JG_SQUAD_LEAD_PERSIST_REQUEST"); then
     REASON[i]="its answer about the open work cannot be tracked, so a clean reload could not be proven"
     i=$((i + 1))
     continue
   fi
   if ! send_out=$(JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" \
     JG_PENDING_REPLY_EXISTING_CORR="$corr" \
-    "$SCRIPT_DIR/jg-send.sh" "$id" "$JG_SECONDMATE_PERSIST_REQUEST" 2>&1); then
+    "$SCRIPT_DIR/jg-send.sh" "$id" "$JG_SQUAD_LEAD_PERSIST_REQUEST" 2>&1); then
     jg_pending_reply_discard_undelivered "$STATE" "$corr" >/dev/null 2>&1 || true
     REASON[i]="the request to write down its open work could not be delivered: $(first_reported_line "$send_out")"
     i=$((i + 1))
@@ -361,7 +361,7 @@ done
 
 # --- phase B: restart ------------------------------------------------------
 
-RESULT_DIR=$(mktemp -d "$STATE/.secondmate-restart.XXXXXX") || {
+RESULT_DIR=$(mktemp -d "$STATE/.squad-lead-restart.XXXXXX") || {
   echo "error: could not create restart result directory under $STATE" >&2
   exit 1
 }

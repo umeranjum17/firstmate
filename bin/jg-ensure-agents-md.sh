@@ -13,7 +13,7 @@
 # project AGENTS.md files, injecting it idempotently into created skeletons,
 # promoted CLAUDE.md files, and existing AGENTS.md files lacking both the exact
 # heading and the project-owned mark below (exact first line, LF or CRLF):
-# <!-- firstmate:maintained-by-project -->
+# <!-- juggernaut:maintained-by-project -->
 # Projects may place this mark at the start of the file and retain equivalent
 # maintenance guidance under their own heading. It declares guidance is present, not
 # permission to remove governance. No prose equivalence is inferred.
@@ -28,7 +28,7 @@
 # This is a manual project-initialization utility, not a supervision script,
 # so it does not call jg-guard.sh. No brief calls it: the sections it inserts
 # and the pointer it creates are additions, and AGENTS.md section 6 bounds
-# crewmate edits of project memory files to correcting the wrong text only.
+# operator edits of project memory files to correcting the wrong text only.
 # Usage: jg-ensure-agents-md.sh [repo-or-worktree-dir]
 set -eu
 
@@ -38,7 +38,7 @@ usage() {
 
 To retain equivalent project-owned maintenance guidance without adding the
 canonical section, use this exact first line of AGENTS.md (LF or CRLF):
-<!-- firstmate:maintained-by-project -->
+<!-- juggernaut:maintained-by-project -->
 The mark declares retained guidance, not permission to remove governance.
 Without the first-line mark or exact canonical heading, the helper adds the section.
 EOF
@@ -85,8 +85,8 @@ MAINT_INJECTED=0
 ensure_maintenance_section() {
   MAINT_INJECTED=0
   if grep -Fqx -e '## Maintaining this file' -e $'## Maintaining this file\r' "$AGENTS" ||
-    head -n 1 "$AGENTS" | grep -Fqx -e '<!-- firstmate:maintained-by-project -->' \
-      -e $'<!-- firstmate:maintained-by-project -->\r'; then
+    head -n 1 "$AGENTS" | grep -Fqx -e '<!-- juggernaut:maintained-by-project -->' \
+      -e $'<!-- juggernaut:maintained-by-project -->\r'; then
     return 0
   fi
   local eol=$'\n' sep=''

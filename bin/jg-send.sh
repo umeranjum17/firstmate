@@ -11,7 +11,7 @@
 #   worse than a loud failure.
 # The text must be nonempty: an empty or whitespace-only message is refused
 # before anything is marked, recorded, or typed, because an empty marked
-# secondmate request delivers only marker and correlation bytes and leaves the
+# squad_lead request delivers only marker and correlation bytes and leaves the
 # parent waiting on a reply to nothing.
 # Special keys instead of text: jg-send.sh <target> --key Enter
 # Key support is backend-specific: tmux/herdr support Escape, Enter, and C-c;
@@ -23,7 +23,7 @@
 # remote alike. The message is appended as a durable sequenced record under
 # the task's steering inbox (newlines are legal) - state/<id>.inbox/ for a
 # local task, or the remote home's host-local inbox reached through jg-on.sh
-# for a remote secondmate - and the terminal receives only one short constant
+# for a remote squad_lead - and the terminal receives only one short constant
 # self-describing doorbell line plus Enter, best-effort. The durable record IS
 # the delivery, so the record's fate alone governs the exit: 0 = the steer is
 # durably sent (recorded); nonzero = nothing was confirmed delivered and a
@@ -77,31 +77,31 @@
 # default to 20 for agy's late busy render) / JG_SEND_SLEEP (0.4). Slash
 # commands, and codex `$...` skill invocations resolved through harness meta,
 # get a longer pre-Enter settle so completion popups do not swallow Enter.
-# A remote secondmate target has no typed text plane at all:
-# every remote text steer rides the inbox (a marked secondmate request already
+# A remote squad_lead target has no typed text plane at all:
+# every remote text steer rides the inbox (a marked squad_lead request already
 # reaches the harness as marker-prefixed chat rather than a parser command, so
 # routing a remote "/..." or "$..." through the record changes nothing the
 # parser would have seen); only --key still crosses to the remote pane as a
 # keystroke.
 #
 # Stage-1 compatibility boundary: classification uses the original pre-marker
-# text, but secondmate marking still precedes every typed submission. Therefore
-# a marked parser-native secondmate invocation intentionally reaches the harness
+# text, but squad_lead marking still precedes every typed submission. Therefore
+# a marked parser-native squad_lead invocation intentionally reaches the harness
 # as marker-prefixed chat rather than executing as a parser command. This is a
 # pre-existing interaction retained for byte compatibility in this local-inbox
 # stage; do not move the marker behind the invocation or omit it here. Follow-up
-# jg-send-secondmate-harness-invocation-r1 owns that behavior.
+# jg-send-squad-lead-harness-invocation-r1 owns that behavior.
 #
-# From-firstmate marker: when the resolved target is a task selector whose meta
-# records kind=secondmate, the message uses the live-charter-compatible
-# from-firstmate carrier owned by bin/jg-operational-input.sh so the secondmate
+# From-juggernaut marker: when the resolved target is a task selector whose meta
+# records kind=squad_lead, the message uses the live-charter-compatible
+# from-juggernaut carrier owned by bin/jg-operational-input.sh so the squad_lead
 # routes its reply via its status file or a status-pointed doc instead of
-# stranding it in chat the main firstmate never reads. On the inbox plane the
-# marker travels verbatim inside the recorded body. A crewmate/scout target,
+# stranding it in chat the main juggernaut never reads. On the inbox plane the
+# marker travels verbatim inside the recorded body. A operator/scout target,
 # an explicit backend-target escape-hatch target, and the --key path are never
 # marked - their behavior is unchanged.
 #
-# Parent-owned pending-reply expectation: every newly marked secondmate request
+# Parent-owned pending-reply expectation: every newly marked squad_lead request
 # except an explicit --fire-and-forget delivery receives a privacy-safe
 # correlation id and a durable parent record under state/pending-replies/ before
 # delivery (bin/jg-pending-reply-lib.sh). Delivery
@@ -117,13 +117,13 @@
 # it armed rather than dropping it, and only a proven send failure discards it.
 # Set JG_PENDING_REPLY_EXISTING_CORR=<id> when re-sending a recovery request
 # for an already-open expectation so a second record is not created. Direct
-# unmarked captain input never creates one. A marked secondmate instruction
+# unmarked captain input never creates one. A marked squad_lead instruction
 # sent with --fire-and-forget <16-hex-delivery-id> uses the same inbox transport
 # without creating a reply expectation; its delivery id makes uncertain retries
 # idempotent while allowing a later identical instruction to be distinct.
 #
-# Remote secondmate delivery: the send crosses jg-on.sh to a host-local leg
-# (bin/jg-remote-secondmate-control.sh cmd_send) that writes the message as a
+# Remote squad_lead delivery: the send crosses jg-on.sh to a host-local leg
+# (bin/jg-remote-squad-lead-control.sh cmd_send) that writes the message as a
 # durable record into the remote home's steering inbox and rings the remote
 # doorbell, best-effort. The remote record is the delivery, exactly as it is
 # locally: leg exit 0 means durably recorded (jg-send then exits 0, marks the
@@ -171,7 +171,7 @@
 # the task's record; the worker reading the answer late is covered by the
 # acknowledgement re-ring ladder. On the typed plane it still waits for the
 # confirmed submit. The close is a LOCAL append for every target kind -
-# crewmate, scout, local secondmate, and remote secondmate alike - because the
+# operator, scout, local squad_lead, and remote squad_lead alike - because the
 # open-decision ledger jg-wake-drain folds lives in this home's own state dir
 # (a remote mate's escalations reach it through the parent-replies ingest);
 # only the answer message crosses the backend or remote transport.
@@ -181,7 +181,7 @@
 # (a blocked: key is ordinary steering and stays lease-guarded only), the Pi
 # supervision branch is refused outright, exactly as its prompt promises. While
 # the away-posture record exists main is parked and that one refusal relocates
-# to the branch (contract: bin/jg-lease-lib.sh); which findings firstmate may
+# to the branch (contract: bin/jg-lease-lib.sh); which findings juggernaut may
 # decide at all remains ask-user-authority's judgment for either actor.
 #
 # Chat is also a channel that carries keyed captain answers, so the same flag
@@ -222,11 +222,11 @@ JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 # shellcheck source=bin/jg-gate-refuse-lib.sh
 . "$SCRIPT_DIR/jg-gate-refuse-lib.sh"
 # Fail closed before any fleet mutation: a no-mistakes gate agent must never steer
-# a crewmate (see bin/jg-gate-refuse-lib.sh).
+# a operator (see bin/jg-gate-refuse-lib.sh).
 jg_refuse_if_gate_agent
 
 if [ -z "${JG_HOME+x}" ] || [ -z "${JG_HOME:-}" ]; then
-  echo "error: JG_HOME is not set; jg-send refuses to resolve targets without an explicit firstmate home" >&2
+  echo "error: JG_HOME is not set; jg-send refuses to resolve targets without an explicit juggernaut home" >&2
   exit 1
 fi
 
@@ -388,7 +388,7 @@ jg_send_resolve_target() { # <raw-target>
     ;;
   jg-*)
     RESOLUTION_TRIED="meta=$STATE/$raw.meta; legacy-meta=$STATE/${raw#jg-}.meta; backend=none"
-    echo "error: no metadata for $raw in $STATE (tried $RESOLUTION_TRIED); pass a well-formed explicit backend target only when targeting outside this firstmate home" >&2
+    echo "error: no metadata for $raw in $STATE (tried $RESOLUTION_TRIED); pass a well-formed explicit backend target only when targeting outside this juggernaut home" >&2
     return 1
     ;;
   esac
@@ -522,12 +522,12 @@ if [ "$TARGET_BACKEND" != remote ]; then
   jg_backend_validate "$TARGET_BACKEND" || exit 1
 fi
 
-# Classify a from-firstmate -> secondmate request. Only a task selector resolved
-# through this home's meta whose authoritative kind is secondmate is marked: the
-# secondmate then routes its reply via the status path (see jg-marker-lib.sh).
+# Classify a from-juggernaut -> squad_lead request. Only a task selector resolved
+# through this home's meta whose authoritative kind is squad_lead is marked: the
+# squad_lead then routes its reply via the status path (see jg-marker-lib.sh).
 # An explicit backend target (the escape hatch for endpoints outside this home)
-# and any crewmate/scout target are left unmarked, and so is the --key path.
-MARK_FROM_FIRSTMATE=0
+# and any operator/scout target are left unmarked, and so is the --key path.
+MARK_FROM_JUGGERNAUT=0
 PENDING_REPLY_CORR=
 PENDING_REPLY_CREATED=0
 TARGET_TASK_ID=
@@ -539,12 +539,12 @@ jg_send_known_undelivered_cleanup() {
     jg_pending_reply_reset_known_undelivered "$STATE" "$PENDING_REPLY_CORR"
   fi
 }
-if [ -n "$TARGET_SELECTOR" ] && [ -n "$TARGET_META" ] && [ "$(jg_meta_get "$TARGET_META" kind)" = secondmate ]; then
-  MARK_FROM_FIRSTMATE=1
+if [ -n "$TARGET_SELECTOR" ] && [ -n "$TARGET_META" ] && [ "$(jg_meta_get "$TARGET_META" kind)" = squad_lead ]; then
+  MARK_FROM_JUGGERNAUT=1
   TARGET_TASK_ID=$(jg_send_id_from_meta "$TARGET_META")
 fi
 
-# Parked-home guard (firstmate-addons/parked-homes): a parked secondmate home
+# Parked-home guard (juggernaut-addons/parked-homes): a parked squad_lead home
 # gets no message, steer, answer or nudge; the shim answers "not parked" without the add-on.
 # shellcheck source=bin/jg-parked-homes-lib.sh
 . "$SCRIPT_DIR/jg-parked-homes-lib.sh"
@@ -606,9 +606,9 @@ if [ -n "$FIRE_AND_FORGET_ID" ]; then
       echo "error: --fire-and-forget delivery id must be 16 lowercase hex characters" >&2
       exit 1
     }
-  [ "$MARK_FROM_FIRSTMATE" = 1 ] ||
+  [ "$MARK_FROM_JUGGERNAUT" = 1 ] ||
     {
-      echo "error: --fire-and-forget requires a recorded secondmate task selector" >&2
+      echo "error: --fire-and-forget requires a recorded squad_lead task selector" >&2
       exit 1
     }
   [ -z "$RESOLVE_KEYS" ] ||
@@ -656,7 +656,7 @@ if [ -n "$RESOLVE_KEYS" ]; then
   # task, is a decision, and answering one is main-owned while attended. A
   # blocked: key is ordinary steering and takes no partition guard. Under the
   # away-posture record the guard passes the branch instead (relocation:
-  # bin/jg-lease-lib.sh); which findings firstmate may decide at all stays
+  # bin/jg-lease-lib.sh); which findings juggernaut may decide at all stays
   # ask-user-authority's judgment, for either actor.
   RESOLVE_IS_DECISION=0
   [ -z "$RESOLVE_HOLD_KEYS" ] || RESOLVE_IS_DECISION=1
@@ -745,7 +745,7 @@ jg_send_feed_resolved_holds() { # <answer-text>
     lines="${lines}${k}"$'\t'"${note}"$'\t'$'\n'
   done
   if ! printf '%s' "$lines" | "$SCRIPT_DIR/jg-captain-hold.sh" answers \
-    --source "a firstmate answer sent to $RESOLVE_TASK_ID" >/dev/null 2>&1; then
+    --source "a juggernaut answer sent to $RESOLVE_TASK_ID" >/dev/null 2>&1; then
     echo "error: the answer was delivered to $T, but this captain-held task could not be closed: ${RESOLVE_HOLD_KEYS}. Close it with jg-captain-hold.sh answer - do not resend the answer." >&2
     return 1
   fi
@@ -786,8 +786,8 @@ if [ "${1:-}" = "--key" ]; then
       ;;
     esac
     if ! jg_run_timed "$JG_SEND_REMOTE_BUDGET" "$SCRIPT_DIR/jg-on.sh" "$TARGET_REMOTE_ID" \
-      jg-remote-secondmate-control.sh key "$TARGET_REMOTE_ID" "$key" </dev/null; then
-      echo "error: key '$key' not sent to remote secondmate $TARGET_REMOTE_ID; completion may be unknown" >&2
+      jg-remote-squad-lead-control.sh key "$TARGET_REMOTE_ID" "$key" </dev/null; then
+      echo "error: key '$key' not sent to remote squad_lead $TARGET_REMOTE_ID; completion may be unknown" >&2
       exit 1
     fi
   elif ! jg_backend_send_key "$TARGET_BACKEND" "$T" "$key" "$EXPECTED_LABEL"; then
@@ -814,11 +814,11 @@ else
   # The pre-marker answer text, kept for the closing resolved note so the
   # durable ledger records the plain answer without marker or corr bytes.
   RESOLVE_ANSWER_TEXT=$MESSAGE
-  if [ "$MARK_FROM_FIRSTMATE" = 1 ] && [ -n "$FIRE_AND_FORGET_ID" ]; then
-    jg_message_mark_from_firstmate "$MESSAGE" MESSAGE
+  if [ "$MARK_FROM_JUGGERNAUT" = 1 ] && [ -n "$FIRE_AND_FORGET_ID" ]; then
+    jg_message_mark_from_juggernaut "$MESSAGE" MESSAGE
     MESSAGE="${JG_FROMFIRST_MARK}delivery=${FIRE_AND_FORGET_ID} ${MESSAGE#"$JG_FROMFIRST_MARK"}"
     JG_SEND_IDEMPOTENT=1
-  elif [ "$MARK_FROM_FIRSTMATE" = 1 ]; then
+  elif [ "$MARK_FROM_JUGGERNAUT" = 1 ]; then
     # Reuse an existing correlation id for recovery resends; otherwise create a
     # durable parent expectation before delivery. Transport success never
     # resolves that expectation (see jg-pending-reply-lib.sh).
@@ -838,7 +838,7 @@ else
         exit 1
       fi
       if [ -z "$TARGET_TASK_ID" ]; then
-        echo "error: cannot create pending-reply expectation without a resolvable secondmate task id" >&2
+        echo "error: cannot create pending-reply expectation without a resolvable squad_lead task id" >&2
         exit 1
       fi
       PENDING_REPLY_CORR=$(jg_pending_reply_create "$JG_HOME" "$STATE" "$TARGET_TASK_ID" "$MESSAGE") ||
@@ -872,15 +872,15 @@ else
   # resolved through this home's metadata rides the inbox plane, unless it is
   # a LOCAL harness-native invocation that must reach the harness's own parser
   # - a leading "/" (slash command), or a leading "$" to a codex target (skill
-  # invocation). A remote secondmate selector always rides the inbox: its
+  # invocation). A remote squad_lead selector always rides the inbox: its
   # requests are marked, and a marked request reaches the harness as
   # marker-prefixed chat rather than a parser command anyway, so no remote
   # text has a typed plane to lose. An explicit backend target stays typed
   # even when it happens to match local metadata: it names an endpoint, not a
   # task, the same boundary that keeps it unmarked and outside --resolve-key.
-  # Classification reads the pre-marker text so a marked secondmate request
-  # and a plain crewmate steer classify identically. It deliberately does NOT
-  # promise that a marked parser-native secondmate request executes as a parser
+  # Classification reads the pre-marker text so a marked squad_lead request
+  # and a plain operator steer classify identically. It deliberately does NOT
+  # promise that a marked parser-native squad_lead request executes as a parser
   # command: the pre-existing marker-first wire bytes are retained in stage 1.
   INBOX_PLANE=0
   if [ -n "$TARGET_SELECTOR" ]; then
@@ -910,7 +910,7 @@ else
       if [ "$PENDING_REPLY_CREATED" = 1 ] && [ -n "$PENDING_REPLY_CORR" ]; then
         jg_pending_reply_discard_undelivered "$STATE" "$PENDING_REPLY_CORR" || true
       fi
-      echo "error: steer not sent to remote secondmate $TARGET_REMOTE_ID: its parent task metadata could not be locked for final delivery validation" >&2
+      echo "error: steer not sent to remote squad_lead $TARGET_REMOTE_ID: its parent task metadata could not be locked for final delivery validation" >&2
       exit 1
     fi
     CURRENT_REMOTE_ID=
@@ -932,7 +932,7 @@ else
       if [ "$PENDING_REPLY_CREATED" = 1 ] && [ -n "$PENDING_REPLY_CORR" ]; then
         jg_pending_reply_discard_undelivered "$STATE" "$PENDING_REPLY_CORR" || true
       fi
-      echo "error: steer not sent to remote secondmate $TARGET_REMOTE_ID: its parent task retired or changed route during target resolution" >&2
+      echo "error: steer not sent to remote squad_lead $TARGET_REMOTE_ID: its parent task retired or changed route during target resolution" >&2
       exit 1
     fi
     remote_rc=0
@@ -947,30 +947,30 @@ else
     # remote job's own timeout also relays as 124; treating it as unconfirmed
     # stays safe because the remote enqueue deduplicates.)
     jg_run_timed "$JG_SEND_REMOTE_BUDGET" "$SCRIPT_DIR/jg-on.sh" "$TARGET_REMOTE_ID" \
-      jg-remote-secondmate-control.sh send "${REMOTE_SEND_ARGS[@]}" </dev/null || remote_rc=$?
+      jg-remote-squad-lead-control.sh send "${REMOTE_SEND_ARGS[@]}" </dev/null || remote_rc=$?
     if [ "$remote_rc" -eq 124 ]; then
       remote_completion_unknown=1
     elif [ "$remote_rc" -eq 255 ]; then
       remote_completion_unknown=1
       remote_rc=0
       jg_run_timed "$JG_SEND_REMOTE_BUDGET" "$SCRIPT_DIR/jg-on.sh" "$TARGET_REMOTE_ID" \
-        jg-remote-secondmate-control.sh send "${REMOTE_SEND_ARGS[@]}" </dev/null || remote_rc=$?
+        jg-remote-squad-lead-control.sh send "${REMOTE_SEND_ARGS[@]}" </dev/null || remote_rc=$?
     fi
     jg_lock_release "$REMOTE_META_LOCK"
     if [ "$remote_rc" -ne 0 ] && [ "$remote_completion_unknown" -eq 1 ]; then
       if [ -n "$FIRE_AND_FORGET_ID" ]; then
-        echo "error: fire-and-forget steer to remote secondmate $TARGET_REMOTE_ID is unconfirmed (delivery-id=$FIRE_AND_FORGET_ID); retry only with the same delivery id" >&2
+        echo "error: fire-and-forget steer to remote squad_lead $TARGET_REMOTE_ID is unconfirmed (delivery-id=$FIRE_AND_FORGET_ID); retry only with the same delivery id" >&2
         exit 3
       fi
       if [ -n "$PENDING_REPLY_CORR" ]; then
         jg_pending_reply_mark_delivery_unknown "$STATE" "$PENDING_REPLY_CORR" || true
       fi
       if [ "$remote_rc" -eq 255 ]; then
-        echo "error: steer to remote secondmate $TARGET_REMOTE_ID is unconfirmed (transport lost twice; remote completion unknown). Only the correlation-reusing resend below is idempotent and lands on the same remote inbox record:" >&2
+        echo "error: steer to remote squad_lead $TARGET_REMOTE_ID is unconfirmed (transport lost twice; remote completion unknown). Only the correlation-reusing resend below is idempotent and lands on the same remote inbox record:" >&2
       elif [ "$remote_rc" -eq 124 ]; then
-        echo "error: steer to remote secondmate $TARGET_REMOTE_ID is unconfirmed (the remote transport did not complete within its ${JG_SEND_REMOTE_BUDGET}s budget; remote completion unknown). Only the correlation-reusing resend below is idempotent and lands on the same remote inbox record:" >&2
+        echo "error: steer to remote squad_lead $TARGET_REMOTE_ID is unconfirmed (the remote transport did not complete within its ${JG_SEND_REMOTE_BUDGET}s budget; remote completion unknown). Only the correlation-reusing resend below is idempotent and lands on the same remote inbox record:" >&2
       else
-        echo "error: steer to remote secondmate $TARGET_REMOTE_ID is unconfirmed (the first transport attempt had unknown completion and the retry failed). Only the correlation-reusing resend below is idempotent and lands on the same remote inbox record:" >&2
+        echo "error: steer to remote squad_lead $TARGET_REMOTE_ID is unconfirmed (the first transport attempt had unknown completion and the retry failed). Only the correlation-reusing resend below is idempotent and lands on the same remote inbox record:" >&2
       fi
       resend_home=$(cd "$JG_HOME" 2>/dev/null && pwd) || resend_home=$JG_HOME
       printf 'JG_HOME=%q ' "$resend_home" >&2
@@ -988,7 +988,7 @@ else
     if [ "$remote_rc" -ne 0 ]; then
       jg_send_known_undelivered_cleanup ||
         echo "error: known-undelivered pending-reply state could not be reset for $TARGET_TASK_ID" >&2
-      echo "error: steer not sent to remote secondmate $TARGET_REMOTE_ID (the remote steering-inbox record could not be written; the remote leg's stderr above has the reason)" >&2
+      echo "error: steer not sent to remote squad_lead $TARGET_REMOTE_ID (the remote steering-inbox record could not be written; the remote leg's stderr above has the reason)" >&2
       exit 1
     fi
     # The remote record is durable delivery, exactly as a local enqueue is.
@@ -1106,7 +1106,7 @@ else
     case "$ring_rc" in
     1) echo "jg-send: doorbell skipped (composer visibly holds pending text); the steer is durably recorded at $INBOX_RECORD and $ring_retry. To ring now, submit the pending text with 'jg-send.sh $INBOX_TASK_ID --key Enter' (or clear the composer); the next ring then lands." >&2 ;;
     2) echo "jg-send: doorbell did not reach $T${JG_TASK_INBOX_RING_REASON:+ ($JG_TASK_INBOX_RING_REASON)}; the steer is durably recorded at $INBOX_RECORD and $ring_retry" >&2 ;;
-    3) echo "jg-send: doorbell not typed because the agent in $T has exited; the steer is durably recorded at $INBOX_RECORD for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane" >&2 ;;
+    3) echo "jg-send: doorbell not typed because the agent in $T has exited; the steer is durably recorded at $INBOX_RECORD for recovery (stuck-operator-recovery), and the watcher will not re-ring a dead pane" >&2 ;;
     esac
     exit 0
   fi
@@ -1213,7 +1213,7 @@ else
   # Submit landed with exact empty. Confirmation only proves the text was
   # accepted; the harness still needs a beat to spin up the
   # turn before its busy footer shows. Pause so an immediate peek catches the
-  # crewmate actually working instead of the stale idle pane. JG_SEND_SETTLE=0
+  # operator actually working instead of the stale idle pane. JG_SEND_SETTLE=0
   # disables it. Scoped to this path only, never the shared submit core.
   [ "${JG_SEND_SETTLE:-1}" = 0 ] || sleep "${JG_SEND_SETTLE:-1}"
 fi

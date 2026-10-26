@@ -22,11 +22,11 @@
 #                                    and --resume names it for the next free slot, oldest first; no steer is needed.
 #   parked ... (resume-on: <when>)   any other park names its resume condition: a date (YYYY-MM-DD), a PR URL or `captain`.
 #                                    A park without one is STALLED: the pulse counts it and a stalled line names it.
-# JG_MAIN_HOME names the main home (default ~/firstmate), where lane-caps, the status rollup and bin/ live.
+# JG_MAIN_HOME names the main home (default ~/juggernaut), where lane-caps, the status rollup and bin/ live.
 import os, re, sys, glob, json, time, subprocess, statistics as st
 
 CAP = 4
-MAIN = os.environ.get('JG_MAIN_HOME') or os.path.expanduser('~/firstmate')
+MAIN = os.environ.get('JG_MAIN_HOME') or os.path.expanduser('~/juggernaut')
 NAMES = {'1': 'takeone', '3': 'crewhouse', '4': 'writeboost', '8': 'muxr', '9': 'desklink', '10': 'byokit'}
 AT = re.compile(r'\[at=(\d+)\]')
 VERB = re.compile(r'^(?:\d{9,11}\s+)?([a-z][a-z-]*)')
@@ -250,7 +250,7 @@ for sp in glob.glob(f'{S}/*.status'):
     for k, at in open_keys(lines(sp), int(os.stat(sp).st_mtime)).items():
         if k.startswith('captain-hold') or k.startswith('pending-reply'): continue
         out.append((f'key {t} {k}', NOW - at, f'{t} lead {h(NOW - at)} key {k} has no live lane: write resolved [key={k}] or re-raise it'))
-# Floor nudge moved into Firstmate's watcher (config/lane-target, afd00e42); no pull line here.
+# Floor nudge moved into Juggernaut's watcher (config/lane-target, afd00e42); no pull line here.
 
 # Nudge-fatigue guard: print a line only when new or its age doubled.
 last_p = f'{S}/.flow.last'

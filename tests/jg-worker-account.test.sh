@@ -359,29 +359,29 @@ test_raw_claude_account_override_is_kept_without_a_pin() {
   pass "an unpinned home keeps a raw Claude account override"
 }
 
-test_local_secondmate_reads_the_launching_home_pin() {
+test_local_squad_lead_reads_the_launching_home_pin() {
   local out rc id=acct-sm sm
-  new_case secondmate claude
+  new_case squad_lead claude
   signed_in_claude_root "$CASE/work"
   printf '%s\n' "$CASE/work" > "$HOME_DIR/config/claude-account"
-  sm="$CASE/secondmate-home"
+  sm="$CASE/squad-lead-home"
   mkdir -p "$sm/bin" "$sm/data" "$sm/config" "$CASE/sm-own"
   git init -q -b main "$sm"
-  printf '# Firstmate\n' > "$sm/AGENTS.md"
-  printf '%s\n' "$id" > "$sm/.jg-secondmate-home"
+  printf '# Juggernaut\n' > "$sm/AGENTS.md"
+  printf '%s\n' "$id" > "$sm/.jg-squad-lead-home"
   printf 'charter for %s\n' "$id" > "$sm/data/charter.md"
   printf '%s\n' "$CASE/sm-own" > "$sm/config/claude-account"
   signed_in_claude_root "$CASE/ambient-claude"
   out=$(JG_FAKE_LAUNCH_LOG="$CASE/launch.log" JG_TEST_CLAUDE_CONFIG_DIR="$CASE/ambient-claude" \
-    jg_test_run_spawn "$HOME_DIR" "$WT" "$FAKEBIN" "$id" "$sm" --secondmate); rc=$?
-  expect_code 0 "$rc" "a local secondmate spawn under the launching home's pin should succeed: $out"
-  assert_contains "$out" "account=$CASE/work" "the secondmate spawn should report the launching home's pin"
+    jg_test_run_spawn "$HOME_DIR" "$WT" "$FAKEBIN" "$id" "$sm" --squad-lead); rc=$?
+  expect_code 0 "$rc" "a local squad_lead spawn under the launching home's pin should succeed: $out"
+  assert_contains "$out" "account=$CASE/work" "the squad_lead spawn should report the launching home's pin"
   [ "$(cat "$sm/config/claude-account")" = "$CASE/sm-own" ] \
-    || fail "the launching home's pin must not be inherited over the secondmate home's own file"
+    || fail "the launching home's pin must not be inherited over the squad_lead home's own file"
   run_pane
   assert_grep "CLAUDE_CONFIG_DIR=$CASE/work" "$CASE/claude-worker" \
-    "the secondmate agent should run under the launching home's pinned root"
-  pass "a local secondmate reads the launching home's pin and its own home's file is never inherited over"
+    "the squad_lead agent should run under the launching home's pinned root"
+  pass "a local squad_lead reads the launching home's pin and its own home's file is never inherited over"
 }
 
 test_absent_pin_keeps_the_launch_unchanged
@@ -396,6 +396,6 @@ test_a_pin_governs_only_its_own_runner
 test_raw_claude_command_receives_the_pin
 test_raw_claude_account_override_refuses_under_a_pin
 test_raw_claude_account_override_is_kept_without_a_pin
-test_local_secondmate_reads_the_launching_home_pin
+test_local_squad_lead_reads_the_launching_home_pin
 
 echo "# all jg-worker-account tests passed"

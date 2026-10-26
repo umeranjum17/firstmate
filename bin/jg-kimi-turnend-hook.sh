@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
-# Install or remove Firstmate's guarded Kimi crew turn-end hook.
+# Install or remove Juggernaut's guarded Kimi crew turn-end hook.
 #
 # This command is the sole owner of the text-level edit to
 # $HOME/.kimi-code/config.toml. It validates the existing TOML but never
-# serializes it: install adds or replaces one marker-delimited Firstmate region,
+# serializes it: install adds or replaces one marker-delimited Juggernaut region,
 # and remove excises only that region. Missing, malformed, symlinked, partially
 # marked, or otherwise surprising config is refused without a config write.
 #
 # The installed Stop hook always exits 0 and stays silent. It reads cwd from the
 # hook payload, checks for a .jg-kimi-turnend pointer before registry work, and
-# touches a task turn-end marker only when the pointer names a Firstmate-created
+# touches a task turn-end marker only when the pointer names a Juggernaut-created
 # token in $HOME/.kimi-code/jg-turn-end.d/.
 #
 # Usage:
@@ -66,15 +66,15 @@ CONFIG_DIR = sys.argv[2]
 CONFIG = os.path.join(CONFIG_DIR, "config.toml")
 HOOK = os.path.join(CONFIG_DIR, "jg-turn-end.sh")
 REGISTRY = os.path.join(CONFIG_DIR, "jg-turn-end.d")
-BEGIN = b"# BEGIN FIRSTMATE KIMI TURN-END HOOK"
+BEGIN = b"# BEGIN JUGGERNAUT KIMI TURN-END HOOK"
 BEGIN_OWNS_NEWLINE = BEGIN + b" (OWNS PRECEDING NEWLINE)"
-END = b"# END FIRSTMATE KIMI TURN-END HOOK"
-IDENTIFIER = b"FIRSTMATE KIMI TURN-END HOOK"
+END = b"# END JUGGERNAUT KIMI TURN-END HOOK"
+IDENTIFIER = b"JUGGERNAUT KIMI TURN-END HOOK"
 HOOK_NAME = b"jg-turn-end.sh"
 TOKEN_NAME = re.compile(r"fm\.[A-Za-z0-9]{12}\Z")
 
 HOOK_BYTES = b'''#!/usr/bin/env bash
-# Firstmate Kimi turn-end hook. Managed by jg-kimi-turnend-hook.sh.
+# Juggernaut Kimi turn-end hook. Managed by jg-kimi-turnend-hook.sh.
 # This hook is deliberately passive: every path is silent and exits zero.
 set +e
 exec >/dev/null 2>&1
@@ -136,23 +136,23 @@ def locate_region(data: bytes):
     if normal_count + owned_count == 0 and end_count == 0 and identifier_count == 0:
         return None
     if normal_count + owned_count != 1 or end_count != 1 or identifier_count != 2:
-        refuse("config.toml has partial, duplicated, or altered Firstmate region markers.")
+        refuse("config.toml has partial, duplicated, or altered Juggernaut region markers.")
     marker = BEGIN_OWNS_NEWLINE if owned_count else BEGIN
     marker_at = data.find(marker)
     if marker_at != 0 and data[marker_at - 1 : marker_at] != b"\n":
-        refuse("the Firstmate begin marker is not at a line boundary.")
+        refuse("the Juggernaut begin marker is not at a line boundary.")
     start = marker_at
     if owned_count:
         if marker_at == 0 or data[marker_at - 1 : marker_at] != b"\n":
-            refuse("the Firstmate region claims a preceding newline that is absent.")
+            refuse("the Juggernaut region claims a preceding newline that is absent.")
         start -= 1
     end_at = data.find(END, marker_at + len(marker))
     if end_at < 0:
-        refuse("the Firstmate end marker is missing.")
+        refuse("the Juggernaut end marker is missing.")
     after = end_at + len(END)
     if after < len(data):
         if data[after : after + 1] != b"\n":
-            refuse("the Firstmate end marker is not a complete line.")
+            refuse("the Juggernaut end marker is not a complete line.")
         after += 1
     return start, after, marker
 
@@ -200,23 +200,23 @@ def atomic_write(path: str, data: bytes, mode: int) -> None:
         raise
 
 
-def validate_firstmate_files_for_remove() -> None:
+def validate_juggernaut_files_for_remove() -> None:
     if os.path.lexists(HOOK):
-        info = regular_not_symlink(HOOK, "Firstmate hook script")
+        info = regular_not_symlink(HOOK, "Juggernaut hook script")
         with open(HOOK, "rb") as stream:
             if stream.read() != HOOK_BYTES:
-                refuse(f"Firstmate hook script has unexpected content at {HOOK}.")
+                refuse(f"Juggernaut hook script has unexpected content at {HOOK}.")
         if stat.S_IMODE(info.st_mode) & 0o077:
-            refuse(f"Firstmate hook script has unexpectedly broad permissions at {HOOK}.")
+            refuse(f"Juggernaut hook script has unexpectedly broad permissions at {HOOK}.")
     if os.path.lexists(REGISTRY):
         info = os.lstat(REGISTRY)
         if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
-            refuse(f"Firstmate registry is not a regular directory at {REGISTRY}.")
+            refuse(f"Juggernaut registry is not a regular directory at {REGISTRY}.")
         for name in os.listdir(REGISTRY):
             path = os.path.join(REGISTRY, name)
             child = os.lstat(path)
             if not TOKEN_NAME.fullmatch(name) or stat.S_ISLNK(child.st_mode) or not stat.S_ISREG(child.st_mode):
-                refuse(f"Firstmate registry contains an unexpected entry at {path}.")
+                refuse(f"Juggernaut registry contains an unexpected entry at {path}.")
 
 
 try:
@@ -229,21 +229,21 @@ try:
     region = locate_region(original)
     outside = original if region is None else without_region(original, region)
     if HOOK_NAME in outside:
-        refuse("config.toml references jg-turn-end.sh outside the Firstmate-owned region.")
+        refuse("config.toml references jg-turn-end.sh outside the Juggernaut-owned region.")
 
     if ACTION == "install":
         if os.path.lexists(REGISTRY):
             info = os.lstat(REGISTRY)
             if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
-                refuse(f"Firstmate registry is not a regular directory at {REGISTRY}.")
+                refuse(f"Juggernaut registry is not a regular directory at {REGISTRY}.")
         if os.path.lexists(HOOK):
-            regular_not_symlink(HOOK, "Firstmate hook script")
+            regular_not_symlink(HOOK, "Juggernaut hook script")
             with open(HOOK, "rb") as stream:
                 existing_hook = stream.read()
             if existing_hook != HOOK_BYTES and not existing_hook.startswith(
-                b"#!/usr/bin/env bash\n# Firstmate Kimi turn-end hook."
+                b"#!/usr/bin/env bash\n# Juggernaut Kimi turn-end hook."
             ):
-                refuse(f"Firstmate hook path has unexpected content at {HOOK}.")
+                refuse(f"Juggernaut hook path has unexpected content at {HOOK}.")
         if region is None:
             marker = BEGIN if original.endswith(b"\n") else BEGIN_OWNS_NEWLINE
             addition = block(marker)
@@ -264,9 +264,9 @@ try:
         if candidate != original:
             atomic_write(CONFIG, candidate, stat.S_IMODE(config_info.st_mode))
     else:
-        validate_firstmate_files_for_remove()
+        validate_juggernaut_files_for_remove()
         candidate = outside
-        parse_toml(candidate, "config.toml after Firstmate region removal")
+        parse_toml(candidate, "config.toml after Juggernaut region removal")
         if candidate != original:
             atomic_write(CONFIG, candidate, stat.S_IMODE(config_info.st_mode))
         if os.path.lexists(HOOK):

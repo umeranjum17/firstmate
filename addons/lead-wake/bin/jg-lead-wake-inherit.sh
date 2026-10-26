@@ -9,7 +9,7 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
 done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Sourced by jg-config-inherit-lib.sh right after it declares JG_INHERITABLE_CONFIG:
-# a secondmate home inherits the primary's config/lane-target. Appends to whatever
+# a squad_lead home inherits the primary's config/lane-target. Appends to whatever
 # list is declared, once, so Kun's own list stays untouched.
 case " $JG_INHERITABLE_CONFIG " in
   *" lane-target "*) ;;

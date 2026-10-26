@@ -1,30 +1,30 @@
 #!/usr/bin/env bash
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
-# jg-role-lib.sh - the Firstmate home role and self-repository publication consent.
+# jg-role-lib.sh - the Juggernaut home role and self-repository publication consent.
 #
-# Every Firstmate home runs as a user/operator by default: it may consume
-# firstmate, change its gitignored operational state, and repair the installation
-# locally, but nothing it does publishes to the firstmate repository's upstream.
+# Every Juggernaut home runs as a user/operator by default: it may consume
+# juggernaut, change its gitignored operational state, and repair the installation
+# locally, but nothing it does publishes to the juggernaut repository's upstream.
 # Upstream publication - a pushed branch, pull request, issue, comment, or fork -
 # requires an explicit, home-local grant: the maintainer opt-in written by the
-# operator into config/firstmate-role, or a bounded per-task consent recorded at
+# operator into config/juggernaut-role, or a bounded per-task consent recorded at
 # dispatch. Role is never inferred from gh identity, permissions, remotes,
-# environment, or CI. docs/configuration.md "Firstmate role" owns the
+# environment, or CI. docs/configuration.md "Juggernaut role" owns the
 # operator-facing schema; this library owns parsing, repository-identity
 # normalization, self-repository detection, and the fail-closed gate the dispatch
 # surfaces share. Everything here resolves from files and local git plumbing
 # only; nothing calls gh or the network.
 #
-# Role file: one directive line in config/firstmate-role (blank lines and
+# Role file: one directive line in config/juggernaut-role (blank lines and
 # full-line # comments ignored), either
 #   user                                 - the default; may be omitted
-#   maintainer <host>/<owner>/<repo>     - this home develops firstmate for the
+#   maintainer <host>/<owner>/<repo>     - this home develops juggernaut for the
 #                                          named upstream
 # A scope names the publication target repository (where a PR lands), not a push
-# destination. In a secondmate home (marked by .jg-secondmate-home) a role file
+# destination. In a squad_lead home (marked by .jg-squad-lead-home) a role file
 # authorizes nothing on its own: it is trusted only when the existing
-# config-inheritance receipt config/.jg-inherit-firstmate-role.generation proves
+# config-inheritance receipt config/.jg-inherit-juggernaut-role.generation proves
 # the exact bytes the parent last published there, so a stale or unproven grant
 # is dead on arrival. The parent publishes its resolved role
 # (jg_role_inherit_payload), never its raw file, so a child never gains through
@@ -51,7 +51,7 @@
 #   jg_role_scope_norm <scope>           - canonical comparison form
 #   jg_role_remote_identity <url> [<dir>]- host/owner/repo or path:<abs> or empty
 #   jg_role_publication_target <git-dir> - identity a default publication reaches
-#   jg_role_self_repo <project> <root>   - 0 firstmate lineage, 1 not, 2 unknown
+#   jg_role_self_repo <project> <root>   - 0 juggernaut lineage, 1 not, 2 unknown
 #   jg_role_parse_file <file>            - sets JG_ROLE/JG_ROLE_SCOPE/JG_ROLE_DIAG
 #   jg_role_resolve <home> <config-dir>  - effective role; adds JG_ROLE_SOURCE
 #   jg_role_inherit_payload <home> <config-dir> <out-file>
@@ -66,13 +66,13 @@
 
 # jg_role_file <config-dir>
 jg_role_file() {
-  printf '%s/firstmate-role\n' "${1%/}"
+  printf '%s/juggernaut-role\n' "${1%/}"
 }
 
 # jg_role_inherit_receipt <config-dir> - receipt written by the inheritance
 # machinery (remote receiver, or the local route's own bookkeeping).
 jg_role_inherit_receipt() {
-  printf '%s/.jg-inherit-firstmate-role.generation\n' "${1%/}"
+  printf '%s/.jg-inherit-juggernaut-role.generation\n' "${1%/}"
 }
 
 # jg_role_scope_valid <scope> - 0 when <scope> is <host>/<owner>/<repo>
@@ -245,7 +245,7 @@ jg_role_shallow() {
 }
 
 # jg_role_self_repo <project-dir> <code-root> - rc 0 when the task's project
-# shares firstmate's lineage: a shared git common dir (the code root itself or
+# shares juggernaut's lineage: a shared git common dir (the code root itself or
 # a linked worktree of it), or a project holding a root commit of the code
 # root's history. rc 1 when the project is not a git repository or provably
 # shares no root. rc 2 when lineage cannot be determined: the code root has no
@@ -419,7 +419,7 @@ jg_role_inherit_check() {
 # jg_role_resolve <home> <config-dir> - resolve the effective role. Sets
 # JG_ROLE, JG_ROLE_SCOPE, JG_ROLE_SOURCE (absent|local|inherited), JG_ROLE_DIAG.
 # Always returns 0: every failure resolves to user with the narrow reason in
-# JG_ROLE_DIAG. A secondmate home (its .jg-secondmate-home marker) requires the
+# JG_ROLE_DIAG. A squad_lead home (its .jg-squad-lead-home marker) requires the
 # inheritance receipt for any grant; a file it cannot prove is dead on arrival.
 jg_role_resolve() {
   local home=$1 config=$2 role_file receipt cmd
@@ -429,7 +429,7 @@ jg_role_resolve() {
   JG_ROLE_SOURCE=absent
   JG_ROLE_DIAG=
   role_file=$(jg_role_file "$config")
-  if [ -f "$home/.jg-secondmate-home" ] && [ ! -L "$home/.jg-secondmate-home" ]; then
+  if [ -f "$home/.jg-squad-lead-home" ] && [ ! -L "$home/.jg-squad-lead-home" ]; then
     receipt=$(jg_role_inherit_receipt "$config")
     if [ -e "$receipt" ] || [ -L "$receipt" ]; then
       if ! jg_role_inherit_check "$role_file" "$receipt"; then
@@ -450,7 +450,7 @@ jg_role_resolve() {
       return 0
     fi
     if [ -e "$role_file" ] || [ -L "$role_file" ]; then
-      JG_ROLE_DIAG="unverified inherited grant: a role file exists with no propagation receipt, and a secondmate gains the role only through propagation"
+      JG_ROLE_DIAG="unverified inherited grant: a role file exists with no propagation receipt, and a squad_lead gains the role only through propagation"
       return 0
     fi
     return 0
@@ -469,7 +469,7 @@ jg_role_resolve() {
 }
 
 # jg_role_inherit_payload <home> <config-dir> <out-file> - stage the role this
-# home publishes to its secondmates: the resolved maintainer directive, or no
+# home publishes to its squad_leads: the resolved maintainer directive, or no
 # file at all when the home resolves to user for any reason (absent, user,
 # malformed, symlinked, or unproven), so propagation carries revocation rather
 # than raw bytes this home's own resolver rejects. Runs in a subshell so the
@@ -483,9 +483,9 @@ jg_role_inherit_payload() (
 
 # jg_role_gate_self_publish <home> <config-dir> <project-dir> <code-root> [consent]
 # Evaluate whether this home may run a publication contract for a task on
-# firstmate's own repository. rc 0 authorized (JG_ROLE_PUB_AUTHORITY names the
+# juggernaut's own repository. rc 0 authorized (JG_ROLE_PUB_AUTHORITY names the
 # source: maintainer scope or task consent); rc 1 refused (JG_ROLE_PUB_DENIAL
-# names the narrow reason); rc 2 the task is not on this firstmate repository
+# names the narrow reason); rc 2 the task is not on this juggernaut repository
 # and the boundary does not apply. JG_ROLE_PUB_TARGET is the normalized
 # publication target when determinable.
 jg_role_gate_self_publish() {
@@ -502,7 +502,7 @@ jg_role_gate_self_publish() {
   JG_ROLE_PUB_TARGET=$(jg_role_publication_target "$proj")
   if [ "$lineage" -eq 2 ]; then
     # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
-    JG_ROLE_PUB_DENIAL="cannot determine whether $proj shares firstmate's history (the code root $root has no readable history, or a shallow clone shares no root commit); fetch full history (git fetch --unshallow) before dispatching publishing work"
+    JG_ROLE_PUB_DENIAL="cannot determine whether $proj shares juggernaut's history (the code root $root has no readable history, or a shallow clone shares no root commit); fetch full history (git fetch --unshallow) before dispatching publishing work"
     return 1
   fi
   jg_role_resolve "$home" "$config"
@@ -516,7 +516,7 @@ jg_role_gate_self_publish() {
   fi
   if [ -z "$JG_ROLE_PUB_TARGET" ]; then
     # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
-    JG_ROLE_PUB_DENIAL="this task targets firstmate's own repository but no publication target can be determined (no upstream, github, or origin remote on $proj)"
+    JG_ROLE_PUB_DENIAL="this task targets juggernaut's own repository but no publication target can be determined (no upstream, github, or origin remote on $proj)"
     return 1
   fi
   if [ -n "$consent" ] && [ "$consent" = "$JG_ROLE_PUB_TARGET" ]; then
@@ -530,6 +530,6 @@ jg_role_gate_self_publish() {
     return 0
   fi
   # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
-  JG_ROLE_PUB_DENIAL="this home runs as firstmate user/operator and holds no publication authority for $JG_ROLE_PUB_TARGET"
+  JG_ROLE_PUB_DENIAL="this home runs as juggernaut user/operator and holds no publication authority for $JG_ROLE_PUB_TARGET"
   return 1
 }

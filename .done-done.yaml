@@ -1,4 +1,4 @@
-app: firstmate
+app: juggernaut
 journeys:
   relaunch-model-refusal:
     command: bash tests/jg-control-relaunch.test.sh > "$DONE_DONE_EVIDENCE_ROOT/${RUN_ID}.log" 2>&1

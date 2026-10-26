@@ -26,7 +26,7 @@ A decision is not a separate thing in this system.
 It is an ordinary backlog task held for the captain, and the task id is the identity every surface and channel uses.
 `bin/jg-captain-hold.sh` is the only lifecycle command layered on that primitive.
 The command addresses the active home's configured data directory.
-As a result, the existing backlog remains the only durable work database, and a secondmate-owned captain call stays in the secondmate home.
+As a result, the existing backlog remains the only durable work database, and a squad-lead-owned captain call stays in the squad lead home.
 It never reads report bodies, review artifacts, terminal output, or chat.
 
 ### Subcommands at a glance
@@ -336,10 +336,10 @@ A subject whose state cannot be established is kept, because a wrongly shown car
 The validator's reservation scope must equal the adapter's reconcile-classification scope.
 That scope is all card types, because the captured payload carries no card type.
 
-### Remote-secondmate cards
+### Remote-squad-lead cards
 
-Owner-aware routing for remote-secondmate decision cards is tracked separately.
-That follow-up must query landedness and route reconciliation in the authoritative secondmate home while honoring the remote and local consistency principle.
+Owner-aware routing for remote-squad-lead decision cards is tracked separately.
+That follow-up must query landedness and route reconciliation in the authoritative squad lead home while honoring the remote and local consistency principle.
 Until then, an absent main-home task passes through this hygiene check unchanged.
 Its Reconcile selection remains announced but cannot create a main-home request, because the main intake refuses an absent task.
 For a main-home call, the reconcile option is the recovery path for whatever still slips through.
@@ -371,7 +371,7 @@ Existing undated holds without a hold-set stamp fall back to the task's `since` 
 That aging is a projection safety net only.
 The durable deferral remains re-holding with `--until`.
 
-The fleet snapshot's secondmate-home summary classifies an actionable captain hold as `captain_decision`.
+The fleet snapshot's squad-lead-home summary classifies an actionable captain hold as `captain_decision`.
 It preserves every captain hold in the bounded queued inventory of the owning home.
 
 ### Bearings placement
@@ -391,9 +391,9 @@ An actively worked held task may also appear in Underway, which reports running 
 
 Three accepted limits remain deliberate:
 
-- A remote or secondmate hold retains the producer home's age and aging decision from the summary's capture time and threshold rather than being recomputed by the parent.
+- A remote or squad lead hold retains the producer home's age and aging decision from the summary's capture time and threshold rather than being recomputed by the parent.
 - A rare concurrent answer-close and re-hold race can leave the newly re-held task without its age basis.
-- Cross-home summaries remain bounded by `JG_SNAPSHOT_SECONDMATE_DECISIONS` and `JG_SNAPSHOT_SECONDMATE_QUEUED`.
+- Cross-home summaries remain bounded by `JG_SNAPSHOT_SQUAD LEAD_DECISIONS` and `JG_SNAPSHOT_SQUAD LEAD_QUEUED`.
   A remote deferred hold beyond those bounds is not exported, so it can be neither gated nor revealed.
 
 Re-holding through the wrapper with `--until` remains the durable fix rather than relying on the projection safety net.

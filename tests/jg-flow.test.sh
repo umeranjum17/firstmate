@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Integration: the task outcome recorder, over isolated durable records; the
 # rows the per-model and per-skill readers consume. The readers themselves moved
-# to firstmate-addons (fleet-stats): their behaviour is tested in that repo, and
+# to juggernaut-addons (fleet-stats): their behaviour is tested in that repo, and
 # tests/jg-stats-shim.test.sh covers the fork shims that exec them.
 set -eu
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -53,10 +53,10 @@ met('rl-legacy', 'kind=ship', 'harness=claude', 'model=claude-opus-5-5', 'effort
 rec('rl-legacy')
 leg = row('rl-legacy')[0].split('\t')
 assert 'claude:claude-opus-5-5:xhigh' in leg[4] and leg[5] == '1700000300', 'fallback uses the record model and spawn_gen epoch'
-met('rl-secondmate', 'kind=secondmate', 'harness=pi', 'model=muse', 'effort=medium')
+met('rl-squad-lead', 'kind=squad_lead', 'harness=pi', 'model=muse', 'effort=medium')
 n0 = nrows()
-rec('rl-secondmate')
-assert nrows() == n0, 'a secondmate retirement appends nothing'
+rec('rl-squad-lead')
+assert nrows() == n0, 'a squad_lead retirement appends nothing'
 rec('rl-absent')
 assert nrows() == n0, 'a missing record appends nothing'
 head = outcomes.read_text().splitlines()

@@ -40,7 +40,7 @@ def validate(card):
     require(len({s.casefold() for s in labels}) == len(labels), 'choice labels must differ')
     require(card['recommend'] in labels and card['default'] in labels, 'recommend and default must name a choice')
     prose = [text, *card['context'], card['reason'], *labels, *outcomes]
-    internal = r'\[[^\]]+\]|\bMain\d+\b|(?:~?/|\b[\w.-]+/)[\w./-]+|\b[\w-]+\.(?:md|sh|json|tsx?|py|log)\b|\b(?:fm|task|ask)-[\w-]+|\b[a-z][a-z0-9]*(?:-[a-z0-9]+){2,}\b|\b(?:captain|Main|lead|secondmate|crewmate|backlog|lane|worker|CLI|reconcile|hold|held)\b'
+    internal = r'\[[^\]]+\]|\bMain\d+\b|(?:~?/|\b[\w.-]+/)[\w./-]+|\b[\w-]+\.(?:md|sh|json|tsx?|py|log)\b|\b(?:fm|task|ask)-[\w-]+|\b[a-z][a-z0-9]*(?:-[a-z0-9]+){2,}\b|\b(?:captain|Main|lead|squad_lead|operator|backlog|lane|worker|CLI|reconcile|hold|held)\b'
     for value in prose:
         require(isinstance(value, str) and value.strip() and len(value) <= 200 and not re.search(r'[\r\n\t|]', value),
                 'each text field must be one short line, at most 200 characters, without tabs or |')

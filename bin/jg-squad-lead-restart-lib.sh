@@ -1,11 +1,11 @@
 # shellcheck shell=bash disable=SC2034
-# jg-secondmate-restart-lib.sh - the shared contract for restarting a second
+# jg-squad-lead-restart-lib.sh - the shared contract for restarting a second
 # mate onto the current instruction surface and launch-time wiring. Source only.
 #
 # Two consumers, one owner:
 #   - bin/jg-update.sh decides WHICH live mates belong in the restart set, so it
 #     needs the capability test before it prints its action lines.
-#   - bin/jg-secondmate-restart.sh performs the pass, so it needs the same test
+#   - bin/jg-squad-lead-restart.sh performs the pass, so it needs the same test
 #     again on its own argv rather than trusting a caller's list.
 #
 # The capability test is the pre-stop half of the control plane's own refusals
@@ -22,11 +22,11 @@
 # <id> relaunch either way, run here for a local mate and run on the host over
 # bin/jg-on.sh for a remote one.
 
-_JG_SECONDMATE_RESTART_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_JG_SQUAD_LEAD_RESTART_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=bin/jg-backend.sh disable=SC1091
-. "$_JG_SECONDMATE_RESTART_LIB_DIR/jg-backend.sh"
+. "$_JG_SQUAD_LEAD_RESTART_LIB_DIR/jg-backend.sh"
 # shellcheck source=bin/jg-control-lib.sh disable=SC1091
-. "$_JG_SECONDMATE_RESTART_LIB_DIR/jg-control-lib.sh"
+. "$_JG_SQUAD_LEAD_RESTART_LIB_DIR/jg-control-lib.sh"
 
 # The persist request the primary sends before it restarts anything. It is the
 # open-record half of /stow and nothing more: a restart needs the state of work
@@ -35,67 +35,67 @@ _JG_SECONDMATE_RESTART_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # The mate answers through its parent channel, which is what resolves the
 # parent-owned reply expectation jg-send arms for a marked request; that
 # correlated answer, never the wall clock, is what releases the restart.
-JG_SECONDMATE_PERSIST_REQUEST='Firstmate was updated and I am about to restart your agent so it comes up on the current instructions and launch-time settings, which drops your conversation but keeps every durable record. Before that, persist the open work you are holding only in this conversation, following the /stow skill'"'"'s "Open-record persistence" section and nothing else from that skill: file a task for each open record that exists only in this conversation, including any captain call you had formed but never registered, and correct any task whose status no longer reflects what you now know. Do NOT run the memory, learnings, or captain-preference sweeps. Then reply on your parent channel saying it is done, or saying what you deliberately left alone and why.'
+JG_SQUAD_LEAD_PERSIST_REQUEST='Juggernaut was updated and I am about to restart your agent so it comes up on the current instructions and launch-time settings, which drops your conversation but keeps every durable record. Before that, persist the open work you are holding only in this conversation, following the /stow skill'"'"'s "Open-record persistence" section and nothing else from that skill: file a task for each open record that exists only in this conversation, including any captain call you had formed but never registered, and correct any task whose status no longer reflects what you now know. Do NOT run the memory, learnings, or captain-preference sweeps. Then reply on your parent channel saying it is done, or saying what you deliberately left alone and why.'
 
 # Resolve one mate's restart capability from its durable record alone.
 # Publishes, on success:
-#   JG_SECONDMATE_RESTART_PLACEMENT  local|remote
-#   JG_SECONDMATE_RESTART_BACKEND    the backend whose classifier must prove the stop
-#   JG_SECONDMATE_RESTART_HARNESS    the verified control adapter it runs on
-#   JG_SECONDMATE_RESTART_HOST       the configured host (remote placement only)
-# and on failure sets JG_SECONDMATE_RESTART_REASON to one operator-readable line.
-JG_SECONDMATE_RESTART_PLACEMENT=""
-JG_SECONDMATE_RESTART_BACKEND=""
-JG_SECONDMATE_RESTART_HARNESS=""
-JG_SECONDMATE_RESTART_HOST=""
-JG_SECONDMATE_RESTART_REASON=""
-jg_secondmate_restart_capable() {  # <meta-file>
+#   JG_SQUAD_LEAD_RESTART_PLACEMENT  local|remote
+#   JG_SQUAD_LEAD_RESTART_BACKEND    the backend whose classifier must prove the stop
+#   JG_SQUAD_LEAD_RESTART_HARNESS    the verified control adapter it runs on
+#   JG_SQUAD_LEAD_RESTART_HOST       the configured host (remote placement only)
+# and on failure sets JG_SQUAD_LEAD_RESTART_REASON to one operator-readable line.
+JG_SQUAD_LEAD_RESTART_PLACEMENT=""
+JG_SQUAD_LEAD_RESTART_BACKEND=""
+JG_SQUAD_LEAD_RESTART_HARNESS=""
+JG_SQUAD_LEAD_RESTART_HOST=""
+JG_SQUAD_LEAD_RESTART_REASON=""
+jg_squad_lead_restart_capable() {  # <meta-file>
   local meta=$1 kind window remote_host backend harness family
-  JG_SECONDMATE_RESTART_PLACEMENT=""
-  JG_SECONDMATE_RESTART_BACKEND=""
-  JG_SECONDMATE_RESTART_HARNESS=""
-  JG_SECONDMATE_RESTART_HOST=""
-  JG_SECONDMATE_RESTART_REASON=""
+  JG_SQUAD_LEAD_RESTART_PLACEMENT=""
+  JG_SQUAD_LEAD_RESTART_BACKEND=""
+  JG_SQUAD_LEAD_RESTART_HARNESS=""
+  JG_SQUAD_LEAD_RESTART_HOST=""
+  JG_SQUAD_LEAD_RESTART_REASON=""
 
   if [ ! -f "$meta" ] || [ -L "$meta" ]; then
-    JG_SECONDMATE_RESTART_REASON="no durable record for this second mate in this home"
+    JG_SQUAD_LEAD_RESTART_REASON="no durable record for this squad lead in this home"
     return 1
   fi
   kind=$(jg_meta_get "$meta" kind)
-  if [ "$kind" != secondmate ]; then
-    JG_SECONDMATE_RESTART_REASON="the durable record is not a second mate's"
+  if [ "$kind" != squad_lead ]; then
+    JG_SQUAD_LEAD_RESTART_REASON="the durable record is not a squad lead's"
     return 1
   fi
   window=$(jg_meta_get "$meta" window)
   if [ -z "$window" ]; then
-    JG_SECONDMATE_RESTART_REASON="the durable record names no endpoint, so there is no agent to replace"
+    JG_SQUAD_LEAD_RESTART_REASON="the durable record names no endpoint, so there is no agent to replace"
     return 1
   fi
   harness=$(jg_meta_get "$meta" harness)
   remote_host=$(jg_meta_get "$meta" remote_host)
   if [ -n "$remote_host" ]; then
-    JG_SECONDMATE_RESTART_PLACEMENT=remote
-    JG_SECONDMATE_RESTART_HOST=$remote_host
+    JG_SQUAD_LEAD_RESTART_PLACEMENT=remote
+    JG_SQUAD_LEAD_RESTART_HOST=$remote_host
     # A remote mate's endpoint record lives on its host; the parent's own record
     # names the backend that launch established there, and the remote route
     # accepts nothing but herdr.
     backend=$(jg_meta_get "$meta" remote_backend)
     [ -n "$backend" ] || backend=herdr
   else
-    JG_SECONDMATE_RESTART_PLACEMENT=local
+    JG_SQUAD_LEAD_RESTART_PLACEMENT=local
     backend=$(jg_backend_of_meta "$meta")
   fi
-  JG_SECONDMATE_RESTART_BACKEND=$backend
+  JG_SQUAD_LEAD_RESTART_BACKEND=$backend
   if ! jg_control_backend_state_verified "$backend"; then
-    JG_SECONDMATE_RESTART_REASON="its runtime cannot prove an agent stopped and came back (backend $backend)"
+    JG_SQUAD_LEAD_RESTART_REASON="its runtime cannot prove an agent stopped and came back (backend $backend)"
     return 1
   fi
   if ! family=$(jg_control_harness_family "$harness") \
     || ! jg_control_harness_supported "$family" \
-    || ! jg_control_harness_supports_kind "$family" secondmate; then
-    JG_SECONDMATE_RESTART_REASON="its worker runtime '${harness:-none}' has no verified restart mechanics for a second mate"
+    || ! jg_control_harness_supports_kind "$family" squad_lead; then
+    JG_SQUAD_LEAD_RESTART_REASON="its worker runtime '${harness:-none}' has no verified restart mechanics for a squad lead"
     return 1
   fi
-  JG_SECONDMATE_RESTART_HARNESS=$family
+  JG_SQUAD_LEAD_RESTART_HARNESS=$family
   return 0
 }

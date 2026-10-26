@@ -145,7 +145,7 @@ export PATH
 "$REAL_TMUX" -L "$SOCKET" new-window -d -t "$SESSION:" -n muse -c "$WORKSPACE" -- \
   env XDG_CONFIG_HOME="$LAB/config" XDG_DATA_HOME="$LAB/data" \
   MUSE_EXPERIMENTAL_FOREIGN_PERSONAL_CONTEXT_KILL=on \
-  "$MUSE_BIN" --provider echo --yolo "firstmate Muse signal drift guard" \
+  "$MUSE_BIN" --provider echo --yolo "juggernaut Muse signal drift guard" \
   || fail "could not launch Muse with the echo provider"
 
 SESSION_LOG=

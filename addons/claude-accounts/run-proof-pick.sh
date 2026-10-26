@@ -9,7 +9,7 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
 done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # run-proof-pick.sh: the chooser proof for done-done. Uses the real pool pick jg-spawn calls
-# (jg_account_pool_select from this repo's account-pool add-on; JG_BIN names a Firstmate checkout's bin/
+# (jg_account_pool_select from this repo's account-pool add-on; JG_BIN names a Juggernaut checkout's bin/
 # for jg-timeout-lib.sh) with a throwaway
 # config/account-pool pointing at the chooser and the real accounts, then starts one tiny throwaway
 # Haiku task on the picked profile folder with the launch prefix the pool builds, and reads quota again.
@@ -17,7 +17,7 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 set -euo pipefail
 repo=$(cd "$(dirname "$0")/.." && pwd)
 evidence=${DONE_DONE_EVIDENCE_ROOT:?}
-JG_BIN=${JG_BIN:?set JG_BIN to a Firstmate checkout bin/}
+JG_BIN=${JG_BIN:?set JG_BIN to a Juggernaut checkout bin/}
 work=$(mktemp -d)
 trap 'rm -rf -- "$work"' EXIT
 mkdir -p "$evidence" "$work/home/config" "$work/home/state" "$work/cwd"

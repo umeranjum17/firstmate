@@ -69,7 +69,7 @@ The mid-turn pull warning in `bin/jg-guard.sh` judges watcher health differently
 ### Primary scope
 
 The guard first calls the shared primary scope.
-A secondmate home runs its own primary Juggernaut session, so a genuine `.jg-secondmate-home` marker includes it whether the home is a linked worktree or plain clone.
+A squad lead home runs its own primary Juggernaut session, so a genuine `.jg-squad-lead-home` marker includes it whether the home is a linked worktree or plain clone.
 The marker must meet both of these conditions:
 
 - It is a regular non-symlink file.
@@ -279,10 +279,10 @@ Each enabled primary harness adapts its own turn-end mechanism to the shared gua
 The registrations in detail:
 
 - Claude registers two `Stop` hooks in `.claude/settings.json`, both anchored through `CLAUDE_PROJECT_DIR`: `bin/jg-turnend-guard.sh --claude`, and `bin/jg-claude-stop-autoarm.sh` with `asyncRewake: true` and `timeout: 28800`.
-  In a Claude secondmate home, `bin/jg-spawn.sh` writes a `.jg-busy-stop` pointer and gives the mate no `Stop` busy hook, so `--claude` is the only Stop writer of the parent home's busy record for that generation.
+  In a Claude squad lead home, `bin/jg-spawn.sh` writes a `.jg-busy-stop` pointer and gives the mate no `Stop` busy hook, so `--claude` is the only Stop writer of the parent home's busy record for that generation.
   It records idle when it allows the Stop and busy when its exit 2 blocks it into a continuation, because Claude runs Stop hooks in parallel and that continuation fires no `UserPromptSubmit`.
   A home whose guard predates `.jg-busy-stop` cannot close the turn, so that launch keeps the ordinary `Stop` idle hook instead.
-  [Runtime backend verification](verification/runtime-backends.md#secondmate-busy-contract) owns the live evidence.
+  [Runtime backend verification](verification/runtime-backends.md#squad-lead-busy-contract) owns the live evidence.
 - Codex registers a `Stop` hook in `.codex/hooks.json`, anchors the executable to the hook process working directory, verifies a Juggernaut-shaped hook-bearing root, and passes the original payload to the shared guard.
 - OpenCode listens for `session.idle` in `.opencode/plugins/jg-primary-turnend-guard.js`, lets the watcher coordinator act first, and calls `client.session.promptAsync` once when the guard returns 2.
 - Pi listens for `agent_settled` in `.pi/extensions/jg-primary-turnend-guard.ts`, runs once per logical agent run, and calls `pi.sendUserMessage(..., { deliverAs: "followUp" })` once when the guard returns 2.
@@ -440,7 +440,7 @@ Their adapters fail open at the hook boundary to protect the user session.
 When the predicate blocks, they schedule one bounded follow-up.
 omp is the exception among the Pi-derived harnesses: its `session_stop` hook blocks like Codex's `Stop` hook, so no passive latch is needed and the `stop_hook_active` loop guard applies unchanged.
 
-The generated prompts use the canonical `turn-end-guard` kind after the U+2063 `FIRSTMATE_OP: ` prefix, so Ahoy does not treat them as captain messages.
+The generated prompts use the canonical `turn-end-guard` kind after the U+2063 `JUGGERNAUT_OP: ` prefix, so Ahoy does not treat them as captain messages.
 Each passive adapter owns a loop latch:
 
 - Pi keeps the latch across internal tool turns and clears it only when the generated follow-up settles or delivery fails.
@@ -536,8 +536,8 @@ That warning uses `bin/jg-supervision-instructions.sh --repair-line`, so it alwa
 ## Compatibility limits
 
 - Child operator and scout worktrees are outside scope.
-- A valid secondmate home is in scope.
-  An idle secondmate endpoint with no Relay poll remains healthy because it has no supervision need.
+- A valid squad lead home is in scope.
+  An idle squad lead endpoint with no Relay poll remains healthy because it has no supervision need.
 - The blocking and bounded-follow-up mechanisms are limited to the primary integrations listed above.
 - OpenCode headless mode and untrusted Grok project hooks remain fail-open at the host boundary.
 - Cursor's `stop` step does not fire in headless `cursor-agent -p`, the same class of limit as OpenCode headless; Juggernaut primaries run interactive.
@@ -558,7 +558,7 @@ That warning uses `bin/jg-supervision-instructions.sh --repair-line`, so it alwa
 `tests/jg-turnend-guard.test.sh` covers:
 
 - The predicate.
-- Main and secondmate primary scope.
+- Main and squad lead primary scope.
 - Child-worktree exclusion.
 - `JG_HOME` and `JG_STATE_OVERRIDE` precedence.
 - The live-lock and fresh-beacon guard predicate.

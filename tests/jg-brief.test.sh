@@ -210,9 +210,9 @@ test_ship_modes_generate_clean_briefs() {
     grep -qx "Delivery contract: mode=$mode" "$brief" \
       || fail "$id: brief did not record its machine-readable delivery contract line"
     assert_grep "{TASK}" "$brief" "$id: brief missing the {TASK} placeholder"
-    assert_grep "{FIRSTMATE_SPEC}" "$brief" "$id: brief missing the {FIRSTMATE_SPEC} placeholder"
+    assert_grep "{JUGGERNAUT_SPEC}" "$brief" "$id: brief missing the {JUGGERNAUT_SPEC} placeholder"
     assert_grep "## Captain's intent" "$brief" "$id: brief missing Captain's intent subsection"
-    assert_grep "## Firstmate spec" "$brief" "$id: brief missing Firstmate spec subsection"
+    assert_grep "## Juggernaut spec" "$brief" "$id: brief missing Juggernaut spec subsection"
     assert_grep 'never a bare number such as "PR 108"' "$brief" "$id: brief missing the full-PR-URL rule"
     assert_grep "mid-task \`working:\` line (including setup complete) is nonterminal" "$brief" \
       "$id: brief missing nonterminal working:/setup-complete gate protection"
@@ -298,7 +298,7 @@ ROWS
   pass "jg-brief.sh: --forge forgejo names tea in Rule 3, the direct-PR DOD, and the draft read-back, marks the delivery contract, and the closed set refuses everything else"
 }
 
-# A ship task's delivery mode is firstmate's per-task decision, so a missing or
+# A ship task's delivery mode is juggernaut's per-task decision, so a missing or
 # unusable value must stop the scaffold instead of silently defaulting. The
 # no-mistakes-prod-only row is the conditional registry policy: it is never a task
 # mode, and its refusal must say to classify the task's surface first.
@@ -337,7 +337,7 @@ test_ship_mode_is_explicit_not_registry() {
   brief="$home/data/brief-explicit-a5/brief.md"
   grep -qx "Delivery contract: mode=no-mistakes" "$brief" \
     || fail "registered direct-PR posture overrode the explicit --mode"
-  assert_grep "Firstmate will then instruct you to run /no-mistakes" "$brief" \
+  assert_grep "Juggernaut will then instruct you to run /no-mistakes" "$brief" \
     "explicit no-mistakes brief did not render the pipeline definition of done"
 
   # An unregistered project is not a blocker either, because nothing is looked up.
@@ -348,7 +348,7 @@ test_ship_mode_is_explicit_not_registry() {
   pass "jg-brief.sh: the explicit ship mode wins over the registered posture"
 }
 
-# yolo is firstmate's merge authority and never reaches the worker, and a scout
+# yolo is juggernaut's merge authority and never reaches the worker, and a scout
 # or charter carries no delivery contract. Each must refuse rather than accept and
 # discard the flag, which would look recorded but change nothing.
 test_delivery_flags_are_refused_where_they_do_not_apply() {
@@ -366,9 +366,9 @@ test_delivery_flags_are_refused_where_they_do_not_apply() {
 yolo on a ship brief|brief-refused-b1 some-proj --mode direct-PR --yolo on|--yolo is not a brief input
 yolo=value form on a ship brief|brief-refused-b2 some-proj --mode direct-PR --yolo=off|--yolo is not a brief input
 mode on a scout brief|brief-refused-b3 some-proj --scout --mode direct-PR|--mode applies only to ship briefs
-mode on a secondmate charter|brief-refused-b4 --secondmate --no-projects --mode no-mistakes|--mode applies only to ship briefs
+mode on a squad_lead charter|brief-refused-b4 --squad-lead --no-projects --mode no-mistakes|--mode applies only to ship briefs
 ROWS
-  pass "jg-brief.sh: --yolo and scout/secondmate --mode are refused, never silently dropped"
+  pass "jg-brief.sh: --yolo and scout/squad_lead --mode are refused, never silently dropped"
 }
 
 test_faster_paths_use_configured_authority_without_stacked_review() {
@@ -378,18 +378,18 @@ test_faster_paths_use_configured_authority_without_stacked_review() {
   id="brief-direct-authority-a4"
   JG_HOME="$home" "$ROOT/bin/jg-brief.sh" "$id" direct-proj --mode direct-PR >/dev/null 2>&1
   brief="$home/data/$id/brief.md"
-  assert_grep "The configured merge authority decides whether to merge the PR; firstmate relays the outcome." "$brief" \
+  assert_grep "The configured merge authority decides whether to merge the PR; juggernaut relays the outcome." "$brief" \
     "direct-PR brief lost configured merge authority"
   assert_no_grep "The captain reviews and merges the PR" "$brief" \
     "direct-PR brief hard-coded captain-only authority"
   id="brief-local-authority-a4"
   JG_HOME="$home" "$ROOT/bin/jg-brief.sh" "$id" local-proj --mode local-only >/dev/null 2>&1
   brief="$home/data/$id/brief.md"
-  assert_grep "The configured merge authority approves the ready branch, then firstmate merges it into local \`main\` through the guarded fast-forward path." "$brief" \
+  assert_grep "The configured merge authority approves the ready branch, then juggernaut merges it into local \`main\` through the guarded fast-forward path." "$brief" \
     "local-only brief lost configured merge authority and guarded landing"
   assert_no_grep "The captain approves the ready branch" "$brief" \
     "local-only brief hard-coded captain-only authority"
-  assert_no_grep "Firstmate then reviews your branch diff" "$brief" \
+  assert_no_grep "Juggernaut then reviews your branch diff" "$brief" \
     "local-only brief retained a personal review stacked on the selected delivery path"
   assert_no_grep "pass \`--intent\` as only this brief's \`## Captain's intent\`" "$home/data/$id/brief.md" \
     "local-only brief must not include the no-mistakes --intent contract"
@@ -454,8 +454,8 @@ test_no_mistakes_dod_wording() {
     "no-mistakes DOD must require --intent to be the Captain's intent subsection"
   assert_grep "plus any later words the captain actually said" "$brief" \
     "no-mistakes DOD must allow later captain words in --intent"
-  assert_grep "Do not include \`## Firstmate spec\`" "$brief" \
-    "no-mistakes DOD must keep Firstmate spec out of --intent"
+  assert_grep "Do not include \`## Juggernaut spec\`" "$brief" \
+    "no-mistakes DOD must keep Juggernaut spec out of --intent"
   assert_grep "or your own decisions and tradeoffs" "$brief" \
     "no-mistakes DOD must keep worker tradeoffs out of --intent"
   assert_grep "This replaces the no-mistakes skill's advice to enrich \`--intent\`" "$brief" \
@@ -537,9 +537,9 @@ test_ask_user_escalation_format() {
 
   # The DOD's own ask-user paragraph must point back at rule 6's format
   # (one-owner rule) rather than restating or bare-citing it.
-  assert_grep "escalate to firstmate using rule 6's ask-user format" "$brief" \
+  assert_grep "escalate to juggernaut using rule 6's ask-user format" "$brief" \
     "no-mistakes DOD ask-user paragraph must point at rule 6's format instead of a bare citation"
-  assert_no_grep "escalate to firstmate (rule 6) and stop." "$brief" \
+  assert_no_grep "escalate to juggernaut (rule 6) and stop." "$brief" \
     "no-mistakes DOD ask-user paragraph still uses the old bare rule-6 pointer"
 
   other_id="brief-no-ask-user-scout"
@@ -561,7 +561,7 @@ test_ask_user_escalation_format() {
   pass "jg-brief.sh: no-mistakes ask-user findings use one event plus a verbatim snapshot"
 }
 
-# The project-memory section bounds crewmate edits of a project's AGENTS.md or
+# The project-memory section bounds operator edits of a project's AGENTS.md or
 # CLAUDE.md to corrections of factually wrong information - including wrong
 # information the task itself introduced - and never invites additions of
 # missing knowledge, because those files tax every agent session of the project.
@@ -593,13 +593,13 @@ test_herdr_lab_contract_is_explicit_and_complete() {
   home="$TMP_ROOT/herdr-lab-home"
   mkdir -p "$home/data"
   id="brief-herdr-lab-d1"
-  JG_HOME="$home" "$ROOT/bin/jg-brief.sh" "$id" firstmate --mode no-mistakes --herdr-lab >/dev/null 2>&1
+  JG_HOME="$home" "$ROOT/bin/jg-brief.sh" "$id" juggernaut --mode no-mistakes --herdr-lab >/dev/null 2>&1
   brief="$home/data/$id/brief.md"
   assert_present "$brief" "Herdr lab brief was not scaffolded"
   assert_grep "# Herdr isolation - HARD SAFETY CONTRACT" "$brief" \
     "Herdr lab brief missing its hard safety contract"
   assert_grep "HERDR_LAB_HELPER='$ROOT/bin/jg-herdr-lab.sh'" "$brief" \
-    "Herdr lab brief must bind the absolute Firstmate helper path"
+    "Herdr lab brief must bind the absolute Juggernaut helper path"
   assert_grep "HERDR_LAB_SESSION=\$(\"\$HERDR_LAB_HELPER\" name $id)" "$brief" \
     "Herdr lab brief missing helper-owned session naming"
   assert_grep "\"\$HERDR_LAB_HELPER\" provision \"\$HERDR_LAB_SESSION\"" "$brief" \
@@ -619,10 +619,10 @@ test_herdr_lab_contract_is_explicit_and_complete() {
   pass "jg-brief.sh: --herdr-lab emits the complete hard safety contract"
 }
 
-test_herdr_lab_contract_quotes_foreign_firstmate_path() {
+test_herdr_lab_contract_quotes_foreign_juggernaut_path() {
   local home id brief foreign_root helper
   home="$TMP_ROOT/herdr-lab-foreign-home"
-  foreign_root="$TMP_ROOT/firstmate helper's root"
+  foreign_root="$TMP_ROOT/juggernaut helper's root"
   mkdir -p "$home/data"
   id="brief-herdr-lab-foreign-d2"
   helper=$(printf '%s' "$foreign_root/bin/jg-herdr-lab.sh" | sed "s/'/'\\\\''/g")
@@ -630,10 +630,10 @@ test_herdr_lab_contract_quotes_foreign_firstmate_path() {
   JG_HOME="$home" JG_ROOT_OVERRIDE="$foreign_root" "$ROOT/bin/jg-brief.sh" "$id" foreign --scout --herdr-lab >/dev/null 2>&1
   brief="$home/data/$id/brief.md"
   assert_grep "HERDR_LAB_HELPER=$helper" "$brief" \
-    "Herdr lab brief must shell-quote an absolute Firstmate helper path"
+    "Herdr lab brief must shell-quote an absolute Juggernaut helper path"
   assert_no_grep "bin/jg-herdr-lab.sh name $id" "$brief" \
     "Herdr lab brief must not invoke a worktree-relative helper"
-  pass "jg-brief.sh: --herdr-lab uses its quoted Firstmate-owned helper path"
+  pass "jg-brief.sh: --herdr-lab uses its quoted Juggernaut-owned helper path"
 }
 
 test_herdr_lab_omission_is_loud_for_ship_and_scout() {
@@ -643,9 +643,9 @@ test_herdr_lab_omission_is_loud_for_ship_and_scout() {
   for kind in ship scout; do
     id="brief-herdr-gate-$kind"
     if [ "$kind" = scout ]; then
-      JG_HOME="$home" "$ROOT/bin/jg-brief.sh" "$id" firstmate --scout >/dev/null 2>&1
+      JG_HOME="$home" "$ROOT/bin/jg-brief.sh" "$id" juggernaut --scout >/dev/null 2>&1
     else
-      JG_HOME="$home" "$ROOT/bin/jg-brief.sh" "$id" firstmate --mode no-mistakes >/dev/null 2>&1
+      JG_HOME="$home" "$ROOT/bin/jg-brief.sh" "$id" juggernaut --mode no-mistakes >/dev/null 2>&1
     fi
     brief="$home/data/$id/brief.md"
     assert_grep "# Herdr lifecycle declaration - NOT ENABLED" "$brief" \
@@ -657,7 +657,7 @@ test_herdr_lab_omission_is_loud_for_ship_and_scout() {
 }
 
 # Regression (issue #2575): AGENTS.md section 11 and this script's own help tell
-# firstmate to fill `{TASK}` and `{FIRSTMATE_SPEC}`. The unguarded Herdr gate used
+# juggernaut to fill `{TASK}` and `{JUGGERNAUT_SPEC}`. The unguarded Herdr gate used
 # to quote `{TASK}` in its own prose, so that documented global replace spliced
 # the whole task body into the middle of the gate's sentence - silently
 # destroying the one contract that exists precisely because the scaffold cannot
@@ -672,44 +672,44 @@ test_documented_global_replace_leaves_the_herdr_gate_intact() {
   for kind in ship scout; do
     id="brief-fill-site-$kind"
     if [ "$kind" = scout ]; then
-      JG_HOME="$home" "$ROOT/bin/jg-brief.sh" "$id" firstmate --scout >/dev/null 2>&1
+      JG_HOME="$home" "$ROOT/bin/jg-brief.sh" "$id" juggernaut --scout >/dev/null 2>&1
     else
-      JG_HOME="$home" "$ROOT/bin/jg-brief.sh" "$id" firstmate --mode no-mistakes >/dev/null 2>&1
+      JG_HOME="$home" "$ROOT/bin/jg-brief.sh" "$id" juggernaut --mode no-mistakes >/dev/null 2>&1
     fi
     brief="$home/data/$id/brief.md"
     assert_present "$brief" "$kind brief was not scaffolded"
     count=$(grep -c -F '{TASK}' "$brief")
     [ "$count" = 1 ] \
       || fail "$kind brief must carry exactly one {TASK} fill site, found $count"
-    count=$(grep -c -F '{FIRSTMATE_SPEC}' "$brief")
+    count=$(grep -c -F '{JUGGERNAUT_SPEC}' "$brief")
     [ "$count" = 1 ] \
-      || fail "$kind brief must carry exactly one {FIRSTMATE_SPEC} fill site, found $count"
+      || fail "$kind brief must carry exactly one {JUGGERNAUT_SPEC} fill site, found $count"
     content=$(cat "$brief")
     filled=${content//'{TASK}'/$body}
-    filled=${filled//'{FIRSTMATE_SPEC}'/$spec}
+    filled=${filled//'{JUGGERNAUT_SPEC}'/$spec}
     count=$(printf '%s\n' "$filled" | grep -c -F "$body")
     [ "$count" = 1 ] \
       || fail "$kind brief: the documented {TASK} replace duplicated the intent body $count times"
     count=$(printf '%s\n' "$filled" | grep -c -F "$spec")
     [ "$count" = 1 ] \
-      || fail "$kind brief: the {FIRSTMATE_SPEC} replace duplicated the spec body $count times"
+      || fail "$kind brief: the {JUGGERNAUT_SPEC} replace duplicated the spec body $count times"
     printf '%s\n' "$filled" | grep -qF 'this scaffold cannot inspect the task text' \
       || fail "$kind brief: the Herdr safety gate did not survive the documented fill"
   done
-  pass "jg-brief.sh: the documented {TASK} and {FIRSTMATE_SPEC} fills cannot corrupt the Herdr safety gate"
+  pass "jg-brief.sh: the documented {TASK} and {JUGGERNAUT_SPEC} fills cannot corrupt the Herdr safety gate"
 }
 
-test_secondmate_no_projects_charter() {
+test_squad_lead_no_projects_charter() {
   local home brief status
   home="$TMP_ROOT/no-projects-home"
   mkdir -p "$home/data"
 
   # The deliberate --no-projects signal scaffolds a valid project-less charter for
-  # a domain whose subject is the firstmate repo itself (no clones needed).
-  JG_HOME="$home" JG_SECONDMATE_CHARTER='firstmate self-development' \
-    JG_SECONDMATE_SCOPE='firstmate repo work' \
-    "$ROOT/bin/jg-brief.sh" fdev --secondmate --no-projects >/dev/null 2>&1; status=$?
-  expect_code 0 "$status" "--no-projects secondmate brief should exit 0"
+  # a domain whose subject is the juggernaut repo itself (no clones needed).
+  JG_HOME="$home" JG_SQUAD_LEAD_CHARTER='juggernaut self-development' \
+    JG_SQUAD_LEAD_SCOPE='juggernaut repo work' \
+    "$ROOT/bin/jg-brief.sh" fdev --squad-lead --no-projects >/dev/null 2>&1; status=$?
+  expect_code 0 "$status" "--no-projects squad_lead brief should exit 0"
   brief="$home/data/fdev/brief.md"
   assert_present "$brief" "project-less charter was not scaffolded"
   assert_grep "# Project clones" "$brief" "project-less charter dropped the Project clones heading"
@@ -720,87 +720,87 @@ test_secondmate_no_projects_charter() {
   assert_no_grep "The projects above are local clones" "$brief" \
     "project-less charter kept the with-projects operating-model line"
   assert_grep '# The captain and the parent channel' "$brief" \
-    "secondmate charter lost the parent-channel section"
+    "squad_lead charter lost the parent-channel section"
   assert_grep 'Nobody reads this chat' "$brief" \
-    "secondmate charter no longer says the chat is unread"
+    "squad_lead charter no longer says the chat is unread"
   assert_grep 'in this home it IS the captain' "$brief" \
-    "secondmate charter no longer names the parent channel as the captain"
+    "squad_lead charter no longer names the parent channel as the captain"
   assert_grep 'working [key=<work-slug>]' "$brief" \
-    "secondmate charter did not key material routed-work phases"
+    "squad_lead charter did not key material routed-work phases"
   assert_grep 'resolved [key=<work-slug>]' "$brief" \
-    "secondmate charter did not close a quietly ended routed-work phase"
+    "squad_lead charter did not close a quietly ended routed-work phase"
   assert_grep 'use the same key on its later' "$brief" \
-    "secondmate charter did not supersede working phases with later states"
+    "squad_lead charter did not supersede working phases with later states"
   if grep -nE '^-[[:space:]]*$' "$brief" >/dev/null; then
     fail "project-less charter left a stray empty project bullet"
   fi
 
   # Accidental omission (no projects, no signal) still fails loudly, writing nothing.
-  JG_HOME="$home" JG_SECONDMATE_CHARTER='x' "$ROOT/bin/jg-brief.sh" oops --secondmate >/dev/null 2>&1; status=$?
-  expect_code 1 "$status" "secondmate brief with no projects and no --no-projects must fail"
-  assert_absent "$home/data/oops/brief.md" "loud-failure secondmate brief still wrote a file"
+  JG_HOME="$home" JG_SQUAD_LEAD_CHARTER='x' "$ROOT/bin/jg-brief.sh" oops --squad-lead >/dev/null 2>&1; status=$?
+  expect_code 1 "$status" "squad_lead brief with no projects and no --no-projects must fail"
+  assert_absent "$home/data/oops/brief.md" "loud-failure squad_lead brief still wrote a file"
 
   # --no-projects is mutually exclusive with a project list.
-  JG_HOME="$home" JG_SECONDMATE_CHARTER='x' "$ROOT/bin/jg-brief.sh" oops2 --secondmate --no-projects alpha >/dev/null 2>&1; status=$?
+  JG_HOME="$home" JG_SQUAD_LEAD_CHARTER='x' "$ROOT/bin/jg-brief.sh" oops2 --squad-lead --no-projects alpha >/dev/null 2>&1; status=$?
   expect_code 1 "$status" "--no-projects combined with a project list must fail"
 
-  # --no-projects applies only to secondmate charters, never a ship/scout brief.
+  # --no-projects applies only to squad_lead charters, never a ship/scout brief.
   JG_HOME="$home" "$ROOT/bin/jg-brief.sh" oops3 somerepo --no-projects >/dev/null 2>&1; status=$?
   expect_code 1 "$status" "--no-projects on a ship brief must fail"
 
   pass "jg-brief.sh: --no-projects scaffolds a project-less charter and guards misuse"
 }
 
-test_secondmate_marked_request_reporting_contract() {
+test_squad_lead_marked_request_reporting_contract() {
   local home brief
   home="$TMP_ROOT/marked-request-reporting-home"
   mkdir -p "$home/data"
   JG_HOME="$home" JG_CLASSIFY_PAUSED_VERB=paused \
-    JG_SECONDMATE_CHARTER='Handle routed domain work.' \
-    "$ROOT/bin/jg-brief.sh" marked-request-reporting --secondmate --no-projects >/dev/null 2>&1
+    JG_SQUAD_LEAD_CHARTER='Handle routed domain work.' \
+    "$ROOT/bin/jg-brief.sh" marked-request-reporting --squad-lead --no-projects >/dev/null 2>&1
   brief="$home/data/marked-request-reporting/brief.md"
 
   assert_grep 'A marked request requires one correlated answer after the work' "$brief" \
-    "secondmate charter did not require the correlated answer after the work"
+    "squad_lead charter did not require the correlated answer after the work"
   assert_grep 'does not require a separate receipt or start acknowledgement' "$brief" \
-    "secondmate charter did not reject a separate receipt/start acknowledgement"
+    "squad_lead charter did not reject a separate receipt/start acknowledgement"
   assert_grep "Never append \`working:\` merely to acknowledge receipt or announce that a marked request has started." "$brief" \
-    "secondmate charter did not forbid a generic working acknowledgement"
+    "squad_lead charter did not forbid a generic working acknowledgement"
   assert_no_grep "Give every routed-work phase a stable key: open it with \`working" "$brief" \
-    "secondmate charter retained the unconditional working opener"
+    "squad_lead charter retained the unconditional working opener"
   assert_grep 'When a routed-work phase has a supervisor-actionable material change worth reporting under the rule above' "$brief" \
-    "secondmate charter did not limit keyed phases to reportable material changes"
+    "squad_lead charter did not limit keyed phases to reportable material changes"
   assert_grep "If its first reportable event is \`working [key=<work-slug>]: {material phase}\`" "$brief" \
-    "secondmate charter lost keyed working syntax for a reportable material phase"
+    "squad_lead charter lost keyed working syntax for a reportable material phase"
   assert_grep "use the same key on its later \`paused\`, \`done\`, \`failed\`, \`needs-decision\`, or \`blocked\` event" "$brief" \
-    "secondmate charter lost same-key closure for a reportable material phase"
+    "squad_lead charter lost same-key closure for a reportable material phase"
   assert_grep 'resolved [key=<work-slug>]' "$brief" \
-    "secondmate charter lost resolved closure for a keyed material phase"
+    "squad_lead charter lost resolved closure for a keyed material phase"
 
   assert_grep 'include that exact token in your parent status reply' "$brief" \
-    "secondmate charter lost correlated parent results"
-  assert_grep 'bin/jg-secondmate-report.sh <verb> <corr_id> <note>' "$brief" \
-    "secondmate charter lost the mechanical helper invocation"
+    "squad_lead charter lost correlated parent results"
+  assert_grep 'bin/jg-squad-lead-report.sh <verb> <corr_id> <note>' "$brief" \
+    "squad_lead charter lost the mechanical helper invocation"
   assert_grep 'do not pass a status path' "$brief" \
-    "secondmate charter still tells the mate to pass a hand path to the helper"
+    "squad_lead charter still tells the mate to pass a hand path to the helper"
   assert_grep 'For a terse result, a status line is the whole answer.' "$brief" \
-    "secondmate charter lost terse result reporting"
+    "squad_lead charter lost terse result reporting"
   assert_grep 'append a status line that points to that doc' "$brief" \
-    "secondmate charter lost detailed document pointers"
+    "squad_lead charter lost detailed document pointers"
   assert_grep 'Report only true captain-relevant outcomes or a declared external wait' "$brief" \
-    "secondmate charter lost declared external waits"
+    "squad_lead charter lost declared external waits"
   assert_grep 'a captain decision, a real blocker, a failure, work ready for review, or work you landed' "$brief" \
-    "secondmate charter lost decisions, blockers, failures, ready outcomes, or landed work"
+    "squad_lead charter lost decisions, blockers, failures, ready outcomes, or landed work"
   # Under standing merge authority nothing is ever "ready for review", so the
   # landed merge is the trigger a charter without this line silently omits.
   assert_grep 'a merge you performed yourself under standing merge authority and one the captain merged on the forge' "$brief" \
-    "secondmate charter did not name a landed merge as a reporting trigger"
+    "squad_lead charter did not name a landed merge as a reporting trigger"
   assert_grep 'States: working, needs-decision, blocked, paused, done, failed.' "$brief" \
-    "secondmate charter changed the preserved status vocabulary"
+    "squad_lead charter changed the preserved status vocabulary"
   pass "jg-brief.sh: marked requests avoid generic acknowledgements and preserve material reporting"
 }
 
-test_secondmate_directory_paths_are_absolute_and_output_is_stable() {
+test_squad_lead_directory_paths_are_absolute_and_output_is_stable() {
   local root home data_override state_override brief baseline err status
   root="$TMP_ROOT/relative-directory-inputs"
   mkdir -p "$root"
@@ -813,47 +813,47 @@ test_secondmate_directory_paths_are_absolute_and_output_is_stable() {
     "$root/cdpath/data-override" "$root/cdpath/state-override"
 
   brief="$home/data/relative-home/brief.md"
-  JG_HOME="$home" JG_SECONDMATE_CHARTER=x \
-    "$ROOT/bin/jg-brief.sh" relative-home --secondmate --no-projects >/dev/null 2>&1
+  JG_HOME="$home" JG_SQUAD_LEAD_CHARTER=x \
+    "$ROOT/bin/jg-brief.sh" relative-home --squad-lead --no-projects >/dev/null 2>&1
   baseline="$root/absolute-home-charter"
   cp "$brief" "$baseline"
   rm -f "$brief"
   (
     cd "$root" || exit 1
-    CDPATH="$root/cdpath" JG_HOME=home JG_SECONDMATE_CHARTER=x \
-      "$ROOT/bin/jg-brief.sh" relative-home --secondmate --no-projects >/dev/null 2>&1
+    CDPATH="$root/cdpath" JG_HOME=home JG_SQUAD_LEAD_CHARTER=x \
+      "$ROOT/bin/jg-brief.sh" relative-home --squad-lead --no-projects >/dev/null 2>&1
   )
   cmp -s "$baseline" "$brief" \
     || fail "relative JG_HOME changed charter bytes compared with the same absolute home"
   assert_grep ">> '$home/state/relative-home.status'" "$brief" \
-    "relative JG_HOME did not render an absolute secondmate status path"
+    "relative JG_HOME did not render an absolute squad_lead status path"
 
   brief="$home/data/relative-state/brief.md"
-  JG_HOME="$home" JG_STATE_OVERRIDE="$state_override" JG_SECONDMATE_CHARTER=x \
-    "$ROOT/bin/jg-brief.sh" relative-state --secondmate --no-projects >/dev/null 2>&1
+  JG_HOME="$home" JG_STATE_OVERRIDE="$state_override" JG_SQUAD_LEAD_CHARTER=x \
+    "$ROOT/bin/jg-brief.sh" relative-state --squad-lead --no-projects >/dev/null 2>&1
   baseline="$root/absolute-state-charter"
   cp "$brief" "$baseline"
   rm -f "$brief"
   (
     cd "$root" || exit 1
-    CDPATH="$root/cdpath" JG_HOME="$home" JG_STATE_OVERRIDE=state-override JG_SECONDMATE_CHARTER=x \
-      "$ROOT/bin/jg-brief.sh" relative-state --secondmate --no-projects >/dev/null 2>&1
+    CDPATH="$root/cdpath" JG_HOME="$home" JG_STATE_OVERRIDE=state-override JG_SQUAD_LEAD_CHARTER=x \
+      "$ROOT/bin/jg-brief.sh" relative-state --squad-lead --no-projects >/dev/null 2>&1
   )
   cmp -s "$baseline" "$brief" \
     || fail "relative JG_STATE_OVERRIDE changed charter bytes compared with the same absolute state directory"
   assert_grep ">> '$state_override/relative-state.status'" "$brief" \
-    "relative JG_STATE_OVERRIDE did not render an absolute secondmate status path"
+    "relative JG_STATE_OVERRIDE did not render an absolute squad_lead status path"
 
   brief="$data_override/relative-data/brief.md"
-  JG_HOME="$home" JG_DATA_OVERRIDE="$data_override" JG_SECONDMATE_CHARTER=x \
-    "$ROOT/bin/jg-brief.sh" relative-data --secondmate --no-projects >/dev/null 2>&1
+  JG_HOME="$home" JG_DATA_OVERRIDE="$data_override" JG_SQUAD_LEAD_CHARTER=x \
+    "$ROOT/bin/jg-brief.sh" relative-data --squad-lead --no-projects >/dev/null 2>&1
   baseline="$root/absolute-data-charter"
   cp "$brief" "$baseline"
   rm -f "$brief"
   (
     cd "$root" || exit 1
-    CDPATH="$root/cdpath" JG_HOME="$home" JG_DATA_OVERRIDE=data-override JG_SECONDMATE_CHARTER=x \
-      "$ROOT/bin/jg-brief.sh" relative-data --secondmate --no-projects >/dev/null 2>&1
+    CDPATH="$root/cdpath" JG_HOME="$home" JG_DATA_OVERRIDE=data-override JG_SQUAD_LEAD_CHARTER=x \
+      "$ROOT/bin/jg-brief.sh" relative-data --squad-lead --no-projects >/dev/null 2>&1
   )
   cmp -s "$baseline" "$brief" \
     || fail "relative JG_DATA_OVERRIDE changed charter bytes compared with the same absolute data directory"
@@ -863,8 +863,8 @@ test_secondmate_directory_paths_are_absolute_and_output_is_stable() {
   err="$root/unresolved.err"
   (
     cd "$root" || exit 1
-    JG_HOME=missing-home JG_SECONDMATE_CHARTER=x \
-      "$ROOT/bin/jg-brief.sh" unresolved-home --secondmate --no-projects >/dev/null 2>"$err"
+    JG_HOME=missing-home JG_SQUAD_LEAD_CHARTER=x \
+      "$ROOT/bin/jg-brief.sh" unresolved-home --squad-lead --no-projects >/dev/null 2>"$err"
   ); status=$?
   expect_code 1 "$status" "an unresolved relative JG_HOME must fail"
   assert_grep "JG_HOME directory cannot be resolved: missing-home" "$err" \
@@ -872,8 +872,8 @@ test_secondmate_directory_paths_are_absolute_and_output_is_stable() {
 
   (
     cd "$root" || exit 1
-    JG_HOME="$home" JG_STATE_OVERRIDE=missing-state JG_SECONDMATE_CHARTER=x \
-      "$ROOT/bin/jg-brief.sh" unresolved-state --secondmate --no-projects >/dev/null 2>"$err"
+    JG_HOME="$home" JG_STATE_OVERRIDE=missing-state JG_SQUAD_LEAD_CHARTER=x \
+      "$ROOT/bin/jg-brief.sh" unresolved-state --squad-lead --no-projects >/dev/null 2>"$err"
   ); status=$?
   expect_code 1 "$status" "an unresolved relative JG_STATE_OVERRIDE must fail"
   assert_grep "JG_STATE_OVERRIDE directory cannot be resolved: missing-state" "$err" \
@@ -881,8 +881,8 @@ test_secondmate_directory_paths_are_absolute_and_output_is_stable() {
 
   (
     cd "$root" || exit 1
-    JG_HOME="$home" JG_DATA_OVERRIDE=missing-data JG_SECONDMATE_CHARTER=x \
-      "$ROOT/bin/jg-brief.sh" unresolved-data --secondmate --no-projects >/dev/null 2>"$err"
+    JG_HOME="$home" JG_DATA_OVERRIDE=missing-data JG_SQUAD_LEAD_CHARTER=x \
+      "$ROOT/bin/jg-brief.sh" unresolved-data --squad-lead --no-projects >/dev/null 2>"$err"
   ); status=$?
   expect_code 1 "$status" "an unresolved relative JG_DATA_OVERRIDE must fail"
   assert_grep "JG_DATA_OVERRIDE directory cannot be resolved: missing-data" "$err" \
@@ -891,20 +891,20 @@ test_secondmate_directory_paths_are_absolute_and_output_is_stable() {
   pass "jg-brief.sh: relative directory inputs ignore CDPATH, render stable absolute charter paths, or fail loudly"
 }
 
-test_herdr_lab_contract_applies_to_scouts_but_not_secondmates() {
+test_herdr_lab_contract_applies_to_scouts_but_not_squad_leads() {
   local home brief status=0
   home="$TMP_ROOT/herdr-kind-home"
   mkdir -p "$home/data"
-  JG_HOME="$home" "$ROOT/bin/jg-brief.sh" herdr-scout firstmate --scout --herdr-lab >/dev/null 2>&1
+  JG_HOME="$home" "$ROOT/bin/jg-brief.sh" herdr-scout juggernaut --scout --herdr-lab >/dev/null 2>&1
   brief="$home/data/herdr-scout/brief.md"
   assert_grep "# Herdr isolation - HARD SAFETY CONTRACT" "$brief" \
     "scout --herdr-lab brief missing the contract"
 
-  JG_HOME="$home" JG_SECONDMATE_CHARTER=ops "$ROOT/bin/jg-brief.sh" herdr-secondmate --secondmate firstmate --herdr-lab >/dev/null 2>&1 || status=$?
-  expect_code 1 "$status" "secondmate --herdr-lab must be rejected"
-  assert_absent "$home/data/herdr-secondmate/brief.md" \
-    "rejected secondmate --herdr-lab still wrote a brief"
-  pass "jg-brief.sh: Herdr lab contract covers scouts and rejects secondmate misuse"
+  JG_HOME="$home" JG_SQUAD_LEAD_CHARTER=ops "$ROOT/bin/jg-brief.sh" herdr-squad-lead --squad-lead juggernaut --herdr-lab >/dev/null 2>&1 || status=$?
+  expect_code 1 "$status" "squad_lead --herdr-lab must be rejected"
+  assert_absent "$home/data/herdr-squad-lead/brief.md" \
+    "rejected squad_lead --herdr-lab still wrote a brief"
+  pass "jg-brief.sh: Herdr lab contract covers scouts and rejects squad_lead misuse"
 }
 
 test_pause_verb_override_renders_all_brief_scaffolds() {
@@ -912,20 +912,20 @@ test_pause_verb_override_renders_all_brief_scaffolds() {
   home="$TMP_ROOT/pause-verb-home"
   mkdir -p "$home/data"
 
-  for kind in ship:no-mistakes ship:direct-PR ship:local-only scout secondmate; do
+  for kind in ship:no-mistakes ship:direct-PR ship:local-only scout squad_lead; do
     id="brief-pause-verb-${kind//:/-}"
     case "$kind" in
       ship:*)
         JG_HOME="$home" JG_CLASSIFY_PAUSED_VERB=awaiting \
-          "$ROOT/bin/jg-brief.sh" "$id" firstmate --mode "${kind#ship:}" >/dev/null 2>&1
+          "$ROOT/bin/jg-brief.sh" "$id" juggernaut --mode "${kind#ship:}" >/dev/null 2>&1
         ;;
       scout)
         JG_HOME="$home" JG_CLASSIFY_PAUSED_VERB=awaiting \
-          "$ROOT/bin/jg-brief.sh" "$id" firstmate --scout >/dev/null 2>&1
+          "$ROOT/bin/jg-brief.sh" "$id" juggernaut --scout >/dev/null 2>&1
         ;;
-      secondmate)
+      squad_lead)
         JG_HOME="$home" JG_CLASSIFY_PAUSED_VERB=awaiting \
-          "$ROOT/bin/jg-brief.sh" "$id" --secondmate --no-projects >/dev/null 2>&1
+          "$ROOT/bin/jg-brief.sh" "$id" --squad-lead --no-projects >/dev/null 2>&1
         ;;
     esac
     brief="$home/data/$id/brief.md"
@@ -1003,9 +1003,9 @@ test_ship_and_scout_teach_validation_round_pause() {
   for kind in ship scout; do
     id="brief-validation-round-pause-$kind"
     if [ "$kind" = scout ]; then
-      JG_HOME="$home" "$ROOT/bin/jg-brief.sh" "$id" firstmate --scout >/dev/null 2>&1
+      JG_HOME="$home" "$ROOT/bin/jg-brief.sh" "$id" juggernaut --scout >/dev/null 2>&1
     else
-      JG_HOME="$home" "$ROOT/bin/jg-brief.sh" "$id" firstmate --mode no-mistakes >/dev/null 2>&1
+      JG_HOME="$home" "$ROOT/bin/jg-brief.sh" "$id" juggernaut --mode no-mistakes >/dev/null 2>&1
     fi
     brief="$home/data/$id/brief.md"
     assert_grep "your own validation round, which you declare once just before its blocking hold" "$brief" \
@@ -1020,7 +1020,7 @@ test_ship_and_scout_teach_validation_round_pause() {
       "$kind brief did not require declaring a background-work wait"
     assert_grep 'before waiting on your own pipeline run or a long foreground command' "$brief" \
       "$kind brief did not require declaring a pipeline or foreground wait"
-    assert_grep 'Firstmate may still raise one first-sight alert' "$brief" \
+    assert_grep 'Juggernaut may still raise one first-sight alert' "$brief" \
       "$kind brief incorrectly promised to suppress the first alert"
     assert_grep 'Do not declare active implementation or reasoning as a wait' "$brief" \
       "$kind brief did not limit the declaration to actual waits"
@@ -1028,7 +1028,7 @@ test_ship_and_scout_teach_validation_round_pause() {
   pass "jg-brief.sh: ship and scout scaffolds declare a validation-round pause once, then hold it"
 }
 
-test_scout_and_secondmate_load_decision_hold_policy() {
+test_scout_and_squad_lead_load_decision_hold_policy() {
   local home scout charter
   home="$TMP_ROOT/decision-policy-home"
   mkdir -p "$home/data"
@@ -1039,11 +1039,11 @@ test_scout_and_secondmate_load_decision_hold_policy() {
     "scout brief did not load the captain-call policy before done"
   assert_grep "pass its shared completion gate for the report and any visual review" "$scout" \
     "scout brief did not cross-reference visual-review completion"
-  JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" JG_SECONDMATE_CHARTER='sample reviews' \
-    "$ROOT/bin/jg-brief.sh" sample-mate --secondmate --no-projects >/dev/null 2>&1
+  JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" JG_SQUAD_LEAD_CHARTER='sample reviews' \
+    "$ROOT/bin/jg-brief.sh" sample-mate --squad-lead --no-projects >/dev/null 2>&1
   charter="$home/data/sample-mate/brief.md"
   assert_grep "load \`captain-hold-lifecycle\`" "$charter" \
-    "secondmate charter did not load the shared captain-call policy for detailed investigations"
+    "squad_lead charter did not load the shared captain-call policy for detailed investigations"
   pass "jg-brief.sh: investigation and visual-review completions load the shared decision policy"
 }
 
@@ -1083,8 +1083,8 @@ ROWS
   pass "jg-brief.sh: scout Lavish hosting follows the bootstrap lavish-axi floor"
 }
 
-# Scout and secondmate paths still scaffold well-formed briefs.
-test_scout_and_secondmate_scaffold() {
+# Scout and squad_lead paths still scaffold well-formed briefs.
+test_scout_and_squad_lead_scaffold() {
   local brief
   JG_HOME="$BRIEF_HOME" "$ROOT/bin/jg-brief.sh" brief-scout-q6 alpha --scout >/dev/null 2>&1 \
     || fail "jg-brief.sh scout scaffold exited non-zero"
@@ -1093,21 +1093,21 @@ test_scout_and_secondmate_scaffold() {
   assert_grep "SCOUT task" "$brief" "scout brief must declare itself a scout task"
   assert_grep "report.md" "$brief" "scout brief must point at the report deliverable"
   assert_grep "## Captain's intent" "$brief" "scout brief missing Captain's intent subsection"
-  assert_grep "## Firstmate spec" "$brief" "scout brief missing Firstmate spec subsection"
-  assert_grep "{FIRSTMATE_SPEC}" "$brief" "scout brief missing the spec placeholder"
+  assert_grep "## Juggernaut spec" "$brief" "scout brief missing Juggernaut spec subsection"
+  assert_grep "{JUGGERNAUT_SPEC}" "$brief" "scout brief missing the spec placeholder"
 
-  JG_SECONDMATE_CHARTER='Supervise the alpha domain.' \
-    JG_HOME="$BRIEF_HOME" "$ROOT/bin/jg-brief.sh" brief-sm-q6 --secondmate alpha >/dev/null 2>&1 \
-    || fail "jg-brief.sh secondmate scaffold exited non-zero"
+  JG_SQUAD_LEAD_CHARTER='Supervise the alpha domain.' \
+    JG_HOME="$BRIEF_HOME" "$ROOT/bin/jg-brief.sh" brief-sm-q6 --squad-lead alpha >/dev/null 2>&1 \
+    || fail "jg-brief.sh squad_lead scaffold exited non-zero"
   brief="$BRIEF_HOME/data/brief-sm-q6/brief.md"
-  assert_present "$brief" "secondmate charter was not scaffolded"
-  assert_grep "persistent second mate" "$brief" \
-    "secondmate charter must declare its role"
+  assert_present "$brief" "squad_lead charter was not scaffolded"
+  assert_grep "persistent squad lead" "$brief" \
+    "squad_lead charter must declare its role"
   assert_no_grep "## Captain's intent" "$brief" \
-    "secondmate charter must not grow ship/scout Task subsections"
-  assert_no_grep "{FIRSTMATE_SPEC}" "$brief" \
-    "secondmate charter must not carry the Firstmate spec placeholder"
-  pass "jg-brief: scout and secondmate code paths still scaffold well-formed briefs"
+    "squad_lead charter must not grow ship/scout Task subsections"
+  assert_no_grep "{JUGGERNAUT_SPEC}" "$brief" \
+    "squad_lead charter must not carry the Juggernaut spec placeholder"
+  pass "jg-brief: scout and squad_lead code paths still scaffold well-formed briefs"
 }
 
 # Contract: a waiting worker spends no turns. A decision wait ends the turn, an
@@ -1144,13 +1144,13 @@ test_workers_wait_without_spending_turns() {
     "the no-mistakes DOD must reattach with the same foreground call"
   assert_no_grep "background the drive call" "$brief" "the no-mistakes DOD still backgrounds the drive call"
 
-  JG_SECONDMATE_CHARTER='Supervise the alpha domain.' \
-    JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-wait-sm --secondmate --no-projects >/dev/null 2>&1 \
-    || fail "jg-brief.sh secondmate scaffold exited non-zero"
+  JG_SQUAD_LEAD_CHARTER='Supervise the alpha domain.' \
+    JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-wait-sm --squad-lead --no-projects >/dev/null 2>&1 \
+    || fail "jg-brief.sh squad_lead scaffold exited non-zero"
   brief="$home/data/brief-wait-sm/brief.md"
   assert_grep "Do not poll or list the inbox while waiting; a waiting instruction rings." "$brief" \
-    "secondmate: polling the inbox while waiting is not forbidden"
-  assert_grep "natural checkpoint" "$brief" "secondmate: the flag dropped the natural-checkpoint inbox check"
+    "squad_lead: polling the inbox while waiting is not forbidden"
+  assert_grep "natural checkpoint" "$brief" "squad_lead: the flag dropped the natural-checkpoint inbox check"
   pass "jg-brief: workers end the turn on a decision, wait in one bounded shell command, and never poll"
 }
 
@@ -1184,14 +1184,14 @@ test_worker_role_scope() {
     brief="$home/data/$kind/brief.md"
     assert_no_grep '# Current worker role contract' "$brief" "$kind scaffolded a second owner of the role scope jg-spawn.sh delivers"
   done
-  JG_HOME="$home" JG_SECONDMATE_CHARTER='Supervise assigned work.' \
-    "$ROOT/bin/jg-brief.sh" supervisor --secondmate --no-projects >/dev/null || fail "secondmate scaffold failed"
+  JG_HOME="$home" JG_SQUAD_LEAD_CHARTER='Supervise assigned work.' \
+    "$ROOT/bin/jg-brief.sh" supervisor --squad-lead --no-projects >/dev/null || fail "squad_lead scaffold failed"
   brief="$home/data/supervisor/brief.md"
-  assert_no_grep '# Current worker role contract' "$brief" "secondmate received the worker exception"
-  assert_no_grep 'do not adopt the supervisor identity' "$brief" "secondmate received the worker exception"
-  assert_grep "The local \`AGENTS.md\` is your job description" "$brief" "secondmate lost its supervisor contract"
-  assert_grep 'That file is your parent channel' "$brief" "secondmate lost its parent channel"
-  pass "jg-brief: scaffolds leave the worker role scope to the launch boundary and keep the secondmate contract"
+  assert_no_grep '# Current worker role contract' "$brief" "squad_lead received the worker exception"
+  assert_no_grep 'do not adopt the supervisor identity' "$brief" "squad_lead received the worker exception"
+  assert_grep "The local \`AGENTS.md\` is your job description" "$brief" "squad_lead lost its supervisor contract"
+  assert_grep 'That file is your parent channel' "$brief" "squad_lead lost its parent channel"
+  pass "jg-brief: scaffolds leave the worker role scope to the launch boundary and keep the squad_lead contract"
 }
 
 # A home can carry standing worker instructions in its gitignored
@@ -1236,9 +1236,9 @@ test_home_brief_include_is_appended_last() {
   assert_absent "$home/data/include-contract" "a refused include left a partial scaffold behind"
   printf '%s\n' 'Prefer small commits.' > "$config/brief-include.md"
 
-  JG_HOME="$home" JG_SECONDMATE_CHARTER='Supervise assigned work.' \
-    "$ROOT/bin/jg-brief.sh" include-mate --secondmate --no-projects >/dev/null || fail "secondmate scaffold failed with an include"
-  assert_no_grep '# Home brief additions' "$home/data/include-mate/brief.md" "a secondmate charter took the brief include"
+  JG_HOME="$home" JG_SQUAD_LEAD_CHARTER='Supervise assigned work.' \
+    "$ROOT/bin/jg-brief.sh" include-mate --squad-lead --no-projects >/dev/null || fail "squad_lead scaffold failed with an include"
+  assert_no_grep '# Home brief additions' "$home/data/include-mate/brief.md" "a squad_lead charter took the brief include"
 
   JG_HOME="$home" JG_CONFIG_OVERRIDE="$TMP_ROOT/include-empty-config" \
     "$ROOT/bin/jg-brief.sh" include-override some-proj --scout >/dev/null || fail "scout scaffold failed under JG_CONFIG_OVERRIDE"
@@ -1333,8 +1333,8 @@ test_base_branch_is_rendered_and_bounded() {
   assert_contains "$out" "mode=local-only" "the local-only refusal did not explain itself"
   out=$(JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-base-bad-b6 some-proj --mode direct-PR --base-branch 'bad..name' 2>&1); rc=$?
   [ "$rc" -ne 0 ] || fail "an invalid base branch name should be refused"
-  out=$(JG_HOME="$home" JG_SECONDMATE_CHARTER=charter "$ROOT/bin/jg-brief.sh" brief-base-sm-b7 --secondmate --no-projects --base-branch feature/hub 2>&1); rc=$?
-  [ "$rc" -ne 0 ] || fail "a secondmate charter should refuse --base-branch"
+  out=$(JG_HOME="$home" JG_SQUAD_LEAD_CHARTER=charter "$ROOT/bin/jg-brief.sh" brief-base-sm-b7 --squad-lead --no-projects --base-branch feature/hub 2>&1); rc=$?
+  [ "$rc" -ne 0 ] || fail "a squad_lead charter should refuse --base-branch"
   for id in brief-base-lo-b5 brief-base-bad-b6 brief-base-sm-b7; do
     [ ! -e "$home/data/$id/brief.md" ] || fail "a refused --base-branch scaffold wrote $id"
   done
@@ -1343,7 +1343,7 @@ test_base_branch_is_rendered_and_bounded() {
 
 # (a) An unregistered/default project - no --branch-prefix passed at all - must
 # keep every generated ship mode's branch on the legacy "fm/<task-id>" name, byte
-# for byte, so every existing firstmate installation is unaffected.
+# for byte, so every existing juggernaut installation is unaffected.
 test_ship_branch_prefix_defaults_to_legacy_fm() {
   local home id mode brief
   home="$TMP_ROOT/branch-prefix-default-home"
@@ -1442,9 +1442,9 @@ test_branch_prefix_is_refused_where_it_does_not_apply() {
     assert_absent "$home/data/${args%% *}/brief.md" "$label: refused scaffold still wrote a brief"
   done <<'ROWS'
 branch-prefix on a scout brief|brief-branchref-f1 some-proj --scout --branch-prefix fix/|--branch-prefix applies only to ship briefs
-branch-prefix on a secondmate charter|brief-branchref-f2 --secondmate --no-projects --branch-prefix fix/|--branch-prefix applies only to ship briefs
+branch-prefix on a squad_lead charter|brief-branchref-f2 --squad-lead --no-projects --branch-prefix fix/|--branch-prefix applies only to ship briefs
 ROWS
-  pass "jg-brief.sh: --branch-prefix is refused on scout and secondmate scaffolds"
+  pass "jg-brief.sh: --branch-prefix is refused on scout and squad_lead scaffolds"
 }
 
 # A branch prefix is embedded verbatim into a `git checkout -b` command in the
@@ -1495,10 +1495,10 @@ test_branch_prefix_command_is_shell_safe() {
 
 test_worker_role_scope
 
-# Rule 2 governs file edits rather than pool administration, so every crewmate
+# Rule 2 governs file edits rather than pool administration, so every operator
 # scaffold must prohibit the administrative act itself. The rule is emitted from
 # one shared string so the ship and scout copies cannot drift apart.
-test_crewmate_scaffolds_forbid_pool_administration() {
+test_operator_scaffolds_forbid_pool_administration() {
   local home id brief mode ship_rule scout_rule
   home="$TMP_ROOT/pool-admin-home"
   mkdir -p "$home/data"
@@ -1552,16 +1552,16 @@ test_crewmate_scaffolds_forbid_pool_administration() {
   assert_grep 'blocked [at=<epoch>]: {the daemon error}' "$brief" \
     "scout brief lost the daemon-error reporting instruction"
 
-  # A secondmate runs its own home and legitimately allocates and returns slots
-  # for its own crewmates, so the crewmate prohibition must NOT reach its charter.
-  JG_SECONDMATE_CHARTER='Supervise the alpha domain.' \
-    JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-pool-mate --secondmate alpha >/dev/null 2>&1 \
-    || fail "jg-brief.sh --secondmate exited non-zero"
+  # A squad_lead runs its own home and legitimately allocates and returns slots
+  # for its own operators, so the operator prohibition must NOT reach its charter.
+  JG_SQUAD_LEAD_CHARTER='Supervise the alpha domain.' \
+    JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-pool-mate --squad-lead alpha >/dev/null 2>&1 \
+    || fail "jg-brief.sh --squad-lead exited non-zero"
   assert_no_grep "create, remove, return, prune, move, or reassign" \
     "$home/data/brief-pool-mate/brief.md" \
-    "secondmate charter must not inherit the crewmate pool-administration prohibition"
+    "squad_lead charter must not inherit the operator pool-administration prohibition"
 
-  pass "jg-brief.sh: every crewmate scaffold forbids administering the shared worktree pool"
+  pass "jg-brief.sh: every operator scaffold forbids administering the shared worktree pool"
 }
 
 test_script_parses
@@ -1579,17 +1579,17 @@ test_pr_based_dod_requires_non_draft
 test_ask_user_escalation_format
 test_ship_project_memory_wording
 test_herdr_lab_contract_is_explicit_and_complete
-test_herdr_lab_contract_quotes_foreign_firstmate_path
+test_herdr_lab_contract_quotes_foreign_juggernaut_path
 test_herdr_lab_omission_is_loud_for_ship_and_scout
 test_documented_global_replace_leaves_the_herdr_gate_intact
-test_herdr_lab_contract_applies_to_scouts_but_not_secondmates
-test_secondmate_no_projects_charter
-test_secondmate_marked_request_reporting_contract
-test_secondmate_directory_paths_are_absolute_and_output_is_stable
+test_herdr_lab_contract_applies_to_scouts_but_not_squad_leads
+test_squad_lead_no_projects_charter
+test_squad_lead_marked_request_reporting_contract
+test_squad_lead_directory_paths_are_absolute_and_output_is_stable
 test_pause_verb_override_renders_all_brief_scaffolds
 test_ship_and_scout_teach_validation_round_pause
-test_scout_and_secondmate_load_decision_hold_policy
-test_scout_and_secondmate_scaffold
+test_scout_and_squad_lead_load_decision_hold_policy
+test_scout_and_squad_lead_scaffold
 test_scout_lavish_line_follows_presentation_floor
 test_workers_wait_without_spending_turns
 test_wait_no_turns_absent_keeps_the_previous_brief
@@ -1603,4 +1603,4 @@ test_ship_branch_prefix_empty_override_yields_bare_task_id
 test_branch_prefix_is_refused_where_it_does_not_apply
 test_branch_prefix_value_is_validated
 test_branch_prefix_command_is_shell_safe
-test_crewmate_scaffolds_forbid_pool_administration
+test_operator_scaffolds_forbid_pool_administration

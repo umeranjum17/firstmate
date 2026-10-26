@@ -15,7 +15,7 @@
 # direct child of $HOME. register refuses anything else; list warns and skips
 # unsafe paths and silently skips missing paths. Inspection or record-read
 # failures fail the whole listing so teardown cannot act on a partial result.
-# The firstmate home, repository, state and data directories, their ancestors
+# The juggernaut home, repository, state and data directories, their ancestors
 # and descendants are ineligible. bin/jg-teardown.sh owns the removal itself.
 set -u
 

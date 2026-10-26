@@ -26,7 +26,7 @@ def main(argv):
     p.add_argument('--upstream', required=True)
     p.add_argument('--bind', default='127.0.0.1')
     p.add_argument('--port', type=int, default=4390)
-    p.add_argument('--board-url-file', default=os.path.expanduser('~/firstmate/state/signoff-board.url'))
+    p.add_argument('--board-url-file', default=os.path.expanduser('~/juggernaut/state/signoff-board.url'))
     a = p.parse_args(argv)
 
     class H(BaseHTTPRequestHandler):

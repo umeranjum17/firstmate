@@ -33,7 +33,7 @@ write_brief() {  # <home> <id>
 ## Captain's intent
 Run the project's heavy suite for $2.
 
-## Firstmate spec
+## Juggernaut spec
 Exercise project capacity admission.
 
 # Definition of done
@@ -41,7 +41,7 @@ Delivery contract: mode=no-mistakes
 EOF
 }
 
-# A Firstmate home with its own backlog (when tasks-axi is installed) and a
+# A Juggernaut home with its own backlog (when tasks-axi is installed) and a
 # brief for every named task.
 make_home() {  # <home> [task-id...]
   local home=$1 id
@@ -94,7 +94,7 @@ case "$*" in
     exit 0
     ;;
 esac
-case "${1:-}" in display-message) printf 'firstmate\n' ;; esac
+case "${1:-}" in display-message) printf 'juggernaut\n' ;; esac
 exit 0
 SH
   cat > "$fakebin/treehouse" <<'SH'
@@ -136,7 +136,7 @@ write_live() {  # <home> <id> <project-dir> [extra-line...]
   local home=$1 id=$2 project=$3
   shift 3
   jg_write_meta "$home/state/$id.meta" \
-    "window=firstmate:jg-$id" \
+    "window=juggernaut:jg-$id" \
     "endpoint_task_id=$id" \
     "worktree=$home/absent-worktree-$id" \
     "project=$project" \
@@ -321,7 +321,7 @@ test_restart_does_not_count_its_own_record() {
   home="$case_dir/home"
   declare_capacity "$home" "project 1"
   jg_write_meta "$home/state/task-c.meta" \
-    "window=firstmate:jg-task-c" \
+    "window=juggernaut:jg-task-c" \
     "project=$case_dir/project" \
     "kind=ship"
   out=$(spawn_ship "$case_dir" task-c) || rc=$?
@@ -369,7 +369,7 @@ test_release_frees_a_place() {
   pass "a recorded PR handoff or a cleanup each frees exactly one place"
 }
 
-# Only workers on the same project identity hold places: a secondmate record, a
+# Only workers on the same project identity hold places: a squad_lead record, a
 # record for another project, and a scout on another project are ignored, while
 # a scout and a legacy record without kind= on this project count.
 test_occupancy_counts_only_this_projects_workers() {
@@ -379,9 +379,9 @@ test_occupancy_counts_only_this_projects_workers() {
   declare_capacity "$home" "project 3"
   write_live "$home" scout-a "$case_dir/project"
   sed -i.bak 's/^kind=ship$/kind=scout/' "$home/state/scout-a.meta" && rm -f "$home/state/scout-a.meta.bak"
-  jg_write_meta "$home/state/legacy-b.meta" "window=firstmate:jg-legacy-b" "project=$case_dir/project"
+  jg_write_meta "$home/state/legacy-b.meta" "window=juggernaut:jg-legacy-b" "project=$case_dir/project"
   write_live "$home" other-c "$case_dir/other-project"
-  jg_write_meta "$home/state/mate-d.meta" "window=remote:mate-d" "project=$case_dir/project" "kind=secondmate"
+  jg_write_meta "$home/state/mate-d.meta" "window=remote:mate-d" "project=$case_dir/project" "kind=squad_lead"
   out=$(spawn_ship "$case_dir" task-c) || rc=$?
   expect_code 0 "$rc" "records outside this project's workers took a place: $out"
   rc=0
@@ -394,9 +394,9 @@ test_occupancy_counts_only_this_projects_workers() {
   pass "only this project's ship and scout records hold places"
 }
 
-# Capacity belongs to the machine: a local secondmate home's workers on a
+# Capacity belongs to the machine: a local squad_lead home's workers on a
 # separate clone of the same origin count, the declaration comes from the root
-# home even when the secondmate spawns, and a remote home's workers never count.
+# home even when the squad_lead spawns, and a remote home's workers never count.
 test_capacity_is_shared_by_every_local_home() {
   local case_dir root mate out rc=0 mate_project
   case_dir=$(make_case machine)
@@ -405,21 +405,21 @@ test_capacity_is_shared_by_every_local_home() {
   make_home "$mate" task-m
   mate_project="$mate/projects/project"
   git clone -q "$(git -C "$case_dir/project" remote get-url origin)" "$mate_project"
-  printf '%s\n' schema=jg-secondmate-parent.v1 route=local "parent_home=$root" > "$mate/.jg-secondmate-parent"
+  printf '%s\n' schema=jg-squad-lead-parent.v1 route=local "parent_home=$root" > "$mate/.jg-squad-lead-parent"
   printf -- '- mate - a local mate (home: %s; scope: project work; projects: project; added 2026-09-01)\n' "$mate" \
-    > "$root/data/secondmates.md"
+    > "$root/data/squad_leads.md"
   printf -- '- far - a remote mate (host: far.example; root: /srv/fm; home: %s/remote-home; scope: other; projects: project; added 2026-09-01)\n' "$case_dir" \
-    >> "$root/data/secondmates.md"
+    >> "$root/data/squad_leads.md"
   mkdir -p "$case_dir/remote-home/state"
   jg_write_meta "$case_dir/remote-home/state/far-x.meta" "window=w" "project=$case_dir/project" "kind=ship"
   declare_capacity "$root" "project 1"
   write_live "$root" live-a "$case_dir/project"
   git -C "$mate_project" worktree add --quiet -b wt-m "$case_dir/wt-m"
   out=$(run_spawn "$case_dir" "$mate" "$case_dir/wt-m" task-m "$mate_project" --mode no-mistakes --yolo off) || rc=$?
-  expect_code "$DEFER_EXIT" "$rc" "a local secondmate launched past the machine's capacity: $out"
+  expect_code "$DEFER_EXIT" "$rc" "a local squad_lead launched past the machine's capacity: $out"
   assert_contains "$out" "admits 1 worker(s) at once on this machine ($root/config/project-capacity) and 1 already hold a place (live-a in $root)" \
-    "the secondmate did not count the root home's worker against the root's declaration"
-  assert_absent "$mate/state/task-m.meta" "the deferred secondmate spawn published a record"
+    "the squad_lead did not count the root home's worker against the root's declaration"
+  assert_absent "$mate/state/task-m.meta" "the deferred squad_lead spawn published a record"
   printf 'pr=%s\n' "https://github.com/o/r/pull/8" >> "$root/state/live-a.meta"
   rc=0
   out=$(run_spawn "$case_dir" "$mate" "$case_dir/wt-m" task-m "$mate_project" --mode no-mistakes --yolo off) || rc=$?
@@ -439,9 +439,9 @@ test_unreadable_holders_refuse_admission() {
   root="$case_dir/home"
   mate="$case_dir/mate"
   make_home "$mate"
-  printf '%s\n' schema=jg-secondmate-parent.v1 route=local "parent_home=$root" > "$mate/.jg-secondmate-parent"
+  printf '%s\n' schema=jg-squad-lead-parent.v1 route=local "parent_home=$root" > "$mate/.jg-squad-lead-parent"
   printf -- '- mate - a local mate (home: %s; scope: project work; projects: project; added 2026-09-01)\n' "$mate" \
-    > "$root/data/secondmates.md"
+    > "$root/data/squad_leads.md"
   declare_capacity "$root" "project 2"
 
   write_live "$root" live-a "$case_dir/project"
@@ -458,7 +458,7 @@ test_unreadable_holders_refuse_admission() {
   out=$(spawn_ship "$case_dir" task-c "$case_dir/unused") || rc=$?
   chmod 755 "$mate/state"
   expect_code 1 "$rc" "an unreadable local state directory did not refuse admission: $out"
-  assert_contains "$out" "local Firstmate state directory $mate/state cannot be read" \
+  assert_contains "$out" "local Juggernaut state directory $mate/state cannot be read" \
     "the refusal did not name the unreadable state directory"
   assert_absent "$root/state/task-c.meta" "a spawn published past an unreadable state directory"
 
@@ -504,7 +504,7 @@ test_failed_spawn_after_admission_holds_no_place() {
   case_dir=$(make_case failed task-a task-b)
   home="$case_dir/home"
   declare_capacity "$home" "project 1"
-  printf '%s\n' '# Task' "## Captain's intent" '{TASK}' '' '## Firstmate spec' 'x' > "$home/data/task-a/brief.md"
+  printf '%s\n' '# Task' "## Captain's intent" '{TASK}' '' '## Juggernaut spec' 'x' > "$home/data/task-a/brief.md"
   out=$(spawn_ship "$case_dir" task-a "$case_dir/unused") || rc=$?
   [ "$rc" -ne 0 ] && [ "$rc" -ne "$DEFER_EXIT" ] || fail "an invalid brief did not fail after admission (exit $rc): $out"
   assert_contains "$out" "still contains {TASK}" "the spawn did not fail where expected"

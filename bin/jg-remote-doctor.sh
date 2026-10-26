@@ -4,16 +4,16 @@
 # Check, and optionally repair, one remote account's second-mate readiness.
 #
 # Usage:
-#   bin/jg-on.sh <secondmate-id|ssh-alias> jg-remote-doctor.sh [--fix]
+#   bin/jg-on.sh <squad-lead-id|ssh-alias> jg-remote-doctor.sh [--fix]
 #
 # Run it through jg-on.sh so the fixed entrypoint invokes this readiness owner
 # over its plain SSH bootstrap. The command reports the same filesystem-composed
 # PATH used by worker jobs while retaining authority to inspect and repair the
 # worker itself.
 #
-# A remote second mate always runs on the Herdr backend in the dedicated
-# jg-remote session. Its account therefore needs the Firstmate-owned Aqua Herdr
-# agent plus the sibling dev.firstmate.remote-job worker that runs normal jg-on
+# A remote squad lead always runs on the Herdr backend in the dedicated
+# jg-remote session. Its account therefore needs the Juggernaut-owned Aqua Herdr
+# agent plus the sibling dev.juggernaut.remote-job worker that runs normal jg-on
 # commands through the Aqua or Linux job-worker path. On darwin, that Herdr
 # agent runs bin/jg-remote-herdr-guard.sh through the remote account's login
 # shell (`-l -c`) so the server inherits the account's own environment; the
@@ -48,11 +48,11 @@
 # exits non-zero.
 #
 # --fix is idempotent and closes only automatable gaps: it writes and reloads
-# both Firstmate-owned Aqua agents, starts the Linux workers where no Aqua agent
+# both Juggernaut-owned Aqua agents, starts the Linux workers where no Aqua agent
 # applies, recreates the entrypoint symlink, and may add an owned ~/.local/bin
 # wrapper for a required tool it can discover under nvm, asdf, or mise. It never
 # installs packages, creates a login session, writes an auto-login password,
-# changes FileVault, stores an account password, or replaces a non-Firstmate
+# changes FileVault, stores an account password, or replaces a non-Juggernaut
 # wrapper; those remain reported gaps.
 set -eu
 
@@ -72,8 +72,8 @@ JG_ROOT="${JG_ROOT_OVERRIDE:-$(CDPATH='' cd "$SCRIPT_DIR/.." && pwd -P)}"
 REQUIRED_TOOLS=(git jq herdr tasks-axi treehouse)
 HARNESS_TOOLS=(claude codex opencode pi pi-signed grok kimi)
 OPTIONAL_TOOLS=(tmux no-mistakes gh)
-LAUNCH_AGENT_LABEL=dev.firstmate.herdr.jg-remote
-# The dedicated remote-secondmate session. The user's interactive Herdr work
+LAUNCH_AGENT_LABEL=dev.juggernaut.herdr.jg-remote
+# The dedicated remote-squad-lead session. The user's interactive Herdr work
 # remains in the separate default session, which this readiness check never
 # requires or changes.
 HERDR_SESSION_NAME=jg-remote
@@ -252,7 +252,7 @@ resolve_launch_agent_shell() {
   printf '%s' /bin/sh
 }
 
-# Login-shell command that execs the Firstmate-owned guard, which in turn execs
+# Login-shell command that execs the Juggernaut-owned guard, which in turn execs
 # the resolved herdr so launchd keeps one foreground process in the Aqua
 # session, or exits 0 when an Aqua-born server already owns the session.
 # KeepAlive={SuccessfulExit=false} is load-bearing for that exit: an
@@ -342,7 +342,7 @@ launch_agent_loaded_contract_matches() { # <resolved-login-shell>
 
 remote_job_existing_state() {
   local root
-  root=${JG_REMOTE_JOB_STATE_ROOT:-${HOME:-}/.firstmate/remote-job}
+  root=${JG_REMOTE_JOB_STATE_ROOT:-${HOME:-}/.juggernaut/remote-job}
   root=$(jg_remote_job_canonical_existing_dir "$root") || return 1
   jg_remote_job_canonical_existing_dir "$root/jobs" >/dev/null || return 1
   # shellcheck disable=SC2034 # The sourceable worker helpers consume the validated state root.
@@ -371,8 +371,8 @@ check_remote_job_worker() {
   local worker
   worker="$JG_ROOT/bin/jg-remote-job-worker.sh"
   if [ ! -f "$worker" ] || [ -L "$worker" ] || [ ! -x "$worker" ]; then
-    record remote-job-worker "human: the configured Firstmate code root has no safe remote job worker" \
-      "update the remote Firstmate checkout, then rerun this command with --fix"
+    record remote-job-worker "human: the configured Juggernaut code root has no safe remote job worker" \
+      "update the remote Juggernaut checkout, then rerun this command with --fix"
     record remote-job-worker-loaded "skip: no worker executable is available"
     record remote-job-probe "skip: no worker executable is available"
     return 0
@@ -380,10 +380,10 @@ check_remote_job_worker() {
   if [ "$PLATFORM" = darwin ]; then
     jg_remote_job_launchagent_paths "${HOME:-}"
     if jg_remote_job_launchagent_contract_matches "$JG_ROOT" "${HOME:-}"; then
-      record remote-job-worker "ok: $JG_REMOTE_JOB_LAUNCH_AGENT_PLIST matches the Firstmate-owned Aqua worker contract"
+      record remote-job-worker "ok: $JG_REMOTE_JOB_LAUNCH_AGENT_PLIST matches the Juggernaut-owned Aqua worker contract"
     else
-      record remote-job-worker "fixable: $JG_REMOTE_JOB_LAUNCH_AGENT_PLIST does not match the Firstmate-owned Aqua worker contract" \
-        "rerun this command with --fix to write dev.firstmate.remote-job"
+      record remote-job-worker "fixable: $JG_REMOTE_JOB_LAUNCH_AGENT_PLIST does not match the Juggernaut-owned Aqua worker contract" \
+        "rerun this command with --fix to write dev.juggernaut.remote-job"
     fi
     if [ -z "$UID_NUM" ] || ! command -v launchctl >/dev/null 2>&1; then
       record remote-job-worker-loaded "human: the remote job worker cannot be inspected without launchctl and an account uid" \
@@ -399,7 +399,7 @@ check_remote_job_worker() {
     fi
   else
     local pid
-    pid=$(cat "${JG_REMOTE_JOB_STATE_ROOT:-${HOME:-}/.firstmate/remote-job}/worker.pid" 2>/dev/null || true)
+    pid=$(cat "${JG_REMOTE_JOB_STATE_ROOT:-${HOME:-}/.juggernaut/remote-job}/worker.pid" 2>/dev/null || true)
     if [ "${JG_REMOTE_JOB_ACTIVE:-}" = 1 ] ||
       { remote_job_existing_state && case "$pid" in ''|*[!0-9]*) false ;; *) kill -0 "$pid" 2>/dev/null ;; esac; }; then
       record remote-job-worker "ok: the Linux remote job worker is running"
@@ -414,7 +414,7 @@ check_remote_job_worker() {
     record remote-job-probe "fixable: the remote job worker has not reported a fresh probe" \
       "rerun this command with --fix to restart the worker, then rerun through jg-on.sh"
   elif ! remote_job_identity_ok; then
-    set_check remote-job-worker "fixable: the running remote job worker does not match the current Firstmate code" \
+    set_check remote-job-worker "fixable: the running remote job worker does not match the current Juggernaut code" \
       "rerun this command with --fix to reload the current worker"
     record remote-job-probe "fixable: the remote job worker identity is stale, so its runtime cannot be probed" \
       "rerun this command with --fix to reload the current worker"
@@ -497,12 +497,12 @@ report_required_tools_from_worker() {
   jg_remote_job_reap "${HOME:-}" "$job_id" 2>/dev/null || true
 }
 
-wrapper_is_firstmate_owned() { # <path>
+wrapper_is_juggernaut_owned() { # <path>
   local path=$1 first second
   [ -f "$path" ] && [ ! -L "$path" ] || return 1
   IFS= read -r first < "$path" || return 1
   IFS= read -r second < <(tail -n +2 "$path") || return 1
-  [ "$first" = '#!/usr/bin/env bash' ] && [ "$second" = '# Firstmate remote tool wrapper v1' ]
+  [ "$first" = '#!/usr/bin/env bash' ] && [ "$second" = '# Juggernaut remote tool wrapper v1' ]
 }
 
 repair_tool_wrapper() { # <tool>
@@ -514,8 +514,8 @@ repair_tool_wrapper() { # <tool>
   [ -n "$target" ] || return 1
   wrapper="${HOME:-}/.local/bin/$tool"
   if [ -e "$wrapper" ] || [ -L "$wrapper" ]; then
-    if ! wrapper_is_firstmate_owned "$wrapper"; then
-      fix_report "required-$tool" failed "$wrapper exists and is not Firstmate-owned"
+    if ! wrapper_is_juggernaut_owned "$wrapper"; then
+      fix_report "required-$tool" failed "$wrapper exists and is not Juggernaut-owned"
       return 1
     fi
   else
@@ -527,7 +527,7 @@ repair_tool_wrapper() { # <tool>
   tmp="${HOME:-}/.local/bin/.$tool.tmp.$$"
   {
     printf '%s\n' '#!/usr/bin/env bash'
-    printf '%s\n' '# Firstmate remote tool wrapper v1'
+    printf '%s\n' '# Juggernaut remote tool wrapper v1'
     printf 'exec %q "$@"\n' "$target"
   } > "$tmp" || { rm -f -- "$tmp"; fix_report "required-$tool" failed "cannot write $wrapper"; return 1; }
   if ! chmod 0700 "$tmp" || ! mv -f -- "$tmp" "$wrapper"; then
@@ -579,7 +579,7 @@ check_herdr() {
     return 0
   fi
   record herdr "human: the herdr CLI does not resolve on the remote runtime PATH" \
-    "install herdr from https://herdr.dev on that account, or add a ~/.local/bin wrapper for it; a remote second mate always runs on the Herdr backend"
+    "install herdr from https://herdr.dev on that account, or add a ~/.local/bin wrapper for it; a remote squad lead always runs on the Herdr backend"
 }
 
 check_gui_session() {
@@ -589,7 +589,7 @@ check_gui_session() {
   fi
   if [ -z "$UID_NUM" ]; then
     record gui-session "human: the account uid could not be read, so its login session cannot be inspected" \
-      "run 'id -u' on that account and report the failure; Firstmate cannot address gui/<uid> without it"
+      "run 'id -u' on that account and report the failure; Juggernaut cannot address gui/<uid> without it"
     return 0
   fi
   if ! command -v launchctl >/dev/null 2>&1; then
@@ -602,7 +602,7 @@ check_gui_session() {
     return 0
   fi
   record gui-session "human: no Aqua login session exists for uid $UID_NUM" \
-    "log that account in once at the console, and enable automatic login in System Settings > Users & Groups if the machine runs headless; SSH cannot create a GUI session, and Firstmate never writes an auto-login password or changes FileVault"
+    "log that account in once at the console, and enable automatic login in System Settings > Users & Groups if the machine runs headless; SSH cannot create a GUI session, and Juggernaut never writes an auto-login password or changes FileVault"
 }
 
 check_launch_agent() { # <resolved-login-shell>
@@ -615,9 +615,9 @@ check_launch_agent() { # <resolved-login-shell>
   fi
   if [ -f "$LAUNCH_AGENT_PLIST" ] && [ ! -L "$LAUNCH_AGENT_PLIST" ]; then
     if launch_agent_contract_matches "$shell"; then
-      record launchagent "ok: $LAUNCH_AGENT_PLIST matches the Firstmate-owned contract"
+      record launchagent "ok: $LAUNCH_AGENT_PLIST matches the Juggernaut-owned contract"
     else
-      record launchagent "fixable: $LAUNCH_AGENT_PLIST does not match the current Firstmate-owned contract" \
+      record launchagent "fixable: $LAUNCH_AGENT_PLIST does not match the current Juggernaut-owned contract" \
         "rerun this command with --fix to rewrite its label, program arguments, session scope, restart policy, and log paths"
     fi
     if launch_agent_is_aqua; then
@@ -627,7 +627,7 @@ check_launch_agent() { # <resolved-login-shell>
         "rerun this command with --fix to rewrite it with LimitLoadToSessionType=Aqua"
     fi
   else
-    record launchagent "fixable: no Firstmate herdr launch agent at $LAUNCH_AGENT_PLIST" \
+    record launchagent "fixable: no Juggernaut herdr launch agent at $LAUNCH_AGENT_PLIST" \
       "rerun this command with --fix to install it"
     record launchagent-scope "skip: no launch agent is installed yet"
   fi
@@ -645,7 +645,7 @@ check_launch_agent_loaded() { # <resolved-login-shell>
     if launch_agent_loaded_contract_matches "$shell"; then
       record launchagent-loaded "ok: gui/$UID_NUM/$LAUNCH_AGENT_LABEL matches the effective contract"
     else
-      record launchagent-loaded "fixable: gui/$UID_NUM/$LAUNCH_AGENT_LABEL does not match the effective Firstmate-owned contract" \
+      record launchagent-loaded "fixable: gui/$UID_NUM/$LAUNCH_AGENT_LABEL does not match the effective Juggernaut-owned contract" \
         "rerun this command with --fix to replace the loaded job with the current launch-agent contract"
     fi
     return 0
@@ -682,11 +682,11 @@ check_herdr_server() {
         ;;
       unproven)
         record herdr-server "fixable: session $HERDR_SESSION_NAME is running but no herdr process can be shown to own its socket, so its birth cannot be proven" \
-          "rerun this command with --fix so the launch agent takes the session over (its current panes close and the parent firstmate relaunches its mates)"
+          "rerun this command with --fix so the launch agent takes the session over (its current panes close and the parent juggernaut relaunches its mates)"
         ;;
       *)
         record herdr-server "fixable: session $HERDR_SESSION_NAME is served by pid ${birth#* } born outside the Aqua login session (${birth%% *}), so its panes cannot reach the login keychain" \
-          "rerun this command with --fix so the launch agent takes the session over (its current panes close and the parent firstmate relaunches its mates)"
+          "rerun this command with --fix so the launch agent takes the session over (its current panes close and the parent juggernaut relaunches its mates)"
         ;;
     esac
     return 0
@@ -713,7 +713,7 @@ check_entrypoint_link() {
   fi
   if [ -e "$ENTRYPOINT_LINK" ] || [ -L "$ENTRYPOINT_LINK" ]; then
     record entrypoint-link "human: $ENTRYPOINT_LINK exists but is not the symlink to $want" \
-      "inspect that path yourself and replace it with 'ln -sfn $want $ENTRYPOINT_LINK' if it is stale; Firstmate never overwrites a file it did not create there"
+      "inspect that path yourself and replace it with 'ln -sfn $want $ENTRYPOINT_LINK' if it is stale; Juggernaut never overwrites a file it did not create there"
     return 0
   fi
   record entrypoint-link "fixable: no entrypoint symlink at $ENTRYPOINT_LINK" \
@@ -938,14 +938,14 @@ done
 if [ "${#MISSING[@]}" -gt 0 ]; then
   printf 'error: required tools do not resolve on the remote runtime PATH: %s\n' "${MISSING[*]}" >&2
   printf 'fix: install each one where it resolves on the path reported above, or put a wrapper script for it in %s/.local/bin, which is always on that PATH.\n' "${HOME:-~}" >&2
-  printf 'fix: tools in an unselected nvm version or outside the discovered asdf or mise paths need an absolute wrapper; see docs/remote-secondmates.md for the wrapper recipe.\n' >&2
+  printf 'fix: tools in an unselected nvm version or outside the discovered asdf or mise paths need an absolute wrapper; see docs/remote-squad-leads.md for the wrapper recipe.\n' >&2
 fi
 if [ "${#MISSING[@]}" -gt 0 ] || [ "${#GAPS[@]}" -gt 0 ]; then
   NAMES=
   for i in ${GAPS[@]+"${GAPS[@]}"}; do
     NAMES="${NAMES:+$NAMES }${CHECK_NAMES[$i]}"
   done
-  printf 'error: this host is not ready for a remote second mate%s\n' "${NAMES:+; unresolved: $NAMES}" >&2
+  printf 'error: this host is not ready for a remote squad lead%s\n' "${NAMES:+; unresolved: $NAMES}" >&2
   exit 1
 fi
 printf 'ok: remote second-mate readiness confirmed on this host\n'

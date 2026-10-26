@@ -93,7 +93,7 @@ test_afk_start_reclaims_stale_daemon_lock_reused_pid() {
 test_daemon_state_root_uses_jg_home() {
   local dir home override out
   dir=$(make_supercase daemon-jg-home)
-  home="$dir/firstmate-home"
+  home="$dir/juggernaut-home"
   override="$dir/override-state"
   mkdir -p "$home" "$override"
 
@@ -374,7 +374,7 @@ test_busy_inbox_escalation_reaches_supervision() {
     stale_window_is_busy "$win" "$state" || fail "inbox consumer fixture is not busy"
   case "$variant" in
     stuck)
-      detail="unread firstmate instruction: stuck-busy after 2 consecutive busy-deferred due doorbells; $state/$task.inbox/001.msg stays unhandled and no doorbell was typed; inspect the worker"
+      detail="unread juggernaut instruction: stuck-busy after 2 consecutive busy-deferred due doorbells; $state/$task.inbox/001.msg stays unhandled and no doorbell was typed; inspect the worker"
       ;;
     write)
       detail="steering-inbox busy bookkeeping unwritable: $state/$task.inbox/.busy-state cannot be written while $state/$task.inbox/001.msg stays unhandled; inspect the inbox directory"
@@ -431,7 +431,7 @@ test_busy_inbox_dispatch_preserves_other_stale_reasons() {
   for detail in \
     '' \
     'busy for 4000s without a turn boundary' \
-    "unread firstmate instruction: $state/ordinary.inbox/001.msg still unhandled after 3 doorbell delivery attempts with an idle pane; inspect the worker" \
+    "unread juggernaut instruction: $state/ordinary.inbox/001.msg still unhandled after 3 doorbell delivery attempts with an idle pane; inspect the worker" \
     'steering-inbox ladder bookkeeping unwritable: .ring-state cannot be written' \
     'steering-inbox retry mark unremovable: .retry-ring cannot be removed'; do
     JG_ESCALATE_BATCH_SECS=999999 handle_wake "stale: sess:jg-ordinary${detail:+ ($detail)}" "$state" \
@@ -1656,7 +1656,7 @@ test_escalate_batches_into_one_digest() {
     || fail "escalate_flush failed"
   # A Claude Code primary strips U+2063 from submitted prompts, so the digest
   # travels as a record in this home's operational inbox behind a plain doorbell.
-  record=$(sed -n "s/.*: Firstmate operational input waiting: read '\([^']*\)'.*/\1/p" "$sent" | head -1)
+  record=$(sed -n "s/.*: Juggernaut operational input waiting: read '\([^']*\)'.*/\1/p" "$sent" | head -1)
   [ -n "$record" ] || fail "batch digest was not typed as a record-backed doorbell for the claude primary: $(cat "$sent")"
   grep -F "$JG_OPERATIONAL_MARK" "$sent" >/dev/null \
     && fail "the claude primary was typed the invisible marker it strips"
@@ -1690,7 +1690,7 @@ test_escalate_marker_preserving_primary_types_envelope() {
   grep -F "${JG_OPERATIONAL_PREFIX}v1 away-supervisor: " "$sent" >/dev/null \
     || fail "a marker-preserving primary lost the typed away-supervisor envelope"
   grep -F 'event C: done: PR 3' "$sent" >/dev/null || fail "typed digest missing event C"
-  grep -F 'Firstmate operational input waiting' "$sent" >/dev/null \
+  grep -F 'Juggernaut operational input waiting' "$sent" >/dev/null \
     && fail "a marker-preserving primary was sent a record-backed doorbell"
   [ ! -e "$state/operational-inbox" ] || fail "a marker-preserving primary published an operational record"
   pass "a marker-preserving primary still receives the typed U+2063 away-supervisor envelope and no record"
@@ -1716,8 +1716,8 @@ test_record_doorbell_detection() {
   missing=${doorbell%.msg\'*}-gone.msg${doorbell##*.msg}
   should_exit_afk "$state" "$missing" \
     || fail "a doorbell naming no record kept afk"
-  should_exit_afk "$state" "FIRSTMATE_OP: v1 away-supervisor: Supervisor escalate: done" \
-    || fail "a typed ASCII FIRSTMATE_OP label kept afk"
+  should_exit_afk "$state" "JUGGERNAUT_OP: v1 away-supervisor: Supervisor escalate: done" \
+    || fail "a typed ASCII JUGGERNAUT_OP label kept afk"
   rm -f "$state"/operational-inbox/*.msg
   should_exit_afk "$state" "$doorbell" \
     || fail "a doorbell whose record was pruned kept afk"
@@ -1777,7 +1777,7 @@ test_handle_wake_routes_self_and_escalate() {
 # The away-mode daemon must classify that payload the same way it classifies an
 # ordinary signal: escalate once as the decision, suppress an unchanged repeat
 # (queued-row and catch-all alike), and re-escalate when the status log grows.
-# https://github.com/kunchenguid/firstmate/issues/4096
+# https://github.com/kunchenguid/juggernaut/issues/4096
 test_needs_decision_queued_row_escalates_once_as_the_decision() {
   local dir state fakebin status_file payload out
   dir=$(make_supercase needs-decision-queued-row)
@@ -1999,7 +1999,7 @@ test_marker_detection() {
   marker_hex=$(printf '%s' "$JG_INJECT_MARK" | od -An -tx1 | tr -d ' \n')
   [ "$marker_hex" = e281a3 ] \
     || fail "JG_INJECT_MARK must use terminal-safe U+2063 bytes, got $marker_hex"
-  [ "$JG_OPERATIONAL_PREFIX" = "${JG_INJECT_MARK}FIRSTMATE_OP: " ] \
+  [ "$JG_OPERATIONAL_PREFIX" = "${JG_INJECT_MARK}JUGGERNAUT_OP: " ] \
     || fail "away-mode operational prefix drifted from the shared captain-boundary marker"
   # message_is_injection: marker present -> injection; absent -> real message
   message_is_injection "${JG_OPERATIONAL_PREFIX}Supervisor escalate: done" \
@@ -2283,7 +2283,7 @@ test_afk_genuine_done_still_terminal_stale() {
   local dir state out
   dir=$(make_supercase afk-genuine-done-stale)
   state="$dir/state"
-  printf 'done: PR https://example.com/pull/76 checks green; stage 1 of 4 ready for firstmate merge\n' \
+  printf 'done: PR https://example.com/pull/76 checks green; stage 1 of 4 ready for juggernaut merge\n' \
     > "$state/stage1-w2.status"
   out=$(JG_STATE_OVERRIDE="$state" classify_stale "sess:jg-stage1-w2" "$state")
   case "$out" in escalate\|*) ;; *) fail "genuine done: stale did not escalate: $out" ;; esac
@@ -2441,11 +2441,11 @@ test_oversized_digest_is_bounded_and_kept_durable() {
   state="$dir/state"; fakebin="$dir/fakebin"
   sent="$dir/sent.log"; : > "$sent"
   for i in a b c; do
-    item="secondmate-$i.status: "
+    item="squad-lead-$i.status: "
     while [ "${#item}" -lt 60000 ]; do item+="done: café fix shipped, PR https://x/y/pull/1 ; "; done
     escalate_add "$state" "$item (catch-all scan)"
   done
-  escalate_add "$state" "secondmate-a.status: needs-decision [key=pick]: pick A or B"
+  escalate_add "$state" "squad-lead-a.status: needs-decision [key=pick]: pick A or B"
   cp "$state/.subsuper-escalations" "$dir/buffer.orig"
   raw=$(LC_ALL=C wc -c < "$dir/buffer.orig" | tr -d ' ')
   [ "$raw" -gt 131071 ] || fail "fixture buffer is only $raw bytes; it must exceed one argument's 131,071-byte ceiling"
@@ -2457,8 +2457,8 @@ test_oversized_digest_is_bounded_and_kept_durable() {
   [ "$(printf '%s\n' "$digest" | wc -l | tr -d ' ')" -eq 1 ] || fail "expected exactly one typed digest"
   [ "$(printf '%s' "$digest" | LC_ALL=C wc -c | tr -d ' ')" -le 16384 ] \
     || fail "delivered digest is not bounded well below the transport ceilings"
-  assert_contains "$digest" 'Supervisor escalate (4 event(s)): secondmate-a.status: done:' "digest lost its header or first event"
-  assert_contains "$digest" 'secondmate-a.status: needs-decision [key=pick]: pick A or B' "a short event did not survive whole"
+  assert_contains "$digest" 'Supervisor escalate (4 event(s)): squad-lead-a.status: done:' "digest lost its header or first event"
+  assert_contains "$digest" 'squad-lead-a.status: needs-decision [key=pick]: pick A or B' "a short event did not survive whole"
   printf '%s' "$digest" | grep -E '\[\+[0-9]+ bytes\]' >/dev/null || fail "truncated items carry no omitted-bytes marker"
   if command -v iconv >/dev/null 2>&1; then
     printf '%s' "$digest" | iconv -f UTF-8 -t UTF-8 >/dev/null 2>&1 || fail "truncation split a UTF-8 sequence"
@@ -2498,7 +2498,7 @@ test_inject_send_failure_logs_stage_stderr_and_bytes() {
   dir=$(make_bordered_case digest-send-failure)
   state="$dir/state"; fakebin="$dir/fakebin"; log="$dir/daemon.log"
   sent="$dir/sent.log"; : > "$sent"
-  item="secondmate-b.status: "
+  item="squad-lead-b.status: "
   while [ "${#item}" -lt 5000 ]; do item+="blocked: waiting on review ; "; done
   escalate_add "$state" "$item"
   cp "$state/.subsuper-escalations" "$dir/buffer.orig"
@@ -2556,7 +2556,7 @@ test_bounded_digest_full_text_kept_after_typing() {
   state="$dir/state"; fakebin="$dir/fakebin"; log="$dir/daemon.log"
   sent="$dir/sent.log"; : > "$sent"
   touch "$dir/.swallow"
-  item="secondmate-c.status: "
+  item="squad-lead-c.status: "
   while [ "${#item}" -lt 5000 ]; do item+="blocked: waiting on review ; "; done
   escalate_add "$state" "$item"
   cp "$state/.subsuper-escalations" "$dir/buffer.orig"
@@ -3058,9 +3058,9 @@ test_discover_supervisor_target_herdr() {
   if out=$(JG_SUPERVISOR_TARGET='' TMUX_PANE='' HERDR_ENV='' HERDR_PANE_ID='' discover_supervisor_target); then
     fail "bare fallback should return non-zero"
   fi
-  [ "$out" = "firstmate:0" ] || fail "bare fallback should still print firstmate:0: $out"
+  [ "$out" = "juggernaut:0" ] || fail "bare fallback should still print juggernaut:0: $out"
 
-  pass "discover_supervisor_target: override > TMUX_PANE > herdr '<session>:<pane-id>' composition > firstmate:0 fallback"
+  pass "discover_supervisor_target: override > TMUX_PANE > herdr '<session>:<pane-id>' composition > juggernaut:0 fallback"
 }
 
 test_pane_is_busy_herdr_native_busy_state() {

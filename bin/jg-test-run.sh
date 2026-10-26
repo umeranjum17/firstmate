@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
-# jg-test-run.sh - single owner of Firstmate's behavior-test runner, lane
+# jg-test-run.sh - single owner of Juggernaut's behavior-test runner, lane
 # composition for portable CI shards, local --jobs for proven-concurrent work,
 # timing markers, and the complete-regression coverage guard.
 #
@@ -339,15 +339,15 @@ family_for_basename() {
     jg-backlog-handoff.test.sh|jg-on.test.sh|jg-remote-backlog-handoff.test.sh|\
     jg-remote-doctor.test.sh|jg-remote-herdr-guard.test.sh|jg-remote-job.test.sh|jg-remote-job-orphan-reap.test.sh|\
     jg-remote-transport-lanes.test.sh|\
-    jg-remote-reply.test.sh|jg-remote-secondmate-lifecycle-e2e.test.sh|\
-    jg-remote-secondmate-trace-context.test.sh|\
-    jg-secondmate-harness.test.sh|jg-secondmate-lifecycle-e2e.test.sh|\
-    jg-secondmate-liveness.test.sh|jg-secondmate-reconcile.test.sh|\
-    jg-secondmate-restart.test.sh|jg-remote-secondmate-relaunch.test.sh|\
-    jg-secondmate-safety.test.sh|jg-secondmate-sync.test.sh|\
+    jg-remote-reply.test.sh|jg-remote-squad-lead-lifecycle-e2e.test.sh|\
+    jg-remote-squad-lead-trace-context.test.sh|\
+    jg-squad-lead-harness.test.sh|jg-squad-lead-lifecycle-e2e.test.sh|\
+    jg-squad-lead-liveness.test.sh|jg-squad-lead-reconcile.test.sh|\
+    jg-squad-lead-restart.test.sh|jg-remote-squad-lead-relaunch.test.sh|\
+    jg-squad-lead-safety.test.sh|jg-squad-lead-sync.test.sh|\
     jg-startup-memory-budget.test.sh|jg-stow-cascade.test.sh|\
-    jg-send-secondmate-marker.test.sh|jg-shared-captain-inheritance.test.sh)
-      printf '%s\n' secondmate
+    jg-send-squad-lead-marker.test.sh|jg-shared-captain-inheritance.test.sh)
+      printf '%s\n' squad_lead
       ;;
     jg-backlog-atomicity.test.sh|\
     jg-bootstrap.test.sh|jg-bootstrap-network-parallel.test.sh|jg-fleet-sync.test.sh|jg-gate-refuse.test.sh|jg-gotmp.test.sh|\
@@ -379,9 +379,9 @@ family_for_basename() {
     jg-sessionstart-hook-live-e2e.test.sh|jg-sessionstart-instruction-refresh-live-e2e.test.sh|\
     jg-supervision-host-live-e2e.test.sh|jg-supervision-host-attended-live-e2e.test.sh|\
     jg-host-mirror-live-e2e.test.sh|\
-    jg-quota-array-dispatch-live-e2e.test.sh|jg-send-secondmate-marker-herdr-e2e.test.sh|\
+    jg-quota-array-dispatch-live-e2e.test.sh|jg-send-squad-lead-marker-herdr-e2e.test.sh|\
     jg-send-inbox-doorbell-live-e2e.test.sh|\
-    jg-secondmate-busy-contract-live-e2e.test.sh|\
+    jg-squad-lead-busy-contract-live-e2e.test.sh|\
     jg-calm-claude-mod-plugin.test.sh|jg-calm-claude-mod-live-e2e.test.sh|\
     jg-calm-pi-queue-retention-live-e2e.test.sh|\
     jg-herdr-submit-confirm-live-e2e.test.sh)
@@ -434,7 +434,7 @@ family_for_basename() {
     jg-procevent-quota.test.sh|jg-procevent-when.test.sh|jg-procevent.test.sh|\
     jg-live-gate.test.sh|\
     jg-project-origin.test.sh|jg-public-followup.test.sh|jg-quota-choose.test.sh|\
-    jg-remote-entrypoint.test.sh|jg-remote-secondmate-parent-binding.test.sh|\
+    jg-remote-entrypoint.test.sh|jg-remote-squad-lead-parent-binding.test.sh|\
     jg-send-remote-delivery.test.sh|jg-spawn-pool-base-freshen.test.sh|\
     jg-test-fixture-cleanup.test.sh|jg-test-fixtures.test.sh|\
     jg-voice-relay.test.sh|jg-wake-drain-open-decisions-cursor.test.sh|\
@@ -462,7 +462,7 @@ list_known_families() {
 pure-contract-unit
 watcher-wake-lock
 real-herdr-gated
-secondmate
+squad_lead
 session-bootstrap
 live-harness-optin
 backend-dispatch
@@ -619,7 +619,7 @@ list_concurrent_safe_families() {
 watcher-wake-lock
 pure-contract-unit
 pr-forge
-secondmate
+squad_lead
 session-bootstrap
 standalone
 EOF
@@ -636,7 +636,7 @@ family_is_concurrent_safe() {
 concurrent_safe_family_jobs_max() {
   case "$1" in
     watcher-wake-lock|pure-contract-unit|pr-forge) printf '4\n' ;;
-    secondmate|session-bootstrap|standalone) printf '4\n' ;;
+    squad_lead|session-bootstrap|standalone) printf '4\n' ;;
     *) printf '1\n' ;;
   esac
 }
@@ -664,7 +664,7 @@ is_proven_isolated_script() {
 
 # The portable serial remainder: every tests/*.test.sh that is neither
 # proven-isolated nor real-herdr-gated. Watcher, lock, AFK, real tmux, daemon,
-# secondmate lifecycle, bootstrap, the live-harness-optin family, GUI-backend,
+# squad_lead lifecycle, bootstrap, the live-harness-optin family, GUI-backend,
 # and other unproven work stays here. Derived rather than enumerated so a newly added test
 # lands here by default instead of falling out of every lane.
 list_portable_serial() {
@@ -820,28 +820,28 @@ tests/jg-remote-herdr-guard.test.sh 3140
 tests/jg-remote-job-orphan-reap.test.sh 2985
 tests/jg-remote-job.test.sh 81046
 tests/jg-remote-reply.test.sh 140887
-tests/jg-remote-secondmate-lifecycle-e2e.test.sh 345655
-tests/jg-remote-secondmate-parent-binding.test.sh 42294
-tests/jg-remote-secondmate-relaunch.test.sh 879
-tests/jg-remote-secondmate-trace-context.test.sh 74870
+tests/jg-remote-squad-lead-lifecycle-e2e.test.sh 345655
+tests/jg-remote-squad-lead-parent-binding.test.sh 42294
+tests/jg-remote-squad-lead-relaunch.test.sh 879
+tests/jg-remote-squad-lead-trace-context.test.sh 74870
 tests/jg-remote-transport-lanes.test.sh 66089
 tests/jg-rovo-harness.test.sh 15691
 tests/jg-rovo-signals-live-e2e.test.sh 52
-tests/jg-secondmate-harness.test.sh 188187
-tests/jg-secondmate-busy-contract-live-e2e.test.sh 90000
-tests/jg-secondmate-lifecycle-e2e.test.sh 11268
-tests/jg-secondmate-liveness.test.sh 24564
-tests/jg-secondmate-reconcile.test.sh 100853
-tests/jg-secondmate-restart.test.sh 52591
-tests/jg-secondmate-safety.test.sh 69424
-tests/jg-secondmate-sync.test.sh 55501
+tests/jg-squad-lead-harness.test.sh 188187
+tests/jg-squad-lead-busy-contract-live-e2e.test.sh 90000
+tests/jg-squad-lead-lifecycle-e2e.test.sh 11268
+tests/jg-squad-lead-liveness.test.sh 24564
+tests/jg-squad-lead-reconcile.test.sh 100853
+tests/jg-squad-lead-restart.test.sh 52591
+tests/jg-squad-lead-safety.test.sh 69424
+tests/jg-squad-lead-sync.test.sh 55501
 tests/jg-send-agy-confirm.test.sh 4440
 tests/jg-send-inbox-doorbell-live-e2e.test.sh 108
 tests/jg-send-inbox.test.sh 41713
 tests/jg-send-remote-delivery.test.sh 31964
 tests/jg-send-resolve-key.test.sh 47317
-tests/jg-send-secondmate-marker-herdr-e2e.test.sh 80
-tests/jg-send-secondmate-marker.test.sh 7574
+tests/jg-send-squad-lead-marker-herdr-e2e.test.sh 80
+tests/jg-send-squad-lead-marker.test.sh 7574
 tests/jg-session-lock-ancestry.test.sh 18918
 tests/jg-session-start.test.sh 363574
 tests/jg-sessionstart-hook-live-e2e.test.sh 50
@@ -1501,14 +1501,14 @@ families_for_changed_path() {
       printf '%s\n' afk
       ;;
     bin/jg-startup-memory-budget.sh|bin/jg-startup-memory-budget-lib.sh)
-      printf '%s\n' secondmate
+      printf '%s\n' squad_lead
       printf '%s\n' session-bootstrap
       ;;
-    bin/jg-secondmate*|bin/jg-remote*|bin/jg-on.sh|bin/jg-home-seed.sh|\
+    bin/jg-squad-lead*|bin/jg-remote*|bin/jg-on.sh|bin/jg-home-seed.sh|\
     bin/jg-backlog-handoff.sh|bin/jg-backlog-receive.sh|bin/jg-procevent-remote-reply.sh|\
     bin/jg-config-inherit-lib.sh|bin/jg-config-push.sh|bin/jg-shared*|\
     bin/jg-stow-cascade.sh)
-      printf '%s\n' secondmate
+      printf '%s\n' squad_lead
       ;;
     bin/jg-session-start.sh|bin/jg-fleet-sync.sh|\
     bin/jg-sessionstart-nudge.sh|bin/jg-startup-network.sh|bin/jg-tangle*|bin/jg-update.sh|\
@@ -1571,7 +1571,7 @@ families_for_changed_path() {
       printf '%s\n' __script__:jg-pi-primary-types.test.sh
       printf '%s\n' live-harness-optin
       ;;
-    .claude/mods/firstmate-calm/*|.pi/extensions/lib/jg-calm-working-ship.ts|\
+    .claude/mods/juggernaut-calm/*|.pi/extensions/lib/jg-calm-working-ship.ts|\
     .pi/extensions/lib/jg-calm-working-ship-sprite.ts)
       # The Claude Code Calm mod and the sprite core it shares with the Pi Calm
       # extension: the portable Node checks, the Pi suites that draw the shared
@@ -1605,7 +1605,7 @@ families_for_changed_path() {
       printf '%s\n' session-bootstrap
       printf '%s\n' snapshot-bearings
       printf '%s\n' pure-contract-unit
-      printf '%s\n' secondmate
+      printf '%s\n' squad_lead
       printf '%s\n' watcher-wake-lock
       printf '%s\n' "__script__:jg-procevent-quota.test.sh"
       ;;

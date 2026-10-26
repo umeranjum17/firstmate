@@ -43,7 +43,7 @@ def rows(args, env, cwd=None):
     return result
 
 ICONS = Path(__file__).resolve().parents[1] / 'fleet-dashboard/jg-dashboard/icons'
-ALIAS = {'firstmate-fork': 'firstmate', 'main': 'firstmate', 'muxr': 'pockit'}  # the dashboard's own project-to-image names
+ALIAS = {'juggernaut-fork': 'juggernaut', 'main': 'juggernaut', 'muxr': 'pockit'}  # the dashboard's own project-to-image names
 
 def icon_problem(image):
     if image.suffix == '.svg':
@@ -105,7 +105,7 @@ def sync():
         closures_file = state / 'closures.json'
         closures = json.loads(closures_file.read_text()) if closures_file.exists() else {}
         homes = {'main': home}
-        registry = home / 'data/secondmates.md'
+        registry = home / 'data/squad_leads.md'
         for line in registry.read_text().splitlines() if registry.exists() else []:
             m = re.match(r'- (\S+) - .*\(home: ([^;]+);', line)
             if m: homes[m[1]] = Path(m[2])

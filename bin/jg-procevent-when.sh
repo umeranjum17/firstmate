@@ -26,18 +26,18 @@
 #            Options, before --condition:
 #              --interval <secs>           poll cadence, decimals allowed (default 60)
 #              --stable <n>                consecutive true polls required to fire (default 2)
-#              --deadline <secs>           give up and wake firstmate if the condition
+#              --deadline <secs>           give up and wake juggernaut if the condition
 #                                          never held this long after arming (default 604800)
 #              --condition-timeout <secs>  per-poll bound on one condition run (default 60)
 #              --action-timeout <secs>     bound on the action run (default 1800)
 #              --error-budget <n>          consecutive condition errors tolerated
-#                                          before waking firstmate (default 3)
+#                                          before waking juggernaut (default 3)
 #            The condition argv must exit 0 for true, 1 for a clean false;
 #            any other exit (or a per-poll timeout) is an error, never a true.
 #            POLICY, not enforceable here: both halves must be exact and
 #            deterministic, and the action must be safe and reversible. Anything
 #            needing judgment, and anything destructive, irreversible, or
-#            security-sensitive, keeps the ordinary wake-firstmate-and-decide
+#            security-sensitive, keeps the ordinary wake-juggernaut-and-decide
 #            flow; this primitive only automates the deterministic subset.
 #            The registered runner starts on the watcher's next cycle via
 #            `jg-procevent.sh reconcile`; arm never blocks on the condition.
@@ -74,7 +74,7 @@
 #            for durable capture. Every failure path - mutated spec, condition
 #            error, deadline, action failure, or an earlier fire whose outcome
 #            was never captured - emits a terminal outcome document instead of
-#            retrying silently, so firstmate is always woken with the evidence.
+#            retrying silently, so juggernaut is always woken with the evidence.
 #
 # Outcome document (the captured result named by the wake):
 #   when: <source-id>

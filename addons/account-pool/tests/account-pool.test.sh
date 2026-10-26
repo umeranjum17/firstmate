@@ -57,7 +57,7 @@ cat > "$w/fake-spawn.sh" <<'FAKE'
 CONFIG=$TEST_CONFIG HARNESS=${TEST_HARNESS:-claude} WORKER_ACCOUNT=${TEST_PIN:-} SPAWN_ACCOUNT= RELAUNCH=0
 SCRIPT_DIR=$TEST_BIN LAUNCH=$HARNESS
 shell_quote() { printf '%q' "$1"; }
-_jg_ap=${JG_ADDONS_DIR:-${JG_HOME:-$SCRIPT_DIR/..}/projects/firstmate-addons}/account-pool/bin/jg-account-pool-lib.sh; { [ -r "$_jg_ap" ] && . "$_jg_ap"; } || jg_account_hook() { :; }
+_jg_ap=${JG_ADDONS_DIR:-${JG_HOME:-$SCRIPT_DIR/..}/projects/juggernaut-addons}/account-pool/bin/jg-account-pool-lib.sh; { [ -r "$_jg_ap" ] && . "$_jg_ap"; } || jg_account_hook() { :; }
 eval "$(jg_account_hook argv "$@")"
 case " $* " in *" --relaunch "*) RELAUNCH=1 ;; esac
 jg_account_hook spawn-validate || exit 1
@@ -75,7 +75,7 @@ cat > "$w/fake-control.sh" <<'FAKE'
 SCRIPT_DIR=$TEST_BIN VERB=$1 CONFIG=$TEST_CONFIG HARNESS=${TEST_HARNESS:-claude}
 shift
 jg_worker_account_resolve() { [ -z "${TEST_PIN:-}" ] || printf 'ordinary\t\t\n'; }
-_jg_ap=${JG_ADDONS_DIR:-${JG_HOME:-$SCRIPT_DIR/..}/projects/firstmate-addons}/account-pool/bin/jg-account-pool-lib.sh; { [ -r "$_jg_ap" ] && . "$_jg_ap"; } || jg_account_hook() { :; }
+_jg_ap=${JG_ADDONS_DIR:-${JG_HOME:-$SCRIPT_DIR/..}/projects/juggernaut-addons}/account-pool/bin/jg-account-pool-lib.sh; { [ -r "$_jg_ap" ] && . "$_jg_ap"; } || jg_account_hook() { :; }
 eval "$(jg_account_hook argv "$@")"
 [ "$#" -eq 0 ] || { echo "error: unexpected argument '$1'" >&2; exit 1; }
 jg_account_hook control-validate "$VERB" || exit 1

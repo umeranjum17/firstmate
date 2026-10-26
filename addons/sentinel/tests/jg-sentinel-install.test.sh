@@ -25,7 +25,7 @@ LOG=$d/systemctl.log
 UNIT_HOME=$d/xdg/config/systemd/user
 UNIT=$UNIT_HOME/jg-sentinel.service
 DEST=$d/xdg/data/jg-sentinel
-FMH=$d/firstmate
+FMH=$d/juggernaut
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 pass() { echo "ok: $*"; }
@@ -41,11 +41,11 @@ chmod +x "$d/stub/systemctl"
 export PATH="$d/stub:$PATH" HOME="$d/home" XDG_DATA_HOME="$d/xdg/data" XDG_CONFIG_HOME="$d/xdg/config"
 cat > "$UNIT" <<'UNIT_TEXT'
 [Unit]
-Description=Firstmate sentinel (fork copy)
+Description=Juggernaut sentinel (fork copy)
 
 [Service]
-Environment="JG_HOME=/home/example/firstmate"
-ExecStart="/home/example/firstmate/bin/jg-sentinel.sh" loop
+Environment="JG_HOME=/home/example/juggernaut"
+ExecStart="/home/example/juggernaut/bin/jg-sentinel.sh" loop
 Restart=always
 RestartSec=10
 

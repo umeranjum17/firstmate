@@ -19,7 +19,7 @@
 #      spacing holds, a spent budget escalates exactly once, and an
 #      acknowledgement resets the ladder for the next message.
 #   5. A real jg-watch.sh subprocess re-rings the doorbell for an unhandled
-#      aged message on an idle pane WITHOUT waking firstmate, waits on a busy
+#      aged message on an idle pane WITHOUT waking juggernaut, waits on a busy
 #      pane, stays silent on a healthy/empty inbox, surfaces unwritable ladder
 #      bookkeeping only while its record remains unhandled, and emits exactly
 #      one stale wake once the ring budget is spent.
@@ -177,7 +177,7 @@ test_write_is_durable_and_exact() {
   assert_contains "$doorbell" "'t1.inbox' steering inbox" "doorbell should quote and name the inbox"
   assert_contains "$doorbell" "numeric order" "doorbell should require ordered processing"
   assert_contains "$doorbell" "handled/" "doorbell should name the handled dir"
-  assert_contains "$doorbell" "Firstmate instruction waiting" "doorbell should be self-describing"
+  assert_contains "$doorbell" "Juggernaut instruction waiting" "doorbell should be self-describing"
   case "$doorbell" in
     *$'\n'*) fail "the doorbell must be a single line" ;;
   esac
@@ -287,13 +287,13 @@ test_ring_skips_dead_agent() {
   PATH="$dir/fakebin:$PATH" JG_SEND_LOG="$log" JG_FAKE_TMUX_AGENT=claude \
     inbox_lib "$state" jg_task_inbox_ring tmux sess:jg-t1 "$rec" jg-t1 || rc=$?
   [ "$rc" = 0 ] || fail "a live agent should still be rung, got $rc"
-  grep -qF 'Firstmate instruction waiting' "$log" || fail "a live agent did not receive the doorbell"
+  grep -qF 'Juggernaut instruction waiting' "$log" || fail "a live agent did not receive the doorbell"
   : > "$log"
   rc=0
   PATH="$dir/fakebin:$PATH" JG_SEND_LOG="$log" \
     inbox_lib "$state" jg_task_inbox_ring tmux sess:jg-t1 "$rec" jg-t1 || rc=$?
   [ "$rc" = 0 ] || fail "an endpoint the classifier cannot see should still be rung, got $rc"
-  grep -qF 'Firstmate instruction waiting' "$log" || fail "an unclassifiable endpoint did not receive the doorbell"
+  grep -qF 'Juggernaut instruction waiting' "$log" || fail "an unclassifiable endpoint did not receive the doorbell"
   pass "inbox: the ring skips dead or missing endpoints and still rings live or unclassifiable endpoints"
 }
 
@@ -677,15 +677,15 @@ test_watcher_rerings_idle_pane_quietly() {
   pid=$!
   local i=0
   while [ "$i" -lt 100 ]; do
-    grep -qF 'Firstmate instruction waiting' "$log" 2>/dev/null && break
+    grep -qF 'Juggernaut instruction waiting' "$log" 2>/dev/null && break
     kill -0 "$pid" 2>/dev/null || break
     sleep 0.1
     i=$((i + 1))
   done
-  grep -qF "Firstmate instruction waiting: list \"\$JG_TASK_INBOX\"/*.msg in your 't1.inbox' steering inbox" "$log" \
+  grep -qF "Juggernaut instruction waiting: list \"\$JG_TASK_INBOX\"/*.msg in your 't1.inbox' steering inbox" "$log" \
     || { kill "$pid" 2>/dev/null; fail "the watcher never re-rang the doorbell:"$'\n'"$(cat "$log")"; }
   kill -0 "$pid" 2>/dev/null \
-    || fail "a healthy re-ring must not wake firstmate (watcher exited):"$'\n'"$(cat "$out")"
+    || fail "a healthy re-ring must not wake juggernaut (watcher exited):"$'\n'"$(cat "$out")"
   [ ! -s "$state/.wake-queue" ] \
     || { kill "$pid" 2>/dev/null; fail "a healthy re-ring queued a wake:"$'\n'"$(cat "$state/.wake-queue")"; }
   # The acknowledgement silences the ladder: no further doorbells after the mv.
@@ -695,7 +695,7 @@ test_watcher_rerings_idle_pane_quietly() {
   sleep 2.5
   kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
   [ ! -s "$log" ] || fail "the watcher kept ringing after the ack:"$'\n'"$(cat "$log")"
-  pass "watcher: an unhandled aged message on an idle pane re-rings without waking firstmate, and the ack silences it"
+  pass "watcher: an unhandled aged message on an idle pane re-rings without waking juggernaut, and the ack silences it"
 }
 
 # A fresh process for each check proves the busy budget survives watcher restarts.
@@ -736,7 +736,7 @@ test_watcher_busy_budget_resets_on_ring_and_ack() {
   dir=$(busy_case busy-reset)
   busy_steer_check "$dir"
   busy_steer_check "$dir" "$(idle_capture "$dir")"
-  grep -q 'Firstmate instruction waiting' "$dir/send.log" || fail "idle transition did not ring"
+  grep -q 'Juggernaut instruction waiting' "$dir/send.log" || fail "idle transition did not ring"
   busy_steer_check "$dir"
   [ ! -s "$dir/state/.wake-queue" ] || fail "delivered ring did not reset busy budget"
   rec=$(inbox_lib "$dir/state" jg_task_inbox_write "$dir/state" t1 "next steer")
@@ -832,7 +832,7 @@ test_watcher_nonbusy_reset_failure_escalates_once() {
   mv "$rec" "$dir/state/t1.inbox/handled/"
   rec=$(inbox_lib "$dir/state" jg_task_inbox_write "$dir/state" t1 "after repair")
   busy_steer_check "$dir" "$(idle_capture "$dir")"
-  grep -q 'Firstmate instruction waiting' "$dir/send.log" || fail "$mode repair did not restore delivery"
+  grep -q 'Juggernaut instruction waiting' "$dir/send.log" || fail "$mode repair did not restore delivery"
   [ "$(cut -f1 "$dir/state/t1.inbox/.ring-state")" = "${rec##*/}" ] || fail "$mode repair lost the delivery ladder"
   pass "watcher: persistent $mode busy-reset failure escalates once and later instructions still deliver"
 }
@@ -867,7 +867,7 @@ test_watcher_retry_ignores_busy_reset_failure() {
     JG_CONFIG_OVERRIDE="$dir/config" busy_steer_check "$dir" "$(idle_capture "$dir")"
     [ ! -s "$dir/state/.wake-queue" ] || fail "fire-and-forget retry escalated a busy reset failure on check $check"
   done
-  [ "$(grep -c 'Firstmate instruction waiting' "$dir/send.log")" = 1 ] || fail "fire-and-forget retry did not ring exactly once"
+  [ "$(grep -c 'Juggernaut instruction waiting' "$dir/send.log")" = 1 ] || fail "fire-and-forget retry did not ring exactly once"
   [ ! -e "$dir/state/t1.inbox/.retry-ring" ] || fail "fire-and-forget retry kept its retry mark"
   [ ! -e "$dir/state/t1.inbox/.escalated" ] || fail "fire-and-forget retry entered escalation"
   [ -f "$rec" ] || fail "fire-and-forget retry lost its instruction"
@@ -878,7 +878,7 @@ test_watcher_successor_escalation_stays_quiet() {
   local mode=$1 dir rec agent='' missing=0 check
   dir=$(busy_case "successor-$mode")
   busy_steer_check "$dir" "$(idle_capture "$dir")"
-  grep -q 'Firstmate instruction waiting' "$dir/send.log" || fail "predecessor did not ring"
+  grep -q 'Juggernaut instruction waiting' "$dir/send.log" || fail "predecessor did not ring"
   rec=$(inbox_lib "$dir/state" jg_task_inbox_write "$dir/state" t1 "queued successor")
   mv "$dir/state/t1.inbox/001.msg" "$dir/state/t1.inbox/handled/"
   case "$mode" in
@@ -978,7 +978,7 @@ test_watcher_ack_silences_unwritable_ladder() {
   kill -0 "$pid" 2>/dev/null \
     || fail "the watcher escalated ladder failure after the record was acknowledged:"$'\n'"$(cat "$out")"
   kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
-  rings=$(grep -cF 'Firstmate instruction waiting' "$log" || true)
+  rings=$(grep -cF 'Juggernaut instruction waiting' "$log" || true)
   [ "$rings" = 1 ] || fail "acknowledgement should silence retries, got $rings doorbells:"$'\n'"$(cat "$log")"
   [ ! -s "$state/.wake-queue" ] \
     || fail "an acknowledged record queued a bookkeeping wake:"$'\n'"$(cat "$state/.wake-queue")"
@@ -998,7 +998,7 @@ test_watcher_surfaces_unwritable_ladder() {
   pid=$!
   wait_watcher_gone "$pid" \
     || { kill "$pid" 2>/dev/null; fail "the watcher silently retried with unwritable ladder bookkeeping"; }
-  rings=$(grep -cF 'Firstmate instruction waiting' "$log" || true)
+  rings=$(grep -cF 'Juggernaut instruction waiting' "$log" || true)
   [ "$rings" = 1 ] || fail "expected one doorbell before the bookkeeping wake, got $rings:"$'\n'"$(cat "$log")"
   wakes=$(grep -cF 'steering-inbox ladder bookkeeping unwritable' "$state/.wake-queue" || true)
   [ "$wakes" = 1 ] \
@@ -1027,16 +1027,16 @@ test_watcher_pays_fire_and_forget_retry_once() {
     JG_TASK_INBOX_RING_MAX=1
   pid=$!
   while [ "$i" -lt 100 ]; do
-    grep -qF 'Firstmate instruction waiting' "$log" 2>/dev/null && break
+    grep -qF 'Juggernaut instruction waiting' "$log" 2>/dev/null && break
     kill -0 "$pid" 2>/dev/null || break
     sleep 0.1
     i=$((i + 1))
   done
   sleep 3
   kill -0 "$pid" 2>/dev/null \
-    || fail "a fire-and-forget retry must not wake firstmate (watcher exited):"$'\n'"$(cat "$out")"
+    || fail "a fire-and-forget retry must not wake juggernaut (watcher exited):"$'\n'"$(cat "$out")"
   kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
-  rings=$(grep -cF 'Firstmate instruction waiting' "$log" || true)
+  rings=$(grep -cF 'Juggernaut instruction waiting' "$log" || true)
   [ "$rings" = 1 ] || fail "expected exactly one retry ring, got $rings:"$'\n'"$(cat "$log")"
   [ ! -s "$state/.wake-queue" ] || fail "a fire-and-forget retry queued a wake:"$'\n'"$(cat "$state/.wake-queue")"
   [ ! -e "$state/t1.inbox/.retry-ring" ] || fail "the watcher did not spend the retry mark"
@@ -1073,7 +1073,7 @@ test_watcher_holds_retry_while_the_worker_decides() {
   printf 'resolved [key=pick]: alpha\n' >> "$state/t1.status"
   steer_check_once "$dir"
   steer_check_once "$dir"
-  rings=$(grep -cF 'Firstmate instruction waiting' "$log" || true)
+  rings=$(grep -cF 'Juggernaut instruction waiting' "$log" || true)
   [ "$rings" = 1 ] || fail "expected exactly one retry ring once the decision closed, got $rings:"$'\n'"$(cat "$log")"
   [ ! -e "$state/t1.inbox/.retry-ring" ] || fail "the watcher did not spend the retry mark"
   unset JG_CONFIG_OVERRIDE
@@ -1093,13 +1093,13 @@ test_watcher_retry_keeps_a_newer_mark() {
   age_path "$state/t1.inbox/.retry-ring"
   newer=$(inbox_lib "$state" jg_task_inbox_write "$state" t1 "newer steer" fire-and-forget)
   JG_RING_MARKS_RETRY="$newer" steer_check_once "$dir"
-  rings=$(grep -cF 'Firstmate instruction waiting' "$log" || true)
+  rings=$(grep -cF 'Juggernaut instruction waiting' "$log" || true)
   [ "$rings" = 1 ] || fail "expected the owed retry to ring once, got $rings:"$'\n'"$(cat "$log")"
   [ "$(cat "$state/t1.inbox/.retry-ring" 2>/dev/null)" = "${newer##*/}" ] \
     || fail "the spent retry removed a newer record's mark written during its ring"
   age_path "$state/t1.inbox/.retry-ring"
   steer_check_once "$dir"
-  rings=$(grep -cF 'Firstmate instruction waiting' "$log" || true)
+  rings=$(grep -cF 'Juggernaut instruction waiting' "$log" || true)
   [ "$rings" = 2 ] || fail "the newer record's retry did not ring, got $rings:"$'\n'"$(cat "$log")"
   [ ! -e "$state/t1.inbox/.retry-ring" ] || fail "the watcher did not spend the newer retry mark"
   unset JG_CONFIG_OVERRIDE
@@ -1118,13 +1118,13 @@ test_watcher_escalates_once_after_budget() {
   pid=$!
   wait_watcher_gone "$pid" \
     || { kill "$pid" 2>/dev/null; fail "the watcher never escalated a spent ring budget"; }
-  rings=$(grep -cF 'Firstmate instruction waiting' "$log" || true)
+  rings=$(grep -cF 'Juggernaut instruction waiting' "$log" || true)
   [ "$rings" = 1 ] || fail "expected exactly 1 doorbell before escalation, got $rings:"$'\n'"$(cat "$log")"
-  grep -qF 'unread firstmate instruction' "$state/.wake-queue" \
+  grep -qF 'unread juggernaut instruction' "$state/.wake-queue" \
     || fail "the escalation should queue a stale wake naming the unread instruction:"$'\n'"$(cat "$state/.wake-queue" 2>/dev/null)"
   grep -qF "$rec" "$state/.wake-queue" \
     || fail "the stale wake should name the record path:"$'\n'"$(cat "$state/.wake-queue")"
-  [ "$(grep -cF 'unread firstmate instruction' "$state/.wake-queue")" = 1 ] \
+  [ "$(grep -cF 'unread juggernaut instruction' "$state/.wake-queue")" = 1 ] \
     || fail "the escalation must fire exactly once:"$'\n'"$(cat "$state/.wake-queue")"
   grep -qF 'stale:' "$out" || fail "the watcher should exit through the ordinary stale wake:"$'\n'"$(cat "$out")"
   pass "watcher: a spent ring budget emits exactly one ordinary stale wake for recovery"
@@ -1143,7 +1143,7 @@ test_watcher_dead_pane_escalates_once_without_ringing() {
   wait_watcher_gone "$pid" \
     || { kill "$pid" 2>/dev/null; fail "the watcher never surfaced a dead pane's unhandled instruction"; }
   [ ! -s "$log" ] || fail "a dead pane was typed into:"$'\n'"$(cat "$log")"
-  [ "$(grep -cF 'unread firstmate instruction' "$state/.wake-queue" 2>/dev/null || true)" = 1 ] \
+  [ "$(grep -cF 'unread juggernaut instruction' "$state/.wake-queue" 2>/dev/null || true)" = 1 ] \
     || fail "a dead pane should surface exactly one stale wake:"$'\n'"$(cat "$state/.wake-queue" 2>/dev/null)"
   grep -qF "agent has exited" "$state/.wake-queue" \
     || fail "the stale wake should say the agent has exited:"$'\n'"$(cat "$state/.wake-queue")"
@@ -1173,7 +1173,7 @@ test_watcher_dead_pane_ignores_stale_busy_state() {
   wait_watcher_gone "$pid" \
     || { kill "$pid" 2>/dev/null; fail "stale busy state hid a dead pane's unhandled instruction"; }
   [ ! -s "$log" ] || fail "a busy-marked dead pane was typed into:"$'\n'"$(cat "$log")"
-  [ "$(grep -cF 'unread firstmate instruction' "$state/.wake-queue" 2>/dev/null || true)" = 1 ] \
+  [ "$(grep -cF 'unread juggernaut instruction' "$state/.wake-queue" 2>/dev/null || true)" = 1 ] \
     || fail "a busy-marked dead pane should surface exactly once:"$'\n'"$(cat "$state/.wake-queue" 2>/dev/null)"
   [ -f "$rec" ] || fail "the durable record must survive stale busy-state recovery"
   [ "$(cat "$state/t1.inbox/.escalated")" = "${rec##*/}" ] \

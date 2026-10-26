@@ -10,9 +10,9 @@ done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # jg-flow.sh - read-only flow data, no endpoint or cache writes.
 # Usage: JG_HOME=<home> jg-flow.sh --json [--now <unix-seconds>] [--checks] [--capacity]
-# JG_BIN names the Firstmate bin/ holding the helper libraries this reader runs
+# JG_BIN names the Juggernaut bin/ holding the helper libraries this reader runs
 # (jg-classify-lib.sh, jg-tasks-axi-lib.sh, jg-backlog-transition-lib.sh, jg-tasks-axi.sh);
-# unset, it defaults to this script's own directory, so a Firstmate checkout copy needs nothing.
+# unset, it defaults to this script's own directory, so a Juggernaut checkout copy needs nothing.
 # --capacity reads Linux procfs, installed memory-gate defaults, the heavy slice,
 # and /tmp filesystem usage (du limited to 3 s). Partial du exposes readable
 # lower bounds, not complete directory sizes/ranks. RSS is per process, not additive
@@ -66,11 +66,11 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Worker-liveness and task-specific admission probes are not collected.
 set -eu
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# The directory holding the Firstmate helper libraries this reader runs. It defaults
+# The directory holding the Juggernaut helper libraries this reader runs. It defaults
 # to this script's own directory (the fork's bin/), so a fork copy needs nothing;
-# else JG_BIN names the Firstmate bin/ when this script runs from another repo.
+# else JG_BIN names the Juggernaut bin/ when this script runs from another repo.
 if [ -n "${JG_BIN+x}" ]; then
-  [ -d "$JG_BIN" ] && [ -f "$JG_BIN/jg-tasks-axi.sh" ] || { echo "jg-flow: JG_BIN is not a Firstmate bin directory (no jg-tasks-axi.sh): $JG_BIN" >&2; exit 1; }
+  [ -d "$JG_BIN" ] && [ -f "$JG_BIN/jg-tasks-axi.sh" ] || { echo "jg-flow: JG_BIN is not a Juggernaut bin directory (no jg-tasks-axi.sh): $JG_BIN" >&2; exit 1; }
 else
   JG_BIN="$SCRIPT_DIR"
 fi
@@ -244,7 +244,7 @@ while pending:
     seen.add(home)
     homes[name] = home
     registering[name] = parent
-    for line in read(home / 'data/secondmates.md', True) or []:
+    for line in read(home / 'data/squad_leads.md', True) or []:
         m = re.match(r'^- ([\w.-]+) - .*\((?:host:\s*([^;]+);\s*root:\s*([^;]+);\s*)?home:\s*([^;]+);', line)
         if m:
             if m[2]:
@@ -303,7 +303,7 @@ for name, home in sorted(homes.items()):
             metadata[(name, path.stem)] = meta
             records.setdefault(path.stem, [])
     for task, es in sorted(records.items()):
-        if any(e.get('kind') == 'secondmate' for e in es):
+        if any(e.get('kind') == 'squad_lead' for e in es):
             continue
         es.sort(key=lambda e: e['ts'])
         times = {k: next((e['ts'] for e in es if e['event'] == 'task.' + k), None)

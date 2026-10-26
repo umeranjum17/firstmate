@@ -45,8 +45,8 @@ report() {
     return 2
   fi
 
-  if [ -e "$JG_HOME/.jg-secondmate-home" ] || [ -L "$JG_HOME/.jg-secondmate-home" ]; then
-    role=secondmate
+  if [ -e "$JG_HOME/.jg-squad-lead-home" ] || [ -L "$JG_HOME/.jg-squad-lead-home" ]; then
+    role=squad_lead
   fi
 
   printf 'estimator=ceil(UTF-8 bytes / 3) conservative-local-estimate\n'
@@ -71,7 +71,7 @@ report() {
   else
     printf 'budget_status=over-budget\n'
   fi
-  if [ "$role" = secondmate ] \
+  if [ "$role" = squad_lead ] \
     && ! jg_startup_memory_decimal_le "$shared_tokens" "$budget"; then
     printf 'exception=primary-owned-shared-file-alone-exceeds-budget\n'
   fi

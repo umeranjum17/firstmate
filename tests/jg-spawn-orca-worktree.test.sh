@@ -5,7 +5,7 @@
 #
 # spawn_current_path (bin/jg-spawn.sh) has no `orca` case, because Orca hands
 # back a terminal that is already bound to the worktree it just created -
-# there is no shared pane whose cwd firstmate must poll for. Without an
+# there is no shared pane whose cwd juggernaut must poll for. Without an
 # explicit skip, spawn_assert_agent_worktree's post-launch proof would poll
 # spawn_current_path in a loop, read nothing but empty output every time, and
 # hard-refuse EVERY Orca launch once its 20-read deadline elapsed. This test
@@ -96,7 +96,7 @@ test_orca_fresh_spawn_enters_the_worktree_it_created() {
 ## Captain's intent
 Exercise an Orca-backed spawn for $id.
 
-## Firstmate spec
+## Juggernaut spec
 Confirm the launch enters the worktree Orca created for it.
 EOF
   fb=$(make_orca_fakebin "$case_dir")
@@ -134,7 +134,7 @@ test_orca_relaunch_is_refused_before_the_worktree_carveout_could_run() {
 ## Captain's intent
 Exercise a relaunch attempt against a recorded Orca task.
 
-## Firstmate spec
+## Juggernaut spec
 Confirm the relaunch is refused before any worktree re-entry logic runs.
 EOF
   {

@@ -8,7 +8,7 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
   export "$_jg_new=$_jg_val"
 done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
-# Install or update the fleet delete guard for this user and register its watcher check in one firstmate home.
+# Install or update the fleet delete guard for this user and register its watcher check in one juggernaut home.
 # Idempotent: rerun it to update. Usage: install.sh [--dry-run] <jg-home>
 set -euo pipefail
 DRY=0
@@ -42,7 +42,7 @@ put() {
 }
 
 # hook <settings.json> <runtime>: merge one PreToolUse Bash entry, dropping any older guard entry.
-# Not Codex: upstream launches Codex crewmates with hooks off, and a new user hook trips its trust modal.
+# Not Codex: upstream launches Codex operators with hooks off, and a new user hook trips its trust modal.
 hook() {
   local file=$1 cmd="node '$DEST/guard.mjs' --runtime $2"
   [ -d "$(dirname "$file")" ] || { echo "skipped: $file (runtime not installed)"; return; }

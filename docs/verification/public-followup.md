@@ -2,14 +2,14 @@
 
 Audience: maintainer verification.
 
-This record supports seven active guarantees for promised public replies made through the myfirstmate relay:
+This record supports seven active guarantees for promised public replies made through the myjuggernaut relay:
 
 1. A promised final reply survives compaction and restart, reconciles from disk alone, and lands in the original thread exactly once.
 2. A home that never opted into the relay pays nothing for any of it.
 3. Delivering a final does not close the public loop: the registration is retained as `state=delivered` until `retire --reason`, session start surfaces an `open-loop` line, and `rechain` can bind follow-on work to the same thread.
 4. A first registration with no registry lock already held succeeds under stock macOS Bash 3.2 with `set -u`.
-5. A public loop whose work lives in a REMOTE secondmate home retires when readable remote state proves no link exists, or after readable and writable remote state clears the matching bound legacy Relay link; unreadable state, a non-writable matching link, an identity mismatch, a metadata lock it cannot acquire within its bound, or unconfirmed completion retains the loop instead of hanging, and `--force` still covers only the unresolved obligation.
-6. Work bound to a REMOTE secondmate home can report its typed terminal result: the instructions name paths that exist on the worker's own machine, the owning home collects results for open registrations over that route, an unreachable route fails loudly, an empty reachable route is a healthy no-op, and a non-open registration is skipped without contact.
+5. A public loop whose work lives in a REMOTE squad lead home retires when readable remote state proves no link exists, or after readable and writable remote state clears the matching bound legacy Relay link; unreadable state, a non-writable matching link, an identity mismatch, a metadata lock it cannot acquire within its bound, or unconfirmed completion retains the loop instead of hanging, and `--force` still covers only the unresolved obligation.
+6. Work bound to a REMOTE squad lead home can report its typed terminal result: the instructions name paths that exist on the worker's own machine, the owning home collects results for open registrations over that route, an unreachable route fails loudly, an empty reachable route is a healthy no-op, and a non-open registration is skipped without contact.
 7. Work that ends failed or parked remains deliverable when its promised final expected a merged pull request, so the original thread receives the honest failed outcome exactly once instead of retaining an undeliverable promise.
 
 [`docs/configuration.md`](../configuration.md#promised-public-replies-statepublic-followup) owns the operator-facing contract, [`docs/architecture.md`](../architecture.md#optional-relay) owns the mechanism boundary, and `tasks-axi public-followup --help` owns the typed obligation schema.
@@ -41,7 +41,7 @@ ok - typed terminal cleanup clears the legacy link without posting
 ok - a delivery interrupted between post and receipt refuses to repost
 ok - a child home reports typed results but can never become the outward-post owner
 ok - typed delivery refuses to post when its cleanup registration is missing
-ok - marked secondmate teardown resolves its parent and fails closed when unavailable
+ok - marked squad lead teardown resolves its parent and fails closed when unavailable
 ok - local seeding publishes durable parent state before its identity marker
 ok - a lost launch-time parent binding is recovered from the durable local record
 ok - a durable local parent record does not bypass a genuinely missing parent-side registration
@@ -51,7 +51,7 @@ ok - unsafe durable parent records fail closed before cleanup
 ok - a NUL-bearing durable parent record fails closed before cleanup
 ok - relay-disabled unmarked teardown runs no public-followup work
 ok - a marked child proceeds without tasks-axi when its parent relay is disabled
-ok - secondmate parent resolution matches the durable registry id literally
+ok - squad lead parent resolution matches the durable registry id literally
 ok - traversal-shaped registrations are rejected before path construction or posting
 ok - pending keeps registrations when tasks-axi returns malformed JSON
 ok - the retained private request context keeps the original thread deliverable after inbox cleanup
@@ -71,9 +71,9 @@ ok - failed rechain retirement keeps the source claimed by one resumable destina
 ok - first register succeeds with an empty lock list under /bin/bash
 ok - registration replay preserves delivered and retired loop states
 ok - redelivery does not report a retired loop as open
-ok - retire closes delivered loops after secondmate home removal
-ok - retire fails closed for an unbound existing secondmate
-ok - retire fails closed when a secondmate ID is reassigned
+ok - retire closes delivered loops after squad lead home removal
+ok - retire fails closed for an unbound existing squad lead
+ok - retire fails closed when a squad lead ID is reassigned
 ok - rechain refuses an unrelated existing destination
 ok - pending skips a registration retired during settlement
 ok - retire --reason closes the loop and drops the open-loop line
@@ -82,8 +82,8 @@ ok - expiry escalation is pinned by FMX_NOW_OVERRIDE
 ok - brief fails explicitly when typed deliverable keys are unavailable
 ok - pre-change registrations are open loops and un-rechainable, never a crash
 ok - teardown reports an unreconciled legacy Relay link
-ok - secondmate promotion matches teardown parent resolution
-ok - a public loop bound to a remote secondmate home delivers and retires
+ok - squad lead promotion matches teardown parent resolution
+ok - a public loop bound to a remote squad lead home delivers and retires
 ok - delivered remote registrations skip offline collection routes
 ok - --force still covers only the unresolved obligation, not the link clear
 ok - retire fails closed when a remote route is reassigned
@@ -102,11 +102,11 @@ ok - empty reachable remote collection remains a healthy no-op
 ok - remote brief rejects traversal and empty route path components
 ok - a local work home's emit path is unchanged
 ok - a duplicate report from a remote work home stays a no-op
-ok - staging requires the matching secondmate firstmate home
+ok - staging requires the matching squad lead juggernaut home
 ```
 
 The restart case is the end-to-end proof of guarantee 1.
-It reproduces the stranded state first (work bound, no reconciled terminal result, delivery refused with "still waiting on its bound work" and zero posts), then has a secondmate-shaped child report a typed `pr-merged` result, deletes the drained inbox payload, reconciles from disk, and asserts exactly one `connector/followup` call carrying the original `request_id`, a validated `posted` receipt, and a Done obligation.
+It reproduces the stranded state first (work bound, no reconciled terminal result, delivery refused with "still waiting on its bound work" and zero posts), then has a squad-lead-shaped child report a typed `pr-merged` result, deletes the drained inbox payload, reconciles from disk, and asserts exactly one `connector/followup` call carrying the original `request_id`, a validated `posted` receipt, and a Done obligation.
 
 The focused tasks-axi 0.2.6 regression is the proof of guarantee 7:
 
@@ -130,7 +130,7 @@ A pre-change on-disk record (no `state=`, no `request_context_b64`) is an open l
 The stock macOS Bash lane in [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) sets `JG_TEST_ONLY=test_first_register_succeeds_with_empty_lock_list_under_bash32` and runs `tests/jg-public-followup.test.sh` through real `/bin/bash` 3.2, proving the first `register` path is safe when its registry lock list starts empty.
 
 The eight remote-route cases are the proof of guarantee 5.
-A remote secondmate home exists only on its own machine, so its registration records no local path, and every close that must first clear the bound legacy Relay link had nothing local to act on.
+A remote squad lead home exists only on its own machine, so its registration records no local path, and every close that must first clear the bound legacy Relay link had nothing local to act on.
 The first case pins that empty recorded path so it cannot go vacuous, then drives `deliver` and `retire` end to end and asserts the matching link inside the remote home is actually gone and the retirement receipt is written.
 The second case shows `--force` still governs only the unresolved-obligation refusal: a plain `retire` of an unresolved remote loop is still refused with the remote link untouched, while a forced one closes and clears it.
 The reassignment case replaces a delivered loop's route with a remote home whose reused work ID carries another Relay request and asserts that retirement retains the registration and leaves the replacement link untouched.

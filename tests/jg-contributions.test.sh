@@ -383,7 +383,7 @@ test_away_yolo_cross_home_is_fleet_work() {
   child=$(new_home away-yolo-child)
   mkdir -p "$child/bin"
   printf '# Fixture\n' > "$child/AGENTS.md"
-  printf 'child\n' > "$child/.jg-secondmate-home"
+  printf 'child\n' > "$child/.jg-squad-lead-home"
   forge_home "$child"
   with_home "$child" "$ROOT/bin/jg-pr-check.sh" delivery https://github.com/o/r/pull/8 >/dev/null \
     || fail 'could not register child away delivery'
@@ -391,9 +391,9 @@ test_away_yolo_cross_home_is_fleet_work() {
   with_home "$child" "$ROOT/bin/jg-afk-contract.sh" enter --words 'merge the delivery PR when green' >/dev/null \
     || fail 'could not enter child away posture'
   mutate_record "$child" delivery '.records[0].observation.can_merge=true'
-  JG_SNAPSHOT_NOW="$NOW" with_home "$child" "$ROOT/bin/jg-fleet-snapshot.sh" --secondmate-home-summary > "$child/state/home-summary.json" \
+  JG_SNAPSHOT_NOW="$NOW" with_home "$child" "$ROOT/bin/jg-fleet-snapshot.sh" --squad-lead-home-summary > "$child/state/home-summary.json" \
     || fail 'could not collect child contribution summary'
-  printf -- '- child - fixture (home: %s; scope: fixture; projects: sample; added 2026-09-16)\n' "$child" > "$home/data/secondmates.md"
+  printf -- '- child - fixture (home: %s; scope: fixture; projects: sample; added 2026-09-16)\n' "$child" > "$home/data/squad_leads.md"
   bearings "$home" | jq -e '.contributions.checked == 1 and .contributions.counts.captain == 0
     and .contributions.counts.fleet == 1' >/dev/null \
     || fail 'cross-home away yolo delivery requiring a merge remained captain work'
@@ -596,13 +596,13 @@ test_expired_child_unsupported_forge_stays_unmeasured() {
   child=$(new_home expired-unsupported-child)
   mkdir -p "$child/bin"
   printf '# Fixture\n' > "$child/AGENTS.md"
-  printf 'child\n' > "$child/.jg-secondmate-home"
+  printf 'child\n' > "$child/.jg-squad-lead-home"
   printf -- '- [ ] unsupported - Filed https://gitlab.com/o/r/-/merge_requests/2 (repo: sample) (kind: ship)\n' >> "$child/data/backlog.md"
-  JG_SNAPSHOT_NOW="$NOW" with_home "$child" "$ROOT/bin/jg-fleet-snapshot.sh" --secondmate-home-summary > "$child/state/home-summary.json" \
+  JG_SNAPSHOT_NOW="$NOW" with_home "$child" "$ROOT/bin/jg-fleet-snapshot.sh" --squad-lead-home-summary > "$child/state/home-summary.json" \
     || fail 'could not collect child unsupported-forge coverage'
   jq '.contributions.valid_until=0' "$child/state/home-summary.json" > "$child/update.json"
   mv "$child/update.json" "$child/state/home-summary.json"
-  printf -- '- child - fixture (home: %s; scope: fixture; projects: sample; added 2026-09-16)\n' "$child" > "$home/data/secondmates.md"
+  printf -- '- child - fixture (home: %s; scope: fixture; projects: sample; added 2026-09-16)\n' "$child" > "$home/data/squad_leads.md"
   bearings "$home" | jq -e '.contributions.known == 1 and .contributions.checked == 0
     and .contributions.unmeasured == 1 and .contributions.counts.captain == 0
     and .contributions.counts.fleet == 0 and .contributions.complete == false
@@ -645,11 +645,11 @@ test_home_summary_coverage() {
   child=$(new_home child)
   mkdir -p "$child/bin"
   printf '# Fixture\n' > "$child/AGENTS.md"
-  printf 'child\n' > "$child/.jg-secondmate-home"
+  printf 'child\n' > "$child/.jg-squad-lead-home"
   record "$child" child-work 15 open mergeable
-  JG_SNAPSHOT_NOW="$NOW" with_home "$child" "$ROOT/bin/jg-fleet-snapshot.sh" --secondmate-home-summary > "$child/state/home-summary.json" \
+  JG_SNAPSHOT_NOW="$NOW" with_home "$child" "$ROOT/bin/jg-fleet-snapshot.sh" --squad-lead-home-summary > "$child/state/home-summary.json" \
     || fail 'child summary failed'
-  printf -- '- child - fixture (home: %s; scope: fixture; projects: sample; added 2026-09-16)\n' "$child" > "$home/data/secondmates.md"
+  printf -- '- child - fixture (home: %s; scope: fixture; projects: sample; added 2026-09-16)\n' "$child" > "$home/data/squad_leads.md"
   bearings "$home" | jq -e '.contributions.known == 1 and .contributions.checked == 1
     and .contributions.proven_clear == true' >/dev/null || fail 'measured child coverage did not reach parent'
   jq '.contributions.valid_until=0' "$child/state/home-summary.json" > "$child/update.json"

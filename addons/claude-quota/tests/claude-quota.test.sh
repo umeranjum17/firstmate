@@ -9,7 +9,7 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
 done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # End-to-end: drive the real check over sample pool readings in its file-argument mode and once live, then drive install.sh
-# against a throwaway firstmate home and HOME. Usage: claude-quota/tests/claude-quota.test.sh
+# against a throwaway juggernaut home and HOME. Usage: claude-quota/tests/claude-quota.test.sh
 set -euo pipefail
 SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 d=$(mktemp -d)

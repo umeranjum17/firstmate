@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Behavior tests for the verified Kimi Code CLI crewmate adapter.
+# Behavior tests for the verified Kimi Code CLI operator adapter.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -99,7 +99,7 @@ case "$*" in
   *"#{cursor_y}"*) fake_cursor_y; exit 0 ;;
 esac
 case "${1:-}" in
-  display-message) printf 'firstmate\n'; exit 0 ;;
+  display-message) printf 'juggernaut\n'; exit 0 ;;
   list-windows) exit 0 ;;
   has-session|new-session|new-window|kill-window) exit 0 ;;
   send-keys)
@@ -234,7 +234,7 @@ make_spawn_case() {
 ## Captain's intent
 Exercise Kimi dispatch.
 
-## Firstmate spec
+## Juggernaut spec
 Verify launch and delivery behavior.
 EOF
   printf 'kimi\n' > "$home/config/crew-harness"
@@ -338,7 +338,7 @@ test_kimi_launch_then_send_is_verified() {
     "kimi spawn did not export its Go temp directory into the pane"
   assert_grep "export JG_TASK_ID=$id" "$CASE_DIR/tmux-calls.log" \
     "kimi spawn did not mark the pane with its task id"
-  assert_grep 'BEGIN FIRSTMATE KIMI TURN-END HOOK' "$HOME_DIR/.kimi-code/config.toml" \
+  assert_grep 'BEGIN JUGGERNAUT KIMI TURN-END HOOK' "$HOME_DIR/.kimi-code/config.toml" \
     "kimi spawn did not install its guarded global hook region"
   assert_grep 'token=' "$WT_DIR/.jg-kimi-turnend" "kimi spawn did not write its token pointer"
   assert_present "$HOME_DIR/state/$id.kimi-turnend-token" "kimi spawn did not record its token"
@@ -466,15 +466,15 @@ EOF
   cp "$config" "$once"
   HOME="$home" "$KIMI_HOOK" install || fail "second Kimi hook install failed"
   cmp -s "$once" "$config" || fail "second Kimi hook install changed config bytes"
-  count=$(grep -c '^# BEGIN FIRSTMATE KIMI TURN-END HOOK' "$config")
-  [ "$count" -eq 1 ] || fail "idempotent install left $count Firstmate regions"
+  count=$(grep -c '^# BEGIN JUGGERNAUT KIMI TURN-END HOOK' "$config")
+  [ "$count" -eq 1 ] || fail "idempotent install left $count Juggernaut regions"
 
   HOME="$home" "$KIMI_HOOK" remove || fail "Kimi hook removal failed"
   cp "$config" "$stripped"
   cmp -s "$original" "$stripped" \
-    || fail "config with the Firstmate region excised was not byte-identical to the original"
-  assert_absent "$home/.kimi-code/jg-turn-end.sh" "removal left the Firstmate hook script"
-  assert_absent "$home/.kimi-code/jg-turn-end.d" "removal left the Firstmate registry"
+    || fail "config with the Juggernaut region excised was not byte-identical to the original"
+  assert_absent "$home/.kimi-code/jg-turn-end.sh" "removal left the Juggernaut hook script"
+  assert_absent "$home/.kimi-code/jg-turn-end.d" "removal left the Juggernaut registry"
   pass "Kimi hook install is idempotent and removal restores every foreign config byte"
 }
 
@@ -538,11 +538,11 @@ test_kimi_hook_fails_closed_on_missing_malformed_or_partial_config() {
     || fail "malformed config refusal changed config bytes"
   assert_absent "$malformed/.kimi-code/jg-turn-end.sh" "malformed config refusal wrote the hook script"
 
-  printf '# BEGIN FIRSTMATE KIMI TURN-END HOOK\n' > "$partial/.kimi-code/config.toml"
+  printf '# BEGIN JUGGERNAUT KIMI TURN-END HOOK\n' > "$partial/.kimi-code/config.toml"
   cp "$partial/.kimi-code/config.toml" "$partial/before"
   rc=0
   out=$(HOME="$partial" "$KIMI_HOOK" install 2>&1) || rc=$?
-  [ "$rc" -ne 0 ] || fail "partial Firstmate marker was accepted"
+  [ "$rc" -ne 0 ] || fail "partial Juggernaut marker was accepted"
   assert_contains "$out" "partial, duplicated, or altered" "partial marker refusal lacked its concrete reason"
   cmp -s "$partial/before" "$partial/.kimi-code/config.toml" \
     || fail "partial marker refusal changed config bytes"
@@ -613,7 +613,7 @@ test_kimi_hook_is_silent_and_requires_registered_workspace_token() {
   expect_code 0 "$rc" "Kimi hook without jq must still exit zero"
   [ -z "$out" ] || fail "Kimi hook without jq printed output: $out"
   assert_absent "$target" "Kimi hook without jq touched the turn-end marker"
-  pass "Kimi hook stays silent and inert without a Firstmate registry token"
+  pass "Kimi hook stays silent and inert without a Juggernaut registry token"
 }
 
 test_kimi_spawn_refuses_unsafe_global_config_before_pane_creation() {

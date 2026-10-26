@@ -283,7 +283,7 @@ calm = registerCalm();
 calm.sessionStart({ reason: "startup" }, context);
 await calm.calmCommand.handler("", context);
 if (readFileSync(`${process.env.EXTENSION_HOME}/config/calm`, "utf8") !== "on\n") {
-  throw new Error("Calm did not derive the Firstmate home from its extension path");
+  throw new Error("Calm did not derive the Juggernaut home from its extension path");
 }
 if (existsSync(`${process.cwd()}/config/calm`)) {
   throw new Error("Calm wrote its preference under Pi's launch directory");
@@ -531,12 +531,12 @@ const check = (condition, message) => {
 };
 const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
 const stripAnsi = (text) => text.replace(/\x1b\[[0-9;]*m/g, "");
-const watcherOne = operationalInput.encodeFirstmateOperationalInput("watcher", "QUEUED_MONITOR_ONE");
-const watcherTwo = operationalInput.encodeFirstmateOperationalInput("watcher", "QUEUED_MONITOR_TWO");
+const watcherOne = operationalInput.encodeJuggernautOperationalInput("watcher", "QUEUED_MONITOR_ONE");
+const watcherTwo = operationalInput.encodeJuggernautOperationalInput("watcher", "QUEUED_MONITOR_TWO");
 const legacyAway = "⁣Supervisor escalate (QUEUED_LEGACY_AWAY)";
 const captainText = "CAPTAIN_QUEUED_TEXT";
 // A captain can type the marker's words; only the authenticated envelope may hide.
-const lookalike = "FIRSTMATE_OP: v1 away-supervisor: CAPTAIN_TYPED_LOOKALIKE";
+const lookalike = "JUGGERNAUT_OP: v1 away-supervisor: CAPTAIN_TYPED_LOOKALIKE";
 const operationalTexts = [watcherOne, watcherTwo, legacyAway];
 
 // Implements every session member the retention relies on with Pi's own semantics:
@@ -610,7 +610,7 @@ function makeHost(session) {
 }
 
 const assertNoOperationalText = (text, context) => {
-  for (const needle of ["⁣", "FIRSTMATE_OP: v1 watcher", "QUEUED_MONITOR", "QUEUED_LEGACY_AWAY"]) {
+  for (const needle of ["⁣", "JUGGERNAUT_OP: v1 watcher", "QUEUED_MONITOR", "QUEUED_LEGACY_AWAY"]) {
     check(!text.includes(needle), `${context} exposed operational text ${JSON.stringify(needle)}: ${JSON.stringify(text)}`);
   }
 };
@@ -785,7 +785,7 @@ JS
   status=$?
   [ "$status" -eq 0 ] || fail "Pi Calm queued operational rows: $out"
   [ -z "$out" ] || fail "Pi Calm queued-row test printed output: $out"
-  pass "Calm hides queued Firstmate rows only on a session that can keep them, keeps hidden ones out of the editor on Escape, delivers them once in order, and leaves unsupported sessions and Calm off stock"
+  pass "Calm hides queued Juggernaut rows only on a session that can keep them, keeps hidden ones out of the editor on Escape, delivers them once in order, and leaves unsupported sessions and Calm off stock"
 }
 
 test_builtin_gate_load_time() {
@@ -1257,7 +1257,7 @@ if (handlers.has("input")) {
 }
 if (
   calmCommand.description !==
-  "Toggle Firstmate's supported conversation-only transcript presentation."
+  "Toggle Juggernaut's supported conversation-only transcript presentation."
 ) {
   throw new Error(`unexpected calm command description: ${calmCommand.description}`);
 }
@@ -1273,9 +1273,9 @@ for (const itemClass of visibility.CALM_TRANSCRIPT_CLASSES) {
   }
 }
 const watcherBody =
-  "FIRSTMATE WATCHER WAKE: signal: /tmp/probe.status\n\n" +
+  "JUGGERNAUT WATCHER WAKE: signal: /tmp/probe.status\n\n" +
   "Run bin/jg-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.";
-const watcherMessage = operationalInput.encodeFirstmateOperationalInput("watcher", watcherBody);
+const watcherMessage = operationalInput.encodeJuggernautOperationalInput("watcher", watcherBody);
 const legacyAwayMessage = "\u2063Supervisor escalate (legacy presentation compatibility)";
 const operationalHistory = [];
 const operationalChat = {
@@ -1289,7 +1289,7 @@ const operationalMode = {
   editor: { addToHistory: (value) => operationalHistory.push(value) },
   // Pi builds user rows with the registered markdown transformers from 0.83 onward and
   // without them before that; the stub answers both shapes with the empty list Pi and
-  // Firstmate both use today.
+  // Juggernaut both use today.
   getMarkdownTransformers: () => [],
   getMarkdownThemeWithSettings: () => undefined,
   getUserMessageText: (message) => typeof message.content === "string"
@@ -1379,7 +1379,7 @@ const watchPi = {
 const watchExtension = await import(`${pathToFileURL(process.env.WATCH_EXT).href}?test=${Date.now()}`);
 watchExtension.default(watchPi);
 const watchTool = tools.find((tool) => tool.name === "jg_watch_arm_pi");
-if (!watchTool) throw new Error("Firstmate watcher extension did not register jg_watch_arm_pi");
+if (!watchTool) throw new Error("Juggernaut watcher extension did not register jg_watch_arm_pi");
 const stockWatchTool = { ...watchTool };
 delete stockWatchTool.renderCall;
 delete stockWatchTool.renderResult;
@@ -1414,7 +1414,7 @@ for (const row of [watchBaseline, watchActual]) {
   row.updateResult(watchResult);
 }
 if (JSON.stringify(watchActual.render(100)) !== JSON.stringify(watchBaseline.render(100))) {
-  throw new Error("Firstmate watcher tool changed stock rendering while Calm was off");
+  throw new Error("Juggernaut watcher tool changed stock rendering while Calm was off");
 }
 
 const customDefinition = {
@@ -1560,31 +1560,31 @@ await handlers.get("session_start")[0]({ reason: "startup" }, commandContext);
 if (workingVisible !== true || hiddenThinkingLabel !== undefined) {
   throw new Error("session start did not restore Pi's stock working and thinking presentation");
 }
-const presentationRenderer = entryRenderers.get("firstmate-synthetic-input-presentation");
+const presentationRenderer = entryRenderers.get("juggernaut-synthetic-input-presentation");
 if (!presentationRenderer) throw new Error("legacy synthetic presentation renderer was not registered");
 const presentationEntry = {
-  customType: "firstmate-synthetic-input-presentation",
+  customType: "juggernaut-synthetic-input-presentation",
   data: { content: watcherMessage, kind: "watcher" },
 };
 const presentationComponent = new CustomEntryComponent(presentationEntry, presentationRenderer);
 presentationComponent.setExpanded(expanded);
 if (
   !presentationComponent.hasContent() ||
-  !presentationComponent.render(100).join("\n").includes("FIRSTMATE WATCHER WAKE")
+  !presentationComponent.render(100).join("\n").includes("JUGGERNAUT WATCHER WAKE")
 ) {
   throw new Error("Calm-off legacy synthetic presentation did not use a stock user-message row");
 }
 
 await calmCommand.handler("", commandContext);
-if (expanded !== true || workingVisible !== true || hiddenThinkingLabel !== "" || statuses.get("firstmate-calm") !== undefined) {
+if (expanded !== true || workingVisible !== true || hiddenThinkingLabel !== "" || statuses.get("juggernaut-calm") !== undefined) {
   throw new Error("Calm did not preserve working visibility or apply its thinking and footer presentation controls");
 }
 if (readFileSync(`${process.env.JG_HOME}/config/calm`, "utf8") !== "on\n") {
-  throw new Error("Calm did not persist the active choice in the effective Firstmate home");
+  throw new Error("Calm did not persist the active choice in the effective Juggernaut home");
 }
 presentationComponent.setExpanded(!expanded);
 if (presentationComponent.hasContent() || presentationComponent.render(100).length !== 0) {
-  throw new Error("Calm left a synthetic Firstmate presentation row or spacer visible");
+  throw new Error("Calm left a synthetic Juggernaut presentation row or spacer visible");
 }
 if (operationalComponent.render(100).length !== 0) {
   throw new Error("Calm left a current operational user row or its leading spacer visible");
@@ -1598,7 +1598,7 @@ const operationalNearMisses = [
     visible: "Captain quote:",
   },
   {
-    content: "FIRSTMATE_OP: v1 watcher: ASCII_ONLY_CAPTAIN_MESSAGE",
+    content: "JUGGERNAUT_OP: v1 watcher: ASCII_ONLY_CAPTAIN_MESSAGE",
     visible: "ASCII_ONLY_CAPTAIN_MESSAGE",
   },
   {
@@ -1610,7 +1610,7 @@ const operationalNearMisses = [
     visible: "ordinary captain text after an unrelated separator",
   },
   {
-    content: "\u2063FIRSTMATE_OP: legacy untyped captain message",
+    content: "\u2063JUGGERNAUT_OP: legacy untyped captain message",
     visible: "legacy untyped captain message",
   },
   {
@@ -1619,7 +1619,7 @@ const operationalNearMisses = [
   },
   {
     content:
-      "FIRSTMATE WATCHER WAKE: captain-authored legacy-shaped message\n\n" +
+      "JUGGERNAUT WATCHER WAKE: captain-authored legacy-shaped message\n\n" +
       "Run bin/jg-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.",
     visible: "captain-authored legacy-shaped message",
   },
@@ -1635,7 +1635,7 @@ const operationalNearMisses = [
       { type: "text", text: watcherMessage },
       { type: "image", data: "ignored-by-text-renderer", mimeType: "image/png" },
     ],
-    visible: "FIRSTMATE WATCHER WAKE",
+    visible: "JUGGERNAUT WATCHER WAKE",
   },
 ];
 for (const nearMiss of operationalNearMisses) {
@@ -1750,7 +1750,7 @@ await calmCommand.handler("", commandContext);
 presentationComponent.setExpanded(expanded);
 if (
   !presentationComponent.hasContent() ||
-  !presentationComponent.render(100).join("\n").includes("FIRSTMATE WATCHER WAKE")
+  !presentationComponent.render(100).join("\n").includes("JUGGERNAUT WATCHER WAKE")
 ) {
   throw new Error("turning Calm off did not restore a legacy synthetic presentation row");
 }
@@ -1771,19 +1771,19 @@ if (JSON.stringify(imageRow.render(100)) !== JSON.stringify(imageVisibleBefore))
 if (JSON.stringify(watchActual.render(100)) !== JSON.stringify(watchBaseline.render(100))) {
   throw new Error("jg_watch_arm_pi did not restore its stock call/result shell");
 }
-if (workingVisible !== true || hiddenThinkingLabel !== undefined || statuses.get("firstmate-calm") !== undefined) {
+if (workingVisible !== true || hiddenThinkingLabel !== undefined || statuses.get("juggernaut-calm") !== undefined) {
   throw new Error("turning Calm off did not restore stock presentation controls");
 }
 if (!assistantThinkingTool.render(100).join("\n").includes("Thinking...")) {
   throw new Error("turning Calm off did not restore the collapsed thinking label");
 }
 if (readFileSync(`${process.env.JG_HOME}/config/calm`, "utf8") !== "off\n") {
-  throw new Error("Calm did not persist the inactive choice in the effective Firstmate home");
+  throw new Error("Calm did not persist the inactive choice in the effective Juggernaut home");
 }
 presentationComponent.setExpanded(expanded);
 if (
   !presentationComponent.hasContent() ||
-  !presentationComponent.render(100).join("\n").includes("FIRSTMATE WATCHER WAKE")
+  !presentationComponent.render(100).join("\n").includes("JUGGERNAUT WATCHER WAKE")
 ) {
   throw new Error("turning Calm off did not restore synthetic user-row presentation");
 }
@@ -1797,7 +1797,7 @@ for (const reason of ["startup", "new", "resume", "fork", "reload"]) {
       throw new Error(`${reason} session did not retain the active Calm choice for ${name}`);
     }
   }
-  if (workingVisible !== true || hiddenThinkingLabel !== "" || statuses.get("firstmate-calm") !== undefined) {
+  if (workingVisible !== true || hiddenThinkingLabel !== "" || statuses.get("juggernaut-calm") !== undefined) {
     throw new Error(`${reason} session did not retain gapless Calm presentation with native working visibility`);
   }
 }
@@ -2160,7 +2160,7 @@ import {
   createAssistantMessageEventStream,
 } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { encodeFirstmateOperationalInput } from "./.pi/extensions/lib/jg-operational-input.ts";
+import { encodeJuggernautOperationalInput } from "./.pi/extensions/lib/jg-operational-input.ts";
 
 let phase: "idle" | "captain" | "monitor" = "idle";
 let label = "";
@@ -2168,7 +2168,7 @@ let adjacent = false;
 let latestInputRole: "user" | "custom" | undefined;
 
 const EXACT_WATCHER_INPUT =
-  "\u2063FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: signal: /home/fixture/github/kunchenguid/firstmate/state/oss-triage-t4.status\n\n" +
+  "\u2063JUGGERNAUT_OP: v1 watcher: JUGGERNAUT WATCHER WAKE: signal: /home/fixture/github/kunchenguid/juggernaut/state/oss-triage-t4.status\n\n" +
   "Run bin/jg-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.";
 
 function monitorInput(suffix: "ONE" | "TWO"): string {
@@ -2176,7 +2176,7 @@ function monitorInput(suffix: "ONE" | "TWO"): string {
   if (label === "legacy_away" && suffix === "ONE") {
     return "\u2063Supervisor escalate (LEGACY_AWAY_E2E)";
   }
-  return encodeFirstmateOperationalInput("watcher", `MONITOR_${label}_${suffix}`);
+  return encodeJuggernautOperationalInput("watcher", `MONITOR_${label}_${suffix}`);
 }
 
 function contentText(content: unknown): string {
@@ -2350,7 +2350,7 @@ TS
     if [ "$calm_state" = on ]; then
       assert_not_contains "$pane" "MONITOR_${label}_ONE" "Pi follow-up $label case rendered a Calm-hidden operational user row"
       if [ "$label" = exact_watcher ]; then
-        assert_not_contains "$pane" "FIRSTMATE WATCHER WAKE: signal: /home/fixture/github/kunchenguid/firstmate/state/oss-triage-t4.status" \
+        assert_not_contains "$pane" "JUGGERNAUT WATCHER WAKE: signal: /home/fixture/github/kunchenguid/juggernaut/state/oss-triage-t4.status" \
           "Pi exact watcher case rendered the Calm-hidden authoritative payload"
         assert_not_contains "$pane" "Run bin/jg-wake-drain.sh first and handle the queued wake." \
           "Pi exact watcher case rendered the Calm-hidden drain instruction"
@@ -2390,10 +2390,10 @@ const handled = expected === 2
 const expectedOperationalTexts = Array.from({ length: expected }, (_, index) => {
   const suffix = index === 0 ? "ONE" : "TWO";
   return label === "exact_watcher" && suffix === "ONE"
-    ? "\u2063FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: signal: /home/fixture/github/kunchenguid/firstmate/state/oss-triage-t4.status\n\nRun bin/jg-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned."
+    ? "\u2063JUGGERNAUT_OP: v1 watcher: JUGGERNAUT WATCHER WAKE: signal: /home/fixture/github/kunchenguid/juggernaut/state/oss-triage-t4.status\n\nRun bin/jg-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned."
     : label === "legacy_away" && suffix === "ONE"
       ? "\u2063Supervisor escalate (LEGACY_AWAY_E2E)"
-      : `\u2063FIRSTMATE_OP: v1 watcher: MONITOR_${label}_${suffix}`;
+      : `\u2063JUGGERNAUT_OP: v1 watcher: MONITOR_${label}_${suffix}`;
 });
 const matching = entries.filter((entry) => {
   const entryText = entry.type === "message"
@@ -2454,7 +2454,7 @@ JS
     done
     assert_contains "$pane" "CAPTAIN_PROMPT_exact_watcher" "Pi restart lost the genuine captain prompt"
     assert_contains "$pane" "MONITOR_HANDLED_exact_watcher_ONE" "Pi restart lost the operational processing response"
-    assert_not_contains "$pane" "FIRSTMATE WATCHER WAKE: signal: /home/fixture/github/kunchenguid/firstmate/state/oss-triage-t4.status" \
+    assert_not_contains "$pane" "JUGGERNAUT WATCHER WAKE: signal: /home/fixture/github/kunchenguid/juggernaut/state/oss-triage-t4.status" \
       "Pi restart replayed the Calm-hidden exact watcher row"
     captain_line=$(printf '%s\n' "$pane" | grep -Fn 'CAPTAIN_ANSWER_exact_watcher' | tail -1 | cut -d: -f1)
     handled_line=$(printf '%s\n' "$pane" | grep -Fn 'MONITOR_HANDLED_exact_watcher_ONE' | tail -1 | cut -d: -f1)
@@ -2467,7 +2467,7 @@ const entries = fs.readFileSync(process.argv[2], "utf8").trim().split("\n").map(
 const text = (content) => typeof content === "string"
   ? content
   : (content ?? []).filter((item) => item.type === "text").map((item) => item.text).join("");
-const exact = "\u2063FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: signal: /home/fixture/github/kunchenguid/firstmate/state/oss-triage-t4.status\n\nRun bin/jg-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.";
+const exact = "\u2063JUGGERNAUT_OP: v1 watcher: JUGGERNAUT WATCHER WAKE: signal: /home/fixture/github/kunchenguid/juggernaut/state/oss-triage-t4.status\n\nRun bin/jg-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.";
 const users = entries.filter((entry) => entry.type === "message" && entry.message.role === "user" && text(entry.message.content) === exact);
 const responses = entries.filter((entry) => entry.type === "message" && entry.message.role === "assistant" && text(entry.message.content) === "MONITOR_HANDLED_exact_watcher_ONE");
 if (users.length !== 1 || responses.length !== 1) {
@@ -2528,7 +2528,7 @@ import { appendFileSync, writeFileSync } from "node:fs";
 import { createFauxCore, fauxAssistantMessage, fauxText, fauxToolCall } from "@earendil-works/pi-ai";
 import { InteractiveMode, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { encodeFirstmateOperationalInput } from "./.pi/extensions/lib/jg-operational-input.ts";
+import { encodeJuggernautOperationalInput } from "./.pi/extensions/lib/jg-operational-input.ts";
 
 // The status may disappear on Pi's next repaint; observe the live call without
 // changing its display behavior.
@@ -2588,7 +2588,7 @@ export default function (pi: ExtensionAPI): void {
     parameters: Type.Object({}),
     async execute(_id, _params, signal) {
       await pi.sendUserMessage(
-        encodeFirstmateOperationalInput("watcher", `MONITOR_${label}_ONE`),
+        encodeJuggernautOperationalInput("watcher", `MONITOR_${label}_ONE`),
         { deliverAs: "followUp" },
       );
       writeFileSync(process.env.QUEUED_ESCAPE_HELD as string, label);
@@ -2641,9 +2641,9 @@ TS
     fi
     pane=$(cat "$TMP_ROOT/queued-escape-pane")
     if [ "$calm_state" = on ]; then
-      assert_not_contains "$pane" "MONITOR_${label}_ONE" "Pi Calm listed a queued Firstmate notification"
+      assert_not_contains "$pane" "MONITOR_${label}_ONE" "Pi Calm listed a queued Juggernaut notification"
     else
-      assert_contains "$pane" "Follow-up: ⁣FIRSTMATE_OP: v1 watcher: MONITOR_${label}_ONE" "Pi Calm off changed the stock queued listing"
+      assert_contains "$pane" "Follow-up: ⁣JUGGERNAUT_OP: v1 watcher: MONITOR_${label}_ONE" "Pi Calm off changed the stock queued listing"
     fi
 
     tmux -L "$TMUX_SOCKET" send-keys -t "$TMUX_SESSION" Escape
@@ -2659,11 +2659,11 @@ TS
         || fail "Pi Calm did not deliver the notification kept across Escape"
       pane=$(cat "$TMP_ROOT/queued-escape-pane")
       assert_not_contains "$pane" "MONITOR_${label}_ONE" "Pi Calm exposed a hidden notification after Escape"
-      assert_not_contains "$pane" "FIRSTMATE_OP" "Pi Calm exposed operational text after Escape"
+      assert_not_contains "$pane" "JUGGERNAUT_OP" "Pi Calm exposed operational text after Escape"
       # Pi before 0.87 drains the retained queue in its own aborted-run loop;
       # only newer Pi needs Calm to start and announce a replacement turn.
       if node -e 'const v=process.argv[1].match(/(\d+)\.(\d+)\.(\d+)/); process.exit(v && (+v[1]>0 || +v[2]>87 || (+v[2]===87 && +v[3]>=1)) ? 0 : 1)' "$version"; then
-        grep -Fxq 'Firstmate supervision continues in a new turn.' "$sessions/$label/status.log" \
+        grep -Fxq 'Juggernaut supervision continues in a new turn.' "$sessions/$label/status.log" \
           || fail "Pi Calm restarted a turn without announcing it after Escape"
       fi
       if [ "$captain_queued" = yes ]; then
@@ -2676,7 +2676,7 @@ TS
       sleep 1
       tmux -L "$TMUX_SOCKET" capture-pane -p -t "$TMUX_SESSION" >"$TMP_ROOT/queued-escape-pane"
       pane=$(cat "$TMP_ROOT/queued-escape-pane")
-      assert_contains "$pane" "FIRSTMATE_OP: v1 watcher: MONITOR_${label}_ONE" "Pi Calm off changed stock Escape, which restores every queued message to the editor"
+      assert_contains "$pane" "JUGGERNAUT_OP: v1 watcher: MONITOR_${label}_ONE" "Pi Calm off changed stock Escape, which restores every queued message to the editor"
       session_file=$(find "$sessions/$label" -type f -name '*.jsonl' | head -1)
     fi
 
@@ -2689,7 +2689,7 @@ const text = (content) => typeof content === "string"
   : (content ?? []).filter((item) => item.type === "text").map((item) => item.text).join("\n");
 const users = entries.filter((entry) => entry.type === "message" && entry.message.role === "user").map((entry) => text(entry.message.content));
 const handled = entries.filter((entry) => entry.type === "message" && entry.message.role === "assistant" && text(entry.message.content) === `MONITOR_HANDLED_${label}`);
-const notification = `⁣FIRSTMATE_OP: v1 watcher: MONITOR_${label}_ONE`;
+const notification = `⁣JUGGERNAUT_OP: v1 watcher: MONITOR_${label}_ONE`;
 const expected = calm === "on" ? 1 : 0;
 if (users.filter((value) => value === notification).length !== expected) throw new Error(`notification delivered ${users.filter((value) => value === notification).length} times: ${JSON.stringify(users)}`);
 if (handled.length !== expected) throw new Error(`notification handled ${handled.length} times`);
@@ -2701,7 +2701,7 @@ JS
   run_queued_escape_case on queued_on no
   run_queued_escape_case on queued_mixed yes
   run_queued_escape_case off queued_off no
-  pass "Pi $version with Calm on hides and retains queued Firstmate input through Escape, delivers it once, and leaves Calm off stock"
+  pass "Pi $version with Calm on hides and retains queued Juggernaut input through Escape, delivers it once, and leaves Calm off stock"
 }
 
 test_hidden_block_geometry_e2e() {
@@ -3658,8 +3658,8 @@ const standaloneWidget = {
   render: () => ["standalone boat"],
   dispose: () => { standaloneDisposed = true; },
 };
-const firstmateWidget = {
-  render: () => ["firstmate boat"],
+const juggernautWidget = {
+  render: () => ["juggernaut boat"],
   dispose: () => {},
 };
 // The standalone Pi Calm extension installs its boat in the same Pi working-row
@@ -3676,12 +3676,12 @@ if (process.env.STANDALONE_CALM_SHIP) {
   standaloneSlot = standaloneShip.CALM_WORKING_SHIP_WIDGET_KEY;
 }
 ui.setWidget(standaloneSlot, () => standaloneWidget);
-ui.setWidget(CALM_WORKING_SHIP_WIDGET_KEY, () => firstmateWidget);
+ui.setWidget(CALM_WORKING_SHIP_WIDGET_KEY, () => juggernautWidget);
 const renderedDualInstallWidgets = [...ui.widgets.values()].map((widget) => widget.render(80));
 check(
   standaloneDisposed &&
     renderedDualInstallWidgets.length === 1 &&
-    renderedDualInstallWidgets[0][0] === "firstmate boat",
+    renderedDualInstallWidgets[0][0] === "juggernaut boat",
   `dual Calm install rendered ${renderedDualInstallWidgets.length} working widgets instead of one`,
 );
 ui.setWidget(standaloneSlot, undefined);
@@ -3933,7 +3933,7 @@ check(
     ui.widgets.get(standaloneSlot) === survivingStandaloneWidget &&
     ui.widgetOps.length === 0 &&
     ui.workingVisible.length === 0,
-  "turning Firstmate Calm off cleared or exposed the standalone working ship",
+  "turning Juggernaut Calm off cleared or exposed the standalone working ship",
 );
 ui.setWidget(standaloneSlot, undefined);
 
@@ -4133,7 +4133,7 @@ import {
   createAssistantMessageEventStream,
 } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { encodeFirstmateOperationalInput } from "./lib/jg-operational-input.ts";
+import { encodeJuggernautOperationalInput } from "./lib/jg-operational-input.ts";
 
 export default function (pi: ExtensionAPI): void {
   pi.registerProvider("calm-e2e", {
@@ -4242,17 +4242,17 @@ export default function (pi: ExtensionAPI): void {
         ["watcher", "CURRENT_WATCHER_E2E /tmp/active-probe.status"],
         ["turn-end-guard", "CURRENT_TURN_END_E2E"],
         ["away-supervisor", "CURRENT_AWAY_E2E"],
-        ["from-firstmate", "corr=0123456789abcdef CURRENT_FROM_FIRSTMATE_E2E"],
+        ["from-juggernaut", "corr=0123456789abcdef CURRENT_FROM_JUGGERNAUT_E2E"],
         ["launch-brief", "CURRENT_LAUNCH_BRIEF_E2E"],
       ] as const);
-      const kind = args.trim() as Parameters<typeof encodeFirstmateOperationalInput>[0];
+      const kind = args.trim() as Parameters<typeof encodeJuggernautOperationalInput>[0];
       const body = fixtures.get(kind);
       if (!body) throw new Error(`unknown current operational kind: ${kind}`);
       const model = ctx.modelRegistry.find("calm-e2e", "operational-error");
       if (!model || !(await pi.setModel(model))) {
         throw new Error("could not select the deterministic Calm operational-error model");
       }
-      await pi.sendUserMessage(encodeFirstmateOperationalInput(kind, body), {
+      await pi.sendUserMessage(encodeJuggernautOperationalInput(kind, body), {
         deliverAs: "followUp",
       });
     },
@@ -4292,12 +4292,12 @@ TS
 {"type":"message","id":"a0000006","parentId":"a0000005","timestamp":"$now","message":{"role":"toolResult","toolCallId":"call_find_e2e","toolName":"find","content":[{"type":"text","text":"CALM_EXPORT_FIND.txt"}],"details":{},"isError":false,"timestamp":6}}
 {"type":"message","id":"a0000007","parentId":"a0000006","timestamp":"$now","message":{"role":"assistant","content":[{"type":"thinking","thinking":"third internal reasoning block"},{"type":"toolCall","id":"call_watch_e2e","name":"jg_watch_arm_pi","arguments":{}}],"api":"anthropic-messages","provider":"anthropic","model":"claude-sonnet-4-5","usage":{"input":2,"output":1,"cacheRead":0,"cacheWrite":0,"totalTokens":3,"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0}},"stopReason":"toolUse","timestamp":7}}
 {"type":"message","id":"a0000008","parentId":"a0000007","timestamp":"$now","message":{"role":"toolResult","toolCallId":"call_watch_e2e","toolName":"jg_watch_arm_pi","content":[{"type":"text","text":"watcher: started Pi extension arm child 1"}],"details":{"ok":true,"message":"watcher: started Pi extension arm child 1"},"isError":false,"timestamp":8}}
-{"type":"custom","id":"a0000009","parentId":"a0000008","timestamp":"$now","customType":"firstmate-synthetic-input-presentation","data":{"content":"FIRSTMATE WATCHER WAKE: signal: /tmp/probe.status\\n\\nRun bin/jg-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.","kind":"watcher"}}
-{"type":"custom_message","id":"a0000010","parentId":"a0000009","timestamp":"$now","customType":"firstmate-synthetic-input","content":"FIRSTMATE WATCHER WAKE: signal: /tmp/probe.status\\n\\nRun bin/jg-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.","display":false,"details":{"kind":"watcher"}}
-{"type":"message","id":"a0000011","parentId":"a0000010","timestamp":"$now","message":{"role":"user","content":[{"type":"text","text":"FIRSTMATE WATCHER WAKE: can you explain this phrase?"}],"timestamp":11}}
-{"type":"message","id":"a0000012","parentId":"a0000011","timestamp":"$now","message":{"role":"user","content":[{"type":"text","text":"Captain quote: \u2063FIRSTMATE_OP: v1 watcher: QUOTED_CURRENT_NEAR_MISS"}],"timestamp":12}}
-{"type":"message","id":"a0000013","parentId":"a0000012","timestamp":"$now","message":{"role":"user","content":[{"type":"text","text":"FIRSTMATE_OP: v1 watcher: ASCII_ONLY_NEAR_MISS"}],"timestamp":13}}
-{"type":"message","id":"a0000014","parentId":"a0000013","timestamp":"$now","message":{"role":"user","content":[{"type":"text","text":"Ordinary captain text before \u2063FIRSTMATE_OP: v1 watcher: EMBEDDED_CURRENT_NEAR_MISS"}],"timestamp":14}}
+{"type":"custom","id":"a0000009","parentId":"a0000008","timestamp":"$now","customType":"juggernaut-synthetic-input-presentation","data":{"content":"JUGGERNAUT WATCHER WAKE: signal: /tmp/probe.status\\n\\nRun bin/jg-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.","kind":"watcher"}}
+{"type":"custom_message","id":"a0000010","parentId":"a0000009","timestamp":"$now","customType":"juggernaut-synthetic-input","content":"JUGGERNAUT WATCHER WAKE: signal: /tmp/probe.status\\n\\nRun bin/jg-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.","display":false,"details":{"kind":"watcher"}}
+{"type":"message","id":"a0000011","parentId":"a0000010","timestamp":"$now","message":{"role":"user","content":[{"type":"text","text":"JUGGERNAUT WATCHER WAKE: can you explain this phrase?"}],"timestamp":11}}
+{"type":"message","id":"a0000012","parentId":"a0000011","timestamp":"$now","message":{"role":"user","content":[{"type":"text","text":"Captain quote: \u2063JUGGERNAUT_OP: v1 watcher: QUOTED_CURRENT_NEAR_MISS"}],"timestamp":12}}
+{"type":"message","id":"a0000013","parentId":"a0000012","timestamp":"$now","message":{"role":"user","content":[{"type":"text","text":"JUGGERNAUT_OP: v1 watcher: ASCII_ONLY_NEAR_MISS"}],"timestamp":13}}
+{"type":"message","id":"a0000014","parentId":"a0000013","timestamp":"$now","message":{"role":"user","content":[{"type":"text","text":"Ordinary captain text before \u2063JUGGERNAUT_OP: v1 watcher: EMBEDDED_CURRENT_NEAR_MISS"}],"timestamp":14}}
 {"type":"message","id":"a0000015","parentId":"a0000014","timestamp":"$now","message":{"role":"user","content":[{"type":"text","text":"\u2063ordinary captain text after unrelated separator"}],"timestamp":15}}
 {"type":"message","id":"a0000016","parentId":"a0000015","timestamp":"$now","message":{"role":"assistant","content":[{"type":"text","text":"The deterministic tool example is complete."}],"api":"anthropic-messages","provider":"anthropic","model":"claude-sonnet-4-5","usage":{"input":2,"output":1,"cacheRead":0,"cacheWrite":0,"totalTokens":3,"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0}},"stopReason":"stop","timestamp":16}}
 JSON
@@ -4307,8 +4307,8 @@ JSON
   wait_for_text "$default_snapshot" "The deterministic tool example is complete." \
     || fail "Pi calm E2E did not reach the restored session transcript"
   assert_contains "$(cat "$default_snapshot")" "CALM_E2E_OUTPUT" "calm mode was not off by default"
-  assert_contains "$(cat "$default_snapshot")" "jg_watch_arm_pi" "Calm-off transcript did not show the Firstmate watcher tool"
-  assert_contains "$(cat "$default_snapshot")" "FIRSTMATE WATCHER WAKE: signal: /tmp/probe.status" "Calm-off transcript did not show the synthetic Firstmate presentation row"
+  assert_contains "$(cat "$default_snapshot")" "jg_watch_arm_pi" "Calm-off transcript did not show the Juggernaut watcher tool"
+  assert_contains "$(cat "$default_snapshot")" "JUGGERNAUT WATCHER WAKE: signal: /tmp/probe.status" "Calm-off transcript did not show the synthetic Juggernaut presentation row"
   assert_contains "$(cat "$default_snapshot")" "Thinking..." "reasoning fixture did not render Pi's collapsed thinking label"
   assert_contains "$(cat "$default_snapshot")" "jg-calm.ts" "project-local Pi calm extension did not auto-load"
   # shellcheck disable=SC2016 # Backticks are literal prompt markup.
@@ -4341,7 +4341,7 @@ JSON
     if ! grep -Fq "Thinking..." "$hidden_snapshot" &&
       ! grep -Fq "/calm" "$hidden_snapshot" &&
       ! grep -Fq "I will run one command." "$hidden_snapshot" &&
-      grep -Fq "FIRSTMATE WATCHER WAKE: can you explain this phrase?" "$hidden_snapshot" &&
+      grep -Fq "JUGGERNAUT WATCHER WAKE: can you explain this phrase?" "$hidden_snapshot" &&
       grep -Fq "The deterministic tool example is complete." "$hidden_snapshot"; then
       break
     fi
@@ -4363,12 +4363,12 @@ JSON
   assert_contains "$(cat "$hidden_snapshot")" "CALM_EXPORT_GREP" "a pre-activation grep row unexpectedly hid; the documented bound regressed"
   assert_contains "$(cat "$hidden_snapshot")" "CALM_EXPORT_FIND" "a pre-activation find row unexpectedly hid; the documented bound regressed"
   assert_not_contains "$(cat "$hidden_snapshot")" "Thinking..." "/calm left collapsed thinking labels in the transcript"
-  assert_not_contains "$(cat "$hidden_snapshot")" "jg_watch_arm_pi" "/calm left the Firstmate watcher tool call shell in the transcript"
-  assert_not_contains "$(cat "$hidden_snapshot")" "watcher: started Pi extension arm child" "/calm left the Firstmate watcher tool result in the transcript"
-  assert_not_contains "$(cat "$hidden_snapshot")" "FIRSTMATE WATCHER WAKE: signal: /tmp/probe.status" "/calm left a synthetic Firstmate user-role presentation in the transcript"
+  assert_not_contains "$(cat "$hidden_snapshot")" "jg_watch_arm_pi" "/calm left the Juggernaut watcher tool call shell in the transcript"
+  assert_not_contains "$(cat "$hidden_snapshot")" "watcher: started Pi extension arm child" "/calm left the Juggernaut watcher tool result in the transcript"
+  assert_not_contains "$(cat "$hidden_snapshot")" "JUGGERNAUT WATCHER WAKE: signal: /tmp/probe.status" "/calm left a synthetic Juggernaut user-role presentation in the transcript"
   assert_not_contains "$(cat "$hidden_snapshot")" "Tool activity is hidden where supported" "/calm appended its own command-status row"
   assert_contains "$(cat "$hidden_snapshot")" "Show a deterministic tool example." "/calm removed a genuine user prompt"
-  assert_contains "$(cat "$hidden_snapshot")" "FIRSTMATE WATCHER WAKE: can you explain this phrase?" "/calm hid a genuine near-miss user prompt"
+  assert_contains "$(cat "$hidden_snapshot")" "JUGGERNAUT WATCHER WAKE: can you explain this phrase?" "/calm hid a genuine near-miss user prompt"
   for near_miss in \
     QUOTED_CURRENT_NEAR_MISS \
     ASCII_ONLY_NEAR_MISS \
@@ -4401,7 +4401,7 @@ JSON
     "watcher|CURRENT_WATCHER_E2E" \
     "turn-end-guard|CURRENT_TURN_END_E2E" \
     "away-supervisor|CURRENT_AWAY_E2E" \
-    "from-firstmate|CURRENT_FROM_FIRSTMATE_E2E" \
+    "from-juggernaut|CURRENT_FROM_JUGGERNAUT_E2E" \
     "launch-brief|CURRENT_LAUNCH_BRIEF_E2E"
   do
     kind=${fixture%%|*}
@@ -4424,13 +4424,13 @@ const fs = require("node:fs");
 const entries = fs.readFileSync(process.argv[2], "utf8").trim().split("\n").map(JSON.parse);
 const nativeSessionStart = entries.find((entry) =>
   entry.type === "custom_message" &&
-  entry.customType === "firstmate-sessionstart-nudge"
+  entry.customType === "juggernaut-sessionstart-nudge"
 );
 if (
   !nativeSessionStart ||
   nativeSessionStart.display !== false ||
   nativeSessionStart.details?.kind !== "session-start" ||
-  !nativeSessionStart.content?.startsWith("\u2063FIRSTMATE_OP: v1 session-start: ")
+  !nativeSessionStart.content?.startsWith("\u2063JUGGERNAUT_OP: v1 session-start: ")
 ) {
   throw new Error(`native session-start provenance was not retained: ${JSON.stringify(nativeSessionStart)}`);
 }
@@ -4438,7 +4438,7 @@ const expected = new Map([
   ["CURRENT_WATCHER_E2E", "watcher"],
   ["CURRENT_TURN_END_E2E", "turn-end-guard"],
   ["CURRENT_AWAY_E2E", "away-supervisor"],
-  ["CURRENT_FROM_FIRSTMATE_E2E", "from-firstmate"],
+  ["CURRENT_FROM_JUGGERNAUT_E2E", "from-juggernaut"],
   ["CURRENT_LAUNCH_BRIEF_E2E", "launch-brief"],
 ]);
 const current = entries.filter((entry) =>
@@ -4452,9 +4452,9 @@ if (current.length !== expected.size) {
 for (const [needle, kind] of expected) {
   const entry = current.find((candidate) => JSON.stringify(candidate.message.content).includes(needle));
   const text = entry?.message.content?.find((item) => item.type === "text")?.text;
-  const exactEnvelope = kind === "from-firstmate"
-    ? text?.startsWith("[jg-from-firstmate]\u2063corr=0123456789abcdef ")
-    : text?.startsWith(`\u2063FIRSTMATE_OP: v1 ${kind}: `);
+  const exactEnvelope = kind === "from-juggernaut"
+    ? text?.startsWith("[jg-from-juggernaut]\u2063corr=0123456789abcdef ")
+    : text?.startsWith(`\u2063JUGGERNAUT_OP: v1 ${kind}: `);
   if (!entry || !exactEnvelope) {
     throw new Error(`expected exact user-role ${needle} as ${kind}, found ${JSON.stringify(entry)}`);
   }
@@ -4478,7 +4478,7 @@ JS
     CURRENT_WATCHER_E2E \
     CURRENT_TURN_END_E2E \
     CURRENT_AWAY_E2E \
-    CURRENT_FROM_FIRSTMATE_E2E \
+    CURRENT_FROM_JUGGERNAUT_E2E \
     CURRENT_LAUNCH_BRIEF_E2E
   do
     assert_not_contains "$(cat "$active_hidden_snapshot")" "$hidden" "Calm rendered operational input $hidden"
@@ -4502,8 +4502,8 @@ for (const id of ["call_grep_e2e", "call_find_e2e", "call_watch_e2e"]) {
 }
 const entries = session.session?.entries ?? session.entries ?? [];
 const serialized = JSON.stringify(entries);
-if (!serialized.includes("firstmate-synthetic-input") || !serialized.includes("/tmp/probe.status")) process.exit(1);
-const synthetic = entries.find((entry) => entry.type === "custom_message" && entry.customType === "firstmate-synthetic-input");
+if (!serialized.includes("juggernaut-synthetic-input") || !serialized.includes("/tmp/probe.status")) process.exit(1);
+const synthetic = entries.find((entry) => entry.type === "custom_message" && entry.customType === "juggernaut-synthetic-input");
 if (!synthetic || synthetic.display) process.exit(1);
 JS
   chrome=$(find_chrome) \
@@ -4574,13 +4574,13 @@ const visible = stripHiddenHookMessages(messages);
 if (visible.includes('<div class="hook-message"') || visible.includes("hook-message")) {
   throw new Error("a visible hook message leaked into the conversation column");
 }
-if (visible.includes("[firstmate-synthetic-input]") || visible.includes("/tmp/probe.status")) {
-  throw new Error("a synthetic Firstmate row is visible in the conversation column");
+if (visible.includes("[juggernaut-synthetic-input]") || visible.includes("/tmp/probe.status")) {
+  throw new Error("a synthetic Juggernaut row is visible in the conversation column");
 }
-for (const current of ["CURRENT_WATCHER_E2E", "CURRENT_TURN_END_E2E", "CURRENT_AWAY_E2E", "CURRENT_FROM_FIRSTMATE_E2E", "CURRENT_LAUNCH_BRIEF_E2E"]) {
+for (const current of ["CURRENT_WATCHER_E2E", "CURRENT_TURN_END_E2E", "CURRENT_AWAY_E2E", "CURRENT_FROM_JUGGERNAUT_E2E", "CURRENT_LAUNCH_BRIEF_E2E"]) {
   if (!visible.includes(current)) throw new Error(`operational input ${current} is missing from the conversation column`);
 }
-if (!tree.includes("firstmate-synthetic-input") || !tree.includes("/tmp/probe.status")) {
+if (!tree.includes("juggernaut-synthetic-input") || !tree.includes("/tmp/probe.status")) {
   throw new Error("the session tree lost the synthetic row");
 }
 JS
@@ -4593,11 +4593,11 @@ JS
   assert_contains "$(cat "$export_settled_snapshot")" "Session exported to: $export_file" \
     "Calm's post-export repaint overwrote Pi's export confirmation"
   assert_not_contains "$(cat "$export_settled_snapshot")" "jg_watch_arm_pi" \
-    "/export left the Firstmate watcher tool call shell in the Calm transcript"
+    "/export left the Juggernaut watcher tool call shell in the Calm transcript"
   assert_not_contains "$(cat "$export_settled_snapshot")" "watcher: started Pi extension arm child" \
-    "/export left the Firstmate watcher tool result in the Calm transcript"
-  assert_not_contains "$(cat "$export_settled_snapshot")" "FIRSTMATE WATCHER WAKE: signal: /tmp/probe.status" \
-    "/export left a synthetic Firstmate user-role presentation in the Calm transcript"
+    "/export left the Juggernaut watcher tool result in the Calm transcript"
+  assert_not_contains "$(cat "$export_settled_snapshot")" "JUGGERNAUT WATCHER WAKE: signal: /tmp/probe.status" \
+    "/export left a synthetic Juggernaut user-role presentation in the Calm transcript"
   assert_not_contains "$(cat "$export_settled_snapshot")" "Thinking..." \
     "/export left collapsed thinking labels in the Calm transcript"
   assert_not_contains "$(cat "$export_settled_snapshot")" "I will run one command." \
@@ -4606,7 +4606,7 @@ JS
     CURRENT_WATCHER_E2E \
     CURRENT_TURN_END_E2E \
     CURRENT_AWAY_E2E \
-    CURRENT_FROM_FIRSTMATE_E2E \
+    CURRENT_FROM_JUGGERNAUT_E2E \
     CURRENT_LAUNCH_BRIEF_E2E
   do
     assert_not_contains "$(cat "$export_settled_snapshot")" "$hidden" \
@@ -4623,13 +4623,13 @@ JS
     || fail "second /calm did not restore tool result output"
   wait_for_text "$restored_snapshot" "/tmp/active-probe.status" \
     || fail "second /calm did not restore a synthetic row received while Calm was active"
-  assert_contains "$(cat "$restored_snapshot")" "jg_watch_arm_pi" "second /calm did not restore the Firstmate watcher tool shell"
-  assert_contains "$(cat "$restored_snapshot")" "FIRSTMATE WATCHER WAKE: signal: /tmp/probe.status" "second /calm did not restore the synthetic Firstmate user row"
+  assert_contains "$(cat "$restored_snapshot")" "jg_watch_arm_pi" "second /calm did not restore the Juggernaut watcher tool shell"
+  assert_contains "$(cat "$restored_snapshot")" "JUGGERNAUT WATCHER WAKE: signal: /tmp/probe.status" "second /calm did not restore the synthetic Juggernaut user row"
   for restored in \
     CURRENT_WATCHER_E2E \
     CURRENT_TURN_END_E2E \
     CURRENT_AWAY_E2E \
-    CURRENT_FROM_FIRSTMATE_E2E \
+    CURRENT_FROM_JUGGERNAUT_E2E \
     CURRENT_LAUNCH_BRIEF_E2E
   do
     assert_contains "$(cat "$restored_snapshot")" "$restored" "second /calm did not restore current operational kind $restored"
@@ -4678,7 +4678,7 @@ JS
   assert_contains "$(cat "$boat_frame_one")" '◿│◣' "the working ship lost its centered asymmetric sail"
   assert_not_contains "$(cat "$boat_frame_one")" "Working" "Calm left Pi's stock working row visible while the ship was shown"
   assert_not_contains "$(cat "$boat_frame_one")" "calm transcript" "the real provider wait showed a persistent Calm status row"
-  assert_not_contains "$(cat "$boat_frame_one")" "FIRSTMATE WATCHER WAKE: signal: /tmp/probe.status" "the real provider wait restored a hidden operational row"
+  assert_not_contains "$(cat "$boat_frame_one")" "JUGGERNAUT WATCHER WAKE: signal: /tmp/probe.status" "the real provider wait restored a hidden operational row"
   boat_hull_line=$(grep -F '╲▁▁▁╱' "$boat_frame_one" | head -1)
   boat_hull_column=$(awk 'index($0,"╲▁▁▁╱"){print index($0,"╲▁▁▁╱"); exit}' "$boat_frame_one")
   boat_sail_column=$(awk 'index($0,"◿│◣"){print index($0,"◿│◣"); exit}' "$boat_frame_one")
@@ -4980,13 +4980,13 @@ JS
   wait_for_text "$restarted_snapshot" "CALM_WORKING_E2E_RESPONSE" \
     || fail "Pi did not restore the persisted session after restart"
   assert_not_contains "$(cat "$restarted_snapshot")" "CALM_E2E_OUTPUT" "restart/resume reset Calm and restored a tool row"
-  assert_not_contains "$(cat "$restarted_snapshot")" "jg_watch_arm_pi" "restart/resume reset Calm and restored the Firstmate watcher tool"
-  assert_not_contains "$(cat "$restarted_snapshot")" "FIRSTMATE WATCHER WAKE: signal: /tmp/probe.status" "restart/resume reset Calm and restored a legacy presentation row"
+  assert_not_contains "$(cat "$restarted_snapshot")" "jg_watch_arm_pi" "restart/resume reset Calm and restored the Juggernaut watcher tool"
+  assert_not_contains "$(cat "$restarted_snapshot")" "JUGGERNAUT WATCHER WAKE: signal: /tmp/probe.status" "restart/resume reset Calm and restored a legacy presentation row"
   for hidden in \
     CURRENT_WATCHER_E2E \
     CURRENT_TURN_END_E2E \
     CURRENT_AWAY_E2E \
-    CURRENT_FROM_FIRSTMATE_E2E \
+    CURRENT_FROM_JUGGERNAUT_E2E \
     CURRENT_LAUNCH_BRIEF_E2E
   do
     assert_not_contains "$(cat "$restarted_snapshot")" "$hidden" "restart/resume rendered operational input $hidden"

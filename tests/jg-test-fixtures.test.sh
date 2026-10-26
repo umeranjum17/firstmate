@@ -108,7 +108,7 @@ SH
   # which layers that helper neutralizes is the helper's own property, settled
   # by the system-layer case below.
   arm_host_signing global
-  for helper in lib fixtures secondmate-helpers wake-helpers; do
+  for helper in lib fixtures squad-lead-helpers wake-helpers; do
     assert_helper_isolates "$helper" global
   done
   bash -eus -- "$ROOT/tests/herdr-test-safety.sh" "$dir/global-herdr" <<'SH' || exit 1
@@ -235,7 +235,7 @@ test_spawn_tmux_and_fakebin() {
   out=$(unset JG_FAKE_PANE_PATH; "$fakebin/tmux" display-message -p '#{pane_current_path}')
   [ -z "$out" ] || fail "spawn tmux pane path should default to empty, got '$out'"
   out=$("$fakebin/tmux" display-message -p '#S')
-  [ "$out" = firstmate ] || fail "spawn tmux session name should be firstmate, got '$out'"
+  [ "$out" = juggernaut ] || fail "spawn tmux session name should be juggernaut, got '$out'"
   JG_FAKE_LAUNCH_LOG="$log" "$fakebin/tmux" send-keys -t @w -l 'codex --yolo'
   assert_grep 'codex --yolo' "$log" "send-keys -l payload was not logged"
   [ -x "$fakebin/treehouse" ] || fail "spawn fakebin should include treehouse"

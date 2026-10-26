@@ -1,10 +1,10 @@
-// Firstmate primary watcher bridge for omp (Oh My Pi).
+// Juggernaut primary watcher bridge for omp (Oh My Pi).
 //
 // A port of .pi/extensions/jg-primary-pi-watch.ts for the omp fork. The arm,
 // successor, retry, and replacement-handoff logic follows the Pi contract;
 // the omp-specific differences are stated once here:
 //   - omp auto-discovers this file from <cwd>/.omp/extensions with no trust
-//     gate, so an omp primary or secondmate started inside its home loads it
+//     gate, so an omp primary or squad_lead started inside its home loads it
 //     without -e (naming it both ways loads it twice - verified, omp 18.1.11).
 //   - pi.sendUserMessage returns synchronously (no promise) in omp, so "Pi
 //     accepted the follow-up" collapses to "the call returned"; consumption is
@@ -68,7 +68,7 @@ import { Type } from "typebox";
 // The operational-input encoder is shared with the omp extensions; its owner
 // resolves bin/jg-operational-input.sh relative to its own location, which is
 // the same repository root this file lives in.
-import { encodeFirstmateOperationalInput } from "../../.pi/extensions/lib/jg-operational-input.ts";
+import { encodeJuggernautOperationalInput } from "../../.pi/extensions/lib/jg-operational-input.ts";
 import { runCommandAsync } from "../../.pi/extensions/lib/jg-async-exec.ts";
 // jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves here
 for (const [_jgOld, _jgVal] of Object.entries(process.env))
@@ -186,10 +186,10 @@ type ReplacementCoordinator = {
   deliveries: Map<string, ActionableDeliveryClaim>;
 };
 type ReplacementCoordinatorGlobal = typeof globalThis & {
-  __firstmateOmpWatchReplacements?: Map<string, ReplacementCoordinator>;
+  __juggernautOmpWatchReplacements?: Map<string, ReplacementCoordinator>;
 };
 const replacementCoordinatorGlobal = globalThis as ReplacementCoordinatorGlobal;
-const replacementCoordinators = replacementCoordinatorGlobal.__firstmateOmpWatchReplacements ??= new Map<string, ReplacementCoordinator>();
+const replacementCoordinators = replacementCoordinatorGlobal.__juggernautOmpWatchReplacements ??= new Map<string, ReplacementCoordinator>();
 function replacementCoordinatorFor(handoff: string): ReplacementCoordinator {
   const existing = replacementCoordinators.get(handoff);
   if (existing) return existing;
@@ -574,9 +574,9 @@ export default function (pi: ExtensionAPI) {
     pending?: PendingActionableClose,
   ): Promise<boolean> {
     if (!generationIsLive(owner)) return false;
-    const content = encodeFirstmateOperationalInput(
+    const content = encodeJuggernautOperationalInput(
       "watcher",
-      `FIRSTMATE WATCHER WAKE: ${message}\n\nRun bin/jg-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.`,
+      `JUGGERNAUT WATCHER WAKE: ${message}\n\nRun bin/jg-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.`,
     );
     if (pending) owner.unconsumedWakes.set(pending.token, { content, pending });
     try {
@@ -946,7 +946,7 @@ export default function (pi: ExtensionAPI) {
   function startArm(owner: SessionGeneration, predecessorArmPid = ""): ArmResult {
     if (!generationIsLive(owner)) return { ok: false, message: shuttingDownMessage };
     const ownership = lockOwnership();
-    if (ownership === "other") return { ok: false, message: "watcher: read-only - session lock is held by another firstmate session" };
+    if (ownership === "other") return { ok: false, message: "watcher: read-only - session lock is held by another juggernaut session" };
     if (ownership === "missing") {
       return {
         ok: false,
@@ -1131,7 +1131,7 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.registerCommand?.("jg-watch-arm-omp", {
-    description: "Arm firstmate watcher supervision through the omp extension instead of foreground bash.",
+    description: "Arm juggernaut watcher supervision through the omp extension instead of foreground bash.",
     handler: async (_args, ctx) => {
       const result = activateOwnedWatch(generation);
       ctx?.ui?.notify?.(result.message, result.ok ? "info" : "warning");
@@ -1140,7 +1140,7 @@ export default function (pi: ExtensionAPI) {
 
   pi.registerTool?.({
     name: "jg_watch_arm_omp",
-    label: "Arm firstmate watcher",
+    label: "Arm juggernaut watcher",
     description: "Start the first required omp watcher cycle, or repair one only after a notification says the cycle is missing, failed, or unhealthy. Do not call after ordinary work or ordinary notifications; the omp extension re-arms automatically. Never run bin/jg-watch-arm.sh through bash.",
     promptSnippet: "Start the first required omp watcher cycle or repair a cycle reported missing, failed, or unhealthy; ordinary re-arming is automatic.",
     promptGuidelines: [

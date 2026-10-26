@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Tests for the local-HEAD secondmate sync: every secondmate home tracks the
-# PRIMARY firstmate checkout's current default-branch commit by a purely LOCAL
+# Tests for the local-HEAD squad_lead sync: every squad_lead home tracks the
+# PRIMARY juggernaut checkout's current default-branch commit by a purely LOCAL
 # fast-forward (no origin fetch). Two hook points drive it - bin/jg-spawn.sh
-# (before launching a secondmate) and bin/jg-bootstrap.sh (a startup sweep of
-# every live secondmate home) - and both share the ff machinery in
+# (before launching a squad_lead) and bin/jg-bootstrap.sh (a startup sweep of
+# every live squad_lead home) - and both share the ff machinery in
 # bin/jg-ff-lib.sh.
 #
 # The guarantees under test:
@@ -17,22 +17,22 @@
 #     today's skip and is never removed.
 #     lsof's non-fatal filesystem warnings (docker overlayfs/nsfs stat warnings)
 #     still prove "no holder" while a real lsof error stays cannot-tell, and the
-#     running second mate holding its own home as cwd never vetoes the proof -
+#     running squad lead holding its own home as cwd never vetoes the proof -
 #     only a live holder of the lock file itself does.
 #   - No origin fetch happens in the local-HEAD sync path.
-#   - The bootstrap sweep fast-forwards every live secondmate home and sends a
-#     reread nudge ONLY for a running secondmate whose instruction surface
+#   - The bootstrap sweep fast-forwards every live squad_lead home and sends a
+#     reread nudge ONLY for a running squad_lead whose instruction surface
 #     actually changed; a successful send is reported as BOOTSTRAP_INFO:, a
-#     failed send is reported as NUDGE_SECONDMATES:, an already-current or
+#     failed send is reported as NUDGE_SQUAD_LEADS:, an already-current or
 #     readme-only home is never nudged, a skipped home is reported as
-#     SECONDMATE_SYNC:, and a home with no live metadata is never swept.
-#   - Spawning a secondmate fast-forwards its worktree to the primary's HEAD
+#     SQUAD_LEAD_SYNC:, and a home with no live metadata is never swept.
+#   - Spawning a squad_lead fast-forwards its worktree to the primary's HEAD
 #     before launch, or warns and launches unchanged when the sync is skipped.
-#   - A REMOTE secondmate home follows that same primary commit rather than the
-#     Firstmate copy on its own host: the parent resolves the commit and the host
+#   - A REMOTE squad_lead home follows that same primary commit rather than the
+#     Juggernaut copy on its own host: the parent resolves the commit and the host
 #     imports it (from the home, that copy, or the home's origin) before running
 #     the same ff guards, skipping with an actionable reason when it cannot. The
-#     host's own copy is never moved, /updatefirstmate's code-root-relative sync
+#     host's own copy is never moved, /updatejuggernaut's code-root-relative sync
 #     is unchanged, and a launch never re-targets that copy.
 set -u
 
@@ -54,13 +54,13 @@ REAL_LSOF_FOR_TEST=$(command -v lsof)
 # Deterministic, isolated git identity for fixture commits.
 jg_git_identity fmtest fmtest@example.com
 
-TMP_ROOT=$(jg_test_tmproot jg-secondmate-sync)
+TMP_ROOT=$(jg_test_tmproot jg-squad-lead-sync)
 mkdir -p "$TMP_ROOT/no-addons"
 export JG_BACKEND=tmux
 
 # --- world builders --------------------------------------------------------
 
-# new_world <name>: a PRIMARY firstmate repo on `main` with one commit (the
+# new_world <name>: a PRIMARY juggernaut repo on `main` with one commit (the
 # instruction surface seeded) and a home dir with state/ and data/. NO origin
 # remote: the local-HEAD sync never needs one. Echoes the world dir.
 new_world() {
@@ -72,7 +72,7 @@ new_world() {
 
   git init -q -b main "$w/main"
   # Mirror the real repo: the gitignored operational dirs never dirty a worktree,
-  # so a secondmate home's data/state/projects can never block its fast-forward.
+  # so a squad_lead home's data/state/projects can never block its fast-forward.
   printf 'projects/\nstate/\ndata/\n.no-mistakes/\nconfig/crew-harness\nscratchpad*\n' > "$w/main/.gitignore"
   printf 'v1\n' > "$w/main/AGENTS.md"
   printf 'r1\n' > "$w/main/README.md"
@@ -84,16 +84,16 @@ new_world() {
   printf '%s\n' "$w"
 }
 
-# add_sm_worktree <w> <id> <commit>: a secondmate home as a DETACHED worktree of
-# the primary at <commit>, plus its seed marker and a LIVE kind=secondmate meta
+# add_sm_worktree <w> <id> <commit>: a squad_lead home as a DETACHED worktree of
+# the primary at <commit>, plus its seed marker and a LIVE kind=squad_lead meta
 # (a window= makes it a running direct report).
 add_sm_worktree() {
   local w=$1 id=$2 commit=$3
   git -C "$w/main" worktree add -q --detach "$w/$id" "$commit"
-  printf '%s\n' "$id" > "$w/$id/.jg-secondmate-home"
+  printf '%s\n' "$id" > "$w/$id/.jg-squad-lead-home"
   {
-    printf 'window=firstmate:jg-%s\n' "$id"
-    printf 'kind=secondmate\n'
+    printf 'window=juggernaut:jg-%s\n' "$id"
+    printf 'kind=squad_lead\n'
     printf 'harness=codex\n'
     printf 'home=%s/%s\n' "$w" "$id"
   } > "$w/home/state/$id.meta"
@@ -120,20 +120,20 @@ bump_primary() {
 head_of() { git -C "$1" rev-parse HEAD; }
 
 # ignore_marker_commit <w>: land THE FIX in the primary - add the seed marker to
-# the tracked .gitignore and commit it on main. The marker (.jg-secondmate-home)
-# is firstmate-generic, written by bin/jg-home-seed.sh into every seeded home; once
+# the tracked .gitignore and commit it on main. The marker (.jg-squad-lead-home)
+# is juggernaut-generic, written by bin/jg-home-seed.sh into every seeded home; once
 # a home fast-forwards past this commit the marker is git-ignored and can no longer
 # read as a dirty working tree to any `git status --porcelain` dirtiness check.
 ignore_marker_commit() {
   local w=$1
-  printf '.jg-secondmate-home\n' >> "$w/main/.gitignore"
+  printf '.jg-squad-lead-home\n' >> "$w/main/.gitignore"
   git -C "$w/main" add -A
   git -C "$w/main" commit -qm "gitignore seed marker"
 }
 
-# seed_marked_home <w> <id> <commit>: a secondmate home matching what
+# seed_marked_home <w> <id> <commit>: a squad_lead home matching what
 # bin/jg-home-seed.sh actually lays down - a detached worktree at <commit>, the
-# seed marker, a live kind=secondmate meta, and the gitignored operational dirs
+# seed marker, a live kind=squad_lead meta, and the gitignored operational dirs
 # with a charter. The ONLY unignored extra file is the seed marker, which is
 # exactly what this fix must keep from dirtying the home.
 seed_marked_home() {
@@ -145,12 +145,12 @@ seed_marked_home() {
 
 # run_ff <dir> <base>: drive the shared ff helper in THIS shell (output to a file,
 # not a subshell, so FF_STATUS / FF_INSTR propagate). Sets FF_OUT to the printed
-# status line. Uses allow_detached=yes, ignore_seed_marker=yes (the secondmate
+# status line. Uses allow_detached=yes, ignore_seed_marker=yes (the squad_lead
 # home contract).
 FF_OUT=""
 run_ff() {
   local dir=$1 base=$2 outfile="$TMP_ROOT/ff.out"
-  ff_target "$dir" "secondmate sm" "$base" yes yes >"$outfile" 2>&1
+  ff_target "$dir" "squad_lead sm" "$base" yes yes >"$outfile" 2>&1
   FF_OUT=$(cat "$outfile")
 }
 
@@ -166,7 +166,7 @@ test_ff_updated() {
   run_ff "$w/sm" "$base"
 
   [ "$FF_STATUS" = updated ] || fail "FF_STATUS: expected updated, got '$FF_STATUS'"
-  assert_contains "$FF_OUT" "secondmate sm: updated " "updated home prints an advance line"
+  assert_contains "$FF_OUT" "squad_lead sm: updated " "updated home prints an advance line"
   assert_contains "$FF_INSTR" "AGENTS.md" "instruction change is recorded in FF_INSTR"
   [ "$(head_of "$w/sm")" = "$base" ] || fail "home did not advance to the primary's local HEAD"
   git -C "$w/sm" symbolic-ref -q HEAD >/dev/null && fail "home is no longer detached"
@@ -187,7 +187,7 @@ test_ff_current() {
   run_ff "$w/sm" "$base"
 
   [ "$FF_STATUS" = current ] || fail "FF_STATUS: expected current, got '$FF_STATUS'"
-  assert_contains "$FF_OUT" "secondmate sm: already current" "current home reports already current"
+  assert_contains "$FF_OUT" "squad_lead sm: already current" "current home reports already current"
   [ -z "$FF_INSTR" ] || fail "a no-op must not report instruction changes (would trigger a nudge)"
   [ "$(head_of "$w/sm")" = "$base" ] || fail "current home HEAD moved"
   pass "T2 current: an already-current home is a no-op and reports no instruction change"
@@ -207,7 +207,7 @@ test_ff_dirty() {
   run_ff "$w/sm" "$base"
 
   [ "$FF_STATUS" = skipped ] || fail "FF_STATUS: expected skipped, got '$FF_STATUS'"
-  assert_contains "$FF_OUT" "secondmate sm: skipped: dirty working tree" "dirty home is skipped"
+  assert_contains "$FF_OUT" "squad_lead sm: skipped: dirty working tree" "dirty home is skipped"
   [ "$(head_of "$w/sm")" = "$before" ] || fail "dirty home HEAD moved"
   grep -q 'uncommitted local edit' "$w/sm/AGENTS.md" || fail "dirty edit was discarded"
   pass "T3 dirty: an uncommitted home is skipped, its edit preserved"
@@ -229,7 +229,7 @@ test_scratchpad2_does_not_dirty_home() {
   [ "$FF_STATUS" = updated ] || fail "FF_STATUS: expected updated, got '$FF_STATUS' (scratchpad2/ must not dirty the home)"
   [ "$(head_of "$w/sm")" = "$base" ] || fail "home did not fast-forward past an ignored scratchpad2/ directory"
   grep -q notes "$w/sm/scratchpad2/notes.txt" || fail "scratchpad2 contents were discarded"
-  pass "scratchpad2/ does not mark a secondmate home dirty for the sync guard"
+  pass "scratchpad2/ does not mark a squad_lead home dirty for the sync guard"
 }
 
 # --- T4: diverged - a home with its own commit is skipped, commit preserved --
@@ -248,13 +248,13 @@ test_ff_diverged() {
   run_ff "$w/sm" "$base"
 
   [ "$FF_STATUS" = skipped ] || fail "FF_STATUS: expected skipped, got '$FF_STATUS'"
-  assert_contains "$FF_OUT" "secondmate sm: skipped: diverged from $base" "diverged home is skipped"
+  assert_contains "$FF_OUT" "squad_lead sm: skipped: diverged from $base" "diverged home is skipped"
   [ "$(head_of "$w/sm")" = "$before" ] || fail "diverged home HEAD moved (unlanded work at risk)"
   pass "T4 diverged: a home that is not an ancestor of the primary's HEAD is skipped"
 }
 
 # --- T5: in-flight - a home on a feature branch is skipped, work preserved ----
-# A secondmate home carrying its own in-flight work sits on a named feature
+# A squad_lead home carrying its own in-flight work sits on a named feature
 # branch, not a detached default-branch HEAD; the ff helper refuses to move it.
 test_ff_inflight_feature_branch() {
   local w c1 base before
@@ -271,7 +271,7 @@ test_ff_inflight_feature_branch() {
   run_ff "$w/sm" "$base"
 
   [ "$FF_STATUS" = skipped ] || fail "FF_STATUS: expected skipped, got '$FF_STATUS'"
-  assert_contains "$FF_OUT" "secondmate sm: skipped: on feature/wip, expected main" \
+  assert_contains "$FF_OUT" "squad_lead sm: skipped: on feature/wip, expected main" \
     "a home on a feature branch is skipped"
   [ "$(head_of "$w/sm")" = "$before" ] || fail "in-flight home HEAD moved (work at risk)"
   pass "T5 in-flight: a home on a feature branch is skipped, its work preserved"
@@ -279,7 +279,7 @@ test_ff_inflight_feature_branch() {
 
 # --- stale index.lock: an orphaned lock no longer blocks the sync forever -----
 # The regression: a killed git process leaves a 0-byte index.lock in the
-# secondmate home's worktree git dir, and every sync then skips forever with
+# squad_lead home's worktree git dir, and every sync then skips forever with
 # "fast-forward failed: error: Unable to create ...index.lock: File exists."
 # A fast-forward that fails on exactly that signature gets ONE recovery attempt
 # through jg-lock-lib.sh's staleness proof: a provably-stale lock is removed and
@@ -339,7 +339,7 @@ test_ff_stale_index_lock_recovery() {
 
   [ "$FF_STATUS" = updated ] || fail "FF_STATUS: expected updated after stale-lock recovery, got '$FF_STATUS' (out: $FF_OUT)"
   assert_contains "$FF_OUT" "removed provably-stale git lock" "stale lock: recovery diagnostic missing"
-  assert_contains "$FF_OUT" "secondmate sm: updated " "stale lock: home did not report its advance after recovery"
+  assert_contains "$FF_OUT" "squad_lead sm: updated " "stale lock: home did not report its advance after recovery"
   [ "$(head_of "$w/sm")" = "$base" ] || fail "home did not advance after the stale index.lock was cleared"
   assert_absent "$lock" "stale lock: the proven-stale index.lock must be removed"
 
@@ -354,7 +354,7 @@ test_ff_stale_index_lock_recovery() {
   PATH="$fakebin:$PATH" JG_FF_STALE_INDEX_LOCK_AGE_SECS=0 run_ff "$w/sm2" "$base"
 
   [ "$FF_STATUS" = skipped ] || fail "FF_STATUS: expected skipped for a live lock, got '$FF_STATUS' (out: $FF_OUT)"
-  assert_contains "$FF_OUT" "secondmate sm: skipped: fast-forward failed: error: Unable to create" \
+  assert_contains "$FF_OUT" "squad_lead sm: skipped: fast-forward failed: error: Unable to create" \
     "live lock: today's skip line must stand"
   assert_contains "$FF_OUT" "not provably stale" "live lock: refusal diagnostic missing"
   assert_present "$lock2" "live lock: the index.lock must never be removed"
@@ -402,7 +402,7 @@ test_ff_stale_index_lock_tolerates_lsof_warnings() {
 }
 
 # The companion-dir regression: the proof used to pass the home itself as the
-# companion liveness directory, and the running second mate always holds its own
+# companion liveness directory, and the running squad lead always holds its own
 # home as cwd, so the proof could never pass. The lock-file holder plus mtime age
 # must decide: a cwd holder of the home never vetoes recovery, while a live
 # process holding the lock file itself always does. Uses the REAL lsof so the
@@ -420,7 +420,7 @@ test_ff_stale_index_lock_ignores_home_cwd_holder() {
   base=$(primary_head_commit "$w/main")
   lock=$(git -C "$w/sm" rev-parse --git-path index.lock)
   : > "$lock"
-  # A process with its cwd in the home - the running second mate's shape.
+  # A process with its cwd in the home - the running squad lead's shape.
   ( cd "$w/sm" && exec sleep 30 ) & holder=$!
 
   JG_FF_STALE_INDEX_LOCK_AGE_SECS=0 run_ff "$w/sm" "$base"
@@ -493,7 +493,7 @@ test_sweep_nudge_requires_instruction_change() {
   JG_ROOT="$w/main" JG_HOME="$w/home"
   FF_NUDGE_WINDOWS=""
   FF_SEEN_HOMES=""
-  sweep_live_secondmate_metas "$w/home/state" "$base" yes >/dev/null
+  sweep_live_squad_lead_metas "$w/home/state" "$base" yes >/dev/null
 
   [ -z "$FF_NUDGE_WINDOWS" ] \
     || fail "readme-only advance must not nudge, got: '$FF_NUDGE_WINDOWS'"
@@ -607,7 +607,7 @@ test_bootstrap_sweep_nudges_only_instruction_change() {
   add_sm_worktree "$w" sm-current "$c3"      # already on the primary's HEAD
   # A home with NO live meta must never be swept (live = a running direct report).
   git -C "$w/main" worktree add -q --detach "$w/sm-nonlive" "$c1"
-  printf 'sm-nonlive\n' > "$w/sm-nonlive/.jg-secondmate-home"
+  printf 'sm-nonlive\n' > "$w/sm-nonlive/.jg-squad-lead-home"
 
   fakebin=$(make_fake_toolchain "$w")
   log="$w/tmux.log"
@@ -617,20 +617,20 @@ test_bootstrap_sweep_nudges_only_instruction_change() {
 
   info_line=$(printf '%s\n' "$out" | grep '^BOOTSTRAP_INFO: nudged jg-sm-instr ' || true)
   [ -n "$info_line" ] || fail "no BOOTSTRAP_INFO nudge line emitted (got: $out)"
-  assert_contains "$info_line" "firstmate was updated to the latest - please re-read your AGENTS.md to pick up the new instructions." \
+  assert_contains "$info_line" "juggernaut was updated to the latest - please re-read your AGENTS.md to pick up the new instructions." \
     "successful nudge report should include the exact message sent"
-  assert_not_contains "$out" "NUDGE_SECONDMATES:" "successful nudge must not leave a firstmate action item"
+  assert_not_contains "$out" "NUDGE_SQUAD_LEADS:" "successful nudge must not leave a juggernaut action item"
   assert_not_contains "$out" "sm-readme" "readme-only advance is not nudged"
-  assert_not_contains "$out" "sm-current" "already-current secondmate is not nudged"
+  assert_not_contains "$out" "sm-current" "already-current squad_lead is not nudged"
   # The nudge rides jg-send's durable inbox plane: the marked message lands in
-  # the secondmate task's steering-inbox record while only the doorbell is typed.
-  assert_contains "$(cat "$w/home/state/sm-instr.inbox/001.msg")" "[jg-from-firstmate]" \
-    "nudge send should use the marked jg-send secondmate path"
-  assert_contains "$(cat "$w/home/state/sm-instr.inbox/001.msg")" "firstmate was updated to the latest - please re-read your AGENTS.md" \
+  # the squad_lead task's steering-inbox record while only the doorbell is typed.
+  assert_contains "$(cat "$w/home/state/sm-instr.inbox/001.msg")" "[jg-from-juggernaut]" \
+    "nudge send should use the marked jg-send squad_lead path"
+  assert_contains "$(cat "$w/home/state/sm-instr.inbox/001.msg")" "juggernaut was updated to the latest - please re-read your AGENTS.md" \
     "nudge send should enqueue the exact re-read message"
-  assert_contains "$(cat "$log")" "Firstmate instruction waiting" \
-    "nudge send should ring the doorbell at the secondmate pane"
-  marker_dir="$w/home/state/.secondmate-nudge-pending"
+  assert_contains "$(cat "$log")" "Juggernaut instruction waiting" \
+    "nudge send should ring the doorbell at the squad_lead pane"
+  marker_dir="$w/home/state/.squad-lead-nudge-pending"
   [ ! -e "$marker_dir/sm-instr.pending" ] || fail "successful nudge should clear its retry marker"
 
   # Every live home advanced to the primary's HEAD; the already-current one stayed.
@@ -661,11 +661,11 @@ test_bootstrap_nudge_send_uses_state_override() {
 
   assert_contains "$out" "BOOTSTRAP_INFO: nudged jg-sm-instr with" \
     "nudge send should resolve jg-sm-instr through the effective state dir"
-  assert_not_contains "$out" "NUDGE_SECONDMATES:" \
+  assert_not_contains "$out" "NUDGE_SQUAD_LEADS:" \
     "effective-state nudge should not fail through JG_HOME/state"
-  assert_contains "$(cat "$override_state/sm-instr.inbox/001.msg")" "[jg-from-firstmate]" \
-    "effective-state nudge should still use secondmate marker metadata"
-  marker="$override_state/.secondmate-nudge-pending/sm-instr.pending"
+  assert_contains "$(cat "$override_state/sm-instr.inbox/001.msg")" "[jg-from-juggernaut]" \
+    "effective-state nudge should still use squad_lead marker metadata"
+  marker="$override_state/.squad-lead-nudge-pending/sm-instr.pending"
   assert_absent "$marker" "successful effective-state nudge should clear its retry marker"
   pass "T8a bootstrap nudge send respects JG_STATE_OVERRIDE"
 }
@@ -676,20 +676,20 @@ test_bootstrap_nudge_retry_rejects_malformed_marker_id() {
   c1=$(head_of "$w/main")
   evil="$w/evil"
   git -C "$w/main" worktree add -q --detach "$evil" "$c1"
-  printf '../escape\n' > "$evil/.jg-secondmate-home"
-  mkdir -p "$w/home/state/.secondmate-nudge-pending"
-  marker="$w/home/state/.secondmate-nudge-pending/bad.pending"
+  printf '../escape\n' > "$evil/.jg-squad-lead-home"
+  mkdir -p "$w/home/state/.squad-lead-nudge-pending"
+  marker="$w/home/state/.squad-lead-nudge-pending/bad.pending"
   {
     printf 'id=../escape\n'
     printf 'selector=jg-../escape\n'
     printf 'home=%s\n' "$evil"
     printf 'commit=%s\n' "$c1"
     printf 'instructions=AGENTS.md\n'
-    printf 'message=firstmate was updated to the latest - please re-read your AGENTS.md to pick up the new instructions.\n'
+    printf 'message=juggernaut was updated to the latest - please re-read your AGENTS.md to pick up the new instructions.\n'
   } > "$marker"
   {
-    printf 'window=firstmate:jg-evil\n'
-    printf 'kind=secondmate\n'
+    printf 'window=juggernaut:jg-evil\n'
+    printf 'kind=squad_lead\n'
     printf 'home=%s\n' "$evil"
   } > "$w/home/escape.meta"
   fakebin=$(make_fake_toolchain "$w")
@@ -699,7 +699,7 @@ test_bootstrap_nudge_retry_rejects_malformed_marker_id() {
     JG_SEND_SETTLE=0 JG_FAKE_TMUX_LOG="$log" \
     "$ROOT/bin/jg-bootstrap.sh" 2>/dev/null)
 
-  assert_contains "$out" "NUDGE_SECONDMATES: secondmate ../escape: send failed: retry marker has unsafe id" \
+  assert_contains "$out" "NUDGE_SQUAD_LEADS: squad_lead ../escape: send failed: retry marker has unsafe id" \
     "malformed retry marker id should be rejected before target resolution"
   assert_not_contains "$out" "BOOTSTRAP_INFO: nudged jg-../escape" \
     "malformed retry marker id must never send through a path-traversed selector"
@@ -723,12 +723,12 @@ test_bootstrap_nudge_failure_records_retry_marker() {
     JG_SEND_SETTLE=0 \
     "$ROOT/bin/jg-bootstrap.sh" 2>/dev/null)
 
-  assert_contains "$out" "NUDGE_SECONDMATES: secondmate sm-instr: send failed:" \
+  assert_contains "$out" "NUDGE_SQUAD_LEADS: squad_lead sm-instr: send failed:" \
     "failed nudge send should be surfaced as actionable bootstrap output"
-  marker="$w/home/state/.secondmate-nudge-pending/sm-instr.pending"
+  marker="$w/home/state/.squad-lead-nudge-pending/sm-instr.pending"
   assert_present "$marker" "failed nudge should leave a retry marker"
   assert_grep "selector=jg-sm-instr" "$marker" "retry marker should pin the stable selector"
-  assert_grep "message=firstmate was updated to the latest - please re-read your AGENTS.md to pick up the new instructions." \
+  assert_grep "message=juggernaut was updated to the latest - please re-read your AGENTS.md to pick up the new instructions." \
     "$marker" "retry marker should pin the exact message"
   pass "T8c failed bootstrap nudge is surfaced and recorded for retry"
 }
@@ -745,9 +745,9 @@ test_bootstrap_nudge_retry_is_idempotent() {
   out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$w/home" JG_ROOT_OVERRIDE="$w/main" \
     JG_SEND_SETTLE=0 \
     "$ROOT/bin/jg-bootstrap.sh" 2>/dev/null)
-  assert_contains "$out" "NUDGE_SECONDMATES: secondmate sm-instr: send failed:" \
+  assert_contains "$out" "NUDGE_SQUAD_LEADS: squad_lead sm-instr: send failed:" \
     "precondition: first nudge should fail"
-  marker="$w/home/state/.secondmate-nudge-pending/sm-instr.pending"
+  marker="$w/home/state/.squad-lead-nudge-pending/sm-instr.pending"
   assert_present "$marker" "precondition: failed nudge should leave marker"
 
   rm -f "$w/home/state/sm-instr.inbox"   # unblock: the steer record can be written again
@@ -775,28 +775,28 @@ test_bootstrap_nudge_retry_refuses_changed_home() {
   out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$w/home" JG_ROOT_OVERRIDE="$w/main" \
     JG_SEND_SETTLE=0 \
     "$ROOT/bin/jg-bootstrap.sh" 2>/dev/null)
-  assert_contains "$out" "NUDGE_SECONDMATES: secondmate sm-instr: send failed:" \
+  assert_contains "$out" "NUDGE_SQUAD_LEADS: squad_lead sm-instr: send failed:" \
     "precondition: first nudge should fail"
-  marker="$w/home/state/.secondmate-nudge-pending/sm-instr.pending"
+  marker="$w/home/state/.squad-lead-nudge-pending/sm-instr.pending"
   assert_present "$marker" "precondition: failed nudge should leave marker"
 
   other="$w/sm-other"
   git -C "$w/main" worktree add -q --detach "$other" "$(head_of "$w/sm-instr")"
-  printf '%s\n' sm-instr > "$other/.jg-secondmate-home"
+  printf '%s\n' sm-instr > "$other/.jg-squad-lead-home"
   sed -i.bak "s|^home=.*|home=$other|" "$w/home/state/sm-instr.meta" 2>/dev/null || \
     sed -i "s|^home=.*|home=$other|" "$w/home/state/sm-instr.meta"
   rm -f "$w/home/state/sm-instr.meta.bak"
 
   out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$w/home" JG_ROOT_OVERRIDE="$w/main" \
     JG_SEND_SETTLE=0 "$ROOT/bin/jg-bootstrap.sh" 2>/dev/null)
-  assert_contains "$out" "NUDGE_SECONDMATES: secondmate sm-instr: send failed: retry target home changed" \
+  assert_contains "$out" "NUDGE_SQUAD_LEADS: squad_lead sm-instr: send failed: retry target home changed" \
     "retry must not infer a nudge target outside the recorded failed home"
   assert_present "$marker" "ambiguous retry should keep marker for operator inspection"
   pass "T8e bootstrap nudge retry refuses a changed home instead of guessing"
 }
 
 # --- T8b: stale herdr nudge failures retry through current jg-<id> metadata ---
-# Reproduces the 2026-07-07 session-start bug: secondmate_sync used to print raw
+# Reproduces the 2026-07-07 session-start bug: squad_lead_sync used to print raw
 # backend targets (default:w9:pY) that liveness respawn immediately replaced
 # (default:wA:p2), so jg-send with the printed target fell back to tmux and failed
 # while jg-<id> resolved through current meta.
@@ -856,7 +856,7 @@ test_nudge_retry_uses_fresh_herdr_endpoint_after_respawn() {
   {
     printf 'window=%s\n' "$stale"
     printf 'backend=herdr\n'
-    printf 'kind=secondmate\n'
+    printf 'kind=squad_lead\n'
     printf 'harness=claude\n'
     printf 'home=%s/sm-instr\n' "$w"
   } > "$meta"
@@ -899,7 +899,7 @@ SH
 
   window=$(grep '^window=' "$meta" | tail -1 | cut -d= -f2-)
   [ "$window" = "$fresh" ] || fail "respawn stub did not rotate meta window to '$fresh' (got '$window')"
-  marker="$w/home/state/.secondmate-nudge-pending/sm-instr.pending"
+  marker="$w/home/state/.squad-lead-nudge-pending/sm-instr.pending"
   assert_absent "$marker" "a durably enqueued nudge owes no retry marker"
 
   # shellcheck disable=SC2016  # $0/$1 belong to the inner bash -c process.
@@ -919,7 +919,7 @@ SH
   pass "T8b a stale herdr endpoint cannot lose a durably enqueued nudge, and jg-<id> resolves through post-respawn metadata"
 }
 
-# --- T9: bootstrap surfaces a skipped dirty live secondmate home --------------
+# --- T9: bootstrap surfaces a skipped dirty live squad_lead home --------------
 test_bootstrap_sweep_surfaces_skipped_home() {
   local w c1 base before fakebin out skip_line
   w=$(new_world boot-skip)
@@ -934,22 +934,22 @@ test_bootstrap_sweep_surfaces_skipped_home() {
   out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$w/home" JG_ROOT_OVERRIDE="$w/main" \
     "$ROOT/bin/jg-bootstrap.sh" 2>/dev/null)
 
-  skip_line=$(printf '%s\n' "$out" | grep '^SECONDMATE_SYNC: secondmate sm-dirty: skipped:' || true)
-  [ -n "$skip_line" ] || fail "no SECONDMATE_SYNC skip line emitted (got: $out)"
+  skip_line=$(printf '%s\n' "$out" | grep '^SQUAD_LEAD_SYNC: squad_lead sm-dirty: skipped:' || true)
+  [ -n "$skip_line" ] || fail "no SQUAD_LEAD_SYNC skip line emitted (got: $out)"
   assert_contains "$skip_line" "dirty working tree" "dirty skipped home reports the actionable reason"
   [ "$(head_of "$w/sm-dirty")" = "$before" ] || fail "dirty home HEAD moved"
   [ "$(head_of "$w/main")" = "$base" ] || fail "primary HEAD changed during bootstrap"
   grep -q 'uncommitted local edit' "$w/sm-dirty/AGENTS.md" || fail "dirty edit was discarded"
-  pass "T9 bootstrap surfaces a skipped dirty live secondmate home"
+  pass "T9 bootstrap surfaces a skipped dirty live squad_lead home"
 }
 
-# --- T10: spawning a secondmate fast-forwards its worktree before launch ------
+# --- T10: spawning a squad_lead fast-forwards its worktree before launch ------
 test_spawn_fast_forwards_before_launch() {
   local w c1 c2 fakebin
   w=$(new_world spawn-ff)
   c1=$(head_of "$w/main")
   git -C "$w/main" worktree add -q --detach "$w/sm" "$c1"
-  printf 'sm\n' > "$w/sm/.jg-secondmate-home"
+  printf 'sm\n' > "$w/sm/.jg-squad-lead-home"
   mkdir -p "$w/sm/data"
   printf 'charter\n' > "$w/sm/data/charter.md"
   bump_primary "$w" instr
@@ -970,11 +970,11 @@ SH
     JG_STATE_OVERRIDE="$w/home/state" JG_DATA_OVERRIDE="$w/home/data" \
     JG_PROJECTS_OVERRIDE="$w/home/projects" JG_CONFIG_OVERRIDE="$w/home/config" \
     JG_SPAWN_NO_GUARD=1 \
-    "$ROOT/bin/jg-spawn.sh" sm "$w/sm" codex --secondmate >/dev/null 2>&1 || true
+    "$ROOT/bin/jg-spawn.sh" sm "$w/sm" codex --squad-lead >/dev/null 2>&1 || true
 
   [ "$(head_of "$w/sm")" = "$c2" ] \
-    || fail "spawn did not fast-forward the secondmate worktree to the primary's HEAD"
-  pass "T10 spawn fast-forwards a secondmate worktree to the primary's local HEAD before launch"
+    || fail "spawn did not fast-forward the squad_lead worktree to the primary's HEAD"
+  pass "T10 spawn fast-forwards a squad_lead worktree to the primary's local HEAD before launch"
 }
 
 # --- T11: spawn warns when pre-launch sync is skipped ------------------------
@@ -983,7 +983,7 @@ test_spawn_warns_when_sync_skipped_before_launch() {
   w=$(new_world spawn-skip)
   c1=$(head_of "$w/main")
   git -C "$w/main" worktree add -q --detach "$w/sm" "$c1"
-  printf 'sm\n' > "$w/sm/.jg-secondmate-home"
+  printf 'sm\n' > "$w/sm/.jg-squad-lead-home"
   mkdir -p "$w/sm/data"
   printf 'charter\n' > "$w/sm/data/charter.md"
   bump_primary "$w" instr
@@ -1004,10 +1004,10 @@ SH
     JG_STATE_OVERRIDE="$w/home/state" JG_DATA_OVERRIDE="$w/home/data" \
     JG_PROJECTS_OVERRIDE="$w/home/projects" JG_CONFIG_OVERRIDE="$w/home/config" \
     JG_SPAWN_NO_GUARD=1 \
-    "$ROOT/bin/jg-spawn.sh" sm "$w/sm" codex --secondmate >/dev/null 2>"$err" || true
+    "$ROOT/bin/jg-spawn.sh" sm "$w/sm" codex --squad-lead >/dev/null 2>"$err" || true
 
   assert_contains "$(cat "$err")" \
-    "warning: secondmate sm sync skipped before launch: dirty working tree" \
+    "warning: squad_lead sm sync skipped before launch: dirty working tree" \
     "spawn warning reports the skipped sync reason"
   [ "$(head_of "$w/sm")" = "$before" ] || fail "dirty spawn home HEAD moved"
   grep -q 'uncommitted local edit' "$w/sm/AGENTS.md" || fail "dirty spawn edit was discarded"
@@ -1030,7 +1030,7 @@ test_seed_marker_clean_when_gitignored() {
   # `git status --porcelain | head -1` is non-empty).
   [ -z "$(git -C "$w/sm" status --porcelain)" ] \
     || fail "seed marker still dirties a fresh home: $(git -C "$w/sm" status --porcelain)"
-  # And the secondmate ff sweep sees no dirt: an at-HEAD home is a clean no-op.
+  # And the squad_lead ff sweep sees no dirt: an at-HEAD home is a clean no-op.
   run_ff "$w/sm" "$base"
   [ "$FF_STATUS" = current ] || fail "fresh home not read as clean/current, got '$FF_STATUS': $FF_OUT"
   pass "T12 gitignored marker: a freshly seeded home reads clean to fleet-sync and the ff sweep"
@@ -1041,7 +1041,7 @@ test_seed_marker_clean_when_gitignored() {
 # is still untracked-and-unignored, and the fix itself only arrives by fast-forward.
 # The marker-tolerant ff-skip (ignore_seed_marker=yes) bridges the gap for
 # linked-worktree homes, which bootstrap/spawn fast-forward from the primary's local HEAD.
-# Standalone-clone homes converge through /updatefirstmate's origin fetch instead.
+# Standalone-clone homes converge through /updatejuggernaut's origin fetch instead.
 # Once advanced, the now-ignored marker reads clean with no hand intervention.
 test_seed_marker_converges_existing_home() {
   local w c0 base
@@ -1079,22 +1079,22 @@ test_seed_marker_does_not_mask_real_dirt() {
   run_ff "$w/sm" "$base"
 
   [ "$FF_STATUS" = skipped ] || fail "a genuinely dirty home must skip, got '$FF_STATUS'"
-  assert_contains "$FF_OUT" "secondmate sm: skipped: dirty working tree" \
+  assert_contains "$FF_OUT" "squad_lead sm: skipped: dirty working tree" \
     "a genuinely dirty home is skipped even with the marker present"
   [ "$(head_of "$w/sm")" = "$before" ] || fail "genuinely dirty home HEAD moved (work at risk)"
   grep -q 'real local change' "$w/sm/AGENTS.md" || fail "genuine local edit was discarded"
   pass "T14 marker tolerance does not mask a genuinely dirty home"
 }
 
-# --- remote secondmate homes ------------------------------------------------
+# --- remote squad_lead homes ------------------------------------------------
 # A remote home lives on another machine and is a standalone clone, so it cannot
 # read the primary's object store. The parent therefore resolves ITS primary
 # default-branch commit and hands it to that host, which imports the commit and
 # then runs the SAME ff_target guards above. These cases drive the real
-# host-local leg (bin/jg-remote-secondmate-control.sh) directly.
+# host-local leg (bin/jg-remote-squad-lead-control.sh) directly.
 
-# new_remote_world <name>: a PRIMARY firstmate repo with a bare forge origin, a
-# host "Firstmate copy" clone (the code root), and a persistent remote home clone
+# new_remote_world <name>: a PRIMARY juggernaut repo with a bare forge origin, a
+# host "Juggernaut copy" clone (the code root), and a persistent remote home clone
 # of that copy - the topology bin/jg-remote-home-provision.sh lays down. Echoes
 # the world dir. The primary starts one commit ahead of both clones.
 new_remote_world() {
@@ -1102,7 +1102,7 @@ new_remote_world() {
   w="$TMP_ROOT/$name"
   mkdir -p "$w/home/state" "$w/home/data"
   git init -q -b main "$w/main"
-  printf 'projects/\nstate/\ndata/\nconfig/\n.no-mistakes/\n.jg-secondmate-home\n' > "$w/main/.gitignore"
+  printf 'projects/\nstate/\ndata/\nconfig/\n.no-mistakes/\n.jg-squad-lead-home\n' > "$w/main/.gitignore"
   printf 'v1\n' > "$w/main/AGENTS.md"
   mkdir -p "$w/main/bin" "$w/main/.agents/skills"
   printf 'echo a\n' > "$w/main/bin/tool.sh"
@@ -1124,7 +1124,7 @@ add_remote_home() {
   git clone -q "$src" "$w/$id"
   git -C "$w/$id" checkout -q --detach "$commit"
   mkdir -p "$w/$id/state" "$w/$id/data" "$w/$id/config" "$w/$id/projects"
-  printf '%s\n' "$id" > "$w/$id/.jg-secondmate-home"
+  printf '%s\n' "$id" > "$w/$id/.jg-squad-lead-home"
 }
 
 # make_remote_leg_ssh_stub <w>: a fake ssh that decodes jg-on.sh's payload and
@@ -1150,11 +1150,11 @@ rargs=()
 while IFS= read -r -d '' a; do rargs+=("$a"); done < <(decode "$argv_b64")
 cmd=${rargs[0]}
 [ "$cmd" != jg-remote-doctor.sh ] || exit 0
-# An older remote Firstmate copy rejects a command shape it does not know with
+# An older remote Juggernaut copy rejects a command shape it does not know with
 # the usage status, which is exactly what a parent-targeted sync meets there.
 if [ "${JG_TEST_REMOTE_LEG_REJECT_SYNC:-0}" = 1 ] \
-  && [ "$cmd" = jg-remote-secondmate-control.sh ] && [ "${rargs[1]:-}" = sync ]; then
-  printf 'Host-local lifecycle control for the remote secondmate home selected by jg-on.\n'
+  && [ "$cmd" = jg-remote-squad-lead-control.sh ] && [ "${rargs[1]:-}" = sync ]; then
+  printf 'Host-local lifecycle control for the remote squad_lead home selected by jg-on.\n'
   exit 2
 fi
 rc=0
@@ -1175,11 +1175,11 @@ remote_sync() {
   shift 2
   REMOTE_SYNC_RC=0
   REMOTE_SYNC_OUT=$(JG_HOME="$w/$id" JG_ROOT_OVERRIDE="$w/coderoot" \
-    "$ROOT/bin/jg-remote-secondmate-control.sh" sync "$id" "$@" 2>&1) || REMOTE_SYNC_RC=$?
+    "$ROOT/bin/jg-remote-squad-lead-control.sh" sync "$id" "$@" 2>&1) || REMOTE_SYNC_RC=$?
 }
 
 # --- R1: a remote home follows the PARENT primary, not the host's own copy ----
-# The reported incident: the home had already advanced past the host's Firstmate
+# The reported incident: the home had already advanced past the host's Juggernaut
 # copy, so a sync aimed at that copy refused as a non-fast-forward and the home
 # stayed behind the primary. Aimed at the primary's own commit it advances, and
 # the host's copy is not touched at all.
@@ -1202,14 +1202,14 @@ test_remote_sync_targets_primary_not_host_copy() {
   assert_contains "$REMOTE_SYNC_OUT" "synced: $c3" "remote sync did not report the primary commit"
   [ "$(head_of "$w/sm")" = "$c3" ] || fail "remote home did not advance to the primary's commit"
   [ "$(head_of "$w/coderoot")" = "$coderoot_before" ] \
-    || fail "remote sync moved the host's own Firstmate copy"
-  pass "R1 a remote home ahead of the host's Firstmate copy still advances to the primary's commit"
+    || fail "remote sync moved the host's own Juggernaut copy"
+  pass "R1 a remote home ahead of the host's Juggernaut copy still advances to the primary's commit"
 }
 
 # --- R2: the target is imported from the host's copy when the home lacks it ----
 # --- R1b: a remote sync reports WHICH instruction paths its advance changed ----
 # The parent cannot diff a checkout it cannot read, so the host's own result is
-# the only place that fact can come from. /updatefirstmate needs it to decide
+# the only place that fact can come from. /updatejuggernaut needs it to decide
 # whether the running remote agent must be replaced to reload, or whether the
 # advance reloads itself.
 test_remote_sync_reports_the_changed_instruction_surface() {
@@ -1264,7 +1264,7 @@ test_remote_sync_imports_from_host_copy() {
   [ "$(head_of "$w/sm")" = "$c2" ] || fail "remote home did not advance to the imported commit"
   [ "$(head_of "$w/coderoot")" = "$coderoot_before" ] \
     || fail "importing from the host's copy moved that copy's HEAD"
-  pass "R2 a missing target is imported from the host's Firstmate copy without moving it"
+  pass "R2 a missing target is imported from the host's Juggernaut copy without moving it"
 }
 
 # --- R3: the target is imported from the home's own origin ---------------------
@@ -1325,7 +1325,7 @@ test_remote_sync_skips_unimportable_target() {
   [ "$REMOTE_SYNC_RC" -ne 0 ] || fail "remote sync claimed success on an unreachable commit"
   assert_contains "$REMOTE_SYNC_OUT" "could not import $c2" \
     "the skip does not name the commit that could not be imported"
-  assert_contains "$REMOTE_SYNC_OUT" "/updatefirstmate" \
+  assert_contains "$REMOTE_SYNC_OUT" "/updatejuggernaut" \
     "the skip does not name the command that refreshes the host's copy"
   [ "$(head_of "$w/sm")" = "$before" ] || fail "an unreachable target still moved the home"
   pass "R5 a target neither the host copy nor the origin holds skips with an actionable reason"
@@ -1374,18 +1374,18 @@ test_remote_sync_skips_dirty_diverged_and_feature_branch() {
   pass "R6 dirty, diverged, and feature-branch remote homes skip and are left untouched"
 }
 
-# --- R7: /updatefirstmate's contract is unchanged ------------------------------
-# That path refreshes the host's own Firstmate copy from origin first and then
+# --- R7: /updatejuggernaut's contract is unchanged ------------------------------
+# That path refreshes the host's own Juggernaut copy from origin first and then
 # syncs the home to THAT copy, so the no-target call must still target the copy.
 test_remote_sync_without_target_follows_host_copy() {
   local w c1 c2
-  w=$(new_remote_world remote-updatefirstmate)
+  w=$(new_remote_world remote-updatejuggernaut)
   c1=$(head_of "$w/main")
   add_remote_home "$w" sm "$w/coderoot" "$c1"
   bump_primary "$w" instr
   c2=$(head_of "$w/main")
   git -C "$w/main" push -q origin main
-  git -C "$w/coderoot" pull -q --ff-only        # what /updatefirstmate does first
+  git -C "$w/coderoot" pull -q --ff-only        # what /updatejuggernaut does first
   [ "$(head_of "$w/coderoot")" = "$c2" ] || fail "precondition: the host copy should be refreshed"
 
   remote_sync "$w" sm
@@ -1393,7 +1393,7 @@ test_remote_sync_without_target_follows_host_copy() {
   [ "$REMOTE_SYNC_RC" -eq 0 ] || fail "the no-target sync failed: $REMOTE_SYNC_OUT"
   assert_contains "$REMOTE_SYNC_OUT" "synced: $c2" "the no-target sync did not follow the host copy"
   [ "$(head_of "$w/sm")" = "$c2" ] || fail "the no-target sync did not advance the home"
-  pass "R7 a sync with no target still follows the host's own refreshed Firstmate copy"
+  pass "R7 a sync with no target still follows the host's own refreshed Juggernaut copy"
 }
 
 # --- R8: session start hands the remote host the PRIMARY's commit --------------
@@ -1418,8 +1418,8 @@ test_bootstrap_syncs_remote_home_to_primary_commit() {
   home="$w/home"
   mkdir -p "$home/config" "$home/projects"
   printf -- '- sm - remote fixture (host: host-sm; root: %s; home: %s; scope: remote work; projects: alpha; added 2026-08-02)\n' \
-    "$w/coderoot" "$w/sm" > "$home/data/secondmates.md"
-  jg_write_secondmate_meta "$home/state/sm.meta" "$w/sm"
+    "$w/coderoot" "$w/sm" > "$home/data/squad_leads.md"
+  jg_write_squad_lead_meta "$home/state/sm.meta" "$w/sm"
   printf 'remote_host=host-sm\n' >> "$home/state/sm.meta"
   mkdir -p "$w/sm/state/parent-route"
   jg_write_meta "$w/sm/state/parent-route/sm.meta" \
@@ -1440,12 +1440,12 @@ test_bootstrap_syncs_remote_home_to_primary_commit() {
   [ "$(head_of "$w/sm")" = "$c2" ] \
     || fail "session start left the remote home off the primary's commit (out: $out)"
   [ "$(head_of "$w/coderoot")" = "$coderoot_before" ] \
-    || fail "session start moved the host's own Firstmate copy"
+    || fail "session start moved the host's own Juggernaut copy"
   pass "R8 session start converges a remote home on the primary's default-branch commit"
 }
 
 # --- R10: an outdated host refuses, and the report says how to fix it ----------
-# A host still running an older Firstmate copy rejects a command shape it does
+# A host still running an older Juggernaut copy rejects a command shape it does
 # not know, which for this leg can only mean it predates the parent-targeted
 # sync. Session start must name the command that refreshes that copy rather than
 # echoing an unexplained refusal.
@@ -1461,8 +1461,8 @@ test_bootstrap_reports_outdated_host_actionably() {
   home="$w/home"
   mkdir -p "$home/config" "$home/projects"
   printf -- '- sm - remote fixture (host: host-sm; root: %s; home: %s; scope: remote work; projects: alpha; added 2026-08-02)\n' \
-    "$w/coderoot" "$w/sm" > "$home/data/secondmates.md"
-  jg_write_secondmate_meta "$home/state/sm.meta" "$w/sm"
+    "$w/coderoot" "$w/sm" > "$home/data/squad_leads.md"
+  jg_write_squad_lead_meta "$home/state/sm.meta" "$w/sm"
   printf 'remote_host=host-sm\n' >> "$home/state/sm.meta"
 
   fakebin=$(make_remote_leg_ssh_stub "$w")
@@ -1475,18 +1475,18 @@ test_bootstrap_reports_outdated_host_actionably() {
     JG_ADDONS_DIR="$TMP_ROOT/no-addons" JG_INHERITABLE_CONFIG='' JG_FAKE_TREEHOUSE_LEASE_HELP=1 JG_SEND_SETTLE=0 \
     "$ROOT/bin/jg-bootstrap.sh" 2>&1)
 
-  assert_contains "$out" "SECONDMATE_SYNC: secondmate sm: skipped:" \
+  assert_contains "$out" "SQUAD_LEAD_SYNC: squad_lead sm: skipped:" \
     "an outdated host did not produce its own convergence line"
-  assert_contains "$out" "too old to sync to this primary's commit; run /updatefirstmate" \
+  assert_contains "$out" "too old to sync to this primary's commit; run /updatejuggernaut" \
     "the outdated-host report does not say how to fix it"
   pass "R10 a host too old for a parent-targeted sync is reported with the command that fixes it"
 }
 
-# --- R9: a remote launch never re-targets the host's own Firstmate copy --------
-# The launch leg runs a host-local spawn whose JG_ROOT is that host's Firstmate
+# --- R9: a remote launch never re-targets the host's own Juggernaut copy --------
+# The launch leg runs a host-local spawn whose JG_ROOT is that host's Juggernaut
 # copy. Once the parent has synced the home to ITS commit, that spawn must leave
 # the home there. The control home proves the suppressed step is otherwise live:
-# the ordinary secondmate spawn contract does move an identical home onto the
+# the ordinary squad_lead spawn contract does move an identical home onto the
 # host's copy.
 test_remote_launch_does_not_retarget_host_copy() {
   local w c1 c2 herdrbin fakebin launch_out control_out
@@ -1512,19 +1512,19 @@ test_remote_launch_does_not_retarget_host_copy() {
   # The real launch leg, exactly as the parent invokes it after its own sync.
   launch_out=$(PATH="$fakebin:$BASE_PATH" \
     JG_HOME="$w/launched" JG_ROOT_OVERRIDE="$w/coderoot" JG_SPAWN_NO_GUARD=1 \
-    "$ROOT/bin/jg-remote-secondmate-control.sh" launch launched codex - - herdr 2>&1) || true
+    "$ROOT/bin/jg-remote-squad-lead-control.sh" launch launched codex - - herdr 2>&1) || true
   [ "$(head_of "$w/launched")" = "$c1" ] \
-    || fail "a remote launch moved the home onto the host's own Firstmate copy (out: $launch_out)"
+    || fail "a remote launch moved the home onto the host's own Juggernaut copy (out: $launch_out)"
 
-  # Divergence control: the ordinary secondmate spawn contract DOES follow its
+  # Divergence control: the ordinary squad_lead spawn contract DOES follow its
   # JG_ROOT, so the suppressed step above is not vacuously absent.
   control_out=$(PATH="$fakebin:$BASE_PATH" \
     JG_HOME="$w/coderoot" JG_ROOT_OVERRIDE="$w/coderoot" \
     JG_STATE_OVERRIDE="$w/control/state" JG_DATA_OVERRIDE="$w/control/data" \
     JG_CONFIG_OVERRIDE="$w/control/config" JG_SPAWN_NO_GUARD=1 \
-    "$ROOT/bin/jg-spawn.sh" control "$w/control" --secondmate --harness codex --backend herdr 2>&1) || true
+    "$ROOT/bin/jg-spawn.sh" control "$w/control" --squad-lead --harness codex --backend herdr 2>&1) || true
   [ "$(head_of "$w/control")" = "$c2" ] \
-    || fail "the ordinary secondmate spawn did not follow its own checkout, so the launch case is vacuous (out: $control_out)"
+    || fail "the ordinary squad_lead spawn did not follow its own checkout, so the launch case is vacuous (out: $control_out)"
 
   pass "R9 a remote launch leaves the home on the parent's commit while an ordinary spawn follows its own checkout"
 }
@@ -1565,4 +1565,4 @@ test_bootstrap_syncs_remote_home_to_primary_commit
 test_bootstrap_reports_outdated_host_actionably
 test_remote_launch_does_not_retarget_host_copy
 
-echo "# all jg-secondmate-sync tests passed"
+echo "# all jg-squad-lead-sync tests passed"

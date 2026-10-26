@@ -2,7 +2,7 @@
 # Behavior tests for the explicit per-task delivery contract (AGENTS.md section 7)
 # across bin/jg-spawn.sh, bin/jg-promote.sh, and bin/jg-project-mode.sh.
 #
-# A ship task's delivery mode and yolo posture are firstmate's decision at intake,
+# A ship task's delivery mode and yolo posture are juggernaut's decision at intake,
 # so the tools refuse to guess: the spawn and a scout promotion require both flags,
 # validate them against a closed set, and the spawn additionally refuses to launch
 # when the brief it is about to hand the worker records a different mode. Scout
@@ -47,7 +47,7 @@ write_brief() {  # <home> <id> [<recorded-mode>]
   local home=$1 id=$2 mode=${3:-}
   mkdir -p "$home/data/$id"
   {
-    printf 'You are a crewmate.\n\n# Task\n## Captain'\''s intent\nExercise the delivery contract.\n\n## Firstmate spec\nVerify the selected delivery behavior.\n\n# Definition of done\n'
+    printf 'You are a operator.\n\n# Task\n## Captain'\''s intent\nExercise the delivery contract.\n\n## Juggernaut spec\nVerify the selected delivery behavior.\n\n# Definition of done\n'
     [ -z "$mode" ] || printf 'Delivery contract: mode=%s\n' "$mode"
   } > "$home/data/$id/brief.md"
 }
@@ -56,7 +56,7 @@ fill_brief_subsections() {  # <file> <intent> <spec>
   local file=$1 intent=$2 spec=$3 content
   content=$(cat "$file")
   content=${content//'{TASK}'/$intent}
-  content=${content//'{FIRSTMATE_SPEC}'/$spec}
+  content=${content//'{JUGGERNAUT_SPEC}'/$spec}
   printf '%s\n' "$content" > "$file"
 }
 
@@ -99,9 +99,9 @@ ROWS
   pass "jg-spawn: a ship spawn requires a valid explicit mode and yolo before anything is created"
 }
 
-# A scout has no merge to govern and a secondmate's posture is fixed, so the flags
+# A scout has no merge to govern and a squad_lead's posture is fixed, so the flags
 # are refused rather than accepted and quietly ignored.
-test_scout_and_secondmate_refuse_delivery_flags() {
+test_scout_and_squad_lead_refuse_delivery_flags() {
   local rec home proj fakebin out status
   rec=$(make_home refused)
   IFS='|' read -r home proj fakebin <<EOF
@@ -119,11 +119,11 @@ EOF
   [ "$status" -ne 0 ] || fail "a scout spawn carrying --yolo should exit non-zero"
   assert_contains "$out" "--yolo applies only to ship spawns" "scout spawn did not refuse --yolo"
 
-  out=$(run_spawn "$home" "$fakebin" delivery-sm-a2 "$home" --secondmate --mode no-mistakes --yolo off)
+  out=$(run_spawn "$home" "$fakebin" delivery-sm-a2 "$home" --squad-lead --mode no-mistakes --yolo off)
   status=$?
-  [ "$status" -ne 0 ] || fail "a secondmate spawn carrying delivery flags should exit non-zero"
-  assert_contains "$out" "applies only to ship spawns" "secondmate spawn did not refuse the delivery flags"
-  pass "jg-spawn: scout and secondmate spawns refuse ship delivery flags"
+  [ "$status" -ne 0 ] || fail "a squad_lead spawn carrying delivery flags should exit non-zero"
+  assert_contains "$out" "applies only to ship spawns" "squad_lead spawn did not refuse the delivery flags"
+  pass "jg-spawn: scout and squad_lead spawns refuse ship delivery flags"
 }
 
 # The brief is what the worker actually follows, so a spawn whose explicit mode
@@ -347,14 +347,14 @@ STUB
       "$mode: promoted worker was not told to verify its physical worktree"
     assert_grep "git rev-parse --show-toplevel" "$payload" \
       "$mode: promoted worker was not told to verify its repository root"
-    assert_grep "If either does not resolve to the worktree you were launched in, stop and escalate to firstmate" "$payload" \
+    assert_grep "If either does not resolve to the worktree you were launched in, stop and escalate to juggernaut" "$payload" \
       "$mode: promoted worker was not told to stop for any wrong worktree"
     assert_grep "git checkout -b fm/$id --" "$payload" \
       "$mode: promoted worker was not told to leave the scratch base for its ship branch"
     assert_grep "## Captain's intent" "$payload" \
       "$mode: promoted worker did not receive the Captain's intent subsection"
-    assert_grep "## Firstmate spec" "$payload" \
-      "$mode: promoted worker did not receive the Firstmate spec subsection"
+    assert_grep "## Juggernaut spec" "$payload" \
+      "$mode: promoted worker did not receive the Juggernaut spec subsection"
 
     # Both the delivered prompt and persisted relaunch brief are public outputs.
     for contract in "$payload" "$home/data/$id/brief.md"; do
@@ -384,7 +384,7 @@ STUB
   done
 
   payload="$TMP_ROOT/promote-dod/payload-promote-dod-no-mistakes"
-  assert_grep "ask-user findings are never yours to answer: escalate to firstmate" "$payload" \
+  assert_grep "ask-user findings are never yours to answer: escalate to juggernaut" "$payload" \
     "promoted no-mistakes worker did not receive the ask-user escalation rule"
   assert_grep "write only the ask-user findings, verbatim and unparaphrased (id, severity, file, line, description, authority)" "$payload" \
     "promoted no-mistakes worker did not receive the ask-user-only snapshot contract"
@@ -584,7 +584,7 @@ EOF
   out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode no-mistakes --yolo off)
   status=$?
   [ "$status" -ne 0 ] || fail "spawn of an unfilled ship brief should exit non-zero"
-  assert_contains "$out" "still contains {TASK} or {FIRSTMATE_SPEC}" \
+  assert_contains "$out" "still contains {TASK} or {JUGGERNAUT_SPEC}" \
     "unfilled ship spawn did not name the leftover placeholders"
   assert_contains "$out" "## Captain's intent" \
     "unfilled ship spawn did not name the intent subsection to fill"
@@ -595,9 +595,9 @@ EOF
     || fail "filled-ship brief should scaffold"
   fill_brief_subsections "$home/data/$id/brief.md" \
     "Fix replacement of \`{TASK}\` in Herdr briefs." \
-    "Keep literal \`{FIRSTMATE_SPEC}\` examples intact."
+    "Keep literal \`{JUGGERNAUT_SPEC}\` examples intact."
   out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
-  assert_not_contains "$out" "still contains {TASK} or {FIRSTMATE_SPEC}" \
+  assert_not_contains "$out" "still contains {TASK} or {JUGGERNAUT_SPEC}" \
     "a filled ship brief mentioning placeholder tokens was refused as unfilled"
   assert_not_contains "$out" "must contain nonempty" \
     "a filled ship brief mentioning placeholder tokens failed content validation"
@@ -605,7 +605,7 @@ EOF
   id=delivery-legacy-fenced-headings
   mkdir -p "$home/data/$id"
   cat > "$home/data/$id/brief.md" <<'EOF'
-You are a crewmate.
+You are a operator.
 
 # Task
 Preserve this legacy task containing a format example.
@@ -613,7 +613,7 @@ Preserve this legacy task containing a format example.
 ```markdown
 ## Captain's intent
 Example intent
-## Firstmate spec
+## Juggernaut spec
 Example specification
 ```
 
@@ -623,7 +623,7 @@ EOF
   out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
   assert_not_contains "$out" "must contain nonempty" \
     "fenced example headings made a filled legacy Task fail validation"
-  assert_not_contains "$out" "still contains {TASK} or {FIRSTMATE_SPEC}" \
+  assert_not_contains "$out" "still contains {TASK} or {JUGGERNAUT_SPEC}" \
     "fenced example headings made a filled legacy Task look unfilled"
 
   id=delivery-legacy-no-mistakes
@@ -631,7 +631,7 @@ EOF
   cat > "$home/data/$id/brief.md" <<'EOF'
 # Task
 [captain] Fix the legacy dispatch boundary.
-Do not copy this Firstmate-authored constraint into intent.
+Do not copy this Juggernaut-authored constraint into intent.
 
 # Definition of done
 Delivery contract: mode=no-mistakes
@@ -651,7 +651,7 @@ EOF
   authorized=$(awk '$0 == "## Captain intent authorized for --intent" { emit=1; next } emit && /^$/ { exit } emit { print }' "$home/data/$id/launch-brief.md")
   assert_contains "$authorized" "Fix the legacy dispatch boundary." \
     "marked legacy launch contract omitted captain words"
-  assert_not_contains "$authorized" "Firstmate-authored constraint" \
+  assert_not_contains "$authorized" "Juggernaut-authored constraint" \
     "marked legacy launch contract included mixed Task specification"
 
   id=delivery-migrated-stale-no-mistakes
@@ -661,12 +661,12 @@ EOF
 ## Captain's intent
 Fix the migrated dispatch boundary.
 
-## Firstmate spec
+## Juggernaut spec
 Preserve the existing compatibility path.
 
 # Definition of done
 Delivery contract: mode=no-mistakes
-Pass the entire Task and every Firstmate requirement as --intent.
+Pass the entire Task and every Juggernaut requirement as --intent.
 EOF
   out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode no-mistakes --yolo off)
   assert_present "$home/data/$id/launch-brief.md" \
@@ -675,7 +675,7 @@ EOF
   assert_contains "$authorized" "Fix the migrated dispatch boundary." \
     "migrated launch contract omitted Captain's intent"
   assert_not_contains "$authorized" "Preserve the existing compatibility path." \
-    "migrated launch contract included Firstmate spec in intent"
+    "migrated launch contract included Juggernaut spec in intent"
   assert_grep "supersedes every earlier brief instruction about constructing \`--intent\`" \
     "$home/data/$id/launch-brief.md" \
     "migrated launch contract did not supersede its stale mixed-Task DoD"
@@ -691,7 +691,7 @@ EOF
   cat > "$home/data/$id/brief.md" <<'EOF'
 # Task
 Fix the legacy dispatch boundary.
-Do not copy this Firstmate-authored constraint into intent.
+Do not copy this Juggernaut-authored constraint into intent.
 
 # Definition of done
 Delivery contract: mode=no-mistakes
@@ -699,7 +699,7 @@ Delivery contract: mode=no-mistakes
 # Notes
 ## Captain's intent
 Unrelated notes must not become task intent.
-## Firstmate spec
+## Juggernaut spec
 Unrelated notes must not satisfy task validation.
 EOF
   out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode no-mistakes --yolo off)
@@ -718,7 +718,7 @@ EOF
   out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --scout)
   status=$?
   [ "$status" -ne 0 ] || fail "spawn of an unfilled scout brief should exit non-zero"
-  assert_contains "$out" "still contains {TASK} or {FIRSTMATE_SPEC}" \
+  assert_contains "$out" "still contains {TASK} or {JUGGERNAUT_SPEC}" \
     "unfilled scout spawn did not name the leftover placeholders"
   assert_absent "$home/state/$id.meta" "unfilled scout spawn wrote task metadata"
 
@@ -729,7 +729,7 @@ EOF
   out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
   status=$?
   [ "$status" -ne 0 ] || fail "spawn of empty Task subsections should exit non-zero"
-  assert_contains "$out" "must contain nonempty ## Captain's intent and ## Firstmate spec" \
+  assert_contains "$out" "must contain nonempty ## Captain's intent and ## Juggernaut spec" \
     "empty Task subsections were not rejected semantically"
   assert_absent "$home/state/$id.meta" "empty-subsection spawn wrote task metadata"
 
@@ -745,7 +745,7 @@ EOF
   assert_contains "$out" "preserve the original ask in ## Captain's intent" \
     "unfilled promotion did not preserve the original captain ask boundary"
   assert_contains "$out" "promotion generates a separate ship-time spec" \
-    "unfilled promotion did not distinguish scout and ship Firstmate specs"
+    "unfilled promotion did not distinguish scout and ship Juggernaut specs"
   assert_grep 'kind=scout' "$meta" "unfilled promotion still changed the task record"
 
   id=promote-missing-brief
@@ -767,12 +767,12 @@ EOF
   cat > "$home/data/$id/brief.md" <<'EOF'
 # Task
 Investigate the unmarked legacy failure.
-Keep this Firstmate constraint out of captain intent.
+Keep this Juggernaut constraint out of captain intent.
 
 # Notes
 ## Captain's intent
 Unrelated notes are not the original ask.
-## Firstmate spec
+## Juggernaut spec
 Unrelated notes are not the task specification.
 EOF
   out=$(JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" "$PROMOTE" "$id" --mode direct-PR --yolo off 2>&1)
@@ -800,12 +800,12 @@ EOF
   assert_grep "Investigate why the identity check is failing." "$brief" \
     "promotion did not preserve the original Captain's intent"
   assert_no_grep "Ship the identity-check fix without adding a classifier." "$brief" \
-    "promotion reused the scout-time Firstmate spec as ship instructions"
-  spec_body=$(awk '$0 == "## Firstmate spec" { emit=1; next } emit && /^# / { exit } emit { print }' "$brief")
+    "promotion reused the scout-time Juggernaut spec as ship instructions"
+  spec_body=$(awk '$0 == "## Juggernaut spec" { emit=1; next } emit && /^# / { exit } emit { print }' "$brief")
   assert_contains "$spec_body" "Verify isolation before anything else" \
-    "promotion did not place its ship-time instructions in Firstmate spec"
+    "promotion did not place its ship-time instructions in Juggernaut spec"
   assert_no_grep "SCOUT task" "$brief" \
-    "promotion copied the scout Setup/Rules contract into Firstmate spec"
+    "promotion copied the scout Setup/Rules contract into Juggernaut spec"
   assert_no_grep "# Setup" "$brief" \
     "promotion copied a later brief section into a Task subsection"
 
@@ -818,7 +818,7 @@ EOF
 ## Captain's intent
 Ship the parser without losing detailed requirements.
 
-## Firstmate spec
+## Juggernaut spec
 Keep this opening requirement.
 
 ### Acceptance criteria
@@ -846,14 +846,14 @@ EOF
   assert_no_grep "Keep this closing requirement." "$brief" \
     "promotion reused trailing scout spec as ship instructions"
   assert_no_grep "This scout-only setup must not become the spec." "$brief" \
-    "promotion copied the following top-level section into Firstmate spec"
+    "promotion copied the following top-level section into Juggernaut spec"
 
   id=promote-legacy-e3
   meta="$home/state/$id.meta"
   printf 'window=jg-%s\nkind=scout\nworktree=/tmp/wt\n' "$id" > "$meta"
   mkdir -p "$home/data/$id"
   cat > "$home/data/$id/brief.md" <<'EOF'
-You are a crewmate.
+You are a operator.
 
 # Task
 [captain] Investigate the fold's session-floor refusal.
@@ -870,7 +870,7 @@ EOF
   expect_code 0 "$status" "promotion of a pre-subsection scout brief should succeed"
   brief="$home/data/$id/ship-instructions.md"
   intent_body=$(awk '$0 == "## Captain'\''s intent" { emit=1; next } emit && /^## / { exit } emit { print }' "$brief")
-  spec_body=$(awk '$0 == "## Firstmate spec" { emit=1; next } emit && /^# / { exit } emit { print }' "$brief")
+  spec_body=$(awk '$0 == "## Juggernaut spec" { emit=1; next } emit && /^# / { exit } emit { print }' "$brief")
   assert_contains "$intent_body" "Investigate the fold's session-floor refusal." \
     "legacy promotion discarded provenance-marked captain words"
   assert_contains "$intent_body" "Preserve the existing successful session behavior." \
@@ -882,9 +882,9 @@ EOF
   assert_not_contains "$spec_body" "Ship the narrow session-floor fix with a regression test." \
     "legacy promotion reused old build instructions as the ship spec"
   assert_contains "$spec_body" "Verify isolation before anything else" \
-    "legacy promotion did not place promotion ship instructions in Firstmate spec"
+    "legacy promotion did not place promotion ship instructions in Juggernaut spec"
   assert_not_contains "$spec_body" "This is a SCOUT task" \
-    "legacy promotion copied the scout Setup section into Firstmate spec"
+    "legacy promotion copied the scout Setup section into Juggernaut spec"
   pass "jg-spawn/jg-promote: leftover Task placeholders are refused until both subsections are filled"
 }
 
@@ -913,7 +913,7 @@ EOF
   words=$(printf '%s\n' "Keep the literal example \`Captain, hello\` in the documentation." \
     "Stop composing Captain:, Captain's words:, Captain's ask:, and Captain's intent: into PR bodies.")
   write_brief "$home" intent-literal no-mistakes
-  printf '# Task\n## Captain'"'"'s intent\n%s\n\n## Firstmate spec\nDo not paraphrase.\n\n# Definition of done\nDelivery contract: mode=no-mistakes\n' "$words" > "$home/data/intent-literal/brief.md"
+  printf '# Task\n## Captain'"'"'s intent\n%s\n\n## Juggernaut spec\nDo not paraphrase.\n\n# Definition of done\nDelivery contract: mode=no-mistakes\n' "$words" > "$home/data/intent-literal/brief.md"
   out=$(run_spawn "$home" "$fakebin" intent-literal "$proj" claude --mode no-mistakes --yolo off)
   assert_not_contains "$out" "operator-address line" "labels mentioned mid-line were refused as address"
   authorized=$(awk '$0 == "## Captain intent authorized for --intent" { emit=1; next } emit { print }' "$home/data/intent-literal/launch-brief.md")
@@ -924,7 +924,7 @@ EOF
     n=$((n + 1))
     id="intent-addressed-$n"
     write_brief "$home" "$id" no-mistakes
-    printf '# Task\n## Captain'"'"'s intent\nKeep the original request intact.\n  %s preserve its provenance.\n\n## Firstmate spec\nDo not paraphrase.\n\n# Definition of done\nDelivery contract: mode=no-mistakes\n' \
+    printf '# Task\n## Captain'"'"'s intent\nKeep the original request intact.\n  %s preserve its provenance.\n\n## Juggernaut spec\nDo not paraphrase.\n\n# Definition of done\nDelivery contract: mode=no-mistakes\n' \
       "$marker" > "$home/data/$id/brief.md"
     out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode no-mistakes --yolo off)
     status=$?
@@ -941,7 +941,7 @@ EOF
   id='intent-addressed-promote'
   printf 'window=jg-%s\nkind=scout\nworktree=/tmp/wt\n' "$id" > "$home/state/$id.meta"
   write_brief "$home" "$id"
-  printf '# Task\n## Captain'"'"'s intent\nCaptain: investigate the refusal.\n\n## Firstmate spec\nReproduce it first.\n' > "$home/data/$id/brief.md"
+  printf '# Task\n## Captain'"'"'s intent\nCaptain: investigate the refusal.\n\n## Juggernaut spec\nReproduce it first.\n' > "$home/data/$id/brief.md"
   out=$(JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" "$PROMOTE" "$id" --mode no-mistakes --yolo off 2>&1)
   status=$?
   [ "$status" -ne 0 ] || fail "promotion of addressed intent should be refused"
@@ -976,8 +976,8 @@ EOF
   # AGENTS.md and its import are instruction inputs, not implementation-source
   # assertions: launching a worker must never rewrite either project's files.
   cp "$ROOT/AGENTS.md" "$home/AGENTS.md"
-  for project_kind in firstmate unrelated; do
-    if [ "$project_kind" = firstmate ]; then
+  for project_kind in juggernaut unrelated; do
+    if [ "$project_kind" = juggernaut ]; then
       cp "$ROOT/AGENTS.md" "$proj/AGENTS.md"
     else
       printf 'Use this project coding standard.\n' > "$proj/AGENTS.md"
@@ -1000,19 +1000,19 @@ EOF
         fail "$project_kind $kind did not put worker identity first"
       assert_grep 'follow this brief instead of that supervisor contract' "$brief" "$project_kind $kind omitted worker authority"
       assert_grep "$home/state/$id.inbox" "$brief" "$project_kind $kind omitted its exact steering inbox"
-      assert_grep 'When this task works on Firstmate itself' "$brief" "$project_kind $kind made the exception unconditional"
+      assert_grep 'When this task works on Juggernaut itself' "$brief" "$project_kind $kind made the exception unconditional"
       assert_grep 'Project instructions still govern the work wherever they do not conflict with this worker identity' "$brief" "$project_kind $kind displaced project guidance"
       ! grep -q '^This section supersedes every earlier brief instruction about your role' "$brief" ||
-        fail "$project_kind $kind revoked the brief's own role for a task that is not Firstmate"
+        fail "$project_kind $kind revoked the brief's own role for a task that is not Juggernaut"
       assert_no_grep '# Current worker role contract' "$home/data/$id/brief.md" "spawn rewrote the source brief"
       cmp -s "$proj/agents-before" "$proj/AGENTS.md" || fail "spawn changed project AGENTS.md"
       [ "$(cat "$proj/CLAUDE.md")" = '@AGENTS.md' ] || fail "spawn changed the project import"
     done
   done
-  role_line=$(grep -n 'A ship or scout worker launched by Firstmate into a worktree of this repository' "$ROOT/AGENTS.md" | cut -d: -f1)
-  supervisor_line=$(grep -n '^You are the first mate\.$' "$ROOT/AGENTS.md" | head -1 | cut -d: -f1)
+  role_line=$(grep -n 'A ship or scout worker launched by Juggernaut into a worktree of this repository' "$ROOT/AGENTS.md" | cut -d: -f1)
+  supervisor_line=$(grep -n '^You are the overwatch\.$' "$ROOT/AGENTS.md" | head -1 | cut -d: -f1)
   [ -n "$role_line" ] && [ "$role_line" -lt "$supervisor_line" ] ||
-    fail "Firstmate AGENTS.md does not disambiguate a launched worker before assigning the supervisor identity"
+    fail "Juggernaut AGENTS.md does not disambiguate a launched worker before assigning the supervisor identity"
   cmp -s "$ROOT/AGENTS.md" "$home/AGENTS.md" || fail "worker spawn changed the primary contract"
   pass "jg-spawn: every legacy worker receives scoped role instructions without changing project or primary instructions"
 }
@@ -1241,9 +1241,9 @@ test_forge_gerrit_changes_what_no_mistakes_means() {
     "the gerrit worker lost the pipeline initialization step no-mistakes still needs"
 
   # The forge changes the contract's head and tail only: how the pipeline is
-  # driven, what --intent may carry, and the two firstmate-specific rules are the
+  # driven, what --intent may carry, and the two juggernaut-specific rules are the
   # same text a GitHub-forge worker receives.
-  assert_grep 'ask-user findings are never yours to answer: escalate to firstmate' "$brief" \
+  assert_grep 'ask-user findings are never yours to answer: escalate to juggernaut' "$brief" \
     "the gerrit worker lost the ask-user escalation rule"
   # shellcheck disable=SC2016 # Backticks are literal generated Markdown.
   assert_grep 'NEVER pass `--yes` (or `-y`)' "$brief" "the gerrit worker lost the --yes ban"
@@ -1413,7 +1413,7 @@ EOF
 }
 
 # The registered ship-branch prefix exists so a third-party project's branches and
-# PRs do not read as firstmate-authored, but a spawn that deviates from it breaks
+# PRs do not read as juggernaut-authored, but a spawn that deviates from it breaks
 # no contract: the brief-vs-spawn agreement above already guarantees the worker's
 # instructions match the branch this spawn selected. So the deviation is announced
 # and the spawn proceeds, while matching the registry (or its fm/ default) stays
@@ -1429,7 +1429,7 @@ EOF
   out=$(run_spawn "$home" "$fakebin" prefix-dev-a1 "$proj" claude --mode no-mistakes --yolo off)
   assert_contains "$out" "ships branch=fm/prefix-dev-a1 while proj registers the ship-branch prefix 'fix/'" \
     "no deviation notice for shipping the legacy prefix past a registered override"
-  assert_contains "$out" "will read as firstmate-authored" \
+  assert_contains "$out" "will read as juggernaut-authored" \
     "the deviation notice did not name the cost of the drift"
 
   JG_HOME="$home" "$BRIEF" prefix-dev-a2 proj --mode no-mistakes --branch-prefix fix/ >/dev/null \
@@ -1682,7 +1682,7 @@ EOF
 # one completion requirement and a ship brief must carry the receipt instruction.
 test_receipt_hooks_run_with_the_addon() {
   local addons home id meta out
-  addons=${JG_ADDONS_DIR:-${JG_HOME:-$ROOT}/projects/firstmate-addons}
+  addons=${JG_ADDONS_DIR:-${JG_HOME:-$ROOT}/projects/juggernaut-addons}
   if [ ! -r "$addons/receipts/bin/jg-receipts-lib.sh" ]; then
     echo "skip: receipts add-on absent, receipt hook sites not run"
     return 0
@@ -1749,7 +1749,7 @@ PYCODE
 }
 
 test_ship_spawn_requires_a_valid_delivery_contract
-test_scout_and_secondmate_refuse_delivery_flags
+test_scout_and_squad_lead_refuse_delivery_flags
 test_spawn_refuses_a_brief_mode_mismatch
 test_spawn_notices_a_rigor_downgrade_against_the_registry
 test_scout_records_no_delivery_posture

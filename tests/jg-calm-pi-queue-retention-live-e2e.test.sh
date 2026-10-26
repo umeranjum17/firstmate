@@ -4,7 +4,7 @@
 # queued notification across Escape. Those members live on Pi's session object, not on an
 # exported class, so only a running Pi can answer.
 #
-# When a member is missing, the adapter degrades quietly by design: queued Firstmate rows
+# When a member is missing, the adapter degrades quietly by design: queued Juggernaut rows
 # stay visible and one warning appears. This guard fails loudly naming the installed Pi
 # version instead, so a Pi release that removes the capability is noticed rather than
 # silently costing the captain the hidden rows. The Escape flow itself is pinned by
@@ -149,5 +149,5 @@ if (Object.keys(probe.session).length === 0) missing.push("(no session members w
 process.stdout.write(missing.join(", "));
 ' "$PROBE_OUT") || fail "could not read the Pi $PI_VERSION capability probe"
 [ -z "$missing" ] \
-  || fail "Pi $PI_VERSION lacks the queue-retention capability Calm needs to hide queued Firstmate rows: $missing"
-pass "Pi $PI_VERSION exposes every queue-retention member Calm preflights before hiding queued Firstmate rows"
+  || fail "Pi $PI_VERSION lacks the queue-retention capability Calm needs to hide queued Juggernaut rows: $missing"
+pass "Pi $PI_VERSION exposes every queue-retention member Calm preflights before hiding queued Juggernaut rows"

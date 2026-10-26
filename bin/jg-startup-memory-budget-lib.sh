@@ -4,7 +4,7 @@
 #
 # The local, primary-authoritative config/startup-memory-budget setting is one
 # strictly formatted positive decimal value followed by one newline.  The
-# locked primary bootstrap owns first materialization.  This library owns safe
+# locked primary bootstrap owns overwatchrialization.  This library owns safe
 # parsing, default publication, and the portable prompt-memory estimate used by
 # bin/jg-startup-memory-budget.sh and the internal /stow skill.
 

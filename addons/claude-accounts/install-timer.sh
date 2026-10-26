@@ -8,7 +8,7 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
   export "$_jg_new=$_jg_val"
 done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
-# Install a systemd user timer that runs claude-accounts-quota.sh every 5 minutes for one Firstmate home, so the
+# Install a systemd user timer that runs claude-accounts-quota.sh every 5 minutes for one Juggernaut home, so the
 # dashboard's Claude accounts card and state/claude-accounts.json stay fresh. Copies the reader to
 # ${XDG_DATA_HOME:-~/.local/share}/jg-claude-accounts/, writes jg-claude-accounts-quota.service and .timer under
 # ~/.config/systemd/user/ (the unit carries the installer's PATH so quota-axi and jq resolve), and enables the timer only when a file changed. Reads quota only; touches no login folder.
@@ -25,7 +25,7 @@ TMP=$(mktemp -d)
 trap 'rm -rf -- "$TMP"' EXIT
 cat > "$TMP/service" <<UNIT
 [Unit]
-Description=Firstmate Claude accounts quota reading for $HOME_DIR
+Description=Juggernaut Claude accounts quota reading for $HOME_DIR
 
 [Service]
 Type=oneshot

@@ -10,10 +10,10 @@ done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Run the post-step-B fork journey with the add-on installed, then verify the
 # optional hooks remain a no-op when it is absent.
-# JG_TEST_FORK names a read-only Firstmate checkout.
+# JG_TEST_FORK names a read-only Juggernaut checkout.
 set -euo pipefail
 addons=$(cd "$(dirname "$0")/../.." && pwd)
-: "${JG_TEST_FORK:?set JG_TEST_FORK to a Firstmate checkout}"
+: "${JG_TEST_FORK:?set JG_TEST_FORK to a Juggernaut checkout}"
 d=$(mktemp -d)
 cleanup() {
   rc=$?
@@ -38,7 +38,7 @@ cp "$addons/wait-timers/tests/jg-wait-timers.test.sh" "$d/fork/tests/"
   JG_HOME="$d/fork" JG_ADDONS_DIR="$d/none"
   mkdir -p "$d/fork/state"
   printf 'blocked [key=wait]: external condition\\n' > "$d/fork/state/fixture.status"
-  lib="${JG_ADDONS_DIR:-$JG_HOME/projects/firstmate-addons}/wait-timers/bin/jg-wait-timers-lib.sh"
+  lib="${JG_ADDONS_DIR:-$JG_HOME/projects/juggernaut-addons}/wait-timers/bin/jg-wait-timers-lib.sh"
   task=fixture
   # shellcheck source=/dev/null
   [ ! -r "$lib" ] || . "$lib"

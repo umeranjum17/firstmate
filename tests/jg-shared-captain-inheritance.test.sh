@@ -28,9 +28,9 @@ shared_header() {
   cat <<'EOF'
 # Shared captain preferences
 
-This file is main-authoritative in the main firstmate home.
-In secondmate homes it is read-only in secondmate homes and must not be edited there.
-Route new captain-preference discoveries to the main firstmate through marked status or a document pointer.
+This file is main-authoritative in the main juggernaut home.
+In squad_lead homes it is read-only in squad_lead homes and must not be edited there.
+Route new captain-preference discoveries to the main juggernaut through marked status or a document pointer.
 EOF
 }
 
@@ -59,9 +59,9 @@ assert_shared_readonly() {
     || fail "$path mode should be $JG_SHARED_CAPTAIN_MODE, got $(file_mode "$path")"
 }
 
-assert_secondmate_write_fails() {
+assert_squad_lead_write_fails() {
   local path=$1
-  if ( printf '%s\n' "secondmate edit" >> "$path" ) 2>/dev/null; then
+  if ( printf '%s\n' "squad_lead edit" >> "$path" ) 2>/dev/null; then
     fail "ordinary write unexpectedly succeeded for read-only shared captain file"
   fi
 }
@@ -74,29 +74,29 @@ test_first_copy_readonly_and_local_files_preserved() {
   write_shared "$primary/data/captain-shared.md" "shared v1"
   report="$TMP_ROOT/first-copy.report"
 
-  out=$(JG_CONFIG_INHERIT_REPORT="$report" propagate_secondmate_inheritance "$primary" "$second")
+  out=$(JG_CONFIG_INHERIT_REPORT="$report" propagate_squad_lead_inheritance "$primary" "$second")
 
   [ -z "$out" ] || fail "first copy should not emit a quarantine diagnostic: $out"
   cmp -s "$primary/data/captain-shared.md" "$second/data/captain-shared.md" \
-    || fail "first copy did not converge secondmate shared preferences"
+    || fail "first copy did not converge squad_lead shared preferences"
   assert_shared_readonly "$second/data/captain-shared.md"
-  assert_secondmate_write_fails "$second/data/captain-shared.md"
+  assert_squad_lead_write_fails "$second/data/captain-shared.md"
   assert_grep $'data/captain-shared.md\tpushed\t' "$report" "first copy should report pushed"
   assert_grep "second local captain" "$second/data/captain.md" "domain-local captain.md was changed"
   assert_grep "second local learning" "$second/data/learnings.md" "domain-local learnings.md was changed"
 
   : > "$report"
-  out=$(JG_CONFIG_INHERIT_REPORT="$report" propagate_secondmate_inheritance "$primary" "$second")
+  out=$(JG_CONFIG_INHERIT_REPORT="$report" propagate_squad_lead_inheritance "$primary" "$second")
   [ -z "$out" ] || fail "unchanged convergence should stay quiet: $out"
   assert_grep $'data/captain-shared.md\tunchanged\t' "$report" "unchanged bytes should report unchanged"
   assert_shared_readonly "$second/data/captain-shared.md"
 
   write_shared "$primary/data/captain-shared.md" "shared v2"
   : > "$report"
-  out=$(JG_CONFIG_INHERIT_REPORT="$report" propagate_secondmate_inheritance "$primary" "$second")
+  out=$(JG_CONFIG_INHERIT_REPORT="$report" propagate_squad_lead_inheritance "$primary" "$second")
   [ -z "$out" ] || fail "source-only edit should not emit a quarantine diagnostic: $out"
   cmp -s "$primary/data/captain-shared.md" "$second/data/captain-shared.md" \
-    || fail "source-only edit did not converge secondmate shared preferences"
+    || fail "source-only edit did not converge squad_lead shared preferences"
   qcount=$(find "$second/data" -name '.captain-shared.md.quarantine.*' | wc -l | tr -d ' ')
   [ "$qcount" -eq 0 ] || fail "source-only edit quarantined an untouched inherited destination"
   assert_grep $'data/captain-shared.md\tpushed\t' "$report" "source-only edit should report pushed"
@@ -113,7 +113,7 @@ test_true_divergence_after_inherit_still_quarantines() {
   second=${rec#*|}
   write_shared "$primary/data/captain-shared.md" "shared v1"
   report="$TMP_ROOT/true-divergence.report"
-  out=$(JG_CONFIG_INHERIT_REPORT="$report" propagate_secondmate_inheritance "$primary" "$second")
+  out=$(JG_CONFIG_INHERIT_REPORT="$report" propagate_squad_lead_inheritance "$primary" "$second")
   [ -z "$out" ] || fail "setup inherit should stay quiet: $out"
 
   chmod u+w "$second/data/captain-shared.md"
@@ -121,9 +121,9 @@ test_true_divergence_after_inherit_still_quarantines() {
   chmod "$JG_SHARED_CAPTAIN_MODE" "$second/data/captain-shared.md"
   write_shared "$primary/data/captain-shared.md" "shared v2"
   : > "$report"
-  out=$(JG_CONFIG_INHERIT_REPORT="$report" propagate_secondmate_inheritance "$primary" "$second")
-  diag=$(printf '%s\n' "$out" | grep '^SECONDMATE_SYNC: secondmate home ' || true)
-  [ -n "$diag" ] || fail "edited destination should emit a SECONDMATE_SYNC diagnostic"
+  out=$(JG_CONFIG_INHERIT_REPORT="$report" propagate_squad_lead_inheritance "$primary" "$second")
+  diag=$(printf '%s\n' "$out" | grep '^SQUAD_LEAD_SYNC: squad_lead home ' || true)
+  [ -n "$diag" ] || fail "edited destination should emit a SQUAD_LEAD_SYNC diagnostic"
   qpath=${diag##* at }
   assert_grep "local edit after inherit" "$qpath" "true-divergence quarantine lost the edited bytes"
   cmp -s "$primary/data/captain-shared.md" "$second/data/captain-shared.md" \
@@ -142,7 +142,7 @@ test_interrupted_publication_matching_source_does_not_quarantine() {
   second=${rec#*|}
   write_shared "$primary/data/captain-shared.md" "shared v1"
   report="$TMP_ROOT/interrupted-pub.report"
-  out=$(JG_CONFIG_INHERIT_REPORT="$report" propagate_secondmate_inheritance "$primary" "$second")
+  out=$(JG_CONFIG_INHERIT_REPORT="$report" propagate_squad_lead_inheritance "$primary" "$second")
   [ -z "$out" ] || fail "setup inherit should stay quiet: $out"
 
   write_shared "$primary/data/captain-shared.md" "shared v2"
@@ -151,7 +151,7 @@ test_interrupted_publication_matching_source_does_not_quarantine() {
   chmod "$JG_SHARED_CAPTAIN_MODE" "$second/data/captain-shared.md"
 
   : > "$report"
-  out=$(JG_CONFIG_INHERIT_REPORT="$report" propagate_secondmate_inheritance "$primary" "$second")
+  out=$(JG_CONFIG_INHERIT_REPORT="$report" propagate_squad_lead_inheritance "$primary" "$second")
   [ -z "$out" ] || fail "destination already matching the new source should not quarantine: $out"
   qcount=$(find "$second/data" -name '.captain-shared.md.quarantine.*' | wc -l | tr -d ' ')
   [ "$qcount" -eq 0 ] || fail "interrupted publication matching source created a quarantine artifact"
@@ -161,7 +161,7 @@ test_interrupted_publication_matching_source_does_not_quarantine() {
 
   write_shared "$primary/data/captain-shared.md" "shared v3"
   : > "$report"
-  out=$(JG_CONFIG_INHERIT_REPORT="$report" propagate_secondmate_inheritance "$primary" "$second")
+  out=$(JG_CONFIG_INHERIT_REPORT="$report" propagate_squad_lead_inheritance "$primary" "$second")
   [ -z "$out" ] || fail "healed receipt should accept a later source-only edit quietly: $out"
   cmp -s "$primary/data/captain-shared.md" "$second/data/captain-shared.md" \
     || fail "later source-only edit after healed receipt did not converge"
@@ -170,7 +170,7 @@ test_interrupted_publication_matching_source_does_not_quarantine() {
   pass "interrupted publication that already matches source heals without quarantine"
 }
 
-# The remote secondmate route reaches the same destination through
+# The remote squad_lead route reaches the same destination through
 # bin/jg-remote-inherit.sh, so it owes the same answer: an untouched inherited
 # copy is ordinary convergence, a locally edited one is drift worth keeping.
 remote_put_shared() {
@@ -245,13 +245,13 @@ SH
   report="$TMP_ROOT/drift.report"
 
   out=$(PATH="$fakebin:$BASE_PATH" JG_CONFIG_INHERIT_REPORT="$report" \
-    propagate_secondmate_inheritance "$primary" "$second")
+    propagate_squad_lead_inheritance "$primary" "$second")
 
-  diag=$(printf '%s\n' "$out" | grep '^SECONDMATE_SYNC: secondmate home ' || true)
-  [ -n "$diag" ] || fail "drift quarantine should emit a SECONDMATE_SYNC diagnostic"
+  diag=$(printf '%s\n' "$out" | grep '^SQUAD_LEAD_SYNC: squad_lead home ' || true)
+  [ -n "$diag" ] || fail "drift quarantine should emit a SQUAD_LEAD_SYNC diagnostic"
   qpath=${diag##* at }
   [ "$qpath" = "$collision.1" ] || fail "collision-safe quarantine name should use .1, got $qpath"
-  assert_grep "local drift" "$qpath" "quarantine artifact lost the secondmate-local bytes"
+  assert_grep "local drift" "$qpath" "quarantine artifact lost the squad-lead-local bytes"
   assert_grep $'data/captain-shared.md\tpushed\tquarantined local drift at '"$qpath" "$report" \
     "drift push should name the quarantine artifact in the report"
   cmp -s "$primary/data/captain-shared.md" "$second/data/captain-shared.md" \
@@ -260,7 +260,7 @@ SH
 
   : > "$report"
   out=$(PATH="$fakebin:$BASE_PATH" JG_CONFIG_INHERIT_REPORT="$report" \
-    propagate_secondmate_inheritance "$primary" "$second")
+    propagate_squad_lead_inheritance "$primary" "$second")
   [ -z "$out" ] || fail "repeated convergence should not quarantine again: $out"
   qcount=$(find "$second/data" -name '.captain-shared.md.quarantine.*' | wc -l | tr -d ' ')
   [ "$qcount" -eq 2 ] || fail "repeated convergence created extra quarantine artifacts"
@@ -276,9 +276,9 @@ test_missing_source_mirrors_absence_without_losing_local_bytes() {
   write_shared "$second/data/captain-shared.md" "orphaned local shared file"
   chmod "$JG_SHARED_CAPTAIN_MODE" "$second/data/captain-shared.md"
 
-  out=$(propagate_secondmate_inheritance "$primary" "$second")
+  out=$(propagate_squad_lead_inheritance "$primary" "$second")
 
-  diag=$(printf '%s\n' "$out" | grep '^SECONDMATE_SYNC: secondmate home ' || true)
+  diag=$(printf '%s\n' "$out" | grep '^SQUAD_LEAD_SYNC: squad_lead home ' || true)
   [ -n "$diag" ] || fail "primary absence with a local copy should quarantine before removal"
   qpath=${diag##* at }
   assert_absent "$second/data/captain-shared.md" "primary absence should converge destination to absence"
@@ -296,7 +296,7 @@ test_unsafe_artifacts_and_failure_restore_readonly_mode() {
 
   ln -s "$primary/data/captain.md" "$primary/data/captain-shared.md"
   err="$TMP_ROOT/unsafe-source.err"
-  propagate_secondmate_inheritance "$primary" "$second" >/dev/null 2>"$err"; rc=$?
+  propagate_squad_lead_inheritance "$primary" "$second" >/dev/null 2>"$err"; rc=$?
   [ "$rc" -ne 0 ] || fail "symlinked primary source should be rejected"
   assert_grep "unsafe primary source" "$err" "unsafe source error should be explicit"
   rm -f "$primary/data/captain-shared.md"
@@ -304,7 +304,7 @@ test_unsafe_artifacts_and_failure_restore_readonly_mode() {
 
   ln -s "$second/data/captain.md" "$second/data/captain-shared.md"
   err="$TMP_ROOT/unsafe-dest-symlink.err"
-  propagate_secondmate_inheritance "$primary" "$second" >/dev/null 2>"$err"; rc=$?
+  propagate_squad_lead_inheritance "$primary" "$second" >/dev/null 2>"$err"; rc=$?
   [ "$rc" -ne 0 ] || fail "symlinked destination should be rejected"
   assert_grep "unsafe destination" "$err" "unsafe destination symlink error should be explicit"
   rm -f "$second/data/captain-shared.md"
@@ -313,7 +313,7 @@ test_unsafe_artifacts_and_failure_restore_readonly_mode() {
   other="$second/data/hardlink-copy"
   ln "$second/data/captain-shared.md" "$other"
   err="$TMP_ROOT/unsafe-dest-hardlink.err"
-  propagate_secondmate_inheritance "$primary" "$second" >/dev/null 2>"$err"; rc=$?
+  propagate_squad_lead_inheritance "$primary" "$second" >/dev/null 2>"$err"; rc=$?
   [ "$rc" -ne 0 ] || fail "hardlinked destination should be rejected"
   assert_grep "unsafe destination" "$err" "unsafe destination hardlink error should be explicit"
   rm -f "$second/data/captain-shared.md" "$other"
@@ -323,7 +323,7 @@ test_unsafe_artifacts_and_failure_restore_readonly_mode() {
     write_shared "$second/data/captain-shared.md" "unreadable local bytes"
     chmod 000 "$second/data/captain-shared.md"
     err="$TMP_ROOT/unreadable-dest.err"
-    propagate_secondmate_inheritance "$primary" "$second" >/dev/null 2>"$err"; rc=$?
+    propagate_squad_lead_inheritance "$primary" "$second" >/dev/null 2>"$err"; rc=$?
     chmod 600 "$second/data/captain-shared.md"
     [ "$rc" -ne 0 ] || fail "an unhashable destination should not converge silently"
     assert_grep "failed to hash destination" "$err" "unhashable destination error should be explicit"
@@ -337,7 +337,7 @@ test_unsafe_artifacts_and_failure_restore_readonly_mode() {
   before_mode=$(file_mode "$second/data/captain-shared.md")
   chmod 500 "$second/data"
   err="$TMP_ROOT/restore-readonly.err"
-  propagate_secondmate_inheritance "$primary" "$second" >/dev/null 2>"$err"; rc=$?
+  propagate_squad_lead_inheritance "$primary" "$second" >/dev/null 2>"$err"; rc=$?
   chmod 700 "$second/data"
   [ "$rc" -ne 0 ] || fail "unwritable destination directory should make quarantine fail"
   [ "$(file_mode "$second/data/captain-shared.md")" = "$before_mode" ] \
@@ -360,9 +360,9 @@ test_header_check_names_the_missing_phrase() {
   cat > "$missing_path" <<'EOF'
 # Shared captain preferences
 
-This file is main-authoritative in the main firstmate home.
-In secondmate homes it is read-only in secondmate homes.
-Route new captain-preference discoveries to the main firstmate through marked status or a document pointer.
+This file is main-authoritative in the main juggernaut home.
+In squad_lead homes it is read-only in squad_lead homes.
+Route new captain-preference discoveries to the main juggernaut through marked status or a document pointer.
 EOF
   out=$(shared_captain_header_valid "$missing_path"); rc=$?
   [ "$rc" -ne 0 ] || fail "a header missing a required phrase should still fail"
@@ -434,7 +434,7 @@ new_git_world() {
   touch "$home/state/.last-watcher-beat"
   git init -q -b main "$root"
   {
-    printf '%s\n' '.jg-secondmate-home'
+    printf '%s\n' '.jg-squad-lead-home'
     printf '%s\n' 'data/'
     printf '%s\n' 'state/'
     printf '%s\n' 'config/'
@@ -448,7 +448,7 @@ new_git_world() {
   git -C "$root" commit -qm initial
   c1=$(git -C "$root" rev-parse HEAD)
   git -C "$root" worktree add -q --detach "$w/sm" "$c1"
-  printf '%s\n' sm > "$w/sm/.jg-secondmate-home"
+  printf '%s\n' sm > "$w/sm/.jg-squad-lead-home"
   mkdir -p "$w/sm/data" "$w/sm/state" "$w/sm/config" "$w/sm/projects"
   printf '%s\n' "charter" > "$w/sm/data/charter.md"
   write_shared "$home/data/captain-shared.md" "shared from primary"
@@ -471,7 +471,7 @@ EOF
     JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$data_override" \
     JG_PROJECTS_OVERRIDE="$home/projects" JG_CONFIG_OVERRIDE="$home/config" \
     JG_SPAWN_NO_GUARD=1 \
-    "$ROOT/bin/jg-spawn.sh" sm "$sm" codex --secondmate >/dev/null 2>&1 || true
+    "$ROOT/bin/jg-spawn.sh" sm "$sm" codex --squad-lead >/dev/null 2>&1 || true
 
   cmp -s "$data_override/captain-shared.md" "$sm/data/captain-shared.md" \
     || fail "spawn convergence point did not copy shared captain preferences from JG_DATA_OVERRIDE"
@@ -489,11 +489,11 @@ EOF
   mkdir -p "$data_override"
   write_shared "$data_override/captain-shared.md" "shared from bootstrap override"
   {
-    printf 'window=firstmate:jg-sm\n'
-    printf 'kind=secondmate\n'
+    printf 'window=juggernaut:jg-sm\n'
+    printf 'kind=squad_lead\n'
   } > "$home/state/sm.meta"
-  printf -- '- sm - fixture secondmate (home: %s; scope: fixture; projects: sample; added 2026-07-16)\n' "$sm" \
-    > "$data_override/secondmates.md"
+  printf -- '- sm - fixture squad_lead (home: %s; scope: fixture; projects: sample; added 2026-07-16)\n' "$sm" \
+    > "$data_override/squad_leads.md"
   fakebin=$(make_fake_spawn_toolchain "$w")
   add_bootstrap_compatible_tools "$fakebin"
 
@@ -501,7 +501,7 @@ EOF
     JG_DATA_OVERRIDE="$data_override" \
     "$ROOT/bin/jg-bootstrap.sh" 2>/dev/null)
 
-  assert_not_contains "$out" "SECONDMATE_SYNC: secondmate sm: skipped: inheritance failed" \
+  assert_not_contains "$out" "SQUAD_LEAD_SYNC: squad_lead sm: skipped: inheritance failed" \
     "bootstrap inheritance should succeed"
   cmp -s "$data_override/captain-shared.md" "$sm/data/captain-shared.md" \
     || fail "bootstrap convergence point did not copy shared captain preferences from JG_DATA_OVERRIDE"
@@ -518,8 +518,8 @@ EOF
   data_override="$w/primary-data-override"
   mkdir -p "$data_override"
   {
-    printf 'window=firstmate:jg-sm\n'
-    printf 'kind=secondmate\n'
+    printf 'window=juggernaut:jg-sm\n'
+    printf 'kind=squad_lead\n'
     printf 'home=%s\n' "$sm"
   } > "$home/state/sm.meta"
   write_shared "$sm/data/captain-shared.md" "old shared bytes"
@@ -547,8 +547,8 @@ EOF
   data_override="$w/primary-data-override"
   mkdir -p "$data_override"
   {
-    printf 'window=firstmate:jg-sm\n'
-    printf 'kind=secondmate\n'
+    printf 'window=juggernaut:jg-sm\n'
+    printf 'kind=squad_lead\n'
     printf 'home=%s\n' "$sm"
   } > "$home/state/sm.meta"
   write_shared "$data_override/captain-shared.md" "inherited shared bytes"
@@ -584,7 +584,7 @@ EOF
   out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$home" JG_ROOT_OVERRIDE="$root" \
     "$ROOT/bin/jg-session-start.sh")
 
-  assert_contains "$out" "data/captain-shared.md (shared, main-authoritative, read-only in secondmate homes)" \
+  assert_contains "$out" "data/captain-shared.md (shared, main-authoritative, read-only in squad_lead homes)" \
     "session-start digest should label the shared captain file unmistakably"
   assert_contains "$out" "shared from primary" "session-start digest should render the shared file"
   contract=$(printf '%s\n' "$out" | awk '/^READ-ONCE CONTRACT$/ { f = 1 } /^FLEET STATE$/ { f = 0 } f')

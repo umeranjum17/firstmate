@@ -22,9 +22,9 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # lane is still chosen for relaunch. A lane spawned after its exit is relaunched.
 set -u
 
-# The Firstmate checkout named by JG_UPSTREAM_ROOT supplies tests/lib.sh (fail, pass, ROOT) and the
+# The Juggernaut checkout named by JG_UPSTREAM_ROOT supplies tests/lib.sh (fail, pass, ROOT) and the
 # upstream bin/ scripts; the sentinel under test is this add-on's copy.
-[ -n "${JG_UPSTREAM_ROOT:-}" ] || { echo "skip: set JG_UPSTREAM_ROOT to a Firstmate checkout"; exit 0; }
+[ -n "${JG_UPSTREAM_ROOT:-}" ] || { echo "skip: set JG_UPSTREAM_ROOT to a Juggernaut checkout"; exit 0; }
 SENTINEL="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/bin/jg-sentinel.sh"
 # shellcheck source=/dev/null
 . "$JG_UPSTREAM_ROOT/tests/lib.sh"

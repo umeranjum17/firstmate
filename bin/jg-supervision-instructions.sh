@@ -36,7 +36,7 @@ Usage: jg-supervision-instructions.sh [--harness <name>] [--read-only 0|1] [--af
 Print the current primary harness's supervision operating instructions.
 With --repair-line, print one concise repair instruction for guard and hook messages.
 --afk-mode only matters when --afk 1 (present); it selects the away-mode vs
-quiet-mode (kunchenguid/firstmate#2356) wording, and defaults to away.
+quiet-mode (kunchenguid/juggernaut#2356) wording, and defaults to away.
 EOF
 }
 

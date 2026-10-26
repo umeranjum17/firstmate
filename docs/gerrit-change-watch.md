@@ -102,7 +102,7 @@ The open change and a change that does not exist both emit nothing.
 
 ```
 $ bin/jg-pr-merge.sh task-a https://gerrit.example/c/proj/+/1
-error: firstmate does not submit a Gerrit change: submitting requires an attributed human approval it must not manufacture, so a human submits the change on the server
+error: juggernaut does not submit a Gerrit change: submitting requires an attributed human approval it must not manufacture, so a human submits the change on the server
 $ echo $?
 2
 ```

@@ -18,15 +18,15 @@ WRAPPERS = {
     'main_dialog_mirror': re.compile(r'(?i)main dialog mirror'),
     'compaction_summary': re.compile(r'(?i)summarized conversation'),
     'artifact_content': re.compile(r'(?i)<artifact-content(?:-[a-z0-9_-]+)?\s*/?>|artifact-content wrapper'),
-    'supervision_wake': re.compile(r'(?i)firstmate supervision wake'),
-    'operational_inbox': re.compile(r'(?i)firstmate operational inbox message'),
-    'instruction_waiting': re.compile(r'(?i)firstmate instruction waiting'),
+    'supervision_wake': re.compile(r'(?i)juggernaut supervision wake'),
+    'operational_inbox': re.compile(r'(?i)juggernaut operational inbox message'),
+    'instruction_waiting': re.compile(r'(?i)juggernaut instruction waiting'),
     'stop_hook_wake': re.compile(r'(?im)^\s*stop[- ]hook(?: wake)?'),
     'watcher_wake': re.compile(r'(?im)^\s*watcher[- ]wake|^\s*watcher wake'),
 }
-BLOCKS = re.compile(r'(?is)<(system-reminder|firstmate-instruction|firstmate-operational-input|pasted_content|cross-session-message|task-notification)>.*?</\1>')
+BLOCKS = re.compile(r'(?is)<(system-reminder|juggernaut-instruction|juggernaut-operational-input|pasted_content|cross-session-message|task-notification)>.*?</\1>')
 XML_STYLE_TAG = re.compile(r'<((?:task|system|command)-[A-Za-z0-9_-]+|local-command(?:-[A-Za-z0-9_-]+)?|bash-[A-Za-z0-9_-]+|user-prompt(?:-[A-Za-z0-9_-]+)?)\b[^>]*>', re.I)
-INJECTED_LINE = re.compile(r'(?i)(?:^|\s)(?:system:|hook:|notification:|firstmate instruction waiting|firstmate operational input)\b')
+INJECTED_LINE = re.compile(r'(?i)(?:^|\s)(?:system:|hook:|notification:|juggernaut instruction waiting|juggernaut operational input)\b')
 
 
 def redact(text):
@@ -79,7 +79,7 @@ def clean(text):
         line = line.strip()
         if not line:
             continue
-        if line.lower().startswith(('reminder', '<system-reminder', '<firstmate')):
+        if line.lower().startswith(('reminder', '<system-reminder', '<juggernaut')):
             line_drops['injected_line_wrapper'] += 1
             continue
         if line.startswith('/'):
@@ -90,8 +90,8 @@ def clean(text):
 
 
 def main():
-    home = Path(os.environ.get('JG_HOME', str(Path.home() / 'firstmate'))).resolve()
-    transcript_default = Path.home() / '.claude/projects/-home-umer-firstmate'
+    home = Path(os.environ.get('JG_HOME', str(Path.home() / 'juggernaut'))).resolve()
+    transcript_default = Path.home() / '.claude/projects/-home-umer-juggernaut'
     transcripts = Path(os.environ.get('CHAT_TSV_TRANSCRIPTS', str(transcript_default)))
     dest, sidecar = home / 'data/chat.tsv', home / 'data/chat.tsv.seen'
     if len(sys.argv) not in (1, 3):
@@ -159,11 +159,11 @@ def main():
             if not any(char.isalnum() for char in body):
                 drops['punctuation_only'] += 1
                 continue
-            if re.match(r'(?i)^(system|hook|notification|firstmate instruction waiting|firstmate operational input|local-command|/\w+)', body):
+            if re.match(r'(?i)^(system|hook|notification|juggernaut instruction waiting|juggernaut operational input|local-command|/\w+)', body):
                 drops['command_or_injected_envelope'] += 1
                 continue
             cwd = rec.get('cwd', '')
-            work = Path(cwd).name if cwd and Path(cwd).name not in ('firstmate', '') else 'main'
+            work = Path(cwd).name if cwd and Path(cwd).name not in ('juggernaut', '') else 'main'
             text = redact(body).replace('\t', ' ').replace('\n', ' ')
             if len(text) > MAX_TEXT:
                 text = text[:MAX_TEXT - len('[truncated]')] + '[truncated]'

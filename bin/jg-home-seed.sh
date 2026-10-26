@@ -1,31 +1,31 @@
 #!/usr/bin/env bash
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
-# Provision and route persistent secondmate homes.
+# Provision and route persistent squad_lead homes.
 #
 # Usage:
 #   jg-home-seed.sh <id> <home|-> {<project>...|--no-projects}
-#       Provision <home> as an isolated firstmate home. If <home> is "-", acquire
-#       a fresh firstmate worktree via "treehouse get --lease", which durably
-#       leases the worktree under the secondmate <id> so the home survives with
+#       Provision <home> as an isolated juggernaut home. If <home> is "-", acquire
+#       a fresh juggernaut worktree via "treehouse get --lease", which durably
+#       leases the worktree under the squad_lead <id> so the home survives with
 #       no live process and is never recycled until the lease is released with
 #       "treehouse return". Projects are cloned
-#       from the active home into the secondmate home's projects/ directory.
+#       from the active home into the squad_lead home's projects/ directory.
 #       That project list is non-exclusive provisioning data. Pass --no-projects
 #       instead of a project list to seed a project-less home for a domain whose
-#       subject is the firstmate repo itself; it is mutually exclusive with a
+#       subject is the juggernaut repo itself; it is mutually exclusive with a
 #       project list, and omitting both still fails loudly. A project-less seed
 #       refuses a home with project clones or project-registry entries, so it
 #       never converts populated homes in place. The charter brief
 #       is copied to data/charter.md, newly cloned no-mistakes projects are
-#       initialized, an ignored .jg-secondmate-parent binding is published before
-#       the .jg-secondmate-home identity marker, and data/secondmates.md is updated.
+#       initialized, an ignored .jg-squad-lead-parent binding is published before
+#       the .jg-squad-lead-home identity marker, and data/squad_leads.md is updated.
 #       Seeding is transactional: on validation, clone, init, or registry failure,
 #       generated briefs, new homes, new project clones, and registry edits are
 #       rolled back. Treehouse-acquired homes are returned only when the rollback
 #       target is safe; a failed return warns because the lease may still be held.
-#       Set JG_SECONDMATE_CHARTER='<charter>' to seed from inline charter text
-#       when no filled charter brief exists. Set JG_SECONDMATE_SCOPE='<scope>'
+#       Set JG_SQUAD_LEAD_CHARTER='<charter>' to seed from inline charter text
+#       when no filled charter brief exists. Set JG_SQUAD_LEAD_SCOPE='<scope>'
 #       to override the registry routing scope. Otherwise the registry summary
 #       and scope are derived from the filled charter brief.
 #   jg-home-seed.sh validate
@@ -40,15 +40,15 @@ JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
 DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
 PROJECTS="${JG_PROJECTS_OVERRIDE:-$JG_HOME/projects}"
 STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
-REG="$DATA/secondmates.md"
-SUB_HOME_MARKER=".jg-secondmate-home"
-SUB_HOME_PARENT_MARKER=".jg-secondmate-parent"
-# shellcheck source=bin/jg-secondmate-registry-lib.sh
-. "$SCRIPT_DIR/jg-secondmate-registry-lib.sh"
-# shellcheck source=bin/jg-secondmate-parent-lib.sh
-. "$SCRIPT_DIR/jg-secondmate-parent-lib.sh"
-# shellcheck source=bin/jg-secondmate-charter-lib.sh
-. "$SCRIPT_DIR/jg-secondmate-charter-lib.sh"
+REG="$DATA/squad_leads.md"
+SUB_HOME_MARKER=".jg-squad-lead-home"
+SUB_HOME_PARENT_MARKER=".jg-squad-lead-parent"
+# shellcheck source=bin/jg-squad-lead-registry-lib.sh
+. "$SCRIPT_DIR/jg-squad-lead-registry-lib.sh"
+# shellcheck source=bin/jg-squad-lead-parent-lib.sh
+. "$SCRIPT_DIR/jg-squad-lead-parent-lib.sh"
+# shellcheck source=bin/jg-squad-lead-charter-lib.sh
+. "$SCRIPT_DIR/jg-squad-lead-charter-lib.sh"
 # shellcheck source=bin/jg-wake-lib.sh
 . "$SCRIPT_DIR/jg-wake-lib.sh"
 
@@ -61,7 +61,7 @@ validate_registry_home_text() {
   local home=$1
   case "$home" in
     *';'*|*')'*|*$'\n'*)
-      echo "error: secondmate home path contains registry delimiters: $home" >&2
+      echo "error: squad_lead home path contains registry delimiters: $home" >&2
       return 1
       ;;
   esac
@@ -149,12 +149,12 @@ registry_home_conflict_for_assignment() {
   while IFS= read -r line || [ -n "$line" ]; do
     case "$line" in
       "- "*)
-        if ! secondmate_registry_parse_line "$line"; then
-          echo "error: malformed secondmate registry entry: $line" >&2
+        if ! squad_lead_registry_parse_line "$line"; then
+          echo "error: malformed squad_lead registry entry: $line" >&2
           return 1
         fi
-        registered_id=$SECONDMATE_REGISTRY_ID
-        registered_home=$SECONDMATE_REGISTRY_HOME
+        registered_id=$SQUAD_LEAD_REGISTRY_ID
+        registered_home=$SQUAD_LEAD_REGISTRY_HOME
         registered_key=$(resolved_path "$registered_home")
         if [ "$registered_key" = "$target" ]; then
           [ "$registered_id" = "$id" ] && continue
@@ -178,13 +178,13 @@ registry_id_conflict_for_assignment() {
   while IFS= read -r line || [ -n "$line" ]; do
     case "$line" in
       "- "*)
-        secondmate_registry_parse_line "$line" || {
-          echo "error: malformed secondmate registry entry: $line" >&2
+        squad_lead_registry_parse_line "$line" || {
+          echo "error: malformed squad_lead registry entry: $line" >&2
           return 1
         }
-        registered_id=$SECONDMATE_REGISTRY_ID
+        registered_id=$SQUAD_LEAD_REGISTRY_ID
         [ "$registered_id" = "$id" ] || continue
-        registered_home=$SECONDMATE_REGISTRY_HOME
+        registered_home=$SQUAD_LEAD_REGISTRY_HOME
         registered_key=$(resolved_path "$registered_home")
         [ "$registered_key" = "$target" ] && continue
         printf '%s\n' "$registered_key"
@@ -197,8 +197,8 @@ registry_id_conflict_for_assignment() {
 
 validate_registry() {
   [ -e "$REG" ] || [ -L "$REG" ] || return 0
-  secondmate_registry_validate_bindings "$REG" resolved_path || {
-    printf 'error: %s\n' "$SECONDMATE_REGISTRY_ERROR" >&2
+  squad_lead_registry_validate_bindings "$REG" resolved_path || {
+    printf 'error: %s\n' "$SQUAD_LEAD_REGISTRY_ERROR" >&2
     return 1
   }
 }
@@ -225,31 +225,31 @@ refuse_active_home_path() {
   abs_active_home=$(resolved_path "$JG_HOME")
   abs_root=$(resolved_path "$JG_ROOT")
   if [ "$abs_home" = "/" ]; then
-    echo "error: secondmate home cannot be the filesystem root: $home" >&2
+    echo "error: squad_lead home cannot be the filesystem root: $home" >&2
     return 1
   fi
   if [ "$abs_home" = "$abs_active_home" ]; then
-    echo "error: secondmate home cannot be the active firstmate home: $home" >&2
+    echo "error: squad_lead home cannot be the active juggernaut home: $home" >&2
     return 1
   fi
   if [ "$abs_home" = "$abs_root" ]; then
-    echo "error: secondmate home cannot be the firstmate repo: $home" >&2
+    echo "error: squad_lead home cannot be the juggernaut repo: $home" >&2
     return 1
   fi
   if path_is_ancestor_of "$abs_active_home" "$abs_home"; then
-    echo "error: secondmate home cannot be inside the active firstmate home: $home" >&2
+    echo "error: squad_lead home cannot be inside the active juggernaut home: $home" >&2
     return 1
   fi
   if path_is_ancestor_of "$abs_root" "$abs_home"; then
-    echo "error: secondmate home cannot be inside the firstmate repo: $home" >&2
+    echo "error: squad_lead home cannot be inside the juggernaut repo: $home" >&2
     return 1
   fi
   if path_is_ancestor_of "$abs_home" "$abs_active_home"; then
-    echo "error: secondmate home cannot be an ancestor of the active firstmate home: $home" >&2
+    echo "error: squad_lead home cannot be an ancestor of the active juggernaut home: $home" >&2
     return 1
   fi
   if path_is_ancestor_of "$abs_home" "$abs_root"; then
-    echo "error: secondmate home cannot be an ancestor of the firstmate repo: $home" >&2
+    echo "error: squad_lead home cannot be an ancestor of the juggernaut repo: $home" >&2
     return 1
   fi
 }
@@ -258,7 +258,7 @@ validate_operational_dir() {
   local home=$1 name=$2 dir abs_home abs_dir abs_active_home abs_root
   dir="$home/$name"
   if [ -L "$dir" ] && [ ! -e "$dir" ]; then
-    echo "error: secondmate $name directory must resolve inside the secondmate home: $dir" >&2
+    echo "error: squad_lead $name directory must resolve inside the squad_lead home: $dir" >&2
     return 1
   fi
   abs_home=$(resolved_path "$home")
@@ -266,15 +266,15 @@ validate_operational_dir() {
   abs_active_home=$(resolved_path "$JG_HOME")
   abs_root=$(resolved_path "$JG_ROOT")
   if ! path_is_ancestor_of "$abs_home" "$abs_dir"; then
-    echo "error: secondmate $name directory must resolve inside the secondmate home: $dir" >&2
+    echo "error: squad_lead $name directory must resolve inside the squad_lead home: $dir" >&2
     return 1
   fi
   if [ "$abs_dir" = "$abs_active_home" ] || path_is_ancestor_of "$abs_active_home" "$abs_dir"; then
-    echo "error: secondmate $name directory cannot be inside the active firstmate home: $dir" >&2
+    echo "error: squad_lead $name directory cannot be inside the active juggernaut home: $dir" >&2
     return 1
   fi
   if [ "$abs_dir" = "$abs_root" ] || path_is_ancestor_of "$abs_root" "$abs_dir"; then
-    echo "error: secondmate $name directory cannot be inside the firstmate repo: $dir" >&2
+    echo "error: squad_lead $name directory cannot be inside the juggernaut repo: $dir" >&2
     return 1
   fi
 }
@@ -292,19 +292,19 @@ validate_seed_leaf_files() {
   for label in "data/projects.md" "data/charter.md" "$SUB_HOME_MARKER" "$SUB_HOME_PARENT_MARKER"; do
     path="$home/$label"
     if [ -L "$path" ]; then
-      echo "error: secondmate leaf file must not be a symlink: $path" >&2
+      echo "error: squad_lead leaf file must not be a symlink: $path" >&2
       return 1
     fi
     [ -e "$path" ] || continue
     if [ ! -f "$path" ]; then
-      echo "error: secondmate leaf file must be a regular file: $path" >&2
+      echo "error: squad_lead leaf file must be a regular file: $path" >&2
       return 1
     fi
     abs_path=$(resolved_path "$path")
     case "$abs_path" in
       "$abs_home"/*) ;;
       *)
-        echo "error: secondmate leaf file must resolve inside the secondmate home: $path" >&2
+        echo "error: squad_lead leaf file must resolve inside the squad_lead home: $path" >&2
         return 1
         ;;
     esac
@@ -315,13 +315,13 @@ validate_existing_parent_binding() {
   local home=$1 record recorded_parent requested_parent
   record="$home/$SUB_HOME_PARENT_MARKER"
   [ -f "$record" ] && [ ! -L "$record" ] || return 0
-  jg_secondmate_parent_record_parse "$record" || return 0
-  [ "$JG_SECONDMATE_PARENT_ROUTE" = local ] || return 0
+  jg_squad_lead_parent_record_parse "$record" || return 0
+  [ "$JG_SQUAD_LEAD_PARENT_ROUTE" = local ] || return 0
 
-  recorded_parent=$(resolved_path "$JG_SECONDMATE_PARENT_HOME")
+  recorded_parent=$(resolved_path "$JG_SQUAD_LEAD_PARENT_HOME")
   requested_parent=$(resolved_path "$JG_HOME")
   [ "$recorded_parent" = "$requested_parent" ] && return 0
-  printf 'error: secondmate home is bound to parent %s, not requested parent %s\n' \
+  printf 'error: squad_lead home is bound to parent %s, not requested parent %s\n' \
     "$recorded_parent" "$requested_parent" >&2
   return 1
 }
@@ -336,19 +336,19 @@ validate_project_destination() {
   abs_active_home=$(resolved_path "$JG_HOME")
   abs_root=$(resolved_path "$JG_ROOT")
   if ! path_is_ancestor_of "$abs_home" "$abs_projects"; then
-    echo "error: secondmate projects directory must resolve inside the secondmate home: $projects_dir" >&2
+    echo "error: squad_lead projects directory must resolve inside the squad_lead home: $projects_dir" >&2
     return 1
   fi
   if ! path_is_ancestor_of "$abs_projects" "$abs_dst"; then
-    echo "error: seeded project $project destination must resolve inside the secondmate projects directory: $dst" >&2
+    echo "error: seeded project $project destination must resolve inside the squad_lead projects directory: $dst" >&2
     return 1
   fi
   if [ "$abs_dst" = "$abs_active_home" ] || path_is_ancestor_of "$abs_active_home" "$abs_dst"; then
-    echo "error: seeded project $project destination cannot be inside the active firstmate home: $dst" >&2
+    echo "error: seeded project $project destination cannot be inside the active juggernaut home: $dst" >&2
     return 1
   fi
   if [ "$abs_dst" = "$abs_root" ] || path_is_ancestor_of "$abs_root" "$abs_dst"; then
-    echo "error: seeded project $project destination cannot be inside the firstmate repo: $dst" >&2
+    echo "error: seeded project $project destination cannot be inside the juggernaut repo: $dst" >&2
     return 1
   fi
   printf '%s\n' "$abs_dst"
@@ -397,20 +397,20 @@ acquire_treehouse_home() (
     return 1
   }
   trap 'jg_lock_release "$project_lock"' EXIT
-  jg_local_firstmate_state_dirs "$STATE" || {
-    echo "error: cannot enumerate recorded Treehouse copies: $JG_LOCAL_FIRSTMATE_ERROR" >&2
+  jg_local_juggernaut_state_dirs "$STATE" || {
+    echo "error: cannot enumerate recorded Treehouse copies: $JG_LOCAL_JUGGERNAUT_ERROR" >&2
     return 1
   }
-  python3 "$SCRIPT_DIR/jg-treehouse-protect.py" "$JG_ROOT" "${JG_LOCAL_FIRSTMATE_STATES[@]}" || return 1
-  # Durably lease a firstmate worktree from the pool. The lease persists with no
+  python3 "$SCRIPT_DIR/jg-treehouse-protect.py" "$JG_ROOT" "${JG_LOCAL_JUGGERNAUT_STATES[@]}" || return 1
+  # Durably lease a juggernaut worktree from the pool. The lease persists with no
   # live process and is skipped by later get/prune, so the home survives restarts
   # until teardown or rollback returns it. treehouse prints only the worktree path
   # to stdout (banners go to stderr), so command substitution captures the path.
   home=$(cd "$JG_ROOT" && treehouse get --lease --lease-holder "$id") || {
-    echo "error: treehouse get --lease failed to lease a firstmate home" >&2
+    echo "error: treehouse get --lease failed to lease a juggernaut home" >&2
     return 1
   }
-  [ -n "$home" ] || { echo "error: treehouse get --lease did not report a firstmate home" >&2; return 1; }
+  [ -n "$home" ] || { echo "error: treehouse get --lease did not report a juggernaut home" >&2; return 1; }
   printf '%s\n' "$home"
 )
 
@@ -418,7 +418,7 @@ ensure_home() {
   local id=$1 requested=$2 home
   if [ "$requested" = "-" ]; then
     home=$(acquire_treehouse_home "$id")
-    verify_firstmate_home "$home"
+    verify_juggernaut_home "$home"
     return
   fi
 
@@ -430,14 +430,14 @@ ensure_home() {
     mkdir -p "$(dirname "$home")"
     git clone --quiet "$JG_ROOT" "$home"
   fi
-  verify_firstmate_home "$home"
+  verify_juggernaut_home "$home"
 }
 
-verify_firstmate_home() {
+verify_juggernaut_home() {
   local home=$1
   refuse_active_home_path "$home" || return 1
-  [ -f "$home/AGENTS.md" ] || { echo "error: $home is not a firstmate home (missing AGENTS.md)" >&2; return 1; }
-  [ -d "$home/bin" ] || { echo "error: $home is not a firstmate home (missing bin/)" >&2; return 1; }
+  [ -f "$home/AGENTS.md" ] || { echo "error: $home is not a juggernaut home (missing AGENTS.md)" >&2; return 1; }
+  [ -d "$home/bin" ] || { echo "error: $home is not a juggernaut home (missing bin/)" >&2; return 1; }
   validate_operational_dirs "$home" || return 1
   printf '%s\n' "$(cd "$home" && pwd -P)"
 }
@@ -447,13 +447,13 @@ validate_home_assignment() {
   if [ -f "$home/$SUB_HOME_MARKER" ]; then
     marker_id=$(cat "$home/$SUB_HOME_MARKER" 2>/dev/null || true)
     if [ "$marker_id" != "$id" ]; then
-      echo "error: secondmate home $home is already marked for ${marker_id:-unknown}" >&2
+      echo "error: squad_lead home $home is already marked for ${marker_id:-unknown}" >&2
       return 1
     fi
   fi
   id_conflict=$(registry_id_conflict_for_assignment "$id" "$home" || true)
   if [ -n "$id_conflict" ]; then
-    echo "error: secondmate id $id is already registered to home $id_conflict; retire it before assigning $home" >&2
+    echo "error: squad_lead id $id is already registered to home $id_conflict; retire it before assigning $home" >&2
     return 1
   fi
   conflict=$(registry_home_conflict_for_assignment "$id" "$home" || true)
@@ -462,10 +462,10 @@ validate_home_assignment() {
 $conflict
 EOF
   if [ "$conflict_type" = exact ]; then
-    echo "error: secondmate home $home is already registered to $owner" >&2
+    echo "error: squad_lead home $home is already registered to $owner" >&2
     return 1
   fi
-  echo "error: secondmate home $home overlaps registered secondmate home $registered_home for $owner" >&2
+  echo "error: squad_lead home $home overlaps registered squad_lead home $registered_home for $owner" >&2
   return 1
 }
 
@@ -493,7 +493,7 @@ clone_project() {
 $mode_line
 EOF
   if [ "$mode" = local-only ]; then
-    echo "error: project $project is local-only; secondmate routes support only no-mistakes and direct-PR projects" >&2
+    echo "error: project $project is local-only; squad_lead routes support only no-mistakes and direct-PR projects" >&2
     return 1
   fi
   if [ -e "$dst" ]; then
@@ -521,7 +521,7 @@ validate_seed_project() {
 $mode_line
 EOF
   if [ "$mode" = local-only ]; then
-    echo "error: project $project is local-only; secondmate routes support only no-mistakes and direct-PR projects" >&2
+    echo "error: project $project is local-only; squad_lead routes support only no-mistakes and direct-PR projects" >&2
     return 1
   fi
   url=$(git -C "$src" remote get-url origin 2>/dev/null || true)
@@ -577,27 +577,27 @@ seed_rollback_target() {
   abs_home=$(resolved_path "$JG_HOME")
   abs_root=$(resolved_path "$JG_ROOT")
   if [ "$abs_target" = "$abs_home" ]; then
-    echo "REFUSED: unsafe $label rollback target $target is the active firstmate home" >&2
+    echo "REFUSED: unsafe $label rollback target $target is the active juggernaut home" >&2
     return 1
   fi
   if [ "$abs_target" = "$abs_root" ]; then
-    echo "REFUSED: unsafe $label rollback target $target is the firstmate repo" >&2
+    echo "REFUSED: unsafe $label rollback target $target is the juggernaut repo" >&2
     return 1
   fi
   if path_is_ancestor_of "$abs_target" "$abs_home"; then
-    echo "REFUSED: unsafe $label rollback target $target is an ancestor of the active firstmate home" >&2
+    echo "REFUSED: unsafe $label rollback target $target is an ancestor of the active juggernaut home" >&2
     return 1
   fi
   if path_is_ancestor_of "$abs_target" "$abs_root"; then
-    echo "REFUSED: unsafe $label rollback target $target is an ancestor of the firstmate repo" >&2
+    echo "REFUSED: unsafe $label rollback target $target is an ancestor of the juggernaut repo" >&2
     return 1
   fi
   if path_is_ancestor_of "$abs_home" "$abs_target"; then
-    echo "REFUSED: unsafe $label rollback target $target is inside the active firstmate home" >&2
+    echo "REFUSED: unsafe $label rollback target $target is inside the active juggernaut home" >&2
     return 1
   fi
   if path_is_ancestor_of "$abs_root" "$abs_target"; then
-    echo "REFUSED: unsafe $label rollback target $target is inside the firstmate repo" >&2
+    echo "REFUSED: unsafe $label rollback target $target is inside the juggernaut repo" >&2
     return 1
   fi
   printf '%s\n' "$abs_target"
@@ -628,11 +628,11 @@ seed_project_rollback_target() {
   abs_home=$(resolved_path "$SEED_HOME")
   abs_projects=$(resolved_path "$SEED_HOME/projects")
   if ! path_is_ancestor_of "$abs_home" "$abs_projects"; then
-    echo "REFUSED: unsafe created project rollback target $target has projects directory outside the secondmate home" >&2
+    echo "REFUSED: unsafe created project rollback target $target has projects directory outside the squad_lead home" >&2
     return 1
   fi
   if ! path_is_ancestor_of "$abs_projects" "$abs_target"; then
-    echo "REFUSED: unsafe created project rollback target $target is outside the secondmate projects directory" >&2
+    echo "REFUSED: unsafe created project rollback target $target is outside the squad_lead projects directory" >&2
     return 1
   fi
   printf '%s\n' "$abs_target"
@@ -685,7 +685,7 @@ seed_rollback() {
   fi
 
   if [ -n "${SEED_BACKUP_DIR:-}" ]; then
-    restore_seed_file "$SEED_PARENT_REG_EXISTED" "$SEED_BACKUP_DIR/parent-secondmates.md" "$REG"
+    restore_seed_file "$SEED_PARENT_REG_EXISTED" "$SEED_BACKUP_DIR/parent-squad-leads.md" "$REG"
     rm -rf -- "$SEED_BACKUP_DIR" 2>/dev/null || true
   fi
 }
@@ -827,7 +827,7 @@ refuse_populated_projectless_home() {
   fi
   [ "${#clones[@]}" -eq 0 ] && [ "${#registry_projects[@]}" -eq 0 ] && return 0
 
-  echo "error: cannot seed project-less secondmate home $home because it contains project data" >&2
+  echo "error: cannot seed project-less squad_lead home $home because it contains project data" >&2
   if [ "${#clones[@]}" -gt 0 ]; then
     printf 'error: projects/ entries: %s\n' "$(join_projects "${clones[@]}")" >&2
   fi
@@ -845,8 +845,8 @@ refuse_projectful_projectless_charter() {
     && ! printf '%s\n' "$project_clones" | grep -Eq '^[[:space:]]*-[[:space:]]+'; then
     return 0
   fi
-  printf 'error: cannot seed project-less secondmate home because existing charter brief at %s conflicts with --no-projects\n' "$brief" >&2
-  printf 'error: re-scaffold it with jg-brief.sh %s --secondmate --no-projects or remove the stale brief before seeding\n' "$id" >&2
+  printf 'error: cannot seed project-less squad_lead home because existing charter brief at %s conflicts with --no-projects\n' "$brief" >&2
+  printf 'error: re-scaffold it with jg-brief.sh %s --squad-lead --no-projects or remove the stale brief before seeding\n' "$id" >&2
   return 1
 }
 
@@ -872,11 +872,11 @@ seed_home() {
   if [ "$no_projects" -eq 1 ]; then
     [ $# -eq 0 ] || { echo "error: --no-projects cannot be combined with a project list" >&2; return 1; }
   else
-    [ $# -gt 0 ] || { echo "error: secondmate needs at least one project, or --no-projects for a project-less home" >&2; return 1; }
+    [ $# -gt 0 ] || { echo "error: squad_lead needs at least one project, or --no-projects for a project-less home" >&2; return 1; }
   fi
 
   mkdir -p "$STATE" || return 1
-  SEED_REGISTRY_LOCK=$(secondmate_registry_lock_path "$STATE")
+  SEED_REGISTRY_LOCK=$(squad_lead_registry_lock_path "$STATE")
   jg_lock_acquire_wait "$SEED_REGISTRY_LOCK" || return 1
   SEED_REGISTRY_LOCK_HELD=1
   trap seed_exit_cleanup EXIT
@@ -905,14 +905,14 @@ seed_home() {
   SEED_MARKER_EXISTED=0
   if [ -f "$REG" ]; then
     SEED_PARENT_REG_EXISTED=1
-    cp "$REG" "$SEED_BACKUP_DIR/parent-secondmates.md"
+    cp "$REG" "$SEED_BACKUP_DIR/parent-squad-leads.md"
   fi
 
   if [ "$requested_home" = "-" ]; then
     SEED_HOME_ACQUIRED=1
     home=$(acquire_treehouse_home "$id")
     SEED_HOME="$home"
-    home=$(verify_firstmate_home "$home")
+    home=$(verify_juggernaut_home "$home")
   else
     requested_abs=$(abs_path_for_new "$requested_home")
     refuse_active_home_path "$requested_abs" || return 1
@@ -953,30 +953,30 @@ seed_home() {
   SEED_HOME_BACKED_UP=1
 
   if [ ! -f "$SEED_PARENT_BRIEF" ]; then
-    [ -n "${JG_SECONDMATE_CHARTER:-}" ] || {
-      echo "error: no filled secondmate charter brief at $SEED_PARENT_BRIEF; set JG_SECONDMATE_CHARTER or scaffold one and replace {TASK}" >&2
+    [ -n "${JG_SQUAD_LEAD_CHARTER:-}" ] || {
+      echo "error: no filled squad_lead charter brief at $SEED_PARENT_BRIEF; set JG_SQUAD_LEAD_CHARTER or scaffold one and replace {TASK}" >&2
       return 1
     }
     [ -d "$DATA/$id" ] || SEED_PARENT_BRIEF_DIR_CREATED=1
     if [ "$no_projects" -eq 1 ]; then
-      "$JG_ROOT/bin/jg-brief.sh" "$id" --secondmate --no-projects
+      "$JG_ROOT/bin/jg-brief.sh" "$id" --squad-lead --no-projects
     else
-      "$JG_ROOT/bin/jg-brief.sh" "$id" --secondmate "$@"
+      "$JG_ROOT/bin/jg-brief.sh" "$id" --squad-lead "$@"
     fi
     SEED_PARENT_BRIEF_CREATED=1
   fi
   if grep -F '{TASK}' "$SEED_PARENT_BRIEF" >/dev/null 2>&1; then
-    echo "error: secondmate charter brief at $SEED_PARENT_BRIEF still contains {TASK}; fill it before seeding" >&2
+    echo "error: squad_lead charter brief at $SEED_PARENT_BRIEF still contains {TASK}; fill it before seeding" >&2
     return 1
   fi
   charter_summary=$(registry_summary_for_brief "$SEED_PARENT_BRIEF")
   [ -n "$charter_summary" ] || {
-    echo "error: secondmate charter brief at $SEED_PARENT_BRIEF has an empty Charter section; fill it before seeding" >&2
+    echo "error: squad_lead charter brief at $SEED_PARENT_BRIEF has an empty Charter section; fill it before seeding" >&2
     return 1
   }
   charter_scope=$(registry_scope_for_brief "$SEED_PARENT_BRIEF")
   [ -n "$charter_scope" ] || {
-    echo "error: secondmate charter brief at $SEED_PARENT_BRIEF has an empty Routing scope section; fill it before seeding" >&2
+    echo "error: squad_lead charter brief at $SEED_PARENT_BRIEF has an empty Routing scope section; fill it before seeding" >&2
     return 1
   }
 
@@ -1004,7 +1004,7 @@ seed_home() {
   # can still resolve the real parent instead of silently treating its relay
   # as inactive.
   {
-    printf 'schema=jg-secondmate-parent.v1\n'
+    printf 'schema=jg-squad-lead-parent.v1\n'
     printf 'route=local\n'
     printf 'parent_home=%s\n' "$(resolved_path "$JG_HOME")"
   } > "$home/$SUB_HOME_PARENT_MARKER.tmp.$$"

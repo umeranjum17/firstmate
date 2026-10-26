@@ -22,10 +22,10 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # command skips with one log line.
 set -u
 
-# The Firstmate checkout owns tests/lib.sh; JG_CODE_ROOT names that checkout.
+# The Juggernaut checkout owns tests/lib.sh; JG_CODE_ROOT names that checkout.
 CODE_ROOT=${JG_CODE_ROOT:-}
 [ -n "$CODE_ROOT" ] && [ -f "$CODE_ROOT/tests/lib.sh" ] \
-  || { echo "skip: set JG_CODE_ROOT to a Firstmate checkout"; exit 0; }
+  || { echo "skip: set JG_CODE_ROOT to a Juggernaut checkout"; exit 0; }
 ADDONS=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 ADAPTER="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/bin/jg-procevent-signoff.sh"
 # shellcheck source=/dev/null

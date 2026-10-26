@@ -2,7 +2,7 @@
 
 Only bin/jg-model-stats.sh and bin/jg-skill-stats.sh import this: usage and
 argument parsing, tab-separated file reading, and enumerating this home plus
-every locally registered home from each home's data/secondmates.md. All
+every locally registered home from each home's data/squad_leads.md. All
 aggregation and output stays in the importing reader.
 """
 import re
@@ -64,7 +64,7 @@ def walk_homes(root):
         seen.add(home)
         homes[name] = home
         try:
-            lines = (home / 'data/secondmates.md').read_text(errors='replace').splitlines()
+            lines = (home / 'data/squad_leads.md').read_text(errors='replace').splitlines()
         except OSError:
             continue
         for line in lines:

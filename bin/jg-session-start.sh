@@ -6,7 +6,7 @@
 # Collapses AGENTS.md sections 3 (bootstrap) and 5 (recovery) into ONE script
 # producing ONE ordered digest, so a session starts in one or two turns
 # instead of the six-plus separate reads the old docs required: run
-# jg-bootstrap.sh, then separately read data/projects.md, data/secondmates.md,
+# jg-bootstrap.sh, then separately read data/projects.md, data/squad_leads.md,
 # data/captain.md, data/captain-shared.md, data/learnings.md, data/owner-rules.md,
 # then run jg-lock.sh, jg-wake-drain.sh, then read data/backlog.md, every state/*.meta,
 # and every state/*.status.
@@ -19,7 +19,7 @@
 # sequencing/formatting logic added here stays local to this file. Those four
 # scripts remain fully working
 # standalone with unchanged default behavior - other flows (jg-bootstrap.sh
-# install <tools> after consent, /updatefirstmate, the afk daemon, existing
+# install <tools> after consent, /updatejuggernaut, the afk daemon, existing
 # tests) still call them directly. The one seam this script needed -
 # bootstrap running its detect-only diagnostics without its six mutating
 # sweeps - is an opt-in JG_BOOTSTRAP_DETECT_ONLY=1 flag on jg-bootstrap.sh
@@ -30,13 +30,13 @@
 #
 #   1. lock          - acquire the per-home session lock FIRST, before any
 #                       mutating step runs.
-#   1b. home role    - the resolved firstmate-repository role line
+#   1b. home role    - the resolved juggernaut-repository role line
 #                      (bin/jg-role.sh report), purely local, no network.
 #   2. bootstrap      - home-local stale Herdr projection cleanup runs only
 #                       when this session actually holds the lock. Detect-only
 #                       diagnostics always run. Bootstrap's six MUTATING sweeps
 #                       (same-home backlog reconciliation,
-#                       secondmate convergence, secondmate liveness, pending remote
+#                       squad_lead convergence, squad_lead liveness, pending remote
 #                       handoff retry, X-mode artifact writes, fleet sync) also run only when
 #                       locked; the four network sweeps run in the deferred
 #                       stage rather than this synchronous bootstrap section.
@@ -63,7 +63,7 @@
 #                       can itself reach the digest's runtime bound.
 #   7. network checks - the result of the deferred network stage started back at
 #                       step 1, harvested WITHOUT waiting for it.
-#   8. context digest - data/projects.md, data/secondmates.md, data/captain.md,
+#   8. context digest - data/projects.md, data/squad_leads.md, data/captain.md,
 #                       data/captain-shared.md, data/learnings.md,
 #                       data/owner-rules.md: read-only,
 #                       always safe, always runs.
@@ -79,11 +79,11 @@
 # NO NETWORK ON THE BLOCKING PATH. This digest runs on a session-open hook that
 # blocks session initialization, so anything it waits for is time the captain
 # waits before the first turn - and every external-network call it used to make
-# was individually unbounded. One unreachable remote secondmate could burn the
+# was individually unbounded. One unreachable remote squad_lead could burn the
 # entire JG_SESSION_START_TIMEOUT and truncate the digest, so a slow network
 # could cost the work queue itself.
 # So no step between here and the last line below makes an external-network
-# call. The five that did - `gh auth status`, secondmate liveness, secondmate
+# call. The five that did - `gh auth status`, squad_lead liveness, squad_lead
 # convergence, pending remote handoff delivery, and the fleet-sync fetch - are
 # started as one detached bounded worker right after the lock (step 1) and
 # harvested at step 7 without ever blocking on it. The bounded inactive-outcome
@@ -121,7 +121,7 @@
 #
 # Why lock first: the old documented order (bootstrap, THEN lock) let a
 # SECOND concurrent session run bootstrap's mutating sweeps - converging
-# secondmate homes, retrying pending handoff outboxes and receiver wakes, writing
+# squad_lead homes, retrying pending handoff outboxes and receiver wakes, writing
 # X-mode artifacts, and fetching or fast-forwarding every project clone - before
 # ever discovering another session already holds the lock. Two sessions racing
 # those sweeps is exactly the hazard the lock exists to prevent, so locking first closes the
@@ -213,7 +213,7 @@
 #             only lost its context (a /clear or a compaction). Skip the
 #             mutating sweeps that startup already reconciled - the stale Herdr
 #             projection cleanup and bootstrap's six mutating sweeps (fleet
-#             sync, same-home backlog reconciliation, secondmate convergence and
+#             sync, same-home backlog reconciliation, squad_lead convergence and
 #             liveness, pending remote handoff retry, X-mode
 #             artifact writes) - and
 #             re-emit the rest. Wake-queue presentation is NOT skipped: queued
@@ -408,7 +408,7 @@ subsection() { printf '\n%s\n%s\n' "$1" "$SUBRULE"; }
 
 # print_file_or_absent <path> <label>: full contents under a labeled
 # subsection, or an explicit ABSENT marker. Absence is semantically
-# meaningful for every one of these files (captain.md absent = firstmate
+# meaningful for every one of these files (captain.md absent = juggernaut
 # repo built-in defaults, projects.md absent = rebuild from clones, etc. -
 # AGENTS.md section 3) and must never be confused with an empty-but-present
 # file, so the two cases print differently.
@@ -568,7 +568,7 @@ print_status_tail() {
   local status=$1 line
   printf 'status tail (last %s line(s), each capped at %s characters, wake-EVENT history, not current state; full log: %s):\n' \
     "$STATUS_TAIL" "$JG_LINE_CAP_DEFAULT" "$status"
-  # A crewmate writes its own status lines, so their length is unbounded: one
+  # A operator writes its own status lines, so their length is unbounded: one
   # observed line ran 865 characters. Cap each one the way the wake digest's
   # OPEN DECISIONS section does; the lede carries the state word and the key,
   # and the full log path above reaches the rest.
@@ -639,7 +639,7 @@ agents_baseline_drifted() {  # <rebuilding-session-pid>
 }
 
 # Only run-tier source pairs with both a stale native instruction cache and a
-# working Firstmate delivery path arrive here. Claude fresh-reads on reset, and
+# working Juggernaut delivery path arrive here. Claude fresh-reads on reset, and
 # Codex has no tracked interactive reset delivery path.
 agents_refresh_required() {  # <rebuilding-session-pid>
   local lock_pid=$1
@@ -657,7 +657,7 @@ print_agents_refresh_if_required() {  # <rebuilding-session-pid>
   if [ -f "$JG_ROOT/AGENTS.md" ]; then
     cat <<'EOF'
 The complete on-disk AGENTS.md below supersedes the instruction copy this session
-started with. Apply it as the current Firstmate instruction contract.
+started with. Apply it as the current Juggernaut instruction contract.
 
 EOF
     cat "$JG_ROOT/AGENTS.md"
@@ -676,7 +676,7 @@ if [ "$REEMIT" -eq 1 ]; then
   printf 'This session already took the helm at its own startup and has only lost its\n'
   printf 'context. Lock ownership is re-verified and the durable records below are\n'
   printf 'reprinted, but the sweeps startup already reconciled - project clone refresh,\n'
-  printf 'secondmate convergence and liveness, pending remote handoff\n'
+  printf 'squad_lead convergence and liveness, pending remote handoff\n'
   printf 'retry, X-mode artifact writes, and stale Herdr child cleanup - are NOT repeated.\n'
   printf 'Queued wakes ARE still drained: they arrived after startup and are this turn work.\n'
 else
@@ -697,7 +697,7 @@ if [ "$LOCK_RC" -ne 0 ]; then
     printf '●  READ-ONLY SESSION - FLEET LOCK OWNERSHIP WAS NOT VERIFIED\n'
     printf '●  %s\n' "$LOCK_OUT"
     printf '●  Skipping every mutating step: stale Herdr child cleanup,\n'
-    printf '●  secondmate convergence, secondmate liveness, pending remote handoff retry,\n'
+    printf '●  squad_lead convergence, squad_lead liveness, pending remote handoff retry,\n'
     printf '●  X-mode artifacts, fleet sync, and wake-queue drain. Detect-only bootstrap\n'
     printf '●  diagnostics and the rest of this read-only-safe digest still ran below.\n'
     printf '●  Operate read-only until this resolves - do not spawn, steer, merge, or\n'
@@ -709,7 +709,7 @@ REBUILDING_SESSION_PID=$(jg_harness_ancestry_pid 2>/dev/null || true)
 print_agents_refresh_if_required "$REBUILDING_SESSION_PID"
 
 # --- 1b. home role -------------------------------------------------------
-# This home's firstmate-repository role: user/operator unless an explicit
+# This home's juggernaut-repository role: user/operator unless an explicit
 # local or receipt-proven inherited grant says otherwise (bin/jg-role-lib.sh).
 # Purely local resolution - no network, no gh call.
 stage role
@@ -879,7 +879,7 @@ section "READ-ONCE CONTRACT"
 cat <<'EOF'
 Everything below is printed in full for this session start: every state/*.meta,
 a compact data/backlog.md listing, a bounded tail of every state/*.status,
-data/projects.md, data/secondmates.md, data/captain.md, data/captain-shared.md,
+data/projects.md, data/squad_leads.md, data/captain.md, data/captain-shared.md,
 data/learnings.md, and data/owner-rules.md.
 Do NOT re-read any of them after reading this digest, and do NOT bulk-read
 data/backlog.md or state/*.status: re-reading everything defeats the entire
@@ -989,7 +989,7 @@ else
   printf 'absent\n'
 fi
 
-# Public commitments made through the myfirstmate relay. A promise to reply in a
+# Public commitments made through the myjuggernaut relay. A promise to reply in a
 # public thread must survive compaction and restart, so it is surfaced from disk
 # here rather than from conversation memory. jg-public-followup-lib.sh owns both
 # gates: a home that never opted into the relay runs one [ -f ] test, prints no
@@ -1009,7 +1009,7 @@ fi
 
 # --- 7. network checks ------------------------------------------------------
 # Deliberately here and not later: these lines are actionable (a stuck clone, a
-# secondmate that could not be relaunched, broken GitHub auth), and the section
+# squad_lead that could not be relaunched, broken GitHub auth), and the section
 # after this one is the curated memory a truncated tail is meant to take first.
 # Deliberately here and not earlier: this is the last point in the digest, so the
 # worker started at step 1 has had the whole composition above to finish in. It
@@ -1019,7 +1019,7 @@ stage network-checks
 section "NETWORK CHECKS"
 if [ "$READ_ONLY" -eq 1 ]; then
   printf 'skipped (read-only session) - GitHub authentication, project clone refresh,\n'
-  printf 'secondmate liveness and convergence, and pending handoff delivery were not run.\n'
+  printf 'squad_lead liveness and convergence, and pending handoff delivery were not run.\n'
   printf 'They need the fleet lock, and this session must not spawn, steer, or merge, so it\n'
   printf 'has no action they would gate. The session holding the lock runs them.\n'
 else
@@ -1034,9 +1034,9 @@ fi
 stage context
 section "CONTEXT"
 print_file_or_absent "$DATA/projects.md" "data/projects.md"
-print_file_or_absent "$DATA/secondmates.md" "data/secondmates.md"
+print_file_or_absent "$DATA/squad_leads.md" "data/squad_leads.md"
 print_file_or_absent "$DATA/captain.md" "data/captain.md"
-print_file_or_absent "$DATA/captain-shared.md" "data/captain-shared.md (shared, main-authoritative, read-only in secondmate homes)"
+print_file_or_absent "$DATA/captain-shared.md" "data/captain-shared.md (shared, main-authoritative, read-only in squad_lead homes)"
 print_file_or_absent "$DATA/learnings.md" "data/learnings.md"
 print_file_or_absent "$DATA/owner-rules.md" "data/owner-rules.md (the shared owner rules every session reads; bin/jg-owner-rules.sh writes it)"
 

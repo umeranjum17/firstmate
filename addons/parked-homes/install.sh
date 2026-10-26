@@ -8,7 +8,7 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
   export "$_jg_new=$_jg_val"
 done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
-# parked-homes install.sh - verify the parked-homes wiring for one firstmate
+# parked-homes install.sh - verify the parked-homes wiring for one juggernaut
 # home. It changes nothing: the add-on works through the fork's shim sourcing
 # this checkout, so the only install state is (1) this checkout reachable from
 # the home, (2) the fork hooks merged, (3) config/parked-homes readable.
@@ -25,19 +25,19 @@ JG_HOME=$home
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd) || exit 1
 lib="$here/parked-homes/bin/jg-parked-homes-lib.sh"
-[ -f "$lib" ] || die "this checkout is missing parked-homes/bin/jg-parked-homes-lib.sh (run from the firstmate-addons checkout)"
+[ -f "$lib" ] || die "this checkout is missing parked-homes/bin/jg-parked-homes-lib.sh (run from the juggernaut-addons checkout)"
 
 status=0
 say() { printf '%s\n' "$*"; }
 bad() { printf 'MISSING: %s\n' "$*"; status=1; }
 
-addons="${JG_ADDONS_DIR:-$home/projects/firstmate-addons}"
+addons="${JG_ADDONS_DIR:-$home/projects/juggernaut-addons}"
 if [ -f "$addons/parked-homes/bin/jg-parked-homes-lib.sh" ]; then
   same=0
   [ "$(cat "$addons/parked-homes/bin/jg-parked-homes-lib.sh" 2>/dev/null)" = "$(cat "$lib")" ] && same=1
   say "add-on checkout: $addons (lib $([ "$same" = 1 ] && echo matches || echo DIFFERS-FROM-this-checkout))"
 else
-  bad "add-on checkout reachable at $addons/parked-homes (set JG_ADDONS_DIR or update projects/firstmate-addons)"
+  bad "add-on checkout reachable at $addons/parked-homes (set JG_ADDONS_DIR or update projects/juggernaut-addons)"
 fi
 
 if [ -f "$home/bin/jg-parked-homes-lib.sh" ] &&

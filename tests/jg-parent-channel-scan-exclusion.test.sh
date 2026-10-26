@@ -41,9 +41,9 @@ trap cleanup EXIT
 seed_remote_mate() {  # <dir>
   local dir=$1
   mkdir -p "$dir/state"
-  printf '%s\n' mate > "$dir/.jg-secondmate-home"
-  printf 'schema=jg-secondmate-parent.v1\nroute=remote\nparent_host=remote.example\n' \
-    > "$dir/.jg-secondmate-parent"
+  printf '%s\n' mate > "$dir/.jg-squad-lead-home"
+  printf 'schema=jg-squad-lead-parent.v1\nroute=remote\nparent_host=remote.example\n' \
+    > "$dir/.jg-squad-lead-parent"
   printf 'needs-decision [key=captain-hold-pr-7-1]: captain hold pr-7: merge the green PR?\n' \
     > "$dir/state/parent-replies.status"
   printf 'resolved [key=captain-hold-pr-5-2]: captain chose the staged rollout\n' \
@@ -53,7 +53,7 @@ seed_remote_mate() {  # <dir>
   printf 'note: benchmark results are in\n' >> "$dir/state/real-task.status"
 }
 
-# seed_plain_home <dir>: a main home (no secondmate identity marker) whose
+# seed_plain_home <dir>: a main home (no squad_lead identity marker) whose
 # state dir carries a parent-replies.status that merely shares the name.
 seed_plain_home() {  # <dir>
   local dir=$1
@@ -70,9 +70,9 @@ seed_plain_home() {  # <dir>
 seed_local_mate() {  # <dir> <parent-home>
   local dir=$1 parent_home=$2
   mkdir -p "$dir/state"
-  printf '%s\n' mate > "$dir/.jg-secondmate-home"
-  printf 'schema=jg-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$parent_home" \
-    > "$dir/.jg-secondmate-parent"
+  printf '%s\n' mate > "$dir/.jg-squad-lead-home"
+  printf 'schema=jg-squad-lead-parent.v1\nroute=local\nparent_home=%s\n' "$parent_home" \
+    > "$dir/.jg-squad-lead-parent"
   printf 'needs-decision [key=local-shape]: still an ordinary self-home file\n' \
     > "$dir/state/parent-replies.status"
 }

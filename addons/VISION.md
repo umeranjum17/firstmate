@@ -41,7 +41,7 @@ In the owner's words: "Whatever is in [the upstream] repo stays in [the fleet ma
 
 ## Next milestones
 
-The last release was [v0.1.0](https://github.com/umeranjum17/firstmate-addons/releases/tag/v0.1.0), the first tagged cut, on 22 Oct 2026. All releases are on the [releases page](https://github.com/umeranjum17/firstmate-addons/releases).
+The last release was [v0.1.0](https://github.com/umeranjum17/juggernaut-addons/releases/tag/v0.1.0), the first tagged cut, on 22 Oct 2026. All releases are on the [releases page](https://github.com/umeranjum17/juggernaut-addons/releases).
 
 1. **v0.2.0 "tickets"** (target 24-25 Oct 2026): a task needs a priority and a target release when it is added or held; a Tickets view on the fleet dashboard with release lanes; old evidence cards retitled.
 2. **v0.3.0**: the account pool and the lead-wake policy leave the fork, each behind one hook line, so upstream updates need no merge.

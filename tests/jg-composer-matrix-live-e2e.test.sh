@@ -4,7 +4,7 @@
 #
 # The shared composer classifier's shape catalogue (bin/jg-composer-lib.sh) is
 # built entirely from vendor-rendered signals, so per
-# .agents/skills/firstmate-coding-guidelines it must be proven against the
+# .agents/skills/juggernaut-coding-guidelines it must be proven against the
 # REAL harnesses: a stub can only confirm the assumption already written into
 # the stub. This guard launches every INSTALLED verified harness idle in an
 # isolated tmux server and requires the real jg_tmux_composer_state to reach

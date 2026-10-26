@@ -7,7 +7,7 @@ DRY=0
 [ "$#" -eq 0 ] || { echo "usage: uninstall.sh [--dry-run]" >&2; exit 2; }
 DATA=${XDG_DATA_HOME:-$HOME/.local/share}
 CONF=${CODEX_HOME:-$HOME/.codex}/config.toml
-BLOCK=$(printf '\n# jg-codex-guard: fleet guards before every Codex shell command (firstmate-addons codex-guard)\n[shell_environment_policy.set]\nBASH_ENV = "%s"' "$DATA/jg-codex-guard/bash-env.sh")
+BLOCK=$(printf '\n# jg-codex-guard: fleet guards before every Codex shell command (juggernaut-addons codex-guard)\n[shell_environment_policy.set]\nBASH_ENV = "%s"' "$DATA/jg-codex-guard/bash-env.sh")
 if [ -f "$CONF" ] && grep -qF 'jg-codex-guard' "$CONF"; then
   python3 -c '
 import sys, tomllib

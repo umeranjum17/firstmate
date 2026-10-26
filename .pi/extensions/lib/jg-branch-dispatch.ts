@@ -87,7 +87,7 @@ export const MAIN_DIALOG_MIRROR_HEADER =
 export function branchWakePrompt(message: string, reportSurface: string, postureTail: string, mirror = ""): string {
   const feed = mirror.replace(/\n+$/, "");
   const head = feed ? `${MAIN_DIALOG_MIRROR_HEADER}\n${feed}\n\n` : "";
-  return `${head}FIRSTMATE SUPERVISION WAKE: ${message}\n\nHandle this per your operating procedure and finish with ${reportSurface}.${postureTail}`;
+  return `${head}JUGGERNAUT SUPERVISION WAKE: ${message}\n\nHandle this per your operating procedure and finish with ${reportSurface}.${postureTail}`;
 }
 
 export type UnreadWakeScopeStatus = "safe" | "empty" | "unsafe";
@@ -388,7 +388,7 @@ export function scopeForUnreadWake(state: string, heartbeat: boolean, afk = fals
 
   const projects = new Set<string>();
   const metadata = new Map<string, string>();
-  const secondmates = new Set<string>();
+  const squad_leads = new Set<string>();
   // The task id behind each key a signal or stale row may carry: the task id
   // itself, or the endpoint its metadata records.
   const taskByKey = new Map<string, string>();
@@ -399,7 +399,7 @@ export function scopeForUnreadWake(state: string, heartbeat: boolean, afk = fals
       const fields = readFileSync(`${state}/${name}`, "utf8").split(/\r?\n/);
       const project = fields.find((line) => line.startsWith("project="))?.slice(8) ?? "";
       const window = fields.find((line) => line.startsWith("window="))?.slice(7) ?? "";
-      if (fields.includes("kind=secondmate")) secondmates.add(task);
+      if (fields.includes("kind=squad_lead")) squad_leads.add(task);
       if (project) {
         metadata.set(task, project);
         taskByKey.set(task, task);
@@ -478,11 +478,11 @@ export function scopeForUnreadWake(state: string, heartbeat: boolean, afk = fals
       // ordinary main-only row.
       return UNSAFE_SCOPE;
     }
-    // A second mate's signal is judged by its new span on both paths. For a
+    // A squad lead's signal is judged by its new span on both paths. For a
     // single-task log, an attended host can have accepted a routine signal
     // before its task gained a main-owned decision, so it checks the whole
     // log; Pi retains its existing per-row scan.
-    const spanRule = kind === "signal" && secondmates.has(task);
+    const spanRule = kind === "signal" && squad_leads.has(task);
     if (task && (kind === "stale" || (kind === "signal" && (attendedHost || spanRule)))) {
       const statusPath = `${state}/${task}.status`;
       const ownershipKey = `${kind}\0${statusPath}`;

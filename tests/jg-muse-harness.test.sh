@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Behavior tests for the muse (Muse Code) crewmate adapter: harness detection,
-# spawn launch shape and credential preflight, the secondmate refusal, the
+# Behavior tests for the muse (Muse Code) operator adapter: harness detection,
+# spawn launch shape and credential preflight, the squad_lead refusal, the
 # session-log busy source, and teardown cleanup of the busy binding.
 #
 # The session-log fixtures below reproduce muse 0.1.0-R708.1's real record
@@ -81,7 +81,7 @@ case "${1:-}" in
     printf 'META_API_KEY=worker-key\n'
     exit 0
     ;;
-  display-message) printf 'firstmate\n'; exit 0 ;;
+  display-message) printf 'juggernaut\n'; exit 0 ;;
   list-windows) exit 0 ;;
   has-session|new-session|new-window|kill-window) exit 0 ;;
   send-keys)
@@ -138,7 +138,7 @@ make_spawn_case() {
 ## Captain's intent
 Exercise Muse dispatch.
 
-## Firstmate spec
+## Juggernaut spec
 Verify the Muse harness behavior under test.
 EOF
   jg_git_worktree "$proj" "$wt" "fm/$id"
@@ -246,17 +246,17 @@ EOF
   assert_contains "$out" "spawned $id harness=muse" "muse spawn did not report success"
 
   launch=$(cat "$home/launch.log")
-  # --yolo is what makes a crewmate pane viable at all: without it muse holds
+  # --yolo is what makes a operator pane viable at all: without it muse holds
   # every tool call for approval and sandboxes the network to proxy-only.
   assert_contains "$launch" ' --yolo ' "muse launch omitted --yolo"
   # The privacy control. Its absence would ship the operator's foreign personal
-  # rules to Meta-hosted inference on every crewmate turn.
+  # rules to Meta-hosted inference on every operator turn.
   assert_contains "$launch" 'MUSE_EXPERIMENTAL_FOREIGN_PERSONAL_CONTEXT_KILL=on' \
     "muse launch omitted the foreign-personal-context kill"
   # exec-only flag: the interactive TUI exits with "unexpected argument" on it.
   assert_not_contains "$launch" '--no-foreign-personal-context' \
     "muse launch passed the exec-only foreign-context flag to the TUI"
-  # The captain accepted muse's self-update risk, so firstmate must not pin it.
+  # The captain accepted muse's self-update risk, so juggernaut must not pin it.
   assert_not_contains "$launch" 'MUSE_NO_AUTO_UPDATE' \
     "muse launch pinned auto-update, which the captain declined"
   assert_contains "$launch" "XDG_CONFIG_HOME='$home/xdgconfig'" \
@@ -387,14 +387,14 @@ EOF
 }
 
 # muse has no primary supervision protocol, and its Claude-compatible hook
-# dialect rejects the model-reawakening handlers a firstmate primary needs, so a
-# secondmate on muse could never arm a supervision cycle.
-test_spawn_refuses_secondmate() {
+# dialect rejects the model-reawakening handlers a juggernaut primary needs, so a
+# squad_lead on muse could never arm a supervision cycle.
+test_spawn_refuses_squad_lead() {
   local case_dir home fakebin id out status
-  case_dir="$TMP_ROOT/secondmate"
+  case_dir="$TMP_ROOT/squad_lead"
   home="$case_dir/home"
   fakebin=$(make_spawn_fakebin "$case_dir/fake")
-  id="muse-secondmate-x1"
+  id="muse-squad-lead-x1"
   mkdir -p "$home/data/$id" "$home/projects" "$home/state" "$home/config" "$case_dir/muse"
   printf 'charter\n' > "$home/data/$id/brief.md"
   out=$(cd "$case_dir" && JG_ROOT_OVERRIDE='' JG_HOME="$home" \
@@ -402,11 +402,11 @@ test_spawn_refuses_secondmate() {
     JG_PROJECTS_OVERRIDE="$home/projects" JG_CONFIG_OVERRIDE="$home/config" \
     JG_SPAWN_NO_GUARD=1 TMUX="fake,1,0" META_API_KEY=test-key \
     PATH="$fakebin:$PATH" \
-    "$SPAWN" "$id" muse --secondmate 2>&1)
+    "$SPAWN" "$id" muse --squad-lead 2>&1)
   status=$?
-  [ "$status" -ne 0 ] || fail "muse was accepted as a secondmate harness"
-  assert_contains "$out" "crewmate/scout adapter only" "muse secondmate refusal did not explain the boundary"
-  pass "muse is refused as a secondmate harness"
+  [ "$status" -ne 0 ] || fail "muse was accepted as a squad_lead harness"
+  assert_contains "$out" "operator/scout adapter only" "muse squad_lead refusal did not explain the boundary"
+  pass "muse is refused as a squad_lead harness"
 }
 
 test_spawn_writes_busy_binding_and_teardown_removes_it() {
@@ -851,7 +851,7 @@ EOF
 
 # Every path with no positive proof of an in-flight turn must be unknown, never
 # idle: unknown is not promoted to either boolean pole, while a wrong idle would
-# report a working crewmate as finished.
+# report a working operator as finished.
 test_missing_and_unreadable_bindings_are_unknown_never_idle() {
   local dir state id verdict root
   dir="$TMP_ROOT/unknowns"
@@ -957,7 +957,7 @@ test_spawn_refuses_without_credential
 test_spawn_refuses_caller_only_environment_credential
 test_spawn_accepts_stored_credential
 test_spawn_resolves_relative_xdg_roots
-test_spawn_refuses_secondmate
+test_spawn_refuses_squad_lead
 test_spawn_writes_busy_binding_and_teardown_removes_it
 test_muse_escape_aliases_clear_the_composer
 test_non_muse_escape_does_not_clear

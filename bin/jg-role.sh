@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
-# jg-role.sh - report and check this home's firstmate role.
+# jg-role.sh - report and check this home's juggernaut role.
 #
 # Usage:
 #   bin/jg-role.sh report
@@ -18,12 +18,12 @@
 #            "authorized: <authority>" when this home may run a publication
 #            contract there, exits 1 and prints "refused: <reason>" when it may
 #            not, and exits 2 with "not a self-repository task" when the task
-#            project is not firstmate's own repository (the boundary does not
+#            project is not juggernaut's own repository (the boundary does not
 #            apply). The optional `upstream-consent <scope>` argument is the
 #            recorded per-task consent a dispatcher captured.
 #
 # bin/jg-role-lib.sh owns the schema summary and mechanics;
-# docs/configuration.md "Firstmate role" owns the operator-facing schema.
+# docs/configuration.md "Juggernaut role" owns the operator-facing schema.
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

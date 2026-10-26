@@ -49,13 +49,13 @@ trap cleanup_lane_fixture EXIT
 
 cp "$ROOT/bin/jg-remote-job-lib.sh" "$ROOT/bin/jg-remote-job-worker.sh" \
   "$ROOT/bin/jg-remote-entrypoint.sh" "$ROOT/bin/jg-remote-delta-read.sh" \
-  "$ROOT/bin/jg-remote-secondmate-control.sh" "$ROOT/bin/jg-backend.sh" \
+  "$ROOT/bin/jg-remote-squad-lead-control.sh" "$ROOT/bin/jg-backend.sh" \
   "$ROOT/bin/jg-pending-reply-lib.sh" "$ROOT/bin/jg-task-inbox-lib.sh" \
   "$ROOT/bin/jg-wake-lib.sh" "$ROOT/bin/jg-path-lib.sh" "$ROOT/bin/jg-marker-lib.sh" \
   "$ROOT/bin/jg-operational-input.sh" "$ROOT/bin/jg-tmux-lib.sh" \
   "$ROOT/bin/jg-composer-lib.sh" "$ROOT/bin/jg-cursor-lib.sh" \
   "$ROOT/bin/jg-classify-lib.sh" "$ROOT/bin/jg-timeout-lib.sh" \
-  "$ROOT/bin/jg-ff-lib.sh" "$ROOT/bin/jg-secondmate-registry-lib.sh" \
+  "$ROOT/bin/jg-ff-lib.sh" "$ROOT/bin/jg-squad-lead-registry-lib.sh" \
   "$ROOT/bin/jg-lock-lib.sh" "$ROOT/bin/jg-parked-homes-lib.sh" \
   "$REMOTE_ROOT/bin/"
 mkdir -p "$REMOTE_ROOT/bin/backends"
@@ -92,7 +92,7 @@ git -C "$REMOTE_ROOT" add AGENTS.md bin
 git -C "$REMOTE_ROOT" commit -qm 'lane transport fixture'
 
 # ios routes to home A, build routes to home B.
-cat > "$LOCAL_HOME/data/secondmates.md" <<EOF
+cat > "$LOCAL_HOME/data/squad_leads.md" <<EOF
 - ios - iOS delivery (host: remote-mac; root: $REMOTE_ROOT; home: $HOME_A; scope: iOS work; projects: alpha; added 2026-08-02)
 - build - build delivery (host: remote-mac; root: $REMOTE_ROOT; home: $HOME_B; scope: build work; projects: beta; added 2026-08-02)
 EOF
@@ -373,15 +373,15 @@ pass "bounded reads after a cancellation meet their own budget with no convoy"
 
 # T6: a non-payload call with an OPEN stdin pipe completes instead of wedging
 # staging on a stdin capture that never reaches EOF.
-printf 'rsm\n' > "$HOME_A/.jg-secondmate-home"
-printf '# fixture secondmate home\n' > "$HOME_A/AGENTS.md"
+printf 'rsm\n' > "$HOME_A/.jg-squad-lead-home"
+printf '# fixture squad_lead home\n' > "$HOME_A/AGENTS.md"
 mkdir -p "$HOME_A/state" "$HOME_A/bin"
 rc=0
 jg_run_timed 20 env JG_HOME="$LOCAL_HOME" JG_ROOT_OVERRIDE="$REMOTE_ROOT" \
   JG_SSH_BIN="$FAKEBIN/fake-ssh" \
   JG_FAKE_REMOTE_ENTRYPOINT="$REMOTE_ROOT/bin/jg-remote-entrypoint.sh" \
   JG_REMOTE_JOB_STATE_ROOT="$STATE_ROOT" JG_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
-  "$ROOT/bin/jg-on.sh" ios jg-remote-secondmate-control.sh state rsm \
+  "$ROOT/bin/jg-on.sh" ios jg-remote-squad-lead-control.sh state rsm \
   < <(sleep 30) > "$TMP_ROOT/state-out" 2> "$TMP_ROOT/state-err" || rc=$?
 [ "$rc" -ne 124 ] || fail "a control-state call with an open stdin pipe wedged staging"
 assert_grep 'missing' "$TMP_ROOT/state-out" \

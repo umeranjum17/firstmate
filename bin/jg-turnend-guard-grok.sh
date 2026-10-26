@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
-# Grok Stop-hook adapter for the firstmate PRIMARY turn-end guard.
+# Grok Stop-hook adapter for the juggernaut PRIMARY turn-end guard.
 #
 # The exact running Stop payload selects one path. A typed native capability
 # field delegates the shared guard's exit status and stderr directly back to

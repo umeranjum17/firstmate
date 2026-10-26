@@ -8,14 +8,14 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
   export "$_jg_new=$_jg_val"
 done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
-# parked-homes e2e: a fixture fleet of two secondmate homes, one parked, driven
+# parked-homes e2e: a fixture fleet of two squad_lead homes, one parked, driven
 # through the real supervision producers. The parked home (home-b) must get no
 # message, steer, nudge, relaunch or config push, no pending-reply retry, no
 # wake-loop drain ring or stalled check, and no model-outage scan; the unparked
 # home (home-a) must still be acted on by every one of those paths.
 #
-# Usage: parked-homes/tests/parked-homes-e2e.sh <firstmate-checkout>
-#   <firstmate-checkout> is a firstmate checkout carrying the parked-homes
+# Usage: parked-homes/tests/parked-homes-e2e.sh <juggernaut-checkout>
+#   <juggernaut-checkout> is a juggernaut checkout carrying the parked-homes
 #   fork hooks (bin/jg-parked-homes-lib.sh shim + the gate lines); without it
 #   the parked gates do not exist and the test fails loudly.
 #
@@ -30,7 +30,7 @@ here=$(cd "$(dirname "$0")" && pwd) || exit 1
 addons=$(cd "$here/../.." && pwd) || exit 1
 FM=${1:-}
 [ -n "$FM" ] && [ -x "$FM/bin/jg-send.sh" ] || {
-  echo "usage: $0 <firstmate-checkout-with-parked-homes-hooks>" >&2
+  echo "usage: $0 <juggernaut-checkout-with-parked-homes-hooks>" >&2
   exit 1
 }
 [ -f "$FM/bin/jg-parked-homes-lib.sh" ] || {
@@ -61,14 +61,14 @@ trap '{
   exit "$rc"
 }' EXIT
 
-# --- the fixture fleet: a supervising home with two secondmate homes ---------
+# --- the fixture fleet: a supervising home with two squad_lead homes ---------
 mkdir -p "$P/config" "$P/state" "$P/data" "$work/home-a/state" "$work/home-b/state"
 printf '# Parked homes: no work, nothing merges.\nhome-b\n' > "$P/config/parked-homes"
 printf 'manual\n' > "$P/config/backlog-backend"
 printf 'Shared captain context for every mate.\n' > "$P/data/captain-shared.md"
-: > "$P/data/secondmates.md"
-printf 'home-a\n' > "$work/home-a/.jg-secondmate-home"
-printf 'home-b\n' > "$work/home-b/.jg-secondmate-home"
+: > "$P/data/squad_leads.md"
+printf 'home-a\n' > "$work/home-a/.jg-squad-lead-home"
+printf 'home-b\n' > "$work/home-b/.jg-squad-lead-home"
 printf '# Fixture mate\n' > "$work/home-a/AGENTS.md"
 printf '# Fixture mate\n' > "$work/home-b/AGENTS.md"
 mkdir -p "$work/home-a/bin" "$work/home-b/bin"
@@ -95,8 +95,8 @@ endpoint_task_id=$1
 worktree=$work/$1
 project=$work/$1
 harness=opencode
-kind=secondmate
-mode=secondmate
+kind=squad_lead
+mode=squad_lead
 model=opencode-go/fixture-route
 backend=tmux
 home=$work/$1
@@ -140,9 +140,9 @@ else
   no "unparked relaunch: expected a non-parked control failure, got exit 0"
 fi
 
-# --- 3. restart pass: jg-secondmate-restart.sh --------------------------------
+# --- 3. restart pass: jg-squad-lead-restart.sh --------------------------------
 before_a=$(find "$P/state/home-a.inbox" -maxdepth 1 -name '*.msg' 2>/dev/null | wc -l | tr -d ' ')
-out=$(JG_SECONDMATE_PERSIST_WAIT=1 JG_SECONDMATE_IDLE_WAIT=1 fork jg-secondmate-restart.sh home-a home-b 2>&1)
+out=$(JG_SQUAD_LEAD_PERSIST_WAIT=1 JG_SQUAD_LEAD_IDLE_WAIT=1 fork jg-squad-lead-restart.sh home-a home-b 2>&1)
 has "restart pass names the parked skip" <(printf "%s" "$out") "parked: home-b"
 lacks "restart pass never reports home-b as restarted" <(printf "%s" "$out") "restarted: home-b"
 now_a=$(find "$P/state/home-a.inbox" -maxdepth 1 -name '*.msg' 2>/dev/null | wc -l | tr -d ' ')
@@ -197,7 +197,7 @@ for r in $recs; do
 done
 is "parked record keeps its phase (no recovery attempt recorded)" "$skipped" "1"
 
-# --- 6. wake-loop check: secondmate_wake_stall_tick ---------------------------
+# --- 6. wake-loop check: squad_lead_wake_stall_tick ---------------------------
 # A stalled row in each home's own wake queue, with the episode's progress
 # marker already old enough to be stalled: the unparked mate gets the stalled
 # check; the parked mate is never touched and its episode markers are dropped.
@@ -205,23 +205,23 @@ is "parked record keeps its phase (no recovery attempt recorded)" "$skipped" "1"
 for id in home-a home-b; do
   row_epoch=$(($(date +%s) - 3600))
   printf '%s\t1\tcheck\tfixture-row\tstalled row for %s\n' "$row_epoch" "$id" >> "$work/$id/state/.wake-queue"
-  printf '%s %s-1\n' "$((row_epoch - 120))" "$row_epoch" > "$P/state/.secondmate-wake-progress-$id"
+  printf '%s %s-1\n' "$((row_epoch - 120))" "$row_epoch" > "$P/state/.squad-lead-wake-progress-$id"
 done
-JG_STATE_OVERRIDE=$P/state STATE=$P/state SECONDMATE_WAKE_STALL_SECS=60 JG_WAKE_QUEUE=$P/state/.wake-queue \
+JG_STATE_OVERRIDE=$P/state STATE=$P/state SQUAD_LEAD_WAKE_STALL_SECS=60 JG_WAKE_QUEUE=$P/state/.wake-queue \
   JG_WAKE_QUEUE_LOCK=$P/state/.wake-queue.lock bash -c '
   . "$1/bin/jg-watch.sh"
   wake() { :; }
-  secondmate_wake_stall_tick
+  squad_lead_wake_stall_tick
 ' _ "$FM" || no "wake-loop stall tick failed"
-has "unparked stalled queue raised the wake-loop check" "$P/state/.wake-queue" "secondmate wake-loop stalled: mate=home-a"
+has "unparked stalled queue raised the wake-loop check" "$P/state/.wake-queue" "squad_lead wake-loop stalled: mate=home-a"
 if grep -q "mate=home-b" "$P/state/.wake-queue" 2>/dev/null; then
   no "parked stalled queue raised no wake-loop check"
 else
   ok "parked stalled queue raised no wake-loop check"
 fi
-[ -e "$P/state/.secondmate-wake-stall-home-b" ] && no "parked stall markers are dropped" \
+[ -e "$P/state/.squad-lead-wake-stall-home-b" ] && no "parked stall markers are dropped" \
   || ok "parked stall markers are dropped"
-[ -e "$P/state/.secondmate-wake-stall-home-a" ] && ok "unparked stall marker recorded" \
+[ -e "$P/state/.squad-lead-wake-stall-home-a" ] && ok "unparked stall marker recorded" \
   || no "unparked stall marker missing"
 
 # --- 7. model-outage check: jg_model_outage_tick ------------------------------
@@ -235,7 +235,7 @@ window=$SES:mo-a
 endpoint_task_id=home-a
 worktree=$work/home-a
 harness=opencode
-kind=secondmate
+kind=squad_lead
 backend=tmux
 home=$work/home-a
 META
@@ -244,7 +244,7 @@ window=$SES:mo-b
 endpoint_task_id=home-b
 worktree=$work/home-b
 harness=opencode
-kind=secondmate
+kind=squad_lead
 backend=tmux
 home=$work/home-b
 META
@@ -307,7 +307,7 @@ chmod +x "$Q/stub/opencode" "$Q/stub/quota-axi"
 for id in home-a home-b; do
   cat > "$Q/state/$id.meta" <<META
 endpoint_task_id=$id
-kind=secondmate
+kind=squad_lead
 harness=opencode
 model=opencode-go/fixture-route
 backend=fixture
@@ -336,7 +336,7 @@ has "unparked move is logged" "$Q/state/quota-failover.log" "home-a: switched"
 M=$work/meta-probe
 mkdir -p "$work/pconfig"
 printf 't1\n' > "$work/pconfig/parked-homes"
-printf 'kind=secondmate\n' > "$M"          # remote secondmate: no home=, task id stands in
+printf 'kind=squad_lead\n' > "$M"          # remote squad_lead: no home=, task id stands in
 printf 'worktree=/x\n' > "$M-ship"        # no kind= line at all
 bash -c '
   set -u
@@ -348,14 +348,14 @@ bash -c '
   if [ "$rc" -ne 0 ] && [ -z "$err" ]; then echo silent; else echo "FAIL rc=$rc err=$err"; fi
 ' _ "$addons" "$work/pconfig" "$M" "$M-ship" > "$work/reader.out" 2>&1 \
   || no "parked-home reader failed under set -u: $(cat "$work/reader.out")"
-is "remote secondmate meta without home= is parked (set -u)" "$(sed -n 1p "$work/reader.out")" "parked"
+is "remote squad_lead meta without home= is parked (set -u)" "$(sed -n 1p "$work/reader.out")" "parked"
 is "ship meta without kind= is silently not parked (set -u)" "$(sed -n 2p "$work/reader.out")" "silent"
 lacks "reader under set -u prints no unbound-variable errors" "$work/reader.out" "unbound variable"
 
 # --- 10. shared fork gate helpers: exact refusal text and absent-source fallback
 G=$work/gate-meta
-printf 'kind=secondmate\nhome=%s\n' "$work/home-b" > "$G"
-printf 'kind=secondmate\nhome=%s\n' "$work/home-a" > "$G-allowed"
+printf 'kind=squad_lead\nhome=%s\n' "$work/home-b" > "$G"
+printf 'kind=squad_lead\nhome=%s\n' "$work/home-a" > "$G-allowed"
 if out=$(jg_parked_refuse_meta "$G" home-b send 2>&1); then rc=0; else rc=$?; fi
 is "parked send gate refuses" "$rc" "1"
 is "parked send gate keeps exact error" "$out" "error: nothing sent to jg-home-b: its home is parked (config/parked-homes); a parked home gets no message, steer, answer or nudge"
@@ -367,7 +367,7 @@ is "unparked refusal gate allows" "$?" "0"
 is "unparked refusal gate is silent" "$(cat "$work/allowed.out")" ""
 jg_parked_skip_meta "$G" home-b config-push > "$work/skip.out" 2>&1
 is "parked skip gate selects skip" "$?" "0"
-is "parked skip gate keeps exact output" "$(cat "$work/skip.out")" "secondmate home-b: skipped - its home is parked (config/parked-homes)"
+is "parked skip gate keeps exact output" "$(cat "$work/skip.out")" "squad_lead home-b: skipped - its home is parked (config/parked-homes)"
 if jg_parked_skip_meta "$G-allowed" home-a config-push > "$work/allowed.out" 2>&1; then rc=0; else rc=$?; fi
 is "unparked skip gate allows continuation" "$rc" "1"
 is "unparked skip gate is silent" "$(cat "$work/allowed.out")" ""

@@ -249,7 +249,7 @@ def validate(root: Path, inventory_path: Path) -> tuple[int, int]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Validate Firstmate documentation audiences and local links.")
+    parser = argparse.ArgumentParser(description="Validate Juggernaut documentation audiences and local links.")
     parser.add_argument("--root", type=Path, default=Path.cwd())
     parser.add_argument("--inventory", type=Path)
     args = parser.parse_args()

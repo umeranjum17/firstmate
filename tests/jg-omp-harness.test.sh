@@ -19,8 +19,8 @@
 #      ancestor: it beats an inherited CLAUDECODE under omp and is inert when it
 #      leaks into a worker whose ancestry holds no omp.
 #   3. Every omp launch clears foreign markers, carries the tracked posture
-#      overlay, --auto-approve, --cwd, and (for a crewmate) one -e pointing at
-#      state/<id>.omp-ext.ts; a secondmate launch names that same busy -e and
+#      overlay, --auto-approve, --cwd, and (for a operator) one -e pointing at
+#      state/<id>.omp-ext.ts; a squad_lead launch names that same busy -e and
 #      nothing else, leaving its primary extensions to auto-discovery.
 #   4. A <provider>/<id> model is validated only when `omp models --json` lists
 #      that provider; an unlisted provider passes through with a notice.
@@ -209,17 +209,17 @@ test_spawn_model_validation_scoped_to_listed_providers() {
   pass "jg-spawn: omp model validation is scoped to providers the listing can prove"
 }
 
-test_secondmate_launch_relies_on_discovery() {
-  # A seeded secondmate home, launched for real through jg-spawn on omp: the
+test_squad_lead_launch_relies_on_discovery() {
+  # A seeded squad_lead home, launched for real through jg-spawn on omp: the
   # launch must carry the posture overlay and pin --cwd to the home. Its only
   # -e is the state-resident busy extension: omp auto-discovers the home's
   # tracked .omp/extensions, and a file named both ways loads twice.
   local world home fakebin launchlog out status launch
-  world="$TMP_ROOT/secondmate"
+  world="$TMP_ROOT/squad_lead"
   home="$world/sm"
   mkdir -p "$world/home/state" "$world/home/data" "$world/home/config" "$home/bin" "$home/data"
-  printf '# Firstmate\n' > "$home/AGENTS.md"
-  printf 'sm\n' > "$home/.jg-secondmate-home"
+  printf '# Juggernaut\n' > "$home/AGENTS.md"
+  printf 'sm\n' > "$home/.jg-squad-lead-home"
   printf 'charter\n' > "$home/data/charter.md"
   printf '%s\n' 'projects/' 'state/' 'data/' 'config/' '.no-mistakes/' > "$home/.gitignore"
   git -C "$home" init -q -b main
@@ -234,36 +234,36 @@ test_secondmate_launch_relies_on_discovery() {
     JG_STATE_OVERRIDE="$world/home/state" JG_DATA_OVERRIDE="$world/home/data" \
     JG_PROJECTS_OVERRIDE="$world/home/projects" JG_CONFIG_OVERRIDE="$world/home/config" \
     JG_SPAWN_NO_GUARD=1 JG_FAKE_LAUNCH_LOG="$launchlog" \
-    "$ROOT/bin/jg-spawn.sh" sm "$home" omp --secondmate 2>&1)
+    "$ROOT/bin/jg-spawn.sh" sm "$home" omp --squad-lead 2>&1)
   status=$?
-  expect_code 0 "$status" "omp secondmate spawn should succeed: $out"
-  assert_grep "harness=omp" "$world/home/state/sm.meta" "secondmate meta missing harness=omp"
+  expect_code 0 "$status" "omp squad_lead spawn should succeed: $out"
+  assert_grep "harness=omp" "$world/home/state/sm.meta" "squad_lead meta missing harness=omp"
   launch=$(cat "$launchlog")
   [ "$(printf '%s\n' "$launch" | grep -o ' -e ' | wc -l | tr -d ' ')" = 1 ] \
-    || fail "an omp secondmate launch must name exactly one -e: omp auto-discovers .omp/extensions and a file named both ways loads twice: $launch"
-  assert_contains "$launch" "-e '$world/home/state/sm.omp-ext.ts'" "an omp secondmate launch must load the parent-home busy extension: $launch"
-  assert_contains "$launch" "--config '$ROOT/.omp/jg-worker-overlay.yml' --auto-approve --cwd '$home'" "secondmate launch lost the posture overlay or the pinned home directory: $launch"
-  assert_contains "$launch" "JG_OMP_HARNESS=omp OMP_SKIP_SETUP=1 '$fakebin/omp'" "secondmate launch lost the omp marker or executable"
-  assert_contains "$launch" "JG_SUPERVISION_MODEL=extension" "an omp secondmate must run the extension supervision model"
-  assert_present "$world/home/state/sm.omp-ext.ts" "a secondmate must receive the per-task busy extension"
-  pass "jg-spawn: a real omp secondmate launch loads only the busy -e and auto-discovers its primary extensions"
+    || fail "an omp squad_lead launch must name exactly one -e: omp auto-discovers .omp/extensions and a file named both ways loads twice: $launch"
+  assert_contains "$launch" "-e '$world/home/state/sm.omp-ext.ts'" "an omp squad_lead launch must load the parent-home busy extension: $launch"
+  assert_contains "$launch" "--config '$ROOT/.omp/jg-worker-overlay.yml' --auto-approve --cwd '$home'" "squad_lead launch lost the posture overlay or the pinned home directory: $launch"
+  assert_contains "$launch" "JG_OMP_HARNESS=omp OMP_SKIP_SETUP=1 '$fakebin/omp'" "squad_lead launch lost the omp marker or executable"
+  assert_contains "$launch" "JG_SUPERVISION_MODEL=extension" "an omp squad_lead must run the extension supervision model"
+  assert_present "$world/home/state/sm.omp-ext.ts" "a squad_lead must receive the per-task busy extension"
+  pass "jg-spawn: a real omp squad_lead launch loads only the busy -e and auto-discovers its primary extensions"
 }
 
-test_secondmate_config_pinned_model_is_validated() {
-  # The same seeded secondmate home, but the harness and model come from the
-  # primary's config/secondmate-harness rather than the command line: the
+test_squad_lead_config_pinned_model_is_validated() {
+  # The same seeded squad_lead home, but the harness and model come from the
+  # primary's config/squad-lead-harness rather than the command line: the
   # durable pin lands on MODEL after the harness case arm, so an unlisted id
   # under a listed provider must still be refused before endpoint creation.
   local world home fakebin launchlog out status
-  world="$TMP_ROOT/secondmate-config-model"
+  world="$TMP_ROOT/squad-lead-config-model"
   home="$world/sm"
   mkdir -p "$world/home/state" "$world/home/data" "$world/home/config" "$home/bin" "$home/data"
-  printf '# Firstmate\n' > "$home/AGENTS.md"
-  printf 'sm\n' > "$home/.jg-secondmate-home"
+  printf '# Juggernaut\n' > "$home/AGENTS.md"
+  printf 'sm\n' > "$home/.jg-squad-lead-home"
   printf 'charter\n' > "$home/data/charter.md"
   printf '%s\n' 'projects/' 'state/' 'data/' 'config/' '.no-mistakes/' > "$home/.gitignore"
   git -C "$home" init -q -b main
-  printf 'omp openai-codex/gpt-nope\n' > "$world/home/config/secondmate-harness"
+  printf 'omp openai-codex/gpt-nope\n' > "$world/home/config/squad-lead-harness"
   fakebin=$(make_spawn_fakebin "$world/fake" claude)
   make_fake_omp "$fakebin"
   launchlog="$world/launch.log"
@@ -273,14 +273,14 @@ test_secondmate_config_pinned_model_is_validated() {
     JG_STATE_OVERRIDE="$world/home/state" JG_DATA_OVERRIDE="$world/home/data" \
     JG_PROJECTS_OVERRIDE="$world/home/projects" JG_CONFIG_OVERRIDE="$world/home/config" \
     JG_SPAWN_NO_GUARD=1 JG_FAKE_LAUNCH_LOG="$launchlog" \
-    "$ROOT/bin/jg-spawn.sh" sm "$home" --secondmate 2>&1)
+    "$ROOT/bin/jg-spawn.sh" sm "$home" --squad-lead 2>&1)
   status=$?
-  expect_code 1 "$status" "a config-pinned unlisted omp model must refuse the secondmate spawn: $out"
+  expect_code 1 "$status" "a config-pinned unlisted omp model must refuse the squad_lead spawn: $out"
   assert_contains "$out" "omp model 'openai-codex/gpt-nope' is not listed by 'omp models --json' although provider 'openai-codex' is" \
     "the refusal did not name the config-pinned model under its listed provider: $out"
-  assert_absent "$world/home/state/sm.meta" "a refused secondmate spawn must publish no sm.meta"
-  [ ! -s "$launchlog" ] || fail "a refused secondmate spawn must record no launch: $(cat "$launchlog")"
-  pass "jg-spawn: the config/secondmate-harness model pin is validated against the omp catalog before launch"
+  assert_absent "$world/home/state/sm.meta" "a refused squad_lead spawn must publish no sm.meta"
+  [ ! -s "$launchlog" ] || fail "a refused squad_lead spawn must record no launch: $(cat "$launchlog")"
+  pass "jg-spawn: the config/squad-lead-harness model pin is validated against the omp catalog before launch"
 }
 
 # --- 3. Busy state -------------------------------------------------------------
@@ -491,8 +491,8 @@ if (handlers.has("agent_settled")) throw new Error("omp guard must not listen fo
 const ctx = { sessionManager: { getSessionId: () => "s1" } };
 handlers.get("session_start")({ type: "session_start" }, ctx);
 const first = await handlers.get("before_agent_start")({ type: "before_agent_start", prompt: "hi" }, ctx);
-if (!first?.message?.content?.includes("FIRSTMATE_OP: v1 session-start: OMP DIGEST source=startup")) throw new Error(`first start did not deliver a startup digest: ${JSON.stringify(first)}`);
-if (first.message.display !== false || first.message.customType !== "firstmate-sessionstart-nudge") throw new Error("digest message lost its persistent shape");
+if (!first?.message?.content?.includes("JUGGERNAUT_OP: v1 session-start: OMP DIGEST source=startup")) throw new Error(`first start did not deliver a startup digest: ${JSON.stringify(first)}`);
+if (first.message.display !== false || first.message.customType !== "juggernaut-sessionstart-nudge") throw new Error("digest message lost its persistent shape");
 // A later in-process session_start is a replacement and maps to clear.
 handlers.get("session_start")({ type: "session_start" }, ctx);
 const second = await handlers.get("before_agent_start")({ type: "before_agent_start", prompt: "hi" }, ctx);
@@ -503,7 +503,7 @@ const blocked = await handlers.get("tool_call")({ type: "tool_call", toolName: "
 if (blocked.block !== true || !blocked.reason.includes("seatbelt")) throw new Error(`backgrounded arm was not blocked: ${JSON.stringify(blocked)}`);
 const r1 = await handlers.get("session_stop")({ type: "session_stop", stop_hook_active: false }, {});
 if (r1?.continue !== true) throw new Error(`guard exit 2 did not compel a continuation: ${JSON.stringify(r1)}`);
-if (!r1.additionalContext.startsWith("⁣FIRSTMATE_OP: v1 turn-end-guard: ")) throw new Error(`continuation context is not typed operational input: ${r1.additionalContext}`);
+if (!r1.additionalContext.startsWith("⁣JUGGERNAUT_OP: v1 turn-end-guard: ")) throw new Error(`continuation context is not typed operational input: ${r1.additionalContext}`);
 if (!r1.additionalContext.includes("TURN WOULD END BLIND") || !r1.additionalContext.includes("repair with jg_watch_arm_omp")) throw new Error("continuation dropped the guard text");
 const r2 = await handlers.get("session_stop")({ type: "session_stop", stop_hook_active: true }, {});
 if (r2 !== undefined) throw new Error(`the flagged second stop must stand down, got ${JSON.stringify(r2)}`);
@@ -564,7 +564,7 @@ const again = await tool.execute();
 if (!/^watcher: unchanged - omp extension already owns an arm child/.test(again.content[0].text)) throw new Error(`redundant arm was not an ownership no-op: ${again.content[0].text}`);
 for (let i = 0; i < 60 && sent.length < 1; i += 1) await new Promise((r) => setTimeout(r, 100));
 if (sent.length !== 1) throw new Error(`expected one follow-up wake, saw ${sent.length}: ${JSON.stringify(sent)}`);
-if (!sent[0].m.startsWith("⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: signal: omp-e2e done")) throw new Error(`unexpected wake text: ${sent[0].m}`);
+if (!sent[0].m.startsWith("⁣JUGGERNAUT_OP: v1 watcher: JUGGERNAUT WATCHER WAKE: signal: omp-e2e done")) throw new Error(`unexpected wake text: ${sent[0].m}`);
 if (sent[0].o?.deliverAs !== "followUp") throw new Error("wake must be delivered as a follow-up");
 // The wake is consumed when omp starts the next run with that exact prompt.
 await handlers.get("before_agent_start")({ type: "before_agent_start", prompt: sent[0].m }, {});
@@ -865,8 +865,8 @@ test_detection_anchored_name_and_marker_precedence
 test_lock_identity_and_liveness_classification
 test_spawn_launch_line_and_worker_wiring
 test_spawn_model_validation_scoped_to_listed_providers
-test_secondmate_launch_relies_on_discovery
-test_secondmate_config_pinned_model_is_validated
+test_squad_lead_launch_relies_on_discovery
+test_squad_lead_config_pinned_model_is_validated
 test_busy_extension_lifecycle
 test_control_composer_and_model_tables
 test_ownership_proof_is_omp_keyed

@@ -204,7 +204,7 @@ wait_for_file "$PROJECT/state/.omp-watch-extension-loaded" 60 || fail "omp $OMP_
 pass "omp $OMP_VERSION: both tracked .omp/extensions loaded by auto-discovery with no -e and no trust dialog"
 
 # --- 1. session-start digest and lock identity ---------------------------------
-rpc_send '{"id":"p1","type":"prompt","message":"From the Firstmate session-start digest already in your context, reply with the single line that begins with SESSION START - and nothing else. Do not run any tool."}'
+rpc_send '{"id":"p1","type":"prompt","message":"From the Juggernaut session-start digest already in your context, reply with the single line that begins with SESSION START - and nothing else. Do not run any tool."}'
 wait_for_agent_ends 1 360 || fail "omp did not finish the first turn: $(tail -3 "$RPC_ERR")"
 first=$(assistant_text_since 1)
 case "$first" in
@@ -238,7 +238,7 @@ while [ "$i" -lt 240 ]; do
 done
 grep -Eq 'reason=actionable-signal.*successor=started:[0-9]+' "$PROJECT/state/.watch-cycle-exits.log" 2>/dev/null \
   || fail "omp extension did not start and ledger-link a successor after the actionable close"
-wait_for_log "FIRSTMATE WATCHER WAKE: signal:" 240 || fail "the actionable close was not delivered to main as a watcher follow-up"
+wait_for_log "JUGGERNAUT WATCHER WAKE: signal:" 240 || fail "the actionable close was not delivered to main as a watcher follow-up"
 wait_for_agent_ends 3 360 || fail "omp did not finish the wake turn"
 arm_calls=$(tool_call_count jg_watch_arm_omp)
 [ "$arm_calls" -eq 1 ] || fail "the model re-armed from memory instead of the extension (jg_watch_arm_omp call count $arm_calls)"
@@ -297,7 +297,7 @@ pass "omp $OMP_VERSION: session_stop compelled the guard continuation (guard rc=
 # 18.1.11 the process outlived its closed stdin for longer than 30s in this lab
 # while its session-start supervisor child was still attached, so the exit is
 # recorded as a note rather than asserted: it is omp's shutdown behavior, not
-# Firstmate's supervision contract, and cleanup reaps the lab either way.
+# Juggernaut's supervision contract, and cleanup reaps the lab either way.
 exec 3>&-
 i=0
 while [ "$i" -lt 60 ]; do

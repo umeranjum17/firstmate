@@ -34,7 +34,7 @@ printf '%s\n' "export KEEP_VALUE='chain'" > "$1"
 EOF
 chmod +x "$FMH/config/launch-env-hook"
 cp "$FMH/config/launch-env-hook" "$T/original-hook"
-printf '%s\n' '- crewhouse (home: '"$LEAD"'; scope: fixture)' > "$LEAD/data/secondmates.md"
+printf '%s\n' '- crewhouse (home: '"$LEAD"'; scope: fixture)' > "$LEAD/data/squad_leads.md"
 cat > "$T/bin/herdr" <<'EOF'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "$HERDR_LOG"

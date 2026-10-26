@@ -20,13 +20,13 @@
 # the worker starts from, never pushes to, and targets with its pull request, and
 # jg_base_branch_valid refuses it where no pull request carries the work.
 # The optional sixth argument is the task's recorded upstream consent for a
-# firstmate-repository contribution (bin/jg-role-lib.sh owns the boundary): a
+# juggernaut-repository contribution (bin/jg-role-lib.sh owns the boundary): a
 # captain-approved <host>/<owner>/<repo> publication scope for this one task,
 # rendered as an `upstream-consent=<scope>` suffix token on the Delivery
 # contract line so brief, spawn record, and worker instructions agree.
 # Callers of the gate are bin/jg-crew-state.sh (current-state done),
 # bin/jg-pr-check.sh (PR registration), and bin/jg-inactive-reconcile.sh
-# (secondmate ledger-first publish of a child done). A ship `done:` is not
+# (squad_lead ledger-first publish of a child done). A ship `done:` is not
 # accepted while the named head exists only in the worker's disposable copy,
 # except when the done names a pull request whose live forge head is exactly
 # that copy's HEAD: the push that opened the PR can leave no remote-tracking
@@ -84,7 +84,7 @@
 # monitoring on a draft through the same reading bin/jg-pr-merge.sh uses.
 # This file is the one owner of the no-mistakes `--intent` contract: only the
 # brief's `## Captain's intent` subsection plus later captain words, never
-# `## Firstmate spec` and never the worker's own tradeoffs.
+# `## Juggernaut spec` and never the worker's own tradeoffs.
 # Author the subsection body and later relays as the actual words, without
 # adding speaker labels or direct address: the heading supplies provenance and
 # is not part of --intent. A legacy mixed Task instead marks each captain line
@@ -97,7 +97,7 @@
 # roughly the same specification - so a report, decision, or PR the intent
 # refers to is written into it as substance, never left as a pointer.
 # bin/jg-brief.sh scaffolds those two `# Task` subsections; bin/jg-spawn.sh and
-# bin/jg-promote.sh refuse leftover `{TASK}` / `{FIRSTMATE_SPEC}` placeholders
+# bin/jg-promote.sh refuse leftover `{TASK}` / `{JUGGERNAUT_SPEC}` placeholders
 # and a `## Captain's intent` line opening with a Captain label or address
 # through the helpers below. Other mentions of `--intent` point here rather than
 # restating the rule.
@@ -105,13 +105,13 @@
 # breaks parsing of the whole file on Bash 3.2 (tests/jg-brief.test.sh).
 # jg_brief_worker_role owns the ship/scout role scope. bin/jg-spawn.sh is its one
 # emitter, supplying it first in every ship/scout launch brief and never to a
-# secondmate charter. It names the one task-owned steering inbox without
+# squad_lead charter. It names the one task-owned steering inbox without
 # relaxing isolation from every other home's endpoint namespace. Like
 # jg_brief_intent_overlay it is a distinctly titled launch section that states
 # its own precedence, so a brief or project instruction that authors a
 # conflicting role is superseded rather than duplicated.
-# The code root argument is the Firstmate checkout that holds
-# .agents/skills/firstmate-coding-guidelines/SKILL.md. A worker in a Firstmate
+# The code root argument is the Juggernaut checkout that holds
+# .agents/skills/juggernaut-coding-guidelines/SKILL.md. A worker in a Juggernaut
 # worktree loads that skill by name from its own checkout. A worker whose
 # session does not register the skill, such as one in another project's
 # worktree, cannot, so the role also names the file as the fallback to read;
@@ -134,26 +134,26 @@
 
 # Optional merge-card add-on: defines jg_dod_merge_gate and jg_merge_post_hook.
 # shellcheck source=/dev/null
-[ ! -r "${JG_ADDONS_DIR:-${JG_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/projects/firstmate-addons}/merge-card/bin/jg-merge-hooks-lib.sh" ] || . "${JG_ADDONS_DIR:-${JG_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/projects/firstmate-addons}/merge-card/bin/jg-merge-hooks-lib.sh"
+[ ! -r "${JG_ADDONS_DIR:-${JG_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/projects/juggernaut-addons}/merge-card/bin/jg-merge-hooks-lib.sh" ] || . "${JG_ADDONS_DIR:-${JG_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/projects/juggernaut-addons}/merge-card/bin/jg-merge-hooks-lib.sh"
 # Optional receipts add-on: defines jg_dod_receipt_accept and the jg_receipts_* helpers.
 # shellcheck source=/dev/null
-[ ! -r "${JG_ADDONS_DIR:-${JG_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/projects/firstmate-addons}/receipts/bin/jg-receipts-lib.sh" ] || . "${JG_ADDONS_DIR:-${JG_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/projects/firstmate-addons}/receipts/bin/jg-receipts-lib.sh"
+[ ! -r "${JG_ADDONS_DIR:-${JG_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/projects/juggernaut-addons}/receipts/bin/jg-receipts-lib.sh" ] || . "${JG_ADDONS_DIR:-${JG_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/projects/juggernaut-addons}/receipts/bin/jg-receipts-lib.sh"
 
 jg_brief_worker_role() {  # <state-dir> <task-id> <code-root>
   local state=$1 task_id=$2 root=$3
   cat <<'EOF'
 # Current worker role contract
-You are a crewmate: an autonomous worker agent managed by firstmate.
+You are a operator: an autonomous worker agent managed by juggernaut.
 This section establishes your current identity before every project or task instruction below and supersedes any conflicting role identity in those instructions.
-Do the assigned work yourself and report only to firstmate; do not adopt a firstmate or secondmate supervisor identity, delegate the task, run fleet supervision, or address the captain.
+Do the assigned work yourself and report only to juggernaut; do not adopt a juggernaut or squad_lead supervisor identity, delegate the task, run fleet supervision, or address the captain.
 EOF
-  printf "Your steering inbox is \`%s/%s.inbox\`; this exact path belongs to your current task even when it is outside the worktree or under the supervising firstmate home, so read and acknowledge its messages and do not reject it as another home's state.\n" "$state" "$task_id"
+  printf "Your steering inbox is \`%s/%s.inbox\`; this exact path belongs to your current task even when it is outside the worktree or under the supervising juggernaut home, so read and acknowledge its messages and do not reject it as another home's state.\n" "$state" "$task_id"
   cat <<'EOF'
 Never inspect or change any other home's endpoint namespace; this authorization is limited to the exact task paths named by this brief.
-When this task works on Firstmate itself, the repository root `AGENTS.md` (also imported by `CLAUDE.md`) is project content and the supervisor contract for the firstmate managing you: follow this brief instead of that supervisor contract.
-Project instructions still govern the work wherever they do not conflict with this worker identity, including `CONTRIBUTING.md` and `firstmate-coding-guidelines` for Firstmate changes.
+When this task works on Juggernaut itself, the repository root `AGENTS.md` (also imported by `CLAUDE.md`) is project content and the supervisor contract for the juggernaut managing you: follow this brief instead of that supervisor contract.
+Project instructions still govern the work wherever they do not conflict with this worker identity, including `CONTRIBUTING.md` and `juggernaut-coding-guidelines` for Juggernaut changes.
 EOF
-  printf "If the \`firstmate-coding-guidelines\` skill name does not resolve in this session, read \`%s/.agents/skills/firstmate-coding-guidelines/SKILL.md\` instead.\n" "$root"
+  printf "If the \`juggernaut-coding-guidelines\` skill name does not resolve in this session, read \`%s/.agents/skills/juggernaut-coding-guidelines/SKILL.md\` instead.\n" "$root"
 }
 
 # Closed-set gate shared by every forge-aware renderer and bin/jg-brief.sh, so a
@@ -227,7 +227,7 @@ jg_ship_rule_one() {  # <no-mistakes|direct-PR|local-only> <task-id> [branch] [<
       printf '%s\n' "1. Never push to $target (push only your \`$branch\` branch). Never merge a PR."
       ;;
     local-only)
-      printf '%s\n' "1. Never push to any remote and never open a PR. Work only on your \`$branch\` branch; firstmate handles the merge into local \`main\`."
+      printf '%s\n' "1. Never push to any remote and never open a PR. Work only on your \`$branch\` branch; juggernaut handles the merge into local \`main\`."
       ;;
     no-mistakes)
       printf '%s\n' "1. Never push to $target. Never merge a PR."
@@ -245,9 +245,9 @@ jg_brief_task_placeholders_present() {  # <file>
   local file=$1 intent spec
   [ -f "$file" ] || return 1
   intent=$(jg_brief_task_heading_body "$file" "## Captain's intent")
-  spec=$(jg_brief_task_heading_body "$file" "## Firstmate spec")
+  spec=$(jg_brief_task_heading_body "$file" "## Juggernaut spec")
   [ "$(printf '%s' "$intent" | tr -d '[:space:]')" = '{TASK}' ] && return 0
-  [ "$(printf '%s' "$spec" | tr -d '[:space:]')" = '{FIRSTMATE_SPEC}' ] && return 0
+  [ "$(printf '%s' "$spec" | tr -d '[:space:]')" = '{JUGGERNAUT_SPEC}' ] && return 0
   return 1
 }
 
@@ -294,9 +294,9 @@ jg_brief_intent_overlay() {  # <captain-intent>
 
 # Current no-mistakes intent contract
 This section supersedes every earlier brief instruction about constructing `--intent`, but not later clarifications actually supplied by the captain.
-Use everything under `## Captain intent authorized for --intent` through the end of this brief, including any nested subheadings but excluding that heading, plus any later words the captain actually supplied as `--intent`; never include Firstmate specification or other mixed Task content.
+Use everything under `## Captain intent authorized for --intent` through the end of this brief, including any nested subheadings but excluding that heading, plus any later words the captain actually supplied as `--intent`; never include Juggernaut specification or other mixed Task content.
 Preserve those words without adding speaker labels or direct address.
-Firstmate-authored constraints, acceptance criteria, implementation details, decisions, and tradeoffs are specification, not captain intent.
+Juggernaut-authored constraints, acceptance criteria, implementation details, decisions, and tradeoffs are specification, not captain intent.
 The Definition of done's rule that `--intent` must be self-sufficient still governs the string you pass: resolve any report, decision, or PR the intent below refers to into its substance rather than passing the pointer.
 
 ## Captain intent authorized for --intent
@@ -310,11 +310,11 @@ jg_brief_task_content_valid() {  # <file>
   local file=$1 intent spec task has_intent=0 has_spec=0
   [ -f "$file" ] && [ -r "$file" ] || return 1
   jg_brief_task_heading_present "$file" "## Captain's intent" && has_intent=1
-  jg_brief_task_heading_present "$file" "## Firstmate spec" && has_spec=1
+  jg_brief_task_heading_present "$file" "## Juggernaut spec" && has_spec=1
   if [ "$has_intent" -eq 1 ] || [ "$has_spec" -eq 1 ]; then
     [ "$has_intent" -eq 1 ] && [ "$has_spec" -eq 1 ] || return 1
     intent=$(jg_brief_task_heading_body "$file" "## Captain's intent")
-    spec=$(jg_brief_task_heading_body "$file" "## Firstmate spec")
+    spec=$(jg_brief_task_heading_body "$file" "## Juggernaut spec")
     [ -n "$(printf '%s' "$intent" | tr -d '[:space:]')" ] || return 1
     [ -n "$(printf '%s' "$spec" | tr -d '[:space:]')" ] || return 1
     return 0
@@ -350,7 +350,7 @@ EOF
 }
 
 # The forge-independent middle of the no-mistakes contract: how a worker drives
-# the pipeline, what `--intent` may carry, and the two firstmate-specific rules.
+# the pipeline, what `--intent` may carry, and the two juggernaut-specific rules.
 # Written once; only the two sentences about a green PR depend on the forge,
 # because on gerrit the ci step is skipped and there is no PR to report.
 jg_nm_driving_block() {  # <forge>
@@ -382,20 +382,20 @@ Follow the guidance no-mistakes itself provides for the mechanics: it loads when
 When starting no-mistakes, pass \`--intent\` as only this brief's \`## Captain's intent\` subsection body, not its heading, plus any later words the captain actually said.
 Preserve the actual words without adding speaker labels or direct address; the subsection heading supplies provenance outside the pipeline input.
 For a legacy brief with no such subsection, include only words on lines marked \`[captain] \`, excluding that metadata prefix; never copy its mixed \`# Task\` wholesale.
-If it has no provenance-marked captain words, stop and ask firstmate instead of starting no-mistakes.
-Do not include \`## Firstmate spec\`, later Firstmate build constraints, or your own decisions and tradeoffs.
+If it has no provenance-marked captain words, stop and ask juggernaut instead of starting no-mistakes.
+Do not include \`## Juggernaut spec\`, later Juggernaut build constraints, or your own decisions and tradeoffs.
 The \`--intent\` string you pass must be self-sufficient: that string plus the codebase must let a reader reconstruct roughly the same specification, without depending on a separate report, a PR, or context that lives only in this conversation.
-When the captain's intent refers to a report, decision, or PR ("do items 1, 2, 3, and 7 of the report"), write the substance of the referenced items into \`--intent\` in the captain's terms, not only the pointer; that substance is the captain's ask by reference, while Firstmate's build instructions and your own decisions still stay out.
-This replaces the no-mistakes skill's advice to enrich \`--intent\` with decisions and tradeoffs; that advice does not apply to Firstmate-dispatched work.
+When the captain's intent refers to a report, decision, or PR ("do items 1, 2, 3, and 7 of the report"), write the substance of the referenced items into \`--intent\` in the captain's terms, not only the pointer; that substance is the captain's ask by reference, while Juggernaut's build instructions and your own decisions still stay out.
+This replaces the no-mistakes skill's advice to enrich \`--intent\` with decisions and tradeoffs; that advice does not apply to Juggernaut-dispatched work.
 Do not hand-edit, commit, or fix findings yourself while a run is active - the pipeline applies every fix.
 
 $drive_block
 A killed or timed-out call is never evidence the daemon died: the daemon accepts your response immediately and runs the round in the background, so the call was only ever waiting for a read while the run kept working.
 Reattach and keep going rather than reporting the pipeline blocked; rule 7 owns the checks that decide when a pipeline block is real.
 
-Two firstmate-specific rules layer on top of that guidance:
-- ask-user findings are never yours to answer: escalate to firstmate using rule 6's ask-user format and stop.
-  Firstmate applies \`ask-user-authority\` and obtains any required captain decision.
+Two juggernaut-specific rules layer on top of that guidance:
+- ask-user findings are never yours to answer: escalate to juggernaut using rule 6's ask-user format and stop.
+  Juggernaut applies \`ask-user-authority\` and obtains any required captain decision.
   When the decision comes back, feed it to the gate with \`no-mistakes axi respond\` and let the pipeline apply it - do not route the question to "the user" or implement the fix yourself.
 - NEVER pass \`--yes\` (or \`-y\`) to \`no-mistakes axi run\` or \`no-mistakes axi respond\`. It is banned fleet-wide.
   It auto-resolves every gate including ask-user findings with no escalation, and answering your own ask-user finding is a hard rule violation.
@@ -420,7 +420,7 @@ Publish from this copy with \`gerrit-axi\`, never with \`git push\`:
 Then append \`done [at=<epoch>]: PR {change url} published for review\` to the status file and stop. You are finished.
 That \`done:\` is accepted only when the change's current patch set on the server carries this copy's HEAD tree, so commit nothing after publishing; if you must change the work, commit it and publish again before reporting done.
 A \`done:\` whose URL is not the canonical \`https://<host>/c/<project>/+/<number>\` change URL is refused.
-There is no pull request, no \`gh-axi\` call, and no forge CI result to report: a human reviewer approves and submits the change on the server, and firstmate relays that outcome.
+There is no pull request, no \`gh-axi\` call, and no forge CI result to report: a human reviewer approves and submits the change on the server, and juggernaut relays that outcome.
 EOF
 }
 
@@ -474,7 +474,7 @@ Pass \`--skip push,pr,ci\` on every \`no-mistakes axi run\` for this task, and s
 Those three are the only steps that reach a forge, and skipping them is a supported outcome, not a degraded one.
 The task is complete only when committed on your branch.
 When you believe it is complete, append \`done [at=<epoch>]: {summary}\` to the status file and stop.
-Firstmate will then instruct you to run /no-mistakes to validate.
+Juggernaut will then instruct you to run /no-mistakes to validate.
 That first \`done:\` is the handoff that starts the pipeline; it is not a request to publish.
 
 EOF
@@ -509,7 +509,7 @@ A draft cannot be merged, so a done report on one leaves the merge unasked.
 Then append \`done [at=<epoch>]: PR {url}\` to the status file and stop.
 That \`done:\` is accepted only when this copy's HEAD - your latest commit - is pushed to your PR branch; the check tests that commit, not merely that a branch moved.
 If you deliberately keep the PR a draft, append \`paused [at=<epoch>]: {why the draft is held}\` instead of done.
-Do NOT run /no-mistakes. The configured merge authority decides whether to merge the PR; firstmate relays the outcome.
+Do NOT run /no-mistakes. The configured merge authority decides whether to merge the PR; juggernaut relays the outcome.
 EOF
       ;;
     local-only:*)
@@ -522,7 +522,7 @@ The task is complete only when committed on your branch \`$branch\`. Do NOT push
 A \`done:\` is accepted when the named head is on this project's shared local branch, not only on a detached copy; the check tests that head, not merely that a branch moved.
 Keep your branch a clean fast-forward onto the current default branch - if \`main\` has advanced, rebase onto it so the eventual merge stays a fast-forward.
 When it is implemented and committed, append \`done [at=<epoch>]: ready in branch $branch\` to the status file and stop.
-The configured merge authority approves the ready branch, then firstmate merges it into local \`main\` through the guarded fast-forward path.
+The configured merge authority approves the ready branch, then juggernaut merges it into local \`main\` through the guarded fast-forward path.
 EOF
       ;;
     no-mistakes:*)
@@ -532,7 +532,7 @@ Delivery contract: mode=no-mistakes$contract_forge$contract_consent
 Ship branch: $branch
 The task is complete only when committed on your branch.
 When you believe it is complete, append \`done [at=<epoch>]: {summary}\` to the status file and stop.
-Firstmate will then instruct you to run /no-mistakes to validate and ship a PR.
+Juggernaut will then instruct you to run /no-mistakes to validate and ship a PR.
 That first \`done:\` is the handoff that starts the pipeline, which owns the push; it is not a request to push from this copy.
 ${nm_base}
 EOF

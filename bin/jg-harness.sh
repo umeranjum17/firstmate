@@ -3,18 +3,18 @@
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Detect the agent harness this process tree runs on.
 # Usage: jg-harness.sh                  print own harness: claude|codex|opencode|pi|pi-signed|grok|kimi|cursor|gemini|muse|rovo|omp|agy|devin|unknown
-#        jg-harness.sh crew             print the effective CREWMATE harness
+#        jg-harness.sh crew             print the effective OPERATOR harness
 #                                        (config/crew-harness; "default" resolves to own)
-#        jg-harness.sh secondmate [id]  print the harness the PRIMARY uses to launch
-#                                        SECONDMATE agents: config/secondmate-harness ->
+#        jg-harness.sh squad_lead [id]  print the harness the PRIMARY uses to launch
+#                                        SQUAD_LEAD agents: config/squad-lead-harness ->
 #                                        config/crew-harness -> own. "default" or absent
 #                                        defers to the crew resolution, so an unset
-#                                        secondmate-harness behaves exactly as the crew
+#                                        squad-lead-harness behaves exactly as the crew
 #                                        harness did before this knob existed.
-#        jg-harness.sh secondmate-model [id] print the optional MODEL token from
-#                                        config/secondmate-harness, or empty when absent.
-#        jg-harness.sh secondmate-effort [id] print the optional EFFORT token from
-#                                        config/secondmate-harness, or empty when absent.
+#        jg-harness.sh squad-lead-model [id] print the optional MODEL token from
+#                                        config/squad-lead-harness, or empty when absent.
+#        jg-harness.sh squad-lead-effort [id] print the optional EFFORT token from
+#                                        config/squad-lead-harness, or empty when absent.
 #        jg-harness.sh validate-native-effort <harness> <model> <effort>
 #                                        Refuse ultra unless the harness is pi or
 #                                        pi-signed and the model explicitly names
@@ -41,10 +41,10 @@
 #                                        so a caller that knows the terminal's foreground
 #                                        process group can keep a backgrounded process out
 #                                        of the selection.
-# config/secondmate-harness format: a single line "<harness> [<model>] [<effort>]",
+# config/squad-lead-harness format: a single line "<harness> [<model>] [<effort>]",
 # whitespace-separated. A bare "<harness>" (today's format) behaves exactly as before:
 # harness only, no model/effort. Only the first non-empty, non-comment line is parsed.
-# With an id, config/secondmates/<id>/harness takes precedence as a complete
+# With an id, config/squad_leads/<id>/harness takes precedence as a complete
 # three-token harness/model/effort pin. Invalid pins refuse and name the file.
 # config/crew-harness stays a bare adapter name, never parsed for a model.
 # Detection evidence and precedence:
@@ -61,10 +61,10 @@
 # Supervision-branch primary pin: a supervision branch running as its own
 # process under another harness (a Pi engine under a Claude primary detects as
 # pi) would otherwise resolve "own" - and with it an absent or "default"
-# config/crew-harness or config/secondmate-harness - to its own harness and
+# config/crew-harness or config/squad-lead-harness - to its own harness and
 # dispatch crew there. While JG_SUPERVISION_ACTOR=branch, a non-empty
 # JG_SUPERVISION_PRIMARY_HARNESS names the primary's harness and replaces
-# detection for the own, crew, and secondmate resolutions; a value that names
+# detection for the own, crew, and squad_lead resolutions; a value that names
 # no known harness refuses (exit 2, nothing on stdout) instead of resolving.
 # Outside the branch actor the pin is ignored, and the evidence-only ancestry
 # verbs never consult it.
@@ -118,13 +118,13 @@ harness_marker() {
   # omp (Oh My Pi) publishes NO harness-identity marker of its own: verified on
   # omp 18.1.11 that PI_CODING_AGENT is absent from the binary and that the
   # default profile sets neither PI_CODING_AGENT_DIR nor OMP_PROFILE in the
-  # process environment. JG_OMP_HARNESS=omp is therefore a Firstmate-OWNED
+  # process environment. JG_OMP_HARNESS=omp is therefore a Juggernaut-OWNED
   # launch marker, established by bin/jg-spawn.sh at the omp launch boundary
   # (which also clears every foreign marker) and by the README's primary launch
   # command. It is a PRECEDENCE override, never evidence on its own: it wins
   # over an inherited CLAUDECODE only when an omp process is genuinely in the
   # ancestry, so `JG_OMP_HARNESS=omp omp` started from a Claude pane identifies
-  # as omp, while the same variable leaking from an omp secondmate into that
+  # as omp, while the same variable leaking from an omp squad_lead into that
   # home's claude worker (whose ancestry holds no omp) changes nothing. The
   # anchored ancestry arm below covers a plain hand-started `omp` by itself.
   if [ "${JG_OMP_HARNESS:-}" = omp ] && ancestry_names_omp; then
@@ -202,7 +202,7 @@ harness_process_verdict() {  # <pid>
     # on Node v24.20.0), so neither this arm nor the node interpreter arm
     # below matches a live gemini process. GEMINI_CLI above is therefore
     # load-bearing for gemini rather than a fast path, which is why gemini
-    # is not offered as a primary or secondmate harness. Do NOT add
+    # is not offered as a primary or squad_lead harness. Do NOT add
     # MainThread to the interpreter arm to close this: that would make the
     # args of EVERY node process searchable and let an unrelated node
     # command carrying a harness name in its arguments claim an identity.
@@ -369,7 +369,7 @@ EOF
 # (tests/jg-harness-liveness-drift-live-e2e.test.sh).
 #
 # Why the upward path and not the whole subtree: harness_ancestry only ever climbs,
-# so a SIBLING branch is a vantage firstmate's own detection can never occupy. A
+# so a SIBLING branch is a vantage juggernaut's own detection can never occupy. A
 # harness-spawned MCP server running as `node <home>/.claude/mcp/<server>.js` matches
 # *claude* on its script path in the bare-interpreter branch above and would report a
 # foreign harness from a process no real tool subprocess ever asks from.
@@ -446,8 +446,8 @@ detect_own() {
   if [ "$strength" = comm ]; then echo "$harness"; else echo "$marker"; fi
 }
 
-# Resolve the effective crewmate harness: config/crew-harness (a bare adapter
-# name) wins; absent or "default" mirrors firstmate's own harness.
+# Resolve the effective operator harness: config/crew-harness (a bare adapter
+# name) wins; absent or "default" mirrors juggernaut's own harness.
 resolve_crew() {
   local crew=
   [ -f "$CONFIG/crew-harness" ] && crew=$(tr -d '[:space:]' < "$CONFIG/crew-harness" || true)
@@ -457,18 +457,18 @@ resolve_crew() {
 # Select and validate the per-mate pin, otherwise read the global default's
 # first non-empty, non-comment line. An absent/blank global default is empty;
 # an unreadable or malformed per-mate pin refuses, naming its file.
-secondmate_line() {
-  local line file="$CONFIG/secondmate-harness" pinned=0
-  if [ -n "$SECONDMATE_ID" ]; then
-    case "$SECONDMATE_ID" in
-      ''|.*|*[!a-zA-Z0-9._-]*) echo "error: invalid secondmate id '$SECONDMATE_ID'" >&2; return 1 ;;
+squad_lead_line() {
+  local line file="$CONFIG/squad-lead-harness" pinned=0
+  if [ -n "$SQUAD_LEAD_ID" ]; then
+    case "$SQUAD_LEAD_ID" in
+      ''|.*|*[!a-zA-Z0-9._-]*) echo "error: invalid squad_lead id '$SQUAD_LEAD_ID'" >&2; return 1 ;;
     esac
-    file="$CONFIG/secondmates/$SECONDMATE_ID/harness"
+    file="$CONFIG/squad_leads/$SQUAD_LEAD_ID/harness"
     if [ -e "$file" ] || [ -L "$file" ]; then
       pinned=1
-      [ -f "$file" ] && [ -r "$file" ] || { echo "error: unreadable secondmate pin $file" >&2; return 1; }
+      [ -f "$file" ] && [ -r "$file" ] || { echo "error: unreadable squad_lead pin $file" >&2; return 1; }
     else
-      file="$CONFIG/secondmate-harness"
+      file="$CONFIG/squad-lead-harness"
     fi
   fi
   [ -f "$file" ] || return 0
@@ -483,69 +483,69 @@ secondmate_line() {
       local -a fields
       read -r -a fields <<< "$line"
       if [ "${#fields[@]}" != 3 ]; then
-        echo "error: malformed secondmate pin $file: expected <harness> <model> <effort>" >&2
+        echo "error: malformed squad_lead pin $file: expected <harness> <model> <effort>" >&2
         return 1
       fi
       case "${fields[0]}" in
         claude|codex|opencode|pi|pi-signed|grok|kimi|cursor|omp) ;;
-        *) echo "error: malformed secondmate pin $file: unverified secondmate harness '${fields[0]}'" >&2; return 1 ;;
+        *) echo "error: malformed squad_lead pin $file: unverified squad_lead harness '${fields[0]}'" >&2; return 1 ;;
       esac
       case "${fields[1]}" in
-        default|-) echo "error: malformed secondmate pin $file: a concrete model is required" >&2; return 1 ;;
+        default|-) echo "error: malformed squad_lead pin $file: a concrete model is required" >&2; return 1 ;;
       esac
       case "${fields[2]}" in
         low|medium|high|xhigh|max|ultra) ;;
-        *) echo "error: malformed secondmate pin $file: invalid effort '${fields[2]}'" >&2; return 1 ;;
+        *) echo "error: malformed squad_lead pin $file: invalid effort '${fields[2]}'" >&2; return 1 ;;
       esac
-      validate_native_effort "${fields[@]}" || { echo "error: malformed secondmate pin $file" >&2; return 1; }
+      validate_native_effort "${fields[@]}" || { echo "error: malformed squad_lead pin $file" >&2; return 1; }
     fi
     printf '%s\n' "$line"
     return 0
   done < "$file"
-  [ "$pinned" = 0 ] || { echo "error: malformed secondmate pin $file: empty pin" >&2; return 1; }
+  [ "$pinned" = 0 ] || { echo "error: malformed squad_lead pin $file: empty pin" >&2; return 1; }
 }
 
 # Print the 1-based whitespace-separated token (1=harness, 2=model, 3=effort) of
-# the resolved secondmate_line, or nothing if the line or that field is absent.
-secondmate_field() {
+# the resolved squad_lead_line, or nothing if the line or that field is absent.
+squad_lead_field() {
   local idx=$1 line
   local -a fields
-  line=$(secondmate_line) || return 1
+  line=$(squad_lead_line) || return 1
   [ -n "$line" ] || return 0
   read -r -a fields <<< "$line"
   printf '%s\n' "${fields[$((idx - 1))]:-}"
 }
 
-# Resolve the harness the PRIMARY uses to launch SECONDMATE agents: a fallback
-# chain config/secondmate-harness -> config/crew-harness -> own. An absent or
-# "default" secondmate-harness token defers to the crew resolution, so an unset
-# secondmate-harness behaves exactly as before this knob existed (a secondmate
-# launched on the crew harness). config/secondmate-harness is the PRIMARY's own
-# setting and is never inherited downstream - secondmates do not spawn secondmates.
-resolve_secondmate() {
+# Resolve the harness the PRIMARY uses to launch SQUAD_LEAD agents: a fallback
+# chain config/squad-lead-harness -> config/crew-harness -> own. An absent or
+# "default" squad-lead-harness token defers to the crew resolution, so an unset
+# squad-lead-harness behaves exactly as before this knob existed (a squad_lead
+# launched on the crew harness). config/squad-lead-harness is the PRIMARY's own
+# setting and is never inherited downstream - squad_leads do not spawn squad_leads.
+resolve_squad_lead() {
   local sm
-  sm=$(secondmate_field 1) || return 1
+  sm=$(squad_lead_field 1) || return 1
   if [ -z "$sm" ] || [ "$sm" = "default" ]; then sm=$(resolve_crew) || exit; fi
   echo "$sm"
 }
 
-# Print the optional model token (2nd field) from config/secondmate-harness, or
+# Print the optional model token (2nd field) from config/squad-lead-harness, or
 # empty when the harness token is absent/"default" (harness-only file, same as
 # today) or when no model token is present.
-resolve_secondmate_model() {
+resolve_squad_lead_model() {
   local sm
-  sm=$(secondmate_field 1) || return 1
+  sm=$(squad_lead_field 1) || return 1
   [ -n "$sm" ] && [ "$sm" != "default" ] || return 0
-  secondmate_field 2
+  squad_lead_field 2
 }
 
-# Print the optional effort token (3rd field) from config/secondmate-harness,
+# Print the optional effort token (3rd field) from config/squad-lead-harness,
 # the same way.
-resolve_secondmate_effort() {
+resolve_squad_lead_effort() {
   local sm
-  sm=$(secondmate_field 1) || return 1
+  sm=$(squad_lead_field 1) || return 1
   [ -n "$sm" ] && [ "$sm" != "default" ] || return 0
-  secondmate_field 3
+  squad_lead_field 3
 }
 
 validate_native_effort() {
@@ -580,8 +580,8 @@ case "${1:-}" in
     harness_ancestry_descent "$descent_pid" ${1+"$@"}
     ;;
   crew) resolve_crew ;;
-  secondmate) SECONDMATE_ID=${2:-}; resolve_secondmate ;;
-  secondmate-model) SECONDMATE_ID=${2:-}; resolve_secondmate_model ;;
-  secondmate-effort) SECONDMATE_ID=${2:-}; resolve_secondmate_effort ;;
+  squad_lead) SQUAD_LEAD_ID=${2:-}; resolve_squad_lead ;;
+  squad-lead-model) SQUAD_LEAD_ID=${2:-}; resolve_squad_lead_model ;;
+  squad-lead-effort) SQUAD_LEAD_ID=${2:-}; resolve_squad_lead_effort ;;
   *) detect_own ;;
 esac

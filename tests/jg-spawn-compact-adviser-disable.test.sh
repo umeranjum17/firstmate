@@ -121,7 +121,7 @@ test_ship_allowlist_enabled() {
   local rec out status seen launch
   rec=$(make_case ship-filtered codex ship-filtered-a1)
   read_case "$rec"
-  # An empty file is the strictest opt-in: the launch keeps Firstmate's own
+  # An empty file is the strictest opt-in: the launch keeps Juggernaut's own
   # operational floor and nothing else, so it is where a floor either holds or
   # is lost.
   : > "$HOME_DIR/config/launch-env-allowlist"
@@ -164,39 +164,39 @@ test_launch_command_carries_the_switch_without_the_pane_export() {
   pass "the launch command sets the switch on its own, whichever allowlist posture is in force"
 }
 
-test_secondmate_launch() {
+test_squad_lead_launch() {
   local setting rec sm out status seen
   for setting in absent enabled; do
-    rec=$(make_case "secondmate-$setting" codex "sm-$setting")
+    rec=$(make_case "squad-lead-$setting" codex "sm-$setting")
     read_case "$rec"
     [ "$setting" = absent ] || : > "$HOME_DIR/config/launch-env-allowlist"
-    sm="$CASE_DIR/secondmate-home"
+    sm="$CASE_DIR/squad-lead-home"
     mkdir -p "$sm/bin" "$sm/data"
-    printf '# Firstmate\n' > "$sm/AGENTS.md"
-    printf '%s\n' "sm-$setting" > "$sm/.jg-secondmate-home"
+    printf '# Juggernaut\n' > "$sm/AGENTS.md"
+    printf '%s\n' "sm-$setting" > "$sm/.jg-squad-lead-home"
     printf 'charter for sm-%s\n' "$setting" > "$sm/data/charter.md"
     printf '%s\n' 'projects/' 'state/' 'data/' 'config/' '.no-mistakes/' > "$sm/.gitignore"
     git -C "$sm" init -q -b main
-    out=$(run_case_spawn "sm-$setting" "$sm" --secondmate)
+    out=$(run_case_spawn "sm-$setting" "$sm" --squad-lead)
     status=$?
-    expect_code 0 "$status" "secondmate spawn with allowlist=$setting should succeed: $out"
-    assert_pane_export_precedes_launch "$PANE_LOG" "secondmate, allowlist $setting"
+    expect_code 0 "$status" "squad_lead spawn with allowlist=$setting should succeed: $out"
+    assert_pane_export_precedes_launch "$PANE_LOG" "squad_lead, allowlist $setting"
     install_env_probe "$FAKEBIN_DIR" codex
     seen=$(emitted_launch_env "$FAKEBIN_DIR" "$LAUNCH_LOG" "$PANE_LOG") \
-      || fail "secondmate, allowlist $setting: the emitted launch failed to run"
+      || fail "squad_lead, allowlist $setting: the emitted launch failed to run"
     assert_equals 1 "$seen" \
-      "a secondmate launched with allowlist=$setting must start with the compact adviser disabled"
+      "a squad_lead launched with allowlist=$setting must start with the compact adviser disabled"
   done
-  pass "a secondmate launch carries the compact-adviser switch in both allowlist postures"
+  pass "a squad_lead launch carries the compact-adviser switch in both allowlist postures"
 }
 
 # The steering doorbell names "$JG_TASK_INBOX" rather than a path, so every
 # launch must hand its agent the absolute path of the task's own inbox. For a
-# secondmate that inbox lives in the launching home's state, not its own. The
+# squad_lead that inbox lives in the launching home's state, not its own. The
 # cleared allowlist environment is where an ambient forward would be lost.
 test_launch_exports_task_inbox() {
   local kind rec id sm out status seen want
-  for kind in ship secondmate; do
+  for kind in ship squad_lead; do
     id="inbox-$kind-a1"
     rec=$(make_case "inbox-$kind" codex "$id")
     read_case "$rec"
@@ -204,14 +204,14 @@ test_launch_exports_task_inbox() {
     if [ "$kind" = ship ]; then
       out=$(run_case_spawn "$id" "$PROJ_DIR" --mode no-mistakes --yolo off)
     else
-      sm="$CASE_DIR/secondmate-home"
+      sm="$CASE_DIR/squad-lead-home"
       mkdir -p "$sm/bin" "$sm/data"
-      printf '# Firstmate\n' > "$sm/AGENTS.md"
-      printf '%s\n' "$id" > "$sm/.jg-secondmate-home"
+      printf '# Juggernaut\n' > "$sm/AGENTS.md"
+      printf '%s\n' "$id" > "$sm/.jg-squad-lead-home"
       printf 'charter for %s\n' "$id" > "$sm/data/charter.md"
       printf '%s\n' 'projects/' 'state/' 'data/' 'config/' '.no-mistakes/' > "$sm/.gitignore"
       git -C "$sm" init -q -b main
-      out=$(run_case_spawn "$id" "$sm" --secondmate)
+      out=$(run_case_spawn "$id" "$sm" --squad-lead)
     fi
     status=$?
     expect_code 0 "$status" "$kind spawn should succeed: $out"
@@ -222,7 +222,7 @@ test_launch_exports_task_inbox() {
     assert_equals "$want" "$seen" \
       "a $kind agent must start with JG_TASK_INBOX set to its absolute steering inbox"
   done
-  pass "ship and secondmate launches export their absolute steering inbox as JG_TASK_INBOX"
+  pass "ship and squad_lead launches export their absolute steering inbox as JG_TASK_INBOX"
 }
 
 # --- relaunch ---------------------------------------------------------------
@@ -489,7 +489,7 @@ test_worker_git_editors
 test_ship_allowlist_absent
 test_ship_allowlist_enabled
 test_launch_command_carries_the_switch_without_the_pane_export
-test_secondmate_launch
+test_squad_lead_launch
 test_launch_exports_task_inbox
 test_relaunch_rebuilds_the_switch
 test_relaunch_keeps_one_receipt_requirement

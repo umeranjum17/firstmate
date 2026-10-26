@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Opt-in real-Pi regression for a post-start AGENTS.md update followed by
-# compaction. It runs an isolated tmux server, throwaway Firstmate checkout,
+# compaction. It runs an isolated tmux server, throwaway Juggernaut checkout,
 # and scratch JG_HOME, so it never drives the caller's Pi session or fleet.
 #
 # The portable session-start tests own baseline and output logic. This guard
@@ -108,7 +108,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 mkdir -p "$LAB"
-git clone --quiet --no-hardlinks "$ROOT" "$PROJECT" || fail "could not create isolated Firstmate checkout"
+git clone --quiet --no-hardlinks "$ROOT" "$PROJECT" || fail "could not create isolated Juggernaut checkout"
 git -C "$PROJECT" checkout -q -B main "$TEST_COMMIT" \
   || fail "could not check out isolated test ref $TEST_REF ($TEST_COMMIT)"
 git -C "$PROJECT" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main \

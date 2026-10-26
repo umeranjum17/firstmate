@@ -467,10 +467,10 @@ test_commits_behind_origin_are_reported() {
   work=$(git_fixture git-behind-repo)
   git -C "$work" reset -q --hard HEAD~2
   head_before=$(git -C "$work" rev-parse HEAD)
-  write_config "$home" "{\"tools\":[{\"name\":\"firstmate\",\"git\":{\"repo\":\"$work\",\"remote\":\"origin\",\"branch\":\"main\"}}]}"
+  write_config "$home" "{\"tools\":[{\"name\":\"juggernaut\",\"git\":{\"repo\":\"$work\",\"remote\":\"origin\",\"branch\":\"main\"}}]}"
   out="$home/out.txt"
   run_check "$home" "$PATH" "$out"
-  assert_contains "$(cat "$out")" "firstmate update available: local main is 2 commits behind origin/main" "commits behind the origin branch were not reported"
+  assert_contains "$(cat "$out")" "juggernaut update available: local main is 2 commits behind origin/main" "commits behind the origin branch were not reported"
   # The probe is read-only: the watched repository must be untouched.
   [ "$(git -C "$work" rev-parse HEAD)" = "$head_before" ] || fail "the check moved the watched repository's HEAD"
   git -C "$work" diff --quiet || fail "the check left changes in the watched repository"
@@ -482,10 +482,10 @@ test_default_branch_is_detected_when_branch_is_omitted() {
   home=$(make_home git-default)
   work=$(git_fixture git-default-repo)
   git -C "$work" reset -q --hard HEAD~1
-  write_config "$home" "{\"tools\":[{\"name\":\"firstmate\",\"git\":{\"repo\":\"$work\"}}]}"
+  write_config "$home" "{\"tools\":[{\"name\":\"juggernaut\",\"git\":{\"repo\":\"$work\"}}]}"
   out="$home/out.txt"
   run_check "$home" "$PATH" "$out"
-  assert_contains "$(cat "$out")" "firstmate update available: local main is 1 commit behind origin/main" "the default branch was not detected from the remote"
+  assert_contains "$(cat "$out")" "juggernaut update available: local main is 1 commit behind origin/main" "the default branch was not detected from the remote"
   pass "an omitted branch is detected from the remote's default branch"
 }
 
@@ -502,10 +502,10 @@ test_default_branch_is_asked_of_the_remote_when_the_clone_has_no_record() {
   # exists under a non-loose ref backend and would make this vacuous there.
   ! git -C "$work" symbolic-ref --quiet refs/remotes/origin/HEAD >/dev/null 2>&1 \
     || fail "the fixture still records the remote's default branch locally"
-  write_config "$home" "{\"tools\":[{\"name\":\"firstmate\",\"git\":{\"repo\":\"$work\"}}]}"
+  write_config "$home" "{\"tools\":[{\"name\":\"juggernaut\",\"git\":{\"repo\":\"$work\"}}]}"
   out="$home/out.txt"
   run_check "$home" "$PATH" "$out"
-  assert_contains "$(cat "$out")" "firstmate update available: local main is 2 commits behind origin/main" "the default branch was not asked of the remote"
+  assert_contains "$(cat "$out")" "juggernaut update available: local main is 2 commits behind origin/main" "the default branch was not asked of the remote"
   pass "the default branch is asked of the remote when the clone has no local record"
 }
 
@@ -513,7 +513,7 @@ test_current_and_ahead_repositories_are_silent() {
   local home work out
   home=$(make_home git-current)
   work=$(git_fixture git-current-repo)
-  write_config "$home" "{\"tools\":[{\"name\":\"firstmate\",\"git\":{\"repo\":\"$work\",\"branch\":\"main\"}}]}"
+  write_config "$home" "{\"tools\":[{\"name\":\"juggernaut\",\"git\":{\"repo\":\"$work\",\"branch\":\"main\"}}]}"
   out="$home/out.txt"
   run_check "$home" "$PATH" "$out"
   [ ! -s "$out" ] || fail "an up to date repository produced a report: $(cat "$out")"
@@ -531,10 +531,10 @@ test_unusable_git_source_is_reported() {
   local home out
   home=$(make_home git-broken)
   mkdir -p "$TMP_ROOT/git-broken/not-a-repo"
-  write_config "$home" "{\"tools\":[{\"name\":\"firstmate\",\"git\":{\"repo\":\"$TMP_ROOT/git-broken/not-a-repo\",\"branch\":\"main\"}}]}"
+  write_config "$home" "{\"tools\":[{\"name\":\"juggernaut\",\"git\":{\"repo\":\"$TMP_ROOT/git-broken/not-a-repo\",\"branch\":\"main\"}}]}"
   out="$home/out.txt"
   run_check "$home" "$PATH" "$out"
-  assert_contains "$(cat "$out")" "firstmate check failed" "an unusable git source was not reported"
+  assert_contains "$(cat "$out")" "juggernaut check failed" "an unusable git source was not reported"
   pass "an unusable git source is reported as a check failure"
 }
 
@@ -542,16 +542,16 @@ test_unreadable_remote_is_not_reported_as_a_missing_branch() {
   local home work out report
   # A remote that cannot be reached at all and a branch that was deleted are
   # different problems with different repairs. Reporting the first as the second
-  # wakes firstmate with a diagnosis that is simply wrong, so the report must
+  # wakes juggernaut with a diagnosis that is simply wrong, so the report must
   # name only what the probe established.
   home=$(make_home git-unreadable)
   work=$(git_fixture git-unreadable-repo)
   rm -rf "$TMP_ROOT/git-unreadable-repo.git"
-  write_config "$home" "{\"tools\":[{\"name\":\"firstmate\",\"git\":{\"repo\":\"$work\",\"remote\":\"origin\",\"branch\":\"main\"}}]}"
+  write_config "$home" "{\"tools\":[{\"name\":\"juggernaut\",\"git\":{\"repo\":\"$work\",\"remote\":\"origin\",\"branch\":\"main\"}}]}"
   out="$home/out.txt"
   run_check "$home" "$PATH" "$out"
   report=$(cat "$out")
-  assert_contains "$report" "firstmate check failed" "a remote that could not be read was not reported"
+  assert_contains "$report" "juggernaut check failed" "a remote that could not be read was not reported"
   assert_contains "$report" "origin could not be reached or read" "the report does not name the condition the probe actually found"
   assert_not_contains "$report" "has no branch" "a remote that could not be read was reported as a deleted branch"
   pass "a remote that cannot be read is reported as unreadable, not as a missing branch"
@@ -563,10 +563,10 @@ test_missing_branch_on_a_readable_remote_is_still_reported() {
   # have the watched branch, so that must still be reported as a missing branch.
   home=$(make_home git-no-branch)
   work=$(git_fixture git-no-branch-repo)
-  write_config "$home" "{\"tools\":[{\"name\":\"firstmate\",\"git\":{\"repo\":\"$work\",\"remote\":\"origin\",\"branch\":\"release\"}}]}"
+  write_config "$home" "{\"tools\":[{\"name\":\"juggernaut\",\"git\":{\"repo\":\"$work\",\"remote\":\"origin\",\"branch\":\"release\"}}]}"
   out="$home/out.txt"
   run_check "$home" "$PATH" "$out"
-  assert_contains "$(cat "$out")" "firstmate check failed: origin has no branch release" "a branch the remote does not have was not reported as missing"
+  assert_contains "$(cat "$out")" "juggernaut check failed: origin has no branch release" "a branch the remote does not have was not reported as missing"
   pass "a branch a readable remote does not have is still reported as missing"
 }
 
@@ -582,11 +582,11 @@ test_git_probes_stop_when_the_sweep_budget_is_gone() {
   git -C "$work" reset -q --hard HEAD~2
   slow="$TMP_ROOT/git-budget/bin"
   make_slow_copy "$slow" "$TOOL" 30
-  write_config "$home" "{\"tools\":[{\"name\":\"firstmate\",\"command\":\"$TOOL\",\"git\":{\"repo\":\"$work\",\"remote\":\"origin\",\"branch\":\"main\"}}]}"
+  write_config "$home" "{\"tools\":[{\"name\":\"juggernaut\",\"command\":\"$TOOL\",\"git\":{\"repo\":\"$work\",\"remote\":\"origin\",\"branch\":\"main\"}}]}"
   out="$home/out.txt"
   run_check "$home" "$(fixture_path "$slow")" "$out" JG_TOOL_UPDATE_BUDGET_SECS=1
   report=$(cat "$out")
-  assert_contains "$report" "check incomplete: the time budget ran out before firstmate" "a sweep with no budget left did not say which tool it did not finish"
+  assert_contains "$report" "check incomplete: the time budget ran out before juggernaut" "a sweep with no budget left did not say which tool it did not finish"
   assert_not_contains "$report" "commits behind" "the git probes ran after the sweep budget was already gone"
   pass "git probes stop and name their tool once the sweep budget is gone"
 }
@@ -619,7 +619,7 @@ exec $(command -v git) "\$@"
 SH
   chmod 0755 "$dir/git"
 
-  write_config "$home" "{\"tools\":[{\"name\":\"firstmate\",\"git\":{\"repo\":\"$work\",\"remote\":\"origin\",\"branch\":\"main\"}}]}"
+  write_config "$home" "{\"tools\":[{\"name\":\"juggernaut\",\"git\":{\"repo\":\"$work\",\"remote\":\"origin\",\"branch\":\"main\"}}]}"
   out="$home/out.txt"
   # The bound is wide enough that the earlier probes answer comfortably, so the
   # only probe that can hit it is the object query the fixture stalls. Asserting
@@ -628,7 +628,7 @@ SH
   run_check "$home" "$(fixture_path "$dir")" "$out" JG_TOOL_UPDATE_PROBE_SECS=3
   report=$(cat "$out")
   assert_not_contains "$report" "update available" "a probe that never answered was reported as an available update"
-  assert_contains "$report" "firstmate check failed: $work did not answer whether it already has" "the stalled object query was not the reported failure"
+  assert_contains "$report" "juggernaut check failed: $work did not answer whether it already has" "the stalled object query was not the reported failure"
   [ "$(git -C "$work" rev-parse HEAD)" = "$head_before" ] || fail "the check moved the watched repository's HEAD"
   pass "a git probe that does not answer is reported as a failure, never as an update"
 }
@@ -656,11 +656,11 @@ exec $(command -v git) "\$@"
 SH
   chmod 0755 "$dir/git"
 
-  write_config "$home" "{\"tools\":[{\"name\":\"firstmate\",\"git\":{\"repo\":\"$work\",\"remote\":\"origin\",\"branch\":\"main\"}}]}"
+  write_config "$home" "{\"tools\":[{\"name\":\"juggernaut\",\"git\":{\"repo\":\"$work\",\"remote\":\"origin\",\"branch\":\"main\"}}]}"
   out="$home/out.txt"
   run_check "$home" "$(fixture_path "$dir")" "$out" JG_TOOL_UPDATE_PROBE_SECS=1
   report=$(cat "$out")
-  assert_contains "$report" "firstmate check failed: $work did not answer whether it is a git repository" "a repository probe that never answered was not reported as such"
+  assert_contains "$report" "juggernaut check failed: $work did not answer whether it is a git repository" "a repository probe that never answered was not reported as such"
   assert_not_contains "$report" "is not a git repository" "a repository probe that never answered was reported as not a repository"
   pass "a stalled repository probe is reported as no answer, not as not a repository"
 }
@@ -940,7 +940,7 @@ test_arm_refuses_a_symlink_at_the_shim_path() {
 test_a_failed_registration_leaves_no_unregistered_shim() {
   local home dir target stale_shim status
   # An unregistered shim in state/ is not inert: the watcher rejects it every
-  # cycle and wakes firstmate about unauthenticated state checks until someone
+  # cycle and wakes juggernaut about unauthenticated state checks until someone
   # deletes it by hand. So a home that could not be armed has to come back to the
   # state it was in, and arm still has to say it failed.
   home=$(make_home arm-register-fail)

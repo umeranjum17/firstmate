@@ -22,41 +22,41 @@
 #                 "BACKLOG_RECONCILE: <id>: <what this home could not reconcile>",
 #                 "BACKLOG_RECONCILE: code-root <file> is not this home's <file>; ...",
 #                 "TANGLE: <remediation>",
-#                 "SECONDMATE_SYNC: secondmate <id>: skipped: <reason>",
-#                 "NUDGE_SECONDMATES: secondmate <id>: send failed: <reason>",
+#                 "SQUAD_LEAD_SYNC: squad_lead <id>: skipped: <reason>",
+#                 "NUDGE_SQUAD_LEADS: squad_lead <id>: send failed: <reason>",
 #                 "BOOTSTRAP_INFO: nudged jg-<id> with '<message>'",
-#                 "SECONDMATE_LIVENESS: secondmate <id>: skipped: <reason>|respawn failed after <cause>: <reason>",
-#                 "SECONDMATE_HANDOFF: secondmate <id>: pending delivery: <n> item(s)",
+#                 "SQUAD_LEAD_LIVENESS: squad_lead <id>: skipped: <reason>|respawn failed after <cause>: <reason>",
+#                 "SQUAD_LEAD_HANDOFF: squad_lead <id>: pending delivery: <n> item(s)",
 #                 "FMX: X mode on ..." or "FMX: X mode off ...".
-#          When a RUNNING secondmate home is fast-forwarded, its target is
-#          firstmate's own current default-branch commit. A local worktree uses
+#          When a RUNNING squad_lead home is fast-forwarded, its target is
+#          juggernaut's own current default-branch commit. A local worktree uses
 #          a purely local fast-forward with no origin fetch; a remote route hands
 #          the same commit to its host, which imports that commit into the home
-#          without moving the host's Firstmate copy. If either placement changes
+#          without moving the host's Juggernaut copy. If either placement changes
 #          its loaded instruction surface
 #          (AGENTS.md, bin/, or .agents/skills/), bootstrap immediately nudges it
 #          via JG_HOME=<active-home> bin/jg-send.sh jg-<id> so meta resolves the
-#          current route and the standard from-firstmate marker is applied. A
+#          current route and the standard from-juggernaut marker is applied. A
 #          successful send prints one BOOTSTRAP_INFO line with the exact target
 #          and message sent; a failed send leaves an idempotent retry marker
-#          under state/.secondmate-nudge-pending/ and prints an actionable
-#          NUDGE_SECONDMATES line.
+#          under state/.squad-lead-nudge-pending/ and prints an actionable
+#          NUDGE_SQUAD_LEADS line.
 #          Already-current or no-instruction-change homes are silently left alone.
-#          The secondmate sweep also propagates declared inherited local material
-#          into each validated live secondmate home.
-#          SECONDMATE_SYNC lines report actionable skipped placement-specific
-#          syncs or inheritance failures for live secondmate homes, plus
+#          The squad_lead sweep also propagates declared inherited local material
+#          into each validated live squad_lead home.
+#          SQUAD_LEAD_SYNC lines report actionable skipped placement-specific
+#          syncs or inheritance failures for live squad_lead homes, plus
 #          quarantine diagnostics for divergent shared captain-preference
 #          copies; no-op/current and successful updates stay quiet.
-#          SECONDMATE_LIVENESS lines report only actionable failures from the
+#          SQUAD_LEAD_LIVENESS lines report only actionable failures from the
 #          recovery-grade state owned by bin/jg-backend.sh's
 #          jg_backend_agent_state: skipped distinguishes an existing ambiguous
 #          process, an unreadable target, and an unverified backend; respawn
 #          failed names whether the endpoint was missing or agent-less.
-#          Already-live and successfully relaunched secondmates are silent
+#          Already-live and successfully relaunched squad_leads are silent
 #          unless JG_BOOTSTRAP_VERBOSE_FACTS=1 requests BOOTSTRAP_INFO facts.
-#          A TANGLE line means the firstmate primary checkout (JG_ROOT) is stranded
-#          on a feature branch instead of its default branch - a crewmate's work
+#          A TANGLE line means the juggernaut primary checkout (JG_ROOT) is stranded
+#          on a feature branch instead of its default branch - a operator's work
 #          landed in the primary instead of its own worktree; restore it per the line.
 #          treehouse is also MISSING when its installed version lacks
 #          "treehouse get --lease" support.
@@ -76,7 +76,7 @@
 #          .agents/skills/quota-array-dispatch/SKILL.md.
 #          On a primary home, the locked mutable path materializes the visible
 #          default config/startup-memory-budget=7500 when absent. It never
-#          guesses at malformed or unsafe existing files, and secondmate homes
+#          guesses at malformed or unsafe existing files, and squad_lead homes
 #          await the primary-authoritative inherited value instead of creating
 #          their own.
 #          X mode is OPTIONAL and inert unless JG_HOME/.env has a non-empty
@@ -101,21 +101,21 @@
 #          item this home already owns a worker for. The worker-record sweep
 #          never starts a captain-held or closed item, and reconciliation never
 #          reads or writes another home; the fleet snapshot's classifier and
-#          bin/jg-secondmate-reconcile.sh's nudge stay as backstops. Replayed
+#          bin/jg-squad-lead-reconcile.sh's nudge stay as backstops. Replayed
 #          transitions and restored In-flight rows print BOOTSTRAP_INFO facts.
 #          The `code-root <file>` variant is a detect-only local check that runs
 #          even in a read-only session; detect_code_root_backlog_fork owns what
 #          it reports.
 #          Set JG_BOOTSTRAP_DETECT_ONLY=1 to skip the six MUTATING sweeps
-#          (backlog_record_reconcile, secondmate_sync,
-#          secondmate_liveness_sweep, secondmate_handoff_resume, x_mode_setup,
+#          (backlog_record_reconcile, squad_lead_sync,
+#          squad_lead_liveness_sweep, squad_lead_handoff_resume, x_mode_setup,
 #          fleet_sync) while still
 #          printing every read-only detect line
 #          above; the TANGLE line switches to advisory-only wording with no
 #          checkout command. Used by
 #          jg-session-start.sh's read-only path when another live session holds
 #          the fleet lock, so a second concurrent session never race-mutates
-#          secondmate homes, pending handoff outboxes and receiver wakes,
+#          squad_lead homes, pending handoff outboxes and receiver wakes,
 #          X-mode artifacts, project clones, or repair instructions.
 #          Unset/0 (the default) runs all six sweeps - this flag is purely
 #          additive.
@@ -126,8 +126,8 @@
 #                 step. Unrecognized values fall back here on purpose: a typo
 #                 must never silently skip a safety sweep.
 #            skip - every LOCAL step, and none of the network ones. Skips
-#                 `gh auth status`, secondmate_liveness_sweep, secondmate_sync,
-#                 secondmate_handoff_resume, and fleet_sync.
+#                 `gh auth status`, squad_lead_liveness_sweep, squad_lead_sync,
+#                 squad_lead_handoff_resume, and fleet_sync.
 #            only - ONLY those network steps and nothing else. No tool detection,
 #                 no version floors, no tangle check, no backlog
 #                 reconciliation, no x_mode_setup: those already ran on the
@@ -138,8 +138,8 @@
 #          in a detached bounded worker and publishes the result. This file stays
 #          the single owner of every sweep, and the split changes only WHEN each
 #          runs, never WHETHER. During the network phase, project clone refresh
-#          overlaps the independent secondmate work. Per-secondmate remote
-#          liveness workers run concurrently and finish before per-secondmate
+#          overlaps the independent squad_lead work. Per-squad-lead remote
+#          liveness workers run concurrently and finish before per-squad-lead
 #          remote convergence workers run concurrently, because convergence
 #          consumes respawned ids. Worker output is captured separately and
 #          replayed in spawn order; failure to create that private capture
@@ -196,9 +196,9 @@ DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
 . "$SCRIPT_DIR/jg-cursor-lib.sh"
 # shellcheck source=bin/jg-config-inherit-lib.sh disable=SC1091
 . "$SCRIPT_DIR/jg-config-inherit-lib.sh"
-# shellcheck source=bin/jg-secondmate-nudge-lib.sh disable=SC1091
-. "$SCRIPT_DIR/jg-secondmate-nudge-lib.sh"
-# Parked-home guard (firstmate-addons/parked-homes): a parked home gets no
+# shellcheck source=bin/jg-squad-lead-nudge-lib.sh disable=SC1091
+. "$SCRIPT_DIR/jg-squad-lead-nudge-lib.sh"
+# Parked-home guard (juggernaut-addons/parked-homes): a parked home gets no
 # config push or reread nudge. The shim answers not parked when the add-on is absent.
 # shellcheck source=bin/jg-parked-homes-lib.sh
 . "$SCRIPT_DIR/jg-parked-homes-lib.sh"
@@ -210,11 +210,11 @@ DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
 . "$SCRIPT_DIR/jg-backend.sh"
 # shellcheck source=bin/jg-remote-readiness-lib.sh disable=SC1091
 . "$SCRIPT_DIR/jg-remote-readiness-lib.sh"
-# Shared secondmate endpoint probe + guarded relaunch; the watcher's poll tick
+# Shared squad_lead endpoint probe + guarded relaunch; the watcher's poll tick
 # drives the same library so session start and ordinary supervision recover
 # from identical evidence through an identical path.
 # shellcheck source=/dev/null # Analyzed separately as a canonical lint root.
-. "$SCRIPT_DIR/jg-secondmate-liveness-lib.sh"
+. "$SCRIPT_DIR/jg-squad-lead-liveness-lib.sh"
 # jg-timing-lib.sh is inert unless JG_TIMING_LOG names a file, which only the
 # deferred network stage sets, so an ordinary bootstrap run records nothing.
 # shellcheck source=bin/jg-timing-lib.sh disable=SC1091
@@ -251,9 +251,9 @@ network_sweep_authorized() {
 # Concurrent per-item runner for the deferred network sweeps. Each worker's
 # stdout and stderr are captured to private files and replayed in original
 # order after every worker finishes, so concurrent probes cannot interleave
-# or mis-attribute SECONDMATE_LIVENESS / SECONDMATE_SYNC lines. Respawned ids
+# or mis-attribute SQUAD_LEAD_LIVENESS / SQUAD_LEAD_SYNC lines. Respawned ids
 # are collected from per-id files because background workers cannot mutate
-# the parent's SECONDMATE_RESPAWNED_IDS.
+# the parent's SQUAD_LEAD_RESPAWNED_IDS.
 bootstrap_parallel_begin() {
   BOOTSTRAP_PAR_DIR=$(mktemp -d "${TMPDIR:-/tmp}/jg-bootstrap-par.XXXXXX") || return 1
   BOOTSTRAP_PAR_N=0
@@ -285,14 +285,14 @@ bootstrap_parallel_finish() {
   done
   for f in "$BOOTSTRAP_PAR_DIR"/respawned.*; do
     [ -f "$f" ] || continue
-    SECONDMATE_RESPAWNED_IDS="$SECONDMATE_RESPAWNED_IDS $(tr -d '\n' < "$f")"
+    SQUAD_LEAD_RESPAWNED_IDS="$SQUAD_LEAD_RESPAWNED_IDS $(tr -d '\n' < "$f")"
   done
   rm -rf "$BOOTSTRAP_PAR_DIR"
   unset JG_BOOTSTRAP_PARALLEL_DIR BOOTSTRAP_PAR_DIR BOOTSTRAP_PAR_N
 }
 
-secondmate_note_respawned() {  # <id>
-  SECONDMATE_RESPAWNED_IDS="$SECONDMATE_RESPAWNED_IDS $1"
+squad_lead_note_respawned() {  # <id>
+  SQUAD_LEAD_RESPAWNED_IDS="$SQUAD_LEAD_RESPAWNED_IDS $1"
   [ -n "${JG_BOOTSTRAP_PARALLEL_DIR:-}" ] || return 0
   printf '%s\n' "$1" > "$JG_BOOTSTRAP_PARALLEL_DIR/respawned.$1"
 }
@@ -402,31 +402,31 @@ fleet_sync() {
   rm -f "$tmp"
 }
 
-secondmate_sync() {
+squad_lead_sync() {
   # shellcheck source=bin/jg-wake-lib.sh disable=SC1091
   . "$SCRIPT_DIR/jg-wake-lib.sh"
-  # Placement-specific secondmate sync: EVERY home, local or remote, follows the
+  # Placement-specific squad_lead sync: EVERY home, local or remote, follows the
   # primary checkout's current default-branch commit. The local path is purely
   # LOCAL - no fetch, no origin dependency: a linked-worktree home already holds
   # the primary's commit (jg-ff-lib.sh), while a standalone clone without it is
-  # skipped until /updatefirstmate refreshes it from origin. A remote home is on
+  # skipped until /updatejuggernaut refreshes it from origin. A remote home is on
   # another machine, so its host is handed that same commit and imports it there
-  # (bin/jg-remote-secondmate-control.sh); this side still fetches nothing.
-  # Startup sends reread nudges only for RUNNING secondmates whose instruction
-  # surface (AGENTS.md, bin/, or .agents/skills/) actually changed, so a secondmate already on the primary's
+  # (bin/jg-remote-squad-lead-control.sh); this side still fetches nothing.
+  # Startup sends reread nudges only for RUNNING squad_leads whose instruction
+  # surface (AGENTS.md, bin/, or .agents/skills/) actually changed, so a squad_lead already on the primary's
   # version is never disturbed (AGENTS.md bootstrap + supervision). Unlike
-  # /updatefirstmate, startup owns the live-convergence send itself because it is
+  # /updatejuggernaut, startup owns the live-convergence send itself because it is
   # a deterministic locked sweep and can report success as BOOTSTRAP_INFO while
-  # preserving failed sends as NUDGE_SECONDMATES retry markers.
+  # preserving failed sends as NUDGE_SQUAD_LEADS retry markers.
   [ -d "$STATE" ] || return 0
   local primary_head
   if ! primary_head=$(primary_head_commit "$JG_ROOT"); then
     local meta id
     for meta in "$STATE"/*.meta; do
       [ -f "$meta" ] || continue
-      grep -q '^kind=secondmate' "$meta" 2>/dev/null || continue
+      grep -q '^kind=squad_lead' "$meta" 2>/dev/null || continue
       id=$(basename "$meta" .meta)
-      echo "SECONDMATE_SYNC: secondmate $id: skipped: primary default-branch commit cannot be resolved"
+      echo "SQUAD_LEAD_SYNC: squad_lead $id: skipped: primary default-branch commit cannot be resolved"
     done
     return 0
   fi
@@ -434,53 +434,53 @@ secondmate_sync() {
   FF_SEEN_HOMES=""
   SECOND_MATE_NUDGE_MESSAGE=$JG_SECOND_MATE_NUDGE_MESSAGE
   REMOTE_SECOND_MATE_NUDGE_MESSAGE=$JG_REMOTE_SECOND_MATE_NUDGE_MESSAGE
-  SECOND_MATE_NUDGE_PENDING_DIR="$STATE/.secondmate-nudge-pending"
+  SECOND_MATE_NUDGE_PENDING_DIR="$STATE/.squad-lead-nudge-pending"
 
-  secondmate_nudge_marker_path() {
-    jg_secondmate_nudge_marker_path "$STATE" "$1"
+  squad_lead_nudge_marker_path() {
+    jg_squad_lead_nudge_marker_path "$STATE" "$1"
   }
 
-  secondmate_write_nudge_marker() {
+  squad_lead_write_nudge_marker() {
     local id=$1 home=$2 commit=$3 instr=$4 message=${5:-$SECOND_MATE_NUDGE_MESSAGE} remote=${6:-0}
-    jg_secondmate_nudge_write "$STATE" "$id" "$home" "$commit" "$instr" "$message" "$remote"
+    jg_squad_lead_nudge_write "$STATE" "$id" "$home" "$commit" "$instr" "$message" "$remote"
   }
 
-  secondmate_send_nudge() {
+  squad_lead_send_nudge() {
     local id=$1 home=$2 commit=$3 instr=$4 selector marker out
     selector="jg-$id"
-    marker=$(secondmate_nudge_marker_path "$id") || {
-      echo "NUDGE_SECONDMATES: secondmate $id: send failed: unsafe id"
+    marker=$(squad_lead_nudge_marker_path "$id") || {
+      echo "NUDGE_SQUAD_LEADS: squad_lead $id: send failed: unsafe id"
       return 0
     }
-    if ! secondmate_write_nudge_marker "$id" "$home" "$commit" "$instr"; then
-      echo "NUDGE_SECONDMATES: secondmate $id: send failed: cannot record retry marker"
+    if ! squad_lead_write_nudge_marker "$id" "$home" "$commit" "$instr"; then
+      echo "NUDGE_SQUAD_LEADS: squad_lead $id: send failed: cannot record retry marker"
       return 0
     fi
     if out=$(JG_HOME="$JG_HOME" JG_ROOT_OVERRIDE="$JG_ROOT" JG_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/jg-send.sh" "$selector" "$SECOND_MATE_NUDGE_MESSAGE" 2>&1); then
       rm -f "$marker"
       echo "BOOTSTRAP_INFO: nudged $selector with '$SECOND_MATE_NUDGE_MESSAGE'"
     else
-      echo "NUDGE_SECONDMATES: secondmate $id: send failed: $(first_line "$out")"
+      echo "NUDGE_SQUAD_LEADS: squad_lead $id: send failed: $(first_line "$out")"
     fi
   }
 
   jg_ff_after_instruction_update() {
     local id=$1 home=$2 _window=$3 instr=$4
-    secondmate_send_nudge "$id" "$home" "$primary_head" "$instr"
+    squad_lead_send_nudge "$id" "$home" "$primary_head" "$instr"
   }
 
-  secondmate_retry_pending_nudges() {
+  squad_lead_retry_pending_nudges() {
     local marker id selector home commit message remote expected_marker meta meta_home home_real head out
     [ -d "$SECOND_MATE_NUDGE_PENDING_DIR" ] || return 0
     for marker in "$SECOND_MATE_NUDGE_PENDING_DIR"/*.pending; do
       [ -f "$marker" ] || continue
       id=$(jg_meta_get "$marker" id)
-      if ! expected_marker=$(secondmate_nudge_marker_path "$id"); then
-        echo "NUDGE_SECONDMATES: secondmate ${id:-unknown}: send failed: retry marker has unsafe id"
+      if ! expected_marker=$(squad_lead_nudge_marker_path "$id"); then
+        echo "NUDGE_SQUAD_LEADS: squad_lead ${id:-unknown}: send failed: retry marker has unsafe id"
         continue
       fi
       [ "$expected_marker" = "$marker" ] || {
-        echo "NUDGE_SECONDMATES: secondmate $id: send failed: retry marker filename mismatch"
+        echo "NUDGE_SQUAD_LEADS: squad_lead $id: send failed: retry marker filename mismatch"
         continue
       }
       selector=$(jg_meta_get "$marker" selector)
@@ -490,69 +490,69 @@ secondmate_sync() {
       remote=$(jg_meta_get "$marker" remote)
       [ -n "$remote" ] || remote=0
       [ "$selector" = "jg-$id" ] || {
-        echo "NUDGE_SECONDMATES: secondmate ${id:-unknown}: send failed: retry marker selector mismatch"
+        echo "NUDGE_SQUAD_LEADS: squad_lead ${id:-unknown}: send failed: retry marker selector mismatch"
         continue
       }
       case "$remote" in
         0) [ "$message" = "$SECOND_MATE_NUDGE_MESSAGE" ] || {
-          echo "NUDGE_SECONDMATES: secondmate ${id:-unknown}: send failed: retry marker message mismatch"
+          echo "NUDGE_SQUAD_LEADS: squad_lead ${id:-unknown}: send failed: retry marker message mismatch"
           continue
         } ;;
         1) [ "$message" = "$REMOTE_SECOND_MATE_NUDGE_MESSAGE" ] || {
-          echo "NUDGE_SECONDMATES: secondmate ${id:-unknown}: send failed: remote retry marker message mismatch"
+          echo "NUDGE_SQUAD_LEADS: squad_lead ${id:-unknown}: send failed: remote retry marker message mismatch"
           continue
         } ;;
         *)
-          echo "NUDGE_SECONDMATES: secondmate ${id:-unknown}: send failed: retry marker placement is invalid"
+          echo "NUDGE_SQUAD_LEADS: squad_lead ${id:-unknown}: send failed: retry marker placement is invalid"
           continue
           ;;
       esac
       [ "$remote" -ne 1 ] || continue
       meta="$STATE/$id.meta"
-      [ -f "$meta" ] && [ "$(jg_meta_get "$meta" kind)" = secondmate ] || {
-        echo "NUDGE_SECONDMATES: secondmate ${id:-unknown}: send failed: retry target has no live secondmate metadata"
+      [ -f "$meta" ] && [ "$(jg_meta_get "$meta" kind)" = squad_lead ] || {
+        echo "NUDGE_SQUAD_LEADS: squad_lead ${id:-unknown}: send failed: retry target has no live squad_lead metadata"
         continue
       }
       meta_home=$(jg_meta_get "$meta" home)
-      [ -n "$meta_home" ] || meta_home=$(secondmate_registry_field "$DATA/secondmates.md" "$id" home || true)
-      if ! validate_secondmate_home "$id" "$meta_home"; then
-        echo "NUDGE_SECONDMATES: secondmate $id: send failed: retry target home unsafe: $VALIDATION_ERROR"
+      [ -n "$meta_home" ] || meta_home=$(squad_lead_registry_field "$DATA/squad_leads.md" "$id" home || true)
+      if ! validate_squad_lead_home "$id" "$meta_home"; then
+        echo "NUDGE_SQUAD_LEADS: squad_lead $id: send failed: retry target home unsafe: $VALIDATION_ERROR"
         continue
       fi
       home_real="$VALIDATED_HOME"
       [ "$home_real" = "$home" ] || {
-        echo "NUDGE_SECONDMATES: secondmate $id: send failed: retry target home changed"
+        echo "NUDGE_SQUAD_LEADS: squad_lead $id: send failed: retry target home changed"
         continue
       }
       head=$(git -C "$home_real" rev-parse HEAD 2>/dev/null || true)
       [ -n "$head" ] && [ "$head" = "$commit" ] || {
-        echo "NUDGE_SECONDMATES: secondmate $id: send failed: retry target is not at recorded instruction commit"
+        echo "NUDGE_SQUAD_LEADS: squad_lead $id: send failed: retry target is not at recorded instruction commit"
         continue
       }
       if out=$(JG_HOME="$JG_HOME" JG_ROOT_OVERRIDE="$JG_ROOT" JG_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/jg-send.sh" "$selector" "$SECOND_MATE_NUDGE_MESSAGE" 2>&1); then
         rm -f "$marker"
         echo "BOOTSTRAP_INFO: nudged $selector with '$SECOND_MATE_NUDGE_MESSAGE'"
       else
-        echo "NUDGE_SECONDMATES: secondmate $id: send failed: $(first_line "$out")"
+        echo "NUDGE_SQUAD_LEADS: squad_lead $id: send failed: $(first_line "$out")"
       fi
     done
   }
 
   local tmp line
-  secondmate_retry_pending_nudges
-  tmp=$(mktemp "${TMPDIR:-/tmp}/jg-secondmate-sync.XXXXXX" 2>/dev/null) || return 0
-  sweep_live_secondmate_metas "$STATE" "$primary_head" yes "$DATA/secondmates.md" >"$tmp"
+  squad_lead_retry_pending_nudges
+  tmp=$(mktemp "${TMPDIR:-/tmp}/jg-squad-lead-sync.XXXXXX" 2>/dev/null) || return 0
+  sweep_live_squad_lead_metas "$STATE" "$primary_head" yes "$DATA/squad_leads.md" >"$tmp"
   while IFS= read -r line; do
     case "$line" in
-      secondmate\ *': skipped:'*) echo "SECONDMATE_SYNC: $line" ;;
+      squad_lead\ *': skipped:'*) echo "SQUAD_LEAD_SYNC: $line" ;;
       BOOTSTRAP_INFO:\ *) echo "$line" ;;
-      NUDGE_SECONDMATES:\ *) echo "$line" ;;
+      NUDGE_SQUAD_LEADS:\ *) echo "$line" ;;
     esac
   done < "$tmp"
   rm -f "$tmp"
   unset -f jg_ff_after_instruction_update
   # Inheritance propagation: push the primary-authoritative local inheritance
-  # surface into every VALIDATED live secondmate home swept above.
+  # surface into every VALIDATED live squad_lead home swept above.
   # FF_SEEN_HOMES is exactly that set, and jg-config-inherit-lib.sh owns the
   # declared config items plus data/captain-shared.md.
   # After a successful push that changes allowlisted config/* for an already-
@@ -561,10 +561,10 @@ secondmate_sync() {
   # re-reads at launch and needs no redundant nudge unless files changed after launch.
   local id home home_real home_lock propagated_homes report reread_out reread_skip_pending
   propagated_homes=""
-  SECONDMATE_RESPAWNED_IDS=${SECONDMATE_RESPAWNED_IDS:-}
+  SQUAD_LEAD_RESPAWNED_IDS=${SQUAD_LEAD_RESPAWNED_IDS:-}
   while IFS='|' read -r id home _window _meta; do
-    validate_secondmate_home "$id" "$home" || continue
-    # Parked-home guard (firstmate-addons/parked-homes): a parked home gets no
+    validate_squad_lead_home "$id" "$home" || continue
+    # Parked-home guard (juggernaut-addons/parked-homes): a parked home gets no
     # inherited config push and no reread nudge. No-op without the add-on.
     jg_parked_skip_meta "$STATE/$id.meta" "$id" config-reread && continue
     home_real="$VALIDATED_HOME"
@@ -577,40 +577,40 @@ secondmate_sync() {
     esac
     propagated_homes="$propagated_homes $home_real"
     mkdir -p "$home_real/state" || {
-      echo "CONFIG_REREAD: secondmate $id: send failed: could not create state directory"
+      echo "CONFIG_REREAD: squad_lead $id: send failed: could not create state directory"
       continue
     }
     home_lock=$(jg_config_inherit_lock_path "$home_real") || {
-      echo "CONFIG_REREAD: secondmate $id: send failed: could not resolve per-home lock"
+      echo "CONFIG_REREAD: squad_lead $id: send failed: could not resolve per-home lock"
       continue
     }
     jg_lock_acquire_wait "$home_lock" || {
-      echo "CONFIG_REREAD: secondmate $id: send failed: could not acquire per-home lock"
+      echo "CONFIG_REREAD: squad_lead $id: send failed: could not acquire per-home lock"
       continue
     }
     reread_skip_pending=0
-    case " $SECONDMATE_RESPAWNED_IDS " in
+    case " $SQUAD_LEAD_RESPAWNED_IDS " in
       *" $id "*) reread_skip_pending=1 ;;
     esac
     if [ "$reread_skip_pending" -eq 0 ] \
       && jg_config_reread_retry_queue_is_full "$JG_HOME" "$id"; then
       jg_config_reread_retry_pending "$id" "$home_real" || true
       if jg_config_reread_retry_queue_is_full "$JG_HOME" "$id"; then
-        echo "CONFIG_REREAD: secondmate $id: send failed: retry instruction queue is full"
+        echo "CONFIG_REREAD: squad_lead $id: send failed: retry instruction queue is full"
         jg_lock_release "$home_lock" || true
         continue
       fi
     fi
     report=$(mktemp "${TMPDIR:-/tmp}/jg-bootstrap-inherit.XXXXXX" 2>/dev/null) || {
-      echo "SECONDMATE_SYNC: secondmate $id: skipped: inheritance failed"
+      echo "SQUAD_LEAD_SYNC: squad_lead $id: skipped: inheritance failed"
       jg_lock_release "$home_lock" || true
       continue
     }
     if JG_CONFIG_INHERIT_REPORT="$report" JG_CONFIG_INHERIT_LIVE=1 \
-      propagate_secondmate_inheritance "$JG_HOME" "$home_real" "$CONFIG" "$DATA"; then
+      propagate_squad_lead_inheritance "$JG_HOME" "$home_real" "$CONFIG" "$DATA"; then
       :
     else
-      echo "SECONDMATE_SYNC: secondmate $id: skipped: inheritance failed"
+      echo "SQUAD_LEAD_SYNC: squad_lead $id: skipped: inheritance failed"
     fi
     if ! reread_out=$(JG_HOME="$JG_HOME" JG_ROOT_OVERRIDE="$JG_ROOT" \
       JG_STATE_OVERRIDE="$STATE" \
@@ -619,59 +619,59 @@ secondmate_sync() {
       if [ -n "$reread_out" ]; then
         printf '%s\n' "$reread_out"
       else
-        echo "CONFIG_REREAD: secondmate $id: send failed: unknown error"
+        echo "CONFIG_REREAD: squad_lead $id: send failed: unknown error"
       fi
     elif [ -n "$reread_out" ]; then
       printf '%s\n' "$reread_out"
     fi
     rm -f "$report"
     jg_lock_release "$home_lock" || true
-  done < <(live_secondmate_meta_records "$STATE" "$DATA/secondmates.md")
+  done < <(live_squad_lead_meta_records "$STATE" "$DATA/squad_leads.md")
 
-  # One remote secondmate's convergence, split out of the loop so each host is
+  # One remote squad_lead's convergence, split out of the loop so each host is
   # individually timed; every `return` here was a `continue` and still means
-  # "move on to the next secondmate".
-  secondmate_sync_remote_one() {  # <id> <home> <remote-host>
+  # "move on to the next squad_lead".
+  squad_lead_sync_remote_one() {  # <id> <home> <remote-host>
     local id=$1 _home=$2 remote_host=$3
     local sync_out sync_rc inherit_out nudge_needed remote_marker remote_pending converged out remote_lock remote_generation
     remote_lock=$(jg_remote_inherit_transaction_lock_path "$STATE" "$id" 2>/dev/null || true)
     if [ -z "$remote_lock" ] || ! jg_lock_acquire_wait "$remote_lock"; then
-      echo "NUDGE_SECONDMATES: secondmate $id: send failed: cannot lock remote inheritance transaction"
+      echo "NUDGE_SQUAD_LEADS: squad_lead $id: send failed: cannot lock remote inheritance transaction"
       return 0
     fi
     if ! "$SCRIPT_DIR/jg-procevent-remote-reply.sh" arm "$id" >/dev/null 2>&1; then
-      echo "SECONDMATE_LIVENESS: secondmate $id: skipped: remote reply source could not be registered"
+      echo "SQUAD_LEAD_LIVENESS: squad_lead $id: skipped: remote reply source could not be registered"
     fi
     remote_generation=$(jg_remote_inherit_generation_next "$STATE" "$id" 2>/dev/null || true)
     if [ -z "$remote_generation" ]; then
-      echo "SECONDMATE_SYNC: secondmate $id: skipped: remote inheritance generation could not be published"
+      echo "SQUAD_LEAD_SYNC: squad_lead $id: skipped: remote inheritance generation could not be published"
       jg_lock_release "$remote_lock" || true
       return 0
     fi
-    remote_marker=$(secondmate_nudge_marker_path "$id" 2>/dev/null || true)
+    remote_marker=$(squad_lead_nudge_marker_path "$id" 2>/dev/null || true)
     remote_pending=0
     if [ -f "$remote_marker" ] && [ "$(jg_meta_get "$remote_marker" remote)" = 1 ]; then remote_pending=1; fi
-    if ! secondmate_write_nudge_marker "$id" "$_home" "" remote \
+    if ! squad_lead_write_nudge_marker "$id" "$_home" "" remote \
       "$REMOTE_SECOND_MATE_NUDGE_MESSAGE" 1; then
-      echo "NUDGE_SECONDMATES: secondmate $id: send failed: cannot record remote retry marker"
+      echo "NUDGE_SQUAD_LEADS: squad_lead $id: send failed: cannot record remote retry marker"
       jg_lock_release "$remote_lock" || true
       return 0
     fi
     nudge_needed=0
     converged=1
-    if sync_out=$("$SCRIPT_DIR/jg-on.sh" "$id" jg-remote-secondmate-control.sh sync "$id" \
+    if sync_out=$("$SCRIPT_DIR/jg-on.sh" "$id" jg-remote-squad-lead-control.sh sync "$id" \
       "$primary_head" < /dev/null 2>&1); then
       case "$sync_out" in synced:*) nudge_needed=1 ;; esac
     else
       sync_rc=$?
-      echo "SECONDMATE_SYNC: secondmate $id: skipped: remote tracked-file sync failed on $remote_host: $(remote_sync_failure_reason "$sync_rc" "$sync_out")"
+      echo "SQUAD_LEAD_SYNC: squad_lead $id: skipped: remote tracked-file sync failed on $remote_host: $(remote_sync_failure_reason "$sync_rc" "$sync_out")"
       converged=0
     fi
     if inherit_out=$(JG_CONFIG_INHERIT_LIVE=1 \
       "$SCRIPT_DIR/jg-remote-inherit-push.sh" "$id" "$remote_generation" 2>&1); then
       if printf '%s\n' "$inherit_out" | grep -Eq '^(pushed|removed):'; then nudge_needed=1; fi
     else
-      echo "SECONDMATE_SYNC: secondmate $id: skipped: remote inheritance failed on $remote_host: $(remote_inherit_failure_reason "$inherit_out")"
+      echo "SQUAD_LEAD_SYNC: squad_lead $id: skipped: remote inheritance failed on $remote_host: $(remote_inherit_failure_reason "$inherit_out")"
       converged=0
     fi
     [ "$remote_pending" -eq 0 ] || nudge_needed=1
@@ -681,7 +681,7 @@ secondmate_sync() {
         rm -f "$remote_marker"
         [ "${JG_BOOTSTRAP_VERBOSE_FACTS:-0}" != 1 ] || echo "BOOTSTRAP_INFO: nudged remote jg-$id after convergence"
       else
-        echo "NUDGE_SECONDMATES: secondmate $id: send failed: $(first_line "$out")"
+        echo "NUDGE_SQUAD_LEADS: squad_lead $id: send failed: $(first_line "$out")"
       fi
     elif [ "$converged" -eq 1 ]; then
       rm -f "$remote_marker"
@@ -690,11 +690,11 @@ secondmate_sync() {
     return 0
   }
 
-  secondmate_sync_remote_one_timed() {  # <id> <home> <remote-host>
+  squad_lead_sync_remote_one_timed() {  # <id> <home> <remote-host>
     local id=$1 home=$2 remote_host=$3 __jg_timing_stamp
     __jg_timing_stamp=$(jg_timing_now_ms)
-    secondmate_sync_remote_one "$id" "$home" "$remote_host"
-    jg_timing_record secondmate convergence "$__jg_timing_stamp" "$id@$remote_host"
+    squad_lead_sync_remote_one "$id" "$home" "$remote_host"
+    jg_timing_record squad_lead convergence "$__jg_timing_stamp" "$id@$remote_host"
   }
 
   # Remote routes converge through the generic transport. The primary commit is
@@ -706,17 +706,17 @@ secondmate_sync() {
     parallel=1
   fi
   while IFS='|' read -r id _home _window meta; do
-    # Parked-home guard (firstmate-addons/parked-homes): a parked home gets no
+    # Parked-home guard (juggernaut-addons/parked-homes): a parked home gets no
     # remote inheritance push and no reread nudge. No-op without the add-on.
     jg_parked_skip_meta "$meta" "$id" sync && continue
     remote_host=$(jg_meta_get "$meta" remote_host)
     [ -n "$remote_host" ] || continue
     if [ "$parallel" -eq 1 ]; then
-      bootstrap_parallel_spawn secondmate_sync_remote_one_timed "$id" "$_home" "$remote_host"
+      bootstrap_parallel_spawn squad_lead_sync_remote_one_timed "$id" "$_home" "$remote_host"
     else
-      secondmate_sync_remote_one_timed "$id" "$_home" "$remote_host"
+      squad_lead_sync_remote_one_timed "$id" "$_home" "$remote_host"
     fi
-  done < <(live_secondmate_meta_records "$STATE" "$DATA/secondmates.md")
+  done < <(live_squad_lead_meta_records "$STATE" "$DATA/squad_leads.md")
   [ "$parallel" -eq 0 ] || bootstrap_parallel_finish
   return 0
 }
@@ -728,35 +728,35 @@ secondmate_sync() {
 # acted on.
 report_relaunch() {  # <id> <cause> <where>
   [ "${JG_BOOTSTRAP_VERBOSE_FACTS:-0}" = 1 ] || ! local_phase || return 0
-  echo "BOOTSTRAP_INFO: secondmate $1 relaunched after $2 ($3)"
+  echo "BOOTSTRAP_INFO: squad_lead $1 relaunched after $2 ($3)"
 }
 
-secondmate_liveness_sweep() {
-  # Idempotent secondmate liveness guarantee at session start; the watcher's
-  # secondmate_liveness_tick owns the same guarantee mid-session. The detailed
+squad_lead_liveness_sweep() {
+  # Idempotent squad_lead liveness guarantee at session start; the watcher's
+  # squad_lead_liveness_tick owns the same guarantee mid-session. The detailed
   # state machine and its only recovery-authorizing states are owned by
   # jg_backend_agent_state. A missing tmux pane is not enough: tmux must prove
   # the window or session absent. This preserves duplicate prevention for
   # existing ambiguous processes and every transiently unreadable target while
   # adding the missing-session path the original bare-shell and Herdr-husk sweep
   # lacked.
-  # A meta with no window remains owned by secondmate-provisioning recovery.
-  # Secondmate homes never contain kind=secondmate meta, so this is naturally a
+  # A meta with no window remains owned by squad-lead-provisioning recovery.
+  # SquadLead homes never contain kind=squad_lead meta, so this is naturally a
   # primary-only no-op there. The probe/relaunch mechanics live in
-  # bin/jg-secondmate-liveness-lib.sh; this sweep keeps the reporting.
+  # bin/jg-squad-lead-liveness-lib.sh; this sweep keeps the reporting.
   [ -d "$STATE" ] || return 0
   local meta id remote_host label __jg_timing_stamp parallel=0
-  SECONDMATE_RESPAWNED_IDS=""
+  SQUAD_LEAD_RESPAWNED_IDS=""
   if bootstrap_parallel_begin; then
     parallel=1
   fi
   for meta in "$STATE"/*.meta; do
     [ -f "$meta" ] || continue
-    grep -q '^kind=secondmate$' "$meta" 2>/dev/null || continue
+    grep -q '^kind=squad_lead$' "$meta" 2>/dev/null || continue
     # Identity for the timing record is read here, in the loop, so the per-meta
     # body below keeps its single-exit-per-outcome shape.
     id=$(basename "$meta" .meta)
-    # Parked-home guard (firstmate-addons/parked-homes): a parked home gets no
+    # Parked-home guard (juggernaut-addons/parked-homes): a parked home gets no
     # liveness probe and no session-start relaunch - one line names the skip.
     # No-op without the add-on checkout.
     jg_parked_skip_meta "$meta" "$id" bootstrap-liveness && continue
@@ -764,35 +764,35 @@ secondmate_liveness_sweep() {
     label=$id
     [ -z "$remote_host" ] || label="$id@$remote_host"
     if [ "$parallel" -eq 1 ]; then
-      bootstrap_parallel_spawn secondmate_liveness_one_timed "$meta" "$id" "$label"
+      bootstrap_parallel_spawn squad_lead_liveness_one_timed "$meta" "$id" "$label"
     else
-      secondmate_liveness_one_timed "$meta" "$id" "$label"
+      squad_lead_liveness_one_timed "$meta" "$id" "$label"
     fi
   done
   [ "$parallel" -eq 0 ] || bootstrap_parallel_finish
   return 0
 }
 
-secondmate_liveness_one_timed() {  # <meta> <id> <label>
+squad_lead_liveness_one_timed() {  # <meta> <id> <label>
   local meta=$1 id=$2 label=$3 __jg_timing_stamp
   __jg_timing_stamp=$(jg_timing_now_ms)
-  secondmate_liveness_one "$meta" "$id"
-  jg_timing_record secondmate liveness "$__jg_timing_stamp" "$label"
+  squad_lead_liveness_one "$meta" "$id"
+  jg_timing_record squad_lead liveness "$__jg_timing_stamp" "$label"
 }
 
-# One secondmate's liveness check. Split out of the sweep so each is individually
+# One squad_lead's liveness check. Split out of the sweep so each is individually
 # timed; every `return` here was a `continue` in the loop and means exactly the
-# same thing - move on to the next secondmate. Respawned ids are recorded through
-# secondmate_note_respawned so a concurrent sweep can collect them after wait.
-# Probe classification, kill, and spawn live in jg-secondmate-liveness-lib.sh;
+# same thing - move on to the next squad_lead. Respawned ids are recorded through
+# squad_lead_note_respawned so a concurrent sweep can collect them after wait.
+# Probe classification, kill, and spawn live in jg-squad-lead-liveness-lib.sh;
 # this function keeps this sweep's exact reporting.
-secondmate_liveness_one() {  # <meta> <id>
+squad_lead_liveness_one() {  # <meta> <id>
   local meta=$1 id=$2
-  if ! jg_secondmate_liveness_lock "$id"; then
-    echo "SECONDMATE_LIVENESS: secondmate $id: skipped: another liveness check is already in progress"
+  if ! jg_squad_lead_liveness_lock "$id"; then
+    echo "SQUAD_LEAD_LIVENESS: squad_lead $id: skipped: another liveness check is already in progress"
     return 0
   fi
-  jg_secondmate_liveness_probe "$meta" "$id" full
+  jg_squad_lead_liveness_probe "$meta" "$id" full
   case "$JG_SM_LIVE_STATUS" in
     silent)
       ;;
@@ -800,29 +800,29 @@ secondmate_liveness_one() {  # <meta> <id>
       [ "${JG_BOOTSTRAP_VERBOSE_FACTS:-0}" != 1 ] || echo "BOOTSTRAP_INFO: $JG_SM_LIVE_LINE"
       ;;
     relaunchable)
-      if jg_secondmate_liveness_relaunch "$meta" "$id"; then
-        secondmate_note_respawned "$id"
+      if jg_squad_lead_liveness_relaunch "$meta" "$id"; then
+        squad_lead_note_respawned "$id"
         report_relaunch "$id" "$JG_SM_LIVE_CAUSE" "$JG_SM_LIVE_WHERE"
       elif [ "$JG_SM_LIVE_STATUS" = skipped ] || [ "$JG_SM_LIVE_STATUS" = deferred ]; then
-        echo "SECONDMATE_LIVENESS: secondmate $id: skipped: $JG_SM_LIVE_REASON"
+        echo "SQUAD_LEAD_LIVENESS: squad_lead $id: skipped: $JG_SM_LIVE_REASON"
       else
-        echo "SECONDMATE_LIVENESS: secondmate $id: respawn failed after $JG_SM_LIVE_CAUSE: $(first_line "$JG_SM_LIVE_OUT")"
+        echo "SQUAD_LEAD_LIVENESS: squad_lead $id: respawn failed after $JG_SM_LIVE_CAUSE: $(first_line "$JG_SM_LIVE_OUT")"
       fi
       ;;
     skipped)
-      echo "SECONDMATE_LIVENESS: secondmate $id: skipped: $JG_SM_LIVE_REASON"
+      echo "SQUAD_LEAD_LIVENESS: squad_lead $id: skipped: $JG_SM_LIVE_REASON"
       ;;
   esac
-  jg_secondmate_liveness_unlock "$id"
+  jg_squad_lead_liveness_unlock "$id"
   return 0
 }
 
-secondmate_handoff_resume() {
+squad_lead_handoff_resume() {
   [ -d "$DATA/handoff" ] || return 0
   "$SCRIPT_DIR/jg-backlog-handoff.sh" --resume-pending >/dev/null 2>&1 || true
 }
 
-secondmate_handoff_detect() {
+squad_lead_handoff_detect() {
   local outbox id count
   [ -d "$DATA/handoff" ] || return 0
   for outbox in "$DATA/handoff"/*.outbox.md; do
@@ -830,11 +830,11 @@ secondmate_handoff_detect() {
     id=$(basename "$outbox" .outbox.md)
     case "$id" in ''|*[!A-Za-z0-9._-]*) id=unknown ;; esac
     if [ ! -f "$outbox" ] || [ -L "$outbox" ]; then
-      echo "SECONDMATE_HANDOFF: secondmate $id: pending delivery: unsafe outbox"
+      echo "SQUAD_LEAD_HANDOFF: squad_lead $id: pending delivery: unsafe outbox"
       continue
     fi
     count=$(awk '/^- \[[ x]\] / { count++ } END { print count + 0 }' "$outbox" 2>/dev/null || printf unknown)
-    echo "SECONDMATE_HANDOFF: secondmate $id: pending delivery: $count item(s)"
+    echo "SQUAD_LEAD_HANDOFF: squad_lead $id: pending delivery: $count item(s)"
   done
 }
 
@@ -1230,7 +1230,7 @@ crew_dispatch_validate() {
 # process killed mid-transition and drift this home was already carrying. Heal
 # this home's OWN books on its own
 # restart rather than waiting for a parent's cross-home nudge; the fleet
-# snapshot's classifier and bin/jg-secondmate-reconcile.sh's nudge stay as
+# snapshot's classifier and bin/jg-squad-lead-reconcile.sh's nudge stay as
 # backstops for what this cannot see. Never reads or writes another home.
 backlog_record_reconcile() {
   local marker meta control_lock meta_lock id row label has_record=0 gate_status
@@ -1327,7 +1327,7 @@ backlog_record_reconcile() {
       jg_lock_release "$meta_lock"
       return 2
     fi
-    if [ "$(jg_meta_get "$meta" kind)" != secondmate ] \
+    if [ "$(jg_meta_get "$meta" kind)" != squad_lead ] \
        && [ "$(jg_meta_get "$meta" cleanup_recovery)" != orca ]; then
       row=
       if jg_backlog_row_probe "$DATA" "$id"; then
@@ -1351,10 +1351,10 @@ backlog_record_reconcile() {
 }
 
 startup_memory_budget_setup() {
-  # Primary bootstrap owns default publication. A secondmate is deliberately
+  # Primary bootstrap owns default publication. A squad_lead is deliberately
   # passive here because its setting must converge from the primary through the
   # inherited-local-material contract rather than becoming a local authority.
-  if [ -e "$JG_HOME/.jg-secondmate-home" ] || [ -L "$JG_HOME/.jg-secondmate-home" ]; then
+  if [ -e "$JG_HOME/.jg-squad-lead-home" ] || [ -L "$JG_HOME/.jg-squad-lead-home" ]; then
     return 0
   fi
   if ! jg_startup_memory_budget_materialize "$CONFIG"; then
@@ -1394,7 +1394,7 @@ fi
 # sessions never touch state, and the deferred network pass never repeats it:
 # the local pass that ran first already closed that window.
 if [ "${JG_BOOTSTRAP_DETECT_ONLY:-0}" != 1 ] && local_phase; then
-  BOOTSTRAP_BACKLOG_GATE_KIND=secondmate
+  BOOTSTRAP_BACKLOG_GATE_KIND=squad_lead
   if [ -e "$STATE" ] || [ -L "$STATE" ]; then
     if ! jg_backlog_directory_present "$STATE" "state directory"; then
       echo "error: bootstrap cannot reconcile task state ($JG_BACKLOG_TRANSITION_ERROR)" >&2
@@ -1409,14 +1409,14 @@ if [ "${JG_BOOTSTRAP_DETECT_ONLY:-0}" != 1 ] && local_phase; then
       BOOTSTRAP_BACKLOG_GATE_KIND=ship
       break
     done
-    if [ "$BOOTSTRAP_BACKLOG_GATE_KIND" = secondmate ]; then
+    if [ "$BOOTSTRAP_BACKLOG_GATE_KIND" = squad_lead ]; then
       for BOOTSTRAP_BACKLOG_META in "$STATE"/*.meta; do
         [ -e "$BOOTSTRAP_BACKLOG_META" ] || [ -L "$BOOTSTRAP_BACKLOG_META" ] || continue
         if ! jg_backlog_record_present "$BOOTSTRAP_BACKLOG_META" "task record" "$STATE"; then
           echo "error: bootstrap refused unsafe worker record ($JG_BACKLOG_TRANSITION_ERROR)" >&2
           exit 1
         fi
-        if [ "$(jg_meta_get "$BOOTSTRAP_BACKLOG_META" kind)" != secondmate ] \
+        if [ "$(jg_meta_get "$BOOTSTRAP_BACKLOG_META" kind)" != squad_lead ] \
            && [ "$(jg_meta_get "$BOOTSTRAP_BACKLOG_META" cleanup_recovery)" != orca ]; then
           BOOTSTRAP_BACKLOG_GATE_KIND=ship
           break
@@ -1487,9 +1487,9 @@ detect_local_tools() {
 }
 
 detect_local_config() {
-  # Worktree-tangle check: the firstmate primary checkout (JG_ROOT) must sit on its
+  # Worktree-tangle check: the juggernaut primary checkout (JG_ROOT) must sit on its
   # default branch, not a feature branch (see jg-tangle-lib.sh). Scoped to the
-  # primary only; detached-HEAD worktrees and secondmate homes never trip it.
+  # primary only; detached-HEAD worktrees and squad_lead homes never trip it.
   tangle_branch=$(jg_primary_tangle_branch "$JG_ROOT" 2>/dev/null || true)
   if [ -n "$tangle_branch" ]; then
     tangle_default=$(jg_default_branch "$JG_ROOT" 2>/dev/null || echo main)
@@ -1528,7 +1528,7 @@ detect_local_config() {
 # primary Herdr home on a systemd host says so on every start until installed.
 detect_sentinel_service() {
   [ "$BACKEND" = herdr ] || return 0
-  [ -e "$JG_HOME/.jg-secondmate-home" ] || [ -L "$JG_HOME/.jg-secondmate-home" ] && return 0
+  [ -e "$JG_HOME/.jg-squad-lead-home" ] || [ -L "$JG_HOME/.jg-squad-lead-home" ] && return 0
   command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1 || return 0
   systemctl --user is-active --quiet jg-sentinel && return 0
   local quoted_home quoted_sentinel
@@ -1611,7 +1611,7 @@ detect_home_summary_publication() {
 # Each network owner below is bracketed by an elapsed-time record, so a deferred
 # stage that ran long can be attributed to the phase that spent the time.
 # jg-timing-lib.sh discards the record unless the caller asked for timings, and
-# every sweep is still called directly. Per-secondmate remote probes run
+# every sweep is still called directly. Per-squad-lead remote probes run
 # concurrently; clone refresh overlaps them. Diagnostic lines are replayed in
 # original order so attribution is unchanged.
 # The stamp variable is named for the library rather than `start` on purpose:
@@ -1626,7 +1626,7 @@ fi
 local_phase && detect_local_config
 
 if [ "${JG_BOOTSTRAP_DETECT_ONLY:-0}" != 1 ]; then
-  # secondmate_sync consumes SECONDMATE_RESPAWNED_IDS from the liveness sweep, so
+  # squad_lead_sync consumes SQUAD_LEAD_RESPAWNED_IDS from the liveness sweep, so
   # those two always run together in the same phase. Clone refresh does not
   # depend on them, so it starts in the background and overlaps their wall clock.
   fleet_sync_pid=
@@ -1647,19 +1647,19 @@ if [ "${JG_BOOTSTRAP_DETECT_ONLY:-0}" != 1 ]; then
     fi
   fi
   if network_phase; then
-    if network_sweep_authorized 'dead-secondmate relaunch'; then
+    if network_sweep_authorized 'dead-squad-lead relaunch'; then
       __jg_timing_stamp=$(jg_timing_now_ms)
-      secondmate_liveness_sweep
-      jg_timing_record phase secondmate-liveness "$__jg_timing_stamp"
+      squad_lead_liveness_sweep
+      jg_timing_record phase squad-lead-liveness "$__jg_timing_stamp"
     fi
-    if network_sweep_authorized 'secondmate convergence'; then
+    if network_sweep_authorized 'squad_lead convergence'; then
       __jg_timing_stamp=$(jg_timing_now_ms)
-      secondmate_sync
-      jg_timing_record phase secondmate-sync "$__jg_timing_stamp"
+      squad_lead_sync
+      jg_timing_record phase squad-lead-sync "$__jg_timing_stamp"
     fi
     if network_sweep_authorized 'pending handoff delivery'; then
       __jg_timing_stamp=$(jg_timing_now_ms)
-      secondmate_handoff_resume
+      squad_lead_handoff_resume
       jg_timing_record phase handoff-delivery "$__jg_timing_stamp"
     fi
   fi
@@ -1678,5 +1678,5 @@ if [ "${JG_BOOTSTRAP_DETECT_ONLY:-0}" != 1 ]; then
     rm -f "$fleet_sync_out"
   fi
 fi
-local_phase && secondmate_handoff_detect
+local_phase && squad_lead_handoff_detect
 exit 0

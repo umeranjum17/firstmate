@@ -12,14 +12,14 @@
 #   jg-model-allowlist.sh install|uninstall
 #
 # The list is config/model-allow-list.json, one key per provider
-# ({"codex": ["gpt-5.6-sol"]}), the same file the firstmate-addons model-gate reads.
+# ({"codex": ["gpt-5.6-sol"]}), the same file the juggernaut-addons model-gate reads.
 # docs/configuration.md "Model allow-lists" owns the key shape, the match rule, and
 # the refusal wording; this file implements them for every launch.
 #
 # bin/jg-spawn.sh sources this file and refuses an off-list model on every launch,
 # before any endpoint, local copy, or record exists, whichever source the model came
 # from: a --model flag, a dispatch profile, or a config/crew-harness and
-# config/secondmate-harness token. watch reports a model that started outside that
+# config/squad-lead-harness token. watch reports a model that started outside that
 # gate, once each; install registers it for the watcher and uninstall retires it.
 # Sourced, this file only defines functions.
 
@@ -27,7 +27,7 @@
 # jg_model_allowlist_file: the list path, read at call time so a caller's own
 # CONFIG or JG_HOME applies.
 jg_model_allowlist_file() {
-  local config=${JG_CONFIG_OVERRIDE:-${CONFIG:-${JG_HOME:-${JG_ROOT_OVERRIDE:-$HOME/firstmate}}/config}}
+  local config=${JG_CONFIG_OVERRIDE:-${CONFIG:-${JG_HOME:-${JG_ROOT_OVERRIDE:-$HOME/juggernaut}}/config}}
   printf '%s\n' "${JG_MODEL_ALLOWLIST:-$config/model-allow-list.json}"
 }
 

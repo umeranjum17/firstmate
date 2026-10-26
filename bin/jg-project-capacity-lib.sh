@@ -6,7 +6,7 @@
 #
 # A project can depend on a machine-local resource that only a few workers can
 # use at the same time: a heavy test suite, a local editor stack, a device.
-# Firstmate cannot see which part of a worker's life touches that resource, so
+# Juggernaut cannot see which part of a worker's life touches that resource, so
 # the captain declares how many workers the project admits on this machine, and
 # bin/jg-spawn.sh defers a fresh worker beyond that number instead of launching
 # it only to spend full-context turns retrying the resource. A deferred task
@@ -18,8 +18,8 @@
 # place, and of the admission verdict. docs/configuration.md "Project capacity"
 # is the operator reference, and bin/jg-spawn.sh owns where the check runs.
 #
-# Declaration: config/project-capacity in the local root Firstmate home (the home
-# bin/jg-wake-lib.sh's jg_firstmate_root_home resolves), so every home on this
+# Declaration: config/project-capacity in the local root Juggernaut home (the home
+# bin/jg-wake-lib.sh's jg_juggernaut_root_home resolves), so every home on this
 # machine reads the same number for the same machine's resources. One line per
 # project:
 #   <project-name> <capacity>
@@ -37,9 +37,9 @@
 # ship or scout spawn from this machine's homes rather than guessing which limit
 # was meant.
 #
-# Occupancy: a place is held by every task record, in any local Firstmate home on
-# this machine (jg_local_firstmate_state_dirs in bin/jg-wake-lib.sh), that
-#   - is not a secondmate, which is a persistent home rather than a worker,
+# Occupancy: a place is held by every task record, in any local Juggernaut home on
+# this machine (jg_local_juggernaut_state_dirs in bin/jg-wake-lib.sh), that
+#   - is not a squad_lead, which is a persistent home rather than a worker,
 #   - names the same project identity, meaning its project resolves to the same
 #     shared project lock path (jg_treehouse_project_lock_path), which is keyed
 #     by the project's resolved origin, so workers in any clone of that origin
@@ -70,7 +70,7 @@
 # the count.
 #
 # Requires bin/jg-wake-lib.sh (root home, local homes, project lock path),
-# bin/jg-secondmate-registry-lib.sh (which the local-homes walk reads), and
+# bin/jg-squad-lead-registry-lib.sh (which the local-homes walk reads), and
 # bin/jg-backend.sh (jg_meta_get) to be sourced first. No side effects on source.
 
 # Exit status of a spawn deferred because the project is at capacity: the
@@ -84,7 +84,7 @@ JG_PROJECT_CAPACITY_DEFER_EXIT=75
 # applies), otherwise the root home's config/.
 jg_project_capacity_config_dir() {  # <spawning-home> <spawning-config-dir>
   local home=$1 config=$2 root home_real
-  root=$(jg_firstmate_root_home "$home") || return 1
+  root=$(jg_juggernaut_root_home "$home") || return 1
   home_real=$(CDPATH='' cd -- "$home" 2>/dev/null && pwd -P) || return 1
   if [ "$root" = "$home_real" ]; then
     printf '%s\n' "$config"
@@ -167,7 +167,7 @@ jg_project_capacity_lookup() {  # <config-dir> <project-name>
 # <project-lock> is jg_treehouse_project_lock_path for the project being
 # admitted, and <project-dir> is that project's own directory, which matches
 # without recomputing its identity. The local homes come from
-# jg_local_firstmate_state_dirs <first-state>. <own-id> is the task being
+# jg_local_juggernaut_state_dirs <first-state>. <own-id> is the task being
 # admitted; its own record in <first-state> is the one this spawn replaces, so
 # it is not counted.
 # Sets JG_PROJECT_CAPACITY_OCCUPANTS to the count and
@@ -182,15 +182,15 @@ jg_project_capacity_occupants() {  # <project-lock> <project-dir> <first-state> 
   JG_PROJECT_CAPACITY_OCCUPANTS=0
   JG_PROJECT_CAPACITY_OCCUPANT_IDS=
   JG_PROJECT_CAPACITY_ERROR=
-  jg_local_firstmate_state_dirs "$first" || {
-    JG_PROJECT_CAPACITY_ERROR=$JG_LOCAL_FIRSTMATE_ERROR
+  jg_local_juggernaut_state_dirs "$first" || {
+    JG_PROJECT_CAPACITY_ERROR=$JG_LOCAL_JUGGERNAUT_ERROR
     return 1
   }
   cache_dirs=("$own")
   cache_locks=("$want")
-  for state in "${JG_LOCAL_FIRSTMATE_STATES[@]}"; do
+  for state in "${JG_LOCAL_JUGGERNAUT_STATES[@]}"; do
     if [ -e "$state" ] && { [ ! -d "$state" ] || [ ! -r "$state" ] || [ ! -x "$state" ]; }; then
-      JG_PROJECT_CAPACITY_ERROR="local Firstmate state directory $state cannot be read"
+      JG_PROJECT_CAPACITY_ERROR="local Juggernaut state directory $state cannot be read"
       return 1
     fi
     for meta in "$state"/*.meta; do
@@ -201,7 +201,7 @@ jg_project_capacity_occupants() {  # <project-lock> <project-dir> <first-state> 
         return 1
       }
       kind=$(jg_meta_get "$meta" kind)
-      [ "$kind" != secondmate ] || continue
+      [ "$kind" != squad_lead ] || continue
       [ -z "$(jg_meta_get "$meta" pr)" ] || continue
       project=$(jg_meta_get "$meta" project)
       [ -n "$project" ] || continue

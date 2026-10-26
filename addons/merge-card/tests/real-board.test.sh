@@ -51,8 +51,8 @@ is "first head: the card cites the sealed run's own capture" "$(sign-off-axi lis
 is "first head: the other filer's older card is archived" "$(live_keys)" merge-o-r-pull-12
 out=$(post_at 20261022T000000Z-second0001 "$h2") || { echo "$out"; fails=$((fails + 1)); }
 is "new head: exactly one live card, the newest" "$(live)" 20261022T000000Z-second0001
-is "new head: old card archived, history kept" "$(sign-off-axi list "$board" --json --full | jq -r '[.decisions[] | select(.dismissed == true and .filer == "firstmate-merge") | .evidence.run_id] | join(",")')" 20261022T000000Z-first0001
-is "new head: first card keeps the PR key" "$(sign-off-axi list "$board" --json --full | jq -r '.decisions[] | select(.dismissed == true and .filer == "firstmate-merge") | .key')" merge-o-r-pull-12
+is "new head: old card archived, history kept" "$(sign-off-axi list "$board" --json --full | jq -r '[.decisions[] | select(.dismissed == true and .filer == "juggernaut-merge") | .evidence.run_id] | join(",")')" 20261022T000000Z-first0001
+is "new head: first card keeps the PR key" "$(sign-off-axi list "$board" --json --full | jq -r '.decisions[] | select(.dismissed == true and .filer == "juggernaut-merge") | .key')" merge-o-r-pull-12
 out=$(post_at 20261022T000000Z-second0001 "$h2")
 case $out in *"already on the board"*) echo "ok - repeat post adds nothing" ;; *) echo "not ok - repeat post: [$out]"; fails=$((fails + 1)) ;; esac
 # A newer card from another filer without a receipt: the sweep keeps the valid proof and archives it.

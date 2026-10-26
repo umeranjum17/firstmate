@@ -133,7 +133,7 @@ exclusion_reason() {
     jg-afk-pi-herdr-return-e2e.test.sh|\
     jg-codex-continuity-live-e2e.test.sh|jg-grok-continuity-live-e2e.test.sh|\
     jg-opencode-primary-live-e2e.test.sh|jg-pi-primary-live-e2e.test.sh|\
-    jg-quota-array-dispatch-live-e2e.test.sh|jg-send-secondmate-marker-herdr-e2e.test.sh|\
+    jg-quota-array-dispatch-live-e2e.test.sh|jg-send-squad-lead-marker-herdr-e2e.test.sh|\
     jg-sessionstart-instruction-refresh-live-e2e.test.sh)
       printf '%s\n' 'live harness opt-in; never default parallel CI'
       ;;

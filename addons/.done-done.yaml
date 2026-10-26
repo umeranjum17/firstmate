@@ -1,4 +1,4 @@
-app: firstmate-addons
+app: juggernaut-addons
 journeys:
   merge-card-pool-fallback:
     command: bash merge-card/run-proof.sh

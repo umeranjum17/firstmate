@@ -53,7 +53,7 @@ case "$*" in
     ;;
 esac
 case "${1:-}" in
-  display-message) printf 'firstmate\n'; exit 0 ;;
+  display-message) printf 'juggernaut\n'; exit 0 ;;
   list-windows) exit 0 ;;
   has-session|new-session|new-window|kill-window) exit 0 ;;
   send-keys) exit 0 ;;
@@ -69,7 +69,7 @@ SH
 # with a real worktree (the eventual settled path), and a separate real git
 # repo standing in for the stale path (a real checkout of something else
 # entirely, distinct from both the project and the worktree - mirroring the
-# live incident where the stale read was another real firstmate home).
+# live incident where the stale read was another real juggernaut home).
 make_settle_case() {
   local name=$1 id=$2 stale_reads=$3 case_dir home proj wt stale fakebin countfile
   case_dir="$TMP_ROOT/$name"
@@ -89,7 +89,7 @@ make_settle_case() {
 ## Captain's intent
 Exercise settled-worktree detection for $id.
 
-## Firstmate spec
+## Juggernaut spec
 Record only the pane's stable worktree.
 EOF
   touch "$home/state/.last-watcher-beat"

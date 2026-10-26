@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """jg_voice_records.py - what the voice agent is allowed to know, and how it hands work over.
 
-The voice agent answers status questions from firstmate's durable records and
+The voice agent answers status questions from juggernaut's durable records and
 queues everything else. This module owns both halves, because both halves are
 where a mistake is expensive: one sends the captain's records to a model in
-another region, and the other writes to firstmate's wake queue.
+another region, and the other writes to juggernaut's wake queue.
 
 WHAT IS NEVER READ. Two whole classes of record are excluded at every scope,
 not filtered at the end:
@@ -124,14 +124,14 @@ DATE_TAG = re.compile(r"\((?:since|done) [0-9-]+\)")
 READ_SECTIONS = ("in flight", "queued")
 
 # The states a worker is asked to report, and the two more that close a decision.
-# bin/jg-brief.sh states the first six to every crewmate and bin/jg-classify-lib.sh
+# bin/jg-brief.sh states the first six to every operator and bin/jg-classify-lib.sh
 # owns resolved and captain-held; this module only recognises them.
 #
-# A CLOSED set, not a shape. A status line is free text appended by a crewmate,
+# A CLOSED set, not a shape. A status line is free text appended by a operator,
 # and the verb taken off the front of it is the one record-derived string that
 # reaches a counts-scope answer, where there are no titles or links for a deny
 # list to filter. So an unrecognised token is reported as a note instead of being
-# spoken, exactly as a malformed one already was; otherwise a crewmate writing
+# spoken, exactly as a malformed one already was; otherwise a operator writing
 # "acmecorp-migration: waiting on their review" would put that word in front of a
 # model in another region, with nothing in config/voice-read-deny able to stop it.
 STATE_VERBS = ("working", "needs-decision", "blocked", "paused", "done",
@@ -531,7 +531,7 @@ def fleet_status(home=None, scope=None):
 
 
 def queue_request(text, home=None, root=None):
-    """Hand real work to firstmate through bin/jg-inbox.sh note."""
+    """Hand real work to juggernaut through bin/jg-inbox.sh note."""
     home = home or default_home()
     root = root or os.path.dirname(os.path.abspath(__file__))
     body = (text or "").strip()
@@ -560,7 +560,7 @@ def queue_request(text, home=None, root=None):
         "queued": True,
         "note_id": note_id,
         "queued_text": body,
-        "handover": "Firstmate now owns this request and will pick it up at "
+        "handover": "Juggernaut now owns this request and will pick it up at "
                     "its next check. You did not do the work yourself.",
     }
 
@@ -575,7 +575,7 @@ def main(argv):
     status.add_argument("--home")
     status.add_argument("--scope", choices=SCOPES)
 
-    queue = sub.add_parser("queue", help="hand a request to firstmate")
+    queue = sub.add_parser("queue", help="hand a request to juggernaut")
     queue.add_argument("text", nargs="+")
     queue.add_argument("--home")
 

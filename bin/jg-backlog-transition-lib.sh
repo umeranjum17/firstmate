@@ -17,11 +17,11 @@
 #                        open captain call (bin/jg-captain-hold.sh `open`), so
 #                        cleanup never retires the captain's own question
 #   bin/jg-bootstrap.sh  replays whatever a crash left behind, THIS HOME ONLY.
-# bin/jg-fleet-snapshot.sh's classifier and bin/jg-secondmate-reconcile.sh's
+# bin/jg-fleet-snapshot.sh's classifier and bin/jg-squad-lead-reconcile.sh's
 # cross-home nudge stay defense in depth, not the primary mechanism.
 #
 # SCOPE. jg_backlog_transition_applies is the single gate. It excludes
-# secondmates (persistent agents are never backlog items, AGENTS.md section 10),
+# squad_leads (persistent agents are never backlog items, AGENTS.md section 10),
 # homes whose configured backlog backend is manual and markdown homes that keep
 # no backlog file. Those return-1 exemptions are never errors; an
 # unresolvable configured data directory, a backend resolution error, or
@@ -290,8 +290,8 @@ jg_backlog_tasks_axi_addressing() {  # <data-dir>
 jg_backlog_transition_applies() {  # <config-dir> <data-dir> <kind>
   local config=$1 data authorized_data=$2 kind=$3 file root backend authorized_root
   JG_BACKLOG_TRANSITION_SKIP=
-  if [ "$kind" = secondmate ]; then
-    JG_BACKLOG_TRANSITION_SKIP="secondmates are not backlog items"
+  if [ "$kind" = squad_lead ]; then
+    JG_BACKLOG_TRANSITION_SKIP="squad_leads are not backlog items"
     return 1
   fi
   if jg_backlog_backend_manual "$config"; then

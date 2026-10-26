@@ -31,7 +31,7 @@ jg_brief_inherit_owner_rules() {
 jg_brief_inherit_shared() {
   local config=$1 kind=$2 file body
   jg_brief_inherit_owner_rules "$config" "$kind"
-  [ "$kind" != secondmate ] || return 0
+  [ "$kind" != squad_lead ] || return 0
   file=$config/brief-include-shared.md
   { [ -e "$file" ] || [ -L "$file" ]; } || return 0
   { [ -f "$file" ] && body=$(cat "$file" 2>/dev/null); } || {
@@ -47,7 +47,7 @@ jg_brief_inherit_shared() {
 }
 
 # Declare the shared include inheritable, so config-push, bootstrap convergence and the
-# remote push propagate its exact bytes (or its absence) to secondmate homes.
+# remote push propagate its exact bytes (or its absence) to squad_lead homes.
 jg_brief_inherit_config() {
   case " ${JG_INHERITABLE_CONFIG:-} " in
     *" brief-include-shared.md "*) ;;

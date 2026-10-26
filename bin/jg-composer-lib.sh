@@ -83,7 +83,7 @@
 #                that (`─` rule, `❯`+NBSP, `─` rule), so the glyph inside the
 #                pair carries the shape and no identity is needed.
 #
-# THE COMPOSER FOOTER ZONE (task firstmate-doorbell-vals-pending-p1): a
+# THE COMPOSER FOOTER ZONE (task juggernaut-doorbell-vals-pending-p1): a
 # harness draws its own furniture BELOW the composer - a user statusLine, a
 # permission-mode hint - and the cursorless "bottom-most shape wins" rule
 # looks exactly there. `→` (U+2192) is Cursor's prompt glyph but ordinary text
@@ -251,7 +251,7 @@ jg_composer_normalize_trim_var() {  # <varname>
 #     JG_COMPOSER_GHOST_LUMA_MAX (default 128): how grok renders its placeholder
 #     and hint text. A reset (SGR 0), a default-foreground (SGR 39), any base
 #     foreground colour (30-37 / 90-97), or a lighter 38;2 foreground ends the
-#     dark-foreground run. This assumes a DARK terminal theme, the firstmate
+#     dark-foreground run. This assumes a DARK terminal theme, the juggernaut
 #     fleet reality, where real typed input is bright and only de-emphasised UI
 #     is dark; the SGR-2 signal above stays theme-independent. A 256-colour
 #     foreground (38;5;n) is NOT luminance-tested - it is palette-dependent and
@@ -354,7 +354,7 @@ jg_composer_strip_ghost() {
 # problem.
 #
 # This is a DELIVERY guard, deliberately NOT a worker-state source. The semantic
-# busy contract - what firstmate records and supervises on - is owned by
+# busy contract - what juggernaut records and supervises on - is owned by
 # bin/jg-busy-lib.sh, which forbids classifying a harness from rendered text.
 # Matching a footer to confirm a keystroke landed is a different question from
 # asking what a worker is doing, and the two must not be conflated.
@@ -576,8 +576,8 @@ JG_COMPOSER_OPENCODE_STATUS_RE_DEFAULT='^[[:space:]]*/.*[0-9]+(\.[0-9]+)?[KMG]?[
 # width, so its directory fragment lands ALONE on the bar row directly above
 # the model row, right-aligned behind wide left padding (captured live
 # 2026-10-10 on the jg-model-scorecard worker, OpenCode 1.18.25 through Herdr:
-# `  ┃                     ~/.treehouse/firstmate-cff959/2/` above `  ┃  Build
-# · DeepSeek V4.1 Flash (Ollama) Ollama Cloud      firstmate:fm/jg-model-
+# `  ┃                     ~/.treehouse/juggernaut-cff959/2/` above `  ┃  Build
+# · DeepSeek V4.1 Flash (Ollama) Ollama Cloud      juggernaut:fm/jg-model-
 # scorecard`). On an even longer worktree path the SAME cell wraps over
 # CONSECUTIVE rows (captured live 2026-10-10 on the desklink lead's engine-fix
 # worker, OpenCode 1.18.25 through Herdr): `  ┃
@@ -926,7 +926,7 @@ _jg_composer_pi_wave_art_row() {  # <trimmed-row>
 # with this titled one for the whole turn, so the idle shape is simply ABSENT
 # while it holds: the closing rule has no partner and every pi read of such a
 # pane - including a visibly empty composer on an idle/done lead - was
-# `unknown`, which is what made jg-control exit and jg-secondmate-restart
+# `unknown`, which is what made jg-control exit and jg-squad-lead-restart
 # refuse (`composer state is 'unknown', not proven empty`) on panes whose
 # composer was demonstrably empty.
 #

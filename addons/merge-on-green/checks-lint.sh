@@ -8,7 +8,7 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
   export "$_jg_new=$_jg_val"
 done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
-# Run done-done's pinned merge-gate lint, or the Firstmate lint when the pinned CLI is unavailable or the PR
+# Run done-done's pinned merge-gate lint, or the Juggernaut lint when the pinned CLI is unavailable or the PR
 # has more than one page (100 files) of changes for done-done's truncated file list to measure.
 # Usage: JG_HOME=<home> checks-lint.sh <PR URL | report file> <evidence folder>
 set -u
@@ -22,7 +22,7 @@ if [ -n "${JG_LEGACY_CHECKS_LINT:-}" ]; then
 elif [ -x "$SRC/jg-checks-lint.sh" ]; then
   LEGACY=$SRC/jg-checks-lint.sh
 else
-  LEGACY=${JG_MAIN_HOME:-$HOME/firstmate}/config/jg-checks-lint.sh
+  LEGACY=${JG_MAIN_HOME:-$HOME/juggernaut}/config/jg-checks-lint.sh
 fi
 DD_HOME=$JG_HOME/data/done-done-lint
 DD=(npx --yes --quiet --package=done-done-axi@0.6.17 done-done)

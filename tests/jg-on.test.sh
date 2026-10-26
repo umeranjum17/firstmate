@@ -112,7 +112,7 @@ SH
 chmod +x "$FAKEBIN/fake-ssh"
 
 write_registry() {
-  cat > "$LOCAL_HOME/data/secondmates.md" <<EOF
+  cat > "$LOCAL_HOME/data/squad_leads.md" <<EOF
 - ios - iOS delivery (host: remote-mac; root: $REMOTE_ROOT; home: $REMOTE_HOME; scope: iOS work; projects: alpha; added 2026-08-02)
 EOF
 }
@@ -493,7 +493,7 @@ if JG_HOME="$LOCAL_HOME" JG_ROOT_OVERRIDE="$REMOTE_ROOT" JG_SSH_BIN="$FAKEBIN/fa
   fail "an option-shaped SSH route was accepted"
 fi
 ssh_before_bad_path=$(cat "$SSH_COUNT")
-cat > "$LOCAL_HOME/data/secondmates.md" <<EOF
+cat > "$LOCAL_HOME/data/squad_leads.md" <<EOF
 - ios - iOS delivery (host: remote-mac; root: $REMOTE_ROOT/../remote-root; home: $REMOTE_HOME; scope: iOS work; projects: alpha; added 2026-08-02)
 EOF
 if jg_on ios jg-probe-two.sh >/dev/null 2>&1; then
@@ -515,16 +515,16 @@ if "$REMOTE_ROOT/bin/jg-remote-entrypoint.sh" 1 "$traversal_root_b64" "$home_b64
 fi
 pass "the fixed entrypoint refuses incompatible protocols and unsafe roots"
 
-cat >> "$LOCAL_HOME/data/secondmates.md" <<EOF
+cat >> "$LOCAL_HOME/data/squad_leads.md" <<EOF
 - build - build delivery (host: remote-mac; root: $REMOTE_ROOT; home: $TMP_ROOT/other-remote-home; scope: build work; projects: beta; added 2026-08-02)
 EOF
 if jg_on remote-mac jg-probe-two.sh >/dev/null 2>&1; then
   fail "an ambiguous SSH alias was accepted"
 fi
 out=$(jg_on ios jg-probe-two.sh)
-assert_contains "$out" "home=$REMOTE_HOME" "secondmate-id routing broke after alias ambiguity"
+assert_contains "$out" "home=$REMOTE_HOME" "squad-lead-id routing broke after alias ambiguity"
 write_registry
-pass "ambiguous aliases refuse while exact secondmate ids remain routable"
+pass "ambiguous aliases refuse while exact squad_lead ids remain routable"
 
 : > "$SSH_COUNT"
 set +e

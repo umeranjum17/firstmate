@@ -35,7 +35,7 @@ if [ -n "${LOOKOUT_URL:-}" ]; then
   base=${LOOKOUT_URL%/}
 else
   : "${JG_HOME:?set JG_HOME or LOOKOUT_URL}" "${LOOKOUT_DIR:?set LOOKOUT_DIR or LOOKOUT_URL}"
-  adapter=$root/lookout-adapter/lookout-firstmate
+  adapter=$root/lookout-adapter/lookout-juggernaut
   [ -x "$adapter" ] || { echo "capture-lookout-hero: missing $adapter" >&2; exit 1; }
   [ -f "$LOOKOUT_DIR/bin/lookout.js" ] || { echo "capture-lookout-hero: LOOKOUT_DIR has no bin/lookout.js: $LOOKOUT_DIR" >&2; exit 1; }
   ap=$(free_port); lp=$(free_port)
@@ -88,7 +88,7 @@ python3 - "$(git -C "$root" rev-parse HEAD)" "${LOOKOUT_URL:-local-serve}" >"$DO
 import json, sys
 print(json.dumps({
     "target": {"version": sys.argv[1]},
-    "start": f"Lookout Overview at {sys.argv[2]} with a live Firstmate fleet (real history and merges).",
+    "start": f"Lookout Overview at {sys.argv[2]} with a live Juggernaut fleet (real history and merges).",
     "steps": [
         "Open Lookout Overview in light and dark at 390 and 1280.",
         "Confirm the fleet is not Sample fleet and lane history is present.",

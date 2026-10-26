@@ -20,7 +20,7 @@ import json, sys
 from pathlib import Path
 rows = [
     ('human-1', 'Please fix this, Umer. PIN=123456 token=sk-FAKEFAKEFAKE123456'),
-    ('system-1', 'System: Firstmate instruction waiting'),
+    ('system-1', 'System: Juggernaut instruction waiting'),
     ('mirror-1', 'MAIN DIALOG MIRROR\nInjected dialog history'),
     ('mixed-1', 'This typed note stays.\nMAIN DIALOG MIRROR\nInjected context'),
     ('summary-1', 'Summarized conversation: injected recap'),
@@ -28,12 +28,12 @@ rows = [
     ('block-1', 'Keep this sentence. <system-reminder>injected reminder</system-reminder> <pasted_content>injected pasted text</pasted_content> keep this too.'),
     ('command-1', '<command-name>local command</command-name><local-command-stdout>output</local-command-stdout>'),
     ('slash-1', '/local-command output'),
-    ('wake-1', 'FIRSTMATE SUPERVISION WAKE: injected context'),
-    ('inbox-1', 'Firstmate operational inbox message: injected context'),
-    ('waiting-1', 'Firstmate instruction waiting: injected context'),
+    ('wake-1', 'JUGGERNAUT SUPERVISION WAKE: injected context'),
+    ('inbox-1', 'Juggernaut operational inbox message: injected context'),
+    ('waiting-1', 'Juggernaut instruction waiting: injected context'),
     ('stop-hook-1', 'Stop hook: injected wake'),
     ('watcher-wake-1', 'Watcher wake: injected context'),
-    ('mixed-wake-1', 'This typed note stays. FIRSTMATE SUPERVISION WAKE: injected context'),
+    ('mixed-wake-1', 'This typed note stays. JUGGERNAUT SUPERVISION WAKE: injected context'),
     ('punctuation-1', ' : '),
     ('task-wrapper-1', '<task-notification> <task-id>task-123</task-id> background event'),
     ('bash-wrapper-1', '<bash-output>injected command result'),
@@ -45,7 +45,7 @@ rows = [
 with Path(sys.argv[1]).open('w') as f:
     for i, (uid, content) in enumerate(rows):
         msg = {'role': 'user', 'content': content}
-        f.write(json.dumps({'type': 'user', 'uuid': uid, 'timestamp': f'2026-10-20T12:{i:02}:00Z', 'cwd': '/home/you/firstmate', 'message': msg}) + '\n')
+        f.write(json.dumps({'type': 'user', 'uuid': uid, 'timestamp': f'2026-10-20T12:{i:02}:00Z', 'cwd': '/home/you/juggernaut', 'message': msg}) + '\n')
 PY
 export JG_HOME=$home CHAT_TSV_TRANSCRIPTS=$transcripts
 script_dir=$(dirname "${BASH_SOURCE[0]}")/../bin
@@ -90,7 +90,7 @@ grep -Fq 'is not gitignored' "$d/not-ignored.out"
 JG_HOME=$refresh_home CHAT_TSV_TRANSCRIPTS=$transcripts bash "$refresh" > "$d/refresh1" 2>&1
 grep -Fq 'appended=7 rows total=7' "$d/refresh1"
 cp "$refresh_home/data/chat.tsv" "$d/initial.tsv"
-printf '%s\n' "$(python3 -c 'import json; print(json.dumps({"type":"user","uuid":"new-real","timestamp":"2026-10-20T13:00:00Z","cwd":"/home/you/firstmate","message":{"role":"user","content":"New real note."}}))')" "$(python3 -c 'import json; print(json.dumps({"type":"user","uuid":"new-wake","timestamp":"2026-10-20T13:01:00Z","message":{"role":"user","content":"Firstmate supervision wake: injected wake."}}))')" >> "$transcripts/session.jsonl"
+printf '%s\n' "$(python3 -c 'import json; print(json.dumps({"type":"user","uuid":"new-real","timestamp":"2026-10-20T13:00:00Z","cwd":"/home/you/juggernaut","message":{"role":"user","content":"New real note."}}))')" "$(python3 -c 'import json; print(json.dumps({"type":"user","uuid":"new-wake","timestamp":"2026-10-20T13:01:00Z","message":{"role":"user","content":"Juggernaut supervision wake: injected wake."}}))')" >> "$transcripts/session.jsonl"
 JG_HOME=$refresh_home CHAT_TSV_TRANSCRIPTS=$transcripts bash "$refresh" > "$d/refresh2" 2>&1
 grep -Fq 'appended=1 rows total=8' "$d/refresh2"
 head -n 7 "$refresh_home/data/chat.tsv" | cmp - "$d/initial.tsv"

@@ -104,7 +104,7 @@ cat > "$DATA/$ID/brief.md" <<'EOF'
 ## Captain's intent
 Exercise Herdr backend auto-detection.
 
-## Firstmate spec
+## Juggernaut spec
 Verify the real spawn path selects Herdr.
 EOF
 
@@ -113,7 +113,7 @@ mkdir -p "$PROJ"
 git -C "$PROJ" init -q
 printf '# scratch\n' > "$PROJ/README.md"
 git -C "$PROJ" add README.md
-git -C "$PROJ" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm initial
+git -C "$PROJ" -c user.name='Juggernaut Tests' -c user.email='tests@example.invalid' commit -qm initial
 git clone --quiet --bare "$PROJ" "$PROJ.origin.git"
 git -C "$PROJ" remote add origin "file://$PROJ.origin.git"
 

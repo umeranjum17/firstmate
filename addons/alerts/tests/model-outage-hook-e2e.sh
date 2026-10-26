@@ -10,11 +10,11 @@ done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Model-outage observer reached through the step-B loader and guarded tick, over
 # fixture lanes: present -> grouped wake, absent -> kun behavior (no function, no
-# wake, exit 0 under set -e). JG_TEST_FORK names a read-only Firstmate checkout;
+# wake, exit 0 under set -e). JG_TEST_FORK names a read-only Juggernaut checkout;
 # the watcher itself is never run.
 set -euo pipefail
 addons=$(cd "$(dirname "$0")/../.." && pwd)
-: "${JG_TEST_FORK:?set JG_TEST_FORK to a Firstmate checkout}"
+: "${JG_TEST_FORK:?set JG_TEST_FORK to a Juggernaut checkout}"
 d=$(mktemp -d)
 cleanup() {
   rc=$?
@@ -47,7 +47,7 @@ run() {
     set -e
     export JG_HOME=$d/fork SCRIPT_DIR=$d/fork/bin STATE=$state JG_ADDONS_DIR=$ad
     # shellcheck source=/dev/null
-    [ ! -r "${JG_ADDONS_DIR:-$JG_HOME/projects/firstmate-addons}/alerts/bin/jg-model-outage-lib.sh" ] || . "${JG_ADDONS_DIR:-$JG_HOME/projects/firstmate-addons}/alerts/bin/jg-model-outage-lib.sh"
+    [ ! -r "${JG_ADDONS_DIR:-$JG_HOME/projects/juggernaut-addons}/alerts/bin/jg-model-outage-lib.sh" ] || . "${JG_ADDONS_DIR:-$JG_HOME/projects/juggernaut-addons}/alerts/bin/jg-model-outage-lib.sh"
     jg_busy_token_valid() { return 0; }
     jg_backend_visible_capture_supported() { return 0; }
     jg_busy_current_gen() { cat "$1/$2.busy-gen"; }

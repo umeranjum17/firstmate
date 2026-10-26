@@ -7,7 +7,7 @@
 # via a non-empty FMX_PAIRING_TOKEN (from the home's .env or the environment).
 # The watcher invokes this trusted repository script directly only after
 # state/x-watch.check.sh matches the expected byte-static identity shim.
-# Its contract is "output => wake firstmate, silence => keep sleeping", so the
+# Its contract is "output => wake juggernaut, silence => keep sleeping", so the
 # no-op keeps the watcher behaving exactly as today until a user opts in.
 #
 # Behavior when X mode is on:
@@ -37,7 +37,7 @@
 # platform/budget even after this inbox file is drained.
 #
 # Config (home .env, FMX_ENV_FILE, or env): FMX_PAIRING_TOKEN (required),
-# FMX_RELAY_URL (default https://myfirstmate.io). Auth: Authorization: Bearer
+# FMX_RELAY_URL (default https://myjuggernaut.io). Auth: Authorization: Bearer
 # <token>.
 set -u
 

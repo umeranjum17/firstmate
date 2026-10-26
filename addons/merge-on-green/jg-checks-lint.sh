@@ -15,7 +15,7 @@
 # pull-files API counts the added lines, and the diff comes from the compare API (else a local checkout).
 # An API or diff failure keeps the full count, so it can never turn a big PR into a PASS.
 # One gh call per run (plus one per 100 files past the 100-file view cap, the compare/upstream diffs and one or two per moved file). Each run appends a row to $JG_HOME/data/checks-gate.log. A FAIL for a task of this home
-# also publishes a FAIL completion receipt (receipts/bin/jg-run-receipt.sh in firstmate-addons), so bin/jg-pr-merge.sh and jg-merge-local.sh
+# also publishes a FAIL completion receipt (receipts/bin/jg-run-receipt.sh in juggernaut-addons), so bin/jg-pr-merge.sh and jg-merge-local.sh
 # refuse the merge (bin/jg-dod-lib.sh jg_dod_receipt_accept) until the worker re-lints to PASS and republishes PASS.
 import os, re, sys, json, time, hashlib, subprocess, tempfile
 from collections import Counter

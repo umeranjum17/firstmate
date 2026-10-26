@@ -5,7 +5,7 @@ This add-on owns all of it: `bin/jg-account-pool-lib.sh` parses `config/account-
 
 ## Wiring
 
-The fork's `bin/jg-spawn.sh` and `bin/jg-control.sh` carry one setup line that sources the lib from `$JG_ADDONS_DIR` (else `$JG_HOME/projects/firstmate-addons`) and makes `jg_account_hook` a no-op when the add-on is absent, plus one `jg_account_hook <event>` line at each call site:
+The fork's `bin/jg-spawn.sh` and `bin/jg-control.sh` carry one setup line that sources the lib from `$JG_ADDONS_DIR` (else `$JG_HOME/projects/juggernaut-addons`) and makes `jg_account_hook` a no-op when the add-on is absent, plus one `jg_account_hook <event>` line at each call site:
 
 | Script | Events, in call order |
 |---|---|
@@ -32,8 +32,8 @@ The spawn prints the pick as `account=<id>` and records the same field in the ta
 While `config/account-pool` exists, raw launch commands refuse before account selection, even when a pin applies. Use a named harness such as `--harness claude` so a command or shell wrapper cannot bypass or override the selected account.
 
 A malformed file (including one that is not a readable regular file, such as a broken symlink) refuses the launch before anything is created. So does a `pick` that exits non-zero, an answer whose `unset` is not an array of environment-variable names, and an answer that names no usable account folder: not the tool's own store variable, or not an existing readable, searchable directory.
-A failed `pick` refusal names the tool and the login to do, and says which accounts are resting or signed out. Firstmate never falls back to an ambient login or copies a credential.
-The pool is not inherited into secondmate homes: a local secondmate agent launches on the launching home's pool, and the secondmate's own workers read the secondmate home's file.
+A failed `pick` refusal names the tool and the login to do, and says which accounts are resting or signed out. Juggernaut never falls back to an ambient login or copies a credential.
+The pool is not inherited into squad lead homes: a local squad lead agent launches on the launching home's pool, and the squad lead's own workers read the squad lead home's file.
 
 ## Moving one worker between accounts (relaunch --account)
 
@@ -69,14 +69,14 @@ jg-model-pool next --json   # prior selection + typed limit on stdin
 ```
 
 Request fields (`v:1`): `purpose` (`work`), optional `pool_config` (absolute path to `config/account-pool`), optional `model`, `capabilities`, `deadline` (unix seconds for the whole attempt chain), and `attempted` (account/route ids already tried).
-When `pool_config` is omitted (as learn-from-mistakes does for `account_picker`), the helper defaults to `$JG_HOME/config/account-pool` if that file is readable, else `$HOME/firstmate/config/account-pool` — the same order as `pipeline-quota-failover/switch.sh`. An explicit `pool_config` still wins; with no readable default the helper refuses as before.
+When `pool_config` is omitted (as learn-from-mistakes does for `account_picker`), the helper defaults to `$JG_HOME/config/account-pool` if that file is readable, else `$HOME/juggernaut/config/account-pool` — the same order as `pipeline-quota-failover/switch.sh`. An explicit `pool_config` still wins; with no readable default the helper refuses as before.
 `next` also needs `selection` (prior answer) and `cause` (`quota`, `rate_limit`, `unavailable`, `timeout`).
 
 learn-from-mistakes account_picker (global lfm config argv, never shell text):
 
 ```yaml
 account_picker:
-  - /absolute/path/to/firstmate-addons/account-pool/bin/jg-model-pool
+  - /absolute/path/to/juggernaut-addons/account-pool/bin/jg-model-pool
 ```
 
 For ordinary work it picks the eligible Claude account with the greatest minimum runway (min of 5h and 7d) above the **eligibility floor** (`JG_MODEL_POOL_FLOOR`, defaulting to `JG_ACCOUNT_POOL_REST_FLOOR`, **15%**).

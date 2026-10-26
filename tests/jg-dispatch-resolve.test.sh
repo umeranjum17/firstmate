@@ -254,14 +254,14 @@ cat > "$PRIVATE_BRIEF" <<'MD'
 ## Captain's intent
 Fix the pager for the Acme-Ledger account 4417-2290.
 
-## Firstmate spec
+## Juggernaut spec
 - Keep the change small.
 MD
 expect_withheld() {  # <label> <stderr fragment> [<value that must not print>...]
   local label=$1 fragment=$2
   shift 2
   expect_code 0 "$code" "$label exits 0"
-  assert_equals '' "$out" "$label prints nothing on stdout, so firstmate uses its existing intake"
+  assert_equals '' "$out" "$label prints nothing on stdout, so juggernaut uses its existing intake"
   assert_contains "$err" "dispatch-resolve: off ($fragment" "$label names why on stderr"
   assert_contains "$err" 'nothing sent)' "$label says nothing was sent"
   assert_equals '1' "$(grep -c . <<<"$err")" "$label prints one diagnostic line"
@@ -307,19 +307,19 @@ reset_log
 TYPESAFE_API_KEY=$KEY run code out err "$BRIEF" --project pager
 expect_withheld "a rule-criterion match" "brief text matches $NEVER_SEND line 1" 'stated root cause'
 
-SECOND_HOME="$TMP_ROOT/secondmate-home"
+SECOND_HOME="$TMP_ROOT/squad-lead-home"
 mkdir -p "$SECOND_HOME/config"
 printf '%s\n' 'acme-ledger' > "$NEVER_SEND"
 # A child shell keeps the lib's own globals (such as out) out of this script
 # shellcheck disable=SC2016 # Expanded by the child shell
 bash -c '. "$1" && propagate_inheritable_config "$2" "$3"' _ \
   "$ROOT/bin/jg-config-inherit-lib.sh" "$HOME_DIR/config" "$SECOND_HOME/config" \
-  || fail "inheritance into the secondmate home failed"
+  || fail "inheritance into the squad_lead home failed"
 PRIMARY_HOME=$HOME_DIR
 HOME_DIR=$SECOND_HOME
 reset_log
 TYPESAFE_API_KEY=$KEY run code out err "$PRIVATE_BRIEF" --project pager
-expect_withheld "an inherited list in a secondmate home" "brief text matches $SECOND_HOME/config/dispatch-never-send line 1" 'acme-ledger' 'Acme-Ledger'
+expect_withheld "an inherited list in a squad_lead home" "brief text matches $SECOND_HOME/config/dispatch-never-send line 1" 'acme-ledger' 'Acme-Ledger'
 HOME_DIR=$PRIMARY_HOME
 
 rm -f "$NEVER_SEND"
@@ -372,7 +372,7 @@ reset_log
 TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
 expect_code 0 "$code" "absent rules file exits 0"
 assert_contains "$out" '  status: escalate' "absent rules file is non-clear"
-assert_contains "$out" '  reason: no rules to match' "absent rules file returns control to firstmate"
+assert_contains "$out" '  reason: no rules to match' "absent rules file returns control to juggernaut"
 assert_not_contains "$out" '  profile:' "absent rules file emits no profile"
 assert_absent "$LOG/argv" "absent rules file never calls curl"
 assert_absent "$LOG/quota-axi.calls" "absent rules file never reads quota"
@@ -387,7 +387,7 @@ for direct_rules in "$DEFAULT_ONLY" "$EMPTY_RULES"; do
   TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
   expect_code 0 "$code" "no-rule resolution exits 0: $direct_rules"
   assert_contains "$out" '  status: escalate' "no-rule resolution is non-clear: $direct_rules"
-  assert_contains "$out" '  reason: no rules to match' "no-rule resolution returns control to firstmate: $direct_rules"
+  assert_contains "$out" '  reason: no rules to match' "no-rule resolution returns control to juggernaut: $direct_rules"
   assert_not_contains "$out" '  profile:' "no-rule resolution emits no profile: $direct_rules"
   assert_absent "$LOG/argv" "no-rule resolution never calls curl: $direct_rules"
   assert_absent "$LOG/quota-axi.calls" "no-rule resolution never reads quota: $direct_rules"
@@ -515,7 +515,7 @@ cat > "$SCAFFOLD_BRIEF" <<'MD'
 ## Captain's intent
 Add a flag to the pager.
 
-## Firstmate spec
+## Juggernaut spec
 Touch pager.sh only.
 ```sh
 # Not a heading inside a fence
@@ -535,24 +535,24 @@ write_response "$RESPONSE" rule_4 0.9
 TYPESAFE_API_KEY=$KEY run code out err "$SCAFFOLD_BRIEF"
 sent=$(jq -r .state.task.brief "$LOG/body")
 assert_contains "$sent" $'## Captain\'s intent\nAdd a flag to the pager.' "the captain's intent section is sent"
-assert_contains "$sent" $'## Firstmate spec\nTouch pager.sh only.' "the Firstmate spec section is sent"
+assert_contains "$sent" $'## Juggernaut spec\nTouch pager.sh only.' "the Juggernaut spec section is sent"
 assert_contains "$sent" $'# Not a heading inside a fence\n## Setup\n```\n### Out of scope\nAnything else.' "fenced lines and subheadings stay inside the section"
 assert_not_contains "$sent" 'BOILERPLATE' "scaffold boilerplate after the task sections is not sent"
 assert_not_contains "$sent" '# Task' "the enclosing Task heading is not sent"
 assert_not_contains "$sent" 'Brief kind:' "a brief without a scout contract line gets no kind line"
 
 SPEC_ONLY_BRIEF="$TMP_ROOT/spec-only-brief.md"
-printf '%s\n' '# Task' '## Firstmate spec' 'Spec text.' '## Rules' 'RULES-TEXT' > "$SPEC_ONLY_BRIEF"
+printf '%s\n' '# Task' '## Juggernaut spec' 'Spec text.' '## Rules' 'RULES-TEXT' > "$SPEC_ONLY_BRIEF"
 reset_log
 TYPESAFE_API_KEY=$KEY run code out err "$SPEC_ONLY_BRIEF"
-assert_equals $'## Firstmate spec\nSpec text.' "$(jq -r .state.task.brief "$LOG/body")" "one recognized section is enough"
+assert_equals $'## Juggernaut spec\nSpec text.' "$(jq -r .state.task.brief "$LOG/body")" "one recognized section is enough"
 
-printf '%s\n' '# Task' '## Firstmate spec   ' 'Spec text.' '## Rules' 'RULES-TEXT' > "$SPEC_ONLY_BRIEF"
+printf '%s\n' '# Task' '## Juggernaut spec   ' 'Spec text.' '## Rules' 'RULES-TEXT' > "$SPEC_ONLY_BRIEF"
 reset_log
 TYPESAFE_API_KEY=$KEY run code out err "$SPEC_ONLY_BRIEF"
 assert_equals "$(cat "$SPEC_ONLY_BRIEF")" "$(jq -r .state.task.brief "$LOG/body")" "a heading with trailing blanks is not a section, matching spawn validation"
 
-printf '%s\n' 'Preamble.' '## Firstmate spec' 'Spec text.' > "$SPEC_ONLY_BRIEF"
+printf '%s\n' 'Preamble.' '## Juggernaut spec' 'Spec text.' > "$SPEC_ONLY_BRIEF"
 reset_log
 TYPESAFE_API_KEY=$KEY run code out err "$SPEC_ONLY_BRIEF"
 assert_equals "$(cat "$SPEC_ONLY_BRIEF")" "$(jq -r .state.task.brief "$LOG/body")" "a section outside the Task heading is not a task section"
@@ -964,7 +964,7 @@ TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
 expect_code 2 "$code" "non-JSON rules exits 2"
 assert_contains "$err" 'not JSON' "non-JSON rules is named"
 for bad in \
-  '{"rules":[{"when":"x","use":{"harness":"claude"},"approval":"firstmate"}]}|approval must be "captain" when present' \
+  '{"rules":[{"when":"x","use":{"harness":"claude"},"approval":"juggernaut"}]}|approval must be "captain" when present' \
   '{"rules":[{"when":"x","use":{"harness":"claude"},"select":"mystery"}]}|unknown select: mystery' \
   '{"rules":[{"when":"x","use":{"harness":"claude"},"min_confidence":"high"}]}|min_confidence must be a number from 0 through 1 when present' \
   '{"rules":[{"when":"x","use":{"harness":"claude"},"min_confidence":1.5}]}|min_confidence must be a number from 0 through 1 when present' \

@@ -176,7 +176,7 @@ wait_for_state "$SESSION:agent" alive \
 pass "tmux liveness: a harness-named foreground process classifies alive"
 
 # --- muse's version-suffixed binary name ------------------------------------
-# A muse crewmate pane misclassified here reads as a dead endpoint, so a healthy
+# A muse operator pane misclassified here reads as a dead endpoint, so a healthy
 # worker would be torn down or relaunched. The decoys below are what keep the
 # fix from being a substring match that claims unrelated programs.
 

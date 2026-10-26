@@ -8,14 +8,14 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
   export "$_jg_new=$_jg_val"
 done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
-# account-pool install.sh - verify the wiring for one firstmate home; changes nothing. The add-on
+# account-pool install.sh - verify the wiring for one juggernaut home; changes nothing. The add-on
 # works through hook lines in the home's bin/jg-spawn.sh and bin/jg-control.sh sourcing this checkout.
 # Usage: install.sh <jg-home>
 set -u
 home=${1:-${JG_HOME:-}}
 [ -n "$home" ] && [ -d "$home" ] || { echo "account-pool install: usage: install.sh <jg-home>" >&2; exit 1; }
 lib=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/bin/jg-account-pool-lib.sh
-addons=${JG_ADDONS_DIR:-$home/projects/firstmate-addons}
+addons=${JG_ADDONS_DIR:-$home/projects/juggernaut-addons}
 status=0
 if [ -f "$addons/account-pool/bin/jg-account-pool-lib.sh" ]; then
   cmp -s "$addons/account-pool/bin/jg-account-pool-lib.sh" "$lib" && echo "add-on checkout: $addons (lib matches)" || echo "add-on checkout: $addons (lib DIFFERS from this checkout)"

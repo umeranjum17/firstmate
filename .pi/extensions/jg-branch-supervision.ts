@@ -1,4 +1,4 @@
-// Firstmate supervision branch for Pi (docs/pi-supervision-branch.md).
+// Juggernaut supervision branch for Pi (docs/pi-supervision-branch.md).
 //
 // A second AgentSession - the supervision BRANCH - inside the same pi process
 // as the captain's MAIN session, living for exactly one main session: every
@@ -102,12 +102,12 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { Box, Container, fuzzyFilter, Input, SelectList, Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
-import { registerFirstmateTool } from "./lib/jg-native-contract.ts";
+import { registerJuggernautTool } from "./lib/jg-native-contract.ts";
 import { runCommandAsync } from "./lib/jg-async-exec.ts";
 import {
   type CalmPresentationState,
   calmTranscriptClassIsVisible,
-  FIRSTMATE_CALM_PRESENTATION_EVENT,
+  JUGGERNAUT_CALM_PRESENTATION_EVENT,
 } from "./lib/jg-calm-visibility.ts";
 import {
   activateEligibleRowsOwner,
@@ -133,8 +133,8 @@ import {
 for (const [_jgOld, _jgVal] of Object.entries(process.env))
   if (_jgOld.startsWith("FM_") && process.env[`JG_${_jgOld.slice(3)}`] === undefined)
     process.env[`JG_${_jgOld.slice(3)}`] = _jgVal;
-  classifyFirstmateOperationalText,
-  encodeFirstmateOperationalInputWith,
+  classifyJuggernautOperationalText,
+  encodeJuggernautOperationalInputWith,
 } from "./lib/jg-operational-input.ts";
 
 const extensionFile = fileURLToPath(import.meta.url);
@@ -273,7 +273,7 @@ type FollowMainResolution =
 // rejecting a hand-edited pin token Pi would not recognize at all. The
 // assertion below fails the tracked strict typecheck against the INSTALLED Pi
 // package (tests/jg-pi-primary-types.test.sh) the moment Pi adds or removes a
-// level, in either direction, so the list cannot drift into a stale Firstmate
+// level, in either direction, so the list cannot drift into a stale Juggernaut
 // catalog.
 const BRANCH_EFFORT_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
 type DeclaredBranchEffort = (typeof BRANCH_EFFORT_LEVELS)[number];
@@ -451,7 +451,7 @@ function textOfContent(content: unknown): string {
 // analysis counts them apart from dialog, and mirroring them would feed the
 // branch its own supervision traffic back.
 function isOperationalUserText(text: string): boolean {
-  return classifyFirstmateOperationalText(text) !== undefined;
+  return classifyJuggernautOperationalText(text) !== undefined;
 }
 
 function capMirrorText(text: string): string {
@@ -1055,7 +1055,7 @@ export default function (pi: ExtensionAPI) {
       .join("\n");
     const body = `${PROCESSING_INSTRUCTION.replace("{N}", String(through))}\n\n${listed}`;
     try {
-      return await encodeFirstmateOperationalInputWith(runCommandAsync, "branch-outcome", body);
+      return await encodeJuggernautOperationalInputWith(runCommandAsync, "branch-outcome", body);
     } catch {
       return body;
     }
@@ -1908,14 +1908,14 @@ ${context.command}
   // conversation and exposes no hook an extension can use to open either
   // picker, so this is the smallest supported equivalent: Pi's own catalog
   // intersected with the isolated branch runtime, then Pi's own supported
-  // thinking levels for the model just chosen, with no parallel Firstmate
+  // thinking levels for the model just chosen, with no parallel Juggernaut
   // model or effort list. The model step shows that catalog through the same
   // bounded, searchable SelectList primitive Pi's own /model dialog scrolls
   // (pickBranchModel below); the effort step's menu is a handful of levels
   // and stays on Pi's generic selector dialog. The effort step follows the
   // model step because the model decides which levels exist.
   pi.registerCommand?.("supervision-model", {
-    description: "Pick the model and reasoning effort Firstmate's Pi supervision branch uses, or follow main's.",
+    description: "Pick the model and reasoning effort Juggernaut's Pi supervision branch uses, or follow main's.",
     handler: async (_args, ctx) => {
       rememberMainModel(ctx);
       const pin = readModelPin();
@@ -2021,7 +2021,7 @@ ${context.command}
   // Pi's ModelSelectorComponent is deliberately NOT reused: its own selection
   // handler writes the captain's default model through Pi's settings manager,
   // which would move main's conversation as a side effect of pinning the
-  // branch, and it has no room for the "follow main" row or for Firstmate's
+  // branch, and it has no room for the "follow main" row or for Juggernaut's
   // branch-runtime eligibility filter. Ordering and filtering live in
   // lib/jg-branch-model-picker.ts; everything here is Pi's own rendering.
   // Returns the chosen item's value, or undefined when the captain cancels.
@@ -2093,7 +2093,7 @@ ${context.command}
   // Step two of /supervision-model, shown after the model pick and driven by
   // Pi's own supported-level list for the model the branch will now use, so
   // the menu is the one Pi's own thinking selector would show and keeps no
-  // parallel Firstmate picker catalog. Cancelling leaves the current effort
+  // parallel Juggernaut picker catalog. Cancelling leaves the current effort
   // choice standing; the model pick already made is still applied.
   async function pickBranchEffort(
     ctx: { ui: { select: (title: string, options: string[]) => Promise<string | undefined> } },
@@ -2149,7 +2149,7 @@ ${context.command}
     active: false,
     stockExportRendering: false,
   };
-  pi.events?.on?.(FIRSTMATE_CALM_PRESENTATION_EVENT, (data) => {
+  pi.events?.on?.(JUGGERNAUT_CALM_PRESENTATION_EVENT, (data) => {
     const next = data as Partial<CalmPresentationState>;
     calmPresentation = {
       active: next.active === true,
@@ -2277,7 +2277,7 @@ ${context.command}
     return `${header} ${theme.fg("muted", preview)}`;
   };
 
-  registerFirstmateTool(pi, {
+  registerJuggernautTool(pi, {
     name: "jg_branch_outcomes",
     label: "Read supervision branch outcomes",
     description:
@@ -2339,7 +2339,7 @@ ${context.command}
   // cursor, never backwards), and refused outside lock ownership, so neither a
   // paraphrase, an empty reply, nor a stale generation can mark an outcome
   // processed.
-  registerFirstmateTool(pi, {
+  registerJuggernautTool(pi, {
     name: "jg_branch_processed",
     label: "Acknowledge processed supervision outcomes",
     description:

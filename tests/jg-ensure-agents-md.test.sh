@@ -195,7 +195,7 @@ test_marked_project_guidance_stays_unchanged() {
   for eol in $'\n' $'\r\n'; do
     for route in bare pointer symlink promotion; do
       repo=$(mktemp -d "$TMP_ROOT/marked-$route.XXXXXX")
-      printf '%s%s' '<!-- firstmate:maintained-by-project -->' "$eol" \
+      printf '%s%s' '<!-- juggernaut:maintained-by-project -->' "$eol" \
         '# Project memory' "$eol" \
         '## Editing these notes' "$eol" \
         'Keep broadly useful knowledge concise; link to sources and rewrite stale entries.' "$eol" \
@@ -224,11 +224,11 @@ test_marked_project_guidance_stays_unchanged() {
 
 test_reworded_guidance_requires_first_line_marker() {
   local repo marker count eol line
-  for marker in '' 'Use <!-- firstmate:maintained-by-project --> here.' \
-    '<!-- firstmate:maintained-by-project-extra -->' \
-    $'```html\n<!-- firstmate:maintained-by-project -->\n```' \
-    $'~~~html\n<!-- firstmate:maintained-by-project -->\n~~~' \
-    '<!-- firstmate:maintained-by-project -->'; do
+  for marker in '' 'Use <!-- juggernaut:maintained-by-project --> here.' \
+    '<!-- juggernaut:maintained-by-project-extra -->' \
+    $'```html\n<!-- juggernaut:maintained-by-project -->\n```' \
+    $'~~~html\n<!-- juggernaut:maintained-by-project -->\n~~~' \
+    '<!-- juggernaut:maintained-by-project -->'; do
     for eol in $'\n' $'\r\n'; do
       repo=$(mktemp -d "$TMP_ROOT/reworded.XXXXXX")
       printf '%s\n' '# Project memory' "$marker" '## Editing these notes' \

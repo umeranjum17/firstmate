@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
-# Acquire or inspect the per-home firstmate session lock.
+# Acquire or inspect the per-home juggernaut session lock.
 #
 # Line 1 of state/.lock is the owning session's anchor pid, resolved by
 # jg_session_lock_anchor_pid in bin/jg-session-lock-lib.sh: the harness (agent)
 # process found by walking the shell's ancestry, which lives as long as the
-# firstmate session - unlike the transient subshell PID of any one tool call,
+# juggernaut session - unlike the transient subshell PID of any one tool call,
 # which is dead moments after it is written. For a Claude session that proves a
 # trusted session id the anchor is CLAUDE_PID, the model-loop process, so a
 # shared transient daemon or a front-end that outlives the session never keeps
@@ -184,9 +184,9 @@ confirm_own_lock() {  # <recorded-pid>
 refuse_live_owner() {  # <recorded-pid>
   local recorded
   if recorded=$(jg_session_lock_recorded_session_id "$STATE"); then
-    echo "error: another live firstmate session holds the lock (pid $1, session $recorded); operate read-only until resolved" >&2
+    echo "error: another live juggernaut session holds the lock (pid $1, session $recorded); operate read-only until resolved" >&2
   else
-    echo "error: another live firstmate session holds the lock (pid $1); operate read-only until resolved" >&2
+    echo "error: another live juggernaut session holds the lock (pid $1); operate read-only until resolved" >&2
   fi
   exit 1
 }

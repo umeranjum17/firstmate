@@ -10,7 +10,7 @@ done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # The supervisor-work guard end to end: install into a throwaway HOME, run the
 # installed hook against fixture homes, a linked worktree and a worker session,
-# then uninstall. Needs a Firstmate checkout (JG_CODE_ROOT) for the scope predicate
+# then uninstall. Needs a Juggernaut checkout (JG_CODE_ROOT) for the scope predicate
 # and the shell lexer, and fails (not skips) without jq or node.
 # shellcheck disable=SC2016 # single-quoted commands are literal payloads for the guard.
 set -u
@@ -18,7 +18,7 @@ set -u
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 CK=${JG_CODE_ROOT:-}
 [ -n "$CK" ] && [ -f "$CK/bin/jg-primary-scope-lib.sh" ] \
-  || { echo "FAIL: set JG_CODE_ROOT to a Firstmate checkout"; exit 1; }
+  || { echo "FAIL: set JG_CODE_ROOT to a Juggernaut checkout"; exit 1; }
 command -v jq >/dev/null 2>&1 || { echo "FAIL: jq is required"; exit 1; }
 command -v node >/dev/null 2>&1 || { echo "FAIL: node is required"; exit 1; }
 
@@ -38,7 +38,7 @@ check() {
   if "$@"; then echo "PASS: $CHECK_NAME"; else echo "FAIL: $CHECK_NAME"; FAILS=$((FAILS + 1)); fi
 }
 
-# make_home <dir>: a fixture Firstmate home, a plain checkout with AGENTS.md, bin and
+# make_home <dir>: a fixture Juggernaut home, a plain checkout with AGENTS.md, bin and
 # state, and the checkout's scope lib and lexer linked in, as the real home has them.
 make_home() {
   mkdir -p "$1/bin" "$1/state"
@@ -95,7 +95,7 @@ check test "$rc" = 2 && check test -z "$out" && check jq -e '.systemMessage | st
 
 CHECK_NAME="a crew-owned run is refused however it is wrapped or backgrounded"
 check expect 2 'no-mistakes axi respond --action fix --note ok' "$FMH" supervisor-no-mistakes-run
-check expect 2 'cd ~/firstmate/work && no-mistakes axi respond --action fix' "$FMH" supervisor-no-mistakes-run
+check expect 2 'cd ~/juggernaut/work && no-mistakes axi respond --action fix' "$FMH" supervisor-no-mistakes-run
 check expect 2 'sleep 110; no-mistakes axi run --wait' "$FMH" supervisor-no-mistakes-run
 check expect 2 'timeout 1700 no-mistakes axi run --wait' "$FMH" supervisor-no-mistakes-run
 check expect 2 'nohup no-mistakes axi respond --action fix &' "$FMH" supervisor-no-mistakes-run
@@ -137,10 +137,10 @@ check expect 0 'sleep 110' "$TMP/wt"
 CHECK_NAME="a session outside the registered home stays allowed"
 check expect 0 'sleep 120' "$TMP"
 
-CHECK_NAME="a secondmate lead may not type into a pane, a primary may read one"
-SECOND=$(cd "$TMP" && pwd -P)/secondmate
+CHECK_NAME="a squad_lead lead may not type into a pane, a primary may read one"
+SECOND=$(cd "$TMP" && pwd -P)/squad_lead
 make_home "$SECOND"
-printf 'sm-fixture\n' > "$SECOND/.jg-secondmate-home"
+printf 'sm-fixture\n' > "$SECOND/.jg-squad-lead-home"
 git -C "$SECOND" -c user.name=t -c user.email=t@example.com commit -q --allow-empty -m init
 "$HERE/install.sh" "$SECOND" >/dev/null
 check expect 2 'herdr pane send-text "yes"' "$SECOND" supervisor-pane-typing

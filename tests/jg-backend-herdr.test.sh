@@ -26,8 +26,8 @@ herdr_forget_inherited_pane
 
 TMP_ROOT=$(jg_test_tmproot jg-backend-herdr-tests)
 # Pin the ambient-home default to a marker-free fixture: JG_HOME resolves to
-# the suite's own root when unset, and a secondmate-marked checkout (any
-# treehouse crew home carries .jg-secondmate-home) would flip the default
+# the suite's own root when unset, and a squad-lead-marked checkout (any
+# treehouse crew home carries .jg-squad-lead-home) would flip the default
 # workspace label to 2ndmate-*, silently changing placement behavior for
 # every test that does not set JG_HOME itself. Per-test JG_HOME prefixes
 # still override this default.
@@ -169,7 +169,7 @@ SH
 # make_herdr_statefake: a STATEFUL `herdr` stub that models the parts of herdr's
 # real container behavior the workspace-leak fix (and the default-tab-prune
 # safety fix) depend on, so a full spawn->teardown cycle can be replayed
-# repeatedly and the "one persistent firstmate workspace, no orphans"
+# repeatedly and the "one persistent juggernaut workspace, no orphans"
 # invariant asserted end to end (the canned, call-numbered make_herdr_fakebin
 # above cannot model state carried ACROSS calls). Backed by a JSON state file
 # ($JG_FAKE_HERDR_STATE) mutated with real jq. Modeled behaviors, all
@@ -336,53 +336,53 @@ test_version_check_refuses_missing_herdr() {
   pass "jg_backend_herdr_version_check: refuses loudly when herdr is not installed"
 }
 
-# --- workspace_label: per-firstmate-HOME resolution (P3, herdr-sm-spaces-k4) -
+# --- workspace_label: per-juggernaut-HOME resolution (P3, herdr-sm-spaces-k4) -
 
 test_workspace_label_primary_home_no_marker() {
   local home
   home="$TMP_ROOT/primary-home-no-marker"; mkdir -p "$home"
   out=$( JG_HOME="$home" bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_workspace_label' "$ROOT" )
-  [ "$out" = "firstmate" ] || fail "a primary home (no .jg-secondmate-home marker) should resolve to label 'firstmate', got '$out'"
-  pass "jg_backend_herdr_workspace_label: a primary home (no marker) resolves to 'firstmate'"
+  [ "$out" = "juggernaut" ] || fail "a primary home (no .jg-squad-lead-home marker) should resolve to label 'juggernaut', got '$out'"
+  pass "jg_backend_herdr_workspace_label: a primary home (no marker) resolves to 'juggernaut'"
 }
 
-test_workspace_label_secondmate_home_uses_marker_id() {
+test_workspace_label_squad_lead_home_uses_marker_id() {
   local home
-  home="$TMP_ROOT/secondmate-home"; mkdir -p "$home"
-  printf 'sshhip-h7\n' > "$home/.jg-secondmate-home"
+  home="$TMP_ROOT/squad-lead-home"; mkdir -p "$home"
+  printf 'sshhip-h7\n' > "$home/.jg-squad-lead-home"
   out=$( JG_HOME="$home" bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_workspace_label' "$ROOT" )
-  [ "$out" = "2ndmate-sshhip-h7" ] || fail "a secondmate home should resolve to '2ndmate-<id>', got '$out'"
-  pass "jg_backend_herdr_workspace_label: a secondmate home (.jg-secondmate-home) resolves to '2ndmate-<id>'"
+  [ "$out" = "2ndmate-sshhip-h7" ] || fail "a squad_lead home should resolve to '2ndmate-<id>', got '$out'"
+  pass "jg_backend_herdr_workspace_label: a squad_lead home (.jg-squad-lead-home) resolves to '2ndmate-<id>'"
 }
 
-test_workspace_label_secondmate_marker_trims_whitespace() {
+test_workspace_label_squad_lead_marker_trims_whitespace() {
   local home
-  home="$TMP_ROOT/secondmate-home-ws"; mkdir -p "$home"
-  printf '  sshhip-h7  \n\n' > "$home/.jg-secondmate-home"
+  home="$TMP_ROOT/squad-lead-home-ws"; mkdir -p "$home"
+  printf '  sshhip-h7  \n\n' > "$home/.jg-squad-lead-home"
   out=$( JG_HOME="$home" bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_workspace_label' "$ROOT" )
   [ "$out" = "2ndmate-sshhip-h7" ] || fail "the marker id should be trimmed of surrounding whitespace, got '$out'"
-  pass "jg_backend_herdr_workspace_label: trims whitespace around the marker's secondmate id"
+  pass "jg_backend_herdr_workspace_label: trims whitespace around the marker's squad_lead id"
 }
 
 test_workspace_label_empty_marker_falls_back_to_primary() {
   local home
-  home="$TMP_ROOT/secondmate-home-empty"; mkdir -p "$home"
-  : > "$home/.jg-secondmate-home"
+  home="$TMP_ROOT/squad-lead-home-empty"; mkdir -p "$home"
+  : > "$home/.jg-squad-lead-home"
   out=$( JG_HOME="$home" bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_workspace_label' "$ROOT" )
-  [ "$out" = "firstmate" ] || fail "an empty/unreadable marker should fall back to 'firstmate', got '$out'"
-  pass "jg_backend_herdr_workspace_label: an empty marker file falls back to the primary label 'firstmate'"
+  [ "$out" = "juggernaut" ] || fail "an empty/unreadable marker should fall back to 'juggernaut', got '$out'"
+  pass "jg_backend_herdr_workspace_label: an empty marker file falls back to the primary label 'juggernaut'"
 }
 
-test_workspace_label_different_secondmates_get_different_labels() {
+test_workspace_label_different_squad_leads_get_different_labels() {
   local home1 home2 out1 out2
-  home1="$TMP_ROOT/secondmate-a"; mkdir -p "$home1"; printf 'alpha-a1\n' > "$home1/.jg-secondmate-home"
-  home2="$TMP_ROOT/secondmate-b"; mkdir -p "$home2"; printf 'bravo-b2\n' > "$home2/.jg-secondmate-home"
+  home1="$TMP_ROOT/squad-lead-a"; mkdir -p "$home1"; printf 'alpha-a1\n' > "$home1/.jg-squad-lead-home"
+  home2="$TMP_ROOT/squad-lead-b"; mkdir -p "$home2"; printf 'bravo-b2\n' > "$home2/.jg-squad-lead-home"
   out1=$( JG_HOME="$home1" bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_workspace_label' "$ROOT" )
   out2=$( JG_HOME="$home2" bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_workspace_label' "$ROOT" )
-  [ "$out1" = "2ndmate-alpha-a1" ] || fail "secondmate home1 label mismatch: $out1"
-  [ "$out2" = "2ndmate-bravo-b2" ] || fail "secondmate home2 label mismatch: $out2"
-  [ "$out1" != "$out2" ] || fail "two different secondmate homes must not collide on the same label"
-  pass "jg_backend_herdr_workspace_label: two different secondmate homes get two different, non-colliding labels"
+  [ "$out1" = "2ndmate-alpha-a1" ] || fail "squad_lead home1 label mismatch: $out1"
+  [ "$out2" = "2ndmate-bravo-b2" ] || fail "squad_lead home2 label mismatch: $out2"
+  [ "$out1" != "$out2" ] || fail "two different squad_lead homes must not collide on the same label"
+  pass "jg_backend_herdr_workspace_label: two different squad_lead homes get two different, non-colliding labels"
 }
 
 # --- jg_backend_herdr_cli: session targeting (2026-07-02 incident fix) -------
@@ -408,7 +408,7 @@ test_cli_helper_sets_env_and_appends_trailing_session_flag() {
 # ~/.local/bin first. A client older than the running server answers every
 # command with error code protocol_mismatch (verified: herdr 0.8.2, protocol
 # 20, against a 0.9.0 server, protocol 22), and until the adapter learned to
-# step around it, a live remote secondmate read `unreadable`, every doorbell
+# step around it, a live remote squad_lead read `unreadable`, every doorbell
 # into it failed, and the relaunch that would repair it was refused.
 
 # run_with_clients <dir> <path-dirs...> -- <bash -c body>: sources the adapter
@@ -1197,7 +1197,7 @@ SH
 # --- launcher_identity: the exact workspace a worker must be placed in -------
 #
 # Herdr injects HERDR_ENV/HERDR_PANE_ID/HERDR_SESSION/HERDR_SOCKET_PATH into
-# every process it manages a pane for, so a firstmate or secondmate agent's own
+# every process it manages a pane for, so a juggernaut or squad_lead agent's own
 # tool calls carry the identity of the workspace the captain is watching it in.
 # Placement resolves from that identity because workspace labels are mutable and
 # non-unique, and the globally focused workspace is unrelated to the launcher.
@@ -1213,7 +1213,7 @@ test_launcher_identity_absent_without_a_herdr_pane() {
   status=$?
   expect_code 2 "$status" "a process with no herdr pane must report 'no launcher to inherit' (2), not a refusal"
   [ ! -s "$log" ] || fail "resolving an absent launcher identity must not call herdr at all"$'\n'"$(cat "$log")"
-  pass "jg_backend_herdr_launcher_identity: a firstmate not running inside herdr has no launcher workspace to inherit"
+  pass "jg_backend_herdr_launcher_identity: a juggernaut not running inside herdr has no launcher workspace to inherit"
 }
 
 test_launcher_identity_absent_when_herdr_env_alone_is_set() {
@@ -1234,7 +1234,7 @@ test_launcher_identity_resolves_the_exact_pane_tab_and_workspace() {
   printf '{"sessions":[{"name":"fmtest","running":true,"socket_path":"/tmp/jg-herdr-unit/fmtest.sock"}]}\n' > "$resp/1.out"
   printf '{"result":{"pane":{"pane_id":"w7:p3","tab_id":"w7:t3","workspace_id":"w7"}}}\n' > "$resp/2.out"
   printf '{"result":{"tab":{"tab_id":"w7:t3","workspace_id":"w7"}}}\n' > "$resp/3.out"
-  printf '{"result":{"workspaces":[{"workspace_id":"w1","label":"firstmate"},{"workspace_id":"w7","label":"firstmate"}]}}\n' > "$resp/4.out"
+  printf '{"result":{"workspaces":[{"workspace_id":"w1","label":"juggernaut"},{"workspace_id":"w7","label":"juggernaut"}]}}\n' > "$resp/4.out"
   fb=$(make_herdr_fakebin "$dir")
   out=$( PATH="$fb:$PATH" JG_HERDR_LOG="$log" JG_HERDR_RESPONSES="$resp" \
     HERDR_ENV=1 HERDR_PANE_ID=w7:p3 HERDR_SESSION=fmtest HERDR_SOCKET_PATH=/tmp/jg-herdr-unit/fmtest.sock \
@@ -1329,7 +1329,7 @@ test_launcher_identity_refuses_a_workspace_missing_from_the_session() {
   printf '{"sessions":[{"name":"fmtest","running":true,"socket_path":"/tmp/jg-herdr-unit/fmtest.sock"}]}\n' > "$resp/1.out"
   printf '{"result":{"pane":{"pane_id":"w7:p3","tab_id":"w7:t3","workspace_id":"w7"}}}\n' > "$resp/2.out"
   printf '{"result":{"tab":{"tab_id":"w7:t3","workspace_id":"w7"}}}\n' > "$resp/3.out"
-  printf '{"result":{"workspaces":[{"workspace_id":"w1","label":"firstmate"}]}}\n' > "$resp/4.out"
+  printf '{"result":{"workspaces":[{"workspace_id":"w1","label":"juggernaut"}]}}\n' > "$resp/4.out"
   fb=$(make_herdr_fakebin "$dir")
   out=$( PATH="$fb:$PATH" JG_HERDR_LOG="$log" JG_HERDR_RESPONSES="$resp" \
     HERDR_ENV=1 HERDR_PANE_ID=w7:p3 HERDR_SESSION=fmtest HERDR_SOCKET_PATH=/tmp/jg-herdr-unit/fmtest.sock \
@@ -1348,7 +1348,7 @@ test_workspace_ensure_prefers_the_launcher_over_the_first_label_match() {
   printf '{"sessions":[{"name":"fmtest","running":true,"socket_path":"/tmp/jg-herdr-unit/fmtest.sock"}]}\n' > "$resp/1.out"
   printf '{"result":{"pane":{"pane_id":"w7:p3","tab_id":"w7:t3","workspace_id":"w7"}}}\n' > "$resp/2.out"
   printf '{"result":{"tab":{"tab_id":"w7:t3","workspace_id":"w7"}}}\n' > "$resp/3.out"
-  printf '{"result":{"workspaces":[{"workspace_id":"w1","label":"firstmate"},{"workspace_id":"w7","label":"firstmate"}]}}\n' > "$resp/4.out"
+  printf '{"result":{"workspaces":[{"workspace_id":"w1","label":"juggernaut"},{"workspace_id":"w7","label":"juggernaut"}]}}\n' > "$resp/4.out"
   fb=$(make_herdr_fakebin "$dir")
   out=$( PATH="$fb:$PATH" JG_HERDR_LOG="$log" JG_HERDR_RESPONSES="$resp" \
     HERDR_ENV=1 HERDR_PANE_ID=w7:p3 HERDR_SESSION=fmtest HERDR_SOCKET_PATH=/tmp/jg-herdr-unit/fmtest.sock \
@@ -1361,13 +1361,13 @@ test_workspace_ensure_prefers_the_launcher_over_the_first_label_match() {
 test_workspace_ensure_refuses_an_ambiguous_label_with_no_launcher() {
   local dir log resp fb out status
   dir="$TMP_ROOT/ensure-ambiguous"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
-  printf '{"result":{"workspaces":[{"workspace_id":"w1","label":"firstmate"},{"workspace_id":"w7","label":"firstmate"}]}}\n' > "$resp/1.out"
+  printf '{"result":{"workspaces":[{"workspace_id":"w1","label":"juggernaut"},{"workspace_id":"w7","label":"juggernaut"}]}}\n' > "$resp/1.out"
   fb=$(make_herdr_fakebin "$dir")
   out=$( PATH="$fb:$PATH" JG_HERDR_LOG="$log" JG_HERDR_RESPONSES="$resp" HERDR_SESSION=fmtest \
     bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_workspace_ensure fmtest /tmp' "$ROOT" 2>&1 )
   status=$?
   expect_code 3 "$status" "two same-labeled home workspaces with no launcher identity must refuse"
-  assert_contains "$out" "labeled 'firstmate'" "the ambiguity refusal did not name the duplicated label"
+  assert_contains "$out" "labeled 'juggernaut'" "the ambiguity refusal did not name the duplicated label"
   assert_contains "$out" "w1 w7" "the ambiguity refusal did not name the candidate workspaces"
   assert_not_contains "$(cat "$log")" $'\x1f''workspace'$'\x1f''create' "an ambiguous placement must not mint a third same-labeled workspace"
   pass "jg_backend_herdr_workspace_ensure: refuses to guess between two same-labeled home workspaces"
@@ -1377,27 +1377,27 @@ test_workspace_ensure_other_home_ignores_the_launcher_identity() {
   local dir log resp fb out
   dir="$TMP_ROOT/ensure-other-home"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
   # Only a workspace list: the launcher's own pane is never consulted, because a
-  # --secondmate launch stands up a different home's workspace by design.
-  printf '{"result":{"workspaces":[{"workspace_id":"w1","label":"firstmate"}]}}\n' > "$resp/1.out"
+  # --squad-lead launch stands up a different home's workspace by design.
+  printf '{"result":{"workspaces":[{"workspace_id":"w1","label":"juggernaut"}]}}\n' > "$resp/1.out"
   fb=$(make_herdr_fakebin "$dir")
   out=$( PATH="$fb:$PATH" JG_HERDR_LOG="$log" JG_HERDR_RESPONSES="$resp" \
     HERDR_ENV=1 HERDR_PANE_ID=w7:p3 HERDR_SESSION=fmtest \
     bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_workspace_ensure fmtest /tmp other-home' "$ROOT" )
   [ "$out" = w1 ] || fail "an other-home container should resolve by this home's own label, got '$out'"
   assert_not_contains "$(cat "$log")" $'\x1f''pane'$'\x1f''get' "an other-home container must not inherit the launcher's workspace"
-  pass "jg_backend_herdr_workspace_ensure: a --secondmate container resolves that home's own workspace, not the launcher's"
+  pass "jg_backend_herdr_workspace_ensure: a --squad-lead container resolves that home's own workspace, not the launcher's"
 }
 
 test_container_ensure_refuses_an_ambiguous_home_label() {
   local dir log resp fb out status
   dir="$TMP_ROOT/container-ambiguous"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
-  printf '{"result":{"workspaces":[{"workspace_id":"w1","label":"firstmate"},{"workspace_id":"w7","label":"firstmate"}]}}\n' > "$resp/1.out"
+  printf '{"result":{"workspaces":[{"workspace_id":"w1","label":"juggernaut"},{"workspace_id":"w7","label":"juggernaut"}]}}\n' > "$resp/1.out"
   fb=$(make_herdr_fakebin "$dir")
   out=$( PATH="$fb:$PATH" JG_HERDR_LOG="$log" JG_HERDR_RESPONSES="$resp" HERDR_SESSION=fmtest \
     bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_container_ensure /tmp' "$ROOT" 2>&1 )
   status=$?
   [ "$status" -ne 0 ] || fail "container_ensure must fail when the home workspace is ambiguous"
-  assert_contains "$out" "labeled 'firstmate'" "container_ensure buried the specific ambiguity it refused"
+  assert_contains "$out" "labeled 'juggernaut'" "container_ensure buried the specific ambiguity it refused"
   assert_not_contains "$out" "failed to ensure herdr workspace" "container_ensure added a generic message over the specific one"
   pass "jg_backend_herdr_container_ensure: surfaces the exact ambiguous-placement refusal instead of a generic failure"
 }
@@ -1414,19 +1414,19 @@ test_container_ensure_starts_server_and_workspace() {
   # 3: `herdr server` backgrounded launch - no meaningful output
   # 4: server_ensure poll -> now running
   printf '{"server":{"running":true}}\n' > "$resp/4.out"
-  # 5: workspace list -> empty (no "firstmate" workspace yet)
+  # 5: workspace list -> empty (no "juggernaut" workspace yet)
   printf '{"result":{"workspaces":[]}}\n' > "$resp/5.out"
   # 6: workspace create -> w1, seeding default tab w1:t9 (real herdr returns
   # the seeded tab/pane ids in the SAME response - verified empirically).
-  printf '{"result":{"workspace":{"workspace_id":"w1","label":"firstmate"},"tab":{"tab_id":"w1:t9"},"root_pane":{"pane_id":"w1:p9"}}}\n' > "$resp/6.out"
+  printf '{"result":{"workspace":{"workspace_id":"w1","label":"juggernaut"},"tab":{"tab_id":"w1:t9"},"root_pane":{"pane_id":"w1:p9"}}}\n' > "$resp/6.out"
   fb=$(make_herdr_fakebin "$dir")
   out=$( PATH="$fb:$PATH" JG_HERDR_LOG="$log" JG_HERDR_RESPONSES="$resp" JG_HERDR_SCRIPT_STATUS=1 HERDR_SESSION=fmtest \
     bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_container_ensure /tmp' "$ROOT" )
   [ "$out" = $'fmtest:w1\tw1:t9' ] || fail "container_ensure should echo '<session>:<workspace_id>\\t<seeded_default_tab_id>', got '$out'"
   assert_contains "$(cat "$log")" "HERDR_SESSION=fmtest"$'\x1f''server' "container_ensure did not start the herdr server"
-  assert_contains "$(cat "$log")" $'\x1f''workspace'$'\x1f''create'$'\x1f''--cwd'$'\x1f''/tmp'$'\x1f''--label'$'\x1f''firstmate' \
-    "container_ensure did not create the firstmate workspace with the given cwd"
-  pass "jg_backend_herdr_container_ensure: version-gates, starts the server, ensures the firstmate workspace, echoes session:workspace_id + the seeded default tab id"
+  assert_contains "$(cat "$log")" $'\x1f''workspace'$'\x1f''create'$'\x1f''--cwd'$'\x1f''/tmp'$'\x1f''--label'$'\x1f''juggernaut' \
+    "container_ensure did not create the juggernaut workspace with the given cwd"
+  pass "jg_backend_herdr_container_ensure: version-gates, starts the server, ensures the juggernaut workspace, echoes session:workspace_id + the seeded default tab id"
 }
 
 test_server_ensure_scrubs_home_and_harness_identity() {
@@ -1455,13 +1455,13 @@ test_container_ensure_reuses_existing_workspace() {
   dir="$TMP_ROOT/container-reuse"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
   printf '{"client":{"version":"0.7.1","protocol":14}}\n' > "$resp/1.out"
   printf '{"server":{"running":true}}\n' > "$resp/2.out"
-  printf '{"result":{"workspaces":[{"workspace_id":"w9","label":"firstmate"}]}}\n' > "$resp/3.out"
+  printf '{"result":{"workspaces":[{"workspace_id":"w9","label":"juggernaut"}]}}\n' > "$resp/3.out"
   fb=$(make_herdr_fakebin "$dir")
   out=$( PATH="$fb:$PATH" JG_HERDR_LOG="$log" JG_HERDR_RESPONSES="$resp" JG_HERDR_SCRIPT_STATUS=1 HERDR_SESSION=fmtest \
     bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_container_ensure /tmp' "$ROOT" )
-  [ "$out" = $'fmtest:w9\t' ] || fail "container_ensure should reuse the existing firstmate workspace id with an EMPTY seeded-tab field (an ADOPTED workspace is never a prune candidate), got '$out'"
+  [ "$out" = $'fmtest:w9\t' ] || fail "container_ensure should reuse the existing juggernaut workspace id with an EMPTY seeded-tab field (an ADOPTED workspace is never a prune candidate), got '$out'"
   assert_not_contains "$(cat "$log")" $'\x1f''workspace'$'\x1f''create' "container_ensure should not create a workspace that already exists"
-  pass "jg_backend_herdr_container_ensure: reuses an existing firstmate workspace without recreating it, and reports no seeded default tab (adopted, not created)"
+  pass "jg_backend_herdr_container_ensure: reuses an existing juggernaut workspace without recreating it, and reports no seeded default tab (adopted, not created)"
 }
 
 test_create_task_refuses_duplicate_label() {
@@ -1482,7 +1482,7 @@ test_create_task_refuses_duplicate_label() {
 # herdr persists and restores its whole session layout (workspaces/tabs/
 # panes) across a server restart, including a reboot. A restored jg-<id> task
 # tab comes back a HUSK - a dead pane, or a plain agent-less shell sitting in
-# the saved cwd - never the crewmate that used to be there. Before this fix,
+# the saved cwd - never the operator that used to be there. Before this fix,
 # create_task refused ANY same-labeled tab unconditionally, so every fleet
 # respawn after such a restart needed the operator to manually close each
 # husk pane first. These tests cover the four cases the fix must get right:
@@ -1720,20 +1720,20 @@ test_container_ensure_creates_with_no_focus_flag() {
   printf '{"client":{"version":"0.7.1","protocol":14}}\n' > "$resp/1.out"
   printf '{"server":{"running":true}}\n' > "$resp/2.out"
   printf '{"result":{"workspaces":[]}}\n' > "$resp/3.out"
-  printf '{"result":{"workspace":{"workspace_id":"w1","label":"firstmate"},"tab":{"tab_id":"w1:t1"},"root_pane":{"pane_id":"w1:p1"}}}\n' > "$resp/4.out"
+  printf '{"result":{"workspace":{"workspace_id":"w1","label":"juggernaut"},"tab":{"tab_id":"w1:t1"},"root_pane":{"pane_id":"w1:p1"}}}\n' > "$resp/4.out"
   fb=$(make_herdr_fakebin "$dir")
   out=$( PATH="$fb:$PATH" JG_HERDR_LOG="$log" JG_HERDR_RESPONSES="$resp" JG_HERDR_SCRIPT_STATUS=1 HERDR_SESSION=fmtest \
     bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_container_ensure /tmp' "$ROOT" )
   [ "$out" = $'fmtest:w1\tw1:t1' ] || fail "container_ensure should still echo '<session>:<workspace_id>\\t<seeded_default_tab_id>', got '$out'"
-  assert_contains "$(cat "$log")" $'\x1f''workspace'$'\x1f''create'$'\x1f''--cwd'$'\x1f''/tmp'$'\x1f''--label'$'\x1f''firstmate'$'\x1f''--no-focus' \
+  assert_contains "$(cat "$log")" $'\x1f''workspace'$'\x1f''create'$'\x1f''--cwd'$'\x1f''/tmp'$'\x1f''--label'$'\x1f''juggernaut'$'\x1f''--no-focus' \
     "container_ensure's workspace create did not pass --no-focus (focus-safety: never steal the captain's attention on spawn)"
   pass "jg_backend_herdr_container_ensure: workspace create passes --no-focus"
 }
 
-test_container_ensure_uses_secondmate_home_label() {
+test_container_ensure_uses_squad_lead_home_label() {
   local dir log resp fb out home
-  dir="$TMP_ROOT/container-secondmate-label"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
-  home="$TMP_ROOT/container-secondmate-home"; mkdir -p "$home"; printf 'sshhip-h7\n' > "$home/.jg-secondmate-home"
+  dir="$TMP_ROOT/container-squad-lead-label"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
+  home="$TMP_ROOT/container-squad-lead-home"; mkdir -p "$home"; printf 'sshhip-h7\n' > "$home/.jg-squad-lead-home"
   printf '{"client":{"version":"0.7.1","protocol":14}}\n' > "$resp/1.out"
   printf '{"server":{"running":true}}\n' > "$resp/2.out"
   printf '{"result":{"workspaces":[]}}\n' > "$resp/3.out"
@@ -1743,8 +1743,8 @@ test_container_ensure_uses_secondmate_home_label() {
     bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_container_ensure /tmp' "$ROOT" )
   [ "$out" = $'fmtest:w9\tw9:t1' ] || fail "container_ensure did not echo the expected session:workspace_id + seeded default tab id, got '$out'"
   assert_contains "$(cat "$log")" $'\x1f''workspace'$'\x1f''create'$'\x1f''--cwd'$'\x1f''/tmp'$'\x1f''--label'$'\x1f''2ndmate-sshhip-h7' \
-    "container_ensure did not create the workspace under this secondmate home's own label"
-  pass "jg_backend_herdr_container_ensure: creates the workspace under the SECONDMATE home's own label, not 'firstmate'"
+    "container_ensure did not create the workspace under this squad_lead home's own label"
+  pass "jg_backend_herdr_container_ensure: creates the workspace under the SQUAD_LEAD home's own label, not 'juggernaut'"
 }
 
 test_create_task_creates_with_no_focus_flag() {
@@ -1806,7 +1806,7 @@ SH
 }
 
 # jg_backend_herdr_presentation_enabled is the one gate bin/jg-spawn.sh consults
-# before projecting a crewmate or scout, so these cases pin the default-on
+# before projecting a operator or scout, so these cases pin the default-on
 # contract, its explicit opt-out, its explicit opt-in, and the version floor
 # that decides the unconfigured default at that interface.
 presentation_enabled_verdict() {  # <config-dir> <fakebin> [state-dir] [session] -> "on"/"off"
@@ -2142,7 +2142,7 @@ test_projection_journal_v2_binds_and_advances_exact_endpoint() {
     home=$(jg_backend_herdr_projection_home_identity "$2") || exit 1
     label=$(jg_backend_herdr_projection_workspace_label jg-hibit-r1 "$token")
     jg_backend_herdr_projection_journal_bind \
-      "$journal" jg-hibit-r1 "$home" lab-session w2 w2:t2 w2:p2 w1 firstmate "$label" jg-jg-hibit-r1 || exit 1
+      "$journal" jg-hibit-r1 "$home" lab-session w2 w2:t2 w2:p2 w1 juggernaut "$label" jg-jg-hibit-r1 || exit 1
     jg_backend_herdr_projection_journal_snapshot "$journal" jg-hibit-r1 || exit 1
     printf "%s|%s|%s|%s|%s|%s|%s\n" \
       "$JG_BACKEND_HERDR_JOURNAL_VERSION" \
@@ -3288,26 +3288,26 @@ test_projection_seeded_prune_refuses_active_tab() {
 }
 
 test_projection_label_builder_uses_corner_and_strips_owner_prefixes() {
-  local primary secondmate token
+  local primary squad_lead token
   token='AbCdEfGhIjKlMnOpQrStUv'
   [ "${#token}" -eq 22 ] || fail "fixture token must be 22 characters"
   primary=$(bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_projection_workspace_label task-p2 '"$token" "$ROOT")
   [ "$primary" = "└ task-p2 · p:$token" ] \
     || fail "primary child label was wrong: $primary"
-  secondmate=$(bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_projection_workspace_label secondmate-child-demo '"$token" "$ROOT")
-  [ "$secondmate" = "└ secondmate-child-demo · p:$token" ] \
-    || fail "secondmate child label was wrong: $secondmate"
-  primary=$(bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_projection_workspace_label firstmate/task-p2 '"$token" "$ROOT")
+  squad_lead=$(bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_projection_workspace_label squad-lead-child-demo '"$token" "$ROOT")
+  [ "$squad_lead" = "└ squad-lead-child-demo · p:$token" ] \
+    || fail "squad_lead child label was wrong: $squad_lead"
+  primary=$(bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_projection_workspace_label juggernaut/task-p2 '"$token" "$ROOT")
   [ "$primary" = "└ task-p2 · p:$token" ] \
-    || fail "firstmate/ owner prefix was not stripped: $primary"
-  secondmate=$(bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_projection_workspace_label 2ndmate-fmdev-f2/child '"$token" "$ROOT")
-  [ "$secondmate" = "└ child · p:$token" ] \
-    || fail "2ndmate owner prefix was not stripped: $secondmate"
+    || fail "juggernaut/ owner prefix was not stripped: $primary"
+  squad_lead=$(bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_projection_workspace_label 2ndmate-fmdev-f2/child '"$token" "$ROOT")
+  [ "$squad_lead" = "└ child · p:$token" ] \
+    || fail "2ndmate owner prefix was not stripped: $squad_lead"
   primary=$(bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_projection_workspace_label jg-task-p2 '"$token" "$ROOT")
   [ "$primary" = "└ task-p2 · p:$token" ] \
     || fail "presentation jg- owner prefix was not stripped: $primary"
   case "$primary" in $'└ '*) ;; *) fail "label must start with U+2514 and one space" ;; esac
-  pass "herdr presentation labels: └ concise-task · p:<full-token> for primary and secondmate children"
+  pass "herdr presentation labels: └ concise-task · p:<full-token> for primary and squad_lead children"
 }
 
 test_projection_order_moves_only_exact_new_workspace_and_preserves_relative_order() {
@@ -3315,7 +3315,7 @@ test_projection_order_moves_only_exact_new_workspace_and_preserves_relative_orde
   dir="$TMP_ROOT/projection-order"; mkdir -p "$dir/responses"
   log="$dir/log"; resp="$dir/responses"; mover="$dir/mover"; mover_log="$dir/mover.log"
   : > "$log"; : > "$mover_log"
-  printf '%s\n' '{"result":{"workspaces":[{"workspace_id":"w1","label":"firstmate","focused":false},{"workspace_id":"w2","label":"firstmate/old · p:AbCdEfGhIjKlMnOpQrStUv","focused":false},{"workspace_id":"w3","label":"2ndmate-alpha","focused":false},{"workspace_id":"w4","label":"2ndmate-bravo","focused":true},{"workspace_id":"w5","label":"└ new · p:ZyXwVuTsRqPoNmLkJiHgFe","focused":false}]}}' > "$resp/1.out"
+  printf '%s\n' '{"result":{"workspaces":[{"workspace_id":"w1","label":"juggernaut","focused":false},{"workspace_id":"w2","label":"juggernaut/old · p:AbCdEfGhIjKlMnOpQrStUv","focused":false},{"workspace_id":"w3","label":"2ndmate-alpha","focused":false},{"workspace_id":"w4","label":"2ndmate-bravo","focused":true},{"workspace_id":"w5","label":"└ new · p:ZyXwVuTsRqPoNmLkJiHgFe","focused":false}]}}' > "$resp/1.out"
   printf '%s\n' '{"client":{"version":"0.7.4","protocol":16},"server":{"running":true}}' > "$resp/2.out"
   # shellcheck disable=SC2016 # $defs is a literal JSON Schema key.
   printf '%s\n' '{"schemas":{"request":{"oneOf":[{"properties":{"method":{"const":"workspace.move"}}}],"$defs":{"WorkspaceMoveParams":{"required":["workspace_id","insert_index"],"properties":{"insert_index":{"type":"integer"}}}}}}}' > "$resp/3.out"
@@ -3323,13 +3323,13 @@ test_projection_order_moves_only_exact_new_workspace_and_preserves_relative_orde
   cat > "$mover" <<'SH'
 #!/usr/bin/env bash
 printf '%s\t%s\t%s\n' "$1" "$2" "$3" >> "$JG_FAKE_MOVER_LOG"
-printf '%s\n' '{"id":"jg-workspace-move","result":{"type":"workspace_list","workspaces":[{"workspace_id":"w1","label":"firstmate","focused":false},{"workspace_id":"w2","label":"firstmate/old · p:AbCdEfGhIjKlMnOpQrStUv","focused":false},{"workspace_id":"w5","label":"└ new · p:ZyXwVuTsRqPoNmLkJiHgFe","focused":false},{"workspace_id":"w3","label":"2ndmate-alpha","focused":false},{"workspace_id":"w4","label":"2ndmate-bravo","focused":true}]}}'
+printf '%s\n' '{"id":"jg-workspace-move","result":{"type":"workspace_list","workspaces":[{"workspace_id":"w1","label":"juggernaut","focused":false},{"workspace_id":"w2","label":"juggernaut/old · p:AbCdEfGhIjKlMnOpQrStUv","focused":false},{"workspace_id":"w5","label":"└ new · p:ZyXwVuTsRqPoNmLkJiHgFe","focused":false},{"workspace_id":"w3","label":"2ndmate-alpha","focused":false},{"workspace_id":"w4","label":"2ndmate-bravo","focused":true}]}}'
 SH
   chmod +x "$mover"
   fb=$(make_herdr_fakebin "$dir")
   out=$(PATH="$fb:$PATH" JG_HERDR_LOG="$log" JG_HERDR_RESPONSES="$resp" JG_HERDR_SCRIPT_STATUS=1 \
     JG_BACKEND_HERDR_WORKSPACE_MOVER="$mover" JG_FAKE_MOVER_LOG="$mover_log" \
-    bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_projection_focus_snapshot() { printf "w4\tw4:t2"; }; jg_backend_herdr_projection_focus_restore() { return 0; }; jg_backend_herdr_projection_order_best_effort fmtest w5 firstmate' "$ROOT" 2>&1)
+    bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_projection_focus_snapshot() { printf "w4\tw4:t2"; }; jg_backend_herdr_projection_focus_restore() { return 0; }; jg_backend_herdr_projection_order_best_effort fmtest w5 juggernaut' "$ROOT" 2>&1)
   status=$?
   [ "$status" -eq 0 ] || fail "best-effort projection ordering must not fail the spawn"
   [ -z "$out" ] || fail "successful projection ordering emitted a warning: $out"
@@ -3341,13 +3341,13 @@ SH
   pass "herdr presentation ordering: exact new workspace appends to the primary block while focus and relative orders stay stable"
 }
 
-test_projection_order_secondmate_parent_block() {
+test_projection_order_squad_lead_parent_block() {
   local dir log resp fb mover mover_log out status
-  dir="$TMP_ROOT/projection-order-secondmate"; mkdir -p "$dir/responses"
+  dir="$TMP_ROOT/projection-order-squad-lead"; mkdir -p "$dir/responses"
   log="$dir/log"; resp="$dir/responses"; mover="$dir/mover"; mover_log="$dir/mover.log"
   : > "$log"; : > "$mover_log"
-  # firstmate, primary child, 2ndmate-A, A-child legacy, 2ndmate-B, human, NEW for A
-  printf '%s\n' '{"result":{"workspaces":[{"workspace_id":"w1","label":"firstmate"},{"workspace_id":"w2","label":"└ primary · p:AbCdEfGhIjKlMnOpQrStUv"},{"workspace_id":"w3","label":"2ndmate-alpha"},{"workspace_id":"w4","label":"2ndmate-alpha/old · p:AbCdEfGhIjKlMnOpQrStU1"},{"workspace_id":"w5","label":"2ndmate-bravo"},{"workspace_id":"wH","label":"human-notes"},{"workspace_id":"w6","label":"└ new-a · p:ZyXwVuTsRqPoNmLkJiHgFe"}]}}' > "$resp/1.out"
+  # juggernaut, primary child, 2ndmate-A, A-child legacy, 2ndmate-B, human, NEW for A
+  printf '%s\n' '{"result":{"workspaces":[{"workspace_id":"w1","label":"juggernaut"},{"workspace_id":"w2","label":"└ primary · p:AbCdEfGhIjKlMnOpQrStUv"},{"workspace_id":"w3","label":"2ndmate-alpha"},{"workspace_id":"w4","label":"2ndmate-alpha/old · p:AbCdEfGhIjKlMnOpQrStU1"},{"workspace_id":"w5","label":"2ndmate-bravo"},{"workspace_id":"wH","label":"human-notes"},{"workspace_id":"w6","label":"└ new-a · p:ZyXwVuTsRqPoNmLkJiHgFe"}]}}' > "$resp/1.out"
   printf '%s\n' '{"client":{"version":"0.7.4","protocol":16},"server":{"running":true}}' > "$resp/2.out"
   # shellcheck disable=SC2016
   printf '%s\n' '{"schemas":{"request":{"oneOf":[{"properties":{"method":{"const":"workspace.move"}}}],"$defs":{"WorkspaceMoveParams":{"required":["workspace_id","insert_index"],"properties":{"insert_index":{"type":"integer"}}}}}}}' > "$resp/3.out"
@@ -3355,7 +3355,7 @@ test_projection_order_secondmate_parent_block() {
   cat > "$mover" <<'SH'
 #!/usr/bin/env bash
 printf '%s\t%s\t%s\n' "$1" "$2" "$3" >> "$JG_FAKE_MOVER_LOG"
-printf '%s\n' '{"id":"jg-workspace-move","result":{"type":"workspace_list","workspaces":[{"workspace_id":"w1","label":"firstmate"},{"workspace_id":"w2","label":"└ primary · p:AbCdEfGhIjKlMnOpQrStUv"},{"workspace_id":"w3","label":"2ndmate-alpha"},{"workspace_id":"w4","label":"2ndmate-alpha/old · p:AbCdEfGhIjKlMnOpQrStU1"},{"workspace_id":"w6","label":"└ new-a · p:ZyXwVuTsRqPoNmLkJiHgFe"},{"workspace_id":"w5","label":"2ndmate-bravo"},{"workspace_id":"wH","label":"human-notes"}]}}'
+printf '%s\n' '{"id":"jg-workspace-move","result":{"type":"workspace_list","workspaces":[{"workspace_id":"w1","label":"juggernaut"},{"workspace_id":"w2","label":"└ primary · p:AbCdEfGhIjKlMnOpQrStUv"},{"workspace_id":"w3","label":"2ndmate-alpha"},{"workspace_id":"w4","label":"2ndmate-alpha/old · p:AbCdEfGhIjKlMnOpQrStU1"},{"workspace_id":"w6","label":"└ new-a · p:ZyXwVuTsRqPoNmLkJiHgFe"},{"workspace_id":"w5","label":"2ndmate-bravo"},{"workspace_id":"wH","label":"human-notes"}]}}'
 SH
   chmod +x "$mover"
   fb=$(make_herdr_fakebin "$dir")
@@ -3363,19 +3363,19 @@ SH
     JG_BACKEND_HERDR_WORKSPACE_MOVER="$mover" JG_FAKE_MOVER_LOG="$mover_log" \
     bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_projection_focus_snapshot() { printf "w5\tw5:t1"; }; jg_backend_herdr_projection_focus_restore() { return 0; }; jg_backend_herdr_projection_order_best_effort fmtest w6 2ndmate-alpha' "$ROOT" 2>&1)
   status=$?
-  [ "$status" -eq 0 ] || fail "secondmate parent ordering must not fail the spawn: $out"
-  [ -z "$out" ] || fail "successful secondmate ordering emitted a warning: $out"
+  [ "$status" -eq 0 ] || fail "squad_lead parent ordering must not fail the spawn: $out"
+  [ -z "$out" ] || fail "successful squad_lead ordering emitted a warning: $out"
   [ "$(cat "$mover_log")" = "$(cd /tmp && pwd -P)/fmtest.sock"$'\t'"w6"$'\t'"4" ] \
-    || fail "secondmate child was not inserted after its parent block: $(cat "$mover_log")"
-  assert_not_contains "$(cat "$log")" $'workspace\x1frename' "secondmate ordering renamed a legacy child"
-  pass "herdr presentation ordering: secondmate children append under their owning parent block"
+    || fail "squad_lead child was not inserted after its parent block: $(cat "$mover_log")"
+  assert_not_contains "$(cat "$log")" $'workspace\x1frename' "squad_lead ordering renamed a legacy child"
+  pass "herdr presentation ordering: squad_lead children append under their owning parent block"
 }
 
 test_projection_order_foreign_legacy_child_is_read_only() {
   local dir log resp fb mover out status
   dir="$TMP_ROOT/projection-order-foreign-legacy"; mkdir -p "$dir/responses"
   log="$dir/log"; resp="$dir/responses"; mover="$dir/mover"; : > "$log"
-  printf '%s\n' '{"result":{"workspaces":[{"workspace_id":"w1","label":"firstmate"},{"workspace_id":"w2","label":"2ndmate-alpha"},{"workspace_id":"w3","label":"2ndmate-bravo/foreign · p:AbCdEfGhIjKlMnOpQrStUv"},{"workspace_id":"w4","label":"└ new-alpha · p:ZyXwVuTsRqPoNmLkJiHgFe"}]}}' > "$resp/1.out"
+  printf '%s\n' '{"result":{"workspaces":[{"workspace_id":"w1","label":"juggernaut"},{"workspace_id":"w2","label":"2ndmate-alpha"},{"workspace_id":"w3","label":"2ndmate-bravo/foreign · p:AbCdEfGhIjKlMnOpQrStUv"},{"workspace_id":"w4","label":"└ new-alpha · p:ZyXwVuTsRqPoNmLkJiHgFe"}]}}' > "$resp/1.out"
   cat > "$mover" <<'SH'
 #!/usr/bin/env bash
 echo called > "$JG_FAKE_MOVER_CALLED"
@@ -3401,7 +3401,7 @@ test_projection_order_allows_intervening_parent_child_block() {
   dir="$TMP_ROOT/projection-order-intervening-parent"; mkdir -p "$dir/responses"
   log="$dir/log"; resp="$dir/responses"; mover="$dir/mover"; mover_log="$dir/mover.log"
   : > "$log"; : > "$mover_log"
-  printf '%s\n' '{"result":{"workspaces":[{"workspace_id":"w1","label":"firstmate"},{"workspace_id":"w2","label":"firstmate/old · p:AbCdEfGhIjKlMnOpQrStUv"},{"workspace_id":"w3","label":"2ndmate-alpha"},{"workspace_id":"w4","label":"2ndmate-bravo"},{"workspace_id":"w5","label":"└ bravo-child · p:QqWwEeRrTtYyUuIiOoPpAa"},{"workspace_id":"w6","label":"└ new-first · p:ZyXwVuTsRqPoNmLkJiHgFe"}]}}' > "$resp/1.out"
+  printf '%s\n' '{"result":{"workspaces":[{"workspace_id":"w1","label":"juggernaut"},{"workspace_id":"w2","label":"juggernaut/old · p:AbCdEfGhIjKlMnOpQrStUv"},{"workspace_id":"w3","label":"2ndmate-alpha"},{"workspace_id":"w4","label":"2ndmate-bravo"},{"workspace_id":"w5","label":"└ bravo-child · p:QqWwEeRrTtYyUuIiOoPpAa"},{"workspace_id":"w6","label":"└ new-first · p:ZyXwVuTsRqPoNmLkJiHgFe"}]}}' > "$resp/1.out"
   printf '%s\n' '{"client":{"version":"0.7.4","protocol":16},"server":{"running":true}}' > "$resp/2.out"
   # shellcheck disable=SC2016
   printf '%s\n' '{"schemas":{"request":{"oneOf":[{"properties":{"method":{"const":"workspace.move"}}}],"$defs":{"WorkspaceMoveParams":{"required":["workspace_id","insert_index"],"properties":{"insert_index":{"type":"integer"}}}}}}}' > "$resp/3.out"
@@ -3409,13 +3409,13 @@ test_projection_order_allows_intervening_parent_child_block() {
   cat > "$mover" <<'SH'
 #!/usr/bin/env bash
 printf '%s\t%s\t%s\n' "$1" "$2" "$3" >> "$JG_FAKE_MOVER_LOG"
-printf '%s\n' '{"id":"jg-workspace-move","result":{"type":"workspace_list","workspaces":[{"workspace_id":"w1","label":"firstmate"},{"workspace_id":"w2","label":"firstmate/old · p:AbCdEfGhIjKlMnOpQrStUv"},{"workspace_id":"w6","label":"└ new-first · p:ZyXwVuTsRqPoNmLkJiHgFe"},{"workspace_id":"w3","label":"2ndmate-alpha"},{"workspace_id":"w4","label":"2ndmate-bravo"},{"workspace_id":"w5","label":"└ bravo-child · p:QqWwEeRrTtYyUuIiOoPpAa"}]}}'
+printf '%s\n' '{"id":"jg-workspace-move","result":{"type":"workspace_list","workspaces":[{"workspace_id":"w1","label":"juggernaut"},{"workspace_id":"w2","label":"juggernaut/old · p:AbCdEfGhIjKlMnOpQrStUv"},{"workspace_id":"w6","label":"└ new-first · p:ZyXwVuTsRqPoNmLkJiHgFe"},{"workspace_id":"w3","label":"2ndmate-alpha"},{"workspace_id":"w4","label":"2ndmate-bravo"},{"workspace_id":"w5","label":"└ bravo-child · p:QqWwEeRrTtYyUuIiOoPpAa"}]}}'
 SH
   chmod +x "$mover"
   fb=$(make_herdr_fakebin "$dir")
   out=$(PATH="$fb:$PATH" JG_HERDR_LOG="$log" JG_HERDR_RESPONSES="$resp" JG_HERDR_SCRIPT_STATUS=1 \
     JG_BACKEND_HERDR_WORKSPACE_MOVER="$mover" JG_FAKE_MOVER_LOG="$mover_log" \
-    bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_projection_focus_snapshot() { printf "w4\tw4:t1"; }; jg_backend_herdr_projection_focus_restore() { return 0; }; jg_backend_herdr_projection_order_best_effort fmtest w6 firstmate' "$ROOT" 2>&1)
+    bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_projection_focus_snapshot() { printf "w4\tw4:t1"; }; jg_backend_herdr_projection_focus_restore() { return 0; }; jg_backend_herdr_projection_order_best_effort fmtest w6 juggernaut' "$ROOT" 2>&1)
   status=$?
   [ "$status" -eq 0 ] || fail "intervening parent ordering must not fail the spawn: $out"
   [ -z "$out" ] || fail "legitimate intervening parent ordering emitted a warning: $out"
@@ -3429,7 +3429,7 @@ test_projection_order_human_spaces_never_move_targets() {
   dir="$TMP_ROOT/projection-order-human"; mkdir -p "$dir/responses"
   log="$dir/log"; resp="$dir/responses"; mover="$dir/mover"; mover_log="$dir/mover.log"
   : > "$log"; : > "$mover_log"
-  printf '%s\n' '{"result":{"workspaces":[{"workspace_id":"wH1","label":"notes"},{"workspace_id":"w1","label":"firstmate"},{"workspace_id":"wH2","label":"scratch"},{"workspace_id":"w2","label":"2ndmate-alpha"},{"workspace_id":"w3","label":"└ new · p:ZyXwVuTsRqPoNmLkJiHgFe"}]}}' > "$resp/1.out"
+  printf '%s\n' '{"result":{"workspaces":[{"workspace_id":"wH1","label":"notes"},{"workspace_id":"w1","label":"juggernaut"},{"workspace_id":"wH2","label":"scratch"},{"workspace_id":"w2","label":"2ndmate-alpha"},{"workspace_id":"w3","label":"└ new · p:ZyXwVuTsRqPoNmLkJiHgFe"}]}}' > "$resp/1.out"
   printf '%s\n' '{"client":{"version":"0.7.4","protocol":16},"server":{"running":true}}' > "$resp/2.out"
   # shellcheck disable=SC2016
   printf '%s\n' '{"schemas":{"request":{"oneOf":[{"properties":{"method":{"const":"workspace.move"}}}],"$defs":{"WorkspaceMoveParams":{"required":["workspace_id","insert_index"],"properties":{"insert_index":{"type":"integer"}}}}}}}' > "$resp/3.out"
@@ -3437,13 +3437,13 @@ test_projection_order_human_spaces_never_move_targets() {
   cat > "$mover" <<'SH'
 #!/usr/bin/env bash
 printf '%s\t%s\t%s\n' "$1" "$2" "$3" >> "$JG_FAKE_MOVER_LOG"
-printf '%s\n' '{"id":"jg-workspace-move","result":{"type":"workspace_list","workspaces":[{"workspace_id":"wH1","label":"notes"},{"workspace_id":"w1","label":"firstmate"},{"workspace_id":"w3","label":"└ new · p:ZyXwVuTsRqPoNmLkJiHgFe"},{"workspace_id":"wH2","label":"scratch"},{"workspace_id":"w2","label":"2ndmate-alpha"}]}}'
+printf '%s\n' '{"id":"jg-workspace-move","result":{"type":"workspace_list","workspaces":[{"workspace_id":"wH1","label":"notes"},{"workspace_id":"w1","label":"juggernaut"},{"workspace_id":"w3","label":"└ new · p:ZyXwVuTsRqPoNmLkJiHgFe"},{"workspace_id":"wH2","label":"scratch"},{"workspace_id":"w2","label":"2ndmate-alpha"}]}}'
 SH
   chmod +x "$mover"
   fb=$(make_herdr_fakebin "$dir")
   out=$(PATH="$fb:$PATH" JG_HERDR_LOG="$log" JG_HERDR_RESPONSES="$resp" JG_HERDR_SCRIPT_STATUS=1 \
     JG_BACKEND_HERDR_WORKSPACE_MOVER="$mover" JG_FAKE_MOVER_LOG="$mover_log" \
-    bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_projection_focus_snapshot() { printf "w2\tw2:t1"; }; jg_backend_herdr_projection_focus_restore() { return 0; }; jg_backend_herdr_projection_order_best_effort fmtest w3 firstmate' "$ROOT" 2>&1)
+    bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_projection_focus_snapshot() { printf "w2\tw2:t1"; }; jg_backend_herdr_projection_focus_restore() { return 0; }; jg_backend_herdr_projection_order_best_effort fmtest w3 juggernaut' "$ROOT" 2>&1)
   status=$?
   [ "$status" -eq 0 ] || fail "human-interleaved ordering must not fail: $out"
   [ "$(cat "$mover_log")" = "$(cd /tmp && pwd -P)/fmtest.sock"$'\t'"w3"$'\t'"2" ] \
@@ -3461,7 +3461,7 @@ test_workspace_lineage_report_declares_exact_parent_and_kind_tokens() {
   status=$?
   [ "$status" -eq 0 ] || fail "successful lineage reporting must not fail"
   [ -z "$out" ] || fail "successful lineage reporting emitted output: $out"
-  assert_contains "$(cat "$log")" "HERDR_SESSION=fmtest"$'\x1f'"workspace"$'\x1f'"report-metadata"$'\x1f'"w9"$'\x1f'"--source"$'\x1f'"firstmate"$'\x1f'"--token"$'\x1f'"parent=w1"$'\x1f'"--token"$'\x1f'"kind=task" \
+  assert_contains "$(cat "$log")" "HERDR_SESSION=fmtest"$'\x1f'"workspace"$'\x1f'"report-metadata"$'\x1f'"w9"$'\x1f'"--source"$'\x1f'"juggernaut"$'\x1f'"--token"$'\x1f'"parent=w1"$'\x1f'"--token"$'\x1f'"kind=task" \
     "lineage report did not send the exact producer declaration: $(cat "$log")"
   assert_contains "$(cat "$log")" $'\x1f''kind=task'$'\x1f''--session'$'\x1f''fmtest' \
     "lineage report did not route through the named session"
@@ -3506,7 +3506,7 @@ test_projection_order_failure_warns_without_cleanup_or_spawn_failure() {
   local dir log resp fb mover out status
   dir="$TMP_ROOT/projection-order-failure"; mkdir -p "$dir/responses"
   log="$dir/log"; resp="$dir/responses"; mover="$dir/mover"; : > "$log"
-  printf '%s\n' '{"result":{"workspaces":[{"workspace_id":"w1","label":"firstmate","focused":true},{"workspace_id":"w2","label":"2ndmate-alpha","focused":false},{"workspace_id":"w3","label":"└ new · p:ZyXwVuTsRqPoNmLkJiHgFe","focused":false}]}}' > "$resp/1.out"
+  printf '%s\n' '{"result":{"workspaces":[{"workspace_id":"w1","label":"juggernaut","focused":true},{"workspace_id":"w2","label":"2ndmate-alpha","focused":false},{"workspace_id":"w3","label":"└ new · p:ZyXwVuTsRqPoNmLkJiHgFe","focused":false}]}}' > "$resp/1.out"
   printf '%s\n' '{"client":{"version":"0.7.4","protocol":16},"server":{"running":true}}' > "$resp/2.out"
   # shellcheck disable=SC2016 # $defs is a literal JSON Schema key.
   printf '%s\n' '{"schemas":{"request":{"oneOf":[{"properties":{"method":{"const":"workspace.move"}}}],"$defs":{"WorkspaceMoveParams":{"required":["workspace_id","insert_index"],"properties":{"insert_index":{"type":"integer"}}}}}}}' > "$resp/3.out"
@@ -3519,7 +3519,7 @@ SH
   fb=$(make_herdr_fakebin "$dir")
   out=$(PATH="$fb:$PATH" JG_HERDR_LOG="$log" JG_HERDR_RESPONSES="$resp" JG_HERDR_SCRIPT_STATUS=1 \
     JG_BACKEND_HERDR_WORKSPACE_MOVER="$mover" \
-    bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_projection_focus_snapshot() { printf "w1\tw1:t1"; }; jg_backend_herdr_projection_focus_restore() { return 0; }; jg_backend_herdr_projection_order_best_effort fmtest w3 firstmate' "$ROOT" 2>&1)
+    bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_projection_focus_snapshot() { printf "w1\tw1:t1"; }; jg_backend_herdr_projection_focus_restore() { return 0; }; jg_backend_herdr_projection_order_best_effort fmtest w3 juggernaut' "$ROOT" 2>&1)
   status=$?
   [ "$status" -eq 0 ] || fail "a workspace.move failure must not fail the projected spawn"
   assert_contains "$out" "workspace move failed or had an ambiguous response" \
@@ -3535,7 +3535,7 @@ test_projection_order_ambiguous_existing_block_is_read_only() {
   dir="$TMP_ROOT/projection-order-ambiguous"; mkdir -p "$dir/responses"
   log="$dir/log"; resp="$dir/responses"; mover="$dir/mover"; : > "$log"
   # Detached legacy child after the next parent breaks the contiguous block.
-  printf '%s\n' '{"result":{"workspaces":[{"workspace_id":"w1","label":"firstmate","focused":true},{"workspace_id":"w2","label":"2ndmate-alpha","focused":false},{"workspace_id":"w3","label":"firstmate/old · p:AbCdEfGhIjKlMnOpQrStUv","focused":false},{"workspace_id":"w4","label":"└ new · p:ZyXwVuTsRqPoNmLkJiHgFe","focused":false}]}}' > "$resp/1.out"
+  printf '%s\n' '{"result":{"workspaces":[{"workspace_id":"w1","label":"juggernaut","focused":true},{"workspace_id":"w2","label":"2ndmate-alpha","focused":false},{"workspace_id":"w3","label":"juggernaut/old · p:AbCdEfGhIjKlMnOpQrStUv","focused":false},{"workspace_id":"w4","label":"└ new · p:ZyXwVuTsRqPoNmLkJiHgFe","focused":false}]}}' > "$resp/1.out"
   cat > "$mover" <<'SH'
 #!/usr/bin/env bash
 echo called > "$JG_FAKE_MOVER_CALLED"
@@ -3545,7 +3545,7 @@ SH
   fb=$(make_herdr_fakebin "$dir")
   out=$(PATH="$fb:$PATH" JG_HERDR_LOG="$log" JG_HERDR_RESPONSES="$resp" \
     JG_BACKEND_HERDR_WORKSPACE_MOVER="$mover" JG_FAKE_MOVER_CALLED="$dir/called" \
-    bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_projection_order_best_effort fmtest w4 firstmate' "$ROOT" 2>&1)
+    bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_projection_order_best_effort fmtest w4 juggernaut' "$ROOT" 2>&1)
   status=$?
   [ "$status" -eq 0 ] || fail "ambiguous projection ordering must not fail the spawn"
   assert_contains "$out" "ambiguous workspace layout" "ambiguous projection layout did not warn"
@@ -3557,7 +3557,7 @@ SH
 
 test_projection_order_anchors_the_parent_by_exact_id() {
   local dir log resp fb mover layout out status
-  layout='{"result":{"workspaces":[{"workspace_id":"w1","label":"firstmate","focused":false},{"workspace_id":"w7","label":"firstmate","focused":false},{"workspace_id":"wH","label":"human-notes","focused":false},{"workspace_id":"w8","label":"└ new · p:ZyXwVuTsRqPoNmLkJiHgFe","focused":false}]}}'
+  layout='{"result":{"workspaces":[{"workspace_id":"w1","label":"juggernaut","focused":false},{"workspace_id":"w7","label":"juggernaut","focused":false},{"workspace_id":"wH","label":"human-notes","focused":false},{"workspace_id":"w8","label":"└ new · p:ZyXwVuTsRqPoNmLkJiHgFe","focused":false}]}}'
 
   # Without the exact parent id, two same-labeled parents make the whole layout
   # ambiguous and ordering steps aside.
@@ -3573,7 +3573,7 @@ SH
   fb=$(make_herdr_fakebin "$dir")
   out=$(PATH="$fb:$PATH" JG_HERDR_LOG="$log" JG_HERDR_RESPONSES="$resp" \
     JG_BACKEND_HERDR_WORKSPACE_MOVER="$mover" JG_FAKE_MOVER_CALLED="$dir/called" \
-    bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_projection_order_best_effort fmtest w8 firstmate' "$ROOT" 2>&1)
+    bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_projection_order_best_effort fmtest w8 juggernaut' "$ROOT" 2>&1)
   status=$?
   [ "$status" -eq 0 ] || fail "ambiguous projection ordering must not fail the spawn"
   assert_contains "$out" "ambiguous workspace layout" "a duplicated parent label should make label-anchored ordering step aside"
@@ -3594,7 +3594,7 @@ SH
   fb=$(make_herdr_fakebin "$dir")
   out=$(PATH="$fb:$PATH" JG_HERDR_LOG="$log" JG_HERDR_RESPONSES="$resp" \
     JG_BACKEND_HERDR_WORKSPACE_MOVER="$mover" JG_FAKE_MOVER_CALLED="$dir/called" \
-    bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_projection_order_best_effort fmtest w8 firstmate w7' "$ROOT" 2>&1)
+    bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_projection_order_best_effort fmtest w8 juggernaut w7' "$ROOT" 2>&1)
   status=$?
   [ "$status" -eq 0 ] || fail "exact-parent projection ordering must not fail the spawn"
   assert_not_contains "$out" "ambiguous workspace layout" "the exact parent id should have resolved the duplicated label"
@@ -3607,7 +3607,7 @@ test_projection_order_foreign_new_child_before_parent_is_read_only() {
   local dir log resp fb mover out status
   dir="$TMP_ROOT/projection-order-foreign-new"; mkdir -p "$dir/responses"
   log="$dir/log"; resp="$dir/responses"; mover="$dir/mover"; : > "$log"
-  printf '%s\n' '{"result":{"workspaces":[{"workspace_id":"w1","label":"firstmate","focused":true},{"workspace_id":"wH","label":"human-notes","focused":false},{"workspace_id":"w2","label":"└ foreign · p:AbCdEfGhIjKlMnOpQrStUv","focused":false},{"workspace_id":"w3","label":"2ndmate-alpha","focused":false},{"workspace_id":"w4","label":"└ new · p:ZyXwVuTsRqPoNmLkJiHgFe","focused":false}]}}' > "$resp/1.out"
+  printf '%s\n' '{"result":{"workspaces":[{"workspace_id":"w1","label":"juggernaut","focused":true},{"workspace_id":"wH","label":"human-notes","focused":false},{"workspace_id":"w2","label":"└ foreign · p:AbCdEfGhIjKlMnOpQrStUv","focused":false},{"workspace_id":"w3","label":"2ndmate-alpha","focused":false},{"workspace_id":"w4","label":"└ new · p:ZyXwVuTsRqPoNmLkJiHgFe","focused":false}]}}' > "$resp/1.out"
   cat > "$mover" <<'SH'
 #!/usr/bin/env bash
 echo called > "$JG_FAKE_MOVER_CALLED"
@@ -3617,7 +3617,7 @@ SH
   fb=$(make_herdr_fakebin "$dir")
   out=$(PATH="$fb:$PATH" JG_HERDR_LOG="$log" JG_HERDR_RESPONSES="$resp" \
     JG_BACKEND_HERDR_WORKSPACE_MOVER="$mover" JG_FAKE_MOVER_CALLED="$dir/called" \
-    bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_projection_order_best_effort fmtest w4 firstmate' "$ROOT" 2>&1)
+    bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_projection_order_best_effort fmtest w4 juggernaut' "$ROOT" 2>&1)
   status=$?
   [ "$status" -eq 0 ] || fail "foreign new-child ordering must not fail the spawn"
   assert_contains "$out" "ambiguous workspace layout" "foreign new child before its parent did not warn"
@@ -3631,7 +3631,7 @@ test_projection_order_missing_parent_is_read_only() {
   local dir log resp fb mover out status
   dir="$TMP_ROOT/projection-order-missing-parent"; mkdir -p "$dir/responses"
   log="$dir/log"; resp="$dir/responses"; mover="$dir/mover"; : > "$log"
-  printf '%s\n' '{"result":{"workspaces":[{"workspace_id":"w1","label":"firstmate"},{"workspace_id":"w2","label":"└ new · p:ZyXwVuTsRqPoNmLkJiHgFe"}]}}' > "$resp/1.out"
+  printf '%s\n' '{"result":{"workspaces":[{"workspace_id":"w1","label":"juggernaut"},{"workspace_id":"w2","label":"└ new · p:ZyXwVuTsRqPoNmLkJiHgFe"}]}}' > "$resp/1.out"
   cat > "$mover" <<'SH'
 #!/usr/bin/env bash
 echo called > "$JG_FAKE_MOVER_CALLED"
@@ -3667,7 +3667,7 @@ test_presentation_session_lock_path_is_shared_across_homes() {
     || fail "session lock path resolution failed for home B"
   [ "$path_a" = "$path_b" ] || fail "same session/socket must resolve one shared lock path"
   case "$path_a" in
-    "/tmp/firstmate-herdr-presentation-$(id -u)"/order-*.lock) ;;
+    "/tmp/juggernaut-herdr-presentation-$(id -u)"/order-*.lock) ;;
     *) fail "session lock path must use this account's namespace: $path_a" ;;
   esac
   case "$path_a" in
@@ -3720,7 +3720,7 @@ test_projection_order_rejects_malformed_socket() {
   local dir log resp fb mover out status
   dir="$TMP_ROOT/projection-order-malformed-socket"; mkdir -p "$dir/responses"
   log="$dir/log"; resp="$dir/responses"; mover="$dir/mover"; : > "$log"
-  printf '%s\n' '{"result":{"workspaces":[{"workspace_id":"w1","label":"firstmate"},{"workspace_id":"wH","label":"2ndmate-alpha"},{"workspace_id":"w2","label":"└ new · p:ZyXwVuTsRqPoNmLkJiHgFe"}]}}' > "$resp/1.out"
+  printf '%s\n' '{"result":{"workspaces":[{"workspace_id":"w1","label":"juggernaut"},{"workspace_id":"wH","label":"2ndmate-alpha"},{"workspace_id":"w2","label":"└ new · p:ZyXwVuTsRqPoNmLkJiHgFe"}]}}' > "$resp/1.out"
   printf '%s\n' '{"client":{"version":"0.7.4","protocol":16},"server":{"running":true}}' > "$resp/2.out"
   # shellcheck disable=SC2016
   printf '%s\n' '{"schemas":{"request":{"oneOf":[{"properties":{"method":{"const":"workspace.move"}}}],"$defs":{"WorkspaceMoveParams":{"required":["workspace_id","insert_index"],"properties":{"insert_index":{"type":"integer"}}}}}}}' > "$resp/3.out"
@@ -3734,7 +3734,7 @@ SH
   fb=$(make_herdr_fakebin "$dir")
   out=$(PATH="$fb:$PATH" JG_HERDR_LOG="$log" JG_HERDR_RESPONSES="$resp" JG_HERDR_SCRIPT_STATUS=1 \
     JG_BACKEND_HERDR_WORKSPACE_MOVER="$mover" JG_FAKE_MOVER_CALLED="$dir/called" \
-    bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_projection_order_best_effort fmtest w2 firstmate' "$ROOT" 2>&1)
+    bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_projection_order_best_effort fmtest w2 juggernaut' "$ROOT" 2>&1)
   status=$?
   [ "$status" -eq 0 ] || fail "malformed ordering socket must not fail the spawn"
   assert_contains "$out" "ambiguous named session socket" "malformed ordering socket did not warn"
@@ -3753,7 +3753,7 @@ test_projection_reclaim_refusal_matrix_is_non_mutating() {
     label=$(jg_backend_herdr_projection_workspace_label refusal-r1 "$token")
     jg_backend_herdr_projection_journal_bind \
       "$1/refusal-r1.herdr-presentation" refusal-r1 "$2" fmtest \
-      w2 w2:t2 w2:p2 w1 firstmate "$label" jg-refusal-r1 || exit 1
+      w2 w2:t2 w2:p2 w1 juggernaut "$label" jg-refusal-r1 || exit 1
     printf "%s" "$token"
   ' "$ROOT" "$state" "$home_real") || fail "could not create reclaim refusal fixture"
   journal="$state/refusal-r1.herdr-presentation"
@@ -3785,7 +3785,7 @@ test_projection_reclaim_refusal_matrix_is_non_mutating() {
         }
         set +e
         jg_backend_herdr_projection_reclaim_task \
-          fmtest "$journal" refusal-r1 "$home" w2 w2:t2 w2:p2 firstmate jg-refusal-r1 /tmp/project \
+          fmtest "$journal" refusal-r1 "$home" w2 w2:t2 w2:p2 juggernaut jg-refusal-r1 /tmp/project \
           >/dev/null 2>&1
         rc=$?
         set -e
@@ -3819,17 +3819,17 @@ test_projection_reclaim_replaces_only_exact_husk_and_advances_binding() {
     label=$(jg_backend_herdr_projection_workspace_label jg-hibit-r1 "$token")
     jg_backend_herdr_projection_journal_bind \
       "$1/jg-hibit-r1.herdr-presentation" jg-hibit-r1 "$2" fmtest \
-      w2 w2:t2 w2:p2 w1 firstmate "$label" jg-jg-hibit-r1 || exit 1
+      w2 w2:t2 w2:p2 w1 juggernaut "$label" jg-jg-hibit-r1 || exit 1
     printf "%s" "$token"
   ' "$ROOT" "$state" "$home_real") || fail "could not create exact reclaim journal fixture"
   journal="$state/jg-hibit-r1.herdr-presentation"
   label="└ hibit-r1 · p:$token"
-  printf '%s\n' "{\"result\":{\"workspaces\":[{\"workspace_id\":\"w0\",\"label\":\"firstmate\",\"focused\":false,\"active_tab_id\":\"w0:t1\"},{\"workspace_id\":\"w1\",\"label\":\"firstmate\",\"focused\":true,\"active_tab_id\":\"w1:t1\"},{\"workspace_id\":\"w2\",\"label\":\"$label\",\"focused\":false,\"active_tab_id\":\"w2:t2\"}]}}" > "$resp/1.out"
+  printf '%s\n' "{\"result\":{\"workspaces\":[{\"workspace_id\":\"w0\",\"label\":\"juggernaut\",\"focused\":false,\"active_tab_id\":\"w0:t1\"},{\"workspace_id\":\"w1\",\"label\":\"juggernaut\",\"focused\":true,\"active_tab_id\":\"w1:t1\"},{\"workspace_id\":\"w2\",\"label\":\"$label\",\"focused\":false,\"active_tab_id\":\"w2:t2\"}]}}" > "$resp/1.out"
   printf '%s\n' '{"result":{"tabs":[{"tab_id":"w2:t2","label":"jg-jg-hibit-r1"}]}}' > "$resp/2.out"
   printf '%s\n' '{"result":{"panes":[{"pane_id":"w2:p2","tab_id":"w2:t2"}]}}' > "$resp/3.out"
   printf '%s\n' '{"result":{"pane":{"pane_id":"w2:p2"}}}' > "$resp/4.out"
   printf '%s\n' '{"error":{"code":"agent_not_found"}}' > "$resp/5.out"
-  printf '%s\n' "{\"result\":{\"workspaces\":[{\"workspace_id\":\"w1\",\"label\":\"firstmate\",\"focused\":true,\"active_tab_id\":\"w1:t1\"},{\"workspace_id\":\"w2\",\"label\":\"$label\",\"focused\":false,\"active_tab_id\":\"w2:t2\"}]}}" > "$resp/6.out"
+  printf '%s\n' "{\"result\":{\"workspaces\":[{\"workspace_id\":\"w1\",\"label\":\"juggernaut\",\"focused\":true,\"active_tab_id\":\"w1:t1\"},{\"workspace_id\":\"w2\",\"label\":\"$label\",\"focused\":false,\"active_tab_id\":\"w2:t2\"}]}}" > "$resp/6.out"
   printf '%s\n' '{"result":{"tabs":[{"tab_id":"w1:t1","focused":true}]}}' > "$resp/7.out"
   printf '%s\n' '{"result":{"tab":{"tab_id":"w2:t3"},"root_pane":{"pane_id":"w2:p3"}}}' > "$resp/8.out"
   cp "$resp/6.out" "$resp/9.out"
@@ -3859,7 +3859,7 @@ test_projection_reclaim_replaces_only_exact_husk_and_advances_binding() {
     bash -c '
       . "$0/bin/backends/herdr.sh"
       jg_backend_herdr_projection_reclaim_task \
-        fmtest "$1" jg-hibit-r1 "$2" w2 w2:t2 w2:p2 firstmate jg-jg-hibit-r1 /tmp/project || exit 1
+        fmtest "$1" jg-hibit-r1 "$2" w2 w2:t2 w2:p2 juggernaut jg-jg-hibit-r1 /tmp/project || exit 1
       printf "%s %s" "$JG_BACKEND_HERDR_PROJECTION_TAB_ID" "$JG_BACKEND_HERDR_PROJECTION_PANE_ID"
     ' "$ROOT" "$journal" "$home") || fail "exact agent-free projection reclaim failed"
   [ "$out" = "w2:t3 w2:p3" ] || fail "reclaim did not return exact replacement ids: $out"
@@ -3891,7 +3891,7 @@ test_projection_recovery_is_read_only_and_refuses_live_duplicate_risk() {
   log="$dir/log"; resp="$dir/responses"; : > "$log"
   token=$(bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_projection_journal_create "$1" task-p3' "$ROOT" "$state")
   journal="$state/task-p3.herdr-presentation"
-  printf '{"result":{"workspaces":[{"workspace_id":"w1","label":"firstmate/task-p3 · p:%s"},{"workspace_id":"w2","label":"copy/task-p3 · p:%s"}]}}\n' "$token" "$token" > "$resp/1.out"
+  printf '{"result":{"workspaces":[{"workspace_id":"w1","label":"juggernaut/task-p3 · p:%s"},{"workspace_id":"w2","label":"copy/task-p3 · p:%s"}]}}\n' "$token" "$token" > "$resp/1.out"
   printf '{"result":{"panes":[{"pane_id":"w1:p1","tab_id":"w1:t1"}]}}\n' > "$resp/2.out"
   printf '{"result":{"pane":{"pane_id":"w1:p1"}}}\n' > "$resp/3.out"
   printf '{"error":{"code":"agent_not_found"}}\n' > "$resp/4.out"
@@ -3910,7 +3910,7 @@ test_projection_recovery_is_read_only_and_refuses_live_duplicate_risk() {
   assert_not_contains "$calls" $'pane\x1fclose' "recovery inspection closed a pane"
 
   : > "$log"; rm -f "$resp"/*.out "$resp"/*.exit "$resp/.count"
-  printf '{"result":{"workspaces":[{"workspace_id":"w1","label":"firstmate/task-p3 · p:%s"}]}}\n' "$token" > "$resp/1.out"
+  printf '{"result":{"workspaces":[{"workspace_id":"w1","label":"juggernaut/task-p3 · p:%s"}]}}\n' "$token" > "$resp/1.out"
   printf '{"result":{"panes":[{"pane_id":"w1:p1","tab_id":"w1:t1"}]}}\n' > "$resp/2.out"
   printf '{"result":{"pane":{"pane_id":"w1:p1"}}}\n' > "$resp/3.out"
   printf '{"result":{"agent":{"agent_status":"idle"}}}\n' > "$resp/4.out"
@@ -3930,12 +3930,12 @@ test_projection_recovery_is_read_only_and_refuses_live_duplicate_risk() {
 test_workspace_find_matches_only_this_homes_own_label() {
   local dir log resp fb out home
   dir="$TMP_ROOT/find-scoped"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
-  home="$TMP_ROOT/find-scoped-home"; mkdir -p "$home"; printf 'bravo-b2\n' > "$home/.jg-secondmate-home"
-  # A workspace list carrying BOTH the primary's "firstmate" space and this
-  # secondmate's own "2ndmate-bravo-b2" space (as would be true once several
+  home="$TMP_ROOT/find-scoped-home"; mkdir -p "$home"; printf 'bravo-b2\n' > "$home/.jg-squad-lead-home"
+  # A workspace list carrying BOTH the primary's "juggernaut" space and this
+  # squad_lead's own "2ndmate-bravo-b2" space (as would be true once several
   # homes share one herdr session) - find must pick the one matching THIS
-  # home's own label, never the primary's or a sibling secondmate's.
-  printf '{"result":{"workspaces":[{"workspace_id":"w1","label":"firstmate"},{"workspace_id":"w2","label":"2ndmate-bravo-b2"},{"workspace_id":"w3","label":"2ndmate-alpha-a1"}]}}\n' > "$resp/1.out"
+  # home's own label, never the primary's or a sibling squad_lead's.
+  printf '{"result":{"workspaces":[{"workspace_id":"w1","label":"juggernaut"},{"workspace_id":"w2","label":"2ndmate-bravo-b2"},{"workspace_id":"w3","label":"2ndmate-alpha-a1"}]}}\n' > "$resp/1.out"
   fb=$(make_herdr_fakebin "$dir")
   out=$( PATH="$fb:$PATH" JG_HOME="$home" JG_HERDR_LOG="$log" JG_HERDR_RESPONSES="$resp" \
     bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_workspace_find fmtest' "$ROOT" )
@@ -3948,21 +3948,21 @@ test_workspace_find_matches_only_this_homes_own_label() {
 test_list_live_scoped_to_this_homes_workspace_only() {
   local dir log resp fb out home
   dir="$TMP_ROOT/list-live-scoped"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
-  home="$TMP_ROOT/list-live-scoped-home"; mkdir -p "$home"; printf 'bravo-b2\n' > "$home/.jg-secondmate-home"
-  # 1: workspace_find's `workspace list` - two homes coexist, secondmate's is w2
-  printf '{"result":{"workspaces":[{"workspace_id":"w1","label":"firstmate"},{"workspace_id":"w2","label":"2ndmate-bravo-b2"}]}}\n' > "$resp/1.out"
-  # 2: tab list --workspace w2 (this secondmate's own tabs only)
-  printf '{"result":{"tabs":[{"tab_id":"w2:t1","label":"jg-secondmatetask"}]}}\n' > "$resp/2.out"
+  home="$TMP_ROOT/list-live-scoped-home"; mkdir -p "$home"; printf 'bravo-b2\n' > "$home/.jg-squad-lead-home"
+  # 1: workspace_find's `workspace list` - two homes coexist, squad_lead's is w2
+  printf '{"result":{"workspaces":[{"workspace_id":"w1","label":"juggernaut"},{"workspace_id":"w2","label":"2ndmate-bravo-b2"}]}}\n' > "$resp/1.out"
+  # 2: tab list --workspace w2 (this squad_lead's own tabs only)
+  printf '{"result":{"tabs":[{"tab_id":"w2:t1","label":"jg-squad-leadtask"}]}}\n' > "$resp/2.out"
   # 3: pane_for_tab's `pane list --workspace w2`
   printf '{"result":{"panes":[{"pane_id":"w2:p1","tab_id":"w2:t1"}]}}\n' > "$resp/3.out"
   fb=$(make_herdr_fakebin "$dir")
   out=$( PATH="$fb:$PATH" JG_HOME="$home" JG_HERDR_LOG="$log" JG_HERDR_RESPONSES="$resp" \
     bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_list_live fmtest' "$ROOT" )
-  [ "$out" = $'fmtest:w2:p1\tjg-secondmatetask' ] || fail "list_live should report only this home's own tab, got '$out'"
+  [ "$out" = $'fmtest:w2:p1\tjg-squad-leadtask' ] || fail "list_live should report only this home's own tab, got '$out'"
   assert_contains "$(cat "$log")" $'\x1f''tab'$'\x1f''list'$'\x1f''--workspace'$'\x1f''w2' \
     "list_live did not scope the tab list call to this home's own workspace (w2)"
   assert_not_contains "$(cat "$log")" $'\x1f''tab'$'\x1f''list'$'\x1f''--workspace'$'\x1f''w1' \
-    "list_live must never query the primary's (or a sibling secondmate's) workspace"
+    "list_live must never query the primary's (or a sibling squad_lead's) workspace"
   pass "jg_backend_herdr_list_live: scoped to this home's own workspace, never a sibling home's"
 }
 
@@ -3983,7 +3983,7 @@ test_normalize_key() {
     [ "$(jg_backend_herdr_normalize_key Escape)" = escape ] || exit 1
     [ "$(jg_backend_herdr_normalize_key C-c)" = ctrl+c ] || exit 1
     [ "$(jg_backend_herdr_normalize_key ctrl+c)" = ctrl+c ] || exit 1
-  ) || fail "jg_backend_herdr_normalize_key did not map firstmate's key vocabulary to herdr's verified names"
+  ) || fail "jg_backend_herdr_normalize_key did not map juggernaut's key vocabulary to herdr's verified names"
   pass "jg_backend_herdr_normalize_key: Enter/Escape/C-c map to herdr's verified enter/escape/ctrl+c"
 }
 
@@ -4181,7 +4181,7 @@ SH
 }
 
 # Verified live (2026-10-05): a composer read that hit a herdr which never
-# answered held jg-secondmate-restart open for over an hour. The read must end
+# answered held jg-squad-lead-restart open for over an hour. The read must end
 # within JG_BACKEND_HERDR_READ_TIMEOUT and report unknown. The outer timeout
 # only turns a regression into a failure instead of a hung suite.
 test_composer_state_stalled_read_returns_unknown_within_bound() {
@@ -5498,7 +5498,7 @@ test_send_text_submit_refuses_suffix_when_transcript_still_shows_the_head() {
   pass "jg_backend_herdr_send_text_submit: a matching head in the transcript does not prove the current composer"
 }
 
-# Away-mode digests and marked firstmate steers carry U+2063, which Claude's
+# Away-mode digests and marked juggernaut steers carry U+2063, which Claude's
 # composer read-back on Herdr drops (verified live). The rest of the payload,
 # byte for byte, is still proof; a missing message head is still refused.
 test_send_text_submit_accepts_marked_payloads_whose_read_back_drops_u2063() {
@@ -5602,7 +5602,7 @@ test_send_text_submit_claude_grey_slash_command_is_proven_and_submitted() {
   head=$(printf '%0.s\xe2\x94\x80' $(seq 1 19))
   {
     printf '  \x1b[0m\x1b[38;2;112;112;112m/\x1b[0m\x1b[1m\x1b[38;2;112;112;112mexit\x1b[0m\x1b[38;2;112;112;112m    Exit the CLI\x1b[0m\n'
-    printf '\x1b[0m\x1b[38;2;121;129;134m%s Firstmate operational input 1790546042 \xe2\x94\x80\x1b[0m\n' "$head"
+    printf '\x1b[0m\x1b[38;2;121;129;134m%s Juggernaut operational input 1790546042 \xe2\x94\x80\x1b[0m\n' "$head"
     printf '\xe2\x9d\xaf\xc2\xa0\x1b[0m\x1b[38;2;112;112;112m/exit\x1b[0m\n'
     printf '\x1b[0m\x1b[38;2;121;129;134m%s\x1b[0m\n' "$rule"
     printf '  \x1b[0m\x1b[38;2;86;93;96m\xe2\x8f\xb5\xe2\x8f\xb5 bypass permissions on\x1b[0m\n'
@@ -5870,9 +5870,9 @@ EOF
       ' "$ROOT" "fmtest:$pane" \
       || fail "cycle $i: kill failed"
   done
-  # exactly one firstmate workspace survives three spawn/teardown cycles
-  wscount=$(jq -r '[.workspaces[]|select(.label=="firstmate")]|length' "$state")
-  [ "$wscount" = 1 ] || fail "expected exactly 1 firstmate workspace after 3 cycles, got $wscount: $(jq -c '.workspaces' "$state")"
+  # exactly one juggernaut workspace survives three spawn/teardown cycles
+  wscount=$(jq -r '[.workspaces[]|select(.label=="juggernaut")]|length' "$state")
+  [ "$wscount" = 1 ] || fail "expected exactly 1 juggernaut workspace after 3 cycles, got $wscount: $(jq -c '.workspaces' "$state")"
   # and no orphaned workspaces of any label
   total=$(jq -r '.workspaces|length' "$state")
   [ "$total" = 1 ] || fail "expected no orphaned workspaces after 3 cycles, got $total total: $(jq -c '.workspaces' "$state")"
@@ -5882,7 +5882,7 @@ EOF
   # the workspace was minted once and reused thereafter, never re-created
   created=$(grep -c $'\x1f''workspace'$'\x1f''create' "$log")
   [ "$created" = 1 ] || fail "workspace create should run exactly once across 3 cycles (reuse, not re-mint), ran $created times"
-  pass "herdr repeated spawn/teardown: one persistent firstmate workspace reused, zero orphans, default tab pruned, create ran once"
+  pass "herdr repeated spawn/teardown: one persistent juggernaut workspace reused, zero orphans, default tab pruned, create ran once"
 }
 
 # --- created-vs-adopted default-tab-prune safety (2026-07-02 self-kill fix) -
@@ -5911,7 +5911,7 @@ test_adopted_workspace_never_prunes_default_tab() {
   # previous session created it), with a single tab labeled "1" - the same
   # shape herdr's own auto-seeded default tab has, but this run's own
   # container_ensure never ran a `workspace create` call to produce it.
-  jq -n '{next:2,workspaces:[{workspace_id:"w1",label:"firstmate"}],tabs:[{tab_id:"w1:t1",label:"1",workspace_id:"w1",pane_id:"w1:p1"}],agent_status:{}}' > "$state"
+  jq -n '{next:2,workspaces:[{workspace_id:"w1",label:"juggernaut"}],tabs:[{tab_id:"w1:t1",label:"1",workspace_id:"w1",pane_id:"w1:p1"}],agent_status:{}}' > "$state"
   raw=$( PATH="$fb:$PATH" JG_HERDR_LOG="$log" JG_FAKE_HERDR_STATE="$state" HERDR_SESSION=fmtest \
     bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_container_ensure /proj' "$ROOT" ) \
     || fail "container_ensure failed against the stateful fake"
@@ -5939,21 +5939,21 @@ EOF
 
 test_label_collision_startup_workspace_leaves_live_tab_alone() {
   # The exact live-fire incident shape (2026-07-02): a captain launches herdr
-  # directly inside a directory named "firstmate", so herdr auto-derives that
-  # workspace's DISPLAYED label from the cwd basename - "firstmate" - byte-
-  # identical to the primary firstmate home's own derived label, with no
-  # --label ever passed and no firstmate involvement at all. That workspace's
+  # directly inside a directory named "juggernaut", so herdr auto-derives that
+  # workspace's DISPLAYED label from the cwd basename - "juggernaut" - byte-
+  # identical to the primary juggernaut home's own derived label, with no
+  # --label ever passed and no juggernaut involvement at all. That workspace's
   # single auto-created tab (label "1") holds the captain's own live agent.
-  # The very next crewmate spawn must adopt-and-leave-alone, never prune.
+  # The very next operator spawn must adopt-and-leave-alone, never prune.
   local dir log state fb raw container seeded ids pane
   dir="$TMP_ROOT/label-collision"; mkdir -p "$dir"; log="$dir/log"; state="$dir/state.json"; : > "$log"
   fb=$(make_herdr_statefake "$dir")
-  # Mimic a bare `herdr workspace create --cwd <dir-named-firstmate>` (no
+  # Mimic a bare `herdr workspace create --cwd <dir-named-juggernaut>` (no
   # --label): the resulting workspace's label is the cwd basename, and its
   # one auto-created tab is still labeled "1" - indistinguishable, by label
-  # alone, from firstmate's own freshly-seeded default tab. Its pane hosts a
+  # alone, from juggernaut's own freshly-seeded default tab. Its pane hosts a
   # live agent (agent_status=working), exactly like the captain's own pane.
-  jq -n '{next:2,workspaces:[{workspace_id:"w1",label:"firstmate"}],tabs:[{tab_id:"w1:t1",label:"1",workspace_id:"w1",pane_id:"w1:p1"}],agent_status:{"w1:p1":"working"}}' > "$state"
+  jq -n '{next:2,workspaces:[{workspace_id:"w1",label:"juggernaut"}],tabs:[{tab_id:"w1:t1",label:"1",workspace_id:"w1",pane_id:"w1:p1"}],agent_status:{"w1:p1":"working"}}' > "$state"
   raw=$( PATH="$fb:$PATH" JG_HERDR_LOG="$log" JG_FAKE_HERDR_STATE="$state" HERDR_SESSION=fmtest \
     bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_container_ensure /proj' "$ROOT" ) \
     || fail "container_ensure failed against the stateful fake"
@@ -6325,10 +6325,10 @@ test_version_check_accepts_current_protocol
 test_version_check_refuses_old_protocol
 test_version_check_refuses_missing_herdr
 test_workspace_label_primary_home_no_marker
-test_workspace_label_secondmate_home_uses_marker_id
-test_workspace_label_secondmate_marker_trims_whitespace
+test_workspace_label_squad_lead_home_uses_marker_id
+test_workspace_label_squad_lead_marker_trims_whitespace
 test_workspace_label_empty_marker_falls_back_to_primary
-test_workspace_label_different_secondmates_get_different_labels
+test_workspace_label_different_squad_leads_get_different_labels
 test_cli_helper_sets_env_and_appends_trailing_session_flag
 test_agent_state_bypasses_a_stale_client_shadowing_a_compatible_one
 test_pin_agent_name_scopes_spawn_rename_to_task_session
@@ -6373,7 +6373,7 @@ test_container_ensure_starts_server_and_workspace
 test_server_ensure_scrubs_home_and_harness_identity
 test_container_ensure_reuses_existing_workspace
 test_container_ensure_creates_with_no_focus_flag
-test_container_ensure_uses_secondmate_home_label
+test_container_ensure_uses_squad_lead_home_label
 test_workspace_ensure_prunes_default_tab
 test_repeated_cycles_reuse_one_workspace_no_orphans
 test_adopted_workspace_never_prunes_default_tab
@@ -6438,7 +6438,7 @@ test_kill_refuses_when_presentation_lock_is_unavailable
 test_projection_seeded_prune_refuses_active_tab
 test_projection_label_builder_uses_corner_and_strips_owner_prefixes
 test_projection_order_moves_only_exact_new_workspace_and_preserves_relative_order
-test_projection_order_secondmate_parent_block
+test_projection_order_squad_lead_parent_block
 test_projection_order_foreign_legacy_child_is_read_only
 test_projection_order_allows_intervening_parent_child_block
 test_projection_order_human_spaces_never_move_targets

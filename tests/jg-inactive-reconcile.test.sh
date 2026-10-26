@@ -64,18 +64,18 @@ make_world() { # <name>
   : > "$WORLD/forge.log"
 }
 
-bind_secondmate() { # <local|remote>
+bind_squad_lead() { # <local|remote>
   local route=$1
-  printf 'mate\n' > "$MATE/.jg-secondmate-home"
+  printf 'mate\n' > "$MATE/.jg-squad-lead-home"
   if [ "$route" = local ]; then
-    cat > "$MATE/.jg-secondmate-parent" <<EOF
-schema=jg-secondmate-parent.v1
+    cat > "$MATE/.jg-squad-lead-parent" <<EOF
+schema=jg-squad-lead-parent.v1
 route=local
 parent_home=$MAIN
 EOF
   else
-    cat > "$MATE/.jg-secondmate-parent" <<'EOF'
-schema=jg-secondmate-parent.v1
+    cat > "$MATE/.jg-squad-lead-parent" <<'EOF'
+schema=jg-squad-lead-parent.v1
 route=remote
 EOF
   fi
@@ -89,7 +89,7 @@ write_child() { # <home> <id> <status> [spawn-gen]
   sha=$(git -C "$home/projects/$id" rev-parse HEAD)
   git -C "$home/projects/$id" update-ref refs/remotes/origin/main "$sha"
   jg_write_meta "$home/state/$id.meta" \
-    "window=firstmate:jg-$id" "worktree=$home/projects/$id" "project=$home/projects/$id" \
+    "window=juggernaut:jg-$id" "worktree=$home/projects/$id" "project=$home/projects/$id" \
     'harness=codex' 'kind=ship' 'mode=no-mistakes' 'yolo=off' \
     "spawn_gen=$spawn_gen" 'pr=https://example.test/owner/repo/pull/1' \
     "pr_head=$sha"
@@ -99,7 +99,7 @@ write_child() { # <home> <id> <status> [spawn-gen]
 }
 
 write_mate_meta() {
-  jg_write_secondmate_meta "$MAIN/state/mate.meta" "$MATE"
+  jg_write_squad_lead_meta "$MAIN/state/mate.meta" "$MATE"
   printf 'working: delegated scope\n' > "$MAIN/state/mate.status"
   age "$MAIN/state/mate.meta" "$MAIN/state/mate.status"
 }
@@ -236,7 +236,7 @@ test_branch_ack_retires_inactive_outcome_receipt() {
 # ledger pass reads the child's line before any PR is recorded for it, so the
 # gate tests the worker copy's HEAD.
 test_unpushed_ci_ready_done_is_not_published() {
-  make_world unpushed-ready; bind_secondmate local
+  make_world unpushed-ready; bind_squad_lead local
   write_child "$MATE" child 'done: PR https://example.test/owner/repo/pull/1 checks green, risk low'
   git -C "$MATE/projects/child" commit -q --allow-empty -m 'only in the copy'
   grep -v '^pr=\|^pr_head=' "$MATE/state/child.meta" > "$MATE/state/child.meta.tmp"
@@ -251,7 +251,7 @@ test_unpushed_ci_ready_done_is_not_published() {
 # not pay for the git reachability check again.
 test_delivered_ledger_done_skips_git_gate() {
   local real_git
-  make_world gate-once; bind_secondmate local
+  make_world gate-once; bind_squad_lead local
   write_child "$MATE" child 'done: PR https://example.test/owner/repo/pull/2 checks green'
   real_git=$(command -v git)
   printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" >> %q\nexec %q "$@"\n' \
@@ -268,21 +268,21 @@ test_delivered_ledger_done_skips_git_gate() {
   pass "a delivered ship done: skips the git gate on later polls"
 }
 
-# A secondmate delivers a child's terminal ledger line to the parent on the
+# A squad_lead delivers a child's terminal ledger line to the parent on the
 # very next poll, from the ledger alone: no current-state read, no inactive
 # cadence, and no line appended by the mate model. The delivery carries the
 # child's note, recorded PR, delivery mode, and merge posture, happens once,
 # and takes the outcome away from the inactive path so it is never reported
 # twice.
-test_local_secondmate_delivers_terminal_ledger_line() {
+test_local_squad_lead_delivers_terminal_ledger_line() {
   local expected key
-  make_world local; bind_secondmate local
+  make_world local; bind_squad_lead local
   write_child "$MATE" child 'done: PR https://example.test/owner/repo/pull/1 checks green'
   JG_FAKE_CREW_STATE='unknown' run_reconcile "$MATE"
   key=$(reported_outcome_key "$MATE" child 'done') || fail "ledger receipt did not retain its collision-resistant key"
   expected="done [key=$key]: child child done: PR https://example.test/owner/repo/pull/1 checks green pr=https://example.test/owner/repo/pull/1 mode=no-mistakes yolo=off"
   sed -E 's/ \[at=[0-9]+\]//' "$MAIN/state/mate.status" | grep -Fxq "$expected" \
-    || fail "secondmate did not deliver the child's ledger line on a plain poll: $(cat "$MAIN/state/mate.status" 2>/dev/null)"
+    || fail "squad_lead did not deliver the child's ledger line on a plain poll: $(cat "$MAIN/state/mate.status" 2>/dev/null)"
   [ "$(outcome_count "$MATE" reported)" = 1 ] || fail "ledger delivery receipt was not durable"
   JG_FAKE_CREW_STATE='unknown' run_reconcile "$MATE"
   [ "$(grep -c 'child-outcome-child-done' "$MAIN/state/mate.status")" = 1 ] \
@@ -293,17 +293,17 @@ test_local_secondmate_delivers_terminal_ledger_line() {
   ! grep -q 'inactive-outcome-' "$MAIN/state/mate.status" \
     || fail "the inactive path reported a child the ledger delivery already owned"
   [ "$(outcome_count "$MATE" reported)" = 1 ] || fail "the inactive path minted a second receipt"
-  pass "secondmate delivers a child's terminal ledger line once, on the next poll, from the ledger alone"
+  pass "squad_lead delivers a child's terminal ledger line once, on the next poll, from the ledger alone"
 }
 
 # A terminal record written as a multi-line block belongs to the ledger path
 # whether the block lands before or during the state read: it is delivered once,
 # under the ledger's own outcome key, and the inactive fallback stays out of it.
-test_secondmate_multiline_terminal_outcome_is_delivered_once() {
+test_squad_lead_multiline_terminal_outcome_is_delivered_once() {
   local terminal timing key
   for terminal in 'done' failed; do
     for timing in before during; do
-      make_world "multiline-$terminal-$timing"; bind_secondmate local
+      make_world "multiline-$terminal-$timing"; bind_squad_lead local
       write_child "$MATE" child 'working: finishing validation'
       if [ "$timing" = before ]; then
         printf '%s: validation finished\nSee the report for details.\n\n' "$terminal" >> "$MATE/state/child.status"
@@ -336,8 +336,8 @@ SH
 # A child that dies mid-prose cannot hide an outcome its run already proves: an
 # unterminated continuation line states no terminal event, so the inactive
 # fallback still reports the attributed failure upward.
-test_secondmate_unterminated_prose_reports_run_outcome() {
-  make_world unterminated-prose; bind_secondmate local
+test_squad_lead_unterminated_prose_reports_run_outcome() {
+  make_world unterminated-prose; bind_squad_lead local
   write_child "$MATE" child 'working: compiling'
   printf 'Still going' >> "$MATE/state/child.status"
   age "$MATE/state/child.status"
@@ -358,7 +358,7 @@ test_secondmate_unterminated_prose_reports_run_outcome() {
 # identity binds the incarnation, task, terminal state, and PR only, never the
 # child's last status line.
 test_inactive_receipt_ignores_later_status_prose() {
-  make_world prose-after-outcome; bind_secondmate local
+  make_world prose-after-outcome; bind_squad_lead local
   write_child "$MATE" child 'working: quiet since'
   JG_FAKE_CREW_STATE='failed' run_reconcile "$MATE" --startup
   [ "$(grep -c 'inactive-outcome-mate-child-failed' "$MAIN/state/mate.status")" = 1 ] \
@@ -380,7 +380,7 @@ test_inactive_receipt_ignores_later_status_prose() {
 # retried on the next poll after its lifecycle lock becomes available.
 test_busy_child_does_not_starve_later_ledger_outcomes() {
   local holder i delivered=0
-  make_world busy-ledger; bind_secondmate local
+  make_world busy-ledger; bind_squad_lead local
   write_child "$MATE" a-busy 'done: busy child finished'
   write_child "$MATE" b-ready 'done: later child finished'
   printf 'epoch=%s\ncursor=\n' "$(date +%s)" > "$MATE/state/.inactive-outcome-reconcile"
@@ -412,9 +412,9 @@ test_busy_child_does_not_starve_later_ledger_outcomes() {
 # A scout's done line carries its report pointer, a failed line is delivered
 # under the failed verb, and a later terminal line after recovery is a new
 # delivery rather than a suppressed duplicate.
-test_secondmate_ledger_delivery_carries_report_and_failure() {
+test_squad_lead_ledger_delivery_carries_report_and_failure() {
   local scout_key boom_key replaced_key
-  make_world ledger-shapes; bind_secondmate local
+  make_world ledger-shapes; bind_squad_lead local
   write_child "$MATE" scout 'done: report written'
   mkdir -p "$MATE/data/scout"
   printf '# findings\n' > "$MATE/data/scout/report.md"
@@ -447,7 +447,7 @@ test_secondmate_ledger_delivery_carries_report_and_failure() {
 # ready-signal shape carries one, and a scout never carries one at all.
 test_pr_field_requires_recorded_pr_or_ready_signal_line() {
   local id prose_key ready_key stamped_key placeholder_key scout_key
-  make_world pr-provenance; bind_secondmate local
+  make_world pr-provenance; bind_squad_lead local
   write_child "$MATE" prose $'working: context in https://example.test/other/repo/pull/33\ndone: cleanup finished'
   write_child "$MATE" ready 'done: PR https://example.test/owner/repo/pull/44 checks green'
   write_child "$MATE" stamped 'done [at=1788576000]: PR https://example.test/owner/repo/pull/66 checks green'
@@ -483,7 +483,7 @@ test_pr_field_requires_recorded_pr_or_ready_signal_line() {
 # If a terminal ledger line lands while the authoritative state read is in
 # flight, the ledger path remains the single owner on the next poll.
 test_terminal_line_during_state_read_yields_to_ledger_delivery() {
-  make_world state-ledger-race; bind_secondmate local
+  make_world state-ledger-race; bind_squad_lead local
   write_child "$MATE" child 'working: finishing now'
   cat > "$WORLD/fakebin/jg-crew-state.sh" <<'SH'
 #!/usr/bin/env bash
@@ -508,7 +508,7 @@ SH
 # store reconciles that ledger event with the fallback delivery, while a later
 # same-state completion remains independently deliverable.
 test_terminal_line_after_inactive_delivery_is_not_reported_twice() {
-  make_world inactive-ledger-race; bind_secondmate local
+  make_world inactive-ledger-race; bind_squad_lead local
   write_child "$MATE" child 'working: finishing now'
   JG_FAKE_CREW_STATE='done' run_reconcile "$MATE" --startup
   [ "$(grep -c 'inactive-outcome-mate-child-done' "$MAIN/state/mate.status")" = 1 ] \
@@ -533,7 +533,7 @@ test_terminal_line_after_inactive_delivery_is_not_reported_twice() {
 # An intervening progress line means the next terminal line is a new completion,
 # not a late ledger rendering of the inactive fallback.
 test_progress_after_inactive_delivery_starts_a_new_event() {
-  make_world inactive-recovery; bind_secondmate local
+  make_world inactive-recovery; bind_squad_lead local
   write_child "$MATE" child 'working: first attempt finishing'
   JG_FAKE_CREW_STATE='done' run_reconcile "$MATE" --startup
   printf 'working: retry started\ndone: retry completed\n' >> "$MATE/state/child.status"
@@ -549,7 +549,7 @@ test_progress_after_inactive_delivery_starts_a_new_event() {
 # captain-facing rendering truncates two long notes to the same text.
 test_long_terminal_lines_have_distinct_receipts() {
   local prefix
-  make_world long-ledger; bind_secondmate local
+  make_world long-ledger; bind_squad_lead local
   prefix=$(awk 'BEGIN { for (i = 0; i < 1300; i++) printf "a" }')
   write_child "$MATE" child "failed: ${prefix}one"
   JG_FAKE_CREW_STATE='unknown' run_reconcile "$MATE"
@@ -563,9 +563,9 @@ test_long_terminal_lines_have_distinct_receipts() {
 }
 
 # A line still being appended has no trailing newline yet and must wait.
-test_secondmate_partial_ledger_line_waits_for_newline() {
+test_squad_lead_partial_ledger_line_waits_for_newline() {
   local key
-  make_world partial; bind_secondmate local
+  make_world partial; bind_squad_lead local
   write_child "$MATE" child 'working: nearly there'
   printf 'done: half writ' >> "$MATE/state/child.status"
   age "$MATE/state/child.status"
@@ -585,8 +585,8 @@ test_secondmate_partial_ledger_line_waits_for_newline() {
 
 # The remote route delivers the same line into this home's parent-replies
 # input, once.
-test_secondmate_remote_route_ledger_delivery() {
-  make_world remote-ledger; bind_secondmate remote
+test_squad_lead_remote_route_ledger_delivery() {
+  make_world remote-ledger; bind_squad_lead remote
   write_child "$MATE" child 'done: PR https://example.test/owner/repo/pull/1 checks green'
   JG_FAKE_CREW_STATE='unknown' run_reconcile "$MATE"
   JG_FAKE_CREW_STATE='unknown' run_reconcile "$MATE"
@@ -600,14 +600,14 @@ test_secondmate_remote_route_ledger_delivery() {
 # line instead of re-testing a copy that no longer exists.
 test_pending_ledger_done_is_delivered_after_worktree_removal() {
   local key
-  make_world pending-retry; bind_secondmate local
+  make_world pending-retry; bind_squad_lead local
   write_child "$MATE" child 'done: PR https://example.test/owner/repo/pull/2 checks green'
-  cp "$MATE/.jg-secondmate-parent" "$WORLD/parent-binding"
-  printf 'schema=jg-secondmate-parent.v1\nroute=invalid\n' > "$MATE/.jg-secondmate-parent"
+  cp "$MATE/.jg-squad-lead-parent" "$WORLD/parent-binding"
+  printf 'schema=jg-squad-lead-parent.v1\nroute=invalid\n' > "$MATE/.jg-squad-lead-parent"
   JG_FAKE_CREW_STATE='unknown' run_reconcile "$MATE"
   [ "$(outcome_count "$MATE" pending)" = 1 ] || fail "failed parent write did not leave a pending delivery"
   rm -rf "$MATE/projects/child"
-  cp "$WORLD/parent-binding" "$MATE/.jg-secondmate-parent"
+  cp "$WORLD/parent-binding" "$MATE/.jg-squad-lead-parent"
   run_report "$MATE" child || fail "report refused the pending delivery"
   key=$(reported_outcome_key "$MATE" child 'done') || fail "pending delivery was dropped instead of reported"
   sed -E 's/ \[at=[0-9]+\]//' "$MAIN/state/mate.status" | grep -Fq "done [key=$key]: child child done: PR https://example.test/owner/repo/pull/2 checks green" \
@@ -619,7 +619,7 @@ test_pending_ledger_done_is_delivered_after_worktree_removal() {
 # is owed with 0, and returns non-zero only when the channel cannot be written.
 test_report_subcommand_delivers_and_refuses() {
   local rc key
-  make_world report; bind_secondmate local
+  make_world report; bind_squad_lead local
   write_child "$MATE" child 'done: final word'
   run_report "$MATE" child || fail "report refused a deliverable ledger line"
   key=$(reported_outcome_key "$MATE" child 'done') || fail "report receipt key missing"
@@ -628,7 +628,7 @@ test_report_subcommand_delivers_and_refuses() {
   run_report "$MATE" child || fail "report did not treat an already delivered line as owed nothing"
   write_child "$MATE" quiet 'working: nothing terminal'
   run_report "$MATE" quiet || fail "report refused a child that owes nothing"
-  printf 'schema=jg-secondmate-parent.v1\nroute=invalid\n' > "$MATE/.jg-secondmate-parent"
+  printf 'schema=jg-squad-lead-parent.v1\nroute=invalid\n' > "$MATE/.jg-squad-lead-parent"
   write_child "$MATE" stuck 'failed: cannot reach anyone'
   rc=0
   run_report "$MATE" stuck >/dev/null || rc=$?
@@ -645,7 +645,7 @@ test_report_subcommand_delivers_and_refuses() {
 # must not wait for the scan lock in the opposite order.
 test_report_avoids_scan_meta_lock_inversion() {
   local holder scan_pid report_pid i completed=0
-  make_world report-lock-order; bind_secondmate local
+  make_world report-lock-order; bind_squad_lead local
   write_child "$MATE" child 'done: final word'
   JG_HOME="$MATE" JG_STATE_OVERRIDE="$MATE/state" bash -c '
     . "$1/bin/jg-wake-lib.sh"
@@ -683,10 +683,10 @@ test_report_avoids_scan_meta_lock_inversion() {
   pass "report preserves teardown's metadata-before-scan lock order"
 }
 
-test_local_secondmate_rejects_relative_parent_home() {
-  make_world relative-parent; bind_secondmate local
-  printf 'schema=jg-secondmate-parent.v1\nroute=local\nparent_home=relative-parent\n' \
-    > "$MATE/.jg-secondmate-parent"
+test_local_squad_lead_rejects_relative_parent_home() {
+  make_world relative-parent; bind_squad_lead local
+  printf 'schema=jg-squad-lead-parent.v1\nroute=local\nparent_home=relative-parent\n' \
+    > "$MATE/.jg-squad-lead-parent"
   write_child "$MATE" child 'failed: terminal'
   (cd "$WORLD" && JG_FAKE_CREW_STATE='failed' run_reconcile "$MATE" --startup)
   [ ! -e "$WORLD/relative-parent/state/mate.status" ] \
@@ -700,39 +700,39 @@ test_local_secondmate_rejects_relative_parent_home() {
   pass "relative local parent homes fail closed"
 }
 
-# A present invalid identity marker cannot turn a secondmate home into a main
+# A present invalid identity marker cannot turn a squad_lead home into a main
 # home. The original child state remains available after the routing alarm.
-test_invalid_secondmate_marker_blocks_routing() {
+test_invalid_squad_lead_marker_blocks_routing() {
   local kind out target
   for kind in malformed symlink; do
     make_world "invalid-marker-$kind"
     write_child "$MATE" child 'failed: terminal'
     if [ "$kind" = malformed ]; then
-      printf '../main\n' > "$MATE/.jg-secondmate-home"
+      printf '../main\n' > "$MATE/.jg-squad-lead-home"
     else
       target="$WORLD/marker-target"
       printf 'mate\n' > "$target"
-      ln -s "$target" "$MATE/.jg-secondmate-home"
+      ln -s "$target" "$MATE/.jg-squad-lead-home"
     fi
 
     out=$(JG_FAKE_CREW_STATE='failed' run_reconcile "$MATE" --startup)
-    printf '%s\n' "$out" | grep -Fq 'inactive terminal outcomes remain unreconciled: invalid .jg-secondmate-home marker' \
-      || fail "$kind secondmate marker did not surface the blocked terminal obligation"
+    printf '%s\n' "$out" | grep -Fq 'inactive terminal outcomes remain unreconciled: invalid .jg-squad-lead-home marker' \
+      || fail "$kind squad_lead marker did not surface the blocked terminal obligation"
     [ "$(outcome_count "$MATE" pending)" = 0 ] \
-      || fail "$kind secondmate marker created a main-home pending receipt"
-    [ "$(wake_count "$MATE" 'inactive-reconcile-diagnostic:invalid-secondmate-home')" = 1 ] \
-      || fail "$kind secondmate marker diagnostic was not durably queued"
+      || fail "$kind squad_lead marker created a main-home pending receipt"
+    [ "$(wake_count "$MATE" 'inactive-reconcile-diagnostic:invalid-squad-lead-home')" = 1 ] \
+      || fail "$kind squad_lead marker diagnostic was not durably queued"
     ! grep -Fq 'inactive-outcome:' "$MATE/state/.wake-queue" 2>/dev/null \
-      || fail "$kind secondmate marker routed a captain presentation wake"
+      || fail "$kind squad_lead marker routed a captain presentation wake"
     [ -f "$MATE/state/child.meta" ] && [ -f "$MATE/state/child.status" ] \
-      || fail "$kind secondmate marker lost the terminal obligation"
+      || fail "$kind squad_lead marker lost the terminal obligation"
   done
-  pass "invalid secondmate markers block routing and surface the obligation"
+  pass "invalid squad_lead markers block routing and surface the obligation"
 }
 
 # A remote child route writes the existing mirror input once even across restarts.
 test_remote_parent_reply_is_idempotent() {
-  make_world remote; bind_secondmate remote; write_child "$MATE" child 'working: quiet since'
+  make_world remote; bind_squad_lead remote; write_child "$MATE" child 'working: quiet since'
   JG_FAKE_CREW_STATE='done' run_reconcile "$MATE" --startup
   JG_FAKE_CREW_STATE='done' run_reconcile "$MATE" --startup
   [ "$(grep -c 'inactive-outcome-mate-child-done' "$MATE/state/parent-replies.status")" = 1 ] \
@@ -744,7 +744,7 @@ test_remote_parent_reply_is_idempotent() {
 # Reusing a task id creates a separate receipt for the new spawned worker even
 # when its terminal state and status text match the retired worker exactly.
 test_reused_task_id_reports_each_incarnation() {
-  make_world reused-id; bind_secondmate remote
+  make_world reused-id; bind_squad_lead remote
   write_child "$MATE" child 'working: quiet since' spawn-one
   JG_FAKE_CREW_STATE='failed' run_reconcile "$MATE" --startup
   rm -f "$MATE/state/child.meta" "$MATE/state/child.status" "$MATE/state/child.turn-ended"
@@ -761,7 +761,7 @@ test_reused_task_id_reports_each_incarnation() {
 # the same receipt identity across supported atomic metadata rewrites.
 test_legacy_metadata_rewrite_keeps_receipt_identity() {
   local meta tmp
-  make_world legacy-rewrite; bind_secondmate remote
+  make_world legacy-rewrite; bind_squad_lead remote
   write_child "$MATE" child 'working: quiet since' spawn-old
   meta="$MATE/state/child.meta"
   tmp="$MATE/state/.child.meta.legacy"
@@ -787,7 +787,7 @@ test_legacy_metadata_rewrite_keeps_receipt_identity() {
 # lifecycle lock used by relaunch metadata publication.
 test_relaunch_cannot_replace_metadata_during_state_snapshot() {
   local recon_pid update_pid record i
-  make_world relaunch-race; bind_secondmate remote
+  make_world relaunch-race; bind_squad_lead remote
   write_child "$MATE" child 'working: quiet since' spawn-old
   cat > "$WORLD/fakebin/jg-crew-state.sh" <<'SH'
 #!/usr/bin/env bash
@@ -864,9 +864,9 @@ test_nonterminal_and_captain_held_states_do_not_report() {
   pass "nonterminal and captain-held workers remain outside inactive terminal reporting"
 }
 
-# The actual watcher poll invokes the helper, while an idle secondmate remains
+# The actual watcher poll invokes the helper, while an idle squad_lead remains
 # exempt from wedge escalation and emits no false wake.
-test_watcher_hook_and_idle_secondmate_exemption() {
+test_watcher_hook_and_idle_squad_lead_exemption() {
   local out pid i
   make_world watcher; write_child "$MAIN" child 'done: green'; prime_seen "$MAIN/state" "$MAIN/state/child.status"
   # Signal-first ordering (retro fix 4): an unconsumed turn-ended is a pending
@@ -889,21 +889,21 @@ test_watcher_hook_and_idle_secondmate_exemption() {
   wait "$pid" 2>/dev/null || true
   grep -Fq 'check: inactive-outcome' "$out" || fail "watcher did not surface its reconciliation result"
 
-  make_world idle-secondmate; bind_secondmate local; write_mate_meta; prime_seen "$MAIN/state" "$MAIN/state/mate.status"
+  make_world idle-squad-lead; bind_squad_lead local; write_mate_meta; prime_seen "$MAIN/state" "$MAIN/state/mate.status"
   PATH="$WORLD/fakebin:$PATH" JG_HOME="$MAIN" JG_STATE_OVERRIDE="$MAIN/state" JG_POLL=1 JG_SIGNAL_GRACE=1 \
     JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 "$WATCH" > "$WORLD/idle.out" 2>&1 &
-  pid=$!; sleep 2; kill -0 "$pid" 2>/dev/null || fail "idle secondmate watcher exited unexpectedly"; reap "$pid"
-  grep -F 'stale:' "$WORLD/idle.out" >/dev/null && fail "idle secondmate was treated as a wedge"
-  [ ! -s "$MAIN/state/.wake-queue" ] || fail "idle secondmate emitted a false wake"
-  pass "watcher hook wakes for terminal loss and preserves idle secondmate exemption"
+  pid=$!; sleep 2; kill -0 "$pid" 2>/dev/null || fail "idle squad_lead watcher exited unexpectedly"; reap "$pid"
+  grep -F 'stale:' "$WORLD/idle.out" >/dev/null && fail "idle squad_lead was treated as a wedge"
+  [ ! -s "$MAIN/state/.wake-queue" ] || fail "idle squad_lead emitted a false wake"
+  pass "watcher hook wakes for terminal loss and preserves idle squad_lead exemption"
 }
 
-# The real watcher poll in a secondmate home delivers a child's terminal ledger
+# The real watcher poll in a squad_lead home delivers a child's terminal ledger
 # line to the parent channel on its first cycle, with no line appended by the
 # mate and no wake needed in the mate home for it.
 test_watcher_poll_delivers_child_ledger_line_to_parent() {
   local pid i key
-  make_world watcher-ledger; bind_secondmate local
+  make_world watcher-ledger; bind_squad_lead local
   write_child "$MATE" child 'done: PR https://example.test/owner/repo/pull/1 checks green'
   prime_seen "$MATE/state" "$MATE/state/child.status"
   # Signal-first ordering (retro fix 4): an unconsumed turn-ended wins the
@@ -984,34 +984,34 @@ test_full_scan_budget_includes_wake_lock_wait() {
   pass "aggregate scan budget includes durable wake operations"
 }
 
-# A secondmate home seeded without its parent binding cannot report ANY terminal
+# A squad_lead home seeded without its parent binding cannot report ANY terminal
 # outcome upward, and every later one fails for the same reason. The diagnostic
 # has to name the binding, or three weeks of identical failures read as three
 # weeks of unrelated report failures.
 test_missing_parent_binding_names_itself() {
   local out
   make_world missing-binding
-  printf 'mate\n' > "$MATE/.jg-secondmate-home"
+  printf 'mate\n' > "$MATE/.jg-squad-lead-home"
   write_child "$MATE" child 'done: PR merged'
   write_child "$MATE" quiet 'working: quiet since'
   out=$(JG_FAKE_CREW_STATE='done' run_reconcile "$MATE" --startup)
   case "$out" in
-    *"actionable: child outcome needs parent report: child=child"*".jg-secondmate-parent"*) ;;
+    *"actionable: child outcome needs parent report: child=child"*".jg-squad-lead-parent"*) ;;
     *) fail "a missing parent binding did not name itself for a ledger delivery: $out" ;;
   esac
   case "$out" in
-    *"actionable: inactive terminal outcome needs parent report: child=quiet"*".jg-secondmate-parent"*) ;;
+    *"actionable: inactive terminal outcome needs parent report: child=quiet"*".jg-squad-lead-parent"*) ;;
     *) fail "a missing parent binding did not name itself for an inactive report: $out" ;;
   esac
   [ "$(outcome_count "$MATE" reported)" = 0 ] \
     || fail "an outcome that never reached a parent was recorded as reported"
-  pass "a secondmate home with no parent binding names the missing binding instead of failing quietly"
+  pass "a squad_lead home with no parent binding names the missing binding instead of failing quietly"
 }
 
 test_notice_recovery_does_not_duplicate_wake() {
   local record err seq generation
-  make_world notice-recovery; bind_secondmate remote
-  printf 'schema=jg-secondmate-parent.v1\nroute=invalid\n' > "$MATE/.jg-secondmate-parent"
+  make_world notice-recovery; bind_squad_lead remote
+  printf 'schema=jg-squad-lead-parent.v1\nroute=invalid\n' > "$MATE/.jg-squad-lead-parent"
   write_child "$MATE" child 'working: quiet since'
   JG_FAKE_CREW_STATE='failed' run_reconcile "$MATE" --startup
   [ "$(wake_count "$MATE" 'inactive-reconcile:')" = 1 ] || fail "parent-report failure did not queue one notice"
@@ -1061,11 +1061,11 @@ SH
 # outcome forever. Both the per-poll pass and teardown's own entry point settle it.
 test_cleaned_up_child_receipts_are_settled() {
   local cycle notice_before
-  make_world torn-down; bind_secondmate local
+  make_world torn-down; bind_squad_lead local
   write_child "$MATE" child 'working: still running the pipeline'
   write_child "$MATE" other 'working: still running the pipeline'
   # An unusable parent route leaves both outcomes pending.
-  printf 'schema=jg-secondmate-parent.v1\nroute=invalid\n' > "$MATE/.jg-secondmate-parent"
+  printf 'schema=jg-squad-lead-parent.v1\nroute=invalid\n' > "$MATE/.jg-squad-lead-parent"
   JG_FAKE_CREW_STATE='done' run_reconcile "$MATE" --startup
   [ "$(outcome_count "$MATE" pending)" = 2 ] || fail "broken binding did not leave the outcomes pending"
   notice_before=$(wake_count "$MATE" 'inactive-reconcile:')
@@ -1088,7 +1088,7 @@ test_cleaned_up_child_receipts_are_settled() {
   [ "$(outcome_count "$MATE" pending)" = 2 ] || fail "the second fingerprint did not retain its own receipt"
 
   # Delivery works again: it receipts the current fingerprint, not the earlier.
-  bind_secondmate local
+  bind_squad_lead local
   JG_FAKE_CREW_STATE='done' run_reconcile "$MATE" --startup
   [ "$(outcome_count "$MATE" reported)" = 1 ] || fail "restored binding did not deliver the outcome"
   [ "$(outcome_count "$MATE" pending)" = 1 ] || fail "the earlier fingerprint was not left pending"
@@ -1145,24 +1145,24 @@ test_cleaned_up_child_receipts_are_settled
 test_watcher_drops_a_status_path_retired_before_it_is_reported
 test_unpushed_ci_ready_done_is_not_published
 test_delivered_ledger_done_skips_git_gate
-test_local_secondmate_delivers_terminal_ledger_line
-test_secondmate_multiline_terminal_outcome_is_delivered_once
-test_secondmate_unterminated_prose_reports_run_outcome
+test_local_squad_lead_delivers_terminal_ledger_line
+test_squad_lead_multiline_terminal_outcome_is_delivered_once
+test_squad_lead_unterminated_prose_reports_run_outcome
 test_inactive_receipt_ignores_later_status_prose
 test_busy_child_does_not_starve_later_ledger_outcomes
-test_secondmate_ledger_delivery_carries_report_and_failure
+test_squad_lead_ledger_delivery_carries_report_and_failure
 test_pr_field_requires_recorded_pr_or_ready_signal_line
 test_terminal_line_during_state_read_yields_to_ledger_delivery
 test_terminal_line_after_inactive_delivery_is_not_reported_twice
 test_progress_after_inactive_delivery_starts_a_new_event
 test_long_terminal_lines_have_distinct_receipts
-test_secondmate_partial_ledger_line_waits_for_newline
-test_secondmate_remote_route_ledger_delivery
+test_squad_lead_partial_ledger_line_waits_for_newline
+test_squad_lead_remote_route_ledger_delivery
 test_report_subcommand_delivers_and_refuses
 test_pending_ledger_done_is_delivered_after_worktree_removal
 test_report_avoids_scan_meta_lock_inversion
-test_local_secondmate_rejects_relative_parent_home
-test_invalid_secondmate_marker_blocks_routing
+test_local_squad_lead_rejects_relative_parent_home
+test_invalid_squad_lead_marker_blocks_routing
 test_remote_parent_reply_is_idempotent
 test_reused_task_id_reports_each_incarnation
 test_legacy_metadata_rewrite_keeps_receipt_identity
@@ -1170,7 +1170,7 @@ test_relaunch_cannot_replace_metadata_during_state_snapshot
 test_heartbeat_cap_does_not_delay_reconciliation
 test_scan_marker_replaces_symlink_safely
 test_nonterminal_and_captain_held_states_do_not_report
-test_watcher_hook_and_idle_secondmate_exemption
+test_watcher_hook_and_idle_squad_lead_exemption
 test_watcher_poll_delivers_child_ledger_line_to_parent
 test_stalled_state_read_is_bounded_and_scan_progresses
 test_full_scan_budget_includes_wake_lock_wait

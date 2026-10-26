@@ -7,7 +7,7 @@ const adapterRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..")
 
 // Cross-language adapter only. bin/jg-operational-input.sh owns the protocol,
 // accepted kinds, marker bytes, and serialization grammar.
-export function encodeFirstmateOperationalInput(root, kind, content) {
+export function encodeJuggernautOperationalInput(root, kind, content) {
   return new Promise((resolveResult, reject) => {
     const requested = `${root}/bin/jg-operational-input.sh`;
     const script = existsSync(requested)

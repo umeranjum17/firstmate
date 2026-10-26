@@ -15,14 +15,14 @@ make_world() {
   root="$TMP_ROOT/$name/root"
   home="$TMP_ROOT/$name/home"
   mkdir -p "$root/bin" "$home/config" "$home/data" "$home/state"
-  printf '# Firstmate\n' > "$root/AGENTS.md"
+  printf '# Juggernaut\n' > "$root/AGENTS.md"
   printf 'See AGENTS.md\n' > "$root/CLAUDE.md"
   printf '#!/usr/bin/env bash\nexit 0\n' > "$root/bin/jg-session-start.sh"
   printf '#!/usr/bin/env bash\nexit 0\n' > "$root/bin/jg-bootstrap.sh"
   printf '#!/usr/bin/env bash\nexit 0\n' > "$root/bin/jg-supervision-instructions.sh"
   printf '7500\n' > "$home/config/startup-memory-budget"
   printf 'projects\n' > "$home/data/projects.md"
-  printf 'secondmates\n' > "$home/data/secondmates.md"
+  printf 'squad_leads\n' > "$home/data/squad_leads.md"
   printf 'captain\n' > "$home/data/captain.md"
   printf 'shared\n' > "$home/data/captain-shared.md"
   printf 'learnings\n' > "$home/data/learnings.md"
@@ -60,7 +60,7 @@ test_initial_baseline_is_silent_and_records_metadata() {
   assert_grep $'AGENTS.md\ttracked\tpresent' "$home/state/.startup-growth-check" "baseline did not record tracked startup metadata"
   assert_grep $'data/learnings.md\tmemory\tpresent' "$home/state/.startup-growth-check" "baseline did not record memory metadata"
   assert_grep $'data/projects.md\tprinted-memory\tpresent' "$home/state/.startup-growth-check" "baseline did not record printed projects metadata"
-  assert_grep $'data/secondmates.md\tprinted-memory\tpresent' "$home/state/.startup-growth-check" "baseline did not record printed secondmates metadata"
+  assert_grep $'data/squad_leads.md\tprinted-memory\tpresent' "$home/state/.startup-growth-check" "baseline did not record printed squad_leads metadata"
 }
 
 test_same_day_poll_does_not_touch_surfaces() {
@@ -147,23 +147,23 @@ test_first_content_of_an_optional_file_is_baselined_silently() {
   rec=$(make_world first-content)
   root=${rec%%|*}
   home=${rec#*|}
-  rm -f "$home/data/secondmates.md"
+  rm -f "$home/data/squad_leads.md"
   result=$(run_check "$root" "$home" 1000)
   [ "$(status_part "$result")" = 0 ] || fail "absent-surface baseline failed: $(output_part "$result")"
   out=$(output_part "$result")
   [ -z "$out" ] || fail "an absent optional surface should stay silent: $out"
 
-  add_bytes "$home/data/secondmates.md" 1000
+  add_bytes "$home/data/squad_leads.md" 1000
   result=$(run_check "$root" "$home" 87401)
   [ "$(status_part "$result")" = 0 ] || fail "first-content check failed: $(output_part "$result")"
   out=$(output_part "$result")
   [ -z "$out" ] || fail "first content of an optional file was reported as growth: $out"
 
-  add_bytes "$home/data/secondmates.md" 900
+  add_bytes "$home/data/squad_leads.md" 900
   result=$(run_check "$root" "$home" 173802)
   [ "$(status_part "$result")" = 0 ] || fail "post-baseline growth check failed: $(output_part "$result")"
   out=$(output_part "$result")
-  assert_contains "$out" 'printed-memory growth data/secondmates.md +300 estimated_tokens (+900 bytes' "growth above the silently established baseline was not reported"
+  assert_contains "$out" 'printed-memory growth data/squad_leads.md +300 estimated_tokens (+900 bytes' "growth above the silently established baseline was not reported"
 }
 
 test_established_baseline_survives_disappearance_and_restoration() {
@@ -194,18 +194,18 @@ test_established_baseline_survives_disappearance_and_restoration() {
   assert_contains "$out" 'printed-memory growth data/projects.md +300 estimated_tokens (+900 bytes' "growth above the preserved baseline was not reported after restoration"
 }
 
-test_secondmate_is_not_notified_about_primary_owned_shared_growth() {
+test_squad_lead_is_not_notified_about_primary_owned_shared_growth() {
   local rec root home result out
   rec=$(make_world shared-growth)
   root=${rec%%|*}
   home=${rec#*|}
-  : > "$home/.jg-secondmate-home"
+  : > "$home/.jg-squad-lead-home"
   run_check "$root" "$home" 1000 >/dev/null
   add_bytes "$home/data/captain-shared.md" 900
   result=$(run_check "$root" "$home" 87401)
-  [ "$(status_part "$result")" = 0 ] || fail "secondmate shared-growth check failed: $(output_part "$result")"
+  [ "$(status_part "$result")" = 0 ] || fail "squad_lead shared-growth check failed: $(output_part "$result")"
   out=$(output_part "$result")
-  [ -z "$out" ] || fail "a secondmate was notified about growth of the read-only primary-owned shared file: $out"
+  [ -z "$out" ] || fail "a squad_lead was notified about growth of the read-only primary-owned shared file: $out"
 
   rec=$(make_world shared-growth-primary)
   root=${rec%%|*}
@@ -238,20 +238,20 @@ test_budget_overrun_reports_and_separates_prompt_cost() {
   [ -z "$out" ] || fail "standing budget overrun was reported again instead of deduplicated: $out"
 }
 
-test_secondmate_is_not_woken_about_the_primary_owned_shared_overrun() {
+test_squad_lead_is_not_woken_about_the_primary_owned_shared_overrun() {
   local rec root home result out
-  rec=$(make_world secondmate)
+  rec=$(make_world squad_lead)
   root=${rec%%|*}
   home=${rec#*|}
   printf '10\n' > "$home/config/startup-memory-budget"
   add_bytes "$home/data/captain-shared.md" 900
-  : > "$home/.jg-secondmate-home"
+  : > "$home/.jg-squad-lead-home"
   result=$(run_check "$root" "$home" 1000)
-  [ "$(status_part "$result")" = 0 ] || fail "secondmate overrun check failed: $(output_part "$result")"
+  [ "$(status_part "$result")" = 0 ] || fail "squad_lead overrun check failed: $(output_part "$result")"
   out=$(output_part "$result")
-  assert_not_contains "$out" 'startup memory budget overrun' "a secondmate was woken about the primary-owned shared overrun it cannot act on"
+  assert_not_contains "$out" 'startup memory budget overrun' "a squad_lead was woken about the primary-owned shared overrun it cannot act on"
 
-  rm -f "$home/.jg-secondmate-home"
+  rm -f "$home/.jg-squad-lead-home"
   result=$(run_check "$root" "$home" 87401)
   [ "$(status_part "$result")" = 0 ] || fail "primary overrun check failed: $(output_part "$result")"
   out=$(output_part "$result")
@@ -610,9 +610,9 @@ test_gradual_growth_below_daily_threshold_is_reported_cumulatively
 test_printed_memory_growth_is_reported_without_entering_the_budget_total
 test_first_content_of_an_optional_file_is_baselined_silently
 test_established_baseline_survives_disappearance_and_restoration
-test_secondmate_is_not_notified_about_primary_owned_shared_growth
+test_squad_lead_is_not_notified_about_primary_owned_shared_growth
 test_budget_overrun_reports_and_separates_prompt_cost
-test_secondmate_is_not_woken_about_the_primary_owned_shared_overrun
+test_squad_lead_is_not_woken_about_the_primary_owned_shared_overrun
 test_metadata_read_failure_keeps_the_retained_baseline
 test_due_unsafe_inputs_are_reported_but_absent_optional_memory_is_not
 test_findings_are_delivered_even_when_the_record_cannot_be_published

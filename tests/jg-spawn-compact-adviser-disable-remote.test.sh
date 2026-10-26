@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # tests/jg-spawn-compact-adviser-disable-remote.test.sh - the compact-adviser
-# kill switch must reach a second mate that Firstmate launches on another host.
+# kill switch must reach a squad lead that Juggernaut launches on another host.
 #
-# A remote second mate never reaches the local spawn path covered by
+# A remote squad lead never reaches the local spawn path covered by
 # tests/jg-spawn-compact-adviser-disable.test.sh: bin/jg-spawn.sh routes it
-# through spawn_remote_secondmate, which hands the launch across the transport
+# through spawn_remote_squad_lead, which hands the launch across the transport
 # to the remote host's own jg-spawn. These assertions drive that real chain -
 # parent jg-spawn -> jg-on -> the real remote entrypoint ->
-# jg-remote-secondmate-control -> the remote host's jg-spawn - against a fake
+# jg-remote-squad-lead-control -> the remote host's jg-spawn - against a fake
 # herdr CLI, so what the remote pane received is observable, and then execute
 # that received command with a probe harness to read back the environment the
 # remote agent would have started with.
@@ -47,7 +47,7 @@ CONTRARY=0
 ) | (cd "$REMOTE_ROOT" && tar -xf -)
 
 # The remote host's own non-second-mate tooling only has to stay resolvable;
-# the second mate itself always launches on Herdr, whose fixture logs every
+# the squad lead itself always launches on Herdr, whose fixture logs every
 # invocation verbatim.
 cat > "$REMOTE_ROOT/bin/tmux" <<'SH'
 #!/usr/bin/env bash
@@ -92,7 +92,7 @@ printf '%s\n' "${COMPACT_ADVISER_DISABLE-unset}"
 SH
 chmod +x "$PROBEBIN/codex"
 
-printf 'codex\n' > "$PARENT/config/secondmate-harness"
+printf 'codex\n' > "$PARENT/config/squad-lead-harness"
 printf 'tmux\n' > "$PARENT/config/backend"
 printf 'codex\n' > "$PARENT/config/crew-harness"
 printf '## In flight\n\n## Queued\n\n## Done\n' > "$PARENT/data/backlog.md"
@@ -132,8 +132,8 @@ remote_pane_exports() {
 }
 
 # Provision and register the remote route from the captain-facing primary.
-JG_SECONDMATE_CHARTER='Own iOS delivery on the build Mac.' \
-  JG_SECONDMATE_SCOPE='iOS implementation and Xcode validation' \
+JG_SQUAD_LEAD_CHARTER='Own iOS delivery on the build Mac.' \
+  JG_SQUAD_LEAD_SCOPE='iOS implementation and Xcode validation' \
   remote_env "$ROOT/bin/jg-remote-home-seed.sh" ios remote-mac "$REMOTE_ROOT" "$REMOTE_HOME" --no-projects >/dev/null \
   || fail "remote seed did not provision the route under test"
 
@@ -141,7 +141,7 @@ run_remote_launch() {  # <label>
   local label=$1
   reset_remote_herdr_fixture "$HERDR_STATE"
   : > "$HERDR_LOG"
-  remote_env "$ROOT/bin/jg-spawn.sh" ios --secondmate >/dev/null 2>&1 \
+  remote_env "$ROOT/bin/jg-spawn.sh" ios --squad-lead >/dev/null 2>&1 \
     || fail "$label: the remote second-mate launch failed"
 }
 
@@ -165,12 +165,12 @@ remote_pane_exports | grep -qx 'export COMPACT_ADVISER_DISABLE=1' \
 SEEN=$(replay_remote_launch preamble) \
   || fail "the command the remote pane received failed to run"
 assert_equals 1 "$SEEN" \
-  "a second mate launched on a remote host must start with the compact adviser disabled"
+  "a squad lead launched on a remote host must start with the compact adviser disabled"
 SEEN=$(replay_remote_launch bare) \
   || fail "the remote launch command failed to run on its own"
 assert_equals 1 "$SEEN" \
   "the remote launch command must set the compact-adviser switch on its own, overriding a contrary remote pane value"
-pass "a remote-routed second mate starts with the compact adviser disabled, from the pane export and from the launch command alike"
+pass "a remote-routed squad lead starts with the compact adviser disabled, from the pane export and from the launch command alike"
 
 # --- the same holds through the cleared allowlisted environment -------------
 # The allowlist is inherited local material, so the parent's opt-in is what puts
@@ -182,11 +182,11 @@ assert_present "$REMOTE_HOME/config/launch-env-allowlist" \
   "the remote launch did not inherit the launch-environment opt-in"
 LAUNCH=$(remote_launch_command)
 assert_contains "$LAUNCH" '/usr/bin/env -i' \
-  "an inherited allowlist should launch the remote second mate under a cleared environment"
+  "an inherited allowlist should launch the remote squad lead under a cleared environment"
 SEEN=$(replay_remote_launch bare) \
   || fail "the cleared-environment remote launch failed to run"
 assert_equals 1 "$SEEN" \
-  "a remote second mate launched under the cleared allowlisted environment must still start with the compact adviser disabled"
+  "a remote squad lead launched under the cleared allowlisted environment must still start with the compact adviser disabled"
 pass "the remote route keeps the compact-adviser switch through the cleared allowlisted environment"
 
 echo "ALL TESTS PASSED"

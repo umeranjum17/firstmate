@@ -9,7 +9,7 @@ Herdr registers a foreground client only when the attaching terminal reports a
 usable window grid. A pty created by ``script`` or a bare ``pty.fork()`` from a
 non-tty parent starts at 0x0, which makes Herdr report a zero-sized grid and
 keeps ``client.window_title.clear`` answering ``no_foreground_client``. That is
-why firstmate could not drive the attached-viewer teardown cases live before
+why juggernaut could not drive the attached-viewer teardown cases live before
 this helper existed. The fix is ordering as much as sizing: the window size is
 set on the master fd BEFORE the fork, so the TUI cannot read the grid until it
 is already non-zero.

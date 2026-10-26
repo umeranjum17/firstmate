@@ -10,10 +10,10 @@
 # only ever exits non-zero on a usage error.
 #
 # One tab-separated row per ended task; the first line is the header:
-#   home     the home that ran the task: "main" or the secondmate id whose home
-#            has the .jg-secondmate-home marker.
+#   home     the home that ran the task: "main" or the squad_lead id whose home
+#            has the .jg-squad-lead-home marker.
 #   task     the task id.
-#   kind     ship | scout (secondmate retirements are not tasks and are skipped).
+#   kind     ship | scout (squad_lead retirements are not tasks and are skipped).
 #   project  the project directory basename, or "-" when none is recorded.
 #   models   every harness:model:effort the task ran on, in launch order, joined by
 #            ";", read from state/<id>.models, which bin/jg-spawn.sh starts anew on
@@ -70,7 +70,7 @@ clean_field() {  # collapse tabs/newlines so one task stays one row
 
 KIND=$(meta_get kind)
 [ -n "$KIND" ] || KIND=ship
-[ "$KIND" = secondmate ] && exit 0
+[ "$KIND" = squad_lead ] && exit 0
 case "$KIND" in ship | scout) ;; *) KIND=ship ;; esac
 
 PROJECT=$(meta_get project)
@@ -80,8 +80,8 @@ PROJECT=${PROJECT##*/}
 
 PR=$(awk -F= '$1 == "pr" { sub(/^[^=]*=/, ""); v=$0 } END { print v }' "$META" 2>/dev/null || true)
 
-if [ -f "$JG_HOME/.jg-secondmate-home" ] && [ ! -L "$JG_HOME/.jg-secondmate-home" ]; then
-  HOME_NAME=$(head -n 1 "$JG_HOME/.jg-secondmate-home" 2>/dev/null | tr -d '\r\n')
+if [ -f "$JG_HOME/.jg-squad-lead-home" ] && [ ! -L "$JG_HOME/.jg-squad-lead-home" ]; then
+  HOME_NAME=$(head -n 1 "$JG_HOME/.jg-squad-lead-home" 2>/dev/null | tr -d '\r\n')
 else
   HOME_NAME=main
 fi

@@ -9,11 +9,11 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
 done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Real local landing through the fork's unmodified bin, which sources this
-# add-on's loader from JG_ADDONS_DIR. JG_TEST_FORK names a read-only Firstmate
+# add-on's loader from JG_ADDONS_DIR. JG_TEST_FORK names a read-only Juggernaut
 # checkout; no watcher is armed.
 set -euo pipefail
 addons=$(cd "$(dirname "$0")/../.." && pwd)
-: "${JG_TEST_FORK:?set JG_TEST_FORK to a Firstmate checkout}"
+: "${JG_TEST_FORK:?set JG_TEST_FORK to a Juggernaut checkout}"
 d=$(mktemp -d)
 cleanup() {
   rc=$?

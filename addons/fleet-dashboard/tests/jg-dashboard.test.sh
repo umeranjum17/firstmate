@@ -66,7 +66,7 @@ lane() {  # <home> <task> <kind> <status line>...: a lane record whose last stat
 }
 
 summary() {  # <home> <state> <epoch> [json fields]: the summary a home publishes about itself
-  printf '{"schema":"jg-secondmate-home-summary.v1","home":"%s","state":"%s","generated_epoch":%s%s}\n' "$1" "$2" "$3" "${4:+,$4}" > "$1/state/home-summary.json"
+  printf '{"schema":"jg-squad-lead-home-summary.v1","home":"%s","state":"%s","generated_epoch":%s%s}\n' "$1" "$2" "$3" "${4:+,$4}" > "$1/state/home-summary.json"
 }
 
 # A fleet of Main, one active lead (zephyrine) and one parked lead (beta).
@@ -80,7 +80,7 @@ make_home() {  # <name>
   z="$home/mates/zephyrine" b="$home/mates/beta" stubs="$home/stubs"
   mkdir -p "$home/data/metrics" "$home/state" "$home/config" "$z/data" "$z/state" "$b/data" "$b/state" "$stubs"
   printf -- '- zephyrine - made-up domain (home: %s; scope: made-up work; projects: alpha; added 2026-07-11)\n- beta - parked domain (home: %s; scope: parked; projects: alpha; added 2026-07-11)\n' \
-    "$z" "$b" > "$home/data/secondmates.md"
+    "$z" "$b" > "$home/data/squad_leads.md"
   printf 'beta  # parked by the captain\n' > "$home/config/parked-homes"
   printf '3\n' > "$home/config/lane-target"
   printf 'main 6\n' > "$home/config/lane-caps"
@@ -119,7 +119,7 @@ EOF
   lane "$home" m-wait scout "paused [at=$((now - 2400))]: waiting for the vendor's reply"
   lane "$z" z-build ship "working [at=$((now - 60))]: building"
   lane "$b" b-stale ship "working [at=$((now - 60))]: building"
-  jg_write_meta "$home/state/zephyrine.meta" "kind=secondmate" "harness=claude" "model=lead-model" "herdr_pane_id=pane-lead"
+  jg_write_meta "$home/state/zephyrine.meta" "kind=squad_lead" "harness=claude" "model=lead-model" "herdr_pane_id=pane-lead"
   summary "$home" no_active_work "$now" '"endpoints":[{"id":"zephyrine","endpoint":{"exists":true,"agent_alive":"alive"}}]'
   summary "$z" active_child_work "$now"
   # Merges: zephyrine's on Main's channel for it, Main's own in its fleet ledger, which starts 2 days ago.
@@ -350,8 +350,8 @@ test_claude_accounts_card_shows_each_account_five_hour_and_seven_day_left() {
   has "$d/index.html" "Rested until"
   jq -e '.claude_accounts[0].rested_until > now' "$d/data.json" >/dev/null || fail "dashboard lost rest expiry"
   # Load: live task records count against their account; a repeated profile name gets an ordinal, never an id.
-  printf 'kind=crewmate\nharness=claude\naccount=a\n' > "$home/state/w1.meta"
-  printf 'kind=crewmate\nharness=claude\naccount=a\n' > "$home/state/w2.meta"
+  printf 'kind=operator\nharness=claude\naccount=a\n' > "$home/state/w1.meta"
+  printf 'kind=operator\nharness=claude\naccount=a\n' > "$home/state/w2.meta"
   jq '.accounts += [{"id":"c","name":"default","folder":"/z","five_hour":{"left":90,"resets_at":null},"seven_day":{"left":80,"resets_at":null},"problem":null}]' \
     "$home/state/claude-accounts.json" > "$home/state/quota.next"
   mv "$home/state/quota.next" "$home/state/claude-accounts.json"
@@ -635,7 +635,7 @@ test_board_json_feeds_the_app() {
 
   printf '{"ts":%s,"event":"task.merged","task":"m-gitlab","pr":"https://gitlab.example/team/nested/app/-/merge_requests/27"}\n{"ts":%s,"event":"task.merged","task":"m-gerrit","pr":"https://review.example/c/team/nested/app/+/27"}\n' "$((now - 60))" "$((now - 60))" >> "$home/state/fleet-ledger.jsonl"
   printf 'done [key=merged-z-lab] [at=%s]: merged z-lab https://gitlab.example/team/app/-/merge_requests/50\ndone [key=merged-z-review] [at=%s]: merged z-review https://review.example/c/team/app/+/51\n' "$((now - 60))" "$((now - 60))" >> "$home/state/zephyrine.status"
-  printf -- '- zephyrine - remote (host: distant; root: /srv; home: %s; scope: work; projects: alpha; added 2026-07-11)\n' "$home/mates/zephyrine" > "$home/data/secondmates.md"
+  printf -- '- zephyrine - remote (host: distant; root: /srv; home: %s; scope: work; projects: alpha; added 2026-07-11)\n' "$home/mates/zephyrine" > "$home/data/squad_leads.md"
   printf '{"ts":%s,"event":"task.dispatched","task":"z-shipped","model":"gpt-5.5"}\n' "$((now - 5000))" >> "$home/mates/zephyrine/state/fleet-ledger.jsonl"
   for i in 1 2 3 4; do
     printf '{"ts":%s,"event":"task.dispatched","task":"m-cycle%s","model":"gpt-5.5"}\n{"ts":%s,"event":"task.merged","task":"m-cycle%s","pr":"https://github.com/acme/alpha/pull/%s"}\n' "$((now - 60 - i * 1000))" "$i" "$((now - 60))" "$i" "$((20 + i))" >> "$home/state/fleet-ledger.jsonl"
@@ -730,7 +730,7 @@ test_fleet_past_twenty_mates_keeps_every_lead_row() {
     mdir="$TMP_ROOT/mate$i"
     mkdir -p "$mdir/state" "$mdir/data"
     printf -- '- mate%s - domain %s (home: %s; scope: work; projects: alpha; added 2026-07-11)\n' \
-      "$i" "$i" "$mdir" >> "$home/data/secondmates.md"
+      "$i" "$i" "$mdir" >> "$home/data/squad_leads.md"
     summary "$mdir" unknown "$([ "$i" = 24 ] && echo $((now - 3600)) || echo "$now")"
   done
   summary "$home" no_active_work "$now" '"endpoints":[{"id":"mate25","endpoint":{"exists":false}}]'
@@ -791,14 +791,14 @@ PY
   summary "$home" no_active_work "$now" '"endpoints":[{"id":"zephyrine","endpoint":{"exists":false}}]'
   build "$home"
   has "$d/index.html" "zephyrine Not running" "lead down"
-  printf -- '- zephyrine - remote (host: distant; root: /srv; home: %s; scope: work; projects: alpha; added 2026-07-11)\n' "$z" > "$home/data/secondmates.md"
+  printf -- '- zephyrine - remote (host: distant; root: /srv; home: %s; scope: work; projects: alpha; added 2026-07-11)\n' "$z" > "$home/data/squad_leads.md"
   key=$(printf 'zephyrine\ndistant\n%s\n' "$z" | sha256sum | cut -d' ' -f1)
-  mkdir "$home/state/secondmate-summary-cache"
-  jq '.state="externally_held" | .hold_classifier_schema="jg-captain-hold-buckets.v1"' "$z/state/home-summary.json" > "$home/state/secondmate-summary-cache/$key.json"
+  mkdir "$home/state/squad-lead-summary-cache"
+  jq '.state="externally_held" | .hold_classifier_schema="jg-captain-hold-buckets.v1"' "$z/state/home-summary.json" > "$home/state/squad-lead-summary-cache/$key.json"
   build "$home"
   has "$d/index.html" "zephyrine Waiting on someone else" "Closed 7 d unknown" "Out: unknown"
   lacks "$d/index.html" "Not running" "Start the zephyrine thing" "Ship the zephyrine thing"
-  rm "$home/state/secondmate-summary-cache/$key.json"
+  rm "$home/state/squad-lead-summary-cache/$key.json"
   build "$home"
   has "$d/index.html" "zephyrine State unknown"
   printf 'backend = "beads"\n' > "$home/.tasks.toml"
@@ -806,7 +806,7 @@ PY
   has "$d/index.html" "Closed 7 d unknown" "Out: unknown"
   [ ! -e "$home/quota.called" ] || fail "page build collected quota"
   rm "$home/.tasks.toml"
-  printf -- '- zephyrine - domain (home: %s; scope: work; projects: alpha; added 2026-07-11)\n' "$z" > "$home/data/secondmates.md"
+  printf -- '- zephyrine - domain (home: %s; scope: work; projects: alpha; added 2026-07-11)\n' "$z" > "$home/data/squad_leads.md"
   printf '\n## Queued\n- [ ] m-held - Lead release call (hold: choose lead release) (hold-kind: captain)\n' >> "$z/data/backlog.md"
   printf '\n## In flight\n- [ ] flight-call - Flight call (hold: choose flight scope) (hold-kind: captain)\n\n## Queued\n- [ ] expired-call - Expired call (hold: choose deferred scope) (hold-kind: captain) (hold-until: %s)\n- [ ] vendor - Vendor access (since %s) (hold: waiting for vendor credentials) (hold-kind: external)\n' "$(date -d yesterday +%F)" "$today" >> "$home/data/backlog.md"
   build "$home"
@@ -843,7 +843,7 @@ test_incomplete_lanes_and_moved_filings() {
   rm "$home/.tasks.toml" "$home/stubs/tasks-axi"
   mkdir -p "$home/mates/missing/data"
   printf '## Queued\n- [ ] missing-ready - Missing home ready (since %s)\n' "$(date +%F)" > "$home/mates/missing/data/backlog.md"
-  printf -- '- missing - domain (home: %s; scope: work; projects: alpha; added 2026-07-11)\n' "$home/mates/missing" >> "$home/data/secondmates.md"
+  printf -- '- missing - domain (home: %s; scope: work; projects: alpha; added 2026-07-11)\n' "$home/mates/missing" >> "$home/data/squad_leads.md"
   build "$home"
   has "$d/index.html" "Lanes open at least 8" "Stuck at least 3" "free unknown" "Ready, capacity unknown 1" "unknown of 3"
   lacks "$d/index.html" "All flowing" "missing 0 of 3"
@@ -855,7 +855,7 @@ test_incomplete_lanes_and_moved_filings() {
   build "$home"
   has "$d/index.html" "new agents wait (zephyrine)" "local-pressure-task"
   printf '%s\tmain-pressure-task\tmain pressure refusal\n' "$now" > "$home/state/admission-refused"
-  printf -- '- zephyrine - remote (host: distant; root: /srv; home: %s; scope: work; projects: alpha; added 2026-07-11)\n' "$z" > "$home/data/secondmates.md"
+  printf -- '- zephyrine - remote (host: distant; root: /srv; home: %s; scope: work; projects: alpha; added 2026-07-11)\n' "$z" > "$home/data/squad_leads.md"
   build "$home"
   has "$d/index.html" "new agents wait (Main)" "main-pressure-task"
   for p in index backlog backlog.home measure; do
@@ -863,7 +863,7 @@ test_incomplete_lanes_and_moved_filings() {
   done
   has "$d/index.html" "Lanes open at least 7" "unknown of 3"
   jq -e '[.homes[] | select(.home == "zephyrine")][0] | .lanes.status == "unknown" and .free_lanes.value == null' "$d/data.json" >/dev/null || fail "remote lane capacity was inferred"
-  : > "$home/data/secondmates.md"
+  : > "$home/data/squad_leads.md"
   printf '## Queued\n' > "$home/data/backlog.md"
   rm "$home/state"/m-*.meta "$home/state"/m-*.status
   mkdir "$home/state/unreadable.meta"
@@ -908,7 +908,7 @@ test_unavailable_readings_and_concurrent_caches() {
   local home d
   home=$(make_home sources)
   d="$home/state/dashboard"
-  : > "$home/data/secondmates.md"
+  : > "$home/data/squad_leads.md"
   printf '## Queued\n' > "$home/data/backlog.md"
   rm "$home/state"/m-*.meta "$home/state"/m-*.status
   printf '{"result":{"agents":[]}}\n' > "$home/herdr.json"
@@ -944,7 +944,7 @@ test_unavailable_readings_and_concurrent_caches() {
     jq -e 'any(.sources_unknown[]; .source == "lead state" and (.reason | startswith("zephyrine:")))' "$d/data.json" >/dev/null || fail "lead uncertainty absent: $scenario"
   done
   home=$(make_home concurrent)
-  : > "$home/data/secondmates.md"
+  : > "$home/data/squad_leads.md"
   JG_HOME="$home" bash "$ROOT/bin/jg-tasks-axi.sh" list --limit 10000 --fields held,hold_kind,hold_reason,blocked,created,closed > "$home/table"
   # shellcheck disable=SC2016 # the single-quoted stub expands when it runs
   printf '#!/bin/sh\ncat "$TEST_TABLE"\ntouch "$TEST_TABLE.read"\n' > "$home/stubs/tasks-axi"

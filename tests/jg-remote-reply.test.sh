@@ -31,7 +31,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-cat > "$PARENT/data/secondmates.md" <<EOF
+cat > "$PARENT/data/squad_leads.md" <<EOF
 - ios - iOS delivery (host: remote-mac; root: $ROOT; home: $REMOTE; scope: iOS work; projects: alpha; added 2026-08-02)
 EOF
 printf '# Detailed remote answer\n\nThe build is green.\n' > "$REMOTE/data/reply/report.md"
@@ -222,8 +222,8 @@ out=$(remote_env "$ADAPTER" handle ios 1 "$RESULT")
 assert_contains "$out" 'ingested: ios appended=0' "retried reply ingest was not idempotent"
 assert_contains "$out" 'handled: remote-reply-ios 1' "captured generation was not acknowledged"
 assert_grep 'done [corr=0123456789abcdef]' "$PARENT/state/ios.status" "parent status did not receive the correlated reply"
-assert_grep 'data/remote-secondmates/ios/data/reply/report.md' "$PARENT/state/ios.status" "remote document pointer was not rewritten locally"
-cmp -s "$REMOTE/data/reply/report.md" "$PARENT/data/remote-secondmates/ios/data/reply/report.md" \
+assert_grep 'data/remote-squad-leads/ios/data/reply/report.md' "$PARENT/state/ios.status" "remote document pointer was not rewritten locally"
+cmp -s "$REMOTE/data/reply/report.md" "$PARENT/data/remote-squad-leads/ios/data/reply/report.md" \
   || fail "the path-confined remote document copy is not byte-identical"
 cmp -s "$SOURCE_AFTER" "$REMOTE/state/parent-replies.status" \
   || fail "handling consumed or rewrote the remote append-only log"
@@ -310,7 +310,7 @@ assert_grep "offset=$mirror_offset" "$PARENT/state/remote-replies/ios.cursor" \
   "the cursor did not advance past an uncorrelated line"
 # The prose line NAMES a path that really does exist on the remote, so only the
 # structured-pointer trigger can explain the parent never fetching it.
-assert_absent "$PARENT/data/remote-secondmates/ios/data/reply/prose-only.md" \
+assert_absent "$PARENT/data/remote-squad-leads/ios/data/reply/prose-only.md" \
   "a bare path mentioned in prose was fetched as though the line offered it"
 assert_grep 'audit complete (data/reply/prose-only.md)' "$PARENT/state/ios.status" \
   "the prose mention was rewritten as though its document had been fetched"
@@ -363,7 +363,7 @@ assert_grep 'blocked [key=ctl]: escape ?[31mhere' "$PARENT/state/ios.status" \
 [ -z "$(LC_ALL=C tr -d '\11\12\40-\176\200-\377' < "$PARENT/state/ios.status")" ] \
   || fail "a control byte reached the parent status file"
 assert_grep "$(printf 'caf\xc3\xa9 end')" "$PARENT/state/ios.status" \
-  "normalization mangled a UTF-8 note a local secondmate could have written"
+  "normalization mangled a UTF-8 note a local squad_lead could have written"
 ctl_offset=$(LC_ALL=C wc -c < "$REMOTE/state/parent-replies.status" | tr -d ' ')
 assert_grep "offset=$ctl_offset" "$PARENT/state/remote-replies/ios.cursor" \
   "the cursor did not advance past a control-character line"
@@ -403,7 +403,7 @@ printf 'done [key=retry-document]: retry local storage report=data/reply/retry.m
 # automatic application fails for real. That is the documented fallback: a
 # capture whose application does not complete stays unacknowledged and
 # uncommitted, and the handler finishes it once storage recovers.
-retry_destination="$PARENT/data/remote-secondmates/ios/data/reply/retry.md"
+retry_destination="$PARENT/data/remote-squad-leads/ios/data/reply/retry.md"
 retry_decoy="$TMP_ROOT/retry-decoy.md"
 printf 'local decoy\n' > "$retry_decoy"
 ln -s "$retry_decoy" "$retry_destination"
@@ -435,7 +435,7 @@ assert_no_grep 'blocked [key=remote-reply-document-ios]' "$PARENT/state/ios.stat
 rm -f "$retry_destination"
 remote_env "$ADAPTER" handle ios 8 "$RESULT_EIGHT" >/dev/null \
   || fail "the document delta did not succeed after local storage recovered"
-assert_grep 'data/remote-secondmates/ios/data/reply/retry.md' "$PARENT/state/ios.status" \
+assert_grep 'data/remote-squad-leads/ios/data/reply/retry.md' "$PARENT/state/ios.status" \
   "the retried document pointer was not rewritten locally"
 cmp -s "$REMOTE/data/reply/retry.md" "$retry_destination" \
   || fail "the retried remote document was not copied byte-identically"
@@ -472,7 +472,7 @@ assert_no_document_decision() { # <label>
 
 printf '# valid report behind a malformed pointer\n' > "$REMOTE/data/reply/result.md"
 mirror_lines 'working [key=malformed-report]: malformed offer report=data/reply/result.md.bak'
-assert_absent "$PARENT/data/remote-secondmates/ios/data/reply/result.md" \
+assert_absent "$PARENT/data/remote-squad-leads/ios/data/reply/result.md" \
   "a valid prefix of a malformed report pointer was fetched"
 assert_grep 'report=data/reply/result.md.bak' "$PARENT/state/ios.status" \
   "a valid prefix of a malformed report pointer was rewritten"
@@ -483,13 +483,13 @@ pass "a structured pointer must end at its token boundary"
 printf '# first adjacent report\n' > "$REMOTE/data/reply/adjacent-a.md"
 printf '# second adjacent report\n' > "$REMOTE/data/reply/adjacent-b.md"
 mirror_lines 'done [key=adjacent-reports]: report=data/reply/adjacent-a.md,report=data/reply/adjacent-b.md report=data/reply/result.md alongside report=data/reply/result.md.bak'
-cmp -s "$REMOTE/data/reply/adjacent-a.md" "$PARENT/data/remote-secondmates/ios/data/reply/adjacent-a.md" \
+cmp -s "$REMOTE/data/reply/adjacent-a.md" "$PARENT/data/remote-squad-leads/ios/data/reply/adjacent-a.md" \
   || fail "the first comma-separated structured pointer was not fetched"
-cmp -s "$REMOTE/data/reply/adjacent-b.md" "$PARENT/data/remote-secondmates/ios/data/reply/adjacent-b.md" \
+cmp -s "$REMOTE/data/reply/adjacent-b.md" "$PARENT/data/remote-squad-leads/ios/data/reply/adjacent-b.md" \
   || fail "the second comma-separated structured pointer was not fetched"
-cmp -s "$REMOTE/data/reply/result.md" "$PARENT/data/remote-secondmates/ios/data/reply/result.md" \
+cmp -s "$REMOTE/data/reply/result.md" "$PARENT/data/remote-squad-leads/ios/data/reply/result.md" \
   || fail "the whitespace-separated structured pointer was not fetched"
-assert_grep 'report=data/remote-secondmates/ios/data/reply/adjacent-a.md,report=data/remote-secondmates/ios/data/reply/adjacent-b.md report=data/remote-secondmates/ios/data/reply/result.md alongside report=data/reply/result.md.bak' "$PARENT/state/ios.status" \
+assert_grep 'report=data/remote-squad-leads/ios/data/reply/adjacent-a.md,report=data/remote-squad-leads/ios/data/reply/adjacent-b.md report=data/remote-squad-leads/ios/data/reply/result.md alongside report=data/reply/result.md.bak' "$PARENT/state/ios.status" \
   "structured pointer rewriting skipped an adjacent pointer or changed a malformed token"
 mirrored_cursor_is_current "adjacent structured pointers prevented the cursor from advancing"
 pass "adjacent pointers are fetched while malformed tokens remain unchanged"
@@ -498,24 +498,24 @@ pass "adjacent pointers are fetched while malformed tokens remain unchanged"
 # of a line: the second `report=` here has no boundary of its own.
 printf '# glued report\n' > "$REMOTE/data/reply/glued.md"
 mirror_lines 'working [key=glued-pointers]: glued report=data/reply/glued-prefix.mdreport=data/reply/glued.md'
-assert_absent "$PARENT/data/remote-secondmates/ios/data/reply/glued.md" \
+assert_absent "$PARENT/data/remote-squad-leads/ios/data/reply/glued.md" \
   "a pointer with no preceding boundary was fetched after a rejected candidate"
 assert_grep 'glued report=data/reply/glued-prefix.mdreport=data/reply/glued.md' "$PARENT/state/ios.status" \
   "a pointer with no preceding boundary was rewritten after a rejected candidate"
 pass "a rejected candidate never gives the following text a false leading boundary"
 
-# A `report=` under a remote-secondmates mirror tree is fetched like any other
+# A `report=` under a remote-squad-leads mirror tree is fetched like any other
 # structured offer. When this mate genuinely holds it, it is a nested remote
 # report worth relaying; when it does not, the fetch fails open and harmlessly.
-mkdir -p "$REMOTE/data/remote-secondmates/nested/data/reply"
-printf '# nested grandchild report\n' > "$REMOTE/data/remote-secondmates/nested/data/reply/report.md"
-mirror_lines 'done [key=nested-remote]: nested report=data/remote-secondmates/nested/data/reply/report.md foreign report=data/remote-secondmates/other/data/reply/report.md'
-cmp -s "$REMOTE/data/remote-secondmates/nested/data/reply/report.md" \
-  "$PARENT/data/remote-secondmates/ios/data/remote-secondmates/nested/data/reply/report.md" \
+mkdir -p "$REMOTE/data/remote-squad-leads/nested/data/reply"
+printf '# nested grandchild report\n' > "$REMOTE/data/remote-squad-leads/nested/data/reply/report.md"
+mirror_lines 'done [key=nested-remote]: nested report=data/remote-squad-leads/nested/data/reply/report.md foreign report=data/remote-squad-leads/other/data/reply/report.md'
+cmp -s "$REMOTE/data/remote-squad-leads/nested/data/reply/report.md" \
+  "$PARENT/data/remote-squad-leads/ios/data/remote-squad-leads/nested/data/reply/report.md" \
   || fail "a nested remote report this mate holds was not relayed"
-assert_grep 'nested report=data/remote-secondmates/ios/data/remote-secondmates/nested/data/reply/report.md foreign report=data/remote-secondmates/other/data/reply/report.md' "$PARENT/state/ios.status" \
+assert_grep 'nested report=data/remote-squad-leads/ios/data/remote-squad-leads/nested/data/reply/report.md foreign report=data/remote-squad-leads/other/data/reply/report.md' "$PARENT/state/ios.status" \
   "the nested pointer was not rewritten or the undeliverable foreign pointer was changed"
-assert_grep 'note: remote document did not transfer for ios: data/remote-secondmates/other/data/reply/report.md - ' <(sed -E 's/ \[at=[0-9]+\]//' "$PARENT/state/ios.status") \
+assert_grep 'note: remote document did not transfer for ios: data/remote-squad-leads/other/data/reply/report.md - ' <(sed -E 's/ \[at=[0-9]+\]//' "$PARENT/state/ios.status") \
   "an undeliverable foreign pointer left no note"
 assert_no_document_decision "an undeliverable foreign pointer raised a document decision"
 mirrored_cursor_is_current "an undeliverable foreign pointer prevented the cursor from advancing"
@@ -541,9 +541,9 @@ mirrored_cursor_is_current "the prose announcement delta did not advance the cur
 printf '# voice scout report\n\nfindings\n' > "$REMOTE/$INCIDENT_DOC"
 # The exact shape bin/jg-inactive-reconcile.sh publishes for a finished child.
 mirror_lines "done [key=child-outcome-voice-scout-done-ab12cd34]: child voice-scout done: report ready mode=scout report=$INCIDENT_DOC"
-cmp -s "$REMOTE/$INCIDENT_DOC" "$PARENT/data/remote-secondmates/ios/$INCIDENT_DOC" \
+cmp -s "$REMOTE/$INCIDENT_DOC" "$PARENT/data/remote-squad-leads/ios/$INCIDENT_DOC" \
   || fail "the structured ledger offer did not deliver the finished report"
-assert_grep "report ready mode=scout report=data/remote-secondmates/ios/$INCIDENT_DOC" "$PARENT/state/ios.status" \
+assert_grep "report ready mode=scout report=data/remote-squad-leads/ios/$INCIDENT_DOC" "$PARENT/state/ios.status" \
   "the structured ledger offer was not rewritten to its local copy"
 assert_no_document_decision "the reported incident left a document decision standing"
 pass "the reported incident raises no standing decision and still delivers the report"
@@ -573,7 +573,7 @@ head -c 300000 /dev/zero | tr '\0' 'x' > "$REMOTE/data/reply/big.md"
 mirror_lines 'done [key=big-report]: oversize deliverable report=data/reply/big.md'
 assert_grep 'note: remote document did not transfer for ios: data/reply/big.md - file exceeds max-bytes' <(sed -E 's/ \[at=[0-9]+\]//' "$PARENT/state/ios.status") \
   "an oversize document's refusal did not surface with its reason"
-assert_absent "$PARENT/data/remote-secondmates/ios/data/reply/big.md" \
+assert_absent "$PARENT/data/remote-squad-leads/ios/data/reply/big.md" \
   "a refused oversize document was stored locally anyway"
 assert_no_document_decision "an oversize document raised a document decision"
 mirrored_cursor_is_current "an oversize document held the cursor back"
@@ -621,9 +621,9 @@ cmp -s "$TMP_ROOT/ios-status-before-extractfail" "$PARENT/state/ios.status" \
   || fail "a failed extraction pass appended partial or blank status content"
 remote_env "$ADAPTER" handle ios "$GEN" "$RESULT_EXTRACTFAIL" >/dev/null \
   || fail "the delta did not apply once pointer extraction worked again"
-assert_grep 'report=data/remote-secondmates/ios/data/reply/extractfail.md' "$PARENT/state/ios.status" \
+assert_grep 'report=data/remote-squad-leads/ios/data/reply/extractfail.md' "$PARENT/state/ios.status" \
   "the recovered delta did not mirror its rewritten pointer"
-cmp -s "$REMOTE/data/reply/extractfail.md" "$PARENT/data/remote-secondmates/ios/data/reply/extractfail.md" \
+cmp -s "$REMOTE/data/reply/extractfail.md" "$PARENT/data/remote-squad-leads/ios/data/reply/extractfail.md" \
   || fail "the recovered delta did not fetch its offered document"
 mirrored_cursor_is_current "the recovered extraction-failure delta did not advance the cursor"
 pass "a failed pointer extraction never commits a partial delta"
@@ -652,7 +652,7 @@ cmp -s "$TMP_ROOT/ios-status-before-writefail" "$PARENT/state/ios.status" \
   || fail "a failed mirror write left partial or blank content on the parent stream"
 remote_env "$ADAPTER" handle ios "$GEN" "$RESULT_WRITEFAIL" >/dev/null \
   || fail "the delta did not apply once the parent stream was writable again"
-assert_grep 'report=data/remote-secondmates/ios/data/reply/writefail.md' "$PARENT/state/ios.status" \
+assert_grep 'report=data/remote-squad-leads/ios/data/reply/writefail.md' "$PARENT/state/ios.status" \
   "the recovered delta did not mirror its rewritten pointer"
 mirrored_cursor_is_current "the recovered delta did not advance the cursor"
 pass "a failed mirror write never drops status content or advances the cursor"
@@ -706,9 +706,9 @@ remote_env "$ADAPTER" handle ios "$GEN" "$RESULT_REPLAY_COMMIT" >/dev/null \
   || fail "the uncommitted generation did not retry after its document arrived"
 [ "$(grep -cF "$REPLAY_LINE" "$PARENT/state/ios.status")" -eq 1 ] \
   || fail "retrying after document arrival duplicated the source decision line"
-assert_no_grep 'needs-decision [key=replay-decision]: pick report=data/remote-secondmates/ios/data/reply/replay.md' \
+assert_no_grep 'needs-decision [key=replay-decision]: pick report=data/remote-squad-leads/ios/data/reply/replay.md' \
   "$PARENT/state/ios.status" "retrying after document arrival appended a rewritten duplicate"
-assert_present "$PARENT/data/remote-secondmates/ios/data/reply/replay.md" \
+assert_present "$PARENT/data/remote-squad-leads/ios/data/reply/replay.md" \
   "the retry did not fetch the document that had since arrived"
 printf 'resolved [key=replay-decision]: selection complete\n' >> "$PARENT/state/ios.status"
 assert_not_contains "$(status_open_decisions "$PARENT/state/ios.status")" $'replay-decision\t' \
@@ -722,7 +722,7 @@ assert_present "$PARENT/state/procevent-inbox/$SID.$GEN.handled" \
   "the replay-identity whole-log recapture was not applied"
 [ "$(grep -cF "$REPLAY_LINE" "$PARENT/state/ios.status")" -eq 1 ] \
   || fail "cursor-loss recapture duplicated the resolved decision"
-assert_no_grep 'needs-decision [key=replay-decision]: pick report=data/remote-secondmates/ios/data/reply/replay.md' \
+assert_no_grep 'needs-decision [key=replay-decision]: pick report=data/remote-squad-leads/ios/data/reply/replay.md' \
   "$PARENT/state/ios.status" "cursor-loss recapture reopened the decision in rewritten form"
 assert_not_contains "$(status_open_decisions "$PARENT/state/ios.status")" $'replay-decision\t' \
   "cursor-loss recapture reopened the resolved decision"

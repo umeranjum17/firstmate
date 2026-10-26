@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Behavioral coverage for the visible startup-memory budget, its safe parser,
-# accounting command, primary-to-secondmate convergence, and exact reread bytes.
+# accounting command, primary-to-squad-lead convergence, and exact reread bytes.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -80,7 +80,7 @@ new_bootstrap_world() {
   mkdir -p "$home/config" "$home/data" "$home/state" "$root/bin"
   git init -q -b main "$root"
   printf '%s\n' 'config/' > "$root/.gitignore"
-  printf '%s\n' '# Firstmate test root' > "$root/AGENTS.md"
+  printf '%s\n' '# Juggernaut test root' > "$root/AGENTS.md"
   printf '%s\n' '#!/usr/bin/env bash' 'exit 0' > "$root/bin/placeholder.sh"
   chmod +x "$root/bin/placeholder.sh"
   git -C "$root" add -A
@@ -113,12 +113,12 @@ test_primary_bootstrap_materializes_visible_default() {
   [ "$(<"$home/config/startup-memory-budget")" = 321 ] \
     || fail "bootstrap replaced a valid captain-selected budget"
 
-  second="$TMP_ROOT/materialize/secondmate"
+  second="$TMP_ROOT/materialize/squad_lead"
   mkdir -p "$second/config" "$second/data" "$second/state"
-  printf '%s\n' sm > "$second/.jg-secondmate-home"
+  printf '%s\n' sm > "$second/.jg-squad-lead-home"
   run_bootstrap "$root" "$second" "$fakebin" >/dev/null
   [ ! -e "$second/config/startup-memory-budget" ] \
-    || fail "secondmate bootstrap created an independent budget instead of awaiting inheritance"
+    || fail "squad_lead bootstrap created an independent budget instead of awaiting inheritance"
   pass "primary bootstrap materializes only the visible default and preserves valid captain choices"
 }
 
@@ -212,18 +212,18 @@ new_propagation_world() {
   touch "$home/state/.last-watcher-beat"
   git init -q -b main "$root"
   printf '%s\n' 'config/' > "$root/.gitignore"
-  printf '%s\n' '# Firstmate test root' > "$root/AGENTS.md"
+  printf '%s\n' '# Juggernaut test root' > "$root/AGENTS.md"
   printf '%s\n' '#!/usr/bin/env bash' 'exit 0' > "$root/bin/placeholder.sh"
   chmod +x "$root/bin/placeholder.sh"
   git -C "$root" add -A
   git -C "$root" -c user.name=fmtest -c user.email=fmtest@example.invalid commit -qm initial
   head=$(git -C "$root" rev-parse HEAD)
   git -C "$root" worktree add -q --detach "$sm" "$head"
-  printf '%s\n' sm > "$sm/.jg-secondmate-home"
+  printf '%s\n' sm > "$sm/.jg-squad-lead-home"
   mkdir -p "$sm/config" "$sm/data" "$sm/state" "$sm/projects"
   {
-    printf 'window=firstmate:jg-sm\n'
-    printf 'kind=secondmate\n'
+    printf 'window=juggernaut:jg-sm\n'
+    printf 'kind=squad_lead\n'
     printf 'harness=codex\n'
     printf 'home=%s\n' "$sm"
   } > "$home/state/sm.meta"
@@ -268,7 +268,7 @@ test_primary_budget_converges_with_exact_reread_and_safe_failures() {
   assert_contains "$out" 'startup-memory-budget: pushed' \
     "config push did not report the new budget as inherited"
   [ "$(<"$sm/config/startup-memory-budget")" = 321 ] \
-    || fail "secondmate did not receive the primary budget bytes"
+    || fail "squad_lead did not receive the primary budget bytes"
   instruction=$(latest_reread_instruction "$sm") || fail "budget propagation did not publish a reread instruction"
   expected=$(printf '%s\n\n%s\n%s\n321\n%s' \
     'These inherited config files changed. Re-read and apply their exact contents at every future intake. They are defaults/rules and do not remove your judgment to choose differently when warranted.' \
@@ -279,7 +279,7 @@ test_primary_budget_converges_with_exact_reread_and_safe_failures() {
     || fail "budget reread payload was not the exact destination bytes"
   assert_contains "$(inbox_record_body "$home/state/sm.inbox/001.msg")" "CONFIG_REREAD: $instruction" \
     "budget propagation did not enqueue the pointer to its exact reread generation"
-  assert_contains "$(<"$log")" "Firstmate instruction waiting: list " \
+  assert_contains "$(<"$log")" "Juggernaut instruction waiting: list " \
     "budget propagation did not ring the durable inbox doorbell"
   assert_contains "$(<"$log")" "'sm.inbox' steering inbox" \
     "budget propagation doorbell did not identify the durable inbox"
@@ -322,7 +322,7 @@ test_primary_budget_converges_with_exact_reread_and_safe_failures() {
   assert_contains "$out" 'startup-memory-budget: error - unsafe or invalid primary source: file is symlinked' \
     "unsafe primary budget did not produce a concrete propagation error"
   [ ! -e "$sm/config/startup-memory-budget" ] \
-    || fail "unsafe primary budget changed the converged secondmate copy"
+    || fail "unsafe primary budget changed the converged squad_lead copy"
   [ "$(<"$outside")" = 555 ] || fail "unsafe primary budget handling changed its symlink target"
   pass "budget propagation converges through config push with exact rereads, absence, and safe rejection"
 }

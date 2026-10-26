@@ -11,11 +11,11 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 set -euo pipefail
 
 if [[ -z ${JG_HOME:-} ]]; then
-    echo 'chat-tsv-refresh: JG_HOME must be set to the main Firstmate home' >&2
+    echo 'chat-tsv-refresh: JG_HOME must be set to the main Juggernaut home' >&2
     exit 1
 fi
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
-transcripts=${CHAT_TSV_TRANSCRIPTS:-$HOME/.claude/projects/-home-umer-firstmate}
+transcripts=${CHAT_TSV_TRANSCRIPTS:-$HOME/.claude/projects/-home-umer-juggernaut}
 if [[ ! -d $transcripts || ! -r $transcripts ]]; then
     echo "chat-tsv-refresh: transcripts directory is missing or unreadable: $transcripts" >&2
     exit 1

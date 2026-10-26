@@ -41,7 +41,7 @@ check 0 'uninstalled note keeps previous behavior' "$status" working 'lavish-axi
 bash "$addons/owner-rules/install.sh" "$JG_HOME" >/dev/null
 check 1 'working note refuses Lavish URL' "$status" working 'http://review.example:4387/session/umer'
 check 1 'done note refuses CLI mention' "$status" 'done' 'lavish-axi'
-check 0 'secondmate note accepts sign-off URL' "$status" 'done' 'http://review.example:4388/board/umer'
+check 0 'squad_lead note accepts sign-off URL' "$status" 'done' 'http://review.example:4388/board/umer'
 wait_refused() {
   local out
   out=$("$status" blocked 'waiting on CI' 2>&1) && return 1
@@ -51,16 +51,16 @@ check 0 'existing blocked wait refusal is preserved' wait_refused
 
 if [ -n "${JG_TEST_FORK:-}" ]; then
   mkdir -p "$work/parent/state"
-  printf 'umer\n' > "$JG_HOME/.jg-secondmate-home"
-  printf 'schema=jg-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$work/parent" > "$JG_HOME/.jg-secondmate-parent"
+  printf 'umer\n' > "$JG_HOME/.jg-squad-lead-home"
+  printf 'schema=jg-squad-lead-parent.v1\nroute=local\nparent_home=%s\n' "$work/parent" > "$JG_HOME/.jg-squad-lead-parent"
   export JG_ADDONS_DIR=$addons
-  report=$JG_TEST_FORK/bin/jg-secondmate-report.sh
+  report=$JG_TEST_FORK/bin/jg-squad-lead-report.sh
   check 2 'real helper refuses before status append' bash "$report" 'done' abcdef0123456789 'http://review.example:4387/session/umer'
   if [ ! -e "$work/parent/state/umer.status" ]; then echo 'ok - refused note wrote no status'
   else echo 'not ok - refused note wrote status'; fails=$((fails + 1)); fi
   check 0 'real helper appends sign-off note' bash "$report" 'done' abcdef0123456789 'http://review.example:4388/board/umer'
   grep -qF 'http://review.example:4388/board/umer' "$work/parent/state/umer.status"
-else echo 'SKIP real secondmate helper: set JG_TEST_FORK to a Firstmate checkout'; fi
+else echo 'SKIP real squad_lead helper: set JG_TEST_FORK to a Juggernaut checkout'; fi
 
 command -v sign-off-axi >/dev/null # Required: never silently skip the real writer.
 board=$SIGN_OFF_HOME/decisions.json
@@ -91,4 +91,4 @@ if sign-off-axi list "$board" --json --full | jq -e '.decisions | length == 1 an
   echo 'ok - exactly one clean card exists'
 else echo 'not ok - expected one clean card'; fails=$((fails + 1)); fi
 [ "$fails" -eq 0 ] || { echo "FAIL no-lavish: $fails"; exit 1; }
-echo 'PASS no-lavish: checker, secondmate notes and real merge-card posts'
+echo 'PASS no-lavish: checker, squad_lead notes and real merge-card posts'

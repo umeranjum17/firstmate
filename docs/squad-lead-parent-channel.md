@@ -1,16 +1,16 @@
-# Secondmate parent channel
+# Squad Lead parent channel
 
-This note records why a secondmate home's captain-facing outcomes are delivered by scripts instead of by the mate model, and which script delivers each one.
+This note records why a squad lead home's captain-facing outcomes are delivered by scripts instead of by the mate model, and which script delivers each one.
 `bin/jg-parent-channel-lib.sh` owns the channel contract: where the channel lives, how a line is appended, and the return codes every publisher shares.
-[`remote-secondmates.md`](remote-secondmates.md) owns the transport that carries the remote form of the channel back to the parent.
+[`remote-squad-leads.md`](remote-squad-leads.md) owns the transport that carries the remote form of the channel back to the parent.
 
 ## The problem
 
-A secondmate is a Juggernaut in its own home, and nobody reads its chat: the captain and the main Juggernaut see only what is appended to the parent channel.
+A squad lead is a Juggernaut in its own home, and nobody reads its chat: the captain and the main Juggernaut see only what is appended to the parent channel.
 On 2026-09-02 four outcomes across two mate homes never reached the captain.
 The watcher had delivered the parent's request within a minute each time, the mate did the work, and then the mate addressed "captain" in its own chat instead of appending to the channel.
-The cause is structural rather than a one-off lapse: the mate can satisfy the [address rule in `AGENTS.md`](../AGENTS.md#firstmate) in local chat while missing the charter's later return-channel instruction.
-The captain's framing of the requirement was: "the root problem is not specific to PRs, right? it looks like any message or outcomes from second mates can miss. we need to make sure our fixes are addressing this in a principled, fundamental way, not surgically treating the symptoms of just this PR update miss."
+The cause is structural rather than a one-off lapse: the mate can satisfy the [address rule in `AGENTS.md`](../AGENTS.md#juggernaut) in local chat while missing the charter's later return-channel instruction.
+The captain's framing of the requirement was: "the root problem is not specific to PRs, right? it looks like any message or outcomes from squad leads can miss. we need to make sure our fixes are addressing this in a principled, fundamental way, not surgically treating the symptoms of just this PR update miss."
 A PR-ready report was the observed symptom, but a finding, a decision, a blocker, and a failure all fail the same way, because every one of them depended on the mate model remembering to write one line.
 
 The design goal is therefore: the parent channel must not depend on the model remembering to write to it.
@@ -29,7 +29,7 @@ Every captain-facing outcome that leaves durable evidence in the mate home is pu
 | PR merged | the merge poll or the mate's own merge | `bin/jg-merge-outcome-lib.sh` |
 | Child leaving the home | its final ledger line | `bin/jg-teardown.sh`, which refuses to remove the child while that line is undelivered |
 | Child ended silently | terminal current state with a silent ledger | the existing inactive-outcome scan in `bin/jg-inactive-reconcile.sh` |
-| Answer to a marked request | a correlated line guarded by the pending-reply record | `bin/jg-secondmate-report.sh`, which resolves the parent channel from the mate home; the pending-reply guard repairs a line stranded in the local mate's same-basename status file before recovery or escalation |
+| Answer to a marked request | a correlated line guarded by the pending-reply record | `bin/jg-squad-lead-report.sh`, which resolves the parent channel from the mate home; the pending-reply guard repairs a line stranded in the local mate's same-basename status file before recovery or escalation |
 | An outcome that exists only in the mate's reasoning | none | the charter and the `AGENTS.md` carve-outs only |
 
 The ledger delivery reads files, plus a local git reachability check on a ship `done:` with no delivery record yet (`bin/jg-dod-lib.sh`; the gate adds one bounded live forge read for a publishing-mode done whose named head holds no tracking ref in the copy, per the gate's header): it calls no harness and no current-state reader, so it is identical for every harness and runtime backend.
@@ -45,7 +45,7 @@ A missed-reply escalation includes the complete first sighting path and line num
 ## What is deliberately not built
 
 - No mirror of the mate's chat: chat can mix outcomes with other conversation, so choosing which sentence is an outcome would itself be model behavior, and every harness exposes turn text differently.
-- No threshold escalation of a child's open decision or blocker in the fork: the optional firstmate-addons wait-timers add-on owns that escalation and publishes it through this channel when installed; a decision the mate neither answers nor escalates is a supervision-quality question, separable from channel delivery.
+- No threshold escalation of a child's open decision or blocker in the fork: the optional juggernaut-addons wait-timers add-on owns that escalation and publishes it through this channel when installed; a decision the mate neither answers nor escalates is a supervision-quality question, separable from channel delivery.
 - No second watcher or standalone scanner: a lightweight ledger pass runs inside the existing inactive-outcome command on every watcher poll and reuses its receipts and upstream append.
 - No orphan lifecycle: teardown refuses instead of removing an undelivered outcome, the same way it refuses on other unlanded conditions.
 
@@ -61,4 +61,4 @@ A missed-reply escalation includes the complete first sighting path and line num
 
 ## Live verification
 
-[`verification/secondmate-parent-channel.md`](verification/secondmate-parent-channel.md) records the dated live run: real tmux panes, both real watchers re-armed after each wake, and no model, with every delivered parent line and the parent wake it produced.
+[`verification/squad-lead-parent-channel.md`](verification/squad-lead-parent-channel.md) records the dated live run: real tmux panes, both real watchers re-armed after each wake, and no model, with every delivered parent line and the parent wake it produced.

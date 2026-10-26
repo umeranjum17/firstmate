@@ -197,7 +197,7 @@ So a finished, hung, or identity-mismatched claim cannot suppress that recovery 
 The recovery-episode contract below owns once-per-generation announcement.
 A handling successor does not re-announce.
 It enters its poll loop immediately and keeps scanning signals, stale panes, and checks.
-The watcher's local queue backstop observes the oldest actionable row and re-delivers it after `JG_SECONDMATE_WAKE_STALL_SECS` without progress, without appending, consuming, or rewriting a row.
+The watcher's local queue backstop observes the oldest actionable row and re-delivers it after `JG_SQUAD LEAD_WAKE_STALL_SECS` without progress, without appending, consuming, or rewriting a row.
 Its observation timer survives watcher replacement, resets when the oldest row changes or a reminder is delivered, and clears when no actionable row remains, giving each handling successor time to establish continuity.
 A live supervision-branch grant for that row defers the reminder only until the same no-progress interval reaches `JG_BUSY_TURN_MAX_SECS`; this local path does not use main's busy verdict.
 Declared external-wait stale rows are excluded and retain their existing pause cadence.
@@ -225,7 +225,7 @@ Every owner above runs inside the agent runtime, so a killed Herdr server takes 
 `bin/jg-sentinel.sh` is the one piece that must run outside the runtime, as a systemd user service:
 `mkdir -p ~/.config/systemd/user && JG_HOME="/absolute/home" bin/jg-sentinel.sh unit > ~/.config/systemd/user/jg-sentinel.service && systemctl --user enable --now jg-sentinel`.
 While the service is inactive, session start on a primary Herdr home with a systemd user bus prints a `SENTINEL:` line carrying the install command with shell-quoted absolute home and executable paths.
-On a server restart it reconciles the home's direct reports, orders each live secondmate to run its own session start, and types an operational-input doorbell into the primary, so that turn's end re-arms through the primary's own owner.
+On a server restart it reconciles the home's direct reports, orders each live squad lead to run its own session start, and types an operational-input doorbell into the primary, so that turn's end re-arms through the primary's own owner.
 Session start runs the same reconcile once in the background, so every home resumes its own lanes: a dead lane is relaunched, a lane whose turn was lost gets one resume nudge, and a mid-turn or properly waiting lane is left alone.
 It also wakes the primary when supervision is needed and the beacon has been stale beyond the guard grace with no turn running.
 Its header owns the exact rules.
@@ -358,7 +358,7 @@ Under the away-posture record the exclusion lifts and a check row is offered to 
 `jg-wake-drain.sh` never reclassifies a row itself.
 It filters the queue to the current actor's opaque claim before same-key deduplication, then presents and acknowledges only that actor-local view.
 A missing or empty branch snapshot is refused loudly rather than read as "nothing eligible", because reaching the drain without the non-empty handoff promised by the extension is a wiring bug.
-A branch acknowledgement retires the check-row receipts - inactive-outcome, inactive-reconcile notice, and secondmate stall - of exactly the granted sequences it consumes, so a branch-consumed check is never re-queued by its producer.
+A branch acknowledgement retires the check-row receipts - inactive-outcome, inactive-reconcile notice, and squad lead stall - of exactly the granted sequences it consumes, so a branch-consumed check is never re-queued by its producer.
 Attended, a grant names no check row and each scan finds nothing.
 
 ### Per-actor regression tests
@@ -377,7 +377,7 @@ The same suite pins the counted-equals-presentable invariant against `bin/jg-gua
 - That row is presented with its acknowledgement command - with the ordinary warning restored - as soon as the grant clears.
 - Structurally unusable rows are retired by main alone while every remaining row stays presentable and acknowledgeable.
 
-Branch acknowledgement retiring the check-row receipts of exactly its granted sequences is pinned by `tests/jg-wake-queue.test.sh` for the secondmate stall receipt and by `tests/jg-inactive-reconcile.test.sh` for the inactive-outcome receipt.
+Branch acknowledgement retiring the check-row receipts of exactly its granted sequences is pinned by `tests/jg-wake-queue.test.sh` for the squad lead stall receipt and by `tests/jg-inactive-reconcile.test.sh` for the inactive-outcome receipt.
 
 `tests/jg-pi-branch-extension.test.sh` pins extension-side classification, claim publication and release, and the pre-drain recheck.
 

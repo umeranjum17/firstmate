@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # End-to-end and regression tests for the deterministic public-followup consumer.
 #
-# The failure this suite pins: firstmate promises a public final reply in an X or
+# The failure this suite pins: juggernaut promises a public final reply in an X or
 # Discord thread, routes the work out, and then the session compacts or restarts.
 # Nothing in memory survives. The promise is only kept if a terminal work result
 # reconciles the typed obligation from DISK and the final reply lands in the
@@ -36,7 +36,7 @@ write_promotion_brief() {  # <home> <id>
 ## Captain's intent
 Promote the selected scout.
 
-## Firstmate spec
+## Juggernaut spec
 Verify promotion preserves the behavior under test.
 EOF
 }
@@ -114,9 +114,9 @@ SH
   printf '%s\n' "$fakebin"
 }
 
-# make_home <name> [relay-on|relay-off]: a firstmate home with its own backlog.
+# make_home <name> [relay-on|relay-off]: a juggernaut home with its own backlog.
 # relay-off omits .env entirely, which is exactly what a home that never opted
-# into the myfirstmate relay looks like.
+# into the myjuggernaut relay looks like.
 make_home() {  # <name> [relay-on|relay-off]
   local home="$TMP_ROOT/$1" relay=${2:-relay-on}
   mkdir -p "$home/data" "$home/state" "$home/config" "$home/projects"
@@ -174,7 +174,7 @@ seed_commitment() {
       received_at:"2026-07-30T10:00:00Z",
       followup_expires_at:"2026-08-06T10:00:00Z",
       reservation_expires_at:"2026-08-06T10:00:00Z"}' > "$home/request.json"
-  jq -n '{type:"pr-merged", project:"firstmate",
+  jq -n '{type:"pr-merged", project:"juggernaut",
           required_deliverables:["pr_url"], completion_policy:"all-required"}' \
     > "$home/expected.json"
   jq -n --arg h "$work_home" --arg w "$work_id" \
@@ -206,7 +206,7 @@ seed_commitment() {
     || fail "could not register the public commitment"
 }
 
-# The pi-rearm shape: a report-ready promised-final bound to a secondmate.
+# The pi-rearm shape: a report-ready promised-final bound to a squad_lead.
 seed_repro_commitment() {   # <home> <obligation> <request> <work-home> <work-id>
   local home=$1 obligation=$2 request=$3 work_home=$4 work_id=$5
   jq -n --arg r "$request" \
@@ -216,7 +216,7 @@ seed_repro_commitment() {   # <home> <obligation> <request> <work-home> <work-id
       received_at:"2026-08-21T01:12:00Z",
       followup_expires_at:"2026-08-28T01:12:00Z",
       reservation_expires_at:"2026-08-28T01:12:00Z"}' > "$home/request.json"
-  jq -n '{type:"report-ready", project:"firstmate",
+  jq -n '{type:"report-ready", project:"juggernaut",
           required_deliverables:["report_path"], completion_policy:"all-required"}' \
     > "$home/expected.json"
   jq -n --arg h "$work_home" --arg w "$work_id" \
@@ -297,7 +297,7 @@ test_ambient_tasks_axi_env_never_reaches_a_real_backlog() {
           received_at:"2026-07-30T10:00:00Z",
           followup_expires_at:"2026-08-06T10:00:00Z",
           reservation_expires_at:"2026-08-06T10:00:00Z"}' > "$home/request.json"
-  jq -n '{type:"pr-merged", project:"firstmate",
+  jq -n '{type:"pr-merged", project:"juggernaut",
           required_deliverables:["pr_url"], completion_policy:"all-required"}' \
     > "$home/expected.json"
 
@@ -364,7 +364,7 @@ test_outcome_text_is_bounded_without_corrupting_characters() {
 # --- 1. the restart end-to-end -------------------------------------------------
 
 # The whole reported failure, start to finish, with no conversation memory
-# anywhere: a Discord request becomes a typed commitment, a secondmate child
+# anywhere: a Discord request becomes a typed commitment, a squad_lead child
 # lands the work and reports a TYPED terminal result, the session ends, and a
 # cold reconciliation from disk delivers exactly one final reply into the
 # original thread and closes the obligation.
@@ -373,9 +373,9 @@ test_restart_e2e_delivers_exactly_once() {
   home=$(make_home restart-e2e)
   child=$(make_home restart-child relay-off)
   log="$home/curl.log"; : > "$log"
-  printf '%s\n' fmdev > "$child/.jg-secondmate-home"
-  jg_write_meta "$home/state/fmdev.meta" "kind=secondmate" "home=$child"
-  seed_commitment "$home" pf-restart req-restart discord secondmate:fmdev work-code-q1
+  printf '%s\n' fmdev > "$child/.jg-squad-lead-home"
+  jg_write_meta "$home/state/fmdev.meta" "kind=squad_lead" "home=$child"
+  seed_commitment "$home" pf-restart req-restart discord squad_lead:fmdev work-code-q1
   jg_write_meta "$child/state/work-code-q1.meta" \
     "x_request=req-restart" "x_request_ts=1700000000" "x_followups=1"
 
@@ -392,7 +392,7 @@ test_restart_e2e_delivers_exactly_once() {
 
   # The child home reports its terminal result as typed data. This is the step
   # whose absence left the obligation stranded at pending-work.
-  emit_terminal "$home" "$home" pf-restart secondmate:fmdev work-code-q1 >/dev/null \
+  emit_terminal "$home" "$home" pf-restart squad_lead:fmdev work-code-q1 >/dev/null \
     || fail "the child could not report its typed terminal result"
 
   # Simulate compaction/restart: nothing but disk survives, and the drained inbox
@@ -429,7 +429,7 @@ test_restart_e2e_delivers_exactly_once() {
   [ "$(task_state "$home" pf-restart)" = 'done' ] \
     || fail "the commitment must be Done only after the receipt"
   assert_no_grep '^x_request=' "$child/state/work-code-q1.meta" \
-    "typed delivery must clear the secondmate's legacy X link"
+    "typed delivery must clear the squad_lead's legacy X link"
   pass "restart end-to-end: typed result reconciles from disk and delivers one reply to the original thread"
 }
 
@@ -511,7 +511,7 @@ test_invalid_events_are_refused_and_quarantined() {
   # because the owning home's own registration disagrees.
   expect_failure "a wrong source home must be refused" \
     "$EMIT" --home "$home" --obligation pf-refuse --relation rel-code \
-    --source-home secondmate:other --work-id work-real --generation 1 \
+    --source-home squad_lead:other --work-id work-real --generation 1 \
     --outcome pr-merged --deliverable pr_url=https://example.invalid/example/repo/pulls/1 \
     --outcome-text 'x'
   assert_contains "$EXPECT_OUT" "does not match this home's registration" \
@@ -697,13 +697,13 @@ test_outward_delivery_stays_with_the_owning_home() {
   owner=$(make_home owner)
   child=$(make_home child relay-off)
   log="$owner/curl.log"; : > "$log"
-  printf '%s\n' child > "$child/.jg-secondmate-home"
-  jg_write_meta "$owner/state/child.meta" "kind=secondmate" "home=$child"
-  seed_commitment "$owner" pf-own req-own discord secondmate:child work-child
+  printf '%s\n' child > "$child/.jg-squad-lead-home"
+  jg_write_meta "$owner/state/child.meta" "kind=squad_lead" "home=$child"
+  seed_commitment "$owner" pf-own req-own discord squad_lead:child work-child
   jg_write_meta "$child/state/work-child.meta" \
     "x_request=req-own" "x_request_ts=1700000000" "x_followups=1"
 
-  FAKE_CURL_LOG="$log" emit_terminal "$owner" "$owner" pf-own secondmate:child work-child >/dev/null \
+  FAKE_CURL_LOG="$log" emit_terminal "$owner" "$owner" pf-own squad_lead:child work-child >/dev/null \
     || fail "the child could not report its typed result"
   [ "$(followup_posts "$log")" -eq 0 ] \
     || fail "reporting a terminal result must never post publicly"
@@ -715,7 +715,7 @@ test_outward_delivery_stays_with_the_owning_home() {
     JG_STATE_OVERRIDE="$child/state" FAKE_CURL_LOG="$log" \
     expect_failure "a home without relay consent must not deliver a public reply" \
     "$PF" deliver pf-own
-  assert_contains "$EXPECT_OUT" "has not opted into the myfirstmate relay" \
+  assert_contains "$EXPECT_OUT" "has not opted into the myjuggernaut relay" \
     "the refusal must name the missing relay consent"
   [ "$(followup_posts "$log")" -eq 0 ] || fail "the refused delivery must post nothing"
   FAKE_CURL_LOG="$log" run_pf "$owner" deliver pf-own >/dev/null \
@@ -748,41 +748,41 @@ test_delivery_requires_registration_before_posting() {
   pass "typed delivery refuses to post when its cleanup registration is missing"
 }
 
-test_secondmate_teardown_requires_parent_binding() {
+test_squad_lead_teardown_requires_parent_binding() {
   local parent child registry_before marker_before
   parent=$(make_home teardown-parent)
   child=$(make_home teardown-child)
-  printf '%s\n' mate > "$child/.jg-secondmate-home"
-  seed_commitment "$parent" pf-teardown req-teardown x secondmate:mate work-child
-  jg_write_meta "$parent/state/mate.meta" "kind=secondmate" "home=$child"
+  printf '%s\n' mate > "$child/.jg-squad-lead-home"
+  seed_commitment "$parent" pf-teardown req-teardown x squad_lead:mate work-child
+  jg_write_meta "$parent/state/mate.meta" "kind=squad_lead" "home=$child"
   jg_write_meta "$child/state/work-child.meta" \
-    "window=firstmate:jg-work-child" "endpoint_task_id=work-child" \
+    "window=juggernaut:jg-work-child" "endpoint_task_id=work-child" \
     "worktree=$child" "project=$child" "kind=ship" "mode=local-only" "spawn_gen=public-followup-fixture"
 
   PATH="$child/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$child" \
     JG_STATE_OVERRIDE="$child/state" JG_DATA_OVERRIDE="$child/data" \
     expect_failure "marked child teardown without a parent must refuse cleanup" \
     "$TEARDOWN" work-child
-  assert_contains "$EXPECT_OUT" "cannot resolve the primary home for marked secondmate mate" \
+  assert_contains "$EXPECT_OUT" "cannot resolve the primary home for marked squad_lead mate" \
     "missing parent binding must be an actionable teardown refusal"
   assert_present "$child/state/work-child.meta" \
     "missing parent binding must preserve the child work metadata"
 
   parent=$(make_home teardown-valid-parent)
   child=$(make_home teardown-valid-child)
-  printf '%s\n' mate > "$child/.jg-secondmate-home"
+  printf '%s\n' mate > "$child/.jg-squad-lead-home"
   printf -- '- mate - synthetic (id is legacy); preserve this (home: %s; scope: synthetic (child); semicolon remains meaningful; projects: ; added 2026-07-30)\n' \
-    "$child" > "$parent/data/secondmates.md"
+    "$child" > "$parent/data/squad_leads.md"
   JG_HOME="$parent" "$ROOT/bin/jg-home-seed.sh" validate >/dev/null \
     || fail "home-seed validation rejected a punctuation-bearing operational registry record"
-  registry_before=$(cat "$parent/data/secondmates.md")
-  marker_before=$(cat "$child/.jg-secondmate-home")
-  seed_commitment "$parent" pf-teardown-valid req-teardown-valid x secondmate:mate work-child
-  jg_write_meta "$parent/state/mate.meta" "kind=secondmate" "home=$child"
+  registry_before=$(cat "$parent/data/squad_leads.md")
+  marker_before=$(cat "$child/.jg-squad-lead-home")
+  seed_commitment "$parent" pf-teardown-valid req-teardown-valid x squad_lead:mate work-child
+  jg_write_meta "$parent/state/mate.meta" "kind=squad_lead" "home=$child"
   jg_write_meta "$child/state/work-child.meta" \
-    "window=firstmate:jg-work-child" "endpoint_task_id=work-child" \
+    "window=juggernaut:jg-work-child" "endpoint_task_id=work-child" \
     "worktree=$child" "project=$child" "kind=ship" "mode=local-only" "spawn_gen=public-followup-fixture"
-  assert_absent "$child/.jg-secondmate-parent" \
+  assert_absent "$child/.jg-squad-lead-parent" \
     "the legacy env-only binding case must not gain a durable parent record"
 
   PATH="$child/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$child" \
@@ -797,15 +797,15 @@ test_secondmate_teardown_requires_parent_binding() {
   esac
   assert_present "$child/state/work-child.meta" \
     "an owed parent commitment must preserve the child work metadata"
-  [ "$registry_before" = "$(cat "$parent/data/secondmates.md")" ] \
+  [ "$registry_before" = "$(cat "$parent/data/squad_leads.md")" ] \
     || fail "guarded cleanup refusal changed the parent registry"
-  [ "$marker_before" = "$(cat "$child/.jg-secondmate-home")" ] \
+  [ "$marker_before" = "$(cat "$child/.jg-squad-lead-home")" ] \
     || fail "guarded cleanup refusal changed the child identity marker"
-  pass "marked secondmate teardown resolves its parent and fails closed when unavailable"
+  pass "marked squad_lead teardown resolves its parent and fails closed when unavailable"
 }
 
-# The three tests below exercise the durable .jg-secondmate-parent record a real
-# bin/jg-home-seed.sh seed now writes next to .jg-secondmate-home (jg-remote-sm-
+# The three tests below exercise the durable .jg-squad-lead-parent record a real
+# bin/jg-home-seed.sh seed now writes next to .jg-squad-lead-home (jg-remote-sm-
 # cleanup-parent-binding-s1 report, section 7). Before this record existed, the
 # marked-child gate above could only ever see the parent through the launch-time
 # JG_PUBLIC_FOLLOWUP_PRIMARY_HOME env var: a restart that dropped that prefix made
@@ -814,14 +814,14 @@ test_secondmate_teardown_requires_parent_binding() {
 # the real bin/jg-teardown.sh cleanup path against a home real jg-home-seed.sh
 # produced, never a hand-crafted marker.
 
-assert_local_secondmate_parent_record() {
+assert_local_squad_lead_parent_record() {
   local child=$1 parent=$2
-  cmp -s "$child/.jg-secondmate-parent" <(
-    printf 'schema=jg-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$parent"
-  ) || fail "real secondmate seeding must write the exact durable local parent record"
+  cmp -s "$child/.jg-squad-lead-parent" <(
+    printf 'schema=jg-squad-lead-parent.v1\nroute=local\nparent_home=%s\n' "$parent"
+  ) || fail "real squad_lead seeding must write the exact durable local parent record"
 }
 
-test_local_secondmate_seed_publishes_parent_before_identity() {
+test_local_squad_lead_seed_publishes_parent_before_identity() {
   local parent child parent_resolved fakebin entered release manifest_out real_mv seed_pid wait_count
   parent=$(make_home seed-publication-parent relay-off)
   child="$TMP_ROOT/seed-publication-child"
@@ -835,7 +835,7 @@ test_local_secondmate_seed_publishes_parent_before_identity() {
 #!/usr/bin/env bash
 destination=${!#}
 case "$destination" in
-  */.jg-secondmate-home)
+  */.jg-squad-lead-home)
     touch "$JG_TEST_PUBLISH_ENTERED"
     wait_count=0
     while [ ! -f "$JG_TEST_PUBLISH_RELEASE" ]; do
@@ -849,7 +849,7 @@ exec "$JG_TEST_REAL_MV" "$@"
 SH
   chmod +x "$fakebin/mv"
   PATH="$fakebin:$PATH" JG_HOME="$parent" \
-    JG_SECONDMATE_CHARTER='Local publication-order regression charter.' \
+    JG_SQUAD_LEAD_CHARTER='Local publication-order regression charter.' \
     JG_TEST_REAL_MV="$real_mv" JG_TEST_PUBLISH_ENTERED="$entered" \
     JG_TEST_PUBLISH_RELEASE="$release" \
     "$ROOT/bin/jg-home-seed.sh" mate "$child" --no-projects > "$manifest_out" 2>&1 &
@@ -862,37 +862,37 @@ SH
     [ "$wait_count" -le 3000 ] || fail "local seeding never reached its identity completion marker"
     sleep 0.02
   done
-  assert_local_secondmate_parent_record "$child" "$parent_resolved"
-  assert_absent "$child/.jg-secondmate-home" \
+  assert_local_squad_lead_parent_record "$child" "$parent_resolved"
+  assert_absent "$child/.jg-squad-lead-home" \
     "the local identity marker must remain absent until durable parent publication completes"
   touch "$release"
   wait "$seed_pid" || fail "local seeding failed after publishing durable parent state: $(cat "$manifest_out")"
-  assert_present "$child/.jg-secondmate-home" \
+  assert_present "$child/.jg-squad-lead-home" \
     "local seeding must publish its identity marker as the completion point"
   pass "local seeding publishes durable parent state before its identity marker"
 }
 
-test_secondmate_teardown_resolves_parent_from_durable_record_when_env_lost() {
+test_squad_lead_teardown_resolves_parent_from_durable_record_when_env_lost() {
   local parent child parent_resolved
   parent=$(make_home teardown-durable-parent)
   child="$TMP_ROOT/teardown-durable-child"
-  JG_SECONDMATE_CHARTER='Durable-record regression charter.' \
+  JG_SQUAD_LEAD_CHARTER='Durable-record regression charter.' \
     JG_HOME="$parent" "$ROOT/bin/jg-home-seed.sh" mate "$child" --no-projects >/dev/null \
-    || fail "real secondmate seeding failed"
+    || fail "real squad_lead seeding failed"
   child=$(cd "$child" && pwd -P)
   parent_resolved=$(cd "$parent" && pwd -P)
   make_fake_curl "$child" >/dev/null
   jg_fake_exit0 "$child/fakebin" tmux treehouse no-mistakes gh gh-axi
 
-  assert_local_secondmate_parent_record "$child" "$parent_resolved"
+  assert_local_squad_lead_parent_record "$child" "$parent_resolved"
 
-  seed_commitment "$parent" pf-durable req-durable x secondmate:mate work-child
-  jg_write_meta "$parent/state/mate.meta" "kind=secondmate" "home=$child"
+  seed_commitment "$parent" pf-durable req-durable x squad_lead:mate work-child
+  jg_write_meta "$parent/state/mate.meta" "kind=squad_lead" "home=$child"
   jg_write_meta "$child/state/work-child.meta" \
-    "window=firstmate:jg-work-child" "endpoint_task_id=work-child" \
+    "window=juggernaut:jg-work-child" "endpoint_task_id=work-child" \
     "worktree=$child" "project=$child" "kind=ship" "mode=local-only" "spawn_gen=public-followup-fixture"
 
-  # No JG_PUBLIC_FOLLOWUP_PRIMARY_HOME at all here: a restart of the secondmate
+  # No JG_PUBLIC_FOLLOWUP_PRIMARY_HOME at all here: a restart of the squad_lead
   # agent that drops the launch-time prefix must still find the real parent
   # through the durable record instead of silently treating the relay as off.
   PATH="$child/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$child" \
@@ -909,22 +909,22 @@ test_secondmate_teardown_resolves_parent_from_durable_record_when_env_lost() {
   pass "a lost launch-time parent binding is recovered from the durable local record"
 }
 
-test_secondmate_teardown_durable_record_missing_parent_registration_still_refuses() {
+test_squad_lead_teardown_durable_record_missing_parent_registration_still_refuses() {
   local parent child parent_resolved
   parent=$(make_home teardown-durable-missing-parent relay-off)
   child="$TMP_ROOT/teardown-durable-missing-child"
-  JG_SECONDMATE_CHARTER='Durable-record missing-registration regression charter.' \
+  JG_SQUAD_LEAD_CHARTER='Durable-record missing-registration regression charter.' \
     JG_HOME="$parent" "$ROOT/bin/jg-home-seed.sh" mate "$child" --no-projects >/dev/null \
-    || fail "real secondmate seeding failed"
+    || fail "real squad_lead seeding failed"
   child=$(cd "$child" && pwd -P)
   parent_resolved=$(cd "$parent" && pwd -P)
   make_fake_curl "$child" >/dev/null
   jg_fake_exit0 "$child/fakebin" tmux treehouse no-mistakes gh gh-axi
-  assert_local_secondmate_parent_record "$child" "$parent_resolved"
+  assert_local_squad_lead_parent_record "$child" "$parent_resolved"
   jg_write_meta "$child/state/work-child.meta" \
-    "window=firstmate:jg-work-child" "endpoint_task_id=work-child" \
+    "window=juggernaut:jg-work-child" "endpoint_task_id=work-child" \
     "worktree=$child" "project=$child" "kind=ship" "mode=local-only" "spawn_gen=public-followup-fixture"
-  # No parent/state/mate.meta at all: the parent never recorded this secondmate's
+  # No parent/state/mate.meta at all: the parent never recorded this squad_lead's
   # own agent, so its side of the binding is genuinely missing. A durable LOCAL
   # record naming the real parent path must not be enough on its own to bypass
   # the check; the real protection this guard exists for must survive the fix.
@@ -933,33 +933,33 @@ test_secondmate_teardown_durable_record_missing_parent_registration_still_refuse
     JG_STATE_OVERRIDE="$child/state" JG_DATA_OVERRIDE="$child/data" \
     expect_failure "a durable local record with no parent-side registration must still refuse" \
     "$TEARDOWN" work-child
-  assert_contains "$EXPECT_OUT" "cannot resolve the primary home for marked secondmate mate" \
+  assert_contains "$EXPECT_OUT" "cannot resolve the primary home for marked squad_lead mate" \
     "a genuinely missing parent-side registration must remain an actionable teardown refusal"
   assert_present "$child/state/work-child.meta" \
     "a genuinely missing parent binding must preserve the child work metadata"
   pass "a durable local parent record does not bypass a genuinely missing parent-side registration"
 }
 
-test_secondmate_teardown_durable_record_with_unknown_field_succeeds() {
+test_squad_lead_teardown_durable_record_with_unknown_field_succeeds() {
   local parent parent_alias child parent_resolved rc out
   parent=$(make_home teardown-durable-clean-parent relay-off)
   child="$TMP_ROOT/teardown-durable-clean-child"
-  JG_SECONDMATE_CHARTER='Durable-record clean-cleanup regression charter.' \
+  JG_SQUAD_LEAD_CHARTER='Durable-record clean-cleanup regression charter.' \
     JG_HOME="$parent" "$ROOT/bin/jg-home-seed.sh" mate "$child" --no-projects >/dev/null \
-    || fail "real secondmate seeding failed"
+    || fail "real squad_lead seeding failed"
   child=$(cd "$child" && pwd -P)
   parent_resolved=$(cd "$parent" && pwd -P)
   make_fake_curl "$child" >/dev/null
   jg_fake_exit0 "$child/fakebin" tmux treehouse no-mistakes gh gh-axi
-  assert_local_secondmate_parent_record "$child" "$parent_resolved"
-  printf 'some_future_field=value\n' >> "$child/.jg-secondmate-parent"
+  assert_local_squad_lead_parent_record "$child" "$parent_resolved"
+  printf 'some_future_field=value\n' >> "$child/.jg-squad-lead-parent"
   parent_alias="$TMP_ROOT/teardown-durable-clean-parent-alias"
   ln -s "$parent" "$parent_alias"
-  jg_write_meta "$parent/state/mate.meta" "kind=secondmate" "home=$child"
+  jg_write_meta "$parent/state/mate.meta" "kind=squad_lead" "home=$child"
   jg_git_init_commit "$child/projects/worktree"
   printf 'manual\n' > "$child/config/backlog-backend"
   jg_write_meta "$child/state/work-clean.meta" \
-    "window=firstmate:jg-work-clean" "endpoint_task_id=work-clean" \
+    "window=juggernaut:jg-work-clean" "endpoint_task_id=work-clean" \
     "worktree=$child/projects/worktree" "project=$child/projects/worktree" \
     "kind=ship" "mode=local-only" "spawn_gen=public-followup-fixture"
 
@@ -974,24 +974,24 @@ test_secondmate_teardown_durable_record_with_unknown_field_succeeds() {
   pass "unknown durable parent fields remain forward-compatible"
 }
 
-test_secondmate_teardown_rejects_conflicting_live_and_durable_parent_bindings() {
+test_squad_lead_teardown_rejects_conflicting_live_and_durable_parent_bindings() {
   local durable_parent live_parent child parent_resolved
   durable_parent=$(make_home teardown-durable-conflict-recorded relay-off)
   live_parent=$(make_home teardown-durable-conflict-live relay-off)
   child="$TMP_ROOT/teardown-durable-conflict-child"
-  JG_SECONDMATE_CHARTER='Durable-record conflict regression charter.' \
+  JG_SQUAD_LEAD_CHARTER='Durable-record conflict regression charter.' \
     JG_HOME="$durable_parent" "$ROOT/bin/jg-home-seed.sh" mate "$child" --no-projects >/dev/null \
-    || fail "real secondmate seeding failed"
+    || fail "real squad_lead seeding failed"
   child=$(cd "$child" && pwd -P)
   parent_resolved=$(cd "$durable_parent" && pwd -P)
   make_fake_curl "$child" >/dev/null
   jg_fake_exit0 "$child/fakebin" tmux treehouse no-mistakes gh gh-axi
-  assert_local_secondmate_parent_record "$child" "$parent_resolved"
-  jg_write_meta "$durable_parent/state/mate.meta" "kind=secondmate" "home=$child"
+  assert_local_squad_lead_parent_record "$child" "$parent_resolved"
+  jg_write_meta "$durable_parent/state/mate.meta" "kind=squad_lead" "home=$child"
   jg_git_init_commit "$child/projects/worktree"
   printf 'manual\n' > "$child/config/backlog-backend"
   jg_write_meta "$child/state/work-conflict.meta" \
-    "window=firstmate:jg-work-conflict" "endpoint_task_id=work-conflict" \
+    "window=juggernaut:jg-work-conflict" "endpoint_task_id=work-conflict" \
     "worktree=$child/projects/worktree" "project=$child/projects/worktree" \
     "kind=ship" "mode=local-only" "spawn_gen=public-followup-fixture"
 
@@ -1000,46 +1000,46 @@ test_secondmate_teardown_rejects_conflicting_live_and_durable_parent_bindings() 
     JG_CONFIG_OVERRIDE="$child/config" JG_PUBLIC_FOLLOWUP_PRIMARY_HOME="$live_parent" \
     expect_failure "conflicting live and durable parent bindings must refuse cleanup" \
     "$TEARDOWN" work-conflict
-  assert_contains "$EXPECT_OUT" "cannot resolve the primary home for marked secondmate mate" \
+  assert_contains "$EXPECT_OUT" "cannot resolve the primary home for marked squad_lead mate" \
     "a conflicting live parent must produce the explicit durable-binding refusal"
   assert_present "$child/state/work-conflict.meta" \
     "a conflicting live parent must preserve child work metadata"
   pass "conflicting live and durable parent bindings fail closed"
 }
 
-test_secondmate_teardown_rejects_unsafe_durable_parent_records() {
+test_squad_lead_teardown_rejects_unsafe_durable_parent_records() {
   local case_name parent child parent_record
   for case_name in symlink invalid-route duplicate-route remote-parent-home local-parent-host; do
     parent=$(make_home "teardown-durable-$case_name-parent" relay-off)
     child="$TMP_ROOT/teardown-durable-$case_name-child"
-    JG_SECONDMATE_CHARTER='Unsafe durable-record regression charter.' \
+    JG_SQUAD_LEAD_CHARTER='Unsafe durable-record regression charter.' \
       JG_HOME="$parent" "$ROOT/bin/jg-home-seed.sh" mate "$child" --no-projects >/dev/null \
-      || fail "real secondmate seeding failed for $case_name"
+      || fail "real squad_lead seeding failed for $case_name"
     child=$(cd "$child" && pwd -P)
     make_fake_curl "$child" >/dev/null
     jg_fake_exit0 "$child/fakebin" tmux treehouse no-mistakes gh gh-axi
     jg_write_meta "$child/state/work-child.meta" \
-      "window=firstmate:jg-work-child" "endpoint_task_id=work-child" \
+      "window=juggernaut:jg-work-child" "endpoint_task_id=work-child" \
       "worktree=$child" "project=$child" "kind=ship" "mode=local-only" "spawn_gen=public-followup-fixture"
-    parent_record="$child/.jg-secondmate-parent"
+    parent_record="$child/.jg-squad-lead-parent"
     case "$case_name" in
       symlink)
         mv "$parent_record" "$parent_record.valid"
-        ln -s .jg-secondmate-parent.valid "$parent_record"
+        ln -s .jg-squad-lead-parent.valid "$parent_record"
         ;;
       invalid-route)
-        printf 'schema=jg-secondmate-parent.v1\nroute=garbage\n' > "$parent_record"
+        printf 'schema=jg-squad-lead-parent.v1\nroute=garbage\n' > "$parent_record"
         ;;
       duplicate-route)
-        printf 'schema=jg-secondmate-parent.v1\nroute=local\nparent_home=%s\nroute=remote\n' \
+        printf 'schema=jg-squad-lead-parent.v1\nroute=local\nparent_home=%s\nroute=remote\n' \
           "$parent" > "$parent_record"
         ;;
       remote-parent-home)
-        printf 'schema=jg-secondmate-parent.v1\nroute=remote\nparent_home=%s\n' \
+        printf 'schema=jg-squad-lead-parent.v1\nroute=remote\nparent_home=%s\n' \
           "$parent" > "$parent_record"
         ;;
       local-parent-host)
-        printf 'schema=jg-secondmate-parent.v1\nroute=local\nparent_home=%s\nparent_host=remote-host\n' \
+        printf 'schema=jg-squad-lead-parent.v1\nroute=local\nparent_home=%s\nparent_host=remote-host\n' \
           "$parent" > "$parent_record"
         ;;
     esac
@@ -1048,7 +1048,7 @@ test_secondmate_teardown_rejects_unsafe_durable_parent_records() {
       JG_STATE_OVERRIDE="$child/state" JG_DATA_OVERRIDE="$child/data" \
       expect_failure "an unsafe $case_name durable parent record must refuse cleanup" \
       "$TEARDOWN" work-child
-    assert_contains "$EXPECT_OUT" "cannot resolve the primary home for marked secondmate mate" \
+    assert_contains "$EXPECT_OUT" "cannot resolve the primary home for marked squad_lead mate" \
       "an unsafe $case_name durable parent record must produce the explicit binding refusal"
     assert_present "$child/state/work-child.meta" \
       "an unsafe $case_name durable parent record must preserve child work metadata"
@@ -1069,30 +1069,30 @@ test_secondmate_teardown_rejects_unsafe_durable_parent_records() {
 # parent under a NUL-dropping read, so before the parser rejected NUL this
 # cleanup PROCEEDED - the refusal asserted here is the parser failing closed,
 # not the fixture refusing for some unrelated reason.
-test_secondmate_teardown_rejects_nul_bearing_durable_parent_record() {
+test_squad_lead_teardown_rejects_nul_bearing_durable_parent_record() {
   local parent child parent_resolved pre suf record
   parent=$(make_home teardown-durable-nul-parent relay-off)
   child="$TMP_ROOT/teardown-durable-nul-child"
-  JG_SECONDMATE_CHARTER='Durable-record NUL regression charter.' \
+  JG_SQUAD_LEAD_CHARTER='Durable-record NUL regression charter.' \
     JG_HOME="$parent" "$ROOT/bin/jg-home-seed.sh" mate "$child" --no-projects >/dev/null \
-    || fail "real secondmate seeding failed"
+    || fail "real squad_lead seeding failed"
   child=$(cd "$child" && pwd -P)
   parent_resolved=$(cd "$parent" && pwd -P)
   make_fake_curl "$child" >/dev/null
   jg_fake_exit0 "$child/fakebin" tmux treehouse no-mistakes gh gh-axi
-  assert_local_secondmate_parent_record "$child" "$parent_resolved"
-  jg_write_meta "$parent/state/mate.meta" "kind=secondmate" "home=$child"
+  assert_local_squad_lead_parent_record "$child" "$parent_resolved"
+  jg_write_meta "$parent/state/mate.meta" "kind=squad_lead" "home=$child"
   jg_git_init_commit "$child/projects/worktree"
   printf 'manual\n' > "$child/config/backlog-backend"
   jg_write_meta "$child/state/work-child.meta" \
-    "window=firstmate:jg-work-child" "endpoint_task_id=work-child" \
+    "window=juggernaut:jg-work-child" "endpoint_task_id=work-child" \
     "worktree=$child/projects/worktree" "project=$child/projects/worktree" \
     "kind=ship" "mode=local-only" "spawn_gen=public-followup-fixture"
   pre=${parent_resolved%??????}
   suf=${parent_resolved#"$pre"}
-  record="$child/.jg-secondmate-parent"
+  record="$child/.jg-squad-lead-parent"
   {
-    printf 'schema=jg-secondmate-parent.v1\nroute=local\n'
+    printf 'schema=jg-squad-lead-parent.v1\nroute=local\n'
     printf 'parent_home=%s' "$pre"
     printf '\0'
     printf '%s\n' "$suf"
@@ -1103,7 +1103,7 @@ test_secondmate_teardown_rejects_nul_bearing_durable_parent_record() {
     JG_CONFIG_OVERRIDE="$child/config" \
     expect_failure "a NUL-bearing durable parent record must refuse cleanup" \
     "$TEARDOWN" work-child
-  assert_contains "$EXPECT_OUT" "cannot resolve the primary home for marked secondmate mate" \
+  assert_contains "$EXPECT_OUT" "cannot resolve the primary home for marked squad_lead mate" \
     "a NUL-bearing durable parent record must produce the explicit binding refusal"
   assert_present "$child/state/work-child.meta" \
     "a NUL-bearing durable parent record must preserve child work metadata"
@@ -1123,7 +1123,7 @@ exit 99
 SH
   chmod +x "$home/fakebin/tasks-axi"
   jg_write_meta "$home/state/work-disabled.meta" \
-    "window=firstmate:jg-work-disabled" "endpoint_task_id=work-disabled" \
+    "window=juggernaut:jg-work-disabled" "endpoint_task_id=work-disabled" \
     "worktree=$home/projects/worktree" "project=$home/projects/worktree" \
     "kind=ship" "mode=local-only" "spawn_gen=public-followup-fixture"
 
@@ -1146,10 +1146,10 @@ test_relay_disabled_parent_allows_marked_child_teardown() {
   parent=$(make_home teardown-disabled-parent relay-off)
   child=$(make_home teardown-disabled-child relay-off)
   jg_git_init_commit "$child/projects/worktree"
-  printf '%s\n' disabled-mate > "$child/.jg-secondmate-home"
+  printf '%s\n' disabled-mate > "$child/.jg-squad-lead-home"
   printf -- '- disabled-mate - synthetic (home: %s; scope: synthetic; projects: ; added 2026-07-30)\n' \
-    "$child" > "$parent/data/secondmates.md"
-  jg_write_meta "$parent/state/disabled-mate.meta" "kind=secondmate" "home=$child"
+    "$child" > "$parent/data/squad_leads.md"
+  jg_write_meta "$parent/state/disabled-mate.meta" "kind=squad_lead" "home=$child"
   tasks_log="$child/tasks-axi.log"; : > "$tasks_log"
   printf 'manual\n' > "$child/config/backlog-backend"
   cat > "$child/fakebin/tasks-axi" <<'SH'
@@ -1159,7 +1159,7 @@ exit 99
 SH
   chmod +x "$child/fakebin/tasks-axi"
   jg_write_meta "$child/state/work-disabled.meta" \
-    "window=firstmate:jg-work-disabled" "endpoint_task_id=work-disabled" \
+    "window=juggernaut:jg-work-disabled" "endpoint_task_id=work-disabled" \
     "worktree=$child/projects/worktree" "project=$child/projects/worktree" \
     "kind=ship" "mode=local-only" "spawn_gen=public-followup-fixture"
 
@@ -1178,17 +1178,17 @@ SH
   pass "a marked child proceeds without tasks-axi when its parent relay is disabled"
 }
 
-test_secondmate_parent_binding_matches_literal_id() {
+test_squad_lead_parent_binding_matches_literal_id() {
   local parent child
   parent=$(make_home teardown-literal-parent)
   child=$(make_home teardown-literal-child)
-  printf '%s\n' 'mate.id' > "$child/.jg-secondmate-home"
+  printf '%s\n' 'mate.id' > "$child/.jg-squad-lead-home"
   printf -- '- mateXid - synthetic (home: %s; scope: synthetic; projects: ; added 2026-07-30)\n' \
-    "$child" > "$parent/data/secondmates.md"
-  seed_commitment "$parent" pf-teardown-literal req-teardown-literal x secondmate:mate.id work-literal
-  jg_write_meta "$parent/state/mate.id.meta" "kind=secondmate" "home=$child"
+    "$child" > "$parent/data/squad_leads.md"
+  seed_commitment "$parent" pf-teardown-literal req-teardown-literal x squad_lead:mate.id work-literal
+  jg_write_meta "$parent/state/mate.id.meta" "kind=squad_lead" "home=$child"
   jg_write_meta "$child/state/work-literal.meta" \
-    "window=firstmate:jg-work-literal" "endpoint_task_id=work-literal" \
+    "window=juggernaut:jg-work-literal" "endpoint_task_id=work-literal" \
     "worktree=$child" "project=$child" "kind=ship" "mode=local-only" "spawn_gen=public-followup-fixture"
 
   PATH="$child/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$child" \
@@ -1196,11 +1196,11 @@ test_secondmate_parent_binding_matches_literal_id() {
     JG_CONFIG_OVERRIDE="$child/config" JG_PUBLIC_FOLLOWUP_PRIMARY_HOME="$parent" \
     expect_failure "a near-match registry id must not satisfy a dotted parent binding" \
     "$TEARDOWN" work-literal
-  assert_contains "$EXPECT_OUT" "cannot resolve the primary home for marked secondmate mate.id" \
+  assert_contains "$EXPECT_OUT" "cannot resolve the primary home for marked squad_lead mate.id" \
     "a dotted id must be matched as an exact registry field"
   assert_present "$child/state/work-literal.meta" \
     "a near-match parent binding must preserve the child work metadata"
-  pass "secondmate parent resolution matches the durable registry id literally"
+  pass "squad_lead parent resolution matches the durable registry id literally"
 }
 
 test_traversal_registration_is_refused_before_delivery() {
@@ -1211,7 +1211,7 @@ test_traversal_registration_is_refused_before_delivery() {
   emit_terminal "$home" "$home" pf-traversal main work-traversal >/dev/null \
     || fail "emit failed for traversal registration"
   run_pf "$home" consume >/dev/null || fail "consume failed before traversal registration damage"
-  sed -i.bak 's/^work_home=.*/work_home=secondmate:..\/..\/x/' \
+  sed -i.bak 's/^work_home=.*/work_home=squad_lead:..\/..\/x/' \
     "$home/state/public-followup/registry/pf-traversal"
   rm -f "$home/state/public-followup/registry/pf-traversal.bak"
 
@@ -1279,7 +1279,7 @@ test_cleanup_refuses_while_a_public_reply_is_owed() {
   tasks_in "$home" start ship-task >/dev/null \
     || fail "could not mark the guarded ship In flight"
   jg_write_meta "$home/state/ship-task.meta" \
-    "window=firstmate:jg-ship-task" \
+    "window=juggernaut:jg-ship-task" \
     "worktree=$home/projects/gone" \
     "project=$home/projects/sample" \
     "harness=codex" \
@@ -1310,7 +1310,7 @@ test_cleanup_refuses_while_a_public_reply_is_owed() {
 
 # --- 7. zero overhead for homes that do not use the relay ----------------------
 
-# The hard acceptance criterion. A home that never opted into the myfirstmate
+# The hard acceptance criterion. A home that never opted into the myjuggernaut
 # relay must see no process, no tasks-axi call, no scan, no output, and no file.
 test_relay_disabled_home_pays_nothing() {
   local home tasks_log out rc before after cmd
@@ -1447,7 +1447,7 @@ test_relay_poll_stays_inert_and_surfaces_once() {
   second=$(PATH="$on/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$on" \
     JG_STATE_OVERRIDE="$on/state" "$POLL" 2>&1)
   assert_not_contains "$second" "public-followup" \
-    "an unchanged pending set must not wake firstmate again every cycle"
+    "an unchanged pending set must not wake juggernaut again every cycle"
   pass "the relay poll stays inert without a token, silent with no commitments, and surfaces a new result once"
 }
 
@@ -1506,7 +1506,7 @@ test_dropped_baton_now_surfaces_open_loop() {
   local parent child log
   parent=$(make_home baton-parent)
   child="$TMP_ROOT/baton-child"
-  JG_SECONDMATE_CHARTER='Baton repro charter.' JG_HOME="$parent" \
+  JG_SQUAD_LEAD_CHARTER='Baton repro charter.' JG_HOME="$parent" \
     "$ROOT/bin/jg-home-seed.sh" mate "$child" --no-projects >/dev/null || fail "seed failed"
   child=$(cd "$child" && pwd -P)
   make_fake_curl "$child" >/dev/null
@@ -1514,11 +1514,11 @@ test_dropped_baton_now_surfaces_open_loop() {
   log="$TMP_ROOT/curl.log"; : > "$log"
 
   seed_repro_commitment "$parent" public-final-pi-rearm-repro req-pirearm \
-    secondmate:mate pi-rearm-loop-repro-s1
-  jg_write_meta "$parent/state/mate.meta" "kind=secondmate" "home=$child"
+    squad_lead:mate pi-rearm-loop-repro-s1
+  jg_write_meta "$parent/state/mate.meta" "kind=squad_lead" "home=$child"
 
   "$EMIT" --home "$parent" --obligation public-final-pi-rearm-repro --relation rel-code \
-    --source-home secondmate:mate --work-id pi-rearm-loop-repro-s1 --generation 1 \
+    --source-home squad_lead:mate --work-id pi-rearm-loop-repro-s1 --generation 1 \
     --outcome report-ready --deliverable report_path=data/pi-rearm-loop-repro-s1/report.md \
     --outcome-text 'Reproduced the loop. A bounded fix is scoped and waiting on you, captain.' >/dev/null \
     || fail "emit failed"
@@ -1529,11 +1529,11 @@ test_dropped_baton_now_surfaces_open_loop() {
     "delivery must retain the registration"
 
   jg_write_meta "$child/state/pi-rearm-loop-fix-r1.meta" \
-    "window=firstmate:jg-pi-rearm-loop-fix-r1" "endpoint_task_id=pi-rearm-loop-fix-r1" \
+    "window=juggernaut:jg-pi-rearm-loop-fix-r1" "endpoint_task_id=pi-rearm-loop-fix-r1" \
     "worktree=$child" "project=$child" "kind=ship" "mode=local-only" "spawn_gen=public-followup-fixture"
 
   PATH="$parent/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$parent" \
-    JG_STATE_OVERRIDE="$parent/state" "$PF" guard-work secondmate:mate pi-rearm-loop-fix-r1 \
+    JG_STATE_OVERRIDE="$parent/state" "$PF" guard-work squad_lead:mate pi-rearm-loop-fix-r1 \
     || fail "guard-work unexpectedly blocked the unregistered follow-on"
 
   run_pf "$parent" pending > "$TMP_ROOT/pending.out"
@@ -1556,16 +1556,16 @@ test_control_registered_followon_is_guarded() {
   local parent child
   parent=$(make_home baton-control-parent)
   child="$TMP_ROOT/baton-control-child"
-  JG_SECONDMATE_CHARTER='Baton control charter.' JG_HOME="$parent" \
+  JG_SQUAD_LEAD_CHARTER='Baton control charter.' JG_HOME="$parent" \
     "$ROOT/bin/jg-home-seed.sh" mate "$child" --no-projects >/dev/null || fail "seed failed"
   child=$(cd "$child" && pwd -P)
   make_fake_curl "$child" >/dev/null
   jg_fake_exit0 "$child/fakebin" tmux treehouse no-mistakes gh gh-axi
   seed_repro_commitment "$parent" public-final-pi-rearm-ship req-pirearm2 \
-    secondmate:mate pi-rearm-loop-fix-r1
-  jg_write_meta "$parent/state/mate.meta" "kind=secondmate" "home=$child"
+    squad_lead:mate pi-rearm-loop-fix-r1
+  jg_write_meta "$parent/state/mate.meta" "kind=squad_lead" "home=$child"
   jg_write_meta "$child/state/pi-rearm-loop-fix-r1.meta" \
-    "window=firstmate:jg-pi-rearm-loop-fix-r1" "endpoint_task_id=pi-rearm-loop-fix-r1" \
+    "window=juggernaut:jg-pi-rearm-loop-fix-r1" "endpoint_task_id=pi-rearm-loop-fix-r1" \
     "worktree=$child" "project=$child" "kind=ship" "mode=local-only" "spawn_gen=public-followup-fixture"
   PATH="$child/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$child" \
     JG_STATE_OVERRIDE="$child/state" JG_DATA_OVERRIDE="$child/data" \
@@ -1788,7 +1788,7 @@ test_first_register_succeeds_with_empty_lock_list_under_bash32() {
       received_at:"2026-07-30T10:00:00Z",
       followup_expires_at:"2026-08-06T10:00:00Z",
       reservation_expires_at:"2026-08-06T10:00:00Z"}' > "$home/request.json"
-  jq -n '{type:"pr-merged", project:"firstmate",
+  jq -n '{type:"pr-merged", project:"juggernaut",
           required_deliverables:["pr_url"], completion_policy:"all-required"}' \
     > "$home/expected.json"
   jq -n '{relation_id:"rel-code", work_ref:{home_id:"main", task_id:"work-empty-locks"},
@@ -1897,17 +1897,17 @@ test_redelivery_does_not_report_retired_loop_open() {
   pass "redelivery does not report a retired loop as open"
 }
 
-test_retire_after_secondmate_home_removal() {
+test_retire_after_squad_lead_home_removal() {
   local home child log out
-  home=$(make_home retire-removed-secondmate)
+  home=$(make_home retire-removed-squad-lead)
   child="$home/removed-mate"
   mkdir -p "$child/state"
-  printf 'mate\n' > "$child/.jg-secondmate-home"
-  jg_write_meta "$home/state/mate.meta" "kind=secondmate" "home=$child"
+  printf 'mate\n' > "$child/.jg-squad-lead-home"
+  jg_write_meta "$home/state/mate.meta" "kind=squad_lead" "home=$child"
   log="$home/curl.log"; : > "$log"
-  seed_repro_commitment "$home" pf-removed-mate req-removed-mate secondmate:mate scout-removed
+  seed_repro_commitment "$home" pf-removed-mate req-removed-mate squad_lead:mate scout-removed
   "$EMIT" --home "$home" --obligation pf-removed-mate --relation rel-code \
-    --source-home secondmate:mate --work-id scout-removed --generation 1 \
+    --source-home squad_lead:mate --work-id scout-removed --generation 1 \
     --outcome report-ready --deliverable report_path=data/scout-removed/report.md \
     --outcome-text 'The removed child completed its investigation.' >/dev/null || fail "emit failed"
   run_pf "$home" consume >/dev/null || fail "consume failed"
@@ -1918,26 +1918,26 @@ test_retire_after_secondmate_home_removal() {
   out=$(run_pf "$home" retire pf-removed-mate --reason "child home was torn down") \
     || fail "retire must accept an already-absent child legacy link: $out"
   assert_contains "$out" "retired pf-removed-mate" \
-    "retire must close a delivered loop after its secondmate home is removed"
+    "retire must close a delivered loop after its squad_lead home is removed"
   assert_absent "$home/state/public-followup/registry/pf-removed-mate" \
     "retire must remove the registration after child teardown"
   assert_present "$home/state/public-followup/retired/pf-removed-mate" \
     "retire must still record its receipt"
-  pass "retire closes delivered loops after secondmate home removal"
+  pass "retire closes delivered loops after squad_lead home removal"
 }
 
-test_retire_refuses_unbound_existing_secondmate() {
+test_retire_refuses_unbound_existing_squad_lead() {
   local home child log
-  home=$(make_home retire-unbound-secondmate)
+  home=$(make_home retire-unbound-squad-lead)
   child="$home/unbound-mate"
   mkdir -p "$child/state"
   child=$(cd "$child" && pwd -P)
-  printf 'mate\n' > "$child/.jg-secondmate-home"
-  jg_write_meta "$home/state/mate.meta" "kind=secondmate" "home=$child"
+  printf 'mate\n' > "$child/.jg-squad-lead-home"
+  jg_write_meta "$home/state/mate.meta" "kind=squad_lead" "home=$child"
   log="$home/curl.log"; : > "$log"
-  seed_repro_commitment "$home" pf-unbound-mate req-unbound-mate secondmate:mate scout-unbound
+  seed_repro_commitment "$home" pf-unbound-mate req-unbound-mate squad_lead:mate scout-unbound
   "$EMIT" --home "$home" --obligation pf-unbound-mate --relation rel-code \
-    --source-home secondmate:mate --work-id scout-unbound --generation 1 \
+    --source-home squad_lead:mate --work-id scout-unbound --generation 1 \
     --outcome report-ready --deliverable report_path=data/scout-unbound/report.md \
     --outcome-text 'The unbound child completed its investigation.' >/dev/null || fail "emit failed"
   run_pf "$home" consume >/dev/null || fail "consume failed"
@@ -1945,34 +1945,34 @@ test_retire_refuses_unbound_existing_secondmate() {
   jg_write_meta "$child/state/scout-unbound.meta" "status=working" "x_request=req-unbound-mate"
   assert_grep "work_home_path=$child" \
     "$home/state/public-followup/registry/pf-unbound-mate" \
-    "registration must retain the canonical secondmate path"
+    "registration must retain the canonical squad_lead path"
   rm -f "$home/state/mate.meta"
 
   expect_failure "retire must not assume an unbound existing child link is cleared" \
     run_pf "$home" retire pf-unbound-mate --reason "child binding disappeared"
   assert_contains "$EXPECT_OUT" "could not clear the legacy X link" \
-    "retire must report an unverifiable secondmate legacy link"
+    "retire must report an unverifiable squad_lead legacy link"
   assert_present "$home/state/public-followup/registry/pf-unbound-mate" \
     "an unverifiable child link must retain the registration"
   assert_absent "$home/state/public-followup/retired/pf-unbound-mate" \
     "an unverifiable child link must not create a retirement receipt"
   assert_grep 'x_request=req-unbound-mate' "$child/state/scout-unbound.meta" \
     "failed retirement must preserve the unresolved legacy link"
-  pass "retire fails closed for an unbound existing secondmate"
+  pass "retire fails closed for an unbound existing squad_lead"
 }
 
-test_retire_refuses_reassigned_secondmate_home() {
+test_retire_refuses_reassigned_squad_lead_home() {
   local home original replacement log
-  home=$(make_home retire-reassigned-secondmate)
+  home=$(make_home retire-reassigned-squad-lead)
   original="$home/original-mate"
   replacement="$home/replacement-mate"
   mkdir -p "$original/state"
-  printf 'mate\n' > "$original/.jg-secondmate-home"
-  jg_write_meta "$home/state/mate.meta" "kind=secondmate" "home=$original"
+  printf 'mate\n' > "$original/.jg-squad-lead-home"
+  jg_write_meta "$home/state/mate.meta" "kind=squad_lead" "home=$original"
   log="$home/curl.log"; : > "$log"
-  seed_repro_commitment "$home" pf-reassigned-mate req-reassigned-mate secondmate:mate scout-reassigned
+  seed_repro_commitment "$home" pf-reassigned-mate req-reassigned-mate squad_lead:mate scout-reassigned
   "$EMIT" --home "$home" --obligation pf-reassigned-mate --relation rel-code \
-    --source-home secondmate:mate --work-id scout-reassigned --generation 1 \
+    --source-home squad_lead:mate --work-id scout-reassigned --generation 1 \
     --outcome report-ready --deliverable report_path=data/scout-reassigned/report.md \
     --outcome-text 'The original child completed its investigation.' >/dev/null || fail "emit failed"
   run_pf "$home" consume >/dev/null || fail "consume failed"
@@ -1981,12 +1981,12 @@ test_retire_refuses_reassigned_secondmate_home() {
   rm -rf "$original"
   mkdir -p "$replacement/state"
   replacement=$(cd "$replacement" && pwd -P)
-  printf 'mate\n' > "$replacement/.jg-secondmate-home"
+  printf 'mate\n' > "$replacement/.jg-squad-lead-home"
   jg_write_meta "$replacement/state/scout-reassigned.meta" \
     "status=working" "x_request=req-unrelated-replacement"
-  jg_write_meta "$home/state/mate.meta" "kind=secondmate" "home=$replacement"
+  jg_write_meta "$home/state/mate.meta" "kind=squad_lead" "home=$replacement"
 
-  expect_failure "retire must not clear a reassigned secondmate home" \
+  expect_failure "retire must not clear a reassigned squad_lead home" \
     run_pf "$home" retire pf-reassigned-mate --reason "original child was removed"
   assert_contains "$EXPECT_OUT" "could not clear the legacy X link" \
     "retirement must fail when the stable ID resolves to a different home"
@@ -1996,7 +1996,7 @@ test_retire_refuses_reassigned_secondmate_home() {
     "a reassigned child must not create a retirement receipt"
   assert_grep 'x_request=req-unrelated-replacement' "$replacement/state/scout-reassigned.meta" \
     "failed retirement must preserve the replacement home's Relay link"
-  pass "retire fails closed when a secondmate ID is reassigned"
+  pass "retire fails closed when a squad_lead ID is reassigned"
 }
 
 test_rechain_refuses_unclaimed_existing_destination() {
@@ -2012,7 +2012,7 @@ test_rechain_refuses_unclaimed_existing_destination() {
   FAKE_CURL_LOG="$log" run_pf "$home" deliver public-final-existing-a >/dev/null \
     || fail "deliver failed"
 
-  jq -n '{type:"pr-merged", project:"firstmate", required_deliverables:["pr_url"],
+  jq -n '{type:"pr-merged", project:"juggernaut", required_deliverables:["pr_url"],
       completion_policy:"all-required"}' > "$home/collision-expected.json"
   tasks_in "$home" public-followup add public-final-existing-b \
     --request-context-file "$home/request.json" --purpose promised-final \
@@ -2154,7 +2154,7 @@ test_retention_creates_no_false_teardown_refusal() {
   tasks_in "$home" start ship-retain >/dev/null \
     || fail "could not mark the retained-registration ship In flight"
   jg_write_meta "$home/state/ship-retain.meta" \
-    "window=firstmate:jg-ship-retain" \
+    "window=juggernaut:jg-ship-retain" \
     "worktree=$home/projects/gone" \
     "project=$home/projects/sample" \
     "harness=codex" \
@@ -2314,7 +2314,7 @@ test_x_request_teardown_warns_when_final_unposted() {
   tasks_in "$home" start linked-task >/dev/null \
     || fail "could not mark the legacy-link ship In flight"
   jg_write_meta "$home/state/linked-task.meta" \
-    "window=firstmate:jg-linked-task" \
+    "window=juggernaut:jg-linked-task" \
     "worktree=$home/projects/gone" \
     "project=$home/projects/sample" \
     "kind=ship" \
@@ -2334,27 +2334,27 @@ test_x_request_teardown_warns_when_final_unposted() {
   pass "teardown reports an unreconciled legacy Relay link"
 }
 
-test_secondmate_promotion_uses_teardown_parent_resolution() {
+test_squad_lead_promotion_uses_teardown_parent_resolution() {
   local parent stale child remote_child out
   parent=$(make_home promote-parent)
   stale=$(make_home promote-stale-parent)
   child=$(make_home promote-child relay-off)
-  printf '%s\n' mate > "$child/.jg-secondmate-home"
-  printf 'schema=jg-secondmate-parent.v1\nroute=local\nparent_home=%s\n' \
-    "$stale" > "$child/.jg-secondmate-parent"
+  printf '%s\n' mate > "$child/.jg-squad-lead-home"
+  printf 'schema=jg-squad-lead-parent.v1\nroute=local\nparent_home=%s\n' \
+    "$stale" > "$child/.jg-squad-lead-parent"
   printf -- '- mate - synthetic (home: %s; scope: synthetic; projects: ; added 2026-08-21)\n' \
-    "$child" > "$parent/data/secondmates.md"
-  jg_write_meta "$parent/state/mate.meta" "kind=secondmate" "home=$child"
+    "$child" > "$parent/data/squad_leads.md"
+  jg_write_meta "$parent/state/mate.meta" "kind=squad_lead" "home=$child"
   mkdir -p "$parent/state/public-followup/registry" "$stale/state/public-followup/registry"
-  printf 'obligation_id=pf-valid\nwork_home=secondmate:mate\nwork_id=promote-legacy\nstate=delivered\n' \
+  printf 'obligation_id=pf-valid\nwork_home=squad_lead:mate\nwork_id=promote-legacy\nstate=delivered\n' \
     > "$parent/state/public-followup/registry/pf-valid"
-  printf 'obligation_id=pf-stale\nwork_home=secondmate:mate\nwork_id=promote-conflict\nstate=delivered\n' \
+  printf 'obligation_id=pf-stale\nwork_home=squad_lead:mate\nwork_id=promote-conflict\nstate=delivered\n' \
     > "$stale/state/public-followup/registry/pf-stale"
   chmod 600 "$parent/state/public-followup/registry/pf-valid" \
     "$stale/state/public-followup/registry/pf-stale"
 
   jg_write_meta "$child/state/promote-conflict.meta" \
-    "window=firstmate:jg-promote-conflict" "kind=scout"
+    "window=juggernaut:jg-promote-conflict" "kind=scout"
   write_promotion_brief "$child" promote-conflict
   out=$(PATH="$child/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$child" \
     JG_STATE_OVERRIDE="$child/state" JG_PUBLIC_FOLLOWUP_PRIMARY_HOME="$parent" \
@@ -2367,9 +2367,9 @@ test_secondmate_promotion_uses_teardown_parent_resolution() {
   assert_not_contains "$out" "--from pf-stale" \
     "a stale durable parent must not produce a rechain hint"
 
-  rm -f "$child/.jg-secondmate-parent"
+  rm -f "$child/.jg-squad-lead-parent"
   jg_write_meta "$child/state/promote-legacy.meta" \
-    "window=firstmate:jg-promote-legacy" "kind=scout"
+    "window=juggernaut:jg-promote-legacy" "kind=scout"
   write_promotion_brief "$child" promote-legacy
   out=$(PATH="$child/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$child" \
     JG_STATE_OVERRIDE="$child/state" JG_PUBLIC_FOLLOWUP_PRIMARY_HOME="$parent" \
@@ -2377,16 +2377,16 @@ test_secondmate_promotion_uses_teardown_parent_resolution() {
     || fail "legacy parent recovery must not block promotion: $out"
   assert_contains "$out" "next: JG_HOME=" \
     "a recovered legacy parent must identify the consent-holding home"
-  assert_contains "$out" "--from pf-valid --work-home secondmate:mate --work-id promote-legacy" \
+  assert_contains "$out" "--from pf-valid --work-home squad_lead:mate --work-id promote-legacy" \
     "legacy parent recovery must print the rechain hint"
 
   remote_child=$(make_home promote-remote-child relay-off)
-  printf '%s\n' remote-mate > "$remote_child/.jg-secondmate-home"
-  printf 'schema=jg-secondmate-parent.v1\nroute=remote\nparent_host=remote.example\n' \
-    > "$remote_child/.jg-secondmate-parent"
+  printf '%s\n' remote-mate > "$remote_child/.jg-squad-lead-home"
+  printf 'schema=jg-squad-lead-parent.v1\nroute=remote\nparent_host=remote.example\n' \
+    > "$remote_child/.jg-squad-lead-parent"
   printf 'FMX_PAIRING_TOKEN=child-local-token\n' > "$remote_child/.env"
   jg_write_meta "$remote_child/state/promote-remote.meta" \
-    "window=firstmate:jg-promote-remote" "kind=scout"
+    "window=juggernaut:jg-promote-remote" "kind=scout"
   write_promotion_brief "$remote_child" promote-remote
   out=$(PATH="$remote_child/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$remote_child" \
     JG_STATE_OVERRIDE="$remote_child/state" \
@@ -2396,12 +2396,12 @@ test_secondmate_promotion_uses_teardown_parent_resolution() {
     "an unresolved remote parent must never refuse the kind flip"
   assert_contains "$out" "could not resolve the consent-holding parent home" \
     "a remote route with a local Relay token must warn as teardown does"
-  pass "secondmate promotion matches teardown parent resolution"
+  pass "squad_lead promotion matches teardown parent resolution"
 }
 
-# --- remote secondmate work homes ---------------------------------------------
+# --- remote squad_lead work homes ---------------------------------------------
 #
-# A REMOTE secondmate route's home exists only on the other machine. Registration
+# A REMOTE squad_lead route's home exists only on the other machine. Registration
 # therefore stores an empty work_home_path, so every close that must first clear
 # the bound legacy X link has to reach that home over the route's SSH transport,
 # and a worker there cannot write into the owning home's typed terminal-result
@@ -2464,20 +2464,20 @@ SH
   REMOTE_FIXTURE_SSH="$fakebin/fake-ssh"
 }
 
-# make_remote_route <home> <secondmate-id>: register a REMOTE secondmate route in
-# <home> and echo the path standing in for that secondmate's home on the far
+# make_remote_route <home> <squad-lead-id>: register a REMOTE squad_lead route in
+# <home> and echo the path standing in for that squad_lead's home on the far
 # machine. The parent-side task record carries the same route jg-spawn writes.
 # Callers run remote_fixture_prepare first, because this one is used in command
 # substitution and a subshell cannot publish the shared fixture globals.
-make_remote_route() {  # <home> <secondmate-id>
+make_remote_route() {  # <home> <squad-lead-id>
   local home=$1 id=$2 remote_home
   remote_home="$TMP_ROOT/$(basename "$home")-remote-$id"
   mkdir -p "$remote_home/state" "$remote_home/data"
   remote_home=$(cd "$remote_home" && pwd -P)
-  cat > "$home/data/secondmates.md" <<EOF
-- $id - remote lane (host: remote-mac; root: $REMOTE_FIXTURE_ROOT; home: $remote_home; scope: relay work; projects: firstmate; added 2026-08-02)
+  cat > "$home/data/squad_leads.md" <<EOF
+- $id - remote lane (host: remote-mac; root: $REMOTE_FIXTURE_ROOT; home: $remote_home; scope: relay work; projects: juggernaut; added 2026-08-02)
 EOF
-  jg_write_meta "$home/state/$id.meta" "kind=secondmate" "home=$remote_home" \
+  jg_write_meta "$home/state/$id.meta" "kind=squad_lead" "home=$remote_home" \
     "remote_host=remote-mac" "remote_root=$REMOTE_FIXTURE_ROOT"
   printf '%s\n' "$remote_home"
 }
@@ -2513,18 +2513,18 @@ run_pf_remote_timed() {  # <seconds> <home> <args...>
     "$PF" "$@"
 }
 
-# The reported failure: a public loop whose work lived in a REMOTE secondmate
+# The reported failure: a public loop whose work lived in a REMOTE squad_lead
 # home could never be closed. Its registration carries no local path, so the
 # legacy-link clear that every close runs first had nothing to act on and refused
 # forever - leaving the promise permanently open and, on the delivery path,
 # leaving a loop stuck at posted after the public reply had already landed.
-test_remote_secondmate_loop_delivers_and_retires() {
+test_remote_squad_lead_loop_delivers_and_retires() {
   local home remote log
   remote_fixture_prepare
   home=$(make_home remote-retire)
   remote=$(make_remote_route "$home" mini-default)
   log="$home/curl.log"; : > "$log"
-  seed_repro_commitment "$home" pf-remote-close req-remote-close secondmate:mini-default work-remote
+  seed_repro_commitment "$home" pf-remote-close req-remote-close squad_lead:mini-default work-remote
   jg_write_meta "$remote/state/work-remote.meta" \
     "x_request=req-remote-close" "x_request_ts=1700000000" "x_followups=1"
 
@@ -2534,7 +2534,7 @@ test_remote_secondmate_loop_delivers_and_retires() {
     || fail "a remote work home must register with no local path"
 
   "$EMIT" --home "$home" --obligation pf-remote-close --relation rel-code \
-    --source-home secondmate:mini-default --work-id work-remote --generation 1 \
+    --source-home squad_lead:mini-default --work-id work-remote --generation 1 \
     --outcome report-ready --deliverable report_path=data/work-remote/report.md \
     --outcome-text 'The remote lane finished its investigation.' >/dev/null \
     || fail "emit failed"
@@ -2553,7 +2553,7 @@ test_remote_secondmate_loop_delivers_and_retires() {
     "retiring a remote-home loop must record its receipt"
   assert_absent "$home/state/public-followup/registry/pf-remote-close" \
     "retiring a remote-home loop must drop its registration"
-  pass "a public loop bound to a remote secondmate home delivers and retires"
+  pass "a public loop bound to a remote squad_lead home delivers and retires"
 }
 
 test_delivered_remote_registration_skips_offline_route() {
@@ -2562,12 +2562,12 @@ test_delivered_remote_registration_skips_offline_route() {
   home=$(make_home remote-delivered-skip)
   remote=$(make_remote_route "$home" mini-default)
   log="$home/curl.log"; : > "$log"
-  seed_repro_commitment "$home" pf-remote-delivered req-remote-delivered secondmate:mini-default work-delivered
+  seed_repro_commitment "$home" pf-remote-delivered req-remote-delivered squad_lead:mini-default work-delivered
   jg_write_meta "$remote/state/work-delivered.meta" \
     "x_request=req-remote-delivered" "x_request_ts=1700000000" "x_followups=1"
 
   "$EMIT" --home "$home" --obligation pf-remote-delivered --relation rel-code \
-    --source-home secondmate:mini-default --work-id work-delivered --generation 1 \
+    --source-home squad_lead:mini-default --work-id work-delivered --generation 1 \
     --outcome report-ready --deliverable report_path=data/work-delivered/report.md \
     --outcome-text 'The remote lane completed its work.' >/dev/null \
     || fail "emit failed"
@@ -2595,8 +2595,8 @@ test_remote_retire_force_semantics_unchanged() {
   remote_fixture_prepare
   home=$(make_home remote-force)
   remote=$(make_remote_route "$home" mini-default)
-  seed_repro_commitment "$home" pf-remote-open req-remote-open secondmate:mini-default work-open
-  seed_repro_commitment "$home" pf-remote-forced req-remote-forced secondmate:mini-default work-forced
+  seed_repro_commitment "$home" pf-remote-open req-remote-open squad_lead:mini-default work-open
+  seed_repro_commitment "$home" pf-remote-forced req-remote-forced squad_lead:mini-default work-forced
   jg_write_meta "$remote/state/work-open.meta" \
     "x_request=req-remote-open" "x_request_ts=1700000000" "x_followups=1"
   jg_write_meta "$remote/state/work-forced.meta" \
@@ -2626,11 +2626,11 @@ test_remote_retire_refuses_reassigned_route() {
   home=$(make_home remote-reassigned)
   original=$(make_remote_route "$home" mate)
   log="$home/curl.log"; : > "$log"
-  seed_repro_commitment "$home" pf-remote-reassigned req-remote-original secondmate:mate work-reused
+  seed_repro_commitment "$home" pf-remote-reassigned req-remote-original squad_lead:mate work-reused
   jg_write_meta "$original/state/work-reused.meta" \
     "x_request=req-remote-original" "x_request_ts=1700000000" "x_followups=1"
   "$EMIT" --home "$home" --obligation pf-remote-reassigned --relation rel-code \
-    --source-home secondmate:mate --work-id work-reused --generation 1 \
+    --source-home squad_lead:mate --work-id work-reused --generation 1 \
     --outcome report-ready --deliverable report_path=data/work-reused/report.md \
     --outcome-text 'The original remote route finished its work.' >/dev/null || fail "emit failed"
   run_pf_remote "$home" consume >/dev/null || fail "consume failed"
@@ -2640,10 +2640,10 @@ test_remote_retire_refuses_reassigned_route() {
   replacement="$TMP_ROOT/remote-replacement-mate"
   mkdir -p "$replacement/state" "$replacement/data"
   replacement=$(cd "$replacement" && pwd -P)
-  cat > "$home/data/secondmates.md" <<EOF
-- mate - replacement lane (host: remote-mac; root: $REMOTE_FIXTURE_ROOT; home: $replacement; scope: relay work; projects: firstmate; added 2026-08-03)
+  cat > "$home/data/squad_leads.md" <<EOF
+- mate - replacement lane (host: remote-mac; root: $REMOTE_FIXTURE_ROOT; home: $replacement; scope: relay work; projects: juggernaut; added 2026-08-03)
 EOF
-  jg_write_meta "$home/state/mate.meta" "kind=secondmate" "home=$replacement" \
+  jg_write_meta "$home/state/mate.meta" "kind=squad_lead" "home=$replacement" \
     "remote_host=remote-mac" "remote_root=$REMOTE_FIXTURE_ROOT"
   jg_write_meta "$replacement/state/work-reused.meta" \
     "status=working" "x_request=req-remote-replacement" "x_request_ts=1700000000" "x_followups=1"
@@ -2666,7 +2666,7 @@ test_remote_retire_refuses_unreadable_state() {
   remote_fixture_prepare
   home=$(make_home remote-unreadable)
   remote=$(make_remote_route "$home" mate)
-  seed_repro_commitment "$home" pf-remote-unreadable req-remote-unreadable secondmate:mate work-unreadable
+  seed_repro_commitment "$home" pf-remote-unreadable req-remote-unreadable squad_lead:mate work-unreadable
   meta="$remote/state/work-unreadable.meta"
   jg_write_meta "$meta" \
     "status=working" "x_request=req-remote-unreadable" "x_request_ts=1700000000" "x_followups=1"
@@ -2693,7 +2693,7 @@ test_remote_retire_refuses_nonwritable_state() {
   remote_fixture_prepare
   home=$(make_home remote-nonwritable)
   remote=$(make_remote_route "$home" mate)
-  seed_repro_commitment "$home" pf-remote-nonwritable req-remote-nonwritable secondmate:mate work-nonwritable
+  seed_repro_commitment "$home" pf-remote-nonwritable req-remote-nonwritable squad_lead:mate work-nonwritable
   meta="$remote/state/work-nonwritable.meta"
   jg_write_meta "$meta" \
     "status=working" "x_request=req-remote-nonwritable" "x_request_ts=1700000000" "x_followups=1"
@@ -2719,7 +2719,7 @@ test_remote_retire_accepts_nonwritable_absence() {
   remote_fixture_prepare
   home=$(make_home remote-no-link)
   remote=$(make_remote_route "$home" mate)
-  seed_repro_commitment "$home" pf-remote-no-link req-remote-no-link secondmate:mate work-no-link
+  seed_repro_commitment "$home" pf-remote-no-link req-remote-no-link squad_lead:mate work-no-link
   jg_write_meta "$remote/state/work-no-link.meta" "status=done"
   chmod 555 "$remote/state"
 
@@ -2751,7 +2751,7 @@ test_remote_retire_refuses_unacquirable_lock_without_hanging() {
   remote_fixture_prepare
   home=$(make_home remote-lock-bound)
   remote=$(make_remote_route "$home" mate)
-  seed_repro_commitment "$home" pf-remote-lock req-remote-lock secondmate:mate work-lock
+  seed_repro_commitment "$home" pf-remote-lock req-remote-lock squad_lead:mate work-lock
   meta="$remote/state/work-lock.meta"
   jg_write_meta "$meta" \
     "status=working" "x_request=req-remote-lock" "x_request_ts=1700000000" "x_followups=1"
@@ -2801,7 +2801,7 @@ test_remote_unconfirmed_clear_is_unknown_completion() {
   remote_fixture_prepare
   home=$(make_home remote-unknown)
   remote=$(make_remote_route "$home" mini-default)
-  seed_repro_commitment "$home" pf-remote-unknown req-remote-unknown secondmate:mini-default work-unknown
+  seed_repro_commitment "$home" pf-remote-unknown req-remote-unknown squad_lead:mini-default work-unknown
   jg_write_meta "$remote/state/work-unknown.meta" \
     "x_request=req-remote-unknown" "x_request_ts=1700000000" "x_followups=1"
 
@@ -2830,7 +2830,7 @@ brief_emit_command() {  # <brief-output>
   '
 }
 
-# The reported failure: a public loop whose work lives in a REMOTE secondmate
+# The reported failure: a public loop whose work lives in a REMOTE squad_lead
 # home never received its typed terminal result. The instructions named the
 # owning home's own absolute path, which does not exist on the worker's machine,
 # so the worker's emit could not land anything the owning home would ever read -
@@ -2840,7 +2840,7 @@ test_remote_work_home_emit_reaches_owning_home() {
   remote_fixture_prepare
   home=$(make_home remote-emit)
   remote=$(make_remote_route "$home" mini-default)
-  seed_repro_commitment "$home" pf-remote-emit req-remote-emit secondmate:mini-default work-remote
+  seed_repro_commitment "$home" pf-remote-emit req-remote-emit squad_lead:mini-default work-remote
 
   out=$(run_pf "$home" brief pf-remote-emit) || fail "brief failed: $out"
   command=$(brief_emit_command "$out")
@@ -2869,7 +2869,7 @@ test_remote_work_home_emit_reaches_owning_home() {
   # checkout really exists at the route's remote root, so the printed command is
   # literally executable there.
   command=${command//<one bounded public-safe sentence>/The remote lane finished its investigation.}
-  printf 'mini-default\n' > "$remote/.jg-secondmate-home"
+  printf 'mini-default\n' > "$remote/.jg-squad-lead-home"
   bash -c "$command" >/dev/null || fail "the worker's own instructions must run in its home"
 
   staged=$(run_pf_remote "$home" consume) || fail "consume failed: $staged"
@@ -2896,7 +2896,7 @@ test_remote_promise_without_deliverables_is_briefable() {
   home=$(make_home remote-explicit)
   remote=$(make_remote_route "$home" mini-default)
   seed_typed_commitment "$home" pf-remote-explicit req-remote-explicit explicit-answer '[]' \
-    secondmate:mini-default work-explicit
+    squad_lead:mini-default work-explicit
 
   out=$(run_pf "$home" brief pf-remote-explicit) || fail "brief failed: $out"
   command=$(brief_emit_command "$out")
@@ -2907,7 +2907,7 @@ test_remote_promise_without_deliverables_is_briefable() {
     "a promise that requires no deliverable must not ask the worker to invent one"
 
   command=${command//<one bounded public-safe sentence>/The question is answered on main.}
-  printf 'mini-default\n' > "$remote/.jg-secondmate-home"
+  printf 'mini-default\n' > "$remote/.jg-squad-lead-home"
   bash -c "$command" >/dev/null || fail "the worker's own instructions must run in its home"
 
   staged=$(run_pf_remote "$home" consume) || fail "consume failed: $staged"
@@ -2924,12 +2924,12 @@ test_remote_collection_is_idempotent() {
   remote_fixture_prepare
   home=$(make_home remote-emit-twice)
   remote=$(make_remote_route "$home" mini-default)
-  seed_repro_commitment "$home" pf-remote-twice req-remote-twice secondmate:mini-default work-twice
+  seed_repro_commitment "$home" pf-remote-twice req-remote-twice squad_lead:mini-default work-twice
 
   out=$(run_pf "$home" brief pf-remote-twice) || fail "brief failed: $out"
   command=$(brief_emit_command "$out")
   command=${command//<one bounded public-safe sentence>/The remote lane finished its investigation.}
-  printf 'mini-default\n' > "$remote/.jg-secondmate-home"
+  printf 'mini-default\n' > "$remote/.jg-squad-lead-home"
   bash -c "$command" >/dev/null || fail "the worker's own instructions must run in its home"
   staged=$(run_pf_remote "$home" consume) || fail "consume failed: $staged"
   assert_contains "$staged" "ready pf-remote-twice" "the first collection must report the loop ready"
@@ -2947,7 +2947,7 @@ test_remote_collection_is_idempotent() {
 }
 
 # The two home flags answer different questions, so mixing them is refused rather
-# than resolved by argument order, and a staging path that is not a firstmate
+# than resolved by argument order, and a staging path that is not a juggernaut
 # home is refused rather than swallowing the result.
 test_stage_in_refuses_ambiguous_or_unusable_homes() {
   local home unrelated
@@ -2966,23 +2966,23 @@ test_stage_in_refuses_ambiguous_or_unusable_homes() {
   mkdir -p "$unrelated/state"
   expect_failure "an ordinary directory with state must not pass as a staging home" \
     "$EMIT" --stage-in "$unrelated" --obligation pf-stage-refuse \
-    --relation rel-code --source-home secondmate:mate --work-id work-stage --generation 1 \
+    --relation rel-code --source-home squad_lead:mate --work-id work-stage --generation 1 \
     --outcome report-ready --deliverable report_path=data/work-stage/report.md \
     --outcome-text 'Nowhere to be collected from.'
-  assert_contains "$EXPECT_OUT" "firstmate home" \
+  assert_contains "$EXPECT_OUT" "juggernaut home" \
     "the refusal must name what --stage-in has to point at"
   assert_absent "$unrelated/state/public-followup" \
     "a refused staging path must gain no outbox"
 
-  printf 'someone-else\n' > "$unrelated/.jg-secondmate-home"
+  printf 'someone-else\n' > "$unrelated/.jg-squad-lead-home"
   expect_failure "a staging home's identity must match --source-home" \
     "$EMIT" --stage-in "$unrelated" --obligation pf-stage-refuse \
-    --relation rel-code --source-home secondmate:mate --work-id work-stage --generation 1 \
+    --relation rel-code --source-home squad_lead:mate --work-id work-stage --generation 1 \
     --outcome report-ready --deliverable report_path=data/work-stage/report.md \
     --outcome-text 'Wrong home.'
   assert_absent "$unrelated/state/public-followup" \
     "an identity mismatch must gain no outbox"
-  pass "staging requires the matching secondmate firstmate home"
+  pass "staging requires the matching squad_lead juggernaut home"
 }
 
 # The owning home must never quietly report "nothing waiting" when it simply
@@ -2993,7 +2993,7 @@ test_remote_collection_transport_failure_is_loud() {
   remote_fixture_prepare
   home=$(make_home remote-emit-down)
   remote=$(make_remote_route "$home" mini-default)
-  seed_repro_commitment "$home" pf-remote-down req-remote-down secondmate:mini-default work-down
+  seed_repro_commitment "$home" pf-remote-down req-remote-down squad_lead:mini-default work-down
 
   JG_FAKE_SSH_MODE=unreachable expect_failure \
     "an unreachable work home must not pass as an empty inbox" \
@@ -3012,12 +3012,12 @@ test_remote_collection_refuses_unreadable_outbox() {
   remote_fixture_prepare
   home=$(make_home remote-outbox-unreadable)
   remote=$(make_remote_route "$home" mini-default)
-  seed_repro_commitment "$home" pf-outbox-unreadable req-outbox-unreadable secondmate:mini-default work-unreadable
+  seed_repro_commitment "$home" pf-outbox-unreadable req-outbox-unreadable squad_lead:mini-default work-unreadable
 
   out=$(run_pf "$home" brief pf-outbox-unreadable) || fail "brief failed: $out"
   command=$(brief_emit_command "$out")
   command=${command//<one bounded public-safe sentence>/The result remains staged while its outbox is unreadable.}
-  printf 'mini-default\n' > "$remote/.jg-secondmate-home"
+  printf 'mini-default\n' > "$remote/.jg-squad-lead-home"
   bash -c "$command" >/dev/null || fail "the worker must stage its terminal result"
 
   chmod 000 "$remote/state/public-followup/outbox"
@@ -3040,12 +3040,12 @@ test_invalid_registration_fails_remote_collection() {
   remote_fixture_prepare
   home=$(make_home remote-invalid-registration)
   remote=$(make_remote_route "$home" mini-default)
-  seed_repro_commitment "$home" pf-invalid-registration req-invalid-registration secondmate:mini-default work-invalid
+  seed_repro_commitment "$home" pf-invalid-registration req-invalid-registration squad_lead:mini-default work-invalid
 
   out=$(run_pf "$home" brief pf-invalid-registration) || fail "brief failed: $out"
   command=$(brief_emit_command "$out")
   command=${command//<one bounded public-safe sentence>/The remote lane finished before registration damage.}
-  printf 'mini-default\n' > "$remote/.jg-secondmate-home"
+  printf 'mini-default\n' > "$remote/.jg-squad-lead-home"
   bash -c "$command" >/dev/null || fail "the remote route must stage its terminal result"
 
   registry="$home/state/public-followup/registry/pf-invalid-registration"
@@ -3073,12 +3073,12 @@ test_unsafe_registration_entry_fails_remote_collection() {
   remote_fixture_prepare
   home=$(make_home remote-unsafe-registration)
   remote=$(make_remote_route "$home" mini-default)
-  seed_repro_commitment "$home" pf-unsafe-registration req-unsafe-registration secondmate:mini-default work-unsafe
+  seed_repro_commitment "$home" pf-unsafe-registration req-unsafe-registration squad_lead:mini-default work-unsafe
 
   out=$(run_pf "$home" brief pf-unsafe-registration) || fail "brief failed: $out"
   command=$(brief_emit_command "$out")
   command=${command//<one bounded public-safe sentence>/The remote lane finished before registration replacement.}
-  printf 'mini-default\n' > "$remote/.jg-secondmate-home"
+  printf 'mini-default\n' > "$remote/.jg-squad-lead-home"
   bash -c "$command" >/dev/null || fail "the remote route must stage its terminal result"
 
   registry="$home/state/public-followup/registry/pf-unsafe-registration"
@@ -3106,18 +3106,18 @@ test_remote_route_loss_fails_brief_and_collection() {
   remote_fixture_prepare
   home=$(make_home remote-route-lost)
   remote=$(make_remote_route "$home" mini-default)
-  seed_repro_commitment "$home" pf-route-lost req-route-lost secondmate:mini-default work-lost
+  seed_repro_commitment "$home" pf-route-lost req-route-lost squad_lead:mini-default work-lost
 
   out=$(run_pf "$home" brief pf-route-lost) || fail "brief failed before route loss: $out"
   command=$(brief_emit_command "$out")
   command=${command//<one bounded public-safe sentence>/The remote lane finished before its route record was lost.}
-  printf 'mini-default\n' > "$remote/.jg-secondmate-home"
+  printf 'mini-default\n' > "$remote/.jg-squad-lead-home"
   bash -c "$command" >/dev/null || fail "the staged result must exist before route loss"
-  rm -f "$home/data/secondmates.md"
+  rm -f "$home/data/squad_leads.md"
 
   expect_failure "brief must refuse an unresolved remote registration" \
     run_pf "$home" brief pf-route-lost
-  assert_contains "$EXPECT_OUT" "data/secondmates.md" \
+  assert_contains "$EXPECT_OUT" "data/squad_leads.md" \
     "brief must point at the route record that needs repair"
 
   expect_failure "consume must refuse an unresolved remote registration" \
@@ -3138,7 +3138,7 @@ test_empty_remote_collection_is_healthy() {
   remote_fixture_prepare
   home=$(make_home remote-empty-collection)
   remote=$(make_remote_route "$home" mini-default)
-  seed_repro_commitment "$home" pf-empty-collection req-empty-collection secondmate:mini-default work-pending
+  seed_repro_commitment "$home" pf-empty-collection req-empty-collection squad_lead:mini-default work-pending
 
   out=$(run_pf_remote "$home" consume) || fail "an empty reachable route must collect cleanly: $out"
   [ -z "$out" ] || fail "an empty reachable route must remain silent, got: $out"
@@ -3152,18 +3152,18 @@ test_remote_brief_rejects_traversal_route_paths() {
   remote_fixture_prepare
   home=$(make_home remote-route-paths)
   remote=$(make_remote_route "$home" mini-default)
-  seed_repro_commitment "$home" pf-route-paths req-route-paths secondmate:mini-default work-paths
+  seed_repro_commitment "$home" pf-route-paths req-route-paths squad_lead:mini-default work-paths
 
-  cat > "$home/data/secondmates.md" <<EOF
-- mini-default - remote lane (host: remote-mac; root: $REMOTE_FIXTURE_ROOT/../remote-root; home: $remote; scope: relay work; projects: firstmate; added 2026-08-02)
+  cat > "$home/data/squad_leads.md" <<EOF
+- mini-default - remote lane (host: remote-mac; root: $REMOTE_FIXTURE_ROOT/../remote-root; home: $remote; scope: relay work; projects: juggernaut; added 2026-08-02)
 EOF
   expect_failure "brief must reject a traversal component in the remote root" \
     run_pf "$home" brief pf-route-paths
   assert_contains "$EXPECT_OUT" "no usable code root and home" \
     "a traversal route must use the route-record refusal"
 
-  cat > "$home/data/secondmates.md" <<EOF
-- mini-default - remote lane (host: remote-mac; root: $REMOTE_FIXTURE_ROOT; home: //$remote; scope: relay work; projects: firstmate; added 2026-08-02)
+  cat > "$home/data/squad_leads.md" <<EOF
+- mini-default - remote lane (host: remote-mac; root: $REMOTE_FIXTURE_ROOT; home: //$remote; scope: relay work; projects: juggernaut; added 2026-08-02)
 EOF
   expect_failure "brief must reject an empty component in the remote home" \
     run_pf "$home" brief pf-route-paths
@@ -3214,7 +3214,7 @@ seed_typed_commitment() {
       followup_expires_at:"2026-08-28T01:12:00Z",
       reservation_expires_at:"2026-08-28T01:12:00Z"}' > "$home/request.json"
   jq -n --arg t "$expected" --argjson k "$keys" \
-    '{type:$t, project:"firstmate", required_deliverables:$k, completion_policy:"all-required"}' \
+    '{type:$t, project:"juggernaut", required_deliverables:$k, completion_policy:"all-required"}' \
     > "$home/expected.json"
   jq -n --arg h "$work_home" --arg w "$work_id" \
     '{relation_id:"rel-code", work_ref:{home_id:$h, task_id:$w},
@@ -3318,10 +3318,10 @@ test_emit_refuses_a_deliverable_tasks_axi_would_reject() {
 
   staging="$TMP_ROOT/emit-format-staging"
   mkdir -p "$staging/state"
-  printf 'axi-a1\n' > "$staging/.jg-secondmate-home"
+  printf 'axi-a1\n' > "$staging/.jg-squad-lead-home"
   expect_failure "a staged emit must apply the same deliverable rules" \
     "$EMIT" --stage-in "$staging" --obligation pf-emit-format --relation rel-code \
-    --source-home secondmate:axi-a1 --work-id work-format --generation 1 --outcome report-ready \
+    --source-home squad_lead:axi-a1 --work-id work-format --generation 1 --outcome report-ready \
     --deliverable report_path=/abs/data/work-format/report.md \
     --outcome-text 'The report is ready.'
   assert_contains "$EXPECT_OUT" "data/<task-id>/report.md" \
@@ -3362,10 +3362,10 @@ test_emit_refuses_a_repeated_deliverable_key() {
 
   staging="$TMP_ROOT/emit-repeat-staging"
   mkdir -p "$staging/state"
-  printf 'axi-a1\n' > "$staging/.jg-secondmate-home"
+  printf 'axi-a1\n' > "$staging/.jg-squad-lead-home"
   expect_failure "a staged emit must refuse a repeated deliverable key" \
     "$EMIT" --stage-in "$staging" --obligation pf-emit-repeat --relation rel-code \
-    --source-home secondmate:axi-a1 --work-id work-repeat --generation 1 --outcome report-ready \
+    --source-home squad_lead:axi-a1 --work-id work-repeat --generation 1 --outcome report-ready \
     --deliverable report_path=data/work-repeat/report.md \
     --deliverable report_path=data/work-repeat/report.md \
     --outcome-text 'The report is ready.'
@@ -3418,8 +3418,8 @@ CASES
   remote_fixture_prepare
   remote=$(make_remote_route "$home" mini-default)
   seed_repro_commitment "$home" pf-missing-remote req-missing-remote \
-    secondmate:mini-default work-missing-remote
-  printf 'mini-default\n' > "$remote/.jg-secondmate-home"
+    squad_lead:mini-default work-missing-remote
+  printf 'mini-default\n' > "$remote/.jg-squad-lead-home"
   out=$(run_pf "$home" brief pf-missing-remote) || fail "brief failed: $out"
   command=$(brief_emit_command "$out")
   assert_contains "$command" "--require-deliverable report_path" \
@@ -3462,7 +3462,7 @@ test_emit_rules_agree_with_tasks_axi() {
   # --stage-in is ever used from: it cannot read the obligation record at all.
   staging="$home/staged-work-home"
   mkdir -p "$staging/state"
-  printf 'agree\n' > "$staging/.jg-secondmate-home"
+  printf 'agree\n' > "$staging/.jg-squad-lead-home"
   while IFS='|' read -r expected required outcome deliverables verdict mode; do
     [ -n "$expected" ] || continue
     n=$((n + 1))
@@ -3489,7 +3489,7 @@ test_emit_rules_agree_with_tasks_axi() {
 
     emit_destination=(--home "$home" --source-home main)
     [ "$mode" != stage-in ] \
-      || emit_destination=(--stage-in "$staging" --source-home secondmate:agree)
+      || emit_destination=(--stage-in "$staging" --source-home squad_lead:agree)
     emit_args=()
     if [ "$mode" = stage-in ]; then
       while IFS= read -r key; do
@@ -3637,7 +3637,7 @@ test_rejected_event_wakes_owning_home_with_specific_reason() {
   pass "a rejected event records a specific reason and wakes the owning home once"
 }
 
-# The incident's exact shape: the bad value came from a REMOTE secondmate and
+# The incident's exact shape: the bad value came from a REMOTE squad_lead and
 # was quarantined in the owning main home after collection. The owning home is
 # the one that must be woken.
 test_remote_rejected_event_wakes_owning_home() {
@@ -3645,10 +3645,10 @@ test_remote_rejected_event_wakes_owning_home() {
   remote_fixture_prepare
   home=$(make_home remote-reject-wake)
   remote=$(make_remote_route "$home" axi-a1)
-  seed_repro_commitment "$home" pf-remote-reject req-remote-reject secondmate:axi-a1 work-remote-reject
-  printf 'axi-a1\n' > "$remote/.jg-secondmate-home"
+  seed_repro_commitment "$home" pf-remote-reject req-remote-reject squad_lead:axi-a1 work-remote-reject
+  printf 'axi-a1\n' > "$remote/.jg-squad-lead-home"
   event_id=$(publish_raw_event "$remote/state/public-followup/outbox" pf-remote-reject \
-    secondmate:axi-a1 work-remote-reject report-ready \
+    squad_lead:axi-a1 work-remote-reject report-ready \
     '{"report_path":"/home/axi/jg-home/data/work-remote-reject/report.md"}') \
     || fail "could not stage the raw event"
 
@@ -3656,11 +3656,11 @@ test_remote_rejected_event_wakes_owning_home() {
   assert_contains "$out" "rejected $event_id" "the owning home must refuse the collected event"
   wake=$(run_poll "$home")
   assert_contains "$wake" "public-followup rejected $event_id" \
-    "the owning home must be woken for a rejection it collected from a remote secondmate"
+    "the owning home must be woken for a rejection it collected from a remote squad_lead"
   assert_contains "$wake" "report_path" "the wake must carry the specific reason"
   [ -z "$(ls -A "$remote/state/public-followup/rejected" 2>/dev/null)" ] \
     || fail "the rejection belongs to the owning home, not the remote work home"
-  pass "a rejection collected from a remote secondmate wakes the owning home"
+  pass "a rejection collected from a remote squad_lead wakes the owning home"
 }
 
 # A promise names the value its public reply needs, so switching to another
@@ -3674,7 +3674,7 @@ test_emit_requires_promised_deliverable_under_any_successful_outcome() {
     main work-swap
   staging="$TMP_ROOT/outcome-swap-staging"
   mkdir -p "$staging/state"
-  printf 'axi-a1\n' > "$staging/.jg-secondmate-home"
+  printf 'axi-a1\n' > "$staging/.jg-squad-lead-home"
 
   expect_failure "a pr-merged promise cannot be answered with a report-ready result" \
     "$EMIT" --home "$home" --obligation pf-outcome-swap --relation rel-code \
@@ -3688,7 +3688,7 @@ test_emit_requires_promised_deliverable_under_any_successful_outcome() {
 
   expect_failure "a staged outcome swap must be refused by the same rule" \
     "$EMIT" --stage-in "$staging" --obligation pf-outcome-swap --relation rel-code \
-    --source-home secondmate:axi-a1 --work-id work-swap --generation 1 \
+    --source-home squad_lead:axi-a1 --work-id work-swap --generation 1 \
     --outcome report-ready --require-deliverable pr_url \
     --deliverable report_path=data/work-swap/report.md \
     --outcome-text 'The report is ready.'
@@ -3707,7 +3707,7 @@ test_emit_requires_promised_deliverable_under_any_successful_outcome() {
   assert_contains "$EXPECT_OUT" "successor" \
     "the refusal must say what tasks-axi needs for a superseded event"
   "$EMIT" --stage-in "$staging" --obligation pf-outcome-swap --relation rel-code \
-    --source-home secondmate:axi-a1 --work-id work-swap --generation 1 --outcome failed \
+    --source-home squad_lead:axi-a1 --work-id work-swap --generation 1 --outcome failed \
     --require-deliverable pr_url --deliverable error_code=ci-red \
     --outcome-text 'The work could not finish.' >/dev/null \
     || fail "a staged failed outcome must stay reportable without the promised key"
@@ -3724,7 +3724,7 @@ test_emit_requires_error_code_on_a_failure_promise() {
     '["error_code"]' main work-failure
   staging="$TMP_ROOT/failure-promise-staging"
   mkdir -p "$staging/state"
-  printf 'axi-a1\n' > "$staging/.jg-secondmate-home"
+  printf 'axi-a1\n' > "$staging/.jg-squad-lead-home"
 
   expect_failure "a failure promise reported without its error_code must be refused" \
     "$EMIT" --home "$home" --obligation pf-failure-promise --relation rel-code \
@@ -3736,7 +3736,7 @@ test_emit_requires_error_code_on_a_failure_promise() {
 
   expect_failure "a staged failure promise must apply the same rule" \
     "$EMIT" --stage-in "$staging" --obligation pf-failure-promise --relation rel-code \
-    --source-home secondmate:axi-a1 --work-id work-failure --generation 1 --outcome failed \
+    --source-home squad_lead:axi-a1 --work-id work-failure --generation 1 --outcome failed \
     --require-deliverable error_code --outcome-text 'The work could not finish.'
   assert_contains "$EXPECT_OUT" "error_code" "the staged refusal must name the missing key"
   assert_absent "$staging/state/public-followup" \
@@ -3934,17 +3934,17 @@ test_typed_terminal_clear_only_removes_legacy_link
 test_interrupted_delivery_refuses_to_repost
 test_outward_delivery_stays_with_the_owning_home
 test_delivery_requires_registration_before_posting
-test_secondmate_teardown_requires_parent_binding
-test_local_secondmate_seed_publishes_parent_before_identity
-test_secondmate_teardown_resolves_parent_from_durable_record_when_env_lost
-test_secondmate_teardown_durable_record_missing_parent_registration_still_refuses
-test_secondmate_teardown_durable_record_with_unknown_field_succeeds
-test_secondmate_teardown_rejects_conflicting_live_and_durable_parent_bindings
-test_secondmate_teardown_rejects_unsafe_durable_parent_records
-test_secondmate_teardown_rejects_nul_bearing_durable_parent_record
+test_squad_lead_teardown_requires_parent_binding
+test_local_squad_lead_seed_publishes_parent_before_identity
+test_squad_lead_teardown_resolves_parent_from_durable_record_when_env_lost
+test_squad_lead_teardown_durable_record_missing_parent_registration_still_refuses
+test_squad_lead_teardown_durable_record_with_unknown_field_succeeds
+test_squad_lead_teardown_rejects_conflicting_live_and_durable_parent_bindings
+test_squad_lead_teardown_rejects_unsafe_durable_parent_records
+test_squad_lead_teardown_rejects_nul_bearing_durable_parent_record
 test_relay_disabled_unmarked_teardown_skips_public_path
 test_relay_disabled_parent_allows_marked_child_teardown
-test_secondmate_parent_binding_matches_literal_id
+test_squad_lead_parent_binding_matches_literal_id
 test_traversal_registration_is_refused_before_delivery
 test_pending_rejects_malformed_listing
 test_private_context_survives_inbox_cleanup
@@ -3964,9 +3964,9 @@ test_failed_rechain_retirement_keeps_source_claimed
 test_first_register_succeeds_with_empty_lock_list_under_bash32
 test_registration_replay_preserves_delivery_and_retirement
 test_redelivery_does_not_report_retired_loop_open
-test_retire_after_secondmate_home_removal
-test_retire_refuses_unbound_existing_secondmate
-test_retire_refuses_reassigned_secondmate_home
+test_retire_after_squad_lead_home_removal
+test_retire_refuses_unbound_existing_squad_lead
+test_retire_refuses_reassigned_squad_lead_home
 test_rechain_refuses_unclaimed_existing_destination
 test_pending_skips_concurrent_retirement
 test_retire_reason_closes_the_open_loop
@@ -3975,8 +3975,8 @@ test_expiry_escalation_uses_now_override
 test_brief_fails_without_typed_deliverable_keys
 test_prechange_registration_is_open_and_unrechainable
 test_x_request_teardown_warns_when_final_unposted
-test_secondmate_promotion_uses_teardown_parent_resolution
-test_remote_secondmate_loop_delivers_and_retires
+test_squad_lead_promotion_uses_teardown_parent_resolution
+test_remote_squad_lead_loop_delivers_and_retires
 test_delivered_remote_registration_skips_offline_route
 test_remote_retire_force_semantics_unchanged
 test_remote_retire_refuses_reassigned_route

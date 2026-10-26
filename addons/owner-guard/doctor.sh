@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Verify owner-guard installation for one Firstmate home. Usage: doctor.sh <jg-home>
+# Verify owner-guard installation for one Juggernaut home. Usage: doctor.sh <jg-home>
 set -euo pipefail
 [ "$#" -eq 1 ] && [ -d "$1" ] || { echo 'usage: doctor.sh <jg-home>' >&2; exit 2; }
 FMH=$(cd "$1" && pwd -P)

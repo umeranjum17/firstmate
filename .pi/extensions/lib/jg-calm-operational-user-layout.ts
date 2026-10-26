@@ -6,7 +6,7 @@
 import type { UserMessageComponent as PiUserMessageComponent } from "@earendil-works/pi-coding-agent";
 import * as PiCodingAgent from "@earendil-works/pi-coding-agent";
 import { calmPresentationHides } from "./jg-calm-visibility.ts";
-import { isFirstmateOperationalPresentationText } from "./jg-operational-input.ts";
+import { isJuggernautOperationalPresentationText } from "./jg-operational-input.ts";
 
 type UserMessageConstructorArgs = ConstructorParameters<typeof PiUserMessageComponent>;
 type UserMessageLike = {
@@ -43,7 +43,7 @@ type CalmOperationalUserLayoutPatch = {
 // Keep the introduction-version symbol stable so a compatible upgrade cannot
 // double-patch a live process.
 const CALM_OPERATIONAL_USER_LAYOUT_PATCH = Symbol.for(
-  "firstmate:calm-operational-user-layout:pi-0.81.1",
+  "juggernaut:calm-operational-user-layout:pi-0.81.1",
 );
 
 function contentIsTextOnly(content: unknown): boolean {
@@ -63,7 +63,7 @@ export function installCalmOperationalUserLayout(): void {
     [key: symbol]: CalmOperationalUserLayoutPatch | undefined;
   };
   const hidesOperationalInput = (): boolean => calmPresentationHides("synthetic-user");
-  const isOperationalInput = isFirstmateOperationalPresentationText;
+  const isOperationalInput = isJuggernautOperationalPresentationText;
   const installed = registry[CALM_OPERATIONAL_USER_LAYOUT_PATCH];
   if (installed) {
     installed.hidesOperationalInput = hidesOperationalInput;
@@ -77,17 +77,17 @@ export function installCalmOperationalUserLayout(): void {
   };
   const InteractiveMode = PiCodingAgent.InteractiveMode;
   if (typeof InteractiveMode !== "function") {
-    throw new Error("Firstmate Calm requires Pi InteractiveMode");
+    throw new Error("Juggernaut Calm requires Pi InteractiveMode");
   }
   const prototype = InteractiveMode.prototype as unknown as InteractiveModePrototype;
   const originalAddMessageToChat = prototype.addMessageToChat;
   if (typeof originalAddMessageToChat !== "function") {
-    throw new Error("Firstmate Calm requires Pi InteractiveMode.addMessageToChat");
+    throw new Error("Juggernaut Calm requires Pi InteractiveMode.addMessageToChat");
   }
 
   const UserMessageComponent = PiCodingAgent.UserMessageComponent;
   if (typeof UserMessageComponent !== "function") {
-    throw new Error("Firstmate Calm requires Pi UserMessageComponent");
+    throw new Error("Juggernaut Calm requires Pi UserMessageComponent");
   }
   class CalmOperationalUserMessageComponent extends UserMessageComponent {
     private readonly hasLeadingSpacer: boolean;

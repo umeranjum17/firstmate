@@ -13,7 +13,7 @@ set -euo pipefail
 repo=$(cd "$(dirname "$0")/.." && pwd)
 fork=${JG_TEST_FORK:-}
 [ -n "$fork" ] && [ -x "$fork/bin/jg-brief.sh" ] \
-  || { echo "owner-rules hierarchy proof: set JG_TEST_FORK to a Firstmate checkout with the brief-inherit seam" >&2; exit 1; }
+  || { echo "owner-rules hierarchy proof: set JG_TEST_FORK to a Juggernaut checkout with the brief-inherit seam" >&2; exit 1; }
 [ -n "${DONE_DONE_EVIDENCE_ROOT:-}" ] && [ -n "${DONE_DONE_RUN_ID:-}" ] \
   || { echo "owner-rules hierarchy proof: run through done-done" >&2; exit 1; }
 target=$(git -C "$repo" rev-parse --short HEAD)

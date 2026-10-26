@@ -299,7 +299,7 @@ test_build_refuses_malformed_payloads_before_touching_the_board() {
     "id": "sample-landed",
     "repo": "sample",
     "what": "Landed work",
-    "owner": "firstmate",
+    "owner": "juggernaut",
     "pr_url": "data:text/html,unsafe"
   }]' "$data" > "$data.tmp" && mv "$data.tmp" "$data"
   set +e; out=$(run_board "$home" build "$data" 2>&1); rc=$?; set -e
@@ -675,7 +675,7 @@ EOF
   write_valid_payload "$data"
   jq '.captains_call = [{
         "key":"remote-mate-call","type":"decision","repo":"sample",
-        "title":"Remote secondmate decision",
+        "title":"Remote squad_lead decision",
         "options":[{"value":"yes","label":"Yes"}]
       }]
       | .landed = []' "$data" > "$data.tmp" && mv "$data.tmp" "$data"

@@ -206,7 +206,7 @@ On macOS the pane command reflected the rewritable title while the full install 
 The classifier therefore accepts a harness basename first, then an exact harness path component in the full executable path, then the same component in argv[0], without depending on which field carries it on a given platform.
 
 The portable regression is CI-enforced.
-The real-harness drift guard spends no model tokens, so under the policy in `.agents/skills/firstmate-coding-guidelines/SKILL.md` it runs by default wherever tmux is installed and reports a capability skip elsewhere; `JG_HARNESS_LIVENESS_DRIFT=1` additionally turns an absent tool into a failure.
+The real-harness drift guard spends no model tokens, so under the policy in `.agents/skills/juggernaut-coding-guidelines/SKILL.md` it runs by default wherever tmux is installed and reports a capability skip elsewhere; `JG_HARNESS_LIVENESS_DRIFT=1` additionally turns an absent tool into a failure.
 Run the live guard after any harness upgrade and before trusting or refreshing the table above:
 
 ```sh
@@ -317,7 +317,7 @@ Both recorded runtime identities now classify the exact `pi-launcher` foreground
 Backend applicability was reviewed across every spawn adapter.
 Tmux needs the exact `pi-launcher`, `pi-signed`, `pi`, and `Pi` process identities for recovery-grade liveness.
 Herdr uses native registered-agent state and needs no process-name branch.
-Zellij has no verified recovery-grade agent process probe, while Orca and cmux do not support secondmate spawns, so those three retain their existing generic ordinary-launch semantics without a new liveness matcher.
+Zellij has no verified recovery-grade agent process probe, while Orca and cmux do not support squad lead spawns, so those three retain their existing generic ordinary-launch semantics without a new liveness matcher.
 
 The current classifier matrix and its refresh guard are recorded in [Composer classification matrix](#composer-classification-matrix), with portable shape coverage in `tests/jg-composer-lib.test.sh` and `tests/jg-composer-ghost.test.sh`.
 Kimi pointer delivery and OpenCode 1.18.4 busy-queue behavior remain pinned by `tests/jg-kimi-harness.test.sh`, `tests/jg-tmux-submit-busy.test.sh`, and `tests/jg-composer-lib.test.sh`.
@@ -366,7 +366,7 @@ tests/jg-backend-orca.test.sh
 ok - jg-teardown: a close that genuinely failed refuses and keeps the record naming the surviving endpoint, and the same teardown finishes once the close works
 ok - jg-teardown: --force continues past a close it could not make while still reporting it, and the same case refuses without --force
 ok - jg-teardown: a close re-read that could not run refuses, while a definitively absent session or server still completes silently
-ok - jg-teardown: forced secondmate cleanup still refuses on a child endpoint close that failed
+ok - jg-teardown: forced squad lead cleanup still refuses on a child endpoint close that failed
 ok - jg-teardown: an Orca close its missing CLI never attempted refuses even under --force, keeping the record naming the terminal
 ok - jg-teardown: an already-exited endpoint, and a server that is already gone, still complete cleanup silently
 ok - jg_backend_orca_kill: a close its missing CLI never attempted reports the failure instead of a success
@@ -398,7 +398,7 @@ It states what `--force` authorizes rather than what will have happened, because
 
 The Orca close refuses under `--force` too.
 The step immediately after it removes the Orca worktree through the same CLI whose absence is the only thing that arm ever reports, so a forced continue would die there having removed nothing while claiming the records were already gone.
-The two child close sites inside forced secondmate cleanup also keep refusing: that path is only ever reached under `--force`, so honoring force there would delete the refusal rather than override it, and would contradict the adjacent Herdr child gate that stops forced cleanup for the same hazard.
+The two child close sites inside forced squad lead cleanup also keep refusing: that path is only ever reached under `--force`, so honoring force there would delete the refusal rather than override it, and would contradict the adjacent Herdr child gate that stops forced cleanup for the same hazard.
 
 The retained record is this run's, not a durable guarantee.
 A task carrying a backlog transition writes its pending-close marker before the endpoint close, and the marker survives the refusal; the next `bin/jg-bootstrap.sh` replays it and removes the retained record.
@@ -409,7 +409,7 @@ Both directions are proven non-vacuous.
 Restoring the swallowed status makes the refusal case report `teardown <id> complete`, delete the endpoint record, and leave the window live.
 Keeping the refusal but dropping the exact re-read makes an already-exited endpoint refuse its own cleanup, and also fails the cleanup identity case above.
 Letting an unreadable inventory pass for absence makes the unreadable case complete and remove the record while the window is still there.
-Removing the `--force` arm makes the forced generic case refuse; honoring `--force` at the child sites makes forced secondmate cleanup continue past a child endpoint it could not close, and honoring it at the Orca site makes that forced cleanup abort on the missing CLI after announcing that it was continuing.
+Removing the `--force` arm makes the forced generic case refuse; honoring `--force` at the child sites makes forced squad lead cleanup continue past a child endpoint it could not close, and honoring it at the Orca site makes that forced cleanup abort on the missing CLI after announcing that it was continuing.
 Restoring `jg_backend_orca_kill`'s swallowed tool check makes the CLI-absent adapter case report success.
 Dropping the retention-is-not-durable line makes the refusal claim a retention teardown does not own.
 
@@ -483,11 +483,11 @@ That warning rendered in the same shape as the trust dialog, with the selection 
 That gate is not a production blocker, because a normal environment has already accepted it and the treatment arm above ran against the real config and saw neither dialog.
 This change does not address that warning and does not claim to.
 
-### Secondmate homes
+### Squad Lead homes
 
 Verified 2026-09-11 on Claude Code 2.1.269.
-A secondmate launches in its own Juggernaut home rather than a task worktree, and that home meets the same gate.
-The control arm launched a standalone-clone secondmate home that the store had no entry for, the way `bin/jg-spawn.sh --secondmate` launches one.
+A squad lead launches in its own Juggernaut home rather than a task worktree, and that home meets the same gate.
+The control arm launched a standalone-clone squad lead home that the store had no entry for, the way `bin/jg-spawn.sh --squad-lead` launches one.
 
 ```sh
 tmux -L <sock> new-session -d -s ctrl -x 180 -y 44 -c <home> \
@@ -502,10 +502,10 @@ tmux -L <sock> new-session -d -s ctrl -x 180 -y 44 -c <home> \
    Yes, I trust this folder
 ```
 
-The treatment arm pre-registered that same home through the secondmate-home mode and launched it identically against the operator's real config.
+The treatment arm pre-registered that same home through the squad-lead-home mode and launched it identically against the operator's real config.
 
 ```sh
-bin/jg-claude-trust.sh --secondmate-home <home> livemate-n1
+bin/jg-claude-trust.sh --squad-lead-home <home> livemate-n1
 ```
 
 ```
@@ -524,14 +524,14 @@ trusted: /private/tmp/jg-sm-trust-live-69759/jg-homes/livemate-n1
 No dialog appeared, the composer was reached, and neither did the machine-scoped bypass warning, because this ran against the real config.
 The lab home was deleted and the test entry was removed from the store and verified absent, with the same point-in-time caveat as the worktree arms above.
 
-`bin/jg-spawn.sh` therefore pre-registers the directory every claude launch starts in through `bin/jg-claude-trust.sh` before launch, and `tests/jg-claude-trust.test.sh` pins both halves of the scope contract for both shapes: a fresh worktree and a seeded secondmate home are trusted, and an out-of-scope path is refused.
+`bin/jg-spawn.sh` therefore pre-registers the directory every claude launch starts in through `bin/jg-claude-trust.sh` before launch, and `tests/jg-claude-trust.test.sh` pins both halves of the scope contract for both shapes: a fresh worktree and a seeded squad lead home are trusted, and an out-of-scope path is refused.
 That automated spawn case runs against a fake claude, so it asserts the store entry and the launch command and nothing more; the live arms above are what establish that the entry actually suppresses the dialog.
 The composer-classification record below observes the same gate from the other side, where an untrusted worktree left Claude, Grok, and Muse unverified because the guard reads a first-launch trust dialog as an unreadable composer.
 
-## Pi seeded-secondmate project trust
+## Pi seeded-squad-lead project trust
 
-[`jg-spawn.sh --help`](../../bin/jg-spawn.sh) owns the seeded-secondmate project-trust approval contract and compatibility fallback.
-The live guard below isolates Pi's trust-gate behavior in secondmate-shaped homes; portable launch-command coverage separately verifies that spawn selects the flag for the intended launches.
+[`jg-spawn.sh --help`](../../bin/jg-spawn.sh) owns the seeded-squad-lead project-trust approval contract and compatibility fallback.
+The live guard below isolates Pi's trust-gate behavior in squad-lead-shaped homes; portable launch-command coverage separately verifies that spawn selects the flag for the intended launches.
 
 Verified 2026-10-02 on pi 0.82.0 through the default-on live guard (disposable `PI_CODING_AGENT_DIR` / `HOME` only; never `~/.pi`):
 
@@ -541,13 +541,13 @@ bash tests/jg-pi-seeded-home-trust-live-e2e.test.sh
 
 ```
 # live pi version: 0.82.0
-ok - fresh seeded Pi secondmate-shaped home stalls on Trust project folder? without --approve
+ok - fresh seeded Pi squad-lead-shaped home stalls on Trust project folder? without --approve
 ok - seeded home with --approve starts past the trust dialog without rewriting trust.json
 ok - unseeded path without --approve still prompts on Trust project folder?
 # all jg-pi-seeded-home-trust-live-e2e checks passed (3)
 ```
 
-Portable launch-command coverage lives in `tests/jg-spawn-dispatch-profile.test.sh` (`test_pi_seeded_secondmate_preapproves_project_trust`, `test_pi_worker_launch_omits_seeded_home_approve`, `test_pi_approve_probe_omits_unsupported_flag`).
+Portable launch-command coverage lives in `tests/jg-spawn-dispatch-profile.test.sh` (`test_pi_seeded_squad_lead_preapproves_project_trust`, `test_pi_worker_launch_omits_seeded_home_approve`, `test_pi_approve_probe_omits_unsupported_flag`).
 
 ## Launch-prompt backstop signatures
 
@@ -658,19 +658,19 @@ skip-runner: pi-signed is not installed, so its pin check was not exercised
 
 The guard submits no prompt and spends no tokens, so it runs by default wherever a runner is installed; rerun it after every Claude or Pi upgrade.
 
-## Secondmate busy contract
+## Squad Lead busy contract
 
 Verified 2026-09-22 on this host with Claude Code 2.1.278, OpenCode 1.18.31, Pi 0.86.1, and Grok 1.0.40.
 
-A tmux-backed secondmate's active-turn gate reads the parent home's semantic busy record.
+A tmux-backed squad lead's active-turn gate reads the parent home's semantic busy record.
 Launches of opencode, pi, pi-signed, and omp arm that record and load the same hook or extension an ordinary worker uses, and those hooks do not touch the parent's turn-ended marker.
-A Claude secondmate arms the same record through busy hooks in the parent home's `state/<id>.claude-settings.json`, passed as Claude Code's `--settings` file, and does not write the mate home's `.claude/settings.local.json`.
+A Claude squad lead arms the same record through busy hooks in the parent home's `state/<id>.claude-settings.json`, passed as Claude Code's `--settings` file, and does not write the mate home's `.claude/settings.local.json`.
 That `--settings` load and the merge of its hook entries with the home's own hooks rest on Claude Code's documentation (<https://code.claude.com/docs/en/cli-reference>, <https://code.claude.com/docs/en/hooks>) and not on a live run recorded in this section: the sample output below predates the `--settings` mechanism.
-A Claude secondmate is the one exception on Stop: its home's tracked Stop guard is the only Stop writer, recording idle when it allows the Stop and busy when it blocks it into a continuation, because Claude runs Stop hooks in parallel.
+A Claude squad lead is the one exception on Stop: its home's tracked Stop guard is the only Stop writer, recording idle when it allows the Stop and busy when it blocks it into a continuation, because Claude runs Stop hooks in parallel.
 Claude Code 2.1.278 was probed live in a scratch project with logging `UserPromptSubmit` and `Stop` hooks.
 A synchronous Stop hook that exits 2 forced a continuation with no `UserPromptSubmit`, which is why the guard itself records busy when it blocks.
 An `asyncRewake` Stop hook that exited 2 six seconds after the turn ended woke a new turn, and `UserPromptSubmit` fired 45ms after that hook exited.
-So a secondmate turn started by the Stop auto-arm reopens busy through the same `UserPromptSubmit` hook as a typed prompt, and the auto-arm needs no busy writer of its own.
+So a squad lead turn started by the Stop auto-arm reopens busy through the same `UserPromptSubmit` hook as a typed prompt, and the auto-arm needs no busy writer of its own.
 
 ```text
 # asyncRewake probe                # synchronous block probe
@@ -682,35 +682,35 @@ stop   1790092388.953108486
 ```
 Codex stays unverified.
 Grok keeps its rendered-tail verdict and gets no parent turn-end hook.
-Cursor's transcript sidecar is written for a secondmate the same way it is for an ordinary worker, and this host has no Cursor agent binary, so that path was not started.
-Kimi stays unarmed, and a secondmate still gets no parent turn-end token.
+Cursor's transcript sidecar is written for a squad lead the same way it is for an ordinary worker, and this host has no Cursor agent binary, so that path was not started.
+Kimi stays unarmed, and a squad lead still gets no parent turn-end token.
 
 The portable regression is `tests/jg-busy-adapter-wiring.test.sh`.
-It spawns those harnesses through the real `bin/jg-spawn.sh --secondmate` path on a fake tmux pane, drives the generated hook or extension, and runs the stall gate while the record is busy and again after it goes idle.
+It spawns those harnesses through the real `bin/jg-spawn.sh --squad-lead` path on a fake tmux pane, drives the generated hook or extension, and runs the stall gate while the record is busy and again after it goes idle.
 
-The live guard is `tests/jg-secondmate-busy-contract-live-e2e.test.sh`.
+The live guard is `tests/jg-squad-lead-busy-contract-live-e2e.test.sh`.
 It runs by default wherever tmux is installed.
-`JG_SECONDMATE_BUSY_LIVE=1` forces an absent binary to fail rather than skip.
+`JG_SQUAD LEAD_BUSY_LIVE=1` forces an absent binary to fail rather than skip.
 The spawn pane is a sleeper, so the launch brief is never delivered to a model.
 Each installed armed harness is then started for real, with no prompt and no keystrokes.
 
 ```sh
-bash tests/jg-secondmate-busy-contract-live-e2e.test.sh
+bash tests/jg-squad-lead-busy-contract-live-e2e.test.sh
 ```
 
 ```text
 # claude 2.1.278 (Claude Code): real process stayed up; pane tail classify=busy jg-spawn
-ok - claude 2.1.278 (Claude Code): a tmux secondmate spawn arms a busy verdict the active-turn gate can see
+ok - claude 2.1.278 (Claude Code): a tmux squad lead spawn arms a busy verdict the active-turn gate can see
 # opencode 1.18.31: real process stayed up; pane tail classify=busy jg-spawn
-ok - opencode 1.18.31: a tmux secondmate spawn arms a busy verdict the active-turn gate can see
+ok - opencode 1.18.31: a tmux squad lead spawn arms a busy verdict the active-turn gate can see
 # pi 0.86.1: real process stayed up; pane tail classify=unknown launch-prompt
-ok - pi 0.86.1: a tmux secondmate spawn arms a busy verdict the active-turn gate can see
-# skip: pi-signed is not installed on this machine, so its secondmate busy contract is unverified here
-# skip: omp is not installed on this machine, so its secondmate busy contract is unverified here
-ok - grok grok 1.0.40 (eb1a2256660d) [stable]: secondmate spawn stays unarmed and does not emit a parent turn-end
-# skip: codex is not installed on this machine, so its secondmate busy contract is unverified here
+ok - pi 0.86.1: a tmux squad lead spawn arms a busy verdict the active-turn gate can see
+# skip: pi-signed is not installed on this machine, so its squad lead busy contract is unverified here
+# skip: omp is not installed on this machine, so its squad lead busy contract is unverified here
+ok - grok grok 1.0.40 (eb1a2256660d) [stable]: squad lead spawn stays unarmed and does not emit a parent turn-end
+# skip: codex is not installed on this machine, so its squad lead busy contract is unverified here
 # checked 4 harness(es); absent: pi-signed omp codex
-ok - secondmate busy contract live guard checked every installed harness
+ok - squad lead busy contract live guard checked every installed harness
 ```
 
 Pi's real parked pane classified `unknown launch-prompt`.
@@ -771,7 +771,7 @@ $ ls "$TURNEND"
 `tests/jg-codex-hook-layer-live-e2e.test.sh` is the command that refreshes this record.
 It captures the launch `bin/jg-spawn.sh` actually builds, replays those exact flags against the installed Codex, and fails naming the harness and version if the hook layer comes back on.
 It spends no model tokens, so it runs by default wherever Codex is installed.
-The portable half, `tests/jg-spawn-dispatch-profile.test.sh`, pins the split the launch template makes: an operator launches hook-free while a secondmate, which runs a primary session on this repository's own project hooks, keeps them.
+The portable half, `tests/jg-spawn-dispatch-profile.test.sh`, pins the split the launch template makes: an operator launches hook-free while a squad lead, which runs a primary session on this repository's own project hooks, keeps them.
 
 ## Composer classification matrix
 
@@ -904,7 +904,7 @@ The Herdr captures above are therefore this entry's live evidence, and the guard
 
 ### 2026-09-15 codex-cli 0.154.0 idle starfield and status footer through Herdr
 
-Verified on 2026-09-15 on macOS arm64 (Darwin 25.5.0) against codex-cli 0.154.0 (model gpt-6-astra, fast mode) running as a Codex second mate inside a Herdr pane, read through Herdr's ANSI capture with its exact capability descriptor (`styled=1`, `cursor=0`, `identity=1`, `rows=20`).
+Verified on 2026-09-15 on macOS arm64 (Darwin 25.5.0) against codex-cli 0.154.0 (model gpt-6-astra, fast mode) running as a Codex squad lead inside a Herdr pane, read through Herdr's ANSI capture with its exact capability descriptor (`styled=1`, `cursor=0`, `identity=1`, `rows=20`).
 Idle, codex 0.154 animates a braille starfield on the row above its bold `›` prompt row, on the `›` row behind the SGR-2 dim `Ask Codex to do anything` placeholder, and on the row below it, then draws a status footer reading `gpt-6-astra high fast · ~/Projects/purser · Launch Purser desk brief`.
 The starfield cells are truecolor greys whose luminance runs from roughly 66 to 165, so the cells above the 128 ghost ceiling survive ghost stripping, and the footer is bright, non-blank, and carries no structural edge.
 
@@ -1253,7 +1253,7 @@ teardown gm2 complete; state/gm2.gemini-settings.json removed
 
 ### Not verified
 
-Gemini as a PRIMARY or SECONDMATE runtime is unverified and is refused by `bin/jg-spawn.sh`: no wake protocol exists under `docs/supervision-protocols/` and no turn-end guard adapter was built or exercised.
+Gemini as a PRIMARY or SQUAD LEAD runtime is unverified and is refused by `bin/jg-spawn.sh`: no wake protocol exists under `docs/supervision-protocols/` and no turn-end guard adapter was built or exercised.
 No reasoning-effort axis was found; `gemini --help` on 0.58.0 exposes no effort, reasoning, or thinking flag, so the record-and-omit contract applies.
 
 ## Herdr
@@ -1335,9 +1335,9 @@ SSH-born herdr server (child of `herdr --session jg-remote remote-client-bridge`
 `XPC_SERVICE_NAME` identifies a launchd label but does not identify its domain, because the Background `user/501` job also carried that variable while lacking keychain access.
 The owner classifier therefore accepts that label only when `launchctl print gui/<uid>/<label>` identifies the owner pid or the label is loaded in `gui/<uid>` but not `user/<uid>`.
 `XPC_SERVICE_NAME=0`, including a value inherited by a herdr live-handoff child, remains unknown.
-`JG_REMOTE_JOB_ACTIVE=1` proves the Aqua worker only when `dev.firstmate.remote-job` is loaded in `gui/<uid>` but not `user/<uid>`.
+`JG_REMOTE_JOB_ACTIVE=1` proves the Aqua worker only when `dev.juggernaut.remote-job` is loaded in `gui/<uid>` but not `user/<uid>`.
 
-The SSH-born row was read on the remote host whose `dev.firstmate.herdr.jg-remote` job showed `state = spawn scheduled`, `runs = 239`, `last exit code = 1` and a log repeating `error: herdr server is already running`: herdr's remote attach had started the session's server as its own child before the login session existed, and launchd's copy lost the socket on every retry.
+The SSH-born row was read on the remote host whose `dev.juggernaut.herdr.jg-remote` job showed `state = spawn scheduled`, `runs = 239`, `last exit code = 1` and a log repeating `error: herdr server is already running`: herdr's remote attach had started the session's server as its own child before the login session existed, and launchd's copy lost the socket on every retry.
 `pgrep -f` did not list the herdr server's argv on macOS; `lsof -U -a -c herdr -F pn` named the socket owner.
 
 A separate foreground-supervision check ran on 2026-09-09 on macOS 26 (Darwin 25.6.0) with Herdr 0.9.0 using the throwaway Aqua launch agent `dev.jg-rca.herdr-fg`.
@@ -1399,7 +1399,7 @@ Measured 2026-09-26 against Herdr 0.9.0 and Claude Code 2.1.283 in an isolated `
 
 Typing `/exit` makes Claude Code render its command popup between the composer and the pane bottom: about 19 menu rows below a solid rule pair, with the footer row last.
 The composer row lands outside a bounded 20-row tail of the pane, so the adapter's bounded composer reads reported the composer as empty while it actually held `/exit`.
-The pre-Enter payload proof then judged the typed command unsent, pressed Ctrl+U, and reported `send-failed` without ever pressing Enter, so `bin/jg-control.sh exit` never exited the worker (and `bin/jg-secondmate-restart.sh` inherited the failure through its exit step).
+The pre-Enter payload proof then judged the typed command unsent, pressed Ctrl+U, and reported `send-failed` without ever pressing Enter, so `bin/jg-control.sh exit` never exited the worker (and `bin/jg-squad-lead-restart.sh` inherited the failure through its exit step).
 
 The fix captures the FULL VISIBLE VIEWPORT for every herdr adapter composer read (`pane read --source visible [--format ansi]`, `jg_backend_herdr_composer_state` and `jg_backend_herdr_composer_content`): the composer is by definition inside the viewport, and the viewport is the one bound that always contains it.
 The shared inbox pending-line confirmation read (`bin/jg-task-inbox-lib.sh`) stays a bounded tail on every backend, herdr included; its payloads are task lines, not slash commands, so the popup shape does not arise there.
@@ -1569,16 +1569,16 @@ HERDR_LAB_HELPER=bin/jg-herdr-lab.sh \
 Observed guarantees on 2026-07-30 against Herdr 0.7.5 protocol 17:
 
 ```text
-ok - real herdr E2E: with one 'firstmate' workspace and no herdr parent, a crewmate still lands in this home's own workspace without stealing focus
+ok - real herdr E2E: with one 'juggernaut' workspace and no herdr parent, a operator still lands in this home's own workspace without stealing focus
 ok - real herdr E2E: the normal unique-label path is unchanged when the launcher's own pane identifies the workspace
 ok - real herdr E2E: presentation spaces still create the isolated child workspace and bind it under the launcher's exact parent, without stealing focus
-ok - real herdr E2E: with two 'firstmate' workspaces, a worker spawned from inside the second one lands in that exact workspace
+ok - real herdr E2E: with two 'juggernaut' workspaces, a worker spawned from inside the second one lands in that exact workspace
 ok - real herdr E2E: the duplicate-labeled sibling workspace is left entirely untouched and focus is preserved
 ok - real herdr E2E: with a duplicated home label, a projected worker still hangs off the launcher's exact workspace and the sibling stays untouched
 ok - real herdr E2E: an ambiguous home label with no launcher identity refuses before any worker endpoint exists
 ok - real herdr E2E: a launcher pane that no longer exists refuses before any worker endpoint exists
-ok - real herdr E2E: a secondmate launching its own worker gets the same exact-workspace guarantee, and its same-labeled sibling is untouched
-ok - real herdr E2E: a --secondmate launch still stands up that secondmate's own workspace instead of inheriting the launcher's
+ok - real herdr E2E: a squad lead launching its own worker gets the same exact-workspace guarantee, and its same-labeled sibling is untouched
+ok - real herdr E2E: a --squad-lead launch still stands up that squad lead's own workspace instead of inheriting the launcher's
 ok - real herdr E2E: teardown closes only the worker's own pane and leaves the launcher, its workspace, and the same-labeled sibling intact
 ```
 
@@ -1594,7 +1594,7 @@ HERDR_LAB_HELPER=bin/jg-herdr-lab.sh \
   tests/jg-backend-herdr-workspace-per-home-e2e.test.sh
 ```
 
-Observed guarantee: the primary and secondmate used distinct home workspaces, a child launched by the secondmate stayed in that secondmate workspace, list-live remained home-scoped, and exact cleanup did not affect sibling homes.
+Observed guarantee: the primary and squad lead used distinct home workspaces, a child launched by the squad lead stayed in that squad lead workspace, list-live remained home-scoped, and exact cleanup did not affect sibling homes.
 
 The complete projection suite ran on 2026-07-21 against Herdr 0.7.4 protocol 16:
 
@@ -1606,10 +1606,10 @@ HERDR_LAB_HELPER=bin/jg-herdr-lab.sh \
 Observed guarantees included:
 
 ```text
-ok - real Herdr lab: primary and two secondmate homes each own a top-level contiguous child block
+ok - real Herdr lab: primary and two squad lead homes each own a top-level contiguous child block
 ok - real Herdr lab: concurrent primary/A/B spawns stay session-locked with zero focus drift
-ok - real Herdr lab: session lock contention from a secondmate home falls back flat with no journal
-ok - real Herdr lab: legacy projection labels and flat secondmate tabs are left unmigrated
+ok - real Herdr lab: session lock contention from a squad lead home falls back flat with no journal
+ok - real Herdr lab: legacy projection labels and flat squad lead tabs are left unmigrated
 ok - real Herdr lab: multi-home exact-pane teardowns restore captain focus without workspace close authority
 ok - real Herdr lab validation completed on Herdr 0.7.4 with the default-session tripwire intact
 ```
@@ -1627,7 +1627,7 @@ Observed restart-reclaim guarantees:
 
 ```text
 ok - real Herdr lab: Hi Bit and Wheelhouse-style same-identity restarts reclaim one nested space with exact focus and idempotence
-ok - real Herdr lab: secondmate restart binding and reclaim stay isolated to the exact child home and parent
+ok - real Herdr lab: squad lead restart binding and reclaim stay isolated to the exact child home and parent
 ok - real Herdr lab: concurrent cross-home recoveries replace exact husks under one session lock with no focus drift
 ok - real Herdr lab: missing, renamed, and duplicate tokens trigger zero destructive or adoptive calls, and live duplicate risk refuses launch
 ok - real Herdr lab validation completed on Herdr 0.7.5 with the default-session tripwire intact
@@ -1645,7 +1645,7 @@ Observed default and opt-out guarantees:
 ```text
 ok - real Herdr lab: an opted-out spawn retains the Stage 1 Herdr command sequence with zero ordering calls
 ok - real Herdr lab: a home that configured nothing is projected by default
-ok - real Herdr lab: the primary presentation setting inherits into real secondmate homes
+ok - real Herdr lab: the primary presentation setting inherits into real squad lead homes
 ok - real Herdr lab validation completed on Herdr 0.8.0 with the default-session tripwire intact
 ```
 
@@ -1653,7 +1653,7 @@ The projected spawn in that run used the historical empty opt-in file, so a home
 One concurrent cross-home recovery case refused under contention on a loaded machine and passed on an immediate rerun; recovery-path presentation lock contention remains a deliberate hard refusal by default rather than a flat fallback, which default-on makes reachable from any Herdr home.
 Callers that need concurrent recoveries to serialize can pass `jg-spawn.sh --herdr-resume-lock-wait`.
 The flag applies to a fresh ship or scout spawn, and the multi-task path forwards it to each per-pair spawn.
-It has no effect on `--relaunch` and `--secondmate`, because those paths take no exact-resume presentation-order lock.
+It has no effect on `--relaunch` and `--squad-lead`, because those paths take no exact-resume presentation-order lock.
 That run measured the default-on projection on Herdr 0.8.0 only, while the focus-flash regression below was last run on 0.7.5 before the flip, so neither run covered a defective release under default-on projection; the version floor and the focus-flash suite's Part C close that gap.
 
 The restored-shell session-start cleanup ran on 2026-07-24 against Herdr 0.7.5 protocol 17:
@@ -1811,14 +1811,14 @@ Observed guarantees: a contended presentation lock refused the teardown before t
 
 The same fixtures verified three further boundaries on 2026-07-29: missing or malformed endpoint identity and an unparseable pane presence refused record removal with everything retained; the SIGKILL escalation re-read the exact pane's process information and refused to signal when a different shell pid owned the pane, falling back to the plain close with the original process untouched; and a reposition whose removal then failed on every path restored the exact original workspace order through a second verified move and reported the close as failed.
 
-The teardown fixture was re-run on 2026-07-31 after extending the same fail-closed boundary through forced secondmate cleanup, including recursive cleanup of a nested secondmate whose Herdr grandchild close remains unconfirmed.
+The teardown fixture was re-run on 2026-07-31 after extending the same fail-closed boundary through forced squad lead cleanup, including recursive cleanup of a nested squad lead whose Herdr grandchild close remains unconfirmed.
 
 Observed output:
 
 ```text
-ok - forced secondmate teardown preflights every Herdr child before cleanup mutation
-ok - forced secondmate teardown retains Herdr child identity until exact pane disappearance
-ok - forced teardown retains a nested secondmate home and its grandchild's Herdr identity when the grandchild close is unconfirmed
+ok - forced squad lead teardown preflights every Herdr child before cleanup mutation
+ok - forced squad lead teardown retains Herdr child identity until exact pane disappearance
+ok - forced teardown retains a nested squad lead home and its grandchild's Herdr identity when the grandchild close is unconfirmed
 ```
 
 ### Composer and operational input
@@ -1837,7 +1837,7 @@ The U+2063 operational and routed-request separators were exercised through a re
 
 ```sh
 JG_SEND_MARKER_HERDR_E2E=1 \
-  tests/jg-send-secondmate-marker-herdr-e2e.test.sh
+  tests/jg-send-squad-lead-marker-herdr-e2e.test.sh
 ```
 
 ### Native blocked event
@@ -2108,7 +2108,7 @@ The daemon injection transport into a live composer keeps its coverage in `tests
 ## Zellij
 
 The current compatibility floor and latest verification are Zellij 0.44.0 with `jq` on macOS aarch64.
-All real tests use a uniquely named session and `tests/zellij-test-safety.sh`; they never touch a session named `firstmate` or call all-session deletion.
+All real tests use a uniquely named session and `tests/zellij-test-safety.sh`; they never touch a session named `juggernaut` or call all-session deletion.
 
 | Guarantee | Command shape | Result |
 | --- | --- | --- |
@@ -2254,7 +2254,7 @@ App-server partial methods and raw socket experiments do not satisfy that bridge
 
 ## Cursor Agent CLI
 
-Cursor runs operator, scout, secondmate, and primary work; [`supervision.md`](supervision.md#cursor-primary-park-2026-08-13) owns the primary evidence.
+Cursor runs operator, scout, squad lead, and primary work; [`supervision.md`](supervision.md#cursor-primary-park-2026-08-13) owns the primary evidence.
 The evidence below was produced on 2026-08-11 against the installed signed CLI on macOS 26.5.2 arm64 with tmux 3.6a, running as `kunchenguid`, and extended on 2026-08-13 with the tmux composer verdict below.
 
 - Binary: `~/.local/bin/cursor-agent`, canonicalizing into `~/.local/share/cursor-agent/versions/2026.08.11-e8db854/cursor-agent`.
@@ -2322,7 +2322,7 @@ with-cursor : unknown      cursorless : unknown   (agent exited to a shell)
 
 `bin/jg-tmux-lib.sh` therefore reclassifies cursorlessly only when the pane's foreground process group is provably Cursor, so every other harness keeps the strict blank-cursor-row posture.
 That supplies the genuine composer-empty proof required for away-mode escalation delivery.
-A live injection through `bin/jg-supervise-daemon.sh`'s own `inject_msg` into a real Cursor pane returned 0 and the pane processed the typed `FIRSTMATE_OP: v1 away-supervisor:` escalation.
+A live injection through `bin/jg-supervise-daemon.sh`'s own `inject_msg` into a real Cursor pane returned 0 and the pane processed the typed `JUGGERNAUT_OP: v1 away-supervisor:` escalation.
 
 `tests/jg-tmux-agent-liveness.test.sh` pins this with real processes and no Cursor installed: it asserts the cursor-anchored source is blind, that the composite still reads `empty` idle and `pending` with typed text, that an identical screen stays `unknown` when the pane is not Cursor, and that a stale Cursor screen over a dead shell never reads `empty`.
 
@@ -2716,7 +2716,7 @@ Hung validation and precisely post-scan writes remain automated evidence only.
 
 ## Oh My Pi (omp)
 
-omp runs operator, scout, secondmate, and primary work; [`supervision.md`](supervision.md#omp-oh-my-pi-native-delivery-2026-09-05) owns the primary evidence.
+omp runs operator, scout, squad lead, and primary work; [`supervision.md`](supervision.md#omp-oh-my-pi-native-delivery-2026-09-05) owns the primary evidence.
 The evidence below was produced on 2026-09-05 against omp 18.1.11 (`~/.local/bin/omp`, a Bun-compiled single binary) on macOS 26 arm64 through the Herdr backend with the `openai-codex/gpt-6-astra` model, building on the 2026-09-02 adapter investigation against 18.1.2.
 
 ### Process identity and markers

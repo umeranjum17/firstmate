@@ -10,10 +10,10 @@
 # path.
 #
 # The destination is the home's role, never the caller's choice:
-#   - a secondmate home reports upward on its parent channel, resolved and
+#   - a squad_lead home reports upward on its parent channel, resolved and
 #     appended through bin/jg-parent-channel-lib.sh under its channel contract;
 #   - a main home reports to the captain through the durable wake queue.
-# A poll observed in a secondmate home also receives a local durable wake after
+# A poll observed in a squad_lead home also receives a local durable wake after
 # the upward write, so the mate can handle its own poll observation.
 # No new state file and no new transport are involved.
 #
@@ -42,7 +42,7 @@ JG_MERGE_OUTCOME_ALREADY_RECORDED=false
 # existing poll path also needs a local wake:
 #   self - this home performed the merge.
 #   poll - this home's merge poll detected the merge, so the canonical outcome
-#          also wakes this home after any upward hop needed by a secondmate.
+#          also wakes this home after any upward hop needed by a squad_lead.
 # Optional <authority> is away, attended, or external (the retired yolo and
 # away-grant values are still accepted for a persisted authority written before
 # the words model landed). Away, external, and the retired tags are appended to
@@ -122,4 +122,4 @@ jg_merge_outcome_report() {  # <home> <state> <task-id> <pr-url> <origin> [autho
 
 # Optional merge-card add-on: defines jg_merge_post_hook.
 # shellcheck source=/dev/null
-[ ! -r "${JG_ADDONS_DIR:-${JG_HOME:-$_JG_MERGE_OUTCOME_LIB_DIR/..}/projects/firstmate-addons}/merge-card/bin/jg-merge-hooks-lib.sh" ] || . "${JG_ADDONS_DIR:-${JG_HOME:-$_JG_MERGE_OUTCOME_LIB_DIR/..}/projects/firstmate-addons}/merge-card/bin/jg-merge-hooks-lib.sh"
+[ ! -r "${JG_ADDONS_DIR:-${JG_HOME:-$_JG_MERGE_OUTCOME_LIB_DIR/..}/projects/juggernaut-addons}/merge-card/bin/jg-merge-hooks-lib.sh" ] || . "${JG_ADDONS_DIR:-${JG_HOME:-$_JG_MERGE_OUTCOME_LIB_DIR/..}/projects/juggernaut-addons}/merge-card/bin/jg-merge-hooks-lib.sh"

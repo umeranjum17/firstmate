@@ -158,7 +158,7 @@ exec "$REAL_TMUX" -L "$SOCKET" "\$@"
 SHIM
 chmod +x "$TMUX_SHIM_DIR/tmux"
 
-# Create a fake crewmate window (the watcher lists jg-* windows for stale
+# Create a fake operator window (the watcher lists jg-* windows for stale
 # detection). The pane is an inert shell - it just needs to exist.
 "$REAL_TMUX" -L "$SOCKET" new-window -d -n jg-fake-c1 -t supervisor
 

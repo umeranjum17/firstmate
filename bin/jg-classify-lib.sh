@@ -76,7 +76,7 @@ case $- in *u*) _jg_classify_nounset=on ;; *) _jg_classify_nounset=off ;; esac
 unset _jg_classify_nounset
 
 # Captain-relevant status verbs. A status line carrying any of these is work
-# firstmate must see. Lines without these verbs are no-verb signals: the watcher
+# juggernaut must see. Lines without these verbs are no-verb signals: the watcher
 # absorbs them only with positive provably-working evidence, while the daemon uses
 # its away-mode classification. JG_CAPTAIN_RE overrides the whole set when a home
 # needs a custom verb vocabulary; absent, this default applies.
@@ -94,13 +94,13 @@ unset _jg_classify_nounset
 # classification below.
 JG_CLASSIFY_CAPTAIN_RE_DEFAULT='done:|needs-decision:|blocked:|failed:|PR ready|checks green|ready in branch|merged'
 
-# The declared-wait verb. A crew (or firstmate steering it) appends
+# The declared-wait verb. A crew (or juggernaut steering it) appends
 #   paused: <reason>
 # to declare a known wait expected to clear on its own. The legacy "external
 # wait" name and "awaiting external" reason also cover the worker's own work;
 # they do not identify a separate classification or liveness source.
 # bin/jg-brief.sh owns worker-facing declaration and resolution instructions.
-# Unlike `blocked:` (stuck, firstmate must help), an idle `paused:` pane is EXPECTED, so
+# Unlike `blocked:` (stuck, juggernaut must help), an idle `paused:` pane is EXPECTED, so
 # the stale path bounds repeats instead of escalating a possible wedge; a live
 # idle worker can still surface a first-sight stale alert. It is
 # deliberately NOT in the captain-relevant set above: a pause is a "stop
@@ -359,7 +359,7 @@ status_is_paused_or_captain_held() {  # <status-line>
 
 # The status line that holds a crew in a declared wait, or nothing when it is in
 # none. Supervisors decide the wait from this line, never from the raw latest
-# event: a resolved line is also how firstmate answers a decision (jg-send
+# event: a resolved line is also how juggernaut answers a decision (jg-send
 # --resolve-key), and one that lands after a pause for a different phase key -
 # including the stated default key a keyless decision shares - does not end the
 # pause. Only a resolved line for the pause's own phase key (the keyed
@@ -578,9 +578,9 @@ status_event_recorded() {  # <status-file> <new-status-line>
 # statement of the status-fold contract that fixes this - a needs-decision/blocked
 # line OPENS a keyed decision, and an explicit resolution or a verified
 # captain-held backlog transfer referencing that key CLOSES it.
-# Ship/scout terminal declarations supersede stale log decisions; a secondmate's
+# Ship/scout terminal declarations supersede stale log decisions; a squad_lead's
 # terminal event may describe other work and cannot close an unrelated decision.
-# Who WRITES the closing line is owned elsewhere: the answering firstmate closes
+# Who WRITES the closing line is owned elsewhere: the answering juggernaut closes
 # at answer time through jg-send's --resolve-key (bin/jg-send.sh header), and a
 # worker self-closes only a blocker that cleared without an answer (bin/jg-brief.sh
 # rule 6), so closure never depends on a busy worker's discipline.
@@ -608,9 +608,9 @@ status_event_recorded() {  # <status-file> <new-status-line>
 # ends at the first tag rather than special-casing "[key=...]".
 #
 # Correlation tokens. That bracket rule already covers every BRACKETED tag,
-# including the "[corr=<16 hex>]" form bin/jg-secondmate-report.sh writes. It
+# including the "[corr=<16 hex>]" form bin/jg-squad-lead-report.sh writes. It
 # does not cover the UNBRACKETED token that bin/jg-pending-reply-lib.sh writes
-# (jg_pending_reply_corr_token), which a secondmate answering a marked request
+# (jg_pending_reply_corr_token), which a squad_lead answering a marked request
 # echoes on its parent status line ahead of the key tag (bin/jg-brief.sh), so a
 # real transition routinely arrives as
 #   needs-decision corr=<16 hex> [key=texte-du-mur]: <summary>
@@ -635,14 +635,14 @@ status_event_recorded() {  # <status-file> <new-status-line>
 # free-text word carrying an equals sign ("resolved x=1 [key=k]: ...") reduce to
 # a bare verb and impersonate a transition, which is the takeover the strict
 # parse and _jg_decision_key_transition_allowed exist to prevent. Recognising
-# only what a firstmate library actually writes costs one more line here each
+# only what a juggernaut library actually writes costs one more line here each
 # time a real new token shape is introduced, and that is the intended trade: a
 # new shape is a deliberate, reviewed edit rather than a silent widening. A line
 # whose token is malformed, wrong-length, or merely mentioned in prose keeps its
 # extra words and therefore stays a non-transition, exactly as before.
 #
 # The 16 hex classes are written out literally rather than built from a
-# variable, the same way bin/jg-secondmate-report.sh validates the id it is
+# variable, the same way bin/jg-squad-lead-report.sh validates the id it is
 # handed: a variable holding a glob is only re-read as a pattern under some
 # shells' expansion rules, and a safety parse must not turn on that.
 #
@@ -861,7 +861,7 @@ _jg_status_kind() {
     done < "$meta"
     kind=${kind:-ship}
   fi
-  case "$kind" in ship|scout|secondmate) printf '%s' "$kind" ;; *) printf unknown ;; esac
+  case "$kind" in ship|scout|squad_lead) printf '%s' "$kind" ;; *) printf unknown ;; esac
 }
 
 # Emit-out shared by _jg_decision_fold_line's return points: prints the
@@ -990,7 +990,7 @@ EOF
 # pending-reply escalation), a `remote-reply-continuity-` key is the parent's
 # own blocker about a broken remote reply mirror
 # (bin/jg-procevent-remote-reply.sh), and a `captain-hold-` key relays a child
-# decision a secondmate escalated to the captain (bin/jg-captain-hold.sh) while
+# decision a squad_lead escalated to the captain (bin/jg-captain-hold.sh) while
 # it keeps working, so the task is not waiting on any of them. Pending-reply
 # recovery and a fire-and-forget retry ring consult this set and leave a task
 # alone while it is non-empty.
@@ -1016,7 +1016,7 @@ status_own_open_decisions() {  # <status-file>
 # Given a <run-id>, only a decision whose key is exactly `nm-<run-id>-<step>` for
 # a non-empty step counts - the key shape the brief mandates for a gate
 # escalation - so an unrelated question left open earlier in the same task is
-# never read as firstmate being told about THIS run's gate.
+# never read as juggernaut being told about THIS run's gate.
 status_has_open_needs_decision() {  # <status-file> [<run-id>]
   local run=${2-} open line key verb
   open=$(status_open_decisions "$1")
@@ -2602,12 +2602,12 @@ crew_is_paused() {  # <id>
 JG_GATE_HUMAN_DECISION='ask-user: authority decision'
 
 # 0 if crew <id>'s authoritative current state is a no-mistakes gate whose answer
-# is owed by a human rather than by the crewmate itself.
+# is owed by a human rather than by the operator itself.
 #
 # `parked` alone cannot answer this: the gate's shape (awaiting_approval,
 # fix_review, awaiting_agent) is reported parked in every case and does not by
 # itself say who owes the answer; only a findings row whose `action` column is
-# exactly `ask-user` does. A crewmate that goes quiet before answering its OWN
+# exactly `ask-user` does. A operator that goes quiet before answering its OWN
 # gate is precisely the wedge the escalation ladder exists to catch, so only the
 # minted component above - never the parked verdict, the gate name, or the
 # finding text - admits a lane here.
@@ -2645,7 +2645,7 @@ crew_gate_awaits_human_decision() {  # <id> -> <run-id> on stdout
 
 # Directories excluded from the worktree write probe below, and the depth it walks.
 # The excluded set is everything a supervisor read or a package manager can write
-# without the crew doing any work - .git first, so firstmate's own read-only git
+# without the crew doing any work - .git first, so juggernaut's own read-only git
 # commands against the worktree can never make the probe self-fulfilling - plus the
 # large generated trees that would make the walk expensive. Both are overridable so
 # a home with an unusual layout can widen or narrow the probe. The list is a skip
@@ -2685,7 +2685,7 @@ JG_WORKTREE_WRITE_TIMEOUT=${JG_WORKTREE_WRITE_TIMEOUT:-10}
 # evidence therefore always leaves the caller's existing escalation schedule
 # untouched, so a crew that writes nothing still escalates exactly as before.
 #
-# A kind=secondmate task records a provisioned firstmate home, not a code tree, and
+# A kind=squad_lead task records a provisioned juggernaut home, not a code tree, and
 # such a home runs its OWN supervision inside it: its state/ directory churns a
 # watcher beacon, pane hashes, and heartbeats whether or not the mate is producing
 # anything, so a walk there would report liveness for a mate that has done nothing.
@@ -2711,8 +2711,8 @@ crew_worktree_written_since() {  # <id> <state> <anchor-file>
   wt=$(grep '^worktree=' "$state/$id.meta" 2>/dev/null | tail -1 | cut -d= -f2- || true)
   [ -n "$wt" ] && [ -d "$wt" ] || return 1
   kind=$(grep '^kind=' "$state/$id.meta" 2>/dev/null | tail -1 | cut -d= -f2- || true)
-  [ "$kind" != secondmate ] || return 1
-  if [ -e "$wt/.jg-secondmate-home" ] || [ -L "$wt/.jg-secondmate-home" ]; then
+  [ "$kind" != squad_lead ] || return 1
+  if [ -e "$wt/.jg-squad-lead-home" ] || [ -L "$wt/.jg-squad-lead-home" ]; then
     return 1
   fi
   read -r -a names <<< "$JG_WORKTREE_WRITE_PRUNE"
@@ -2738,21 +2738,21 @@ crew_worktree_written_since() {  # <id> <state> <anchor-file>
 # Files are mapped to task ids by stripping the .status / .turn-ended suffix;
 # a no-verb wake with nothing
 # provably working must surface, so an empty/unresolvable list returns 1.
-# A kind=secondmate task's .status stream doubles as its routed-reply channel,
+# A kind=squad_lead task's .status stream doubles as its routed-reply channel,
 # so the lines new since the watcher's classified position are read before any
 # busy evidence counts: a decision, blocker, terminal outcome, `note:`, any line
 # carrying a correlation marker (jg_pending_reply_corr_token, bracketed or not),
 # and any verb this library does not know is parent-directed content the
 # supervisor must read, so it surfaces regardless of how busy the mate is. Only
 # unmarked routine `working:` and `paused:` progress falls through
-# to the same provably-working absorb an ordinary crewmate gets, so a healthy
+# to the same provably-working absorb an ordinary operator gets, so a healthy
 # mate's progress no longer wakes the primary on every append while an unproven
 # mate still surfaces. The span starts at the classified position its owner
 # reports (jg_wake_signal_seen_size, bin/jg-wake-lib.sh, loaded by every watcher
 # caller); a caller without that library reads the whole log, which can only
 # surface more. An unreadable span surfaces. Scoped to .status files - a mate's
 # bare turn-ended ping always used the ordinary provably-working absorb.
-_jg_secondmate_status_new_lines_routine() {  # <status-file> <state>
+_jg_squad_lead_status_new_lines_routine() {  # <status-file> <state>
   local f=$1 state=$2 start=0 size chunk line verb
   if command -v jg_wake_signal_seen_size >/dev/null 2>&1; then
     start=$(jg_wake_signal_seen_size "$state" "$f")
@@ -2791,8 +2791,8 @@ signal_crew_provably_working() {  # <file> ...
     [ -n "$task" ] || continue
     case "$base" in
       *.status)
-        if [ "$(grep '^kind=' "$dir/$task.meta" 2>/dev/null | tail -1 | cut -d= -f2-)" = secondmate ]; then
-          _jg_secondmate_status_new_lines_routine "$f" "$dir" || return 1
+        if [ "$(grep '^kind=' "$dir/$task.meta" 2>/dev/null | tail -1 | cut -d= -f2-)" = squad_lead ]; then
+          _jg_squad_lead_status_new_lines_routine "$f" "$dir" || return 1
         fi
         ;;
     esac

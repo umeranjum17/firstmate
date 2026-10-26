@@ -6,7 +6,7 @@
 # Why this exists: state/<id>.status is an append-only, best-effort EVENT LOG.
 # Crews append only wake-worthy transitions (done/needs-decision/blocked/paused/failed)
 # and nothing when they silently resume, so `tail -1` of that log reports the
-# last EVENT, not the current STATE. After firstmate resolves a needs-decision
+# last EVENT, not the current STATE. After juggernaut resolves a needs-decision
 # or blocked and the crew resumes (responds to the gate, the pipeline fixes, it
 # re-validates), the log's last line stays stale. This helper never infers the
 # current state from a tail of the log: it reads the authoritative source (a
@@ -23,7 +23,7 @@
 # JG_CREW_STATE_NO_FORGE=1 keeps the receipt read but skips the forge fallback.
 # An absent or unreadable PR identity yields an honest unknown, never an
 # optimistic merged claim.
-# Output is one stable, parseable, token-tight line firstmate can read every
+# Output is one stable, parseable, token-tight line juggernaut can read every
 # heartbeat:
 #
 #   state: <working|parked|done|blocked|paused|failed|unknown> · source: <run-step|pane|status-log|remote-endpoint|none> · <detail>
@@ -35,10 +35,10 @@
 #
 # Logic, in order:
 #   1. Resolve worktree + backend target + kind from state/<id>.meta. A meta
-#      recording remote_host= is a remote secondmate: its worktree and endpoint
+#      recording remote_host= is a remote squad_lead: its worktree and endpoint
 #      live on that host, so the local worktree and pane reads are skipped and
 #      the remote host is asked for the endpoint's recovery-grade state
-#      (jg-on.sh + jg-remote-secondmate-control.sh state). alive falls through
+#      (jg-on.sh + jg-remote-squad-lead-control.sh state). alive falls through
 #      to the routed status log; dead/missing report the remote verdict; an
 #      unreachable or unreadable remote reports unknown-remote, never a false
 #      gone/dead.
@@ -240,7 +240,7 @@ REMOTE_HOST=$(meta_value remote_host)
 [ -n "$KIND" ] || KIND=ship
 
 # A torn-down (or never-created) worktree has no current state to read. A
-# remote secondmate's recorded worktree is a path on ITS host, so the local
+# remote squad_lead's recorded worktree is a path on ITS host, so the local
 # probe proves nothing for it - the remote arm below reads the true source.
 if [ -z "$REMOTE_HOST" ] && { [ -z "$WT" ] || [ ! -d "$WT" ]; }; then
   emit unknown none "worktree gone (torn down?)"
@@ -282,20 +282,20 @@ map_log_state() {  # <line>
 LOG_LINE=$(status_current_line "$LOG" "$KIND")
 LOG_VERB=$(status_line_verb "$LOG_LINE")
 
-# --- remote secondmate: the true source is the remote endpoint ---------------
+# --- remote squad_lead: the true source is the remote endpoint ---------------
 # A remote mate's recorded worktree and backend target live on its own host, so
 # the local worktree probe above and the local pane reads below would misreport
 # a healthy remote mate as gone or dead. Ask the remote host for the endpoint's
 # recovery-grade state over the same jg-on.sh transport jg-send uses, then read
 # current activity from the routed status log exactly as for a local
-# secondmate (an idle endpoint is healthy for a secondmate either way). An
+# squad_lead (an idle endpoint is healthy for a squad_lead either way). An
 # unreachable host or unreadable endpoint is reported as unknown-remote -
 # explicitly NOT proof of death - so a transport blip never reads as a torn
 # down or dead mate; only the remote host's own dead/missing verdict may say
 # the endpoint is actually gone.
 if [ -n "$REMOTE_HOST" ]; then
   if ! REMOTE_STATE=$(JG_HOME="$JG_HOME" "$SCRIPT_DIR/jg-on.sh" "$ID" \
-    jg-remote-secondmate-control.sh state "$ID" < /dev/null 2>/dev/null); then
+    jg-remote-squad-lead-control.sh state "$ID" < /dev/null 2>/dev/null); then
     REMOTE_STATE=
   fi
   REMOTE_STATE=$(printf '%s\n' "$REMOTE_STATE" | tail -1)
@@ -307,7 +307,7 @@ if [ -n "$REMOTE_HOST" ]; then
           emit "$LOG_STATE" status-log "$(status_line_note "$LOG_LINE")${SEP}remote endpoint alive on $REMOTE_HOST"
         fi
       fi
-      emit unknown remote-endpoint "alive on $REMOTE_HOST (an idle secondmate is healthy)"
+      emit unknown remote-endpoint "alive on $REMOTE_HOST (an idle squad_lead is healthy)"
       ;;
     dead|missing)
       emit unknown remote-endpoint "remote endpoint $REMOTE_STATE on $REMOTE_HOST"
@@ -610,7 +610,7 @@ nm_gate_findings_count() {
 }
 # 0 when the gate's own findings table holds at least one row whose `action`
 # column is exactly `ask-user` - the pipeline's own record that this gate's
-# answer is owed by a HUMAN, not by the crewmate (the gate's shape -
+# answer is owed by a HUMAN, not by the operator (the gate's shape -
 # awaiting_approval, fix_review, awaiting_agent - is reported parked in every
 # case and does not by itself say who owes the answer; only a findings row whose
 # `action` column is exactly `ask-user` does).
@@ -621,7 +621,7 @@ nm_gate_findings_count() {
 # substring search over the run payload cannot make this distinction - the
 # trailing `description` column is free text that routinely quotes finding
 # actions, and the payload also carries the branch name and step names, so a
-# gate owed the crewmate's own answer would match just as readily as one owed a
+# gate owed the operator's own answer would match just as readily as one owed a
 # human. Column order is read from the header rather than assumed, so a table
 # that grows a column keeps answering correctly. Both the header match and the
 # row scan require the BRACE, so the count, the index and the rows all come from
@@ -641,7 +641,7 @@ nm_gate_findings_count() {
 # is known to carry as short comma-free scalars, and anything else refuses:
 # a whitelist rather than a blacklist of free-text names, because an unknown
 # column must read as unsafe rather than as safe. When the table's shape is not
-# provably safe the correct answer is the noisy one - a crewmate that went quiet
+# provably safe the correct answer is the noisy one - a operator that went quiet
 # before answering its own gate is the failure that must never be silenced.
 # Residual bound, which no unquoted positional parse of this table escapes: a
 # comma inside a whitelisted field's own value (a path with a comma in it, say)
@@ -754,7 +754,7 @@ nm_steps_rows() {
 # fixing step. The client prefixes a step's `last_activity` with `quiet` once no
 # step log or native-agent lifecycle event has arrived for longer than its
 # configured quiet warning, so its own recency verdict is the signal here rather
-# than a second threshold invented in firstmate. Positive evidence is required:
+# than a second threshold invented in juggernaut. Positive evidence is required:
 # an absent table is not recency, so a run record that merely still says
 # `running` while nothing executes it never reads as alive.
 nm_run_activity_is_recent() {
@@ -974,7 +974,7 @@ NM_DAEMON_ANSWER=""
 RUN_DEAD_DAEMON=""
 COARSE_STATUS=""
 SELECTED_RUN_ID=""
-# Scouts and secondmates never drive a no-mistakes validation of their own
+# Scouts and squad_leads never drive a no-mistakes validation of their own
 # worktree, so skip the lookup for them and read state from pane/log directly.
 if [ "$KIND" = ship ] && [ -n "$CREW_BRANCH" ] && command -v no-mistakes >/dev/null 2>&1; then
   RUN_OUT=$(nm_run axi status)
@@ -1358,12 +1358,12 @@ if ! pane_readable "$BACKEND_TARGET"; then
   esac
 fi
 
-# Secondmates idle on their own watcher (idle pane = healthy), so the busy
+# SquadLeads idle on their own watcher (idle pane = healthy), so the busy
 # state is not meaningful for them; read their state from the status log only.
 # Only an exact busy verdict reports working here, and only an exact idle
 # verdict permits the status-log fallback below. Missing, malformed, stale, or
 # unverified semantic state remains unknown.
-if [ "$KIND" != secondmate ]; then
+if [ "$KIND" != squad_lead ]; then
   BUSY_VERDICT=$(crew_busy_verdict "$BACKEND_TARGET")
   case "${BUSY_VERDICT%% *}" in
     busy) emit working pane "harness busy (${BUSY_VERDICT#* })" ;;
@@ -1378,7 +1378,7 @@ fi
 # JG_CLASSIFY_RESOLVE_VERB), and any future decision-only sibling - is NOT a state:
 # it exists solely to CLOSE a keyed decision in the durable fold, so a trailing
 # resolved: must never become the current state or leak its resolution prose as the
-# detail. Skipping it lets a just-resolved idle crew (typically a secondmate, which
+# detail. Skipping it lets a just-resolved idle crew (typically a squad_lead, which
 # has no busy check above) fall through to the idle default instead of rendering
 # `unknown` with the resolution note as `doing`. map_log_state is the single owner of
 # the verb->state mapping (including the configurable paused verb), so reusing its

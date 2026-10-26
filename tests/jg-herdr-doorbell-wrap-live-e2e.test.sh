@@ -135,7 +135,7 @@ rc=0
 jg_task_inbox_ring herdr "$TARGET" "$REC" || rc=$?
 screen=$(lab pane read "$PANE" --source visible 2>/dev/null || true)
 [ "$rc" -eq 0 ] || fail "Claude Code ($VERSION) on $HERDR_VER: the wrapped doorbell ring returned $rc (reason: ${JG_TASK_INBOX_RING_REASON:-none reported}); viewport:"$'\n'"$screen"
-printf '%s\n' "$screen" | grep -q 'Firstmate instruction waiting' \
+printf '%s\n' "$screen" | grep -q 'Juggernaut instruction waiting' \
   || fail "the rang doorbell is not on screen; viewport:"$'\n'"$screen"
 left=unknown
 for ((i = 0; i < 20; i++)); do

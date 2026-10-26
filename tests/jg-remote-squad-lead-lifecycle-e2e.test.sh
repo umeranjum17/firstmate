@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Full remote secondmate lifecycle over the deterministic generic SSH boundary.
+# Full remote squad_lead lifecycle over the deterministic generic SSH boundary.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -11,7 +11,7 @@ set -u
 
 command -v jq >/dev/null 2>&1 || { echo "skip: jq not found"; exit 0; }
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
-TMP_ROOT=$(jg_test_tmproot jg-remote-secondmate-e2e)
+TMP_ROOT=$(jg_test_tmproot jg-remote-squad-lead-e2e)
 mkdir -p "$TMP_ROOT"
 TMP_ROOT=$(cd "$TMP_ROOT" && pwd -P)
 PARENT="$TMP_ROOT/parent"
@@ -71,7 +71,7 @@ case "\${1:-}" in
   list-windows)
     [ -f "\$state" ] || exit 0
     name=\$(cut -d'|' -f1 "\$state")
-    case "\$*" in *'#{session_name}:#{window_name}'*) printf 'firstmate:%s\n' "\$name" ;; *) printf '%s\n' "\$name" ;; esac
+    case "\$*" in *'#{session_name}:#{window_name}'*) printf 'juggernaut:%s\n' "\$name" ;; *) printf '%s\n' "\$name" ;; esac
     exit 0
     ;;
   new-window)
@@ -89,7 +89,7 @@ case "\${1:-}" in
       *'#{pane_current_path}'*) cut -d'|' -f2- "\$state" ;;
       *'#{pane_current_command}'*) printf 'codex\n' ;;
       *'#{cursor_y}'*) printf '0\n' ;;
-      *'#S'*) printf 'firstmate\n' ;;
+      *'#S'*) printf 'juggernaut\n' ;;
       *) printf '%%1\n' ;;
     esac
     exit 0
@@ -109,7 +109,7 @@ git -C "$REMOTE_ROOT" config user.email test@example.com
 git -C "$REMOTE_ROOT" config user.name Test
 git -C "$REMOTE_ROOT" add .
 git -C "$REMOTE_ROOT" commit -qm 'remote fixture root'
-REMOTE_ORIGIN="$TMP_ROOT/firstmate-origin.git"
+REMOTE_ORIGIN="$TMP_ROOT/juggernaut-origin.git"
 git init -q --bare "$REMOTE_ORIGIN"
 git -C "$REMOTE_ROOT" remote add origin "file://$REMOTE_ORIGIN"
 git -C "$REMOTE_ROOT" push -q -u origin main
@@ -129,7 +129,7 @@ git -C "$PARENT/projects/alpha" push -q -u origin main
 cat > "$PARENT/data/projects.md" <<EOF
 - alpha [direct-PR] - alpha project (added 2026-08-02)
 EOF
-printf 'codex\n' > "$PARENT/config/secondmate-harness"
+printf 'codex\n' > "$PARENT/config/squad-lead-harness"
 printf 'tmux\n' > "$PARENT/config/backend"
 printf 'primary harness defaults\n' > "$PARENT/config/crew-harness"
 
@@ -178,14 +178,14 @@ if [ "$command_name" = jg-remote-doctor.sh ]; then
         printf 'fix launchagent=applied: wrote the Aqua-scoped launch agent\n'
         exit 255
       fi
-      printf 'check launchagent=fixable: no Firstmate herdr launch agent\n'
-      printf 'error: this host is not ready for a remote second mate; unresolved: launchagent\n' >&2
+      printf 'check launchagent=fixable: no Juggernaut herdr launch agent\n'
+      printf 'error: this host is not ready for a remote squad lead; unresolved: launchagent\n' >&2
       exit 1
       ;;
     doctor-human)
       printf 'check gui-session=human: no Aqua login session exists for uid 501\n'
       printf 'action: gui-session: log that account in once at the console\n'
-      printf 'error: this host is not ready for a remote second mate; unresolved: gui-session\n' >&2
+      printf 'error: this host is not ready for a remote squad lead; unresolved: gui-session\n' >&2
       exit 1
       ;;
     doctor-fixable)
@@ -197,8 +197,8 @@ if [ "$command_name" = jg-remote-doctor.sh ]; then
         exit 0
       fi
       [ -f "$JG_FAKE_DOCTOR_REPAIRED" ] || {
-        printf 'check launchagent=fixable: no Firstmate herdr launch agent\n'
-        printf 'error: this host is not ready for a remote second mate; unresolved: launchagent\n' >&2
+        printf 'check launchagent=fixable: no Juggernaut herdr launch agent\n'
+        printf 'error: this host is not ready for a remote squad lead; unresolved: launchagent\n' >&2
         exit 1
       }
       ;;
@@ -208,24 +208,24 @@ if [ "$command_name" = jg-remote-doctor.sh ]; then
   exit 0
 fi
 if [ "${JG_FAKE_SSH_MODE:-normal}" = doctor-fixable ] \
-  && [ "$command_name" = jg-remote-secondmate-control.sh ] \
+  && [ "$command_name" = jg-remote-squad-lead-control.sh ] \
   && [ "$_command_action" = state ] \
   && [ ! -f "$JG_FAKE_DOCTOR_REPAIRED" ]; then
   printf 'unreadable\n'
   exit 0
 fi
 case "${JG_FAKE_SSH_MODE:-normal}:$command_name:$command_rel" in
-  launch-nonherdr-route:jg-remote-secondmate-control.sh:*)
+  launch-nonherdr-route:jg-remote-squad-lead-control.sh:*)
     [ "$_command_action" = launch ] || exit 93
-    printf 'schema=jg-remote-secondmate-control.v1\n'
+    printf 'schema=jg-remote-squad-lead-control.v1\n'
     printf 'backend=tmux\n'
-    printf 'target=firstmate:jg-ios\n'
+    printf 'target=juggernaut:jg-ios\n'
     printf 'harness=codex\n'
     exit 0
     ;;
-  launch-default-session-route:jg-remote-secondmate-control.sh:*)
+  launch-default-session-route:jg-remote-squad-lead-control.sh:*)
     [ "$_command_action" = launch ] || exit 93
-    printf 'schema=jg-remote-secondmate-control.v1\n'
+    printf 'schema=jg-remote-squad-lead-control.v1\n'
     printf 'backend=herdr\n'
     printf 'target=default:w1:p2\n'
     printf 'herdr_session=default\n'
@@ -237,7 +237,7 @@ case "${JG_FAKE_SSH_MODE:-normal}:$command_name:$command_rel" in
     while [ ! -f "$JG_FAKE_SEED_RELEASE" ]; do sleep 0.02; done
     exit 1
     ;;
-  launch-block:jg-remote-secondmate-control.sh:*)
+  launch-block:jg-remote-squad-lead-control.sh:*)
     [ "$_command_action" = launch ] || exit 93
     touch "$JG_FAKE_LAUNCH_ENTERED"
     while [ ! -f "$JG_FAKE_LAUNCH_RELEASE" ]; do sleep 0.02; done
@@ -246,13 +246,13 @@ esac
 case "${JG_FAKE_SSH_MODE:-normal}" in
   unreachable) exit 255 ;;
   ambiguous) "$JG_FAKE_REMOTE_ENTRYPOINT" "$@"; exit 255 ;;
-  # The remote retirement really runs, then reports what its forced secondmate
+  # The remote retirement really runs, then reports what its forced squad_lead
   # teardown reports for a lost child slot: tests/jg-teardown.test.sh owns that
   # remote-side exit 4.
   retire-lost-slot)
     rc=0
     "$JG_FAKE_REMOTE_ENTRYPOINT" "$@" || rc=$?
-    if [ "$rc" -eq 0 ] && [ "$command_name:$_command_action" = jg-remote-secondmate-control.sh:retire ]; then
+    if [ "$rc" -eq 0 ] && [ "$command_name:$_command_action" = jg-remote-squad-lead-control.sh:retire ]; then
       printf 'warning: treehouse return left pool slot 3 (/remote/slot-3) dirty or unverified; the pool lost this slot. Remaining paths:\n' >&2
       printf '  ?? left-behind-clone/\n' >&2
       printf 'teardown ios finished its cleanup and removed its task record, but a returned pool slot did not come back clean\n' >&2
@@ -323,7 +323,7 @@ sha256_file() {
   if command -v shasum >/dev/null 2>&1; then shasum -a 256 "$1" | awk '{print $1}'; else sha256sum "$1" | awk '{print $1}'; fi
 }
 
-# The correlation token of the newest record in the remote secondmate's
+# The correlation token of the newest record in the remote squad_lead's
 # steering inbox: a remote steer is delivered as a durable record there, so
 # the corr a reply must echo is read from the record body, never from typed
 # pane bytes.
@@ -416,7 +416,7 @@ sleep 0.2
 touch "$TMP_ROOT/provision.release"
 wait "$provision_one" || fail "first serialized provisioning attempt failed"
 wait "$provision_two" || fail "reconciled provisioning attempt failed"
-[ "$(cat "$TMP_ROOT/concurrent-home/.jg-secondmate-home")" = ios ] \
+[ "$(cat "$TMP_ROOT/concurrent-home/.jg-squad-lead-home")" = ios ] \
   || fail "serialized provisioning lost the published home"
 [ "$(grep -cF clone "$TMP_ROOT/provision-clones")" -eq 1 ] \
   || fail "reconciled provisioning cloned the already-published home"
@@ -445,7 +445,7 @@ rm -rf -- "$TMP_ROOT/raced-home"
 touch "$TMP_ROOT/race-clone.release"
 wait "$race_provision" \
   || { sed 's/^/race-provision: /' "$TMP_ROOT/race-provision.out"; fail "competing home cleanup reached a live provisioning clone"; }
-[ "$(cat "$TMP_ROOT/raced-home/.jg-secondmate-home")" = race ] \
+[ "$(cat "$TMP_ROOT/raced-home/.jg-squad-lead-home")" = race ] \
   || fail "raced provisioning lost its published home marker"
 if [ "$(git -C "$TMP_ROOT/raced-home" rev-parse --show-toplevel 2>/dev/null)" = "$TMP_ROOT/raced-home" ] \
   && [ "$(git -C "$TMP_ROOT/raced-home" rev-parse HEAD)" = "$(git -C "$REMOTE_ROOT" rev-parse HEAD)" ] \
@@ -497,7 +497,7 @@ if [ "${JG_TEST_PROVISION_ONLY:-0}" = 1 ]; then
 fi
 
 mkdir -p "$TMP_ROOT/seed-parent/data" "$TMP_ROOT/seed-parent/state"
-JG_SECONDMATE_CHARTER='Failing seed charter.' JG_SECONDMATE_SCOPE='failed seed' \
+JG_SQUAD_LEAD_CHARTER='Failing seed charter.' JG_SQUAD_LEAD_SCOPE='failed seed' \
   JG_FAKE_SSH_MODE=provision-block-fail seed_env "$ROOT/bin/jg-remote-home-seed.sh" \
   seed-fail remote-mac "$REMOTE_ROOT" "$TMP_ROOT/seed-fail-home" --no-projects \
   > "$TMP_ROOT/seed-fail.out" 2>&1 &
@@ -509,7 +509,7 @@ while [ ! -f "$TMP_ROOT/seed.entered" ]; do
   [ "$seed_wait" -le 250 ] || fail "failing seed never reached remote provisioning"
   sleep 0.02
 done
-JG_SECONDMATE_CHARTER='Successful seed charter.' JG_SECONDMATE_SCOPE='successful seed' \
+JG_SQUAD_LEAD_CHARTER='Successful seed charter.' JG_SQUAD_LEAD_SCOPE='successful seed' \
   seed_env "$ROOT/bin/jg-remote-home-seed.sh" seed-keep remote-mac "$REMOTE_ROOT" \
   "$TMP_ROOT/seed-keep-home" --no-projects > "$TMP_ROOT/seed-keep.out" 2>&1 &
 seed_keep_pid=$!
@@ -520,13 +520,13 @@ if wait "$seed_fail_pid"; then
   fail "known-failing seed unexpectedly succeeded"
 fi
 wait "$seed_keep_pid" || fail "serialized successful seed failed"
-assert_no_grep '- seed-fail ' "$TMP_ROOT/seed-parent/data/secondmates.md" "failed seed route survived rollback"
-assert_grep '- seed-keep ' "$TMP_ROOT/seed-parent/data/secondmates.md" "failed seed rollback removed a competing successful route"
-assert_present "$TMP_ROOT/seed-keep-home/.jg-secondmate-home" "serialized seed lost its published remote home"
+assert_no_grep '- seed-fail ' "$TMP_ROOT/seed-parent/data/squad_leads.md" "failed seed route survived rollback"
+assert_grep '- seed-keep ' "$TMP_ROOT/seed-parent/data/squad_leads.md" "failed seed rollback removed a competing successful route"
+assert_present "$TMP_ROOT/seed-keep-home/.jg-squad-lead-home" "serialized seed lost its published remote home"
 pass "remote seed rollback preserves serialized competing routes"
 
 : > "$DOCTOR_LOG"
-if JG_SECONDMATE_CHARTER='Unknown readiness charter.' JG_SECONDMATE_SCOPE='unknown readiness' \
+if JG_SQUAD_LEAD_CHARTER='Unknown readiness charter.' JG_SQUAD_LEAD_SCOPE='unknown readiness' \
   JG_FAKE_SSH_MODE=doctor-fix-unknown seed_env "$ROOT/bin/jg-remote-home-seed.sh" \
   seed-unknown remote-mac "$REMOTE_ROOT" "$TMP_ROOT/seed-unknown-home" --no-projects \
   > "$TMP_ROOT/seed-unknown.out" 2>&1; then
@@ -534,7 +534,7 @@ if JG_SECONDMATE_CHARTER='Unknown readiness charter.' JG_SECONDMATE_SCOPE='unkno
 fi
 assert_grep 'remote readiness completion is unknown' "$TMP_ROOT/seed-unknown.out" \
   "unknown readiness did not report its distinct completion state"
-assert_grep '- seed-unknown ' "$TMP_ROOT/seed-parent/data/secondmates.md" \
+assert_grep '- seed-unknown ' "$TMP_ROOT/seed-parent/data/squad_leads.md" \
   "unknown readiness removed the registered route"
 assert_present "$TMP_ROOT/seed-parent/data/seed-unknown/brief.md" \
   "unknown readiness removed the scaffolded brief"
@@ -544,15 +544,15 @@ assert_absent "$TMP_ROOT/seed-unknown-home" \
 doctor-fix-unknown --fix' ] || fail "unknown readiness did not occur during the repair stage"$'\n'"$(cat "$DOCTOR_LOG")"
 pass "unknown readiness preserves its route and brief for reconciliation"
 
-# A host that cannot hold a durable second mate must be rejected by the
+# A host that cannot hold a durable squad lead must be rejected by the
 # readiness gate before any home is created on it, and the operator must get the
 # gap text rather than a bare refusal.
 : > "$DOCTOR_LOG"
-if JG_SECONDMATE_CHARTER='Unready host charter.' JG_SECONDMATE_SCOPE='unready host' \
+if JG_SQUAD_LEAD_CHARTER='Unready host charter.' JG_SQUAD_LEAD_SCOPE='unready host' \
   JG_FAKE_SSH_MODE=doctor-human seed_env "$ROOT/bin/jg-remote-home-seed.sh" \
   seed-toolless remote-mac "$REMOTE_ROOT" "$TMP_ROOT/seed-toolless-home" --no-projects \
   > "$TMP_ROOT/seed-toolless.out" 2>&1; then
-  fail "seeding proceeded against a host that is not ready for a remote second mate"
+  fail "seeding proceeded against a host that is not ready for a remote squad lead"
 fi
 assert_grep 'check gui-session=human:' \
   "$TMP_ROOT/seed-toolless.out" "the seed hid the remaining human gap"
@@ -561,7 +561,7 @@ assert_grep 'action: gui-session:' \
 assert_grep 'remote runtime preflight failed' "$TMP_ROOT/seed-toolless.out" \
   "the seed did not report the failing stage"
 assert_absent "$TMP_ROOT/seed-toolless-home" "the seed provisioned a home despite a failing preflight"
-assert_no_grep '- seed-toolless ' "$TMP_ROOT/seed-parent/data/secondmates.md" \
+assert_no_grep '- seed-toolless ' "$TMP_ROOT/seed-parent/data/squad_leads.md" \
   "the refused route survived the preflight rollback"
 assert_absent "$TMP_ROOT/seed-parent/data/seed-toolless/brief.md" \
   "the refused route left its scaffolded charter behind"
@@ -573,18 +573,18 @@ pass "remote seeding checks, repairs, and re-checks readiness, then stops on a r
 # The same gate must accept a host whose only gaps were repairable.
 : > "$DOCTOR_LOG"
 rm -f "$TMP_ROOT/doctor.repaired"
-out=$(JG_SECONDMATE_CHARTER='Repairable host charter.' JG_SECONDMATE_SCOPE='repairable host' \
+out=$(JG_SQUAD_LEAD_CHARTER='Repairable host charter.' JG_SQUAD_LEAD_SCOPE='repairable host' \
   JG_FAKE_SSH_MODE=doctor-fixable seed_env "$ROOT/bin/jg-remote-home-seed.sh" \
   seed-repair remote-mac "$REMOTE_ROOT" "$TMP_ROOT/seed-repair-home" --no-projects 2>&1) \
   || fail "seeding refused a host whose gaps the repair closed"$'\n'"$out"
-assert_present "$TMP_ROOT/seed-repair-home/.jg-secondmate-home" "the repaired host was never provisioned"
-assert_grep '- seed-repair ' "$TMP_ROOT/seed-parent/data/secondmates.md" "the repaired route was not registered"
+assert_present "$TMP_ROOT/seed-repair-home/.jg-squad-lead-home" "the repaired host was never provisioned"
+assert_grep '- seed-repair ' "$TMP_ROOT/seed-parent/data/squad_leads.md" "the repaired route was not registered"
 [ "$(cat "$DOCTOR_LOG")" = 'doctor-fixable -
 doctor-fixable --fix
 doctor-fixable -' ] || fail "the repaired seed did not re-check after its repair"$'\n'"$(cat "$DOCTOR_LOG")"
 pass "remote seeding proceeds once the repair closes every gap"
 
-# Seeding must not need a copy of the project in this home: firstmate names the
+# Seeding must not need a copy of the project in this home: juggernaut names the
 # origin it already resolved, the seed validates and transports it, and the
 # primary project tree is left exactly as it was found.
 projects_snapshot() { # <dir>
@@ -617,7 +617,7 @@ EOF
 BETA_ORIGIN="file://$TMP_ROOT/beta.git"
 PROJECTS_BEFORE=$(projects_snapshot "$TMP_ROOT/seed-parent/projects")
 
-if JG_SECONDMATE_CHARTER='Unsupplied origin charter.' JG_SECONDMATE_SCOPE='unsupplied origin' \
+if JG_SQUAD_LEAD_CHARTER='Unsupplied origin charter.' JG_SQUAD_LEAD_SCOPE='unsupplied origin' \
   seed_env "$ROOT/bin/jg-remote-home-seed.sh" seed-noorigin remote-mac "$REMOTE_ROOT" \
   "$TMP_ROOT/seed-noorigin-home" beta > "$TMP_ROOT/seed-noorigin.out" 2>&1; then
   fail "seeding an uncloned project with no origin claimed success"
@@ -626,7 +626,7 @@ assert_grep 'pass beta=<origin-url>' "$TMP_ROOT/seed-noorigin.out" \
   "the refusal did not name how to supply the origin"
 assert_absent "$TMP_ROOT/seed-noorigin-home" "the unresolvable origin still provisioned a remote home"
 
-if JG_SECONDMATE_CHARTER='Unsafe origin charter.' JG_SECONDMATE_SCOPE='unsafe origin' \
+if JG_SQUAD_LEAD_CHARTER='Unsafe origin charter.' JG_SQUAD_LEAD_SCOPE='unsafe origin' \
   seed_env "$ROOT/bin/jg-remote-home-seed.sh" seed-unsafe remote-mac "$REMOTE_ROOT" \
   "$TMP_ROOT/seed-unsafe-home" 'beta=ext::git-upload-pack' \
   > "$TMP_ROOT/seed-unsafe.out" 2>&1; then
@@ -636,7 +636,7 @@ assert_grep 'not an accepted clone URL' "$TMP_ROOT/seed-unsafe.out" \
   "the unsafe-origin refusal did not name the reason"
 assert_absent "$TMP_ROOT/seed-unsafe-home" "the unsafe origin still provisioned a remote home"
 
-if JG_SECONDMATE_CHARTER='Local-only charter.' JG_SECONDMATE_SCOPE='local only' \
+if JG_SQUAD_LEAD_CHARTER='Local-only charter.' JG_SQUAD_LEAD_SCOPE='local only' \
   seed_env "$ROOT/bin/jg-remote-home-seed.sh" seed-localonly remote-mac "$REMOTE_ROOT" \
   "$TMP_ROOT/seed-localonly-home" "delta=$BETA_ORIGIN" \
   > "$TMP_ROOT/seed-localonly.out" 2>&1; then
@@ -645,7 +645,7 @@ fi
 assert_grep 'is local-only and cannot be provisioned remotely' "$TMP_ROOT/seed-localonly.out" \
   "the local-only refusal did not name the registered mode"
 
-if JG_SECONDMATE_CHARTER='Unregistered charter.' JG_SECONDMATE_SCOPE='unregistered' \
+if JG_SQUAD_LEAD_CHARTER='Unregistered charter.' JG_SQUAD_LEAD_SCOPE='unregistered' \
   seed_env "$ROOT/bin/jg-remote-home-seed.sh" seed-unregistered remote-mac "$REMOTE_ROOT" \
   "$TMP_ROOT/seed-unregistered-home" "gamma=$BETA_ORIGIN" \
   > "$TMP_ROOT/seed-unregistered.out" 2>&1; then
@@ -654,14 +654,14 @@ fi
 assert_grep 'has no registry record' "$TMP_ROOT/seed-unregistered.out" \
   "the unregistered-project refusal did not name the missing record"
 
-out=$(JG_SECONDMATE_CHARTER='Own beta delivery on the build Mac.' \
-  JG_SECONDMATE_SCOPE='beta delivery and validation' \
+out=$(JG_SQUAD_LEAD_CHARTER='Own beta delivery on the build Mac.' \
+  JG_SQUAD_LEAD_SCOPE='beta delivery and validation' \
   seed_env "$ROOT/bin/jg-remote-home-seed.sh" seed-noclone remote-mac "$REMOTE_ROOT" \
   "$TMP_ROOT/seed-noclone-home" "beta=$BETA_ORIGIN" 2>&1) \
   || fail "seeding refused a registered project whose origin was supplied"$'\n'"$out"
 assert_contains "$out" "home=remote-mac:$TMP_ROOT/seed-noclone-home" \
   "the no-clone seed did not report the host-qualified home"
-assert_grep '- seed-noclone ' "$TMP_ROOT/seed-parent/data/secondmates.md" \
+assert_grep '- seed-noclone ' "$TMP_ROOT/seed-parent/data/squad_leads.md" \
   "the no-clone seed did not register the remote route"
 assert_present "$TMP_ROOT/seed-noclone-home/projects/beta/README.md" \
   "the remote host did not clone the supplied origin"
@@ -695,7 +695,7 @@ assert_grep 'not an accepted clone URL' "$TMP_ROOT/unsafe-origin.out" \
 assert_absent "$TMP_ROOT/unsafe-origin-home" "the rejected manifest left a remote home behind"
 pass "remote provisioning re-validates a supplied origin at the receiving host"
 
-# Firstmate is a shared template, so seeding must carry a project origin from any
+# Juggernaut is a shared template, so seeding must carry a project origin from any
 # forge or host, not a privileged one. These four URL shapes have to survive the
 # parent's validation, the manifest, the transport, and the receiving host's own
 # validation, and arrive at git unchanged. A fixture resolver records the exact
@@ -712,7 +712,7 @@ forge_project() { # <project> <origin-url>
   printf 'served from %s\n' "$origin" > "$TMP_ROOT/forge-src-$project/ORIGIN.txt"
   git -C "$TMP_ROOT/forge-src-$project" add ORIGIN.txt
   git -C "$TMP_ROOT/forge-src-$project" \
-    -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm origin
+    -c user.name='Juggernaut Tests' -c user.email='tests@example.invalid' commit -qm origin
   git clone --quiet --bare "$TMP_ROOT/forge-src-$project" "$TMP_ROOT/forge-$project.git"
   rm -rf "$TMP_ROOT/forge-src-$project"
   printf '%s%s%s\n' "$origin" "$tab" "$TMP_ROOT/forge-$project.git" >> "$FORGE_ORIGIN_MAP"
@@ -744,8 +744,8 @@ SH
 chmod +x "$REMOTE_ROOT/bin/git"
 
 FORGE_HOME="$TMP_ROOT/seed-forge-home"
-out=$(JG_SECONDMATE_CHARTER='Own delivery for projects hosted anywhere.' \
-  JG_SECONDMATE_SCOPE='multi-forge delivery' \
+out=$(JG_SQUAD_LEAD_CHARTER='Own delivery for projects hosted anywhere.' \
+  JG_SQUAD_LEAD_SCOPE='multi-forge delivery' \
   seed_env "$ROOT/bin/jg-remote-home-seed.sh" seed-forge remote-mac "$REMOTE_ROOT" \
   "$FORGE_HOME" \
   'bitbucket-app=https://bitbucket.org/team/bitbucket-app.git' \
@@ -777,7 +777,7 @@ done
   || fail "the scp-like route did not clone its own origin"
 [ "$(projects_snapshot "$TMP_ROOT/seed-parent/projects")" = "$PROJECTS_BEFORE" ] \
   || fail "seeding non-GitHub projects changed the primary project tree"
-assert_grep '- seed-forge ' "$TMP_ROOT/seed-parent/data/secondmates.md" \
+assert_grep '- seed-forge ' "$TMP_ROOT/seed-parent/data/squad_leads.md" \
   "the multi-forge route was not registered"
 
 rm -f "$REMOTE_ROOT/bin/git"
@@ -786,25 +786,25 @@ rm -f "$REMOTE_ROOT/bin/git"
 pass "seeding carries bitbucket, self-hosted, and scp-like origins through to the remote clone"
 
 # Provision and register the remote route from the captain-facing primary.
-out=$(JG_SECONDMATE_CHARTER='Own iOS delivery on the build Mac.' \
-  JG_SECONDMATE_SCOPE='iOS implementation and Xcode validation' \
+out=$(JG_SQUAD_LEAD_CHARTER='Own iOS delivery on the build Mac.' \
+  JG_SQUAD_LEAD_SCOPE='iOS implementation and Xcode validation' \
   remote_env "$ROOT/bin/jg-remote-home-seed.sh" ios remote-mac "$REMOTE_ROOT" "$REMOTE_HOME" alpha)
 assert_contains "$out" "home=remote-mac:$REMOTE_HOME" "remote seed did not report the host-qualified home"
-assert_grep 'host: remote-mac; root:' "$PARENT/data/secondmates.md" "registry did not record the remote host dimension"
-assert_present "$REMOTE_HOME/.jg-secondmate-home" "remote provisioning did not publish the identity marker"
+assert_grep 'host: remote-mac; root:' "$PARENT/data/squad_leads.md" "registry did not record the remote host dimension"
+assert_present "$REMOTE_HOME/.jg-squad-lead-home" "remote provisioning did not publish the identity marker"
 assert_present "$REMOTE_HOME/projects/alpha/.git" "remote provisioning did not clone the project on that host"
 assert_grep "$REMOTE_HOME/state/parent-replies.status" "$REMOTE_HOME/data/charter.md" "remote charter did not use its append-only reply log"
 assert_no_grep "$PARENT/state/ios.status" "$REMOTE_HOME/data/charter.md" "remote charter retained the inaccessible local status path"
 assert_grep "$PARENT_ROUTE_INBOX" "$REMOTE_HOME/data/charter.md" "remote charter did not name its host-local steering inbox"
 assert_no_grep "$PARENT/state/ios.inbox" "$REMOTE_HOME/data/charter.md" "remote charter retained the inaccessible local steering inbox path"
 assert_grep "$PARENT_ROUTE_INBOX'/NNN.msg '$PARENT_ROUTE_INBOX'/handled/" "$REMOTE_HOME/data/charter.md" "remote charter did not render the inbox acknowledgement move host-local"
-if JG_SECONDMATE_CHARTER='Own iOS delivery on the build Mac.' \
-  JG_SECONDMATE_SCOPE='iOS implementation and Xcode validation' \
+if JG_SQUAD_LEAD_CHARTER='Own iOS delivery on the build Mac.' \
+  JG_SQUAD_LEAD_SCOPE='iOS implementation and Xcode validation' \
   remote_env "$ROOT/bin/jg-remote-home-seed.sh" ios remote-mac "$REMOTE_ROOT" "$TMP_ROOT/other-home" alpha \
   >/dev/null 2>&1; then
   fail "remote seed allowed an existing id to move to another home"
 fi
-assert_grep "home: $REMOTE_HOME" "$PARENT/data/secondmates.md" "refused remote reassignment changed the durable route"
+assert_grep "home: $REMOTE_HOME" "$PARENT/data/squad_leads.md" "refused remote reassignment changed the durable route"
 pass "remote seed registers the route and provisions the whole home and project clone on that host"
 
 PROTOCOL_HOME="$TMP_ROOT/protocol-home"
@@ -834,10 +834,10 @@ pass "remote inheritance rejects incomplete and superseded payload generations"
 
 # Add one local route to prove mixed fleets remain parseable and projected.
 mkdir -p "$LOCAL_HOME/data" "$LOCAL_HOME/state" "$LOCAL_HOME/config" "$LOCAL_HOME/projects" "$LOCAL_HOME/bin"
-printf 'local\n' > "$LOCAL_HOME/.jg-secondmate-home"
+printf 'local\n' > "$LOCAL_HOME/.jg-squad-lead-home"
 printf 'fixture\n' > "$LOCAL_HOME/AGENTS.md"
 printf '## In flight\n\n## Queued\n\n## Done\n' > "$LOCAL_HOME/data/backlog.md"
-cat >> "$PARENT/data/secondmates.md" <<EOF
+cat >> "$PARENT/data/squad_leads.md" <<EOF
 - local - Local delivery (home: $LOCAL_HOME; scope: local work; projects: alpha; added 2026-08-02)
 EOF
 remote_env "$ROOT/bin/jg-home-seed.sh" validate >/dev/null || fail "mixed local and remote registry validation failed"
@@ -848,7 +848,7 @@ pass "mixed local and remote routes validate without migration"
 printf 'pi\n' > "$PARENT/config/crew-harness"
 launches_before_inherit=0
 [ ! -f "$HERDR_LOG" ] || launches_before_inherit=$(grep -c '^tab create' "$HERDR_LOG" || true)
-if JG_FAKE_SSH_MODE=inherit-partial remote_env "$ROOT/bin/jg-spawn.sh" ios --secondmate \
+if JG_FAKE_SSH_MODE=inherit-partial remote_env "$ROOT/bin/jg-spawn.sh" ios --squad-lead \
   > "$TMP_ROOT/spawn-inherit-partial.out" 2>&1; then
   fail "remote spawn launched after ambiguous partial inheritance"
 fi
@@ -857,7 +857,7 @@ launches_after_inherit=0
 [ "$launches_before_inherit" -eq "$launches_after_inherit" ] \
   || fail "remote spawn reached launch after ambiguous partial inheritance"
 assert_absent "$PARENT/state/ios.meta" "failed remote inheritance published launch metadata"
-out=$(remote_env "$ROOT/bin/jg-spawn.sh" ios --secondmate)
+out=$(remote_env "$ROOT/bin/jg-spawn.sh" ios --squad-lead)
 assert_contains "$out" 'remote=remote-mac backend=herdr' "remote spawn did not report separate host and backend dimensions"
 assert_grep 'remote_host=remote-mac' "$PARENT/state/ios.meta" "parent metadata omitted the remote host"
 assert_grep 'remote_backend=herdr' "$PARENT/state/ios.meta" "parent metadata omitted the remote-local backend"
@@ -869,11 +869,11 @@ assert_no_grep '--session default' "$HERDR_LOG" "remote launch targeted the inte
 assert_grep 'window=remote:ios' "$PARENT/state/ios.meta" "parent metadata pretended the endpoint was local"
 assert_present "$PARENT/state/procevent/remote-reply-ios.source" "remote spawn did not arm its reply source"
 publish_healthy_watcher_identity "$PARENT/state" "$PARENT" "$ROOT/bin/jg-watch.sh"
-[ "$(remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-secondmate-control.sh state ios)" = alive ] \
+[ "$(remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-squad-lead-control.sh state ios)" = alive ] \
   || fail "remote endpoint was not projected alive from its own host"
 # Herdr reports a native agent state, so the delivery observation resolves
 # without the rendered-output fallback a tmux endpoint needs.
-[ "$(remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-secondmate-control.sh observe ios)" = idle ] \
+[ "$(remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-squad-lead-control.sh observe ios)" = idle ] \
   || fail "remote endpoint delivery observation did not execute on its own host"
 pass "remote spawn launches on the remote-local backend and records a host-qualified route"
 
@@ -886,15 +886,15 @@ awk -v pane="$legacy_pane" '
   { print }
 ' "$TMP_ROOT/remote-ios-before-default-session.meta" > "$remote_route_meta"
 cp "$HERDR_LOG" "$TMP_ROOT/herdr-before-default-session.log"
-[ "$(remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-secondmate-control.sh state ios 2>/dev/null)" = unverified ] \
+[ "$(remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-squad-lead-control.sh state ios 2>/dev/null)" = unverified ] \
   || fail "legacy default-session metadata was not classified unverified"
-if remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-secondmate-control.sh route ios >/dev/null 2>&1 \
-  || remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-secondmate-control.sh send ios probe >/dev/null 2>&1 \
-  || remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-secondmate-control.sh key ios Enter >/dev/null 2>&1 \
-  || remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-secondmate-control.sh capture ios >/dev/null 2>&1 \
-  || remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-secondmate-control.sh observe ios >/dev/null 2>&1 \
-  || remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-secondmate-control.sh retire ios --force >/dev/null 2>&1 \
-  || remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-secondmate-control.sh launch ios codex - - herdr >/dev/null 2>&1; then
+if remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-squad-lead-control.sh route ios >/dev/null 2>&1 \
+  || remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-squad-lead-control.sh send ios probe >/dev/null 2>&1 \
+  || remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-squad-lead-control.sh key ios Enter >/dev/null 2>&1 \
+  || remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-squad-lead-control.sh capture ios >/dev/null 2>&1 \
+  || remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-squad-lead-control.sh observe ios >/dev/null 2>&1 \
+  || remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-squad-lead-control.sh retire ios --force >/dev/null 2>&1 \
+  || remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-squad-lead-control.sh launch ios codex - - herdr >/dev/null 2>&1; then
   fail "legacy default-session metadata remained operational"
 fi
 cmp -s "$TMP_ROOT/herdr-before-default-session.log" "$HERDR_LOG" \
@@ -906,7 +906,7 @@ awk -v pane="$legacy_pane" '
   /^window=/ { print "window=default:" pane; next }
   { print }
 ' "$TMP_ROOT/remote-ios-before-default-session.meta" > "$remote_route_meta"
-[ "$(remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-secondmate-control.sh state ios 2>/dev/null)" = unverified ] \
+[ "$(remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-squad-lead-control.sh state ios 2>/dev/null)" = unverified ] \
   || fail "mismatched jg-remote target was not classified unverified"
 cmp -s "$TMP_ROOT/herdr-before-default-session.log" "$HERDR_LOG" \
   || fail "mismatched jg-remote target caused a Herdr operation"
@@ -914,9 +914,9 @@ mv -f "$TMP_ROOT/remote-ios-before-default-session.meta" "$remote_route_meta"
 pass "legacy and mismatched remote endpoints fail closed before backend access"
 
 cp "$PARENT/state/ios.meta" "$TMP_ROOT/parent-ios-before-nonherdr.meta"
-cp "$PARENT/data/secondmates.md" "$TMP_ROOT/registry-before-nonherdr.md"
+cp "$PARENT/data/squad_leads.md" "$TMP_ROOT/registry-before-nonherdr.md"
 set +e
-JG_FAKE_SSH_MODE=launch-nonherdr-route remote_env "$ROOT/bin/jg-spawn.sh" ios --secondmate \
+JG_FAKE_SSH_MODE=launch-nonherdr-route remote_env "$ROOT/bin/jg-spawn.sh" ios --squad-lead \
   > "$TMP_ROOT/spawn-nonherdr-route.out" 2>&1
 nonherdr_parent_rc=$?
 set -e
@@ -925,11 +925,11 @@ assert_grep "remote launch returned backend 'tmux', expected herdr" "$TMP_ROOT/s
   "parent refusal did not name the returned remote backend"
 cmp -s "$TMP_ROOT/parent-ios-before-nonherdr.meta" "$PARENT/state/ios.meta" \
   || fail "parent rewrote its endpoint metadata after a non-herdr route refusal"
-cmp -s "$TMP_ROOT/registry-before-nonherdr.md" "$PARENT/data/secondmates.md" \
+cmp -s "$TMP_ROOT/registry-before-nonherdr.md" "$PARENT/data/squad_leads.md" \
   || fail "parent removed or changed the registry route after a non-herdr route refusal"
 
 set +e
-JG_FAKE_SSH_MODE=launch-default-session-route remote_env "$ROOT/bin/jg-spawn.sh" ios --secondmate \
+JG_FAKE_SSH_MODE=launch-default-session-route remote_env "$ROOT/bin/jg-spawn.sh" ios --squad-lead \
   > "$TMP_ROOT/spawn-default-session-route.out" 2>&1
 default_session_parent_rc=$?
 set -e
@@ -942,17 +942,17 @@ cmp -s "$TMP_ROOT/parent-ios-before-nonherdr.meta" "$PARENT/state/ios.meta" \
 remote_route_meta="$REMOTE_HOME/state/parent-route/ios.meta"
 cp "$remote_route_meta" "$TMP_ROOT/remote-ios-before-legacy.meta"
 cat > "$remote_route_meta" <<EOF
-window=firstmate:jg-ios
+window=juggernaut:jg-ios
 worktree=$REMOTE_HOME
 project=$REMOTE_ROOT
 harness=codex
-kind=secondmate
+kind=squad_lead
 backend=tmux
 EOF
 cp "$remote_route_meta" "$TMP_ROOT/remote-ios-legacy-before-refusal.meta"
 printf 'jg-ios|%s\n' "$REMOTE_HOME" > "$TMUX_STATE"
 set +e
-remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-secondmate-control.sh launch ios codex - - herdr \
+remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-squad-lead-control.sh launch ios codex - - herdr \
   > "$TMP_ROOT/legacy-alive-refusal.out" 2>&1
 legacy_alive_rc=$?
 set -e
@@ -962,7 +962,7 @@ assert_grep "endpoint is recorded on backend 'tmux', expected 'herdr'" "$TMP_ROO
 cmp -s "$TMP_ROOT/remote-ios-legacy-before-refusal.meta" "$remote_route_meta" \
   || fail "remote refusal changed the legacy endpoint metadata"
 assert_present "$TMUX_STATE" "remote refusal killed the alive legacy endpoint"
-cmp -s "$TMP_ROOT/registry-before-nonherdr.md" "$PARENT/data/secondmates.md" \
+cmp -s "$TMP_ROOT/registry-before-nonherdr.md" "$PARENT/data/squad_leads.md" \
   || fail "remote legacy refusal removed or changed the registry route"
 mv -f "$TMP_ROOT/remote-ios-before-legacy.meta" "$remote_route_meta"
 rm -f "$TMUX_STATE"
@@ -971,12 +971,12 @@ pass "non-herdr remote endpoints are refused without changing either route"
 rm -f "$TMP_ROOT/inherit.entered" "$TMP_ROOT/inherit.release" "$TMP_ROOT/inherit.payload"
 cat > "$PARENT/data/captain-shared.md" <<'EOF'
 # Shared captain preferences
-This file is main-authoritative and maintained by the main firstmate.
-It is read-only in secondmate homes and must not be edited there.
+This file is main-authoritative and maintained by the main juggernaut.
+It is read-only in squad_lead homes and must not be edited there.
 Changes return through a marked status document pointer.
 stale spawn preference
 EOF
-JG_FAKE_SSH_MODE=inherit-block remote_env "$ROOT/bin/jg-spawn.sh" ios --secondmate \
+JG_FAKE_SSH_MODE=inherit-block remote_env "$ROOT/bin/jg-spawn.sh" ios --squad-lead \
   > "$TMP_ROOT/spawn-concurrent.out" 2>&1 &
 spawn_concurrent=$!
 spawn_inherit_wait=0
@@ -990,8 +990,8 @@ while [ ! -f "$TMP_ROOT/inherit.entered" ]; do
 done
 cat > "$PARENT/data/captain-shared.md" <<'EOF'
 # Shared captain preferences
-This file is main-authoritative and maintained by the main firstmate.
-It is read-only in secondmate homes and must not be edited there.
+This file is main-authoritative and maintained by the main juggernaut.
+It is read-only in squad_lead homes and must not be edited there.
 Changes return through a marked status document pointer.
 current post-spawn preference
 EOF
@@ -1031,7 +1031,7 @@ records_after_send=$(find "$PARENT_ROUTE_INBOX" -maxdepth 1 -name '*.msg' | wc -
 [ "$records_after_send" -eq $((records_before_send + 1)) ] \
   || fail "the retried remote steer did not dedup onto one new record, went $records_before_send -> $records_after_send"
 assert_no_grep 'report the build result' "$HERDR_LOG" "the steer payload was typed into the remote pane"
-assert_grep 'Firstmate instruction waiting' "$HERDR_LOG" "the remote doorbell never rang"
+assert_grep 'Juggernaut instruction waiting' "$HERDR_LOG" "the remote doorbell never rang"
 CORR=$(newest_remote_inbox_corr)
 [ -n "$CORR" ] || fail "remote send did not carry a correlation token"
 assert_grep "JG_PENDING_REPLY_EXISTING_CORR=$CORR" "$TMP_ROOT/send.err" "ambiguous remote send did not print its correlation-reusing command"
@@ -1061,7 +1061,7 @@ set -e
 assert_grep '"revision":2' "$REMOTE_HOME/config/crew-dispatch.json" "partial inheritance did not apply its first file"
 [ "$(cat "$REMOTE_HOME/config/crew-harness")" != grok ] \
   || fail "partial inheritance unexpectedly applied the failed file"
-NUDGE_MARKER="$PARENT/state/.secondmate-nudge-pending/ios.pending"
+NUDGE_MARKER="$PARENT/state/.squad-lead-nudge-pending/ios.pending"
 assert_grep 'remote=1' "$NUDGE_MARKER" "partial inheritance left no durable remote reread marker"
 publish_healthy_watcher_identity "$PARENT/state" "$PARENT" "$REMOTE_ROOT/bin/jg-watch.sh"
 remote_env "$ROOT/bin/jg-bootstrap.sh" > "$TMP_ROOT/config-partial-retry.out" \
@@ -1082,8 +1082,8 @@ pass "partial remote inheritance retains reread intent through bootstrap converg
 rm -f "$TMP_ROOT/inherit.entered" "$TMP_ROOT/inherit.release" "$TMP_ROOT/inherit.payload"
 cat > "$PARENT/data/captain-shared.md" <<'EOF'
 # Shared captain preferences
-This file is main-authoritative and maintained by the main firstmate.
-It is read-only in secondmate homes and must not be edited there.
+This file is main-authoritative and maintained by the main juggernaut.
+It is read-only in squad_lead homes and must not be edited there.
 Changes return through a marked status document pointer.
 stale concurrent preference
 EOF
@@ -1101,8 +1101,8 @@ while [ ! -f "$TMP_ROOT/inherit.entered" ]; do
 done
 cat > "$PARENT/data/captain-shared.md" <<'EOF'
 # Shared captain preferences
-This file is main-authoritative and maintained by the main firstmate.
-It is read-only in secondmate homes and must not be edited there.
+This file is main-authoritative and maintained by the main juggernaut.
+It is read-only in squad_lead homes and must not be edited there.
 Changes return through a marked status document pointer.
 current concurrent preference
 EOF
@@ -1191,20 +1191,20 @@ JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$LOCAL_HOME" \
 remote_env "$ROOT/bin/jg-on.sh" ios jg-home-summary-refresh.sh >/dev/null \
   || fail "remote fixture did not publish its home ledger"
 SNAPSHOT=$(remote_env "$ROOT/bin/jg-fleet-snapshot.sh" --json)
-if ! printf '%s' "$SNAPSHOT" | jq -e '.secondmate_current.records | any(.id == "ios" and .remote == true and .host == "remote-mac" and .provenance.selected == "structured-home")' >/dev/null; then
-  printf 'secondmate projection:\n%s\n' "$(printf '%s' "$SNAPSHOT" | jq '.secondmate_current')" >&2
+if ! printf '%s' "$SNAPSHOT" | jq -e '.squad_lead_current.records | any(.id == "ios" and .remote == true and .host == "remote-mac" and .provenance.selected == "structured-home")' >/dev/null; then
+  printf 'squad_lead projection:\n%s\n' "$(printf '%s' "$SNAPSHOT" | jq '.squad_lead_current')" >&2
   fail "fleet snapshot did not select the remote structured-home projection"
 fi
 printf '%s' "$SNAPSHOT" | jq -e '.tasks[] | select(.id == "ios") | .paths.home.present == null and .endpoint.agent_alive == "unknown"' >/dev/null \
   || fail "the fleet snapshot performed or invented a remote endpoint-liveness probe"
-printf '%s' "$SNAPSHOT" | jq -e '.secondmate_current.records | any(.id == "local" and .remote == false)' >/dev/null \
-  || fail "fleet snapshot lost the existing local secondmate route"
+printf '%s' "$SNAPSHOT" | jq -e '.squad_lead_current.records | any(.id == "local" and .remote == false)' >/dev/null \
+  || fail "fleet snapshot lost the existing local squad_lead route"
 pass "fleet snapshot projects mixed local and remote structured state"
 rm -f "$PARENT/state/.wake-queue"
 
 # The remote code root updates independently, then the persistent home imports
 # and fast-forwards to that host-local commit without touching project clones.
-REMOTE_SEED="$TMP_ROOT/firstmate-seed"
+REMOTE_SEED="$TMP_ROOT/juggernaut-seed"
 git clone -q "file://$REMOTE_ORIGIN" "$REMOTE_SEED"
 git -C "$REMOTE_SEED" config user.email test@example.com
 git -C "$REMOTE_SEED" config user.name Test
@@ -1212,7 +1212,7 @@ printf 'remote update probe\n' > "$REMOTE_SEED/REMOTE_UPDATE_PROBE"
 git -C "$REMOTE_SEED" add REMOTE_UPDATE_PROBE
 git -C "$REMOTE_SEED" commit -qm 'advance remote code root'
 git -C "$REMOTE_SEED" push -q origin main
-UPDATE_OUT=$(remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-secondmate-control.sh update ios)
+UPDATE_OUT=$(remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-squad-lead-control.sh update ios)
 assert_contains "$UPDATE_OUT" 'synced:' "remote update did not report a host-local fast-forward"
 [ "$(git -C "$REMOTE_HOME" rev-parse HEAD)" = "$(git -C "$REMOTE_ROOT" rev-parse HEAD)" ] \
   || fail "remote persistent home did not fast-forward to its code-root commit"
@@ -1224,46 +1224,46 @@ pass "remote update imports and fast-forwards the persistent home on its configu
 # host. These two refusals can only come from that plane's own pre-stop
 # capability tables, and they leave the live agent exactly as it was - which is
 # the whole safety property of asking before anything is stopped.
-RELAUNCH_UNVERIFIED=$(remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-secondmate-control.sh \
+RELAUNCH_UNVERIFIED=$(remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-squad-lead-control.sh \
   relaunch ios notaharness - - 2>&1) && fail "an unverified runtime should refuse a remote restart"
-assert_contains "$RELAUNCH_UNVERIFIED" 'unverified remote secondmate harness' \
+assert_contains "$RELAUNCH_UNVERIFIED" 'unverified remote squad_lead harness' \
   "the remote restart verb did not refuse an unverified runtime"
 RELAUNCH_ROUTE_META="$REMOTE_HOME/state/parent-route/ios.meta"
 cp "$RELAUNCH_ROUTE_META" "$TMP_ROOT/ios-before-relaunch.meta"
 mkdir -p "$TMP_ROOT/not-a-checkout"
 sed "s|^worktree=.*|worktree=$TMP_ROOT/not-a-checkout|" \
   "$TMP_ROOT/ios-before-relaunch.meta" > "$RELAUNCH_ROUTE_META"
-RELAUNCH_CHECKPOINT=$(remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-secondmate-control.sh \
+RELAUNCH_CHECKPOINT=$(remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-squad-lead-control.sh \
   relaunch ios codex - - 2>&1) && fail "a restart with no accountable checkout should refuse"
 assert_contains "$RELAUNCH_CHECKPOINT" 'refusing to relaunch without a checkout whose unlanded work can be accounted for' \
   "the host-local restart did not reach the control plane's own pre-stop checkpoint"
 cp "$TMP_ROOT/ios-before-relaunch.meta" "$RELAUNCH_ROUTE_META"
-[ "$(remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-secondmate-control.sh state ios)" = alive ] \
+[ "$(remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-squad-lead-control.sh state ios)" = alive ] \
   || fail "a refused remote restart must leave the running agent untouched"
 pass "the remote restart verb delegates to the host-local control plane and refuses before stopping anything"
 
 
 rm -f "$TMP_ROOT/doctor.repaired"
 : > "$DOCTOR_LOG"
-[ "$(JG_FAKE_SSH_MODE=doctor-fixable remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-secondmate-control.sh state ios)" = unreadable ] \
+[ "$(JG_FAKE_SSH_MODE=doctor-fixable remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-squad-lead-control.sh state ios)" = unreadable ] \
   || fail "the stopped-server fixture did not make the pre-repair endpoint probe unreadable"
 launches_before_repair=$(grep -c '^tab create' "$HERDR_LOG" || true)
 BOOT_REPAIRED=$(JG_FAKE_SSH_MODE=doctor-fixable remote_env "$ROOT/bin/jg-bootstrap.sh")
 [ "$(cat "$DOCTOR_LOG")" = 'doctor-fixable -
 doctor-fixable --fix
 doctor-fixable -' ] || fail "liveness did not check, repair, and re-check readiness before probing"$'\n'"$(cat "$DOCTOR_LOG")"
-assert_not_contains "$BOOT_REPAIRED" 'SECONDMATE_LIVENESS: secondmate ios:' \
+assert_not_contains "$BOOT_REPAIRED" 'SQUAD_LEAD_LIVENESS: squad_lead ios:' \
   "successful pre-probe readiness repair produced a liveness failure"
 launches_after_repair=$(grep -c '^tab create' "$HERDR_LOG" || true)
 [ "$launches_before_repair" -eq "$launches_after_repair" ] \
   || fail "readiness repair introduced a new remote relaunch point"
-[ "$(remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-secondmate-control.sh state ios)" = alive ] \
+[ "$(remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-squad-lead-control.sh state ios)" = alive ] \
   || fail "the endpoint was not probed successfully after readiness repair"
 pass "startup repairs remote readiness before probing without relaunching"
 
 # --- ordinary-supervision recovery of a dead remote endpoint -----------------
 # The watcher's cadence-gated liveness tick (bin/jg-watch.sh
-# secondmate_liveness_tick) drives the same shared probe+relaunch library the
+# squad_lead_liveness_tick) drives the same shared probe+relaunch library the
 # startup sweep used above: a positively dead remote endpoint relaunches
 # through the guarded remote spawn and emits exactly one check wake, while an
 # unreachable host is preserved untouched. The tick runs against a dedicated
@@ -1287,7 +1287,7 @@ ios_pane=$(sed -n 's/^herdr_pane_id=//p' "$remote_route_meta")
 jq --arg p "$ios_pane" \
   '.typed |= with_entries(select(.key != $p)) | .working |= with_entries(select(.key != $p))' \
   "$HERDR_STATE" > "$TMP_ROOT/herdr-dead.json" && mv "$TMP_ROOT/herdr-dead.json" "$HERDR_STATE"
-[ "$(remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-secondmate-control.sh state ios)" = dead ] \
+[ "$(remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-squad-lead-control.sh state ios)" = dead ] \
   || fail "the agent-free remote pane did not classify dead"
 
 tabs_before=$(grep -c '^tab create' "$HERDR_LOG" || true)
@@ -1297,8 +1297,8 @@ watch_relaunch_timeout=120
 # Recovery may use its full production timeout; allow another 30 seconds for
 # the initial probe, watcher startup and cleanup rather than killing it at 30 s.
 watch_wait_bound=$(( (watch_relaunch_timeout + 30) * 50 ))
-JG_STATE_OVERRIDE="$WATCH_STATE" JG_SECONDMATE_LIVENESS_SECS=1 JG_POLL=1 \
-  JG_SECONDMATE_LIVENESS_TIMEOUT="$watch_relaunch_timeout" \
+JG_STATE_OVERRIDE="$WATCH_STATE" JG_SQUAD_LEAD_LIVENESS_SECS=1 JG_POLL=1 \
+  JG_SQUAD_LEAD_LIVENESS_TIMEOUT="$watch_relaunch_timeout" \
   JG_SIGNAL_GRACE=0 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
   remote_env exec "$ROOT/bin/jg-watch.sh" \
   > "$TMP_ROOT/watch-liveness.out" 2> "$TMP_ROOT/watch-liveness.err" &
@@ -1315,14 +1315,14 @@ fi
 wait "$watch_pid" \
   || fail "the liveness watcher leg exited non-zero: $(cat "$TMP_ROOT/watch-liveness.err")"
 watch_pid=''
-grep -F 'check: secondmate ios auto-relaunched after remote endpoint dead on its configured host (host=remote-mac)' \
+grep -F 'check: squad_lead ios auto-relaunched after remote endpoint dead on its configured host (host=remote-mac)' \
   "$TMP_ROOT/watch-liveness.out" >/dev/null \
-  || fail "the dead remote secondmate was not auto-relaunched: $(cat "$TMP_ROOT/watch-liveness.out")"
-[ "$(grep -c 'check: secondmate ios auto-relaunched' "$TMP_ROOT/watch-liveness.out")" -eq 1 ] \
+  || fail "the dead remote squad_lead was not auto-relaunched: $(cat "$TMP_ROOT/watch-liveness.out")"
+[ "$(grep -c 'check: squad_lead ios auto-relaunched' "$TMP_ROOT/watch-liveness.out")" -eq 1 ] \
   || fail "the remote auto-relaunch did not produce exactly one captain-facing line"
-grep -F $'\tcheck\tsecondmate-relaunch-ios-' "$WATCH_STATE/.wake-queue" >/dev/null \
+grep -F $'\tcheck\tsquad-lead-relaunch-ios-' "$WATCH_STATE/.wake-queue" >/dev/null \
   || fail "the durable auto-relaunch wake row was not queued: $(cat "$WATCH_STATE/.wake-queue" 2>/dev/null)"
-grep -F 'relaunched' "$WATCH_STATE/.secondmate-relaunch-ios" >/dev/null \
+grep -F 'relaunched' "$WATCH_STATE/.squad-lead-relaunch-ios" >/dev/null \
   || fail "the durable per-mate ledger did not record the relaunch"
 tabs_after=$(grep -c '^tab create' "$HERDR_LOG" || true)
 [ "$tabs_after" -gt "$tabs_before" ] \
@@ -1331,16 +1331,16 @@ assert_grep 'remote_host=remote-mac' "$WATCH_STATE/ios.meta" \
   "the watcher relaunch dropped the remote host route"
 assert_grep 'herdr_session=jg-remote' "$remote_route_meta" \
   "the watcher relaunch did not re-record the pinned remote Herdr session"
-assert_grep '- ios ' "$PARENT/data/secondmates.md" \
+assert_grep '- ios ' "$PARENT/data/squad_leads.md" \
   "the watcher relaunch changed the registry route"
-[ "$(remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-secondmate-control.sh state ios)" = alive ] \
+[ "$(remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-squad-lead-control.sh state ios)" = alive ] \
   || fail "the auto-relaunched remote endpoint did not read alive"
 # Production relaunch updates the parent route meta and inheritance generation
 # in place; the dedicated watch state above kept the rest of this suite's
 # parent state out of scope, so fold both records back now.
 cp "$WATCH_STATE/ios.meta" "$PARENT/state/ios.meta"
 cp "$WATCH_STATE/.remote-inherit-ios.generation" "$PARENT/state/" 2>/dev/null || true
-pass "watch liveness: a dead remote secondmate is auto-relaunched on its own host with one wake"
+pass "watch liveness: a dead remote squad_lead is auto-relaunched on its own host with one wake"
 
 # Host loss mid-supervision is never evidence of death: the same tick on an
 # unreachable route probes, preserves, and stays silent.
@@ -1350,14 +1350,14 @@ cp "$WATCH_STATE/ios.meta" "$WATCH_STATE_UNREACHABLE/ios.meta"
 touch "$WATCH_STATE_UNREACHABLE/home-summary.json"
 ssh_before=$(cat "$SSH_COUNT" 2>/dev/null || printf '0')
 JG_FAKE_SSH_MODE=unreachable JG_STATE_OVERRIDE="$WATCH_STATE_UNREACHABLE" \
-  JG_SECONDMATE_LIVENESS_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
+  JG_SQUAD_LEAD_LIVENESS_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
   JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
   remote_env exec "$ROOT/bin/jg-watch.sh" \
   > "$TMP_ROOT/watch-unreachable.out" 2> "$TMP_ROOT/watch-unreachable.err" &
 watch_pid=$!
 sleep 4
 kill -0 "$watch_pid" 2>/dev/null \
-  || fail "the watcher exited against an unreachable remote secondmate: $(cat "$TMP_ROOT/watch-unreachable.out" "$TMP_ROOT/watch-unreachable.err")"
+  || fail "the watcher exited against an unreachable remote squad_lead: $(cat "$TMP_ROOT/watch-unreachable.out" "$TMP_ROOT/watch-unreachable.err")"
 kill "$watch_pid" 2>/dev/null || true
 wait "$watch_pid" 2>/dev/null || true
 watch_pid=''
@@ -1374,13 +1374,13 @@ sleep 3
   || fail "the stopped unreachable watcher kept writing its state"
 [ ! -s "$WATCH_STATE_UNREACHABLE/.wake-queue" ] \
   || fail "an unreachable remote probe queued a wake: $(cat "$WATCH_STATE_UNREACHABLE/.wake-queue")"
-assert_absent "$WATCH_STATE_UNREACHABLE/.secondmate-relaunch-ios" \
+assert_absent "$WATCH_STATE_UNREACHABLE/.squad-lead-relaunch-ios" \
   "an unreachable remote probe ledgered a relaunch attempt"
 assert_grep 'remote_host=remote-mac' "$WATCH_STATE_UNREACHABLE/ios.meta" \
   "an unreachable remote probe changed the route metadata"
-assert_grep '- ios ' "$PARENT/data/secondmates.md" \
+assert_grep '- ios ' "$PARENT/data/squad_leads.md" \
   "an unreachable remote probe changed the registry route"
-pass "watch liveness: an unreachable remote secondmate is probed, preserved, and never failed over"
+pass "watch liveness: an unreachable remote squad_lead is probed, preserved, and never failed over"
 
 # --- a stale herdr client shadowing the one the server accepts --------------
 # The remote host's job PATH can resolve an older self-updated herdr ahead of
@@ -1391,7 +1391,7 @@ make_herdr_client_pair "$TMP_ROOT/client-pair" 0.7.1 14 0.7.5 16
 export JG_HERDR_PAIR_DIR="$TMP_ROOT/client-pair"
 SHADOWED_STATE=$(JG_HOME="$REMOTE_HOME" JG_ROOT_OVERRIDE="$REMOTE_ROOT" \
   PATH="$TMP_ROOT/client-pair/stale:$REMOTE_ROOT/bin:$TMP_ROOT/client-pair/tools:/usr/bin:/bin" \
-  "$REMOTE_ROOT/bin/jg-remote-secondmate-control.sh" state ios 2>"$TMP_ROOT/shadowed-state.err")
+  "$REMOTE_ROOT/bin/jg-remote-squad-lead-control.sh" state ios 2>"$TMP_ROOT/shadowed-state.err")
 [ "$SHADOWED_STATE" = alive ] \
   || fail "a live endpoint behind a stale shadowing client must still read alive, got: $SHADOWED_STATE ($(cat "$TMP_ROOT/shadowed-state.err"))"
 assert_contains "$(cat "$TMP_ROOT/client-pair/stale.log")" 'pane get' "the stale client was not the one the job PATH resolved first"
@@ -1401,13 +1401,13 @@ pass "the host-local state read steps around a stale shadowing herdr client"
 remote_route_meta="$REMOTE_HOME/state/parent-route/ios.meta"
 cp "$remote_route_meta" "$TMP_ROOT/remote-ios-before-liveness-legacy.meta"
 cp "$PARENT/state/ios.meta" "$TMP_ROOT/parent-ios-before-liveness-legacy.meta"
-cp "$PARENT/data/secondmates.md" "$TMP_ROOT/registry-before-liveness-legacy.md"
+cp "$PARENT/data/squad_leads.md" "$TMP_ROOT/registry-before-liveness-legacy.md"
 cat > "$remote_route_meta" <<EOF
-window=firstmate:jg-ios
+window=juggernaut:jg-ios
 worktree=$REMOTE_HOME
 project=$REMOTE_ROOT
 harness=codex
-kind=secondmate
+kind=squad_lead
 backend=tmux
 EOF
 cp "$remote_route_meta" "$TMP_ROOT/remote-ios-liveness-legacy.meta"
@@ -1415,13 +1415,13 @@ printf 'jg-ios|%s\n' "$REMOTE_HOME" > "$TMUX_STATE"
 tmux_state_before=$(cat "$TMUX_STATE")
 launches_before_legacy=$(grep -c '^tab create' "$HERDR_LOG" || true)
 BOOT_LEGACY=$(remote_env "$ROOT/bin/jg-bootstrap.sh")
-assert_contains "$BOOT_LEGACY" "SECONDMATE_LIVENESS: secondmate ios: skipped: remote endpoint state is unverified on remote-mac" \
+assert_contains "$BOOT_LEGACY" "SQUAD_LEAD_LIVENESS: squad_lead ios: skipped: remote endpoint state is unverified on remote-mac" \
   "liveness accepted an alive legacy remote backend"
 cmp -s "$TMP_ROOT/remote-ios-liveness-legacy.meta" "$remote_route_meta" \
   || fail "liveness rewrote the alive legacy endpoint metadata"
 cmp -s "$TMP_ROOT/parent-ios-before-liveness-legacy.meta" "$PARENT/state/ios.meta" \
   || fail "liveness rewrote the parent route metadata for an alive legacy endpoint"
-cmp -s "$TMP_ROOT/registry-before-liveness-legacy.md" "$PARENT/data/secondmates.md" \
+cmp -s "$TMP_ROOT/registry-before-liveness-legacy.md" "$PARENT/data/squad_leads.md" \
   || fail "liveness changed the registry route for an alive legacy endpoint"
 [ "$(cat "$TMUX_STATE")" = "$tmux_state_before" ] \
   || fail "liveness changed or killed the alive legacy endpoint"
@@ -1436,15 +1436,15 @@ pass "startup reports alive legacy backends without changing their routes"
 # and its parent-side cache so the structured-home read degrades explicitly;
 # endpoint liveness remains the startup supervisor's concern.
 rm -f -- "$REMOTE_HOME/state/home-summary.json"
-rm -rf -- "$PARENT/state/secondmate-summary-cache"
+rm -rf -- "$PARENT/state/squad-lead-summary-cache"
 launches_before=$(grep -c '^tab create' "$HERDR_LOG" || true)
 rm -rf -- "$PARENT/state/.watch.lock"
 rm -f -- "$PARENT/state/.last-watcher-beat"
 BOOT_UNAVAILABLE=$(JG_FAKE_SSH_MODE=unreachable remote_env "$ROOT/bin/jg-bootstrap.sh")
-assert_contains "$BOOT_UNAVAILABLE" 'SECONDMATE_LIVENESS: secondmate ios: skipped: remote host unavailable or endpoint state unknown' \
+assert_contains "$BOOT_UNAVAILABLE" 'SQUAD_LEAD_LIVENESS: squad_lead ios: skipped: remote host unavailable or endpoint state unknown' \
   "bootstrap did not preserve an unreachable remote endpoint as unknown"
 UNAVAILABLE=$(JG_FAKE_SSH_MODE=unreachable remote_env "$ROOT/bin/jg-fleet-snapshot.sh" --json)
-printf '%s' "$UNAVAILABLE" | jq -e '.secondmate_current.records | any(.id == "ios"
+printf '%s' "$UNAVAILABLE" | jq -e '.squad_lead_current.records | any(.id == "ios"
   and .current.state == "unknown" and .provenance.selected != "structured-home"
   and (.current.reason | test("home ledger.*(timed out|missing|unreadable|invalid)")))' >/dev/null \
   || fail "unreachable no-ledger remote home did not degrade to explicit unknown state"
@@ -1454,12 +1454,12 @@ rm -f "$PARENT/state/.wake-queue"
 launches_after=$(grep -c '^tab create' "$HERDR_LOG" || true)
 [ "$launches_before" -eq "$launches_after" ] || fail "unreachable projection attempted a replacement launch"
 assert_present "$PARENT/state/ios.meta" "unreachable readiness removed the parent route metadata"
-assert_grep '- ios ' "$PARENT/data/secondmates.md" "unreachable readiness removed the registry route"
+assert_grep '- ios ' "$PARENT/data/squad_leads.md" "unreachable readiness removed the registry route"
 pass "unreachable no-ledger remote state remains explicit with no local respawn or failover"
 
 # Retirement delegates its safety check to the remote home. An in-flight child
 # record refuses cleanup and preserves both machines' durable routes.
-# A sibling remote secondmate workspace shares jg-remote and must survive every
+# A sibling remote squad_lead workspace shares jg-remote and must survive every
 # refusal and the eventual successful retirement of ios.
 # This fixture overrides JG_ROOT for transport, so teardown's root-owned guard
 # sees the fixture root rather than the source script path used by jg-send.
@@ -1481,7 +1481,7 @@ if remote_env "$ROOT/bin/jg-teardown.sh" ios >/dev/null 2>&1; then
 fi
 assert_present "$REMOTE_HOME" "refused remote retirement removed the home"
 assert_present "$PARENT/state/ios.meta" "refused remote retirement removed parent metadata"
-assert_grep '- ios ' "$PARENT/data/secondmates.md" "refused remote retirement removed the route"
+assert_grep '- ios ' "$PARENT/data/squad_leads.md" "refused remote retirement removed the route"
 rm -f "$PARENT/state/procevent"
 mkdir "$PARENT/state/procevent"
 remote_env "$ROOT/bin/jg-bootstrap.sh" >/dev/null \
@@ -1521,9 +1521,9 @@ JG_HOME="$PARENT" bash -c '
 ' _ "$ROOT/bin/jg-pending-reply-lib.sh" "$retired_wake_rec" \
   || fail "could not settle remote receiver wake retirement state"
 printf 'confirmed:%s\n' "$retired_wake_corr" > "$PARENT/state/.backlog-handoff-ios.wake-pending"
-printf '%s\tattempt\n' "$(date +%s)" > "$PARENT/state/.secondmate-relaunch-ios"
-printf '%s\tdead\n' "$(date +%s)" > "$PARENT/state/.secondmate-relaunch-bound-ios"
-liveness_lock="$PARENT/state/.secondmate-liveness-ios.lock"
+printf '%s\tattempt\n' "$(date +%s)" > "$PARENT/state/.squad-lead-relaunch-ios"
+printf '%s\tdead\n' "$(date +%s)" > "$PARENT/state/.squad-lead-relaunch-bound-ios"
+liveness_lock="$PARENT/state/.squad-lead-liveness-ios.lock"
 # The link is published before the claim finishes; signal only after acquire.
 # shellcheck disable=SC2016 # Positional parameters expand in the child shell.
 ( STATE="$PARENT/state" exec bash -c '. "$1" && jg_lock_acquire_wait "$2" && touch "$3" && exec sleep 120' \
@@ -1546,7 +1546,7 @@ assert_grep 'liveness check is in progress for ios' "$TMP_ROOT/teardown-liveness
   "a liveness-busy retirement did not ask for a retry"
 assert_present "$REMOTE_HOME" "a liveness-busy retirement removed the remote home"
 assert_present "$PARENT/state/ios.meta" "a liveness-busy retirement removed parent metadata"
-assert_grep '- ios ' "$PARENT/data/secondmates.md" "a liveness-busy retirement removed the registry route"
+assert_grep '- ios ' "$PARENT/data/squad_leads.md" "a liveness-busy retirement removed the registry route"
 [ "$(cat "$liveness_lock/pid" 2>/dev/null)" = "$liveness_owner" ] \
   || fail "a liveness-busy retirement removed or took the episode's lock"
 kill "$liveness_holder_pid" 2>/dev/null || true
@@ -1569,7 +1569,7 @@ while [ ! -f "$TMP_ROOT/handoff.entered" ]; do
   sleep 0.02
 done
 rm -f "$TMUX_STATE" "$TMP_ROOT/launch.entered" "$TMP_ROOT/launch.release"
-JG_FAKE_SSH_MODE=launch-block remote_env "$ROOT/bin/jg-spawn.sh" ios --secondmate \
+JG_FAKE_SSH_MODE=launch-block remote_env "$ROOT/bin/jg-spawn.sh" ios --squad-lead \
   > "$TMP_ROOT/spawn-retirement.out" 2>&1 &
 spawn_retirement_pid=$!
 launch_wait=0
@@ -1616,17 +1616,17 @@ assert_absent "$PARENT/state/ios.meta" "remote retirement did not remove parent 
 assert_absent "$PARENT/state/.backlog-handoff-ios.wake-pending" \
   "remote retirement left receiver wake state that could poison a replacement route"
 assert_absent "$retired_wake_rec" "remote retirement left the retired receiver wake correlation"
-assert_absent "$PARENT/state/.secondmate-relaunch-ios" \
+assert_absent "$PARENT/state/.squad-lead-relaunch-ios" \
   "remote retirement left the relaunch ledger a same-id replacement would inherit"
-assert_absent "$PARENT/state/.secondmate-relaunch-bound-ios" \
+assert_absent "$PARENT/state/.squad-lead-relaunch-bound-ios" \
   "remote retirement left the relaunch park marker a same-id replacement would inherit"
 assert_absent "$liveness_lock" "remote retirement left its liveness lock behind"
-assert_no_grep '- ios ' "$PARENT/data/secondmates.md" "remote retirement did not remove the registry route"
+assert_no_grep '- ios ' "$PARENT/data/squad_leads.md" "remote retirement did not remove the registry route"
 jq -e --arg workspace "$SIBLING_WORKSPACE" --arg pane "$SIBLING_PANE" '
   any(.workspaces[]; .workspace_id == $workspace and .label == "2ndmate-macos")
   and any(.tabs[]; .workspace_id == $workspace and .pane_id == $pane)
 ' "$HERDR_STATE" >/dev/null \
-  || fail "remote retirement removed the sibling secondmate workspace or pane from jg-remote"
+  || fail "remote retirement removed the sibling squad_lead workspace or pane from jg-remote"
 assert_no_grep 'session stop' "$HERDR_LOG" "remote retirement stopped the shared jg-remote session"
 assert_no_grep 'server stop' "$HERDR_LOG" "remote retirement stopped the shared jg-remote server"
 pass "remote retirement refuses child work, then removes only its own endpoint while a shared-session sibling survives"

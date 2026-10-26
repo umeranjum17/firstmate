@@ -2,7 +2,7 @@
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Pre-register Antigravity CLI's workspace trust for the isolated task worktree
-# a ship/scout spawn is about to launch an agy crewmate into, so the worker
+# a ship/scout spawn is about to launch an agy operator into, so the worker
 # reaches its brief in the worktree instead of parking on the folder-trust
 # dialog and running its turn in agy's own scratch directory.
 #

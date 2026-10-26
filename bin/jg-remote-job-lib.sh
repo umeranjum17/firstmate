@@ -5,7 +5,7 @@
 #
 # Source this file from the fixed SSH entrypoint, the long-lived worker, or the
 # remote doctor. It owns the per-account queue at
-# ~/.firstmate/remote-job (override only with JG_REMOTE_JOB_STATE_ROOT for
+# ~/.juggernaut/remote-job (override only with JG_REMOTE_JOB_STATE_ROOT for
 # isolated tests), the bounded job record, worker installation, and the remote
 # runtime PATH.
 #
@@ -81,8 +81,8 @@
 # of a multi-version tool wins is fixed by this composition rather than by the
 # order the filesystem happens to return.
 #
-# On macOS the worker is Firstmate's Aqua LaunchAgent
-# dev.firstmate.remote-job at ~/Library/LaunchAgents/dev.firstmate.remote-job.plist
+# On macOS the worker is Juggernaut's Aqua LaunchAgent
+# dev.juggernaut.remote-job at ~/Library/LaunchAgents/dev.juggernaut.remote-job.plist
 # with logs under ~/Library/Logs. Linux starts the same worker process without
 # an Aqua requirement. The launch-agent renderer and repair helpers here are
 # shared by the entrypoint and remote doctor so their ownership cannot drift.
@@ -99,7 +99,7 @@
 # bin/jg-remote-job-reap-orphans.sh uses it to reap workers that were already
 # orphaned that way.
 
-JG_REMOTE_JOB_LABEL=dev.firstmate.remote-job
+JG_REMOTE_JOB_LABEL=dev.juggernaut.remote-job
 JG_REMOTE_JOB_MAX_BYTES=${JG_REMOTE_JOB_MAX_BYTES:-1048576}
 JG_REMOTE_JOB_QUEUE_TIMEOUT=${JG_REMOTE_JOB_QUEUE_TIMEOUT:-360}
 JG_REMOTE_JOB_TIMEOUT=${JG_REMOTE_JOB_TIMEOUT:-360}
@@ -410,7 +410,7 @@ jg_remote_job_safe_child_dir() { # <canonical-parent> <single child basename>
 }
 
 jg_remote_job_prepare_state() { # <account-home>
-  local account_home=$1 root parent base firstmate
+  local account_home=$1 root parent base juggernaut
   jg_remote_job_validate_settings || {
     JG_REMOTE_JOB_ERROR="remote job bounds or timeout are invalid"
     return 1
@@ -436,11 +436,11 @@ jg_remote_job_prepare_state() { # <account-home>
       return 1
     }
   else
-    firstmate=$(jg_remote_job_safe_child_dir "$account_home" .firstmate) || {
-      JG_REMOTE_JOB_ERROR="cannot prepare $account_home/.firstmate for remote jobs"
+    juggernaut=$(jg_remote_job_safe_child_dir "$account_home" .juggernaut) || {
+      JG_REMOTE_JOB_ERROR="cannot prepare $account_home/.juggernaut for remote jobs"
       return 1
     }
-    root=$(jg_remote_job_safe_child_dir "$firstmate" remote-job) || {
+    root=$(jg_remote_job_safe_child_dir "$juggernaut" remote-job) || {
       JG_REMOTE_JOB_ERROR="cannot prepare remote job state"
       return 1
     }
@@ -997,7 +997,7 @@ jg_remote_job_process_pgid() { # <pid>
   printf '%s\n' "$value"
 }
 
-# The code root a worker serves is still a genuine Firstmate checkout. A worker
+# The code root a worker serves is still a genuine Juggernaut checkout. A worker
 # whose root fails this can never claim, validate, or execute another job, so
 # the same predicate decides both self-termination and orphan reaping.
 jg_remote_job_root_is_live() { # <remote-root>

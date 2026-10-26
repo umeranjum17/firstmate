@@ -38,8 +38,8 @@ cat > "$EXPECTED_JSON" <<'JSON'
     {"id":"resume.default","common":["references/common/control-and-recovery.md"],"harness":"references/harness/kimi.md"},
     {"id":"recovery.default","common":["references/common/control-and-recovery.md"],"harness":"references/harness/cursor.md"},
     {"id":"recovery.replacement-profile","common":["references/common/control-and-recovery.md","references/common/dispatch.md","references/common/model-and-effort.md"],"harness":"references/harness/muse.md"},
-    {"id":"recovery.secondmate","common":["references/common/control-and-recovery.md","references/common/primary-hooks.md"],"harness":"references/harness/claude.md"},
-    {"id":"recovery.replacement-secondmate","common":["references/common/control-and-recovery.md","references/common/dispatch.md","references/common/model-and-effort.md","references/common/primary-hooks.md"],"harness":"references/harness/codex.md"},
+    {"id":"recovery.squad_lead","common":["references/common/control-and-recovery.md","references/common/primary-hooks.md"],"harness":"references/harness/claude.md"},
+    {"id":"recovery.replacement-squad-lead","common":["references/common/control-and-recovery.md","references/common/dispatch.md","references/common/model-and-effort.md","references/common/primary-hooks.md"],"harness":"references/harness/codex.md"},
     {"id":"primary.default","common":["references/common/primary-hooks.md"],"harness":"references/harness/opencode.md"},
     {"id":"model-effort.default","common":["references/common/model-and-effort.md"],"harness":"references/harness/pi.md"},
     {"id":"model-effort.configured-profile","common":["references/common/model-and-effort.md","references/common/dispatch.md"],"harness":"references/harness/pi.md"},
@@ -63,8 +63,8 @@ JSON
     'resume.default kimi' \
     'recovery.default cursor' \
     'recovery.replacement-profile muse' \
-    'recovery.secondmate claude' \
-    'recovery.replacement-secondmate codex' \
+    'recovery.squad_lead claude' \
+    'recovery.replacement-squad-lead codex' \
     'primary.default opencode' \
     'model-effort.default pi' \
     'model-effort.configured-profile pi-signed' \

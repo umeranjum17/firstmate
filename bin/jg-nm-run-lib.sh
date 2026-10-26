@@ -148,7 +148,7 @@ jg_nm_run_status_class() {  # <status_word>
 # release emits: it is the `working_path` the CLI itself resolved for the
 # queried worktree. That is NOT the task worktree path in general - a linked
 # git worktree resolves to its main clone's registered path (observed
-# 2026-09-22 on v1.79.0: every task copy of a firstmate home reports
+# 2026-09-22 on v1.79.0: every task copy of a juggernaut home reports
 # `repo: <home clone>`, and looking the repo up by the task worktree path
 # matched no row, so every capped read reported the inventory unreadable).
 # The recorded spelling is matched exactly, so an overview without exactly one

@@ -372,7 +372,7 @@ test_harness_at_namespace_pid1_is_examined() {
 # REACHABLE depends on where the question is asked from. Under an interpreter
 # shim the top of the session is the shim, whose own script path is args
 # strength, while the native binary that carries comm strength is its CHILD.
-# firstmate's own detect_own always runs from a tool subprocess below that child,
+# juggernaut's own detect_own always runs from a tool subprocess below that child,
 # so it sees comm; a guard that probed only the top of a real session would
 # observe args, pass, and never notice a vendor release that stopped spawning the
 # native child at all. `ancestry-descent` is what lets a probe ask from the same
@@ -441,7 +441,7 @@ EOF
 }
 
 # The other half of the vantage question: which vantages a probe must NOT ask
-# from. harness_ancestry only ever climbs, so firstmate's own detection can never
+# from. harness_ancestry only ever climbs, so juggernaut's own detection can never
 # occupy a SIBLING branch of the process that runs it. A harness routinely spawns
 # such branches - an MCP server started as `node <home>/.claude/mcp/<server>.js`
 # matches *claude* on its script path in the bare-interpreter branch of the walk -
@@ -721,7 +721,7 @@ SH
 # A supervision branch running as its own process under another harness sees
 # its own harness in both evidence layers: a Pi engine under a Claude primary
 # carries PI_CODING_AGENT and a pi ancestor. Left alone, an absent or "default"
-# crew or secondmate config would then dispatch workers on Pi. The primary's
+# crew or squad_lead config would then dispatch workers on Pi. The primary's
 # pin must win while the branch actor is set, and only then.
 pin_probe() {  # <named-executable> <home> <verb> [VAR=VAL ...]
   local bin=$1 home=$2 verb=$3
@@ -740,13 +740,13 @@ test_supervision_branch_resolves_the_primary_pin() {
   bin=$(named_bin "$dir/pi-tree" pi)
 
   # Without the pin the branch reads as its own engine, which is the hazard.
-  for verb in '' crew secondmate; do
+  for verb in '' crew squad_lead; do
     got=$(pin_probe "$bin" "$home" "$verb" PI_CODING_AGENT=true JG_SUPERVISION_ACTOR=branch)
     [ "$got" = 'pi|0' ] \
       || fail "an unpinned branch under a Pi engine resolved '${verb:-own}' as '$got', expected pi (the hazard is not live)"
   done
 
-  for verb in '' crew secondmate; do
+  for verb in '' crew squad_lead; do
     got=$(pin_probe "$bin" "$home" "$verb" PI_CODING_AGENT=true \
       JG_SUPERVISION_ACTOR=branch JG_SUPERVISION_PRIMARY_HARNESS=claude)
     [ "$got" = 'claude|0' ] \
@@ -775,7 +775,7 @@ test_supervision_branch_resolves_the_primary_pin() {
   got=$(pin_probe "$bin" "$home" ancestry PI_CODING_AGENT=true \
     JG_SUPERVISION_ACTOR=branch JG_SUPERVISION_PRIMARY_HARNESS=claude)
   [ "$got" = 'comm pi|0' ] || fail "the ancestry verb consulted the pin: '$got'"
-  pass "a supervision branch resolves own, crew, and secondmate to the primary's pinned harness"
+  pass "a supervision branch resolves own, crew, and squad_lead to the primary's pinned harness"
 }
 
 test_supervision_branch_refuses_an_unknown_primary_pin() {
@@ -784,7 +784,7 @@ test_supervision_branch_refuses_an_unknown_primary_pin() {
   home="$dir/home"
   mkdir -p "$home/config"
   bin=$(named_bin "$dir/pi-tree" pi)
-  for verb in '' crew secondmate; do
+  for verb in '' crew squad_lead; do
     got=$(pin_probe "$bin" "$home" "$verb" PI_CODING_AGENT=true \
       JG_SUPERVISION_ACTOR=branch JG_SUPERVISION_PRIMARY_HARNESS=unknown)
     [ "$got" = '|2' ] \

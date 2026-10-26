@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Opt-in credentialed live E2E for bin/jg-sentinel.sh against a real Herdr
 # restart. In one guarded named Herdr lab it runs a real Claude lab primary, a
-# real seeded Claude second mate (the lead), and the lead's real Claude worker
+# real seeded Claude squad lead (the lead), and the lead's real Claude worker
 # spawned by bin/jg-spawn.sh. With every turn ended and both watchers armed, it
 # stops and restarts the lab server through bin/jg-herdr-lab.sh, which kills
 # every agent and watcher the way an out-of-memory kill of the Herdr service
@@ -264,14 +264,14 @@ mkdir -p "$MAIN/state" "$MAIN/data" "$MAIN/config" "$MAIN/projects"
 wire_treehouse_root "$MAIN"
 printf 'herdr\n' > "$MAIN/config/backend"
 printf 'claude\n' > "$MAIN/config/crew-harness"
-printf 'claude %s low\n' "$MODEL" > "$MAIN/config/secondmate-harness"
+printf 'claude %s low\n' "$MODEL" > "$MAIN/config/squad-lead-harness"
 # Lab launches use auto mode, so no lab agent stops at the bypass acceptance prompt.
 printf 'auto\n' > "$MAIN/config/claude-permission-mode"
 lab_settings "$MAIN"
 
-# The lead: a real seeded second mate home with its own project and worker.
-fm "$MAIN" env JG_SECONDMATE_CHARTER='Lab second mate for a Herdr restart test. Act only on orders from your parent; never spawn, merge, or edit project files yourself.' \
-  JG_SECONDMATE_SCOPE='lab restart recovery test' \
+# The lead: a real seeded squad lead home with its own project and worker.
+fm "$MAIN" env JG_SQUAD_LEAD_CHARTER='Lab squad lead for a Herdr restart test. Act only on orders from your parent; never spawn, merge, or edit project files yourself.' \
+  JG_SQUAD_LEAD_SCOPE='lab restart recovery test' \
   "$MAIN/bin/jg-home-seed.sh" "$LEAD_ID" "$LEAD" --no-projects >"$LABROOT/seed.out" 2>&1 \
   || fail "cannot seed the lead home: $(tail -5 "$LABROOT/seed.out")"
 cp "$MAIN/config/backend" "$MAIN/config/crew-harness" "$MAIN/config/claude-permission-mode" "$LEAD/config/"
@@ -295,7 +295,7 @@ write_brief() {  # <id>
 import os, sys
 p = sys.argv[1]
 t = open(p, encoding="utf-8").read()
-t = t.replace("{TASK}", os.environ["TASK_TEXT"], 1).replace("{FIRSTMATE_SPEC}", os.environ["SPEC_TEXT"], 1)
+t = t.replace("{TASK}", os.environ["TASK_TEXT"], 1).replace("{JUGGERNAUT_SPEC}", os.environ["SPEC_TEXT"], 1)
 open(p, "w", encoding="utf-8").write(t)
 PY
   fm "$LEAD" bash -c 'cd "$JG_HOME" && bin/jg-tasks-axi.sh add "$1" "lab worker" --kind ship --repo notes' _ "$1" >/dev/null \
@@ -350,16 +350,16 @@ WORKER_WT=$(sed -n 's/^worktree=//p' "$WORKER_META" | tail -n 1)
 WORKER_PANE=$(pane_of_meta "$WORKER_META")
 [ -d "$WORKER_WT" ] && [ -n "$WORKER_PANE" ] || fail "worker record lacks a worktree or pane"
 wait_for 600 "the worker to settle on its brief" worker_settled
-fm "$MAIN" "$MAIN/bin/jg-spawn.sh" "$LEAD_ID" --secondmate >"$LABROOT/lead-spawn.out" 2>&1 \
+fm "$MAIN" "$MAIN/bin/jg-spawn.sh" "$LEAD_ID" --squad-lead >"$LABROOT/lead-spawn.out" 2>&1 \
   || fail "lead spawn failed: $(tail -5 "$LABROOT/lead-spawn.out")"
 LEAD_PANE=$(pane_of_meta "$MAIN/state/$LEAD_ID.meta")
 wait_for 600 "the lead's turn to end with its watcher armed" lead_armed
 
-# The lab primary, launched the way an operator starts Firstmate.
+# The lab primary, launched the way an operator starts Juggernaut.
 fm "$MAIN" "$MAIN/bin/jg-claude-trust.sh" --lab-home "$MAIN" >/dev/null || fail "cannot register trust for the lab primary"
 MAIN_WS=$(lab workspace create --cwd "$MAIN" --label lab-main --no-focus) || fail "cannot create the primary workspace"
 MAIN_PANE=$(printf '%s' "$MAIN_WS" | jq -r '.result.root_pane.pane_id')
-lab pane run "$MAIN_PANE" "claude --model $MODEL --effort low 'This is a disposable Firstmate lab. Run no command for this message: reply with only MAIN-READY and end your turn. For each later message, handle the Firstmate operational input it names with as few commands as possible, never spawn, steer, merge, or edit project files, and end your turn as soon as it is handled.'" >/dev/null \
+lab pane run "$MAIN_PANE" "claude --model $MODEL --effort low 'This is a disposable Juggernaut lab. Run no command for this message: reply with only MAIN-READY and end your turn. For each later message, handle the Juggernaut operational input it names with as few commands as possible, never spawn, steer, merge, or edit project files, and end your turn as soon as it is handled.'" >/dev/null \
   || fail "cannot launch the lab primary"
 wait_for 600 "the primary's first turn to end with its watcher armed" primary_armed
 MAIN_SID=$(head -n 1 "$MAIN/state/.lock-session")

@@ -1,10 +1,10 @@
 # lookout-adapter
 
-`lookout-firstmate` turns this fleet's real data into the `lookout.fleet.v1` document that [Lookout](https://github.com/umeranjum17/lookout) shows (its contract is `docs/adapter.md` there).
+`lookout-juggernaut` turns this fleet's real data into the `lookout.fleet.v1` document that [Lookout](https://github.com/umeranjum17/lookout) shows (its contract is `docs/adapter.md` there).
 
 ```
-lookout-firstmate [--home DIR] [--no-build]          # print the JSON
-lookout-firstmate --serve [--port N] [--bind ADDR]   # the last good snapshot at once from /fleet.json (rebuilt every 30 s in the background; its generated_at says how old), for `lookout serve --adapter http://…/fleet.json`
+lookout-juggernaut [--home DIR] [--no-build]          # print the JSON
+lookout-juggernaut --serve [--port N] [--bind ADDR]   # the last good snapshot at once from /fleet.json (rebuilt every 30 s in the background; its generated_at says how old), for `lookout serve --adapter http://…/fleet.json`
 ```
 
 It reuses the fleet dashboard builder (`fleet-dashboard/jg-dashboard.sh build`, run when `state/dashboard/data.json` is over 2 minutes old) and maps its `data.json` and `board.json` onto the contract; nothing is copied from the builder. Every home and state file is only read, and only whitelisted fields are taken (a lane's `.meta` gives model, harness and account id, nothing else).

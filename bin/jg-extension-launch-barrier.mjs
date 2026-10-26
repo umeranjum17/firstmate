@@ -11,9 +11,9 @@ import { spawn } from "node:child_process";
 import { open, readFile, rename } from "node:fs/promises";
 import path from "node:path";
 
-const READY_SCHEMA = "firstmate.extension-invocation-ready.v1";
-const OWNER_SCHEMA = "firstmate.extension-invocation-owner.v1";
-const RELEASE_SCHEMA = "firstmate.extension-invocation-release.v1";
+const READY_SCHEMA = "juggernaut.extension-invocation-ready.v1";
+const OWNER_SCHEMA = "juggernaut.extension-invocation-owner.v1";
+const RELEASE_SCHEMA = "juggernaut.extension-invocation-release.v1";
 const STARTUP_WAIT_MS = 5000;
 const MAX_CONTROL_BYTES = 16384;
 const POLL_MS = 20;

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Portable checks for the Claude Code Calm mod (.claude/mods/firstmate-calm) that need
+# Portable checks for the Claude Code Calm mod (.claude/mods/juggernaut-calm) that need
 # no Claude Code binary, so CI enforces them wherever Node runs:
 #   - the plugin's declared shape: one hooks module and nothing else, reached from the
 #     project's .claude/skills auto-load path through the tracked symlink, so nothing
@@ -21,7 +21,7 @@ set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-MOD="$ROOT/.claude/mods/firstmate-calm"
+MOD="$ROOT/.claude/mods/juggernaut-calm"
 PI_SHIP="$ROOT/.pi/extensions/lib/jg-calm-working-ship.ts"
 PI_SPRITE="$ROOT/.pi/extensions/lib/jg-calm-working-ship-sprite.ts"
 OPERATIONAL_INPUT="$ROOT/bin/jg-operational-input.sh"
@@ -42,11 +42,11 @@ js_string() {  # <value>
 
 test_plugin_shape() {
   local link resolved autoload
-  link="$ROOT/.agents/skills/firstmate-calm"
+  link="$ROOT/.agents/skills/juggernaut-calm"
   [ -L "$link" ] || fail "the Calm mod is not linked into .agents/skills, so Claude Code's project skills-dir scan cannot adopt it"
-  resolved=$(cd "$link" && pwd -P) || fail "the .agents/skills/firstmate-calm link does not resolve"
-  [ "$resolved" = "$(cd "$MOD" && pwd -P)" ] || fail "the .agents/skills/firstmate-calm link resolves to $resolved, not the mod"
-  autoload="$ROOT/.claude/skills/firstmate-calm"
+  resolved=$(cd "$link" && pwd -P) || fail "the .agents/skills/juggernaut-calm link does not resolve"
+  [ "$resolved" = "$(cd "$MOD" && pwd -P)" ] || fail "the .agents/skills/juggernaut-calm link resolves to $resolved, not the mod"
+  autoload="$ROOT/.claude/skills/juggernaut-calm"
   [ -f "$autoload/.claude-plugin/plugin.json" ] || fail "the project's .claude/skills path does not reach the mod's manifest"
   [ -f "$autoload/hooks/hooks.json" ] || fail "the project's .claude/skills path does not reach the mod's hooks module declaration"
   [ -L "$PI_SPRITE" ] || fail "the Pi sprite path is not a symlink to the shared core"
@@ -245,11 +245,11 @@ import { pathToFileURL } from "node:url";
 const policy = await import(pathToFileURL($(js_string "$MOD") + "/lib/jg-calm-presentation.ts").href);
 const piPreservation = await import(pathToFileURL($(js_string "$ROOT") + "/.pi/extensions/lib/jg-calm-preservation.ts").href);
 const check = (condition, message) => { if (!condition) throw new Error(message); };
-const plugin = "/repo/.claude/mods/firstmate-calm";
+const plugin = "/repo/.claude/mods/juggernaut-calm";
 check(policy.calmPreferencePath({}, plugin) === "/repo/config/calm", "plugin-root fallback");
-check(policy.calmPreferencePath({}, "/repo/.claude/skills/firstmate-calm/") === "/repo/config/calm", "trailing slash on the plugin root");
-check(policy.calmPreferencePath({}, "/repo/.agents/skills/firstmate-calm") === "/repo/config/calm", ".agents/skills spelling of the plugin root");
-check(policy.calmCodeRootFromPluginRoot("C:\\\\fm\\\\.claude\\\\mods\\\\firstmate-calm") === "C:\\\\fm", "Windows separators");
+check(policy.calmPreferencePath({}, "/repo/.claude/skills/juggernaut-calm/") === "/repo/config/calm", "trailing slash on the plugin root");
+check(policy.calmPreferencePath({}, "/repo/.agents/skills/juggernaut-calm") === "/repo/config/calm", ".agents/skills spelling of the plugin root");
+check(policy.calmCodeRootFromPluginRoot("C:\\\\fm\\\\.claude\\\\mods\\\\juggernaut-calm") === "C:\\\\fm", "Windows separators");
 check(policy.calmPreferencePath({ JG_ROOT_OVERRIDE: "/override/root" }, plugin) === "/override/root/config/calm", "JG_ROOT_OVERRIDE");
 check(policy.calmPreferencePath({ JG_HOME: "/home/fm", JG_ROOT_OVERRIDE: "/override/root" }, plugin) === "/home/fm/config/calm", "JG_HOME beats JG_ROOT_OVERRIDE");
 check(policy.calmPreferencePath({ JG_HOME: "/home/fm", JG_CONFIG_OVERRIDE: "/cfg" }, plugin) === "/cfg/calm", "JG_CONFIG_OVERRIDE beats the home");
@@ -312,7 +312,7 @@ const restored = policy.classifyRestoredTranscript([
 ]);
 check(JSON.stringify(restored.workingNotes) === JSON.stringify(["own call", "before a tool row", belowThresholdNote, "Checking."]), \`restored notes \${JSON.stringify(restored.workingNotes)}\`);
 check(JSON.stringify(restored.finalReplies) === JSON.stringify(["final", "collision", "plain reply", multiLineReply + "\\n", atThresholdReply, "Checking.\\n"]), \`restored final replies \${JSON.stringify(restored.finalReplies)}\`);
-check(policy.userTextIsOperational("\\u2063FIRSTMATE_OP: v1 watcher: x") && !policy.userTextIsOperational("hello"), "operational recognition");
+check(policy.userTextIsOperational("\\u2063JUGGERNAUT_OP: v1 watcher: x") && !policy.userTextIsOperational("hello"), "operational recognition");
 console.log("policy-ok");
 JS
   out=$(run_node "$TMP_ROOT/policy.mjs" 2>&1) || fail "presentation policy: $out"
@@ -348,10 +348,10 @@ const check = (condition, message) => { if (!condition) throw new Error(message)
 const same = (actual, expected, message) => check(JSON.stringify(actual) === JSON.stringify(expected), `${message}: ${JSON.stringify(actual)}`);
 const state = process.env.NOTES_STATE;
 const read = (name) => readFileSync(`${state}/${name}`, "utf8");
-const plugin = "/repo/.claude/mods/firstmate-calm";
-same(notes.firstmateStateDirectory({}, plugin), "/repo/state", "code-root fallback");
-same(notes.firstmateStateDirectory({ JG_ROOT_OVERRIDE: "/r", JG_HOME: "/h" }, plugin), "/h/state", "JG_HOME beats JG_ROOT_OVERRIDE");
-same(notes.firstmateStateDirectory({ JG_HOME: "/h", JG_STATE_OVERRIDE: "/s" }, plugin), "/s", "JG_STATE_OVERRIDE beats the home");
+const plugin = "/repo/.claude/mods/juggernaut-calm";
+same(notes.juggernautStateDirectory({}, plugin), "/repo/state", "code-root fallback");
+same(notes.juggernautStateDirectory({ JG_ROOT_OVERRIDE: "/r", JG_HOME: "/h" }, plugin), "/h/state", "JG_HOME beats JG_ROOT_OVERRIDE");
+same(notes.juggernautStateDirectory({ JG_HOME: "/h", JG_STATE_OVERRIDE: "/s" }, plugin), "/s", "JG_STATE_OVERRIDE beats the home");
 // A torn last line, as a reader racing a writer that is not atomic would see, is skipped.
 const rows = notes.parseOutcomeTail(read(".branch-outcomes-tail.jsonl") + '{"seq":6,"epoch":');
 same(rows.map((row) => row.seq), [1, 2, 3, 4, 5], "rows the store owner wrote");
@@ -417,7 +417,7 @@ JS
 # The classifier parity corpus: envelopes the shell owner encodes itself, its legacy
 # shapes, and near misses. Each case is one file so multi-line bodies stay exact.
 canonical_generic_kinds() {
-  bash -c '. "$1"; printf "%s\n" "$JG_OPERATIONAL_KINDS"' firstmate "$OPERATIONAL_INPUT"
+  bash -c '. "$1"; printf "%s\n" "$JG_OPERATIONAL_KINDS"' juggernaut "$OPERATIONAL_INPUT"
 }
 
 write_parity_corpus() {
@@ -434,32 +434,32 @@ write_parity_corpus() {
   done
   for body in 'plain body' $'multi\nline\n\nbody' $'trailing newline\n' $'two trailing newlines\n\n' 'colon: inside: body' 'ünïcödé body ✓' ' '; do
     index=$((index + 1))
-    printf '%s' "$body" | "$OPERATIONAL_INPUT" encode from-firstmate >"$dir/case-$index.txt" \
-      || fail "the owner could not encode from-firstmate for the parity corpus"
+    printf '%s' "$body" | "$OPERATIONAL_INPUT" encode from-juggernaut >"$dir/case-$index.txt" \
+      || fail "the owner could not encode from-juggernaut for the parity corpus"
   done
   for body in \
     'Run `bin/jg-session-start.sh` now, exactly once, before executing any other instructions.' \
     'Run `bin/jg-session-start.sh` now, exactly once, before executing any other instructions. ' \
-    $'FIRSTMATE WATCHER WAKE: signal: x\n\nRun bin/jg-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.' \
-    $'FIRSTMATE WATCHER WAKE: \n\nRun bin/jg-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.' \
+    $'JUGGERNAUT WATCHER WAKE: signal: x\n\nRun bin/jg-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.' \
+    $'JUGGERNAUT WATCHER WAKE: \n\nRun bin/jg-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.' \
     $'TURN WOULD END BLIND - supervision is off. The watcher cycle is missing, failed, or unhealthy. Follow the harness recovery instruction below before ending the turn.\n\nrecover' \
     $'TURN WOULD END BLIND - supervision is off. The watcher cycle is missing, failed, or unhealthy. Follow the harness recovery instruction below before ending the turn.\n\n' \
     $'\xE2\x81\xA3Supervisor escalate (' \
     $'\xE2\x81\xA3Supervisor escalate (needs you)' \
-    $'\xE2\x81\xA3FIRSTMATE_OP: untyped legacy' \
-    $'\xE2\x81\xA3FIRSTMATE_OP: ' \
-    $'\xE2\x81\xA3FIRSTMATE_OP: v1 watcher:' \
-    $'\xE2\x81\xA3FIRSTMATE_OP: v1 watcher: ' \
-    $'\xE2\x81\xA3FIRSTMATE_OP: v1 bogus: body' \
-    $'\xE2\x81\xA3FIRSTMATE_OP: v2 watcher: body' \
-    $'\xE2\x81\xA3FIRSTMATE_OP: v1 watcher: : x' \
-    $'\xE2\x81\xA3FIRSTMATE_OP:v1 watcher: body' \
-    $'[jg-from-firstmate]\xE2\x81\xA3' \
-    $'[jg-from-firstmate]\xE2\x81\xA3x' \
-    '[jg-from-firstmate] no separator' \
-    "'"$'\xE2\x81\xA3'"FIRSTMATE_OP: v1 watcher: quoted'" \
-    'FIRSTMATE_OP: v1 watcher: ascii only' \
-    $'text before \xE2\x81\xA3FIRSTMATE_OP: v1 watcher: body' \
+    $'\xE2\x81\xA3JUGGERNAUT_OP: untyped legacy' \
+    $'\xE2\x81\xA3JUGGERNAUT_OP: ' \
+    $'\xE2\x81\xA3JUGGERNAUT_OP: v1 watcher:' \
+    $'\xE2\x81\xA3JUGGERNAUT_OP: v1 watcher: ' \
+    $'\xE2\x81\xA3JUGGERNAUT_OP: v1 bogus: body' \
+    $'\xE2\x81\xA3JUGGERNAUT_OP: v2 watcher: body' \
+    $'\xE2\x81\xA3JUGGERNAUT_OP: v1 watcher: : x' \
+    $'\xE2\x81\xA3JUGGERNAUT_OP:v1 watcher: body' \
+    $'[jg-from-juggernaut]\xE2\x81\xA3' \
+    $'[jg-from-juggernaut]\xE2\x81\xA3x' \
+    '[jg-from-juggernaut] no separator' \
+    "'"$'\xE2\x81\xA3'"JUGGERNAUT_OP: v1 watcher: quoted'" \
+    'JUGGERNAUT_OP: v1 watcher: ascii only' \
+    $'text before \xE2\x81\xA3JUGGERNAUT_OP: v1 watcher: body' \
     $'\xE2\x81\xA3' \
     $'\xE2\x81\xA3unrelated' \
     'hello there' \
@@ -486,7 +486,7 @@ const count = ${count};
 const lines = [];
 for (let index = 1; index <= count; index += 1) {
   const text = readFileSync(\`\${corpus}/case-\${index}.txt\`, "utf8");
-  lines.push(\`\${index}\\t\${port.classifyFirstmateOperationalText(text) ?? "none"}\`);
+  lines.push(\`\${index}\\t\${port.classifyJuggernautOperationalText(text) ?? "none"}\`);
 }
 writeFileSync(\`\${corpus}/port-verdicts.tsv\`, lines.join("\\n") + "\\n");
 console.log("classified " + count);
@@ -514,7 +514,7 @@ JS
   # The corpus must exercise every current kind and the legacy shapes, or parity is vacuous.
   generic_kinds=$(canonical_generic_kinds) || fail "could not reread generic kinds from the operational-input owner"
   [ -n "$generic_kinds" ] || fail "the operational-input owner exposes no generic kinds"
-  for kind in $generic_kinds from-firstmate legacy-operational; do
+  for kind in $generic_kinds from-juggernaut legacy-operational; do
     grep -q "	$kind\$" "$corpus/port-verdicts.tsv" || fail "the parity corpus never produced the $kind verdict"
   done
   grep -q '	none$' "$corpus/port-verdicts.tsv" || fail "the parity corpus never produced a non-operational verdict"
@@ -535,25 +535,25 @@ test_doorbell_parity_with_shell_owner() {
       | tr -d '\n' >"$dir/case-$index.txt" || fail "the owner could not publish a $kind record"
   done
   doorbell=$(cat "$dir/case-1.txt")
-  printf 'FIRSTMATE_OP: v1 watcher: ascii only' >"$inbox/9-ascii.msg"
-  printf '\342\201\243FIRSTMATE_OP: v1 bogus: body' >"$inbox/9-bogus.msg"
-  printf '\342\201\243FIRSTMATE_OP: legacy untyped' >"$inbox/9-legacy.msg"
-  printf '[jg-from-firstmate]\342\201\243routed' >"$inbox/9-routed.msg"
+  printf 'JUGGERNAUT_OP: v1 watcher: ascii only' >"$inbox/9-ascii.msg"
+  printf '\342\201\243JUGGERNAUT_OP: v1 bogus: body' >"$inbox/9-bogus.msg"
+  printf '\342\201\243JUGGERNAUT_OP: legacy untyped' >"$inbox/9-legacy.msg"
+  printf '[jg-from-juggernaut]\342\201\243routed' >"$inbox/9-routed.msg"
   mkdir -p "$dir/elsewhere"
-  printf '\342\201\243FIRSTMATE_OP: v1 watcher: x' >"$dir/elsewhere/9-x.msg"
+  printf '\342\201\243JUGGERNAUT_OP: v1 watcher: x' >"$dir/elsewhere/9-x.msg"
   for out in \
     "$inbox/9-ascii.msg" "$inbox/9-bogus.msg" "$inbox/9-legacy.msg" "$inbox/9-routed.msg" \
     "$inbox/9-missing.msg" "$dir/elsewhere/9-x.msg" "$inbox/9-UPPER.msg" "$inbox/9_x.msg" \
     "$inbox/.msg" "$inbox/9-x.txt" "relative/operational-inbox/9-x.msg" "$inbox/9 x.msg" \
     "$inbox/it's.msg" "$inbox/9-é.msg"; do
     index=$((index + 1))
-    printf ": Firstmate operational input waiting: read '%s' and handle its contents as Firstmate operational input." "$out" \
+    printf ": Juggernaut operational input waiting: read '%s' and handle its contents as Juggernaut operational input." "$out" \
       >"$dir/case-$index.txt"
   done
   for out in "$doorbell " " $doorbell" "${doorbell%.}" "$doorbell"$'\n' \
-    ": Firstmate operational input waiting: read '' and handle its contents as Firstmate operational input." \
-    ": Firstmate operational input waiting: read ' and handle its contents as Firstmate operational input." \
-    'FIRSTMATE_OP: v1 away-supervisor: typed by a human' ''; do
+    ": Juggernaut operational input waiting: read '' and handle its contents as Juggernaut operational input." \
+    ": Juggernaut operational input waiting: read ' and handle its contents as Juggernaut operational input." \
+    'JUGGERNAUT_OP: v1 away-supervisor: typed by a human' ''; do
     index=$((index + 1))
     printf '%s' "$out" >"$dir/case-$index.txt"
   done
@@ -565,14 +565,14 @@ const port = await import(pathToFileURL($(js_string "$MOD") + "/lib/jg-operation
 const dir = $(js_string "$dir");
 const lines = [];
 for (let index = 1; index <= ${count}; index += 1) {
-  const record = port.firstmateOperationalDoorbellPath(readFileSync(\`\${dir}/case-\${index}.txt\`, "utf8"));
+  const record = port.juggernautOperationalDoorbellPath(readFileSync(\`\${dir}/case-\${index}.txt\`, "utf8"));
   let content;
   try {
     content = record === undefined ? undefined : readFileSync(record, "utf8");
   } catch {
     content = undefined;
   }
-  lines.push(\`\${index}\\t\${(content === undefined ? undefined : port.firstmateOperationalRecordKind(content)) ?? "none"}\`);
+  lines.push(\`\${index}\\t\${(content === undefined ? undefined : port.juggernautOperationalRecordKind(content)) ?? "none"}\`);
 }
 writeFileSync(\`\${dir}/port-verdicts.tsv\`, lines.join("\\n") + "\\n");
 console.log("classified ${count}");

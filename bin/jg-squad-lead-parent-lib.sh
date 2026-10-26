@@ -2,9 +2,9 @@
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # shellcheck disable=SC2034 # parsed fields are output globals for sourcing callers.
-# Parse the durable parent binding written into a seeded secondmate home.
+# Parse the durable parent binding written into a seeded squad_lead home.
 #
-# The jg-secondmate-parent.v1 record contains exactly one schema and route.
+# The jg-squad-lead-parent.v1 record contains exactly one schema and route.
 # A local route contains exactly one absolute parent_home and no parent_host.
 # A remote route contains no parent_home; current provisioning includes its SSH
 # alias as diagnostic-only parent_host, while legacy-compatible manifests may
@@ -12,16 +12,16 @@
 # Unknown fields are reserved for forward-compatible additions.
 # Duplicate schema or route fields, a malformed local binding, an unsupported
 # route or schema, a NUL-bearing record, and a symlinked record fail closed.
-# Writers publish this record before .jg-secondmate-home so that the identity
+# Writers publish this record before .jg-squad-lead-home so that the identity
 # marker remains the seed-completion point.
 
-jg_secondmate_parent_record_parse() {
+jg_squad_lead_parent_record_parse() {
   local file=$1 line schema='' route='' parent_home='' parent_host=''
   local schema_count=0 route_count=0 parent_home_count=0 parent_host_count=0
 
-  JG_SECONDMATE_PARENT_ROUTE=
-  JG_SECONDMATE_PARENT_HOME=
-  JG_SECONDMATE_PARENT_HOST=
+  JG_SQUAD_LEAD_PARENT_ROUTE=
+  JG_SQUAD_LEAD_PARENT_HOME=
+  JG_SQUAD_LEAD_PARENT_HOST=
 
   [ -f "$file" ] && [ ! -L "$file" ] || return 1
   # bash's read drops NUL bytes, and different bash generations disagree on the
@@ -53,13 +53,13 @@ jg_secondmate_parent_record_parse() {
 
   [ "$schema_count" -eq 1 ] || return 1
   [ "$route_count" -eq 1 ] || return 1
-  [ "$schema" = jg-secondmate-parent.v1 ] || return 1
+  [ "$schema" = jg-squad-lead-parent.v1 ] || return 1
   case "$route" in
     local)
       [ "$parent_home_count" -eq 1 ] || return 1
       [ "$parent_host_count" -eq 0 ] || return 1
       case "$parent_home" in /*) ;; *) return 1 ;; esac
-      JG_SECONDMATE_PARENT_HOME=$parent_home
+      JG_SQUAD_LEAD_PARENT_HOME=$parent_home
       ;;
     remote)
       [ "$parent_home_count" -eq 0 ] || return 1
@@ -67,6 +67,6 @@ jg_secondmate_parent_record_parse() {
     *) return 1 ;;
   esac
 
-  JG_SECONDMATE_PARENT_ROUTE=$route
-  JG_SECONDMATE_PARENT_HOST=$parent_host
+  JG_SQUAD_LEAD_PARENT_ROUTE=$route
+  JG_SQUAD_LEAD_PARENT_HOST=$parent_host
 }

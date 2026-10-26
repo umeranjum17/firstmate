@@ -43,7 +43,7 @@ printf '{"ok":true,"id":"pa_most_room","set":{"CLAUDE_CONFIG_DIR":"$tmp/pool/pa_
 EOF2
 chmod +x "$tmp/byokit-accounts"
 printf 'state=%s\ncommand=%s\n' "$tmp/pool" "$tmp/byokit-accounts" >"$home/config/account-pool"
-printf 'endpoint_task_id=lead\nkind=secondmate\nharness=claude\nspawn_gen=s1\n' >"$S/muxr-lead.meta"
+printf 'endpoint_task_id=lead\nkind=squad_lead\nharness=claude\nspawn_gen=s1\n' >"$S/muxr-lead.meta"
 cat >"$tmp/pane.sh" <<PANE
 #!/usr/bin/env bash
 cat '$repo/limit-prompt-move/tests/weekly-limit-menu.screen'
@@ -70,7 +70,7 @@ bash -x "$tool" "$home" 2>"$tmp/trace" || true
 sleep 1
 {
   echo "TOOL OUTPUT: limit-prompt-move detected that menu, interrupted the lead with Escape and relaunched it on pool account pa_most_room"
-  echo "pool library loaded from the account-pool add-on, not the Firstmate bin/:"
+  echo "pool library loaded from the account-pool add-on, not the Juggernaut bin/:"
   grep -m1 -E '^\++ \. .*account-pool/bin/jg-account-pool-lib\.sh' "$tmp/trace" | sed 's/^+* \. //'
   echo "the installed tool: $tool"
   echo "# state/limit-prompt-move.log:"; cat "$S/limit-prompt-move.log"
@@ -83,7 +83,7 @@ grep -q 'moved off its unrecorded account to account pa_most_room' "$evidence/2-
   && grep -q 'account-pool/bin/jg-account-pool-lib.sh' "$evidence/2-tool-output.txt" \
   && grep -q 'now on account pa_most_room' "$evidence/3-pane-after.txt" || { echo "FAIL limit-prompt-move live" >&2; exit 1; }
 { echo "JOURNEY: a lead sitting on the Claude usage-limit menu is interrupted and relaunched on another pool account by limit-prompt-move, with the pool library loaded from the add-on"
-  echo; echo "== 1. POOL LIBRARY LOADED FROM THE ADD-ON (not the Firstmate bin/) =="
+  echo; echo "== 1. POOL LIBRARY LOADED FROM THE ADD-ON (not the Juggernaut bin/) =="
   grep -A1 '^pool library loaded' "$evidence/2-tool-output.txt" | tail -n 1
   echo; echo "== 2. $(head -n 1 "$evidence/1-limit-screen-before.txt") =="; tail -n +2 "$evidence/1-limit-screen-before.txt"
   echo; echo "== 3. $(head -n 1 "$evidence/2-tool-output.txt") =="; tail -n +2 "$evidence/2-tool-output.txt"

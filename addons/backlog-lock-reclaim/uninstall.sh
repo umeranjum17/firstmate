@@ -8,7 +8,7 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
   export "$_jg_new=$_jg_val"
 done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
-# Retire the backlog-lock-reclaim check from one firstmate home (its check and trust binding), then remove the installed
+# Retire the backlog-lock-reclaim check from one juggernaut home (its check and trust binding), then remove the installed
 # copy. Idempotent. Usage: uninstall.sh <jg-home>
 set -euo pipefail
 [ "$#" -eq 1 ] && [ -x "$1/bin/jg-check-unregister.sh" ] || { echo "usage: uninstall.sh <jg-home>" >&2; exit 2; }

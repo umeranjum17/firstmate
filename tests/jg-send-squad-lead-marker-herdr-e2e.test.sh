@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Real Pi/Herdr regression for exact-id secondmate marker delivery.
+# Real Pi/Herdr regression for exact-id squad_lead marker delivery.
 #
 # This is opt-in because it launches a real interactive Pi process and a real
 # isolated Herdr lab session.
 # It exercises the end-user command shape against metadata written by a real
-# jg-spawn.sh --secondmate launch, captures Pi's before_agent_start prompt bytes,
+# jg-spawn.sh --squad-lead launch, captures Pi's before_agent_start prompt bytes,
 # and proves both sides of the routing boundary:
 #   - exact task id through explicit JG_HOME receives exactly one marker;
 #   - direct terminal input remains unmarked.
@@ -25,10 +25,10 @@ set -u
 jg_live_gate opt-in JG_SEND_MARKER_HERDR_E2E git herdr jq pi
 
 LAB_HELPER=${HERDR_LAB_HELPER:-$ROOT/bin/jg-herdr-lab.sh}
-SESSION=$("$LAB_HELPER" name jg-send-secondmate-marker-v7)
+SESSION=$("$LAB_HELPER" name jg-send-squad-lead-marker-v7)
 TMP_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/jg-send-marker-herdr-e2e.XXXXXX")
 SENDER_HOME="$TMP_ROOT/sender-home"
-SECOND_HOME="$TMP_ROOT/secondmate-home"
+SECOND_HOME="$TMP_ROOT/squad-lead-home"
 CAPTURE="$TMP_ROOT/pi-before-agent.jsonl"
 FAKEBIN="$TMP_ROOT/fakebin"
 ORIGINAL_PATH=$PATH
@@ -79,18 +79,18 @@ chmod +x "$FAKEBIN/herdr"
 git clone -q --no-hardlinks "$ROOT" "$SECOND_HOME"
 git -C "$SECOND_HOME" checkout -q --detach HEAD
 mkdir -p "$SECOND_HOME/state" "$SECOND_HOME/data" "$SECOND_HOME/config" "$SECOND_HOME/projects"
-printf '%s\n' "$ID" > "$SECOND_HOME/.jg-secondmate-home"
+printf '%s\n' "$ID" > "$SECOND_HOME/.jg-squad-lead-home"
 cat > "$SECOND_HOME/data/charter.md" <<'EOF'
-# Isolated marker capture secondmate
+# Isolated marker capture squad_lead
 
-You are a task-local secondmate used only for the marker transport regression.
+You are a task-local squad_lead used only for the marker transport regression.
 Stay idle and do not initiate work.
 EOF
 
 # A separate explicit Pi extension grants session-only project trust, records
 # before_agent_start prompt bytes, and aborts before any provider request.
 # The PATH wrapper adds only that test resource while preserving the production
-# secondmate launch and its own extension arguments unchanged.
+# squad_lead launch and its own extension arguments unchanged.
 CAPTURE_JSON=$(printf '%s' "$CAPTURE" | jq -Rs .)
 CAPTURE_EXTENSION="$TMP_ROOT/jg-send-marker-capture.ts"
 cat > "$CAPTURE_EXTENSION" <<EOF
@@ -109,16 +109,16 @@ chmod +x "$FAKEBIN/pi"
 
 "$LAB_HELPER" provision "$SESSION"
 PATH="$FAKEBIN:$ORIGINAL_PATH" JG_GATE_REFUSE_BYPASS=1 JG_HOME="$SENDER_HOME" HERDR_SESSION="$SESSION" \
-  "$ROOT/bin/jg-spawn.sh" "$ID" "$SECOND_HOME" --secondmate --harness pi --backend herdr >/dev/null
+  "$ROOT/bin/jg-spawn.sh" "$ID" "$SECOND_HOME" --squad-lead --harness pi --backend herdr >/dev/null
 
 META="$SENDER_HOME/state/$ID.meta"
-[ -f "$META" ] || fail "real secondmate spawn did not write exact-id metadata"
-[ "$(jg_meta_get "$META" kind)" = secondmate ] || fail "real secondmate metadata did not record kind=secondmate"
+[ -f "$META" ] || fail "real squad_lead spawn did not write exact-id metadata"
+[ "$(jg_meta_get "$META" kind)" = squad_lead ] || fail "real squad_lead metadata did not record kind=squad_lead"
 TARGET=$(jg_backend_target_of_meta "$META")
 PANE=${TARGET#*:}
 case "$TARGET" in
   "$SESSION":w*:p*) : ;;
-  *) fail "real secondmate metadata recorded an unexpected Herdr target: $TARGET" ;;
+  *) fail "real squad_lead metadata recorded an unexpected Herdr target: $TARGET" ;;
 esac
 
 wait_for_prompt() { # <needle>
@@ -152,7 +152,7 @@ wait_for_idle() {
 # The startup charter proves the CLI extension loaded. Wait until ctx.abort()
 # has remained idle long enough for the Pi composer to fully settle before
 # exercising it. A single native idle sample can precede Pi's final redraw.
-wait_for_prompt 'Isolated marker capture secondmate' \
+wait_for_prompt 'Isolated marker capture squad_lead' \
   || fail "real Pi before_agent_start capture did not load for the startup charter"
 wait_for_idle || fail "real Pi did not become idle after the startup capture"
 
@@ -163,7 +163,7 @@ GOT=$(jq -r --arg needle "$REQUEST" 'select(.prompt | contains($needle)) | .prom
 [ "$GOT" = "${JG_FROMFIRST_MARK}${REQUEST}" ] \
   || fail "real Pi exact-id prompt did not contain exactly one terminal-safe marker"$'\n'"--- bytes ---"$'\n'"$(printf '%s' "$GOT" | od -An -tx1)"
 printf 'evidence: exact-id received-hex=%s\n' "$(printf '%s' "$GOT" | od -An -tx1 | tr -d ' \n')"
-pass "real Pi/Herdr: exact-id JG_HOME send delivers exactly one from-firstmate marker"
+pass "real Pi/Herdr: exact-id JG_HOME send delivers exactly one from-juggernaut marker"
 wait_for_idle || fail "real Pi did not become idle after the exact-id capture"
 
 # Direct terminal input bypasses jg-send's metadata-routed transformation and
@@ -173,8 +173,8 @@ wait_for_idle || fail "real Pi did not become idle after the exact-id capture"
 wait_for_prompt "$DIRECT" || fail "real Pi did not receive direct terminal input"
 GOT=$(jq -r --arg needle "$DIRECT" 'select(.prompt | contains($needle)) | .prompt' "$CAPTURE" | tail -1)
 [ "$GOT" = "$DIRECT" ] || fail "direct captain input was changed or marked"$'\n'"--- bytes ---"$'\n'"$(printf '%s' "$GOT" | od -An -tx1)"
-if jg_message_from_firstmate "$GOT"; then
-  fail "direct captain input was classified as from-firstmate"
+if jg_message_from_juggernaut "$GOT"; then
+  fail "direct captain input was classified as from-juggernaut"
 fi
 printf 'evidence: direct-input received-hex=%s\n' "$(printf '%s' "$GOT" | od -An -tx1 | tr -d ' \n')"
 pass "real Pi/Herdr: direct captain terminal input stays unmarked"

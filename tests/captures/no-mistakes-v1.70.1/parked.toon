@@ -5,7 +5,7 @@ run:
   awaiting_agent: parked 2d14h
   head: fb90db9f
   head_sha: fb90db9f09db9b0cd1a83539959367c612659638
-  pr: "https://github.com/kunchenguid/firstmate/pull/3998"
+  pr: "https://github.com/kunchenguid/juggernaut/pull/3998"
   findings: 1 awaiting
   steps[9]{step,status,findings,duration_ms}:
     intent,completed,0,200

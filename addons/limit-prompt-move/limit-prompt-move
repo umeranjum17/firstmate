@@ -10,7 +10,7 @@
 # "1. Stop and wait for limit to reset", then "Enter to confirm · Esc to cancel" last.
 # Moves go through bin/jg-control.sh only: interrupt (Claude's Esc cancels the menu, so no option,
 # usage credits included, is ever chosen), then relaunch --account next, which rests the recorded
-# account, or, with no recorded account (a secondmate on the ambient login), --account <the pool's
+# account, or, with no recorded account (a squad_lead on the ambient login), --account <the pool's
 # pick>, the account with the most room. One attempt per spawn_gen, logged in
 # state/limit-prompt-move.log and the task's state/<id>.status (working, or blocked [key=limit-prompt-move]).
 set -u

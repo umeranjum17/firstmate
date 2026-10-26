@@ -53,7 +53,7 @@ The installed pi-signed 0.82.0 wrapper repeated the shared Pi primary extension 
 The omp Run-tier adapter was verified on 2026-09-05 with omp 18.1.11 and the openai-codex `gpt-6-astra` model through `JG_OMP_LIVE_E2E=1 tests/jg-omp-primary-live-e2e.test.sh`, which drives a real omp in its JSON-RPC stdio mode inside an isolated lab clone.
 Both tracked `.omp/extensions/*.ts` files loaded by auto-discovery alone (no `-e`, no trust dialog), `before_agent_start` returned the digest as a persistent context message, the model quoted the lab's `SESSION START -` heading back on its first turn, `state/.session-start-complete` was recorded, and `state/.lock` named the omp process, so ancestry detection identified the markerless binary.
 omp's `session_start` payload carries no reason field, so the adapter derives the source: the first start of the process is `startup` (or `resume` from a `--continue`/`--resume` launch line) and a later in-process start is `clear`; `tests/jg-omp-harness.test.sh` pins that mapping over a fake omp API.
-A file named both by `-e` and by auto-discovery loads twice (two factory calls, doubled `session_stop` continuations), which is why a secondmate launch never names its auto-discovered primary extensions with `-e` and the per-task busy extension lives in `state/`.
+A file named both by `-e` and by auto-discovery loads twice (two factory calls, doubled `session_stop` continuations), which is why a squad lead launch never names its auto-discovered primary extensions with `-e` and the per-task busy extension lives in `state/`.
 
 ### Run-tier source vocabulary and context-reset injection
 
@@ -156,7 +156,7 @@ finished=1786048723
 
 The worker started before the harness exited and published 6s after it was gone.
 
-The latency this buys was re-measured on 2026-08-06 against default-branch tip `8398d31`, in a throwaway home holding one remote secondmate whose host hangs 25s per SSH connection (an `JG_SSH_BIN`-shaped stub; no real host was contacted).
+The latency this buys was re-measured on 2026-08-06 against default-branch tip `8398d31`, in a throwaway home holding one remote squad lead whose host hangs 25s per SSH connection (an `JG_SSH_BIN`-shaped stub; no real host was contacted).
 Both runs used the same fixture and the same `bin/jg-session-start.sh` invocation, differing only in which checkout supplied the script:
 
 ```text
@@ -165,15 +165,15 @@ after              real 0m3.36s    digest prints IN PROGRESS; the same 3 SSH att
                                    run in the detached worker and finish at +77s
 ```
 
-The remaining seconds are entirely local subprocess work; the `NETWORK CHECKS` section named GitHub authentication, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, and project clone refresh as not yet confirmed.
+The remaining seconds are entirely local subprocess work; the `NETWORK CHECKS` section named GitHub authentication, dead-squad-lead relaunch, squad lead convergence, pending handoff delivery, and project clone refresh as not yet confirmed.
 
 Deferring the sweeps changed only when they run, not what they conclude.
 The deferred worker's published report was byte-identical to the three sweep lines the blocking baseline printed, on the same fixture:
 
 ```text
-SECONDMATE_LIVENESS: secondmate ios: skipped: remote host unavailable or endpoint state unknown; route preserved on remote-mac
-SECONDMATE_SYNC: secondmate ios: skipped: remote tracked-file sync failed on remote-mac:
-SECONDMATE_SYNC: secondmate ios: skipped: remote inheritance failed on remote-mac:
+SQUAD LEAD_LIVENESS: squad lead ios: skipped: remote host unavailable or endpoint state unknown; route preserved on remote-mac
+SQUAD LEAD_SYNC: squad lead ios: skipped: remote tracked-file sync failed on remote-mac:
+SQUAD LEAD_SYNC: squad lead ios: skipped: remote inheritance failed on remote-mac:
 ```
 
 The unreachable route was preserved rather than relaunched in both runs, and the result surfaced durably as a queued `check: startup-network` wake once the worker finished.
@@ -338,8 +338,8 @@ The same run proved the Claude-compatible Stop entries stay inert under `GROK_AG
 That inertness result is scoped to the builds it exercised: it did not establish that `GROK_AGENT` reaches a Grok HOOK process, and on grok 1.0.0 it does not, so the marker set was widened to `GROK_HOOK_EVENT` as well (docs/turnend-guard.md "Harness integrations").
 `tests/jg-turnend-guard.test.sh` now pins every tracked `.claude/settings.json` hook entry against a real grok 1.0.0 hook environment so the inertness contract is covered deterministically rather than only by the opt-in live matrix.
 
-The secondmate-home scope and manual-repair wake path were measured with Claude Code 2.1.207 on 2026-07-12, when a native background completion re-invoked the idle model with no human input.
-The current Stop-owned main/secondmate inclusion and child-worktree exclusion are covered deterministically by `tests/jg-claude-stop-autoarm.test.sh`.
+The squad-lead-home scope and manual-repair wake path were measured with Claude Code 2.1.207 on 2026-07-12, when a native background completion re-invoked the idle model with no human input.
+The current Stop-owned main/squad lead inclusion and child-worktree exclusion are covered deterministically by `tests/jg-claude-stop-autoarm.test.sh`.
 Session-lock ownership in `bin/jg-session-lock-lib.sh` is decided against a session's whole contiguous harness ancestry rather than one chosen pid, so the Stop auto-arm reaches its lock owner wherever that owner sits: a pid of Claude Code's multi-level `bg-spare` hook worker chain, or an inner pid when a harness-named daemon parents the session.
 A background Claude session whose transient helper chain is recycled loses that contiguity while its recorded owner stays alive, so the library also accepts a trusted same-session id: `CLAUDE_CODE_SESSION_ID` counts only when `CLAUDE_PID` is a Claude-shaped member of the current run, it must equal the id `bin/jg-lock.sh` recorded in `state/.lock-session`, and the recorded pid must still be a live harness, while every weaker combination (no id, no sidecar, an untrusted id, a different id, a dead recorded pid) leaves the ancestry verdict unchanged.
 For such a session `bin/jg-lock.sh` records `CLAUDE_PID` on lock line 1 instead of the outermost chain pid, so a shared daemon or front-end that outlives the session never keeps a dead session's lock alive, and a same-session confirmation never rewrites a live line 1.
@@ -361,7 +361,7 @@ ok - session-lock: a trusted same-session id keeps owning a recycled background 
 ok - session-lock: a trusted id anchors the lock on the model-loop process, anything else on the outermost pid
 ok - session-lock e2e: a background session keeps its lock and its supervision across a recycled helper chain
 same-session acquisition rc=0 stdout='lock acquired: harness pid 41994\nlock_rc=0\n' stderr=''
-other-session acquisition rc=0 stdout='lock_rc=1\n' stderr='error: another live firstmate session holds the lock (pid 41994, session synthetic-same); operate read-only until resolved\n'
+other-session acquisition rc=0 stdout='lock_rc=1\n' stderr='error: another live juggernaut session holds the lock (pid 41994, session synthetic-same); operate read-only until resolved\n'
 FIXED same-session id owns the lock; a different id is still foreign
 COMPLETE
 ```
@@ -369,7 +369,7 @@ COMPLETE
 No live unattended Claude background session ran on the verifying machine: that topology is documented by the real process listings in issues #3902, #2314, #3398, and #4066, and the coverage above is the structural predicate plus those executable fixtures, not a live pass.
 [`sessionstart-nudge.md`](../sessionstart-nudge.md#shared-wrapper-and-safety) owns the nudge wrapper's separate ancestry check and its redundant-nudge behavior after helper-chain recycling.
 `tests/jg-watch-arm.test.sh` runs real watcher and arm cycles against durable on-disk state to verify that a delivered reason survives until post-handling acknowledgement and stops replaying after acknowledgement, while an unrelated queue append cannot make a watcher cycle that delivered nothing look successful.
-The same suite ingests a keyed remote-secondmate parent reply through the real adapter, establishes the incremental OPEN DECISIONS cursor, interrupts supervision, and proves re-arm replays every unacknowledged queue row plus the still-open decision through the ordinary drain path.
+The same suite ingests a keyed remote-squad-lead parent reply through the real adapter, establishes the incremental OPEN DECISIONS cursor, interrupts supervision, and proves re-arm replays every unacknowledged queue row plus the still-open decision through the ordinary drain path.
 It also covers decision-only recovery, interrupted handling, handling-window generation reuse, non-fatal moved-generation acknowledgement with sequence-bounded consumption, and a persistent successor remaining live after recovery is acknowledged.
 
 The Claude product live path ran with Claude Code 2.1.278 on 2026-09-21.
@@ -467,7 +467,7 @@ Observed output, before and after the model correction, then with the recorded P
 The broader relevant regression pass was rerun on 2026-08-02 without live-home or daemon mutation.
 
 ```sh
-bin/jg-test-run.sh tests/jg-watch-triage.test.sh tests/jg-watcher-lock.test.sh tests/jg-afk-inject-e2e.test.sh tests/jg-afk-return.test.sh tests/jg-x-mode.test.sh tests/jg-backend.test.sh tests/jg-backend-tmux-smoke.test.sh tests/jg-secondmate-safety.test.sh
+bin/jg-test-run.sh tests/jg-watch-triage.test.sh tests/jg-watcher-lock.test.sh tests/jg-afk-inject-e2e.test.sh tests/jg-afk-return.test.sh tests/jg-x-mode.test.sh tests/jg-backend.test.sh tests/jg-backend-tmux-smoke.test.sh tests/jg-squad-lead-safety.test.sh
 ```
 
 Observed output:
@@ -856,9 +856,9 @@ Argv-safe Notification Center command:
 ```sh
 /usr/bin/osascript \
   -e 'on run argv' \
-  -e 'display notification (item 1 of argv) with title "FIRSTMATE TEST - IGNORE" sound name "Basso"' \
+  -e 'display notification (item 1 of argv) with title "JUGGERNAUT TEST - IGNORE" sound name "Basso"' \
   -e 'end run' \
-  'FIRSTMATE TEST - IGNORE (wedge-alarm channel verification)'
+  'JUGGERNAUT TEST - IGNORE (wedge-alarm channel verification)'
 ```
 
 Observed output: no stdout, exit 0, and one banner with the supplied body.
@@ -866,8 +866,8 @@ Observed output: no stdout, exit 0, and one banner with the supplied body.
 Herdr command:
 
 ```sh
-herdr notification show 'FIRSTMATE TEST - IGNORE' \
-  --body 'FIRSTMATE TEST - IGNORE (wedge-alarm channel verification)' \
+herdr notification show 'JUGGERNAUT TEST - IGNORE' \
+  --body 'JUGGERNAUT TEST - IGNORE (wedge-alarm channel verification)' \
   --sound request
 ```
 

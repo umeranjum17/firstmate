@@ -3,7 +3,7 @@
 
 This is the WIRE TRANSPORT half of the herdr push-escalation path
 (bin/backends/herdr.sh jg_backend_herdr_wait_transition). It deliberately does
-NOT know firstmate's supervision policy: it opens ONE connection to a herdr
+NOT know juggernaut's supervision policy: it opens ONE connection to a herdr
 session's control socket, subscribes to pane.agent_status_changed for the given
 panes (all statuses, so working/idle/done edges are seen too), and prints one
 projected line per event to stdout, flushing each so the bash caller can react

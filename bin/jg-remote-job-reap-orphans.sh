@@ -7,8 +7,8 @@
 #   --dry-run reports what would be reaped and signals nothing.
 #
 # A remote job worker (bin/jg-remote-job-worker.sh) is launched from a specific
-# Firstmate code root: the account's own checkout under the LaunchAgent, a
-# remote secondmate's checkout, a no-mistakes gate worktree, a pooled task
+# Juggernaut code root: the account's own checkout under the LaunchAgent, a
+# remote squad_lead's checkout, a no-mistakes gate worktree, a pooled task
 # worktree, or a test fixture root. When that root is pruned while the worker is
 # running, the worker is reparented to init and, on older builds, keeps polling
 # and logging indefinitely. Current workers stop themselves once their root is
@@ -20,7 +20,7 @@
 # named in the worker's own command line. That is deliberately the whole test:
 # a worker whose root is gone can never claim, validate, or execute another job,
 # and no healthy worker can present a missing root. The account's healthy
-# LaunchAgent worker, a live remote secondmate's worker, and any worker whose
+# LaunchAgent worker, a live remote squad_lead's worker, and any worker whose
 # checkout still exists are therefore never candidates, with no dependence on
 # log paths, process age, or which home is sweeping.
 #
@@ -49,9 +49,9 @@ reap_usage() {
   cat <<'TXT'
 Usage: jg-remote-job-reap-orphans.sh [--dry-run]
 
-Stop every remote job worker whose Firstmate code root has been pruned. A
+Stop every remote job worker whose Juggernaut code root has been pruned. A
 worker whose root still exists - the account's LaunchAgent worker, a live
-remote secondmate's worker - is never a candidate. --dry-run reports the
+remote squad_lead's worker - is never a candidate. --dry-run reports the
 candidates and signals nothing. Read this script's header for the full rule.
 TXT
 }

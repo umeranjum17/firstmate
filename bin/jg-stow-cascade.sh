@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
-# Enumerate this home's registered secondmates for an internal /stow cascade.
+# Enumerate this home's registered squad_leads for an internal /stow cascade.
 # Usage: jg-stow-cascade.sh [--help]
 #
 # The internal /stow skill owns curation judgement; this command owns only the
 # mechanical inputs a cascade needs: which homes exist, what each home's own
 # startup-memory accounting says right now, and how the sweep can reach it.
 #
-# Enumeration comes from data/secondmates.md, the registry that already refuses
+# Enumeration comes from data/squad_leads.md, the registry that already refuses
 # a duplicate id, a duplicate home, and an overlapping home, so each registered
-# secondmate is emitted exactly once and no home is accounted twice. A home's
+# squad_lead is emitted exactly once and no home is accounted twice. A home's
 # budget is that home's alone: this command never sums a fleet total, because
 # config/startup-memory-budget is a per-home allowance.
 #
 # Each home is reported as one blank-line-separated key=value stanza:
-#   secondmate=<id>
+#   squad_lead=<id>
 #   placement=local|remote            (host=<alias> on a remote route)
 #   home=<path>
 #   budget_report=ok|error|timeout    (report lines follow on ok)
@@ -23,7 +23,7 @@
 #   reason=<one line>                 (whenever a step did not complete)
 #
 # transport says how the sweep reaches that home:
-#   agent     - a live secondmate agent owns the home; steer it with
+#   agent     - a live squad_lead agent owns the home; steer it with
 #               bin/jg-send.sh so it sweeps its own uncaptured session
 #               knowledge and replies through its marked return channel.
 #   direct    - a local home with no live agent; curate its editable memory
@@ -41,7 +41,7 @@
 # blocking the primary's own /stow. A local endpoint probe reads this host's
 # recorded backend in process, like every other caller of that contract.
 #
-# A secondmate home never cascades: secondmates do not own secondmates, so this
+# A squad_lead home never cascades: squad_leads do not own squad_leads, so this
 # command reports the empty cascade there rather than reaching for a registry.
 #
 # Exit status: 0 every home reported cleanly (or there were none); 3 at least
@@ -65,9 +65,9 @@ JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
 DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
 STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
-REGISTRY="$DATA/secondmates.md"
+REGISTRY="$DATA/squad_leads.md"
 BUDGET_CMD=jg-startup-memory-budget.sh
-SUB_HOME_MARKER="${SUB_HOME_MARKER:-.jg-secondmate-home}"
+SUB_HOME_MARKER="${SUB_HOME_MARKER:-.jg-squad-lead-home}"
 
 # shellcheck source=bin/jg-ff-lib.sh
 . "$SCRIPT_DIR/jg-ff-lib.sh"
@@ -100,11 +100,11 @@ run_step() {
   return "$rc"
 }
 
-# This home's recorded secondmate endpoint for <id>, if it has one.
+# This home's recorded squad_lead endpoint for <id>, if it has one.
 meta_for() { # <id>
   local meta="$STATE/$1.meta"
   [ -f "$meta" ] && [ ! -L "$meta" ] || return 1
-  grep -q '^kind=secondmate$' "$meta" 2>/dev/null || return 1
+  grep -q '^kind=squad_lead$' "$meta" 2>/dev/null || return 1
   printf '%s\n' "$meta"
 }
 
@@ -121,7 +121,7 @@ resolve_local_transport() { # <id> <resolved-home>
   fi
   meta_home=$(jg_meta_get "$meta" home)
   if [ -n "$meta_home" ] \
-    && [ "$(secondmate_registry_path_key "$meta_home" 2>/dev/null || true)" != "$home" ]; then
+    && [ "$(squad_lead_registry_path_key "$meta_home" 2>/dev/null || true)" != "$home" ]; then
     set_transport direct 'recorded endpoint belongs to another home'
     return 0
   fi
@@ -146,7 +146,7 @@ resolve_remote_transport() { # <id>
     set_transport deferred 'no recorded endpoint and no remote memory write path'
     return 0
   fi
-  run_step "$SCRIPT_DIR/jg-on.sh" "$id" jg-remote-secondmate-control.sh state "$id" || rc=$?
+  run_step "$SCRIPT_DIR/jg-on.sh" "$id" jg-remote-squad-lead-control.sh state "$id" || rc=$?
   if [ "$rc" -eq 124 ]; then
     set_transport deferred "remote endpoint probe exceeded the ${BOUND}s bound"
     return 0
@@ -162,21 +162,21 @@ resolve_remote_transport() { # <id>
 }
 
 if [ -e "$JG_HOME/$SUB_HOME_MARKER" ] || [ -L "$JG_HOME/$SUB_HOME_MARKER" ]; then
-  emit 'role=secondmate'
-  emit 'secondmates=0'
-  emit 'reason=a secondmate home stows its own memory only and never cascades'
+  emit 'role=squad_lead'
+  emit 'squad_leads=0'
+  emit 'reason=a squad_lead home stows its own memory only and never cascades'
   exit 0
 fi
 emit 'role=primary'
 
 if [ ! -e "$REGISTRY" ] && [ ! -L "$REGISTRY" ]; then
-  emit 'secondmates=0'
+  emit 'squad_leads=0'
   emit 'exceptions=0'
-  emit 'reason=no secondmate registry in this home'
+  emit 'reason=no squad_lead registry in this home'
   exit 0
 fi
-if ! secondmate_registry_validate_bindings "$REGISTRY" secondmate_registry_path_key; then
-  die "$SECONDMATE_REGISTRY_ERROR"
+if ! squad_lead_registry_validate_bindings "$REGISTRY" squad_lead_registry_path_key; then
+  die "$SQUAD_LEAD_REGISTRY_ERROR"
 fi
 
 grep '^- ' "$REGISTRY" > "$TMP/records" 2>/dev/null || : > "$TMP/records"
@@ -184,15 +184,15 @@ total=0
 exceptions=0
 while IFS= read -r line || [ -n "$line" ]; do
   [ -n "$line" ] || continue
-  secondmate_registry_parse_line "$line" || die "malformed secondmate registry entry: $line"
-  id=$SECONDMATE_REGISTRY_ID
-  home=$SECONDMATE_REGISTRY_HOME
-  remote=$SECONDMATE_REGISTRY_REMOTE
-  host=$SECONDMATE_REGISTRY_HOST
+  squad_lead_registry_parse_line "$line" || die "malformed squad_lead registry entry: $line"
+  id=$SQUAD_LEAD_REGISTRY_ID
+  home=$SQUAD_LEAD_REGISTRY_HOME
+  remote=$SQUAD_LEAD_REGISTRY_REMOTE
+  host=$SQUAD_LEAD_REGISTRY_HOST
   total=$((total + 1))
   rc=0
   printf '\n'
-  emit "secondmate=$id"
+  emit "squad_lead=$id"
   if [ "$remote" -eq 1 ]; then
     emit 'placement=remote'
     emit "host=$host"
@@ -200,7 +200,7 @@ while IFS= read -r line || [ -n "$line" ]; do
     run_step "$SCRIPT_DIR/jg-on.sh" "$id" "$BUDGET_CMD" report || rc=$?
   else
     emit 'placement=local'
-    if ! validate_secondmate_home "$id" "$home"; then
+    if ! validate_squad_lead_home "$id" "$home"; then
       emit "home=$home"
       emit 'budget_report=error'
       emit 'transport=unavailable'
@@ -247,7 +247,7 @@ while IFS= read -r line || [ -n "$line" ]; do
 done < "$TMP/records"
 
 printf '\n'
-emit "secondmates=$total"
+emit "squad_leads=$total"
 emit "exceptions=$exceptions"
 [ "$exceptions" -eq 0 ] || exit 3
 exit 0

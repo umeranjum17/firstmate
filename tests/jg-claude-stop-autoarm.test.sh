@@ -56,16 +56,16 @@ make_primary_dir() {
   printf '%s\n' "$dir"
 }
 
-make_secondmate_dir() {
+make_squad_lead_dir() {
   local dir=$1
   make_primary_dir "$dir" >/dev/null
-  printf 'sm-autoarm-1\n' > "$dir/.jg-secondmate-home"
+  printf 'sm-autoarm-1\n' > "$dir/.jg-squad-lead-home"
   printf '%s\n' "$dir"
 }
 
-# A genuine linked git worktree: the shape every crewmate/scout task worktree
+# A genuine linked git worktree: the shape every operator/scout task worktree
 # has (git-dir != git-common-dir), which must keep the hook inert.
-make_crewmate_worktree_dir() {
+make_operator_worktree_dir() {
   local base=$1 dir=$2
   jg_git_worktree "$base" "$dir" fm/autoarm-test-branch
   mkdir -p "$dir/state"
@@ -275,7 +275,7 @@ test_inert_in_child_worktree() {
   local base dir out status
   base="$TMP_ROOT/crew-base"
   dir="$TMP_ROOT/crew-wt"
-  make_crewmate_worktree_dir "$base" "$dir" >/dev/null
+  make_operator_worktree_dir "$base" "$dir" >/dev/null
   : > "$dir/state/task.meta"
   write_arm_fixture "$dir" actionable
   out=$(run_autoarm "$dir" 2>/dev/null); status=$?
@@ -430,7 +430,7 @@ test_actionable_close_rewakes_with_reason() {
   write_arm_fixture "$dir" actionable
   out=$(run_autoarm "$dir" 2>/dev/null); status=$?
   expect_code 2 "$status" "an actionable arm close must exit 2 so Claude rewakes"
-  assert_contains "$out" "firstmate watcher wake" "rewake must carry the wake banner"
+  assert_contains "$out" "juggernaut watcher wake" "rewake must carry the wake banner"
   assert_contains "$out" "stale: fixture-win actionable" "rewake must carry the arm's reason line"
   assert_contains "$out" "bin/jg-wake-drain.sh" "rewake must direct the drain-first protocol"
   assert_contains "$out" "do NOT run bin/jg-watch-arm.sh" "rewake must forbid a duplicate model re-arm"
@@ -496,7 +496,7 @@ test_actionable_close_with_live_successor_rewakes_once() {
 
   expect_code 2 "$status" "an actionable close must rewake when a live successor already exists"
   expect_code 0 "$status2" "a repeated non-actionable close with the live successor must stay quiet"
-  [ "$(printf '%s\n' "$out" | grep -c '^firstmate watcher wake')" -eq 1 ] \
+  [ "$(printf '%s\n' "$out" | grep -c '^juggernaut watcher wake')" -eq 1 ] \
     || fail "actionable close with a live successor did not emit exactly one wake banner: $out"
   [ "$(printf '%s\n' "$out" | grep -c '^stale: fixture-win actionable')" -eq 1 ] \
     || fail "actionable close with a live successor did not surface its reason exactly once: $out"
@@ -539,7 +539,7 @@ test_attached_cycle_end_starts_handling_successor() {
     sleep 0.05
     i=$((i + 1))
   done
-  [ "$(printf '%s\n' "$out" | grep -c '^firstmate watcher wake')" -eq 1 ] \
+  [ "$(printf '%s\n' "$out" | grep -c '^juggernaut watcher wake')" -eq 1 ] \
     || fail "the successor start must not change the single wake banner: $out"
   assert_not_contains "$out" "did not confirm" "a confirmed successor adds nothing to the rewake"
   [ "$(epoch_outcome "$dir")" = rewake ] || fail "epoch must record outcome=rewake, got: $(epoch_outcome "$dir")"
@@ -889,7 +889,7 @@ test_term_mid_arm_commits_failure_and_rewakes() {
   assert_present "$dir/state/.claude-autoarm-failure-notified" "TERM mid-arm left no durable failure marker"
   [ "$(epoch_outcome "$dir")" = failed ] \
     || fail "TERM mid-arm left a nonterminal ledger outcome: $(sed -n '1p' "$dir/state/.claude-autoarm-epoch")"
-  assert_contains "$(cat "$out")" "firstmate watcher auto-arm INTERRUPTED" \
+  assert_contains "$(cat "$out")" "juggernaut watcher auto-arm INTERRUPTED" \
     "TERM mid-arm omitted the rewake failure banner"
   pass "auto-arm: TERM mid-arm commits a durable failure and exits 2 for rewake"
 }
@@ -961,7 +961,7 @@ test_abandoned_owner_claim_is_reclaimed_and_rearms() {
   wait "$pid" 2>/dev/null || true
   expect_code 2 "$status" "a claim whose ledger outcome is already terminal must be reclaimed, not deferred to forever"
   [ -e "$dir/state/arm-ran" ] || fail "abandoned claim left the home unarmed with work in flight"
-  assert_contains "$out" "firstmate watcher wake" "the reclaimed cycle must still translate its wake"
+  assert_contains "$out" "juggernaut watcher wake" "the reclaimed cycle must still translate its wake"
   [ "$(epoch_field "$dir" epoch)" -gt 464 ] || fail "reclaimed cycle did not advance the frozen ledger: $(epoch_field "$dir" epoch)"
   [ "$(epoch_outcome "$dir")" = rewake ] || fail "reclaimed cycle did not record its own outcome: $(epoch_outcome "$dir")"
   [ "$(epoch_field "$dir" owner_pid)" != "$pid" ] || fail "reclaimed ledger still names the abandoned owner"
@@ -1114,7 +1114,7 @@ test_pid_reused_arming_claim_is_reclaimed_and_rearms() {
   wait "$pid" 2>/dev/null || true
   expect_code 2 "$status" "a claim whose recorded identity no longer matches its live pid must be reclaimed, arming entry or not"
   [ -e "$dir/state/arm-ran" ] || fail "a reused-pid claim left the home unarmed with work in flight"
-  assert_contains "$out" "firstmate watcher wake" "the reclaimed cycle must still translate its wake"
+  assert_contains "$out" "juggernaut watcher wake" "the reclaimed cycle must still translate its wake"
   [ "$(epoch_field "$dir" epoch)" -gt 464 ] || fail "reclaimed cycle did not advance the frozen ledger: $(epoch_field "$dir" epoch)"
   assert_absent "$dir/state/.claude-autoarm.lock" "reclaimed cycle left an owner lock behind"
   assert_absent "$dir/state/.claude-autoarm.lock.steal" "reclaim left its serialization mutex behind"
@@ -1139,7 +1139,7 @@ test_pid_reused_claim_with_no_ledger_is_reclaimed_and_rearms() {
   wait "$pid" 2>/dev/null || true
   expect_code 2 "$status" "a reused-pid claim with no ledger to consult must still be reclaimed"
   [ -e "$dir/state/arm-ran" ] || fail "a reused-pid claim with no ledger left the home unarmed"
-  assert_contains "$out" "firstmate watcher wake" "the reclaimed cycle must still translate its wake"
+  assert_contains "$out" "juggernaut watcher wake" "the reclaimed cycle must still translate its wake"
   [ "$(epoch_outcome "$dir")" = rewake ] || fail "reclaimed cycle did not record its own outcome: $(epoch_outcome "$dir")"
   assert_absent "$dir/state/.claude-autoarm.lock" "reclaimed cycle left an owner lock behind"
   pass "auto-arm: a reused-pid claim is reclaimed even with no ledger entry to prove it"
@@ -1211,7 +1211,7 @@ test_stuck_live_legacy_owner_is_retired_and_reclaimed() {
   kill -0 "$pid" 2>/dev/null && fail "the stuck legacy owner was reclaimed without being retired"
   wait "$pid" 2>/dev/null || true
   [ -e "$dir/state/arm-ran" ] || fail "the reclaimed home did not re-arm"
-  assert_contains "$out" "firstmate watcher wake" "the reclaimed cycle must still translate its wake"
+  assert_contains "$out" "juggernaut watcher wake" "the reclaimed cycle must still translate its wake"
   assert_absent "$dir/state/.claude-autoarm.lock" "reclaim left the legacy owner lock behind"
   pass "auto-arm: a stuck live legacy owner is retired via TERM and its lock reclaimed"
 }
@@ -1308,7 +1308,7 @@ test_stuck_generation_claim_is_superseded_and_rearms() {
   wait "$pid" 2>/dev/null || true
   expect_code 2 "$status" "a live owner stuck arming past grace with a beacon just as stale must be superseded, not deferred to forever"
   [ -e "$dir/state/arm-ran" ] || fail "a stuck generation claim left the home unarmed with work in flight"
-  assert_contains "$out" "firstmate watcher wake" "the superseding generation must still translate its wake"
+  assert_contains "$out" "juggernaut watcher wake" "the superseding generation must still translate its wake"
   [ "$(epoch_field "$dir" epoch)" -gt 464 ] || fail "superseding claim did not advance the frozen ledger: $(epoch_field "$dir" epoch)"
   [ "$(epoch_field "$dir" owner_pid)" != "$pid" ] || fail "superseding claim left the stuck owner on the ledger"
   assert_absent "$dir/state/.claude-autoarm.lock" "the generation claim left a lock held after finishing"
@@ -1391,7 +1391,7 @@ test_superseded_owner_goes_silent_and_never_double_translates() {
   touch -t 202001010000 "$dir/state/.last-watcher-beat"
   c_out=$(run_autoarm "$dir" 2>/dev/null); c_status=$?
   expect_code 2 "$c_status" "the superseding generation must translate its own close"
-  assert_contains "$c_out" "firstmate watcher wake" "the superseding generation must carry the rewake banner"
+  assert_contains "$c_out" "juggernaut watcher wake" "the superseding generation must carry the rewake banner"
   wait "$a_pid"
   a_status=$?
   expect_code 0 "$a_status" "the superseded owner must exit 0 instead of double-translating"
@@ -1427,16 +1427,16 @@ test_afk_mid_cycle_suppresses_rewake() {
   pass "auto-arm: mid-cycle AFK hands triage to the daemon with no rewake"
 }
 
-test_active_in_marked_secondmate_home() {
+test_active_in_marked_squad_lead_home() {
   local dir out status
-  dir=$(make_secondmate_dir "$TMP_ROOT/secondmate")
+  dir=$(make_squad_lead_dir "$TMP_ROOT/squad_lead")
   : > "$dir/state/task.meta"
   write_arm_fixture "$dir" actionable
   out=$(run_autoarm "$dir" 2>/dev/null); status=$?
-  expect_code 2 "$status" "a marked secondmate home must get the same active auto-arm as the main primary"
-  [ -e "$dir/state/arm-ran" ] || fail "hook did not arm in a marked secondmate home"
-  [ "$(epoch_outcome "$dir")" = rewake ] || fail "secondmate epoch must record outcome=rewake"
-  pass "auto-arm: active in a marked secondmate home"
+  expect_code 2 "$status" "a marked squad_lead home must get the same active auto-arm as the main primary"
+  [ -e "$dir/state/arm-ran" ] || fail "hook did not arm in a marked squad_lead home"
+  [ "$(epoch_outcome "$dir")" = rewake ] || fail "squad_lead epoch must record outcome=rewake"
+  pass "auto-arm: active in a marked squad_lead home"
 }
 
 test_long_poll_grace_reaches_arm_wrapper() {
@@ -1562,7 +1562,7 @@ test_host_boundary_rewakes_with_the_host_line() {
   write_host_fixture "$dir" boundary
   out=$(run_autoarm "$dir" 2>/dev/null); status=$?
   expect_code 2 "$status" "a host cycle boundary must rewake main"
-  assert_contains "$out" "firstmate watcher wake" "the host close must carry the wake banner"
+  assert_contains "$out" "juggernaut watcher wake" "the host close must carry the wake banner"
   assert_contains "$out" "supervision-host: cycle boundary - fixture" "the rewake must carry the host's line"
   [ ! -e "$dir/state/arm-ran" ] || fail "an opted-in home ran the plain arm instead of the host"
   [ "$(epoch_outcome "$dir")" = rewake ] || fail "a host boundary must record outcome=rewake, got: $(epoch_outcome "$dir")"
@@ -1617,7 +1617,7 @@ test_plain_arm_banner_keeps_its_wake_line_cap() {
   write_arm_fixture "$dir" actionable-many
   out=$(run_autoarm "$dir" 2>/dev/null)
   expected=$(
-    printf 'firstmate watcher wake - one supervision event needs a handling turn now.\n'
+    printf 'juggernaut watcher wake - one supervision event needs a handling turn now.\n'
     for i in 1 2 3 4 5 6 7 8; do printf 'stale: fixture-%s actionable\n' "$i"; done
     printf 'Run bin/jg-wake-drain.sh first, handle the wake, then run its exact WAKE_ACK_REQUIRED --ack-through command. Until that post-handling acknowledgement, interruption leaves the wake durable for idempotent re-handling. This Stop hook owns watcher continuity: when the handling turn ends, the next needed cycle arms automatically - do NOT run bin/jg-watch-arm.sh after an ordinary wake.\n'
   )
@@ -1855,7 +1855,7 @@ test_superseded_owner_never_reinvokes_the_arm
 test_superseded_owner_goes_silent_and_never_double_translates
 test_need_vanished_mid_cycle_closes_quietly
 test_afk_mid_cycle_suppresses_rewake
-test_active_in_marked_secondmate_home
+test_active_in_marked_squad_lead_home
 test_long_poll_grace_reaches_arm_wrapper
 test_host_off_flag_keeps_the_arm
 test_host_absent_flag_runs_the_host

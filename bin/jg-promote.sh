@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
-# Promote a scout task to a ship task in place: the crewmate keeps its window,
+# Promote a scout task to a ship task in place: the operator keeps its window,
 # worktree, and loaded context; only the contract changes. Flips kind= to ship in
 # state/<task-id>.meta so jg-teardown.sh applies the full ship-task teardown protection
-# again. Promotion also writes the crewmate's ship instructions to
+# again. Promotion also writes the operator's ship instructions to
 # data/<task-id>/ship-instructions.md, appends that same superseding contract to
 # data/<task-id>/brief.md for future relaunches, and prints the jg-send.sh command
 # that delivers it to the current worker. Those instructions carry the
@@ -15,21 +15,21 @@
 # delivery contract as a briefed one, including the no-mistakes mode's ask-user
 # escalation rule and --yes ban. The instructions also carry `# Task` with
 # `## Captain's intent` preserved from the scout brief and promotion's ship-time
-# instructions under `## Firstmate spec`; the scout-time spec remains context but
+# instructions under `## Juggernaut spec`; the scout-time spec remains context but
 # is not relabeled as the ship spec. Promotion refuses leftover `{TASK}` /
-# `{FIRSTMATE_SPEC}` placeholders and a `## Captain's intent` line opening with
+# `{JUGGERNAUT_SPEC}` placeholders and a `## Captain's intent` line opening with
 # a Captain label or address (bin/jg-dod-lib.sh). A pre-subsection scout
 # brief contributes only Task lines explicitly marked as captain words to intent,
 # read outside fenced blocks and indented examples so a quoted `Captain:` sample
 # never passes the provenance gate as the ask (bin/jg-dod-lib.sh).
 # A scout records no delivery posture, so promotion is where this task's delivery
 # contract is decided: --mode, --yolo, and the ship branch resolved from
-# --branch-prefix are written into the meta alongside the kind= flip. Firstmate resolves all three at promotion time, having just
+# --branch-prefix are written into the meta alongside the kind= flip. Juggernaut resolves all three at promotion time, having just
 # read the scout's report (AGENTS.md section 7); data/projects.md holds the
 # captain's standing posture as context, and this script never looks that posture
 # up. The registry IS read for one thing only: the project's forge binding, which
 # is a project fact rather than a per-task decision, so promotion takes it from
-# there instead of asking firstmate to remember it.
+# there instead of asking juggernaut to remember it.
 # no-mistakes-prod-only is a registry policy rather than a task mode and is refused.
 # A scout spawned on a named base records base_branch= in its meta; promotion
 # keeps that base as the ship's starting point and pull-request target, and
@@ -42,7 +42,7 @@
 # the refusal of a forge on local-only.
 # Usage: jg-promote.sh <task-id> --mode <no-mistakes|direct-PR|local-only> --yolo <on|off> [--branch-prefix <prefix>] [--upstream-consent <host>/<owner>/<repo>]
 # --upstream-consent records the captain's one-off approval for this task to
-# publish to firstmate's own upstream repository; promotion applies the same
+# publish to juggernaut's own upstream repository; promotion applies the same
 # self-repository publication gate as bin/jg-spawn.sh (bin/jg-role-lib.sh), so
 # a promoted scout cannot gain authority a fresh ship spawn would be refused.
 set -eu
@@ -68,10 +68,10 @@ CONFIG="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"
 . "$SCRIPT_DIR/jg-backlog-transition-lib.sh"
 # shellcheck source=bin/jg-public-followup-lib.sh
 . "$SCRIPT_DIR/jg-public-followup-lib.sh"
-# shellcheck source=bin/jg-secondmate-parent-lib.sh
-. "$SCRIPT_DIR/jg-secondmate-parent-lib.sh"
-# shellcheck source=bin/jg-secondmate-registry-lib.sh
-. "$SCRIPT_DIR/jg-secondmate-registry-lib.sh"
+# shellcheck source=bin/jg-squad-lead-parent-lib.sh
+. "$SCRIPT_DIR/jg-squad-lead-parent-lib.sh"
+# shellcheck source=bin/jg-squad-lead-registry-lib.sh
+. "$SCRIPT_DIR/jg-squad-lead-registry-lib.sh"
 
 MODE=
 YOLO=
@@ -152,7 +152,7 @@ fi
 refuse_impossible_forge_posture() {
   jg_forge_valid_for_mode "$FORGE" "$MODE" jg-promote.sh || return 1
   if [ "$FORGE" = gerrit ] && [ "$YOLO" = on ]; then
-    echo "error: --yolo on is refused for forge=gerrit: a Code-Review+2 is a positive attributed claim that a named human approved and firstmate must not manufacture one (captain's decision 2026-09-15); promote with --yolo off and take any landing on a current explicit captain instruction naming that concrete change" >&2
+    echo "error: --yolo on is refused for forge=gerrit: a Code-Review+2 is a positive attributed claim that a named human approved and juggernaut must not manufacture one (captain's decision 2026-09-15); promote with --yolo off and take any landing on a current explicit captain instruction naming that concrete change" >&2
     return 1
   fi
   return 0
@@ -213,7 +213,7 @@ grep -qx 'kind=scout' "$META" || { echo "error: task $ID is not a scout task (ki
 
 # Unlike the mode and yolo above, the forge is not a per-task decision: it is the
 # captain's project binding, so promotion takes it from the registry rather than
-# from a flag firstmate must remember.
+# from a flag juggernaut must remember.
 PROMOTE_PROJECT=$(sed -n 's/^project=//p' "$META" | head -n 1)
 if [ -n "$PROMOTE_PROJECT" ]; then
   PROMOTE_PROJECT_NAME=$(basename "$PROMOTE_PROJECT")
@@ -236,7 +236,7 @@ if [ "$MODE" != local-only ] && [ -n "$PROMOTE_PROJECT" ]; then
   0 | 2) ;;
   *)
     echo "error: promotion refused for $ID: $JG_ROLE_PUB_DENIAL" >&2
-    echo "error: to let this home publish to ${JG_ROLE_PUB_TARGET:-that repository}, write 'maintainer ${JG_ROLE_PUB_TARGET:-<host>/<owner>/<repo>}' into $CONFIG/firstmate-role (docs/configuration.md \"Firstmate role\"), or pass --upstream-consent ${JG_ROLE_PUB_TARGET:-<host>/<owner>/<repo>} for this one task with the captain's explicit approval" >&2
+    echo "error: to let this home publish to ${JG_ROLE_PUB_TARGET:-that repository}, write 'maintainer ${JG_ROLE_PUB_TARGET:-<host>/<owner>/<repo>}' into $CONFIG/juggernaut-role (docs/configuration.md \"Juggernaut role\"), or pass --upstream-consent ${JG_ROLE_PUB_TARGET:-<host>/<owner>/<repo>} for this one task with the captain's explicit approval" >&2
       exit 1
       ;;
   esac
@@ -251,11 +251,11 @@ PROMOTE_CONSENT_WORDS=
 
 SCOUT_BRIEF="$DATA/$ID/brief.md"
 if jg_brief_task_placeholders_present "$SCOUT_BRIEF"; then
-  echo "error: $SCOUT_BRIEF still contains {TASK} or {FIRSTMATE_SPEC}; preserve the original ask in ## Captain's intent and fill the scout-time ## Firstmate spec; promotion generates a separate ship-time spec" >&2
+  echo "error: $SCOUT_BRIEF still contains {TASK} or {JUGGERNAUT_SPEC}; preserve the original ask in ## Captain's intent and fill the scout-time ## Juggernaut spec; promotion generates a separate ship-time spec" >&2
   exit 1
 fi
 if ! jg_brief_task_content_valid "$SCOUT_BRIEF"; then
-  echo "error: $SCOUT_BRIEF must contain nonempty ## Captain's intent and ## Firstmate spec subsections (or a nonempty legacy # Task body) before promotion" >&2
+  echo "error: $SCOUT_BRIEF must contain nonempty ## Captain's intent and ## Juggernaut spec subsections (or a nonempty legacy # Task body) before promotion" >&2
   exit 1
 fi
 if ADDRESS_LINE=$(jg_brief_intent_address_line "$SCOUT_BRIEF"); then
@@ -285,12 +285,12 @@ if [ "$MODE" = no-mistakes ]; then
 fi
 IFS= read -r -d '' PROMOTION_SHIP_SPEC <<EOF || true
 If these promotion steps were already completed before a relaunch, preserve the existing \`$BRANCH_Q\` branch and continue from its current state; do not repeat them destructively.
-1. **Verify isolation before anything else.** Run \`pwd -P\` and \`git rev-parse --show-toplevel\`; both must resolve to the disposable task worktree you were launched in, such as a treehouse pool path or an Orca-managed worktree, not the primary checkout firstmate operates from. If either does not resolve to the worktree you were launched in, stop and escalate to firstmate.
+1. **Verify isolation before anything else.** Run \`pwd -P\` and \`git rev-parse --show-toplevel\`; both must resolve to the disposable task worktree you were launched in, such as a treehouse pool path or an Orca-managed worktree, not the primary checkout juggernaut operates from. If either does not resolve to the worktree you were launched in, stop and escalate to juggernaut.
 2. Inventory this worktree's scratch state with \`git status\` and \`git log\` before changing anything.
 3. Return to a clean $PROMOTE_BASE_WORDS, then create your branch: \`git checkout -b $BRANCH_Q --\`.
 4. Carry over only the intended fix changes. Leave scratch commits, debug edits, and experiment files behind.
 5. If you reproduced a bug, turn that reproduction into a regression test.
-6. Treat the scout-time Firstmate spec and any unmarked legacy \`# Task\` text as investigation context, not captain intent or current ship-time instructions.
+6. Treat the scout-time Juggernaut spec and any unmarked legacy \`# Task\` text as investigation context, not captain intent or current ship-time instructions.
 7. Everything else in your original instructions carries over unchanged: the status protocol; the instruction inbox and its acknowledgement; the escalation rules, including ask-user; and every safety rule, except where the current delivery contract below explicitly replaces scout-only delivery rules.
 EOF
 promote_delivery_contract() {
@@ -303,7 +303,7 @@ Any earlier "Never push" or scout-only delivery language in this file is superse
 This replaces the scout rule limiting outside-worktree writes to the report and status file.
 Keep project edits inside this worktree; keep proof and scratch output outside it, under \`$DATA/$ID/\` or a temporary directory.
 Outside the worktree, write only that task material and the status and steering-inbox records authorized below.
-Register disposable temporary directories outside the Firstmate home, repository, state and data directories with \`JG_HOME='$JG_HOME' JG_STATE_OVERRIDE='$STATE' JG_DATA_OVERRIDE='$DATA' '$JG_ROOT/bin/jg-scratch.sh' register $ID <dir>\` so cleanup reaps them; keep retained evidence under \`$DATA/$ID/\` unregistered.
+Register disposable temporary directories outside the Juggernaut home, repository, state and data directories with \`JG_HOME='$JG_HOME' JG_STATE_OVERRIDE='$STATE' JG_DATA_OVERRIDE='$DATA' '$JG_ROOT/bin/jg-scratch.sh' register $ID <dir>\` so cleanup reaps them; keep retained evidence under \`$DATA/$ID/\` unregistered.
 Leave the worktree clean before reporting done.
 The mode-specific Definition of done below is the current delivery contract.
 
@@ -330,7 +330,7 @@ EOF
   printf '%s\n' "$INTENT_BODY"
   cat <<EOF
 
-## Firstmate spec
+## Juggernaut spec
 $PROMOTION_SHIP_SPEC
 
 EOF
@@ -347,7 +347,7 @@ BRIEF_REPLACEMENT="$DATA/$ID/.brief.md.promote.${BASHPID:-$$}"
 {
   cat "$SCOUT_BRIEF"
   printf '\n\n'
-  printf '# Current ship Firstmate spec\n%s\n\n' "$PROMOTION_SHIP_SPEC"
+  printf '# Current ship Juggernaut spec\n%s\n\n' "$PROMOTION_SHIP_SPEC"
   promote_delivery_contract
 } > "$BRIEF_REPLACEMENT" || {
   echo "error: could not render the promoted brief for mode=$MODE" >&2
@@ -421,37 +421,37 @@ promote_canonical_home() {
 
 promote_resolve_primary_home() {
   local parent=$1 child=$2 mate_id=$3 parent_meta registry meta_home
-  jg_pf_home_id_valid "secondmate:$mate_id" || return 1
+  jg_pf_home_id_valid "squad_lead:$mate_id" || return 1
   parent=$(promote_canonical_home "$parent") || return 1
   child=$(promote_canonical_home "$child") || return 1
   [ "$parent" != "$child" ] || return 1
   parent_meta="$parent/state/$mate_id.meta"
   [ -f "$parent_meta" ] && [ ! -L "$parent_meta" ] || return 1
-  [ "$(fmx_meta_get "$parent_meta" kind)" = secondmate ] || return 1
+  [ "$(fmx_meta_get "$parent_meta" kind)" = squad_lead ] || return 1
   meta_home=$(fmx_meta_get "$parent_meta" home)
   meta_home=$(CDPATH='' cd -- "$meta_home" 2>/dev/null && pwd -P) || return 1
   [ "$meta_home" = "$child" ] || return 1
-  registry="$parent/data/secondmates.md"
-  secondmate_registry_validate_bindings "$registry" secondmate_registry_path_key \
+  registry="$parent/data/squad_leads.md"
+  squad_lead_registry_validate_bindings "$registry" squad_lead_registry_path_key \
     "$mate_id" "$child" || return 1
   printf '%s\n' "$parent"
 }
 
 promote_warn_parent_unresolved() {
-  echo "warning: could not resolve the consent-holding parent home for secondmate $1; promotion succeeded, but any open public loop must be inspected and rechained from the parent." >&2
+  echo "warning: could not resolve the consent-holding parent home for squad_lead $1; promotion succeeded, but any open public loop must be inspected and rechained from the parent." >&2
 }
 
-if [ -f "$JG_HOME/.jg-secondmate-home" ]; then
-  PROMOTE_MATE_ID=$(sed -n '1p' "$JG_HOME/.jg-secondmate-home" 2>/dev/null || true)
+if [ -f "$JG_HOME/.jg-squad-lead-home" ]; then
+  PROMOTE_MATE_ID=$(sed -n '1p' "$JG_HOME/.jg-squad-lead-home" 2>/dev/null || true)
   PROMOTE_PARENT_RECORD=absent
   PROMOTE_PARENT_ROUTE=
   PROMOTE_DURABLE_PARENT=
-  if [ -e "$JG_HOME/.jg-secondmate-parent" ] || [ -L "$JG_HOME/.jg-secondmate-parent" ]; then
+  if [ -e "$JG_HOME/.jg-squad-lead-parent" ] || [ -L "$JG_HOME/.jg-squad-lead-parent" ]; then
     PROMOTE_PARENT_RECORD=invalid
-    if jg_secondmate_parent_record_parse "$JG_HOME/.jg-secondmate-parent"; then
+    if jg_squad_lead_parent_record_parse "$JG_HOME/.jg-squad-lead-parent"; then
       PROMOTE_PARENT_RECORD=valid
-      PROMOTE_PARENT_ROUTE=$JG_SECONDMATE_PARENT_ROUTE
-      PROMOTE_DURABLE_PARENT=$JG_SECONDMATE_PARENT_HOME
+      PROMOTE_PARENT_ROUTE=$JG_SQUAD_LEAD_PARENT_ROUTE
+      PROMOTE_DURABLE_PARENT=$JG_SQUAD_LEAD_PARENT_HOME
     fi
   fi
   if [ "$PROMOTE_PARENT_RECORD" = invalid ]; then
@@ -473,7 +473,7 @@ if [ -f "$JG_HOME/.jg-secondmate-home" ]; then
         && PROMOTE_PARENT=$(promote_resolve_primary_home \
           "$PROMOTE_PARENT_CANDIDATE" "$JG_HOME" "$PROMOTE_MATE_ID"); then
       if jg_pf_relay_active "$PROMOTE_PARENT"; then
-        promote_print_rechain_hint "$PROMOTE_PARENT" "secondmate:$PROMOTE_MATE_ID" "$ID"
+        promote_print_rechain_hint "$PROMOTE_PARENT" "squad_lead:$PROMOTE_MATE_ID" "$ID"
       fi
     else
       promote_warn_parent_unresolved "$PROMOTE_MATE_ID"
@@ -490,7 +490,7 @@ if [ -f "$JG_HOME/.jg-secondmate-home" ]; then
     if jg_pf_relay_active "$JG_PUBLIC_FOLLOWUP_PRIMARY_HOME"; then
       if PROMOTE_PARENT=$(promote_resolve_primary_home \
           "$JG_PUBLIC_FOLLOWUP_PRIMARY_HOME" "$JG_HOME" "$PROMOTE_MATE_ID"); then
-        promote_print_rechain_hint "$PROMOTE_PARENT" "secondmate:$PROMOTE_MATE_ID" "$ID"
+        promote_print_rechain_hint "$PROMOTE_PARENT" "squad_lead:$PROMOTE_MATE_ID" "$ID"
       else
         promote_warn_parent_unresolved "$PROMOTE_MATE_ID"
       fi

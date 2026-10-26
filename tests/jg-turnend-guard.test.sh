@@ -220,19 +220,19 @@ make_primary_dir() {
   printf '%s\n' "$dir"
 }
 
-# Same shape as primary, plus the .jg-secondmate-home marker bin/jg-home-seed.sh
+# Same shape as primary, plus the .jg-squad-lead-home marker bin/jg-home-seed.sh
 # writes at seed time (regardless of treehouse-lease or git-clone acquisition).
-make_secondmate_dir() {
+make_squad_lead_dir() {
   local dir=$1
   make_primary_dir "$dir" >/dev/null
-  printf 'sm-test-1\n' > "$dir/.jg-secondmate-home"
+  printf 'sm-test-1\n' > "$dir/.jg-squad-lead-home"
   printf '%s\n' "$dir"
 }
 
 # A genuine linked `git worktree` of a base repo - the shape bin/jg-spawn.sh
-# always hands crewmate/scout tasks working on firstmate itself. git-dir and
+# always hands operator/scout tasks working on juggernaut itself. git-dir and
 # git-common-dir differ here, unlike a plain checkout.
-make_crewmate_worktree_dir() {
+make_operator_worktree_dir() {
   local base=$1 dir=$2
   jg_git_worktree "$base" "$dir" fm/turnend-guard-test-branch
   mkdir -p "$dir/state"
@@ -241,32 +241,32 @@ make_crewmate_worktree_dir() {
   printf '%s\n' "$dir"
 }
 
-# A secondmate home's OWN child crew/scout worktree: a genuine linked git
-# worktree of the secondmate home, so git-dir != git-common-dir exactly as for a
+# A squad_lead home's OWN child crew/scout worktree: a genuine linked git
+# worktree of the squad_lead home, so git-dir != git-common-dir exactly as for a
 # main-home child worktree. A child worktree never carries the gitignored
-# .jg-secondmate-home marker, so the marker force-include never fires for it and
+# .jg-squad-lead-home marker, so the marker force-include never fires for it and
 # it stays exempt through the linked-worktree git-dir test.
-make_secondmate_child_worktree_dir() {
+make_squad_lead_child_worktree_dir() {
   local home=$1 dir=$2
-  git -C "$home" worktree add --quiet -b fm/turnend-secondmate-child "$dir"
+  git -C "$home" worktree add --quiet -b fm/turnend-squad-lead-child "$dir"
   mkdir -p "$dir/state"
   : > "$dir/AGENTS.md"
   install_guard_scripts "$dir"
   printf '%s\n' "$dir"
 }
 
-# A treehouse-leased secondmate HOME: a genuine linked `git worktree` (git-dir !=
+# A treehouse-leased squad_lead HOME: a genuine linked `git worktree` (git-dir !=
 # git-common-dir, exactly like a default treehouse-leased home) that DOES carry a
-# valid .jg-secondmate-home marker. This is the production topology the plain
-# git-init secondmate fixture cannot represent; the guard must force-INCLUDE it
+# valid .jg-squad-lead-home marker. This is the production topology the plain
+# git-init squad_lead fixture cannot represent; the guard must force-INCLUDE it
 # as a guarded primary via the marker, not exempt it as a linked worktree.
-make_secondmate_linked_home_dir() {
+make_squad_lead_linked_home_dir() {
   local base=$1 dir=$2
-  jg_git_worktree "$base" "$dir" fm/turnend-secondmate-linked-home
+  jg_git_worktree "$base" "$dir" fm/turnend-squad-lead-linked-home
   mkdir -p "$dir/state"
   : > "$dir/AGENTS.md"
   install_guard_scripts "$dir"
-  printf 'sm-linked-1\n' > "$dir/.jg-secondmate-home"
+  printf 'sm-linked-1\n' > "$dir/.jg-squad-lead-home"
   printf '%s\n' "$dir"
 }
 
@@ -526,57 +526,57 @@ test_hook_loop_guard_allows_retry() {
   pass "jg-turnend-guard: stop_hook_active=true always allows the stop (never blocks twice in one turn)"
 }
 
-# A secondmate's OWN home runs a primary firstmate session and must be guarded
+# A squad_lead's OWN home runs a primary juggernaut session and must be guarded
 # exactly like the main primary. This was the guard's proven blind spot: the
-# .jg-secondmate-home marker used to early-exit here, so an overnight secondmate
+# .jg-squad-lead-home marker used to early-exit here, so an overnight squad_lead
 # could end a turn with an unsupervised child and sit blind. Removing that marker
 # check makes the guard fire, mirroring the cd-guard.
-test_hook_blocks_in_secondmate_own_home() {
+test_hook_blocks_in_squad_lead_own_home() {
   local dir out status
-  dir=$(make_secondmate_dir "$TMP_ROOT/hook-secondmate")
+  dir=$(make_squad_lead_dir "$TMP_ROOT/hook-squad-lead")
   : > "$dir/state/task1.meta"
   out=$(run_hook "$dir" false); status=$?
-  expect_code 2 "$status" "hook must guard a secondmate's own home like the main primary when unhealthy"
+  expect_code 2 "$status" "hook must guard a squad_lead's own home like the main primary when unhealthy"
   assert_contains "$out" "$REQUIRED_REASON" "block reason must contain the exact required instruction"
   assert_contains "$out" "TURN WOULD END BLIND" "block banner must read as an alarm"
-  pass "jg-turnend-guard: blocks a blind turn end in a secondmate's own home (.jg-secondmate-home no longer excludes it)"
+  pass "jg-turnend-guard: blocks a blind turn end in a squad_lead's own home (.jg-squad-lead-home no longer excludes it)"
 }
 
-# Idle-by-default: an empty-queue secondmate has no in-flight meta, so the guard
+# Idle-by-default: an empty-queue squad_lead has no in-flight meta, so the guard
 # exits at the in-flight gate - never forcing a busy continuation loop.
-test_hook_silent_in_idle_secondmate_home() {
+test_hook_silent_in_idle_squad_lead_home() {
   local dir out status
-  dir=$(make_secondmate_dir "$TMP_ROOT/hook-secondmate-idle")
+  dir=$(make_squad_lead_dir "$TMP_ROOT/hook-squad-lead-idle")
   out=$(run_hook "$dir" false); status=$?
-  expect_code 0 "$status" "hook must stay silent in an idle, empty-queue secondmate home"
-  [ -z "$out" ] || fail "idle secondmate home produced guard output: $out"
-  pass "jg-turnend-guard: idle-by-default - silent in a secondmate home with nothing in flight"
+  expect_code 0 "$status" "hook must stay silent in an idle, empty-queue squad_lead home"
+  [ -z "$out" ] || fail "idle squad_lead home produced guard output: $out"
+  pass "jg-turnend-guard: idle-by-default - silent in a squad_lead home with nothing in flight"
 }
 
-# The stop_hook_active loop guard bounds the secondmate to one forced
+# The stop_hook_active loop guard bounds the squad_lead to one forced
 # continuation per turn, exactly as it does for the main primary - no wedged,
 # un-endable session.
-test_hook_secondmate_loop_guard_allows_retry() {
+test_hook_squad_lead_loop_guard_allows_retry() {
   local dir out status
-  dir=$(make_secondmate_dir "$TMP_ROOT/hook-secondmate-loopguard")
+  dir=$(make_squad_lead_dir "$TMP_ROOT/hook-squad-lead-loopguard")
   : > "$dir/state/task1.meta"
   out=$(run_hook "$dir" true); status=$?
-  expect_code 0 "$status" "hook must allow the stop in a secondmate home when stop_hook_active is already true"
-  [ -z "$out" ] || fail "secondmate loop-guarded retry produced output: $out"
-  pass "jg-turnend-guard: stop_hook_active=true allows the stop in a secondmate home (never blocks twice in one turn)"
+  expect_code 0 "$status" "hook must allow the stop in a squad_lead home when stop_hook_active is already true"
+  [ -z "$out" ] || fail "squad_lead loop-guarded retry produced output: $out"
+  pass "jg-turnend-guard: stop_hook_active=true allows the stop in a squad_lead home (never blocks twice in one turn)"
 }
 
-# The guard's half of the deferred-death recovery loop in a secondmate home,
+# The guard's half of the deferred-death recovery loop in a squad_lead home,
 # proven deterministically without a live model or any daemon: silent while the
-# watcher is live (the secondmate ends its turn and relies on the background
+# watcher is live (the squad_lead ends its turn and relies on the background
 # re-invoke), then blocks to force the re-arm once the watcher has exited and a
 # second child event lands. The live half - that Claude Code autonomously
 # re-invokes the model when the background watcher exits (Mechanism A) - is a
 # harness property recorded empirically in docs/turnend-guard.md; it needs a live
 # session and cannot be a hermetic CI assertion.
-test_hook_secondmate_reinvoke_recovery_loop() {
+test_hook_squad_lead_reinvoke_recovery_loop() {
   local dir pid identity out status
-  dir=$(make_secondmate_dir "$TMP_ROOT/hook-secondmate-reinvoke")
+  dir=$(make_squad_lead_dir "$TMP_ROOT/hook-squad-lead-reinvoke")
   : > "$dir/state/child1.meta"
   sleep 60 &
   pid=$!
@@ -588,14 +588,14 @@ test_hook_secondmate_reinvoke_recovery_loop() {
   record_watcher_lock "$dir" "$pid" "$identity"
   touch "$dir/state/.last-watcher-beat"
   out=$(run_hook "$dir" false); status=$?
-  expect_code 0 "$status" "secondmate turn must end silently while its watcher is live (Stop #1)"
+  expect_code 0 "$status" "squad_lead turn must end silently while its watcher is live (Stop #1)"
   [ -z "$out" ] || {
     kill "$pid" 2>/dev/null || true
     wait "$pid" 2>/dev/null || true
-    fail "guard nagged a healthy secondmate at Stop #1: $out"
+    fail "guard nagged a healthy squad_lead at Stop #1: $out"
   }
   # The watcher exits on the wake (its normal lifecycle) and a SECOND child event
-  # lands. On the re-invoked recovery turn the secondmate must re-arm; if it did
+  # lands. On the re-invoked recovery turn the squad_lead must re-arm; if it did
   # not, the guard blocks that turn's end and forces the re-arm (Stop #2).
   kill "$pid" 2>/dev/null || true
   wait "$pid" 2>/dev/null || true
@@ -603,46 +603,46 @@ test_hook_secondmate_reinvoke_recovery_loop() {
   : > "$dir/state/child2.meta"
   touch "$dir/state/.last-watcher-beat"
   out=$(run_hook "$dir" false); status=$?
-  expect_code 2 "$status" "secondmate recovery turn must not end blind after the watcher exits (Stop #2)"
+  expect_code 2 "$status" "squad_lead recovery turn must not end blind after the watcher exits (Stop #2)"
   assert_contains "$out" "$REQUIRED_REASON" "block reason must contain the exact required instruction"
-  pass "jg-turnend-guard: secondmate deferred-death recovery - silent while watched, forces re-arm once the watcher exits"
+  pass "jg-turnend-guard: squad_lead deferred-death recovery - silent while watched, forces re-arm once the watcher exits"
 }
 
-# The marker force-include must guard only the secondmate's OWN home, never its
-# children: a secondmate's linked crew/scout worktree carries no marker, so it
+# The marker force-include must guard only the squad_lead's OWN home, never its
+# children: a squad_lead's linked crew/scout worktree carries no marker, so it
 # stays exempt by the same git-dir/git-common-dir test that exempts the main
 # home's children.
-test_hook_silent_in_secondmate_child_worktree() {
+test_hook_silent_in_squad_lead_child_worktree() {
   local home dir out status
-  home=$(make_secondmate_dir "$TMP_ROOT/hook-sm-child-home")
+  home=$(make_squad_lead_dir "$TMP_ROOT/hook-sm-child-home")
   dir="$TMP_ROOT/hook-sm-child-wt"
-  make_secondmate_child_worktree_dir "$home" "$dir" >/dev/null
+  make_squad_lead_child_worktree_dir "$home" "$dir" >/dev/null
   : > "$dir/state/task1.meta"
   out=$(run_hook "$dir" false); status=$?
-  expect_code 0 "$status" "hook must stay exempt in a secondmate's own child crew/scout worktree"
-  [ -z "$out" ] || fail "hook produced output inside a secondmate's child worktree: $out"
-  pass "jg-turnend-guard: inert in a secondmate's own child worktree (linked git worktree) even when unhealthy"
+  expect_code 0 "$status" "hook must stay exempt in a squad_lead's own child crew/scout worktree"
+  [ -z "$out" ] || fail "hook produced output inside a squad_lead's child worktree: $out"
+  pass "jg-turnend-guard: inert in a squad_lead's own child worktree (linked git worktree) even when unhealthy"
 }
 
-# THE regression the plain git-init fixtures masked: a treehouse-leased secondmate
+# THE regression the plain git-init fixtures masked: a treehouse-leased squad_lead
 # home is a genuine LINKED worktree (git-dir != git-common-dir), which the
 # remove-only form wrongly exempted. With the marker force-include, its own
 # primary session is GUARDED. The test asserts the fixture really is a linked
 # worktree so it can never silently regress back into a plain-checkout shape.
-test_hook_blocks_in_treehouse_leased_secondmate_home() {
+test_hook_blocks_in_treehouse_leased_squad_lead_home() {
   local base dir gd gcd out status
   base="$TMP_ROOT/hook-sm-leased-base"
   dir="$TMP_ROOT/hook-sm-leased-home"
-  make_secondmate_linked_home_dir "$base" "$dir" >/dev/null
+  make_squad_lead_linked_home_dir "$base" "$dir" >/dev/null
   gd=$(git -C "$dir" rev-parse --git-dir)
   gcd=$(git -C "$dir" rev-parse --git-common-dir)
   [ "$gd" != "$gcd" ] || fail "leased-home fixture must be a linked worktree (git-dir != git-common-dir), got equal: $gd"
   : > "$dir/state/task1.meta"
   out=$(run_hook "$dir" false); status=$?
-  expect_code 2 "$status" "hook must GUARD a treehouse-leased (linked) secondmate home via its marker when unhealthy"
+  expect_code 2 "$status" "hook must GUARD a treehouse-leased (linked) squad_lead home via its marker when unhealthy"
   assert_contains "$out" "$REQUIRED_REASON" "block reason must contain the exact required instruction"
   assert_contains "$out" "TURN WOULD END BLIND" "block banner must read as an alarm"
-  pass "jg-turnend-guard: blocks a blind turn end in a treehouse-leased LINKED secondmate home (marker force-include)"
+  pass "jg-turnend-guard: blocks a blind turn end in a treehouse-leased LINKED squad_lead home (marker force-include)"
 }
 
 # Anti-spoof: a linked worktree with an INVALID (empty) marker must NOT be
@@ -653,8 +653,8 @@ test_hook_exempts_linked_worktree_with_stray_marker() {
   local base dir out status
   base="$TMP_ROOT/hook-stray-marker-base"
   dir="$TMP_ROOT/hook-stray-marker-wt"
-  make_crewmate_worktree_dir "$base" "$dir" >/dev/null
-  : > "$dir/.jg-secondmate-home"
+  make_operator_worktree_dir "$base" "$dir" >/dev/null
+  : > "$dir/.jg-squad-lead-home"
   : > "$dir/state/task1.meta"
   out=$(run_hook "$dir" false); status=$?
   expect_code 0 "$status" "an empty/invalid marker must not spoof force-inclusion in a linked worktree"
@@ -670,8 +670,8 @@ test_hook_exempts_linked_worktree_with_non_ascii_marker() {
   local base dir out status
   base="$TMP_ROOT/hook-nonascii-marker-base"
   dir="$TMP_ROOT/hook-nonascii-marker-wt"
-  make_crewmate_worktree_dir "$base" "$dir" >/dev/null
-  printf 'caf\xc3\xa9\n' > "$dir/.jg-secondmate-home"
+  make_operator_worktree_dir "$base" "$dir" >/dev/null
+  printf 'caf\xc3\xa9\n' > "$dir/.jg-squad-lead-home"
   : > "$dir/state/task1.meta"
   out=$(run_hook "$dir" false); status=$?
   expect_code 0 "$status" "a non-ASCII marker id must not spoof force-inclusion in a linked worktree"
@@ -679,16 +679,16 @@ test_hook_exempts_linked_worktree_with_non_ascii_marker() {
   pass "jg-turnend-guard: a non-ASCII marker cannot spoof inclusion; linked worktree stays exempt"
 }
 
-test_hook_silent_in_crewmate_worktree() {
+test_hook_silent_in_operator_worktree() {
   local base dir out status
   base="$TMP_ROOT/hook-crew-base"
   dir="$TMP_ROOT/hook-crew-wt"
-  make_crewmate_worktree_dir "$base" "$dir" >/dev/null
+  make_operator_worktree_dir "$base" "$dir" >/dev/null
   : > "$dir/state/task1.meta"
   out=$(run_hook "$dir" false); status=$?
-  expect_code 0 "$status" "hook must never block inside a crewmate task worktree"
-  [ -z "$out" ] || fail "hook produced output inside a crewmate task worktree: $out"
-  pass "jg-turnend-guard: inert in a crewmate/scout task worktree (linked git worktree) even when unhealthy"
+  expect_code 0 "$status" "hook must never block inside a operator task worktree"
+  [ -z "$out" ] || fail "hook produced output inside a operator task worktree: $out"
+  pass "jg-turnend-guard: inert in a operator/scout task worktree (linked git worktree) even when unhealthy"
 }
 
 test_hook_silent_without_jq() {
@@ -755,7 +755,7 @@ EOF
   assert_contains "$(cat "$log")" '<session-test>' "grok adapter must pass the hook session id"
   assert_not_contains "$(cat "$log")" '<--permission-mode>' "grok adapter must not add a stronger permission mode"
   assert_not_contains "$(cat "$log")" '<bypassPermissions>' "grok adapter must not bypass permissions on forced resume"
-  assert_contains "$(cat "$log")" 'FIRSTMATE_OP: v1 turn-end-guard: TURN WOULD END BLIND' "grok adapter must retain the typed guard kind"
+  assert_contains "$(cat "$log")" 'JUGGERNAUT_OP: v1 turn-end-guard: TURN WOULD END BLIND' "grok adapter must retain the typed guard kind"
   pass "jg-turnend-guard-grok: forces one explicitly marked same-session resume when the shared predicate blocks"
 }
 
@@ -959,7 +959,7 @@ EOF
   chmod +x "$dir/bin/jg-turnend-guard.sh"
   payload=$(jq -cn --arg cwd "$outside" '{cwd:$cwd,stop_hook_active:false}')
   out=$(printf '%s' "$payload" | (cd "$dir" && bash -c "$command") 2>&1); status=$?
-  expect_code 0 "$status" "codex hook must execute successfully when payload cwd is outside the firstmate root"
+  expect_code 0 "$status" "codex hook must execute successfully when payload cwd is outside the juggernaut root"
   assert_contains "$out" "guard=$expected_root/bin/jg-turnend-guard.sh" "codex hook must use the hook process root"
   assert_contains "$out" "$payload" "codex hook must pass the original payload to the guard"
   pass ".codex/hooks.json: Stop hook uses hook process root when payload cwd is outside"
@@ -998,7 +998,7 @@ EOF
   payload=$(jq -cn --arg cwd "$subdir" '{cwd:$cwd,stop_hook_active:false}')
   out=$(printf '%s' "$payload" | (cd "$dir" && bash -c "$command") 2>&1); status=$?
   expect_code 0 "$status" "codex hook must not execute a nested project guard"
-  assert_contains "$out" "guard=$expected_root/bin/jg-turnend-guard.sh" "codex hook must keep using the outer firstmate guard"
+  assert_contains "$out" "guard=$expected_root/bin/jg-turnend-guard.sh" "codex hook must keep using the outer juggernaut guard"
   assert_not_contains "$out" "nested guard executed" "codex hook must not execute nested project code"
   pass ".codex/hooks.json: Stop hook ignores nested git root guard scripts"
 }
@@ -1038,7 +1038,7 @@ const hooks = await mod.FmPrimaryTurnendGuard({
   worktree: process.env.WORKTREE,
 });
 await hooks.event({ event: { type: "session.idle", properties: { sessionID: "session-test" } } });
-if (!promptBody.startsWith("\u2063FIRSTMATE_OP: v1 turn-end-guard: ")) {
+if (!promptBody.startsWith("\u2063JUGGERNAUT_OP: v1 turn-end-guard: ")) {
   console.error(`untyped operational prompt: ${promptBody}`);
   process.exit(1);
 }
@@ -1096,7 +1096,7 @@ const pi = {
   },
   async sendUserMessage(message, options) {
     prompts += 1;
-    if (!message.startsWith("\u2063FIRSTMATE_OP: v1 turn-end-guard: ")) throw new Error(`untyped operational prompt: ${message}`);
+    if (!message.startsWith("\u2063JUGGERNAUT_OP: v1 turn-end-guard: ")) throw new Error(`untyped operational prompt: ${message}`);
     if (!message.includes("TURN WOULD END BLIND")) throw new Error(`unexpected prompt: ${message}`);
     if (!message.includes("watcher cycle is missing, failed, or unhealthy")) throw new Error(`guard prompt omitted recovery-only state: ${message}`);
     if (message.includes("Resume supervision according to the session-start operating block")) throw new Error(`guard prompt used ordinary continuity: ${message}`);
@@ -1342,7 +1342,7 @@ test_hook_claude_mode_repeated_failed_to_arming_interleavings_reach_fail_open() 
 
   out=$(run_hook_claude "$dir" true); status=$?
   expect_code 0 "$status" "repeated failed-to-arming interleavings must reach terminal fail-open"
-  assert_contains "$out" 'FIRSTMATE SUPERVISION IS GENUINELY DOWN' "arming interleavings stalled before the bounded fail-open"
+  assert_contains "$out" 'JUGGERNAUT SUPERVISION IS GENUINELY DOWN' "arming interleavings stalled before the bounded fail-open"
   assert_present "$dir/state/.claude-autoarm-failure-alarmed" "arming interleavings did not consume the one-time alarm"
   pass "jg-turnend-guard --claude: repeated failed-to-arming races make bounded monotonic progress"
 }
@@ -1395,7 +1395,7 @@ SH
   [ -z "$auto_out" ] || fail "excluded terminal-window owner produced output: $auto_out"
   assert_absent "$dir/state/arm-ran" "excluded terminal-window owner started an arm cycle"
   expect_code 0 "$(cat "$guard_status")" "terminal boundary guard must complete without deadlock"
-  assert_contains "$(cat "$guard_out")" 'FIRSTMATE SUPERVISION IS GENUINELY DOWN' "terminal boundary did not produce the one-time alarm"
+  assert_contains "$(cat "$guard_out")" 'JUGGERNAUT SUPERVISION IS GENUINELY DOWN' "terminal boundary did not produce the one-time alarm"
   assert_absent "$dir/state/.claude-autoarm.lock" "terminal boundary left its owner lock behind"
   pass "jg-turnend-guard --claude: terminal owner boundary excludes a concurrent start without deadlock"
 }
@@ -1553,7 +1553,7 @@ test_hook_claude_mode_terminal_fail_open_clears_abandoned_claim() {
   kill "$pid" 2>/dev/null || true
   wait "$pid" 2>/dev/null || true
   expect_code 0 "$status" "the verified attended fail-open still ends the turn once it is spent"
-  assert_contains "$out" 'FIRSTMATE SUPERVISION IS GENUINELY DOWN' "an abandoned claim suppressed the episode's attended alarm"
+  assert_contains "$out" 'JUGGERNAUT SUPERVISION IS GENUINELY DOWN' "an abandoned claim suppressed the episode's attended alarm"
   assert_present "$dir/state/.claude-autoarm-failure-alarmed" "abandoned-claim terminal path did not consume the one-time alarm"
   assert_absent "$dir/state/.claude-autoarm.lock" "abandoned-claim terminal path left the stale claim in place"
   assert_absent "$dir/state/.claude-autoarm.lock.steal" "abandoned-claim reclaim left its serialization mutex behind"
@@ -1603,10 +1603,10 @@ test_hook_claude_mode_integrated_monotonic_fail_open() {
     guard_out=$(JG_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" true); guard_status=$?
     if [ "$i" -lt 4 ]; then
       expect_code 2 "$guard_status" "failed epoch $i must consume a bounded blind-stop block"
-      assert_not_contains "$guard_out" 'FIRSTMATE SUPERVISION IS GENUINELY DOWN' "fail-open fired before the bounded progression ended"
+      assert_not_contains "$guard_out" 'JUGGERNAUT SUPERVISION IS GENUINELY DOWN' "fail-open fired before the bounded progression ended"
     else
       expect_code 0 "$guard_status" "the bounded failure progression must reach the attended fail-open"
-      assert_contains "$guard_out" 'FIRSTMATE SUPERVISION IS GENUINELY DOWN' "the integrated fail-open alarm is missing"
+      assert_contains "$guard_out" 'JUGGERNAUT SUPERVISION IS GENUINELY DOWN' "the integrated fail-open alarm is missing"
       assert_present "$dir/state/.claude-autoarm-failure-alarmed" "the integrated fail-open did not consume its episode alarm"
     fi
   done
@@ -1616,7 +1616,7 @@ test_hook_claude_mode_integrated_monotonic_fail_open() {
   [ -z "$out" ] || fail "post-fail-open auto-arm produced continuation output: $out"
   guard_out=$(JG_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" true); guard_status=$?
   expect_code 2 "$guard_status" "a later unhealthy stop in the same episode must remain attended"
-  assert_not_contains "$guard_out" 'FIRSTMATE SUPERVISION IS GENUINELY DOWN' "the attended alarm repeated in the same episode"
+  assert_not_contains "$guard_out" 'JUGGERNAUT SUPERVISION IS GENUINELY DOWN' "the attended alarm repeated in the same episode"
 
   sleep 60 &
   pid=$!
@@ -1678,18 +1678,18 @@ test_hook_claude_mode_frozen_epoch_reaches_bounded_fail_open() {
     if [ "$i" -lt 4 ]; then
       expect_code 2 "$guard_status" "frozen-epoch stop $i must still re-block within the budget"
       assert_contains "$guard_out" "TURN WOULD END BLIND" "frozen-epoch re-block $i lost the blind-turn banner"
-      assert_not_contains "$guard_out" 'FIRSTMATE SUPERVISION IS GENUINELY DOWN' "fail-open fired before the frozen-epoch budget was spent"
+      assert_not_contains "$guard_out" 'JUGGERNAUT SUPERVISION IS GENUINELY DOWN' "fail-open fired before the frozen-epoch budget was spent"
       assert_absent "$dir/state/.claude-autoarm-failure-alarmed" "frozen-epoch re-block $i consumed the attended alarm early"
     else
       expect_code 0 "$guard_status" "the frozen-epoch progression must reach the attended fail-open"
-      assert_contains "$guard_out" 'FIRSTMATE SUPERVISION IS GENUINELY DOWN' "the frozen-epoch fail-open alarm is missing"
+      assert_contains "$guard_out" 'JUGGERNAUT SUPERVISION IS GENUINELY DOWN' "the frozen-epoch fail-open alarm is missing"
       assert_present "$dir/state/.claude-autoarm-failure-alarmed" "the frozen-epoch fail-open did not consume its episode alarm"
     fi
   done
 
   guard_out=$(JG_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" true); guard_status=$?
   expect_code 2 "$guard_status" "a later unhealthy stop after the frozen-epoch alarm must remain attended"
-  assert_not_contains "$guard_out" 'FIRSTMATE SUPERVISION IS GENUINELY DOWN' "the attended alarm repeated against the frozen epoch"
+  assert_not_contains "$guard_out" 'JUGGERNAUT SUPERVISION IS GENUINELY DOWN' "the attended alarm repeated against the frozen epoch"
 
   # The other direction: the bound must not outlive the failure. A verified
   # healthy watcher still lets the stop through and clears the whole episode.
@@ -1844,14 +1844,14 @@ test_hook_claude_mode_verified_failure_alarm_is_loud_and_once() {
   seed_claude_budget "$dir" 3
   out=$(JG_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" true); status=$?
   expect_code 0 "$status" "verified failure with exhausted budget must take the bounded attended fail-open"
-  assert_contains "$out" 'FIRSTMATE SUPERVISION IS GENUINELY DOWN' "bounded fail-open alarm was not unmistakable"
+  assert_contains "$out" 'JUGGERNAUT SUPERVISION IS GENUINELY DOWN' "bounded fail-open alarm was not unmistakable"
   assert_contains "$out" 'Keep this session attended' "bounded fail-open alarm omitted the attended-session action"
   assert_contains "$out" 'diagnose the automatic Stop-hook and watcher startup' "bounded fail-open alarm omitted automatic-mechanism diagnosis"
   assert_not_contains "$out" 'jg-watch-arm.sh' "bounded fail-open alarm assigned a manual watcher launch"
   assert_present "$dir/state/.claude-autoarm-failure-alarmed" "bounded fail-open did not consume the episode alarm"
   out2=$(JG_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" true); status2=$?
   expect_code 2 "$status2" "a consumed attended alarm must make later unhealthy stops block again"
-  assert_not_contains "$out2" 'FIRSTMATE SUPERVISION IS GENUINELY DOWN' "attended failure alarm repeated in one episode"
+  assert_not_contains "$out2" 'JUGGERNAUT SUPERVISION IS GENUINELY DOWN' "attended failure alarm repeated in one episode"
   pass "jg-turnend-guard --claude: verified fail-open is loud, bounded, attended, and non-repeating"
 }
 
@@ -1941,21 +1941,21 @@ test_hook_claude_mode_waits_for_late_claim() {
   pass "jg-turnend-guard --claude: bounded claim wait avoids a token-consuming forced continuation"
 }
 
-test_hook_claude_mode_secondmate_reblocks_like_primary() {
+test_hook_claude_mode_squad_lead_reblocks_like_primary() {
   local dir pid out status
-  dir=$(make_secondmate_dir "$TMP_ROOT/hook-claude-sm-reblock")
+  dir=$(make_squad_lead_dir "$TMP_ROOT/hook-claude-sm-reblock")
   : > "$dir/state/task1.meta"
   out=$(JG_CLAUDE_AUTOARM_SYNC_WAIT_MS=200 run_hook_claude "$dir" true); status=$?
-  expect_code 2 "$status" "--claude mode must re-block in a marked secondmate home exactly like the main primary"
-  assert_contains "$out" "TURN WOULD END BLIND" "--claude secondmate re-block must carry the blind-turn banner"
+  expect_code 2 "$status" "--claude mode must re-block in a marked squad_lead home exactly like the main primary"
+  assert_contains "$out" "TURN WOULD END BLIND" "--claude squad_lead re-block must carry the blind-turn banner"
   sleep 60 &
   pid=$!
   record_autoarm_owner "$dir" "$pid"
   out=$(run_hook_claude "$dir" false); status=$?
   kill "$pid" 2>/dev/null || true
   wait "$pid" 2>/dev/null || true
-  expect_code 0 "$status" "--claude mode must allow a claimed secondmate home"
-  pass "jg-turnend-guard --claude: secondmate home re-blocks unclaimed and allows auto-arm-claimed stops"
+  expect_code 0 "$status" "--claude mode must allow a claimed squad_lead home"
+  pass "jg-turnend-guard --claude: squad_lead home re-blocks unclaimed and allows auto-arm-claimed stops"
 }
 
 # --- AWAY MODE: the daemon owns supervision ----------------------------------
@@ -2224,15 +2224,15 @@ test_hook_registered_check_only_blocks_with_check_banner
 test_hook_ignores_repo_state_when_jg_home_set
 test_hook_uses_state_override
 test_hook_loop_guard_allows_retry
-test_hook_blocks_in_secondmate_own_home
-test_hook_silent_in_idle_secondmate_home
-test_hook_secondmate_loop_guard_allows_retry
-test_hook_secondmate_reinvoke_recovery_loop
-test_hook_silent_in_secondmate_child_worktree
-test_hook_blocks_in_treehouse_leased_secondmate_home
+test_hook_blocks_in_squad_lead_own_home
+test_hook_silent_in_idle_squad_lead_home
+test_hook_squad_lead_loop_guard_allows_retry
+test_hook_squad_lead_reinvoke_recovery_loop
+test_hook_silent_in_squad_lead_child_worktree
+test_hook_blocks_in_treehouse_leased_squad_lead_home
 test_hook_exempts_linked_worktree_with_stray_marker
 test_hook_exempts_linked_worktree_with_non_ascii_marker
-test_hook_silent_in_crewmate_worktree
+test_hook_silent_in_operator_worktree
 test_hook_silent_without_jq
 test_hook_silent_without_stdin
 test_hook_runs_fast
@@ -2274,7 +2274,7 @@ test_hook_claude_mode_fail_open_requires_notice_and_failure_epoch
 test_hook_claude_mode_away_mode_never_uses_stop_autoarm_fail_open
 test_hook_claude_mode_allow_resets_budget
 test_hook_claude_mode_waits_for_late_claim
-test_hook_claude_mode_secondmate_reblocks_like_primary
+test_hook_claude_mode_squad_lead_reblocks_like_primary
 test_hook_away_daemon_allows_between_watcher_cycles
 test_hook_away_daemon_allows_over_dead_watcher_lock
 test_hook_away_mode_blocks_without_any_supervisor

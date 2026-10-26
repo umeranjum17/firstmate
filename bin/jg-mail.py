@@ -12,7 +12,7 @@
 #
 # All configuration arrives through the environment, never through arguments,
 # so credentials never appear in argv or logs. read/poll use BODY.PEEK so mail
-# is never marked seen before firstmate answers it.
+# is never marked seen before juggernaut answers it.
 import imaplib
 import os
 import re

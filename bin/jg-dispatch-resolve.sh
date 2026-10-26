@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
-# jg-dispatch-resolve.sh - resolve one concrete crewmate or scout dispatch
+# jg-dispatch-resolve.sh - resolve one concrete operator or scout dispatch
 # profile from a task brief with typesafe.ai's System One model (Jev), opt-in.
 #
 # Usage:
@@ -11,13 +11,13 @@
 #   TYPESAFE_API_KEY= line in $JG_HOME/.env read with fmx_env_get, the same
 #   accessor as FMX_PAIRING_TOKEN (bin/jg-env-lib.sh). The environment wins.
 #   Absent in both: one "dispatch-resolve: off" line on stderr, nothing on
-#   stdout, exit 0, no network call, so firstmate dispatches exactly as today.
+#   stdout, exit 0, no network call, so juggernaut dispatches exactly as today.
 #   The key lives in one shell variable and reaches curl as a header read from
 #   a file descriptor, never on argv; nothing logs or writes it.
 #
 # What it does when on with at least one rule: one POST to
 #   https://api.typesafe.ai/v1/systemone with the project name and the brief's
-#   `## Captain's intent` and `## Firstmate spec` sections, tagged when it is a
+#   `## Captain's intent` and `## Juggernaut spec` sections, tagged when it is a
 #   scout brief (the whole brief when it has neither section), as state and
 #   ONE Choice question whose options are every rule's `when` from
 #   config/crew-dispatch.json plus one fixed generic none option. Jev returns
@@ -33,7 +33,7 @@
 #   candidate is unmeasured, never blocked), and the spendPriority argmax over
 #   the eligible candidates. The model never sees quota, catalogs, approvals,
 #   confidence floors, `why`, or `use`. With no rules, it returns a non-clear
-#   result so firstmate keeps using the existing intake.
+#   result so juggernaut keeps using the existing intake.
 #   docs/configuration.md "Crew dispatch profiles" owns the declared fields and
 #   "Typed dispatch resolution" owns this tool's operator contract.
 #
@@ -67,7 +67,7 @@
 # Environment:
 #   TYPESAFE_API_KEY is the only resolver-specific environment setting.
 #
-# Authority: this tool never replaces firstmate's judgment, quota-array-dispatch,
+# Authority: this tool never replaces juggernaut's judgment, quota-array-dispatch,
 #   the captain-approval gate, or jg-spawn.sh validation; it publishes one
 #   inspectable answer plus every candidate's evidence, in code.
 set -u
@@ -295,7 +295,7 @@ brief_kind() {
 }
 task_sections() {
   local heading
-  for heading in "## Captain's intent" "## Firstmate spec"; do
+  for heading in "## Captain's intent" "## Juggernaut spec"; do
     jg_brief_task_heading_present "$BRIEF" "$heading" || continue
     printf '%s\n%s\n\n' "$heading" "$(jg_brief_task_heading_body "$BRIEF" "$heading")"
   done

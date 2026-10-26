@@ -87,7 +87,7 @@ cat > "$HOME_DIR/data/hsmoke/brief.md" <<'EOF'
 ## Captain's intent
 Exercise Herdr lifecycle control safely.
 
-## Firstmate spec
+## Juggernaut spec
 Keep the isolated endpoint and worktree intact.
 EOF
 
@@ -98,7 +98,7 @@ mkdir -p "$PROJ"
 git -C "$PROJ" init -q
 printf '# proj\n' > "$PROJ/README.md"
 git -C "$PROJ" add README.md
-git -C "$PROJ" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm initial
+git -C "$PROJ" -c user.name='Juggernaut Tests' -c user.email='tests@example.invalid' commit -qm initial
 git -C "$PROJ" worktree add --quiet -b hsmoke "$WT"
 PROJ_REAL=$(cd "$PROJ" && pwd -P)
 WT_REAL=$(cd "$WT" && pwd -P)

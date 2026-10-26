@@ -3,7 +3,7 @@
 #
 # Bootstrap prints one block or line per actionable problem, optional verbose
 # BOOTSTRAP_INFO fact, or completed bootstrap no-action fact and is silent when
-# all is well. firstmate consumes the exact 'MISSING: treehouse (install: ...)',
+# all is well. juggernaut consumes the exact 'MISSING: treehouse (install: ...)',
 # 'MISSING: tasks-axi (install: ...)', 'MISSING: quota-axi (install: ...)',
 # 'MISSING: gh-axi (install: ...)', 'PRESENTATION_UNAVAILABLE: lavish-axi ...', and
 # 'BOOTSTRAP_INFO: ...' lines, so those contracts are pinned verbatim. The cases
@@ -675,7 +675,7 @@ SH
   unit="$case_dir/escaped.service"
   JG_HOME="$special_home" PATH="$special_home/bin:$BASE_PATH" \
     "$case_dir/code % root/bin/jg-sentinel.sh" unit > "$unit" || fail "unit generation failed"
-  grep -Fx "Description=Firstmate sentinel for ${special_home//%/%%} (recovers supervision after an agent-runtime restart)" "$unit" >/dev/null \
+  grep -Fx "Description=Juggernaut sentinel for ${special_home//%/%%} (recovers supervision after an agent-runtime restart)" "$unit" >/dev/null \
     || fail "the generated description must preserve literal percent signs"
   grep -Fx "Environment=\"JG_HOME=$escaped_home\"" "$unit" >/dev/null \
     || fail "the generated home assignment must escape systemd metacharacters"
@@ -689,10 +689,10 @@ SH
   out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
     JG_FAKE_TREEHOUSE_LEASE_HELP=1 JG_FAKE_SENTINEL_DOWN=1 JG_FAKE_NO_USER_BUS=1 "$ROOT/bin/jg-bootstrap.sh")
   [ -z "$out" ] || fail "a host without a systemd user bus has nothing to install, got: $out"
-  : > "$case_dir/home/.jg-secondmate-home"
+  : > "$case_dir/home/.jg-squad-lead-home"
   out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
     JG_FAKE_TREEHOUSE_LEASE_HELP=1 JG_FAKE_SENTINEL_DOWN=1 "$ROOT/bin/jg-bootstrap.sh")
-  assert_not_contains "$out" "SENTINEL:" "a secondmate home is recovered by its primary's sentinel"
+  assert_not_contains "$out" "SENTINEL:" "a squad_lead home is recovered by its primary's sentinel"
   pass "bootstrap: a Herdr primary without the restart-recovery service gets the install command"
 }
 
@@ -907,7 +907,7 @@ make_routine_bootstrap_fixture() {
     > "$home/config/crew-dispatch.json"
   git init -q -b main "$root"
   {
-    printf '%s\n' '.jg-secondmate-home'
+    printf '%s\n' '.jg-squad-lead-home'
     printf '%s\n' 'config/crew-harness'
     printf '%s\n' 'config/crew-dispatch.json'
     printf '%s\n' 'config/startup-memory-budget'
@@ -920,10 +920,10 @@ make_routine_bootstrap_fixture() {
   git -C "$root" commit -qm initial
   c1=$(git -C "$root" rev-parse HEAD)
   git -C "$root" worktree add -q --detach "$sm" "$c1"
-  printf '%s\n' sm > "$sm/.jg-secondmate-home"
+  printf '%s\n' sm > "$sm/.jg-squad-lead-home"
   {
-    printf 'window=firstmate:jg-sm\n'
-    printf 'kind=secondmate\n'
+    printf 'window=juggernaut:jg-sm\n'
+    printf 'kind=squad_lead\n'
     printf 'harness=codex\n'
     printf 'home=%s\n' "$sm"
   } > "$home/state/sm.meta"
@@ -1081,9 +1081,9 @@ SH
     JG_BOOTSTRAP_NETWORK_LOCK_PID=111111 JG_FAKE_FLEET_SYNC_STARTED_MARKER="$marker" \
     "$ROOT/bin/jg-bootstrap.sh")
   assert_absent "$marker" "a stale worker refreshed project clones after lock handoff"
-  assert_contains "$out" "changed before dead-secondmate relaunch" \
+  assert_contains "$out" "changed before dead-squad-lead relaunch" \
     "the stale worker did not report the refused liveness sweep"
-  assert_contains "$out" "changed before secondmate convergence" \
+  assert_contains "$out" "changed before squad_lead convergence" \
     "the stale worker did not report the refused convergence sweep"
   assert_contains "$out" "changed before pending handoff delivery" \
     "the stale worker did not report the refused handoff sweep"
@@ -1122,9 +1122,9 @@ test_network_phases_record_per_step_elapsed_times() {
   # A real clone with a real origin, so jg-fleet-sync.sh genuinely iterates it.
   jg_git_init_commit "$case_dir/home/projects/alpha"
   jg_git_add_origin "$case_dir/home/projects/alpha" "$case_dir/alpha-origin"
-  # A secondmate the liveness sweep must account for. Whatever verdict it reaches
+  # A squad_lead the liveness sweep must account for. Whatever verdict it reaches
   # is owned elsewhere; what matters here is that the step is measured.
-  jg_write_secondmate_meta "$case_dir/home/state/mate-a.meta" "$case_dir/home"
+  jg_write_squad_lead_meta "$case_dir/home/state/mate-a.meta" "$case_dir/home"
 
   log="$case_dir/timings.tsv"
   PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$ROOT" \
@@ -1134,12 +1134,12 @@ test_network_phases_record_per_step_elapsed_times() {
 
   assert_present "$log" "the network phase recorded no elapsed times at all"
   assert_timing_record "$log" phase gh-auth '' "the GitHub auth probe was not timed"
-  assert_timing_record "$log" phase secondmate-liveness '' "the dead-secondmate relaunch sweep was not timed"
-  assert_timing_record "$log" phase secondmate-sync '' "the secondmate convergence sweep was not timed"
+  assert_timing_record "$log" phase squad-lead-liveness '' "the dead-squad-lead relaunch sweep was not timed"
+  assert_timing_record "$log" phase squad-lead-sync '' "the squad_lead convergence sweep was not timed"
   assert_timing_record "$log" phase handoff-delivery '' "the pending handoff sweep was not timed"
   assert_timing_record "$log" phase fleet-sync '' "the project clone refresh was not timed"
-  assert_timing_record "$log" secondmate liveness mate-a \
-    "the liveness sweep was not attributed to the individual secondmate it checked"
+  assert_timing_record "$log" squad_lead liveness mate-a \
+    "the liveness sweep was not attributed to the individual squad_lead it checked"
   assert_timing_record "$log" clone sync alpha \
     "the clone refresh was not attributed to the individual clone it refreshed"
 
@@ -1157,7 +1157,7 @@ test_network_phases_record_per_step_elapsed_times() {
     JG_BOOTSTRAP_NETWORK_LOCK_PID=$$ \
     "$ROOT/bin/jg-bootstrap.sh" >/dev/null 2>&1
   assert_absent "$log" "a run that never asked for timings recorded them anyway"
-  pass "bootstrap: each deferred network phase, secondmate, and clone records its own elapsed time"
+  pass "bootstrap: each deferred network phase, squad_lead, and clone records its own elapsed time"
 }
 
 test_tasks_axi_verdict_handoff_is_consumed_once() {
@@ -1286,7 +1286,7 @@ array profile with malformed model is flagged^{"rules":[{"when":"big feature","u
 resolve fields are accepted^{"rules":[{"when":"hard design","approval":"captain","floor":{"scope":"model:fable","min_percent":20,"provider":"claude"},"use":[{"harness":"pi","model":"openai-codex/gpt-5.6-sol","provider":"codex"},{"harness":"codex","model":"gpt-5.6-sol","floor":{"scope":"all_models","min_percent":50}}]}],"default":[{"harness":"pi","model":"kimi-code/k3","provider":"kimi","floor":{"scope":"all_models","min_percent":10}}]}^empty^
 rule min_confidence is accepted^{"rules":[{"when":"hard design","min_confidence":0.9,"use":{"harness":"claude"}}]}^empty^
 rule min_confidence out of range is flagged^{"rules":[{"when":"hard design","min_confidence":1.2,"use":{"harness":"claude"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - min_confidence must be a number from 0 through 1 when present
-non-captain approval is flagged^{"rules":[{"when":"hard design","approval":"firstmate","use":{"harness":"claude"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - approval must be "captain" when present
+non-captain approval is flagged^{"rules":[{"when":"hard design","approval":"juggernaut","use":{"harness":"claude"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - approval must be "captain" when present
 rule floor without provider is flagged^{"rules":[{"when":"hard design","floor":{"scope":"model:fable","min_percent":20},"use":{"harness":"claude"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - rule floor needs scope, min_percent 0..100, and provider matching ^[a-z0-9]+(-[a-z0-9]+)*\z
 rule floor uppercase provider is flagged^{"rules":[{"when":"hard design","floor":{"scope":"model:fable","min_percent":20,"provider":"CLAUDE"},"use":{"harness":"claude"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - rule floor needs scope, min_percent 0..100, and provider matching ^[a-z0-9]+(-[a-z0-9]+)*\z
 rule floor out of range is flagged^{"rules":[{"when":"hard design","floor":{"scope":"model:fable","min_percent":120,"provider":"claude"},"use":{"harness":"claude"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - rule floor needs scope, min_percent 0..100, and provider matching ^[a-z0-9]+(-[a-z0-9]+)*\z
@@ -1323,7 +1323,7 @@ ROWS
   [ "$out" = 'CREW_DISPATCH: invalid config/crew-dispatch.json - default profile model and effort must be non-empty strings when present' ] \
     || fail "no-key default-profile diagnostic changed from main, got: $out"
 
-  printf '%s\n' '{"rules":[{"when":"legacy metadata","approval":"firstmate","floor":{"scope":"all_models","min_percent":200,"provider":"CLAUDE"},"use":{"harness":"claude","provider":"Anthropic","floor":{"scope":"all_models"}}}]}' > "$case_dir/home/config/crew-dispatch.json"
+  printf '%s\n' '{"rules":[{"when":"legacy metadata","approval":"juggernaut","floor":{"scope":"all_models","min_percent":200,"provider":"CLAUDE"},"use":{"harness":"claude","provider":"Anthropic","floor":{"scope":"all_models"}}}]}' > "$case_dir/home/config/crew-dispatch.json"
   out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
     JG_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
   [ -z "$out" ] || fail "resolver-only fields must be ignored without the typed key, got: $out"
@@ -1346,7 +1346,7 @@ ROWS
   printf '%s\n' 'TYPESAFE_API_KEY=test-key' > "$case_dir/home/.env"
   out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
     JG_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
-  [ -z "$out" ] || fail "typed resolution should add verified Gemini crewmate routing, got: $out"
+  [ -z "$out" ] || fail "typed resolution should add verified Gemini operator routing, got: $out"
 
   rm -f "$case_dir/home/.env"
   : > "$case_dir/child-env.log"

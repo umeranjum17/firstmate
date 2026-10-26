@@ -24,12 +24,12 @@ jobs:
         run: npm install --global tasks-axi
       - name: Wait-timers hook journey
         run: |
-          git clone --no-single-branch https://github.com/umeranjum17/firstmate.git "$RUNNER_TEMP/firstmate"
-          JG_TEST_FORK="$RUNNER_TEMP/firstmate" bash wait-timers/tests/wait-timers-hook-e2e.sh
+          git clone --no-single-branch https://github.com/umeranjum17/juggernaut.git "$RUNNER_TEMP/juggernaut"
+          JG_TEST_FORK="$RUNNER_TEMP/juggernaut" bash wait-timers/tests/wait-timers-hook-e2e.sh
       - name: Receipts hook journeys
-        run: JG_TEST_FORK="$RUNNER_TEMP/firstmate" bash receipts/tests/receipts-hook-e2e.sh
+        run: JG_TEST_FORK="$RUNNER_TEMP/juggernaut" bash receipts/tests/receipts-hook-e2e.sh
       - name: Lead-wake hook journeys
-        run: JG_TEST_FORK="$RUNNER_TEMP/firstmate" bash lead-wake/tests/lead-wake-e2e.sh
+        run: JG_TEST_FORK="$RUNNER_TEMP/juggernaut" bash lead-wake/tests/lead-wake-e2e.sh
       # An add-on script is a shell script under a top-level add-on directory,
       # either one level down (`merge-card/merge-card`, `fleet-dashboard/jg-dashboard.sh`)
       # or two levels down in its `bin/` and `tests/` subdirectories
@@ -108,7 +108,7 @@ jobs:
       - name: Quota failover tests
         run: |
           bash quota-failover/tests/quota-failover-e2e.sh
-          JG_TEST_FORK="$RUNNER_TEMP/firstmate" bash quota-failover/tests/install.test.sh
+          JG_TEST_FORK="$RUNNER_TEMP/juggernaut" bash quota-failover/tests/install.test.sh
       # Quota JSON fixtures, a throwaway home and HOME, and a stub register: nothing real is touched.
       - name: Claude quota check test
         run: bash claude-quota/tests/claude-quota.test.sh
@@ -158,8 +158,8 @@ jobs:
       - name: Task priority test
         run: bash task-priority/tests/task-priority.test.sh
       - name: Tickets sync real-board journey
-        run: command -v identify >/dev/null || sudo apt-get install -y --no-install-recommends imagemagick; npm install --global sign-off-axi && JG_TEST_FORK="$RUNNER_TEMP/firstmate" bash tickets-sync/tests/sync.test.sh
-      # Stub Firstmate checkout and a fixture home: no real board, hook or launcher is touched.
+        run: command -v identify >/dev/null || sudo apt-get install -y --no-install-recommends imagemagick; npm install --global sign-off-axi && JG_TEST_FORK="$RUNNER_TEMP/juggernaut" bash tickets-sync/tests/sync.test.sh
+      # Stub Juggernaut checkout and a fixture home: no real board, hook or launcher is touched.
       - name: Bearings board test
         run: bash bearings-board/tests/bearings-board.test.sh
       # Fixture transcripts and a throwaway home; no real chat data is read or written.
@@ -212,7 +212,7 @@ jobs:
           npm install --global sign-off-axi
           bash owner-rules/tests/no-lavish.test.sh
           bash ask-default/tests-owner-ask.test.sh
-          JG_CODE_ROOT="$RUNNER_TEMP/firstmate" bash signoff/tests/jg-procevent-signoff.test.sh
+          JG_CODE_ROOT="$RUNNER_TEMP/juggernaut" bash signoff/tests/jg-procevent-signoff.test.sh
       # Fixture home: fleet JSON for Lookout from the builder's output files; no real home is read.
       - name: Lookout adapter test
         run: bash lookout-adapter/tests/test.sh

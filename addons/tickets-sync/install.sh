@@ -18,7 +18,7 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 set -euo pipefail
 src=$(cd "$(dirname "$0")/.." && pwd -P)
 dest=${XDG_DATA_HOME:-$HOME/.local/share}/jg-tickets-sync
-: "${JG_HOME:?set JG_HOME to the fleet home with data/secondmates.md}"
+: "${JG_HOME:?set JG_HOME to the fleet home with data/squad_leads.md}"
 if [ "${1:-}" = --dry-run ]; then echo "would install $dest and register tickets-sync and tickets-stale"; exit; fi
 [ "$#" = 0 ] || { echo 'usage: install.sh [--dry-run]' >&2; exit 2; }
 mkdir -p "$dest/tickets-sync" "$dest/fleet-dashboard" "$JG_HOME/state"

@@ -19,7 +19,7 @@ export PYTHONDONTWRITEBYTECODE=1
 CHECK=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)/bin/jg-flow-check.sh
 d=$(mktemp -d)
 trap 'rm -rf -- "$d"' EXIT
-main=$d/main home=$d/pool/8/firstmate now=$(date +%s)
+main=$d/main home=$d/pool/8/juggernaut now=$(date +%s)
 mkdir -p "$main/bin" "$main/config" "$main/state" "$home/state" "$home/data" "$home/crew"
 cat > "$main/bin/jg-tasks-axi.sh" <<'EOF'
 #!/usr/bin/env bash
@@ -89,7 +89,7 @@ expect '--can-start refuses at the hard cap of counting lanes' '1 6 open lanes, 
 
 # A lane held for the captain only through its backlog item (jg-captain-hold.sh hold) is captain-held, not red:
 # both lanes are 30 h old past the 24 h red limit, and only the unheld control lane goes red.
-bhome=$d/bl/8/firstmate
+bhome=$d/bl/8/juggernaut
 mkdir -p "$bhome/state" "$bhome/data"
 for t in bl-held bl-open; do
   printf 'kind=ship\n' > "$bhome/state/$t.meta"
@@ -115,7 +115,7 @@ expect 'unheld done lane still raises land line' 1 "$(grep -cF 'bl-done-open lea
 
 # Real muxr shape (2026-10-18): a lane whose own no-mistakes run is executing keeps a paused: stamp, and crew-state reads
 # that run-step as working, so it is busy. A short external wait is not busy, and a working lane still is.
-home=$d/own/8/firstmate
+home=$d/own/8/juggernaut
 mkdir -p "$home/state" "$home/data" "$home/crew"
 echo 3 > "$home/ready-count"
 lane own-run "paused [at=$((now - 600))]: own run: no-mistakes fix round executing on fm/own-run" working
@@ -129,7 +129,7 @@ expect '--can-start sees the busy lanes at cap 2' '1 2 working lanes, cap 2: fin
 # Parked lanes (retro fix 3): they leave the open count and the cap; a lane-cap park is ready work that the next free
 # slot resumes with no steer (--resume, oldest first, one per free slot); any other park without a named resume
 # condition is STALLED; one that names a date, a PR or the captain is not.
-home=$d/park/8/firstmate
+home=$d/park/8/juggernaut
 mkdir -p "$home/state" "$home/data" "$home/crew"
 echo 0 > "$home/ready-count"
 printf 'muxr 2\n' > "$main/config/lane-caps"
@@ -158,7 +158,7 @@ expect 'parked lanes raise no wait line' '' "$(grep -E 'past its clock' <<<"$out
 # so the copy stays inspectable and cleanable, but it occupies no working slot - crew-state proves its backend target
 # gone. `open` still lists it; only `counted` leaves it out. Four live lanes with three kept copies accept a start,
 # six live lanes still fill the hard cap and refuse a seventh, and a live working lane still counts.
-home=$d/kept/8/firstmate
+home=$d/kept/8/juggernaut
 mkdir -p "$home/state" "$home/data" "$home/crew"
 echo 1 > "$home/ready-count"
 kept() {  # <task> <verb> <age seconds>: record, status and worktree stay; the worker is gone

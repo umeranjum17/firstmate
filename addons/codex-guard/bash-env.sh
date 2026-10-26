@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Fleet guards for Codex (installed by firstmate-addons codex-guard/install.sh as Codex's shell BASH_ENV).
+# Fleet guards for Codex (installed by juggernaut-addons codex-guard/install.sh as Codex's shell BASH_ENV).
 # Codex runs each agent command as bash -lc '<snapshot wrapper>', and the wrapper ends in exec bash -c '<command>' with
 # BASH_ENV kept, so the inner shell arrives here holding exactly the agent's command. Each installed fleet guard judges it
 # through the same entry its Claude hook uses; exit 2 is a final block. BASH_ENV is then dropped, so scripts and shells

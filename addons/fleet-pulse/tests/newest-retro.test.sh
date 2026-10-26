@@ -17,7 +17,7 @@ d=$(mktemp -d)
 trap 'rm -rf -- "$d"' EXIT
 
 main=$d/main
-sib=$d/treehouse/firstmate-test/1/firstmate
+sib=$d/treehouse/juggernaut-test/1/juggernaut
 mkdir -p "$main/data" "$main/state" "$sib/data" "$sib/state"
 export HOME=$d/user JG_TREEHOUSE=$d/treehouse
 mkdir -p "$HOME"
@@ -68,12 +68,12 @@ got=$("$bin/newest-retro-report.sh" "$main")
   || { echo "FAIL newest-picks-sibling got=$(printf %q "$got")" >&2; fail=1; }
 check newer-elsewhere-quiet quiet env JG_RETRO_NOW=$now "$bin/fleet-retro-due.sh" "$main"
 
-# 3) all old -> due (also via secondmates.md home, no treehouse hit required)
+# 3) all old -> due (also via squad_leads.md home, no treehouse hit required)
 sib2=$d/other-home
 mkdir -p "$sib2/data"
 stamp "$sib2/data/jg-retro-also/report.md" "$old"
-printf -- '- other - note (home: %s; scope: x)\n' "$sib2" >"$main/data/secondmates.md"
-# Hide treehouse sibling so only main+secondmates (both old) remain newest.
+printf -- '- other - note (home: %s; scope: x)\n' "$sib2" >"$main/data/squad_leads.md"
+# Hide treehouse sibling so only main+squad_leads (both old) remain newest.
 mv "$d/treehouse" "$d/treehouse.hide"
 rm -f "$main"/state/.fleet-retro.last
 check all-old-due due env JG_RETRO_NOW=$now "$bin/fleet-retro-due.sh" "$main"
@@ -97,8 +97,8 @@ cat >"$main/state/fleet-pulse.check.sh" <<'EOF'
 set -u
 now=$(date +%s)
 # Fleet retro every 2-3 days (captain 5 Oct): wake Main once 60 h after the last retro report.
-last=$(ls -t /home/you/firstmate/data/jg-retro-*/report.md 2>/dev/null | head -1)
-RM=/home/you/firstmate/state/.fleet-retro.last
+last=$(ls -t /home/you/juggernaut/data/jg-retro-*/report.md 2>/dev/null | head -1)
+RM=/home/you/juggernaut/state/.fleet-retro.last
 if [ -n "$last" ] && [ $((now - $(stat -c %Y "$last"))) -ge 216000 ] && { [ ! -f "$RM" ] || [ $((now - $(stat -c %Y "$RM"))) -ge 43200 ]; }; then
   touch "$RM"; echo "fleet-retro due: last report $last; spawn the next strong-model fleet retro scout (captain-shared A5)"; exit 0
 fi

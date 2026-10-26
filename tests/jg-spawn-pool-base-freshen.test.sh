@@ -31,7 +31,7 @@ make_case() {
   git init --quiet -b "$default" "$project"
   printf 'base\n' > "$project/README.md"
   git -C "$project" add README.md
-  git -C "$project" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm initial
+  git -C "$project" -c user.name='Juggernaut Tests' -c user.email='tests@example.invalid' commit -qm initial
   git clone --quiet --bare "$project" "$origin"
   git -C "$project" remote add origin "file://$origin"
   initial=$(git -C "$project" rev-parse HEAD)
@@ -40,7 +40,7 @@ make_case() {
   git clone --quiet "file://$origin" "$publisher"
   printf 'must survive a newly spawned branch\n' > "$publisher/advanced-main.txt"
   git -C "$publisher" add advanced-main.txt
-  git -C "$publisher" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm advance-main
+  git -C "$publisher" -c user.name='Juggernaut Tests' -c user.email='tests@example.invalid' commit -qm advance-main
   git -C "$publisher" push --quiet origin "$default"
 
   printf '%s\n' "$case_dir|$home|$project|$pool|$fakebin|$initial|$default"
@@ -64,8 +64,8 @@ test_remote_seeded_home_spawns_from_treehouse_pool() {
   id='pool-remote-seeded-r13'
   rec=$(make_case remote-seeded "$id")
   read_case_record "$rec"
-  cat > "$HOME_DIR/.jg-secondmate-parent" <<'REC'
-schema=jg-secondmate-parent.v1
+  cat > "$HOME_DIR/.jg-squad-lead-parent" <<'REC'
+schema=jg-squad-lead-parent.v1
 route=remote
 parent_host=parent-machine
 REC
@@ -73,7 +73,7 @@ REC
   out=$(run_spawn "$id" --scout)
   status=$?
   expect_code 0 "$status" \
-    "a remote-seeded secondmate home should allocate and launch from its Treehouse pool"$'\n'"$out"
+    "a remote-seeded squad_lead home should allocate and launch from its Treehouse pool"$'\n'"$out"
   assert_contains "$out" "spawned $id" \
     "the remote-seeded spawn did not report success"
   assert_grep "worktree=$POOL_DIR" "$HOME_DIR/state/$id.meta" \
@@ -91,7 +91,7 @@ REC
       "$HOME_DIR" "$id" "$PROJECT_DIR" "$out" "$status"
     printf 'published worktree=%s\nresolved project lock=%s\n' "$POOL_DIR" "$lock"
   fi
-  pass "a remote-seeded secondmate home allocates and launches from its Treehouse pool"
+  pass "a remote-seeded squad_lead home allocates and launches from its Treehouse pool"
 }
 
 test_linked_spawning_home_rejects_primary_before_refresh() {
@@ -101,7 +101,7 @@ test_linked_spawning_home_rejects_primary_before_refresh() {
     rec=$(make_case "linked-$returned" "$id")
     read_case_record "$rec"
     primary=$PROJECT_DIR
-    spawning="$CASE_DIR/secondmate"
+    spawning="$CASE_DIR/squad_lead"
     git -C "$primary" worktree add --quiet --detach "$spawning" HEAD
     PROJECT_DIR=$spawning
     case "$returned" in
@@ -231,7 +231,7 @@ make_originless_case() {  # <name> <id>
   git init --quiet -b main "$project"
   printf 'base\n' > "$project/README.md"
   git -C "$project" add README.md
-  git -C "$project" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm initial
+  git -C "$project" -c user.name='Juggernaut Tests' -c user.email='tests@example.invalid' commit -qm initial
   initial=$(git -C "$project" rev-parse HEAD)
   git -C "$project" worktree add --quiet --detach "$pool" "$initial"
 
@@ -478,19 +478,19 @@ make_submodule_case() {  # <name> <id>
   git init --quiet -b main "$sub"
   printf 'pin one\n' > "$sub/lib.txt"
   git -C "$sub" add lib.txt
-  git -C "$sub" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm sub-one
+  git -C "$sub" -c user.name='Juggernaut Tests' -c user.email='tests@example.invalid' commit -qm sub-one
   subpin1=$(git -C "$sub" rev-parse HEAD)
   printf 'pin two\n' > "$sub/lib.txt"
-  git -C "$sub" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qam sub-two
+  git -C "$sub" -c user.name='Juggernaut Tests' -c user.email='tests@example.invalid' commit -qam sub-two
   subpin2=$(git -C "$sub" rev-parse HEAD)
   git -C "$sub" checkout --quiet "$subpin1"
 
   git init --quiet -b main "$project"
   printf 'base\n' > "$project/README.md"
   git -C "$project" add README.md
-  git -C "$project" -c protocol.file.allow=always -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' \
+  git -C "$project" -c protocol.file.allow=always -c user.name='Juggernaut Tests' -c user.email='tests@example.invalid' \
     submodule --quiet add "file://$sub" ui
-  git -C "$project" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm initial
+  git -C "$project" -c user.name='Juggernaut Tests' -c user.email='tests@example.invalid' commit -qm initial
   git clone --quiet --bare "$project" "$origin"
   git -C "$project" remote add origin "file://$origin"
   git -C "$project" worktree add --quiet --detach "$pool" HEAD
@@ -500,7 +500,7 @@ make_submodule_case() {  # <name> <id>
   git clone --quiet "file://$origin" "$publisher"
   git -C "$publisher" -c protocol.file.allow=always submodule --quiet update --init
   git -C "$publisher/ui" checkout --quiet "$subpin2"
-  git -C "$publisher" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qam advance-pin
+  git -C "$publisher" -c user.name='Juggernaut Tests' -c user.email='tests@example.invalid' commit -qam advance-pin
   git -C "$publisher" push --quiet origin main
   advanced=$(git -C "$publisher" rev-parse HEAD)
 
@@ -577,7 +577,7 @@ test_unpushed_submodule_commit_is_still_uncommitted_work() {
   # unreferenced, so this case must keep the conservative refusal.
   printf 'unlanded submodule work\n' > "$POOL_DIR/ui/unlanded.txt"
   git -C "$POOL_DIR/ui" add unlanded.txt
-  git -C "$POOL_DIR/ui" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' \
+  git -C "$POOL_DIR/ui" -c user.name='Juggernaut Tests' -c user.email='tests@example.invalid' \
     commit -qm unlanded-submodule-work
   unpushed=$(git -C "$POOL_DIR/ui" rev-parse HEAD)
   [ -z "$(git -C "$POOL_DIR/ui" status --porcelain)" ] \
@@ -773,7 +773,7 @@ publish_feature_branch() { # <branch>
   git -C "$CASE_DIR/publisher" checkout --quiet -b "$1"
   printf 'only on %s\n' "$1" > "$CASE_DIR/publisher/feature-only.txt"
   git -C "$CASE_DIR/publisher" add feature-only.txt
-  git -C "$CASE_DIR/publisher" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm feature
+  git -C "$CASE_DIR/publisher" -c user.name='Juggernaut Tests' -c user.email='tests@example.invalid' commit -qm feature
   git -C "$CASE_DIR/publisher" push --quiet origin "$1"
 }
 
@@ -936,7 +936,7 @@ test_real_pool_lease_survives_worker_exit_and_teardown_releases_it() {
     git -C "$first" -c user.name=Tests -c user.email=tests@example.invalid commit -qm retained
     head=$(git -C "$first" rev-parse HEAD)
     printf 'kind=ship\nworktree=%s\n' "$first" > "$home/state/retained-task.meta"
-    tmux new-session -d -s firstmate -c "$project" || exit 1
+    tmux new-session -d -s juggernaut -c "$project" || exit 1
     out=$(bash "${JG_TEST_LEASE_SPAWN_BIN:-$ROOT/bin/jg-spawn.sh}" lease-journey "$project" --scout 'sleep 600' 2>&1)
     status=$?
     printf '%s\n' "$out"
@@ -971,7 +971,7 @@ test_real_pool_lease_survives_worker_exit_and_teardown_releases_it() {
       [ "$status" != 0 ] || exit 1
       grep -Fxq 'cleanup_recovery=treehouse' "$home/state/$id.meta" || exit 1
       target=$(awk -F= '$1 == "window" {print $2}' "$home/state/$id.meta")
-      [ "$target" = "firstmate:jg-$id" ] || exit 1
+      [ "$target" = "juggernaut:jg-$id" ] || exit 1
       grep -Eq '^spawn_gen=.+$' "$home/state/$id.meta" || exit 1
       jq -e --arg path "$second" 'any(.worktrees[]; .path == $path and .leased)' "$pool/treehouse-state.json" || exit 1
       if [ "$id" = recovery-relaunch ]; then
@@ -1000,12 +1000,12 @@ test_real_home_seed_protects_recorded_copy() {
   project="$case_dir/project"; home="$case_dir/home"
   mkdir -p "$home/data/seed-home" "$home/state" "$project/bin"
   jg_git_init_commit "$project"
-  printf 'firstmate fixture\n' > "$project/AGENTS.md"
+  printf 'juggernaut fixture\n' > "$project/AGENTS.md"
   touch "$project/bin/.keep"
   printf 'root = "%s"\nmax_trees = 2\n' "$case_dir" > "$project/treehouse.toml"
   git -C "$project" add AGENTS.md bin treehouse.toml
   git -C "$project" -c user.name=Tests -c user.email=tests@example.invalid commit -qm seed-fixture
-  printf '# Charter\n\nOwn firstmate work.\n\n# Routing scope\n\nFirstmate.\n\n# Project clones\n\nNone. This is a project-less domain.\n' > "$home/data/seed-home/brief.md"
+  printf '# Charter\n\nOwn juggernaut work.\n\n# Routing scope\n\nJuggernaut.\n\n# Project clones\n\nNone. This is a project-less domain.\n' > "$home/data/seed-home/brief.md"
   (
     local HOME="$home" XDG_CONFIG_HOME="$home/.config" TMPDIR="$case_dir" TREEHOUSE_NO_UPDATE_CHECK=1
     local JG_ROOT_OVERRIDE="$project" JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data"
@@ -1039,7 +1039,7 @@ test_real_home_seed_protects_recorded_copy() {
       any(.worktrees[]; .path == $first and .leased and .lease_holder == "retained-seed-task") and
       any(.worktrees[]; .path == $second and .leased and .lease_holder == "seed-home")
     ' "$pool/treehouse-state.json" || exit 1
-    [ "$(cat "$second/.jg-secondmate-home")" = seed-home ] || exit 1
+    [ "$(cat "$second/.jg-squad-lead-home")" = seed-home ] || exit 1
   ) || fail "real home seeding must lock allocation and preserve recorded task copies"
   pass "real home seeding protects recorded copies and allocates only a free home"
 }

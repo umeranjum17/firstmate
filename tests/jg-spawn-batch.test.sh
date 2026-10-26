@@ -16,7 +16,7 @@ SPAWN="$ROOT/bin/jg-spawn.sh"
 TMP_ROOT=$(jg_test_tmproot jg-spawn-batch)
 export JG_BACKEND=tmux
 
-# Clear ambient firstmate overrides so the behavior test owns its environment.
+# Clear ambient juggernaut overrides so the behavior test owns its environment.
 run_spawn() {
   JG_ROOT_OVERRIDE='' \
     JG_HOME='' \
@@ -75,7 +75,7 @@ ROWS
   pass "batch detection: single pair batches, non-pair rejected, single-task and slash-id stay single"
 }
 
-# A projects/ path is resolved through the firstmate home, never the caller cwd,
+# A projects/ path is resolved through the juggernaut home, never the caller cwd,
 # before the missing-brief check. One row per home-scoping override.
 test_projects_path_scoping() {
   local label use_override id home projects out status expected
@@ -107,7 +107,7 @@ test_projects_path_scoping() {
 JG_HOME scopes projects/|no|nope-home-z7
 JG_PROJECTS_OVERRIDE scopes projects/|yes|nope-override-z8
 ROWS
-  pass "projects/ paths are scoped through the firstmate home for single-task spawn"
+  pass "projects/ paths are scoped through the juggernaut home for single-task spawn"
 }
 
 # A ship batch carries one shared delivery contract. Missing flags must stop the

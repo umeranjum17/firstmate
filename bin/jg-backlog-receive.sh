@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
-# Receive one delivered remote-secondmate outbox into this home's backlog.
+# Receive one delivered remote-squad-lead outbox into this home's backlog.
 #
 # Usage:
-#   jg-backlog-receive.sh state/handoff/<secondmate-id>.outbox.md <bytes> <sha256> <generation>
+#   jg-backlog-receive.sh state/handoff/<squad-lead-id>.outbox.md <bytes> <sha256> <generation>
 #
 # The delivered file must be a non-symlink backlog-format scratch file confined
 # to JG_HOME/state/handoff. Every item must be Queued. Keys already present in
@@ -101,9 +101,9 @@ case "$GENERATION" in ''|*[!0-9]*) die "generation must be a positive integer" ;
 case "$REL" in state/handoff/*.outbox.md) ;; *) die "delivered outbox path is outside state/handoff: $REL" ;; esac
 case "/$REL/" in */../*|*/./*) die "delivered outbox path contains traversal" ;; esac
 case "$REL" in *'//'*) die "delivered outbox path is malformed" ;; esac
-[ -f "$JG_HOME/.jg-secondmate-home" ] && [ ! -L "$JG_HOME/.jg-secondmate-home" ] \
-  || die "JG_HOME is not a seeded secondmate home"
-[ -f "$JG_HOME/AGENTS.md" ] && [ -d "$JG_HOME/bin" ] || die "JG_HOME is not a Firstmate home"
+[ -f "$JG_HOME/.jg-squad-lead-home" ] && [ ! -L "$JG_HOME/.jg-squad-lead-home" ] \
+  || die "JG_HOME is not a seeded squad_lead home"
+[ -f "$JG_HOME/AGENTS.md" ] && [ -d "$JG_HOME/bin" ] || die "JG_HOME is not a Juggernaut home"
 HOME_REAL=$(CDPATH='' cd -- "$JG_HOME" 2>/dev/null && pwd -P) || die "JG_HOME cannot be resolved"
 PARENT=$(dirname "$JG_HOME/$REL")
 PARENT_REAL=$(CDPATH='' cd -- "$PARENT" 2>/dev/null && pwd -P) || die "delivered outbox parent is unavailable"

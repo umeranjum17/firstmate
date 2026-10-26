@@ -2,8 +2,8 @@
 
 <h1><picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/media/logo-dark.svg">
-  <img src="docs/media/logo-light.svg" width="40" height="40" align="top" alt="Firstmate add-ons logo">
-</picture> Firstmate add-ons</h1>
+  <img src="docs/media/logo-light.svg" width="40" height="40" align="top" alt="Juggernaut add-ons logo">
+</picture> Juggernaut add-ons</h1>
 
 **Keep your coding-agent fleet moving through stalled tasks, depleted quota, and destructive commands.**
 
@@ -42,7 +42,7 @@ Choose the job you need first; the reference lists the full catalog and dependen
 ## Choose your job
 
 Run these from the repository root.
-For home-specific installers, export `JG_HOME` pointing to your existing Firstmate home: the directory containing its `bin/`, `config/`, and `state/`.
+For home-specific installers, export `JG_HOME` pointing to your existing Juggernaut home: the directory containing its `bin/`, `config/`, and `state/`.
 Each job names one starting add-on.
 
 **Protect the machine** — [Memory gate](host-memory/install.sh); also delete, kill, and read guards.
@@ -90,4 +90,4 @@ Installers can change hooks, configuration, or user services; read the selected 
 - [Full catalog, installation, checks, and removal](docs/addons-reference.md)
 - [Fork dependencies and exit paths](FORK-EXIT.md)
 - [Product direction](VISION.md)
-- [Contributor verification journeys](.agents/skills/done-done-verify-firstmate-addons/SKILL.md)
+- [Contributor verification journeys](.agents/skills/done-done-verify-juggernaut-addons/SKILL.md)

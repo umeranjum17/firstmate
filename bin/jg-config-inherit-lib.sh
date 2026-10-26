@@ -1,39 +1,39 @@
 # shellcheck shell=bash
-# Inheritance propagation: the PRIMARY firstmate pushes a declared, extensible
-# set of LOCAL (gitignored) config items down into each secondmate home's
-# config/, so a secondmate's OWN crewmates inherit the primary's settings
-# (e.g. primary config/crew-dispatch.json makes a secondmate use the same dispatch
+# Inheritance propagation: the PRIMARY juggernaut pushes a declared, extensible
+# set of LOCAL (gitignored) config items down into each squad_lead home's
+# config/, so a squad_lead's OWN operators inherit the primary's settings
+# (e.g. primary config/crew-dispatch.json makes a squad_lead use the same dispatch
 # profile rules and primary config/dispatch-never-send keeps the same values
-# out of its dispatch resolver requests, primary config/crew-harness=codex makes a secondmate's crewmates
+# out of its dispatch resolver requests, primary config/crew-harness=codex makes a squad_lead's operators
 # spawn on codex too, primary config/backlog-backend=manual makes that home
 # hand-edit backlog files too, primary config/backend pins that home's local
 # runtime-backend default for future spawns, primary config/startup-memory-budget
-# bounds that home's startup-memory curation, primary config/firstmate-role
-# carries the primary's resolved firstmate-repository role with a
-# proof-of-state receipt (so a secondmate inherits only what the primary
+# bounds that home's startup-memory curation, primary config/juggernaut-role
+# carries the primary's resolved juggernaut-repository role with a
+# proof-of-state receipt (so a squad_lead inherits only what the primary
 # resolves), and primary
 # config/herdr-presentation-spaces carries the same Herdr presentation-projection
 # preference - an absent primary file and an absent destination file both mean
 # the same unconfigured default, so the generic absence mirror below converges
-# a secondmate without deciding the release-dependent floor; explicit "on" and
+# a squad_lead without deciding the release-dependent floor; explicit "on" and
 # "off" preferences propagate as files. Primary
 # config/trace-context is copied at the launch convergence point as part of the
 # default-off W3C trace-context setup, while live convergence leaves it unchanged.
 # Primary config/lavish-axi-host carries the one per-machine Lavish server address
 # to every worker so a worker never starts a second server on another interface.
 # The primary passes its frozen home-session decision into a newly launched
-# Secondmate; see docs/trace-context.md.
+# SquadLead; see docs/trace-context.md.
 # Primary config/claude-permission-mode is a captain-wide safety preference
 # (bypass or auto for every claude launch), so it flows down too and a
-# secondmate's own claude crewmates launch on the same permission posture.
+# squad_lead's own claude operators launch on the same permission posture.
 # Primary config/keep-ai-trailers is a home-wide commit-attribution choice, so
-# a secondmate's own crewmates keep AI co-author trailers too.
+# a squad_lead's own operators keep AI co-author trailers too.
 # Primary config/supervision-host-off is the fleet's supervision-host opt-out,
-# so a primary that opts out opts every secondmate home out too, while each
+# so a primary that opts out opts every squad_lead home out too, while each
 # home's config/supervision-host engine line stays its own.
 # It also pushes
 # the one primary-authoritative shared captain-preference file,
-# data/captain-shared.md, into each secondmate home's data/ as a read-only copy.
+# data/captain-shared.md, into each squad_lead home's data/ as a read-only copy.
 # Shared-captain convergence records the SHA-256 of the last successfully
 # published destination generation beside that copy. A destination whose bytes
 # still match that receipt is replaced quietly when the primary source advances.
@@ -48,20 +48,20 @@
 # Why this is separate from the tracked-files fast-forward (jg-ff-lib.sh): config/
 # is gitignored, so a tracked-files fast-forward never carries these items. This
 # is an explicit copy run at the convergence points the primary owns - a
-# secondmate spawn (bin/jg-spawn.sh), the bootstrap secondmate sweep
+# squad_lead spawn (bin/jg-spawn.sh), the bootstrap squad_lead sweep
 # (bin/jg-bootstrap.sh), and the focused mid-session config push
 # (bin/jg-config-push.sh). It is PRIMARY-AUTHORITATIVE: the primary's value wins
 # and is re-pushed on every convergence, so the fleet stays converged on the
 # primary; an item the primary does not set is mirrored as absence downstream.
-# After successful config/* changes under an already-running secondmate, callers
+# After successful config/* changes under an already-running squad_lead, callers
 # invoke jg_config_send_reread_nudge so the live agent re-reads exact post-write
 # bytes (spawn/respawn already re-reads at launch and needs no redundant nudge).
 #
 # Extensible by design: JG_INHERITABLE_CONFIG is the single declared list of
 # config-dir-relative items the primary propagates. Add an item there and every
-# convergence point inherits it - no other change needed. config/secondmate-harness
+# convergence point inherits it - no other change needed. config/squad-lead-harness
 # is deliberately NOT in the list: it is the primary's own setting for launching
-# secondmates, and a secondmate never spawns secondmates, so it must not flow
+# squad_leads, and a squad_lead never spawns squad_leads, so it must not flow
 # downstream.
 #
 # That single declaration is also the ONE owner of the inherited-material
@@ -87,12 +87,12 @@ JG_SHARED_CAPTAIN_MODE="444"
 # The declared inheritable set (space-separated, config-dir-relative item paths).
 # Extend here to inherit more of the primary's local config; override via the
 # environment only in tests. Items must not contain whitespace.
-JG_INHERITABLE_CONFIG="${JG_INHERITABLE_CONFIG:-crew-dispatch.json dispatch-never-send crew-harness backlog-backend backend herdr-presentation-spaces startup-memory-budget trace-context launch-env-allowlist claude-permission-mode lavish-axi-host keep-ai-trailers supervision-host-off firstmate-role lane-target}"
-_bi="${JG_ADDONS_DIR:-${JG_HOME:-$(dirname "${BASH_SOURCE[0]}")/..}/projects/firstmate-addons}/brief-inherit/bin/jg-brief-inherit-lib.sh"; [ ! -f "$_bi" ] || { . "$_bi" && jg_brief_inherit_config; }
+JG_INHERITABLE_CONFIG="${JG_INHERITABLE_CONFIG:-crew-dispatch.json dispatch-never-send crew-harness backlog-backend backend herdr-presentation-spaces startup-memory-budget trace-context launch-env-allowlist claude-permission-mode lavish-axi-host keep-ai-trailers supervision-host-off juggernaut-role lane-target}"
+_bi="${JG_ADDONS_DIR:-${JG_HOME:-$(dirname "${BASH_SOURCE[0]}")/..}/projects/juggernaut-addons}/brief-inherit/bin/jg-brief-inherit-lib.sh"; [ ! -f "$_bi" ] || { . "$_bi" && jg_brief_inherit_config; }
 
-# firstmate-role additionally carries a proof-of-state receipt: a scoped role
-# grant (or its recorded absence) authorizes a secondmate home only while
-# config/.jg-inherit-firstmate-role.generation there proves the exact bytes the
+# juggernaut-role additionally carries a proof-of-state receipt: a scoped role
+# grant (or its recorded absence) authorizes a squad_lead home only while
+# config/.jg-inherit-juggernaut-role.generation there proves the exact bytes the
 # primary last published, so revocation converges and a grant without a matching
 # receipt is dead on arrival. The receipt proves consistency, not provenance;
 # deliberately forged local records are out of scope. Both routes publish the
@@ -100,7 +100,7 @@ _bi="${JG_ADDONS_DIR:-${JG_HOME:-$(dirname "${BASH_SOURCE[0]}")/..}/projects/fir
 # a primary file its own resolver rejects propagates as an absence, never as a
 # grant. The remote route's receiver already writes that same receipt through
 # its generation machinery; the local route commits
-# it in propagate_secondmate_inheritance, and a failed propagation removes it
+# it in propagate_squad_lead_inheritance, and a failed propagation removes it
 # rather than leaving a stale proof. bin/jg-role-lib.sh owns how the grant and
 # receipt are interpreted.
 
@@ -221,7 +221,7 @@ destination_allows_inherited_item() {
 
 # propagate_inheritable_config <src-config-dir> <dest-config-dir>
 # Copy each declared inheritable item from the primary's config dir (src) into a
-# secondmate home's config dir (dest). SILENT on stdout - callers parse stdout,
+# squad_lead home's config dir (dest). SILENT on stdout - callers parse stdout,
 # so this writes nothing there. It emits concise stderr diagnostics only for
 # notable events: a guard skip or a copy/remove error. A source item that is
 # present is copied only when its content differs (idempotent: a re-run never
@@ -239,7 +239,7 @@ destination_allows_inherited_item() {
 # error, such as copy or remove failure, occurs.
 record_inheritable_config_result() {
   local item=$1 status=$2 reason=${3:-}
-  if [ "$item" = firstmate-role ] && [ -n "${JG_INHERIT_DEST_CONFIG:-}" ]; then
+  if [ "$item" = juggernaut-role ] && [ -n "${JG_INHERIT_DEST_CONFIG:-}" ]; then
     # The inherited role grant is provable only through its receipt: write it
     # for converged outcomes that produced a destination state (a copied grant
     # or a mirrored absence), and drop it for every outcome that wrote nothing,
@@ -252,24 +252,24 @@ record_inheritable_config_result() {
       if ! jg_inherit_role_receipt_commit "$JG_INHERIT_DEST_CONFIG"; then
         status=error
         reason="could not commit the role inheritance receipt"
-        warn_inheritable_config_error "$item" "$JG_INHERIT_DEST_CONFIG/firstmate-role" "$reason"
+        warn_inheritable_config_error "$item" "$JG_INHERIT_DEST_CONFIG/juggernaut-role" "$reason"
         JG_INHERIT_ROLE_RECEIPT_FAILED=1
       fi
       ;;
     unchanged)
-      if [ -f "$JG_INHERIT_DEST_CONFIG/firstmate-role" ] && [ ! -L "$JG_INHERIT_DEST_CONFIG/firstmate-role" ]; then
+      if [ -f "$JG_INHERIT_DEST_CONFIG/juggernaut-role" ] && [ ! -L "$JG_INHERIT_DEST_CONFIG/juggernaut-role" ]; then
         if ! jg_inherit_role_receipt_commit "$JG_INHERIT_DEST_CONFIG"; then
           status=error
           reason="could not commit the role inheritance receipt"
-          warn_inheritable_config_error "$item" "$JG_INHERIT_DEST_CONFIG/firstmate-role" "$reason"
+          warn_inheritable_config_error "$item" "$JG_INHERIT_DEST_CONFIG/juggernaut-role" "$reason"
           JG_INHERIT_ROLE_RECEIPT_FAILED=1
         fi
       else
-        rm -f "$JG_INHERIT_DEST_CONFIG/.jg-inherit-firstmate-role.generation" 2>/dev/null || true
+        rm -f "$JG_INHERIT_DEST_CONFIG/.jg-inherit-juggernaut-role.generation" 2>/dev/null || true
       fi
       ;;
     *)
-      rm -f "$JG_INHERIT_DEST_CONFIG/.jg-inherit-firstmate-role.generation" 2>/dev/null || true
+      rm -f "$JG_INHERIT_DEST_CONFIG/.jg-inherit-juggernaut-role.generation" 2>/dev/null || true
       ;;
     esac
   fi
@@ -288,8 +288,8 @@ record_inheritable_config_result() {
 # never land.
 jg_inherit_role_receipt_commit() {
   local dest_config=$1 dest receipt gen bytes sha cmd tmp prior_gen
-  dest=$dest_config/firstmate-role
-  receipt=$dest_config/.jg-inherit-firstmate-role.generation
+  dest=$dest_config/juggernaut-role
+  receipt=$dest_config/.jg-inherit-juggernaut-role.generation
   [ -d "$dest_config" ] && [ ! -L "$dest_config" ] || return 1
   gen=1
   if [ -f "$receipt" ] && [ ! -L "$receipt" ]; then
@@ -357,9 +357,9 @@ shared_captain_header_valid() {
   local src=$1 head
   head=$(sed -n '1,12p' "$src" 2>/dev/null) || return 1
   case "$head" in *main-authoritative*) ;; *) printf '%s' "main-authoritative"; return 1 ;; esac
-  case "$head" in *"read-only in secondmate homes"*) ;; *) printf '%s' "read-only in secondmate homes"; return 1 ;; esac
+  case "$head" in *"read-only in squad_lead homes"*) ;; *) printf '%s' "read-only in squad_lead homes"; return 1 ;; esac
   case "$head" in *"must not be edited there"*) ;; *) printf '%s' "must not be edited there"; return 1 ;; esac
-  case "$head" in *"main firstmate"*) ;; *) printf '%s' "main firstmate"; return 1 ;; esac
+  case "$head" in *"main juggernaut"*) ;; *) printf '%s' "main juggernaut"; return 1 ;; esac
   case "$head" in *"marked status"*|*"document pointer"*) ;; *) printf '%s' "marked status\" or \"document pointer"; return 1 ;; esac
 }
 
@@ -593,7 +593,7 @@ propagate_shared_captain_preferences() {
           restore_shared_captain_readonly "$dest" || true
           return 1
         fi
-        printf 'SECONDMATE_SYNC: secondmate home %s: quarantined %s drift at %s\n' "$dest_home" "$JG_SHARED_CAPTAIN_REL" "$quarantine"
+        printf 'SQUAD_LEAD_SYNC: squad_lead home %s: quarantined %s drift at %s\n' "$dest_home" "$JG_SHARED_CAPTAIN_REL" "$quarantine"
       fi
     elif ! shared_captain_dir_safe "$dest_parent"; then
       reason="unsafe destination directory"
@@ -636,7 +636,7 @@ propagate_shared_captain_preferences() {
     fi
     if quarantine=$(quarantine_shared_captain_dest "$dest" "$dest_parent"); then
       shared_captain_remove_inherited_receipt "$dest_parent" || true
-      printf 'SECONDMATE_SYNC: secondmate home %s: quarantined %s drift at %s\n' "$dest_home" "$JG_SHARED_CAPTAIN_REL" "$quarantine"
+      printf 'SQUAD_LEAD_SYNC: squad_lead home %s: quarantined %s drift at %s\n' "$dest_home" "$JG_SHARED_CAPTAIN_REL" "$quarantine"
       record_inheritable_config_result "$JG_SHARED_CAPTAIN_REL" pushed "mirrored primary absence after quarantining local copy at $quarantine"
     else
       reason="failed to quarantine destination before mirroring primary absence"
@@ -652,7 +652,7 @@ propagate_shared_captain_preferences() {
   return "$rc"
 }
 
-propagate_secondmate_inheritance() {
+propagate_squad_lead_inheritance() {
   local src_home=$1 dest_home=$2 src_config=${3:-} src_data=${4:-} rc
   [ -n "$src_home" ] || return 1
   [ -n "$dest_home" ] || return 1
@@ -670,7 +670,7 @@ propagate_inheritable_config() {
   [ -n "$src_config" ] || return 1
   [ -n "$dest_config" ] || return 1
   rc=0
-  # Dest dir the per-item outcome recorder uses for firstmate-role receipt
+  # Dest dir the per-item outcome recorder uses for juggernaut-role receipt
   # bookkeeping; restored on return so nested callers keep their own.
   JG_INHERIT_DEST_CONFIG=$dest_config
   JG_INHERIT_ROLE_RECEIPT_FAILED=
@@ -688,7 +688,7 @@ propagate_inheritable_config() {
     fi
     src="$src_config/$item"
     dest="$dest_config/$item"
-    if [ "$item" = firstmate-role ]; then
+    if [ "$item" = juggernaut-role ]; then
       if ! role_stage=$(mktemp -d "${TMPDIR:-/tmp}/jg-inherit-role.XXXXXX" 2>/dev/null) ||
         ! jg_role_inherit_payload "$src_home" "$src_config" "$role_stage/$item"; then
         reason="cannot resolve the primary role"
@@ -798,7 +798,7 @@ propagate_inheritable_config() {
 }
 
 # Relative prefix of per-home instruction files written after a successful
-# config push so the live secondmate can re-read exact post-write bytes.
+# config push so the live squad_lead can re-read exact post-write bytes.
 # Kept under state/ (gitignored operational dir) so it never dirties the home.
 JG_CONFIG_REREAD_INSTRUCTION_PREFIX_REL="state/.jg-inherited-config-reread"
 JG_CONFIG_REREAD_MAX_SENT=16
@@ -894,7 +894,7 @@ jg_config_reread_retry_queue_is_full() {
 jg_config_reread_retry_pending() {
   local id=$1 dest_home=$2 report retry_out rc
   report=$(mktemp "${TMPDIR:-/tmp}/jg-config-reread-retry.XXXXXX" 2>/dev/null) || {
-    printf 'CONFIG_REREAD: secondmate %s: send failed: could not create retry report\n' "$id"
+    printf 'CONFIG_REREAD: squad_lead %s: send failed: could not create retry report\n' "$id"
     return 1
   }
   retry_out=$(jg_config_send_reread_nudge "$id" "$dest_home" "$report" 2>&1)
@@ -1109,7 +1109,7 @@ jg_config_reread_send_failure() {
   if ! jg_config_reread_mark_pending "$instruction_path" "$pending_path"; then
     detail="$detail; could not record retry marker"
   fi
-  printf 'CONFIG_REREAD: secondmate %s: send failed: %s\n' "$id" "$detail"
+  printf 'CONFIG_REREAD: squad_lead %s: send failed: %s\n' "$id" "$detail"
   return 1
 }
 
@@ -1118,12 +1118,12 @@ jg_config_reread_send_pointer() {
   local id=$1 instruction_path=$2 pending_path selector out rc send_bin message pending_pointer
   pending_path="$instruction_path.pending"
   if [ ! -f "$instruction_path" ] || [ -L "$instruction_path" ]; then
-    printf 'CONFIG_REREAD: secondmate %s: send failed: pending instruction file is missing\n' "$id"
+    printf 'CONFIG_REREAD: squad_lead %s: send failed: pending instruction file is missing\n' "$id"
     return 1
   fi
   pending_pointer=$(cat "$pending_path" 2>/dev/null || true)
   if [ "$pending_pointer" != "$instruction_path" ]; then
-    printf 'CONFIG_REREAD: secondmate %s: send failed: pending instruction file is mismatched\n' "$id"
+    printf 'CONFIG_REREAD: squad_lead %s: send failed: pending instruction file is mismatched\n' "$id"
     return 1
   fi
   selector="jg-$id"
@@ -1296,7 +1296,7 @@ jg_config_reread_quarantine_pending() {
 # jg_config_send_reread_nudge <id> <dest-home> <report>
 # After successful propagation, if any allowlisted config item changed for this
 # home, write the exact-byte instruction under the destination home and send a
-# single-line pointers to those files through the routed secondmate path
+# single-line pointers to those files through the routed squad_lead path
 # (jg-send). The files contain only changed config paths, clear delimiters, and
 # the destination's full exact post-write bytes (or ABSENT) - never summaries,
 # SHA values, selected profiles, or data/captain-shared.md. No-op (return 0) when
@@ -1312,7 +1312,7 @@ jg_config_send_reread_nudge() {
   [ -n "$dest_home" ] || return 1
   [ -n "$report" ] && [ -f "$report" ] || return 1
   dest_home_abs=$(cd "$dest_home" 2>/dev/null && pwd -P) || {
-    printf 'CONFIG_REREAD: secondmate %s: send failed: destination home is not readable\n' "$id"
+    printf 'CONFIG_REREAD: squad_lead %s: send failed: destination home is not readable\n' "$id"
     return 1
   }
   state="$dest_home_abs/${JG_CONFIG_REREAD_INSTRUCTION_PREFIX_REL%/*}"
@@ -1358,11 +1358,11 @@ jg_config_send_reread_nudge() {
         fi
         stage_paths+="$retry_stage_path"
       elif [ -n "$exact_tmp" ] && [ -f "$exact_tmp" ]; then
-        printf 'CONFIG_REREAD: secondmate %s: send failed: retained exact retry temporary %s\n' "$id" "$exact_tmp"
+        printf 'CONFIG_REREAD: squad_lead %s: send failed: retained exact retry temporary %s\n' "$id" "$exact_tmp"
         send_failures=1
         break
       else
-        printf 'CONFIG_REREAD: secondmate %s: send failed: could not rebuild retry instruction\n' "$id"
+        printf 'CONFIG_REREAD: squad_lead %s: send failed: could not rebuild retry instruction\n' "$id"
         send_failures=1
         break
       fi
@@ -1377,31 +1377,31 @@ EOF
   if [ -n "$changed_items" ]; then
     source_home_abs=$(cd "${JG_HOME:-}" 2>/dev/null && pwd -P || true)
     if [ -z "$source_home_abs" ]; then
-      printf 'CONFIG_REREAD: secondmate %s: send failed: could not reserve retry instruction\n' "$id"
+      printf 'CONFIG_REREAD: squad_lead %s: send failed: could not reserve retry instruction\n' "$id"
       return 1
     fi
     if jg_config_reread_retry_queue_is_full "$source_home_abs" "$id"; then
-      printf 'CONFIG_REREAD: secondmate %s: send failed: retry instruction queue is full\n' "$id"
+      printf 'CONFIG_REREAD: squad_lead %s: send failed: retry instruction queue is full\n' "$id"
       return 1
     fi
     current_stage_path=$(jg_config_reread_new_retry_stage_path "$source_home_abs" "$id") || {
-      printf 'CONFIG_REREAD: secondmate %s: send failed: could not reserve retry instruction\n' "$id"
+      printf 'CONFIG_REREAD: squad_lead %s: send failed: could not reserve retry instruction\n' "$id"
       return 1
     }
     if ! jg_config_write_reread_instruction "$dest_home_abs" "$report" "$current_stage_path"; then
       exact_tmp=${JG_CONFIG_REREAD_FAILED_TEMP:-}
       if [ -n "$exact_tmp" ] \
         && jg_config_reread_adopt_exact_temp "$exact_tmp" "$current_stage_path"; then
-        printf 'CONFIG_REREAD: secondmate %s: send failed: could not publish retry instruction; retained exact retry generation %s\n' "$id" "$current_stage_path"
+        printf 'CONFIG_REREAD: squad_lead %s: send failed: could not publish retry instruction; retained exact retry generation %s\n' "$id" "$current_stage_path"
       elif [ -n "$exact_tmp" ] && [ -f "$exact_tmp" ]; then
         rm -f "$current_stage_path" 2>/dev/null || true
-        printf 'CONFIG_REREAD: secondmate %s: send failed: retained exact retry temporary %s\n' "$id" "$exact_tmp"
+        printf 'CONFIG_REREAD: squad_lead %s: send failed: retained exact retry temporary %s\n' "$id" "$exact_tmp"
       elif retry_record_path=$(jg_config_reread_save_retry_report "$report" "$current_stage_path"); then
         rm -f "$current_stage_path" 2>/dev/null || true
-        printf 'CONFIG_REREAD: secondmate %s: send failed: could not write retry instruction; retained retry report %s\n' "$id" "$retry_record_path"
+        printf 'CONFIG_REREAD: squad_lead %s: send failed: could not write retry instruction; retained retry report %s\n' "$id" "$retry_record_path"
       else
         rm -f "$current_stage_path" 2>/dev/null || true
-        printf 'CONFIG_REREAD: secondmate %s: send failed: could not write retry instruction or retain retry report\n' "$id"
+        printf 'CONFIG_REREAD: squad_lead %s: send failed: could not write retry instruction or retain retry report\n' "$id"
       fi
       return 1
     fi
@@ -1423,7 +1423,7 @@ EOF
         delivery_paths="$instruction_path"
       fi
     else
-      printf 'CONFIG_REREAD: secondmate %s: send failed: could not publish retry instruction\n' "$id"
+      printf 'CONFIG_REREAD: squad_lead %s: send failed: could not publish retry instruction\n' "$id"
       send_failures=1
       break
     fi

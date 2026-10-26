@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Outbox-based remote secondmate backlog handoff and dropped-link recovery.
+# Outbox-based remote squad_lead backlog handoff and dropped-link recovery.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -63,16 +63,16 @@ git -C "$REMOTE_ROOT" config user.name Test
 git -C "$REMOTE_ROOT" add AGENTS.md bin
 git -C "$REMOTE_ROOT" commit -qm 'tracked remote fixture'
 printf 'fixture\n' > "$REMOTE/AGENTS.md"
-printf 'ios\n' > "$REMOTE/.jg-secondmate-home"
-cat > "$PARENT/data/secondmates.md" <<EOF
+printf 'ios\n' > "$REMOTE/.jg-squad-lead-home"
+cat > "$PARENT/data/squad_leads.md" <<EOF
 - ios - iOS delivery (host: remote-mac; root: $REMOTE_ROOT; home: $REMOTE; scope: iOS work; projects: alpha; added 2026-08-02)
 EOF
 cat > "$PARENT/state/ios.meta" <<EOF
 window=jg-remote:w1:p1
 endpoint_task_id=ios
 harness=claude
-kind=secondmate
-mode=secondmate
+kind=squad_lead
+mode=squad_lead
 remote_host=remote-mac
 remote_root=$REMOTE_ROOT
 remote_backend=herdr
@@ -100,7 +100,7 @@ shift 2
 argv_b64=$4
 command_name=$(perl -MMIME::Base64=decode_base64 -e '$d=decode_base64($ARGV[0]); ($c)=split(/\0/, $d); print $c' "$argv_b64")
 case "${JG_FAKE_SSH_MODE:-normal}:$command_name" in
-  *:jg-remote-secondmate-control.sh)
+  *:jg-remote-squad-lead-control.sh)
     printf '%s\n' "$command_name" >> "$JG_FAKE_REMOTE_WAKE_LOG"
     [ "${JG_FAKE_REMOTE_WAKE_RC:-0}" -eq 0 ] || printf 'remote receiver wake failed\n' >&2
     exit "${JG_FAKE_REMOTE_WAKE_RC:-0}"
@@ -243,7 +243,7 @@ pass "ambiguous receipt leaves one durable outbox and no duplicate dispatchable 
 
 out=$(handoff_env "$ROOT/bin/jg-backlog-handoff.sh" --resume-pending)
 assert_contains "$out" 'received: ios moved=0 already=2' "retry did not classify already-delivered keys idempotently"
-[ "$(grep -cF jg-remote-secondmate-control.sh "$WAKE_LOG")" -eq 1 ] \
+[ "$(grep -cF jg-remote-squad-lead-control.sh "$WAKE_LOG")" -eq 1 ] \
   || fail "confirmed remote receipt did not wake its supported receiver endpoint exactly once"
 assert_absent "$PARENT/data/handoff/ios.outbox.md" "confirmed retry did not clean the local outbox"
 [ "$(grep -cF -- '- [ ] ios-a - first iOS task' "$REMOTE/data/backlog.md")" -eq 1 ] \
@@ -328,7 +328,7 @@ set -e
 [ "$rc" -ne 0 ] || fail "offline handoff claimed success"
 bootstrap_out=$(JG_HOME="$PARENT" JG_ROOT_OVERRIDE="$ROOT" JG_BACKEND=tmux \
   JG_BOOTSTRAP_DETECT_ONLY=1 "$ROOT/bin/jg-bootstrap.sh" 2>&1)
-assert_contains "$bootstrap_out" 'SECONDMATE_HANDOFF: secondmate ios: pending delivery: 1 item(s)' \
+assert_contains "$bootstrap_out" 'SQUAD_LEAD_HANDOFF: squad_lead ios: pending delivery: 1 item(s)' \
   "bootstrap did not surface the pending outbox count"
 handoff_env "$ROOT/bin/jg-backlog-handoff.sh" --resume-pending >/dev/null \
   || fail "pending bootstrap-visible outbox did not later converge"
@@ -357,7 +357,7 @@ pass "remote handoff releases durable work and separately retries its receiver w
 # stay retryable: the outbox otherwise jams every later handoff to this mate
 # behind a correlation the resume refuses to resend forever.
 write_backlog '- [ ] wake-escalated - escalated undelivered wake stays retryable (repo: alpha)'
-wakes_before=$(grep -cF jg-remote-secondmate-control.sh "$WAKE_LOG")
+wakes_before=$(grep -cF jg-remote-squad-lead-control.sh "$WAKE_LOG")
 JG_FAKE_REMOTE_WAKE_RC=255 handoff_env "$ROOT/bin/jg-backlog-handoff.sh" ios wake-escalated \
   > "$TMP_ROOT/wake-escalated.out" 2>&1 \
   || fail "durably received handoff failed only because its wake transport was lost"
@@ -392,7 +392,7 @@ if [ "$rc" -ne 0 ]; then
 fi
 assert_absent "$PARENT/data/handoff/ios.outbox.md" "escalated wake retry recreated a released outbox"
 assert_absent "$PARENT/state/.backlog-handoff-ios.wake-pending" "escalated wake retry left wake state behind"
-[ "$(grep -cF jg-remote-secondmate-control.sh "$WAKE_LOG")" -eq $((wakes_before + 3)) ] \
+[ "$(grep -cF jg-remote-squad-lead-control.sh "$WAKE_LOG")" -eq $((wakes_before + 3)) ] \
   || fail "escalated wake retry did not resend the wake exactly once after the two lost attempts"
 [ -n "$(grep '^delivered_epoch=' "$escalated_rec" | cut -d= -f2-)" ] \
   || fail "successful wake retry did not confirm delivery on the same correlation"
@@ -409,7 +409,7 @@ assert_absent "$PARENT/data/handoff/ios.outbox.md" "handoff after the escalated 
 pass "an escalated undelivered receiver wake stays retryable instead of jamming the outbox"
 
 write_backlog '- [ ] wake-permanent-a - first handoff with permanently lost wake (repo: alpha)'
-wakes_before=$(grep -cF jg-remote-secondmate-control.sh "$WAKE_LOG")
+wakes_before=$(grep -cF jg-remote-squad-lead-control.sh "$WAKE_LOG")
 JG_FAKE_REMOTE_WAKE_RC=255 handoff_env "$ROOT/bin/jg-backlog-handoff.sh" ios wake-permanent-a \
   > "$TMP_ROOT/wake-permanent-a.out" 2>&1 \
   || fail "first durably received handoff was held hostage to a permanently lost wake"
@@ -421,7 +421,7 @@ case "$permanent_marker" in
   pending:*) permanent_corr=${permanent_marker#pending:} ;;
   *) fail "permanently lost wake was not separately tracked, got '$permanent_marker'" ;;
 esac
-wakes_after_first=$(grep -cF jg-remote-secondmate-control.sh "$WAKE_LOG")
+wakes_after_first=$(grep -cF jg-remote-squad-lead-control.sh "$WAKE_LOG")
 [ "$wakes_after_first" -gt "$wakes_before" ] || fail "first permanently lost wake was not attempted"
 set +e
 JG_FAKE_REMOTE_WAKE_RC=255 handoff_env "$ROOT/bin/jg-backlog-handoff.sh" --resume-pending \
@@ -431,7 +431,7 @@ set -e
 [ "$rc" -ne 0 ] || fail "resume claimed that the permanently lost wake was confirmed"
 [ "$(cat "$PARENT/state/.backlog-handoff-ios.wake-pending")" = "pending:$permanent_corr" ] \
   || fail "failed wake resume did not preserve the original correlation"
-wakes_after_resume=$(grep -cF jg-remote-secondmate-control.sh "$WAKE_LOG")
+wakes_after_resume=$(grep -cF jg-remote-squad-lead-control.sh "$WAKE_LOG")
 [ "$wakes_after_resume" -gt "$wakes_after_first" ] || fail "resume did not retry the separately pending wake"
 write_backlog '- [ ] wake-permanent-b - second handoff despite permanently lost wake (repo: alpha)'
 JG_FAKE_REMOTE_WAKE_RC=255 handoff_env "$ROOT/bin/jg-backlog-handoff.sh" ios wake-permanent-b \
@@ -444,7 +444,7 @@ assert_absent "$PARENT/data/handoff/ios.outbox.md" "permanently lost wake retain
   || fail "later handoff was lost or duplicated behind the pending wake"
 [ "$(cat "$PARENT/state/.backlog-handoff-ios.wake-pending")" = "pending:$permanent_corr" ] \
   || fail "later handoff did not retain the same pending wake correlation"
-[ "$(grep -cF jg-remote-secondmate-control.sh "$WAKE_LOG")" -gt "$wakes_after_resume" ] \
+[ "$(grep -cF jg-remote-squad-lead-control.sh "$WAKE_LOG")" -gt "$wakes_after_resume" ] \
   || fail "later handoff did not retry the separately pending wake"
 pass "a permanently unconfirmable wake never jams later durable handoffs"
 
@@ -461,7 +461,7 @@ exec "$JG_REAL_RM" "$@"
 SH
 chmod +x "$RM_FAKEBIN/rm"
 write_backlog '- [ ] cleanup-retry - confirmed wake survives cleanup retry (repo: alpha)'
-wakes_before=$(grep -cF jg-remote-secondmate-control.sh "$WAKE_LOG")
+wakes_before=$(grep -cF jg-remote-squad-lead-control.sh "$WAKE_LOG")
 set +e
 PATH="$RM_FAKEBIN:$PATH" JG_REAL_RM="$REAL_RM" \
   JG_FAIL_RM_PATH="$PARENT/data/handoff/ios.outbox.md" \
@@ -476,13 +476,13 @@ case "$(cat "$PARENT/state/.backlog-handoff-ios.wake-pending")" in
   confirmed:*) ;;
   *) fail "remote cleanup failure did not preserve confirmed wake state" ;;
 esac
-wakes_after=$(grep -cF jg-remote-secondmate-control.sh "$WAKE_LOG")
+wakes_after=$(grep -cF jg-remote-squad-lead-control.sh "$WAKE_LOG")
 [ "$wakes_after" -eq $((wakes_before + 1)) ] \
   || fail "remote cleanup failure did not perform exactly one receiver wake"
 write_backlog '- [ ] after-cleanup - fresh work after confirmed cleanup failure (repo: alpha)'
 handoff_env "$ROOT/bin/jg-backlog-handoff.sh" ios after-cleanup >/dev/null \
   || fail "fresh handoff did not converge an older confirmed cleanup failure"
-[ "$(grep -cF jg-remote-secondmate-control.sh "$WAKE_LOG")" -eq $((wakes_after + 1)) ] \
+[ "$(grep -cF jg-remote-squad-lead-control.sh "$WAKE_LOG")" -eq $((wakes_after + 1)) ] \
   || fail "fresh handoff reused the older confirmed wake instead of waking its receiver"
 [ "$(grep -cF cleanup-retry "$REMOTE/data/backlog.md")" -eq 1 ] \
   || fail "cleanup recovery lost or duplicated the older delivered item"
@@ -495,7 +495,7 @@ assert_absent "$PARENT/state/.backlog-handoff-ios.wake-pending" \
 pass "fresh remote work gets a new wake after confirmed cleanup recovery"
 
 write_backlog '- [ ] confirmed-marker-stale - completed handoff ignores marker cleanup failure (repo: alpha)'
-wakes_before=$(grep -cF jg-remote-secondmate-control.sh "$WAKE_LOG")
+wakes_before=$(grep -cF jg-remote-squad-lead-control.sh "$WAKE_LOG")
 PATH="$RM_FAKEBIN:$PATH" JG_REAL_RM="$REAL_RM" \
   JG_FAIL_RM_PATH="$PARENT/state/.backlog-handoff-ios.wake-pending" \
   handoff_env "$ROOT/bin/jg-backlog-handoff.sh" ios confirmed-marker-stale \
@@ -510,7 +510,7 @@ esac
 assert_contains "$(cat "$TMP_ROOT/confirmed-marker-stale.out")" \
   "stale confirmed wake marker remains at $PARENT/state/.backlog-handoff-ios.wake-pending" \
   "confirmed marker cleanup failure did not name the stale marker"
-[ "$(grep -cF jg-remote-secondmate-control.sh "$WAKE_LOG")" -eq $((wakes_before + 1)) ] \
+[ "$(grep -cF jg-remote-squad-lead-control.sh "$WAKE_LOG")" -eq $((wakes_before + 1)) ] \
   || fail "confirmed marker cleanup failure changed the completed wake count"
 [ "$(grep -cF -- '- [ ] confirmed-marker-stale -' "$REMOTE/data/backlog.md")" -eq 1 ] \
   || fail "confirmed marker cleanup failure lost or duplicated durable work"
@@ -533,7 +533,7 @@ exec "$JG_REAL_MV" "$@"
 SH
 chmod +x "$CONFIRM_MV_FAKEBIN/mv"
 write_backlog '- [ ] delivered-pending-old - wake confirms before state promotion fails (repo: alpha)'
-wakes_before=$(grep -cF jg-remote-secondmate-control.sh "$WAKE_LOG")
+wakes_before=$(grep -cF jg-remote-squad-lead-control.sh "$WAKE_LOG")
 PATH="$CONFIRM_MV_FAKEBIN:$PATH" JG_REAL_MV="$REAL_MV" \
   JG_CONFIRM_MV_PATH="$PARENT/state/.backlog-handoff-ios.wake-pending" \
   JG_CONFIRM_MV_COUNT="$TMP_ROOT/confirm-mv.count" \
@@ -551,7 +551,7 @@ delivered_pending_rec="$PARENT/state/pending-replies/$delivered_pending_corr"
 write_backlog '- [ ] delivered-pending-new - new work after delivered pending marker (repo: alpha)'
 handoff_env "$ROOT/bin/jg-backlog-handoff.sh" ios delivered-pending-new >/dev/null \
   || fail "delivered pending marker blocked the next handoff"
-[ "$(grep -cF jg-remote-secondmate-control.sh "$WAKE_LOG")" -eq $((wakes_before + 2)) ] \
+[ "$(grep -cF jg-remote-squad-lead-control.sh "$WAKE_LOG")" -eq $((wakes_before + 2)) ] \
   || fail "delivered pending marker suppressed the new handoff wake"
 [ "$(grep -cF -- '- [ ] delivered-pending-old -' "$REMOTE/data/backlog.md")" -eq 1 ] \
   || fail "state promotion failure lost or duplicated the older item"
@@ -579,7 +579,7 @@ SH
 chmod +x "$MV_FAKEBIN/mv"
 write_backlog '- [ ] wake-state-drop - durable work survives lost wake state (repo: alpha)'
 pending_records_before=$(find "$PARENT/state/pending-replies" -maxdepth 1 -type f | wc -l | tr -d ' ')
-wakes_before=$(grep -cF jg-remote-secondmate-control.sh "$WAKE_LOG")
+wakes_before=$(grep -cF jg-remote-squad-lead-control.sh "$WAKE_LOG")
 PATH="$MV_FAKEBIN:$PATH" JG_REAL_MV="$REAL_MV" \
   JG_FAIL_MV_PATH="$PARENT/state/.backlog-handoff-ios.wake-pending" \
   handoff_env "$ROOT/bin/jg-backlog-handoff.sh" ios wake-state-drop \
@@ -596,11 +596,11 @@ assert_absent "$PARENT/state/.backlog-handoff-ios.wake-pending" \
 pending_records_after=$(find "$PARENT/state/pending-replies" -maxdepth 1 -type f | wc -l | tr -d ' ')
 [ "$pending_records_after" -eq "$pending_records_before" ] \
   || fail "wake-state write failure left an unreferenced pending-reply record"
-[ "$(grep -cF jg-remote-secondmate-control.sh "$WAKE_LOG")" -eq "$wakes_before" ] \
+[ "$(grep -cF jg-remote-squad-lead-control.sh "$WAKE_LOG")" -eq "$wakes_before" ] \
   || fail "wake-state write failure attempted an untracked wake"
 handoff_env "$ROOT/bin/jg-backlog-handoff.sh" --resume-pending >/dev/null \
   || fail "resume treated the dropped wake as pending"
-[ "$(grep -cF jg-remote-secondmate-control.sh "$WAKE_LOG")" -eq "$wakes_before" ] \
+[ "$(grep -cF jg-remote-squad-lead-control.sh "$WAKE_LOG")" -eq "$wakes_before" ] \
   || fail "resume retried a wake whose state was dropped"
 write_backlog '- [ ] after-wake-state-drop - later handoff after dropped wake state (repo: alpha)'
 handoff_env "$ROOT/bin/jg-backlog-handoff.sh" ios after-wake-state-drop >/dev/null \
@@ -642,7 +642,7 @@ rm -f -- "$stale_wake_marker"
 pass "undeletable invalid wake state cannot block remote handoffs"
 
 write_backlog '- [ ] route-race - remains dispatchable through retirement (repo: alpha)'
-registry_lock="$PARENT/state/.secondmate-registry.lock"
+registry_lock="$PARENT/state/.squad-lead-registry.lock"
 handoff_lock="$PARENT/state/.backlog-handoff-ios.lock"
 JG_HOME="$PARENT" /bin/bash -c '
   . "$1"
@@ -656,7 +656,7 @@ JG_HOME="$PARENT" /bin/bash -c '
   jg_lock_release "$3"
   jg_lock_release "$2"
 ' _ "$ROOT/bin/jg-wake-lib.sh" "$registry_lock" "$handoff_lock" \
-  "$TMP_ROOT/route.entered" "$TMP_ROOT/route.release" "$PARENT/data/secondmates.md" &
+  "$TMP_ROOT/route.entered" "$TMP_ROOT/route.release" "$PARENT/data/squad_leads.md" &
 route_holder_pid=$!
 route_wait=0
 while [ ! -f "$TMP_ROOT/route.entered" ]; do
@@ -686,7 +686,7 @@ mkdir -p "$FRESH/data" "$FRESH/state"
 : > "$SSH_COUNT"
 fresh_out=$(JG_HOME="$FRESH" JG_ROOT_OVERRIDE="$ROOT" JG_BACKEND=tmux \
   JG_BOOTSTRAP_DETECT_ONLY=1 "$ROOT/bin/jg-bootstrap.sh" 2>&1)
-assert_not_contains "$fresh_out" 'SECONDMATE_HANDOFF:' "unconfigured bootstrap emitted a remote handoff diagnostic"
+assert_not_contains "$fresh_out" 'SQUAD_LEAD_HANDOFF:' "unconfigured bootstrap emitted a remote handoff diagnostic"
 [ ! -s "$SSH_COUNT" ] || fail "unconfigured bootstrap touched SSH"
 pass "unconfigured bootstrap has no remote handoff behavior"
 
@@ -696,7 +696,7 @@ RECV_HOME="$TMP_ROOT/decoy-receive-home"
 RECV_DECOY="$TMP_ROOT/decoy-receive-cwd"
 mkdir -p "$RECV_HOME/bin" "$RECV_HOME/data" "$RECV_HOME/state/handoff" "$RECV_DECOY"
 printf 'fixture\n' > "$RECV_HOME/AGENTS.md"
-printf 'ios\n' > "$RECV_HOME/.jg-secondmate-home"
+printf 'ios\n' > "$RECV_HOME/.jg-squad-lead-home"
 printf '## Queued\n\n## Done\n' > "$RECV_HOME/data/backlog.md"
 printf '## Queued\n- [ ] decoy-recv - received despite a cwd beads config (repo: alpha)\n\n## Done\n' \
   > "$RECV_HOME/state/handoff/ios.outbox.md"

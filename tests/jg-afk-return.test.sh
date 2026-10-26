@@ -3,7 +3,7 @@
 #
 # Covers the second half of the 2026-07-14 incident: an away-mode blocked event
 # survived in durable state, but the ordinary return request could proceed to
-# Bearings before Firstmate owned remediation. The shared script now stops,
+# Bearings before Juggernaut owned remediation. The shared script now stops,
 # drains, preserves evidence, and holds ordinary WORK until every live open
 # `blocked:` event is resolved or durably reclassified. Reporting is not work:
 # Bearings renders behind the catch-up gate and surfaces the catch-up posture
@@ -98,7 +98,7 @@ window=$target
 backend=$backend
 kind=ship
 EOF
-  printf 'blocked [key=%s]: firstmate can refresh the synthetic token\n' "$key" > "$dir/home/state/repair-task.status"
+  printf 'blocked [key=%s]: juggernaut can refresh the synthetic token\n' "$key" > "$dir/home/state/repair-task.status"
 }
 
 test_return_gate_owns_remediation_and_reports_catchup_to_bearings() {
@@ -132,7 +132,7 @@ test_return_gate_owns_remediation_and_reports_catchup_to_bearings() {
   [ "$rc" -eq 3 ] || fail "return begin should gate on a live blocker (rc=$rc): $out"
   gate="$dir/home/state/.afk-return-catchup"
   [ -s "$gate" ] || fail "return begin did not persist its fail-closed catch-up gate"
-  assert_contains "$out" 'firstmate-actionable blocker: repair-task [key=synthetic-dependency]' "return output did not assign blocker remediation to Firstmate"
+  assert_contains "$out" 'juggernaut-actionable blocker: repair-task [key=synthetic-dependency]' "return output did not assign blocker remediation to Juggernaut"
   grep -F $'evidence\twake\t1784074271' "$gate" >/dev/null || fail "drained wake evidence was not retained in the durable gate"
   grep -F $'evidence\twake\twake annotation: latest wake-EVENT observed at drain, not current state: repair-task.status: blocked synthetic dependency' "$gate" >/dev/null \
     || fail "the separate drain annotation was not retained as away-return evidence"
@@ -244,7 +244,7 @@ test_explicit_reclassification_requires_durable_reason() {
   pass "tmux and Herdr blockers require the same explicit durable reclassification before ordinary work"
 }
 
-test_captain_decision_does_not_masquerade_as_firstmate_blocker() {
+test_captain_decision_does_not_masquerade_as_juggernaut_blocker() {
   local dir out
   dir="$TMP_ROOT/captain-decision"
   install_runner "$dir"
@@ -256,10 +256,10 @@ EOF
   printf 'needs-decision [key=api-shape]: captain must choose the synthetic API shape\n' > "$dir/home/state/decision-task.status"
   date +%s > "$dir/home/state/.afk"
   printf '1784074271\t1\tsignal\tdecision-task.status\tsignal: synthetic decision\n' > "$dir/home/state/.fake-drain"
-  out=$(run_return "$dir" begin) || fail "approval decision should not be treated as a firstmate blocker: $out"
+  out=$(run_return "$dir" begin) || fail "approval decision should not be treated as a juggernaut blocker: $out"
   assert_contains "$out" 'catch-up wake:' "approval decision notification was not surfaced in catch-up"
-  [ ! -e "$dir/home/state/.afk-return-catchup" ] || fail "approval decision incorrectly opened a firstmate blocker gate"
-  pass "needs-decision remains reportable without masquerading as a firstmate-actionable blocker"
+  [ ! -e "$dir/home/state/.afk-return-catchup" ] || fail "approval decision incorrectly opened a juggernaut blocker gate"
+  pass "needs-decision remains reportable without masquerading as a juggernaut-actionable blocker"
 }
 
 test_evidence_publication_failure_preserves_wake_for_redrain() {
@@ -314,7 +314,7 @@ test_away_reentry_refuses_pending_return_gate() {
 }
 
 test_return_is_mode_agnostic_for_quiet_mode() {
-  # kunchenguid/firstmate#2356's /quiet off calls this exact script, unchanged
+  # kunchenguid/juggernaut#2356's /quiet off calls this exact script, unchanged
   # - it must behave identically whether state/.afk declares "away" or
   # "quiet", since return_guard/return_reconcile only ever test presence.
   local dir out
@@ -388,7 +388,7 @@ test_return_brief_composes_from_record_store_and_held_set() {
   # Two live blockers, one on a task with a captain-verdict outcome and one on a
   # task with a routine outcome. A third task failed outright.
   printf 'window=synthetic:jg-fix-windows\nbackend=tmux\nkind=ship\n' > "$dir/home/state/fix-windows.meta"
-  printf 'blocked [key=token]: firstmate can refresh the token\n' > "$dir/home/state/fix-windows.status"
+  printf 'blocked [key=token]: juggernaut can refresh the token\n' > "$dir/home/state/fix-windows.status"
   printf 'window=synthetic:jg-other\nbackend=tmux\nkind=ship\n' > "$dir/home/state/other.meta"
   printf 'blocked [key=dep]: needs the upstream dependency\nneeds-decision [key=pick]: choose the target\n' > "$dir/home/state/other.status"
   printf 'window=synthetic:jg-dead\nbackend=tmux\nkind=scout\n' > "$dir/home/state/dead.meta"
@@ -448,14 +448,14 @@ test_return_brief_composes_from_record_store_and_held_set() {
   assert_contains "$out" 'awaiting the captain on the merge' "the hold reason was not listed"
   assert_contains "$out" 'other [key=pick] needs your decision: choose the target' "the open decision was not listed under waiting on you"
   assert_contains "$out" 'fix-windows: blocked on a token only the captain holds; held for return' "the captain-verdict outcome was not listed"
-  assert_contains "$out" 'fix-windows [key=token] still blocked, firstmate remediates before ordinary work' "the blocker sharing a task with a captain outcome was exempted"
-  assert_contains "$out" 'other [key=dep] still blocked, firstmate remediates before ordinary work' "the unreached blocker was not listed as could-not-fix"
+  assert_contains "$out" 'fix-windows [key=token] still blocked, juggernaut remediates before ordinary work' "the blocker sharing a task with a captain outcome was exempted"
+  assert_contains "$out" 'other [key=dep] still blocked, juggernaut remediates before ordinary work' "the unreached blocker was not listed as could-not-fix"
   assert_contains "$out" 'dead: failed: the reproduction never compiled' "the failed task was not listed"
   assert_contains "$out" '4 routine outcome(s) recorded' "the routine outcome count was not reported"
   assert_contains "$out" 'other: resent the steer; worker resumed' "the routine outcome was not listed"
   assert_contains "$out" 'Cost: 6 supervision outcome(s) recorded (4 routine, 2 captain); 3 task(s) live at return.' "the cost line is wrong"
-  assert_contains "$out" 'firstmate-actionable blocker: other [key=dep]' "the unreached blocker did not gate"
-  assert_contains "$out" 'firstmate-actionable blocker: fix-windows [key=token]' "a captain outcome incorrectly exempted an open blocker"
+  assert_contains "$out" 'juggernaut-actionable blocker: other [key=dep]' "the unreached blocker did not gate"
+  assert_contains "$out" 'juggernaut-actionable blocker: fix-windows [key=token]' "a captain outcome incorrectly exempted an open blocker"
   grep -F "$(printf 'contract\t')" "$gate" >/dev/null || fail "the gate did not retain the posture-record window"
   grep -F "$(printf 'evidence\thealth\t')" "$gate" >/dev/null || fail "the gate did not retain the health snapshot"
 
@@ -618,11 +618,11 @@ test_return_brief_lists_landed_work_awaiting_cleanup() {
   printf 'done [at=1]: PR https://github.com/example/landed/pull/7\n' > "$dir/home/state/landed.status"
   printf 'window=synthetic:jg-open\nbackend=tmux\nkind=ship\npr=https://github.com/example/open/pull/8\n' > "$dir/home/state/open.meta"
   printf 'done [at=1]: PR https://github.com/example/open/pull/8\n' > "$dir/home/state/open.status"
-  # The 2026-09-25 supervision-host window: a persistent secondmate's record
+  # The 2026-09-25 supervision-host window: a persistent squad_lead's record
   # carried a relayed child's pr= and the same merged marker, and the brief
   # offered the mate itself for teardown. Identical merge evidence must still
-  # never list it: a secondmate is never landed work.
-  printf 'window=synthetic:jg-axi-mate\nbackend=tmux\nkind=secondmate\npr=https://github.com/example/child/pull/7\n' > "$dir/home/state/axi-mate.meta"
+  # never list it: a squad_lead is never landed work.
+  printf 'window=synthetic:jg-axi-mate\nbackend=tmux\nkind=squad_lead\npr=https://github.com/example/child/pull/7\n' > "$dir/home/state/axi-mate.meta"
   printf 'done [at=1] [key=merged-childx]: merged childx https://github.com/example/child/pull/7\n' > "$dir/home/state/axi-mate.status"
   (
     # shellcheck source=bin/jg-pr-lib.sh
@@ -642,11 +642,11 @@ test_return_brief_lists_landed_work_awaiting_cleanup() {
     || fail "landed work is out of order (failed $failed_line, landed $landed_line, handled $handled_line)"
   assert_contains "$out" '  - landed: https://github.com/example/landed/pull/7 is merged and the worker is still up; close it with bin/jg-teardown.sh landed once catch-up clears' "the landed worker was not listed for cleanup"
   assert_not_contains "$out" '  - open:' "a done worker with no durable merge evidence was listed as landed"
-  assert_not_contains "$out" '  - axi-mate:' "a persistent secondmate was listed as landed work"
-  assert_not_contains "$out" 'bin/jg-teardown.sh axi-mate' "the brief offered a persistent secondmate for teardown"
-  assert_not_contains "$out" 'example/child/pull/7' "a secondmate's recorded PR surfaced in the brief"
+  assert_not_contains "$out" '  - axi-mate:' "a persistent squad_lead was listed as landed work"
+  assert_not_contains "$out" 'bin/jg-teardown.sh axi-mate' "the brief offered a persistent squad_lead for teardown"
+  assert_not_contains "$out" 'example/child/pull/7' "a squad_lead's recorded PR surfaced in the brief"
   assert_contains "$out" 'catch-up clear' "landed work must not hold the gate"
-  pass "the return brief lists landed work whose worker is still up, from the durable merge marker only, without gating on it and never offering a secondmate for teardown"
+  pass "the return brief lists landed work whose worker is still up, from the durable merge marker only, without gating on it and never offering a squad_lead for teardown"
 }
 
 test_return_brief_keeps_refresh_history() {
@@ -1355,7 +1355,7 @@ test_missing_final_archive_keeps_retained_contract_gated() {
 
 test_return_gate_owns_remediation_and_reports_catchup_to_bearings
 test_explicit_reclassification_requires_durable_reason
-test_captain_decision_does_not_masquerade_as_firstmate_blocker
+test_captain_decision_does_not_masquerade_as_juggernaut_blocker
 test_evidence_publication_failure_preserves_wake_for_redrain
 test_away_reentry_refuses_pending_return_gate
 test_return_is_mode_agnostic_for_quiet_mode

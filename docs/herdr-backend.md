@@ -50,7 +50,7 @@ Select Herdr in any of these ways:
 - `JG_BACKEND=herdr` for one launch.
 - An explicit request to Juggernaut.
 
-A remote second-mate agent is the one case with no choice: it always runs on Herdr, and [`remote-secondmates.md`](remote-secondmates.md) owns that requirement and the readiness its host must meet.
+A remote second-mate agent is the one case with no choice: it always runs on Herdr, and [`remote-squad-leads.md`](remote-squad-leads.md) owns that requirement and the readiness its host must meet.
 
 Herdr is also auto-detected when the primary runs natively under `HERDR_ENV=1` and is not inside tmux.
 A tmux pane nested inside Herdr resolves to tmux because the innermost multiplexer wins.
@@ -96,15 +96,15 @@ Removing or upgrading the shadowing client is the durable fix.
 
 ## Watching and task containers
 
-The ordinary topology puts one task tab per endpoint in the exact workspace of the Juggernaut or secondmate that launches it.
+The ordinary topology puts one task tab per endpoint in the exact workspace of the Juggernaut or squad lead that launches it.
 When the launcher has no Herdr workspace to inherit, the adapter maintains one durable home-labeled workspace instead.
 
 | Home | Workspace label |
 | --- | --- |
-| Primary | `firstmate` |
-| Secondmate | `2ndmate-<secondmate-id>`, derived from its validated `.jg-secondmate-home` marker |
+| Primary | `juggernaut` |
+| Squad Lead | `2ndmate-<squad-lead-id>`, derived from its validated `.jg-squad-lead-home` marker |
 
-A secondmate launched by the primary receives a narrowly scoped home override during container creation.
+A squad lead launched by the primary receives a narrowly scoped home override during container creation.
 
 ### Watching tasks
 
@@ -122,13 +122,13 @@ Later task creation does not intentionally steal focus.
 Herdr does not enforce workspace or tab label uniqueness, so a label can never decide where a worker goes.
 
 Herdr 0.7.5 exports `HERDR_ENV`, `HERDR_PANE_ID`, `HERDR_SESSION`, `HERDR_SOCKET_PATH`, `HERDR_TAB_ID`, and `HERDR_WORKSPACE_ID` into every process it manages a pane for.
-A Juggernaut or secondmate agent's own commands inherit them.
+A Juggernaut or squad lead agent's own commands inherit them.
 Older injection shapes are unverified, so a claimed launcher pane without the injected socket identity cannot be trusted.
 
 With presentation spaces disabled, an operator or scout is created in the exact workspace that identity currently resolves to.
 That workspace is read live from Herdr rather than from the injected snapshot, so the worker always appears beside the agent that launched it.
 Duplicate labels elsewhere in the session are irrelevant, and the globally focused workspace is never the target.
-A `--secondmate` launch is the deliberate exception: it stands up that secondmate home's own workspace instead of joining the launcher's.
+A `--squad-lead` launch is the deliberate exception: it stands up that squad lead home's own workspace instead of joining the launcher's.
 
 ### Unresolvable launcher identity
 
@@ -147,10 +147,10 @@ Juggernaut running outside Herdr entirely has no launcher workspace to inherit, 
 That path needs the home label to identify exactly one workspace.
 Two workspaces sharing it are an unresolvable placement and refuse rather than adopting either.
 
-Avoid naming a personal workspace `firstmate` or `2ndmate-<id>` for that reason.
+Avoid naming a personal workspace `juggernaut` or `2ndmate-<id>` for that reason.
 Also avoid it because the adapter cannot distinguish that label collision from its own container.
 
-An older secondmate workspace using `firstmate-<id>` is not migrated automatically.
+An older squad lead workspace using `juggernaut-<id>` is not migrated automatically.
 Rename it manually before expecting new tasks or recovery to use it.
 
 ### Recovery and existing tasks
@@ -231,15 +231,15 @@ So cleanup for a projection that already exists always runs and never strands a 
 Upgrading Herdr to 0.8.0 or newer is the fix.
 Writing `off` is the immediate mitigation for a home that cannot upgrade yet.
 
-### Secondmate homes
+### Squad Lead homes
 
-The setting is inherited into secondmate homes through the normal configuration-convergence owner.
+The setting is inherited into squad lead homes through the normal configuration-convergence owner.
 The default needs no special convergence.
-The primary's absent file and the secondmate's absent file both mean the same unconfigured default.
-So leaving the file absent converges a secondmate to that same default rather than turning it off.
+The primary's absent file and the squad lead's absent file both mean the same unconfigured default.
+So leaving the file absent converges a squad lead to that same default rather than turning it off.
 Only an explicit primary `off` propagates the opt-out.
 
-A secondmate agent itself always stays in its ordinary parent workspace; only children launched by that home are eligible.
+A squad lead agent itself always stays in its ordinary parent workspace; only children launched by that home are eligible.
 An unconverged opt-out keeps the default projection in that home until convergence.
 
 ### Presentation journal
@@ -347,7 +347,7 @@ Ordinary non-projected task removal:
 Task cleanup acquires that session lock before the task's isolated copy is returned.
 So a contended lock refuses up front while the copy, every durable record, and the endpoint are all intact for a plain rerun.
 
-Forced secondmate cleanup recursively preflights every Herdr child endpoint and acquires every affected named-session lock before mutating any child.
+Forced squad lead cleanup recursively preflights every Herdr child endpoint and acquires every affected named-session lock before mutating any child.
 It then retains each child's durable identity unless that exact pane returns structured not-found after its close.
 
 ### When task records are erased
@@ -401,7 +401,7 @@ A live or unknown recorded or token-matched endpoint refuses duplicate launch, a
 
 Locked session start has one narrower cleanup for a restored projected child that is no longer current task state.
 It runs only when the current home has at least one ordinary presentation journal, and it considers only that home.
-A primary never recursively sweeps a secondmate home.
+A primary never recursively sweeps a squad lead home.
 
 Discovery starts from the exact current `└ <concise-task> · p:<22-character-token>` grammar, but a title or token alone is never mutation authority.
 A candidate must meet all of these conditions:
@@ -464,14 +464,14 @@ Any of these preserves the candidate and lets session startup continue with at m
   Pass `jg-spawn.sh --herdr-resume-lock-wait` to opt that recovery into waiting for the lock instead, so concurrent recoveries can serialize.
   The flag applies to a fresh ship or scout spawn that recovers a journal.
   The multi-task path forwards the flag to each per-pair spawn.
-  `jg-spawn.sh --relaunch` and `--secondmate` take no exact-resume presentation-order lock, so the flag has no effect there.
+  `jg-spawn.sh --relaunch` and `--squad-lead` take no exact-resume presentation-order lock, so the flag has no effect there.
   Dead-owner reclaim still stops the wait when a holder crashed.
   Unbounded blocking on the session lock is never the default.
 - Existing layouts are not force-renamed or rearranged.
 - Missing or ambiguous restart bindings fall back to the ordinary home workspace while the old projection remains untouched.
 - Crashes, lost responses, failed exact-pane cleanup, or human renames can leave quarantined spaces.
   Session start removes only the exact home-local, uniquely journal-correlated, childless idle-shell shape above.
-- Spaces have no cross-home cleanup path, and a secondmate child can clean up only from its exact home.
+- Spaces have no cross-home cleanup path, and a squad lead child can clean up only from its exact home.
 - Every stale-looking space outside that narrow startup proof still requires manual cleanup in Herdr's UI after human inspection.
 - Regaining a dedicated space after degradation requires stopping the flat task, manually checking the stale projection, and clearing its journal before a genuinely fresh launch.
 - The visible token is only a restart-stable correlator and never substitutes for the exact binding.
@@ -499,7 +499,7 @@ Immediately before close, Juggernaut rechecks the exact tab, expected seed label
 A working seed pane is never closed.
 
 This created-versus-adopted gate is a destructive safety boundary.
-A prior label heuristic could adopt a captain-owned workspace named `firstmate` and close its live seed-shaped tab.
+A prior label heuristic could adopt a captain-owned workspace named `juggernaut` and close its live seed-shaped tab.
 The current structural gate removes label inference from cleanup authority.
 `tests/jg-backend-herdr-prune-safety-e2e.test.sh` reproduces the collision in an isolated named session and proves the adopted pane remains untouched.
 
@@ -554,7 +554,7 @@ Before that Enter, the adapter continues only when the selected composer shows t
 Every herdr adapter composer read (`jg_backend_herdr_composer_state`, `jg_backend_herdr_composer_content`) captures the full visible viewport, never a bounded tail, while the shared inbox pending-line confirmation read (bin/jg-task-inbox-lib.sh) stays a bounded tail on every backend: an overlay Claude renders between the composer and the pane bottom - the slash-command popup is the verified shape - pushes the composer outside a tail window, and the composer is by definition inside the viewport.
 Dated measurement: docs/verification/runtime-backends.md "Claude exit behind the slash-command popup".
 
-That comparison ignores whitespace and U+2063, the invisible mark that starts operational inputs and ends the from-firstmate label.
+That comparison ignores whitespace and U+2063, the invisible mark that starts operational inputs and ends the from-juggernaut label.
 It ignores U+2063 because Claude's Herdr read-back never shows it.
 
 A composer that holds a shorter suffix, or a placeholder plus a literal remainder, does not receive Enter.
@@ -659,8 +659,8 @@ This prevents a dead agent pane from receiving and possibly executing an escalat
 
 ### Operational input markers
 
-The current operational envelope starts with U+2063 and `FIRSTMATE_OP: `.
-The separate routed-request carrier uses `[jg-from-firstmate]` plus U+2063.
+The current operational envelope starts with U+2063 and `JUGGERNAUT_OP: `.
+The separate routed-request carrier uses `[jg-from-juggernaut]` plus U+2063.
 U+2063 survives Herdr terminal input as text, unlike the legacy ASCII control separator that could erase the visible routing label.
 Claude Code itself then removes it from the submitted prompt, so a Claude Code primary receives away-mode escalations as the owner's record-backed doorbell instead.
 `bin/jg-operational-input.sh` owns current operational construction and parsing, and the AFK skill owns legacy away-input compatibility.
@@ -730,9 +730,9 @@ The process-level proof only decides whether that registration is backed by a ru
 `tests/jg-backend-herdr-agent-exit-shell-e2e.test.sh` pins the live-Pi versus leftover-shell distinction.
 [`verification/runtime-backends.md`](verification/runtime-backends.md#agent-lifecycle-control) owns the versioned evidence.
 
-The session-start sweep and the watcher's dedicated secondmate liveness tick use this probe.
-Idle secondmates remain exempt from stale-pane escalation.
-[Secondmate endpoint recovery](architecture.md) owns the shared supervision mechanism.
+The session-start sweep and the watcher's dedicated squad lead liveness tick use this probe.
+Idle squad leads remain exempt from stale-pane escalation.
+[Squad Lead endpoint recovery](architecture.md) owns the shared supervision mechanism.
 
 ## Agent status authority and relaunch
 
@@ -759,7 +759,7 @@ The Herdr adapter subscribes before reconciling current levels, buffers edges du
 
 The watcher maps the pane back to the task and skips these (the optional wait-timers add-on applies its own native-evidence admission and active-hold policy on top when installed):
 
-- Secondmate endpoints.
+- Squad Lead endpoints.
 - Declared `paused:` waits, because the worker's declared wait already accounts for its quiet.
   It is left to the watcher's own bounded pause cadence.
 - Verified `captain-held` transfers.
@@ -768,7 +768,7 @@ The watcher maps the pane back to the task and skips these (the optional wait-ti
 ### Polling fallback
 
 The push path only shortens latency.
-The optional firstmate-addons wait-timers add-on owns the independent recorded-pane polling timers and owner routing.
+The optional juggernaut-addons wait-timers add-on owns the independent recorded-pane polling timers and owner routing.
 Polling runs every cycle and remains the permanent fallback when any of these is unavailable:
 
 - Protocol 16.

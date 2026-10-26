@@ -7,7 +7,7 @@
 # A missing or dash-leading request_id, or any extra argument, is a usage error
 # before dismissing or recording anything.
 #
-# When firstmate decides NOT to reply to a mention (a pure acknowledgment, or any
+# When juggernaut decides NOT to reply to a mention (a pure acknowledgment, or any
 # mention it judges not worth a reply), clearing only the local inbox file is not
 # enough: the relay keeps re-offering that request on every poll until it times
 # out to a polite "offline" auto-reply. Dismiss tells the relay to drop the
@@ -23,7 +23,7 @@
 # pass.
 #
 # Live post config (home .env, FMX_ENV_FILE, or env): FMX_PAIRING_TOKEN
-# (required), FMX_RELAY_URL (default https://myfirstmate.io). Auth:
+# (required), FMX_RELAY_URL (default https://myjuggernaut.io). Auth:
 # Authorization: Bearer <token>.
 #
 # Preview / dry-run: with FMX_DRY_RUN set (truthy), nothing is posted. Instead the

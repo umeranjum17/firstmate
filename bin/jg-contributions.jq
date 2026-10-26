@@ -32,7 +32,7 @@ def valid_record:
         and (.review_decision | IN("","APPROVED","CHANGES_REQUESTED","REVIEW_REQUIRED"))
         else (.ready | type == "boolean") end))))) catch false;
 def known($input; $saved):
-  ([($input.tasks // [])[] | select(.kind != "secondmate")
+  ([($input.tasks // [])[] | select(.kind != "squad_lead")
      | select(.pr.url | canonical_url) | {task:.id,url:.pr.url}]
    + [($input.backlog.records // [])[] | select(.structured == true) as $task
       | ($task.links // [])[] | select(canonical_url) | {task:$task.id,url:.}]

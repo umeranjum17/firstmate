@@ -497,14 +497,14 @@ gate: review
 EOF
 }
 
-# A gate owed the CREWMATE's own answer: every finding's `action` column is
+# A gate owed the OPERATOR's own answer: every finding's `action` column is
 # auto-fix. The free-text `description` column is where this repository's own
 # review output routinely quotes finding actions, so one row spells the token out
 # the way an enumeration does - surrounded by commas, in the exact shape a
 # substring or unanchored-regex derivation would accept - and the branch name
 # carries it too. Both are the counterexample: the ONLY thing that may mint the
 # human-decision component is the `action` column read by position.
-run_parked_crewmate_gate_with_ask_user_prose() {  # <branch>
+run_parked_operator_gate_with_ask_user_prose() {  # <branch>
   cat <<EOF
 run:
   id: "01RUN"
@@ -539,7 +539,7 @@ gate: review
 EOF
 }
 
-# The same crewmate-owed gate with `description` placed BEFORE `action` in the
+# The same operator-owed gate with `description` placed BEFORE `action` in the
 # header. Every row's real action column is auto-fix, but one description spells
 # the token out surrounded by commas at exactly the comma offset the `action`
 # index lands on, so a derivation that reads the index from the header and then
@@ -560,7 +560,7 @@ gate: review
 EOF
 }
 
-# The same crewmate-owed gate preceded by an UNBRACED `findings[N]:` block from
+# The same operator-owed gate preceded by an UNBRACED `findings[N]:` block from
 # an earlier, already-resolved round. The braced header that follows is the live
 # gate's table and is the one the column index is read from, so the rows walked
 # must be that table's rows too. An earlier block carrying `ask-user` at the very
@@ -581,7 +581,7 @@ run:
     prior-1,warning,a.go,ask-user,an earlier already-resolved block
     prior-2,info,b.go,ask-user,another earlier row
   findings[1]{id,severity,file,action,description}:
-    r1,warning,a.go,auto-fix,the live gate is owed to the crewmate
+    r1,warning,a.go,auto-fix,the live gate is owed to the operator
 gate: review
 EOF
 }
@@ -1067,7 +1067,7 @@ test_parked_human_decision_comes_from_the_action_column() {
 
   # The counterexample. Nothing here is owed a human: every action column is
   # auto-fix. A description enumerating the action values, and a branch named
-  # after the same token, must not mint the component - a crewmate that goes
+  # after the same token, must not mint the component - a operator that goes
   # quiet before answering its own gate has to keep the wedge ladder.
   reset_fakes
   d=$(new_case parked-ask-user-prose-only)
@@ -1075,7 +1075,7 @@ test_parked_human_decision_comes_from_the_action_column() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-ap.meta" "window=fm:jg-feat-ap" "worktree=$d/wt" "kind=ship"
   printf 'working: validation under way\n' > "$d/state/feat-ap.status"
-  JG_FAKE_AXI_STATUS="$(run_parked_crewmate_gate_with_ask_user_prose fm/ask-user-authority-fix)"
+  JG_FAKE_AXI_STATUS="$(run_parked_operator_gate_with_ask_user_prose fm/ask-user-authority-fix)"
   # Guard the counterexample against going vacuous: the payload this gate is read
   # from must really contain the token in a position a substring or unanchored
   # regex would accept, or the case below proves nothing.
@@ -1084,7 +1084,7 @@ test_parked_human_decision_comes_from_the_action_column() {
   assert_contains "$JG_FAKE_AXI_STATUS" "branch: fm/ask-user-authority-fix" \
     "the counterexample payload must also carry the token in its branch name"
   out=$(run_crew_state "$d" feat-ap)
-  assert_contains "$out" "state: parked" "a crewmate-owed gate still reports parked"
+  assert_contains "$out" "state: parked" "a operator-owed gate still reports parked"
   assert_not_contains "$out" " · ask-user: authority decision" \
     "free text and a branch name must not mint the human-decision component"
 
@@ -1103,7 +1103,7 @@ test_parked_human_decision_comes_from_the_action_column() {
   # A header index alone is not enough, because the row is split on raw commas.
   # With `description` ahead of `action` the comma walk lands inside free text,
   # so a gate whose every action is auto-fix would mint the component. The table
-  # is not provably safe to walk, so the derivation must refuse and the crewmate
+  # is not provably safe to walk, so the derivation must refuse and the operator
   # must keep the wedge ladder.
   reset_fakes
   d=$(new_case parked-free-text-before-action)
@@ -1128,7 +1128,7 @@ test_parked_human_decision_comes_from_the_action_column() {
   # supply the rows while the braced header supplies the count and the `action`
   # index, so the walk reads the wrong rows at the right index. Here that earlier
   # block carries ask-user at exactly that offset while the live gate's only row
-  # is auto-fix: the crewmate owes this gate its own answer and must keep the
+  # is auto-fix: the operator owes this gate its own answer and must keep the
   # wedge ladder.
   reset_fakes
   d=$(new_case parked-unbraced-findings-precursor)
@@ -2030,7 +2030,7 @@ EOF
   out=$(JG_HOME="$d" run_crew_state "$d" cancelled)
   assert_contains "$out" 'state: working' 'fixture begins with active validation'
   # Deliberately transition the external instrument fixture to cancelled.
-  # This executes Firstmate end to end; it does not cancel a real daemon run.
+  # This executes Juggernaut end to end; it does not cancel a real daemon run.
   JG_FAKE_AXI_STATUS="$(run_failed fm/cancelled)"
   JG_FAKE_AXI_STATUS=${JG_FAKE_AXI_STATUS//failed/cancelled}
   JG_FAKE_AXI_STATUS=${JG_FAKE_AXI_STATUS/status: completed/status: cancelled}
@@ -2046,7 +2046,7 @@ branch: fm/cancelled
 status: cancelled
 head: ${JG_FAKE_RUN_HEAD:0:8}
 head_sha: $JG_FAKE_RUN_HEAD
-pr: "https://github.com/kunchenguid/firstmate/pull/4818"
+pr: "https://github.com/kunchenguid/juggernaut/pull/4818"
 findings: 2 awaiting
 steps[9]{step,status,findings,duration_ms}:
 intent,completed,0,32
@@ -2070,7 +2070,7 @@ EOF
   assert_not_contains "$out" 'state: failed' "$scenario cancellation is not a failure"
   assert_not_contains "$out" 'held for merge' "$scenario has no positive delivery evidence"
   summary=$(PATH="$d/fakebin:$PATH" JG_HOME="$d" JG_ROOT_OVERRIDE="$d/fixture-root" \
-    "$ROOT/bin/jg-fleet-snapshot.sh" --secondmate-home-summary)
+    "$ROOT/bin/jg-fleet-snapshot.sh" --squad-lead-home-summary)
   printf '%s' "$summary" | jq -e '
     .state == "unknown" and .valid == false
     and .invalidity == {kind:"child_current_unavailable",ids:["cancelled"]}
@@ -3029,13 +3029,13 @@ test_no_run_idle_pane_paused() {
   pass "no run + idle pane on a paused: status reports state: paused with its reason"
 }
 
-test_secondmate_open_block_survives_unrelated_append() {
+test_squad_lead_open_block_survives_unrelated_append() {
   reset_fakes
   local d out suffix gen
   d=$(new_case buried-block)
   mkdir -p "$d/wt"
   make_fakebin "$d" >/dev/null
-  jg_write_meta "$d/state/mate.meta" "window=fm:jg-mate" "worktree=$d/wt" "kind=secondmate" "harness=claude"
+  jg_write_meta "$d/state/mate.meta" "window=fm:jg-mate" "worktree=$d/wt" "kind=squad_lead" "harness=claude"
   gen=$("$ROOT/bin/jg-busy-event.sh" arm "$d/state" mate)
   "$ROOT/bin/jg-busy-event.sh" apply "$d/state" mate busy --gen "$gen" --source claude-hook --event user-prompt-submit
   for suffix in '' 'note: unrelated progress' 'resolved [key=other]: unrelated answer' 'working: continuing another task' 'done: another task completed' 'failed: another task failed' $'done: another task completed\nnote: cleanup complete' $'failed: another task failed\nnote: cleanup complete'; do
@@ -3048,7 +3048,7 @@ test_secondmate_open_block_survives_unrelated_append() {
   out=$(run_crew_state "$d" mate)
   assert_contains "$out" "state: unknown" "matching resolution clears the blocker"
   assert_not_contains "$out" "need release access" "closed blocker is not resurrected"
-  pass "a busy secondmate keeps its open blocker until that exact key closes"
+  pass "a busy squad_lead keeps its open blocker until that exact key closes"
 }
 
 test_newest_open_decision_supplies_the_reported_detail() {
@@ -3057,7 +3057,7 @@ test_newest_open_decision_supplies_the_reported_detail() {
   d=$(new_case newest-open-decision)
   mkdir -p "$d/wt"
   make_fakebin "$d" >/dev/null
-  jg_write_meta "$d/state/mate.meta" "window=fm:jg-mate" "worktree=$d/wt" "kind=secondmate" "harness=claude"
+  jg_write_meta "$d/state/mate.meta" "window=fm:jg-mate" "worktree=$d/wt" "kind=squad_lead" "harness=claude"
   gen=$("$ROOT/bin/jg-busy-event.sh" arm "$d/state" mate)
   "$ROOT/bin/jg-busy-event.sh" apply "$d/state" mate busy --gen "$gen" --source claude-hook --event user-prompt-submit
   printf 'blocked [key=a]: staging is down\nneeds-decision [key=b]: pick a rollout order\n' > "$d/state/mate.status"
@@ -3196,23 +3196,23 @@ test_no_run_idle_pane_custom_paused_verb() {
 
 # A trailing keyed resolved: event is a decision-CLOSING event, not a run-state
 # verb. It must never become the current state or leak its resolution prose as the
-# detail: a healthy idle secondmate that just closed a keyed decision falls through
+# detail: a healthy idle squad_lead that just closed a keyed decision falls through
 # to the idle default (unknown/none), not `unknown` with the resolution note as its
-# `doing`. Regression for the bearings render bug where such a secondmate showed
+# `doing`. Regression for the bearings render bug where such a squad_lead showed
 # state=unknown with resolution prose. The one-owner keyed fold in jg-classify-lib.sh
 # is untouched; this only stops the deriver from reading a non-state event as state.
-test_no_run_idle_secondmate_resolved_event_not_state() {
+test_no_run_idle_squad_lead_resolved_event_not_state() {
   reset_fakes
   local d; d=$(new_case resolved-idle)
   mkdir -p "$d/wt"
   make_fakebin "$d" >/dev/null
-  jg_write_meta "$d/state/mate.meta" "window=fm:jg-mate" "worktree=$d/wt" "kind=secondmate" "home=$d/wt"
+  jg_write_meta "$d/state/mate.meta" "window=fm:jg-mate" "worktree=$d/wt" "kind=squad_lead" "home=$d/wt"
   printf 'needs-decision [key=race]: pick subscribe order\n' > "$d/state/mate.status"
   printf 'resolved [key=race]: went with subscribe-before-write\n' >> "$d/state/mate.status"
   JG_FAKE_AXI_STATUS=""
   JG_FAKE_BUSY=0
   local out; out=$(run_crew_state "$d" mate)
-  assert_contains "$out" "state: unknown" "resolved-then-idle secondmate is not a spurious run-state"
+  assert_contains "$out" "state: unknown" "resolved-then-idle squad_lead is not a spurious run-state"
   assert_contains "$out" "source: none" "a resolved event is not treated as a status-log state source"
   assert_not_contains "$out" "subscribe-before-write" "resolution prose must not leak into the detail"
   # A bare (non-keyed) resolved: closes the default key and behaves the same.
@@ -3378,7 +3378,7 @@ test_torn_down_worktree() {
   pass "torn-down worktree is handled gracefully"
 }
 
-# --- remote secondmate arm ---------------------------------------------------
+# --- remote squad_lead arm ---------------------------------------------------
 # A meta recording remote_host= must never be read through the local worktree
 # probe or a local backend adapter: the recorded worktree and pane live on the
 # remote host, and the old local reads misreported a healthy remote mate as
@@ -3396,14 +3396,14 @@ setup_remote_case() {  # <name> -> echoes case dir with remote meta + registry
     "endpoint_task_id=rsm" \
     "worktree=/remote/home/never-locally-present" \
     "harness=claude" \
-    "kind=secondmate" \
-    "mode=secondmate" \
+    "kind=squad_lead" \
+    "mode=squad_lead" \
     "remote_host=remote-mac" \
     "remote_root=/remote/root" \
     "remote_backend=herdr" \
     "remote_herdr_session=jg-remote" \
     "remote_target=jg-remote:w1:p1"
-  cat > "$d/data/secondmates.md" <<EOF
+  cat > "$d/data/squad_leads.md" <<EOF
 - rsm - remote test domain (host: remote-mac; root: /remote/root; home: /remote/home; scope: remote testing; projects: alpha; added 2026-08-02)
 EOF
   cat > "$d/fakebin/fake-ssh" <<'SH'
@@ -5816,7 +5816,7 @@ test_socket_refusal_over_terminal_run_reports_blocked
 test_socket_refusal_override_expires_when_the_crew_moves_on
 test_ordinary_blocked_over_live_run_keeps_plain_superseded
 test_genuine_daemon_down_reports_blocked
-test_secondmate_open_block_survives_unrelated_append
+test_squad_lead_open_block_survives_unrelated_append
 test_newest_open_decision_supplies_the_reported_detail
 test_single_owner_terminal_declaration_supersedes_stale_decision
 test_latest_status_preserves_legacy_completions
@@ -5890,7 +5890,7 @@ test_no_run_idle_pane_uses_log
 test_no_run_idle_pane_uses_keyed_log
 test_no_run_idle_pane_paused
 test_no_run_idle_pane_custom_paused_verb
-test_no_run_idle_secondmate_resolved_event_not_state
+test_no_run_idle_squad_lead_resolved_event_not_state
 test_dead_window_ignores_stale_status_log
 test_no_run_tmux_unreadable_reads_unreachable_not_gone
 test_dead_window_still_reports_terminal_run_step

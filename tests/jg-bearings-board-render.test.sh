@@ -181,7 +181,7 @@ test_omitted_warnings_never_count_as_more_queued() {
     || fail "an omitted warning was counted as queued work: $out"
   printf '%s' "$out" | jq -e '
     (.empty | length) == 1 and (.empty[0] | test("Nothing is queued"))
-      and (.more == ["+1 more repair warning - ask firstmate for the full chart"])
+      and (.more == ["+1 more repair warning - ask juggernaut for the full chart"])
       and ([.more[] | select(test("more queued"))] | length) == 0
   ' >/dev/null || fail "an omitted warning was labeled as more queued: $out"
   pass "omitted warnings remain separate from omitted queued work"
@@ -207,7 +207,7 @@ test_an_underway_row_leads_with_the_task_name_and_keeps_its_run_status() {
   local home out
   home=$(make_home underway-name)
   out=$(render_board "$home" '[
-    {"id":"jg-board-name-r1","repo":"firstmate","name":"Show task names on the board",
+    {"id":"jg-board-name-r1","repo":"juggernaut","name":"Show task names on the board",
      "state":"working","kind":"ship","doing":"no-mistakes: review round 2"}
   ]' '[]')
   printf '%s' "$out" | jq -e '
@@ -215,7 +215,7 @@ test_an_underway_row_leads_with_the_task_name_and_keeps_its_run_status() {
       and (.underway[0]
         | .title == "Show task names on the board"
           and (.sub | test("no-mistakes: review round 2"))
-          and (.sub | test("ship")) and (.sub | test("firstmate"))
+          and (.sub | test("ship")) and (.sub | test("juggernaut"))
           and [.badges[] | .text] == ["working"])
   ' >/dev/null || fail "an underway row did not lead with the task name: $out"
   pass "an underway row leads with the task name and still reports its run status"
@@ -226,7 +226,7 @@ test_an_underway_identifier_label_is_not_replaced_by_run_status() {
   home=$(make_home underway-identifier)
   out=$(render_board "$home" '[
     {"id":"mate/child-1","repo":null,"name":"mate/child-1",
-     "state":"working","kind":"secondmate","doing":"fixing the failing check"}
+     "state":"working","kind":"squad_lead","doing":"fixing the failing check"}
   ]' '[]')
   printf '%s' "$out" | jq -e '
     (.underway | length) == 1

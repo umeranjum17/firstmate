@@ -5,7 +5,7 @@
 # historically stayed open forever when the answer kicked off work: the worker's
 # next line is working [key=<workstream>], never resolved [key=<decision>].
 # jg-send's --resolve-key removes that writer-dependency at its source: the
-# ANSWERING firstmate closes the decision in this home's own ledger at answer
+# ANSWERING juggernaut closes the decision in this home's own ledger at answer
 # time - for a local target that is ENQUEUE time, because the durable inbox
 # write is delivery to the task's record. These tests drive the real jg-send
 # executable over stubbed transports and assert closure through the real
@@ -19,10 +19,10 @@
 #   4. The close happens at enqueue: a failed doorbell ring still closes the
 #      answered key (the record is durably sent), while a failed ENQUEUE - the
 #      real local failure - closes nothing and leaves the decision open.
-#   5. A local secondmate answer is marked+corr'd in its record yet closes the
+#   5. A local squad_lead answer is marked+corr'd in its record yet closes the
 #      same way, and the closing line carries the plain answer, not marker or
 #      corr bytes.
-#   6. A remote secondmate answer differs only at the transport layer: the
+#   6. A remote squad_lead answer differs only at the transport layer: the
 #      message crosses the stubbed ssh transport while the close is the same
 #      local ledger append; a failed transport closes nothing.
 #   7. Flag misuse (--key, empty message, explicit backend target) refuses.
@@ -84,7 +84,7 @@ SH
 exit 0
 SH
   chmod +x "$fb/sleep"
-  # Stub ssh transport for the remote-secondmate legs, selected via JG_SSH_BIN.
+  # Stub ssh transport for the remote-squad-lead legs, selected via JG_SSH_BIN.
   # Records the full remote invocation and exits JG_FAKE_SSH_RC (default 0).
   cat > "$fb/fake-ssh" <<'SH'
 #!/usr/bin/env bash
@@ -134,7 +134,7 @@ test_answer_send_closes_open_decision() {
   expect_code 0 "$rc" "an answer send with --resolve-key should succeed"
   grep -qF "go with REST" "$home/state/t1.inbox/001.msg" \
     || fail "the answer text should reach the worker's durable inbox record"
-  assert_contains "$(cat "$log")" "Firstmate instruction waiting" "the doorbell should be rung for the answer"
+  assert_contains "$(cat "$log")" "Juggernaut instruction waiting" "the doorbell should be rung for the answer"
   sed -E 's/ \[at=[0-9]+\]//' "$home/state/t1.status" | grep -qF 'resolved [key=api-shape]: answered: go with REST' \
     || fail "jg-send did not append the closing resolved line:"$'\n'"$(cat "$home/state/t1.status")"
   # The drain folded the worker's `working:` line but never listed it, so the
@@ -455,24 +455,24 @@ test_multiple_keys_close_after_fold_is_self_announced() {
   pass "jg-send --resolve-key: one answer's closes after a drain fold never wake this home"
 }
 
-test_local_secondmate_answer_marked_and_closed() {
+test_local_squad_lead_answer_marked_and_closed() {
   local dir fb log home rc got out closing
   dir="$TMP_ROOT/sm"; mkdir -p "$dir"
   fb=$(make_stubs "$dir"); log="$dir/send.log"
   home=$(setup_home sm)
-  jg_write_secondmate_meta "$home/state/domain.meta" "$home" "sess:jg-domain"
+  jg_write_squad_lead_meta "$home/state/domain.meta" "$home" "sess:jg-domain"
   printf 'needs-decision [key=fleet-split]: shard by team or by repo\n' > "$home/state/domain.status"
 
   run_send "$fb" "$home" "$log" jg-domain --resolve-key fleet-split "shard by team"; rc=$?
-  expect_code 0 "$rc" "a secondmate answer send should succeed"
+  expect_code 0 "$rc" "a squad_lead answer send should succeed"
   got=$(bash -c '. "$1"; jg_task_inbox_body "$2"' _ "$ROOT/bin/jg-task-inbox-lib.sh" \
     "$home/state/domain.inbox/001.msg")
   case "$got" in
     "$JG_FROMFIRST_MARK"corr=*) : ;;
-    *) fail "the secondmate answer's record lost its from-firstmate marker/corr framing: $got" ;;
+    *) fail "the squad_lead answer's record lost its from-juggernaut marker/corr framing: $got" ;;
   esac
   closing=$(grep -F 'resolved [key=fleet-split]' "$home/state/domain.status" || true)
-  [ -n "$closing" ] || fail "the secondmate decision was not closed: $(cat "$home/state/domain.status")"
+  [ -n "$closing" ] || fail "the squad_lead decision was not closed: $(cat "$home/state/domain.status")"
   case "$closing" in
     *corr=*) fail "the closing line leaked the corr token: $closing" ;;
   esac
@@ -482,12 +482,12 @@ test_local_secondmate_answer_marked_and_closed() {
   assert_contains "$closing" "shard by team" "the closing line should carry the plain answer"
   out=$(drain_out "$home")
   if printf '%s' "$out" | grep -F 'OPEN DECISIONS' >/dev/null; then
-    fail "the answered secondmate decision still lists as open: $out"
+    fail "the answered squad_lead decision still lists as open: $out"
   fi
-  pass "jg-send --resolve-key: a marked local-secondmate answer closes with the plain answer text"
+  pass "jg-send --resolve-key: a marked local-squad-lead answer closes with the plain answer text"
 }
 
-# Remote secondmate: the answer crosses the (stubbed) ssh transport through the
+# Remote squad_lead: the answer crosses the (stubbed) ssh transport through the
 # real jg-on.sh + registry route, while the close is the SAME local ledger
 # append as every other target kind - the transport is the only difference.
 setup_remote_home() {  # <name> -> echoes home dir with remote meta + registry
@@ -498,21 +498,21 @@ setup_remote_home() {  # <name> -> echoes home dir with remote meta + registry
     "window=jg-remote:w1:p1" \
     "endpoint_task_id=rsm" \
     "harness=claude" \
-    "kind=secondmate" \
-    "mode=secondmate" \
+    "kind=squad_lead" \
+    "mode=squad_lead" \
     "yolo=off" \
     "remote_host=remote-mac" \
     "remote_root=/remote/root" \
     "remote_backend=herdr" \
     "remote_herdr_session=jg-remote" \
     "remote_target=jg-remote:w1:p1"
-  cat > "$home/data/secondmates.md" <<EOF
+  cat > "$home/data/squad_leads.md" <<EOF
 - rsm - remote test domain (host: remote-mac; root: /remote/root; home: /remote/home; scope: remote testing; projects: alpha; added 2026-08-02)
 EOF
   printf '%s\n' "$home"
 }
 
-test_remote_secondmate_answer_closes_locally() {
+test_remote_squad_lead_answer_closes_locally() {
   local dir fb log home ssh_log rc out
   dir="$TMP_ROOT/remote-ok"; mkdir -p "$dir"
   fb=$(make_stubs "$dir"); log="$dir/send.log"; ssh_log="$dir/ssh.log"; : > "$ssh_log"
@@ -524,19 +524,19 @@ test_remote_secondmate_answer_closes_locally() {
     JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" JG_SEND_LOG="$log" JG_SEND_SETTLE=0 \
     JG_SSH_BIN="$fb/fake-ssh" JG_SSH_LOG="$ssh_log" JG_FAKE_SSH_RC=0 \
     "$SEND" rsm --resolve-key upgrade-window "the weekend, freeze Friday" >/dev/null 2>&1; rc=$?
-  expect_code 0 "$rc" "a remote secondmate answer send should succeed"
+  expect_code 0 "$rc" "a remote squad_lead answer send should succeed"
   assert_grep 'jg-remote-entrypoint.sh' "$ssh_log" \
     "the answer message should cross the remote transport"
   sed -E 's/ \[at=[0-9]+\]//' "$home/state/rsm.status" | grep -qF 'resolved [key=upgrade-window]: answered: the weekend, freeze Friday' \
     || fail "the remote answer did not close the local ledger: $(cat "$home/state/rsm.status")"
   out=$(drain_out "$home")
   if printf '%s' "$out" | grep -F 'OPEN DECISIONS' >/dev/null; then
-    fail "the answered remote-secondmate decision still lists as open: $out"
+    fail "the answered remote-squad-lead decision still lists as open: $out"
   fi
-  pass "jg-send --resolve-key: a remote-secondmate answer closes the same local ledger, transport-only difference"
+  pass "jg-send --resolve-key: a remote-squad-lead answer closes the same local ledger, transport-only difference"
 }
 
-# The reported failure: a remote secondmate reply line prepends a
+# The reported failure: a remote squad_lead reply line prepends a
 # "[corr=<hex>]" correlation tag ahead of "[key=...]"
 # (needs-decision [corr=d448ea86afa4bf67] [key=x]: ...). The verb parser used
 # to strip only a leading "[key=...]" token, so the corr tag stayed glued onto
@@ -840,7 +840,7 @@ test_remote_reserved_pending_reply_key_closes_locally() {
   if printf '%s' "$out" | grep -F 'OPEN DECISIONS' >/dev/null; then
     fail "the remote reserved pending-reply decision still lists as open: $out"
   fi
-  pass "jg-send --resolve-key: a remote secondmate reserved-key close is the same local ledger append"
+  pass "jg-send --resolve-key: a remote squad_lead reserved-key close is the same local ledger append"
 }
 
 # The decision-answer partition (bin/jg-send.sh header "Answering a decision"):
@@ -857,7 +857,7 @@ test_decision_answer_partition_relocates_under_the_record() {
   home=$(setup_home partition)
   jg_write_meta "$home/state/t1.meta" "window=sess:jg-t1" "kind=ship"
   printf 'needs-decision [key=api-shape]: pick REST or RPC\n' > "$home/state/t1.status"
-  printf 'blocked [key=token]: firstmate can refresh the token\n' >> "$home/state/t1.status"
+  printf 'blocked [key=token]: juggernaut can refresh the token\n' >> "$home/state/t1.status"
 
   # Attended branch: the decision is refused at the partition, nothing sent.
   : > "$log"
@@ -916,8 +916,8 @@ test_failed_ring_still_closes_at_enqueue
 test_failed_enqueue_does_not_close
 test_multiple_keys_close_together
 test_multiple_keys_close_after_fold_is_self_announced
-test_local_secondmate_answer_marked_and_closed
-test_remote_secondmate_answer_closes_locally
+test_local_squad_lead_answer_marked_and_closed
+test_remote_squad_lead_answer_closes_locally
 test_remote_reply_corr_tag_does_not_block_resolve_key
 test_remote_transport_failure_does_not_close
 test_flag_misuse_refuses

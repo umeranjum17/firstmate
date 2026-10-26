@@ -19,7 +19,7 @@ set -euo pipefail
 real_pi=$(mise which pi 2>/dev/null) && PATH=$(dirname "$real_pi"):$PATH
 repo=$(cd "$(dirname "$0")/.." && pwd -P)
 evidence=${DONE_DONE_EVIDENCE_ROOT:?}
-FMC=${JG_CHECKOUT:?set JG_CHECKOUT to a Firstmate checkout}
+FMC=${JG_CHECKOUT:?set JG_CHECKOUT to a Juggernaut checkout}
 port=${LAB_429_PORT:-18429} wait=${LAB_WAIT_SECS:-1800} ID=lab429-worker
 mkdir -p "$evidence" && work=$(mktemp -d "${XDG_CACHE_HOME:-$HOME/.cache}/jg-quota-failover-live.$(date -u +%Y%m%dT%H%M%SZ).XXXXXX")
 ROOT=$work/lab raw=$work/raw srv='' downed=''
@@ -73,10 +73,10 @@ inst=$ROOT/xdg/jg-quota-failover # the only pool library line the installed watc
   grep -q '^\. "\$_JG_POOL_DIR/jg-account-pool-lib\.sh"' "$inst/quota-failover/quota-failover" &&
   cmp -s "$inst/account-pool/bin/jg-account-pool-lib.sh" "$repo/account-pool/bin/jg-account-pool-lib.sh" ||
   { log "FAIL: the installed watcher does not load the add-on's own account-pool library"; exit 1; }
-log "setup: the installed watcher sources only the add-on's own account-pool/bin/jg-account-pool-lib.sh (installed beside it, identical to this checkout's), not the Firstmate checkout's bin/ copy"
+log "setup: the installed watcher sources only the add-on's own account-pool/bin/jg-account-pool-lib.sh (installed beside it, identical to this checkout's), not the Juggernaut checkout's bin/ copy"
 
 lab_run "$LAB/bin/jg-brief.sh" "$ID" notes --mode local-only >/dev/null
-sed -i 's|{TASK}|Add count_notes(), which returns how many notes are stored, to notes/__init__.py.|; s|{FIRSTMATE_SPEC}|Implement count_notes(), commit, and report done. Nothing else is in scope.|' "$LAB/data/$ID/brief.md"
+sed -i 's|{TASK}|Add count_notes(), which returns how many notes are stored, to notes/__init__.py.|; s|{JUGGERNAUT_SPEC}|Implement count_notes(), commit, and report done. Nothing else is in scope.|' "$LAB/data/$ID/brief.md"
 lab_run "$LAB/bin/jg-tasks-axi.sh" add "$ID" "lab worker on a rate-limited route" --kind ship --repo notes --priority 3 >/dev/null
 lab_run timeout "${LAB_SPAWN_SECS:-120}" "$LAB/bin/jg-spawn.sh" "$ID" "$LAB/projects/notes" --mode local-only --yolo on --harness pi --model lab429/rl-model --effort low >"$raw/spawn.txt" 2>&1
 wt=$(sed -n "s/^spawned $ID .* worktree=//p" "$raw/spawn.txt")

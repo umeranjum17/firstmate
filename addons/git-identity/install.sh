@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install or update the git-identity add-on for this user and point one firstmate home's config/launch-env-hook at it
+# Install or update the git-identity add-on for this user and point one juggernaut home's config/launch-env-hook at it
 # through an exec shim, backing up a replaced hook first. Idempotent; a configured identity is kept unless a flag
 # replaces it. Usage: install.sh [--dry-run] [--email <email>] [--name <name>] <jg-home>
 set -euo pipefail

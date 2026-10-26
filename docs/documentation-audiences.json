@@ -31,11 +31,11 @@
     "docs/zellij-backend.md",
     "docs/orca-backend.md",
     "docs/cmux-backend.md",
-    "docs/remote-secondmates.md"
+    "docs/remote-squad-leads.md"
   ],
   "requiredOwnerPointers": [
     {
-      "source": ".agents/skills/firstmate-coding-guidelines/SKILL.md",
+      "source": ".agents/skills/juggernaut-coding-guidelines/SKILL.md",
       "target": "docs/documentation-audiences.md"
     },
     {
@@ -141,19 +141,19 @@
       "audience": "agent-runtime"
     },
     {
-      "path": ".agents/skills/firstmate-codexapp/SKILL.md",
+      "path": ".agents/skills/juggernaut-codexapp/SKILL.md",
       "audience": "agent-runtime"
     },
     {
-      "path": ".agents/skills/firstmate-coding-guidelines/SKILL.md",
+      "path": ".agents/skills/juggernaut-coding-guidelines/SKILL.md",
       "audience": "agent-runtime"
     },
     {
-      "path": ".agents/skills/firstmate-orca/SKILL.md",
+      "path": ".agents/skills/juggernaut-orca/SKILL.md",
       "audience": "agent-runtime"
     },
     {
-      "path": ".agents/skills/firstmate-self-repo/SKILL.md",
+      "path": ".agents/skills/juggernaut-self-repo/SKILL.md",
       "audience": "agent-runtime"
     },
     {
@@ -249,7 +249,7 @@
       "audience": "agent-runtime"
     },
     {
-      "path": ".agents/skills/secondmate-provisioning/SKILL.md",
+      "path": ".agents/skills/squad-lead-provisioning/SKILL.md",
       "audience": "agent-runtime"
     },
     {
@@ -257,11 +257,11 @@
       "audience": "agent-runtime"
     },
     {
-      "path": ".agents/skills/stuck-crewmate-recovery/SKILL.md",
+      "path": ".agents/skills/stuck-operator-recovery/SKILL.md",
       "audience": "agent-runtime"
     },
     {
-      "path": ".agents/skills/updatefirstmate/SKILL.md",
+      "path": ".agents/skills/updatejuggernaut/SKILL.md",
       "audience": "agent-runtime"
     },
     {
@@ -353,7 +353,7 @@
       "audience": "operator-example"
     },
     {
-      "path": "docs/examples/process-event-extension/firstmate-extension.json",
+      "path": "docs/examples/process-event-extension/juggernaut-extension.json",
       "audience": "operator-example"
     },
     {
@@ -413,11 +413,11 @@
       "audience": "maintainer-architecture"
     },
     {
-      "path": "docs/remote-secondmates.md",
+      "path": "docs/remote-squad-leads.md",
       "audience": "operator-current"
     },
     {
-      "path": "docs/secondmate-parent-channel.md",
+      "path": "docs/squad-lead-parent-channel.md",
       "audience": "maintainer-architecture"
     },
     {
@@ -525,7 +525,7 @@
       "audience": "maintainer-verification"
     },
     {
-      "path": "docs/verification/secondmate-parent-channel.md",
+      "path": "docs/verification/squad-lead-parent-channel.md",
       "audience": "maintainer-verification"
     },
     {
@@ -657,91 +657,91 @@
       "audience": "agent-runtime"
     },
     {
-      "path": "addons/.agents/skills/done-done-verify-firstmate-addons/SKILL.md",
+      "path": "addons/.agents/skills/done-done-verify-juggernaut-addons/SKILL.md",
       "audience": "agent-runtime"
     },
     {
-      "path": "addons/.agents/skills/done-done-verify-firstmate-addons/features/README.md",
+      "path": "addons/.agents/skills/done-done-verify-juggernaut-addons/features/README.md",
       "audience": "agent-runtime"
     },
     {
-      "path": "addons/.agents/skills/done-done-verify-firstmate-addons/features/account-next-relaunch.md",
+      "path": "addons/.agents/skills/done-done-verify-juggernaut-addons/features/account-next-relaunch.md",
       "audience": "agent-runtime"
     },
     {
-      "path": "addons/.agents/skills/done-done-verify-firstmate-addons/features/claude-accounts-first-run.md",
+      "path": "addons/.agents/skills/done-done-verify-juggernaut-addons/features/claude-accounts-first-run.md",
       "audience": "agent-runtime"
     },
     {
-      "path": "addons/.agents/skills/done-done-verify-firstmate-addons/features/claude-accounts-pick.md",
+      "path": "addons/.agents/skills/done-done-verify-juggernaut-addons/features/claude-accounts-pick.md",
       "audience": "agent-runtime"
     },
     {
-      "path": "addons/.agents/skills/done-done-verify-firstmate-addons/features/claude-accounts-quota.md",
+      "path": "addons/.agents/skills/done-done-verify-juggernaut-addons/features/claude-accounts-quota.md",
       "audience": "agent-runtime"
     },
     {
-      "path": "addons/.agents/skills/done-done-verify-firstmate-addons/features/claude-accounts-timer.md",
+      "path": "addons/.agents/skills/done-done-verify-juggernaut-addons/features/claude-accounts-timer.md",
       "audience": "agent-runtime"
     },
     {
-      "path": "addons/.agents/skills/done-done-verify-firstmate-addons/features/fleet-dashboard-live-core.md",
+      "path": "addons/.agents/skills/done-done-verify-juggernaut-addons/features/fleet-dashboard-live-core.md",
       "audience": "agent-runtime"
     },
     {
-      "path": "addons/.agents/skills/done-done-verify-firstmate-addons/features/fleet-dashboard-wait-reasons.md",
+      "path": "addons/.agents/skills/done-done-verify-juggernaut-addons/features/fleet-dashboard-wait-reasons.md",
       "audience": "agent-runtime"
     },
     {
-      "path": "addons/.agents/skills/done-done-verify-firstmate-addons/features/fleet-flow-lane-cap.md",
+      "path": "addons/.agents/skills/done-done-verify-juggernaut-addons/features/fleet-flow-lane-cap.md",
       "audience": "agent-runtime"
     },
     {
-      "path": "addons/.agents/skills/done-done-verify-firstmate-addons/features/fleet-pulse-newest-retro.md",
+      "path": "addons/.agents/skills/done-done-verify-juggernaut-addons/features/fleet-pulse-newest-retro.md",
       "audience": "agent-runtime"
     },
     {
-      "path": "addons/.agents/skills/done-done-verify-firstmate-addons/features/incremental-fleet-pulse-chat-export.md",
+      "path": "addons/.agents/skills/done-done-verify-juggernaut-addons/features/incremental-fleet-pulse-chat-export.md",
       "audience": "agent-runtime"
     },
     {
-      "path": "addons/.agents/skills/done-done-verify-firstmate-addons/features/merge-card-one-card-per-pr.md",
+      "path": "addons/.agents/skills/done-done-verify-juggernaut-addons/features/merge-card-one-card-per-pr.md",
       "audience": "agent-runtime"
     },
     {
-      "path": "addons/.agents/skills/done-done-verify-firstmate-addons/features/merge-card-retitle.md",
+      "path": "addons/.agents/skills/done-done-verify-juggernaut-addons/features/merge-card-retitle.md",
       "audience": "agent-runtime"
     },
     {
-      "path": "addons/.agents/skills/done-done-verify-firstmate-addons/features/model-pool-helper.md",
+      "path": "addons/.agents/skills/done-done-verify-juggernaut-addons/features/model-pool-helper.md",
       "audience": "agent-runtime"
     },
     {
-      "path": "addons/.agents/skills/done-done-verify-firstmate-addons/features/pipeline-route-switch.md",
+      "path": "addons/.agents/skills/done-done-verify-juggernaut-addons/features/pipeline-route-switch.md",
       "audience": "agent-runtime"
     },
     {
-      "path": "addons/.agents/skills/done-done-verify-firstmate-addons/features/pipeline-route.md",
+      "path": "addons/.agents/skills/done-done-verify-juggernaut-addons/features/pipeline-route.md",
       "audience": "agent-runtime"
     },
     {
-      "path": "addons/.agents/skills/done-done-verify-firstmate-addons/features/quota-axi-pool.md",
+      "path": "addons/.agents/skills/done-done-verify-juggernaut-addons/features/quota-axi-pool.md",
       "audience": "agent-runtime"
     },
     {
-      "path": "addons/.agents/skills/done-done-verify-firstmate-addons/features/quota-failover-limit-handoff.md",
+      "path": "addons/.agents/skills/done-done-verify-juggernaut-addons/features/quota-failover-limit-handoff.md",
       "audience": "agent-runtime"
     },
     {
-      "path": "addons/.agents/skills/done-done-verify-firstmate-addons/features/quota-failover-live-route.md",
+      "path": "addons/.agents/skills/done-done-verify-juggernaut-addons/features/quota-failover-live-route.md",
       "audience": "agent-runtime"
     },
     {
-      "path": "addons/.agents/skills/done-done-verify-firstmate-addons/features/quota-failover-prelimit.md",
+      "path": "addons/.agents/skills/done-done-verify-juggernaut-addons/features/quota-failover-prelimit.md",
       "audience": "agent-runtime"
     },
     {
-      "path": "addons/.agents/skills/done-done-verify-firstmate-addons/features/quota-failover-screen-match.md",
+      "path": "addons/.agents/skills/done-done-verify-juggernaut-addons/features/quota-failover-screen-match.md",
       "audience": "agent-runtime"
     },
     {

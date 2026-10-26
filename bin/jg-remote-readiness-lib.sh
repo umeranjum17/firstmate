@@ -4,7 +4,7 @@
 # jg-remote-readiness-lib.sh - the remote second-mate readiness gate sequence.
 #
 # Source this file and call:
-#   jg_remote_readiness_ensure <bin-dir> <secondmate-id>
+#   jg_remote_readiness_ensure <bin-dir> <squad-lead-id>
 #
 # It runs bin/jg-remote-doctor.sh on that route's configured host, and when the
 # read-only run reports any gap it runs the doctor again with --fix and then a
@@ -23,7 +23,7 @@
 # shellcheck disable=SC2034
 JG_REMOTE_READINESS_OUT=
 
-jg_remote_readiness_ensure() { # <bin-dir> <secondmate-id>
+jg_remote_readiness_ensure() { # <bin-dir> <squad-lead-id>
   local bin_dir=$1 id=$2 out rc
 
   out=$("$bin_dir/jg-on.sh" "$id" jg-remote-doctor.sh < /dev/null 2>&1)

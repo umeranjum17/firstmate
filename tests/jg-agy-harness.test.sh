@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Behavior tests for the verified Antigravity CLI crewmate/scout adapter.
+# Behavior tests for the verified Antigravity CLI operator/scout adapter.
 #
 # The facts pinned here are the ones an agy release could silently change and
 # the ones a wrong guess would make dangerous:
@@ -22,7 +22,7 @@
 #      ready on an unregistered path until the dialog has been answered (the
 #      Herdr native-busy-before-dialog race), and fails the spawn with endpoint
 #      cleanup when the brief cannot be confirmed to run in the worktree.
-#   5. agy is a crewmate/scout adapter only: a secondmate launch is refused,
+#   5. agy is a operator/scout adapter only: a squad_lead launch is refused,
 #      and nothing is armed as busy wiring because no writer could clear it.
 #   6. The busy signature is the pinned `esc to cancel` status row alone; the
 #      free-floating `Generating...` word must never read busy on its own.
@@ -150,8 +150,8 @@ test_agy_control_mechanics_are_the_verified_ones() {
   [ "$(jg_control_harness_family agy)" = agy ] || fail "agy must map to its own family"
   jg_control_harness_supports_kind agy scout || fail "agy must run scouts"
   jg_control_harness_supports_kind agy ship || fail "agy must run ships"
-  jg_control_harness_supports_kind agy secondmate \
-    && fail "agy must refuse secondmates" || true
+  jg_control_harness_supports_kind agy squad_lead \
+    && fail "agy must refuse squad_leads" || true
   [ "$(jg_control_interrupt_key agy)" = Escape ] || fail "agy must interrupt on Escape"
   [ "$(jg_control_interrupt_repeat agy)" = 1 ] || fail "agy must interrupt on a single press"
   [ -z "$(jg_control_interrupt_clear_key agy)" ] || fail "agy must need no clear key"
@@ -442,7 +442,7 @@ test_agy_trust_refuses_out_of_scope_paths() {
 # in the trustedWorkspaces array of the store the spawn just wrote.
 # JG_FAKE_AGY_IGNORE_TRUST=1 models a vendor that stopped honouring the store;
 # JG_FAKE_AGY_ASSUME_TRUSTED=1 models a pane that never shows the dialog even
-# though firstmate could not register the path (a busy verdict with no proof
+# though juggernaut could not register the path (a busy verdict with no proof
 # of where the turn runs);
 # JG_FAKE_AGY_RACE=1 models Herdr's native busy verdict rendering one capture
 # before the dialog paints; JG_FAKE_AGY_ANSWER=stuck models a dialog whose
@@ -483,7 +483,7 @@ case "$*" in
   *"#{cursor_y}"*) printf '1\n'; exit 0 ;;
 esac
 case "${1:-}" in
-  display-message) printf 'firstmate\n'; exit 0 ;;
+  display-message) printf 'juggernaut\n'; exit 0 ;;
   list-windows) exit 0 ;;
   has-session|new-session|new-window|kill-window) exit 0 ;;
   send-keys)
@@ -564,7 +564,7 @@ make_agy_spawn_case() {
 ## Captain's intent
 Exercise Antigravity dispatch.
 
-## Firstmate spec
+## Juggernaut spec
 Verify launch and delivery behavior.
 EOF
   printf 'agy\n' > "$home/config/crew-harness"
@@ -852,21 +852,21 @@ test_agy_missing_binary_refuses_before_pane_creation() {
   pass "jg-spawn: a missing agy executable refuses before pane creation"
 }
 
-test_agy_secondmate_is_refused() {
+test_agy_squad_lead_is_refused() {
   local id rec out rc
-  id="agy-secondmate-z6-$$"
-  rec=$(make_agy_spawn_case secondmate-refuse "$id")
+  id="agy-squad-lead-z6-$$"
+  rec=$(make_agy_spawn_case squad-lead-refuse "$id")
   read_agy_spawn_record "$rec"
   rc=0
   out=$(HOME="$HOME_DIR" JG_ROOT_OVERRIDE='' JG_HOME="$HOME_DIR" \
     JG_STATE_OVERRIDE="$HOME_DIR/state" JG_DATA_OVERRIDE="$HOME_DIR/data" \
     JG_PROJECTS_OVERRIDE="$HOME_DIR/projects" JG_CONFIG_OVERRIDE="$HOME_DIR/config" \
     JG_SPAWN_NO_GUARD=1 PATH="$FAKEBIN_DIR:$BASE_PATH" \
-    "$SPAWN" "$id" --secondmate agy 2>&1) || rc=$?
-  [ "$rc" -ne 0 ] || fail "an agy secondmate spawn should be refused"
-  assert_contains "$out" "agy is a verified crewmate/scout adapter only" \
-    "agy secondmate refusal lacked its concrete reason"
-  pass "jg-spawn: agy cannot be launched as a secondmate"
+    "$SPAWN" "$id" --squad-lead agy 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail "an agy squad_lead spawn should be refused"
+  assert_contains "$out" "agy is a verified operator/scout adapter only" \
+    "agy squad_lead refusal lacked its concrete reason"
+  pass "jg-spawn: agy cannot be launched as a squad_lead"
 }
 
 test_agy_spawn_arms_no_busy_wiring() {
@@ -915,5 +915,5 @@ test_agy_unregistered_path_ignores_busy_until_the_dialog_is_answered
 test_agy_unregistered_path_without_a_dialog_fails_the_spawn
 test_agy_pre_trusted_path_that_never_turns_busy_fails_the_spawn
 test_agy_missing_binary_refuses_before_pane_creation
-test_agy_secondmate_is_refused
+test_agy_squad_lead_is_refused
 test_agy_spawn_arms_no_busy_wiring

@@ -8,7 +8,7 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
   export "$_jg_new=$_jg_val"
 done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
-# End-to-end: drive merge-on-green.sh against a fixture firstmate home with stub jg-crew-state.sh and
+# End-to-end: drive merge-on-green.sh against a fixture juggernaut home with stub jg-crew-state.sh and
 # jg-pr-merge.sh in the home's bin/ and a stub jg-checks-lint.sh behind JG_MOG_CHECKS_LINT, then install.sh
 # against the same home. Usage: merge-on-green/tests/merge-on-green.test.sh
 set -euo pipefail

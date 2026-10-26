@@ -232,7 +232,7 @@ test_slow_poll_times_out_and_is_reported() {
 test_repeated_failure_that_queued_new_mail_still_wakes() {
   # A poll can append durable mail wakes and then fail with the same cause as
   # the last check. Difference-record silence would leave those wakes queued
-  # and unacted; the check must print again so the watcher wakes firstmate.
+  # and unacted; the check must print again so the watcher wakes juggernaut.
   local tmpbin home out check_bin
   tmpbin="$TMP_ROOT/repeat-wake/bin"
   home="$TMP_ROOT/repeat-wake/home"

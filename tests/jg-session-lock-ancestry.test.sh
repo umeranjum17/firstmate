@@ -733,7 +733,7 @@ expect_phase_foreign() {  # <dir> <n> <expected-arms> <owner-pid> <label>
   grep -q "OWNED BY ANOTHER LIVE SESSION.*lock owner pid $owner" "$dir/state/phase-$n/guard.out" \
     || fail "$label: the guard did not report the live owner $owner: $(cat "$dir/state/phase-$n/guard.out")"
   expect_code 1 "$(phase_value "$dir" "$n" lock.rc)" "$label: jg-lock.sh accepted a lock this session does not own"
-  grep -q "another live firstmate session holds the lock (pid $owner, session S1)" "$dir/state/phase-$n/lock.out" \
+  grep -q "another live juggernaut session holds the lock (pid $owner, session S1)" "$dir/state/phase-$n/lock.out" \
     || fail "$label: the refusal did not name the owner pid and recorded session: $(cat "$dir/state/phase-$n/lock.out")"
   [ "$(phase_value "$dir" "$n" lock-after)" = "$owner" ] || fail "$label: a non-owner rewrote the lock"
 }
@@ -1004,7 +1004,7 @@ SH
     || fail "the waiter overwrote the other session's sidecar to $(cat "$dir/state/.lock-session")"
   [ "$(tr -d '[:space:]' < "$dir/state/.lock")" = "$other_pid" ] \
     || fail "the waiter rewrote lock line 1 off the other live session"
-  grep -q "another live firstmate session holds the lock (pid $other_pid, session OTHER)" "$dir/state/confirm.out" \
+  grep -q "another live juggernaut session holds the lock (pid $other_pid, session OTHER)" "$dir/state/confirm.out" \
     || fail "the waiter did not refuse the other live owner: $(cat "$dir/state/confirm.out")"
   pass "session-lock: a waiting confirmation does not steal another session's lock"
 }

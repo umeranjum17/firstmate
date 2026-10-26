@@ -9,8 +9,8 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
 done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # brief-inherit e2e: the shared worker-instruction include through the real jg-brief.sh and
-# jg-config-push.sh of a firstmate checkout.
-# Usage: brief-inherit/tests/brief-inherit-e2e.sh <firstmate-checkout>
+# jg-config-push.sh of a juggernaut checkout.
+# Usage: brief-inherit/tests/brief-inherit-e2e.sh <juggernaut-checkout>
 #   A checkout without the seam (today's fork) is copied to a temp root and Kun's single-file
 #   include read plus the two seam lines are applied there, which is step B. A checkout that
 #   already carries the seam runs as is. Present must equal the pre-seam fork's output, the
@@ -23,7 +23,7 @@ set -u
 here=$(cd "$(dirname "$0")" && pwd) || exit 1
 addons=$(cd "$here/../.." && pwd) || exit 1
 FM=${1:-}
-[ -n "$FM" ] && [ -x "$FM/bin/jg-brief.sh" ] || { echo "usage: $0 <firstmate-checkout>" >&2; exit 1; }
+[ -n "$FM" ] && [ -x "$FM/bin/jg-brief.sh" ] || { echo "usage: $0 <juggernaut-checkout>" >&2; exit 1; }
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/brief-inherit-e2e.XXXXXX") || exit 1
 trap 'rm -rf -- "$work"' EXIT
@@ -33,8 +33,8 @@ no() { printf 'not ok - %s\n' "$1"; fails=$((fails + 1)); }
 same() { if cmp -s "$2" "$3"; then ok "$1"; else no "$1: $2 differs from $3"; diff "$2" "$3" | head -5; fi; }
 is() { if [ "$2" = "$3" ]; then ok "$1"; else no "$1: got [$2], want [$3]"; fi; }
 
-SEAM_BRIEF='_bi="${JG_ADDONS_DIR:-$JG_HOME/projects/firstmate-addons}/brief-inherit/bin/jg-brief-inherit-lib.sh"; [ ! -f "$_bi" ] || { . "$_bi" && jg_brief_inherit_shared "$CONFIG" "$KIND"; }'
-SEAM_LIST='_bi="${JG_ADDONS_DIR:-${JG_HOME:-$HOME}/projects/firstmate-addons}/brief-inherit/bin/jg-brief-inherit-lib.sh"; [ ! -f "$_bi" ] || { . "$_bi" && jg_brief_inherit_config; }'
+SEAM_BRIEF='_bi="${JG_ADDONS_DIR:-$JG_HOME/projects/juggernaut-addons}/brief-inherit/bin/jg-brief-inherit-lib.sh"; [ ! -f "$_bi" ] || { . "$_bi" && jg_brief_inherit_shared "$CONFIG" "$KIND"; }'
+SEAM_LIST='_bi="${JG_ADDONS_DIR:-${JG_HOME:-$HOME}/projects/juggernaut-addons}/brief-inherit/bin/jg-brief-inherit-lib.sh"; [ ! -f "$_bi" ] || { . "$_bi" && jg_brief_inherit_config; }'
 
 # The seam root: the checkout itself when it has the seam, else a step-B copy of it.
 root=$FM
@@ -45,7 +45,7 @@ if [ "$seamed" = 0 ]; then
   awk -v seam="$SEAM_BRIEF" '
     /^# Read both optional includes/ && !done {
       print "BRIEF_INCLUDE_BODY="
-      print "if [ \"$KIND\" != secondmate ] && { [ -e \"$CONFIG/brief-include.md\" ] || [ -L \"$CONFIG/brief-include.md\" ]; }; then"
+      print "if [ \"$KIND\" != squad_lead ] && { [ -e \"$CONFIG/brief-include.md\" ] || [ -L \"$CONFIG/brief-include.md\" ]; }; then"
       print "  BRIEF_INCLUDE_FILE=$CONFIG/brief-include.md"
       print "  { [ -f \"$BRIEF_INCLUDE_FILE\" ] && BRIEF_INCLUDE_BODY=$(cat \"$BRIEF_INCLUDE_FILE\" 2>/dev/null); } || {"
       print "    echo \"error: $BRIEF_INCLUDE_FILE must be a readable regular file\" >&2; exit 1; }"
@@ -126,16 +126,16 @@ done
 
 # charters never take an include
 mkhome "$work/sm"; cp "$work/present/config/brief-include-shared.md" "$work/sm/config/"
-JG_HOME=$work/sm JG_ADDONS_DIR=$addons JG_SECONDMATE_CHARTER=sample bash "$root/bin/jg-brief.sh" c --secondmate --no-projects >/dev/null 2>&1
+JG_HOME=$work/sm JG_ADDONS_DIR=$addons JG_SQUAD_LEAD_CHARTER=sample bash "$root/bin/jg-brief.sh" c --squad-lead --no-projects >/dev/null 2>&1
 grep -q 'Home brief additions' "$work/sm/data/c/brief.md" && no "charter took the shared include" || ok "charter takes no include"
 
 # config-push: exact bytes propagate, then absence converges (present); nothing propagates (absent)
 push_case() { # <addons-dir> <label> <expect-pushed 1|0>
   local a=$1 p=$work/push-$2 sm=$work/push-$2-sm out
   mkhome "$p"; mkdir -p "$sm/config" "$sm/bin"
-  printf '%s\n' 'Fixture.' > "$sm/AGENTS.md"; printf '%s\n' config/ data/ state/ .jg-secondmate-home > "$sm/.gitignore"
-  git init -q "$sm"; printf '%s\n' pm > "$sm/.jg-secondmate-home"
-  printf 'kind=secondmate\nbackend=tmux\nwindow=bi-e2e:absent\nhome=%s\n' "$sm" > "$p/state/pm.meta"
+  printf '%s\n' 'Fixture.' > "$sm/AGENTS.md"; printf '%s\n' config/ data/ state/ .jg-squad-lead-home > "$sm/.gitignore"
+  git init -q "$sm"; printf '%s\n' pm > "$sm/.jg-squad-lead-home"
+  printf 'kind=squad_lead\nbackend=tmux\nwindow=bi-e2e:absent\nhome=%s\n' "$sm" > "$p/state/pm.meta"
   touch "$p/state/.last-watcher-beat"; printf '%s\n' "$shared" > "$p/config/brief-include-shared.md"
   out=$(JG_HOME=$p JG_ROOT_OVERRIDE=$root JG_ADDONS_DIR=$a bash "$root/bin/jg-config-push.sh" 2>&1)
   if [ "$3" = 1 ]; then

@@ -8,7 +8,7 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
   export "$_jg_new=$_jg_val"
 done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
-# Fixture-home test for lookout-firstmate: builds a throwaway JG_HOME with the dashboard builder's output files, then checks the
+# Fixture-home test for lookout-juggernaut: builds a throwaway JG_HOME with the dashboard builder's output files, then checks the
 # document (every list, no secret from a lane's .meta), the Lookout contract check when LOOKOUT_DIR holds a lookout clone, and the
 # HTTP source. Usage: lookout-adapter/tests/test.sh
 set -eu
@@ -17,7 +17,7 @@ t="$(mktemp -d)"; trap 'kill "${srv:-}" 2>/dev/null || true; rm -rf -- "$t"' EXI
 mkdir -p "$t/home/state/dashboard" "$t/home/data" "$t/main2/state" "$t/proc"
 now=1792852545
 printf 'MemTotal: 1000 kB\nMemAvailable: 400 kB\n' > "$t/proc/meminfo"; echo '0.50 0.4 0.3 1/2 3' > "$t/proc/loadavg"
-echo "- alpha - Owns alpha. (home: $t/main2; scope: x)" > "$t/home/data/secondmates.md"
+echo "- alpha - Owns alpha. (home: $t/main2; scope: x)" > "$t/home/data/squad_leads.md"
 printf 'model=claude-sonnet-5-5\nharness=claude\naccount=pa_fixture\napi_key=SECRET-VALUE-123\n' > "$t/main2/state/a-one.meta"
 cat > "$t/home/state/dashboard/data.json" <<J
 {"cutoff":$now,"build_time":"2026-10-24T18:35:45+04:00","machine":{"pressure":50},"machine_limits":{"memory_pressure":40,"emulators":2,"gradle":2},
@@ -39,7 +39,7 @@ cat > "$t/home/state/dashboard/board.json" <<J
                   {"home":"alpha","task":"old","pr":"https://github.com/o/r/pull/0","times":{"merged":$((now-40*86400))}}]}}
 J
 out="$t/fleet.json"
-"$here/lookout-firstmate" --home "$t/home" --no-build --proc "$t/proc" > "$out"
+"$here/lookout-juggernaut" --home "$t/home" --no-build --proc "$t/proc" > "$out"
 python3 - "$out" <<'P'
 import json, sys
 d = json.load(open(sys.argv[1])); raw = open(sys.argv[1]).read()
@@ -58,12 +58,12 @@ if [ -n "${LOOKOUT_DIR:-}" ] && command -v node >/dev/null; then
   node --input-type=module -e "import { validateFleet } from '$LOOKOUT_DIR/lib/contract.js'; import fs from 'node:fs'; const p = validateFleet(JSON.parse(fs.readFileSync('$out', 'utf8'))); if (p.length) { console.error(p.join('\n')); process.exit(1) }"
   echo "contract: valid"
 else echo "contract: skipped (set LOOKOUT_DIR to a lookout clone)"; fi
-"$here/lookout-firstmate" --home "$t/home" --no-build --proc "$t/proc" --serve --port 0 --every 1 > "$t/serve.log" & srv=$!
+"$here/lookout-juggernaut" --home "$t/home" --no-build --proc "$t/proc" --serve --port 0 --every 1 > "$t/serve.log" & srv=$!
 for _ in $(seq 50); do grep -q serving "$t/serve.log" && break; sleep 0.1; done
 url="$(sed 's/.*serving //' "$t/serve.log")"
 first="$(curl -fsS "$url")"
-python3 -c 'import json,sys; assert json.loads(sys.argv[1])["name"] == "Firstmate fleet"' "$first"
+python3 -c 'import json,sys; assert json.loads(sys.argv[1])["name"] == "Juggernaut fleet"' "$first"
 rm "$t/home/state/dashboard/data.json"; sleep 2.5  # the rebuild fails now: the last good snapshot is still served, at once, unchanged
 [ "$(curl -fsS -m 2 "$url")" = "$first" ]
 [ "$(curl -s -o /dev/null -w '%{http_code}' "${url%fleet.json}nope")" = 404 ]
-echo "lookout-firstmate: PASS"
+echo "lookout-juggernaut: PASS"

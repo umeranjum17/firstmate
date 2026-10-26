@@ -6,11 +6,11 @@
 #
 # WHY THIS EXISTS: a public promise is kept by the home that owns the relay
 # consent and the thread binding. When the bound work lives in a REMOTE
-# secondmate home, that worker has no local path to the owning home's inbox, so
+# squad_lead home, that worker has no local path to the owning home's inbox, so
 # `jg-public-followup-emit.sh --stage-in` leaves the typed event in this home's
 # public-followup outbox instead. The owning home runs THIS command over the
 # route's own transport (bin/jg-on.sh) to collect what is waiting. The transport
-# only runs main -> secondmate, so collection is a pull; nothing here ever
+# only runs main -> squad_lead, so collection is a pull; nothing here ever
 # reaches back out.
 #
 # WHAT IT DOES NOT DO: it never builds, edits, posts, or judges an event. The

@@ -95,11 +95,11 @@ fi
 grep -q 'absorbed push' "$STATE_DIR/.watch-triage.log" 2>/dev/null || fail "the captain-held absorb should be logged to the triage log"
 pass "handle_push_transition: a captain-held crew is absorbed (no fast wake), left to the poll loop's long cadence"
 
-# --- event_wait_or_sleep: secondmate windows are excluded from the pane list --
+# --- event_wait_or_sleep: squad_lead windows are excluded from the pane list --
 
 reset_state
 jg_write_meta "$STATE_DIR/tk3.meta" "window=default:wG:pQ" "backend=herdr" "kind=ship"
-jg_write_meta "$STATE_DIR/sm1.meta" "window=default:wA:pS" "backend=herdr" "kind=secondmate"
+jg_write_meta "$STATE_DIR/sm1.meta" "window=default:wA:pS" "backend=herdr" "kind=squad_lead"
 # shellcheck disable=SC2329 # Runtime overrides called by the isolated watcher.
 jg_backend_events_capable() { return 0; }
 # shellcheck disable=SC2329 # Runtime overrides called by the isolated watcher.
@@ -107,8 +107,8 @@ jg_backend_wait_transition() { shift 4; printf '%s\n' "$*" > "$TMP/panes"; retur
 event_wait_or_sleep
 PANES=$(cat "$TMP/panes" 2>/dev/null || true)
 case "$PANES" in *"default:wG:pQ"*) : ;; *) fail "the ship window must be in the event pane list, got '$PANES'" ;; esac
-case "$PANES" in *"default:wA:pS"*) fail "a kind=secondmate window must be EXCLUDED from the event pane list, got '$PANES'" ;; *) : ;; esac
-pass "event_wait_or_sleep: herdr windows go on the event pane list, but kind=secondmate endpoints are excluded"
+case "$PANES" in *"default:wA:pS"*) fail "a kind=squad_lead window must be EXCLUDED from the event pane list, got '$PANES'" ;; *) : ;; esac
+pass "event_wait_or_sleep: herdr windows go on the event pane list, but kind=squad_lead endpoints are excluded"
 
 reset_state
 jg_write_meta "$STATE_DIR/tk3.meta" "window=default:wG:pQ" "backend=herdr" "kind=ship"

@@ -9,11 +9,11 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
 done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # quota-failover install journey: install.sh --all on throwaway homes with the real fork's check registration
-# (JG_TEST_FORK=<Firstmate checkout>): reached homes are trusted and their shims run, parked, remote and broken
+# (JG_TEST_FORK=<Juggernaut checkout>): reached homes are trusted and their shims run, parked, remote and broken
 # homes are named, a rerun changes nothing, uninstall --all retires them all. No real home or HOME is touched.
 set -u
 SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)
-FORK=${JG_TEST_FORK:?set JG_TEST_FORK to a Firstmate checkout}
+FORK=${JG_TEST_FORK:?set JG_TEST_FORK to a Juggernaut checkout}
 d=$(mktemp -d)
 trap 'rm -rf -- "$d"' EXIT
 export HOME=$d/home XDG_DATA_HOME=$d/data
@@ -33,11 +33,11 @@ registered() { # <home>: 0 when the fork's reader trusts the watcher check's cur
 }
 M=$d/main A=$d/alpha
 home "$M"; home "$A"; mkdir -p "$d/broken/state"
-cat >"$M/data/secondmates.md" <<EOF
+cat >"$M/data/squad_leads.md" <<EOF
 - alpha - Owns alpha. (home: $A; worktree: $d/wt)
 - parkedone - Owns a parked app. (home: $d/parked; worktree: $d/wt)
 - faraway - Owns a remote app. (host: box; root: /srv; home: /srv/fm; worktree: /srv/wt)
-- broken - Owns a home with no firstmate. (home: $d/broken; worktree: $d/wt)
+- broken - Owns a home with no juggernaut. (home: $d/broken; worktree: $d/wt)
 EOF
 printf '# parked\nparkedone\n' >"$M/config/parked-homes"
 printf 'hand-made check\n' >"$A/state/quota-failover-watch.check.sh"

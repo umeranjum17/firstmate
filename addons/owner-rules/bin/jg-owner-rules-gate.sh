@@ -57,7 +57,7 @@ awk -F'\t' -v pr="$4" -v head="$3" -v task="$1" '
   END { exit !f }' "$JG_HOME/data/checks-gate.log" 2>/dev/null || {
   src=$4; [ "$4" != - ] || src="<report file>"
   lint=${JG_CHECKS_LINT:-${XDG_DATA_HOME:-$HOME/.local/share}/jg-merge-on-green/checks-lint.sh}
-  [ -x "$lint" ] || lint=${JG_MAIN_HOME:-$HOME/firstmate}/config/jg-checks-lint.sh
+  [ -x "$lint" ] || lint=${JG_MAIN_HOME:-$HOME/juggernaut}/config/jg-checks-lint.sh
   echo "owner-rules: no checks-lint PASS for $src at $3; run JG_HOME=$JG_HOME $lint $src $JG_HOME/data/$1 then merge again"
   exit 1
 }
@@ -69,7 +69,7 @@ board=${JG_FLEET_BOARD:-}
 if [ -z "$board" ] && [ -r "$JG_HOME/config/fleet-board" ]; then
   IFS= read -r board < "$JG_HOME/config/fleet-board"
 fi
-main_home=${JG_MAIN_HOME:-$HOME/firstmate}
+main_home=${JG_MAIN_HOME:-$HOME/juggernaut}
 if [ -z "$board" ] && [ -r "$main_home/config/fleet-board" ]; then
   IFS= read -r board < "$main_home/config/fleet-board"
 fi

@@ -32,7 +32,7 @@
 # the away session handled, then cost. The health snapshot is taken BEFORE the
 # daemon shutdown so the shutdown itself cannot read as a gap.
 #
-# THE GATE. `blocked:` is the crewmate protocol's firstmate-actionable verb. A
+# THE GATE. `blocked:` is the operator protocol's juggernaut-actionable verb. A
 # live task's open blocked event must be remediated and closed with
 # `resolved [key=...]`, or explicitly reclassified in the status stream with a
 # durable reason, before an ordinary captain request may proceed.
@@ -256,7 +256,7 @@ print_blockers() {  # <file>
   local file=$1 tag id key summary
   while IFS="$(printf '\t')" read -r tag id key summary; do
     [ "$tag" = blocker ] || continue
-    printf 'firstmate-actionable blocker: %s [key=%s] %s\n' "$id" "$key" "$summary"
+    printf 'juggernaut-actionable blocker: %s [key=%s] %s\n' "$id" "$key" "$summary"
   done < "$file"
 }
 
@@ -522,9 +522,9 @@ scan_landed_awaiting_cleanup() {  # -> <task>\t<url> rows
   for meta in "$STATE"/*.meta; do
     [ -f "$meta" ] || continue
     task=$(basename "$meta"); task=${task%.meta}
-    # A secondmate is a persistent worker, never landed work: its teardown is
+    # A squad_lead is a persistent worker, never landed work: its teardown is
     # retirement, which is never an ordinary cleanup this section may offer.
-    [ "$(grep '^kind=' "$meta" | tail -1 | cut -d= -f2- || true)" = secondmate ] && continue
+    [ "$(grep '^kind=' "$meta" | tail -1 | cut -d= -f2- || true)" = squad_lead ] && continue
     jg_pr_metadata_identity_parse "$meta" || continue
     jg_pr_poll_merge_already_notified "$STATE" "$task" \
       "$JG_PR_META_PROVIDER" "$JG_PR_META_HOST" "$JG_PR_META_PATH" "$JG_PR_META_NUMBER" \
@@ -640,7 +640,7 @@ EOF
   while IFS="$(printf '\t')" read -r tag task key summary; do
     [ "$tag" = blocker ] || continue
     count=$((count + 1))
-    printf '  - %s [key=%s] still blocked, firstmate remediates before ordinary work: %s\n' "$task" "$key" "$summary"
+    printf '  - %s [key=%s] still blocked, juggernaut remediates before ordinary work: %s\n' "$task" "$key" "$summary"
   done < "$blockers"
   for meta in "$STATE"/*.meta; do
     [ -f "$meta" ] || continue

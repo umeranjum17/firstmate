@@ -1,6 +1,6 @@
-# Secondmate parent channel: live verification
+# Squad Lead parent channel: live verification
 
-Maintainer-verification record for the guarantee in [`secondmate-parent-channel.md`](../secondmate-parent-channel.md): a captain-facing outcome recorded inside a secondmate home reaches the parent channel without the mate model writing it.
+Maintainer-verification record for the guarantee in [`squad-lead-parent-channel.md`](../squad-lead-parent-channel.md): a captain-facing outcome recorded inside a squad lead home reaches the parent channel without the mate model writing it.
 Refresh it by rerunning the fixture below after changing any publisher named in `bin/jg-parent-channel-lib.sh`.
 This run predates emission-time stamping, so each published line below is the payload without its stamp: a rerun now writes the same bytes with an `[at=<epoch>]` tag closing the head, as in `done [key=child-outcome-child-done-05b032a1] [at=<epoch>]: child ...`.
 [`bin/jg-classify-lib.sh`](../../bin/jg-classify-lib.sh) owns that tag's syntax; nothing this record proves about delivery depends on it.
@@ -10,7 +10,7 @@ This run predates emission-time stamping, so each published line below is the pa
 Date: 2026-09-03.
 Tree: this change's branch on macOS with tmux 3.6a, bash 3.2 as `/bin/bash`, and the repo's own scripts.
 Fixture: two isolated homes under a scratch directory, `$P` (parent) and `$M` (mate), with `config/backend` set to `tmux` in both.
-The mate home carries `.jg-secondmate-home` (`mate`) and a local `.jg-secondmate-parent` binding to `$P`; the parent home carries `state/mate.meta` (`kind=secondmate`, `home=$M`).
+The mate home carries `.jg-squad-lead-home` (`mate`) and a local `.jg-squad-lead-parent` binding to `$P`; the parent home carries `state/mate.meta` (`kind=squad lead`, `home=$M`).
 The mate's child task `child` is a real tmux pane (`fmlive:jg-child`) recorded in `$M/state/child.meta` with `mode=no-mistakes` and `yolo=off`; the mate itself is a second real pane (`fmlive:jg-mate`).
 Both homes run the real `bin/jg-watch.sh` (`JG_POLL=2`), re-armed after every wake through `bin/jg-wake-drain.sh` acknowledgement, exactly as fleet supervision re-arms a watcher after a handled turn.
 No agent harness and no model runs anywhere in the fixture.
@@ -21,19 +21,19 @@ The mate's only actions are the scripts a Juggernaut runs when it registers a PR
 ## Transcript
 
 ```text
-$ # Setup: mate home $M is a secondmate of parent home $P (local route); child task 'child' lives in a real tmux pane; both watchers are live
+$ # Setup: mate home $M is a squad lead of parent home $P (local route); child task 'child' lives in a real tmux pane; both watchers are live
 
 $ # Step 1: the child appends its terminal line from inside its own real tmux pane
 
-$ tmux send-keys -t fmlive:jg-child "echo 'done: PR https://github.com/kunchenguid/firstmate/pull/9999 checks green' >> $M/state/child.status" Enter
+$ tmux send-keys -t fmlive:jg-child "echo 'done: PR https://github.com/kunchenguid/juggernaut/pull/9999 checks green' >> $M/state/child.status" Enter
 
 $ cat $M/state/child.status
 working: implementing the feature
-done: PR https://github.com/kunchenguid/firstmate/pull/9999 checks green
+done: PR https://github.com/kunchenguid/juggernaut/pull/9999 checks green
 
 $ cat $P/state/mate.status   (the parent channel)
 working: delegated scope
-done [key=child-outcome-child-done-05b032a1]: child child done: PR https://github.com/kunchenguid/firstmate/pull/9999 checks green pr=https://github.com/kunchenguid/firstmate/pull/9999 mode=no-mistakes yolo=off
+done [key=child-outcome-child-done-05b032a1]: child child done: PR https://github.com/kunchenguid/juggernaut/pull/9999 checks green pr=https://github.com/kunchenguid/juggernaut/pull/9999 mode=no-mistakes yolo=off
 
 $ mate watcher wakes so far
 signal: $M/state/child.status
@@ -43,13 +43,13 @@ signal: $P/state/mate.status
 
 $ # Step 2: the mate registers the PR with jg-pr-check; the ready line with the canonical URL reaches the parent from the script itself
 
-$ JG_HOME=$M JG_STATE_OVERRIDE=$M/state bin/jg-pr-check.sh child https://github.com/kunchenguid/firstmate/pull/9999
+$ JG_HOME=$M JG_STATE_OVERRIDE=$M/state bin/jg-pr-check.sh child https://github.com/kunchenguid/juggernaut/pull/9999
 armed: state/child.check.sh
 
 $ cat $P/state/mate.status
 working: delegated scope
-done [key=child-outcome-child-done-05b032a1]: child child done: PR https://github.com/kunchenguid/firstmate/pull/9999 checks green pr=https://github.com/kunchenguid/firstmate/pull/9999 mode=no-mistakes yolo=off
-done [key=child-pr-child]: child child PR ready: https://github.com/kunchenguid/firstmate/pull/9999 mode=no-mistakes yolo=off
+done [key=child-outcome-child-done-05b032a1]: child child done: PR https://github.com/kunchenguid/juggernaut/pull/9999 checks green pr=https://github.com/kunchenguid/juggernaut/pull/9999 mode=no-mistakes yolo=off
+done [key=child-pr-child]: child child PR ready: https://github.com/kunchenguid/juggernaut/pull/9999 mode=no-mistakes yolo=off
 
 $ parent watcher wakes so far (2 signals)
 signal: $P/state/mate.status
@@ -67,8 +67,8 @@ answered: child-call
 
 $ cat $P/state/mate.status   (final parent channel)
 working: delegated scope
-done [key=child-outcome-child-done-05b032a1]: child child done: PR https://github.com/kunchenguid/firstmate/pull/9999 checks green pr=https://github.com/kunchenguid/firstmate/pull/9999 mode=no-mistakes yolo=off
-done [key=child-pr-child]: child child PR ready: https://github.com/kunchenguid/firstmate/pull/9999 mode=no-mistakes yolo=off
+done [key=child-outcome-child-done-05b032a1]: child child done: PR https://github.com/kunchenguid/juggernaut/pull/9999 checks green pr=https://github.com/kunchenguid/juggernaut/pull/9999 mode=no-mistakes yolo=off
+done [key=child-pr-child]: child child PR ready: https://github.com/kunchenguid/juggernaut/pull/9999 mode=no-mistakes yolo=off
 needs-decision [key=captain-hold-child-call-1]: captain hold child-call: rollout window choice pending
 resolved [key=captain-hold-child-call-1]: captain hold child-call: answered
 

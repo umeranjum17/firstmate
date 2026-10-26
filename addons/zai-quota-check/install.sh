@@ -15,7 +15,7 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 set -euo pipefail
 dry=0
 [ "${1:-}" = --dry-run ] && dry=1
-JG_HOME=${JG_HOME:?set JG_HOME to the firstmate home that runs the check}
+JG_HOME=${JG_HOME:?set JG_HOME to the juggernaut home that runs the check}
 src=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/zai-quota-check
 dest=$JG_HOME/state/zai-quota.check.sh
 if [ "$dry" = 1 ]; then

@@ -29,7 +29,7 @@ jg_meta_get() { [ -f "$1" ] || return 0; sed -n "s|^$2=||p" "$1" | tail -n 1; }
 jg_backend_of_meta() { echo fixture; }; jg_backend_target_of_meta() { jg_meta_get "$1" endpoint_task_id; }
 jg_backend_visible_capture() { cat "$JG_HOME/state/$2.screen" 2>/dev/null; return 0; }
 EOF
-# No jg-account-pool-lib.sh in the home's bin/, as since firstmate PR 128: the pass loads the account-pool
+# No jg-account-pool-lib.sh in the home's bin/, as since juggernaut PR 128: the pass loads the account-pool
 # add-on's lib. The pool tool is a stub that answers a fixed pick; no real login or account is touched.
 printf 'jg_run_timed() { shift; "$@"; }\n' >"$home/bin/jg-timeout-lib.sh"
 mkdir -p "$work/pool/pa_most_room"
@@ -62,7 +62,7 @@ task() { # <id> <kind> <harness> [account]
   printf 'endpoint_task_id=%s\nkind=%s\nharness=%s\nspawn_gen=s1\naccount=%s\n' "$1" "$2" "$3" "${4:-}" >"$S/$1.meta"
   cp "$here/weekly-limit-menu.screen" "$S/$1.screen"
 }
-task muxr-lead secondmate claude
+task muxr-lead squad_lead claude
 task notes-worker ship claude pa_full
 task codex-worker ship codex pa_codex
 task quoting-worker ship claude pa_quote

@@ -1,7 +1,7 @@
 # Rovo CLI
 
 Verified 2026-09-02 on Rovo CLI 202609.1.2 for operator/scout work only.
-Not verified, and not naturally verifiable, as a secondmate or primary: rovo has no turn-end hook and no primary supervision protocol, the same gap that scopes muse to operator/scout.
+Not verified, and not naturally verifiable, as a squad lead or primary: rovo has no turn-end hook and no primary supervision protocol, the same gap that scopes muse to operator/scout.
 
 ## Operating facts
 
@@ -66,7 +66,7 @@ Treat the ~1h access-token lifetime as an ordinary operational fact, not a non-n
 ## Skill-loading interop gap
 
 rovo's skill loader rejects every Juggernaut skill: `Invalid skill definition in .../SKILL.md: 'metadata -> internal': Input should be a valid string`, because Juggernaut's `metadata.internal` is a boolean and rovo's schema wants a string.
-This blocks `/no-mistakes` and every other Juggernaut skill invocation inside a rovo worker until Juggernaut's `SKILL.md` frontmatter is made rovo-compatible (a separate, deferred follow-up - it touches every skill file and the installer contract, per `../../firstmate-coding-guidelines/SKILL.md`).
+This blocks `/no-mistakes` and every other Juggernaut skill invocation inside a rovo worker until Juggernaut's `SKILL.md` frontmatter is made rovo-compatible (a separate, deferred follow-up - it touches every skill file and the installer contract, per `../../juggernaut-coding-guidelines/SKILL.md`).
 A `no-mistakes`-mode rovo ship operator is blocked by this gap; a rovo scout, which invokes no skill, is unaffected.
 
 ## ACP as a future upgrade

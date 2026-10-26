@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Native Codex-through-Pi primary compatibility guard. Runs installed Pi and
-# the adapter package with actual FirstMate extensions and durable scripts.
+# the adapter package with actual Juggernaut extensions and durable scripts.
 # A local protocol peer and watcher close stand in for model calls and a live
 # fleet. No provider request leaves the machine and no live fleet is touched.
 # PI_CODEX_NATIVE_PACKAGE selects the installed adapter package; JG_PI_BIN
@@ -95,7 +95,7 @@ async function handle(q){
  const reply=(result)=>emit({id:q.id,result});const thread={id:'jg-native-primary-thread',cwd:process.cwd(),turns:[],status:{type:'idle'}};
  if(q.method==='initialize')return reply({userAgent:'native-primary-smoke/1'});
  if(q.method==='model/list')return reply({data:[{id:'gpt-6-astra',model:'gpt-6-astra',displayName:'Astra',supportedReasoningEfforts:['high','ultra'].map(reasoningEffort=>({reasoningEffort,description:reasoningEffort})),defaultReasoningEffort:'high',inputModalities:['text'],isDefault:true}],nextCursor:null});
- if(q.method==='thread/start'||q.method==='thread/resume'){config=q.params.config.mcp_servers.pi_firstmate;log({kind:'thread',method:q.method});return reply({thread,model:'gpt-6-astra',modelProvider:'openai',cwd:process.cwd(),approvalPolicy:'never',sandbox:{type:'dangerFullAccess'}});}
+ if(q.method==='thread/start'||q.method==='thread/resume'){config=q.params.config.mcp_servers.pi_juggernaut;log({kind:'thread',method:q.method});return reply({thread,model:'gpt-6-astra',modelProvider:'openai',cwd:process.cwd(),approvalPolicy:'never',sandbox:{type:'dangerFullAccess'}});}
  if(q.method==='turn/start'){
  const id='native-turn-'+ ++counter;const text=JSON.stringify(q.params.input);log({kind:'input',text,effort:q.params.effort});reply({turn:{id,status:'inProgress',items:[]}});emit({method:'turn/started',params:{threadId:thread.id,turn:{id,status:'inProgress',items:[]}}});
  // Yield once so the adapter has accepted the turn and opened its MCP guard.
@@ -333,7 +333,7 @@ try {
           "actual Pi runtime and native package",
           "native Ultra preserved across operational turns and restart",
           "installed native adapter emits observable output progress",
-          "actual FirstMate primary extensions",
+          "actual Juggernaut primary extensions",
           "startup operational message forwarded",
           "MCP watcher control",
           "idle watcher notification opens native turn",
@@ -356,7 +356,7 @@ try {
   await stop();
   if (passed && process.env.JG_NATIVE_TEST_KEEP !== "1")
     fs.rmSync(fixture, { recursive: true, force: true });
-  else console.error("Native FirstMate test fixture: " + fixture);
+  else console.error("Native Juggernaut test fixture: " + fixture);
 }
 
 JS

@@ -4,7 +4,7 @@ run:
   status: cancelled
   head: 735a1fc5
   head_sha: 735a1fc5f8a02dbf2cab3851ad0d28ec85a177e3
-  pr: "https://github.com/kunchenguid/firstmate/pull/4019"
+  pr: "https://github.com/kunchenguid/juggernaut/pull/4019"
   findings: "1 awaiting, 2 auto-fix"
   steps[9]{step,status,findings,duration_ms}:
     intent,completed,0,18

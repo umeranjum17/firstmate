@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Live guard for bin/jg-busy-lib.sh's launch-prompt backstop (live-harness-optin
-# family). Per .agents/skills/firstmate-coding-guidelines "Harness-dependent
+# family). Per .agents/skills/juggernaut-coding-guidelines "Harness-dependent
 # checks", a classifier built on vendor-rendered dialog text must be proven
 # against the REAL installed harness, because a stub can only confirm the
 # assumption already written into the stub - and this guard exists because that
@@ -29,7 +29,7 @@
 # first-run onboarding (a subscription or API key already selected, and a
 # theme already chosen) - the guard targets a brand-new SCRATCH WORKTREE under
 # the operator's own already-onboarded config, exactly the shape a real
-# crewmate spawn produces, never a fresh CLAUDE_CONFIG_DIR. An unonboarded
+# operator spawn produces, never a fresh CLAUDE_CONFIG_DIR. An unonboarded
 # machine reports that precondition explicitly rather than failing the
 # signature.
 #

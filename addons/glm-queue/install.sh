@@ -23,7 +23,7 @@ TMP=$(mktemp -d)
 trap 'rm -rf -- "$TMP"' EXIT
 cat > "$TMP/unit" <<EOF
 [Unit]
-Description=Firstmate GLM call queue (at most $MAX Z.AI calls in flight, 127.0.0.1:$PORT)
+Description=Juggernaut GLM call queue (at most $MAX Z.AI calls in flight, 127.0.0.1:$PORT)
 
 [Service]
 Environment=GLM_QUEUE_MAX=$MAX GLM_QUEUE_PORT=$PORT

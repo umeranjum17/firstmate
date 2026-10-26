@@ -14,11 +14,11 @@
 # directory beside the absent home and installed by rename once complete, so
 # cleanup of the public home cannot remove a live clone's destination. Project
 # origins are cloned on this host, the project registry and charter are
-# published, the durable .jg-secondmate-parent record names this home's route to its parent as
+# published, the durable .jg-squad-lead-parent record names this home's route to its parent as
 # "remote" - read by bin/jg-teardown.sh's cleanup gate so a delegated public
 # reply promise, which the subsystem can only carry on the parent's own
 # filesystem, is never mistaken for one this child could hold - and the
-# .jg-secondmate-home marker commits the complete seed last.
+# .jg-squad-lead-home marker commits the complete seed last.
 # A newly created home is removed on failure. An existing matching seeded home
 # is converged only through guarded ordinary-file updates and new project clones.
 set -eu
@@ -86,8 +86,8 @@ rollback() {
       done < "$CREATED_PROJECTS"
       restore_owned_file data/charter.md || true
       restore_owned_file data/projects.md || true
-      restore_owned_file .jg-secondmate-home || true
-      restore_owned_file .jg-secondmate-parent || true
+      restore_owned_file .jg-squad-lead-home || true
+      restore_owned_file .jg-squad-lead-parent || true
       [ "$CREATED_BACKLOG" -eq 0 ] || rm -f -- "$JG_HOME/data/backlog.md"
     fi
   fi
@@ -117,7 +117,7 @@ if [ -n "$PARENT_HOST_B64" ]; then
   PARENT_HOST=$(cat "$TMP/parent-host")
 fi
 ID=$(cat "$TMP/id")
-safe_id "$ID" || die "manifest carries an unsafe secondmate id"
+safe_id "$ID" || die "manifest carries an unsafe squad_lead id"
 case "$COUNT" in ''|*[!0-9]*) die "manifest project count is invalid" ;; esac
 [ -s "$TMP/charter" ] || die "manifest charter is empty"
 [ -z "$(LC_ALL=C tr -cd '\000' < "$TMP/charter")" ] || die "manifest charter contains NUL bytes"
@@ -128,7 +128,7 @@ HOME_PARENT=$(dirname "$JG_HOME")
 HOME_PARENT_REAL=$(CDPATH='' cd -- "$HOME_PARENT" 2>/dev/null && pwd -P) \
   || die "remote home parent is unavailable"
 [ "$HOME_PARENT_REAL" = "$HOME_PARENT" ] || die "remote home parent is not canonical"
-PROVISION_LOCK_STATE="$HOME_PARENT/.firstmate-provision-locks"
+PROVISION_LOCK_STATE="$HOME_PARENT/.juggernaut-provision-locks"
 if [ -e "$PROVISION_LOCK_STATE" ] || [ -L "$PROVISION_LOCK_STATE" ]; then
   [ -d "$PROVISION_LOCK_STATE" ] && [ ! -L "$PROVISION_LOCK_STATE" ] \
     || die "remote provisioning lock root is unsafe"
@@ -154,7 +154,7 @@ PROVISION_LOCK_HELD=1
 if [ -e "$JG_HOME" ] || [ -L "$JG_HOME" ]; then
   [ -d "$JG_HOME" ] && [ ! -L "$JG_HOME" ] || die "remote home exists but is not a safe directory"
   [ -f "$JG_HOME/AGENTS.md" ] && [ ! -L "$JG_HOME/AGENTS.md" ] \
-    && [ -d "$JG_HOME/bin" ] && [ ! -L "$JG_HOME/bin" ] || die "existing remote home is not a safe Firstmate checkout"
+    && [ -d "$JG_HOME/bin" ] && [ ! -L "$JG_HOME/bin" ] || die "existing remote home is not a safe Juggernaut checkout"
   for operational_dir in data state config projects; do
     operational_path="$JG_HOME/$operational_dir"
     if [ -e "$operational_path" ] || [ -L "$operational_path" ]; then
@@ -163,7 +163,7 @@ if [ -e "$JG_HOME" ] || [ -L "$JG_HOME" ]; then
     fi
   done
   mkdir -p "$TMP/before/data"
-  for rel in data/charter.md data/projects.md .jg-secondmate-home .jg-secondmate-parent; do
+  for rel in data/charter.md data/projects.md .jg-squad-lead-home .jg-squad-lead-parent; do
     existing="$JG_HOME/$rel"
     if [ -e "$existing" ] || [ -L "$existing" ]; then
       [ -f "$existing" ] && [ ! -L "$existing" ] || die "existing remote home has unsafe owned file: $rel"
@@ -173,8 +173,8 @@ if [ -e "$JG_HOME" ] || [ -L "$JG_HOME" ]; then
     fi
   done
   EXISTING_HOME=1
-  if [ -f "$JG_HOME/.jg-secondmate-home" ]; then
-    [ "$(cat "$JG_HOME/.jg-secondmate-home")" = "$ID" ] || die "existing remote home belongs to another secondmate"
+  if [ -f "$JG_HOME/.jg-squad-lead-home" ]; then
+    [ "$(cat "$JG_HOME/.jg-squad-lead-home")" = "$ID" ] || die "existing remote home belongs to another squad_lead"
   elif find "$JG_HOME/data" "$JG_HOME/state" "$JG_HOME/projects" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null | grep -q .; then
     die "unmarked existing remote home contains operational data"
   fi
@@ -190,7 +190,7 @@ else
   # image does that copy before the destination shard directory exists, so the
   # clone dies intermittently with "failed to copy file to .../objects/xx/hash".
   # --no-local uses the normal transport and writes a pack instead.
-  git clone --no-local --quiet -- "$JG_ROOT" "$STAGE_HOME" || die "could not clone the remote Firstmate home"
+  git clone --no-local --quiet -- "$JG_ROOT" "$STAGE_HOME" || die "could not clone the remote Juggernaut home"
   STAGE_SENTINEL="${STAGE_HOME##*/}.owner"
   : > "$STAGE_HOME/$STAGE_SENTINEL" || die "cannot mark the remote home staging directory"
   mv -- "$STAGE_HOME" "$JG_HOME" || die "cannot install the remote home"
@@ -271,13 +271,13 @@ mv -f -- "$JG_HOME/data/charter.md.tmp.$$" "$JG_HOME/data/charter.md"
 cp "$PROJECT_REG" "$JG_HOME/data/projects.md.tmp.$$"
 mv -f -- "$JG_HOME/data/projects.md.tmp.$$" "$JG_HOME/data/projects.md"
 {
-  printf 'schema=jg-secondmate-parent.v1\n'
+  printf 'schema=jg-squad-lead-parent.v1\n'
   printf 'route=remote\n'
   [ -z "$PARENT_HOST" ] || printf 'parent_host=%s\n' "$PARENT_HOST"
-} > "$JG_HOME/.jg-secondmate-parent.tmp.$$"
-mv -f -- "$JG_HOME/.jg-secondmate-parent.tmp.$$" "$JG_HOME/.jg-secondmate-parent"
-printf '%s\n' "$ID" > "$JG_HOME/.jg-secondmate-home.tmp.$$"
-mv -f -- "$JG_HOME/.jg-secondmate-home.tmp.$$" "$JG_HOME/.jg-secondmate-home"
+} > "$JG_HOME/.jg-squad-lead-parent.tmp.$$"
+mv -f -- "$JG_HOME/.jg-squad-lead-parent.tmp.$$" "$JG_HOME/.jg-squad-lead-parent"
+printf '%s\n' "$ID" > "$JG_HOME/.jg-squad-lead-home.tmp.$$"
+mv -f -- "$JG_HOME/.jg-squad-lead-home.tmp.$$" "$JG_HOME/.jg-squad-lead-home"
 PUBLISHED=1
 release_provision_lock
 trap - EXIT

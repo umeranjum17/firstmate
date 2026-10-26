@@ -16,16 +16,16 @@
 # A due evaluation uses metadata only: regular-file safety checks plus stat(1)
 # byte sizes.  It does not run the startup digest, bootstrap, network checks,
 # model calls, repository refreshes, /stow, or full preference/learning
-# rereads.  The budget total, its verdict, and its secondmate exception come
+# rereads.  The budget total, its verdict, and its squad_lead exception come
 # from `bin/jg-startup-memory-budget.sh report`, the single owner of
 # config/startup-memory-budget, and are never re-derived here.  data/projects.md
-# and data/secondmates.md are printed in full by every session start too, so
+# and data/squad_leads.md are printed in full by every session start too, so
 # they are watched for prompt growth without entering that budget total.
 # The tracked set is the startup entrypoints session start executes directly
 # plus the agent instruction files, not every script and library the startup
 # path reaches; those bytes are code/instruction size, not LLM prompt cost.
 #
-# A secondmate home is never notified about the primary-owned
+# A squad_lead home is never notified about the primary-owned
 # data/captain-shared.md it cannot edit: the owner suppresses the budget overrun
 # it causes alone, and this check suppresses its per-file growth there while
 # still recording the observation.
@@ -97,7 +97,7 @@ MAX_LINE=1000
 ORPHAN_GRACE=3600
 ORPHAN_SWEEP_LIMIT=64
 PRIMARY_OWNED_MEMORY=
-if [ -e "$JG_HOME/.jg-secondmate-home" ] || [ -L "$JG_HOME/.jg-secondmate-home" ]; then
+if [ -e "$JG_HOME/.jg-squad-lead-home" ] || [ -L "$JG_HOME/.jg-squad-lead-home" ]; then
   PRIMARY_OWNED_MEMORY=data/captain-shared.md
 fi
 
@@ -294,7 +294,7 @@ run_check() {
   stat_surface tracked bin/jg-bootstrap.sh "$JG_ROOT/bin/jg-bootstrap.sh" no
   stat_surface tracked bin/jg-supervision-instructions.sh "$JG_ROOT/bin/jg-supervision-instructions.sh" no
   stat_surface printed-memory data/projects.md "$DATA_DIR/projects.md" yes
-  stat_surface printed-memory data/secondmates.md "$DATA_DIR/secondmates.md" yes
+  stat_surface printed-memory data/squad_leads.md "$DATA_DIR/squad_leads.md" yes
   stat_surface memory data/captain.md "$DATA_DIR/captain.md" yes
   stat_surface memory data/captain-shared.md "$DATA_DIR/captain-shared.md" yes
   stat_surface memory data/learnings.md "$DATA_DIR/learnings.md" yes

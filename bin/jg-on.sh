@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
-# Execute one tracked Firstmate command in a configured remote secondmate home.
+# Execute one tracked Juggernaut command in a configured remote squad_lead home.
 #
 # Usage:
-#   jg-on.sh [--stdin] <secondmate-id|unambiguous-ssh-alias> <jg-command> [args...]
+#   jg-on.sh [--stdin] <squad-lead-id|unambiguous-ssh-alias> <jg-command> [args...]
 #
-# Routes come only from remote records in data/secondmates.md. A record names an
-# SSH config alias, remote Firstmate code root, and remote JG_HOME. A host alias
+# Routes come only from remote records in data/squad_leads.md. A record names an
+# SSH config alias, remote Juggernaut code root, and remote JG_HOME. A host alias
 # may be used directly only when exactly one record selects it; an ambiguous
 # alias is refused. The command must be a genuine executable in this checkout's
 # bin/jg-*.sh namespace. No per-command table exists.
@@ -40,11 +40,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
 DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
-REG="$DATA/secondmates.md"
+REG="$DATA/squad_leads.md"
 PROTOCOL=1
 
-# shellcheck source=bin/jg-secondmate-registry-lib.sh
-. "$SCRIPT_DIR/jg-secondmate-registry-lib.sh"
+# shellcheck source=bin/jg-squad-lead-registry-lib.sh
+. "$SCRIPT_DIR/jg-squad-lead-registry-lib.sh"
 
 die() { printf 'error: %s\n' "$1" >&2; exit 1; }
 usage() { sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
@@ -63,7 +63,7 @@ ROUTE=$1
 COMMAND=$2
 shift 2
 
-case "$ROUTE" in ''|-*|*[!A-Za-z0-9._-]*) die "remote route must be a safe secondmate id or SSH alias: $ROUTE" ;; esac
+case "$ROUTE" in ''|-*|*[!A-Za-z0-9._-]*) die "remote route must be a safe squad_lead id or SSH alias: $ROUTE" ;; esac
 case "$COMMAND" in
   jg-*.sh) ;;
   *) die "remote command must be a basename in the jg-*.sh namespace: $COMMAND" ;;
@@ -71,10 +71,10 @@ esac
 case "$COMMAND" in */*|*..*) die "remote command must not contain a path or traversal: $COMMAND" ;; esac
 LOCAL_COMMAND="$JG_ROOT/bin/$COMMAND"
 [ -f "$LOCAL_COMMAND" ] && [ ! -L "$LOCAL_COMMAND" ] && [ -x "$LOCAL_COMMAND" ] \
-  || die "remote command is not a genuine tracked executable in this Firstmate checkout: $COMMAND"
+  || die "remote command is not a genuine tracked executable in this Juggernaut checkout: $COMMAND"
 git -C "$JG_ROOT" ls-files --error-unmatch "bin/$COMMAND" >/dev/null 2>&1 \
-  || die "remote command is not tracked by this Firstmate checkout: $COMMAND"
-[ -f "$REG" ] && [ ! -L "$REG" ] || die "no safe secondmate registry at $REG"
+  || die "remote command is not tracked by this Juggernaut checkout: $COMMAND"
+[ -f "$REG" ] && [ ! -L "$REG" ] || die "no safe squad_lead registry at $REG"
 
 MATCHES=0
 HOST=
@@ -82,17 +82,17 @@ ROOT=
 HOME_PATH=
 while IFS= read -r line || [ -n "$line" ]; do
   case "$line" in '- '*) ;; *) continue ;; esac
-  secondmate_registry_parse_line "$line" || die "malformed secondmate registry entry: $line"
-  [ "$SECONDMATE_REGISTRY_REMOTE" -eq 1 ] || continue
-  if [ "$SECONDMATE_REGISTRY_ID" = "$ROUTE" ] || [ "$SECONDMATE_REGISTRY_HOST" = "$ROUTE" ]; then
+  squad_lead_registry_parse_line "$line" || die "malformed squad_lead registry entry: $line"
+  [ "$SQUAD_LEAD_REGISTRY_REMOTE" -eq 1 ] || continue
+  if [ "$SQUAD_LEAD_REGISTRY_ID" = "$ROUTE" ] || [ "$SQUAD_LEAD_REGISTRY_HOST" = "$ROUTE" ]; then
     MATCHES=$((MATCHES + 1))
-    HOST=$SECONDMATE_REGISTRY_HOST
-    ROOT=$SECONDMATE_REGISTRY_ROOT
-    HOME_PATH=$SECONDMATE_REGISTRY_HOME
+    HOST=$SQUAD_LEAD_REGISTRY_HOST
+    ROOT=$SQUAD_LEAD_REGISTRY_ROOT
+    HOME_PATH=$SQUAD_LEAD_REGISTRY_HOME
   fi
 done < "$REG"
-[ "$MATCHES" -gt 0 ] || die "no remote secondmate or SSH alias matches '$ROUTE'"
-[ "$MATCHES" -eq 1 ] || die "remote route '$ROUTE' is ambiguous across $MATCHES configured secondmates; use a secondmate id"
+[ "$MATCHES" -gt 0 ] || die "no remote squad_lead or SSH alias matches '$ROUTE'"
+[ "$MATCHES" -eq 1 ] || die "remote route '$ROUTE' is ambiguous across $MATCHES configured squad_leads; use a squad_lead id"
 case "$HOST" in ''|-*|*[!A-Za-z0-9._-]*) die "configured SSH alias is unsafe: $HOST" ;; esac
 case "$ROOT" in /*) ;; *) die "configured remote root is not absolute: $ROOT" ;; esac
 case "$HOME_PATH" in /*) ;; *) die "configured remote home is not absolute: $HOME_PATH" ;; esac

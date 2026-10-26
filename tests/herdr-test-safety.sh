@@ -9,7 +9,7 @@ set -u
 
 # Herdr backend tests drive the real jg-spawn/jg-teardown but do not source
 # tests/lib.sh, so exempt them from the gate-lifecycle refusal here too (see
-# tests/lib.sh and bin/jg-gate-refuse-lib.sh for why firstmate's own suite,
+# tests/lib.sh and bin/jg-gate-refuse-lib.sh for why juggernaut's own suite,
 # which the no-mistakes gate runs from a gate worktree, must be exempt).
 export JG_GATE_REFUSE_BYPASS=1
 

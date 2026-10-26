@@ -8,8 +8,8 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
   export "$_jg_new=$_jg_val"
 done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
-# End to end: install into a throwaway HOME against a fixture home built from an upstream Firstmate checkout's bin/,
-# then drive the installed hook entrypoint. Usage: delete-guard.test.sh <firstmate-checkout> [git-ref, default HEAD]
+# End to end: install into a throwaway HOME against a fixture home built from an upstream Juggernaut checkout's bin/,
+# then drive the installed hook entrypoint. Usage: delete-guard.test.sh <juggernaut-checkout> [git-ref, default HEAD]
 # shellcheck disable=SC2016 # the cases are literal commands, never expanded here
 set -euo pipefail
 unset JG_TASK_ID JG_TASK_INBOX JG_HOME
@@ -85,8 +85,8 @@ grep -q 'delete-guard' "$T/fm/state/.wake-queue" 2>/dev/null && no "first block 
 JG_TASK_ID=t1 JG_TASK_INBOX="$T/lead/state/t1.inbox" hookrun /w 'rm -rf "$HOME"' || true
 grep -q "delete guard REPEAT: task t1 tried 2 .*home $T/lead," "$T/fm/state/.wake-queue" && ok "repeat queues an immediate wake" || no "no repeat wake"
 tail -n1 "$T/fm/state/delete-guard.log" | jq -e --arg h "$T/lead" '.task == "t1" and .home == $h and .cwd == "/w" and .runtime == "claude"' >/dev/null && ok "log line names home, task, cwd, runtime" || no "log line fields"
-JG_TASK_ID=t2 JG_TASK_INBOX="$T/lead/state/t2.inbox" hookrun "$T/fm/state" 'rm -rf ~' || true # cwd's firstmate home wins over an inherited inbox home
-jq -e --arg h "$T/fm" '.task == "t2" and .home == $h' <(tail -n1 "$T/fm/state/delete-guard.log") >/dev/null && ok "home is the firstmate home of cwd, not an inherited inbox" || no "cwd home lost to inbox"
+JG_TASK_ID=t2 JG_TASK_INBOX="$T/lead/state/t2.inbox" hookrun "$T/fm/state" 'rm -rf ~' || true # cwd's juggernaut home wins over an inherited inbox home
+jq -e --arg h "$T/fm" '.task == "t2" and .home == $h' <(tail -n1 "$T/fm/state/delete-guard.log") >/dev/null && ok "home is the juggernaut home of cwd, not an inherited inbox" || no "cwd home lost to inbox"
 JG_HOME=/elsewhere hookrun "$T/fm/state" 'rm -rf ~' || true # a lead with an inherited JG_HOME, working in its own home
 tail -n1 "$T/fm/state/delete-guard.log" | jq -e --arg h "$T/fm" '.home == $h and .task == ""' >/dev/null && ok "no-task block logs the home holding cwd" || no "home from cwd"
 out=$(check "$T/fm/state/delete-guard.check.sh")

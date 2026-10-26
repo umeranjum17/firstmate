@@ -282,7 +282,7 @@ if (process.env.MODE === "pi" || process.env.MODE.startsWith("omp")) {
 } else {
   const client = { session: { promptAsync: async (request) => { prompts.push(JSON.stringify(request)); } } };
   await mod.FmPrimaryWatchArm({ client, directory: process.env.JG_ROOT_OVERRIDE, worktree: process.env.JG_ROOT_OVERRIDE });
-  await globalThis.__firstmateOpenCodeWatchArm.ensureArmed("slow-scan", client);
+  await globalThis.__juggernautOpenCodeWatchArm.ensureArmed("slow-scan", client);
 }
 for (let i = 0; i < 1200 && !prompts.length; i++) await new Promise((resolve) => setTimeout(resolve, 100));
 if (prompts.length !== 1) throw new Error(`expected one recovery delivery, got ${prompts.length}`);

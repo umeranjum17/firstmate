@@ -34,18 +34,18 @@ printf '#!/usr/bin/env bash\nexec %q -L %q "$@"\n' "$TMUX_BIN" "$sock" > "$world
 chmod +x "$world/fakebin/tmux"
 export HOME="$world/home" XDG_CONFIG_HOME="$world/home/config" TMPDIR="$world/tmp"
 export PATH="$world/fakebin:$PATH" JG_HOME="$world" JG_STATE_OVERRIDE="$world/state" JG_DATA_OVERRIDE="$world/data" JG_CONFIG_OVERRIDE="$world/config"
-export JG_ROOT_OVERRIDE="$world" JG_TMUX_SESSION=firstmate JG_SESSION=firstmate
+export JG_ROOT_OVERRIDE="$world" JG_TMUX_SESSION=juggernaut JG_SESSION=juggernaut
 printf 'tmux\n' > "$world/config/backend"
-printf 'lead\n' > "$world/.jg-secondmate-home"
-printf 'schema=jg-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$world/parent" > "$world/.jg-secondmate-parent"
+printf 'lead\n' > "$world/.jg-squad-lead-home"
+printf 'schema=jg-squad-lead-parent.v1\nroute=local\nparent_home=%s\n' "$world/parent" > "$world/.jg-squad-lead-parent"
 cp "$ROOT/.tasks.toml" "$world/.tasks.toml"
 printf '## In flight\n\n## Queued\n\n## Done\n' > "$world/data/backlog.md"
 (cd "$world" && tasks-axi add held-lane 'deliberately paused lane' --file data/backlog.md)
-tmux new-session -d -s firstmate -n jg-held-lane 'sleep 300'
-printf 'window=firstmate:jg-held-lane\nkind=ship\nharness=pi\nbackend=tmux\nworktree=%s\n' "$world" > "$world/state/held-lane.meta"
+tmux new-session -d -s juggernaut -n jg-held-lane 'sleep 300'
+printf 'window=juggernaut:jg-held-lane\nkind=ship\nharness=pi\nbackend=tmux\nworktree=%s\n' "$world" > "$world/state/held-lane.meta"
 cycle() {
   JG_POLL=1 JG_SIGNAL_GRACE=1 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
-    JG_HOME_SUMMARY_INTERVAL=999999 JG_SECONDMATE_LIVENESS_SECS=99999999 \
+    JG_HOME_SUMMARY_INTERVAL=999999 JG_SQUAD_LEAD_LIVENESS_SECS=99999999 \
     JG_WAIT_ALERT_SECS=2 JG_WAIT_ESCALATE_SECS=4 \
     bash "$ROOT/bin/jg-watch.sh" > "$world/out" 2> "$world/err" &
   watch_pid=$!
@@ -100,8 +100,8 @@ echo 'PASS: real tmux watcher honours pause deadline, owner-only pause and activ
 # Restart an unheld lane after its observation window has elapsed, but before
 # its owner has received a wake. The real watcher must leave a response interval
 # before publishing to Main, including for a future-until decision declaration.
-tmux new-window -d -t firstmate -n jg-ladder 'sleep 300'
-printf 'window=firstmate:jg-ladder\nkind=ship\nharness=pi\nbackend=tmux\nworktree=%s\n' "$world" > "$world/state/ladder.meta"
+tmux new-window -d -t juggernaut -n jg-ladder 'sleep 300'
+printf 'window=juggernaut:jg-ladder\nkind=ship\nharness=pi\nbackend=tmux\nworktree=%s\n' "$world" > "$world/state/ladder.meta"
 for verb in blocked needs-decision; do
   : > "$world/events"
   : > "$world/parent/state/lead.status"

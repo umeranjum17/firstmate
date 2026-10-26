@@ -3,7 +3,7 @@
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # PreToolUse guard against primary-session delegation outside the fleet.
 #
-# A firstmate primary that delegates through a harness's own delegation,
+# A juggernaut primary that delegates through a harness's own delegation,
 # scheduling, or background-work tool creates work with no `state/<id>.meta` and
 # no `data/<id>/brief.md`. Only `bin/jg-spawn.sh` writes that metadata, and
 # untracked project work contributes nothing to the in-flight branch of
@@ -18,7 +18,7 @@
 # because it removes them from the model's schema entirely.
 # That deny list must not be tracked: it is Claude-only rather than
 # harness-agnostic, and tracked project settings propagate into linked
-# worktrees where they disarm legitimate crewmates.
+# worktrees where they disarm legitimate operators.
 # The tracked Claude matcher is deliberately `.*`: a stem-enumerating matcher
 # would reintroduce the fail-open-by-enumeration problem this guard exists to
 # solve, because any future tool name outside the matcher would never reach this
@@ -43,8 +43,8 @@
 #   ALLOW - exit 0 and no output.
 #   DENY - exit 2, a Claude-shaped deny object on stderr, and a Grok-shaped
 #          deny object on stdout unless --claude was supplied.
-#   INERT - not a genuine primary home (a crewmate/scout task worktree or a
-#           non-firstmate repo): exit 0 with no output, exactly like ALLOW.
+#   INERT - not a genuine primary home (a operator/scout task worktree or a
+#           non-juggernaut repo): exit 0 with no output, exactly like ALLOW.
 #   ESCAPE - JG_ALLOW_SUBAGENT=1 in the environment allows deliberately.
 #   FAIL OPEN - malformed or empty stdin, or missing jq for stdin transport.
 #
@@ -55,7 +55,7 @@
 set -u
 
 # Lowercase substrings that mark a tool name as delegation-shaped: it creates
-# work, an agent, a schedule, or an isolated workspace that firstmate would not
+# work, an agent, a schedule, or an isolated workspace that juggernaut would not
 # know about. This list is the single owner of the shipped classification.
 DELEGATION_STEMS='agent subagent task workflow cron schedul worktree delegate spawn dispatch handoff remote sendmessage monitor'
 
@@ -70,7 +70,7 @@ OBSERVE_ONLY_TOOLS='taskoutput taskstop taskget tasklist cronlist bashoutput kil
 # Exact lowercase tool names that match a stem above but create no RUNNABLE
 # work. These write only the harness's session-local todo list, which has no
 # executor: it spawns no agent, allocates no worktree, registers no schedule,
-# and starts nothing that could outlive the session or escape a firstmate
+# and starts nothing that could outlive the session or escape a juggernaut
 # guard. Denying them stops the primary tracking its own plan while granting no
 # delegation power, and the deny text would tell it to run bin/jg-brief.sh for a
 # todo entry, so the stem match here is a false positive rather than a policy.
@@ -94,13 +94,13 @@ Denies a delegation-SHAPED tool name in a genuine primary home.
 Claude primaries may also add an untracked per-home permissions.deny list that
 removes known delegation tools from the model schema before this hook is needed.
 Do not ship that Claude-only list in tracked project settings, because linked
-worktrees inherit it and legitimate crewmates would lose their delegation tools.
+worktrees inherit it and legitimate operators would lose their delegation tools.
 This hook remains as the shipped guard for future delegation-shaped names
 outside any local fixed list.
-Fires only in a genuine firstmate primary home; it is a silent no-op in a
-crewmate/scout task worktree or any non-firstmate repo, where a worker using
+Fires only in a genuine juggernaut primary home; it is a silent no-op in a
+operator/scout task worktree or any non-juggernaut repo, where a worker using
 delegation tools is legitimate.
-Exits 0 to allow and 2 to deny, naming the real crewmate dispatch path instead.
+Exits 0 to allow and 2 to deny, naming the real operator dispatch path instead.
 Set JG_ALLOW_SUBAGENT=1 in the session environment to allow deliberately.
 Malformed transport fails open.
 EOF
@@ -179,9 +179,9 @@ STATE=${JG_STATE_OVERRIDE:-$JG_HOME/state}
 
 # Scope to a genuine primary home, exactly as the session-start nudge and the
 # turn-end guard do. jg_primary_scope_matches accepts a plain checkout or a
-# marked secondmate home - both operate a fleet and must dispatch through it -
+# marked squad_lead home - both operate a fleet and must dispatch through it -
 # and rejects a linked task worktree, which is the shape bin/jg-spawn.sh always
-# hands a crewmate. A crewmate using delegation tools inside its own task
+# hands a operator. A operator using delegation tools inside its own task
 # worktree is legitimate and stays allowed. Any failure to confirm the home is
 # inert (exit 0), never a block, so a broken environment never denies a call.
 # shellcheck source=bin/jg-primary-scope-lib.sh
@@ -197,7 +197,7 @@ else
   ROUTE='first classify the work under the AGENTS.md intake contract, then use bin/jg-brief.sh followed by bin/jg-spawn.sh for dispatched work'
 fi
 
-REASON="[subagent-dispatch] the firstmate primary dispatches through the fleet, not the harness's own delegation tools: work started that way has no durable fleet record, leaves every firstmate guard inert, and dies with this session. Instead, $ROUTE (blocked tool: $TOOL, delegation-shaped on \"$MATCHED\"). Launch the session with JG_ALLOW_SUBAGENT=1 for a deliberate exception."
+REASON="[subagent-dispatch] the juggernaut primary dispatches through the fleet, not the harness's own delegation tools: work started that way has no durable fleet record, leaves every juggernaut guard inert, and dies with this session. Instead, $ROUTE (blocked tool: $TOOL, delegation-shaped on \"$MATCHED\"). Launch the session with JG_ALLOW_SUBAGENT=1 for a deliberate exception."
 
 json_escape() {
   printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' | tr '\n' ' '

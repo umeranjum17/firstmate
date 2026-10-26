@@ -51,7 +51,7 @@ write_spawn_brief() {  # <file> <id>
 ## Captain's intent
 Exercise backend dispatch for $2.
 
-## Firstmate spec
+## Juggernaut spec
 Verify backend selection without changing task intent.
 EOF
 }
@@ -231,7 +231,7 @@ test_backend_detect_precedence() {
   [ "$out" = cmux ] || fail "jg_backend_detect should report cmux for CMUX_WORKSPACE_ID alone, got '$out'"
 
   # Nesting: tmux started inside a herdr pane carries BOTH markers. Innermost
-  # (tmux) must win, since that is the surface firstmate is actually running on.
+  # (tmux) must win, since that is the surface juggernaut is actually running on.
   out=$(unset CMUX_WORKSPACE_ID; TMUX='fake,1,0' HERDR_ENV=1 jg_backend_detect) \
     || fail "jg_backend_detect should succeed with both markers present"
   [ "$out" = tmux ] || fail "jg_backend_detect should resolve nesting innermost-first (tmux over herdr), got '$out'"
@@ -259,7 +259,7 @@ test_backend_detect_precedence() {
 
 # jg_backend_detect's cmux FALLBACK signals (docs/cmux-backend.md "Runtime
 # auto-detection"): cmux's bundled claude wrapper strips every CMUX_* env var
-# on its passthrough path, so a claude-under-cmux firstmate has no
+# on its passthrough path, so a claude-under-cmux juggernaut has no
 # CMUX_WORKSPACE_ID; detection then falls back to __CFBundleIdentifier and,
 # after that, a process-ancestry walk - macOS-only, and never outranking the
 # $TMUX/HERDR_ENV innermost-first checks.
@@ -475,7 +475,7 @@ test_backend_name_explicit_beats_detection() {
   [ "$out" = tmux ] || fail "config/backend=tmux should win over an ambient HERDR_ENV=1 auto-detect marker, got '$out'"
 
   # The same opt-out must work for an ambient cmux auto-detect marker: a
-  # captain who is running firstmate inside a cmux terminal but explicitly
+  # captain who is running juggernaut inside a cmux terminal but explicitly
   # wants tmux is never overridden by CMUX_WORKSPACE_ID.
   out=$(unset TMUX HERDR_ENV; CMUX_WORKSPACE_ID='fake-uuid' JG_BACKEND=tmux JG_BACKEND_CONFIG_DIR="$dir/config-empty" jg_backend_name)
   [ "$out" = tmux ] || fail "JG_BACKEND=tmux should win over an ambient CMUX_WORKSPACE_ID auto-detect marker, got '$out'"
@@ -595,8 +595,8 @@ test_backend_validate_spawn_accepts_orca() {
 
 test_meta_get_and_backend_of_meta() {
   local meta=$TMP_ROOT/meta-get.meta edge=$TMP_ROOT/meta-get-edge.meta
-  jg_write_meta "$meta" "window=firstmate:jg-x1" "harness=claude"
-  [ "$(jg_meta_get "$meta" window)" = "firstmate:jg-x1" ] || fail "jg_meta_get did not read window="
+  jg_write_meta "$meta" "window=juggernaut:jg-x1" "harness=claude"
+  [ "$(jg_meta_get "$meta" window)" = "juggernaut:jg-x1" ] || fail "jg_meta_get did not read window="
   [ "$(jg_meta_get "$meta" missing)" = "" ] || fail "jg_meta_get should print nothing for an absent key"
   [ "$(jg_backend_of_meta "$meta")" = tmux ] || fail "jg_backend_of_meta should default absent backend= to tmux"
 
@@ -613,7 +613,7 @@ test_meta_get_and_backend_of_meta() {
 test_resolve_selector_three_forms() {
   local state=$TMP_ROOT/resolve-state fakebin out
   mkdir -p "$state"
-  jg_write_meta "$state/task1.meta" "window=firstmate:jg-task1"
+  jg_write_meta "$state/task1.meta" "window=juggernaut:jg-task1"
   jg_write_meta "$state/dotfiles-d6.meta" "window=default:wA:p2" "backend=herdr"
   jg_write_meta "$state/jg-turnend-all-harnesses-v9.meta" "window=default:wB:p3" "backend=herdr"
 
@@ -634,7 +634,7 @@ test_resolve_selector_three_forms() {
   [ "$(jg_backend_expected_label_of_selector 'jg-turnend-all-harnesses-v9' "$state")" = "jg-jg-turnend-all-harnesses-v9" ] \
     || fail "exact jg-* task id should report the spawned jg-<id> label"
 
-  [ "$(jg_backend_resolve_selector 'jg-task1' "$state")" = "firstmate:jg-task1" ] \
+  [ "$(jg_backend_resolve_selector 'jg-task1' "$state")" = "juggernaut:jg-task1" ] \
     || fail "legacy jg-<id> label should resolve through <id>.meta's window="
   [ "$(jg_backend_expected_label_of_selector 'jg-task1' "$state")" = "jg-task1" ] \
     || fail "legacy jg-<id> label should preserve its backend label"
@@ -646,7 +646,7 @@ test_resolve_selector_three_forms() {
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
 case "${1:-}" in
-  list-windows) printf 'firstmate:adhoc\nother:otherwin\n' ;;
+  list-windows) printf 'juggernaut:adhoc\nother:otherwin\n' ;;
 esac
 exit 0
 SH
@@ -659,7 +659,7 @@ SH
   assert_contains "$out" "no metadata for jg-adhoc" "an jg-* selector must always require meta, not silently fall back to a live search"
 
   out=$(PATH="$fakebin:$PATH" jg_backend_resolve_selector 'adhoc' "$state")
-  [ "$out" = "firstmate:adhoc" ] || fail "an ad hoc bare name should resolve via the tmux live-window fallback, got '$out'"
+  [ "$out" = "juggernaut:adhoc" ] || fail "an ad hoc bare name should resolve via the tmux live-window fallback, got '$out'"
 
   pass "jg_backend_resolve_selector: session:window literal, exact task id first, legacy jg-<id> label fallback, ad hoc bare name via tmux list-windows"
 }
@@ -670,7 +670,7 @@ test_backend_of_selector_matches_explicit_target_meta() {
   jg_write_meta "$state/herdr-task.meta" "window=default:w1:p2" "backend=herdr"
   jg_write_meta "$state/dotfiles-d6.meta" "window=default:wA:p2" "backend=herdr"
   jg_write_meta "$state/jg-turnend-all-harnesses-v9.meta" "window=default:wB:p3" "backend=herdr"
-  jg_write_meta "$state/tmux-task.meta" "window=firstmate:jg-tmux-task"
+  jg_write_meta "$state/tmux-task.meta" "window=juggernaut:jg-tmux-task"
   jg_write_meta "$state/custom-window-task.meta" "window=custom-window"
   jg_write_meta "$state/orca-task.meta" "window=jg-orca-task" "terminal=term-orca-task" "backend=orca"
 
@@ -690,7 +690,7 @@ test_backend_of_selector_matches_explicit_target_meta() {
     || fail "matching an explicit Orca terminal handle should inherit metadata backend"
   [ "$(jg_backend_of_selector 'default:w1:p2' 'default:w1:p2' "$state")" = herdr ] \
     || fail "explicit backend target matching metadata should use that task's backend"
-  [ "$(jg_backend_of_selector 'firstmate:jg-tmux-task' 'firstmate:jg-tmux-task' "$state")" = tmux ] \
+  [ "$(jg_backend_of_selector 'juggernaut:jg-tmux-task' 'juggernaut:jg-tmux-task' "$state")" = tmux ] \
     || fail "explicit tmux-shaped target with absent backend= should default to tmux"
   [ "$(jg_backend_of_selector 'manual:outside' 'manual:outside' "$state")" = tmux ] \
     || fail "explicit target with no matching metadata should keep the tmux compatibility default"
@@ -857,7 +857,7 @@ set -u
 case "\${1:-}" in
   display-message)
     for a in "\$@"; do case "\$a" in *pane_current_path*) printf '%s\\n' "$wt"; exit 0 ;; esac; done
-    printf 'firstmate\\n'; exit 0 ;;
+    printf 'juggernaut\\n'; exit 0 ;;
   list-windows) exit 0 ;;
 esac
 exit 0
@@ -930,7 +930,7 @@ case "\${1:-}" in
       fi
       exit 0
     ;; esac; done
-    printf 'firstmate\\n'; exit 0 ;;
+    printf 'juggernaut\\n'; exit 0 ;;
   list-windows) exit 0 ;;
 esac
 exit 0
@@ -1060,10 +1060,10 @@ test_teardown_conformance_old_vs_new() {
   mkdir -p "$state_old" "$state_new" "$config_old" "$config_new"
 
   jg_write_meta "$state_old/$id.meta" \
-    "window=firstmate:jg-$id" "worktree=$wt" "project=$proj" "harness=claude" "kind=scout" "mode=no-mistakes" "yolo=off" \
+    "window=juggernaut:jg-$id" "worktree=$wt" "project=$proj" "harness=claude" "kind=scout" "mode=no-mistakes" "yolo=off" \
     "decisions_reviewed=1" "decision_keys="
   jg_write_meta "$state_new/$id.meta" \
-    "window=firstmate:jg-$id" "worktree=$wt" "project=$proj" "harness=claude" "kind=scout" "mode=no-mistakes" "yolo=off" \
+    "window=juggernaut:jg-$id" "worktree=$wt" "project=$proj" "harness=claude" "kind=scout" "mode=no-mistakes" "yolo=off" \
     "decisions_reviewed=1" "decision_keys="
   touch "$state_old/.last-watcher-beat" "$state_new/.last-watcher-beat"
 
@@ -1084,9 +1084,9 @@ test_teardown_conformance_old_vs_new() {
   # forever, so the '=' exactness markers are normalized away and the legacy run
   # is only required to have reached tmux window cleanup for this task. The
   # exact-selector contract belongs to the current script, asserted below.
-  assert_contains "$(tr -d '=' < "$log_old")" "tmux"$'\x1f''kill-window'$'\x1f''-t'$'\x1f'"firstmate:jg-$id" \
+  assert_contains "$(tr -d '=' < "$log_old")" "tmux"$'\x1f''kill-window'$'\x1f''-t'$'\x1f'"juggernaut:jg-$id" \
     "legacy teardown fixture did not exercise tmux window cleanup for the task"
-  assert_contains "$(cat "$log_new")" "tmux"$'\x1f''kill-window'$'\x1f''-t'$'\x1f'"=firstmate:=jg-$id" \
+  assert_contains "$(cat "$log_new")" "tmux"$'\x1f''kill-window'$'\x1f''-t'$'\x1f'"=juggernaut:=jg-$id" \
     "teardown did not call tmux kill-window with exact session and window selectors"
 
   pass "jg-teardown.sh: treehouse return remains compatible while tmux cleanup uses exact selectors"
@@ -1162,7 +1162,7 @@ test_spawn_explicit_backend_flag_beats_autodetect_herdr_env() {
   state="$TMP_ROOT/explicit-backend-state"; config="$TMP_ROOT/explicit-backend-config"
   mkdir -p "$state" "$config"
 
-  # HERDR_ENV=1 is present (as if firstmate itself were running under herdr),
+  # HERDR_ENV=1 is present (as if juggernaut itself were running under herdr),
   # but an explicit --backend tmux flag must still win outright.
   out=$(PATH="$fb:$PATH" JG_ROOT_OVERRIDE="$ROOT" HOME="$SPAWN_HOME" CLAUDE_CONFIG_DIR='' \
     JG_STATE_OVERRIDE="$state" JG_DATA_OVERRIDE="$data" JG_CONFIG_OVERRIDE="$config" \

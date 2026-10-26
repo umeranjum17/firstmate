@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# tests/jg-secondmate-reconcile.test.sh - the cooldown-limited reconcile ask.
+# tests/jg-squad-lead-reconcile.test.sh - the cooldown-limited reconcile ask.
 #
-# A backlog-vs-metadata inventory mismatch inside a secondmate home no longer
+# A backlog-vs-metadata inventory mismatch inside a squad_lead home no longer
 # blanks that home in the fleet snapshot, so the parent asks the home that owns
 # those books to fix them. This suite pins that ask: it lands as a real durable
 # steering record, a home is asked at most once per cooldown window however
@@ -9,28 +9,28 @@
 # earns one gentle re-nudge, and the parent never touches the mate's own files.
 set -u
 
-# shellcheck source=tests/secondmate-helpers.sh disable=SC1091
-. "$(dirname "${BASH_SOURCE[0]}")/secondmate-helpers.sh"
+# shellcheck source=tests/squad-lead-helpers.sh disable=SC1091
+. "$(dirname "${BASH_SOURCE[0]}")/squad-lead-helpers.sh"
 
-RECONCILE="$ROOT/bin/jg-secondmate-reconcile.sh"
-TMP_ROOT=$(jg_test_tmproot jg-secondmate-reconcile)
+RECONCILE="$ROOT/bin/jg-squad-lead-reconcile.sh"
+TMP_ROOT=$(jg_test_tmproot jg-squad-lead-reconcile)
 
 command -v jq >/dev/null 2>&1 || { echo "skip: jq not found"; exit 0; }
 
 export JG_SEND_SETTLE=0 JG_SEND_SLEEP=0 JG_SEND_RETRIES=1
 
-# A main home with one registered, live, local secondmate reachable through the
+# A main home with one registered, live, local squad_lead reachable through the
 # fake tmux backend, so jg-send's real inbox plane is exercised end to end.
 make_main_home() {  # <name> <mate-id>
   local home="$TMP_ROOT/$1" mate="$TMP_ROOT/$1-mate" id=$2 abs fakebin
   mkdir -p "$home/data" "$home/state"
-  seed_secondmate_home_marker "$mate" "$id"
+  seed_squad_lead_home_marker "$mate" "$id"
   abs=$(cd "$mate" && pwd -P)
   printf -- '- %s - fixture domain (home: %s; scope: fixture; projects: sample; added 2026-08-26)\n' \
-    "$id" "$abs" > "$home/data/secondmates.md"
+    "$id" "$abs" > "$home/data/squad_leads.md"
   cat > "$home/state/$id.meta" <<META
-window=firstmate:jg-$id
-kind=secondmate
+window=juggernaut:jg-$id
+kind=squad_lead
 harness=claude
 backend=tmux
 spawn_gen=spawn-$id
@@ -45,19 +45,19 @@ META
 write_snapshot() {  # <path> <mate-id> <invalidity-json> [state]
   jq -n --arg id "$2" --argjson inv "$3" --arg state "${4:-captain_decision}" '{
     schema:"jg-fleet-snapshot.v1", generated:"2026-08-26T00:00:00Z",
-    secondmate_current:{records:[{
+    squad_lead_current:{records:[{
       id:$id, home:("/tmp/" + $id), spawn_gen:("spawn-" + $id),
       current:{state:$state, reason:null},
       invalidity:$inv, reconcile_inventory:($inv // {kind:null,ids:[]}),
       provenance:{selected:"structured-home", trust:"partial-structured"}}]}}' > "$1"
 }
 
-# The same shape, but for a persistent REMOTE secondmate: no spawn_gen (its
+# The same shape, but for a persistent REMOTE squad_lead: no spawn_gen (its
 # parent metadata never carries one), host instead.
 write_remote_snapshot() {  # <path> <mate-id> <host> <invalidity-json> [state]
   jq -n --arg id "$2" --arg host "$3" --argjson inv "$4" --arg state "${5:-captain_decision}" '{
     schema:"jg-fleet-snapshot.v1", generated:"2026-08-26T00:00:00Z",
-    secondmate_current:{records:[{
+    squad_lead_current:{records:[{
       id:$id, home:("/tmp/" + $id), host:$host, spawn_gen:null,
       current:{state:$state, reason:null},
       invalidity:$inv, reconcile_inventory:($inv // {kind:null,ids:[]}),
@@ -65,7 +65,7 @@ write_remote_snapshot() {  # <path> <mate-id> <host> <invalidity-json> [state]
 }
 
 # A fake ssh that decodes jg-on.sh's base64 remote-home/argv payload and
-# EXECUTES the real host-local leg (jg-remote-secondmate-control.sh) against a
+# EXECUTES the real host-local leg (jg-remote-squad-lead-control.sh) against a
 # genuinely seeded remote-home fixture, exactly like the ssh stub proven in
 # tests/jg-send-remote-delivery.test.sh.
 make_remote_ssh_stub() {  # <dir> -> echoes fakebin dir
@@ -98,13 +98,13 @@ SH
   printf '%s\n' "$fb"
 }
 
-# A seeded remote secondmate home the real host-local leg validates and writes
-# into (identity marker, Firstmate-checkout shape, parent-route endpoint meta).
-make_remote_secondmate_home() {  # <name> -> echoes remote home dir
+# A seeded remote squad_lead home the real host-local leg validates and writes
+# into (identity marker, Juggernaut-checkout shape, parent-route endpoint meta).
+make_remote_squad_lead_home() {  # <name> -> echoes remote home dir
   local rh="$TMP_ROOT/$1-rhome"
   mkdir -p "$rh/state/parent-route" "$rh/bin"
-  printf '%s\n' "$1" > "$rh/.jg-secondmate-home"
-  printf '# remote secondmate home fixture\n' > "$rh/AGENTS.md"
+  printf '%s\n' "$1" > "$rh/.jg-squad-lead-home"
+  printf '# remote squad_lead home fixture\n' > "$rh/AGENTS.md"
   cat > "$rh/state/parent-route/$1.meta" <<META
 window=jg-remote:p1
 worktree=-
@@ -120,8 +120,8 @@ META
   printf '%s\n' "$rh"
 }
 
-# A parent home whose secondmate is a persistent REMOTE route (as
-# spawn_remote_secondmate() writes it: no spawn_gen, remote_host instead).
+# A parent home whose squad_lead is a persistent REMOTE route (as
+# spawn_remote_squad_lead() writes it: no spawn_gen, remote_host instead).
 make_remote_parent_home() {  # <name> <mate-id> <remote-home> <host> -> echoes home dir
   local home="$TMP_ROOT/$1" id=$2 rhome host=$4
   mkdir -p "$home/data" "$home/state"
@@ -133,8 +133,8 @@ make_remote_parent_home() {  # <name> <mate-id> <remote-home> <host> -> echoes h
 window=remote:$id
 endpoint_task_id=$id
 harness=claude
-kind=secondmate
-mode=secondmate
+kind=squad_lead
+mode=squad_lead
 yolo=off
 remote_host=$host
 remote_root=/remote/root
@@ -142,7 +142,7 @@ remote_backend=herdr
 remote_herdr_session=jg-remote
 remote_target=jg-remote:p1
 META
-  cat > "$home/data/secondmates.md" <<EOF
+  cat > "$home/data/squad_leads.md" <<EOF
 - $id - remote fixture domain (host: $host; root: /remote/root; home: $rhome; scope: remote fixture; projects: sample; added 2026-08-26)
 EOF
   printf '%s\n' "$home"
@@ -170,7 +170,7 @@ run_notify() {  # <home> <fakebin> <name> <snapshot> [extra args...]
   shift 4
   PATH="$fakebin:$PATH" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     JG_STATE_OVERRIDE="$home/state" \
-    JG_FAKE_TMUX_WINDOW="firstmate:jg-mate" \
+    JG_FAKE_TMUX_WINDOW="juggernaut:jg-mate" \
     JG_FAKE_TMUX_LOG="$TMP_ROOT/$name-tmux.log" \
     JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/$name-fake/pane.txt" \
     "$RECONCILE" notify --snapshot "$snap" "$@"
@@ -315,7 +315,7 @@ test_each_home_carries_its_own_cooldown() {
   sed -i.bak 's/jg-mate/jg-other/' "$home/state/other.meta" && rm -f "$home/state/other.meta.bak"
   snap="$home/snapshot.json"
   jq -n '{schema:"jg-fleet-snapshot.v1", generated:"2026-08-26T00:00:00Z",
-    secondmate_current:{records:[
+    squad_lead_current:{records:[
       {id:"mate", home:"/tmp/mate", spawn_gen:"spawn-mate", current:{state:"captain_decision",reason:null},
        invalidity:{kind:"orphan_in_flight",ids:["a"]},
        reconcile_inventory:{kind:"orphan_in_flight",ids:["a"]},
@@ -360,7 +360,7 @@ test_the_ask_never_arms_a_reply_expectation_or_a_re_ring() {
   # the same inbox, same grace, with an ordinary unhandled steer added.
   PATH="$fakebin:$PATH" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     JG_STATE_OVERRIDE="$home/state" \
-    JG_FAKE_TMUX_WINDOW="firstmate:jg-mate" \
+    JG_FAKE_TMUX_WINDOW="juggernaut:jg-mate" \
     JG_FAKE_TMUX_LOG="$TMP_ROOT/fireforget-tmux.log" \
     JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/fireforget-fake/pane.txt" \
     "$ROOT/bin/jg-send.sh" mate "an ordinary steer that does expect handling" >/dev/null 2>&1 \
@@ -552,8 +552,8 @@ SH
     rm -rf "$home/state/mate.inbox"
     rm -f "$home/state/mate.meta" "$home/state/mate.reconcile-nudged"
     cat > "$home/state/mate.meta" <<META
-window=firstmate:jg-mate
-kind=secondmate
+window=juggernaut:jg-mate
+kind=squad_lead
 harness=claude
 backend=tmux
 spawn_gen=spawn-replacement
@@ -577,15 +577,15 @@ META
   pass "teardown retires the cooldown before a replacement can inherit it"
 }
 
-# A persistent REMOTE secondmate's parent metadata never carries spawn_gen
-# (bin/jg-spawn.sh's spawn_remote_secondmate() never writes one). This is the
+# A persistent REMOTE squad_lead's parent metadata never carries spawn_gen
+# (bin/jg-spawn.sh's spawn_remote_squad_lead() never writes one). This is the
 # proven marker-bearing path's counterpart: same durable fire-and-forget
 # delivery and cooldown behavior, driven end to end through the real remote
 # transport, for a mate that legitimately has no generation marker at all.
-test_a_markerless_remote_secondmate_is_nudged_once_per_window() {
+test_a_markerless_remote_squad_lead_is_nudged_once_per_window() {
   local home rhome fakebin snap out
   fakebin=$(make_remote_ssh_stub "$TMP_ROOT/remote-once")
-  rhome=$(make_remote_secondmate_home remote-once-mate)
+  rhome=$(make_remote_squad_lead_home remote-once-mate)
   home=$(make_remote_parent_home remote-once remote-once-mate "$rhome" remote-once-host)
   snap="$home/snapshot.json"
   write_remote_snapshot "$snap" remote-once-mate remote-once-host \
@@ -606,7 +606,7 @@ test_a_markerless_remote_secondmate_is_nudged_once_per_window() {
     "a repeated markerless snapshot did not report the cooldown: $out"
   [ "$(remote_inbox_records "$rhome" remote-once-mate | grep -c . || true)" -eq 1 ] \
     || fail "repeated markerless snapshots asked the mate more than once inside the cooldown"
-  pass "a legitimately markerless persistent remote secondmate is nudged once per window"
+  pass "a legitimately markerless persistent remote squad_lead is nudged once per window"
 }
 
 # The safety boundary the spawn_gen check protects for local mates has a
@@ -616,7 +616,7 @@ test_a_markerless_remote_secondmate_is_nudged_once_per_window() {
 test_a_stale_remote_route_is_refused() {
   local home rhome fakebin snap out
   fakebin=$(make_remote_ssh_stub "$TMP_ROOT/remote-stale")
-  rhome=$(make_remote_secondmate_home remote-stale-mate)
+  rhome=$(make_remote_squad_lead_home remote-stale-mate)
   home=$(make_remote_parent_home remote-stale remote-stale-mate "$rhome" old-host)
   snap="$home/snapshot.json"
   write_remote_snapshot "$snap" remote-stale-mate old-host \
@@ -639,7 +639,7 @@ test_a_stale_remote_route_is_refused() {
 test_route_replacement_during_send_is_refused() {
   local home rhome fakebin snap signal release out rc notify_pid
   fakebin=$(make_remote_ssh_stub "$TMP_ROOT/remote-send-race")
-  rhome=$(make_remote_secondmate_home remote-send-race-mate)
+  rhome=$(make_remote_squad_lead_home remote-send-race-mate)
   home=$(make_remote_parent_home remote-send-race remote-send-race-mate "$rhome" old-host)
   snap="$home/snapshot.json"
   signal="$home/jg-send-started"
@@ -680,8 +680,8 @@ SH
     "$home/state/remote-send-race-mate.meta" > "$home/state/remote-send-race-mate.meta.tmp"
   mv "$home/state/remote-send-race-mate.meta.tmp" "$home/state/remote-send-race-mate.meta"
   sed 's/host: old-host/host: new-host/' \
-    "$home/data/secondmates.md" > "$home/data/secondmates.md.tmp"
-  mv "$home/data/secondmates.md.tmp" "$home/data/secondmates.md"
+    "$home/data/squad_leads.md" > "$home/data/squad_leads.md.tmp"
+  mv "$home/data/squad_leads.md.tmp" "$home/data/squad_leads.md"
   jg_lock_release "$home/state/.meta-remote-send-race-mate.lock"
   jg_lock_release "$home/state/.control-remote-send-race-mate.lock"
   : > "$release"
@@ -704,7 +704,7 @@ SH
 test_a_row_with_no_identity_at_all_fails_loudly() {
   local home rhome fakebin snap out
   fakebin=$(make_remote_ssh_stub "$TMP_ROOT/remote-noid")
-  rhome=$(make_remote_secondmate_home remote-noid-mate)
+  rhome=$(make_remote_squad_lead_home remote-noid-mate)
   home=$(make_remote_parent_home remote-noid remote-noid-mate "$rhome" remote-noid-host)
   snap="$home/snapshot.json"
   write_remote_snapshot "$snap" remote-noid-mate "" \
@@ -761,13 +761,13 @@ test_reconcile_requests_coalesce_per_target_until_delivery() {
   local home mate fakebin second_mate second_abs snap bearings requests remaining out i ready_a ready_b ready_b2 release_a release_b release_b2 holder_a holder_b holder_b2
   { read -r home; read -r mate; read -r fakebin; } < <(make_main_home coalesced-requests coalesce-a)
   second_mate="$TMP_ROOT/coalesced-requests-mate-b"
-  seed_secondmate_home_marker "$second_mate" coalesce-b
+  seed_squad_lead_home_marker "$second_mate" coalesce-b
   second_abs=$(cd "$second_mate" && pwd -P)
   printf -- '- coalesce-b - fixture domain (home: %s; scope: fixture; projects: sample; added 2026-08-26)\n' \
-    "$second_abs" >> "$home/data/secondmates.md"
+    "$second_abs" >> "$home/data/squad_leads.md"
   cat > "$home/state/coalesce-b.meta" <<META
-window=firstmate:jg-coalesce-b
-kind=secondmate
+window=juggernaut:jg-coalesce-b
+kind=squad_lead
 harness=claude
 backend=tmux
 spawn_gen=spawn-coalesce-b
@@ -776,7 +776,7 @@ worktree=$second_abs
 META
   snap="$home/coalesced-snapshot.json"
   write_snapshot "$snap" coalesce-a '{"kind":"orphan_in_flight","ids":["a-1"]}'
-  jq '.secondmate_current.records += [(.secondmate_current.records[0]
+  jq '.squad_lead_current.records += [(.squad_lead_current.records[0]
     | .id = "coalesce-b"
     | .home = "/tmp/coalesce-b"
     | .spawn_gen = "spawn-coalesce-b"
@@ -794,7 +794,7 @@ META
   requests=$(find "$home/state/reconcile-notify" -maxdepth 1 -type f -name 'request-*.json' | wc -l | tr -d '[:space:]')
   [ "$requests" -eq 2 ] || fail "repeated requests did not coalesce to one pending file per target"
   bearings="$home/coalesced-bearings.json"
-  jq '{schema:"jg-bearings.v1",secondmate_reconcile:[.secondmate_current.records[] | {
+  jq '{schema:"jg-bearings.v1",squad_lead_reconcile:[.squad_lead_current.records[] | {
     id,spawn_gen,host:(.host // null),kind:.reconcile_inventory.kind,ids:.reconcile_inventory.ids}]}' \
     "$snap" > "$bearings"
   JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" JG_STATE_OVERRIDE="$home/state" \
@@ -805,7 +805,7 @@ META
   JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" JG_STATE_OVERRIDE="$home/state" \
     "$RECONCILE" request --snapshot "$snap" >/dev/null \
     || fail "the fleet request could not replace its Bearings representation"
-  jq '(.secondmate_current.records[] | select(.id == "coalesce-a") | .spawn_gen) = "spawn-coalesce-a-v2"' \
+  jq '(.squad_lead_current.records[] | select(.id == "coalesce-a") | .spawn_gen) = "spawn-coalesce-a-v2"' \
     "$snap" > "$snap.next"
   mv "$snap.next" "$snap"
   awk '{ if ($0 ~ /^spawn_gen=/) print "spawn_gen=spawn-coalesce-a-v2"; else print }' \
@@ -816,7 +816,7 @@ META
     || fail "the relaunched target request could not replace its predecessor"
   requests=$(find "$home/state/reconcile-notify" -maxdepth 1 -type f -name 'request-*.json' | wc -l | tr -d '[:space:]')
   [ "$requests" -eq 2 ] || fail "a target relaunch created an additional pending request"
-  jq -s -e '[.[].secondmate_current.records[] | select(.id == "coalesce-a")]
+  jq -s -e '[.[].squad_lead_current.records[] | select(.id == "coalesce-a")]
     | length == 1 and .[0].spawn_gen == "spawn-coalesce-a-v2"' \
     "$home/state/reconcile-notify"/request-*.json >/dev/null \
     || fail "the relaunched target did not replace its pending identity payload"
@@ -854,7 +854,7 @@ META
   holder_b2=$!
   while [ ! -f "$ready_b2" ]; do sleep 0.01; done
   PATH="$fakebin:$PATH" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" JG_STATE_OVERRIDE="$home/state" \
-    JG_FAKE_TMUX_WINDOW='firstmate:jg-coalesce-a' JG_FAKE_TMUX_LOG="$home/tmux.log" \
+    JG_FAKE_TMUX_WINDOW='juggernaut:jg-coalesce-a' JG_FAKE_TMUX_LOG="$home/tmux.log" \
     JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/coalesced-requests-fake/pane.txt" \
     "$RECONCILE" process-requests > "$out" 2>&1 || true
   : > "$release_b2"
@@ -864,11 +864,11 @@ META
   requests=$(find "$home/state/reconcile-notify" -maxdepth 1 -type f -name 'request-*.json' | wc -l | tr -d '[:space:]')
   [ "$requests" -eq 1 ] || fail "successful delivery did not retire only its target request"
   remaining=$(find "$home/state/reconcile-notify" -maxdepth 1 -type f -name 'request-*.json' -print -quit)
-  jq -e '.secondmate_current.records | length == 1 and .[0].id == "coalesce-b"' "$remaining" >/dev/null \
+  jq -e '.squad_lead_current.records | length == 1 and .[0].id == "coalesce-b"' "$remaining" >/dev/null \
     || fail "delivery of one target did not preserve the other target independently"
 
   PATH="$fakebin:$PATH" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" JG_STATE_OVERRIDE="$home/state" \
-    JG_FAKE_TMUX_WINDOW='firstmate:jg-coalesce-b' JG_FAKE_TMUX_LOG="$home/tmux.log" \
+    JG_FAKE_TMUX_WINDOW='juggernaut:jg-coalesce-b' JG_FAKE_TMUX_LOG="$home/tmux.log" \
     JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/coalesced-requests-fake/pane.txt" \
     "$RECONCILE" process-requests > "$out" 2>&1 \
     || fail "the remaining target request could not be delivered"
@@ -880,11 +880,11 @@ META
 test_bearings_request_returns_before_remote_delivery_and_supervision_sends_later() {
   local home rhome fakebin snap warm started elapsed watcher i requests beat_before beat_after processing beacon_advanced=0
   fakebin=$(make_remote_ssh_stub "$TMP_ROOT/remote-offpath")
-  rhome=$(make_remote_secondmate_home remote-offpath-mate)
+  rhome=$(make_remote_squad_lead_home remote-offpath-mate)
   rhome=$(cd "$rhome" && pwd -P)
   home=$(make_remote_parent_home remote-offpath remote-offpath-mate "$rhome" remote-offpath-host)
   jq -n --arg home "$rhome" '{
-    schema:"jg-secondmate-home-summary.v1",hold_classifier_schema:"jg-captain-hold-buckets.v1",
+    schema:"jg-squad-lead-home-summary.v1",hold_classifier_schema:"jg-captain-hold-buckets.v1",
     generated:"2026-09-01T22:00:00Z",generated_epoch:1900,home:$home,
     valid:false,reason:"in-flight backlog item has no child metadata: stale-row",
     invalidity:{kind:"orphan_in_flight",ids:["stale-row"]},state:"no_active_work",
@@ -897,7 +897,7 @@ test_bearings_request_returns_before_remote_delivery_and_supervision_sends_later
     JG_STATE_OVERRIDE="$home/state" JG_SNAPSHOT_BUDGET=3 JG_SNAPSHOT_NOW_EPOCH=2000 \
     JG_BEARINGS_NOW=2026-09-01T22:00:00Z "$ROOT/bin/jg-bearings-snapshot.sh" --json) \
     || fail "the initial remote ledger could not seed the parent cache"
-  printf '%s' "$warm" | jq -e '.secondmate_reconcile | any(.id == "remote-offpath-mate" and .kind == "orphan_in_flight")' >/dev/null \
+  printf '%s' "$warm" | jq -e '.squad_lead_reconcile | any(.id == "remote-offpath-mate" and .kind == "orphan_in_flight")' >/dev/null \
     || fail "the warm remote ledger did not carry its inventory mismatch"
   touch "$home/state/home-summary.json"
 
@@ -914,7 +914,7 @@ test_bearings_request_returns_before_remote_delivery_and_supervision_sends_later
   elapsed=$(( $(date +%s) - started ))
   [ "$elapsed" -lt 5 ] \
     || fail "Bearings and request publication waited past the collector budget behind remote delivery (${elapsed}s)"
-  printf '%s' "$snap" | jq -e '.secondmates | any(.id == "remote-offpath-mate" and .freshness == "cached" and .age_seconds == 100)' >/dev/null \
+  printf '%s' "$snap" | jq -e '.squad_leads | any(.id == "remote-offpath-mate" and .freshness == "cached" and .age_seconds == 100)' >/dev/null \
     || fail "the delayed queue did not leave an age-labeled cached mismatch row"
   requests=$(find "$home/state/reconcile-notify" -maxdepth 1 -type f -name 'request-*.json' | wc -l | tr -d '[:space:]')
   [ "$requests" -eq 1 ] || fail "the mismatched-home snapshot did not leave one durable notify request"
@@ -931,7 +931,7 @@ test_bearings_request_returns_before_remote_delivery_and_supervision_sends_later
     JG_SSH_BIN="$fakebin/fake-ssh" JG_REMOTE_CODE_ROOT="$ROOT" \
     PATH="$fakebin:$PATH" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     JG_STATE_OVERRIDE="$home/state" JG_POLL=1 JG_HOME_SUMMARY_INTERVAL=999999 \
-    JG_SECONDMATE_LIVENESS_SECS=99999999 \
+    JG_SQUAD_LEAD_LIVENESS_SECS=99999999 \
     "$ROOT/bin/jg-watch.sh" > "$home/watch.out" 2> "$home/watch.err" &
   watcher=$!
   i=0
@@ -1003,7 +1003,7 @@ test_concurrent_recaps_send_one_instruction
 test_a_delayed_snapshot_never_prescribes_a_stale_repair
 test_a_stale_snapshot_never_targets_a_replacement_mate
 test_teardown_cannot_leave_its_replacement_in_cooldown
-test_a_markerless_remote_secondmate_is_nudged_once_per_window
+test_a_markerless_remote_squad_lead_is_nudged_once_per_window
 test_a_stale_remote_route_is_refused
 test_route_replacement_during_send_is_refused
 test_a_row_with_no_identity_at_all_fails_loudly

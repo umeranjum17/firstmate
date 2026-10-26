@@ -5,7 +5,7 @@
 # workers commonly write the colon first (needs-decision: [key=x] note); that
 # stated key must be honored, never silently folded into the shared "default"
 # bucket where an answer can close the wrong record (issue #2109). Also covers
-# status_line_verb's bracket-tag stripping: a remote secondmate reply prepends
+# status_line_verb's bracket-tag stripping: a remote squad_lead reply prepends
 # a "[corr=...]" correlation tag before (or without) "[key=...]", and every
 # such tag before the colon must be stripped so the leading word is the bare
 # verb, regardless of order or count. These tests drive the REAL
@@ -157,7 +157,7 @@ test_malformed_stated_key_never_collapses_to_default() {
   pass "a malformed stated key is rejected in both positions, never folded as default"
 }
 
-# A remote secondmate reply routinely prepends a "[corr=<hex>]" correlation
+# A remote squad_lead reply routinely prepends a "[corr=<hex>]" correlation
 # tag ahead of "[key=...]" (issue: a remote reply's "needs-decision
 # [corr=d448ea86afa4bf67] [key=x]: ..." folded to no open decision at all,
 # because the verb parser only stripped a leading "[key=...]" token and left
@@ -368,7 +368,7 @@ test_closing_verb_filters_unrelated_history_without_subshell_growth() {
   local dir f want tag size i level small large
   dir=$(case_dir closing-verb-processes)
   f="$dir/task.status"
-  printf 'kind=secondmate\n' > "$dir/task.meta"
+  printf 'kind=squad_lead\n' > "$dir/task.meta"
   for want in route default; do
     tag="[key=$want]"
     [ "$want" != default ] || tag=''
@@ -401,7 +401,7 @@ test_closing_verb_filter_preserves_terminal_chronology() {
   local dir f kind want tag terminal expected
   dir=$(case_dir closing-verb-terminals)
   f="$dir/task.status"
-  for kind in ship scout secondmate; do
+  for kind in ship scout squad_lead; do
     printf 'kind=%s\n' "$kind" > "$dir/task.meta"
     for want in access default; do
       tag="[key=$want]"
@@ -414,14 +414,14 @@ test_closing_verb_filter_preserves_terminal_chronology() {
         esac
         printf 'note: cleanup complete\n' >> "$f"
         expected=$terminal
-        [ "$kind" != secondmate ] || expected=blocked
+        [ "$kind" != squad_lead ] || expected=blocked
         [ "$(status_key_closing_verb "$f" "$want")" = "$expected" ] || fail "$kind/$want lost $terminal chronology"
         printf 'needs-decision: [key=%s] reopened\nnote: more cleanup\n' "$want" >> "$f"
         [ "$(status_key_closing_verb "$f" "$want")" = needs-decision ] || fail "$kind/$want lost a post-terminal reopening"
       done
     done
   done
-  pass "per-key filtering retains ship/scout terminals, reopenings, and secondmate blockers"
+  pass "per-key filtering retains ship/scout terminals, reopenings, and squad_lead blockers"
 }
 
 test_closing_verb_filters_unrelated_history_without_subshell_growth

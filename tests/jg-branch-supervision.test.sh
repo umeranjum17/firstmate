@@ -46,7 +46,7 @@ test_branch_prompt_is_byte_stable_and_above_cache_floor() {
     *) fail "branch prompt lost its role preamble" ;;
   esac
   case "$out_a" in
-    *"stuck-crewmate-recovery"*) ;;
+    *"stuck-operator-recovery"*) ;;
     *) fail "branch prompt lost the inlined recovery playbook" ;;
   esac
   case "$out_a" in
@@ -66,7 +66,7 @@ test_branch_prompt_is_byte_stable_and_above_cache_floor() {
     *) fail "branch prompt lost the landed-work cleanup rule" ;;
   esac
   case "$out_a" in
-    *"A second mate's status log is a relay channel for its child work"*"retiring a second mate is MAIN's alone"*"Report a second mate's signal wake from the status lines that wake newly presents"*"A second mate's stale wake is a liveness event: report it even when it presents no new status lines."*) ;;
+    *"A squad lead's status log is a relay channel for its child work"*"retiring a squad lead is MAIN's alone"*"Report a squad lead's signal wake from the status lines that wake newly presents"*"A squad lead's stale wake is a liveness event: report it even when it presents no new status lines."*) ;;
     *) fail "branch prompt lost the second-mate relay, signal-span, or stale-liveness rule" ;;
   esac
   pass "branch prompt is byte-stable across homes, cwd, timezone, and time, above the cache floor"
@@ -1397,7 +1397,7 @@ test_away_record_relocates_main_owned_actions_to_the_branch() {
   # An arbitrary id is not already-queued work, so the branch is refused at
   # that gate rather than proceeding to ordinary validation.
   jg_write_meta "$home/state/task-a.meta" "window=jg-task-a" "kind=ship"
-  jg_write_meta "$home/state/mate-1.meta" "window=remote:mate-1" "kind=secondmate"
+  jg_write_meta "$home/state/mate-1.meta" "window=remote:mate-1" "kind=squad_lead"
   out=$(JG_HOME="$home" JG_ROOT_OVERRIDE="$root" JG_SUPERVISION_ACTOR=branch \
     "$ROOT/bin/jg-spawn.sh" task-new --mode no-mistakes --yolo off 2>&1)
   status=$?
@@ -1515,10 +1515,10 @@ EOF
   assert_contains "$out" "queued unblocked work" "an in-flight row was dispatched by the away branch"
 
   out=$(JG_HOME="$home" JG_ROOT_OVERRIDE="$root" JG_SUPERVISION_ACTOR=branch \
-    "$ROOT/bin/jg-spawn.sh" mate-new --secondmate 2>&1)
+    "$ROOT/bin/jg-spawn.sh" mate-new --squad-lead 2>&1)
   status=$?
-  [ "$status" -eq 6 ] || fail "a branch secondmate spawn exited $status, not 6: $out"
-  assert_contains "$out" "the supervision branch never performs this action" "a branch secondmate spawn was not refused at the partition"
+  [ "$status" -eq 6 ] || fail "a branch squad_lead spawn exited $status, not 6: $out"
+  assert_contains "$out" "the supervision branch never performs this action" "a branch squad_lead spawn was not refused at the partition"
 
   rm -f "$root/bin"
   mkdir -p "$root/bin"

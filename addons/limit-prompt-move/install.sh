@@ -8,10 +8,10 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
   export "$_jg_new=$_jg_val"
 done
 unset _jg_old _jg_new _jg_val 2>/dev/null || true
-# Install or update the limit-prompt-move check for this user and point a firstmate home's
+# Install or update the limit-prompt-move check for this user and point a juggernaut home's
 # state/limit-prompt-move.check.sh at it through an exec shim (a replaced check is backed up), then register it.
-# --all reaches every active home from <jg-home>: the home itself and each local secondmate home its
-# data/secondmates.md lists, minus the ones its config/parked-homes parks; a remote home is skipped and named.
+# --all reaches every active home from <jg-home>: the home itself and each local squad_lead home its
+# data/squad_leads.md lists, minus the ones its config/parked-homes parks; a remote home is skipped and named.
 # --list prints the homes it would reach, one "<name><TAB><dir>" line each, and writes nothing. Idempotent.
 # Usage: install.sh [--all] [--list] <jg-home>
 set -euo pipefail
@@ -29,7 +29,7 @@ ID=limit-prompt-move
 homes() {
   local line name dir re='^- ([^[:space:]]+) - .*\((host:[^;]*;[[:space:]]*root:[^;]*;[[:space:]]*)?home: ([^;]*[^;[:space:]])[[:space:]]*;'
   printf 'main\t%s\n' "$FMH"
-  [ "$ALL" -eq 1 ] && [ -f "$FMH/data/secondmates.md" ] || return 0
+  [ "$ALL" -eq 1 ] && [ -f "$FMH/data/squad_leads.md" ] || return 0
   # shellcheck source=parked-homes/bin/jg-parked-homes-lib.sh
   . "$SRC/parked-homes/bin/jg-parked-homes-lib.sh"
   while IFS= read -r line; do
@@ -39,7 +39,7 @@ homes() {
     elif JG_HOME=$FMH jg_parked_home "$name"; then echo "skipped: $name: parked" >&2
     else printf '%s\t%s\n' "$name" "$dir"
     fi
-  done <"$FMH/data/secondmates.md"
+  done <"$FMH/data/squad_leads.md"
 }
 
 [ "$LIST" -eq 0 ] || { homes; exit 0; }

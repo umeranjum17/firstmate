@@ -67,15 +67,15 @@ jg_backend_tmux_send_text_submit() {  # <target> <text> <retries> <enter-sleep> 
 }
 
 # jg_backend_tmux_container_ensure: reuse the current tmux session when
-# firstmate itself runs inside tmux, else ensure a dedicated detached
-# "firstmate" session exists. Mirrors jg-spawn.sh's container-ensure block;
+# juggernaut itself runs inside tmux, else ensure a dedicated detached
+# "juggernaut" session exists. Mirrors jg-spawn.sh's container-ensure block;
 # prints the resolved session name.
 jg_backend_tmux_container_ensure() {
   if [ -n "${TMUX:-}" ]; then
     tmux display-message -p '#S'
   else
-    tmux has-session -t firstmate 2>/dev/null || tmux new-session -d -s firstmate
-    printf 'firstmate'
+    tmux has-session -t juggernaut 2>/dev/null || tmux new-session -d -s juggernaut
+    printf 'juggernaut'
   fi
 }
 

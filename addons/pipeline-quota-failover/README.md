@@ -6,7 +6,7 @@ Drop-in pi wrapper for the no-mistakes pipeline agent. It runs the real pi and m
 
 Without an account pool the default chain is one route, `claude-bridge/claude-haiku-5-5`: Claude Haiku through claude-bridge. A call pinned to a model outside the chain does not run that model, it runs the chain. `PI_QUOTA_FAILOVER_CHAIN` overrides the chain, and `PI_QUOTA_FAILOVER_PRINT_CHAIN=1` prints it: the chain is the fleet's one route list, and `route-change` reads it from here.
 
-With an account pool (`PI_QUOTA_FAILOVER_ACCOUNT_POOL`, default `~/firstmate/config/account-pool` when it exists), the route comes from `jg-model-pool` pick/next (see `account-pool/README.md`): the eligible Claude account with the greatest runway above the 15% eligibility floor runs as `claude-bridge/claude-haiku-5-5` on that account's folder (credential variables shed). A limit calls `next`, which rests that account when the pool allows and advances; when every Claude account is under the floor the helper order is Codex Sol, then DeepSeek Goat, then Cursor auto. An account limit never marks the whole Claude route dead. When the helper refuses, the call ends with the terminal `quota exhausted` line and never falls back to the default login.
+With an account pool (`PI_QUOTA_FAILOVER_ACCOUNT_POOL`, default `~/juggernaut/config/account-pool` when it exists), the route comes from `jg-model-pool` pick/next (see `account-pool/README.md`): the eligible Claude account with the greatest runway above the 15% eligibility floor runs as `claude-bridge/claude-haiku-5-5` on that account's folder (credential variables shed). A limit calls `next`, which rests that account when the pool allows and advances; when every Claude account is under the floor the helper order is Codex Sol, then DeepSeek Goat, then Cursor auto. An account limit never marks the whole Claude route dead. When the helper refuses, the call ends with the terminal `quota exhausted` line and never falls back to the default login.
 
 An `openrouter/*` route takes the deepseek idle limit (`PI_QUOTA_FAILOVER_DEEPSEEK_IDLE_SECS`, default 300), not the generic one (default 120), because the floor route answers on the same clock as direct DeepSeek.
 
@@ -49,7 +49,7 @@ call time from `pi list` (user packages and their manifests), the user extension
 settings. If the list cannot be read, pi runs as before and one log line says why.
 
 Not included: project-level `.pi/extensions/`. pi loads those only for a trusted project, and `pi list` reports user
-packages only, so a pipeline call run from a trusted checkout that has them loses them under `-ne`. The firstmate
+packages only, so a pipeline call run from a trusted checkout that has them loses them under `-ne`. The juggernaut
 checkout does (`jg-calm`, `jg-branch-supervision`).
 
 ## Route failures and credit probe

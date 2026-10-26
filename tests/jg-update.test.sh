@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Tests for bin/jg-update.sh: fast-forward-only self-update of a running
-# firstmate repo and every registered secondmate home.
+# juggernaut repo and every registered squad_lead home.
 #
 # The guarantees under test mirror jg-fleet-sync.sh and prime directive #3:
-#   - The running firstmate repo (on its default branch) fast-forwards from
-#     origin; a leased secondmate home (detached HEAD on the default branch)
+#   - The running juggernaut repo (on its default branch) fast-forwards from
+#     origin; a leased squad_lead home (detached HEAD on the default branch)
 #     fast-forwards the same way.
 #   - A dirty, offline, wrong-branch, or genuinely unique diverged target is
 #     skipped and reported, never forced or stashed, so unlanded work survives.
@@ -13,18 +13,18 @@
 #   - The update is a single-parent fast-forward (never a merge commit) and a
 #     fast-forward of one worktree never disturbs another worktree's checkout
 #     or the shared default branch.
-#   - The caller-action summary is correct: reread-firstmate flips to yes only
+#   - The caller-action summary is correct: reread-juggernaut flips to yes only
 #     when the instruction surface (AGENTS.md / bin / .agents/skills) changed, and
-#     the two secondmate action sets are disjoint and correctly gated -
-#     restart-secondmates carries EVERY live mate this pass left on origin's tip
+#     the two squad_lead action sets are disjoint and correctly gated -
+#     restart-squad-leads carries EVERY live mate this pass left on origin's tip
 #     whose recorded runtime can prove a restart, INCLUDING one that was already
 #     there and one whose advance touched no instruction surface, because a
 #     restart is also what re-resolves launch-time harness wiring; a live mate
-#     whose runtime cannot prove a restart falls to nudge-secondmates; and a mate
+#     whose runtime cannot prove a restart falls to nudge-squad-leads; and a mate
 #     whose home was skipped or whose endpoint is stopped gets no action at all.
-#   - Secondmate homes resolve from both state/<id>.meta and the
-#     data/secondmates.md registry, deduped, and the firstmate repo is never
-#     re-processed as one of its own secondmates.
+#   - SquadLead homes resolve from both state/<id>.meta and the
+#     data/squad_leads.md registry, deduped, and the juggernaut repo is never
+#     re-processed as one of its own squad_leads.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -37,7 +37,7 @@ jg_git_identity fmtest fmtest@example.com
 
 TMP_ROOT=$(jg_test_tmproot jg-update-tests)
 
-# Build a fresh world: a bare origin seeded with one commit, a firstmate repo
+# Build a fresh world: a bare origin seeded with one commit, a juggernaut repo
 # clone checked out on main, and a home dir with state/ and data/. Echoes the
 # world dir. Files seeded: AGENTS.md, README.md, bin/tool.sh, and an internal skill note.
 new_world() {
@@ -77,8 +77,8 @@ SH
   printf 'r1\n' > "$w/seed/README.md"
   mkdir -p "$w/seed/bin" "$w/seed/.agents/skills"
   printf 'echo a\n' > "$w/seed/bin/tool.sh"
-  printf '#!/usr/bin/env bash\nexit 0\n' > "$w/seed/bin/jg-remote-secondmate-control.sh"
-  chmod +x "$w/seed/bin/jg-remote-secondmate-control.sh"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$w/seed/bin/jg-remote-squad-lead-control.sh"
+  chmod +x "$w/seed/bin/jg-remote-squad-lead-control.sh"
   printf 's1\n' > "$w/seed/.agents/skills/note.md"
   git -C "$w/seed" add -A
   git -C "$w/seed" commit -qm c1
@@ -90,8 +90,8 @@ SH
   printf '%s\n' "$w"
 }
 
-# Add a secondmate home as a DETACHED worktree of the firstmate repo (matching
-# how treehouse leases a secondmate home), plus its state meta. Args: world id.
+# Add a squad_lead home as a DETACHED worktree of the juggernaut repo (matching
+# how treehouse leases a squad_lead home), plus its state meta. Args: world id.
 # The recorded runtime matters to the action split, so it is part of the fixture:
 # harness defaults to a control-verified adapter on the default (tmux) backend,
 # which is what makes a restart provable. Pass a backend to model one that cannot
@@ -104,13 +104,13 @@ add_sm() {
     printf 'endpoint_task_id=%s\n' "$id"
     printf 'worktree=%s/%s\n' "$w" "$id"
     printf 'project=%s/%s\n' "$w" "$id"
-    printf 'kind=secondmate\n'
+    printf 'kind=squad_lead\n'
     printf 'harness=%s\n' "$harness"
     [ -z "$backend" ] || printf 'backend=%s\n' "$backend"
     printf 'home=%s/%s\n' "$w" "$id"
   } > "$w/home/state/$id.meta"
   printf 'jg-%s\n' "$id" >> "$w/fake/windows"
-  printf '%s\n' "$id" > "$w/$id/.jg-secondmate-home"
+  printf '%s\n' "$id" > "$w/$id/.jg-squad-lead-home"
 }
 
 # Advance origin by one commit. mode=instr changes the whole instruction surface
@@ -140,11 +140,11 @@ run_update() {
     JG_ROOT_OVERRIDE="$w/main" JG_HOME="$w/home" "$UPDATE" 2>/dev/null
 }
 
-# --- T1: main + secondmate behind, instruction change; FF, not a merge ------
+# --- T1: main + squad_lead behind, instruction change; FF, not a merge ------
 # Combines the former T1 (fast-forward + reread + nudge signalling) and T2
 # (the advance is a single-parent fast-forward, never a merge commit) into one
 # world so both contracts are proven against the same update run.
-test_updates_main_and_secondmate() {
+test_updates_main_and_squad_lead() {
   local w out
   w=$(new_world t1)
   add_sm "$w" sm1
@@ -152,28 +152,28 @@ test_updates_main_and_secondmate() {
 
   out=$(run_update "$w")
 
-  assert_contains "$out" "firstmate: updated " "firstmate fast-forwarded"
-  assert_contains "$out" "secondmate sm1: updated " "secondmate fast-forwarded"
-  assert_contains "$out" "reread-firstmate: yes" "instruction change triggers reread"
-  assert_contains "$out" "restart-secondmates: jg-sm1" "a changed AGENTS.md must move the secondmate into the restart set"
-  assert_contains "$out" "nudge-secondmates: none" "a restarted secondmate must not also be nudged"
+  assert_contains "$out" "juggernaut: updated " "juggernaut fast-forwarded"
+  assert_contains "$out" "squad_lead sm1: updated " "squad_lead fast-forwarded"
+  assert_contains "$out" "reread-juggernaut: yes" "instruction change triggers reread"
+  assert_contains "$out" "restart-squad-leads: jg-sm1" "a changed AGENTS.md must move the squad_lead into the restart set"
+  assert_contains "$out" "nudge-squad-leads: none" "a restarted squad_lead must not also be nudged"
 
   # Fast-forward landed: HEAD == origin/main on both targets.
   [ "$(git -C "$w/main" rev-parse HEAD)" = "$(git -C "$w/main" rev-parse origin/main)" ] \
-    || fail "firstmate HEAD not at origin/main"
+    || fail "juggernaut HEAD not at origin/main"
   [ "$(git -C "$w/sm1" rev-parse HEAD)" = "$(git -C "$w/sm1" rev-parse origin/main)" ] \
-    || fail "secondmate HEAD not at origin/main"
-  # Firstmate stays on its default branch; secondmate stays detached.
+    || fail "squad_lead HEAD not at origin/main"
+  # Juggernaut stays on its default branch; squad_lead stays detached.
   [ "$(git -C "$w/main" symbolic-ref --short HEAD 2>/dev/null)" = "main" ] \
-    || fail "firstmate left its default branch"
+    || fail "juggernaut left its default branch"
   git -C "$w/sm1" symbolic-ref -q HEAD >/dev/null \
-    && fail "secondmate worktree is no longer detached"
+    && fail "squad_lead worktree is no longer detached"
   # A fast-forwarded tip has exactly one parent; a merge commit would have two.
   [ "$(git -C "$w/main" rev-list --parents -n1 HEAD | wc -w | tr -d ' ')" -eq 2 ] \
-    || fail "firstmate tip is not a single-parent fast-forward"
+    || fail "juggernaut tip is not a single-parent fast-forward"
   [ "$(git -C "$w/sm1" rev-list --parents -n1 HEAD | wc -w | tr -d ' ')" -eq 2 ] \
-    || fail "secondmate tip is not a single-parent fast-forward"
-  pass "T1 main + secondmate fast-forward (single-parent), reread + restart signalled"
+    || fail "squad_lead tip is not a single-parent fast-forward"
+  pass "T1 main + squad_lead fast-forward (single-parent), reread + restart signalled"
 }
 
 # --- T3: README-only change does not trigger a reread ----------------------
@@ -185,14 +185,14 @@ test_reread_gate_is_instruction_only() {
 
   out=$(run_update "$w")
 
-  assert_contains "$out" "firstmate: updated " "firstmate still advanced"
-  assert_contains "$out" "reread-firstmate: no" "non-instruction change skips reread"
-  # The running firstmate reads nothing new, but the mate's agent still holds its
+  assert_contains "$out" "juggernaut: updated " "juggernaut still advanced"
+  assert_contains "$out" "reread-juggernaut: no" "non-instruction change skips reread"
+  # The running juggernaut reads nothing new, but the mate's agent still holds its
   # launch-time wiring from before the pass, which only a restart re-resolves.
-  assert_contains "$out" "restart-secondmates: jg-sm1" \
+  assert_contains "$out" "restart-squad-leads: jg-sm1" \
     "a live mate on the new tip must restart even when no instruction file moved"
-  assert_contains "$out" "nudge-secondmates: none" "a restarted secondmate must not also be nudged"
-  pass "T3 a non-instruction advance still restarts the live secondmate"
+  assert_contains "$out" "nudge-squad-leads: none" "a restarted squad_lead must not also be nudged"
+  pass "T3 a non-instruction advance still restarts the live squad_lead"
 }
 
 # --- T3b: a bin/-only advance restarts too ---------------------------------
@@ -207,10 +207,10 @@ test_bin_only_advance_restarts() {
 
   out=$(run_update "$w")
 
-  assert_contains "$out" "reread-firstmate: yes" "a bin/ change is still an instruction-surface advance"
-  assert_contains "$out" "restart-secondmates: jg-sm1" "a bin/-only advance must still restart the live mate"
-  assert_contains "$out" "nudge-secondmates: none" "a restarted secondmate must not also be nudged"
-  pass "T3b a bin/-only advance restarts the secondmate"
+  assert_contains "$out" "reread-juggernaut: yes" "a bin/ change is still an instruction-surface advance"
+  assert_contains "$out" "restart-squad-leads: jg-sm1" "a bin/-only advance must still restart the live mate"
+  assert_contains "$out" "nudge-squad-leads: none" "a restarted squad_lead must not also be nudged"
+  pass "T3b a bin/-only advance restarts the squad_lead"
 }
 
 # --- T3c: an unverifiable runtime receives the fallback nudge ----------------
@@ -224,13 +224,13 @@ test_unprovable_runtime_gets_fallback_nudge() {
 
   out=$(run_update "$w")
 
-  assert_contains "$out" "restart-secondmates: none" "an unprovable runtime must stay out of the restart set"
-  assert_contains "$out" "nudge-secondmates: jg-sm1" "an unverifiable runtime must retain the fallback re-read nudge"
-  pass "T3c an unverifiable secondmate receives the fallback nudge"
+  assert_contains "$out" "restart-squad-leads: none" "an unprovable runtime must stay out of the restart set"
+  assert_contains "$out" "nudge-squad-leads: jg-sm1" "an unverifiable runtime must retain the fallback re-read nudge"
+  pass "T3c an unverifiable squad_lead receives the fallback nudge"
 }
 
 # --- T3d: an already-stopped mate is left to startup recovery ---------------
-test_dead_secondmate_gets_no_action() {
+test_dead_squad_lead_gets_no_action() {
   local w out
   w=$(new_world t3d)
   add_sm "$w" sm1
@@ -239,10 +239,10 @@ test_dead_secondmate_gets_no_action() {
 
   out=$(run_update "$w")
 
-  assert_contains "$out" "secondmate sm1: updated " "the stopped mate's safe checkout still advances"
-  assert_contains "$out" "restart-secondmates: none" "a stopped mate must not be sent to restart"
-  assert_contains "$out" "nudge-secondmates: none" "a stopped mate must not receive a queued nudge"
-  pass "T3d an already-stopped secondmate is left to startup recovery"
+  assert_contains "$out" "squad_lead sm1: updated " "the stopped mate's safe checkout still advances"
+  assert_contains "$out" "restart-squad-leads: none" "a stopped mate must not be sent to restart"
+  assert_contains "$out" "nudge-squad-leads: none" "a stopped mate must not receive a queued nudge"
+  pass "T3d an already-stopped squad_lead is left to startup recovery"
 }
 
 # --- T3e: a legacy remote advance still restarts ---------------------------
@@ -277,27 +277,27 @@ endpoint_task_id=sm1
 worktree=/srv/sm1
 project=/srv/sm1
 harness=claude
-kind=secondmate
+kind=squad_lead
 home=/srv/sm1
 remote_host=remote-mac
 remote_backend=herdr
 EOF
   printf -- '- sm1 - remote domain (host: remote-mac; root: /srv/fm; home: /srv/sm1; scope: things; projects: p; added 2026-09-03)\n' \
-    > "$w/home/data/secondmates.md"
+    > "$w/home/data/squad_leads.md"
 
   out=$(JG_TEST_SSH_BIN="$fake_ssh" run_update "$w")
 
-  assert_contains "$out" "remote secondmate sm1: updated on remote-mac" \
+  assert_contains "$out" "remote squad_lead sm1: updated on remote-mac" \
     "the legacy remote advance was not accepted"
-  assert_contains "$out" "restart-secondmates: jg-sm1" \
+  assert_contains "$out" "restart-squad-leads: jg-sm1" \
     "a live remote mate on the new tip must restart even when the host reports no instruction diff"
-  assert_contains "$out" "nudge-secondmates: none" \
+  assert_contains "$out" "nudge-squad-leads: none" \
     "a restarted remote mate must not also be steered"
   pass "T3e a legacy remote advance still restarts the live remote mate"
 }
 
-# --- T4: dirty secondmate is skipped, its edit preserved -------------------
-test_dirty_secondmate_skipped() {
+# --- T4: dirty squad_lead is skipped, its edit preserved -------------------
+test_dirty_squad_lead_skipped() {
   local w out
   w=$(new_world t4)
   add_sm "$w" sm1
@@ -306,19 +306,19 @@ test_dirty_secondmate_skipped() {
 
   out=$(run_update "$w")
 
-  assert_contains "$out" "secondmate sm1: skipped: dirty working tree" "dirty home skipped"
-  assert_not_contains "$out" "jg-sm1" "skipped secondmate is not nudged"
+  assert_contains "$out" "squad_lead sm1: skipped: dirty working tree" "dirty home skipped"
+  assert_not_contains "$out" "jg-sm1" "skipped squad_lead is not nudged"
   grep -q 'uncommitted local edit' "$w/sm1/AGENTS.md" \
     || fail "dirty edit was discarded"
-  pass "T4 dirty secondmate skipped, local edit preserved"
+  pass "T4 dirty squad_lead skipped, local edit preserved"
 }
 
-# --- T5: diverged secondmate is skipped, its commit preserved --------------
-test_diverged_secondmate_skipped() {
+# --- T5: diverged squad_lead is skipped, its commit preserved --------------
+test_diverged_squad_lead_skipped() {
   local w out before marker second_out
   w=$(new_world t5)
   add_sm "$w" sm1
-  # Local commit on the secondmate's detached HEAD makes it diverge from origin.
+  # Local commit on the squad_lead's detached HEAD makes it diverge from origin.
   printf 'fork work\n' > "$w/sm1/AGENTS.md"
   git -C "$w/sm1" add -A
   git -C "$w/sm1" commit -qm local-work
@@ -327,20 +327,20 @@ test_diverged_secondmate_skipped() {
 
   out=$(run_update "$w")
 
-  assert_contains "$out" "secondmate sm1: skipped: diverged from origin/main" "diverged home skipped"
+  assert_contains "$out" "squad_lead sm1: skipped: diverged from origin/main" "diverged home skipped"
   assert_contains "$out" "reconciliation required (record:" "diverged skip is actionable"
-  assert_not_contains "$out" "jg-sm1" "diverged secondmate is not nudged"
+  assert_not_contains "$out" "jg-sm1" "diverged squad_lead is not nudged"
   [ "$(git -C "$w/sm1" rev-parse HEAD)" = "$before" ] \
-    || fail "diverged secondmate HEAD moved (unlanded work at risk)"
-  marker="$w/home/state/.secondmate-update-reconcile/sm1.pending"
-  assert_present "$marker" "diverged secondmate did not retain a durable reconciliation record"
-  assert_grep 'schema=jg-secondmate-update-reconcile.v1' "$marker" "divergence record schema missing"
+    || fail "diverged squad_lead HEAD moved (unlanded work at risk)"
+  marker="$w/home/state/.squad-lead-update-reconcile/sm1.pending"
+  assert_present "$marker" "diverged squad_lead did not retain a durable reconciliation record"
+  assert_grep 'schema=jg-squad-lead-update-reconcile.v1' "$marker" "divergence record schema missing"
   assert_grep "local_commit=$before" "$marker" "divergence record lost the protected local commit"
 
   second_out=$(run_update "$w")
   assert_contains "$second_out" "reconciliation required (record: $marker)" \
     "a later update did not surface the durable divergence"
-  pass "T5 diverged secondmate is preserved and durably actionable"
+  pass "T5 diverged squad_lead is preserved and durably actionable"
 }
 
 test_squash_merged_divergence_reconciles() {
@@ -359,8 +359,8 @@ test_squash_merged_divergence_reconciles() {
 
   bump_origin "$w" readme
   out=$(run_update "$w")
-  marker="$w/home/state/.secondmate-update-reconcile/sm1.pending"
-  assert_contains "$out" "secondmate sm1: skipped: diverged from origin/main" \
+  marker="$w/home/state/.squad-lead-update-reconcile/sm1.pending"
+  assert_contains "$out" "squad_lead sm1: skipped: diverged from origin/main" \
     "unique local work was not initially protected"
   assert_present "$marker" "initial divergence did not leave its durable record"
 
@@ -371,13 +371,13 @@ test_squash_merged_divergence_reconciles() {
 
   out=$(run_update "$w")
 
-  assert_contains "$out" "secondmate sm1: reconciled redundant divergence" \
+  assert_contains "$out" "squad_lead sm1: reconciled redundant divergence" \
     "the squash-merged local result did not heal"
   [ "$(git -C "$w/sm1" rev-parse HEAD)" = "$(git -C "$w/sm1" rev-parse origin/main)" ] \
-    || fail "reconciled secondmate did not reach origin/main"
+    || fail "reconciled squad_lead did not reach origin/main"
   assert_absent "$marker" "successful reconciliation left the divergence marker behind"
-  assert_contains "$out" "restart-secondmates: jg-sm1" \
-    "the reconciled live secondmate was excluded from restart"
+  assert_contains "$out" "restart-squad-leads: jg-sm1" \
+    "the reconciled live squad_lead was excluded from restart"
   pass "T5b squash-merged divergence heals and rejoins live convergence"
 }
 
@@ -385,7 +385,7 @@ test_squash_merged_divergence_reconciles() {
 # This is the SSHHIP case: that mate's home was already at the target commit, so
 # the old classifier skipped it entirely and its agent kept running the launch-time
 # wiring it started with. An already-current live mate must still be restarted.
-test_already_current_secondmate_still_restarts() {
+test_already_current_squad_lead_still_restarts() {
   local w out restart_line
   w=$(new_world t6)
   add_sm "$w" sm1
@@ -394,14 +394,14 @@ test_already_current_secondmate_still_restarts() {
 
   out=$(run_update "$w")       # second run: nothing left to fast-forward
 
-  assert_contains "$out" "firstmate: already current" "firstmate already current"
-  assert_contains "$out" "secondmate sm1: already current" "secondmate already current"
-  assert_contains "$out" "reread-firstmate: no" "no reread when nothing changed"
-  restart_line=$(printf '%s\n' "$out" | grep '^restart-secondmates:')
+  assert_contains "$out" "juggernaut: already current" "juggernaut already current"
+  assert_contains "$out" "squad_lead sm1: already current" "squad_lead already current"
+  assert_contains "$out" "reread-juggernaut: no" "no reread when nothing changed"
+  restart_line=$(printf '%s\n' "$out" | grep '^restart-squad-leads:')
   assert_contains "$restart_line" "jg-sm1" \
-    "an already-current live secondmate must still be in the restart set"
-  assert_contains "$out" "nudge-secondmates: none" "a restarted secondmate must not also be nudged"
-  pass "T6 an already-current live secondmate is still restarted"
+    "an already-current live squad_lead must still be in the restart set"
+  assert_contains "$out" "nudge-squad-leads: none" "a restarted squad_lead must not also be nudged"
+  pass "T6 an already-current live squad_lead is still restarted"
 }
 
 # --- T6b: an already-current mate that cannot be restarted stays honest -----
@@ -415,74 +415,74 @@ test_already_current_unprovable_mate_is_nudged() {
 
   out=$(run_update "$w")       # second run: the home is already on the tip
 
-  assert_contains "$out" "secondmate sm1: already current" "the mate must need no advance"
-  restart_line=$(printf '%s\n' "$out" | grep '^restart-secondmates:')
-  nudge_line=$(printf '%s\n' "$out" | grep '^nudge-secondmates:')
+  assert_contains "$out" "squad_lead sm1: already current" "the mate must need no advance"
+  restart_line=$(printf '%s\n' "$out" | grep '^restart-squad-leads:')
+  nudge_line=$(printf '%s\n' "$out" | grep '^nudge-squad-leads:')
   assert_not_contains "$restart_line" "sm1" "an unprovable runtime must stay out of the restart set"
   assert_contains "$nudge_line" "jg-sm1" "an unprovable runtime must keep the honest re-read steer"
   pass "T6b an already-current mate with an unprovable runtime is steered, not claimed as reloaded"
 }
 
 # --- T7: registry backstop + dedup + self-exclusion, one world -------------
-# One world carries every secondmate-resolution edge at once:
-#   reg1 - registered in secondmates.md only, NO live meta (registry backstop);
+# One world carries every squad-lead-resolution edge at once:
+#   reg1 - registered in squad_leads.md only, NO live meta (registry backstop);
 #   sm1  - present in BOTH meta and the registry (must be processed exactly once);
-#   selfish - a bogus registry line pointing the firstmate repo at itself.
+#   selfish - a bogus registry line pointing the juggernaut repo at itself.
 # Asserts: reg1 advances but is NOT nudged (no live metadata); sm1 advances,
-# is processed once, and IS nudged; the firstmate repo is never re-processed.
+# is processed once, and IS nudged; the juggernaut repo is never re-processed.
 test_registry_backstop_dedup_and_self_exclusion() {
   local w out count
   w=$(new_world t7)
   add_sm "$w" sm1
   git -C "$w/main" worktree add -q --detach "$w/reg1" main
-  printf 'reg1\n' > "$w/reg1/.jg-secondmate-home"
+  printf 'reg1\n' > "$w/reg1/.jg-squad-lead-home"
   {
     printf -- '- reg1 - domain supervisor (home: %s/reg1; scope: things; projects: p; added 2026-06-23)\n' "$w"
     printf -- '- sm1 - dup (home: %s/sm1; scope: x; projects: p; added 2026-06-23)\n' "$w"
     printf -- '- selfish - self (home: %s/main; scope: x; projects: p; added 2026-06-23)\n' "$w"
-  } > "$w/home/data/secondmates.md"
+  } > "$w/home/data/squad_leads.md"
   bump_origin "$w" instr
 
   out=$(run_update "$w")
 
-  assert_contains "$out" "secondmate reg1: updated " "registry-only secondmate fast-forwarded"
-  assert_contains "$out" "secondmate sm1: updated " "meta+registry secondmate fast-forwarded"
-  count=$(printf '%s\n' "$out" | grep -c '^secondmate sm1:' || true)
-  [ "$count" -eq 1 ] || fail "secondmate sm1 processed $count times, expected 1 (dedup across meta+registry)"
-  assert_not_contains "$out" "secondmate selfish" "firstmate repo re-processed as its own secondmate"
+  assert_contains "$out" "squad_lead reg1: updated " "registry-only squad_lead fast-forwarded"
+  assert_contains "$out" "squad_lead sm1: updated " "meta+registry squad_lead fast-forwarded"
+  count=$(printf '%s\n' "$out" | grep -c '^squad_lead sm1:' || true)
+  [ "$count" -eq 1 ] || fail "squad_lead sm1 processed $count times, expected 1 (dedup across meta+registry)"
+  assert_not_contains "$out" "squad_lead selfish" "juggernaut repo re-processed as its own squad_lead"
   # sm1 has live metadata, so it is nudged; reg1 has none, so it is not. Pin the
   # nudge line exactly and confirm reg1 is absent from it (not from the whole
-  # output, where 'secondmate reg1: updated' legitimately appears).
+  # output, where 'squad_lead reg1: updated' legitimately appears).
   local nudge_line
-  nudge_line=$(printf '%s\n' "$out" | grep '^nudge-secondmates:')
+  nudge_line=$(printf '%s\n' "$out" | grep '^nudge-squad-leads:')
   local restart_line
-  restart_line=$(printf '%s\n' "$out" | grep '^restart-secondmates:')
-  assert_contains "$restart_line" "jg-sm1" "live-meta secondmate is restarted"
-  assert_not_contains "$restart_line" "reg1" "registry-only secondmate without live metadata gets no action"
-  assert_not_contains "$nudge_line" "sm1" "a restarted secondmate must not also be nudged"
-  assert_not_contains "$nudge_line" "reg1" "registry-only secondmate without live metadata is not nudged"
-  pass "T7 registry backstop resolves, dedups meta+registry, excludes the firstmate repo"
+  restart_line=$(printf '%s\n' "$out" | grep '^restart-squad-leads:')
+  assert_contains "$restart_line" "jg-sm1" "live-meta squad_lead is restarted"
+  assert_not_contains "$restart_line" "reg1" "registry-only squad_lead without live metadata gets no action"
+  assert_not_contains "$nudge_line" "sm1" "a restarted squad_lead must not also be nudged"
+  assert_not_contains "$nudge_line" "reg1" "registry-only squad_lead without live metadata is not nudged"
+  pass "T7 registry backstop resolves, dedups meta+registry, excludes the juggernaut repo"
 }
 
-# --- T9: firstmate repo on a feature branch is skipped ---------------------
-test_firstmate_wrong_branch_skipped() {
+# --- T9: juggernaut repo on a feature branch is skipped ---------------------
+test_juggernaut_wrong_branch_skipped() {
   local w out before
   w=$(new_world t9)
   bump_origin "$w" instr
-  # Simulate firstmate mid-shipping its own change: not on the default branch.
+  # Simulate juggernaut mid-shipping its own change: not on the default branch.
   git -C "$w/main" checkout -q -b feature/wip
   before=$(git -C "$w/main" rev-parse HEAD)
 
   out=$(run_update "$w")
 
-  assert_contains "$out" "firstmate: skipped: on feature/wip, expected main" "off-default firstmate skipped"
-  assert_contains "$out" "reread-firstmate: no" "no reread when firstmate was skipped"
+  assert_contains "$out" "juggernaut: skipped: on feature/wip, expected main" "off-default juggernaut skipped"
+  assert_contains "$out" "reread-juggernaut: no" "no reread when juggernaut was skipped"
   [ "$(git -C "$w/main" rev-parse HEAD)" = "$before" ] \
-    || fail "skipped firstmate HEAD moved"
-  pass "T9 firstmate off its default branch is skipped, not forced"
+    || fail "skipped juggernaut HEAD moved"
+  pass "T9 juggernaut off its default branch is skipped, not forced"
 }
 
-test_firstmate_detached_head_skipped() {
+test_juggernaut_detached_head_skipped() {
   local w out before
   w=$(new_world t10)
   bump_origin "$w" instr
@@ -491,33 +491,33 @@ test_firstmate_detached_head_skipped() {
 
   out=$(run_update "$w")
 
-  assert_contains "$out" "firstmate: skipped: detached HEAD, expected main" "detached firstmate skipped"
-  assert_contains "$out" "reread-firstmate: no" "no reread when detached firstmate was skipped"
+  assert_contains "$out" "juggernaut: skipped: detached HEAD, expected main" "detached juggernaut skipped"
+  assert_contains "$out" "reread-juggernaut: no" "no reread when detached juggernaut was skipped"
   [ "$(git -C "$w/main" rev-parse HEAD)" = "$before" ] \
-    || fail "detached firstmate HEAD moved"
-  pass "T10 firstmate detached HEAD is skipped"
+    || fail "detached juggernaut HEAD moved"
+  pass "T10 juggernaut detached HEAD is skipped"
 }
 
-test_unsafe_secondmate_home_skipped_before_git_update() {
+test_unsafe_squad_lead_home_skipped_before_git_update() {
   local w out bad before
   w=$(new_world t11)
   bad="$w/home/projects/bad"
   mkdir -p "$w/home/projects"
   git clone -q "$w/origin.git" "$bad"
-  printf 'bad\n' > "$bad/.jg-secondmate-home"
+  printf 'bad\n' > "$bad/.jg-squad-lead-home"
   before=$(git -C "$bad" rev-parse HEAD)
   printf -- '- bad - bad home (home: %s; scope: x; projects: p; added 2026-06-23)\n' \
-    "$bad" > "$w/home/data/secondmates.md"
+    "$bad" > "$w/home/data/squad_leads.md"
   bump_origin "$w" instr
 
   out=$(run_update "$w")
 
-  assert_contains "$out" "secondmate bad: skipped: unsafe home: secondmate home cannot be inside the active firstmate home" \
+  assert_contains "$out" "squad_lead bad: skipped: unsafe home: squad_lead home cannot be inside the active juggernaut home" \
     "unsafe project-like home skipped"
-  assert_contains "$out" "nudge-secondmates: none" "unsafe home is not nudged"
+  assert_contains "$out" "nudge-squad-leads: none" "unsafe home is not nudged"
   [ "$(git -C "$bad" rev-parse HEAD)" = "$before" ] \
-    || fail "unsafe secondmate home HEAD moved"
-  pass "T11 unsafe secondmate home is not fast-forwarded"
+    || fail "unsafe squad_lead home HEAD moved"
+  pass "T11 unsafe squad_lead home is not fast-forwarded"
 }
 
 # --- T12: a self-update rebinds a locally armed watch on the primary --------
@@ -548,7 +548,7 @@ test_primary_update_rebinds_local_watch() {
 
   out=$(run_update "$w")
 
-  assert_contains "$out" "firstmate: updated " "the primary still advanced"
+  assert_contains "$out" "juggernaut: updated " "the primary still advanced"
   assert_contains "$out" "rebound: when-rebind-primary" "the primary self-update rebound its own locally armed watch"
   after_hash=$(grep '^action_sha256=' "$spec")
   [ "$before_hash" != "$after_hash" ] \
@@ -556,21 +556,21 @@ test_primary_update_rebinds_local_watch() {
   pass "T12 a self-update rebinds a locally armed watch on the primary"
 }
 
-test_updates_main_and_secondmate
+test_updates_main_and_squad_lead
 test_reread_gate_is_instruction_only
 test_bin_only_advance_restarts
 test_unprovable_runtime_gets_fallback_nudge
-test_dead_secondmate_gets_no_action
+test_dead_squad_lead_gets_no_action
 test_legacy_remote_advance_restarts
-test_dirty_secondmate_skipped
-test_diverged_secondmate_skipped
+test_dirty_squad_lead_skipped
+test_diverged_squad_lead_skipped
 test_squash_merged_divergence_reconciles
-test_already_current_secondmate_still_restarts
+test_already_current_squad_lead_still_restarts
 test_already_current_unprovable_mate_is_nudged
 test_registry_backstop_dedup_and_self_exclusion
-test_firstmate_wrong_branch_skipped
-test_firstmate_detached_head_skipped
-test_unsafe_secondmate_home_skipped_before_git_update
+test_juggernaut_wrong_branch_skipped
+test_juggernaut_detached_head_skipped
+test_unsafe_squad_lead_home_skipped_before_git_update
 test_primary_update_rebinds_local_watch
 
 echo "# all jg-update tests passed"

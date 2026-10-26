@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# jg-send remote-secondmate delivery: the remote inbox leg.
+# jg-send remote-squad-lead delivery: the remote inbox leg.
 #
 # A remote steer is delivered by durable record, never by typing its payload:
-# jg-send crosses jg-on.sh to the host-local leg (jg-remote-secondmate-control.sh
+# jg-send crosses jg-on.sh to the host-local leg (jg-remote-squad-lead-control.sh
 # cmd_send), which writes the message idempotently into the remote home's
 # steering inbox and rings the remote doorbell best-effort. These tests drive
 # the real jg-send + jg-on executables with a stubbed ssh transport that
@@ -148,14 +148,14 @@ setup_home() {  # <name> -> echoes a fresh home dir with an empty state/
   printf '%s\n' "$home"
 }
 
-# A seeded remote secondmate home the executed host-local leg validates and
-# writes into: identity marker, Firstmate-checkout shape, and a parent-route
+# A seeded remote squad_lead home the executed host-local leg validates and
+# writes into: identity marker, Juggernaut-checkout shape, and a parent-route
 # endpoint record on Herdr in the dedicated jg-remote session.
-setup_remote_secondmate_home() {  # <name> -> echoes remote home dir
+setup_remote_squad_lead_home() {  # <name> -> echoes remote home dir
   local rh="$TMP_ROOT/$1-rhome"
   mkdir -p "$rh/state/parent-route" "$rh/bin"
-  printf 'rsm\n' > "$rh/.jg-secondmate-home"
-  printf '# remote secondmate home fixture\n' > "$rh/AGENTS.md"
+  printf 'rsm\n' > "$rh/.jg-squad-lead-home"
+  printf '# remote squad_lead home fixture\n' > "$rh/AGENTS.md"
   jg_write_meta "$rh/state/parent-route/rsm.meta" \
     "window=jg-remote:p1" \
     "worktree=-" \
@@ -170,7 +170,7 @@ setup_remote_secondmate_home() {  # <name> -> echoes remote home dir
   printf '%s\n' "$rh"
 }
 
-# A parent home with a remote-secondmate task meta plus the registry row
+# A parent home with a remote-squad-lead task meta plus the registry row
 # jg-on.sh resolves the ssh route from, pointing at <remote-home>.
 setup_remote_parent_home() {  # <name> <remote-home> -> echoes home dir
   local home
@@ -180,15 +180,15 @@ setup_remote_parent_home() {  # <name> <remote-home> -> echoes home dir
     "window=jg-remote:p1" \
     "endpoint_task_id=rsm" \
     "harness=claude" \
-    "kind=secondmate" \
-    "mode=secondmate" \
+    "kind=squad_lead" \
+    "mode=squad_lead" \
     "yolo=off" \
     "remote_host=remote-mac" \
     "remote_root=/remote/root" \
     "remote_backend=herdr" \
     "remote_herdr_session=jg-remote" \
     "remote_target=jg-remote:p1"
-  cat > "$home/data/secondmates.md" <<EOF
+  cat > "$home/data/squad_leads.md" <<EOF
 - rsm - remote test domain (host: remote-mac; root: /remote/root; home: $2; scope: remote testing; projects: alpha; added 2026-08-02)
 EOF
   printf '%s\n' "$home"
@@ -221,7 +221,7 @@ test_remote_steer_lands_in_remote_inbox() {
   local dir fb ssh_log home rhome rc err rec recs body pend
   dir="$TMP_ROOT/remote-inbox"; mkdir -p "$dir"
   fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; : > "$ssh_log"
-  rhome=$(setup_remote_secondmate_home remote-inbox)
+  rhome=$(setup_remote_squad_lead_home remote-inbox)
   home=$(setup_remote_parent_home remote-inbox "$rhome")
 
   rc=0
@@ -242,7 +242,7 @@ test_remote_steer_lands_in_remote_inbox() {
     || fail "the remote record must carry the marked request's corr token: $body"
   case "$body" in
     *"$JG_FROMFIRST_MARK"*) : ;;
-    *) fail "the remote record must carry the from-firstmate marker: $body" ;;
+    *) fail "the remote record must carry the from-juggernaut marker: $body" ;;
   esac
   # The doorbell could not reach the fixture pane (no herdr CLI here); that
   # never fails the send, and the notice still names the durable record.
@@ -262,7 +262,7 @@ test_remote_rerun_is_idempotent() {
   local dir fb ssh_log home rhome rc err count pend corr expected_cmd arg quoted rec ssh_before resend_cmd
   dir="$TMP_ROOT/remote-idem"; mkdir -p "$dir"
   fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; : > "$ssh_log"
-  rhome=$(setup_remote_secondmate_home remote-idem)
+  rhome=$(setup_remote_squad_lead_home remote-idem)
   home=$(setup_remote_parent_home remote-idem "$rhome")
 
   # Ambiguous transport: the remote leg executes for real, then ssh reports
@@ -352,7 +352,7 @@ test_remote_retry_failure_preserves_ambiguous_expectation() {
   local dir fb ssh_log home rhome rc err pend
   dir="$TMP_ROOT/remote-ambiguous-then-fail"; mkdir -p "$dir"
   fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; : > "$ssh_log"
-  rhome=$(setup_remote_secondmate_home remote-ambiguous-then-fail)
+  rhome=$(setup_remote_squad_lead_home remote-ambiguous-then-fail)
   home=$(setup_remote_parent_home remote-ambiguous-then-fail "$rhome")
 
   rc=0
@@ -375,7 +375,7 @@ test_remote_fire_and_forget_never_arms_reply_recovery() {
   local dir fb ssh_log home rhome rc count delivery action
   dir="$TMP_ROOT/remote-fire-and-forget"; mkdir -p "$dir"
   fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; : > "$ssh_log"
-  rhome=$(setup_remote_secondmate_home remote-fire-and-forget)
+  rhome=$(setup_remote_squad_lead_home remote-fire-and-forget)
   home=$(setup_remote_parent_home remote-fire-and-forget "$rhome")
   delivery=0123456789abcdef
 
@@ -406,7 +406,7 @@ test_remote_fire_and_forget_never_arms_reply_recovery() {
 test_remote_send_revalidates_after_retirement_lock() {
   local dir rhome meta lock ready release rc sender_pid holder_pid
   dir="$TMP_ROOT/remote-retire-race"; mkdir -p "$dir"
-  rhome=$(setup_remote_secondmate_home remote-retire-race)
+  rhome=$(setup_remote_squad_lead_home remote-retire-race)
   meta="$rhome/state/parent-route/rsm.meta"
   lock="$rhome/state/parent-route/.meta-rsm.lock"
   ready="$dir/lock-ready"
@@ -424,7 +424,7 @@ test_remote_send_revalidates_after_retirement_lock() {
 
   rc=0
   env JG_HOME="$rhome" JG_ROOT_OVERRIDE="$ROOT" \
-    "$ROOT/bin/jg-remote-secondmate-control.sh" send rsm "retirement-race steer" \
+    "$ROOT/bin/jg-remote-squad-lead-control.sh" send rsm "retirement-race steer" \
     >"$dir/out" 2>"$dir/err" &
   sender_pid=$!
   sleep 0.2
@@ -441,7 +441,7 @@ test_remote_send_revalidates_parent_route_after_retirement_lock() {
   local dir fb ssh_log home rhome meta lock ready release rc sender_pid holder_pid
   dir="$TMP_ROOT/remote-parent-retire-race"; mkdir -p "$dir"
   fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; : > "$ssh_log"
-  rhome=$(setup_remote_secondmate_home remote-parent-retire-race)
+  rhome=$(setup_remote_squad_lead_home remote-parent-retire-race)
   home=$(setup_remote_parent_home remote-parent-retire-race "$rhome")
   meta="$home/state/rsm.meta"
   lock="$home/state/.meta-rsm.lock"
@@ -478,7 +478,7 @@ test_remote_expected_host_revalidates_final_route() {
   local dir fb ssh_log home rhome rc err count
   dir="$TMP_ROOT/remote-expected-host"; mkdir -p "$dir"
   fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; : > "$ssh_log"
-  rhome=$(setup_remote_secondmate_home remote-expected-host)
+  rhome=$(setup_remote_squad_lead_home remote-expected-host)
   home=$(setup_remote_parent_home remote-expected-host "$rhome")
 
   rc=0
@@ -508,7 +508,7 @@ test_remote_resolve_key_closes_at_enqueue() {
   local dir fb ssh_log home rhome rc out
   dir="$TMP_ROOT/remote-key"; mkdir -p "$dir"
   fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; : > "$ssh_log"
-  rhome=$(setup_remote_secondmate_home remote-key)
+  rhome=$(setup_remote_squad_lead_home remote-key)
   home=$(setup_remote_parent_home remote-key "$rhome")
   printf 'needs-decision [key=upgrade-window]: tonight or the weekend\n' > "$home/state/rsm.status"
 
@@ -531,7 +531,7 @@ test_remote_slash_rides_inbox() {
   local dir fb ssh_log home rhome rc recs
   dir="$TMP_ROOT/remote-slash"; mkdir -p "$dir"
   fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; : > "$ssh_log"
-  rhome=$(setup_remote_secondmate_home remote-slash)
+  rhome=$(setup_remote_squad_lead_home remote-slash)
   home=$(setup_remote_parent_home remote-slash "$rhome")
 
   rc=0
@@ -549,16 +549,16 @@ test_remote_real_failure_still_fails() {
   local dir fb ssh_log home rhome rc err
   dir="$TMP_ROOT/remote-fail"; mkdir -p "$dir"
   fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; : > "$ssh_log"
-  rhome=$(setup_remote_secondmate_home remote-fail)
+  rhome=$(setup_remote_squad_lead_home remote-fail)
   home=$(setup_remote_parent_home remote-fail "$rhome")
 
   rc=0
   send_env "$fb" "$home" "$ssh_log" JG_FAKE_SSH_RC=1 \
-    JG_FAKE_SSH_STDERR='error: remote secondmate rsm endpoint metadata is invalid; refusing access until it is explicitly migrated' \
+    JG_FAKE_SSH_STDERR='error: remote squad_lead rsm endpoint metadata is invalid; refusing access until it is explicitly migrated' \
     "$SEND" rsm "please rename the metric" >"$dir/out" 2>"$dir/err" || rc=$?
   err=$(cat "$dir/err")
   [ "$rc" -ne 0 ] || fail "a genuinely failed remote send must exit nonzero"
-  assert_contains "$err" "steer not sent to remote secondmate rsm" \
+  assert_contains "$err" "steer not sent to remote squad_lead rsm" \
     "a real remote failure must still report a real error"
   assert_contains "$err" "endpoint metadata is invalid" \
     "a real remote failure must surface the remote leg's own stderr"
@@ -573,7 +573,7 @@ test_remote_exit3_no_longer_delivered() {
   local dir fb ssh_log home rhome rc err
   dir="$TMP_ROOT/remote-exit3"; mkdir -p "$dir"
   fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; : > "$ssh_log"
-  rhome=$(setup_remote_secondmate_home remote-exit3)
+  rhome=$(setup_remote_squad_lead_home remote-exit3)
   home=$(setup_remote_parent_home remote-exit3 "$rhome")
 
   # The typed-plane remote transport remapped a leg exit 3 to "delivered with
@@ -584,9 +584,9 @@ test_remote_exit3_no_longer_delivered() {
     "$SEND" rsm "please rename the metric" >"$dir/out" 2>"$dir/err" || rc=$?
   err=$(cat "$dir/err")
   [ "$rc" -ne 0 ] || fail "a nonzero remote leg must no longer be remapped to delivered"
-  assert_not_contains "$err" "delivered to remote secondmate" \
+  assert_not_contains "$err" "delivered to remote squad_lead" \
     "the deleted exit-3-as-delivered remap must be gone"
-  assert_contains "$err" "steer not sent to remote secondmate rsm" \
+  assert_contains "$err" "steer not sent to remote squad_lead rsm" \
     "a failed remote leg must report the steer as not sent"
   [ -z "$(pending_record "$home")" ] \
     || fail "a failed remote leg must discard its undelivered expectation"
@@ -597,7 +597,7 @@ test_remote_transport_loss_preserves_expectation() {
   local dir fb ssh_log home rhome rc err pend
   dir="$TMP_ROOT/remote-255"; mkdir -p "$dir"
   fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; : > "$ssh_log"
-  rhome=$(setup_remote_secondmate_home remote-255)
+  rhome=$(setup_remote_squad_lead_home remote-255)
   home=$(setup_remote_parent_home remote-255 "$rhome")
 
   rc=0
@@ -622,7 +622,7 @@ test_remote_send_budget_bounds_busy_lane() {
   local dir fb ssh_log home rhome rc err began elapsed count pend delivery corr ssh_before
   dir="$TMP_ROOT/remote-budget"; mkdir -p "$dir"
   fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; : > "$ssh_log"
-  rhome=$(setup_remote_secondmate_home remote-budget)
+  rhome=$(setup_remote_squad_lead_home remote-budget)
   home=$(setup_remote_parent_home remote-budget "$rhome")
   delivery=aaaabbbbccccdddd
 
@@ -707,25 +707,25 @@ test_remote_send_budget_bounds_busy_lane() {
   pass "jg-send remote: the remote leg is budget-bounded and stays idempotent across the bound"
 }
 
-test_local_secondmate_pending_keeps_expectation_armed() {
+test_local_squad_lead_pending_keeps_expectation_armed() {
   local dir fb log home rc rec corr
   dir="$TMP_ROOT/local-pending-expectation"; mkdir -p "$dir"
   fb=$(make_stubs "$dir"); log="$dir/send.log"
   home=$(setup_home local-pending-expectation)
   jg_write_meta "$home/state/lsm.meta" \
-    "window=sess:jg-lsm" "harness=claude" "kind=secondmate" "mode=secondmate" "home=$home/sm"
+    "window=sess:jg-lsm" "harness=claude" "kind=squad_lead" "mode=squad_lead" "home=$home/sm"
 
   # A harness-native slash invocation keeps the typed plane for a LOCAL marked
-  # secondmate target, so this pins the kept armed-expectation semantics there.
+  # squad_lead target, so this pins the kept armed-expectation semantics there.
   : > "$log"
   rc=0
   env PATH="$fb:$PATH" JG_FAKE_TMUX_PENDING=1 \
     JG_ROOT_OVERRIDE="$home" JG_HOME="$home" JG_SEND_LOG="$log" JG_SEND_SETTLE=0 \
     "$SEND" lsm "/audit the ledger" >/dev/null 2>&1 || rc=$?
-  expect_code 3 "$rc" "an unconfirmed local secondmate submit must exit delivered-unconfirmed"
+  expect_code 3 "$rc" "an unconfirmed local squad_lead submit must exit delivered-unconfirmed"
   rec=$(pending_record "$home")
   [ -n "$rec" ] \
-    || fail "the pending-reply expectation must survive an unconfirmed local secondmate send"
+    || fail "the pending-reply expectation must survive an unconfirmed local squad_lead send"
   [ "$(jg_pending_reply_get "$rec" phase)" = awaiting_report ] \
     || fail "the surviving expectation must stay armed, got $(jg_pending_reply_get "$rec" phase)"
   # Armed means resolvable: the mate's correlated report still closes it.
@@ -733,7 +733,7 @@ test_local_secondmate_pending_keeps_expectation_armed() {
   printf 'done [corr=%s]: ledger clean\n' "$corr" > "$home/state/lsm.status"
   jg_pending_reply_try_resolve "$home/state" "$corr" \
     || fail "a correlated report must still resolve the preserved expectation"
-  pass "jg-send local: an unconfirmed secondmate send keeps its reply expectation armed"
+  pass "jg-send local: an unconfirmed squad_lead send keeps its reply expectation armed"
 }
 
 test_local_pending_reports_delivered_unconfirmed() {
@@ -800,6 +800,6 @@ test_remote_transport_loss_preserves_expectation
 test_remote_send_budget_bounds_busy_lane
 test_local_pending_reports_delivered_unconfirmed
 test_local_pending_does_not_close_resolve_key
-test_local_secondmate_pending_keeps_expectation_armed
+test_local_squad_lead_pending_keeps_expectation_armed
 
 echo "all jg-send-remote-delivery tests passed"

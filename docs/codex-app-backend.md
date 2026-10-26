@@ -51,7 +51,7 @@ Once available, Juggernaut should add a real `bin/backends/codex-app.sh`, persis
 ## Rollout
 
 Ship and scout tasks come first.
-Secondmate support remains out of scope until create, send, read, status return, and archive are proven through the normal backend dispatcher.
+Squad Lead support remains out of scope until create, send, read, status return, and archive are proven through the normal backend dispatcher.
 Until then, Codex App remains a blocked backend boundary with a verified host-tool capability record, not a selectable backend.
 
 [`verification/runtime-backends.md`](verification/runtime-backends.md#codex-app-host-tools) owns the active Desktop host-tool smoke without exposing task-specific thread ids or local paths.

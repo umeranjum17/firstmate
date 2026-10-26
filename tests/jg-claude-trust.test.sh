@@ -3,7 +3,7 @@
 #
 # Both halves of the contract are load-bearing and both are proven here, for
 # each directory a claude launch can start in: a legitimate fresh task worktree
-# and a seeded secondmate home are trusted so the agent reaches its brief or
+# and a seeded squad_lead home are trusted so the agent reaches its brief or
 # charter with no human, and every out-of-scope path is REFUSED rather than
 # warned about or quietly skipped.
 set -u
@@ -112,16 +112,16 @@ node_free_path() {  # <case-dir> -> a bin dir holding the script's own tools but
   printf '%s\n' "$dir"
 }
 
-# --- secondmate homes -------------------------------------------------------
+# --- squad_lead homes -------------------------------------------------------
 
-# seed_secondmate_home <home> <id> [shape]: the on-disk shape bin/jg-home-seed.sh
-# leaves behind - the identity marker, the firstmate instance files, the four
+# seed_squad_lead_home <home> <id> [shape]: the on-disk shape bin/jg-home-seed.sh
+# leaves behind - the identity marker, the juggernaut instance files, the four
 # operational directories, and a charter for the launch to carry. "clone" (the
 # default) is the standalone-clone home an explicit ~/jg-homes/<id> path
-# produces, a primary checkout of the firstmate repo; "worktree" is the linked
+# produces, a primary checkout of the juggernaut repo; "worktree" is the linked
 # worktree a treehouse lease produces. Both shapes are real homes, so both must
 # be trusted.
-seed_secondmate_home() {
+seed_squad_lead_home() {
   local home=$1 id=$2 shape=${3:-clone} src
   case "$shape" in
     worktree)
@@ -134,29 +134,29 @@ seed_secondmate_home() {
       ;;
   esac
   mkdir -p "$home/bin" "$home/data" "$home/state" "$home/config" "$home/projects"
-  printf '# Firstmate\n' > "$home/AGENTS.md"
+  printf '# Juggernaut\n' > "$home/AGENTS.md"
   printf 'charter\n' > "$home/data/charter.md"
-  printf '%s\n' "$id" > "$home/.jg-secondmate-home"
+  printf '%s\n' "$id" > "$home/.jg-squad-lead-home"
 }
 
-# run_home_trust <config> <home> <id> [user-home]: invoke the secondmate-home
+# run_home_trust <config> <home> <id> [user-home]: invoke the squad-lead-home
 # mode against an isolated store.
 run_home_trust() {
   local config=$1 home=$2 id=$3 user_home=${4:-$1}
-  CLAUDE_CONFIG_DIR="$config" HOME="$user_home" "$TRUST" --secondmate-home "$home" "$id" 2>&1
+  CLAUDE_CONFIG_DIR="$config" HOME="$user_home" "$TRUST" --squad-lead-home "$home" "$id" 2>&1
 }
 
-# spawn_secondmate_claude <case-dir> <home> <id>: run a real --secondmate claude
+# spawn_squad_lead_claude <case-dir> <home> <id>: run a real --squad-lead claude
 # spawn against the isolated store at <case-dir>/claude-config, logging the
 # launch to <case-dir>/launch.log. Echoes the spawn output.
-spawn_secondmate_claude() {
+spawn_squad_lead_claude() {
   local case_dir=$1 home=$2 id=$3 primary fakebin
   primary="$case_dir/primary"
   mkdir -p "$case_dir/claude-config"
   fakebin=$(make_spawn_fakebin "$case_dir/fake" claude)
   jg_test_spawn_home "$primary" claude
   JG_TEST_CLAUDE_CONFIG_DIR="$case_dir/claude-config" JG_FAKE_LAUNCH_LOG="$case_dir/launch.log" \
-    jg_test_run_spawn "$primary" "$home" "$fakebin" "$id" "$home" claude --secondmate
+    jg_test_run_spawn "$primary" "$home" "$fakebin" "$id" "$home" claude --squad-lead
 }
 
 test_fresh_worktree_is_trusted() {
@@ -522,7 +522,7 @@ test_worktree_subdirectory_is_refused() {
 
 # The write target the external-imports flags depend on is only correct when
 # it names the primary checkout. When <project> is itself a linked worktree
-# (a secondmate home spawned from, rather than as, the primary checkout),
+# (a squad_lead home spawned from, rather than as, the primary checkout),
 # writing the flags at that worktree's own path would land them at a key
 # Claude Code's git-root canonicalization never reads, silently reproducing
 # the bug this script exists to close - so this resolves the argument
@@ -723,7 +723,7 @@ test_claude_spawn_pretrusts_its_worktree_and_reaches_the_brief() {
     "the launch command was not the claude worker launch"
   launch=$(cat "$launch_log")
   doorbell=$(claude_launch_doorbell "$launch")
-  record=$(printf '%s' "$doorbell" | sed -n "s/.*: Firstmate operational input waiting: read '\([^']*\)'.*/\1/p")
+  record=$(printf '%s' "$doorbell" | sed -n "s/.*: Juggernaut operational input waiting: read '\([^']*\)'.*/\1/p")
   [ -n "$record" ] || fail "the launch command did not carry a brief doorbell"
   [ "$(printf '%s' "$doorbell" | JG_STATE_OVERRIDE="$home/state" "$ROOT/bin/jg-operational-input.sh" doorbell-kind)" = launch-brief ] \
     || fail "the launch command's doorbell did not name a brief record in the receiving home"
@@ -736,58 +736,58 @@ test_claude_spawn_pretrusts_its_worktree_and_reaches_the_brief() {
   pass "jg-spawn.sh: a claude spawn pre-trusts its worktree and launches with a readable brief doorbell"
 }
 
-# A secondmate home is the second directory a claude launch starts in, and it is
+# A squad_lead home is the second directory a claude launch starts in, and it is
 # as unseen by Claude as a fresh worktree. The standalone-clone shape is the one
-# that wedged in production: the trust step was skipped for every secondmate, so
+# that wedged in production: the trust step was skipped for every squad_lead, so
 # nothing was registered and the pane stopped on the dialog before it read its
 # charter.
-test_secondmate_standalone_clone_home_is_trusted() {
+test_squad_lead_standalone_clone_home_is_trusted() {
   local case_dir home out launch doorbell record
   case_dir="$TMP_ROOT/sm-clone-spawn"
   home="$case_dir/jg-homes/nomistakes-n1"
-  seed_secondmate_home "$home" nomistakes-n1 clone
-  out=$(spawn_secondmate_claude "$case_dir" "$home" nomistakes-n1)
-  expect_code 0 $? "a claude secondmate spawn into a standalone-clone home must succeed: $out"
+  seed_squad_lead_home "$home" nomistakes-n1 clone
+  out=$(spawn_squad_lead_claude "$case_dir" "$home" nomistakes-n1)
+  expect_code 0 $? "a claude squad_lead spawn into a standalone-clone home must succeed: $out"
   assert_trusted "$case_dir/claude-config/.claude.json" "$home" \
-    "the claude secondmate spawn did not pre-register trust for its standalone-clone home"
-  assert_present "$case_dir/launch.log" "the claude secondmate spawn sent no launch command"
+    "the claude squad_lead spawn did not pre-register trust for its standalone-clone home"
+  assert_present "$case_dir/launch.log" "the claude squad_lead spawn sent no launch command"
   assert_grep 'claude --dangerously-skip-permissions' "$case_dir/launch.log" \
-    "the launch command was not the claude secondmate launch"
+    "the launch command was not the claude squad_lead launch"
   launch=$(cat "$case_dir/launch.log")
   doorbell=$(claude_launch_doorbell "$launch")
-  record=$(printf '%s' "$doorbell" | sed -n "s/.*: Firstmate operational input waiting: read '\([^']*\)'.*/\1/p")
-  [ -n "$record" ] || fail "the secondmate launch command did not carry a brief doorbell"
+  record=$(printf '%s' "$doorbell" | sed -n "s/.*: Juggernaut operational input waiting: read '\([^']*\)'.*/\1/p")
+  [ -n "$record" ] || fail "the squad_lead launch command did not carry a brief doorbell"
   [ "$(printf '%s' "$doorbell" | JG_STATE_OVERRIDE="$home/state" "$ROOT/bin/jg-operational-input.sh" doorbell-kind)" = launch-brief ] \
-    || fail "the secondmate's doorbell did not name a brief record in its home"
+    || fail "the squad_lead's doorbell did not name a brief record in its home"
   [ "$(printf '%s' "$doorbell" | JG_STATE_OVERRIDE="$home/state" "$ROOT/bin/jg-operational-input.sh" open "$record")" = "$(cat "$home/data/charter.md")" ] \
-    || fail "the secondmate could not read its charter from the record"
+    || fail "the squad_lead could not read its charter from the record"
   # The pane must read the SAME store the registration wrote, or the trust would
   # land somewhere it never looks and the dialog would appear anyway.
   assert_grep "CLAUDE_CONFIG_DIR='$case_dir/claude-config'" "$case_dir/launch.log" \
-    "the launch command did not point the secondmate at the store that was trusted"
-  pass "jg-spawn.sh: a claude secondmate spawn pre-trusts a standalone-clone home"
+    "the launch command did not point the squad_lead at the store that was trusted"
+  pass "jg-spawn.sh: a claude squad_lead spawn pre-trusts a standalone-clone home"
 }
 
 # The other seeded shape, a treehouse-leased linked worktree. It must be trusted
 # through the same seed evidence rather than incidentally, so the registration
 # does not depend on which shape the home happens to have.
-test_secondmate_leased_worktree_home_is_trusted() {
+test_squad_lead_leased_worktree_home_is_trusted() {
   local case_dir home out
   case_dir="$TMP_ROOT/sm-leased-spawn"
   home="$case_dir/leased/home"
   mkdir -p "$case_dir/leased"
-  seed_secondmate_home "$home" leased-n1 worktree
-  out=$(spawn_secondmate_claude "$case_dir" "$home" leased-n1)
-  expect_code 0 $? "a claude secondmate spawn into a leased worktree home must succeed: $out"
+  seed_squad_lead_home "$home" leased-n1 worktree
+  out=$(spawn_squad_lead_claude "$case_dir" "$home" leased-n1)
+  expect_code 0 $? "a claude squad_lead spawn into a leased worktree home must succeed: $out"
   assert_trusted "$case_dir/claude-config/.claude.json" "$home" \
-    "the claude secondmate spawn did not pre-register trust for its leased worktree home"
-  pass "jg-spawn.sh: a claude secondmate spawn pre-trusts a leased worktree home"
+    "the claude squad_lead spawn did not pre-register trust for its leased worktree home"
+  pass "jg-spawn.sh: a claude squad_lead spawn pre-trusts a leased worktree home"
 }
 
 # The seed is the whole security boundary for home-level trust, so every path
-# that is not a home seeded for THIS secondmate is refused and left untrusted.
+# that is not a home seeded for THIS squad_lead is refused and left untrusted.
 # Each row drives one structural property apart from a genuine home.
-test_secondmate_home_trust_refuses_everything_unseeded() {
+test_squad_lead_home_trust_refuses_everything_unseeded() {
   local case_dir config home target out
   case_dir="$TMP_ROOT/sm-refusals"
   config="$case_dir/claude-config"
@@ -798,34 +798,34 @@ test_secondmate_home_trust_refuses_everything_unseeded() {
   mkdir -p "$target"
   out=$(run_home_trust "$config" "$target" plain-n1)
   expect_code 1 $? "a plain directory must be refused: $out"
-  assert_contains "$out" "no .jg-secondmate-home marker" "the refusal did not name the missing marker"
+  assert_contains "$out" "no .jg-squad-lead-home marker" "the refusal did not name the missing marker"
   assert_not_trusted "$config/.claude.json" "$target" "a plain directory was trusted"
 
-  # A firstmate checkout that was never seeded as a secondmate home: every other
+  # A juggernaut checkout that was never seeded as a squad_lead home: every other
   # structural signal matches and only the marker is missing.
   target="$case_dir/checkout"
-  seed_secondmate_home "$target" checkout-n1 clone
-  rm -f "$target/.jg-secondmate-home"
+  seed_squad_lead_home "$target" checkout-n1 clone
+  rm -f "$target/.jg-squad-lead-home"
   out=$(run_home_trust "$config" "$target" checkout-n1)
-  expect_code 1 $? "an unseeded firstmate checkout must be refused: $out"
-  assert_contains "$out" "no .jg-secondmate-home marker" "the refusal did not name the missing marker"
-  assert_not_trusted "$config/.claude.json" "$target" "an unseeded firstmate checkout was trusted"
+  expect_code 1 $? "an unseeded juggernaut checkout must be refused: $out"
+  assert_contains "$out" "no .jg-squad-lead-home marker" "the refusal did not name the missing marker"
+  assert_not_trusted "$config/.claude.json" "$target" "an unseeded juggernaut checkout was trusted"
 
-  # A home seeded for a DIFFERENT secondmate: one home's trust must not be
+  # A home seeded for a DIFFERENT squad_lead: one home's trust must not be
   # granted while spawning another id.
   target="$case_dir/other-mate"
-  seed_secondmate_home "$target" other-n1 clone
+  seed_squad_lead_home "$target" other-n1 clone
   out=$(run_home_trust "$config" "$target" wanted-n1)
-  expect_code 1 $? "a home marked for another secondmate must be refused: $out"
+  expect_code 1 $? "a home marked for another squad_lead must be refused: $out"
   assert_contains "$out" "other-n1" "the refusal did not name the id the home is marked for"
-  assert_not_trusted "$config/.claude.json" "$target" "a home marked for another secondmate was trusted"
+  assert_not_trusted "$config/.claude.json" "$target" "a home marked for another squad_lead was trusted"
 
   # A marker that is a symlink: another file's bytes must not stand in for the
   # seed, even when they read as the right id.
   target="$case_dir/linked-marker"
-  seed_secondmate_home "$target" linked-n1 clone
+  seed_squad_lead_home "$target" linked-n1 clone
   printf 'linked-n1\n' > "$case_dir/planted-id"
-  ln -sf "$case_dir/planted-id" "$target/.jg-secondmate-home"
+  ln -sf "$case_dir/planted-id" "$target/.jg-squad-lead-home"
   out=$(run_home_trust "$config" "$target" linked-n1)
   expect_code 1 $? "a symlinked marker must be refused: $out"
   assert_contains "$out" "symlink" "the refusal did not name the symlinked marker"
@@ -834,7 +834,7 @@ test_secondmate_home_trust_refuses_everything_unseeded() {
   # An operational directory that escapes the home: the home's own working
   # surface must stay inside it.
   target="$case_dir/escaping"
-  seed_secondmate_home "$target" escaping-n1 clone
+  seed_squad_lead_home "$target" escaping-n1 clone
   rm -rf "$target/projects"
   mkdir -p "$case_dir/elsewhere"
   ln -s "$case_dir/elsewhere" "$target/projects"
@@ -846,7 +846,7 @@ test_secondmate_home_trust_refuses_everything_unseeded() {
   # The user's own home directory, seeded to prove the marker alone cannot carry
   # it: HOME is refused in this mode exactly as it is for a worktree.
   target="$case_dir/user-home"
-  seed_secondmate_home "$target" userhome-n1 clone
+  seed_squad_lead_home "$target" userhome-n1 clone
   out=$(run_home_trust "$config" "$target" userhome-n1 "$target")
   expect_code 1 $? "the user's home directory must be refused: $out"
   assert_contains "$out" "home directory" "the refusal did not name the home directory"
@@ -856,46 +856,46 @@ test_secondmate_home_trust_refuses_everything_unseeded() {
   out=$(run_home_trust "$config" "$target" userhome-n1 "$case_dir/elsewhere-home")
   expect_code 0 $? "the same seeded home must be accepted once it is not HOME: $out"
 
-  pass "jg-claude-trust.sh: home-level trust is refused for everything but a home seeded for this secondmate"
+  pass "jg-claude-trust.sh: home-level trust is refused for everything but a home seeded for this squad_lead"
 }
 
-# A secondmate home is not a linked worktree, so worktree mode must keep
+# A squad_lead home is not a linked worktree, so worktree mode must keep
 # refusing it rather than quietly widening to cover the new case.
-test_worktree_mode_still_refuses_a_secondmate_home() {
+test_worktree_mode_still_refuses_a_squad_lead_home() {
   local case_dir config home out
   case_dir="$TMP_ROOT/sm-wrong-mode"
   config="$case_dir/claude-config"
   home="$case_dir/home"
   mkdir -p "$config"
-  seed_secondmate_home "$home" mode-n1 clone
+  seed_squad_lead_home "$home" mode-n1 clone
   out=$(run_trust "$config" "$home" "$home")
   expect_code 1 $? "worktree mode must still refuse a standalone-clone home: $out"
   assert_contains "$out" "primary checkout" "the refusal did not name the primary checkout"
   assert_not_trusted "$config/.claude.json" "$home" "worktree mode trusted a standalone-clone home"
-  pass "jg-claude-trust.sh: worktree mode still refuses a secondmate home"
+  pass "jg-claude-trust.sh: worktree mode still refuses a squad_lead home"
 }
 
-# The fail-closed half for secondmates: when the home's trust genuinely cannot be
+# The fail-closed half for squad_leads: when the home's trust genuinely cannot be
 # recorded, the spawn must refuse rather than launch a pane that would wedge on
 # the dialog. This is the guard that never fired while the step was skipped.
-test_secondmate_spawn_fails_closed_when_home_trust_cannot_be_recorded() {
+test_squad_lead_spawn_fails_closed_when_home_trust_cannot_be_recorded() {
   local case_dir home out
   case_dir="$TMP_ROOT/sm-failclosed"
   home="$case_dir/jg-homes/failclosed-n1"
   # Root owns /etc/passwd, so a store resolving to it is refused as another
   # user's file. Running as root would own it and make the refusal vacuous.
   if [ "$(id -u)" = 0 ]; then
-    pass "jg-spawn.sh: a claude secondmate spawn refuses when home trust cannot be recorded (skipped as root)"
+    pass "jg-spawn.sh: a claude squad_lead spawn refuses when home trust cannot be recorded (skipped as root)"
     return 0
   fi
-  seed_secondmate_home "$home" failclosed-n1 clone
+  seed_squad_lead_home "$home" failclosed-n1 clone
   mkdir -p "$case_dir/claude-config"
   ln -s /etc/passwd "$case_dir/claude-config/.claude.json"
-  out=$(spawn_secondmate_claude "$case_dir" "$home" failclosed-n1)
-  expect_code 1 $? "a secondmate spawn whose trust registration is refused must fail: $out"
+  out=$(spawn_squad_lead_claude "$case_dir" "$home" failclosed-n1)
+  expect_code 1 $? "a squad_lead spawn whose trust registration is refused must fail: $out"
   assert_contains "$out" "workspace trust" "the spawn did not report the trust refusal"
-  assert_absent "$case_dir/launch.log" "a secondmate was launched into a home whose trust could not be recorded"
-  pass "jg-spawn.sh: a claude secondmate spawn refuses when home trust cannot be recorded"
+  assert_absent "$case_dir/launch.log" "a squad_lead was launched into a home whose trust could not be recorded"
+  pass "jg-spawn.sh: a claude squad_lead spawn refuses when home trust cannot be recorded"
 }
 
 test_fresh_worktree_is_trusted
@@ -926,8 +926,8 @@ test_missing_node_is_refused
 test_scope_refusal_stays_fail_closed_without_node
 test_claude_spawn_pretrusts_its_worktree_and_reaches_the_brief
 test_refused_spawn_leaves_no_task_state
-test_secondmate_standalone_clone_home_is_trusted
-test_secondmate_leased_worktree_home_is_trusted
-test_secondmate_home_trust_refuses_everything_unseeded
-test_worktree_mode_still_refuses_a_secondmate_home
-test_secondmate_spawn_fails_closed_when_home_trust_cannot_be_recorded
+test_squad_lead_standalone_clone_home_is_trusted
+test_squad_lead_leased_worktree_home_is_trusted
+test_squad_lead_home_trust_refuses_everything_unseeded
+test_worktree_mode_still_refuses_a_squad_lead_home
+test_squad_lead_spawn_fails_closed_when_home_trust_cannot_be_recorded

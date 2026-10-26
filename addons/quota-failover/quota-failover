@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# quota-failover - move limit-stopped Firstmate workers and leads to the next
+# quota-failover - move limit-stopped Juggernaut workers and leads to the next
 # live route, and keep a route that is answering errors out of new dispatch.
 #
 # Usage: quota-failover <jg-home>
@@ -82,7 +82,7 @@ for lib in jg-backend.sh jg-busy-lib.sh jg-quota-axi-lib.sh jg-parent-channel-li
   # shellcheck source=/dev/null
   . "$BIN/$lib" || die "cannot load $BIN/$lib"
 done
-# Parked-home reader (firstmate-addons/parked-homes): a parked home is never
+# Parked-home reader (juggernaut-addons/parked-homes): a parked home is never
 # failover-moved - a parked home gets no relaunch. No-op when the reader is
 # absent (the predicate then answers "not parked").
 _JG_PARKED_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../parked-homes/bin/jg-parked-homes-lib.sh"
