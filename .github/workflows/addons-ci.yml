@@ -183,6 +183,10 @@ jobs:
       # Fixture pool readings and stub upstream quota-axi: Claude row follows fm-model-pool.
       - name: Quota-axi pool test
         run: bash quota-axi-pool/tests/quota-axi-pool.test.sh
+      # Wrapper first on PATH, a stub upstream and a stand-in pool tool: the reader must reach the
+      # upstream without delegating, and the wrapper must refuse a call that is already inside one.
+      - name: Quota-axi pool recursion test
+        run: bash quota-axi-pool/tests/quota-axi-pool-recursion.test.sh
       # Fixture muxr registry and a stub quota-axi: nothing real is touched.
       - name: Claude accounts test
         run: bash claude-accounts/tests/claude-accounts.test.sh
