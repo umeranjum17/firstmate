@@ -44,14 +44,19 @@ Add required status checks with `strict_required_status_checks_policy: false`; a
 Bind the checks to the GitHub Actions app already producing them, rather than accepting the same context from any integration.
 No new app installation or manual runner setup is needed for that setting.
 
-Require the actual job contexts: `Lint 1`, `Lint 2`, `Test coverage guard`, `Repo invariants`, `Stock macOS Bash snapshot compatibility`, `Behavior portable parallel 1`, `Behavior portable parallel 2`, `Behavior portable serial 1` through `Behavior portable serial 9`, `Behavior tests (Herdr)`, `Behavior timing aggregate`, and `PR must be raised via no-mistakes`.
-The last name is the compliance job context, not its workflow title; its existing automation exceptions remain unchanged.
-The timing aggregate is not a substitute for individual jobs because it can succeed while collecting evidence from a failed run.
-
+Require exactly one context from this workflow: `CI required`.
+It always reports, and `bin/fm-ci-required.sh` owns its verdict: it fails whenever a lane the change needed did not run or did not pass, and accepts a lane's deliberate skip only when the change did not need that lane.
+The individual lane names are therefore not required; the compliance context `PR must be raised via no-mistakes` stays required beside it, and a retired job name leaves the required list in the same change that retires it.
 Apply the approved rule change only after the corresponding workflow is green and landed, confirming exact names and the Actions integration id from real checks first.
 Snapshot the current ruleset, amend that same rule with the authenticated GitHub API or settings UI, and read back both the ruleset and effective branch rules.
 Verify missing or red checks prevent ordinary merging without creating a test merge; administrator override intentionally remains available.
-Coordinate any workflow rollback with its required-check names so a retired check cannot leave ordinary merges waiting forever.
+
+## CI path scope
+
+`bin/fm-ci-scope.sh` owns which changes need the behavior lanes.
+A change touching only documentation, media assets, or the license runs `Repo invariants` and `CI required`, which still prove the repo invariants, the complete-regression partition, the linted workflows, and the documentation inventory.
+Everything else, including any path the classifier does not recognize, runs lint, both portable parallel lanes, the portable serial shards, the Herdr lane, and the macOS snapshot, so a code change can never lose a behavior gate to a path filter.
+The scope is a job-level condition, never a trigger `paths:` filter: a filtered-out workflow leaves its required check pending forever, while a false condition reports a skip `CI required` accepts.
 
 ## Repo conventions
 
@@ -63,7 +68,7 @@ Coordinate any workflow rollback with its required-check names so a retired chec
   A module may load through `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS` or Claude Code's `tengu_plugin_hooks_modules` rollout flag, but the Calm mod activates only when `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS` is exactly `1` and is otherwise a complete no-op; Juggernaut never sets that variable in any settings file, and [`docs/calm.md`](docs/calm.md) owns the contract.
   Everything personal to one captain's fleet (`.env`, `data/`, `state/`, `config/`, `projects/`, `.no-mistakes/`) is gitignored; never commit it.
   The root `.tasks.toml` is tracked `tasks-axi` config for `data/backlog.md`; compatible `tasks-axi` is the default backend for routine backlog mutations, with the compatibility definition owned by [`docs/configuration.md`](docs/configuration.md) ("Backlog backend").
-  A local `config/backlog-backend=manual` opt-out forces Juggernaut's routine backlog updates to hand-editing and stays gitignored; validated secondmate handoffs still delegate through `tasks-axi mv`.
+  A local `config/backlog-backend=manual` opt-out forces Juggernaut's routine backlog updates to hand-editing and stays gitignored; validated Squad Lead handoffs still delegate through `tasks-axi mv`.
   A local `config/backend` file explicitly overrides runtime auto-detection for new task endpoints and stays gitignored; spawn-supported values are `tmux`, `herdr` (which has its own required CI lane), and `zellij`, `orca`, and `cmux`, which remain experimental with no dedicated real-backend CI lane, while `codex-app` is documented only in `docs/codex-app-backend.md`.
   It does not make `data/` tracked.
 - Helper scripts in `bin/` are plain bash.
@@ -92,7 +97,7 @@ It has the knowledge-placement rules that keep `AGENTS.md` from regrowing after 
 Juggernaut adds this skill's load line to Juggernaut repo briefs by hand; the [coding-guidelines skill](.agents/skills/firstmate-coding-guidelines/SKILL.md#trigger-hygiene) owns the scaffold's detection limits.
 An operator picking up such a brief should load the skill even if the brief predates this instruction.
 When supervising live operators, keep Juggernaut's own long validation or build commands in the background so watcher wakes can still be handled.
-Crewmate validation follows the installed no-mistakes version's SKILL.md and live `axi` help instead of duplicating gate mechanics in Juggernaut docs.
+Operator validation follows the installed no-mistakes version's SKILL.md and live `axi` help instead of duplicating gate mechanics in Juggernaut docs.
 Juggernaut's wrapper still matters: operators route every `ask-user` finding to Juggernaut, which applies `ask-user-authority`, and operators never pass `--yes` or `-y` because either flag bypasses that check and any required captain escalation.
 [`docs/configuration.md`](docs/configuration.md#gate-defaults-no-mistakesyaml) owns the tracked `.no-mistakes.yaml` gate defaults.
 The `firstmate-coding-guidelines` skill owns the rule that local no-mistakes Test stays intent-targeted rather than configuring `commands.test`.

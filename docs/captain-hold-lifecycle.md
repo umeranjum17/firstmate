@@ -26,7 +26,7 @@ A decision is not a separate thing in this system.
 It is an ordinary backlog task held for the captain, and the task id is the identity every surface and channel uses.
 `bin/fm-captain-hold.sh` is the only lifecycle command layered on that primitive.
 The command addresses the active home's configured data directory.
-As a result, the existing backlog remains the only durable work database, and a secondmate-owned captain call stays in the secondmate home.
+As a result, the existing backlog remains the only durable work database, and a Squad Lead-owned captain call stays in the Squad Lead home.
 It never reads report bodies, review artifacts, terminal output, or chat.
 
 ### Subcommands at a glance
@@ -36,7 +36,7 @@ It never reads report bodies, review artifacts, terminal output, or chat.
 | `hold` | Creates or reuses a task and holds it for the captain. | [Creating a hold](#creating-a-hold-hold) |
 | `answer` | Records the captain's exact words and resolves the call. | [Answering a call](#answering-a-call-answer) |
 | `complete` | Records the reviewed captain-held task ids in the originating task's metadata. | [Recording a reviewed inventory](#recording-a-reviewed-inventory-complete) |
-| `verify` | Read-only check that scout teardown runs before removing source state. | [Checking before scout teardown](#checking-before-scout-teardown-verify) |
+| `verify` | Read-only check that Recon teardown runs before removing source state. | [Checking before Recon teardown](#checking-before-recon-teardown-verify) |
 | `open` | Read-only check of whether a row is still an open captain call. | [Cleanup never closes a captain call](#cleanup-never-closes-a-captain-call) |
 | `answers` | Channel-agnostic entry point for keyed answers. | [Answer-time resolution](#answer-time-resolution) |
 | `bind`, `unbind`, `binding` | Record that a captured-answer source feeds the keyed-answer intake. | [Source bindings](#source-bindings) |
@@ -118,9 +118,9 @@ With a non-empty inventory, `complete` appends a `captain-held [key=<key>]` tran
 The event names the reviewed inventory.
 `bin/fm-classify-lib.sh` recognizes it as closing the live status copy without claiming that the captain has answered it.
 
-### Checking before scout teardown (`verify`)
+### Checking before Recon teardown (`verify`)
 
-Scout teardown calls the read-only `verify` subcommand after checking for the report and before removing any source state.
+Recon teardown calls the read-only `verify` subcommand after checking for the report and before removing any source state.
 `verify` checks three things:
 
 - The recorded attestation exists.
@@ -336,10 +336,10 @@ A subject whose state cannot be established is kept, because a wrongly shown car
 The validator's reservation scope must equal the adapter's reconcile-classification scope.
 That scope is all card types, because the captured payload carries no card type.
 
-### Remote-secondmate cards
+### Remote Squad Lead cards
 
-Owner-aware routing for remote-secondmate decision cards is tracked separately.
-That follow-up must query landedness and route reconciliation in the authoritative secondmate home while honoring the remote and local consistency principle.
+Owner-aware routing for remote Squad Lead decision cards is tracked separately.
+That follow-up must query landedness and route reconciliation in the authoritative Squad Lead home while honoring the remote and local consistency principle.
 Until then, an absent main-home task passes through this hygiene check unchanged.
 Its Reconcile selection remains announced but cannot create a main-home request, because the main intake refuses an absent task.
 For a main-home call, the reconcile option is the recovery path for whatever still slips through.
@@ -371,7 +371,7 @@ Existing undated holds without a hold-set stamp fall back to the task's `since` 
 That aging is a projection safety net only.
 The durable deferral remains re-holding with `--until`.
 
-The fleet snapshot's secondmate-home summary classifies an actionable captain hold as `captain_decision`.
+The fleet snapshot's squad-home summary classifies an actionable captain hold as `captain_decision`.
 It preserves every captain hold in the bounded queued inventory of the owning home.
 
 ### Bearings placement
@@ -391,7 +391,7 @@ An actively worked held task may also appear in Underway, which reports running 
 
 Three accepted limits remain deliberate:
 
-- A remote or secondmate hold retains the producer home's age and aging decision from the summary's capture time and threshold rather than being recomputed by the parent.
+- A remote or Squad Lead hold retains the producer home's age and aging decision from the summary's capture time and threshold rather than being recomputed by the parent.
 - A rare concurrent answer-close and re-hold race can leave the newly re-held task without its age basis.
 - Cross-home summaries remain bounded by `FM_SNAPSHOT_SECONDMATE_DECISIONS` and `FM_SNAPSHOT_SECONDMATE_QUEUED`.
   A remote deferred hold beyond those bounds is not exported, so it can be neither gated nor revealed.
@@ -524,7 +524,7 @@ The suite does not test the accepted merge-to-cleanup re-hold window or asynchro
 ### Completion and verification
 
 - A report-only unresolved captain call refuses `--none` completion before teardown can erase the source.
-- Non-forced scout teardown always requires the durable inventory verification.
+- Non-forced Recon teardown always requires the durable inventory verification.
 - The recorded-answer guard holds: a bare `tasks-axi done` close fails `verify` until `answer` records the captain's word, and an ordinary finished task cannot be dressed up as an answered call. The backlog wrapper's own `[captain-ask]` refusal reads the same record through `answered` ([`bin/fm-tasks-axi.sh`](../bin/fm-tasks-axi.sh) owns it).
 
 ### Answers, stamps, and deferral
@@ -633,7 +633,7 @@ Projection regressions live in two suites:
 | Suite | What it covers |
 | --- | --- |
 | `tests/fm-fleet-snapshot-view.test.sh` | The total structured-only bucket classifier, hold-until parsing, kind-independent captain actionability, undated-hold aging, and title stripping. |
-| `tests/fm-bearings-snapshot.test.sh` | Default and expanded decision-bucket membership, deferral explanations, blocker-overflow disclosure, working-hold dual surfaces, remote-summary schema invalidation, exact leading-kind inference, artifact-kind mismatch and answered-question exclusion, kind-bearing and kindless local-only landings publishing their recorded note, and scout-report precedence over competing pull-request links. |
+| `tests/fm-bearings-snapshot.test.sh` | Default and expanded decision-bucket membership, deferral explanations, blocker-overflow disclosure, working-hold dual surfaces, remote-summary schema invalidation, exact leading-kind inference, artifact-kind mismatch and answered-question exclusion, kind-bearing and kindless local-only landings publishing their recorded note, and Recon report precedence over competing pull-request links. |
 
 ### Refreshing this record
 

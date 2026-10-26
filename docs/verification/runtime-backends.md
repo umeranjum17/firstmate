@@ -184,7 +184,7 @@ The operator-only Muse Code 0.1.0-R708.1 adapter was verified separately on 2026
 Its installed `muse-bin-0.1.0-R708.1` foreground identity classified `alive`, while `musescore`, `amuse`, `muse-binary`, and `muse-bind` remained ambiguous in the portable regression.
 [`muse.md`](muse.md#process-identity) owns the artifact identity and launcher evidence for that verification.
 
-The operator/scout-only Rovo CLI 202609.1.2 adapter added `*rovo*` to the same glob family as `*grok*`/`*kimi*` in the shared process-name classifier (now `fm_agent_process_classify_name` in `bin/fm-agent-process-lib.sh`), and was relaunched live under tmux 3.6a in an isolated private socket.
+The operator/Recon-only Rovo CLI 202609.1.2 adapter added `*rovo*` to the same glob family as `*grok*`/`*kimi*` in the shared process-name classifier (now `fm_agent_process_classify_name` in `bin/fm-agent-process-lib.sh`), and was relaunched live under tmux 3.6a in an isolated private socket.
 `#{pane_current_command}` reported the truncated on-disk binary name `atlassian_cli_r` - macOS's 15-char `comm` truncation cuts `atlassian_cli_rovodev` off just before the `rovo` substring begins, the same truncation-volatility class codex/kimi's own patch-release name drift shows above - while the foreground ps-based `comm` correctly reported `rovo`, so `fm_backend_tmux_agent_state` returned `alive` through that primary source; the two-independent-name-sources design is exactly why the truncated title does not break the verdict.
 [`rovo.md`](rovo.md#backend-liveness-tmux-verified-live-herdr-placement-verified-live-with-a-herdr-side-agent-detection-gap) owns the fuller record, including the busy/interrupt/exit facts captured in that same live tmux session and the herdr agent-detection gap found when herdr placement was verified live in an isolated lab session.
 
@@ -317,7 +317,7 @@ Both recorded runtime identities now classify the exact `pi-launcher` foreground
 Backend applicability was reviewed across every spawn adapter.
 Tmux needs the exact `pi-launcher`, `pi-signed`, `pi`, and `Pi` process identities for recovery-grade liveness.
 Herdr uses native registered-agent state and needs no process-name branch.
-Zellij has no verified recovery-grade agent process probe, while Orca and cmux do not support secondmate spawns, so those three retain their existing generic ordinary-launch semantics without a new liveness matcher.
+Zellij has no verified recovery-grade agent process probe, while Orca and cmux do not support Squad Lead spawns, so those three retain their existing generic ordinary-launch semantics without a new liveness matcher.
 
 The current classifier matrix and its refresh guard are recorded in [Composer classification matrix](#composer-classification-matrix), with portable shape coverage in `tests/fm-composer-lib.test.sh` and `tests/fm-composer-ghost.test.sh`.
 Kimi pointer delivery and OpenCode 1.18.4 busy-queue behavior remain pinned by `tests/fm-kimi-harness.test.sh`, `tests/fm-tmux-submit-busy.test.sh`, and `tests/fm-composer-lib.test.sh`.
@@ -398,7 +398,7 @@ It states what `--force` authorizes rather than what will have happened, because
 
 The Orca close refuses under `--force` too.
 The step immediately after it removes the Orca worktree through the same CLI whose absence is the only thing that arm ever reports, so a forced continue would die there having removed nothing while claiming the records were already gone.
-The two child close sites inside forced secondmate cleanup also keep refusing: that path is only ever reached under `--force`, so honoring force there would delete the refusal rather than override it, and would contradict the adjacent Herdr child gate that stops forced cleanup for the same hazard.
+The two child close sites inside forced Squad Lead cleanup also keep refusing: that path is only ever reached under `--force`, so honoring force there would delete the refusal rather than override it, and would contradict the adjacent Herdr child gate that stops forced cleanup for the same hazard.
 
 The retained record is this run's, not a durable guarantee.
 A task carrying a backlog transition writes its pending-close marker before the endpoint close, and the marker survives the refusal; the next `bin/fm-bootstrap.sh` replays it and removes the retained record.
@@ -409,7 +409,7 @@ Both directions are proven non-vacuous.
 Restoring the swallowed status makes the refusal case report `teardown <id> complete`, delete the endpoint record, and leave the window live.
 Keeping the refusal but dropping the exact re-read makes an already-exited endpoint refuse its own cleanup, and also fails the cleanup identity case above.
 Letting an unreadable inventory pass for absence makes the unreadable case complete and remove the record while the window is still there.
-Removing the `--force` arm makes the forced generic case refuse; honoring `--force` at the child sites makes forced secondmate cleanup continue past a child endpoint it could not close, and honoring it at the Orca site makes that forced cleanup abort on the missing CLI after announcing that it was continuing.
+Removing the `--force` arm makes the forced generic case refuse; honoring `--force` at the child sites makes forced Squad Lead cleanup continue past a child endpoint it could not close, and honoring it at the Orca site makes that forced cleanup abort on the missing CLI after announcing that it was continuing.
 Restoring `fm_backend_orca_kill`'s swallowed tool check makes the CLI-absent adapter case report success.
 Dropping the retention-is-not-durable line makes the refusal claim a retention teardown does not own.
 
@@ -483,11 +483,11 @@ That warning rendered in the same shape as the trust dialog, with the selection 
 That gate is not a production blocker, because a normal environment has already accepted it and the treatment arm above ran against the real config and saw neither dialog.
 This change does not address that warning and does not claim to.
 
-### Secondmate homes
+### Squad Lead homes
 
 Verified 2026-09-11 on Claude Code 2.1.269.
-A secondmate launches in its own Juggernaut home rather than a task worktree, and that home meets the same gate.
-The control arm launched a standalone-clone secondmate home that the store had no entry for, the way `bin/fm-spawn.sh --secondmate` launches one.
+A Squad Lead launches in its own Juggernaut home rather than a task worktree, and that home meets the same gate.
+The control arm launched a standalone-clone Squad Lead home that the store had no entry for, the way `bin/fm-spawn.sh --secondmate` launches one.
 
 ```sh
 tmux -L <sock> new-session -d -s ctrl -x 180 -y 44 -c <home> \
@@ -502,7 +502,7 @@ tmux -L <sock> new-session -d -s ctrl -x 180 -y 44 -c <home> \
    Yes, I trust this folder
 ```
 
-The treatment arm pre-registered that same home through the secondmate-home mode and launched it identically against the operator's real config.
+The treatment arm pre-registered that same home through the squad-home mode and launched it identically against the operator's real config.
 
 ```sh
 bin/fm-claude-trust.sh --secondmate-home <home> livemate-n1
@@ -524,14 +524,14 @@ trusted: /private/tmp/fm-sm-trust-live-69759/fm-homes/livemate-n1
 No dialog appeared, the composer was reached, and neither did the machine-scoped bypass warning, because this ran against the real config.
 The lab home was deleted and the test entry was removed from the store and verified absent, with the same point-in-time caveat as the worktree arms above.
 
-`bin/fm-spawn.sh` therefore pre-registers the directory every claude launch starts in through `bin/fm-claude-trust.sh` before launch, and `tests/fm-claude-trust.test.sh` pins both halves of the scope contract for both shapes: a fresh worktree and a seeded secondmate home are trusted, and an out-of-scope path is refused.
+`bin/fm-spawn.sh` therefore pre-registers the directory every claude launch starts in through `bin/fm-claude-trust.sh` before launch, and `tests/fm-claude-trust.test.sh` pins both halves of the scope contract for both shapes: a fresh worktree and a seeded Squad Lead home are trusted, and an out-of-scope path is refused.
 That automated spawn case runs against a fake claude, so it asserts the store entry and the launch command and nothing more; the live arms above are what establish that the entry actually suppresses the dialog.
 The composer-classification record below observes the same gate from the other side, where an untrusted worktree left Claude, Grok, and Muse unverified because the guard reads a first-launch trust dialog as an unreadable composer.
 
-## Pi seeded-secondmate project trust
+## Pi seeded Squad Lead project trust
 
-[`fm-spawn.sh --help`](../../bin/fm-spawn.sh) owns the seeded-secondmate project-trust approval contract and compatibility fallback.
-The live guard below isolates Pi's trust-gate behavior in secondmate-shaped homes; portable launch-command coverage separately verifies that spawn selects the flag for the intended launches.
+[`fm-spawn.sh --help`](../../bin/fm-spawn.sh) owns the seeded Squad Lead project-trust approval contract and compatibility fallback.
+The live guard below isolates Pi's trust-gate behavior in Squad-Lead-shaped homes; portable launch-command coverage separately verifies that spawn selects the flag for the intended launches.
 
 Verified 2026-10-02 on pi 0.82.0 through the default-on live guard (disposable `PI_CODING_AGENT_DIR` / `HOME` only; never `~/.pi`):
 
@@ -658,19 +658,19 @@ skip-runner: pi-signed is not installed, so its pin check was not exercised
 
 The guard submits no prompt and spends no tokens, so it runs by default wherever a runner is installed; rerun it after every Claude or Pi upgrade.
 
-## Secondmate busy contract
+## Squad Lead busy contract
 
 Verified 2026-09-22 on this host with Claude Code 2.1.278, OpenCode 1.18.31, Pi 0.86.1, and Grok 1.0.40.
 
-A tmux-backed secondmate's active-turn gate reads the parent home's semantic busy record.
+A tmux-backed Squad Lead's active-turn gate reads the parent home's semantic busy record.
 Launches of opencode, pi, pi-signed, and omp arm that record and load the same hook or extension an ordinary worker uses, and those hooks do not touch the parent's turn-ended marker.
-A Claude secondmate arms the same record through busy hooks in the parent home's `state/<id>.claude-settings.json`, passed as Claude Code's `--settings` file, and does not write the mate home's `.claude/settings.local.json`.
+A Claude Squad Lead arms the same record through busy hooks in the parent home's `state/<id>.claude-settings.json`, passed as Claude Code's `--settings` file, and does not write the mate home's `.claude/settings.local.json`.
 That `--settings` load and the merge of its hook entries with the home's own hooks rest on Claude Code's documentation (<https://code.claude.com/docs/en/cli-reference>, <https://code.claude.com/docs/en/hooks>) and not on a live run recorded in this section: the sample output below predates the `--settings` mechanism.
-A Claude secondmate is the one exception on Stop: its home's tracked Stop guard is the only Stop writer, recording idle when it allows the Stop and busy when it blocks it into a continuation, because Claude runs Stop hooks in parallel.
+A Claude Squad Lead is the one exception on Stop: its home's tracked Stop guard is the only Stop writer, recording idle when it allows the Stop and busy when it blocks it into a continuation, because Claude runs Stop hooks in parallel.
 Claude Code 2.1.278 was probed live in a scratch project with logging `UserPromptSubmit` and `Stop` hooks.
 A synchronous Stop hook that exits 2 forced a continuation with no `UserPromptSubmit`, which is why the guard itself records busy when it blocks.
 An `asyncRewake` Stop hook that exited 2 six seconds after the turn ended woke a new turn, and `UserPromptSubmit` fired 45ms after that hook exited.
-So a secondmate turn started by the Stop auto-arm reopens busy through the same `UserPromptSubmit` hook as a typed prompt, and the auto-arm needs no busy writer of its own.
+So a Squad Lead turn started by the Stop auto-arm reopens busy through the same `UserPromptSubmit` hook as a typed prompt, and the auto-arm needs no busy writer of its own.
 
 ```text
 # asyncRewake probe                # synchronous block probe
@@ -682,8 +682,8 @@ stop   1790092388.953108486
 ```
 Codex stays unverified.
 Grok keeps its rendered-tail verdict and gets no parent turn-end hook.
-Cursor's transcript sidecar is written for a secondmate the same way it is for an ordinary worker, and this host has no Cursor agent binary, so that path was not started.
-Kimi stays unarmed, and a secondmate still gets no parent turn-end token.
+Cursor's transcript sidecar is written for a Squad Lead the same way it is for an ordinary worker, and this host has no Cursor agent binary, so that path was not started.
+Kimi stays unarmed, and a Squad Lead still gets no parent turn-end token.
 
 The portable regression is `tests/fm-busy-adapter-wiring.test.sh`.
 It spawns those harnesses through the real `bin/fm-spawn.sh --secondmate` path on a fake tmux pane, drives the generated hook or extension, and runs the stall gate while the record is busy and again after it goes idle.
@@ -771,7 +771,7 @@ $ ls "$TURNEND"
 `tests/fm-codex-hook-layer-live-e2e.test.sh` is the command that refreshes this record.
 It captures the launch `bin/fm-spawn.sh` actually builds, replays those exact flags against the installed Codex, and fails naming the harness and version if the hook layer comes back on.
 It spends no model tokens, so it runs by default wherever Codex is installed.
-The portable half, `tests/fm-spawn-dispatch-profile.test.sh`, pins the split the launch template makes: an operator launches hook-free while a secondmate, which runs a primary session on this repository's own project hooks, keeps them.
+The portable half, `tests/fm-spawn-dispatch-profile.test.sh`, pins the split the launch template makes: an operator launches hook-free while a Squad Lead, which runs a primary session on this repository's own project hooks, keeps them.
 
 ## Composer classification matrix
 
@@ -904,7 +904,7 @@ The Herdr captures above are therefore this entry's live evidence, and the guard
 
 ### 2026-09-15 codex-cli 0.154.0 idle starfield and status footer through Herdr
 
-Verified on 2026-09-15 on macOS arm64 (Darwin 25.5.0) against codex-cli 0.154.0 (model gpt-6-astra, fast mode) running as a Codex second mate inside a Herdr pane, read through Herdr's ANSI capture with its exact capability descriptor (`styled=1`, `cursor=0`, `identity=1`, `rows=20`).
+Verified on 2026-09-15 on macOS arm64 (Darwin 25.5.0) against codex-cli 0.154.0 (model gpt-6-astra, fast mode) running as a Codex Squad Lead inside a Herdr pane, read through Herdr's ANSI capture with its exact capability descriptor (`styled=1`, `cursor=0`, `identity=1`, `rows=20`).
 Idle, codex 0.154 animates a braille starfield on the row above its bold `›` prompt row, on the `›` row behind the SGR-2 dim `Ask Codex to do anything` placeholder, and on the row below it, then draws a status footer reading `gpt-6-astra high fast · ~/Projects/purser · Launch Purser desk brief`.
 The starfield cells are truecolor greys whose luminance runs from roughly 66 to 165, so the cells above the 128 ghost ceiling survive ghost stripping, and the footer is bright, non-blank, and carries no structural edge.
 
@@ -1016,7 +1016,7 @@ Observed 2026-10-07: claude 2.1.292, codex-cli 0.159.2, opencode 1.18.25, and pi
 
 ## Waiting-worker command ceilings
 
-The `# Waiting` section of the ship and scout briefs (`bin/fm-brief.sh`) has a worker hold every external wait inside one blocking shell command, bounded by what its harness lets one command run.
+The `# Waiting` section of the ship and Recon briefs (`bin/fm-brief.sh`) has a worker hold every external wait inside one blocking shell command, bounded by what its harness lets one command run.
 That section is generated only when `config/wait-no-turns` is present.
 Those bounds were read from the installed vendor code on 2026-09-11, macOS arm64, with Pi 0.85.1, codex-cli 0.154.0, and Claude Code 2.1.268.
 
@@ -1253,7 +1253,7 @@ teardown gm2 complete; state/gm2.gemini-settings.json removed
 
 ### Not verified
 
-Gemini as a PRIMARY or SECONDMATE runtime is unverified and is refused by `bin/fm-spawn.sh`: no wake protocol exists under `docs/supervision-protocols/` and no turn-end guard adapter was built or exercised.
+Gemini as a PRIMARY or Squad Lead runtime is unverified and is refused by `bin/fm-spawn.sh`: no wake protocol exists under `docs/supervision-protocols/` and no turn-end guard adapter was built or exercised.
 No reasoning-effort axis was found; `gemini --help` on 0.58.0 exposes no effort, reasoning, or thinking flag, so the record-and-omit contract applies.
 
 ## Herdr
@@ -1594,7 +1594,7 @@ HERDR_LAB_HELPER=bin/fm-herdr-lab.sh \
   tests/fm-backend-herdr-workspace-per-home-e2e.test.sh
 ```
 
-Observed guarantee: the primary and secondmate used distinct home workspaces, a child launched by the secondmate stayed in that secondmate workspace, list-live remained home-scoped, and exact cleanup did not affect sibling homes.
+Observed guarantee: the primary and Squad Lead used distinct home workspaces, a child launched by the Squad Lead stayed in that Squad Lead workspace, list-live remained home-scoped, and exact cleanup did not affect sibling homes.
 
 The complete projection suite ran on 2026-07-21 against Herdr 0.7.4 protocol 16:
 
@@ -1652,7 +1652,7 @@ ok - real Herdr lab validation completed on Herdr 0.8.0 with the default-session
 The projected spawn in that run used the historical empty opt-in file, so a home that had already enabled the projection keeps it without any migration step.
 One concurrent cross-home recovery case refused under contention on a loaded machine and passed on an immediate rerun; recovery-path presentation lock contention remains a deliberate hard refusal by default rather than a flat fallback, which default-on makes reachable from any Herdr home.
 Callers that need concurrent recoveries to serialize can pass `fm-spawn.sh --herdr-resume-lock-wait`.
-The flag applies to a fresh ship or scout spawn, and the multi-task path forwards it to each per-pair spawn.
+The flag applies to a fresh ship or Recon spawn, and the multi-task path forwards it to each per-pair spawn.
 It has no effect on `--relaunch` and `--secondmate`, because those paths take no exact-resume presentation-order lock.
 That run measured the default-on projection on Herdr 0.8.0 only, while the focus-flash regression below was last run on 0.7.5 before the flip, so neither run covered a defective release under default-on projection; the version floor and the focus-flash suite's Part C close that gap.
 
@@ -1811,7 +1811,7 @@ Observed guarantees: a contended presentation lock refused the teardown before t
 
 The same fixtures verified three further boundaries on 2026-07-29: missing or malformed endpoint identity and an unparseable pane presence refused record removal with everything retained; the SIGKILL escalation re-read the exact pane's process information and refused to signal when a different shell pid owned the pane, falling back to the plain close with the original process untouched; and a reposition whose removal then failed on every path restored the exact original workspace order through a second verified move and reported the close as failed.
 
-The teardown fixture was re-run on 2026-07-31 after extending the same fail-closed boundary through forced secondmate cleanup, including recursive cleanup of a nested secondmate whose Herdr grandchild close remains unconfirmed.
+The teardown fixture was re-run on 2026-07-31 after extending the same fail-closed boundary through forced Squad Lead cleanup, including recursive cleanup of a nested Squad Lead whose Herdr grandchild close remains unconfirmed.
 
 Observed output:
 
@@ -2254,7 +2254,7 @@ App-server partial methods and raw socket experiments do not satisfy that bridge
 
 ## Cursor Agent CLI
 
-Cursor runs operator, scout, secondmate, and primary work; [`supervision.md`](supervision.md#cursor-primary-park-2026-08-13) owns the primary evidence.
+Cursor runs operator, Recon, Squad Lead, and primary work; [`supervision.md`](supervision.md#cursor-primary-park-2026-08-13) owns the primary evidence.
 The evidence below was produced on 2026-08-11 against the installed signed CLI on macOS 26.5.2 arm64 with tmux 3.6a, running as `kunchenguid`, and extended on 2026-08-13 with the tmux composer verdict below.
 
 - Binary: `~/.local/bin/cursor-agent`, canonicalizing into `~/.local/share/cursor-agent/versions/2026.08.11-e8db854/cursor-agent`.
@@ -2360,7 +2360,7 @@ This row is a delivery guard for submit acknowledgement only; recorded worker st
 
 ### End-to-end
 
-A throwaway scout was spawned through `bin/fm-spawn.sh --scout --backend tmux` on a real cursor worker and driven to completion:
+A throwaway Recon was spawned through `bin/fm-spawn.sh --scout --backend tmux` on a real cursor worker and driven to completion:
 
 1. the launch delivered its brief positionally and the agent executed it;
 2. `state/<id>.cursor-session` was written with the task worktree;
@@ -2368,7 +2368,7 @@ A throwaway scout was spawned through `bin/fm-spawn.sh --scout --backend tmux` o
 4. `bin/fm-send.sh` delivered a steer through the then-current typed path and exited 0;
 5. `bin/fm-control.sh <id> interrupt` cancelled a running turn;
 6. `bin/fm-control.sh <id> exit` stopped the agent;
-7. `bin/fm-teardown.sh` refused until the scout's report and decision gate were satisfied, then removed the session record.
+7. `bin/fm-teardown.sh` refused until the Recon's report and decision gate were satisfied, then removed the session record.
 
 ### Herdr backend
 
@@ -2398,7 +2398,7 @@ The rest of the lifecycle was driven end to end on that worker:
 2. the transcript fold read `busy` mid-turn and `idle` after, unchanged from tmux, so the recorded worker state is backend-agnostic;
 3. `bin/fm-control.sh <id> interrupt` reported `cancel=unconfirmed` by design and the pane showed `Cancelled`, with the footer and the fold both returning to idle;
 4. `bin/fm-control.sh <id> exit` stopped the agent through the slash popup and the pane returned to its shell;
-5. `bin/fm-teardown.sh` refused until the scout's report and decision gate were satisfied, then removed the session record and returned the worktree.
+5. `bin/fm-teardown.sh` refused until the Recon's report and decision gate were satisfied, then removed the session record and returned the worktree.
 
 Other harnesses on Herdr are unaffected by the edge-detector change.
 All seven live panes of the running default session - one Pi, four Claude, two plain shells - classified identically under the pre-fix and current classifiers.
@@ -2716,7 +2716,7 @@ Hung validation and precisely post-scan writes remain automated evidence only.
 
 ## Oh My Pi (omp)
 
-omp runs operator, scout, secondmate, and primary work; [`supervision.md`](supervision.md#omp-oh-my-pi-native-delivery-2026-09-05) owns the primary evidence.
+omp runs operator, Recon, Squad Lead, and primary work; [`supervision.md`](supervision.md#omp-oh-my-pi-native-delivery-2026-09-05) owns the primary evidence.
 The evidence below was produced on 2026-09-05 against omp 18.1.11 (`~/.local/bin/omp`, a Bun-compiled single binary) on macOS 26 arm64 through the Herdr backend with the `openai-codex/gpt-6-astra` model, building on the 2026-09-02 adapter investigation against 18.1.2.
 
 ### Process identity and markers
@@ -2751,7 +2751,7 @@ After the rule, the same live Herdr capture read `empty`, a steer's doorbell lan
 
 ### End-to-end
 
-A throwaway scout was spawned through `bin/fm-spawn.sh --scout --harness omp --model openai-codex/gpt-6-astra --effort low` on Herdr and driven to completion:
+A throwaway Recon was spawned through `bin/fm-spawn.sh --scout --harness omp --model openai-codex/gpt-6-astra --effort low` on Herdr and driven to completion:
 
 1. the launch delivered its brief positionally under the tracked posture overlay and the agent executed it with no approval prompt;
 2. the busy record moved seed, busy, idle exactly as the extension contract states;
@@ -2760,7 +2760,7 @@ A throwaway scout was spawned through `bin/fm-spawn.sh --scout --harness omp --m
 5. `bin/fm-control.sh <id> interrupt` cancelled the running turn;
 6. `bin/fm-control.sh <id> exit` stopped the agent and `bin/fm-teardown.sh` returned the worktree and closed the item.
 
-`FM_OMP_LIVE_E2E=1 tests/fm-omp-primary-live-e2e.test.sh` refreshes the primary evidence; the worker path above is refreshed by repeating the scout dispatch after any omp upgrade.
+`FM_OMP_LIVE_E2E=1 tests/fm-omp-primary-live-e2e.test.sh` refreshes the primary evidence; the worker path above is refreshed by repeating the Recon dispatch after any omp upgrade.
 
 ## Codex registration recovery and native busy
 

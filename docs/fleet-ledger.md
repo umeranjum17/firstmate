@@ -6,7 +6,7 @@ It is the stable, documented hook for Juggernaut status; this page is its contra
 ## Turning it on and off
 
 Create the presence flag `config/fleet-ledger` in a Juggernaut home to turn the ledger on, and delete it to turn the ledger off.
-The flag is local, gitignored, per home, and not inherited by second mate homes, so each home that should publish a ledger needs its own flag.
+The flag is local, gitignored, per home, and not inherited by squad homes, so each home that should publish a ledger needs its own flag.
 While the flag is absent, each producer performs one file-existence test and nothing else: no process starts and nothing is written.
 
 ## The file
@@ -29,13 +29,13 @@ Readers must ignore members and events they do not recognize, so later versions 
 
 | Event              | Extra members                                  | Written when |
 | ------------------ | ---------------------------------------------- | ------------ |
-| `task.dispatched`  | `kind`, `project`, `harness`, `model`          | A new worker or second mate is launched. A relaunch of an existing task is not recorded. |
+| `task.dispatched`  | `kind`, `project`, `harness`, `model`          | A new worker or Squad Lead is launched. A relaunch of an existing task is not recorded. |
 | `task.status`      | `state`, `key`, `text`                         | A complete, nonblank line in the task's status log is captured. |
 | `task.pr_ready`    | `pr`                                           | Juggernaut records the task's PR as ready for review. |
 | `task.merged`      | `via` (`"pr"` or `"local"`), plus `pr` when `via` is `"pr"` | The task's PR merge is recorded, or its local-only branch landed. |
 | `task.cleaned_up`  | none                                           | The task's worker and local copy were removed. |
 
-`task.dispatched` members: `kind` is `ship`, `scout`, or `secondmate`; `project` is the project directory name, or `null` for a remote second mate; `harness` names the agent tool; `model` is the requested model, or `null` for the tool's default.
+`task.dispatched` members: `kind` is `ship`, `scout`, or `secondmate`; `project` is the project directory name, or `null` for a remote Squad Lead; `harness` names the agent tool; `model` is the requested model, or `null` for the tool's default.
 
 `task.pr_ready` members: `pr` is the PR's full URL.
 It is written each time Juggernaut records a PR for the task, so registering a replacement PR, or the same PR again, writes another record; recording the PR again as part of merging it writes none.
@@ -60,9 +60,9 @@ Example:
 - A worker using the current status command in its instructions records its line immediately after appending it, while the ledger is enabled.
   The supervision monitor's regular poll is the backstop: it records any line the immediate write missed, and does not record again a line that write already recorded.
   These lines still trail the status log by up to one poll interval, or until the monitor next runs when none is running:
-  - lines Juggernaut itself writes to a task's status log, such as a recorded answer, a failed launch, a relayed pending reply, or a second mate's report line;
+  - lines Juggernaut itself writes to a task's status log, such as a recorded answer, a failed launch, a relayed pending reply, or a Squad Lead's report line;
   - lines from workers whose instructions predate this, or that append without running the instruction's full command;
-  - lines a remote second mate reports, which reach this home through Juggernaut's relay;
+  - lines a remote Squad Lead reports, which reach this home through Juggernaut's relay;
   - lines written while the immediate record fails, for example when the ledger file cannot be written.
   Recording `task.pr_ready`, `task.merged`, or `task.cleaned_up` first records that task's pending status lines.
 - Captured status lines are delivered at least once unless a write fails or a crash loses unflushed records: an interrupted capture can repeat records, so a reader that must not double-count should tolerate duplicates.
@@ -85,7 +85,7 @@ The reader's CLI regression journey is the add-on's `fleet-flow/tests/fm-flow.te
 
 [`fm-task-outcome.sh`](../bin/fm-task-outcome.sh) appends one durable, append-only row per finished task to the home-local `data/metrics/task-outcomes.tsv`, whose header row and columns are `home`, `task`, `kind`, `project`, `models`, `started`, `ended`, `outcome`, and `pr`; give it the same trust as `state/`.
 `models` lists every launch of the task in order as `harness:model:effort`, joined by `;`, sourced from the `state/<id>.models` history that `fm-spawn.sh` starts on a fresh spawn and appends to on each relaunch, so a mid-task model switch is recorded rather than lost.
-`outcome` is `merged`, `closed`, `cancelled`, `scout`, or `failed`; a secondmate retirement is not a task and records nothing.
+`outcome` is `merged`, `closed`, `cancelled`, `scout`, or `failed`; a Squad Lead retirement is not a task and records nothing.
 The recorder runs best-effort from `bin/fm-teardown.sh` before the task's durable presentation is retired, and never blocks cleanup.
 
 [`fm-model-stats.sh`](../bin/fm-model-stats.sh) reads every local home's `task-outcomes.tsv` and the main home's sampled `lanes.tsv`/`prs.tsv` into `fm-model-stats.v1`: per model over 7- and 30-day windows, started, finished, merged, merge rate, time-to-merge P50/P75, first-pass rate, rework, revert, escape, cancelled/failed, and model switches, each with its sample size.

@@ -54,6 +54,15 @@ REAL_LSOF_FOR_TEST=$(command -v lsof)
 # Deterministic, isolated git identity for fixture commits.
 fm_git_identity fmtest fmtest@example.com
 
+# Pinned builds come from the repo's own table, so a bump moves these fixtures with it.
+# shellcheck source=bin/fm-pin-lib.sh
+. "$ROOT/bin/fm-pin-lib.sh"
+export FM_FAKE_GH_AXI_VERSION=${FM_FAKE_GH_AXI_VERSION:-$(fm_pin_version gh-axi)}
+export FM_FAKE_QUOTA_AXI_VERSION=${FM_FAKE_QUOTA_AXI_VERSION:-$(fm_pin_version quota-axi)}
+export FM_FAKE_LAVISH_AXI_VERSION=${FM_FAKE_LAVISH_AXI_VERSION:-$(fm_pin_version lavish-axi)}
+export FM_FAKE_LEARN_FROM_MISTAKES_AXI_VERSION=${FM_FAKE_LEARN_FROM_MISTAKES_AXI_VERSION:-$(fm_pin_version learn-from-mistakes)}
+export FM_FAKE_DONE_DONE_AXI_VERSION=${FM_FAKE_DONE_DONE_AXI_VERSION:-$(fm_pin_version done-done)}
+export FM_FAKE_SIGN_OFF_AXI_VERSION=${FM_FAKE_SIGN_OFF_AXI_VERSION:-$(fm_pin_version sign-off-axi)}
 TMP_ROOT=$(fm_test_tmproot fm-secondmate-sync)
 mkdir -p "$TMP_ROOT/no-addons"
 export FM_BACKEND=tmux
@@ -508,12 +517,14 @@ make_fake_toolchain() {
   fakebin="$dir/fakebin"
   mkdir -p "$fakebin"
   fm_fake_exit0 "$fakebin" node chrome-devtools-axi
-  fm_fake_version_tool "$fakebin" lavish-axi FM_FAKE_LAVISH_AXI_VERSION 0.1.80
-  fm_fake_version_tool "$fakebin" learn-from-mistakes FM_FAKE_LEARN_FROM_MISTAKES_AXI_VERSION 0.2.0
+  fm_fake_version_tool "$fakebin" lavish-axi FM_FAKE_LAVISH_AXI_VERSION "$FM_FAKE_LAVISH_AXI_VERSION"
+  fm_fake_version_tool "$fakebin" learn-from-mistakes FM_FAKE_LEARN_FROM_MISTAKES_AXI_VERSION "$FM_FAKE_LEARN_FROM_MISTAKES_AXI_VERSION"
+  fm_fake_version_tool "$fakebin" done-done FM_FAKE_DONE_DONE_AXI_VERSION "$FM_FAKE_DONE_DONE_AXI_VERSION"
+  fm_fake_version_tool "$fakebin" sign-off-axi FM_FAKE_SIGN_OFF_AXI_VERSION "$FM_FAKE_SIGN_OFF_AXI_VERSION"
   cat > "$fakebin/gh-axi" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --version ]; then
-  printf '%s\n' '0.1.29'
+  printf '%s\n' "${FM_FAKE_GH_AXI_VERSION:-0.1.29}"
   exit 0
 fi
 exit 0
@@ -576,7 +587,7 @@ SH
   cat > "$fakebin/quota-axi" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --version ]; then
-  printf '%s\n' 'quota-axi 0.1.51 (fake)'
+  printf '%s\n' "quota-axi ${FM_FAKE_QUOTA_AXI_VERSION:-0.1.51} (fake)"
 fi
 exit 0
 SH

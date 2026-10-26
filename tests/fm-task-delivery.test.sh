@@ -1009,10 +1009,12 @@ EOF
       [ "$(cat "$proj/CLAUDE.md")" = '@AGENTS.md' ] || fail "spawn changed the project import"
     done
   done
-  role_line=$(grep -n 'A ship or scout worker launched by Firstmate into a worktree of this repository' "$ROOT/AGENTS.md" | cut -d: -f1)
-  supervisor_line=$(grep -n '^You are the first mate\.$' "$ROOT/AGENTS.md" | head -1 | cut -d: -f1)
-  [ -n "$role_line" ] && [ "$role_line" -lt "$supervisor_line" ] ||
-    fail "Firstmate AGENTS.md does not disambiguate a launched worker before assigning the supervisor identity"
+  # The contract's own words, not two wordings that satisfy a grep: the worker
+  # role must be handed out before the supervisor identity is claimed.
+  role_line=$(grep -n 'A ship or Recon worker launched by Overwatch into a worktree of this repository' "$ROOT/AGENTS.md" | cut -d: -f1)
+  supervisor_line=$(grep -n '^You are the Overwatch\.$' "$ROOT/AGENTS.md" | head -1 | cut -d: -f1)
+  [ -n "$role_line" ] && [ -n "$supervisor_line" ] && [ "$role_line" -lt "$supervisor_line" ] ||
+    fail "AGENTS.md does not disambiguate a launched worker before assigning the supervisor identity"
   cmp -s "$ROOT/AGENTS.md" "$home/AGENTS.md" || fail "worker spawn changed the primary contract"
   pass "fm-spawn: every legacy worker receives scoped role instructions without changing project or primary instructions"
 }

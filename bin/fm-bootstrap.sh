@@ -72,6 +72,15 @@
 #          quota-axi is required for the agent-owned dispatch-profile array
 #          procedure in AGENTS.md section 4 and
 #          .agents/skills/quota-array-dispatch/SKILL.md.
+#          done-done and sign-off-axi are the published proof and decision tools;
+#          each install line is the exact build its toolchain.versions row names,
+#          never a git install, and that row is their floor too. The locked
+#          mutable path also wires them through bin/fm-tool-wiring.sh: the skill
+#          the package ships, the done-done brief include as one managed block,
+#          and config/merge-gate when the home has none. Sign-off arming stays per
+#          home and is never done there; the first wiring prints one line naming
+#          bin/fm-procevent-signoff.sh arm, so the user is told instead of
+#          remembering it.
 #          On a primary home, the locked mutable path materializes the visible
 #          default config/startup-memory-budget=7500 when absent. It never
 #          guesses at malformed or unsafe existing files, and secondmate homes
@@ -176,6 +185,8 @@ PROJECTS="${FM_PROJECTS_OVERRIDE:-$FM_HOME/projects}"
 CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
 STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
+# shellcheck source=bin/fm-pin-lib.sh disable=SC1091
+. "$SCRIPT_DIR/fm-pin-lib.sh"
 # shellcheck source=bin/fm-tasks-axi-lib.sh disable=SC1091
 . "$SCRIPT_DIR/fm-tasks-axi-lib.sh"
 # shellcheck source=bin/fm-backlog-transition-lib.sh disable=SC1091
@@ -837,15 +848,22 @@ secondmate_handoff_detect() {
 }
 
 install_cmd() {
+  local spec
   case "$1" in
     tmux|node|git|gh|curl|jq|orca|zellij) echo "brew install $1  # or the platform's package manager" ;;
     cmux) echo "brew install --cask cmux  # or see https://cmux.com" ;;
     treehouse) echo "curl -fsSL https://kunchenguid.github.io/treehouse/install.sh | sh" ;;
     no-mistakes) echo "curl -fsSL https://raw.githubusercontent.com/kunchenguid/no-mistakes/main/docs/install.sh | sh" ;;
-    gh-axi|chrome-devtools-axi|lavish-axi) echo "npm install -g $1 && $1 setup hooks" ;;
-    tasks-axi|quota-axi) echo "npm install -g $1" ;;
-    learn-from-mistakes) echo "npm install -g learn-from-mistakes-axi && ln -sf learn-from-mistakes-axi \"\$(dirname \"\$(command -v learn-from-mistakes-axi)\")/learn-from-mistakes\"" ;;
-    *) return 1 ;;
+    learn-from-mistakes) echo "npm install -g $(fm_pin_npm learn-from-mistakes) && ln -sf learn-from-mistakes-axi \"\$(dirname \"\$(command -v learn-from-mistakes-axi)\")/learn-from-mistakes\"" ;;
+    *)
+      # Every npm tool installs the exact build its toolchain.versions row names, so this
+      # command and the installer cannot disagree about a version.
+      spec=$(fm_pin_npm "$1") || return 1
+      case "$1" in
+        gh-axi|chrome-devtools-axi|lavish-axi) echo "npm install -g $spec && $1 setup hooks" ;;
+        *) echo "npm install -g $spec" ;;
+      esac
+      ;;
   esac
 }
 
@@ -871,7 +889,7 @@ missing_tool_diagnostic() {
 # fm_backend_required_tools (bin/fm-backend.sh). So a herdr/zellij/cmux home is
 # never told tmux is missing, and only orca drops treehouse. A backend value with
 # no verified dependency set is reported before the universal checks continue.
-COMMON_TOOLS="node git gh no-mistakes gh-axi chrome-devtools-axi tasks-axi quota-axi learn-from-mistakes"
+COMMON_TOOLS="node git gh no-mistakes gh-axi chrome-devtools-axi tasks-axi quota-axi learn-from-mistakes done-done sign-off-axi"
 BACKEND=$(fm_backend_name)
 BACKEND_VALID=1
 if ! BACKEND_TOOLS=$(fm_backend_required_tools "$BACKEND"); then
@@ -879,7 +897,10 @@ if ! BACKEND_TOOLS=$(fm_backend_required_tools "$BACKEND"); then
   BACKEND_TOOLS=""
 fi
 TOOLS="$BACKEND_TOOLS $COMMON_TOOLS"
-NO_MISTAKES_MIN=1.46.0
+# Every floor below is read from its toolchain.versions row, so a bump moves installation, detection and
+# this diagnostic together. The one floor not read from that table is LAVISH_AXI_BOARD_MIN: it accepts an
+# older build for legacy boards, which is a compatibility fact rather than a version we install.
+NO_MISTAKES_MIN=$(fm_pin_version no-mistakes) || NO_MISTAKES_MIN=0.0.0
 # AXI-FAMILY FLOOR POLICY. Every axi-family floor is the CURRENT LATEST published
 # version of that tool, captain-bumped periodically to keep the whole fleet on the
 # newest axi tools. It is NOT the minimum feature-introduced version. These floors
@@ -887,10 +908,15 @@ NO_MISTAKES_MIN=1.46.0
 # earliest release that happens to satisfy some depended-on behavior. The
 # tasks-axi feature probes are an independent defense-in-depth concern, not part
 # of its floor.
-GH_AXI_MIN=0.1.29
-LEARN_FROM_MISTAKES_AXI_MIN=0.2.0
-LAVISH_AXI_MIN=0.1.80
+GH_AXI_MIN=$(fm_pin_version gh-axi) || GH_AXI_MIN=0.0.0
+LEARN_FROM_MISTAKES_AXI_MIN=$(fm_pin_version learn-from-mistakes) || LEARN_FROM_MISTAKES_AXI_MIN=0.0.0
+LAVISH_AXI_MIN=$(fm_pin_version lavish-axi) || LAVISH_AXI_MIN=0.0.0
 LAVISH_AXI_BOARD_MIN=0.1.77
+# The proof and decision tools Juggernaut publishes install at the exact build
+# their toolchain.versions rows name, and that row is their floor too, so one bump
+# moves installation, detection and this diagnostic together.
+DONE_DONE_AXI_MIN=$(fm_pin_version done-done) || DONE_DONE_AXI_MIN=0.0.0
+SIGN_OFF_AXI_MIN=$(fm_pin_version sign-off-axi) || SIGN_OFF_AXI_MIN=0.0.0
 
 treehouse_supports_lease() {
   treehouse get --help 2>&1 | grep -Eq '(^|[^[:alnum:]_-])--lease([^[:alnum:]_-]|$)'
@@ -1360,6 +1386,24 @@ startup_memory_budget_setup() {
   fi
 }
 
+# An install is not wiring: the proof and decision tools also need the skill
+# their package ships, the brief include, and the merge gate.
+# bin/fm-tool-wiring.sh owns each write and is idempotent, so this runs on every
+# locked session - a home that already has its tool installed gets wired - and
+# prints nothing once a home is complete. A successful first wiring prints what
+# it wrote, including sign-off's one-line arming reminder; arming itself stays
+# per home and is never done here.
+companion_tool_wiring() {
+  local tool out
+  for tool in done-done sign-off; do
+    if out=$("$SCRIPT_DIR/fm-tool-wiring.sh" "$tool" 2>&1); then
+      [ -z "$out" ] || printf '%s\n' "$out"
+      continue
+    fi
+    echo "BOOTSTRAP_INFO: $tool wiring not applied: ${out:-unknown error}"
+  done
+}
+
 if [ "${1:-}" = "lavish-compatible" ]; then
   tool_version_at_least lavish-axi "$LAVISH_AXI_BOARD_MIN"
   exit
@@ -1372,18 +1416,39 @@ if [ "${1:-}" = "lavish-reply-compatible" ]; then
   exit 2
 fi
 
+if [ "${1:-}" = "version" ]; then
+  # The one owner of version parsing, so the installer never carries its own copy.
+  parts=$(tool_version_parts "${2:?usage: fm-bootstrap.sh version <tool>}") || exit 1
+  printf '%s\n' "${parts// /.}"
+  exit 0
+fi
+
 if [ "${1:-}" = "install" ]; then
   shift
   [ $# -gt 0 ] || { echo "usage: fm-bootstrap.sh install <tool>..." >&2; exit 1; }
+  # Installs stay user-local and need no sudo: a package-manager prefix the user owns, and the tool
+  # callable in this same shell straight after its install. An explicit NPM_CONFIG_PREFIX wins.
+  export NPM_CONFIG_PREFIX=${NPM_CONFIG_PREFIX:-$HOME/.local}
+  export PATH=$NPM_CONFIG_PREFIX/bin:$PATH
   for t in "$@"; do
-    if ! cmd=$(install_cmd "$t"); then
-      instructions=$(manual_install_url "$t") || { echo "error: unknown tool $t" >&2; exit 1; }
+    # Manual guidance is checked before the install command, because a tool with manual
+    # instructions has no row in toolchain.versions: probing install_cmd first would surface
+    # the pin table's refusal ahead of the guidance the user actually needs.
+    if instructions=$(manual_install_url "$t"); then
       echo "error: $t requires manual installation (instructions: $instructions)" >&2
+      exit 1
+    fi
+    if ! cmd=$(install_cmd "$t"); then
+      echo "error: unknown tool $t" >&2
       exit 1
     fi
     cmd=${cmd%%  #*}
     echo "installing $t: $cmd"
-    eval "$cmd"
+    eval "$cmd" || { echo "error: installing $t failed: $cmd" >&2; exit 1; }
+    case $t in
+      done-done) "$SCRIPT_DIR/fm-tool-wiring.sh" done-done || exit 1 ;;
+      sign-off-axi) "$SCRIPT_DIR/fm-tool-wiring.sh" sign-off || exit 1 ;;
+    esac
   done
   exit 0
 fi
@@ -1432,6 +1497,7 @@ if [ "${FM_BOOTSTRAP_DETECT_ONLY:-0}" != 1 ] && local_phase; then
     fi
   fi
   startup_memory_budget_setup
+  companion_tool_wiring
   if backlog_record_reconcile; then
     :
   else
@@ -1470,6 +1536,12 @@ detect_local_tools() {
   fi
   if command -v learn-from-mistakes >/dev/null 2>&1 && ! tool_version_at_least learn-from-mistakes "$LEARN_FROM_MISTAKES_AXI_MIN"; then
     echo "MISSING: learn-from-mistakes (install: $(install_cmd learn-from-mistakes))"
+  fi
+  if command -v done-done >/dev/null 2>&1 && ! tool_version_at_least done-done "$DONE_DONE_AXI_MIN"; then
+    echo "MISSING: done-done (install: $(install_cmd done-done))"
+  fi
+  if command -v sign-off-axi >/dev/null 2>&1 && ! tool_version_at_least sign-off-axi "$SIGN_OFF_AXI_MIN"; then
+    echo "MISSING: sign-off-axi (install: $(install_cmd sign-off-axi))"
   fi
   if ! tool_version_at_least lavish-axi "$LAVISH_AXI_BOARD_MIN"; then
     echo "PRESENTATION_UNAVAILABLE: lavish-axi (requires >=$LAVISH_AXI_BOARD_MIN; install: $(install_cmd lavish-axi)) - nonvisual work may proceed with plain-text decisions and reports; install or upgrade before using Lavish"
