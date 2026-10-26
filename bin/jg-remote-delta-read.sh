@@ -34,10 +34,14 @@ if [ -r "$_jg_d/jg-compat.sh" ]; then
 else
   # A copy of this script with no compat file beside it (a test fixture) has no
   # legacy record to read, so every legacy reader answers "nothing legacy here".
-  for _jg_f in legacy_of legacy_product record_ok label_ok marker parent_marker claims_root; do
-    eval "jg_compat_$_jg_f() { return 1; }"
-  done
-  unset _jg_f
+  eval 'jg_compat_legacy_of() { printf "%s\n" "${1-}"; }
+    jg_compat_legacy_product() { printf "%s\n" "${1-}"; }
+    jg_compat_record_ok() { [ "${1-}" = "${2-}" ]; }
+    jg_compat_label_ok() { [ -n "${1-}" ] && [ "${1-}" = "${2-}" ]; }
+    jg_compat_marker_ok() { [ "${1-}" = JUGGERNAUT_OP ]; }
+    jg_compat_marker() { printf "%s\n" "${1-}/.jg-squad-lead-home"; }
+    jg_compat_parent_marker() { printf "%s\n" "${1-}/.jg-squad-lead-parent"; }
+    jg_compat_claims_root() { printf "%s\n" "${1-}"; }'
 fi
 unset _jg_d
 set -eu
