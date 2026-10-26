@@ -31,6 +31,7 @@ One line per add-on, with how it wires in. `<home>` is your home folder for the 
 - `git-identity` — task commits always carry the configured git identity; pushes of foreign-author commits are refused. Wire in: `git-identity/install.sh <home>`, plus a fork hook.
 - `key-in-env-check` — wakes Main when any running fleet process carries a provider API key (OPENROUTER, ANTHROPIC, OPENAI, MINIMAX...) in its environment; names only, never a value. It names the pid, home, task and the topmost parent still exporting the key, and writes `state/key-in-env.incidents` for the dashboard. Wire in: `FM_HOME=<home> key-in-env-check/install.sh`; see `key-in-env-check/README.md`.
 - `kill-guard` — protects critical services and interactive shells, refuses pattern kills, and permits audited fleet-process kills by verified primary Main; other callers keep descendant/worktree ownership (see [rules and limits](../kill-guard/README.md)). Record device launches with `node guard.mjs own start <serial> -- <command>`; records bind device PID to start time and serial, while unrecorded legacy device processes stay refused (stop a stuck one via its owned host adb parent or have the lead stop it). A block is final, except a kill whose PID the shell sets (`$pid`, `$!`, `%1`), which asks for the literal PID. Wire in: `kill-guard/install.sh`; remove: `kill-guard/uninstall.sh`.
+- `repo-guard` — refuses any create, comment, review or push aimed at a repository outside its allow-list (`umeranjum17/*` by default), and never lets a fork clone fall back to its parent repository. Wire in: `repo-guard/install.sh`; remove: `repo-guard/install.sh --uninstall`.
 - `read-guard` — blocks agent tool access to provider logins, BYOKit person credentials and no-mistakes config; metadata-only `ls`, `stat`, `test` and `[` checks are allowed. Process/library reads are unaffected. Wire in: `read-guard/install.sh`; remove: `read-guard/uninstall.sh`.
 - `glm-queue` — one local line in front of the GLM API, so parallel calls queue instead of hitting rate limits. Wire in: `glm-queue/install.sh`, then point pi at the queue.
 - `host-memory` — a gate that makes heavy jobs wait for host memory instead of crashing. Wire in: `host-memory/install.sh`.
@@ -73,6 +74,7 @@ for d in pipeline-literal-delete pipeline-quota-failover host-memory fleet-flow 
 for d in delete-guard claude-quota merge-on-green git-identity nm-drain owner-guard pane-titles; do "$d/install.sh" "$FM_HOME"; done
 read-guard/install.sh
 codex-guard/install.sh
+repo-guard/install.sh
 FM_HOME="$FM_HOME" fleet-stall/install.sh
 FM_HOME="$FM_HOME" owner-guard/install-scan.sh
 FM_HOME="$FM_HOME" zai-quota-check/install.sh
@@ -125,6 +127,7 @@ bash nm-drain/tests/nm-drain.test.sh
 bash owner-guard/tests/owner-guard.test.sh
 bash owner-guard/tests/owner-guard-global.test.sh
 bash owner-guard/tests/owner-guard-merge.test.sh
+bash repo-guard/tests/repo-guard.test.sh
 bash fleet-stall/tests/fleet-stall-e2e.sh
 bash fleet-flow/tests/fm-flow-check.test.sh
 bash fleet-pulse/tests/chat-tsv.test.sh
@@ -151,6 +154,7 @@ pipeline-quota-failover/install.sh --restore             # removes the wrapper a
 "$FM_HOME/bin/fm-check-unregister.sh" zai-quota          # then rm "$FM_HOME/state/zai-quota.check.sh"
 rm "$FM_HOME/config/merge-gate" "$FM_HOME/config/post-merge"                    # merge-card (with owner-guard: its config/merge-gate.pre-owner-guard instead of merge-gate)
 owner-guard/install.sh --uninstall "$FM_HOME"            # owner-guard: also restores the home's previous config/merge-gate
+repo-guard/install.sh --uninstall                       # repo-guard: puts the real gh and gh-axi back; an extended allow-list stays
 pane-titles/uninstall.sh "$FM_HOME"                      # pane-titles: restores the home's previous launch-env-hook
 rm "$FM_HOME/config/parked-homes"                        # parked-homes: a missing file parks nothing
 systemctl --user disable --now fm-glm-queue && rm -r ~/.local/share/fm-glm-queue ~/.config/systemd/user/fm-glm-queue.service   # glm-queue
@@ -462,3 +466,9 @@ Install or update with `git-identity/install.sh [--dry-run] [--email <email>] [-
 
 Test: `git-identity/tests/git-identity.test.sh` builds a pooled-style lane (a shared clone whose `.git/config` holds `t <t@e.c>` and its own logging pre-push, a linked worktree, a bare origin carrying a forge-made squash commit), shows the leak without the add-on, then launches the lane the way `fm-spawn` runs the hook: task commits carry the configured identity, a push of a hand-made `t@e.c` commit is refused with the commit and the fix and reaches nothing, a clean push on the forge-made base passes and runs the repository's own pre-push with git's stdin, a push whose inspection fails (a `git log` error) is refused instead of let through, a fixture repository outside the clone keeps its identity and pushes freely, and `--email` changes what is pinned and allowed; it also drives `install.sh` as `--dry-run`, a real install with a backup and an idempotent rerun.
 With `FM_ROOT=<firstmate checkout>` the lane also gets that checkout's AI-trailer hooks dir layered on top, as a real spawn does.
+
+### repo-guard
+
+No lane can create, comment on, review, or push to a repository outside `repo-guard/allowed-repos`, the one list (`umeranjum17/*` by default; add `owner/repo` or `owner/*`). A fork clone that also carries the parent repository as a remote otherwise resolves `gh pr create` to the parent, which is how six phantom pull requests reached the upstream repository in minutes.
+`install.sh` puts a shim in front of `gh` and `gh-axi` (recording the real binary's path, so a symlink into an npm package is never written through or copied out of its package, and a mise- or npm-managed plain binary is left alone) and into git-identity's `hooks.d/pre-push/`, which every lane push runs. A write (`pr`, `issue`, `release` or `repo` with `create`, `comment`, `review`, `edit`, `merge`, `close`, `reopen`, `delete`, `ready`, `update-branch`, `revert`, `lock`, `unlock`, `archive`, `rename` or `transfer`) resolves its target explicitly - `--repo`, then `GH_REPO`, then this clone's own `origin` - and never from another remote; an on-list target reaches the real tool with `--repo` explicit, and an off-list one is refused by name with the allow-list, exits non-zero, and never reaches the tool. Read commands pass through untouched. A push is refused when the remote URL names an off-list repository (https, ssh or scp-style); a local path or `file://` remote publishes nothing, so it passes. Other clients (raw `curl`, `gh api -X POST`) are outside what a shim can see.
+Test: `repo-guard/tests/repo-guard.test.sh` builds a fixture fork clone (origin ours, the parent as a second remote), installs the real guard and git-identity hook chain in a throwaway HOME with argv-recording stubs, and proves both directions: create, comment, review and issue create against the parent are refused by name and never reach the stub, the same against our own repository run with `--repo` explicit, a push to the parent URL is refused while ours and a local remote pass, and `--uninstall` puts the real tools back.
