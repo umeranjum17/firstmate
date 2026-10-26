@@ -15,13 +15,13 @@ The hero line is "Ship like it's a game." with the promise "Talk to one agent. S
 ## The mark: B2 Monolith
 
 A clipped bone plate on a 64x64 grid: a square with two opposite corners chamfered on the same angle as the mascot's armour plates, closed into a solid chin guard with a broad flat chin and a wide jaw.
-The faceplate carries a single ember T-visor, cut as a knockout so it reads as a hole in the plate rather than a painted shape.
+The faceplate carries a single ember T-visor inside an aperture cut as a knockout, so the plate reads as an opening rather than a filled rectangle; in the one-ink masters the T is itself a knockout.
 No gradients, no outline-only variant, and no second accent: the ember T is the one hot element at every size.
 
 It is drawn as three paths in one viewBox, so it holds as vector at any size:
 
 - the plate, filled with the ink colour and knocked out by a mask that cuts the helmet aperture,
-- the T-visor cross, filled once in ink and once in ember on top,
+- the T-visor cross, filled once in ink and once in ember on top, so the ember sits in the aperture rather than on the plate,
 - variants that swap the ink and ember to CSS custom properties (`--mark-ink`, `--mark-accent`), so a host page recolours the mark without a second file.
 
 ### How it is drawn small
