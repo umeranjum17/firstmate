@@ -27,6 +27,9 @@ SLUG=${REPO//\//-}
 RAWMARK=$OUT/README.md
 LOG=$OUT/assertions.log
 URL="https://github.com/$REPO/blob/$SHA/README.md"
+# The step record names the done-done that actually recorded this run, never a version typed here.
+DD_VERSION=$(done-done --version 2>/dev/null | head -1 || true)
+[ -n "$DD_VERSION" ] || DD_VERSION=unknown
 
 case $SHA in
   [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
@@ -160,7 +163,7 @@ log "PASS: four captures, 390 and 1280 wide in light and dark, each under 65536 
 # 4. The run's step record, beside the captures, so a claim citing them can be tied to this run.
 cat > "$OUT/steps.json" <<JSON
 {
-  "target": { "version": "0.6.17" },
+  "target": { "version": "$DD_VERSION" },
   "start": "GitHub's own rendered README of $REPO pull request #$PULL at $SHA, opened in a fresh headless Chrome",
   "steps": [
     "fetch README.md at $SHA from the forge and assert the x.com/$OWN_HANDLE link, no other X/Twitter account, no other X badge handle and no Discord invite",
