@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 # Shared fork guard for captain asks; callers supply tasks_axi, SCRIPT_DIR, and fail.
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 captain_ask_row() {  # <id>; sets CAPTAIN_ASK_SHOW to the row's show output when it is a [captain-ask] item
   local title
   CAPTAIN_ASK_SHOW=''
@@ -60,3 +58,19 @@ guard_captain_ask_archive() {  # <state> <keep-or-empty> <call-target-or-empty>
   [ "$skip" -ge 0 ] || skip=0
   for id in $(printf '%s\n' "$ids" | tail -n +"$(( skip + 1 ))"); do guard_captain_ask "$id"; done
 }
+
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+_jg_d=${BASH_SOURCE[0]%/*}
+[ "$_jg_d" != "${BASH_SOURCE[0]}" ] || _jg_d=.
+if [ -r "$_jg_d/jg-compat.sh" ]; then
+  # shellcheck source=bin/jg-compat.sh
+  . "$_jg_d/jg-compat.sh"
+else
+  # A copy of this script with no compat file beside it (a test fixture) has no
+  # legacy record to read, so every legacy reader answers "nothing legacy here".
+  for _jg_f in legacy_of legacy_product record_ok label_ok marker parent_marker claims_root; do
+    eval "jg_compat_$_jg_f() { return 1; }"
+  done
+  unset _jg_f
+fi
+unset _jg_d

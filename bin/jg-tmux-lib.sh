@@ -40,8 +40,6 @@
 # capture, the #{cursor_y} cursor read, the pi foreground-process identity
 # probe, and the capability descriptor - plus the busy detection and submit
 # cores that consume the shared verdict.
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 # The sibling directory is derived without forking dirname, because a backend
 # probe can re-source this adapter inside a subshell on every watcher cycle.
@@ -307,3 +305,19 @@ jg_tmux_submit_core() {  # <target> <text> <retries> <enter-sleep> <settle>
   sleep "$settle"
   jg_tmux_submit_enter_core "$target" "$retries" "$sleep_s" "$baseline_idle"
 }
+
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+_jg_d=${BASH_SOURCE[0]%/*}
+[ "$_jg_d" != "${BASH_SOURCE[0]}" ] || _jg_d=.
+if [ -r "$_jg_d/jg-compat.sh" ]; then
+  # shellcheck source=bin/jg-compat.sh
+  . "$_jg_d/jg-compat.sh"
+else
+  # A copy of this script with no compat file beside it (a test fixture) has no
+  # legacy record to read, so every legacy reader answers "nothing legacy here".
+  for _jg_f in legacy_of legacy_product record_ok label_ok marker parent_marker claims_root; do
+    eval "jg_compat_$_jg_f() { return 1; }"
+  done
+  unset _jg_f
+fi
+unset _jg_d

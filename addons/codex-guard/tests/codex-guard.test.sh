@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
-# here, so an unmigrated shell, unit, pane or record keeps this script working.
-for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
-  _jg_new="JG_${_jg_old#FM_}"
-  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
-  eval "_jg_val=\${_jg_old}"
-  export "$_jg_new=$_jg_val"
-done
-unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # End to end: install the delete, kill and read guards and this adapter into a throwaway HOME, then run commands the way
 # Codex 0.159 does (bash -lc '<snapshot wrapper>' ending in exec bash -c '<command>', BASH_ENV from config.toml).
 # Only this test's own sleep is signalled, and every command the guards must block is harmless if it ran.
 # shellcheck disable=SC2016 # the cases are literal commands
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -euo pipefail; unset JG_TASK_ID JG_TASK_INBOX JG_HOME XDG_DATA_HOME CODEX_HOME
 ADDON=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P); ROOT=$(dirname "$ADDON")
 T=$(mktemp -d); SLEEP=

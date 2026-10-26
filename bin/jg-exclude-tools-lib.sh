@@ -6,8 +6,6 @@
 # operator contract; bin/jg-spawn.sh's header owns launch-flag mechanics.
 # Name verification belongs inside the worker's loaded-tool registry, never
 # in an out-of-band server connection from these launch-time checks.
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 # jg_exclude_tools_names <config-dir>: print the comma-joined names, empty when
 # the file is absent or lists nothing. Non-zero with the reason on stderr when
@@ -64,3 +62,19 @@ jg_exclude_tools_check() {
   fi
   printf '%s' "$names"
 }
+
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+_jg_d=${BASH_SOURCE[0]%/*}
+[ "$_jg_d" != "${BASH_SOURCE[0]}" ] || _jg_d=.
+if [ -r "$_jg_d/jg-compat.sh" ]; then
+  # shellcheck source=bin/jg-compat.sh
+  . "$_jg_d/jg-compat.sh"
+else
+  # A copy of this script with no compat file beside it (a test fixture) has no
+  # legacy record to read, so every legacy reader answers "nothing legacy here".
+  for _jg_f in legacy_of legacy_product record_ok label_ok marker parent_marker claims_root; do
+    eval "jg_compat_$_jg_f() { return 1; }"
+  done
+  unset _jg_f
+fi
+unset _jg_d

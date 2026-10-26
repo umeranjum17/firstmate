@@ -23,8 +23,6 @@
 # Fail direction: when the host cannot be determined (no payload, no jq), the
 # caller RUNS. A redundant run under Cursor wastes work; a skipped run under
 # Claude breaks the primary's supervision, which is the worse failure.
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 # Return 0 when payload $1 was delivered by a foreign host whose own tracked
 # Juggernaut registration already covers this event.
@@ -36,3 +34,19 @@ jg_hook_payload_is_foreign_host() {  # <payload>
     type == "object" and has("cursor_version") and (.cursor_version | type) == "string"
   ' >/dev/null 2>&1
 }
+
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+_jg_d=${BASH_SOURCE[0]%/*}
+[ "$_jg_d" != "${BASH_SOURCE[0]}" ] || _jg_d=.
+if [ -r "$_jg_d/jg-compat.sh" ]; then
+  # shellcheck source=bin/jg-compat.sh
+  . "$_jg_d/jg-compat.sh"
+else
+  # A copy of this script with no compat file beside it (a test fixture) has no
+  # legacy record to read, so every legacy reader answers "nothing legacy here".
+  for _jg_f in legacy_of legacy_product record_ok label_ok marker parent_marker claims_root; do
+    eval "jg_compat_$_jg_f() { return 1; }"
+  done
+  unset _jg_f
+fi
+unset _jg_d

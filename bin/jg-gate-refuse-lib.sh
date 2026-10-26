@@ -72,8 +72,6 @@
 # bin/jg-lab-home.sh, and the tests.
 # No side effects on source. set -u / set -e safe. The refusal is a hard exit,
 # not a return, because an unpermitted gate call cannot safely mutate the fleet.
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 # The exit code every refusal uses, distinct enough to recognize in a caller or
 # test as "the gate refusal fired" rather than an ordinary usage error.
@@ -158,3 +156,19 @@ jg_refuse_if_gate_agent() {
   fi
   exit "$JG_GATE_REFUSE_EXIT"
 }
+
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+_jg_d=${BASH_SOURCE[0]%/*}
+[ "$_jg_d" != "${BASH_SOURCE[0]}" ] || _jg_d=.
+if [ -r "$_jg_d/jg-compat.sh" ]; then
+  # shellcheck source=bin/jg-compat.sh
+  . "$_jg_d/jg-compat.sh"
+else
+  # A copy of this script with no compat file beside it (a test fixture) has no
+  # legacy record to read, so every legacy reader answers "nothing legacy here".
+  for _jg_f in legacy_of legacy_product record_ok label_ok marker parent_marker claims_root; do
+    eval "jg_compat_$_jg_f() { return 1; }"
+  done
+  unset _jg_f
+fi
+unset _jg_d

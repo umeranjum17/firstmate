@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
-# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
-# here, so an unmigrated shell, unit, pane or record keeps this script working.
-for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
-  _jg_new="JG_${_jg_old#FM_}"
-  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
-  eval "_jg_val=\${_jg_old}"
-  export "$_jg_new=$_jg_val"
-done
-unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # limit-prompt-move live proof: the INSTALLED limit-prompt-move runs against a real tmux pane that shows a
 # captured Claude usage-limit menu (tests/weekly-limit-menu.screen). The pane reads one key like Claude's menu
 # does; jg-control is a stub that sends the interrupt as a real Escape key to that pane and records the
 # relaunch; the pool tool is a stub that answers a fixed pick. No real account, login or Claude is touched.
 # Captures: the pane before, the tool's own output (log, status, the key sent, the pool lib it loaded), the pane after.
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -euo pipefail
 repo=$(cd "$(dirname "$0")/.." && pwd)
 evidence=${DONE_DONE_EVIDENCE_ROOT:?}

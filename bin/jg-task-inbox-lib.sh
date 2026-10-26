@@ -91,8 +91,6 @@
 #   JG_TASK_INBOX_GRACE_SECS   default 90; delivery-attempt grace and spacing
 #   JG_TASK_INBOX_RING_MAX     default 3; delivery attempts before escalation
 #   JG_TASK_INBOX_BUSY_MAX     default 2; consecutive busy-deferred due polls before escalation
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 _JG_TASK_INBOX_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Both dependencies are canonical lint roots in their own right. Keep them as
@@ -557,3 +555,19 @@ jg_task_inbox_record_escalated() {  # <state-dir> <task-id> <record-path>
     return 1
   fi
 }
+
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+_jg_d=${BASH_SOURCE[0]%/*}
+[ "$_jg_d" != "${BASH_SOURCE[0]}" ] || _jg_d=.
+if [ -r "$_jg_d/jg-compat.sh" ]; then
+  # shellcheck source=bin/jg-compat.sh
+  . "$_jg_d/jg-compat.sh"
+else
+  # A copy of this script with no compat file beside it (a test fixture) has no
+  # legacy record to read, so every legacy reader answers "nothing legacy here".
+  for _jg_f in legacy_of legacy_product record_ok label_ok marker parent_marker claims_root; do
+    eval "jg_compat_$_jg_f() { return 1; }"
+  done
+  unset _jg_f
+fi
+unset _jg_d

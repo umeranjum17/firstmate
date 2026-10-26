@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
-# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
-# here, so an unmigrated shell, unit, pane or record keeps this script working.
-for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
-  _jg_new="JG_${_jg_old#FM_}"
-  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
-  eval "_jg_val=\${_jg_old}"
-  export "$_jg_new=$_jg_val"
-done
-unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # run-live-proof.sh: a controlled real route failure recovers with no human. A disposable live lab (JG_CHECKOUT's
 # jg-live-lab.sh, Haiku main) gets one real jg-spawn worker on pi, pinned to a local provider that answers HTTP 429, and
 # this checkout's watcher in a lab-only data path; PASS is the lab watcher moving it to Claude Haiku and the worker
 # finishing there. The lab pi agent dir defines only that provider and holds no credential. The evidence is one readable
 # route.log (setup, the 429 calls, the move, the finish, teardown) and steps.json; raw lab output stays in $work/raw.
 # A set CLAUDE_CONFIG_DIR (a pool account) reaches every lab Claude and its trust store, as jg-live-lab.sh does.
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -euo pipefail
 # The real pi first on PATH: in a lab, jg-spawn's `pi --help` probe through the mise shim never returned (24 Oct).
 real_pi=$(mise which pi 2>/dev/null) && PATH=$(dirname "$real_pi"):$PATH

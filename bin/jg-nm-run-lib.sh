@@ -20,8 +20,6 @@
 # `no-mistakes "$@"` specialization. The bounded
 # form preserves stdout, stderr, and exit status; the checked form discards
 # stderr, while jg_nm_run keeps the fail-open query contract for read-only callers.
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 jg_nm_bounded() {  # <dir> <timeout_secs> <command> <args...>
   local dir=$1 timeout_secs=$2 have_timeout=none
   shift 2
@@ -520,3 +518,19 @@ jg_nm_runs_status_for_worktree() {  # <worktree> <branch> <runs-list-output> [ex
   printf '%s' "$decided"
   return 0
 }
+
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+_jg_d=${BASH_SOURCE[0]%/*}
+[ "$_jg_d" != "${BASH_SOURCE[0]}" ] || _jg_d=.
+if [ -r "$_jg_d/jg-compat.sh" ]; then
+  # shellcheck source=bin/jg-compat.sh
+  . "$_jg_d/jg-compat.sh"
+else
+  # A copy of this script with no compat file beside it (a test fixture) has no
+  # legacy record to read, so every legacy reader answers "nothing legacy here".
+  for _jg_f in legacy_of legacy_product record_ok label_ok marker parent_marker claims_root; do
+    eval "jg_compat_$_jg_f() { return 1; }"
+  done
+  unset _jg_f
+fi
+unset _jg_d

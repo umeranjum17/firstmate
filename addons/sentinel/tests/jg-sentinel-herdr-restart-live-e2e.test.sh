@@ -1,13 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
-# here, so an unmigrated shell, unit, pane or record keeps this script working.
-for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
-  _jg_new="JG_${_jg_old#FM_}"
-  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
-  eval "_jg_val=\${_jg_old}"
-  export "$_jg_new=$_jg_val"
-done
-unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Opt-in credentialed live E2E for bin/jg-sentinel.sh against a real Herdr
 # restart. In one guarded named Herdr lab it runs a real Claude lab primary, a
 # real seeded Claude squad lead (the lead), and the lead's real Claude worker
@@ -30,6 +21,15 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # ~/.treehouse are never touched.
 # Set JG_SENTINEL_E2E_EVIDENCE=<dir> to keep pane captures and logs.
 # shellcheck disable=SC2016 # inner bash -c scripts expand their own arguments
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -u
 
 # The Juggernaut checkout named by JG_UPSTREAM_ROOT supplies tests/lib.sh (fail, pass, ROOT) and the

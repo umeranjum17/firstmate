@@ -4,8 +4,6 @@
 # This file is sourced by hook entrypoints and has no side effects on source.
 # jg_primary_root_matches is split out so a caller can confirm primary-home
 # identity before its gitignored state dir exists, such as to create it.
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 # Return 0 when $1 carries a genuine squad-lead-home marker.
 jg_root_is_squad_lead_home() {
@@ -43,3 +41,19 @@ jg_primary_scope_matches() {
   local root=$1 state=$2
   jg_primary_root_matches "$root" && [ -d "$state" ]
 }
+
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+_jg_d=${BASH_SOURCE[0]%/*}
+[ "$_jg_d" != "${BASH_SOURCE[0]}" ] || _jg_d=.
+if [ -r "$_jg_d/jg-compat.sh" ]; then
+  # shellcheck source=bin/jg-compat.sh
+  . "$_jg_d/jg-compat.sh"
+else
+  # A copy of this script with no compat file beside it (a test fixture) has no
+  # legacy record to read, so every legacy reader answers "nothing legacy here".
+  for _jg_f in legacy_of legacy_product record_ok label_ok marker parent_marker claims_root; do
+    eval "jg_compat_$_jg_f() { return 1; }"
+  done
+  unset _jg_f
+fi
+unset _jg_d

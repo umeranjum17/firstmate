@@ -1,13 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
-# here, so an unmigrated shell, unit, pane or record keeps this script working.
-for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
-  _jg_new="JG_${_jg_old#FM_}"
-  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
-  eval "_jg_val=\${_jg_old}"
-  export "$_jg_new=$_jg_val"
-done
-unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # claude-accounts-quota.sh - one quota view of every Claude account the owner has signed in.
 # Reads the account list from the muxr registry, asks `quota-axi --profile-only` about each profile
 # folder (the folder path is the only thing passed; nothing inside a login folder is opened), and writes
@@ -16,6 +7,15 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Env:   JG_HOME (required), JG_CLAUDE_ACCOUNTS_REGISTRY
 #        (default: ~/.muxr/plans/accounts-v1.json), JG_CLAUDE_ACCOUNTS_SECONDS (per-account read limit, 60).
 #        JG_ACCOUNTS_PROVIDER=claude|codex (default claude); writes <provider>-accounts.json.
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -uo pipefail
 
 JG_HOME=${JG_HOME:?set JG_HOME to the Juggernaut home}

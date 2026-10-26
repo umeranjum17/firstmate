@@ -16,8 +16,6 @@
 # route and reconciles on the same host instead of treating it as a refusal.
 # JG_REMOTE_READINESS_OUT always holds the output of the last run, which carries
 # the check lines, the remaining human: gaps, and their exact operator actions.
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 # Consumed by the sourcing caller, so every assignment reads as unused here.
 # shellcheck disable=SC2034
@@ -44,3 +42,19 @@ jg_remote_readiness_ensure() { # <bin-dir> <squad-lead-id>
   [ "$rc" -eq 0 ] || return 1
   return 0
 }
+
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+_jg_d=${BASH_SOURCE[0]%/*}
+[ "$_jg_d" != "${BASH_SOURCE[0]}" ] || _jg_d=.
+if [ -r "$_jg_d/jg-compat.sh" ]; then
+  # shellcheck source=bin/jg-compat.sh
+  . "$_jg_d/jg-compat.sh"
+else
+  # A copy of this script with no compat file beside it (a test fixture) has no
+  # legacy record to read, so every legacy reader answers "nothing legacy here".
+  for _jg_f in legacy_of legacy_product record_ok label_ok marker parent_marker claims_root; do
+    eval "jg_compat_$_jg_f() { return 1; }"
+  done
+  unset _jg_f
+fi
+unset _jg_d

@@ -12,8 +12,6 @@
 # signal ever fails open: no id, no sidecar, an untrusted id, or a different
 # recorded id leaves the ancestry verdict exactly as it was.
 # This file is sourced by scripts and has no side effects on source.
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 # Cursor process identity is NOT expressible as a command-name pattern and is
 # deliberately not added to the tables below: Cursor's installed names are
@@ -387,3 +385,19 @@ jg_session_lock_inspect() {  # <state>
   # shellcheck disable=SC2034 # Output global, read by lock status and inbox ready.
   JG_LOCK_INSPECT_LIVE_HARNESS=false
 }
+
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+_jg_d=${BASH_SOURCE[0]%/*}
+[ "$_jg_d" != "${BASH_SOURCE[0]}" ] || _jg_d=.
+if [ -r "$_jg_d/jg-compat.sh" ]; then
+  # shellcheck source=bin/jg-compat.sh
+  . "$_jg_d/jg-compat.sh"
+else
+  # A copy of this script with no compat file beside it (a test fixture) has no
+  # legacy record to read, so every legacy reader answers "nothing legacy here".
+  for _jg_f in legacy_of legacy_product record_ok label_ok marker parent_marker claims_root; do
+    eval "jg_compat_$_jg_f() { return 1; }"
+  done
+  unset _jg_f
+fi
+unset _jg_d

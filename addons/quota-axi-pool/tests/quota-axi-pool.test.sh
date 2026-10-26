@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
+# Forced-limit: A=70%/B=40%; quota-axi --json Claude row matches jg-model-pool (not ambient 11%).
 # jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
 # here, so an unmigrated shell, unit, pane or record keeps this script working.
 for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
   _jg_new="JG_${_jg_old#FM_}"
-  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
-  eval "_jg_val=\${_jg_old}"
-  export "$_jg_new=$_jg_val"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
 done
-unset _jg_old _jg_new _jg_val 2>/dev/null || true
-# Forced-limit: A=70%/B=40%; quota-axi --json Claude row matches jg-model-pool (not ambient 11%).
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -u
 here=$(cd "$(dirname "$0")" && pwd) || exit 1
 addons=$(cd "$here/../.." && pwd) || exit 1

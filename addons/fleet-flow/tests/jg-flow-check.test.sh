@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
-# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
-# here, so an unmigrated shell, unit, pane or record keeps this script working.
-for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
-  _jg_new="JG_${_jg_old#FM_}"
-  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
-  eval "_jg_val=\${_jg_old}"
-  export "$_jg_new=$_jg_val"
-done
-unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Integration test for fleet-flow/bin/jg-flow-check.sh over a fixture Main home and one muxr home.
 # Stub jg-tasks-axi.sh and jg-crew-state.sh in the fixture Main's bin/ stand in for the fork.
 # Proves: parked lanes (lane-cap park resumes, unnamed park is STALLED); a 5 h external-wait lane (paused or failed) stops counting toward the cap, a 3 h one,
 # a working one, a captain-held one and a 5 h one that has resumed still count; paused lanes and long
 # blocked or failed waits are probed; --can-start frees the slot; --summary prints dry=1 and dry=0.
 # A paused lane whose crew-state run is working (its own no-mistakes run) is busy: --summary and --can-start count it.
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -euo pipefail
 export PYTHONDONTWRITEBYTECODE=1
 CHECK=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)/bin/jg-flow-check.sh

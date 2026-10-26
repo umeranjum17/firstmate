@@ -1,13 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
-# here, so an unmigrated shell, unit, pane or record keeps this script working.
-for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
-  _jg_new="JG_${_jg_old#FM_}"
-  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
-  eval "_jg_val=\${_jg_old}"
-  export "$_jg_new=$_jg_val"
-done
-unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # jg-dashboard.sh - build and serve the fleet dashboard for this home (read-only but for ticket comments).
 #
 # The dashboard is the app in bin/jg-dashboard/ (vendored Preact, htm and Inter; no network
@@ -171,6 +162,15 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # It prints `serving http://ADDR:PORT/` once listening. ADDR defaults to
 # 127.0.0.1 and PORT to 8787; port 0 picks a free port. Reading needs no authentication:
 # reach is whatever the bind address exposes; only a comment needs the owner token.
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

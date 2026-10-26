@@ -1,13 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
-# here, so an unmigrated shell, unit, pane or record keeps this script working.
-for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
-  _jg_new="JG_${_jg_old#FM_}"
-  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
-  eval "_jg_val=\${_jg_old}"
-  export "$_jg_new=$_jg_val"
-done
-unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # jg-brief-inherit-lib.sh - shared worker-instruction inheritance for briefs. Source only.
 #
 # The fork's brief seam sources this when the add-on checkout is present and calls:
@@ -17,6 +8,15 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 
 # owner-rules add-on: run its lane check when owner-rules/install.sh wrote config/owner-rules.
 # Marker without the lib is an error, so a moved add-ons clone cannot silently drop the rules.
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 jg_brief_inherit_owner_rules() {
   local lib=${BASH_SOURCE[0]%/*}/../../owner-rules/bin/jg-owner-rules-lib.sh
   [ -f "$1/owner-rules" ] || return 0

@@ -2,8 +2,6 @@
 # Shared extraction of squad_lead registry summary and scope from a charter.
 # Source only. JG_SQUAD_LEAD_CHARTER and JG_SQUAD_LEAD_SCOPE remain explicit
 # caller overrides; otherwise the named sections in the filled brief are used.
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 normalize_registry_text() {
   awk '
@@ -44,3 +42,19 @@ registry_scope_for_brief() {
     brief_section_text "$brief" "Routing scope" | normalize_registry_text
   fi
 }
+
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+_jg_d=${BASH_SOURCE[0]%/*}
+[ "$_jg_d" != "${BASH_SOURCE[0]}" ] || _jg_d=.
+if [ -r "$_jg_d/jg-compat.sh" ]; then
+  # shellcheck source=bin/jg-compat.sh
+  . "$_jg_d/jg-compat.sh"
+else
+  # A copy of this script with no compat file beside it (a test fixture) has no
+  # legacy record to read, so every legacy reader answers "nothing legacy here".
+  for _jg_f in legacy_of legacy_product record_ok label_ok marker parent_marker claims_root; do
+    eval "jg_compat_$_jg_f() { return 1; }"
+  done
+  unset _jg_f
+fi
+unset _jg_d

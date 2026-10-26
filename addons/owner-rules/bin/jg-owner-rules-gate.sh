@@ -1,13 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
-# here, so an unmigrated shell, unit, pane or record keeps this script working.
-for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
-  _jg_new="JG_${_jg_old#FM_}"
-  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
-  eval "_jg_val=\${_jg_old}"
-  export "$_jg_new=$_jg_val"
-done
-unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # jg-owner-rules-gate.sh <task-id> <worktree|-> <head|-> <pr-url|-> - the merge-gate half of owner-rules.
 # config/merge-gate runs this first, with the gate args and JG_HOME set. It refuses (exit 1, one line naming
 # the PR) a merge with no passed-proof receipt: no sealed clean done-done run at the merge head in the task's
@@ -16,6 +7,15 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # no capture is demanded of it, and it still needs that sealed receipt for the card. PR merges also require their
 # passed-proof Evidence card on the fleet board. Every refusal names the command that clears it. A no-op when
 # config/owner-rules is absent. Reuses merge-card's own checks.
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -u
 [ "$#" -eq 4 ] || { echo "usage: jg-owner-rules-gate.sh <task-id> <worktree|-> <head|-> <pr-url|->" >&2; exit 2; }
 [ -n "${JG_HOME:-}" ] && [ -e "$JG_HOME/config/owner-rules" ] || exit 0

@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
-# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
-# here, so an unmigrated shell, unit, pane or record keeps this script working.
-for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
-  _jg_new="JG_${_jg_old#FM_}"
-  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
-  eval "_jg_val=\${_jg_old}"
-  export "$_jg_new=$_jg_val"
-done
-unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Install or update fleet-stall: copy the check to
 # ${XDG_DATA_HOME:-~/.local/share}/jg-fleet-stall/fleet-stall-check, write the home's
 # state/fleet-stall.check.sh as a one-line shim that execs it (mode 700, the old
 # file kept as .bak-fleet-stall-<stamp> when it differs), and register the
 # fleet-stall check with the home's bin/jg-check-register.sh. Idempotent.
 # Usage: install.sh [--dry-run]  (JG_HOME must name the home that runs it)
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -euo pipefail
 dry=0
 [ "${1:-}" = --dry-run ] && dry=1

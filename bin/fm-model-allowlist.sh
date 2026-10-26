@@ -5,9 +5,11 @@
 # sourced it loads the renamed library, because a library reached through its
 # old path must not exec a shell.
 set -u
-_jg_alias_dir=$(dirname "${BASH_SOURCE[0]}")
+_jg_alias_dir=${BASH_SOURCE[0]%/*}
+[ "$_jg_alias_dir" != "${BASH_SOURCE[0]}" ] || _jg_alias_dir=.
 _jg_alias_new="$_jg_alias_dir/jg-model-allowlist.sh"
 if [ "${BASH_SOURCE[0]}" != "$0" ]; then
+  # shellcheck source=/dev/null
   . "$_jg_alias_new"
 else
   exec "$_jg_alias_new" "$@"

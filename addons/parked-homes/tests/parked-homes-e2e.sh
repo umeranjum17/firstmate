@@ -1,13 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
-# here, so an unmigrated shell, unit, pane or record keeps this script working.
-for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
-  _jg_new="JG_${_jg_old#FM_}"
-  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
-  eval "_jg_val=\${_jg_old}"
-  export "$_jg_new=$_jg_val"
-done
-unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # parked-homes e2e: a fixture fleet of two squad_lead homes, one parked, driven
 # through the real supervision producers. The parked home (home-b) must get no
 # message, steer, nudge, relaunch or config push, no pending-reply retry, no
@@ -24,6 +15,15 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # contract (jg-busy-event.sh). No real fleet home, credential or worktree is
 # touched. Needs bash, tmux, jq, flock on PATH.
 # shellcheck disable=SC2016 # stub bodies and child scripts keep their own expansions
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -u
 
 here=$(cd "$(dirname "$0")" && pwd) || exit 1

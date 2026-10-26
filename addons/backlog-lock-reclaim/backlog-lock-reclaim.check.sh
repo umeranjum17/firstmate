@@ -1,13 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
-# here, so an unmigrated shell, unit, pane or record keeps this script working.
-for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
-  _jg_new="JG_${_jg_old#FM_}"
-  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
-  eval "_jg_val=\${_jg_old}"
-  export "$_jg_new=$_jg_val"
-done
-unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # backlog-lock-reclaim watcher check: reclaims <jg-home>/data/backlog.md.lock when it is a 0-byte file older than
 # JG_BACKLOG_LOCK_SAFE_AGE_S seconds (default 60, above tasks-axi's 30 s stale mark) and no process has it open.
 # A tasks-axi writer that dies between creating the lock and writing its token leaves exactly that file, and tasks-axi
@@ -17,6 +8,15 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # and the table is the one signal that names the lock file itself (a process name or cwd match cannot tell which
 # backlog a tasks-axi process writes). Descriptors of other users' processes are unreadable; a tasks-axi process we
 # cannot read counts as a holder, so it is never reclaimed under.
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -u
 FMH=${1:?usage: check.sh <jg-home>}
 SAFE_AGE_S=${JG_BACKLOG_LOCK_SAFE_AGE_S:-60}

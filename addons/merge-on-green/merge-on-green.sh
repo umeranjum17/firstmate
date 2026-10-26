@@ -1,13 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
-# here, so an unmigrated shell, unit, pane or record keeps this script working.
-for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
-  _jg_new="JG_${_jg_old#FM_}"
-  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
-  eval "_jg_val=\${_jg_old}"
-  export "$_jg_new=$_jg_val"
-done
-unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # merge-on-green watcher check: merge a yolo task's PR through bin/jg-pr-merge.sh once its required
 # checks are green, so the merge wait after green (about 21 min per change) disappears.
 # Usage: merge-on-green.sh check <jg-home>
@@ -33,6 +24,15 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Nothing is printed when nothing happened.
 # Every command is bounded with timeout; a merge always finishes before the watcher's kill, a gate cut
 # by it is retried next sweep.
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -u
 [ "$#" -eq 2 ] && [ "$1" = check ] && [ -d "$2/state" ] || { echo "usage: merge-on-green.sh check <jg-home>" >&2; exit 2; }
 FMH=$(cd "$2" && pwd -P)

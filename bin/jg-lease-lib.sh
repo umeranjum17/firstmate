@@ -96,8 +96,6 @@
 # bin/jg-pr-merge.sh, bin/jg-merge-local.sh, bin/jg-spawn.sh, and
 # bin/jg-lease.sh. Callers must have $STATE resolved before calling. No side
 # effects on source. set -u / set -e safe.
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 # Distinct from usage errors (2), the gate refusal (3), and jg-send's
 # unconfirmed submit (3): recognizable as "the other supervision actor holds
@@ -343,3 +341,19 @@ jg_lease_forbid_branch() {
   echo "error: $action refused - the supervision branch never performs this action; report the outcome and leave it to main (role partition: docs/pi-supervision-branch.md)" >&2
   exit "$JG_LEASE_REFUSE_EXIT"
 }
+
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+_jg_d=${BASH_SOURCE[0]%/*}
+[ "$_jg_d" != "${BASH_SOURCE[0]}" ] || _jg_d=.
+if [ -r "$_jg_d/jg-compat.sh" ]; then
+  # shellcheck source=bin/jg-compat.sh
+  . "$_jg_d/jg-compat.sh"
+else
+  # A copy of this script with no compat file beside it (a test fixture) has no
+  # legacy record to read, so every legacy reader answers "nothing legacy here".
+  for _jg_f in legacy_of legacy_product record_ok label_ok marker parent_marker claims_root; do
+    eval "jg_compat_$_jg_f() { return 1; }"
+  done
+  unset _jg_f
+fi
+unset _jg_d

@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
-# here, so an unmigrated shell, unit, pane or record keeps this script working.
-for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
-  _jg_new="JG_${_jg_old#FM_}"
-  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
-  eval "_jg_val=\${_jg_old}"
-  export "$_jg_new=$_jg_val"
-done
-unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Memory gate for heavy jobs: no heat caps, but guard memory.
 # Usage: jg-mem-gate.sh <command...>  - waits until the machine has room, then runs the command.
 # Room = MemAvailable >= JG_MEM_MIN_GB (default 12) and memory pressure some avg10 < 40.
 # ponytail: one global threshold, per-job sizes if jobs vary a lot.
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 min=${JG_MEM_MIN_GB:-12}
 proc=${JG_MEM_GATE_PROC:-/proc}  # tests point this at fixture meminfo and pressure files
 # Emulator cap: an emulator job also waits while JG_EMU_MAX (default 2) emulators already run on this host.

@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
+# E2E: the 1,000-line gate measures a PR past gh's 100-file view cap and its 300-file diff cap.
+# gh pr view still lists only 100 files and gh pr diff still refuses >300 files here; the gate must read
+# every pull-files page and learn the diff from the compare API, never from a refusal (no network).
 # jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
 # here, so an unmigrated shell, unit, pane or record keeps this script working.
 for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
   _jg_new="JG_${_jg_old#FM_}"
-  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
-  eval "_jg_val=\${_jg_old}"
-  export "$_jg_new=$_jg_val"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
 done
-unset _jg_old _jg_new _jg_val 2>/dev/null || true
-# E2E: the 1,000-line gate measures a PR past gh's 100-file view cap and its 300-file diff cap.
-# gh pr view still lists only 100 files and gh pr diff still refuses >300 files here; the gate must read
-# every pull-files page and learn the diff from the compare API, never from a refusal (no network).
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)
 LINT=$ROOT/merge-on-green/jg-checks-lint.sh

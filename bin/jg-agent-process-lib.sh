@@ -12,8 +12,6 @@
 # docs/tmux-backend.md "Agent liveness probe" owns the empirical basis for the
 # names below, and tests/jg-tmux-agent-liveness.test.sh plus
 # tests/jg-harness-liveness-drift-live-e2e.test.sh keep them honest.
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 _JG_AGENT_PROCESS_LIB_DIR=${BASH_SOURCE[0]%/*}
 [ "$_JG_AGENT_PROCESS_LIB_DIR" != "${BASH_SOURCE[0]}" ] || _JG_AGENT_PROCESS_LIB_DIR=.
@@ -116,3 +114,19 @@ jg_agent_process_classify() {  # <name> <argv0> <args> [pid] -> agent|shell|othe
     printf 'other'
   fi
 }
+
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+_jg_d=${BASH_SOURCE[0]%/*}
+[ "$_jg_d" != "${BASH_SOURCE[0]}" ] || _jg_d=.
+if [ -r "$_jg_d/jg-compat.sh" ]; then
+  # shellcheck source=bin/jg-compat.sh
+  . "$_jg_d/jg-compat.sh"
+else
+  # A copy of this script with no compat file beside it (a test fixture) has no
+  # legacy record to read, so every legacy reader answers "nothing legacy here".
+  for _jg_f in legacy_of legacy_product record_ok label_ok marker parent_marker claims_root; do
+    eval "jg_compat_$_jg_f() { return 1; }"
+  done
+  unset _jg_f
+fi
+unset _jg_d

@@ -96,8 +96,6 @@
 # it to stop itself once its root is pruned, and
 # bin/jg-remote-job-reap-orphans.sh uses it to reap workers that were already
 # orphaned that way.
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 JG_REMOTE_JOB_LABEL=dev.juggernaut.remote-job
 JG_REMOTE_JOB_MAX_BYTES=${JG_REMOTE_JOB_MAX_BYTES:-1048576}
@@ -1476,3 +1474,19 @@ jg_remote_job_ensure_worker() { # <remote-root> <account-home>
   JG_REMOTE_JOB_ERROR="remote job worker did not report ready after startup"
   return 1
 }
+
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+_jg_d=${BASH_SOURCE[0]%/*}
+[ "$_jg_d" != "${BASH_SOURCE[0]}" ] || _jg_d=.
+if [ -r "$_jg_d/jg-compat.sh" ]; then
+  # shellcheck source=bin/jg-compat.sh
+  . "$_jg_d/jg-compat.sh"
+else
+  # A copy of this script with no compat file beside it (a test fixture) has no
+  # legacy record to read, so every legacy reader answers "nothing legacy here".
+  for _jg_f in legacy_of legacy_product record_ok label_ok marker parent_marker claims_root; do
+    eval "jg_compat_$_jg_f() { return 1; }"
+  done
+  unset _jg_f
+fi
+unset _jg_d

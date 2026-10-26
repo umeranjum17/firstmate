@@ -1,13 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
-# here, so an unmigrated shell, unit, pane or record keeps this script working.
-for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
-  _jg_new="JG_${_jg_old#FM_}"
-  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
-  eval "_jg_val=\${_jg_old}"
-  export "$_jg_new=$_jg_val"
-done
-unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # switch.sh - move the no-mistakes pipeline agent, and therefore every pipeline
 # step including review, to one accepted agent and one model.
 #
@@ -30,6 +21,15 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # The no-mistakes daemon re-reads its config per run, so no daemon restart is
 # needed for this edit. No config value is ever printed; only key names and the
 # route are. Folder paths and unset names only; never credentials or login files.
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -u
 
 die() { echo "switch.sh: $*" >&2; exit 1; }

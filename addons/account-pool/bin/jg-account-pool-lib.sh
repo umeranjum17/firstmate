@@ -1,13 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
-# here, so an unmigrated shell, unit, pane or record keeps this script working.
-for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
-  _jg_new="JG_${_jg_old#FM_}"
-  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
-  eval "_jg_val=\${_jg_old}"
-  export "$_jg_new=$_jg_val"
-done
-unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # jg-account-pool-lib.sh - account-pool add-on: config/account-pool parsing, the
 # `byokit-accounts pick` call, the launch prefix its answer applies, the relaunch --account gate,
 # and jg_account_hook, the one entry point bin/jg-spawn.sh and bin/jg-control.sh call. Sourced
@@ -15,6 +6,15 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # A pick answers with folder paths only, so no secret reaches a launch line, record or log.
 
 # shellcheck source=/dev/null
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 type jg_run_timed >/dev/null 2>&1 || . "${SCRIPT_DIR:?sourced from a bin/ script}/jg-timeout-lib.sh"
 
 JG_ACCOUNT_POOL_PICK_SECONDS=${JG_ACCOUNT_POOL_PICK_SECONDS:-120}

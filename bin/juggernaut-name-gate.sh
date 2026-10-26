@@ -35,7 +35,20 @@
 # This gate's own path and its allow file are allow-listed because they define
 # the strings they search for; they are the two files that must keep them.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
+_jg_d=${BASH_SOURCE[0]%/*}
+[ "$_jg_d" != "${BASH_SOURCE[0]}" ] || _jg_d=.
+if [ -r "$_jg_d/jg-compat.sh" ]; then
+  # shellcheck source=bin/jg-compat.sh
+  . "$_jg_d/jg-compat.sh"
+else
+  # A copy of this script with no compat file beside it (a test fixture) has no
+  # legacy record to read, so every legacy reader answers "nothing legacy here".
+  for _jg_f in legacy_of legacy_product record_ok label_ok marker parent_marker claims_root; do
+    eval "jg_compat_$_jg_f() { return 1; }"
+  done
+  unset _jg_f
+fi
+unset _jg_d
 set -eu
 
 BASE_PATTERN='first[ -]?mate|second ?mate|crewmate|fm[-_]'
@@ -65,7 +78,7 @@ report() {
   [ -d "$root/.git" ] || [ -f "$root/.git" ] || die "$root is not a git checkout"
   cd "$root" || die "cannot enter $root"
 
-  local allow_files exempt tracked stale_file stale
+  local allow_files exempt tracked stale
   gate_work=$(mktemp -d) || die "cannot create a temporary directory"
   # shellcheck disable=SC2064 # the path is already resolved and must not change
   trap "rm -rf -- '$gate_work'" EXIT

@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
+# Source before a tool that can spawn Claude. Cache only folder paths and variable
+# names, never credentials. A configured pool failure never uses the default login.
+# JG_POOL_REQUIRE_FRESH=1 refuses cached picks for callers requiring current capacity.
 # jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
 # here, so an unmigrated shell, unit, pane or record keeps this script working.
 for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
   _jg_new="JG_${_jg_old#FM_}"
-  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
-  eval "_jg_val=\${_jg_old}"
-  export "$_jg_new=$_jg_val"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
 done
-unset _jg_old _jg_new _jg_val 2>/dev/null || true
-# Source before a tool that can spawn Claude. Cache only folder paths and variable
-# names, never credentials. A configured pool failure never uses the default login.
-# JG_POOL_REQUIRE_FRESH=1 refuses cached picks for callers requiring current capacity.
+unset _jg_old _jg_new 2>/dev/null || true
+
 jg_pool_claude_env() {
   local home=${JG_HOME:?set JG_HOME} command=byokit-accounts state='' line out='' reason='' cache folder var age
   local -a shed=()

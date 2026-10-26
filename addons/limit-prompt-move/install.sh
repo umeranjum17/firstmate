@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
-# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
-# here, so an unmigrated shell, unit, pane or record keeps this script working.
-for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
-  _jg_new="JG_${_jg_old#FM_}"
-  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
-  eval "_jg_val=\${_jg_old}"
-  export "$_jg_new=$_jg_val"
-done
-unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Install or update the limit-prompt-move check for this user and point a juggernaut home's
 # state/limit-prompt-move.check.sh at it through an exec shim (a replaced check is backed up), then register it.
 # --all reaches every active home from <jg-home>: the home itself and each local squad_lead home its
 # data/squad_leads.md lists, minus the ones its config/parked-homes parks; a remote home is skipped and named.
 # --list prints the homes it would reach, one "<name><TAB><dir>" line each, and writes nothing. Idempotent.
 # Usage: install.sh [--all] [--list] <jg-home>
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -euo pipefail
 ALL=0 LIST=0
 while [ "$#" -gt 1 ]; do

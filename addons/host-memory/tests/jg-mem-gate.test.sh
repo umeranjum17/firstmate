@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
-# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
-# here, so an unmigrated shell, unit, pane or record keeps this script working.
-for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
-  _jg_new="JG_${_jg_old#FM_}"
-  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
-  eval "_jg_val=\${_jg_old}"
-  export "$_jg_new=$_jg_val"
-done
-unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Integration check for bin/jg-mem-gate.sh, run with stub commands, fixture memory files and private lock dirs.
 # Usage: jg-mem-gate.test.sh [gate-script]   exit 0 = PASS. Never starts a real emulator or Gradle build.
 # 1. (lock-deadlock regression) an emulator job that waits for an emulator slot must not hold the host
 #    lock while it sleeps, so a Gradle job with room gets through.
 # 2. (wrapper-resolution regression: more emulators than the cap) a job behind known wrappers (flock, timeout,
 #    nice, ionice, env, bash/sh -c) is still held at the emulator or Gradle cap, and starts when there is a slot.
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 G=${1:-$(dirname "$(readlink -f "$0")")/../bin/jg-mem-gate.sh}
 REAL_RUNTIME_DIR=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT

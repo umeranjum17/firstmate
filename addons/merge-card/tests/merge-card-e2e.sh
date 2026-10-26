@@ -1,13 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
-# here, so an unmigrated shell, unit, pane or record keeps this script working.
-for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
-  _jg_new="JG_${_jg_old#FM_}"
-  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
-  eval "_jg_val=\${_jg_old}"
-  export "$_jg_new=$_jg_val"
-done
-unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # merge-card e2e: the real script, a stub done-done placed earlier on PATH, and a
 # task folder holding a retained PNG and a Checks block that names it bare, as
 # PR 24's did. Like the real one, the stub resolves each evidence name against
@@ -24,6 +15,15 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # verdict, the invocation the stub saw, and whether the card's media resolves are
 # asserted in each mode. Needs bash, jq, base64, cmp and sort -V on PATH; nothing
 # is posted anywhere and no real tool outside this directory is touched.
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -u
 
 here=$(cd "$(dirname "$0")" && pwd) || exit 1

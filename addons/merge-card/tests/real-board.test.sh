@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
-# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
-# here, so an unmigrated shell, unit, pane or record keeps this script working.
-for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
-  _jg_new="JG_${_jg_old#FM_}"
-  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
-  eval "_jg_val=\${_jg_old}"
-  export "$_jg_new=$_jg_val"
-done
-unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # merge-card against the real sign-off-axi on a seeded temp board: a PR's card at one head, then a
 # re-post at a new head. The old card must be archived (dismissed, kept) and exactly one card live,
 # and another filer's cards for the PR are archived too (one-card-per-pr keeps the newest valid proof).
 # The screen-free path needs no done-done, only a sealed run record; gh is a stub. Skips (exit 0)
 # when sign-off-axi is not on PATH. Never touches a real board: SIGN_OFF_HOME is a temp folder.
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -u
 here=$(cd "$(dirname "$0")" && pwd) || exit 1
 command -v sign-off-axi >/dev/null || { echo "skip - sign-off-axi is not on PATH"; exit 0; }

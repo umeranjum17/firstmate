@@ -1,13 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
-# here, so an unmigrated shell, unit, pane or record keeps this script working.
-for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
-  _jg_new="JG_${_jg_old#FM_}"
-  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
-  eval "_jg_val=\${_jg_old}"
-  export "$_jg_new=$_jg_val"
-done
-unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # tests/jg-sentinel-restart-resume.test.sh - real-Herdr journey for the restart
 # resume in bin/jg-sentinel.sh reconcile, token-free.
 #
@@ -21,6 +12,15 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # second restart must not nudge again while the lane's state is unchanged.
 # Every Herdr call goes through bin/jg-herdr-lab.sh; the default session is
 # never touched. Set JG_SENTINEL_RESUME_EVIDENCE=<dir> to keep the outputs.
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -u
 
 # The Juggernaut checkout named by JG_UPSTREAM_ROOT supplies tests/lib.sh (fail, pass, ROOT) and the

@@ -15,8 +15,6 @@
 # non-zero (NOT stale): fail safe, never remove a lock that cannot be proven dead.
 # Diagnostics print to stderr prefixed by ${JG_LOCK_LOG_PREFIX:-jg-lock} so each
 # caller's output stays recognizable.
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-[ ! -r "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh" ] || . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 jg_lock_log() {
   echo "${JG_LOCK_LOG_PREFIX:-jg-lock}: $*" >&2
@@ -120,3 +118,19 @@ jg_lock_is_provably_stale() {
   fi
   [ "$age" -ge "$min_age" ]
 }
+
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+_jg_d=${BASH_SOURCE[0]%/*}
+[ "$_jg_d" != "${BASH_SOURCE[0]}" ] || _jg_d=.
+if [ -r "$_jg_d/jg-compat.sh" ]; then
+  # shellcheck source=bin/jg-compat.sh
+  . "$_jg_d/jg-compat.sh"
+else
+  # A copy of this script with no compat file beside it (a test fixture) has no
+  # legacy record to read, so every legacy reader answers "nothing legacy here".
+  for _jg_f in legacy_of legacy_product record_ok label_ok marker parent_marker claims_root; do
+    eval "jg_compat_$_jg_f() { return 1; }"
+  done
+  unset _jg_f
+fi
+unset _jg_d

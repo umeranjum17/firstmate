@@ -1,13 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
-# here, so an unmigrated shell, unit, pane or record keeps this script working.
-for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
-  _jg_new="JG_${_jg_old#FM_}"
-  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
-  eval "_jg_val=\${_jg_old}"
-  export "$_jg_new=$_jg_val"
-done
-unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # The sign-off adapter, driven through the process-event runner in a throwaway
 # HOME with the process-event claim root redirected. Section A uses a stub
 # sign-off-axi and a stub keyed-answer intake: a transient intake failure is
@@ -20,6 +11,15 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # its captured result is handled (Main or the lead picked up the note), never
 # before; NOT_FOUND counts as done and a sign-off-axi without the feedback
 # command skips with one log line.
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -u
 
 # The Juggernaut checkout owns tests/lib.sh; JG_CODE_ROOT names that checkout.

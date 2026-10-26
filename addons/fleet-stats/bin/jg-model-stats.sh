@@ -1,13 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
-# here, so an unmigrated shell, unit, pane or record keeps this script working.
-for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
-  _jg_new="JG_${_jg_old#FM_}"
-  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
-  eval "_jg_val=\${_jg_old}"
-  export "$_jg_new=$_jg_val"
-done
-unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # jg-model-stats.sh - per-model fleet statistics for the dashboard's Models view.
 # Usage: JG_HOME=<home> jg-model-stats.sh --json [--now <unix-seconds>]
 #
@@ -31,6 +22,15 @@ unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # finished ship tasks with a recorded terminal outcome; a sampled lane with no
 # merged PR is reported in unknown_outcome and left out of the denominator so a
 # sampled row never fabricates a verdict.
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -eu
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 exec python3 - "$SCRIPT_DIR" "${JG_HOME:-$SCRIPT_DIR/..}" "$@" <<'PY'

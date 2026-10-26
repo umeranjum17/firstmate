@@ -25,12 +25,11 @@
 # The old prefix still wins only where the new name is unset, so a migrated
 # home that exports JG_* is never overridden by a stale FM_* in the environment.
 jg_compat_env_aliases() {
-  local old new value
+  local old new
   for old in $(compgen -v FM_ 2>/dev/null || true); do
     new="JG_${old#FM_}"
-    eval "[ -n \"\${$new+set}\" ]" && continue
-    eval "value=\${$old}"
-    export "$new=$value"
+    declare -p "$new" >/dev/null 2>&1 && continue
+    export "$new=${!old}"
   done
   return 0
 }
@@ -146,7 +145,7 @@ jg_compat_claims_root() {  # <new-root>
 # ${JG_ADDONS_DIR:-<home>/projects/juggernaut-addons} default resolves to the
 # directory that exists, without touching each of the 23 call sites.
 if [ -z "${JG_ADDONS_DIR-}" ]; then
-  _jg_addons_root=${JG_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd)}
+  _jg_addons_root=${JG_HOME:-$(cd "${BASH_SOURCE[0]%/*}/.." 2>/dev/null && pwd)}
   if [ -n "${_jg_addons_root-}" ] && [ -d "$_jg_addons_root/projects/firstmate-addons" ] \
     && [ ! -d "$_jg_addons_root/projects/juggernaut-addons" ]; then
     JG_ADDONS_DIR="$_jg_addons_root/projects/firstmate-addons"

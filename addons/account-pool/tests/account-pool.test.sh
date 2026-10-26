@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
-# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
-# here, so an unmigrated shell, unit, pane or record keeps this script working.
-for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
-  _jg_new="JG_${_jg_old#FM_}"
-  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
-  eval "_jg_val=\${_jg_old}"
-  export "$_jg_new=$_jg_val"
-done
-unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # account-pool: drive the jg-spawn and jg-control hook lines (the exact form a Kun jg-spawn.sh and
 # jg-control.sh carry) against a stub byokit-accounts and a throwaway config. Add-on present = the
 # pool pick lands in the launch line and record, and relaunch --account rests and moves; add-on
 # absent = every hook line is a silent no-op (Kun behavior). These are the pool cases that lived in
 # the fork's tests/jg-worker-account.test.sh and tests/jg-control-relaunch.test.sh.
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -u
 here=$(cd "$(dirname "$0")" && pwd) || exit 1
 addons=$(cd "$here/../.." && pwd) || exit 1

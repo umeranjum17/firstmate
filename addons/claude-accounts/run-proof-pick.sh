@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
-# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
-# here, so an unmigrated shell, unit, pane or record keeps this script working.
-for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
-  _jg_new="JG_${_jg_old#FM_}"
-  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
-  eval "_jg_val=\${_jg_old}"
-  export "$_jg_new=$_jg_val"
-done
-unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # run-proof-pick.sh: the chooser proof for done-done. Uses the real pool pick jg-spawn calls
 # (jg_account_pool_select from this repo's account-pool add-on; JG_BIN names a Juggernaut checkout's bin/
 # for jg-timeout-lib.sh) with a throwaway
 # config/account-pool pointing at the chooser and the real accounts, then starts one tiny throwaway
 # Haiku task on the picked profile folder with the launch prefix the pool builds, and reads quota again.
 # Captures keep ids, names and percentages only: no folder path, no credential value.
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -euo pipefail
 repo=$(cd "$(dirname "$0")/.." && pwd)
 evidence=${DONE_DONE_EVIDENCE_ROOT:?}

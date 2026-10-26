@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
-# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
-# here, so an unmigrated shell, unit, pane or record keeps this script working.
-for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
-  _jg_new="JG_${_jg_old#FM_}"
-  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
-  eval "_jg_val=\${_jg_old}"
-  export "$_jg_new=$_jg_val"
-done
-unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Live proof on the real product: for every Claude account in the pool registry plus the ambient ~/.claude, a fresh
 # Haiku worker on that account must load the guard hooks and be refused a read of a planted fake login file.
 # This checkout's delete, kill and read guards are installed into a temporary data folder; their hooks go into each pool
 # account folder's settings.json for the probe only, and this checkout's uninstallers take them out again (backups kept).
 # The ambient ~/.claude keeps the guards already installed there. One short Haiku turn per account; no login is read.
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 OUT=${DONE_DONE_EVIDENCE_ROOT:?run through done-done}/guards-pool-accounts; T=$(mktemp -d)
