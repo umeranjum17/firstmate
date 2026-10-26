@@ -111,19 +111,20 @@ for width in 390 1280; do
     [ "$7" = 1 ] || fail "the @$OWN_HANDLE link is not in the ${width}w $theme viewport"
     shot=$WORK/$SLUG.$width-$theme.full.png
     chrome-devtools-axi screenshot "$shot" >/dev/null
-    # Crop the badge row the badge sits in, with nothing cut: the row's own line box across its
-    # paragraph, plus the title line above it when the README carries the link as plain text.
-    cx=$(( rx - 12 )); [ "$cx" -lt 0 ] && cx=0
-    cw=$(( rx + rw + 12 - cx )); [ $(( cx + cw )) -gt "$vw" ] && cw=$(( vw - cx ))
-    # A heading right above the row comes along, so a plain text link shows which README it sits in;
-    # otherwise the band is the badge row itself, with nothing cut out of the page around it.
-    cy=$(( ry - 10 ))
-    if [ "$head_top" -ge 0 ] && [ $(( ry + rh + 10 - (head_top - 4) )) -le 200 ]; then
-      cy=$(( head_top - 4 ))
+    # Crop a real screen around the badge row, never a thin strip: the row across its whole width plus
+    # the header above it, at least 160 px tall, and more when a heading right above the row says which
+    # README this is. A capture shorter than that is not a screen a reviewer can judge.
+    cx=0
+    cw=$vw
+    cy=$(( ry - 60 ))
+    if [ "$head_top" -ge 0 ] && [ "$head_top" -lt "$cy" ] && [ $(( ry + rh + 20 - (head_top - 8) )) -le 400 ]; then
+      cy=$(( head_top - 8 ))
     fi
     [ "$cy" -lt 0 ] && cy=0
-    ch=$(( ry + rh + 10 - cy ))
+    ch=$(( ry + rh + 20 - cy ))
+    [ "$ch" -lt 160 ] && ch=160
     [ $(( cy + ch )) -gt "$vh" ] && ch=$(( vh - cy ))
+    [ "$ch" -ge 120 ] || fail "the ${width}w $theme capture would be ${ch}px tall, below the 120px floor a judgeable screen needs"
     out=$OUT/badge-row.$width-$theme.png
     magick "$shot" -crop "${cw}x${ch}+${cx}+${cy}" +repage "$out"
     bytes=$(wc -c < "$out")
@@ -138,7 +139,7 @@ for width in 390 1280; do
     if [ "$theme" = light ] && [ -z "$light_shot" ]; then light_shot=$out; fi
     if [ "$theme" = dark ] && [ -z "$dark_shot" ]; then dark_shot=$out; fi
     log "capture $out: $bytes bytes, ${cw}x${ch} crop, page background ${c_bg}% luminance, sha256 $(sha256sum "$out" | cut -d' ' -f1)"
-    log "PASS: the page rendered at ${width}w $theme: the README of $REPO at $SHA shows the @$OWN_HANDLE badge, the README body is present, and the page is not an error page (page title names $REPO, body drawn $theme, badge at ${ax},${ay} ${aw}x${ah})."
+    log "PASS: the page rendered at ${width}w $theme: the README of $REPO at $SHA shows the @$OWN_HANDLE badge, the README body is present, and the page is not an error page (page title names $REPO, body drawn $theme, badge at ${ax},${ay} ${aw}x${ah} inside the row at ${rx},${ry} ${rw}x${rh})."
   done
 done
 
@@ -146,6 +147,21 @@ done
 if cmp -s "$light_shot" "$dark_shot"; then fail "the light and dark captures are the same image"; fi
 for f in $captures; do [ -s "$f" ] || fail "capture $f is empty"; done
 log "PASS: four captures, 390 and 1280 wide in light and dark, each under 65536 bytes, and the light and dark pages are demonstrably different pictures."
+# 4. The run's step record, beside the captures, so a claim citing them can be tied to this run.
+cat > "$OUT/steps.json" <<JSON
+{
+  "target": { "version": "0.6.17" },
+  "start": "GitHub's own rendered README of $REPO pull request #$PULL at $SHA, opened in a fresh headless Chrome",
+  "steps": [
+    "fetch README.md at $SHA from the forge and assert the x.com/$OWN_HANDLE link, no other X/Twitter account, no other X badge handle and no Discord invite",
+    "open https://github.com/$REPO/blob/$SHA/README.md in chrome-devtools-axi",
+    "for 390x900 and 1280x900, in light and dark: emulate the viewport and colour scheme, wait for the README body and the badge to render, scroll the badge into view, capture the badge row and the header around it",
+    "crop each capture from the page screenshot, refuse one that is under 120px tall or at the 65536-byte citation cap, and read the page background to prove the theme"
+  ],
+  "result": "the rendered README shows the @$OWN_HANDLE badge linking to $OWN_LINK, with no other person's handle and no Discord invite, in four captures"
+}
+JSON
+log "step record: $OUT/steps.json"
 log "PROVEN: GitHub's rendered README of $REPO pull request #$PULL at $SHA ($URL) shows the @$OWN_HANDLE badge linking to $OWN_LINK, with no other person's handle and no Discord invite."
 
 rm -f -- "$WORK/$SLUG."*.full.png
