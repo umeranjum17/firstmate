@@ -83,20 +83,29 @@ for width in 390 1280; do
     # One digit per condition: anchor, README body, badge image loaded, not an error page, the page
     # title names this repository, and the body really is in the theme asked for.
     ok=no
+    attempt=0
+    while [ "$attempt" -lt 2 ]; do
+    attempt=$(( attempt + 1 ))
     for _ in $(seq 1 20); do
-      raw=$(chrome-devtools-axi eval "() => { const a = document.querySelector('a[href=\"$OWN_LINK\"]'); const body = document.querySelector('.markdown-body'); const img = a && a.querySelector('img'); const rgb = (getComputedStyle(document.body).backgroundColor.match(/([0-9]+)/g) || ['255', '255', '255']).map(Number); const lum = (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255; const theme_ok = '$theme' === 'dark' ? (lum < 0.4 ? 1 : 0) : (lum > 0.8 ? 1 : 0); return [a ? 1 : 0, body ? 1 : 0, !img || img.naturalWidth > 0 ? 1 : 0, /could not be found|404 Not Found/.test(document.body.innerText) ? 0 : 1, document.title.includes('$REPO') ? 1 : 0, theme_ok, body ? body.innerText.trim().length : 0, Math.round(lum * 100)].join(','); }" 2>/dev/null || true)
+      raw=$(chrome-devtools-axi eval "() => { const a = document.querySelector('a[href=\"$OWN_LINK\"]'); const body = document.querySelector('.markdown-body'); const img = a && a.querySelector('img'); const rgb = (getComputedStyle(document.body).backgroundColor.match(/([0-9]+)/g) || ['255', '255', '255']).map(Number); const lum = (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255; const theme_ok = '$theme' === 'dark' ? (lum < 0.4 ? 1 : 0) : (lum > 0.8 ? 1 : 0); return [a ? 1 : 0, body ? 1 : 0, !img || img.naturalWidth > 0 ? 1 : 0, /could not be found|404 Not Found/.test(document.body.innerText) ? 0 : 1, document.title.includes('$REPO') ? 1 : 0, theme_ok, body ? body.innerText.trim().length : 0, Math.round(lum * 100), body ? [...body.querySelectorAll('img')].filter((i) => { const q = i.getBoundingClientRect(); return q.bottom > 0 && q.top < window.innerHeight && (!i.complete || i.naturalWidth === 0); }).length : 0].join(','); }" 2>/dev/null || true)
       # Conditions in order: the badge anchor, the README body, the badge image, no error page, the
       # page title naming this repository, the body drawn in the theme asked for, the body's length,
-      # and the page background's luminance in percent.
+      # the page background's luminance in percent, and no image on screen left unloaded.
       flags=$(printf '%s\n' "$raw" | sed -n 's/^result: //p' | tr -cd '0-9,')
-      IFS=, read -r c_anchor c_body c_img c_noerror c_title c_theme c_text c_bg <<<"$flags"
+      IFS=, read -r c_anchor c_body c_img c_noerror c_title c_theme c_text c_bg c_broken <<<"$flags"
       if [ "${c_anchor:-0}" = 1 ] && [ "${c_body:-0}" = 1 ] && [ "${c_img:-0}" = 1 ] &&
          [ "${c_noerror:-0}" = 1 ] && [ "${c_title:-0}" = 1 ] && [ "${c_theme:-0}" = 1 ] &&
-         [ "${c_text:-0}" -gt 0 ]; then
+         [ "${c_text:-0}" -gt 0 ] && [ "${c_broken:-9}" = 0 ]; then
         ok=yes
         break
       fi
       sleep 1
+    done
+    [ "$ok" = yes ] && break
+    # A neighbour badge that GitHub's image proxy served late leaves a broken icon in the shot; one
+    # reload is cheap and keeps the evidence a clean screen.
+    chrome-devtools-axi eval "() => { location.reload(); return 1; }" >/dev/null
+    sleep 3
     done
     [ "$ok" = yes ] || fail "$REPO at $SHA did not render the README with the @$OWN_HANDLE badge at ${width}w $theme (anchor/body/image/no-error/title/theme: ${flags:-no answer from the page})"
 
