@@ -7,7 +7,7 @@
 #
 # --dry-run   print the changes and write nothing.
 # --restore   remove agent_path_override.pi and the installed copy.
-# --home      alternate install dir (default ~/.local/share/fm-pipeline-quota-failover)
+# --home      alternate install dir (default ~/.local/share/jg-pipeline-quota-failover)
 #
 # The edit never prints the config or any value in it; it reports only the
 # key name and the wrapper path it wrote. A timestamped backup of the config
@@ -18,7 +18,7 @@ set -u
 die() { echo "install.sh: $*" >&2; exit 1; }
 
 dry=0 restore=0
-install_root=${HOME:?}/.local/share/fm-pipeline-quota-failover
+install_root=${HOME:?}/.local/share/jg-pipeline-quota-failover
 config=${NM_CONFIG:-${HOME:?}/.no-mistakes/config.yaml}
 while [ $# -gt 0 ]; do
   case $1 in

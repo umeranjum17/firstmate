@@ -39,7 +39,7 @@ export const hname = (d, id) => d.homes.find(h => h.id === id)?.name || id
 
 // Stuck first, then waiting, then by time in stage; on hold last; landed newest first.
 const rank = c => stuck(c) ? 0 : c.wait === 'waiting' ? 1 : c.wait === 'parked' ? 3 : 2
-// An ask's type, the same rule as fm-dashboard.sh: an explicit type field wins; else pick on a pick/choose/which verb, the word options, two option markers ("1)" or "A Foo, C Bar"), or three or more choices ending "or ...?"; approval on approv*/merg*; else yes/no.
+// An ask's type, the same rule as jg-dashboard.sh: an explicit type field wins; else pick on a pick/choose/which verb, the word options, two option markers ("1)" or "A Foo, C Bar"), or three or more choices ending "or ...?"; approval on approv*/merg*; else yes/no.
 export const ASK_TAG = { yn: 'yes/no', pick: 'pick', approval: 'approval' }
 export const askType = (text, explicit) => Object.hasOwn(ASK_TAG, explicit) ? explicit
   : /\b(?:pick|choose|which)\b|\boptions?\b/i.test(text) || (text.match(/(?:^|\s)\(?[1-9a-h]\)/gi) || []).length >= 2

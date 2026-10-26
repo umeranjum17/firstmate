@@ -15,16 +15,16 @@ trap cleanup EXIT
 export HOME=$d/user TMPDIR=$d/tmp
 mkdir -p "$HOME" "$TMPDIR" "$d/fork"
 cp -a "$FM_TEST_FORK/bin" "$d/fork/bin"
-rm -f "$d/fork/bin/fm-model-outage-lib.sh"   # step B deletes the fork-only copy
+rm -f "$d/fork/bin/jg-model-outage-lib.sh"   # step B deletes the fork-only copy
 # The observer reads the backend and busy verdict through sibling libraries run
 # in a bounded subshell; fake only those two, as the fork's own fixtures do.
-cat > "$d/fork/bin/fm-backend.sh" <<'FAKE'
-fm_backend_agent_state() { printf alive; }
-fm_backend_visible_capture_supported() { return 0; }
-fm_backend_visible_capture() { printf 'Upstream request failed: region denied\n'; }
+cat > "$d/fork/bin/jg-backend.sh" <<'FAKE'
+jg_backend_agent_state() { printf alive; }
+jg_backend_visible_capture_supported() { return 0; }
+jg_backend_visible_capture() { printf 'Upstream request failed: region denied\n'; }
 FAKE
-cat > "$d/fork/bin/fm-busy-lib.sh" <<'FAKE'
-fm_busy_classify_semantic() { printf 'idle opencode-plugin\n'; }
+cat > "$d/fork/bin/jg-busy-lib.sh" <<'FAKE'
+jg_busy_classify_semantic() { printf 'idle opencode-plugin\n'; }
 FAKE
 
 # shellcheck disable=SC2317,SC2329,SC2030 # the watcher helpers are called by the sourced library
@@ -38,19 +38,19 @@ run() {
     set -e
     export FM_HOME=$d/fork SCRIPT_DIR=$d/fork/bin STATE=$state FM_ADDONS_DIR=$ad
     # shellcheck source=/dev/null
-    [ ! -r "${FM_ADDONS_DIR:-$FM_HOME/projects/firstmate-addons}/alerts/bin/fm-model-outage-lib.sh" ] || . "${FM_ADDONS_DIR:-$FM_HOME/projects/firstmate-addons}/alerts/bin/fm-model-outage-lib.sh"
-    fm_busy_token_valid() { return 0; }
-    fm_backend_visible_capture_supported() { return 0; }
-    fm_busy_current_gen() { cat "$1/$2.busy-gen"; }
-    fm_meta_get() { printf opencode; }
-    fm_backend_target_of_meta() { printf 'fake:%s' "${1##*/}"; }
-    fm_backend_of_meta() { printf fake; }
+    [ ! -r "${FM_ADDONS_DIR:-$FM_HOME/projects/firstmate-addons}/alerts/bin/jg-model-outage-lib.sh" ] || . "${FM_ADDONS_DIR:-$FM_HOME/projects/firstmate-addons}/alerts/bin/jg-model-outage-lib.sh"
+    jg_busy_token_valid() { return 0; }
+    jg_backend_visible_capture_supported() { return 0; }
+    jg_busy_current_gen() { cat "$1/$2.busy-gen"; }
+    jg_meta_get() { printf opencode; }
+    jg_backend_target_of_meta() { printf 'fake:%s' "${1##*/}"; }
+    jg_backend_of_meta() { printf fake; }
     hash_pane() { md5sum | cut -c1-12; }
-    fm_wake_append() { printf '%s\n' "$3" >> "$wakes"; }
+    jg_wake_append() { printf '%s\n' "$3" >> "$wakes"; }
     wake() { :; }
     triage_log() { printf '%s\n' "$*" >> "$d/triage.log"; }
     for id in alpha bravo; do : > "$state/$id.meta"; printf 'g1\n' > "$state/$id.busy-gen"; done
-    if declare -F fm_model_outage_tick >/dev/null; then fm_model_outage_tick || triage_log "model-error observation failed"; fi
+    if declare -F jg_model_outage_tick >/dev/null; then jg_model_outage_tick || triage_log "model-error observation failed"; fi
   )
 }
 
@@ -68,12 +68,12 @@ run "$d/no-addons" "$d/absent.wakes"
   export FM_HOME=$d/fork SCRIPT_DIR=$d/fork/bin STATE=$d/state-push
   mkdir -p "$STATE"
   # shellcheck source=/dev/null
-  . "$addons/alerts/bin/fm-model-outage-lib.sh"
-  ! fm_alerts_push_suppress cursor-task || { echo "FAIL: hook suppressed without watcher helpers" >&2; exit 1; }
-  fm_meta_get() { case $1 in *cursor-task.meta) printf cursor ;; *) printf claude ;; esac; }
+  . "$addons/alerts/bin/jg-model-outage-lib.sh"
+  ! jg_alerts_push_suppress cursor-task || { echo "FAIL: hook suppressed without watcher helpers" >&2; exit 1; }
+  jg_meta_get() { case $1 in *cursor-task.meta) printf cursor ;; *) printf claude ;; esac; }
   task_captain_call_open() { [ "$1" = call-task ]; }
-  fm_alerts_push_suppress cursor-task || { echo "FAIL: cursor task must suppress" >&2; exit 1; }
-  fm_alerts_push_suppress call-task || { echo "FAIL: open captain call must suppress" >&2; exit 1; }
-  ! fm_alerts_push_suppress plain-task || { echo "FAIL: ordinary task must not suppress" >&2; exit 1; }
+  jg_alerts_push_suppress cursor-task || { echo "FAIL: cursor task must suppress" >&2; exit 1; }
+  jg_alerts_push_suppress call-task || { echo "FAIL: open captain call must suppress" >&2; exit 1; }
+  ! jg_alerts_push_suppress plain-task || { echo "FAIL: ordinary task must not suppress" >&2; exit 1; }
 )
 echo "ok: alerts observer present -> grouped wake; absent -> kun behavior"

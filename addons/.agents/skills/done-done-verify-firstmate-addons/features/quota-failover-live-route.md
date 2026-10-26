@@ -11,4 +11,4 @@ The watcher runs in Main and every active local secondmate home, and a worker st
 
 ## Evidence
 
-`route.log`, one readable log in order: setup (including the check that the installed watcher sources only the add-on's own `account-pool/bin/fm-account-pool-lib.sh`), the 429 count with the worker's real `Error: 429` screen line, the watcher's `switched` line, the worker's `done` line on its new route with its commit, lab teardown and `PASS`; and the step record `steps.json`. Raw lab output (lab up/down, pane captures, provider hits) stays in the run's work folder, not the evidence root.
+`route.log`, one readable log in order: setup (including the check that the installed watcher sources only the add-on's own `account-pool/bin/jg-account-pool-lib.sh`), the 429 count with the worker's real `Error: 429` screen line, the watcher's `switched` line, the worker's `done` line on its new route with its commit, lab teardown and `PASS`; and the step record `steps.json`. Raw lab output (lab up/down, pane captures, provider hits) stays in the run's work folder, not the evidence root.

@@ -39,9 +39,8 @@
 set -eu
 
 BASE_PATTERN='first[ -]?mate|second ?mate|crewmate|fm[-_]'
-# The one pattern the allow file's own lines are matched against, so a stale
-# entry (a path that no longer exists, or that no longer carries an old name)
-# is reported instead of quietly widening the exemption.
+# The pattern a tracked file name is matched against, so the allow file can
+# only exempt a name that still carries an old spelling in the first place.
 NAME_PATTERN='first[ -]?mate|second ?mate|crewmate|fm[-_]'
 PREFIX_PATTERN='^fm[-_]'
 
@@ -86,9 +85,7 @@ report() {
       entry=${entry%%[[:space:]]*}
       [ -n "$entry" ] || continue
       printf '%s\n' "$entry" >>"$allow_files"
-      if [ ! -e "$entry" ] || ! printf '%s' "$entry" | grep -qiE -- "$NAME_PATTERN"; then
-        printf '%s\n' "$entry" >>"$stale"
-      fi
+      [ -e "$entry" ] || printf '%s\n' "$entry" >>"$stale"
     done <"$allow_file"
   fi
   for entry in ${ALLOWED_LINES[@]+"${ALLOWED_LINES[@]}"}; do

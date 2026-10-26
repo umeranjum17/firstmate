@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # End-to-end: a pooled-style lane worktree whose shared clone .git/config carries a stray identity
-# (t <t@e.c>), launched the way the fork's fm-spawn runs config/launch-env-hook, against a throwaway HOME and home.
+# (t <t@e.c>), launched the way the fork's jg-spawn runs config/launch-env-hook, against a throwaway HOME and home.
 # With FM_ROOT set to a firstmate checkout, the lane also gets that checkout's AI-trailer hooks dir layered on top,
 # as a real spawn does. Usage: [FM_ROOT=<firstmate>] git-identity/tests/git-identity.test.sh
 set -euo pipefail
@@ -59,11 +59,11 @@ has "install notes a home without the fork hook" "$out" "does not run config/lau
 check "install backed up the old hook" "$(cat "$FM"/config/launch-env-hook.bak-git-identity-*)" "echo old"
 snap() { (cd "$d" && find data fm -type f -print0 | sort -z | xargs -0 sha256sum); }
 before=$(snap)
-echo 'launch-env-hook' >"$FM/bin/fm-spawn.sh"
+echo 'launch-env-hook' >"$FM/bin/jg-spawn.sh"
 out=$("$SRC/install.sh" "$FM")
-rm "$FM/bin/fm-spawn.sh"
+rm "$FM/bin/jg-spawn.sh"
 check "rerun changes nothing" "$(snap)" "$before"
-check "pinned identity" "$(git config -f "$XDG_DATA_HOME/fm-git-identity/identity.gitconfig" user.email)" "$ME"
+check "pinned identity" "$(git config -f "$XDG_DATA_HOME/jg-git-identity/identity.gitconfig" user.email)" "$ME"
 
 # (c) The lane launch: the hook runs in the pane at the worktree, then the launch sources its export.
 lane() {
@@ -73,10 +73,10 @@ lane() {
     # shellcheck source=/dev/null
     . "$d/env.sh"
     if [ -n "${FM_ROOT:-}" ]; then
-      "$FM_ROOT/bin/fm-git-strip-ai-trailers.sh" install "$d/fm-hooks" "$WT"
-      "$FM_ROOT/bin/fm-git-strip-ai-trailers.sh" env-file "$d/fm-hooks" "$d/fm-env.sh"
+      "$FM_ROOT/bin/jg-git-strip-ai-trailers.sh" install "$d/jg-hooks" "$WT"
+      "$FM_ROOT/bin/jg-git-strip-ai-trailers.sh" env-file "$d/jg-hooks" "$d/jg-env.sh"
       # shellcheck source=/dev/null
-      . "$d/fm-env.sh"
+      . "$d/jg-env.sh"
     fi
     "$@"
   )
@@ -102,7 +102,7 @@ has "repo's own pre-push hook ran with git's stdin" "$(cat "$d/repo-hook.log" 2>
 # the failure is produced with a real missing object rather than a shimmed git.
 git -C "$WT" -c user.name=t -c user.email=t@e.c commit -q --allow-empty -m uninspectable
 missing=$(printf x | git hash-object --stdin)
-out=$(lane "$XDG_DATA_HOME/fm-git-identity/git-identity" hook pre-push \
+out=$(lane "$XDG_DATA_HOME/jg-git-identity/git-identity" hook pre-push \
   <<<"refs/heads/lane $missing refs/heads/lane $(git -C "$d/origin.git" rev-parse refs/heads/lane)" 2>&1) && rc=0 || rc=$?
 check "an inspection failure refuses the push" "$rc" 1
 has "refusal names the uninspectable push" "$out" "cannot inspect pushed commits"

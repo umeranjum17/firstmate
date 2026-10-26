@@ -5,7 +5,7 @@ Usage: ticket.py <task> [--stage WORD] [--state WORD] [--pr URL] [--release TEXT
 
 FM_HOME names the home whose config/fleet-board owns this task, and the task is
 its backlog item id, published as the ticket for main/<task> (the sync's own
-home name, bin/fm-watch.sh's check environment included).
+home name, bin/jg-watch.sh's check environment included).
 
 Nothing is written when this home has no fleet board, when the board file is
 missing, or when the sync has not published that ticket yet: the poll owns
@@ -57,7 +57,7 @@ def main(argv):
         board = home / board
     if not board.is_file():
         return 0
-    ticket_id = 'fm-' + hashlib.sha256(f'main/{options.task}'.encode()).hexdigest()[:32]
+    ticket_id = 'jg-' + hashlib.sha256(f'main/{options.task}'.encode()).hexdigest()[:32]
     try:
         read = sp.run(['sign-off-axi', 'ticket', str(board), '--id', ticket_id, '--json'],
                       text=True, capture_output=True, timeout=60)

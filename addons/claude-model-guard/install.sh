@@ -9,9 +9,9 @@
 #     before any request is sent.
 # An earlier version also mapped env.ANTHROPIC_DEFAULT_SONNET_MODEL to Haiku; install.sh and --restore delete that key
 # when it still holds claude-haiku-5-5, so a reinstall upgrades an old install.
-# refuse-model.sh is copied to ${XDG_DATA_HOME:-~/.local/share}/fm-claude-model-guard. Settings are edited at key level with a
+# refuse-model.sh is copied to ${XDG_DATA_HOME:-~/.local/share}/jg-claude-model-guard. Settings are edited at key level with a
 # backup; only these keys are printed, never the file, other keys, or credentials (never read or touched).
-# Not covered: a launch with --setting-sources that leaves out "user" (fm-live-lab.sh's primary uses project,local); user
+# Not covered: a launch with --setting-sources that leaves out "user" (jg-live-lab.sh's primary uses project,local); user
 # settings do not load there at all.
 # Usage: install.sh [--dry-run] [--restore] [--config-dir <dir>]   (default ${CLAUDE_CONFIG_DIR:-~/.claude})
 # --restore removes exactly the guard's keys and hook entries when they still hold the values above.
@@ -28,7 +28,7 @@ while [ $# -gt 0 ]; do
 done
 [ -d "$DIR" ] || { echo "install.sh: no Claude config dir at $DIR" >&2; exit 1; }
 F=$DIR/settings.json
-DEST=${XDG_DATA_HOME:-$HOME/.local/share}/fm-claude-model-guard
+DEST=${XDG_DATA_HOME:-$HOME/.local/share}/jg-claude-model-guard
 HOOK=$DEST/refuse-model.sh
 TMP=$(mktemp -d)
 trap 'rm -rf -- "$TMP"' EXIT

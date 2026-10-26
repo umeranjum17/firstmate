@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# account-pool: drive the fm-spawn and fm-control hook lines (the exact form a Kun fm-spawn.sh and
-# fm-control.sh carry) against a stub byokit-accounts and a throwaway config. Add-on present = the
+# account-pool: drive the jg-spawn and jg-control hook lines (the exact form a Kun jg-spawn.sh and
+# jg-control.sh carry) against a stub byokit-accounts and a throwaway config. Add-on present = the
 # pool pick lands in the launch line and record, and relaunch --account rests and moves; add-on
 # absent = every hook line is a silent no-op (Kun behavior). These are the pool cases that lived in
-# the fork's tests/fm-worker-account.test.sh and tests/fm-control-relaunch.test.sh.
+# the fork's tests/jg-worker-account.test.sh and tests/jg-control-relaunch.test.sh.
 set -u
 here=$(cd "$(dirname "$0")" && pwd) || exit 1
 addons=$(cd "$here/../.." && pwd) || exit 1
@@ -14,7 +14,7 @@ printf 'state=%s\ncommand=%s\n' "$w/pool" "$w/bin/byokit-accounts" > "$w/config/
 printf '# a comment\n\ncommand=/usr/bin/byokit-accounts\n' > "$w/cfg-bad/account-pool"
 ln -s "$w/missing" "$w/cfg-link/account-pool"
 ln -s "$w/config/account-pool" "$w/cfg-ok/account-pool"
-printf 'fm_run_timed() { shift; "$@"; }\n' > "$w/bin/fm-timeout-lib.sh"
+printf 'jg_run_timed() { shift; "$@"; }\n' > "$w/bin/jg-timeout-lib.sh"
 # The stub pool: pick answers TEST_PICK (FOLDER = acct1's folder), or TEST_PICK_RESTED once an account
 # rests, else acct1 until it rests, then acct2, or the --prefer id, in the tool's own store variable;
 # an answer without "ok":true exits 1. status names a go* account's tool opencode. Every call is logged.
@@ -42,38 +42,38 @@ echo "worker CLAUDE_CONFIG_DIR=${CLAUDE_CONFIG_DIR-unset} CODEX_HOME=${CODEX_HOM
 WORKER
 cp "$w/bin/claude" "$w/bin/codex"
 chmod +x "$w/bin/byokit-accounts" "$w/bin/claude" "$w/bin/codex"
-# The hook lines at their call sites, in fm-spawn.sh order; TEST_PANE runs the launch line in a pane
+# The hook lines at their call sites, in jg-spawn.sh order; TEST_PANE runs the launch line in a pane
 # whose ambient environment names another login.
 cat > "$w/fake-spawn.sh" <<'FAKE'
 CONFIG=$TEST_CONFIG HARNESS=${TEST_HARNESS:-claude} WORKER_ACCOUNT=${TEST_PIN:-} SPAWN_ACCOUNT= RELAUNCH=0
 SCRIPT_DIR=$TEST_BIN LAUNCH=$HARNESS
 shell_quote() { printf '%q' "$1"; }
-_fm_ap=${FM_ADDONS_DIR:-${FM_HOME:-$SCRIPT_DIR/..}/projects/firstmate-addons}/account-pool/bin/fm-account-pool-lib.sh; { [ -r "$_fm_ap" ] && . "$_fm_ap"; } || fm_account_hook() { :; }
-eval "$(fm_account_hook argv "$@")"
+_jg_ap=${FM_ADDONS_DIR:-${FM_HOME:-$SCRIPT_DIR/..}/projects/firstmate-addons}/account-pool/bin/jg-account-pool-lib.sh; { [ -r "$_jg_ap" ] && . "$_jg_ap"; } || jg_account_hook() { :; }
+eval "$(jg_account_hook argv "$@")"
 case " $* " in *" --relaunch "*) RELAUNCH=1 ;; esac
-fm_account_hook spawn-validate || exit 1
-[ -z "${TEST_RAW:-}" ] || fm_account_hook raw-launch "$CONFIG" || exit 1
-fm_account_hook spawn-pick "$HARNESS" "$CONFIG" "$WORKER_ACCOUNT" "${POOL_ACCOUNT_WANT:-}" || exit 1
+jg_account_hook spawn-validate || exit 1
+[ -z "${TEST_RAW:-}" ] || jg_account_hook raw-launch "$CONFIG" || exit 1
+jg_account_hook spawn-pick "$HARNESS" "$CONFIG" "$WORKER_ACCOUNT" "${POOL_ACCOUNT_WANT:-}" || exit 1
 [ "$HARNESS" != claude ] || [ -z "${CLAUDE_CONFIG_DIR:-}" ] || LAUNCH="CLAUDE_CONFIG_DIR=$(shell_quote "$CLAUDE_CONFIG_DIR") $LAUNCH"
-fm_account_hook launch-prefix "$HARNESS" "$WORKER_ACCOUNT"
-fm_account_hook spawn-line
-fm_account_hook record-line
+jg_account_hook launch-prefix "$HARNESS" "$WORKER_ACCOUNT"
+jg_account_hook spawn-line
+jg_account_hook record-line
 echo "launch=$LAUNCH spawn_account=$SPAWN_ACCOUNT args=$*"
 [ -z "${TEST_PANE:-}" ] || env CLAUDE_CONFIG_DIR=/ambient ANTHROPIC_API_KEY=pane-key CLAUDE_CODE_OAUTH_TOKEN=pane-token PATH="$TEST_BIN:$PATH" bash -c "$LAUNCH"
 FAKE
-# fm-control.sh's lines: parse, verb check, preflight pool half, last pre-stop step, spawn args.
+# jg-control.sh's lines: parse, verb check, preflight pool half, last pre-stop step, spawn args.
 cat > "$w/fake-control.sh" <<'FAKE'
 SCRIPT_DIR=$TEST_BIN VERB=$1 CONFIG=$TEST_CONFIG HARNESS=${TEST_HARNESS:-claude}
 shift
-fm_worker_account_resolve() { [ -z "${TEST_PIN:-}" ] || printf 'ordinary\t\t\n'; }
-_fm_ap=${FM_ADDONS_DIR:-${FM_HOME:-$SCRIPT_DIR/..}/projects/firstmate-addons}/account-pool/bin/fm-account-pool-lib.sh; { [ -r "$_fm_ap" ] && . "$_fm_ap"; } || fm_account_hook() { :; }
-eval "$(fm_account_hook argv "$@")"
+jg_worker_account_resolve() { [ -z "${TEST_PIN:-}" ] || printf 'ordinary\t\t\n'; }
+_jg_ap=${FM_ADDONS_DIR:-${FM_HOME:-$SCRIPT_DIR/..}/projects/firstmate-addons}/account-pool/bin/jg-account-pool-lib.sh; { [ -r "$_jg_ap" ] && . "$_jg_ap"; } || jg_account_hook() { :; }
+eval "$(jg_account_hook argv "$@")"
 [ "$#" -eq 0 ] || { echo "error: unexpected argument '$1'" >&2; exit 1; }
-fm_account_hook control-validate "$VERB" || exit 1
-fm_account_hook relaunch-pre "$HARNESS" "$CONFIG" "${TEST_TO:-}" "$TEST_RECORDED" "${TEST_FROM:-}" t1 || exit 1
-fm_account_hook relaunch-commit "$HARNESS" "$CONFIG" "$TEST_RECORDED" || exit 1
+jg_account_hook control-validate "$VERB" || exit 1
+jg_account_hook relaunch-pre "$HARNESS" "$CONFIG" "${TEST_TO:-}" "$TEST_RECORDED" "${TEST_FROM:-}" t1 || exit 1
+jg_account_hook relaunch-commit "$HARNESS" "$CONFIG" "$TEST_RECORDED" || exit 1
 spawn_args=(t1 --relaunch --harness "$HARNESS")
-fm_account_hook spawn-args
+jg_account_hook spawn-args
 FM_CONTROL_RELAUNCH_TX=tx bash "$TEST_SPAWN" "${spawn_args[@]}"
 FAKE
 fails=0
@@ -137,7 +137,7 @@ TEST_PICK_RESTED=$refusal run "$addons" fake-control.sh relaunch --account next;
 run2 "  ... after one rest" "^rest acct1 " 1
 TEST_PICK='{"ok":true,"id":"pa_other","set":{"CLAUDE_CONFIG_DIR":"FOLDER"},"unset":[]}' run "$addons" fake-control.sh relaunch --account pa_wanted
 has "a pick answering another account refuses" "answered with account 'pa_other' rather than the requested account 'pa_wanted'"
-TEST_RECORDED=go1 run "$addons" fake-control.sh relaunch --account next; run1 "relaunch --account next off an OpenCode Go account is refused" "1|error: '--account next' cannot move an account of tool 'opencode' automatically; move this worker by hand with 'bin/fm-control.sh t1 relaunch --account <id>'"
+TEST_RECORDED=go1 run "$addons" fake-control.sh relaunch --account next; run1 "relaunch --account next off an OpenCode Go account is refused" "1|error: '--account next' cannot move an account of tool 'opencode' automatically; move this worker by hand with 'bin/jg-control.sh t1 relaunch --account <id>'"
 run2 "  ... and nothing rests" "^rest " 0
 TEST_HARNESS=pi TEST_FROM=opencode-go/glm run "$addons" fake-control.sh relaunch --account next; has "next off a worker on the opencode-go provider is refused" "cannot move a worker on the opencode-go provider automatically"
 TEST_HARNESS=pi TEST_FROM=opencode-go/glm TEST_TO=pi/sonnet run "$addons" fake-control.sh relaunch --account next
@@ -155,7 +155,7 @@ run "$addons" fake-control.sh relaunch --account ../x; run2 "a malformed --accou
 run1 "a malformed --account is refused" "1|error: --account takes 'next' or one account id, not '../x'"
 run "$addons" fake-control.sh relaunch --account 'pa two words'; has "an --account with spaces is refused" "--account takes 'next' or one account id"
 run "$addons" fake-spawn.sh --account next;   run1 "a fresh launch refuses --account" "1|error: --account applies to a relaunch only; a fresh launch picks its pool account on its own"
-run "$addons" fake-spawn.sh --relaunch --account next; run1 "a direct relaunch --account next is refused" "1|error: --account next rests the recorded account only in fm-control's pre-stop gate; a direct relaunch would ignore it and may re-pick the same account - use 'bin/fm-control.sh <task-id> relaunch --account next'"
+run "$addons" fake-spawn.sh --relaunch --account next; run1 "a direct relaunch --account next is refused" "1|error: --account next rests the recorded account only in jg-control's pre-stop gate; a direct relaunch would ignore it and may re-pick the same account - use 'bin/jg-control.sh <task-id> relaunch --account next'"
 CFG=$w/empty run "$addons" fake-spawn.sh --relaunch --account pa_named; has "a direct relaunch --account with no pool refuses, never the ambient login" "no account pool for claude workers"
 TEST_HARNESS=opencode run "$addons" fake-spawn.sh --relaunch --account pa_named; has "  ... and on a harness with no pool tool" "no account pool for opencode workers"
 run "$w/empty" fake-control.sh relaunch --account next; run1 "absent: --account stays the caller's own argument" "1|error: unexpected argument '--account'"

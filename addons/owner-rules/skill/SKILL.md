@@ -35,7 +35,7 @@ owner-rules: no valid parent: add parent: <backlog item id> or parent: upkeep to
 ```
 
 Fix: add `parent: <backlog item id>` or `parent: upkeep` to the item's body, then brief again.
-Run `bin/fm-owner-rules-tree.sh <backlog-file>` to inspect parent chains and invalid parent references.
+Run `bin/jg-owner-rules-tree.sh <backlog-file>` to inspect parent chains and invalid parent references.
 
 ## Rule 13: direct-PR plus a done-done check is the default route
 
@@ -64,7 +64,7 @@ The gate opens with one line saying so.
 Refusal (`$src` is the PR URL, `$3` the merge head) when checks-lint has no PASS row for the PR head in `data/checks-gate.log`:
 
 ```
-owner-rules: no checks-lint PASS for $src at $3; run FM_HOME=$FM_HOME <XDG_DATA_HOME>/fm-merge-on-green/checks-lint.sh $src $FM_HOME/data/<id> then merge again
+owner-rules: no checks-lint PASS for $src at $3; run FM_HOME=$FM_HOME <XDG_DATA_HOME>/jg-merge-on-green/checks-lint.sh $src $FM_HOME/data/<id> then merge again
 ```
 
 Fix: run that command (it logs the row), then merge again.
@@ -93,7 +93,7 @@ Fix: make the item's line exactly `design: required` or `design: none`, then bri
 No add-on installs skills, so link this folder into the home's skills by hand:
 
 ```
-ln -s <firstmate-addons>/owner-rules/skill <fm-home>/.agents/skills/firstmate-addons-owner-rules
+ln -s <firstmate-addons>/owner-rules/skill <jg-home>/.agents/skills/firstmate-addons-owner-rules
 ```
 
-`owner-rules/install.sh <fm-home>` turns the refusals on; the skill is only the reading for the leads.
+`owner-rules/install.sh <jg-home>` turns the refusals on; the skill is only the reading for the leads.

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# owner-rules merge-gate e2e: the config/merge-gate that install.sh writes, run with the args fm-pr-merge.sh passes.
+# owner-rules merge-gate e2e: the config/merge-gate that install.sh writes, run with the args jg-pr-merge.sh passes.
 # Usage: owner-rules/tests/owner-rules-gate.test.sh
 # Proves one refusal (no receipt) and one clean pass (a stubbed sealed clean done-done run at the head), plus the
 # screen: none exemption, the chained previous gate, and the no-op once uninstalled. No forge, no done-done.
@@ -14,8 +14,8 @@ ok() { printf 'ok - %s\n' "$1"; }
 no() { printf 'not ok - %s\n' "$1"; fails=$((fails + 1)); }
 is() { if [ "$2" = "$3" ]; then ok "$1"; else no "$1: got [$2], want [$3]"; fi; }
 
-home=$work/home; mkdir -p "$home/config" "$home/data/lane/.done-done/runs" "$work/bin" "$work/data/fm-merge-on-green"
-printf '#!/bin/sh\nexit 0\n' > "$work/data/fm-merge-on-green/checks-lint.sh"; chmod +x "$work/data/fm-merge-on-green/checks-lint.sh"
+home=$work/home; mkdir -p "$home/config" "$home/data/lane/.done-done/runs" "$work/bin" "$work/data/jg-merge-on-green"
+printf '#!/bin/sh\nexit 0\n' > "$work/data/jg-merge-on-green/checks-lint.sh"; chmod +x "$work/data/jg-merge-on-green/checks-lint.sh"
 pr=https://github.com/umeranjum17/firstmate-addons/pull/9 head=abc123
 # gh stub: the PR body is whatever is in $work/body.
 printf '#!/bin/sh\ncat "%s/body" 2>/dev/null\n' "$work" > "$work/bin/gh"; chmod +x "$work/bin/gh"
@@ -54,7 +54,7 @@ seal other; is "refusal: a run at a different head" "$(gate | tail -1)" "rc=1"
 seal "$head"; printf '{"schema":1,"exit":0,"dirty":true,"commit":"%s","files":["a"],"run_id":"r1"}\n' "$head" > "$run"
 is "refusal: a dirty run" "$(gate | tail -1)" "rc=1"
 seal "$head"
-LINT="owner-rules: no checks-lint PASS for $pr at $head; run FM_HOME=$home $work/data/fm-merge-on-green/checks-lint.sh $pr $home/data/lane then merge again"
+LINT="owner-rules: no checks-lint PASS for $pr at $head; run FM_HOME=$home $work/data/jg-merge-on-green/checks-lint.sh $pr $home/data/lane then merge again"
 is "refusal: receipt but no checks-lint row" "$(gate)" "$LINT
 rc=1"
 log=$home/data/checks-gate.log
@@ -66,7 +66,7 @@ is "refusal: receipt and lint but missing board card" "$(printf '%s\n' "$card_re
 card_command=$(printf '%s\n' "$card_refusal" | sed -n 's|.*; post it with: FM_HOME=[^ ]* \(/[^ ]*\) post .*|\1|p')
 [ -n "$card_command" ] && [ -x "$card_command" ] && ok "card hint names an executable absolute path" || no "card hint command is not an executable absolute path: $card_command"
 # Guard gate/check script hints against bare add-on executables (a path is required in every home).
-if grep -REn --include='*.sh' --exclude-dir=tests 'run[[:space:]]+(FM_HOME=[^[:space:]]+[[:space:]]+)?(merge-card|fm-[[:alnum:]_-]+\.sh|checks-lint\.sh)([[:space:]]|$)' \
+if grep -REn --include='*.sh' --exclude-dir=tests 'run[[:space:]]+(FM_HOME=[^[:space:]]+[[:space:]]+)?(merge-card|jg-[[:alnum:]_-]+\.sh|checks-lint\.sh)([[:space:]]|$)' \
   "$addons/owner-rules" "$addons/merge-card" "$addons/merge-on-green" "$addons/owner-guard" "$addons/read-guard" "$addons/delete-guard" "$addons/kill-guard"; then
   no "bare add-on tool in gate/check hint"
 else

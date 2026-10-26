@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# PATH wrapper: with FM_HOME/config/account-pool, --json Claude row uses fm-model-pool's
+# PATH wrapper: with FM_HOME/config/account-pool, --json Claude row uses jg-model-pool's
 # claude-accounts reading (same pick/floors/credits refusal). Else exec upstream.
 # Env: FM_QUOTA_AXI_REAL, FM_MODEL_POOL, FM_QUOTA_AXI_POOL_UPSTREAM, FM_QUOTA_AXI_POOL_ATTEMPTED.
 set -euo pipefail
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 addons=$(cd "$here/../.." && pwd)
-model_pool=${FM_MODEL_POOL:-${FM_ADDONS_DIR:-$addons}/account-pool/bin/fm-model-pool}
-upstream_file=${FM_QUOTA_AXI_POOL_UPSTREAM:-${XDG_DATA_HOME:-$HOME/.local/share}/fm-quota-axi-pool/upstream}
+model_pool=${FM_MODEL_POOL:-${FM_ADDONS_DIR:-$addons}/account-pool/bin/jg-model-pool}
+upstream_file=${FM_QUOTA_AXI_POOL_UPSTREAM:-${XDG_DATA_HOME:-$HOME/.local/share}/jg-quota-axi-pool/upstream}
 
 find_upstream() {
   if [ -n "${FM_QUOTA_AXI_REAL:-}" ] && [ -x "$FM_QUOTA_AXI_REAL" ]; then printf '%s\n' "$FM_QUOTA_AXI_REAL"; return 0; fi
@@ -18,7 +18,7 @@ find_upstream() {
   while IFS= read -r cand; do
     [ -n "$cand" ] || continue
     [ "$(readlink -f "$cand" 2>/dev/null || printf '%s\n' "$cand")" = "$self" ] && continue
-    case "$cand" in */fm-quota-axi-pool/*|*/quota-axi-pool/bin/*) continue ;; esac
+    case "$cand" in */jg-quota-axi-pool/*|*/quota-axi-pool/bin/*) continue ;; esac
     [ -x "$cand" ] || continue
     printf '%s\n' "$cand"; return 0
   done < <(type -aP quota-axi 2>/dev/null || true)
@@ -70,7 +70,7 @@ unknown_row() {
 }
 
 if [ "$provider" != claude ] || [ -z "$pick_id" ] || [[ $pick_id == route:* ]]; then
-  claude_row=$(unknown_row "$pick_id" "fm-model-pool non-Claude fallover")
+  claude_row=$(unknown_row "$pick_id" "jg-model-pool non-Claude fallover")
 elif [ -z "$reading" ]; then
   claude_row=$(unknown_row "$pick_id" "no claude-accounts reading")
 else
@@ -89,7 +89,7 @@ else
           boundedBy:[(if $a.five_hour.left!=null then "five_hour" else empty end),(if $a.seven_day.left!=null then "seven_day" else empty end)],
           limitingWindowIds:(if ($a.five_hour.left//999)<=($a.seven_day.left//999) then ["five_hour"] else ["seven_day"] end),
           runway:through($r), selection:{status:"known",spendPriority:($r/100)}}]},
-        pool:{id:$id,folder:$folder,source:"fm-model-pool",runway:$r}
+        pool:{id:$id,folder:$folder,source:"jg-model-pool",runway:$r}
       } end
     end' "$reading")
 fi

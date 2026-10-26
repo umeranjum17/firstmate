@@ -19,7 +19,7 @@ printf '{"hasCompletedOnboarding":true}\n' > "$T/home/.claude.json"
 inst() { env -u CLAUDE_CONFIG_DIR -u XDG_DATA_HOME HOME="$T/home" "$ADDON/install.sh" "$@"; }
 
 inst --dry-run > "$T/dry.out"
-jq -e '.env.ANTHROPIC_DEFAULT_SONNET_MODEL == "claude-haiku-5-5"' "$T/home/.claude/settings.json" >/dev/null && [ ! -e "$T/home/.local/share/fm-claude-model-guard" ] \
+jq -e '.env.ANTHROPIC_DEFAULT_SONNET_MODEL == "claude-haiku-5-5"' "$T/home/.claude/settings.json" >/dev/null && [ ! -e "$T/home/.local/share/jg-claude-model-guard" ] \
   && ok "dry run writes nothing" || no "dry run wrote"
 inst > "$T/install.out" && inst > "$T/reinstall.out"
 cat "$T/dry.out" "$T/install.out" "$T/reinstall.out" | grep -q 'sk-do-not-print\|KEEP_ME\|theme' && no "installer printed other settings" || ok "installer prints only its own keys"
@@ -29,7 +29,7 @@ jq -e '.theme == "dark" and .env.KEEP_ME == "1" and .env.FAKE_SECRET == "sk-do-n
   and .env.ANTHROPIC_DEFAULT_SONNET_MODEL == null and .env.ANTHROPIC_DEFAULT_FABLE_MODEL == "claude-haiku-5-5"
   and .availableModels == null and ([.hooks.UserPromptSubmit[].hooks[].command, .hooks.PreToolUse[].hooks[].command] | length == 2 and all(endswith("/refuse-model.sh")))
   and .hooks.PreToolUse[0].matcher == "Agent|Task"' "$T/home/.claude/settings.json" >/dev/null && ok "stale sonnet mapping cleared, fable key set, other settings kept" || no "settings content"
-cmp -s "$ADDON/refuse-model.sh" "$T/home/.local/share/fm-claude-model-guard/refuse-model.sh" && ok "hook installed" || no "hook not installed"
+cmp -s "$ADDON/refuse-model.sh" "$T/home/.local/share/jg-claude-model-guard/refuse-model.sh" && ok "hook installed" || no "hook not installed"
 
 # dispatched <claude args...>: the model the real claude dispatches to, from its debug log, or "refused" when a hook blocked
 # the prompt. $AM, when set, is passed as ANTHROPIC_MODEL.
@@ -52,7 +52,7 @@ done
 jq '.model = "claude-fable-5-1"' "$T/home/.claude/settings.json" > "$T/s.json" && cp "$T/home/.claude/settings.json" "$T/keep.json" && cp "$T/s.json" "$T/home/.claude/settings.json"
 [ "$(dispatched)" = refused ] && ok "settings model claude-fable-5-1 -> refused" || no "settings model not refused"
 cp "$T/keep.json" "$T/home/.claude/settings.json"
-G=$T/home/.local/share/fm-claude-model-guard/refuse-model.sh
+G=$T/home/.local/share/jg-claude-model-guard/refuse-model.sh
 echo '{"tool_input":{"model":"claude-fable-5-1"}}' | "$G" 2>/dev/null; [ $? -eq 2 ] && ok "Agent call with model claude-fable-5-1 refused" || no "Agent call not refused"
 echo '{"tool_input":{"model":"claude-sonnet-5-5"}}' | "$G" && ok "Agent call with model claude-sonnet-5-5 allowed" || no "Agent sonnet refused"
 echo '{"tool_input":{"model":"haiku"}}' | "$G" && ok "Agent call with model haiku allowed" || no "Agent haiku refused"

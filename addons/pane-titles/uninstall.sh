@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Remove pane titles and restore the launch-env hook this add-on chained. Usage: uninstall.sh [--dry-run] <fm-home>
+# Remove pane titles and restore the launch-env hook this add-on chained. Usage: uninstall.sh [--dry-run] <jg-home>
 set -euo pipefail
 DRY=0
 [ "${1:-}" = --dry-run ] && { DRY=1; shift; }
-[ "$#" -eq 1 ] && [ -d "$1/config" ] || { echo 'usage: uninstall.sh [--dry-run] <fm-home>' >&2; exit 2; }
+[ "$#" -eq 1 ] && [ -d "$1/config" ] || { echo 'usage: uninstall.sh [--dry-run] <jg-home>' >&2; exit 2; }
 FMH=$(cd "$1" && pwd -P)
-DEST=${XDG_DATA_HOME:-$HOME/.local/share}/fm-pane-titles
+DEST=${XDG_DATA_HOME:-$HOME/.local/share}/jg-pane-titles
 HOOK=$FMH/config/launch-env-hook
 SHIM=$(printf '#!/usr/bin/env bash\nexport FM_PANE_TITLES_HOME=%q\nexec %q/launch-env-hook "$@"\n' "$DEST" "$DEST")
 if [ ! -f "$HOOK" ] || [ "$(cat "$HOOK")" != "$SHIM" ]; then

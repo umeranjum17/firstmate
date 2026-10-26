@@ -2,9 +2,9 @@
 # pi-quota-failover route test: the real wrapper against a stub pi and a stub
 # quota-axi in a throwaway HOME, with the exact argv shape no-mistakes builds
 # (--model <m> --mode json --no-session, prompt on stdin). It pins the
-# persisted pipeline route and the fm-model-pool adoption:
+# persisted pipeline route and the jg-model-pool adoption:
 #   - without a pool, the default chain is Claude Haiku through claude-bridge;
-#   - with a pool, route/account come from fm-model-pool pick/next (A=70% over
+#   - with a pool, route/account come from jg-model-pool pick/next (A=70% over
 #     B=40%, A limit then B, all Claude under floor then Sol -> Goat -> Cursor);
 #   - an openrouter/* route takes the deepseek idle limit.
 # Nothing real is called: no network, no config, no login copy. Needs bash, jq,
@@ -14,7 +14,7 @@ set -u
 here=$(cd "$(dirname "$0")" && pwd) || exit 1
 addons=$(cd "$here/../.." && pwd) || exit 1
 wrapper=$here/../pi-quota-failover
-helper=$addons/account-pool/bin/fm-model-pool
+helper=$addons/account-pool/bin/jg-model-pool
 pick=$addons/claude-accounts/bin/claude-accounts-pick
 [ -f "$wrapper" ] || { echo "not ok - $wrapper is missing"; exit 1; }
 [ -x "$helper" ] || { echo "not ok - $helper is missing"; exit 1; }
@@ -160,7 +160,7 @@ OUT=$(printf '%s' "$prompt" | STUB_LIMITED=a PI_QUOTA_FAILOVER_ACCOUNT_POOL=$wor
 is "A=70% B=40%: a limit still answers" "$?" "0"
 out_has "bridge route answers after account move" "\"model\":\"$route\""
 is "first account a (70%), then b (40%), never default login" "$(sed 's|.*/||' "$STUB_ACCOUNTS" | paste -sd, -)" "a,b"
-log_has "fm-model-pool next moved off A" "next id=pa_umer_b"
+log_has "jg-model-pool next moved off A" "next id=pa_umer_b"
 is "no quota marker for the Claude route" "$(find "$work/state" -path "*pi-quota-failover-dead/*" 2>/dev/null | wc -l)" "0"
 
 # 6. All Claude under the eligibility floor: Sol then Goat then Cursor auto.
@@ -183,7 +183,7 @@ OUT=$(printf '%s' "$prompt" | STUB_LIMIT_MODELS='openai-codex/gpt-6.1-sol deepse
   PI_QUOTA_FAILOVER_ACCOUNT_POOL=$work/account-pool \
   "$wrapper" --model "$route" --mode json --no-session 2>"$work/err7")
 is "exhausted helper routes fail" "$?" "1"
-log_has "quota exhausted when helper next refuses" "quota exhausted\|fm-model-pool next refused"
+log_has "quota exhausted when helper next refuses" "quota exhausted\|jg-model-pool next refused"
 is "no Claude bridge when every fallover is limited" "$(grep -c 'claude-bridge' "$STUB_ARGV")" "0"
 
 echo

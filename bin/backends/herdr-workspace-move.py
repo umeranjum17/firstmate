@@ -8,9 +8,9 @@ prints the verified JSON response.
 
 Wire protocol verified against Herdr 0.7.4, protocol 16:
 
-  request:  {"id":"fm-workspace-move","method":"workspace.move",
+  request:  {"id":"jg-workspace-move","method":"workspace.move",
              "params":{"workspace_id":W,"insert_index":N}}\n
-  response: {"id":"fm-workspace-move","result":
+  response: {"id":"jg-workspace-move","result":
              {"type":"workspace_list","workspaces":[...]}}\n
 Usage: herdr-workspace-move.py <socket_path> <workspace_id> <insert_index>
 
@@ -31,7 +31,7 @@ CONNECT_TIMEOUT = 5.0
 RESPONSE_TIMEOUT = 5.0
 RECV_CHUNK = 65536
 MAX_RESPONSE_BYTES = 4 * 1024 * 1024
-REQUEST_ID = "fm-workspace-move"
+REQUEST_ID = "jg-workspace-move"
 
 
 def _read_line(sock, deadline):

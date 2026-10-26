@@ -23,18 +23,18 @@ The first task for a project registers that repository with `orca repo add --pat
 No manual repository registration is required.
 
 Open the Orca app to watch a task's terminal.
-Routine supervision uses the recorded endpoint through `bin/fm-peek.sh <id>` and `FM_HOME=<home> bin/fm-send.sh <id> '<text>'`.
+Routine supervision uses the recorded endpoint through `bin/jg-peek.sh <id>` and `FM_HOME=<home> bin/jg-send.sh <id> '<text>'`.
 Enter and Ctrl-C are supported; Escape is not.
 
 ## Task shape and metadata
 
 Each task has one Orca-managed git worktree and one Orca terminal.
-`fm-spawn.sh` does not call Treehouse for Orca tasks.
+`jg-spawn.sh` does not call Treehouse for Orca tasks.
 The normal isolation and unlanded-work refusal rules still apply.
 
 ```text
 backend=orca
-window=fm-<id>
+window=jg-<id>
 terminal=<orca terminal handle>
 orca_worktree_id=<orca repo id>::<absolute worktree path>
 worktree=<absolute Orca worktree path>
@@ -49,9 +49,9 @@ Orca returns `orca_worktree_id=` as that composite of the Orca repo id and the w
 Spawn registers the repository, creates an independent worktree, reuses only the verified `result.terminal.handle` returned by Orca or creates a terminal explicitly, installs harness hooks, records metadata, and launches the selected harness.
 Exact command flags and response parsing are owned by `bin/backends/orca.sh` and script help.
 
-`fm-peek.sh` reads with `orca terminal read`.
-An ordinary metadata-routed `fm-send.sh` text steer becomes a durable steering-inbox record, and only its best-effort constant doorbell passes through Orca's submit machinery.
-On the typed plane, `fm-send.sh` verifies composer clearance through the fleet-wide classifier in `bin/fm-composer-lib.sh`, retrying Enter without retyping when a slash popup first fills an argument placeholder.
+`jg-peek.sh` reads with `orca terminal read`.
+An ordinary metadata-routed `jg-send.sh` text steer becomes a durable steering-inbox record, and only its best-effort constant doorbell passes through Orca's submit machinery.
+On the typed plane, `jg-send.sh` verifies composer clearance through the fleet-wide classifier in `bin/jg-composer-lib.sh`, retrying Enter without retyping when a slash popup first fills an argument placeholder.
 The composer read is one bounded tail of the live terminal and never pages backward into scrollback, so a stale startup banner cannot compete with the bottom-anchored composer.
 A bare shell row is `unknown`, not an empty agent composer, and plain-text captures degrade a glyph row carrying trailing text to `unknown` rather than a false `pending`.
 The watcher has no native Orca busy signal, so each harness adapter's semantic lifecycle supplies worker state.
@@ -75,15 +75,15 @@ Reinstall the CLI and rerun; [`verification/runtime-backends.md`](verification/r
 - Escape is unsupported.
 - Orca exposes no stable CLI version or protocol marker, so readiness is the compatibility gate rather than a version floor.
 - Only the verified terminal-handle and worktree result fields are accepted; speculative response shapes are rejected.
-- Orca's worktree shape is unverified against the spawn-time Claude workspace-trust check in `bin/fm-claude-trust.sh`, which refuses any path that is not a linked git worktree sharing the project's git common dir, so a claude spawn on Orca fails loudly at that check rather than launching if Orca clones instead of linking.
+- Orca's worktree shape is unverified against the spawn-time Claude workspace-trust check in `bin/jg-claude-trust.sh`, which refuses any path that is not a linked git worktree sharing the project's git common dir, so a claude spawn on Orca fails loudly at that check rather than launching if Orca clones instead of linking.
 
 ## Regression entry points
 
 ```sh
-tests/fm-backend-orca.test.sh
-tests/fm-backend.test.sh
-tests/fm-bootstrap.test.sh
-tests/fm-teardown-endpoint-safety.test.sh
+tests/jg-backend-orca.test.sh
+tests/jg-backend.test.sh
+tests/jg-bootstrap.test.sh
+tests/jg-teardown-endpoint-safety.test.sh
 ```
 
 [`verification/runtime-backends.md`](verification/runtime-backends.md#orca) records the real readiness and response-shape smoke.

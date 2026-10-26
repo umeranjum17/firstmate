@@ -4,7 +4,7 @@
 # (no network: stub gh answers the PR, its pages, its diff and the moved file's previous content).
 set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)
-LINT=$ROOT/merge-on-green/fm-checks-lint.sh
+LINT=$ROOT/merge-on-green/jg-checks-lint.sh
 d=$(mktemp -d)
 trap 'rm -rf -- "$d"' EXIT
 mkdir -p "$d/bin" "$d/home" "$d/xdg" "$d/fm/state" "$d/fm/data/evidence"

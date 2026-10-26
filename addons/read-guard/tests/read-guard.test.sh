@@ -9,8 +9,8 @@ echo '{"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","comm
 mkdir -p "$T/pool1" "$H/.muxr/plans"; echo '{}' > "$T/pool1/settings.json" # a pool account's CLAUDE_CONFIG_DIR
 jq -n --arg f "$T/pool1" '{accounts: [{provider: "claude", folder: $f}]}' > "$H/.muxr/plans/accounts-v1.json"
 HOME=$H XDG_DATA_HOME=$H/.local/share "$ADDON/install.sh" >/dev/null
-jq -e '[.hooks.PreToolUse[].hooks[].command] == ["node '\''\($d)/fm-read-guard/guard.mjs'\''"]' --arg d "$H/.local/share" "$T/pool1/settings.json" >/dev/null || { echo "FAIL pool account settings lack the hook"; exit 1; }
-G=$H/.local/share/fm-read-guard/guard.mjs
+jq -e '[.hooks.PreToolUse[].hooks[].command] == ["node '\''\($d)/jg-read-guard/guard.mjs'\''"]' --arg d "$H/.local/share" "$T/pool1/settings.json" >/dev/null || { echo "FAIL pool account settings lack the hook"; exit 1; }
+G=$H/.local/share/jg-read-guard/guard.mjs
 run() { HOME=$H node "$G" --runtime claude; }
 block() {
   local rc=0 err
@@ -77,14 +77,14 @@ $OPEN
  */
 EOF"
 for opener in "$OPEN" "$(printf '/\052')" "$(printf '/\052\052/')"; do allow "echo $opener"; done
-# Text-only commands (echo, printf, fm-send.sh) may name a login folder as an example.
-allow "bin/fm-send.sh task-1 'never read ~/.codex'"
+# Text-only commands (echo, printf, jg-send.sh) may name a login folder as an example.
+allow "bin/jg-send.sh task-1 'never read ~/.codex'"
 allow "echo 'never read ~/.codex/auth.json'"
 allow "printf '%s\n' 'never read ~/.codex'"
 # Text-only commands still block when a login path is substituted, redirected, read as input, or chained after a read.
 block 'echo "$(cat ~/.codex/auth.json)"'
-block 'bin/fm-send.sh task-1 "$(cat ~/.codex/auth.json)"'
-block 'bin/fm-send.sh task-1 < ~/.codex/auth.json'
+block 'bin/jg-send.sh task-1 "$(cat ~/.codex/auth.json)"'
+block 'bin/jg-send.sh task-1 < ~/.codex/auth.json'
 block 'echo hi > ~/.codex/auth.json'
 block 'echo hi; cat ~/.codex/auth.json'
 # A piped text-only command passes its path on to a reader, so the whole command must have no pipe.
@@ -97,7 +97,7 @@ block "cat $TILDE_GLOB"
 block "cat $T/*/.pi/agent/*"
 block "cat $T/*/.codex/*"
 # The exact incident command reaches the installed Claude PreToolUse hook and is refused.
-HOOK=$(jq -r '.hooks.PreToolUse[] | select(.matcher | contains("Bash")) | .hooks[] | select(.command | contains("fm-read-guard")) | .command' "$H/.claude/settings.json")
+HOOK=$(jq -r '.hooks.PreToolUse[] | select(.matcher | contains("Bash")) | .hooks[] | select(.command | contains("jg-read-guard")) | .command' "$H/.claude/settings.json")
 printf '{"tool_name":"Bash","tool_input":{"command":"cat ~/.local/share/opencode/auth.json | head -c 300"}}' |
   HOME=$H bash -c "$HOOK" >/dev/null 2>"$T/hook.err" && { echo 'FAIL Claude hook allowed defect command'; exit 1; } || rc=$?
 [ "${rc:-0}" -eq 2 ] && grep -q 'BLOCKED by the fleet read guard' "$T/hook.err"
@@ -114,7 +114,7 @@ for (const event of [
   if (!result?.block || !result.reason.includes("block is final")) process.exit(1);
 }
 EOF
-HOME=$H node "$T/pi.mjs" "$H/.pi/agent/extensions/fm-read-guard.ts" >/dev/null
+HOME=$H node "$T/pi.mjs" "$H/.pi/agent/extensions/jg-read-guard.ts" >/dev/null
 # Pi Read and Claude Read/Grep/Glob tool inputs are blocked too.
 node --input-type=module - "$G" "$H" <<'EOF'
 const { guardTool } = await import(process.argv[2]); const home = process.argv[3];

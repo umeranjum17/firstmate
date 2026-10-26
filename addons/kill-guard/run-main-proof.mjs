@@ -10,7 +10,7 @@ const temp = fs.mkdtempSync(join(tmpdir(), 'kill-live-')), home = join(temp, 'ac
 const dirs = [main, join(home, 'worker'), join(home, 'lead')], agents = [], children = [], log = text => fs.appendFileSync(join(ev, 'journey.txt'), text + '\n');
 for (const dir of [...dirs, copy, join(main, 'state'), join(main, 'data'), join(main, 'bin'), join(main, 'projects/demo'), join(temp, 'no-mistakes')]) fs.mkdirSync(dir, { recursive: true });
 for (const dir of dirs) execFileSync('git', ['init', '-q', dir], { env: { ...process.env, HOME: home, XDG_CONFIG_HOME: home } });
-fs.writeFileSync(join(main, 'bin/fm-spawn.sh'), ''); fs.copyFileSync(new URL('./guard.mjs', import.meta.url), join(copy, 'guard.mjs'));
+fs.writeFileSync(join(main, 'bin/jg-spawn.sh'), ''); fs.copyFileSync(new URL('./guard.mjs', import.meta.url), join(copy, 'guard.mjs'));
 const preload = join(temp, 'account.cjs'), helper = join(temp, 'caller.cjs'), lock = join(main, 'state/.lock');
 fs.writeFileSync(preload, `const os=require('node:os'), original=os.userInfo; os.userInfo=()=>({...original(),homedir:${JSON.stringify(home)}}); require('node:module').syncBuiltinESMExports();`);
 fs.writeFileSync(helper, `const fs=require('node:fs'),{spawnSync}=require('node:child_process'); process.title=process.argv[2]==='lead'?'claude':'codex';

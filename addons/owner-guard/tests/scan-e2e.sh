@@ -80,25 +80,25 @@ out=$("$SRC/install-scan.sh" --dry-run "$FM")
 has "install dry-run prints the plan" "$out" "dry-run"
 check "dry-run writes nothing" "$(test -e "$FM/state/owner-details-scan.check.sh" && echo yes || echo no)" no
 printf '#!/bin/sh\necho prior scan\n' >"$FM/state/owner-details-scan.check.sh"
-cat >"$FM/bin/fm-check-register.sh" <<EOF
+cat >"$FM/bin/jg-check-register.sh" <<EOF
 #!/usr/bin/env bash
 printf 'registered: %s\n' "\$1" >>"$d/registered.log"
 EOF
-cat >"$FM/bin/fm-check-unregister.sh" <<EOF
+cat >"$FM/bin/jg-check-unregister.sh" <<EOF
 #!/usr/bin/env bash
 printf 'unregistered: %s\\n' "\$1" >>"$d/unregistered.log"
 EOF
-chmod +x "$FM/bin/fm-check-register.sh" "$FM/bin/fm-check-unregister.sh"
+chmod +x "$FM/bin/jg-check-register.sh" "$FM/bin/jg-check-unregister.sh"
 export XDG_DATA_HOME=$d/data
 "$SRC/install-scan.sh" "$FM" >/dev/null
 check "install writes the shim" "$(test -x "$FM/state/owner-details-scan.check.sh" && echo yes || echo no)" yes
 check "install keeps the previous shim backup" "$(find "$FM/state" -name 'owner-details-scan.check.sh.bak-owner-guard-scan-*' | wc -l)" 1
 check "install registers the check" "$(cat "$d/registered.log")" "registered: owner-details-scan"
-check "installed check is executable" "$(test -x "$d/data/fm-owner-guard-scan/scan-check" && echo yes || echo no)" yes
+check "installed check is executable" "$(test -x "$d/data/jg-owner-guard-scan/scan-check" && echo yes || echo no)" yes
 "$SRC/uninstall.sh" "$FM" >/dev/null
 check "owner uninstall restores previous scan shim" "$(cat "$FM/state/owner-details-scan.check.sh")" "$(printf '#!/bin/sh\necho prior scan')"
 check "owner uninstall consumes its backup" "$(find "$FM/state" -name 'owner-details-scan.check.sh.bak-owner-guard-scan-*' | wc -l)" 0
-check "owner uninstall removes scan executable" "$(test -e "$d/data/fm-owner-guard-scan/scan-check" && echo yes || echo no)" no
+check "owner uninstall removes scan executable" "$(test -e "$d/data/jg-owner-guard-scan/scan-check" && echo yes || echo no)" no
 "$SRC/uninstall.sh" "$FM" >/dev/null
 check "second owner uninstall is a no-op" "$(cat "$FM/state/owner-details-scan.check.sh")" "$(printf '#!/bin/sh\necho prior scan')"
 

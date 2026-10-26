@@ -75,17 +75,17 @@ check "d: no --force anywhere" "$(grep -c -- --force "$NM/calls" || true)" 0
 check "d: drain cleared" "$([ -e "$FM/state/.nm-drain" ] && echo present || echo cleared)" cleared
 
 # (e) install --dry-run: lists the register and the three unregisters, writes nothing.
-for s in fm-check-register.sh fm-check-unregister.sh; do printf '#!/bin/sh\necho stub ran >&2; exit 1\n' > "$FM/bin/$s"; chmod +x "$FM/bin/$s"; done
+for s in jg-check-register.sh jg-check-unregister.sh; do printf '#!/bin/sh\necho stub ran >&2; exit 1\n' > "$FM/bin/$s"; chmod +x "$FM/bin/$s"; done
 for old in nm-quiet nm-update nm-upgrade; do : > "$FM/state/$old.check.sh"; done
 before=$(find "$d" | sort)
 out=$("$SRC/install.sh" --dry-run "$FM" 2>&1)
-has "e: register" "$out" "would run: env -u FM_STATE_OVERRIDE FM_HOME=$FM $FM/bin/fm-check-register.sh 0-nm-drain"
-for old in nm-quiet nm-update nm-upgrade; do has "e: unregister $old" "$out" "would run: env -u FM_STATE_OVERRIDE FM_HOME=$FM $FM/bin/fm-check-unregister.sh $old"; done
+has "e: register" "$out" "would run: env -u FM_STATE_OVERRIDE FM_HOME=$FM $FM/bin/jg-check-register.sh 0-nm-drain"
+for old in nm-quiet nm-update nm-upgrade; do has "e: unregister $old" "$out" "would run: env -u FM_STATE_OVERRIDE FM_HOME=$FM $FM/bin/jg-check-unregister.sh $old"; done
 check "e: nothing written" "$(find "$d" | sort)" "$before"
 
 # (f) real install with FM_STATE_OVERRIDE exported empty: the stubs fail if it reaches them, so register and all
 #     three unregisters must run without it.
-for s in fm-check-register.sh fm-check-unregister.sh; do
+for s in jg-check-register.sh jg-check-unregister.sh; do
   cat > "$FM/bin/$s" <<'EOF'
 #!/bin/sh
 if [ "${FM_STATE_OVERRIDE+set}" ]; then echo "override leaked" >&2; exit 1; fi
@@ -94,7 +94,7 @@ EOF
 done
 out=$(FM_STATE_OVERRIDE='' "$SRC/install.sh" "$FM" 2>&1) && rc=0 || rc=$?
 check "f: install exits 0 with FM_STATE_OVERRIDE=''" "$rc" 0
-check "f: register and unregisters ran" "$(cat "$FM/calls" 2>/dev/null)" "$(printf 'fm-check-register.sh 0-nm-drain\nfm-check-unregister.sh nm-quiet\nfm-check-unregister.sh nm-update\nfm-check-unregister.sh nm-upgrade')"
-check "f: shim written" "$(sed -n 2p "$FM/state/0-nm-drain.check.sh")" "exec $XDG_DATA_HOME/fm-nm-drain/nm-drain.sh check $FM"
+check "f: register and unregisters ran" "$(cat "$FM/calls" 2>/dev/null)" "$(printf 'jg-check-register.sh 0-nm-drain\njg-check-unregister.sh nm-quiet\njg-check-unregister.sh nm-update\njg-check-unregister.sh nm-upgrade')"
+check "f: shim written" "$(sed -n 2p "$FM/state/0-nm-drain.check.sh")" "exec $XDG_DATA_HOME/jg-nm-drain/nm-drain.sh check $FM"
 
 [ "$fails" -eq 0 ] && echo "PASS: nm-drain e2e" || { echo "FAIL: $fails check(s)"; exit 1; }

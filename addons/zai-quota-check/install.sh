@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Install or update zai-quota-check: copy the check into $FM_HOME/state/ as
 # zai-quota.check.sh (mode 700, the state-check convention) and register the
-# zai-quota check with the home's bin/fm-check-register.sh. Idempotent.
+# zai-quota check with the home's bin/jg-check-register.sh. Idempotent.
 # Usage: install.sh [--dry-run]  (FM_HOME must name the home that runs it)
 set -euo pipefail
 dry=0
@@ -16,7 +16,7 @@ fi
 mkdir -p "$FM_HOME/state"
 cp -p "$src" "$dest"
 chmod 700 "$dest"
-if [ -x "$FM_HOME/bin/fm-check-register.sh" ]; then
-  "$FM_HOME/bin/fm-check-register.sh" zai-quota
+if [ -x "$FM_HOME/bin/jg-check-register.sh" ]; then
+  "$FM_HOME/bin/jg-check-register.sh" zai-quota
 fi
 echo "installed $dest"

@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Install readable worker/lead pane titles through the home launch-env hook. Usage: install.sh [--dry-run] <fm-home>
+# Install readable worker/lead pane titles through the home launch-env hook. Usage: install.sh [--dry-run] <jg-home>
 set -euo pipefail
 DRY=0
 [ "${1:-}" = --dry-run ] && { DRY=1; shift; }
-[ "$#" -eq 1 ] && [ -d "$1/config" ] || { echo 'usage: install.sh [--dry-run] <fm-home>' >&2; exit 2; }
+[ "$#" -eq 1 ] && [ -d "$1/config" ] || { echo 'usage: install.sh [--dry-run] <jg-home>' >&2; exit 2; }
 FMH=$(cd "$1" && pwd -P)
 SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
-DEST=${XDG_DATA_HOME:-$HOME/.local/share}/fm-pane-titles
+DEST=${XDG_DATA_HOME:-$HOME/.local/share}/jg-pane-titles
 HOOK=$FMH/config/launch-env-hook
 SHIM=$(printf '#!/usr/bin/env bash\nexport FM_PANE_TITLES_HOME=%q\nexec %q/launch-env-hook "$@"\n' "$DEST" "$DEST")
 if [ -e "$HOOK" ] && [ "$(cat "$HOOK")" != "$SHIM" ] && [ -e "$DEST/previous-launch-env-hook" ]; then

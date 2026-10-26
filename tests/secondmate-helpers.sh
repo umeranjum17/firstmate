@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # tests/secondmate-helpers.sh - shared fixtures and mocks for the secondmate
-# suites (fm-secondmate-lifecycle-e2e and fm-secondmate-safety).
+# suites (jg-secondmate-lifecycle-e2e and jg-secondmate-safety).
 #
 # These mocks encode secondmate-lifecycle behavior (fake tmux that logs window
 # ops, fake treehouse that leases/returns homes, fake no-mistakes that records
@@ -17,7 +17,7 @@
 # FM_FAKE_TREEHOUSE_RETURN_FAIL is set). Echoes the fakebin dir.
 make_fake_tmux() {
   local dir=$1 fakebin capture
-  fakebin=$(fm_fakebin "$dir")
+  fakebin=$(jg_fakebin "$dir")
   capture="$dir/pane.txt"
   # A real, positively identified empty agent composer. A blank capture is
   # deliberately unknown under the fleet-wide strict blank-row posture.
@@ -138,7 +138,7 @@ SH
 # A fake no-mistakes that touches .no-mistakes-init / .no-mistakes-doctor markers.
 make_fake_no_mistakes() {
   local dir=$1 fakebin
-  fakebin=$(fm_fakebin "$dir")
+  fakebin=$(jg_fakebin "$dir")
   cat > "$fakebin/no-mistakes" <<'SH'
 #!/usr/bin/env bash
 set -eu
@@ -156,7 +156,7 @@ SH
 # FM_FAKE_NO_MISTAKES_LOG and fails for the project named FM_FAKE_NO_MISTAKES_FAIL_PROJECT.
 make_recording_no_mistakes() {
   local dir=$1 fakebin
-  fakebin=$(fm_fakebin "$dir")
+  fakebin=$(jg_fakebin "$dir")
   cat > "$fakebin/no-mistakes" <<'SH'
 #!/usr/bin/env bash
 set -eu
@@ -187,13 +187,13 @@ make_firstmate_git_root() {
   local home=$1
   mkdir -p "$home/bin"
   printf '# Firstmate\n' > "$home/AGENTS.md"
-  cat > "$home/bin/fm-guard.sh" <<'SH'
+  cat > "$home/bin/jg-guard.sh" <<'SH'
 #!/usr/bin/env bash
 exit 0
 SH
-  chmod +x "$home/bin/fm-guard.sh"
+  chmod +x "$home/bin/jg-guard.sh"
   git -C "$home" init -q
-  git -C "$home" add AGENTS.md bin/fm-guard.sh
+  git -C "$home" add AGENTS.md bin/jg-guard.sh
   git -C "$home" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm initial
 }
 
@@ -202,7 +202,7 @@ SH
 scaffold_secondmate_charter() {
   local home=$1 id=$2 charter=$3
   shift 3
-  FM_HOME="$home" FM_SECONDMATE_CHARTER="$charter" "$ROOT/bin/fm-brief.sh" "$id" --secondmate "$@" >/dev/null
+  FM_HOME="$home" FM_SECONDMATE_CHARTER="$charter" "$ROOT/bin/jg-brief.sh" "$id" --secondmate "$@" >/dev/null
 }
 
 # Make a directory look like a genuine seeded secondmate home (for handoff tests).
@@ -210,7 +210,7 @@ seed_secondmate_home_marker() {
   local home=$1 id=$2
   mark_firstmate_home "$home"
   mkdir -p "$home/data"
-  printf '%s\n' "$id" > "$home/.fm-secondmate-home"
+  printf '%s\n' "$id" > "$home/.jg-secondmate-home"
 }
 
 # Wait up to <limit> 0.1s ticks while <pid> stays alive. Returns 1 if it dies.

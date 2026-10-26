@@ -4,8 +4,8 @@ data/
 scratchpad*
 .no-mistakes/
 .lavish/
-.fm-secondmate-home
-.fm-secondmate-parent
+.jg-secondmate-home
+.jg-secondmate-parent
 .DS_Store
 __pycache__/
 *.pyc

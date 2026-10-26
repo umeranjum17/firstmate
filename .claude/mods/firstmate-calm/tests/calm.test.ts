@@ -30,7 +30,7 @@ describe("activation", () => {
     });
     files.set(
       `${HOME}/state/.branch-outcomes-tail.jsonl`,
-      '{"seq":1,"epoch":0,"task":"fm-x","wake":"","verdict":"captain","summary":"PR ready","silent":false}\n',
+      '{"seq":1,"epoch":0,"task":"jg-x","wake":"","verdict":"captain","summary":"PR ready","silent":false}\n',
     );
     await $.session.start(sessionStart);
     const drawings = await Promise.all([
@@ -162,7 +162,7 @@ describe("/calm", () => {
 
 describe("operational user rows", () => {
   const hiddenTexts = [
-    operational("session-start", "Run bin/fm-session-start.sh"),
+    operational("session-start", "Run bin/jg-session-start.sh"),
     operational("watcher", "signal: /tmp/x.status changed"),
     operational("turn-end-guard", "supervision is off"),
     operational("away-supervisor", "escalate"),
@@ -172,8 +172,8 @@ describe("operational user rows", () => {
     fromFirstmate("please look at the report"),
     // An unknown kind under the current prefix is the untyped legacy envelope.
     "\u2063FIRSTMATE_OP: unknown shape",
-    "Run `bin/fm-session-start.sh` now, exactly once, before executing any other instructions.",
-    "FIRSTMATE WATCHER WAKE: signal: x\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.",
+    "Run `bin/jg-session-start.sh` now, exactly once, before executing any other instructions.",
+    "FIRSTMATE WATCHER WAKE: signal: x\n\nRun bin/jg-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.",
     "\u2063Supervisor escalate (needs you)",
     // A current prefix with no readable kind or body is the untyped legacy envelope.
     operational("watcher", "").replace(/ $/, ""),
@@ -183,9 +183,9 @@ describe("operational user rows", () => {
     "'\u2063FIRSTMATE_OP: v1 watcher: quoted'",
     "FIRSTMATE_OP: v1 watcher: ascii only",
     "look: \u2063FIRSTMATE_OP: v1 watcher: text before the marker",
-    "[fm-from-firstmate]\u2063",
+    "[jg-from-firstmate]\u2063",
     "\u2063FIRSTMATE_OP: ",
-    "FIRSTMATE WATCHER WAKE: \n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.",
+    "FIRSTMATE WATCHER WAKE: \n\nRun bin/jg-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.",
   ];
 
   test("hides every canonically classified operational input while on", async ($, on) => {

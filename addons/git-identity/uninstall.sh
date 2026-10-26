@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Remove git-identity files and its home launch shim. Usage: uninstall.sh [--dry-run] <fm-home>
+# Remove git-identity files and its home launch shim. Usage: uninstall.sh [--dry-run] <jg-home>
 set -euo pipefail
-DRY=0; [ "${1:-}" = --dry-run ] && { DRY=1; shift; }; [ "$#" -eq 1 ] && [ -d "$1/config" ] || { echo 'usage: uninstall.sh [--dry-run] <fm-home>' >&2; exit 2; }
-FMH=$(cd "$1" && pwd -P); DEST=${XDG_DATA_HOME:-$HOME/.local/share}/fm-git-identity; HOOK=$FMH/config/launch-env-hook
+DRY=0; [ "${1:-}" = --dry-run ] && { DRY=1; shift; }; [ "$#" -eq 1 ] && [ -d "$1/config" ] || { echo 'usage: uninstall.sh [--dry-run] <jg-home>' >&2; exit 2; }
+FMH=$(cd "$1" && pwd -P); DEST=${XDG_DATA_HOME:-$HOME/.local/share}/jg-git-identity; HOOK=$FMH/config/launch-env-hook
 SHIM=$(printf '#!/usr/bin/env bash\nexec %q env-file "$@"\n' "$DEST/git-identity")
 HOOKS='applypatch-msg pre-applypatch post-applypatch pre-commit pre-merge-commit prepare-commit-msg commit-msg post-commit pre-rebase post-checkout post-merge pre-push post-rewrite pre-auto-gc sendemail-validate'
 if [ -e "$HOOK" ] && [ "$(cat "$HOOK")" = "$SHIM" ]; then

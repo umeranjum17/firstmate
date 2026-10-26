@@ -10,8 +10,8 @@ work=$(mktemp -d /var/tmp/owner-rules-live.XXXXXX)
 export HOME=$work/user XDG_DATA_HOME=$work/data XDG_CONFIG_HOME=$work/config XDG_CACHE_HOME=$work/cache
 export TMPDIR=$work/tmp SIGN_OFF_HOME=$work/board FM_HOME=$work/home FM_ADDONS_DIR=$repo
 mkdir -p "$HOME" "$TMPDIR" "$SIGN_OFF_HOME" "$FM_HOME/config" "$work/parent/state" "$FM_HOME/data/umer/.done-done/runs"
-printf 'umer\n' > "$FM_HOME/.fm-secondmate-home"
-printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$work/parent" > "$FM_HOME/.fm-secondmate-parent"
+printf 'umer\n' > "$FM_HOME/.jg-secondmate-home"
+printf 'schema=jg-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$work/parent" > "$FM_HOME/.jg-secondmate-parent"
 bash "$repo/owner-rules/install.sh" "$FM_HOME" >/dev/null
 board=$SIGN_OFF_HOME/decisions.json
 printf '{"schema":2,"items":[]}\n' > "$board"
@@ -35,10 +35,10 @@ post() {
 {
   printf 'Candidate commit: %s\n' "$head"
   printf 'sign-off-axi version: '; sign-off-axi --version
-  record 2 'A secondmate Lavish link is refused before append.' bash "$fork/bin/fm-secondmate-report.sh" 'done' abcdef0123456789 'http://review.example:4387/session/umer'
+  record 2 'A secondmate Lavish link is refused before append.' bash "$fork/bin/jg-secondmate-report.sh" 'done' abcdef0123456789 'http://review.example:4387/session/umer'
   [ ! -e "$work/parent/state/umer.status" ]
   echo 'Refused secondmate note wrote no status file.'
-  record 0 'A secondmate sign-off link is accepted.' bash "$fork/bin/fm-secondmate-report.sh" 'done' abcdef0123456789 'http://review.example:4388/board/umer'
+  record 0 'A secondmate sign-off link is accepted.' bash "$fork/bin/jg-secondmate-report.sh" 'done' abcdef0123456789 'http://review.example:4388/board/umer'
   cat "$work/parent/state/umer.status"
   grep -qF 'http://review.example:4388/board/umer' "$work/parent/state/umer.status"
   post 'See http://review.example:4387/session/umer' 1 'A merge-card Lavish link is refused before posting.'

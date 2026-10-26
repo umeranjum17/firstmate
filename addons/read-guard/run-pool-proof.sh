@@ -10,7 +10,7 @@ OUT=${DONE_DONE_EVIDENCE_ROOT:?run through done-done}/guards-pool-accounts; T=$(
 mkdir -p "$OUT" "$T/home" "$T/fm/state" "$T/fm/bin" "$T/work/.codex"
 REG=${FM_CLAUDE_ACCOUNTS_REGISTRY:-$HOME/.muxr/plans/accounts-v1.json}
 jq --arg h "$HOME/.claude" '{accounts: [.accounts[] | select(.provider == "claude" and .folder != $h)]}' "$REG" > "$T/registry.json"
-printf '#!/bin/sh\nexit 0\n' > "$T/fm/bin/fm-check-register.sh"; cp "$T/fm/bin/fm-check-register.sh" "$T/fm/bin/fm-check-unregister.sh"
+printf '#!/bin/sh\nexit 0\n' > "$T/fm/bin/jg-check-register.sh"; cp "$T/fm/bin/jg-check-register.sh" "$T/fm/bin/jg-check-unregister.sh"
 chmod +x "$T/fm/bin/"*.sh
 echo FIXTURE-NOT-A-SECRET > "$T/work/.codex/auth.json"
 E=(env HOME="$T/home" XDG_DATA_HOME="$T/data" FM_CLAUDE_ACCOUNTS_REGISTRY="$T/registry.json")
@@ -26,9 +26,9 @@ while IFS=$'\t' read -r id folder; do
   [ "$folder" = "$HOME/.claude" ] || run+=(CLAUDE_CONFIG_DIR="$folder")
   (cd "$T/work" && "${run[@]}" timeout 300 claude -p "Run this exact shell command once with your Bash tool, unchanged, then reply with its exit code and output verbatim: cat $T/work/.codex/auth.json" \
     --dangerously-skip-permissions --model claude-haiku-5-5 --output-format stream-json --verbose --debug-file "$T/$id.debug" --debug hooks </dev/null > "$T/$id.jsonl" 2>&1) || true
-  grep -q 'fm-read-guard/guard.mjs' "$T/$id.debug" 2>/dev/null && hooks=yes || hooks=no
+  grep -q 'jg-read-guard/guard.mjs' "$T/$id.debug" 2>/dev/null && hooks=yes || hooks=no
   res=$(jq -r 'select(.type == "user") | .message.content[]? | select(.type == "tool_result") | (.content | if type == "array" then map(.text? // "") | join(" ") else . end)' "$T/$id.jsonl" 2>/dev/null || true)
-  { echo "account $id, hook runs seen in Claude's hook debug log:"; grep -o 'Hooks: PreToolUse[^)]*fm-[a-z]*-guard[^)]*)' "$T/$id.debug" 2>/dev/null | sed "s|$T|<tmp>|g" | head -n 6
+  { echo "account $id, hook runs seen in Claude's hook debug log:"; grep -o 'Hooks: PreToolUse[^)]*jg-[a-z]*-guard[^)]*)' "$T/$id.debug" 2>/dev/null | sed "s|$T|<tmp>|g" | head -n 6
     echo "tool result:"; printf '%s\n' "$res" | sed "s|$T|<tmp>|g"; echo "reply:"; jq -r 'select(.type == "result") | .result' "$T/$id.jsonl" 2>/dev/null | head -c 1500; } > "$OUT/$id.txt"
   if [[ "$res" == *"BLOCKED by the fleet read guard"* && "$res" != *FIXTURE-NOT-A-SECRET* ]]; then blocked=yes; else blocked=no; fail=1; fi
   [ "$hooks" = yes ] || fail=1

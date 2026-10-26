@@ -18,7 +18,7 @@ Load `harness-adapters` for harness-specific launch, interrupt, resume, trust-di
 
 Implementation details, metadata fields, teardown guarantees, and limitations live in `docs/orca-backend.md`.
 `docs/verification/runtime-backends.md` "Orca" owns active smoke evidence.
-Prefer the `bin/fm-*` helpers over raw `orca` commands.
+Prefer the `bin/jg-*` helpers over raw `orca` commands.
 Use raw `orca` only when the helper surface cannot answer the inspection question, and keep the recorded Juggernaut metadata as the task identity.
 
 ## Preflight
@@ -36,30 +36,30 @@ Before switching or spawning against Orca:
 
 ## Spawn
 
-Use `bin/fm-spawn.sh` so Juggernaut creates the brief, worktree, terminal, metadata, status file, and watcher surface together.
+Use `bin/jg-spawn.sh` so Juggernaut creates the brief, worktree, terminal, metadata, status file, and watcher surface together.
 Pass `--backend orca` for a one-off Orca task, or rely on the already-selected Orca backend when that selection is intentional.
 
 After spawn, check the task with Juggernaut helpers:
 
-- `bin/fm-peek.sh fm-<id>` for launch failures, trust dialogs, or first output.
+- `bin/jg-peek.sh jg-<id>` for launch failures, trust dialogs, or first output.
 - `state/<id>.meta` for `backend=orca`, `terminal=`, `orca_worktree_id=`, and `worktree=`.
-- `bin/fm-crew-state.sh <id>` when the current run state matters.
-- `bin/fm-watch.sh` whenever there are tasks in flight and this session owns supervision.
+- `bin/jg-crew-state.sh <id>` when the current run state matters.
+- `bin/jg-watch.sh` whenever there are tasks in flight and this session owns supervision.
 
 Do not manually create the Orca worktree or terminal for a normal Juggernaut task.
 Do not manually patch metadata to make an externally-created Orca terminal look like a Juggernaut task.
 
 ## Supervision
 
-Use `bin/fm-peek.sh`, `bin/fm-send.sh`, `bin/fm-crew-state.sh`, and `bin/fm-teardown.sh` for routine operation.
-For steer messages, use `bin/fm-send.sh <id> '...'`; the stable `fm-<id>` alias also works, and ordinary local text steers may contain newlines because they ride the durable inbox.
+Use `bin/jg-peek.sh`, `bin/jg-send.sh`, `bin/jg-crew-state.sh`, and `bin/jg-teardown.sh` for routine operation.
+For steer messages, use `bin/jg-send.sh <id> '...'`; the stable `jg-<id>` alias also works, and ordinary local text steers may contain newlines because they ride the durable inbox.
 Keep initial scope in the task brief; a temporary file remains useful when the instruction includes supporting material the worker should inspect separately.
 
 When supervising, treat `state/<id>.meta` as the routing record and Orca's own ids as backend implementation details.
-The stable Juggernaut alias is `fm-<id>`.
+The stable Juggernaut alias is `jg-<id>`.
 The recorded `terminal=` and `orca_worktree_id=` fields are what backend helpers use under the hood.
 
-If an ordinary steer fails to enqueue, or a typed-plane `fm-send` fails to submit, do not immediately repeat the instruction.
+If an ordinary steer fails to enqueue, or a typed-plane `jg-send` fails to submit, do not immediately repeat the instruction.
 Read the reported failure and peek first, then decide whether the record exists or the target is busy, waiting on a prompt, stuck behind a popup, or genuinely wedged.
 For harness-specific interrupts or exits, load `harness-adapters`.
 
@@ -83,10 +83,10 @@ Ship work can be torn down only after the work is landed by its project mode.
 Keep Orca smoke tests focused on lifecycle plumbing:
 
 1. Select Orca intentionally for a disposable task or scout.
-2. Spawn through `bin/fm-spawn.sh`.
+2. Spawn through `bin/jg-spawn.sh`.
 3. Confirm metadata records the Orca backend, terminal, Orca worktree id, and isolated worktree path.
-4. Verify `bin/fm-peek.sh`, a short `bin/fm-send.sh` steer, watcher wake behavior, and `bin/fm-crew-state.sh`.
-5. Tear down through `bin/fm-teardown.sh` after the task is safely disposable or landed.
+4. Verify `bin/jg-peek.sh`, a short `bin/jg-send.sh` steer, watcher wake behavior, and `bin/jg-crew-state.sh`.
+5. Tear down through `bin/jg-teardown.sh` after the task is safely disposable or landed.
 6. Restore the previous backend selection if Orca was selected only for the smoke test.
 
 Do not mix a backend smoke test with unrelated feature work.

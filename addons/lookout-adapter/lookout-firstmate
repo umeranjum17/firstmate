@@ -5,7 +5,7 @@
   lookout-firstmate --serve [--port N] [--bind ADDR]     serve it at /fleet.json (Lookout's --adapter URL), the last good
                                                          snapshot at once, rebuilt in the background every --every seconds
 
-The data is the fleet dashboard builder's own output (fleet-dashboard/fm-dashboard.sh build), reused as is: state/dashboard/
+The data is the fleet dashboard builder's own output (fleet-dashboard/jg-dashboard.sh build), reused as is: state/dashboard/
 data.json and board.json under FM_HOME. A build older than 2 minutes is rebuilt first (it writes only under state/dashboard)
 unless --no-build. Homes, their state files and every other source are only read; only whitelisted fields are copied, so no
 key, token or account secret reaches the document. FM_HOME defaults to the current directory's Firstmate home.
@@ -36,7 +36,7 @@ def refresh(home, force_build):
     if force_build and (not os.path.exists(data) or time.time() - os.path.getmtime(data) > 120):
         env = dict(os.environ, FM_HOME=home)
         env.setdefault('FM_BIN', os.path.join(home, 'bin'))
-        r = subprocess.run([os.path.join(HERE, '../fleet-dashboard/fm-dashboard.sh'), 'build'], env=env, capture_output=True, text=True, timeout=240)
+        r = subprocess.run([os.path.join(HERE, '../fleet-dashboard/jg-dashboard.sh'), 'build'], env=env, capture_output=True, text=True, timeout=240)
         if r.returncode:
             raise RuntimeError('dashboard build failed: ' + (r.stderr.strip().splitlines() or ['no output'])[-1])
     return load(data), load(os.path.join(home, 'state/dashboard/board.json'))

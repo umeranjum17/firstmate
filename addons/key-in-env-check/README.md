@@ -19,4 +19,4 @@ It never kills, signals or changes anything.
 
 ## Install and test
 
-`FM_HOME=<home> key-in-env-check/install.sh [--dry-run]` copies the check to `${XDG_DATA_HOME:-~/.local/share}/fm-key-in-env-check/` and registers `key-in-env-check` as a home watcher check. Remove with `uninstall.sh`. Test: `bash key-in-env-check/tests/key-in-env-check-e2e.sh` (uses a temp `HOME` and a fixture key file; never the real one).
+`FM_HOME=<home> key-in-env-check/install.sh [--dry-run]` copies the check to `${XDG_DATA_HOME:-~/.local/share}/jg-key-in-env-check/` and registers `key-in-env-check` as a home watcher check. Remove with `uninstall.sh`. Test: `bash key-in-env-check/tests/key-in-env-check-e2e.sh` (uses a temp `HOME` and a fixture key file; never the real one).

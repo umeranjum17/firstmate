@@ -3,7 +3,7 @@
 # Task identity comes from lane meta / data/<task>, not the PR branch tip name.
 set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)
-LINT=$ROOT/merge-on-green/fm-checks-lint.sh
+LINT=$ROOT/merge-on-green/jg-checks-lint.sh
 d=$(mktemp -d)
 trap 'rm -rf -- "$d"' EXIT
 mkdir -p "$d/fm/state" "$d/fm/data/lane-alpha" "$d/fm/data/lane-beta" "$d/bin"

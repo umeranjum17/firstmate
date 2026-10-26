@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
 # Compatibility source for real-Herdr tests.
 # The production owner of the isolation, refuse-default, teardown, and
-# fleet-state tripwire contract is bin/fm-herdr-lab.sh.
+# fleet-state tripwire contract is bin/jg-herdr-lab.sh.
 set -u
 
 # shellcheck source=tests/git-config-helpers.sh
 . "$(dirname "${BASH_SOURCE[0]}")/git-config-helpers.sh"
 
-# Herdr backend tests drive the real fm-spawn/fm-teardown but do not source
+# Herdr backend tests drive the real jg-spawn/jg-teardown but do not source
 # tests/lib.sh, so exempt them from the gate-lifecycle refusal here too (see
-# tests/lib.sh and bin/fm-gate-refuse-lib.sh for why firstmate's own suite,
+# tests/lib.sh and bin/jg-gate-refuse-lib.sh for why firstmate's own suite,
 # which the no-mistakes gate runs from a gate worktree, must be exempt).
 export FM_GATE_REFUSE_BYPASS=1
 
 HERDR_TEST_SAFETY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=/dev/null
-. "$HERDR_TEST_SAFETY_DIR/bin/fm-herdr-lab.sh"
+. "$HERDR_TEST_SAFETY_DIR/bin/jg-herdr-lab.sh"
 
 # herdr_forget_inherited_pane: drop the Herdr PANE identity this test process
 # inherited from whatever terminal it was started in.
@@ -45,14 +45,14 @@ done
 unset herdr_test_key
 
 herdr_prepare_runtime() {
-  fm_herdr_lab_prepare "$1" || return 1
-  fm_herdr_lab_runtime_env "$1"
+  jg_herdr_lab_prepare "$1" || return 1
+  jg_herdr_lab_runtime_env "$1"
 }
 
 herdr_refuse_if_default() { # <session>
-  fm_herdr_lab_refuse_if_default "$1"
+  jg_herdr_lab_refuse_if_default "$1"
 }
 
 herdr_safe_stop_and_delete() { # <session>
-  env "${HERDR_TEST_FLEET_ENV[@]}" bash "$HERDR_TEST_SAFETY_DIR/bin/fm-herdr-lab.sh" teardown "$1"
+  env "${HERDR_TEST_FLEET_ENV[@]}" bash "$HERDR_TEST_SAFETY_DIR/bin/jg-herdr-lab.sh" teardown "$1"
 }

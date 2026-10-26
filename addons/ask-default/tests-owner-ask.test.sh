@@ -7,7 +7,7 @@ trap 'rm -rf -- "$work"' EXIT
 export HOME="$work/home" FM_HOME="$work/home" SIGN_OFF_HOME="$work/board"
 export XDG_DATA_HOME="$work/xdg" XDG_CONFIG_HOME="$work/config" TMPDIR="$work/tmp"
 mkdir -p "$HOME/config" "$SIGN_OFF_HOME" "$TMPDIR"
-ask() { python3 "$root/ask-default/bin/fm-captain-ask.py" "$@"; }
+ask() { python3 "$root/ask-default/bin/jg-captain-ask.py" "$@"; }
 author() {
   ask add device-check "${ASK_QUESTION:-Can you test the new phone connection?}" '' --owner-must own-device-test \
     --about 'The phone connection is ready to try.' --why 'Your phone is needed before we release it.' \
@@ -47,7 +47,7 @@ assert len({o['outcome'] for o in card['options']}) == 2
 print('PASS: real board has the authored owner question, three context lines and distinct outcomes')
 PY
 ask install "$HOME"
-FM_HOME="$HOME" "$HOME/config/fm-captain-ask.sh" list > "$work/installed-list"
+FM_HOME="$HOME" "$HOME/config/jg-captain-ask.sh" list > "$work/installed-list"
 [ "$(cat "$work/installed-list")" = "$before" ]
 ask "done" device-check
 [ -z "$(ask list)" ]

@@ -48,7 +48,7 @@ case "$1 $2" in
   *) echo "unexpected gh call: $*" >&2; exit 2 ;;
 esac
 EOF
-cat > "$d/addons/receipts/bin/fm-run-receipt.sh" <<'EOF'
+cat > "$d/addons/receipts/bin/jg-run-receipt.sh" <<'EOF'
 #!/usr/bin/env bash
 printf '%s|%s|%s|%s\n' "$1" "$2" "$3" "$(cat "$3")" >> "$FM_MAIN_HOME/revocations"
 EOF
@@ -56,19 +56,19 @@ cat > "$d/legacy.sh" <<'EOF'
 #!/usr/bin/env bash
 case "$1" in */1004) echo 'checks-lint: FAIL: 1000 added non-generated lines'; exit 1 ;; *) echo 'checks-lint: PASS: fixture' ;; esac
 EOF
-chmod +x "$d/bin/gh" "$d/bin/done-done" "$d/legacy.sh" "$d/addons/receipts/bin/fm-run-receipt.sh"
+chmod +x "$d/bin/gh" "$d/bin/done-done" "$d/legacy.sh" "$d/addons/receipts/bin/jg-run-receipt.sh"
 export PATH="$d/bin:$PATH" FM_DONE_DONE_BIN="$d/bin/done-done" FM_LEGACY_CHECKS_LINT="$d/legacy.sh" FM_ADDONS_DIR="$d/addons" FM_MAIN_HOME="$d/main" DONE_DONE_ARGS_LOG="$d/done-done-args"
 failures=0
 # done-done 0.6.17 reads the pull number from the URL, so each fixture carries a real-shaped one.
 for id in good:1001 generated:1002 routes:1003 bad:1004; do
   name=${id%%:*}; num=${id##*:}
-  mkdir -p "$d/fm-$name/state" "$d/fm-$name/data"
-  [ "$name" != bad ] || printf 'pr=https://github.com/owner/repo/pull/%s\n' "$num" > "$d/fm-$name/state/fixture.meta"
+  mkdir -p "$d/jg-$name/state" "$d/jg-$name/data"
+  [ "$name" != bad ] || printf 'pr=https://github.com/owner/repo/pull/%s\n' "$num" > "$d/jg-$name/state/fixture.meta"
   set +e
-  legacy=$(FM_HOME="$d/fm-$name" "$d/legacy.sh" "https://github.com/owner/repo/pull/$num" "$d/fm/data/evidence" 2>&1); legacy_rc=$?
-  actual=$(FM_HOME="$d/fm-$name" "$ROOT/merge-on-green/checks-lint.sh" "https://github.com/owner/repo/pull/$num" "$d/fm/data/evidence" 2>&1); actual_rc=$?
+  legacy=$(FM_HOME="$d/jg-$name" "$d/legacy.sh" "https://github.com/owner/repo/pull/$num" "$d/fm/data/evidence" 2>&1); legacy_rc=$?
+  actual=$(FM_HOME="$d/jg-$name" "$ROOT/merge-on-green/checks-lint.sh" "https://github.com/owner/repo/pull/$num" "$d/fm/data/evidence" 2>&1); actual_rc=$?
   set -e
-  logged=$(awk -F '\t' -v src="https://github.com/owner/repo/pull/$num" '$2 == src { verdict = $4 } END { print verdict }' "$d/fm-$name/data/checks-gate.log")
+  logged=$(awk -F '\t' -v src="https://github.com/owner/repo/pull/$num" '$2 == src { verdict = $4 } END { print verdict }' "$d/jg-$name/data/checks-gate.log")
   want=pass; [ "$actual_rc" -eq 0 ] || want=fail
   if [ "$legacy_rc" -ne "$actual_rc" ] || [ "${logged/warn/pass}" != "$want" ]; then printf 'FAIL %s: legacy=%s (%s), done-done=%s (%s), log=%s\n' "$name" "$legacy_rc" "$legacy" "$actual_rc" "$actual" "$logged"; failures=$((failures + 1)); else echo "PASS $name: both verdicts $([ "$actual_rc" -eq 0 ] && echo PASS || echo FAIL)"; fi
 done
@@ -80,15 +80,15 @@ exit 2
 EOF
 chmod +x "$d/bin/old-done-done"
 set +e
-fallback=$(FM_HOME="$d/fm-good" FM_DONE_DONE_BIN="$d/bin/old-done-done" "$ROOT/merge-on-green/checks-lint.sh" 'https://github.com/owner/repo/pull/1001' "$d/fm/data/evidence" 2>&1); fallback_rc=$?
+fallback=$(FM_HOME="$d/jg-good" FM_DONE_DONE_BIN="$d/bin/old-done-done" "$ROOT/merge-on-green/checks-lint.sh" 'https://github.com/owner/repo/pull/1001' "$d/fm/data/evidence" 2>&1); fallback_rc=$?
 set -e
 [ "$fallback_rc" -eq 0 ] && [[ "$fallback" == *'checks-lint: PASS: fixture'* ]] || { echo "FAIL fallback: rc=$fallback_rc ($fallback)"; exit 1; }
 [ "$(wc -l < "$FM_MAIN_HOME/revocations")" -eq 1 ] && grep -q '^fixture|FAIL|' "$FM_MAIN_HOME/revocations" || { echo 'FAIL FAIL receipt'; exit 1; }
 # A caller-relative evidence directory must survive the adapter's temporary cwd.
 printf 'evidence fixture\n' > "$d/cwd/data/evidence/result.txt"
-printf 'pr=https://github.com/owner/repo/pull/1001\n' > "$d/fm-good/state/fixture.meta"
+printf 'pr=https://github.com/owner/repo/pull/1001\n' > "$d/jg-good/state/fixture.meta"
 set +e
-relative=$(cd "$d/cwd" && FM_HOME="$d/fm-good" "$ROOT/merge-on-green/checks-lint.sh" 'https://github.com/owner/repo/pull/1001' data/evidence 2>&1); relative_rc=$?
+relative=$(cd "$d/cwd" && FM_HOME="$d/jg-good" "$ROOT/merge-on-green/checks-lint.sh" 'https://github.com/owner/repo/pull/1001' data/evidence 2>&1); relative_rc=$?
 set -e
 [ "$relative_rc" -eq 0 ] && [[ "$relative" == *'checks-lint: PASS: not-proven:'* ]] || { echo "FAIL relative evidence: rc=$relative_rc ($relative)"; exit 1; }
 grep -Fq "https://github.com/owner/repo/pull/1001|$d/cwd/data/evidence" "$DONE_DONE_ARGS_LOG" || { echo 'FAIL relative evidence was not made absolute'; exit 1; }

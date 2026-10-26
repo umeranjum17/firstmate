@@ -6,25 +6,25 @@ tmp=$(mktemp -d)
 trap 'rm -rf -- "$tmp"' EXIT
 home=$tmp/home; stub=$tmp/bin
 mkdir -p "$home/state" "$home/config" "$home/bin" "$stub"
-cat >"$home/bin/fm-stub-lib.sh" <<'LIB'
-fm_meta_get() { sed -n "s|^$2=||p" "$1" | tail -n 1; }
-fm_backend_of_meta() { echo fixture; }
-fm_backend_target_of_meta() { fm_meta_get "$1" endpoint_task_id; }
-fm_backend_visible_capture() { [ ! -f "$FM_HOME/state/$2.screen" ] || cat "$FM_HOME/state/$2.screen"; return 0; }
-fm_busy_classify_meta() { echo 'idle no-busy-record'; }
-fm_busy_record_read() { echo ''; }
+cat >"$home/bin/jg-stub-lib.sh" <<'LIB'
+jg_meta_get() { sed -n "s|^$2=||p" "$1" | tail -n 1; }
+jg_backend_of_meta() { echo fixture; }
+jg_backend_target_of_meta() { jg_meta_get "$1" endpoint_task_id; }
+jg_backend_visible_capture() { [ ! -f "$FM_HOME/state/$2.screen" ] || cat "$FM_HOME/state/$2.screen"; return 0; }
+jg_busy_classify_meta() { echo 'idle no-busy-record'; }
+jg_busy_record_read() { echo ''; }
 FM_QUOTA_ROW_JQ='def quota_lane($harness; $model): ""; def quota_row($snapshot; $provider; $lane): null;'
-fm_quota_json_valid() { jq -e '.schemaVersion == 5 and (.providers | type) == "array"' >/dev/null 2>&1; }
-fm_quota_single_provider_for_harness() { return 1; }
-fm_parent_channel_report() { :; }
-fm_run_timed() { shift; "$@"; }
+jg_quota_json_valid() { jq -e '.schemaVersion == 5 and (.providers | type) == "array"' >/dev/null 2>&1; }
+jg_quota_single_provider_for_harness() { return 1; }
+jg_parent_channel_report() { :; }
+jg_run_timed() { shift; "$@"; }
 LIB
-for lib in fm-backend.sh fm-busy-lib.sh fm-quota-axi-lib.sh fm-parent-channel-lib.sh; do ln -s fm-stub-lib.sh "$home/bin/$lib"; done
-cat >"$home/bin/fm-control.sh" <<'CONTROL'
+for lib in jg-backend.sh jg-busy-lib.sh jg-quota-axi-lib.sh jg-parent-channel-lib.sh; do ln -s jg-stub-lib.sh "$home/bin/$lib"; done
+cat >"$home/bin/jg-control.sh" <<'CONTROL'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >>"$FM_HOME/state/control.log"
 CONTROL
-cat >"$home/bin/fm-crew-state.sh" <<'CREW'
+cat >"$home/bin/jg-crew-state.sh" <<'CREW'
 #!/usr/bin/env bash
 echo 'state: working · source: fixture'
 CREW
@@ -37,7 +37,7 @@ cat >"$stub/claude" <<'CLAUDE'
 if [ "${CLAUDE_LIMIT:-}" = yes ]; then echo "You've hit your usage limit for your plan; try again in 3h"; exit 1; fi
 echo PONG
 CLAUDE
-chmod +x "$home/bin/fm-control.sh" "$home/bin/fm-crew-state.sh" "$stub/quota-axi" "$stub/claude"
+chmod +x "$home/bin/jg-control.sh" "$home/bin/jg-crew-state.sh" "$stub/quota-axi" "$stub/claude"
 cat >"$home/config/crew-dispatch.json" <<'DISPATCH'
 {"rules":[],"default":[{"harness":"claude","model":"claude-haiku-5-5"}]}
 DISPATCH

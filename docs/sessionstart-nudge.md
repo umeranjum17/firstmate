@@ -1,12 +1,12 @@
 # Native session-start adapters
 
-This doc is for operators who need to know which harnesses run `bin/fm-session-start.sh` when a session opens, which only nudge the agent to run it, and how clear, compaction, and resume are handled.
+This doc is for operators who need to know which harnesses run `bin/jg-session-start.sh` when a session opens, which only nudge the agent to run it, and how clear, compaction, and resume are handled.
 AGENTS.md section 3 is the authoritative behavioral contract for session start.
 This file owns how the tracked native session-open adapters deliver it, and the compatibility limits that force two tiers rather than one.
 
 One term recurs throughout:
 
-- The digest is the ordered startup report that `bin/fm-session-start.sh` prints.
+- The digest is the ordered startup report that `bin/jg-session-start.sh` prints.
 
 ## Find a topic
 
@@ -26,7 +26,7 @@ The tier is a property of the harness surface, not of the home.
 
 | Tier | What the adapter does | Used by |
 | --- | --- | --- |
-| Run | Executes `bin/fm-session-start.sh` through the native session-open adapter and gates its ordered digest into model context before the first turn. | Claude, `codex exec`, Pi / pi-signed, omp, Cursor |
+| Run | Executes `bin/jg-session-start.sh` through the native session-open adapter and gates its ordered digest into model context before the first turn. | Claude, `codex exec`, Pi / pi-signed, omp, Cursor |
 | Nudge | Asks the agent to run the digest through the native adapter or the tracked session-start instruction. | Grok, OpenCode, and run-tier sources routed to the nudge |
 
 Codex's interactive TUI has no tracked session-open, compaction, or re-emit channel and is not covered by either tier.
@@ -52,11 +52,11 @@ An agent can defer an instruction, including when a first-command skill has its 
 Running the digest through the native adapter removes that discretion, so even a session whose first command is a skill has already taken the helm.
 
 The nudge tier remains the floor for harnesses that cannot carry hook stdout into model context.
-It is never a second contract: both tiers end in the same `bin/fm-session-start.sh`.
+It is never a second contract: both tiers end in the same `bin/jg-session-start.sh`.
 
 ## Source routing
 
-`bin/fm-sessionstart-run.sh` is the single owner of what a session-open source means.
+`bin/jg-sessionstart-run.sh` is the single owner of what a session-open source means.
 Because of that, no harness matcher string has to encode that policy.
 The run wrapper learns the source in one of two ways:
 
@@ -94,7 +94,7 @@ The full digest updates the completion record in this order:
 
 So `clear` or `compact` cannot skip startup sweeps after a truncated run.
 
-`bin/fm-lock.sh` treats a lock as this session's own when it is owned through either of these:
+`bin/jg-lock.sh` treats a lock as this session's own when it is owned through either of these:
 
 - The shared ancestry verdict.
 - A trusted same-session Claude id.
@@ -112,13 +112,13 @@ The requested session start remains idempotent.
 
 ### Re-emit mechanics
 
-`bin/fm-session-start.sh --reemit` owns these re-emit details:
+`bin/jg-session-start.sh --reemit` owns these re-emit details:
 
 - Which work a re-emit skips.
 - Its true-start AGENTS.md baseline.
 - Its supported stale-instruction refresh pairs.
 
-The `bin/fm-session-start.sh` header is the single owner of those mechanics.
+The `bin/jg-session-start.sh` header is the single owner of those mechanics.
 
 ## Runtime bound
 
@@ -127,12 +127,12 @@ While the digest runs, the run tier blocks one of two things:
 - Hook-driven session initialization.
 - Pi's first provider preflight.
 
-So `bin/fm-session-start.sh` bounds itself rather than betting on an unbounded prerequisite.
+So `bin/jg-session-start.sh` bounds itself rather than betting on an unbounded prerequisite.
 
 ### Network work stays off the blocking path
 
 The digest makes no external-network call at all.
-Every network call it owes runs off the blocking path, in the separately bounded deferred stage owned by `bin/fm-startup-network.sh`.
+Every network call it owes runs off the blocking path, in the separately bounded deferred stage owned by `bin/jg-startup-network.sh`.
 So an unreachable host can no longer consume this budget.
 
 ### Digest timeout
@@ -149,7 +149,7 @@ So a read that hangs or dies becomes that task's own `endpoint: error` line and 
 With a wedged backend the stage's ceiling is tasks times that per-read bound and can itself reach the digest bound.
 
 The per-item backlog row reads inside bootstrap's reconcile and close-replay sweeps are the exception.
-Each of those reads is bounded by `FM_BACKLOG_ROW_TIMEOUT_SECS` (default 10s) through `bin/fm-backlog-transition-lib.sh`.
+Each of those reads is bounded by `FM_BACKLOG_ROW_TIMEOUT_SECS` (default 10s) through `bin/jg-backlog-transition-lib.sh`.
 The first bound hit latches the sweep.
 Later reads in that sweep then return immediately while still naming their own item.
 
@@ -178,10 +178,10 @@ So a truncated digest does neither of these:
 
 ## Shared wrapper and safety
 
-`bin/fm-sessionstart-run.sh` and `bin/fm-sessionstart-nudge.sh` share the same two eligibility owners.
+`bin/jg-sessionstart-run.sh` and `bin/jg-sessionstart-nudge.sh` share the same two eligibility owners.
 
-- They source `bin/fm-gate-refuse-lib.sh` and stay silent for a no-mistakes gate agent identified by `NO_MISTAKES_GATE` or a `.no-mistakes/repos/*.git` git-common-dir.
-- They share `bin/fm-primary-scope-lib.sh` with `bin/fm-turnend-guard.sh`, so every hook uses one primary-detection owner.
+- They source `bin/jg-gate-refuse-lib.sh` and stay silent for a no-mistakes gate agent identified by `NO_MISTAKES_GATE` or a `.no-mistakes/repos/*.git` git-common-dir.
+- They share `bin/jg-primary-scope-lib.sh` with `bin/jg-turnend-guard.sh`, so every hook uses one primary-detection owner.
 
 A fresh clone has no gitignored state directory yet.
 When the root otherwise qualifies as primary, the run wrapper creates the state directory before the unchanged scope check, so the first session takes the helm without a manual `mkdir state`.
@@ -196,7 +196,7 @@ The nudge payload has three parts:
 
 - It starts with U+2063 and the stable `FIRSTMATE_OP: ` label.
 - It carries the current `session-start` protocol kind.
-- It retains exactly ``Run `bin/fm-session-start.sh` now, exactly once, before executing any other instructions.`` as its body.
+- It retains exactly ``Run `bin/jg-session-start.sh` now, exactly once, before executing any other instructions.`` as its body.
 
 The Ahoy skill owns the rule that this marked operational input is never a captain-authored session boundary, including its narrow legacy compatibility cases.
 The Ahoy skill's own step 0 helm check is the fallback that protects a nudge-tier harness whose first command is a skill.
@@ -206,7 +206,7 @@ The Ahoy skill's own step 0 helm check is the fallback that protects a nudge-tie
 Before printing, the nudge wrapper reads `state/.lock` and walks at most eight parents from its own pid.
 It does this in its own separate, hard-coded loop, independent of two other ownership checks:
 
-- The shared sixteen-hop ancestry walk in `bin/fm-session-lock-lib.sh` that `bin/fm-lock.sh` uses for anchor selection and ownership.
+- The shared sixteen-hop ancestry walk in `bin/jg-session-lock-lib.sh` that `bin/jg-lock.sh` uses for anchor selection and ownership.
 - Pi's `lockOwnership()`.
 
 If the lock names a live pid in that ancestry, session start already ran in this harness session and the wrapper stays silent.
@@ -260,7 +260,7 @@ Juggernaut does not claim instruction-refresh delivery for this surface.
 ### Pi and pi-signed
 
 Pi and pi-signed are run-tier harnesses.
-The tracked transport is `.pi/extensions/fm-primary-turnend-guard.ts`.
+The tracked transport is `.pi/extensions/jg-primary-turnend-guard.ts`.
 The extension maps Pi events onto wrapper sources:
 
 - It maps `session_start` reasons `startup`, `new`, `resume`, and `fork` onto wrapper sources.
@@ -307,7 +307,7 @@ Whenever the digest is incomplete, this approved containment keeps the prefix an
 ### OpenCode
 
 OpenCode is a nudge-tier harness.
-The `.opencode/plugins/fm-primary-sessionstart-nudge.js` plugin does three things:
+The `.opencode/plugins/jg-primary-sessionstart-nudge.js` plugin does three things:
 
 - It listens for `session.created`.
 - It runs once per session id.
@@ -324,19 +324,19 @@ The guard lets the watcher coordinator act first, so the plugins do not race for
 ### Grok
 
 Grok is a nudge-tier harness.
-`.grok/hooks/fm-primary-sessionstart-nudge.json` registers a project `SessionStart` hook and invokes the wrapper through inline-defaulted `${GROK_WORKSPACE_ROOT:-}`.
+`.grok/hooks/jg-primary-sessionstart-nudge.json` registers a project `SessionStart` hook and invokes the wrapper through inline-defaulted `${GROK_WORKSPACE_ROOT:-}`.
 The project hook runs when the checkout is trusted.
 Grok currently discards hook stdout from model context.
 So this path is intentionally fail-open and cannot use the run tier.
 
-Grok's guaranteed-loading alternative is a global token-guarded hook like the pattern used by `bin/fm-spawn.sh`.
+Grok's guaranteed-loading alternative is a global token-guarded hook like the pattern used by `bin/jg-spawn.sh`.
 That alternative expands trust and writes outside this repository.
 So Juggernaut never installs it or grants folder trust automatically.
 
 ### Cursor
 
 Cursor is a run-tier harness for session open.
-`.cursor/hooks.json` registers `sessionStart`, anchored through `$CURSOR_PROJECT_DIR` with a 180s timeout, invoking `bin/fm-sessionstart-cursor.sh`.
+`.cursor/hooks.json` registers `sessionStart`, anchored through `$CURSOR_PROJECT_DIR` with a 180s timeout, invoking `bin/jg-sessionstart-cursor.sh`.
 Cursor's payload has no `source` field, so the registration supplies `--source` itself.
 The adapter returns the digest as `additional_context`.
 Project hooks load only when the workspace is launched with `--trust`.
@@ -348,7 +348,7 @@ That is redundant and idempotent rather than a lost helm.
 ### omp
 
 omp is a run-tier harness.
-The tracked transport is `.omp/extensions/fm-primary-turnend-guard.ts`, which is auto-discovered from the home with no trust gate.
+The tracked transport is `.omp/extensions/jg-primary-turnend-guard.ts`, which is auto-discovered from the home with no trust gate.
 The extension starts the wrapper at `session_start`.
 It has `before_agent_start` await the wrapper and return one persistent context message before the first provider call, exactly as Pi's does.
 `session_compact` is the compaction equivalent.
@@ -381,7 +381,7 @@ So a compacted Cursor session keeps whatever context survived rather than receiv
 
 ### Wrapper and Pi extension suite
 
-`tests/fm-sessionstart-nudge.test.sh` is a portable suite.
+`tests/jg-sessionstart-nudge.test.sh` is a portable suite.
 It proves the nudge wrapper's silence for these cases:
 
 - Both gate signals.
@@ -395,7 +395,7 @@ It separately proves the run wrapper's silence for the gate environment and an u
 It proves the run wrapper creates a missing state directory on a fresh primary and delivers the full digest, while an unmarked linked worktree gets none.
 It proves a fresh primary whose state directory cannot be created reports that on one stderr line and stands down without a digest.
 
-It proves the run wrapper's source routing end to end against a real `fm-session-start.sh`, including:
+It proves the run wrapper's source routing end to end against a real `jg-session-start.sh`, including:
 
 - Completion-gated `--reemit` selection.
 - Resume delegation.
@@ -420,7 +420,7 @@ Through the extension's public event surface, the same portable suite proves:
 
 ### Runtime bound test
 
-`tests/fm-session-start.test.sh` proves the runtime bound through the forced pure-Bash fallback.
+`tests/jg-session-start.test.sh` proves the runtime bound through the forced pure-Bash fallback.
 It uses a TERM-resistant digest that exceeds its budget and proves that the digest:
 
 - Is force-killed with its grandchild.
@@ -431,22 +431,22 @@ It uses a TERM-resistant digest that exceeds its budget and proves that the dige
 
 ### Native startup and Ahoy tests
 
-`tests/fm-pi-primary-live-e2e.test.sh` and `tests/fm-opencode-primary-live-e2e.test.sh` exercise native startup paths with first-message and later-message Ahoy regressions.
+`tests/jg-pi-primary-live-e2e.test.sh` and `tests/jg-opencode-primary-live-e2e.test.sh` exercise native startup paths with first-message and later-message Ahoy regressions.
 
 ### Cursor tests
 
-`tests/fm-cursor-primary.test.sh` proves the Cursor adapter over real processes:
+`tests/jg-cursor-primary.test.sh` proves the Cursor adapter over real processes:
 
 - `sessionStart` emits the whole digest as `additional_context` with a caller-supplied `--source`.
 - It stays silent in a child worktree.
 - It lets the run wrapper stand down on the Cursor-delivered duplicate.
 - It keeps `preCompact` unregistered, so the deferred surface cannot be reintroduced unnoticed.
 
-`FM_CURSOR_PRIMARY_LIVE_E2E=1 tests/fm-cursor-primary-live-e2e.test.sh` proves the injected digest actually reaches model context in a real cursor-agent session.
+`FM_CURSOR_PRIMARY_LIVE_E2E=1 tests/jg-cursor-primary-live-e2e.test.sh` proves the injected digest actually reaches model context in a real cursor-agent session.
 
 ### Live run-tier guards
 
-`tests/fm-sessionstart-hook-live-e2e.test.sh` is the opt-in live guard for the Claude, Codex exec, and Pi run-tier adapters.
+`tests/jg-sessionstart-hook-live-e2e.test.sh` is the opt-in live guard for the Claude, Codex exec, and Pi run-tier adapters.
 It confirms each installed adapter in that suite invokes the run wrapper and delivers its output into context.
 It verifies context-preserving reopen sources for those adapters, and context-reset delivery wherever their tracked TUI surface is reachable.
 
@@ -455,11 +455,11 @@ That mode proves both an immediate prompt and a completed-before-prompt control 
 
 Cursor uses the separate primary live guard named in [Cursor tests](#cursor-tests) because its source-free `sessionStart` and stop-hook park are validated together.
 
-`tests/fm-sessionstart-instruction-refresh-live-e2e.test.sh` is the separate opt-in real-Pi guard for a post-start AGENTS.md update followed by compaction.
+`tests/jg-sessionstart-instruction-refresh-live-e2e.test.sh` is the separate opt-in real-Pi guard for a post-start AGENTS.md update followed by compaction.
 
 ### Guard, monitoring, and away-mode tests
 
-`tests/fm-turnend-guard.test.sh`, `tests/fm-pi-watch-extension.test.sh`, and `tests/fm-daemon.test.sh` cover marked guard, monitoring, and away-mode delivery.
+`tests/jg-turnend-guard.test.sh`, `tests/jg-pi-watch-extension.test.sh`, and `tests/jg-daemon.test.sh` cover marked guard, monitoring, and away-mode delivery.
 
 ### Transport evidence
 

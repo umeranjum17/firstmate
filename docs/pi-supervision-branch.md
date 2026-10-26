@@ -64,10 +64,10 @@ This document records the shape it landed as, and the delivering PR cites the bo
 
 This in-process supervision branch is Pi-only by construction:
 
-- The branch lives in `.pi/extensions/fm-branch-supervision.ts`, which only a Pi primary ever loads.
+- The branch lives in `.pi/extensions/jg-branch-supervision.ts`, which only a Pi primary ever loads.
   No other harness gains branch supervision behavior.
-- In a home with no branch state, the bash-side additions remain inert (`tests/fm-branch-supervision.test.sh`).
-  `bin/fm-lease-lib.sh` owns how a pre-existing lease is honored on any harness.
+- In a home with no branch state, the bash-side additions remain inert (`tests/jg-branch-supervision.test.sh`).
+  `bin/jg-lease-lib.sh` owns how a pre-existing lease is honored on any harness.
   A home on any harness that already has an outcome store still receives the shared drain compatibility recovery described in [Lost-wake outcome backstop](#lost-wake-outcome-backstop).
 - It does not change which harness is primary and never moves a home to Pi.
 
@@ -78,18 +78,18 @@ On a non-Pi home that runs the supervision host, the host runs the branch beside
 
 | Component | Owner or rule |
 | --- | --- |
-| [Wake dispatch](#wake-dispatch) | `.pi/extensions/fm-primary-pi-watch.ts` dispatches; `.pi/extensions/lib/fm-branch-dispatch.ts` owns the offer handshake and row eligibility |
-| [The branch itself](#the-branch-itself) | `.pi/extensions/fm-branch-supervision.ts` |
+| [Wake dispatch](#wake-dispatch) | `.pi/extensions/jg-primary-pi-watch.ts` dispatches; `.pi/extensions/lib/jg-branch-dispatch.ts` owns the offer handshake and row eligibility |
+| [The branch itself](#the-branch-itself) | `.pi/extensions/jg-branch-supervision.ts` |
 | [Branch model and effort selection](#branch-model-and-effort-selection) | `/supervision-model`, registered by the same extension |
-| [Branch system prompt](#branch-system-prompt) | `bin/fm-branch-prompt.sh` |
-| [Outcome store](#outcome-store) | `bin/fm-branch-outcome.sh` |
-| [Consistency](#consistency) | `bin/fm-lease-lib.sh`, with `bin/fm-lease.sh` as the command surface |
+| [Branch system prompt](#branch-system-prompt) | `bin/jg-branch-prompt.sh` |
+| [Outcome store](#outcome-store) | `bin/jg-branch-outcome.sh` |
+| [Consistency](#consistency) | `bin/jg-lease-lib.sh`, with `bin/jg-lease.sh` as the command surface |
 | [Autonomy](#autonomy) | Default-on once a Pi primary session owns the fleet lock |
 
 ### Wake dispatch
 
-`.pi/extensions/fm-primary-pi-watch.ts` stays the dispatcher.
-`.pi/extensions/lib/fm-branch-dispatch.ts` owns the offer handshake and row eligibility.
+`.pi/extensions/jg-primary-pi-watch.ts` stays the dispatcher.
+`.pi/extensions/lib/jg-branch-dispatch.ts` owns the offer handshake and row eligibility.
 [`watcher-continuity.md`](watcher-continuity.md#per-actor-acknowledgement) owns the per-actor consume contract.
 
 A successful row grant transfers ownership of exactly the currently branch-eligible rows to the branch.
@@ -106,7 +106,7 @@ The no-acceptor fallback and the alarms still reach main in that posture.
 
 #### Decision-owned rows
 
-A decision-owned event surfaced by `bin/fm-watch.sh`'s signal path gets the same treatment as a check-kind triggering close, even though it keeps the ordinary `signal` kind.
+A decision-owned event surfaced by `bin/jg-watch.sh`'s signal path gets the same treatment as a check-kind triggering close, even though it keeps the ordinary `signal` kind.
 `signal_files_actionable` marks the queued payload `needs-decision:` for any of these:
 
 - A newly surfaced `needs-decision`.
@@ -120,7 +120,7 @@ The row is excluded when one of those lines is a decision, blocked, or captain-h
 A resolution that closes nothing, key-less beside only keyed decisions or keyed for a key never open, stays routine.
 A key-less line otherwise falls back to its verb; an unrelated open decision alone leaves a routine span eligible, while a mixed span goes wholly to main.
 The status-presentation cursor bounds that span, and a missing or unmatched cursor falls back to the whole log.
-Single-task operator signals keep their existing Pi payload and attended-host whole-log rules, except that the TypeScript decision fold now ignores bare transition words without a colon or complete key token, matching `bin/fm-classify-lib.sh` on both operator and second-mate logs.
+Single-task operator signals keep their existing Pi payload and attended-host whole-log rules, except that the TypeScript decision fold now ignores bare transition words without a colon or complete key token, matching `bin/jg-classify-lib.sh` on both operator and second-mate logs.
 
 For a stale row, `scopeForUnreadWake` folds the mapped task's status log.
 It excludes the row when any `needs-decision` remains open or the current meaningful declaration is `captain-held`.
@@ -145,7 +145,7 @@ That row is not fleet context the branch is missing, and main is woken for it on
 
 ### The branch itself
 
-`.pi/extensions/fm-branch-supervision.ts` creates the branch session, serializes wakes, mirrors dialog, and merges outcomes.
+`.pi/extensions/jg-branch-supervision.ts` creates the branch session, serializes wakes, mirrors dialog, and merges outcomes.
 
 #### One conversation per main session
 
@@ -174,15 +174,15 @@ An explicit queue inside the extension is what keeps them serialized (see "Off-t
 
 Every accepted path that cannot reach a working branch rejects its settlement to the watcher.
 The watcher retains delivery ownership and routes the wake to main as a follow-up, which counts as delivered once Pi accepts it.
-A settlement still open past the watcher's bounded settlement wait is re-ringed to main the same way, so a wedged branch cannot park later wakes behind it (`.pi/extensions/fm-primary-pi-watch.ts` owns the bound).
+A settlement still open past the watcher's bounded settlement wait is re-ringed to main the same way, so a wedged branch cannot park later wakes behind it (`.pi/extensions/jg-primary-pi-watch.ts` owns the bound).
 A broken branch declines later offers, so they take that path directly.
 
-After wake rows are claimed, a branch prompt counts as handled only when `fm_branch_report` appends a durable outcome before that prompt settles.
+After wake rows are claimed, a branch prompt counts as handled only when `jg_branch_report` appends a durable outcome before that prompt settles.
 A settled provider error, or a settled prompt with no report, releases the grant and rejects delivery ownership back to the watcher.
 
 #### Report scoping
 
-While a signal or stale prompt is open, `fm_branch_report` accepts only the tasks that prompt's claimed rows resolve to:
+While a signal or stale prompt is open, `jg_branch_report` accepts only the tasks that prompt's claimed rows resolve to:
 
 - A signal row resolves by its status-log key.
 - A stale row resolves through the task record naming that endpoint.
@@ -192,7 +192,7 @@ That way, a task remembered from an earlier wake cannot become a delivered outco
 A heartbeat review is not scoped by task.
 
 The branch's guarded commands never tell it to drain queued rows mid-handling.
-For that actor, `bin/fm-guard.sh` keeps the queued-wakes warning silent.
+For that actor, `bin/jg-guard.sh` keeps the queued-wakes warning silent.
 An acknowledgement that consumed nothing reports that plainly, with the exact command for the current wake (`docs/watcher-continuity.md` "Per-actor acknowledgement").
 
 #### Broken-branch latch and recovery
@@ -204,7 +204,7 @@ An acknowledgement that consumed nothing reports that plainly, with the exact co
 4. Each probe that settles with another provider error doubles the next cooldown, up to one hour.
 
 A prompt from the current branch generation and model or effort selection can clear the latch.
-It must append a durable `fm_branch_report` and then settle without a provider error.
+It must append a durable `jg_branch_report` and then settle without a provider error.
 That clears both the latch and the provider-error streak and surfaces a one-line recovery note.
 If a provider error settles after that report, the error wins instead: it re-latches the branch and extends the cooldown.
 A session replacement or branch model or effort change resets the recovery state immediately.
@@ -217,12 +217,12 @@ It applies both at the branch-session creation boundary.
 
 ### Branch system prompt
 
-The branch system prompt comes from `bin/fm-branch-prompt.sh`.
+The branch system prompt comes from `bin/jg-branch-prompt.sh`.
 Its header owns the byte-stable-prefix contract (no timestamps, no fleet snapshot, no per-wake content).
 
 ### Outcome store
 
-The outcome store is `bin/fm-branch-outcome.sh`.
+The outcome store is `bin/jg-branch-outcome.sh`.
 Its header owns the append-only format, read cursor, and bounded per-task status-coverage indexes.
 
 Outcomes are written to the store before delivery to Pi.
@@ -234,27 +234,27 @@ If its cursor write fails after the note was delivered, the next reconciliation 
 That asymmetry is a known limitation of the routine delivery representation rather than of the ordering above.
 It predates delivery moving off Pi's render thread.
 Closing it means giving routine delivery a durable idempotent record.
-That work is tracked as follow-up `fm-pi-routine-delivery-idempotency-followup-r1`, and `tests/fm-pi-branch-extension.test.sh` pins that asymmetry meanwhile.
+That work is tracked as follow-up `jg-pi-routine-delivery-idempotency-followup-r1`, and `tests/jg-pi-branch-extension.test.sh` pins that asymmetry meanwhile.
 
 ### Consistency
 
-`bin/fm-lease-lib.sh` owns:
+`bin/jg-lease-lib.sh` owns:
 
 - The per-task lease contract.
 - The posture-aware main-only role partition.
 - The deliberate CONFUSED-AGENT-GRADE threat model these guards target.
   That threat model was captain-decided; adversarial-grade separation is out of scope and tracked as follow-up design work.
 
-`bin/fm-lease.sh` is the command surface.
+`bin/jg-lease.sh` is the command surface.
 
 The guards are wired into these scripts:
 
 | Scripts | Guard behavior |
 | --- | --- |
-| `fm-send.sh`, `fm-control.sh`, and `fm-teardown.sh` | Overlap, lease-checked, with claim serialization retained through the mutation. |
-| `fm-pr-merge.sh`, `fm-merge-local.sh`, `fm-spawn.sh`, `fm-send.sh --resolve-key` for a decision key, and `fm-teardown.sh` for a second mate | Main-owned while attended; branch refused. |
+| `jg-send.sh`, `jg-control.sh`, and `jg-teardown.sh` | Overlap, lease-checked, with claim serialization retained through the mutation. |
+| `jg-pr-merge.sh`, `jg-merge-local.sh`, `jg-spawn.sh`, `jg-send.sh --resolve-key` for a decision key, and `jg-teardown.sh` for a second mate | Main-owned while attended; branch refused. |
 
-A relaunch through `fm-control` stays branch-legal recovery in both postures.
+A relaunch through `jg-control` stays branch-legal recovery in both postures.
 Under the away-posture record, the PR merge, a fresh spawn, and a decision answer relocate to the branch behind each script's own gate.
 Local-only landing and second-mate retirement never do ("Postures" below).
 
@@ -293,12 +293,12 @@ A synchronous subprocess in the delivery path therefore stops repaint and key ec
 The captain saw that as a subsecond freeze every time a routine or captain-facing outcome arrived.
 
 Subprocess work reached through Pi's asynchronous APIs is now awaited instead.
-`.pi/extensions/lib/fm-async-exec.ts` owns that awaited-spawn replacement.
+`.pi/extensions/lib/jg-async-exec.ts` owns that awaited-spawn replacement.
 It preserves the status, captured-output, and failure semantics its callers used from the synchronous form.
 
 ### The explicit delivery queue
 
-Awaiting yields the thread, so what the single thread used to guarantee for free is now an explicit queue in `.pi/extensions/fm-branch-supervision.ts`.
+Awaiting yields the thread, so what the single thread used to guarantee for free is now an explicit queue in `.pi/extensions/jg-branch-supervision.ts`.
 Every delivery, every acknowledgement, and every turn boundary's reconciliation runs as one unit of that queue.
 That queue is what preserves these guarantees:
 
@@ -354,7 +354,7 @@ Only a genuine store fault keeps that backstop skipped.
 
 ## How the branch knows what the captain said
 
-Main's captain and assistant text is mirrored into the branch as read-only `fm-main-mirror` messages.
+Main's captain and assistant text is mirrored into the branch as read-only `jg-main-mirror` messages.
 The mirror never carries tool calls, tool results, operational injections, or the branch's own merged notes.
 
 Mirroring happens at two points:
@@ -382,12 +382,12 @@ An authorization addressed to main (for example "you may merge when green") does
 ## Two-stage noise filter
 
 Stage one is unchanged: the bash watcher absorbs everything provably fine at zero token cost.
-Stage two is the branch's verdict on each handled event, reported through its `fm_branch_report` tool:
+Stage two is the branch's verdict on each handled event, reported through its `jg_branch_report` tool:
 
 | Verdict | Delivery |
 | --- | --- |
 | `routine` | A non-silent outcome uses the custom-message path; a silent outcome is stored without a rendered note. Neither opens a follow-up turn. |
-| `captain` | Appends a versioned `fm-branch-visible-outcome` custom session entry. |
+| `captain` | Appends a versioned `jg-branch-visible-outcome` custom session entry. |
 
 ### The visible captain entry
 
@@ -413,16 +413,16 @@ Together, these let a cold start that acquires the lock through the startup dige
 Display is only half of a captain outcome.
 The other half is processing, because a blocker, a decision, or a ready PR needs main to act, not only the captain to see it.
 
-1. After the visible entry exists and the read cursor has passed it, the extension hands the oldest batch of at most 32 still-unprocessed captain rows to main as one hidden, typed `fm-branch-process` request (kind `branch-outcome`), and presents the next batch after main acknowledges that one.
-   The request lists each `[seq N, recorded <age> ago] task: summary`, with the age from the store's `recordedAgo` (`bin/fm-branch-outcome.sh` owns its wording), and asks main to check the task's current state first.
-   Summaries over 1024 characters are abbreviated within that bound and point to `bin/fm-branch-outcome.sh lookup --seqs <N>` for the full outcome.
+1. After the visible entry exists and the read cursor has passed it, the extension hands the oldest batch of at most 32 still-unprocessed captain rows to main as one hidden, typed `jg-branch-process` request (kind `branch-outcome`), and presents the next batch after main acknowledges that one.
+   The request lists each `[seq N, recorded <age> ago] task: summary`, with the age from the store's `recordedAgo` (`bin/jg-branch-outcome.sh` owns its wording), and asks main to check the task's current state first.
+   Summaries over 1024 characters are abbreviated within that bound and point to `bin/jg-branch-outcome.sh lookup --seqs <N>` for the full outcome.
    Main must read the full outcome for any abbreviated line before acting on, relaying, or acknowledging it.
    It says each outcome was recorded earlier and may already have been seen or handled, rather than claiming a visible entry in this transcript, because an outcome carried over from before a restart or a switch of primary has none here.
    Main sorts the outcomes by that state, and its reply to the captain covers only the still-open ones, as if the settled ones had never been listed; a settled one needs only the acknowledgement below.
    A listed row without a valid age breaks the store's contract, so the extension reports it to main as a visible note and sends no request; every row stays unprocessed and is presented once the store is healthy.
 2. That request opens exactly one main turn.
-3. Main closes it only by calling `fm_branch_processed` with the highest sequence the request listed.
-   That call advances a processed marker, which `bin/fm-branch-outcome.sh` keeps separately from the read cursor and never moves past it or backwards.
+3. Main closes it only by calling `jg_branch_processed` with the highest sequence the request listed.
+   That call advances a processed marker, which `bin/jg-branch-outcome.sh` keeps separately from the read cursor and never moves past it or backwards.
 
 A lower listed captain sequence is accepted only as a partial acknowledgement and leaves every newer captain sequence open.
 
@@ -430,7 +430,7 @@ Nothing else advances that marker.
 An unrelated reply, an empty reply, or a reply that paraphrases the outcome leaves the sequence unprocessed.
 The extension presents the current unprocessed sequence set again at the next main run boundary and at every session start.
 
-The first presentation of a sequence set is an ordinary turn whose response stays visible, including prose alongside `fm_branch_processed`.
+The first presentation of a sequence set is an ordinary turn whose response stays visible, including prose alongside `jg_branch_processed`.
 From the second triggered presentation of that same set on, until its listed outcomes are acknowledged, an assistant final is removed before persistence only when its text is empty after trimming or exactly matches a final already visible for that sequence set after trimming.
 Differing replies stay visible, including the first real handling after an empty or unrelated reply.
 Messages carrying tool calls always retain their prose, signed reasoning, and usage accounting.
@@ -448,7 +448,7 @@ After that, the request rides the captain's next prompt, so an ignored request c
 Changed sequence membership and a session replacement each start that budget over.
 
 Routine outcomes never enter this path and stay turn-free.
-A home with no processed marker, including an upgrade or switch from the supervision host, re-presents delivered captain rows dated and check-first until acknowledged; see the marker contract in `bin/fm-branch-outcome.sh`.
+A home with no processed marker, including an upgrade or switch from the supervision host, re-presents delivered captain rows dated and check-first until acknowledged; see the marker contract in `bin/jg-branch-outcome.sh`.
 
 ### Ownership and verdict rules
 
@@ -462,13 +462,13 @@ Its "PR identity: copy or abstain" section owns where a PR URL in a summary or t
 - The task's ready status or `pr=` metadata, verbatim.
 - Otherwise, only the identifier the branch actually has.
 
-Main can read the durable outcome store on demand through its `fm_branch_outcomes` tool.
+Main can read the durable outcome store on demand through its `jg_branch_outcomes` tool.
 
 ## Heartbeat routing
 
 The cheap bash-level heartbeat scan absorbs a genuinely no-op pass before it reaches Pi, unchanged from before.
 Only a scan already flagged as possibly captain-relevant emits the bare `heartbeat` wake.
-`.pi/extensions/fm-primary-pi-watch.ts` flags that offer `heartbeat: true`.
+`.pi/extensions/jg-primary-pi-watch.ts` flags that offer `heartbeat: true`.
 The branch accepts it without a project only when every branch-ownable row observed in the unread-queue eligibility check is one of these:
 
 - Heartbeat-kind.
@@ -490,7 +490,7 @@ An unresolvable task-local row, an unknown row kind, or an unreadable queue stil
 
 ### Reporting the review
 
-The branch runs its normal operating procedure for the wake (`bin/fm-branch-prompt.sh` "Handling a wake") and performs the deeper fleet review that main previously performed.
+The branch runs its normal operating procedure for the wake (`bin/jg-branch-prompt.sh` "Handling a wake") and performs the deeper fleet review that main previously performed.
 
 | Review result | Report |
 | --- | --- |
@@ -535,19 +535,19 @@ That carve-out is scoped to provider registration alone:
 - The copy is never persisted.
 - A provider whose registration fails to compose is simply unavailable.
 
-`tests/fm-pi-branch-extension.test.sh` pins the pin-and-fallthrough behavior.
+`tests/jg-pi-branch-extension.test.sh` pins the pin-and-fallthrough behavior.
 
 ### No further caching machinery
 
 No caching machinery beyond this exists, deliberately.
 Any later dynamic content in the branch prefix silently removes most of the cache benefit.
-That is why `bin/fm-branch-prompt.sh`'s header is the contract's single owner and `tests/fm-branch-supervision.test.sh` pins the output to byte identity.
+That is why `bin/jg-branch-prompt.sh`'s header is the contract's single owner and `tests/jg-branch-supervision.test.sh` pins the output to byte identity.
 
 ## Postures
 
 One supervision session runs in two postures, attended and away.
 The posture is a file: the away-posture record `state/.afk-contract`.
-Only `bin/fm-afk-contract.sh` writes it, in the same turn as `/afk`.
+Only `bin/jg-afk-contract.sh` writes it, in the same turn as `/afk`.
 The return path archives it on the captain's first unmarked message.
 
 ### Who reads the record
@@ -570,18 +570,18 @@ A leftover `state/.afk` flag declines nothing.
   The two vetoes that describe a broken queue, an unresolvable task-local row and a structurally invalid row, stay vetoes in both postures.
   A prompt that claims a check row is not scoped by task, so the branch may report it as `fleet`.
 - Main is parked, and reachable only for the classes only main can act on:
-  - A watcher-failure alarm is delivered to main as always, because `fm_watch_arm_pi` lives there.
+  - A watcher-failure alarm is delivered to main as always, because `jg_watch_arm_pi` lives there.
   - A wake the branch declines or cannot take (a broken branch inside its cooldown, an unresolvable or corrupt scan) falls back to main exactly as attended.
 
   Parking is a cost and chat-cleanliness measure.
   Supervision continuity is the safety property, and the return brief's health section reads any gap.
-- The wake message ends with a fixed `POSTURE: AWAY` tail plus the record's read-back verbatim (`bin/fm-afk-contract.sh readback`).
+- The wake message ends with a fixed `POSTURE: AWAY` tail plus the record's read-back verbatim (`bin/jg-afk-contract.sh readback`).
   The branch therefore has the captain's away words, the spend cap, the expected return, and the reach line in front of it at execution time, without any prefix change.
 - Captain-verdict outcomes accumulate unprocessed in the outcome store.
   Their visible entries still persist, but no processing turn opens on the parked main.
   The request is re-checked against the record immediately before it would open and at every run boundary, so a request pending when the record appears is cancelled rather than delivered.
   The first run boundary after the record is archived, ordinarily the captain's return message, presents the accumulated rows with a fresh triggered budget exactly as after any other gap.
-  `bin/fm-afk-return.sh` lists them under "waiting on you".
+  `bin/jg-afk-return.sh` lists them under "waiting on you".
 - Main's standing authority relocates to the branch, and nothing more.
   [Authority relocation](#authority-relocation) below gives the details.
 - The branch prompt's fixed "Postures" section states these rules once per Juggernaut version, so the prefix stays byte-stable.
@@ -589,8 +589,8 @@ A leftover `state/.afk` flag declines nothing.
 
 ### Authority relocation
 
-`fm_lease_forbid_branch` passes the branch actor only for the actions whose guarded script opts in.
-It does so only while `bin/fm-afk-contract.sh validate` succeeds on a complete, readable, live away record (`mode` is not quiet).
+`jg_lease_forbid_branch` passes the branch actor only for the actions whose guarded script opts in.
+It does so only while `bin/jg-afk-contract.sh validate` succeeds on a complete, readable, live away record (`mode` is not quiet).
 An archived, incomplete, invalid, or quiet record restores the attended refusal byte for byte.
 
 The captain's away words are the whole mandate:
@@ -600,17 +600,17 @@ The captain's away words are the whole mandate:
 - It acts on them only through the guarded scripts, never by analogy.
 - It holds with verdict captain on doubt.
 
-`bin/fm-branch-prompt.sh` "Postures" owns those execution rules.
+`bin/jg-branch-prompt.sh` "Postures" owns those execution rules.
 It requires every action taken under the words to open its outcome summary with "per your away instructions:".
 
 Each relocated script keeps its own gate, enforcing exactly what a script can check without reading words:
 
 | Script | Gate while away |
 | --- | --- |
-| `bin/fm-pr-merge.sh` | Merges any pull request green at its live head, synchronously, under the record lock, and refuses `--allow-red` and `--allow-missing` while away, so the green gate is absolute in this posture; which pull request the words meant is the branch's reading. |
-| `bin/fm-spawn.sh` | Dispatches only queued work whose blockers cleared - already queued, or filed by the branch because the words explicitly call for it; refuses a fresh ordinary spawn for either actor once the home holds as many ordinary task records as the record's spend cap (relaunches and secondmates exempt). |
-| `bin/fm-send.sh --resolve-key` | Answers a decision the words pre-answer, or one `ask-user-authority`'s judgment (carried verbatim in the branch prompt) lets Juggernaut decide. |
-| `bin/fm-merge-local.sh` | Never relocated. |
+| `bin/jg-pr-merge.sh` | Merges any pull request green at its live head, synchronously, under the record lock, and refuses `--allow-red` and `--allow-missing` while away, so the green gate is absolute in this posture; which pull request the words meant is the branch's reading. |
+| `bin/jg-spawn.sh` | Dispatches only queued work whose blockers cleared - already queued, or filed by the branch because the words explicitly call for it; refuses a fresh ordinary spawn for either actor once the home holds as many ordinary task records as the record's spend cap (relaunches and secondmates exempt). |
+| `bin/jg-send.sh --resolve-key` | Answers a decision the words pre-answer, or one `ask-user-authority`'s judgment (carried verbatim in the branch prompt) lets Juggernaut decide. |
+| `bin/jg-merge-local.sh` | Never relocated. |
 
 The merge-authority record and the outcome row's summary are the audit trail.
 The return brief renders the words verbatim beside that account.
@@ -618,7 +618,7 @@ The return brief renders the words verbatim beside that account.
 ### The authority invariant
 
 Being away changes how the captain is informed and what happens at a captain-owned decision point, never Juggernaut's authority set.
-`tests/fm-branch-supervision.test.sh`, `tests/fm-pr-merge.test.sh`, and `tests/fm-send-resolve-key.test.sh` pin this invariant.
+`tests/jg-branch-supervision.test.sh`, `tests/jg-pr-merge.test.sh`, and `tests/jg-send-resolve-key.test.sh` pin this invariant.
 It sets these limits:
 
 - The never-set (credential entry, legal or financial acceptance, an attended prompt, an unnamed discard, a security-sensitive action) has no guarded entrypoint that accepts away authority for either actor.
@@ -629,14 +629,14 @@ It sets these limits:
 ### Cleanup after a landed pull request
 
 The ordinary cleanup of a task whose pull request has landed needs no relocation, because it is the branch's own job in both postures.
-`bin/fm-branch-prompt.sh` names the `check: merge landed:` wake, and any later stale or inactive-outcome row on that task, as the moment to attempt `bin/fm-teardown.sh` without `--force`.
+`bin/jg-branch-prompt.sh` names the `check: merge landed:` wake, and any later stale or inactive-outcome row on that task, as the moment to attempt `bin/jg-teardown.sh` without `--force`.
 At that moment the branch reports any refusal instead of concluding there is "nothing to recover".
 
 ## Verification
 
 ### Portable regressions
 
-`tests/fm-pi-branch-extension.test.sh` covers:
+`tests/jg-pi-branch-extension.test.sh` covers:
 
 - Dispatch, and signal and stale report scoping with unscoped heartbeat reports.
 - The new branch conversation at every main session start with continuation inside one session, and the mirror re-anchor that pairs with it.
@@ -652,20 +652,20 @@ At that moment the branch reports any refusal instead of concluding there is "no
 - In `test_branch_dispatch_classifies_main_only_rows_and_writes_the_eligible_snapshot`: decision-owned signal and stale rows' exclusion from `eligibleSeqs`, their presence in `needsDecisionKeys`, task alias resolution, reserved-key configuration, status-log race and symlink refusal, non-vetoing behavior for unrelated eligible rows, and decision-only queues reading as ordinary main-only absence.
 - In `test_branch_dispatch_routes_secondmate_signal_by_new_span`: second-mate signal routing by new span on the Pi and attended-host paths, including an unrelated open hold, mixed, same-key, stamped-key, key-less blocked, and resolution spans, the whole-log fallback, stale-row isolation, and operator routing.
 
-`tests/fm-branch-supervision.test.sh` covers:
+`tests/jg-branch-supervision.test.sh` covers:
 
 - Prompt stability, including the landed-work cleanup instruction and the second-mate relay, signal-span, and stale-liveness rules.
 - Store append-only behavior, the captain cursor barrier, processed-marker sequence bounds and absent-marker safety, and captain-only recorded ages.
 - Leases, guards, and non-branch-home invariance.
 - The away relocation: only under a valid live record, never for local-only landing, queued-only branch dispatch rather than orphaned in-flight recovery, the spend cap for both actors and its lock-held recheck, and the attended guarded-action behavior restored by archive or an invalid record.
 
-`tests/fm-afk-return.test.sh` covers the ordered cleanup-due section, its durable merge-marker requirement, and exclusion of both a done task without durable merge evidence and a persistent secondmate carrying that evidence.
+`tests/jg-afk-return.test.sh` covers the ordered cleanup-due section, its durable merge-marker requirement, and exclusion of both a done task without durable merge evidence and a persistent secondmate carrying that evidence.
 
-`tests/fm-pr-merge.test.sh` covers the branch actor merging a green task under the record, being refused on a red check, an unreported required check, or `--allow-red`/`--allow-missing` under it, and being refused at the partition while attended.
+`tests/jg-pr-merge.test.sh` covers the branch actor merging a green task under the record, being refused on a red check, an unreported required check, or `--allow-red`/`--allow-missing` under it, and being refused at the partition while attended.
 
-`tests/fm-secondmate-safety.test.sh` covers the branch actor being refused second-mate retirement with the mate's record, home, route, and endpoint left intact.
+`tests/jg-secondmate-safety.test.sh` covers the branch actor being refused second-mate retirement with the mate's record, home, route, and endpoint left intact.
 
-`tests/fm-send-resolve-key.test.sh` covers the decision-answer partition:
+`tests/jg-send-resolve-key.test.sh` covers the decision-answer partition:
 
 - A needs-decision or captain-held key refuses the attended branch before anything is sent.
 - A `blocked:` key stays ordinary steering.
@@ -673,39 +673,39 @@ At that moment the branch reports any refusal instead of concluding there is "no
 
 For the away posture:
 
-- `tests/fm-pi-watch-extension.test.sh` covers the away eligibility collapse (check-kind and decision-owned triggers offered) with the broken-queue vetoes and the watcher-failure alarm still reaching main.
-- `tests/fm-pi-branch-extension.test.sh` covers the posture tail with the verbatim read-back, the unscoped claim of check and heartbeat rows, no processing turn under the record, cancellation of a request pending when the record appears, and the re-presentation at the first run boundary after archive.
+- `tests/jg-pi-watch-extension.test.sh` covers the away eligibility collapse (check-kind and decision-owned triggers offered) with the broken-queue vetoes and the watcher-failure alarm still reaching main.
+- `tests/jg-pi-branch-extension.test.sh` covers the posture tail with the verbatim read-back, the unscoped claim of check and heartbeat rows, no processing turn under the record, cancellation of a request pending when the record appears, and the re-presentation at the first run boundary after archive.
 
-`tests/fm-wake-drain-outcome-backstop.test.sh` covers keyless resurfacing, causal suppression, same-second ordering, one-shot presentation, first-drain index self-healing under the outcome lock, store-fault fail-closed behavior, bounded history cost and output, and the oversized-line limit.
+`tests/jg-wake-drain-outcome-backstop.test.sh` covers keyless resurfacing, causal suppression, same-second ordering, one-shot presentation, first-drain index self-healing under the outcome lock, store-fault fail-closed behavior, bounded history cost and output, and the oversized-line limit.
 
-`tests/fm-teardown.test.sh` covers removal of the retired task's outcome index and the append-side rule that a post-teardown report does not recreate it.
+`tests/jg-teardown.test.sh` covers removal of the retired task's outcome index and the append-side rule that a post-teardown report does not recreate it.
 
 Other tests remain where they were:
 
-- The branch-offer, heartbeat-offer, heartbeat-not-ridden-by-main-only-rows, main-only-check-class, captain-held-stale-stays-on-main, and mixed-signal-routing tests remain in `tests/fm-pi-watch-extension.test.sh`.
+- The branch-offer, heartbeat-offer, heartbeat-not-ridden-by-main-only-rows, main-only-check-class, captain-held-stale-stays-on-main, and mixed-signal-routing tests remain in `tests/jg-pi-watch-extension.test.sh`.
   The last two routing classes exercise `offerWakeToBranch`'s trigger-key cross-reference end to end.
-- The recovery test remains in `tests/fm-session-start.test.sh`.
-- The per-actor consume regression remains in `tests/fm-wake-queue.test.sh`.
+- The recovery test remains in `tests/jg-session-start.test.sh`.
+- The per-actor consume regression remains in `tests/jg-wake-queue.test.sh`.
 
-`tests/fm-pi-branch-extension.test.sh` also covers the off-thread delivery contract behaviorally:
+`tests/jg-pi-branch-extension.test.sh` also covers the off-thread delivery contract behaviorally:
 
 - A delivery leaves the event loop running rather than blocking it.
 - Interleaved reports stay ordered and exactly once.
 - A session replaced mid-delivery neither loses nor duplicates an outcome.
 - A failing store script surfaces without losing or doubling one.
 
-`tests/fm-watch-triage.test.sh` covers `bin/fm-watch.sh`'s side of the contract end to end:
+`tests/jg-watch-triage.test.sh` covers `bin/jg-watch.sh`'s side of the contract end to end:
 
 - Needs-decision, no-verb captain-held, and pending-reply second-mate escalation signal rows are marked `needs-decision:`.
-- A needs-decision whose key transition was rejected by the reserved-key vocabulary (`fm-classify-lib.sh`'s `reconciliation-required:` wrapper) is still marked.
+- A needs-decision whose key transition was rejected by the reserved-key vocabulary (`jg-classify-lib.sh`'s `reconciliation-required:` wrapper) is still marked.
 - Ordinary blocked or captain-relevant signals stay unmarked.
 
 ### Live guards
 
-`FM_PI_BRANCH_LIVE_E2E=1 tests/fm-pi-branch-live-e2e.test.sh` exercises the real installed Pi SDK's immediate active-transcript appendEntry rendering, persistence, custom-entry model exclusion, branch-session surfaces, and watcher-owned fallback after rejected branch settlement.
+`FM_PI_BRANCH_LIVE_E2E=1 tests/jg-pi-branch-live-e2e.test.sh` exercises the real installed Pi SDK's immediate active-transcript appendEntry rendering, persistence, custom-entry model exclusion, branch-session surfaces, and watcher-owned fallback after rejected branch settlement.
 
-`FM_PI_BRANCH_RESPONSIVENESS_E2E=1 tests/fm-pi-branch-responsiveness-live-e2e.test.sh` answers the question only a real TUI can.
+`FM_PI_BRANCH_RESPONSIVENESS_E2E=1 tests/jg-pi-branch-responsiveness-live-e2e.test.sh` answers the question only a real TUI can.
 It types into an isolated Pi pane while outcomes are delivered and fails if keystroke echo leaves the class of the same machine's extension-free floor.
 
 Record dated current results in [docs/verification/runtime-backends.md](verification/runtime-backends.md).
-The strict typecheck in `tests/fm-pi-primary-types.test.sh` pins the extension against the installed Pi package.
+The strict typecheck in `tests/jg-pi-primary-types.test.sh` pins the extension against the installed Pi package.

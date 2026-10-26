@@ -7,11 +7,11 @@ producer reads — so a parked home still got config-reread nudges, a pending
 reply retry ladder, and quota-failover relaunches onto a new model.
 
 Every supervision producer now gates on **one shared reader**,
-`fm_parked_home <id>`, instead of carrying its own copy of the rule.
+`jg_parked_home <id>`, instead of carrying its own copy of the rule.
 
 ## The parked-homes file
 
-`<fm-home>/config/parked-homes` — one home id per line; `#` comments and blank
+`<jg-home>/config/parked-homes` — one home id per line; `#` comments and blank
 lines are ignored:
 
 ```
@@ -25,7 +25,7 @@ A missing file parks nothing; an unparked home behaves exactly as before.
 ## Home-id resolution
 
 A task meta belongs to a parked home only when its `kind=secondmate`. A local
-secondmate's `home=` path carries `.fm-secondmate-home` with the id; a remote
+secondmate's `home=` path carries `.jg-secondmate-home` with the id; a remote
 secondmate's home lives on its host, so the recorded task id stands in.
 Crewmate and lead lanes are never parked, whatever their task id spells.
 
@@ -33,14 +33,14 @@ Crewmate and lead lanes are never parked, whatever their task id spells.
 
 | Producer | Gate | Skip behavior |
 |---|---|---|
-| Supervision session (message, steer, answer, nudge — `fm-send.sh`) | after target resolution | one `error:` line, exit 1, nothing delivered or marked |
-| Relaunch (`fm-control.sh <id> relaunch`, `fm-remote-secondmate-relaunch.sh`) | before the launch transaction | one `error:` line, exit 1 |
-| Restart pass (`fm-secondmate-restart.sh`, used by /updatefirstmate) | argv filter | one `parked: <id>:` line; no persist request, no restart, no nudge |
-| Reconcile nudge (`fm-secondmate-reconcile.sh`) | per-target | `skipped: <id> parked`; request preserved |
-| Config push (`fm-config-push.sh`) | per-home | `secondmate <id>: skipped - its home is parked` |
+| Supervision session (message, steer, answer, nudge — `jg-send.sh`) | after target resolution | one `error:` line, exit 1, nothing delivered or marked |
+| Relaunch (`jg-control.sh <id> relaunch`, `jg-remote-secondmate-relaunch.sh`) | before the launch transaction | one `error:` line, exit 1 |
+| Restart pass (`jg-secondmate-restart.sh`, used by /updatefirstmate) | argv filter | one `parked: <id>:` line; no persist request, no restart, no nudge |
+| Reconcile nudge (`jg-secondmate-reconcile.sh`) | per-target | `skipped: <id> parked`; request preserved |
+| Config push (`jg-config-push.sh`) | per-home | `secondmate <id>: skipped - its home is parked` |
 | Inherited config push (CONFIG_REREAD, both bootstrap loops) | per-home | one skip line; no push, no reread nudge |
-| Pending-reply retries and missed-report escalation (`fm_pending_reply_tick`) | per-record | record kept as-is; no recovery resend, no escalation |
-| Model-outage alert (`fm_model_outage_tick`) | per-lane | lane never scanned, never alerts |
+| Pending-reply retries and missed-report escalation (`jg_pending_reply_tick`) | per-record | record kept as-is; no recovery resend, no escalation |
+| Model-outage alert (`jg_model_outage_tick`) | per-lane | lane never scanned, never alerts |
 | Wake-loop check (`secondmate_wake_stall_tick`) | per-mate | no drain ring, no stalled check; episode markers dropped |
 | quota-failover (this repo) | per-task | `note`d once; the stopped parked worker is never moved |
 
@@ -48,7 +48,7 @@ One log line per skip is all a parked home ever produces.
 
 ## Layout
 
-- `bin/fm-parked-homes-lib.sh` — the shared reader (source-only, no deps).
+- `bin/jg-parked-homes-lib.sh` — the shared reader (source-only, no deps).
 - `install.sh` — verifies the wiring: this checkout reachable from the home,
   the fork shim present, the parked file readable. It changes nothing.
 - `tests/parked-homes-e2e.sh` — the integration test: a fixture fleet of two
@@ -59,7 +59,7 @@ One log line per skip is all a parked home ever produces.
 
 The live producers live in the firstmate fork, so the gates are one source
 line plus one predicate call per producer (fork PR carries the full list; see
-`FORK-EXIT.md`). The fork's `bin/fm-parked-homes-lib.sh` is a thin shim: it
+`FORK-EXIT.md`). The fork's `bin/jg-parked-homes-lib.sh` is a thin shim: it
 sources this directory's reader from `FM_ADDONS_DIR` (default
 `$FM_HOME/projects/firstmate-addons`). When the add-on checkout is absent the
 shim defines no-op predicates — every gate is a no-op and behavior is exactly
@@ -70,4 +70,4 @@ add-on checkout.
 no-mistakes pipeline calls and never touches a secondmate home. The ff-sweep's
 fast-forward of a parked home's checkout is also untouched (a park stops
 contact, not the fleet's code convergence); its nudge is gated at
-fm-send/bootstrap.
+jg-send/bootstrap.

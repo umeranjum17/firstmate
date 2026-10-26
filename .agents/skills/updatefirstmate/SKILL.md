@@ -26,7 +26,7 @@ That is why **every live second mate is restarted after a successful update, inc
 Launch-time wiring is not derivable from a file diff, so an unchanged tracked surface is not evidence the running agent is already on the current behavior.
 The only live mates that do not restart are the ones whose home the update pass had to skip, and the ones whose runtime cannot prove a restart; the updater keeps both cases honest and neither is reported as a reload.
 
-**One-time rollout note:** the update that carries this change is still executed by the previous release, which restarts only the mates whose `AGENTS.md` or `.agents/skills/` moved on that pass. After it completes, run `bin/fm-secondmate-restart.sh <fm-id>...` once with every live second mate ID, not only the ones that release named; later updates follow the normal flow below.
+**One-time rollout note:** the update that carries this change is still executed by the previous release, which restarts only the mates whose `AGENTS.md` or `.agents/skills/` moved on that pass. After it completes, run `bin/jg-secondmate-restart.sh <jg-id>...` once with every live second mate ID, not only the ones that release named; later updates follow the normal flow below.
 
 The primary update is fast-forward only, while each secondmate uses the same guarded convergence path plus one narrow recovery for squash-merged local history.
 For a remote route, it updates the configured Juggernaut code root on that host from its own origin, then guardedly fast-forwards the persistent home to that code-root commit.
@@ -40,13 +40,13 @@ This touches only the Juggernaut repo and its own worktrees, never anything unde
 
 1. **Run the updater:**
    ```sh
-   bin/fm-update.sh
+   bin/jg-update.sh
    ```
    It fast-forwards this Juggernaut repo's default branch from origin, then updates every registered local or remote secondmate home through its placement-specific guarded path.
    It prints one status line per target (`updated <old>..<new>` / `reconciled redundant divergence <old>..<new>` / `already current` / `skipped: <reason>`), followed by three action lines that tell you exactly what to do next:
    - `reread-firstmate: yes|no`
-   - `restart-secondmates: fm-<id>...|none`
-   - `nudge-secondmates: fm-<id>...|none`
+   - `restart-secondmates: jg-<id>...|none`
+   - `nudge-secondmates: jg-<id>...|none`
 
    The two second-mate sets are disjoint and the script owns the split; do not re-derive it.
    `restart-secondmates:` carries every live mate the pass left on the latest commit, whether it advanced or was already there.
@@ -61,7 +61,7 @@ This touches only the Juggernaut repo and its own worktrees, never anything unde
 3. **Restart every second mate the updater named.**
    Pass the whole `restart-secondmates:` list to one command (skip this step entirely when it says `none`):
    ```sh
-   FM_HOME=<this-firstmate-home> bin/fm-secondmate-restart.sh <fm-id>...
+   FM_HOME=<this-firstmate-home> bin/jg-secondmate-restart.sh <jg-id>...
    ```
    Include `FM_HOME=<this-juggernaut-home>` unless `FM_HOME` is already set to the active Juggernaut home.
    This is automatic and needs no per-mate confirmation from the captain.
@@ -81,7 +81,7 @@ This touches only the Juggernaut repo and its own worktrees, never anything unde
 4. **Send the re-read message to the rest.**
    For every target on the `nudge-secondmates:` line (do nothing when it says `none`), send the one-line re-read steer:
    ```sh
-   FM_HOME=<this-firstmate-home> bin/fm-send.sh <id> 'firstmate was updated to the latest - please re-read your AGENTS.md to pick up the new instructions.'
+   FM_HOME=<this-firstmate-home> bin/jg-send.sh <id> 'firstmate was updated to the latest - please re-read your AGENTS.md to pick up the new instructions.'
    ```
    These are the mates that are on the latest bytes but could not be restarted provably, so the steer is the most this pass can honestly do for them.
    It is a gentle steer, not an interruption: the mate already got a safe tracked-files fast-forward, and the steer never forces, tears down, or discards its work.

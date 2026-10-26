@@ -33,7 +33,7 @@ kill_writer() { kill -9 "$W" 2>/dev/null || true; wait "$W" 2>/dev/null || true;
 age_lock() { touch -d '5 minutes ago' -- "$LOCK"; }
 
 inst --dry-run > "$T/dry.out"
-[ ! -e "$CHECK" ] && [ ! -e "$T/data/fm-backlog-lock-reclaim/backlog-lock-reclaim.check.sh" ] \
+[ ! -e "$CHECK" ] && [ ! -e "$T/data/jg-backlog-lock-reclaim/backlog-lock-reclaim.check.sh" ] \
   && ok "dry run writes nothing" || no "dry run wrote files"
 inst > "$T/install.out" && inst > "$T/reinstall.out"
 grep -q 'registered: state/backlog-lock-reclaim.check.sh' "$T/install.out" && ok "check registered" || no "check not registered"
@@ -70,7 +70,7 @@ out=$("$CHECK")
   || no "lock not reclaimed after holder death: $out"
 
 HOME="$T/home" XDG_DATA_HOME="$T/data" "$ADDON/uninstall.sh" "$T/fm" > "$T/uninstall.out" \
-  && [ ! -e "$CHECK" ] && [ ! -e "$T/data/fm-backlog-lock-reclaim/backlog-lock-reclaim.check.sh" ] \
+  && [ ! -e "$CHECK" ] && [ ! -e "$T/data/jg-backlog-lock-reclaim/backlog-lock-reclaim.check.sh" ] \
   && ok "uninstall retires the check and its copy" || no "uninstall left files: $(cat "$T/uninstall.out")"
 
 [ "$fail" -eq 0 ] && echo "PASS: backlog-lock-reclaim e2e" || echo "FAIL: backlog-lock-reclaim e2e"

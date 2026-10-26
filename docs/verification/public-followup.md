@@ -17,16 +17,16 @@ Task chronology and delivery evidence stay outside this record.
 
 ## Environment
 
-Recorded 2026-09-01 on Darwin 25.5.0 (arm64) with GNU bash 5.3.9, tasks-axi 0.2.5, jq 1.8.1, and ShellCheck 0.11.0 (the version `bin/fm-lint.sh` pins).
+Recorded 2026-09-01 on Darwin 25.5.0 (arm64) with GNU bash 5.3.9, tasks-axi 0.2.5, jq 1.8.1, and ShellCheck 0.11.0 (the version `bin/jg-lint.sh` pins).
 The stock macOS compatibility lane additionally runs the focused first-registration regression with `/bin/bash` 3.2.57 and a real `tasks-axi` installation.
 The relay is a fakebin `curl` in every case, so no public post is ever made; `tasks-axi` and `jq` are the real tools, because stubbing the obligation state machine would verify nothing.
-The remote-route cases fake only the SSH binary at the `FM_SSH_BIN` process seam and then run the real tracked `fm-remote-entrypoint.sh` against a local checkout standing in for the remote one, so the work that has to reach the remote home actually runs there; no host and no network are involved.
+The remote-route cases fake only the SSH binary at the `FM_SSH_BIN` process seam and then run the real tracked `jg-remote-entrypoint.sh` against a local checkout standing in for the remote one, so the work that has to reach the remote home actually runs there; no host and no network are involved.
 The failed-result regression was refreshed separately on 2026-09-22 in the same environment with tasks-axi 0.2.6.
 
 ## Restart end-to-end and regressions
 
 ```sh
-bash tests/fm-public-followup.test.sh
+bash tests/jg-public-followup.test.sh
 ```
 
 ```
@@ -111,7 +111,7 @@ It reproduces the stranded state first (work bound, no reconciled terminal resul
 The focused tasks-axi 0.2.6 regression is the proof of guarantee 7:
 
 ```sh
-FM_TEST_ONLY=test_failed_work_on_pr_merged_promise_delivers_honest_outcome bash tests/fm-public-followup.test.sh
+FM_TEST_ONLY=test_failed_work_on_pr_merged_promise_delivers_honest_outcome bash tests/jg-public-followup.test.sh
 ```
 
 ```
@@ -127,7 +127,7 @@ It delivers a `report-ready` promised-final, asserts the registration is retaine
 `retire --reason` records its private receipt before removal and is the only close; replayed registration cannot reopen that retired loop.
 The concurrency and interrupted-bind cases verify that one delivered source cannot fork and that retry converges on the same destination obligation.
 A pre-change on-disk record (no `state=`, no `request_context_b64`) is an open loop and un-rechainable rather than a crash.
-The stock macOS Bash lane in [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) sets `FM_TEST_ONLY=test_first_register_succeeds_with_empty_lock_list_under_bash32` and runs `tests/fm-public-followup.test.sh` through real `/bin/bash` 3.2, proving the first `register` path is safe when its registry lock list starts empty.
+The stock macOS Bash lane in [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) sets `FM_TEST_ONLY=test_first_register_succeeds_with_empty_lock_list_under_bash32` and runs `tests/jg-public-followup.test.sh` through real `/bin/bash` 3.2, proving the first `register` path is safe when its registry lock list starts empty.
 
 The eight remote-route cases are the proof of guarantee 5.
 A remote secondmate home exists only on its own machine, so its registration records no local path, and every close that must first clear the bound legacy Relay link had nothing local to act on.
@@ -160,14 +160,14 @@ Outward delivery for a remote-home loop is the separate legacy-link clear proven
 
 ## Relay-disabled zero overhead
 
-The relay-disabled case in `tests/fm-public-followup.test.sh` invokes every public-followup entry point against a home with no `.env`, logs every `tasks-axi` invocation, and compares the state tree before and after.
+The relay-disabled case in `tests/jg-public-followup.test.sh` invokes every public-followup entry point against a home with no `.env`, logs every `tasks-axi` invocation, and compares the state tree before and after.
 It proves the feature makes no `tasks-axi` call, prints nothing, and creates no `state/public-followup` artifact without coupling that guarantee to session start's independently owned state files.
 
 The whole added cost in that home is the activation predicate, measured over 1000 in-process calls including loop overhead:
 
 ```sh
-. bin/fm-public-followup-lib.sh
-for i in $(seq 1 1000); do fm_pf_relay_active "$HOME_DIR" || true; done
+. bin/jg-public-followup-lib.sh
+for i in $(seq 1 1000); do jg_pf_relay_active "$HOME_DIR" || true; done
 ```
 
 ```
@@ -180,9 +180,9 @@ Roughly 0.02 ms per session start, from a single `[ -f "$FM_HOME/.env" ]` test t
 
 Primary harnesses (`claude`, `codex`, `opencode`, `pi`, `pi-signed`, `grok`, `kimi`): not applicable after inspection.
 Nothing here reads or renders harness-specific state.
-The only supervision surfaces touched are the session-start digest, which `bin/fm-supervision-instructions.sh` already renders per harness without knowing this section exists, and the wake payload produced by the existing relay poll, which every harness protocol consumes identically.
+The only supervision surfaces touched are the session-start digest, which `bin/jg-supervision-instructions.sh` already renders per harness without knowing this section exists, and the wake payload produced by the existing relay poll, which every harness protocol consumes identically.
 
 Runtime backends (tmux, herdr, zellij, orca, cmux): not applicable after inspection.
 No command here reads `state/<id>.meta`'s backend fields, resolves an endpoint, or captures a pane.
-The lifecycle integrations are backlog-handoff warnings, promotion rechain hints, and `bin/fm-teardown.sh`'s owed-reply refusal plus non-blocking open-loop and legacy `x_request=` warnings.
+The lifecycle integrations are backlog-handoff warnings, promotion rechain hints, and `bin/jg-teardown.sh`'s owed-reply refusal plus non-blocking open-loop and legacy `x_request=` warnings.
 They inspect home, task, parent-binding, and registration records rather than backend fields or endpoints, so they behave identically on every backend.

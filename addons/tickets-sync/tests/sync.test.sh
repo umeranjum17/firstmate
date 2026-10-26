@@ -33,13 +33,13 @@ printf '\n## Done\n- [x] recent - Umer shipped feature (repo: alpha) (done %s)\n
 git init -q "$FM_HOME/projects/alpha"
 git -C "$FM_HOME/projects/alpha" remote add origin https://github.com/example/alpha-app.git
 printf 'working [at=1700000000]: building Umer release\n' > "$FM_HOME/state/long.status"
-sign-off-axi ticket "$work/board.json" --id fm-legacy-fixture --title 'Needs a parent · alpha' --progress 17 --asked yes >/dev/null
-sign-off-axi ticket "$work/board.json" --id fm-history-fixture --title 'Umer historical maintenance' --project main --progress 100 --asked no >/dev/null
+sign-off-axi ticket "$work/board.json" --id jg-legacy-fixture --title 'Needs a parent · alpha' --progress 17 --asked yes >/dev/null
+sign-off-axi ticket "$work/board.json" --id jg-history-fixture --title 'Umer historical maintenance' --project main --progress 100 --asked no >/dev/null
 source_before=$(sha256sum "$FM_HOME/data/backlog.md" "$work/parked/data/backlog.md")
 bash "$root/tickets-sync/install.sh" --dry-run
-test ! -d "$XDG_DATA_HOME/fm-tickets-sync"
+test ! -d "$XDG_DATA_HOME/jg-tickets-sync"
 bash "$root/tickets-sync/install.sh"
-printf 'not an image' > "$XDG_DATA_HOME/fm-tickets-sync/fleet-dashboard/fm-dashboard/icons/takeone.png"
+printf 'not an image' > "$XDG_DATA_HOME/jg-tickets-sync/fleet-dashboard/jg-dashboard/icons/takeone.png"
 env -u FM_HOME "$FM_HOME/state/tickets-sync.check.sh" | tee "$work/first.out"
 # Missing/broken icons are recorded quietly; check stdout would wake Main.
 jq -e '.["alpha-app"] == "no local image" and .takeone == "not a readable png image"' "$FM_HOME/state/tickets-sync/icons-skipped.json"
@@ -48,7 +48,7 @@ grep -q 'icon skipped' "$work/first.out" && { echo 'FAIL: icon skip must not pri
 grep -qE '^tickets-sync: [0-9]+ homes read; [0-9]+ tickets changed$' "$work/first.out"
 grep -q continuing "$work/first.out" && { echo 'FAIL: backfill continue must not print to check stdout'; exit 1; }
 rm -f "$FM_HOME/state/tickets-sync/cursor.json" "$FM_HOME/state/tickets-sync/progress.log"
-FM_TICKETS_SYNC_BUDGET_SECS=0 FM_HOME="$FM_HOME" python3 "$XDG_DATA_HOME/fm-tickets-sync/tickets-sync/sync.py" > "$work/continue.out"
+FM_TICKETS_SYNC_BUDGET_SECS=0 FM_HOME="$FM_HOME" python3 "$XDG_DATA_HOME/jg-tickets-sync/tickets-sync/sync.py" > "$work/continue.out"
 grep -q continuing "$work/continue.out" && { echo 'FAIL: backfill continue must stay off stdout'; exit 1; }
 grep -q continuing "$FM_HOME/state/tickets-sync/progress.log"
 test -s "$FM_HOME/state/tickets-sync/cursor.json"
@@ -57,7 +57,7 @@ printf 'working [at=1700000050]: still building Umer release\n' >> "$FM_HOME/sta
 grep -q continuing "$work/resume.out" && { echo 'FAIL: resumed backfill continue must stay off stdout'; exit 1; }
 grep -qE '^tickets-sync: [0-9]+ homes read; [0-9]+ tickets changed$' "$work/resume.out"
 echo 'PASS: backfill continue is quiet; finished pass wakes once with a summary'
-ticket_id() { printf 'fm-%s\n' "$(printf '%s' "$1" | sha256sum | cut -c1-32)"; }
+ticket_id() { printf 'jg-%s\n' "$(printf '%s' "$1" | sha256sum | cut -c1-32)"; }
 child=$(ticket_id main/child) parent=$(ticket_id main/parent) parked=$(ticket_id parked/parent)
 sign-off-axi ticket "$work/board.json" --json > "$work/first.json" || { cat "$work/first.json"; exit 1; }
 jq -e '.tickets | all(.[]; (.title | length) <= 160) and all(.[]; (.title | startswith("Needs a parent")) | not)'  "$work/first.json"
@@ -66,8 +66,8 @@ jq -e --arg id "$parked" '.tickets[] | select(.id == $id) | .hold == true' "$wor
 jq -e --arg id "$(ticket_id main/held)" '[.tickets[] | select(.id == $id and .hold == true)] | length == 1' "$work/first.json"
 upkeep=$(ticket_id fleet/:upkeep)
 jq -e --arg root "$parent" --arg upkeep "$upkeep" '.tickets as $ts | all($ts[]; ((.parent // "") != "") or .id == $root or .id == $upkeep) and any($ts[]; .id == $root and .title == "Umer telescope focus should be simple") and any($ts[]; .id == $upkeep and .asked == false and .title == "Not from your asks (fleet upkeep)")' "$work/first.json"
-jq -e --arg upkeep "$upkeep" '.tickets[] | select(.id == "fm-legacy-fixture") | .parent == $upkeep and .asked == false and .progress == 0' "$work/first.json"
-jq -e --arg upkeep "$upkeep" '.tickets[] | select(.id == "fm-history-fixture") | .parent == $upkeep and (.project // "") == ""' "$work/first.json"
+jq -e --arg upkeep "$upkeep" '.tickets[] | select(.id == "jg-legacy-fixture") | .parent == $upkeep and .asked == false and .progress == 0' "$work/first.json"
+jq -e --arg upkeep "$upkeep" '.tickets[] | select(.id == "jg-history-fixture") | .parent == $upkeep and (.project // "") == ""' "$work/first.json"
 jq -e --arg inferred "$(ticket_id main/inferred)" --arg parent "$parent" '.tickets[] | select(.id == $inferred) | .parent == $parent' "$work/first.json"
 # herdr is an internal home: no ticket project label and no icon wake line.
 jq -e --arg internal "$(ticket_id main/internal)" '.tickets[] | select(.id == $internal) | (.project // "") == ""' "$work/first.json"
@@ -88,8 +88,8 @@ PY
 jq -e --arg internal "$(ticket_id main/internal)" '.tickets[] | select(.id == $internal) | (.project // "") == ""' <(sign-off-axi ticket "$work/board.json" --json)
 grep -qiE 'herdr( |$)' "$work/first.out" && { echo 'FAIL: herdr must not appear on check stdout'; exit 1; }
 sign-off-axi project "$work/board.json" --json | jq -e '[.projects[] | .name | ascii_downcase] | (index("herdr") == null) and (index("herdr-runtime") == null)'
-sign-off-axi project "$work/board.json" --json | jq -e '[.projects[] | .name] == ["ownvoice"] and .projects[0].icon.sha256 == "'"$(sha256sum "$root/fleet-dashboard/fm-dashboard/icons/ownvoice.png" | cut -d" " -f1)"'"'
-cmp "$root/fleet-dashboard/fm-dashboard/icons/ownvoice.png" "$work/icons/ownvoice.png"
+sign-off-axi project "$work/board.json" --json | jq -e '[.projects[] | .name] == ["ownvoice"] and .projects[0].icon.sha256 == "'"$(sha256sum "$root/fleet-dashboard/jg-dashboard/icons/ownvoice.png" | cut -d" " -f1)"'"'
+cmp "$root/fleet-dashboard/jg-dashboard/icons/ownvoice.png" "$work/icons/ownvoice.png"
 test ! -e "$work/icons/takeone.png"
 sign-off-axi ticket "$work/board.json" --id "$(ticket_id main/long)" --json | jq -e '.ticket.progress == 30 and .ticket.state == "in progress" and .ticket.stage == "building" and .ticket.last_event_at == 1700000050'
 printf 'working [key=nm-umer-ci] [at=1700000100]: checking CI\n' >> "$FM_HOME/state/long.status"
@@ -101,7 +101,7 @@ sign-off-axi ticket "$work/board.json" --id "$(ticket_id main/long)" --json | jq
 printf 'cancelled [at=1700000300]: Umer cancelled this task\n' >> "$FM_HOME/state/long.status"
 "$FM_HOME/state/tickets-sync.check.sh"
 sign-off-axi ticket "$work/board.json" --id "$(ticket_id main/long)" --json | jq -e '.ticket.progress == 100 and .ticket.state == "done" and .ticket.stage == "done" and .ticket.last_event_at == 1700000300'
-FM_HOME="$FM_HOME" python3 "$XDG_DATA_HOME/fm-tickets-sync/tickets-sync/sync.py" --close main/held --reason superseded --reconcile
+FM_HOME="$FM_HOME" python3 "$XDG_DATA_HOME/jg-tickets-sync/tickets-sync/sync.py" --close main/held --reason superseded --reconcile
 sign-off-axi ticket "$work/board.json" --id "$(ticket_id main/held)" --json | jq -e '.ticket.progress == 100 and .ticket.hold == false'
 before=$(sha256sum "$work/board.tickets.jsonl" "$work/board.projects.jsonl")
 rm "$FM_HOME/state/tickets-sync/closures.json"
@@ -143,7 +143,7 @@ echo 'PASS: full-body parent beyond list truncation and source revision refresh'
 
 # The lifecycle writer records what a merge, a dispatch or a cleanup knows at the
 # moment it happens; a repeated step appends nothing, and an unknown ticket is a no-op.
-WRITER="$XDG_DATA_HOME/fm-tickets-sync/tickets-sync/ticket.py"
+WRITER="$XDG_DATA_HOME/jg-tickets-sync/tickets-sync/ticket.py"
 FM_HOME="$FM_HOME" python3 "$WRITER" refresh --stage merging --pr https://github.com/example/alpha/pull/999 --release v9
 sign-off-axi ticket "$work/board.json" --id "$(ticket_id main/refresh)" --json | jq -e '.ticket.stage == "merging" and .ticket.prs == ["https://github.com/example/alpha/pull/999"] and .ticket.release == "v9"'
 before=$(sha256sum "$work/board.tickets.jsonl")
@@ -167,7 +167,7 @@ grep -q "no home's work accounts for it" <<<"$out"
 test "$before" = "$(sha256sum "$work/board.tickets.jsonl")"
 # The fixture's leftover row from its earlier grouping history is the surplus row the
 # check is for; closing it and settling the rest leaves the board true and silent.
-sign-off-axi ticket "$work/board.json" --id fm-history-fixture --state "done" >/dev/null
+sign-off-axi ticket "$work/board.json" --id jg-history-fixture --state "done" >/dev/null
 "$FM_HOME/state/tickets-sync.check.sh" >/dev/null
 test -z "$("$FM_HOME/state/tickets-stale.check.sh")"
 echo 'PASS: the stale check flags a contradicting and an orphaned ticket, writes nothing, and silences a settled board'

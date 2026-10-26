@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Forced-limit journey for fm-model-pool: fixture Umer A/B, A=70% B=40%, A limit then B,
+# Forced-limit journey for jg-model-pool: fixture Umer A/B, A=70% B=40%, A limit then B,
 # all Claude under floor then Sol -> Goat -> Cursor, no repeated attempted id, credits refused.
 # No network, no real login copy, no real model CLI.
 set -u
 here=$(cd "$(dirname "$0")" && pwd) || exit 1
 addons=$(cd "$here/../.." && pwd) || exit 1
-helper=$addons/account-pool/bin/fm-model-pool
+helper=$addons/account-pool/bin/jg-model-pool
 pool=$addons/claude-accounts/bin/claude-accounts-pick
 w=$(mktemp -d "${TMPDIR:-/tmp}/model-pool-test.XXXXXX") || exit 1
 trap 'rm -rf -- "$w"' EXIT

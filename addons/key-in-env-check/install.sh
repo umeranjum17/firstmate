@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Install or update key-in-env-check: copy the check to ${XDG_DATA_HOME:-~/.local/share}/fm-key-in-env-check/,
+# Install or update key-in-env-check: copy the check to ${XDG_DATA_HOME:-~/.local/share}/jg-key-in-env-check/,
 # write the home's state/key-in-env-check.check.sh as a shim that execs it (old file kept as .bak) and
-# register it with the home's bin/fm-check-register.sh. Idempotent. Usage: install.sh [--dry-run]  (FM_HOME names the home)
+# register it with the home's bin/jg-check-register.sh. Idempotent. Usage: install.sh [--dry-run]  (FM_HOME names the home)
 set -euo pipefail
 dry=0
 [ "${1:-}" = --dry-run ] && dry=1
 FM_HOME=${FM_HOME:?set FM_HOME to the firstmate home that runs the check}
 src=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/key-in-env-check
-dest=${XDG_DATA_HOME:-$HOME/.local/share}/fm-key-in-env-check/key-in-env-check
+dest=${XDG_DATA_HOME:-$HOME/.local/share}/jg-key-in-env-check/key-in-env-check
 check=$FM_HOME/state/key-in-env-check.check.sh
 shim=$(printf '#!/usr/bin/env bash\nexec %q "$@"\n' "$dest")
 if [ "$dry" = 1 ]; then
@@ -22,7 +22,7 @@ if [ "$(cat "$check" 2>/dev/null)" != "$shim" ]; then
   printf '%s\n' "$shim" > "$check"
 fi
 chmod 700 "$check"
-if [ -x "$FM_HOME/bin/fm-check-register.sh" ]; then
-  env -u FM_STATE_OVERRIDE "$FM_HOME/bin/fm-check-register.sh" key-in-env-check
+if [ -x "$FM_HOME/bin/jg-check-register.sh" ]; then
+  env -u FM_STATE_OVERRIDE "$FM_HOME/bin/jg-check-register.sh" key-in-env-check
 fi
 echo "installed $dest; $check execs it"

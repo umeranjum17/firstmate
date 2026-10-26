@@ -47,7 +47,7 @@ $ grep -nE 'muse-bin|exec ' launcher.sh
 ```
 
 `ps -o comm= -p <pid>` returns the full executable path, whose basename is `muse-bin-<version>`.
-That is why both `bin/fm-harness.sh` and `bin/backends/tmux.sh` match the anchored prefix `muse-bin-*` rather than an exact name, and why neither can rely on an install-path component: `~/.local/bin/muse-bin-<version>` contains no `muse` path component.
+That is why both `bin/jg-harness.sh` and `bin/backends/tmux.sh` match the anchored prefix `muse-bin-*` rather than an exact name, and why neither can rely on an install-path component: `~/.local/bin/muse-bin-<version>` contains no `muse` path component.
 The Muse launch clears `CLAUDECODE`, `PI_CODING_AGENT`, `GROK_AGENT`, `FM_PI_HARNESS`, `CURSOR_AGENT`, and `CURSOR_INVOKED_AS` before the worker starts, which is the verified launch behavior rather than what detection depends on.
 [Harness detection precedence](runtime-backends.md#harness-detection-precedence) owns why a retained foreign marker cannot override the versioned ancestry.
 
@@ -82,7 +82,7 @@ T+25s fold=busy
 T+30s fold=settled
 ```
 
-Two decoys were observed in real logs and are pinned by regressions in `tests/fm-muse-harness.test.sh`:
+Two decoys were observed in real logs and are pinned by regressions in `tests/jg-muse-harness.test.sh`:
 a nested `"record":{"kind":"terminal"}` cleanup-effect payload that is not a run terminal, and independent sub-agent run lifecycles under `subagent/<child-session-id>/session.jsonl`.
 The same regression suite verifies that unique resolution is cached, a changed current-day main-session namespace restores ambiguity to unknown, a replacement spawn binding selects its fresh main log, missing cached logs fail closed, and cached sub-agent paths are rejected.
 
@@ -112,7 +112,7 @@ An unauthenticated launch does not exit; it waits indefinitely:
   Esc cancel
 ```
 
-That is why `bin/fm-spawn.sh` preflights worker-reachable `META_API_KEY` or `<config>/muse/auth.json` and refuses before creating an endpoint.
+That is why `bin/jg-spawn.sh` preflights worker-reachable `META_API_KEY` or `<config>/muse/auth.json` and refuses before creating an endpoint.
 A caller-only `META_API_KEY` is refused because a long-lived backend daemon does not inherit it, while the non-secret `XDG_CONFIG_HOME` and `XDG_DATA_HOME` roots are resolved to absolute paths before preflight and forwarding so the stored credential and session-log binding reach the same worker environment.
 
 ### Foreign personal context
@@ -160,7 +160,7 @@ After a single Escape the interrupted prompt is restored into the composer at th
 This was the one item deferred until a `META_API_KEY` was available, because it is what decides whether a settled log may classify `idle`.
 An open run was always positive proof of a turn in flight, but a settled log only proves no run is open at that instant, so the classifier held idle behind an opt-in in case a real turn spanned several runs.
 The smoke below answered that: one run brackets a whole multi-step turn, and an Escape interrupt closes that run with `terminal=cancelled` rather than leaving the turn to continue in another run.
-The credentialed result gives a settled Muse log the same idle trust as the Claude and Pi push sources, so the opt-in was removed and `bin/fm-busy-lib.sh` classifies a settled log `idle` outright.
+The credentialed result gives a settled Muse log the same idle trust as the Claude and Pi push sources, so the opt-in was removed and `bin/jg-busy-lib.sh` classifies a settled log `idle` outright.
 Muse auto-updates its vendor binary underneath the fleet, Juggernaut normalizes the versioned process identity to the `muse` harness before busy classification, and the session log's own metadata carries semver `0.1.0` plus a build SHA that cannot be matched to that normalized identity.
 A verified-build allowlist against this coarse identity would be false precision because it could not distinguish the running build, as well as a maintenance treadmill against the auto-updating binary.
 
@@ -190,7 +190,7 @@ A bare `grep -c '"event":{"kind":"started"'` returns 56 on the same log, because
 ### Busy sampling and interrupt
 
 Session `e4e0b4f4-38d0-46dc-b669-dfb5de92e0e0` sampled the fold while a multi-step turn was in flight, then interrupted it with Escape mid tool loop.
-Five consecutive samples of `fm_busy_muse_run_state` on the bound log returned `busy`, and `fm_busy_classify` returned `busy muse-session-log` for the same samples; the fold settled immediately after the interrupt.
+Five consecutive samples of `jg_busy_muse_run_state` on the bound log returned `busy`, and `jg_busy_classify` returned `busy muse-session-log` for the same samples; the fold settled immediately after the interrupt.
 Its run closed as cancelled rather than staying open:
 
 ```
@@ -201,15 +201,15 @@ Its run closed as cancelled rather than staying open:
 
 That is the same terminal shape the `echo`-provider interrupt produced, now confirmed against a live model mid tool loop.
 
-`tests/fm-muse-harness.test.sh` pins the resulting classifier behavior: a log settled by either terminal reads `idle`, an open run reads `busy`, and only a resolution failure reads `unknown`.
+`tests/jg-muse-harness.test.sh` pins the resulting classifier behavior: a log settled by either terminal reads `idle`, an open run reads `busy`, and only a resolution failure reads `unknown`.
 
 ## Refreshing this record
 
 Run both live guards after any muse upgrade, because the version-suffixed process name, session protocol, and styled composer are vendor-controlled surfaces:
 
 ```
-FM_HARNESS_LIVENESS_DRIFT=1 bin/fm-test-run.sh tests/fm-harness-liveness-drift-live-e2e.test.sh
-FM_MUSE_SIGNALS_LIVE=1 bin/fm-test-run.sh tests/fm-muse-signals-live-e2e.test.sh
+FM_HARNESS_LIVENESS_DRIFT=1 bin/jg-test-run.sh tests/jg-harness-liveness-drift-live-e2e.test.sh
+FM_MUSE_SIGNALS_LIVE=1 bin/jg-test-run.sh tests/jg-muse-signals-live-e2e.test.sh
 ```
 
 The Muse signals guard requires a real `muse` binary and tmux but uses `--provider echo`, so it does not require `META_API_KEY` and cannot re-check the real-model turn-to-run relationship on its own.
@@ -219,4 +219,4 @@ muse's launcher can replace the running binary underneath the fleet, so an upgra
 Repeat that smoke after a protocol-affecting upgrade: run one real multi-step tool-loop turn with credentials in place, confirm the run-scoped `started`/`terminal` counts are still exactly one each, and confirm an Escape still yields `terminal` with `cancelled`.
 A build that ever split one turn across several runs would make a settled log ambiguous, which is a classifier change rather than a note in this file.
 
-The portable counterparts that run in ordinary CI are `tests/fm-muse-harness.test.sh`, `tests/fm-tmux-agent-liveness.test.sh`, `tests/fm-composer-lib.test.sh`, and `tests/fm-composer-ghost.test.sh`.
+The portable counterparts that run in ordinary CI are `tests/jg-muse-harness.test.sh`, `tests/jg-tmux-agent-liveness.test.sh`, `tests/jg-composer-lib.test.sh`, and `tests/jg-composer-ghost.test.sh`.

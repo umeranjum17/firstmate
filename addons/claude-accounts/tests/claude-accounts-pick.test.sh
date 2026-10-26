@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# claude-accounts-pick: drive the account-pool add-on's own fm_account_pool_select (what fm-spawn calls)
+# claude-accounts-pick: drive the account-pool add-on's own jg_account_pool_select (what jg-spawn calls)
 # with config/account-pool pointing at the chooser, a fixture muxr registry and a stub quota-axi whose
 # readings change per case. New workers spread by runway and skip an account when it runs low.
 set -u
@@ -28,7 +28,7 @@ pick() { # [tool] [want]: sets out and rc from the pool pick
   rm -f "$w/pool/account-assignments.json" # Independent election for each existing case.
   # shellcheck disable=SC2016
   out=$(env -i PATH="$w/bin:$PATH" HOME="$w" TMPDIR="$w" QDIR="$w" FM_HOME="$w/home" FM_CLAUDE_ACCOUNTS_REGISTRY="$w/registry.json" \
-    FM_CLAUDE_ACCOUNTS_FRESH=0 CODEX_HOME="$w/other" bash -c 'fm_run_timed() { shift; "$@"; }; . "$1/account-pool/bin/fm-account-pool-lib.sh"; shift; fm_account_pool_select "$@"' _ "$addons" "${1:-claude}" "$w/home/config" "${2:-}" 2>&1); rc=$?
+    FM_CLAUDE_ACCOUNTS_FRESH=0 CODEX_HOME="$w/other" bash -c 'jg_run_timed() { shift; "$@"; }; . "$1/account-pool/bin/jg-account-pool-lib.sh"; shift; jg_account_pool_select "$@"' _ "$addons" "${1:-claude}" "$w/home/config" "${2:-}" 2>&1); rc=$?
 }
 q() { echo "$2" > "$w/$1.q"; }
 
@@ -65,7 +65,7 @@ q a1 "0 34"; cmd rest $A1 --json --state "$w/pool" >/dev/null; q a1 "63 34"; pic
 cmd unrest $A1 --json --state "$w/pool" >/dev/null; cmd unrest $A2 --json --state "$w/pool" >/dev/null
 pick claude $A2; is "an explicit pa_ id resolves once unrested" "$rc|$(cut -f1 <<<"$out")" "0|$A2"
 
-# A quota-reader failure never refuses a launch. Each case drives the picker the way fm-spawn does,
+# A quota-reader failure never refuses a launch. Each case drives the picker the way jg-spawn does,
 # with the reader unable to answer: no FM_HOME at all, a reader that cannot run, a reading nobody has
 # refreshed, and a reading so old the 5h window is meaningless. The roster is the registry, so the
 # pick still answers, and it says where its numbers came from and how old they are.
@@ -171,10 +171,10 @@ is "concurrent launches share the counter without lost assignments" "$(jq -r .id
 out=$(FM_ACCOUNT_POOL_ASSIGNMENT_SECONDS=0 cmd_nohome pick codex --json --state "$w/pool")
 is "expired assignments reset the winner to the most headroom" "$(jq -r .id <<<"$out")" c1
 
-# Floor wording: launch admission (5%) stays distinct from verified-rest / fm-model-pool eligibility (15%).
+# Floor wording: launch admission (5%) stays distinct from verified-rest / jg-model-pool eligibility (15%).
 is "launch admission default stays 5" "${FM_CLAUDE_ACCOUNTS_LOW:-5}" 5
 is "rest/eligibility floor default stays 15" "${FM_ACCOUNT_POOL_REST_FLOOR:-15}" 15
-is "fm-model-pool exists for tool rotation above the rest floor" "$([ -x "$addons/account-pool/bin/fm-model-pool" ] && echo yes)" yes
+is "jg-model-pool exists for tool rotation above the rest floor" "$([ -x "$addons/account-pool/bin/jg-model-pool" ] && echo yes)" yes
 
 [ "$fails" -eq 0 ] || { echo "$fails failed"; exit 1; }
 echo "all passed"

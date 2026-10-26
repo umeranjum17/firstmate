@@ -3,13 +3,13 @@
 The 2026-09-05 lint-cost audit measured the seven roots from the missed-reply incident at commit `f09de8a3d3a550b13b4d535346fbc7b9ac0d6c19`:
 
 ```text
-bin/fm-brief.sh
-bin/fm-parent-channel-lib.sh
-bin/fm-pending-reply-lib.sh
-bin/fm-secondmate-report.sh
-tests/fm-brief.test.sh
-tests/fm-classify-corr-token.test.sh
-tests/fm-pending-reply.test.sh
+bin/jg-brief.sh
+bin/jg-parent-channel-lib.sh
+bin/jg-pending-reply-lib.sh
+bin/jg-secondmate-report.sh
+tests/jg-brief.test.sh
+tests/jg-classify-corr-token.test.sh
+tests/jg-pending-reply.test.sh
 ```
 
 ShellCheck was the repository-pinned 0.11.0 Darwin arm64 build.
@@ -24,21 +24,21 @@ Both variants were measured in the same quiet-host window:
 
 ## Reproduction
 
-Check out the recorded commit, install the pinned binary with `bin/fm-install-shellcheck.sh`, put it first on `PATH`, and run the following on macOS.
+Check out the recorded commit, install the pinned binary with `bin/jg-install-shellcheck.sh`, put it first on `PATH`, and run the following on macOS.
 No `--extended-analysis=false` flag is present, so dataflow remains on.
 Diagnostics are discarded because only process cost is under measurement.
 
 ```bash
 set -eu
-[ "$(bin/fm-lint.sh --required-version)" = "$(shellcheck --version | awk '/^version:/ {print $2; exit}')" ]
+[ "$(bin/jg-lint.sh --required-version)" = "$(shellcheck --version | awk '/^version:/ {print $2; exit}')" ]
 roots=(
-  bin/fm-brief.sh
-  bin/fm-parent-channel-lib.sh
-  bin/fm-pending-reply-lib.sh
-  bin/fm-secondmate-report.sh
-  tests/fm-brief.test.sh
-  tests/fm-classify-corr-token.test.sh
-  tests/fm-pending-reply.test.sh
+  bin/jg-brief.sh
+  bin/jg-parent-channel-lib.sh
+  bin/jg-pending-reply-lib.sh
+  bin/jg-secondmate-report.sh
+  tests/jg-brief.test.sh
+  tests/jg-classify-corr-token.test.sh
+  tests/jg-pending-reply.test.sh
 )
 rm -rf .lint-option-a-measurement
 mkdir .lint-option-a-measurement

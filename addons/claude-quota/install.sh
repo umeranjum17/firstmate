@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Install or update the claude-quota check for this user and point one firstmate home's state/claude-quota.check.sh
 # at it through an exec shim, backing up a replaced check first, then re-register it. Idempotent.
-# Usage: install.sh [--dry-run] <fm-home>
+# Usage: install.sh [--dry-run] <jg-home>
 set -euo pipefail
 DRY=0
 [ "${1:-}" = --dry-run ] && { DRY=1; shift; }
-[ "$#" -eq 1 ] && [ -x "$1/bin/fm-check-register.sh" ] || { echo "usage: install.sh [--dry-run] <fm-home>" >&2; exit 2; }
+[ "$#" -eq 1 ] && [ -x "$1/bin/jg-check-register.sh" ] || { echo "usage: install.sh [--dry-run] <jg-home>" >&2; exit 2; }
 FMH=$(cd "$1" && pwd -P)
 SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
-DEST=${XDG_DATA_HOME:-$HOME/.local/share}/fm-claude-quota
+DEST=${XDG_DATA_HOME:-$HOME/.local/share}/jg-claude-quota
 CHECK=$FMH/state/claude-quota.check.sh
 SHIM=$(printf '#!/usr/bin/env bash\nexec %q "$@"\n' "$DEST/claude-quota.check.sh")
 BAK=
@@ -19,7 +19,7 @@ if [ "$DRY" -eq 1 ]; then
   [ -z "$BAK" ] || echo "would back up: $CHECK -> $BAK"
   echo "would write: $CHECK:"
   printf '%s\n' "$SHIM" | sed 's/^/  /'
-  echo "would run: $FMH/bin/fm-check-register.sh claude-quota"
+  echo "would run: $FMH/bin/jg-check-register.sh claude-quota"
   echo "dry run: nothing written"
   exit 0
 fi
@@ -29,5 +29,5 @@ install -m 755 "$SRC/claude-quota.check.sh" "$DEST/claude-quota.check.sh"
 printf '%s\n' "$SHIM" > "$CHECK"
 chmod 700 "$CHECK"
 # An FM_STATE_OVERRIDE in the caller env, even empty, would register away from FMH/state.
-env -u FM_STATE_OVERRIDE FM_HOME="$FMH" "$FMH/bin/fm-check-register.sh" claude-quota
+env -u FM_STATE_OVERRIDE FM_HOME="$FMH" "$FMH/bin/jg-check-register.sh" claude-quota
 echo "installed: $CHECK -> $DEST/claude-quota.check.sh"

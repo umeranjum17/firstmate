@@ -38,11 +38,11 @@ function health(key: string, cooldown: number): string {
 }
 
 const history: Row[] = [
-  { seq: 1, task: "fm-old", verdict: "captain", summary: "PR merged earlier" },
-  { seq: 2, task: "fm-a", verdict: "routine", summary: "read already" },
-  { seq: 3, task: "fm-b", verdict: "captain", summary: "decision waiting" },
-  { seq: 4, task: "fm-c", verdict: "routine", summary: "worker healthy" },
-  { seq: 5, task: "fm-d", verdict: "routine", summary: "no change", silent: true },
+  { seq: 1, task: "jg-old", verdict: "captain", summary: "PR merged earlier" },
+  { seq: 2, task: "jg-a", verdict: "routine", summary: "read already" },
+  { seq: 3, task: "jg-b", verdict: "captain", summary: "decision waiting" },
+  { seq: 4, task: "jg-c", verdict: "routine", summary: "worker healthy" },
+  { seq: 5, task: "jg-d", verdict: "routine", summary: "no change", silent: true },
 ];
 
 describe("supervision notes", () => {
@@ -52,7 +52,7 @@ describe("supervision notes", () => {
     files.set(CURSOR, "3\n");
     files.set(PROCESSED, "1\n");
     await $.session.start(sessionStart);
-    expect(journal.logs).toEqual(["⚓ [seq 3] fm-b: decision waiting", "⛵ fm-c: worker healthy"]);
+    expect(journal.logs).toEqual(["⚓ [seq 3] jg-b: decision waiting", "⛵ jg-c: worker healthy"]);
     // Only reads: the markers the drain owns are exactly as they were.
     expect(files.get(CURSOR)).toBe("3\n");
     expect(files.get(PROCESSED)).toBe("1\n");
@@ -69,15 +69,15 @@ describe("supervision notes", () => {
       TAIL,
       tail([
         ...history,
-        { seq: 6, task: "fm-e", verdict: "routine", summary: "reconciled\nthe backlog" },
-        { seq: 7, task: "fm-f", verdict: "routine", summary: "nothing new", silent: true },
-        { seq: 8, task: "fm-g", verdict: "captain", summary: "PR https://example.test/pr/1 checks green" },
+        { seq: 6, task: "jg-e", verdict: "routine", summary: "reconciled\nthe backlog" },
+        { seq: 7, task: "jg-f", verdict: "routine", summary: "nothing new", silent: true },
+        { seq: 8, task: "jg-g", verdict: "captain", summary: "PR https://example.test/pr/1 checks green" },
       ]),
     );
     await clock.advance(POLL - 1);
     expect(journal.logs).toEqual([]);
     await clock.advance(1);
-    expect(journal.logs).toEqual(["⛵ fm-e: reconciled the backlog", "⚓ [seq 8] fm-g: PR https://example.test/pr/1 checks green"]);
+    expect(journal.logs).toEqual(["⛵ jg-e: reconciled the backlog", "⚓ [seq 8] jg-g: PR https://example.test/pr/1 checks green"]);
     await clock.advance(POLL * 3);
     expect(journal.logs).toHaveLength(2);
   });
@@ -91,10 +91,10 @@ describe("supervision notes", () => {
     expect(journal.logs).toEqual([]);
     // Session start seeds the copy, or an append in the session's first second creates it, with every
     // earlier row; the drain then reads the new routine row before the mod's first poll.
-    files.set(TAIL, tail([...history, { seq: 6, task: "fm-new", verdict: "routine", summary: "fresh" }]));
+    files.set(TAIL, tail([...history, { seq: 6, task: "jg-new", verdict: "routine", summary: "fresh" }]));
     files.set(CURSOR, "6\n");
     await clock.advance(POLL);
-    expect(journal.logs).toEqual(["⚓ [seq 3] fm-b: decision waiting", "⛵ fm-new: fresh"]);
+    expect(journal.logs).toEqual(["⚓ [seq 3] jg-b: decision waiting", "⛵ jg-new: fresh"]);
     await clock.advance(POLL);
     expect(journal.logs).toHaveLength(2);
   });
@@ -108,15 +108,15 @@ describe("supervision notes", () => {
     files.set(
       TAIL,
       tail([
-        { seq: 9, task: "fm-i", verdict: "routine", summary: "kept" },
-        { seq: 10, task: "fm-j", verdict: "captain", summary: "newest" },
+        { seq: 9, task: "jg-i", verdict: "routine", summary: "kept" },
+        { seq: 10, task: "jg-j", verdict: "captain", summary: "newest" },
       ]),
     );
     await clock.advance(POLL);
     expect(journal.logs).toEqual([
-      "⛵ 3 earlier supervision outcomes not shown; bin/fm-branch-outcome.sh list shows them",
-      "⛵ fm-i: kept",
-      "⚓ [seq 10] fm-j: newest",
+      "⛵ 3 earlier supervision outcomes not shown; bin/jg-branch-outcome.sh list shows them",
+      "⛵ jg-i: kept",
+      "⚓ [seq 10] jg-j: newest",
     ]);
   });
 
@@ -129,11 +129,11 @@ describe("supervision notes", () => {
     files.set(PROCESSED, "3\n");
     await $.session.start(sessionStart);
     expect(journal.logs).toEqual([]);
-    const replaced = tail([...history.slice(1), { seq: 6, task: "fm-new", verdict: "captain", summary: "fresh anchor here" }]);
+    const replaced = tail([...history.slice(1), { seq: 6, task: "jg-new", verdict: "captain", summary: "fresh anchor here" }]);
     expect(replaced.length).toBe(tail(history).length);
     files.set(TAIL, replaced);
     await clock.advance(POLL);
-    expect(journal.logs).toEqual(["⚓ [seq 6] fm-new: fresh anchor here"]);
+    expect(journal.logs).toEqual(["⚓ [seq 6] jg-new: fresh anchor here"]);
     await clock.advance(POLL * 3);
     expect(journal.logs).toHaveLength(1);
   });
@@ -161,15 +161,15 @@ describe("supervision notes", () => {
     files.set(CURSOR, "5\n");
     files.set(PROCESSED, "2\n");
     await $.session.start(sessionStart);
-    expect(journal.logs).toEqual(["⚓ [seq 3] fm-b: decision waiting"]);
+    expect(journal.logs).toEqual(["⚓ [seq 3] jg-b: decision waiting"]);
     // Resumed (or hot reloaded): its restored transcript already holds seq 3.
-    files.set(TAIL, tail([...history, { seq: 6, task: "fm-h", verdict: "captain", summary: "while closed" }]));
+    files.set(TAIL, tail([...history, { seq: 6, task: "jg-h", verdict: "captain", summary: "while closed" }]));
     await $.session.start(sessionStart);
-    expect(journal.logs).toEqual(["⚓ [seq 3] fm-b: decision waiting", "⚓ [seq 6] fm-h: while closed"]);
+    expect(journal.logs).toEqual(["⚓ [seq 3] jg-b: decision waiting", "⚓ [seq 6] jg-h: while closed"]);
     await clock.advance(POLL);
     expect(journal.logs).toHaveLength(2);
     setSessionId("session-2");
     await $.session.start(sessionStart);
-    expect(journal.logs.slice(2)).toEqual(["⚓ [seq 3] fm-b: decision waiting", "⚓ [seq 6] fm-h: while closed"]);
+    expect(journal.logs.slice(2)).toEqual(["⚓ [seq 3] jg-b: decision waiting", "⚓ [seq 6] jg-h: while closed"]);
   });
 });

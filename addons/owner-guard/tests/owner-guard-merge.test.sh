@@ -64,17 +64,17 @@ gate() { env FM_HOME="$FM" "$FM/config/merge-gate" "$@" 2>&1; }
 # The standalone doctor catches both missing guard files and missing global wiring.
 out=$("$SRC/doctor.sh" "$FM" 2>&1)
 has "doctor confirms installed guard" "$out" "$FM is installed"
-mv "$XDG_DATA_HOME/fm-owner-guard/owner-guard" "$d/guard.off"
+mv "$XDG_DATA_HOME/jg-owner-guard/owner-guard" "$d/guard.off"
 git config --global --unset core.hooksPath
 out=$("$SRC/doctor.sh" "$FM" 2>&1) && rc=0 || rc=$?
 check "doctor fails when guard and global hook path are missing" "$rc" 1
-has "doctor names home and missing executable" "$out" "$FM is missing executable $XDG_DATA_HOME/fm-owner-guard/owner-guard"
+has "doctor names home and missing executable" "$out" "$FM is missing executable $XDG_DATA_HOME/jg-owner-guard/owner-guard"
 has "doctor names unset global hook path" "$out" "$FM has unset global core.hooksPath"
 has "doctor prints recovery command" "$out" "owner-guard/install.sh $FM"
 out=$(gate missing - HEAD -) && rc=0 || rc=$?
 check "missing guard merge gate refuses explicitly" "$rc" 1
 has "missing guard merge gate names recovery" "$out" "owner-guard is missing from this home; reinstall"
-mv "$d/guard.off" "$XDG_DATA_HOME/fm-owner-guard/owner-guard"
+mv "$d/guard.off" "$XDG_DATA_HOME/jg-owner-guard/owner-guard"
 "$SRC/install.sh" "$FM" >/dev/null
 
 git -C "$d/work" checkout -q -b clean

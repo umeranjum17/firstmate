@@ -6,7 +6,7 @@
 set -eu
 
 ADDON=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-WRAPPER="$ADDON/bin/fm-bearings-board.sh"
+WRAPPER="$ADDON/bin/jg-bearings-board.sh"
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/bearings-board-test.XXXXXX")
 trap 'rm -rf -- "$TMP"' EXIT
 export HOME=$TMP/home XDG_DATA_HOME=$TMP/data
@@ -14,7 +14,7 @@ export HOME=$TMP/home XDG_DATA_HOME=$TMP/data
 fail() { printf 'not ok: %s\n' "$*" >&2; exit 1; }
 FMH="$TMP/fm"
 mkdir -p "$FMH/bin" "$FMH/state" "$FMH/config"
-cat > "$FMH/bin/fm-bearings-board.sh" <<'STUB'
+cat > "$FMH/bin/jg-bearings-board.sh" <<'STUB'
 #!/usr/bin/env bash
 printf '%s\n' "$@" > "$FM_HOME/state/build-args"
 case "$1" in
@@ -22,7 +22,7 @@ case "$1" in
   path) printf '%s/state/board.html\n' "$FM_HOME" ;;
 esac
 STUB
-chmod +x "$FMH/bin/fm-bearings-board.sh"
+chmod +x "$FMH/bin/jg-bearings-board.sh"
 printf 'old\n' > "$FMH/config/bearings-board-command"
 export FM_CODE_ROOT="$FMH" FM_HOME="$FMH"
 

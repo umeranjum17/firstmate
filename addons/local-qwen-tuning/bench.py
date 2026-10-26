@@ -368,10 +368,10 @@ def _t_locate():
     return {
         "kind": "locate",
         "prompt": ("Which single file under {repo}/bin defines the shell function "
-                   "`fm_afk_mode`? Answer with just the file name, for example `foo.sh`."
+                   "`jg_afk_mode`? Answer with just the file name, for example `foo.sh`."
                    ).format(repo=REPO),
-        "expect_any": ["fm-wake-lib.sh"],
-        "expect_regex": [r"fm-wake-lib\.sh"],
+        "expect_any": ["jg-wake-lib.sh"],
+        "expect_regex": [r"jg-wake-lib\.sh"],
         "max_tokens": 3072,
     }
 
@@ -384,7 +384,7 @@ def _t_cross():
                    "Which distinct files under bin/ contain it? Answer with the file "
                    "names only, comma separated, in alphabetical order."
                    ).format(repo=REPO),
-        "expect_all": ["fm-afk-return.sh", "fm-branch-outcome.sh", "fm-wake-drain.sh"],
+        "expect_all": ["jg-afk-return.sh", "jg-branch-outcome.sh", "jg-wake-drain.sh"],
         "max_tokens": 4096,
     }
 
@@ -393,7 +393,7 @@ def _t_cross():
 def _t_longfile():
     return {
         "kind": "locate",
-        "prompt": ("Read {repo}/bin/fm-classify-lib.sh, a long shell library. "
+        "prompt": ("Read {repo}/bin/jg-classify-lib.sh, a long shell library. "
                    "List, in file order, the names of the top-level shell functions "
                    "defined in it whose names begin with `status_is_`. "
                    "Answer with the names only, comma separated, nothing else."
@@ -426,7 +426,7 @@ def _t_refuse():
     return {
         "kind": "text",
         "prompt": ("What is the value of the shell variable `FM_WATCH_POLL_INTERVAL_MS` "
-                   "in {repo}/bin/fm-watch.sh? Reply with the value only, or the single "
+                   "in {repo}/bin/jg-watch.sh? Reply with the value only, or the single "
                    "word ABSENT if that variable is not defined in that file."
                    ).format(repo=REPO),
         "check": "sentinel_absent",
@@ -473,8 +473,8 @@ TOOL_TASK_TOOLS = [
 ]
 
 
-PATCH_FILES = ("bin/fm-transition-lib.sh", "tests/lib.sh", "tests/git-config-helpers.sh",
-               "tests/fm-transition-lib.test.sh")
+PATCH_FILES = ("bin/jg-transition-lib.sh", "tests/lib.sh", "tests/git-config-helpers.sh",
+               "tests/jg-transition-lib.test.sh")
 PATCH_BROKEN = "    blocked) printf 'absorb' ;;"
 PATCH_CORRECT = "    blocked) printf 'actionable' ;;"
 
@@ -487,7 +487,7 @@ def _t_patch():
             "The isolated copy of the firstmate repository at {sandbox} has a broken "
             "unit test. Run nothing; instead read the code and fix the defect so the "
             "behavior matches what the code's own documentation says the policy table "
-            "must do. The test to satisfy is {sandbox}/tests/fm-transition-lib.test.sh. "
+            "must do. The test to satisfy is {sandbox}/tests/jg-transition-lib.test.sh. "
             "Stay inside {sandbox}."),
         "max_tokens": 6144,
     }
@@ -566,7 +566,7 @@ def score_tools(spec: dict, result: dict, calls: list[dict]) -> tuple[bool, str]
 
 
 def score_patch(spec: dict, sandbox: Path) -> tuple[bool, str]:
-    test = sandbox / "tests/fm-transition-lib.test.sh"
+    test = sandbox / "tests/jg-transition-lib.test.sh"
     proc = subprocess.run(
         ["bash", str(test)], cwd=str(sandbox), capture_output=True, text=True, timeout=180)
     if proc.returncode == 0 and "all assertions passed" in proc.stdout:
@@ -585,7 +585,7 @@ def prepare_sandbox(root: Path) -> Path:
         destination = sandbox / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(REPO / relative, destination)
-    library = sandbox / "bin/fm-transition-lib.sh"
+    library = sandbox / "bin/jg-transition-lib.sh"
     body = library.read_text(encoding="utf-8")
     if PATCH_CORRECT not in body:
         raise RuntimeError("patch fixture does not contain the expected policy line")
@@ -658,10 +658,10 @@ def run_task(name: str, spec: dict, root: Path, args) -> dict:
 
 
 SPEED_PROMPT = (
-    "Write a bash function `fm_collect_ids` that reads lines from stdin, trims "
+    "Write a bash function `jg_collect_ids` that reads lines from stdin, trims "
     "surrounding whitespace, drops empty lines and lines starting with '#', "
     "deduplicates while preserving first-seen order, and prints the result "
-    "one per line. Then write a second function `fm_join_ids` that takes the "
+    "one per line. Then write a second function `jg_join_ids` that takes the "
     "same input and prints it comma separated on one line. Include short "
     "comments. Reply with the code only."
 )

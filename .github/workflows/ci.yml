@@ -22,8 +22,8 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-# Timeout policy: docs/fm-test-portable-shards.md "Timeouts" owns the three
-# tiers and their rationale; tests/fm-ci-workflow.test.sh guards this workflow.
+# Timeout policy: docs/jg-test-portable-shards.md "Timeouts" owns the three
+# tiers and their rationale; tests/jg-ci-workflow.test.sh guards this workflow.
 # Each job comment identifies the tier implemented by its executable value.
 
 # Fork opt-out: a fork sets the repository variable FM_CI_SKIP_PUSH to 1 to
@@ -50,12 +50,12 @@ jobs:
       - name: Install pinned ShellCheck
         run: |
           set -eu
-          bin/fm-install-shellcheck.sh "$RUNNER_TEMP/bin"
+          bin/jg-install-shellcheck.sh "$RUNNER_TEMP/bin"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - name: Install pinned actionlint
         run: |
           set -eu
-          bin/fm-install-actionlint.sh "$RUNNER_TEMP/bin"
+          bin/jg-install-actionlint.sh "$RUNNER_TEMP/bin"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       # Single owner of the lint definition (shell file set, config, version,
       # and GitHub workflow lint). Do not re-spell the checks here; keep CI
@@ -69,17 +69,17 @@ jobs:
           FM_LINT_JOBS: '1'
         run: |
           set -eu
-          mkdir -p "$RUNNER_TEMP/fm-lint"
-          bin/fm-lint.sh --partition "${{ matrix.partition }}of${{ strategy.job-total }}" \
-            --telemetry "$RUNNER_TEMP/fm-lint/partition-${{ matrix.partition }}.tsv"
+          mkdir -p "$RUNNER_TEMP/jg-lint"
+          bin/jg-lint.sh --partition "${{ matrix.partition }}of${{ strategy.job-total }}" \
+            --telemetry "$RUNNER_TEMP/jg-lint/partition-${{ matrix.partition }}.tsv"
       - name: Upload lint telemetry
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: fm-lint-telemetry-${{ matrix.partition }}
+          name: jg-lint-telemetry-${{ matrix.partition }}
           path: |
-            ${{ runner.temp }}/fm-lint/partition-${{ matrix.partition }}.tsv
-            ${{ runner.temp }}/fm-lint/partition-${{ matrix.partition }}.roots.tsv
+            ${{ runner.temp }}/jg-lint/partition-${{ matrix.partition }}.tsv
+            ${{ runner.temp }}/jg-lint/partition-${{ matrix.partition }}.roots.tsv
           if-no-files-found: warn
 
   # Deterministic proof that portable parallel shards + portable serial + Herdr
@@ -94,10 +94,10 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Prove complete regression partition
-        run: bin/fm-test-run.sh --check-coverage
+        run: bin/jg-test-run.sh --check-coverage
 
   # Two duration-balanced portable parallel shards of the Phase 2 proven-isolated
-  # set only. Composition owner: bin/fm-test-run.sh (docs/fm-test-portable-shards.md).
+  # set only. Composition owner: bin/jg-test-run.sh (docs/jg-test-portable-shards.md).
   tests-portable-parallel-1:
     name: Behavior portable parallel 1
     runs-on: ubuntu-latest
@@ -111,12 +111,12 @@ jobs:
       - name: Install pinned ShellCheck
         run: |
           set -eu
-          bin/fm-install-shellcheck.sh "$RUNNER_TEMP/bin"
+          bin/jg-install-shellcheck.sh "$RUNNER_TEMP/bin"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - name: Install pinned actionlint
         run: |
           set -eu
-          bin/fm-install-actionlint.sh "$RUNNER_TEMP/bin"
+          bin/jg-install-actionlint.sh "$RUNNER_TEMP/bin"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - name: Install tasks-axi
         run: |
@@ -131,16 +131,16 @@ jobs:
       - name: Run portable parallel shard 1
         run: |
           set -eu
-          mkdir -p "$RUNNER_TEMP/fm-test"
-          bin/fm-test-run.sh --lane portable-parallel-1 \
+          mkdir -p "$RUNNER_TEMP/jg-test"
+          bin/jg-test-run.sh --lane portable-parallel-1 \
             --fail-on-gate-skip 'Pi extension typecheck prerequisite not found' \
-            --json "$RUNNER_TEMP/fm-test/fm-test-timing-portable-parallel-1.json"
+            --json "$RUNNER_TEMP/jg-test/jg-test-timing-portable-parallel-1.json"
       - name: Upload shard 1 timing artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: fm-test-timing-portable-parallel-1
-          path: ${{ runner.temp }}/fm-test/fm-test-timing-portable-parallel-1.json
+          name: jg-test-timing-portable-parallel-1
+          path: ${{ runner.temp }}/jg-test/jg-test-timing-portable-parallel-1.json
           if-no-files-found: warn
 
   tests-portable-parallel-2:
@@ -156,12 +156,12 @@ jobs:
       - name: Install pinned ShellCheck
         run: |
           set -eu
-          bin/fm-install-shellcheck.sh "$RUNNER_TEMP/bin"
+          bin/jg-install-shellcheck.sh "$RUNNER_TEMP/bin"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - name: Install pinned actionlint
         run: |
           set -eu
-          bin/fm-install-actionlint.sh "$RUNNER_TEMP/bin"
+          bin/jg-install-actionlint.sh "$RUNNER_TEMP/bin"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - name: Install tasks-axi
         run: |
@@ -171,23 +171,23 @@ jobs:
       - name: Run portable parallel shard 2
         run: |
           set -eu
-          mkdir -p "$RUNNER_TEMP/fm-test"
-          bin/fm-test-run.sh --lane portable-parallel-2 \
-            --json "$RUNNER_TEMP/fm-test/fm-test-timing-portable-parallel-2.json"
+          mkdir -p "$RUNNER_TEMP/jg-test"
+          bin/jg-test-run.sh --lane portable-parallel-2 \
+            --json "$RUNNER_TEMP/jg-test/jg-test-timing-portable-parallel-2.json"
       - name: Upload shard 2 timing artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: fm-test-timing-portable-parallel-2
-          path: ${{ runner.temp }}/fm-test/fm-test-timing-portable-parallel-2.json
+          name: jg-test-timing-portable-parallel-2
+          path: ${{ runner.temp }}/jg-test/jg-test-timing-portable-parallel-2.json
           if-no-files-found: warn
 
   # Required portable serial remainder: watcher, lock, AFK, tmux, daemon,
   # ambiguous, and other stateful tests. Real Herdr stays in tests-herdr.
   # Split across separate runners so no two of these stateful scripts ever share
   # a machine: each shard is still strictly serial in itself. Shard membership
-  # and the shard count both belong to bin/fm-test-run.sh, which refuses a lane
-  # whose "ofN" disagrees with it (docs/fm-test-portable-shards.md).
+  # and the shard count both belong to bin/jg-test-run.sh, which refuses a lane
+  # whose "ofN" disagrees with it (docs/jg-test-portable-shards.md).
   tests-portable-serial:
     name: Behavior portable serial ${{ matrix.shard }}
     runs-on: ubuntu-latest
@@ -206,12 +206,12 @@ jobs:
       - name: Install pinned ShellCheck
         run: |
           set -eu
-          bin/fm-install-shellcheck.sh "$RUNNER_TEMP/bin"
+          bin/jg-install-shellcheck.sh "$RUNNER_TEMP/bin"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - name: Install pinned actionlint
         run: |
           set -eu
-          bin/fm-install-actionlint.sh "$RUNNER_TEMP/bin"
+          bin/jg-install-actionlint.sh "$RUNNER_TEMP/bin"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - name: Require tmux for e2e tests
         run: |
@@ -227,7 +227,7 @@ jobs:
           npm install -g tasks-axi
           tasks-axi --version
       # Runtime-facing Pi extension probes need the installed public package
-      # to avoid capability skips. tests/fm-pi-primary-types.test.sh owns its
+      # to avoid capability skips. tests/jg-pi-primary-types.test.sh owns its
       # separate compiler dependencies.
       - name: Install the Pi package for the Pi extension tests
         run: |
@@ -237,22 +237,22 @@ jobs:
       - name: Run portable serial shard ${{ matrix.shard }}
         env:
           # job-total rather than a literal, so shrinking or growing the matrix
-          # without matching bin/fm-test-run.sh is refused instead of quietly
+          # without matching bin/jg-test-run.sh is refused instead of quietly
           # leaving a shard of the required lane unrun.
           FM_SERIAL_LANE: portable-serial-${{ matrix.shard }}of${{ strategy.job-total }}
           FM_SERIAL_SHARD: ${{ matrix.shard }}
         run: |
           set -eu
-          mkdir -p "$RUNNER_TEMP/fm-test"
-          bin/fm-test-run.sh --lane "$FM_SERIAL_LANE" \
+          mkdir -p "$RUNNER_TEMP/jg-test"
+          bin/jg-test-run.sh --lane "$FM_SERIAL_LANE" \
             --fail-on-gate-skip 'Pi extension typecheck prerequisite not found' \
-            --json "$RUNNER_TEMP/fm-test/fm-test-timing-portable-serial-${FM_SERIAL_SHARD}.json"
+            --json "$RUNNER_TEMP/jg-test/jg-test-timing-portable-serial-${FM_SERIAL_SHARD}.json"
       - name: Upload portable serial shard ${{ matrix.shard }} timing artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: fm-test-timing-portable-serial-${{ matrix.shard }}
-          path: ${{ runner.temp }}/fm-test/fm-test-timing-portable-serial-${{ matrix.shard }}.json
+          name: jg-test-timing-portable-serial-${{ matrix.shard }}
+          path: ${{ runner.temp }}/jg-test/jg-test-timing-portable-serial-${{ matrix.shard }}.json
           if-no-files-found: warn
 
   # Required real-Herdr lane: pinned install, serial real-herdr-gated family,
@@ -283,14 +283,14 @@ jobs:
       - name: Install pinned Herdr
         run: |
           set -eu
-          bin/fm-install-herdr.sh "$RUNNER_TEMP/bin"
+          bin/jg-install-herdr.sh "$RUNNER_TEMP/bin"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - name: Install pinned Treehouse
         run: |
           set -eu
           # Several real-herdr-gated E2E scripts require treehouse for spawn
           # worktree acquisition (presentation, workspace-per-home, autodetect).
-          bin/fm-install-treehouse.sh "$RUNNER_TEMP/bin"
+          bin/jg-install-treehouse.sh "$RUNNER_TEMP/bin"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - name: Assert Herdr pin and protocol floor
         run: |
@@ -319,10 +319,10 @@ jobs:
           set -eu
           # Lab provision requires exactly one running default session so the
           # default-session tripwire can arm. Start it headless; never use it
-          # for lab work (tests still refuse default and use fm-lab-* only).
-          mkdir -p "$RUNNER_TEMP/fm-herdr"
-          nohup herdr server >"$RUNNER_TEMP/fm-herdr/default-server.log" 2>&1 &
-          echo $! >"$RUNNER_TEMP/fm-herdr/default-server.pid"
+          # for lab work (tests still refuse default and use jg-lab-* only).
+          mkdir -p "$RUNNER_TEMP/jg-herdr"
+          nohup herdr server >"$RUNNER_TEMP/jg-herdr/default-server.log" 2>&1 &
+          echo $! >"$RUNNER_TEMP/jg-herdr/default-server.pid"
           attempt=0
           while [ "$attempt" -lt 150 ]; do
             running=$(herdr status --json 2>/dev/null | jq -r '.server.running // false' || echo false)
@@ -338,13 +338,13 @@ jobs:
             attempt=$((attempt + 1))
           done
           echo "::error::default Herdr server did not become ready"
-          cat "$RUNNER_TEMP/fm-herdr/default-server.log" || true
+          cat "$RUNNER_TEMP/jg-herdr/default-server.log" || true
           exit 1
       - name: Snapshot pre-suite Herdr sessions
         run: |
           set -eu
-          mkdir -p "$RUNNER_TEMP/fm-herdr"
-          bin/fm-herdr-ci-cleanup.sh snapshot "$RUNNER_TEMP/fm-herdr/sessions-before.json"
+          mkdir -p "$RUNNER_TEMP/jg-herdr"
+          bin/jg-herdr-ci-cleanup.sh snapshot "$RUNNER_TEMP/jg-herdr/sessions-before.json"
       - name: Run real-Herdr family (serial, required)
         id: run-real-herdr-family
         # Heavy tier step tripwire: above the healthy 7-10 minute wall and far
@@ -352,18 +352,18 @@ jobs:
         timeout-minutes: 20
         run: |
           set -eu
-          mkdir -p "$RUNNER_TEMP/fm-test"
+          mkdir -p "$RUNNER_TEMP/jg-test"
           # Serial only. Fail if any script reports herdr not found. Live
           # harness credential tests stay outside this family (opt-in env only).
-          bin/fm-test-run.sh --family real-herdr-gated \
+          bin/jg-test-run.sh --family real-herdr-gated \
             --fail-on-gate-skip 'herdr not found' \
-            --json "$RUNNER_TEMP/fm-test/fm-test-timing-herdr.json"
+            --json "$RUNNER_TEMP/jg-test/jg-test-timing-herdr.json"
       - name: Cleanup job-owned Herdr lab sessions
         id: cleanup-herdr-lab-sessions
         if: always()
         run: |
           set -eu
-          bin/fm-herdr-ci-cleanup.sh teardown "$RUNNER_TEMP/fm-herdr/sessions-before.json" || {
+          bin/jg-herdr-ci-cleanup.sh teardown "$RUNNER_TEMP/jg-herdr/sessions-before.json" || {
             echo "::warning::lab session cleanup reported a problem; see logs"
             # Surface diagnostics without weakening the suite result above.
             herdr session list --json || true
@@ -373,11 +373,11 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: fm-test-timing-herdr
+          name: jg-test-timing-herdr
           path: |
-            ${{ runner.temp }}/fm-test/fm-test-timing-herdr.json
-            ${{ runner.temp }}/fm-herdr/sessions-before.json
-            ${{ runner.temp }}/fm-herdr/default-server.log
+            ${{ runner.temp }}/jg-test/jg-test-timing-herdr.json
+            ${{ runner.temp }}/jg-herdr/sessions-before.json
+            ${{ runner.temp }}/jg-herdr/default-server.log
           if-no-files-found: warn
 
   # Aggregate per-lane timing into one summary artifact for critical-path review.
@@ -397,28 +397,28 @@ jobs:
       - name: Download lane timing artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: fm-test-timing-*
-          path: ${{ runner.temp }}/fm-test-aggregate
+          pattern: jg-test-timing-*
+          path: ${{ runner.temp }}/jg-test-aggregate
           merge-multiple: true
       - name: Build aggregate timing summary
         run: |
           set -eu
-          mkdir -p "$RUNNER_TEMP/fm-test"
+          mkdir -p "$RUNNER_TEMP/jg-test"
           shopt -s nullglob
-          inputs=("$RUNNER_TEMP"/fm-test-aggregate/fm-test-timing-*.json)
+          inputs=("$RUNNER_TEMP"/jg-test-aggregate/jg-test-timing-*.json)
           if [ "${#inputs[@]}" -eq 0 ]; then
             echo "::warning::no per-lane timing JSON found to aggregate"
             exit 0
           fi
-          bin/fm-test-run.sh --aggregate-json \
-            "$RUNNER_TEMP/fm-test/fm-test-timing-aggregate.json" \
+          bin/jg-test-run.sh --aggregate-json \
+            "$RUNNER_TEMP/jg-test/jg-test-timing-aggregate.json" \
             "${inputs[@]}"
       - name: Upload aggregate timing artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: fm-test-timing-aggregate
-          path: ${{ runner.temp }}/fm-test/fm-test-timing-aggregate.json
+          name: jg-test-timing-aggregate
+          path: ${{ runner.temp }}/jg-test/jg-test-timing-aggregate.json
           if-no-files-found: warn
 
   macos-stock-bash:
@@ -442,8 +442,8 @@ jobs:
           /bin/bash --version | head -1
           command -v jq >/dev/null || { echo "::error::jq is required"; exit 1; }
 
-          shell_inventory="$RUNNER_TEMP/fm-shell-inventory"
-          bin/fm-lint.sh --list-files > "$shell_inventory"
+          shell_inventory="$RUNNER_TEMP/jg-shell-inventory"
+          bin/jg-lint.sh --list-files > "$shell_inventory"
           parse_fail=0
           while IFS= read -r f; do
             /bin/bash -n "$f" || { echo "::error::stock macOS Bash 3.2 failed to parse $f"; parse_fail=1; }
@@ -456,7 +456,7 @@ jobs:
           export PATH
           command -v tasks-axi >/dev/null || { echo "::error::tasks-axi is required for the stock Bash regressions"; exit 1; }
 
-          snapshot_output=$(/bin/bash tests/fm-fleet-snapshot-view.test.sh)
+          snapshot_output=$(/bin/bash tests/jg-fleet-snapshot-view.test.sh)
           printf '%s\n' "$snapshot_output"
           snapshot_count=$(printf '%s\n' "$snapshot_output" | grep -c '^ok - ')
           [ "$snapshot_count" -eq 19 ] || {
@@ -464,7 +464,7 @@ jobs:
             exit 1
           }
 
-          bearings_output=$(/bin/bash tests/fm-bearings-snapshot.test.sh)
+          bearings_output=$(/bin/bash tests/jg-bearings-snapshot.test.sh)
           printf '%s\n' "$bearings_output"
           bearings_count=$(printf '%s\n' "$bearings_output" | grep -c '^ok - ')
           [ "$bearings_count" -eq 60 ] || {
@@ -475,7 +475,7 @@ jobs:
           # The full public-followup suite is not a stock-bash snapshot; run only
           # the empty-lock register regression under real /bin/bash 3.2.
           pf_output=$(FM_TEST_ONLY=test_first_register_succeeds_with_empty_lock_list_under_bash32 \
-            /bin/bash tests/fm-public-followup.test.sh)
+            /bin/bash tests/jg-public-followup.test.sh)
           printf '%s\n' "$pf_output"
           pf_count=$(printf '%s\n' "$pf_output" | grep -c '^ok - ')
           [ "$pf_count" -eq 1 ] || {
@@ -487,7 +487,7 @@ jobs:
           # marked churn window expands an empty array that only stock Bash
           # treats as an unbound variable under set -u.
           churn_output=$(FM_TEST_ONLY=test_turn_ended_churn_existing_marker_absorbed \
-            /bin/bash tests/fm-watch-triage.test.sh)
+            /bin/bash tests/jg-watch-triage.test.sh)
           printf '%s\n' "$churn_output"
           churn_count=$(printf '%s\n' "$churn_output" | grep -c '^ok - ')
           [ "$churn_count" -eq 1 ] || {
@@ -498,7 +498,7 @@ jobs:
           # The fork-free hot-path helpers must stay byte-identical to the
           # commands they replace under stock Bash 3.2, which lacks the
           # printf %(...)T clock and falls back to date.
-          helpers_output=$(/bin/bash tests/fm-fork-free-helpers.test.sh)
+          helpers_output=$(/bin/bash tests/jg-fork-free-helpers.test.sh)
           printf '%s\n' "$helpers_output"
           helpers_count=$(printf '%s\n' "$helpers_output" | grep -c '^ok - ')
           [ "$helpers_count" -eq 6 ] || {
@@ -508,7 +508,7 @@ jobs:
 
           backend_output=$(FM_TEST_ONLY=test_backend_source_requires_adapter_file \
             FM_TEST_BASH=/bin/bash \
-            /bin/bash tests/fm-backend.test.sh)
+            /bin/bash tests/jg-backend.test.sh)
           printf '%s\n' "$backend_output"
           backend_count=$(printf '%s\n' "$backend_output" | grep -c '^ok - ')
           [ "$backend_count" -eq 2 ] || {

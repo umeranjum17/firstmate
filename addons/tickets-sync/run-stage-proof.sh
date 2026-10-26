@@ -30,7 +30,7 @@ old=$(( $(date +%s) - 8 * 3600 ))
 printf 'working [at=%s]: building Umer stuck telescope focus\n' "$old" > "$FM_HOME/state/stuck.status"
 bash "$repo/tickets-sync/install.sh"
 "$FM_HOME/state/tickets-sync.check.sh" | tee "$evidence/sync.out"
-tid=$(printf 'fm-%s' "$(printf '%s' main/stuck | sha256sum | cut -c1-32)")
+tid=$(printf 'jg-%s' "$(printf '%s' main/stuck | sha256sum | cut -c1-32)")
 sign-off-axi ticket "$work/board.json" --id "$tid" --json | tee "$evidence/ticket.json" | jq -e --argjson old "$old" \
   '.ticket.stage == "building" and .ticket.last_event_at == $old and .ticket.progress == 30' >/dev/null
 # serve stays in the foreground; run it in the background and stop by board path.

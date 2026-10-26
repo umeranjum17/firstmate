@@ -1,36 +1,36 @@
 # fleet-flow
 
 The read-only fleet flow reader — the lifecycle, queue, bottleneck and capacity
-JSON reader the dashboard consumes as its `fm-flow.v1` observation — moved out
-of the Firstmate fork into this add-on repository. The fork's `bin/fm-flow.sh`
+JSON reader the dashboard consumes as its `jg-flow.v1` observation — moved out
+of the Firstmate fork into this add-on repository. The fork's `bin/jg-flow.sh`
 is a thin shim that resolves this checkout (`FM_ADDONS_DIR`, default
-`$FM_HOME/projects/firstmate-addons`) and execs `fleet-flow/bin/fm-flow.sh`
+`$FM_HOME/projects/firstmate-addons`) and execs `fleet-flow/bin/jg-flow.sh`
 with `FM_BIN` pointing at the fork's `bin/`; the served dashboard reaches the
 reader only through that shim.
 
 ## Layout
 
-- `bin/fm-flow.sh` — the `--json` reader: FM_HOME plus recursively registered
-  local homes in, one `fm-flow.v1` document out; no endpoint or cache writes.
-- `tests/fm-flow.test.sh` — the integration test for that reader over isolated
+- `bin/jg-flow.sh` — the `--json` reader: FM_HOME plus recursively registered
+  local homes in, one `jg-flow.v1` document out; no endpoint or cache writes.
+- `tests/jg-flow.test.sh` — the integration test for that reader over isolated
   durable records; run it with `FM_BIN` pointing at a Firstmate checkout's
   `bin/` (it prints one PASS line for the reader and one for the fork's
   model/skill statistics and outcome-recording readers).
-- `bin/fm-flow-check.sh` — the home flow check (below); live once installed.
+- `bin/jg-flow-check.sh` — the home flow check (below); live once installed.
 - `install.sh` — installs the flow check.
-- `tests/fm-flow-check.test.sh` — the flow check's integration test.
+- `tests/jg-flow-check.test.sh` — the flow check's integration test.
 
-The reader sources `fm-classify-lib.sh`, `fm-tasks-axi-lib.sh` and
-`fm-backlog-transition-lib.sh` from `${FM_BIN:-its own directory}` and runs
-the home-addressed `fm-tasks-axi.sh` backlog consumer from the same directory;
+The reader sources `jg-classify-lib.sh`, `jg-tasks-axi-lib.sh` and
+`jg-backlog-transition-lib.sh` from `${FM_BIN:-its own directory}` and runs
+the home-addressed `jg-tasks-axi.sh` backlog consumer from the same directory;
 those fork files did not move, so a Firstmate checkout copy needs nothing and
 this copy runs only with `FM_BIN` naming such a `bin/` (the fork shim always
 sets it).
 
 ## Home flow check: lane slots and dry
 
-`bin/fm-flow-check.sh <home> [--can-start|--target|--summary]` is the home flow check every lead's `state/flow.check.sh` runs, and it owns the open-lane count against `config/lane-caps` that the `--can-start` hard cap, the over-cap line and the fleet-pulse row share.
-A lane whose last status event is stamped `[at=]` more than 4 h ago, not waiting on you, and whose `bin/fm-crew-state.sh` read answers anything but `working`, is no live lane: a long external wait, a held gate, or a kept copy of a lane that stopped.
+`bin/jg-flow-check.sh <home> [--can-start|--target|--summary]` is the home flow check every lead's `state/flow.check.sh` runs, and it owns the open-lane count against `config/lane-caps` that the `--can-start` hard cap, the over-cap line and the fleet-pulse row share.
+A lane whose last status event is stamped `[at=]` more than 4 h ago, not waiting on you, and whose `bin/jg-crew-state.sh` read answers anything but `working`, is no live lane: a long external wait, a held gate, or a kept copy of a lane that stopped.
 It keeps its worktree, record and status for inspection and cleanup but stops counting toward the cap and as working, so a ready item takes its slot.
 A lane read as working keeps counting, and so do a record still inside the 4 h window, an unstamped record, and a probe that does not answer within 15 s.
 Candidates are probed in parallel: a paused lane at any age, every other lane once its last event is past the window.
@@ -41,26 +41,26 @@ A lane whose last event is `parked` leaves the open count and the cap.
 Any other park names `(resume-on: YYYY-MM-DD | PR URL | captain)`; without it the pulse shows `stalled` and `--summary` counts it in its last column (after `parked`).
 `FM_MAIN_HOME` names the main home (default `~/firstmate`).
 
-Moved from Main's `config/fm-flow-check.sh` (sha256 `6e353c9e...4ed2`) in the first commit, then changed.
-Install with `fleet-flow/install.sh [--dry-run]`: it copies the check to `${XDG_DATA_HOME:-~/.local/share}/fm-fleet-flow/fm-flow-check.sh`, is idempotent, and `--dry-run` writes nothing.
-Main's `config/fm-flow-check.sh` then becomes a symlink to that copy, not an exec shim, because `bin/fm-flow.sh` reads its stage-clock policy from that file's text.
-Test: `tests/fm-flow-check.test.sh` drives the real check over a fixture Main home and lead homes with stub `fm-tasks-axi.sh` and `fm-crew-state.sh`, including the live-lanes-and-kept-copies cases.
+Moved from Main's `config/jg-flow-check.sh` (sha256 `6e353c9e...4ed2`) in the first commit, then changed.
+Install with `fleet-flow/install.sh [--dry-run]`: it copies the check to `${XDG_DATA_HOME:-~/.local/share}/jg-fleet-flow/jg-flow-check.sh`, is idempotent, and `--dry-run` writes nothing.
+Main's `config/jg-flow-check.sh` then becomes a symlink to that copy, not an exec shim, because `bin/jg-flow.sh` reads its stage-clock policy from that file's text.
+Test: `tests/jg-flow-check.test.sh` drives the real check over a fixture Main home and lead homes with stub `jg-tasks-axi.sh` and `jg-crew-state.sh`, including the live-lanes-and-kept-copies cases.
 
 ## Install (operator, after merge)
 
 The firstmate-addons lead performs these steps from a checkout of merged `main`; the add-on never writes Main's config.
 
-1. `fleet-flow/install.sh --dry-run`, then `fleet-flow/install.sh` — copies the check to `${XDG_DATA_HOME:-~/.local/share}/fm-fleet-flow/fm-flow-check.sh`.
-2. `cmp fleet-flow/bin/fm-flow-check.sh "${XDG_DATA_HOME:-~/.local/share}/fm-fleet-flow/fm-flow-check.sh"` — must print nothing.
-3. `mv $FM_MAIN_HOME/config/fm-flow-check.sh $FM_MAIN_HOME/config/.bak-$(date +%Y%m%d)-slots` and `ln -s "${XDG_DATA_HOME:-~/.local/share}/fm-fleet-flow/fm-flow-check.sh" $FM_MAIN_HOME/config/fm-flow-check.sh`.
+1. `fleet-flow/install.sh --dry-run`, then `fleet-flow/install.sh` — copies the check to `${XDG_DATA_HOME:-~/.local/share}/jg-fleet-flow/jg-flow-check.sh`.
+2. `cmp fleet-flow/bin/jg-flow-check.sh "${XDG_DATA_HOME:-~/.local/share}/jg-fleet-flow/jg-flow-check.sh"` — must print nothing.
+3. `mv $FM_MAIN_HOME/config/jg-flow-check.sh $FM_MAIN_HOME/config/.bak-$(date +%Y%m%d)-slots` and `ln -s "${XDG_DATA_HOME:-~/.local/share}/jg-fleet-flow/jg-flow-check.sh" $FM_MAIN_HOME/config/jg-flow-check.sh`.
 
-The symlink is deliberate, not an exec shim: `bin/fm-flow.sh` reads its stage-clock policy from that file's text.
+The symlink is deliberate, not an exec shim: `bin/jg-flow.sh` reads its stage-clock policy from that file's text.
 
 ## Frozen contract (identical to the fork)
 
-- CLI: `FM_HOME=<home> fm-flow.sh --json [--now <unix-seconds>] [--checks]
+- CLI: `FM_HOME=<home> jg-flow.sh --json [--now <unix-seconds>] [--checks]
   [--capacity]`; every other invocation prints the usage line and exits 2.
-- Output: one `fm-flow.v1` document with `homes`, `lanes`, `queue`,
+- Output: one `jg-flow.v1` document with `homes`, `lanes`, `queue`,
   `bottlenecks`, `capacity` (null unless `--capacity`), `executed_24h`,
   `executed_7d`, `time_to_merge` (median, nearest-rank P85),
   `time_to_merge_by_home`, `trend_7d`, `trend_7d_by_home` and `limitations`;
@@ -82,17 +82,17 @@ Every moved file was compared byte for byte against its fork source at
 
 | moved file | sha256 at the fork commit | sha256 here |
 | --- | --- | --- |
-| `bin/fm-flow.sh` | `fa7ef5bf41d759b483393bccd7bc867daeb13111c87dd7c444ef66bd6a8ba4f1` | `fa7ef5bf41d759b483393bccd7bc867daeb13111c87dd7c444ef66bd6a8ba4f1` |
-| `tests/fm-flow.test.sh` | `a0fdc3349fa899c9b12897797d2051187b1e321db70e8e136be6f7bd38e9e93d` | `a0fdc3349fa899c9b12897797d2051187b1e321db70e8e136be6f7bd38e9e93d` |
+| `bin/jg-flow.sh` | `fa7ef5bf41d759b483393bccd7bc867daeb13111c87dd7c444ef66bd6a8ba4f1` | `fa7ef5bf41d759b483393bccd7bc867daeb13111c87dd7c444ef66bd6a8ba4f1` |
+| `tests/jg-flow.test.sh` | `a0fdc3349fa899c9b12897797d2051187b1e321db70e8e136be6f7bd38e9e93d` | `a0fdc3349fa899c9b12897797d2051187b1e321db70e8e136be6f7bd38e9e93d` |
 
 Treat any future diff against the fork file as a contract change, not a
 refactor.
 
 Contract change since the move (mem-gate-wrappers): the capacity
 census reads the gate policy from the installed gate
-`${XDG_DATA_HOME:-~/.local/share}/fm-host-memory/fm-mem-gate.sh` when it
-exists (Main's `config/fm-mem-gate.sh` is then a one-line shim to it), else
-from `config/fm-mem-gate.sh` as before, and `gate_source` names the file it
+`${XDG_DATA_HOME:-~/.local/share}/jg-host-memory/jg-mem-gate.sh` when it
+exists (Main's `config/jg-mem-gate.sh` is then a one-line shim to it), else
+from `config/jg-mem-gate.sh` as before, and `gate_source` names the file it
 read.
 
 Contract change (approval audit D16): the capacity pressure is the memory
@@ -108,12 +108,12 @@ holds the only reader.
 
 At move time the fork copy and this copy were run side by side on synthesized
 fixture homes with a frozen clock and redirected `/proc`, `/tmp` and PATH
-stubs, and their `fm-flow.v1` JSON diffed byte for byte; the harness lived
+stubs, and their `jg-flow.v1` JSON diffed byte for byte; the harness lived
 with that task's evidence and ended `ALL CHECKS PASSED`.
 
 At the shim swap the moved integration test ran against this checkout with
 `FM_BIN` naming a Firstmate `bin/` and printed both PASS lines, and the fork
-shim was proven live: `FM_HOME=<Main home> bin/fm-flow.sh --json --capacity`
+shim was proven live: `FM_HOME=<Main home> bin/jg-flow.sh --json --capacity`
 through the shim reported the real installed memory/emulator/Gradle limits,
 not unknown.
 

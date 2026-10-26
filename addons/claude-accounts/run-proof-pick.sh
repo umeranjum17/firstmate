@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# run-proof-pick.sh: the chooser proof for done-done. Uses the real pool pick fm-spawn calls
-# (fm_account_pool_select from this repo's account-pool add-on; FM_BIN names a Firstmate checkout's bin/
-# for fm-timeout-lib.sh) with a throwaway
+# run-proof-pick.sh: the chooser proof for done-done. Uses the real pool pick jg-spawn calls
+# (jg_account_pool_select from this repo's account-pool add-on; FM_BIN names a Firstmate checkout's bin/
+# for jg-timeout-lib.sh) with a throwaway
 # config/account-pool pointing at the chooser and the real accounts, then starts one tiny throwaway
 # Haiku task on the picked profile folder with the launch prefix the pool builds, and reads quota again.
 # Captures keep ids, names and percentages only: no folder path, no credential value.
@@ -21,8 +21,8 @@ summary() { # label: both accounts' windows from the file the reader wrote
 { summary before; } >"$evidence/pick.txt"
 
 # shellcheck source=/dev/null
-. "$repo/account-pool/bin/fm-account-pool-lib.sh"
-tuple=$(fm_account_pool_select claude "$FM_HOME/config")
+. "$repo/account-pool/bin/jg-account-pool-lib.sh"
+tuple=$(jg_account_pool_select claude "$FM_HOME/config")
 id=$(cut -f1 <<<"$tuple"); folder=$(cut -f3 <<<"$tuple"); shed=$(cut -f4 <<<"$tuple")
 echo "pool pick for a new Claude worker: $id" >>"$evidence/pick.txt"
 prefix='env'

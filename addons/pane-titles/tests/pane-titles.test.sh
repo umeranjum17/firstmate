@@ -12,13 +12,13 @@ EOF
 cat > "$FMH/data/backlog.md" <<'EOF'
 - [ ] muxr - Scroll fix
 EOF
-cat > "$FMH/bin/fm-tasks-axi.sh" <<'EOF'
+cat > "$FMH/bin/jg-tasks-axi.sh" <<'EOF'
 #!/usr/bin/env bash
 [ "$1" = show ] && [ "$2" = muxr ] || exit 2
 title=$(awk -F ' - ' '$1 == "- [ ] muxr" { print $2; exit }' "$FM_HOME/data/backlog.md")
 printf '  title: %s\n' "$title"
 EOF
-chmod +x "$FMH/bin/fm-tasks-axi.sh"
+chmod +x "$FMH/bin/jg-tasks-axi.sh"
 cat > "$FMH/config/launch-env-hook" <<'EOF'
 #!/usr/bin/env bash
 printf '%s\n' "export KEEP_VALUE='chain'" > "$1"

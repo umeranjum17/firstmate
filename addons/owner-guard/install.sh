@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Install or update the owner-details guard: copy owner-guard to
-# ${XDG_DATA_HOME:-~/.local/share}/fm-owner-guard, record the home, keep the
+# ${XDG_DATA_HOME:-~/.local/share}/jg-owner-guard, record the home, keep the
 # home's config/owner-details-patterns private (mode 600, never created
 # and never overwritten), chain pre-commit and pre-push through the
 # git-identity hooks dir, and point the user's global core.hooksPath at the
@@ -10,7 +10,7 @@
 # guard's merge scan first, then the home's previous gate (moved aside to
 # config/merge-gate.pre-owner-guard; uninstall moves it back). Idempotent;
 # never touches repo-local core.hooksPath. Usage: install.sh [--dry-run]
-# <fm-home> | install.sh [--dry-run] --uninstall [<fm-home>] (the home
+# <jg-home> | install.sh [--dry-run] --uninstall [<jg-home>] (the home
 # defaults to the recorded one).
 set -euo pipefail
 DRY=0 UNINST=0
@@ -22,14 +22,14 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 if [ "$UNINST" -eq 0 ]; then
-  [ "$#" -eq 1 ] && [ -d "$1/config" ] || { echo "usage: install.sh [--dry-run] <fm-home> | install.sh [--dry-run] --uninstall [<fm-home>]" >&2; exit 2; }
+  [ "$#" -eq 1 ] && [ -d "$1/config" ] || { echo "usage: install.sh [--dry-run] <jg-home> | install.sh [--dry-run] --uninstall [<jg-home>]" >&2; exit 2; }
   FMH=$(cd "$1" && pwd -P)
 elif [ "$#" -gt 1 ]; then
-  echo "usage: install.sh [--dry-run] <fm-home> | install.sh [--dry-run] --uninstall [<fm-home>]" >&2; exit 2
+  echo "usage: install.sh [--dry-run] <jg-home> | install.sh [--dry-run] --uninstall [<jg-home>]" >&2; exit 2
 fi
 SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
-DEST=${XDG_DATA_HOME:-$HOME/.local/share}/fm-owner-guard
-GDEST=${XDG_DATA_HOME:-$HOME/.local/share}/fm-git-identity
+DEST=${XDG_DATA_HOME:-$HOME/.local/share}/jg-owner-guard
+GDEST=${XDG_DATA_HOME:-$HOME/.local/share}/jg-git-identity
 GHOOKS=$DEST/hooks
 PREVF=$DEST/prev-hooks-path
 # The client-side hook names git-identity chains, plus the server-side names
@@ -39,7 +39,7 @@ HOOK_NAMES='applypatch-msg pre-applypatch post-applypatch pre-commit pre-merge-c
 post-commit pre-rebase post-checkout post-merge pre-push post-rewrite pre-auto-gc sendemail-validate
 pre-receive update post-receive post-update push-to-checkout proc-receive reference-transaction post-index-change'
 CURGLOBAL=$(git config --global --get --type=path core.hooksPath 2>/dev/null || true)
-MGMARK='# fm-owner-guard merge gate'
+MGMARK='# jg-owner-guard merge gate'
 if [ "$UNINST" -eq 1 ]; then
   FMH=${1:-$(cat "$DEST/home" 2>/dev/null || true)}
 fi

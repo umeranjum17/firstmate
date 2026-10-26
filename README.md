@@ -222,7 +222,7 @@ cp "$(npm root -g)/done-done-axi/integrations/firstmate/merge-gate" "$FM_HOME/co
 npx skills add umeranjum17/sign-off --skill sign-off-axi
 
 # learn-from-mistakes
-npx skills add umeranjum17/learn-from-mistakes --skill lfm-retro
+npx skills add umeranjum17/learn-from-mistakes --skill ljg-retro
 ```
 
 Run the `cat >>` line once: each run appends the brief include again, duplicating it in every brief.
@@ -230,7 +230,7 @@ Run the `cat >>` line once: each run appends the brief include again, duplicatin
 - `config/brief-include.md` is appended to every ship and recon brief, so every operator proves its change with done-done ([details](docs/configuration.md#home-brief-include-configbrief-includemd)).
 - `config/merge-gate` is enforced by the merge-card add-on when it is installed; without the add-on, core does not check it. The gate runs `done-done check` against the mission's PR, or its `data/<task-id>/checks.md` when there is no PR, with the default-branch rules, then `receipt --verify <head>`. A nonzero exit refuses the merge and shows its output. Run `git fetch origin` first, since the gate reads local origin refs.
 
-**sign-off** raises a card on the sign-off board for every mission held in a home where it is armed. Run `bin/fm-procevent-signoff.sh arm` once in a home; arm each secondmate home the same way, and your click comes back to Juggernaut as the answer to that hold ([details](docs/configuration.md#process-to-event-sources-stateprocevent)). The adapter needs `sign-off-axi` on your PATH; open the board with `sign-off-axi open`, and turn the link off with `bin/fm-procevent-signoff.sh retire`.
+**sign-off** raises a card on the sign-off board for every mission held in a home where it is armed. Run `bin/jg-procevent-signoff.sh arm` once in a home; arm each secondmate home the same way, and your click comes back to Juggernaut as the answer to that hold ([details](docs/configuration.md#process-to-event-sources-stateprocevent)). The adapter needs `sign-off-axi` on your PATH; open the board with `sign-off-axi open`, and turn the link off with `bin/jg-procevent-signoff.sh retire`.
 
 **learn-from-mistakes** needs no Juggernaut hook. Point it at the records your fleet already keeps, such as a defect log or failed pipeline steps, and it counts the causes that keep coming back and proposes changes that cite the real records.
 

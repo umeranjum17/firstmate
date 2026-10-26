@@ -11,7 +11,7 @@ mkdir -p "$evidence"
   echo "== a tool release breaks owner-guard: the check names the caller and exits non-zero"
   fork=$(mktemp -d)
   mkdir -p "$fork/config"
-  printf '#!/usr/bin/env bash\n/nonexistent/fm-owner-guard/owner-guard merge-gate "$@"\n' > "$fork/config/merge-gate"
+  printf '#!/usr/bin/env bash\n/nonexistent/jg-owner-guard/owner-guard merge-gate "$@"\n' > "$fork/config/merge-gate"
   rc=0
   FM_MAIN_HOME=$fork bash "$repo/fleet-contract-check/fleet-contract-check" owner-guard || rc=$?
   echo "exit code: $rc"

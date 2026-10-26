@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# install.sh [--dry-run] [--rollback]: replace the old fleet dashboard (fm-dashboard.service) with Lookout on its address.
+# install.sh [--dry-run] [--rollback]: replace the old fleet dashboard (jg-dashboard.service) with Lookout on its address.
 #   (default)    start the new unit's command on a spare port, check it with curl, then swap: stop the old unit and start the new
 #                one on the old address. The old unit's files are never edited, so the swap is undone by --rollback.
 #   --dry-run    print every step and the unit; change nothing.
@@ -12,7 +12,7 @@ mode=apply dry=no
 for arg in "$@"; do case $arg in --dry-run) dry=yes ;; --rollback) mode=rollback ;; *) echo "usage: install.sh [--dry-run] [--rollback]" >&2; exit 2 ;; esac; done
 [ "$dry" = no ] || { [ "$mode" = rollback ] && mode=rollback-dry || mode=dry; }
 FM_HOME=${FM_HOME:-$HOME/firstmate} PORT=${PORT:-4390} SPARE_PORT=${SPARE_PORT:-4395}
-OLD=fm-dashboard.service NEW=fm-dashboard-lookout.service
+OLD=jg-dashboard.service NEW=jg-dashboard-lookout.service
 unit_dir=${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user
 BIND=${BIND:-$(tailscale ip -4 | head -1)}
 run() { echo "+ $*"; case $mode in *dry) ;; *) "$@" ;; esac; }
@@ -45,7 +45,7 @@ fi
 [ -f "$LOOKOUT_DIR/bin/lookout.js" ] || { echo "install: $LOOKOUT_DIR has no bin/lookout.js" >&2; exit 1; }
 echo "== unit $unit_dir/$NEW"; unit
 echo "== 1. spare port: the unit's own command on $BIND:$SPARE_PORT, checked before anything is stopped"
-probe=fm-dashboard-lookout-probe
+probe=jg-dashboard-lookout-probe
 run systemd-run --user --collect --unit "$probe" --setenv=FM_HOME="$FM_HOME" --setenv=LOOKOUT_DIR="$LOOKOUT_DIR" "$here/fleet-serve" --bind "$BIND" --port "$SPARE_PORT"
 if [ "$mode" = apply ]; then
   trap 'systemctl --user stop "$probe" 2>/dev/null || true' EXIT

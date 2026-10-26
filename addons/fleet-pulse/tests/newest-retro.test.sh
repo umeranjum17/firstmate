@@ -51,18 +51,18 @@ rm -f "$main"/state/.fleet-retro.last
 check none-due due env FM_RETRO_NOW=$now "$bin/fleet-retro-due.sh" "$main"
 
 # 2) older in main, newer in sibling treehouse home -> not due
-stamp "$main/data/fm-retro-old/report.md" "$old"
-stamp "$sib/data/lfm-fleet-retro-new/report.md" "$fresh"
+stamp "$main/data/jg-retro-old/report.md" "$old"
+stamp "$sib/data/ljg-fleet-retro-new/report.md" "$fresh"
 rm -f "$main"/state/.fleet-retro.last
 got=$("$bin/newest-retro-report.sh" "$main")
-[ "$got" = "$sib/data/lfm-fleet-retro-new/report.md" ] && echo ok newest-picks-sibling \
+[ "$got" = "$sib/data/ljg-fleet-retro-new/report.md" ] && echo ok newest-picks-sibling \
   || { echo "FAIL newest-picks-sibling got=$(printf %q "$got")" >&2; fail=1; }
 check newer-elsewhere-quiet quiet env FM_RETRO_NOW=$now "$bin/fleet-retro-due.sh" "$main"
 
 # 3) all old -> due (also via secondmates.md home, no treehouse hit required)
 sib2=$d/other-home
 mkdir -p "$sib2/data"
-stamp "$sib2/data/fm-retro-also/report.md" "$old"
+stamp "$sib2/data/jg-retro-also/report.md" "$old"
 printf -- '- other - note (home: %s; scope: x)\n' "$sib2" >"$main/data/secondmates.md"
 # Hide treehouse sibling so only main+secondmates (both old) remain newest.
 mv "$d/treehouse" "$d/treehouse.hide"
@@ -74,7 +74,7 @@ mv "$d/treehouse.hide" "$d/treehouse"
 check wake-suppressed quiet env FM_RETRO_NOW=$now "$bin/fleet-retro-due.sh" "$main"
 
 # 5) folder name must contain retro; plain report.md dirs are ignored
-rm -f "$sib/data/lfm-fleet-retro-new/report.md"
+rm -f "$sib/data/ljg-fleet-retro-new/report.md"
 stamp "$main/data/not-a-match/report.md" "$fresh"
 stamp "$sib/data/still-old-retro/report.md" "$old"
 rm -f "$main"/state/.fleet-retro.last
@@ -88,7 +88,7 @@ cat >"$main/state/fleet-pulse.check.sh" <<'EOF'
 set -u
 now=$(date +%s)
 # Fleet retro every 2-3 days (captain 5 Oct): wake Main once 60 h after the last retro report.
-last=$(ls -t /home/you/firstmate/data/fm-retro-*/report.md 2>/dev/null | head -1)
+last=$(ls -t /home/you/firstmate/data/jg-retro-*/report.md 2>/dev/null | head -1)
 RM=/home/you/firstmate/state/.fleet-retro.last
 if [ -n "$last" ] && [ $((now - $(stat -c %Y "$last"))) -ge 216000 ] && { [ ! -f "$RM" ] || [ $((now - $(stat -c %Y "$RM"))) -ge 43200 ]; }; then
   touch "$RM"; echo "fleet-retro due: last report $last; spawn the next strong-model fleet retro scout (captain-shared A5)"; exit 0
@@ -97,7 +97,7 @@ echo later
 EOF
 "$root/fleet-pulse/install.sh" "$main" >/dev/null
 grep -q fleet-retro-due.sh "$main/state/fleet-pulse.check.sh" \
-  && ! grep -q 'fm-retro-\*/report\.md' "$main/state/fleet-pulse.check.sh" \
+  && ! grep -q 'jg-retro-\*/report\.md' "$main/state/fleet-pulse.check.sh" \
   && echo ok install-retargets-check \
   || { echo FAIL install-retargets-check >&2; fail=1; }
 

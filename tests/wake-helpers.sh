@@ -7,16 +7,16 @@
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-# fm-wake-drain.sh now calls fm-guard.sh to assert watcher liveness on every
-# drain. fm-guard.sh's first check warns when the firstmate PRIMARY checkout
+# jg-wake-drain.sh now calls jg-guard.sh to assert watcher liveness on every
+# drain. jg-guard.sh's first check warns when the firstmate PRIMARY checkout
 # (FM_ROOT) sits on a feature branch; with no override FM_ROOT resolves to the
 # test runner's own checkout, which during validation is on a feature branch, so
 # each drain would emit a spurious worktree-tangle banner. Point the tangle check
 # at a fresh non-git dir to keep it inert across these suites - the same trick the
-# direct fm-guard.sh tests use. A per-call FM_ROOT_OVERRIDE still wins where a
+# direct jg-guard.sh tests use. A per-call FM_ROOT_OVERRIDE still wins where a
 # suite sets its own (e.g. the watcher-lock guard-banner cases).
 if [ -z "${FM_ROOT_OVERRIDE:-}" ]; then
-  FM_ROOT_OVERRIDE="$(fm_test_tmproot fm-wake-tangle-root)"
+  FM_ROOT_OVERRIDE="$(jg_test_tmproot jg-wake-tangle-root)"
   export FM_ROOT_OVERRIDE
 fi
 
@@ -32,24 +32,24 @@ fi
 # that channel, to exercise graceful degradation. Suites that do not source this
 # harness still cannot fire a real notification: the daemon defaults the seam to
 # "discard" whenever it is sourced (its library-mode guard).
-_fm_wedge_rec_dir=$(fm_test_tmproot fm-wedge-rec)
-cat > "$_fm_wedge_rec_dir/rec" <<'REC'
+_jg_wedge_rec_dir=$(jg_test_tmproot jg-wedge-rec)
+cat > "$_jg_wedge_rec_dir/rec" <<'REC'
 #!/usr/bin/env bash
 printf '%s\t%s\n' "${1:-}" "${2:-}" >> "${FM_WEDGE_ALARM_LOG:-/dev/null}"
 case " ${FM_WEDGE_ALARM_FAIL:-} " in *" ${1:-} "*) exit 1 ;; esac
 exit 0
 REC
-chmod +x "$_fm_wedge_rec_dir/rec"
-export FM_WEDGE_ALARM_EXEC="$_fm_wedge_rec_dir/rec"
+chmod +x "$_jg_wedge_rec_dir/rec"
+export FM_WEDGE_ALARM_EXEC="$_jg_wedge_rec_dir/rec"
 
 # append_wake <state> <kind> <key> <payload>: append a wake record to the durable
 # queue in a subshell scoped to <state>, using the production wake library.
 append_wake() {
-  local state=$1 kind=$2 key=$3 payload=$4 lib="$ROOT/bin/fm-wake-lib.sh"
+  local state=$1 kind=$2 key=$3 payload=$4 lib="$ROOT/bin/jg-wake-lib.sh"
   FM_STATE_OVERRIDE="$state" bash -c '
     # shellcheck disable=SC1090,SC1091
     . "$1"
-    fm_wake_append "$2" "$3" "$4"
+    jg_wake_append "$2" "$3" "$4"
   ' _ "$lib" "$kind" "$key" "$payload"
 }
 
@@ -58,7 +58,7 @@ make_case() {
   dir="$TMP_ROOT/$name"
   fakebin="$dir/fakebin"
   mkdir -p "$dir/state" "$fakebin"
-  fm_test_track_watcher_state "$dir/state"
+  jg_test_track_watcher_state "$dir/state"
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
 set -u
@@ -109,7 +109,7 @@ SH
   printf '%s\n' "$dir"
 }
 
-# Install a hermetic fake fm-crew-state.sh into <fakebin> and echo its path. The
+# Install a hermetic fake jg-crew-state.sh into <fakebin> and echo its path. The
 # watcher's absorb-only-when-provably-working triage calls this (via
 # FM_CREW_STATE_BIN) to read a crew's current state on no-verb signal and stale
 # paths; the fake returns a canned "state: <s> · source: <src> · <detail>"
@@ -123,7 +123,7 @@ SH
 # half of watcher triage - can count them instead of inferring them.
 make_fake_crew_state() {  # <fakebin>
   local fakebin=$1
-  cat > "$fakebin/fm-crew-state.sh" <<'SH'
+  cat > "$fakebin/jg-crew-state.sh" <<'SH'
 #!/usr/bin/env bash
 set -u
 id=${1:-}
@@ -134,19 +134,19 @@ val=${!var:-${FM_FAKE_CREW_STATE:-}}
 printf '%s\n' "${val:-state: unknown · source: none · fake default}"
 exit 0
 SH
-  chmod +x "$fakebin/fm-crew-state.sh"
-  printf '%s\n' "$fakebin/fm-crew-state.sh"
+  chmod +x "$fakebin/jg-crew-state.sh"
+  printf '%s\n' "$fakebin/jg-crew-state.sh"
 }
 
 # Prime <file>'s .seen-* marker to its CURRENT signature through the production
-# signature owner (bin/fm-wake-lib.sh), so a test can declare "everything in
+# signature owner (bin/jg-wake-lib.sh), so a test can declare "everything in
 # this file was already surfaced or deliberately absorbed" before exercising
 # the next wake, self-announced append, or annotation decision.
 prime_status_seen() {  # <state> <file>
   FM_STATE_OVERRIDE="$1" bash -c '
     . "$1"
-    fm_wake_status_mark_current "$2" "$3"
-  ' _ "$ROOT/bin/fm-wake-lib.sh" "$1" "$2"
+    jg_wake_status_mark_current "$2" "$3"
+  ' _ "$ROOT/bin/jg-wake-lib.sh" "$1" "$2"
 }
 
 # Print the generation from a recovery marker token of any status/kind.
@@ -160,7 +160,7 @@ ack_drain_err() {  # <state> <stderr-file>
   sequence=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through \([0-9][0-9]*\) --recovery-generation [A-Za-z0-9._-][A-Za-z0-9._-]*$/\1/p' "$err")
   generation=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through [0-9][0-9]* --recovery-generation \([A-Za-z0-9._-][A-Za-z0-9._-]*\)$/\1/p' "$err")
   [ -n "$sequence" ] && [ -n "$generation" ] || return 1
-  FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-wake-drain.sh" \
+  FM_STATE_OVERRIDE="$state" "$ROOT/bin/jg-wake-drain.sh" \
     --ack-through "$sequence" --recovery-generation "$generation"
 }
 
@@ -169,7 +169,7 @@ make_supercase() {
   dir="$TMP_ROOT/$name"
   fakebin="$dir/fakebin"
   mkdir -p "$dir/state" "$fakebin"
-  fm_test_track_watcher_state "$dir/state"
+  jg_test_track_watcher_state "$dir/state"
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
 set -u
@@ -190,7 +190,7 @@ case "${1:-}" in
   capture-pane)
     # Honor a single-line band capture (-S N -E M, both non-negative) for the
     # composer reader's non-bordered compatibility fallback; otherwise (e.g. its
-    # structural full-pane scan or fm_pane_is_busy's "-S -40" tail) return the whole capture. -e is accepted and
+    # structural full-pane scan or jg_pane_is_busy's "-S -40" tail) return the whole capture. -e is accepted and
     # ignored: this fake emits plain text, which the dim-stripper passes through.
     _S=""; _E=""; shift
     while [ "$#" -gt 0 ]; do
@@ -249,7 +249,7 @@ make_bordered_case() {
   local name=$1 dir fakebin
   dir="$TMP_ROOT/$name"; fakebin="$dir/fakebin"
   mkdir -p "$dir/state" "$fakebin"
-  fm_test_track_watcher_state "$dir/state"
+  jg_test_track_watcher_state "$dir/state"
   printf '╭─────╮\n│ >   │\n╰─────╯\n' > "$dir/composer"
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash

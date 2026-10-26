@@ -2,9 +2,9 @@
 # quota-failover - move limit-stopped Firstmate workers and leads to the next
 # live route, and keep a route that is answering errors out of new dispatch.
 #
-# Usage: quota-failover <fm-home>
+# Usage: quota-failover <jg-home>
 #
-# One pass over <fm-home>/state/*.meta, under a non-blocking lock.
+# One pass over <jg-home>/state/*.meta, under a non-blocking lock.
 # A worker or lead counts as stopped by a limit when its status says working
 # (or it has none), it is not progressing (no status, turn-end, progress or
 # re-arm write for QUOTA_FAILOVER_STALL_SECS, default 240), it is not busy
@@ -18,7 +18,7 @@
 # A stopped task moves to the first route, from the crew-dispatch rules that
 # hold its current route and then the default, that is not out of dispatch,
 # whose provider is not exhausted and that answers a one-prompt live test
-# (QUOTA_FAILOVER_TEST_SECS, default 90), through bin/fm-control.sh relaunch
+# (QUOTA_FAILOVER_TEST_SECS, default 90), through bin/jg-control.sh relaunch
 # with a note naming the old route, the new route and why; an Opus-only rule
 # only ever moves to another Opus route, and a remote task is logged, never
 # switched.
@@ -37,7 +37,7 @@
 # profile folder, the folder the pool command names for that account, not on
 # the ambient login, so a full account cannot look like a full route. When
 # the task's tool may change accounts automatically (D1 below) it moves
-# through bin/fm-control.sh relaunch --account next, which rests the account;
+# through bin/jg-control.sh relaunch --account next, which rests the account;
 # only when that fails does the route move above run. A home that wants the
 # human in the loop instead writes config/account-pool-autorelaunch-off
 # (content ignored): then the account only rests, and one line in
@@ -49,7 +49,7 @@
 # lifecycle source reads idle between turns for QUOTA_FAILOVER_PRELIMIT_IDLE_SECS
 # (60), once per incarnation; a tool D1 bars from moving wakes the home instead.
 # With config/account-pool, a Claude test that names no account runs on the
-# pool's pick (account-pool/bin/fm-pool-claude-env.sh); a failed pick fails the
+# pool's pick (account-pool/bin/jg-pool-claude-env.sh); a failed pick fails the
 # test instead of falling back to the default login.
 # Every decision is one line in state/quota-failover.log. A worker left with
 # no live route also gets one failed line on the home's parent channel, if any.
@@ -58,7 +58,7 @@ set -u
 die() { echo "quota-failover: $*" >&2; exit 1; }
 
 home=${1:-${FM_HOME:-}}
-[ -n "$home" ] && [ -d "$home/state" ] || die "usage: quota-failover <fm-home>"
+[ -n "$home" ] && [ -d "$home/state" ] || die "usage: quota-failover <jg-home>"
 FM_HOME=$(cd "$home" && pwd) || die "cannot read $home"
 export FM_HOME
 STATE=$FM_HOME/state BIN=$FM_HOME/bin LOG=$FM_HOME/state/quota-failover.log
@@ -78,24 +78,24 @@ SCREEN_LIMIT_RE="You've hit your usage limit for your plan"
 HTTP_ERR_RE='(^|[^0-9])429($|[^0-9])|(status|error|code|http)[^0-9]{0,16}5[0-9]{2}|upstream request failed|internal server error|service unavailable|bad gateway|gateway timeout'
 
 exec 9>"$STATE/.quota-failover.lock" && flock -n 9 || exit 0
-for lib in fm-backend.sh fm-busy-lib.sh fm-quota-axi-lib.sh fm-parent-channel-lib.sh; do
+for lib in jg-backend.sh jg-busy-lib.sh jg-quota-axi-lib.sh jg-parent-channel-lib.sh; do
   # shellcheck source=/dev/null
   . "$BIN/$lib" || die "cannot load $BIN/$lib"
 done
 # Parked-home reader (firstmate-addons/parked-homes): a parked home is never
 # failover-moved - a parked home gets no relaunch. No-op when the reader is
 # absent (the predicate then answers "not parked").
-_FM_PARKED_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../parked-homes/bin/fm-parked-homes-lib.sh"
+_FM_PARKED_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../parked-homes/bin/jg-parked-homes-lib.sh"
 # shellcheck source=/dev/null # sibling add-on path, resolved at runtime
 [ -f "$_FM_PARKED_LIB" ] && . "$_FM_PARKED_LIB"
 # The pool library and a Claude test that names no account's pool pick are the account-pool add-on's, never the
-# default login. The library finds fm-timeout-lib.sh in SCRIPT_DIR, the home's bin/.
+# default login. The library finds jg-timeout-lib.sh in SCRIPT_DIR, the home's bin/.
 _FM_POOL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../account-pool/bin"
-_FM_POOL_ENV=$_FM_POOL_DIR/fm-pool-claude-env.sh
+_FM_POOL_ENV=$_FM_POOL_DIR/jg-pool-claude-env.sh
 # shellcheck disable=SC2034 # read by the sourced pool lib
 SCRIPT_DIR=$BIN
 # shellcheck source=/dev/null # sibling add-on path, resolved at runtime
-. "$_FM_POOL_DIR/fm-account-pool-lib.sh" || die "cannot load $_FM_POOL_DIR/fm-account-pool-lib.sh"
+. "$_FM_POOL_DIR/jg-account-pool-lib.sh" || die "cannot load $_FM_POOL_DIR/jg-account-pool-lib.sh"
 
 log() { printf '%s %s\n' "$(date -u +%FT%TZ)" "$*" >> "$LOG"; }
 last() { sed -n "s|^[^ ]* $1: ||p" "$LOG" 2>/dev/null | tail -n 1; } # <id>
@@ -130,11 +130,11 @@ pool_account_folder() {
 }
 
 QUOTA=$(quota-axi --json --no-credential-refresh --max-age "${QUOTA_FAILOVER_MAX_AGE:-10m}" 2>/dev/null)
-fm_quota_json_valid <<<"$QUOTA" || QUOTA='{"schemaVersion":5,"providers":[]}'
+jg_quota_json_valid <<<"$QUOTA" || QUOTA='{"schemaVersion":5,"providers":[]}'
 
 provider() { # <harness> <model> [declared provider]
   [ -z "${3:-}" ] || { echo "$3"; return; }
-  fm_quota_single_provider_for_harness "$1" 2>/dev/null && return
+  jg_quota_single_provider_for_harness "$1" 2>/dev/null && return
   case $2 in
     openai-codex/*|codex-native/*) echo codex ;;
     anthropic/*) echo claude ;;
@@ -143,7 +143,7 @@ provider() { # <harness> <model> [declared provider]
 }
 
 exhausted() { # <provider> <harness> <model>
-  # Scope matching is bin/fm-dispatch-resolve.sh's: the model's bare name
+  # Scope matching is bin/jg-dispatch-resolve.sh's: the model's bare name
   # against an exact model: or product: scope, and the account-wide scopes.
   [ -n "$1" ] && jq -e --arg p "$1" --arg h "$2" --arg m "$3" "$FM_QUOTA_ROW_JQ"'
     ($m | split("/") | last) as $b
@@ -164,7 +164,7 @@ probe() { # <harness> <model> [account folder]: the one-line prompt through the 
   ( cd "$dir" || exit 1
   if [ -z "${3:-}" ] && [[ $1 = claude* ]] && [ -f "$FM_HOME/config/account-pool" ]; then
     # shellcheck source=/dev/null # sibling add-on path, resolved at runtime
-    . "$_FM_POOL_ENV" && fm_pool_claude_env || exit 1
+    . "$_FM_POOL_ENV" && jg_pool_claude_env || exit 1
   fi
   case $1 in
     opencode*) timeout "$TEST_SECS" "${on_account[@]}" opencode run --model "$2" "$prompt" ;;
@@ -335,28 +335,28 @@ account_low() {
 # refuses before the worker stops. A tool whose terms bar an automatic move (D1) gets the wake line.
 prelimit() {
   local meta=$1 id=$2 acct=$3 left=$4 h m gen crew verdict notefile out
-  h=$(fm_meta_get "$meta" harness) m=$(fm_meta_get "$meta" model) gen=$(fm_meta_get "$meta" spawn_gen)
-  [ -z "$(fm_meta_get "$meta" remote_host)" ] || return 1
-  crew=$(FM_CREW_STATE_NO_FORGE=1 "$BIN/fm-crew-state.sh" "$id" 2>/dev/null) crew=${crew#state: } crew=${crew%% *}
+  h=$(jg_meta_get "$meta" harness) m=$(jg_meta_get "$meta" model) gen=$(jg_meta_get "$meta" spawn_gen)
+  [ -z "$(jg_meta_get "$meta" remote_host)" ] || return 1
+  crew=$(FM_CREW_STATE_NO_FORGE=1 "$BIN/jg-crew-state.sh" "$id" 2>/dev/null) crew=${crew#state: } crew=${crew%% *}
   [ "$crew" = working ] || return 1
-  verdict=$(fm_busy_classify_meta "$meta" "$id" "$STATE" \
-    "$(fm_backend_visible_capture "$(fm_backend_of_meta "$meta")" "$(fm_backend_target_of_meta "$meta")" 2>/dev/null)")
+  verdict=$(jg_busy_classify_meta "$meta" "$id" "$STATE" \
+    "$(jg_backend_visible_capture "$(jg_backend_of_meta "$meta")" "$(jg_backend_target_of_meta "$meta")" 2>/dev/null)")
   [ "${verdict%% *}" = idle ] || return 1
   printf '%s\n' "$gen" >"$STATE/$id.prelimit-gen"
   if ! auto_move "$h" "$m" || [ -e "$FM_HOME/config/account-pool-autorelaunch-off" ]; then
-    log "$id: account $acct is low ($left) under idle $h $m; move it by hand: bin/fm-control.sh $id relaunch --account <id>"
-    printf 'quota-failover: %s account %s is low (%s); move it by hand: bin/fm-control.sh %s relaunch --account <id>\n' "$id" "$acct" "$left" "$id" >>"$WAKE"
+    log "$id: account $acct is low ($left) under idle $h $m; move it by hand: bin/jg-control.sh $id relaunch --account <id>"
+    printf 'quota-failover: %s account %s is low (%s); move it by hand: bin/jg-control.sh %s relaunch --account <id>\n' "$id" "$acct" "$left" "$id" >>"$WAKE"
     return 0
   fi
   notefile=$(mktemp)
   echo "quota-failover moved this task off pool account $acct ($left left) to the next $h account before it ran out. Continue the task from where it stopped." >"$notefile"
-  if out=$("$BIN/fm-control.sh" "$id" relaunch --account next --note-file "$notefile" 2>&1); then
+  if out=$("$BIN/jg-control.sh" "$id" relaunch --account next --note-file "$notefile" 2>&1); then
     log "$id: moved idle $h $m off low account $acct ($left) to the next $h account"
   else
     out=$(grep -m1 '^error: ' <<<"$out" || tail -n 1 <<<"$out")
     # A relaunch can fail after it replaced the incarnation; say what the meta now records.
-    if [ "$(fm_meta_get "$meta" spawn_gen)" != "$gen" ]; then
-      log "$id: moved idle $h $m off low account $acct ($left) to account $(fm_meta_get "$meta" account), but the relaunch reported: $out"
+    if [ "$(jg_meta_get "$meta" spawn_gen)" != "$gen" ]; then
+      log "$id: moved idle $h $m off low account $acct ($left) to account $(jg_meta_get "$meta" account), but the relaunch reported: $out"
     else
       log "$id: pre-limit move off $acct ($left) refused: $out"
     fi
@@ -370,7 +370,7 @@ for meta in "$STATE"/*.meta; do
   [ -f "$meta" ] || continue
   id=${meta##*/} id=${id%.meta}
   # A parked home never moves: the skip is logged once per change, not per pass.
-  if fm_parked_meta "$meta" "$id"; then
+  if jg_parked_meta "$meta" "$id"; then
     note "$id" "parked: its home is parked (config/parked-homes); skipped"
     continue
   fi
@@ -383,29 +383,29 @@ for meta in "$STATE"/*.meta; do
   for f in "$STATE/$id".{status,turn-ended,progress} "$STATE/$id.busy-gen"; do
     t=$(stat -c %Y "$f" 2>/dev/null) && [ "$t" -gt "$newest" ] && newest=$t
   done
-  acct=$(fm_meta_get "$meta" account)
+  acct=$(jg_meta_get "$meta" account)
   if [ -n "$acct" ] && [ $(($(date +%s) - newest)) -ge "${QUOTA_FAILOVER_PRELIMIT_IDLE_SECS:-60}" ] \
-    && [ "$(cat "$STATE/$id.prelimit-gen" 2>/dev/null)" != "$(fm_meta_get "$meta" spawn_gen)" ] \
-    && pool=$(fm_account_pool_config "$FM_HOME/config" 2>/dev/null) && [ -n "$pool" ] \
-    && tool=$(fm_account_pool_tool "$(fm_meta_get "$meta" harness)") \
+    && [ "$(cat "$STATE/$id.prelimit-gen" 2>/dev/null)" != "$(jg_meta_get "$meta" spawn_gen)" ] \
+    && pool=$(jg_account_pool_config "$FM_HOME/config" 2>/dev/null) && [ -n "$pool" ] \
+    && tool=$(jg_account_pool_tool "$(jg_meta_get "$meta" harness)") \
     && left=$(account_low "$tool" "$acct" "${pool#*$'\t'}") && prelimit "$meta" "$id" "$acct" "$left"; then
     continue
   fi
   [ $(($(date +%s) - newest)) -ge "$STALL" ] || continue
-  crew=$(FM_CREW_STATE_NO_FORGE=1 "$BIN/fm-crew-state.sh" "$id" 2>/dev/null) crew=${crew#state: } crew=${crew%% *}
+  crew=$(FM_CREW_STATE_NO_FORGE=1 "$BIN/jg-crew-state.sh" "$id" 2>/dev/null) crew=${crew#state: } crew=${crew%% *}
   [[ $crew = working || $crew = unknown ]] || continue
-  screen=$(fm_backend_visible_capture "$(fm_backend_of_meta "$meta")" "$(fm_backend_target_of_meta "$meta")" 2>/dev/null)
+  screen=$(jg_backend_visible_capture "$(jg_backend_of_meta "$meta")" "$(jg_backend_target_of_meta "$meta")" 2>/dev/null)
   # A harness only retrying a provider error is busy but not progressing: the
   # harness's own session status writes a session-retry busy event on every
   # attempt, and that worker moves like a stopped one.
-  verdict=$(fm_busy_classify_meta "$meta" "$id" "$STATE" "$screen")
-  [ "${verdict%% *}" != busy ] || [[ $(fm_busy_record_read "$STATE" "$id" 2>/dev/null) = *" session-retry "* ]] || continue
+  verdict=$(jg_busy_classify_meta "$meta" "$id" "$STATE" "$screen")
+  [ "${verdict%% *}" != busy ] || [[ $(jg_busy_record_read "$STATE" "$id" 2>/dev/null) = *" session-retry "* ]] || continue
 
-  h=$(fm_meta_get "$meta" harness) m=$(fm_meta_get "$meta" model) gen=$(fm_meta_get "$meta" spawn_gen)
+  h=$(jg_meta_get "$meta" harness) m=$(jg_meta_get "$meta" model) gen=$(jg_meta_get "$meta" spawn_gen)
   route="$h $m" cands=() pinned=false declared='' pool=''
-  acct=$(fm_meta_get "$meta" account)
+  acct=$(jg_meta_get "$meta" account)
   acct_folder=''
-  [ -z "$acct" ] || pool=$(fm_account_pool_config "$FM_HOME/config" 2>/dev/null)
+  [ -z "$acct" ] || pool=$(jg_account_pool_config "$FM_HOME/config" 2>/dev/null)
   [ -z "$pool" ] || acct_folder=$(pool_account_folder "$acct") || pool=''
   [ -f "$DISPATCH" ] && { IFS=$'\t' read -r pinned declared; mapfile -t cands; } \
     < <(jq -r --arg h "$h" --arg m "$m" "$CANDIDATES_JQ" "$DISPATCH" 2>/dev/null)
@@ -427,17 +427,17 @@ for meta in "$STATE"/*.meta; do
   else
     continue
   fi
-  if [ -n "$(fm_meta_get "$meta" remote_host)" ]; then
+  if [ -n "$(jg_meta_get "$meta" remote_host)" ]; then
     note "$id" "stopped on $route ($why); remote task, not switched"
     continue
   fi
 
   if [ -n "$pool" ]; then
     if auto_move "$h" "$m" && [ ! -e "$FM_HOME/config/account-pool-autorelaunch-off" ]; then
-      [ "$(fm_meta_get "$meta" spawn_gen)" = "$gen" ] || continue
+      [ "$(jg_meta_get "$meta" spawn_gen)" = "$gen" ] || continue
       notefile=$(mktemp)
       echo "quota-failover moved this task off pool account $acct to the next $h account because $why. Continue the task from where it stopped." > "$notefile"
-      out=$("$BIN/fm-control.sh" "$id" relaunch --account next --note-file "$notefile" 2>&1) && rc=0 || rc=$?
+      out=$("$BIN/jg-control.sh" "$id" relaunch --account next --note-file "$notefile" 2>&1) && rc=0 || rc=$?
       rm -f "$notefile"
       if [ "$rc" = 0 ]; then
         log "$id: moved $route off account $acct to the next $h account ($why)"
@@ -445,19 +445,19 @@ for meta in "$STATE"/*.meta; do
       fi
       note "$id" "account move off $acct failed, trying a route move: $(grep -m1 '^error: ' <<<"$out" || tail -n 1 <<<"$out")"
     else
-      [ "$(fm_meta_get "$meta" spawn_gen)" = "$gen" ] || continue
+      [ "$(jg_meta_get "$meta" spawn_gen)" = "$gen" ] || continue
       hand='<id|next>'
       auto_move "$h" "$m" || hand='<id>'
       # config/account-pool-autorelaunch-off, or a tool whose terms bar an automatic move:
       # rest the account, then wake the home with the command that moves it.
-      text="stopped on $route account $acct ($why, gen $gen); account rested, move it by hand: bin/fm-control.sh $id relaunch --account $hand"
+      text="stopped on $route account $acct ($why, gen $gen); account rested, move it by hand: bin/jg-control.sh $id relaunch --account $hand"
       case $(last "$id") in *"account $acct ("*"gen $gen); account rested"*) continue ;; esac
-      if out=$(fm_account_pool_rest "${pool%%$'\t'*}" "${pool#*$'\t'}" "$acct" 2>&1); then
+      if out=$(jg_account_pool_rest "${pool%%$'\t'*}" "${pool#*$'\t'}" "$acct" 2>&1); then
         log "$id: $text"
         printf 'quota-failover: %s %s\n' "$id" "$text" >>"$WAKE"
       else
         errline=${out%%$'\n'*}
-        ftext="stopped on $route account $acct ($why, gen $gen); rest failed ($errline), move it by hand: bin/fm-control.sh $id relaunch --account $hand"
+        ftext="stopped on $route account $acct ($why, gen $gen); rest failed ($errline), move it by hand: bin/jg-control.sh $id relaunch --account $hand"
         case $(last "$id") in *"account $acct ("*"gen $gen); rest failed ("*) continue ;; esac
         log "$id: $ftext"
         printf 'quota-failover: %s %s\n' "$id" "$ftext" >>"$WAKE"
@@ -480,19 +480,19 @@ for meta in "$STATE"/*.meta; do
     left="no live route in crew-dispatch"
     [ "${pinned:-false}" = false ] || left="Opus-only route and no live Opus route"
     note "$id" "stopped on $route ($why); $left, left waiting"
-    fm_parent_channel_report "$FM_HOME" "$STATE" \
+    jg_parent_channel_report "$FM_HOME" "$STATE" \
       "failed [key=quota-failover-$id]: quota-failover: $id is stopped by a usage limit on $route and no live route exists" \
       >/dev/null 2>&1 || true
     continue
   fi
   IFS=$'\t' read -r ch cm ce _ <<<"$next"
-  [ "$(fm_meta_get "$meta" spawn_gen)" = "$gen" ] || continue
+  [ "$(jg_meta_get "$meta" spawn_gen)" = "$gen" ] || continue
   notefile=$(mktemp)
   echo "quota-failover moved this task from $route to $ch $cm because $why. Continue the task from where it stopped." > "$notefile"
-  if out=$("$BIN/fm-control.sh" "$id" relaunch --harness "$ch" --model "$cm" --effort "$ce" --note-file "$notefile" 2>&1); then
+  if out=$("$BIN/jg-control.sh" "$id" relaunch --harness "$ch" --model "$cm" --effort "$ce" --note-file "$notefile" 2>&1); then
     log "$id: switched $route -> $ch $cm ($why)"
   else
-    # The first error line is fm-control's cause; the last is rollback bookkeeping.
+    # The first error line is jg-control's cause; the last is rollback bookkeeping.
     log "$id: switch $route -> $ch $cm failed: $(grep -m1 '^error: ' <<<"$out" || tail -n 1 <<<"$out")"
   fi
   rm -f "$notefile"

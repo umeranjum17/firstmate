@@ -8,18 +8,18 @@ case ${BASH_EXECUTION_STRING-} in
   '' | __CODEX_SNAPSHOT_*) ;;
   *)
     unset BASH_ENV
-    fm_codex_guard() { # <guard dir> [args]: 0 allows (also when that guard is not installed), 2 blocks
+    jg_codex_guard() { # <guard dir> [args]: 0 allows (also when that guard is not installed), 2 blocks
       [ -f "__DATA__/$1/guard.mjs" ] || return 0
       local err rc=0
-      err=$(node "__DATA__/$1/guard.mjs" "${@:2}" 2>&1 >/dev/null <<<"$fm_codex_guard_in") || rc=$?
+      err=$(node "__DATA__/$1/guard.mjs" "${@:2}" 2>&1 >/dev/null <<<"$jg_codex_guard_in") || rc=$?
       [ "$rc" -ne 2 ] || { printf '%s\n' "$err" >&2; return 2; }
       [ "$rc" -eq 0 ] || printf 'fleet guard %s could not check this command (exit %s): %s\n' "$1" "$rc" "$err" >&2
     }
-    if fm_codex_guard_in=$(jq -n --arg c "$BASH_EXECUTION_STRING" --arg d "$PWD" '{tool_name: "Bash", tool_input: {command: $c}, cwd: $d}'); then
-      fm_codex_guard fm-delete-guard --runtime codex && fm_codex_guard fm-kill-guard --caller "$PPID" && fm_codex_guard fm-read-guard || exit 2
+    if jg_codex_guard_in=$(jq -n --arg c "$BASH_EXECUTION_STRING" --arg d "$PWD" '{tool_name: "Bash", tool_input: {command: $c}, cwd: $d}'); then
+      jg_codex_guard jg-delete-guard --runtime codex && jg_codex_guard jg-kill-guard --caller "$PPID" && jg_codex_guard jg-read-guard || exit 2
     else
       echo "fleet guards could not check this command: jq failed to encode it" >&2
     fi
-    unset -f fm_codex_guard; unset fm_codex_guard_in
+    unset -f jg_codex_guard; unset jg_codex_guard_in
     ;;
 esac

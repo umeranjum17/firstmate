@@ -3,15 +3,15 @@
 A Jev guard is a bounded, read-only host diagnostic that turns one class of resource or state pressure into a machine-readable audit record and a one-line verdict.
 Guards exist so a supervision loop can distinguish a genuinely wedged worker from a host condition that merely looks like one, without granting any guard the power to change the system it measures.
 This document owns the diagnostic framework contract; each diagnostic family's own script header owns its measured signals and thresholds.
-Despite its retained filename, `fm-jev-mem-guard` is now the [host memory admission guard](configuration.md#host-memory-guard-confighost-memory), not a diagnostic family governed by the contract below.
-Its [script header](../bin/fm-jev-mem-guard.py) owns its CLI, compatibility limits, and record formats.
+Despite its retained filename, `jg-jev-mem-guard` is now the [host memory admission guard](configuration.md#host-memory-guard-confighost-memory), not a diagnostic family governed by the contract below.
+Its [script header](../bin/jg-jev-mem-guard.py) owns its CLI, compatibility limits, and record formats.
 
 ## Shape
 
 Each family ships as a pair plus its tests.
-`bin/fm-jev-<name>-guard.sh` is a thin wrapper that resolves its own directory and `exec`s the family engine with `python3`.
-`bin/fm-jev-<name>-guard.py` is the engine: it measures, classifies, and prints.
-`tests/fm-jev-<name>-guard.test.sh` drives the engine through its public CLI and asserts observable output, never engine source text.
+`bin/jg-jev-<name>-guard.sh` is a thin wrapper that resolves its own directory and `exec`s the family engine with `python3`.
+`bin/jg-jev-<name>-guard.py` is the engine: it measures, classifies, and prints.
+`tests/jg-jev-<name>-guard.test.sh` drives the engine through its public CLI and asserts observable output, never engine source text.
 
 ## Engine contract
 
@@ -31,5 +31,5 @@ Each family ships as a pair plus its tests.
 ## Adding a family
 
 Copy the smallest existing pair, keep the wrapper under ten lines, and keep every threshold in the engine with a comment naming the resource it bounds.
-Add the family's behavioral test alongside it and run it through `bin/fm-test-run.sh`.
+Add the family's behavioral test alongside it and run it through `bin/jg-test-run.sh`.
 A family that needs a host-specific source (a fleet registry, a pool manager, a quota service, or a product's hook store) belongs to the operator's own layer, not this framework.

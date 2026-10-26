@@ -2,7 +2,7 @@
 
 ## User outcome
 
-A model-calling tool can ask `fm-model-pool` for the next eligible Claude account (or Sol / Goat / Cursor fallover) without caching a stale pick or enabling usage credits.
+A model-calling tool can ask `jg-model-pool` for the next eligible Claude account (or Sol / Goat / Cursor fallover) without caching a stale pick or enabling usage credits.
 
 ## Drive
 

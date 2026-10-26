@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # limit-prompt-move e2e: the real pass on a fixture home whose panes show weekly-limit-menu.screen,
 # a real Claude Code 2.1.310 capture (path and time zone scrubbed). A lead with no account moves to
-# the pool's pick, a worker with --account next, each by fm-control interrupt then relaunch only; a
+# the pool's pick, a worker with --account next, each by jg-control interrupt then relaunch only; a
 # pane only quoting the menu, a Codex pane and a second pass move nothing; a failed relaunch blocks.
 set -u
 # Usage: limit-prompt-move-e2e.sh [--installed]
@@ -15,14 +15,14 @@ mkdir -p "$S" "$home/config" "$home/bin" "$home/state"
 fails=0
 is() { if [ "$2" = "$3" ]; then echo "ok - $1"; else echo "not ok - $1: got [$2], want [$3]"; fails=$((fails + 1)); fi; }
 
-cat >"$home/bin/fm-backend.sh" <<'EOF'
-fm_meta_get() { [ -f "$1" ] || return 0; sed -n "s|^$2=||p" "$1" | tail -n 1; }
-fm_backend_of_meta() { echo fixture; }; fm_backend_target_of_meta() { fm_meta_get "$1" endpoint_task_id; }
-fm_backend_visible_capture() { cat "$FM_HOME/state/$2.screen" 2>/dev/null; return 0; }
+cat >"$home/bin/jg-backend.sh" <<'EOF'
+jg_meta_get() { [ -f "$1" ] || return 0; sed -n "s|^$2=||p" "$1" | tail -n 1; }
+jg_backend_of_meta() { echo fixture; }; jg_backend_target_of_meta() { jg_meta_get "$1" endpoint_task_id; }
+jg_backend_visible_capture() { cat "$FM_HOME/state/$2.screen" 2>/dev/null; return 0; }
 EOF
-# No fm-account-pool-lib.sh in the home's bin/, as since firstmate PR 128: the pass loads the account-pool
+# No jg-account-pool-lib.sh in the home's bin/, as since firstmate PR 128: the pass loads the account-pool
 # add-on's lib. The pool tool is a stub that answers a fixed pick; no real login or account is touched.
-printf 'fm_run_timed() { shift; "$@"; }\n' >"$home/bin/fm-timeout-lib.sh"
+printf 'jg_run_timed() { shift; "$@"; }\n' >"$home/bin/jg-timeout-lib.sh"
 mkdir -p "$work/pool/pa_most_room"
 cat >"$work/byokit-accounts" <<'EOF2'
 #!/usr/bin/env bash
@@ -30,8 +30,8 @@ printf '{"ok":true,"id":"pa_most_room","set":{"CLAUDE_CONFIG_DIR":"%s"},"unset":
 EOF2
 chmod +x "$work/byokit-accounts"
 printf 'state=%s\ncommand=%s\n' "$work/pool" "$work/byokit-accounts" >"$home/config/account-pool"
-# fm-control stub: records each call; a relaunch records the new account and generation and clears the screen.
-cat >"$home/bin/fm-control.sh" <<'EOF'
+# jg-control stub: records each call; a relaunch records the new account and generation and clears the screen.
+cat >"$home/bin/jg-control.sh" <<'EOF'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >>"$FM_HOME/state/control.log"
 [ "$2" = relaunch ] || exit 0
@@ -40,13 +40,13 @@ acct=$4; [ "$acct" = next ] && acct=pa_next
 printf 'account=%s\nspawn_gen=s2\n' "$acct" >>"$FM_HOME/state/$1.meta"
 rm -f "$FM_HOME/state/$1.screen"
 EOF
-chmod +x "$home/bin/fm-control.sh"
+chmod +x "$home/bin/jg-control.sh"
 
 pass=$here/../limit-prompt-move
 if [ "${1:-}" = --installed ]; then # the copy install.sh ships, run from its own folder
-  printf '#!/bin/sh\n' >"$home/bin/fm-check-register.sh"; chmod +x "$home/bin/fm-check-register.sh"
+  printf '#!/bin/sh\n' >"$home/bin/jg-check-register.sh"; chmod +x "$home/bin/jg-check-register.sh"
   XDG_DATA_HOME=$work/share "$here/../install.sh" "$home" >/dev/null || exit 1
-  pass=$work/share/fm-limit-prompt-move/limit-prompt-move/limit-prompt-move
+  pass=$work/share/jg-limit-prompt-move/limit-prompt-move/limit-prompt-move
 fi
 
 task() { # <id> <kind> <harness> [account]
@@ -81,7 +81,7 @@ is "one attempt per incarnation: a second pass on the same generation moves noth
 task stuck-worker ship claude pa_full
 touch "$S/stuck-worker.relaunch-fails"
 FM_HOME=$home "$pass" "$home"
-is "a failed relaunch leaves a blocked status line naming fm-control's error" "$(sed 's/\[at=[0-9]*\]/[at=N]/' "$S/stuck-worker.status")" \
+is "a failed relaunch leaves a blocked status line naming jg-control's error" "$(sed 's/\[at=[0-9]*\]/[at=N]/' "$S/stuck-worker.status")" \
   "blocked [key=limit-prompt-move] [at=N]: limit-prompt-move: sat on Claude's usage-limit menu; interrupted, but relaunch --account next failed: error: the pool cannot start a claude worker"
 
 [ "$fails" -eq 0 ] && echo "PASS limit-prompt-move" || { echo "FAIL limit-prompt-move ($fails)"; exit 1; }

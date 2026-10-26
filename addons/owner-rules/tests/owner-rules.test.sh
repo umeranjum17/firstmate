@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# owner-rules e2e: the real fm-brief.sh of a firstmate checkout that carries the brief-inherit seam.
+# owner-rules e2e: the real jg-brief.sh of a firstmate checkout that carries the brief-inherit seam.
 # Usage: owner-rules/tests/owner-rules.test.sh <firstmate-checkout>
 # Proves a no-owner-ask refusal, a no-risk-reason refusal and a clean pass (brief written), plus the
 # exemptions and the no-op when the add-on is not installed.
@@ -7,7 +7,7 @@ set -u
 here=$(cd "$(dirname "$0")" && pwd) || exit 1
 addons=$(cd "$here/../.." && pwd) || exit 1
 FM=${1:-}
-[ -n "$FM" ] && [ -x "$FM/bin/fm-brief.sh" ] && grep -q fm_brief_inherit_shared "$FM/bin/fm-brief.sh" \
+[ -n "$FM" ] && [ -x "$FM/bin/jg-brief.sh" ] && grep -q jg_brief_inherit_shared "$FM/bin/jg-brief.sh" \
   || { echo "usage: $0 <firstmate-checkout with the brief-inherit seam>" >&2; exit 1; }
 work=$(mktemp -d "${TMPDIR:-/tmp}/owner-rules-e2e.XXXXXX") || exit 1
 trap 'rm -rf -- "$work"' EXIT
@@ -58,7 +58,7 @@ BL
 # brief <id> <args...>: stderr, then rc= on the last line.
 brief() {
   local id=$1 out rc; shift
-  out=$(FM_HOME=$home FM_ADDONS_DIR=$addons bash "$FM/bin/fm-brief.sh" "$id" sample "$@" 2>&1 >/dev/null); rc=$?
+  out=$(FM_HOME=$home FM_ADDONS_DIR=$addons bash "$FM/bin/jg-brief.sh" "$id" sample "$@" 2>&1 >/dev/null); rc=$?
   printf '%s%src=%s\n' "$out" "${out:+$'\n'}" "$rc"
 }
 ASK='owner-rules: no owner ask: name the [captain-ask] item or the MainNNN order this lane serves (add it to the backlog item for no-ask)'
@@ -95,10 +95,10 @@ is "pass: no-mistakes with risk: fork-repo" "$(brief fork-pr --mode no-mistakes)
 [ -s "$home/data/fork-pr/brief.md" ] && ok "fork-repo pass wrote the brief" || no "fork-repo pass wrote no brief"
 is "pass: scout is exempt from the risk rule" "$(brief with-ask-longer --scout)" "rc=0"
 is "pass: prefix id does not match a longer id" "$(brief with-ask --scout | tail -1)" "rc=1"
-FM_HOME=$home FM_ADDONS_DIR=$addons FM_SECONDMATE_CHARTER=x bash "$FM/bin/fm-brief.sh" sm --secondmate --no-projects >/dev/null 2>&1 \
+FM_HOME=$home FM_ADDONS_DIR=$addons FM_SECONDMATE_CHARTER=x bash "$FM/bin/jg-brief.sh" sm --secondmate --no-projects >/dev/null 2>&1 \
   && ok "pass: secondmate charter is exempt" || no "secondmate charter refused"
 
-tree=$(bash "$addons/owner-rules/bin/fm-owner-rules-tree.sh" "$home/data/backlog.md")
+tree=$(bash "$addons/owner-rules/bin/jg-owner-rules-tree.sh" "$home/data/backlog.md")
 printf '%s\n' "$tree" | grep -qF 'with-main: with-main -> with-ask -> [epic root]' && ok "tree: prints epic parent chain" || no "tree: epic parent chain missing"
 printf '%s\n' "$tree" | grep -qF 'bad-parent: bad-parent -> [missing: nowhere]' && ok "tree: reports missing parent id" || no "tree: missing parent id unreported"
 printf '%s\n' "$tree" | grep -qF 'cycle-a: cycle-a -> cycle-b -> cycle-a -> [cycle: cycle-a]' && ok "tree: reports cycle" || no "tree: cycle unreported"
@@ -112,7 +112,7 @@ n=0
 while IFS= read -r q; do
   n=$((n + 1))
   refusal=${q%%; run *}
-  grep -qF -- "${refusal#owner-rules: }" "$addons/owner-rules/bin/fm-owner-rules-lib.sh" "$addons/owner-rules/bin/fm-owner-rules-gate.sh" \
+  grep -qF -- "${refusal#owner-rules: }" "$addons/owner-rules/bin/jg-owner-rules-lib.sh" "$addons/owner-rules/bin/jg-owner-rules-gate.sh" \
     && ok "skill quote matches the code: ${q:0:40}" || no "skill quote not in lib or gate: $q"
 done < <(grep '^owner-rules: ' "$addons/owner-rules/skill/SKILL.md")
 is "skill quotes all six refusals" "$n" "6"

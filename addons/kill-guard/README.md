@@ -13,13 +13,13 @@ A missing, malformed, symlinked, dead or uncertain lock never grants it.
 Environment variables and `--caller` alone cannot select Main.
 The lock is same-user writable: this is a cooperative hook preventing accidental kills, not a security boundary against hostile programs running as that user.
 
-Fleet ownership uses resolved cwd or absolute command-line paths under the primary home, `~/.treehouse/<pool>[/<slot>]/firstmate*`, or `~/.local/{share,bin}/fm-*` add-on tools.
+Fleet ownership uses resolved cwd or absolute command-line paths under the primary home, `~/.treehouse/<pool>[/<slot>]/firstmate*`, or `~/.local/{share,bin}/jg-*` add-on tools.
 Project worktrees also qualify when their resolved Git common directory is under the primary home's `projects/`.
 Symlinks resolve before comparison and directory boundaries matter.
 Process start time is read before and after identity collection, and checked again before Main approval.
 There remains a PID-reuse window between hook approval and the shell's subsequent kill; the hook does not execute signals or hold a pidfd.
 
-Each approved Main target appends a JSON line to `<guard directory>/state/main-kills.jsonl` (normally `~/.local/share/fm-kill-guard/state/main-kills.jsonl`) for Lookout Incidents.
+Each approved Main target appends a JSON line to `<guard directory>/state/main-kills.jsonl` (normally `~/.local/share/jg-kill-guard/state/main-kills.jsonl`) for Lookout Incidents.
 Fields are `pid`, `starttime`, `cmdline` (argument array), `cwd`, `caller` (PID), and `reason`.
 The hook CLI accepts `--reason <text>`; otherwise `FM_KILL_REASON`, then command text supplies the reason.
 Only fleet paths, numeric PIDs, option names and a small set of operational words survive in command/reason fields; arbitrary values, prompts, URLs and credentials become `[redacted]`.

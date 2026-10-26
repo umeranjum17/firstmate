@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Proof journey: render the real Insights "Why work waits now" card at 390px from real fleet data.
-# DASH_HOME is a Firstmate home to read; FLOW_JSON is a saved real `fm-flow.sh --json --capacity` run of it
+# DASH_HOME is a Firstmate home to read; FLOW_JSON is a saved real `jg-flow.sh --json --capacity` run of it
 # (a saved run keeps the proof repeatable while the live records move); FM_BIN is a Firstmate bin/.
 set -euo pipefail
 : "${DASH_HOME:?}" "${FLOW_JSON:?}" "${FM_BIN:?}" "${DONE_DONE_EVIDENCE_ROOT:?}"
@@ -8,11 +8,11 @@ here=$(cd "$(dirname "$0")" && pwd)
 tmp=$(mktemp -d)
 trap 'rm -rf -- "$tmp"' EXIT
 for f in "$FM_BIN"/*; do ln -s "$f" "$tmp/${f##*/}"; done
-rm -- "$tmp/fm-flow.sh"
-printf '#!/bin/bash\ncat %q\n' "$FLOW_JSON" >"$tmp/fm-flow.sh"
+rm -- "$tmp/jg-flow.sh"
+printf '#!/bin/bash\ncat %q\n' "$FLOW_JSON" >"$tmp/jg-flow.sh"
 export FM_BIN=$tmp FM_HOME=$DASH_HOME
-bash "$here/fm-dashboard.sh" build >/dev/null
-timeout 240 bash "$here/fm-dashboard.sh" serve --port 0 >"$tmp/serve.log" 2>&1 &
+bash "$here/jg-dashboard.sh" build >/dev/null
+timeout 240 bash "$here/jg-dashboard.sh" serve --port 0 >"$tmp/serve.log" 2>&1 &
 url=
 for _ in $(seq 50); do
   url=$(sed -n 's|^serving \(http[^ ]*\)|\1|p' "$tmp/serve.log")

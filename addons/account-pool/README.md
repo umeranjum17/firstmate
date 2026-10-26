@@ -1,16 +1,16 @@
 # account-pool
 
 A home that keeps a pool of logins for one tool can have its worker launches pick the account with the most room instead of always starting on the one default login, and `relaunch --account <id|next>` moves a running worker between those accounts.
-This add-on owns all of it: `bin/fm-account-pool-lib.sh` parses `config/account-pool`, maps the harness to its pool tool, runs the pool command, builds the launch prefix, runs the relaunch-time choice gate and rest, and writes every refusal message.
+This add-on owns all of it: `bin/jg-account-pool-lib.sh` parses `config/account-pool`, maps the harness to its pool tool, runs the pool command, builds the launch prefix, runs the relaunch-time choice gate and rest, and writes every refusal message.
 
 ## Wiring
 
-The fork's `bin/fm-spawn.sh` and `bin/fm-control.sh` carry one setup line that sources the lib from `$FM_ADDONS_DIR` (else `$FM_HOME/projects/firstmate-addons`) and makes `fm_account_hook` a no-op when the add-on is absent, plus one `fm_account_hook <event>` line at each call site:
+The fork's `bin/jg-spawn.sh` and `bin/jg-control.sh` carry one setup line that sources the lib from `$FM_ADDONS_DIR` (else `$FM_HOME/projects/firstmate-addons`) and makes `jg_account_hook` a no-op when the add-on is absent, plus one `jg_account_hook <event>` line at each call site:
 
 | Script | Events, in call order |
 |---|---|
-| `bin/fm-spawn.sh` | `argv` (eval'd before the argument loop), `spawn-validate`, `raw-launch`, `spawn-pick <harness> <config> <pin> <want>`, `record-line`, `launch-prefix`, `spawn-line` |
-| `bin/fm-control.sh` | `argv`, `control-validate <verb>`, `relaunch-pre <harness> <config> <to-model> <recorded-id> <from-model> <task>`, `relaunch-commit <harness> <config> <recorded-id>` (the last step before the stop), `spawn-args` |
+| `bin/jg-spawn.sh` | `argv` (eval'd before the argument loop), `spawn-validate`, `raw-launch`, `spawn-pick <harness> <config> <pin> <want>`, `record-line`, `launch-prefix`, `spawn-line` |
+| `bin/jg-control.sh` | `argv`, `control-validate <verb>`, `relaunch-pre <harness> <config> <to-model> <recorded-id> <from-model> <task>`, `relaunch-commit <harness> <config> <recorded-id>` (the last step before the stop), `spawn-args` |
 
 With the add-on absent every hook line prints nothing and returns 0, and `--account` is the caller's own unexpected argument, as upstream.
 An unknown event is a no-op too, so a newer fork never fails against an older add-on checkout.
@@ -37,7 +37,7 @@ The pool is not inherited into secondmate homes: a local secondmate agent launch
 
 ## Moving one worker between accounts (relaunch --account)
 
-`bin/fm-control.sh <task-id> relaunch --account <id|next>` moves a running worker onto a different pool account while it replaces the agent. The local copy, its commits and its uncommitted work stay as they are, as with any relaunch.
+`bin/jg-control.sh <task-id> relaunch --account <id|next>` moves a running worker onto a different pool account while it replaces the agent. The local copy, its commits and its uncommitted work stay as they are, as with any relaunch.
 
 `--account <id>` selects that account for this launch, and it is the only way to select an OpenCode Go one. The pick runs with `--prefer <id>`, and the launch refuses unless the pool answers with exactly that account, so an account that is resting, signed out, or another tool's is never launched by accident.
 `--account next` rests the account the running worker launched on, for that account's own default rest, and launches the worker on another one. `byokit-accounts unrest <id>` returns a rested account to the rotation.
@@ -53,19 +53,19 @@ These refusals all happen before the running agent stops:
 - a pick that answers a different account than the requested one.
 
 The rest and the proving pick are the last steps before the stop. With exactly one account in the pool, `next` rests it and then refuses, so the worker keeps working while its account rests.
-One refusal can land after the stop: the launch owner (`fm-spawn --relaunch`) picks again at launch, so pool state that changed in between refuses there and the rollback reports the stopped agent with its work preserved.
-`fm-spawn --relaunch --account next` outside fm-control refuses, because only fm-control's pre-stop gate rests the recorded account. A fresh spawn refuses `--account`: it picks on its own.
+One refusal can land after the stop: the launch owner (`jg-spawn --relaunch`) picks again at launch, so pool state that changed in between refuses there and the rollback reports the stopped agent with its work preserved.
+`jg-spawn --relaunch --account next` outside jg-control refuses, because only jg-control's pre-stop gate rests the recorded account. A fresh spawn refuses `--account`: it picks on its own.
 A home pin still wins: with a pin file for that runner, `--account` refuses rather than being silently ignored.
 The replacement records the selected account as `account=`, exactly as a spawn-time pick does.
 
-## Shared model helper (`bin/fm-model-pool`)
+## Shared model helper (`bin/jg-model-pool`)
 
 Model-calling tools use this JSON CLI instead of caching a one-shot Claude env pick.
 It sits on the same `config/account-pool` and pool command as worker launches; it is not a daemon or a second login store.
 
 ```text
-fm-model-pool pick --json   # request JSON on stdin
-fm-model-pool next --json   # prior selection + typed limit on stdin
+jg-model-pool pick --json   # request JSON on stdin
+jg-model-pool next --json   # prior selection + typed limit on stdin
 ```
 
 Request fields (`v:1`): `purpose` (`work`), optional `pool_config` (absolute path to `config/account-pool`), optional `model`, `capabilities`, `deadline` (unix seconds for the whole attempt chain), and `attempted` (account/route ids already tried).
@@ -76,7 +76,7 @@ learn-from-mistakes account_picker (global lfm config argv, never shell text):
 
 ```yaml
 account_picker:
-  - /absolute/path/to/firstmate-addons/account-pool/bin/fm-model-pool
+  - /absolute/path/to/firstmate-addons/account-pool/bin/jg-model-pool
 ```
 
 For ordinary work it picks the eligible Claude account with the greatest minimum runway (min of 5h and 7d) above the **eligibility floor** (`FM_MODEL_POOL_FLOOR`, defaulting to `FM_ACCOUNT_POOL_REST_FLOOR`, **15%**).

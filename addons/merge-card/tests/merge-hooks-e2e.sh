@@ -17,11 +17,11 @@ export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR
 mkdir -p "$HOME" "$TMPDIR" "$d/fork"
 cp -a "$FM_TEST_FORK/bin" "$d/fork/"
-# No rewriting: fm-dod-lib.sh and fm-merge-outcome-lib.sh load the add-on
-# library themselves from FM_ADDONS_DIR, and fm-merge-local.sh calls the hooks.
+# No rewriting: jg-dod-lib.sh and jg-merge-outcome-lib.sh load the add-on
+# library themselves from FM_ADDONS_DIR, and jg-merge-local.sh calls the hooks.
 
 fail() { echo "not ok - $*" >&2; exit 1; }
-run_merge() { FM_HOME=$home bash "$d/fork/bin/fm-merge-local.sh" task > "$d/out" 2>&1; }
+run_merge() { FM_HOME=$home bash "$d/fork/bin/jg-merge-local.sh" task > "$d/out" 2>&1; }
 for mode in present absent; do
   home=$d/$mode
   repo=$home/project

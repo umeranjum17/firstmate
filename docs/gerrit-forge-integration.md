@@ -5,7 +5,7 @@ It is written for whoever integrates a forge with Juggernaut rather than for the
 Every question it raises is answered, and each decision is stated in the body where the reasoning for it sits rather than collected into a list at the end.
 
 The mechanics it reasons about have their own owners.
-[`bin/fm-pr-lib.sh`](../bin/fm-pr-lib.sh) owns the provider-tagged identity and the merge-poll artifacts, [`bin/fm-pr-merge.sh`](../bin/fm-pr-merge.sh) owns merging, [`bin/fm-project-mode.sh`](../bin/fm-project-mode.sh) owns the registered delivery posture, and [`bin/fm-dod-lib.sh`](../bin/fm-dod-lib.sh) owns what a delivery mode tells a worker.
+[`bin/jg-pr-lib.sh`](../bin/jg-pr-lib.sh) owns the provider-tagged identity and the merge-poll artifacts, [`bin/jg-pr-merge.sh`](../bin/jg-pr-merge.sh) owns merging, [`bin/jg-project-mode.sh`](../bin/jg-project-mode.sh) owns the registered delivery posture, and [`bin/jg-dod-lib.sh`](../bin/jg-dod-lib.sh) owns what a delivery mode tells a worker.
 This note asserts the design that the changes following it implement, so it states what the forge field in the registry and the delivery-mode rules that consume it are for, not what they were before.
 
 ## 1. Gerrit is not a forge variant
@@ -54,7 +54,7 @@ Reading it as a publication quirk is what makes the rest of Gerrit look like a p
 
 What does *not* differ is worth stating, because it bounds the problem.
 Reading review state after publication fits Juggernaut's existing record with no new shape.
-`bin/fm-pr-lib.sh` already carries a provider-tagged identity of provider, url, host, path, and number, because GitLab had already forced host and an arbitrarily nested path into it, and a Gerrit change URL populates those same fields.
+`bin/jg-pr-lib.sh` already carries a provider-tagged identity of provider, url, host, path, and number, because GitLab had already forced host and an arbitrarily nested path into it, and a Gerrit change URL populates those same fields.
 The break is not in watching a change.
 It is in making one.
 
@@ -114,10 +114,10 @@ Shape is not varying *with* mode there, it is varying *inside* every value of mo
 
 Shape already exists on GitHub, it predates Gerrit entirely, and it is load-bearing in four places today:
 
-- `bin/fm-pr-merge.sh` defaults a GitHub merge to `--squash` when the caller selects no method.
-- `bin/fm-fleet-sync.sh`'s branch pruning reasons about it explicitly, dropping the ancestry check on the grounds that pull requests in this fleet are squash-merged, so a merged branch is never an ancestor and such a check would prune nothing.
-- `bin/fm-teardown.sh`'s landed-work test accepts content present in the default branch precisely because a squash collapses the branch's commits and per-commit patch identities stop matching.
-- `bin/fm-ff-lib.sh` reconciles a clean secondmate divergence through a three-way tree proof, as happens after an upstream squash merge.
+- `bin/jg-pr-merge.sh` defaults a GitHub merge to `--squash` when the caller selects no method.
+- `bin/jg-fleet-sync.sh`'s branch pruning reasons about it explicitly, dropping the ancestry check on the grounds that pull requests in this fleet are squash-merged, so a merged branch is never an ancestor and such a check would prune nothing.
+- `bin/jg-teardown.sh`'s landed-work test accepts content present in the default branch precisely because a squash collapses the branch's commits and per-commit patch identities stop matching.
+- `bin/jg-ff-lib.sh` reconciles a clean secondmate divergence through a three-way tree proof, as happens after an upstream squash merge.
 
 It appears nowhere in the registry.
 A property that four mechanisms depend on, across pruning, teardown safety, merging, and secondmate convergence, and that no project has ever declared, is not a Gerrit concept arriving with Gerrit.
@@ -127,7 +127,7 @@ That it survived being invisible says how rarely it varies, not where it belongs
 ### The hinge: pre-publication versus post-publication
 
 Juggernaut has no forge property for GitLab and has never needed one.
-`bin/fm-pr-lib.sh` derives the provider from the merge-request URL *after the fact*, tagging the stored identity with it, and the work is handed to `glab`; workers create the artifact with the vendor CLI, and `bin/fm-pr-merge.sh` merges through that same CLI.
+`bin/jg-pr-lib.sh` derives the provider from the merge-request URL *after the fact*, tagging the stored identity with it, and the work is handed to `glab`; workers create the artifact with the vendor CLI, and `bin/jg-pr-merge.sh` merges through that same CLI.
 Juggernaut owns none of the mechanics.
 Every forge decision it makes, it makes with the URL already in hand.
 
@@ -188,7 +188,7 @@ The objection bounds how much weight detection can carry alone, which is the wei
 
 Read the modes as stopping points rather than as artifacts and they line up cleanly:
 
-- `local-only` stops at a ready branch and publishes nothing. Nothing about a forge applies, because no artifact is made: `bin/fm-merge-local.sh` fast-forwards the project's *local* default branch, and the intake guidance already allows a `local-only` project to have no remote at all.
+- `local-only` stops at a ready branch and publishes nothing. Nothing about a forge applies, because no artifact is made: `bin/jg-merge-local.sh` fast-forwards the project's *local* default branch, and the intake guidance already allows a `local-only` project to have no remote at all.
 - `direct-PR` publishes without the pipeline.
 - `no-mistakes` runs the pipeline, then publishes.
 
@@ -215,7 +215,7 @@ This is a property of Gerrit and no amount of tooling changes it.
 
 **There is no branch on the remote.**
 `refs/for/<branch>` is a magic ref rather than a destination: the push creates or updates a change and leaves behind no ref a later fetch can see.
-Every mechanism that reasons about a remote branch therefore has no counterpart here - the gone-upstream prune in `bin/fm-fleet-sync.sh`, the remote-reachability leg of `bin/fm-teardown.sh`'s local-only landed-work test, and the `refs/pull/<n>/head` fetch in `bin/fm-review-diff.sh`.
+Every mechanism that reasons about a remote branch therefore has no counterpart here - the gone-upstream prune in `bin/jg-fleet-sync.sh`, the remote-reachability leg of `bin/jg-teardown.sh`'s local-only landed-work test, and the `refs/pull/<n>/head` fetch in `bin/jg-review-diff.sh`.
 There is no separate namespace either, because there are no forks, so the change is the only remote artifact the work ever has.
 The teardown test and the review diff each already have a fallback that reasons about content or about the local branch, and on Gerrit the fallback is not a fallback, it is the only path.
 The prune has no fallback at all: a `refs/for/<branch>` push creates no upstream tracking ref, so nothing ever reads `[gone]`, the prune never fires, and ship branches accumulate locally after teardown.

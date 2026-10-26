@@ -8,10 +8,10 @@ The router owns the operator/scout-only boundary; primary and secondmate integra
 
 | Fact | Value |
 |---|---|
-| Busy state | Native `UserPromptSubmit` opens, `Stop` closes normal completion, and `SessionEnd` closes shutdown through the generation-bound writer; `../../../bin/fm-busy-lib.sh` owns trust. |
+| Busy state | Native `UserPromptSubmit` opens, `Stop` closes normal completion, and `SessionEnd` closes shutdown through the generation-bound writer; `../../../bin/jg-busy-lib.sh` owns trust. |
 | Exit command | `/quit`, with the shared slash-command settle before Enter; prints `devin -r <session-id>`. |
 | Interrupt | One Esc, then a second only after the running turn renders `esc again to interrupt` and at least 0.5 seconds later; no restored draft and no clear key. An idle agent gets one press and `cancel=not-running`, because a fast idle pair opens the `/revert` picker, where Enter reverts file changes. |
-| Skill invocation | `/<skill>`, for example `/no-mistakes`; Devin discovers Juggernaut's user skills from `~/.agents/skills`, and `fm-send` types the slash form through its popup settle. |
+| Skill invocation | `/<skill>`, for example `/no-mistakes`; Devin discovers Juggernaut's user skills from `~/.agents/skills`, and `jg-send` types the slash form through its popup settle. |
 | Resume | `devin -r <session-id>`; `--model` may switch the resumed session's model. |
 | Model flag | `--model <model-id>`, including `swe-2-medium` and account-listed `fusion-<lead>-sidekick-swe-2-medium` ids. |
 | Effort flag | None; effort is encoded in the model id, and Juggernaut records the independent axis without passing it. |
@@ -30,15 +30,15 @@ An open revert picker is closed with one Esc, never Enter; the control plane doe
 Tool responses are not used as main-turn completion signals.
 Herdr identifies a Devin pane natively from its own screen-detection manifest, and interrupt and steering work there, but `exit` and therefore `relaunch` refuse on Herdr: its cursorless composer read answers `unknown` for Devin's frame.
 
-`../../../../../bin/fm-spawn.sh` owns autonomy, trust, typed brief delivery, color preservation, and the omission of the Claude permission-mode mapping.
-`../../../../../bin/fm-devin-config.sh` owns the private user-config snapshot and appended lifecycle hooks; the user and project configs remain vendor-owned.
+`../../../../../bin/jg-spawn.sh` owns autonomy, trust, typed brief delivery, color preservation, and the omission of the Claude permission-mode mapping.
+`../../../../../bin/jg-devin-config.sh` owns the private user-config snapshot and appended lifecycle hooks; the user and project configs remain vendor-owned.
 The config snapshot can contain private settings and has mode 600.
 
 ## Composer and steering
 
-`../../../../../bin/fm-composer-lib.sh` owns the verified `❭` glyph, dim idle placeholder, active-turn composer, and interrupt hint.
+`../../../../../bin/jg-composer-lib.sh` owns the verified `❭` glyph, dim idle placeholder, active-turn composer, and interrupt hint.
 The shared delivery path must preserve ANSI styling: placeholder-like text surviving a styled capture remains a draft and must not be overwritten.
-The `../../../../../bin/fm-task-inbox-lib.sh` doorbell was read and acknowledged through real `fm-send` on both SWE-2 and Fusion.
+The `../../../../../bin/jg-task-inbox-lib.sh` doorbell was read and acknowledged through real `jg-send` on both SWE-2 and Fusion.
 The shared slash-command settling path also handles `/quit` autocomplete.
 
 ## Primary integration

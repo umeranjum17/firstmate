@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Forced-limit: A=70%/B=40%; quota-axi --json Claude row matches fm-model-pool (not ambient 11%).
+# Forced-limit: A=70%/B=40%; quota-axi --json Claude row matches jg-model-pool (not ambient 11%).
 set -u
 here=$(cd "$(dirname "$0")" && pwd) || exit 1
 addons=$(cd "$here/../.." && pwd) || exit 1
 wrap=$addons/quota-axi-pool/bin/quota-axi-pool
-helper=$addons/account-pool/bin/fm-model-pool
+helper=$addons/account-pool/bin/jg-model-pool
 pool=$addons/claude-accounts/bin/claude-accounts-pick
 w=$(mktemp -d "${TMPDIR:-/tmp}/quota-axi-pool-test.XXXXXX") || exit 1
 trap 'rm -rf -- "$w"' EXIT
@@ -66,7 +66,7 @@ pick=$(printf '%s' "$(jq -nc --arg p "$w/home/config/account-pool" '{v:1,purpose
   | env -i PATH="$w/bin:/usr/bin:/bin" HOME="$w" TMPDIR="$w" FM_HOME="$w/home" \
     FM_CLAUDE_ACCOUNTS_REGISTRY="$w/registry.json" FM_MODEL_POOL_FLOOR=15 \
     FM_ACCOUNT_POOL_REST_FLOOR=15 FM_CLAUDE_ACCOUNTS_FRESH=999999 "$helper" pick --json 2>/dev/null)
-is "fm-model-pool picks A" "$(jq -r .id <<<"$pick")" pa_umer_a
+is "jg-model-pool picks A" "$(jq -r .id <<<"$pick")" pa_umer_a
 run_json '["pa_umer_a"]'
 is "after A attempted, Claude row B=40" "$(pct "$out")" 40
 is "pool id B" "$(pid "$out")" pa_umer_b
@@ -98,25 +98,25 @@ env -i PATH="$empty/.local/bin:/usr/bin:/bin" HOME="$empty" XDG_DATA_HOME="$empt
   bash "$inst" >"$empty/out" 2>"$empty/err" || refuse_rc=$?
 is "refuse install without upstream exit nonzero" "$refuse_rc" 1
 is "refuse left link absent" "$( [ -e "$empty/.local/bin/quota-axi" ] && echo yes || echo no )" no
-is "refuse wrote no share dir" "$( [ -d "$empty/.local/share/fm-quota-axi-pool" ] && echo yes || echo no )" no
+is "refuse wrote no share dir" "$( [ -d "$empty/.local/share/jg-quota-axi-pool" ] && echo yes || echo no )" no
 grep -q 'no upstream quota-axi found' "$empty/err" && echo "ok - refuse message" || { echo "not ok - refuse message"; fails=$((fails + 1)); }
 # Install over existing foreign symlink: record resolved upstream + original link target.
 inst_rc=0
 env -i PATH="$ih/.local/bin:/usr/bin:/bin" HOME="$ih" XDG_DATA_HOME="$ih/.local/share" \
   bash "$inst" >"$ih/install.out" 2>"$ih/install.err" || inst_rc=$?
 is "install over foreign link exit 0" "$inst_rc" 0
-is "upstream recorded resolved" "$(head -n 1 "$ih/.local/share/fm-quota-axi-pool/upstream")" "$orig_resolved"
-is "link-target recorded original" "$(head -n 1 "$ih/.local/share/fm-quota-axi-pool/link-target")" "$orig_target"
+is "upstream recorded resolved" "$(head -n 1 "$ih/.local/share/jg-quota-axi-pool/upstream")" "$orig_resolved"
+is "link-target recorded original" "$(head -n 1 "$ih/.local/share/jg-quota-axi-pool/link-target")" "$orig_target"
 is "link now our wrapper" "$(readlink -f "$ih/.local/bin/quota-axi")" \
-  "$(readlink -f "$ih/.local/share/fm-quota-axi-pool/quota-axi-pool")"
+  "$(readlink -f "$ih/.local/share/jg-quota-axi-pool/quota-axi-pool")"
 # Idempotent re-install keeps recorded upstream.
-saved_up=$(head -n 1 "$ih/.local/share/fm-quota-axi-pool/upstream")
-saved_lt=$(head -n 1 "$ih/.local/share/fm-quota-axi-pool/link-target")
+saved_up=$(head -n 1 "$ih/.local/share/jg-quota-axi-pool/upstream")
+saved_lt=$(head -n 1 "$ih/.local/share/jg-quota-axi-pool/link-target")
 env -i PATH="$ih/.local/bin:/usr/bin:/bin" HOME="$ih" XDG_DATA_HOME="$ih/.local/share" \
   bash "$inst" >"$ih/reinstall.out" 2>"$ih/reinstall.err" || inst_rc=$?
 is "reinstall exit 0" "$inst_rc" 0
-is "reinstall kept upstream" "$(head -n 1 "$ih/.local/share/fm-quota-axi-pool/upstream")" "$saved_up"
-is "reinstall kept link-target" "$(head -n 1 "$ih/.local/share/fm-quota-axi-pool/link-target")" "$saved_lt"
+is "reinstall kept upstream" "$(head -n 1 "$ih/.local/share/jg-quota-axi-pool/upstream")" "$saved_up"
+is "reinstall kept link-target" "$(head -n 1 "$ih/.local/share/jg-quota-axi-pool/link-target")" "$saved_lt"
 # Wrapper finds recorded upstream (no FM_QUOTA_AXI_REAL).
 wrap_out=$(env -i PATH="$ih/.local/bin:/usr/bin:/bin" HOME="$ih" XDG_DATA_HOME="$ih/.local/share" \
   quota-axi 2>"$ih/wrap.err") || true
@@ -126,7 +126,7 @@ env -i PATH="$ih/.local/bin:/usr/bin:/bin" HOME="$ih" XDG_DATA_HOME="$ih/.local/
   bash "$uninst" >"$ih/uninstall.out" 2>"$ih/uninstall.err" || true
 is "uninstall restored link target" "$(readlink -- "$ih/.local/bin/quota-axi")" "$orig_target"
 is "uninstall restored resolved" "$(readlink -f "$ih/.local/bin/quota-axi")" "$orig_resolved"
-is "uninstall removed share dir" "$( [ -d "$ih/.local/share/fm-quota-axi-pool" ] && echo yes || echo no )" no
+is "uninstall removed share dir" "$( [ -d "$ih/.local/share/jg-quota-axi-pool" ] && echo yes || echo no )" no
 rm -rf -- "$ih" "$empty"
 
 [ "$fails" -eq 0 ] || { echo "FAIL: $fails assertions"; exit 1; }

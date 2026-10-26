@@ -19,7 +19,7 @@ fi
 
 # 2. The fork shim: silent without the add-on or a board, and it hands an installed
 #    writer this home's task and flags.
-bash tests/fm-ticket.test.sh >"$OUT/fm-ticket-test.log" 2>&1 || failed=1
+bash tests/jg-ticket.test.sh >"$OUT/jg-ticket-test.log" 2>&1 || failed=1
 
 # 3. The dashboard's own core journey serves a seeded home at phone width; its
 #    Tickets hero must name the open tickets nothing has updated for a day.
@@ -29,7 +29,7 @@ stale=$(sed -n '/^stale tickets on the seeded board:/p' "$OUT/fleet-dashboard-pr
 [ -n "$stale" ] || failed=1
 
 if [ "$failed" -ne 0 ]; then
-  echo "tickets-writeback: a step failed; read tickets-sync-test.log, fm-ticket-test.log and fleet-dashboard-proof.log" >&2
+  echo "tickets-writeback: a step failed; read tickets-sync-test.log, jg-ticket-test.log and fleet-dashboard-proof.log" >&2
 fi
 
 python3 - "$OUT/steps.json" "$(git rev-parse HEAD)" "$stale" <<'PY'

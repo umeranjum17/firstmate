@@ -19,7 +19,7 @@ bash "$repo/claude-accounts/tests/claude-accounts.test.sh" >"$evidence/test.txt"
 jq 'del(.accounts[].folder)' "$FM_HOME/state/claude-accounts.json" >"$evidence/reading.json"
 
 port=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1])')
-bash "$repo/fleet-dashboard/fm-dashboard.sh" serve --bind 127.0.0.1 --port "$port" >"$work/serve.log" 2>&1 &
+bash "$repo/fleet-dashboard/jg-dashboard.sh" serve --bind 127.0.0.1 --port "$port" >"$work/serve.log" 2>&1 &
 pid=$!
 until curl -sf "http://127.0.0.1:$port/" >/dev/null; do sleep 1; done
 done-done look "http://127.0.0.1:$port/#/overview" --out "$evidence/overview-390.png"

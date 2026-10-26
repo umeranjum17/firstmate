@@ -45,7 +45,7 @@ pushing the owner's private details to a public repo, shaped like
   with the same args (moved aside to `config/merge-gate.pre-owner-guard`;
   `--uninstall [<home>]` moves it back). Rerun it after writing another
   gate shim over `config/merge-gate` to re-chain it.
-- `doctor.sh <fm-home>` — exits nonzero with the missing guard path or incorrect
+- `doctor.sh <jg-home>` — exits nonzero with the missing guard path or incorrect
   global `core.hooksPath` and prints the install command to recover.
 - `tests/owner-guard.test.sh` — fixture-repo proof (throwaway HOME and repo,
   made-up patterns only): matching commit refused, clean commit passes,

@@ -8,7 +8,7 @@ if [ "${FM_TEST_KEEP:-0}" != 1 ]; then trap 'rm -rf -- "$work"' EXIT; fi
 export HOME=$work/user XDG_DATA_HOME=$work/xdg SIGN_OFF_HOME=$work/signoff FM_HOME=$work/home
 export XDG_CONFIG_HOME=$work/config XDG_CACHE_HOME=$work/cache TMPDIR=$work/tmp
 mkdir -p "$HOME" "$FM_HOME/config" "$FM_HOME/data/t/.done-done/runs" "$SIGN_OFF_HOME" "$TMPDIR"
-checker=$addons/owner-rules/bin/fm-owner-rules-text-check.sh
+checker=$addons/owner-rules/bin/jg-owner-rules-text-check.sh
 status=$addons/status-wait-check/status-wait-check
 refusal='use the sign-off board (sign-off-axi) instead'
 fails=0
@@ -42,10 +42,10 @@ check 0 'existing blocked wait refusal is preserved' wait_refused
 
 if [ -n "${FM_TEST_FORK:-}" ]; then
   mkdir -p "$work/parent/state"
-  printf 'umer\n' > "$FM_HOME/.fm-secondmate-home"
-  printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$work/parent" > "$FM_HOME/.fm-secondmate-parent"
+  printf 'umer\n' > "$FM_HOME/.jg-secondmate-home"
+  printf 'schema=jg-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$work/parent" > "$FM_HOME/.jg-secondmate-parent"
   export FM_ADDONS_DIR=$addons
-  report=$FM_TEST_FORK/bin/fm-secondmate-report.sh
+  report=$FM_TEST_FORK/bin/jg-secondmate-report.sh
   check 2 'real helper refuses before status append' bash "$report" 'done' abcdef0123456789 'http://review.example:4387/session/umer'
   if [ ! -e "$work/parent/state/umer.status" ]; then echo 'ok - refused note wrote no status'
   else echo 'not ok - refused note wrote status'; fails=$((fails + 1)); fi

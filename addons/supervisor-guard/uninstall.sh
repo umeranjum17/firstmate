@@ -4,13 +4,13 @@
 set -euo pipefail
 DRY=0
 [ "${1:-}" = --dry-run ] && { DRY=1; shift; }
-[ "$#" -le 1 ] || { echo "usage: uninstall.sh [--dry-run] [<fm-home>]" >&2; exit 2; }
+[ "$#" -le 1 ] || { echo "usage: uninstall.sh [--dry-run] [<jg-home>]" >&2; exit 2; }
 FMH=
 if [ "$#" -eq 1 ]; then
   [ -d "$1" ] || { echo "uninstall.sh: home is not a directory: $1" >&2; exit 2; }
   FMH=$(cd "$1" && pwd -P)
 fi
-DEST=${XDG_DATA_HOME:-$HOME/.local/share}/fm-supervisor-guard
+DEST=${XDG_DATA_HOME:-$HOME/.local/share}/jg-supervisor-guard
 SETTINGS=$HOME/.claude/settings.json
 STAMP=$(date +%s)
 TMP=$(mktemp -d)
@@ -33,8 +33,8 @@ if [ -n "$FMH" ] && [ -f "$DEST/home" ]; then
   fi
 fi
 
-if [ -s "$SETTINGS" ] && jq -e '[.hooks.PreToolUse[]?.hooks[]? | (.command // "") | select(contains("fm-supervisor-work-pretool-check.sh"))] | length > 0' "$SETTINGS" >/dev/null; then
-  jq '.hooks.PreToolUse = ([.hooks.PreToolUse[]? | .hooks |= map(select((.command // "") | contains("fm-supervisor-work-pretool-check.sh") | not)) | select(.hooks | length > 0)])' \
+if [ -s "$SETTINGS" ] && jq -e '[.hooks.PreToolUse[]?.hooks[]? | (.command // "") | select(contains("jg-supervisor-work-pretool-check.sh"))] | length > 0' "$SETTINGS" >/dev/null; then
+  jq '.hooks.PreToolUse = ([.hooks.PreToolUse[]? | .hooks |= map(select((.command // "") | contains("jg-supervisor-work-pretool-check.sh") | not)) | select(.hooks | length > 0)])' \
     "$SETTINGS" > "$TMP/settings.json"
   if cmp -s "$SETTINGS" "$TMP/settings.json"; then
     echo "unchanged: $SETTINGS"
@@ -47,7 +47,7 @@ if [ -s "$SETTINGS" ] && jq -e '[.hooks.PreToolUse[]?.hooks[]? | (.command // ""
   fi
 fi
 
-for f in fm-supervisor-work-pretool-check.sh fm-supervisor-work-decide.mjs fm-supervisor-work-command-policy.mjs home; do
+for f in jg-supervisor-work-pretool-check.sh jg-supervisor-work-decide.mjs jg-supervisor-work-command-policy.mjs home; do
   if [ -e "$DEST/$f" ]; then
     echo "remove: $DEST/$f"
     [ "$DRY" -eq 1 ] || rm -f -- "$DEST/$f"

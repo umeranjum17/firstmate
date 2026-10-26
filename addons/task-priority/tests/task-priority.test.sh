@@ -8,7 +8,7 @@ fails=0
 fail() { echo "FAIL: $*" >&2; fails=$((fails + 1)); }
 
 XDG_DATA_HOME=$T/xdg bash "$ROOT/install.sh" >/dev/null || fail "install"
-CHECK=$T/xdg/fm-task-priority/check.sh
+CHECK=$T/xdg/jg-task-priority/check.sh
 [ -x "$CHECK" ] || fail "installed check is not executable at a known path"
 XDG_DATA_HOME=$T/xdg bash "$ROOT/install.sh" --dry-run | grep -q 'nothing written' || fail "dry run"
 

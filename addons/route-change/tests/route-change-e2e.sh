@@ -29,12 +29,12 @@ awk -v w="$work" '
   /^#--- / { file = w "/" substr($0, 6); next }
   file { print > file }
 ' <<'FIXTURE' || exit 1
-#--- home/bin/fm-quota-axi-lib.sh
+#--- home/bin/jg-quota-axi-lib.sh
 # shellcheck shell=bash
-# The schema-5 join of firstmate's bin/fm-quota-axi-lib.sh.
+# The schema-5 join of firstmate's bin/jg-quota-axi-lib.sh.
 FM_QUOTA_ROW_JQ='def quota_lane($harness; $model): "";
   def quota_row($snapshot; $provider; $lane): ([$snapshot.providers[]? | select(.provider == $provider)] | first) // null;'
-fm_quota_json_valid() { jq -e '.schemaVersion == 5 and (.providers | type) == "array"' >/dev/null 2>&1; }
+jg_quota_json_valid() { jq -e '.schemaVersion == 5 and (.providers | type) == "array"' >/dev/null 2>&1; }
 #--- home/config/crew-dispatch.json
 {"rules": [
   {"when": "tough", "use": [
@@ -187,7 +187,7 @@ is "no log line for the failed switch" "$(grep -c deepseek "$home/state/route-ch
 
 # An unusable quota-axi reading (lib signature drift): refused, nothing written.
 mkdir -p "$work/home2/config" "$work/home2/state" "$work/home2/bin"
-sed 's/def quota_row(/def quota_row_unusable(/' "$home/bin/fm-quota-axi-lib.sh" >"$work/home2/bin/fm-quota-axi-lib.sh"
+sed 's/def quota_row(/def quota_row_unusable(/' "$home/bin/jg-quota-axi-lib.sh" >"$work/home2/bin/jg-quota-axi-lib.sh"
 cp "$work/dispatch.orig" "$work/home2/config/crew-dispatch.json"
 out=$("$rc_bin" "$work/home2" muse-spark-1.3-contributor 2>&1)
 is "an unusable quota reading exits non-zero" "$?" 1

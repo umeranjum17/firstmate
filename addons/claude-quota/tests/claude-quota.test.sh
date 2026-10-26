@@ -77,14 +77,14 @@ check "d: a second read inside 10 min is held, even a step lower" "$(FM_MAIN_HOM
 
 # (e) install --dry-run: prints the steps, writes nothing.
 # shellcheck disable=SC2016 # expands in the stub, not here
-printf '#!/bin/sh\necho "$FM_HOME|${FM_STATE_OVERRIDE-unset}|$*" >> "%s/register.calls"\n' "$d" > "$FM/bin/fm-check-register.sh"
-chmod +x "$FM/bin/fm-check-register.sh"
+printf '#!/bin/sh\necho "$FM_HOME|${FM_STATE_OVERRIDE-unset}|$*" >> "%s/register.calls"\n' "$d" > "$FM/bin/jg-check-register.sh"
+chmod +x "$FM/bin/jg-check-register.sh"
 printf '#!/usr/bin/env bash\necho old check\n' > "$FM/state/claude-quota.check.sh"
 chmod 700 "$FM/state/claude-quota.check.sh"
 before=$(find "$d" | sort)
 out=$("$SRC/install.sh" --dry-run "$FM")
 has "e: dry run names the backup" "$out" "would back up: $FM/state/claude-quota.check.sh -> $FM/state/claude-quota.check.sh.bak-claude-quota-"
-has "e: dry run names the register" "$out" "would run: $FM/bin/fm-check-register.sh claude-quota"
+has "e: dry run names the register" "$out" "would run: $FM/bin/jg-check-register.sh claude-quota"
 check "e: dry run wrote nothing" "$(find "$d" | sort)" "$before"
 
 # (f) install: backs up the old check, writes the exec shim (mode 700), re-registers with FM_STATE_OVERRIDE dropped.

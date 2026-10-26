@@ -3,7 +3,7 @@
 set -euo pipefail
 [ "$#" -eq 1 ] || { echo 'pane-titles: expected the launch environment output path' >&2; exit 2; }
 out=$1
-addon=${FM_PANE_TITLES_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/fm-pane-titles}
+addon=${FM_PANE_TITLES_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/jg-pane-titles}
 previous=$addon/previous-launch-env-hook
 tmp=$out.pane-titles.$$
 trap 'rm -f -- "$tmp"' EXIT
@@ -12,8 +12,8 @@ title=''
 if [ -n "${FM_TASK_ID:-}" ]; then
   id=${FM_TASK_ID//[-_]/ }
   home=${FM_HOME:-}
-  [ -x "$home/bin/fm-tasks-axi.sh" ] || { echo 'pane-titles: FM_HOME backlog helper is unavailable' >&2; exit 1; }
-  shown=$(FM_HOME="$home" "$home/bin/fm-tasks-axi.sh" show "$FM_TASK_ID" --full) || {
+  [ -x "$home/bin/jg-tasks-axi.sh" ] || { echo 'pane-titles: FM_HOME backlog helper is unavailable' >&2; exit 1; }
+  shown=$(FM_HOME="$home" "$home/bin/jg-tasks-axi.sh" show "$FM_TASK_ID" --full) || {
     echo "pane-titles: cannot read backlog title for task $FM_TASK_ID" >&2; exit 1;
   }
   backlog_title=$(printf '%s\n' "$shown" | sed -n 's/^  title: //p' | head -1)

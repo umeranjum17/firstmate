@@ -2,7 +2,7 @@
 # Live proof on a real Android device: this checkout's kill guard, copied to a temporary path, records a device process
 # with own start, allows the task's own kill and refuses device PID 1 and a name kill; the kill runs only once allowed.
 # Only the sleep this proof starts is signalled. Needs FM_DEVICE_SERIAL; FM_DEVICE_LOCK (a lock command taking
-# <serial> <command...>, such as fm-device-lock.sh) holds the device for the whole journey.
+# <serial> <command...>, such as jg-device-lock.sh) holds the device for the whole journey.
 set -euo pipefail
 S=${FM_DEVICE_SERIAL:?set FM_DEVICE_SERIAL to the test device}
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
@@ -13,7 +13,7 @@ cat > "$T/journey.sh" <<'EOF'
 set -u; cd "$1"; G=$2; S=$3
 verdict() { jq -n --arg c "$1" '{tool_input:{command:$c}}' | node "$G" --caller $$ 2>&1; }
 echo "\$ own start $S -- sleep 120"; start=$(date +%s); node "$G" own start "$S" -- sleep 120 || exit 4; echo "returned in $(( $(date +%s) - start ))s"
-P=$(jq -r '.[-1].pid' .fm-kill-guard-device-pids.json); echo "recorded device pid $P"
+P=$(jq -r '.[-1].pid' .jg-kill-guard-device-pids.json); echo "recorded device pid $P"
 echo "\$ ps -p $P"; adb -s "$S" shell ps -o PID,NAME -p "$P" || exit 5
 echo "--- guard on: adb shell kill $P"; verdict "adb -s $S shell kill $P" && echo "allowed" || exit 6
 echo "--- guard on: adb shell kill 1"; ! verdict "adb -s $S shell kill 1" || exit 7

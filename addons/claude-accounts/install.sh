@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Point one Firstmate home's config/account-pool at the claude-accounts chooser, so every new Claude worker
 # shares signed-in accounts in proportion to quota runway. Refuses to replace a different account-pool file.
-# Usage: install.sh <fm-home>          Undo: uninstall.sh <fm-home>
+# Usage: install.sh <jg-home>          Undo: uninstall.sh <jg-home>
 set -euo pipefail
-[ "$#" -eq 1 ] && [ -d "$1/config" ] || { echo "usage: install.sh <fm-home>" >&2; exit 2; }
+[ "$#" -eq 1 ] && [ -d "$1/config" ] || { echo "usage: install.sh <jg-home>" >&2; exit 2; }
 home=$(cd "$1" && pwd -P)
 src=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 want=$(printf 'command=%s\nstate=%s\n' "$src/bin/claude-accounts-pick" "$home/state")

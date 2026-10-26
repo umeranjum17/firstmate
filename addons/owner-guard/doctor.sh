@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Verify owner-guard installation for one Firstmate home. Usage: doctor.sh <fm-home>
+# Verify owner-guard installation for one Firstmate home. Usage: doctor.sh <jg-home>
 set -euo pipefail
-[ "$#" -eq 1 ] && [ -d "$1" ] || { echo 'usage: doctor.sh <fm-home>' >&2; exit 2; }
+[ "$#" -eq 1 ] && [ -d "$1" ] || { echo 'usage: doctor.sh <jg-home>' >&2; exit 2; }
 FMH=$(cd "$1" && pwd -P)
 DATA=${XDG_DATA_HOME:-$HOME/.local/share}
-GUARD=$DATA/fm-owner-guard/owner-guard
-HOOKS=$DATA/fm-owner-guard/hooks
+GUARD=$DATA/jg-owner-guard/owner-guard
+HOOKS=$DATA/jg-owner-guard/hooks
 fail=0
 if [ ! -x "$GUARD" ]; then
   echo "owner-guard doctor: $FMH is missing executable $GUARD" >&2

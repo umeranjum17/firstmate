@@ -44,7 +44,7 @@ That is deliberate: the host-agnostic property is a property of the stored recor
 GitLab runs mostly on self-hosted instances, so a merge request can live under any host.
 A GitLab project also sits under at least one group at no fixed depth, so no owner-and-repository pair can address one the way it can on GitHub.
 The stored record therefore carries `provider`, `url`, `host`, `path`, and `number`, and every consumer rebuilds the URL from those parts and refuses any record that does not reconstruct the stored URL exactly.
-`tests/fm-pr-check-security.test.sh` proves the host-agnostic path through a non-default-host sidecar and verifies that `glab` receives the reconstructed project URL.
+`tests/jg-pr-check-security.test.sh` proves the host-agnostic path through a non-default-host sidecar and verifies that `glab` receives the reconstructed project URL.
 
 ## How plain glab is invoked, and why
 
@@ -90,11 +90,11 @@ open
 Three tasks were armed, two against the fixture and one against the placeholder host:
 
 ```
-$ fm-pr-check.sh e1 https://gitlab.com/KarotKris/gitlab-merge-watch-fixture/-/merge_requests/1
+$ jg-pr-check.sh e1 https://gitlab.com/KarotKris/gitlab-merge-watch-fixture/-/merge_requests/1
 armed: state/e1.check.sh
-$ fm-pr-check.sh e2 https://gitlab.com/KarotKris/gitlab-merge-watch-fixture/-/merge_requests/2
+$ jg-pr-check.sh e2 https://gitlab.com/KarotKris/gitlab-merge-watch-fixture/-/merge_requests/2
 armed: state/e2.check.sh
-$ fm-pr-check.sh e3 https://gitlab.example/group/subgroup/project/-/merge_requests/7
+$ jg-pr-check.sh e3 https://gitlab.example/group/subgroup/project/-/merge_requests/7
 armed: state/e3.check.sh
 ```
 
@@ -120,7 +120,7 @@ The provenance record for the non-default host, showing the bumped version tag:
 
 ```
 $ cat state/e3.pr-poll-registration
-fm-pr-poll-registration-v2
+jg-pr-poll-registration-v2
 e3
 gitlab
 https://gitlab.example/group/subgroup/project/-/merge_requests/7
@@ -136,10 +136,10 @@ group/subgroup/project
 Running each published poll the way the watcher does, where an empty result means the poll stayed silent and produced no wake:
 
 ```
-$ fm-pr-poll.sh --validated $(tr '\n' ' ' < state/e1.pr-poll)
+$ jg-pr-poll.sh --validated $(tr '\n' ' ' < state/e1.pr-poll)
 merged
-$ fm-pr-poll.sh --validated $(tr '\n' ' ' < state/e2.pr-poll)
-$ fm-pr-poll.sh --validated $(tr '\n' ' ' < state/e3.pr-poll)
+$ jg-pr-poll.sh --validated $(tr '\n' ' ' < state/e2.pr-poll)
+$ jg-pr-poll.sh --validated $(tr '\n' ' ' < state/e3.pr-poll)
 ```
 
 The merged fixture merge request produces exactly one `merged` line.
@@ -158,14 +158,14 @@ The poll is silent on every error by design, so a missing `glab` would otherwise
 With `glab` removed from `PATH`, the poll stays silent even for the merge request that is genuinely merged:
 
 ```
-$ PATH="$noglab" fm-pr-poll.sh --validated $(tr '\n' ' ' < state/e1.pr-poll)
-$ PATH="$noglab" fm-pr-poll.sh --validated $(tr '\n' ' ' < state/e3.pr-poll)
+$ PATH="$noglab" jg-pr-poll.sh --validated $(tr '\n' ' ' < state/e1.pr-poll)
+$ PATH="$noglab" jg-pr-poll.sh --validated $(tr '\n' ' ' < state/e3.pr-poll)
 ```
 
 Arming is the one point where that can be reported, so it refuses there instead of arming a watch that can never fire:
 
 ```
-$ PATH="$noglab" fm-pr-check.sh e5 https://gitlab.com/KarotKris/gitlab-merge-watch-fixture/-/merge_requests/1
+$ PATH="$noglab" jg-pr-check.sh e5 https://gitlab.com/KarotKris/gitlab-merge-watch-fixture/-/merge_requests/1
 error: watching a GitLab merge request requires glab on PATH
 $ echo $?
 1
@@ -174,30 +174,30 @@ $ echo $?
 A GitHub task is unaffected by a missing `glab`:
 
 ```
-$ PATH="$noglab" fm-pr-check.sh e6 https://github.com/kunchenguid/firstmate/pull/750
+$ PATH="$noglab" jg-pr-check.sh e6 https://github.com/kunchenguid/firstmate/pull/750
 armed: state/e6.check.sh
 ```
 
 ## Registration version
 
-The live registration tag is `fm-pr-poll-registration-v2`, which includes the provider tag.
-A `fm-pr-poll-registration-v1` record no longer parses.
-Arm a current watch with `bin/fm-pr-check.sh`.
+The live registration tag is `jg-pr-poll-registration-v2`, which includes the provider tag.
+A `jg-pr-poll-registration-v1` record no longer parses.
+Arm a current watch with `bin/jg-pr-check.sh`.
 
 ## Merging a merge request
 
-`bin/fm-pr-merge.sh` now merges a GitLab merge request through the shared recording helper and GitLab's own live pre-merge guards.
+`bin/jg-pr-merge.sh` now merges a GitLab merge request through the shared recording helper and GitLab's own live pre-merge guards.
 Every run below used a throwaway `FM_HOME`, so no live task record was touched, and a `glab` wrapper that refused any `merge` subcommand outright, so no merge could reach the forge even if a check were wrong.
 That wrapper is why the open fixture merge request could be used as evidence at all: it is `mergeable` with discussions resolved, so the pipeline conditions are the only thing between it and a real merge.
 
 Merging needs `glab` for the read and `jq` to parse it, and either one absent refuses before anything is recorded:
 
 ```
-$ PATH="$noglab" fm-pr-merge.sh e5 https://gitlab.com/KarotKris/gitlab-merge-watch-fixture/-/merge_requests/2
+$ PATH="$noglab" jg-pr-merge.sh e5 https://gitlab.com/KarotKris/gitlab-merge-watch-fixture/-/merge_requests/2
 error: merging a GitLab merge request requires glab on PATH
 $ echo $?
 1
-$ PATH="$nojq" fm-pr-merge.sh e6 https://gitlab.com/KarotKris/gitlab-merge-watch-fixture/-/merge_requests/2
+$ PATH="$nojq" jg-pr-merge.sh e6 https://gitlab.com/KarotKris/gitlab-merge-watch-fixture/-/merge_requests/2
 error: merging a GitLab merge request requires jq on PATH
 $ echo $?
 1
@@ -212,7 +212,7 @@ The poll's silence on a missing tool is safe because silence means "not merged y
 The merged half of the fixture is refused, and every failing condition is listed rather than just the first:
 
 ```
-$ fm-pr-merge.sh e1 https://gitlab.com/KarotKris/gitlab-merge-watch-fixture/-/merge_requests/1
+$ jg-pr-merge.sh e1 https://gitlab.com/KarotKris/gitlab-merge-watch-fixture/-/merge_requests/1
 armed: state/e1.check.sh
 error: refusing to merge https://gitlab.com/KarotKris/gitlab-merge-watch-fixture/-/merge_requests/1
   - state is "merged", not open
@@ -227,7 +227,7 @@ The open half is `mergeable`, conflict-free, and has its discussions resolved, s
 The fixture runs no CI, so its `head_pipeline` is `null`, which is reported as `none` rather than treated as nothing to check:
 
 ```
-$ fm-pr-merge.sh e2 https://gitlab.com/KarotKris/gitlab-merge-watch-fixture/-/merge_requests/2
+$ jg-pr-merge.sh e2 https://gitlab.com/KarotKris/gitlab-merge-watch-fixture/-/merge_requests/2
 armed: state/e2.check.sh
 error: refusing to merge https://gitlab.com/KarotKris/gitlab-merge-watch-fixture/-/merge_requests/2
   - the head pipeline status is "none", not success
@@ -245,7 +245,7 @@ A recorded `pr_head=` that no longer matches the live head is reported, and the 
 The stale value below was written into the task record by hand, because a GitLab task never records one on its own:
 
 ```
-$ fm-pr-merge.sh e4 https://gitlab.com/KarotKris/gitlab-merge-watch-fixture/-/merge_requests/2
+$ jg-pr-merge.sh e4 https://gitlab.com/KarotKris/gitlab-merge-watch-fixture/-/merge_requests/2
 armed: state/e4.check.sh
 notice: recorded head 1111111111111111111111111111111111111111 disagrees with the live head 66b8a6777bea5e291d7fa2fc20c42ad7686f6bc8; verifying the live head
 error: refusing to merge https://gitlab.com/KarotKris/gitlab-merge-watch-fixture/-/merge_requests/2
@@ -253,7 +253,7 @@ error: refusing to merge https://gitlab.com/KarotKris/gitlab-merge-watch-fixture
   - the head pipeline ran at "none", not at the current head 66b8a6777bea5e291d7fa2fc20c42ad7686f6bc8
 ```
 
-The remaining refusal conditions, and the merge itself, are covered by `tests/fm-pr-merge.test.sh` against fixtures.
+The remaining refusal conditions, and the merge itself, are covered by `tests/jg-pr-merge.test.sh` against fixtures.
 The conflict, unresolved-discussion, and running-pipeline conditions were additionally exercised against real merge requests on a private instance; those runs cannot be reproduced here, so their identifiers stay out of this record.
 The merge itself is not exercised against any live merge request, in either direction: `glab mr merge` has no dry run, so a live success path would mean merging someone's work to produce evidence.
 
@@ -267,8 +267,8 @@ It skips only that prompt; the conditions above are what authorize the merge.
 
 ## Why a recorded head is not the authority
 
-`bin/fm-pr-check.sh` records `pr_head=` only for GitHub, where `gh` exposes the head commit as a selectable field.
-It is optional by design, and the other consumers already treat it that way: `bin/fm-teardown.sh` reads the head from the forge at teardown and falls back to its provider-agnostic content check, and `bin/fm-review-diff.sh` fetches a pull-request head from the remote when none is recorded, which a merge request has no ref for, so a GitLab task is diffed against its local branch under that script's warning ([architecture.md](architecture.md) owns that fallback).
+`bin/jg-pr-check.sh` records `pr_head=` only for GitHub, where `gh` exposes the head commit as a selectable field.
+It is optional by design, and the other consumers already treat it that way: `bin/jg-teardown.sh` reads the head from the forge at teardown and falls back to its provider-agnostic content check, and `bin/jg-review-diff.sh` fetches a pull-request head from the remote when none is recorded, which a merge request has no ref for, so a GitLab task is diffed against its local branch under that script's warning ([architecture.md](architecture.md) owns that fallback).
 
 The merge path does not record one either, and deliberately does not depend on one.
 A rebase moves the head and leaves any recorded value stale, so a merge decided from metadata can verify a commit that no longer exists.

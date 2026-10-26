@@ -5,7 +5,7 @@ set -euo pipefail
 DRY=0
 [ "${1:-}" = --dry-run ] && { DRY=1; shift; }
 [ "$#" -eq 0 ] || { echo "usage: uninstall.sh [--dry-run]" >&2; exit 2; }
-DEST=${XDG_DATA_HOME:-$HOME/.local/share}/fm-kill-guard
+DEST=${XDG_DATA_HOME:-$HOME/.local/share}/jg-kill-guard
 STAMP=$(date +%s)
 TMP=$(mktemp -d)
 trap 'rm -rf -- "$TMP"' EXIT
@@ -16,8 +16,8 @@ CLAUDE_DIRS=$( { echo "$HOME/.claude"; [ ! -e "$REG" ] || jq -r '.accounts[] | s
 
 while read -r d; do
   SETTINGS=$d/settings.json
-  if [ -s "$SETTINGS" ] && jq -e '[.hooks.PreToolUse[]?.hooks[]? | (.command // "") | select(contains("fm-kill-guard/guard.mjs"))] | length > 0' "$SETTINGS" >/dev/null; then
-    jq '.hooks.PreToolUse = [.hooks.PreToolUse[] | .hooks |= map(select((.command // "") | contains("fm-kill-guard/guard.mjs") | not)) | select(.hooks | length > 0)] | if .hooks.PreToolUse == [] then del(.hooks.PreToolUse) else . end | if .hooks == {} then del(.hooks) else . end' \
+  if [ -s "$SETTINGS" ] && jq -e '[.hooks.PreToolUse[]?.hooks[]? | (.command // "") | select(contains("jg-kill-guard/guard.mjs"))] | length > 0' "$SETTINGS" >/dev/null; then
+    jq '.hooks.PreToolUse = [.hooks.PreToolUse[] | .hooks |= map(select((.command // "") | contains("jg-kill-guard/guard.mjs") | not)) | select(.hooks | length > 0)] | if .hooks.PreToolUse == [] then del(.hooks.PreToolUse) else . end | if .hooks == {} then del(.hooks) else . end' \
       "$SETTINGS" > "$TMP/settings.json"
     diff -u --label "$SETTINGS (before)" --label "$SETTINGS (after)" "$SETTINGS" "$TMP/settings.json" || true
     if [ "$DRY" -eq 0 ]; then
@@ -27,7 +27,7 @@ while read -r d; do
   fi
 done <<<"$CLAUDE_DIRS"
 
-for f in "$DEST/guard.mjs" "$DEST/disabled/fm-kill-guard.ts" "$HOME/.pi/agent/extensions/fm-kill-guard.ts" "$HOME/.config/opencode/plugins/fm-kill-guard.js"; do
+for f in "$DEST/guard.mjs" "$DEST/disabled/jg-kill-guard.ts" "$HOME/.pi/agent/extensions/jg-kill-guard.ts" "$HOME/.config/opencode/plugins/jg-kill-guard.js"; do
   if [ -e "$f" ]; then
     echo "remove: $f"
     [ "$DRY" -eq 1 ] || rm -f -- "$f"

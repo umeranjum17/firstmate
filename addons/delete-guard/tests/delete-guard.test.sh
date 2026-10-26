@@ -15,20 +15,20 @@ ok() { echo "ok: $*"; }; no() { echo "FAIL: $*"; fail=1; }
 inst() { env -u XDG_DATA_HOME HOME="$T/home" "$ADDON/install.sh" "$@" "$T/fm"; }
 
 inst --dry-run > "$T/dry.out"
-[ ! -e "$T/home/.local/share/fm-delete-guard/guard.mjs" ] && ok "dry run writes nothing" || no "dry run wrote files"
+[ ! -e "$T/home/.local/share/jg-delete-guard/guard.mjs" ] && ok "dry run writes nothing" || no "dry run wrote files"
 inst > "$T/install.out" && inst > "$T/reinstall.out"
 grep -q 'registered: state/delete-guard.check.sh' "$T/install.out" && ok "check registered" || no "check not registered"
 [ "$(grep -c '^unchanged: ' "$T/reinstall.out")" -eq 7 ] && ok "reinstall changes nothing" || no "reinstall not idempotent: $(cat "$T/reinstall.out")"
 jq -e '.env.KEEP == "1" and ([.hooks.PreToolUse[].hooks[].command] | length == 2 and index("other-hook") == 0)' "$T/home/.claude/settings.json" >/dev/null && ok "claude settings merged, existing settings kept" || no "claude settings merge"
 ls "$T/home/.claude/"settings.json.bak-delete-guard-* >/dev/null && ok "backup made" || no "no backup"
-grep -q "$T/home/.local/share/fm-delete-guard/guard.mjs" "$T/home/.pi/agent/extensions/fm-rm-guard.ts" && ok "pi adapter replaces fm-rm-guard.ts" || no "pi adapter"
+grep -q "$T/home/.local/share/jg-delete-guard/guard.mjs" "$T/home/.pi/agent/extensions/jg-rm-guard.ts" && ok "pi adapter replaces jg-rm-guard.ts" || no "pi adapter"
 
-hookrun() { jq -n --arg c "$2" --arg d "$1" '{tool_input:{command:$c},cwd:$d}' | HOME="$T/home" node "$T/home/.local/share/fm-delete-guard/guard.mjs" --runtime claude 2>/dev/null; } # exit 2 = blocked
+hookrun() { jq -n --arg c "$2" --arg d "$1" '{tool_input:{command:$c},cwd:$d}' | HOME="$T/home" node "$T/home/.local/share/jg-delete-guard/guard.mjs" --runtime claude 2>/dev/null; } # exit 2 = blocked
 blocked=('rm -rf "$HOME"' 'rm -rf ~' 'rm -rf ~/' 'rm -fr $HOME/*' 'rm -r -f /home/you' 'rm -rf $HOME/.config' 'rm -rf ~/.agents'
   'cd x && rm -rf ${HOME}' 'rm -rf /' 'rm -rf /*' 'rm -rf .' 'rm -rf *' 'rm -Rf $BUILD/*' 'find ~ -delete' 'npx rimraf $HOME'
   'rm -rf -- "$HOME"' 'HOME=$(mktemp -d) node t.js; rm -rf "$HOME"' '/usr/bin/rm -rf /home'
   'export HOME=$(mktemp -d); rm -rf "$HOME"' 'rm -rf "${HOME:?}"' 'rm -rf "$TMPHOME/"'
-  'bash -c "rm -rf ~"' '\rm -rf ~' 'rm -rf /home/you/..' 'rm -rf ../..' 'rm -rf ~/.fm-guard-probe-nonexistent'
+  'bash -c "rm -rf ~"' '\rm -rf ~' 'rm -rf /home/you/..' 'rm -rf ../..' 'rm -rf ~/.jg-guard-probe-nonexistent'
   'rm -rf -- "$d"' 'd=$(mktemp -d); d=$HOME; rm -rf "$d"' 'd=$(mktemp -d); rm -rf "$d/.."' 'd=$(mktemp -d); rm -rf "$d"/../x'
   'd=$(mktemp -d); rm -rf ${d:-/}' 'HOME=$(mktemp -d); rm -rf "$HOME"' 'd=$(mktemp -d) node t.js; rm -rf "$d"'
   'd=$(mktemp -d); read d; rm -rf "$d"' 'TMPDIR=$(mktemp -d); rm -rf "$TMPDIR"' 'TMP=$(mktemp -d /tmp/x.XXXXXX); rm -rf -- "$TMP"' '(d=$(mktemp -d)); rm -rf "$d"' $'cat > f <<EOF\nhi\nEOF\nrm -rf ~'
@@ -47,16 +47,16 @@ allowed=(  'rm -rf ./build' 'rm -rf node_modules' 'd=$(mktemp -d); rm -rf -- "$d
   'HOME=$(mktemp -d) npm test' 'd=$(mktemp -d); cd "$d" && make; rm -rf -- "$d"' 'T="$(mktemp -d)" || exit 1; rm -rf "${T}"' 'f=$(mktemp); rm -rf "$f"'
   $'cat > f <<\'EOF\'\nnever rm -rf on /, ~ or a bare . target\nEOF' $'git commit -m "guard\n\nrm -rf ~ is blocked"' 'gh pr create --body "rm -rf ~/x was blocked; rm -rf . too"'
   $'python3 - <<\'EOF\'\nprint("rm -rf ~")\nEOF'
-  'SCRATCH=~/.cache/fm-scratch/lfm-doctor-real-checks/proof && rm -rf "$SCRATCH" && mkdir -p "$SCRATCH"' 'S=~/.cache/x; rm -rf "$S"'
+  'SCRATCH=~/.cache/jg-scratch/ljg-doctor-real-checks/proof && rm -rf "$SCRATCH" && mkdir -p "$SCRATCH"' 'S=~/.cache/x; rm -rf "$S"'
   'd=$(mktemp -d /some/dir/maintest.XXXX); rm -rf "$d"' 'd=$(mktemp -d /tmp/x.XXXXXX); rm -rf -- "$d"' 'd=$(mktemp -p ~/.cache -d); rm -rf "$d"' 'd=$(mktemp -d -p ~); rm -rf "$d"'
   'd=$(mktemp -d -p /tmp/x 2>/dev/null || mktemp -d); rm -rf -- "$d"' 'd=$(mktemp -d || mktemp -d); rm -rf -- "$d"'
   'd=$(mktemp -d -p /tmp/x 2>/dev/null); rm -rf -- "$d"' 'd="$(mktemp -d -p /tmp/x || mktemp -d)"; rm -rf "$d"'
   $'d=$(mktemp -d -p /tmp/x 2>/dev/null || mktemp -d)\ncd "$d" && make\nrm -rf -- "$d"'
   'export T=$(mktemp -d); rm -rf -- "$T"' 'local -r d=$(mktemp -d); rm -rf "$d"' 'declare -x T=~/.cache/x; rm -rf "$T"'
-  $'export T=$(mktemp -d --tmpdir=/dev/shm lfm-wt-XXXXXX); export LFM_HOME=$T/home PROJ=$T/proj; mkdir -p $LFM_HOME $PROJ; git init -q $PROJ; node bin/learn-from-mistakes-axi.mjs init --no-skill --dir $PROJ --agent claude --model m --judge-agent codex --judge-model m2 >/tmp/init-out.txt 2>&1; echo "exit=$?"; awk \'{ if (length($0)>100) print FILENAME" "FNR" ("length($0)"): "$0 }\' $LFM_HOME/config.yaml $PROJ/.learn-from-mistakes.yaml; echo "CONFIG-CHECK-DONE"; cat /tmp/init-out.txt; echo "---json---"; node bin/learn-from-mistakes-axi.mjs init --json --dir $PROJ 2>&1 | head -5; rm -rf -- "$T"'
+  $'export T=$(mktemp -d --tmpdir=/dev/shm ljg-wt-XXXXXX); export LFM_HOME=$T/home PROJ=$T/proj; mkdir -p $LFM_HOME $PROJ; git init -q $PROJ; node bin/learn-from-mistakes-axi.mjs init --no-skill --dir $PROJ --agent claude --model m --judge-agent codex --judge-model m2 >/tmp/init-out.txt 2>&1; echo "exit=$?"; awk \'{ if (length($0)>100) print FILENAME" "FNR" ("length($0)"): "$0 }\' $LFM_HOME/config.yaml $PROJ/.learn-from-mistakes.yaml; echo "CONFIG-CHECK-DONE"; cat /tmp/init-out.txt; echo "---json---"; node bin/learn-from-mistakes-axi.mjs init --json --dir $PROJ 2>&1 | head -5; rm -rf -- "$T"'
   $'d=$(mktemp -d); REPO=/repo; CLI=$REPO/bin/cli.mjs; FAKE=$REPO/test/fake-agent/claude\nmkdir -p "$d/fakes" "$d/home" "$d/p"\nln -s "$FAKE" "$d/fakes/claude"; ln -s "$FAKE" "$d/fakes/codex"\nprintf \'agent: claude\\njudge_agent: codex\\n\' > "$d/home/config.yaml"\ncp "$REPO/examples/defects.md" "$d/p/"\nprintf \'\\n## %s\\n\\n- [tests] Fixture tests failed: EXAMPLE_FIXTURES was unset.\\n- [tests] They failed again for the same reason.\\n\' "$(date -Is)" >> "$d/p/defects.md"\nHOME="$d/home" node "$CLI" retro --project "$d/p" || true\nrm -rf -- "$d"'
   'd=$(mktemp -d ${X}/a.XXXX); rm -rf "$d"'
-  $'cd /home/you/.no-mistakes/worktrees/example-review-base && grep -n \'^ROOT=\' bin/fm-test-run.sh && d=$(mktemp -d "$PWD/.review-base-XXXX") && mkdir -p "$d/bin" "$d/tests" && git show 5758e52046f49dcc7297a2f0952cfa1bbdf969b0:bin/fm-test-run.sh > "$d/bin/fm-test-run.sh" && chmod +x "$d/bin/fm-test-run.sh" && git archive 5758e52046f49dcc7297a2f0952cfa1bbdf969b0 tests | tar -x -C "$d" && (cd "$d" && bash bin/fm-test-run.sh --check-coverage; echo "base rc=$?") ; rm -rf -- "$d"')
+  $'cd /home/you/.no-mistakes/worktrees/example-review-base && grep -n \'^ROOT=\' bin/jg-test-run.sh && d=$(mktemp -d "$PWD/.review-base-XXXX") && mkdir -p "$d/bin" "$d/tests" && git show 5758e52046f49dcc7297a2f0952cfa1bbdf969b0:bin/jg-test-run.sh > "$d/bin/jg-test-run.sh" && chmod +x "$d/bin/jg-test-run.sh" && git archive 5758e52046f49dcc7297a2f0952cfa1bbdf969b0 tests | tar -x -C "$d" && (cd "$d" && bash bin/jg-test-run.sh --check-coverage; echo "base rc=$?") ; rm -rf -- "$d"')
 n=0
 for c in "${blocked[@]}"; do n=$((n + 1)); if hookrun "/tmp/case-$n" "$c"; then no "MISSED: $c"; fi; done
 for c in "${allowed[@]}"; do n=$((n + 1)); hookrun "/tmp/case-$n" "$c" || no "FALSE BLOCK: $c"; done
@@ -88,7 +88,7 @@ case "$out" in "delete guard blocked 1 recursive delete(s)"*"task t1 (claude, ho
 mkdir -p "$T/replay/state"; wakes=()
 while IFS= read -r row; do
   printf '%s\n' "$row" >> "$T/replay/state/delete-guard.log"
-  w=$(HOME=/home/you "$T/home/.local/share/fm-delete-guard/check.sh" "$T/replay"); [ -z "$w" ] || wakes+=("$w")
+  w=$(HOME=/home/you "$T/home/.local/share/jg-delete-guard/check.sh" "$T/replay"); [ -z "$w" ] || wakes+=("$w")
 done < "$ADDON/tests/fixtures/delete-guard-2026-10-16.log"
 [ "${#wakes[@]}" -eq 1 ] && case "${wakes[0]}" in *"task rd-stale-screen-on-return (pi, "*", 14:22Z) /home/you/scratch-test: "*) true ;; *) false ;; esac \
   && ok "replay wakes only on the 14:22 /home/you/scratch-test block" || no "replay wakes: $(printf '%s\n' "${wakes[@]}")"

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Model-outage scan behaviour over fixture lanes: the real fm_model_outage_tick
+# Model-outage scan behaviour over fixture lanes: the real jg_model_outage_tick
 # from this add-on, with backend liveness, the lane verdict and the wake sink
 # faked; busy-gen and the pane capture are the real on-disk contract.
 # FM_TEST_FORK names a read-only Firstmate checkout whose bin/ holds the sibling
@@ -17,14 +17,14 @@ trap cleanup EXIT
 export HOME=$d/user TMPDIR=$d/tmp
 mkdir -p "$HOME" "$TMPDIR" "$d/fork"
 cp -a "$FM_TEST_FORK/bin" "$d/fork/bin"
-rm -f "$d/fork/bin/fm-model-outage-lib.sh"
-cat > "$d/fork/bin/fm-backend.sh" <<'FAKE'
-fm_backend_agent_state() { cat "$FAKE_LIVENESS/$4" 2>/dev/null || printf alive; }
-fm_backend_visible_capture_supported() { return 0; }
-fm_backend_visible_capture() { local t=${2#fake:}; cat "$FAKE_LIVENESS/capture-${t%.meta}" 2>/dev/null; }
+rm -f "$d/fork/bin/jg-model-outage-lib.sh"
+cat > "$d/fork/bin/jg-backend.sh" <<'FAKE'
+jg_backend_agent_state() { cat "$FAKE_LIVENESS/$4" 2>/dev/null || printf alive; }
+jg_backend_visible_capture_supported() { return 0; }
+jg_backend_visible_capture() { local t=${2#fake:}; cat "$FAKE_LIVENESS/capture-${t%.meta}" 2>/dev/null; }
 FAKE
-cat > "$d/fork/bin/fm-busy-lib.sh" <<'FAKE'
-fm_busy_classify_semantic() {
+cat > "$d/fork/bin/jg-busy-lib.sh" <<'FAKE'
+jg_busy_classify_semantic() {
   local verdict
   verdict=$(cat "$STATE/$4.verdict")
   if [ "$verdict" = hang ]; then sleep 30; printf 'idle opencode-plugin\n'; return 0; fi
@@ -44,16 +44,16 @@ run_scans() {
   (
     export FM_HOME=$d/fork SCRIPT_DIR=$d/fork/bin STATE=$case_dir/state FAKE_LIVENESS=$case_dir/liveness
     # shellcheck source=/dev/null
-    . "$addons/alerts/bin/fm-model-outage-lib.sh"
-    fm_busy_token_valid() { return 0; }
-    fm_busy_current_gen() { cat "$1/$2.busy-gen"; }
-    fm_meta_get() { printf opencode; }
-    fm_backend_visible_capture_supported() { return 0; }
-    fm_backend_target_of_meta() { printf 'fake:%s' "${1##*/}"; }
-    fm_backend_of_meta() { printf fake; }
+    . "$addons/alerts/bin/jg-model-outage-lib.sh"
+    jg_busy_token_valid() { return 0; }
+    jg_busy_current_gen() { cat "$1/$2.busy-gen"; }
+    jg_meta_get() { printf opencode; }
+    jg_backend_visible_capture_supported() { return 0; }
+    jg_backend_target_of_meta() { printf 'fake:%s' "${1##*/}"; }
+    jg_backend_of_meta() { printf fake; }
     hash_pane() { md5sum | cut -c1-12; }
     wake() { :; }
-    fm_wake_append() { printf '%s\n' "$3" >> "$case_dir/wakes"; }
+    jg_wake_append() { printf '%s\n' "$3" >> "$case_dir/wakes"; }
     lane() {
       : > "$STATE/$1.meta"
       printf 'g1\n' > "$STATE/$1.busy-gen"
@@ -61,7 +61,7 @@ run_scans() {
       printf '%s\n' "$3" > "$FAKE_LIVENESS/$1"
       printf '%s\n' "${4-Upstream request failed: region denied}" > "$FAKE_LIVENESS/capture-$1"
     }
-    tick() { ( rm -f "$STATE/.model-outages/.scan-at"; fm_model_outage_tick ); }
+    tick() { ( rm -f "$STATE/.model-outages/.scan-at"; jg_model_outage_tick ); }
     "$body"
   ) || fail "$1: scans failed"
   if compgen -G "$case_dir/state/.model-outages/.scan.*" >/dev/null; then fail "$1: a scan batch directory leaked"; fi

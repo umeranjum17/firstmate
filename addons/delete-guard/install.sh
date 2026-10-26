@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Install or update the fleet delete guard for this user and register its watcher check in one firstmate home.
-# Idempotent: rerun it to update. Usage: install.sh [--dry-run] <fm-home>
+# Idempotent: rerun it to update. Usage: install.sh [--dry-run] <jg-home>
 set -euo pipefail
 DRY=0
 [ "${1:-}" = --dry-run ] && { DRY=1; shift; }
-[ "$#" -eq 1 ] && [ -x "$1/bin/fm-check-register.sh" ] || { echo "usage: install.sh [--dry-run] <fm-home>" >&2; exit 2; }
+[ "$#" -eq 1 ] && [ -x "$1/bin/jg-check-register.sh" ] || { echo "usage: install.sh [--dry-run] <jg-home>" >&2; exit 2; }
 FMH=$(cd "$1" && pwd -P)
 SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
-DEST=${XDG_DATA_HOME:-$HOME/.local/share}/fm-delete-guard
+DEST=${XDG_DATA_HOME:-$HOME/.local/share}/jg-delete-guard
 STAMP=$(date +%s)
 TMP=$(mktemp -d)
 trap 'rm -rf -- "$TMP"' EXIT
@@ -39,7 +39,7 @@ hook() {
   [ -d "$(dirname "$file")" ] || { echo "skipped: $file (runtime not installed)"; return; }
   # shellcheck disable=SC2016 # $cmd is a jq variable
   { [ -s "$file" ] && cat "$file" || echo '{}'; } | jq --arg cmd "$cmd" '
-    .hooks.PreToolUse = ([.hooks.PreToolUse[]? | .hooks |= map(select((.command // "") | contains("fm-delete-guard/guard.mjs") | not)) | select(.hooks | length > 0)]
+    .hooks.PreToolUse = ([.hooks.PreToolUse[]? | .hooks |= map(select((.command // "") | contains("jg-delete-guard/guard.mjs") | not)) | select(.hooks | length > 0)]
       + [{matcher: "Bash", hooks: [{type: "command", command: $cmd, timeout: 10}]}])' > "$TMP/$2.json"
   put "$file" "$TMP/$2.json" .hooks.PreToolUse
 }
@@ -51,11 +51,11 @@ put "$DEST/check.sh" "$SRC/check.sh"
 [ "$DRY" -eq 1 ] || chmod 755 "$DEST/check.sh"
 
 for a in pi-extension.ts opencode-plugin.js; do sed "s|__GUARD__|$DEST/guard.mjs|" "$SRC/$a" > "$TMP/$a"; done
-if [ -d "$HOME/.pi/agent" ]; then put "$HOME/.pi/agent/extensions/fm-rm-guard.ts" "$TMP/pi-extension.ts"; else echo "skipped: pi (not installed)"; fi
-if [ -d "$HOME/.config/opencode" ]; then put "$HOME/.config/opencode/plugins/fm-delete-guard.js" "$TMP/opencode-plugin.js"; else echo "skipped: opencode (not installed)"; fi
+if [ -d "$HOME/.pi/agent" ]; then put "$HOME/.pi/agent/extensions/jg-rm-guard.ts" "$TMP/pi-extension.ts"; else echo "skipped: pi (not installed)"; fi
+if [ -d "$HOME/.config/opencode" ]; then put "$HOME/.config/opencode/plugins/jg-delete-guard.js" "$TMP/opencode-plugin.js"; else echo "skipped: opencode (not installed)"; fi
 while read -r d; do hook "$d/settings.json" claude; done <<<"$CLAUDE_DIRS"
 
 printf '#!/usr/bin/env bash\nexec %q %q\n' "$DEST/check.sh" "$FMH" > "$TMP/check"
 put "$FMH/state/delete-guard.check.sh" "$TMP/check"
-[ "$DRY" -eq 0 ] || { echo "dry run: nothing written; would run $FMH/bin/fm-check-register.sh delete-guard"; exit 0; }
-chmod 700 "$FMH/state/delete-guard.check.sh" && FM_HOME="$FMH" "$FMH/bin/fm-check-register.sh" delete-guard
+[ "$DRY" -eq 0 ] || { echo "dry run: nothing written; would run $FMH/bin/jg-check-register.sh delete-guard"; exit 0; }
+chmod 700 "$FMH/state/delete-guard.check.sh" && FM_HOME="$FMH" "$FMH/bin/jg-check-register.sh" delete-guard

@@ -2,7 +2,7 @@
 # owner-rules design flag: the backlog "design: required|none" line, the brief record, the typo guard and the nudge.
 # Usage: owner-rules/tests/design-flag.test.sh [<firstmate-checkout>]
 # Sources the real lib against a fixture backlog. With a checkout that carries the brief-inherit seam, it also
-# drives the real fm-brief.sh and reads data/<id>/brief.md.
+# drives the real jg-brief.sh and reads data/<id>/brief.md.
 set -u
 here=$(cd "$(dirname "$0")" && pwd) || exit 1
 addons=$(cd "$here/../.." && pwd) || exit 1
@@ -42,11 +42,11 @@ check() {
   out=$(
     BRIEF_INCLUDE_BODY=${2:-}
     # shellcheck disable=SC1091 # the lib is in this checkout
-    . "$addons/owner-rules/bin/fm-owner-rules-lib.sh"
+    . "$addons/owner-rules/bin/jg-owner-rules-lib.sh"
     # the exit paths end the shell, so print the body from a trap
     rc=0
     trap 'rc=$?; printf "err=%s\nbody=%s\nrc=%s\n" "$(cat "$work/err")" "$BRIEF_INCLUDE_BODY" "$rc"' EXIT
-    fm_owner_rules_check "$home/data" "$1" direct-PR ship 2>"$work/err"
+    jg_owner_rules_check "$home/data" "$1" direct-PR ship 2>"$work/err"
   )
   printf '%s\n' "$out"
 }
@@ -78,17 +78,17 @@ is "D4: a design line silences the nudge" "$(check flagged-words)" "err=
 body=
 rc=0"
 
-# with the fork: the real fm-brief.sh writes the line, and a typo writes no brief
+# with the fork: the real jg-brief.sh writes the line, and a typo writes no brief
 FM=${1:-}
-if [ -n "$FM" ] && [ -x "$FM/bin/fm-brief.sh" ] && grep -q fm_brief_inherit_shared "$FM/bin/fm-brief.sh"; then
+if [ -n "$FM" ] && [ -x "$FM/bin/jg-brief.sh" ] && grep -q jg_brief_inherit_shared "$FM/bin/jg-brief.sh"; then
   export HOME=$work/user XDG_DATA_HOME=$work/data
   "$addons/owner-rules/install.sh" "$home" >/dev/null
-  brief() { FM_HOME=$home FM_ADDONS_DIR=$addons bash "$FM/bin/fm-brief.sh" "$1" sample --mode direct-PR >/dev/null 2>&1; }
+  brief() { FM_HOME=$home FM_ADDONS_DIR=$addons bash "$FM/bin/jg-brief.sh" "$1" sample --mode direct-PR >/dev/null 2>&1; }
   brief req; grep -qx 'Design discovery: required' "$home/data/req/brief.md" && ok "brief.md carries the line when required" || no "brief.md lacks the line"
   brief none; [ -s "$home/data/none/brief.md" ] && ! grep -q 'Design discovery' "$home/data/none/brief.md" && ok "brief.md has no line for none" || no "brief.md for none"
   brief typo && no "typo briefed" || { [ ! -e "$home/data/typo" ] && ok "typo writes no brief" || no "typo left data/typo"; }
 else
-  echo "skip - fm-brief.sh journey (no firstmate checkout given)"
+  echo "skip - jg-brief.sh journey (no firstmate checkout given)"
 fi
 
 [ "$fails" -eq 0 ] && echo "PASS design-flag" || { echo "FAIL design-flag: $fails"; exit 1; }

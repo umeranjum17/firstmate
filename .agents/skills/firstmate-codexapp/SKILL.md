@@ -62,7 +62,7 @@ For a Juggernaut-managed task, include an explicit status instruction:
 ```text
 Append supervisor-visible status lines to <absolute-firstmate-home>/state/<task-id>.status.
 Use only these prefixes for status changes: working:, needs-decision:, blocked:, paused:, done:, failed:.
-Follow the task brief's status-reporting rule for declaring and resolving waits; bin/fm-brief.sh owns that rule.
+Follow the task brief's status-reporting rule for declaring and resolving waits; bin/jg-brief.sh owns that rule.
 Before doing substantive work, append "working: Codex Desktop thread started".
 ```
 

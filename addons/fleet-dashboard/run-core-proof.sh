@@ -13,7 +13,7 @@ trap 'echo "run-core-proof: stopped at line $LINENO: $BASH_COMMAND" >&2' ERR
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/.." && pwd)
 FM_BIN=${FM_BIN:-$HOME/firstmate/bin}
-[ -f "$FM_BIN/fm-tasks-axi.sh" ] || { echo "run-core-proof: FM_BIN has no fm-tasks-axi.sh: $FM_BIN" >&2; exit 1; }
+[ -f "$FM_BIN/jg-tasks-axi.sh" ] || { echo "run-core-proof: FM_BIN has no jg-tasks-axi.sh: $FM_BIN" >&2; exit 1; }
 home=$(mktemp -d)
 bin=$home/bin
 session=core-journey-$$
@@ -57,7 +57,7 @@ seed() {
 - [ ] m-ready - Start the ready thing (repo: beta) (kind: ship) (priority: 1) (since $today)
   release: next
 - [ ] m-held - Wait for the captain's call (repo: alpha) (kind: ship) (since $held_day) (hold: needs his call) (hold-kind: captain)
-  Resolution recorded by fm-captain-hold.
+  Resolution recorded by jg-captain-hold.
   Decision digest: 0f0f
   Resolution mode: released
   Captain decision:
@@ -119,8 +119,8 @@ PY
   printf 'core-owner-token-%s\n' "$(od -An -N12 -tx1 /dev/urandom | tr -d ' \n')" > "$home/board/board.token"
   printf 'board/board.json\n' > "$home/config/owner-board"
   ln -s "$bin" "$home/alpha/bin"
-  printf 'alpha\n' > "$home/alpha/.fm-secondmate-home"
-  printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$home" > "$home/alpha/.fm-secondmate-parent"
+  printf 'alpha\n' > "$home/alpha/.jg-secondmate-home"
+  printf 'schema=jg-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$home" > "$home/alpha/.jg-secondmate-parent"
   printf -- '- alpha - Owns the alpha screens. (home: %s/alpha; scope: alpha)\n' "$home" > "$home/data/secondmates.md"
   printf 'kind=secondmate\nwindow=core:alpha\nbackend=tmux\n' > "$home/state/alpha.meta"
   printf '## In flight\n- [ ] t-lead - Keep the ask list on top (repo: alpha) (kind: ship) (priority: 1) (since %s)\n' "$today" > "$home/alpha/data/backlog.md"
@@ -130,7 +130,7 @@ PY
 dash() {  # <build|serve> [args]: the dashboard against the seed home, with the stubs first on PATH
   env -u TMUX PATH="$home/stubs:$PATH" HOME="$home" FM_HOME="$home" FM_BIN="$bin" FM_ADDONS_DIR="$root" TMUX_TMPDIR="$home/tmux" \
     FM_DEVICE_LOCK_DIR="$home/locks" FM_DASHBOARD_PROC="$home/proc" FM_MAC_HOST= \
-    bash "$here/fm-dashboard.sh" "$@"
+    bash "$here/jg-dashboard.sh" "$@"
 }
 
 seed
@@ -160,12 +160,12 @@ fi
 if [ "${README_HERO_ONLY:-0}" = 1 ]; then
   chrome-devtools-axi open "$url#/tickets" >/dev/null
   for theme in light dark; do
-    chrome-devtools-axi eval "localStorage.setItem('fm-theme', '$theme')" >/dev/null
+    chrome-devtools-axi eval "localStorage.setItem('jg-theme', '$theme')" >/dev/null
     for width in 390 1280; do
       chrome-devtools-axi resize "$width" 844 >/dev/null
       chrome-devtools-axi open "$url?readme-$theme-$width#/tickets" >/dev/null
       chrome-devtools-axi wait 'Your asks done' >/dev/null
-      chrome-devtools-axi eval 'JSON.stringify({width:innerWidth,text:document.body.innerText,theme:localStorage.getItem("fm-theme")})' >"$DONE_DONE_EVIDENCE_ROOT/hero-$width-$theme.txt"
+      chrome-devtools-axi eval 'JSON.stringify({width:innerWidth,text:document.body.innerText,theme:localStorage.getItem("jg-theme")})' >"$DONE_DONE_EVIDENCE_ROOT/hero-$width-$theme.txt"
       chrome-devtools-axi screenshot "$DONE_DONE_EVIDENCE_ROOT/hero-$width-$theme.png" >/dev/null
     done
   done
@@ -252,12 +252,12 @@ for v in overview insights tickets; do
   chrome-devtools-axi screenshot "$DONE_DONE_EVIDENCE_ROOT/end-$v-390.png" >/dev/null
 done
 # The new Tickets screen in the dark theme too: the stored theme applies on the next full load (a new query string).
-chrome-devtools-axi eval 'localStorage.setItem("fm-theme", "dark")' >/dev/null
+chrome-devtools-axi eval 'localStorage.setItem("jg-theme", "dark")' >/dev/null
 for w in 390 1280; do
   shot "tickets-dark-$w" "?dark-$w#/tickets" "$w" 'Your asks done'
   shot "ticket-page-dark-$w" "?dark-page-$w#/tickets?ticket=main/m-ask" "$w" 'Your words'
 done
-chrome-devtools-axi eval 'localStorage.removeItem("fm-theme")' >/dev/null
+chrome-devtools-axi eval 'localStorage.removeItem("jg-theme")' >/dev/null
 # The app opens on Tickets, and the phone's pill nav has one button per view, each named; the current one shows its name.
 shot landing-390 '?landing' 390 'Your asks done'
 chrome-devtools-axi eval 'JSON.stringify([...document.querySelectorAll(".dock a")].map(a => a.getAttribute("aria-label") + (a.getAttribute("aria-current") ? " (current)" : "")))' >"$DONE_DONE_EVIDENCE_ROOT/landing-dock.txt"
@@ -306,12 +306,12 @@ chrome-devtools-axi eval "document.cookie = 'sign-off-4420=$tok; path=/'" >/dev/
 say main main/m-ask 'Pick the layout that keeps the ask list on top.'
 chrome-devtools-axi wait 'Sent to Main' >/dev/null  # the comment shows in the thread at once
 chrome-devtools-axi screenshot "$DONE_DONE_EVIDENCE_ROOT/ticket-comment-sent-390.png" >/dev/null
-inbox() { env PATH="$home/stubs:$PATH" HOME="$home" FM_HOME="$home" bash "$bin/fm-inbox.sh" "$@"; }
+inbox() { env PATH="$home/stubs:$PATH" HOME="$home" FM_HOME="$home" bash "$bin/jg-inbox.sh" "$@"; }
 note=$(jq -r 'select(.ticket == "main/m-ask") | .note' "$home/state/dashboard/comments.jsonl")
-grep -qF 'Answer the captain in the ticket thread: bin/fm-inbox.sh reply' "$home/state/inbox/$note.note" || { echo "run-core-proof: the comment did not reach Main's inbox with how to answer" >&2; exit 1; }
+grep -qF 'Answer the captain in the ticket thread: bin/jg-inbox.sh reply' "$home/state/inbox/$note.note" || { echo "run-core-proof: the comment did not reach Main's inbox with how to answer" >&2; exit 1; }
 inbox drain --ack "$note" >/dev/null
 inbox reply "$note" "Agreed: the ask list stays on top in both layouts." >/dev/null
-# The lead: the comment goes through fm-send to its endpoint, which rings; the lead picks the steer up (moves it to
+# The lead: the comment goes through jg-send to its endpoint, which rings; the lead picks the steer up (moves it to
 # handled/) and runs the answer command it carries, unchanged, with its own FM_HOME.
 say alpha alpha/t-lead 'Keep the ask list above the fold on a phone.'
 chrome-devtools-axi wait 'Sent to the alpha lead as a steer' >/dev/null
@@ -438,9 +438,9 @@ fi
 
 # A failing flow reader names its cause on Insights instead of a bare "unavailable".
 mkdir "$home/badbin" && for f in "$bin"/*; do ln -s "$(readlink "$f")" "$home/badbin/${f##*/}"; done
-rm -- "$home/badbin/fm-flow.sh" && printf '#!/bin/sh\necho "fm-flow: lane records unreadable" >&2\nexit 3\n' > "$home/badbin/fm-flow.sh"
+rm -- "$home/badbin/jg-flow.sh" && printf '#!/bin/sh\necho "jg-flow: lane records unreadable" >&2\nexit 3\n' > "$home/badbin/jg-flow.sh"
 bin=$home/badbin dash build >/dev/null
-jq -e '.flow == null and .flow_error == "Flow reader unavailable: fm-flow: lane records unreadable"' "$home/state/dashboard/board.json" >/dev/null \
+jq -e '.flow == null and .flow_error == "Flow reader unavailable: jg-flow: lane records unreadable"' "$home/state/dashboard/board.json" >/dev/null \
   || { echo "run-core-proof: flow_error lacks the reader's cause: $(jq -c .flow_error "$home/state/dashboard/board.json")" >&2; exit 1; }
 shot flow-error-390 '?flow-error#/insights' 390 'lane records unreadable'
 
@@ -488,7 +488,7 @@ steps = {
         "Open the held ticket at 390px: its description is the plain decision, with no leftover labels or punctuation",
         "Open Overview at 390px and 1280px: each card names its source; scroll Overview, Insights and Tickets to the end at 390px",
         "With the owner's sign-off board cookie in the browser, write a comment on the ticket and send it to the owning lead (Main here), with no pasted secret",
-        "Pick the note up and reply to it as Main with fm-inbox.sh, and open the ticket thread at 390px and 1280px",
+        "Pick the note up and reply to it as Main with jg-inbox.sh, and open the ticket thread at 390px and 1280px",
         "Comment on the alpha lead's ticket; as the lead, pick the steer up and run the answer command it carries; open that thread at 390px and 1280px",
         "Switch Tickets to By release at 390px and 1280px, then filter it to release v0.2.0",
         "On Metrics at 390px and 1280px, tap the PR + CI stage of the lifecycle rail; tap To land at 1280px",
@@ -502,7 +502,7 @@ steps = {
         "On touch screens 360, 412, 445 and 600px wide and touch tablets 768 and 1024px wide, and with a mouse at 1280px, open Tickets and Needs you and try every control 21px off its centre",
         "Open the first question on Needs you on a phone and a computer, move to the next with J, then with a swipe (phone) or the right arrow (computer), and try past the last; open a question under the Pick type filter",
     ],
-    "result": "The Board lists m-stuck, m-ask, m-ci and m-build with their titles and states; the Stuck tab holds only stuck lanes, the Waiting tab only the waiting lane, and a home with four open lanes against a cap of three reads 4 / 3; Insights shows Why work waits now with the Blocked, Lead reply and Held groups; Tickets puts each backlog item in its column with its priority chip and release, the captain-held item On hold, and only the one ask under Waiting on captain; a ticket page shows its description, the captain's words with their day, and the lane's activity; Overview names the source of every figure, and each page's end clears the tab bar at 390px; the sidebar and the phone dock no longer offer a Ship tab; a post without the owner's board token is refused, the board's cookie lets the page send a comment with no pasted secret, the comment reaches Main's inbox and shows in the ticket thread as sent with Main's pickup and reply under it, and a comment on a lead's ticket reaches that lead's endpoint through fm-send and shows the lead's pickup and its own answer; By release puts alpha's v0.2.0 and beta's next item under Next release, the v0.3.0 item under After and items with no release under Later, and the v0.2.0 filter leaves only its item; the PR + CI stage opens the Board filtered to that stage with a removable Stage chip, and To land opens it filtered to To merge; a failing flow reader shows its own error on Insights; the Metrics Memory card reads 32 GB free of 64 GB and 8.0% pressure, not the 45% spike; Time in stage draws the four open lanes, names Building the bottleneck and its row opens the Building Board; a ticket whose name and body the backlog list cuts shows both whole, with its ask's day and Main message, and the m-ci ticket page shows Receipt PASS · done-done pass · abc1234; the Flow card shows GitHub 2 today, the average before today and that the records hold 0 of 3 of GitHub's earlier merges in 1 repository, with GitHub's count marked on each day of the Landed chart; Needs you shows how many questions wait and one row per question with its type, its age and an Open link to answer it where it was asked; Search opens (a full-screen sheet on a phone, a panel over the page on a computer) with a rounded search field above the matching tickets and lanes in their own groups, each row with its icon and priority chip, and finds the ask's ticket and lane by the word layout; a question opens on its own page with its type, when it was asked, why it is asked and its answers with the suggested one, and prev/next moves through the list in its order with the position (1 of 3, 2 of 3, 3 of 3) in the header, the next arrow off on the last question, and under a type filter only that type (1 of 1); touch screens up to 759px get the phone design with the dock and 14px row titles, touch tablets at 768 and 1024px the computer layout with 44px sidebar rows, and every visible control on Tickets and Needs you takes a 44px tap there, while a mouse at 1280px keeps the 36px rows",
+    "result": "The Board lists m-stuck, m-ask, m-ci and m-build with their titles and states; the Stuck tab holds only stuck lanes, the Waiting tab only the waiting lane, and a home with four open lanes against a cap of three reads 4 / 3; Insights shows Why work waits now with the Blocked, Lead reply and Held groups; Tickets puts each backlog item in its column with its priority chip and release, the captain-held item On hold, and only the one ask under Waiting on captain; a ticket page shows its description, the captain's words with their day, and the lane's activity; Overview names the source of every figure, and each page's end clears the tab bar at 390px; the sidebar and the phone dock no longer offer a Ship tab; a post without the owner's board token is refused, the board's cookie lets the page send a comment with no pasted secret, the comment reaches Main's inbox and shows in the ticket thread as sent with Main's pickup and reply under it, and a comment on a lead's ticket reaches that lead's endpoint through jg-send and shows the lead's pickup and its own answer; By release puts alpha's v0.2.0 and beta's next item under Next release, the v0.3.0 item under After and items with no release under Later, and the v0.2.0 filter leaves only its item; the PR + CI stage opens the Board filtered to that stage with a removable Stage chip, and To land opens it filtered to To merge; a failing flow reader shows its own error on Insights; the Metrics Memory card reads 32 GB free of 64 GB and 8.0% pressure, not the 45% spike; Time in stage draws the four open lanes, names Building the bottleneck and its row opens the Building Board; a ticket whose name and body the backlog list cuts shows both whole, with its ask's day and Main message, and the m-ci ticket page shows Receipt PASS · done-done pass · abc1234; the Flow card shows GitHub 2 today, the average before today and that the records hold 0 of 3 of GitHub's earlier merges in 1 repository, with GitHub's count marked on each day of the Landed chart; Needs you shows how many questions wait and one row per question with its type, its age and an Open link to answer it where it was asked; Search opens (a full-screen sheet on a phone, a panel over the page on a computer) with a rounded search field above the matching tickets and lanes in their own groups, each row with its icon and priority chip, and finds the ask's ticket and lane by the word layout; a question opens on its own page with its type, when it was asked, why it is asked and its answers with the suggested one, and prev/next moves through the list in its order with the position (1 of 3, 2 of 3, 3 of 3) in the header, the next arrow off on the last question, and under a type filter only that type (1 of 1); touch screens up to 759px get the phone design with the dock and 14px row titles, touch tablets at 768 and 1024px the computer layout with 44px sidebar rows, and every visible control on Tickets and Needs you takes a 44px tap there, while a mouse at 1280px keeps the 36px rows",
 }
 with open(sys.argv[1], "w") as f:
     json.dump(steps, f, indent=2, ensure_ascii=False)

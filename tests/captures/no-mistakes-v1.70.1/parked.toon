@@ -1,6 +1,6 @@
 run:
   id: "01M20NDQH0G96AQYH1EHWGKT5F"
-  branch: fm/fm-codex-hook-trust-dialog-undocumented
+  branch: fm/jg-codex-hook-trust-dialog-undocumented
   status: running
   awaiting_agent: parked 2d14h
   head: fb90db9f

@@ -38,7 +38,7 @@ def rows(args, env, cwd=None):
         raise RuntimeError('tasks-axi returned an unreadable or capped task list')
     return result
 
-ICONS = Path(__file__).resolve().parents[1] / 'fleet-dashboard/fm-dashboard/icons'
+ICONS = Path(__file__).resolve().parents[1] / 'fleet-dashboard/jg-dashboard/icons'
 ALIAS = {'firstmate-fork': 'firstmate', 'main': 'firstmate', 'muxr': 'pockit'}  # the dashboard's own project-to-image names
 
 def icon_problem(image):
@@ -69,7 +69,7 @@ def register_icon(board, project, registry):
     return None
 
 def ticket_id(home, item):
-    return "fm-" + hashlib.sha256(f"{home}/{item}".encode()).hexdigest()[:32]
+    return "jg-" + hashlib.sha256(f"{home}/{item}".encode()).hexdigest()[:32]
 
 def sync():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -156,16 +156,16 @@ def sync():
         upkeep_id = ticket_id('fleet', ':upkeep')
         publish(upkeep_id, dict(title=UPKEEP, progress=0, project='', parent='', hold='no', asked='no', state='queued'))
         for tid, old in existing.items():
-            if tid.startswith('fm-') and old['title'].startswith(('Needs a parent', 'Upkeep ·', 'Earlier task grouping')):
+            if tid.startswith('jg-') and old['title'].startswith(('Needs a parent', 'Upkeep ·', 'Earlier task grouping')):
                 publish(tid, dict(title='Earlier task grouping', progress=0, project='', parent=upkeep_id, hold='no', asked='no', state='done'))
-            elif tid.startswith('fm-') and tid != upkeep_id and (old.get('project', '').lower() in INTERNAL or not old.get('asked') and not old.get('parent')):
+            elif tid.startswith('jg-') and tid != upkeep_id and (old.get('project', '').lower() in INTERNAL or not old.get('asked') and not old.get('parent')):
                 publish(tid, dict(project='' if old.get('project', '').lower() in INTERNAL else old.get('project', ''), parent=old.get('parent') or ('' if old.get('asked') else upkeep_id)))
         for name, source in ordered:
             env = {k: v for k, v in os.environ.items() if k not in ('FM_DATA_OVERRIDE', 'FM_ROOT_OVERRIDE', 'TASKS_AXI_FILE', 'TASKS_AXI_BACKEND')}
             env['FM_HOME'] = str(source)
-            reader = ['bash', str(home / 'bin/fm-tasks-axi.sh')]
+            reader = ['bash', str(home / 'bin/jg-tasks-axi.sh')]
             tasks = rows(reader + ['list'], env) + rows(reader + ['list', '--state', 'done'], env)
-            address = run(['bash', '-c', '. "$1/fm-tasks-axi-lib.sh"; . "$1/fm-backlog-transition-lib.sh"; fm_backlog_tasks_axi_addressing "$FM_HOME/data" || exit; printf "%s\\n%s\\n" "$FM_BACKLOG_AXI_ROOT" "$FM_BACKLOG_AXI_FILE"', 'tickets-sync', str(home / 'bin')], env).splitlines()
+            address = run(['bash', '-c', '. "$1/jg-tasks-axi-lib.sh"; . "$1/jg-backlog-transition-lib.sh"; jg_backlog_tasks_axi_addressing "$FM_HOME/data" || exit; printf "%s\\n%s\\n" "$FM_BACKLOG_AXI_ROOT" "$FM_BACKLOG_AXI_FILE"', 'tickets-sync', str(home / 'bin')], env).splitlines()
             root, file = address
             if not file: raise RuntimeError(f'{name}: archive backfill requires markdown addressing')
             settings = {}
@@ -251,7 +251,7 @@ def sync():
                 publish(tid, desired)
         if options.check:
             for tid, old in existing.items():
-                if tid.startswith('fm-') and tid not in seen and (old.get('state') or '') != 'done':
+                if tid.startswith('jg-') and tid not in seen and (old.get('state') or '') != 'done':
                     print(f"tickets-check: {str(old.get('title'))[:70]} ticket says {old.get('state') or 'no state'}, but no home's work accounts for it")
             return
         save(cursor, {})

@@ -20,7 +20,7 @@ It does not replace `secondmate-provisioning`, which owns project clones inside 
 ## Preconditions and registry
 
 Projects live flat under `projects/`, and `data/projects.md` is the private fleet registry.
-Use the registry format and parser contract owned by the header of `bin/fm-project-mode.sh`.
+Use the registry format and parser contract owned by the header of `bin/jg-project-mode.sh`.
 Keep each registry description useful for identifying the project, but keep delivery posture, captain-private state, and detailed project knowledge in their existing designated homes.
 Do not turn the registry into project documentation.
 
@@ -55,12 +55,12 @@ Default it off for every project and every posture, and enable it only on the ca
 
 The optional `forge=` token records which forge the project's remote actually is; its values are `forge=gerrit` and `forge=forgejo`.
 It is orthogonal to the mode and to `+yolo`, so it is never derived from either, and it is never inferred at use time from a remote name, host, port, or push target.
-At add or create intake, run `bin/fm-forge-detect.sh projects/<name>` once the clone exists and propose its answer alongside the posture; the captain's confirmation is what binds it, and the registry token is the durable record of that confirmation.
+At add or create intake, run `bin/jg-forge-detect.sh projects/<name>` once the clone exists and propose its answer alongside the posture; the captain's confirmation is what binds it, and the registry token is the durable record of that confirmation.
 Never register the binding from detection alone, and never re-derive it later from the clone.
-`bin/fm-forge-detect.sh` never proposes `forge=forgejo`, so for a remote that may be Forgejo or Gitea ask the captain and register `forge=forgejo` only on that confirmation.
+`bin/jg-forge-detect.sh` never proposes `forge=forgejo`, so for a remote that may be Forgejo or Gitea ask the captain and register `forge=forgejo` only on that confirmation.
 A forge composes with `no-mistakes`, `direct-PR`, and `no-mistakes-prod-only`, and the registry refuses it on `local-only`, which publishes nothing; a Gerrit-hosted project kept local registers `local-only` with no forge token.
 `yolo` is inactive on a `forge=gerrit` project, so never propose `+yolo` alongside it.
-`bin/fm-project-mode.sh`'s header owns the binding and `bin/fm-dod-lib.sh` owns what it changes for a worker.
+`bin/jg-project-mode.sh`'s header owns the binding and `bin/jg-dod-lib.sh` owns what it changes for a worker.
 
 ## Add or clone an existing project
 

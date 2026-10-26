@@ -21,7 +21,7 @@ Test: `bash claude-accounts/tests/claude-accounts.test.sh`.
 
 ## Automatic account choice for new workers
 
-`bin/claude-accounts-pick` is a `config/account-pool` command used by fm-spawn and relaunch.
+`bin/claude-accounts-pick` is a `config/account-pool` command used by jg-spawn and relaunch.
 It spreads new Claude and Codex assignments in proportion to headroom; its header documents the smooth weighting, recent-assignment window, locking, quota floor and quota-verified rest policy.
 Each provider uses its own registry accounts and `<provider>-accounts.json` reading, with `account-assignments.json` in the pool state folder shared by callers.
 The reader accepts `FM_ACCOUNTS_PROVIDER=codex` to refresh Codex quota, including its weekly window.
@@ -36,6 +36,6 @@ Test: `bash claude-accounts/tests/claude-accounts-pick.test.sh`.
 
 ## Refresh timer
 
-`install-timer.sh [--dry-run] <home>` installs a systemd user timer (`fm-claude-accounts-quota.timer`) that runs the reader every 5 minutes for that home, so the dashboard card and `state/claude-accounts.json` stay current; `--dry-run` prints what would be written. It copies the reader to `~/.local/share/fm-claude-accounts/` and enables the timer only when something changed. Remove with `uninstall-timer.sh`. Install from merged main only.
+`install-timer.sh [--dry-run] <home>` installs a systemd user timer (`jg-claude-accounts-quota.timer`) that runs the reader every 5 minutes for that home, so the dashboard card and `state/claude-accounts.json` stay current; `--dry-run` prints what would be written. It copies the reader to `~/.local/share/jg-claude-accounts/` and enables the timer only when something changed. Remove with `uninstall-timer.sh`. Install from merged main only.
 
 Test: `bash claude-accounts/tests/claude-accounts-timer.test.sh`.

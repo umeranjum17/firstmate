@@ -2,7 +2,7 @@
 
 ## User outcome
 
-Dispatch `quota-axi --json` Claude runway matches `fm-model-pool`'s account reading. Install over an existing foreign `~/.local/bin/quota-axi` symlink records its resolved target as upstream and restores that link on uninstall.
+Dispatch `quota-axi --json` Claude runway matches `jg-model-pool`'s account reading. Install over an existing foreign `~/.local/bin/quota-axi` symlink records its resolved target as upstream and restores that link on uninstall.
 
 ## Drive
 

@@ -78,7 +78,7 @@ The [reference](docs/addons-reference.md) covers hooks, platform requirements, r
 ## Proof you can inspect
 
 The [pull-request CI workflow](.github/workflows/addons-ci.yml) runs shell checks and executable integration journeys against disposable homes.
-For example, [the memory-gate journey](host-memory/tests/fm-mem-gate.test.sh) exercises waiting and release under changing memory readings without starting a heavy job.
+For example, [the memory-gate journey](host-memory/tests/jg-mem-gate.test.sh) exercises waiting and release under changing memory readings without starting a heavy job.
 The [Lookout Overview hero journey](docs/capture-lookout-hero.sh) captures phone and desktop views from a live Lookout (or from lookout-adapter into a Lookout clone).
 
 ## Setup and limits

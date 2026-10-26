@@ -162,7 +162,7 @@ function escalate(row) {
 	});
 	if (recent.length < 2) return;
 	const reason = `check: delete guard REPEAT: ${row.task ? "task " + row.task : "an agent in " + row.cwd} tried ${recent.length} blocked recursive deletes in ${REPEAT_SECS / 60} min (home ${row.home || "?"}, ${row.runtime}); latest: ${row.command.slice(0, 200)} - stop that task and check it`;
-	const wake = spawnSync("bash", ["-c", '. "$1/bin/fm-wake-lib.sh" && fm_wake_append check delete-guard "$2"', "_", home, reason],
+	const wake = spawnSync("bash", ["-c", '. "$1/bin/jg-wake-lib.sh" && jg_wake_append check delete-guard "$2"', "_", home, reason],
 		{ env: { PATH: process.env.PATH, FM_HOME: home }, stdio: ["ignore", "ignore", "pipe"] });
 	if (wake.status !== 0) throw new Error(`repeat wake failed: ${wake.stderr}`);
 }
@@ -175,7 +175,7 @@ export function guard(command, { cwd = process.cwd(), runtime = "unknown" } = {}
 	// The true home: the firstmate home holding cwd (the lane the command ran in, even when an inbox or FM_HOME from
 	// elsewhere is inherited), else the task's inbox, else FM_HOME.
 	let home = "";
-	for (let d = resolve(cwd); !home && d !== "/"; d = dirname(d)) if (existsSync(`${d}/bin/fm-wake-lib.sh`) && existsSync(`${d}/state`)) home = d;
+	for (let d = resolve(cwd); !home && d !== "/"; d = dirname(d)) if (existsSync(`${d}/bin/jg-wake-lib.sh`) && existsSync(`${d}/state`)) home = d;
 	if (!home && env.FM_TASK_INBOX) home = dirname(dirname(env.FM_TASK_INBOX));
 	home = home || env.FM_HOME || "";
 	const row = { at: new Date().toISOString(), home, task: env.FM_TASK_ID || "", cwd, runtime, target, command: loggedCommand(command, target) };

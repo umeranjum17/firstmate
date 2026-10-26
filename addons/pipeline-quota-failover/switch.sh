@@ -14,7 +14,7 @@
 # written next to the config first. A real request on the model must answer
 # before the edit is kept; otherwise the backup is restored.
 #
-# With neither --agent nor --model, the route comes from fm-model-pool pick
+# With neither --agent nor --model, the route comes from jg-model-pool pick
 # (Claude above the eligibility floor, else Sol then Goat then Cursor auto).
 # Explicit --agent/--model keep the old pin. Never hand-edit the live config.
 #
@@ -55,13 +55,13 @@ done
 
 [ -f "$config" ] || die "no no-mistakes config at $config"
 
-# Resolve fm-model-pool and map a pick onto agent + model when the caller did not pin either.
+# Resolve jg-model-pool and map a pick onto agent + model when the caller did not pin either.
 model_pool=${PI_QUOTA_FAILOVER_MODEL_POOL:-}
 if [ -z "$model_pool" ]; then
   for cand in \
-    "$(cd "$(dirname "$0")/.." 2>/dev/null && pwd)/account-pool/bin/fm-model-pool" \
-    "${FM_ADDONS_DIR:+$FM_ADDONS_DIR/account-pool/bin/fm-model-pool}" \
-    "${FM_HOME:+$FM_HOME/projects/firstmate-addons/account-pool/bin/fm-model-pool}"; do
+    "$(cd "$(dirname "$0")/.." 2>/dev/null && pwd)/account-pool/bin/jg-model-pool" \
+    "${FM_ADDONS_DIR:+$FM_ADDONS_DIR/account-pool/bin/jg-model-pool}" \
+    "${FM_HOME:+$FM_HOME/projects/firstmate-addons/account-pool/bin/jg-model-pool}"; do
     [ -n "${cand:-}" ] && [ -x "$cand" ] && { model_pool=$cand; break; }
   done
 fi
@@ -69,7 +69,7 @@ pool_sel=''
 if [ "$agent_set" = 0 ] && [ "$model_set" = 0 ] && [ -n "$pool_config" ] && [ -f "$pool_config" ] && [ -n "$model_pool" ]; then
   req=$(jq -nc --arg p "$pool_config" '{v:1,purpose:"work",pool_config:$p,capabilities:["text"],attempted:[]}')
   pool_sel=$(printf '%s' "$req" | timeout 120 "$model_pool" pick --json 2>/dev/null) || pool_sel=''
-  jq -e '.ok == true' <<<"$pool_sel" >/dev/null 2>&1 || die "fm-model-pool pick refused: $(jq -r '.reason // "no answer"' <<<"${pool_sel:-}" 2>/dev/null)"
+  jq -e '.ok == true' <<<"$pool_sel" >/dev/null 2>&1 || die "jg-model-pool pick refused: $(jq -r '.reason // "no answer"' <<<"${pool_sel:-}" 2>/dev/null)"
   harness=$(jq -r '.harness // empty' <<<"$pool_sel")
   m=$(jq -r '.model // empty' <<<"$pool_sel")
   case $harness in
@@ -79,9 +79,9 @@ if [ "$agent_set" = 0 ] && [ "$model_set" = 0 ] && [ -n "$pool_config" ] && [ -f
       ;;
     codex) agent=codex; model=$m ;;
     opencode|cursor) agent=pi; model=$m ;;
-    *) die "fm-model-pool returned unsupported harness=$harness" ;;
+    *) die "jg-model-pool returned unsupported harness=$harness" ;;
   esac
-  echo "fm-model-pool pick id=$(jq -r '.selection_id // .id' <<<"$pool_sel") -> agent=$agent model=$model"
+  echo "jg-model-pool pick id=$(jq -r '.selection_id // .id' <<<"$pool_sel") -> agent=$agent model=$model"
 fi
 
 if [ "$restore" = 1 ]; then

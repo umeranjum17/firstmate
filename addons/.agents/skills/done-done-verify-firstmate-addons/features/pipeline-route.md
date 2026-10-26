@@ -2,7 +2,7 @@
 
 ## User outcome
 
-With a pool, `fm-model-pool` pick/next chooses the Claude account (A=70% before B=40%) or Sol → Goat → Cursor auto when every Claude account is under the eligibility floor; without a pool the chain stays Claude Haiku through claude-bridge. A limit moves inside the same call and never falls back to the default login.
+With a pool, `jg-model-pool` pick/next chooses the Claude account (A=70% before B=40%) or Sol → Goat → Cursor auto when every Claude account is under the eligibility floor; without a pool the chain stays Claude Haiku through claude-bridge. A limit moves inside the same call and never falls back to the default login.
 
 ## Drive
 

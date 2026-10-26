@@ -9,9 +9,9 @@
 // captain-facing contract and docs/calm-mode-feasibility.md the version-scoped evidence.
 //
 // This file is the only place the engine interface `$` is touched: the geometry lives
-// in ../lib/fm-calm-working-ship-sprite.ts (shared with the Pi extension), the Raster
-// packing in ../lib/fm-calm-ship-raster.ts, and every visibility decision in
-// ../lib/fm-calm-presentation.ts, so the policy is testable under Node and the engine
+// in ../lib/jg-calm-working-ship-sprite.ts (shared with the Pi extension), the Raster
+// packing in ../lib/jg-calm-ship-raster.ts, and every visibility decision in
+// ../lib/jg-calm-presentation.ts, so the policy is testable under Node and the engine
 // glue under `claude plugin test`. Nothing here rewrites a message: `ui.render` changes
 // drawings and leaves the stored transcript, model context, and session storage alone.
 //
@@ -34,7 +34,7 @@
 // replays the outcomes unread or unprocessed at `session.start` that this session has
 // not already shown. The mod only reads the Firstmate home: the drain remains the one
 // presenter that marks outcomes read.
-// ../lib/fm-branch-notes.ts owns every line and which rows are due.
+// ../lib/jg-branch-notes.ts owns every line and which rows are due.
 //
 // Loading is lazy and cached within a session: a resumed transcript or a hot reload can
 // draw restored rows before `session.start`, so every hook awaits that session's load of
@@ -44,7 +44,7 @@ import type { EngineInterface, Register, RenderElement, RenderInput } from "clau
 import {
   CALM_WORKING_SHIP_TICK_MS,
   createCalmWorkingShipSprite,
-} from "../lib/fm-calm-working-ship-sprite.ts";
+} from "../lib/jg-calm-working-ship-sprite.ts";
 import {
   CALM_SHIP_RASTER_KEY,
   CALM_SHIP_RASTER_PALETTES,
@@ -52,7 +52,7 @@ import {
   calmShipRasterColumns,
   packCalmShipRasterCells,
   type CalmShipRasterPalette,
-} from "../lib/fm-calm-ship-raster.ts";
+} from "../lib/jg-calm-ship-raster.ts";
 import {
   calmPreferencePath,
   parseCalmPreference,
@@ -63,7 +63,7 @@ import {
   userTextIsOperational,
   userTextOperationalRecord,
   workingNoteKey,
-} from "../lib/fm-calm-presentation.ts";
+} from "../lib/jg-calm-presentation.ts";
 import {
   firstmateStateDirectory,
   hostHealthNote,
@@ -75,7 +75,7 @@ import {
   replayOutcomeNotes,
   sessionShownThrough,
   type HostHealth,
-} from "../lib/fm-branch-notes.ts";
+} from "../lib/jg-branch-notes.ts";
 
 /** The slash command the mod serves, the same name as Pi's `/calm`. */
 const CALM_COMMAND = "calm";

@@ -1,41 +1,14 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
-# fm-path-lib.sh - fork-free pathname helpers with no source-time side effects,
-# so read-only callers can load them without any library's state setup.
-#
-# Each assigns <output-variable> exactly what `$(dirname -- <path>)` or
-# `$(basename -- <path>)` would: POSIX component rules, and the command
-# substitution's removal of trailing newlines.
-
-fm_dirname_to() {  # <output-variable> <path>
-  local fm_path=$2
-  case "$fm_path" in
-    '') fm_path=. ;;
-    *[!/]*)
-      fm_path=${fm_path%"${fm_path##*[!/]}"}
-      case "$fm_path" in
-        */*)
-          fm_path=${fm_path%/*}
-          fm_path=${fm_path%"${fm_path##*[!/]}"}
-          [ -n "$fm_path" ] || fm_path=/
-          ;;
-        *) fm_path=. ;;
-      esac
-      ;;
-    *) fm_path=/ ;;
-  esac
-  while [ "${fm_path%$'\n'}" != "$fm_path" ]; do fm_path=${fm_path%$'\n'}; done
-  printf -v "$1" '%s' "$fm_path"
-}
-
-fm_basename_to() {  # <output-variable> <path>
-  local fm_path=$2
-  case "$fm_path" in
-    '') ;;
-    *[!/]*) fm_path=${fm_path%"${fm_path##*[!/]}"}; fm_path=${fm_path##*/} ;;
-    *) fm_path=/ ;;
-  esac
-  while [ "${fm_path%$'\n'}" != "$fm_path" ]; do fm_path=${fm_path%$'\n'}; done
-  printf -v "$1" '%s' "$fm_path"
-}
+# alias shim (slice S3, deleted by slice S10): still called by live homes,
+# watchers, panes, generated per-lane extensions, and persisted records that
+# resolved this path before the rename. Executed it runs the renamed script;
+# sourced it loads the renamed library, because a library reached through its
+# old path must not exec a shell.
+set -u
+_jg_alias_dir=$(dirname "${BASH_SOURCE[0]}")
+_jg_alias_new="$_jg_alias_dir/jg-path-lib.sh"
+if [ "${BASH_SOURCE[0]}" != "$0" ]; then
+  . "$_jg_alias_new"
+else
+  exec "$_jg_alias_new" "$@"
+fi

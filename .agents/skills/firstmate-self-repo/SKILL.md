@@ -41,24 +41,24 @@ Only the operator may opt the primary home in; follow the [Juggernaut role schem
 
 ### One-task contribution consent (bounded)
 
-When the captain explicitly approves one specific upstream contribution, record it on that task only: `--upstream-consent <host>/<owner>/<repo>` on `bin/fm-brief.sh`, `bin/fm-spawn.sh`, and `bin/fm-promote.sh`.
+When the captain explicitly approves one specific upstream contribution, record it on that task only: `--upstream-consent <host>/<owner>/<repo>` on `bin/jg-brief.sh`, `bin/jg-spawn.sh`, and `bin/jg-promote.sh`.
 Consent renders as an `upstream-consent=` token on the brief's `Delivery contract:` line, is recorded in `state/<id>.meta`, and a relaunch reuses the recorded value.
 It changes the home's persistent role in no way; the next task is gated fresh.
 The captain's approval must be a current explicit instruction naming the contribution - never an inference from the task resembling maintainer work.
 
 ## Where the boundary is enforced
 
-The gate is code, not memory: `bin/fm-role-lib.sh`'s `fm_role_gate_self_publish` applies the [lineage and publication-target policy](../../../docs/configuration.md#juggernaut-role-configfirstmate-role) to publishing contracts.
+The gate is code, not memory: `bin/jg-role-lib.sh`'s `jg_role_gate_self_publish` applies the [lineage and publication-target policy](../../../docs/configuration.md#juggernaut-role-configfirstmate-role) to publishing contracts.
 
-- `bin/fm-brief.sh --project <dir>` refuses to scaffold a publishing ship brief the home cannot authorize.
-- `bin/fm-spawn.sh` refuses to launch a ship task on this repository without a maintainer scope or matching task consent, and refuses a brief whose `upstream-consent=` disagrees with the flag.
-- `bin/fm-promote.sh` applies the same gate to scout promotion so the in-place path grants no more than a fresh spawn.
+- `bin/jg-brief.sh --project <dir>` refuses to scaffold a publishing ship brief the home cannot authorize.
+- `bin/jg-spawn.sh` refuses to launch a ship task on this repository without a maintainer scope or matching task consent, and refuses a brief whose `upstream-consent=` disagrees with the flag.
+- `bin/jg-promote.sh` applies the same gate to scout promotion so the in-place path grants no more than a fresh spawn.
 - `local-only` publishes nothing, so it never needs authority and never takes consent.
 
 An authorized contribution then flows through the task's normal delivery contract - usually no-mistakes - like any other project; the grant answers only "may this publish", never "how".
 
 A gate refusal names the exact remedy: write `maintainer <scope>` into `config/firstmate-role`, or pass `--upstream-consent <scope>` for that one task with the captain's explicit approval.
-Never work around a refusal by pointing the task at a second checkout, fork, or parent clone; `fm_role_self_repo` treats every repository sharing Juggernaut's lineage as Juggernaut's own.
+Never work around a refusal by pointing the task at a second checkout, fork, or parent clone; `jg_role_self_repo` treats every repository sharing Juggernaut's lineage as Juggernaut's own.
 
 ## Updating is not contributing
 

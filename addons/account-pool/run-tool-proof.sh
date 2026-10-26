@@ -20,9 +20,9 @@ printf '{"structured_output":{}}\n'
 SH
 chmod +x "$work/bin/"*
 printf 'command=%s\nstate=%s\n' "$work/bin/pick" "$work" >"$FM_HOME/config/account-pool"
-# shellcheck source=account-pool/bin/fm-pool-claude-env.sh
-. "$repo/account-pool/bin/fm-pool-claude-env.sh"
-fm_pool_claude_env
+# shellcheck source=account-pool/bin/jg-pool-claude-env.sh
+. "$repo/account-pool/bin/jg-pool-claude-env.sh"
+jg_pool_claude_env
 export FIXTURE_CLAUDE=$work/bin/claude
 # Resolve the real installed package without reading its user config or credentials.
 export DONE_DONE_DIST

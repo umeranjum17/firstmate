@@ -2,7 +2,7 @@
 
 This document is the maintainer-architecture owner for the package manifest, enabled binding, handshake, invocation envelope, trust boundary, and `process-event-adapter/1` capability.
 [`configuration.md`](configuration.md#trusted-external-process-event-adapters-configextensionsd) owns operator setup and the home-local layout.
-`bin/fm-extension.sh --help` and `bin/fm-procevent.sh --help` own command mechanics.
+`bin/jg-extension.sh --help` and `bin/jg-procevent.sh --help` own command mechanics.
 
 ## Scope and design
 
@@ -30,7 +30,7 @@ A captured external result therefore remains unhandled until the existing Jugger
 Discovery reads only regular mode-`0600` JSON files in the effective home's mode-`0700` `config/extensions.d/` directory.
 The effective home follows the repository convention of `FM_HOME`, then `FM_ROOT_OVERRIDE`, then the tracked Juggernaut root, but no environment value names a package or binding inside that home.
 The current directory, project files, task copies, worker text, Pi packages, and package-manager metadata are never searched.
-A package cannot bind an adapter name already owned by an installed `bin/fm-procevent-<adapter>.sh` built-in.
+A package cannot bind an adapter name already owned by an installed `bin/jg-procevent-<adapter>.sh` built-in.
 If a later Juggernaut release adds the same built-in name, already captured extension evidence retains its immutable package owner and is never reinterpreted by that built-in; the pinned extension registration remains explicit until owner-matched retirement.
 
 `bind` takes one explicit package directory outside the active home and outside every Git project or task copy.
@@ -219,7 +219,7 @@ The host runs in the Juggernaut home that owns the source, never in a task worke
 Claude, Codex, OpenCode, Pi, pi-signed, Grok, Kimi, Cursor, Muse, and Rovo therefore expose no package-loading surface for this capability.
 The result reaches every supported primary through the existing bounded `check` wake path, including the unknown-protocol fallback used where no specialized primary continuation exists.
 The tmux, Herdr, Zellij, Orca, and cmux session providers are not consulted because a process-event source has no task endpoint.
-Remote and local secondmate homes bind and install independently, and the primary never executes a missing remote-home package locally. `remote-bind` carries one canonical `firstmate.extension-package-transfer.v1` JSON envelope over the existing bounded `fm-on` stdin/stdout job. Its hashed manifest pins the extension id, version, complete package-tree digest, entry count, total bytes, and byte-sorted entries. Entries are limited to normalized relative directories at mode 0755 and single regular files at mode 0644 or 0755, each with an exact size and SHA-256 payload digest. The receiver accepts at most 128 entries, 256 KiB per file, 512 KiB of package bytes, and 900,000 serialized bytes; it rejects malformed or truncated JSON, duplicate keys or paths, collisions, absolute or traversing names, links and special files, noncanonical modes, hash or size mismatches, and duplicate transfer identities.
+Remote and local secondmate homes bind and install independently, and the primary never executes a missing remote-home package locally. `remote-bind` carries one canonical `firstmate.extension-package-transfer.v1` JSON envelope over the existing bounded `jg-on` stdin/stdout job. Its hashed manifest pins the extension id, version, complete package-tree digest, entry count, total bytes, and byte-sorted entries. Entries are limited to normalized relative directories at mode 0755 and single regular files at mode 0644 or 0755, each with an exact size and SHA-256 payload digest. The receiver accepts at most 128 entries, 256 KiB per file, 512 KiB of package bytes, and 900,000 serialized bytes; it rejects malformed or truncated JSON, duplicate keys or paths, collisions, absolute or traversing names, links and special files, noncanonical modes, hash or size mismatches, and duplicate transfer identities.
 
 The receiver creates the package in a private temporary directory below `data/extensions/staging`, validates ownership, permissions, the package manifest, executable, and complete reconstructed tree, then atomically publishes the transfer before the normal bind handshake and binding publication.
 A failed bind moves the exact transfer identity into `data/extensions/retired-staging` without enabling it.
@@ -234,4 +234,4 @@ Bindings and credentials are deliberately absent from the inherited secondmate c
 [`examples/process-event-extension`](examples/process-event-extension) is a complete external `file-signal` adapter package.
 It waits for one configured absolute file, returns that file's bounded UTF-8 contents as evidence, classifies the result as `file-signal`, and reports it terminal.
 The package is intentionally copied outside this Git project before binding, proving that project-local package discovery is not a registration path.
-The operator commands live in [`configuration.md`](configuration.md#trusted-external-process-event-adapters-configextensionsd), and `tests/fm-extension-binding.test.sh` runs the complete example path.
+The operator commands live in [`configuration.md`](configuration.md#trusted-external-process-event-adapters-configextensionsd), and `tests/jg-extension-binding.test.sh` runs the complete example path.

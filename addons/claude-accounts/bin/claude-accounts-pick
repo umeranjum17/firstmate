@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # claude-accounts-pick - config/account-pool's `command=` for a home that spreads new Claude workers over
-# every signed-in Claude account. fm-spawn runs `<command> pick <tool> --json [--prefer <id>] --state <dir>`
+# every signed-in Claude account. jg-spawn runs `<command> pick <tool> --json [--prefer <id>] --state <dir>`
 # for each new worker; the answer names one existing profile folder for CLAUDE_CONFIG_DIR and the credential
 # variable names to unset (names only). Smooth weighted round robin picks the largest assignment
 # deficit (runway share * next assignment number - recent count) within each provider's best tier.
@@ -9,7 +9,7 @@
 # - Launch admission: FM_CLAUDE_ACCOUNTS_LOW (default 5%). An account under that percent is skipped
 #   for new worker launches, so new workers go to the other account when one runs low.
 # - Verified rest / tool eligibility: FM_ACCOUNT_POOL_REST_FLOOR (default 15%). `rest` and
-#   account-pool/bin/fm-model-pool use that higher floor so tools rotate off an account earlier than
+#   account-pool/bin/jg-model-pool use that higher floor so tools rotate off an account earlier than
 #   spawn admission would. Do not silently treat 5% and 15% as one policy.
 # A running worker is never moved: the pick only happens at launch. Claude and Codex use their own
 # registry roster and quota reading; Codex keeps its ambient folder only when no Codex registry

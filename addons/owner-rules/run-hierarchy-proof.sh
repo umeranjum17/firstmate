@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Drive the hierarchy rule through the fork's real fm-brief.sh and record the done-done journey.
+# Drive the hierarchy rule through the fork's real jg-brief.sh and record the done-done journey.
 set -euo pipefail
 repo=$(cd "$(dirname "$0")/.." && pwd)
 fork=${FM_TEST_FORK:-}
-[ -n "$fork" ] && [ -x "$fork/bin/fm-brief.sh" ] \
+[ -n "$fork" ] && [ -x "$fork/bin/jg-brief.sh" ] \
   || { echo "owner-rules hierarchy proof: set FM_TEST_FORK to a Firstmate checkout with the brief-inherit seam" >&2; exit 1; }
 [ -n "${DONE_DONE_EVIDENCE_ROOT:-}" ] && [ -n "${DONE_DONE_RUN_ID:-}" ] \
   || { echo "owner-rules hierarchy proof: run through done-done" >&2; exit 1; }

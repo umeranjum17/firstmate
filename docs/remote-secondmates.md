@@ -21,10 +21,10 @@ Juggernaut does not support placing an individual worker remotely or failing a r
 
 ## Where the remote agent runs
 
-The remote second-mate agent itself always runs on the [Herdr backend](herdr-backend.md) in the shared `fm-remote` session.
+The remote second-mate agent itself always runs on the [Herdr backend](herdr-backend.md) in the shared `jg-remote` session.
 Every path that provisions or launches one refuses a host that is not ready for it.
 
-- `fm-remote` is reserved for remote fleet work and must not be used for personal work.
+- `jg-remote` is reserved for remote fleet work and must not be used for personal work.
 - The user's interactive Herdr session remains `default` and is not a remote-secondmate prerequisite.
 - Herdr's remote-session server belongs to the host's own GUI login session rather than to the SSH connection.
   As a result, the agent's endpoint survives every disconnection the primary's supervision depends on.
@@ -39,12 +39,12 @@ Every path that provisions or launches one refuses a host that is not ready for 
 2. Use ordinary public-key authentication, strict host-key verification, and a dedicated remote account where practical.
 3. Do not enable agent forwarding for Juggernaut.
 
-`fm-on.sh` adds its own protections:
+`jg-on.sh` adds its own protections:
 
 - On every call, it also disables agent forwarding, forwarding setup, and configured `SendEnv` patterns.
 - It arms bounded SSH dead-peer detection, so a vanished host (a reboot, a dropped link) fails within a bounded window instead of hanging indefinitely.
 
-Its [script header](../bin/fm-on.sh) owns the keepalive defaults and environment overrides.
+Its [script header](../bin/jg-on.sh) owns the keepalive defaults and environment overrides.
 
 ### Remote clone and entrypoint
 
@@ -53,10 +53,10 @@ Its [script header](../bin/fm-on.sh) owns the keepalive defaults and environment
 
 ```sh
 mkdir -p ~/.local/bin
-ln -s /absolute/path/to/firstmate/bin/fm-remote-entrypoint.sh ~/.local/bin/fm-remote-entrypoint.sh
+ln -s /absolute/path/to/firstmate/bin/jg-remote-entrypoint.sh ~/.local/bin/jg-remote-entrypoint.sh
 ```
 
-The entrypoint accepts encoded argv for genuine executable `bin/fm-*.sh` files only.
+The entrypoint accepts encoded argv for genuine executable `bin/jg-*.sh` files only.
 It never accepts a shell command string.
 
 ### Doctor bootstrap over plain SSH
@@ -79,18 +79,18 @@ Each such command takes these steps:
 4. It relays stdout, stderr, and the exit status separately.
 
 On macOS the worker is `dev.firstmate.remote-job`, an Aqua-scoped LaunchAgent at `~/Library/LaunchAgents/dev.firstmate.remote-job.plist` with logs under `~/Library/Logs/`.
-After that bootstrap, every non-doctor `fm-on.sh` target runs through that worker in the remote account's GUI session.
+After that bootstrap, every non-doctor `jg-on.sh` target runs through that worker in the remote account's GUI session.
 It never runs in the SSH process or a Herdr pane.
 Linux uses the same queue and worker protocol without the Aqua-session requirement.
-The [`fm-remote-job-worker.sh` header](../bin/fm-remote-job-worker.sh) owns dispatch cadence and the quiet-scan latency for work arriving after its post-activity burst.
-Active-command and result waits use a separate sampling interval; the [`fm-remote-job-lib.sh` header](../bin/fm-remote-job-lib.sh) owns its defaults, overrides, and completion, cancellation, and timeout latency contract.
+The [`jg-remote-job-worker.sh` header](../bin/jg-remote-job-worker.sh) owns dispatch cadence and the quiet-scan latency for work arriving after its post-activity burst.
+Active-command and result waits use a separate sampling interval; the [`jg-remote-job-lib.sh` header](../bin/jg-remote-job-lib.sh) owns its defaults, overrides, and completion, cancellation, and timeout latency contract.
 
 On macOS, worker repair serializes the replacement decision and LaunchAgent reload with other callers, including its bounded startup wait.
 A live process tracked by launchd gets time to publish readiness even if the caller that started it disconnected before publication.
 Reload waits for launchd to finish removing the old service before bootstrap, with at most 100 sleeps of 0.1 seconds plus command and scheduling time; a timeout fails the repair instead of bootstrapping during removal.
 A verified lock owner running stale code or no longer tracked by launchd is stopped identity-safely before launchd starts the current worker.
 If readiness remains stale while a verified current, launchd-tracked lock owner is alive, the command fails with `remote-job: ready heartbeat stale while verified worker lock owner is alive` rather than reloading that worker merely for the stale heartbeat.
-The repair invariant is implemented in [`fm_remote_job_repair_launchagent`](../bin/fm-remote-job-lib.sh); heartbeat ownership and cadence are documented in the worker header above.
+The repair invariant is implemented in [`jg_remote_job_repair_launchagent`](../bin/jg-remote-job-lib.sh); heartbeat ownership and cadence are documented in the worker header above.
 
 The independent heartbeat and live-owner check build on [Diabl0570's contribution](https://github.com/kunchenguid/firstmate/pull/6217), alongside [gearhead924's supervisor-multiplication work](https://github.com/kunchenguid/firstmate/pull/5851), addressing [remote reply reliability](https://github.com/kunchenguid/firstmate/issues/2921).
 
@@ -98,18 +98,18 @@ The independent heartbeat and live-owner check build on [Diabl0570's contributio
 
 The worker serves one lane per staged home:
 
-- Jobs for the same home follow the staging-order contract owned by [`bin/fm-remote-job-lib.sh`](../bin/fm-remote-job-lib.sh).
+- Jobs for the same home follow the staging-order contract owned by [`bin/jg-remote-job-lib.sh`](../bin/jg-remote-job-lib.sh).
 - Different homes' lanes run concurrently, so one home's long job never delays another home's commands.
 
 Within a home's lane, the worker preempts a running reply long-poll on its next queue check when any command other than another reply long-poll is queued for that home.
 As a result, interactive commands and startup checks are never serialized behind a poll window.
 
-`bin/fm-remote-job-lib.sh` owns that preemption contract.
+`bin/jg-remote-job-lib.sh` owns that preemption contract.
 It distinguishes preemption from a wait window that closes with no data:
 
 - Only a genuinely quiet window proves channel freshness.
 - Either outcome can re-arm without losing data.
-- The parent's reply listener polls again under the same claim after either one, so a same-home command such as the per-cycle liveness probe never tears the listener down; [`bin/fm-procevent-remote-reply.sh`](../bin/fm-procevent-remote-reply.sh) owns that mapping.
+- The parent's reply listener polls again under the same claim after either one, so a same-home command such as the per-cycle liveness probe never tears the listener down; [`bin/jg-procevent-remote-reply.sh`](../bin/jg-procevent-remote-reply.sh) owns that mapping.
 
 ### Cancelled and orphaned jobs
 
@@ -122,7 +122,7 @@ A caller cancels its job instead of abandoning it when, before the job completes
 As a result, retries never convoy behind abandoned work.
 
 A worker stops itself once its configured code root stops being a Juggernaut checkout, so a worker started from a worktree cannot outlive that worktree.
-`bin/fm-remote-job-reap-orphans.sh` clears any worker already left behind that way.
+`bin/jg-remote-job-reap-orphans.sh` clears any worker already left behind that way.
 It never touches a worker whose checkout still exists.
 
 ### What the remote account must provide
@@ -135,7 +135,7 @@ It never touches a worker whose checkout still exists.
 
 Remote job execution never runs a login or interactive shell.
 So `~/.profile`, `~/.bashrc`, and `~/.zshrc` never contribute to the job worker's runtime `PATH`.
-`bin/fm-remote-job-lib.sh` is the single owner of the worker `PATH`.
+`bin/jg-remote-job-lib.sh` is the single owner of the worker `PATH`.
 It builds the `PATH` by filesystem discovery rather than by evaluating shell startup files.
 
 ### Worker PATH order
@@ -179,7 +179,7 @@ Other final-component symlink directories, including `~/.local/bin`, are exclude
 ### Stale Herdr clients
 
 Because `~/.local/bin` precedes the package-manager directories, a stale self-updated `herdr` there shadows the one the account's login shell may resolve.
-The Herdr adapter steps around a client the running server refuses, and `fm-remote-doctor.sh` names which client it selected ([`herdr-backend.md`](herdr-backend.md#client-selection)).
+The Herdr adapter steps around a client the running server refuses, and `jg-remote-doctor.sh` names which client it selected ([`herdr-backend.md`](herdr-backend.md#client-selection)).
 
 ### How the entrypoint resolves git
 
@@ -193,7 +193,7 @@ This has two consequences:
 ### Wrappers for version-managed tools
 
 The filesystem discovery normally finds tools installed by nvm, asdf, or mise without starting their shell hooks.
-When a required tool remains discoverable only through one of those managers, `fm-remote-doctor.sh --fix` may create a Juggernaut-owned wrapper in `~/.local/bin` that executes its selected absolute target.
+When a required tool remains discoverable only through one of those managers, `jg-remote-doctor.sh --fix` may create a Juggernaut-owned wrapper in `~/.local/bin` that executes its selected absolute target.
 It never overwrites a wrapper or other file it does not own, and it never installs a package.
 An operator can use the same wrapper shape when a tool needs a manual selection:
 
@@ -214,14 +214,14 @@ chmod +x ~/.local/bin/tasks-axi
 
 ## Readiness, repair, and the human steps
 
-`bin/fm-remote-doctor.sh` is the single owner of what "ready for a remote second mate" means.
+`bin/jg-remote-doctor.sh` is the single owner of what "ready for a remote second mate" means.
 
 ### Check a host
 
 Check any host against it directly:
 
 ```sh
-bin/fm-on.sh <secondmate-id|ssh-alias> fm-remote-doctor.sh
+bin/jg-on.sh <secondmate-id|ssh-alias> jg-remote-doctor.sh
 ```
 
 That run is read-only.
@@ -248,19 +248,19 @@ The script's own header owns the full line protocol.
 `--fix` repairs only the automatable gaps and is safe to rerun:
 
 ```sh
-bin/fm-on.sh <secondmate-id|ssh-alias> fm-remote-doctor.sh --fix
+bin/jg-on.sh <secondmate-id|ssh-alias> jg-remote-doctor.sh --fix
 ```
 
 Over the plain SSH doctor bootstrap, it writes and reloads two Juggernaut-owned launch agents on macOS:
 
 - `dev.firstmate.remote-job`.
-- `dev.firstmate.herdr.fm-remote`.
+- `dev.firstmate.herdr.jg-remote`.
 
 Both are scoped with `LimitLoadToSessionType=Aqua` and bootstrapped in `gui/<uid>`.
 
 ### How the Herdr launch agent starts its server
 
-The Herdr agent runs [`bin/fm-remote-herdr-guard.sh`](../bin/fm-remote-herdr-guard.sh) through a shell in login mode with separate `-l` and `-c` arguments.
+The Herdr agent runs [`bin/jg-remote-herdr-guard.sh`](../bin/jg-remote-herdr-guard.sh) through a shell in login mode with separate `-l` and `-c` arguments.
 It resolves that shell in this order, so the server inherits the account's own environment:
 
 1. The remote account's executable labeled Directory Services `UserShell`.
@@ -274,9 +274,9 @@ Every claude pane under such a server falls back to a stale plaintext credential
 ### How the guard converges on one server
 
 Herdr's own SSH remote attach starts a server born in another session when it finds none.
-At boot, that server wins the `fm-remote` socket, because sshd accepts connections before the login session exists.
+At boot, that server wins the `jg-remote` socket, because sshd accepts connections before the login session exists.
 The guard is what makes the launch agent converge.
-It acts on whichever server owns the `fm-remote` socket:
+It acts on whichever server owns the `jg-remote` socket:
 
 | Socket owner | Guard action |
 | --- | --- |
@@ -285,21 +285,21 @@ It acts on whichever server owns the `fm-remote` socket:
 | Any other (foreign) server | Stops the foreign server and takes the session over, closing its panes so the parent Juggernaut relaunches its mates into the Aqua-born server. |
 
 `KeepAlive={SuccessfulExit=false}` lets that exit 0 rest instead of respawning against a held socket.
-The guard's header owns the decision table, and [`bin/fm-remote-herdr-owner-lib.sh`](../bin/fm-remote-herdr-owner-lib.sh) owns the birth markers it reads.
+The guard's header owns the decision table, and [`bin/jg-remote-herdr-owner-lib.sh`](../bin/jg-remote-herdr-owner-lib.sh) owns the birth markers it reads.
 
 ### Other repairs and limits
 
 `--fix` also takes these actions:
 
 - It starts the same workers directly on Linux.
-- It recreates the `~/.local/bin/fm-remote-entrypoint.sh` symlink when it is absent.
+- It recreates the `~/.local/bin/jg-remote-entrypoint.sh` symlink when it is absent.
 - It creates only Juggernaut-owned required-tool wrappers that it can prove resolve to a version-manager target.
   It stops after one harness satisfies the at-least-one requirement, which is the harness line of the [required remote tools](#required-remote-tools).
 
 Its limits:
 
 - It never installs packages or overwrites a non-Juggernaut file at a reserved wrapper path.
-- The dedicated Herdr launch agent owns only the remote-secondmate `fm-remote` server.
+- The dedicated Herdr launch agent owns only the remote-secondmate `jg-remote` server.
   It does not inspect, rewrite, start, stop, or require the user's interactive `default` session or its `dev.firstmate.herdr` launch agent.
 - It re-derives every check from the host afterwards, so what it prints is the state after the repair rather than the intent of one.
 
@@ -313,7 +313,7 @@ These steps are never automated and are always reported rather than silently att
 - Each worker runtime's own `/login`, and any keychain password prompt that login needs.
 
 Juggernaut never writes an auto-login password, never changes FileVault, and never stores an account password.
-A file at `~/.local/bin/fm-remote-entrypoint.sh` that is not Juggernaut's own symlink is reported for the operator to inspect and is never overwritten.
+A file at `~/.local/bin/jg-remote-entrypoint.sh` that is not Juggernaut's own symlink is reported for the operator to inspect and is never overwritten.
 
 ### Required remote tools
 
@@ -329,7 +329,7 @@ A file at `~/.local/bin/fm-remote-entrypoint.sh` that is not Juggernaut's own sy
 2. Then run:
 
 ```sh
-bin/fm-remote-home-seed.sh <id> <ssh-alias> <remote-root> <remote-home> {<project>[=<origin-url>]...|--no-projects}
+bin/jg-remote-home-seed.sh <id> <ssh-alias> <remote-root> <remote-home> {<project>[=<origin-url>]...|--no-projects}
 ```
 
 | Argument | Meaning |
@@ -354,7 +354,7 @@ That clone's configured origin is then read instead of being retyped.
 
 ### Origin validation
 
-[`bin/fm-project-origin-lib.sh`](../bin/fm-project-origin-lib.sh) owns which URLs are accepted.
+[`bin/jg-project-origin-lib.sh`](../bin/jg-project-origin-lib.sh) owns which URLs are accepted.
 It decides on structure and safety alone, so no forge, domain, or host is privileged and a self-hosted server works exactly as a hosted one does.
 The primary validates every resolved origin before transport, and the receiving host validates it again before cloning.
 
@@ -400,16 +400,16 @@ SSH exit 255 preserves the route, because remote completion is unknown and must 
 
 ### The parent record
 
-Seeding also writes a durable `.fm-secondmate-parent` record next to the home's `.fm-secondmate-home` identity marker.
+Seeding also writes a durable `.jg-secondmate-parent` record next to the home's `.jg-secondmate-home` identity marker.
 That record names this home's route to its parent as `local` or `remote`.
 The promised-public-reply subsystem is same-filesystem by construction, so a remote route can never carry a delegated public-reply promise.
-`bin/fm-teardown.sh`'s cleanup gate reads this record to treat a remote parent as out of scope rather than an unresolved binding.
+`bin/jg-teardown.sh`'s cleanup gate reads this record to treat a remote parent as out of scope rather than an unresolved binding.
 
 ### Local and remote routes together
 
 Local secondmates keep the existing route form and need no migration.
 A fleet may contain local and remote routes together.
-Use `bin/fm-home-seed.sh validate` to validate either form.
+Use `bin/jg-home-seed.sh validate` to validate either form.
 
 ## Normal operation
 
@@ -418,7 +418,7 @@ Use `bin/fm-home-seed.sh validate` to validate either form.
 Launch or recover the remote second mate with the same command used for a local route:
 
 ```sh
-bin/fm-spawn.sh <id> --secondmate
+bin/jg-spawn.sh <id> --secondmate
 ```
 
 The primary then takes these steps:
@@ -426,9 +426,9 @@ The primary then takes these steps:
 1. It resolves the verified secondmate harness and optional model and effort.
 2. It runs the same readiness gate the seed runs.
 3. It transfers the inherited-material allowlist.
-4. It asks the remote host to launch on Herdr in `fm-remote`.
+4. It asks the remote host to launch on Herdr in `jg-remote`.
 
-All remote secondmates on one host share `fm-remote` and retain separate `2ndmate-<id>` workspaces inside it.
+All remote secondmates on one host share `jg-remote` and retain separate `2ndmate-<id>` workspaces inside it.
 
 ### Refused and unsupported launches
 
@@ -444,7 +444,7 @@ All remote secondmates on one host share `fm-remote` and retain separate `2ndmat
 Startup liveness recovery relaunches a dead or missing remote second mate through this same command.
 So recovery passes the same readiness gate rather than a weaker one.
 
-The watcher's liveness tick applies the identical rule during ordinary supervision through the shared `bin/fm-secondmate-liveness-lib.sh`:
+The watcher's liveness tick applies the identical rule during ordinary supervision through the shared `bin/jg-secondmate-liveness-lib.sh`:
 
 - The remote endpoint is probed read-only once per cadence.
 - Only a positive `dead` or `missing` reply relaunches through that command.
@@ -460,17 +460,17 @@ The Bearings inventory-reconcile hook therefore handles these markerless routes 
 - It revalidates the sampled host at delivery.
 - It refuses a route that changed hosts.
 
-[`fm-secondmate-reconcile.sh`](../bin/fm-secondmate-reconcile.sh) owns the exact cooldown, identity, and reporting contract.
+[`jg-secondmate-reconcile.sh`](../bin/jg-secondmate-reconcile.sh) owns the exact cooldown, identity, and reporting contract.
 
 ### Send a routed request
 
 Send routed requests normally:
 
 ```sh
-FM_HOME=<primary-home> bin/fm-send.sh fm-<id> '<request>'
+FM_HOME=<primary-home> bin/jg-send.sh jg-<id> '<request>'
 ```
 
-The [`fm-send.sh` header](../bin/fm-send.sh) owns the exact delivery-status contract.
+The [`jg-send.sh` header](../bin/jg-send.sh) owns the exact delivery-status contract.
 A routed request is delivered as a durable record in the remote home's steering inbox plus a best-effort doorbell, a constant line rung into the terminal.
 It is never delivered by typing the payload into the pane.
 Exit 0 means the record durably exists.
@@ -478,7 +478,7 @@ Exit 0 means the record durably exists.
 ### Retries and safe resends
 
 Every remote transport attempt is bounded by `FM_SEND_REMOTE_BUDGET`.
-The `fm-send.sh` header owns the setting's default and validation contract.
+The `jg-send.sh` header owns the setting's default and validation contract.
 
 | Outcome | Retry behavior |
 | --- | --- |
@@ -487,7 +487,7 @@ The `fm-send.sh` header owns the setting's default and validation contract.
 
 Either outcome preserves this ordinary reply-bearing request's pending-reply expectation for the record that may have landed.
 
-If delivery remains unconfirmed, only the exact `FM_PENDING_REPLY_EXISTING_CORR=<id>` resend command printed by `fm-send` is safe to run later.
+If delivery remains unconfirmed, only the exact `FM_PENDING_REPLY_EXISTING_CORR=<id>` resend command printed by `jg-send` is safe to run later.
 That command preserves the request body and lets the remote enqueue deduplicate onto the same record.
 A plain rerun mints a different correlation and is not idempotent.
 When deduplication finds that the worker already moved the matching record into `handled/`, the resend exits successfully without ringing the doorbell again.
@@ -501,14 +501,14 @@ A fire-and-forget record, such as a reconcile ask, gets its single retry ring on
 
 ### Remote reads
 
-`fm-peek.sh` and `fm-crew-state.sh` route remote-secondmate reads to the endpoint's host instead of consulting local worktree or backend state.
+`jg-peek.sh` and `jg-crew-state.sh` route remote-secondmate reads to the endpoint's host instead of consulting local worktree or backend state.
 An unreachable or unreadable remote read is unknown, not evidence that the endpoint is dead.
 
 ### Replies and the parent channel
 
 Marked requests keep the existing correlation contract.
 The remote charter appends replies to `state/parent-replies.status` in the remote home.
-The remote home's own outcome publishers append there too, through the channel contract in `bin/fm-parent-channel-lib.sh` ([secondmate-parent-channel.md](secondmate-parent-channel.md)).
+The remote home's own outcome publishers append there too, through the channel contract in `bin/jg-parent-channel-lib.sh` ([secondmate-parent-channel.md](secondmate-parent-channel.md)).
 The remote charter also names its steering inbox as `state/parent-route/<id>.inbox` in the remote home.
 That inbox is the record surface the routed transport writes to, so a steer never lands on a parent-home path the remote host cannot reach.
 
@@ -522,9 +522,9 @@ A process-event source takes these steps:
 - It does not carry blank separators.
 
 The listener holds its claim across an empty wait and across a delta it re-arms, so a line appended during either is collected without waiting for the next supervision cycle.
-The [`fm-remote-delta-read.sh` header](../bin/fm-remote-delta-read.sh) owns snapshot sampling and its line-visibility and wait-window latency contract.
+The [`jg-remote-delta-read.sh` header](../bin/jg-remote-delta-read.sh) owns snapshot sampling and its line-visibility and wait-window latency contract.
 It stops when that registration is retired, the registered command changes, or the home's owner lease lapses.
-`bin/fm-procevent.sh` owns the generic relisten rule, and `bin/fm-procevent-remote-reply.sh` owns this adapter's answer.
+`bin/jg-procevent.sh` owns the generic relisten rule, and `bin/jg-procevent-remote-reply.sh` owns this adapter's answer.
 
 Only a structured `report=data/....md` pointer offers a document.
 A bare path inside prose is a mention.
@@ -599,7 +599,7 @@ A line written before that position was recorded does not match, so the next bre
 ### SSH exit 255 and unavailable homes
 
 An SSH exit status of 255 always means transport failure or unknown remote completion.
-The underlying `fm-on` transport never retries automatically, but `fm-send` retries its correlation-preserving steering-inbox leg exactly once.
+The underlying `jg-on` transport never retries automatically, but `jg-send` retries its correlation-preserving steering-inbox leg exactly once.
 Semantic callers preserve the route or pending request:
 
 - An operation that is not idempotent requires same-host reconciliation rather than a blind resend.
@@ -612,16 +612,16 @@ An unavailable remote home is projected as unknown and is never replaced by a lo
 Move already-judged queued work with the normal command:
 
 ```sh
-bin/fm-backlog-handoff.sh <id> <item-key>...
+bin/jg-backlog-handoff.sh <id> <item-key>...
 ```
 
 For a remote route, the handoff takes these steps:
 
 1. `tasks-axi mv` first moves the dependency-closed set atomically from the primary backlog into `data/handoff/<id>.outbox.md`.
 2. The outbox is then copied to the remote handoff scratch directory.
-3. `fm-backlog-receive.sh` atomically ingests every destination-absent key (a key the remote backlog does not already hold) under the remote backlog's own lock.
+3. `jg-backlog-receive.sh` atomically ingests every destination-absent key (a key the remote backlog does not already hold) under the remote backlog's own lock.
 
-The [`bin/fm-backlog-handoff.sh`](../bin/fm-backlog-handoff.sh) header owns remote outbox release after receipt and stable wake-correlation retry behavior.
+The [`bin/jg-backlog-handoff.sh`](../bin/jg-backlog-handoff.sh) header owns remote outbox release after receipt and stable wake-correlation retry behavior.
 Bootstrap retries pending outboxes and wakes, and emits `SECONDMATE_HANDOFF:` only when an outbox remains.
 There is no two-phase journal and no additional tasks-axi release requirement.
 
@@ -629,7 +629,7 @@ There is no two-phase journal and no additional tasks-axi release requirement.
 
 ### Inherited-material transfer
 
-Locked startup convergence and `bin/fm-config-push.sh` transfer only the declared inherited-material allowlist.
+Locked startup convergence and `bin/jg-config-push.sh` transfer only the declared inherited-material allowlist.
 Changed live routes receive a marked instruction to re-read the transferred files.
 The primary records that remote nudge before delivery and retries it during locked startup convergence after a failed send.
 Local secondmates retain their generation-specific local pointer contract.
@@ -645,12 +645,12 @@ The primary passes `<harness> <model|default|-> <effort|default|->` explicitly, 
 It passes them explicitly because neither the global `config/secondmate-harness` nor the per-mate `config/secondmates/<id>/harness` pin is inherited into a second mate's home, and any such file on that host belongs to a different home.
 Letting the far side re-resolve it would silently move the mate onto another runtime.
 SSH exit 255 leaves completion unknown and the route preserved, exactly as every other verb here.
-Move a live remote second mate onto a newly pinned harness, model, or effort with [`bin/fm-remote-secondmate-relaunch.sh`](../bin/fm-remote-secondmate-relaunch.sh) rather than calling `relaunch` through `fm-on.sh` directly: the host-local relaunch it drives can only rewrite the host's own endpoint record, so this wrapper reads the confirmed identity back from that record afterward and republishes the primary's own route metadata to match, the same way launch already records a fresh route.
+Move a live remote second mate onto a newly pinned harness, model, or effort with [`bin/jg-remote-secondmate-relaunch.sh`](../bin/jg-remote-secondmate-relaunch.sh) rather than calling `relaunch` through `jg-on.sh` directly: the host-local relaunch it drives can only rewrite the host's own endpoint record, so this wrapper reads the confirmed identity back from that record afterward and republishes the primary's own route metadata to match, the same way launch already records a fresh route.
 
 ### Juggernaut code convergence
 
 Session start and every remote launch converge the persistent remote home on the primary's own default-branch commit rather than on the Juggernaut copy that host keeps.
-The [`secondmate-provisioning` skill](../.agents/skills/secondmate-provisioning/SKILL.md) owns the guarded convergence contract, including the distinct `/updatefirstmate` behavior, and [`bin/fm-remote-secondmate-control.sh`](../bin/fm-remote-secondmate-control.sh) owns the commit-import mechanics.
+The [`secondmate-provisioning` skill](../.agents/skills/secondmate-provisioning/SKILL.md) owns the guarded convergence contract, including the distinct `/updatefirstmate` behavior, and [`bin/jg-remote-secondmate-control.sh`](../bin/jg-remote-secondmate-control.sh) owns the commit-import mechanics.
 Neither session start nor launch moves the host's own Juggernaut copy.
 An unsafe or unavailable target is reported and left untouched.
 A completed sync reports which watched instruction paths its advance changed.
@@ -662,7 +662,7 @@ It uses the fact to decide whether the running remote agent must be replaced to 
 Retire a remote second mate with the normal guarded command:
 
 ```sh
-bin/fm-teardown.sh <id>
+bin/jg-teardown.sh <id>
 ```
 
 Retirement is executed on the configured host.
@@ -672,7 +672,7 @@ It refuses while any of these holds:
 - The primary has an unfinished backlog outbox.
 - A routed reply remains unresolved.
 
-It closes only the retiring secondmate's panes or `2ndmate-<id>` workspace in `fm-remote`.
+It closes only the retiring secondmate's panes or `2ndmate-<id>` workspace in `jg-remote`.
 It never stops the shared session or removes a sibling secondmate's workspace or panes.
 SSH exit 255 preserves both the route and local records because completion is unknown.
 `--force` remains the explicit discard path and requires the same captain authority as local secondmate discard.
@@ -694,31 +694,31 @@ The portable tests use these pieces:
 - A stateful host-local Herdr CLI fixture.
 - A controlled account fixture for the readiness gate.
 
-[`fm-remote-job-launchagent.test.sh`](../tests/fm-remote-job-launchagent.test.sh) exercises the real worker with stubbed asynchronous `launchctl`, covering slow claim sweeps, missing readiness recovery during a sweep, stale readiness without reload, concurrent repair, untracked owners, interrupted repairs, and asynchronous service removal before bootstrap.
+[`jg-remote-job-launchagent.test.sh`](../tests/jg-remote-job-launchagent.test.sh) exercises the real worker with stubbed asynchronous `launchctl`, covering slow claim sweeps, missing readiness recovery during a sweep, stale readiness without reload, concurrent repair, untracked owners, interrupted repairs, and asynchronous service removal before bootstrap.
 The lifecycle test covers seeding a registered project that this machine has never cloned.
 It asserts that the local project tree is unchanged afterwards.
 It carries Bitbucket, self-hosted, and scp-like origins through to the remote clone.
 The portable tests run with these commands:
 
 ```sh
-bin/fm-test-run.sh tests/fm-on.test.sh
-bin/fm-test-run.sh tests/fm-send-remote-delivery.test.sh
-bin/fm-test-run.sh tests/fm-secondmate-reconcile.test.sh
-bin/fm-test-run.sh tests/fm-peek-remote.test.sh
-bin/fm-test-run.sh tests/fm-crew-state.test.sh
-bin/fm-test-run.sh tests/fm-remote-job.test.sh
-bin/fm-test-run.sh tests/fm-remote-job-claim-reap.test.sh
-bin/fm-test-run.sh tests/fm-remote-job-claim-retention.test.sh
-bin/fm-test-run.sh tests/fm-remote-job-launchagent.test.sh
-bin/fm-test-run.sh tests/fm-remote-transport-lanes.test.sh
-bin/fm-test-run.sh tests/fm-remote-doctor.test.sh
-bin/fm-test-run.sh tests/fm-remote-herdr-guard.test.sh
-bin/fm-test-run.sh tests/fm-project-origin.test.sh
-bin/fm-test-run.sh tests/fm-secondmate-sync.test.sh
-bin/fm-test-run.sh tests/fm-remote-reply.test.sh
-bin/fm-test-run.sh tests/fm-remote-backlog-handoff.test.sh
-bin/fm-test-run.sh tests/fm-remote-secondmate-lifecycle-e2e.test.sh
-bin/fm-test-run.sh tests/fm-remote-secondmate-trace-context.test.sh
+bin/jg-test-run.sh tests/jg-on.test.sh
+bin/jg-test-run.sh tests/jg-send-remote-delivery.test.sh
+bin/jg-test-run.sh tests/jg-secondmate-reconcile.test.sh
+bin/jg-test-run.sh tests/jg-peek-remote.test.sh
+bin/jg-test-run.sh tests/jg-crew-state.test.sh
+bin/jg-test-run.sh tests/jg-remote-job.test.sh
+bin/jg-test-run.sh tests/jg-remote-job-claim-reap.test.sh
+bin/jg-test-run.sh tests/jg-remote-job-claim-retention.test.sh
+bin/jg-test-run.sh tests/jg-remote-job-launchagent.test.sh
+bin/jg-test-run.sh tests/jg-remote-transport-lanes.test.sh
+bin/jg-test-run.sh tests/jg-remote-doctor.test.sh
+bin/jg-test-run.sh tests/jg-remote-herdr-guard.test.sh
+bin/jg-test-run.sh tests/jg-project-origin.test.sh
+bin/jg-test-run.sh tests/jg-secondmate-sync.test.sh
+bin/jg-test-run.sh tests/jg-remote-reply.test.sh
+bin/jg-test-run.sh tests/jg-remote-backlog-handoff.test.sh
+bin/jg-test-run.sh tests/jg-remote-secondmate-lifecycle-e2e.test.sh
+bin/jg-test-run.sh tests/jg-remote-secondmate-trace-context.test.sh
 ```
 
 ### What the portable tests cannot prove
@@ -730,12 +730,12 @@ The doctor performs these account-level checks, and they are only ever exercised
 - A real herdr server.
 
 So the readiness gate's behavior on a genuine Mac remains an operator-run smoke test.
-The audit-session facts the guard relies on are recorded with their commands in [runtime backend verification](verification/runtime-backends.md#fm-remote-server-birth-and-login-keychain-access).
+The audit-session facts the guard relies on are recorded with their commands in [runtime backend verification](verification/runtime-backends.md#jg-remote-server-birth-and-login-keychain-access).
 
 ### Read-only post-deploy turnover check
 
 After the updated worker has started through an independently authorized deployment, observe it on the remote Mac under normal traffic for at least two hours.
-Use a console shell or plain SSH as the worker account, not `fm-on.sh` or the remote entrypoint: those paths can repair the worker and invalidate a read-only observation.
+Use a console shell or plain SSH as the worker account, not `jg-on.sh` or the remote entrypoint: those paths can repair the worker and invalidate a read-only observation.
 Do not run doctor `--fix`, signal a process, change the queue or readiness timestamps, or invoke any mutating `launchctl` verb during this check.
 Run this Bash sampling loop on that Mac; it only reads service and process records and the existing state files:
 
@@ -760,7 +760,7 @@ done
 ```
 
 Confirm the timestamps span at least two hours, every sample has the same tracked PID and process start time, and both recorded PIDs match that tracked worker.
-Confirm launchd's `runs` count does not increase and readiness stays within the freshness bound implemented by [`fm_remote_job_probe`](../bin/fm-remote-job-lib.sh).
+Confirm launchd's `runs` count does not increase and readiness stays within the freshness bound implemented by [`jg_remote_job_probe`](../bin/jg-remote-job-lib.sh).
 A PID/start-time change or increased run count is turnover; a missing service, failed read, stale heartbeat, host reboot, or missing run counter prevents a clean no-turnover verdict.
 Minute samples alone cannot prove that readiness never stalled between samples, so retain the existing service logs and any stale-ready diagnostics alongside the observations.
 Keep dated output, the deployed commit, and the result in deployment or PR evidence rather than claiming a measured result from the portable fixtures.

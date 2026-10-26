@@ -7,9 +7,9 @@ DRY=0
 [ "${1:-}" = --dry-run ] && { DRY=1; shift; }
 [ "$#" -eq 0 ] || { echo "usage: install.sh [--dry-run]" >&2; exit 2; }
 SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
-DEST=${XDG_DATA_HOME:-$HOME/.local/share}/fm-codex-guard
+DEST=${XDG_DATA_HOME:-$HOME/.local/share}/jg-codex-guard
 CONF=${CODEX_HOME:-$HOME/.codex}/config.toml
-BLOCK=$(printf '\n# fm-codex-guard: fleet guards before every Codex shell command (firstmate-addons codex-guard)\n[shell_environment_policy.set]\nBASH_ENV = "%s"' "$DEST/bash-env.sh")
+BLOCK=$(printf '\n# jg-codex-guard: fleet guards before every Codex shell command (firstmate-addons codex-guard)\n[shell_environment_policy.set]\nBASH_ENV = "%s"' "$DEST/bash-env.sh")
 TMP=$(mktemp -d); trap 'rm -rf -- "$TMP"' EXIT
 [ -d "$(dirname "$CONF")" ] || { echo "skipped: codex (not installed)"; exit 0; }
 

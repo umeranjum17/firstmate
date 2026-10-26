@@ -16,7 +16,7 @@ const POLL_MS = 10000, STALE_S = 15 * 60, WIDE = '(min-width: 760px)'
 
 const root = document.documentElement
 let saved = null
-try { saved = localStorage.getItem('fm-theme') } catch {}
+try { saved = localStorage.getItem('jg-theme') } catch {}
 root.dataset.theme = saved || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
 
 // board.json, polled with its ETag so an unchanged fleet costs one empty answer. The first pull is a plain
@@ -427,7 +427,7 @@ function App() {
   const [pal, setPal] = useState(false), [keys, setKeys] = useState(false), [, setTheme] = useState(root.dataset.theme)
   // the button shows the theme a click turns on
   const themeIcon = () => root.dataset.theme === 'dark' ? IC.sun : IC.theme
-  const toggleTheme = () => { const t = root.dataset.theme === 'dark' ? 'light' : 'dark'; root.dataset.theme = t; setTheme(t); try { localStorage.setItem('fm-theme', t) } catch {} }
+  const toggleTheme = () => { const t = root.dataset.theme === 'dark' ? 'light' : 'dark'; root.dataset.theme = t; setTheme(t); try { localStorage.setItem('jg-theme', t) } catch {} }
   useKeys(r, go, setPal, setKeys, toggleTheme, pal, keys)
   const d = st.data
   useEffect(() => { document.title = d?.asks?.length ? `(${d.asks.length}) Fleet dashboard` : 'Fleet dashboard' }, [d])

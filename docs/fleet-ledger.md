@@ -76,28 +76,28 @@ Example:
 
 ## Reading lifecycle metrics
 
-The firstmate-addons fleet-flow add-on reads retained fleet records into lifecycle, queue-reason, and bottleneck metrics, with optional live capacity observations; this fork's `bin/fm-flow.sh` is a thin shim that execs the add-on's `fleet-flow/bin/fm-flow.sh` with `FM_BIN` pointing at this checkout's `bin/`, and the add-on reader's header owns usage, output interpretation, timestamp provenance, and uncertainty limits.
-The dashboard's Insights view consumes its output: the firstmate-addons fleet-dashboard add-on (reached through the `fm-dashboard.sh` shim) runs the reader at each build and embeds the result as the `flow` key of `board.json`.
+The firstmate-addons fleet-flow add-on reads retained fleet records into lifecycle, queue-reason, and bottleneck metrics, with optional live capacity observations; this fork's `bin/jg-flow.sh` is a thin shim that execs the add-on's `fleet-flow/bin/jg-flow.sh` with `FM_BIN` pointing at this checkout's `bin/`, and the add-on reader's header owns usage, output interpretation, timestamp provenance, and uncertainty limits.
+The dashboard's Insights view consumes its output: the firstmate-addons fleet-dashboard add-on (reached through the `jg-dashboard.sh` shim) runs the reader at each build and embeds the result as the `flow` key of `board.json`.
 The add-on's header owns that embedding and its scrubbing.
-The reader's CLI regression journey is the add-on's `fleet-flow/tests/fm-flow.test.sh`, run with `FM_BIN` naming this checkout's `bin/`; the shim's own behavior is covered by [`tests/fm-flow-shim.test.sh`](../tests/fm-flow-shim.test.sh).
+The reader's CLI regression journey is the add-on's `fleet-flow/tests/jg-flow.test.sh`, run with `FM_BIN` naming this checkout's `bin/`; the shim's own behavior is covered by [`tests/jg-flow-shim.test.sh`](../tests/jg-flow-shim.test.sh).
 
 ## Per-model statistics
 
-[`fm-task-outcome.sh`](../bin/fm-task-outcome.sh) appends one durable, append-only row per finished task to the home-local `data/metrics/task-outcomes.tsv`, whose header row and columns are `home`, `task`, `kind`, `project`, `models`, `started`, `ended`, `outcome`, and `pr`; give it the same trust as `state/`.
-`models` lists every launch of the task in order as `harness:model:effort`, joined by `;`, sourced from the `state/<id>.models` history that `fm-spawn.sh` starts on a fresh spawn and appends to on each relaunch, so a mid-task model switch is recorded rather than lost.
+[`jg-task-outcome.sh`](../bin/jg-task-outcome.sh) appends one durable, append-only row per finished task to the home-local `data/metrics/task-outcomes.tsv`, whose header row and columns are `home`, `task`, `kind`, `project`, `models`, `started`, `ended`, `outcome`, and `pr`; give it the same trust as `state/`.
+`models` lists every launch of the task in order as `harness:model:effort`, joined by `;`, sourced from the `state/<id>.models` history that `jg-spawn.sh` starts on a fresh spawn and appends to on each relaunch, so a mid-task model switch is recorded rather than lost.
 `outcome` is `merged`, `closed`, `cancelled`, `scout`, or `failed`; a secondmate retirement is not a task and records nothing.
-The recorder runs best-effort from `bin/fm-teardown.sh` before the task's durable presentation is retired, and never blocks cleanup.
+The recorder runs best-effort from `bin/jg-teardown.sh` before the task's durable presentation is retired, and never blocks cleanup.
 
-[`fm-model-stats.sh`](../bin/fm-model-stats.sh) reads every local home's `task-outcomes.tsv` and the main home's sampled `lanes.tsv`/`prs.tsv` into `fm-model-stats.v1`: per model over 7- and 30-day windows, started, finished, merged, merge rate, time-to-merge P50/P75, first-pass rate, rework, revert, escape, cancelled/failed, and model switches, each with its sample size.
+[`jg-model-stats.sh`](../bin/jg-model-stats.sh) reads every local home's `task-outcomes.tsv` and the main home's sampled `lanes.tsv`/`prs.tsv` into `jg-model-stats.v1`: per model over 7- and 30-day windows, started, finished, merged, merge rate, time-to-merge P50/P75, first-pass rate, rework, revert, escape, cancelled/failed, and model switches, each with its sample size.
 The firstmate-addons fleet-stats add-on reader's header owns usage (`--json [--now <epoch>]`), attribution, and uncertainty limits.
 A task is attributed to the model of its final launch, and one that changed model mid-flight counts as a switch under that model.
 Every recorded outcome is authoritative; a sampled lane that predates the recorder is a disclosed fallback, and merge rate is computed over recorded outcomes only so a sampled row never fabricates a rate.
 First-pass, rework, revert and escape figures use the same recorded merged PRs as merge rate, since a sampled lane only proves the merges it observed and never the tasks that ended without one; the coverage line counts the sampled tasks they leave out.
-The dashboard's Insights view embeds the reader as the `models` key of `board.json`; its regression journeys are the add-on's `fleet-stats` tests, and the shim's own behavior is covered by [`tests/fm-stats-shim.test.sh`](../tests/fm-stats-shim.test.sh).
+The dashboard's Insights view embeds the reader as the `models` key of `board.json`; its regression journeys are the add-on's `fleet-stats` tests, and the shim's own behavior is covered by [`tests/jg-stats-shim.test.sh`](../tests/jg-stats-shim.test.sh).
 
 ## Skill statistics
 
-[`fm-skill-stats.sh`](../bin/fm-skill-stats.sh) reads the main home's private `data/metrics/skills.tsv` (`day`, `home`, `skill`, `reads`) into `fm-skill-stats.v1`: per skill over 7- and 30-day windows, its read count and the number of homes it was read in, plus a per-home breakdown and, for each window the file's coverage spans, the known skills that had no reads in it.
+[`jg-skill-stats.sh`](../bin/jg-skill-stats.sh) reads the main home's private `data/metrics/skills.tsv` (`day`, `home`, `skill`, `reads`) into `jg-skill-stats.v1`: per skill over 7- and 30-day windows, its read count and the number of homes it was read in, plus a per-home breakdown and, for each window the file's coverage spans, the known skills that had no reads in it.
 Known skill names come from each local home's `skills/` and `.agents/skills/` directories; a missing file or directory contributes nothing rather than failing.
 A registered remote home's reads are not readable locally and are disclosed; while one is registered the reader makes no zero-read claim, since a skill it never saw locally may still have been read there.
 The firstmate-addons fleet-stats add-on reader's header owns usage (`--json [--now <epoch>]`), window arithmetic, and uncertainty limits; the dashboard embeds it as the `skills` key of `board.json`, and its regression journeys are the add-on's `fleet-stats` tests.
@@ -114,4 +114,4 @@ These are possible follow-ups, deliberately left out of this version:
 - backfill or replay of events from before the ledger was turned on;
 - secret scrubbing beyond what status lines already contain, and privacy guarantees stronger than those of `state/`.
 
-`bin/fm-fleet-ledger.sh`'s header owns the writer mechanics and lists every producer.
+`bin/jg-fleet-ledger.sh`'s header owns the writer mechanics and lists every producer.

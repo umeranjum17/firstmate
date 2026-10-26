@@ -9,7 +9,7 @@
 #     0.3.1+; on an older one merge-card resolves the names itself), prints the verdict and
 #     saves it for the card in $FM_HOME/data/<task-id>/merge-card.json.
 #     done-done's verdict is report only. A PR merge is refused (exit 1) when
-#     $FM_HOME/data/checks-gate.log has no pass row for the head from fm-checks-lint.sh.
+#     $FM_HOME/data/checks-gate.log has no pass row for the head from jg-checks-lint.sh.
 #   merge-card check [--judge <route>] <task-id> <worktree|-> <head|-> <pr-url|->
 #     The gate's check alone: run done-done, save and print the verdict, post nothing.
 #     gate, check and post all take `--judge <route>`: it reaches `done-done check --judge <route>`
@@ -155,10 +155,10 @@ redirect_evidence() {
   printf '%s' "$out"
 }
 
-# shellcheck source=account-pool/bin/fm-pool-claude-env.sh
-. "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/account-pool/bin/fm-pool-claude-env.sh"
-# shellcheck source=signoff/bin/fm-signoff-feedback-lib.sh
-. "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/signoff/bin/fm-signoff-feedback-lib.sh"
+# shellcheck source=account-pool/bin/jg-pool-claude-env.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/account-pool/bin/jg-pool-claude-env.sh"
+# shellcheck source=signoff/bin/jg-signoff-feedback-lib.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/signoff/bin/jg-signoff-feedback-lib.sh"
 
 # The executable selects before capturing judge JSON, keeping diagnostics out of it.
 pool_env_run() {
@@ -235,7 +235,7 @@ check() {
     # Explicit non-Claude judges must never depend on Claude pool capacity.
     case ${judge[1]:-claude-code} in
       claude-code|answerer:claude|answerer:claude-code)
-        FM_POOL_REQUIRE_FRESH=1 fm_pool_claude_env || fallback=1 ;;
+        FM_POOL_REQUIRE_FRESH=1 jg_pool_claude_env || fallback=1 ;;
     esac
     if done-done check --help 2>&1 | grep -q -- '--citation-base' ||
        version_at_least "$dd_v" 0.3.1; then
@@ -296,10 +296,10 @@ gate() {
   check "${judge[@]}" "$1" "$2" "$3" "$4"
   echo "merge-card: report only; done-done's verdict never refuses this merge"
   [ "$4" != - ] && [ "$3" != - ] || return 0
-  # Row: <time> <src> <head> pass|fail <why>, one per fm-checks-lint.sh run.
+  # Row: <time> <src> <head> pass|fail <why>, one per jg-checks-lint.sh run.
   awk -F'\t' -v h="$3" '$3 == h && $4 == "pass" { f = 1 } END { exit !f }' "$FM_HOME/data/checks-gate.log" 2>/dev/null && return 0
-  local lint=${FM_CHECKS_LINT:-${XDG_DATA_HOME:-$HOME/.local/share}/fm-merge-on-green/checks-lint.sh}
-  [ -x "$lint" ] || lint=${FM_MAIN_HOME:-$HOME/firstmate}/config/fm-checks-lint.sh
+  local lint=${FM_CHECKS_LINT:-${XDG_DATA_HOME:-$HOME/.local/share}/jg-merge-on-green/checks-lint.sh}
+  [ -x "$lint" ] || lint=${FM_MAIN_HOME:-$HOME/firstmate}/config/jg-checks-lint.sh
   echo "merge refused: no checks-lint PASS row for head $3; log one with: FM_HOME=$FM_HOME $lint $4 $FM_HOME/data/$1"
   return 1
 }
@@ -338,7 +338,7 @@ screen_none() {
 file_card() {
   local k checker text sweep
   if [ -f "$FM_HOME/config/owner-rules" ]; then
-    checker=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/owner-rules/bin/fm-owner-rules-text-check.sh
+    checker=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/owner-rules/bin/jg-owner-rules-text-check.sh
     text=$(jq -r '.. | strings' "$2") || return $?
     printf '%s\n' "$text" | bash "$checker" || return $?
   fi
@@ -358,8 +358,8 @@ mark_acted() {
   while IFS= read -r card; do
     ! grep -qxF "$card"$'\t'"$pr" "$marked" 2>/dev/null || continue
     rc=0
-    if [ -n "$reply" ]; then fm_signoff_feedback "$card" "$board" --reply "${reply:0:500}" --link "$pr" || rc=$?
-    else fm_signoff_feedback "$card" "$board" --acted --link "$pr" || rc=$?; fi
+    if [ -n "$reply" ]; then jg_signoff_feedback "$card" "$board" --reply "${reply:0:500}" --link "$pr" || rc=$?
+    else jg_signoff_feedback "$card" "$board" --acted --link "$pr" || rc=$?; fi
     case $rc in 0) ;; 3) old=1 ;; *) continue ;; esac
     mkdir -p "${marked%/*}" && printf '%s\t%s\n' "$card" "$pr" >> "$marked"
   done < <(printf '%s\n' "$text" | sed -n 's/^[[:space:]]*sign-off cards\{0,1\}:[[:space:]]*//p' |

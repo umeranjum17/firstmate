@@ -10,10 +10,10 @@ evidence=$(cd "$(dirname "$2")" && printf '%s/%s\n' "$PWD" "$(basename "$2")")
 # Prefer the add-on's lint (lane/meta task identity); FM_LEGACY_CHECKS_LINT overrides.
 if [ -n "${FM_LEGACY_CHECKS_LINT:-}" ]; then
   LEGACY=$FM_LEGACY_CHECKS_LINT
-elif [ -x "$SRC/fm-checks-lint.sh" ]; then
-  LEGACY=$SRC/fm-checks-lint.sh
+elif [ -x "$SRC/jg-checks-lint.sh" ]; then
+  LEGACY=$SRC/jg-checks-lint.sh
 else
-  LEGACY=${FM_MAIN_HOME:-$HOME/firstmate}/config/fm-checks-lint.sh
+  LEGACY=${FM_MAIN_HOME:-$HOME/firstmate}/config/jg-checks-lint.sh
 fi
 DD_HOME=$FM_HOME/data/done-done-lint
 DD=(npx --yes --quiet --package=done-done-axi@0.6.17 done-done)
@@ -105,13 +105,13 @@ fi
 for meta in "$FM_HOME"/state/*.meta; do
   [ -f "$meta" ] && grep -Fxq "pr=$source" "$meta" || continue
   task=${meta##*/}; task=${task%.meta}
-  helper=${FM_ADDONS_DIR:-$(cd "$SRC/.." && pwd -P)}/receipts/bin/fm-run-receipt.sh
+  helper=${FM_ADDONS_DIR:-$(cd "$SRC/.." && pwd -P)}/receipts/bin/jg-run-receipt.sh
   if [ -x "$helper" ]; then
     report=$(mktemp) || exit 1
     printf 'checks-lint %s %s head %s: %s\n' "$receipt_verdict" "$source" "$head" "${why:-$out}" > "$report"
     worktree=$(awk -F= '$1 == "worktree" { value = $2 } END { print value }' "$meta")
     receipt=$(env FM_HOME="$FM_HOME" "$helper" "$task" "$receipt_verdict" "$report" "${worktree:-$FM_HOME}" 2>&1); receipt_rc=$?
-    [ "$receipt_rc" -eq 0 ] || echo "checks-lint: receipt not published: ${receipt:-fm-run-receipt.sh failed}" >&2
+    [ "$receipt_rc" -eq 0 ] || echo "checks-lint: receipt not published: ${receipt:-jg-run-receipt.sh failed}" >&2
     rm -f -- "$report"
   fi
   break

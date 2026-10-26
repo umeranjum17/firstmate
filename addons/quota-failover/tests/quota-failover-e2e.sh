@@ -36,34 +36,34 @@ has() { if grep -q -- "$3" "$2" 2>/dev/null; then ok "$1"; else no "$1: $2 lacks
 count() { local got; got=$(grep -c -- "$3" "$2" 2>/dev/null) || got=0; is "$1" "$got" "$4"; }
 
 # The fixture's firstmate surface: one stub lib (screens are state/<id>.screen,
-# an fm-control relaunch clears the task's screen and status), the two exec'd
+# an jg-control relaunch clears the task's screen and status), the two exec'd
 # scripts, and the CLI stubs.
 awk -v w="$work" '
   /^#--- / { file = w "/" substr($0, 6); next }
   file { print > file }
 ' <<'STUBS' || exit 1
-#--- home/bin/fm-stub-lib.sh
+#--- home/bin/jg-stub-lib.sh
 # shellcheck shell=bash
-fm_meta_get() { [ -f "$1" ] || return 0; sed -n "s|^$2=||p" "$1" | tail -n 1; }
-fm_backend_of_meta() { echo fixture; }
-fm_backend_target_of_meta() { fm_meta_get "$1" endpoint_task_id; }
-fm_backend_visible_capture() { [ -f "$FM_HOME/state/$2.screen" ] && cat "$FM_HOME/state/$2.screen"; return 0; }
-fm_busy_classify_meta() { cat "$FM_HOME/state/$2.verdict" 2>/dev/null || echo 'idle no-busy-record'; }
-fm_busy_record_read() { echo ''; }
+jg_meta_get() { [ -f "$1" ] || return 0; sed -n "s|^$2=||p" "$1" | tail -n 1; }
+jg_backend_of_meta() { echo fixture; }
+jg_backend_target_of_meta() { jg_meta_get "$1" endpoint_task_id; }
+jg_backend_visible_capture() { [ -f "$FM_HOME/state/$2.screen" ] && cat "$FM_HOME/state/$2.screen"; return 0; }
+jg_busy_classify_meta() { cat "$FM_HOME/state/$2.verdict" 2>/dev/null || echo 'idle no-busy-record'; }
+jg_busy_record_read() { echo ''; }
 FM_QUOTA_ROW_JQ='def quota_lane($harness; $model): ""; def quota_row($snapshot; $provider; $lane): null;'
-fm_quota_json_valid() { jq -e '.schemaVersion == 5 and (.providers | type) == "array"' >/dev/null 2>&1; }
-fm_quota_single_provider_for_harness() { return 1; }
-fm_parent_channel_report() { printf '%s\n' "$3" >>"$1/state/parent-channel.log"; }
-fm_run_timed() { shift; "$@"; }
-#--- home/bin/fm-crew-state.sh
+jg_quota_json_valid() { jq -e '.schemaVersion == 5 and (.providers | type) == "array"' >/dev/null 2>&1; }
+jg_quota_single_provider_for_harness() { return 1; }
+jg_parent_channel_report() { printf '%s\n' "$3" >>"$1/state/parent-channel.log"; }
+jg_run_timed() { shift; "$@"; }
+#--- home/bin/jg-crew-state.sh
 #!/usr/bin/env bash
 echo 'state: working · source: fixture'
-#--- home/bin/fm-control.sh
+#--- home/bin/jg-control.sh
 #!/usr/bin/env bash
-printf '%s\n' "$*" >>"$FM_HOME/state/fm-control.log"
+printf '%s\n' "$*" >>"$FM_HOME/state/jg-control.log"
 [ "${2:-}" = relaunch ] || exit 0
 id=${1:-}
-# d1's pool has no next account ready, as fm-control answers after its rest.
+# d1's pool has no next account ready, as jg-control answers after its rest.
 [ "$id $3 $4" != "d1 --account next" ] || { echo "error: config/account-pool cannot start a claude worker: no account is ready"; exit 1; }
 # p6's relaunch replaces the incarnation, then fails a later launch step.
 [ "$id $3 $4" != "p6 --account next" ] || { printf 'spawn_gen=s1.p6\naccount=nextacct\n' >>"$FM_HOME/state/p6.meta"; echo "error: launch step failed"; exit 1; }
@@ -113,10 +113,10 @@ case ${1:-} in
   *) echo "usage: byokit-accounts status <id>" >&2; exit 1 ;;
 esac
 STUBS
-for lib in fm-backend.sh fm-busy-lib.sh fm-quota-axi-lib.sh fm-parent-channel-lib.sh; do
-  ln -s fm-stub-lib.sh "$home/bin/$lib" || exit 1
+for lib in jg-backend.sh jg-busy-lib.sh jg-quota-axi-lib.sh jg-parent-channel-lib.sh; do
+  ln -s jg-stub-lib.sh "$home/bin/$lib" || exit 1
 done
-chmod +x "$home/bin/fm-crew-state.sh" "$home/bin/fm-control.sh" "$stub/opencode" "$stub/claude" "$stub/quota-axi" "$stub/byokit-accounts"
+chmod +x "$home/bin/jg-crew-state.sh" "$home/bin/jg-control.sh" "$stub/opencode" "$stub/claude" "$stub/quota-axi" "$stub/byokit-accounts"
 
 # Step 5 ranked first, a second dead route, then the live ones.
 cat >"$home/config/crew-dispatch.json" <<'JSON' || exit 1
@@ -136,7 +136,7 @@ printf 'endpoint_task_id=w1\nharness=opencode\nmodel=openai-codex/gpt-5.6-luna\n
   >"$home/state/w1.meta" || exit 1
 printf '%s\n' "You've hit your usage limit for your plan; try again in 3h" >"$home/state/w1.screen"
 
-log=$home/state/quota-failover.log ctl=$home/state/fm-control.log
+log=$home/state/quota-failover.log ctl=$home/state/jg-control.log
 dead=$home/state/quota-failover-dead.json disp=$home/config/crew-dispatch.json
 run() { # one watcher pass, with the knobs the fixture needs
   env -u CLAUDE_CONFIG_DIR PATH="$stub:$PATH" FM_HOME="$home" QUOTA_FAILOVER_PROBE_SECS=0 \
@@ -199,7 +199,7 @@ is "pass3: Go and Codex accounts rested" "$(sort "$pooll" | paste -sd, -)" "rest
 has "pass3: a worker on an account the pool does not name takes the route move" "$ctl" \
   '^y1 relaunch --harness opencode --model opencode-go/deepseek-v4.1-flash '
 has "pass3: the Go wake names the account and the manual command" "$wake" \
-  'g1 stopped on opencode opencode-go/mimo-v2.6-flash account go1 .*bin/fm-control.sh g1 relaunch --account <id>$'
+  'g1 stopped on opencode opencode-go/mimo-v2.6-flash account go1 .*bin/jg-control.sh g1 relaunch --account <id>$'
 is "pass3: an account limit leaves the route in dispatch" "$(jq -c . "$dead")" '[]'
 
 # The home asks for the human instead: a Claude pool worker only rests, a
@@ -216,11 +216,11 @@ count "pass4: no relaunch with the opt-out file" "$ctl" '^b1 ' 0
 count "pass4: no relaunch for the failed-rest worker either" "$ctl" '^f1 ' 0
 is "pass4: the account rested once" "$(cat "$pooll")" "rest c3"
 has "pass4: one log line names the account and the manual command" "$log" \
-  'b1: stopped on claude claude-opus-4-8 account c3 .*bin/fm-control.sh b1 relaunch --account <id|next>$'
+  'b1: stopped on claude claude-opus-4-8 account c3 .*bin/jg-control.sh b1 relaunch --account <id|next>$'
 has "pass4: a failed rest is logged with the pool's error" "$log" \
   'f1: stopped on claude claude-opus-4-8 account deadpool .*rest failed (error: config/account-pool cannot rest account deadpool: pool lib broken at [0-9]*; it stays on the pick.s list until it rests), move it by hand'
 has "pass4: a failed rest still wakes the home with the account named" "$wake" \
-  'f1 stopped on claude claude-opus-4-8 account deadpool .*bin/fm-control.sh f1 relaunch --account <id|next>$'
+  'f1 stopped on claude claude-opus-4-8 account deadpool .*bin/jg-control.sh f1 relaunch --account <id|next>$'
 count "pass4: one wake line per stopped worker" "$wake" '' 2
 
 # The home takes the wake's advice and relaunches b1 on the same account c3;
@@ -246,7 +246,7 @@ is "pass6: the pinned probe takes the pool worker's route out" \
 is "pass6: and the route leaves new dispatch" \
   "$(grep -Eo 'step-5-preview-free' "$disp" 2>/dev/null | sort -u | paste -sd, -)" ""
 has "pass6: the worker itself still rests and wakes" "$wake" \
-  'q1 stopped on opencode opencode-go/step-5-preview-free account go9 .*bin/fm-control.sh q1 relaunch --account <id>$'
+  'q1 stopped on opencode opencode-go/step-5-preview-free account go9 .*bin/jg-control.sh q1 relaunch --account <id>$'
 
 # The next pass sees q1's route as already out of dispatch instead of
 # probe-detected, but the stop is the same one: nothing rests or wakes again.
