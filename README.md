@@ -253,16 +253,88 @@ The built-in dashboard reads the fleet read-only and shows what is moving, what 
 
 ### The toolbelt
 
-| Tool | What it does | Screen | Install |
-| --- | --- | --- | --- |
-| **done-done** | Drives the real product, has a fresh judge check the capture, and writes a receipt tied to the commit. | <img src="assets/tools/done-done/1280-light.png" width="360" alt="A real done-done run, a passing judge, and a receipt"> | `npm install -g done-done-axi@0.6.18` |
-| **sign-off** | Collects questions, designs, reports, and proof on one board; the answer is saved for the agent. | <img src="assets/tools/sign-off/board-1280-light.png" width="360" alt="The sign-off Today board"> | `npm install -g sign-off-axi@0.7.0` (0.8.0 once sign-off PR 303 releases) |
-| **learn-from-mistakes** | Finds the causes that keep coming back in your records, with counts, evidence, and fixes that cite the record. | <img src="assets/tools/learn-from-mistakes/1280-light.png" width="360" alt="A real retro report excerpt with repeated causes and counts"> | `npm i -g learn-from-mistakes-axi@0.10.0` |
-| **first-draft** | Makes several HTML design directions, lets you compare them at desktop and phone width, and keeps the one you pick. | <img src="assets/tools/first-draft/studio-1280-light.png" width="360" alt="The first-draft Studio with two options and a comment"> | `npm install -g first-draft-axi@0.3.0` |
-| **TakeOne** | Turns a raw screen recording into a framed, paced demo video on your machine. | <img src="assets/tools/takeone/1280-light.png" width="360" alt="TakeOne doctor reporting the recorder, planner, and renderer"> | `npm install -g --allow-remote=all https://github.com/umeranjum17/takeone/releases/latest/download/takeone.tgz` (0.2.1) |
-| **quota-axi** | Reports the quota windows your local agents can use, in one read, without routing or recommending anything. | <img src="assets/tools/quota-axi/1280-light.png" width="360" alt="One quota-axi read showing several providers and their windows"> | `npx -y quota-axi@0.1.67` |
-| **BYOKit** | Gives your app the parts it needs to use a person's own AI plan and devices: sign-in, pairing, voice, usage. | <img src="assets/tools/byokit/voice-1280-light.png" width="360" alt="The BYOKit offline voice example after a turn"> | `npm install @byokit/accounts@0.34.0 @byokit/realtime@0.3.3` |
-| **Lookout** | A read-only fleet dashboard: which agents need you, what limits capacity, and why work is waiting. | <img src="assets/tools/lookout/overview-1280-light.png" width="360" alt="Lookout Overview of the bundled sample fleet"> | `npx -y lookout-axi@0.1.0 serve` |
+| Tool | What it does and how to install it |
+| --- | --- |
+| **done-done** | Drives the real product, has a fresh judge check the capture, and writes a receipt tied to the commit.<br>`npm install -g done-done-axi@0.6.18` |
+| **sign-off** | Collects questions, designs, reports, and proof on one board; the answer is saved for the agent.<br>`npm install -g sign-off-axi@0.7.0 (0.8.0 once sign-off PR 303 releases)` |
+| **learn-from-mistakes** | Finds the causes that keep coming back in your records, with counts, evidence, and fixes that cite the record.<br>`npm i -g learn-from-mistakes-axi@0.10.0` |
+| **first-draft** | Makes several HTML design directions, lets you compare them at desktop and phone width, and keeps the one you pick.<br>`npm install -g first-draft-axi@0.3.0` |
+| **TakeOne** | Turns a raw screen recording into a framed, paced demo video on your machine.<br>`npm install -g --allow-remote=all https://github.com/umeranjum17/takeone/releases/latest/download/takeone.tgz (0.2.1)` |
+| **quota-axi** | Reports the quota windows your local agents can use, in one read, without routing or recommending anything.<br>`npx -y quota-axi@0.1.67` |
+| **BYOKit** | Gives your app the parts it needs to use a person's own AI plan and devices: sign-in, pairing, voice, usage.<br>`npm install @byokit/accounts@0.34.0 @byokit/realtime@0.3.3` |
+| **Lookout** | A read-only fleet dashboard: which agents need you, what limits capacity, and why work is waiting.<br>`npx -y lookout-axi@0.1.0 serve` |
+
+<p align="center">
+  <picture>
+    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="assets/tools/done-done/390-dark.png">
+    <source media="(max-width: 600px)" srcset="assets/tools/done-done/390-light.png">
+    <source media="(prefers-color-scheme: dark)" srcset="assets/tools/done-done/1280-dark.png">
+    <img src="assets/tools/done-done/1280-light.png" width="880" alt="done-done: A real done-done run, a passing judge, and a receipt">
+  </picture>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="assets/tools/sign-off/board-390-dark.png">
+    <source media="(max-width: 600px)" srcset="assets/tools/sign-off/board-390-light.png">
+    <source media="(prefers-color-scheme: dark)" srcset="assets/tools/sign-off/board-1280-dark.png">
+    <img src="assets/tools/sign-off/board-1280-light.png" width="880" alt="sign-off: The sign-off Today board">
+  </picture>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="assets/tools/learn-from-mistakes/390-dark.png">
+    <source media="(max-width: 600px)" srcset="assets/tools/learn-from-mistakes/390-light.png">
+    <source media="(prefers-color-scheme: dark)" srcset="assets/tools/learn-from-mistakes/1280-dark.png">
+    <img src="assets/tools/learn-from-mistakes/1280-light.png" width="880" alt="learn-from-mistakes: A real retro report excerpt with repeated causes and counts">
+  </picture>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="assets/tools/first-draft/studio-390-dark.png">
+    <source media="(max-width: 600px)" srcset="assets/tools/first-draft/studio-390-light.png">
+    <source media="(prefers-color-scheme: dark)" srcset="assets/tools/first-draft/studio-1280-dark.png">
+    <img src="assets/tools/first-draft/studio-1280-light.png" width="880" alt="first-draft: The first-draft Studio with two options and a comment">
+  </picture>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="assets/tools/takeone/390-dark.png">
+    <source media="(max-width: 600px)" srcset="assets/tools/takeone/390-light.png">
+    <source media="(prefers-color-scheme: dark)" srcset="assets/tools/takeone/1280-dark.png">
+    <img src="assets/tools/takeone/1280-light.png" width="880" alt="TakeOne: TakeOne doctor reporting the recorder, planner, and renderer">
+  </picture>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="assets/tools/quota-axi/390-dark.png">
+    <source media="(max-width: 600px)" srcset="assets/tools/quota-axi/390-light.png">
+    <source media="(prefers-color-scheme: dark)" srcset="assets/tools/quota-axi/1280-dark.png">
+    <img src="assets/tools/quota-axi/1280-light.png" width="880" alt="quota-axi: One quota-axi read showing several providers and their windows">
+  </picture>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="assets/tools/byokit/voice-390-dark.png">
+    <source media="(max-width: 600px)" srcset="assets/tools/byokit/voice-390-light.png">
+    <source media="(prefers-color-scheme: dark)" srcset="assets/tools/byokit/voice-1280-dark.png">
+    <img src="assets/tools/byokit/voice-1280-light.png" width="880" alt="BYOKit: The BYOKit offline voice example after a turn">
+  </picture>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="assets/tools/lookout/overview-390-dark.png">
+    <source media="(max-width: 600px)" srcset="assets/tools/lookout/overview-390-light.png">
+    <source media="(prefers-color-scheme: dark)" srcset="assets/tools/lookout/overview-1280-dark.png">
+    <img src="assets/tools/lookout/overview-1280-light.png" width="880" alt="Lookout: Lookout Overview of the bundled sample fleet">
+  </picture>
+</p>
 
 Install lines are copied from each project's published README and pinned to the version published on 26 October 2026; sign-off stays on 0.7.0 until its 0.8.0 release (PR 303) ships. The done-done screen is the project's 0.6.12 transcript, the learn-from-mistakes screen is a 0.9.0 report, and the first-draft screen is 0.3.0-dev release evidence; the install pins are the current published versions. A clean-home install proof for every row is still owed, so treat an install line as the project's documented command, not as a claim that this page ran it end to end.
 
