@@ -44,14 +44,19 @@ Add required status checks with `strict_required_status_checks_policy: false`; a
 Bind the checks to the GitHub Actions app already producing them, rather than accepting the same context from any integration.
 No new app installation or manual runner setup is needed for that setting.
 
-Require the actual job contexts: `Lint 1`, `Lint 2`, `Test coverage guard`, `Repo invariants`, `Stock macOS Bash snapshot compatibility`, `Behavior portable parallel 1`, `Behavior portable parallel 2`, `Behavior portable serial 1` through `Behavior portable serial 9`, `Behavior tests (Herdr)`, `Behavior timing aggregate`, and `PR must be raised via no-mistakes`.
-The last name is the compliance job context, not its workflow title; its existing automation exceptions remain unchanged.
-The timing aggregate is not a substitute for individual jobs because it can succeed while collecting evidence from a failed run.
-
+Require exactly one context from this workflow: `CI required`.
+It always reports, and `bin/fm-ci-required.sh` owns its verdict: it fails whenever a lane the change needed did not run or did not pass, and accepts a lane's deliberate skip only when the change did not need that lane.
+The individual lane names are therefore not required; the compliance context `PR must be raised via no-mistakes` stays required beside it, and a retired job name leaves the required list in the same change that retires it.
 Apply the approved rule change only after the corresponding workflow is green and landed, confirming exact names and the Actions integration id from real checks first.
 Snapshot the current ruleset, amend that same rule with the authenticated GitHub API or settings UI, and read back both the ruleset and effective branch rules.
 Verify missing or red checks prevent ordinary merging without creating a test merge; administrator override intentionally remains available.
-Coordinate any workflow rollback with its required-check names so a retired check cannot leave ordinary merges waiting forever.
+
+## CI path scope
+
+`bin/fm-ci-scope.sh` owns which changes need the behavior lanes.
+A change touching only documentation, media assets, or the license runs `Repo invariants` and `CI required`, which still prove the repo invariants, the complete-regression partition, the linted workflows, and the documentation inventory.
+Everything else, including any path the classifier does not recognize, runs lint, both portable parallel lanes, the portable serial shards, the Herdr lane, and the macOS snapshot, so a code change can never lose a behavior gate to a path filter.
+The scope is a job-level condition, never a trigger `paths:` filter: a filtered-out workflow leaves its required check pending forever, while a false condition reports a skip `CI required` accepts.
 
 ## Repo conventions
 
