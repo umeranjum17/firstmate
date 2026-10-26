@@ -27,11 +27,8 @@ DRAIN="$ROOT/bin/fm-wake-drain.sh"
 
 TMP_ROOT=$(fm_test_tmproot fm-watch-triage-tests)
 
-# This suite asserts the watcher's stock behaviour, so it pins the add-on directory
-# to an empty one: the deferred add-on lookup prefers this checkout's own addons/,
-# and a suite that let an installed-in-the-repo add-on decide its assertions would
-# stop testing the watcher. The resolution chain itself is covered by
-# tests/fm-addons-dir.test.sh and the dashboard/flow/stats shim suites.
+# This suite asserts the watcher's stock behaviour, so it pins the add-on directory to an empty one: the
+# deferred lookup prefers this checkout's own addons/, and an in-repo add-on must not decide its assertions.
 FM_ADDONS_DIR="$TMP_ROOT/no-addons"
 mkdir -p "$FM_ADDONS_DIR"
 export FM_ADDONS_DIR

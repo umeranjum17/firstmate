@@ -1,22 +1,15 @@
 #!/usr/bin/env bash
 # fm-addons-dir-lib.sh - the one owner of where a checkout finds its add-ons.
 #
-# The add-ons live in this repository's tracked `addons/` directory. A home that predates that fold still
-# carries the clone at `<home>/projects/firstmate-addons`, so resolution is a chain, never one path:
-#
+# The add-ons live in this repository's tracked `addons/`. A home that predates that fold still carries the
+# clone at `<home>/projects/firstmate-addons`, so resolution is a chain, never one path:
 #   1. `FM_ADDONS_DIR` when set: the operator override, and what every test fixture pins.
 #   2. the in-repo `addons/` beside this checkout (this library's own parent directory).
-#   3. the pre-fold clone at `<home>/projects/firstmate-addons`, with `<home>` the caller's home argument,
-#      else `FM_HOME`, else this checkout.
+#   3. the pre-fold clone, with `<home>` the caller's home argument, else `FM_HOME`, else this checkout.
+# That order keeps a live home working before, during and after the move; callers pass the home they mean,
+# because a secondmate home resolves its own base.
 #
-# That order is what lets a live home keep working before, during and after the move: a checkout that has
-# no `addons/` (an older release, a partial sync) still resolves the clone, and the in-repo copy wins as
-# soon as it exists. Callers pass the home they mean, because a secondmate home resolves its own base.
-#
-# Sourced, not executed:
-#   # shellcheck source=bin/fm-addons-dir-lib.sh
-#   . "$SCRIPT_DIR/fm-addons-dir-lib.sh"
-#   dir=$(fm_addons_dir "$FM_HOME")
+# Sourced, not executed:  . "$SCRIPT_DIR/fm-addons-dir-lib.sh"; dir=$(fm_addons_dir "$FM_HOME")
 
 _FM_ADDONS_LIB_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
 
