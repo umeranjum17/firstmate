@@ -1583,8 +1583,8 @@ jg_task_set_lock_path() {  # <state-dir>
 jg_juggernaut_root_home() {
   local home=${1:-$JG_HOME} marker parent seen="|" depth=0
   home=$(CDPATH='' cd -- "$home" 2>/dev/null && pwd -P) || return 1
-  while [ -e "$home/.jg-squad-lead-parent" ] || [ -L "$home/.jg-squad-lead-parent" ]; do
-    marker="$home/.jg-squad-lead-parent"
+  while [ -e "$(jg_compat_parent_marker "$home")" ] || [ -L "$(jg_compat_parent_marker "$home")" ]; do
+    marker="$(jg_compat_parent_marker "$home")"
     if ! command -v jg_squad_lead_parent_record_parse >/dev/null 2>&1; then
       # shellcheck source=bin/jg-squad-lead-parent-lib.sh
       . "$JG_WAKE_LIB_DIR/jg-squad-lead-parent-lib.sh"

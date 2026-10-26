@@ -9,7 +9,8 @@
 
 # Return 0 when $1 carries a genuine squad-lead-home marker.
 jg_root_is_squad_lead_home() {
-  local marker="$1/.jg-squad-lead-home" id LC_ALL=C
+  local marker id LC_ALL=C
+  marker=$(jg_compat_marker "$1") || return 1
   [ -L "$marker" ] && return 1
   [ -f "$marker" ] || return 1
   IFS= read -r id < "$marker" 2>/dev/null || return 1

@@ -441,14 +441,14 @@ promote_warn_parent_unresolved() {
   echo "warning: could not resolve the consent-holding parent home for squad_lead $1; promotion succeeded, but any open public loop must be inspected and rechained from the parent." >&2
 }
 
-if [ -f "$JG_HOME/.jg-squad-lead-home" ]; then
-  PROMOTE_MATE_ID=$(sed -n '1p' "$JG_HOME/.jg-squad-lead-home" 2>/dev/null || true)
+if [ -f "$(jg_compat_marker "$JG_HOME")" ]; then
+  PROMOTE_MATE_ID=$(sed -n '1p' "$(jg_compat_marker "$JG_HOME")" 2>/dev/null || true)
   PROMOTE_PARENT_RECORD=absent
   PROMOTE_PARENT_ROUTE=
   PROMOTE_DURABLE_PARENT=
-  if [ -e "$JG_HOME/.jg-squad-lead-parent" ] || [ -L "$JG_HOME/.jg-squad-lead-parent" ]; then
+  if [ -e "$(jg_compat_parent_marker "$JG_HOME")" ] || [ -L "$(jg_compat_parent_marker "$JG_HOME")" ]; then
     PROMOTE_PARENT_RECORD=invalid
-    if jg_squad_lead_parent_record_parse "$JG_HOME/.jg-squad-lead-parent"; then
+    if jg_squad_lead_parent_record_parse "$(jg_compat_parent_marker "$JG_HOME")"; then
       PROMOTE_PARENT_RECORD=valid
       PROMOTE_PARENT_ROUTE=$JG_SQUAD_LEAD_PARENT_ROUTE
       PROMOTE_DURABLE_PARENT=$JG_SQUAD_LEAD_PARENT_HOME

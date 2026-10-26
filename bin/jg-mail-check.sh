@@ -147,7 +147,7 @@ record_read() {
   while IFS= read -r line; do
     if [ "$first" = 1 ]; then
       first=0
-      [ "$line" = "$RECORD_SCHEMA" ] || return 0
+      jg_compat_record_ok "$line" "$RECORD_SCHEMA" "$(jg_compat_legacy_of "$RECORD_SCHEMA")" || return 0
       continue
     fi
     case "$line" in

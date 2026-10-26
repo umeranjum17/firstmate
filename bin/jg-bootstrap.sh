@@ -1354,7 +1354,7 @@ startup_memory_budget_setup() {
   # Primary bootstrap owns default publication. A squad_lead is deliberately
   # passive here because its setting must converge from the primary through the
   # inherited-local-material contract rather than becoming a local authority.
-  if [ -e "$JG_HOME/.jg-squad-lead-home" ] || [ -L "$JG_HOME/.jg-squad-lead-home" ]; then
+  if [ -e "$(jg_compat_marker "$JG_HOME")" ] || [ -L "$(jg_compat_marker "$JG_HOME")" ]; then
     return 0
   fi
   if ! jg_startup_memory_budget_materialize "$CONFIG"; then
@@ -1528,7 +1528,7 @@ detect_local_config() {
 # primary Herdr home on a systemd host says so on every start until installed.
 detect_sentinel_service() {
   [ "$BACKEND" = herdr ] || return 0
-  [ -e "$JG_HOME/.jg-squad-lead-home" ] || [ -L "$JG_HOME/.jg-squad-lead-home" ] && return 0
+  [ -e "$(jg_compat_marker "$JG_HOME")" ] || [ -L "$(jg_compat_marker "$JG_HOME")" ] && return 0
   command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1 || return 0
   systemctl --user is-active --quiet jg-sentinel && return 0
   local quoted_home quoted_sentinel

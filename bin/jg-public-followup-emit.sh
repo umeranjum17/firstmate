@@ -240,9 +240,9 @@ if [ "$HOME_MODE" = staging ]; then
     *) die "--stage-in must name the squad_lead juggernaut home identified by --source-home" ;;
   esac
   [ -d "$HOME_DIR/state" ] && [ ! -L "$HOME_DIR/state" ] \
-    && [ -f "$HOME_DIR/.jg-squad-lead-home" ] && [ ! -L "$HOME_DIR/.jg-squad-lead-home" ] \
+    && [ -f "$(jg_compat_marker "$HOME_DIR")" ] && [ ! -L "$(jg_compat_marker "$HOME_DIR")" ] \
     || die "--stage-in must name the squad_lead juggernaut home identified by --source-home"
-  STAGING_HOME_MARKER=$(sed -n '1p' "$HOME_DIR/.jg-squad-lead-home" 2>/dev/null) || STAGING_HOME_MARKER=
+  STAGING_HOME_MARKER=$(sed -n '1p' "$(jg_compat_marker "$HOME_DIR")" 2>/dev/null) || STAGING_HOME_MARKER=
   [ "$STAGING_HOME_MARKER" = "$STAGING_HOME_ID" ] \
     || die "--stage-in must name the squad_lead juggernaut home identified by --source-home"
 fi

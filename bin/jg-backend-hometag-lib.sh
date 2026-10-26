@@ -31,7 +31,8 @@
 JG_BACKEND_HOMETAG_SQUAD_LEAD_MARKER=".jg-squad-lead-home"
 
 jg_backend_hometag() {
-  local marker="$JG_HOME/$JG_BACKEND_HOMETAG_SQUAD_LEAD_MARKER" id prefix root hash
+  local marker id prefix root hash
+  marker=$(jg_compat_marker "$JG_HOME")
   if [ -f "$marker" ]; then
     id=$(tr -d '[:space:]' < "$marker" 2>/dev/null)
     if [ -n "$id" ]; then

@@ -397,7 +397,11 @@ command_build() {
   # would fail to parse in the browser fails here instead.
   extracted=$(sed -n '/<script id="bearings-data" type="application\/json">/,/<\/script>/p' "$tmp" \
     | sed '1d;$d')
-  if ! printf '%s\n' "$extracted" | jq -e --arg schema "$BOARD_SCHEMA" '.schema == $schema' >/dev/null 2>&1; then
+  # Compatibility (slice S5): a board written before the rename carries the old
+  # schema id and is still readable.
+  if ! printf '%s\n' "$extracted" | jq -e --arg schema "$BOARD_SCHEMA" \
+    --arg legacy "$(jg_compat_legacy_of "$BOARD_SCHEMA")" \
+    '.schema == $schema or .schema == $legacy' >/dev/null 2>&1; then
     rm -f -- "$tmp"
     fail "the built board does not carry a readable $BOARD_SCHEMA payload"
   fi

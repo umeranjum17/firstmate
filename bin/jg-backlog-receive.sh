@@ -101,7 +101,7 @@ case "$GENERATION" in ''|*[!0-9]*) die "generation must be a positive integer" ;
 case "$REL" in state/handoff/*.outbox.md) ;; *) die "delivered outbox path is outside state/handoff: $REL" ;; esac
 case "/$REL/" in */../*|*/./*) die "delivered outbox path contains traversal" ;; esac
 case "$REL" in *'//'*) die "delivered outbox path is malformed" ;; esac
-[ -f "$JG_HOME/.jg-squad-lead-home" ] && [ ! -L "$JG_HOME/.jg-squad-lead-home" ] \
+[ -f "$(jg_compat_marker "$JG_HOME")" ] && [ ! -L "$(jg_compat_marker "$JG_HOME")" ] \
   || die "JG_HOME is not a seeded squad_lead home"
 [ -f "$JG_HOME/AGENTS.md" ] && [ -d "$JG_HOME/bin" ] || die "JG_HOME is not a Juggernaut home"
 HOME_REAL=$(CDPATH='' cd -- "$JG_HOME" 2>/dev/null && pwd -P) || die "JG_HOME cannot be resolved"

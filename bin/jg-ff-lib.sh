@@ -186,15 +186,15 @@ validate_squad_lead_home() {
     return 1
   fi
   validate_operational_dirs "$abs_home" "$abs_active_home" "$abs_root" || return 1
-  if [ -L "$abs_home/$SUB_HOME_MARKER" ]; then
+  if [ -L "$(jg_compat_marker "$abs_home")" ]; then
     VALIDATION_ERROR="squad_lead marker must not be a symlink"
     return 1
   fi
-  if [ ! -f "$abs_home/$SUB_HOME_MARKER" ]; then
+  if [ ! -f "$(jg_compat_marker "$abs_home")" ]; then
     VALIDATION_ERROR="not a seeded squad_lead home"
     return 1
   fi
-  marker_id=$(cat "$abs_home/$SUB_HOME_MARKER" 2>/dev/null || true)
+  marker_id=$(cat "$(jg_compat_marker "$abs_home")" 2>/dev/null || true)
   if [ "$marker_id" != "$id" ]; then
     VALIDATION_ERROR="marked for squad_lead ${marker_id:-unknown}, expected $id"
     return 1

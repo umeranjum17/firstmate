@@ -1306,7 +1306,8 @@ read_binding() {  # <source-id>
   [ -e "$path" ] || return 0
   [ -f "$path" ] && [ ! -L "$path" ] || fail "decision binding is unsafe: $path"
   schema=$(sed -n 's/^schema=//p' "$path" | head -1)
-  [ "$schema" = "$BINDING_SCHEMA" ] || fail "decision binding has an incompatible schema: $path"
+  jg_compat_record_ok "$schema" "$BINDING_SCHEMA" "$(jg_compat_legacy_of "$BINDING_SCHEMA")" \
+    || fail "decision binding has an incompatible schema: $path"
   origin=$(sed -n 's/^origin=//p' "$path" | head -1)
   if [ "$origin" != "$BINDING_ANY" ]; then
     case "$origin" in
@@ -1565,7 +1566,8 @@ reconcile_request_read() {  # <task-id>; sets RECONCILE_REQUESTED/RECONCILE_SOUR
   path=$(reconcile_request_path "$id")
   [ -f "$path" ] && [ ! -L "$path" ] || return 1
   schema=$(sed -n 's/^schema=//p' "$path" | head -1)
-  [ "$schema" = "$RECONCILE_SCHEMA" ] || fail "reconcile request has an incompatible schema: $path"
+  jg_compat_record_ok "$schema" "$RECONCILE_SCHEMA" "$(jg_compat_legacy_of "$RECONCILE_SCHEMA")" \
+    || fail "reconcile request has an incompatible schema: $path"
   task=$(sed -n 's/^task=//p' "$path" | head -1)
   [ "$task" = "$id" ] || fail "reconcile request names a different task: $path"
   RECONCILE_REQUESTED=$(sed -n 's/^requested=//p' "$path" | head -1)

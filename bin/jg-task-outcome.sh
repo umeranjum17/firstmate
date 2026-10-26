@@ -80,8 +80,8 @@ PROJECT=${PROJECT##*/}
 
 PR=$(awk -F= '$1 == "pr" { sub(/^[^=]*=/, ""); v=$0 } END { print v }' "$META" 2>/dev/null || true)
 
-if [ -f "$JG_HOME/.jg-squad-lead-home" ] && [ ! -L "$JG_HOME/.jg-squad-lead-home" ]; then
-  HOME_NAME=$(head -n 1 "$JG_HOME/.jg-squad-lead-home" 2>/dev/null | tr -d '\r\n')
+if [ -f "$(jg_compat_marker "$JG_HOME")" ] && [ ! -L "$(jg_compat_marker "$JG_HOME")" ]; then
+  HOME_NAME=$(head -n 1 "$(jg_compat_marker "$JG_HOME")" 2>/dev/null | tr -d '\r\n')
 else
   HOME_NAME=main
 fi

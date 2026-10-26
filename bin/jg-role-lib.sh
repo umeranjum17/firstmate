@@ -429,7 +429,7 @@ jg_role_resolve() {
   JG_ROLE_SOURCE=absent
   JG_ROLE_DIAG=
   role_file=$(jg_role_file "$config")
-  if [ -f "$home/.jg-squad-lead-home" ] && [ ! -L "$home/.jg-squad-lead-home" ]; then
+  if [ -f "$(jg_compat_marker "$home")" ] && [ ! -L "$(jg_compat_marker "$home")" ]; then
     receipt=$(jg_role_inherit_receipt "$config")
     if [ -e "$receipt" ] || [ -L "$receipt" ]; then
       if ! jg_role_inherit_check "$role_file" "$receipt"; then

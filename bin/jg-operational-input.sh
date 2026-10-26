@@ -58,6 +58,11 @@ JG_OPERATIONAL_MARK=$'\xE2\x81\xA3'
 JG_OPERATIONAL_PREFIX="${JG_OPERATIONAL_MARK}JUGGERNAUT_OP: "
 JG_OPERATIONAL_VERSION=v1
 JG_OPERATIONAL_HEADER_PREFIX="${JG_OPERATIONAL_PREFIX}${JG_OPERATIONAL_VERSION} "
+# Compatibility (slice S5): a supervisor and its worker can be on opposite
+# sides of the update, so a marshalled message may still carry the marker's
+# pre-rename spelling. Readers accept either; writers emit this one.
+JG_OPERATIONAL_LEGACY_PREFIX="${JG_OPERATIONAL_MARK}$(jg_compat_legacy_product JUGGERNAUT_OP): "
+JG_OPERATIONAL_LEGACY_HEADER_PREFIX="${JG_OPERATIONAL_LEGACY_PREFIX}${JG_OPERATIONAL_VERSION} "
 JG_OPERATIONAL_KINDS='session-start watcher turn-end-guard away-supervisor launch-brief branch-outcome'
 
 # Compatibility name retained for the away-mode owner and its tests.
@@ -99,10 +104,12 @@ jg_operational_generic_kind() {  # <message> <result-var>
   local message=${1-} result_var=${2-} remainder parsed_kind body
   [ -n "$result_var" ] || return 2
   case "$message" in
-    "$JG_OPERATIONAL_HEADER_PREFIX"*': '?*) ;;
+    "$JG_OPERATIONAL_HEADER_PREFIX"*': '*) ;;
+    "$JG_OPERATIONAL_LEGACY_HEADER_PREFIX"*': '*) ;;
     *) return 1 ;;
   esac
   remainder=${message#"$JG_OPERATIONAL_HEADER_PREFIX"}
+  [ "$remainder" != "$message" ] || remainder=${message#"$JG_OPERATIONAL_LEGACY_HEADER_PREFIX"}
   parsed_kind=${remainder%%': '*}
   jg_operational_kind_is_current "$parsed_kind" || return 1
   body=${remainder#"${parsed_kind}: "}
@@ -131,6 +138,7 @@ jg_operational_input_body() {  # <current-message> <result-var>
   [ -n "$result_var" ] || return 2
   if jg_operational_generic_kind "$message" current_kind; then
     parsed_body=${message#"${JG_OPERATIONAL_HEADER_PREFIX}${current_kind}: "}
+    [ "$parsed_body" != "$message" ] || parsed_body=${message#"${JG_OPERATIONAL_LEGACY_HEADER_PREFIX}${current_kind}: "}
     printf -v "$result_var" '%s' "$parsed_body"
     return 0
   fi
@@ -161,7 +169,7 @@ jg_legacy_operational_input_kind() {  # <message> <result-var>
   # PR 899 landed an untyped JUGGERNAUT_OP prefix. Its subtype cannot be
   # recovered without body prose, so it is explicitly generic.
   case "$message" in
-    "$JG_OPERATIONAL_PREFIX"?*)
+    "$JG_OPERATIONAL_PREFIX"?* | "$JG_OPERATIONAL_LEGACY_PREFIX"?*)
       printf -v "$result_var" '%s' legacy-operational
       return 0
       ;;

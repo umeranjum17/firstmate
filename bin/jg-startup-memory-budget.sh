@@ -45,7 +45,7 @@ report() {
     return 2
   fi
 
-  if [ -e "$JG_HOME/.jg-squad-lead-home" ] || [ -L "$JG_HOME/.jg-squad-lead-home" ]; then
+  if [ -e "$(jg_compat_marker "$JG_HOME")" ] || [ -L "$(jg_compat_marker "$JG_HOME")" ]; then
     role=squad_lead
   fi
 

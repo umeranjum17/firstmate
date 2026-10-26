@@ -173,8 +173,8 @@ if [ -e "$JG_HOME" ] || [ -L "$JG_HOME" ]; then
     fi
   done
   EXISTING_HOME=1
-  if [ -f "$JG_HOME/.jg-squad-lead-home" ]; then
-    [ "$(cat "$JG_HOME/.jg-squad-lead-home")" = "$ID" ] || die "existing remote home belongs to another squad_lead"
+  if [ -f "$(jg_compat_marker "$JG_HOME")" ]; then
+    [ "$(cat "$(jg_compat_marker "$JG_HOME")")" = "$ID" ] || die "existing remote home belongs to another squad_lead"
   elif find "$JG_HOME/data" "$JG_HOME/state" "$JG_HOME/projects" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null | grep -q .; then
     die "unmarked existing remote home contains operational data"
   fi
@@ -275,9 +275,9 @@ mv -f -- "$JG_HOME/data/projects.md.tmp.$$" "$JG_HOME/data/projects.md"
   printf 'route=remote\n'
   [ -z "$PARENT_HOST" ] || printf 'parent_host=%s\n' "$PARENT_HOST"
 } > "$JG_HOME/.jg-squad-lead-parent.tmp.$$"
-mv -f -- "$JG_HOME/.jg-squad-lead-parent.tmp.$$" "$JG_HOME/.jg-squad-lead-parent"
+mv -f -- "$JG_HOME/.jg-squad-lead-parent.tmp.$$" "$(jg_compat_parent_marker "$JG_HOME")"
 printf '%s\n' "$ID" > "$JG_HOME/.jg-squad-lead-home.tmp.$$"
-mv -f -- "$JG_HOME/.jg-squad-lead-home.tmp.$$" "$JG_HOME/.jg-squad-lead-home"
+mv -f -- "$JG_HOME/.jg-squad-lead-home.tmp.$$" "$(jg_compat_marker "$JG_HOME")"
 PUBLISHED=1
 release_provision_lock
 trap - EXIT

@@ -152,8 +152,8 @@ scan_squad_lead_routes() { # <task-id>
     home=$SQUAD_LEAD_REGISTRY_HOME
     case "$home" in /*) ;; *) continue ;; esac
     home=$(CDPATH='' cd -- "$home" 2>/dev/null && pwd -P) || continue
-    [ -f "$home/.jg-squad-lead-home" ] && [ ! -L "$home/.jg-squad-lead-home" ] || continue
-    marker=$(sed -n '1p' "$home/.jg-squad-lead-home" 2>/dev/null)
+    [ -f "$(jg_compat_marker "$home")" ] && [ ! -L "$(jg_compat_marker "$home")" ] || continue
+    marker=$(sed -n '1p' "$(jg_compat_marker "$home")" 2>/dev/null)
     [ "$marker" = "$SQUAD_LEAD_REGISTRY_ID" ] || continue
     [ -f "$home/state/$id.meta" ] && [ ! -L "$home/state/$id.meta" ] || continue
     ROUTE_MATCHES="${ROUTE_MATCHES:+$ROUTE_MATCHES }$SQUAD_LEAD_REGISTRY_ID"

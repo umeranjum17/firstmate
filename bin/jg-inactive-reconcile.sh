@@ -377,7 +377,7 @@ report_to_parent() { # <task> <state> <outcome-key> <fingerprint> <pr>
 # binding is named when it is the cause.
 notice_parent_report_failed() { # <record> <fingerprint> <payload>
   local record=$1 fingerprint=$2 payload=$3
-  if ! jg_squad_lead_parent_record_parse "$JG_HOME/.jg-squad-lead-parent"; then
+  if ! jg_squad_lead_parent_record_parse "$(jg_compat_parent_marker "$JG_HOME")"; then
     payload="$payload (missing or unreadable parent binding .jg-squad-lead-parent)"
   fi
   queue_notice_once "$record" "inactive-reconcile:$fingerprint" "$payload" || true

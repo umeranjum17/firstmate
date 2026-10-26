@@ -95,12 +95,62 @@ jg_compat_marker_ok() {  # <marker-text>
   return 1
 }
 
-# The second-mate home marker files and their schema line. A home that has not
-# been migrated still carries the old names, so readers try both.
-jg_compat_home_marker_paths() {  # <home>
-  printf '%s\n' "$1/.jg-squad-lead-home" "$1/.fm-secondmate-home"
+# The squad-lead home marker files and their schema line. A home that has not
+# been migrated still carries the old names, so every reader and writer asks
+# for the path rather than assuming the new spelling.
+jg_compat_marker() {  # <home>
+  local home=${1-} new old
+  [ -n "$home" ] || return 0
+  new="$home/.jg-squad-lead-home"
+  old="$home/.fm-secondmate-home"
+  if [ ! -e "$new" ] && [ -e "$old" ]; then printf '%s\n' "$old"; else printf '%s\n' "$new"; fi
 }
 
-jg_compat_parent_marker_paths() {  # <home>
-  printf '%s\n' "$1/.jg-squad-lead-parent" "$1/.fm-secondmate-parent"
+jg_compat_parent_marker() {  # <home>
+  local home=${1-} new old
+  [ -n "$home" ] || return 0
+  new="$home/.jg-squad-lead-parent"
+  old="$home/.fm-secondmate-parent"
+  if [ ! -e "$new" ] && [ -e "$old" ]; then printf '%s\n' "$old"; else printf '%s\n' "$new"; fi
 }
+
+# The pre-rename spelling of a current identifier, derived from it rather than
+# listed: jg- becomes fm-, and a nested-supervisor word becomes its old word.
+# Readers use it to accept a record written before the rename.
+jg_compat_legacy_of() {  # <current spelling>
+  local value=${1-}
+  value=${value/#jg-/fm-}
+  value=${value//squad-lead/secondmate}
+  printf '%s\n' "$value"
+}
+
+# The same text with the product token in its pre-rename spelling. The
+# operational-input marker is the one wire value a supervisor and a worker can
+# be on opposite sides of mid-update, so its reader accepts both spellings.
+jg_compat_legacy_product() {  # <text>
+  local legacy=FIRSTMATE
+  printf '%s\n' "${1//JUGGERNAUT/$legacy}"
+}
+
+# The XDG claims root for process-event sources: prefer the directory a home
+# already uses, so a claim registered before the rename is still found and the
+# same source is never armed twice under two roots.
+jg_compat_claims_root() {  # <new-root>
+  local new=${1-} old
+  [ -n "$new" ] || return 0
+  old=${new//\/juggernaut\//\/firstmate\/}
+  if [ ! -d "$new" ] && [ -d "$old" ]; then printf '%s\n' "$old"; else printf '%s\n' "$new"; fi
+}
+
+# The add-ons checkout a home already has. Exported here so every caller's
+# ${JG_ADDONS_DIR:-<home>/projects/juggernaut-addons} default resolves to the
+# directory that exists, without touching each of the 23 call sites.
+if [ -z "${JG_ADDONS_DIR-}" ]; then
+  _jg_addons_root=${JG_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd)}
+  if [ -n "${_jg_addons_root-}" ] && [ -d "$_jg_addons_root/projects/firstmate-addons" ] \
+    && [ ! -d "$_jg_addons_root/projects/juggernaut-addons" ]; then
+    JG_ADDONS_DIR="$_jg_addons_root/projects/firstmate-addons"
+    export JG_ADDONS_DIR
+  fi
+  unset _jg_addons_root
+fi

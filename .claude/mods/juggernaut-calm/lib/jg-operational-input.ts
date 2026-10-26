@@ -23,6 +23,13 @@ const OPERATIONAL_MARK = "\u2063";
 const OPERATIONAL_PREFIX = `${OPERATIONAL_MARK}JUGGERNAUT_OP: `;
 const OPERATIONAL_VERSION = "v1";
 const OPERATIONAL_HEADER_PREFIX = `${OPERATIONAL_PREFIX}${OPERATIONAL_VERSION} `;
+// Compatibility (slice S5): a supervisor and its worker can be on opposite sides
+// of the update, so the marker's product token is matched by shape rather than by
+// one spelling. Writers still emit the current one above.
+const OPERATIONAL_PREFIX_PATTERN = new RegExp(`^${OPERATIONAL_MARK}[A-Z][A-Z_]*_OP: `);
+const OPERATIONAL_HEADER_PATTERN = new RegExp(
+  `^${OPERATIONAL_MARK}[A-Z][A-Z_]*_OP: ${OPERATIONAL_VERSION} `,
+);
 
 /** The kinds the owner's `JG_OPERATIONAL_KINDS` names, in its order. */
 export const JUGGERNAUT_OPERATIONAL_GENERIC_KINDS = [
@@ -54,8 +61,9 @@ function isCurrentKind(kind: string): boolean {
 
 /** `jg_operational_generic_kind`: the kind of a current generic envelope, else undefined. */
 function genericKind(message: string): string | undefined {
-  if (!message.startsWith(OPERATIONAL_HEADER_PREFIX)) return undefined;
-  const remainder = message.slice(OPERATIONAL_HEADER_PREFIX.length);
+  const header = OPERATIONAL_HEADER_PATTERN.exec(message);
+  if (header === null) return undefined;
+  const remainder = message.slice(header[0].length);
   const separator = remainder.indexOf(": ");
   if (separator < 0) return undefined;
   const kind = remainder.slice(0, separator);
@@ -78,7 +86,8 @@ export function juggernautOperationalInputKind(message: string): string | undefi
 export function juggernautLegacyOperationalInputKind(message: string): string | undefined {
   // PR 899 landed an untyped JUGGERNAUT_OP prefix whose subtype cannot be recovered
   // without body prose, so it is explicitly generic.
-  if (message.startsWith(OPERATIONAL_PREFIX) && message.length > OPERATIONAL_PREFIX.length) {
+  const prefix = OPERATIONAL_PREFIX_PATTERN.exec(message);
+  if (prefix !== null && message.length > prefix[0].length) {
     return "legacy-operational";
   }
   if (message === LEGACY_SESSIONSTART) return "session-start";

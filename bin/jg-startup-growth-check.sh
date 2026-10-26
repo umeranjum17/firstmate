@@ -97,7 +97,7 @@ MAX_LINE=1000
 ORPHAN_GRACE=3600
 ORPHAN_SWEEP_LIMIT=64
 PRIMARY_OWNED_MEMORY=
-if [ -e "$JG_HOME/.jg-squad-lead-home" ] || [ -L "$JG_HOME/.jg-squad-lead-home" ]; then
+if [ -e "$(jg_compat_marker "$JG_HOME")" ] || [ -L "$(jg_compat_marker "$JG_HOME")" ]; then
   PRIMARY_OWNED_MEMORY=data/captain-shared.md
 fi
 

@@ -32,7 +32,12 @@
 # Machine-wide claim root. Homes can share one underlying source store, so the
 # "one owner per canonical source" rule cannot live inside a single home.
 jg_procevent_claim_root() {
-  printf '%s\n' "${JG_PROCEVENT_CLAIM_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/juggernaut/procevent-claims}"
+  # Compatibility (slice S5): a claim registered before the rename lives under the
+  # old XDG directory. Prefer whichever directory this machine already uses so one
+  # source is never armed twice under two roots.
+  local default_root
+  default_root="${XDG_STATE_HOME:-$HOME/.local/state}/juggernaut/procevent-claims"
+  printf '%s\n' "${JG_PROCEVENT_CLAIM_ROOT:-$(jg_compat_claims_root "$default_root")}"
 }
 
 jg_procevent_registry_dir() { printf '%s\n' "$1/procevent"; }

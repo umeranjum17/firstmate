@@ -983,8 +983,8 @@ public_followup_squad_lead_home() {
     return 3
   fi
   home=$(CDPATH='' cd -- "$home" 2>/dev/null && pwd -P) || return 2
-  [ -f "$home/.jg-squad-lead-home" ] && [ ! -L "$home/.jg-squad-lead-home" ] || return 2
-  marker=$(sed -n '1p' "$home/.jg-squad-lead-home" 2>/dev/null)
+  [ -f "$(jg_compat_marker "$home")" ] && [ ! -L "$(jg_compat_marker "$home")" ] || return 2
+  marker=$(sed -n '1p' "$(jg_compat_marker "$home")" 2>/dev/null)
   [ "$marker" = "$id" ] || return 2
   printf '%s\n' "$home"
 }

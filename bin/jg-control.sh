@@ -1159,7 +1159,7 @@ safe_checkpoint() {
     # durable records at startup. The checkpoint proves those records are
     # readable BEFORE the agent stops, so a relaunch can never strand child
     # work behind an unreadable home.
-    marker=$(cat "$WT/.jg-squad-lead-home" 2>/dev/null || true)
+    marker=$(cat "$(jg_compat_marker "$WT")" 2>/dev/null || true)
     [ "$marker" = "$ID" ] \
       || die "task $ID's home $WT is not marked as its own seeded squad_lead home (marker: ${marker:-none}); refusing to relaunch"
     # Do not walk state/ with find(1): watcher scratch files can vanish

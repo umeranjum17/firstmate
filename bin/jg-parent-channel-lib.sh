@@ -83,7 +83,7 @@ _jg_parent_channel_id_valid() {  # <id>
 # or an unusable identity marker (2).
 jg_parent_channel_home_id() {  # <home>
   local home=$1 marker id
-  marker="$home/.jg-squad-lead-home"
+  marker="$(jg_compat_marker "$home")"
   if [ ! -e "$marker" ] && [ ! -L "$marker" ]; then
     return 1
   fi
@@ -104,7 +104,7 @@ jg_parent_channel_destination() {  # <home> <state>
   JG_PARENT_CHANNEL_ROUTE=
   id=$(jg_parent_channel_home_id "$home") || rc=$?
   [ "$rc" -eq 0 ] || return "$rc"
-  jg_squad_lead_parent_record_parse "$home/.jg-squad-lead-parent" || return 3
+  jg_squad_lead_parent_record_parse "$(jg_compat_parent_marker "$home")" || return 3
   case "$JG_SQUAD_LEAD_PARENT_ROUTE" in
     local)
       [ -n "$JG_SQUAD_LEAD_PARENT_HOME" ] || return 3

@@ -2712,7 +2712,7 @@ crew_worktree_written_since() {  # <id> <state> <anchor-file>
   [ -n "$wt" ] && [ -d "$wt" ] || return 1
   kind=$(grep '^kind=' "$state/$id.meta" 2>/dev/null | tail -1 | cut -d= -f2- || true)
   [ "$kind" != squad_lead ] || return 1
-  if [ -e "$wt/.jg-squad-lead-home" ] || [ -L "$wt/.jg-squad-lead-home" ]; then
+  if [ -e "$(jg_compat_marker "$wt")" ] || [ -L "$(jg_compat_marker "$wt")" ]; then
     return 1
   fi
   read -r -a names <<< "$JG_WORKTREE_WRITE_PRUNE"

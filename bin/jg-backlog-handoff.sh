@@ -244,11 +244,11 @@ validate_squad_lead_home() {
     return 1
   fi
   validate_operational_dirs "$abs_home" "$abs_active_home" "$abs_root" || return 1
-  if [ ! -f "$abs_home/.jg-squad-lead-home" ]; then
+  if [ ! -f "$(jg_compat_marker "$abs_home")" ]; then
     echo "error: juggernaut home $home is not a seeded squad_lead home" >&2
     return 1
   fi
-  marker_id=$(cat "$abs_home/.jg-squad-lead-home" 2>/dev/null || true)
+  marker_id=$(cat "$(jg_compat_marker "$abs_home")" 2>/dev/null || true)
   if [ "$marker_id" != "$id" ]; then
     echo "error: juggernaut home $home is marked for squad_lead ${marker_id:-unknown}, expected $id" >&2
     return 1

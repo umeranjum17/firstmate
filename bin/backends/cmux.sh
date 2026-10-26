@@ -415,7 +415,10 @@ jg_backend_cmux_target_ready() {  # <target> [expected-label]
   if [ -n "$expected_label" ]; then
     expected_title=$(jg_backend_cmux_scoped_title "$expected_label")
     title=$(jg_backend_cmux_cli workspace list --json --id-format uuids 2>/dev/null | jq -r --arg id "$JG_BACKEND_CMUX_WORKSPACE" '.workspaces[]? | select(.id == $id) | .title' 2>/dev/null)
-    if [ "$title" = "$expected_title" ]; then
+    # Compatibility (slice S5): a workspace titled before the rename keeps
+    # resolving, so a live pane is still recognized by its owning task.
+    if [ "$title" = "$expected_title" ] \
+      || [ "$title" = "$(jg_backend_cmux_scoped_title "$(jg_compat_legacy_of "$expected_label")")" ]; then
       jg_backend_cmux_surface_exists "$JG_BACKEND_CMUX_WORKSPACE" "$JG_BACKEND_CMUX_SURFACE" && return 0
       wsid=$JG_BACKEND_CMUX_WORKSPACE
     elif [ -n "$title" ]; then

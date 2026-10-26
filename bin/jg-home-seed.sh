@@ -444,8 +444,8 @@ verify_juggernaut_home() {
 
 validate_home_assignment() {
   local id=$1 home=$2 marker_id id_conflict conflict conflict_type owner registered_home
-  if [ -f "$home/$SUB_HOME_MARKER" ]; then
-    marker_id=$(cat "$home/$SUB_HOME_MARKER" 2>/dev/null || true)
+  if [ -f "$(jg_compat_marker "$home")" ]; then
+    marker_id=$(cat "$(jg_compat_marker "$home")" 2>/dev/null || true)
     if [ "$marker_id" != "$id" ]; then
       echo "error: squad_lead home $home is already marked for ${marker_id:-unknown}" >&2
       return 1
@@ -942,7 +942,7 @@ seed_home() {
     SEED_CHARTER_EXISTED=1
     cp "$home/data/charter.md" "$SEED_BACKUP_DIR/charter.md"
   fi
-  if [ -f "$home/$SUB_HOME_MARKER" ]; then
+  if [ -f "$(jg_compat_marker "$home")" ]; then
     SEED_MARKER_EXISTED=1
     cp "$home/$SUB_HOME_MARKER" "$SEED_BACKUP_DIR/marker"
   fi

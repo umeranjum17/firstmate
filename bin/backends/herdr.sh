@@ -699,8 +699,11 @@ jg_backend_herdr_projection_journal_snapshot() {  # <journal> <task-id>
     && [ -n "$JG_BACKEND_HERDR_JOURNAL_TASK_LABEL" ] || return 1
   expected_label=$(jg_backend_herdr_projection_workspace_label "$id" "$JG_BACKEND_HERDR_JOURNAL_PROJECTION_ID")
   expected_task_label="jg-$id"
-  [ "$JG_BACKEND_HERDR_JOURNAL_WORKSPACE_LABEL" = "$expected_label" ] \
-    && [ "$JG_BACKEND_HERDR_JOURNAL_TASK_LABEL" = "$expected_task_label" ]
+  # Compatibility (slice S5): a journal written before the rename carries the old
+  # label spelling, and it must keep validating so a resumed task reconciles
+  # instead of being refused.
+  jg_compat_label_ok "$JG_BACKEND_HERDR_JOURNAL_WORKSPACE_LABEL" "$expected_label" \
+    && jg_compat_label_ok "$JG_BACKEND_HERDR_JOURNAL_TASK_LABEL" "$expected_task_label"
 }
 
 # jg_backend_herdr_projection_journal_token: validate and read either journal

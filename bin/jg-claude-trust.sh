@@ -419,7 +419,7 @@ else
   # make some other file's bytes stand in for the seed, and a marker this user
   # does not own was planted by someone else.
   [ -n "$SUB_ID" ] || refuse "no squad_lead id was supplied, so '$TARGET_REAL' cannot be matched against its seed marker"
-  SUB_MARKER="$TARGET_REAL/.jg-squad-lead-home"
+  SUB_MARKER="$(jg_compat_marker "$TARGET_REAL")"
   [ ! -L "$SUB_MARKER" ] || refuse "'$SUB_MARKER' is a symlink; a seeded squad_lead home carries the marker as a regular file"
   [ -f "$SUB_MARKER" ] || refuse "'$TARGET_REAL' carries no .jg-squad-lead-home marker, so it is not a seeded squad_lead home"
   [ -O "$SUB_MARKER" ] || refuse "'$SUB_MARKER' is not owned by this user"

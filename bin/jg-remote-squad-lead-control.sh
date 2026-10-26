@@ -80,9 +80,9 @@ validate_home() { # <id> [allow-absent]
   local id=$1 allow_absent=${2:-no} marker
   if [ ! -e "$TARGET_HOME" ] && [ ! -L "$TARGET_HOME" ] && [ "$allow_absent" = yes ]; then return 2; fi
   [ -d "$TARGET_HOME" ] && [ ! -L "$TARGET_HOME" ] || die "remote squad_lead home is unavailable or unsafe"
-  [ -f "$TARGET_HOME/.jg-squad-lead-home" ] && [ ! -L "$TARGET_HOME/.jg-squad-lead-home" ] \
+  [ -f "$(jg_compat_marker "$TARGET_HOME")" ] && [ ! -L "$(jg_compat_marker "$TARGET_HOME")" ] \
     || die "remote home is not a seeded squad_lead home"
-  marker=$(cat "$TARGET_HOME/.jg-squad-lead-home")
+  marker=$(cat "$(jg_compat_marker "$TARGET_HOME")")
   [ "$marker" = "$id" ] || die "remote home belongs to $marker, not $id"
   [ -f "$TARGET_HOME/AGENTS.md" ] && [ -d "$TARGET_HOME/bin" ] || die "remote home is not a Juggernaut checkout"
 }

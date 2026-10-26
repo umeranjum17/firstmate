@@ -32,7 +32,10 @@ jg_custom_check_trust_read() {
     return 1
   fi
   exec 9<&-
-  [ "$version" = jg-custom-check-v1 ] || return 1
+  # Compatibility (slice S5): a check registered before the rename still carries
+  # the old schema line, so its binding keeps verifying instead of silently
+  # disarming the check. Re-registering writes the current spelling.
+  jg_compat_record_ok "$version" jg-custom-check-v1 "$(jg_compat_legacy_of jg-custom-check-v1)" || return 1
   [[ "$hash" =~ ^[0-9a-f]{64}$ ]] || return 1
   JG_CUSTOM_CHECK_HASH=$hash
 }

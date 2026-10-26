@@ -1082,8 +1082,8 @@ squad_lead_wake_stall_tick() {
     jg_parked_skip_meta "$meta" "$task" watch-wake-stall && { rm -f "$STATE/.squad-lead-wake-stall-$task" "$STATE/.squad-lead-wake-progress-$task" "$STATE/.squad-lead-wake-ring-$task" 2>/dev/null || true; continue; }
     home=$(jg_meta_get "$meta" home)
     [ -n "$home" ] || continue
-    [ -f "$home/.jg-squad-lead-home" ] && [ ! -L "$home/.jg-squad-lead-home" ] || continue
-    [ "$(cat "$home/.jg-squad-lead-home" 2>/dev/null || true)" = "$task" ] || continue
+    [ -f "$(jg_compat_marker "$home")" ] && [ ! -L "$(jg_compat_marker "$home")" ] || continue
+    [ "$(cat "$(jg_compat_marker "$home")" 2>/dev/null || true)" = "$task" ] || continue
     queue="$home/state/.wake-queue"
     row=$(squad_lead_oldest_queue_row "$queue")
     marker="$STATE/.squad-lead-wake-stall-$task"
@@ -2741,7 +2741,7 @@ ready_work_waits_idle() {
   local meta task target open now surfaced surfaced_at surfaced_ids ready_out ready_rc
   READY_WORK_IDS=
   READY_WORK_REASON=
-  [ -f "$JG_HOME/.jg-squad-lead-home" ] && [ ! -L "$JG_HOME/.jg-squad-lead-home" ] || return 1
+  [ -f "$(jg_compat_marker "$JG_HOME")" ] && [ ! -L "$(jg_compat_marker "$JG_HOME")" ] || return 1
   ready_out=$(JG_HOME="$JG_HOME" "$SCRIPT_DIR/jg-tasks-axi.sh" ready 2>/dev/null)
   ready_rc=$?
   READY_WORK_IDS=$(printf '%s\n' "$ready_out" \
