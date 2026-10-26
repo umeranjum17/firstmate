@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 # claude-accounts-quota.sh - one quota view of every Claude account the owner has signed in.
-# Reads the account list from the muxr registry, asks `quota-axi --profile-only` about each profile
-# folder (the folder path is the only thing passed; nothing inside a login folder is opened), and writes
-# <home>/state/claude-accounts.json for the dashboard card and for dispatch input.
+# Reads the account list from the muxr registry, asks the real `quota-axi --profile-only` about each
+# profile folder (the folder path is the only thing passed; nothing inside a login folder is opened),
+# and writes <home>/state/claude-accounts.json for the dashboard card and for dispatch input.
 # Usage: claude-accounts-quota.sh [--print]     (--print: also show the file on stdout)
 # Env:   JG_HOME (required), JG_CLAUDE_ACCOUNTS_REGISTRY
 #        (default: ~/.muxr/plans/accounts-v1.json), JG_CLAUDE_ACCOUNTS_SECONDS (per-account read limit, 60).
 #        JG_ACCOUNTS_PROVIDER=claude|codex (default claude); writes <provider>-accounts.json.
+#        JG_QUOTA_AXI_REAL (the upstream quota-axi path, when it is not the recorded one),
+#        JG_QUOTA_AXI_POOL_UPSTREAM (where quota-axi-pool recorded its upstream).
 # jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
 # here, so an unmigrated shell, unit, pane or record keeps this script working.
 for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
@@ -28,9 +30,35 @@ REST_STATE=$(sed -n 's/^state=//p' "$JG_HOME/config/account-pool" 2>/dev/null | 
 case "$REST_STATE" in /*) ;; *) REST_STATE=$JG_HOME/state ;; esac
 PRINT=0
 [ "${1:-}" = --print ] && PRINT=1
-for tool in jq quota-axi; do
-  command -v "$tool" >/dev/null 2>&1 || { echo "error: claude-accounts needs $tool on PATH" >&2; exit 1; }
-done
+command -v jq >/dev/null 2>&1 || { echo "error: claude-accounts needs jq on PATH" >&2; exit 1; }
+
+# The real quota-axi, never the quota-axi-pool PATH wrapper. That wrapper delegates to the account
+# pick, the pick refreshes its reading by running this reader, and this reader asks `quota-axi`
+# again - so a bare name here recurses until the machine stops. Resolve the way the wrapper does:
+# JG_QUOTA_AXI_REAL, then the upstream it recorded, then PATH with every copy of the wrapper skipped.
+UPSTREAM_FILE=${JG_QUOTA_AXI_POOL_UPSTREAM:-${XDG_DATA_HOME:-$HOME/.local/share}/jg-quota-axi-pool/upstream}
+find_quota_axi() { # -> the real quota-axi path; fails when only the wrapper is installed
+  local cand s
+  if [ -n "${JG_QUOTA_AXI_REAL:-}" ] && [ -x "$JG_QUOTA_AXI_REAL" ]; then printf '%s\n' "$JG_QUOTA_AXI_REAL"; return 0; fi
+  # The recorded upstream, plus the default location even when XDG_DATA_HOME differs from the installer's.
+  for f in "$UPSTREAM_FILE" "$HOME/.local/share/jg-quota-axi-pool/upstream"; do
+    [ -r "$f" ] || continue
+    s=$(head -n 1 "$f")
+    if [ -n "$s" ] && [ -x "$s" ]; then printf '%s\n' "$s"; return 0; fi
+  done
+  while IFS= read -r cand; do
+    [ -n "$cand" ] && [ -x "$cand" ] || continue
+    case "$(readlink -f "$cand" 2>/dev/null || printf '%s\n' "$cand")" in
+    */jg-quota-axi-pool/* | */quota-axi-pool/bin/*) continue ;;
+    esac
+    printf '%s\n' "$cand"; return 0
+  done < <(type -aP quota-axi 2>/dev/null || true)
+  return 1
+}
+QUOTA_AXI=$(find_quota_axi) || {
+  echo "error: claude-accounts needs the real quota-axi, not the quota-axi-pool wrapper (set JG_QUOTA_AXI_REAL)" >&2
+  exit 1
+}
 [ -r "$REGISTRY" ] || { echo "error: muxr account registry not readable: $REGISTRY" >&2; exit 1; }
 
 # id, name and folder only: the filter names these three fields, so nothing else is ever printed.
@@ -43,7 +71,7 @@ read_one() { # id name folder -> one account JSON object
   rested=$(cat "$REST_STATE/$PROVIDER-accounts-rested/$id" 2>/dev/null) || rested=0
   case "$rested" in '' | *[!0-9]*) rested=0 ;; esac
   errf=$(mktemp "${TMPDIR:-/tmp}/claude-accounts.XXXXXX") || return 1
-  raw=$(CLAUDE_CONFIG_DIR=$folder CODEX_HOME=$folder timeout "$SECONDS_MAX" quota-axi --provider "$PROVIDER" --profile-only --json 2>"$errf")
+  raw=$(CLAUDE_CONFIG_DIR=$folder CODEX_HOME=$folder timeout "$SECONDS_MAX" "$QUOTA_AXI" --provider "$PROVIDER" --profile-only --json 2>"$errf")
   rc=$?
   err=$(sed -n '1p' "$errf" | cut -c1-160)
   rm -f "$errf"

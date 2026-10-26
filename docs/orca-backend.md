@@ -7,7 +7,7 @@ Juggernaut agents load [`juggernaut-orca`](../.agents/skills/juggernaut-orca/SKI
 ## Setup
 
 Pick Orca when you already use the Orca macOS app and want Orca-managed worktrees and terminals instead of Treehouse plus a session multiplexer.
-Orca is macOS-only, explicit-only, and does not support squad lead spawns.
+Orca is macOS-only, explicit-only, and does not support Squad Lead spawns.
 
 Prerequisites:
 
@@ -58,7 +58,7 @@ The watcher has no native Orca busy signal, so each harness adapter's semantic l
 Grok alone retains its isolated rendered-tail fallback.
 
 Cleanup keeps all shared Juggernaut safety checks.
-A scout still requires its report and completed decision inventory.
+A Recon still requires its report and completed decision inventory.
 A ship still refuses dirty or unlanded work.
 Before release, cleanup resolves the recorded Orca worktree id and verifies its path matches the recorded worktree path.
 A missing, unreadable, or mismatched identity preserves metadata and stops rather than deleting anything.

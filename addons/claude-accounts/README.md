@@ -2,7 +2,7 @@
 
 One quota view of every Claude account signed in on this machine.
 
-`bin/claude-accounts-quota.sh` reads the account list from the muxr registry (`~/.muxr/plans/accounts-v1.json`, or `JG_CLAUDE_ACCOUNTS_REGISTRY`), takes only the `id`, `name` and `folder` of each Claude account, and runs `quota-axi --provider claude --profile-only --json` with `CLAUDE_CONFIG_DIR` set to that folder. It never opens, copies, links or edits anything inside a login folder, and changes nothing about how accounts sign in.
+`bin/claude-accounts-quota.sh` reads the account list from the muxr registry (`~/.muxr/plans/accounts-v1.json`, or `JG_CLAUDE_ACCOUNTS_REGISTRY`), takes only the `id`, `name` and `folder` of each Claude account, and runs `quota-axi --provider claude --profile-only --json` with `CLAUDE_CONFIG_DIR` set to that folder. It resolves the real upstream `quota-axi` (`JG_QUOTA_AXI_REAL`, then the target `quota-axi-pool` recorded, then `PATH` without the wrapper) and never the `quota-axi-pool` wrapper itself, which delegates to the account pick and would come back here for another reading. It never opens, copies, links or edits anything inside a login folder, and changes nothing about how accounts sign in.
 
 It writes `<home>/state/claude-accounts.json` (atomic replace):
 

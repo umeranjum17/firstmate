@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# jg-remote-readiness-lib.sh - the remote second-mate readiness gate sequence.
+# jg-remote-readiness-lib.sh - the remote squad-lead readiness gate sequence.
 #
 # Source this file and call:
 #   jg_remote_readiness_ensure <bin-dir> <squad-lead-id>

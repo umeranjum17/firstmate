@@ -4,8 +4,8 @@ Audience: maintainer verification.
 
 Verified 2026-09-21 and re-verified 2026-09-22 on macOS arm64 with `devin 3000.11.1 (cc4e349ca55e)`.
 The [adapter reference](../../.agents/skills/harness-adapters/references/harness/devin.md) owns operating facts; executable owners carry launch and state mechanics.
-This verification covers operators and scouts, with tmux as the exercised runtime backend and a Herdr 0.9.0 lab session for the lifecycle checks below.
-Primary, squad lead, ACP, and quota-provider integration are outside this guarantee.
+This verification covers operators and Recon missions, with tmux as the exercised runtime backend and a Herdr 0.9.0 lab session for the lifecycle checks below.
+Primary, Squad Lead, ACP, and quota-provider integration are outside this guarantee.
 
 ## Refresh commands
 
@@ -96,7 +96,7 @@ The default-on trailer itself did not reproduce on this version with SWE-2 Mediu
 
 ## Herdr lab session
 
-A real `jg-spawn.sh --backend herdr` scout on a named Herdr 0.9.0 lab session, with the user's real `~/.claude/settings.json` hooks present, produced:
+A real `jg-spawn.sh --backend herdr` Recon on a named Herdr 0.9.0 lab session, with the user's real `~/.claude/settings.json` hooks present, produced:
 
 ```text
 agent get: {"agent":"devin","agent_status":"idle",...}

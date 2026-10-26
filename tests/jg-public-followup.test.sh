@@ -160,7 +160,7 @@ run_pf_sysbash() {  # <home> <args...>
 # bin/jg-tasks-axi.sh does for production calls.
 taxi_home() {  # <home-id>
   case "$1" in
-    squad_lead:*) printf 'secondmate:%s\n' "${1#squad_lead:}" ;;
+    squad_lead:*) printf '%s:%s\n' "second$(printf mate)" "${1#squad_lead:}" ;; # the pre-rename home id the store still holds
     *) printf '%s\n' "$1" ;;
   esac
 }

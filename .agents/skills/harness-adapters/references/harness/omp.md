@@ -1,6 +1,6 @@
 # omp (Oh My Pi)
 
-Verified for crew, scout, squad lead, and primary work on Herdr on 2026-09-05 with omp 18.1.11, building on the 2026-09-02 adapter investigation against 18.1.2.
+Verified for crew, Recon, Squad Lead, and primary work on Herdr on 2026-09-05 with omp 18.1.11, building on the 2026-09-02 adapter investigation against 18.1.2.
 omp is a Pi fork, so `references/harness/pi.md` is the nearest relative; every difference from Pi is stated here.
 Cross-harness provider and credential identity is owned by `references/common/model-and-effort.md`.
 
@@ -9,7 +9,7 @@ Cross-harness provider and credential identity is owned by `references/common/mo
 | Fact | Value |
 |---|---|
 | Binary | `omp`, a single Bun-compiled executable resolved from `PATH` by `../../../bin/jg-spawn.sh`; a missing binary refuses the spawn. |
-| Launch | Foreign markers cleared (`CLAUDECODE`, `PI_CODING_AGENT`, `GROK_AGENT`, `JG_PI_HARNESS`, `GEMINI_CLI`, Cursor's), `JG_OMP_HARNESS=omp OMP_SKIP_SETUP=1`, then `omp --config <.omp/jg-worker-overlay.yml> --auto-approve --cwd <worktree> [--model] [--thinking] -e state/<id>.omp-ext.ts <one positional brief>`; a squad lead passes that same `-e` for the busy extension and still relies on auto-discovery for its primary extensions. |
+| Launch | Foreign markers cleared (`CLAUDECODE`, `PI_CODING_AGENT`, `GROK_AGENT`, `JG_PI_HARNESS`, `GEMINI_CLI`, Cursor's), `JG_OMP_HARNESS=omp OMP_SKIP_SETUP=1`, then `omp --config <.omp/jg-worker-overlay.yml> --auto-approve --cwd <worktree> [--model] [--thinking] -e state/<id>.omp-ext.ts <one positional brief>`; a Squad Lead passes that same `-e` for the busy extension and still relies on auto-discovery for its primary extensions. |
 | Busy state | `../../../bin/jg-busy-lib.sh` source `omp-ext`: the per-task extension marks busy at `agent_start` and idle at `agent_end` only when `willContinue` is not true; `ctx.isIdle()` is deliberately not consulted because it reads false at a natural TUI `agent_end` (`session_stop` is awaited before settle). |
 | Exit command | `/quit` (`/exit` and `/q` are aliases). |
 | Interrupt | Single Escape; the composer is left empty, no clear key. |
@@ -30,7 +30,7 @@ omp cold start is roughly twenty seconds to the first agent turn, paid once per 
 ## Detection
 
 `../../../bin/jg-harness.sh` tests `JG_OMP_HARNESS=omp` before `CLAUDECODE`, like Cursor's markers, and its ancestry walk matches the anchored process name `omp` above the interpreter fallback.
-The omp template in `../../../bin/jg-spawn.sh` clears every foreign marker at its own launch boundary, and `JG_OMP_HARNESS=omp` counts only under a real `omp` ancestor, so the marker inherited by any other launch is inert: an omp squad lead's workers keep their own identity and an inherited `CLAUDECODE` cannot outrank a worker that omp launched.
+The omp template in `../../../bin/jg-spawn.sh` clears every foreign marker at its own launch boundary, and `JG_OMP_HARNESS=omp` counts only under a real `omp` ancestor, so the marker inherited by any other launch is inert: an omp Squad Lead's workers keep their own identity and an inherited `CLAUDECODE` cannot outrank a worker that omp launched.
 `../../../bin/jg-session-lock-lib.sh` matches the same anchored name for session-lock ownership, and `../../../bin/backends/tmux.sh` classifies it `agent` for liveness.
 The optional claude-bridge extension runs a nested executable literally named `claude` as a sibling of tool execution, never an ancestor of it, so omp's own tool calls detect as omp; that subtree is never walked by a Juggernaut script.
 
@@ -42,7 +42,7 @@ The captain's own `~/.omp/agent/config.yml` is never written; the tracked `.omp/
 ## Extension loading
 
 omp auto-discovers `<cwd>/.omp/extensions/*.ts` (top level only, cwd only, no ancestor walk, no trust dialog) and the active profile's `agent/extensions/`; `.pi/extensions/` is not a discovery root.
-A file that is both auto-discovered and named with `-e` loads twice, so the per-task busy extension lives in `state/` and is the only `-e` a squad lead launch names.
+A file that is both auto-discovered and named with `-e` loads twice, so the per-task busy extension lives in `state/` and is the only `-e` a Squad Lead launch names.
 The primary extensions stay auto-discovered and are not named again.
 There is no `agent_settled` event; `agent_end` plus `willContinue` replaces it.
 
@@ -54,4 +54,4 @@ omp has no asynchronous Stop-hook equivalent, so the Claude auto-arm model does 
 The Pi supervision branch does not run on omp; without the supervision host every actionable wake is delivered to main, and in a home with `config/supervision-host` and no `config/supervision-host-off` the watch extension spawns the host instead of the arm, with Claude's print mode as its headless engine ([`supervision-host.md`](../../../../../docs/supervision-host.md)).
 Launch a primary with plain `omp` inside the home (`JG_OMP_HARNESS=omp omp` when starting from a Claude pane); `../../../bin/jg-session-start.sh` prints `OMP_WATCH_EXTENSION: not loaded` when the running session has not loaded both tracked extensions.
 `JG_OMP_LIVE_E2E=1 ../../../tests/jg-omp-primary-live-e2e.test.sh` is the opt-in live guard; `../../../tests/jg-omp-harness.test.sh` is the portable regression.
-A squad lead registered with `remote=1` in `data/squad leads.md`, spawned through the ordinary `../../../bin/jg-spawn.sh <id> <home> --squad-lead` path, is refused on omp until a remote host verifies it, as is `../../../bin/jg-remote-squad-lead-control.sh launch`; there is no `--remote` flag.
+A Squad Lead registered with `remote=1` in `data/squad leads.md`, spawned through the ordinary `../../../bin/jg-spawn.sh <id> <home> --squad-lead` path, is refused on omp until a remote host verifies it, as is `../../../bin/jg-remote-squad-lead-control.sh launch`; there is no `--remote` flag.

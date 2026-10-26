@@ -118,7 +118,11 @@ jg_merge_outcome_report() {  # <home> <state> <task-id> <pr-url> <origin> [autho
   return "$status"
 }
 
-# Optional merge-card add-on: defines jg_merge_post_hook.
+# Merge hooks owned by core (the same file bin/jg-dod-lib.sh sources), so
+# config/post-merge runs whether or not the merge-card add-on is installed.
+# shellcheck source=bin/jg-merge-gate-lib.sh
+. "$_JG_MERGE_OUTCOME_LIB_DIR/jg-merge-gate-lib.sh"
+# Optional merge-card add-on: defines the same two hooks for homes that install it.
 # shellcheck source=/dev/null
 [ ! -r "${JG_ADDONS_DIR:-${JG_HOME:-$_JG_MERGE_OUTCOME_LIB_DIR/..}/projects/juggernaut-addons}/merge-card/bin/jg-merge-hooks-lib.sh" ] || . "${JG_ADDONS_DIR:-${JG_HOME:-$_JG_MERGE_OUTCOME_LIB_DIR/..}/projects/juggernaut-addons}/merge-card/bin/jg-merge-hooks-lib.sh"
 

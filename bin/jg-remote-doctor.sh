@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Check, and optionally repair, one remote account's second-mate readiness.
+# Check, and optionally repair, one remote account's squad-lead readiness.
 #
 # Usage:
 #   bin/jg-on.sh <squad-lead-id|ssh-alias> jg-remote-doctor.sh [--fix]
@@ -961,4 +961,4 @@ if [ "${#MISSING[@]}" -gt 0 ] || [ "${#GAPS[@]}" -gt 0 ]; then
   printf 'error: this host is not ready for a remote squad lead%s\n' "${NAMES:+; unresolved: $NAMES}" >&2
   exit 1
 fi
-printf 'ok: remote second-mate readiness confirmed on this host\n'
+printf 'ok: remote squad-lead readiness confirmed on this host\n'

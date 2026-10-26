@@ -188,7 +188,7 @@ const UNSAFE_SCOPE: UnreadWakeScope = {
 // (jg-primary-pi-watch.ts forces every check-kind TRIGGER to main), so nothing
 // starves by being left behind.
 //
-// A signal row marked "needs-decision:" by the watcher, a second-mate signal
+// A signal row marked "needs-decision:" by the watcher, a squad-lead signal
 // whose presented span owns a decision (spanIsDecisionOwned), or a stale row
 // for a task with an open needs-decision or a current captain-held declaration
 // gets the identical treatment: excluded from eligibleSeqs, never a scan veto,

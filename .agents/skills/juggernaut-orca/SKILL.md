@@ -75,14 +75,14 @@ For a messy Orca-backed task:
 6. Stop and inspect if the recorded worktree path, Orca worktree id, or project checkout no longer matches expectations.
 
 Teardown remains governed by the normal Juggernaut landing rules.
-Scout work can be torn down after the report exists and the `captain-hold-lifecycle` completion gate passes.
+Recon work can be torn down after the report exists and the `captain-hold-lifecycle` completion gate passes.
 Ship work can be torn down only after the work is landed by its project mode.
 
 ## Smoke Test
 
 Keep Orca smoke tests focused on lifecycle plumbing:
 
-1. Select Orca intentionally for a disposable task or scout.
+1. Select Orca intentionally for a disposable task or Recon.
 2. Spawn through `bin/jg-spawn.sh`.
 3. Confirm metadata records the Orca backend, terminal, Orca worktree id, and isolated worktree path.
 4. Verify `bin/jg-peek.sh`, a short `bin/jg-send.sh` steer, watcher wake behavior, and `bin/jg-crew-state.sh`.

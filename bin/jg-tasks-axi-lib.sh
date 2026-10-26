@@ -42,7 +42,11 @@
 # Both layers are bounded by process lifetime, so a tasks-axi install or upgrade
 # is picked up by the next process rather than being cached to disk.
 
-JG_TASKS_AXI_MIN=0.2.6
+# The pin table (toolchain.versions) owns this floor. The literal below is only the degraded value for a
+# copy of this lib running outside the repo, such as a test fixture; the repo's own path always reads the row.
+# shellcheck source=bin/jg-pin-lib.sh
+. "$(dirname "${BASH_SOURCE[0]}")/jg-pin-lib.sh" 2>/dev/null || true
+JG_TASKS_AXI_MIN=$(jg_pin_version tasks-axi 2>/dev/null) || JG_TASKS_AXI_MIN=0.2.6
 
 JG_TASKS_AXI_COMPATIBLE_MEMO=${JG_TASKS_AXI_COMPATIBLE:-}
 unset JG_TASKS_AXI_COMPATIBLE

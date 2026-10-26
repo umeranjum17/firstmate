@@ -188,7 +188,7 @@ Every other audited class is policy-hidden when Pi exposes a supported presentat
 The home-local persistence schema is owned by [`docs/configuration.md`](configuration.md#calm-preference-configcalm).
 
 On Pi, current session-start, watcher, turn-end guard, away supervisor, and launch-brief inputs use their versioned U+2063 static envelopes.
-The established leading `[jg-from-juggernaut]` plus U+2063 routing carrier remains current so running squad lead charters remain compatible.
+The established leading `[jg-from-juggernaut]` plus U+2063 routing carrier remains current so running Squad Lead charters remain compatible.
 Claude-bound typed away escalations and launch briefs instead use the record-backed carrier owned by `bin/jg-operational-input.sh`; its replay limit is described in [`calm.md`](calm.md#claude-code).
 Calm classifies only at Pi's transcript-presentation owner through the canonical parser and never replaces, reorders, or weakens those messages.
 
@@ -657,9 +657,9 @@ tests/jg-pi-primary-types.test.sh
 
 ```text
 0.87.1
-ok - Pi 0.87.1 exposes every queue-retention member Calm preflights before hiding queued Juggernaut rows
-ok - Calm hides queued Juggernaut rows only on a session that can keep them, keeps hidden ones out of the editor on Escape, delivers them once in order, and leaves unsupported sessions and Calm off stock
-ok - Pi 0.87.1 with Calm on keeps a queued Juggernaut notification unlisted, out of the editor on Escape, and delivers it once in a new announced turn, while Calm off stays stock
+ok - Pi 0.87.1 exposes every queue-retention member Calm preflights before hiding queued Overwatch rows
+ok - Calm hides queued Overwatch rows only on a session that can keep them, keeps hidden ones out of the editor on Escape, delivers them once in order, and leaves unsupported sessions and Calm off stock
+ok - Pi 0.87.1 with Calm on keeps a queued Overwatch notification unlisted, out of the editor on Escape, and delivers it once in a new announced turn, while Calm off stays stock
 ok - tracked Pi extensions pass strict no-emit typecheck against Pi 0.87.1
 ```
 
@@ -667,7 +667,7 @@ The rest of `tests/jg-calm-pi-extension.test.sh` passed unchanged in the same ru
 With a member name the running session does not have added to the adapter's required list, the live guard failed as designed:
 
 ```text
-not ok - Pi 0.87.1 lacks the queue-retention capability Calm needs to hide queued Juggernaut rows: session._queueNotARealMember
+not ok - Pi 0.87.1 lacks the queue-retention capability Calm needs to hide queued Overwatch rows: session._queueNotARealMember
 ```
 
 With the queued-row adapter left uninstalled, the real-Pi Escape case failed on the listed notification, `Pi Calm listed a queued Juggernaut notification`.

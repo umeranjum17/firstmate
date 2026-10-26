@@ -1086,7 +1086,7 @@ EOF
   pass "a captain-held signal trigger reaches main with routine rows present"
 }
 
-# An unread second-mate pending-reply escalation keeps a later stale reminder
+# An unread squad-lead pending-reply escalation keeps a later stale reminder
 # under the same task's window alias on main until the decision row is read.
 test_pi_unread_pending_reply_forces_later_stale_alias_to_main() {
   local repo home plugin log stop out status

@@ -165,7 +165,7 @@ That its duration landed within 3% of the two clean runs is evidence the elevate
 These durations are not comparable with the six-member run above: that measurement was taken on a different machine state, and the gap is far larger than two short scripts can account for, so it is not evidence about the two new members.
 For the same reason the 1.72x four-worker figure recorded above is left as a statement about that measurement rather than restated as current.
 
-### squad lead: admitted
+### Squad Lead: admitted
 
 - Date: 2026-09-03
 - Command: `bin/jg-test-isolation-proof.sh --pool squad lead --jobs 4`
@@ -177,7 +177,7 @@ For the same reason the 1.72x four-worker figure recorded above is left as a sta
 | 2 | `JG_ISOLATION_SUMMARY total=21 failed=0 concurrency=4 duration_ms=571247` |
 
 An earlier proof on 2026-09-03 refused this family on `tests/jg-backlog-handoff.test.sh`, failing two runs of three with `Task "pre-move-crash" not found in this backlog`.
-The cause was in the case's crash injection, not in shared squad lead state.
+The cause was in the case's crash injection, not in shared Squad Lead state.
 Its fake `tasks-axi` killed the handoff and then slept a fixed second before delegating to the real binary, expecting to be torn down during that pause.
 Nothing tore it down: the fake outlives the process it kills, so on a host slow enough for the case's next assertions to take longer than a second, the orphan woke up and completed the very move the case requires left undone, which then made the recovery step fail.
 Direct observation of the source and destination backlogs during the injected crash showed exactly that, the item moving one second after the crash while the case was still asserting.

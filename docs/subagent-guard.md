@@ -137,7 +137,7 @@ The shipped hook fires only in a genuine Juggernaut primary home, using the shar
 This is the same predicate `bin/jg-sessionstart-nudge.sh` and `bin/jg-turnend-guard.sh` use, so the three tracked primary-scoped hooks cannot drift apart.
 
 A home is in scope when it has `AGENTS.md`, a `bin/` directory, an existing state directory, and either a plain checkout where git-dir equals git-common-dir or a valid `.jg-squad-lead-home` marker.
-A marked squad lead home is in scope on purpose: it operates its own fleet and must dispatch through it for the same durability reasons.
+A marked Squad Lead home is in scope on purpose: it operates its own fleet and must dispatch through it for the same durability reasons.
 
 An operator's disposable task worktree is a linked git worktree, which is the shape `bin/jg-spawn.sh` always hands out, so it is out of scope.
 An operator using delegation tools inside its own task worktree is legitimate and stays allowed.
@@ -170,7 +170,7 @@ A tool removed from the schema stays removed, so a genuinely intended use of a l
 - Malformed or empty stdin, invalid JSON, a payload with no tool name, and missing `jq` for stdin transport all fail open with exit 0 and no output.
 
 The deny message names the real dispatch path.
-When `bin/jg-scout.sh` exists in the home the message first defers to the `AGENTS.md` intake classification, then routes work already classified as a scout there and authorized ship work with its bounded research to `bin/jg-brief.sh` then `bin/jg-spawn.sh`.
+When `bin/jg-scout.sh` exists in the home the message first defers to the `AGENTS.md` intake classification, then routes work already classified as a Recon there and authorized ship work with its bounded research to `bin/jg-brief.sh` then `bin/jg-spawn.sh`.
 When that script is absent the message still defers to intake classification and degrades to naming `bin/jg-brief.sh` then `bin/jg-spawn.sh` for dispatched work, rather than pointing at a script that is not there.
 
 ## Harness wiring
@@ -354,7 +354,7 @@ The live consequence is confirmed by the shipped-guard result above: Claude hono
 ## Automated validation
 
 `tests/jg-subagent-pretool-check.test.sh` owns the acceptance matrix and is registered in the `pure-contract-unit` family in `bin/jg-test-run.sh`.
-It covers the tracked Claude settings boundary that forbids a `permissions` key; the match-all Claude hook registration; denial of every work-creating delegation tool by shape; denial of twelve hypothetical future tool names that appear on no list; the observe-or-stop, plan-only, and MCP exclusions; the exactness of the plan-only exclusion against six near-miss names a substring or shorter-stem widening would release; the scout-present and scout-absent message variants; the escape hatch including its fail-closed values; inertness in a linked task worktree and in a non-Juggernaut repo; in-scope enforcement for a marked squad lead home; both stdin transports; the empty-stdout requirement; fail-open transport behavior; and the preserved `Bash` seatbelts and `Stop` guard.
+It covers the tracked Claude settings boundary that forbids a `permissions` key; the match-all Claude hook registration; denial of every work-creating delegation tool by shape; denial of twelve hypothetical future tool names that appear on no list; the observe-or-stop, plan-only, and MCP exclusions; the exactness of the plan-only exclusion against six near-miss names a substring or shorter-stem widening would release; the scout-present and scout-absent message variants; the escape hatch including its fail-closed values; inertness in a linked task worktree and in a non-Juggernaut repo; in-scope enforcement for a marked Squad Lead home; both stdin transports; the empty-stdout requirement; fail-open transport behavior; and the preserved `Bash` seatbelts and `Stop` guard.
 
 Run:
 

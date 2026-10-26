@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Real hosted OpenCode failures, grouped automatic wake, and second-mate
+# Real hosted OpenCode failures, grouped automatic wake, and squad-lead
 # watcher continuity in a named Herdr lab. No user credentials or settings.
 # JG_MODEL_OUTAGE_LIVE=1 bin/jg-test-run.sh tests/jg-model-outage-live-e2e.test.sh
 # JG_MODEL_OUTAGE_EVIDENCE selects a retained private evidence directory.
@@ -113,7 +113,7 @@ elapsed=$(( $(date +%s) - failure_at ))
 printf 'outage delivered and handled in %ss\n' "$elapsed" > "$E/latency.txt"
 cp "$JG_HOME/state/.last-watcher-beat" "$E/first-beacon"
 sleep 4
-[ "$JG_HOME/state/.last-watcher-beat" -nt "$E/first-beacon" ] || fail 'second-mate beacon stopped'
+[ "$JG_HOME/state/.last-watcher-beat" -nt "$E/first-beacon" ] || fail 'squad-lead beacon stopped'
 # Delivery ledger records successful automatic delivery, not just queued text.
 cp "$JG_HOME/state/.watch-deliveries.log" "$E/grouped-wake.txt"
 grep -q 'affected=\[lanea,laneb\]: Model outage-unavailable is not supported' "$E/grouped-wake.txt"

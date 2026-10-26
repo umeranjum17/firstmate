@@ -60,7 +60,7 @@ External process-event bindings intentionally expose no answer operation and can
 `captain-hold-lifecycle` owns when a binding is required and what the keys must be.
 A sign-off board is the one built-in answer source that binds itself: `bin/jg-procevent-signoff.sh arm` binds and registers it in one step, and from then on each undated captain hold also raises a board card keyed by this home's tag, its task id and its hold stamp.
 
-A configured remote squad lead reply source is armed and handled through `bin/jg-procevent-remote-reply.sh`.
+A configured remote Squad Lead reply source is armed and handled through `bin/jg-procevent-remote-reply.sh`.
 Its header owns exact commands, while the adapter owns cursor continuity, validated deduplicated status ingest, path-confined document fetch, acknowledgement, and re-arming after a good delta.
 A continuity break is escalated once and stays unarmed until an operator deliberately rebases it.
 
@@ -80,7 +80,7 @@ bin/jg-procevent-when.sh arm <name> --condition <argv>... --action <argv>...
 
 [`docs/configuration.md`](../../../docs/configuration.md#process-to-event-sources-stateprocevent) owns the watch's operating contract, while the adapter's header and `--help` own the flags, cadence, trust binding, and outcome document.
 Eligibility is a Juggernaut judgment made BEFORE arming, because the scripts cannot classify an argv: the action must be safe, reversible, and exact (for example `no-mistakes update --beta`, whose own guard refuses while a validation run is active).
-Never bind an action that is destructive, irreversible, or security-sensitive, an action needing captain approval or any gate decision, or an action whose right form depends on what the condition finds - those keep the existing check-fires-then-juggernaut-decides flow, for which a plain custom check or another adapter stays correct.
+Never bind an action that is destructive, irreversible, or security-sensitive, an action needing captain approval or any gate decision, or an action whose right form depends on what the condition finds - those keep the existing check-fires-then-Overwatch-decides flow, for which a plain custom check or another adapter stays correct.
 When in doubt, arm only the condition half as an ordinary check and keep the action as a wake-time decision.
 
 `bin/jg-procevent.sh --help`, `bin/jg-procevent-lavish.sh --help`, `bin/jg-procevent-when.sh --help`, `bin/jg-procevent-quota.sh --help`, `bin/jg-procevent-signoff.sh --help`, and `bin/jg-procevent-remote-reply.sh --help` own the exact commands and flags.

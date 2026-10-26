@@ -146,7 +146,7 @@ This is the cursor precedent, not a gap to patch in shared code.
 
 ## Supervised task: spawn, steer, relaunch, and exit through the new path
 
-A trivial scout ran end to end through `bin/jg-spawn.sh --harness agy` against the same isolated lab session: `spawned agy-e2e1 harness=agy kind=scout` with a treehouse-provisioned worktree, `--model gemini-3.8-flash-low`, and `--effort low` all recorded in task metadata.
+A trivial Recon ran end to end through `bin/jg-spawn.sh --harness agy` against the same isolated lab session: `spawned agy-e2e1 harness=agy kind=scout` with a treehouse-provisioned worktree, `--model gemini-3.8-flash-low`, and `--effort low` all recorded in task metadata.
 The worker wrote its worktree file and appended `done: agy e2e turn complete` to its status file, which lives outside the worktree, proving prompt processing, tool execution, outside-workspace file access, and a new completion event.
 Durable steering held: a `bin/jg-send.sh` message landed in the task inbox, the worker appended the steered lines to both files, and its inbox record moved to `handled/`.
 Same-copy relaunch held: `bin/jg-control.sh relaunch --note` replaced the worker in place on the identical worktree, model, and effort, the replacement verified both prior lines intact and appended `relaunched: done`.
@@ -158,7 +158,7 @@ No automatic quota failover was exercised or claimed; every handoff above was an
 The unauthenticated failure mode was never observed; this host's agy runs signed in, so any auth prompt is a fail-loud credential blocker, not a handled dialog.
 No slash-skill invocation form was verified, so skill invocation stays natural language.
 `--continue` and `--conversation` resume were never exercised; recovery uses deterministic relaunch from the brief on disk.
-No primary or squad lead behavior was built or tested, and none is claimed.
+No primary or Squad Lead behavior was built or tested, and none is claimed.
 
 ## Refreshing this record
 

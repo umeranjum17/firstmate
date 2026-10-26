@@ -45,8 +45,8 @@ Each adapter:
 Pi treats an arm child whose process is already gone as an empty slot even while its close event is still pending, so a repair call or a scheduled retry starts a fresh arm instead of answering unchanged.
 A failed follow-up never cancels continuity restoration.
 
-OpenCode uses the same owner in a second-mate home, retaining the primary-root and session-lock ownership checks that exclude task workers.
-A running OpenCode session keeps the plugin it loaded at launch, so an existing second-mate home gains this arm only when its OpenCode session restarts.
+OpenCode uses the same owner in a squad homes, retaining the primary-root and session-lock ownership checks that exclude task workers.
+A running OpenCode session keeps the plugin it loaded at launch, so an existing squad homes gains this arm only when its OpenCode session restarts.
 
 ### Pi session replacement
 
@@ -225,7 +225,7 @@ Every owner above runs inside the agent runtime, so a killed Herdr server takes 
 `bin/jg-sentinel.sh` is the one piece that must run outside the runtime, as a systemd user service:
 `mkdir -p ~/.config/systemd/user && JG_HOME="/absolute/home" bin/jg-sentinel.sh unit > ~/.config/systemd/user/jg-sentinel.service && systemctl --user enable --now jg-sentinel`.
 While the service is inactive, session start on a primary Herdr home with a systemd user bus prints a `SENTINEL:` line carrying the install command with shell-quoted absolute home and executable paths.
-On a server restart it reconciles the home's direct reports, orders each live squad lead to run its own session start, and types an operational-input doorbell into the primary, so that turn's end re-arms through the primary's own owner.
+On a server restart it reconciles the home's direct reports, orders each live Squad Lead to run its own session start, and types an operational-input doorbell into the primary, so that turn's end re-arms through the primary's own owner.
 Session start runs the same reconcile once in the background, so every home resumes its own lanes: a dead lane is relaunched, a lane whose turn was lost gets one resume nudge, and a mid-turn or properly waiting lane is left alone.
 It also wakes the primary when supervision is needed and the beacon has been stale beyond the guard grace with no turn running.
 Its header owns the exact rules.
@@ -358,7 +358,7 @@ Under the away-posture record the exclusion lifts and a check row is offered to 
 `jg-wake-drain.sh` never reclassifies a row itself.
 It filters the queue to the current actor's opaque claim before same-key deduplication, then presents and acknowledges only that actor-local view.
 A missing or empty branch snapshot is refused loudly rather than read as "nothing eligible", because reaching the drain without the non-empty handoff promised by the extension is a wiring bug.
-A branch acknowledgement retires the check-row receipts - inactive-outcome, inactive-reconcile notice, and squad lead stall - of exactly the granted sequences it consumes, so a branch-consumed check is never re-queued by its producer.
+A branch acknowledgement retires the check-row receipts - inactive-outcome, inactive-reconcile notice, and Squad Lead stall - of exactly the granted sequences it consumes, so a branch-consumed check is never re-queued by its producer.
 Attended, a grant names no check row and each scan finds nothing.
 
 ### Per-actor regression tests
@@ -377,7 +377,7 @@ The same suite pins the counted-equals-presentable invariant against `bin/jg-gua
 - That row is presented with its acknowledgement command - with the ordinary warning restored - as soon as the grant clears.
 - Structurally unusable rows are retired by main alone while every remaining row stays presentable and acknowledgeable.
 
-Branch acknowledgement retiring the check-row receipts of exactly its granted sequences is pinned by `tests/jg-wake-queue.test.sh` for the squad lead stall receipt and by `tests/jg-inactive-reconcile.test.sh` for the inactive-outcome receipt.
+Branch acknowledgement retiring the check-row receipts of exactly its granted sequences is pinned by `tests/jg-wake-queue.test.sh` for the Squad Lead stall receipt and by `tests/jg-inactive-reconcile.test.sh` for the inactive-outcome receipt.
 
 `tests/jg-pi-branch-extension.test.sh` pins extension-side classification, claim publication and release, and the pre-drain recheck.
 

@@ -17,7 +17,11 @@
 # quota-axi keeps working unchanged. JG_QUOTA_ROW_JQ is the one join used to
 # bind a candidate to its row under either schema.
 
-JG_QUOTA_AXI_MIN=0.1.51
+# The pin table (toolchain.versions) owns this floor. The literal below is only the degraded value for a
+# copy of this lib running outside the repo, such as a test fixture; the repo's own path always reads the row.
+# shellcheck source=bin/jg-pin-lib.sh
+. "$(dirname "${BASH_SOURCE[0]}")/jg-pin-lib.sh" 2>/dev/null || true
+JG_QUOTA_AXI_MIN=$(jg_pin_version quota-axi 2>/dev/null) || JG_QUOTA_AXI_MIN=0.1.51
 JG_QUOTA_PROVIDER_ID_RE='^[a-z0-9]+(-[a-z0-9]+)*\z'
 
 # The eligibility section of .agents/skills/quota-array-dispatch/SKILL.md

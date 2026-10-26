@@ -30,6 +30,23 @@ BASE_PATH=${JG_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
 TMP_ROOT=$(jg_test_tmproot jg-bootstrap-tests)
 export JG_BACKEND_CMUX_BUNDLE_BIN="$TMP_ROOT/no-bundled-cmux"
 
+# Every install hint and version floor is pinned in toolchain.versions, so the
+# expectations and the fake toolchain derive from that table: bumping a row moves
+# these cases with it instead of leaving them asserting a stale version.
+# shellcheck source=bin/jg-pin-lib.sh
+. "$ROOT/bin/jg-pin-lib.sh"
+export JG_FAKE_GH_AXI_VERSION=${JG_FAKE_GH_AXI_VERSION:-$(jg_pin_version gh-axi)}
+export JG_FAKE_QUOTA_AXI_VERSION=${JG_FAKE_QUOTA_AXI_VERSION:-$(jg_pin_version quota-axi)}
+export JG_FAKE_LAVISH_AXI_VERSION=${JG_FAKE_LAVISH_AXI_VERSION:-$(jg_pin_version lavish-axi)}
+export JG_FAKE_LEARN_FROM_MISTAKES_AXI_VERSION=${JG_FAKE_LEARN_FROM_MISTAKES_AXI_VERSION:-$(jg_pin_version learn-from-mistakes)}
+export JG_FAKE_DONE_DONE_AXI_VERSION=${JG_FAKE_DONE_DONE_AXI_VERSION:-$(jg_pin_version done-done)}
+export JG_FAKE_SIGN_OFF_AXI_VERSION=${JG_FAKE_SIGN_OFF_AXI_VERSION:-$(jg_pin_version sign-off-axi)}
+MISS_TASKS_AXI="MISSING: tasks-axi (install: npm install -g $(jg_pin_npm tasks-axi))"
+MISS_QUOTA_AXI="MISSING: quota-axi (install: npm install -g $(jg_pin_npm quota-axi))"
+MISS_GH_AXI="MISSING: gh-axi (install: npm install -g $(jg_pin_npm gh-axi) && gh-axi setup hooks)"
+# The patch release one step below a pinned floor, derived rather than typed.
+just_below() { awk -F. '{ printf "%s.%s.%d", $1, $2, $3 - 1 }' <<<"$1"; }
+
 # Hermetic runtime-backend detection. These cases pin the backend per-home via
 # config/backend; the dev shell's ambient runtime markers ($TMUX inside tmux,
 # HERDR_ENV inside herdr, CMUX_* inside a cmux terminal) must not leak into
@@ -53,8 +70,10 @@ make_fake_toolchain() {
 exit 0
 SH
   chmod +x "$fakebin/systemctl"
-  jg_fake_version_tool "$fakebin" lavish-axi JG_FAKE_LAVISH_AXI_VERSION 0.1.80
-  jg_fake_version_tool "$fakebin" learn-from-mistakes JG_FAKE_LEARN_FROM_MISTAKES_AXI_VERSION 0.2.0
+  jg_fake_version_tool "$fakebin" lavish-axi JG_FAKE_LAVISH_AXI_VERSION "$JG_FAKE_LAVISH_AXI_VERSION"
+  jg_fake_version_tool "$fakebin" learn-from-mistakes JG_FAKE_LEARN_FROM_MISTAKES_AXI_VERSION "$JG_FAKE_LEARN_FROM_MISTAKES_AXI_VERSION"
+  jg_fake_version_tool "$fakebin" done-done JG_FAKE_DONE_DONE_AXI_VERSION "$JG_FAKE_DONE_DONE_AXI_VERSION"
+  jg_fake_version_tool "$fakebin" sign-off-axi JG_FAKE_SIGN_OFF_AXI_VERSION "$JG_FAKE_SIGN_OFF_AXI_VERSION"
   cat > "$fakebin/gh-axi" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --version ]; then
@@ -312,17 +331,17 @@ test_bootstrap_reporting() {
         fi
         ;;
     esac
-  done <<'ROWS'
-treehouse --lease support is accepted silently^1^0.2.6^1^manual^empty^^
-treehouse without --lease reports an upgrade, gh auth is fine^0^0.2.6^1^-^grep^MISSING: treehouse (install: curl -fsSL https://kunchenguid.github.io/treehouse/install.sh | sh)^NEEDS_GH_AUTH
-compatible tasks-axi is silent by default^1^0.2.6^1^-^empty^^
-missing tasks-axi is required by default^1^-^1^-^exact^MISSING: tasks-axi (install: npm install -g tasks-axi)^
-incompatible tasks-axi is required by default^1^0.1.0^1^-^exact^MISSING: tasks-axi (install: npm install -g tasks-axi)^
-tasks-axi without archive-body is required by default^1^0.2.6:noarchive^1^-^exact^MISSING: tasks-axi (install: npm install -g tasks-axi)^
-tasks-axi without multi-id mv is required by default^1^0.2.6:nomulti^1^-^exact^MISSING: tasks-axi (install: npm install -g tasks-axi)^
-missing quota-axi is required by default^1^0.2.6^0^manual^exact^MISSING: quota-axi (install: npm install -g quota-axi)^
-manual backlog backend still requires missing tasks-axi^1^-^1^manual^exact^MISSING: tasks-axi (install: npm install -g tasks-axi)^
-manual backlog backend suppresses tasks-axi availability^1^0.2.6^1^manual^empty^^
+  done <<ROWS
+treehouse --lease support is accepted silently^1^$(jg_pin_version tasks-axi)^1^manual^empty^^
+treehouse without --lease reports an upgrade, gh auth is fine^0^$(jg_pin_version tasks-axi)^1^-^grep^MISSING: treehouse (install: curl -fsSL https://kunchenguid.github.io/treehouse/install.sh | sh)^NEEDS_GH_AUTH
+compatible tasks-axi is silent by default^1^$(jg_pin_version tasks-axi)^1^-^empty^^
+missing tasks-axi is required by default^1^-^1^-^exact^$MISS_TASKS_AXI^
+incompatible tasks-axi is required by default^1^0.1.0^1^-^exact^$MISS_TASKS_AXI^
+tasks-axi without archive-body is required by default^1^$(jg_pin_version tasks-axi):noarchive^1^-^exact^$MISS_TASKS_AXI^
+tasks-axi without multi-id mv is required by default^1^$(jg_pin_version tasks-axi):nomulti^1^-^exact^$MISS_TASKS_AXI^
+missing quota-axi is required by default^1^$(jg_pin_version tasks-axi)^0^manual^exact^$MISS_QUOTA_AXI^
+manual backlog backend still requires missing tasks-axi^1^-^1^manual^exact^$MISS_TASKS_AXI^
+manual backlog backend suppresses tasks-axi availability^1^$(jg_pin_version tasks-axi)^1^manual^empty^^
 ROWS
   pass "bootstrap reports treehouse lease + tasks-axi/quota-axi bootstrap contracts"
 }
@@ -359,7 +378,10 @@ ROWS
 
 test_gh_axi_min_version() {
   local label version mode case_dir fakebin out missing n
-  missing='MISSING: gh-axi (install: npm install -g gh-axi && gh-axi setup hooks)'
+  missing=$MISS_GH_AXI
+  local gh_min gh_below
+  gh_min=$(jg_pin_version gh-axi)
+  gh_below=$(just_below "$gh_min")
   n=0
   while IFS='^' read -r label version mode; do
     [ -n "$label" ] || continue
@@ -376,12 +398,11 @@ test_gh_axi_min_version() {
       missing)
         [ "$out" = "$missing" ] || fail "$label: expected '$missing', got: $out" ;;
     esac
-  done <<'ROWS'
-minimum gh-axi version is accepted^0.1.29^empty
-newer gh-axi patch is accepted^0.1.30^empty
+  done <<ROWS
+pinned gh-axi version is accepted^$gh_min^empty
 newer gh-axi minor is accepted^0.2.0^empty
 newer gh-axi major is accepted^1.0.0^empty
-older gh-axi patch reports an upgrade^0.1.19^missing
+older gh-axi patch reports an upgrade^$gh_below^missing
 much older gh-axi minor reports an upgrade^0.0.9^missing
 unparseable gh-axi version reports an upgrade^gh-axi development build^missing
 ROWS
@@ -390,8 +411,11 @@ ROWS
 
 test_lavish_axi_min_version() {
   local label version mode case_dir fakebin out unavailable upgrade n
-  unavailable='PRESENTATION_UNAVAILABLE: lavish-axi (requires >=0.1.77; install: npm install -g lavish-axi && lavish-axi setup hooks) - nonvisual work may proceed with plain-text decisions and reports; install or upgrade before using Lavish'
-  upgrade='BOOTSTRAP_INFO: lavish-axi >=0.1.80 enables confirmed board replies; this older compatible version retains the legacy reply path, but upgrade to prevent handing back a board before its reply is accepted'
+  unavailable="PRESENTATION_UNAVAILABLE: lavish-axi (requires >=0.1.77; install: npm install -g $(jg_pin_npm lavish-axi) && lavish-axi setup hooks) - nonvisual work may proceed with plain-text decisions and reports; install or upgrade before using Lavish"
+  local lavish_min lavish_below
+  lavish_min=$(jg_pin_version lavish-axi)
+  lavish_below=$(just_below "$lavish_min")
+  upgrade="BOOTSTRAP_INFO: lavish-axi >=$lavish_min enables confirmed board replies; this older compatible version retains the legacy reply path, but upgrade to prevent handing back a board before its reply is accepted"
   n=0
   while IFS='^' read -r label version mode; do
     [ -n "$label" ] || continue
@@ -413,12 +437,12 @@ test_lavish_axi_min_version() {
       unavailable)
         [ "$out" = "$unavailable" ] || fail "$label: expected '$unavailable', got: $out" ;;
     esac
-  done <<'ROWS'
+  done <<ROWS
 absent lavish-axi permits text fallback^absent^unavailable
-lavish-axi reply feature floor is accepted^0.1.80^empty
-older compatible lavish-axi retains boards and recommends upgrade^0.1.79^upgrade
+pinned lavish-axi version is accepted^$lavish_min^empty
+older compatible lavish-axi retains boards and recommends upgrade^$lavish_below^upgrade
 minimum legacy board version is accepted with upgrade advice^0.1.77^upgrade
-newer lavish-axi patch is accepted^0.1.81^empty
+newer lavish-axi patch is accepted^0.2.0^empty
 newer lavish-axi minor is accepted^0.2.0^empty
 newer lavish-axi major is accepted^1.0.0^empty
 the patch just below the board compatibility floor permits text fallback^0.1.76^unavailable
@@ -430,7 +454,7 @@ ROWS
 
 test_tasks_axi_min_version() {
   local label version mode case_dir fakebin out missing n archive_body multi_id
-  missing='MISSING: tasks-axi (install: npm install -g tasks-axi)'
+  missing=$MISS_TASKS_AXI
   n=0
   while IFS='^' read -r label version mode; do
     [ -n "$label" ] || continue
@@ -480,7 +504,10 @@ ROWS
 # --version: below the floor produces MISSING, while at or above is silent.
 test_quota_axi_min_version() {
   local label version mode case_dir fakebin out missing n
-  missing='MISSING: quota-axi (install: npm install -g quota-axi)'
+  missing=$MISS_QUOTA_AXI
+  local quota_min quota_below
+  quota_min=$(jg_pin_version quota-axi)
+  quota_below=$(just_below "$quota_min")
   n=0
   while IFS='^' read -r label version mode; do
     [ -n "$label" ] || continue
@@ -497,12 +524,12 @@ test_quota_axi_min_version() {
       missing)
         [ "$out" = "$missing" ] || fail "$label: expected '$missing', got: $out" ;;
     esac
-  done <<'ROWS'
-minimum quota-axi version is accepted^0.1.51^empty
-newer quota-axi patch is accepted^0.1.52^empty
+  done <<ROWS
+pinned quota-axi version is accepted^$quota_min^empty
+newer quota-axi patch is accepted^0.2.0^empty
 newer quota-axi minor is accepted^0.2.0^empty
 newer quota-axi major is accepted^1.0.0^empty
-the patch just below the floor reports an upgrade^0.1.50^missing
+the patch just below the floor reports an upgrade^$quota_below^missing
 much older quota-axi minor reports an upgrade^0.0.9^missing
 unparseable quota-axi version reports an upgrade^quota-axi development build^missing
 ROWS

@@ -69,14 +69,14 @@ The mid-turn pull warning in `bin/jg-guard.sh` judges watcher health differently
 ### Primary scope
 
 The guard first calls the shared primary scope.
-A squad lead home runs its own primary Juggernaut session, so a genuine `.jg-squad-lead-home` marker includes it whether the home is a linked worktree or plain clone.
+A Squad Lead home runs its own primary Juggernaut session, so a genuine `.jg-squad-lead-home` marker includes it whether the home is a linked worktree or plain clone.
 The marker must meet both of these conditions:
 
 - It is a regular non-symlink file.
 - Its whitespace-stripped first line is a non-empty identifier containing only letters, digits, dots, underscores, and dashes.
 
 An unmarked checkout or invalid marker falls through to the git-dir check.
-That check keeps operator and scout linked worktrees inert because their git dir differs from their git common dir.
+That check keeps operator and Recon linked worktrees inert because their git dir differs from their git common dir.
 It also requires `AGENTS.md`, `bin/`, and the effective state directory.
 
 ### Supervision need
@@ -279,7 +279,7 @@ Each enabled primary harness adapts its own turn-end mechanism to the shared gua
 The registrations in detail:
 
 - Claude registers two `Stop` hooks in `.claude/settings.json`, both anchored through `CLAUDE_PROJECT_DIR`: `bin/jg-turnend-guard.sh --claude`, and `bin/jg-claude-stop-autoarm.sh` with `asyncRewake: true` and `timeout: 28800`.
-  In a Claude squad lead home, `bin/jg-spawn.sh` writes a `.jg-busy-stop` pointer and gives the mate no `Stop` busy hook, so `--claude` is the only Stop writer of the parent home's busy record for that generation.
+  In a Claude Squad Lead home, `bin/jg-spawn.sh` writes a `.jg-busy-stop` pointer and gives the mate no `Stop` busy hook, so `--claude` is the only Stop writer of the parent home's busy record for that generation.
   It records idle when it allows the Stop and busy when its exit 2 blocks it into a continuation, because Claude runs Stop hooks in parallel and that continuation fires no `UserPromptSubmit`.
   A home whose guard predates `.jg-busy-stop` cannot close the turn, so that launch keeps the ordinary `Stop` idle hook instead.
   [Runtime backend verification](verification/runtime-backends.md#squad-lead-busy-contract) owns the live evidence.
@@ -535,9 +535,9 @@ That warning uses `bin/jg-supervision-instructions.sh --repair-line`, so it alwa
 
 ## Compatibility limits
 
-- Child operator and scout worktrees are outside scope.
-- A valid squad lead home is in scope.
-  An idle squad lead endpoint with no Relay poll remains healthy because it has no supervision need.
+- Child operator and Recon worktrees are outside scope.
+- A valid Squad Lead home is in scope.
+  An idle Squad Lead endpoint with no Relay poll remains healthy because it has no supervision need.
 - The blocking and bounded-follow-up mechanisms are limited to the primary integrations listed above.
 - OpenCode headless mode and untrusted Grok project hooks remain fail-open at the host boundary.
 - Cursor's `stop` step does not fire in headless `cursor-agent -p`, the same class of limit as OpenCode headless; Juggernaut primaries run interactive.
@@ -558,7 +558,7 @@ That warning uses `bin/jg-supervision-instructions.sh --repair-line`, so it alwa
 `tests/jg-turnend-guard.test.sh` covers:
 
 - The predicate.
-- Main and squad lead primary scope.
+- Main and Squad Lead primary scope.
 - Child-worktree exclusion.
 - `JG_HOME` and `JG_STATE_OVERRIDE` precedence.
 - The live-lock and fresh-beacon guard predicate.

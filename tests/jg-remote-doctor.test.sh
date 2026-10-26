@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tests/jg-remote-doctor.test.sh - the remote second-mate readiness gate.
+# tests/jg-remote-doctor.test.sh - the remote squad-lead readiness gate.
 #
 # Drives the real bin/jg-remote-doctor.sh against a controlled account fixture:
 # a private HOME, a fake launchctl backed by state files, a fake herdr CLI, a

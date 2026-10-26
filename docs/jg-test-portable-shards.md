@@ -44,7 +44,7 @@ Refresh `portable_parallel_weight_hints` with the slowest completed `duration_ms
 ## Portable serial remainder
 
 `portable-serial` includes every `tests/*.test.sh` that is neither proven-isolated nor `real-herdr-gated`.
-It keeps watcher, lock, AFK, real tmux, daemon, squad lead lifecycle, bootstrap, the `live-harness-optin` family, GUI-backend, and other unproven work serial.
+It keeps watcher, lock, AFK, real tmux, daemon, Squad Lead lifecycle, bootstrap, the `live-harness-optin` family, GUI-backend, and other unproven work serial.
 Membership is derived rather than enumerated, so a newly added test lands here by default.
 
 ## Portable serial CI shards

@@ -1,6 +1,6 @@
 # tmux runtime backend
 
-tmux is Juggernaut's verified reference runtime backend and the fully supported baseline for squad lead homes.
+tmux is Juggernaut's verified reference runtime backend and the fully supported baseline for Squad Lead homes.
 [`configuration.md`](configuration.md#runtime-backend-configbackend--jg_backend) owns shared backend selection and metadata semantics.
 
 ## Setup
@@ -101,7 +101,7 @@ Without that baseline, an `unknown` verdict is preserved untouched, so a busy-lo
 
 ## Limits and regression entry points
 
-- tmux is the reference path and supports squad lead homes.
+- tmux is the reference path and supports Squad Lead homes.
 
 ```sh
 tests/jg-backend-tmux-smoke.test.sh

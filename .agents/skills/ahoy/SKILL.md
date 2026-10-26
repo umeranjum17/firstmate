@@ -15,7 +15,7 @@ Give the captain a concise session-only recap without gathering fresh state.
    Run-tier harness surfaces run it automatically at session open, so this step is normally already satisfied and costs one glance; it is the safety net for surfaces that cannot run it on a hook, and for any path where a skill would otherwise act first.
    Taking the helm always precedes this skill's own logic, and the digest it produces is operational input, never a captain message or a recap event.
 
-1. Inspect only conversation or session history already visible to the current overwatch.
+1. Inspect only conversation or session history already visible to the current Overwatch.
 2. Find the most recent real captain-authored message before the current `/ahoy` invocation.
    A captain boundary is an ordinary user-role message unless it matches one of the narrow operational exclusions below.
    Exclude messages that begin with the current U+2063 `JUGGERNAUT_OP:` injection prefix.
@@ -34,7 +34,7 @@ Give the captain a concise session-only recap without gathering fresh state.
 4. If a prior real captain message exists, preserve the ordinary recap interval: recap what happened after that message and before the current invocation.
    Include concrete outcomes, landed work, failures, decisions made, new decisions needed, and work still running only when those events appear in that visible interval.
    Use captain-facing outcome language and preserve every full PR URL present in that interval.
-5. Additionally inspect the entire session history visible to the current overwatch before the current invocation for every explicit captain decision that remains unanswered, including decisions raised before the ordinary recap boundary.
+5. Additionally inspect the entire session history visible to the current Overwatch before the current invocation for every explicit captain decision that remains unanswered, including decisions raised before the ordinary recap boundary.
    A later unrelated captain message establishes a recap boundary but does not close an earlier decision.
    Treat a decision as closed only when a later visible response substantively resolves it, chooses an option, declines it, grants or denies the requested approval, or otherwise directly addresses that decision.
    Include every visibly supported open decision once, and deduplicate by the decision's substance when the ordinary interval recap already represents it or its wording differs.

@@ -54,6 +54,15 @@ REAL_LSOF_FOR_TEST=$(command -v lsof)
 # Deterministic, isolated git identity for fixture commits.
 jg_git_identity fmtest fmtest@example.com
 
+# Pinned builds come from the repo's own table, so a bump moves these fixtures with it.
+# shellcheck source=bin/jg-pin-lib.sh
+. "$ROOT/bin/jg-pin-lib.sh"
+export JG_FAKE_GH_AXI_VERSION=${JG_FAKE_GH_AXI_VERSION:-$(jg_pin_version gh-axi)}
+export JG_FAKE_QUOTA_AXI_VERSION=${JG_FAKE_QUOTA_AXI_VERSION:-$(jg_pin_version quota-axi)}
+export JG_FAKE_LAVISH_AXI_VERSION=${JG_FAKE_LAVISH_AXI_VERSION:-$(jg_pin_version lavish-axi)}
+export JG_FAKE_LEARN_FROM_MISTAKES_AXI_VERSION=${JG_FAKE_LEARN_FROM_MISTAKES_AXI_VERSION:-$(jg_pin_version learn-from-mistakes)}
+export JG_FAKE_DONE_DONE_AXI_VERSION=${JG_FAKE_DONE_DONE_AXI_VERSION:-$(jg_pin_version done-done)}
+export JG_FAKE_SIGN_OFF_AXI_VERSION=${JG_FAKE_SIGN_OFF_AXI_VERSION:-$(jg_pin_version sign-off-axi)}
 TMP_ROOT=$(jg_test_tmproot jg-squad-lead-sync)
 mkdir -p "$TMP_ROOT/no-addons"
 export JG_BACKEND=tmux
@@ -508,12 +517,14 @@ make_fake_toolchain() {
   fakebin="$dir/fakebin"
   mkdir -p "$fakebin"
   jg_fake_exit0 "$fakebin" node chrome-devtools-axi
-  jg_fake_version_tool "$fakebin" lavish-axi JG_FAKE_LAVISH_AXI_VERSION 0.1.80
-  jg_fake_version_tool "$fakebin" learn-from-mistakes JG_FAKE_LEARN_FROM_MISTAKES_AXI_VERSION 0.2.0
+  jg_fake_version_tool "$fakebin" lavish-axi JG_FAKE_LAVISH_AXI_VERSION "$JG_FAKE_LAVISH_AXI_VERSION"
+  jg_fake_version_tool "$fakebin" learn-from-mistakes JG_FAKE_LEARN_FROM_MISTAKES_AXI_VERSION "$JG_FAKE_LEARN_FROM_MISTAKES_AXI_VERSION"
+  jg_fake_version_tool "$fakebin" done-done JG_FAKE_DONE_DONE_AXI_VERSION "$JG_FAKE_DONE_DONE_AXI_VERSION"
+  jg_fake_version_tool "$fakebin" sign-off-axi JG_FAKE_SIGN_OFF_AXI_VERSION "$JG_FAKE_SIGN_OFF_AXI_VERSION"
   cat > "$fakebin/gh-axi" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --version ]; then
-  printf '%s\n' '0.1.29'
+  printf '%s\n' "${JG_FAKE_GH_AXI_VERSION:-0.1.29}"
   exit 0
 fi
 exit 0
@@ -576,7 +587,7 @@ SH
   cat > "$fakebin/quota-axi" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --version ]; then
-  printf '%s\n' 'quota-axi 0.1.51 (fake)'
+  printf '%s\n' "quota-axi ${JG_FAKE_QUOTA_AXI_VERSION:-0.1.51} (fake)"
 fi
 exit 0
 SH

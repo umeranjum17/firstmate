@@ -2776,7 +2776,7 @@ test_link_refuses_squad_lead_routed_task_with_promised_final_pointer() {
   expect_code 0 "$rc" "local link exit with squad leads registered"
   assert_grep "x_request=req-local" "$main/state/local-k1.meta" \
     "a local task must still link while squad leads are registered"
-  pass "jg-x-link refuses a second-mate-routed task and points at the promised-final path"
+  pass "jg-x-link refuses a squad-lead-routed task and points at the promised-final path"
 }
 
 # A remote squad_lead's home cannot be inspected from here, and neither can a

@@ -117,10 +117,10 @@ Shape already exists on GitHub, it predates Gerrit entirely, and it is load-bear
 - `bin/jg-pr-merge.sh` defaults a GitHub merge to `--squash` when the caller selects no method.
 - `bin/jg-fleet-sync.sh`'s branch pruning reasons about it explicitly, dropping the ancestry check on the grounds that pull requests in this fleet are squash-merged, so a merged branch is never an ancestor and such a check would prune nothing.
 - `bin/jg-teardown.sh`'s landed-work test accepts content present in the default branch precisely because a squash collapses the branch's commits and per-commit patch identities stop matching.
-- `bin/jg-ff-lib.sh` reconciles a clean squad lead divergence through a three-way tree proof, as happens after an upstream squash merge.
+- `bin/jg-ff-lib.sh` reconciles a clean Squad Lead divergence through a three-way tree proof, as happens after an upstream squash merge.
 
 It appears nowhere in the registry.
-A property that four mechanisms depend on, across pruning, teardown safety, merging, and squad lead convergence, and that no project has ever declared, is not a Gerrit concept arriving with Gerrit.
+A property that four mechanisms depend on, across pruning, teardown safety, merging, and Squad Lead convergence, and that no project has ever declared, is not a Gerrit concept arriving with Gerrit.
 It is an existing axis that has been pinned to one value by assumption for long enough to become invisible.
 That it survived being invisible says how rarely it varies, not where it belongs.
 

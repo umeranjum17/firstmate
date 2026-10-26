@@ -130,7 +130,11 @@
 # shellcheck source=bin/jg-timeout-lib.sh
 . "$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/jg-timeout-lib.sh"
 
-# Optional merge-card add-on: defines jg_dod_merge_gate and jg_merge_post_hook.
+# Merge hooks owned by core: config/merge-gate and config/post-merge are honoured
+# whether or not the merge-card add-on is installed.
+# shellcheck source=bin/jg-merge-gate-lib.sh
+. "$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/jg-merge-gate-lib.sh"
+# Optional merge-card add-on: defines the same two hooks for homes that install it.
 # shellcheck source=/dev/null
 [ ! -r "${JG_ADDONS_DIR:-${JG_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/projects/juggernaut-addons}/merge-card/bin/jg-merge-hooks-lib.sh" ] || . "${JG_ADDONS_DIR:-${JG_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/projects/juggernaut-addons}/merge-card/bin/jg-merge-hooks-lib.sh"
 # Optional receipts add-on: defines jg_dod_receipt_accept and the jg_receipts_* helpers.

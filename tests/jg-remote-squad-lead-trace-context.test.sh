@@ -47,7 +47,7 @@ trap 'JG_HOME="$PARENT" JG_PROCEVENT_CLAIM_ROOT="$CLAIMS" "$ROOT/bin/jg-proceven
 # verbatim, so the pre-launch `export TRACEPARENT=` line and the launch
 # literal's JG_TRACE_CONTEXT prefix are both observable exactly as the pane
 # received them. The tmux fixture below only keeps the remote home's own
-# non-second-mate tooling resolvable.
+# non-squad-lead tooling resolvable.
 cat > "$REMOTE_ROOT/bin/tmux" <<SH
 #!/usr/bin/env bash
 set -u
@@ -113,7 +113,7 @@ cd "$JG_FAKE_REMOTE_CWD" || exit 93
 # would inspect the RUNNER's own account; tests/jg-remote-doctor.test.sh owns
 # the doctor's behavior against controlled account fixtures.
 if printf '%s' "$4" | base64 --decode 2>/dev/null | tr '\0' '\n' | head -1 | grep -q '^jg-remote-doctor.sh$'; then
-  printf 'ok: remote second-mate readiness confirmed on this host\n'
+  printf 'ok: remote squad-lead readiness confirmed on this host\n'
   exit 0
 fi
 exec "$JG_FAKE_REMOTE_ENTRYPOINT" "$@"

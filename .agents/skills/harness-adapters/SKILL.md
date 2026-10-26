@@ -2,7 +2,7 @@
 name: harness-adapters
 description: >-
   Agent-only reference for Juggernaut harness operations.
-  Use before spawning or recovering an operator or squad lead, handling a trust dialog, sending a harness-specific skill invocation, interrupting or exiting an agent, resuming an exited agent, or verifying a new harness adapter.
+  Use before spawning or recovering an operator or Squad Lead, handling a trust dialog, sending a harness-specific skill invocation, interrupting or exiting an agent, resuming an exited agent, or verifying a new harness adapter.
   Contains verified facts for claude, codex, opencode, pi, pi-signed, grok, kimi, cursor, gemini, muse, rovo, omp, agy, and devin.
 user-invocable: false
 metadata:
@@ -24,7 +24,7 @@ Operational paths keep the context named by their owner: `config/` and active-ho
 
 ## Non-negotiable safety
 
-Never dispatch an operator or squad lead on an unverified adapter.
+Never dispatch an operator or Squad Lead on an unverified adapter.
 If `config/crew-harness` or `config/squad-lead-harness` names one, tell the captain under `../../../AGENTS.md` section 9 that the requested worker runtime is not verified, use Juggernaut's own verified runtime for current work, and ask only whether to verify the requested runtime for future work.
 Do not pause current work for that choice.
 
@@ -35,7 +35,7 @@ For recovery and control, use the exact `harness=` in `state/<id>.meta`; never i
 Deliver lifecycle actions only through `../../../bin/jg-control.sh <task-id> interrupt|exit|relaunch`.
 Never type an interrupt key or exit command through `jg-send`, where routing-marked lifecycle text becomes chat.
 Trust handling is complete only when inspection proves the target started processing its instructions; delivery success alone is not proof.
-Muse, Gemini, AGY, and Devin are verified only for operator and scout work, never a squad lead or primary.
+Muse, Gemini, AGY, and Devin are verified only for operator and Recon work, never a Squad Lead or primary.
 
 ## Detection
 

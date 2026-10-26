@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # tests/remote-herdr-fixture.sh - the stateful herdr CLI fixture the remote
-# second-mate suites install on their fake remote host.
+# squad-lead suites install on their fake remote host.
 #
 # A remote squad lead always launches on the Herdr backend
 # (docs/remote-squad-leads.md), so a remote-route test needs a herdr CLI on the

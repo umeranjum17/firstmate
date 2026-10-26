@@ -1,9 +1,9 @@
 ---
-name: updatejuggernaut
+name: updateOverwatch
 description: >-
-  Self-update a running Juggernaut and its squad leads to the latest from origin.
-  Use when the captain invokes /updatejuggernaut (e.g. "/updatejuggernaut", "update Juggernaut", "pull the latest Juggernaut").
-  Updates this Juggernaut repo's default branch and every local or remote squad lead through its guarded convergence path (never forced, never disruptive), then re-reads AGENTS.md and restarts every live squad lead through the persist-gated restart, with a fallback re-read nudge only where a restart cannot be proven.
+  Self-update a running Juggernaut and its Squad Leads to the latest from origin.
+  Use when the captain invokes /updateOverwatch (e.g. "/updateOverwatch", "update Juggernaut", "pull the latest Juggernaut").
+  Updates this Juggernaut repo's default branch and every local or remote Squad Lead through its guarded convergence path (never forced, never disruptive), then re-reads AGENTS.md and restarts every live Squad Lead through the persist-gated restart, with a fallback re-read nudge only where a restart cannot be proven.
 user-invocable: true
 metadata:
   internal: true
@@ -14,7 +14,7 @@ metadata:
 Self-update Juggernaut in place.
 Juggernaut is its own repo, behind the same no-mistakes gate as any project, so new tracked material (`AGENTS.md`, `bin/`, `.agents/skills/`, and public `skills/`) reaches `main` and then sits there until each running Juggernaut pulls it.
 Only `AGENTS.md`, `bin/`, and `.agents/skills/` are a running Juggernaut instruction surface; public `skills/` is installer-facing and is not loaded by Juggernaut.
-This skill performs that pull for the running main Juggernaut and every squad lead, without disturbing any in-flight work.
+This skill performs that pull for the running main Juggernaut and every Squad Lead, without disturbing any in-flight work.
 Updating is consumption, not publication: it only pulls from upstream, so every home runs it regardless of role, and the Juggernaut repository publication boundary (`juggernaut-self-repo`) never applies to it.
 
 Pulling the files is only half of it.
@@ -22,18 +22,18 @@ A running agent holds `AGENTS.md` and every skill it has already loaded frozen f
 A re-read cannot substitute: it appends a second copy of the mate's own job description with no defined precedence, and it cannot reach a skill that is already loaded.
 Replacing the agent is also the only thing that re-resolves the launch-time wiring - turn-end hooks, harness flags, per-harness feature switches - which the mate froze when it started and which nothing on disk describes.
 
-That is why **every live squad lead is restarted after a successful update, including one that was already on the target commit.**
+That is why **every live Squad Lead is restarted after a successful update, including one that was already on the target commit.**
 Launch-time wiring is not derivable from a file diff, so an unchanged tracked surface is not evidence the running agent is already on the current behavior.
 The only live mates that do not restart are the ones whose home the update pass had to skip, and the ones whose runtime cannot prove a restart; the updater keeps both cases honest and neither is reported as a reload.
 
-**One-time rollout note:** the update that carries this change is still executed by the previous release, which restarts only the mates whose `AGENTS.md` or `.agents/skills/` moved on that pass. After it completes, run `bin/jg-squad-lead-restart.sh <jg-id>...` once with every live squad lead ID, not only the ones that release named; later updates follow the normal flow below.
+**One-time rollout note:** the update that carries this change is still executed by the previous release, which restarts only the mates whose `AGENTS.md` or `.agents/skills/` moved on that pass. After it completes, run `bin/jg-squad-lead-restart.sh <jg-id>...` once with every live Squad Lead ID, not only the ones that release named; later updates follow the normal flow below.
 
-The primary update is fast-forward only, while each squad lead uses the same guarded convergence path plus one narrow recovery for squash-merged local history.
+The primary update is fast-forward only, while each Squad Lead uses the same guarded convergence path plus one narrow recovery for squash-merged local history.
 For a remote route, it updates the configured Juggernaut code root on that host from its own origin, then guardedly fast-forwards the persistent home to that code-root commit.
 It never forces, never creates a merge commit, and never stashes.
-A clean squad lead divergence advances with `reset --keep` only when a three-way tree proof shows its complete local result is already present at the target, which recognizes squash-merged contributions without discarding unique content.
+A clean Squad Lead divergence advances with `reset --keep` only when a three-way tree proof shows its complete local result is already present at the target, which recognizes squash-merged contributions without discarding unique content.
 Every other dirty, diverged, offline, or wrong-branch target is skipped and reported, and a genuine divergence leaves a durable `state/.squad-lead-update-reconcile/<id>.pending` record that future bootstrap and update passes surface until convergence clears it.
-A tracked-files fast-forward leaves the gitignored operational dirs (data/, state/, config/, projects/, .no-mistakes/) untouched, so a squad lead's in-flight work is never disrupted.
+A tracked-files fast-forward leaves the gitignored operational dirs (data/, state/, config/, projects/, .no-mistakes/) untouched, so a Squad Lead's in-flight work is never disrupted.
 This touches only the Juggernaut repo and its own worktrees, never anything under `projects/`.
 
 ## What it does
@@ -42,13 +42,13 @@ This touches only the Juggernaut repo and its own worktrees, never anything unde
    ```sh
    bin/jg-update.sh
    ```
-   It fast-forwards this Juggernaut repo's default branch from origin, then updates every registered local or remote squad lead home through its placement-specific guarded path.
+   It fast-forwards this Juggernaut repo's default branch from origin, then updates every registered local or remote Squad Lead home through its placement-specific guarded path.
    It prints one status line per target (`updated <old>..<new>` / `reconciled redundant divergence <old>..<new>` / `already current` / `skipped: <reason>`), followed by three action lines that tell you exactly what to do next:
    - `reread-juggernaut: yes|no`
    - `restart-squad-leads: jg-<id>...|none`
    - `nudge-squad-leads: jg-<id>...|none`
 
-   The two second-mate sets are disjoint and the script owns the split; do not re-derive it.
+   The two Squad Lead sets are disjoint and the script owns the split; do not re-derive it.
    `restart-squad-leads:` carries every live mate the pass left on the latest commit, whether it advanced or was already there.
    A mate reaches neither set only because its home was skipped, because it has no live endpoint recorded here, or because its endpoint was positively classified as dead or missing.
    A skipped genuine divergence still requires attention through its durable reconciliation record; the other two cases need no update action from you.
@@ -58,7 +58,7 @@ This touches only the Juggernaut repo and its own worktrees, never anything unde
    **Read `AGENTS.md` now** (CLAUDE.md is a real `@AGENTS.md` pointer to it) to refresh your operating instructions before doing anything else, so you are acting on the new instructions rather than the stale ones you were started with.
    When it printed `reread-juggernaut: no`, nothing changed for you - skip the re-read.
 
-3. **Restart every squad lead the updater named.**
+3. **Restart every Squad Lead the updater named.**
    Pass the whole `restart-squad-leads:` list to one command (skip this step entirely when it says `none`):
    ```sh
    JG_HOME=<this-juggernaut-home> bin/jg-squad-lead-restart.sh <jg-id>...
@@ -89,7 +89,7 @@ This touches only the Juggernaut repo and its own worktrees, never anything unde
 
 5. **Report to the captain in plain outcomes, in one line where you can.**
    Summarize what landed under `AGENTS.md` section 9 without Juggernaut's internal vocabulary: which parts of the fleet are now on the latest, and which were left as-is and why.
-   For example: "Captain, Juggernaut and both squad leads are now on the latest."
+   For example: "Captain, Juggernaut and both Squad Leads are now on the latest."
    Say plainly when a mate got the message rather than a clean reload, and why - never let a partial reload read as a full one.
    Surface any skipped target whose reason needs the captain's attention - for instance a home with its own un-landed changes (diverged) or local edits (dirty), which were left untouched on purpose.
 
@@ -97,12 +97,12 @@ This touches only the Juggernaut repo and its own worktrees, never anything unde
 
 - **Guarded convergence only.**
   A dirty, offline, non-default, or uniquely diverged target is skipped and reported, never forced or stashed.
-  Only a clean squad lead divergence whose complete local result is already present upstream may move without ancestry, and `reset --keep` still refuses conflicting working-tree changes.
+  Only a clean Squad Lead divergence whose complete local result is already present upstream may move without ancestry, and `reset --keep` still refuses conflicting working-tree changes.
   Nothing with unlanded work is ever discarded - this is prime directive #3.
 - **Only the Juggernaut repo and its worktrees** are touched, never `projects/`.
   It is the same sanctioned self-write as the fleet sync.
 - **Nothing with work in it is disrupted.**
-  A local or remote squad lead gets a tracked-files fast-forward only when its own checkout is safe to advance, and a mate whose home was skipped is not restarted either.
+  A local or remote Squad Lead gets a tracked-files fast-forward only when its own checkout is safe to advance, and a mate whose home was skipped is not restarted either.
   A restart replaces that mate's agent in the same home and endpoint after its open work is written down; it is never a teardown and never forced.
   Its operators keep running in their own endpoints, and every durable record - backlog, held captain calls, unread status, unhandled instructions - is re-presented to the replacement at startup.
   A restart refused before it is attempted leaves that mate on the re-read path; once a relaunch is attempted, any failed or ambiguous result is reported as unknown rather than attributed to either incarnation.

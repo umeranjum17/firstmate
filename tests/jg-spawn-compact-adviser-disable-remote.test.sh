@@ -46,7 +46,7 @@ CONTRARY=0
   tar --exclude=.git --exclude=.no-mistakes --exclude=data --exclude=state --exclude=config -cf - .
 ) | (cd "$REMOTE_ROOT" && tar -xf -)
 
-# The remote host's own non-second-mate tooling only has to stay resolvable;
+# The remote host's own non-squad-lead tooling only has to stay resolvable;
 # the squad lead itself always launches on Herdr, whose fixture logs every
 # invocation verbatim.
 cat > "$REMOTE_ROOT/bin/tmux" <<'SH'
@@ -77,7 +77,7 @@ cd "$JG_FAKE_REMOTE_CWD" || exit 93
 # would inspect the RUNNER's own account; tests/jg-remote-doctor.test.sh owns
 # the doctor's behavior against controlled account fixtures.
 if printf '%s' "$4" | base64 --decode 2>/dev/null | tr '\0' '\n' | head -1 | grep -q '^jg-remote-doctor.sh$'; then
-  printf 'ok: remote second-mate readiness confirmed on this host\n'
+  printf 'ok: remote squad-lead readiness confirmed on this host\n'
   exit 0
 fi
 exec "$JG_FAKE_REMOTE_ENTRYPOINT" "$@"
@@ -142,7 +142,7 @@ run_remote_launch() {  # <label>
   reset_remote_herdr_fixture "$HERDR_STATE"
   : > "$HERDR_LOG"
   remote_env "$ROOT/bin/jg-spawn.sh" ios --squad-lead >/dev/null 2>&1 \
-    || fail "$label: the remote second-mate launch failed"
+    || fail "$label: the remote squad-lead launch failed"
 }
 
 # Replay what the remote pane received, in the order it received it, under a

@@ -82,10 +82,12 @@ SH
   # jg-pr-lib.sh: teardown uses its canonical task-ID validator for poll cleanup.
   ln -s "$ROOT/bin/jg-pr-lib.sh" "$fake/bin/jg-pr-lib.sh"
   ln -s "$ROOT/bin/jg-scratch.sh" "$fake/bin/jg-scratch.sh"
-  # jg-dod-lib.sh (and the jg-brief-heading-lib.sh it sources): teardown uses
-  # its PR-outside-origin check to prove a cross-repo lane.
+  # jg-dod-lib.sh (and the jg-brief-heading-lib.sh, jg-merge-gate-lib.sh and
+  # jg-timeout-lib.sh it sources): teardown uses its PR-outside-origin check to
+  # prove a cross-repo lane, and the merge hooks it sources are core-owned.
   ln -s "$ROOT/bin/jg-dod-lib.sh" "$fake/bin/jg-dod-lib.sh"
   ln -s "$ROOT/bin/jg-brief-heading-lib.sh" "$fake/bin/jg-brief-heading-lib.sh"
+  ln -s "$ROOT/bin/jg-merge-gate-lib.sh" "$fake/bin/jg-merge-gate-lib.sh"
   # jg-public-followup-lib.sh (and the jg-x-lib.sh and jg-env-lib.sh it
   # sources): teardown sources it for the relay-activation gate on the
   # promised-public-reply check. None does anything in this fixture, which has
@@ -193,10 +195,12 @@ SH
   # jg-pr-lib.sh: teardown uses its canonical task-ID validator for poll cleanup.
   ln -s "$ROOT/bin/jg-pr-lib.sh" "$fake/bin/jg-pr-lib.sh"
   ln -s "$ROOT/bin/jg-scratch.sh" "$fake/bin/jg-scratch.sh"
-  # jg-dod-lib.sh (and the jg-brief-heading-lib.sh it sources): teardown uses
-  # its PR-outside-origin check to prove a cross-repo lane.
+  # jg-dod-lib.sh (and the jg-brief-heading-lib.sh, jg-merge-gate-lib.sh and
+  # jg-timeout-lib.sh it sources): teardown uses its PR-outside-origin check to
+  # prove a cross-repo lane, and the merge hooks it sources are core-owned.
   ln -s "$ROOT/bin/jg-dod-lib.sh" "$fake/bin/jg-dod-lib.sh"
   ln -s "$ROOT/bin/jg-brief-heading-lib.sh" "$fake/bin/jg-brief-heading-lib.sh"
+  ln -s "$ROOT/bin/jg-merge-gate-lib.sh" "$fake/bin/jg-merge-gate-lib.sh"
   # jg-public-followup-lib.sh (and the jg-x-lib.sh and jg-env-lib.sh it
   # sources): teardown sources it for the relay-activation gate on the
   # promised-public-reply check. None does anything in this fixture, which has

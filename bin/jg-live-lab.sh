@@ -488,7 +488,7 @@ PY
 spawn_mate() {
   local charter='Provide an idle live-validation lab squad lead. When explicitly steered for a synthetic test, report only honest local lab outcomes; do not claim external PR activity, merge, or retire yourself.'
   (cd "$LAB" && lab_run JG_HOME="$LAB" JG_SQUAD_LEAD_CHARTER="$charter" \
-    JG_SQUAD_LEAD_SCOPE='second-mate live validation synthetic status relay' \
+    JG_SQUAD_LEAD_SCOPE='squad-lead live validation synthetic status relay' \
     "$LAB/bin/jg-home-seed.sh" "$MATE_ID" "$ROOT/mate" --no-projects) || return 1
   (cd "$LAB" && lab_run JG_HOME="$LAB" "$LAB/bin/jg-spawn.sh" "$MATE_ID" --squad-lead)
 }

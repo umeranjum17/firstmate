@@ -5026,7 +5026,7 @@ expectRoute("captain-held declaration", "working: history\n", "captain-held [key
 // The host decides the whole close through the offer rule, which must agree.
 stage("mate", hold, "done: sample-c PR merged\n");
 if (!branchOfferForWake(state, `signal: ${state}/mate.status`, false, true).eligible) {
-  throw new Error("the attended-host offer kept a routine second-mate close on main behind an unrelated hold");
+  throw new Error("the attended-host offer kept a routine squad-lead close on main behind an unrelated hold");
 }
 
 // Without a readable cursor the whole log is the span, so routing falls back
@@ -5060,8 +5060,8 @@ process.exit(0);
 EOF
   status=$?
   out=$(cat "$TMP_ROOT/node-output")
-  expect_code 0 "$status" "second-mate signal rows must be routed by their new span: $out"
-  pass "second-mate signal rows route by their new span while operator and stale routing stay unchanged"
+  expect_code 0 "$status" "squad-lead signal rows must be routed by their new span: $out"
+  pass "squad-lead signal rows route by their new span while operator and stale routing stay unchanged"
 }
 
 # The model picker's bounded scrolling and its search ranking are Pi's own

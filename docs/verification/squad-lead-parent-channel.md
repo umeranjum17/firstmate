@@ -1,6 +1,6 @@
 # Squad Lead parent channel: live verification
 
-Maintainer-verification record for the guarantee in [`squad-lead-parent-channel.md`](../squad-lead-parent-channel.md): a captain-facing outcome recorded inside a squad lead home reaches the parent channel without the mate model writing it.
+Maintainer-verification record for the guarantee in [`squad-lead-parent-channel.md`](../squad-lead-parent-channel.md): a captain-facing outcome recorded inside a Squad Lead home reaches the parent channel without the mate model writing it.
 Refresh it by rerunning the fixture below after changing any publisher named in `bin/jg-parent-channel-lib.sh`.
 This run predates emission-time stamping, so each published line below is the payload without its stamp: a rerun now writes the same bytes with an `[at=<epoch>]` tag closing the head, as in `done [key=child-outcome-child-done-05b032a1] [at=<epoch>]: child ...`.
 [`bin/jg-classify-lib.sh`](../../bin/jg-classify-lib.sh) owns that tag's syntax; nothing this record proves about delivery depends on it.

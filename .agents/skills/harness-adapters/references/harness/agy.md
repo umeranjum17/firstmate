@@ -1,7 +1,7 @@
 # Antigravity CLI
 
 Antigravity's `agy` TUI, verified end to end on 2026-09-10 with agy 1.2.0 on Linux through the Herdr backend.
-Verified as a OPERATOR and SCOUT adapter only; `../../../../../bin/jg-spawn.sh` refuses a squad lead launch on it because `../../../../../docs/supervision-protocols/` carries no agy wake protocol.
+Verified as a OPERATOR and Recon adapter only; `../../../../../bin/jg-spawn.sh` refuses a Squad Lead launch on it because `../../../../../docs/supervision-protocols/` carries no agy wake protocol.
 `../../../../../docs/verification/agy.md` owns how every fact below was established and what is still unproven.
 
 ## Operating facts

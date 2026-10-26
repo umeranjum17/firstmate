@@ -8,7 +8,7 @@
 # the harness binary replaced by a probe that prints the environment it was
 # started with. What the probe prints is what a real agent would have received.
 #
-# The remote second-mate route never reaches this path; its coverage lives in
+# The remote squad-lead route never reaches this path; its coverage lives in
 # tests/jg-spawn-compact-adviser-disable-remote.test.sh.
 set -u
 

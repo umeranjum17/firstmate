@@ -92,7 +92,7 @@ Every `/stow` invocation performs this complete pass, even when the session cont
    Note any `Memory layering` declaration in them (schema: `docs/configuration.md`) and which declared tiers this session can reach; every later step consults it.
    When neither `data/captain.md` nor `data/captain-shared.md` holds one, treat the local files as the only owners.
    In a primary home, all three are curation inputs under their existing ownership rules.
-   In a squad lead home, `data/captain-shared.md` is a read-only primary-owned input: count it, never edit it, and curate only the editable local files.
+   In a Squad Lead home, `data/captain-shared.md` is a read-only primary-owned input: count it, never edit it, and curate only the editable local files.
    Every mutation in the rest of this pass, including reinforcement, retiering, decay archival, legacy migration, consolidation, budget archival, and offload, applies only to an editable memory file.
    When a read-only shared entry appears to require one of those changes, leave it untouched, report the required change as an ownership exception, and route it to the primary owner.
 3. Build one whole-file retention plan before editing, ordered by likelihood of informing a future session.
@@ -125,7 +125,7 @@ Every `/stow` invocation performs this complete pass, even when the session cont
    The sole exception is relocation to a JIT owner after explicit, per-item captain approval under the offload flow below, and that entry remains in memory until its destination is live.
 8. Run `bin/jg-startup-memory-budget.sh report` again after the complete pass.
    Finish at or below the effective budget, or open a concrete captain decision before ending the pass.
-   A squad lead must explicitly report `primary-owned-shared-file-alone-exceeds-budget` when the inherited shared file alone exceeds its allowance, because local curation cannot resolve it.
+   A Squad Lead must explicitly report `primary-owned-shared-file-alone-exceeds-budget` when the inherited shared file alone exceeds its allowance, because local curation cannot resolve it.
    Route that constraint to the primary owner and open one concrete captain decision at the primary owning level that names the shortfall, with exactly these options: raise the affected home's effective budget, or explicitly approve the primary owner trimming or offloading each named shared-file entry.
    When the convergence precondition skipped eviction, report the exempt pinned and pending-capture floor and the remaining shortfall as that concrete inability rather than archiving eligible knowledge that could not close the gap.
    Only after every safe non-pinned archival, consolidation, offload, and eligible eviction action is exhausted may a remaining excess be attributed to pinned safety, authority, or genuine captain-preference entries.
@@ -230,7 +230,7 @@ A local skill exists only in this home, so offloading an entry out of `data/capt
    - Captain preferences and fleet-local operational facts belong in the destination selected by AGENTS.md after the required whole-file curation pass.
      Create `data/learnings.md` only for a genuinely new local learning with no stronger owner.
    - In a primary home, curate shared captain preferences only under the existing primary-authoritative shared-preference contract.
-     In a squad lead home, route a newly discovered shared preference to the main Juggernaut through marked status or a document pointer instead of editing the inherited file.
+     In a Squad Lead home, route a newly discovered shared preference to the main Juggernaut through marked status or a document pointer instead of editing the inherited file.
    - Project-intrinsic knowledge never goes into a project's `AGENTS.md` through this fleet: an operator edits those files only to correct factually wrong information (AGENTS.md section 6), so no ship task carries an addition.
      Keep the candidate in `data/learnings.md` or surface it in the completion receipt so the captain can extend the file by hand.
    - Knowledge general to every Juggernaut user belongs in this repo's shared tracked material through the normal branch, no-mistakes, PR, and captain-merge path, which exists only under this home's Juggernaut repository publication authority (`AGENTS.md` section 1's role boundary).
@@ -276,7 +276,7 @@ Report the outcome in plain captain-facing language with all of these facts:
 - each durable finding filed outside memory and its authoritative owner, including every capture to a declared memory tier;
 - every finding or entry a declared tier should hold but this session could not reach, left carrying its pending-capture marker and named so a session that can reach it captures it;
 - each archived entry's reason, each autonomous offload's live destination and actual relief, and, when a pinned candidate was proposed, the `proposed-offload` section with every candidate's fields;
-- every unresolved exception, including a primary-owned shared-file constraint in a squad lead home, and every concrete captain decision opened for an over-budget result;
+- every unresolved exception, including a primary-owned shared-file constraint in a Squad Lead home, and every concrete captain decision opened for an over-budget result;
 - each open record this pass filed or corrected, and each one it deliberately left alone with the judgment it is waiting on;
 - whether the session is safe to reset, only when all durable findings are captured, no tier-owned finding is waiting on an unreachable declared tier, every open record this session held is filed or explicitly left with its reason, and the post-pass result is within budget with no exception or pending budget decision.
 
@@ -285,31 +285,31 @@ It is never a claim that the home's durable records are correct, because this pa
 Do not hide an over-budget result behind a reset-safe claim.
 In a primary home the receipt is written after the cascade below, not instead of it.
 
-## Automatic cascade to squad leads
+## Automatic cascade to Squad Leads
 
-In a primary home, every `/stow` cascades to every registered squad lead after this home's own required pass and knowledge sweep are complete.
-In a squad lead home, `/stow` curates that home only and never cascades further.
+In a primary home, every `/stow` cascades to every registered Squad Lead after this home's own required pass and knowledge sweep are complete.
+In a Squad Lead home, `/stow` curates that home only and never cascades further.
 The cascade changes nothing until `/stow` is invoked: it adds no notification, no digest section, and no background work.
 
 Run `bin/jg-stow-cascade.sh` once the primary's own pass is done.
-It enumerates each registered squad lead exactly once, reports that home's own budget accounting, and resolves how the sweep reaches it; its header owns the stanza fields, the bound, and the exit codes.
+It enumerates each registered Squad Lead exactly once, reports that home's own budget accounting, and resolves how the sweep reaches it; its header owns the stanza fields, the bound, and the exit codes.
 Every home is judged against its own `config/startup-memory-budget` allowance, so never add homes together or treat one home's excess as another's.
 
 Act on each home by its reported `transport`:
 
-- `agent` - send the marked request with `bin/jg-send.sh jg-<id> "<request>"` so the live squad lead performs its own `/stow`, including the uncaptured knowledge that exists only in its session.
+- `agent` - send the marked request with `bin/jg-send.sh jg-<id> "<request>"` so the live Squad Lead performs its own `/stow`, including the uncaptured knowledge that exists only in its session.
   Ask it for the same completion receipt this skill defines, and read its reply from its status file or the document it points to, never from its chat.
 - `direct` - curate that local home's editable memory files yourself under the same retention plan, then re-run the cascade to confirm the after totals.
-  `data/captain-shared.md` stays a read-only counted input there, exactly as it is in any squad lead home.
+  `data/captain-shared.md` stays a read-only counted input there, exactly as it is in any Squad Lead home.
 - `deferred` - a remote home with no live agent. Its memory is accounted read-only and cannot be curated from here, because there is no generic remote write path for a home's own memory files.
   Report it as an unresolved exception and leave it to its next cascade.
-  Relaunching that squad lead is a separate decision owned by `squad-lead-provisioning`, never something `/stow` does on its own.
+  Relaunching that Squad Lead is a separate decision owned by `squad-lead-provisioning`, never something `/stow` does on its own.
 - `unavailable` - that home's own accounting did not complete. Report the concrete exception and continue; a slow or unreachable home never blocks this home's `/stow`.
 
 A newly discovered shared captain preference still routes to the primary's `data/captain-shared.md` under the existing primary-authoritative contract, whichever home found it.
 Offload proposals and the cold archive are per-home: file proposals only in the home whose pass produced them, and never cascade either to another home.
 
-Extend the completion receipt with one entry per squad lead alongside the primary's own, carrying that home's budget before and after, its per-file actions, its exceptions, and whether that home swept itself or was curated from here.
+Extend the completion receipt with one entry per Squad Lead alongside the primary's own, carrying that home's budget before and after, its per-file actions, its exceptions, and whether that home swept itself or was curated from here.
 Keep those entries in the same plain captain-facing language the rest of the receipt uses.
 The session is reset-safe only when every home is within its own budget with no unresolved exception.
 

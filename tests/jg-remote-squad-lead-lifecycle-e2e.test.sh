@@ -193,7 +193,7 @@ if [ "$command_name" = jg-remote-doctor.sh ]; then
       if [ "${_command_action:-}" = --fix ]; then
         touch "$JG_FAKE_DOCTOR_REPAIRED"
         printf 'fix launchagent=applied: wrote the Aqua-scoped launch agent\n'
-        printf 'ok: remote second-mate readiness confirmed on this host\n'
+        printf 'ok: remote squad-lead readiness confirmed on this host\n'
         exit 0
       fi
       [ -f "$JG_FAKE_DOCTOR_REPAIRED" ] || {
@@ -204,7 +204,7 @@ if [ "$command_name" = jg-remote-doctor.sh ]; then
       ;;
   esac
   printf 'check herdr=ok: /usr/bin/herdr\n'
-  printf 'ok: remote second-mate readiness confirmed on this host\n'
+  printf 'ok: remote squad-lead readiness confirmed on this host\n'
   exit 0
 fi
 if [ "${JG_FAKE_SSH_MODE:-normal}" = doctor-fixable ] \

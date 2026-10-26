@@ -4,6 +4,10 @@ set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+# The pinned floor comes from the table, so the fake version follows a bump.
+# shellcheck source=bin/jg-pin-lib.sh
+. "$JG_ROOT/bin/jg-pin-lib.sh"
+export QUOTA_AXI_VERSION=${QUOTA_AXI_VERSION:-$(jg_pin_version quota-axi)}
 BIN="$JG_ROOT/bin"
 LAB=$(mktemp -d "${TMPDIR:-/tmp}/jg-procevent-quota.XXXXXX")
 FAKEBIN="$LAB/fakebin"

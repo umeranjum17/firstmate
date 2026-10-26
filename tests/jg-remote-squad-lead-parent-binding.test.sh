@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # tests/jg-remote-squad-lead-parent-binding.test.sh - regression coverage for the
 # jg-remote-sm-cleanup-parent-binding-s1 scout report: finished-worker cleanup
-# inside a REMOTE second-mate home refused forever with "cannot resolve the
+# inside a REMOTE squad-lead home refused forever with "cannot resolve the
 # primary home ... durable parent binding", because the remote launch hands the
 # child the remote code checkout as its parent home (bin/jg-spawn.sh's sole
 # writer of JG_PUBLIC_FOLLOWUP_PRIMARY_HOME receives JG_HOME=$JG_ROOT from
@@ -172,7 +172,7 @@ $command_fields
 EOF
 if [ "$command_name" = jg-remote-doctor.sh ]; then
   printf 'check herdr=ok: /usr/bin/herdr\n'
-  printf 'ok: remote second-mate readiness confirmed on this host\n'
+  printf 'ok: remote squad-lead readiness confirmed on this host\n'
   exit 0
 fi
 if [ "$command_name" = jg-remote-squad-lead-control.sh ] \

@@ -52,7 +52,7 @@ The gate is code, not memory: `bin/jg-role-lib.sh`'s `jg_role_gate_self_publish`
 
 - `bin/jg-brief.sh --project <dir>` refuses to scaffold a publishing ship brief the home cannot authorize.
 - `bin/jg-spawn.sh` refuses to launch a ship task on this repository without a maintainer scope or matching task consent, and refuses a brief whose `upstream-consent=` disagrees with the flag.
-- `bin/jg-promote.sh` applies the same gate to scout promotion so the in-place path grants no more than a fresh spawn.
+- `bin/jg-promote.sh` applies the same gate to Recon promotion so the in-place path grants no more than a fresh spawn.
 - `local-only` publishes nothing, so it never needs authority and never takes consent.
 
 An authorized contribution then flows through the task's normal delivery contract - usually no-mistakes - like any other project; the grant answers only "may this publish", never "how".

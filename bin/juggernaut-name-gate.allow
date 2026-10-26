@@ -430,3 +430,8 @@ addons/zai-quota-check/tests/zai-quota-check-uninstall.test.sh  # inline jg-comp
 addons/zai-quota-check/uninstall.sh  # inline jg-compat env alias
 journeys/receipt-candidate-hook.sh  # inline jg-compat env alias
 journeys/tickets-writeback.sh  # inline jg-compat env alias
+bin/fm-merge-gate-lib.sh  # alias for bin/jg-merge-gate-lib.sh; called by live homes, panes and per-lane records
+bin/fm-pin-lib.sh  # alias for bin/jg-pin-lib.sh; called by live homes, panes and per-lane records
+bin/fm-tool-wiring.sh  # alias for bin/jg-tool-wiring.sh; called by live homes, panes and per-lane records
+addons/quota-axi-pool/tests/quota-axi-pool-recursion.test.sh  # inline FM_ alias (slice S4); deleted by slice S10
+tests/jg-tool-wiring.test.sh  # inline FM_ alias (slice S4); deleted by slice S10

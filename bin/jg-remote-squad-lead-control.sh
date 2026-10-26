@@ -14,7 +14,7 @@
 #   jg-remote-squad-lead-control.sh update <id>
 #   jg-remote-squad-lead-control.sh retire <id> [--force]
 #
-# Remote placement ends here, but the second-mate agent always runs on the
+# Remote placement ends here, but the squad-lead agent always runs on the
 # Herdr backend in the dedicated jg-remote session, so launch refuses any other
 # selection rather than reading this home's config/backend. The interactive
 # default session remains for the user's work.
@@ -233,7 +233,7 @@ cmd_launch() {
   print_route "$id"
 }
 
-# Restart the second-mate agent this host runs, by executing the ORDINARY local
+# Restart the squad-lead agent this host runs, by executing the ORDINARY local
 # control plane here. From this host's point of view the mate is a plain local
 # squad_lead: its endpoint record under the private parent-route state directory
 # was written by a host-local jg-spawn and carries no remote_host= field, so

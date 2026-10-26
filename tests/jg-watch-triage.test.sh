@@ -2087,7 +2087,7 @@ test_pending_reply_escalation_signal_payload_marked_for_branch_exclusion() {
   wait_for_exit "$pid" 100 || fail "watcher did not exit for a pending-reply escalation"
   grep -F "$(printf 'signal\ttask.status\tneeds-decision:')" "$state/.wake-queue" >/dev/null \
     || fail "a pending-reply escalation was not payload-marked for branch exclusion: $(cat "$state/.wake-queue")"
-  pass "a pending-reply second-mate escalation is marked for main-only routing"
+  pass "a pending-reply squad-lead escalation is marked for main-only routing"
 }
 
 test_ordinary_blocked_signal_payload_remains_branch_eligible() {
@@ -2102,7 +2102,7 @@ test_ordinary_blocked_signal_payload_remains_branch_eligible() {
   grep -F "$(printf 'signal\ttask.status\tsignal:')" "$state/.wake-queue" >/dev/null \
     || fail "an ordinary blocked event lost branch-eligible routing: $(cat "$state/.wake-queue")"
   if grep -F "$(printf 'signal\ttask.status\tneeds-decision:')" "$state/.wake-queue" >/dev/null; then
-    fail "an ordinary blocked event was marked as a second-mate escalation"
+    fail "an ordinary blocked event was marked as a squad-lead escalation"
   fi
   pass "an ordinary blocked event remains branch-eligible"
 }

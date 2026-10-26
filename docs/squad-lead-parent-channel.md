@@ -1,16 +1,16 @@
 # Squad Lead parent channel
 
-This note records why a squad lead home's captain-facing outcomes are delivered by scripts instead of by the mate model, and which script delivers each one.
+This note records why a Squad Lead home's captain-facing outcomes are delivered by scripts instead of by the mate model, and which script delivers each one.
 `bin/jg-parent-channel-lib.sh` owns the channel contract: where the channel lives, how a line is appended, and the return codes every publisher shares.
 [`remote-squad-leads.md`](remote-squad-leads.md) owns the transport that carries the remote form of the channel back to the parent.
 
 ## The problem
 
-A squad lead is a Juggernaut in its own home, and nobody reads its chat: the captain and the main Juggernaut see only what is appended to the parent channel.
+A Squad Lead is a Juggernaut in its own home, and nobody reads its chat: the captain and the main Juggernaut see only what is appended to the parent channel.
 On 2026-09-02 four outcomes across two mate homes never reached the captain.
 The watcher had delivered the parent's request within a minute each time, the mate did the work, and then the mate addressed "captain" in its own chat instead of appending to the channel.
 The cause is structural rather than a one-off lapse: the mate can satisfy the [address rule in `AGENTS.md`](../AGENTS.md#juggernaut) in local chat while missing the charter's later return-channel instruction.
-The captain's framing of the requirement was: "the root problem is not specific to PRs, right? it looks like any message or outcomes from squad leads can miss. we need to make sure our fixes are addressing this in a principled, fundamental way, not surgically treating the symptoms of just this PR update miss."
+The captain's framing of the requirement was: "the root problem is not specific to PRs, right? it looks like any message or outcomes from Squad Leads can miss. we need to make sure our fixes are addressing this in a principled, fundamental way, not surgically treating the symptoms of just this PR update miss."
 A PR-ready report was the observed symptom, but a finding, a decision, a blocker, and a failure all fail the same way, because every one of them depended on the mate model remembering to write one line.
 
 The design goal is therefore: the parent channel must not depend on the model remembering to write to it.
@@ -23,7 +23,7 @@ Every captain-facing outcome that leaves durable evidence in the mate home is pu
 | Outcome | Durable evidence in the mate home | Published by |
 |---|---|---|
 | Ship child PR ready | the child's `done:` PR ready line, whose accepted spellings the publisher below owns; `pr=` in the child's record once registered | `bin/jg-inactive-reconcile.sh` on the next poll with the child's line; `bin/jg-pr-check.sh` at registration with the canonical URL |
-| Scout child findings | the child's `done:` line plus `data/<child>/report.md` | `bin/jg-inactive-reconcile.sh` on the next poll, with the report pointer |
+| Recon child findings | the child's `done:` line plus `data/<child>/report.md` | `bin/jg-inactive-reconcile.sh` on the next poll, with the report pointer |
 | Child failed | the child's `failed:` line | `bin/jg-inactive-reconcile.sh` on the next poll |
 | Child decision escalated to the captain | the task held for the captain in the mate backlog | `bin/jg-captain-hold.sh hold`, and its answer by `answer` |
 | PR merged | the merge poll or the mate's own merge | `bin/jg-merge-outcome-lib.sh` |

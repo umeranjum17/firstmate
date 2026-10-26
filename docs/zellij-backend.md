@@ -36,7 +36,7 @@ Verify setup by spawning a small task and confirming metadata contains `backend=
 Every task receives one tab in the shared Zellij session.
 The caller-facing label remains `jg-<id>`, while the visible title is home-scoped as `jg-<home-label>-<id>`.
 The home label is `juggernaut` or `2ndmate-<id>` plus a short stable hash of the resolved Juggernaut root.
-This prevents task-id collisions between a primary, squad leads, and separate Juggernaut installations sharing one session.
+This prevents task-id collisions between a primary, Squad Leads, and separate Juggernaut installations sharing one session.
 
 Zellij does not enforce tab-name uniqueness, so the adapter performs its own duplicate check against the scoped title.
 Create, recover, list, and cleanup paths all use the same scoped title owner in `bin/jg-backend-hometag-lib.sh`.
@@ -97,7 +97,7 @@ Real test cleanup uses only an isolated non-`juggernaut` session and the guard i
 - All homes share one session and tab bar; scoped titles prevent cross-home identity collisions but do not create per-home visual containers.
 - There is no native busy or push-event signal, so supervision uses capture/hash polling for screen changes and each harness adapter's semantic lifecycle for worker state.
   Grok alone retains its isolated rendered-tail fallback.
-- There is no verified agent-process liveness signal, so a dead Zellij squad lead is reported inconclusive rather than auto-respawned.
+- There is no verified agent-process liveness signal, so a dead Zellij Squad Lead is reported inconclusive rather than auto-respawned.
 - New-tab focus restoration has a narrow visible race.
 - CLI exit status is not meaningful; a target can still disappear after structural readiness checks.
 - Worktree cwd discovery requires the spawn-time marker probe.

@@ -18,7 +18,7 @@ A stale or dead-endpoint report for a worker whose pull request has already land
 Follow the crew-hosted Lavish board contract in [`docs/configuration.md`](../../../docs/configuration.md#crew-hosted-lavish-review-boards) when recovering a worker that hosts a board.
 
 Interrupt, stop, and relaunch a worker through `bin/jg-control.sh <task-id> interrupt|exit|relaunch`, which resolves the recorded runtime itself, verifies each action, and never tears down or discards anything ([`docs/agent-control.md`](../../../docs/agent-control.md)).
-That plane covers workers running in this home; a remotely placed squad lead is refused by name and reconciled through `squad-lead-provisioning` instead.
+That plane covers workers running in this home; a remotely placed Squad Lead is refused by name and reconciled through `squad-lead-provisioning` instead.
 Load `harness-adapters` before a resume command or a harness-specific skill invocation, and whenever the adapter's own quirks matter.
 The target window's harness is recorded as `harness=` in `state/<id>.meta`.
 
@@ -27,7 +27,7 @@ The target window's harness is recorded as `harness=` in `state/<id>.meta`.
 This procedure covers ordinary `kind=ship` and `kind=scout` direct reports.
 Load `squad-lead-provisioning` instead for `kind=squad lead` recovery.
 
-For a REMOTE squad lead, `jg-crew-state` and `jg-peek` read the actual remote endpoint over `jg-on.sh`, and `jg-send` reports a delivered-with-pending-confirmation steer as delivered (their headers own the contracts); an `unknown-remote` read or unreachable-host failure means the remote state could not be read, never that the mate is dead or the send failed.
+For a REMOTE Squad Lead, `jg-crew-state` and `jg-peek` read the actual remote endpoint over `jg-on.sh`, and `jg-send` reports a delivered-with-pending-confirmation steer as delivered (their headers own the contracts); an `unknown-remote` read or unreachable-host failure means the remote state could not be read, never that the mate is dead or the send failed.
 Recover a genuinely stuck remote mate only through `bin/jg-spawn.sh <id> --squad-lead`, never raw herdr pane close/kill surgery, which strands the endpoint binding.
 
 Treat the digest's endpoint result as a presence signal, not proof that the task's work or validation run is gone.
@@ -44,7 +44,7 @@ A HERDR endpoint that is not merely idle but destroyed - a pane or workspace rem
 That relaunch proves the endpoint is destroyed before it rebinds, so a Herdr server that was merely stopped is adopted back rather than duplicated.
 On tmux there is no reclaim: a task record carries no socket identity for its endpoint, so a `missing` window cannot be told apart from one on a tmux server this seat cannot address, and both `exit` and `relaunch` refuse.
 Do not work around either refusal by respawning - it means a live agent may still hold that worktree.
-That reclaim is the owning home's operation only, and a squad lead is the one exception: recover it through `bin/jg-spawn.sh <id> --squad-lead` as above.
+That reclaim is the owning home's operation only, and a Squad Lead is the one exception: recover it through `bin/jg-spawn.sh <id> --squad-lead` as above.
 Do not use a fresh generic spawn while the recorded worktree is unaccounted for, because allocating another worktree can split one task across two copies.
 If the worktree or ownership cannot be reconciled safely, leave all state intact and report the task failed or blocked with the conflicting evidence.
 

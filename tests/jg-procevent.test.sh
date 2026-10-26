@@ -17,6 +17,15 @@ set -u
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+# Lavish's synchronous reply receipt is gated by the floor in toolchain.versions, so the
+# reply-refusal fixture below reports that pinned build rather than a version under the floor.
+# shellcheck source=bin/jg-pin-lib.sh
+. "$ROOT/bin/jg-pin-lib.sh"
+JG_FAKE_LAVISH_AXI_VERSION=$(jg_pin_version lavish-axi) || JG_FAKE_LAVISH_AXI_VERSION=0.1.93
+export JG_FAKE_LAVISH_AXI_VERSION
+# The patch release one step below that floor, which is the legacy poll-reply case.
+LAVISH_AXI_BELOW_FLOOR=$(awk -F. '{ printf "%s.%s.%d", $1, $2, $3 - 1 }' <<<"$JG_FAKE_LAVISH_AXI_VERSION")
+export LAVISH_AXI_BELOW_FLOOR
 TMP_ROOT=$(jg_test_tmproot jg-procevent-tests)
 export JG_PROCEVENT_CLAIM_ROOT="$TMP_ROOT/claims"
 export LAVISH_AXI_STATE_DIR="$TMP_ROOT/lavish-state"
@@ -4657,7 +4666,8 @@ PATH="$LIVE/bin:$PATH" JG_HOME="$LIVE/home" \
   "$ROOT/bin/jg-procevent-lavish.sh" retire "$live_art" >/dev/null 2>&1 || true
 pass "re-arm over a live earlier listener reports it still serving the board"
 
-# Old compatible Lavish versions keep using their existing poll reply path.
+# Old compatible Lavish versions keep using their existing poll reply path: one patch
+# release below the pinned floor, which moves with toolchain.versions.
 LEGACY="$TMP_ROOT/legacy-reply"
 mkdir -p "$LEGACY/bin" "$LEGACY/home/state"
 export LEGACY
@@ -4665,7 +4675,7 @@ cat > "$LEGACY/bin/lavish-axi" <<'SH'
 #!/usr/bin/env bash
 set -eu
 case "${1-}" in
-  --version) printf '0.1.79\n' ;;
+  --version) printf '%s\n' "${LAVISH_AXI_BELOW_FLOOR:-0.1.92}" ;;
   poll)
     [ "${3-}" = --agent-reply ] || exit 3
     printf '%s\n' "$4" > "$LEGACY/reply"
@@ -4704,7 +4714,7 @@ cat > "$REPLY_FAIL/bin/lavish-axi" <<'SH'
 #!/usr/bin/env bash
 set -eu
 case "${1-}" in
-  --version) printf '0.1.80\n' ;;
+  --version) printf '%s\n' "${JG_FAKE_LAVISH_AXI_VERSION:-0.1.93}" ;;
   reply) printf 'simulated reply timeout\n' >&2; exit 1 ;;
   poll) : > "$REPLY_FAIL/polled"; exit 0 ;;
   *) exit 2 ;;
@@ -4734,7 +4744,7 @@ cat > "$REPLY_FAIL/bin/lavish-axi" <<'SH'
 #!/usr/bin/env bash
 set -eu
 case "${1-}" in
-  --version) printf '0.1.80\n' ;;
+  --version) printf '%s\n' "${JG_FAKE_LAVISH_AXI_VERSION:-0.1.93}" ;;
   reply) printf '%s\n' "$(cat -- "$4")" >> "$REPLY_FAIL/replies" ;;
   poll) while [ ! -e "$REPLY_FAIL/release" ]; do sleep 0.02; done; exit 1 ;;
   *) exit 2 ;;
@@ -4791,7 +4801,7 @@ cat > "$POLL_REPLY/bin/lavish-axi" <<'SH'
 #!/usr/bin/env bash
 set -eu
 case "${1-}" in
-  --version) printf '0.1.80\n' ;;
+  --version) printf '%s\n' "${JG_FAKE_LAVISH_AXI_VERSION:-0.1.93}" ;;
   reply)
     [ "${3-}" = --agent-reply-file ] || exit 2
     [ "$(cat -- "$4")" = 'direct poll reply' ] || exit 3
@@ -4872,7 +4882,7 @@ cat > "$DRAIN/bin/lavish-axi" <<'SH'
 #!/usr/bin/env bash
 set -eu
 case "${1-}" in
-  --version) printf '0.1.80\n' ;;
+  --version) printf '%s\n' "${JG_FAKE_LAVISH_AXI_VERSION:-0.1.93}" ;;
   reply)
     [ "${3-}" = --agent-reply-file ] || exit 2
     printf '%s\n' "$(cat -- "$4")" >> "$DRAIN/replies"
