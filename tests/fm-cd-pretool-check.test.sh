@@ -183,7 +183,7 @@ run_matrix_entry() {
     return
   fi
 
-  [ "$rc" -eq 2 ] || fail "$id via $entry must deny, got exit $rc"
+  [ "$rc" -eq 3 ] || fail "$id via $entry must deny, got exit $rc"
   jq -e '.hookSpecificOutput.permissionDecision == "deny" and (.systemMessage | test("\\[persistent-cd\\]"))' "$err_file" >/dev/null 2>&1 \
     || fail "$id via $entry deny must carry the persistent-cd reason code on stderr: $(cat "$err_file")"
   if [ "$entry" = claude ]; then
