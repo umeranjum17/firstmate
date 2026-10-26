@@ -49,18 +49,22 @@ owner-rules: mode no-mistakes needs one listed risk reason (release, security, m
 
 Fix: if the lane truly is one of those, add exactly one body line `risk: <reason>` to the item (reason is one of the six listed). Otherwise brief with `--mode direct-PR`.
 
-Refusal at merge time (`$what` is the PR URL, or `local merge <head>` with no PR):
+Refusal at merge time (`$what` is the PR URL, or `local merge <head>` with no PR, `$2` the worktree, `$3` the merge head):
 
 ```
-owner-rules: no passed-proof receipt for $what; run the done-done check and post the evidence to the sign-off Evidence tab first
+owner-rules: no passed-proof receipt for $what: seal a clean done-done run at $3 with: cd '$2' && done-done run -- <the command that proves it>
 ```
 
-Fix: run the done-done check on the real journey at the merge head and post its evidence, then merge again. A merge whose Checks block says `screen: none` is exempt from this receipt only.
+A merge that names no worktree reads `... at $3 with: done-done run -- <the command that proves it> in the copy at $3` instead.
+
+Fix: run that command at the merge head, then merge again.
+A merge whose Checks block says `screen: none` still needs that sealed receipt for its text-only card, with no capture.
+The gate opens with one line saying so.
 
 Refusal (`$src` is the PR URL, `$3` the merge head) when checks-lint has no PASS row for the PR head in `data/checks-gate.log`:
 
 ```
-owner-rules: no checks-lint PASS for $src at $3; run FM_HOME=$FM_HOME <XDG_DATA_HOME>/fm-merge-on-green/checks-lint.sh $src <evidence folder> first
+owner-rules: no checks-lint PASS for $src at $3; run FM_HOME=$FM_HOME <XDG_DATA_HOME>/fm-merge-on-green/checks-lint.sh $src $FM_HOME/data/<id> then merge again
 ```
 
 Fix: run that command (it logs the row), then merge again.
