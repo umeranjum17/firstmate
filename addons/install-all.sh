@@ -1,0 +1,163 @@
+#!/usr/bin/env bash
+# install-all.sh - the one entry point that installs every add-on in this catalog for one fleet home.
+#
+# Usage: install-all.sh [--dry-run] <fm-home>        (FM_HOME may name the home instead)
+#
+# Each add-on keeps its own installer and its own contract: this script only runs them in a working order, gives each
+# the argument shape it documents, and names the add-ons that have no installer instead of inventing one. An add-on
+# without an installer is a dormant copy, a fork-hook seam, or a hand-wired one, and its setup lives in its own README.
+# --dry-run reaches every installer that supports it; one that does not is printed as a would-run line and not run.
+# Nothing here writes the home's files itself, so a rerun is a rerun of each installer's idempotent install. Two add-ons
+# share one home file (`git-identity` and `pane-titles` own `config/launch-env-hook`; `owner-rules` and `owner-guard` own
+# `config/merge-gate`), and the one that chains the other is installed last: an installer that refuses to re-chain a
+# foreign hook says so and this script names it, rather than pretending the rerun was clean.
+set -uo pipefail
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+
+dry=0
+home=${FM_HOME:-}
+for a in "$@"; do
+  case $a in
+    --dry-run) dry=1 ;;
+    -h | --help) sed -n '2,10p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -*) printf 'install-all: unknown option %s\n' "$a" >&2; exit 2 ;;
+    *)
+      if [ -n "$home" ] && [ "$home" != "$a" ]; then
+        printf 'install-all: one home per run (got %s and %s)\n' "$home" "$a" >&2
+        exit 2
+      fi
+      home=$a
+      ;;
+  esac
+done
+if [ -z "$home" ]; then
+  printf 'install-all: name the home: install-all.sh [--dry-run] <fm-home> (or set FM_HOME)\n' >&2
+  exit 2
+fi
+if [ ! -d "$home" ]; then
+  printf 'install-all: no such home directory: %s\n' "$home" >&2
+  exit 2
+fi
+export FM_HOME=$home
+
+# name:kind, in a working order (route-change reads pipeline-quota-failover's installed wrapper; the guards come
+# before anything that chains to them; the home-wide account pool comes before the checks that read it).
+#   plain       install.sh [--dry-run]
+#   home        install.sh [--dry-run] <fm-home>
+#   env         FM_HOME=<fm-home> install.sh [--dry-run]
+#   all         install.sh [--dry-run] --all <fm-home>   (the home and every active local secondmate home it lists)
+#   home-nodry, all-nodry   the same without --dry-run support: printed, not run, under --dry-run
+#   verify      install.sh <fm-home> is that add-on's wiring check, not an install: its incomplete report is printed
+#               and never fails this run
+plan=(
+  kill-guard:plain
+  read-guard:plain
+  delete-guard:home
+  host-memory:plain
+  pipeline-literal-delete:plain
+  pipeline-quota-failover:plain
+  route-change:plain
+  account-pool:verify
+  claude-accounts:home-nodry
+  quota-axi-pool:plain
+  git-identity:home
+  fleet-flow:plain
+  fleet-pulse:home
+  fleet-stall:env
+  key-in-env-check:env
+  zai-quota-check:env
+  nm-drain:home
+  merge-on-green:home
+  quota-failover:all
+  limit-prompt-move:all-nodry
+  model-gate:env
+  owner-guard:home
+  owner-rules:home
+  pane-titles:home
+  backlog-lock-reclaim:home
+  bearings-board:home
+  parked-homes:verify
+  sentinel:home
+  supervisor-guard:home
+  task-priority:plain
+  tickets-sync:env
+  lookout-adapter:plain
+)
+
+failed=''
+installed=0
+for entry in "${plan[@]}"; do
+  name=${entry%%:*}
+  kind=${entry##*:}
+  script=$here/$name/install.sh
+  if [ ! -f "$script" ]; then
+    printf 'install-all: %s has no installer at %s\n' "$name" "$script" >&2
+    failed="$failed $name"
+    continue
+  fi
+  args=()
+  dryable=1
+  case $kind in
+    plain) ;;
+    home) args=("$home") ;;
+    env) ;;
+    all) args=(--all "$home") ;;
+    home-nodry) args=("$home") dryable=0 ;;
+    all-nodry) args=(--all "$home") dryable=0 ;;
+    verify) args=("$home") ;;
+    *) printf 'install-all: %s has an unknown kind %s\n' "$name" "$kind" >&2; failed="$failed $name"; continue ;;
+  esac
+  # A wiring check reports the home's state; an incomplete home is information, not a failed install.
+  if [ "$kind" = verify ]; then
+    printf '\n== %s: bash %s/install.sh %s\n' "$name" "$name" "$home"
+    bash "$script" "$home" || printf 'install-all: %s wiring incomplete (see the lines above; it changes nothing)\n' "$name"
+    continue
+  fi
+  # Lookout replaces the dashboard service and needs its own clone; without it there is nothing to point at.
+  if [ "$name" = lookout-adapter ] && [ -z "${LOOKOUT_DIR:-}" ]; then
+    printf '\n== %s: skipped, set LOOKOUT_DIR to the Lookout clone to install it\n' "$name"
+    continue
+  fi
+  [ "$dry" = 0 ] || args=(--dry-run "${args[@]}")
+  printf '\n== %s: bash %s/install.sh%s\n' "$name" "$name" "${args[*]:+ ${args[*]}}"
+  if [ "$dry" = 1 ] && [ "$dryable" = 0 ]; then
+    printf 'would-run %s/install.sh%s (this installer has no --dry-run of its own)\n' "$name" "${args[*]:+ ${args[*]//--dry-run/}}"
+    continue
+  fi
+  if ! bash "$script" "${args[@]}"; then
+    printf 'install-all: %s failed\n' "$name" >&2
+    failed="$failed $name"
+    continue
+  fi
+  installed=$((installed + 1))
+done
+
+# owner-guard is installed by its daily owner-details scan too: the catalog's install path ran that second installer.
+scan=$here/owner-guard/install-scan.sh
+if [ -f "$scan" ]; then
+  printf '\n== owner-guard scan: bash owner-guard/install-scan.sh%s\n' "$([ "$dry" = 0 ] || printf ' --dry-run')"
+  if [ "$dry" = 1 ]; then
+    bash "$scan" --dry-run "$home" || { printf 'install-all: owner-guard scan failed\n' >&2; failed="$failed owner-guard-scan"; }
+  else
+    bash "$scan" "$home" || { printf 'install-all: owner-guard scan failed\n' >&2; failed="$failed owner-guard-scan"; }
+  fi
+fi
+
+# Everything else in the catalog on purpose: no installer to run, and saying so beats pretending to wire it in.
+printf '\n== no installer to run (setup lives in the add-on):'
+missing=0
+for dir in "$here"/*/; do
+  name=$(basename "$dir")
+  case $name in docs | .agents | .github) continue ;; esac
+  [ -f "$dir/install.sh" ] && continue
+  printf ' %s' "$name"
+  missing=$((missing + 1))
+done
+printf '\n   %s add-ons; docs/addons-reference.md#install and each README own their wiring.\n' "$missing"
+
+printf '\ninstall-all: %s installed, %s without an installer' "$installed" "$missing"
+if [ -n "$failed" ]; then
+  printf ', failed:%s\n' "$failed" >&2
+  exit 1
+fi
+printf '.\n'

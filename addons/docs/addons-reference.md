@@ -16,9 +16,6 @@ One line per add-on, with how it wires in. `<home>` is your home folder for the 
 - `ask-default` — owns owner-only ask authoring (`python3 ask-default/bin/fm-captain-ask.py --help`; after merge, `install <home>` wires the config shim) and an unanswered ask falls back to its pre-declared safe default instead of blocking the home. Needs a fork hook (FORK-EXIT.md).
 - `backlog-lock-reclaim` — reclaims a 0-byte `<home>/data/backlog.md.lock` left by a dead tasks-axi writer, once it is older than 60 s and no process has it open; until then every backlog write fails LOCKED. Wire in: `backlog-lock-reclaim/install.sh <home>`.
 - `claude-accounts` — one quota view of every signed-in Claude account (5-hour and 7-day left), shown on the dashboard and written for dispatch; new Claude workers start on the account with the most runway. Wire in: `claude-accounts/install.sh <home>` plus the reader on a timer; see `claude-accounts/README.md`.
-- `claude-model-guard` — keeps agent runs off Fable (Sonnet is allowed): the fable alias resolves to Haiku, full Fable ids are refused. Wire in: `claude-model-guard/install.sh`.
-- `claude-quota` — alarms when the whole Claude account pool (every `claude-accounts` account together) will run dry before its soonest 5-hour or weekly reset. Wire in: `claude-quota/install.sh <home>`.
-- `codex-guard` — runs the delete, kill and read guards before every Codex shell command; Codex workers start with hooks off, so Codex's own shell environment carries it. Wire in: `codex-guard/install.sh` after the guards; remove: `codex-guard/uninstall.sh`.
 - `delete-guard` — stops any agent from recursively deleting `/` or a home folder; a block alerts you and is final. Wire in: `delete-guard/install.sh <home>`.
 - `fleet-contract-check` — runs each real cross-repo call (dispatch-resolve, owner-guard, checks-lint) in a throwaway HOME and names the caller that breaks. Nothing to install: run `fleet-contract-check/fleet-contract-check`.
 - `fleet-dashboard` — the read-only fleet dashboard: board, charts, kanban, insights, ship view. Served through the fork shim (FORK-EXIT.md).
@@ -33,13 +30,12 @@ One line per add-on, with how it wires in. `<home>` is your home folder for the 
 - `kill-guard` — protects critical services and interactive shells, refuses pattern kills, and permits audited fleet-process kills by verified primary Main; other callers keep descendant/worktree ownership (see [rules and limits](../kill-guard/README.md)). Record device launches with `node guard.mjs own start <serial> -- <command>`; records bind device PID to start time and serial, while unrecorded legacy device processes stay refused (stop a stuck one via its owned host adb parent or have the lead stop it). A block is final, except a kill whose PID the shell sets (`$pid`, `$!`, `%1`), which asks for the literal PID. Wire in: `kill-guard/install.sh`; remove: `kill-guard/uninstall.sh`.
 - `repo-guard` — refuses any create, comment, review or push aimed at a repository outside its allow-list (`umeranjum17/*` by default), and never lets a fork clone fall back to its parent repository. Wire in: `repo-guard/install.sh`; remove: `repo-guard/install.sh --uninstall`.
 - `read-guard` — blocks agent tool access to provider logins, BYOKit person credentials and no-mistakes config; metadata-only `ls`, `stat`, `test` and `[` checks are allowed. Process/library reads are unaffected. Wire in: `read-guard/install.sh`; remove: `read-guard/uninstall.sh`.
-- `glm-queue` — one local line in front of the GLM API, so parallel calls queue instead of hitting rate limits. Wire in: `glm-queue/install.sh`, then point pi at the queue.
 - `host-memory` — a gate that makes heavy jobs wait for host memory instead of crashing. Wire in: `host-memory/install.sh`.
 - `brief-inherit` — shared worker instructions (`config/brief-include-shared.md`) reach every home's briefs. Needs fork hooks (FORK-EXIT.md); step A only.
-- `local-qwen-tuning` — operator reference for the local Qwen model server: launch, tuning, limits, rollback. Reference only, nothing to install.
 - `lead-wake` — wakes a secondmate home that sits below its lane floor with ready backlog work, and withdraws the wake when the work is gone, and rings a stalled lead naming its frozen row. Needs fork hooks (FORK-EXIT.md).
 - `merge-card` — runs the merge gate and posts one evidence card per merge to the sign-off board. Wire in: config shims, see Install.
 - `merge-on-green` — merges a PR you allowed to auto-merge once its checks are green and its proof receipt passes. Wire in: `merge-on-green/install.sh <home>`.
+- `model-gate` — one allow-list per provider: a model the list does not carry cannot be picked, spawned or paid for. Wire in: `FM_HOME=<home> model-gate/install.sh`; see `model-gate/README.md`.
 - `nm-drain` — updates the shared pipeline service through a planned drain, never over live runs. Wire in: `nm-drain/install.sh <home>`.
 - `owner-rules` - enforces owner asks, backlog hierarchy and risk reasons at brief creation, plus [Lavish refusals for secondmate notes and merge-card posts](../owner-rules/README.md#lavish-refusal-secondmate-notes-and-merge-card-posts).
   Wire in: `owner-rules/install.sh <home>`; brief checks need the brief-inherit seam.
@@ -65,23 +61,17 @@ Every change still on the fork that is not upstream yet, with its exit path and 
 
 ## Install
 
-There is no install-all script yet. The shortest real install for the add-ons that work on an unmodified install of the host tool is this loop, run from a clone of this repo (any installer accepts `--dry-run` first to print what it would change and write nothing):
+`install-all.sh` is the one entry point: it installs every add-on in this catalog that has an installer, in dependency order, and names the ones that wire in by hand. Run it from a clone of this repository with `FM_HOME` naming your home folder for the fleet manager:
 
 ```sh
 git clone https://github.com/umeranjum17/juggernaut && cd juggernaut/addons
 export FM_HOME=~/firstmate    # your home folder for the fleet manager
-for d in pipeline-literal-delete pipeline-quota-failover host-memory fleet-flow glm-queue route-change claude-model-guard; do "$d/install.sh"; done
-for d in delete-guard claude-quota merge-on-green git-identity nm-drain owner-guard pane-titles; do "$d/install.sh" "$FM_HOME"; done
-read-guard/install.sh
-codex-guard/install.sh
-repo-guard/install.sh
-FM_HOME="$FM_HOME" fleet-stall/install.sh
-FM_HOME="$FM_HOME" owner-guard/install-scan.sh
-FM_HOME="$FM_HOME" zai-quota-check/install.sh
-quota-failover/install.sh --all "$FM_HOME"   # also each active local secondmate home in data/secondmates.md
+bash install-all.sh --dry-run "$FM_HOME"   # every command it would run, writing nothing
+bash install-all.sh "$FM_HOME"
 ```
 
-`route-change` must come after `pipeline-quota-failover` from the same clone (the loop's order). To route GLM calls through the queue, set `.providers.zai.baseUrl` to `http://127.0.0.1:8787/api/coding/paas/v4` in `~/.pi/agent/models.json`; new pi sessions pick it up. `git-identity` prints a note until the fork's launch-env hook is merged — until then lanes stay unguarded.
+It runs `route-change` after `pipeline-quota-failover` from the same clone, as that add-on requires, and `owner-guard/install-scan.sh` once the guards are in. An add-on with no installer (a dormant copy, a fork-hook seam, or a hand-wired one like `merge-card`) is listed at the end with where its setup lives, and nothing is invented for it. `--dry-run` goes to every installer; each one writes nothing.
+`git-identity` prints a note until the fork's launch-env hook is merged — until then lanes stay unguarded.
 
 The delete, kill and read guards put their Claude hook in `~/.claude` and in every Claude account folder listed in the account pool's registry (`~/.muxr/plans/accounts-v1.json`), since a worker started with `CLAUDE_CONFIG_DIR` reads only that folder's settings: rerun them after adding an account.
 
@@ -102,11 +92,9 @@ owner-guard/install.sh "$FM_HOME"   # re-chain: the owner-details merge scan run
 One command per add-on, from the repo root — all of these were run and pass:
 
 ```sh
-bash claude-quota/tests/claude-quota.test.sh
-bash claude-quota/install.sh --dry-run <home>            # what it would write; same shape as every --dry-run below
 bash delete-guard/install.sh --dry-run <home>
+bash model-gate/tests/model-gate.test.sh
 bash read-guard/tests/read-guard.test.sh
-bash claude-model-guard/install.sh --dry-run
 bash zai-quota-check/tests/zai-quota-check-e2e.sh
 bash pipeline-quota-failover/tests/switch-route.test.sh
 bash pipeline-quota-failover/tests/pi-quota-failover-e2e.sh
@@ -115,7 +103,6 @@ bash pipeline-literal-delete/tests/pipeline-literal-delete.test.sh
 bash quota-failover/tests/quota-failover-e2e.sh
 bash limit-prompt-move/tests/limit-prompt-move-e2e.sh
 FM_TEST_FORK=<fork checkout> bash quota-failover/tests/install.test.sh
-bash glm-queue/tests/glm-queue.test.sh
 bash route-change/tests/route-change-e2e.sh
 bash merge-on-green/tests/merge-on-green.test.sh
 bash merge-on-green/tests/no-old-receipt-path.test.sh
@@ -144,10 +131,8 @@ The dormant and fork-hook add-ons are not wired into an unmodified install of th
 ## Remove
 
 ```sh
-claude-model-guard/install.sh --restore                  # removes exactly its keys and hook entries
 pipeline-quota-failover/install.sh --restore             # removes the wrapper and its config key
 "$FM_HOME/bin/fm-check-unregister.sh" quota-failover-watch
-"$FM_HOME/bin/fm-check-unregister.sh" claude-quota       # then rm "$FM_HOME/state/claude-quota.check.sh" ~/.local/share/fm-claude-quota -r
 "$FM_HOME/bin/fm-check-unregister.sh" merge-on-green     # then rm "$FM_HOME/state/merge-on-green.check.sh" ~/.local/share/fm-merge-on-green -r
 "$FM_HOME/bin/fm-check-unregister.sh" 0-nm-drain         # then rm "$FM_HOME/state/0-nm-drain.check.sh" ~/.local/share/fm-nm-drain -r
 "$FM_HOME/bin/fm-check-unregister.sh" fleet-stall        # then rm "$FM_HOME/state/fleet-stall.check.sh" ~/.local/share/fm-fleet-stall -r
@@ -157,7 +142,6 @@ owner-guard/install.sh --uninstall "$FM_HOME"            # owner-guard: also res
 repo-guard/install.sh --uninstall                       # repo-guard: puts the real gh and gh-axi back; an extended allow-list stays
 pane-titles/uninstall.sh "$FM_HOME"                      # pane-titles: restores the home's previous launch-env-hook
 rm "$FM_HOME/config/parked-homes"                        # parked-homes: a missing file parks nothing
-systemctl --user disable --now fm-glm-queue && rm -r ~/.local/share/fm-glm-queue ~/.config/systemd/user/fm-glm-queue.service   # glm-queue
 rm -r ~/.local/share/fm-route-change ~/.local/bin/route-change                  # route-change
 rm -r ~/.local/share/fm-host-memory ~/.local/share/fm-fleet-flow                # host-memory, fleet-flow
 rm -r ~/.local/share/fm-git-identity                     # git-identity: also restore the backed-up "$FM_HOME/config/launch-env-hook"
@@ -392,14 +376,6 @@ The state defaults to `${XDG_STATE_HOME:-$HOME/.local/state}/tailscale-resilienc
 
 The dead-display case is detected, recorded and alerted but not healed; a heal for it is a later slice.
 
-### claude-model-guard
-
-Claude Code never starts Fable; Sonnet is allowed (the captain lifted the Sonnet ban on 2026-10-19).
-`claude-model-guard/install.sh [--dry-run] [--restore] [--config-dir <dir>]` edits `<dir>/settings.json` (default `${CLAUDE_CONFIG_DIR:-~/.claude}`) at key level, with a timestamped backup, so every Fable form ends on Haiku or is refused, never on another model: `env.ANTHROPIC_DEFAULT_FABLE_MODEL` = `claude-haiku-5-5`, so the `fable` alias (a `--model fable` launch, an agent's `model: fable`) runs on Haiku (a reinstall deletes the old `env.ANTHROPIC_DEFAULT_SONNET_MODEL` mapping to Haiku, so the `sonnet` and `opusplan` aliases run on Sonnet again); and a `UserPromptSubmit` hook plus a `PreToolUse` hook for `Agent|Task` running `refuse-model.sh` (copied to `${XDG_DATA_HOME:-~/.local/share}/fm-claude-model-guard`), which refuses the prompt or the subagent call before any request is sent when a full Fable id such as `claude-fable-5-1` comes from `--model`, `ANTHROPIC_MODEL`, a settings `model` key or an Agent call. It prints only its own keys and never reads or touches credentials; `--restore` removes exactly its keys and hook entries.
-Claude Code itself cannot refuse a full id from user settings: `availableModels` and the managed-only `deniedModels` both fall back to the default model (Opus), and `modelOverrides` does not remap first-party ids. Not covered: a launch with `--setting-sources` that leaves out `user` (the `fm-live-lab.sh` primary uses `project,local`) loads no user settings, so neither the mapping nor the hook applies there; a session with its own `CLAUDE_CONFIG_DIR` needs the installer run with `--config-dir` for that dir. The hook fails open if it cannot run.
-
-Test: `claude-model-guard/tests/claude-model-guard-e2e.sh` installs into a throwaway HOME with no credential and drives the real `claude` binary: each `--model` (the sonnet and fable aliases, full Sonnet and Fable ids, `--model=`, `ANTHROPIC_MODEL`, a settings `model`, opus, haiku, none) is checked against the model Claude Code dispatches to, or the hook refusal, in its debug log, so no API call is made and a refused model can never run; the Agent-call check feeds the hook a tool input; plus key-only output, other settings kept, idempotence, backup, upgrade of an old install that mapped the sonnet alias to Haiku, and restore.
-
 ### merge-on-green
 
 A yolo task's PR merges itself once the required checks are green, instead of waiting for the lead to notice and merge (about 21 minutes per change).
@@ -417,22 +393,6 @@ Install with `zai-quota-check/install.sh [--dry-run]` and `FM_HOME` set: it copi
 
 Test: `zai-quota-check/tests/zai-quota-check-e2e.sh` drives the real check in the file-argument mode over fixture sequences: with the week-ahead condition true all week and the 5 h window above 30%, fp 90->80->...->40 wakes once (the old signature woke on every run); with the 5 h condition each 10% step wakes once (29, 19, 9); a week 50->40->30 step wakes once per step.
 
-### claude-quota
-
-`claude-quota/claude-quota.check.sh` alerts you when the Claude account pool as a whole burns ahead of time.
-It reads every pool account from the `claude-accounts` reader's `state/claude-accounts.json`, so one low account is no alarm: new lanes and relaunches move to another account.
-For each window (5 h, week) it adds up the accounts' percent left, takes the pool's burn rate over the last 1-5 h of its own history (counted from after the last reset), and wakes when that sum runs out before the soonest reset among the accounts, again on each 10% step of the pool's mean left.
-The wake names each account's share, the burn and the account that resets first, with the action: new lanes pick the pool account with the most runway; relaunch --account next on a limit; never usage credits.
-A reading file that is missing, older than 30 min, or with any account unread prints a diagnostic on stderr and gives no verdict, so it never wakes falsely; the watcher drops stderr, so run the check by hand to see it.
-It reads at most once per 10 min.
-`$0 <claude-accounts-json-file>` is the test mode: it reads the file, and `CQ_MARK` and `CQ_HIST` name the repeat-state and history files (default fresh temp files).
-
-Install with `claude-quota/install.sh [--dry-run] <main-fm-home>`: it copies the check to `${XDG_DATA_HOME:-~/.local/share}/fm-claude-quota/`, backs up a replaced `state/claude-quota.check.sh` as `<file>.bak-claude-quota-<epoch>`, writes that path as an exec shim (mode 700), and re-registers the `claude-quota` check with `bin/fm-check-register.sh`; idempotent.
-The live repeat state stays at `~/firstmate/state/.claude-quota.last`, the file the state copy used.
-
-Test: `claude-quota/tests/claude-quota.test.sh` drives the real check over sample pool readings: one account low and the others fine gives no wake; all accounts together short of the soonest reset give one wake with the action text and no other route, the same step stays quiet and the next step wakes again; an account with no reading, an hour-old file or no file gives a stderr diagnostic and no wake; live mode reads the home's file and holds a second read inside 10 min.
-It then drives `install.sh` against a throwaway home, as `--dry-run` and as a real install and rerun.
-
 ### fleet-stall
 
 `fleet-stall/fleet-stall-check` is a shippable version of a proven state check: it alerts at most every 45 min when a home lead is idle while it has 0 busy lanes and ready work, or while live workers have sat more than 45 min in a `paused:` that waits on the lead; the missed-wake guard, fleet-pause marker, zero-busy guard, live-lane filter and `slot` exclusion are unchanged. Fix over the state copy: the paused-reason word list is matched against the reason text only, with absolute paths, URLs, `key=value` tokens (`evidence=...`) and `[at=...]`/`[key=...]` stamps removed first. Before it, a treehouse evidence path matched `firstmate`, so workers waiting on their own CI or emulator runs counted as waiting on the lead. `FM_STALL_ROOT` (the main home) and `FM_STALL_BASE` (the leads' homes) default to the live paths and exist for the fixture test.
@@ -441,16 +401,22 @@ Install with `fleet-stall/install.sh [--dry-run]` and `FM_HOME` set: it copies t
 
 Test: `fleet-stall/tests/fleet-stall-e2e.sh` runs the real check against a fixture fleet (the main home's lead records, two fixture homes, a stub herdr showing both leads idle): the false-stall lines no longer count, while `waiting on firstmate for the decision` and `awaiting main instruction` still do. `FLEET_STALL_BIN` runs another copy against the same fixture.
 
-### glm-queue
+### model-gate
 
-Every pi GLM call waits in one local line instead of drawing the provider's "Rate limit reached for requests" refusal and backing off.
-`glm-queue/glm-queue.mjs` is a Node proxy on `127.0.0.1` (port `GLM_QUEUE_PORT`, default 8787) that forwards to `https://api.z.ai` (`GLM_QUEUE_UPSTREAM`) with at most `GLM_QUEUE_MAX` calls in flight (default 8) and a FIFO line for the rest.
-Method, path, headers (Authorization included) and body pass through unchanged, responses and SSE streams are piped back as they arrive, and a caller that leaves while waiting hands its slot on unused. An upstream request that goes idle is cut after 5 minutes, and an upstream that dies mid-response (a truncated body, say) cuts the client connection immediately so the caller sees the failure and re-queues instead of hanging; its slot is freed at once.
-It logs only one line per call to the journal: upstream status, ms waited, ms in flight, and the in-flight and waiting counts (`journalctl --user -u fm-glm-queue`).
+One JSON allow-list per provider (`${FM_HOME:-~/firstmate}/config/model-allow-list.json`) is the only owner of what a
+provider may run: opencode is written to offer exactly the listed names, `fm-model-gate check <provider> <model>` exits
+non-zero for an off-list one with one line naming the provider, the model and the file, `account-pool`'s `fm-model-pool`
+calls that check before it emits a route, and the fleet check restores opencode's whitelist if an update drops it, then
+warns once per off-list sighting with the credit left. A provider the file does not name is not limited.
+Install with `FM_HOME=<home> model-gate/install.sh [--dry-run]`; `--remove` takes the gate, the whitelist and the check
+away and keeps the list. [`model-gate/README.md`](../model-gate/README.md) owns the seams, the watch and its limits.
 
-Install or update with `glm-queue/install.sh [--dry-run] [--max N] [--port P]`: it copies the proxy to `${XDG_DATA_HOME:-~/.local/share}/fm-glm-queue/`, writes the `fm-glm-queue` systemd user service, and restarts it only when either file changed (a restart cuts calls in flight); it is idempotent and `--dry-run` writes nothing.
-pi uses the queue once `.providers.zai.baseUrl` in `~/.pi/agent/models.json` is `http://127.0.0.1:8787/api/coding/paas/v4`; new pi sessions pick it up, running ones keep the direct URL.
-Test: `glm-queue/tests/glm-queue.test.sh` runs the proxy against a stub upstream: 20 parallel clients through N=4 all complete unchanged while the upstream never sees more than 4 at once, a streamed response reaches the client before it ends, and a truncated Content-Length response fails the client in milliseconds with its slot freed for the next call.
+Test: `model-gate/tests/model-gate.test.sh` runs against a throwaway HOME, XDG paths and firstmate home with a fixture
+opencode config, a stub curl for the usage and balance endpoints and a fixture key: the whitelist written at key level
+with other providers and keys untouched, idempotence and removal, the check's allow/pinned-tag/off-list verdicts and its
+one-line refusal, the list edits, the pool refusing an off-list route for the next one, the launch hook refusing an
+explicit off-list `--model` and staying a no-op with no gate reachable, the watch's one warning per sighting, its
+cadence throttle and the whitelist repair, and the key never printed.
 
 ### git-identity
 

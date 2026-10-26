@@ -51,6 +51,9 @@ Each job names one starting add-on.
 bash addons/host-memory/install.sh
 ```
 
+Every add-on with an installer at once, from `addons/`: `bash install-all.sh [--dry-run] "$FM_HOME"`.
+The [reference](docs/addons-reference.md#install) owns that entry point.
+
 **Keep work moving** — [Stall alerts](docs/addons-reference.md#fleet-stall); also quota recovery and account routing.
 
 ```sh
@@ -71,19 +74,19 @@ bash \
 bash addons/fleet-flow/install.sh
 ```
 
-These are entry points, not install-all bundles.
+These are per-job entry points; `install-all.sh` installs every add-on with an installer.
 Preview an install by putting `--dry-run` immediately after the script name.
 The [reference](docs/addons-reference.md) covers hooks, platform requirements, removal, and the additional add-ons in each job.
 
 ## Proof you can inspect
 
-The [pull-request CI workflow](.github/workflows/addons-ci.yml) runs shell checks and executable integration journeys against disposable homes.
+The [pull-request CI workflow](../.github/workflows/addons-ci.yml) runs shell checks and executable integration journeys against disposable homes.
 For example, [the memory-gate journey](host-memory/tests/fm-mem-gate.test.sh) exercises waiting and release under changing memory readings without starting a heavy job.
 The [Lookout Overview hero journey](docs/capture-lookout-hero.sh) captures phone and desktop views from a live Lookout (or from lookout-adapter into a Lookout clone).
 
 ## Setup and limits
 
-Install from the GitHub clone; add-on installers are under `addons/`, and there is no install-all command.
+Install from the GitHub clone; add-on installers are under `addons/`, and `bash addons/install-all.sh [--dry-run] "$FM_HOME"` runs every one of them from that directory.
 Some add-ons need fork-side hooks or remain dormant copies; check [FORK-EXIT.md](FORK-EXIT.md) before choosing one.
 Installers can change hooks, configuration, or user services; read the selected add-on's setup before applying it.
 
